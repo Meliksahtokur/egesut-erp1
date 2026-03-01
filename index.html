@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ege Süt">
+<meta name="theme-color" content="#111a0a">
+<title>Ege Süt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#111a0a;--bg2:#1a2812;--bg3:#22361a;
+  --card:#f7f4ee;--card2:#edeae2;--card3:#e2ddd3;
+  --ink:#1a1f14;--ink2:#3d4a32;--ink3:#6b7a5c;
+  --green:#4e9a2a;--green2:#6abf3d;--green3:#98d96e;
+  --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;
+  --nav:64px;--safe:env(safe-area-inset-bottom,0px);--r:16px;--r2:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none;background:var(--bg)}
+body{font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);overflow:hidden;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-family:inherit}
+
+/* SHELL */
+#shell{display:flex;flex-direction:column;height:100dvh}
+#topbar{background:var(--bg);padding:14px 16px 10px;padding-top:max(14px,env(safe-area-inset-top,14px));display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.logo{display:flex;align-items:baseline;gap:6px}
+.logo-main{font-size:1.3rem;font-weight:800;color:#fff;letter-spacing:-.02em}
+.logo-main em{color:var(--green2);font-style:normal}
+.logo-sub{font-size:.6rem;font-weight:600;color:var(--ink3);letter-spacing:.12em;text-transform:uppercase}
+#top-right{display:flex;align-items:center;gap:8px}
+
+/* SYNC STATUS BAR */
+#sync-bar{display:none;background:var(--amber);padding:6px 14px;flex-shrink:0;align-items:center;gap:8px}
+#sync-bar.on{display:flex}
+#sync-bar.syncing{background:var(--blue)}
+#sync-bar.ok{background:var(--green)}
+#sync-bar-txt{font-size:.72rem;font-weight:700;color:#fff;flex:1}
+#sync-now-btn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 10px;border-radius:12px;font-size:.68rem;font-weight:700;cursor:pointer}
+
+/* DOT */
+#dot{width:7px;height:7px;border-radius:50%;background:var(--green2);box-shadow:0 0 8px var(--green2);animation:blink 2.5s infinite;flex-shrink:0}
+#dot.off{background:var(--red2);box-shadow:0 0 8px var(--red2);animation:none}
+#dot.warn{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+#refbtn{background:rgba(106,191,61,.12);border:1px solid rgba(106,191,61,.2);color:var(--green3);padding:5px 13px;border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:.05em;cursor:pointer}
+
+/* PAGES */
+#pages{flex:1;overflow:hidden;position:relative}
+.pg{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;padding-bottom:calc(var(--nav) + var(--safe) + 8px)}
+.pg.on{display:block}
+.pg-inner{padding:12px}
+
+/* NAV */
+#nav{height:calc(var(--nav) + var(--safe));padding-bottom:var(--safe);background:var(--bg);border-top:1px solid var(--bg3);display:flex;flex-shrink:0}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:none;border:none;color:var(--ink3);cursor:pointer;position:relative;transition:color .15s;padding:6px 4px}
+.nb.on{color:var(--green2)}
+.nb.on::after{content:'';position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--green2);border-radius:0 0 4px 4px;box-shadow:0 1px 8px var(--green2)}
+.nb svg{width:23px;height:23px;stroke-width:1.8}
+.nb-lbl{font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.nbadge{position:absolute;top:5px;right:calc(50% - 20px);background:var(--red);color:#fff;font-size:.52rem;font-weight:800;min-width:16px;height:16px;border-radius:8px;padding:0 3px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+
+/* DASHBOARD */
+.stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+.sc{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--r2);padding:14px 12px;position:relative;overflow:hidden}
+.sc::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(106,191,61,.06) 0%,transparent 60%)}
+.sc.warn{background:#1f1500;border-color:#3d2a00}
+.sc.alert{background:#1f0800;border-color:#3d1500}
+.sc.ok{background:#0a1f05;border-color:#1a3d0a}
+.sv{font-size:2rem;font-weight:800;color:var(--green2);line-height:1;letter-spacing:-.03em}
+.sc.warn .sv{color:var(--amber)}
+.sc.alert .sv{color:var(--red2)}
+.sc.ok .sv{color:var(--green3)}
+.sl{font-size:.63rem;font-weight:600;color:var(--ink3);margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
+.sc.warn .sl{color:#8a5a10}.sc.alert .sl{color:#8a3020}
+.aband{border-radius:var(--r2);overflow:hidden;margin-bottom:8px}
+.aband-hdr{padding:9px 14px;font-size:.72rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.aband-hdr.red{background:var(--red);color:#fff}
+.aband-hdr.amber{background:var(--amber);color:#fff}
+.aband-hdr.green{background:var(--green);color:#fff}
+.aband-hdr.blue{background:var(--blue);color:#fff}
+.aband-body{background:var(--card);border:1px solid var(--card3);border-top:none}
+.arow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--card2)}
+.arow:last-child{border-bottom:none}
+.arow-left{flex:1;min-width:0}
+.arow-id{font-weight:700;font-size:.88rem;color:var(--ink)}
+.arow-sub{font-size:.72rem;color:var(--ink3);margin-top:2px}
+
+/* TASKS */
+.task-card{background:var(--card);border:1px solid var(--card3);border-left:4px solid var(--green);border-radius:var(--r2);padding:12px 13px;margin-bottom:7px;display:flex;gap:10px;align-items:flex-start;transition:opacity .25s}
+.task-card.late{border-left-color:var(--red)}
+.task-card.soon{border-left-color:var(--amber)}
+.task-card.done{opacity:.35}
+.task-card.pending-sync{border-style:dashed;opacity:.8}
+.tc-main{flex:1;min-width:0}
+.tc-id{font-weight:700;font-size:.88rem;color:var(--ink)}
+.tc-desc{font-size:.76rem;color:var(--ink2);margin-top:3px;line-height:1.45}
+.tc-meta{font-size:.65rem;color:var(--ink3);margin-top:5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;font-size:.58rem;font-weight:800;padding:2px 7px;border-radius:7px;letter-spacing:.04em;text-transform:uppercase}
+.pill.ILAC{background:#ddeeff;color:#1a44aa}
+.pill.PADOK_GECIS{background:#ddffee;color:#0a5a2a}
+.pill.BUZAGI_BAKIM{background:#fff3dd;color:#7a3a00}
+.pill.TOHUMLAMA_HAZIRLIK{background:#f0ddff;color:#5a0a9a}
+.pill.DIGER{background:var(--card2);color:var(--ink3)}
+.ck-btn{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:2px solid var(--card3);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:var(--ink3)}
+.ck-btn:active{background:var(--green2);border-color:var(--green2);color:#fff;transform:scale(.88)}
+
+/* ANIMALS */
+.search-bar{display:flex;gap:7px;margin-bottom:10px}
+.srch{flex:1;background:var(--card);border:1.5px solid var(--card3);border-radius:var(--r2);padding:10px 13px;font-size:.88rem;outline:none;color:var(--ink)}
+.srch:focus{border-color:var(--green)}
+.psel{background:var(--card);border:1.5px solid var(--card3);border-radius:var(--r2);padding:10px;font-size:.78rem;outline:none;color:var(--ink);-webkit-appearance:none;min-width:64px}
+.animal-card{background:var(--card);border:1px solid var(--card3);border-radius:var(--r);padding:13px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:background .1s}
+.animal-card:active{background:var(--card2)}
+.avt{width:44px;height:44px;border-radius:50%;background:var(--bg2);border:2px solid var(--bg3);display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;color:var(--green2);flex-shrink:0}
+.ainfo{flex:1;min-width:0}
+.a-id{font-weight:700;font-size:.9rem;color:var(--ink)}
+.a-sub{font-size:.7rem;color:var(--ink3);margin-top:2px}
+.a-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
+.tag{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:6px;letter-spacing:.03em}
+.tg{background:#ddffee;color:#0a5a2a}.ta{background:#fff3dd;color:#7a3a00}
+.tr{background:#ffdddd;color:#8a1a1a}.tb{background:#ddeeff;color:#1a3a8a}
+.tk{background:var(--card2);color:var(--ink3)}
+.a-arr{color:var(--card3);flex-shrink:0}
+
+/* DETAIL */
+#det{position:fixed;inset:0;z-index:50;background:var(--card);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,0,.67,0)}
+#det.on{transform:translateX(0)}
+#det-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:24px}
+.det-hero{background:var(--bg);padding:16px 16px 0;padding-top:max(16px,env(safe-area-inset-top,16px))}
+.det-back{display:flex;align-items:center;gap:6px;color:var(--green3);font-size:.8rem;font-weight:700;background:none;border:none;cursor:pointer;margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em}
+.det-name{font-size:1.7rem;font-weight:800;color:#fff;letter-spacing:-.02em;line-height:1}
+.det-meta{font-size:.75rem;color:var(--ink3);margin-top:5px}
+.det-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-bottom:16px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:20px;font-size:.68rem;font-weight:700;letter-spacing:.04em}
+.chip-g{background:rgba(106,191,61,.15);color:var(--green3)}
+.chip-a{background:rgba(201,125,10,.15);color:#f0a020}
+.chip-r{background:rgba(192,50,26,.15);color:#ff6644}
+.chip-b{background:rgba(42,107,181,.15);color:#6aadff}
+.chip-k{background:rgba(255,255,255,.08);color:var(--ink3)}
+.tabs{display:flex;border-bottom:1px solid var(--card2);background:var(--card);position:sticky;top:0;z-index:5}
+.tab{flex:1;padding:12px 4px;font-size:.7rem;font-weight:700;text-align:center;color:var(--ink3);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;letter-spacing:.06em}
+.tab.on{color:var(--green);border-bottom-color:var(--green)}
+.tab-pane{display:none;padding:14px}
+.tab-pane.on{display:block}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--card2);border-radius:var(--r2);overflow:hidden;margin-bottom:12px}
+.ig-item{background:var(--card);padding:11px 13px}
+.ig-lbl{font-size:.6rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em}
+.ig-val{font-size:.9rem;font-weight:600;color:var(--ink);margin-top:2px}
+.hist-row{padding:11px 0;border-bottom:1px solid var(--card2);display:flex;gap:10px;align-items:flex-start}
+.hist-row:last-child{border-bottom:none}
+.hist-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.hist-main{flex:1}
+.hist-title{font-weight:600;font-size:.85rem;color:var(--ink)}
+.hist-sub{font-size:.7rem;color:var(--ink3);margin-top:2px}
+.stats-strip{display:flex;background:var(--bg);border-radius:var(--r2);overflow:hidden;margin-bottom:12px}
+.ss-item{flex:1;padding:12px 8px;text-align:center;border-right:1px solid var(--bg3)}
+.ss-item:last-child{border-right:none}
+.ss-val{font-size:1.2rem;font-weight:800;color:var(--green2);letter-spacing:-.02em}
+.ss-lbl{font-size:.57rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+
+/* STOCK */
+.stk-item{background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:12px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px}
+.stk-item.crit{border-left:4px solid var(--amber)}
+.stk-item.neg{border-left:4px solid var(--red);background:#fff8f6}
+.stk-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.stk-dot.ok{background:var(--green2)}.stk-dot.crit{background:var(--amber)}.stk-dot.neg{background:var(--red2)}
+.stk-info{flex:1;min-width:0}
+.stk-name{font-weight:700;font-size:.88rem;color:var(--ink)}
+.stk-meta{font-size:.68rem;color:var(--ink3);margin-top:2px}
+.stk-qty{text-align:right;flex-shrink:0}
+.stk-num{font-size:1.1rem;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+.stk-num.crit{color:var(--amber)}.stk-num.neg{color:var(--red)}
+.stk-unit{font-size:.58rem;color:var(--ink3)}
+.add-btn{background:var(--card2);border:1px solid var(--card3);border-radius:7px;padding:6px 11px;font-size:.68rem;font-weight:800;color:var(--green);cursor:pointer;flex-shrink:0;letter-spacing:.04em}
+.add-btn:active{background:var(--green);color:#fff}
+
+/* LOG PAGE */
+.log-btn{background:var(--card);border:1px solid var(--card3);border-radius:var(--r);padding:16px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:background .1s}
+.log-btn:active{background:var(--card2)}
+.log-ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
+.log-ico.g{background:rgba(78,154,42,.12)}.log-ico.b{background:rgba(42,107,181,.12)}
+.log-ico.r{background:rgba(192,50,26,.12)}.log-ico.a{background:rgba(201,125,10,.12)}
+.log-text{flex:1}
+.log-title{font-weight:700;font-size:.92rem;color:var(--ink)}
+.log-sub{font-size:.7rem;color:var(--ink3);margin-top:2px}
+.log-arr{color:var(--card3)}
+
+/* MODALS */
+.mo{position:fixed;inset:0;background:rgba(10,20,5,.8);backdrop-filter:blur(6px);z-index:80;display:none;align-items:flex-end}
+.mo.on{display:flex}
+.modal{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-height:94dvh;overflow-y:auto;padding-bottom:calc(16px + var(--safe));animation:slideup .28s cubic-bezier(.22,1,.36,1)}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.m-handle{width:38px;height:4px;background:var(--card3);border-radius:2px;margin:11px auto}
+.m-title{font-size:1.05rem;font-weight:800;padding:2px 18px 14px;border-bottom:1px solid var(--card2);color:var(--ink)}
+.m-body{padding:14px 18px}
+.fg{margin-bottom:12px}
+.flbl{font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;display:block}
+.fi,.fsel,.fta{width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px 13px;font-size:.9rem;background:#fff;outline:none;color:var(--ink);-webkit-appearance:none;transition:border-color .15s}
+.fi:focus,.fsel:focus,.fta:focus{border-color:var(--green)}
+.fta{resize:none;height:72px}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-weight:800;font-size:.9rem;cursor:pointer;text-align:center;transition:all .12s}
+.btn:active{transform:scale(.97)}
+.btn-g{background:var(--green);color:#fff}
+.btn-o{background:none;border:1.5px solid var(--card3);color:var(--ink);margin-top:7px}
+.btn-r{background:var(--red);color:#fff;margin-top:7px}
+.btn-b{background:var(--blue);color:#fff}
+
+/* MISC */
+.sh{display:flex;align-items:center;justify-content:space-between;margin:14px 0 7px}
+.sh-title{font-size:.68rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em}
+.sh-link{font-size:.72rem;font-weight:700;color:var(--green2);background:none;border:none;cursor:pointer}
+.filter-strip{display:flex;gap:6px;margin-bottom:10px}
+.fs-btn{flex:1;padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);font-size:.68rem;font-weight:800;color:var(--ink3);cursor:pointer;text-align:center;letter-spacing:.05em;text-transform:uppercase;transition:all .12s}
+.fs-btn.on{background:var(--green);border-color:var(--green);color:#fff}
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 20px;gap:14px;color:var(--ink3);font-size:.8rem}
+.spin{width:32px;height:32px;border:3px solid var(--card2);border-top-color:var(--green);border-radius:50%;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:48px 20px;color:var(--ink3);font-size:.82rem}
+.empty-ico{font-size:2.8rem;margin-bottom:10px}
+#toast{position:fixed;bottom:calc(var(--nav) + var(--safe) + 10px);left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;padding:9px 20px;border-radius:24px;font-size:.8rem;font-weight:700;z-index:99;opacity:0;transition:all .28s;pointer-events:none;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.err{background:var(--red)}
+#toast.sync{background:var(--blue)}
+
+@media(min-width:768px){
+  #shell{flex-direction:row}
+  #nav{flex-direction:column;width:72px;height:auto;border-top:none;border-right:1px solid var(--bg3);padding-bottom:0;padding-top:8px}
+  #topbar{display:none}
+  #pages{flex:1}
+  .pg-inner{padding:20px}
+}
+</style>
+</head>
+<body>
+<div id="shell">
+
+<div id="topbar">
+  <div class="logo">
+    <div class="logo-main"><em>Ege</em>Süt</div>
+    <div class="logo-sub">Saha ERP</div>
+  </div>
+  <div id="top-right">
+    <div id="dot"></div>
+    <button id="refbtn" onclick="refreshAll()">↻</button>
+  </div>
+</div>
+
+<!-- SYNC STATUS BAR -->
+<div id="sync-bar">
+  <span id="sync-bar-txt">⏳ 0 kayıt senkronize edilecek</span>
+  <button id="sync-now-btn" onclick="syncNow()">Şimdi Gönder</button>
+</div>
+
+<div id="pages">
+
+  <div id="pg-dash" class="pg on">
+    <div class="pg-inner">
+      <div id="dash-body"><div class="loader"><div class="spin"></div><span>Yükleniyor…</span></div></div>
+    </div>
+  </div>
+
+  <div id="pg-suru" class="pg">
+    <div class="pg-inner">
+      <div class="search-bar">
+        <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" oninput="filterA()" autocomplete="off">
+        <select class="psel" id="pflt" onchange="filterA()">
+          <option value="">Tüm</option>
+          <option>P1</option><option>P2</option><option>P3</option><option>P4</option><option>P5</option>
+        </select>
+      </div>
+      <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+  <div id="pg-tasks" class="pg">
+    <div class="pg-inner">
+      <div class="filter-strip">
+        <button class="fs-btn on" onclick="loadTasks('today',this)">Bugün</button>
+        <button class="fs-btn" onclick="loadTasks('late',this)">Geciken</button>
+        <button class="fs-btn" onclick="loadTasks('all',this)">Tümü</button>
+      </div>
+      <div id="tasks-body"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+  <div id="pg-log" class="pg">
+    <div class="pg-inner">
+      <div class="sh"><span class="sh-title">Hızlı Kayıt</span></div>
+      <div onclick="openM('m-birth')" class="log-btn">
+        <div class="log-ico g">🐄</div>
+        <div class="log-text"><div class="log-title">Doğum Kaydı</div><div class="log-sub">Anne, yavru, protokol görevleri otomatik</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div onclick="openM('m-insem')" class="log-btn">
+        <div class="log-ico b">💉</div>
+        <div class="log-text"><div class="log-title">Tohumlama</div><div class="log-sub">Sperma, tarih, kontrol görevleri otomatik</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div onclick="openM('m-disease')" class="log-btn">
+        <div class="log-ico r">🏥</div>
+        <div class="log-text"><div class="log-title">Hastalık / Tedavi</div><div class="log-sub">Tanı, ilaç, stok otomatik düşer</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div onclick="openM('m-animal')" class="log-btn">
+        <div class="log-ico a">➕</div>
+        <div class="log-text"><div class="log-title">Yeni Hayvan</div><div class="log-sub">Sürüye hayvan ekle</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+      <div class="sh" style="margin-top:6px"><span class="sh-title">Son Doğumlar</span></div>
+      <div id="births-body"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+</div>
+
+<nav id="nav">
+  <button class="nb on" id="nb-dash" onclick="goTo('dash')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span class="nb-lbl">Panel</span>
+  </button>
+  <button class="nb" id="nb-suru" onclick="goTo('suru')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="9" r="2"/><path d="M2 21v-1a5 5 0 015-5h4a5 5 0 015 5v1"/><path d="M22 21v-1a4 4 0 00-3-3.87"/></svg>
+    <span class="nb-lbl">Sürü</span>
+  </button>
+  <button class="nb" id="nb-tasks" onclick="goTo('tasks')">
+    <div id="tbadge" class="nbadge" style="display:none">0</div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    <span class="nb-lbl">Görevler</span>
+  </button>
+  <button class="nb" id="nb-log" onclick="goTo('log')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span class="nb-lbl">Kayıt</span>
+  </button>
+</nav>
+
+</div>
+
+<!-- DETAIL -->
+<div id="det">
+  <div class="det-hero">
+    <button class="det-back" onclick="closeDet()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+      Sürüye Dön
+    </button>
+    <div id="det-name" class="det-name">—</div>
+    <div id="det-meta" class="det-meta">—</div>
+    <div id="det-chips" class="det-chips"></div>
+  </div>
+  <div id="det-scroll">
+    <div class="tabs">
+      <button class="tab on" onclick="showTab('ozet',this)">Özet</button>
+      <button class="tab" onclick="showTab('saglik',this)">Sağlık</button>
+      <button class="tab" onclick="showTab('ureme',this)">Üreme</button>
+      <button class="tab" onclick="showTab('gorev',this)">Görevler</button>
+    </div>
+    <div id="tab-ozet" class="tab-pane on"></div>
+    <div id="tab-saglik" class="tab-pane"></div>
+    <div id="tab-ureme" class="tab-pane"></div>
+    <div id="tab-gorev" class="tab-pane"></div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div id="m-birth" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">🐄 Doğum Kaydı</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Anne ID *</label><input id="b-anne" class="fi" placeholder="TR001" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Doğum Tarihi *</label><input id="b-tarih" class="fi" type="date"></div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Cinsiyet *</label><select id="b-cins" class="fsel"><option>Dişi</option><option>Erkek</option></select></div>
+        <div class="fg"><label class="flbl">Yavru Küpe *</label><input id="b-kupe" class="fi" placeholder="BZ-001" autocomplete="off"></div>
+      </div>
+      <div class="fg"><label class="flbl">Doğum Tipi</label><select id="b-tip" class="fsel"><option>Normal</option><option>Güç</option><option>Sezaryen</option></select></div>
+      <button class="btn btn-g" onclick="submitBirth(this)">Kaydet + Protokol Görevleri</button>
+      <button class="btn btn-o" onclick="closeM('m-birth')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="m-insem" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">💉 Tohumlama</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Hayvan ID *</label><input id="i-hid" class="fi" placeholder="TR001" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Tarih *</label><input id="i-tarih" class="fi" type="date"></div>
+      <div class="fg"><label class="flbl">Sperma / Boğa *</label><input id="i-sperma" class="fi" placeholder="ABK-Zenith-ET" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Tohumlayan</label><input id="i-toh" class="fi" placeholder="Dr. Ahmet" autocomplete="off"></div>
+      <button class="btn btn-b" onclick="submitInsem(this)">Kaydet + Kontrol Görevleri</button>
+      <button class="btn btn-o" onclick="closeM('m-insem')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="m-disease" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">🏥 Hastalık / Tedavi</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Hayvan ID *</label><input id="d-hid" class="fi" placeholder="TR001" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Kategori</label><select id="d-kat" class="fsel"><option>Genital</option><option>Meme</option><option>Metabolik & Diğer</option></select></div>
+      <div class="fg"><label class="flbl">Tanı *</label><input id="d-tani" class="fi" placeholder="Mastit (Klinik-Hafif)" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Şiddet</label><select id="d-sid" class="fsel"><option>Hafif</option><option selected>Orta</option><option>Şiddetli</option><option>Kritik</option></select></div>
+      <div class="fg"><label class="flbl">Semptomlar</label><textarea id="d-sempt" class="fta" placeholder="Belirtiler…"></textarea></div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">İlaç StokID</label><input id="d-stok" class="fi" placeholder="STK001" autocomplete="off"></div>
+        <div class="fg"><label class="flbl">Miktar</label><input id="d-mik" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
+      </div>
+      <button class="btn btn-r" onclick="submitDisease(this)">Kaydet</button>
+      <button class="btn btn-o" onclick="closeM('m-disease')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="m-animal" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">➕ Yeni Hayvan</div>
+    <div class="m-body">
+      <div class="r2">
+        <div class="fg"><label class="flbl">Hayvan ID *</label><input id="a-id" class="fi" placeholder="TR019" autocomplete="off"></div>
+        <div class="fg"><label class="flbl">Küpe No *</label><input id="a-kupe" class="fi" placeholder="TR-019" autocomplete="off"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Cins</label><input id="a-cins" class="fi" placeholder="Holstein" autocomplete="off"></div>
+        <div class="fg"><label class="flbl">Irk</label><input id="a-irk" class="fi" placeholder="HF" autocomplete="off"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Doğum Tarihi</label><input id="a-dt" class="fi" type="date"></div>
+        <div class="fg"><label class="flbl">Doğum Kg</label><input id="a-dkg" class="fi" type="number" placeholder="38" inputmode="decimal"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Grup</label><select id="a-grup" class="fsel"><option>Sağmal</option><option>Kuru</option><option>Düve</option><option>Buzağı</option></select></div>
+        <div class="fg"><label class="flbl">Padok</label><select id="a-padok" class="fsel"><option>P1</option><option>P2</option><option>P3</option><option>P4</option><option>P5</option></select></div>
+      </div>
+      <button class="btn btn-g" onclick="submitAnimal(this)">Kaydet</button>
+      <button class="btn btn-o" onclick="closeM('m-animal')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="m-stk" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title" id="m-stk-title">📦 Stok Girişi</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Ürün</label><input id="se-urun" class="fi" readonly style="opacity:.6"></div>
+      <div class="fg"><label class="flbl">Miktar (<span id="se-birim">?</span>) *</label><input id="se-mik" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
+      <div class="fg"><label class="flbl">Not</label><input id="se-not" class="fi" placeholder="Tedarikçi, kaynak…"></div>
+      <button class="btn btn-g" onclick="submitStk(this)">Stok Ekle</button>
+      <button class="btn btn-o" onclick="closeM('m-stk')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════
+const SB_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
+const SB_KEY = 'sb_publishable_-erowcVJ100DwEQrjyIyoA_AU76R12S';
+const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+const DB_NAME = 'egesut_v1';
+const DB_VER  = 1;
+const TABLES  = ['hayvanlar','tohumlama','hastalik_log','tedavi','dogum','stok','stok_hareket','gorev_log','buzagi_takip'];
+
+// ═══════════════════════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════════════════════
+let _db = null;
+
+async function openDB() {
+  if (_db) return _db;
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      TABLES.forEach(t => {
+        if (!db.objectStoreNames.contains(t)) {
+          db.createObjectStore(t, { keyPath: 'id' });
+        }
+      });
+      // Sync queue
+      if (!db.objectStoreNames.contains('_queue')) {
+        db.createObjectStore('_queue', { keyPath: '_qid', autoIncrement: true });
+      }
+      // Last sync timestamps
+      if (!db.objectStoreNames.contains('_meta')) {
+        db.createObjectStore('_meta', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = e => { _db = e.target.result; res(_db); };
+    req.onerror   = e => rej(e.target.error);
+  });
+}
+
+async function idbGetAll(store) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror   = e  => rej(e.target.error);
+  });
+}
+
+async function idbPut(store, data) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx  = db.transaction(store, 'readwrite');
+    const os  = tx.objectStore(store);
+    const arr = Array.isArray(data) ? data : [data];
+    arr.forEach(item => os.put(item));
+    tx.oncomplete = () => res(true);
+    tx.onerror    = e  => rej(e.target.error);
+  });
+}
+
+async function idbClearAndPut(store, data) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(store, 'readwrite');
+    const os = tx.objectStore(store);
+    os.clear();
+    const arr = Array.isArray(data) ? data : [data];
+    arr.forEach(item => {
+      // Ensure id field exists
+      if (!item.id) item.id = item.id || crypto.randomUUID();
+      os.put(item);
+    });
+    tx.oncomplete = () => res(true);
+    tx.onerror    = e  => rej(e.target.error);
+  });
+}
+
+// ─── SYNC QUEUE ───────────────────────────────────────
+async function queueOp(op) {
+  // op = { table, method, data, filter }
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('_queue', 'readwrite');
+    tx.objectStore('_queue').add({ ...op, ts: Date.now() });
+    tx.oncomplete = () => res(true);
+    tx.onerror    = e  => rej(e.target.error);
+  });
+}
+
+async function getQueue() {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx  = db.transaction('_queue', 'readonly');
+    const req = tx.objectStore('_queue').getAll();
+    req.onsuccess = () => res(req.result || []);
+    req.onerror   = e  => rej(e.target.error);
+  });
+}
+
+async function removeFromQueue(qid) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('_queue', 'readwrite');
+    tx.objectStore('_queue').delete(qid);
+    tx.oncomplete = () => res(true);
+    tx.onerror    = e  => rej(e.target.error);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// SUPABASE REST
+// ═══════════════════════════════════════════════════════
+async function sbGet(table, qs = '') {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${qs}`, { headers: HDR });
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).message || 'HTTP '+r.status);
+  return r.json();
+}
+
+async function sbPost(table, data) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`, { method:'POST', headers:HDR, body:JSON.stringify(data) });
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).message || 'HTTP '+r.status);
+  return r.json().catch(()=>({}));
+}
+
+async function sbPatch(table, qs, data) {
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${qs}`, { method:'PATCH', headers:HDR, body:JSON.stringify(data) });
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).message || 'HTTP '+r.status);
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════
+// OFFLINE-FIRST WRITE
+// Önce IndexedDB'ye yazar, sonra Supabase'e gönderir.
+// İnternet yoksa kuyruğa ekler.
+// ═══════════════════════════════════════════════════════
+async function write(table, data, method = 'POST', filter = '') {
+  const isOnline = navigator.onLine;
+  const arr      = Array.isArray(data) ? data : [data];
+
+  // Ensure local IDs
+  arr.forEach(item => { if (!item.id) item.id = crypto.randomUUID(); });
+
+  // 1. Hemen IndexedDB'ye yaz
+  await idbPut(table, arr);
+
+  if (isOnline) {
+    // 2a. Supabase'e gönder
+    try {
+      if (method === 'POST')  await sbPost(table, arr.length === 1 ? arr[0] : arr);
+      if (method === 'PATCH') await sbPatch(table, filter, arr[0]);
+    } catch(e) {
+      // Supabase hata verdiyse kuyruğa at
+      await queueOp({ table, method, data: arr, filter });
+      updateSyncBar();
+    }
+  } else {
+    // 2b. Kuyruğa ekle
+    await queueOp({ table, method, data: arr, filter });
+    updateSyncBar();
+  }
+
+  return arr;
+}
+
+// ═══════════════════════════════════════════════════════
+// SYNC ENGINE — kuyruğu Supabase'e gönder
+// ═══════════════════════════════════════════════════════
+let _syncing = false;
+const MAX_RETRY = 3;
+
+async function syncNow() {
+  if (_syncing || !navigator.onLine) return;
+  const queue = await getQueue();
+  if (!queue.length) { updateSyncBar(); return; }
+
+  _syncing = true;
+  setSyncBar('syncing', `⟳ ${queue.length} kayıt gönderiliyor…`);
+
+  let sent = 0, failed = 0;
+
+  for (const op of queue) {
+    let success = false;
+    let lastErr = null;
+
+    // Retry: 3 deneme, aralarında 800ms bekleme
+    for (let attempt = 1; attempt <= MAX_RETRY; attempt++) {
+      try {
+        if (op.method === 'POST')  await sbPost(op.table, op.data.length===1 ? op.data[0] : op.data);
+        if (op.method === 'PATCH') await sbPatch(op.table, op.filter, op.data[0]);
+        success = true;
+        break;
+      } catch(e) {
+        lastErr = e;
+        if (attempt < MAX_RETRY) await new Promise(r => setTimeout(r, 800 * attempt));
+      }
+    }
+
+    if (success) {
+      await removeFromQueue(op._qid);
+      sent++;
+    } else {
+      failed++;
+      console.warn(`[SYNC] Başarısız (${MAX_RETRY} deneme): ${op.table}`, lastErr?.message);
+    }
+  }
+
+  _syncing = false;
+  if (failed === 0) {
+    setSyncBar('ok', `✅ ${sent} kayıt senkronize edildi`);
+    setTimeout(updateSyncBar, 2500);
+    await pullFromSupabase();
+    refreshAll();
+  } else {
+    setSyncBar('warn', `⚠️ ${sent} gönderildi, ${failed} başarısız — tekrar denenecek`);
+  }
+}
+
+async function pullFromSupabase() {
+  // Tüm kritik tabloları çek ve IndexedDB'yi güncelle
+  try {
+    const [animals, tasks, stock, moves, diseases, tohs, births] = await Promise.all([
+      sbGet('hayvanlar','select=*&durum=eq.Aktif'),
+      sbGet('gorev_log','select=*&tamamlandi=eq.false'),
+      sbGet('stok','select=*'),
+      sbGet('stok_hareket','select=*&iptal=eq.false'),
+      sbGet('hastalik_log','select=*'),
+      sbGet('tohumlama','select=*'),
+      sbGet('dogum','select=*&order=tarih.desc&limit=50'),
+    ]);
+    await idbClearAndPut('hayvanlar', animals);
+    await idbClearAndPut('gorev_log', tasks);
+    await idbClearAndPut('stok', stock);
+    await idbClearAndPut('stok_hareket', moves);
+    await idbClearAndPut('hastalik_log', diseases);
+    await idbClearAndPut('tohumlama', tohs);
+    await idbClearAndPut('dogum', births);
+    document.getElementById('dot').classList.remove('off','warn');
+  } catch(e) {
+    document.getElementById('dot').classList.add('off');
+  }
+}
+
+function updateSyncBar() {
+  getQueue().then(q => {
+    if (!q.length) {
+      document.getElementById('sync-bar').classList.remove('on','syncing','ok');
+      return;
+    }
+    setSyncBar('warn', `⏳ ${q.length} kayıt senkronize edilecek`);
+  });
+}
+
+function setSyncBar(type, txt) {
+  const bar = document.getElementById('sync-bar');
+  bar.className = 'on ' + type;
+  document.getElementById('sync-bar-txt').textContent = txt;
+}
+
+// ═══════════════════════════════════════════════════════
+// STATE & DATA LAYER — IndexedDB'den okur
+// ═══════════════════════════════════════════════════════
+let _A = [], _S = [], _curStk = null, _detId = null, _curPg = 'dash';
+
+async function getData(table, filterFn) {
+  const data = await idbGetAll(table);
+  return filterFn ? data.filter(filterFn) : data;
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+window.addEventListener('load', async () => {
+  await openDB();
+  const t = new Date().toISOString().split('T')[0];
+  ['b-tarih','i-tarih'].forEach(id => { const el=document.getElementById(id); if(el) el.value=t; });
+
+  // Service Worker kaydet
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
+  // Önce local'den göster (hızlı)
+  await renderFromLocal();
+
+  // Sonra Supabase'den çek (güncel)
+  if (navigator.onLine) {
+    await pullFromSupabase();
+    await renderFromLocal();
+    await syncNow();
+  } else {
+    document.getElementById('dot').classList.add('warn');
+    toast('Çevrimdışı — yerel veri gösteriliyor', false);
+  }
+
+  updateSyncBar();
+});
+
+// Online/offline eventleri
+window.addEventListener('online',  async () => {
+  document.getElementById('dot').classList.remove('off','warn');
+  toast('🌐 Bağlantı geldi — senkronize ediliyor…', false);
+  await syncNow();
+  await pullFromSupabase();
+  await renderFromLocal();
+});
+window.addEventListener('offline', () => {
+  document.getElementById('dot').classList.add('off');
+  toast('📵 Çevrimdışı — kayıtlar cihazda saklanacak', false);
+});
+
+async function refreshAll() {
+  if (navigator.onLine) {
+    await pullFromSupabase();
+  }
+  await renderFromLocal();
+  updateSyncBar();
+}
+
+async function renderFromLocal() {
+  await Promise.all([loadDash(), loadAnimals(), loadStock(), loadBirths()]);
+  if (_curPg === 'tasks') await loadTasks('today');
+}
+
+// ═══════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════
+function goTo(pg) {
+  _curPg = pg;
+  document.querySelectorAll('.pg').forEach(el => el.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(el => el.classList.remove('on'));
+  document.getElementById('pg-'+pg).classList.add('on');
+  document.getElementById('nb-'+pg).classList.add('on');
+  if (pg==='tasks') loadTasks('today');
+}
+
+// ═══════════════════════════════════════════════════════
+// DASHBOARD — IndexedDB'den
+// ═══════════════════════════════════════════════════════
+async function loadDash() {
+  const el = document.getElementById('dash-body');
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const [animals, diseases, tasks, stock, moves, births60, gebeTohs] = await Promise.all([
+      getData('hayvanlar', a => a.durum === 'Aktif'),
+      getData('hastalik_log', d => d.durum === 'Aktif'),
+      getData('gorev_log', t => !t.tamamlandi),
+      idbGetAll('stok'),
+      getData('stok_hareket', m => !m.iptal),
+      getData('dogum', b => b.tarih >= dAgo(63) && b.tarih <= dAgo(58)),
+      getData('tohumlama', t => t.sonuc === 'Gebe'),
+    ]);
+
+    const stkNet = {};
+    stock.forEach(s => {
+      const used = moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0);
+      stkNet[s.id] = (+s.baslangic_miktar||0) - used;
+    });
+    const critStk = stock.filter(s => stkNet[s.id]>=0 && stkNet[s.id]<=(+s.esik||0)).length;
+    const negStk  = stock.filter(s => stkNet[s.id]<0).length;
+    const late    = tasks.filter(t => t.hedef_tarih < today);
+    const todayT  = tasks.filter(t => t.hedef_tarih === today);
+    const badge   = late.length;
+
+    const tb = document.getElementById('tbadge');
+    tb.textContent = badge > 99 ? '99+' : badge;
+    tb.style.display = badge > 0 ? 'flex' : 'none';
+
+    const nearBirth = gebeTohs.filter(t => {
+      if (!t.tarih) return false;
+      const d = Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000);
+      return d>=0 && d<=7;
+    });
+
+    let h = `<div class="stat-row">
+      <div class="sc ok"><div class="sv">${animals.length}</div><div class="sl">Aktif Hayvan</div></div>
+      <div class="sc ok"><div class="sv">${gebeTohs.length}</div><div class="sl">Gebe</div></div>
+      <div class="sc ${diseases.length>0?'alert':'ok'}"><div class="sv">${diseases.length}</div><div class="sl">Aktif Hastalık</div></div>
+      <div class="sc ${badge>0?'alert':tasks.length>0?'warn':'ok'}"><div class="sv">${tasks.length}</div><div class="sl">Bekleyen Görev</div></div>
+    </div>`;
+
+    if (negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında</div></div></div>`);
+    if (late.length) { h+=`<div class="sh"><span class="sh-title">🔴 Geciken</span><button class="sh-link" onclick="goTo('tasks')">Tümü →</button></div>`; h+=late.slice(0,4).map(t=>renderTask(t,'late')).join(''); }
+    if (todayT.length) { h+=`<div class="sh"><span class="sh-title">⏳ Bugün</span></div>`; h+=todayT.slice(0,4).map(t=>renderTask(t,'soon')).join(''); }
+    if (births60.length) { h+=band('amber','💛 Kızgınlık Beklenenler',births60.map(b=>`<div class="arow"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${b.tarih} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div>`).join('')); }
+    if (nearBirth.length) { h+=band('blue','🤰 Yaklaşan Doğumlar',nearBirth.map(b=>`<div class="arow"><div class="arow-left"><div class="arow-id">${b.hayvan_id}</div><div class="arow-sub">${Math.floor((new Date(b.tarih).getTime()+280*86400000-Date.now())/86400000)} gün kaldı</div></div></div>`).join('')); }
+    if (critStk>0) { const cl=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0)); h+=band('amber','⚠️ Kritik Stok',cl.map(s=>`<div class="arow"><div class="arow-left"><div class="arow-id">${s.urun_adi}</div><div class="arow-sub">${(stkNet[s.id]||0).toFixed(0)} ${s.birim||''}</div></div></div>`).join('')); }
+
+    el.innerHTML = h || '<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
+  } catch(e) {
+    el.innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function band(cls,title,content){ return `<div class="aband"><div class="aband-hdr ${cls}">${title}</div><div class="aband-body">${content}</div></div>`; }
+
+// ═══════════════════════════════════════════════════════
+// TASKS
+// ═══════════════════════════════════════════════════════
+async function loadTasks(f, btn) {
+  if (btn) { document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
+  const el = document.getElementById('tasks-body');
+  el.innerHTML = '<div class="loader"><div class="spin"></div></div>';
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    let data = await getData('gorev_log', t => !t.tamamlandi);
+    if (f==='today') data = data.filter(t=>t.hedef_tarih<=today);
+    else if (f==='late') data = data.filter(t=>t.hedef_tarih<today);
+    data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
+    if (!data.length) { el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
+    el.innerHTML = data.slice(0,100).map(t => {
+      const cls = t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':'';
+      return renderTask(t,cls);
+    }).join('');
+  } catch(e) { el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
+function renderTask(t, cls='') {
+  return `<div class="task-card ${cls}" id="tc-${t.id}">
+    <div class="tc-main">
+      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+        <span class="tc-id">${t.hayvan_id||'—'}</span>
+        <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
+      </div>
+      <div class="tc-desc">${t.aciklama||''}</div>
+      <div class="tc-meta"><span>${t.hedef_tarih||''}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
+    </div>
+    <button class="ck-btn" onclick="doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+    </button>
+  </div>`;
+}
+
+async function doneTask(id, hid, stokId, miktar, padok, btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
+  try {
+    await write('gorev_log', { id, tamamlandi:true, tamamlanma_tarihi:new Date().toISOString() }, 'PATCH', `id=eq.${id}`);
+    if (stokId && miktar>0) await write('stok_hareket', { stok_id:stokId, tur:'Görev', miktar, notlar:'GorevID:'+id, iptal:false });
+    if (padok && hid)       await write('hayvanlar', { id:hid, padok }, 'PATCH', `id=eq.${hid}`);
+    const el = document.getElementById('tc-'+id);
+    if (el) { el.classList.add('done'); setTimeout(()=>el.remove(),320); }
+    toast('✅ Tamamlandı');
+    loadDash();
+  } catch(e) {
+    btn.disabled=false;
+    btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
+    toast(e.message,true);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// ANIMALS
+// ═══════════════════════════════════════════════════════
+async function loadAnimals() {
+  const el = document.getElementById('suru-body');
+  try {
+    _A = await getData('hayvanlar', a => a.durum === 'Aktif');
+    _A.sort((a,b)=>(a.id||'').localeCompare(b.id||''));
+    renderAnimals(_A);
+  } catch(e) { el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
+function renderAnimals(list) {
+  const el = document.getElementById('suru-body');
+  if (!list.length) { el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; return; }
+  el.innerHTML = list.map(a => {
+    const init = (a.kupe_no||a.id).replace(/\D/g,'').slice(-3)||a.id.slice(0,2).toUpperCase();
+    const yas  = a.dogum_tarihi ? Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000)+' gün' : '';
+    return `<div class="animal-card" onclick="openDet('${a.id}')">
+      <div class="avt">${init}</div>
+      <div class="ainfo">
+        <div class="a-id">${a.kupe_no||a.id}</div>
+        <div class="a-sub">${a.cins||'—'} · ${a.irk||''} · ${yas}</div>
+        <div class="a-tags"><span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span></div>
+      </div>
+      <svg class="a-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+    </div>`;
+  }).join('');
+}
+
+function filterA() {
+  const q = document.getElementById('srch').value.toLowerCase();
+  const p = document.getElementById('pflt').value;
+  let f = _A;
+  if (q) f = f.filter(a=>(a.id+a.kupe_no+(a.cins||'')).toLowerCase().includes(q));
+  if (p) f = f.filter(a=>a.padok===p);
+  renderAnimals(f);
+}
+
+// ═══════════════════════════════════════════════════════
+// ANIMAL DETAIL
+// ═══════════════════════════════════════════════════════
+async function openDet(id) {
+  _detId = id;
+  document.getElementById('det').classList.add('on');
+  document.getElementById('det-name').textContent = 'Yükleniyor…';
+  ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev'].forEach(i=>document.getElementById(i).innerHTML='');
+  showTab('ozet', document.querySelector('.tab'));
+
+  try {
+    const [aArr, diseases, tohs, tasks, births] = await Promise.all([
+      getData('hayvanlar', a=>a.id===id),
+      getData('hastalik_log', d=>d.hayvan_id===id),
+      getData('tohumlama', t=>t.hayvan_id===id),
+      getData('gorev_log', t=>t.hayvan_id===id && !t.tamamlandi),
+      getData('dogum', b=>b.anne_id===id),
+    ]);
+    const a = aArr[0];
+    if (!a) { document.getElementById('det-name').textContent='Bulunamadı'; return; }
+
+    diseases.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+    tohs.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+    tasks.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
+
+    const yasGun   = a.dogum_tarihi ? Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000) : '—';
+    const aktifHst = diseases.filter(d=>d.durum==='Aktif').length;
+    const sonGebe  = tohs.find(t=>t.sonuc==='Gebe');
+    const today    = new Date().toISOString().split('T')[0];
+
+    document.getElementById('det-name').textContent = a.kupe_no||a.id;
+    document.getElementById('det-meta').textContent = `${a.cins||'—'} · ${a.irk||''} · ${a.padok||'?'}`;
+    document.getElementById('det-chips').innerHTML = [
+      {cls:'chip-k',txt:a.grup||'?'},
+      {cls:'chip-k',txt:a.padok||'?'},
+      aktifHst>0 ? {cls:'chip-r',txt:`🚨 ${aktifHst} aktif vaka`} : {cls:'chip-g',txt:'✅ Sağlıklı'},
+      sonGebe ? {cls:'chip-g',txt:'🤰 Gebe'} : null,
+    ].filter(Boolean).map(c=>`<div class="chip ${c.cls}">${c.txt}</div>`).join('');
+
+    document.getElementById('tab-ozet').innerHTML = `
+      <div class="stats-strip">
+        <div class="ss-item"><div class="ss-val">${yasGun}</div><div class="ss-lbl">Gün Yaş</div></div>
+        <div class="ss-item"><div class="ss-val">${births.length}</div><div class="ss-lbl">Laktasyon</div></div>
+        <div class="ss-item"><div class="ss-val">${diseases.length}</div><div class="ss-lbl">Toplam Vaka</div></div>
+        <div class="ss-item"><div class="ss-val">${tasks.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
+      </div>
+      <div class="info-grid">
+        ${[{l:'Doğum',v:a.dogum_tarihi||'—'},{l:'Irk',v:a.irk||'—'},{l:'Grup',v:a.grup||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum Kg',v:a.dogum_kg||'—'},{l:'Durum',v:a.durum||'—'},{l:'Son Tohumlama',v:tohs[0]?.tarih||'—'},{l:'Son Doğum',v:births[0]?.tarih||'—'}].map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
+      </div>`;
+
+    document.getElementById('tab-saglik').innerHTML = diseases.length
+      ? diseases.map(d=>`<div class="hist-row"><div class="hist-dot" style="background:${d.durum==='Aktif'?'var(--red2)':'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${d.tani||'—'}</div><div class="hist-sub">${d.tarih||''} · ${d.siddet||''} · <b style="color:${d.durum==='Aktif'?'var(--red)':'var(--green)'}">${d.durum}</b></div>${d.semptomlar?`<div class="hist-sub" style="margin-top:3px">${d.semptomlar}</div>`:''}</div></div>`).join('')
+      : '<div class="empty"><div class="empty-ico">✅</div>Hastalık kaydı yok</div>';
+
+    document.getElementById('tab-ureme').innerHTML = tohs.length
+      ? tohs.map(t=>`<div class="hist-row"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'} · ${t.deneme_no||1}. deneme</div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
+      : '<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>';
+
+    document.getElementById('tab-gorev').innerHTML = tasks.length
+      ? tasks.map(t=>renderTask(t, t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':'')).join('')
+      : '<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>';
+
+  } catch(e) { document.getElementById('det-name').textContent='Hata: '+e.message; }
+}
+
+function closeDet() { document.getElementById('det').classList.remove('on'); }
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+  if (btn) btn.classList.add('on');
+}
+
+// ═══════════════════════════════════════════════════════
+// STOCK
+// ═══════════════════════════════════════════════════════
+async function loadStock() {
+  try {
+    const [stk, moves] = await Promise.all([idbGetAll('stok'), getData('stok_hareket', m=>!m.iptal)]);
+    _S = stk.map(s => {
+      const used = moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0);
+      const guncel = (+s.baslangic_miktar||0) - used;
+      return {...s, guncel, durum: guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok'};
+    });
+  } catch(e) { console.error(e); }
+}
+
+function openStk(id) {
+  _curStk = _S.find(s=>s.id===id);
+  if (!_curStk) return;
+  document.getElementById('m-stk-title').textContent = '📦 '+_curStk.urun_adi;
+  document.getElementById('se-urun').value  = _curStk.urun_adi;
+  document.getElementById('se-birim').textContent = _curStk.birim||'?';
+  g('se-mik').value=''; g('se-not').value='';
+  openM('m-stk');
+}
+
+async function submitStk(btn) {
+  const mik = parseFloat(g('se-mik').value);
+  if (!mik||mik<=0) { toast('Geçerli miktar girin',true); return; }
+  if(btn){btn.disabled=true;btn.textContent='Ekleniyor…';}
+  try {
+    const updated = { ..._curStk, baslangic_miktar: (+_curStk.baslangic_miktar||0)+mik };
+    await write('stok', updated, 'PATCH', `id=eq.${_curStk.id}`);
+    toast(`✅ ${_curStk.urun_adi}: +${mik} ${_curStk.birim||''}`);
+    closeM('m-stk');
+    await loadStock(); loadDash();
+  } catch(e) {
+    toast(e.message,true);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Stok Ekle';}
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// BIRTHS
+// ═══════════════════════════════════════════════════════
+async function loadBirths() {
+  const el = document.getElementById('births-body');
+  try {
+    const data = await idbGetAll('dogum');
+    data.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+    if (!data.length) { el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Henüz doğum yok</div>'; return; }
+    el.innerHTML = data.slice(0,8).map(b=>`
+      <div class="hist-row">
+        <div class="hist-dot" style="background:var(--green2)"></div>
+        <div class="hist-main">
+          <div class="hist-title">${b.anne_id} → ${b.yavru_kupe} (${b.yavru_cins})</div>
+          <div class="hist-sub">${b.tarih} · ${b.dogum_tipi||'Normal'}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
+// ═══════════════════════════════════════════════════════
+// FORM SUBMISSIONS
+// ═══════════════════════════════════════════════════════
+async function submitBirth(btn) {
+  const anneId=v('b-anne'),tarih=v('b-tarih'),cins=v('b-cins'),kupe=v('b-kupe'),tip=v('b-tip');
+  if(!anneId||!tarih||!kupe){toast('Anne ID, Tarih ve Küpe zorunlu',true);return;}
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  try {
+    // Duplicate küpe kontrolü
+    const existing = await getData('buzagi_takip', b=>b.kupe_no===kupe);
+    if(existing.length){ toast('⚠️ '+kupe+' küpe no zaten kayıtlı',true); return; }
+
+    await write('dogum', {id:crypto.randomUUID(),anne_id:anneId,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip});
+    await write('buzagi_takip', {id:crypto.randomUUID(),kupe_no:kupe,cinsiyet:cins,dogum_tarihi:tarih,anne_id:anneId});
+
+    const anne = _A.find(a=>a.id===anneId);
+    if (anne) await write('hayvanlar', {...anne, padok:'P1'}, 'PATCH', `id=eq.${anneId}`);
+
+    const protokol=[
+      {gun:0,tip:'ILAC',ac:'Doğum günü: Oksitosin + Ademin + Kalsiyum',stok:'STK001'},
+      {gun:2,tip:'ILAC',ac:'2. Gün PG',stok:'STK003'},
+      {gun:11,tip:'ILAC',ac:'11. Gün PG',stok:'STK003'},
+      {gun:25,tip:'ILAC',ac:'25. Gün PG',stok:'STK003'},
+      {gun:53,tip:'ILAC',ac:'53. Gün: Ademin + Yeldif',stok:'STK002'},
+      {gun:54,tip:'ILAC',ac:'54. Gün: Yeldif',stok:'STK004'},
+      {gun:58,tip:'DIGER',ac:'⚡ 58-63. gün kızgınlık takibi',stok:null},
+    ];
+    const gorevler = protokol.map(p=>({id:crypto.randomUUID(),hayvan_id:anneId,gorev_tipi:p.tip,aciklama:p.ac,hedef_tarih:dFwd(tarih,p.gun),stok_id:p.stok,tamamlandi:false,kaynak:'DOGUM-'+anneId}));
+    gorevler.push({id:crypto.randomUUID(),hayvan_id:kupe,gorev_tipi:'BUZAGI_BAKIM',aciklama:'Kolostrum + Göbek dezenfeksiyonu + Küpeleme',hedef_tarih:tarih,tamamlandi:false,kaynak:'DOGUM-'+anneId});
+    await write('gorev_log', gorevler);
+
+    toast(`✅ Doğum kaydedildi, ${gorevler.length} görev oluşturuldu`);
+    closeM('m-birth'); cl('b-anne'); cl('b-kupe');
+    await renderFromLocal();
+  } catch(e){
+    toast(e.message,true);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Kaydet + Protokol Görevleri';}
+  }
+}
+
+async function submitInsem(btn) {
+  const hid=v('i-hid'),tarih=v('i-tarih'),sperma=v('i-sperma');
+  if(!hid||!tarih||!sperma){toast('Hayvan ID, Tarih ve Sperma zorunlu',true);return;}
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  try {
+    const prev = await getData('tohumlama', t=>t.hayvan_id===hid);
+    await write('tohumlama', {id:crypto.randomUUID(),hayvan_id:hid,tarih,sperma,tohumlayan:v('i-toh'),sonuc:'Bekliyor',deneme_no:prev.length+1});
+    await write('gorev_log', [
+      {id:crypto.randomUUID(),hayvan_id:hid,gorev_tipi:'TOHUMLAMA_HAZIRLIK',aciklama:'21. Gün gebelik kontrolü',hedef_tarih:dFwd(tarih,21),tamamlandi:false},
+      {id:crypto.randomUUID(),hayvan_id:hid,gorev_tipi:'TOHUMLAMA_HAZIRLIK',aciklama:'35. Gün gebelik kontrolü',hedef_tarih:dFwd(tarih,35),tamamlandi:false},
+    ]);
+    toast('✅ Tohumlama + 2 kontrol görevi kaydedildi');
+    closeM('m-insem'); cl('i-hid'); cl('i-sperma');
+    await renderFromLocal();
+  } catch(e){
+    toast(e.message,true);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Kaydet + Kontrol Görevleri';}
+  }
+}
+
+async function submitDisease(btn) {
+  const hid=v('d-hid'),tani=v('d-tani');
+  if(!hid||!tani){toast('Hayvan ID ve Tanı zorunlu',true);return;}
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  try {
+    const stokId=v('d-stok'), mik=+v('d-mik');
+    await write('hastalik_log', {id:crypto.randomUUID(),hayvan_id:hid,tarih:new Date().toISOString().split('T')[0],kategori:v('d-kat'),tani,siddet:v('d-sid'),semptomlar:v('d-sempt'),ilac_stok_id:stokId||null,ilac_miktar:mik||null,durum:'Aktif'});
+    if(stokId&&mik>0) await write('stok_hareket', {id:crypto.randomUUID(),stok_id:stokId,tur:'Tedavi',miktar:mik,notlar:'Hasta:'+hid,iptal:false});
+    toast('✅ Hastalık kaydedildi');
+    closeM('m-disease'); ['d-hid','d-tani','d-sempt','d-stok','d-mik'].forEach(cl);
+    await renderFromLocal();
+  } catch(e){
+    toast(e.message,true);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Kaydet';}
+  }
+}
+
+async function submitAnimal(btn) {
+  const id=v('a-id'),kupe=v('a-kupe');
+  if(!id||!kupe){toast('ID ve Küpe zorunlu',true);return;}
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  try {
+    // Duplicate ID kontrolü
+    const existing = await getData('hayvanlar', a=>a.id===id);
+    if(existing.length){ toast('⚠️ '+id+' ID zaten kayıtlı',true); return; }
+    await write('hayvanlar', {id,kupe_no:kupe,cins:v('a-cins'),irk:v('a-irk'),dogum_tarihi:v('a-dt')||null,dogum_kg:+v('a-dkg')||null,grup:v('a-grup'),padok:v('a-padok'),durum:'Aktif'});
+    toast('✅ '+id+' sürüye eklendi');
+    closeM('m-animal'); ['a-id','a-kupe','a-cins','a-irk','a-dt','a-dkg'].forEach(cl);
+    await loadAnimals();
+  } catch(e){
+    toast(e.message,true);
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Kaydet';}
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+function g(id){return document.getElementById(id)}
+function v(id){return g(id)?.value||''}
+function cl(id){const el=g(id);if(el)el.value=''}
+function dAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d.toISOString().split('T')[0]}
+function dFwd(base,n){const d=base?new Date(base):new Date();d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+function openM(id){g(id).classList.add('on')}
+function closeM(id){g(id).classList.remove('on')}
+function mClose(e,el){if(e.target===el)el.classList.remove('on')}
+
+let _tt;
+function toast(msg,err=false){
+  const el=g('toast');clearTimeout(_tt);
+  el.textContent=msg;el.className='on'+(err?' err':'');
+  _tt=setTimeout(()=>{el.className=''},3200);
+}
+</script>
+
+<!-- SERVICE WORKER — inline kayıt -->
+<script>
+// sw.js içeriğini blob olarak kaydet
+const swCode = `
+const CACHE = 'egesut-v3';
+const SHELL = ['/', '/index.html'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  const url = new URL(e.request.url);
+  // Supabase isteklerini pass-through et (cache'leme)
+  if (url.hostname.includes('supabase.co') || url.hostname.includes('googleapis.com')) {
+    e.respondWith(fetch(e.request).catch(()=>new Response('offline',{status:503})));
+    return;
+  }
+  // App shell: cache first, then network
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+      if(res.ok){const clone=res.clone();caches.open(CACHE).then(c=>c.put(e.request,clone));}
+      return res;
+    })).catch(()=>caches.match('/index.html'))
+  );
+});
+`;
+const swBlob = new Blob([swCode],{type:'text/javascript'});
+const swUrl  = URL.createObjectURL(swBlob);
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register(swUrl).catch(()=>{});
+}
+
+// PWA manifest
+const _m={name:"Ege Süt ERP",short_name:"EgeSüt",start_url:".",display:"standalone",background_color:"#111a0a",theme_color:"#111a0a",icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23111a0a'/><text y='.9em' font-size='76' x='12'>🐄</text></svg>",sizes:"192x192",type:"image/svg+xml"}]};
+const _b=new Blob([JSON.stringify(_m)],{type:'application/json'});
+const _l=document.createElement('link');_l.rel='manifest';_l.href=URL.createObjectURL(_b);document.head.appendChild(_l);
+</script>
+</body>
+</html>
