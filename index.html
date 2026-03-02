@@ -838,20 +838,26 @@ async function sbGet(table,qs='') {
   return r.json();
 }
 async function sbPost(table,data) {
-  // HDR_UPSERT ile gönder — aynı id varsa günceller, yoksa ekler (duplicate önler)
   const r=await sbFetch(`${SB_URL}/rest/v1/${table}`,{method:'POST',headers:HDR_UPSERT,body:JSON.stringify(data)});
   if(!r.ok){
-    const err=await r.json().catch(()=>({}));
-    if(r.status===401) throw new Error('401: API key hatalı');
-    throw new Error(err.message||`HTTP ${r.status}`);
+    const body=await r.text().catch(()=>'');
+    let msg='';
+    try{ const j=JSON.parse(body); msg=j.message||j.hint||j.details||JSON.stringify(j); }catch{ msg=body; }
+    const fullMsg=`${table} POST ${r.status}: ${msg}`;
+    showDebug(fullMsg);
+    throw new Error(fullMsg);
   }
   return r.json().catch(()=>({}));
 }
 async function sbPatch(table,qs,data) {
   const r=await sbFetch(`${SB_URL}/rest/v1/${table}?${qs}`,{method:'PATCH',headers:HDR,body:JSON.stringify(data)});
   if(!r.ok){
-    const err=await r.json().catch(()=>({}));
-    throw new Error(err.message||`HTTP ${r.status}`);
+    const body=await r.text().catch(()=>'');
+    let msg='';
+    try{ const j=JSON.parse(body); msg=j.message||j.hint||j.details||JSON.stringify(j); }catch{ msg=body; }
+    const fullMsg=`${table} PATCH ${r.status}: ${msg}`;
+    showDebug(fullMsg);
+    throw new Error(fullMsg);
   }
   return true;
 }
@@ -2180,6 +2186,20 @@ async function buildDataLists(){
   const stk=await idbGetAll('stok');
   const dlI=document.getElementById('dl-ilac');
   if(dlI) dlI.innerHTML=stk.map(s=>`<option value="${s.id}">${s.urun_adi}</option>`).join('');
+}
+
+// DEBUG: Hata kutusunu ekranda göster
+function showDebug(msg){
+  let box=document.getElementById('debug-box');
+  if(!box){
+    box=document.createElement('div');
+    box.id='debug-box';
+    box.style.cssText='position:fixed;bottom:70px;left:8px;right:8px;background:#1a0000;color:#ff6b6b;padding:10px 12px;border-radius:10px;font-size:.72rem;font-family:monospace;z-index:9999;max-height:120px;overflow-y:auto;border:1px solid #ff3333;word-break:break-all';
+    box.onclick=()=>box.remove();
+    document.body.appendChild(box);
+  }
+  const t=new Date().toTimeString().slice(0,8);
+  box.innerHTML=`<div style="color:#ff9999;margin-bottom:4px">[${t}] TAP TO DISMISS</div>`+msg;
 }
 
 function g(id){ return document.getElementById(id); }
