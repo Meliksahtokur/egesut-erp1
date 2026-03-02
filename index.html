@@ -652,9 +652,11 @@ button,input,select,textarea{font-family:inherit}
 // CONFIG
 // ══════════════════════════════════════════
 const SB_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
-const SB_KEY = 'sb_publishable_-erowcVJ100DwEQrjyIyoA_AU76R12S';
+// ⚠️ ÖNEMLI: Supabase Dashboard > Settings > API > "anon public" JWT key'ini buraya yaz
+// sb_publishable_ formatı REST API'de çalışmıyor — eyJ... ile başlayan key lazım
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
 const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-const DB_NAME = 'egesut_v7';
+const DB_NAME = 'egesut_v8';
 const DB_VER  = 1;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip'];
 const MAX_RETRY = 3;
@@ -719,17 +721,20 @@ async function idbPut(store,data) {
 async function idbClearAndPut(store,remoteData) {
   const db=await openDB();
   const arr=Array.isArray(remoteData)?remoteData:[remoteData];
-  // Kuyrukta bekleyen POST kayıtlarını koru — Supabase'e henüz gitmediler
   const queue=await getQueue();
-  const pendingItems=queue
-    .filter(op=>op.table===store&&op.method==='POST')
-    .flatMap(op=>op.data||[]);
+  // Hem POST hem PATCH kuyruğundaki tüm kayıtları koru
+  const pendingPost=queue.filter(op=>op.table===store&&op.method==='POST').flatMap(op=>op.data||[]);
+  const pendingPatchIds=new Set(queue.filter(op=>op.table===store&&op.method==='PATCH').flatMap(op=>op.data?.map(d=>d.id)||[]));
   return new Promise((res,rej)=>{
     const tx=db.transaction(store,'readwrite'),os=tx.objectStore(store);
     os.clear();
     arr.forEach(item=>{ if(!item.id)item.id=crypto.randomUUID(); os.put(item); });
-    // Remote'da olmayan pending kayıtları geri koy
-    pendingItems.forEach(item=>{ if(!arr.find(r=>r.id===item.id)) os.put(item); });
+    // Remote'da olmayan POST pending'leri geri koy
+    pendingPost.forEach(item=>{ if(!arr.find(r=>r.id===item.id)) os.put(item); });
+    // PATCH pending'lerin local versiyonu güncel kalsın (remote'un üzerine yaz)
+    queue.filter(op=>op.table===store&&op.method==='PATCH').forEach(op=>{
+      op.data?.forEach(item=>{ if(item.id) os.put(item); });
+    });
     tx.oncomplete=()=>res(true); tx.onerror=e=>rej(e.target.error);
   });
 }
@@ -757,19 +762,35 @@ async function removeFromQueue(qid) {
 // ══════════════════════════════════════════
 // SUPABASE REST
 // ══════════════════════════════════════════
+function sbFetch(url, opts={}, timeoutMs=12000){
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(),timeoutMs);
+  return fetch(url,{...opts,signal:ctrl.signal}).finally(()=>clearTimeout(tid));
+}
 async function sbGet(table,qs='') {
-  const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{headers:HDR});
-  if(!r.ok) throw new Error((await r.json().catch(()=>({}))).message||'HTTP '+r.status);
+  const r=await sbFetch(`${SB_URL}/rest/v1/${table}?${qs}`,{headers:HDR});
+  if(!r.ok){
+    const err=await r.json().catch(()=>({}));
+    if(r.status===401) throw new Error('401: API key hatalı — Supabase anon JWT key gerekli');
+    throw new Error(err.message||`HTTP ${r.status}`);
+  }
   return r.json();
 }
 async function sbPost(table,data) {
-  const r=await fetch(`${SB_URL}/rest/v1/${table}`,{method:'POST',headers:HDR,body:JSON.stringify(data)});
-  if(!r.ok) throw new Error((await r.json().catch(()=>({}))).message||'HTTP '+r.status);
+  const r=await sbFetch(`${SB_URL}/rest/v1/${table}`,{method:'POST',headers:HDR,body:JSON.stringify(data)});
+  if(!r.ok){
+    const err=await r.json().catch(()=>({}));
+    if(r.status===401) throw new Error('401: API key hatalı');
+    throw new Error(err.message||`HTTP ${r.status}`);
+  }
   return r.json().catch(()=>({}));
 }
 async function sbPatch(table,qs,data) {
-  const r=await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{method:'PATCH',headers:HDR,body:JSON.stringify(data)});
-  if(!r.ok) throw new Error((await r.json().catch(()=>({}))).message||'HTTP '+r.status);
+  const r=await sbFetch(`${SB_URL}/rest/v1/${table}?${qs}`,{method:'PATCH',headers:HDR,body:JSON.stringify(data)});
+  if(!r.ok){
+    const err=await r.json().catch(()=>({}));
+    throw new Error(err.message||`HTTP ${r.status}`);
+  }
   return true;
 }
 
@@ -779,26 +800,23 @@ async function sbPatch(table,qs,data) {
 async function write(table,data,method='POST',filter='') {
   const arr=(Array.isArray(data)?data:[data]);
   arr.forEach(item=>{ if(!item.id) item.id=crypto.randomUUID(); });
-  // 1. Önce local'e yaz (anında)
+  // 1. Local'e anında yaz
   await idbPut(table,arr);
-  // 2. Online ise Supabase'e gönder (2sn timeout)
+  // 2. Supabase'e gönder (sbFetch kendi içinde 12sn AbortController kullanıyor)
   if(navigator.onLine) {
     try {
-      await Promise.race([
-        (async()=>{
-          if(method==='POST')  await sbPost(table, arr.length===1?arr[0]:arr);
-          if(method==='PATCH') await sbPatch(table,filter,arr[0]);
-        })(),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),2000))
-      ]);
-      // Başarı — kuyrukta bu kayıt varsa temizle
+      if(method==='POST')  await sbPost(table, arr.length===1?arr[0]:arr);
+      if(method==='PATCH') await sbPatch(table,filter,arr[0]);
+      // Başarılı — kuyruktan temizle
       const q=await getQueue();
       for(const op of q){
-        if(op.table===table && op.data?.some(d=>arr.find(a=>a.id===d.id))){
+        if(op.table===table&&op.data?.some(d=>arr.find(a=>a.id===d.id))){
           await removeFromQueue(op._qid);
         }
       }
     } catch(e) {
+      // Başarısız — kuyruğa ekle
+      console.warn(`write ${table} failed:`,e.message);
       await queueOp({table,method,data:arr,filter});
       updateSyncBar();
     }
@@ -822,20 +840,38 @@ async function syncNow() {
   _syncing=true;
   setSyncBar('syncing',`⟳ ${queue.length} kayıt gönderiliyor…`);
 
+  // Tablo + method'a göre grupla → toplu gönderim
+  const groups={};
+  queue.forEach(op=>{
+    const key=`${op.table}__${op.method}`;
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(op);
+  });
+
   let sent=0,failed=0;
-  for(const op of queue) {
-    let ok=false;
-    for(let attempt=1;attempt<=MAX_RETRY;attempt++) {
-      try {
-        if(op.method==='POST')  await sbPost(op.table, op.data.length===1?op.data[0]:op.data);
-        if(op.method==='PATCH') await sbPatch(op.table,op.filter,op.data[0]);
-        ok=true; break;
-      } catch(e) {
-        if(attempt<MAX_RETRY) await new Promise(r=>setTimeout(r,800*attempt));
+  await Promise.all(Object.values(groups).map(async grp=>{
+    const first=grp[0];
+    try {
+      if(first.method==='POST'){
+        const allData=grp.flatMap(op=>op.data||[]);
+        // Duplicate önle: id bazında unique yap
+        const unique=[...new Map(allData.map(d=>[d.id,d])).values()];
+        await sbPost(first.table, unique.length===1?unique[0]:unique);
+        for(const op of grp){ await removeFromQueue(op._qid); sent++; }
+      } else if(first.method==='PATCH'){
+        // PATCH'ler ayrı ayrı — her birinin filter'ı farklı
+        for(const op of grp){
+          try {
+            await sbPatch(op.table,op.filter,op.data[0]);
+            await removeFromQueue(op._qid); sent++;
+          } catch(e){ failed++; console.warn('PATCH failed:',e.message); }
+        }
       }
+    } catch(e){
+      failed+=grp.length;
+      console.warn(`sync ${first.table} ${first.method} failed:`,e.message);
     }
-    if(ok){ await removeFromQueue(op._qid); sent++; } else { failed++; }
-  }
+  }));
 
   _syncing=false;
   if(failed===0) {
@@ -907,6 +943,11 @@ async function getData(table,filterFn) {
 // ══════════════════════════════════════════
 window.addEventListener('load',async()=>{
   await openDB();
+  // API key kontrolü
+  if(!SB_KEY.startsWith('eyJ')){
+    setSyncBar('warn','⚠️ Supabase API key hatalı! Dashboard > Settings > API > anon public key gerekli');
+    document.getElementById('sync-bar').classList.add('on');
+  }
   const t=new Date().toISOString().split('T')[0];
   ['b-tarih','i-tarih','ta-tarih'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=t; });
   populateHekimSelects();
@@ -918,10 +959,7 @@ window.addEventListener('load',async()=>{
   // 2. Arka planda Supabase'den çek (5sn timeout)
   if(navigator.onLine){
     try {
-      await Promise.race([
-        pullFromSupabase(),
-        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))
-      ]);
+      await pullFromSupabase();
       await renderFromLocal();
       await syncNow();
     } catch(e) {
@@ -955,10 +993,18 @@ async function refreshAll(){
   updateSyncBar();
 }
 async function renderFromLocal(){
-  await Promise.all([loadDash(),loadAnimals(),loadStock(),loadBirths(),loadStokList()]);
+  // Arka plan verileri (her zaman)
+  await Promise.all([loadAnimals(),loadStock()]);
+  // Aktif sayfaya göre render
+  const pg=_curPg||'dash';
+  if(pg==='dash')    await Promise.all([loadDash(),loadStokList()]);
+  if(pg==='suru')    {} // animals zaten yüklendi
+  if(pg==='tasks')   await loadTasks(_curTaskFilter||'today');
+  if(pg==='gecmis')  await loadGecmis(_curGecmisFilter||'hepsi');
+  if(pg==='log')     await Promise.all([loadBirths(),loadStokList()]);
+  // Dash her zaman başlangıçta yükle
+  if(pg!=='dash')    loadDash();
   checkSpermaUyari();
-  if(_curPg==='tasks') await loadTasks(_curTaskFilter||'today');
-  if(_curPg==='gecmis') await loadGecmis(_curGecmisFilter||'hepsi');
 }
 
 // ══════════════════════════════════════════
@@ -1196,13 +1242,17 @@ function renderAnimals(list){
   }).join('');
 }
 
+let _filterTimer=null;
 function filterA(){
-  const q=document.getElementById('srch').value.toLowerCase();
-  const p=document.getElementById('pflt').value;
-  let f=_A;
-  if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
-  if(p) f=f.filter(a=>a.padok===p);
-  renderAnimals(f);
+  clearTimeout(_filterTimer);
+  _filterTimer=setTimeout(()=>{
+    const q=document.getElementById('srch').value.toLowerCase();
+    const p=document.getElementById('pflt').value;
+    let f=_A;
+    if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
+    if(p) f=f.filter(a=>a.padok===p);
+    renderAnimals(f);
+  },250);
 }
 
 // ══════════════════════════════════════════
@@ -1951,7 +2001,7 @@ function toast(msg,err=false){
 <script>
 // SERVICE WORKER (inline blob)
 const swCode=`
-const CACHE='egesut-v7';
+const CACHE='egesut-v8';
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/index.html'])).then(()=>self.skipWaiting())); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
 self.addEventListener('fetch',e=>{
