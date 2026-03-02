@@ -242,6 +242,7 @@ button,input,select,textarea{font-family:inherit}
   <div id="top-right">
     <div id="dot"></div>
     <button id="refbtn" onclick="refreshAll()">↻</button>
+    <button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
   </div>
 </div>
 
@@ -293,6 +294,7 @@ button,input,select,textarea{font-family:inherit}
     <button class="fab" onclick="openM('m-task-add')" title="Görev Ekle">+</button>
   </div>
 
+
   <!-- GEÇMİŞ -->
   <div id="pg-gecmis" class="pg">
     <div class="pg-inner">
@@ -331,6 +333,11 @@ button,input,select,textarea{font-family:inherit}
         <div class="log-text"><div class="log-title">Yeni Hayvan</div><div class="log-sub">Sürüye hayvan ekle</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
+      <div class="sh" style="margin-top:6px">
+        <span class="sh-title">📦 Stok</span>
+        <button class="sh-link" onclick="openM('m-stok-add')">+ Ürün Ekle</button>
+      </div>
+      <div id="stok-list-body"><div style="text-align:center;padding:12px;color:var(--ink3);font-size:.8rem">Yükleniyor…</div></div>
       <div class="sh" style="margin-top:6px"><span class="sh-title">Son Doğumlar</span></div>
       <div id="births-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -431,7 +438,6 @@ button,input,select,textarea{font-family:inherit}
         <input id="i-sperma" class="fi" placeholder="Yazmaya başlayın…" autocomplete="off" list="dl-sperma">
         <datalist id="dl-sperma"></datalist>
       </div>
-      <div class="fg"><label class="flbl">Tohumlayan</label><input id="i-toh" class="fi" placeholder="Dr. Ahmet" autocomplete="off"></div>
       <div class="fg"><label class="flbl">Tohumlayan Hekim</label><select id="i-hekim" class="fsel"></select></div>
       <button class="btn btn-b" onclick="submitInsem(this)">Kaydet + Kontrol Görevleri</button>
       <button class="btn btn-o" onclick="closeM('m-insem')">İptal</button>
@@ -540,6 +546,70 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+<!-- YENİ STOK ÜRÜNÜ EKLE -->
+<div id="m-stok-add" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">📦 Yeni Stok Ürünü</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Ürün Adı *</label><input id="sa-ad" class="fi" placeholder="Oksitosin, Mastit Tüpü, Şırınga…" autocomplete="off"></div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Birim *</label>
+          <select id="sa-birim" class="fsel">
+            <option value="ml">ml (sıvı ilaç)</option>
+            <option value="adet">adet (ekipman)</option>
+            <option value="tüp">tüp</option>
+            <option value="kutu">kutu</option>
+            <option value="kg">kg</option>
+            <option value="lt">lt</option>
+          </select>
+        </div>
+        <div class="fg"><label class="flbl">Başlangıç Miktarı</label><input id="sa-mik" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Kritik Eşik</label><input id="sa-esik" class="fi" type="number" placeholder="Uyarı sınırı" inputmode="decimal"></div>
+        <div class="fg"><label class="flbl">Kategori</label>
+          <select id="sa-kat" class="fsel">
+            <option>İlaç</option><option>Hormon</option><option>Vitamin</option>
+            <option>Ekipman</option><option>Sarf</option><option>Diğer</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-g" onclick="submitStokAdd(this)">Ürünü Ekle</button>
+      <button class="btn btn-o" onclick="closeM('m-stok-add')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- AYARLAR -->
+<div id="m-ayarlar" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">⚙️ Ayarlar</div>
+    <div class="m-body">
+      <div class="sh" style="margin-top:0"><span class="sh-title">Hekimler</span><button class="sh-link" onclick="ayarlarHekimEkle()">+ Ekle</button></div>
+      <div id="ay-hekim-list" style="margin-bottom:12px"></div>
+      <div id="ay-hekim-form" style="display:none;margin-bottom:12px">
+        <div class="fg"><label class="flbl">Hekim Adı</label><input id="ay-hek-ad" class="fi" placeholder="Ad Soyad" autocomplete="off"></div>
+        <div class="r2">
+          <button class="btn btn-g btn-sm" onclick="ayarlarHekimKaydet()">Kaydet</button>
+          <button class="btn btn-o btn-sm" onclick="document.getElementById('ay-hekim-form').style.display='none'">İptal</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="sh"><span class="sh-title">Sperma Listesi</span><button class="sh-link" onclick="ayarlarSpermaEkle()">+ Ekle</button></div>
+      <div id="ay-sperma-list" style="margin-bottom:12px"></div>
+      <div id="ay-sperma-form" style="display:none;margin-bottom:12px">
+        <div class="fg"><label class="flbl">Sperma Kodu</label><input id="ay-sp-kod" class="fi" placeholder="ABK-Zenith-ET" autocomplete="off"></div>
+        <div class="r2">
+          <button class="btn btn-b btn-sm" onclick="ayarlarSpermaKaydet()">Ekle</button>
+          <button class="btn btn-o btn-sm" onclick="document.getElementById('ay-sperma-form').style.display='none'">İptal</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="sh"><span class="sh-title">Versiyon</span></div>
+      <div style="font-size:.75rem;color:var(--ink3);padding:4px 0">EgeSüt v6 · IndexedDB + Supabase offline-first</div>
+      <button class="btn btn-o" onclick="closeM('m-ayarlar')" style="margin-top:12px">Kapat</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -549,7 +619,7 @@ button,input,select,textarea{font-family:inherit}
 const SB_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY = 'sb_publishable_-erowcVJ100DwEQrjyIyoA_AU76R12S';
 const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-const DB_NAME = 'egesut_v5';
+const DB_NAME = 'egesut_v6';
 const DB_VER  = 1;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip'];
 const MAX_RETRY = 3;
@@ -836,8 +906,9 @@ async function refreshAll(){
   updateSyncBar();
 }
 async function renderFromLocal(){
-  await Promise.all([loadDash(),loadAnimals(),loadStock(),loadBirths()]);
-  if(_curPg==='tasks') await loadTasks('today');
+  await Promise.all([loadDash(),loadAnimals(),loadStock(),loadBirths(),loadStokList()]);
+  if(_curPg==='tasks') await loadTasks(_curTaskFilter||'today');
+  if(_curPg==='gecmis') await loadGecmis(_curGecmisFilter||'hepsi');
 }
 
 // ══════════════════════════════════════════
@@ -955,7 +1026,7 @@ async function loadTasks(f,btn){
             <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           </div>
           <div class="tc-desc">${t.aciklama||''}</div>
-          <div class="tc-meta" style="color:var(--green)">✅ Tamamlandı: ${t.tamamlanma_tarihi?t.tamamlanma_tarihi.slice(0,10):(t.hedef_tarih||'')}</div>
+          <div class="tc-meta" style="color:var(--green)">✅ Tamamlandı: ${fmtTarih(t.tamamlanma_tarihi||t.hedef_tarih)}</div>
         </div></div>
       </div>`).join('');
       return;
@@ -995,7 +1066,7 @@ function renderTask(t,cls='',subs=[]){
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
         <div class="tc-desc">${t.aciklama||''}</div>
-        <div class="tc-meta"><span>${t.hedef_tarih||''}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
+        <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
       ${subs.length===0?`<button class="ck-btn" onclick="doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
@@ -1094,7 +1165,7 @@ async function openDet(id){
   showTab('ozet',document.querySelector('.tab'));
   try {
     const [aArr,diseases,tohs,tasks,births,subs]=await Promise.all([
-      getData('hayvanlar',a=>a.id===id),
+      getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('hastalik_log',d=>d.hayvan_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
       getData('gorev_log',t=>t.hayvan_id===id&&!t.tamamlandi&&!t.parent_id),
@@ -1105,7 +1176,8 @@ async function openDet(id){
     diseases.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
     tohs.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
     tasks.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
-    const yasGun=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):'—';
+    const yasRaw=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):null;
+    const yasGun=yasRaw===null?'—':yasRaw<0||yasRaw>36500?'Geçersiz tarih':(yasRaw+' gün');
     const aktifHst=diseases.filter(d=>d.durum==='Aktif').length;
     const today=new Date().toISOString().split('T')[0];
     const displayId=a.devlet_kupe||a.kupe_no||a.id;
@@ -1121,13 +1193,13 @@ async function openDet(id){
 
     document.getElementById('tab-ozet').innerHTML=`
       <div class="stats-strip">
-        <div class="ss-item"><div class="ss-val">${yasGun}</div><div class="ss-lbl">Gün Yaş</div></div>
+        <div class="ss-item"><div class="ss-val" style="font-size:${yasRaw!==null&&(yasRaw<0||yasRaw>36500)?"0.75rem":"1.15rem"}">${yasGun}</div><div class="ss-lbl">Gün Yaş</div></div>
         <div class="ss-item"><div class="ss-val">${births.length}</div><div class="ss-lbl">Laktasyon</div></div>
         <div class="ss-item"><div class="ss-val">${diseases.length}</div><div class="ss-lbl">Toplam Vaka</div></div>
         <div class="ss-item"><div class="ss-val">${tasks.length+subs.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
       </div>
       <div class="info-grid">
-        ${[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Grup',v:a.grup||'—'},{l:'Doğum',v:a.dogum_tarihi||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum Kg',v:a.dogum_kg||'—'},{l:'Durum',v:a.durum||'—'}].map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
+        ${[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Grup',v:a.grup||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum Kg',v:a.dogum_kg||'—'},{l:'Durum',v:a.durum||'—'}].map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
       </div>`;
 
     document.getElementById('tab-saglik').innerHTML=diseases.length
@@ -1194,7 +1266,7 @@ async function loadBirths(){
     const data=await idbGetAll('dogum');
     data.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Henüz doğum yok</div>'; return; }
-    el.innerHTML=data.slice(0,8).map(b=>`<div class="hist-row"><div class="hist-dot" style="background:var(--green2)"></div><div class="hist-main"><div class="hist-title">${b.anne_id} → ${b.yavru_kupe} (${b.yavru_cins})</div><div class="hist-sub">${b.tarih} · ${b.dogum_tipi||'Normal'}</div></div></div>`).join('');
+    el.innerHTML=data.slice(0,8).map(b=>`<div class="hist-row"><div class="hist-dot" style="background:var(--green2)"></div><div class="hist-main"><div class="hist-title">${b.anne_id} → ${b.yavru_kupe} (${b.yavru_cins})</div><div class="hist-sub">${fmtTarih(b.tarih)} · ${b.dogum_tipi||'Normal'}</div></div></div>`).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 
@@ -1431,7 +1503,7 @@ async function loadGecmis(f,btn){
     if(!entries.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>'; return; }
     el.innerHTML=entries.slice(0,300).map(e=>{
       const {type,date,data}=e;
-      const d=(date||'?').slice(0,10);
+      const d=fmtTarih(date);
       const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
       const hkName=hk?` · ${hk.ad}`:'';
       const oc=(data.hayvan_id||data.anne_id)?`onclick="openDet('${data.hayvan_id||data.anne_id}')" style="cursor:pointer"`:'';
@@ -1457,6 +1529,141 @@ async function loadGecmis(f,btn){
 }
 
 // ══════════════════════════════════════════
+// STOK LİSTESİ RENDER (Kayıt sayfasında)
+// ══════════════════════════════════════════
+async function loadStokList(){
+  const el=document.getElementById('stok-list-body'); if(!el) return;
+  try {
+    await loadStock(); // _S güncelle
+    if(!_S.length){
+      el.innerHTML='<div style="text-align:center;padding:12px;color:var(--ink3);font-size:.78rem">📦 Henüz stok ürünü eklenmemiş<br><button class="sh-link" onclick="openM(\'m-stok-add\')" style="margin-top:6px;display:block;margin:6px auto 0">İlk ürünü ekle →</button></div>';
+      return;
+    }
+    el.innerHTML=_S.map(s=>{
+      const pct=Math.max(0,Math.min(100,s.esik>0?(s.guncel/((+s.baslangic_miktar||1)||1))*100:100));
+      const barClr=s.durum==='neg'?'var(--red)':s.durum==='crit'?'var(--amber)':'var(--green)';
+      return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:11px 13px;margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${s.urun_adi}</div>
+            <div style="font-size:.65rem;color:var(--ink3);margin-top:2px">${s.kategori||''} · Eşik: ${s.esik||0} ${s.birim||''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:1.2rem;font-weight:800;color:${barClr}">${(s.guncel||0).toFixed(s.birim==='adet'?0:1)}</div>
+            <div style="font-size:.6rem;color:var(--ink3)">${s.birim||''}</div>
+          </div>
+        </div>
+        <div style="height:4px;background:var(--card2);border-radius:2px;margin-top:8px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barClr};border-radius:2px;transition:width .3s"></div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button onclick="openStk('${s.id}')" style="flex:1;padding:6px;background:var(--green);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">+ Stok Ekle</button>
+          <button onclick="stokHareketGor('${s.id}')" style="flex:1;padding:6px;background:var(--card2);color:var(--ink3);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">Hareketler</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e){ if(el) el.innerHTML=`<div style="color:var(--red);padding:8px;font-size:.75rem">⚠️ ${e.message}</div>`; }
+}
+
+// Stok hareketi göster (basit toast ile)
+async function stokHareketGor(stokId){
+  const s=_S.find(x=>x.id===stokId); if(!s) return;
+  const mvs=await getData('stok_hareket',m=>m.stok_id===stokId&&!m.iptal);
+  mvs.sort((a,b)=>(b.ts||b.notlar||'').localeCompare(a.ts||a.notlar||''));
+  const txt=mvs.length?mvs.slice(0,5).map(m=>`${m.tur}: -${m.miktar} ${s.birim||''} (${m.notlar||''})`).join('\n'):'Hareket yok';
+  toast(`${s.urun_adi}: Başlangıç ${s.baslangic_miktar||0}, Kullanılan ${(+s.baslangic_miktar||0)-(s.guncel||0)}, Kalan ${(s.guncel||0).toFixed(1)}`);
+}
+
+// ══════════════════════════════════════════
+// STOK ÜRÜN EKLE
+// ══════════════════════════════════════════
+async function submitStokAdd(btn){
+  const ad=v('sa-ad').trim(), birim=v('sa-birim'), mik=parseFloat(v('sa-mik'))||0, esik=parseFloat(v('sa-esik'))||0, kat=v('sa-kat');
+  if(!ad){ toast('Ürün adı zorunlu',true); return; }
+  if(btn){btn.disabled=true;btn.textContent='Ekleniyor…';}
+  try {
+    const mevcut=await idbGetAll('stok');
+    const dup=mevcut.find(s=>s.urun_adi.toLowerCase()===ad.toLowerCase());
+    if(dup){ toast(`⚠️ "${ad}" zaten kayıtlı`,true); return; }
+    const id='STK'+String(mevcut.length+1).padStart(3,'0');
+    await write('stok',{id,urun_adi:ad,birim,baslangic_miktar:mik,esik,kategori:kat});
+    toast(`✅ "${ad}" stoka eklendi (${id})`);
+    closeM('m-stok-add');
+    ['sa-ad','sa-mik','sa-esik'].forEach(cl);
+    await loadStokList();
+    await buildDataLists();
+  } catch(e){ toast(e.message,true); }
+  finally{ if(btn){btn.disabled=false;btn.textContent='Ürünü Ekle';} }
+}
+
+// ══════════════════════════════════════════
+// AYARLAR
+// ══════════════════════════════════════════
+let _customHekimler=[];
+let _customSperma=[];
+
+function ayarlarAc(){
+  renderAyarlarHekimList();
+  renderAyarlarSpermaList();
+  openM('m-ayarlar');
+}
+
+function renderAyarlarHekimList(){
+  const el=document.getElementById('ay-hekim-list'); if(!el) return;
+  const all=[...HEKIMLER,..._customHekimler];
+  el.innerHTML=all.map((h,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2)">
+    <span style="font-size:.85rem;color:var(--ink)">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
+    ${i>=HEKIMLER.length?`<button onclick="customHekimSil('${h.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>`:'<span style="font-size:.65rem;color:var(--ink3)">Sistem</span>'}
+  </div>`).join('');
+}
+function renderAyarlarSpermaList(){
+  const el=document.getElementById('ay-sperma-list'); if(!el) return;
+  const all=[...SPERMA_LISTESI,..._customSperma];
+  el.innerHTML=all.map((s,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
+    <span style="font-size:.8rem;color:var(--ink)">${s}</span>
+    ${i>=SPERMA_LISTESI.length?`<button onclick="customSpermaSil('${s}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>`:'<span style="font-size:.6rem;color:var(--ink3)">Sabit</span>'}
+  </div>`).join('');
+}
+function ayarlarHekimEkle(){ document.getElementById('ay-hekim-form').style.display='block'; }
+function ayarlarHekimKaydet(){
+  const ad=v('ay-hek-ad').trim(); if(!ad) return;
+  const id='CH'+Date.now();
+  _customHekimler.push({id,ad});
+  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(sid=>{
+    const el=document.getElementById(sid); if(!el) return;
+    el.innerHTML+=`<option value="${id}">${ad}</option>`;
+  });
+  cl('ay-hek-ad');
+  document.getElementById('ay-hekim-form').style.display='none';
+  renderAyarlarHekimList();
+  toast(`✅ ${ad} eklendi`);
+}
+function customHekimSil(id){
+  _customHekimler=_customHekimler.filter(h=>h.id!==id);
+  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(sid=>{
+    const el=document.getElementById(sid); if(!el) return;
+    const opt=el.querySelector(`option[value="${id}"]`); if(opt) opt.remove();
+  });
+  renderAyarlarHekimList();
+}
+function ayarlarSpermaEkle(){ document.getElementById('ay-sperma-form').style.display='block'; }
+function ayarlarSpermaKaydet(){
+  const kod=v('ay-sp-kod').trim(); if(!kod) return;
+  _customSperma.push(kod);
+  const dl=document.getElementById('dl-sperma');
+  if(dl) dl.innerHTML+=`<option value="${kod}">`;
+  cl('ay-sp-kod');
+  document.getElementById('ay-sperma-form').style.display='none';
+  renderAyarlarSpermaList();
+  toast(`✅ ${kod} eklendi`);
+}
+function customSpermaSil(kod){
+  _customSperma=_customSperma.filter(s=>s!==kod);
+  buildSpermaList();
+  renderAyarlarSpermaList();
+}
+
+// ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
 function g(id){ return document.getElementById(id); }
@@ -1464,6 +1671,8 @@ function v(id){ return g(id)?.value||''; }
 function cl(id){ const el=g(id); if(el) el.value=''; }
 function dAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toISOString().split('T')[0]; }
 function dFwd(base,n){ const d=base?new Date(base):new Date(); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
+// Türkçe tarih gösterimi: YYYY-MM-DD → GG.AA.YYYY
+function fmtTarih(iso){ if(!iso) return '—'; const p=iso.slice(0,10).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:iso; }
 function openM(id){ g(id).classList.add('on'); }
 function closeM(id){ g(id).classList.remove('on'); }
 function mClose(e,el){ if(e.target===el) el.classList.remove('on'); }
@@ -1479,7 +1688,7 @@ function toast(msg,err=false){
 <script>
 // SERVICE WORKER (inline blob)
 const swCode=`
-const CACHE='egesut-v5';
+const CACHE='egesut-v6';
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/index.html'])).then(()=>self.skipWaiting())); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
 self.addEventListener('fetch',e=>{
