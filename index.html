@@ -879,6 +879,7 @@ async function write(table,data,method='POST',filter='') {
     } catch(e) {
       // Başarısız — kuyruğa ekle
       console.warn(`write ${table} failed:`,e.message);
+      toast(`⚠️ ${table}: ${e.message}`,true);
       await queueOp({table,method,data:arr,filter});
       updateSyncBar();
     }
@@ -932,6 +933,9 @@ async function syncNow() {
     } catch(e){
       failed+=grp.length;
       console.warn(`sync ${first.table} ${first.method} failed:`,e.message);
+      // Ekranda göster — hangi tablo, ne hatası
+      setSyncBar('warn',`❌ ${first.table}: ${e.message}`);
+      await new Promise(r=>setTimeout(r,3000));
     }
   }));
 
