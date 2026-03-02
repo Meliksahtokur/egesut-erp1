@@ -250,6 +250,7 @@ button,input,select,textarea{font-family:inherit}
 <div id="sync-bar">
   <span id="sync-bar-txt"></span>
 </div>
+<div id="sperma-warn-band" style="display:none;background:#7a3a00;color:#fff;padding:5px 14px;font-size:.68rem;font-weight:700;align-items:center"></div>
 
 <div id="pages">
 
@@ -401,7 +402,11 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-birth" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🐄 Doğum Kaydı</div>
     <div class="m-body">
-      <div class="fg"><label class="flbl">Anne Küpesi *</label><input id="b-anne" class="fi" placeholder="Küpe no veya işletme ID" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Anne Küpesi *</label><div style="position:relative">
+          <input id="b-anne" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
+            oninput="acHayvan('b-anne','ac-banne')" onfocus="acHayvan('b-anne','ac-banne')" onkeydown="acNav(event,'ac-banne')">
+          <div id="ac-banne" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
+        </div></div>
       <div class="fg"><label class="flbl">Doğum Tarihi *</label><input id="b-tarih" class="fi" type="date"></div>
       <div class="r2">
         <div class="fg"><label class="flbl">Yavru Cinsiyeti *</label><select id="b-cins" class="fsel"><option>Dişi</option><option>Erkek</option></select></div>
@@ -432,11 +437,19 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-insem" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">💉 Tohumlama</div>
     <div class="m-body">
-      <div class="fg"><label class="flbl">Hayvan Küpesi *</label><input id="i-hid" class="fi" placeholder="Küpe no" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Hayvan Küpesi *</label><div style="position:relative">
+          <input id="i-hid" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
+            oninput="acHayvan('i-hid','ac-ihid')" onfocus="acHayvan('i-hid','ac-ihid')" onkeydown="acNav(event,'ac-ihid')">
+          <div id="ac-ihid" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
+        </div></div>
       <div class="fg"><label class="flbl">Tarih *</label><input id="i-tarih" class="fi" type="date"></div>
       <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
-        <input id="i-sperma" class="fi" placeholder="Yazmaya başlayın…" autocomplete="off" list="dl-sperma">
-        <datalist id="dl-sperma"></datalist>
+        <div style="position:relative">
+          <input id="i-sperma" class="fi" placeholder="Yazmaya başlayın veya seçin…" autocomplete="off"
+            oninput="acSperma()" onfocus="acSperma()" onkeydown="acNav(event,'ac-sperma')" style="border-radius:10px 10px 0 0">
+          <div id="ac-sperma" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
+        </div>
+        <div id="sperma-stok-hint" style="font-size:.62rem;color:var(--ink3);margin-top:3px;padding:0 2px"></div>
       </div>
       <div class="fg"><label class="flbl">Tohumlayan Hekim</label><select id="i-hekim" class="fsel"></select></div>
       <button class="btn btn-b" onclick="submitInsem(this)">Kaydet + Kontrol Görevleri</button>
@@ -449,7 +462,11 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-disease" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🏥 Hastalık / Tedavi</div>
     <div class="m-body">
-      <div class="fg"><label class="flbl">Hayvan Küpesi *</label><input id="d-hid" class="fi" placeholder="Küpe no" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Hayvan Küpesi *</label><div style="position:relative">
+          <input id="d-hid" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
+            oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')">
+          <div id="ac-dhid" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
+        </div></div>
       <div class="fg"><label class="flbl">Kategori</label><select id="d-kat" class="fsel"><option>Genital</option><option>Meme</option><option>Metabolik & Diğer</option></select></div>
       <div class="fg"><label class="flbl">Tanı *</label>
         <input id="d-tani" class="fi" placeholder="Yazmaya başlayın veya listeden seçin…" autocomplete="off"
@@ -610,6 +627,24 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+
+<!-- GÖREV DETAY -->
+<div id="m-task-det" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div id="td-header" style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
+      <div id="td-hayvan" style="font-size:.68rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em"></div>
+      <div id="td-aciklama" style="font-size:1rem;font-weight:700;color:var(--ink);margin-top:4px;line-height:1.35"></div>
+      <div id="td-meta" style="font-size:.7rem;color:var(--ink3);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap"></div>
+    </div>
+    <div id="td-subs" style="padding:12px 16px;border-bottom:1px solid var(--card2);display:none"></div>
+    <div class="m-body" style="padding-top:10px">
+      <button id="td-tamam-btn" class="btn btn-g" onclick="detayTamamla()">✅ Tamamlandı Olarak İşaretle</button>
+      <button class="btn" style="background:#fff3e0;color:#b84c00;margin-top:6px;border:1px solid #f0b060;font-weight:700" onclick="detayIptal()">🗑 Görevi İptal Et</button>
+      <button class="btn btn-o" onclick="closeM('m-task-det')" style="margin-top:6px">Kapat</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -619,7 +654,7 @@ button,input,select,textarea{font-family:inherit}
 const SB_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY = 'sb_publishable_-erowcVJ100DwEQrjyIyoA_AU76R12S';
 const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-const DB_NAME = 'egesut_v6';
+const DB_NAME = 'egesut_v7';
 const DB_VER  = 1;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip'];
 const MAX_RETRY = 3;
@@ -744,11 +779,25 @@ async function sbPatch(table,qs,data) {
 async function write(table,data,method='POST',filter='') {
   const arr=(Array.isArray(data)?data:[data]);
   arr.forEach(item=>{ if(!item.id) item.id=crypto.randomUUID(); });
+  // 1. Önce local'e yaz (anında)
   await idbPut(table,arr);
+  // 2. Online ise Supabase'e gönder (2sn timeout)
   if(navigator.onLine) {
     try {
-      if(method==='POST')  await sbPost(table, arr.length===1?arr[0]:arr);
-      if(method==='PATCH') await sbPatch(table,filter,arr[0]);
+      await Promise.race([
+        (async()=>{
+          if(method==='POST')  await sbPost(table, arr.length===1?arr[0]:arr);
+          if(method==='PATCH') await sbPatch(table,filter,arr[0]);
+        })(),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),2000))
+      ]);
+      // Başarı — kuyrukta bu kayıt varsa temizle
+      const q=await getQueue();
+      for(const op of q){
+        if(op.table===table && op.data?.some(d=>arr.find(a=>a.id===d.id))){
+          await removeFromQueue(op._qid);
+        }
+      }
     } catch(e) {
       await queueOp({table,method,data:arr,filter});
       updateSyncBar();
@@ -907,6 +956,7 @@ async function refreshAll(){
 }
 async function renderFromLocal(){
   await Promise.all([loadDash(),loadAnimals(),loadStock(),loadBirths(),loadStokList()]);
+  checkSpermaUyari();
   if(_curPg==='tasks') await loadTasks(_curTaskFilter||'today');
   if(_curPg==='gecmis') await loadGecmis(_curGecmisFilter||'hepsi');
 }
@@ -1058,7 +1108,7 @@ function renderTask(t,cls='',subs=[]){
     <div class="st-prog">${doneSubs}/${subs.length} tamamlandı</div>
   </div>`:'';
 
-  return `<div class="task-card ${cls}${allDone?' done':''}" id="tc-${t.id}">
+  return `<div class="task-card ${cls}${allDone?' done':''}" id="tc-${t.id}" onclick="openTaskDet('${t.id}')" style="cursor:pointer">
     <div class="tc-header">
       <div class="tc-main">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
@@ -1351,8 +1401,10 @@ async function submitInsem(btn){
       {id:crypto.randomUUID(),hayvan_id:hayvanId,gorev_tipi:'TOHUMLAMA_HAZIRLIK',aciklama:'21. Gün gebelik kontrolü',hedef_tarih:dFwd(tarih,21),tamamlandi:false},
       {id:crypto.randomUUID(),hayvan_id:hayvanId,gorev_tipi:'TOHUMLAMA_HAZIRLIK',aciklama:'35. Gün gebelik kontrolü',hedef_tarih:dFwd(tarih,35),tamamlandi:false},
     ]);
+    await dusSpermaStok(sperma);
     toast('✅ Tohumlama + 2 kontrol görevi kaydedildi');
     closeM('m-insem'); cl('i-hid'); cl('i-sperma');
+    checkSpermaUyari();
     await renderFromLocal();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Kontrol Görevleri';} }
 }
@@ -1420,6 +1472,25 @@ async function submitTaskAdd(btn){
     loadDash();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Görev Oluştur';} }
 }
+
+
+// ══════════════════════════════════════════
+// ENTER → SONRAKI ALAN
+// ══════════════════════════════════════════
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  const tag=e.target.tagName;
+  if(tag==='TEXTAREA') return; // textarea'da enter normal satır
+  if(tag==='INPUT'||tag==='SELECT'){
+    e.preventDefault();
+    // Modal içindeki tüm focuslanabilir alanları bul
+    const modal=e.target.closest('.modal');
+    if(!modal) return;
+    const fields=Array.from(modal.querySelectorAll('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button.btn:not([disabled])'));
+    const idx=fields.indexOf(e.target);
+    if(idx>=0 && idx<fields.length-1) fields[idx+1].focus();
+  }
+});
 
 // ══════════════════════════════════════════
 // HEKİM SELECTLERİ
@@ -1506,7 +1577,9 @@ async function loadGecmis(f,btn){
       const d=fmtTarih(date);
       const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
       const hkName=hk?` · ${hk.ad}`:'';
-      const oc=(data.hayvan_id||data.anne_id)?`onclick="openDet('${data.hayvan_id||data.anne_id}')" style="cursor:pointer"`:'';
+      const hayvanKey=data.hayvan_id||data.anne_id;
+      const hayvanVarMi=hayvanKey&&(_A.some(a=>a.id===hayvanKey||a.kupe_no===hayvanKey));
+      const oc=hayvanVarMi?`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`:(hayvanKey?`onclick="toast('⚠️ ${hayvanKey} sürüde kayıtlı değil')" style="cursor:pointer;opacity:.75"`:'');
       const style='background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start;transition:background .1s';
       const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅'}[type];
       const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)'}[type];
@@ -1664,6 +1737,196 @@ function customSpermaSil(kod){
 }
 
 // ══════════════════════════════════════════
+// HAYVAN KÜPE AUTOCOMPLETE (sadece sürüden)
+// ══════════════════════════════════════════
+function acHayvan(inputId, listId){
+  const q=(document.getElementById(inputId)?.value||'').toLowerCase().trim();
+  const ac=document.getElementById(listId);
+  if(!ac) return;
+  const src=_A.length?_A:(window._allAnimals||[]);
+  const filtered=q
+    ? src.filter(a=>(a.kupe_no||'').toLowerCase().includes(q)||(a.devlet_kupe||'').toLowerCase().includes(q)||(a.id||'').toLowerCase().includes(q)).slice(0,12)
+    : src.slice(0,10);
+  if(!filtered.length){
+    ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--red)">⚠️ Sürüde eşleşen hayvan bulunamadı</div>';
+    ac.style.display='block'; return;
+  }
+  ac.innerHTML=filtered.map(a=>{
+    const kupe=a.kupe_no||a.devlet_kupe||a.id;
+    return `<div onclick="selHayvan('${inputId}','${listId}','${kupe}')" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee;display:flex;justify-content:space-between">
+      <span style="font-weight:600">${kupe}</span>
+      <span style="color:var(--ink3);font-size:.7rem">${a.irk||''} · ${a.padok||''}</span>
+    </div>`;
+  }).join('');
+  ac.style.display='block';
+}
+function selHayvan(inputId, listId, val){
+  const el=document.getElementById(inputId); if(el) el.value=val;
+  const ac=document.getElementById(listId); if(ac) ac.style.display='none';
+  // Sperma hint güncelle (tohumlama formundaysa)
+  if(inputId==='i-sperma') updateSpermaHint();
+}
+document.addEventListener('click',e=>{
+  ['ac-ihid','ac-dhid','ac-banne','ac-sperma'].forEach(id=>{
+    const ac=document.getElementById(id);
+    if(ac && !e.target.closest('#'+id) && !e.target.id?.endsWith(id.replace('ac-','')))
+      ac.style.display='none';
+  });
+});
+
+// ══════════════════════════════════════════
+// SPERMA AUTOCOMPLETE + STOK
+// ══════════════════════════════════════════
+async function acSperma(){
+  const q=(document.getElementById('i-sperma')?.value||'').toLowerCase().trim();
+  const ac=document.getElementById('ac-sperma'); if(!ac) return;
+  // Stoktan + sabit listeden + önceki kullanımlardan
+  const stokSperma=await getSpermaStok();
+  const tohs=await idbGetAll('tohumlama');
+  const used=[...new Set(tohs.map(t=>t.sperma).filter(Boolean))];
+  const all=[...new Set([...stokSperma.map(s=>s.urun_adi),...SPERMA_LISTESI,..._customSperma,...used])];
+  const filtered=q?all.filter(s=>s.toLowerCase().includes(q)):all;
+  if(!filtered.length){ ac.style.display='none'; return; }
+  // Stok miktarları
+  const stokMap={};
+  stokSperma.forEach(s=>{ stokMap[s.urun_adi]=s.guncel||0; });
+  ac.innerHTML=filtered.map(s=>{
+    const adet=stokMap[s];
+    const warn=adet!==undefined&&adet<=5;
+    const adetTxt=adet!==undefined?`<span style="color:${warn?'var(--red)':'var(--green)'};font-weight:700">${adet} doz</span>`:'';
+    return `<div onclick="selSperma('${s.replace(/'/g,"\\'")}');event.stopPropagation()" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+      <span>${s}${warn?' ⚠️':''}</span>${adetTxt}
+    </div>`;
+  }).join('');
+  ac.style.display='block';
+}
+async function selSperma(val){
+  document.getElementById('i-sperma').value=val;
+  document.getElementById('ac-sperma').style.display='none';
+  await updateSpermaHint(val);
+}
+async function updateSpermaHint(val){
+  const v2=val||document.getElementById('i-sperma')?.value;
+  const hint=document.getElementById('sperma-stok-hint'); if(!hint||!v2) return;
+  const st=await getSpermaStok();
+  const s=st.find(x=>x.urun_adi===v2);
+  if(s){
+    const warn=s.guncel<=5;
+    hint.innerHTML=`Stok: <b style="color:${warn?'var(--red)':'var(--green)'}">${s.guncel} doz</b>${warn?' ⚠️ Kritik seviye!':''}`;
+  } else {
+    hint.textContent='Stokta kayıtlı değil';
+  }
+}
+async function getSpermaStok(){
+  const all=await idbGetAll('stok');
+  const mvs=await getData('stok_hareket',m=>!m.iptal);
+  return all.filter(s=>s.kategori==='Sperma').map(s=>{
+    const used=mvs.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0);
+    return {...s, guncel:(+s.baslangic_miktar||0)-used};
+  });
+}
+// Sperma stok düşümü tohumlama kaydında
+async function dusSpermaStok(spermaAdi){
+  const st=await getSpermaStok();
+  const s=st.find(x=>x.urun_adi===spermaAdi);
+  if(s && s.guncel>0){
+    await write('stok_hareket',{id:crypto.randomUUID(),stok_id:s.id,tur:'Tohumlama',miktar:1,notlar:'Tohumlama',iptal:false});
+  }
+}
+// Sperma uyarı bandı
+async function checkSpermaUyari(){
+  const st=await getSpermaStok();
+  const critik=st.filter(s=>s.guncel<=5&&s.guncel>=0);
+  const band=document.getElementById('sperma-warn-band');
+  if(!band) return;
+  if(critik.length>0){
+    band.style.display='flex';
+    band.textContent='⚠️ Kritik sperma stoku: '+critik.map(s=>`${s.urun_adi} (${s.guncel} doz)`).join(', ');
+  } else {
+    band.style.display='none';
+  }
+}
+
+// ══════════════════════════════════════════
+// GÖREV DETAY MODAL
+// ══════════════════════════════════════════
+let _curTaskDet=null;
+async function openTaskDet(id){
+  const all=await idbGetAll('gorev_log');
+  const t=all.find(x=>x.id===id); if(!t) return;
+  if(t.tamamlandi){ toast('Bu görev zaten tamamlanmış'); return; }
+  _curTaskDet=t;
+  const today=new Date().toISOString().split('T')[0];
+  const hekim=HEKIMLER.find(h=>h.id===t.hekim_id)||_customHekimler.find(h=>h.id===t.hekim_id);
+  const isLate=t.hedef_tarih<today;
+  document.getElementById('td-hayvan').textContent=t.hayvan_id||'GENEL GÖREV';
+  document.getElementById('td-aciklama').textContent=t.aciklama||'';
+  const meta=[];
+  meta.push(`📅 ${fmtTarih(t.hedef_tarih)}${isLate?' ⚠️ Gecikmiş':''}` );
+  if(hekim) meta.push(`👨‍⚕️ ${hekim.ad}`);
+  if(t.stok_id) meta.push(`💊 ${t.stok_id}`);
+  meta.push(`🏷 ${(t.gorev_tipi||'DIGER').replace(/_/g,' ')}`);
+  document.getElementById('td-meta').innerHTML=meta.map(m=>`<span style="background:var(--card2);padding:3px 8px;border-radius:10px">${m}</span>`).join('');
+  // Alt görevler
+  const subs=all.filter(s=>s.parent_id===id&&!s.tamamlandi);
+  const subsDone=all.filter(s=>s.parent_id===id&&s.tamamlandi);
+  const subsEl=document.getElementById('td-subs');
+  if(subs.length+subsDone.length>0){
+    subsEl.style.display='block';
+    subsEl.innerHTML=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Alt Görevler (${subsDone.length}/${subs.length+subsDone.length})</div>`
+    +[...subsDone,...subs].map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
+      <div style="width:18px;height:18px;border-radius:50%;background:${s.tamamlandi?'var(--green)':'var(--card2)'};border:2px solid ${s.tamamlandi?'var(--green)':'var(--card3)'};flex-shrink:0"></div>
+      <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${s.aciklama}</span>
+    </div>`).join('');
+  } else {
+    subsEl.style.display='none';
+  }
+  openM('m-task-det');
+}
+async function detayTamamla(){
+  if(!_curTaskDet) return;
+  const btn=document.getElementById('td-tamam-btn');
+  if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
+  try {
+    await doneTask(_curTaskDet.id,_curTaskDet.hayvan_id||'',_curTaskDet.stok_id||'',+_curTaskDet.miktar||0,_curTaskDet.padok_hedef||'',{disabled:false,innerHTML:''});
+    closeM('m-task-det');
+  } catch(e){ toast(e.message,true); }
+  if(btn){btn.disabled=false;btn.textContent='✅ Tamamlandı Olarak İşaretle';}
+}
+async function detayIptal(){
+  if(!_curTaskDet) return;
+  if(!confirm('Bu görevi iptal etmek istediğinizden emin misiniz?')) return;
+  const t=_curTaskDet;
+  await write('gorev_log',{...t,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString(),iptal:true},'PATCH',`id=eq.${t.id}`);
+  // Alt görevleri de iptal et
+  const subs=await getData('gorev_log',s=>s.parent_id===t.id&&!s.tamamlandi);
+  for(const s of subs){
+    await write('gorev_log',{...s,tamamlandi:true,iptal:true},'PATCH',`id=eq.${s.id}`);
+  }
+  closeM('m-task-det');
+  toast('🗑 Görev iptal edildi');
+  loadTasks(_curTaskFilter||'today');
+  loadDash();
+}
+
+// ══════════════════════════════════════════
+// KEYBOARD NAV FOR CUSTOM DROPDOWNS
+// ══════════════════════════════════════════
+function acNav(e,listId){
+  const ac=document.getElementById(listId); if(!ac||ac.style.display==='none') return;
+  const items=ac.querySelectorAll('div[onclick]');
+  const active=ac.querySelector('.ac-active');
+  let idx=Array.from(items).indexOf(active);
+  if(e.key==='ArrowDown'){ e.preventDefault(); idx=Math.min(idx+1,items.length-1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); idx=Math.max(idx-1,0); }
+  else if(e.key==='Enter'&&active){ e.preventDefault(); active.click(); return; }
+  else if(e.key==='Escape'){ ac.style.display='none'; return; }
+  else return;
+  items.forEach(i=>i.classList.remove('ac-active'));
+  if(items[idx]){ items[idx].classList.add('ac-active'); items[idx].style.background='var(--card2)'; items[idx].scrollIntoView({block:'nearest'}); }
+}
+
+// ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
 function g(id){ return document.getElementById(id); }
@@ -1688,7 +1951,7 @@ function toast(msg,err=false){
 <script>
 // SERVICE WORKER (inline blob)
 const swCode=`
-const CACHE='egesut-v6';
+const CACHE='egesut-v7';
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/index.html'])).then(()=>self.skipWaiting())); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
 self.addEventListener('fetch',e=>{
