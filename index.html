@@ -18,7 +18,7 @@
   --ink:#1a1f14;--ink2:#3d4a32;--ink3:#6b7a5c;
   --green:#4e9a2a;--green2:#6abf3d;--green3:#98d96e;
   --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;
-  --nav:64px;--safe:env(safe-area-inset-bottom,0px);--r:16px;--r2:10px;
+  --nav:60px;--safe:env(safe-area-inset-bottom,0px);--r:16px;--r2:10px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overscroll-behavior:none;background:var(--bg)}
@@ -58,7 +58,7 @@ button,input,select,textarea{font-family:inherit}
 .nb.on{color:var(--green2)}
 .nb.on::after{content:'';position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--green2);border-radius:0 0 4px 4px;box-shadow:0 1px 8px var(--green2)}
 .nb svg{width:23px;height:23px;stroke-width:1.8}
-.nb-lbl{font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.nb-lbl{font-size:.52rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .nbadge{position:absolute;top:5px;right:calc(50% - 20px);background:var(--red);color:#fff;font-size:.52rem;font-weight:800;min-width:16px;height:16px;border-radius:8px;padding:0 3px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
 
 /* DASHBOARD */
@@ -284,12 +284,27 @@ button,input,select,textarea{font-family:inherit}
       <div class="filter-strip">
         <button class="fs-btn on" onclick="loadTasks('today',this)">Bugün</button>
         <button class="fs-btn" onclick="loadTasks('late',this)">Geciken</button>
-        <button class="fs-btn" onclick="loadTasks('all',this)">Tümü</button>
+        <button class="fs-btn" onclick="loadTasks('all',this)">Bekleyen</button>
+        <button class="fs-btn" onclick="loadTasks('done',this)">Tamamlanan</button>
       </div>
       <div id="tasks-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
     <!-- FAB: görev ekle -->
     <button class="fab" onclick="openM('m-task-add')" title="Görev Ekle">+</button>
+  </div>
+
+  <!-- GEÇMİŞ -->
+  <div id="pg-gecmis" class="pg">
+    <div class="pg-inner">
+      <div style="display:flex;gap:6px;margin-bottom:9px;overflow-x:auto;padding-bottom:2px">
+        <button class="fs-btn on" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('hepsi',this)">Hepsi</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('dogum',this)">🐄 Doğum</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('tohumlama',this)">💉 Tohumlama</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('hastalik',this)">🏥 Hastalık</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('gorev',this)">✅ Görev</button>
+      </div>
+      <div id="gecmis-body"><div class="loader"><div class="spin"></div></div></div>
+    </div>
   </div>
 
   <!-- KAYIT -->
@@ -336,6 +351,10 @@ button,input,select,textarea{font-family:inherit}
     <div id="tbadge" class="nbadge" style="display:none">0</div>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
     <span class="nb-lbl">Görevler</span>
+  </button>
+  <button class="nb" id="nb-gecmis" onclick="goTo('gecmis')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <span class="nb-lbl">Geçmiş</span>
   </button>
   <button class="nb" id="nb-log" onclick="goTo('log')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -395,6 +414,7 @@ button,input,select,textarea{font-family:inherit}
           <div><label class="flbl" style="font-size:.58rem">PG (ml)</label><input id="b-pg" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
         </div>
       </div>
+      <div class="fg"><label class="flbl">İşlemi Yapan Hekim</label><select id="b-hekim" class="fsel"></select></div>
       <button class="btn btn-g" onclick="submitBirth(this)">Kaydet + Protokol Görevleri</button>
       <button class="btn btn-o" onclick="closeM('m-birth')">İptal</button>
     </div>
@@ -407,8 +427,12 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan Küpesi *</label><input id="i-hid" class="fi" placeholder="Küpe no" autocomplete="off"></div>
       <div class="fg"><label class="flbl">Tarih *</label><input id="i-tarih" class="fi" type="date"></div>
-      <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label><input id="i-sperma" class="fi" placeholder="ABK-Zenith-ET" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
+        <input id="i-sperma" class="fi" placeholder="Yazmaya başlayın…" autocomplete="off" list="dl-sperma">
+        <datalist id="dl-sperma"></datalist>
+      </div>
       <div class="fg"><label class="flbl">Tohumlayan</label><input id="i-toh" class="fi" placeholder="Dr. Ahmet" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Tohumlayan Hekim</label><select id="i-hekim" class="fsel"></select></div>
       <button class="btn btn-b" onclick="submitInsem(this)">Kaydet + Kontrol Görevleri</button>
       <button class="btn btn-o" onclick="closeM('m-insem')">İptal</button>
     </div>
@@ -421,13 +445,18 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan Küpesi *</label><input id="d-hid" class="fi" placeholder="Küpe no" autocomplete="off"></div>
       <div class="fg"><label class="flbl">Kategori</label><select id="d-kat" class="fsel"><option>Genital</option><option>Meme</option><option>Metabolik & Diğer</option></select></div>
-      <div class="fg"><label class="flbl">Tanı *</label><input id="d-tani" class="fi" placeholder="Mastit (Klinik-Hafif)" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Tanı *</label>
+        <input id="d-tani" class="fi" placeholder="Yazmaya başlayın veya listeden seçin…" autocomplete="off"
+          oninput="acDisease()" onfocus="acDisease()" style="border-radius:10px 10px 0 0">
+        <div id="ac-dis" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;margin-bottom:4px"></div>
+      </div>
       <div class="fg"><label class="flbl">Şiddet</label><select id="d-sid" class="fsel"><option>Hafif</option><option selected>Orta</option><option>Şiddetli</option><option>Kritik</option></select></div>
       <div class="fg"><label class="flbl">Semptomlar</label><textarea id="d-sempt" class="fta" placeholder="Gözlemlenen belirtiler…"></textarea></div>
       <div class="r2">
         <div class="fg"><label class="flbl">İlaç Stok ID</label><input id="d-stok" class="fi" placeholder="STK001" autocomplete="off"></div>
         <div class="fg"><label class="flbl">Miktar (ml)</label><input id="d-mik" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
       </div>
+      <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
       <button class="btn btn-r" onclick="submitDisease(this)">Kaydet</button>
       <button class="btn btn-o" onclick="closeM('m-disease')">İptal</button>
     </div>
@@ -520,10 +549,37 @@ button,input,select,textarea{font-family:inherit}
 const SB_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY = 'sb_publishable_-erowcVJ100DwEQrjyIyoA_AU76R12S';
 const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-const DB_NAME = 'egesut_v4';
+const DB_NAME = 'egesut_v5';
 const DB_VER  = 1;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip'];
 const MAX_RETRY = 3;
+
+// ══════════════════════════════════════════
+// SABİT VERİLER
+// ══════════════════════════════════════════
+const HEKIMLER=[
+  {id:'H1',ad:'Melik Tokur'},
+  {id:'H2',ad:'Hüseyin Aygün'},
+  {id:'H3',ad:'Süleyman Kocabaş'},
+];
+const VARSAYILAN_HEKIM='H1';
+
+const HASTALIK_LISTESI=[
+  'Mastit (Klinik-Hafif)','Mastit (Klinik-Orta)','Mastit (Klinik-Şiddetli)','Subklinik Mastit',
+  'Metrit (Sınıf 1)','Metrit (Sınıf 2)','Metrit (Sınıf 3)','Endometrit','Pyometra',
+  'Retensiyo Sekundinarum','Kistik Over','Anoestrus',
+  'Hipokalsemi (Süt Humması)','Ketozis','Ruminal Asidoz','Timpani','Şirden Deplasmanı',
+  'Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı',
+  'Pnömoni','Buzağı İshali','Buzağı Göbek İltihabı','Neonatal Zayıflık',
+];
+
+const SPERMA_LISTESI=[
+  'ABK-Zenith-ET','ABK-Parfect-ET','ABK-Iconic-ET',
+  'CRI-Crushabull','CRI-Extreme-ET','Alta-Kalahari','Alta-Achiever',
+  'Semex-O-Man','Semex-Planet',
+];
+
+let _disFreq={};
 
 // ══════════════════════════════════════════
 // INDEXEDDB
@@ -555,12 +611,20 @@ async function idbPut(store,data) {
     tx.oncomplete=()=>res(true); tx.onerror=e=>rej(e.target.error);
   });
 }
-async function idbClearAndPut(store,data) {
+async function idbClearAndPut(store,remoteData) {
   const db=await openDB();
+  const arr=Array.isArray(remoteData)?remoteData:[remoteData];
+  // Kuyrukta bekleyen POST kayıtlarını koru — Supabase'e henüz gitmediler
+  const queue=await getQueue();
+  const pendingItems=queue
+    .filter(op=>op.table===store&&op.method==='POST')
+    .flatMap(op=>op.data||[]);
   return new Promise((res,rej)=>{
     const tx=db.transaction(store,'readwrite'),os=tx.objectStore(store);
     os.clear();
-    (Array.isArray(data)?data:[data]).forEach(item=>{ if(!item.id)item.id=crypto.randomUUID(); os.put(item); });
+    arr.forEach(item=>{ if(!item.id)item.id=crypto.randomUUID(); os.put(item); });
+    // Remote'da olmayan pending kayıtları geri koy
+    pendingItems.forEach(item=>{ if(!arr.find(r=>r.id===item.id)) os.put(item); });
     tx.oncomplete=()=>res(true); tx.onerror=e=>rej(e.target.error);
   });
 }
@@ -726,6 +790,9 @@ window.addEventListener('load',async()=>{
   await openDB();
   const t=new Date().toISOString().split('T')[0];
   ['b-tarih','i-tarih','ta-tarih'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=t; });
+  populateHekimSelects();
+  buildSpermaList();
+  await buildDiseaseFreq();
   await renderFromLocal();
   if(navigator.onLine){
     await pullFromSupabase();
@@ -769,7 +836,8 @@ function goTo(pg){
   document.querySelectorAll('.nb').forEach(el=>el.classList.remove('on'));
   document.getElementById('pg-'+pg).classList.add('on');
   document.getElementById('nb-'+pg).classList.add('on');
-  if(pg==='tasks') loadTasks('today');
+  if(pg==='tasks') loadTasks(_curTaskFilter||'today');
+  if(pg==='gecmis') loadGecmis(_curGecmisFilter||'hepsi');
 }
 
 // ══════════════════════════════════════════
@@ -853,25 +921,42 @@ async function showGebe(){
 // ══════════════════════════════════════════
 // TASKS — alt görev desteğiyle
 // ══════════════════════════════════════════
+let _curTaskFilter='today';
 async function loadTasks(f,btn){
+  _curTaskFilter=f;
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
   const el=document.getElementById('tasks-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const today=new Date().toISOString().split('T')[0];
-    // Ana görevler (parent_id yok)
-    let data=await getData('gorev_log',t=>!t.tamamlandi&&!t.parent_id);
+    const all=await idbGetAll('gorev_log');
+
+    if(f==='done'){
+      let done=all.filter(t=>t.tamamlandi&&!t.parent_id);
+      done.sort((a,b)=>(b.tamamlanma_tarihi||b.hedef_tarih||'').localeCompare(a.tamamlanma_tarihi||a.hedef_tarih||''));
+      if(!done.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Henüz tamamlanan görev yok</div>'; return; }
+      el.innerHTML=done.slice(0,150).map(t=>`<div class="task-card" style="border-left-color:var(--ink3);opacity:.65">
+        <div class="tc-header"><div class="tc-main">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span class="tc-id">${t.hayvan_id||'GENEL'}</span>
+            <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
+          </div>
+          <div class="tc-desc">${t.aciklama||''}</div>
+          <div class="tc-meta" style="color:var(--green)">✅ Tamamlandı: ${t.tamamlanma_tarihi?t.tamamlanma_tarihi.slice(0,10):(t.hedef_tarih||'')}</div>
+        </div></div>
+      </div>`).join('');
+      return;
+    }
+
+    let data=all.filter(t=>!t.tamamlandi&&!t.parent_id);
     if(f==='today') data=data.filter(t=>t.hedef_tarih<=today);
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
-
-    // Alt görevleri de çek
-    const allSubs=await getData('gorev_log',t=>!!t.parent_id);
-    el.innerHTML=data.slice(0,100).map(t=>{
+    const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
+    el.innerHTML=data.slice(0,150).map(t=>{
       const cls=t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':'';
-      const subs=allSubs.filter(s=>s.parent_id===t.id);
-      return renderTask(t,cls,subs);
+      return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id));
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
@@ -1113,7 +1198,8 @@ async function submitBirth(btn){
     const dupCheck=await getData('buzagi_takip',b=>b.kupe_no===kupe);
     if(dupCheck.length){ toast(`⚠️ ${kupe} küpesi zaten kayıtlı`,true); return; }
 
-    await write('dogum',{id:crypto.randomUUID(),anne_id:anneId,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip});
+    const hekimIdB=v('b-hekim');
+    await write('dogum',{id:crypto.randomUUID(),anne_id:anneId,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip,hekim_id:hekimIdB});
     await write('buzagi_takip',{id:crypto.randomUUID(),kupe_no:kupe,cinsiyet:cins,dogum_tarihi:tarih,anne_id:anneId}).catch(()=>{});
 
     // Anne ilaç stok düşümü — sadece dolu alanlar
@@ -1176,7 +1262,8 @@ async function submitInsem(btn){
     const prev=await getData('tohumlama',t=>t.hayvan_id===hid||t.hayvan_id===(_A.find(a=>a.kupe_no===hid)?.id));
     const hayvan=_A.find(a=>a.kupe_no===hid||a.id===hid);
     const hayvanId=hayvan?.id||hid;
-    await write('tohumlama',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih,sperma,tohumlayan:v('i-toh'),sonuc:'Bekliyor',deneme_no:prev.length+1});
+    const hekimIdI=v('i-hekim');
+    await write('tohumlama',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih,sperma,hekim_id:hekimIdI,sonuc:'Bekliyor',deneme_no:prev.length+1});
     await write('gorev_log',[
       {id:crypto.randomUUID(),hayvan_id:hayvanId,gorev_tipi:'TOHUMLAMA_HAZIRLIK',aciklama:'21. Gün gebelik kontrolü',hedef_tarih:dFwd(tarih,21),tamamlandi:false},
       {id:crypto.randomUUID(),hayvan_id:hayvanId,gorev_tipi:'TOHUMLAMA_HAZIRLIK',aciklama:'35. Gün gebelik kontrolü',hedef_tarih:dFwd(tarih,35),tamamlandi:false},
@@ -1198,7 +1285,8 @@ async function submitDisease(btn){
     const hayvan=_A.find(a=>a.kupe_no===hid||a.id===hid);
     const hayvanId=hayvan?.id||hid;
     const stokId=v('d-stok'),mik=+v('d-mik');
-    await write('hastalik_log',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih:new Date().toISOString().split('T')[0],kategori:v('d-kat'),tani,siddet:v('d-sid'),semptomlar:v('d-sempt'),ilac_stok_id:stokId||null,ilac_miktar:mik||null,durum:'Aktif'});
+    const hekimIdD=v('d-hekim');
+    await write('hastalik_log',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih:new Date().toISOString().split('T')[0],kategori:v('d-kat'),tani,siddet:v('d-sid'),hekim_id:hekimIdD,semptomlar:v('d-sempt'),ilac_stok_id:stokId||null,ilac_miktar:mik||null,durum:'Aktif'});
     if(stokId&&mik>0) await write('stok_hareket',{id:crypto.randomUUID(),stok_id:stokId,tur:'Tedavi',miktar:mik,notlar:'Hasta:'+hayvanId,iptal:false});
     toast('✅ Hastalık kaydedildi');
     closeM('m-disease');
@@ -1248,6 +1336,113 @@ async function submitTaskAdd(btn){
     await loadTasks(_curTaskFilter||'today');
     loadDash();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Görev Oluştur';} }
+}
+
+// ══════════════════════════════════════════
+// HEKİM SELECTLERİ
+// ══════════════════════════════════════════
+function populateHekimSelects(){
+  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.innerHTML=HEKIMLER.map(h=>`<option value="${h.id}">${h.ad}</option>`).join('');
+    el.value=VARSAYILAN_HEKIM;
+  });
+}
+
+// ══════════════════════════════════════════
+// SPERMA LİSTESİ
+// ══════════════════════════════════════════
+async function buildSpermaList(){
+  const tohs=await idbGetAll('tohumlama');
+  const used=[...new Set(tohs.map(t=>t.sperma).filter(Boolean))];
+  const all=[...new Set([...SPERMA_LISTESI,...used])];
+  const dl=document.getElementById('dl-sperma');
+  if(dl) dl.innerHTML=all.map(s=>`<option value="${s}">`).join('');
+}
+
+// ══════════════════════════════════════════
+// HASTALIK AUTOCOMPLETE
+// ══════════════════════════════════════════
+async function buildDiseaseFreq(){
+  const logs=await idbGetAll('hastalik_log');
+  _disFreq={};
+  logs.forEach(l=>{ if(l.tani) _disFreq[l.tani]=(_disFreq[l.tani]||0)+1; });
+}
+async function acDisease(){
+  const q=(document.getElementById('d-tani').value||'').toLowerCase().trim();
+  const ac=document.getElementById('ac-dis');
+  const logs=await idbGetAll('hastalik_log');
+  const usedDis=[...new Set(logs.map(l=>l.tani).filter(Boolean))];
+  const all=[...new Set([...HASTALIK_LISTESI,...usedDis])];
+  all.sort((a,b)=>(_disFreq[b]||0)-(_disFreq[a]||0));
+  const filtered=q?all.filter(d=>d.toLowerCase().includes(q)):all.slice(0,12);
+  if(!filtered.length){ ac.style.display='none'; return; }
+  ac.innerHTML=filtered.map(d=>`<div onclick="selDis('${d.replace(/'/g,"\\'")}');event.stopPropagation()"
+    style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee">
+    ${d}${_disFreq[d]?` <span style="color:#aaa;font-size:.6rem">(${_disFreq[d]}x)</span>`:''}
+  </div>`).join('');
+  ac.style.display='block';
+}
+function selDis(val){
+  document.getElementById('d-tani').value=val;
+  document.getElementById('ac-dis').style.display='none';
+}
+document.addEventListener('click',e=>{
+  const ac=document.getElementById('ac-dis');
+  if(ac&&!e.target.closest('#d-tani')&&!e.target.closest('#ac-dis')) ac.style.display='none';
+});
+
+// ══════════════════════════════════════════
+// GEÇMİŞ SEKMESİ
+// ══════════════════════════════════════════
+let _curGecmisFilter='hepsi';
+async function loadGecmis(f,btn){
+  _curGecmisFilter=f;
+  if(btn){ document.querySelectorAll('#pg-gecmis .fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
+  const el=document.getElementById('gecmis-body');
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  try {
+    const entries=[];
+    if(f==='hepsi'||f==='dogum'){
+      (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,data:r}));
+    }
+    if(f==='hepsi'||f==='tohumlama'){
+      (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
+    }
+    if(f==='hepsi'||f==='hastalik'){
+      (await idbGetAll('hastalik_log')).forEach(r=>entries.push({type:'hastalik',date:r.tarih,data:r}));
+    }
+    if(f==='hepsi'||f==='gorev'){
+      (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id))
+        .forEach(r=>entries.push({type:'gorev',date:r.tamamlanma_tarihi||r.hedef_tarih,data:r}));
+    }
+    entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(!entries.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>'; return; }
+    el.innerHTML=entries.slice(0,300).map(e=>{
+      const {type,date,data}=e;
+      const d=(date||'?').slice(0,10);
+      const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
+      const hkName=hk?` · ${hk.ad}`:'';
+      const oc=(data.hayvan_id||data.anne_id)?`onclick="openDet('${data.hayvan_id||data.anne_id}')" style="cursor:pointer"`:'';
+      const style='background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start;transition:background .1s';
+      const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅'}[type];
+      const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)'}[type];
+      let title='', sub='';
+      if(type==='dogum'){ title=`${data.anne_id||'?'} → ${data.yavru_kupe||'?'} (${data.yavru_cins||'?'})`; sub=`${data.dogum_tipi||'Normal'}${hkName}`; }
+      if(type==='tohumlama'){ title=`${data.hayvan_id||'?'} — ${data.sperma||'?'}`; const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)'; sub=`${data.deneme_no||1}. deneme · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`; }
+      if(type==='hastalik'){ title=`${data.hayvan_id||'?'} — ${data.tani||'?'}`; const sc=data.durum==='Aktif'?'var(--red)':'var(--green)'; sub=`${data.siddet||''} · <b style="color:${sc}">${data.durum||''}</b>${hkName}`; }
+      if(type==='gorev'){ title=`${data.hayvan_id||'GENEL'} — ${data.aciklama||''}`; sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span>${hkName}`; }
+      const dateStr=type==='gorev'?`✅ ${d}`:d;
+      return `<div style="${style}" ${oc}>
+        <div style="width:36px;height:36px;border-radius:10px;background:${icoBg};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${ico}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${title}</div>
+          <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${sub}</div>
+          <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${dateStr}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 
 // ══════════════════════════════════════════
