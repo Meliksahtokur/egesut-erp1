@@ -475,9 +475,18 @@ button,input,select,textarea{font-family:inherit}
       </div>
       <div class="fg"><label class="flbl">Şiddet</label><select id="d-sid" class="fsel"><option>Hafif</option><option selected>Orta</option><option>Şiddetli</option><option>Kritik</option></select></div>
       <div class="fg"><label class="flbl">Semptomlar</label><textarea id="d-sempt" class="fta" placeholder="Gözlemlenen belirtiler…"></textarea></div>
-      <div class="r2">
-        <div class="fg"><label class="flbl">İlaç Stok ID</label><input id="d-stok" class="fi" placeholder="STK001" autocomplete="off"></div>
-        <div class="fg"><label class="flbl">Miktar (ml)</label><input id="d-mik" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
+      <div class="fg"><label class="flbl">İlaç (sadece stoktan seç)</label>
+        <div style="position:relative">
+          <input id="d-stok-ac" class="fi" placeholder="İlaç adı yazın…" autocomplete="off"
+            oninput="acIlac()" onfocus="acIlac()" onkeydown="acNav(event,'ac-dilac')"
+            style="border-radius:10px 10px 0 0">
+          <div id="ac-dilac" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
+        </div>
+        <input id="d-stok" type="hidden">
+        <div id="d-stok-hint" style="font-size:.62rem;color:var(--ink3);margin-top:3px;padding:0 2px"></div>
+      </div>
+      <div class="fg"><label class="flbl">Miktar</label>
+        <input id="d-mik" class="fi" type="number" placeholder="0" inputmode="decimal">
       </div>
       <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
       <button class="btn btn-r" onclick="submitDisease(this)">Kaydet</button>
@@ -585,8 +594,22 @@ button,input,select,textarea{font-family:inherit}
         <div class="fg"><label class="flbl">Kritik Eşik</label><input id="sa-esik" class="fi" type="number" placeholder="Uyarı sınırı" inputmode="decimal"></div>
         <div class="fg"><label class="flbl">Kategori</label>
           <select id="sa-kat" class="fsel">
-            <option>İlaç</option><option>Hormon</option><option>Vitamin</option>
-            <option>Ekipman</option><option>Sarf</option><option>Diğer</option>
+            <optgroup label="İlaç">
+              <option value="Antibiyotik">Antibiyotik</option>
+              <option value="NSAID">NSAID / Ağrı Kesici</option>
+              <option value="Hormon">Hormon</option>
+              <option value="Vitamin">Vitamin / Mineral</option>
+              <option value="Antiparaziter">Antiparaziter</option>
+              <option value="Diğer İlaç">Diğer İlaç</option>
+            </optgroup>
+            <optgroup label="Sperma">
+              <option value="Sperma">Sperma</option>
+            </optgroup>
+            <optgroup label="Ekipman & Sarf">
+              <option value="Ekipman">Ekipman</option>
+              <option value="Sarf">Sarf Malzeme</option>
+              <option value="Diğer">Diğer</option>
+            </optgroup>
           </select>
         </div>
       </div>
@@ -645,6 +668,43 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+
+<!-- HASTALIK DETAY -->
+<div id="m-hst-det" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
+      <div id="hd-hayvan" style="font-size:.68rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em"></div>
+      <div id="hd-tani" style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px"></div>
+      <div id="hd-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <div class="m-body">
+      <div id="hd-body" style="font-size:.82rem;color:var(--ink2);line-height:1.55;margin-bottom:12px"></div>
+      <button class="btn btn-g" onclick="hstKapat()">✅ İyileşti — Kaydı Kapat</button>
+      <button class="btn btn-o" onclick="closeM('m-hst-det')" style="margin-top:6px">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOHUMLAMA DETAY -->
+<div id="m-toh-det" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
+      <div id="td2-hayvan" style="font-size:.68rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.07em"></div>
+      <div id="td2-sperma" style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px"></div>
+      <div id="td2-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <div class="m-body">
+      <div style="font-size:.75rem;font-weight:700;color:var(--ink3);margin-bottom:8px;text-transform:uppercase">Sonuç Güncelle</div>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button onclick="tohSonuc('Gebe')" class="btn" style="flex:1;background:var(--green);color:#fff;padding:10px">✅ Gebe</button>
+        <button onclick="tohSonuc('Boş')" class="btn" style="flex:1;background:var(--red);color:#fff;padding:10px">❌ Boş</button>
+        <button onclick="tohSonuc('Bekliyor')" class="btn" style="flex:1;background:var(--amber);color:#fff;padding:10px">⏳ Bekliyor</button>
+      </div>
+      <button class="btn btn-o" onclick="closeM('m-toh-det')" style="margin-top:2px">Kapat</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -656,7 +716,8 @@ const SB_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 // sb_publishable_ formatı REST API'de çalışmıyor — eyJ... ile başlayan key lazım
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
 const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
-const DB_NAME = 'egesut_v8';
+const HDR_UPSERT = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'};
+const DB_NAME = 'egesut_v9';
 const DB_VER  = 1;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip'];
 const MAX_RETRY = 3;
@@ -777,7 +838,8 @@ async function sbGet(table,qs='') {
   return r.json();
 }
 async function sbPost(table,data) {
-  const r=await sbFetch(`${SB_URL}/rest/v1/${table}`,{method:'POST',headers:HDR,body:JSON.stringify(data)});
+  // HDR_UPSERT ile gönder — aynı id varsa günceller, yoksa ekler (duplicate önler)
+  const r=await sbFetch(`${SB_URL}/rest/v1/${table}`,{method:'POST',headers:HDR_UPSERT,body:JSON.stringify(data)});
   if(!r.ok){
     const err=await r.json().catch(()=>({}));
     if(r.status===401) throw new Error('401: API key hatalı');
@@ -805,7 +867,7 @@ async function write(table,data,method='POST',filter='') {
   // 2. Supabase'e gönder (sbFetch kendi içinde 12sn AbortController kullanıyor)
   if(navigator.onLine) {
     try {
-      if(method==='POST')  await sbPost(table, arr.length===1?arr[0]:arr);
+      if(method==='POST')  await sbPost(table, arr); // Supabase her zaman array bekliyor
       if(method==='PATCH') await sbPatch(table,filter,arr[0]);
       // Başarılı — kuyruktan temizle
       const q=await getQueue();
@@ -856,7 +918,7 @@ async function syncNow() {
         const allData=grp.flatMap(op=>op.data||[]);
         // Duplicate önle: id bazında unique yap
         const unique=[...new Map(allData.map(d=>[d.id,d])).values()];
-        await sbPost(first.table, unique.length===1?unique[0]:unique);
+        await sbPost(first.table, unique); // Her zaman array
         for(const op of grp){ await removeFromQueue(op._qid); sent++; }
       } else if(first.method==='PATCH'){
         // PATCH'ler ayrı ayrı — her birinin filter'ı farklı
@@ -1383,7 +1445,8 @@ async function submitBirth(btn){
 
     const hekimIdB=v('b-hekim');
     await write('dogum',{id:crypto.randomUUID(),anne_id:anneId,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip,hekim_id:hekimIdB});
-    await write('buzagi_takip',{id:crypto.randomUUID(),kupe_no:kupe,cinsiyet:cins,dogum_tarihi:tarih,anne_id:anneId}).catch(()=>{});
+    // buzagi_takip sadece local — Supabase tablosu yok
+    await idbPut('buzagi_takip',[{id:crypto.randomUUID(),kupe_no:kupe,cinsiyet:cins,dogum_tarihi:tarih,anne_id:anneId}]);
 
     // Anne ilaç stok düşümü — sadece dolu alanlar
     const ilaclar=[
@@ -1469,13 +1532,16 @@ async function submitDisease(btn){
   try {
     const hayvan=_A.find(a=>a.kupe_no===hid||a.id===hid);
     const hayvanId=hayvan?.id||hid;
-    const stokId=v('d-stok'),mik=+v('d-mik');
+    const stokId=document.getElementById('d-stok')?.value||'',mik=+v('d-mik');
     const hekimIdD=v('d-hekim');
     await write('hastalik_log',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih:new Date().toISOString().split('T')[0],kategori:v('d-kat'),tani,siddet:v('d-sid'),hekim_id:hekimIdD,semptomlar:v('d-sempt'),ilac_stok_id:stokId||null,ilac_miktar:mik||null,durum:'Aktif'});
-    if(stokId&&mik>0) await write('stok_hareket',{id:crypto.randomUUID(),stok_id:stokId,tur:'Tedavi',miktar:mik,notlar:'Hasta:'+hayvanId,iptal:false});
+    if(stokId&&mik>0){
+      await write('stok_hareket',{id:crypto.randomUUID(),stok_id:stokId,tur:'Tedavi',miktar:mik,notlar:'Hasta:'+hayvanId,iptal:false});
+      _ilacCache=[]; // Cache'i temizle, bir sonraki açılışta yenilensin
+    }
     toast('✅ Hastalık kaydedildi');
     closeM('m-disease');
-    ['d-hid','d-tani','d-sempt','d-stok','d-mik'].forEach(cl);
+    ['d-hid','d-tani','d-sempt','d-stok-ac','d-stok','d-mik'].forEach(cl); document.getElementById('d-stok-hint').textContent='';
     await renderFromLocal();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet';} }
 }
@@ -1629,7 +1695,12 @@ async function loadGecmis(f,btn){
       const hkName=hk?` · ${hk.ad}`:'';
       const hayvanKey=data.hayvan_id||data.anne_id;
       const hayvanVarMi=hayvanKey&&(_A.some(a=>a.id===hayvanKey||a.kupe_no===hayvanKey));
-      const oc=hayvanVarMi?`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`:(hayvanKey?`onclick="toast('⚠️ ${hayvanKey} sürüde kayıtlı değil')" style="cursor:pointer;opacity:.75"`:'');
+      // Tip bazlı onclick: hastalık ve tohumlama kendi detaylarını açsın
+      let oc='';
+      if(type==='hastalik') oc=`onclick="openHstDet('${data.id}')" style="cursor:pointer"`;
+      else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
+      else if(type==='dogum'&&hayvanVarMi) oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
+      else if(type==='dogum'&&hayvanKey) oc=`onclick="toast('⚠️ ${hayvanKey} sürüde kayıtlı değil')" style="cursor:pointer;opacity:.75"`;
       const style='background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start;transition:background .1s';
       const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅'}[type];
       const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)'}[type];
@@ -1977,8 +2048,136 @@ function acNav(e,listId){
 }
 
 // ══════════════════════════════════════════
+// İLAÇ AUTOCOMPLETE (sadece stoktan)
+// ══════════════════════════════════════════
+let _ilacCache=[];
+async function refreshIlacCache(){
+  const stk=await idbGetAll('stok');
+  const mvs=await getData('stok_hareket',m=>!m.iptal);
+  _ilacCache=stk
+    .filter(s=>s.kategori&&['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','İlaç'].includes(s.kategori))
+    .map(s=>{
+      const used=mvs.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0);
+      return {...s, guncel:(+s.baslangic_miktar||0)-used};
+    });
+}
+async function acIlac(){
+  const q=(document.getElementById('d-stok-ac')?.value||'').toLowerCase().trim();
+  const ac=document.getElementById('ac-dilac'); if(!ac) return;
+  if(!_ilacCache.length) await refreshIlacCache();
+  const filtered=q?_ilacCache.filter(s=>s.urun_adi.toLowerCase().includes(q)):_ilacCache.slice(0,12);
+  if(!filtered.length){
+    ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--red)">⚠️ Stokta eşleşen ilaç yok — önce stoka ekleyin</div>';
+    ac.style.display='block'; return;
+  }
+  ac.innerHTML=filtered.map(s=>{
+    const warn=s.guncel<=0;
+    return `<div onclick="selIlac('${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||'ml'}',${s.guncel});event.stopPropagation()"
+      style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;${warn?'opacity:.5':''}">
+      <div>
+        <div style="font-weight:600">${s.urun_adi}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">${s.kategori||''}</div>
+      </div>
+      <span style="color:${warn?'var(--red)':s.guncel<=5?'var(--amber)':'var(--green)'};font-weight:700;font-size:.78rem">${s.guncel.toFixed(s.birim==='adet'?0:1)} ${s.birim||''}</span>
+    </div>`;
+  }).join('');
+  ac.style.display='block';
+}
+function selIlac(id, ad, birim, guncel){
+  document.getElementById('d-stok-ac').value=ad;
+  document.getElementById('d-stok').value=id;
+  document.getElementById('ac-dilac').style.display='none';
+  const hint=document.getElementById('d-stok-hint');
+  if(hint){
+    const warn=guncel<=5;
+    hint.innerHTML=`Birim: <b>${birim}</b> · Stok: <b style="color:${warn?'var(--red)':'var(--green)'}">${guncel.toFixed(birim==='adet'?0:1)} ${birim}</b>${warn?' ⚠️':''}`;
+  }
+}
+document.addEventListener('click',e=>{
+  const ac=document.getElementById('ac-dilac');
+  if(ac&&!e.target.closest('#d-stok-ac')&&!e.target.closest('#ac-dilac')) ac.style.display='none';
+});
+
+// ══════════════════════════════════════════
+// HASTALIK DETAY MODAL
+// ══════════════════════════════════════════
+let _curHst=null;
+async function openHstDet(id){
+  const all=await idbGetAll('hastalik_log');
+  const h=all.find(x=>x.id===id); if(!h) return;
+  _curHst=h;
+  const hk=HEKIMLER.find(x=>x.id===h.hekim_id)||_customHekimler.find(x=>x.id===h.hekim_id);
+  const stk=(await idbGetAll('stok')).find(s=>s.id===h.ilac_stok_id);
+  document.getElementById('hd-hayvan').textContent=h.hayvan_id||'?';
+  document.getElementById('hd-tani').textContent=`🏥 ${h.tani||'?'}`;
+  const chips=[
+    `<span style="background:${h.durum==='Aktif'?'rgba(192,50,26,.12)':'rgba(78,154,42,.12)'};color:${h.durum==='Aktif'?'var(--red)':'var(--green)'};padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700">${h.durum||'Aktif'}</span>`,
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${h.siddet||''}</span>`,
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(h.tarih)}</span>`,
+    hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
+  ];
+  document.getElementById('hd-meta').innerHTML=chips.filter(Boolean).join('');
+  const rows=[];
+  if(h.kategori) rows.push(`<b>Kategori:</b> ${h.kategori}`);
+  if(h.semptomlar) rows.push(`<b>Semptomlar:</b> ${h.semptomlar}`);
+  if(stk) rows.push(`<b>İlaç:</b> ${stk.urun_adi} — ${h.ilac_miktar||0} ${stk.birim||''}`);
+  document.getElementById('hd-body').innerHTML=rows.join('<br>') || 'Ek bilgi yok';
+  openM('m-hst-det');
+}
+async function hstKapat(){
+  if(!_curHst) return;
+  await write('hastalik_log',{..._curHst,durum:'İyileşti',kapanma_tarihi:new Date().toISOString().split('T')[0]},'PATCH',`id=eq.${_curHst.id}`);
+  toast('✅ Hastalık kaydı kapatıldı');
+  closeM('m-hst-det');
+  await renderFromLocal();
+}
+
+// ══════════════════════════════════════════
+// TOHUMLAMA DETAY MODAL
+// ══════════════════════════════════════════
+let _curToh=null;
+async function openTohDet(id){
+  const all=await idbGetAll('tohumlama');
+  const t=all.find(x=>x.id===id); if(!t) return;
+  _curToh=t;
+  const hk=HEKIMLER.find(x=>x.id===t.hekim_id)||_customHekimler.find(x=>x.id===t.hekim_id);
+  document.getElementById('td2-hayvan').textContent=t.hayvan_id||'?';
+  document.getElementById('td2-sperma').textContent=`💉 ${t.sperma||'?'}`;
+  const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'?'var(--red)':'var(--amber)';
+  const chips=[
+    `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc||'Bekliyor'}</span>`,
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no||1}. deneme</span>`,
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(t.tarih)}</span>`,
+    hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
+  ];
+  document.getElementById('td2-meta').innerHTML=chips.filter(Boolean).join('');
+  openM('m-toh-det');
+}
+async function tohSonuc(sonuc){
+  if(!_curToh) return;
+  await write('tohumlama',{..._curToh,sonuc},'PATCH',`id=eq.${_curToh.id}`);
+  if(sonuc==='Gebe'){
+    toast('✅ Gebe olarak işaretlendi');
+  } else if(sonuc==='Boş'){
+    toast('Boş olarak işaretlendi');
+  } else {
+    toast('Güncellendi');
+  }
+  closeM('m-toh-det');
+  await renderFromLocal();
+}
+
+// ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
+// buildDataLists - ilaç datalist'ini güncelle (geriye uyumluluk)
+async function buildDataLists(){
+  // İlaç datalist'i stoktan
+  const stk=await idbGetAll('stok');
+  const dlI=document.getElementById('dl-ilac');
+  if(dlI) dlI.innerHTML=stk.map(s=>`<option value="${s.id}">${s.urun_adi}</option>`).join('');
+}
+
 function g(id){ return document.getElementById(id); }
 function v(id){ return g(id)?.value||''; }
 function cl(id){ const el=g(id); if(el) el.value=''; }
@@ -2001,7 +2200,7 @@ function toast(msg,err=false){
 <script>
 // SERVICE WORKER (inline blob)
 const swCode=`
-const CACHE='egesut-v8';
+const CACHE='egesut-v9';
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/','/index.html'])).then(()=>self.skipWaiting())); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
 self.addEventListener('fetch',e=>{
