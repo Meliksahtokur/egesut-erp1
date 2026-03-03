@@ -412,85 +412,17 @@ button,input,select,textarea{font-family:inherit}
         <div class="fg"><label class="flbl">Yavru Cinsiyeti *</label><select id="b-cins" class="fsel"><option>Dişi</option><option>Erkek</option></select></div>
         <div class="fg"><label class="flbl">Yavru Küpe *</label><input id="b-kupe" class="fi" placeholder="BZ-001" autocomplete="off"></div>
       </div>
-      <div class="fg"><label class="flbl">Doğum Tipi</label><select id="b-tip" class="fsel"><option>Normal</option><option>Güç</option><option>Sezaryen</option></select></div>
-      <div class="divider"></div>
-      <div class="fg">
-        <label class="flbl">Anne İlaçları (stoktan düşülür)</label>
-        <div class="fhint">Kullanılan miktarları girin. Boş bırakılan düşülmez.</div>
-        <div class="r2" style="margin-bottom:6px">
-          <div><label class="flbl" style="font-size:.58rem">Oksitosin (ml)</label><input id="b-oks" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
-          <div><label class="flbl" style="font-size:.58rem">Kalsiyum (ml)</label><input id="b-kals" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
-        </div>
-        <div class="r2">
-          <div><label class="flbl" style="font-size:.58rem">Ademin (ml)</label><input id="b-adem" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
-          <div><label class="flbl" style="font-size:.58rem">PG (ml)</label><input id="b-pg" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
-        </div>
+      <div class="fg-row">
+        <div class="fg"><label class="flbl">Doğum Ağırlığı (kg) *</label><input id="b-dogum-kg" type="number" step="0.1" min="0" max="100" class="fi" placeholder="Örn: 38.5"></div>
+        <div class="fg"><label class="flbl">Baba Bilgisi</label><input id="b-baba" class="fi" placeholder="Boğa adı / kodu"></div>
       </div>
-      <div class="fg"><label class="flbl">İşlemi Yapan Hekim</label><select id="b-hekim" class="fsel"></select></div>
-      <button class="btn btn-g" onclick="submitBirth(this)">Kaydet + Protokol Görevleri</button>
+      <div class="fg-row">
+        <div class="fg"><label class="flbl">Doğum Tipi</label><select id="b-tip" class="fsel"><option>Normal</option><option>Güç</option><option>Sezaryen</option></select></div>
+      </div>
+      
+            <div class="fg"><label class="flbl">Hekim</label><select id="b-hekim" class="fsel"></select></div>
+      <button class="btn btn-g" onclick="submitBirth(this)">🐄 Kaydet + Protokol Görevleri</button>
       <button class="btn btn-o" onclick="closeM('m-birth')">İptal</button>
-    </div>
-  </div>
-</div>
-
-<!-- TOHUMLAMA -->
-<div id="m-insem" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div><div class="m-title">💉 Tohumlama</div>
-    <div class="m-body">
-      <div class="fg"><label class="flbl">Hayvan Küpesi *</label><div style="position:relative">
-          <input id="i-hid" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
-            oninput="acHayvan('i-hid','ac-ihid')" onfocus="acHayvan('i-hid','ac-ihid')" onkeydown="acNav(event,'ac-ihid')">
-          <div id="ac-ihid" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
-        </div></div>
-      <div class="fg"><label class="flbl">Tarih *</label><input id="i-tarih" class="fi" type="date"></div>
-      <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
-        <div style="position:relative">
-          <input id="i-sperma" class="fi" placeholder="Yazmaya başlayın veya seçin…" autocomplete="off"
-            oninput="acSperma()" onfocus="acSperma()" onkeydown="acNav(event,'ac-sperma')" style="border-radius:10px 10px 0 0">
-          <div id="ac-sperma" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
-        </div>
-        <div id="sperma-stok-hint" style="font-size:.62rem;color:var(--ink3);margin-top:3px;padding:0 2px"></div>
-      </div>
-      <div class="fg"><label class="flbl">Tohumlayan Hekim</label><select id="i-hekim" class="fsel"></select></div>
-      <button class="btn btn-b" onclick="submitInsem(this)">Kaydet + Kontrol Görevleri</button>
-      <button class="btn btn-o" onclick="closeM('m-insem')">İptal</button>
-    </div>
-  </div>
-</div>
-
-<!-- HASTALIK -->
-<div id="m-disease" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div><div class="m-title">🏥 Hastalık / Tedavi</div>
-    <div class="m-body">
-      <div class="fg"><label class="flbl">Hayvan Küpesi *</label><div style="position:relative">
-          <input id="d-hid" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
-            oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')">
-          <div id="ac-dhid" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
-        </div></div>
-      <div class="fg"><label class="flbl">Kategori</label><select id="d-kat" class="fsel"><option>Genital</option><option>Meme</option><option>Metabolik & Diğer</option></select></div>
-      <div class="fg"><label class="flbl">Tanı *</label>
-        <input id="d-tani" class="fi" placeholder="Yazmaya başlayın veya listeden seçin…" autocomplete="off"
-          oninput="acDisease()" onfocus="acDisease()" style="border-radius:10px 10px 0 0">
-        <div id="ac-dis" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;margin-bottom:4px"></div>
-      </div>
-      <div class="fg"><label class="flbl">Şiddet</label><select id="d-sid" class="fsel"><option>Hafif</option><option selected>Orta</option><option>Şiddetli</option><option>Kritik</option></select></div>
-      <div class="fg"><label class="flbl">Semptomlar</label><textarea id="d-sempt" class="fta" placeholder="Gözlemlenen belirtiler…"></textarea></div>
-      <div class="fg"><label class="flbl">İlaç (sadece stoktan seç)</label>
-        <div style="position:relative">
-          <input id="d-stok-ac" class="fi" placeholder="İlaç adı yazın…" autocomplete="off"
-            oninput="acIlac()" onfocus="acIlac()" onkeydown="acNav(event,'ac-dilac')"
-            style="border-radius:10px 10px 0 0">
-          <div id="ac-dilac" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
-        </div>
-        <input id="d-stok" type="hidden">
-        <div id="d-stok-hint" style="font-size:.62rem;color:var(--ink3);margin-top:3px;padding:0 2px"></div>
-      </div>
-      <div class="fg"><label class="flbl">Miktar</label>
-        <input id="d-mik" class="fi" type="number" placeholder="0" inputmode="decimal">
-      </div>
-      <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
-      <button class="btn btn-r" onclick="submitDisease(this)">Kaydet</button>
-      <button class="btn btn-o" onclick="closeM('m-disease')">İptal</button>
     </div>
   </div>
 </div>
@@ -512,26 +444,36 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Irk</label><input id="a-irk" class="fi" placeholder="Holstein, Simmental, Montofon…" autocomplete="off"></div>
       <div class="r2">
         <div class="fg"><label class="flbl">Doğum Tarihi</label><input id="a-dt" class="fi" type="date"></div>
-        <div class="fg"><label class="flbl">Doğum Kg</label><input id="a-dkg" class="fi" type="number" placeholder="38" inputmode="decimal"></div>
+        <div class="fg"><label class="flbl">Cinsiyet</label>
+          <select id="a-cinsiyet" class="fsel"><option>Dişi</option><option>Erkek</option></select>
+        </div>
       </div>
       <div class="r2">
         <div class="fg"><label class="flbl">Grup</label>
           <select id="a-grup" class="fsel">
             <option>Sağmal</option><option>Kuru</option><option>Gebe Düve</option>
-            <option>Düve</option><option>Buzağı</option>
+            <option>Düve</option><option>Süt İçen Buzağılar</option><option>Sütten Kesilmiş Buzağılar</option>
           </select>
         </div>
         <div class="fg"><label class="flbl">Padok</label>
           <select id="a-padok" class="fsel">
-            <option>Sağmal Padok</option>
-            <option>Kuru/Gebe Padok</option>
-            <option>Düve Padok (Büyük)</option>
-            <option>Düve Padok (Küçük)</option>
-            <option>Buzağı Padok (Sütten Kesilmiş)</option>
-            <option>Buzağı Padok (Süt İçenler)</option>
+            <option>Sağmal Padok</option><option>Kuru/Gebe Padok</option>
+            <option>Düve Padok (Büyük)</option><option>Düve Padok (Küçük)</option>
+            <option>Buzağı Ahırı</option>
           </select>
         </div>
       </div>
+      <!-- FİZİKSEL ÖZELLİKLER -->
+      <div style="margin:14px 0 6px;font-size:.72rem;font-weight:800;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase">📐 Fiziksel Özellikler</div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Canlı Ağırlık (kg)</label><input id="a-agirlik" class="fi" type="number" step="0.5" placeholder="Şimdiki ağırlık" inputmode="decimal"></div>
+        <div class="fg"><label class="flbl">Doğum Ağırlığı (kg)</label><input id="a-dkg" class="fi" type="number" step="0.1" placeholder="38" inputmode="decimal"></div>
+      </div>
+      <div class="r2">
+        <div class="fg"><label class="flbl">Boy (cm)</label><input id="a-boy" class="fi" type="number" step="1" placeholder="Omuz yüksekliği" inputmode="decimal"></div>
+        <div class="fg"><label class="flbl">Renk / Desen</label><input id="a-renk" class="fi" placeholder="Siyah-beyaz" autocomplete="off"></div>
+      </div>
+      <div class="fg"><label class="flbl">Ayırt Edici Özellik</label><input id="a-ozellik" class="fi" placeholder="Sol kulakta çentik, alın beyazı vb." autocomplete="off"></div>
       <button class="btn btn-g" onclick="submitAnimal(this)">Kaydet</button>
       <button class="btn btn-o" onclick="closeM('m-animal')">İptal</button>
     </div>
@@ -1210,7 +1152,7 @@ async function loadTasks(f,btn){
       el.innerHTML=done.slice(0,150).map(t=>`<div class="task-card" style="border-left-color:var(--ink3);opacity:.65">
         <div class="tc-header"><div class="tc-main">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span class="tc-id">${(_A.find(a=>a.id===t.hayvan_id)?.kupe_no)||t.hayvan_id||'GENEL'}</span>
+            <span class="tc-id">${(_A.find(a=>a.id===t.hayvan_id)?.kupe_no)||(_A.find(a=>a.id===t.hayvan_id)?.devlet_kupe)||(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id)||'GENEL'}</span>
             <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           </div>
           <div class="tc-desc">${t.aciklama||''}</div>
@@ -1250,7 +1192,7 @@ function renderTask(t,cls='',subs=[]){
     <div class="tc-header">
       <div class="tc-main">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          <span class="tc-id">${(_A.find(a=>a.id===t.hayvan_id)?.kupe_no)||t.hayvan_id||'—'}</span>
+          <span class="tc-id">${(_A.find(a=>a.id===t.hayvan_id)?.kupe_no)||(_A.find(a=>a.id===t.hayvan_id)?.devlet_kupe)||(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id)||'—'}</span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
         <div class="tc-desc">${t.aciklama||''}</div>
@@ -1290,7 +1232,8 @@ async function doneTask(id,hid,stokId,miktar,padok,btn){
   try {
     const task=(await getData('gorev_log',t=>t.id===id))[0]||{};
     await write('gorev_log',{...task,id,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString()},'PATCH',`id=eq.${id}`);
-    if(stokId&&miktar>0) await write('stok_hareket',{id:crypto.randomUUID(),stok_id:stokId,tur:'Görev',miktar,notlar:'GorevID:'+id,iptal:false});
+    const _stokKontrol=stokId?_S.find(s=>s.id===stokId):null;
+    if(stokId&&miktar>0&&_stokKontrol) await write('stok_hareket',{id:crypto.randomUUID(),stok_id:stokId,tur:'Görev',miktar,notlar:'GorevID:'+id,iptal:false});
     if(padok&&hid) await write('hayvanlar',{id:hid,padok},'PATCH',`id=eq.${hid}`);
     const el=document.getElementById('tc-'+id);
     if(el){ el.classList.add('done'); setTimeout(()=>el.remove(),320); }
@@ -1467,7 +1410,10 @@ async function loadBirths(){
 // ══════════════════════════════════════════
 async function submitBirth(btn){
   const anneId=v('b-anne'),tarih=v('b-tarih'),cins=v('b-cins'),kupe=v('b-kupe'),tip=v('b-tip');
+  const dogumKg=parseFloat(document.getElementById('b-dogum-kg')?.value||'');
+  const babaInfo=v('b-baba');
   if(!anneId||!tarih||!kupe){ toast('Anne Küpesi, Tarih ve Yavru Küpe zorunlu',true); return; }
+  if(!dogumKg||dogumKg<=0){ toast('Doğum ağırlığı zorunludur',true); return; }
 
   // ── Anne sürüde kayıtlı mı? ──
   const anne=_A.find(a=>a.id===anneId||a.kupe_no===anneId||a.devlet_kupe===anneId);
@@ -1482,33 +1428,19 @@ async function submitBirth(btn){
     const hekimIdB=v('b-hekim');
 
     // ── 1. Doğum kaydı ──
-    await write('dogum',{id:crypto.randomUUID(),anne_id:anne.id,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip,hekim_id:hekimIdB});
+    await write('dogum',{id:crypto.randomUUID(),anne_id:anne.id,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip,hekim_id:hekimIdB,dogum_kg:dogumKg,baba_bilgi:babaInfo||null});
 
     // ── 2. Buzağıyı hayvanlar tablosuna otomatik ekle ──
     const buzagiId=crypto.randomUUID();
     const buzagiGrup=cins==='Dişi'?'Buzağı (Dişi)':'Buzağı (Erkek)';
-    await write('hayvanlar',{id:buzagiId,kupe_no:kupe,irk:anne.irk||'',dogum_tarihi:tarih,anne_id:anne.id,cinsiyet:cins,grup:buzagiGrup,padok:'Buzağı Ahırı',durum:'Aktif'});
+    await write('hayvanlar',{id:buzagiId,kupe_no:kupe,irk:anne.irk||'',dogum_tarihi:tarih,anne_id:anne.id,baba_bilgi:babaInfo||null,cinsiyet:cins,grup:'Süt İçen Buzağılar',padok:'Buzağı Ahırı',durum:'Aktif',dogum_kg:dogumKg});
     toast(`🐄 Buzağı "${kupe}" sürüye eklendi`);
 
     // ── 3. Buzağı local takip ──
     await idbPut('buzagi_takip',[{id:crypto.randomUUID(),kupe_no:kupe,cinsiyet:cins,dogum_tarihi:tarih,anne_id:anne.id}]);
 
-    // Anne ilaç stok düşümü — sadece dolu alanlar
-    const ilaclar=[
-      {f:'b-oks',stok:'STK001',tur:'Oksitosin'},
-      {f:'b-kals',stok:'STK005',tur:'Kalsiyum'},
-      {f:'b-adem',stok:'STK002',tur:'Ademin'},
-      {f:'b-pg',stok:'STK003',tur:'PG'},
-    ];
-    const tumStok=await idbGetAll('stok');
-    for(const il of ilaclar){
-      const mik=parseFloat(v(il.f));
-      if(mik<=0) continue;
-      // Sadece ID ile eşleştir — isim eşleştirmesi yanlış stok düşebilir
-      const stokVar=tumStok.find(s=>s.id===il.stok);
-      if(!stokVar){ console.warn(`Stok ID bulunamadı: ${il.stok}, atlandı`); continue; }
-      await write('stok_hareket',{id:crypto.randomUUID(),stok_id:stokVar.id,tur:'Tedavi',miktar:mik,notlar:`Doğum-${anne.id}-${il.tur}`,iptal:false});
-    }
+    // Hardcoded stok düşümü KALDIRILDI — yanlış ilaç çekiyordu
+    // Doğumda ilaç kullanımı hastalık/tedavi formuyla kaydedilmeli
 
     // Anne padok → Kuru/Gebe Padok'tan Sağmal Padok'a
     // anne zaten bulundu yukarıda
@@ -1619,10 +1551,20 @@ async function submitAnimal(btn){
     const dupCheck=existing.filter(a=>a.devlet_kupe===devlet&&devlet||a.kupe_no===kupe&&kupe);
     if(dupCheck.length){ toast('⚠️ Bu küpe zaten kayıtlı',true); return; }
 
-    await write('hayvanlar',{id:autoId,devlet_kupe:devlet||null,kupe_no:kupe||null,irk:v('a-irk'),dogum_tarihi:v('a-dt')||null,dogum_kg:+v('a-dkg')||null,grup:v('a-grup'),padok:v('a-padok'),durum:'Aktif'});
+    await write('hayvanlar',{
+      id:autoId,devlet_kupe:devlet||null,kupe_no:kupe||null,irk:v('a-irk'),
+      dogum_tarihi:v('a-dt')||null,cinsiyet:v('a-cinsiyet')||null,
+      grup:v('a-grup'),padok:v('a-padok'),durum:'Aktif',
+      // Fiziksel özellikler
+      dogum_kg:parseFloat(v('a-dkg'))||null,
+      canli_agirlik:parseFloat(v('a-agirlik'))||null,
+      boy:parseFloat(v('a-boy'))||null,
+      renk:v('a-renk')||null,
+      ayirici_ozellik:v('a-ozellik')||null,
+    });
     toast(`✅ ${primaryKupe} eklendi (ID: ${autoId})`);
     closeM('m-animal');
-    ['a-devlet','a-kupe','a-irk','a-dt','a-dkg'].forEach(cl);
+    ['a-devlet','a-kupe','a-irk','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
     await loadAnimals();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet';} }
 }
