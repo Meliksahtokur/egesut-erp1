@@ -1,0 +1,29 @@
+{
+  "name": "EgeSüt ERP",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "mtxr.sqltools",
+        "GitHub.copilot"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.fontSize": 15,
+        "editor.tabSize": 2,
+        "editor.wordWrap": "on",
+        "editor.minimap.enabled": false,
+        "editor.lineNumbers": "on",
+        "editor.scrollBeyondLastLine": false,
+        "workbench.colorTheme": "Default Dark Modern",
+        "workbench.activityBar.location": "bottom",
+        "editor.quickSuggestions": {
+          "strings": true
+        }
+      }
+    }
+  },
+  "postCreateCommand": "echo '✅ EgeSüt ortamı hazır'"
+}
