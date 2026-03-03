@@ -36,6 +36,8 @@ button,input,select,textarea{font-family:inherit}
 #dot.off{background:var(--red2);box-shadow:0 0 8px var(--red2);animation:none}
 #dot.warn{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:none}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes spin{to{transform:rotate(360deg)}}
+#refbtn.spinning{animation:spin .6s linear;}
 #refbtn{background:rgba(106,191,61,.12);border:1px solid rgba(106,191,61,.2);color:var(--green3);padding:5px 13px;border-radius:20px;font-size:.7rem;font-weight:700;cursor:pointer}
 
 /* SYNC BAR — sadece offline/hata durumunda görünür */
@@ -241,7 +243,7 @@ button,input,select,textarea{font-family:inherit}
   </div>
   <div id="top-right">
     <div id="dot"></div>
-    <button id="refbtn" onclick="refreshAll()">↻</button>
+    <button id="refbtn" onclick="this.classList.add('spinning');refreshAll().finally(()=>this.classList.remove('spinning'))">↻</button>
     <button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
   </div>
 </div>
@@ -402,11 +404,22 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-birth" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🐄 Doğum Kaydı</div>
     <div class="m-body">
-      <div class="fg"><label class="flbl">Anne Küpesi *</label><div style="position:relative">
+      <div class="fg"><label class="flbl">Anne *</label>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <button type="button" id="btn-gebe-sec" onclick="gebeledenSec()" style="flex:1;padding:8px;background:rgba(78,154,42,.1);border:1.5px solid var(--green);border-radius:var(--r1);font-size:.78rem;font-weight:700;color:var(--green3);cursor:pointer">🤰 Gebelerden Seç</button>
+          <button type="button" onclick="this.style.display='none';document.getElementById('b-anne-manual').style.display='block'" style="flex:1;padding:8px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);font-size:.78rem;font-weight:700;color:var(--ink3);cursor:pointer">✏️ Manuel Gir</button>
+        </div>
+        <div id="b-anne-manual" style="display:none;position:relative">
           <input id="b-anne" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
             oninput="acHayvan('b-anne','ac-banne')" onfocus="acHayvan('b-anne','ac-banne')" onkeydown="acNav(event,'ac-banne')">
           <div id="ac-banne" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
-        </div></div>
+        </div>
+        <div id="anne-secili-card" style="display:none;background:rgba(78,154,42,.08);border:1.5px solid var(--green);border-radius:var(--r1);padding:10px 13px;font-size:.8rem">
+          <div id="anne-secili-adi" style="font-weight:700;color:var(--green3)"></div>
+          <div id="anne-secili-bilgi" style="color:var(--ink3);font-size:.7rem;margin-top:2px"></div>
+          <button type="button" onclick="anneSecimSifirla()" style="background:none;border:none;color:var(--ink3);font-size:.7rem;cursor:pointer;margin-top:4px">↩ Değiştir</button>
+        </div>
+      </div>
       <div class="fg"><label class="flbl">Doğum Tarihi *</label><input id="b-tarih" class="fi" type="date"></div>
       <div class="r2">
         <div class="fg"><label class="flbl">Yavru Cinsiyeti *</label><select id="b-cins" class="fsel"><option>Dişi</option><option>Erkek</option></select></div>
@@ -585,10 +598,15 @@ button,input,select,textarea{font-family:inherit}
         </div>
       </div>
       <div class="divider"></div>
+      <div class="sh"><span class="sh-title">📡 Data Traffic</span><button class="sh-link" onclick="dataTrafficYenile()">Yenile</button></div>
+      <div id="dt-summary" style="font-size:.72rem;color:var(--ink3);margin-bottom:8px">Yükleniyor…</div>
+      <div id="dt-list" style="max-height:220px;overflow-y:auto;margin-bottom:10px"></div>
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <button class="btn" style="flex:1;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2);font-weight:700;font-size:.72rem" onclick="dataTrafficGonder()">↑ Tümünü Gönder</button>
+        <button class="btn" style="flex:1;background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;font-size:.72rem" onclick="kuyrukuTemizle()">🗑 Temizle</button>
+      </div>
       <div class="sh"><span class="sh-title">Sistem</span></div>
-      <div style="font-size:.75rem;color:var(--ink3);margin-bottom:8px">Kuyruktaki başarısız kayıtları temizler.</div>
-      <button class="btn" style="background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;margin-bottom:6px" onclick="kuyrukuTemizle()">🗑 Başarısız Kuyruğu Temizle</button>
-      <button class="btn" style="background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;margin-bottom:10px" onclick="stokHareketiTemizle()">🗑 Geçersiz Stok Hareketlerini Temizle</button>
+      <button class="btn" style="background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;margin-bottom:6px" onclick="stokHareketiTemizle()">🗑 Geçersiz Stok Hareketlerini Temizle</button>
       <div class="sh"><span class="sh-title">Versiyon</span></div>
       <div style="font-size:.75rem;color:var(--ink3);padding:4px 0">EgeSüt v9 · IndexedDB + Supabase offline-first</div>
       <button class="btn btn-o" onclick="closeM('m-ayarlar')" style="margin-top:12px">Kapat</button>
@@ -822,13 +840,15 @@ async function sbPatch(table,qs,data) {
 async function write(table,data,method='POST',filter='') {
   const arr=(Array.isArray(data)?data:[data]);
   arr.forEach(item=>{ if(!item.id) item.id=crypto.randomUUID(); });
-  // 1. Local'e anında yaz
+  // null/undefined değerleri temizle — Supabase schema cache'i tanımadığı kolonları reddeder
+  const cleanArr=arr.map(item=>Object.fromEntries(Object.entries(item).filter(([k,v])=>v!==null&&v!==undefined&&v!=='')));
+  // 1. Local'e tam haliyle yaz, Supabase'e temizlenmiş gönder
   await idbPut(table,arr);
   // 2. Supabase'e gönder (sbFetch kendi içinde 12sn AbortController kullanıyor)
   if(navigator.onLine) {
     try {
-      if(method==='POST')  await sbPost(table, arr); // Supabase her zaman array bekliyor
-      if(method==='PATCH') await sbPatch(table,filter,arr[0]);
+      if(method==='POST')  await sbPost(table, cleanArr);
+      if(method==='PATCH') await sbPatch(table,filter,cleanArr[0]);
       // Başarılı — kuyruktan temizle
       const q=await getQueue();
       for(const op of q){
@@ -880,9 +900,10 @@ async function syncNow() {
         const unique=[...new Map(allData.map(d=>[d.id,d])).values()];
         if(first.table==='gorev_log'){
           // gorev_log: teker teker gönder (kolonlar farklı olabilir)
-          for(const item of unique) await sbPost(first.table,[item]);
+          for(const item of unique){ const ci=Object.fromEntries(Object.entries(item).filter(([k,v])=>v!==null&&v!==undefined&&v!=='')); await sbPost(first.table,[ci]); }
         } else {
-          await sbPost(first.table, unique);
+          const cleanUnique=unique.map(item=>Object.fromEntries(Object.entries(item).filter(([k,v])=>v!==null&&v!==undefined&&v!=='')));
+          await sbPost(first.table, cleanUnique);
         }
         for(const op of grp){ await removeFromQueue(op._qid); sent++; }
       } else if(first.method==='PATCH'){
@@ -1401,13 +1422,140 @@ async function loadBirths(){
     const data=await idbGetAll('dogum');
     data.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Henüz doğum yok</div>'; return; }
-    el.innerHTML=data.slice(0,8).map(b=>`<div class="hist-row"><div class="hist-dot" style="background:var(--green2)"></div><div class="hist-main"><div class="hist-title">${b.anne_id} → ${b.yavru_kupe} (${b.yavru_cins})</div><div class="hist-sub">${fmtTarih(b.tarih)} · ${b.dogum_tipi||'Normal'}</div></div></div>`).join('');
+    el.innerHTML=data.slice(0,8).map(b=>`<div style="background:#fff;border:1px solid var(--card3);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+    <div style="width:34px;height:34px;border-radius:9px;background:rgba(78,154,42,.12);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🐄</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:.85rem;color:#1a2010">${b.anne_id} → <b>${b.yavru_kupe}</b> (${b.yavru_cins||'?'})</div>
+      <div style="font-size:.7rem;color:#666;margin-top:2px">${fmtTarih(b.tarih)} · ${b.dogum_tipi||'Normal'}${b.dogum_kg?' · '+b.dogum_kg+' kg':''}</div>
+    </div>
+  </div>`).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 
 // ══════════════════════════════════════════
 // FORM: DOĞUM — buzağı alt görevleri dahil
 // ══════════════════════════════════════════
+async function gebeledenSec(){
+  // Gebe tohumlama kayıtları + 280 gün hesabı
+  const tohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
+  const today=new Date();
+  
+  // Her gebe için kalan gün hesapla
+  const gebeList=tohs.map(t=>{
+    const toh=new Date(t.tarih);
+    const dogumTahmini=new Date(toh.getTime()+280*86400000);
+    const kalanGun=Math.floor((dogumTahmini-today)/86400000);
+    const hayvan=_A.find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
+    return {toh:t,hayvan,kalanGun,dogumTahmini:dogumTahmini.toISOString().split('T')[0]};
+  }).filter(g=>g.hayvan&&g.kalanGun>=-14); // -14: 2 hafta geçmişe kadar göster
+  
+  gebeList.sort((a,b)=>a.kalanGun-b.kalanGun); // En yakın doğum önce
+  
+  // Modal göster
+  let box=document.getElementById('gebe-sec-modal');
+  if(!box){
+    box=document.createElement('div');
+    box.id='gebe-sec-modal';
+    box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end';
+    box.onclick=e=>{if(e.target===box)box.remove();};
+    document.body.appendChild(box);
+  }
+  
+  const listHtml=gebeList.length===0
+    ? '<div style="text-align:center;padding:24px;color:#999">Gebe hayvan kaydı bulunamadı</div>'
+    : gebeList.map(g=>{
+        const kupe=g.hayvan?.kupe_no||g.hayvan?.devlet_kupe||g.toh.hayvan_id;
+        const urgent=g.kalanGun<=7;
+        const overdue=g.kalanGun<0;
+        const color=overdue?'#c0321a':urgent?'#b84c00':'#1a5c1a';
+        const bg=overdue?'rgba(192,50,26,.06)':urgent?'rgba(184,76,0,.06)':'rgba(78,154,42,.04)';
+        const badge=overdue?`<span style="background:#c0321a;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">GECİKTİ ${Math.abs(g.kalanGun)} GÜN</span>`
+          :urgent?`<span style="background:#b84c00;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">⚡ ${g.kalanGun} GÜN</span>`
+          :`<span style="background:rgba(78,154,42,.15);color:#1a5c1a;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">${g.kalanGun} gün kaldı</span>`;
+        return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
+          style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;background:${bg};display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:.88rem;color:${color}">${kupe}</div>
+            <div style="font-size:.68rem;color:#666;margin-top:2px">${g.hayvan?.irk||'—'} · Tohumlama: ${g.toh.tarih} · ${g.toh.sperma||'?'}</div>
+            <div style="font-size:.65rem;color:#888;margin-top:1px">Tahmini doğum: ${fmtTarih(g.dogumTahmini)}</div>
+          </div>
+          ${badge}
+        </div>`;
+      }).join('');
+  
+  const srchHtml=`<div style="padding:12px 14px;border-bottom:1px solid #eee">
+    <input id="gebe-srch" oninput="gebeFiltrele()" placeholder="Küpe no ara…" style="width:100%;padding:8px 12px;border:1.5px solid var(--green);border-radius:8px;font-size:.85rem;outline:none;box-sizing:border-box">
+  </div>`;
+  
+  box.innerHTML=`<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-height:75vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px 0;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800;font-size:1rem">🤰 Gebe Hayvanlar</div>
+      <button onclick="document.getElementById('gebe-sec-modal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#999">✕</button>
+    </div>
+    <div style="font-size:.68rem;color:#999;padding:4px 16px 10px">280 güne yakınlığa göre sıralandı</div>
+    ${srchHtml}
+    <div id="gebe-list" style="overflow-y:auto;flex:1">${listHtml}</div>
+    <div style="padding:12px 16px;border-top:1px solid #eee">
+      <button onclick="document.getElementById('gebe-sec-modal').remove()" style="width:100%;padding:11px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">Kapat</button>
+    </div>
+  </div>`;
+  
+  box.style.display='flex';
+  // Arama fonksiyonu için listeyi sakla
+  box._gebeList=gebeList;
+  setTimeout(()=>document.getElementById('gebe-srch')?.focus(),100);
+}
+
+function gebeFiltrele(){
+  const q=(document.getElementById('gebe-srch')?.value||'').toLowerCase();
+  const box=document.getElementById('gebe-sec-modal');
+  if(!box||!box._gebeList) return;
+  const listEl=document.getElementById('gebe-list');
+  const filtered=q?box._gebeList.filter(g=>{
+    const kupe=(g.hayvan?.kupe_no||g.hayvan?.devlet_kupe||g.toh.hayvan_id||'').toLowerCase();
+    return kupe.includes(q);
+  }):box._gebeList;
+  // Basit re-render
+  listEl.innerHTML=filtered.map(g=>{
+    const kupe=g.hayvan?.kupe_no||g.hayvan?.devlet_kupe||g.toh.hayvan_id;
+    const overdue=g.kalanGun<0, urgent=g.kalanGun<=7&&!overdue;
+    const color=overdue?'#c0321a':urgent?'#b84c00':'#1a5c1a';
+    return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
+      style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer">
+      <div style="font-weight:700;font-size:.88rem;color:${color}">${kupe} — ${overdue?'GECİKTİ '+Math.abs(g.kalanGun)+' gün':g.kalanGun+' gün kaldı'}</div>
+      <div style="font-size:.68rem;color:#666;margin-top:2px">${g.hayvan?.irk||'—'} · ${g.toh.sperma||'?'} · Tahmini: ${fmtTarih(g.dogumTahmini)}</div>
+    </div>`;
+  }).join('') || '<div style="padding:20px;text-align:center;color:#999">Eşleşen hayvan yok</div>';
+}
+
+function anneSeç(hayvanId,kupe,dogumTahmini,sperma){
+  // Gizli input'a ID yaz
+  let hiddenInput=document.getElementById('b-anne');
+  if(!hiddenInput){
+    hiddenInput=document.createElement('input');
+    hiddenInput.id='b-anne';
+    hiddenInput.type='hidden';
+    document.getElementById('m-birth').appendChild(hiddenInput);
+  }
+  hiddenInput.value=hayvanId;
+  
+  // Kart göster
+  document.getElementById('anne-secili-adi').textContent=kupe;
+  document.getElementById('anne-secili-bilgi').textContent=`Tahmini doğum: ${fmtTarih(dogumTahmini)} · Sperma: ${sperma||'?'}`;
+  document.getElementById('anne-secili-card').style.display='block';
+  document.getElementById('b-anne-manual').style.display='none';
+  document.getElementById('btn-gebe-sec').style.display='none';
+  
+  // Modalı kapat
+  document.getElementById('gebe-sec-modal')?.remove();
+}
+
+function anneSecimSifirla(){
+  const el=document.getElementById('b-anne'); if(el) el.value='';
+  document.getElementById('anne-secili-card').style.display='none';
+  document.getElementById('btn-gebe-sec').style.display='';
+}
+
 async function submitBirth(btn){
   const anneId=v('b-anne'),tarih=v('b-tarih'),cins=v('b-cins'),kupe=v('b-kupe'),tip=v('b-tip');
   const dogumKg=parseFloat(document.getElementById('b-dogum-kg')?.value||'');
@@ -1848,7 +1996,78 @@ async function stokHareketiTemizle(){
 function ayarlarAc(){
   renderAyarlarHekimList();
   renderAyarlarSpermaList();
+  dataTrafficYenile();
   openM('m-ayarlar');
+}
+
+async function dataTrafficYenile(){
+  const q=await getQueue();
+  const sumEl=document.getElementById('dt-summary');
+  const listEl=document.getElementById('dt-list');
+  if(!sumEl||!listEl) return;
+  if(!q.length){
+    sumEl.innerHTML='<span style="color:var(--green)">✅ Kuyruk boş — tüm kayıtlar senkronize</span>';
+    listEl.innerHTML='';
+    return;
+  }
+  sumEl.innerHTML=`<span style="color:var(--amber)">⏳ ${q.length} kayıt bekliyor</span>`;
+  const tableCount={};
+  q.forEach(op=>{ tableCount[op.table]=(tableCount[op.table]||0)+1; });
+  listEl.innerHTML=q.slice(0,50).map(op=>{
+    const ts=op.ts?new Date(op.ts).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'?';
+    const data0=op.data?.[0]||{};
+    const preview=data0.aciklama||data0.tani||data0.urun_adi||data0.kupe_no||data0.yavru_kupe||JSON.stringify(data0).slice(0,40);
+    return `<div style="border:1px solid var(--card3);border-radius:8px;padding:8px 10px;margin-bottom:5px;background:var(--card)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;font-size:.72rem;color:var(--ink)">${op.table}</span>
+        <div style="display:flex;gap:4px">
+          <span style="font-size:.62rem;background:${op.method==='POST'?'rgba(42,107,181,.1)':'rgba(255,165,0,.1)'};color:${op.method==='POST'?'var(--blue)':'var(--amber)'};padding:2px 6px;border-radius:8px;font-weight:700">${op.method}</span>
+          <button onclick="dataTrafficTekGonder(${op._qid})" style="background:var(--green);color:#fff;border:none;border-radius:6px;font-size:.6rem;padding:2px 7px;cursor:pointer;font-weight:700">↑</button>
+          <button onclick="dataTrafficSil(${op._qid})" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2);border-radius:6px;font-size:.6rem;padding:2px 7px;cursor:pointer;font-weight:700">✕</button>
+        </div>
+      </div>
+      <div style="font-size:.65rem;color:var(--ink3);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${preview}</div>
+      <div style="font-size:.58rem;color:var(--ink3);margin-top:2px">${ts}</div>
+    </div>`;
+  }).join('');
+}
+
+async function dataTrafficGonder(){
+  const btn=event.target;
+  btn.disabled=true; btn.textContent='Gönderiliyor…';
+  await syncNow();
+  await dataTrafficYenile();
+  btn.disabled=false; btn.textContent='↑ Tümünü Gönder';
+}
+
+async function dataTrafficTekGonder(qid){
+  const q=await getQueue();
+  const op=q.find(o=>o._qid===qid); if(!op) return;
+  try {
+    if(op.method==='POST'){
+      const clean=op.data.map(item=>Object.fromEntries(Object.entries(item).filter(([k,v])=>v!==null&&v!==undefined&&v!=='')));
+      if(op.table==='gorev_log'){
+        for(const item of clean) await sbPost(op.table,[item]);
+      } else {
+        await sbPost(op.table,clean);
+      }
+    } else if(op.method==='PATCH'){
+      const clean=Object.fromEntries(Object.entries(op.data[0]).filter(([k,v])=>v!==null&&v!==undefined&&v!==''));
+      await sbPatch(op.table,op.filter,clean);
+    }
+    await removeFromQueue(qid);
+    toast('✅ Kayıt gönderildi');
+  } catch(e){ toast('❌ '+e.message,true); }
+  await dataTrafficYenile();
+  updateSyncBar();
+}
+
+async function dataTrafficSil(qid){
+  if(!confirm('Bu kaydı kuyruktan sil? (Supabase\'e gönderilmeyecek)')) return;
+  await removeFromQueue(qid);
+  toast('🗑 Kayıt kuyruktan silindi');
+  await dataTrafficYenile();
+  updateSyncBar();
 }
 
 function renderAyarlarHekimList(){
@@ -2029,7 +2248,8 @@ async function openTaskDet(id){
   const today=new Date().toISOString().split('T')[0];
   const hekim=HEKIMLER.find(h=>h.id===t.hekim_id)||_customHekimler.find(h=>h.id===t.hekim_id);
   const isLate=t.hedef_tarih<today;
-  document.getElementById('td-hayvan').textContent=t.hayvan_id||'GENEL GÖREV';
+  const hayvanLabel=_A.find(a=>a.id===t.hayvan_id);
+  document.getElementById('td-hayvan').textContent=(hayvanLabel?.kupe_no||hayvanLabel?.devlet_kupe)||(t.hayvan_id?.length>20?'Buzağı-'+t.hayvan_id.slice(-6):t.hayvan_id)||'GENEL GÖREV';
   document.getElementById('td-aciklama').textContent=t.aciklama||'';
   const meta=[];
   meta.push(`📅 ${fmtTarih(t.hedef_tarih)}${isLate?' ⚠️ Gecikmiş':''}` );
