@@ -1359,12 +1359,13 @@ async function openDet(id){
       </div>`;
 
     document.getElementById('tab-saglik').innerHTML=diseases.length
-      ?diseases.map(d=>`<div class="hist-row"><div class="hist-dot" style="background:${d.durum==='Aktif'?'var(--red2)':'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${d.tani||'—'}</div><div class="hist-sub">${d.tarih||''} · ${d.siddet||''} · <b style="color:${d.durum==='Aktif'?'var(--red)':'var(--green)'}">${d.durum}</b></div>${d.semptomlar?`<div class="hist-sub" style="margin-top:3px">${d.semptomlar}</div>`:''}</div></div>`).join('')
+      ?diseases.map(d=>`<div class="hist-row" onclick="openHstDet('${d.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${d.durum==='Aktif'?'var(--red2)':'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${d.tani||'—'}</div><div class="hist-sub">${d.tarih||''} · ${d.siddet||''} · <b style="color:${d.durum==='Aktif'?'var(--red)':'var(--green)'}">${d.durum}</b></div>${d.semptomlar?`<div class="hist-sub" style="margin-top:3px">${d.semptomlar}</div>`:''}</div></div>`).join('')
       :'<div class="empty"><div class="empty-ico">✅</div>Hastalık kaydı yok</div>';
 
     document.getElementById('tab-ureme').innerHTML=tohs.length
-      ?tohs.map(t=>`<div class="hist-row"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'} · ${t.deneme_no||1}. deneme</div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
+      ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'} · ${t.deneme_no||1}. deneme</div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
       :'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>';
+    document.getElementById('tab-ureme').innerHTML+=`<div style="padding:12px 0"><button class="btn btn-g" onclick="openGebelikEkle('${id}')">🤰 Gebelik Ekle</button></div>`;
 
     document.getElementById('tab-gorev').innerHTML=tasks.length
       ?tasks.map(t=>{
@@ -1561,6 +1562,8 @@ async function submitBirth(btn){
   const dogumKg=parseFloat(document.getElementById('b-dogum-kg')?.value||'');
   const babaInfo=v('b-baba');
   if(!anneId||!tarih||!kupe){ toast('Anne Küpesi, Tarih ve Yavru Küpe zorunlu',true); return; }
+  const bugun=new Date().toISOString().split('T')[0];
+  if(tarih>bugun){ toast('Doğum tarihi ileri tarih olamaz',true); return; }
   if(!dogumKg||dogumKg<=0){ toast('Doğum ağırlığı zorunludur',true); return; }
 
   // ── Anne sürüde kayıtlı mı? ──
@@ -1636,6 +1639,8 @@ async function submitBirth(btn){
 async function submitInsem(btn){
   const hid=v('i-hid'),tarih=v('i-tarih'),sperma=v('i-sperma');
   if(!hid||!tarih||!sperma){ toast('Küpe, Tarih ve Sperma zorunlu',true); return; }
+  const bugun2=new Date().toISOString().split('T')[0];
+  if(tarih>bugun2){ toast('Tohumlama tarihi ileri tarih olamaz',true); return; }
   const hayvan=_A.find(a=>a.kupe_no===hid||a.id===hid||a.devlet_kupe===hid);
   if(!hayvan){ toast(`⚠️ "${hid}" sürüde kayıtlı değil`,true); return; }
   if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
@@ -1727,7 +1732,7 @@ async function submitTaskAdd(btn){
   try {
     const hid=v('ta-hid').trim();
     const hayvan=hid?(_A.find(a=>a.kupe_no===hid||a.id===hid)):null;
-    await write('gorev_log',{id:crypto.randomUUID(),hayvan_id:hayvan?.id||hid||null',gorev_tipi:v('ta-tip'),aciklama:desc,hedef_tarih:tarih,tamamlandi:false,kaynak:'MANUEL'});
+    await write('gorev_log',{id:crypto.randomUUID(),hayvan_id:hayvan?.id||hid||'GENEL',gorev_tipi:v('ta-tip'),aciklama:desc,hedef_tarih:tarih,tamamlandi:false,kaynak:'MANUEL'});
     toast('✅ Görev oluşturuldu');
     closeM('m-task-add');
     ['ta-hid','ta-desc'].forEach(cl);
@@ -2392,6 +2397,16 @@ async function openHstDet(id){
   if(stk) rows.push(`<b>İlaç:</b> ${stk.urun_adi} — ${h.ilac_miktar||0} ${stk.birim||''}`);
   document.getElementById('hd-body').innerHTML=rows.join('<br>') || 'Ek bilgi yok';
   openM('m-hst-det');
+}
+function openGebelikEkle(hayvanId){
+  const tarih=prompt('Tohumlama tarihi (YYYY-MM-DD):');
+  if(!tarih) return;
+  const bugun=new Date().toISOString().split('T')[0];
+  if(tarih>bugun){ toast('İleri tarih girilemez',true); return; }
+  const sperma=prompt('Sperma / Boğa kodu (boş bırakılabilir):');
+  write('tohumlama',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih,sperma:sperma||null,sonuc:'Gebe',deneme_no:1})
+    .then(()=>{ toast('✅ Gebelik kaydedildi'); openDet(hayvanId); })
+    .catch(e=>toast(e.message,true));
 }
 async function hstKapat(){
   if(!_curHst) return;
