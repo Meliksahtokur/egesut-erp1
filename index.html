@@ -1732,7 +1732,7 @@ async function submitTaskAdd(btn){
   try {
     const hid=v('ta-hid').trim();
     const hayvan=hid?(_A.find(a=>a.kupe_no===hid||a.id===hid)):null;
-    await write('gorev_log',{id:crypto.randomUUID(),hayvan_id:hayvan?.id||hid||'null',gorev_tipi:v('ta-tip'),aciklama:desc,hedef_tarih:tarih,tamamlandi:false,kaynak:'MANUEL'});
+    await write('gorev_log',{id:crypto.randomUUID(),hayvan_id:hayvan?.id||hid||null,gorev_tipi:v('ta-tip'),aciklama:desc,hedef_tarih:tarih,tamamlandi:false,kaynak:'MANUEL'});
     toast('✅ Görev oluşturuldu');
     closeM('m-task-add');
     ['ta-hid','ta-desc'].forEach(cl);
