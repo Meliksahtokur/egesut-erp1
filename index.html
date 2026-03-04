@@ -400,6 +400,72 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- ═══ MODALS ═══ -->
 
+<!-- TOHUMLAMA -->
+<div id="m-insem" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">💉 Tohumlama Kaydı</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Küpe No *</label>
+        <input id="i-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
+          oninput="acHayvan('i-hid','ac-ihid')" onfocus="acHayvan('i-hid','ac-ihid')" onkeydown="acNav(event,'ac-ihid')">
+        <div id="ac-ihid" class="ac-box" style="display:none"></div>
+      </div>
+      <div class="fg"><label class="flbl">Tohumlama Tarihi *</label><input id="i-tarih" class="fi" type="date"></div>
+      <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
+        <input id="i-sperma" class="fi" placeholder="Stoktan seç veya yaz…" autocomplete="off"
+          oninput="acSperma('i-sperma','ac-isperma')" onfocus="acSperma('i-sperma','ac-isperma')" onkeydown="acNav(event,'ac-isperma')">
+        <div id="ac-isperma" class="ac-box" style="display:none"></div>
+        <div id="sperma-hint" style="font-size:.7rem;color:var(--ink3);margin-top:4px"></div>
+      </div>
+      <div class="fg"><label class="flbl">Hekim</label><select id="i-hekim" class="fsel"></select></div>
+      <button class="btn btn-g" onclick="submitInsem(this)">💉 Kaydet + Kontrol Görevleri</button>
+      <button class="btn btn-o" onclick="closeM('m-insem')" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- HASTALIK -->
+<div id="m-disease" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">🏥 Hastalık / Tedavi</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Küpe No *</label>
+        <input id="d-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
+          oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')">
+        <div id="ac-dhid" class="ac-box" style="display:none"></div>
+      </div>
+      <div class="fg"><label class="flbl">Tanı *</label>
+        <input id="d-tani" class="fi" placeholder="Tanı yazın veya seçin…" autocomplete="off"
+          oninput="acTani()" onfocus="acTani()" onkeydown="acNav(event,'ac-dis')">
+        <div id="ac-dis" class="ac-box" style="display:none"></div>
+      </div>
+      <div class="fg"><label class="flbl">Kategori</label>
+        <select id="d-kat" class="fsel">
+          <option value="">Seçin</option>
+          <option>Solunum</option><option>Sindirim</option><option>Üreme</option>
+          <option>Ayak</option><option>Meme</option><option>Metabolik</option><option>Diğer</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Şiddet</label>
+        <select id="d-sid" class="fsel">
+          <option value="">Seçin</option>
+          <option>Hafif</option><option>Orta</option><option>Ağır</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Semptomlar</label><input id="d-sempt" class="fi" placeholder="Opsiyonel…"></div>
+      <div class="fg"><label class="flbl">İlaç (stoktan)</label>
+        <input id="d-stok-ac" class="fi" placeholder="İlaç adı yazın…" autocomplete="off"
+          oninput="acDilac()" onfocus="acDilac()" onkeydown="acNav(event,'ac-dilac')">
+        <input type="hidden" id="d-stok">
+        <div id="ac-dilac" class="ac-box" style="display:none"></div>
+        <div id="d-stok-hint" style="font-size:.7rem;color:var(--ink3);margin-top:4px"></div>
+      </div>
+      <div class="fg"><label class="flbl">İlaç Miktarı</label><input id="d-mik" class="fi" type="number" min="0" placeholder="0"></div>
+      <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
+      <button class="btn btn-g" onclick="submitDisease(this)">🏥 Kaydet</button>
+      <button class="btn btn-o" onclick="closeM('m-disease')" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
 <!-- DOĞUM -->
 <div id="m-birth" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🐄 Doğum Kaydı</div>
@@ -1437,20 +1503,31 @@ async function loadBirths(){
 // FORM: DOĞUM — buzağı alt görevleri dahil
 // ══════════════════════════════════════════
 async function gebeledenSec(){
-  // Gebe tohumlama kayıtları + 280 gün hesabı
+  // Gebe tohumlama kayıtları + hayvanlar tablosunda gebe işaretliler
   const tohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
+  const gebeHayvanlar=_A.filter(a=>a.durum==='Gebe'||a.durum==='gebe');
   const today=new Date();
-  
-  // Her gebe için kalan gün hesapla
-  const gebeList=tohs.map(t=>{
+
+  // Tohumlama kaydından gelenler
+  const listFromToh=tohs.map(t=>{
     const toh=new Date(t.tarih);
     const dogumTahmini=new Date(toh.getTime()+280*86400000);
     const kalanGun=Math.floor((dogumTahmini-today)/86400000);
     const hayvan=_A.find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
     return {toh:t,hayvan,kalanGun,dogumTahmini:dogumTahmini.toISOString().split('T')[0]};
-  }).filter(g=>g.hayvan&&g.kalanGun>=-14); // -14: 2 hafta geçmişe kadar göster
-  
-  gebeList.sort((a,b)=>a.kalanGun-b.kalanGun); // En yakın doğum önce
+  }).filter(g=>g.hayvan&&g.kalanGun>=-14);
+
+  // Hayvanlar tablosunda gebe ama tohumlama kaydı olmayanlar
+  const tohHayvanIds=new Set(listFromToh.map(g=>g.hayvan?.id));
+  const listFromHayvan=gebeHayvanlar.filter(a=>!tohHayvanIds.has(a.id)).map(a=>({
+    toh:{hayvan_id:a.id,tarih:a.tohumlama_tarihi||'',sperma:a.baba_bilgi||''},
+    hayvan:a,
+    kalanGun:a.tohumlama_tarihi?Math.floor((new Date(new Date(a.tohumlama_tarihi).getTime()+280*86400000)-today)/86400000):999,
+    dogumTahmini:a.tohumlama_tarihi?new Date(new Date(a.tohumlama_tarihi).getTime()+280*86400000).toISOString().split('T')[0]:'?'
+  }));
+
+  const gebeList=[...listFromToh,...listFromHayvan];
+  gebeList.sort((a,b)=>a.kalanGun-b.kalanGun);
   
   // Modal göster
   let box=document.getElementById('gebe-sec-modal');
