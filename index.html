@@ -139,9 +139,12 @@ button,input,select,textarea{font-family:inherit}
 .a-id{font-weight:700;font-size:.9rem;color:var(--ink)}
 .a-sub{font-size:.7rem;color:var(--ink3);margin-top:2px}
 .a-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
-.tag{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:6px}
+.tag{display:inline-block;font-size:.6rem;padding:2px 8px;border-radius:6px;white-space:nowrap}
 .tg{background:#ddffee;color:#0a5a2a}.ta{background:#fff3dd;color:#7a3a00}
-.tb{background:#ddeeff;color:#1a3a8a}.tk{background:var(--card2);color:var(--ink3)}
+/* tb = padok (nerede): mavi zemin, koyu, büyük harf etkisi */
+.tb{background:rgba(42,107,181,.14);color:#1a3c8c;font-weight:800;font-size:.58rem;letter-spacing:.03em}
+/* tk = grup (ne): soluk zemin, kenarlık, orta ağırlık */
+.tk{background:var(--card2);color:var(--ink2);font-weight:600;border:1px solid var(--card3);font-size:.62rem}
 .a-arr{color:var(--card3);flex-shrink:0}
 
 /* DETAIL */
@@ -1039,17 +1042,45 @@ async function sbPatch(table,qs,data) {
 // ══════════════════════════════════════════
 async function write(table,data,method='POST',filter='') {
   const arr=(Array.isArray(data)?data:[data]);
+
+  // PATCH için: filter'dan ID'yi çıkar, local kaydı merge et, POST için UUID ata
+  if(method==='PATCH'){
+    const idMatch=filter.match(/id=eq\.([^&]+)/);
+    const targetId=idMatch?idMatch[1]:null;
+    if(targetId){
+      // Mevcut local kaydı bul ve merge et (ID'yi zorla koy)
+      const existing=await idbGetAll(table);
+      const base=existing.find(r=>r.id===targetId)||{id:targetId};
+      const merged={...base,...arr[0],id:targetId};
+      await idbPut(table,[merged]);
+      // Supabase'e sadece değişen alanları gönder (temizlenmiş)
+      const cleanPatch=Object.fromEntries(Object.entries(arr[0]).filter(([k,v])=>v!==null&&v!==undefined&&v!==''));
+      if(navigator.onLine){
+        try {
+          await sbPatch(table,filter,cleanPatch);
+          const q=await getQueue();
+          for(const op of q){ if(op.table===table&&op.filter===filter) await removeFromQueue(op._qid); }
+        } catch(e){
+          console.warn(`PATCH ${table} failed:`,e.message);
+          toast(`⚠️ ${table}: ${e.message}`,true);
+          await queueOp({table,method:'PATCH',data:[merged],filter});
+          updateSyncBar();
+        }
+      } else {
+        await queueOp({table,method:'PATCH',data:[merged],filter});
+        updateSyncBar();
+      }
+      return [merged];
+    }
+  }
+
+  // POST için normal akış
   arr.forEach(item=>{ if(!item.id) item.id=crypto.randomUUID(); });
-  // null/undefined değerleri temizle — Supabase schema cache'i tanımadığı kolonları reddeder
   const cleanArr=arr.map(item=>Object.fromEntries(Object.entries(item).filter(([k,v])=>v!==null&&v!==undefined&&v!=='')));
-  // 1. Local'e tam haliyle yaz, Supabase'e temizlenmiş gönder
   await idbPut(table,arr);
-  // 2. Supabase'e gönder (sbFetch kendi içinde 12sn AbortController kullanıyor)
   if(navigator.onLine) {
     try {
-      if(method==='POST')  await sbPost(table, cleanArr);
-      if(method==='PATCH') await sbPatch(table,filter,cleanArr[0]);
-      // Başarılı — kuyruktan temizle
+      await sbPost(table, cleanArr);
       const q=await getQueue();
       for(const op of q){
         if(op.table===table&&op.data?.some(d=>arr.find(a=>a.id===d.id))){
@@ -1057,7 +1088,6 @@ async function write(table,data,method='POST',filter='') {
         }
       }
     } catch(e) {
-      // Başarısız — kuyruğa ekle
       console.warn(`write ${table} failed:`,e.message);
       toast(`⚠️ ${table}: ${e.message}`,true);
       await queueOp({table,method,data:arr,filter});
@@ -1600,7 +1630,7 @@ function renderAnimals(list){
       <div class="ainfo">
         <div class="a-id">${mainId}${subId}</div>
         <div class="a-sub">${a.irk||'—'}${yas?' · '+yas:''}</div>
-        <div class="a-tags"><span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${extraBadge}</div>
+        <div class="a-tags"><span class="tag tb">📍 ${a.padok||'Padok?'}</span><span class="tag tk">${a.grup||'Grup?'}</span>${extraBadge}</div>
       </div>
       <svg class="a-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
     </div>`;
@@ -1971,7 +2001,6 @@ function gebeFiltrele(){
 }
 
 function anneSeç(hayvanId,kupe,dogumTahmini,sperma){
-  // Gizli input'a ID yaz
   let hiddenInput=document.getElementById('b-anne');
   if(!hiddenInput){
     hiddenInput=document.createElement('input');
@@ -1980,15 +2009,30 @@ function anneSeç(hayvanId,kupe,dogumTahmini,sperma){
     document.getElementById('m-birth').appendChild(hiddenInput);
   }
   hiddenInput.value=hayvanId;
-  
-  // Kart göster
+
+  // Baba alanını sperma ile otomatik doldur
+  const babaSel=document.getElementById('b-baba-select');
+  const babaTxt=document.getElementById('b-baba-text');
+  const babaHid=document.getElementById('b-baba');
+  if(sperma&&babaSel){
+    const opt=[...babaSel.options].find(o=>o.value===sperma);
+    if(opt){
+      babaSel.value=sperma;
+      babaSel.style.display='block';
+      if(babaTxt) babaTxt.style.display='none';
+    } else {
+      // Stokta yok, elle gir
+      babaSel.style.display='none';
+      if(babaTxt){ babaTxt.style.display='block'; babaTxt.value=sperma; }
+    }
+    if(babaHid) babaHid.value=sperma;
+  }
+
   document.getElementById('anne-secili-adi').textContent=kupe;
-  document.getElementById('anne-secili-bilgi').textContent=`Tahmini doğum: ${fmtTarih(dogumTahmini)} · Sperma: ${sperma||'?'}`;
+  document.getElementById('anne-secili-bilgi').textContent=`Tahmini doğum: ${fmtTarih(dogumTahmini)} · Baba: ${sperma||'?'}`;
   document.getElementById('anne-secili-card').style.display='block';
   document.getElementById('b-anne-manual').style.display='none';
   document.getElementById('btn-gebe-sec').style.display='none';
-  
-  // Modalı kapat
   document.getElementById('gebe-sec-modal')?.remove();
 }
 
@@ -2000,18 +2044,15 @@ function anneSecimSifirla(){
 
 async function submitBirth(btn){
   const anneId=v('b-anne'),tarih=v('b-tarih'),cins=v('b-cins'),kupe=v('b-kupe'),tip=v('b-tip');
-  const dogumKg=parseFloat(document.getElementById('b-dogum-kg')?.value||'');
+  const dogumKg=parseFloat(document.getElementById('b-dogum-kg')?.value||'')||null;
   const babaInfo=v('b-baba');
-  if(!anneId||!tarih||!kupe){ toast('Anne Küpesi, Tarih ve Yavru Küpe zorunlu',true); return; }
+  if(!anneId){ toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir',true); return; }
+  if(!tarih||!kupe){ toast('Doğum Tarihi ve Yavru Küpe zorunlu',true); return; }
   const bugun=new Date().toISOString().split('T')[0];
   if(tarih>bugun){ toast('Doğum tarihi ileri tarih olamaz',true); return; }
-  if(!dogumKg||dogumKg<=0){ toast('Doğum ağırlığı zorunludur',true); return; }
 
-  // ── Anne sürüde kayıtlı mı? ──
   const anne=_A.find(a=>a.id===anneId||a.kupe_no===anneId||a.devlet_kupe===anneId);
-  if(!anne){ toast(`⚠️ "${anneId}" sürüde kayıtlı değil — önce hayvan ekleyin`,true); return; }
-
-  // ── Buzağı küpesi zaten var mı? ──
+  if(!anne){ toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`,true); return; }
   const dupCheck=_A.find(a=>a.kupe_no===kupe||a.devlet_kupe===kupe);
   if(dupCheck){ toast(`⚠️ "${kupe}" küpesi sürüde zaten kayıtlı`,true); return; }
 
@@ -2019,68 +2060,60 @@ async function submitBirth(btn){
   try {
     const hekimIdB=v('b-hekim');
 
-    // ── 1. Doğum kaydı ──
-    await write('dogum',{id:crypto.randomUUID(),anne_id:anne.id,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip,hekim_id:hekimIdB,dogum_kg:dogumKg,baba_bilgi:babaInfo||null});
+    // 1. Doğum kaydı
+    await write('dogum',{id:crypto.randomUUID(),anne_id:anne.id,tarih,yavru_cins:cins,yavru_kupe:kupe,dogum_tipi:tip,hekim_id:hekimIdB||null,dogum_kg:dogumKg,baba_bilgi:babaInfo||null});
 
-    // ── 2. Buzağıyı hayvanlar tablosuna otomatik ekle ──
+    // 2. Buzağıyı sürüye ekle
     const buzagiId=crypto.randomUUID();
-    const buzagiGrup=cins==='Dişi'?'Buzağı (Dişi)':'Buzağı (Erkek)';
-    await write('hayvanlar',{id:buzagiId,kupe_no:kupe,irk:anne.irk||'',dogum_tarihi:tarih,anne_id:anne.id,baba_bilgi:babaInfo||null,cinsiyet:cins,grup:'Süt İçen Buzağılar',padok:'Buzağı Ahırı',durum:'Aktif',dogum_kg:dogumKg});
-    toast(`🐄 Buzağı "${kupe}" sürüye eklendi`);
+    await write('hayvanlar',{id:buzagiId,kupe_no:kupe,irk:anne.irk||'',dogum_tarihi:tarih,anne_id:anne.id,baba_bilgi:babaInfo||null,cinsiyet:cins,grup:'Süt İçen Buzağılar',padok:'Buzağı Ahırı',durum:'Aktif',dogum_kg:dogumKg||null});
 
-    // ── 3. Buzağı local takip ──
+    // 3. Buzağı lokal takip
     await idbPut('buzagi_takip',[{id:crypto.randomUUID(),kupe_no:kupe,cinsiyet:cins,dogum_tarihi:tarih,anne_id:anne.id}]);
 
-    // Hardcoded stok düşümü KALDIRILDI — yanlış ilaç çekiyordu
-    // Doğumda ilaç kullanımı hastalık/tedavi formuyla kaydedilmeli
-
-    // Anne padok güncelle — sadece padok alanını PATCH et, ...anne spread yapma (schema hatası verir)
+    // 4. Anne padok güncelle
     await write('hayvanlar',{padok:'Sağmal Padok',durum:'Aktif'},'PATCH',`id=eq.${anne.id}`);
 
-    // Anne protokol görevleri
+    // 5. Anne protokol görevleri
     const protokol=[
-      {gun:0, tip:'ILAC',  ac:'Doğum günü: Oksitosin + Ademin + Kalsiyum', stok:'STK001'},
-      {gun:2, tip:'ILAC',  ac:'2. Gün PG', stok:'STK003'},
-      {gun:11,tip:'ILAC',  ac:'11. Gün PG', stok:'STK003'},
-      {gun:25,tip:'ILAC',  ac:'25. Gün PG', stok:'STK003'},
-      {gun:53,tip:'ILAC',  ac:'53. Gün: Ademin + Yeldif', stok:'STK002'},
-      {gun:54,tip:'ILAC',  ac:'54. Gün: Yeldif', stok:'STK004'},
-      {gun:58,tip:'DIGER', ac:'⚡ 58-63. gün kızgınlık takibi', stok:null},
+      {gun:0, tip:'ILAC',  ac:'Doğum günü: Oksitosin + Ademin + Kalsiyum'},
+      {gun:2, tip:'ILAC',  ac:'2. Gün PG'},
+      {gun:11,tip:'ILAC',  ac:'11. Gün PG'},
+      {gun:25,tip:'ILAC',  ac:'25. Gün PG'},
+      {gun:53,tip:'ILAC',  ac:'53. Gün: Ademin + Yeldif'},
+      {gun:54,tip:'ILAC',  ac:'54. Gün: Yeldif'},
+      {gun:58,tip:'DIGER', ac:'⚡ 58-63. gün kızgınlık takibi'},
     ];
-    const anneGorevler=protokol.map(p=>({id:crypto.randomUUID(),hayvan_id:anne.id,gorev_tipi:p.tip,aciklama:p.ac,hedef_tarih:dFwd(tarih,p.gun),stok_id:p.stok,tamamlandi:false,kaynak:'DOGUM-'+anne.id}));
-    // Görevleri teker teker gönder — Supabase batch upsert farklı kolonları reddeder
+    const anneGorevler=protokol.map(p=>({id:crypto.randomUUID(),hayvan_id:anne.id,gorev_tipi:p.tip,aciklama:p.ac,hedef_tarih:dFwd(tarih,p.gun),tamamlandi:false,kaynak:'DOGUM-'+anne.id}));
     for(const g of anneGorevler) await write('gorev_log',g);
 
-    // Buzağı ana görevi + alt görevler
+    // 6. Buzağı bakım görevi + alt görevler
     const buzagiAnaId=crypto.randomUUID();
-    const buzagiAltGorevler=[
-      {ac:'Kolostrum ver (doğumdan sonra ilk 2 saat)'},
-      {ac:'Göbek kordonu dezenfeksiyonu (iyot)'},
-      {ac:'Küpeleme'},
-      {ac:'Ademin uygula (1. gün)'},
-      {ac:'Maya ver (1. gün)'},
-      {ac:'Probiyotik ver (1. gün)'},
-    ].map(s=>({id:crypto.randomUUID(),hayvan_id:buzagiId,gorev_tipi:'BUZAGI_BAKIM',aciklama:s.ac,hedef_tarih:tarih,tamamlandi:false,parent_id:buzagiAnaId,kaynak:'DOGUM-'+anne.id}));
-
-    // Ana görev önce, sonra alt görevler — teker teker
     await write('gorev_log',{id:buzagiAnaId,hayvan_id:buzagiId,gorev_tipi:'BUZAGI_BAKIM',aciklama:'Buzağı İlk Gün Bakımı ('+kupe+')',hedef_tarih:tarih,tamamlandi:false,kaynak:'DOGUM-'+anne.id});
+    const buzagiAltGorevler=[
+      'Kolostrum ver (doğumdan sonra ilk 2 saat)',
+      'Göbek kordonu dezenfeksiyonu (iyot)','Küpeleme',
+      'Ademin uygula (1. gün)','Maya ver (1. gün)','Probiyotik ver (1. gün)',
+    ].map(ac=>({id:crypto.randomUUID(),hayvan_id:buzagiId,gorev_tipi:'BUZAGI_BAKIM',aciklama:ac,hedef_tarih:tarih,tamamlandi:false,parent_id:buzagiAnaId,kaynak:'DOGUM-'+anne.id}));
     for(const g of buzagiAltGorevler) await write('gorev_log',g);
 
-    // Doğum ↔ Tohumlama zinciri: gebe tohumlama kaydını kapat
+    // 7. Gebe tohumlama kaydını kapat — write PATCH artık doğru merge yapıyor
     const gebeTohs=await getData('tohumlama',t=>t.hayvan_id===anne.id&&t.sonuc==='Gebe');
     for(const t of gebeTohs){
-      // Sadece değişen alanları PATCH et — ...t spread schema hatası verir
       await write('tohumlama',{sonuc:'Doğum Yaptı',dogum_tarihi:tarih,buzagi_kupe:kupe},'PATCH',`id=eq.${t.id}`);
-      // Local'e tam güncellemeyi kaydet
-      await idbPut('tohumlama',[{...t,sonuc:'Doğum Yaptı',dogum_tarihi:tarih,buzagi_kupe:kupe}]);
     }
 
-    toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${anneGorevler.length} görev oluşturuldu`);
+    toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${protokol.length} görev oluşturuldu`);
     closeM('m-birth');
-    ['b-anne','b-kupe','b-oks','b-kals','b-adem','b-pg'].forEach(cl);
+    // Formu sıfırla
+    const anneEl=document.getElementById('b-anne'); if(anneEl) anneEl.value='';
+    document.getElementById('anne-secili-card').style.display='none';
+    document.getElementById('btn-gebe-sec').style.display='';
+    document.getElementById('b-anne-manual').style.display='none';
+    ['b-kupe','b-dogum-kg','b-baba','b-baba-text'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     if(_curPg==='ureme') loadUreme(_curUremeTab);
     await renderFromLocal();
-  } catch(e){ toast('❌ Doğum kaydedilemedi: '+e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Protokol Görevleri';} }
+  } catch(e){ toast('❌ Doğum kaydedilemedi: '+e.message,true); }
+  finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Protokol Görevleri';} }
 }
 
 // ══════════════════════════════════════════
@@ -2989,23 +3022,18 @@ async function openHstDet(id){
   document.getElementById('hd-body').innerHTML=rows.join('<br>') || 'Ek bilgi yok';
   openM('m-hst-det');
 }
-// Hayvan kartından doğum modalını o hayvanla aç
-function openBirthForAnimal(hayvanId, kupe){
+async function openBirthForAnimal(hayvanId, kupe){
   openM('m-birth');
-  // Anne alanını doldur
-  setTimeout(()=>{
-    const anneInp=document.getElementById('b-anne');
-    if(anneInp){ anneInp.value=kupe||hayvanId; }
-    // Gebe seçim listesini de o hayvanla eşleştir
-    const gebeList=document.getElementById('gebe-liste');
-    if(gebeList){
-      const opt=[...gebeList.options].find(o=>o.dataset.id===hayvanId||o.value===kupe);
-      if(opt){ gebeList.value=opt.value; gebeList.dispatchEvent(new Event('change')); }
-    }
-    // Manuel giriş göster
-    const manuelEl=document.getElementById('b-anne-manual');
-    if(manuelEl) manuelEl.style.display='block';
-  },50);
+  // Kısa bekleme — modal açılsın, baba-select dolsun
+  setTimeout(async()=>{
+    // Gebelik tohumlama kaydını bul
+    const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvanId&&t.sonuc==='Gebe');
+    const toh=tohs.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''))[0];
+    const sperma=toh?.sperma||'';
+    const dogumTahmini=toh?dFwd(toh.tarih,280):'?';
+    // anneSeç ile formu doldur
+    anneSeç(hayvanId, kupe, dogumTahmini, sperma);
+  },120);
 }
 
 function openGebelikEkle(hayvanId){
