@@ -3602,14 +3602,18 @@ if(localStorage.getItem('bildirim_aktif')==='1'){
   setInterval(bildirimKontrol,3600000);
 }
 
-// Service Worker kaydı — sadece GitHub Pages'te çalışır
+// Service Worker — sadece GitHub Pages / production'da
 if('serviceWorker' in navigator){
   const host=location.hostname;
   const isProd=host.endsWith('github.io')||host.endsWith('egesut.com')||host==='localhost'||host==='127.0.0.1';
   if(isProd){
     window.addEventListener('load',()=>{
       navigator.serviceWorker.register('./sw.js')
-        .then(reg=>console.log('✅ SW devrede:',reg.scope))
+        .then(reg=>{
+          console.log('✅ SW devrede:',reg.scope);
+          // Her yüklemede güncelleme kontrol et
+          reg.update();
+        })
         .catch(err=>console.warn('SW hatası:',err));
     });
   }
