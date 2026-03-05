@@ -286,6 +286,11 @@ button,input,select,textarea{font-family:inherit}
         </select>
       </div>
       <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 2px"></div>
+      <div class="filter-strip" style="margin-bottom:6px">
+        <button class="fs-btn on" id="sf-tumuu"  onclick="setSuruFilter('tumuu',this)">Tümü</button>
+        <button class="fs-btn"    id="sf-gebe"   onclick="setSuruFilter('gebe',this)">🤰 Gebe</button>
+        <button class="fs-btn"    id="sf-bos"    onclick="setSuruFilter('bos',this)">⬜ Boş</button>
+      </div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>
@@ -880,8 +885,8 @@ async function openDB() {
     req.onsuccess = e => { clearTimeout(timeout); _db=e.target.result; res(_db); };
     req.onerror   = e => { clearTimeout(timeout); rej(e.target.error); };
     req.onblocked = () => {
-      // Timeout'u iptal etme — 5sn sonra rej() çalışsın
-      console.warn('IndexedDB blocked — başka sekme açık olabilir, bekleniyor…');
+      // Timeout'u iptal etme — diğer sekme DB'yi bloke ediyorsa 5sn sonra hata verilsin
+      console.warn('IndexedDB blocked — başka bir sekme eski DB sürümünü açık tutuyor olabilir');
     };
   });
 }
@@ -1129,6 +1134,7 @@ function hideSyncBar() {
 // STATE
 // ══════════════════════════════════════════
 let _A=[],_S=[],_curStk=null,_curPg='dash',_gebeIds=[];
+let _suruFilter='tumuu', _gebeGunMap={}, _bosGunMap={};
 
 async function getData(table,filterFn) {
   const data=await idbGetAll(table);
@@ -1217,13 +1223,14 @@ function goTo(pg){
   document.querySelectorAll('.nb').forEach(el=>el.classList.remove('on'));
   document.getElementById('pg-'+pg).classList.add('on');
   document.getElementById('nb-'+pg).classList.add('on');
-  if(pg==='tasks') loadTasks(_curTaskFilter||'today');
+  if(pg==='tasks')  loadTasks(_curTaskFilter||'today');
   if(pg==='gecmis') loadGecmis(_curGecmisFilter||'hepsi');
+  if(pg==='log')    { loadBirths(); loadStokList(); }
   if(pg==='ureme'){
     const tab=_curUremeTab||'kizginlik';
     document.querySelectorAll('#pg-ureme .fs-btn').forEach(b=>b.classList.remove('on'));
-    const activeBtn=document.getElementById('ureme-tab-'+tab);
-    if(activeBtn) activeBtn.classList.add('on');
+    const ab=document.getElementById('ureme-tab-'+tab);
+    if(ab) ab.classList.add('on');
     loadUreme(tab);
   }
 }
@@ -1427,41 +1434,106 @@ async function loadAnimals(){
   const el=document.getElementById('suru-body');
   try {
     _A=await getData('hayvanlar',a=>a.durum==='Aktif');
-    const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
+    const [gebeTohs, tumTohs, dogumlar]=await Promise.all([
+      getData('tohumlama',t=>t.sonuc==='Gebe'),
+      idbGetAll('tohumlama'),
+      idbGetAll('dogum'),
+    ]);
     _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
+
+    // Gebelik gün haritası: hayvan_id → kaç gündür gebe
+    _gebeGunMap={};
+    gebeTohs.forEach(t=>{
+      _gebeGunMap[t.hayvan_id]=Math.floor((Date.now()-new Date(t.tarih))/86400000);
+    });
+    _A.filter(a=>a.durum==='Gebe'&&!_gebeGunMap[a.id]).forEach(a=>{
+      _gebeGunMap[a.id]=a.tohumlama_tarihi?Math.floor((Date.now()-new Date(a.tohumlama_tarihi))/86400000):0;
+    });
+
+    // Boş gün haritası: son Boş tohumlama veya son doğum tarihinden bu yana gün
+    _bosGunMap={};
+    const gebeSet=new Set(_gebeIds);
+    _A.filter(a=>!gebeSet.has(a.id)&&(a.cinsiyet==='Dişi'||!a.cinsiyet)).forEach(a=>{
+      const sonBos=tumTohs.filter(t=>t.hayvan_id===a.id&&(t.sonuc==='Boş'||t.sonuc==='Abort')).sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
+      const sonDogum=dogumlar.filter(d=>d.anne_id===a.id).sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
+      let ref=null;
+      if(sonBos&&sonDogum) ref=sonBos.tarih>sonDogum.tarih?sonBos.tarih:sonDogum.tarih;
+      else if(sonBos) ref=sonBos.tarih;
+      else if(sonDogum) ref=sonDogum.tarih;
+      if(ref) _bosGunMap[a.id]=Math.floor((Date.now()-new Date(ref))/86400000);
+    });
+
     _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     renderAnimals(_A);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 
+// Evrensel süre formatlayıcı: gün sayısı → "X yıl Y ay Z gün"
+function gunleriFmt(totalDays){
+  if(totalDays===null||totalDays===undefined||isNaN(totalDays)) return '';
+  totalDays=Math.max(0,Math.floor(Number(totalDays)));
+  const y=Math.floor(totalDays/365);
+  const m=Math.floor((totalDays%365)/30);
+  const g=totalDays%365%30;
+  const parts=[];
+  if(y>0) parts.push(y+' yıl');
+  if(m>0) parts.push(m+' ay');
+  if(g>0||parts.length===0) parts.push(g+' gün');
+  return parts.join(' ');
+}
+
 function yasHesapla(dogumTarihi){
   if(!dogumTarihi) return '';
-  const d=new Date(dogumTarihi), now=new Date();
-  let y=now.getFullYear()-d.getFullYear(), m=now.getMonth()-d.getMonth(), g=now.getDate()-d.getDate();
-  if(g<0){ m--; g+=new Date(now.getFullYear(),now.getMonth(),0).getDate(); }
-  if(m<0){ y--; m+=12; }
-  if(y>0) return `${y} yıl ${m} ay`;
-  if(m>0) return `${m} ay ${g} gün`;
-  return `${g} gün`;
+  const totalDays=Math.floor((Date.now()-new Date(dogumTarihi))/86400000);
+  if(totalDays<0||totalDays>36500) return 'Geçersiz tarih';
+  return gunleriFmt(totalDays);
 }
 
 function renderAnimals(list){
   const el=document.getElementById('suru-body');
-  if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
   const gebeSet=new Set(_gebeIds||[]);
-  el.innerHTML=list.map(a=>{
+
+  // Filtre uygula
+  let filtered=list;
+  if(_suruFilter==='gebe'){
+    filtered=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe');
+    filtered.sort((a,b)=>((_gebeGunMap[b.id]||0)-(_gebeGunMap[a.id]||0)));
+  } else if(_suruFilter==='bos'){
+    filtered=list.filter(a=>!gebeSet.has(a.id)&&(a.cinsiyet==='Dişi'||!a.cinsiyet));
+    filtered.sort((a,b)=>{
+      const da=_bosGunMap[a.id]!==undefined?_bosGunMap[a.id]:-1;
+      const db=_bosGunMap[b.id]!==undefined?_bosGunMap[b.id]:-1;
+      return db-da;
+    });
+  }
+
+  if(!filtered.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
+
+  el.innerHTML=filtered.map(a=>{
     const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
     const subId=a.kupe_no&&a.devlet_kupe?`<span style="font-size:.65rem;color:var(--ink3);font-weight:400"> · ${a.devlet_kupe}</span>`:'';
     const init=mainId.replace(/\D/g,'').slice(-3)||mainId.slice(0,2).toUpperCase();
     const yas=yasHesapla(a.dogum_tarihi);
     const isGebe=gebeSet.has(a.id)||a.durum==='Gebe';
-    const gebeBadge=isGebe?`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 Gebe</span>`:'';
+
+    let extraBadge='';
+    if(isGebe&&_gebeGunMap[a.id]!==undefined){
+      const gebeSure=gunleriFmt(_gebeGunMap[a.id]);
+      const kalan=280-(_gebeGunMap[a.id]||0);
+      const urgent=kalan<=14;
+      extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 ${gebeSure}${urgent?` · <b style="color:var(--red)">⚡${kalan}g kaldı</b>`:''}</span>`;
+    } else if(isGebe){
+      extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 Gebe</span>`;
+    } else if(_suruFilter==='bos'&&_bosGunMap[a.id]!==undefined){
+      extraBadge=`<span class="tag" style="background:rgba(201,125,10,.12);color:var(--amber);font-weight:700">⬜ ${gunleriFmt(_bosGunMap[a.id])} boş</span>`;
+    }
+
     return `<div class="animal-card" onclick="openDet('${a.id}')">
       <div class="avt">${init}</div>
       <div class="ainfo">
         <div class="a-id">${mainId}${subId}</div>
         <div class="a-sub">${a.irk||'—'}${yas?' · '+yas:''}</div>
-        <div class="a-tags"><span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}</div>
+        <div class="a-tags"><span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${extraBadge}</div>
       </div>
       <svg class="a-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
     </div>`;
@@ -1472,13 +1544,13 @@ function renderAnimals(list){
 function updatePadokOzet(list){
   const el=document.getElementById('padok-ozet'); if(!el) return;
   const gebeSet=new Set(_gebeIds||[]);
-  const padok=document.getElementById('pflt')?.value;
   if(!list.length){ el.innerHTML=''; return; }
   const toplam=list.length;
   const disi=list.filter(a=>a.cinsiyet==='Dişi'||!a.cinsiyet).length;
   const erkek=list.filter(a=>a.cinsiyet==='Erkek').length;
   const gebe=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe').length;
   const bos=disi-gebe;
+  const padok=document.getElementById('pflt')?.value;
   const isBuzagi=padok&&padok.toLowerCase().includes('buzağı');
   const chip=(txt,color)=>`<span style="background:${color};border-radius:8px;padding:3px 9px;font-size:.68rem;font-weight:700;color:#fff">${txt}</span>`;
   let html=chip(`Toplam: ${toplam}`,'rgba(61,74,50,.7)');
@@ -1488,6 +1560,13 @@ function updatePadokOzet(list){
     html+=chip(`Gebe: ${gebe}`,'rgba(78,154,42,.8)')+chip(`Boş: ${bos}`,'rgba(180,140,0,.7)');
   }
   el.innerHTML=html;
+  // Filtre butonlarındaki sayıları güncelle
+  const btnGebe=document.getElementById('sf-gebe');
+  const btnBos=document.getElementById('sf-bos');
+  const btnTumuu=document.getElementById('sf-tumuu');
+  if(btnGebe) btnGebe.textContent=`🤰 Gebe (${gebe})`;
+  if(btnBos)  btnBos.textContent=`⬜ Boş (${bos})`;
+  if(btnTumuu) btnTumuu.textContent=`Tümü (${toplam})`;
 }
 
 let _filterTimer=null;
@@ -1524,16 +1603,25 @@ document.addEventListener('click',e=>{
     document.getElementById('ac-srch') && (document.getElementById('ac-srch').style.display='none');
 });
 
+function setSuruFilter(f, btn){
+  _suruFilter=f;
+  document.querySelectorAll('#pg-suru .fs-btn').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  applyAnimalFilter();
+}
+
+function applyAnimalFilter(){
+  const q=(document.getElementById('srch')?.value||'').toLowerCase();
+  const p=document.getElementById('pflt')?.value||'';
+  let f=_A;
+  if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
+  if(p) f=f.filter(a=>a.padok===p);
+  renderAnimals(f);
+}
+
 function filterA(){
   clearTimeout(_filterTimer);
-  _filterTimer=setTimeout(()=>{
-    const q=document.getElementById('srch').value.toLowerCase();
-    const p=document.getElementById('pflt').value;
-    let f=_A;
-    if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
-    if(p) f=f.filter(a=>a.padok===p);
-    renderAnimals(f);
-  },250);
+  _filterTimer=setTimeout(applyAnimalFilter,250);
 }
 
 // ══════════════════════════════════════════
@@ -1575,7 +1663,7 @@ async function openDet(id){
 
     document.getElementById('tab-ozet').innerHTML=`
       <div class="stats-strip">
-        <div class="ss-item"><div class="ss-val" style="font-size:${yasRaw!==null&&(yasRaw<0||yasRaw>36500)?"0.75rem":"1.15rem"}">${yasGun}</div><div class="ss-lbl">Gün Yaş</div></div>
+        <div class="ss-item"><div class="ss-val" style="font-size:${yasRaw!==null&&(yasRaw<0||yasRaw>36500)?"0.75rem":"1.15rem"}">${yasGun}</div><div class="ss-lbl">Yaş</div></div>
         <div class="ss-item"><div class="ss-val">${births.length}</div><div class="ss-lbl">Laktasyon</div></div>
         <div class="ss-item"><div class="ss-val">${diseases.length}</div><div class="ss-lbl">Toplam Vaka</div></div>
         <div class="ss-item"><div class="ss-val">${tasks.length+subs.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
@@ -1600,10 +1688,9 @@ async function openDet(id){
 
     const gebeTohumlama=tohs.find(t=>t.sonuc==='Gebe');
     const gebeBilgi=gebeTohumlama?(()=>{
-      const toh=new Date(gebeTohumlama.tarih);
-      const gunler=Math.floor((new Date()-toh)/86400000);
-      const ay=Math.floor(gunler/30), kalanGun=gunler%30;
-      return `${ay} ay ${kalanGun} gün (${gunler}. gün) · Tahmini: ${dFwd(gebeTohumlama.tarih,280)}`;
+      const gunler=Math.floor((Date.now()-new Date(gebeTohumlama.tarih))/86400000);
+      const kalan=280-gunler;
+      return `${gunleriFmt(gunler)} (${gunler}. gün) · Tahmini doğum: ${fmtTarih(dFwd(gebeTohumlama.tarih,280))}${kalan<=14?` · <b style="color:var(--red)">⚡ ${kalan} gün kaldı!</b>`:''}`;
     })():null;
 
     document.getElementById('tab-saglik').innerHTML=
@@ -2835,10 +2922,8 @@ async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
   const el=document.getElementById('ureme-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
-  // Güvenlik: 8 saniye içinde yüklenemezse hata göster
   const safetyTimer=setTimeout(()=>{
-    if(el.innerHTML.includes('spin'))
-      el.innerHTML='<div class="empty">⚠️ Yükleme zaman aşımı — sayfayı yenileyin</div>';
+    if(el.querySelector('.spin')) el.innerHTML='<div class="empty">⚠️ Yükleme zaman aşımı — sayfayı yenileyin</div>';
   },8000);
   try {
     const today=new Date().toISOString().split('T')[0];
@@ -2893,7 +2978,6 @@ async function loadUreme(tab='kizginlik'){
           const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
           const toh=new Date(t.tarih);
           const gun=Math.floor((new Date()-toh)/86400000);
-          const ay=Math.floor(gun/30), gKalan=gun%30;
           const dogumTahmini=dFwd(t.tarih,280);
           const kalanGun=Math.floor((new Date(dogumTahmini)-new Date())/86400000);
           const urgent=kalanGun<=14;
@@ -2901,7 +2985,7 @@ async function loadUreme(tab='kizginlik'){
             <div class="hist-dot" style="background:var(--green2)"></div>
             <div class="hist-main">
               <div class="hist-title" style="color:var(--green)">🤰 ${kupe}</div>
-              <div class="hist-sub">${ay} ay ${gKalan} gün (${gun}. gün) · Tahmini: ${fmtTarih(dogumTahmini)}</div>
+              <div class="hist-sub">${gunleriFmt(gun)} (${gun}. gün) · Tahmini: ${fmtTarih(dogumTahmini)}</div>
               <div class="hist-sub">${urgent?`<b style="color:var(--red)">⚡ ${kalanGun} gün kaldı!</b>`:`${kalanGun} gün kaldı`}</div>
             </div>
           </div>`;
