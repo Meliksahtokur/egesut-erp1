@@ -829,7 +829,7 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 const HDR_UPSERT = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'};
 const DB_NAME = 'egesut_v9';
-const DB_VER  = 3;
+const DB_VER  = 4;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip','kizginlik_log'];
 const MAX_RETRY = 3;
 
@@ -880,9 +880,8 @@ async function openDB() {
     req.onsuccess = e => { clearTimeout(timeout); _db=e.target.result; res(_db); };
     req.onerror   = e => { clearTimeout(timeout); rej(e.target.error); };
     req.onblocked = () => {
-      clearTimeout(timeout);
-      console.warn('IndexedDB blocked — trying anyway');
-      // Bloklanınca da devam et — veri olmadan açılır
+      // Timeout'u iptal etme — 5sn sonra rej() çalışsın
+      console.warn('IndexedDB blocked — başka sekme açık olabilir, bekleniyor…');
     };
   });
 }
@@ -1220,7 +1219,13 @@ function goTo(pg){
   document.getElementById('nb-'+pg).classList.add('on');
   if(pg==='tasks') loadTasks(_curTaskFilter||'today');
   if(pg==='gecmis') loadGecmis(_curGecmisFilter||'hepsi');
-  if(pg==='ureme') loadUreme(_curUremeTab||'kizginlik');
+  if(pg==='ureme'){
+    const tab=_curUremeTab||'kizginlik';
+    document.querySelectorAll('#pg-ureme .fs-btn').forEach(b=>b.classList.remove('on'));
+    const activeBtn=document.getElementById('ureme-tab-'+tab);
+    if(activeBtn) activeBtn.classList.add('on');
+    loadUreme(tab);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -2830,6 +2835,11 @@ async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
   const el=document.getElementById('ureme-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  // Güvenlik: 8 saniye içinde yüklenemezse hata göster
+  const safetyTimer=setTimeout(()=>{
+    if(el.innerHTML.includes('spin'))
+      el.innerHTML='<div class="empty">⚠️ Yükleme zaman aşımı — sayfayı yenileyin</div>';
+  },8000);
   try {
     const today=new Date().toISOString().split('T')[0];
 
@@ -2945,6 +2955,7 @@ async function loadUreme(tab='kizginlik'){
     }
 
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+  finally { clearTimeout(safetyTimer); }
 }
 
 // ══════════════════════════════════════════
