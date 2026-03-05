@@ -21,7 +21,7 @@
   --card:#f7f4ee;--card2:#edeae2;--card3:#e2ddd3;
   --ink:#1a1f14;--ink2:#3d4a32;--ink3:#6b7a5c;
   --green:#4e9a2a;--green2:#6abf3d;--green3:#98d96e;
-  --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;
+  --amber:#c97d0a;--amber-dark:#8a5a10;--red:#c0321a;--red2:#e85535;--red-dark:#8a3020;--blue:#2a6bb5;
   --nav:60px;--safe:env(safe-area-inset-bottom,0px);--r:16px;--r2:10px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -30,7 +30,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);overflow:hidden
 button,input,select,textarea{font-family:inherit}
 
 /* SHELL */
-#shell{display:flex;flex-direction:column;height:100dvh}
+#shell{display:flex;flex-direction:column;height:100vh;height:100dvh}
 #topbar{background:var(--bg);padding:14px 16px 10px;padding-top:max(14px,env(safe-area-inset-top,14px));display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .logo-main{font-size:1.3rem;font-weight:800;color:#fff;letter-spacing:-.02em}
 .logo-main em{color:var(--green2);font-style:normal}
@@ -80,7 +80,7 @@ button,input,select,textarea{font-family:inherit}
 .sc.alert .sv{color:var(--red2)}
 .sc.ok .sv{color:var(--green3)}
 .sl{font-size:.63rem;font-weight:600;color:var(--ink3);margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
-.sc.warn .sl{color:#8a5a10}.sc.alert .sl{color:#8a3020}
+.sc.warn .sl{color:var(--amber-dark)}.sc.alert .sl{color:var(--red-dark)}
 
 /* ALARM BANDS */
 .aband{border-radius:var(--r2);overflow:hidden;margin-bottom:8px}
@@ -194,9 +194,9 @@ button,input,select,textarea{font-family:inherit}
 .fab:active{transform:scale(.88)}
 
 /* MODALS */
-.mo{position:fixed;inset:0;background:rgba(10,20,5,.8);backdrop-filter:blur(6px);z-index:80;display:none;align-items:flex-end}
+.mo{position:fixed;inset:0;background:rgba(10,20,5,.8);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);z-index:80;display:none;align-items:flex-end}
 .mo.on{display:flex}
-.modal{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-height:94dvh;overflow-y:auto;padding-bottom:calc(16px + var(--safe));animation:slideup .28s cubic-bezier(.22,1,.36,1)}
+.modal{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-height:94vh;max-height:94dvh;overflow-y:auto;padding-bottom:calc(16px + var(--safe));animation:slideup .28s cubic-bezier(.22,1,.36,1)}
 @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .m-handle{width:38px;height:4px;background:var(--card3);border-radius:2px;margin:11px auto}
 .m-title{font-size:1.05rem;font-weight:800;padding:2px 18px 14px;border-bottom:1px solid var(--card2);color:var(--ink)}
@@ -226,8 +226,8 @@ button,input,select,textarea{font-family:inherit}
 .fs-btn{flex:1;padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);font-size:.68rem;font-weight:800;color:var(--ink3);cursor:pointer;text-align:center;letter-spacing:.05em;text-transform:uppercase;transition:all .12s}
 .fs-btn.on{background:var(--green);border-color:var(--green);color:#fff}
 .loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 20px;gap:14px;color:var(--ink3);font-size:.8rem}
-.spin{width:32px;height:32px;border:3px solid var(--card2);border-top-color:var(--green);border-radius:50%;animation:rot .7s linear infinite}
-@keyframes rot{to{transform:rotate(360deg)}}
+.spin{width:32px;height:32px;border:3px solid var(--card2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+
 .empty{text-align:center;padding:48px 20px;color:var(--ink3);font-size:.82rem}
 .empty-ico{font-size:2.8rem;margin-bottom:10px}
 #toast{position:fixed;bottom:calc(var(--nav) + var(--safe) + 10px);left:50%;transform:translateX(-50%) translateY(12px);background:var(--ink);color:#fff;padding:9px 20px;border-radius:24px;font-size:.8rem;font-weight:700;z-index:99;opacity:0;transition:all .28s;pointer-events:none;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;box-shadow:0 4px 20px rgba(0,0,0,.3)}
@@ -287,9 +287,9 @@ button,input,select,textarea{font-family:inherit}
       </div>
       <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 2px"></div>
       <div class="filter-strip" style="margin-bottom:6px">
-        <button class="fs-btn on" id="sf-tumuu"  onclick="setSuruFilter('tumuu',this)">Tümü</button>
-        <button class="fs-btn"    id="sf-gebe"   onclick="setSuruFilter('gebe',this)">🤰 Gebe</button>
-        <button class="fs-btn"    id="sf-bos"    onclick="setSuruFilter('bos',this)">⬜ Boş</button>
+        <button class="fs-btn on" id="sf-tumuu" onclick="setSuruFilter('tumuu',this)">Tümü</button>
+        <button class="fs-btn"    id="sf-gebe"  onclick="setSuruFilter('gebe',this)">🤰 Gebe</button>
+        <button class="fs-btn"    id="sf-bos"   onclick="setSuruFilter('bos',this)">⬜ Boş</button>
       </div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -872,8 +872,7 @@ let _db = null;
 async function openDB() {
   if (_db) return Promise.resolve(_db);
   return new Promise((res,rej) => {
-    // 5sn içinde açılmazsa hata ver
-    const timeout=setTimeout(()=>rej(new Error('IndexedDB timeout — sayfayı yenileyin')),5000);
+    const timeout=setTimeout(()=>rej(new Error('IndexedDB timeout — sayfayı yenileyin')),8000);
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = e => {
       const db = e.target.result;
@@ -882,17 +881,29 @@ async function openDB() {
       if(!db.objectStoreNames.contains('_meta'))  db.createObjectStore('_meta', {keyPath:'key'});
       if(!db.objectStoreNames.contains('kizginlik_log')) db.createObjectStore('kizginlik_log',{keyPath:'id'});
     };
-    req.onsuccess = e => { clearTimeout(timeout); _db=e.target.result; res(_db); };
+    req.onsuccess = e => {
+      clearTimeout(timeout);
+      _db=e.target.result;
+      // Başka sekme DB'yi yükseltirse mevcut bağlantıyı kapat
+      _db.onversionchange=()=>{ _db.close(); _db=null; };
+      res(_db);
+    };
     req.onerror   = e => { clearTimeout(timeout); rej(e.target.error); };
     req.onblocked = () => {
-      // Timeout'u iptal etme — diğer sekme DB'yi bloke ediyorsa 5sn sonra hata verilsin
+      // Timeout'u iptal ETME — 8sn sonra rej() çalışır ve kullanıcıya mesaj gösterilir
       console.warn('IndexedDB blocked — başka bir sekme eski DB sürümünü açık tutuyor olabilir');
     };
   });
 }
 async function idbGetAll(store) {
   const db=await openDB();
-  return new Promise((res,rej)=>{ const req=db.transaction(store,'readonly').objectStore(store).getAll(); req.onsuccess=()=>res(req.result||[]); req.onerror=e=>rej(e.target.error); });
+  return new Promise((res,rej)=>{
+    try {
+      const req=db.transaction(store,'readonly').objectStore(store).getAll();
+      req.onsuccess=()=>res(req.result||[]);
+      req.onerror=e=>rej(e.target.error);
+    } catch(e){ rej(e); }
+  });
 }
 async function idbPut(store,data) {
   const db=await openDB();
@@ -1134,7 +1145,7 @@ function hideSyncBar() {
 // STATE
 // ══════════════════════════════════════════
 let _A=[],_S=[],_curStk=null,_curPg='dash',_gebeIds=[];
-let _suruFilter='tumuu', _gebeGunMap={}, _bosGunMap={};
+let _suruFilter='tumuu',_gebeGunMap={},_bosGunMap={};
 
 async function getData(table,filterFn) {
   const data=await idbGetAll(table);
@@ -1434,7 +1445,7 @@ async function loadAnimals(){
   const el=document.getElementById('suru-body');
   try {
     _A=await getData('hayvanlar',a=>a.durum==='Aktif');
-    const [gebeTohs, tumTohs, dogumlar]=await Promise.all([
+    const [gebeTohs,tumTohs,dogumlar]=await Promise.all([
       getData('tohumlama',t=>t.sonuc==='Gebe'),
       idbGetAll('tohumlama'),
       idbGetAll('dogum'),
@@ -1450,12 +1461,14 @@ async function loadAnimals(){
       _gebeGunMap[a.id]=a.tohumlama_tarihi?Math.floor((Date.now()-new Date(a.tohumlama_tarihi))/86400000):0;
     });
 
-    // Boş gün haritası: son Boş tohumlama veya son doğum tarihinden bu yana gün
+    // Boş gün haritası: son boş tohumlama veya son doğumdan bu yana gün (yetişkin dişi için)
     _bosGunMap={};
     const gebeSet=new Set(_gebeIds);
     _A.filter(a=>!gebeSet.has(a.id)&&(a.cinsiyet==='Dişi'||!a.cinsiyet)).forEach(a=>{
-      const sonBos=tumTohs.filter(t=>t.hayvan_id===a.id&&(t.sonuc==='Boş'||t.sonuc==='Abort')).sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
-      const sonDogum=dogumlar.filter(d=>d.anne_id===a.id).sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
+      const sonBos=tumTohs.filter(t=>t.hayvan_id===a.id&&(t.sonuc==='Boş'||t.sonuc==='Abort'))
+        .sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
+      const sonDogum=dogumlar.filter(d=>d.anne_id===a.id)
+        .sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
       let ref=null;
       if(sonBos&&sonDogum) ref=sonBos.tarih>sonDogum.tarih?sonBos.tarih:sonDogum.tarih;
       else if(sonBos) ref=sonBos.tarih;
@@ -1468,13 +1481,19 @@ async function loadAnimals(){
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 
-// Evrensel süre formatlayıcı: gün sayısı → "X yıl Y ay Z gün"
+// ══════════════════════════════════════════
+// YARDIMCI FONKSIYONLAR
+// ══════════════════════════════════════════
+// Gün sayısını "X yıl Y ay Z gün" formatına çevirir (referans tarih yöntemi — /365 ve /30 yuvarlama hatası yok)
 function gunleriFmt(totalDays){
   if(totalDays===null||totalDays===undefined||isNaN(totalDays)) return '';
   totalDays=Math.max(0,Math.floor(Number(totalDays)));
-  const y=Math.floor(totalDays/365);
-  const m=Math.floor((totalDays%365)/30);
-  const g=totalDays%365%30;
+  if(totalDays===0) return '0 gün';
+  const s=new Date(2000,0,1);
+  const e=new Date(s.getTime()+totalDays*86400000);
+  let y=e.getFullYear()-s.getFullYear(), m=e.getMonth()-s.getMonth(), g=e.getDate()-s.getDate();
+  if(g<0){ m--; g+=new Date(e.getFullYear(),e.getMonth(),0).getDate(); }
+  if(m<0){ y--; m+=12; }
   const parts=[];
   if(y>0) parts.push(y+' yıl');
   if(m>0) parts.push(m+' ay');
@@ -1489,43 +1508,56 @@ function yasHesapla(dogumTarihi){
   return gunleriFmt(totalDays);
 }
 
+// Hayvan için önce işletme küpesi, yoksa devlet küpesi, yoksa id
+function getDisplayKupe(h,fallback){
+  if(!h) return fallback||'?';
+  return h.kupe_no||h.devlet_kupe||h.id||fallback||'?';
+}
+
 function renderAnimals(list){
   const el=document.getElementById('suru-body');
   const gebeSet=new Set(_gebeIds||[]);
+  const today=Date.now();
+  const BOS_YAS_ESIK=365; // Boş tabında sadece >=365 günlük dişiler
 
-  // Filtre uygula
   let filtered=list;
   if(_suruFilter==='gebe'){
     filtered=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe');
     filtered.sort((a,b)=>((_gebeGunMap[b.id]||0)-(_gebeGunMap[a.id]||0)));
   } else if(_suruFilter==='bos'){
-    filtered=list.filter(a=>!gebeSet.has(a.id)&&(a.cinsiyet==='Dişi'||!a.cinsiyet));
-    filtered.sort((a,b)=>{
-      const da=_bosGunMap[a.id]!==undefined?_bosGunMap[a.id]:-1;
-      const db=_bosGunMap[b.id]!==undefined?_bosGunMap[b.id]:-1;
-      return db-da;
+    filtered=list.filter(a=>{
+      if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
+      if(a.cinsiyet==='Erkek') return false;
+      const yas=a.dogum_tarihi?Math.floor((today-new Date(a.dogum_tarihi))/86400000):9999;
+      return yas>=BOS_YAS_ESIK;
     });
+    filtered.sort((a,b)=>(_bosGunMap[b.id]!==undefined?_bosGunMap[b.id]:-1)-(_bosGunMap[a.id]!==undefined?_bosGunMap[a.id]:-1));
   }
 
   if(!filtered.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
 
   el.innerHTML=filtered.map(a=>{
-    const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
+    const mainId=getDisplayKupe(a);
     const subId=a.kupe_no&&a.devlet_kupe?`<span style="font-size:.65rem;color:var(--ink3);font-weight:400"> · ${a.devlet_kupe}</span>`:'';
     const init=mainId.replace(/\D/g,'').slice(-3)||mainId.slice(0,2).toUpperCase();
     const yas=yasHesapla(a.dogum_tarihi);
     const isGebe=gebeSet.has(a.id)||a.durum==='Gebe';
 
     let extraBadge='';
-    if(isGebe&&_gebeGunMap[a.id]!==undefined){
-      const gebeSure=gunleriFmt(_gebeGunMap[a.id]);
-      const kalan=280-(_gebeGunMap[a.id]||0);
-      const urgent=kalan<=14;
-      extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 ${gebeSure}${urgent?` · <b style="color:var(--red)">⚡${kalan}g kaldı</b>`:''}</span>`;
-    } else if(isGebe){
-      extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 Gebe</span>`;
+    if(isGebe){
+      if(_gebeGunMap[a.id]!==undefined){
+        const kalan=280-_gebeGunMap[a.id];
+        const kalanTxt=kalan<=0
+          ?`<b style="color:var(--red)"> · ⚠️ Doğum gecikmiş!</b>`
+          :kalan<=14?`<b style="color:var(--red)"> · ⚡${kalan}g kaldı</b>`:'';
+        extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 ${gunleriFmt(_gebeGunMap[a.id])}${kalanTxt}</span>`;
+      } else {
+        extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 Gebe</span>`;
+      }
     } else if(_suruFilter==='bos'&&_bosGunMap[a.id]!==undefined){
       extraBadge=`<span class="tag" style="background:rgba(201,125,10,.12);color:var(--amber);font-weight:700">⬜ ${gunleriFmt(_bosGunMap[a.id])} boş</span>`;
+    } else if(!isGebe&&_suruFilter!=='bos'){
+      extraBadge='';
     }
 
     return `<div class="animal-card" onclick="openDet('${a.id}')">
@@ -1544,13 +1576,18 @@ function renderAnimals(list){
 function updatePadokOzet(list){
   const el=document.getElementById('padok-ozet'); if(!el) return;
   const gebeSet=new Set(_gebeIds||[]);
+  const padok=document.getElementById('pflt')?.value;
   if(!list.length){ el.innerHTML=''; return; }
   const toplam=list.length;
   const disi=list.filter(a=>a.cinsiyet==='Dişi'||!a.cinsiyet).length;
   const erkek=list.filter(a=>a.cinsiyet==='Erkek').length;
   const gebe=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe').length;
-  const bos=disi-gebe;
-  const padok=document.getElementById('pflt')?.value;
+  const bos=list.filter(a=>{
+    if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
+    if(a.cinsiyet==='Erkek') return false;
+    const yas=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):9999;
+    return yas>=365;
+  }).length;
   const isBuzagi=padok&&padok.toLowerCase().includes('buzağı');
   const chip=(txt,color)=>`<span style="background:${color};border-radius:8px;padding:3px 9px;font-size:.68rem;font-weight:700;color:#fff">${txt}</span>`;
   let html=chip(`Toplam: ${toplam}`,'rgba(61,74,50,.7)');
@@ -1561,12 +1598,28 @@ function updatePadokOzet(list){
   }
   el.innerHTML=html;
   // Filtre butonlarındaki sayıları güncelle
-  const btnGebe=document.getElementById('sf-gebe');
-  const btnBos=document.getElementById('sf-bos');
-  const btnTumuu=document.getElementById('sf-tumuu');
-  if(btnGebe) btnGebe.textContent=`🤰 Gebe (${gebe})`;
-  if(btnBos)  btnBos.textContent=`⬜ Boş (${bos})`;
-  if(btnTumuu) btnTumuu.textContent=`Tümü (${toplam})`;
+  const btnT=document.getElementById('sf-tumuu');
+  const btnG=document.getElementById('sf-gebe');
+  const btnB=document.getElementById('sf-bos');
+  if(btnT) btnT.textContent=`Tümü (${toplam})`;
+  if(btnG) btnG.textContent=`🤰 Gebe (${gebe})`;
+  if(btnB) btnB.textContent=`⬜ Boş (${bos})`;
+}
+
+function setSuruFilter(f,btn){
+  _suruFilter=f;
+  document.querySelectorAll('#pg-suru .fs-btn').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  applyAnimalFilter();
+}
+
+function applyAnimalFilter(){
+  const q=(document.getElementById('srch')?.value||'').toLowerCase();
+  const p=document.getElementById('pflt')?.value||'';
+  let f=_A;
+  if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
+  if(p) f=f.filter(a=>a.padok===p);
+  renderAnimals(f);
 }
 
 let _filterTimer=null;
@@ -1603,22 +1656,6 @@ document.addEventListener('click',e=>{
     document.getElementById('ac-srch') && (document.getElementById('ac-srch').style.display='none');
 });
 
-function setSuruFilter(f, btn){
-  _suruFilter=f;
-  document.querySelectorAll('#pg-suru .fs-btn').forEach(b=>b.classList.remove('on'));
-  if(btn) btn.classList.add('on');
-  applyAnimalFilter();
-}
-
-function applyAnimalFilter(){
-  const q=(document.getElementById('srch')?.value||'').toLowerCase();
-  const p=document.getElementById('pflt')?.value||'';
-  let f=_A;
-  if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
-  if(p) f=f.filter(a=>a.padok===p);
-  renderAnimals(f);
-}
-
 function filterA(){
   clearTimeout(_filterTimer);
   _filterTimer=setTimeout(applyAnimalFilter,250);
@@ -1650,7 +1687,7 @@ async function openDet(id){
     const yasGun=yasRaw===null?'—':yasRaw<0||yasRaw>36500?'Geçersiz tarih':yasHesapla(a.dogum_tarihi);
     const aktifHst=diseases.filter(d=>d.durum==='Aktif').length;
     const today=new Date().toISOString().split('T')[0];
-    const displayId=a.devlet_kupe||a.kupe_no||a.id;
+    const displayId=a.kupe_no||a.devlet_kupe||a.id;
 
     document.getElementById('det-name').textContent=displayId;
     document.getElementById('det-meta').textContent=`${a.irk||'—'} · ${a.padok||'?'}`;
@@ -1663,7 +1700,7 @@ async function openDet(id){
 
     document.getElementById('tab-ozet').innerHTML=`
       <div class="stats-strip">
-        <div class="ss-item"><div class="ss-val" style="font-size:${yasRaw!==null&&(yasRaw<0||yasRaw>36500)?"0.75rem":"1.15rem"}">${yasGun}</div><div class="ss-lbl">Yaş</div></div>
+        <div class="ss-item"><div class="ss-val" style="font-size:${yasRaw!==null&&(yasRaw<0||yasRaw>36500)?"0.75rem":"1.15rem"}">${yasGun}</div><div class="ss-lbl">Gün Yaş</div></div>
         <div class="ss-item"><div class="ss-val">${births.length}</div><div class="ss-lbl">Laktasyon</div></div>
         <div class="ss-item"><div class="ss-val">${diseases.length}</div><div class="ss-lbl">Toplam Vaka</div></div>
         <div class="ss-item"><div class="ss-val">${tasks.length+subs.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
@@ -1690,7 +1727,10 @@ async function openDet(id){
     const gebeBilgi=gebeTohumlama?(()=>{
       const gunler=Math.floor((Date.now()-new Date(gebeTohumlama.tarih))/86400000);
       const kalan=280-gunler;
-      return `${gunleriFmt(gunler)} (${gunler}. gün) · Tahmini doğum: ${fmtTarih(dFwd(gebeTohumlama.tarih,280))}${kalan<=14?` · <b style="color:var(--red)">⚡ ${kalan} gün kaldı!</b>`:''}`;
+      const kalanTxt=kalan<=0
+        ?` · <b style="color:var(--red)">⚠️ Doğum gecikmiş!</b>`
+        :kalan<=14?` · <b style="color:var(--red)">⚡ ${kalan} gün kaldı!</b>`:'';
+      return `${gunleriFmt(gunler)} (${gunler}. gün) · Tahmini doğum: ${fmtTarih(dFwd(gebeTohumlama.tarih,280))}${kalanTxt}`;
     })():null;
 
     document.getElementById('tab-saglik').innerHTML=
@@ -1771,13 +1811,17 @@ async function loadBirths(){
     const data=await idbGetAll('dogum');
     data.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Henüz doğum yok</div>'; return; }
-    el.innerHTML=data.slice(0,8).map(b=>`<div style="background:#fff;border:1px solid var(--card3);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
-    <div style="width:34px;height:34px;border-radius:9px;background:rgba(78,154,42,.12);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🐄</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-weight:700;font-size:.85rem;color:#1a2010">${b.anne_id} → <b>${b.yavru_kupe}</b> (${b.yavru_cins||'?'})</div>
-      <div style="font-size:.7rem;color:#666;margin-top:2px">${fmtTarih(b.tarih)} · ${b.dogum_tipi||'Normal'}${b.dogum_kg?' · '+b.dogum_kg+' kg':''}</div>
-    </div>
-  </div>`).join('');
+    el.innerHTML=data.slice(0,8).map(b=>{
+      const anne=_A.find(a=>a.id===b.anne_id);
+      const anneKupe=getDisplayKupe(anne,b.anne_id||'?');
+      return `<div style="background:#fff;border:1px solid var(--card3);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
+      <div style="width:34px;height:34px;border-radius:9px;background:rgba(78,154,42,.12);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🐄</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:.85rem;color:#1a2010">${anneKupe} → <b>${b.yavru_kupe}</b> (${b.yavru_cins||'?'})</div>
+        <div style="font-size:.7rem;color:#666;margin-top:2px">${fmtTarih(b.tarih)} · ${b.dogum_tipi||'Normal'}${b.dogum_kg?' · '+b.dogum_kg+' kg':''}</div>
+      </div>
+    </div>`;
+    }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 
@@ -2922,9 +2966,11 @@ async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
   const el=document.getElementById('ureme-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
-  const safetyTimer=setTimeout(()=>{
-    if(el.querySelector('.spin')) el.innerHTML='<div class="empty">⚠️ Yükleme zaman aşımı — sayfayı yenileyin</div>';
-  },8000);
+  // 10 saniye içinde yüklenemezse spinner yerine hata göster
+  const safety=setTimeout(()=>{
+    if(el.querySelector('.spin'))
+      el.innerHTML='<div class="empty">⚠️ Yükleme başarısız — sayfayı yenileyin<br><button class="btn btn-g btn-sm" style="margin-top:10px" onclick="location.reload()">Yenile</button></div>';
+  },10000);
   try {
     const today=new Date().toISOString().split('T')[0];
 
@@ -2971,26 +3017,30 @@ async function loadUreme(tab='kizginlik'){
       const gebeHayvanlar=_A.filter(a=>a.durum==='Gebe');
       const gebeIds=new Set(tohs.map(t=>t.hayvan_id));
       const extra=gebeHayvanlar.filter(a=>!gebeIds.has(a.id));
+      // Gebelik gün sayısına göre büyükten küçüğe (en uzun gebelik önce)
       tohs.sort((a,b)=>(a.tarih||'').localeCompare(b.tarih||''));
       const html=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Yeni Tohumlama</button></div>`+
         (tohs.length||extra.length?[...tohs.map(t=>{
           const h=_A.find(a=>a.id===t.hayvan_id);
-          const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
-          const toh=new Date(t.tarih);
-          const gun=Math.floor((new Date()-toh)/86400000);
+          const kupe=getDisplayKupe(h,t.hayvan_id);
+          const gun=Math.floor((Date.now()-new Date(t.tarih))/86400000);
           const dogumTahmini=dFwd(t.tarih,280);
           const kalanGun=Math.floor((new Date(dogumTahmini)-new Date())/86400000);
-          const urgent=kalanGun<=14;
+          const kalanTxt=kalanGun<=0
+            ?`<b style="color:var(--red)">⚠️ Doğum gecikmiş! (${Math.abs(kalanGun)} gün)</b>`
+            :kalanGun<=14
+              ?`<b style="color:var(--red)">⚡ ${kalanGun} gün kaldı</b>`
+              :`${kalanGun} gün kaldı`;
           return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${t.hayvan_id}')">
-            <div class="hist-dot" style="background:var(--green2)"></div>
+            <div class="hist-dot" style="background:${kalanGun<=0?'var(--red2)':'var(--green2)'}"></div>
             <div class="hist-main">
-              <div class="hist-title" style="color:var(--green)">🤰 ${kupe}</div>
-              <div class="hist-sub">${gunleriFmt(gun)} (${gun}. gün) · Tahmini: ${fmtTarih(dogumTahmini)}</div>
-              <div class="hist-sub">${urgent?`<b style="color:var(--red)">⚡ ${kalanGun} gün kaldı!</b>`:`${kalanGun} gün kaldı`}</div>
+              <div class="hist-title" style="color:${kalanGun<=0?'var(--red)':'var(--green)'}">🤰 ${kupe}</div>
+              <div class="hist-sub">${gunleriFmt(gun)} (${gun}. gün) · Tahmini doğum: ${fmtTarih(dogumTahmini)}</div>
+              <div class="hist-sub">${kalanTxt}</div>
             </div>
           </div>`;
         }),...extra.map(a=>{
-          const kupe=a.kupe_no||a.devlet_kupe||a.id;
+          const kupe=getDisplayKupe(a);
           return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${a.id}')">
             <div class="hist-dot" style="background:var(--green2)"></div>
             <div class="hist-main">
@@ -3039,7 +3089,7 @@ async function loadUreme(tab='kizginlik'){
     }
 
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
-  finally { clearTimeout(safetyTimer); }
+  finally { clearTimeout(safety); }
 }
 
 // ══════════════════════════════════════════
