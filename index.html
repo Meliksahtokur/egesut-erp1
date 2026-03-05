@@ -1249,16 +1249,13 @@ async function refreshAll(){
   updateSyncBar();
 }
 async function renderFromLocal(){
-  // Arka plan verileri (her zaman)
   await Promise.all([loadAnimals(),loadStock()]);
-  // Aktif sayfaya göre render
   const pg=_curPg||'dash';
   if(pg==='dash')    await Promise.all([loadDash(),loadStokList()]);
-  if(pg==='suru')    {} // animals zaten yüklendi
   if(pg==='tasks')   await loadTasks(_curTaskFilter||'today');
   if(pg==='gecmis')  await loadGecmis(_curGecmisFilter||'hepsi');
   if(pg==='log')     await Promise.all([loadBirths(),loadStokList()]);
-  // Dash her zaman başlangıçta yükle
+  if(pg==='ureme')   loadUreme(_curUremeTab||'kizginlik');
   if(pg!=='dash')    loadDash();
   checkSpermaUyari();
 }
@@ -1586,7 +1583,7 @@ function renderAnimals(list){
       if(_gebeGunMap[a.id]!==undefined){
         const kalan=280-_gebeGunMap[a.id];
         const kalanTxt=kalan<=0
-          ?`<b style="color:var(--red)"> · ⚠️ Doğum gecikmiş!</b>`
+          ?`<b style="color:var(--red)"> · ⚠️ Doğum ${Math.abs(kalan)} gün gecikmiş!</b>`
           :kalan<=14?`<b style="color:var(--red)"> · ⚡${kalan}g kaldı</b>`:'';
         extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 ${gunleriFmt(_gebeGunMap[a.id])}${kalanTxt}</span>`;
       } else {
@@ -2037,9 +2034,8 @@ async function submitBirth(btn){
     // Hardcoded stok düşümü KALDIRILDI — yanlış ilaç çekiyordu
     // Doğumda ilaç kullanımı hastalık/tedavi formuyla kaydedilmeli
 
-    // Anne padok → Kuru/Gebe Padok'tan Sağmal Padok'a
-    // anne zaten bulundu yukarıda
-    if(anne) await write('hayvanlar',{...anne,padok:'Sağmal Padok'},'PATCH',`id=eq.${anne.id}`);
+    // Anne padok güncelle — sadece padok alanını PATCH et, ...anne spread yapma (schema hatası verir)
+    await write('hayvanlar',{padok:'Sağmal Padok',durum:'Aktif'},'PATCH',`id=eq.${anne.id}`);
 
     // Anne protokol görevleri
     const protokol=[
@@ -2073,15 +2069,18 @@ async function submitBirth(btn){
     // Doğum ↔ Tohumlama zinciri: gebe tohumlama kaydını kapat
     const gebeTohs=await getData('tohumlama',t=>t.hayvan_id===anne.id&&t.sonuc==='Gebe');
     for(const t of gebeTohs){
-      await write('tohumlama',{...t,sonuc:'Doğum Yaptı',dogum_tarihi:tarih,buzagi_kupe:kupe},'PATCH',`id=eq.${t.id}`);
+      // Sadece değişen alanları PATCH et — ...t spread schema hatası verir
+      await write('tohumlama',{sonuc:'Doğum Yaptı',dogum_tarihi:tarih,buzagi_kupe:kupe},'PATCH',`id=eq.${t.id}`);
+      // Local'e tam güncellemeyi kaydet
+      await idbPut('tohumlama',[{...t,sonuc:'Doğum Yaptı',dogum_tarihi:tarih,buzagi_kupe:kupe}]);
     }
 
-    toast(`✅ Doğum kaydedildi. ${anneGorevler.length} anne + 1 buzağı görev grubu oluşturuldu.`);
+    toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${anneGorevler.length} görev oluşturuldu`);
     closeM('m-birth');
     ['b-anne','b-kupe','b-oks','b-kals','b-adem','b-pg'].forEach(cl);
     if(_curPg==='ureme') loadUreme(_curUremeTab);
     await renderFromLocal();
-  } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Protokol Görevleri';} }
+  } catch(e){ toast('❌ Doğum kaydedilemedi: '+e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Protokol Görevleri';} }
 }
 
 // ══════════════════════════════════════════
@@ -2094,11 +2093,23 @@ async function submitInsem(btn){
   if(tarih>bugun2){ toast('Tohumlama tarihi ileri tarih olamaz',true); return; }
   const hayvan=_A.find(a=>a.kupe_no===hid||a.id===hid||a.devlet_kupe===hid);
   if(!hayvan){ toast(`⚠️ "${hid}" sürüde kayıtlı değil`,true); return; }
+
+  // Erkek hayvan kontrolü
+  if(hayvan.cinsiyet==='Erkek'){ toast('⚠️ Erkek hayvana tohumlama yapılamaz',true); return; }
+
+  // Buzağı kontrolü — 12 aydan küçük ya da grup "Buzağı" içeriyorsa engelle
+  const yasGun=hayvan.dogum_tarihi?Math.floor((Date.now()-new Date(hayvan.dogum_tarihi))/86400000):9999;
+  const grupAdiBuzagi=(hayvan.grup||'').toLowerCase().includes('buzağı')||(hayvan.padok||'').toLowerCase().includes('buzağı');
+  if(yasGun<365||grupAdiBuzagi){
+    toast(`⚠️ "${getDisplayKupe(hayvan)}" buzağı — 12 ay dolmadan tohumlama yapılamaz`,true);
+    return;
+  }
+
   const mevcutGebe=await getData('tohumlama',t=>t.hayvan_id===hayvan.id&&t.sonuc==='Gebe');
   if(mevcutGebe.length>0){ toast('⚠️ Bu hayvan zaten gebe — önce gebeliği kapatın (abort veya doğum)',true); return; }
   if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
   try {
-    const prev=await getData('tohumlama',t=>t.hayvan_id===hid||t.hayvan_id===(_A.find(a=>a.kupe_no===hid)?.id));
+    const prev=await getData('tohumlama',t=>t.hayvan_id===hayvan.id);
     const hayvanId=hayvan.id;
     const hekimIdI=v('i-hekim');
     await write('tohumlama',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih,sperma,hekim_id:hekimIdI,sonuc:'Bekliyor',deneme_no:prev.length+1});
@@ -2108,11 +2119,11 @@ async function submitInsem(btn){
     ];
     for(const g of insemGorevler) await write('gorev_log',g);
     await dusSpermaStok(sperma);
-    toast('✅ Tohumlama + 2 kontrol görevi kaydedildi');
+    toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
     closeM('m-insem'); cl('i-hid'); cl('i-sperma');
     checkSpermaUyari();
     await renderFromLocal();
-  } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Kontrol Görevleri';} }
+  } catch(e){ toast('❌ Tohumlama kaydedilemedi: '+e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Kontrol Görevleri';} }
 }
 
 // ══════════════════════════════════════════
@@ -3181,7 +3192,7 @@ async function loadUreme(tab='kizginlik'){
           const dogumTahmini=dFwd(t.tarih,280);
           const kalanGun=Math.floor((new Date(dogumTahmini)-new Date())/86400000);
           const kalanTxt=kalanGun<=0
-            ?`<b style="color:var(--red)">⚠️ Doğum gecikmiş! (${Math.abs(kalanGun)} gün)</b>`
+            ?`<b style="color:var(--red)">⚠️ Doğum ${Math.abs(kalanGun)} gün gecikmiş!</b>`
             :kalanGun<=14
               ?`<b style="color:var(--red)">⚡ ${kalanGun} gün kaldı</b>`
               :`${kalanGun} gün kaldı`;
@@ -3277,12 +3288,18 @@ async function abortKaydet(hayvanId, tohId){
   if(!confirm('Bu hayvanda abort / erken doğum mu oldu? Gebelik kaydı kapatılacak.')) return;
   const notlar=prompt('Abort detayı (opsiyonel):') || '';
   try {
-    await write('tohumlama',{sonuc:'Boş',abort:true,abort_notlar:notlar},'PATCH',`id=eq.${tohId}`);
-    await write('hastalik_log',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih:new Date().toISOString().split('T')[0],kategori:'Üreme',tani:'Abort / Erken Doğum',siddet:'Orta',semptomlar:notlar,durum:'Kapalı'});
+    // Sadece 'sonuc' gönder — 'abort' kolonu Supabase schema'sında yok
+    await write('tohumlama',{sonuc:'Abort'},'PATCH',`id=eq.${tohId}`);
+    // Local'e notu da kaydet (idbPut direkt, Supabase'e gitmez)
+    const mevcut=await idbGetAll('tohumlama');
+    const toh=mevcut.find(t=>t.id===tohId);
+    if(toh) await idbPut('tohumlama',[{...toh,sonuc:'Abort',abort_notlar:notlar||null}]);
+    // Hastalık logu — notları buraya koy
+    await write('hastalik_log',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih:new Date().toISOString().split('T')[0],kategori:'Üreme',tani:'Abort / Erken Doğum',siddet:'Orta',semptomlar:notlar||null,durum:'Kapalı'});
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
     await renderFromLocal();
     openDet(hayvanId);
-  } catch(e){ toast(e.message,true); }
+  } catch(e){ toast('❌ Abort kaydedilemedi: '+e.message,true); }
 }
 
 async function hstKapat(){
