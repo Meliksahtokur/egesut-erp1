@@ -1,0 +1,13 @@
+{
+  "name": "EgeSüt ERP",
+  "short_name": "EgeSüt",
+  "description": "Offline-first Süt Çiftliği Yönetim Sistemi",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111a0a",
+  "theme_color": "#111a0a",
+  "icons": [
+    { "src": "favicon.ico", "sizes": "192x192", "type": "image/x-icon" },
+    { "src": "favicon.ico", "sizes": "512x512", "type": "image/x-icon" }
+  ]
+}
