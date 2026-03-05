@@ -3159,50 +3159,55 @@ async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
   const el=document.getElementById('ureme-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
-  // 10 saniye içinde yüklenemezse spinner yerine hata göster
   const safety=setTimeout(()=>{
     if(el.querySelector('.spin'))
       el.innerHTML='<div class="empty">⚠️ Yükleme başarısız — sayfayı yenileyin<br><button class="btn btn-g btn-sm" style="margin-top:10px" onclick="location.reload()">Yenile</button></div>';
   },10000);
-  try {
-    const today=new Date().toISOString().split('T')[0];
 
+  // Kart stili — tüm tablarda ortak
+  const CS='background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start;cursor:pointer;transition:background .1s';
+
+  try {
     if(tab==='kizginlik'){
       const list=await idbGetAll('kizginlik_log');
       list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-      const html=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`+
+      el.innerHTML=
+        `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`+
         (list.length?list.map(k=>{
           const h=_A.find(a=>a.id===k.hayvan_id);
           const kupe=h?(h.kupe_no||h.devlet_kupe):k.hayvan_id;
-          return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
-            <div class="hist-dot" style="background:#e74c3c"></div>
+          return `<div style="${CS}" onclick="openDet('${k.hayvan_id}')">
+            <div class="hist-dot" style="background:#e74c3c;margin-top:4px"></div>
             <div class="hist-main">
               <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'}</div>
-              <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
-            </div>
-          </div>`;
+              <div class="hist-sub">${k.tarih}${k.notlar?' · '+k.notlar:''}</div>
+            </div></div>`;
         }).join(''):'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
-      el.innerHTML=html;
     }
 
     else if(tab==='tohumlama'){
       const list=await idbGetAll('tohumlama');
       list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-      const html=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
-        (list.length?list.map(t=>{
-          const h=_A.find(a=>a.id===t.hayvan_id);
-          const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
-          const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red)':'var(--amber)';
-          const dot=t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red2)':'var(--amber)';
-          return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
-            <div class="hist-dot" style="background:${dot}"></div>
-            <div class="hist-main">
-              <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
-              <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
-            </div>
-          </div>`;
-        }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
-      el.innerHTML=html;
+      const renderToh=(arr)=>arr.map(t=>{
+        const h=_A.find(a=>a.id===t.hayvan_id);
+        const kupe=getDisplayKupe(h,t.hayvan_id);
+        const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red)':'var(--amber)';
+        const dot=t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red2)':'var(--amber)';
+        return `<div style="${CS}" onclick="openTohDet('${t.id}')">
+          <div class="hist-dot" style="background:${dot};margin-top:4px"></div>
+          <div class="hist-main">
+            <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
+            <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
+          </div></div>`;
+      }).join('');
+      el.innerHTML=
+        `<div style="padding:10px 0 6px;display:flex;gap:6px">
+          <button class="btn btn-g" style="flex:1;padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button>
+        </div>
+        <input id="toh-srch" class="srch" placeholder="Küpe no ara…" oninput="tohumlamaFiltrele()" style="margin-bottom:8px">
+        <div id="toh-list">${list.length?renderToh(list):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>'}</div>`;
+      // Arama verisi sakla
+      el._tohList=list;
     }
 
     else if(tab==='gebelik'){
@@ -3210,79 +3215,183 @@ async function loadUreme(tab='kizginlik'){
       const gebeHayvanlar=_A.filter(a=>a.durum==='Gebe');
       const gebeIds=new Set(tohs.map(t=>t.hayvan_id));
       const extra=gebeHayvanlar.filter(a=>!gebeIds.has(a.id));
-      // Gebelik gün sayısına göre büyükten küçüğe (en uzun gebelik önce)
       tohs.sort((a,b)=>(a.tarih||'').localeCompare(b.tarih||''));
-      const html=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Yeni Tohumlama</button></div>`+
-        (tohs.length||extra.length?[...tohs.map(t=>{
+
+      // Tohumlama yapılmış ama gebe işaretlenmemiş olan bekleyenler
+      const bekleyenler=await getData('tohumlama',t=>t.sonuc==='Bekliyor');
+      const bekleyenHayvanIds=new Set(tohs.map(t=>t.hayvan_id));
+      const isaretlenebilir=bekleyenler.filter(t=>!bekleyenHayvanIds.has(t.hayvan_id));
+
+      const gebeListHtml=(tohs.length||extra.length)?[
+        ...tohs.map(t=>{
           const h=_A.find(a=>a.id===t.hayvan_id);
           const kupe=getDisplayKupe(h,t.hayvan_id);
           const gun=Math.floor((Date.now()-new Date(t.tarih))/86400000);
           const dogumTahmini=dFwd(t.tarih,280);
           const kalanGun=Math.floor((new Date(dogumTahmini)-new Date())/86400000);
           const kalanTxt=kalanGun<=0
-            ?`<b style="color:var(--red)">⚠️ Doğum ${Math.abs(kalanGun)} gün gecikmiş!</b>`
-            :kalanGun<=14
-              ?`<b style="color:var(--red)">⚡ ${kalanGun} gün kaldı</b>`
-              :`${kalanGun} gün kaldı`;
-          return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${t.hayvan_id}')">
-            <div class="hist-dot" style="background:${kalanGun<=0?'var(--red2)':'var(--green2)'}"></div>
+            ?`<span style="color:var(--red);font-weight:700">⚠️ Doğum ${Math.abs(kalanGun)} gün gecikmiş!</span>`
+            :kalanGun<=14?`<span style="color:var(--red);font-weight:700">⚡ ${kalanGun} gün kaldı</span>`
+            :`${kalanGun} gün kaldı`;
+          const bg=kalanGun<=0?'background:rgba(192,50,26,.05)':'';
+          return `<div style="${CS};${bg}" onclick="openDet('${t.hayvan_id}')">
+            <div class="hist-dot" style="background:${kalanGun<=0?'var(--red2)':'var(--green2)'};margin-top:4px"></div>
             <div class="hist-main">
-              <div class="hist-title" style="color:${kalanGun<=0?'var(--red)':'var(--green)'}">🤰 ${kupe}</div>
-              <div class="hist-sub">${gunleriFmt(gun)} (${gun}. gün) · Tahmini doğum: ${fmtTarih(dogumTahmini)}</div>
+              <div class="hist-title" style="color:var(--ink)">🤰 ${kupe}</div>
+              <div class="hist-sub">${gunleriFmt(gun)} (${gun}. gün) · Tahmini: ${fmtTarih(dogumTahmini)}</div>
               <div class="hist-sub">${kalanTxt}</div>
-            </div>
-          </div>`;
-        }),...extra.map(a=>{
+            </div></div>`;
+        }),
+        ...extra.map(a=>{
           const kupe=getDisplayKupe(a);
-          return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${a.id}')">
-            <div class="hist-dot" style="background:var(--green2)"></div>
+          return `<div style="${CS}" onclick="openDet('${a.id}')">
+            <div class="hist-dot" style="background:var(--green2);margin-top:4px"></div>
             <div class="hist-main">
-              <div class="hist-title" style="color:var(--green)">🤰 ${kupe} (manuel gebe)</div>
+              <div class="hist-title" style="color:var(--ink)">🤰 ${kupe} <span style="color:var(--ink3);font-weight:400;font-size:.7rem">(manuel)</span></div>
               <div class="hist-sub">Tohumlama kaydı yok</div>
-            </div>
-          </div>`;
-        })].join('')
-        :'<div class="empty"><div class="empty-ico">🤰</div>Gebe hayvan yok</div>');
-      el.innerHTML=html;
+            </div></div>`;
+        })
+      ].join('') : '';
+
+      el.innerHTML=
+        `<div style="padding:10px 0 6px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-g" style="flex:1;padding:9px;min-width:140px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button>
+          <button class="btn" style="flex:1;padding:9px;min-width:140px;background:rgba(78,154,42,.1);color:var(--green);font-weight:700" onclick="gebeIsaretle()">🤰 Gebe İşaretle</button>
+        </div>
+        ${tohs.length||extra.length
+          ? gebeListHtml
+          : '<div class="empty"><div class="empty-ico">🤰</div>Gebe hayvan yok</div>'}`;
     }
 
     else if(tab==='dogum'){
       const list=await idbGetAll('dogum');
       list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-      const html=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-birth')">🐄 Doğum Kaydet</button></div>`+
+      el.innerHTML=
+        `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-birth')">🐄 Doğum Kaydet</button></div>`+
         (list.length?list.map(b=>{
           const anne=_A.find(a=>a.id===b.anne_id);
-          const anneKupe=anne?(anne.kupe_no||anne.devlet_kupe):b.anne_id;
-          return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${b.anne_id}')">
-            <div class="hist-dot" style="background:var(--green2)"></div>
-            <div class="hist-main">
-              <div class="hist-title">🐄 ${anneKupe} → <b>${b.yavru_kupe}</b> (${b.yavru_cins||'?'})</div>
-              <div class="hist-sub">${b.tarih} · ${b.dogum_tipi||'Normal'}</div>
+          const buzagi=_A.find(a=>a.kupe_no===b.yavru_kupe||a.devlet_kupe===b.yavru_kupe);
+          const anneKupe=anne?getDisplayKupe(anne):(b.anne_id||'?');
+          const buzagiKupe=b.yavru_kupe||'?';
+          // Anne ve buzağı ayrı ayrı tıklanabilir
+          return `<div style="${CS.replace('cursor:pointer','')};flex-direction:column;gap:6px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.68rem;color:var(--ink3)">${b.tarih} · ${b.dogum_tipi||'Normal'} · ${b.yavru_cins||'?'}</span>
+              ${b.dogum_kg?`<span style="font-size:.68rem;color:var(--ink3)">${b.dogum_kg} kg</span>`:''}
+            </div>
+            <div style="display:flex;gap:8px">
+              <div onclick="openDet('${b.anne_id}')" style="flex:1;background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.25);border-radius:8px;padding:8px 10px;cursor:pointer;transition:background .1s" ontouchstart="this.style.background='rgba(78,154,42,.18)'" ontouchend="this.style.background='rgba(78,154,42,.08)'">
+                <div style="font-size:.6rem;color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Anne</div>
+                <div style="font-weight:700;color:var(--ink);font-size:.88rem;margin-top:2px">🐄 ${anneKupe}</div>
+              </div>
+              <div onclick="${buzagi?`openDet('${buzagi.id}')`:`toast('⚠️ ${buzagiKupe} sürüde kayıtlı değil',true)`}" style="flex:1;background:rgba(42,107,181,.08);border:1px solid rgba(42,107,181,.25);border-radius:8px;padding:8px 10px;cursor:pointer;transition:background .1s" ontouchstart="this.style.background='rgba(42,107,181,.18)'" ontouchend="this.style.background='rgba(42,107,181,.08)'">
+                <div style="font-size:.6rem;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Buzağı</div>
+                <div style="font-weight:700;color:var(--ink);font-size:.88rem;margin-top:2px">🐮 ${buzagiKupe}</div>
+              </div>
             </div>
           </div>`;
         }).join(''):'<div class="empty"><div class="empty-ico">🐄</div>Doğum kaydı yok</div>');
-      el.innerHTML=html;
     }
 
     else if(tab==='abort'){
       const list=await getData('tohumlama',t=>t.abort===true||t.sonuc==='Abort');
       list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-      const html=(list.length?list.map(t=>{
+      el.innerHTML=(list.length?list.map(t=>{
         const h=_A.find(a=>a.id===t.hayvan_id);
-        const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
-        return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${t.hayvan_id}')">
-          <div class="hist-dot" style="background:var(--red2)"></div>
+        const kupe=getDisplayKupe(h,t.hayvan_id);
+        return `<div style="${CS}" onclick="openDet('${t.hayvan_id}')">
+          <div class="hist-dot" style="background:var(--red2);margin-top:4px"></div>
           <div class="hist-main">
             <div class="hist-title" style="color:var(--red)">⚠️ ${kupe} — Abort</div>
-            <div class="hist-sub">${t.tarih} ${t.abort_notlar?'· '+t.abort_notlar:''}</div>
-          </div>
-        </div>`;
+            <div class="hist-sub">${t.tarih}${t.abort_notlar?' · '+t.abort_notlar:''}</div>
+          </div></div>`;
       }).join(''):'<div class="empty"><div class="empty-ico">⚠️</div>Abort kaydı yok</div>');
-      el.innerHTML=html;
     }
 
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
   finally { clearTimeout(safety); }
+}
+
+// Tohumlama sekmesinde arama
+function tohumlamaFiltrele(){
+  const q=(document.getElementById('toh-srch')?.value||'').toLowerCase().trim();
+  const el=document.getElementById('ureme-body');
+  const list=el?._tohList||[];
+  const filtered=q?list.filter(t=>{
+    const h=_A.find(a=>a.id===t.hayvan_id);
+    const kupe=getDisplayKupe(h,t.hayvan_id)||'';
+    return kupe.toLowerCase().includes(q)||(t.sperma||'').toLowerCase().includes(q);
+  }):list;
+  const listEl=document.getElementById('toh-list');
+  if(!listEl) return;
+  const CS='background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start;cursor:pointer;transition:background .1s';
+  listEl.innerHTML=filtered.length?filtered.map(t=>{
+    const h=_A.find(a=>a.id===t.hayvan_id);
+    const kupe=getDisplayKupe(h,t.hayvan_id);
+    const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red)':'var(--amber)';
+    const dot=t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red2)':'var(--amber)';
+    return `<div style="${CS}" onclick="openTohDet('${t.id}')">
+      <div class="hist-dot" style="background:${dot};margin-top:4px"></div>
+      <div class="hist-main">
+        <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
+        <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
+      </div></div>`;
+  }).join(''):'<div class="empty" style="padding:20px;text-align:center;color:var(--ink3)">Eşleşen kayıt yok</div>';
+}
+
+// Gebe İşaretle — tohumlama yapılmış ama gebe işaretlenmemiş hayvanları listeler
+async function gebeIsaretle(){
+  const tohs=await idbGetAll('tohumlama');
+  // En son tohumlama kaydı 'Bekliyor' olan hayvanlar
+  const hayvanTohMap={};
+  tohs.forEach(t=>{ if(!hayvanTohMap[t.hayvan_id]||t.tarih>hayvanTohMap[t.hayvan_id].tarih) hayvanTohMap[t.hayvan_id]=t; });
+  const adaylar=Object.values(hayvanTohMap).filter(t=>t.sonuc==='Bekliyor');
+
+  if(!adaylar.length){ toast('Bekleyen tohumlama kaydı yok'); return; }
+
+  let box=document.getElementById('gebe-isaret-modal');
+  if(!box){ box=document.createElement('div'); box.id='gebe-isaret-modal'; box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end'; box.onclick=e=>{if(e.target===box)box.remove();}; document.body.appendChild(box); }
+
+  const rows=adaylar.map(t=>{
+    const h=_A.find(a=>a.id===t.hayvan_id);
+    const kupe=getDisplayKupe(h,t.hayvan_id);
+    const gun=Math.floor((Date.now()-new Date(t.tarih))/86400000);
+    return `<label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #eee;cursor:pointer">
+      <input type="checkbox" class="gebe-chk" data-toh-id="${t.id}" data-hayvan-id="${t.hayvan_id}" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer">
+      <div>
+        <div style="font-weight:700;color:var(--ink)">${kupe}</div>
+        <div style="font-size:.7rem;color:var(--ink3)">${t.sperma||'?'} · ${t.tarih} · ${gun}. gün</div>
+      </div>
+    </label>`;
+  }).join('');
+
+  box.innerHTML=`<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-height:80vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px 0;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:800;font-size:1rem">🤰 Gebe İşaretle</div>
+      <button onclick="document.getElementById('gebe-isaret-modal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#999">✕</button>
+    </div>
+    <div style="font-size:.7rem;color:#999;padding:4px 16px 10px">Gebe olduğunu onayladığınız hayvanları seçin</div>
+    <div style="overflow-y:auto;flex:1">${rows}</div>
+    <div style="padding:12px 16px;display:flex;gap:8px;border-top:1px solid #eee">
+      <button onclick="gebeIsaretKaydet()" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:.9rem;cursor:pointer">✅ Gebe Olarak Kaydet</button>
+      <button onclick="document.getElementById('gebe-isaret-modal').remove()" style="padding:12px 16px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">İptal</button>
+    </div>
+  </div>`;
+}
+
+async function gebeIsaretKaydet(){
+  const secili=[...document.querySelectorAll('.gebe-chk:checked')];
+  if(!secili.length){ toast('En az bir hayvan seçin',true); return; }
+  let n=0;
+  for(const chk of secili){
+    const tohId=chk.dataset.tohId;
+    await write('tohumlama',{sonuc:'Gebe'},'PATCH',`id=eq.${tohId}`);
+    n++;
+  }
+  document.getElementById('gebe-isaret-modal')?.remove();
+  toast(`✅ ${n} hayvan gebe olarak işaretlendi`);
+  await renderFromLocal();
+  loadUreme('gebelik');
 }
 
 // ══════════════════════════════════════════
