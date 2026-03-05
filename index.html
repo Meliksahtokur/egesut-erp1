@@ -3144,7 +3144,7 @@ function openMWithHayvan(modalId, inputId, kupeNo){
   },100);
 }
 
-async // ══════════════════════════════════════════
+// ══════════════════════════════════════════
 // ÜREME SEKMESİ
 // ══════════════════════════════════════════
 let _curUremeTab='kizginlik';
@@ -3493,13 +3493,17 @@ if(localStorage.getItem('bildirim_aktif')==='1'){
   setInterval(bildirimKontrol,3600000);
 }
 
-// Service Worker kaydı
+// Service Worker kaydı — sadece GitHub Pages'te çalışır
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('./sw.js')
-      .then(reg=>console.log('✅ SW devrede:',reg.scope))
-      .catch(err=>console.warn('SW hatası:',err));
-  });
+  const host=location.hostname;
+  const isProd=host.endsWith('github.io')||host.endsWith('egesut.com')||host==='localhost'||host==='127.0.0.1';
+  if(isProd){
+    window.addEventListener('load',()=>{
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg=>console.log('✅ SW devrede:',reg.scope))
+        .catch(err=>console.warn('SW hatası:',err));
+    });
+  }
 }
 
 </script>
