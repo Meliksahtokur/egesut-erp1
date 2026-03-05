@@ -259,6 +259,11 @@ button,input,select,textarea{font-family:inherit}
 <div id="sync-bar">
   <span id="sync-bar-txt"></span>
 </div>
+<!-- Güncelleme banner: yeni SW hazır olunca çıkar -->
+<div id="update-bar" style="display:none;background:#1a4a9a;color:#fff;padding:8px 14px;font-size:.75rem;font-weight:700;align-items:center;gap:10px;cursor:pointer" onclick="window.location.reload(true)">
+  <span>🔄 Yeni sürüm hazır — güncellemek için dokunun</span>
+  <span style="margin-left:auto;opacity:.7;font-size:.68rem">× kapat</span>
+</div>
 <div id="sperma-warn-band" style="display:none;background:#7a3a00;color:#fff;padding:5px 14px;font-size:.68rem;font-weight:700;align-items:center"></div>
 
 <div id="pages">
@@ -3602,19 +3607,47 @@ if(localStorage.getItem('bildirim_aktif')==='1'){
   setInterval(bildirimKontrol,3600000);
 }
 
-// Service Worker — sadece GitHub Pages / production'da
+// ── App versiyonu — her deploy'da değiştir ──
+const APP_VERSION = '2025-03-05-c';
+
+// Service Worker — production only
 if('serviceWorker' in navigator){
   const host=location.hostname;
   const isProd=host.endsWith('github.io')||host.endsWith('egesut.com')||host==='localhost'||host==='127.0.0.1';
   if(isProd){
-    window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg=>{
-          console.log('✅ SW devrede:',reg.scope);
-          // Her yüklemede güncelleme kontrol et
-          reg.update();
-        })
-        .catch(err=>console.warn('SW hatası:',err));
+    window.addEventListener('load',async()=>{
+      try {
+        const reg=await navigator.serviceWorker.register('./sw.js');
+        console.log('✅ SW devrede:',reg.scope);
+
+        // Yeni SW bekliyorsa hemen aktifleştir (Firefox için kritik)
+        if(reg.waiting){
+          reg.waiting.postMessage({type:'SKIP_WAITING'});
+        }
+
+        // Güncelleme algılandığında banner göster
+        reg.addEventListener('updatefound',()=>{
+          const newWorker=reg.installing;
+          newWorker.addEventListener('statechange',()=>{
+            if(newWorker.state==='installed'&&navigator.serviceWorker.controller){
+              // Yeni SW yüklendi, bekliyor — banner göster
+              const bar=document.getElementById('update-bar');
+              if(bar) bar.style.display='flex';
+              // 3 saniye sonra otomatik yenile (isteğe bağlı)
+              // setTimeout(()=>window.location.reload(true),3000);
+            }
+          });
+        });
+
+        // Kontrol değişince (yeni SW aktif olduktan sonra) sayfayı yenile
+        let refreshing=false;
+        navigator.serviceWorker.addEventListener('controllerchange',()=>{
+          if(!refreshing){ refreshing=true; window.location.reload(true); }
+        });
+
+        // Her yüklemede güncelleme kontrol et
+        reg.update();
+      } catch(err){ console.warn('SW hatası:',err); }
     });
   }
 }
