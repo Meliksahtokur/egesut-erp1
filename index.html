@@ -503,40 +503,60 @@ button,input,select,textarea{font-family:inherit}
           oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
       </div>
+
+      <div class="fg"><label class="flbl">Kategori *</label>
+        <select id="d-kat" class="fsel" onchange="filterHastalikList()">
+          <option value="">Seçin…</option>
+          <option value="Meme">🐄 Meme</option>
+          <option value="Üreme">🤰 Üreme</option>
+          <option value="Ayak">🦶 Ayak</option>
+          <option value="Metabolik">⚗️ Metabolik</option>
+          <option value="Solunum">🫁 Solunum</option>
+          <option value="Sindirim">🫀 Sindirim</option>
+          <option value="Buzağı">🐮 Buzağı</option>
+          <option value="Diğer">📋 Diğer</option>
+        </select>
+      </div>
+
       <div class="fg"><label class="flbl">Tanı *</label>
-        <input id="d-tani" class="fi" placeholder="Tanı yazın veya seçin…" autocomplete="off"
+        <div id="tani-secenekler" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <input id="d-tani" class="fi" placeholder="Yukarıdan seçin veya buraya yazın…" autocomplete="off"
           oninput="acDisease()" onfocus="acDisease()" onkeydown="acNav(event,'ac-dis')">
         <div id="ac-dis" class="ac-box" style="display:none"></div>
       </div>
+
+      <!-- LOKASYON: Meme için çeyrek, Ayak için hangi ayak -->
+      <div id="d-lokasyon-wrap" style="display:none" class="fg">
+        <label class="flbl" id="d-lokasyon-lbl">Lokasyon</label>
+        <div id="d-lokasyon-secenekler" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        <input type="hidden" id="d-lokasyon">
+      </div>
+
       <div style="display:flex;gap:8px">
-        <div class="fg" style="flex:1"><label class="flbl">Kategori</label>
-          <select id="d-kat" class="fsel">
-            <option value="">Seçin</option>
-            <option>Solunum</option><option>Sindirim</option><option>Üreme</option>
-            <option>Ayak</option><option>Meme</option><option>Metabolik</option><option>Diğer</option>
-          </select>
-        </div>
         <div class="fg" style="flex:1"><label class="flbl">Şiddet</label>
           <select id="d-sid" class="fsel">
             <option value="">Seçin</option>
             <option>Hafif</option><option>Orta</option><option>Ağır</option>
           </select>
         </div>
+        <div class="fg" style="flex:1"><label class="flbl">Hekim</label>
+          <select id="d-hekim" class="fsel"></select>
+        </div>
       </div>
-      <div class="fg"><label class="flbl">Semptomlar</label><input id="d-sempt" class="fi" placeholder="Opsiyonel…"></div>
+
+      <div class="fg"><label class="flbl">Semptomlar / Not</label><input id="d-sempt" class="fi" placeholder="Opsiyonel…"></div>
+
+      <!-- TEDAVİ SÜRESİ -->
+      <div class="fg"><label class="flbl">Tedavi Süresi (gün)</label>
+        <input id="d-tedavi-gun" class="fi" type="number" min="1" max="30" placeholder="Kaç gün?" value="1">
+        <div class="fhint">Her gün için ayrı ilaç programı girebilirsiniz</div>
+      </div>
 
       <!-- ÇOKLU İLAÇ -->
-      <div style="margin:8px 0 4px;font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em">İlaçlar</div>
+      <div style="margin:8px 0 4px;font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em">İlaçlar (Gün 1)</div>
       <div id="ilac-rows"></div>
       <button type="button" onclick="ilacSatirEkle()" style="width:100%;padding:7px;background:rgba(42,107,181,.08);border:1.5px dashed var(--blue);border-radius:8px;color:var(--blue);font-size:.78rem;font-weight:700;cursor:pointer;margin-bottom:8px">+ İlaç Ekle</button>
 
-      <!-- TEDAVİ DEVAM GÜNLERİ -->
-      <div class="fg"><label class="flbl">Tedavi Kaç Gün Daha Devam Edecek?</label>
-        <input id="d-tedavi-gun" class="fi" type="number" min="0" max="30" placeholder="0 = sadece bugün" value="0">
-        <div style="font-size:.68rem;color:var(--ink3);margin-top:3px">Girilen gün sayısı kadar takip görevi oluşturulur (3 saat öncesinden bildirim)</div>
-      </div>
-
-      <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
       <button class="btn btn-g" onclick="submitDisease(this)">🏥 Kaydet + Görevler</button>
       <button class="btn btn-o" onclick="closeM('m-disease')" style="margin-top:6px">İptal</button>
     </div>
@@ -685,6 +705,7 @@ button,input,select,textarea{font-family:inherit}
         <div class="fg"><label class="flbl">Birim *</label>
           <select id="sa-birim" class="fsel">
             <option value="ml">ml (sıvı ilaç)</option>
+            <option value="gr">gr (toz/granül)</option>
             <option value="adet">adet (ekipman)</option>
             <option value="tüp">tüp</option>
             <option value="kutu">kutu</option>
@@ -849,13 +870,30 @@ const HEKIMLER=[
 const VARSAYILAN_HEKIM='H1';
 
 const HASTALIK_LISTESI=[
-  'Mastit (Klinik-Hafif)','Mastit (Klinik-Orta)','Mastit (Klinik-Şiddetli)','Subklinik Mastit',
-  'Metrit (Sınıf 1)','Metrit (Sınıf 2)','Metrit (Sınıf 3)','Endometrit','Pyometra',
-  'Retensiyo Sekundinarum','Kistik Over','Anoestrus',
+  'Mastit','Subklinik Mastit','Klinik Mastit',
+  'Metrit','Endometrit','Pyometra','Retensiyo Sekundinarum','Kistik Over','Anoestrus',
   'Hipokalsemi (Süt Humması)','Ketozis','Ruminal Asidoz','Timpani','Şirden Deplasmanı',
-  'Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı',
+  'Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı','Tırnak Yarası',
   'Pnömoni','Buzağı İshali','Buzağı Göbek İltihabı','Neonatal Zayıflık',
 ];
+
+const HASTALIK_KAT={
+  'Meme':['Mastit','Subklinik Mastit','Klinik Mastit'],
+  'Üreme':['Metrit','Endometrit','Pyometra','Retensiyo Sekundinarum','Kistik Over','Anoestrus'],
+  'Metabolik':['Hipokalsemi (Süt Humması)','Ketozis','Ruminal Asidoz','Timpani','Şirden Deplasmanı'],
+  'Ayak':['Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı','Tırnak Yarası'],
+  'Solunum':['Pnömoni'],
+  'Sindirim':['Ruminal Asidoz','Timpani','Şirden Deplasmanı'],
+  'Buzağı':['Buzağı İshali','Buzağı Göbek İltihabı','Neonatal Zayıflık'],
+  'Diğer':[],
+};
+
+// Lokasyon seçenekleri kategoriye göre
+const LOKASYON_KAT={
+  'Meme':['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'],
+  'Ayak':['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'],
+  'Göz':['Sol Göz','Sağ Göz'],
+};
 
 const SPERMA_LISTESI=[
   'ABK-Zenith-ET','ABK-Parfect-ET','ABK-Iconic-ET',
@@ -1740,12 +1778,15 @@ async function openDet(id){
       :'<div class="empty"><div class="empty-ico">✅</div>Hastalık kaydı yok</div>');
 
     // Üreme sekmesi
-    let uremeHtml=`<div style="padding:10px 0 6px;display:flex;gap:6px">`;
+    let uremeHtml=`<div style="padding:10px 0 6px;display:flex;gap:6px;flex-wrap:wrap">`;
     if(gebeTohumlama){
-      uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.1);color:var(--red);font-weight:700" onclick="abortKaydet('${a.id}','${gebeTohumlama.id}')">⚠️ Abort / Erken Doğum</button>`;
+      // Gebe: Doğum Kaydet + Abort
+      uremeHtml+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openBirthForAnimal('${a.id}','${getDisplayKupe(a)}')">🐄 Doğum Kaydet</button>`;
+      uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.1);color:var(--red);font-weight:700" onclick="abortKaydet('${a.id}','${gebeTohumlama.id}')">⚠️ Abort</button>`;
     } else {
-      uremeHtml+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${a.kupe_no||a.devlet_kupe||a.id}')">💉 Tohumlama Ekle</button>`;
+      uremeHtml+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${getDisplayKupe(a)}')">💉 Tohumlama Ekle</button>`;
       uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(78,154,42,.1);color:var(--green);font-weight:700" onclick="openGebelikEkle('${a.id}')">🤰 Gebelik Ekle</button>`;
+      uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(42,107,181,.1);color:var(--blue);font-weight:700" onclick="openBirthForAnimal('${a.id}','${getDisplayKupe(a)}')">🐄 Doğum</button>`;
     }
     uremeHtml+='</div>';
     if(gebeBilgi){
@@ -2097,55 +2138,65 @@ async function submitDisease(btn){
       const stokId=row.querySelector('.ilac-stok-id')?.value||'';
       const stokAd=row.querySelector('.ilac-stok-ac')?.value||'';
       const mik=parseFloat(row.querySelector('.ilac-mik')?.value)||0;
-      if((stokId||stokAd)&&mik>0) ilaclar.push({stokId,stokAd,mik});
+      const birim=row.querySelector('.ilac-birim')?.value||'';
+      if((stokId||stokAd)&&mik>0) ilaclar.push({stokId,stokAd,mik,birim});
     });
 
-    // Hastalık kaydı
+    // Hastalık kaydı — ilac_listesi Supabase'de yok, local idbPut ile ayrı sakla
     const ilkIlac=ilaclar[0];
-    await write('hastalik_log',{
+    const hastalikObj={
       id:hastalikId,hayvan_id:hayvanId,tarih:bugun,
       kategori:v('d-kat'),tani,siddet:v('d-sid'),
+      lokasyon:v('d-lokasyon')||null,
       hekim_id:hekimIdD,semptomlar:v('d-sempt'),
       ilac_stok_id:ilkIlac?.stokId||null,
       ilac_miktar:ilkIlac?.mik||null,
-      ilac_listesi:JSON.stringify(ilaclar),
       durum:'Aktif'
-    });
+    };
+    // Local'e ilac_listesi ile kaydet, Supabase'e göndermeden önce temizlenecek (write fonk. zaten temizliyor)
+    await idbPut('hastalik_log',[{...hastalikObj,ilac_listesi:JSON.stringify(ilaclar)}]);
+    // Supabase'e ilac_listesi olmadan gönder
+    if(navigator.onLine){
+      try { await sbPost('hastalik_log',[hastalikObj]); }
+      catch(e){ await queueOp({table:'hastalik_log',method:'POST',data:[hastalikObj],filter:''}); updateSyncBar(); }
+    } else {
+      await queueOp({table:'hastalik_log',method:'POST',data:[hastalikObj],filter:''}); updateSyncBar();
+    }
 
-    // Stok düşümleri (bugün için)
+    // Stok düşümleri — sadece stok ID'si olan ilaçlar (elle girilen düşülmez)
     for(const ilac of ilaclar){
       if(ilac.stokId&&ilac.mik>0){
-        const stk=_S.find(s=>s.id===ilac.stokId);
-        if(stk) await write('stok_hareket',{id:crypto.randomUUID(),stok_id:ilac.stokId,tur:'Tedavi',miktar:ilac.mik,notlar:`${tani} - ${hayvan.kupe_no||hayvanId}`,iptal:false});
+        await write('stok_hareket',{id:crypto.randomUUID(),stok_id:ilac.stokId,tur:'Tedavi',miktar:ilac.mik,notlar:`${tani} - ${getDisplayKupe(hayvan)}`,iptal:false});
       }
     }
     _ilacCache=[];
 
-    // Takip görevleri (devam günleri için)
-    if(tedaviGun>0&&ilaclar.length>0){
-      const ilacAciklama=ilaclar.map(i=>`${i.stokAd||i.stokId} ${i.mik} ${_S.find(s=>s.id===i.stokId)?.birim||''}`).join(', ');
-      for(let g=1;g<=tedaviGun;g++){
-        const hedefTarih=dFwd(bugun,g);
+    // Takip görevleri — tedaviGun kadar gün boyunca görev oluştur
+    const ilacAciklama=ilaclar.map(i=>`${i.stokAd||i.stokId} ${i.mik} ${i.birim||_S.find(s=>s.id===i.stokId)?.birim||''}`).join(', ');
+    if(tedaviGun>1&&ilaclar.length>0){
+      for(let g=1;g<tedaviGun;g++){
         await write('gorev_log',{
           id:crypto.randomUUID(),
           hayvan_id:hayvanId,
           gorev_tipi:'ILAC',
           aciklama:`Tedavi ${g+1}. gün: ${ilacAciklama}`,
-          hedef_tarih:hedefTarih,
+          hedef_tarih:dFwd(bugun,g),
           tamamlandi:false,
           kaynak:'TEDAVI-'+hastalikId,
-          tedavi_ilaclar:JSON.stringify(ilaclar)
         });
       }
-      toast(`✅ Hastalık + ${tedaviGun} günlük takip görevi kaydedildi`);
+      toast(`✅ Hastalık + ${tedaviGun-1} günlük takip görevi kaydedildi`);
     } else {
-      toast('✅ Hastalık kaydedildi');
+      toast(`✅ Hastalık kaydedildi${ilacAciklama?' · '+ilacAciklama:''}`);
     }
 
     closeM('m-disease');
     document.getElementById('ilac-rows').innerHTML='';
-    ['d-hid','d-tani','d-sempt'].forEach(cl);
-    document.getElementById('d-tedavi-gun').value='0';
+    document.getElementById('tani-secenekler').innerHTML='';
+    document.getElementById('d-lokasyon-wrap').style.display='none';
+    ['d-hid','d-tani','d-sempt','d-lokasyon'].forEach(cl);
+    document.getElementById('d-tedavi-gun').value='1';
+    document.getElementById('d-kat').value='';
     await renderFromLocal();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Görevler';} }
 }
@@ -2252,24 +2303,74 @@ async function buildDiseaseFreq(){
   _disFreq={};
   logs.forEach(l=>{ if(l.tani) _disFreq[l.tani]=(_disFreq[l.tani]||0)+1; });
 }
+function filterHastalikList(){
+  const kat=document.getElementById('d-kat')?.value||'';
+  const wrap=document.getElementById('tani-secenekler');
+  const lokWrap=document.getElementById('d-lokasyon-wrap');
+  const lokSec=document.getElementById('d-lokasyon-secenekler');
+  const lokLbl=document.getElementById('d-lokasyon-lbl');
+  if(!wrap) return;
+
+  // Tanı seçeneklerini göster
+  const liste=kat&&HASTALIK_KAT[kat]?HASTALIK_KAT[kat]:HASTALIK_LISTESI;
+  wrap.innerHTML=liste.map(h=>`<button type="button" onclick="selDis('${h.replace(/'/g,"\\'")}',this)"
+    style="padding:5px 11px;border:1.5px solid var(--card3);border-radius:20px;background:var(--card);font-size:.72rem;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .12s"
+    class="tani-btn">${h}</button>`).join('');
+
+  // Lokasyon seçeneklerini göster
+  const lokList=LOKASYON_KAT[kat]||[];
+  if(lokList.length){
+    lokLbl.textContent=kat==='Meme'?'Çeyrek':'Hangi Ayak';
+    lokSec.innerHTML=lokList.map(l=>`<button type="button" onclick="toggleLokasyon('${l}',this)"
+      style="padding:5px 11px;border:1.5px solid var(--card3);border-radius:20px;background:var(--card);font-size:.72rem;font-weight:700;color:var(--ink2);cursor:pointer"
+      class="lok-btn">${l}</button>`).join('');
+    lokWrap.style.display='block';
+    document.getElementById('d-lokasyon').value='';
+  } else {
+    lokWrap.style.display='none';
+    document.getElementById('d-lokasyon').value='';
+  }
+
+  // Tanı alanını temizle
+  document.getElementById('d-tani').value='';
+  document.getElementById('ac-dis').style.display='none';
+}
+
+function toggleLokasyon(val,btn){
+  btn.classList.toggle('lok-on');
+  if(btn.classList.contains('lok-on')){
+    btn.style.background='var(--green)'; btn.style.borderColor='var(--green)'; btn.style.color='#fff';
+  } else {
+    btn.style.background='var(--card)'; btn.style.borderColor='var(--card3)'; btn.style.color='var(--ink2)';
+  }
+  const secili=[...document.querySelectorAll('.lok-btn.lok-on')].map(b=>b.textContent.trim());
+  document.getElementById('d-lokasyon').value=secili.join(', ');
+}
+
 async function acDisease(){
-  const q=(document.getElementById('d-tani').value||'').toLowerCase().trim();
+  const q=(document.getElementById('d-tani')?.value||'').toLowerCase().trim();
+  const kat=document.getElementById('d-kat')?.value||'';
   const ac=document.getElementById('ac-dis');
+  if(!q){ ac.style.display='none'; return; }
   const logs=await idbGetAll('hastalik_log');
   const usedDis=[...new Set(logs.map(l=>l.tani).filter(Boolean))];
-  const all=[...new Set([...HASTALIK_LISTESI,...usedDis])];
-  all.sort((a,b)=>(_disFreq[b]||0)-(_disFreq[a]||0));
-  const filtered=q?all.filter(d=>d.toLowerCase().includes(q)):all.slice(0,12);
+  const base=kat&&HASTALIK_KAT[kat]?HASTALIK_KAT[kat]:HASTALIK_LISTESI;
+  const all=[...new Set([...base,...usedDis])];
+  const filtered=all.filter(d=>d.toLowerCase().includes(q));
   if(!filtered.length){ ac.style.display='none'; return; }
   ac.innerHTML=filtered.map(d=>`<div onclick="selDis('${d.replace(/'/g,"\\'")}');event.stopPropagation()"
-    style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee">
-    ${d}${_disFreq[d]?` <span style="color:#aaa;font-size:.6rem">(${_disFreq[d]}x)</span>`:''}
-  </div>`).join('');
+    style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee">${d}</div>`).join('');
   ac.style.display='block';
 }
-function selDis(val){
+
+function selDis(val, btn){
   document.getElementById('d-tani').value=val;
   document.getElementById('ac-dis').style.display='none';
+  // Seçili butonu vurgula
+  document.querySelectorAll('.tani-btn').forEach(b=>{
+    b.style.background='var(--card)'; b.style.borderColor='var(--card3)'; b.style.color='var(--ink2)';
+  });
+  if(btn){ btn.style.background='var(--green)'; btn.style.borderColor='var(--green)'; btn.style.color='#fff'; }
 }
 document.addEventListener('click',e=>{
   const ac=document.getElementById('ac-dis');
@@ -2430,16 +2531,19 @@ async function stokHareketGor(stokId){
 async function submitStokAdd(btn){
   const ad=v('sa-ad').trim(), birim=v('sa-birim'), mik=parseFloat(v('sa-mik'))||0, esik=parseFloat(v('sa-esik'))||0, kat=v('sa-kat');
   if(!ad){ toast('Ürün adı zorunlu',true); return; }
+  if(!kat){ toast('Kategori seçin',true); return; }
   if(btn){btn.disabled=true;btn.textContent='Ekleniyor…';}
   try {
     const mevcut=await idbGetAll('stok');
-    const dup=mevcut.find(s=>s.urun_adi.toLowerCase()===ad.toLowerCase());
+    const dup=mevcut.find(s=>(s.urun_adi||'').toLowerCase()===ad.toLowerCase());
     if(dup){ toast(`⚠️ "${ad}" zaten kayıtlı`,true); return; }
     const id='STK'+String(mevcut.length+1).padStart(3,'0');
     await write('stok',{id,urun_adi:ad,birim,baslangic_miktar:mik,esik,kategori:kat});
     toast(`✅ "${ad}" stoka eklendi (${id})`);
     closeM('m-stok-add');
     ['sa-ad','sa-mik','sa-esik'].forEach(cl);
+    // _S'i güncelle ki ilaç formunda hemen görünsün
+    await loadStock();
     await loadStokList();
     await buildDataLists();
   } catch(e){ toast(e.message,true); }
@@ -2874,6 +2978,25 @@ async function openHstDet(id){
   document.getElementById('hd-body').innerHTML=rows.join('<br>') || 'Ek bilgi yok';
   openM('m-hst-det');
 }
+// Hayvan kartından doğum modalını o hayvanla aç
+function openBirthForAnimal(hayvanId, kupe){
+  openM('m-birth');
+  // Anne alanını doldur
+  setTimeout(()=>{
+    const anneInp=document.getElementById('b-anne');
+    if(anneInp){ anneInp.value=kupe||hayvanId; }
+    // Gebe seçim listesini de o hayvanla eşleştir
+    const gebeList=document.getElementById('gebe-liste');
+    if(gebeList){
+      const opt=[...gebeList.options].find(o=>o.dataset.id===hayvanId||o.value===kupe);
+      if(opt){ gebeList.value=opt.value; gebeList.dispatchEvent(new Event('change')); }
+    }
+    // Manuel giriş göster
+    const manuelEl=document.getElementById('b-anne-manual');
+    if(manuelEl) manuelEl.style.display='block';
+  },50);
+}
+
 function openGebelikEkle(hayvanId){
   const tarih=prompt('Tohumlama tarihi (YYYY-MM-DD):');
   if(!tarih) return;
@@ -2886,21 +3009,31 @@ function openGebelikEkle(hayvanId){
 }
 function ilacSatirEkle(){
   const container=document.getElementById('ilac-rows');
-  const idx=container.children.length;
-  const stokOptions=_S.filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'))
-    .map(s=>`<option value="${s.id}" data-ad="${s.urun_adi}" data-birim="${s.birim||''}">${s.urun_adi} (${s.guncel||0} ${s.birim||''})</option>`).join('');
   const row=document.createElement('div');
   row.className='ilac-satir';
-  row.style.cssText='display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  row.style.cssText='background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px;margin-bottom:8px';
   row.innerHTML=`
-    <div style="flex:2;position:relative">
-      <input class="fi ilac-stok-ac" placeholder="İlaç ara…" autocomplete="off" style="margin:0"
-        oninput="acDilacSatir(this)" onfocus="acDilacSatir(this)">
-      <input type="hidden" class="ilac-stok-id">
-      <div class="ac-box ilac-ac" style="display:none;position:absolute;z-index:200;background:#fff;border:1px solid var(--card3);border-radius:8px;max-height:160px;overflow-y:auto;width:100%"></div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <div style="flex:2;position:relative">
+        <input class="fi ilac-stok-ac" placeholder="İlaç adı ara veya yaz…" autocomplete="off" style="margin:0"
+          oninput="acDilacSatir(this)" onfocus="acDilacSatir(this)">
+        <input type="hidden" class="ilac-stok-id">
+        <div class="ac-box ilac-ac" style="display:none;position:absolute;z-index:200;background:#fff;border:1px solid var(--card3);border-radius:8px;max-height:160px;overflow-y:auto;width:100%"></div>
+      </div>
+      <button type="button" onclick="this.closest('.ilac-satir').remove()" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:8px 10px;cursor:pointer;flex-shrink:0">✕</button>
     </div>
-    <input class="fi ilac-mik" type="number" min="0" placeholder="ml/adet" style="flex:1;margin:0">
-    <button type="button" onclick="this.closest('.ilac-satir').remove()" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;flex-shrink:0">✕</button>`;
+    <div style="display:flex;gap:6px;align-items:center">
+      <input class="fi ilac-mik" type="number" min="0" step="0.1" placeholder="Miktar" style="flex:1;margin:0">
+      <select class="fsel ilac-birim" style="flex:1;margin:0">
+        <option value="ml">ml</option>
+        <option value="gr">gr</option>
+        <option value="adet">adet</option>
+        <option value="tüp">tüp</option>
+        <option value="lt">lt</option>
+        <option value="kg">kg</option>
+      </select>
+    </div>
+    <div class="ilac-stok-hint" style="font-size:.65rem;color:var(--ink3);margin-top:4px"></div>`;
   container.appendChild(row);
 }
 
@@ -2909,8 +3042,13 @@ function acDilacSatir(inp){
   const ac=inp.closest('.ilac-satir').querySelector('.ilac-ac');
   const stoklar=_S.filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'));
   const filtered=q?stoklar.filter(s=>(s.urun_adi||'').toLowerCase().includes(q)):stoklar.slice(0,8);
-  if(!filtered.length){ac.style.display='none';return;}
-  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #eee">${s.urun_adi} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
+  // Stokta olmayan ama yazılan değeri de "elle giriş" olarak sun
+  const elleSecenek=q?[{id:'',urun_adi:`"${inp.value}" — elle giriş`,birim:'',guncel:null,_elle:true}]:[];
+  const tumListe=[...filtered,...elleSecenek];
+  if(!tumListe.length){ac.style.display='none';return;}
+  ac.innerHTML=tumListe.map(s=>`<div onclick="selDilacSatir(this,'${s._elle?'':s.id}','${(s._elle?inp.value:s.urun_adi).replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #eee;${s._elle?'color:var(--blue);font-style:italic':''}">
+    ${s.urun_adi}${!s._elle?` <span style="color:#aaa;font-size:.65rem">${s.guncel!=null?s.guncel:''} ${s.birim||''}</span>`:''}
+  </div>`).join('');
   ac.style.display='block';
 }
 
@@ -2918,7 +3056,23 @@ function selDilacSatir(el,id,ad,birim){
   const row=el.closest('.ilac-satir');
   row.querySelector('.ilac-stok-ac').value=ad;
   row.querySelector('.ilac-stok-id').value=id;
-  row.querySelector('.ilac-mik').placeholder=birim||'miktar';
+  // Birim select'ini eşleştir
+  const birimSel=row.querySelector('.ilac-birim');
+  if(birimSel&&birim){
+    const opt=[...birimSel.options].find(o=>o.value===birim);
+    if(opt) birimSel.value=birim;
+  }
+  // Stok bilgisi hint
+  const hint=row.querySelector('.ilac-stok-hint');
+  const stk=_S.find(s=>s.id===id);
+  if(hint&&stk){
+    const warn=stk.guncel<=0;
+    hint.textContent=`Stok: ${stk.guncel} ${stk.birim||''} ${warn?'⚠️ Stok bitti!':''}`;
+    hint.style.color=warn?'var(--red)':stk.guncel<=5?'var(--amber)':'var(--ink3)';
+  } else if(hint&&!id){
+    hint.textContent='Elle girilen ilaç — stoktan düşülmeyecek';
+    hint.style.color='var(--blue)';
+  }
   el.closest('.ilac-ac').style.display='none';
 }
 
