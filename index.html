@@ -345,6 +345,7 @@ button,input,select,textarea{font-family:inherit}
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('tohumlama',this)">💉 Tohumlama</button>
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('hastalik',this)">🏥 Hastalık</button>
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('gorev',this)">✅ Görev</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('cikis',this)">📤 Çıkış</button>
       </div>
       <div id="gecmis-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -745,6 +746,22 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+<!-- GERİ ALMA ONAY -->
+<div id="m-geri-al" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" style="color:var(--red)">🔄 İşlemi Geri Al</div>
+    <div class="m-body">
+      <input type="hidden" id="ga-hid">
+      <div style="background:rgba(192,50,26,.07);border:1px solid rgba(192,50,26,.2);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+        <div style="font-size:.82rem;font-weight:700;color:var(--ink);margin-bottom:6px" id="ga-ozet">Bu işlem geri alınacak.</div>
+        <div style="font-size:.75rem;color:var(--ink2)">Bu işlemde oluşturulan tüm kayıtlar silinecek ve değiştirilen veriler eski haline dönecek. Bu işlem geri alınamaz.</div>
+      </div>
+      <button class="btn" style="background:var(--red);color:#fff;font-weight:700" onclick="geriAl(document.getElementById('ga-hid').value,this)">🔄 Evet, Geri Al</button>
+      <button class="btn btn-o" onclick="closeM('m-geri-al')">Vazgeç</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOPLU SÜTTEN KESME -->
 <div id="m-sutten-kes" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div>
@@ -955,8 +972,8 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'};
 const HDR_UPSERT = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'};
 const DB_NAME = 'egesut_v9';
-const DB_VER  = 4;
-const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip','kizginlik_log','bildirim_log'];
+const DB_VER  = 5;
+const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu'];
 const MAX_RETRY = 3;
 
 // ══════════════════════════════════════════
@@ -1267,8 +1284,8 @@ setInterval(async()=>{ if(navigator.onLine){ const q=await getQueue(); if(q.leng
 
 async function pullFromSupabase() {
   try {
-    const [animals,tasks,stock,moves,diseases,tohs,births,bildirims] = await Promise.all([
-      sbGet('hayvan_durum_view','select=*'),           // view'dan çek — badge ve kategori hazır
+    const [animals,tasks,stock,moves,diseases,tohs,births,bildirims,islemler] = await Promise.all([
+      sbGet('hayvan_durum_view','select=*'),
       sbGet('gorev_log','select=*&tamamlandi=eq.false'),
       sbGet('stok','select=*'),
       sbGet('stok_hareket','select=*&iptal=eq.false'),
@@ -1276,6 +1293,7 @@ async function pullFromSupabase() {
       sbGet('tohumlama','select=*'),
       sbGet('dogum','select=*&order=tarih.desc&limit=50'),
       sbGet('bildirim_log','select=*&durum=eq.bekliyor'),
+      sbGet('islem_log','select=*&order=tarih.desc&limit=100'),
     ]);
     await Promise.all([
       idbClearAndPut('hayvanlar',animals),
@@ -1286,6 +1304,7 @@ async function pullFromSupabase() {
       idbClearAndPut('tohumlama',tohs),
       idbClearAndPut('dogum',births),
       idbClearAndPut('bildirim_log',bildirims),
+      idbClearAndPut('islem_log',islemler),
     ]);
     document.getElementById('dot').classList.remove('off','warn');
   } catch(e) {
@@ -2016,37 +2035,78 @@ async function submitCikis(btn){
     const hayvan=_A.find(a=>a.id===hayvanId);
     if(!hayvan){ toast('Hayvan bulunamadı',true); return; }
 
-    // 1. Hayvanı sürüden çıkar
-    await write('hayvanlar',{
-      durum:'Pasif',
-      cikis_tipi:tip,
-      cikis_tarihi:tarih,
-      cikis_sebebi:tip==='olum'?sebep:notlar||null,
-      satis_fiyati:tip==='satis'?fiyat:null,
-    },'PATCH',`id=eq.${hayvanId}`);
-
-    // 2. Açık görevleri kapat
-    const acikGorevler=await getData('gorev_log',g=>g.hayvan_id===hayvanId&&!g.tamamlandi&&!g.iptal);
-    for(const g of acikGorevler){
-      await write('gorev_log',{iptal:true,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString()},'PATCH',`id=eq.${g.id}`);
-    }
-
-    // 3. Bildirimleri kapat
-    const acikBildirimler=await getData('bildirim_log',b=>b.hayvan_id===hayvanId&&b.durum==='bekliyor');
-    for(const b of acikBildirimler){
-      await write('bildirim_log',{durum:'iptal'},'PATCH',`id=eq.${b.id}`);
-    }
+    // Backend stored procedure — tek transaction, islem_log da oradan yazılır
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/cikis_yap`, {
+      method:'POST',
+      headers:{...HDR,'Content-Type':'application/json'},
+      body: JSON.stringify({
+        p_hayvan_id: hayvanId,
+        p_cikis_tipi: tip,
+        p_cikis_tarihi: tarih,
+        p_cikis_sebebi: tip==='olum' ? sebep : (notlar||null),
+        p_satis_fiyati: tip==='satis' ? fiyat : null
+      })
+    });
+    const result = await res.json();
+    if(!result?.ok) throw new Error(result?.mesaj||'İşlem başarısız');
 
     const tipTxt=tip==='olum'?'Ölüm':'Satış';
     toast(`✅ ${getDisplayKupe(hayvan)} sürüden çıkarıldı (${tipTxt})`);
     closeM('m-cikis');
     closeDet();
-    await renderFromLocal();
+    await refreshAll();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='📤 Sürüden Çıkar';} }
 }
 
 // ══════════════════════════════════════════
-// SÜTTEN KESME
+// İŞLEM LOG YARDIMCISI
+// ══════════════════════════════════════════
+async function yazIslemLog(tip, anaHayvanId, snapshot){
+  if(!navigator.onLine) return; // offline'da yazma — Faz 6'da queue'ya alınacak
+  try {
+    const logObj = {
+      id: crypto.randomUUID(),
+      tip,
+      ana_hayvan_id: anaHayvanId||null,
+      tarih: new Date().toISOString(),
+      durum: 'aktif',
+      snapshot
+    };
+    await write('islem_log', logObj, 'POST');
+  } catch(e){ console.warn('islem_log yazılamadı:', e.message); }
+  // İşlem logu yazma hatası ana işlemi engellemez
+}
+
+// ══════════════════════════════════════════
+// GERİ ALMA
+// ══════════════════════════════════════════
+async function geriAl(islemLogId, btn){
+  if(!navigator.onLine){ toast('⚠️ Geri alma için internet gerekli',true); return; }
+  if(btn){btn.disabled=true;btn.textContent='Geri alınıyor…';}
+  try {
+    // Supabase stored procedure çağır — atomic transaction
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/geri_al`, {
+      method:'POST',
+      headers:{...HDR,'Content-Type':'application/json'},
+      body: JSON.stringify({p_islem_id: islemLogId})
+    });
+    const result = await res.json();
+    if(!result?.ok) throw new Error(result?.mesaj||'Geri alma başarısız');
+    toast('✅ İşlem geri alındı');
+    closeM('m-geri-al');
+    await refreshAll();
+  } catch(e){ toast('❌ '+e.message,true); }
+  finally { if(btn){btn.disabled=false;btn.textContent='🔄 Evet, Geri Al';} }
+}
+
+function openGeriAl(islemLogId, ozet){
+  document.getElementById('ga-hid').value=islemLogId;
+  document.getElementById('ga-ozet').textContent=ozet||'Bu işlem geri alınacak.';
+  openM('m-geri-al');
+}
+
+// ══════════════════════════════════════════
+// SÜRÜDEN ÇIKIŞ — cikis_yap() RPC kullanır
 // ══════════════════════════════════════════
 async function submitSuttenKes(hayvanIdList, btn){
   if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli',true); return; }
@@ -2079,6 +2139,11 @@ async function suttenKesTekil(hayvanId, btn){
   const bugun=new Date().toISOString().split('T')[0];
   try {
     await write('hayvanlar',{suttten_kesme_tarihi:bugun},'PATCH',`id=eq.${hayvanId}`);
+    await yazIslemLog('SUTTEN_KESME', hayvanId, {
+      olusturulan: [],
+      guncellenen: [{tablo:'hayvanlar', id:hayvanId, onceki:{suttten_kesme_tarihi:null}, sonraki:{suttten_kesme_tarihi:bugun}}],
+      silinen: []
+    });
     toast(`✅ ${getDisplayKupe(h)} sütten kesildi`);
     closeDet();
     await refreshAll();
@@ -2402,6 +2467,16 @@ async function submitBirth(btn){
 
     toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${protokol.length} görev oluşturuldu`);
     closeM('m-birth');
+
+    // İşlem log
+    await yazIslemLog('DOGUM_KAYDI', anne.id, {
+      olusturulan: [
+        {tablo:'dogum', id:'(son kayıt)', veri:{anne_id:anne.id, tarih, yavru_kupe:kupe}},
+        {tablo:'hayvanlar', id:buzagiId, veri:{kupe_no:kupe, dogum_tarihi:tarih}}
+      ],
+      guncellenen: [{tablo:'hayvanlar', id:anne.id, onceki:{padok:anne.padok}, sonraki:{padok:'Sağmal Padok'}}],
+      silinen:[]
+    });
     // Formu sıfırla
     const anneEl=document.getElementById('b-anne'); if(anneEl) anneEl.value='';
     document.getElementById('anne-secili-card').style.display='none';
@@ -2450,6 +2525,10 @@ async function submitInsem(btn){
     ];
     for(const g of insemGorevler) await write('gorev_log',g);
     await dusSpermaStok(sperma);
+    await yazIslemLog('TOHUMLAMA', hayvanId, {
+      olusturulan: [{tablo:'tohumlama', id:'(son kayıt)', veri:{hayvan_id:hayvanId, tarih, sperma}}],
+      guncellenen: [], silinen: []
+    });
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
     closeM('m-insem'); cl('i-hid'); cl('i-sperma');
     checkSpermaUyari();
@@ -2539,6 +2618,10 @@ async function submitDisease(btn){
     ['d-hid','d-tani','d-sempt','d-lokasyon'].forEach(cl);
     document.getElementById('d-tedavi-gun').value='1';
     document.getElementById('d-kat').value='';
+    await yazIslemLog('HASTALIK_KAYDI', hayvanId, {
+      olusturulan: [{tablo:'hastalik_log', id:hastalikId, veri:{hayvan_id:hayvanId, tani, tarih:bugun}}],
+      guncellenen: [], silinen: []
+    });
     await renderFromLocal();
   } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='Kaydet + Görevler';} }
 }
@@ -2780,61 +2863,110 @@ async function loadCikanlar(f='hepsi', btn){
 }
 
 async function loadGecmis(f,btn){
-  _curGecmisFilter=f;
+  _curGecmisFilter=f||_curGecmisFilter||'hepsi';
   if(btn){ document.querySelectorAll('#pg-gecmis .fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
   const el=document.getElementById('gecmis-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
-    const entries=[];
-    if(f==='hepsi'||f==='dogum'){
-      (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,data:r}));
+    // islem_log'dan oku (banka modeli — backend yazar, biz gösteririz)
+    let loglar=await idbGetAll('islem_log');
+    loglar.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+
+    // Filtre
+    const tipMap={
+      dogum:['DOGUM_KAYDI'],
+      tohumlama:['TOHUMLAMA'],
+      hastalik:['HASTALIK_KAYDI'],
+      cikis:['OLUM_KAYDI','SATIS_KAYDI'],
+      diger:['SUTTEN_KESME','ABORT']
+    };
+    if(f&&f!=='hepsi') loglar=loglar.filter(l=>( tipMap[f]||[f] ).includes(l.tip));
+
+    if(!loglar.length){
+      // islem_log henüz boşsa eski tablolardan fallback göster
+      el.innerHTML=await _gecmisFallback(f);
+      return;
     }
-    if(f==='hepsi'||f==='tohumlama'){
-      (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
-    }
-    if(f==='hepsi'||f==='hastalik'){
-      (await idbGetAll('hastalik_log')).forEach(r=>entries.push({type:'hastalik',date:r.tarih,data:r}));
-    }
-    if(f==='hepsi'||f==='gorev'){
-      (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id))
-        .forEach(r=>entries.push({type:'gorev',date:r.tamamlanma_tarihi||r.hedef_tarih,data:r}));
-    }
-    entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    if(!entries.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>'; return; }
-    el.innerHTML=entries.slice(0,300).map(e=>{
-      const {type,date,data}=e;
-      const d=fmtTarih(date);
-      const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
-      const hkName=hk?` · ${hk.ad}`:'';
-      const hayvanKey=data.hayvan_id||data.anne_id;
-      const hayvanObj=_A.find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);
-      const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;
-      const hayvanVarMi=hayvanKey&&hayvanObj;
-      // Tip bazlı onclick: hastalık ve tohumlama kendi detaylarını açsın
-      let oc='';
-      if(type==='hastalik') oc=`onclick="openHstDet('${data.id}')" style="cursor:pointer"`;
-      else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
-      else if(type==='dogum'&&hayvanVarMi) oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
-      else if(type==='dogum'&&hayvanKey) oc=`onclick="toast('⚠️ ${hayvanKey} sürüde kayıtlı değil')" style="cursor:pointer;opacity:.75"`;
-      const style='background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start;transition:background .1s';
-      const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅'}[type];
-      const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)'}[type];
-      let title='', sub='';
-      if(type==='dogum'){ const anneObj=_A.find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id); const anneLabel=anneObj?(anneObj.kupe_no||anneObj.devlet_kupe||data.anne_id):data.anne_id; title=`${anneLabel||'?'} → ${data.yavru_kupe||'?'} (${data.yavru_cins||'?'})`; sub=`${data.dogum_tipi||'Normal'}${hkName}`; }
-      if(type==='tohumlama'){ title=`${hayvanLabel||'?'} — ${data.sperma||'?'}`; const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)'; sub=`${data.deneme_no||1}. deneme · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`; }
-      if(type==='hastalik'){ title=`${hayvanLabel||'?'} — ${data.tani||'?'}`; const sc=data.durum==='Aktif'?'var(--red)':'var(--green)'; sub=`${data.siddet||''} · <b style="color:${sc}">${data.durum||''}</b>${hkName}`; }
-      if(type==='gorev'){ const gHayvan=_A.find(a=>a.id===data.hayvan_id); const gLabel=gHayvan?(gHayvan.kupe_no||gHayvan.devlet_kupe):data.hayvan_id; title=`${gLabel||'GENEL'} — ${data.aciklama||''}`; sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span>${hkName}`; }
-      const dateStr=type==='gorev'?`✅ ${d}`:d;
-      return `<div style="${style}" ${oc}>
-        <div style="width:36px;height:36px;border-radius:10px;background:${icoBg};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${ico}</div>
+
+    el.innerHTML=loglar.slice(0,200).map(log=>{
+      const snap=log.snapshot||{};
+      const hayvanId=log.ana_hayvan_id;
+      const hayvan=_A.find(a=>a.id===hayvanId);
+      const kupe=hayvan?getDisplayKupe(hayvan):(hayvanId||'—');
+      const tarih=fmtTarih((log.tarih||'').substring(0,10));
+      const geriAlinabilir=log.durum==='aktif';
+
+      const tipBilgi={
+        DOGUM_KAYDI:    {ico:'🐄',renk:'rgba(78,154,42,.1)', ikoCln:'var(--green)', etiket:'Doğum'},
+        TOHUMLAMA:      {ico:'💉',renk:'rgba(42,107,181,.1)',ikoCln:'var(--blue)',  etiket:'Tohumlama'},
+        HASTALIK_KAYDI: {ico:'🏥',renk:'rgba(192,50,26,.1)', ikoCln:'var(--red)',   etiket:'Hastalık'},
+        OLUM_KAYDI:     {ico:'💀',renk:'rgba(192,50,26,.1)', ikoCln:'var(--red)',   etiket:'Ölüm'},
+        SATIS_KAYDI:    {ico:'💰',renk:'rgba(42,107,181,.1)',ikoCln:'var(--blue)',  etiket:'Satış'},
+        SUTTEN_KESME:   {ico:'🍼',renk:'rgba(78,154,42,.1)', ikoCln:'var(--green)', etiket:'Sütten Kesme'},
+        ABORT:          {ico:'⚠️',renk:'rgba(201,125,10,.1)',ikoCln:'var(--amber)', etiket:'Abort'},
+      }[log.tip]||{ico:'📋',renk:'var(--card2)',ikoCln:'var(--ink3)',etiket:log.tip};
+
+      // Snapshot özeti
+      const olusturulan=(snap.olusturulan||[]).map(o=>`+${o.tablo}`).join(', ');
+      const guncellenen=(snap.guncellenen||[]).map(g=>`~${g.tablo}`).join(', ');
+      const snapOzet=[olusturulan,guncellenen].filter(Boolean).join(' · ')||'';
+
+      const geriAlBtn=geriAlinabilir
+        ?`<button onclick="openGeriAl('${log.id}','${tipBilgi.etiket}: ${kupe} — ${tarih}')" 
+            style="margin-top:6px;padding:4px 10px;border:1px solid rgba(192,50,26,.3);border-radius:7px;background:rgba(192,50,26,.06);color:var(--red);font-size:.68rem;font-weight:700;cursor:pointer">
+            🔄 Geri Al
+          </button>`
+        :`<span style="font-size:.65rem;color:var(--ink3);margin-top:4px;display:inline-block">✅ Geri Alındı</span>`;
+
+      return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">
+        <div style="width:36px;height:36px;border-radius:10px;background:${tipBilgi.renk};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${tipBilgi.ico}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${title}</div>
-          <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${sub}</div>
-          <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${dateStr}</div>
+          <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${tipBilgi.etiket} — ${kupe}</div>
+          <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${snapOzet}</div>
+          <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${tarih}</div>
+          ${geriAlBtn}
         </div>
       </div>`;
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
+// islem_log henüz boşken eski tablolardan fallback
+async function _gecmisFallback(f){
+  try {
+    const entries=[];
+    if(!f||f==='hepsi'||f==='dogum')
+      (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,data:r}));
+    if(!f||f==='hepsi'||f==='tohumlama')
+      (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
+    if(!f||f==='hepsi'||f==='hastalik')
+      (await idbGetAll('hastalik_log')).forEach(r=>entries.push({type:'hastalik',date:r.tarih,data:r}));
+    if(!f||f==='hepsi'||f==='gorev')
+      (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id))
+        .forEach(r=>entries.push({type:'gorev',date:r.tamamlanma_tarihi||r.hedef_tarih,data:r}));
+    entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(!entries.length) return '<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>';
+    const tip2={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅'};
+    const bg2={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)'};
+    return `<div style="background:rgba(201,125,10,.08);border:1px solid rgba(201,125,10,.2);border-radius:10px;padding:9px 12px;margin-bottom:10px;font-size:.75rem;color:var(--amber)">
+      ℹ️ İşlem geçmişi henüz kaydedilmemiş — eski kayıtlar gösteriliyor. Yeni işlemler otomatik loglanacak.
+    </div>`+entries.slice(0,200).map(e=>{
+      const {type,date,data}=e;
+      const hayvanKey=data.hayvan_id||data.anne_id;
+      const hayvanObj=_A.find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);
+      const kupe=hayvanObj?getDisplayKupe(hayvanObj):(hayvanKey||'—');
+      let title='';
+      if(type==='dogum'){ const an=_A.find(a=>a.id===data.anne_id); title=`${an?getDisplayKupe(an):(data.anne_id||'?')} → ${data.yavru_kupe||'?'}`; }
+      if(type==='tohumlama') title=`${kupe} — ${data.sperma||'?'}`;
+      if(type==='hastalik') title=`${kupe} — ${data.tani||'?'}`;
+      if(type==='gorev') title=`${kupe} — ${data.aciklama||''}`;
+      return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">
+        <div style="width:36px;height:36px;border-radius:10px;background:${bg2[type]};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${tip2[type]}</div>
+        <div style="flex:1"><div style="font-weight:700;font-size:.84rem">${title}</div>
+        <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${fmtTarih(date)}</div></div>
+      </div>`;
+    }).join('');
+  } catch(e){ return `<div class="empty">⚠️ ${e.message}</div>`; }
 }
 
 // ══════════════════════════════════════════
