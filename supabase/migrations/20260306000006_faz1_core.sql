@@ -1,109 +1,51 @@
 -- ═══════════════════════════════════════════════════════
--- FAZ 1 — CORE MIGRATION
+-- FAZ 3 MIGRATION — İşlem Geçmişi + Geri Alma
 -- EgeSüt ERP v9 — 2026-03-06
--- DURUM: Supabase'e zaten uygulandı. Git kaydı için eklendi.
 -- ═══════════════════════════════════════════════════════
 
 -- ──────────────────────────────────────────
--- 1. EKSİK KOLON DÜZELTMELERİ
+-- 1. UPDATED_AT KOLONLARI
 -- ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.kizginlik_log (
-  id text PRIMARY KEY,
-  hayvan_id text,
-  tarih date,
-  belirti text,
-  notlar text,
-  olusturma timestamptz DEFAULT now()
-);
-
-ALTER TABLE public.hastalik_log ADD COLUMN IF NOT EXISTS lokasyon text;
-ALTER TABLE public.hastalik_log ADD COLUMN IF NOT EXISTS siddet text;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS dogum_tarihi date;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS buzagi_kupe text;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS abort_notlar text;
-ALTER TABLE public.gorev_log ADD COLUMN IF NOT EXISTS kaynak text;
-ALTER TABLE public.dogum ADD COLUMN IF NOT EXISTS hekim_id text;
+ALTER TABLE public.hayvanlar     ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+ALTER TABLE public.tohumlama     ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+ALTER TABLE public.hastalik_log  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+ALTER TABLE public.dogum         ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+ALTER TABLE public.gorev_log     ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+ALTER TABLE public.bildirim_log  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
 -- ──────────────────────────────────────────
--- 2. HAYVAN YAŞAM DÖNGÜSÜ KOLONLARI
+-- 2. UPDATED_AT OTOMATİK TRIGGER
 -- ──────────────────────────────────────────
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS kategori text;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS suttten_kesme_tarihi date;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS tohumlama_onay_tarihi date;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS tohumlama_durumu text;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS cikis_tipi text;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS cikis_tarihi date;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS cikis_sebebi text;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS satis_fiyati numeric;
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_hayvanlar_updated_at
+  BEFORE UPDATE ON public.hayvanlar
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_tohumlama_updated_at
+  BEFORE UPDATE ON public.tohumlama
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_hastalik_updated_at
+  BEFORE UPDATE ON public.hastalik_log
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_dogum_updated_at
+  BEFORE UPDATE ON public.dogum
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+CREATE OR REPLACE TRIGGER trg_gorev_updated_at
+  BEFORE UPDATE ON public.gorev_log
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- ──────────────────────────────────────────
--- 3. IRK EŞİK TABLOSU
--- ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.irk_esik (
-  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  irk text NOT NULL UNIQUE,
-  tohumlama_gun integer NOT NULL DEFAULT 365,
-  suttten_kesme_gun integer NOT NULL DEFAULT 60,
-  guncelleme timestamptz DEFAULT now()
-);
-
-INSERT INTO public.irk_esik (irk, tohumlama_gun, suttten_kesme_gun) VALUES
-  ('Holstein', 365, 60),
-  ('Montofon', 420, 60),
-  ('Simmental', 400, 60),
-  ('Jersey', 365, 56),
-  ('Simental', 400, 60),
-  ('Melez', 365, 60)
-ON CONFLICT (irk) DO NOTHING;
-
--- ──────────────────────────────────────────
--- 4. BİLDİRİM LOG
--- ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.bildirim_log (
-  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  hayvan_id text,
-  tip text NOT NULL,
-  mesaj text,
-  durum text NOT NULL DEFAULT 'bekliyor',
-  erteleme_tarihi date,
-  olusturma timestamptz DEFAULT now(),
-  guncelleme timestamptz DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_bildirim_hayvan ON public.bildirim_log(hayvan_id);
-CREATE INDEX IF NOT EXISTS idx_bildirim_durum ON public.bildirim_log(durum);
-
--- ──────────────────────────────────────────
--- 5. İŞLEM LOG
--- ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.islem_log (
-  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  tip text NOT NULL,
-  ana_hayvan_id text,
-  tarih timestamptz DEFAULT now(),
-  kullanici_notu text,
-  durum text NOT NULL DEFAULT 'aktif',
-  geri_alma_tarihi timestamptz,
-  snapshot jsonb NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_islem_hayvan ON public.islem_log(ana_hayvan_id);
-CREATE INDEX IF NOT EXISTS idx_islem_tarih ON public.islem_log(tarih DESC);
-
--- ──────────────────────────────────────────
--- 6. ÇÖP KUTUSU
--- ──────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS public.cop_kutusu (
-  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  kaynak_tablo text NOT NULL,
-  kaynak_id text NOT NULL,
-  veri jsonb NOT NULL,
-  silme_tarihi timestamptz DEFAULT now(),
-  otomatik_silme_tarihi timestamptz DEFAULT (now() + interval '30 days'),
-  geri_yuklendi boolean DEFAULT false,
-  silme_sebebi text
-);
-
--- ──────────────────────────────────────────
--- 7. HAYVAN DURUM VIEW
+-- 3. HAYVAN_DURUM_VIEW GÜNCELLEMESİ (bos_gun eklendi)
 -- ──────────────────────────────────────────
 CREATE OR REPLACE VIEW public.hayvan_durum_view AS
 WITH yas AS (
@@ -124,6 +66,18 @@ son_tohumlama AS (
   FROM public.tohumlama
   ORDER BY hayvan_id, tarih DESC
 ),
+son_bos_ref AS (
+  -- Son boş tohumlama VEYA son doğumdan bu yana gün (gebe olmayan dişiler için)
+  SELECT t.hayvan_id,
+    MAX(t.tarih) AS bos_ref_tarih
+  FROM (
+    SELECT hayvan_id, tarih FROM public.tohumlama
+    WHERE sonuc IN ('Boş', 'Abort')
+    UNION ALL
+    SELECT anne_id AS hayvan_id, tarih FROM public.dogum
+  ) t
+  GROUP BY t.hayvan_id
+),
 aktif_hastalik AS (
   SELECT hayvan_id, COUNT(*) AS hastalik_sayisi
   FROM public.hastalik_log WHERE durum = 'Aktif'
@@ -132,6 +86,11 @@ aktif_hastalik AS (
 SELECT
   y.*,
   st.toh_id, st.toh_tarih, st.sperma, st.toh_sonuc, st.toh_gun,
+  CASE
+    WHEN st.toh_sonuc IS DISTINCT FROM 'Gebe' AND sb.bos_ref_tarih IS NOT NULL
+    THEN (CURRENT_DATE - sb.bos_ref_tarih)
+    ELSE NULL
+  END AS bos_gun,
   COALESCE(ah.hastalik_sayisi, 0) AS aktif_hastalik_sayisi,
   CASE
     WHEN y.cikis_tipi IS NOT NULL THEN 'suruden_cikti'
@@ -140,7 +99,7 @@ SELECT
     WHEN y.yas_gun > 180 AND y.yas_gun <= 365 THEN 'kucuk_dana_duve'
     WHEN y.yas_gun > 365 AND st.toh_sonuc IS DISTINCT FROM 'Gebe' AND y.cinsiyet = 'Dişi' THEN 'buyuk_duve'
     WHEN st.toh_sonuc = 'Gebe' THEN 'gebe_duve_inek'
-    WHEN y.grup = 'Sağmal' OR y.grup LIKE '%Sağmal%' THEN 'sagmal_inek'
+    WHEN y.grup LIKE '%Sağmal%' THEN 'sagmal_inek'
     WHEN y.cinsiyet = 'Erkek' AND y.yas_gun > 180 THEN 'besi_danasi'
     ELSE 'diger'
   END AS hesap_kategori,
@@ -166,61 +125,128 @@ SELECT
   END AS dogum_gecikme_gun
 FROM yas y
 LEFT JOIN son_tohumlama st ON st.hayvan_id = y.id
+LEFT JOIN son_bos_ref sb ON sb.hayvan_id = y.id
 LEFT JOIN aktif_hastalik ah ON ah.hayvan_id = y.id
 WHERE y.durum = 'Aktif';
 
 -- ──────────────────────────────────────────
--- 8. RAPORLAMA VİEW'LARI
+-- 4. CIKIS_YAP STORED PROCEDURE
+-- Tek transaction: hayvan güncelle + görevleri kapat + bildirimleri iptal et
+-- Frontend artık bu RPC'yi çağırır, JS cascade kaldırılır
 -- ──────────────────────────────────────────
-CREATE OR REPLACE VIEW public.gebelik_ozet_view AS
-SELECT
-  COUNT(*) FILTER (WHERE sonuc = 'Gebe') AS gebe_sayisi,
-  COUNT(*) FILTER (WHERE sonuc = 'Bekliyor') AS bekleyen_sayisi,
-  COUNT(*) FILTER (WHERE sonuc = 'Abort') AS abort_sayisi,
-  COUNT(*) FILTER (WHERE sonuc = 'Doğum Yaptı') AS dogum_yapti_sayisi,
-  ROUND(100.0 * COUNT(*) FILTER (WHERE sonuc IN ('Gebe','Doğum Yaptı')) / NULLIF(COUNT(*), 0), 1) AS gebelik_orani_pct
-FROM public.tohumlama
-WHERE tarih >= CURRENT_DATE - interval '12 months';
-
-CREATE OR REPLACE VIEW public.hastalik_istatistik_view AS
-SELECT tani, kategori, COUNT(*) AS toplam,
-  COUNT(*) FILTER (WHERE durum = 'Aktif') AS aktif,
-  COUNT(*) FILTER (WHERE durum = 'İyileşti') AS iyilesti,
-  MIN(tarih) AS ilk_gorulme, MAX(tarih) AS son_gorulme
-FROM public.hastalik_log GROUP BY tani, kategori ORDER BY toplam DESC;
-
-CREATE OR REPLACE VIEW public.stok_tuketim_view AS
-SELECT s.id, s.urun_adi, s.kategori, s.birim, s.baslangic_miktar, s.esik,
-  COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) AS toplam_kullanim,
-  s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) AS guncel_stok,
-  CASE
-    WHEN s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) <= 0 THEN 'tukendi'
-    WHEN s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) <= s.esik THEN 'kritik'
-    ELSE 'normal'
-  END AS stok_durum
-FROM public.stok s
-LEFT JOIN public.stok_hareket sh ON sh.stok_id = s.id
-GROUP BY s.id, s.urun_adi, s.kategori, s.birim, s.baslangic_miktar, s.esik;
-
--- ──────────────────────────────────────────
--- 9. DUPLICATE KONTROL FONKSİYONU
--- ──────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.kupe_musait_mi(
-  p_kupe_no text, p_devlet_kupe text, p_hayvan_id text DEFAULT NULL
-) RETURNS jsonb AS $func$
-DECLARE v_kupe text; v_devlet text;
+CREATE OR REPLACE FUNCTION public.cikis_yap(
+  p_hayvan_id   text,
+  p_cikis_tipi  text,
+  p_cikis_tarihi date,
+  p_cikis_sebebi text DEFAULT NULL,
+  p_satis_fiyati numeric DEFAULT NULL
+) RETURNS jsonb AS $$
+DECLARE
+  v_hayvan record;
+  v_snapshot jsonb;
 BEGIN
-  IF p_kupe_no IS NOT NULL AND p_kupe_no != '' THEN
-    SELECT id INTO v_kupe FROM public.hayvanlar
-    WHERE kupe_no = p_kupe_no AND (p_hayvan_id IS NULL OR id != p_hayvan_id) LIMIT 1;
+  -- Hayvanı bul
+  SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı veya zaten pasif');
   END IF;
-  IF p_devlet_kupe IS NOT NULL AND p_devlet_kupe != '' THEN
-    SELECT id INTO v_devlet FROM public.hayvanlar
-    WHERE devlet_kupe = p_devlet_kupe AND (p_hayvan_id IS NULL OR id != p_hayvan_id) LIMIT 1;
-  END IF;
-  RETURN jsonb_build_object('musait', (v_kupe IS NULL AND v_devlet IS NULL),
-    'kupe_cakisma_id', v_kupe, 'devlet_cakisma_id', v_devlet);
+
+  -- Snapshot oluştur (geri alma için)
+  v_snapshot := jsonb_build_object(
+    'olusturulan', '[]'::jsonb,
+    'guncellenen', jsonb_build_array(
+      jsonb_build_object(
+        'tablo', 'hayvanlar', 'id', p_hayvan_id,
+        'onceki', jsonb_build_object('durum', v_hayvan.durum, 'cikis_tipi', v_hayvan.cikis_tipi),
+        'sonraki', jsonb_build_object('durum', 'Pasif', 'cikis_tipi', p_cikis_tipi)
+      )
+    ),
+    'silinen', '[]'::jsonb
+  );
+
+  -- 1. Hayvanı pasif yap
+  UPDATE public.hayvanlar SET
+    durum = 'Pasif',
+    cikis_tipi = p_cikis_tipi,
+    cikis_tarihi = p_cikis_tarihi,
+    cikis_sebebi = p_cikis_sebebi,
+    satis_fiyati = p_satis_fiyati
+  WHERE id = p_hayvan_id;
+
+  -- 2. Açık görevleri kapat
+  UPDATE public.gorev_log SET
+    iptal = true, tamamlandi = true, tamamlanma_tarihi = now()
+  WHERE hayvan_id = p_hayvan_id AND tamamlandi = false AND (iptal IS NULL OR iptal = false);
+
+  -- 3. Bekleyen bildirimleri iptal et
+  UPDATE public.bildirim_log SET durum = 'iptal'
+  WHERE hayvan_id = p_hayvan_id AND durum = 'bekliyor';
+
+  -- 4. İşlem log'una yaz
+  INSERT INTO public.islem_log (tip, ana_hayvan_id, snapshot)
+  VALUES (
+    CASE WHEN p_cikis_tipi = 'olum' THEN 'OLUM_KAYDI' ELSE 'SATIS_KAYDI' END,
+    p_hayvan_id,
+    v_snapshot
+  );
+
+  RETURN jsonb_build_object('ok', true);
 END;
-$func$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
+
+-- ──────────────────────────────────────────
+-- 5. GERİ_AL STORED PROCEDURE
+-- islem_log snapshot'ından işlemi tersine çevirir
+-- ──────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.geri_al(
+  p_islem_id text
+) RETURNS jsonb AS $$
+DECLARE
+  v_log    record;
+  v_item   jsonb;
+  v_tablo  text;
+  v_id     text;
+  v_set    text;
+  v_pairs  text[];
+  v_key    text;
+  v_val    text;
+BEGIN
+  SELECT * INTO v_log FROM public.islem_log WHERE id = p_islem_id AND durum = 'aktif';
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'İşlem bulunamadı veya zaten geri alındı');
+  END IF;
+
+  -- Oluşturulanları sil
+  FOR v_item IN SELECT value FROM jsonb_array_elements(v_log.snapshot->'olusturulan')
+  LOOP
+    v_tablo := v_item->>'tablo';
+    v_id    := v_item->>'id';
+    EXECUTE format('DELETE FROM public.%I WHERE id = %L', v_tablo, v_id);
+  END LOOP;
+
+  -- Güncellenenleri eski haline döndür
+  FOR v_item IN SELECT value FROM jsonb_array_elements(v_log.snapshot->'guncellenen')
+  LOOP
+    v_tablo  := v_item->>'tablo';
+    v_id     := v_item->>'id';
+    v_pairs  := ARRAY[]::text[];
+    FOR v_key, v_val IN SELECT key, value #>> '{}' FROM jsonb_each(v_item->'onceki')
+    LOOP
+      v_pairs := v_pairs || format('%I = %L', v_key, v_val);
+    END LOOP;
+    IF array_length(v_pairs, 1) > 0 THEN
+      v_set := array_to_string(v_pairs, ', ');
+      EXECUTE format('UPDATE public.%I SET %s WHERE id = %L', v_tablo, v_set, v_id);
+    END IF;
+  END LOOP;
+
+  -- İşlem log'unu geri alındı olarak işaretle
+  UPDATE public.islem_log
+  SET durum = 'geri_alindi', geri_alma_tarihi = now()
+  WHERE id = p_islem_id;
+
+  RETURN jsonb_build_object('ok', true);
+END;
+$$ LANGUAGE plpgsql;
 
 NOTIFY pgrst, 'reload schema';
