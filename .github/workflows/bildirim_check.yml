@@ -1,0 +1,107 @@
+name: Bildirim Kontrolü
+
+on:
+  schedule:
+    - cron: '0 5,8,11,14,17 * * *'
+  workflow_dispatch:
+
+jobs:
+  bildirim-kontrol:
+    runs-on: ubuntu-latest
+    env:
+      SB_URL: ${{ secrets.SUPABASE_URL }}
+      SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+    steps:
+      - name: Bildirimleri Oluştur
+        run: |
+          cat << 'SCRIPT' > kontrol.py
+          import urllib.request, urllib.error, json, os, sys
+          from datetime import date
+
+          SB_URL = os.environ['SB_URL'].rstrip('/')
+          SB_KEY = os.environ['SB_KEY']
+          HEADERS = {
+            'apikey': SB_KEY,
+            'Authorization': f'Bearer {SB_KEY}',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          }
+
+          def sb_get(path):
+            req = urllib.request.Request(f'{SB_URL}/rest/v1/{path}', headers=HEADERS)
+            try:
+              with urllib.request.urlopen(req) as r:
+                return json.loads(r.read())
+            except urllib.error.HTTPError as e:
+              print(f'GET hata {path}: {e.code} {e.read().decode()}')
+              return []
+
+          def sb_post(path, data):
+            body = json.dumps(data).encode()
+            req = urllib.request.Request(f'{SB_URL}/rest/v1/{path}', data=body, headers=HEADERS, method='POST')
+            try:
+              with urllib.request.urlopen(req) as r:
+                return json.loads(r.read())
+            except urllib.error.HTTPError as e:
+              print(f'POST hata {path}: {e.code} {e.read().decode()}')
+              return None
+
+          bugun = date.today().isoformat()
+
+          mevcut = sb_get('bildirim_log?select=hayvan_id,tip&durum=eq.bekliyor')
+          mevcut_set = set((b['hayvan_id'], b['tip']) for b in mevcut if b.get('hayvan_id') and b.get('tip'))
+          print(f'Mevcut bekleyen bildirim: {len(mevcut_set)}')
+
+          hayvanlar = sb_get(
+            'hayvan_durum_view?select=id,kupe_no,devlet_kupe,irk,'
+            'tohumlama_bildirisi_gerekli,tohumlama_durumu,'
+            'suttten_kesme_bildirisi_gerekli,'
+            'dogum_yaklasti,dogum_gecikme_gun,toh_gun'
+          )
+          print(f'Aktif hayvan sayısı: {len(hayvanlar)}')
+
+          yeni_bildirimler = []
+
+          for h in hayvanlar:
+            hid = h.get('id')
+            kupe = h.get('kupe_no') or h.get('devlet_kupe') or hid
+            if not hid:
+              continue
+
+            if h.get('tohumlama_bildirisi_gerekli') and h.get('tohumlama_durumu') not in ('tohumlanabilir', 'ertelendi'):
+              tip = 'tohumlama_yasi'
+              if (hid, tip) not in mevcut_set:
+                yeni_bildirimler.append({'hayvan_id': hid, 'tip': tip, 'mesaj': f'{kupe} tohumlanabilir yaşa ulaştı.', 'durum': 'bekliyor'})
+
+            if h.get('suttten_kesme_bildirisi_gerekli'):
+              tip = 'suttten_kesme'
+              if (hid, tip) not in mevcut_set:
+                yeni_bildirimler.append({'hayvan_id': hid, 'tip': tip, 'mesaj': f'{kupe} sütten kesme zamanı geldi.', 'durum': 'bekliyor'})
+
+            if h.get('dogum_yaklasti') and h.get('dogum_gecikme_gun', 0) == 0:
+              tip = 'dogum_yaklasti'
+              kalan = 280 - (h.get('toh_gun') or 280)
+              if (hid, tip) not in mevcut_set:
+                yeni_bildirimler.append({'hayvan_id': hid, 'tip': tip, 'mesaj': f'{kupe} doğum yaklaşıyor, {kalan} gün kaldı.', 'durum': 'bekliyor'})
+
+            gecikme = h.get('dogum_gecikme_gun', 0)
+            if gecikme and gecikme > 0:
+              tip = 'dogum_gecikti'
+              if (hid, tip) not in mevcut_set:
+                yeni_bildirimler.append({'hayvan_id': hid, 'tip': tip, 'mesaj': f'{kupe} doğum {gecikme} gün gecikti.', 'durum': 'bekliyor'})
+
+          print(f'Yeni oluşturulacak bildirim: {len(yeni_bildirimler)}')
+
+          if yeni_bildirimler:
+            result = sb_post('bildirim_log', yeni_bildirimler)
+            if result is not None:
+              print(f'Basarili: {len(yeni_bildirimler)} bildirim olusturuldu.')
+            else:
+              print('Hata: Bildirim olusturma basarisiz.')
+              sys.exit(1)
+          else:
+            print('Yeni bildirim yok.')
+
+          SCRIPT
+          python3 kontrol.py
