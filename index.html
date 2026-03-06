@@ -399,6 +399,17 @@ button,input,select,textarea{font-family:inherit}
 
 </div><!-- /pages -->
 
+  <div id="pg-bildirim" class="pg">
+    <div class="pg-hdr"><div class="pg-title">🔔 Bildirimler</div></div>
+    <div class="pg-inner">
+      <div class="filter-strip" style="overflow-x:auto;white-space:nowrap">
+        <button class="fs-btn on" id="bd-tab-bekliyor" onclick="bildirimTab('bekliyor',this)">⏳ Bekleyen</button>
+        <button class="fs-btn" id="bd-tab-goruldu" onclick="bildirimTab('goruldu',this)">✅ Görüldü</button>
+      </div>
+      <div id="bildirim-body"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
 <nav id="nav">
   <button class="nb on" id="nb-dash" onclick="goTo('dash')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -428,6 +439,11 @@ button,input,select,textarea{font-family:inherit}
   <button class="nb" id="nb-log" onclick="goTo('log')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     <span class="nb-lbl">Kayıt</span>
+  </button>
+  <button class="nb" id="nb-bildirim" onclick="goTo('bildirim')">
+    <div id="bbadge" class="nbadge" style="display:none">0</div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+    <span class="nb-lbl">Bildirim</span>
   </button>
 </nav>
 </div><!-- /shell -->
@@ -895,8 +911,9 @@ button,input,select,textarea{font-family:inherit}
       <div class="sh"><span class="sh-title">Sistem</span></div>
       <button class="btn" style="background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;margin-bottom:6px" onclick="stokHareketiTemizle()">🗑 Geçersiz Stok Hareketlerini Temizle</button>
       <div class="sh"><span class="sh-title">🔔 Bildirimler</span></div>
-      <div style="font-size:.72rem;color:var(--ink3);margin-bottom:6px">Tedavi görevleri için 3 saat öncesinde ve sabah uyarısı alırsınız.</div>
-      <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:6px" onclick="bildirimAc()">🔔 Bildirimleri Aç / Aktifleştir</button>
+      <div style="font-size:.72rem;color:var(--ink3);margin-bottom:6px">Yaşam döngüsü bildirimleri (tohumlama, sütten kesme, doğum) günde 5 kez sunucudan kontrol edilir ve bildirim ekranına düşer. Görev bildirimleri tarayıcı üzerinden çalışır.</div>
+      <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:6px" onclick="bildirimAc()">🔔 Görev Bildirimlerini Aç</button>
+      <button class="btn" style="background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2);font-weight:700;margin-bottom:6px" onclick="goTo('bildirim');closeM('m-ayarlar')">📋 Bildirim Ekranına Git</button>
       <div class="sh"><span class="sh-title">Versiyon</span></div>
       <div style="font-size:.75rem;color:var(--ink3);padding:4px 0">EgeSüt v9 · IndexedDB + Supabase offline-first</div>
       <button class="btn btn-o" onclick="closeM('m-ayarlar')" style="margin-top:12px">Kapat</button>
@@ -1400,13 +1417,15 @@ async function refreshAll(){
 async function renderFromLocal(){
   await Promise.all([loadAnimals(),loadStock()]);
   const pg=_curPg||'dash';
-  if(pg==='dash')    await Promise.all([loadDash(),loadStokList()]);
-  if(pg==='tasks')   await loadTasks(_curTaskFilter||'today');
-  if(pg==='gecmis')  await loadGecmis(_curGecmisFilter||'hepsi');
-  if(pg==='log')     await Promise.all([loadBirths(),loadStokList()]);
-  if(pg==='ureme')   loadUreme(_curUremeTab||'kizginlik');
-  if(pg!=='dash')    loadDash();
+  if(pg==='dash')     await Promise.all([loadDash(),loadStokList()]);
+  if(pg==='tasks')    await loadTasks(_curTaskFilter||'today');
+  if(pg==='gecmis')   await loadGecmis(_curGecmisFilter||'hepsi');
+  if(pg==='log')      await Promise.all([loadBirths(),loadStokList()]);
+  if(pg==='ureme')    loadUreme(_curUremeTab||'kizginlik');
+  if(pg==='bildirim') loadBildirimler(_curBildirimTab||'bekliyor');
+  if(pg!=='dash')     loadDash();
   checkSpermaUyari();
+  updateBildirimBadge();
 }
 
 // ══════════════════════════════════════════
@@ -1422,6 +1441,7 @@ function goTo(pg){
   if(pg==='gecmis') loadGecmis(_curGecmisFilter||'hepsi');
   if(pg==='log')    { loadBirths(); loadStokList(); }
   if(pg==='cikanlar') loadCikanlar('hepsi');
+  if(pg==='bildirim') loadBildirimler('bekliyor');
   if(pg==='ureme'){
     const tab=_curUremeTab||'kizginlik';
     document.querySelectorAll('#pg-ureme .fs-btn').forEach(b=>b.classList.remove('on'));
@@ -4091,6 +4111,125 @@ async function bildirimIzniAl(){
   return result==='granted';
 }
 
+// ══════════════════════════════════════════
+// BİLDİRİM SİSTEMİ
+// bildirim_log → GitHub Actions yazar, frontend okur
+// ══════════════════════════════════════════
+
+let _curBildirimTab = 'bekliyor';
+
+function bildirimTab(durum, btn){
+  _curBildirimTab = durum;
+  document.querySelectorAll('#pg-bildirim .fs-btn').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  loadBildirimler(durum);
+}
+
+async function loadBildirimler(durum='bekliyor'){
+  const el=document.getElementById('bildirim-body'); if(!el) return;
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  try {
+    const tumBildirimler=await idbGetAll('bildirim_log');
+    const liste=tumBildirimler
+      .filter(b=>b.durum===durum)
+      .sort((a,b)=>(b.olusturma||'').localeCompare(a.olusturma||''));
+
+    // Badge güncelle
+    const bekleyenSayisi=tumBildirimler.filter(b=>b.durum==='bekliyor').length;
+    const badge=document.getElementById('bbadge');
+    if(badge){ badge.textContent=bekleyenSayisi; badge.style.display=bekleyenSayisi>0?'':'none'; }
+
+    if(!liste.length){
+      el.innerHTML=`<div class="empty"><div class="empty-ico">${durum==='bekliyor'?'✅':'📭'}</div>${durum==='bekliyor'?'Bekleyen bildirim yok':'Görülen bildirim yok'}</div>`;
+      return;
+    }
+
+    const tipBilgi={
+      tohumlama_yasi:  {ico:'💉', renk:'rgba(42,107,181,.1)', baslik:'Tohumlama Zamanı',   aksiyon:'tohumlama'},
+      suttten_kesme:   {ico:'🍼', renk:'rgba(78,154,42,.1)',  baslik:'Sütten Kesme Zamanı', aksiyon:'suttenkes'},
+      dogum_yaklasti:  {ico:'🐄', renk:'rgba(78,154,42,.1)',  baslik:'Doğum Yaklaşıyor',    aksiyon:'dogum'},
+      dogum_gecikti:   {ico:'⚠️', renk:'rgba(192,50,26,.1)', baslik:'Doğum Gecikiyor',      aksiyon:'gecikme'},
+    };
+
+    el.innerHTML=liste.map(b=>{
+      const h=_A.find(a=>a.id===b.hayvan_id);
+      const kupe=h?getDisplayKupe(h):(b.hayvan_id||'—');
+      const bilgi=tipBilgi[b.tip]||{ico:'🔔',renk:'var(--card2)',baslik:b.tip,aksiyon:null};
+      const tarih=fmtTarih((b.olusturma||'').substring(0,10));
+
+      let aksiyonHtml='';
+      if(durum==='bekliyor'){
+        if(bilgi.aksiyon==='tohumlama' && h){
+          aksiyonHtml=`
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <button onclick="submitTohumOnayla('${h.id}',this);bildirimGoruldu('${b.id}')" 
+                style="flex:1;padding:7px;background:rgba(42,107,181,.1);border:1px solid rgba(42,107,181,.3);border-radius:8px;color:var(--blue);font-weight:700;font-size:.75rem;cursor:pointer">
+                ✅ Tohumlanabilir Onayla
+              </button>
+              <button onclick="openTohumErtele('${h.id}','${kupe}');bildirimGoruldu('${b.id}')"
+                style="flex:1;padding:7px;background:rgba(201,125,10,.1);border:1px solid rgba(201,125,10,.3);border-radius:8px;color:var(--amber);font-weight:700;font-size:.75rem;cursor:pointer">
+                ⏰ Ertele
+              </button>
+            </div>`;
+        } else if(bilgi.aksiyon==='suttenkes' && h){
+          aksiyonHtml=`
+            <div style="margin-top:8px">
+              <button onclick="suttenKesTekil('${h.id}',this);bildirimGoruldu('${b.id}')"
+                style="width:100%;padding:7px;background:rgba(78,154,42,.1);border:1px solid rgba(78,154,42,.3);border-radius:8px;color:var(--green);font-weight:700;font-size:.75rem;cursor:pointer">
+                🍼 Sütten Kes
+              </button>
+            </div>`;
+        } else if((bilgi.aksiyon==='dogum'||bilgi.aksiyon==='gecikme') && h){
+          aksiyonHtml=`
+            <div style="margin-top:8px">
+              <button onclick="openDet('${h.id}');closeDet();goTo('suru')" 
+                style="width:100%;padding:7px;background:rgba(78,154,42,.1);border:1px solid rgba(78,154,42,.3);border-radius:8px;color:var(--green);font-weight:700;font-size:.75rem;cursor:pointer">
+                🐄 Hayvan Kartını Aç
+              </button>
+            </div>`;
+        }
+        aksiyonHtml+=`
+          <button onclick="bildirimGoruldu('${b.id}')" 
+            style="margin-top:6px;width:100%;padding:5px;background:transparent;border:1px solid var(--card3);border-radius:7px;color:var(--ink3);font-size:.68rem;cursor:pointer">
+            Görüldü olarak işaretle
+          </button>`;
+      }
+
+      return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="width:36px;height:36px;border-radius:10px;background:${bilgi.renk};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${bilgi.ico}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${bilgi.baslik} — ${kupe}</div>
+            <div style="font-size:.74rem;color:var(--ink2);margin-top:3px">${b.mesaj||''}</div>
+            <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${tarih}</div>
+          </div>
+        </div>
+        ${aksiyonHtml}
+      </div>`;
+    }).join('');
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
+async function bildirimGoruldu(bildirimId){
+  try {
+    await write('bildirim_log',{durum:'goruldu',guncelleme:new Date().toISOString()},'PATCH',`id=eq.${bildirimId}`);
+    // Listeyi yenile
+    loadBildirimler(_curBildirimTab);
+  } catch(e){ toast(e.message,true); }
+}
+
+function updateBildirimBadge(){
+  idbGetAll('bildirim_log').then(liste=>{
+    const n=liste.filter(b=>b.durum==='bekliyor').length;
+    const badge=document.getElementById('bbadge');
+    if(badge){ badge.textContent=n; badge.style.display=n>0?'':'none'; }
+  }).catch(()=>{});
+}
+
+// ══════════════════════════════════════════
+// GÖREV BİLDİRİMLERİ (Tarayıcı Push — sadece görevler)
+// Yaşam döngüsü bildirimleri artık GitHub Actions'tan bildirim_log'a geliyor
+// ══════════════════════════════════════════
 async function bildirimKontrol(){
   if(!('Notification' in window)||Notification.permission!=='granted') return;
   const now=new Date();
@@ -4119,6 +4258,8 @@ async function bildirimKontrol(){
   }
   Object.keys(gosterilen).forEach(k=>{ if(simdi-gosterilen[k]>7*86400000) delete gosterilen[k]; });
   localStorage.setItem('bildirim_gosterilen',JSON.stringify(gosterilen));
+  // Aynı zamanda bildirim_log badge güncelle
+  updateBildirimBadge();
 }
 
 async function bildirimAc(){
