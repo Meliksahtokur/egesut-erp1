@@ -410,6 +410,13 @@ button,input,select,textarea{font-family:inherit}
     </div>
   </div>
 
+  <div id="pg-raporlar" class="pg">
+    <div class="pg-hdr"><div class="pg-title">📊 Raporlar</div></div>
+    <div class="pg-inner" id="rapor-body">
+      <div class="loader"><div class="spin"></div></div>
+    </div>
+  </div>
+
 <nav id="nav">
   <button class="nb on" id="nb-dash" onclick="goTo('dash')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -444,6 +451,10 @@ button,input,select,textarea{font-family:inherit}
     <div id="bbadge" class="nbadge" style="display:none">0</div>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
     <span class="nb-lbl">Bildirim</span>
+  </button>
+  <button class="nb" id="nb-raporlar" onclick="goTo('raporlar')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span class="nb-lbl">Rapor</span>
   </button>
 </nav>
 </div><!-- /shell -->
@@ -1423,6 +1434,7 @@ async function renderFromLocal(){
   if(pg==='log')      await Promise.all([loadBirths(),loadStokList()]);
   if(pg==='ureme')    loadUreme(_curUremeTab||'kizginlik');
   if(pg==='bildirim') loadBildirimler(_curBildirimTab||'bekliyor');
+  if(pg==='raporlar') loadRaporlar();
   if(pg!=='dash')     loadDash();
   checkSpermaUyari();
   updateBildirimBadge();
@@ -4096,7 +4108,151 @@ function toast(msg,err=false){
 }
 
 // ══════════════════════════════════════════
-// BİLDİRİM SİSTEMİ
+// RAPORLAR
+// ══════════════════════════════════════════
+async function loadRaporlar(){
+  const el=document.getElementById('rapor-body'); if(!el) return;
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  try {
+    // Sürü dağılımı — IndexedDB'den (offline da çalışır)
+    const suruDagilimi = _suruDagilimHesapla();
+
+    // Online: view'lardan rapor verileri
+    let gebelikOzet=null, hastalikStat=[], stokDurum=[];
+    if(navigator.onLine){
+      [gebelikOzet, hastalikStat, stokDurum] = await Promise.all([
+        sbGet('gebelik_ozet_view','select=*').then(r=>r[0]||null).catch(()=>null),
+        sbGet('hastalik_istatistik_view','select=*&order=toplam.desc&limit=8').catch(()=>[]),
+        sbGet('stok_tuketim_view','select=*&order=stok_durum.asc').catch(()=>[]),
+      ]);
+    }
+
+    let html='';
+
+    // ── SÜRÜ DAĞILIMI ──────────────────────
+    const katRenk={
+      sut_icen:     {renk:'#4e9a2a',etiket:'Süt İçen'},
+      suttten_kesilmis:{renk:'#8abf6a',etiket:'Sütten Kesilmiş'},
+      kucuk_dana_duve:{renk:'#c9870a',etiket:'Küçük Dana/Düve'},
+      buyuk_duve:   {renk:'#e8a020',etiket:'Büyük Düve'},
+      gebe_duve_inek:{renk:'#2a6bb5',etiket:'Gebe'},
+      sagmal_inek:  {renk:'#1a5fa0',etiket:'Sağmal İnek'},
+      besi_danasi:  {renk:'#8b6914',etiket:'Besi Danası'},
+      diger:        {renk:'#888',etiket:'Diğer'},
+    };
+    const toplam=Object.values(suruDagilimi).reduce((a,b)=>a+b,0)||1;
+    const dagItems=Object.entries(suruDagilimi).filter(([,v])=>v>0);
+
+    html+=`<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px 16px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:.9rem;color:var(--ink);margin-bottom:12px">🐄 Sürü Dağılımı <span style="font-weight:400;font-size:.75rem;color:var(--ink3)">(${toplam} aktif hayvan)</span></div>
+      ${dagItems.map(([kat,sayi])=>{
+        const pct=Math.round(sayi/toplam*100);
+        const bilgi=katRenk[kat]||{renk:'#888',etiket:kat};
+        return `<div style="margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="font-size:.76rem;color:var(--ink2)">${bilgi.etiket}</span>
+            <span style="font-size:.76rem;font-weight:700;color:var(--ink)">${sayi} <span style="font-weight:400;color:var(--ink3)">(${pct}%)</span></span>
+          </div>
+          <div style="height:8px;background:var(--card2);border-radius:4px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${bilgi.renk};border-radius:4px;transition:width .4s"></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+    // ── GEBELİK ÖZETİ ──────────────────────
+    if(gebelikOzet){
+      const oran=gebelikOzet.gebelik_orani_pct||0;
+      const oranRenk=oran>=60?'var(--green)':oran>=40?'var(--amber)':'var(--red)';
+      html+=`<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px 16px;margin-bottom:12px">
+        <div style="font-weight:700;font-size:.9rem;color:var(--ink);margin-bottom:12px">💉 Gebelik Özeti <span style="font-weight:400;font-size:.72rem;color:var(--ink3)">(Son 12 ay)</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          ${[
+            {etiket:'Gebe',deger:gebelikOzet.gebe_sayisi||0,renk:'var(--green)'},
+            {etiket:'Bekleyen',deger:gebelikOzet.bekleyen_sayisi||0,renk:'var(--amber)'},
+            {etiket:'Doğum Yaptı',deger:gebelikOzet.dogum_yapti_sayisi||0,renk:'var(--blue)'},
+            {etiket:'Abort',deger:gebelikOzet.abort_sayisi||0,renk:'var(--red)'},
+          ].map(x=>`<div style="background:var(--card2);border-radius:10px;padding:10px 12px;text-align:center">
+            <div style="font-size:1.4rem;font-weight:800;color:${x.renk}">${x.deger}</div>
+            <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${x.etiket}</div>
+          </div>`).join('')}
+        </div>
+        <div style="text-align:center;padding:8px;background:var(--card2);border-radius:10px">
+          <span style="font-size:.78rem;color:var(--ink3)">Gebelik Oranı → </span>
+          <span style="font-size:1.1rem;font-weight:800;color:${oranRenk}">%${oran}</span>
+        </div>
+      </div>`;
+    }
+
+    // ── HASTALIK İSTATİSTİKLERİ ──────────────
+    if(hastalikStat.length){
+      const maxToplam=hastalikStat[0].toplam||1;
+      html+=`<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px 16px;margin-bottom:12px">
+        <div style="font-weight:700;font-size:.9rem;color:var(--ink);margin-bottom:12px">🏥 En Sık Tanılar</div>
+        ${hastalikStat.map(h=>{
+          const pct=Math.round((h.toplam/maxToplam)*100);
+          const aktifPct=h.toplam>0?Math.round((h.aktif/h.toplam)*100):0;
+          return `<div style="margin-bottom:9px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-size:.76rem;color:var(--ink2);max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.tani||'—'}</span>
+              <span style="font-size:.74rem;font-weight:700;color:var(--ink)">${h.toplam} <span style="color:${h.aktif>0?'var(--red)':'var(--green)'}">· ${h.aktif} aktif</span></span>
+            </div>
+            <div style="height:7px;background:var(--card2);border-radius:4px;overflow:hidden">
+              <div style="height:100%;width:${pct}%;background:rgba(192,50,26,.55);border-radius:4px"></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    // ── STOK DURUMU ──────────────────────────
+    if(stokDurum.length){
+      const kritik=stokDurum.filter(s=>s.stok_durum==='kritik'||s.stok_durum==='tukendi');
+      const normal=stokDurum.filter(s=>s.stok_durum==='normal');
+      html+=`<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px 16px;margin-bottom:12px">
+        <div style="font-weight:700;font-size:.9rem;color:var(--ink);margin-bottom:4px">📦 Stok Durumu</div>
+        <div style="font-size:.72rem;color:var(--ink3);margin-bottom:12px">${kritik.length} kritik · ${normal.length} normal</div>
+        ${stokDurum.slice(0,10).map(s=>{
+          const renk=s.stok_durum==='tukendi'?'var(--red)':s.stok_durum==='kritik'?'var(--amber)':'var(--green)';
+          const ikon=s.stok_durum==='tukendi'?'🆘':s.stok_durum==='kritik'?'⚠️':'✅';
+          const pct=s.baslangic_miktar>0?Math.max(0,Math.min(100,Math.round(s.guncel_stok/s.baslangic_miktar*100))):0;
+          return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <span style="font-size:.9rem;flex-shrink:0">${ikon}</span>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:.76rem;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%">${s.urun_adi||'—'}</span>
+                <span style="font-size:.74rem;font-weight:700;color:${renk}">${(s.guncel_stok||0).toFixed(1)} ${s.birim||''}</span>
+              </div>
+              <div style="height:5px;background:var(--card2);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${pct}%;background:${renk};border-radius:3px"></div>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    if(!navigator.onLine){
+      html+=`<div style="background:rgba(201,125,10,.07);border:1px solid rgba(201,125,10,.2);border-radius:10px;padding:10px 14px;font-size:.76rem;color:var(--amber);margin-bottom:10px">
+        📶 Offline — Gebelik, hastalık ve stok raporları internet bağlantısı gerektirir.
+      </div>`;
+    }
+
+    el.innerHTML=html||'<div class="empty"><div class="empty-ico">📊</div>Henüz veri yok</div>';
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
+function _suruDagilimHesapla(){
+  const say={};
+  (_A||[]).forEach(a=>{
+    const kat=a.hesap_kategori||'diger';
+    say[kat]=(say[kat]||0)+1;
+  });
+  return say;
+}
+
+// ══════════════════════════════════════════
+// BİLDİRİM İZNİ
 // ══════════════════════════════════════════
 async function bildirimIzniAl(){
   if(!('Notification' in window)){ toast('Tarayıcınız bildirimleri desteklemiyor',true); return false; }
