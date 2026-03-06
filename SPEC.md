@@ -13,7 +13,7 @@
 | Faz 2B | Sütten kesme, tohumlanabilir onay | ✅ Tamamlandı |
 | Faz 2C | Frontend hesap temizliği | ✅ Tamamlandı |
 | Faz 3 | İşlem geçmişi, geri alma | ✅ Tamamlandı |
-| Faz 4 | Bildirim sistemi (GitHub Actions) | ❌ Başlanmadı |
+| Faz 4 | Bildirim sistemi (GitHub Actions) | ✅ Tamamlandı |
 | Faz 5 | Raporlama | ❌ Başlanmadı |
 | Faz 6 | Startup sync ekranı | ❌ Başlanmadı |
 
@@ -153,35 +153,14 @@ SATIS_KAYDI    ← cikis_yap() stored proc (submitCikis)
 - [x] Her satırda `🔄 Geri Al` butonu (sadece `durum='aktif'` olanlar)
 - [x] Migration 007: `updated_at`, `bos_gun`, `cikis_yap()`, `geri_al()`
 
-### ❌ FAZ 4 — Bildirim Sistemi
-
-**GitHub Actions Workflow:**
-Dosya: `.github/workflows/bildirim_check.yml`
-```yaml
-name: Bildirim Kontrolü
-on:
-  schedule:
-    - cron: '0 */3 * * *'   # Her 3 saatte bir
-  workflow_dispatch:          # Manuel tetikleme
-jobs:
-  kontrol:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Bildirimleri Oluştur
-        env:
-          SB_URL: ${{ secrets.SUPABASE_URL }}
-          SB_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: |
-          # hayvan_durum_view'dan flag'leri çek
-          # bildirim_log'da mükerrer var mı kontrol et
-          # Yoksa INSERT
-```
-
-**Frontend:**
-- `bildirim_log` listesi sayfası/modal'ı
-- Tohumlama bildirimi → Onayla / Ertele
-- Sütten kesme → bilgilendirme
-- `bildirimKontrol()` → `setInterval` 1h→3h, localStorage kaldır
+### ✅ FAZ 4 — Bildirim Sistemi
+- [x] `.github/workflows/bildirim_check.yml` — UTC 05,08,11,14,17 (TR 08,11,14,17,20)
+- [x] Tipleri: `tohumlama_yasi`, `suttten_kesme`, `dogum_yaklasti`, `dogum_gecikti`
+- [x] Mükerrer önleme: aynı `(hayvan_id,tip)` beklemedeyse INSERT yapılmaz
+- [x] `pg-bildirim` — Bekleyen/Görüldü tab'ları, aksiyonlar, `bbadge`
+- [x] `bildirimGoruldu()`, `updateBildirimBadge()`, `loadBildirimler()`
+- [x] `bildirimKontrol()` → sadece görev bildirimleri kaldı
+- [x] Secrets gerekli: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
 
 ### ❌ FAZ 5 — Raporlama
 - gebelik_ozet_view, hastalik_istatistik_view, stok_tuketim_view grafikleri
@@ -219,7 +198,21 @@ Sonda: Faz durumu güncelle → sorunları ekle → Bölüm 9 yaz → outputs'a 
 
 ## 8. BİR SONRAKİ OTURUM BAŞLANGIÇ NOKTASI
 
-**Hedef:** Faz 4 — Bildirim Sistemi
+**Hedef:** Faz 4 tamamlandı → GitHub'a push + secrets ayarla → Faz 5 Raporlama
+
+**⚠️ Push öncesi yapılacak:**
+1. GitHub repo → Settings → Secrets → `SUPABASE_URL` ve `SUPABASE_SERVICE_KEY` ekle
+   - `SUPABASE_URL` = `https://zqnexqbdfvbhlxzelzju.supabase.co`
+   - `SUPABASE_SERVICE_KEY` = Supabase dashboard → Settings → API → `service_role` key
+2. Push et → Actions sekmesinden `Bildirim Kontrolü` workflow'unu manuel tetikle (`workflow_dispatch`)
+3. Supabase'de `bildirim_log` tablosunu kontrol et — kayıtlar gelmeli
+
+**Faz 5 — Raporlama Planı:**
+- `pg-raporlar` yeni sayfa veya dashboard genişletmesi
+- `gebelik_ozet_view` → gebelik oranı, bekleyen, doğum yaptı
+- `hastalik_istatistik_view` → en sık tanı, aktif/iyileşen dağılımı
+- `stok_tuketim_view` → kritik stoklar, tüketim grafiği
+- Basit bar/donut grafik — Canvas veya inline SVG (dış kütüphane yok)
 
 **Adım 0 — Migration 007'yi push et (henüz yapılmadıysa):**
 ```
