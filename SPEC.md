@@ -1,249 +1,296 @@
-# EgeSüt ERP — Proje Spec Dosyası
-> **Bu dosya her oturumun başında okunur. Her oturumun sonunda güncellenir.**
-> Son güncelleme: 2026-03-06 — Faz 3 tamamlandı
+# EgeSüt ERP — Ana Spec Dosyası v2
+> Her oturumun başında okunur, sonunda güncellenir.
+> Son güncelleme: 2026-03-06 — v2 başlangıcı (test raporu sonrası yeniden yapılanma)
 
 ---
 
-## 0. HIZLI DURUM ÖZETİ
+## 0. GÖREV LİSTESİ — İLERLEME TAKİBİ
 
-| Faz | İçerik | Durum |
-|---|---|---|
-| Faz 1 | Veri modeli, migration'lar, view'lar | ✅ Tamamlandı |
-| Faz 2A | View entegrasyonu, duplikasyon, sürüden çıkış | ✅ Tamamlandı |
-| Faz 2B | Sütten kesme, tohumlanabilir onay | ✅ Tamamlandı |
-| Faz 2C | Frontend hesap temizliği | ✅ Tamamlandı |
-| Faz 3 | İşlem geçmişi, geri alma | ✅ Tamamlandı |
-| Faz 4 | Bildirim sistemi (GitHub Actions) | ✅ Tamamlandı |
-| Faz 5 | Raporlama | ✅ Tamamlandı |
-| Faz 6 | Startup sync ekranı | ❌ Başlanmadı |
+> Tamamlanan görevin yanına `+` koy. Oturum başında buradan devam edilir.
 
-**Bir sonraki oturum:** Faz 4 — GitHub Actions bildirim sistemi
+### BLOK 1 — Backend Temeli (Migration 008)
+```
+[ ] B-01  dogum_kaydet()       stored procedure
+[ ] B-02  tohumlama_kaydet()   stored procedure
+[ ] B-03  kizginlik_kaydet()   stored procedure  (yaş + cinsiyet kontrolü)
+[ ] B-04  hastalik_kaydet()    stored procedure
+[ ] B-05  hayvan_ekle()        stored procedure  (kupe kontrolü + irk sayacı)
+[ ] B-06  abort_kaydet()       stored procedure
+[ ] B-07  islem_log otomatik trigger (her işlemde DB seviyesi)
+[ ] B-08  Doğum sonrası görev trigger'ı (anne protokol + buzağı bakım)
+[ ] B-09  hayvan_durum_view güncelle (notlar, abort_sayisi)
+[ ] B-10  irk_esik.kullanim_sayisi kolonu ekle
+[ ] B-11  hayvanlar.notlar kolonu ekle
+[ ] B-12  Migration 008 push
+```
+
+### BLOK 2 — Supabase JS SDK Geçişi
+```
+[ ] S-01  supabase-js CDN import (index.html head)
+[ ] S-02  api.js oluştur — createClient + tüm sorgu fonksiyonları
+[ ] S-03  sbGet() → db.from().select()
+[ ] S-04  sbPost() → db.from().insert()
+[ ] S-05  sbPatch() → db.from().update()
+[ ] S-06  rpc çağrıları → db.rpc()
+[ ] S-07  Eski fetch/HDR/SB_URL kodunu kaldır
+```
+
+### BLOK 3 — Dosya Bölme
+```
+[ ] F-01  js/api.js    — tüm Supabase çağrıları
+[ ] F-02  js/ui.js     — tüm render/HTML fonksiyonları
+[ ] F-03  js/forms.js  — tüm submit fonksiyonları
+[ ] F-04  js/app.js    — init, routing, global state
+[ ] F-05  index.html   — sadece HTML/CSS + script tag'leri (~1500 satır)
+[ ] F-06  sw.js güncelle — js/*.js cache'e ekle
+```
+
+### BLOK 4 — Özellik Düzeltmeleri
+```
+[ ] O-01  Irk alanı: dropdown (irk_esik) + serbest giriş yan yana
+[ ] O-02  Irk dropdown: kullanim_sayisi DESC sıralı
+[ ] O-03  Kızgınlık: sadece >= 12 ay dişi hayvanlar (backend kontrolü)
+[ ] O-04  Hayvan kartı: Notlar butonu + not ekleme
+[ ] O-05  Geçmiş: HAYVAN_EKLENDI işlemi görünsün
+[ ] O-06  Geçmiş: her satırda ikon + okunabilir metin
+[ ] O-07  Görevler: geciken/bugün/yakın/gelecek renk mantığı
+[ ] O-08  Görevler: gelecek görevler uyarı rengi olmadan listele
+[ ] O-09  Gebelik tab: "Tohumlama Ekle" butonu kaldır
+[ ] O-10  Doğum tab: anne+buzağı listesinde tetiklenen görevler
+[ ] O-11  Abort tab: gebe listele + abort kaydet akışı
+[ ] O-12  Hayvan kartı: abort geçmişi badge göster
+```
+
+### BLOK 5 — Temizlik
+```
+[ ] T-01  DB_VER = 6 (IndexedDB)
+[ ] T-02  yazIslemLog() kaldır (trigger yapıyor artık)
+[ ] T-03  _gecmisFallback() kaldır (islem_log her şeyi yazıyor)
+[ ] T-04  Eski raw fetch kalıntılarını temizle
+[ ] T-05  APP_VERSION güncelle
+```
 
 ---
 
-## 1. TEKNİK ALTYAPI
+## 1. MİMARİ KARAR — "ÇAĞIR & GÖSTER"
 
-### Dosyalar
-| Dosya | Konum | Açıklama |
+```
+┌─────────────────────────────────────────┐
+│  Browser                                │
+│  ┌──────────────┐  ┌─────────────────┐  │
+│  │  HTML / CSS  │  │   JS (4 dosya)  │  │
+│  │  Görsel yapı │  │  Çağır & Göster │  │
+│  │  Değişmez    │  │  Hesap yapmaz   │  │
+│  └──────────────┘  └────────┬────────┘  │
+└───────────────────────────── │ ──────────┘
+                               │ Supabase JS SDK
+┌──────────────────────────────▼──────────┐
+│  Supabase (Gerçek Backend)              │
+│  • Stored Procedures  (iş mantığı)      │
+│  • Triggers           (otomatik log)    │
+│  • Views              (hesap + badge)   │
+│  • islem_log          (tüm geçmiş)      │
+└─────────────────────────────────────────┘
+```
+
+**Tek kural:** Frontend hiçbir şey hesaplamaz.
+1. Supabase'den veri çek
+2. Ekrana bas
+3. Kullanıcı aksiyonunu stored procedure'e gönder
+
+---
+
+## 2. TEKNİK ALTYAPI
+
+### Mevcut Dosyalar
+| Dosya | Durum | Hedef |
 |---|---|---|
-| `index.html` | repo root | Tek dosya uygulama, ~4187 satır |
-| `sw.js` | repo root | Service Worker v13 |
-| `manifest.json` | repo root | PWA manifest |
-| `supabase/migrations/` | repo | 7 migration dosyası |
-| `SPEC.md` | repo root | Bu dosya |
+| `index.html` | ~4484 satır, her şey burada | Sadece HTML/CSS, ~1500 satır |
+| `sw.js` | Service Worker | Yeni JS dosyalarını cache'e alacak |
+| `manifest.json` | PWA | Değişmez |
+| `supabase/migrations/` | 7 dosya | +1 dosya (008) |
 
-### Deployment
-- GitHub Pages — Push → Actions otomatik deploy
-- SW: `index.html` → network-only, statik → cache-first
-- `APP_VERSION = '2026-03-06-a'`
+### Hedef Dosya Yapısı
+```
+index.html          → HTML/CSS + <script src="js/..."> tag'leri
+js/
+  app.js            → init(), goTo(), global state (_A, _S, _curPg...)
+  api.js            → createClient, tüm db sorguları
+  ui.js             → loadDash(), renderAnimals(), loadUreme()...
+  forms.js          → submitBirth() → db.rpc('dogum_kaydet')...
+sw.js               → cache: ['/', '/js/app.js', '/js/api.js', ...]
+```
 
 ### Supabase
 - **URL:** `https://zqnexqbdfvbhlxzelzju.supabase.co`
-- **DB / IndexedDB adı:** `egesut_v9`
-- **IndexedDB version:** `DB_VER = 5`
+- **IndexedDB:** `egesut_v9`, `DB_VER` → 5'ten 6'ya çıkacak
+- **SDK:** `@supabase/supabase-js` v2 CDN — build pipeline yok
 - **RLS:** Kapalı
 
-### IndexedDB TABLES array
+### SDK Kullanım Şekli
 ```javascript
-['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
- 'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu']
+// js/api.js
+const { createClient } = window.supabase
+const db = createClient(SB_URL, SB_KEY)
+
+// Veri çek
+const { data, error } = await db.from('hayvan_durum_view').select('*')
+
+// Stored procedure
+const { data, error } = await db.rpc('dogum_kaydet', {
+  p_anne_id: '...', p_tarih: '...', p_kupe: '...'
+})
+
+// IndexedDB cache — offline için
+await idbClearAndPut('hayvanlar', data)
 ```
 
 ---
 
-## 2. MİMARİ — "BANKA MODELİ"
+## 3. VERİTABANI
 
-### Mimariyle Çelişen Kod (kalan)
-| Sorun | Çözüm | Faz |
-|---|---|---|
-| `bildirimKontrol()` localStorage | `bildirim_log`'a taşı | 4 |
+### Mevcut Migration'lar (Uygulandı)
+| Dosya | İçerik |
+|---|---|
+| 001-005 | Temel şema, FK, trigger'lar |
+| 006 | hayvan_durum_view, irk_esik, bildirim_log, islem_log, kupe_musait_mi() |
+| 007 | updated_at, bos_gun, cikis_yap(), geri_al() |
 
-### ✅ Tüm Çözülen Sorunlar
-- `_gebeGunMap/_bosGunMap` → view'dan `toh_gun/bos_gun`
-- `submitCikis` cascade → `cikis_yap()` stored procedure
-- `islem_log` entegrasyonu → tüm submit* fonksiyonlarında yazılıyor
-- `loadGecmis` → `islem_log`'dan okuyor (fallback: eski tablolar)
-- `updated_at` kolonları → migration 007
-- `bos_gun` view'da → migration 007
+### Migration 008 — Planlanıyor
 
-### Offline Kuralları
-**İzin:** Görüntüleme, doğum/hastalık/tohumlama/kızgınlık kaydı
-**Yasak:** Geri alma, ölüm/satış, sütten kesme, tohumlanabilir onay, bildirim yönetimi
-
----
-
-## 3. VERİTABANI ŞEMASI
-
-### Migration Dosyaları
-| Dosya | İçerik | Durum |
-|---|---|---|
-| `20260303000001` — `20260303000005` | Temel şema, FK, trigger | ✅ |
-| `20260306000006_faz1_core.sql` | View'lar, stored proc, yeni tablolar | ✅ |
-| `20260306000007_faz3.sql` | `updated_at`, `bos_gun`, `cikis_yap()`, `geri_al()` | ✅ Push edilmeli |
-
-### Tablolar — Önemli Güncellemeler
-```
-hayvanlar: + updated_at timestamptz  ← migration 007
-tohumlama, hastalik_log, dogum, gorev_log: + updated_at  ← migration 007
-hayvan_durum_view: + bos_gun  ← migration 007
+**Yeni kolonlar:**
+```sql
+ALTER TABLE hayvanlar ADD COLUMN IF NOT EXISTS notlar text;
+ALTER TABLE irk_esik  ADD COLUMN IF NOT EXISTS kullanim_sayisi integer DEFAULT 0;
 ```
 
-### Stored Procedures
-```
-kupe_musait_mi()  → duplikasyon kontrolü
-cikis_yap()       → ✅ FAZ 3: hayvan pasif + görev kapat + bildirim iptal + islem_log
-geri_al()         → ✅ FAZ 3: snapshot'tan cascade geri dön
+**Stored Procedures:**
+
+`dogum_kaydet(p_anne_id, p_tarih, p_kupe, p_cins, p_tip, p_kg, p_baba, p_hekim_id)`
+- dogum INSERT
+- hayvanlar INSERT (buzağı)
+- gorev_log INSERT × 13 (anne 7 protokol + buzağı 6 bakım)
+- tohumlama UPDATE → sonuc='Doğum Yaptı'
+- RETURNS jsonb {ok, buzagi_id, gorev_sayisi}
+
+`tohumlama_kaydet(p_hayvan_id, p_tarih, p_sperma, p_hekim_id)`
+- Kontrol: cinsiyet=Erkek? yas<365? zaten gebe?
+- tohumlama INSERT
+- gorev_log INSERT × 2 (21. ve 35. gün)
+- stok_hareket INSERT (sperma)
+- irk_esik.kullanim_sayisi UPDATE
+- RETURNS jsonb {ok, mesaj}
+
+`kizginlik_kaydet(p_hayvan_id, p_tarih, p_belirti, p_notlar)`
+- Kontrol: cinsiyet=Erkek? yas<365?
+- kizginlik_log INSERT
+- RETURNS jsonb {ok, mesaj}
+
+`hastalik_kaydet(p_hayvan_id, p_tani, p_kategori, p_siddet, p_semptomlar, p_lokasyon, p_ilaclar jsonb, p_tedavi_gun, p_hekim_id)`
+- hastalik_log INSERT
+- stok_hareket INSERT (her ilaç)
+- gorev_log INSERT (tedavi günleri)
+- RETURNS jsonb {ok, hastalik_id}
+
+`hayvan_ekle(p_kupe_no, p_devlet_kupe, p_irk, p_cinsiyet, p_dogum_tarihi, p_grup, p_padok, p_dogum_kg, p_anne_id, p_baba_bilgi)`
+- kupe_musait_mi() kontrolü
+- hayvanlar INSERT
+- irk_esik.kullanim_sayisi UPDATE
+- RETURNS jsonb {ok, hayvan_id, mesaj}
+
+`abort_kaydet(p_tohumlama_id, p_notlar)`
+- tohumlama UPDATE → sonuc='Abort', abort_notlar=p_notlar
+- hayvanlar UPDATE → tohumlama_durumu=NULL
+- RETURNS jsonb {ok}
+
+**Trigger — islem_log otomatik:**
+```sql
+-- dogum INSERT → islem_log INSERT (DOGUM_KAYDI)
+-- tohumlama INSERT → islem_log INSERT (TOHUMLAMA)
+-- hayvanlar INSERT → islem_log INSERT (HAYVAN_EKLENDI)
+-- tohumlama UPDATE sonuc='Abort' → islem_log INSERT (ABORT_KAYDI)
 ```
 
----
-
-## 4. FRONTEND MİMARİSİ
-
-### Global State
-```javascript
-_A, _S, _curStk, _curPg
-_suruFilter, _suruSiralama
-_curUremeTab, _curGecmisFilter, _curTaskFilter
-// Temizlendi: _gebeIds, _gebeGunMap, _bosGunMap (hepsi kaldırıldı)
-```
-
-### Sayfalar
-```
-pg-gecmis → loadGecmis() — islem_log'dan okur, fallback: eski tablolar
-            Filtreler: Hepsi | Doğum | Tohumlama | Hastalık | Görev | Çıkış
-```
-
-### Modal'lar
-```
-m-geri-al  ✅ YENİ — işlem geri alma onay modalı (ga-hid, ga-ozet)
-```
-
-### Yeni Fonksiyonlar (Faz 3)
-```javascript
-yazIslemLog(tip, anaHayvanId, snapshot)  // tüm submit* sonrası çağrılır
-geriAl(islemLogId, btn)                  // geri_al() RPC çağrısı
-openGeriAl(islemLogId, ozet)             // modal açar
-_gecmisFallback(f)                       // islem_log boşken eski tablolardan göster
-```
-
-### islem_log Tipleri
-```
-DOGUM_KAYDI    ← submitBirth
-TOHUMLAMA      ← submitInsem
-HASTALIK_KAYDI ← submitDisease
-SUTTEN_KESME   ← suttenKesTekil
-OLUM_KAYDI     ← cikis_yap() stored proc (submitCikis)
-SATIS_KAYDI    ← cikis_yap() stored proc (submitCikis)
+**hayvan_durum_view güncellemesi:**
+```sql
+-- notlar kolonu eklenir
+-- abort_sayisi: tohumlama tablosundan COUNT WHERE sonuc='Abort'
 ```
 
 ---
 
-## 5. FAZ PLANI
+## 4. ÖZELLİK DETAYLARI
 
-### ✅ FAZ 3 — İşlem Geçmişi + Geri Alma
-- [x] `DB_VER = 5`, `islem_log` + `cop_kutusu` TABLES'a eklendi
-- [x] `pullFromSupabase()` → `islem_log` çekiyor (son 100 kayıt)
-- [x] `yazIslemLog()` yardımcı fonksiyonu
-- [x] `submitBirth`, `submitInsem`, `submitDisease`, `suttenKesTekil` → `yazIslemLog` çağırıyor
-- [x] `submitCikis` → `cikis_yap()` RPC (stored procedure, atomic)
-- [x] `geriAl()`, `openGeriAl()` fonksiyonları
-- [x] `m-geri-al` modal
-- [x] `loadGecmis()` → `islem_log`'dan okur, fallback var
-- [x] Geçmiş sekmesine `📤 Çıkış` filtresi eklendi
-- [x] Her satırda `🔄 Geri Al` butonu (sadece `durum='aktif'` olanlar)
-- [x] Migration 007: `updated_at`, `bos_gun`, `cikis_yap()`, `geri_al()`
+### Irk Alanı (O-01/02)
+```
+[Holstein ▼] [____________ serbest giriş]
+  Montofon        ↑
+  Simmental   bilinmeyenler buraya
+  ...
+```
+- Sol: `irk_esik` tablosundan, `kullanim_sayisi DESC`
+- Sağ: serbest metin, backend'de `diger` grubuna eklenir
+- Form gönderilince: sol seçildiyse sol değer, sağ yazıldıysa sağ değer
 
-### ✅ FAZ 4 — Bildirim Sistemi
-- [x] `.github/workflows/bildirim_check.yml` — UTC 05,08,11,14,17 (TR 08,11,14,17,20)
-- [x] Tipleri: `tohumlama_yasi`, `suttten_kesme`, `dogum_yaklasti`, `dogum_gecikti`
-- [x] Mükerrer önleme: aynı `(hayvan_id,tip)` beklemedeyse INSERT yapılmaz
-- [x] `pg-bildirim` — Bekleyen/Görüldü tab'ları, aksiyonlar, `bbadge`
-- [x] `bildirimGoruldu()`, `updateBildirimBadge()`, `loadBildirimler()`
-- [x] `bildirimKontrol()` → sadece görev bildirimleri kaldı
-- [x] Secrets gerekli: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
+### Görev Renkleri (O-07/08)
+```
+geciken  (< bugün)    → kırmızı bg, badge'e dahil
+bugün    (= bugün)    → amber bg, badge'e dahil
+yakın    (1-3 gün)    → sarı, uyarı ikonu var, badge'e dahil değil
+gelecek  (> 3 gün)    → normal, uyarı yok, liste görünümü
+```
 
-### ✅ FAZ 5 — Raporlama
-- [x] `pg-raporlar` sayfası + nav butonu (bar ikon)
-- [x] Sürü Dağılımı — IndexedDB'den `hesap_kategori` bazında, offline çalışır
-- [x] Gebelik Özeti — `gebelik_ozet_view` (gebe, bekleyen, doğum yaptı, abort, oran)
-- [x] En Sık Tanılar — `hastalik_istatistik_view` (ilk 8, aktif sayısı ile)
-- [x] Stok Durumu — `stok_tuketim_view` (kritik/tükendi/normal, bar)
-- [x] Offline banner — online olmayan kısımlar için uyarı
-- [x] `_suruDagilimHesapla()` yardımcı fonksiyon
+### Abort Akışı (O-11/12)
+```
+Abort tab açılır
+  → "Gebe Hayvanları Listele" butonu
+  → Liste: gebelik günü ASC, küpe arama
+  → Hayvan seçilir → "Abort Kaydet" butonu
+  → Modal: "⚠️ Bu işlem geri alınamaz. {kupe} hayvanının gebeliği sonlandırılacak."
+  → Onay → abort_kaydet() RPC
+  → Hayvan boş olarak düşer
+  → Hayvan kartında: "⚠️ {n} Abort" kırmızı badge
+```
 
-### ❌ FAZ 6 — Startup Sync Ekranı
-- Queue'da bekleyen varsa ön ekran göster
-- updated_at karşılaştırmayla çakışma tespiti
+### Geçmiş Metin Etiketleri (O-06)
+```
+DOGUM_KAYDI    → "🐄 Doğum Kaydı"
+TOHUMLAMA      → "💉 Tohumlama"
+HASTALIK_KAYDI → "🏥 Hastalık Kaydı"
+HAYVAN_EKLENDI → "🐮 Hayvan Eklendi"
+SUTTEN_KESME   → "🍼 Sütten Kesme"
+SATIS_KAYDI    → "💰 Satış"
+OLUM_KAYDI     → "💀 Ölüm"
+ABORT_KAYDI    → "⚠️ Abort"
+```
+
+---
+
+## 5. SIRALAMA MANTIĞI
+
+```
+BLOK 1 → BLOK 2 → BLOK 3 → BLOK 4 → BLOK 5
+Backend   SDK       Dosya    Özellik  Temizlik
+```
+
+- BLOK 1 olmadan BLOK 4 yapılırsa → frontend'e iş mantığı eklenir, yanlış
+- BLOK 2 olmadan BLOK 3 yapılırsa → dosya bölme yarım kalır
+- BLOK 3 olmadan BLOK 4 yapılırsa → yine 4500 satırlık dosyaya eklenir
+- **Bir oturumda bir blok. Blok ortasında bırakılmaz.**
 
 ---
 
 ## 6. BİLİNEN SORUNLAR
 
-### 🟡 Orta
-| # | Sorun | Çözüm | Faz |
-|---|---|---|---|
-| 1 | `bildirimKontrol()` localStorage | `bildirim_log`'a taşı | 4 |
-| 2 | `cop_kutusu` hiç yazılmıyor | Faz 3'te unuttuk — silme işlemlerinde yazılmalı | 3.5 |
-| 3 | `geri_al()` view'lardan okuma yapamaz (dynamic SQL kısıtı) | Test edilmeli, gerekirse düzelt | Test |
-
-### 🟢 Küçük
-| # | Sorun | Çözüm | Faz |
-|---|---|---|---|
-| 4 | `islem_log` fallback mesajı her zaman görünüyor | İlk kayıt sonrası kaybolur, sorun değil | — |
-| 5 | RLS kapalı | Çoklu kullanıcıya geçince | Gelecek |
-
----
-
-## 7. OTURUM PROTOKOLÜ
-
-Başta: Bölüm 0 özeti → Bölüm 9 başlangıç noktası
-Sonda: Faz durumu güncelle → sorunları ekle → Bölüm 9 yaz → outputs'a kaydet → push
-
----
-
-## 8. BİR SONRAKİ OTURUM BAŞLANGIÇ NOKTASI
-
-**Hedef:** Faz 4 tamamlandı → GitHub'a push + secrets ayarla → Faz 5 Raporlama
-
-**⚠️ Push öncesi yapılacak:**
-1. GitHub repo → Settings → Secrets → `SUPABASE_URL` ve `SUPABASE_SERVICE_KEY` ekle
-   - `SUPABASE_URL` = `https://zqnexqbdfvbhlxzelzju.supabase.co`
-   - `SUPABASE_SERVICE_KEY` = Supabase dashboard → Settings → API → `service_role` key
-2. Push et → Actions sekmesinden `Bildirim Kontrolü` workflow'unu manuel tetikle (`workflow_dispatch`)
-3. Supabase'de `bildirim_log` tablosunu kontrol et — kayıtlar gelmeli
-
-**Faz 5 — Raporlama Planı:**
-- `pg-raporlar` yeni sayfa veya dashboard genişletmesi
-- `gebelik_ozet_view` → gebelik oranı, bekleyen, doğum yaptı
-- `hastalik_istatistik_view` → en sık tanı, aktif/iyileşen dağılımı
-- `stok_tuketim_view` → kritik stoklar, tüketim grafiği
-- Basit bar/donut grafik — Canvas veya inline SVG (dış kütüphane yok)
-
-**Adım 0 — Migration 007'yi push et (henüz yapılmadıysa):**
-```
-supabase/migrations/20260306000007_faz3.sql
-```
-Supabase'e GitHub Actions ile uygulanacak.
-
-**Adım 1 — GitHub Actions workflow dosyası yaz:**
-Dosya: `.github/workflows/bildirim_check.yml`
-- `secrets.SUPABASE_URL` ve `secrets.SUPABASE_SERVICE_KEY` ayarlanmış olmalı
-- Supabase REST API ile `hayvan_durum_view` çek
-- Mükerrer kontrol: `bildirim_log`'da aynı `hayvan_id` + `tip` + `durum=bekliyor` varsa INSERT yapma
-- Tipleri: `tohumlama_yasi`, `suttten_kesme`, `dogum_yaklasti`, `dogum_gecikti`
-
-**Adım 2 — Frontend bildirim ekranı:**
-- Mevcut nav'da bildirim ikonu veya yeni sayfa
-- `bildirim_log` listesi: `durum=bekliyor` olanlar
-- Tohumlama → `✅ Onayla` (submitTohumOnayla çağrısı) + `⏰ Ertele`
-- Sütten kesme → `🍼 Sütten Kes` butonu
-- Okuma onayı: `durum='goruldu'` PATCH
-
-**Adım 3 — bildirimKontrol() temizle:**
-- Görev bildirimleri kısmı kalır
-- Yaşam döngüsü bildirimleri kaldırılır (artık `bildirim_log`'dan okunacak)
-- `setInterval` 1h → 3h
-
-**⚠️ Adım 0.5 — cop_kutusu eklemesi (küçük, Faz 3 artığı):**
-- `submitCikis` (cikis_yap stored proc) zaten islem_log yazıyor — cop_kutusu ayrıca yazılmaya gerek yok
-- Hayvan fiziksel silinmediği için (durum=Pasif) cop_kutusu'na gerek kalmadı — bu özelliği Faz 5+'a ertele
+| # | Sorun | Görev |
+|---|---|---|
+| 1 | Irk serbest giriş | O-01/02 |
+| 2 | Hayvan kaydı geçmişte yok | B-07, O-05 |
+| 3 | Görev sayısı tutarsız | O-07/08 |
+| 4 | Kızgınlık yaş/cinsiyet filtresi yok | B-03, O-03 |
+| 5 | Notlar butonu yok | B-11, O-04 |
+| 6 | Abort tabı çalışmıyor | B-06, O-11/12 |
+| 7 | Geçmiş işlem metin yok | O-06 |
+| 8 | Doğum tab görevler yok | O-10 |
+| 9 | Gebelik tabı ekstra buton | O-09 |
+| 10 | islem_log eksik | B-07 |
