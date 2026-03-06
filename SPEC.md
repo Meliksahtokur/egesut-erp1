@@ -14,7 +14,7 @@
 | Faz 2C | Frontend hesap temizliği | ✅ Tamamlandı |
 | Faz 3 | İşlem geçmişi, geri alma | ✅ Tamamlandı |
 | Faz 4 | Bildirim sistemi (GitHub Actions) | ✅ Tamamlandı |
-| Faz 5 | Raporlama | ❌ Başlanmadı |
+| Faz 5 | Raporlama | ✅ Tamamlandı |
 | Faz 6 | Startup sync ekranı | ❌ Başlanmadı |
 
 **Bir sonraki oturum:** Faz 4 — GitHub Actions bildirim sistemi
@@ -162,9 +162,14 @@ SATIS_KAYDI    ← cikis_yap() stored proc (submitCikis)
 - [x] `bildirimKontrol()` → sadece görev bildirimleri kaldı
 - [x] Secrets gerekli: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
 
-### ❌ FAZ 5 — Raporlama
-- gebelik_ozet_view, hastalik_istatistik_view, stok_tuketim_view grafikleri
-- Dashboard genişletmesi veya yeni "Raporlar" sayfası
+### ✅ FAZ 5 — Raporlama
+- [x] `pg-raporlar` sayfası + nav butonu (bar ikon)
+- [x] Sürü Dağılımı — IndexedDB'den `hesap_kategori` bazında, offline çalışır
+- [x] Gebelik Özeti — `gebelik_ozet_view` (gebe, bekleyen, doğum yaptı, abort, oran)
+- [x] En Sık Tanılar — `hastalik_istatistik_view` (ilk 8, aktif sayısı ile)
+- [x] Stok Durumu — `stok_tuketim_view` (kritik/tükendi/normal, bar)
+- [x] Offline banner — online olmayan kısımlar için uyarı
+- [x] `_suruDagilimHesapla()` yardımcı fonksiyon
 
 ### ❌ FAZ 6 — Startup Sync Ekranı
 - Queue'da bekleyen varsa ön ekran göster
