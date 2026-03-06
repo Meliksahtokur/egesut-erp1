@@ -2,7 +2,7 @@
 <html lang="tr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -298,6 +298,8 @@ button,input,select,textarea{font-family:inherit}
         <button class="fs-btn on" id="sf-tumuu" onclick="setSuruFilter('tumuu',this)">Tümü</button>
         <button class="fs-btn"    id="sf-gebe"  onclick="setSuruFilter('gebe',this)">🤰 Gebe</button>
         <button class="fs-btn"    id="sf-bos"   onclick="setSuruFilter('bos',this)">⬜ Boş</button>
+        <button class="fs-btn"    id="sf-kupe"  onclick="setSirala('kupe',this)" style="color:var(--blue)">🔢 Küpe</button>
+        <button class="fs-btn"    id="sf-yas"   onclick="setSirala('yas',this)" style="color:var(--blue)">📅 Yaş</button>
       </div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -312,6 +314,7 @@ button,input,select,textarea{font-family:inherit}
         <button class="fs-btn" id="ureme-tab-gebelik" onclick="uremeTab('gebelik',this)">🤰 Gebelik</button>
         <button class="fs-btn" id="ureme-tab-dogum" onclick="uremeTab('dogum',this)">🐄 Doğum</button>
         <button class="fs-btn" id="ureme-tab-abort" onclick="uremeTab('abort',this)">⚠️ Abort</button>
+        <button class="fs-btn" id="ureme-tab-suttenkes" onclick="uremeTab('suttenkes',this)">🍼 Sütten Kes</button>
       </div>
       <div id="ureme-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -344,6 +347,18 @@ button,input,select,textarea{font-family:inherit}
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('gorev',this)">✅ Görev</button>
       </div>
       <div id="gecmis-body"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+  <!-- SÜRÜDEN ÇIKANLAR -->
+  <div id="pg-cikanlar" class="pg">
+    <div class="pg-inner">
+      <div class="filter-strip">
+        <button class="fs-btn on" id="cik-tab-hepsi"  onclick="loadCikanlar('hepsi',this)">Tümü</button>
+        <button class="fs-btn"   id="cik-tab-olum"   onclick="loadCikanlar('olum',this)">💀 Ölenler</button>
+        <button class="fs-btn"   id="cik-tab-satis"  onclick="loadCikanlar('satis',this)">💰 Satılanlar</button>
+      </div>
+      <div id="cikanlar-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>
 
@@ -404,6 +419,10 @@ button,input,select,textarea{font-family:inherit}
   <button class="nb" id="nb-gecmis" onclick="goTo('gecmis')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     <span class="nb-lbl">Geçmiş</span>
+  </button>
+  <button class="nb" id="nb-cikanlar" onclick="goTo('cikanlar')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+    <span class="nb-lbl">Çıkanlar</span>
   </button>
   <button class="nb" id="nb-log" onclick="goTo('log')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -670,6 +689,79 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+<!-- SÜRÜDEN ÇIKIŞ (Ölüm / Satış) -->
+<!-- SÜRÜDEN ÇIKIŞ -->
+<div id="m-cikis" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="cikis-title">📤 Sürüden Çıkış</div>
+    <div class="m-body">
+      <input type="hidden" id="cikis-hid">
+      <div class="fg">
+        <label class="flbl">Çıkış Tipi</label>
+        <select id="cikis-tip" class="fsel" onchange="cikisTipDegisti()">
+          <option value="olum">💀 Ölüm</option>
+          <option value="satis">💰 Satış</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Tarih</label><input id="cikis-tarih" class="fi" type="date"></div>
+      <div id="cikis-olum-alan" class="fg">
+        <label class="flbl">Ölüm Sebebi</label>
+        <input id="cikis-sebep" class="fi" placeholder="Hastalık, kaza, yaşlılık…">
+      </div>
+      <div id="cikis-satis-alan" class="fg" style="display:none">
+        <label class="flbl">Satış Fiyatı (₺)</label>
+        <input id="cikis-fiyat" class="fi" type="number" step="1" placeholder="0" inputmode="decimal">
+      </div>
+      <div class="fg"><label class="flbl">Notlar</label><input id="cikis-notlar" class="fi" placeholder="Opsiyonel…"></div>
+      <div style="background:rgba(192,50,26,.07);border:1px solid rgba(192,50,26,.2);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:.78rem;color:var(--red)">
+        ⚠️ Bu işlem hayvanı sürüden çıkarır. Tüm açık görevler kapatılır. İşlem geçmişinden geri alınabilir.
+      </div>
+      <button class="btn" style="background:var(--red);color:#fff;font-weight:700" onclick="submitCikis(this)">📤 Sürüden Çıkar</button>
+      <button class="btn btn-o" onclick="closeM('m-cikis')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOHUMLAMA ERTELE -->
+<div id="m-tohum-ertele" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="te-title">⏰ Tohumlama Ertele</div>
+    <div class="m-body">
+      <input type="hidden" id="te-hid">
+      <div class="fg">
+        <label class="flbl">Kaç ay erteleyelim?</label>
+        <select id="te-ay" class="fsel">
+          <option value="1">1 ay</option>
+          <option value="2">2 ay</option>
+          <option value="3">3 ay</option>
+        </select>
+      </div>
+      <div style="background:rgba(201,125,10,.07);border:1px solid rgba(201,125,10,.2);border-radius:10px;padding:10px 13px;margin-bottom:12px;font-size:.78rem;color:var(--amber)">
+        ⏰ Seçilen süre sonunda tekrar bildirim gelecek.
+      </div>
+      <button class="btn" style="background:var(--amber);color:#fff;font-weight:700" onclick="submitTohumErtele(document.getElementById('te-hid').value,parseInt(document.getElementById('te-ay').value),this)">⏰ Ertele</button>
+      <button class="btn btn-o" onclick="closeM('m-tohum-ertele')">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOPLU SÜTTEN KESME -->
+<div id="m-sutten-kes" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title">🍼 Toplu Sütten Kesme</div>
+    <div class="m-body">
+      <div style="font-size:.82rem;color:var(--ink2);margin-bottom:10px">Sütten kesilecek buzağıları seçin:</div>
+      <div id="sk-liste" style="max-height:280px;overflow-y:auto;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-sm" style="flex:1" onclick="skHepsiniSec(true)">Tümünü Seç</button>
+        <button class="btn btn-sm" style="flex:1" onclick="skHepsiniSec(false)">Temizle</button>
+      </div>
+      <button class="btn btn-g" onclick="skOnayla(this)">🍼 Seçilenleri Sütten Kes</button>
+      <button class="btn btn-o" onclick="closeM('m-sutten-kes')">İptal</button>
+    </div>
+  </div>
+</div>
+
 <!-- STOK GİRİŞİ -->
 <div id="m-stk" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title" id="m-stk-title">📦 Stok Girişi</div>
@@ -864,7 +956,7 @@ const HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'ap
 const HDR_UPSERT = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'};
 const DB_NAME = 'egesut_v9';
 const DB_VER  = 4;
-const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip','kizginlik_log'];
+const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket','gorev_log','buzagi_takip','kizginlik_log','bildirim_log'];
 const MAX_RETRY = 3;
 
 // ══════════════════════════════════════════
@@ -1175,14 +1267,15 @@ setInterval(async()=>{ if(navigator.onLine){ const q=await getQueue(); if(q.leng
 
 async function pullFromSupabase() {
   try {
-    const [animals,tasks,stock,moves,diseases,tohs,births] = await Promise.all([
-      sbGet('hayvanlar','select=*&durum=eq.Aktif'),
+    const [animals,tasks,stock,moves,diseases,tohs,births,bildirims] = await Promise.all([
+      sbGet('hayvan_durum_view','select=*'),           // view'dan çek — badge ve kategori hazır
       sbGet('gorev_log','select=*&tamamlandi=eq.false'),
       sbGet('stok','select=*'),
       sbGet('stok_hareket','select=*&iptal=eq.false'),
       sbGet('hastalik_log','select=*'),
       sbGet('tohumlama','select=*'),
       sbGet('dogum','select=*&order=tarih.desc&limit=50'),
+      sbGet('bildirim_log','select=*&durum=eq.bekliyor'),
     ]);
     await Promise.all([
       idbClearAndPut('hayvanlar',animals),
@@ -1192,6 +1285,7 @@ async function pullFromSupabase() {
       idbClearAndPut('hastalik_log',diseases),
       idbClearAndPut('tohumlama',tohs),
       idbClearAndPut('dogum',births),
+      idbClearAndPut('bildirim_log',bildirims),
     ]);
     document.getElementById('dot').classList.remove('off','warn');
   } catch(e) {
@@ -1217,8 +1311,9 @@ function hideSyncBar() {
 // ══════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════
-let _A=[],_S=[],_curStk=null,_curPg='dash',_gebeIds=[];
-let _suruFilter='tumuu',_gebeGunMap={},_bosGunMap={};
+let _A=[],_S=[],_curStk=null,_curPg='dash';
+let _suruFilter='tumuu',_suruSiralama='kupe';
+let _curUremeTab='kizginlik',_curGecmisFilter='hepsi',_curTaskFilter='today';
 
 async function getData(table,filterFn) {
   const data=await idbGetAll(table);
@@ -1307,6 +1402,7 @@ function goTo(pg){
   if(pg==='tasks')  loadTasks(_curTaskFilter||'today');
   if(pg==='gecmis') loadGecmis(_curGecmisFilter||'hepsi');
   if(pg==='log')    { loadBirths(); loadStokList(); }
+  if(pg==='cikanlar') loadCikanlar('hepsi');
   if(pg==='ureme'){
     const tab=_curUremeTab||'kizginlik';
     document.querySelectorAll('#pg-ureme .fs-btn').forEach(b=>b.classList.remove('on'));
@@ -1397,7 +1493,6 @@ async function showGebe(){
 // ══════════════════════════════════════════
 // TASKS — alt görev desteğiyle
 // ══════════════════════════════════════════
-let _curTaskFilter='today';
 async function loadTasks(f,btn){
   _curTaskFilter=f;
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
@@ -1514,47 +1609,39 @@ async function doneTask(id,hid,stokId,miktar,padok,btn){
 async function loadAnimals(){
   const el=document.getElementById('suru-body');
   try {
-    _A=await getData('hayvanlar',a=>a.durum==='Aktif');
-    const [gebeTohs,tumTohs,dogumlar]=await Promise.all([
-      getData('tohumlama',t=>t.sonuc==='Gebe'),
-      idbGetAll('tohumlama'),
-      idbGetAll('dogum'),
-    ]);
-    _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
-
-    // Gebelik gün haritası: hayvan_id → kaç gündür gebe
-    _gebeGunMap={};
-    gebeTohs.forEach(t=>{
-      _gebeGunMap[t.hayvan_id]=Math.floor((Date.now()-new Date(t.tarih))/86400000);
-    });
-    _A.filter(a=>a.durum==='Gebe'&&!_gebeGunMap[a.id]).forEach(a=>{
-      _gebeGunMap[a.id]=a.tohumlama_tarihi?Math.floor((Date.now()-new Date(a.tohumlama_tarihi))/86400000):0;
-    });
-
-    // Boş gün haritası: son boş tohumlama veya son doğumdan bu yana gün (yetişkin dişi için)
-    _bosGunMap={};
-    const gebeSet=new Set(_gebeIds);
-    _A.filter(a=>!gebeSet.has(a.id)&&(a.cinsiyet==='Dişi'||!a.cinsiyet)).forEach(a=>{
-      const sonBos=tumTohs.filter(t=>t.hayvan_id===a.id&&(t.sonuc==='Boş'||t.sonuc==='Abort'))
-        .sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
-      const sonDogum=dogumlar.filter(d=>d.anne_id===a.id)
-        .sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''))[0];
-      let ref=null;
-      if(sonBos&&sonDogum) ref=sonBos.tarih>sonDogum.tarih?sonBos.tarih:sonDogum.tarih;
-      else if(sonBos) ref=sonBos.tarih;
-      else if(sonDogum) ref=sonDogum.tarih;
-      if(ref) _bosGunMap[a.id]=Math.floor((Date.now()-new Date(ref))/86400000);
-    });
-
-    _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
+    // view'dan gelen veri: durum=Aktif olanlar (Pasif=sürüden çıkmış)
+    // Tüm badge, kategori, gebe/boş gün bilgisi view'dan hazır gelir — frontend hesaplamaz
+    _A=await getData('hayvanlar',a=>a.durum==='Aktif'||(!a.durum));
+    suruSirala();
     renderAnimals(_A);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
+function suruSirala(){
+  if(_suruSiralama==='yas'){
+    _A.sort((a,b)=>{
+      const ag=a.dogum_tarihi?new Date(a.dogum_tarihi).getTime():0;
+      const bg=b.dogum_tarihi?new Date(b.dogum_tarihi).getTime():0;
+      return bg-ag; // küçükten büyüğe = en yeni doğum önce = en küçük yas önce
+    });
+  } else {
+    _A.sort((a,b)=>(a.kupe_no||a.devlet_kupe||a.id||'').localeCompare(b.kupe_no||b.devlet_kupe||b.id||'',undefined,{numeric:true}));
+  }
 }
 
 // ══════════════════════════════════════════
 // YARDIMCI FONKSIYONLAR
 // ══════════════════════════════════════════
 // Gün sayısını "X yıl Y ay Z gün" formatına çevirir (referans tarih yöntemi — /365 ve /30 yuvarlama hatası yok)
+function kategoriTxt(k){
+  const M={'sut_icen':'Süt İçen','suttten_kesilmis':'Sütten Kesilmiş',
+    'kucuk_dana_duve':'Küçük Dana/Düve','buyuk_dana_duve':'Büyük Dana/Düve',
+    'buyuk_duve':'Büyük Düve','gebe_duve_inek':'Gebe',
+    'sagmal_inek':'Sağmal','kuru_donem':'Kuru Dönem',
+    'besi_danasi':'Besi Danası','tosun':'Tosun','suruden_cikti':'Çıktı'};
+  return M[k]||k;
+}
+
 function gunleriFmt(totalDays){
   if(totalDays===null||totalDays===undefined||isNaN(totalDays)) return '';
   totalDays=Math.max(0,Math.floor(Number(totalDays)));
@@ -1586,22 +1673,22 @@ function getDisplayKupe(h,fallback){
 
 function renderAnimals(list){
   const el=document.getElementById('suru-body');
-  const gebeSet=new Set(_gebeIds||[]);
   const today=Date.now();
-  const BOS_YAS_ESIK=365; // Boş tabında sadece >=365 günlük dişiler
+  const BOS_YAS_ESIK=365;
 
   let filtered=list;
   if(_suruFilter==='gebe'){
-    filtered=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe');
-    filtered.sort((a,b)=>((_gebeGunMap[b.id]||0)-(_gebeGunMap[a.id]||0)));
+    filtered=list.filter(a=>a.toh_sonuc==='Gebe');
+    filtered.sort((a,b)=>((b.toh_gun||0)-(a.toh_gun||0)));
   } else if(_suruFilter==='bos'){
     filtered=list.filter(a=>{
-      if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
+      if(a.toh_sonuc==='Gebe') return false;
       if(a.cinsiyet==='Erkek') return false;
       const yas=a.dogum_tarihi?Math.floor((today-new Date(a.dogum_tarihi))/86400000):9999;
       return yas>=BOS_YAS_ESIK;
     });
-    filtered.sort((a,b)=>(_bosGunMap[b.id]!==undefined?_bosGunMap[b.id]:-1)-(_bosGunMap[a.id]!==undefined?_bosGunMap[a.id]:-1));
+    // bos_gun view'dan gelir; yoksa yas_gun ile fallback
+    filtered.sort((a,b)=>((b.bos_gun??b.yas_gun??-1)-(a.bos_gun??a.yas_gun??-1)));
   }
 
   if(!filtered.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
@@ -1611,31 +1698,37 @@ function renderAnimals(list){
     const subId=a.kupe_no&&a.devlet_kupe?`<span style="font-size:.65rem;color:var(--ink3);font-weight:400"> · ${a.devlet_kupe}</span>`:'';
     const init=mainId.replace(/\D/g,'').slice(-3)||mainId.slice(0,2).toUpperCase();
     const yas=yasHesapla(a.dogum_tarihi);
-    const isGebe=gebeSet.has(a.id)||a.durum==='Gebe';
+
+    const isGebe=a.toh_sonuc==='Gebe';
+    const kategori=a.hesap_kategori||a.kategori||'';
 
     let extraBadge='';
     if(isGebe){
-      if(_gebeGunMap[a.id]!==undefined){
-        const kalan=280-_gebeGunMap[a.id];
-        const kalanTxt=kalan<=0
-          ?`<b style="color:var(--red)"> · ⚠️ Doğum ${Math.abs(kalan)} gün gecikmiş!</b>`
-          :kalan<=14?`<b style="color:var(--red)"> · ⚡${kalan}g kaldı</b>`:'';
-        extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 ${gunleriFmt(_gebeGunMap[a.id])}${kalanTxt}</span>`;
-      } else {
-        extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 Gebe</span>`;
-      }
-    } else if(_suruFilter==='bos'&&_bosGunMap[a.id]!==undefined){
-      extraBadge=`<span class="tag" style="background:rgba(201,125,10,.12);color:var(--amber);font-weight:700">⬜ ${gunleriFmt(_bosGunMap[a.id])} boş</span>`;
-    } else if(!isGebe&&_suruFilter!=='bos'){
-      extraBadge='';
+      const gun=a.toh_gun;
+      const kalan=gun!=null?280-gun:null;
+      const kalanTxt=kalan!=null
+        ?(kalan<=0?`<b style="color:var(--red)"> · ⚠️ ${Math.abs(kalan)}g gecikmiş</b>`
+        :kalan<=14?`<b style="color:var(--red)"> · ⚡${kalan}g kaldı</b>`:'')
+        :'';
+      extraBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰${gun!=null?' '+gunleriFmt(gun):''}${kalanTxt}</span>`;
+    } else if(a.tohumlama_bildirisi_gerekli&&a.tohumlama_durumu==='tohumlanabilir'){
+      extraBadge=`<span class="tag" style="background:rgba(42,107,181,.15);color:var(--blue);font-weight:700">💉 Tohumlanabilir</span>`;
+    } else if(a.tohumlama_bildirisi_gerekli&&!a.tohumlama_durumu){
+      extraBadge=`<span class="tag" style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700">💉 Onay Bekliyor</span>`;
+    } else if(_suruFilter==='bos'&&a.bos_gun!=null){
+      extraBadge=`<span class="tag" style="background:rgba(201,125,10,.12);color:var(--amber);font-weight:700">⬜ ${gunleriFmt(a.bos_gun)} boş</span>`;
     }
+
+    const katBadge=kategori&&kategori!=='diger'
+      ?`<span class="tag" style="background:rgba(61,74,50,.1);color:var(--ink2);font-size:.55rem">${kategoriTxt(kategori)}</span>`
+      :'';
 
     return `<div class="animal-card" onclick="openDet('${a.id}')">
       <div class="avt">${init}</div>
       <div class="ainfo">
         <div class="a-id">${mainId}${subId}</div>
         <div class="a-sub">${a.irk||'—'}${yas?' · '+yas:''}</div>
-        <div class="a-tags"><span class="tag tb">📍 ${a.padok||'Padok?'}</span><span class="tag tk">${a.grup||'Grup?'}</span>${extraBadge}</div>
+        <div class="a-tags"><span class="tag tb">📍 ${a.padok||'Padok?'}</span><span class="tag tk">${a.grup||'Grup?'}</span>${katBadge}${extraBadge}</div>
       </div>
       <svg class="a-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
     </div>`;
@@ -1645,15 +1738,14 @@ function renderAnimals(list){
 
 function updatePadokOzet(list){
   const el=document.getElementById('padok-ozet'); if(!el) return;
-  const gebeSet=new Set(_gebeIds||[]);
   const padok=document.getElementById('pflt')?.value;
   if(!list.length){ el.innerHTML=''; return; }
   const toplam=list.length;
   const disi=list.filter(a=>a.cinsiyet==='Dişi'||!a.cinsiyet).length;
   const erkek=list.filter(a=>a.cinsiyet==='Erkek').length;
-  const gebe=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe').length;
+  const gebe=list.filter(a=>a.toh_sonuc==='Gebe').length;
   const bos=list.filter(a=>{
-    if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
+    if(a.toh_sonuc==='Gebe') return false;
     if(a.cinsiyet==='Erkek') return false;
     const yas=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):9999;
     return yas>=365;
@@ -1667,7 +1759,6 @@ function updatePadokOzet(list){
     html+=chip(`Gebe: ${gebe}`,'rgba(78,154,42,.8)')+chip(`Boş: ${bos}`,'rgba(180,140,0,.7)');
   }
   el.innerHTML=html;
-  // Filtre butonlarındaki sayıları güncelle
   const btnT=document.getElementById('sf-tumuu');
   const btnG=document.getElementById('sf-gebe');
   const btnB=document.getElementById('sf-bos');
@@ -1680,6 +1771,15 @@ function setSuruFilter(f,btn){
   _suruFilter=f;
   document.querySelectorAll('#pg-suru .fs-btn').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
+  applyAnimalFilter();
+}
+
+function setSirala(tip,btn){
+  _suruSiralama=tip;
+  // Sıralama butonlarını işaretle (renkleri koru)
+  document.getElementById('sf-kupe')?.classList.toggle('on',tip==='kupe');
+  document.getElementById('sf-yas')?.classList.toggle('on',tip==='yas');
+  suruSirala();
   applyAnimalFilter();
 }
 
@@ -1698,7 +1798,6 @@ function srchDropdown(){
   const ac=document.getElementById('ac-srch');
   if(!ac) return;
   if(!q){ ac.style.display='none'; return; }
-  const gebeSet=new Set(_gebeIds||[]);
   const matches=_A.filter(a=>{
     const k=(a.kupe_no||'').toLowerCase(), d=(a.devlet_kupe||'').toLowerCase();
     return k.includes(q)||d.includes(q)||(a.irk||'').toLowerCase().includes(q);
@@ -1707,8 +1806,7 @@ function srchDropdown(){
   ac.innerHTML=matches.map(a=>{
     const main=a.kupe_no||a.devlet_kupe||a.id;
     const sub=a.kupe_no&&a.devlet_kupe?` · <span style="color:#aaa">${a.devlet_kupe}</span>`:'';
-    const isGebe=gebeSet.has(a.id)||a.durum==='Gebe';
-    const badge=isGebe?'<span style="background:rgba(78,154,42,.15);color:var(--green);border-radius:5px;padding:1px 5px;font-size:.62rem;font-weight:700;margin-left:4px">🤰</span>':'';
+    const badge=a.toh_sonuc==='Gebe'?'<span style="background:rgba(78,154,42,.15);color:var(--green);border-radius:5px;padding:1px 5px;font-size:.62rem;font-weight:700;margin-left:4px">🤰</span>':'';
     return `<div onclick="srchSec('${a.id}','${main}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
       <div><span style="font-weight:700;font-size:.85rem">${main}</span>${sub}${badge}</div>
       <span style="font-size:.68rem;color:#aaa">${a.padok||''}</span>
@@ -1835,10 +1933,205 @@ async function openDet(id){
       ?tasks.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); return renderTask(t,t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':'',ts); }).join('')
       :'<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>');
 
+    // Sürüden çıkış butonu — her aktif hayvan kartında
+    const cikisHtml=`<div style="border-top:1px solid var(--card2);margin-top:16px;padding-top:12px;display:flex;gap:8px">
+      <button onclick="openCikis('${a.id}','${getDisplayKupe(a)}')" style="flex:1;padding:10px;background:rgba(192,50,26,.08);border:1px solid rgba(192,50,26,.2);border-radius:10px;color:var(--red);font-weight:700;font-size:.8rem;cursor:pointer">
+        💀 Ölüm Kaydı
+      </button>
+      <button onclick="openCikis('${a.id}','${getDisplayKupe(a)}','satis')" style="flex:1;padding:10px;background:rgba(42,107,181,.08);border:1px solid rgba(42,107,181,.2);border-radius:10px;color:var(--blue);font-weight:700;font-size:.8rem;cursor:pointer">
+        💰 Satış Kaydı
+      </button>
+    </div>`;
+
+    // Sütten kesme butonu — sadece sut_icen kategorisindeyse
+    const suttenKesHtml=a.hesap_kategori==='sut_icen'
+      ?`<div style="margin-top:8px">
+          <button onclick="suttenKesTekil('${a.id}',this)" style="width:100%;padding:10px;background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.2);border-radius:10px;color:var(--green);font-weight:700;font-size:.8rem;cursor:pointer">
+            🍼 Sütten Kes
+          </button>
+        </div>`
+      :'';
+
+    // Tohumlanabilir onay butonları — bildirim gerekiyorsa göster
+    let tohumOnayHtml='';
+    if(a.tohumlama_bildirisi_gerekli&&a.tohumlama_durumu!=='tohumlanabilir'){
+      const badge=a.tohumlama_durumu==='ertelendi'
+        ?`<span style="display:inline-block;background:rgba(201,125,10,.12);color:var(--amber);border-radius:7px;padding:3px 9px;font-size:.75rem;font-weight:700;margin-bottom:6px">⏰ Ertelendi — ${fmtTarih(a.tohumlama_onay_tarihi)}'e kadar</span>`
+        :`<span style="display:inline-block;background:rgba(201,125,10,.12);color:var(--amber);border-radius:7px;padding:3px 9px;font-size:.75rem;font-weight:700;margin-bottom:6px">💉 Tohumlama Onayı Bekliyor</span>`;
+      tohumOnayHtml=`<div style="margin-top:8px;background:var(--card2);border-radius:10px;padding:10px 12px">
+        ${badge}
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button onclick="submitTohumOnayla('${a.id}',this)" style="flex:1;padding:8px;background:rgba(42,107,181,.1);border:1px solid rgba(42,107,181,.3);border-radius:8px;color:var(--blue);font-weight:700;font-size:.78rem;cursor:pointer">
+            ✅ Tohumlanabilir Onayla
+          </button>
+          <button onclick="openTohumErtele('${a.id}','${getDisplayKupe(a)}')" style="flex:1;padding:8px;background:rgba(201,125,10,.1);border:1px solid rgba(201,125,10,.3);border-radius:8px;color:var(--amber);font-weight:700;font-size:.78rem;cursor:pointer">
+            ⏰ Ertele
+          </button>
+        </div>
+      </div>`;
+    } else if(a.tohumlama_durumu==='tohumlanabilir'){
+      tohumOnayHtml=`<div style="margin-top:8px;background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.15);border-radius:10px;padding:10px 12px;font-size:.8rem;color:var(--blue)">
+        <b>💉 Tohumlanabilir</b> — Onaylandı: ${fmtTarih(a.tohumlama_onay_tarihi)||'—'}
+      </div>`;
+    }
+
+    document.getElementById('tab-ozet').innerHTML+=suttenKesHtml+tohumOnayHtml+cikisHtml;
+
   } catch(e){ document.getElementById('det-name').textContent='Hata: '+e.message; }
 }
 
 function closeDet(){ document.getElementById('det').classList.remove('on'); }
+
+// ══════════════════════════════════════════
+// SÜRÜDEN ÇIKIŞ
+// ══════════════════════════════════════════
+function openCikis(hayvanId, kupe, tip='olum'){
+  document.getElementById('cikis-hid').value=hayvanId;
+  document.getElementById('cikis-title').textContent=tip==='satis'?`💰 Satış Kaydı — ${kupe}`:`💀 Ölüm Kaydı — ${kupe}`;
+  document.getElementById('cikis-tip').value=tip;
+  document.getElementById('cikis-tarih').value=new Date().toISOString().split('T')[0];
+  document.getElementById('cikis-sebep').value='';
+  document.getElementById('cikis-fiyat').value='';
+  document.getElementById('cikis-notlar').value='';
+  cikisTipDegisti();
+  openM('m-cikis');
+}
+function cikisTipDegisti(){
+  const tip=document.getElementById('cikis-tip').value;
+  document.getElementById('cikis-olum-alan').style.display=tip==='olum'?'':'none';
+  document.getElementById('cikis-satis-alan').style.display=tip==='satis'?'':'none';
+}
+async function submitCikis(btn){
+  if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli — offline kayıt yapılamaz',true); return; }
+  const hayvanId=document.getElementById('cikis-hid').value;
+  const tip=document.getElementById('cikis-tip').value;
+  const tarih=document.getElementById('cikis-tarih').value;
+  const sebep=document.getElementById('cikis-sebep').value.trim();
+  const fiyat=parseFloat(document.getElementById('cikis-fiyat').value)||null;
+  const notlar=document.getElementById('cikis-notlar').value.trim();
+  if(!tarih){ toast('Tarih zorunlu',true); return; }
+  if(tip==='olum'&&!sebep){ toast('Ölüm sebebi girin',true); return; }
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  try {
+    const hayvan=_A.find(a=>a.id===hayvanId);
+    if(!hayvan){ toast('Hayvan bulunamadı',true); return; }
+
+    // 1. Hayvanı sürüden çıkar
+    await write('hayvanlar',{
+      durum:'Pasif',
+      cikis_tipi:tip,
+      cikis_tarihi:tarih,
+      cikis_sebebi:tip==='olum'?sebep:notlar||null,
+      satis_fiyati:tip==='satis'?fiyat:null,
+    },'PATCH',`id=eq.${hayvanId}`);
+
+    // 2. Açık görevleri kapat
+    const acikGorevler=await getData('gorev_log',g=>g.hayvan_id===hayvanId&&!g.tamamlandi&&!g.iptal);
+    for(const g of acikGorevler){
+      await write('gorev_log',{iptal:true,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString()},'PATCH',`id=eq.${g.id}`);
+    }
+
+    // 3. Bildirimleri kapat
+    const acikBildirimler=await getData('bildirim_log',b=>b.hayvan_id===hayvanId&&b.durum==='bekliyor');
+    for(const b of acikBildirimler){
+      await write('bildirim_log',{durum:'iptal'},'PATCH',`id=eq.${b.id}`);
+    }
+
+    const tipTxt=tip==='olum'?'Ölüm':'Satış';
+    toast(`✅ ${getDisplayKupe(hayvan)} sürüden çıkarıldı (${tipTxt})`);
+    closeM('m-cikis');
+    closeDet();
+    await renderFromLocal();
+  } catch(e){ toast(e.message,true); } finally { if(btn){btn.disabled=false;btn.textContent='📤 Sürüden Çıkar';} }
+}
+
+// ══════════════════════════════════════════
+// SÜTTEN KESME
+// ══════════════════════════════════════════
+async function submitSuttenKes(hayvanIdList, btn){
+  if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli',true); return; }
+  if(!hayvanIdList||!hayvanIdList.length){ toast('Hayvan seçilmedi',true); return; }
+  if(!confirm(`${hayvanIdList.length} buzağı sütten kesilecek. Onaylıyor musunuz?`)) return;
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  const bugun=new Date().toISOString().split('T')[0];
+  let basari=0;
+  try {
+    for(const id of hayvanIdList){
+      const h=_A.find(a=>a.id===id);
+      if(!h||h.hesap_kategori!=='sut_icen') continue;
+      await write('hayvanlar',{suttten_kesme_tarihi:bugun},'PATCH',`id=eq.${id}`);
+      basari++;
+    }
+    toast(`✅ ${basari} buzağı sütten kesildi`);
+    closeM('m-sutten-kes');
+    await refreshAll();
+  } catch(e){ toast(e.message,true); }
+  finally { if(btn){btn.disabled=false;btn.textContent='🍼 Sütten Kes';} }
+}
+
+async function suttenKesTekil(hayvanId, btn){
+  if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli',true); return; }
+  const h=_A.find(a=>a.id===hayvanId);
+  if(!h){ toast('Hayvan bulunamadı',true); return; }
+  if(h.hesap_kategori!=='sut_icen'){ toast('Bu hayvan süt içen kategorisinde değil',true); return; }
+  if(!confirm(`${getDisplayKupe(h)} sütten kesilecek. Onaylıyor musunuz?`)) return;
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  const bugun=new Date().toISOString().split('T')[0];
+  try {
+    await write('hayvanlar',{suttten_kesme_tarihi:bugun},'PATCH',`id=eq.${hayvanId}`);
+    toast(`✅ ${getDisplayKupe(h)} sütten kesildi`);
+    closeDet();
+    await refreshAll();
+  } catch(e){ toast(e.message,true); }
+  finally { if(btn){btn.disabled=false;btn.textContent='🍼 Sütten Kes';} }
+}
+
+// ══════════════════════════════════════════
+// TOHUMLANABILIR ONAY
+// ══════════════════════════════════════════
+async function submitTohumOnayla(hayvanId, btn){
+  if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli',true); return; }
+  const h=_A.find(a=>a.id===hayvanId);
+  if(!h){ toast('Hayvan bulunamadı',true); return; }
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  const bugun=new Date().toISOString().split('T')[0];
+  try {
+    await write('hayvanlar',{
+      tohumlama_durumu:'tohumlanabilir',
+      tohumlama_onay_tarihi:bugun
+    },'PATCH',`id=eq.${hayvanId}`);
+    toast(`✅ ${getDisplayKupe(h)} tohumlanabilir olarak onaylandı`);
+    closeDet();
+    await refreshAll();
+  } catch(e){ toast(e.message,true); }
+  finally { if(btn){btn.disabled=false;btn.textContent='✅ Tohumlanabilir Onayla';} }
+}
+
+async function submitTohumErtele(hayvanId, ay, btn){
+  if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli',true); return; }
+  const h=_A.find(a=>a.id===hayvanId);
+  if(!h){ toast('Hayvan bulunamadı',true); return; }
+  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  const erteleme=dFwd(new Date().toISOString().split('T')[0], ay*30);
+  try {
+    await write('hayvanlar',{
+      tohumlama_durumu:'ertelendi',
+      tohumlama_onay_tarihi:erteleme
+    },'PATCH',`id=eq.${hayvanId}`);
+    toast(`✅ ${getDisplayKupe(h)} tohumlama ${ay} ay ertelendi`);
+    closeM('m-tohum-ertele');
+    closeDet();
+    await refreshAll();
+  } catch(e){ toast(e.message,true); }
+  finally { if(btn){btn.disabled=false;btn.textContent='⏰ Ertele';} }
+}
+
+function openTohumErtele(hayvanId, kupe){
+  document.getElementById('te-hid').value=hayvanId;
+  document.getElementById('te-title').textContent=`⏰ Tohumlama Ertele — ${kupe}`;
+  document.getElementById('te-ay').value='1';
+  openM('m-tohum-ertele');
+}
 function showTab(name,btn){
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
@@ -2256,21 +2549,37 @@ async function submitDisease(btn){
 async function submitAnimal(btn){
   const devlet=v('a-devlet').trim(), kupe=v('a-kupe').trim();
   if(!devlet&&!kupe){ toast('Devlet küpesi veya işletme küpesi girin',true); return; }
-  if(btn){btn.disabled=true;btn.textContent='Kaydediliyor…';}
+  if(btn){btn.disabled=true;btn.textContent='Kontrol ediliyor…';}
   try {
-    // Otomatik ID: mevcut sayıya göre
+    // Backend duplikasyon kontrolü (kupe_musait_mi fonksiyonu)
+    if(navigator.onLine){
+      const chk=await fetch(`${SB_URL}/rest/v1/rpc/kupe_musait_mi`,{
+        method:'POST',
+        headers:{...HDR,'Content-Type':'application/json'},
+        body:JSON.stringify({p_kupe_no:kupe||null,p_devlet_kupe:devlet||null})
+      }).then(r=>r.json());
+      if(chk&&!chk.musait){
+        const hangi=chk.kupe_cakisma_id?`İşletme küpesi "${kupe}"`:`Devlet küpesi "${devlet}"`;
+        toast(`⚠️ ${hangi} zaten kayıtlı`,true);
+        return;
+      }
+    } else {
+      // Offline: yerel kontrol
+      const existing=await idbGetAll('hayvanlar');
+      const dup=existing.find(a=>(kupe&&a.kupe_no===kupe)||(devlet&&a.devlet_kupe===devlet));
+      if(dup){ toast(`⚠️ Bu küpe numarası zaten kayıtlı`,true); return; }
+    }
+
+    if(btn) btn.textContent='Kaydediliyor…';
     const existing=await idbGetAll('hayvanlar');
     const autoId='H'+(String(existing.length+1).padStart(4,'0'));
     const primaryKupe=devlet||kupe;
-
-    const dupCheck=existing.filter(a=>a.devlet_kupe===devlet&&devlet||a.kupe_no===kupe&&kupe);
-    if(dupCheck.length){ toast('⚠️ Bu küpe zaten kayıtlı',true); return; }
 
     await write('hayvanlar',{
       id:autoId,devlet_kupe:devlet||null,kupe_no:kupe||null,irk:v('a-irk'),
       dogum_tarihi:v('a-dt')||null,cinsiyet:v('a-cinsiyet')||null,
       grup:v('a-grup'),padok:v('a-padok'),durum:'Aktif',
-      // Fiziksel özellikler
+      kategori:'sut_icen',  // yeni hayvan varsayılan kategori
       dogum_kg:parseFloat(v('a-dkg'))||null,
       canli_agirlik:parseFloat(v('a-agirlik'))||null,
       boy:parseFloat(v('a-boy'))||null,
@@ -2429,7 +2738,47 @@ document.addEventListener('click',e=>{
 // ══════════════════════════════════════════
 // GEÇMİŞ SEKMESİ
 // ══════════════════════════════════════════
-let _curGecmisFilter='hepsi';
+// ══════════════════════════════════════════
+// SÜRÜDEN ÇIKANLAR
+// ══════════════════════════════════════════
+async function loadCikanlar(f='hepsi', btn){
+  if(btn){
+    document.querySelectorAll('#pg-cikanlar .fs-btn').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  const el=document.getElementById('cikanlar-body');
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  try {
+    const list=await getData('hayvanlar',a=>a.durum==='Pasif'||a.cikis_tipi);
+    const filtered=f==='hepsi'?list:list.filter(a=>a.cikis_tipi===f);
+    filtered.sort((a,b)=>(b.cikis_tarihi||'').localeCompare(a.cikis_tarihi||''));
+
+    if(!filtered.length){
+      el.innerHTML=`<div class="empty"><div class="empty-ico">${f==='olum'?'💀':f==='satis'?'💰':'📭'}</div>${f==='olum'?'Ölüm':'Satış'} kaydı yok</div>`;
+      return;
+    }
+
+    const CS='background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px';
+    el.innerHTML=filtered.map(a=>{
+      const kupe=getDisplayKupe(a);
+      const yas=a.dogum_tarihi?yasHesapla(a.dogum_tarihi):'';
+      const tipIco=a.cikis_tipi==='olum'?'💀':'💰';
+      const tipRenk=a.cikis_tipi==='olum'?'var(--red)':'var(--blue)';
+      const detay=a.cikis_tipi==='satis'
+        ?(a.satis_fiyati?`${Number(a.satis_fiyati).toLocaleString('tr-TR')} ₺`:'Fiyat girilmedi')
+        :(a.cikis_sebebi||'Sebep belirtilmedi');
+      return `<div style="${CS}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-weight:700;color:var(--ink)">${tipIco} ${kupe}</span>
+          <span style="font-size:.68rem;color:var(--ink3)">${fmtTarih(a.cikis_tarihi)||'—'}</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--ink2)">${a.irk||'—'}${yas?' · '+yas:''}</div>
+        <div style="font-size:.72rem;color:${tipRenk};margin-top:3px;font-weight:600">${detay}</div>
+      </div>`;
+    }).join('');
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+}
+
 async function loadGecmis(f,btn){
   _curGecmisFilter=f;
   if(btn){ document.querySelectorAll('#pg-gecmis .fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
@@ -3152,7 +3501,6 @@ function openMWithHayvan(modalId, inputId, kupeNo){
 // ══════════════════════════════════════════
 // ÜREME SEKMESİ
 // ══════════════════════════════════════════
-let _curUremeTab='kizginlik';
 function uremeTab(tab, btn){
   _curUremeTab=tab;
   document.querySelectorAll('#pg-ureme .fs-btn').forEach(b=>b.classList.remove('on'));
@@ -3313,8 +3661,58 @@ async function loadUreme(tab='kizginlik'){
       }).join(''):'<div class="empty"><div class="empty-ico">⚠️</div>Abort kaydı yok</div>');
     }
 
+    else if(tab==='suttenkes'){
+      const sutIcenler=_A.filter(a=>a.hesap_kategori==='sut_icen');
+      if(!sutIcenler.length){
+        el.innerHTML='<div class="empty"><div class="empty-ico">🍼</div>Süt içen buzağı yok</div>';
+      } else {
+        el.innerHTML=`
+          <div style="padding:10px 0 6px;display:flex;gap:8px;align-items:center">
+            <div style="font-size:.82rem;color:var(--ink2);flex:1">${sutIcenler.length} süt içen buzağı</div>
+            <button class="btn btn-g" style="padding:8px 14px;font-size:.8rem" onclick="openSuttenKesModal()">🍼 Toplu Sütten Kes</button>
+          </div>
+          <div id="sk-on-liste">
+          ${sutIcenler.map(a=>{
+            const yas=yasHesapla(a.dogum_tarihi);
+            return `<div style="${CS}" onclick="openDet('${a.id}')">
+              <div class="hist-dot" style="background:rgba(78,154,42,.5);margin-top:4px"></div>
+              <div class="hist-main">
+                <div class="hist-title">${getDisplayKupe(a)} — ${a.irk||'—'}</div>
+                <div class="hist-sub">${yas||'Yaş bilinmiyor'} · Doğum: ${fmtTarih(a.dogum_tarihi)||'—'}</div>
+              </div>
+            </div>`;
+          }).join('')}
+          </div>`;
+      }
+    }
+
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
   finally { clearTimeout(safety); }
+}
+
+// ══════════════════════════════════════════
+// TOPLU SÜTTEN KESME MODAL YARDIMCIları
+// ══════════════════════════════════════════
+function openSuttenKesModal(){
+  const sutIcenler=_A.filter(a=>a.hesap_kategori==='sut_icen');
+  if(!sutIcenler.length){ toast('Süt içen buzağı yok'); return; }
+  const liste=document.getElementById('sk-liste');
+  liste.innerHTML=sutIcenler.map(a=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--card2);cursor:pointer">
+      <input type="checkbox" data-id="${a.id}" checked style="width:18px;height:18px;cursor:pointer">
+      <div>
+        <div style="font-weight:700;font-size:.85rem">${getDisplayKupe(a)}</div>
+        <div style="font-size:.72rem;color:var(--ink3)">${a.irk||'—'} · ${yasHesapla(a.dogum_tarihi)||'Yaş?'}</div>
+      </div>
+    </label>`).join('');
+  openM('m-sutten-kes');
+}
+function skHepsiniSec(durum){
+  document.querySelectorAll('#sk-liste input[type=checkbox]').forEach(cb=>cb.checked=durum);
+}
+async function skOnayla(btn){
+  const secili=[...document.querySelectorAll('#sk-liste input[type=checkbox]:checked')].map(cb=>cb.dataset.id);
+  await submitSuttenKes(secili,btn);
 }
 
 // Tohumlama sekmesinde arama
@@ -3608,7 +4006,7 @@ if(localStorage.getItem('bildirim_aktif')==='1'){
 }
 
 // ── App versiyonu — her deploy'da değiştir ──
-const APP_VERSION = '2025-03-05-c';
+const APP_VERSION = '2026-03-06-a';
 
 // Service Worker — production only
 if('serviceWorker' in navigator){
