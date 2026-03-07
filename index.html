@@ -588,38 +588,62 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-animal" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">➕ Yeni Hayvan</div>
     <div class="m-body">
-      <div class="fg">
-        <label class="flbl">Devlet Küpe No</label>
-        <div class="fhint">İkisinden biri yeterli. Devlet küpesi varsa girin.</div>
-        <input id="a-devlet" class="fi" placeholder="TR-1234567" autocomplete="off">
-      </div>
-      <div class="fg">
-        <label class="flbl">İşletme Küpe No</label>
-        <div class="fhint">Devlet küpesi yoksa işletme küpesi zorunludur.</div>
-        <input id="a-kupe" class="fi" placeholder="001" autocomplete="off">
-      </div>
-      <div class="fg"><label class="flbl">Irk</label><input id="a-irk" class="fi" placeholder="Holstein, Simmental, Montofon…" autocomplete="off"></div>
+      <!-- KÜPE -->
       <div class="r2">
-        <div class="fg"><label class="flbl">Doğum Tarihi</label><input id="a-dt" class="fi" type="date"></div>
-        <div class="fg"><label class="flbl">Cinsiyet</label>
-          <select id="a-cinsiyet" class="fsel"><option>Dişi</option><option>Erkek</option></select>
+        <div class="fg">
+          <label class="flbl">Devlet Küpe No</label>
+          <input id="a-devlet" class="fi" placeholder="TR-1234567" autocomplete="off">
+        </div>
+        <div class="fg">
+          <label class="flbl">İşletme Küpe No</label>
+          <input id="a-kupe" class="fi" placeholder="001" autocomplete="off">
         </div>
       </div>
+      <div style="font-size:.62rem;color:var(--ink3);margin-top:-8px;margin-bottom:10px">İkisinden biri zorunlu. İkisi de girilirse ikisi de kaydedilir.</div>
+
+      <!-- CİNSİYET + DOĞUM TARİHİ -->
       <div class="r2">
-        <div class="fg"><label class="flbl">Grup</label>
-          <select id="a-grup" class="fsel">
-            <option>Sağmal</option><option>Kuru</option><option>Gebe Düve</option>
-            <option>Düve</option><option>Süt İçen Buzağılar</option><option>Sütten Kesilmiş Buzağılar</option>
+        <div class="fg">
+          <label class="flbl">Cinsiyet *</label>
+          <select id="a-cinsiyet" class="fsel" onchange="animalFormGuncelle()">
+            <option value="">Seçin</option>
+            <option value="Dişi">Dişi</option>
+            <option value="Erkek">Erkek</option>
           </select>
         </div>
-        <div class="fg"><label class="flbl">Padok</label>
-          <select id="a-padok" class="fsel">
-            <option>Sağmal Padok</option><option>Kuru/Gebe Padok</option>
-            <option>Düve Padok (Büyük)</option><option>Düve Padok (Küçük)</option>
-            <option>Buzağı Ahırı</option>
-          </select>
+        <div class="fg">
+          <label class="flbl">Doğum Tarihi</label>
+          <input id="a-dt" class="fi" type="date" onchange="animalFormGuncelle()">
         </div>
       </div>
+
+      <!-- IRK -->
+      <div class="fg">
+        <label class="flbl">Irk</label>
+        <select id="a-irk-sel" class="fsel" onchange="irkSecimDegisti()">
+          <option value="">Yükleniyor…</option>
+        </select>
+        <input id="a-irk-txt" class="fi" placeholder="Irk adı yazın…" autocomplete="off"
+          style="display:none;margin-top:6px">
+      </div>
+
+      <!-- GRUP — cinsiyet/yaşa göre dinamik -->
+      <div class="fg" id="a-grup-wrap">
+        <label class="flbl">Grup *</label>
+        <select id="a-grup" class="fsel" onchange="animalGrupDegisti()">
+          <option value="">Önce cinsiyet seçin</option>
+        </select>
+        <div id="a-grup-hint" style="font-size:.62rem;color:var(--amber);margin-top:3px;display:none"></div>
+      </div>
+
+      <!-- PADOK — gruba göre dinamik -->
+      <div class="fg" id="a-padok-wrap">
+        <label class="flbl">Padok *</label>
+        <select id="a-padok" class="fsel">
+          <option value="">Önce grup seçin</option>
+        </select>
+      </div>
+
       <!-- FİZİKSEL ÖZELLİKLER -->
       <div style="margin:14px 0 6px;font-size:.72rem;font-weight:800;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase">📐 Fiziksel Özellikler</div>
       <div class="r2">
