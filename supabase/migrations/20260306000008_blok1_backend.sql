@@ -523,11 +523,8 @@ CREATE TRIGGER trg_islem_kizginlik
 -- 10. HAYVAN_DURUM_VIEW GÜNCELLEMESİ
 -- notlar ve abort_sayisi eklendi
 -- ──────────────────────────────────────────────────────────────
+DROP VIEW IF EXISTS public.hayvan_durum_view CASCADE;
 CREATE OR REPLACE VIEW public.hayvan_durum_view AS
-WITH yas AS (
-  SELECT
-    h.id, h.kupe_no, h.devlet_kupe, h.irk, h.cinsiyet, h.dogum_tarihi,
-    h.grup, h.padok, h.durum, h.anne_id, h.kategori, h.notlar,
     h.tohumlama_durumu, h.tohumlama_onay_tarihi, h.suttten_kesme_tarihi,
     h.cikis_tipi, h.cikis_tarihi,
     CASE WHEN h.dogum_tarihi IS NOT NULL THEN CURRENT_DATE - h.dogum_tarihi ELSE NULL END AS yas_gun,
