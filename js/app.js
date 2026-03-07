@@ -271,46 +271,48 @@ function animalFormGuncelle() {
   let yasGun = null;
   if (dt) yasGun = Math.floor((Date.now() - new Date(dt)) / 86400000);
 
-  // Grup seçeneklerini belirle
   let gruplar = [];
+
   if (!cinsiyet) {
     grupSel.innerHTML = '<option value="">Önce cinsiyet seçin</option>';
     g('a-padok').innerHTML = '<option value="">Önce grup seçin</option>';
+    if (hint) hint.style.display = 'none';
     return;
   }
 
   if (cinsiyet === 'Dişi') {
     if (yasGun !== null && yasGun <= 75)
       gruplar = ['Süt İçen Buzağı'];
-    else if (yasGun !== null && yasGun <= 180)
+    else if (yasGun !== null && yasGun > 75 && yasGun <= 180)
       gruplar = ['Sütten Kesilmiş Buzağı'];
-    else if (yasGun !== null && yasGun <= 365)
+    else if (yasGun !== null && yasGun > 180 && yasGun <= 365)
       gruplar = ['Düve (Küçük)', 'Sütten Kesilmiş Buzağı'];
-    else if (yasGun !== null && yasGun <= 730)
+    else if (yasGun !== null && yasGun > 365 && yasGun <= 730)
       gruplar = ['Düve (Büyük)', 'Düve (Küçük)'];
     else
-      gruplar = ['Sağmal', 'Kuru', 'Gebe Düve', 'Düve (Büyük)'];
+      // Doğum tarihi girilmedi veya 2 yaş üstü — tüm dişi gruplar
+      gruplar = ['Sağmal', 'Kuru', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)', 'Sütten Kesilmiş Buzağı', 'Süt İçen Buzağı'];
   } else { // Erkek
     if (yasGun !== null && yasGun <= 75)
       gruplar = ['Süt İçen Buzağı'];
-    else if (yasGun !== null && yasGun <= 180)
+    else if (yasGun !== null && yasGun > 75 && yasGun <= 180)
       gruplar = ['Sütten Kesilmiş Buzağı'];
     else
       gruplar = ['Besi', 'Sütten Kesilmiş Buzağı'];
   }
 
   grupSel.innerHTML = '<option value="">Seçin</option>' +
-    gruplar.map(g => `<option value="${g}">${g}</option>`).join('');
+    gruplar.map(gr => `<option value="${gr}">${gr}</option>`).join('');
 
-  // Hint göster
-  if (cinsiyet === 'Erkek' && hint) {
-    hint.textContent = 'Erkek hayvan Sağmal/Kuru grubuna eklenemez';
-    hint.style.display = 'block';
-  } else if (hint) {
-    hint.style.display = 'none';
+  if (hint) {
+    if (cinsiyet === 'Erkek') {
+      hint.textContent = 'Erkek hayvan Sağmal/Kuru/Gebe grubuna eklenemez';
+      hint.style.display = 'block';
+    } else {
+      hint.style.display = 'none';
+    }
   }
 
-  // Padoku sıfırla
   g('a-padok').innerHTML = '<option value="">Önce grup seçin</option>';
   animalGrupDegisti();
 }
