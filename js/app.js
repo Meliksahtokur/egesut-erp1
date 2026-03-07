@@ -197,24 +197,135 @@ function customSpermaSil(kod) {
 
 // ── IRK DROPDOWN ─────────────────────────────
 // Backend'den irk listesi çek, dropdown'ı doldur
+const IRK_LISTESI_SABIT = ['Holstein','Simental','Montofon','Jersey','Angus','Diğer'];
+
 async function loadIrkDropdown() {
+  const sel = g('a-irk-sel'); if (!sel) return;
   try {
+    // DB'den kullanım sıklığına göre sıralı liste
     const { data } = await db.rpc('irk_listesi');
-    const sel = g('a-irk-sel'); if (!sel) return;
-    sel.innerHTML = '<option value="">— Seç —</option>' + (data || []).map(r => `<option value="${r.irk}">${r.irk}</option>`).join('');
-  } catch (e) { console.warn('irk listesi yüklenemedi:', e.message); }
+    const dbIrkler = (data || []).map(r => r.irk);
+    // Sabit listeyi DB sıralamasına göre önce göster, sonra kalanlar
+    const sirali = [
+      ...dbIrkler.filter(i => IRK_LISTESI_SABIT.includes(i)),
+      ...IRK_LISTESI_SABIT.filter(i => !dbIrkler.includes(i)),
+      ...dbIrkler.filter(i => !IRK_LISTESI_SABIT.includes(i)),
+    ];
+    const uniq = [...new Set(sirali)];
+    sel.innerHTML = '<option value="">— Seç —</option>' +
+      uniq.map(r => `<option value="${r}">${r}</option>`).join('') +
+      '<option value="__diger__">+ Diğer (yazın)</option>';
+  } catch (e) {
+    // DB hatasında sabit listeyi göster
+    sel.innerHTML = '<option value="">— Seç —</option>' +
+      IRK_LISTESI_SABIT.map(r => `<option value="${r}">${r}</option>`).join('') +
+      '<option value="__diger__">+ Diğer (yazın)</option>';
+  }
 }
 function irkSecimDegisti() {
   const sel = g('a-irk-sel');
   const txt = g('a-irk-txt');
   if (!sel || !txt) return;
-  if (sel.value) { txt.style.opacity = '.4'; txt.disabled = true; txt.value = ''; }
-  else           { txt.style.opacity = '1'; txt.disabled = false; }
+  if (sel.value === '__diger__') {
+    txt.style.display = 'block';
+    txt.disabled = false;
+    txt.focus();
+  } else if (sel.value) {
+    txt.style.display = 'none';
+    txt.disabled = true;
+    txt.value = '';
+  } else {
+    txt.style.display = 'none';
+    txt.disabled = true;
+    txt.value = '';
+  }
 }
 function getIrkValue() {
   const sel = g('a-irk-sel');
   const txt = g('a-irk-txt');
   return (sel?.value) || (txt?.value?.trim()) || '';
+}
+
+// ── AKTİF HAYVAN FORMU ──────────────────────
+// Cinsiyet + yaş → grup seçenekleri
+// Grup → padok seçenekleri
+const GRUP_PADOK = {
+  'Sağmal':                    ['Sağmal Padok'],
+  'Kuru':                      ['Kuru/Gebe Padok'],
+  'Gebe Düve':                 ['Kuru/Gebe Padok'],
+  'Düve (Büyük)':              ['Düve Padok (Büyük)'],
+  'Düve (Küçük)':              ['Düve Padok (Küçük)'],
+  'Süt İçen Buzağı':           ['Buzağı Padok (Süt İçenler)'],
+  'Sütten Kesilmiş Buzağı':    ['Buzağı Padok (Sütten Kesilmiş)'],
+  'Besi':                      ['Sağmal Padok','Düve Padok (Büyük)','Düve Padok (Küçük)'],
+};
+
+function animalFormGuncelle() {
+  const cinsiyet = v('a-cinsiyet');
+  const dt       = v('a-dt');
+  const grupSel  = g('a-grup');
+  const hint     = g('a-grup-hint');
+  if (!grupSel) return;
+
+  // Yaş hesapla
+  let yasGun = null;
+  if (dt) yasGun = Math.floor((Date.now() - new Date(dt)) / 86400000);
+
+  // Grup seçeneklerini belirle
+  let gruplar = [];
+  if (!cinsiyet) {
+    grupSel.innerHTML = '<option value="">Önce cinsiyet seçin</option>';
+    g('a-padok').innerHTML = '<option value="">Önce grup seçin</option>';
+    return;
+  }
+
+  if (cinsiyet === 'Dişi') {
+    if (yasGun !== null && yasGun <= 75)
+      gruplar = ['Süt İçen Buzağı'];
+    else if (yasGun !== null && yasGun <= 180)
+      gruplar = ['Sütten Kesilmiş Buzağı'];
+    else if (yasGun !== null && yasGun <= 365)
+      gruplar = ['Düve (Küçük)', 'Sütten Kesilmiş Buzağı'];
+    else if (yasGun !== null && yasGun <= 730)
+      gruplar = ['Düve (Büyük)', 'Düve (Küçük)'];
+    else
+      gruplar = ['Sağmal', 'Kuru', 'Gebe Düve', 'Düve (Büyük)'];
+  } else { // Erkek
+    if (yasGun !== null && yasGun <= 75)
+      gruplar = ['Süt İçen Buzağı'];
+    else if (yasGun !== null && yasGun <= 180)
+      gruplar = ['Sütten Kesilmiş Buzağı'];
+    else
+      gruplar = ['Besi', 'Sütten Kesilmiş Buzağı'];
+  }
+
+  grupSel.innerHTML = '<option value="">Seçin</option>' +
+    gruplar.map(g => `<option value="${g}">${g}</option>`).join('');
+
+  // Hint göster
+  if (cinsiyet === 'Erkek' && hint) {
+    hint.textContent = 'Erkek hayvan Sağmal/Kuru grubuna eklenemez';
+    hint.style.display = 'block';
+  } else if (hint) {
+    hint.style.display = 'none';
+  }
+
+  // Padoku sıfırla
+  g('a-padok').innerHTML = '<option value="">Önce grup seçin</option>';
+  animalGrupDegisti();
+}
+
+function animalGrupDegisti() {
+  const grup    = v('a-grup');
+  const padokSel = g('a-padok');
+  if (!padokSel) return;
+  const padoklar = GRUP_PADOK[grup] || [];
+  if (!padoklar.length) {
+    padokSel.innerHTML = '<option value="">Önce grup seçin</option>';
+    return;
+  }
+  padokSel.innerHTML = padoklar.map(p => `<option value="${p}">${p}</option>`).join('');
+  padokSel.value = padoklar[0];
 }
 
 // ── SPERMA LİSTESİ ──────────────────────────
