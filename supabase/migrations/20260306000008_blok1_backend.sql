@@ -633,3 +633,38 @@ $$ LANGUAGE sql;
 -- 12. NOTIFY — PostgREST schema cache yenile
 -- ──────────────────────────────────────────────────────────────
 NOTIFY pgrst, 'reload schema';
+
+-- ──────────────────────────────────────────────────────────────
+-- 13. RLS POLİCY'LERİ — tüm tablolar
+-- ──────────────────────────────────────────────────────────────
+DO $$ 
+DECLARE t text;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY[
+    'hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
+    'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log',
+    'cop_kutusu','irk_esik'
+  ]) LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    -- Mevcut policy varsa drop et, yeniden oluştur
+    BEGIN
+      EXECUTE format('DROP POLICY IF EXISTS allow_all ON public.%I', t);
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    EXECUTE format(
+      'CREATE POLICY allow_all ON public.%I FOR ALL USING (true) WITH CHECK (true)', t
+    );
+  END LOOP;
+END $$;
+
+-- Stored function'lar SECURITY DEFINER — RLS bypass eder
+ALTER FUNCTION public.hayvan_ekle       SECURITY DEFINER;
+ALTER FUNCTION public.dogum_kaydet      SECURITY DEFINER;
+ALTER FUNCTION public.tohumlama_kaydet  SECURITY DEFINER;
+ALTER FUNCTION public.kizginlik_kaydet  SECURITY DEFINER;
+ALTER FUNCTION public.hastalik_kaydet   SECURITY DEFINER;
+ALTER FUNCTION public.abort_kaydet      SECURITY DEFINER;
+ALTER FUNCTION public.hayvan_not_ekle   SECURITY DEFINER;
+ALTER FUNCTION public.cikis_yap         SECURITY DEFINER;
+ALTER FUNCTION public.geri_al           SECURITY DEFINER;
+ALTER FUNCTION public._islem_log_yaz    SECURITY DEFINER;
