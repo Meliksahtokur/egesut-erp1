@@ -33,8 +33,7 @@ async function submitAnimal(btn) {
     closeM('m-animal');
     ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
     const sel = g('a-irk-sel'); if (sel) sel.value = '';
-    await refreshAll();
-    await loadIrkDropdown(); // sayacı güncellenmiş ırk listesini yenile
+    pullTables(['hayvanlar']).then(() => Promise.all([renderSafe(), loadIrkDropdown()])).catch(console.warn);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
@@ -80,9 +79,9 @@ async function submitBirth(btn) {
     g('b-anne-manual').style.display = 'none';
     ['b-kupe','b-dogum-kg','b-baba','b-baba-text'].forEach(id => { const el = g(id); if (el) el.value = ''; });
 
-    await refreshAll();
+    pullTables(['hayvanlar','dogum','gorev_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast('❌ Doğum kaydedilemedi: ' + e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Protokol Görevleri'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
 }
 
 // ── TOHUMLAMA ────────────────────────────────
@@ -110,7 +109,7 @@ async function submitInsem(btn) {
     closeM('m-insem');
     cl('i-hid'); cl('i-sperma');
     checkSpermaUyari();
-    await refreshAll();
+    pullTables(['tohumlama','gorev_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast('❌ Tohumlama kaydedilemedi: ' + e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
 }
@@ -143,7 +142,7 @@ async function submitKizginlik(btn) {
     toast('✅ Kızgınlık kaydedildi');
     closeM('m-kizginlik');
     ['k-hid','k-notlar'].forEach(cl);
-    await refreshAll();
+    pullTables(['kizginlik_log','gorev_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
@@ -199,9 +198,9 @@ async function submitDisease(btn) {
     g('d-kat').value = '';
     _ilacCache = [];
 
-    await refreshAll();
+    pullTables(['hastalik_log','gorev_log','stok','stok_hareket']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Görevler'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Kaydet + Görevler'; } }
 }
 
 // ── ABORT ────────────────────────────────────
@@ -215,7 +214,7 @@ async function abortKaydet(hayvanId, tohId) {
       p_notlar:       notlar || null,
     });
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
-    await refreshAll();
+    pullTables(['tohumlama','gorev_log','hayvanlar']).then(renderSafe).catch(console.warn);
     openDet(hayvanId);
   } catch (e) { toast('❌ Abort kaydedilemedi: ' + e.message, true); }
 }
@@ -231,7 +230,7 @@ async function hayvanNotEkle(hayvanId, btn) {
     toast('✅ Not kaydedildi');
     closeM('m-not');
     cl('not-input');
-    await refreshAll();
+    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
     openDet(hayvanId);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Not Ekle'; } }
@@ -287,7 +286,7 @@ async function submitCikis(btn) {
     toast(`✅ ${getDisplayKupe(hayvan)} sürüden çıkarıldı (${tipTxt})`);
     closeM('m-cikis');
     closeDet();
-    await refreshAll();
+    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '📤 Sürüden Çıkar'; } }
 }
@@ -330,7 +329,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
     }
     toast(`✅ ${basari} buzağı sütten kesildi`);
     closeM('m-sutten-kes');
-    await refreshAll();
+    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
@@ -346,7 +345,7 @@ async function suttenKesTekil(hayvanId, btn) {
     await write('hayvanlar', { suttten_kesme_tarihi: bugun }, 'PATCH', `id=eq.${hayvanId}`);
     toast(`✅ ${getDisplayKupe(h)} sütten kesildi`);
     closeDet();
-    await refreshAll();
+    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
@@ -361,7 +360,7 @@ async function submitTohumOnayla(hayvanId, btn) {
     await write('hayvanlar', { tohumlama_durumu: 'tohumlanabilir', tohumlama_onay_tarihi: new Date().toISOString().split('T')[0] }, 'PATCH', `id=eq.${hayvanId}`);
     toast(`✅ ${getDisplayKupe(h)} tohumlanabilir olarak onaylandı`);
     closeDet();
-    await refreshAll();
+    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '✅ Tohumlanabilir Onayla'; } }
 }
@@ -376,7 +375,7 @@ async function submitTohumErtele(hayvanId, ay, btn) {
     toast(`✅ ${getDisplayKupe(h)} tohumlama ${ay} ay ertelendi`);
     closeM('m-tohum-ertele');
     closeDet();
-    await refreshAll();
+    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '⏰ Ertele'; } }
 }
@@ -484,7 +483,7 @@ async function hstKapat() {
   await write('hastalik_log', { ..._curHst, durum: 'İyileşti', kapanma_tarihi: new Date().toISOString().split('T')[0] }, 'PATCH', `id=eq.${_curHst.id}`);
   toast('✅ Hastalık kaydı kapatıldı');
   closeM('m-hst-det');
-  await renderFromLocal();
+  renderSafe();
 }
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
@@ -510,7 +509,7 @@ async function tohSonuc(sonuc) {
   await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
   toast(sonuc === 'Gebe' ? '✅ Gebe olarak işaretlendi' : sonuc === 'Boş' ? 'Boş olarak işaretlendi' : 'Güncellendi');
   closeM('m-toh-det');
-  await renderFromLocal();
+  renderSafe();
 }
 
 // ── GEBELİK İŞARETLE ────────────────────────
@@ -561,7 +560,7 @@ async function gebeIsaretKaydet() {
   }
   g('gebe-isaret-modal')?.remove();
   toast(`✅ ${n} hayvan gebe olarak işaretlendi`);
-  await renderFromLocal();
+  renderSafe();
   loadUreme('gebelik');
 }
 
@@ -578,7 +577,7 @@ async function geriAl(islemLogId, btn) {
     await rpc('geri_al', { p_islem_id: islemLogId });
     toast('✅ İşlem geri alındı');
     closeM('m-geri-al');
-    await refreshAll();
+    pullTables(['hayvanlar','tohumlama','hastalik_log','dogum','gorev_log','islem_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast('❌ ' + e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🔄 Evet, Geri Al'; } }
 }
