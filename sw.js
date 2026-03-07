@@ -1,5 +1,13 @@
-const CACHE_NAME = 'egesut-v10-cache';
-const ASSETS_TO_CACHE = ['./', './index.html', './manifest.json'];
+const CACHE_NAME = 'egesut-v11-cache';
+const ASSETS_TO_CACHE = [
+  './',
+  './index.html',
+  './manifest.json',
+  './js/api.js',
+  './js/app.js',
+  './js/ui.js',
+  './js/forms.js',
+];
 
 self.addEventListener('install', event => {
   event.waitUntil(
