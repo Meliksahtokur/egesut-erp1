@@ -1,0 +1,396 @@
+// ══════════════════════════════════════════
+// EgeSüt — app.js
+// Global state, routing, init
+// ══════════════════════════════════════════
+
+// ── SABİT VERİLER ──────────────────────────
+const HEKIMLER = [
+  { id: 'H1', ad: 'Melik Tokur' },
+  { id: 'H2', ad: 'Hüseyin Aygün' },
+  { id: 'H3', ad: 'Süleyman Kocabaş' },
+];
+const VARSAYILAN_HEKIM = 'H1';
+
+const HASTALIK_LISTESI = [
+  'Mastit','Subklinik Mastit','Klinik Mastit',
+  'Metrit','Endometrit','Pyometra','Retensiyo Sekundinarum','Kistik Over','Anoestrus',
+  'Hipokalsemi (Süt Humması)','Ketozis','Ruminal Asidoz','Timpani','Şirden Deplasmanı',
+  'Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı','Tırnak Yarası',
+  'Pnömoni','Buzağı İshali','Buzağı Göbek İltihabı','Neonatal Zayıflık',
+];
+
+const HASTALIK_KAT = {
+  'Meme':    ['Mastit','Subklinik Mastit','Klinik Mastit'],
+  'Üreme':   ['Metrit','Endometrit','Pyometra','Retensiyo Sekundinarum','Kistik Over','Anoestrus'],
+  'Metabolik':['Hipokalsemi (Süt Humması)','Ketozis','Ruminal Asidoz','Timpani','Şirden Deplasmanı'],
+  'Ayak':    ['Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı','Tırnak Yarası'],
+  'Solunum': ['Pnömoni'],
+  'Sindirim':['Ruminal Asidoz','Timpani','Şirden Deplasmanı'],
+  'Buzağı':  ['Buzağı İshali','Buzağı Göbek İltihabı','Neonatal Zayıflık'],
+  'Diğer':   [],
+};
+
+const LOKASYON_KAT = {
+  'Meme': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'],
+  'Ayak': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'],
+  'Göz':  ['Sol Göz','Sağ Göz'],
+};
+
+const SPERMA_LISTESI = [
+  'ABK-Zenith-ET','ABK-Parfect-ET','ABK-Iconic-ET',
+  'CRI-Crushabull','CRI-Extreme-ET','Alta-Kalahari','Alta-Achiever',
+  'Semex-O-Man','Semex-Planet',
+];
+
+let _customHekimler = [];
+let _customSperma   = [];
+let _disFreq        = {};
+let _ilacCache      = [];
+
+// ── GLOBAL STATE ────────────────────────────
+let _A = [], _S = [], _curStk = null, _curPg = 'dash';
+let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
+let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today';
+let _curTaskDet  = null, _curHst = null, _curToh = null;
+let _curBildirimTab = 'bekliyor';
+
+// ── YARDIMCILAR ─────────────────────────────
+function g(id)   { return document.getElementById(id); }
+function v(id)   { return g(id)?.value || ''; }
+function cl(id)  { const el = g(id); if (el) el.value = ''; }
+
+function dAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
+function dFwd(base, n) { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; }
+function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso; }
+
+function openM(id) {
+  const el = g(id); if (!el) return;
+  el.classList.add('on');
+  el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = new Date().toISOString().split('T')[0]; });
+}
+function closeM(id) { g(id)?.classList.remove('on'); }
+function mClose(e, el) { if (e.target === el) el.classList.remove('on'); }
+
+function toast(msg, err = false) {
+  const el = g('toast'); if (!el) return;
+  el.textContent = msg;
+  el.className = 'on' + (err ? ' err' : '');
+  clearTimeout(el._tid);
+  el._tid = setTimeout(() => el.className = '', 3200);
+}
+
+function showDebug(msg) { console.warn('[debug]', msg); }
+
+// Sync bar
+function updateSyncBar() {
+  getQueue().then(q => {
+    if (!q.length) { hideSyncBar(); return; }
+    setSyncBar('warn', `⏳ ${q.length} kayıt bekliyor — internet gelince otomatik gönderilecek`);
+  });
+}
+function setSyncBar(type, txt) {
+  const bar = g('sync-bar');
+  if (!bar) return;
+  bar.className = 'on ' + type;
+  g('sync-bar-txt').textContent = txt;
+}
+function hideSyncBar() { const bar = g('sync-bar'); if (bar) bar.className = ''; }
+
+// ── ROUTING ─────────────────────────────────
+function goTo(pg) {
+  _curPg = pg;
+  document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
+  const pgEl = g('pg-' + pg);
+  const nbEl = g('nb-' + pg);
+  if (pgEl) pgEl.classList.add('on');
+  if (nbEl) nbEl.classList.add('on');
+
+  if (pg === 'dash')     Promise.all([loadDash(), loadStokList()]);
+  if (pg === 'tasks')    loadTasks(_curTaskFilter || 'today');
+  if (pg === 'gecmis')   loadGecmis(_curGecmisFilter || 'hepsi');
+  if (pg === 'log')      Promise.all([loadBirths(), loadStokList()]);
+  if (pg === 'ureme')    loadUreme(_curUremeTab || 'kizginlik');
+  if (pg === 'bildirim') loadBildirimler(_curBildirimTab || 'bekliyor');
+  if (pg === 'raporlar') loadRaporlar();
+  if (pg !== 'dash')     loadDash();
+}
+
+// ── RENDER FROM LOCAL ────────────────────────
+async function renderFromLocal() {
+  await Promise.all([loadAnimals(), loadStock()]);
+  const pg = _curPg || 'dash';
+  if (pg === 'dash')     await Promise.all([loadDash(), loadStokList()]);
+  if (pg === 'tasks')    await loadTasks(_curTaskFilter || 'today');
+  if (pg === 'gecmis')   await loadGecmis(_curGecmisFilter || 'hepsi');
+  if (pg === 'log')      await Promise.all([loadBirths(), loadStokList()]);
+  if (pg === 'ureme')    loadUreme(_curUremeTab || 'kizginlik');
+  if (pg === 'bildirim') loadBildirimler(_curBildirimTab || 'bekliyor');
+  if (pg === 'raporlar') loadRaporlar();
+  if (pg !== 'dash')     loadDash();
+  checkSpermaUyari();
+  updateBildirimBadge();
+}
+
+async function refreshAll() {
+  await pullFromSupabase();
+  await renderFromLocal();
+}
+
+// ── HEKİM SELECTS ───────────────────────────
+function populateHekimSelects() {
+  const all = [...HEKIMLER, ..._customHekimler];
+  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(id => {
+    const el = g(id); if (!el) return;
+    el.innerHTML = all.map(h => `<option value="${h.id}">${h.ad}</option>`).join('');
+    el.value = VARSAYILAN_HEKIM;
+  });
+}
+
+// Hekim/sperma ayarları
+function renderAyarlarHekimList() {
+  const el = g('ay-hekim-list'); if (!el) return;
+  const all = [...HEKIMLER, ..._customHekimler];
+  el.innerHTML = all.map(h => `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--card2)">
+    <span style="font-size:.84rem">${h.ad}</span>
+    ${_customHekimler.find(c => c.id === h.id) ? `<button onclick="customHekimSil('${h.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">Sil</button>` : ''}
+  </div>`).join('');
+}
+function renderAyarlarSpermaList() {
+  const el = g('ay-sperma-list'); if (!el) return;
+  const all = [...new Set([...SPERMA_LISTESI, ..._customSperma])];
+  el.innerHTML = all.map(s => `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--card2)">
+    <span style="font-size:.84rem">${s}</span>
+    ${_customSperma.includes(s) ? `<button onclick="customSpermaSil('${s.replace(/'/g,"\\'")}') " style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">Sil</button>` : ''}
+  </div>`).join('');
+}
+function ayarlarHekimEkle()  { g('ay-hekim-form').style.display = 'block'; }
+function ayarlarHekimKaydet() {
+  const ad = (g('ay-hekim-ad')?.value || '').trim(); if (!ad) return;
+  const id = 'CH' + Date.now();
+  _customHekimler.push({ id, ad });
+  g('ay-hekim-form').style.display = 'none';
+  if (g('ay-hekim-ad')) g('ay-hekim-ad').value = '';
+  renderAyarlarHekimList();
+  populateHekimSelects();
+  toast('Hekim eklendi');
+}
+function customHekimSil(id) {
+  _customHekimler = _customHekimler.filter(h => h.id !== id);
+  renderAyarlarHekimList();
+  populateHekimSelects();
+}
+function ayarlarSpermaEkle()  { g('ay-sperma-form').style.display = 'block'; }
+function ayarlarSpermaKaydet() {
+  const kod = (g('ay-sperma-kod')?.value || '').trim(); if (!kod) return;
+  if (!_customSperma.includes(kod)) _customSperma.push(kod);
+  g('ay-sperma-form').style.display = 'none';
+  if (g('ay-sperma-kod')) g('ay-sperma-kod').value = '';
+  renderAyarlarSpermaList();
+  buildSpermaList();
+  toast('Sperma eklendi');
+}
+function customSpermaSil(kod) {
+  _customSperma = _customSperma.filter(s => s !== kod);
+  renderAyarlarSpermaList();
+}
+
+// ── IRK DROPDOWN ─────────────────────────────
+// Backend'den irk listesi çek, dropdown'ı doldur
+async function loadIrkDropdown() {
+  try {
+    const { data } = await db.rpc('irk_listesi');
+    const sel = g('a-irk-sel'); if (!sel) return;
+    sel.innerHTML = '<option value="">— Seç —</option>' + (data || []).map(r => `<option value="${r.irk}">${r.irk}</option>`).join('');
+  } catch (e) { console.warn('irk listesi yüklenemedi:', e.message); }
+}
+function irkSecimDegisti() {
+  const sel = g('a-irk-sel');
+  const txt = g('a-irk-txt');
+  if (!sel || !txt) return;
+  if (sel.value) { txt.style.opacity = '.4'; txt.disabled = true; txt.value = ''; }
+  else           { txt.style.opacity = '1'; txt.disabled = false; }
+}
+function getIrkValue() {
+  const sel = g('a-irk-sel');
+  const txt = g('a-irk-txt');
+  return (sel?.value) || (txt?.value?.trim()) || '';
+}
+
+// ── SPERMA LİSTESİ ──────────────────────────
+async function buildSpermaList() {
+  const tohs = await idbGetAll('tohumlama');
+  const used = [...new Set(tohs.map(t => t.sperma).filter(Boolean))];
+  const all  = [...new Set([...SPERMA_LISTESI, ..._customSperma, ...used])];
+  const dl   = g('dl-sperma');
+  if (dl) dl.innerHTML = all.map(s => `<option value="${s}">`).join('');
+}
+
+// ── HASTALIK AUTOCOMPLETE ───────────────────
+async function buildDiseaseFreq() {
+  const logs = await idbGetAll('hastalik_log');
+  _disFreq = {};
+  logs.forEach(l => { if (l.tani) _disFreq[l.tani] = (_disFreq[l.tani] || 0) + 1; });
+}
+function filterHastalikList() {
+  const kat    = g('d-kat')?.value || '';
+  const wrap   = g('tani-secenekler');
+  const lokWrap = g('d-lokasyon-wrap');
+  const lokSec  = g('d-lokasyon-secenekler');
+  const lokLbl  = g('d-lokasyon-lbl');
+  if (!wrap) return;
+
+  const liste = kat && HASTALIK_KAT[kat] ? HASTALIK_KAT[kat] : HASTALIK_LISTESI;
+  wrap.innerHTML = liste.map(h => `<button type="button" onclick="selDis('${h.replace(/'/g,"\\'")}',this)"
+    style="padding:5px 11px;border:1.5px solid var(--card3);border-radius:20px;background:var(--card);font-size:.72rem;font-weight:700;color:var(--ink2);cursor:pointer;transition:all .12s"
+    class="tani-btn">${h}</button>`).join('');
+
+  const lokList = LOKASYON_KAT[kat] || [];
+  if (lokList.length) {
+    lokLbl.textContent = kat === 'Meme' ? 'Çeyrek' : 'Hangi Ayak';
+    lokSec.innerHTML = lokList.map(l => `<button type="button" onclick="toggleLokasyon('${l}',this)"
+      style="padding:5px 11px;border:1.5px solid var(--card3);border-radius:20px;background:var(--card);font-size:.72rem;font-weight:700;color:var(--ink2);cursor:pointer"
+      class="lok-btn">${l}</button>`).join('');
+    lokWrap.style.display = 'block';
+    g('d-lokasyon').value = '';
+  } else {
+    lokWrap.style.display = 'none';
+    g('d-lokasyon').value = '';
+  }
+  g('d-tani').value = '';
+  g('ac-dis').style.display = 'none';
+}
+
+function toggleLokasyon(val, btn) {
+  btn.classList.toggle('lok-on');
+  if (btn.classList.contains('lok-on')) {
+    btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff';
+  } else {
+    btn.style.background = 'var(--card)'; btn.style.borderColor = 'var(--card3)'; btn.style.color = 'var(--ink2)';
+  }
+  const secili = [...document.querySelectorAll('.lok-btn.lok-on')].map(b => b.textContent.trim());
+  g('d-lokasyon').value = secili.join(', ');
+}
+
+async function acDisease() {
+  const q   = (g('d-tani')?.value || '').toLowerCase().trim();
+  const kat = g('d-kat')?.value || '';
+  const ac  = g('ac-dis');
+  if (!q) { ac.style.display = 'none'; return; }
+  const logs    = await idbGetAll('hastalik_log');
+  const usedDis = [...new Set(logs.map(l => l.tani).filter(Boolean))];
+  const base    = kat && HASTALIK_KAT[kat] ? HASTALIK_KAT[kat] : HASTALIK_LISTESI;
+  const all     = [...new Set([...base, ...usedDis])];
+  const filtered = all.filter(d => d.toLowerCase().includes(q));
+  if (!filtered.length) { ac.style.display = 'none'; return; }
+  ac.innerHTML = filtered.map(d => `<div onclick="selDis('${d.replace(/'/g,"\\'")}');event.stopPropagation()"
+    style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee">${d}</div>`).join('');
+  ac.style.display = 'block';
+}
+
+function selDis(val, btn) {
+  g('d-tani').value = val;
+  g('ac-dis').style.display = 'none';
+  document.querySelectorAll('.tani-btn').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.borderColor = 'var(--card3)'; b.style.color = 'var(--ink2)';
+  });
+  if (btn) { btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff'; }
+}
+
+document.addEventListener('click', e => {
+  const ac = g('ac-dis');
+  if (ac && !e.target.closest('#d-tani') && !e.target.closest('#ac-dis')) ac.style.display = 'none';
+});
+
+// Enter → sonraki alan
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const tag = e.target.tagName;
+  if (tag === 'TEXTAREA') return;
+  if (tag === 'INPUT' || tag === 'SELECT') {
+    e.preventDefault();
+    const modal = e.target.closest('.modal');
+    if (!modal) return;
+    const fields = Array.from(modal.querySelectorAll('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button.btn:not([disabled])'));
+    const idx = fields.indexOf(e.target);
+    if (idx >= 0 && idx < fields.length - 1) fields[idx + 1].focus();
+  }
+});
+
+// ── INIT ─────────────────────────────────────
+window.addEventListener('load', async () => {
+  try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
+
+  const t = new Date().toISOString().split('T')[0];
+  ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { const el = g(id); if (el) el.value = t; });
+
+  try { populateHekimSelects(); } catch (e) {}
+  await loadIrkDropdown();
+
+  try { await renderFromLocal(); } catch (e) {
+    console.warn('render err:', e);
+    const el = g('dash-body');
+    if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: ${e.message}<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
+  }
+  updateSyncBar();
+
+  if (navigator.onLine) {
+    try {
+      await pullFromSupabase();
+      await renderFromLocal();
+      syncNow();
+    } catch (e) { console.warn('Pull failed:', e.message); }
+  } else {
+    g('dot')?.classList.add('warn');
+    toast('Çevrimdışı — yerel veri gösteriliyor');
+  }
+
+  buildSpermaList();
+  buildDiseaseFreq();
+
+  if (localStorage.getItem('bildirim_aktif') === '1') {
+    bildirimKontrol();
+    setInterval(bildirimKontrol, 3600000);
+  }
+});
+
+window.addEventListener('online', async () => {
+  g('dot')?.classList.remove('off', 'warn');
+  toast('🌐 Bağlantı geldi');
+  await syncNow();
+  await pullFromSupabase();
+  renderFromLocal();
+});
+
+window.addEventListener('offline', () => {
+  g('dot')?.classList.add('off');
+  toast('📵 Çevrimdışı — kayıtlar cihazda saklanacak');
+});
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  const host = location.hostname;
+  const isProd = host.endsWith('github.io') || host.endsWith('egesut.com') || host === 'localhost' || host === '127.0.0.1';
+  if (isProd) {
+    window.addEventListener('load', async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('./sw.js');
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        reg.addEventListener('updatefound', () => {
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              const bar = g('update-bar');
+              if (bar) bar.style.display = 'flex';
+            }
+          });
+        });
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!refreshing) { refreshing = true; window.location.reload(true); }
+        });
+        reg.update();
+      } catch (err) { console.warn('SW hatası:', err); }
+    });
+  }
+}
