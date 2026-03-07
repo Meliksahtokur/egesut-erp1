@@ -66,8 +66,10 @@ function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).spli
 function openM(id) {
   const el = g(id); if (!el) return;
   el.classList.add('on');
-  el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = new Date().toISOString().split('T')[0]; });
-  // Hayvan modalı açılınca dropdown ve form mantığını başlat
+  // Hayvan modalında doğum tarihi otomatik dolmasın — yaş hesabı bozuluyor
+  if (id !== 'm-animal') {
+    el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = new Date().toISOString().split('T')[0]; });
+  }
   if (id === 'm-animal') {
     loadIrkDropdown();
     animalFormGuncelle();
