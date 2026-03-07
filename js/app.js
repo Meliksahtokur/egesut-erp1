@@ -67,6 +67,11 @@ function openM(id) {
   const el = g(id); if (!el) return;
   el.classList.add('on');
   el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = new Date().toISOString().split('T')[0]; });
+  // Hayvan modalı açılınca dropdown ve form mantığını başlat
+  if (id === 'm-animal') {
+    loadIrkDropdown();
+    animalFormGuncelle();
+  }
 }
 function closeM(id) { g(id)?.classList.remove('on'); }
 function mClose(e, el) { if (e.target === el) el.classList.remove('on'); }
