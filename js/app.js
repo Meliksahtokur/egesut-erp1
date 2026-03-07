@@ -337,12 +337,57 @@ function animalGrupDegisti() {
 }
 
 // ── SPERMA LİSTESİ ──────────────────────────
+function spermaModStok() {
+  g('sperma-stok-area').style.display = 'block';
+  g('sperma-elle-area').style.display = 'none';
+  g('btn-sperma-stok').style.background = 'rgba(42,107,181,.2)';
+  g('btn-sperma-elle').style.background = 'var(--card2)';
+
+  const sel = g('i-sperma-select');
+  if (!sel) return;
+
+  const stoklar = window._appState?.stok?.filter(s => s.kategori === 'Sperma' && s.miktar > 0) || [];
+
+  if (stoklar.length === 0) {
+    sel.innerHTML = '<option value="">— Stokta sperma yok —</option>';
+    g('sperma-hint').textContent = 'Stok eklemek için Stok sekmesine gidin';
+  } else {
+    sel.innerHTML =
+      '<option value="">— Seçin —</option>' +
+      stoklar.map(s => `<option value="${s.ad}">${s.ad} (${s.miktar} doz)</option>`).join('');
+
+    g('sperma-hint').textContent = '';
+  }
+
+  g('i-sperma').value = '';
+}
+
+function spermaModElle() {
+  g('sperma-stok-area').style.display = 'none';
+  g('sperma-elle-area').style.display = 'block';
+  g('btn-sperma-elle').style.background = 'rgba(42,107,181,.2)';
+  g('btn-sperma-stok').style.background = 'var(--card2)';
+
+  g('i-sperma').value = '';
+  g('sperma-hint').textContent = 'Boğa kodu veya sperma adını yazın';
+}
+
 async function buildSpermaList() {
   const tohs = await idbGetAll('tohumlama');
+
   const used = [...new Set(tohs.map(t => t.sperma).filter(Boolean))];
-  const all  = [...new Set([...SPERMA_LISTESI, ..._customSperma, ...used])];
-  const dl   = g('dl-sperma');
-  if (dl) dl.innerHTML = all.map(s => `<option value="${s}">`).join('');
+
+  const all = [...new Set([
+    ...SPERMA_LISTESI,
+    ..._customSperma,
+    ...used
+  ])];
+
+  const dl = g('dl-sperma');
+
+  if (dl) {
+    dl.innerHTML = all.map(s => `<option value="${s}">`).join('');
+  }
 }
 
 // ── HASTALIK AUTOCOMPLETE ───────────────────
