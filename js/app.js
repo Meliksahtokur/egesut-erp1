@@ -257,14 +257,14 @@ function getIrkValue() {
 // Cinsiyet + yaş → grup seçenekleri
 // Grup → padok seçenekleri
 const GRUP_PADOK = {
-  'Sağmal':                    ['Sağmal Padok'],
-  'Kuru':                      ['Kuru/Gebe Padok'],
+  'Sağmal (Laktasyonda)':      ['Sağmal Padok'],
+  'Sağmal (Kuru)':             ['Kuru/Gebe Padok'],
   'Gebe Düve':                 ['Kuru/Gebe Padok'],
   'Düve (Büyük)':              ['Düve Padok (Büyük)'],
   'Düve (Küçük)':              ['Düve Padok (Küçük)'],
   'Süt İçen Buzağı':           ['Buzağı Padok (Süt İçenler)'],
   'Sütten Kesilmiş Buzağı':    ['Buzağı Padok (Sütten Kesilmiş)'],
-  'Besi':                      ['Sağmal Padok','Düve Padok (Büyük)','Düve Padok (Küçük)'],
+  'Besi':                      ['Düve Padok (Büyük)', 'Düve Padok (Küçük)', 'Sağmal Padok'],
 };
 
 function animalFormGuncelle() {
@@ -297,8 +297,7 @@ function animalFormGuncelle() {
     else if (yasGun !== null && yasGun > 365 && yasGun <= 730)
       gruplar = ['Düve (Büyük)', 'Düve (Küçük)'];
     else
-      // Doğum tarihi girilmedi veya 2 yaş üstü — tüm dişi gruplar
-      gruplar = ['Sağmal', 'Kuru', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)', 'Sütten Kesilmiş Buzağı', 'Süt İçen Buzağı'];
+      gruplar = ['Sağmal (Laktasyonda)', 'Sağmal (Kuru)', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)', 'Sütten Kesilmiş Buzağı', 'Süt İçen Buzağı'];
   } else { // Erkek
     if (yasGun !== null && yasGun <= 75)
       gruplar = ['Süt İçen Buzağı'];
