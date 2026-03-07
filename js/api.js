@@ -177,6 +177,80 @@ async function write(table, data, method = 'POST', filter = '') {
   return arr;
 }
 
+// ── RPC TABLOLARI MAP ───────────────────────
+// Her RPC hangi tabloları etkiliyor — sadece onlar çekilir
+const RPC_TABLES = {
+  hayvan_ekle:       ['hayvanlar'],
+  dogum_kaydet:      ['hayvanlar','dogum','gorev_log'],
+  tohumlama_kaydet:  ['tohumlama','gorev_log'],
+  kizginlik_kaydet:  ['kizginlik_log','gorev_log'],
+  hastalik_kaydet:   ['hastalik_log','gorev_log','stok','stok_hareket'],
+  abort_kaydet:      ['tohumlama','gorev_log'],
+  hayvan_not_ekle:   ['hayvanlar'],
+  cikis_yap:         ['hayvanlar'],
+  geri_al:           ['hayvanlar','tohumlama','hastalik_log','dogum','gorev_log','islem_log'],
+};
+
+// ── RENDER DEBOUNCE ─────────────────────────
+// Kısa sürede çok çağrı gelirse sadece 1 render yapar
+let _renderTimer;
+function renderSafe() {
+  clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(() => renderFromLocal(), 60);
+}
+
+// ── PULL LOCK ───────────────────────────────
+// Aynı anda iki pullTables çalışmasını önler
+let _pulling = false;
+
+// Sadece belirtilen tabloları Supabase'den çek
+async function pullTables(tables = []) {
+  if (!tables.length || _pulling) return;
+  _pulling = true;
+  try {
+    const FETCHERS = {
+      hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
+      gorev_log:    () => db.from('gorev_log').select('*').eq('tamamlandi', false),
+      stok:         () => db.from('stok').select('*'),
+      stok_hareket: () => db.from('stok_hareket').select('*').eq('iptal', false),
+      hastalik_log: () => db.from('hastalik_log').select('*'),
+      tohumlama:    () => db.from('tohumlama').select('*'),
+      dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
+      bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
+      islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
+      kizginlik_log:() => db.from('kizginlik_log').select('*'),
+    };
+    const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
+    const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
+    await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
+  } finally {
+    _pulling = false;
+  }
+}
+
+// Optimistic RPC: toast önce → rpc gönder → arka planda pull + render
+async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg } = {}) {
+  if (!navigator.onLine) {
+    const msg = 'İnternet bağlantısı gerekli';
+    toast(msg, true);
+    throw new Error(msg);
+  }
+  // Kullanıcıya anında geri bildirim
+  if (successMsg) toast(successMsg);
+  try {
+    const data = await rpc(name, params);
+    // Arka planda sadece ilgili tabloları çek, UI'ı bloklamaz
+    const tables = RPC_TABLES[name] || [];
+    if (tables.length) pullTables(tables).then(renderSafe).catch(console.warn);
+    if (onSuccess) onSuccess(data);
+    return data;
+  } catch (e) {
+    if (onError) onError(e);
+    else toast('❌ ' + e.message, true);
+    throw e;
+  }
+}
+
 // ── PULL FROM SUPABASE ──────────────────────
 async function pullFromSupabase() {
   try {
@@ -240,7 +314,10 @@ async function syncNow() {
   }
 }
 
-// ── DATA ACCESS ─────────────────────────────
+// ── AUTO SYNC ───────────────────────────────
+// Her 5sn offline queue'yu otomatik gönderir
+setInterval(syncNow, 5000);
+window.addEventListener('online', syncNow);
 async function getData(table, filterFn) {
   const data = await idbGetAll(table);
   return filterFn ? data.filter(filterFn) : data;
