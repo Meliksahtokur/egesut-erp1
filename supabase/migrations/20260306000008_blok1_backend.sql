@@ -490,10 +490,13 @@ $$ LANGUAGE plpgsql;
 
 -- Trigger'ları bağla
 DROP TRIGGER IF EXISTS trg_islem_hayvanlar  ON public.hayvanlar;
-DROP TRIGGER IF EXISTS trg_islem_dogum      ON public.dogum;
-DROP TRIGGER IF EXISTS trg_islem_tohumlama  ON public.tohumlama;
-DROP TRIGGER IF EXISTS trg_islem_hastalik   ON public.hastalik_log;
-DROP TRIGGER IF EXISTS trg_islem_kizginlik  ON public.kizginlik_log;
+DROP TRIGGER IF EXISTS trg_islem_hayvanlar          ON public.hayvanlar;
+DROP TRIGGER IF EXISTS trg_islem_dogum              ON public.dogum;
+DROP TRIGGER IF EXISTS trg_islem_tohumlama          ON public.tohumlama;
+DROP TRIGGER IF EXISTS trg_islem_tohumlama_insert   ON public.tohumlama;
+DROP TRIGGER IF EXISTS trg_islem_tohumlama_abort    ON public.tohumlama;
+DROP TRIGGER IF EXISTS trg_islem_hastalik           ON public.hastalik_log;
+DROP TRIGGER IF EXISTS trg_islem_kizginlik          ON public.kizginlik_log;
 
 CREATE TRIGGER trg_islem_hayvanlar
   AFTER INSERT ON public.hayvanlar
