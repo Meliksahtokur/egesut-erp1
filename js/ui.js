@@ -212,6 +212,7 @@ async function loadAnimals(){
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
     _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
     _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
+    window._appState=window._appState||{}; window._appState.hayvanlar=_A;
     renderAnimals(_A);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
@@ -743,6 +744,7 @@ async function loadStock(){
   try {
     const [stk,moves]=await Promise.all([idbGetAll('stok'),getData('stok_hareket',m=>!m.iptal)]);
     _S=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok'}; });
+    window._appState=window._appState||{}; window._appState.stok=_S;
   } catch(e){ console.error(e); }
 }
 function openStk(id){
@@ -1292,14 +1294,19 @@ function openMWithHayvan(modalId,inputId,kupeNo){
   },100);
 }
 function openGebelikEkle(hayvanId){
-  const tarih=prompt('Tohumlama tarihi (YYYY-MM-DD):');
-  if(!tarih) return;
-  const bugun=new Date().toISOString().split('T')[0];
-  if(tarih>bugun){ toast('İleri tarih girilemez',true); return; }
-  const sperma=prompt('Sperma / Boğa kodu (boş bırakılabilir):');
-  write('tohumlama',{id:crypto.randomUUID(),hayvan_id:hayvanId,tarih,sperma:sperma||null,sonuc:'Gebe',deneme_no:1})
-    .then(()=>{ toast('✅ Gebelik kaydedildi'); openDet(hayvanId); })
-    .catch(e=>toast(e.message,true));
+  const hayvan=_A.find(a=>a.id===hayvanId);
+  const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe||hayvanId):hayvanId;
+  const el=document.getElementById('gebelik-hayvan-label');
+  if(el) el.textContent='🐄 '+kupe;
+  const tarihEl=document.getElementById('geb-tarih');
+  if(tarihEl){
+    tarihEl.value=new Date().toISOString().split('T')[0];
+    tarihEl.max=new Date().toISOString().split('T')[0];
+  }
+  const spermaEl=document.getElementById('geb-sperma');
+  if(spermaEl) spermaEl.value='';
+  document.getElementById('m-gebelik')._hayvanId=hayvanId;
+  openM('m-gebelik');
 }
 
 // ──────────────────────────────────────────
