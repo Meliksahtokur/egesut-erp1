@@ -599,26 +599,51 @@ async function submitStk(btn) {
 }
 
 async function submitStokAdd(btn) {
-  const urun = v('sna-urun').trim();
-  const bslg = parseFloat(v('sna-bslg'));
+  const urun = (g('sa-ad')?.value||'').trim();
+  const bslg = parseFloat(g('sa-mik')?.value||'0');
   if (!urun) { toast('Ürün adı zorunlu', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
+  const kat = g('sa-kat')?.value || 'İlaç';
   try {
     await write('stok', {
       id: crypto.randomUUID(), urun_adi: urun,
-      birim: v('sna-birim') || 'adet',
+      birim: g('sa-birim')?.value || 'adet',
       baslangic_miktar: bslg || 0,
-      esik: parseFloat(v('sna-esik')) || 0,
-      kategori: v('sna-kat') || 'İlaç',
-      tur: v('sna-tur') || 'İlaç',
+      esik: parseFloat(g('sa-esik')?.value||'0') || 0,
+      kategori: kat,
+      tur: kat,
     });
     toast(`✅ ${urun} stoka eklendi`);
     closeM('m-stok-add');
-    ['sna-urun','sna-bslg','sna-esik'].forEach(cl);
+    ['sa-ad','sa-mik','sa-esik'].forEach(id=>{const e=g(id);if(e)e.value=''});
     await loadStock();
     await loadStokList();
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Ekle'; } }
+}
+
+
+// ── GEBELİK EKLE ─────────────────────────────
+async function submitGebelikEkle(btn) {
+  const modal = document.getElementById('m-gebelik');
+  const hayvanId = modal?._hayvanId;
+  if (!hayvanId) { toast('Hayvan seçilmedi', true); return; }
+  const tarih = g('geb-tarih')?.value;
+  if (!tarih) { toast('Tarih zorunlu', true); return; }
+  const bugun = new Date().toISOString().split('T')[0];
+  if (tarih > bugun) { toast('İleri tarih girilemez', true); return; }
+  const sperma = (g('geb-sperma')?.value||'').trim();
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  try {
+    await write('tohumlama', {
+      id: crypto.randomUUID(), hayvan_id: hayvanId,
+      tarih, sperma: sperma || null, sonuc: 'Gebe', deneme_no: 1
+    });
+    toast('✅ Gebelik kaydedildi');
+    closeM('m-gebelik');
+    pullTables(['tohumlama','hayvanlar']).then(renderSafe);
+  } catch(e) { toast(e.message, true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
 
 // ── BİLDİRİM ─────────────────────────────────
