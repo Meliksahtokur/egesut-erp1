@@ -425,9 +425,13 @@ function closeDet(){ document.getElementById('det').classList.remove('on'); }
 // ──────────────────────────────────────────
 async function openAnimalEdit(id){
   const a=_A.find(x=>x.id===id); if(!a){ toast('Hayvan bulunamadı',true); return; }
-  // Edit modunu işaretle
   const modal=document.getElementById('m-animal');
   if(!modal) return;
+
+  // Önce formu temizle — önceki değerler kalmasın
+  ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(fid=>{const el=document.getElementById(fid);if(el)el.value='';});
+  const cins=document.getElementById('a-cinsiyet'); if(cins) cins.value='';
+
   modal.dataset.editId=id;
   document.getElementById('m-animal-title').textContent='✏️ Bilgileri Düzenle';
   document.getElementById('m-animal-btn').textContent='💾 Güncelle';
