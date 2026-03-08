@@ -689,6 +689,12 @@ async function loadGecmis(f,btn){
     if(f==='hepsi'||f==='tohumlama') (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
     if(f==='hepsi'||f==='hastalik') (await idbGetAll('hastalik_log')).forEach(r=>entries.push({type:'hastalik',date:r.tarih,data:r}));
     if(f==='hepsi'||f==='gorev') (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>entries.push({type:'gorev',date:r.tamamlanma_tarihi||r.hedef_tarih,data:r}));
+    if(f==='hepsi'||f==='hayvan'){
+      const islemTipler=['HAYVAN_EKLENDI','ABORT_KAYDI','KIZGINLIK_KAYDI'];
+      (await idbGetAll('islem_log'))
+        .filter(r=>islemTipler.includes(r.tip))
+        .forEach(r=>entries.push({type:'islem',date:(r.tarih||r.created_at||'').slice(0,10),data:r}));
+    }
     entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(!entries.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>'; return; }
     el.innerHTML=entries.slice(0,300).map(e=>{
@@ -704,13 +710,20 @@ async function loadGecmis(f,btn){
       if(type==='hastalik') oc=`onclick="openHstDet('${data.id}')" style="cursor:pointer"`;
       else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
       else if(type==='dogum'&&hayvanVarMi) oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
-      const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅'}[type];
-      const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)'}[type];
+      const ISLEM_ICO={'HAYVAN_EKLENDI':'🐮','ABORT_KAYDI':'⚠️','KIZGINLIK_KAYDI':'🔴'};
+      const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',islem:ISLEM_ICO[data.tip]||'📋'}[type];
+      const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)'}[type];
       let title='', sub='';
       if(type==='dogum'){ const anneObj=_A.find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id); const anneLabel=anneObj?(anneObj.kupe_no||anneObj.devlet_kupe||data.anne_id):data.anne_id; title=`${anneLabel||'?'} → ${data.yavru_kupe||'?'} (${data.yavru_cins||'?'})`; sub=`${data.dogum_tipi||'Normal'}${hkName}`; }
       if(type==='tohumlama'){ title=`${hayvanLabel||'?'} — ${data.sperma||'?'}`; const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)'; sub=`${data.deneme_no||1}. deneme · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`; }
       if(type==='hastalik'){ title=`${hayvanLabel||'?'} — ${data.tani||'?'}`; const sc=data.durum==='Aktif'?'var(--red)':'var(--green)'; sub=`${data.siddet||''} · <b style="color:${sc}">${data.durum||''}</b>${hkName}`; }
       if(type==='gorev'){ const gHayvan=_A.find(a=>a.id===data.hayvan_id); const gLabel=gHayvan?(gHayvan.kupe_no||gHayvan.devlet_kupe):data.hayvan_id; title=`${gLabel||'GENEL'} — ${data.aciklama||''}`; sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span>${hkName}`; }
+      if(type==='islem'){
+        const snap=data.snapshot||{}; const kupe=snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
+        const etiket={'HAYVAN_EKLENDI':'🐮 Hayvan Eklendi','ABORT_KAYDI':'⚠️ Abort','KIZGINLIK_KAYDI':'🔴 Kızgınlık'}[data.tip]||data.tip;
+        title=`${kupe} — ${etiket}`; sub=snap.irk||snap.grup||'';
+        if(snap.kupe_no||snap.devlet_kupe) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
+      }
       return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>
         <div style="width:36px;height:36px;border-radius:10px;background:${icoBg};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${ico}</div>
         <div style="flex:1;min-width:0">
