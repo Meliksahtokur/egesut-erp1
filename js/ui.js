@@ -1289,13 +1289,19 @@ function openMWithHayvan(modalId,inputId,kupeNo){
   openM(modalId);
   setTimeout(()=>{
     const el=document.getElementById(inputId);
-    if(el){ el.value=kupeNo; el.dispatchEvent(new Event('input')); }
+    if(el){
+      el.value=kupeNo;
+      // Autocomplete dropdown'ı kapat — input eventi tetikleme
+      const acMap={'d-hid':'ac-dhid','i-hid':'ac-ihid','b-anne':'ac-banne'};
+      const acEl=document.getElementById(acMap[inputId]);
+      if(acEl) acEl.style.display='none';
+    }
     if(modalId==='m-disease'){
       const kat=document.getElementById('d-kat');
       if(kat){ kat.value=''; }
       if(typeof filterHastalikList==='function') filterHastalikList();
     }
-  },100);
+  },150);
 }
 async function tohSonucGuncelle(tohId, sonuc, hayvanId){
   try{
