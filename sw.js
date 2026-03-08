@@ -1,4 +1,4 @@
-const CACHE_NAME = 'egesut-__BUILD_TIME__';
+const CACHE_NAME = 'egesut-20260308-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
