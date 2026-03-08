@@ -587,7 +587,7 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- YENİ HAYVAN — sadeleştirilmiş -->
 <div id="m-animal" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div><div class="m-title">➕ Yeni Hayvan</div>
+  <div class="modal"><div class="m-handle"></div><div id="m-animal-title" class="m-title">➕ Yeni Hayvan</div>
     <div class="m-body">
       <!-- KÜPE -->
       <div class="r2">
@@ -656,8 +656,8 @@ button,input,select,textarea{font-family:inherit}
         <div class="fg"><label class="flbl">Renk / Desen</label><input id="a-renk" class="fi" placeholder="Siyah-beyaz" autocomplete="off"></div>
       </div>
       <div class="fg"><label class="flbl">Ayırt Edici Özellik</label><input id="a-ozellik" class="fi" placeholder="Sol kulakta çentik, alın beyazı vb." autocomplete="off"></div>
-      <button class="btn btn-g" onclick="submitAnimal(this)">Kaydet</button>
-      <button class="btn btn-o" onclick="closeM('m-animal')">İptal</button>
+      <button id="m-animal-btn" class="btn btn-g" onclick="submitAnimal(this)">Kaydet</button>
+      <button class="btn btn-o" onclick="closeAnimalEdit()">İptal</button>
     </div>
   </div>
 </div>
