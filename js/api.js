@@ -8,8 +8,8 @@ const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
 const DB_VER  = 6;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
-                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu'];
-const APP_VERSION = '2026-03-06-b2';
+                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','hekimler'];
+const APP_VERSION = '2026-03-08-m009';
 
 // ── SUPABASE SDK ────────────────────────────
 const { createClient } = window.supabase;
