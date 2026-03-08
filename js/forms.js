@@ -32,6 +32,7 @@ async function submitAnimal(btn) {
     toast(`✅ ${devlet || kupe} eklendi (ID: ${data.hayvan_id})`);
     closeM('m-animal');
     ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
+    const cins = g('a-cinsiyet'); if (cins) cins.value = '';
     const sel = g('a-irk-sel'); if (sel) sel.value = '';
     pullTables(['hayvanlar']).then(() => Promise.all([renderSafe(), loadIrkDropdown()])).catch(console.warn);
   } catch (e) { toast(e.message, true); }
