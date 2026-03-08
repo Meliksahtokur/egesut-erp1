@@ -388,12 +388,16 @@ async function openDet(id){
       ?diseases.map(d=>`<div class="hist-row" onclick="openHstDet('${d.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${d.durum==='Aktif'?'var(--red2)':'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${d.tani||'—'}</div><div class="hist-sub">${d.tarih||''} · ${d.siddet||''} · <b style="color:${d.durum==='Aktif'?'var(--red)':'var(--green)'}">${d.durum}</b></div>${d.semptomlar?`<div class="hist-sub" style="margin-top:3px">${d.semptomlar}</div>`:''}</div></div>`).join('')
       :'<div class="empty"><div class="empty-ico">✅</div>Hastalık kaydı yok</div>');
 
-    let uremeHtml=`<div style="padding:10px 0 6px;display:flex;gap:6px">`;
+    const bekleyenToh=tohs.find(t=>t.sonuc==='Bekliyor');
+    let uremeHtml=`<div style="padding:10px 0 6px;display:flex;gap:6px;flex-wrap:wrap">`;
     if(gebeTohumlama){
       uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.1);color:var(--red);font-weight:700" onclick="abortKaydet('${a.id}','${gebeTohumlama.id}')">⚠️ Abort / Erken Doğum</button>`;
+    } else if(bekleyenToh){
+      uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(78,154,42,.1);color:var(--green);font-weight:700" onclick="tohSonucGuncelle('${bekleyenToh.id}','Gebe','${a.id}')">🤰 Gebe</button>`;
+      uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.08);color:var(--red);font-weight:700" onclick="tohSonucGuncelle('${bekleyenToh.id}','Boş','${a.id}')">❌ Boş</button>`;
+      uremeHtml+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${a.kupe_no||a.devlet_kupe||a.id}')">💉 Tohumlama Ekle</button>`;
     } else {
       uremeHtml+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${a.kupe_no||a.devlet_kupe||a.id}')">💉 Tohumlama Ekle</button>`;
-      uremeHtml+=`<button class="btn" style="flex:1;padding:9px;background:rgba(78,154,42,.1);color:var(--green);font-weight:700" onclick="openGebelikEkle('${a.id}')">🤰 Gebelik Ekle</button>`;
     }
     uremeHtml+='</div>';
     if(gebeBilgi){
@@ -1293,20 +1297,27 @@ function openMWithHayvan(modalId,inputId,kupeNo){
     }
   },100);
 }
-function openGebelikEkle(hayvanId){
-  const hayvan=_A.find(a=>a.id===hayvanId);
-  const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe||hayvanId):hayvanId;
-  const el=document.getElementById('gebelik-hayvan-label');
-  if(el) el.textContent='🐄 '+kupe;
-  const tarihEl=document.getElementById('geb-tarih');
-  if(tarihEl){
-    tarihEl.value=new Date().toISOString().split('T')[0];
-    tarihEl.max=new Date().toISOString().split('T')[0];
-  }
-  const spermaEl=document.getElementById('geb-sperma');
-  if(spermaEl) spermaEl.value='';
-  document.getElementById('m-gebelik')._hayvanId=hayvanId;
-  openM('m-gebelik');
+async function tohSonucGuncelle(tohId, sonuc, hayvanId){
+  try{
+    await db.from('tohumlama').update({sonuc}).eq('id',tohId);
+    await pullTables(['tohumlama','hayvanlar']);
+    renderSafe();
+    toast(sonuc==='Gebe'?'✅ Gebe işaretlendi':'✅ Boş işaretlendi');
+    openDet(hayvanId);
+  }catch(e){ toast(e.message,true); }
+}
+async function openGebelikEkle(hayvanId){
+  const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvanId);
+  tohs.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+  const son=tohs.find(t=>t.sonuc==='Bekliyor')||tohs[0];
+  if(!son){ toast('Tohumlama kaydı bulunamadı',true); return; }
+  const sure=confirm('Son tohumlama ('+fmtTarih(son.tarih)+' · '+(son.sperma||'—')+') Gebe olarak işaretlensin mi?');
+  if(!sure) return;
+  try{
+    await rpcOptimistic(()=>db.from('tohumlama').update({sonuc:'Gebe'}).eq('id',son.id),['tohumlama','hayvanlar']);
+    toast('✅ Gebe işaretlendi');
+    openDet(hayvanId);
+  }catch(e){ toast(e.message,true); }
 }
 
 // ──────────────────────────────────────────
