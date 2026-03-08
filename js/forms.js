@@ -8,35 +8,66 @@
 
 // ── YENİ HAYVAN ─────────────────────────────
 async function submitAnimal(btn) {
-  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli — hayvan kayıt için online olun', true); return; }
-  const devlet = v('a-devlet').trim();
-  const kupe   = v('a-kupe').trim();
-  const irk    = getIrkValue();
-  if (!devlet && !kupe) { toast('Devlet küpesi veya işletme küpesi girin', true); return; }
+  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+
+  const modal   = g('m-animal');
+  const editId  = modal?.dataset.editId || null;
+  const devlet  = v('a-devlet').trim();
+  const kupe    = v('a-kupe').trim();
+  const irk     = getIrkValue();
+
+  if (!editId && !devlet && !kupe) { toast('Devlet küpesi veya işletme küpesi girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+
   try {
-    const data = await rpc('hayvan_ekle', {
-      p_kupe_no:        kupe || null,
-      p_devlet_kupe:    devlet || null,
-      p_irk:            irk || null,
-      p_cinsiyet:       v('a-cinsiyet') || null,
-      p_dogum_tarihi:   v('a-dt') || null,
-      p_grup:           v('a-grup') || 'Genel',
-      p_padok:          v('a-padok') || 'P1',
-      p_dogum_kg:       parseFloat(v('a-dkg')) || null,
-      p_canli_agirlik:  parseFloat(v('a-agirlik')) || null,
-      p_boy:            parseFloat(v('a-boy')) || null,
-      p_renk:           v('a-renk') || null,
-      p_ayirici_ozellik: v('a-ozellik') || null,
-    });
-    toast(`✅ ${devlet || kupe} eklendi (ID: ${data.hayvan_id})`);
-    closeM('m-animal');
-    ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
-    const cins = g('a-cinsiyet'); if (cins) cins.value = '';
-    const sel = g('a-irk-sel'); if (sel) sel.value = '';
-    pullTables(['hayvanlar']).then(() => Promise.all([renderSafe(), loadIrkDropdown()])).catch(console.warn);
+    if (editId) {
+      // GÜNCELLEME MODU
+      await rpc('hayvan_guncelle', {
+        p_id:             editId,
+        p_kupe_no:        kupe || null,
+        p_devlet_kupe:    devlet || null,
+        p_irk:            irk || null,
+        p_cinsiyet:       v('a-cinsiyet') || null,
+        p_dogum_tarihi:   v('a-dt') || null,
+        p_grup:           v('a-grup') || null,
+        p_padok:          v('a-padok') || null,
+        p_dogum_kg:       parseFloat(v('a-dkg')) || null,
+        p_canli_agirlik:  parseFloat(v('a-agirlik')) || null,
+        p_boy:            parseFloat(v('a-boy')) || null,
+        p_renk:           v('a-renk') || null,
+        p_ayirici_ozellik: v('a-ozellik') || null,
+      });
+      toast(`✅ ${devlet || kupe} güncellendi`);
+      closeAnimalEdit();
+      await pullTables(['hayvanlar']);
+      renderSafe();
+      // Detay paneli güncelle
+      openDet(editId);
+    } else {
+      // EKLEME MODU
+      const data = await rpc('hayvan_ekle', {
+        p_kupe_no:        kupe || null,
+        p_devlet_kupe:    devlet || null,
+        p_irk:            irk || null,
+        p_cinsiyet:       v('a-cinsiyet') || null,
+        p_dogum_tarihi:   v('a-dt') || null,
+        p_grup:           v('a-grup') || 'Genel',
+        p_padok:          v('a-padok') || 'P1',
+        p_dogum_kg:       parseFloat(v('a-dkg')) || null,
+        p_canli_agirlik:  parseFloat(v('a-agirlik')) || null,
+        p_boy:            parseFloat(v('a-boy')) || null,
+        p_renk:           v('a-renk') || null,
+        p_ayirici_ozellik: v('a-ozellik') || null,
+      });
+      toast(`✅ ${devlet || kupe} eklendi (ID: ${data.hayvan_id})`);
+      closeM('m-animal');
+      ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
+      const cins = g('a-cinsiyet'); if (cins) cins.value = '';
+      const sel  = g('a-irk-sel');  if (sel)  sel.value  = '';
+      pullTables(['hayvanlar']).then(() => Promise.all([renderSafe(), loadIrkDropdown()])).catch(console.warn);
+    }
   } catch (e) { toast(e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = editId ? '💾 Güncelle' : 'Kaydet'; } }
 }
 
 // ── DOĞUM ────────────────────────────────────
