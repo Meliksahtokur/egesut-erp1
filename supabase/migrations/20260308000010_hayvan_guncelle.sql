@@ -3,6 +3,10 @@
 -- Hayvan kartından bilgi/padok düzenleme
 -- ═══════════════════════════════════════════════════════════════
 
+-- updated_at kolonu yoksa ekle
+ALTER TABLE public.hayvanlar
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
 CREATE OR REPLACE FUNCTION public.hayvan_guncelle(
   p_id              text,
   p_kupe_no         text    DEFAULT NULL,
