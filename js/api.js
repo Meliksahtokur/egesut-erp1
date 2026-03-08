@@ -200,12 +200,16 @@ function renderSafe() {
 }
 
 // ── PULL LOCK ───────────────────────────────
-// Aynı anda iki pullTables çalışmasını önler
 let _pulling = false;
+let _pendingPull = null;  // Son bekleyen pull isteği
 
-// Sadece belirtilen tabloları Supabase'den çek
 async function pullTables(tables = []) {
-  if (!tables.length || _pulling) return;
+  if (!tables.length) return;
+  if (_pulling) {
+    // Çalışan pull varsa, bitince bu tabloları da çek
+    _pendingPull = [...new Set([...(_pendingPull || []), ...tables])];
+    return;
+  }
   _pulling = true;
   try {
     const FETCHERS = {
@@ -225,6 +229,12 @@ async function pullTables(tables = []) {
     await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
   } finally {
     _pulling = false;
+    // Bekleyen pull varsa çalıştır
+    if (_pendingPull && _pendingPull.length) {
+      const pending = _pendingPull;
+      _pendingPull = null;
+      pullTables(pending).then(renderSafe).catch(console.warn);
+    }
   }
 }
 
