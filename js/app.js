@@ -348,7 +348,7 @@ function spermaModStok() {
   const sel = g('i-sperma-select');
   if (!sel) return;
 
-  const stoklar = window._appState?.stok?.filter(s => s.kategori === 'Sperma' && s.miktar > 0) || [];
+  const stoklar = (window._appState?.stok || _S || []).filter(s => s.kategori === 'Sperma' && (s.guncel ?? s.miktar ?? 0) > 0);
 
   if (stoklar.length === 0) {
     sel.innerHTML = '<option value="">— Stokta sperma yok —</option>';
