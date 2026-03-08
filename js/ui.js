@@ -1268,7 +1268,15 @@ function acNav(e,listId){
 // ──────────────────────────────────────────
 function openMWithHayvan(modalId,inputId,kupeNo){
   openM(modalId);
-  setTimeout(()=>{ const el=document.getElementById(inputId); if(el) el.value=kupeNo; },100);
+  setTimeout(()=>{
+    const el=document.getElementById(inputId);
+    if(el){ el.value=kupeNo; el.dispatchEvent(new Event('input')); }
+    if(modalId==='m-disease'){
+      const kat=document.getElementById('d-kat');
+      if(kat){ kat.value=''; }
+      if(typeof filterHastalikList==='function') filterHastalikList();
+    }
+  },100);
 }
 function openGebelikEkle(hayvanId){
   const tarih=prompt('Tohumlama tarihi (YYYY-MM-DD):');
