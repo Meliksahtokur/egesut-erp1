@@ -339,7 +339,7 @@ function animalGrupDegisti() {
 }
 
 // ── SPERMA LİSTESİ ──────────────────────────
-function spermaModStok() {
+async function spermaModStok() {
   g('sperma-stok-area').style.display = 'block';
   g('sperma-elle-area').style.display = 'none';
   g('btn-sperma-stok').style.background = 'rgba(42,107,181,.2)';
@@ -347,6 +347,9 @@ function spermaModStok() {
 
   const sel = g('i-sperma-select');
   if (!sel) return;
+
+  // _S henüz yüklenmediyse yükle
+  if (!_S || !_S.length) await loadStock();
 
   const stoklar = (window._appState?.stok || _S || []).filter(s => s.kategori === 'Sperma' && (s.guncel ?? s.miktar ?? 0) > 0);
 
