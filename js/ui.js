@@ -371,7 +371,8 @@ async function openDet(id){
         }
         return ht;
       })()}
-      <button class="btn btn-o" style="margin-top:4px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
+      <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
+      <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
       <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>`;
 
     const gebeTohumlama=tohs.find(t=>t.sonuc==='Gebe');
@@ -419,6 +420,81 @@ async function openDet(id){
 function closeDet(){ document.getElementById('det').classList.remove('on'); }
 
 // Not modal
+// ──────────────────────────────────────────
+// HAYVAN BİLGİ DÜZENLEME
+// ──────────────────────────────────────────
+async function openAnimalEdit(id){
+  const a=_A.find(x=>x.id===id); if(!a){ toast('Hayvan bulunamadı',true); return; }
+  // Edit modunu işaretle
+  const modal=document.getElementById('m-animal');
+  if(!modal) return;
+  modal.dataset.editId=id;
+  document.getElementById('m-animal-title').textContent='✏️ Bilgileri Düzenle';
+  document.getElementById('m-animal-btn').textContent='💾 Güncelle';
+
+  openM('m-animal');
+
+  // Mevcut değerleri doldur
+  setTimeout(async()=>{
+    if(a.devlet_kupe) document.getElementById('a-devlet').value=a.devlet_kupe;
+    if(a.kupe_no)     document.getElementById('a-kupe').value=a.kupe_no;
+    if(a.cinsiyet){
+      document.getElementById('a-cinsiyet').value=a.cinsiyet;
+    }
+    if(a.dogum_tarihi) document.getElementById('a-dt').value=a.dogum_tarihi;
+    if(a.dogum_kg)    document.getElementById('a-dkg').value=a.dogum_kg;
+    if(a.canli_agirlik) document.getElementById('a-agirlik').value=a.canli_agirlik;
+    if(a.boy)         document.getElementById('a-boy').value=a.boy;
+    if(a.renk)        document.getElementById('a-renk').value=a.renk||'';
+    if(a.ayirici_ozellik) document.getElementById('a-ozellik').value=a.ayirici_ozellik||'';
+
+    // Irk dropdown
+    await loadIrkDropdown();
+    const irkSel=document.getElementById('a-irk-sel');
+    if(irkSel && a.irk){
+      // Seçeneklerde var mı?
+      const opt=[...irkSel.options].find(o=>o.value===a.irk);
+      if(opt){ irkSel.value=a.irk; }
+      else {
+        irkSel.value='__diger__';
+        const txt=document.getElementById('a-irk-txt');
+        if(txt){ txt.style.display='block'; txt.disabled=false; txt.value=a.irk; }
+      }
+    }
+
+    // Grup + padok
+    animalFormGuncelle();
+    setTimeout(()=>{
+      const grupSel=document.getElementById('a-grup');
+      if(grupSel && a.grup){
+        // Seçenekte varsa set et, yoksa ekle
+        const opt=[...grupSel.options].find(o=>o.value===a.grup);
+        if(!opt) grupSel.innerHTML+=`<option value="${a.grup}">${a.grup}</option>`;
+        grupSel.value=a.grup;
+        animalGrupDegisti();
+        setTimeout(()=>{
+          const padokSel=document.getElementById('a-padok');
+          if(padokSel && a.padok){
+            const popt=[...padokSel.options].find(o=>o.value===a.padok);
+            if(!popt) padokSel.innerHTML+=`<option value="${a.padok}">${a.padok}</option>`;
+            padokSel.value=a.padok;
+          }
+        },50);
+      }
+    },50);
+  },100);
+}
+
+function closeAnimalEdit(){
+  const modal=document.getElementById('m-animal');
+  if(modal){ delete modal.dataset.editId; }
+  const titleEl=document.getElementById('m-animal-title');
+  const btnEl=document.getElementById('m-animal-btn');
+  if(titleEl) titleEl.textContent='🐄 Hayvan Ekle';
+  if(btnEl)   btnEl.textContent='Kaydet';
+  closeM('m-animal');
+}
+
 function openNotModal(hayvanId,kupe){
   document.getElementById('not-hid').value=hayvanId;
   document.getElementById('not-title').textContent='📝 '+kupe+' — Not Ekle';
