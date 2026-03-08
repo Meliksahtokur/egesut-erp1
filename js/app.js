@@ -274,9 +274,11 @@ function animalFormGuncelle() {
   const hint     = g('a-grup-hint');
   if (!grupSel) return;
 
-  // Yaş hesapla
   let yasGun = null;
-  if (dt) yasGun = Math.floor((Date.now() - new Date(dt)) / 86400000);
+  if (dt && dt.trim() !== '') {
+    const d = new Date(dt);
+    if (!isNaN(d.getTime())) yasGun = Math.floor((Date.now() - d) / 86400000);
+  }
 
   let gruplar = [];
 
