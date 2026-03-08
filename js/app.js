@@ -4,12 +4,27 @@
 // ══════════════════════════════════════════
 
 // ── SABİT VERİLER ──────────────────────────
-const HEKIMLER = [
+// HEKIMLER artık DB'den geliyor (migration 009)
+// Fallback: DB erişilemezse bu liste kullanılır
+let HEKIMLER = [
   { id: 'H1', ad: 'Melik Tokur' },
   { id: 'H2', ad: 'Hüseyin Aygün' },
   { id: 'H3', ad: 'Süleyman Kocabaş' },
 ];
 const VARSAYILAN_HEKIM = 'H1';
+
+// DB'den hekimleri yükle
+async function loadHekimler() {
+  try {
+    const { data, error } = await db.rpc('hekim_listesi');
+    if (!error && data && data.length > 0) {
+      HEKIMLER = data.map(h => ({ id: h.id, ad: h.ad, telefon: h.telefon }));
+    }
+  } catch (e) {
+    console.warn('Hekimler DB\'den yüklenemedi, fallback kullanılıyor:', e.message);
+  }
+  populateHekimSelects();
+}
 
 const HASTALIK_LISTESI = [
   'Mastit','Subklinik Mastit','Klinik Mastit',
@@ -180,6 +195,10 @@ function ayarlarHekimKaydet() {
   if (g('ay-hekim-ad')) g('ay-hekim-ad').value = '';
   renderAyarlarHekimList();
   populateHekimSelects();
+  // DB'ye de yaz (online ise)
+  if (navigator.onLine) {
+    db.rpc('hekim_ekle', { p_id: id, p_ad: ad }).catch(e => console.warn('Hekim DB yazılamadı:', e.message));
+  }
   toast('Hekim eklendi');
 }
 function customHekimSil(id) {
@@ -493,7 +512,7 @@ window.addEventListener('load', async () => {
   const t = new Date().toISOString().split('T')[0];
   ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { const el = g(id); if (el) el.value = t; });
 
-  try { populateHekimSelects(); } catch (e) {}
+  await loadHekimler();  // DB'den + fallback
   await loadIrkDropdown();
 
   try { await renderFromLocal(); } catch (e) {
