@@ -90,7 +90,18 @@ function openM(id) {
     animalFormGuncelle();
   }
 }
-function closeM(id) { g(id)?.classList.remove('on'); }
+function closeM(id) {
+  g(id)?.classList.remove('on');
+  // Hayvan formunu tam sıfırla — bir sonraki açılışta temiz başlasın
+  if (id === 'm-animal') {
+    ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
+    const cins = g('a-cinsiyet'); if (cins) cins.value = '';
+    const irkSel = g('a-irk-sel'); if (irkSel) irkSel.value = '';
+    const grup = g('a-grup'); if (grup) grup.innerHTML = '<option value="">Önce cinsiyet seçin</option>';
+    const padok = g('a-padok'); if (padok) padok.innerHTML = '<option value="">Önce grup seçin</option>';
+    const hint = g('a-grup-hint'); if (hint) hint.style.display = 'none';
+  }
+}
 function mClose(e, el) { if (e.target === el) el.classList.remove('on'); }
 
 function toast(msg, err = false) {
