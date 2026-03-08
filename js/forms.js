@@ -40,8 +40,7 @@ async function submitAnimal(btn) {
       toast(`✅ ${devlet || kupe} güncellendi`);
       closeAnimalEdit();
       await pullTables(['hayvanlar']);
-      renderSafe();
-      // Detay paneli güncelle
+      await renderFromLocal();
       openDet(editId);
     } else {
       // EKLEME MODU

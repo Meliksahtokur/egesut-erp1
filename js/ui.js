@@ -349,7 +349,7 @@ async function openDet(id){
         <div class="ss-item"><div class="ss-val">${tasks.length+subs.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
       </div>
       <div class="info-grid">
-        ${[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Grup',v:a.grup||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum Kg',v:a.dogum_kg||'—'},{l:'Durum',v:a.durum||'—'}].map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
+        ${[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Cinsiyet',v:a.cinsiyet||'—'},{l:'Grup',v:a.grup||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Doğum Kg',v:a.dogum_kg?a.dogum_kg+' kg':'—'},{l:'Canlı Ağırlık',v:a.canli_agirlik?a.canli_agirlik+' kg':'—'},{l:'Boy',v:a.boy?a.boy+' cm':'—'},{l:'Renk',v:a.renk||'—'},{l:'Ayırt Edici',v:a.ayirici_ozellik||'—'},{l:'Durum',v:a.durum||'—'}].map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
       </div>
       ${(()=>{
         const anneObj=a.anne_id?_A.find(x=>x.id===a.anne_id):null;
