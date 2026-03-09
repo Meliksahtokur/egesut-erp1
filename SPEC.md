@@ -1,6 +1,6 @@
-# EgeSüt ERP — SPEC v3
+# EgeSüt ERP — SPEC v5
 > Her oturumun başında okunur. Hem harita hem rota. Sigortamız.
-> Son güncelleme: 2026-03-07
+> Son güncelleme: 2026-03-09 — Sprint 1 kısmi tamamlandı, SW kaldırıldı, hayvan düzenleme eklendi
 
 ---
 
@@ -10,33 +10,40 @@
 - Migration 008 push edildi (tüm stored proc'lar, triggerlar, RLS, view)
 - Modüler yapı: index.html + js/api.js + js/app.js + js/ui.js + js/forms.js
 - Supabase JS SDK v2 (CDN)
-- Service Worker cache v11
+- ~~Service Worker cache v11~~ → **SW KALDIRILDI** (cache kilidi sorunu yaşatıyordu, offline-first ihtiyaç yok)
 - pullTables / renderSafe / rpcOptimistic optimistic UI sistemi
 - Hayvan kaydı (hayvan_ekle RPC)
 - Irk dropdown (DB'den, kullanım sıklığına göre, "Diğer" text input)
 - Tohumlama kaydı (ileri tarih engeli var)
 - Görev tamamlama
-- Sperma dropdown (spermaModStok / spermaModElle fonksiyonları eklendi)
+- Sperma dropdown (spermaModStok / spermaModElle)
 - islem_log trigger (hayvanlar/dogum/tohumlama/hastalik/kizginlik)
 - SECURITY DEFINER tüm stored proc'lara eklendi
+- **Migration 009 push edildi** (hekimler tablosu, tohumlama validasyon, islem_log payload jsonb, hayvan_timeline_view)
+- **Migration 010 push edildi** (hayvan_guncelle RPC — küpe çakışma kontrolü, COALESCE pattern)
+- **S1-01 ✅** Grup filtreleme düzeltildi — closeM() hayvan formunu tam sıfırlıyor
+- **S1-02 ✅** Tohumlama validasyonu — erkek/12ay altı/aktif gebelik DB'de engelleniyor (migration 009)
+- **S1-03 ✅** Hayvan kartından tedavi küpe otodolumu — dispatchEvent kaldırıldı, acMap ile kapatılıyor
+- **S2-04 ✅** Hekimler DB'ye taşındı — migration 009, loadHekimler() ile fallback korumalı
+- **Hayvan bilgi düzenleme ✅** — hayvan kartından ✏️ Bilgileri Düzenle butonu, tüm fiziksel alanlar (boy, ağırlık, renk vb.) güncelleniyor
+- **Fiziksel alanlar hayvan kartında ✅** — info-grid'e cinsiyet, canlı ağırlık, boy, renk, ayırt edici eklendi
+- **renderFromLocal fix ✅** — güncelleme sonrası await ile _A güncelleniyor, refresh gerekmeden UI yenileniyor
+- **_pulling lock fix ✅** — ardışık pullTables çağrıları artık skip edilmiyor, queue'ya alınıyor
+- **updateBildirimBadge / loadBildirimler stub ✅** — tanımsız hata giderildi
 
 ### Çalışmayan / Eksik 🔴
 | # | Sorun | Dosya | Sprint |
 |---|---|---|---|
-| 1 | Grup filtreleme — doğum tarihi bugün gelince yasGun=0, sadece "Süt İçen" çıkıyor | app.js | S1-01 |
-| 2 | Tohumlama validasyonu — erkek/12ay altı tohumlanabiliyor | tohumlama_kaydet RPC | S1-02 |
-| 3 | Hayvan kartından tedavi açınca küpe otomatik dolmuyor | ui.js/forms.js | S1-03 |
 | 4 | Geçmiş — hayvan kaydı görünmüyor, detay/geri alma çalışmıyor | ui.js | S1-04 |
-| 5 | Sürü filtrasyonu yok — dişi/erkek, gebe/boş, hasta/sağlıklı | ui.js | S2-01 |
-| 6 | Hayvan detay ekranı yok — kilo/boy/notlar/timeline görünmüyor | ui.js | S2-02 |
-| 7 | Hastalık formunda kategori→hastalık zinciri yok | ui.js/index.html | S2-03 |
-| 8 | Hekimler DB'de değil, app.js'de sabit array | migration 009 | S2-04 |
-| 9 | Abort tabı çalışmıyor — gebe listesi + abort kaydet akışı | ui.js/forms.js | S2-05 |
-| 10 | Abort badge hayvan kartında yok | ui.js | S2-05 |
-| 11 | Gebelik tabında "Tohumlama Ekle" butonu kaldırılmadı | ui.js | S2-06 |
-| 12 | Doğum tabında tetiklenen görevler görünmüyor | ui.js | S2-06 |
-| 13 | Görev renk mantığı eksik — geciken/bugün/yakın/gelecek | ui.js | S2-07 |
-| 14 | Sperma stoktan gelmiyor — window._appState bağlantısı eksik | app.js | S1-05 |
+| 5 | Sperma stoktan gelmiyor — window._appState bağlantısı eksik | app.js | S1-05 |
+| 6 | Sürü filtrasyonu yok — dişi/erkek, gebe/boş, hasta/sağlıklı | ui.js | S2-01 |
+| 7 | Hayvan detay ekranı yok — kilo/boy/notlar/timeline görünmüyor | ui.js | S2-02 |
+| 8 | Hastalık formunda kategori→hastalık zinciri yok | ui.js/index.html | S2-03 |
+| 10 | Abort tabı çalışmıyor — gebe listesi + abort kaydet akışı | ui.js/forms.js | S2-05 |
+| 11 | Abort badge hayvan kartında yok | ui.js | S2-05 |
+| 12 | Gebelik tabında "Tohumlama Ekle" butonu kaldırılmadı | ui.js | S2-06 |
+| 13 | Doğum tabında tetiklenen görevler görünmüyor | ui.js | S2-06 |
+| 14 | Görev renk mantığı eksik — geciken/bugün/yakın/gelecek | ui.js | S2-07 |
 
 ### Temizlik Bekleyen 🟡
 | # | Görev |
@@ -45,10 +52,11 @@
 | T-02 | _gecmisFallback() kaldır — islem_log her şeyi yazıyor |
 | T-03 | Eski raw fetch/HDR/SB_URL kalıntılarını temizle |
 | T-04 | APP_VERSION güncelle |
+| T-05 | pullTables() setInterval kaldır — Realtime geçince gereksiz |
 
 ---
 
-## 1. MİMARİ
+## 1. MİMARİ — MEVCUT
 
 ```
 Frontend (JS)
@@ -66,36 +74,54 @@ PostgreSQL (Veri)
 
 ### Dosya Yapısı (Mevcut)
 ```
-index.html      ~901 satır   — sadece HTML/CSS
-js/api.js                    — Supabase client, pullTables, renderSafe, rpcOptimistic
-js/app.js                    — init, routing, global state, form yardımcıları
-js/ui.js        ~1501 satır  — tüm render fonksiyonları
-js/forms.js                  — tüm submit fonksiyonları
-sw.js           v11          — cache (tüm js dosyaları dahil)
-supabase/migrations/         — 008 migration push edildi
-```
-
-### SDK Kullanım Şekli
-```javascript
-// Veri çek
-const { data, error } = await db.from('hayvan_durum_view').select('*')
-
-// Stored procedure
-const { data, error } = await db.rpc('dogum_kaydet', {
-  p_anne_id: '...', p_tarih: '...', p_kupe: '...'
-})
-
-// Hedefli sync (optimistic UI)
-await pullTables(['hayvanlar', 'gorev_log'])
-renderSafe()
-
-// IndexedDB cache — offline için
-await idbClearAndPut('hayvanlar', data)
+index.html      ~922 satır   — sadece HTML/CSS
+js/api.js       ~324 satır   — Supabase client, pullTables, renderSafe, rpcOptimistic
+js/app.js       ~535 satır   — init, routing, global state, form yardımcıları
+js/ui.js        ~1540 satır  — tüm render fonksiyonları
+js/forms.js     ~684 satır   — tüm submit fonksiyonları
+sw.js                        — SW kaydını siler (cache temizleme), fetch handler YOK
+supabase/migrations/         — 010 push edildi
 ```
 
 ---
 
-## 2. VERİTABANI
+## 2. MİMARİ VİZYON — HEDEF (Sprint 3+)
+
+> Strangler fig pattern ile yavaş geçiş.
+
+### Teşhis — Mevcut 3 Sorun
+```
+1. UI-Centric  → iş mantığı kısmen ui.js'de, bir şey değişince başkası kırılıyor
+2. Data Dump   → frontend veriyi ayıklıyor/hesaplıyor (view kısmen çözüyor)
+3. God Module  → ui.js 1540 satır, büyümeye devam ediyor
+```
+
+### Hedef Mimari
+```
+USER ACTION
+    ↓
+EVENT INSERT (events tablosu)
+    ↓
+POSTGRES TRIGGER
+    ↓
+PROJECTION UPDATE (state tabloları)
+    ↓
+SUPABASE REALTIME (websocket)
+    ↓
+FRONTEND STATE UPDATE (polling yok)
+```
+
+### Eksik — Sprint 3'te Eklenecek
+```
+events tablosu   → islem_log rename + payload standardize
+eventBus.js      → 20 satır frontend event bus
+modules/         → her yeni özellik domain modülü olarak
+Realtime sub     → supabase.channel() → polling kalkacak
+```
+
+---
+
+## 3. VERİTABANI
 
 ### Migration Durumu
 | Migration | İçerik | Durum |
@@ -104,35 +130,18 @@ await idbClearAndPut('hayvanlar', data)
 | 006 | hayvan_durum_view, irk_esik, bildirim_log, islem_log, kupe_musait_mi() | ✅ |
 | 007 | updated_at, bos_gun, cikis_yap(), geri_al() | ✅ |
 | 008 | hayvan_ekle, dogum_kaydet, tohumlama_kaydet, kizginlik_kaydet, hastalik_kaydet, abort_kaydet, hayvan_not_ekle, triggerlar, RLS, SECURITY DEFINER | ✅ |
-| 009 | hekimler tablosu, tohumlama validasyon güncelle, hayvan_timeline_view | ⏳ |
-
-### Migration 009 — Planlanıyor
-```sql
--- Hekimler tablosu
-CREATE TABLE IF NOT EXISTS public.hekimler (
-  id text PRIMARY KEY DEFAULT 'H'||nextval('hekimler_seq')::text,
-  ad text NOT NULL,
-  telefon text,
-  aktif boolean DEFAULT true
-);
-INSERT INTO hekimler (id, ad) VALUES ('H1','Dr. Ahmet Yılmaz'),('H2','Dr. Elif Kaya')
-ON CONFLICT DO NOTHING;
-
--- tohumlama_kaydet validasyon güncelle
--- yaş < 365 gün → hata
--- cinsiyet = 'Erkek' → hata
--- sonuc = 'Gebe' olan aktif tohumlama var → hata
-
--- hayvan_timeline_view — detay ekranı için
--- tüm islem_log kayıtlarını hayvan bazında göster
-```
+| 009 | hekimler tablosu, tohumlama validasyon (erkek/yaş/gebelik), hayvan_timeline_view, islem_log payload jsonb | ✅ |
+| 010 | hayvan_guncelle RPC (küpe çakışma + COALESCE pattern) | ✅ |
+| 011 | hayvan_durum_view'a fiziksel alanlar (boy/ağırlık/renk) — şu an gerek yok, view pullTables'dan zaten geliyor | ⏸ Beklemede |
+| 012 | Realtime subscription, projection tabloları, eventBus entegrasyonu | 🔮 Sprint 3 |
 
 ### Mevcut Stored Procedures
 | Proc | Açıklama |
 |---|---|
 | hayvan_ekle() | Küpe kontrolü + hayvan INSERT + ırk sayacı |
+| hayvan_guncelle() | Fiziksel + kimlik alanları güncelle, COALESCE ile sadece gönderilen değişir |
 | dogum_kaydet() | Doğum + buzağı + 13 görev (anne 7 + buzağı 6) |
-| tohumlama_kaydet() | Tohumlama + 2 kontrol görevi + stok hareketi |
+| tohumlama_kaydet() | Tohumlama + validasyon (erkek/yaş/gebelik) + 2 kontrol görevi + stok hareketi |
 | kizginlik_kaydet() | Kızgınlık log |
 | hastalik_kaydet() | Hastalık + ilaç stok hareketi + tedavi görevleri |
 | abort_kaydet() | Abort + hayvan durumu güncelle |
@@ -141,44 +150,53 @@ ON CONFLICT DO NOTHING;
 | geri_al() | İşlem geri alma (cop_kutusu) |
 | kupe_musait_mi() | Küpe kontrol |
 | irk_listesi() | Dropdown için ırk listesi |
+| hekim_listesi() | Hekimler dropdown |
+| hekim_ekle() | Yeni hekim ekle (app + DB) |
 
 ---
 
-## 3. YOL HARİTASI
+## 4. YOL HARİTASI
 
 ### Sprint 1 — Kritik Buglar
 ```
-[ ] S1-01  Grup filtreleme — openM'de doğum tarihi auto-fill kaldırıldı ama hala bug var
-[ ] S1-02  Tohumlama validasyonu — migration 009'a yaş+cinsiyet kontrolü
-[ ] S1-03  Hayvan kartından tedavi — küpe + hayvan adı otomatik dolsun
-[ ] S1-04  Geçmiş — hayvan kaydı görünsün, detay modal, geri alma
+[x] S1-01  Grup filtreleme — closeM() hayvan formunu tam sıfırlıyor
+[x] S1-02  Tohumlama validasyonu — migration 009'da erkek/yaş/gebelik kontrolü
+[x] S1-03  Hayvan kartından tedavi — dispatchEvent kaldırıldı, küpe düzgün doldu
+[ ] S1-04  Geçmiş — hayvan kaydı görünsün, detay modal, geri alma  ← SIRADAKI
 [ ] S1-05  Sperma stok bağlantısı — window._appState.stok
 ```
 
 ### Sprint 2 — Eksik Özellikler
 ```
+[x] S2-04  Hekimler DB'ye taşındı — migration 009
 [ ] S2-01  Sürü filtrasyonu — dişi/erkek, gebe/boş, hasta/sağlıklı, grup/padok
-[ ] S2-02  Hayvan detay ekranı — kilo, boy, renk, notlar, timeline
-[ ] S2-03  Hastalık formu — kategori→hastalık zinciri (tohumlama formu gibi)
-[ ] S2-04  Hekimler DB'ye taşı — migration 009
+[ ] S2-02  Hayvan detay ekranı — kilo, boy, renk, notlar, event timeline
+[ ] S2-03  Hastalık formu — kategori→hastalık zinciri
 [ ] S2-05  Abort akışı — gebe listesi, abort modal, badge
 [ ] S2-06  Üreme tab düzeltme — gebelik butonu kaldır, doğum görevleri
 [ ] S2-07  Görev renk mantığı — geciken/bugün/yakın/gelecek
+[ ] S2-08  Toplu işlem paneli — toplu tohumlama, aşı, padok değişimi, satış
+[ ] S2-09  Excel import/export — SheetJS, boş şablon indir → doldur → yükle
 ```
 
-### Sprint 3 — Gelecek
+### Sprint 3 — Mimari Geçiş + Gelecek
 ```
-[ ] S3-01  Üreme sekmesi UX — ayrı tablar (kızgınlık/tohumlama/gebelik/doğum)
-[ ] S3-02  Sürü ekranı — gelişmiş kart (tüm badge'ler, durum renkleri)
-[ ] S3-03  Raporlar — dönemsel istatistikler
-[ ] S3-04  Ayarlar ekranı — hekim/ırk/padok yönetimi
-[ ] S3-05  Temizlik (T-01..T-04)
-[ ] S3-06  Edge Functions değerlendirmesi
+[ ] S3-01  events tablosu — islem_log standardize, payload jsonb
+[ ] S3-02  Supabase Realtime subscription — polling kalkacak
+[ ] S3-03  eventBus.js — 20 satır, frontend domain event bus
+[ ] S3-04  modules/ klasörü — yeni özellikler domain modülü olarak
+[ ] S3-05  Workflow pipeline — kızgınlık→tohumlama→gebelik→doğum zinciri
+[ ] S3-06  Üreme sekmesi UX — ayrı tablar
+[ ] S3-07  Sürü ekranı — gelişmiş kartlar, tüm badge'ler
+[ ] S3-08  Raporlar — dönemsel istatistikler
+[ ] S3-09  Ayarlar ekranı — hekim/ırk/padok yönetimi
+[ ] S3-10  Temizlik (T-01..T-05)
+[ ] S3-11  Aşılama modülü
 ```
 
 ---
 
-## 4. ÖZELLİK DETAYLARI
+## 5. ÖZELLİK DETAYLARI
 
 ### Yaş → Grup Mantığı
 ```
@@ -188,7 +206,7 @@ Dişi:
   181-365 gün → Düve (Küçük)
   366-730 gün → Düve (Büyük)
   730+ gün    → Sağmal (Laktasyonda) / Sağmal (Kuru) / Gebe Düve / Düve (Büyük)
-  Tarih yok   → Tüm dişi gruplar
+  Tarih yok   → Tüm dişi gruplar açık
 
 Erkek:
   0-75 gün    → Süt İçen Buzağı
@@ -204,8 +222,8 @@ Sağmal (Kuru)          → Kuru/Gebe Padok
 Gebe Düve              → Kuru/Gebe Padok
 Düve (Büyük)           → Düve Padok (Büyük)
 Düve (Küçük)           → Düve Padok (Küçük)
-S�t İçen Buzağı        → Buzağı Padok (Süt İçenler)
-S�tten Kesilmiş Buzağı → Buzağı Padok (Sütten Kesilmiş)
+Süt İçen Buzağı        → Buzağı Padok (Süt İçenler)
+Sütten Kesilmiş Buzağı → Buzağı Padok (Sütten Kesilmiş)
 Besi                   → Düve Padok (Büyük), Düve Padok (Küçük), Sağmal Padok
 ```
 
@@ -229,43 +247,80 @@ Abort tab açılır
   → Hayvan kartında: "⚠️ {n} Abort" kırmızı badge
 ```
 
-### Geçmiş Etiketleri
+### Geçmiş / Event Etiketleri
 ```
-DOGUM_KAYDI    → "🐄 Doğum Kaydı"
-TOHUMLAMA      → "💉 Tohumlama"
-HASTALIK_KAYDI → "🏥 Hastalık Kaydı"
-HAYVAN_EKLENDI → "🐮 Hayvan Eklendi"
-SUTTEN_KESME   → "🍼 Sütten Kesme"
-SATIS_KAYDI    → "💰 Satış"
-OLUM_KAYDI     → "💀 Ölüm"
-ABORT_KAYDI    → "⚠️ Abort"
-KIZGINLIK      → "🔴 Kızgınlık"
-TEDAVI_GUNCELLE→ "💊 Tedavi Güncelleme"
+DOGUM_KAYDI     → "🐄 Doğum Kaydı"
+TOHUMLAMA       → "💉 Tohumlama"
+HASTALIK_KAYDI  → "🏥 Hastalık Kaydı"
+HAYVAN_EKLENDI  → "🐮 Hayvan Eklendi"
+SUTTEN_KESME    → "🍼 Sütten Kesme"
+SATIS_KAYDI     → "💰 Satış"
+OLUM_KAYDI      → "💀 Ölüm"
+ABORT_KAYDI     → "⚠️ Abort"
+KIZGINLIK       → "🔴 Kızgınlık"
+TEDAVI_GUNCELLE → "💊 Tedavi Güncelleme"
+ASIL_KAYDI      → "💉 Aşı"
+PADOK_DEGISIM   → "🏠 Padok Değişimi"
 ```
 
 ### Irk Alanı
 ```
 [Holstein ▼] seçilince → text input gizli
-[+ Diğer]   seçilince → text input açılır, kullanıcı yazar
+[+ Diğer]   seçilince → text input açılır
 ```
 - Dropdown: irk_esik tablosundan, kullanim_sayisi DESC
 - Sabit fallback: Holstein, Simental, Montofon, Jersey, Angus, Diğer
 
+### Excel Import/Export (Sprint 2)
+```
+Export: hayvan_durum_view → SheetJS → .xlsx indir
+Import: boş şablon indir → doldur → yükle → hayvan_ekle() RPC loop
+Kural: DB her zaman kaynak gerçek, Excel sadece giriş/çıkış aracı
+```
+
 ---
 
-## 5. OTURUM KURALLARI
+## 6. OTURUM KURALLARI
 
 1. **Her oturum tek sprint item.** Bitmeden yenisine geçme.
 2. **Küçük değişiklik** → sadece değişen kod bloğunu at, tüm dosyayı değil.
 3. **Bug önce konsol hatası.** "Çalışmıyor" yetmez, hata mesajı lazım.
 4. **Migration her zaman idempotent.** DROP IF EXISTS + CREATE OR REPLACE.
 5. **RLS her yeni tabloda.** Tablo ekle = policy ekle = SECURITY DEFINER ekle.
-6. **Oturum başı:** SPEC.md oku, hangi sprint item'dan devam edildiğini söyle.
+6. **Oturum başı:** SPEC.md oku, hangi sprint item'dan devam et.
 7. **Oturum sonu:** SPEC.md güncelle, tamamlananları işaretle.
+8. **Mimari kural:** Frontend hesap yapmaz. Event gönder, state göster.
+9. **SW yok.** Service Worker kaldırıldı, ekleme. Offline-first ihtiyaç yok.
+10. **Migration öncesi kolon kontrolü.** View güncellemeden önce tablo kolonlarını doğrula.
+11. **Upload yerine GitHub web editörü.** Spck'tan dosya upload etme — çakışma riski var. GitHub'da direkt düzenle.
 
 ---
 
-## 6. TEKNİK REFERANS
+## 7. DERSLER — TEKRAR EDİLMESİN
+
+### SW Cache Kilidi (2026-03-08)
+**Ne oldu:** SW "önce cache" stratejisi yüzünden yeni dosyalar deploy edilse bile eski kod çalışmaya devam etti. Firefox SW'yi otomatik güncellemedi.
+**Çözüm:** SW tamamen kaldırıldı. `app.js`'de unregister + cache temizleme kodu var.
+**Ders:** SW'yi sadece gerçek offline-first ihtiyaçta kullan. Supabase bağlantısı olmadan uygulama zaten çalışmıyor.
+
+### Spck Upload Çakışması (2026-03-08)
+**Ne oldu:** Spck IDE'den 6 dosya upload edilirken `api.js`'e `app.js` içeriği gitti. `db is not defined` hatası çıktı.
+**Çözüm:** GitHub web editöründen dosya düzenlendi.
+**Ders:** Toplu upload yerine GitHub web editöründen tek tek düzenle. Upload öncesi diff kontrolü yap.
+
+### View Güncelleme — Kolon Sırası (2026-03-08)
+**Ne oldu:** `CREATE OR REPLACE VIEW` kolon sırası değişince `cannot change name of view column` hatası verdi.
+**Çözüm:** Önce `DROP VIEW IF EXISTS`, sonra `CREATE VIEW`.
+**Ders:** View güncellemelerinde her zaman DROP + CREATE. Ayrıca yeni kolon eklemeden önce tabloda var mı kontrol et.
+
+### renderSafe vs renderFromLocal (2026-03-08)
+**Ne oldu:** Edit submit'ten sonra `renderSafe()` çağrıldı, 60ms debounce yüzünden `openDet()` eski `_A` ile açıldı.
+**Çözüm:** Kritik işlem sonrası `await renderFromLocal()` kullan.
+**Ders:** `renderSafe` = fire-and-forget, background sync için. `renderFromLocal` = kritik işlem sonrası, sıradaki adım güncel veriye bağlıysa.
+
+---
+
+## 8. TEKNİK REFERANS
 
 ### Bağlantı
 ```
@@ -281,19 +336,35 @@ window._appState = {
   hayvanlar: [],   // hayvan_durum_view
   stok: [],        // stok tablosu
   gorevler: [],    // gorev_log
-  gecmis: [],      // islem_log
+  gecmis: [],      // islem_log (→ events)
   bildirimler: [], // bildirim_log
 }
 ```
 
 ### Önemli Fonksiyonlar
 ```javascript
-pullTables(['tablo'])      // hedefli fetch, _pulling lock ile race condition koruması
-renderSafe()               // 60ms debounce render, spam önler
-rpcOptimistic(fn, tables)  // toast → rpc → background pullTables → renderSafe
-loadIrkDropdown()          // irk_esik'ten dropdown doldur
+pullTables(['tablo'])      // hedefli fetch, _pulling lock + _pendingPull queue
+renderSafe()               // 60ms debounce render — background sync için
+renderFromLocal()          // await'li render — kritik işlem sonrası kullan
+rpcOptimistic(fn, tables)  // toast → rpc → arka planda pull + render
+loadIrkDropdown()          // irk_esik'ten dropdown
+loadHekimler()             // DB'den hekimler, fallback korumalı
 animalFormGuncelle()       // cinsiyet+yaş → grup filtrele
 animalGrupDegisti()        // grup → padok filtrele
-spermaModStok()            // sperma stoktan seç modu
-spermaModElle()            // sperma elle gir modu
+spermaModStok()            // sperma stoktan seç
+spermaModElle()            // sperma elle gir
+openAnimalEdit(id)         // hayvan bilgi düzenleme modalı
+closeAnimalEdit()          // edit modunu temizle, form sıfırla
+```
+
+### Supabase Realtime (Sprint 3)
+```javascript
+// Polling'i tamamen kaldıracak
+supabase
+  .channel('events')
+  .on('postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'events' },
+    payload => eventBus.emit(payload.new.event_type, payload.new)
+  )
+  .subscribe()
 ```
