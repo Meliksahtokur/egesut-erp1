@@ -8,8 +8,8 @@ const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
 const DB_VER  = 6;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
-                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','hekimler'];
-const APP_VERSION = '2026-03-08-m009';
+                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu'];
+const APP_VERSION = '2026-03-06-b2';
 
 // ── SUPABASE SDK ────────────────────────────
 const { createClient } = window.supabase;
@@ -200,16 +200,12 @@ function renderSafe() {
 }
 
 // ── PULL LOCK ───────────────────────────────
+// Aynı anda iki pullTables çalışmasını önler
 let _pulling = false;
-let _pendingPull = null;  // Son bekleyen pull isteği
 
+// Sadece belirtilen tabloları Supabase'den çek
 async function pullTables(tables = []) {
-  if (!tables.length) return;
-  if (_pulling) {
-    // Çalışan pull varsa, bitince bu tabloları da çek
-    _pendingPull = [...new Set([...(_pendingPull || []), ...tables])];
-    return;
-  }
+  if (!tables.length || _pulling) return;
   _pulling = true;
   try {
     const FETCHERS = {
@@ -229,12 +225,6 @@ async function pullTables(tables = []) {
     await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
   } finally {
     _pulling = false;
-    // Bekleyen pull varsa çalıştır
-    if (_pendingPull && _pendingPull.length) {
-      const pending = _pendingPull;
-      _pendingPull = null;
-      pullTables(pending).then(renderSafe).catch(console.warn);
-    }
   }
 }
 
