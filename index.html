@@ -499,17 +499,15 @@ button,input,select,textarea{font-family:inherit}
           oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
       </div>
-      <div class="fg"><label class="flbl">Tanı *</label>
-        <input id="d-tani" class="fi" placeholder="Tanı yazın veya seçin…" autocomplete="off"
-          oninput="acDisease()" onfocus="acDisease()" onkeydown="acNav(event,'ac-dis')">
-        <div id="ac-dis" class="ac-box" style="display:none"></div>
-      </div>
+
+      <!-- KATEGORİ + ŞİDDET -->
       <div style="display:flex;gap:8px">
         <div class="fg" style="flex:1"><label class="flbl">Kategori</label>
-          <select id="d-kat" class="fsel">
-            <option value="">Seçin</option>
+          <select id="d-kat" class="fsel" onchange="filterHastalikList()">
+            <option value="">Tümü</option>
             <option>Solunum</option><option>Sindirim</option><option>Üreme</option>
-            <option>Ayak</option><option>Meme</option><option>Metabolik</option><option>Diğer</option>
+            <option>Ayak</option><option>Meme</option><option>Metabolik</option>
+            <option>Buzağı</option><option>Diğer</option>
           </select>
         </div>
         <div class="fg" style="flex:1"><label class="flbl">Şiddet</label>
@@ -519,7 +517,36 @@ button,input,select,textarea{font-family:inherit}
           </select>
         </div>
       </div>
-      <div class="fg"><label class="flbl">Semptomlar</label><input id="d-sempt" class="fi" placeholder="Opsiyonel…"></div>
+
+      <!-- TANI — önce chip'ler, sonra serbest yazım -->
+      <div class="fg">
+        <label class="flbl">Tanı *</label>
+        <div id="tani-secenekler" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px"></div>
+        <input id="d-tani" class="fi" placeholder="Tanı yazın veya üstten seçin…" autocomplete="off"
+          oninput="acDisease()" onfocus="acDisease()" onkeydown="acNav(event,'ac-dis')">
+        <div id="ac-dis" class="ac-box" style="display:none"></div>
+      </div>
+
+      <!-- LOKASYON (Meme/Ayak seçilince görünür) -->
+      <div id="d-lokasyon-wrap" style="display:none">
+        <div class="fg">
+          <label class="flbl" id="d-lokasyon-lbl">Lokasyon</label>
+          <div id="d-lokasyon-secenekler" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
+          <input type="hidden" id="d-lokasyon">
+        </div>
+      </div>
+
+      <!-- SEMPTOMLAR — çoklu dropdown -->
+      <div class="fg">
+        <label class="flbl">Semptomlar</label>
+        <div id="sempt-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
+        <div style="position:relative">
+          <select id="sempt-ekle" class="fsel" onchange="semptomEkle(this)">
+            <option value="">+ Semptom ekle…</option>
+          </select>
+        </div>
+        <input type="hidden" id="d-sempt">
+      </div>
 
       <!-- ÇOKLU İLAÇ -->
       <div style="margin:8px 0 4px;font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em">İlaçlar</div>
@@ -529,7 +556,7 @@ button,input,select,textarea{font-family:inherit}
       <!-- TEDAVİ DEVAM GÜNLERİ -->
       <div class="fg"><label class="flbl">Tedavi Kaç Gün Daha Devam Edecek?</label>
         <input id="d-tedavi-gun" class="fi" type="number" min="0" max="30" placeholder="0 = sadece bugün" value="0">
-        <div style="font-size:.68rem;color:var(--ink3);margin-top:3px">Girilen gün sayısı kadar takip görevi oluşturulur (3 saat öncesinden bildirim)</div>
+        <div style="font-size:.68rem;color:var(--ink3);margin-top:3px">Girilen gün sayısı kadar takip görevi oluşturulur</div>
       </div>
 
       <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
