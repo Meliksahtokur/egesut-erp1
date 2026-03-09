@@ -804,7 +804,9 @@ async function loadGecmis(f,btn){
       if(type==='hastalik'){ title=`${hayvanLabel||'?'} — ${data.tani||'?'}`; const sc=data.durum==='Aktif'?'var(--red)':'var(--green)'; sub=`${data.siddet||''} · <b style="color:${sc}">${data.durum||''}</b>${hkName}`; }
       if(type==='gorev'){ const gHayvan=_A.find(a=>a.id===data.hayvan_id); const gLabel=gHayvan?(gHayvan.kupe_no||gHayvan.devlet_kupe):data.hayvan_id; title=`${gLabel||'GENEL'} — ${data.aciklama||''}`; sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span>${hkName}`; }
       if(type==='islem'){
-        const snap=data.snapshot||{}; const kupe=snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
+        const snap=data.snapshot||{}; 
+        const hayvanObj2=_A.find(a=>a.id===data.ana_hayvan_id);
+        const kupe=hayvanObj2?(hayvanObj2.kupe_no||hayvanObj2.devlet_kupe):snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
         const etiket={'HAYVAN_EKLENDI':'🐮 Hayvan Eklendi','ABORT_KAYDI':'⚠️ Abort','KIZGINLIK_KAYDI':'🔴 Kızgınlık'}[data.tip]||data.tip;
         title=`${kupe} — ${etiket}`; sub=snap.irk||snap.grup||'';
         if(snap.kupe_no||snap.devlet_kupe) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
@@ -1107,7 +1109,10 @@ async function openHstDet(id){
   _curHst=h;
   const hk=[...HEKIMLER,...(_customHekimler||[])].find(x=>x.id===h.hekim_id);
   const stk=(await idbGetAll('stok')).find(s=>s.id===h.ilac_stok_id);
-  document.getElementById('hd-hayvan').textContent=h.hayvan_id||'?';
+  // Küpe çözümle
+  const hayvanObj=_A.find(a=>a.id===h.hayvan_id||a.kupe_no===h.hayvan_id);
+  const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||h.hayvan_id):h.hayvan_id;
+  document.getElementById('hd-hayvan').textContent=hayvanLabel||'?';
   document.getElementById('hd-tani').textContent=`🏥 ${h.tani||'?'}`;
   const chips=[
     `<span style="background:${h.durum==='Aktif'?'rgba(192,50,26,.12)':'rgba(78,154,42,.12)'};color:${h.durum==='Aktif'?'var(--red)':'var(--green)'};padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700">${h.durum||'Aktif'}</span>`,
@@ -1132,6 +1137,14 @@ async function openHstDet(id){
   if(h.semptomlar) rows.push(`<b>Semptomlar:</b> ${h.semptomlar}`);
   if(ilacHtml) rows.push(ilacHtml);
   document.getElementById('hd-body').innerHTML=rows.join('<br>')||'Ek bilgi yok';
+  // islem_log'dan bu kaydın id'sini bul (geri alma için)
+  const islemLog=await idbGetAll('islem_log');
+  const islemKayit=islemLog.find(l=>l.tip==='HASTALIK_KAYDI'&&(l.payload?.kaynak_id===id||l.snapshot?.id===id));
+  const hdGeriAlBtn=document.getElementById('hd-geri-al-btn');
+  if(hdGeriAlBtn){
+    if(islemKayit){ hdGeriAlBtn.style.display='block'; hdGeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${h.tani||'?'} (${fmtTarih(h.tarih)})`); }
+    else { hdGeriAlBtn.style.display='none'; }
+  }
   openM('m-hst-det');
 }
 
@@ -1143,7 +1156,10 @@ async function openTohDet(id){
   const t=all.find(x=>x.id===id); if(!t) return;
   _curToh=t;
   const hk=[...HEKIMLER,...(_customHekimler||[])].find(x=>x.id===t.hekim_id);
-  document.getElementById('td2-hayvan').textContent=t.hayvan_id||'?';
+  // Küpe çözümle
+  const hayvanObj=_A.find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
+  const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||t.hayvan_id):t.hayvan_id;
+  document.getElementById('td2-hayvan').textContent=hayvanLabel||'?';
   document.getElementById('td2-sperma').textContent=`💉 ${t.sperma||'?'}`;
   const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'?'var(--red)':'var(--amber)';
   const chips=[
@@ -1153,6 +1169,14 @@ async function openTohDet(id){
     hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
   ];
   document.getElementById('td2-meta').innerHTML=chips.filter(Boolean).join('');
+  // islem_log'dan bu kaydın id'sini bul (geri alma için)
+  const islemLog=await idbGetAll('islem_log');
+  const islemKayit=islemLog.find(l=>l.tip==='TOHUMLAMA'&&(l.payload?.kaynak_id===id||l.snapshot?.id===id));
+  const td2GeriAlBtn=document.getElementById('td2-geri-al-btn');
+  if(td2GeriAlBtn){
+    if(islemKayit){ td2GeriAlBtn.style.display='block'; td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`); }
+    else { td2GeriAlBtn.style.display='none'; }
+  }
   openM('m-toh-det');
 }
 async function tohSonuc(sonuc){
