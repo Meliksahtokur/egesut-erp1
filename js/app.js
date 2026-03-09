@@ -165,6 +165,9 @@ async function renderFromLocal() {
   updateBildirimBadge();
 }
 
+function updateBildirimBadge() { /* Sprint 3 — bildirim modülü */ }
+async function loadBildirimler() { /* Sprint 3 — bildirim modülü */ }
+
 async function refreshAll() {
   await pullFromSupabase();
   await renderFromLocal();
@@ -511,4 +514,65 @@ document.addEventListener('keydown', e => {
     const modal = e.target.closest('.modal');
     if (!modal) return;
     const fields = Array.from(modal.querySelectorAll('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button.btn:not([disabled])'));
-  
+    const idx = fields.indexOf(e.target);
+    if (idx >= 0 && idx < fields.length - 1) fields[idx + 1].focus();
+  }
+});
+
+// ── INIT ─────────────────────────────────────
+window.addEventListener('load', async () => {
+  try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
+
+  const t = new Date().toISOString().split('T')[0];
+  ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { const el = g(id); if (el) el.value = t; });
+
+  await loadHekimler();  // DB'den + fallback
+  await loadIrkDropdown();
+
+  try { await renderFromLocal(); } catch (e) {
+    console.warn('render err:', e);
+    const el = g('dash-body');
+    if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: ${e.message}<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
+  }
+  updateSyncBar();
+
+  if (navigator.onLine) {
+    try {
+      await pullFromSupabase();
+      await renderFromLocal();
+      syncNow();
+    } catch (e) { console.warn('Pull failed:', e.message); }
+  } else {
+    g('dot')?.classList.add('warn');
+    toast('Çevrimdışı — yerel veri gösteriliyor');
+  }
+
+  buildSpermaList();
+  buildDiseaseFreq();
+
+  if (localStorage.getItem('bildirim_aktif') === '1') {
+    bildirimKontrol();
+    setInterval(bildirimKontrol, 3600000);
+  }
+});
+
+window.addEventListener('online', async () => {
+  g('dot')?.classList.remove('off', 'warn');
+  toast('🌐 Bağlantı geldi');
+  await syncNow();
+  await pullFromSupabase();
+  renderFromLocal();
+});
+
+window.addEventListener('offline', () => {
+  g('dot')?.classList.add('off');
+  toast('📵 Çevrimdışı — kayıtlar cihazda saklanacak');
+});
+
+// Service Worker — tüm kayıtları temizle
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  });
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+}
