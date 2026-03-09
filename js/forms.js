@@ -211,7 +211,7 @@ async function submitDisease(btn) {
       p_semptomlar: v('d-sempt') || null,
       p_lokasyon:   v('d-lokasyon') || null,
       p_hekim_id:   v('d-hekim') || null,
-      p_ilaclar:    JSON.stringify(ilaclar),
+      p_ilaclar:    ilaclar,
       p_tedavi_gun: tedaviGun,
     });
 
@@ -223,7 +223,9 @@ async function submitDisease(btn) {
     closeM('m-disease');
     g('ilac-rows').innerHTML = '';
     g('tani-secenekler').innerHTML = '';
-    g('d-lokasyon-wrap').style.display = 'none';
+    if(g('d-lokasyon-wrap')) g('d-lokasyon-wrap').style.display = 'none';
+    if(g('sempt-chips')) g('sempt-chips').innerHTML = '';
+    if(typeof _semptomSecili !== 'undefined') window._semptomSecili = [];
     ['d-hid','d-tani','d-sempt','d-lokasyon'].forEach(cl);
     g('d-tedavi-gun').value = '1';
     g('d-kat').value = '';

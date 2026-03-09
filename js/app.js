@@ -89,6 +89,13 @@ function openM(id) {
     loadIrkDropdown();
     animalFormGuncelle();
   }
+  if (id === 'm-disease') {
+    _semptomSecili = [];
+    if(g('sempt-chips')) g('sempt-chips').innerHTML = '';
+    if(g('d-sempt')) g('d-sempt').value = '';
+    updateSemptomDropdown('');
+    filterHastalikList();
+  }
 }
 function closeM(id) {
   g(id)?.classList.remove('on');
@@ -434,9 +441,21 @@ async function buildDiseaseFreq() {
   _disFreq = {};
   logs.forEach(l => { if (l.tani) _disFreq[l.tani] = (_disFreq[l.tani] || 0) + 1; });
 }
+// Kategoriye göre semptom listesi
+const SEMPTOM_KAT = {
+  'Solunum': ['Öksürük','Burun Akıntısı','Nefes Darlığı','Ateş','Hırıltı','İştahsızlık','Halsizlik'],
+  'Sindirim': ['İshal','Kabızlık','Şişkinlik','İştahsızlık','Ateş','Halsizlik','Ağız Kokusu'],
+  'Üreme':   ['Akıntı','Ateş','İştahsızlık','Halsizlik','Yememe','Ödem'],
+  'Ayak':    ['Topallık','Şişlik','Isı Artışı','Yara','Ağrı'],
+  'Meme':    ['Süt Değişimi','Meme Şişliği','Ateş','Ağrı','İştahsızlık','Halsizlik'],
+  'Metabolik':['Sallantı','Düşkünlük','Ateş','Halsizlik','Titreme','Yememe','Ödem'],
+  'Buzağı':  ['İshal','Halsizlik','Ateş','Göbek Şişliği','İştahsızlık','Solunum Güçlüğü'],
+};
+const SEMPTOM_GENEL = ['Ateş','Halsizlik','İştahsızlık','Ağrı','Ödem','Titreme','Yememe','Düşkünlük'];
+
 function filterHastalikList() {
-  const kat    = g('d-kat')?.value || '';
-  const wrap   = g('tani-secenekler');
+  const kat     = g('d-kat')?.value || '';
+  const wrap    = g('tani-secenekler');
   const lokWrap = g('d-lokasyon-wrap');
   const lokSec  = g('d-lokasyon-secenekler');
   const lokLbl  = g('d-lokasyon-lbl');
@@ -448,19 +467,62 @@ function filterHastalikList() {
     class="tani-btn">${h}</button>`).join('');
 
   const lokList = LOKASYON_KAT[kat] || [];
-  if (lokList.length) {
+  if (lokList.length && lokWrap && lokSec && lokLbl) {
     lokLbl.textContent = kat === 'Meme' ? 'Çeyrek' : 'Hangi Ayak';
     lokSec.innerHTML = lokList.map(l => `<button type="button" onclick="toggleLokasyon('${l}',this)"
       style="padding:5px 11px;border:1.5px solid var(--card3);border-radius:20px;background:var(--card);font-size:.72rem;font-weight:700;color:var(--ink2);cursor:pointer"
       class="lok-btn">${l}</button>`).join('');
     lokWrap.style.display = 'block';
     g('d-lokasyon').value = '';
-  } else {
+  } else if (lokWrap) {
     lokWrap.style.display = 'none';
     g('d-lokasyon').value = '';
   }
+
+  // Semptom dropdown'ı güncelle
+  _semptomSecili = [];
+  const semptChips = g('sempt-chips');
+  if (semptChips) semptChips.innerHTML = '';
+  if (g('d-sempt')) g('d-sempt').value = '';
+  updateSemptomDropdown(kat);
+
   g('d-tani').value = '';
-  g('ac-dis').style.display = 'none';
+  const acDis = g('ac-dis');
+  if (acDis) acDis.style.display = 'none';
+}
+
+let _semptomSecili = [];
+
+function updateSemptomDropdown(kat) {
+  const sel = g('sempt-ekle'); if (!sel) return;
+  const liste = (kat && SEMPTOM_KAT[kat]) ? SEMPTOM_KAT[kat] : SEMPTOM_GENEL;
+  const kalanlar = liste.filter(s => !_semptomSecili.includes(s));
+  sel.innerHTML = '<option value="">+ Semptom ekle…</option>' +
+    kalanlar.map(s => `<option value="${s}">${s}</option>`).join('');
+  sel.style.display = kalanlar.length ? 'block' : 'none';
+}
+
+function semptomEkle(sel) {
+  const val = sel.value; if (!val) return;
+  sel.value = '';
+  if (_semptomSecili.includes(val)) return;
+  _semptomSecili.push(val);
+  const chips = g('sempt-chips'); if (!chips) return;
+  const chip = document.createElement('span');
+  chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
+  chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="semptomKaldir('${val}',this.parentElement)">✕</span>`;
+  chips.appendChild(chip);
+  if (g('d-sempt')) g('d-sempt').value = _semptomSecili.join(', ');
+  const kat = g('d-kat')?.value || '';
+  updateSemptomDropdown(kat);
+}
+
+function semptomKaldir(val, chip) {
+  _semptomSecili = _semptomSecili.filter(s => s !== val);
+  chip?.remove();
+  if (g('d-sempt')) g('d-sempt').value = _semptomSecili.join(', ');
+  const kat = g('d-kat')?.value || '';
+  updateSemptomDropdown(kat);
 }
 
 function toggleLokasyon(val, btn) {
