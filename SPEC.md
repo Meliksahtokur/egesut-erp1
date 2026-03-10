@@ -1,6 +1,48 @@
 # EgeSüt ERP — SPEC v5
 > Her oturumun başında okunur. Hem harita hem rota. Sigortamız.
-> Son güncelleme: 2026-03-09 — Sprint 1 kısmi tamamlandı, SW kaldırıldı, hayvan düzenleme eklendi
+> Son güncelleme: 2026-03-10 — Pipeline kuruldu, S1-04/S2-03 kısmi, trigger fix
+
+---
+
+## 0. OTURUM BAŞI KONTROL LİSTESİ
+
+1. Bu SPEC'i oku
+2. Sprint tablosuna bak, sıradaki item'ı söyle
+3. Onay al, başla
+4. Değişiklik = diff patch formatında ver (tam dosya değil)
+5. Oturum sonu SPEC'i güncelle
+
+---
+
+## 0b. GELİŞTİRME PİPELINE'I
+
+**Araçlar:** Acode (editör) + Alpine terminal (git) + GitHub
+
+**Her değişiklik için format:**
+```
+--- a/dosya
++++ b/dosya
+@@ -N,M +N,M @@
+ context satırı
+-eski satır
++yeni satır
+ context satırı
+```
+
+**Terminal komutu:**
+```bash
+cd /home/egesut-erp1
+python3 apply.py
+# patch yapıştır → CTRL+D
+# VEYA
+python3 apply.py /tmp/p.diff
+```
+
+**Kurallar:**
+- Tam dosya rewrite YOK — sadece değişen satırlar + 2-3 context
+- sed ile de uygulanabilir basit tek satır değişimlerde
+- Migration değişiklikleri Supabase SQL Editor'dan çalıştırılır
+- apply.py push eder, SSH key oturum başında yeniden kurulabilir
 
 ---
 
@@ -133,6 +175,7 @@ Realtime sub     → supabase.channel() → polling kalkacak
 | 009 | hekimler tablosu, tohumlama validasyon (erkek/yaş/gebelik), hayvan_timeline_view, islem_log payload jsonb | ✅ |
 | 010 | hayvan_guncelle RPC (küpe çakışma + COALESCE pattern) | ✅ |
 | 011 | hayvan_durum_view'a fiziksel alanlar (boy/ağırlık/renk) — şu an gerek yok, view pullTables'dan zaten geliyor | ⏸ Beklemede |
+| 012 | _islem_log_yaz trigger fix — hastalik_log INSERT hatası düzeltildi | ✅ |
 | 012 | Realtime subscription, projection tabloları, eventBus entegrasyonu | 🔮 Sprint 3 |
 
 ### Mevcut Stored Procedures
@@ -162,8 +205,8 @@ Realtime sub     → supabase.channel() → polling kalkacak
 [x] S1-01  Grup filtreleme — closeM() hayvan formunu tam sıfırlıyor
 [x] S1-02  Tohumlama validasyonu — migration 009'da erkek/yaş/gebelik kontrolü
 [x] S1-03  Hayvan kartından tedavi — dispatchEvent kaldırıldı, küpe düzgün doldu
-[ ] S1-04  Geçmiş — hayvan kaydı görünsün, detay modal, geri alma  ← SIRADAKI
-[ ] S1-05  Sperma stok bağlantısı — window._appState.stok
+[x] S1-04  Geçmiş — küpe çözümlendi, detay modal küpe gösteriyor, geri al butonu eklendi
+[ ] S1-05  Sperma stok bağlantısı — window._appState.stok  ← SIRADAKI
 ```
 
 ### Sprint 2 — Eksik Özellikler
@@ -171,7 +214,7 @@ Realtime sub     → supabase.channel() → polling kalkacak
 [x] S2-04  Hekimler DB'ye taşındı — migration 009
 [ ] S2-01  Sürü filtrasyonu — dişi/erkek, gebe/boş, hasta/sağlıklı, grup/padok
 [ ] S2-02  Hayvan detay ekranı — kilo, boy, renk, notlar, event timeline
-[ ] S2-03  Hastalık formu — kategori→hastalık zinciri
+[x] S2-03  Hastalık formu — kategori→hastalık zinciri + çoklu semptom dropdown
 [ ] S2-05  Abort akışı — gebe listesi, abort modal, badge
 [ ] S2-06  Üreme tab düzeltme — gebelik butonu kaldır, doğum görevleri
 [ ] S2-07  Görev renk mantığı — geciken/bugün/yakın/gelecek
@@ -312,6 +355,16 @@ Kural: DB her zaman kaynak gerçek, Excel sadece giriş/çıkış aracı
 **Ne oldu:** `CREATE OR REPLACE VIEW` kolon sırası değişince `cannot change name of view column` hatası verdi.
 **Çözüm:** Önce `DROP VIEW IF EXISTS`, sonra `CREATE VIEW`.
 **Ders:** View güncellemelerinde her zaman DROP + CREATE. Ayrıca yeni kolon eklemeden önce tabloda var mı kontrol et.
+
+### Alpine Terminal SSH Kalıcılığı (2026-03-10)
+**Ne oldu:** Acode Alpine terminal her oturumda sıfırlanıyor, SSH key kayboluyor.
+**Çözüm:** HTTPS + PAT token ile push. Remote URL'e token göm: `https://user:token@github.com/...`
+**Ders:** SSH yerine HTTPS+token daha stabil bu ortamda.
+
+### Patch Format (2026-03-10)
+**Ne oldu:** `git apply` satır numarası uyuşmazlığında reddediyor. Özel karakterler heredoc'ta bozuluyor.
+**Çözüm:** Basit değişimlerde `sed -i` kullan. Çok satırlı değişimlerde `python3 apply.py /tmp/p.diff`.
+**Ders:** Patch vermeden önce `sed -n 'N,Mp' dosya` ile satırları doğrula.
 
 ### renderSafe vs renderFromLocal (2026-03-08)
 **Ne oldu:** Edit submit'ten sonra `renderSafe()` çağrıldı, 60ms debounce yüzünden `openDet()` eski `_A` ile açıldı.
