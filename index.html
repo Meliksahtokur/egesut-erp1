@@ -470,7 +470,7 @@ button,input,select,textarea{font-family:inherit}
           <button type="button" id="btn-sperma-elle" onclick="spermaModElle()" style="flex:1;padding:7px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);font-size:.75rem;font-weight:700;color:var(--ink3);cursor:pointer">✏️ Elle Gir</button>
         </div>
         <div id="sperma-stok-area">
-          <select id="i-sperma-select" class="fsel" onchange="document.getElementById('i-sperma').value=this.value">
+          <select id="i-sperma-select" class="fsel" onchange="onSpermaSelect(this)">
             <option value="">Sperma seçin…</option>
           </select>
           <input type="hidden" id="i-sperma" value="">
