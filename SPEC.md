@@ -206,7 +206,8 @@ Realtime sub     → supabase.channel() → polling kalkacak
 [x] S1-02  Tohumlama validasyonu — migration 009'da erkek/yaş/gebelik kontrolü
 [x] S1-03  Hayvan kartından tedavi — dispatchEvent kaldırıldı, küpe düzgün doldu
 [x] S1-04  Geçmiş — küpe çözümlendi, detay modal küpe gösteriyor, geri al butonu eklendi
-[ ] S1-05  Sperma stok bağlantısı — window._appState.stok  ← SIRADAKI
+[x] S1-05  Sperma stok bağlantısı — seçimde stok göster, stok=0 kaydet disabled
+[ ] S1-06  Tohumlama dropdown filtresi — hayvan_durum_view'a tohumlanabilir boolean ekle (migration), frontend sadece filtreler
 ```
 
 ### Sprint 2 — Eksik Özellikler
