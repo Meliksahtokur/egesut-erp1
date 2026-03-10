@@ -19,7 +19,7 @@ const db = createClient(SB_URL, SB_KEY);
 async function rpc(name, params = {}) {
   if (!navigator.onLine) throw new Error('İnternet bağlantısı gerekli');
   const { data, error } = await db.rpc(name, params);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
   if (data && data.ok === false) throw new Error(data.mesaj || 'İşlem başarısız');
   return data;
 }
@@ -111,7 +111,7 @@ async function removeFromQueue(qid) {
 async function dbUpdate(table, id, changes) {
   const clean = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== null && v !== undefined && v !== ''));
   const { error } = await db.from(table).update(clean).eq('id', id);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
 }
 
 async function dbInsert(table, rows) {
@@ -119,7 +119,7 @@ async function dbInsert(table, rows) {
   arr.forEach(r => { if (!r.id) r.id = crypto.randomUUID(); });
   const clean = arr.map(r => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null && v !== undefined && v !== '')));
   const { error } = await db.from(table).insert(clean);
-  if (error) throw new Error(error.message);
+  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
   return arr;
 }
 
