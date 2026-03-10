@@ -1,23 +1,21 @@
 import subprocess
 import sys
-import os
-
-os.chdir('/home/egesut-erp1')
+import tempfile
 
 patch = sys.stdin.read()
 
-with open("/tmp/patch.diff", "w") as f:
-    f.write(patch)
+with tempfile.NamedTemporaryFile(delete=False) as f:
+    f.write(patch.encode())
+    patch_file = f.name
 
-result = subprocess.run(["git", "apply", "/tmp/patch.diff"], capture_output=True, text=True)
+result = subprocess.run(["git", "apply", patch_file])
 
-if result.returncode == 0:
-    subprocess.run(["git", "add", "."])
-    subprocess.run(["git", "commit", "-m", "AI patch"])
-    push = subprocess.run(["git", "push"], capture_output=True, text=True)
-    if push.returncode == 0:
-        print("✅ Push tamam")
-    else:
-        print("❌ Push hata:", push.stderr)
-else:
-    print("❌ Patch hata:", result.stderr)
+if result.returncode != 0:
+    print("❌ Patch uygulanamadı")
+    sys.exit(1)
+
+subprocess.run(["git", "add", "."])
+subprocess.run(["git", "commit", "-m", "AI patch"])
+subprocess.run(["git", "push"])
+
+print("✅ Patch uygulandı ve push edildi")
