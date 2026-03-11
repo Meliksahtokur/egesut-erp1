@@ -211,6 +211,8 @@ async function loadAnimals(){
     _A=await getData('hayvanlar',a=>a.durum==='Aktif');
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
     _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
+    const hastaLogs=await getData('hastalik_log',d=>d.durum==='Aktif');
+    _hastaIds=new Set(hastaLogs.map(d=>d.hayvan_id));
     _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     window._appState=window._appState||{}; window._appState.hayvanlar=_A;
     renderAnimals(_A);
