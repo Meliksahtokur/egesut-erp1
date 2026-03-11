@@ -857,6 +857,20 @@ button,input,select,textarea{font-family:inherit}
     </div>
     <div class="m-body">
       <div id="hd-body" style="font-size:.82rem;color:var(--ink2);line-height:1.55;margin-bottom:12px"></div>
+      <div id="hd-edit-form" style="display:none;margin-bottom:12px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:8px">Düzenle</div>
+        <input id="hde-tani" class="inp" placeholder="Tanı" style="margin-bottom:6px">
+        <select id="hde-siddet" class="inp" style="margin-bottom:6px">
+          <option value="">Şiddet seç</option>
+          <option>Hafif</option><option>Orta</option><option>Ağır</option>
+        </select>
+        <input id="hde-semptomlar" class="inp" placeholder="Semptomlar" style="margin-bottom:6px">
+        <input id="hde-lokasyon" class="inp" placeholder="Lokasyon" style="margin-bottom:6px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <button class="btn" style="background:var(--green);color:#fff" onclick="hstGuncelle(this)">💾 Kaydet</button>
+          <button class="btn btn-o" onclick="hstDuzenleKapat()">İptal</button>
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <button class="btn" style="background:var(--blue);color:#fff" onclick="hstDuzenleAc()">✏️ Düzenle</button>
         <button class="btn hstKapat" onclick="hstKapat()">✅ İyileşti</button>

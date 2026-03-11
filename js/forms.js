@@ -513,10 +513,62 @@ async function submitTaskAdd(btn) {
 // ── HASTALIK KAPAT ───────────────────────────
 async function hstKapat() {
   if (!_curHst) return;
-  await write('hastalik_log', { ..._curHst, durum: 'İyileşti', kapanma_tarihi: new Date().toISOString().split('T')[0] }, 'PATCH', `id=eq.${_curHst.id}`);
-  toast('✅ Hastalık kaydı kapatıldı');
-  closeM('m-hst-det');
-  renderSafe();
+  try {
+    const res = await rpc('hastalik_kapat', { p_id: _curHst.id });
+    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
+    toast('✅ Hastalık kaydı kapatıldı');
+    closeM('m-hst-det');
+    await pullTables(['hastalik_log']); renderSafe();
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+function hstDuzenleAc() {
+  if (!_curHst) return;
+  const f = document.getElementById('hd-edit-form');
+  if (!f) return;
+  document.getElementById('hde-tani').value       = _curHst.tani       || '';
+  document.getElementById('hde-siddet').value     = _curHst.siddet     || '';
+  document.getElementById('hde-semptomlar').value = _curHst.semptomlar || '';
+  document.getElementById('hde-lokasyon').value   = _curHst.lokasyon   || '';
+  f.style.display = 'block';
+}
+
+function hstDuzenleKapat() {
+  const f = document.getElementById('hd-edit-form');
+  if (f) f.style.display = 'none';
+}
+
+async function hstGuncelle(btn) {
+  if (!_curHst) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  try {
+    const res = await rpc('hastalik_guncelle', {
+      p_id:         _curHst.id,
+      p_tani:       document.getElementById('hde-tani').value.trim()       || null,
+      p_siddet:     document.getElementById('hde-siddet').value            || null,
+      p_semptomlar: document.getElementById('hde-semptomlar').value.trim() || null,
+      p_lokasyon:   document.getElementById('hde-lokasyon').value.trim()   || null,
+    });
+    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
+    toast('✅ Güncellendi');
+    hstDuzenleKapat();
+    await pullTables(['hastalik_log']);
+    await openHstDet(_curHst.id);
+  } catch(e) { toast('❌ ' + e.message, true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; } }
+}
+
+async function hstSilOnay() {
+  if (!_curHst) return;
+  const onay = confirm(`"${_curHst.tani || 'Bu kayıt'}" silinecek. Emin misin?`);
+  if (!onay) return;
+  try {
+    const res = await rpc('hastalik_sil', { p_id: _curHst.id });
+    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
+    toast('🗑 Kayıt silindi');
+    closeM('m-hst-det');
+    await pullTables(['hastalik_log']); renderSafe();
+  } catch(e) { toast('❌ ' + e.message, true); }
 }
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
