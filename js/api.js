@@ -219,6 +219,7 @@ async function pullTables(tables = []) {
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
       islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
+      tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
