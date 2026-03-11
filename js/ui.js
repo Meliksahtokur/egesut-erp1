@@ -295,14 +295,29 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#srch')&&!e.target.closest('#ac-srch'))
     { const ac=document.getElementById('ac-srch'); if(ac) ac.style.display='none'; }
 });
+let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null};
+function fchipSec(grup,deger,btn){
+  if(_fchip[grup]===deger){ _fchip[grup]=null; btn.classList.remove('on'); }
+  else {
+    document.querySelectorAll(`[id^="fc-${grup}-"]`).forEach(b=>b.classList.remove('on'));
+    _fchip[grup]=deger; btn.classList.add('on');
+  }
+  filterA();
+}
 function filterA(){
   clearTimeout(_filterTimer);
   _filterTimer=setTimeout(()=>{
     const q=document.getElementById('srch')?.value.toLowerCase()||'';
     const p=document.getElementById('pflt')?.value||'';
+    const gebeSet=new Set(_gebeIds||[]);
     let f=_A;
     if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
     if(p) f=f.filter(a=>a.padok===p);
+    if(_fchip.cinsiyet==='disi') f=f.filter(a=>a.cinsiyet==='Dişi'||!a.cinsiyet);
+    else if(_fchip.cinsiyet==='erkek') f=f.filter(a=>a.cinsiyet==='Erkek');
+    if(_fchip.gebelik==='gebe') f=f.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe');
+    else if(_fchip.gebelik==='bos') f=f.filter(a=>!gebeSet.has(a.id)&&a.durum!=='Gebe');
+    if(_fchip.saglik==='hasta') f=f.filter(a=>_hastaIds.has(a.id));
     renderAnimals(f);
   },250);
 }
