@@ -90,7 +90,10 @@ function openM(id) {
     animalFormGuncelle();
   }
   if (id === 'm-insem') {
-    pullTables(['tohumlanabilir_hayvanlar']).catch(console.warn);
+    pullTables(['tohumlanabilir_hayvanlar']).then(() => {
+      const hint = document.getElementById('sperma-hint');
+      if (hint) hint.textContent = '_TH: ' + (window._TH ? window._TH.length : 'yok') + ' hayvan';
+    }).catch(console.warn);
   }
   if (id === 'm-disease') {
     _semptomSecili = [];
