@@ -328,7 +328,7 @@ function filterA(){
 async function openDet(id){
   document.getElementById('det').classList.add('on');
   document.getElementById('det-name').textContent='Yükleniyor…';
-  ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
+  ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   showTab('ozet',document.querySelector('.tab'));
   try {
     const [aArr,diseases,tohs,tasks,births,subs,yavrular]=await Promise.all([
