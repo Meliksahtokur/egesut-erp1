@@ -1372,7 +1372,10 @@ document.addEventListener('click',e=>{
 function acHayvan(inputId,listId){
   const q=(document.getElementById(inputId)?.value||'').toLowerCase().trim();
   const ac=document.getElementById(listId); if(!ac) return;
-  const src=listId==='ac-ihid'?(window._TH||_A):(_A.length?_A:[]);
+  const src=listId==='ac-ihid'?(window._TH||[]):(_A.length?_A:[]);
+  if(listId==='ac-ihid'&&!window._TH){
+    const ac=document.getElementById(listId); if(ac){ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--ink3)">⏳ Yükleniyor…</div>';ac.style.display='block';} return;
+  }
   const filtered=q
     ?src.filter(a=>(a.kupe_no||'').toLowerCase().includes(q)||(a.devlet_kupe||'').toLowerCase().includes(q)||(a.id||'').toLowerCase().includes(q)).slice(0,12)
     :src.slice(0,10);
