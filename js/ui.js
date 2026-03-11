@@ -462,6 +462,13 @@ function closeDet(){ document.getElementById('det').classList.remove('on'); }
 function openIslemDetay(idx){
   const l=(window._detGecmisLogs||[])[idx];
   if(!l) return;
+  // ref_tablo varsa doğrudan ilgili detay modalını aç
+  if(l.ref_tablo==='hastalik_log' && l.ref_id){ openHstDet(l.ref_id); return; }
+  if(l.ref_tablo==='tohumlama'    && l.ref_id){ openTohDet(l.ref_id); return; }
+  // ref_id yoksa snapshot'tan dene (eski kayıtlar)
+  const snapId=l.snapshot?.id;
+  if(l.tip==='HASTALIK_KAYDI'    && snapId){ openHstDet(snapId); return; }
+  if(l.tip==='TOHUMLAMA'         && snapId){ openTohDet(snapId); return; }
   const LABEL={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme'};
   const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
   const ALAN={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe'};
