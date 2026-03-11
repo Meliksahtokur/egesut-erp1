@@ -217,7 +217,7 @@ Sprint 3'te eklenecek: events tablosu (islem_log standardize), eventBus.js, Real
 ### Sprint 2 — Eksik Özellikler
 ```
 [x] S2-01  Sürü filtrasyonu — dişi/erkek, gebe/boş, hasta/sağlıklı chip filtreleri
-[x] S2-02  Hayvan detay ekranı — geçmiş sekmesi, islem_log direkt DB sorgusu, eski kayıtlar trigger öncesi yok
+[~] S2-02  Hayvan detay geçmiş sekmesi — listeleme çalışıyor, tıklayınca detay/aksiyon YOK (devam edecek)
 [x] S2-03  Hastalık formu — kategori→hastalık zinciri + çoklu semptom
 [x] S2-04  Hekimler DB'ye taşındı
 [ ] S2-05  Abort akışı — gebe listesi, abort modal, badge
