@@ -89,6 +89,9 @@ function openM(id) {
     loadIrkDropdown();
     animalFormGuncelle();
   }
+  if (id === 'm-insem') {
+    pullTables(['tohumlanabilir_hayvanlar']).catch(console.warn);
+  }
   if (id === 'm-disease') {
     _semptomSecili = [];
     if(g('sempt-chips')) g('sempt-chips').innerHTML = '';
