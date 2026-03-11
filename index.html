@@ -857,9 +857,13 @@ button,input,select,textarea{font-family:inherit}
     </div>
     <div class="m-body">
       <div id="hd-body" style="font-size:.82rem;color:var(--ink2);line-height:1.55;margin-bottom:12px"></div>
-      <button class="btn hstKapat" onclick="hstKapat()">✅ İyileşti — Kaydı Kapat</button>
-      <button id="hd-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:6px;display:none">🔄 Bu Kaydı Geri Al</button>
-      <button class="btn btn-o" onclick="closeM('m-hst-det')" style="margin-top:6px">Kapat</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+        <button class="btn" style="background:var(--blue);color:#fff" onclick="hstDuzenleAc()">✏️ Düzenle</button>
+        <button class="btn hstKapat" onclick="hstKapat()">✅ İyileşti</button>
+      </div>
+      <button id="hd-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:6px;width:100%;display:none">🔄 Bu Kaydı Geri Al</button>
+      <button class="btn" style="background:rgba(192,50,26,.08);color:var(--red);margin-top:6px;width:100%" onclick="hstSilOnay()">🗑 Kaydı Sil</button>
+      <button class="btn btn-o" onclick="closeM('m-hst-det')" style="margin-top:6px;width:100%">Kapat</button>
     </div>
   </div>
 </div>
