@@ -1,6 +1,6 @@
-# EgeSüt ERP — SPEC v6
+# EgeSüt ERP — SPEC v7
 > Her oturumun başında okunur. Hem harita hem rota. Sigortamız.
-> Son güncelleme: 2026-03-11 — S2-01/S2-02 tamamlandı, sürü filtre chip'leri + hayvan detay geçmiş sekmesi (islem_log direkt DB sorgusu)
+> Son güncelleme: 2026-03-11 — S2-02 hastalık detay aksiyonları (düzenle/kapat/sil), ref_id/ref_tablo migration, geri_al RPC planlandı
 
 ---
 
@@ -131,6 +131,8 @@ PYEOF
 | T-03 | Eski raw fetch/HDR/SB_URL kalıntılarını temizle |
 | T-04 | APP_VERSION güncelle |
 | T-05 | pullTables() setInterval kaldır — Realtime geçince gereksiz |
+| T-06 | lokasyon alanı — hastalik_guncelle formundan kaldır |
+| T-07 | İlaç düzenleme — hastalık detay modalına ekle (stok seçimi + miktar, stok_hareket etkiler) |
 
 ---
 
@@ -217,7 +219,7 @@ Sprint 3'te eklenecek: events tablosu (islem_log standardize), eventBus.js, Real
 ### Sprint 2 — Eksik Özellikler
 ```
 [x] S2-01  Sürü filtrasyonu — dişi/erkek, gebe/boş, hasta/sağlıklı chip filtreleri
-[~] S2-02  Hayvan detay geçmiş sekmesi — listeleme çalışıyor, tıklayınca detay/aksiyon YOK (devam edecek)
+[~] S2-02  Hayvan detay geçmiş sekmesi — düzenle/kapat/sil çalışıyor. Eksik: geri_al RPC (S3-00'a taşındı), ilaç düzenleme (T-07)
 [x] S2-03  Hastalık formu — kategori→hastalık zinciri + çoklu semptom
 [x] S2-04  Hekimler DB'ye taşındı
 [ ] S2-05  Abort akışı — gebe listesi, abort modal, badge
@@ -231,6 +233,11 @@ Sprint 3'te eklenecek: events tablosu (islem_log standardize), eventBus.js, Real
 
 ### Sprint 3 — Mimari Geçiş
 ```
+[ ] S3-00  geri_al RPC — snapshot format yeniden tasarımı
+           • _islem_log_yaz: olusturulan/guncellenen/silinen yapısına geç
+           • geri_al(p_islem_id) RPC implement et (tüm tipler: HASTALIK, TOHUMLAMA, DOGUM, ABORT)
+           • ⚠️‼️ butonu hastalık/tohumlama detay modallarına bağla — tüm silsileyi siler
+           • Diff formatında, tek parça
 [ ] S3-01  events tablosu — islem_log standardize
 [ ] S3-02  Supabase Realtime subscription
 [ ] S3-03  eventBus.js
@@ -400,6 +407,18 @@ Mozilla Nightly Android'de F12 yok. → Geçici toast veya hint div'e değer yaz
 
 ### Remote URL Token
 Her Fedora oturumunda token kayboluyor. → `git remote set-url origin https://Meliksahtokur:TOKEN@github.com/Meliksahtokur/egesut-erp1.git`
+
+### hastalik_log id cast
+`hastalik_log.id` text tipinde ama RPC karşılaştırmada `uuid = text` hatası alındı. → Her zaman `id::text = p_id` cast et.
+
+### gorev_log kolon adı
+`gorev_log`'da `notlar` kolonu yok, `aciklama` var. Karıştırma.
+
+### Geri Al vs Kaydı Sil
+Geri Al = `islem_log` snapshot'tan tüm silsileyi restore eder. Kaydı Sil = sadece o kaydı siler. İkisi farklı — ikisi de gerekli.
+
+### Diff formatı
+Değişiklikler tek parça diff/inline python olarak verilecek, parça parça gönderme.
 
 ---
 
