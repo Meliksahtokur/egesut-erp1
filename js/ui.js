@@ -1372,7 +1372,7 @@ document.addEventListener('click',e=>{
 function acHayvan(inputId,listId){
   const q=(document.getElementById(inputId)?.value||'').toLowerCase().trim();
   const ac=document.getElementById(listId); if(!ac) return;
-  const src=_A.length?_A:[];
+  const src=listId==='ac-ihid'?(window._TH||_A):(_A.length?_A:[]);
   const filtered=q
     ?src.filter(a=>(a.kupe_no||'').toLowerCase().includes(q)||(a.devlet_kupe||'').toLowerCase().includes(q)||(a.id||'').toLowerCase().includes(q)).slice(0,12)
     :src.slice(0,10);
