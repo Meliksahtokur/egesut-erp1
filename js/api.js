@@ -224,6 +224,7 @@ async function pullTables(tables = []) {
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
     await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
+    if (uniq.includes('tohumlanabilir_hayvanlar')) window._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
   } finally {
     _pulling = false;
   }
