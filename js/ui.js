@@ -432,6 +432,24 @@ async function openDet(id){
       ?tasks.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); return renderTask(t,t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':'',ts); }).join('')
       :'<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>');
 
+    // Geçmiş tab — islem_log'dan çek
+    const gecmisEl=document.getElementById('tab-gecmis');
+    if(gecmisEl){
+      gecmisEl.innerHTML='<div class="loader"><div class="spin"></div></div>';
+      try {
+        const logs=await getData('islem_log',l=>l.hayvan_id===id);
+        logs.sort((x,y)=>(y.created_at||y.tarih||'').localeCompare(x.created_at||x.tarih||''));
+        const ISLEM_ICO2={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
+        if(!logs.length){ gecmisEl.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>'; }
+        else { gecmisEl.innerHTML=logs.map(l=>{
+          const ico=ISLEM_ICO2[l.tip]||'📋';
+          const tarih=(l.created_at||l.tarih||'').slice(0,10);
+          const detay=l.detay||(l.payload&&typeof l.payload==='object'?Object.entries(l.payload).filter(([k])=>!['hayvan_id','id'].includes(k)).map(([k,v])=>`${k}: ${v}`).join(' · '):'');
+          return `<div class="hist-row"><div class="hist-dot" style="background:var(--green2)"></div><div class="hist-main"><div class="hist-title">${ico} ${l.tip||'—'}</div><div class="hist-sub">${tarih}${detay?' · '+detay:''}</div></div></div>`;
+        }).join(''); }
+      } catch(e){ gecmisEl.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+    }
+
   } catch(e){ document.getElementById('det-name').textContent='Hata: '+e.message; }
 }
 function closeDet(){ document.getElementById('det').classList.remove('on'); }
