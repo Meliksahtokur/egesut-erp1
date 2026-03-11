@@ -437,7 +437,8 @@ async function openDet(id){
     if(gecmisEl){
       gecmisEl.innerHTML='<div class="loader"><div class="spin"></div></div>';
       try {
-        const {data:logs=[]}=await db.from('islem_log').select('*').eq('ana_hayvan_id',id).order('tarih',{ascending:false});
+        toast('gecmis id: '+id);
+    const {data:logs=[]}=await db.from('islem_log').select('*').eq('ana_hayvan_id',id).order('tarih',{ascending:false});
         logs.sort((x,y)=>(y.created_at||y.tarih||'').localeCompare(x.created_at||x.tarih||''));
         const ISLEM_ICO2={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
         if(!logs.length){ gecmisEl.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>'; }
