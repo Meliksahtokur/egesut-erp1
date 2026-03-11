@@ -380,6 +380,15 @@ Toplu upload'da api.js'e app.js içeriği gitti. → GitHub web editörü veya t
 ### git apply Sorunları
 Satır numarası kayması + unicode bozulması. → SEARCH/REPLACE veya inline python kullan, git apply kullanma.
 
+### islem_log RLS
+islem_log tablosunda sadece `service_insert` policy vardı, SELECT yoktu. Frontend direkt DB sorgusu yapıyorsa her tabloda SELECT policy gerekli.
+
+### openDet Async Kod Kayması
+openDet içine eklenen kod try bloğunun dışına kayabilir — her eklemede satır numaralarını doğrula.
+
+### apply.py SEARCH Eşleşmesi
+Termux'taki dosya ile zip/context'teki dosya farklı olabilir. HATA alınca önce `sed -n` ile gerçek dosyayı oku, ona göre SEARCH yaz.
+
 ### _pulling Lock
 Modal açılırken `pullTables` çağrısı lock'a takılıyordu. → Kritik fetch'leri `db.from().select()` ile direkt yap, `pullTables`'ı bypass et. (Örnek: `m-insem` açılınca `tohumlanabilir_hayvanlar` direkt fetch ediliyor.)
 
