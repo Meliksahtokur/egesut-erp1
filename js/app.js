@@ -92,9 +92,8 @@ function openM(id) {
   if (id === 'm-insem') {
     db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
       window._TH = data || [];
-      const hint = document.getElementById('sperma-hint');
-      if (hint) hint.textContent = '_TH: ' + window._TH.length + ' hayvan';
     }).catch(console.warn);
+    setTimeout(() => spermaModStok(), 100);
   }
   if (id === 'm-disease') {
     _semptomSecili = [];
