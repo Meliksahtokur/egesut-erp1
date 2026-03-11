@@ -285,7 +285,17 @@ button,input,select,textarea{font-family:inherit}
           <option>Buzağı Padok (Süt İçenler)</option>
         </select>
       </div>
-      <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 2px"></div>
+      <div id="filtre-strip" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 0">
+        <button class="fchip on" id="fc-cinsiyet-hepsi" onclick="fchipSec('cinsiyet','hepsi',this)">Tümü</button>
+        <button class="fchip" id="fc-cinsiyet-disi" onclick="fchipSec('cinsiyet','disi',this)">🐄 Dişi</button>
+        <button class="fchip" id="fc-cinsiyet-erkek" onclick="fchipSec('cinsiyet','erkek',this)">🐂 Erkek</button>
+        <span class="fchip-sep">|</span>
+        <button class="fchip" id="fc-gebelik-gebe" onclick="fchipSec('gebelik','gebe',this)">🤰 Gebe</button>
+        <button class="fchip" id="fc-gebelik-bos" onclick="fchipSec('gebelik','bos',this)">⭕ Boş</button>
+        <span class="fchip-sep">|</span>
+        <button class="fchip" id="fc-saglik-hasta" onclick="fchipSec('saglik','hasta',this)">🏥 Hasta</button>
+      </div>
+      <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 2px"></div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>
