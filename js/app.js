@@ -90,9 +90,10 @@ function openM(id) {
     animalFormGuncelle();
   }
   if (id === 'm-insem') {
-    pullTables(['tohumlanabilir_hayvanlar']).then(() => {
+    db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
+      window._TH = data || [];
       const hint = document.getElementById('sperma-hint');
-      if (hint) hint.textContent = '_TH: ' + (window._TH ? window._TH.length : 'yok') + ' hayvan';
+      if (hint) hint.textContent = '_TH: ' + window._TH.length + ' hayvan';
     }).catch(console.warn);
   }
   if (id === 'm-disease') {
