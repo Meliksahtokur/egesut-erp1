@@ -1,6 +1,6 @@
 # EgeSüt ERP — SPEC v6
 > Her oturumun başında okunur. Hem harita hem rota. Sigortamız.
-> Son güncelleme: 2026-03-11 — S1-05/S1-06 tamamlandı, apply.py SEARCH/REPLACE sistemi kuruldu, S2-10 grup/padok/laktasyon yeniden tasarımı eklendi
+> Son güncelleme: 2026-03-11 — S2-01/S2-02 tamamlandı, sürü filtre chip'leri + hayvan detay geçmiş sekmesi (islem_log direkt DB sorgusu)
 
 ---
 
