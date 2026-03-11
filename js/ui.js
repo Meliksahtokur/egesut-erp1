@@ -441,12 +441,17 @@ async function openDet(id){
         logs.sort((x,y)=>(y.created_at||y.tarih||'').localeCompare(x.created_at||x.tarih||''));
         const ISLEM_ICO2={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
         if(!logs.length){ gecmisEl.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>'; }
-        else { gecmisEl.innerHTML=logs.map(l=>{
-          const ico=ISLEM_ICO2[l.tip]||'📋';
-          const tarih=(l.created_at||l.tarih||'').slice(0,10);
-          const detay=l.detay||(l.payload&&typeof l.payload==='object'?Object.entries(l.payload).filter(([k])=>!['hayvan_id','id'].includes(k)).map(([k,v])=>`${k}: ${v}`).join(' · '):'');
-          return `<div class="hist-row"><div class="hist-dot" style="background:var(--green2)"></div><div class="hist-main"><div class="hist-title">${ico} ${l.tip||'—'}</div><div class="hist-sub">${tarih}${detay?' · '+detay:''}</div></div></div>`;
-        }).join(''); }
+        else {
+          window._detGecmisLogs = logs;
+          gecmisEl.innerHTML=logs.map((l,i)=>{
+            const ico=ISLEM_ICO2[l.tip]||'📋';
+            const tarih=(l.created_at||l.tarih||'').slice(0,10);
+            const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI'];
+            const gaIcon=GeriAlabilir.includes(l.tip)?'<span style="font-size:.6rem;color:var(--ink3);margin-left:4px">↩</span>':'';
+            const tipEtiket={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme'}[l.tip]||l.tip||'—';
+            return `<div class="hist-row" style="cursor:pointer" onclick="openIslemDetay(${i})"><div class="hist-dot" style="background:var(--green2)"></div><div class="hist-main"><div class="hist-title">${ico} ${tipEtiket}${gaIcon}</div><div class="hist-sub">${tarih}</div></div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;opacity:.4;margin-top:2px"><path d="M9 18l6-6-6-6"/></svg></div>`;
+          }).join('');
+        }
       } catch(e){ gecmisEl.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
     }
 
