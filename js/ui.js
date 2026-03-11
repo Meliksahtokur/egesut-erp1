@@ -459,6 +459,44 @@ async function openDet(id){
 }
 function closeDet(){ document.getElementById('det').classList.remove('on'); }
 
+function openIslemDetay(idx){
+  const l=(window._detGecmisLogs||[])[idx];
+  if(!l) return;
+  const LABEL={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme'};
+  const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
+  const ALAN={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe'};
+  const tarih=(l.created_at||l.tarih||'').slice(0,10);
+  const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI'];
+  const payload=l.payload&&typeof l.payload==='object'?l.payload:{};
+  const satirlar=Object.entries(payload)
+    .filter(([k,v])=>!['hayvan_id','id','ana_hayvan_id'].includes(k)&&v!==null&&v!==undefined&&v!=='')
+    .map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card3);font-size:.78rem"><span style="color:var(--ink3)">${ALAN[k]||k}</span><span style="font-weight:600;color:var(--ink);text-align:right;max-width:60%">${v}</span></div>`)
+    .join('');
+  const gaBtn=GeriAlabilir.includes(l.tip)?`<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="openGeriAl('${l.id}','${LABEL[l.tip]||l.tip} — ${tarih} tarihli kayıt geri alınacak.')">↩ Geri Al</button>`:'';
+  const html=`<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px;margin-top:8px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:1.1rem">${ICO[l.tip]||'📋'}</span>
+      <span style="font-weight:700;font-size:.88rem">${LABEL[l.tip]||l.tip}</span>
+      <span style="margin-left:auto;font-size:.72rem;color:var(--ink3)">${tarih}</span>
+    </div>
+    ${satirlar||'<div style="font-size:.78rem;color:var(--ink3);text-align:center;padding:8px 0">Detay yok</div>'}
+    ${gaBtn}
+    <button class="btn btn-o" style="width:100%;margin-top:6px;font-size:.8rem" onclick="this.closest('.islem-detay-panel').remove()">Kapat</button>
+  </div>`;
+  // Aynı panel açıksa kapat, yoksa ekle
+  const gecmisEl=document.getElementById('tab-gecmis');
+  const existing=gecmisEl&&gecmisEl.querySelector('.islem-detay-panel');
+  if(existing) existing.remove();
+  const rows=gecmisEl&&gecmisEl.querySelectorAll('.hist-row');
+  const clickedRow=rows&&rows[idx];
+  if(clickedRow){
+    const panel=document.createElement('div');
+    panel.className='islem-detay-panel';
+    panel.innerHTML=html;
+    clickedRow.insertAdjacentElement('afterend',panel);
+  }
+}
+
 // Not modal
 // ──────────────────────────────────────────
 // HAYVAN BİLGİ DÜZENLEME
