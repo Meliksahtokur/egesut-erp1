@@ -6,9 +6,9 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 6;
+const DB_VER  = 7;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
-                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu'];
+                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','tedavi'];
 const APP_VERSION = '2026-03-12';
 
 // ── SUPABASE SDK ────────────────────────────
@@ -184,7 +184,9 @@ const RPC_TABLES = {
   dogum_kaydet:      ['hayvanlar','dogum','gorev_log'],
   tohumlama_kaydet:  ['tohumlama','gorev_log'],
   kizginlik_kaydet:  ['kizginlik_log','gorev_log'],
-  hastalik_kaydet:   ['hastalik_log','gorev_log','stok','stok_hareket'],
+  hastalik_kaydet:   ['hastalik_log','tedavi','gorev_log','stok','stok_hareket'],
+  tedavi_ekle:       ['tedavi','stok','stok_hareket'],
+  tedavi_sil:        ['tedavi','stok','stok_hareket'],
   abort_kaydet:      ['tohumlama','gorev_log'],
   hayvan_not_ekle:   ['hayvanlar'],
   cikis_yap:         ['hayvanlar'],
@@ -220,6 +222,7 @@ async function pullTables(tables = []) {
       islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
       tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
+      tedavi:       () => db.from('tedavi_view').select('*'),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
@@ -256,7 +259,7 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 // ── PULL FROM SUPABASE ──────────────────────
 async function pullFromSupabase() {
   try {
-    const [animals, tasks, stock, moves, diseases, tohs, births, bildirims, islemler] = await Promise.all([
+    const [animals, tasks, stock, moves, diseases, tohs, births, bildirims, islemler, tedaviler] = await Promise.all([
       db.from('hayvan_durum_view').select('*'),
       db.from('gorev_log').select('*').eq('tamamlandi', false),
       db.from('stok').select('*'),
@@ -266,6 +269,7 @@ async function pullFromSupabase() {
       db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
       db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
+      db.from('tedavi_view').select('*'),
     ]);
 
     await Promise.all([
@@ -278,6 +282,7 @@ async function pullFromSupabase() {
       idbClearAndPut('dogum',        births.data     || []),
       idbClearAndPut('bildirim_log', bildirims.data  || []),
       idbClearAndPut('islem_log',    islemler.data   || []),
+      idbClearAndPut('tedavi',       tedaviler.data  || []),
     ]);
 
     document.getElementById('dot')?.classList.remove('off', 'warn');
