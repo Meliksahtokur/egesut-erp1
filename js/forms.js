@@ -181,6 +181,8 @@ async function submitKizginlik(btn) {
 // ── HASTALIK ─────────────────────────────────
 async function submitDisease(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  // Düzenleme modu
+  if (_editMode) { await hstGuncelle(btn); return; }
   const hid  = v('d-hid');
   const tani = v('d-tani');
   if (!hid || !tani) { toast('Küpe ve Tanı zorunlu', true); return; }
@@ -220,16 +222,7 @@ async function submitDisease(btn) {
       ? `✅ Hastalık + ${tedaviGun - 1} günlük takip görevi kaydedildi`
       : `✅ Hastalık kaydedildi${ilacAciklama ? ' · ' + ilacAciklama : ''}`);
 
-    closeM('m-disease');
-    g('ilac-rows').innerHTML = '';
-    g('tani-secenekler').innerHTML = '';
-    if(g('d-lokasyon-wrap')) g('d-lokasyon-wrap').style.display = 'none';
-    if(g('sempt-chips')) g('sempt-chips').innerHTML = '';
-    if(typeof _semptomSecili !== 'undefined') window._semptomSecili = [];
-    ['d-hid','d-tani','d-sempt','d-lokasyon'].forEach(cl);
-    g('d-tedavi-gun').value = '1';
-    g('d-kat').value = '';
-    _ilacCache = [];
+    closeDisease();
 
     pullTables(['hastalik_log','gorev_log','stok','stok_hareket']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(e.message, true); }
@@ -522,62 +515,73 @@ async function hstKapat() {
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
-function hstDuzenleAc() {
-  if (!_curHst) return;
-  const f = document.getElementById('hd-edit-form');
-  if (!f) return;
-  document.getElementById('hde-tani').value       = _curHst.tani       || '';
-  document.getElementById('hde-tani').dataset.kat = _curHst.kategori   || '';
-  document.getElementById('hde-siddet').value     = _curHst.siddet     || '';
-  if (_curHst.tarih) document.getElementById('hde-tarih').value = _curHst.tarih.substring(0,10);
-  const hdeHekim = document.getElementById('hde-hekim');
-  if (hdeHekim && _curHst.hekim_id) hdeHekim.value = _curHst.hekim_id;
-  // Semptom chip sistemi
-  window._hdeSmptSecili = [];
-  const hdeChips = document.getElementById('hde-sempt-chips');
-  if (hdeChips) hdeChips.innerHTML = '';
-  document.getElementById('hde-semptomlar').value = '';
-  const mevSemptomlar = (_curHst.semptomlar || '').split(',').map(s => s.trim()).filter(Boolean);
-  mevSemptomlar.forEach(val => {
-    window._hdeSmptSecili.push(val);
-    if (hdeChips) {
-      const chip = document.createElement('span');
-      chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
-      chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="hdeSmptomKaldir('${val}',this.parentElement)">✕</span>`;
-      hdeChips.appendChild(chip);
-    }
-  });
-  document.getElementById('hde-semptomlar').value = mevSemptomlar.join(', ');
-  hdeUpdateSmptDropdown(_curHst.kategori || '');
-  // Lokasyon chip'leri
-  const hdeKat    = _curHst.kategori || '';
-  const hdeLokMap = { 'Meme': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'], 'Ayak': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'], 'Göz': ['Sol Göz','Sağ Göz'] };
-  const hdeLokWrap = document.getElementById('hde-lokasyon-wrap');
-  const hdeLokSec  = document.getElementById('hde-lokasyon-secenekler');
-  const hdeLokLbl  = document.getElementById('hde-lokasyon-lbl');
-  const hdeLokList = hdeLokMap[hdeKat] || [];
-  if (hdeLokList.length && hdeLokWrap && hdeLokSec) {
-    if (hdeLokLbl) hdeLokLbl.textContent = hdeKat === 'Meme' ? 'Çeyrek' : hdeKat === 'Göz' ? 'Göz' : 'Hangi Ayak';
-    const mevcut = (_curHst.lokasyon || '').split(',').map(s => s.trim()).filter(Boolean);
-    hdeLokSec.innerHTML = hdeLokList.map(l => {
-      const aktif = mevcut.includes(l);
-      return `<button type="button" onclick="hdeToggleLok('${l}',this)"
-        style="padding:5px 11px;border:1.5px solid ${aktif ? 'var(--green)' : 'var(--card3)'};border-radius:20px;background:${aktif ? 'var(--green)' : 'var(--card)'};font-size:.72rem;font-weight:700;color:${aktif ? '#fff' : 'var(--ink2)'};cursor:pointer"
-        class="hde-lok-btn${aktif ? ' lok-on' : ''}">${l}</button>`;
-    }).join('');
-    document.getElementById('hde-lokasyon').value = mevcut.join(', ');
-    hdeLokWrap.style.display = 'block';
-  } else if (hdeLokWrap) {
-    hdeLokWrap.style.display = 'none';
-    document.getElementById('hde-lokasyon').value = '';
-  }
-  f.style.display = 'block';
+// _editMode: true iken submitDisease → hastalik_guncelle çağırır
+let _editMode = false;
+
+function closeDisease() {
+  _editMode = false;
+  const t = document.getElementById('m-disease-title');
+  if (t) t.textContent = '🏥 Hastalık / Tedavi';
+  ['d-hid','d-tani','d-sempt','d-lokasyon'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
+  const kat = document.getElementById('d-kat'); if(kat) kat.value='';
+  const sid = document.getElementById('d-sid'); if(sid) sid.value='';
+  const gun = document.getElementById('d-tedavi-gun'); if(gun) gun.value='0';
+  const dHid = document.getElementById('d-hid'); if(dHid){ dHid.readOnly=false; dHid.style.opacity=''; }
+  if(g('ilac-rows')) g('ilac-rows').innerHTML='';
+  if(g('tani-secenekler')) g('tani-secenekler').innerHTML='';
+  if(g('sempt-chips')) g('sempt-chips').innerHTML='';
+  if(g('d-lokasyon-wrap')) g('d-lokasyon-wrap').style.display='none';
+  const gunWrap = document.getElementById('d-tedavi-gun')?.closest('.fg');
+  if(gunWrap) gunWrap.style.display='';
+  window._semptomSecili = [];
+  _ilacCache = [];
+  closeM('m-disease');
 }
 
-function hstDuzenleKapat() {
-  const f = document.getElementById('hd-edit-form');
-  if (f) f.style.display = 'none';
+function hstDuzenleAc() {
+  if (!_curHst) return;
+  _editMode = true;
+  const t = document.getElementById('m-disease-title');
+  if (t) t.textContent = '✏️ Hastalık Düzenle';
+  const dHid = document.getElementById('d-hid');
+  if (dHid) {
+    const hayvan = _A.find(a => a.id === _curHst.hayvan_id);
+    dHid.value = hayvan ? (hayvan.kupe_no || hayvan.devlet_kupe || '') : '';
+    dHid.readOnly = true;
+    dHid.style.opacity = '0.6';
+  }
+  const dKat = document.getElementById('d-kat');
+  if (dKat) { dKat.value = _curHst.kategori || ''; filterHastalikList(); }
+  const dSid = document.getElementById('d-sid');
+  if (dSid) dSid.value = _curHst.siddet || '';
+  const dTani = document.getElementById('d-tani');
+  if (dTani) dTani.value = _curHst.tani || '';
+  window._semptomSecili = [];
+  const semptChips = g('sempt-chips');
+  if (semptChips) semptChips.innerHTML = '';
+  if (g('d-sempt')) g('d-sempt').value = '';
+  const mevSemptomlar = (_curHst.semptomlar || '').split(',').map(s => s.trim()).filter(Boolean);
+  mevSemptomlar.forEach(val => {
+    if (_semptomSecili.includes(val)) return;
+    _semptomSecili.push(val);
+    const chips = g('sempt-chips'); if (!chips) return;
+    const chip = document.createElement('span');
+    chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
+    chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="semptomKaldir('${val}',this.parentElement)">✕</span>`;
+    chips.appendChild(chip);
+    if (g('d-sempt')) g('d-sempt').value = _semptomSecili.join(', ');
+  });
+  updateSemptomDropdown(_curHst.kategori || '');
+  if (g('d-lokasyon')) g('d-lokasyon').value = _curHst.lokasyon || '';
+  const dHekim = document.getElementById('d-hekim');
+  if (dHekim && _curHst.hekim_id) dHekim.value = _curHst.hekim_id;
+  const gunWrap = document.getElementById('d-tedavi-gun')?.closest('.fg');
+  if (gunWrap) gunWrap.style.display = 'none';
+  if(g('ilac-rows')) g('ilac-rows').innerHTML='';
+  closeM('m-hst-det');
+  openM('m-disease');
 }
+
 
 async function hstGuncelle(btn) {
   if (!_curHst) return;
@@ -585,20 +589,21 @@ async function hstGuncelle(btn) {
   try {
     const res = await rpc('hastalik_guncelle', {
       p_id:         _curHst.id,
-      p_tani:       document.getElementById('hde-tani').value.trim()       || null,
-      p_siddet:     document.getElementById('hde-siddet').value            || null,
-      p_semptomlar: document.getElementById('hde-semptomlar').value.trim() || null,
-      p_lokasyon:   document.getElementById('hde-lokasyon').value.trim()   || null,
-      p_hekim_id:   document.getElementById('hde-hekim').value             || null,
-      p_tarih:      document.getElementById('hde-tarih').value             || null,
+      p_tani:       v('d-tani')     || null,
+      p_kategori:   v('d-kat')      || null,
+      p_siddet:     v('d-sid')      || null,
+      p_semptomlar: v('d-sempt')    || null,
+      p_lokasyon:   v('d-lokasyon') || null,
+      p_hekim_id:   v('d-hekim')    || null,
     });
     if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ Güncellendi');
-    hstDuzenleKapat();
+    const id = _curHst.id;
+    closeDisease();
     await pullTables(['hastalik_log']);
-    await openHstDet(_curHst.id);
+    await openHstDet(id);
   } catch(e) { toast('❌ ' + e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Kaydet + Görevler'; } }
 }
 
 async function hstSilOnay() {
