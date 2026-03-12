@@ -1,4 +1,4 @@
-# EgeSüt ERP — SPEC v10
+# EgeSüt ERP — SPEC v11
 > Operasyonel rehber. Mimari kararlar → ARCHITECTURE.md
 > Son güncelleme: 2026-03-12
 
@@ -24,11 +24,15 @@ Uygulandıktan sonra bu satırı `✅ UYGULANDI` olarak güncelle.
 
 ## 2. SPRINT — SIRADAKI GÖREVLER
 
+### ✅ Tamamlanan
+| Item | Açıklama |
+|------|----------|
+| **CLN-01** | Migration 022 Supabase'e uygulandı |
+| **CLN-02** | `m-case` modal HTML'e eklendi, `diseases` dropdown DB'den, `create_case()` RPC bağlandı, `openMWithHayvan` + `acMap` güncellendi |
+
 ### 🔴 Şu An Yapılacak
 | Item | Açıklama | Dosyalar |
 |------|----------|----------|
-| **CLN-01** | Migration 022'yi Supabase'e uygula | SQL Editor |
-| **CLN-02** | Vaka açma UI: `diseases` dropdown (DB'den), `create_case()` RPC | forms.js, index.html |
 | **CLN-03** | Vaka detay: gün + ilaç ekleme UI, `treatment_timeline` view | ui.js, forms.js |
 | **CLN-04** | `drugs` ↔ `stok` bağlama UI (hangi ilaç hangi stok kalemi) | ui.js, forms.js |
 | **CLN-05** | Vaka kapatma + hayvan kartında aktif vaka gösterimi | ui.js |
@@ -106,3 +110,7 @@ rpcOptimistic(fn,tables)  // toast → rpc → pull + render
 | Stok ledger | `stok_hareket` asla silinmez — yeni hareket ekle |
 | Ledger işareti | Kullanım = POZİTİF, iade = NEGATİF (frontend SUM'dan düşürür) |
 | Controlled entity | diseases, drugs, hayvanlar → asla free text, FK zorunlu |
+| CLN-02 teşhis | `m-case` modal HTML'de yoktu — form elementleri hiç eklenmemişti |
+| Disease cache | `openM('m-case')'de `_diseasesCache = []` reset — taze veri garantisi |
+| CLN-02 teşhis | `m-case` modal HTML'de yoktu — form elementleri hiç eklenmemişti |
+| Disease cache | `openM('m-case')'de `_diseasesCache = []` reset — taze veri garantisi |
