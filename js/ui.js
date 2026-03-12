@@ -1789,10 +1789,51 @@ document.addEventListener('click',e=>{
 function ayarlarAc(){
   renderAyarlarHekimList();
   renderAyarlarSpermaList();
+  renderDrugStokList();
   dataTrafficYenile();
   openM('m-ayarlar');
 }
-async function kuyrukuTemizle(){
+async function renderDrugStokList() {
+  const el = document.getElementById('ay-drug-stok-list');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:.75rem;color:var(--ink3);padding:6px 0">Yükleniyor…</div>';
+  try {
+    const [drugs, stokList] = await Promise.all([
+      idbGetAll('drugs'),
+      idbGetAll('stok'),
+    ]);
+    if (!drugs.length) {
+      el.innerHTML = '<div style="font-size:.75rem;color:var(--ink3)">İlaç kaydı bulunamadı.</div>';
+      return;
+    }
+    const stokOpts = stokList
+      .sort((a, b) => (a.urun_adi || '').localeCompare(b.urun_adi || '', 'tr'))
+      .map(s => `<option value="${s.id}">${s.urun_adi}</option>`)
+      .join('');
+    el.innerHTML = drugs
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'tr'))
+      .map(d => {
+        const linked = d.stock_item_id || '';
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <div style="flex:1;font-size:.78rem;font-weight:600;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name}">${d.name}</div>
+          <select
+            data-drug-id="${d.id}"
+            onchange="submitDrugStokLink('${d.id}', this.value)"
+            style="flex:1.2;font-size:.72rem;padding:5px 6px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink);min-width:0"
+          >
+            <option value="">— Bağlantı yok —</option>
+            ${stokList
+              .sort((a, b) => (a.urun_adi || '').localeCompare(b.urun_adi || '', 'tr'))
+              .map(s => `<option value="${s.id}"${s.id === linked ? ' selected' : ''}>${s.urun_adi}</option>`)
+              .join('')}
+          </select>
+        </div>`;
+      }).join('');
+  } catch (e) {
+    el.innerHTML = `<div style="color:var(--red);font-size:.75rem">⚠️ ${e.message}</div>`;
+  }
+}
+
   if(!confirm('Kuyruktaki tüm bekleyen kayıtlar silinecek. Emin misiniz?')) return;
   const q=await getQueue();
   for(const op of q) await removeFromQueue(op._qid);
