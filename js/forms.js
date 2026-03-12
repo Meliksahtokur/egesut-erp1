@@ -970,3 +970,20 @@ async function hstIlacSil(tedaviId) {
     pullTables(['tedavi','stok','stok_hareket']).then(renderSafe).catch(console.warn);
   } catch(e) { toast('❌ ' + e.message, true); }
 }
+
+// ── İLAÇ–STOK BAĞLAMA ────────────────────────────────────────
+async function submitDrugStokLink(drugId, stockItemId) {
+  // Boş string → NULL (bağlantı kaldır)
+  const stockId = stockItemId || null;
+  try {
+    const res = await rpc('link_drug_to_stock', {
+      p_drug_id:       drugId,
+      p_stock_item_id: stockId,
+    });
+    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
+    toast(stockId ? '✅ Stok bağlantısı kaydedildi' : '✅ Bağlantı kaldırıldı');
+    // drugs cache'ini güncelle (IDB + _drugsCache)
+    _drugsCache = [];
+    await pullTables(['drugs']);
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
