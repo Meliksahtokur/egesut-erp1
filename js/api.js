@@ -6,10 +6,11 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 7;
+const DB_VER  = 8;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
-                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','tedavi'];
-const APP_VERSION = '2026-03-12';
+                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','tedavi',
+                  'cases','diseases','drugs'];
+const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
 const { createClient } = window.supabase;
@@ -223,6 +224,9 @@ async function pullTables(tables = []) {
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
       tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
       tedavi:       () => db.from('tedavi_view').select('*'),
+      cases:        () => db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
+      diseases:     () => db.from('diseases').select('*').order('category').order('name'),
+      drugs:        () => db.from('drugs').select('*').order('name'),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
@@ -259,7 +263,8 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 // ── PULL FROM SUPABASE ──────────────────────
 async function pullFromSupabase() {
   try {
-    const [animals, tasks, stock, moves, diseases, tohs, births, bildirims, islemler, tedaviler] = await Promise.all([
+    const [animals, tasks, stock, moves, hastaliklar, tohs, births, bildirims, islemler, tedaviler,
+           cases, diseasesRef, drugsRef] = await Promise.all([
       db.from('hayvan_durum_view').select('*'),
       db.from('gorev_log').select('*').eq('tamamlandi', false),
       db.from('stok').select('*'),
@@ -270,19 +275,25 @@ async function pullFromSupabase() {
       db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
       db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
       db.from('tedavi_view').select('*'),
+      db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
+      db.from('diseases').select('*').order('category').order('name'),
+      db.from('drugs').select('*').order('name'),
     ]);
 
     await Promise.all([
-      idbClearAndPut('hayvanlar',    animals.data    || []),
-      idbClearAndPut('gorev_log',    tasks.data      || []),
-      idbClearAndPut('stok',         stock.data      || []),
-      idbClearAndPut('stok_hareket', moves.data      || []),
-      idbClearAndPut('hastalik_log', diseases.data   || []),
-      idbClearAndPut('tohumlama',    tohs.data       || []),
-      idbClearAndPut('dogum',        births.data     || []),
-      idbClearAndPut('bildirim_log', bildirims.data  || []),
-      idbClearAndPut('islem_log',    islemler.data   || []),
-      idbClearAndPut('tedavi',       tedaviler.data  || []),
+      idbClearAndPut('hayvanlar',    animals.data     || []),
+      idbClearAndPut('gorev_log',    tasks.data       || []),
+      idbClearAndPut('stok',         stock.data       || []),
+      idbClearAndPut('stok_hareket', moves.data       || []),
+      idbClearAndPut('hastalik_log', hastaliklar.data || []),
+      idbClearAndPut('tohumlama',    tohs.data        || []),
+      idbClearAndPut('dogum',        births.data      || []),
+      idbClearAndPut('bildirim_log', bildirims.data   || []),
+      idbClearAndPut('islem_log',    islemler.data    || []),
+      idbClearAndPut('tedavi',       tedaviler.data   || []),
+      idbClearAndPut('cases',        cases.data       || []),
+      idbClearAndPut('diseases',     diseasesRef.data || []),
+      idbClearAndPut('drugs',        drugsRef.data    || []),
     ]);
 
     document.getElementById('dot')?.classList.remove('off', 'warn');

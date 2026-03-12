@@ -362,9 +362,9 @@ button,input,select,textarea{font-family:inherit}
         <div class="log-text"><div class="log-title">Tohumlama</div><div class="log-sub">Sperma, tarih, kontrol görevleri otomatik</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div onclick="openM('m-disease')" class="log-btn">
+      <div onclick="openM('m-case')" class="log-btn">
         <div class="log-ico r">🏥</div>
-        <div class="log-text"><div class="log-title">Hastalık / Tedavi</div><div class="log-sub">Tanı, ilaç — stok otomatik düşer</div></div>
+        <div class="log-text"><div class="log-title">Vaka Aç</div><div class="log-sub">Tanı, günlük tedavi, ilaç — stok otomatik düşer</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
       <div onclick="openM('m-animal')" class="log-btn">
@@ -506,6 +506,7 @@ button,input,select,textarea{font-family:inherit}
 </div>
 
 <!-- HASTALIK -->
+<!-- HASTALIK / TEDAVİ (ESKİ SİSTEM — korunuyor) -->
 <div id="m-disease" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div id="m-disease-title" class="m-title">🏥 Hastalık / Tedavi</div>
     <div class="m-body">
@@ -893,6 +894,50 @@ button,input,select,textarea{font-family:inherit}
       <button id="hd-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:6px;width:100%;display:none">🔄 Bu Kaydı Geri Al</button>
       <button class="btn" style="background:rgba(192,50,26,.08);color:var(--red);margin-top:6px;width:100%" onclick="hstSilOnay()">🗑 Kaydı Sil</button>
       <button class="btn btn-o" onclick="closeM('m-hst-det')" style="margin-top:6px;width:100%">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- VAKA DETAY (YENİ SİSTEM) -->
+<div id="m-case-det" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
+      <div id="cd-hayvan" style="font-size:.68rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em"></div>
+      <div id="cd-tani" style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px"></div>
+      <div id="cd-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
+    <div class="m-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase">📅 Tedavi Günleri</div>
+        <button id="cd-gun-ekle-btn" class="btn" style="font-size:.7rem;padding:3px 10px;background:var(--blue);color:#fff" onclick="submitAddDay(this)">+ Gün Ekle</button>
+      </div>
+      <div id="cd-timeline"></div>
+      <div id="cd-ilac-form" style="display:none;margin-top:10px;background:var(--card2);border-radius:12px;padding:12px">
+        <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:8px">💊 İlaç Ekle — <span id="cd-ilac-gun-label"></span></div>
+        <div class="fg" style="margin-bottom:8px">
+          <select id="cd-drug-id" class="fsel" onchange="caseDrugSecildi()" style="margin:0">
+            <option value="">İlaç seçin…</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <input id="cd-dose" class="fi" type="number" min="0.1" step="0.1" placeholder="Doz" style="margin:0">
+          <input id="cd-unit" class="fi" placeholder="Birim (ml, gr…)" style="margin:0">
+        </div>
+        <select id="cd-route" class="fsel" style="margin-bottom:6px">
+          <option value="">Uygulama yolu…</option>
+          <option>IM</option><option>IV</option><option>SC</option>
+          <option>PO</option><option>Topikal</option><option>Intrauterin</option>
+        </select>
+        <div style="display:flex;gap:6px">
+          <button class="btn" style="flex:1;background:var(--green);color:#fff" onclick="submitAddDrug(this)">💾 Kaydet</button>
+          <button class="btn btn-o" style="flex:1" onclick="caseIlacFormKapat()">İptal</button>
+        </div>
+      </div>
+      <div id="cd-notes" style="font-size:.8rem;color:var(--ink2);margin-top:10px;padding:8px 10px;background:var(--card2);border-radius:8px;display:none"></div>
+      <div style="margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button id="cd-kapat-btn" class="btn" style="background:var(--green);color:#fff" onclick="submitCloseCase(this)">✅ Vakayı Kapat</button>
+        <button class="btn btn-o" onclick="closeM('m-case-det')">Kapat</button>
+      </div>
     </div>
   </div>
 </div>
