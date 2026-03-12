@@ -788,3 +788,63 @@ async function bildirimAc() {
   if (izin) { toast('✅ Bildirimler açık!'); localStorage.setItem('bildirim_aktif', '1'); bildirimKontrol(); }
   else { toast('⚠️ Bildirim izni verilmedi', true); }
 }
+
+// ──────────────────────────────────────────
+// T-07 — İLAÇ YÖNETİMİ (hastalık detay)
+// ──────────────────────────────────────────
+
+function hstIlacFormToggle() {
+  const f = document.getElementById('hd-ilac-form');
+  if (!f) return;
+  const visible = f.style.display !== 'none';
+  f.style.display = visible ? 'none' : 'block';
+  if (!visible) {
+    document.getElementById('hdi-stok-ac').value = '';
+    document.getElementById('hdi-stok-id').value = '';
+    document.getElementById('hdi-birim').value = '';
+    document.getElementById('hdi-miktar').value = '';
+    document.getElementById('hdi-yol').value = '';
+    document.getElementById('hdi-bekleme').value = '';
+    document.getElementById('ac-hdi').style.display = 'none';
+    window._hdiIlacCache = [];
+  }
+}
+
+async function hstIlacEkle(btn) {
+  const stokId  = document.getElementById('hdi-stok-id').value.trim();
+  const miktar  = parseFloat(document.getElementById('hdi-miktar').value);
+  const yol     = document.getElementById('hdi-yol').value;
+  const bekleme = parseInt(document.getElementById('hdi-bekleme').value) || null;
+  if (!stokId)       { toast('❌ İlaç seçin', true); return; }
+  if (!miktar || miktar <= 0) { toast('❌ Miktar girin', true); return; }
+  if (!_curHst?.id)  { toast('❌ Hastalık kaydı bulunamadı', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  try {
+    const res = await rpc('tedavi_ekle', {
+      p_vaka_id:       _curHst.id,
+      p_hayvan_id:     _curHst.hayvan_id,
+      p_ilac_stok_id:  stokId,
+      p_miktar:        miktar,
+      p_uygulama_yolu: yol || null,
+      p_bekleme_gun:   bekleme,
+      p_hekim_id:      null,
+    });
+    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
+    toast('✅ İlaç kaydedildi');
+    hstIlacFormToggle();
+    await renderHstIlaclar(_curHst.id);
+    pullTables(['tedavi','stok','stok_hareket']).then(renderSafe).catch(console.warn);
+  } catch(e) { toast('❌ ' + e.message, true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '💾 İlaç Kaydet'; } }
+}
+
+async function hstIlacSil(tedaviId) {
+  if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
+  try {
+    const res = await rpc('tedavi_sil', { p_tedavi_id: tedaviId });
+    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
+    toast('✅ İlaç silindi');
+    await renderHstIlaclar(_curHst.id);
+    pullTables(['tedavi','stok','stok_hareket']).then(renderSafe).catch(console.warn);
+  } catch(e) { toast('❌ ' + e.message, true); }
+}

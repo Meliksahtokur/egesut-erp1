@@ -1193,7 +1193,6 @@ async function openHstDet(id){
   const h=all.find(x=>x.id===id); if(!h) return;
   _curHst=h;
   const hk=[...HEKIMLER,...(_customHekimler||[])].find(x=>x.id===h.hekim_id);
-  const stk=(await idbGetAll('stok')).find(s=>s.id===h.ilac_stok_id);
   // Küpe çözümle
   const hayvanObj=_A.find(a=>a.id===h.hayvan_id||a.kupe_no===h.hayvan_id);
   const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||h.hayvan_id):h.hayvan_id;
@@ -1206,22 +1205,14 @@ async function openHstDet(id){
     hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
   ];
   document.getElementById('hd-meta').innerHTML=chips.filter(Boolean).join('');
-  // ilac_listesi (çoklu ilaç desteği)
-  let ilacHtml='';
-  if(h.ilac_listesi){
-    try {
-      const ilaclar=JSON.parse(h.ilac_listesi);
-      if(Array.isArray(ilaclar)&&ilaclar.length){
-        ilacHtml=`<b>İlaçlar:</b><br>`+ilaclar.map(i=>`• ${i.stokAd||i.stokId}: ${i.mik} ${_S.find(s=>s.id===i.stokId)?.birim||''}`).join('<br>');
-      }
-    } catch(_){}
-  }
-  if(!ilacHtml&&stk) ilacHtml=`<b>İlaç:</b> ${stk.urun_adi} — ${h.ilac_miktar||0} ${stk.birim||''}`;
+  // Bilgi satırları
   const rows=[];
   if(h.kategori) rows.push(`<b>Kategori:</b> ${h.kategori}`);
   if(h.semptomlar) rows.push(`<b>Semptomlar:</b> ${h.semptomlar}`);
-  if(ilacHtml) rows.push(ilacHtml);
+  if(h.lokasyon) rows.push(`<b>Lokasyon:</b> ${h.lokasyon}`);
   document.getElementById('hd-body').innerHTML=rows.join('<br>')||'Ek bilgi yok';
+  // İlaç listesi — tedavi_view'dan direkt çek
+  await renderHstIlaclar(id);
   // islem_log'dan bu kaydın id'sini bul (geri alma için)
   const islemLog=await idbGetAll('islem_log');
   const islemKayit=islemLog.find(l=>l.tip==='HASTALIK_KAYDI'&&(l.payload?.kaynak_id===id||l.snapshot?.id===id));
@@ -1230,7 +1221,52 @@ async function openHstDet(id){
     if(islemKayit){ hdGeriAlBtn.style.display='block'; hdGeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${h.tani||'?'} (${fmtTarih(h.tarih)})`); }
     else { hdGeriAlBtn.style.display='none'; }
   }
+  // İlaç ekleme formunu kapat
+  const ilacForm=document.getElementById('hd-ilac-form');
+  if(ilacForm) ilacForm.style.display='none';
   openM('m-hst-det');
+}
+
+async function renderHstIlaclar(vakaId){
+  const el=document.getElementById('hd-ilac-listesi');
+  if(!el) return;
+  try {
+    const {data,error}=await db.from('tedavi_view').select('*').eq('vaka_id',vakaId).order('created_at',{ascending:true});
+    if(error||!data||!data.length){ el.innerHTML='<span style="color:var(--ink3);font-size:.78rem">İlaç kaydı yok</span>'; return; }
+    el.innerHTML=data.map(t=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
+        <div>
+          <span style="font-weight:700">${t.ilac_adi||'?'}</span>
+          <span style="color:var(--ink3)"> ${t.miktar||0} ${t.ilac_birim||''}</span>
+          ${t.uygulama_yolu?`<span style="margin-left:6px;background:var(--card2);padding:2px 7px;border-radius:8px;font-size:.7rem">${t.uygulama_yolu}</span>`:''}
+          ${t.bekleme_suresi_gun?`<span style="margin-left:4px;color:var(--amber);font-size:.72rem">⏳ ${t.bekleme_suresi_gun}g bekleme</span>`:''}
+        </div>
+        <button onclick="hstIlacSil('${t.id}')" style="background:none;border:none;color:var(--red);font-size:1rem;cursor:pointer;padding:2px 6px">🗑</button>
+      </div>`).join('');
+  } catch(e){ el.innerHTML='<span style="color:var(--red);font-size:.78rem">Yüklenemedi</span>'; }
+}
+
+let _hdiIlacCache=[];
+async function acHdiStok(inp){
+  const q=(inp.value||'').toLowerCase().trim();
+  const ac=document.getElementById('ac-hdi');
+  if(!ac) return;
+  if(!_hdiIlacCache.length){
+    const {data}=await db.from('stok').select('*').eq('kategori','İlaç');
+    _hdiIlacCache=data||[];
+  }
+  const filtered=q?_hdiIlacCache.filter(s=>s.urun_adi.toLowerCase().includes(q)):_hdiIlacCache.slice(0,12);
+  if(!filtered.length){ ac.style.display='none'; return; }
+  ac.innerHTML=filtered.map(s=>`<div onclick="hdiStokSec('${s.id}','${s.urun_adi.replace(/'/g,"\'")}','${s.birim||''}')"
+    style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card2)"
+    onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">${s.urun_adi} <span style="color:var(--ink3)">${s.birim||''}</span></div>`).join('');
+  ac.style.display='block';
+}
+function hdiStokSec(id,ad,birim){
+  document.getElementById('hdi-stok-id').value=id;
+  document.getElementById('hdi-stok-ac').value=ad;
+  document.getElementById('hdi-birim').value=birim;
+  document.getElementById('ac-hdi').style.display='none';
 }
 
 // ──────────────────────────────────────────
