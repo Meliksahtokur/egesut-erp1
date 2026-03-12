@@ -331,7 +331,7 @@ async function openDet(id){
   ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   showTab('ozet',document.querySelector('.tab'));
   try {
-    const [aArr,diseases,tohs,tasks,births,subs,yavrular]=await Promise.all([
+    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('hastalik_log',d=>d.hayvan_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
@@ -339,6 +339,7 @@ async function openDet(id){
       getData('dogum',b=>b.anne_id===id),
       getData('gorev_log',t=>t.hayvan_id===id&&!t.tamamlandi&&!!t.parent_id),
       getData('hayvanlar',a=>a.anne_id===id),
+      getData('cases',c=>c.animal_id===id&&c.status==='active'),
     ]);
     const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
@@ -354,7 +355,7 @@ async function openDet(id){
     document.getElementById('det-chips').innerHTML=[
       {cls:'chip-k',txt:a.grup||'?'},
       {cls:'chip-k',txt:a.padok||'?'},
-      aktifHst>0?{cls:'chip-r',txt:`🚨 ${aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
+      aktifHst>0||activeCases.length>0?{cls:'chip-r',txt:`🚨 ${activeCases.length||aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
       tohs.find(t=>t.sonuc==='Gebe')?{cls:'chip-g',txt:'🤰 Gebe'}:null,
     ].filter(Boolean).map(c=>`<div class="chip ${c.cls}">${c.txt}</div>`).join('');
 
@@ -400,8 +401,18 @@ async function openDet(id){
       return `${ay} ay ${kalanGun} gün (${gunler}. gün) · Tahmini: ${dFwd(gebeTohumlama.tarih,280)}`;
     })():null;
 
+    const allDiseasesList = await idbGetAll('diseases');
+    const activeCaseChips = activeCases.length
+      ? `<div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px">`
+        + activeCases.map(c=>{
+            const dis=allDiseasesList.find(d=>d.id===c.disease_id);
+            return `<div onclick="openCaseDet('${c.id}')" style="cursor:pointer;background:rgba(192,50,26,.1);border:1.5px solid var(--red);border-radius:10px;padding:6px 10px;font-size:.78rem;font-weight:700;color:var(--red)">🏥 ${dis?.name||'?'}</div>`;
+          }).join('')
+        + `</div>`
+      : '';
     document.getElementById('tab-saglik').innerHTML=
-      `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-case','case-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button></div>`+
+      activeCaseChips+
+      `<div style="padding:6px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-case','case-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button></div>`+
       await renderCasesForAnimal(a.id)+
       (diseases.length
       ?`<div style="margin-top:14px;font-size:.7rem;font-weight:700;color:var(--ink3);text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid var(--card2)">Eski Kayıtlar</div>`+
