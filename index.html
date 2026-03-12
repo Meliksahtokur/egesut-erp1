@@ -888,17 +888,30 @@ button,input,select,textarea{font-family:inherit}
       </div>
       <div id="hd-edit-form" style="display:none;margin-bottom:12px">
         <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:8px">Düzenle</div>
-        <input id="hde-tani" class="inp" placeholder="Tanı" style="margin-bottom:6px">
+        <div style="position:relative;margin-bottom:6px">
+          <input id="hde-tani" class="inp" placeholder="Tanı…" autocomplete="off" style="margin:0"
+            oninput="acHdeTani(this)" onfocus="acHdeTani(this)">
+          <div id="ac-hde-tani" class="ac-box" style="display:none;position:absolute;z-index:200;background:#fff;border:1px solid var(--card3);border-radius:8px;max-height:160px;overflow-y:auto;width:100%"></div>
+        </div>
         <select id="hde-siddet" class="inp" style="margin-bottom:6px">
           <option value="">Şiddet seç</option>
           <option>Hafif</option><option>Orta</option><option>Ağır</option>
         </select>
-        <input id="hde-semptomlar" class="inp" placeholder="Semptomlar" style="margin-bottom:6px">
+        <div style="font-size:.72rem;color:var(--ink3);margin-bottom:4px">Semptomlar</div>
+        <div id="hde-sempt-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
+        <select id="hde-sempt-ekle" class="inp" style="margin-bottom:6px" onchange="hdeSmptomEkle(this)">
+          <option value="">+ Semptom ekle…</option>
+        </select>
+        <input type="hidden" id="hde-semptomlar">
         <div id="hde-lokasyon-wrap" style="display:none;margin-bottom:6px">
           <div style="font-size:.72rem;color:var(--ink3);margin-bottom:4px" id="hde-lokasyon-lbl">Lokasyon</div>
           <div id="hde-lokasyon-secenekler" style="display:flex;flex-wrap:wrap;gap:5px"></div>
           <input type="hidden" id="hde-lokasyon">
         </div>
+        <select id="hde-hekim" class="inp" style="margin-bottom:6px">
+          <option value="">Hekim seç…</option>
+        </select>
+        <input id="hde-tarih" class="inp" type="date" style="margin-bottom:6px">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <button class="btn" style="background:var(--green);color:#fff" onclick="hstGuncelle(this)">💾 Kaydet</button>
           <button class="btn btn-o" onclick="hstDuzenleKapat()">İptal</button>
@@ -906,7 +919,7 @@ button,input,select,textarea{font-family:inherit}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
         <button class="btn" style="background:var(--blue);color:#fff" onclick="hstDuzenleAc()">✏️ Düzenle</button>
-        <button class="btn hstKapat" onclick="hstKapat()">✅ İyileşti</button>
+        <button class="btn" style="background:var(--green);color:#fff" onclick="hstKapat()">✅ İyileşti</button>
       </div>
       <button id="hd-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:6px;width:100%;display:none">🔄 Bu Kaydı Geri Al</button>
       <button class="btn" style="background:rgba(192,50,26,.08);color:var(--red);margin-top:6px;width:100%" onclick="hstSilOnay()">🗑 Kaydı Sil</button>
