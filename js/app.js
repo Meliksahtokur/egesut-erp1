@@ -189,7 +189,7 @@ async function refreshAll() {
 // ── HEKİM SELECTS ───────────────────────────
 function populateHekimSelects() {
   const all = [...HEKIMLER, ..._customHekimler];
-  ['b-hekim','i-hekim','d-hekim','ta-hekim','hde-hekim'].forEach(id => {
+  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(id => {
     const el = g(id); if (!el) return;
     el.innerHTML = all.map(h => `<option value="${h.id}">${h.ad}</option>`).join('');
     el.value = VARSAYILAN_HEKIM;
@@ -509,8 +509,8 @@ function updateSemptomDropdown(kat) {
 }
 
 function semptomEkle(sel) {
-  const val = sel.value; if (!val) return;
-  sel.value = '';
+  const val = sel.value || sel._noReset && sel.value === '' ? sel.value : sel.value; if (!val) return;
+  if (!sel._noReset) sel.value = '';
   if (_semptomSecili.includes(val)) return;
   _semptomSecili.push(val);
   const chips = g('sempt-chips'); if (!chips) return;
