@@ -401,10 +401,12 @@ async function openDet(id){
     })():null;
 
     document.getElementById('tab-saglik').innerHTML=
-      `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Tedavi Ekle</button></div>`+
+      `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-case','case-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button></div>`+
+      await renderCasesForAnimal(a.id)+
       (diseases.length
-      ?diseases.map(d=>`<div class="hist-row" onclick="openHstDet('${d.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${d.durum==='Aktif'?'var(--red2)':'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${d.tani||'—'}</div><div class="hist-sub">${d.tarih||''} · ${d.siddet||''} · <b style="color:${d.durum==='Aktif'?'var(--red)':'var(--green)'}">${d.durum}</b></div>${d.semptomlar?`<div class="hist-sub" style="margin-top:3px">${d.semptomlar}</div>`:''}</div></div>`).join('')
-      :'<div class="empty"><div class="empty-ico">✅</div>Hastalık kaydı yok</div>');
+      ?`<div style="margin-top:14px;font-size:.7rem;font-weight:700;color:var(--ink3);text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid var(--card2)">Eski Kayıtlar</div>`+
+      diseases.map(d=>`<div class="hist-row" onclick="openHstDet('${d.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${d.durum==='Aktif'?'var(--red2)':'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${d.tani||'—'}</div><div class="hist-sub">${d.tarih||''} · ${d.siddet||''} · <b style="color:${d.durum==='Aktif'?'var(--red)':'var(--green)'}">${d.durum}</b></div>${d.semptomlar?`<div class="hist-sub" style="margin-top:3px">${d.semptomlar}</div>`:''}</div></div>`).join('')
+      :'');
 
     const bekleyenToh=tohs.find(t=>t.sonuc==='Bekliyor');
     let uremeHtml=`<div style="padding:10px 0 6px;display:flex;gap:6px;flex-wrap:wrap">`;
@@ -1188,6 +1190,173 @@ async function detayIptal(){
 // ──────────────────────────────────────────
 // HASTALIK DETAY
 // ──────────────────────────────────────────
+
+// ══════════════════════════════════════════
+// VAKA SİSTEMİ (Migration 022)
+// ══════════════════════════════════════════
+
+let _curCase = null;
+let _curDayId = null;
+let _drugsCache = [];
+
+async function loadDrugsCache() {
+  if (!_drugsCache.length) {
+    _drugsCache = await idbGetAll('drugs');
+  }
+  return _drugsCache;
+}
+
+async function renderCasesForAnimal(animalId) {
+  const allCases = await idbGetAll('cases');
+  const animalCases = allCases
+    .filter(c => c.animal_id === animalId)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (!animalCases.length) return '<div class="empty"><div class="empty-ico">✅</div>Aktif vaka yok</div>';
+  const allDiseases = await idbGetAll('diseases');
+  return animalCases.map(c => {
+    const dis = allDiseases.find(d => d.id === c.disease_id);
+    const isActive = c.status === 'active';
+    return `<div class="hist-row" onclick="openCaseDet('${c.id}')" style="cursor:pointer">
+      <div class="hist-dot" style="background:${isActive ? 'var(--red2)' : 'var(--green2)'}"></div>
+      <div class="hist-main">
+        <div class="hist-title">${dis?.name || '?'}</div>
+        <div class="hist-sub">${fmtTarih(c.start_date)} · <b style="color:${isActive ? 'var(--red)' : 'var(--green)'}">${isActive ? 'Aktif' : 'Kapalı'}</b></div>
+        ${c.notes ? `<div class="hist-sub" style="margin-top:2px">${c.notes}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function openCaseDet(caseId) {
+  const allCases = await idbGetAll('cases');
+  const c = allCases.find(x => x.id === caseId);
+  if (!c) { toast('Vaka bulunamadı', true); return; }
+  _curCase = c;
+  _curDayId = null;
+  const allDiseases = await idbGetAll('diseases');
+  const dis = allDiseases.find(d => d.id === c.disease_id);
+  const hayvan = _A.find(a => a.id === c.animal_id);
+  const hayvanLabel = hayvan ? (hayvan.kupe_no || hayvan.devlet_kupe || hayvan.id) : c.animal_id;
+  const isActive = c.status === 'active';
+  document.getElementById('cd-hayvan').textContent = hayvanLabel;
+  document.getElementById('cd-tani').textContent = `🏥 ${dis?.name || '?'}`;
+  const chips = [
+    `<span style="background:${isActive ? 'rgba(192,50,26,.12)' : 'rgba(78,154,42,.12)'};color:${isActive ? 'var(--red)' : 'var(--green)'};padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700">${isActive ? 'Aktif' : 'Kapalı'}</span>`,
+    dis?.category ? `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${dis.category}</span>` : '',
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(c.start_date)}</span>`,
+  ];
+  document.getElementById('cd-meta').innerHTML = chips.filter(Boolean).join('');
+  const notesEl = document.getElementById('cd-notes');
+  if (c.notes) { notesEl.textContent = c.notes; notesEl.style.display = 'block'; }
+  else { notesEl.style.display = 'none'; }
+  const gunBtn = document.getElementById('cd-gun-ekle-btn');
+  const kapatBtn = document.getElementById('cd-kapat-btn');
+  if (gunBtn) gunBtn.style.display = isActive ? 'block' : 'none';
+  if (kapatBtn) kapatBtn.style.display = isActive ? 'block' : 'none';
+  caseIlacFormKapat();
+  await loadDrugsCache();
+  await renderCaseTimeline(caseId);
+  openM('m-case-det');
+}
+
+async function renderCaseTimeline(caseId) {
+  const el = document.getElementById('cd-timeline');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--ink3);font-size:.8rem">Yükleniyor…</div>';
+  try {
+    const { data: days, error } = await db
+      .from('treatment_days').select('*').eq('case_id', caseId).order('day_no', { ascending: true });
+    if (error) throw error;
+    if (!days || !days.length) {
+      el.innerHTML = '<div class="empty" style="padding:14px 0"><div class="empty-ico">📅</div>Henüz tedavi günü yok — "+ Gün Ekle" ile başlayın</div>';
+      return;
+    }
+    const dayIds = days.map(d => d.id);
+    const { data: admins } = await db
+      .from('drug_administrations').select('*, drugs(name, default_unit)')
+      .in('treatment_day_id', dayIds).order('created_at', { ascending: true });
+    const adminsByDay = {};
+    (admins || []).forEach(a => {
+      if (!adminsByDay[a.treatment_day_id]) adminsByDay[a.treatment_day_id] = [];
+      adminsByDay[a.treatment_day_id].push(a);
+    });
+    const isActive = _curCase?.status === 'active';
+    el.innerHTML = days.map(day => {
+      const dayAdmins = adminsByDay[day.id] || [];
+      const drugRows = dayAdmins.length
+        ? dayAdmins.map(a => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--card2)">
+              <div>
+                <span style="font-weight:600;font-size:.82rem">${a.drugs?.name || '?'}</span>
+                <span style="color:var(--ink3);font-size:.78rem"> ${a.dose} ${a.unit}</span>
+                ${a.route ? `<span style="margin-left:5px;background:var(--card2);padding:1px 6px;border-radius:7px;font-size:.68rem">${a.route}</span>` : ''}
+              </div>
+              ${isActive ? `<button onclick="deleteDrugAdmin('${a.id}','${caseId}')" style="background:none;border:none;color:var(--red);font-size:.85rem;cursor:pointer;padding:2px 6px">🗑</button>` : ''}
+            </div>`).join('')
+        : '<div style="color:var(--ink3);font-size:.78rem;padding:4px 0">İlaç kaydı yok</div>';
+      return `
+        <div style="margin-bottom:12px;border:1.5px solid var(--card3);border-radius:12px;overflow:hidden">
+          <div style="background:var(--card2);padding:8px 12px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <span style="font-weight:800;font-size:.85rem">Gün ${day.day_no}</span>
+              <span style="color:var(--ink3);font-size:.75rem;margin-left:8px">${fmtTarih(day.treatment_date)}</span>
+            </div>
+            ${isActive ? `<button onclick="caseIlacFormAc('${day.id}','${day.day_no}')" style="font-size:.68rem;padding:3px 9px;background:var(--blue);color:#fff;border:none;border-radius:8px;cursor:pointer">+ İlaç</button>` : ''}
+          </div>
+          <div style="padding:8px 12px">${drugRows}</div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--red);font-size:.8rem;padding:8px">Yüklenemedi: ${e.message}</div>`;
+  }
+}
+
+function caseIlacFormAc(dayId, dayNo) {
+  _curDayId = dayId;
+  const form = document.getElementById('cd-ilac-form');
+  const label = document.getElementById('cd-ilac-gun-label');
+  if (label) label.textContent = `Gün ${dayNo}`;
+  const sel = document.getElementById('cd-drug-id');
+  if (sel && _drugsCache.length) {
+    sel.innerHTML = '<option value="">İlaç seçin…</option>'
+      + _drugsCache.map(d => `<option value="${d.id}" data-unit="${d.default_unit || ''}" data-route="${d.default_route || ''}">${d.name}</option>`).join('');
+  }
+  document.getElementById('cd-dose').value = '';
+  document.getElementById('cd-unit').value = '';
+  document.getElementById('cd-route').value = '';
+  if (form) form.style.display = 'block';
+  form?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function caseIlacFormKapat() {
+  _curDayId = null;
+  const form = document.getElementById('cd-ilac-form');
+  if (form) form.style.display = 'none';
+}
+
+function caseDrugSecildi() {
+  const sel = document.getElementById('cd-drug-id');
+  const opt = sel?.options[sel.selectedIndex];
+  if (!opt) return;
+  const unit  = opt.getAttribute('data-unit')  || '';
+  const route = opt.getAttribute('data-route') || '';
+  const unitEl  = document.getElementById('cd-unit');
+  const routeEl = document.getElementById('cd-route');
+  if (unitEl && !unitEl.value)   unitEl.value  = unit;
+  if (routeEl && !routeEl.value) routeEl.value = route;
+}
+
+async function deleteDrugAdmin(adminId, caseId) {
+  if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
+  try {
+    const res = await rpc('remove_drug_administration', { p_admin_id: adminId });
+    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
+    toast('✅ İlaç kaydı silindi');
+    await renderCaseTimeline(caseId);
+    pullTables(['stok_hareket']).then(renderSafe).catch(console.warn);
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+
 async function openHstDet(id){
   const all=await idbGetAll('hastalik_log');
   const h=all.find(x=>x.id===id); if(!h) return;

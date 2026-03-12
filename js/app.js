@@ -61,6 +61,29 @@ let _customHekimler = [];
 let _customSperma   = [];
 let _disFreq        = {};
 let _ilacCache      = [];
+let _diseasesCache  = [];  // migration 022 diseases tablosu
+
+async function loadDiseasesDropdown(kategori) {
+  const sel = g('case-disease-id');
+  if (!sel) return;
+  if (!_diseasesCache.length) {
+    _diseasesCache = await idbGetAll('diseases');
+  }
+  const filtered = kategori
+    ? _diseasesCache.filter(d => d.category === kategori)
+    : _diseasesCache;
+  sel.innerHTML = '<option value="">Tanı seçin…</option>'
+    + filtered.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+  const hint = g('case-disease-hint');
+  if (hint) hint.textContent = filtered.length
+    ? `${filtered.length} tanı seçeneği`
+    : '⚠️ Bu kategoride kayıtlı hastalık yok';
+}
+
+function caseKatFiltrele() {
+  const kat = g('case-kat')?.value || '';
+  loadDiseasesDropdown(kat);
+}
 
 // ── GLOBAL STATE ────────────────────────────
 let _A = [], _S = [], _curStk = null, _curPg = 'dash';
@@ -101,6 +124,9 @@ function openM(id) {
     if(g('d-sempt')) g('d-sempt').value = '';
     updateSemptomDropdown('');
     filterHastalikList();
+  }
+  if (id === 'm-case') {
+    loadDiseasesDropdown('');
   }
 }
 function closeM(id) {
