@@ -529,7 +529,28 @@ function hstDuzenleAc() {
   document.getElementById('hde-tani').value       = _curHst.tani       || '';
   document.getElementById('hde-siddet').value     = _curHst.siddet     || '';
   document.getElementById('hde-semptomlar').value = _curHst.semptomlar || '';
-  document.getElementById('hde-lokasyon').value   = _curHst.lokasyon   || '';
+  // Lokasyon chip'leri
+  const hdeKat    = _curHst.kategori || '';
+  const hdeLokMap = { 'Meme': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'], 'Ayak': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'], 'Göz': ['Sol Göz','Sağ Göz'] };
+  const hdeLokWrap = document.getElementById('hde-lokasyon-wrap');
+  const hdeLokSec  = document.getElementById('hde-lokasyon-secenekler');
+  const hdeLokLbl  = document.getElementById('hde-lokasyon-lbl');
+  const hdeLokList = hdeLokMap[hdeKat] || [];
+  if (hdeLokList.length && hdeLokWrap && hdeLokSec) {
+    if (hdeLokLbl) hdeLokLbl.textContent = hdeKat === 'Meme' ? 'Çeyrek' : hdeKat === 'Göz' ? 'Göz' : 'Hangi Ayak';
+    const mevcut = (_curHst.lokasyon || '').split(',').map(s => s.trim()).filter(Boolean);
+    hdeLokSec.innerHTML = hdeLokList.map(l => {
+      const aktif = mevcut.includes(l);
+      return `<button type="button" onclick="hdeToggleLok('${l}',this)"
+        style="padding:5px 11px;border:1.5px solid ${aktif ? 'var(--green)' : 'var(--card3)'};border-radius:20px;background:${aktif ? 'var(--green)' : 'var(--card)'};font-size:.72rem;font-weight:700;color:${aktif ? '#fff' : 'var(--ink2)'};cursor:pointer"
+        class="hde-lok-btn${aktif ? ' lok-on' : ''}">${l}</button>`;
+    }).join('');
+    document.getElementById('hde-lokasyon').value = mevcut.join(', ');
+    hdeLokWrap.style.display = 'block';
+  } else if (hdeLokWrap) {
+    hdeLokWrap.style.display = 'none';
+    document.getElementById('hde-lokasyon').value = '';
+  }
   f.style.display = 'block';
 }
 
@@ -547,7 +568,7 @@ async function hstGuncelle(btn) {
       p_tani:       document.getElementById('hde-tani').value.trim()       || null,
       p_siddet:     document.getElementById('hde-siddet').value            || null,
       p_semptomlar: document.getElementById('hde-semptomlar').value.trim() || null,
-      p_lokasyon:   document.getElementById('hde-lokasyon').value.trim()   || null,
+      p_lokasyon:   document.getElementById('hde-lokasyon').value.trim() || null,
     });
     if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ Güncellendi');
