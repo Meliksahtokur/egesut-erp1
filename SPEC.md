@@ -1,6 +1,6 @@
-# EgeSüt ERP — SPEC v8
+# EgeSüt ERP — SPEC v9
 > Her oturumun başında okunur. Hem harita hem rota. Sigortamız.
-> Son güncelleme: 2026-03-12 — Form mimarisi sorunu tespit edildi. Tüm formlar serbest text üzerine kurulu, DB objelerini kullanmıyor. T-07 bloke — önce F-01 Form Mimarisi Yeniden Tasarımı yapılacak.
+> Son güncelleme: 2026-03-12 — F-01 kısmen tamamlandı. m-disease edit modda çalışıyor. tedavi_guncelle + ledger düzeltmesi tamamlandı. Kalan: ilaç satırı düzenleme UI (detay modalında). T-07 hala bloke.
 
 ---
 
@@ -101,7 +101,7 @@ git remote set-url origin https://Meliksahtokur:TOKEN@github.com/Meliksahtokur/e
 ### Bekleyen Sprint İtemleri 🔴
 | Item | Açıklama | Dosyalar |
 |------|----------|----------|
-| **F-01** | **Form Mimarisi Yeniden Tasarımı** — öncelikli, T-07 bu olmadan tamamlanamaz | ui.js / forms.js / index.html / app.js |
+| **F-01** | **Form Mimarisi Yeniden Tasarımı** — kısmen ✅. Kalan: detay modalında ilaç satırı düzenleme UI (tedavi_guncelle frontend) | forms.js / index.html |
 | T-07 | İlaç yönetimi — F-01 tamamlandıktan sonra | ui.js / forms.js |
 | S2-05 | Abort akışı — gebe listesi, abort modal, badge | ui.js / forms.js |
 | S2-06 | Üreme tab: gebelik butonu kaldır, doğum görevleri | ui.js |
@@ -223,6 +223,8 @@ supabase/migrations/ — idempotent SQL dosyaları
 | 015 | hayvanlar.laktasyonda boolean — S2-10 için | 🔜 |
 | 016-018 | ref_id/ref_tablo, hastalik_guncelle/kapat/sil | ✅ |
 | 019 | tedavi yeniden tasarım: uygulama_yolu, tedavi_ekle/sil, hastalik_kaydet/sil güncellendi | ✅ |
+| 020 | hastalik_guncelle RPC'ye p_tarih eklendi | ✅ |
+| 021 | stok_hareket audit kolonları (referans_tipi/id) + tedavi_sil ledger + tedavi_guncelle RPC | ✅ |
 
 ### Tablolar
 | Tablo | Amaç |
@@ -344,6 +346,10 @@ KIZGINLIK          → 🔴 Kızgınlık
 | Geri Al vs Sil | Geri Al = snapshot restore. Sil = sadece o kayıt |
 | Diff birikimi | Aşırı küçük diff'ler dosyaları karıştırabilir. Değişiklikler mantıklı gruplar halinde verilmeli. |
 | Modal auto-date | today() otomatik dolunca yasGun=0 bug'ı çıktı |
+| Stok ledger | stok_hareket asla silinmez/iptal edilmez — her düzeltme yeni hareket INSERT |
+| tedavi_sil | iptal=true yanlış — ledger: +miktar yeni hareket ekle |
+| Migration Actions | supabase/migrations push → GitHub Actions otomatik Supabase'e uygular |
+| Zip verme | Değişiklikleri zip değil SEARCH/REPLACE veya PYEOF bloğu olarak ver |
 
 ---
 
