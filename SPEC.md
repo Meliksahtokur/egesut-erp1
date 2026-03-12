@@ -225,6 +225,8 @@ supabase/migrations/ — idempotent SQL dosyaları
 | 019 | tedavi yeniden tasarım: uygulama_yolu, tedavi_ekle/sil, hastalik_kaydet/sil güncellendi | ✅ |
 | 020 | hastalik_guncelle RPC'ye p_tarih eklendi | ✅ |
 | 021 | stok_hareket audit kolonları (referans_tipi/id) + tedavi_sil ledger + tedavi_guncelle RPC | ✅ |
+| 020 | hastalik_guncelle RPC'ye p_tarih eklendi | ✅ |
+| 021 | stok_hareket audit kolonları (referans_tipi/id) + tedavi_sil ledger + tedavi_guncelle RPC | ✅ |
 
 ### Tablolar
 | Tablo | Amaç |
@@ -346,6 +348,10 @@ KIZGINLIK          → 🔴 Kızgınlık
 | Geri Al vs Sil | Geri Al = snapshot restore. Sil = sadece o kayıt |
 | Diff birikimi | Aşırı küçük diff'ler dosyaları karıştırabilir. Değişiklikler mantıklı gruplar halinde verilmeli. |
 | Modal auto-date | today() otomatik dolunca yasGun=0 bug'ı çıktı |
+| Stok ledger | stok_hareket asla silinmez/iptal edilmez — her düzeltme yeni hareket INSERT |
+| tedavi_sil | iptal=true yanlış — ledger: +miktar yeni hareket ekle |
+| Migration Actions | supabase/migrations push → GitHub Actions otomatik Supabase'e uygular |
+| Zip verme | Değişiklikleri zip değil SEARCH/REPLACE veya PYEOF bloğu olarak ver |
 | Stok ledger | stok_hareket asla silinmez/iptal edilmez — her düzeltme yeni hareket INSERT |
 | tedavi_sil | iptal=true yanlış — ledger: +miktar yeni hareket ekle |
 | Migration Actions | supabase/migrations push → GitHub Actions otomatik Supabase'e uygular |
