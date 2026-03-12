@@ -9,7 +9,7 @@ const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 const DB_VER  = 6;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
                   'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu'];
-const APP_VERSION = '2026-03-06-b2';
+const APP_VERSION = '2026-03-12';
 
 // ── SUPABASE SDK ────────────────────────────
 const { createClient } = window.supabase;

@@ -531,6 +531,17 @@ function semptomKaldir(val, chip) {
   updateSemptomDropdown(kat);
 }
 
+function hdeToggleLok(val, btn) {
+  btn.classList.toggle('lok-on');
+  if (btn.classList.contains('lok-on')) {
+    btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff';
+  } else {
+    btn.style.background = 'var(--card)'; btn.style.borderColor = 'var(--card3)'; btn.style.color = 'var(--ink2)';
+  }
+  const secili = [...document.querySelectorAll('.hde-lok-btn.lok-on')].map(b => b.textContent.trim());
+  document.getElementById('hde-lokasyon').value = secili.join(', ');
+}
+
 function toggleLokasyon(val, btn) {
   btn.classList.toggle('lok-on');
   if (btn.classList.contains('lok-on')) {
