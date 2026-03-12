@@ -29,13 +29,13 @@ Uygulandıktan sonra bu satırı `✅ UYGULANDI` olarak güncelle.
 |------|----------|
 | **CLN-01** | Migration 022 Supabase'e uygulandı |
 | **CLN-02** | `m-case` modal HTML'e eklendi, `diseases` dropdown DB'den, `create_case()` RPC bağlandı, `openMWithHayvan` + `acMap` güncellendi |
+| **CLN-03** | Vaka detay UI zaten tamamlanmıştı (renderCaseTimeline, submitAddDay, submitAddDrug, caseIlacFormAc). Eksik olan `remove_drug_administration` RPC → Migration 023 ile eklendi |
 
 ### 🔴 Şu An Yapılacak
 | Item | Açıklama | Dosyalar |
 |------|----------|----------|
-| **CLN-03** | Vaka detay: gün + ilaç ekleme UI, `treatment_timeline` view | ui.js, forms.js |
 | **CLN-04** | `drugs` ↔ `stok` bağlama UI (hangi ilaç hangi stok kalemi) | ui.js, forms.js |
-| **CLN-05** | Vaka kapatma + hayvan kartında aktif vaka gösterimi | ui.js |
+| **CLN-05** | Hayvan kartında aktif vaka gösterimi (CLN-02'de kısmi var, tamamla) | ui.js |
 
 ### 🟡 Sonraki Sprint
 | Item | Açıklama |
@@ -110,7 +110,4 @@ rpcOptimistic(fn,tables)  // toast → rpc → pull + render
 | Stok ledger | `stok_hareket` asla silinmez — yeni hareket ekle |
 | Ledger işareti | Kullanım = POZİTİF, iade = NEGATİF (frontend SUM'dan düşürür) |
 | Controlled entity | diseases, drugs, hayvanlar → asla free text, FK zorunlu |
-| CLN-02 teşhis | `m-case` modal HTML'de yoktu — form elementleri hiç eklenmemişti |
-| Disease cache | `openM('m-case')'de `_diseasesCache = []` reset — taze veri garantisi |
-| CLN-02 teşhis | `m-case` modal HTML'de yoktu — form elementleri hiç eklenmemişti |
-| Disease cache | `openM('m-case')'de `_diseasesCache = []` reset — taze veri garantisi |
+| Migration 023 | `remove_drug_administration`: silme değil iptal — ledger `iptal=true`, sonra `DELETE drug_administrations` |
