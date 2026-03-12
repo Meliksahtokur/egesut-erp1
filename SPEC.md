@@ -1,4 +1,4 @@
-# EgeSüt ERP — SPEC v12
+# EgeSüt ERP — SPEC v11
 > Operasyonel rehber. Mimari kararlar → ARCHITECTURE.md
 > Son güncelleme: 2026-03-12
 
@@ -15,9 +15,10 @@
 
 ## 1. MEVCUT DURUM
 
-- Migration 022 ✅ uygulandı
-- Migration 023 ✅ uygulandı (`remove_drug_administration`)
-- Migration 024 ✅ uygulandı (`link_drug_to_stock`)
+### Migration 022 uygulandı mı?
+** ✅  UYGULANDI** — `supabase/migrations/20260312000022_case_management.sql` hazır, Supabase'e verildi.
+
+Uygulandıktan sonra bu satırı `✅ UYGULANDI` olarak güncelle.
 
 ---
 
@@ -28,18 +29,18 @@
 |------|----------|
 | **CLN-01** | Migration 022 Supabase'e uygulandı |
 | **CLN-02** | `m-case` modal HTML'e eklendi, `diseases` dropdown DB'den, `create_case()` RPC bağlandı, `openMWithHayvan` + `acMap` güncellendi |
-| **CLN-03** | Vaka detay UI tamamlandı. Eksik `remove_drug_administration` RPC → Migration 023 |
-| **CLN-04** | `drugs` ↔ `stok` bağlama: Migration 024 + Ayarlar'a bölüm + `renderDrugStokList` + `submitDrugStokLink` |
-| **CLN-05** | Hayvan kartı: `activeCases` IDB'den çekildi, chip `cases` tablosuna bakıyor, tab-saglik'te aktif vakalar tıklanabilir chip |
+| **CLN-03** | Vaka detay UI zaten tamamlanmıştı (renderCaseTimeline, submitAddDay, submitAddDrug, caseIlacFormAc). Eksik olan `remove_drug_administration` RPC → Migration 023 ile eklendi |
 
 ### 🔴 Şu An Yapılacak
 | Item | Açıklama | Dosyalar |
 |------|----------|----------|
-| **VAC-01** | Aşılama modülü (vaccines tablosu + protokol + görev) | migration, ui.js, forms.js |
+| **CLN-04** | `drugs` ↔ `stok` bağlama UI (hangi ilaç hangi stok kalemi) | ui.js, forms.js |
+| **CLN-05** | Hayvan kartında aktif vaka gösterimi (CLN-02'de kısmi var, tamamla) | ui.js |
 
 ### 🟡 Sonraki Sprint
 | Item | Açıklama |
 |------|----------|
+| VAC-01 | Aşılama modülü (vaccines tablosu + protokol + görev) |
 | BULK-01 | Toplu işlem paneli |
 | S2-05 | Abort akışı |
 | S2-07 | Görev renk mantığı (geciken/bugün/yakın/gelecek) |
@@ -49,7 +50,7 @@
 ### ⏸ Bloke / Bekleyen
 | Item | Bloke Sebebi |
 |------|-------------|
-| T-07 İlaç yönetimi (eski sistem) | CLN serisi tamamlandı — re-evaluate |
+| T-07 İlaç yönetimi (eski sistem) | CLN serisi tamamlanınca re-evaluate |
 | S3-01 Supabase Realtime | Sprint 3 |
 | DEBT-01 Teknik borç temizliği (orphan kolonlar, drift) | Sprint 3 |
 
@@ -65,3 +66,48 @@ SEARCH:
 eski metin
 REPLACE:
 yeni metin
+EOF
+python3 apply.py --replace js/ui.js /tmp/r.txt
+
+# Çok dosya + commit
+python3 << 'PYEOF'
+import subprocess, os
+os.chdir('/root/egesut-erp1')
+changes = [('js/api.js','eski','yeni')]
+for f,s,r in changes:
+    t=open(f,encoding='utf-8').read()
+    open(f,'w',encoding='utf-8').write(t.replace(s,r,1))
+subprocess.run(["git","add","."])
+subprocess.run(["git","commit","-m","commit"])
+subprocess.run(["git","push"])
+PYEOF
+```
+
+### Git Token
+```bash
+git remote set-url origin https://Meliksahtokur:TOKEN@github.com/Meliksahtokur/egesut-erp1.git
+```
+
+### Kritik Fonksiyonlar
+```javascript
+pullTables(['tablo'])     // hedefli fetch
+renderFromLocal()         // await — kritik işlem sonrası
+renderSafe()              // debounce — background
+rpcOptimistic(fn,tables)  // toast → rpc → pull + render
+```
+
+---
+
+## 4. KISA DERS LİSTESİ
+
+| Konu | Kural |
+|------|-------|
+| View güncelleme | `DROP VIEW IF EXISTS ... CASCADE` zorunlu |
+| Trigger | `DROP TRIGGER IF EXISTS` tüm varyantlar |
+| Kritik render | `renderSafe()` değil, `await renderFromLocal()` |
+| hastalik_log id | `id::text = p_id` cast et |
+| gorev_log kolon | `notlar` yok, `aciklama` var |
+| Stok ledger | `stok_hareket` asla silinmez — yeni hareket ekle |
+| Ledger işareti | Kullanım = POZİTİF, iade = NEGATİF (frontend SUM'dan düşürür) |
+| Controlled entity | diseases, drugs, hayvanlar → asla free text, FK zorunlu |
+| Migration 023 | `remove_drug_administration`: silme değil iptal — ledger `iptal=true`, sonra `DELETE drug_administrations` |
