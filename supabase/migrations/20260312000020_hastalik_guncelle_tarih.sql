@@ -1,3 +1,8 @@
+-- Migration 020: hastalik_guncelle RPC'ye p_tarih parametresi ekle
+
+-- Eski imzalı fonksiyonu drop et
+DROP FUNCTION IF EXISTS public.hastalik_guncelle(text,text,text,text,text,text,text);
+
 CREATE OR REPLACE FUNCTION public.hastalik_guncelle(
   p_id         text,
   p_tani       text    DEFAULT NULL,
@@ -26,4 +31,3 @@ BEGIN
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
-ALTER FUNCTION public.hastalik_guncelle SECURITY DEFINER;
