@@ -1717,7 +1717,7 @@ function openMWithHayvan(modalId,inputId,kupeNo){
     if(el){
       el.value=kupeNo;
       // Autocomplete dropdown'ı kapat — input eventi tetikleme
-      const acMap={'d-hid':'ac-dhid','i-hid':'ac-ihid','b-anne':'ac-banne'};
+      const acMap={'d-hid':'ac-dhid','i-hid':'ac-ihid','b-anne':'ac-banne','case-hid':'ac-casehid'};
       const acEl=document.getElementById(acMap[inputId]);
       if(acEl) acEl.style.display='none';
     }
@@ -1725,6 +1725,11 @@ function openMWithHayvan(modalId,inputId,kupeNo){
       const kat=document.getElementById('d-kat');
       if(kat){ kat.value=''; }
       if(typeof filterHastalikList==='function') filterHastalikList();
+    }
+    if(modalId==='m-case'){
+      const kat=document.getElementById('case-kat');
+      if(kat) kat.value='';
+      if(typeof loadDiseasesDropdown==='function') loadDiseasesDropdown('');
     }
   },150);
 }
