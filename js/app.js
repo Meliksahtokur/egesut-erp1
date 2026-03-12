@@ -189,7 +189,7 @@ async function refreshAll() {
 // ── HEKİM SELECTS ───────────────────────────
 function populateHekimSelects() {
   const all = [...HEKIMLER, ..._customHekimler];
-  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(id => {
+  ['b-hekim','i-hekim','d-hekim','ta-hekim','hde-hekim'].forEach(id => {
     const el = g(id); if (!el) return;
     el.innerHTML = all.map(h => `<option value="${h.id}">${h.ad}</option>`).join('');
     el.value = VARSAYILAN_HEKIM;
@@ -531,6 +531,63 @@ function semptomKaldir(val, chip) {
   updateSemptomDropdown(kat);
 }
 
+// ── DÜZENLEME FORMU SEMPTOM SİSTEMİ ────────────
+let _hdeSmptSecili = [];
+
+function hdeUpdateSmptDropdown(kat) {
+  const sel = g('hde-sempt-ekle'); if (!sel) return;
+  const liste = (kat && SEMPTOM_KAT[kat]) ? SEMPTOM_KAT[kat] : SEMPTOM_GENEL;
+  const kalanlar = liste.filter(s => !_hdeSmptSecili.includes(s));
+  sel.innerHTML = '<option value="">+ Semptom ekle…</option>' +
+    kalanlar.map(s => `<option value="${s}">${s}</option>`).join('');
+  sel.style.display = kalanlar.length ? '' : 'none';
+}
+
+function hdeSmptomEkle(sel) {
+  const val = sel.value; if (!val) return;
+  sel.value = '';
+  if (_hdeSmptSecili.includes(val)) return;
+  _hdeSmptSecili.push(val);
+  const chips = g('hde-sempt-chips'); if (!chips) return;
+  const chip = document.createElement('span');
+  chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
+  chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="hdeSmptomKaldir('${val}',this.parentElement)">✕</span>`;
+  chips.appendChild(chip);
+  if (g('hde-semptomlar')) g('hde-semptomlar').value = _hdeSmptSecili.join(', ');
+  hdeUpdateSmptDropdown(g('hde-tani')?.dataset?.kat || '');
+}
+
+function hdeSmptomKaldir(val, chip) {
+  _hdeSmptSecili = _hdeSmptSecili.filter(s => s !== val);
+  chip?.remove();
+  if (g('hde-semptomlar')) g('hde-semptomlar').value = _hdeSmptSecili.join(', ');
+  hdeUpdateSmptDropdown(g('hde-tani')?.dataset?.kat || '');
+}
+
+// ── DÜZENLEME FORMU TANI AUTOCOMPLETE ────────────
+function acHdeTani(inp) {
+  const q = (inp.value || '').toLowerCase().trim();
+  const ac = g('ac-hde-tani'); if (!ac) return;
+  const kat = _curHst?.kategori || '';
+  const base = (kat && HASTALIK_KAT[kat]) ? HASTALIK_KAT[kat] : HASTALIK_LISTESI;
+  const filtered = q ? base.filter(h => h.toLowerCase().includes(q)) : base.slice(0, 12);
+  if (!filtered.length) { ac.style.display = 'none'; return; }
+  ac.innerHTML = filtered.map(h =>
+    `<div onclick="hdeSelTani('${h.replace(/'/g, "\\'")}','${kat}')"
+      style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card2)"
+      onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''>${h}</div>`
+  ).join('');
+  ac.style.display = 'block';
+}
+
+function hdeSelTani(val, kat) {
+  const inp = g('hde-tani'); if (!inp) return;
+  inp.value = val;
+  inp.dataset.kat = kat;
+  g('ac-hde-tani').style.display = 'none';
+  hdeUpdateSmptDropdown(kat);
+}
+
 function hdeToggleLok(val, btn) {
   btn.classList.toggle('lok-on');
   if (btn.classList.contains('lok-on')) {
@@ -581,6 +638,8 @@ function selDis(val, btn) {
 document.addEventListener('click', e => {
   const ac = g('ac-dis');
   if (ac && !e.target.closest('#d-tani') && !e.target.closest('#ac-dis')) ac.style.display = 'none';
+  const acHde = g('ac-hde-tani');
+  if (acHde && !e.target.closest('#hde-tani') && !e.target.closest('#ac-hde-tani')) acHde.style.display = 'none';
 });
 
 // Enter → sonraki alan

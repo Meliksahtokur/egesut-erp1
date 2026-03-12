@@ -527,8 +527,28 @@ function hstDuzenleAc() {
   const f = document.getElementById('hd-edit-form');
   if (!f) return;
   document.getElementById('hde-tani').value       = _curHst.tani       || '';
+  document.getElementById('hde-tani').dataset.kat = _curHst.kategori   || '';
   document.getElementById('hde-siddet').value     = _curHst.siddet     || '';
-  document.getElementById('hde-semptomlar').value = _curHst.semptomlar || '';
+  if (_curHst.tarih) document.getElementById('hde-tarih').value = _curHst.tarih.substring(0,10);
+  const hdeHekim = document.getElementById('hde-hekim');
+  if (hdeHekim && _curHst.hekim_id) hdeHekim.value = _curHst.hekim_id;
+  // Semptom chip sistemi
+  window._hdeSmptSecili = [];
+  const hdeChips = document.getElementById('hde-sempt-chips');
+  if (hdeChips) hdeChips.innerHTML = '';
+  document.getElementById('hde-semptomlar').value = '';
+  const mevSemptomlar = (_curHst.semptomlar || '').split(',').map(s => s.trim()).filter(Boolean);
+  mevSemptomlar.forEach(val => {
+    window._hdeSmptSecili.push(val);
+    if (hdeChips) {
+      const chip = document.createElement('span');
+      chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
+      chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="hdeSmptomKaldir('${val}',this.parentElement)">✕</span>`;
+      hdeChips.appendChild(chip);
+    }
+  });
+  document.getElementById('hde-semptomlar').value = mevSemptomlar.join(', ');
+  hdeUpdateSmptDropdown(_curHst.kategori || '');
   // Lokasyon chip'leri
   const hdeKat    = _curHst.kategori || '';
   const hdeLokMap = { 'Meme': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'], 'Ayak': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'], 'Göz': ['Sol Göz','Sağ Göz'] };
@@ -568,7 +588,9 @@ async function hstGuncelle(btn) {
       p_tani:       document.getElementById('hde-tani').value.trim()       || null,
       p_siddet:     document.getElementById('hde-siddet').value            || null,
       p_semptomlar: document.getElementById('hde-semptomlar').value.trim() || null,
-      p_lokasyon:   document.getElementById('hde-lokasyon').value.trim() || null,
+      p_lokasyon:   document.getElementById('hde-lokasyon').value.trim()   || null,
+      p_hekim_id:   document.getElementById('hde-hekim').value             || null,
+      p_tarih:      document.getElementById('hde-tarih').value             || null,
     });
     if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ Güncellendi');

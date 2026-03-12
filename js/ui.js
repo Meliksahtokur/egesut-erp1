@@ -1192,6 +1192,7 @@ async function openHstDet(id){
   const all=await idbGetAll('hastalik_log');
   const h=all.find(x=>x.id===id); if(!h) return;
   _curHst=h;
+  _hdiIlacCache=[];  // stale cache temizle
   const hk=[...HEKIMLER,...(_customHekimler||[])].find(x=>x.id===h.hekim_id);
   // Küpe çözümle
   const hayvanObj=_A.find(a=>a.id===h.hayvan_id||a.kupe_no===h.hayvan_id);
