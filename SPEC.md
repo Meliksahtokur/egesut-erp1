@@ -1,6 +1,6 @@
 # EgeSüt ERP — SPEC v8
 > Her oturumun başında okunur. Hem harita hem rota. Sigortamız.
-> Son güncelleme: 2026-03-12 — v8 temiz yazıldı. Migration 019 tamamlandı (tedavi yeniden tasarım). T-07 frontend devam ediyor.
+> Son güncelleme: 2026-03-12 — Form mimarisi sorunu tespit edildi. Tüm formlar serbest text üzerine kurulu, DB objelerini kullanmıyor. T-07 bloke — önce F-01 Form Mimarisi Yeniden Tasarımı yapılacak.
 
 ---
 
@@ -101,7 +101,8 @@ git remote set-url origin https://Meliksahtokur:TOKEN@github.com/Meliksahtokur/e
 ### Bekleyen Sprint İtemleri 🔴
 | Item | Açıklama | Dosyalar |
 |------|----------|----------|
-| T-07 | İlaç yönetimi — hastalık detay modalı frontend | ui.js / forms.js / index.html / api.js |
+| **F-01** | **Form Mimarisi Yeniden Tasarımı** — öncelikli, T-07 bu olmadan tamamlanamaz | ui.js / forms.js / index.html / app.js |
+| T-07 | İlaç yönetimi — F-01 tamamlandıktan sonra | ui.js / forms.js |
 | S2-05 | Abort akışı — gebe listesi, abort modal, badge | ui.js / forms.js |
 | S2-06 | Üreme tab: gebelik butonu kaldır, doğum görevleri | ui.js |
 | S2-07 | Görev renk mantığı — geciken/bugün/yakın/gelecek | ui.js |
@@ -117,44 +118,54 @@ git remote set-url origin https://Meliksahtokur:TOKEN@github.com/Meliksahtokur/e
 | T-04 | APP_VERSION | ✅ 2026-03-12 |
 | T-05 | pullTables setInterval kaldır | ⏸ Realtime gelince |
 | T-06 | Lokasyon — düzenleme formunda chip dropdown | ✅ |
-| T-07 | İlaç yönetimi | 🔄 Backend ✅ Frontend devam |
+| T-07 | İlaç yönetimi | ⏸ F-01 bekliyor |
 
 ---
 
-## 2. T-07 — İLAÇ YÖNETİMİ ROADMAP
+## 2. F-01 — FORM MİMARİSİ YENİDEN TASARIM
 
-### Hedef
-Hastalık detay modalında mevcut ilaçları göster, yeni ilaç ekle, var olanı sil.
-Her aksiyon `tedavi` tablosuna ve `stok_hareket`'e yansır.
+### Sorun
+Tüm formlar serbest text girişi üzerine kurulu. DB'de tanımlı objeler var ama formlar bunları kullanmıyor.
+Bu durum analitik verileri bozuyor — aynı hastalık farklı yazılışlarla kayıt altına giriyor.
 
-### Backend (Migration 019) ✅
-- `tedavi` tablosuna eklenen: `uygulama_yolu`, `hekim_id`, `bekleme_suresi_gun`, `notlar`
-- `tedavi_view`: ilaç adı ve birimini stok'tan join ederek getirir
-- `hastalik_kaydet`: ilaçları artık `tedavi` tablosuna yazar
-- `tedavi_ekle` RPC: mevcut vakaya ilaç ekle + stok_hareket düş
-- `tedavi_sil` RPC: ilaç sil + stok_hareket iptal
-- `hastalik_sil`: bağlı tedavileri de temizler
+### Etkilenen Formlar
+| Form | Sorun |
+|------|-------|
+| Hastalık kayıt | Tanı, semptom elle yazılıyor — DB dropdown yok |
+| Hastalık düzenleme | Eski kayıt verisi yükleniyor ama ilaç/hekim dropdown yok |
+| İlaç ekleme (detay modal) | Stok autocomplete çalışmıyor, birim otomatik dolmuyor |
+| Tüm formlar | Hekim dropdown var ama tutarsız bağlanmış |
 
-### Frontend Adımları 🔄
+### Yapılacaklar
 
-**1. api.js** — `tedavi` tablosunu pullTables ve IndexedDB'ye ekle
+**1. Hastalık kayıt formu (mevcut `m-disease` modalı)**
+- Tanı: `HASTALIK_KAT` zaten var, dropdown çalışıyor → dokunma
+- Semptom: `SEMPTOM_KAT` zaten var, chip sistemi çalışıyor → dokunma
+- İlaç satırı: stok autocomplete `kategori='İlaç'` filtreli → düzelt
+- İlaç satırına uygulama yolu dropdown + bekleme süresi ekle
+- Payload'a `uygulama_yolu` ve `bekleme_suresi_gun` ekle
 
-**2. ui.js: openHstDet()** — `tedavi_view`'dan vakaya ait ilaçları çek, listele
-- Her ilaç satırı: ad, miktar, birim, uygulama yolu, bekleme süresi, 🗑 butonu
-- "➕ İlaç Ekle" toggle butonu
+**2. Hastalık düzenleme formu (`hd-edit-form`)**
+- Tanı: text input → autocomplete (HASTALIK_KAT'tan)
+- Şiddet: select — zaten var, veri dolumu kontrol et
+- Semptomlar: text → chip sistemi (kayıt formuyla aynı)
+- Hekim: text → `loadHekimler()` dropdown
+- Tarih: input date ekle
 
-**3. index.html** — hastalık detay modalına ilaç bölümü ekle
-- `hd-ilac-listesi` — ilaç listesi alanı
-- İlaç ekleme formu (toggle): stok arama + miktar + uygulama yolu + bekleme günü
+**3. İlaç ekleme formu (detay modal `hd-ilac-form`)**
+- `acHdiStok()` debug et — stok listesi gelmiyor
+- Birim: ilaç seçince otomatik dolsun, readonly
+- Uygulama yolu: dropdown ✅ (çalışıyor)
+- Bekleme süresi: input ✅
 
-**4. forms.js**
-- `hstIlacEkle()` → `tedavi_ekle` RPC → detayı yenile
-- `hstIlacSil(tedaviId)` → `tedavi_sil` RPC → detayı yenile
+**4. Genel**
+- `btn-o` renk sorunu — CSS kontrol et
+- "İyileşti" butonu renk ekle (sarı/yeşil)
 
-**5. Stok arama** — sadece `kategori = 'İlaç'` filtreli autocomplete
-
-### Uygulama Yolu Seçenekleri
-`IM | SC | IV | Oral | Topikal | Intrauterin`
+### T-07 ile İlişki
+F-01 tamamlandıktan sonra T-07 (ilaç yönetimi) anlamlı hale gelir.
+Şu an T-07 backend'i hazır, ilaç listesi ve silme çalışıyor.
+Eksik: ilaç ekleme formu stok'tan seçim yapamıyor.
 
 ---
 
@@ -239,7 +250,8 @@ supabase/migrations/ — idempotent SQL dosyaları
 
 ### Sprint 2 — Devam
 ```
-[🔄] T-07   İlaç yönetimi frontend
+[🔴] F-01   Form mimarisi yeniden tasarım — ÖNCELİKLİ
+[⏸]  T-07   İlaç yönetimi (F-01 sonrası)
 [ ]  S2-05  Abort akışı
 [ ]  S2-06  Üreme tab düzeltme
 [ ]  S2-07  Görev renk mantığı
