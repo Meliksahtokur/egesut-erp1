@@ -16,7 +16,7 @@
 ## 1. MEVCUT DURUM
 
 ### Migration 022 uygulandı mı?
-**🔜 UYGULANMADI** — `supabase/migrations/20260312000022_case_management.sql` hazır, Supabase'e henüz verilmedi.
+**🔜 UYGULANMADI** — `supabase/migrations/20260312000022_case_management.sql` hazır, Supabase'e verildi.
 
 Uygulandıktan sonra bu satırı `✅ UYGULANDI` olarak güncelle.
 
