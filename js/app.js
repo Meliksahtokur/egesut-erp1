@@ -126,6 +126,7 @@ function openM(id) {
     filterHastalikList();
   }
   if (id === 'm-case') {
+    _diseasesCache = [];
     loadDiseasesDropdown('');
   }
 }

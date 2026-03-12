@@ -582,6 +582,38 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+<!-- VAKA AÇ (YENİ SİSTEM — migration 022) -->
+<div id="m-case" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">🏥 Vaka Aç</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Küpe No *</label>
+        <input id="case-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
+          oninput="acHayvan('case-hid','ac-casehid')" onfocus="acHayvan('case-hid','ac-casehid')" onkeydown="acNav(event,'ac-casehid')">
+        <div id="ac-casehid" class="ac-box" style="display:none"></div>
+      </div>
+      <div class="fg"><label class="flbl">Kategori (filtre)</label>
+        <select id="case-kat" class="fsel" onchange="caseKatFiltrele()">
+          <option value="">Tümü</option>
+          <option>Meme</option><option>Üreme</option><option>Metabolik</option>
+          <option>Ayak</option><option>Solunum</option><option>Sindirim</option>
+          <option>Buzağı</option><option>Diğer</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Tanı *</label>
+        <select id="case-disease-id" class="fsel">
+          <option value="">Yükleniyor…</option>
+        </select>
+        <div id="case-disease-hint" style="font-size:.68rem;color:var(--ink3);margin-top:3px"></div>
+      </div>
+      <div class="fg"><label class="flbl">Notlar</label>
+        <input id="case-notes" class="fi" placeholder="İsteğe bağlı not…" autocomplete="off">
+      </div>
+      <button class="btn btn-g" onclick="submitCase(this)">🏥 Vakayı Aç</button>
+      <button class="btn btn-o" onclick="closeM('m-case')" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
 <!-- DOĞUM -->
 <div id="m-birth" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🐄 Doğum Kaydı</div>
