@@ -538,6 +538,29 @@ function closeDisease() {
   closeM('m-disease');
 }
 
+// _editMode: true iken submitDisease → hastalik_guncelle çağırır
+let _editMode = false;
+
+function closeDisease() {
+  _editMode = false;
+  const t = document.getElementById('m-disease-title');
+  if (t) t.textContent = '🏥 Hastalık / Tedavi';
+  ['d-hid','d-tani','d-sempt','d-lokasyon'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
+  const kat = document.getElementById('d-kat'); if(kat) kat.value='';
+  const sid = document.getElementById('d-sid'); if(sid) sid.value='';
+  const gun = document.getElementById('d-tedavi-gun'); if(gun) gun.value='0';
+  const dHid = document.getElementById('d-hid'); if(dHid){ dHid.readOnly=false; dHid.style.opacity=''; }
+  if(g('ilac-rows')) g('ilac-rows').innerHTML='';
+  if(g('tani-secenekler')) g('tani-secenekler').innerHTML='';
+  if(g('sempt-chips')) g('sempt-chips').innerHTML='';
+  if(g('d-lokasyon-wrap')) g('d-lokasyon-wrap').style.display='none';
+  const gunWrap = document.getElementById('d-tedavi-gun')?.closest('.fg');
+  if(gunWrap) gunWrap.style.display='';
+  window._semptomSecili = [];
+  _ilacCache = [];
+  closeM('m-disease');
+}
+
 function hstDuzenleAc() {
   if (!_curHst) return;
   _editMode = true;
