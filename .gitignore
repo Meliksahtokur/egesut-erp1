@@ -1,1 +1,7 @@
 node_modules
+# Geçici dosyalar
+*.orig
+*.rej
+*.bak
+apply_*.py
+asama*.patch
