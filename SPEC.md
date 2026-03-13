@@ -189,3 +189,30 @@ rpc('close_case', { p_case_id })
 | Çift tanım | JS'de aynı isimli iki `async function` → son tanım kazanır, ilk sessizce ezilir — kaçınılacak |
 | Cache isimlendirme | ui.js ilaç cache: `_drugsCache` + `loadDrugsCache()` — başka alias (`_caseDrugsCache` vb.) üretilmez |
 | `tedavi_view` | Bu view mevcut değil — eski sistem kalıntısı, `renderHstIlaclar` kullanılmaz |
+
+---
+
+## CLN Oturum-2 Bulgular & Canlı Durum (2026-03-13)
+
+### Bu oturumda düzeltilen
+- `hastalik_log` IDB transaction hatası → `buildDiseaseFreq` ve `acDisease` temizlendi
+- `loadDiseasesDropdown` yanlış selector (`case-disease-id` → `d-disease-id`)
+- `openM('m-case')` → `openM('m-disease')` (HTML + openMWithHayvan)
+- `openMWithHayvan` içindeki `m-case` bloğu kaldırıldı
+- Tab-saglik eski `hastalik_log` render bloğu kaldırıldı
+- `openHstDet` tanımsız — 3 çağrı kaldırıldı/güvenli hale getirildi
+- IDB adı `egesut_v9` → `egesut_v10` (yeni store'lar için zorla upgrade)
+
+### Canlı durum (test edilen)
+- ✅ Vaka açma modalı açılıyor (`m-disease`)
+- ✅ Vaka kapatma çalışıyor
+- ❌ Tab-saglik'te vakalar `?` isimle görünüyor (disease_id eşleşmiyor veya openDet exception'a düşüyor)
+- ❌ Gün ekleme çalışmıyor (renderCaseTimeline'a ulaşamıyor)
+- ❌ Debug sarı kutu hiç görünmedi → `openDet` `renderCasesForAnimal`'a ulaşamıyor
+- ✅ Supabase'den `diseases` ve `cases` verisi geliyor (curl ile doğrulandı)
+- ✅ `getData` tek tanımlı, sorun değil
+
+### Sonraki oturumda
+- `openDet` içine try/catch + visible hata göstergesi ekle
+- `openDet`'in tam olarak nerede durduğunu tespit et
+- `renderCaseTimeline` Supabase direkt sorgu — `treatment_timeline` view erişimi doğrula
