@@ -625,7 +625,7 @@ async function hstKapat() {
     if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ Hastalık kaydı kapatıldı');
     closeM('m-hst-det');
-    await pullTables(['hastalik_log']); renderSafe();
+    await pullTables(['cases']); renderSafe();
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
@@ -714,7 +714,7 @@ async function hstGuncelle(btn) {
     toast('✅ Güncellendi');
     const id = _curHst.id;
     closeDisease();
-    await pullTables(['hastalik_log']);
+    await pullTables(['cases']);
     await openHstDet(id);
   } catch(e) { toast('❌ ' + e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Kaydet + Görevler'; } }
@@ -729,7 +729,7 @@ async function hstSilOnay() {
     if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('🗑 Kayıt silindi');
     closeM('m-hst-det');
-    await pullTables(['hastalik_log']); renderSafe();
+    await pullTables(['cases']); renderSafe();
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
@@ -824,7 +824,7 @@ async function geriAl(islemLogId, btn) {
     await rpc('geri_al', { p_islem_id: islemLogId });
     toast('✅ İşlem geri alındı');
     closeM('m-geri-al');
-    pullTables(['hayvanlar','tohumlama','hastalik_log','dogum','gorev_log','islem_log']).then(renderSafe).catch(console.warn);
+    pullTables(['hayvanlar','tohumlama','dogum','gorev_log','islem_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast('❌ ' + e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🔄 Evet, Geri Al'; } }
 }
