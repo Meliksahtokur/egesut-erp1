@@ -211,7 +211,7 @@ async function loadAnimals(){
     _A=await getData('hayvanlar',a=>a.durum==='Aktif');
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
     _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
-    const hastaLogs=await getData('hastalik_log',d=>d.durum==='Aktif');
+    const hastaLogs=await getData('cases',c=>c.status==='active');
     _hastaIds=new Set(hastaLogs.map(d=>d.hayvan_id));
     _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     window._appState=window._appState||{}; window._appState.hayvanlar=_A;
@@ -477,7 +477,7 @@ function openIslemDetay(idx){
   const l=(window._detGecmisLogs||[])[idx];
   if(!l) return;
   // ref_tablo varsa doğrudan ilgili detay modalını aç
-  if(l.ref_tablo==='hastalik_log' && l.ref_id){ openHstDet(l.ref_id); return; }
+  if(l.ref_tablo==='hastalik_log' && l.ref_id){ return; } // eski kayit, desteklenmiyor
   if(l.ref_tablo==='tohumlama'    && l.ref_id){ openTohDet(l.ref_id); return; }
   // ref_id yoksa snapshot'tan dene (eski kayıtlar)
   const snapId=l.snapshot?.id;
@@ -871,7 +871,7 @@ async function loadGecmis(f,btn){
     const entries=[];
     if(f==='hepsi'||f==='dogum')  (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,data:r}));
     if(f==='hepsi'||f==='tohumlama') (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
-    if(f==='hepsi'||f==='hastalik') (await idbGetAll('hastalik_log')).forEach(r=>entries.push({type:'hastalik',date:r.tarih,data:r}));
+    if(f==='hepsi'||f==='hastalik') (await idbGetAll('cases')).forEach(r=>entries.push({type:'hastalik',date:r.start_date,data:r}));
     if(f==='hepsi'||f==='gorev') (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>entries.push({type:'gorev',date:r.tamamlanma_tarihi||r.hedef_tarih,data:r}));
     if(f==='hepsi'||f==='hayvan'){
       const islemTipler=['HAYVAN_EKLENDI','ABORT_KAYDI','KIZGINLIK_KAYDI'];
@@ -1021,7 +1021,7 @@ async function loadRaporlar(){
     const [animals,tohs,diseases,births,moves,stock]=await Promise.all([
       idbGetAll('hayvanlar'),
       idbGetAll('tohumlama'),
-      idbGetAll('hastalik_log'),
+      idbGetAll('cases'),
       idbGetAll('dogum'),
       getData('stok_hareket',m=>!m.iptal),
       idbGetAll('stok'),
@@ -1901,7 +1901,7 @@ async function openGebelikEkle(hayvanId){
 async function acDisease(){
   const q=(document.getElementById('d-tani')?.value||'').toLowerCase().trim();
   const ac=document.getElementById('ac-dis');
-  const logs=await idbGetAll('hastalik_log');
+  const logs=[]; // hastalik_log kaldirildi
   const usedDis=[...new Set(logs.map(l=>l.tani).filter(Boolean))];
   const all=[...new Set([...HASTALIK_LISTESI,...usedDis])];
   all.sort((a,b)=>(_disFreq[b]||0)-(_disFreq[a]||0));
