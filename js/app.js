@@ -64,7 +64,7 @@ let _ilacCache      = [];
 let _diseasesCache  = [];  // migration 022 diseases tablosu
 
 async function loadDiseasesDropdown(kategori) {
-  const sel = g('case-disease-id');
+  const sel = g('d-disease-id');
   if (!sel) return;
   if (!_diseasesCache.length) {
     _diseasesCache = await idbGetAll('diseases');
@@ -72,12 +72,16 @@ async function loadDiseasesDropdown(kategori) {
   const filtered = kategori
     ? _diseasesCache.filter(d => d.category === kategori)
     : _diseasesCache;
-  sel.innerHTML = '<option value="">Tanı seçin…</option>'
-    + filtered.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-  const hint = g('case-disease-hint');
-  if (hint) hint.textContent = filtered.length
-    ? `${filtered.length} tanı seçeneği`
-    : '⚠️ Bu kategoride kayıtlı hastalık yok';
+  const grouped = {};
+  filtered.forEach(d => {
+    const cat = d.category || 'Diğer';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(d);
+  });
+  sel.innerHTML = '<option value="">— Hastalık seçin —</option>'
+    + Object.keys(grouped).sort().map(cat =>
+        `<optgroup label="${cat}">${grouped[cat].map(d => `<option value="${d.id}" data-category="${d.category||''}">${d.name}</option>`).join('')}</optgroup>`
+      ).join('');
 }
 
 function caseKatFiltrele() {
@@ -125,7 +129,7 @@ function openM(id) {
     updateSemptomDropdown('');
     filterHastalikList();
   }
-  if (id === 'm-case') {
+  if (id === 'm-disease') {
     _diseasesCache = [];
     loadDiseasesDropdown('');
   }
@@ -470,9 +474,7 @@ async function buildSpermaList() {
 
 // ── HASTALIK AUTOCOMPLETE ───────────────────
 async function buildDiseaseFreq() {
-  const logs = await idbGetAll('hastalik_log');
-  _disFreq = {};
-  logs.forEach(l => { if (l.tani) _disFreq[l.tani] = (_disFreq[l.tani] || 0) + 1; });
+  _disFreq = {}; // hastalik_log kaldırıldı — diseases tablosu kullanılıyor
 }
 // Kategoriye göre semptom listesi
 const SEMPTOM_KAT = {
@@ -642,8 +644,7 @@ async function acDisease() {
   const kat = g('d-kat')?.value || '';
   const ac  = g('ac-dis');
   if (!q) { ac.style.display = 'none'; return; }
-  const logs    = await idbGetAll('hastalik_log');
-  const usedDis = [...new Set(logs.map(l => l.tani).filter(Boolean))];
+  const usedDis = []; // hastalik_log kaldırıldı
   const base    = kat && HASTALIK_KAT[kat] ? HASTALIK_KAT[kat] : HASTALIK_LISTESI;
   const all     = [...new Set([...base, ...usedDis])];
   const filtered = all.filter(d => d.toLowerCase().includes(q));
