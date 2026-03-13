@@ -478,7 +478,7 @@ function openIslemDetay(idx){
   if(l.ref_tablo==='tohumlama'    && l.ref_id){ openTohDet(l.ref_id); return; }
   // ref_id yoksa snapshot'tan dene (eski kayıtlar)
   const snapId=l.snapshot?.id;
-  if(l.tip==='HASTALIK_KAYDI'    && snapId){ openHstDet(snapId); return; }
+  if(l.tip==='HASTALIK_KAYDI'    && snapId){ return; } // eski kayit — case sistemi öncesi
   if(l.tip==='TOHUMLAMA'         && snapId){ openTohDet(snapId); return; }
   const LABEL={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme'};
   const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
@@ -888,7 +888,7 @@ async function loadGecmis(f,btn){
       const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;
       const hayvanVarMi=hayvanKey&&hayvanObj;
       let oc='';
-      if(type==='hastalik') oc=`onclick="openHstDet('${data.id}')" style="cursor:pointer"`;
+      if(type==='hastalik') oc=''; // eski hastalik_log — tıklanamaz
       else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
       else if(type==='dogum'&&hayvanVarMi) oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
       const ISLEM_ICO={'HAYVAN_EKLENDI':'🐮','ABORT_KAYDI':'⚠️','KIZGINLIK_KAYDI':'🔴'};

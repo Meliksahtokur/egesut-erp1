@@ -618,10 +618,9 @@ async function hstGuncelle(btn) {
     });
     if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ Güncellendi');
-    const id = _curHst.id;
     closeDisease();
     await pullTables(['cases']);
-    await openHstDet(id);
+    await renderFromLocal();
   } catch(e) { toast('❌ ' + e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Kaydet + Görevler'; } }
 }
