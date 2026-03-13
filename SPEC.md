@@ -1,4 +1,4 @@
-# EgeSüt ERP — SPEC v11
+# EgeSüt ERP — SPEC v11.1
 > Operasyonel rehber. Mimari kararlar → ARCHITECTURE.md
 > Son güncelleme: 2026-03-13
 
@@ -22,6 +22,7 @@
 | 019–021 | ✅ | ✅ Uygulandı |
 | 022 case_management | ✅ | ✅ Uygulandı |
 | 023 remove_drug_admin | ✅ | ✅ Uygulandı |
+| 024 link_drug_to_stock | ✅ | ✅ Uygulandı |
 
 ### Aktif DB Şeması (Tıbbi Sistem)
 Yeni (022 ile gelen) tablolar aktif:
@@ -47,14 +48,24 @@ Eski tablolar (arşiv, readonly):
 
 ## 2. SPRINT — SIRADAKI GÖREVLER
 
-### 🔴 Şu An Yapılacak — CLN Serisi (Case UI)
-| Item | Açıklama | Dosyalar | Durum |
-|------|----------|----------|-------|
-| **CLN-02** | Vaka açma modal: `diseases` dropdown (DB'den), `create_case()` RPC | forms.js, index.html | 🔜 |
-| **CLN-03** | Vaka detay modal: gün + ilaç ekleme UI, `treatment_timeline` render | ui.js, forms.js | 🔜 |
-| **CLN-04** | `drugs` ↔ `stok` bağlama UI | ui.js, forms.js | 🔜 |
-| **CLN-05** | Vaka kapatma + hayvan kartında aktif vaka badge | ui.js | 🔜 |
-| **CLN-06** | `pullTables`'a `cases`, `diseases`, `drugs` ekle; eski `hastalik_log` çekimini kaldır | api.js | 🔜 |
+### ⚠️ Yazıldı — Test Geçmedi (CLN Serisi)
+| Item | Açıklama | Bilinen Bug |
+|------|----------|-------------|
+| **CLN-01** | Migration 022 uygulandı | — |
+| **CLN-02** | `m-disease` modal, `diseases` dropdown, `create_case()` RPC | `loadDiseasesDropdown` çift tanımlı: biri `d-disease-id`, diğeri `case-disease-id` selector — ikinci versiyon boş çalışır |
+| **CLN-03** | Vaka detay UI, `treatment_timeline` render, ilaç ekleme/silme | `openCaseDet` + `renderCaseTimeline` ui.js'de çift tanımlı (~satır 1242 ve ~1374). `_loadCaseDrugsCache` ve `_caseDrugsCache` hiçbir yerde tanımlanmamış → `ReferenceError`, modal açılmaz |
+| **CLN-04** | `link_drug_to_stock` RPC + `submitDrugStokLink` | Backend doğru; Ayarlar UI render test edilmedi |
+| **CLN-05** | Hayvan kartında aktif vaka chip, tab-saglik | `openCaseDet` çalışmadığı için chip tıklaması da çalışmaz (CLN-03 blocker) |
+| **CLN-06** | `pullTables` güncellendi, `hastalik_log` kaldırıldı | ✅ |
+
+### 🔴 Şu An Yapılacak — CLN Bugfix
+| Item | Açıklama | Dosyalar |
+|------|----------|----------|
+| **CLN-FIX-1** | `openCaseDet` + `renderCaseTimeline` çift tanımını sil — ui.js ~satır 1242–1370 eski versiyonu kaldır | ui.js |
+| **CLN-FIX-2** | `_loadCaseDrugsCache` / `_caseDrugsCache` tanımsız → `loadDrugsCache()` / `_drugsCache` olarak düzelt (ui.js 3 yer, forms.js 1 yer) | ui.js, forms.js |
+| **CLN-FIX-3** | `loadDiseasesDropdown` çift tanımlı — `case-disease-id` selector'lü ikinci versiyonu sil | forms.js |
+| **CLN-FIX-4** | `submitAddDay`, `submitAddDrug`, `submitCloseCase` ölü kod — HTML çağırmıyor, sil | forms.js |
+| **VAC-01** | Aşılama modülü (vaccines tablosu + protokol + görev) | migration, ui.js, forms.js |
 
 > CLN-01 (022 uygula) tamamlandı — migrations klasöründe mevcut ve DB'de aktif.
 
@@ -175,3 +186,6 @@ rpc('close_case', { p_case_id })
 | Controlled entity | diseases, drugs, hayvanlar → asla free text, FK zorunlu |
 | Stok düşümü | SADECE `drug_administrations` INSERT trigger'ından — başka yol yok |
 | Eski tıbbi tablolar | `hastalik_log`, `tedavi` → arşiv, yeni veri girilmez, UI göstermez |
+| Çift tanım | JS'de aynı isimli iki `async function` → son tanım kazanır, ilk sessizce ezilir — kaçınılacak |
+| Cache isimlendirme | ui.js ilaç cache: `_drugsCache` + `loadDrugsCache()` — başka alias (`_caseDrugsCache` vb.) üretilmez |
+| `tedavi_view` | Bu view mevcut değil — eski sistem kalıntısı, `renderHstIlaclar` kullanılmaz |
