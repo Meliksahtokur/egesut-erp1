@@ -1368,49 +1368,175 @@ async function deleteDrugAdmin(adminId, caseId) {
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
-async function openHstDet(id){
-  const all=await idbGetAll('hastalik_log');
-  const h=all.find(x=>x.id===id); if(!h) return;
-  _curHst=h;
-  _hdiIlacCache=[];  // stale cache temizle
-  const hk=[...HEKIMLER,...(_customHekimler||[])].find(x=>x.id===h.hekim_id);
-  // Küpe çözümle
-  const hayvanObj=_A.find(a=>a.id===h.hayvan_id||a.kupe_no===h.hayvan_id);
-  const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||h.hayvan_id):h.hayvan_id;
-  document.getElementById('hd-hayvan').textContent=hayvanLabel||'?';
-  document.getElementById('hd-tani').textContent=`🏥 ${h.tani||'?'}`;
-  const chips=[
-    `<span style="background:${h.durum==='Aktif'?'rgba(192,50,26,.12)':'rgba(78,154,42,.12)'};color:${h.durum==='Aktif'?'var(--red)':'var(--green)'};padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700">${h.durum||'Aktif'}</span>`,
-    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${h.siddet||''}</span>`,
-    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(h.tarih)}</span>`,
-    hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
+// ── VAKA DETAY (CLN-03) ─────────────────────
+let _curCase = null;
+
+async function openCaseDet(caseId) {
+  const cases    = await idbGetAll('cases');
+  const diseases = await idbGetAll('diseases');
+  const c = cases.find(x => x.id === caseId);
+  if (!c) { toast('Vaka bulunamadı', true); return; }
+  _curCase = c;
+
+  const disease = diseases.find(d => d.id === c.disease_id);
+  const hayvan  = _A.find(a => a.id === c.animal_id);
+  const kupe    = hayvan ? (hayvan.kupe_no || hayvan.devlet_kupe || c.animal_id) : c.animal_id;
+
+  document.getElementById('cd-hayvan').textContent  = kupe;
+  document.getElementById('cd-disease').textContent = '🏥 ' + (disease?.name || '?');
+  document.getElementById('cd-notes').textContent   = c.notes || '';
+
+  const aktif = c.status === 'active';
+  const chips = [
+    `<span style="background:${aktif?'rgba(192,50,26,.12)':'rgba(78,154,42,.12)'};color:${aktif?'var(--red)':'var(--green)'};padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700">${aktif?'Aktif':'Kapalı'}</span>`,
+    disease?.category ? `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📂 ${disease.category}</span>` : '',
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(c.start_date)}</span>`,
+    c.closed_at ? `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">🔒 ${fmtTarih(c.closed_at)}</span>` : '',
   ];
-  document.getElementById('hd-meta').innerHTML=chips.filter(Boolean).join('');
-  // Bilgi satırları
-  const rows=[];
-  if(h.kategori) rows.push(`<b>Kategori:</b> ${h.kategori}`);
-  if(h.semptomlar) rows.push(`<b>Semptomlar:</b> ${h.semptomlar}`);
-  if(h.lokasyon) rows.push(`<b>Lokasyon:</b> ${h.lokasyon}`);
-  document.getElementById('hd-body').innerHTML=rows.join('<br>')||'Ek bilgi yok';
-  // İlaç listesi — tedavi_view'dan direkt çek
-  await renderHstIlaclar(id);
-  // islem_log'dan bu kaydın id'sini bul (geri alma için)
-  const islemLog=await idbGetAll('islem_log');
-  const islemKayit=islemLog.find(l=>l.tip==='HASTALIK_KAYDI'&&(l.payload?.kaynak_id===id||l.snapshot?.id===id));
-  const hdGeriAlBtn=document.getElementById('hd-geri-al-btn');
-  if(hdGeriAlBtn){
-    if(islemKayit){ hdGeriAlBtn.style.display='block'; hdGeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${h.tani||'?'} (${fmtTarih(h.tarih)})`); }
-    else { hdGeriAlBtn.style.display='none'; }
-  }
-  // İlaç ekleme formunu kapat
-  const ilacForm=document.getElementById('hd-ilac-form');
-  if(ilacForm) ilacForm.style.display='none';
-  openM('m-hst-det');
+  document.getElementById('cd-meta').innerHTML = chips.filter(Boolean).join('');
+
+  document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
+  document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
+
+  await _loadCaseDrugsCache();
+  await renderCaseTimeline(caseId);
+  openM('m-case-det');
 }
 
-async function _loadCaseDrugsCache(){
-  _caseDrugsCache = await idbGetAll('drugs');
+async function renderCaseTimeline(caseId) {
+  const el = document.getElementById('cd-timeline');
+  if (!el) return;
+  el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Yükleniyor…</span>';
+  try {
+    const { data, error } = await db
+      .from('treatment_timeline')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('day_no', { ascending: true });
+    if (error) throw error;
+    if (!data || !data.length) {
+      el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Henüz tedavi günü yok</span>';
+      return;
+    }
+    const byDay = {};
+    data.forEach(r => {
+      if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, drugs: [] };
+      if (r.administration_id) byDay[r.day_id].drugs.push(r);
+    });
+    el.innerHTML = Object.values(byDay).map(day => `
+      <div style="border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:700;font-size:.8rem">Gün ${day.day_no} — ${fmtTarih(day.date)}</span>
+          ${_curCase?.status==='active'?`<button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;cursor:pointer">+ İlaç</button>`:''}
+        </div>
+        <div id="drugs-${day.day_id}">
+          ${day.drugs.length ? day.drugs.map(d => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--card2)">
+              <span><b>${d.drug}</b> ${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span>
+              ${_curCase?.status==='active'?`<button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem">🗑</button>`:''}
+            </div>`).join('') : '<span style="color:var(--ink3);font-size:.75rem">İlaç eklenmemiş</span>'}
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<span style="color:var(--red);font-size:.78rem">Yüklenemedi: ${e.message}</span>`;
+  }
 }
+
+async function caseGunEkle() {
+  if (!_curCase) return;
+  try {
+    await rpc('add_treatment_day', { p_case_id: _curCase.id });
+    toast('✅ Tedavi günü eklendi');
+    await renderCaseTimeline(_curCase.id);
+  } catch(e) { toast(e.message, true); }
+}
+
+let _activeDayId = null;
+function caseDrugFormAc(dayId) {
+  _activeDayId = dayId;
+  document.querySelectorAll('.cd-drug-form').forEach(f => f.remove());
+  const container = document.getElementById('drugs-' + dayId);
+  if (!container) return;
+  const drugs = _caseDrugsCache || [];
+  const opts = drugs.map(d => `<option value="${d.id}">${d.name}${d.default_unit?' ('+d.default_unit+')':''}</option>`).join('');
+  const form = document.createElement('div');
+  form.className = 'cd-drug-form';
+  form.style.cssText = 'margin-top:8px;background:var(--card2);border-radius:8px;padding:8px';
+  form.innerHTML = `
+    <select id="cdf-drug" class="fsel" style="margin-bottom:6px" onchange="onCdfDrugChange()">
+      <option value="">— İlaç seçin —</option>${opts}
+    </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      <input id="cdf-dose" class="fi" type="number" min="0.01" step="0.01" placeholder="Doz" style="margin:0">
+      <input id="cdf-unit" class="fi" placeholder="Birim" style="margin:0">
+    </div>
+    <select id="cdf-route" class="fsel" style="margin-bottom:6px">
+      <option value="">Uygulama yolu…</option>
+      <option>IM</option><option>IV</option><option>SC</option>
+      <option>PO</option><option>Topikal</option><option>Intrauterin</option>
+    </select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <button onclick="caseDrugKaydet(this)" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:7px;font-weight:700;cursor:pointer">💾 Kaydet</button>
+      <button onclick="this.closest('.cd-drug-form').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:7px;cursor:pointer">İptal</button>
+    </div>`;
+  container.appendChild(form);
+}
+
+function onCdfDrugChange() {
+  const sel  = document.getElementById('cdf-drug');
+  const drug = (_caseDrugsCache||[]).find(d => d.id === sel?.value);
+  if (drug?.default_unit)  document.getElementById('cdf-unit').value  = drug.default_unit;
+  if (drug?.default_route) document.getElementById('cdf-route').value = drug.default_route;
+}
+
+async function caseDrugKaydet(btn) {
+  const drugId = document.getElementById('cdf-drug')?.value;
+  const dose   = parseFloat(document.getElementById('cdf-dose')?.value);
+  const unit   = document.getElementById('cdf-unit')?.value?.trim();
+  const route  = document.getElementById('cdf-route')?.value || null;
+  if (!drugId)        { toast('İlaç seçin', true); return; }
+  if (!dose || dose<=0){ toast('Geçerli doz girin', true); return; }
+  if (!unit)          { toast('Birim girin', true); return; }
+  if (!_activeDayId)  return;
+  btn.disabled = true; btn.textContent = 'Kaydediliyor…';
+  try {
+    await rpc('add_drug_administration', {
+      p_day_id:  _activeDayId,
+      p_drug_id: drugId,
+      p_dose:    dose,
+      p_unit:    unit,
+      p_route:   route,
+    });
+    toast('✅ İlaç eklendi');
+    btn.closest('.cd-drug-form').remove();
+    await pullTables(['stok','stok_hareket']);
+    await renderCaseTimeline(_curCase.id);
+  } catch(e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = '💾 Kaydet'; }
+}
+
+async function caseDrugSil(adminId) {
+  if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
+  try {
+    await rpc('remove_drug_administration', { p_admin_id: adminId });
+    toast('✅ Silindi');
+    await pullTables(['stok','stok_hareket']);
+    await renderCaseTimeline(_curCase.id);
+  } catch(e) { toast(e.message, true); }
+}
+
+async function caseKapat() {
+  if (!_curCase) return;
+  if (!confirm('Vakayı kapatmak istiyor musunuz?')) return;
+  try {
+    await rpc('close_case', { p_case_id: _curCase.id });
+    toast('✅ Vaka kapatıldı');
+    await pullTables(['cases']);
+    await renderFromLocal();
+    closeM('m-case-det');
+  } catch(e) { toast(e.message, true); }
+}
+
 
 async function renderHstIlaclar(vakaId){
   const el=document.getElementById('hd-ilac-listesi');
