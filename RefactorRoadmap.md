@@ -9,3 +9,9 @@
 - `js/state.js` oluşturuldu, merkezi state altyapısı eklendi.
 - `index.html`'e script sırasına eklendi.
 - Henüz global değişkenler state'e taşınmadı, sadece altyapı hazır.
+
+## Aşama 1.1 – 2026-03-14
+- `_A` (hayvanlar listesi) merkezi state'e taşındı.
+  - `js/api.js`'de `pullTables` içinde animals çekilip `setState('animals')` yapılıyor.
+  - Tüm dosyalarda `_A` yerine `getState('animals')` kullanıldı.
+  - `js/state.js` altyapısı aktif hale getirildi.
