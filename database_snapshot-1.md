@@ -25,6 +25,19 @@ CREATE TABLE public.buzagi_takip (
   CONSTRAINT buzagi_takip_pkey PRIMARY KEY (id),
   CONSTRAINT buzagi_takip_anne_id_fkey FOREIGN KEY (anne_id) REFERENCES public.hayvanlar(id)
 );
+CREATE TABLE public.cases (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  animal_id text NOT NULL,
+  disease_id uuid NOT NULL,
+  start_date date NOT NULL DEFAULT CURRENT_DATE,
+  status text NOT NULL DEFAULT 'active'::text CHECK (status = ANY (ARRAY['active'::text, 'closed'::text])),
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  closed_at timestamp with time zone,
+  CONSTRAINT cases_pkey PRIMARY KEY (id),
+  CONSTRAINT cases_animal_id_fkey FOREIGN KEY (animal_id) REFERENCES public.hayvanlar(id),
+  CONSTRAINT cases_disease_id_fkey FOREIGN KEY (disease_id) REFERENCES public.diseases(id)
+);
 CREATE TABLE public.cop_kutusu (
   id text NOT NULL DEFAULT (gen_random_uuid())::text,
   kaynak_tablo text NOT NULL,
@@ -35,6 +48,13 @@ CREATE TABLE public.cop_kutusu (
   geri_yuklendi boolean DEFAULT false,
   silme_sebebi text,
   CONSTRAINT cop_kutusu_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.diseases (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  category text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT diseases_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.dogum (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -50,6 +70,29 @@ CREATE TABLE public.dogum (
   baba_bilgi text,
   CONSTRAINT dogum_pkey PRIMARY KEY (id),
   CONSTRAINT dogum_anne_id_fkey FOREIGN KEY (anne_id) REFERENCES public.hayvanlar(id)
+);
+CREATE TABLE public.drug_administrations (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  treatment_day_id uuid NOT NULL,
+  drug_id uuid NOT NULL,
+  dose numeric NOT NULL CHECK (dose > 0::numeric),
+  unit text NOT NULL,
+  route text CHECK (route IS NULL OR (route = ANY (ARRAY['IM'::text, 'IV'::text, 'SC'::text, 'PO'::text, 'Topikal'::text, 'Intrauterin'::text]))),
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT drug_administrations_pkey PRIMARY KEY (id),
+  CONSTRAINT drug_administrations_treatment_day_id_fkey FOREIGN KEY (treatment_day_id) REFERENCES public.treatment_days(id),
+  CONSTRAINT drug_administrations_drug_id_fkey FOREIGN KEY (drug_id) REFERENCES public.drugs(id)
+);
+CREATE TABLE public.drugs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  stock_item_id text,
+  default_unit text,
+  default_route text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT drugs_pkey PRIMARY KEY (id),
+  CONSTRAINT drugs_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES public.stok(id)
 );
 CREATE TABLE public.gorev_log (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -216,4 +259,14 @@ CREATE TABLE public.tohumlama (
   abort_notlar text,
   CONSTRAINT tohumlama_pkey PRIMARY KEY (id),
   CONSTRAINT tohumlama_hayvan_id_fkey FOREIGN KEY (hayvan_id) REFERENCES public.hayvanlar(id)
+);
+CREATE TABLE public.treatment_days (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  case_id uuid NOT NULL,
+  day_no integer,
+  treatment_date date NOT NULL DEFAULT CURRENT_DATE,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT treatment_days_pkey PRIMARY KEY (id),
+  CONSTRAINT treatment_days_case_id_fkey FOREIGN KEY (case_id) REFERENCES public.cases(id)
 );
