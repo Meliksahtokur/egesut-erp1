@@ -1408,6 +1408,10 @@ async function openHstDet(id){
   openM('m-hst-det');
 }
 
+async function _loadCaseDrugsCache(){
+  _caseDrugsCache = await idbGetAll('drugs');
+}
+
 async function renderHstIlaclar(vakaId){
   const el=document.getElementById('hd-ilac-listesi');
   if(!el) return;
