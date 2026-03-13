@@ -40,7 +40,7 @@ async function loadDash(){
     const today=new Date().toISOString().split('T')[0];
     const [animals,diseases,tasks,stock,moves,births60,gebeTohs]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
-      getData('hastalik_log',d=>d.durum==='Aktif'),
+      getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi),
       idbGetAll('stok'),
       getData('stok_hareket',m=>!m.iptal),
@@ -333,7 +333,7 @@ async function openDet(id){
   try {
     const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
-      getData('hastalik_log',d=>d.hayvan_id===id),
+      getData('cases',c=>c.animal_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
       getData('gorev_log',t=>t.hayvan_id===id&&!t.tamamlandi&&!t.parent_id),
       getData('dogum',b=>b.anne_id===id),
@@ -347,7 +347,7 @@ async function openDet(id){
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
     const yasRaw=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):null;
     const yasGun=yasRaw===null?'—':yasRaw<0||yasRaw>36500?'Geçersiz tarih':yasHesapla(a.dogum_tarihi);
-    const aktifHst=diseases.filter(d=>d.durum==='Aktif').length;
+    const aktifHst=diseases.filter(c=>c.status==='active').length;
     const today=new Date().toISOString().split('T')[0];
     const displayId=a.devlet_kupe||a.kupe_no||a.id;
     document.getElementById('det-name').textContent=displayId;
