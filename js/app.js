@@ -119,13 +119,6 @@ function openM(id) {
     setTimeout(() => spermaModStok(), 100);
   }
   if (id === 'm-disease') {
-    _semptomSecili = [];
-    if(g('sempt-chips')) g('sempt-chips').innerHTML = '';
-    if(g('d-sempt')) g('d-sempt').value = '';
-    updateSemptomDropdown('');
-    filterHastalikList();
-  }
-  if (id === 'm-disease') {
     _diseasesCache = [];
     loadDiseasesDropdown('');
   }
