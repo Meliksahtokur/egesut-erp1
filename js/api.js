@@ -28,6 +28,14 @@ async function rpc(name, params = {}) {
 // ── INDEXEDDB ───────────────────────────────
 let _idb;
 
+async function clearAndReloadIDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.deleteDatabase('egesut_v9');
+    req.onsuccess = () => { console.log('IDB temizlendi, yeniden yükleniyor...'); location.reload(); };
+    req.onerror = () => rej('IDB silinemedi');
+  });
+}
+
 async function openDB() {
   return new Promise((res, rej) => {
     const req = indexedDB.open('egesut_v9', DB_VER);
