@@ -273,55 +273,74 @@ async function submitCloseCase(btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = '✅ Vakayı Kapat'; } }
 }
 
-// ── HASTALIK ─────────────────────────────────
-async function submitDisease(btn) {
+// ── VAKA AÇ (CLN-02) ────────────────────────
+// diseases dropdown'u DB'den doldur
+async function loadDiseasesDropdown() {
+  const sel = g('d-disease-id');
+  if (!sel) return;
+  const list = await idbGetAll('diseases');
+  // Kategoriye göre grupla
+  const grouped = {};
+  list.forEach(d => {
+    const cat = d.category || 'Diğer';
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(d);
+  });
+  sel.innerHTML = '<option value="">— Hastalık seçin —</option>';
+  Object.keys(grouped).sort().forEach(cat => {
+    const og = document.createElement('optgroup');
+    og.label = cat;
+    grouped[cat].forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.id;
+      o.textContent = d.name;
+      o.dataset.category = d.category || '';
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+}
+
+function onDiseaseSelect() {
+  const sel = g('d-disease-id');
+  const catEl = g('d-disease-cat');
+  const opt = sel?.selectedOptions[0];
+  if (opt?.dataset.category) {
+    catEl.textContent = '📂 ' + opt.dataset.category;
+    catEl.style.display = 'block';
+  } else {
+    catEl.style.display = 'none';
+  }
+}
+
+async function submitCase(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  // Düzenleme modu
-  if (_editMode) { await hstGuncelle(btn); return; }
-  const hid  = v('d-hid');
-  const tani = v('d-tani');
-  if (!hid || !tani) { toast('Küpe ve Tanı zorunlu', true); return; }
+  const hid       = v('d-hid');
+  const diseaseId = v('d-disease-id');
+  if (!hid)       { toast('Hayvan seçilmedi', true); return; }
+  if (!diseaseId) { toast('Hastalık seçilmedi', true); return; }
 
   const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
-  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
   try {
-    // İlaç satırlarını topla
-    const ilacRows = document.querySelectorAll('.ilac-satir');
-    const ilaclar  = [];
-    ilacRows.forEach(row => {
-      const stokId = row.querySelector('.ilac-stok-id')?.value || '';
-      const stokAd = row.querySelector('.ilac-stok-ac')?.value || '';
-      const mik    = parseFloat(row.querySelector('.ilac-mik')?.value) || 0;
-      const birim  = row.querySelector('.ilac-birim')?.value || '';
-      if ((stokId || stokAd) && mik > 0) ilaclar.push({ stokId, stokAd, mik, birim });
+    const res = await rpc('create_case', {
+      p_animal_id:  hayvan.id,
+      p_disease_id: diseaseId,
+      p_notes:      v('d-case-notes') || null,
     });
-
-    const tedaviGun = parseInt(g('d-tedavi-gun')?.value || '1') || 1;
-
-    await rpc('hastalik_kaydet', {
-      p_hayvan_id:  hayvan.id,
-      p_tani:       tani,
-      p_kategori:   v('d-kat') || null,
-      p_siddet:     v('d-sid') || null,
-      p_semptomlar: v('d-sempt') || null,
-      p_lokasyon:   v('d-lokasyon') || null,
-      p_hekim_id:   v('d-hekim') || null,
-      p_ilaclar:    ilaclar,
-      p_tedavi_gun: tedaviGun,
-    });
-
-    const ilacAciklama = ilaclar.map(i => `${i.stokAd || i.stokId} ${i.mik} ${i.birim}`).join(', ');
-    toast(tedaviGun > 1
-      ? `✅ Hastalık + ${tedaviGun - 1} günlük takip görevi kaydedildi`
-      : `✅ Hastalık kaydedildi${ilacAciklama ? ' · ' + ilacAciklama : ''}`);
-
-    closeDisease();
-
-    pullTables(['hastalik_log','gorev_log','stok','stok_hareket']).then(renderSafe).catch(console.warn);
+    toast('✅ Vaka açıldı');
+    closeM('m-disease');
+    cl('d-hid'); cl('d-case-notes');
+    g('d-disease-id').value = '';
+    g('d-disease-cat').style.display = 'none';
+    await pullTables(['cases']);
+    await renderFromLocal();
+    // Açılan vakayı göster
+    if (res?.case_id) openCaseDet(res.case_id);
   } catch (e) { toast(e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Kaydet + Görevler'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
 }
 
 // ── ABORT ────────────────────────────────────

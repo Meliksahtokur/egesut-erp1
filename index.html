@@ -508,76 +508,30 @@ button,input,select,textarea{font-family:inherit}
 <!-- HASTALIK -->
 <!-- HASTALIK / TEDAVİ (ESKİ SİSTEM — korunuyor) -->
 <div id="m-disease" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div><div id="m-disease-title" class="m-title">🏥 Hastalık / Tedavi</div>
+  <div class="modal"><div class="m-handle"></div><div id="m-disease-title" class="m-title">🏥 Yeni Vaka Aç</div>
     <div class="m-body">
-      <div class="fg"><label class="flbl">Küpe No *</label>
+      <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="d-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
           oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
       </div>
 
-      <!-- KATEGORİ + ŞİDDET -->
-      <div style="display:flex;gap:8px">
-        <div class="fg" style="flex:1"><label class="flbl">Kategori</label>
-          <select id="d-kat" class="fsel" onchange="filterHastalikList()">
-            <option value="">Tümü</option>
-            <option>Solunum</option><option>Sindirim</option><option>Üreme</option>
-            <option>Ayak</option><option>Meme</option><option>Metabolik</option>
-            <option>Buzağı</option><option>Diğer</option>
-          </select>
-        </div>
-        <div class="fg" style="flex:1"><label class="flbl">Şiddet</label>
-          <select id="d-sid" class="fsel">
-            <option value="">Seçin</option>
-            <option>Hafif</option><option>Orta</option><option>Ağır</option>
-          </select>
-        </div>
+      <!-- TANI — DB'den controlled dropdown -->
+      <div class="fg"><label class="flbl">Hastalık / Tanı *</label>
+        <select id="d-disease-id" class="fsel" onchange="onDiseaseSelect()">
+          <option value="">— Hastalık seçin —</option>
+        </select>
+        <div id="d-disease-cat" style="font-size:.68rem;color:var(--ink3);margin-top:3px;display:none"></div>
       </div>
 
-      <!-- TANI — önce chip'ler, sonra serbest yazım -->
-      <div class="fg">
-        <label class="flbl">Tanı *</label>
-        <div id="tani-secenekler" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px"></div>
-        <input id="d-tani" class="fi" placeholder="Tanı yazın veya üstten seçin…" autocomplete="off"
-          oninput="acDisease()" onfocus="acDisease()" onkeydown="acNav(event,'ac-dis')">
-        <div id="ac-dis" class="ac-box" style="display:none"></div>
-      </div>
-
-      <!-- LOKASYON (Meme/Ayak seçilince görünür) -->
-      <div id="d-lokasyon-wrap" style="display:none">
-        <div class="fg">
-          <label class="flbl" id="d-lokasyon-lbl">Lokasyon</label>
-          <div id="d-lokasyon-secenekler" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-          <input type="hidden" id="d-lokasyon">
-        </div>
-      </div>
-
-      <!-- SEMPTOMLAR — çoklu dropdown -->
-      <div class="fg">
-        <label class="flbl">Semptomlar</label>
-        <div id="sempt-chips" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px"></div>
-        <div style="position:relative">
-          <select id="sempt-ekle" class="fsel" onchange="semptomEkle(this)">
-            <option value="">+ Semptom ekle…</option>
-          </select>
-        </div>
-        <input type="hidden" id="d-sempt">
-      </div>
-
-      <!-- ÇOKLU İLAÇ -->
-      <div style="margin:8px 0 4px;font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em">İlaçlar</div>
-      <div id="ilac-rows"></div>
-      <button type="button" onclick="ilacSatirEkle()" style="width:100%;padding:7px;background:rgba(42,107,181,.08);border:1.5px dashed var(--blue);border-radius:8px;color:var(--blue);font-size:.78rem;font-weight:700;cursor:pointer;margin-bottom:8px">+ İlaç Ekle</button>
-
-      <!-- TEDAVİ DEVAM GÜNLERİ -->
-      <div class="fg"><label class="flbl">Tedavi Kaç Gün Daha Devam Edecek?</label>
-        <input id="d-tedavi-gun" class="fi" type="number" min="0" max="30" placeholder="0 = sadece bugün" value="0">
-        <div style="font-size:.68rem;color:var(--ink3);margin-top:3px">Girilen gün sayısı kadar takip görevi oluşturulur</div>
+      <!-- NOTLAR -->
+      <div class="fg"><label class="flbl">Notlar</label>
+        <textarea id="d-case-notes" class="fi" rows="2" placeholder="Semptomlar, gözlemler…" style="resize:vertical"></textarea>
       </div>
 
       <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
-      <button class="btn btn-g" onclick="submitDisease(this)">🏥 Kaydet + Görevler</button>
-      <button class="btn btn-o" onclick="closeDisease()" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" onclick="submitCase(this)">🏥 Vakayı Aç</button>
+      <button class="btn btn-o" onclick="closeM('m-disease')" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
