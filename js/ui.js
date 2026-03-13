@@ -242,7 +242,7 @@ function renderAnimals(list){
     const subId=a.kupe_no&&a.devlet_kupe?`<span style="font-size:.65rem;color:var(--ink3);font-weight:400"> · ${a.devlet_kupe}</span>`:'';
     const init=mainId.replace(/\D/g,'').slice(-3)||mainId.slice(0,2).toUpperCase();
     const yas=yasHesapla(a.dogum_tarihi);
-    const isGebe=gebeSet.has(a.id)||a.durum==='Gebe';
+    const isGebe=(getState('gebeIds') || []).includes(a.id)||a.durum==='Gebe';
     const gebeBadge=isGebe?`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 Gebe</span>`:'';
     const abortBadge=a.abort_sayisi>0?`<span class="tag" style="background:rgba(192,50,26,.12);color:var(--red);font-size:.6rem">${a.abort_sayisi}x abort</span>`:'';
     return `<div class="animal-card" onclick="openDet('${a.id}')">
@@ -336,7 +336,7 @@ function filterA(){
     else if(_fchip.cinsiyet==='erkek') f=f.filter(a=>a.cinsiyet==='Erkek');
     if(_fchip.gebelik==='gebe') f=f.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe');
     else if(_fchip.gebelik==='bos') f=f.filter(a=>!gebeSet.has(a.id)&&a.durum!=='Gebe');
-    if(_fchip.saglik==='hasta') f=f.filter(a=>_hastaIds.has(a.id));
+    if(_fchip.saglik==='hasta') f=f.filter(a=>(getState('hastaIds') || []).includes(a.id));
     renderAnimals(f);
   },250);
 }
@@ -966,7 +966,7 @@ async function loadStokList(){
   const el=document.getElementById('stok-list-body'); if(!el) return;
   try {
     await loadStock();
-    if(!_S.length){
+    if(!getState('stock').length){
       el.innerHTML='<div style="text-align:center;padding:12px;color:var(--ink3);font-size:.78rem">📦 Henüz stok ürünü eklenmemiş<br><button class="sh-link" onclick="openM(\'m-stok-add\')" style="margin-top:6px;display:block;margin:6px auto 0">İlk ürünü ekle →</button></div>';
       return;
     }

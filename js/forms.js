@@ -317,7 +317,7 @@ async function submitCikis(btn) {
   if (tip === 'olum' && !sebep) { toast('Ölüm sebebi girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    const hayvan = _A.find(a => a.id === hayvanId);
+    const hayvan = getState('animals').find(a => a.id === hayvanId);
     if (!hayvan) { toast('Hayvan bulunamadı', true); return; } // _A henüz değişmedi ama forms.js'de tanımlı değil? Bu satırı da getState ile değiştirelim.
 
     await rpc('cikis_yap', {
@@ -381,7 +381,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
 }
 async function suttenKesTekil(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const h = _A.find(a => a.id === hayvanId);
+  const h = getState('animals').find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (h.hesap_kategori !== 'sut_icen') { toast('Bu hayvan süt içen kategorisinde değil', true); return; }
   if (!confirm(`${getDisplayKupe(h)} sütten kesilecek. Onaylıyor musunuz?`)) return;
