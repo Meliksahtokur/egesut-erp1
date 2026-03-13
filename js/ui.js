@@ -19,6 +19,12 @@ function yasHesapla(dogumTarihi){
   return `${gn} gün`;
 }
 function showTab(name,btn){
+  // state'e current tab'ı kaydetmek isteyebiliriz
+  setState('currentAnimalTab', name);
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('tab-'+name).classList.add('on');
+  if(btn) btn.classList.add('on');
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
   document.getElementById('tab-'+name).classList.add('on');
@@ -53,6 +59,10 @@ async function loadDash(){
     const negStk=stock.filter(s=>stkNet[s.id]<0).length;
     const late=tasks.filter(t=>t.hedef_tarih<today&&!t.parent_id);
     const todayT=tasks.filter(t=>t.hedef_tarih===today&&!t.parent_id);
+    // animals zaten animals değişkeninde
+    if (!animals) {
+      animals = await getData('hayvanlar', a => a.durum === 'Aktif');
+    }
     const badge=late.length;
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
@@ -93,7 +103,7 @@ async function showGebe(){
   goTo('suru');
   const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
   const gebeIds=new Set(gebeTohs.map(t=>t.hayvan_id));
-  renderAnimals(_A.filter(a=>gebeIds.has(a.id)||gebeIds.has(a.kupe_no)));
+  renderAnimals(animals.filter(a=>gebeIds.has(a.id)||gebeIds.has(a.kupe_no)));
 }
 
 // ──────────────────────────────────────────
@@ -105,6 +115,7 @@ async function loadTasks(f,btn){
   const el=document.getElementById('tasks-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
+    const animals = getState('animals');
     const today=new Date().toISOString().split('T')[0];
     const all=await idbGetAll('gorev_log');
     if(f==='done'){
@@ -114,7 +125,7 @@ async function loadTasks(f,btn){
       el.innerHTML=done.slice(0,150).map(t=>`<div class="task-card" style="border-left-color:var(--ink3);opacity:.65">
         <div class="tc-header"><div class="tc-main">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span class="tc-id">${(()=>{const h=_A.find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'GENEL');})()} </span>
+            <span class="tc-id">${(()=>{const h=animals.find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'GENEL');})()} </span>
             <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           </div>
           <div class="tc-desc">${t.aciklama||''}</div>
@@ -135,6 +146,7 @@ async function loadTasks(f,btn){
       return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id));
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 function renderTask(t,cls='',subs=[]){
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
@@ -151,8 +163,9 @@ function renderTask(t,cls='',subs=[]){
   return `<div class="task-card ${cls}${allDone?' done':''}" id="tc-${t.id}" onclick="openTaskDet('${t.id}')" style="cursor:pointer">
     <div class="tc-header">
       <div class="tc-main">
+        const animals = getState('animals');
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          <span class="tc-id">${(()=>{const h=_A.find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
+          <span class="tc-id">${(()=>{const h=animals.find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
         <div class="tc-desc">${t.aciklama||''}</div>
@@ -209,11 +222,13 @@ async function loadAnimals(){
   const el=document.getElementById('suru-body');
   try {
     _A=await getData('hayvanlar',a=>a.durum==='Aktif');
+    setState('animals', _A); // _A'yı state'e de ata
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
-    _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
+    _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),...animals.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
     const hastaLogs=await getData('cases',c=>c.status==='active');
     _hastaIds=new Set(hastaLogs.map(d=>d.hayvan_id));
     _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
+    // state zaten güncellendi, renderAnimals'da state.animals kullanılacak
     window._appState=window._appState||{}; window._appState.hayvanlar=_A;
     renderAnimals(_A);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
@@ -244,6 +259,7 @@ function renderAnimals(list){
 }
 function updatePadokOzet(list){
   const el=document.getElementById('padok-ozet'); if(!el) return;
+  const animals = getState('animals');
   const gebeSet=new Set(_gebeIds||[]);
   const padok=document.getElementById('pflt')?.value;
   if(!list.length){ el.innerHTML=''; return; }
@@ -253,6 +269,7 @@ function updatePadokOzet(list){
   const gebe=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe').length;
   const bos=disi-gebe;
   const isBuzagi=padok&&padok.toLowerCase().includes('buzağı');
+  if (!list) list = animals;
   const chip=(txt,color)=>`<span style="background:${color};border-radius:8px;padding:3px 9px;font-size:.68rem;font-weight:700;color:#fff">${txt}</span>`;
   let html=chip(`Toplam: ${toplam}`,'rgba(61,74,50,.7)');
   if(isBuzagi||erkek>0){
@@ -267,9 +284,10 @@ function srchDropdown(){
   const q=(document.getElementById('srch')?.value||'').toLowerCase().trim();
   const ac=document.getElementById('ac-srch');
   if(!ac) return;
+  const animals = getState('animals');
   if(!q){ ac.style.display='none'; return; }
   const gebeSet=new Set(_gebeIds||[]);
-  const matches=_A.filter(a=>{
+  const matches=animals.filter(a=>{
     const k=(a.kupe_no||'').toLowerCase(), d=(a.devlet_kupe||'').toLowerCase();
     return k.includes(q)||d.includes(q)||(a.irk||'').toLowerCase().includes(q);
   }).slice(0,8);
@@ -310,7 +328,8 @@ function filterA(){
     const q=document.getElementById('srch')?.value.toLowerCase()||'';
     const p=document.getElementById('pflt')?.value||'';
     const gebeSet=new Set(_gebeIds||[]);
-    let f=_A;
+    const animals = getState('animals');
+  let f=animals;
     if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
     if(p) f=f.filter(a=>a.padok===p);
     if(_fchip.cinsiyet==='disi') f=f.filter(a=>a.cinsiyet==='Dişi'||!a.cinsiyet);
@@ -331,7 +350,9 @@ async function openDet(id){
   ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   showTab('ozet',document.querySelector('.tab'));
   try {
-    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases]=await Promise.all([
+    const animals = getState('animals');
+    const a = animals.find(a => a.id === id || a.kupe_no === id || a.devlet_kupe === id);
+    const [diseases,tohs,tasks,births,subs,yavrular,activeCases]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('cases',c=>c.animal_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
@@ -342,7 +363,6 @@ async function openDet(id){
       getData('cases',c=>c.animal_id===id&&c.status==='active'),
     ]);
     const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
-    diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
     const yasRaw=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):null;
@@ -523,7 +543,8 @@ async function openAnimalEdit(id){
   const a=_A.find(x=>x.id===id); if(!a){ toast('Hayvan bulunamadı',true); return; }
   const modal=document.getElementById('m-animal');
   if(!modal) return;
-
+  // animals state'i güncellemek için a'yı kullanacağız
+  setState('animals', _A);
   // Önce formu temizle — önceki değerler kalmasın
   ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(fid=>{const el=document.getElementById(fid);if(el)el.value='';});
   const cins=document.getElementById('a-cinsiyet'); if(cins) cins.value='';
@@ -634,7 +655,8 @@ async function loadBirths(){
 // ──────────────────────────────────────────
 async function gebeledenSec(){
   const tohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
-  const gebeHayvanlar=_A.filter(a=>a.durum==='Gebe'||a.durum==='gebe');
+  const animals = getState('animals');
+  const gebeHayvanlar=animals.filter(a=>a.durum==='Gebe'||a.durum==='gebe');
   const today2=new Date();
   const listFromToh=tohs.map(t=>{
     const toh=new Date(t.tarih);
@@ -728,6 +750,7 @@ function anneSeç(hayvanId,kupe,dogumTahmini,sperma){
   document.getElementById('anne-secili-adi').textContent=kupe;
   document.getElementById('anne-secili-bilgi').textContent=`Tahmini doğum: ${fmtTarih(dogumTahmini)} · Sperma: ${sperma||'?'}`;
   document.getElementById('anne-secili-card').style.display='block';
+  document.getElementById('anne-secili-card').style.display='block';
   document.getElementById('b-anne-manual').style.display='none';
   document.getElementById('btn-gebe-sec').style.display='none';
   document.getElementById('gebe-sec-modal')?.remove();
@@ -789,7 +812,7 @@ async function loadUreme(tab='kizginlik'){
     }
     else if(tab==='gebelik'){
       const tohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
-      const gebeHayvanlar=_A.filter(a=>a.durum==='Gebe');
+      const gebeHayvanlar=animals.filter(a=>a.durum==='Gebe');
       const gebeIds=new Set(tohs.map(t=>t.hayvan_id));
       const extra=gebeHayvanlar.filter(a=>!gebeIds.has(a.id));
       tohs.sort((a,b)=>(a.tarih||'').localeCompare(b.tarih||''));
@@ -865,6 +888,7 @@ async function loadGecmis(f,btn){
   const el=document.getElementById('gecmis-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
+    const animals = getState('animals');
     const entries=[];
     if(f==='hepsi'||f==='dogum')  (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,data:r}));
     if(f==='hepsi'||f==='tohumlama') (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
@@ -883,6 +907,7 @@ async function loadGecmis(f,btn){
       const d=fmtTarih(date);
       const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
       const hkName=hk?` · ${hk.ad}`:'';
+      const hayvanKey=data.hayvan_id||data.anne_id;
       const hayvanKey=data.hayvan_id||data.anne_id;
       const hayvanObj=_A.find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);
       const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;
@@ -1015,6 +1040,7 @@ async function loadRaporlar(){
   const el=document.getElementById('raporlar-body'); if(!el) return;
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
+    const animals = getState('animals');
     const [animals,tohs,diseases,births,moves,stock]=await Promise.all([
       idbGetAll('hayvanlar'),
       idbGetAll('tohumlama'),
@@ -1033,6 +1059,7 @@ async function loadRaporlar(){
     const abortlar=tohs.filter(t=>t.abort||t.sonuc==='Abort').length;
 
     // Irk dağılımı
+    const aktif = animals.filter(a => a.durum === 'Aktif');
     const irkMap={};
     aktif.forEach(a=>{ const irk=a.irk||'Bilinmiyor'; irkMap[irk]=(irkMap[irk]||0)+1; });
     const irkSorted=Object.entries(irkMap).sort((a,b)=>b[1]-a[1]);
@@ -1147,6 +1174,7 @@ async function openTaskDet(id){
   const all=await idbGetAll('gorev_log');
   const t=all.find(x=>x.id===id); if(!t) return;
   if(t.tamamlandi){ toast('Bu görev zaten tamamlanmış'); return; }
+  const animals = getState('animals');
   _curTaskDet=t;
   const today=new Date().toISOString().split('T')[0];
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
@@ -1187,6 +1215,7 @@ async function detayIptal(){
   if(!_curTaskDet) return;
   if(!confirm('Bu görevi iptal etmek istediğinizden emin misiniz?')) return;
   const t=_curTaskDet;
+  const animals = getState('animals');
   await write('gorev_log',{...t,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString(),iptal:true},'PATCH',`id=eq.${t.id}`);
   const subs=await getData('gorev_log',s=>s.parent_id===t.id&&!s.tamamlandi);
   for(const s of subs) await write('gorev_log',{...s,tamamlandi:true,iptal:true},'PATCH',`id=eq.${s.id}`);
@@ -1251,6 +1280,7 @@ async function openCaseDet(caseId) {
   const diseases = await idbGetAll('diseases');
   const c = cases.find(x => x.id === caseId);
   if (!c) { toast('Vaka bulunamadı', true); return; }
+  const animals = getState('animals');
   _curCase = c;
 
   const disease = diseases.find(d => d.id === c.disease_id);
@@ -1462,6 +1492,7 @@ async function openTohDet(id){
   const all=await idbGetAll('tohumlama');
   const t=all.find(x=>x.id===id); if(!t) return;
   _curToh=t;
+  const animals = getState('animals');
   const hk=[...HEKIMLER,...(_customHekimler||[])].find(x=>x.id===t.hekim_id);
   // Küpe çözümle
   const hayvanObj=_A.find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
@@ -1489,6 +1520,7 @@ async function openTohDet(id){
 async function tohSonuc(sonuc){
   if(!_curToh) return;
   await write('tohumlama',{..._curToh,sonuc},'PATCH',`id=eq.${_curToh.id}`);
+  const animals = getState('animals');
   toast(sonuc==='Gebe'?'✅ Gebe olarak işaretlendi':sonuc==='Boş'?'Boş olarak işaretlendi':'Güncellendi');
   closeM('m-toh-det');
   await renderFromLocal();
@@ -1533,6 +1565,7 @@ async function updateSpermaHint(val){
     hint.innerHTML=`Stok: <b style="color:${warn?'var(--red)':'var(--green)'}">${s.guncel} doz</b>${warn?' ⚠️ Kritik seviye!':''}`;
   } else { hint.textContent='Stokta kayıtlı değil'; }
 }
+// async function getSpermaStok zaten var
 async function getSpermaStok(){
   const all=await idbGetAll('stok');
   const mvs=await getData('stok_hareket',m=>!m.iptal);
@@ -1568,6 +1601,7 @@ function spermaModStok(){
   document.getElementById('sperma-hint').textContent='';
   const kaydetBtn=document.querySelector('#m-insem .btn-g');
   if(kaydetBtn) kaydetBtn.disabled=false;
+  const animals = getState('animals');
 }
 function onSpermaSelect(sel){
   const val=sel.value;
@@ -2016,6 +2050,7 @@ async function bildirimAc(){
   const izin=await bildirimIzniAl();
   if(izin){ toast('✅ Bildirimler açık!'); localStorage.setItem('bildirim_aktif','1'); bildirimKontrol(); }
   else { toast('⚠️ Bildirim izni verilmedi',true); }
+  const animals = getState('animals');
 }
 
 // ──────────────────────────────────────────

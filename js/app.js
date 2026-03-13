@@ -1,6 +1,10 @@
 // ══════════════════════════════════════════
 // EgeSüt — app.js
 // Global state, routing, init
+// Not: _A artık kullanılmıyor, state.animals kullanın.
+// Geçici olarak _A referanslarını state.animals ile değiştireceğiz.
+// Bu dosyadaki _A kullanımları kaldırılacak, ancak diğer dosyalar hala _A bekliyor.
+// Bu nedenle önce diğer dosyaları güncelleyeceğiz.
 // ══════════════════════════════════════════
 
 // ── SABİT VERİLER ──────────────────────────
@@ -90,17 +94,9 @@ function caseKatFiltrele() {
 }
 
 // ── GLOBAL STATE ────────────────────────────
-let _A = [], _S = [], _curStk = null, _curPg = 'dash';
+let _S = [], _curStk = null, _curPg = 'dash';
 let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
 let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today';
-let _curTaskDet  = null, _curHst = null, _curToh = null;
-let _curBildirimTab = 'bekliyor';
-
-// ── YARDIMCILAR ─────────────────────────────
-function g(id)   { return document.getElementById(id); }
-function v(id)   { return g(id)?.value || ''; }
-function cl(id)  { const el = g(id); if (el) el.value = ''; }
-
 function dAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
 function dFwd(base, n) { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; }
 function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso; }

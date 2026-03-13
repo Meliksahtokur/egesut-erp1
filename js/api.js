@@ -221,7 +221,13 @@ async function pullTables(tables = []) {
   if (!tables.length || _pulling) return;
   _pulling = true;
   try {
-    const FETCHERS = {
+    
+      // Önce hayvanları çek, state'e yaz
+      const { data: animals, error: animalsError } = await db.from('hayvan_durum_view').select('*');
+      if (!animalsError && animals) {
+        setState('animals', animals);
+      }
+const FETCHERS = {
       hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
       gorev_log:    () => db.from('gorev_log').select('*').eq('tamamlandi', false),
       stok:         () => db.from('stok').select('*'),
