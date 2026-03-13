@@ -1,6 +1,6 @@
 # EgeSüt ERP — SPEC v11
 > Operasyonel rehber. Mimari kararlar → ARCHITECTURE.md
-> Son güncelleme: 2026-03-12
+> Son güncelleme: 2026-03-13
 
 ---
 
@@ -15,27 +15,48 @@
 
 ## 1. MEVCUT DURUM
 
-### Migration 022 uygulandı mı?
-** ✅  UYGULANDI** — `supabase/migrations/20260312000022_case_management.sql` hazır, Supabase'e verildi.
+### Migration Durumu
+| Migration | Dosya | DB Durumu |
+|-----------|-------|-----------|
+| 001–013 | ✅ | ✅ Uygulandı |
+| 019–021 | ✅ | ✅ Uygulandı |
+| 022 case_management | ✅ | ✅ Uygulandı |
+| 023 remove_drug_admin | ✅ | ✅ Uygulandı |
 
-Uygulandıktan sonra bu satırı `✅ UYGULANDI` olarak güncelle.
+### Aktif DB Şeması (Tıbbi Sistem)
+Yeni (022 ile gelen) tablolar aktif:
+- `diseases` — controlled entity, seed data yüklü
+- `drugs` — controlled entity, seed data yüklü, `stock_item_id → stok`
+- `cases` — vaka kaydı, `animal_id → hayvanlar`, `disease_id → diseases`
+- `treatment_days` — günlük tedavi, `case_id → cases`
+- `drug_administrations` — ilaç uygulama, `drug_id → drugs`, trigger → `stok_hareket`
+- `treatment_timeline` view — frontend için hazır
+
+Eski tablolar (arşiv, readonly):
+- `hastalik_log` — eski free-text hastalık kaydı, yeni veri girilmez
+- `tedavi` — eski ilaç kaydı, yeni veri girilmez
+
+### Mimari Kararlar (2026-03-13)
+1. `hastalik_log` ve `tedavi` taşınmıyor — veriler test verisi, önemli değil. Salt arşiv.
+2. Yeni UI tamamen case-based sisteme göre yeniden yazılıyor.
+3. `hastalik_kaydet`, `tedavi_ekle`, `tedavi_sil` RPC'leri deprecated — yeni UI bunları çağırmaz.
+4. Stok düşümü SADECE `drug_administrations` INSERT trigger'ından gerçekleşir.
+5. Free text tani/ilac yasak — `diseases.id` ve `drugs.id` FK zorunlu.
 
 ---
 
 ## 2. SPRINT — SIRADAKI GÖREVLER
 
-### ✅ Tamamlanan
-| Item | Açıklama |
-|------|----------|
-| **CLN-01** | Migration 022 Supabase'e uygulandı |
-| **CLN-02** | `m-case` modal HTML'e eklendi, `diseases` dropdown DB'den, `create_case()` RPC bağlandı, `openMWithHayvan` + `acMap` güncellendi |
-| **CLN-03** | Vaka detay UI zaten tamamlanmıştı (renderCaseTimeline, submitAddDay, submitAddDrug, caseIlacFormAc). Eksik olan `remove_drug_administration` RPC → Migration 023 ile eklendi |
+### 🔴 Şu An Yapılacak — CLN Serisi (Case UI)
+| Item | Açıklama | Dosyalar | Durum |
+|------|----------|----------|-------|
+| **CLN-02** | Vaka açma modal: `diseases` dropdown (DB'den), `create_case()` RPC | forms.js, index.html | 🔜 |
+| **CLN-03** | Vaka detay modal: gün + ilaç ekleme UI, `treatment_timeline` render | ui.js, forms.js | 🔜 |
+| **CLN-04** | `drugs` ↔ `stok` bağlama UI | ui.js, forms.js | 🔜 |
+| **CLN-05** | Vaka kapatma + hayvan kartında aktif vaka badge | ui.js | 🔜 |
+| **CLN-06** | `pullTables`'a `cases`, `diseases`, `drugs` ekle; eski `hastalik_log` çekimini kaldır | api.js | 🔜 |
 
-### 🔴 Şu An Yapılacak
-| Item | Açıklama | Dosyalar |
-|------|----------|----------|
-| **CLN-04** | `drugs` ↔ `stok` bağlama UI (hangi ilaç hangi stok kalemi) | ui.js, forms.js |
-| **CLN-05** | Hayvan kartında aktif vaka gösterimi (CLN-02'de kısmi var, tamamla) | ui.js |
+> CLN-01 (022 uygula) tamamlandı — migrations klasöründe mevcut ve DB'de aktif.
 
 ### 🟡 Sonraki Sprint
 | Item | Açıklama |
@@ -50,7 +71,7 @@ Uygulandıktan sonra bu satırı `✅ UYGULANDI` olarak güncelle.
 ### ⏸ Bloke / Bekleyen
 | Item | Bloke Sebebi |
 |------|-------------|
-| T-07 İlaç yönetimi (eski sistem) | CLN serisi tamamlanınca re-evaluate |
+| T-07 İlaç yönetimi (eski sistem) | CLN serisi tamamlandı, deprecated — kapatıldı |
 | S3-01 Supabase Realtime | Sprint 3 |
 | DEBT-01 Teknik borç temizliği (orphan kolonlar, drift) | Sprint 3 |
 
@@ -96,21 +117,49 @@ renderSafe()              // debounce — background
 rpcOptimistic(fn,tables)  // toast → rpc → pull + render
 ```
 
+### Tıbbi Sistem RPC Referansı (Aktif — Case-Based)
+```javascript
+// Vaka aç
+rpc('create_case', { p_animal_id, p_disease_id, p_notes })
+// → { ok, case_id }
+
+// Tedavi günü ekle
+rpc('add_treatment_day', { p_case_id })
+// → { ok, day_id }
+
+// İlaç uygula (trigger → stok_hareket)
+rpc('add_drug_administration', { p_day_id, p_drug_id, p_dose, p_unit, p_route })
+// → { ok, administration_id }
+
+// İlaç kaydı sil (trigger → stok_hareket iptal)
+rpc('remove_drug_administration', { p_admin_id })
+// → { ok }
+
+// Vaka kapat
+rpc('close_case', { p_case_id })
+// → { ok }
+```
+
+### Deprecated RPC'ler (eski sistem — çağrılmaz)
+- `hastalik_kaydet` — eski free-text hastalık
+- `hastalik_guncelle` — eski
+- `hastalik_kapat` — eski
+- `hastalik_sil` — eski
+- `tedavi_ekle` — eski
+- `tedavi_sil` — eski
+
+### pullTables Tabloları (güncel)
+```javascript
+// Aktif
+['hayvanlar', 'cases', 'diseases', 'drugs',
+ 'stok', 'stok_hareket', 'tohumlama',
+ 'dogum', 'gorev_log', 'islem_log', 'bildirim_log']
+
+// Arşiv (çekilmez artık)
+// 'hastalik_log', 'tedavi'
+```
+
 ---
-
-## 4. OTURUM NOTLARI — 2026-03-13
-
-| Değişiklik | Durum |
-|------------|-------|
-| Migration 022 Supabase'de mevcut (diseases, cases, drugs, treatment_days tabloları var) | ✅ |
-| api.js: TABLES, pullTables, RPC_TABLES güncellendi | ✅ |
-| api.js: pullFromSupabase → pullTables bazlı refactor | ✅ |
-| api.js: DB_VER 9 | ✅ |
-| forms.js: loadDiseasesDropdown eklendi | ✅ |
-| index.html: m-vaka-ac modali eklendi | ✅ |
-| index.html: script sırası api→ui→forms→app yapıldı | ✅ |
-| ui.js: tab-saglik Vaka Aç butonu eklendi | ✅ |
-| **AÇIK SORUN:** Sayfada `loadDash is not defined` hatası — script sırası değişikliğine rağmen devam ediyor, tarayıcı cache'i temizlenince düzelecek mi test edilmedi | 🔴 |
 
 ## 4. KISA DERS LİSTESİ
 
@@ -124,4 +173,5 @@ rpcOptimistic(fn,tables)  // toast → rpc → pull + render
 | Stok ledger | `stok_hareket` asla silinmez — yeni hareket ekle |
 | Ledger işareti | Kullanım = POZİTİF, iade = NEGATİF (frontend SUM'dan düşürür) |
 | Controlled entity | diseases, drugs, hayvanlar → asla free text, FK zorunlu |
-| Migration 023 | `remove_drug_administration`: silme değil iptal — ledger `iptal=true`, sonra `DELETE drug_administrations` |
+| Stok düşümü | SADECE `drug_administrations` INSERT trigger'ından — başka yol yok |
+| Eski tıbbi tablolar | `hastalik_log`, `tedavi` → arşiv, yeni veri girilmez, UI göstermez |
