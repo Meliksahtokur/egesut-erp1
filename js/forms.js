@@ -338,7 +338,7 @@ async function submitCase(btn) {
     await pullTables(['cases']);
     await renderFromLocal();
     // Açılan vakayı göster
-    if (res?.case_id) openCaseDet(res.case_id);
+    if (res?.case_id) { await _loadCaseDrugsCache(); openCaseDet(res.case_id); }
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
 }

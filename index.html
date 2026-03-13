@@ -840,51 +840,34 @@ button,input,select,textarea{font-family:inherit}
 
 
 <!-- HASTALIK DETAY -->
-<div id="m-hst-det" class="mo" onclick="mClose(event,this)">
+<div id="m-case-det" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div>
+    <!-- BAŞLIK -->
     <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
-      <div id="hd-hayvan" style="font-size:.68rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em"></div>
-      <div id="hd-tani" style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px"></div>
-      <div id="hd-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
+      <div id="cd-hayvan" style="font-size:.68rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em"></div>
+      <div id="cd-disease" style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px"></div>
+      <div id="cd-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
     <div class="m-body">
-      <div id="hd-body" style="font-size:.82rem;color:var(--ink2);line-height:1.55;margin-bottom:8px"></div>
+      <!-- NOTLAR -->
+      <div id="cd-notes" style="font-size:.82rem;color:var(--ink2);line-height:1.55;margin-bottom:10px"></div>
 
-      <!-- İLAÇ LİSTESİ -->
-      <div id="hd-ilac-bolum" style="margin-bottom:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase">💊 İlaçlar</div>
-          <button class="btn" style="font-size:.7rem;padding:3px 10px;background:var(--blue);color:#fff" onclick="hstIlacFormToggle()">➕ Ekle</button>
-        </div>
-        <div id="hd-ilac-listesi" style="font-size:.82rem;color:var(--ink2)"></div>
-        <!-- İlaç Ekleme Formu -->
-        <div id="hd-ilac-form" style="display:none;margin-top:8px;background:var(--card2);border-radius:10px;padding:10px">
-          <div style="position:relative;margin-bottom:6px">
-            <input id="hdi-stok-ac" class="inp" placeholder="İlaç ara…" autocomplete="off" style="margin:0"
-              oninput="acHdiStok(this)" onfocus="acHdiStok(this)">
-            <input type="hidden" id="hdi-stok-id">
-            <div id="ac-hdi" class="ac-box" style="display:none;position:absolute;z-index:200;background:#fff;border:1px solid var(--card3);border-radius:8px;max-height:160px;overflow-y:auto;width:100%"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-            <input id="hdi-miktar" class="inp" type="number" min="0" placeholder="Miktar" style="margin:0">
-            <input id="hdi-birim" class="inp" placeholder="Birim" style="margin:0" readonly>
-          </div>
-          <select id="hdi-yol" class="inp" style="margin-bottom:6px">
-            <option value="">Uygulama yolu…</option>
-            <option>IM</option><option>SC</option><option>IV</option>
-            <option>Oral</option><option>Topikal</option><option>Intrauterin</option>
-          </select>
-          <input id="hdi-bekleme" class="inp" type="number" min="0" placeholder="Süt/et bekleme süresi (gün)" style="margin-bottom:6px">
-          <button class="btn" style="background:var(--green);color:#fff;width:100%" onclick="hstIlacEkle(this)">💾 İlaç Kaydet</button>
-        </div>
+      <!-- TEDAVİ GÜNÜ EKLE -->
+      <div id="cd-gun-bolum">
+        <button class="btn" style="background:var(--blue);color:#fff;width:100%;margin-bottom:10px"
+          onclick="caseGunEkle()">➕ Bugün Tedavi Günü Ekle</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-        <button class="btn" style="background:var(--blue);color:#fff" onclick="hstDuzenleAc()">✏️ Düzenle</button>
-        <button class="btn" style="background:var(--green);color:#fff" onclick="hstKapat()">✅ İyileşti</button>
+
+      <!-- TIMELINE -->
+      <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Tedavi Günleri</div>
+      <div id="cd-timeline" style="font-size:.82rem"></div>
+
+      <!-- VAKA KAPAT -->
+      <div id="cd-kapat-bolum" style="margin-top:12px">
+        <button class="btn" style="background:var(--green);color:#fff;width:100%"
+          onclick="caseKapat()">✅ Vakayı Kapat (İyileşti)</button>
       </div>
-      <button id="hd-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:6px;width:100%;display:none">🔄 Bu Kaydı Geri Al</button>
-      <button class="btn" style="background:rgba(192,50,26,.08);color:var(--red);margin-top:6px;width:100%" onclick="hstSilOnay()">🗑 Kaydı Sil</button>
-      <button class="btn btn-o" onclick="closeM('m-hst-det')" style="margin-top:6px;width:100%">Kapat</button>
+      <button class="btn btn-o" onclick="closeM('m-case-det')" style="margin-top:6px;width:100%">Kapat</button>
     </div>
   </div>
 </div>
