@@ -1973,6 +1973,7 @@ async function renderDrugStokList() {
   }
 }
 
+async function kuyrukTemizle(){
   if(!confirm('Kuyruktaki tüm bekleyen kayıtlar silinecek. Emin misiniz?')) return;
   const q=await getQueue();
   for(const op of q) await removeFromQueue(op._qid);
