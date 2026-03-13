@@ -38,7 +38,7 @@ async function clearAndReloadIDB() {
 
 async function openDB() {
   return new Promise((res, rej) => {
-    const req = indexedDB.open('egesut_v9', DB_VER);
+    const req = indexedDB.open('egesut_v10', DB_VER);
     req.onupgradeneeded = e => {
       const d = e.target.result;
       TABLES.forEach(t => { if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: 'id' }); });
