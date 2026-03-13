@@ -1217,6 +1217,14 @@ async function loadDrugsCache() {
 
 async function renderCasesForAnimal(animalId) {
   const allCases = await idbGetAll('cases');
+  const _dbg = await idbGetAll('diseases');
+  const _hint = document.createElement('div');
+  _hint.id = 'dbg-hint';
+  _hint.style.cssText = 'position:fixed;top:60px;left:10px;right:10px;background:#ff0;color:#000;padding:8px;z-index:9999;font-size:.75rem;border-radius:8px';
+  _hint.textContent = `cases:${allCases.filter(c=>c.animal_id===animalId).length} diseases:${_dbg.length}`;
+  document.getElementById('dbg-hint')?.remove();
+  document.body.appendChild(_hint);
+  setTimeout(()=>document.getElementById('dbg-hint')?.remove(), 5000);
   const animalCases = allCases
     .filter(c => c.animal_id === animalId)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
