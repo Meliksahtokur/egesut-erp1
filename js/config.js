@@ -4,7 +4,7 @@
 // ══════════════════════════════════════════
 
 // Hekimler (fallback, DB'den gelenlerle birleşecek)
-let HEKIMLER = [
+const HEKIMLER = [
   { id: 'H1', ad: 'Melik Tokur' },
   { id: 'H2', ad: 'Hüseyin Aygün' },
   { id: 'H3', ad: 'Süleyman Kocabaş' },
