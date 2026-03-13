@@ -1370,7 +1370,6 @@ async function deleteDrugAdmin(adminId, caseId) {
 }
 
 // ── VAKA DETAY (CLN-03) ─────────────────────
-let _curCase = null;
 
 async function openCaseDet(caseId) {
   const cases    = await idbGetAll('cases');
