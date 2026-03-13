@@ -9,7 +9,7 @@ const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 const DB_VER  = 8;
 const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
                   'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','tedavi',
-                  'cases','diseases','drugs'];
+                  'cases','diseases','drugs','treatment_days','drug_administrations'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
@@ -191,6 +191,10 @@ const RPC_TABLES = {
   abort_kaydet:      ['tohumlama','gorev_log'],
   hayvan_not_ekle:   ['hayvanlar'],
   cikis_yap:         ['hayvanlar'],
+  create_case:            ['cases'],
+  close_case:             ['cases'],
+  add_treatment_day:      ['cases'],
+  add_drug_administration:['cases'],
   create_case:       ['cases'],
   close_case:        ['cases'],
   add_treatment_day: ['cases'],
