@@ -960,6 +960,25 @@ async function hstIlacEkle(btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = '💾 İlaç Kaydet'; } }
 }
 
+// ── DISEASES DROPDOWN (CLN-02) ──────────────
+async function loadDiseasesDropdown(filterCategory = '') {
+  const sel = g('case-disease-id');
+  if (!sel) return;
+  try {
+    const { data, error } = await db.from('diseases').select('id,name,category').order('category').order('name');
+    if (error || !data) { console.warn('diseases fetch:', error?.message); return; }
+    const filtered = filterCategory ? data.filter(d => d.category === filterCategory) : data;
+    const grouped = {};
+    filtered.forEach(d => { if (!grouped[d.category]) grouped[d.category] = []; grouped[d.category].push(d); });
+    sel.innerHTML = '<option value="">Hastalık seçin…</option>' +
+      Object.entries(grouped).map(([cat, items]) =>
+        `<optgroup label="${cat}">${items.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}</optgroup>`
+      ).join('');
+    const hint = g('case-disease-hint');
+    if (hint) hint.textContent = `${filtered.length} hastalık yüklendi`;
+  } catch(e) { console.warn('loadDiseasesDropdown:', e.message); }
+}
+
 async function hstIlacSil(tedaviId) {
   if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
   try {
