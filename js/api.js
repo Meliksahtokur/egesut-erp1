@@ -181,27 +181,19 @@ async function write(table, data, method = 'POST', filter = '') {
 // ── RPC TABLOLARI MAP ───────────────────────
 // Her RPC hangi tabloları etkiliyor — sadece onlar çekilir
 const RPC_TABLES = {
-  hayvan_ekle:       ['hayvanlar'],
-  dogum_kaydet:      ['hayvanlar','dogum','gorev_log'],
-  tohumlama_kaydet:  ['tohumlama','gorev_log'],
-  kizginlik_kaydet:  ['kizginlik_log','gorev_log'],
-  create_case:              ['cases'],
-  add_treatment_day:        ['cases'],
-  add_drug_administration:  ['stok','stok_hareket'],
+  hayvan_ekle:               ['hayvanlar'],
+  dogum_kaydet:              ['hayvanlar','dogum','gorev_log'],
+  tohumlama_kaydet:          ['tohumlama','gorev_log'],
+  kizginlik_kaydet:          ['kizginlik_log','gorev_log'],
+  abort_kaydet:              ['tohumlama','gorev_log'],
+  hayvan_not_ekle:           ['hayvanlar'],
+  cikis_yap:                 ['hayvanlar'],
+  geri_al:                   ['hayvanlar','tohumlama','dogum','gorev_log','islem_log'],
+  create_case:               ['cases'],
+  add_treatment_day:         ['cases'],
+  add_drug_administration:   ['stok','stok_hareket'],
   remove_drug_administration:['stok','stok_hareket'],
-  close_case:               ['cases'],
-  abort_kaydet:      ['tohumlama','gorev_log'],
-  hayvan_not_ekle:   ['hayvanlar'],
-  cikis_yap:         ['hayvanlar'],
-  create_case:            ['cases'],
-  close_case:             ['cases'],
-  add_treatment_day:      ['cases'],
-  add_drug_administration:['cases'],
-  create_case:       ['cases'],
-  close_case:        ['cases'],
-  add_treatment_day: ['cases'],
-  add_drug_administration: ['cases'],
-  geri_al:           ['hayvanlar','tohumlama','hastalik_log','dogum','gorev_log','islem_log'],
+  close_case:                ['cases'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────
@@ -226,19 +218,15 @@ async function pullTables(tables = []) {
       gorev_log:    () => db.from('gorev_log').select('*').eq('tamamlandi', false),
       stok:         () => db.from('stok').select('*'),
       stok_hareket: () => db.from('stok_hareket').select('*').eq('iptal', false),
-      cases:    () => db.from('cases').select('*').order('created_at', { ascending: false }),
-      diseases: () => db.from('diseases').select('*').order('category').order('name'),
-      drugs:    () => db.from('drugs').select('*').order('name'),
+      cases:        () => db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
+      diseases:     () => db.from('diseases').select('*').order('category').order('name'),
+      drugs:        () => db.from('drugs').select('*').order('name'),
       tohumlama:    () => db.from('tohumlama').select('*'),
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
       islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
       tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
-
-      cases:        () => db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
-      diseases:     () => db.from('diseases').select('*').order('category').order('name'),
-      drugs:        () => db.from('drugs').select('*').order('name'),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
@@ -276,8 +264,8 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 async function pullFromSupabase() {
   try {
     await pullTables([
-      'hayvanlar','gorev_log','stok','stok_hareket','hastalik_log',
-      'tohumlama','dogum','bildirim_log','islem_log','tedavi',
+      'hayvanlar','gorev_log','stok','stok_hareket',
+      'tohumlama','dogum','bildirim_log','islem_log',
       'cases','diseases','drugs',
     ]);
     document.getElementById('dot')?.classList.remove('off', 'warn');
