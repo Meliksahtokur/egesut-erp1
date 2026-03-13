@@ -271,41 +271,13 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 // ── PULL FROM SUPABASE ──────────────────────
 async function pullFromSupabase() {
   try {
-    const [animals, tasks, stock, moves, hastaliklar, tohs, births, bildirims, islemler, tedaviler,
-           cases, diseasesRef, drugsRef] = await Promise.all([
-      db.from('hayvan_durum_view').select('*'),
-      db.from('gorev_log').select('*').eq('tamamlandi', false),
-      db.from('stok').select('*'),
-      db.from('stok_hareket').select('*').eq('iptal', false),
-      db.from('hastalik_log').select('*'),
-      db.from('tohumlama').select('*'),
-      db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
-      db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
-      db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
-      db.from('tedavi_view').select('*'),
-      db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
-      db.from('diseases').select('*').order('category').order('name'),
-      db.from('drugs').select('*').order('name'),
+    await pullTables([
+      'hayvanlar','gorev_log','stok','stok_hareket','hastalik_log',
+      'tohumlama','dogum','bildirim_log','islem_log','tedavi',
+      'cases','diseases','drugs',
     ]);
-
-    await Promise.all([
-      idbClearAndPut('hayvanlar',    animals.data     || []),
-      idbClearAndPut('gorev_log',    tasks.data       || []),
-      idbClearAndPut('stok',         stock.data       || []),
-      idbClearAndPut('stok_hareket', moves.data       || []),
-      idbClearAndPut('hastalik_log', hastaliklar.data || []),
-      idbClearAndPut('tohumlama',    tohs.data        || []),
-      idbClearAndPut('dogum',        births.data      || []),
-      idbClearAndPut('bildirim_log', bildirims.data   || []),
-      idbClearAndPut('islem_log',    islemler.data    || []),
-      idbClearAndPut('tedavi',       tedaviler.data   || []),
-      idbClearAndPut('cases',        cases.data       || []),
-      idbClearAndPut('diseases',     diseasesRef.data || []),
-      idbClearAndPut('drugs',        drugsRef.data    || []),
-    ]);
-
     document.getElementById('dot')?.classList.remove('off', 'warn');
-  } catch (e) {
+  } catch(e) {
     console.warn('pull failed:', e.message);
     document.getElementById('dot')?.classList.add('off');
   }
