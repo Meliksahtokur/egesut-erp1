@@ -1114,5 +1114,17 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+<div id="err-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0321a;color:#fff;font-size:.72rem;padding:8px 12px;z-index:9999;word-break:break-all" onclick="this.style.display='none'"></div>
+<script>
+window.onerror=function(msg,src,line){
+  const b=document.getElementById('err-bar');
+  if(b){b.textContent='❌ '+msg+' ('+src?.split('/').pop()+':'+line+')';b.style.display='block';}
+  return false;
+};
+window.addEventListener('unhandledrejection',function(e){
+  const b=document.getElementById('err-bar');
+  if(b){b.textContent='❌ '+e.reason?.message;b.style.display='block';}
+});
+</script>
 </body>
 </html>
