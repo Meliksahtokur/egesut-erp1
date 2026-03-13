@@ -178,34 +178,6 @@ async function submitKizginlik(btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
 
-async function submitCase(btn) {
-  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const hid       = v('case-hid').trim();
-  const diseaseId = v('case-disease-id').trim();
-  const notes     = v('case-notes').trim() || null;
-  if (!hid)       { toast('❌ Küpe no girin', true); return; }
-  if (!diseaseId) { toast('❌ Tanı seçin', true); return; }
-  const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
-  if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
-  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
-  try {
-    const res = await rpc('create_case', {
-      p_animal_id:  hayvan.id,
-      p_disease_id: diseaseId,
-      p_notes:      notes,
-    });
-    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
-    toast('✅ Vaka açıldı');
-    closeM('m-case');
-    ['case-hid','case-notes'].forEach(cl);
-    g('case-kat') && (g('case-kat').value = '');
-    g('case-disease-id') && (g('case-disease-id').value = '');
-    _diseasesCache = [];
-    await pullTables(['cases']);
-    renderSafe();
-  } catch(e) { toast('❌ ' + e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
-}
 
 async function submitAddDay(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
