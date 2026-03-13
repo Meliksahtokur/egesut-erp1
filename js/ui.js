@@ -1732,11 +1732,7 @@ function openMWithHayvan(modalId,inputId,kupeNo){
     if(modalId==='m-disease'){
       if(typeof loadDiseasesDropdown==='function') loadDiseasesDropdown();
     }
-    if(modalId==='m-case'){
-      const kat=document.getElementById('case-kat');
-      if(kat) kat.value='';
-      if(typeof loadDiseasesDropdown==='function') loadDiseasesDropdown('');
-    }
+
   },150);
 }
 async function tohSonucGuncelle(tohId, sonuc, hayvanId){
