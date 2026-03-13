@@ -1000,6 +1000,26 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+<!-- VAKA AÇ (CLN-02) -->
+<div id="m-vaka-ac" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="va-title">🏥 Vaka Aç</div>
+    <input type="hidden" id="va-hid">
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Hastalık *</label>
+        <select id="va-disease" class="fsel">
+          <option value="">Hastalık seçin…</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Notlar</label>
+        <textarea id="va-notlar" class="fta" style="height:72px" placeholder="Opsiyonel klinik not…"></textarea>
+      </div>
+      <button class="btn btn-g" onclick="submitVakaAc(this)">🏥 Vaka Aç</button>
+      <button class="btn btn-o" onclick="closeM('m-vaka-ac')" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
 <!-- GERİ ALMA ONAY MODALI -->
 <div id="m-geri-al" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div>
