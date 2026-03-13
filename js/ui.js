@@ -1733,9 +1733,7 @@ function openMWithHayvan(modalId,inputId,kupeNo){
       if(acEl) acEl.style.display='none';
     }
     if(modalId==='m-disease'){
-      const kat=document.getElementById('d-kat');
-      if(kat){ kat.value=''; }
-      if(typeof filterHastalikList==='function') filterHastalikList();
+      if(typeof loadDiseasesDropdown==='function') loadDiseasesDropdown();
     }
     if(modalId==='m-case'){
       const kat=document.getElementById('case-kat');
