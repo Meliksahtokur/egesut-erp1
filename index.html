@@ -537,36 +537,7 @@ button,input,select,textarea{font-family:inherit}
 </div>
 
 <!-- VAKA AÇ (YENİ SİSTEM — migration 022) -->
-<div id="m-case" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div><div class="m-title">🏥 Vaka Aç</div>
-    <div class="m-body">
-      <div class="fg"><label class="flbl">Küpe No *</label>
-        <input id="case-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('case-hid','ac-casehid')" onfocus="acHayvan('case-hid','ac-casehid')" onkeydown="acNav(event,'ac-casehid')">
-        <div id="ac-casehid" class="ac-box" style="display:none"></div>
-      </div>
-      <div class="fg"><label class="flbl">Kategori (filtre)</label>
-        <select id="case-kat" class="fsel" onchange="caseKatFiltrele()">
-          <option value="">Tümü</option>
-          <option>Meme</option><option>Üreme</option><option>Metabolik</option>
-          <option>Ayak</option><option>Solunum</option><option>Sindirim</option>
-          <option>Buzağı</option><option>Diğer</option>
-        </select>
-      </div>
-      <div class="fg"><label class="flbl">Tanı *</label>
-        <select id="case-disease-id" class="fsel">
-          <option value="">Yükleniyor…</option>
-        </select>
-        <div id="case-disease-hint" style="font-size:.68rem;color:var(--ink3);margin-top:3px"></div>
-      </div>
-      <div class="fg"><label class="flbl">Notlar</label>
-        <input id="case-notes" class="fi" placeholder="İsteğe bağlı not…" autocomplete="off">
-      </div>
-      <button class="btn btn-g" onclick="submitCase(this)">🏥 Vakayı Aç</button>
-      <button class="btn btn-o" onclick="closeM('m-case')" style="margin-top:6px">İptal</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- DOĞUM -->
 <div id="m-birth" class="mo" onclick="mClose(event,this)">
@@ -839,40 +810,9 @@ button,input,select,textarea{font-family:inherit}
 </div>
 
 
-<!-- HASTALIK DETAY -->
-<div id="m-case-det" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div>
-    <!-- BAŞLIK -->
-    <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
-      <div id="cd-hayvan" style="font-size:.68rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em"></div>
-      <div id="cd-disease" style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px"></div>
-      <div id="cd-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
-    </div>
-    <div class="m-body">
-      <!-- NOTLAR -->
-      <div id="cd-notes" style="font-size:.82rem;color:var(--ink2);line-height:1.55;margin-bottom:10px"></div>
 
-      <!-- TEDAVİ GÜNÜ EKLE -->
-      <div id="cd-gun-bolum">
-        <button class="btn" style="background:var(--blue);color:#fff;width:100%;margin-bottom:10px"
-          onclick="caseGunEkle()">➕ Bugün Tedavi Günü Ekle</button>
-      </div>
 
-      <!-- TIMELINE -->
-      <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Tedavi Günleri</div>
-      <div id="cd-timeline" style="font-size:.82rem"></div>
-
-      <!-- VAKA KAPAT -->
-      <div id="cd-kapat-bolum" style="margin-top:12px">
-        <button class="btn" style="background:var(--green);color:#fff;width:100%"
-          onclick="caseKapat()">✅ Vakayı Kapat (İyileşti)</button>
-      </div>
-      <button class="btn btn-o" onclick="closeM('m-case-det')" style="margin-top:6px;width:100%">Kapat</button>
-    </div>
-  </div>
-</div>
-
-<!-- VAKA DETAY (YENİ SİSTEM) -->
+<!-- VAKA DETAY -->
 <div id="m-case-det" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div>
     <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
@@ -937,25 +877,7 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
-<!-- VAKA AÇ (CLN-02) -->
-<div id="m-vaka-ac" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div>
-    <div class="m-title" id="va-title">🏥 Vaka Aç</div>
-    <input type="hidden" id="va-hid">
-    <div class="m-body">
-      <div class="fg"><label class="flbl">Hastalık *</label>
-        <select id="va-disease" class="fsel">
-          <option value="">Hastalık seçin…</option>
-        </select>
-      </div>
-      <div class="fg"><label class="flbl">Notlar</label>
-        <textarea id="va-notlar" class="fta" style="height:72px" placeholder="Opsiyonel klinik not…"></textarea>
-      </div>
-      <button class="btn btn-g" onclick="submitVakaAc(this)">🏥 Vaka Aç</button>
-      <button class="btn btn-o" onclick="closeM('m-vaka-ac')" style="margin-top:6px">İptal</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- GERİ ALMA ONAY MODALI -->
 <div id="m-geri-al" class="mo" onclick="mClose(event,this)">
