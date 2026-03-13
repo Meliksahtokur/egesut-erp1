@@ -410,10 +410,11 @@ async function openDet(id){
           }).join('')
         + `</div>`
       : '';
+    const _caseListHtml = await renderCasesForAnimal(a.id);
     document.getElementById('tab-saglik').innerHTML=
       activeCaseChips+
-      `<div style="padding:6px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-case','case-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button></div>`+
-      await renderCasesForAnimal(a.id)+
+      `<div style="padding:6px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Yeni Vaka Aç</button></div>`+
+      _caseListHtml+
       (diseases.length
       ?`<div style="margin-top:14px;font-size:.7rem;font-weight:700;color:var(--ink3);text-transform:uppercase;padding-bottom:4px;border-bottom:1px solid var(--card2)">Eski Kayıtlar</div>`+
       diseases.map(d=>`<div class="hist-row" onclick="openHstDet('${d.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${d.durum==='Aktif'?'var(--red2)':'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${d.tani||'—'}</div><div class="hist-sub">${d.tarih||''} · ${d.siddet||''} · <b style="color:${d.durum==='Aktif'?'var(--red)':'var(--green)'}">${d.durum}</b></div>${d.semptomlar?`<div class="hist-sub" style="margin-top:3px">${d.semptomlar}</div>`:''}</div></div>`).join('')
