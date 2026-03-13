@@ -37,6 +37,7 @@ async function clearAndReloadIDB() {
 }
 
 async function openDB() {
+  console.log("openDB çağrıldı");
   return new Promise((res, rej) => {
     const req = indexedDB.open('egesut_v10', DB_VER);
     req.onupgradeneeded = e => {
