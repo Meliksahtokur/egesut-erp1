@@ -318,7 +318,7 @@ async function submitCikis(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     const hayvan = getState('animals').find(a => a.id === hayvanId);
-    if (!hayvan) { toast('Hayvan bulunamadı', true); return; } // _A henüz değişmedi ama forms.js'de tanımlı değil? Bu satırı da getState ile değiştirelim.
+    if (!hayvan) { toast('Hayvan bulunamadı', true); return; } // getState('animals') henüz değişmedi ama forms.js'de tanımlı değil? Bu satırı da getState ile değiştirelim.
 
     await rpc('cikis_yap', {
       p_hayvan_id:    hayvanId,
@@ -339,7 +339,7 @@ async function submitCikis(btn) {
 
 // ── SÜTTEN KESME ─────────────────────────────
 function openSuttenKesModal() {
-  const sutIcenler = _A.filter(a => a.hesap_kategori === 'sut_icen');
+  const sutIcenler = getState('animals').filter(a => a.hesap_kategori === 'sut_icen');
   if (!sutIcenler.length) { toast('Süt içen buzağı yok'); return; }
   const liste = g('sk-liste');
   liste.innerHTML = sutIcenler.map(a => `
@@ -368,7 +368,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
   let basari = 0;
   try {
     for (const id of hayvanIdList) {
-      const h = _A.find(a => a.id === id);
+      const h = getState('animals').find(a => a.id === id);
       if (!h || h.hesap_kategori !== 'sut_icen') continue;
       await write('hayvanlar', { suttten_kesme_tarihi: bugun }, 'PATCH', `id=eq.${id}`);
       basari++;
@@ -399,7 +399,7 @@ async function suttenKesTekil(hayvanId, btn) {
 // ── TOHUMLANABILIR ONAY ──────────────────────
 async function submitTohumOnayla(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const h = _A.find(a => a.id === hayvanId);
+  const h = getState('animals').find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
@@ -412,7 +412,7 @@ async function submitTohumOnayla(hayvanId, btn) {
 }
 async function submitTohumErtele(hayvanId, ay, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const h = _A.find(a => a.id === hayvanId);
+  const h = getState('animals').find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   const erteleme = dFwd(new Date().toISOString().split('T')[0], ay * 30);
@@ -438,7 +438,7 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
   btn.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
   try {
     await write('gorev_log', { id, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString() }, 'PATCH', `id=eq.${id}`);
-    const _stokKontrol = stokId ? _S.find(s => s.id === stokId) : null;
+    const _stokKontrol = stokId ? getState('stock').find(s => s.id === stokId) : null;
     if (stokId && miktar > 0 && _stokKontrol)
       await write('stok_hareket', { id: crypto.randomUUID(), stok_id: stokId, tur: 'Görev', miktar, notlar: 'GorevID:' + id, iptal: false });
     if (padok && hid)
@@ -459,7 +459,7 @@ async function openTaskDet(id) {
   const task = (await getData('gorev_log', t => t.id === id))[0];
   if (!task) return;
   _curTaskDet = task;
-  const h = _A.find(a => a.id === task.hayvan_id);
+  const h = getState('animals').find(a => a.id === task.hayvan_id);
   g('td-title').textContent  = task.aciklama || '';
   g('td-hayvan').textContent = h ? getDisplayKupe(h) : (task.hayvan_id || '—');
   g('td-tarih').textContent  = fmtTarih(task.hedef_tarih);
@@ -508,7 +508,7 @@ async function submitTaskAdd(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Oluşturuluyor…'; }
   try {
     const hid    = v('ta-hid').trim();
-    const hayvan = hid ? (_A.find(a => a.kupe_no === hid || a.id === hid)) : null;
+    const hayvan = hid ? (getState('animals').find(a => a.kupe_no === hid || a.id === hid)) : null;
     await write('gorev_log', {
       id: crypto.randomUUID(), hayvan_id: hayvan?.id || hid || null,
       gorev_tipi: v('ta-tip'), aciklama: desc, hedef_tarih: tarih,
@@ -565,7 +565,7 @@ function hstDuzenleAc() {
   if (t) t.textContent = '✏️ Hastalık Düzenle';
   const dHid = document.getElementById('d-hid');
   if (dHid) {
-    const hayvan = _A.find(a => a.id === _curHst.hayvan_id);
+    const hayvan = getState('animals').find(a => a.id === _curHst.hayvan_id);
     dHid.value = hayvan ? (hayvan.kupe_no || hayvan.devlet_kupe || '') : '';
     dHid.readOnly = true;
     dHid.style.opacity = '0.6';
@@ -676,7 +676,7 @@ async function gebeIsaretle() {
   if (!box) { box = document.createElement('div'); box.id = 'gebe-isaret-modal'; box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end'; box.onclick = e => { if (e.target === box) box.remove(); }; document.body.appendChild(box); }
 
   const rows = adaylar.map(t => {
-    const h    = _A.find(a => a.id === t.hayvan_id);
+    const h    = getState('animals').find(a => a.id === t.hayvan_id);
     const kupe = getDisplayKupe(h, t.hayvan_id);
     const gun  = Math.floor((Date.now() - new Date(t.tarih)) / 86400000);
     return `<label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #eee;cursor:pointer">

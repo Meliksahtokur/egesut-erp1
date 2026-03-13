@@ -94,9 +94,9 @@ function caseKatFiltrele() {
 }
 
 // ── GLOBAL STATE ────────────────────────────
-let _S = [], _curStk = null, _curPg = 'dash';
-let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
-let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today';
+// let _S = [], _curStk = null, _curPg = 'dash';
+// let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
+// let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today';
 function dAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
 function dFwd(base, n) { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; }
 function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso; }
