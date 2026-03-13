@@ -84,7 +84,7 @@ async function submitBirth(btn) {
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
   if (tarih > new Date().toISOString().split('T')[0]) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
 
-  const anne = _A.find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
+  const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -124,7 +124,7 @@ async function submitInsem(btn) {
   if (!hid || !tarih || !sperma) { toast('Küpe, Tarih ve Sperma zorunlu', true); return; }
   if (tarih > new Date().toISOString().split('T')[0]) { toast('Tohumlama tarihi ileri tarih olamaz', true); return; }
 
-  const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -152,7 +152,7 @@ async function submitKizginlik(btn) {
   const tarih = v('k-tarih');
   if (!hid || !tarih) { toast('Küpe ve Tarih zorunlu', true); return; }
 
-  const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -226,7 +226,7 @@ async function submitCase(btn) {
   if (!hid)       { toast('Hayvan seçilmedi', true); return; }
   if (!diseaseId) { toast('Hastalık seçilmedi', true); return; }
 
-  const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
@@ -318,7 +318,7 @@ async function submitCikis(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     const hayvan = _A.find(a => a.id === hayvanId);
-    if (!hayvan) { toast('Hayvan bulunamadı', true); return; }
+    if (!hayvan) { toast('Hayvan bulunamadı', true); return; } // _A henüz değişmedi ama forms.js'de tanımlı değil? Bu satırı da getState ile değiştirelim.
 
     await rpc('cikis_yap', {
       p_hayvan_id:    hayvanId,
