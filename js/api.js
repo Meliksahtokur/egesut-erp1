@@ -6,10 +6,10 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 9;
-const TABLES  = ['hayvanlar','tohumlama','hastalik_log','dogum','stok','stok_hareket',
-                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','tedavi',
-                  'cases','diseases','drugs','treatment_days','drug_administrations'];
+const DB_VER  = 10;
+const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
+                  'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu',
+                  'cases','diseases','drugs'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
