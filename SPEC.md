@@ -98,6 +98,20 @@ rpcOptimistic(fn,tables)  // toast → rpc → pull + render
 
 ---
 
+## 4. OTURUM NOTLARI — 2026-03-13
+
+| Değişiklik | Durum |
+|------------|-------|
+| Migration 022 Supabase'de mevcut (diseases, cases, drugs, treatment_days tabloları var) | ✅ |
+| api.js: TABLES, pullTables, RPC_TABLES güncellendi | ✅ |
+| api.js: pullFromSupabase → pullTables bazlı refactor | ✅ |
+| api.js: DB_VER 9 | ✅ |
+| forms.js: loadDiseasesDropdown eklendi | ✅ |
+| index.html: m-vaka-ac modali eklendi | ✅ |
+| index.html: script sırası api→ui→forms→app yapıldı | ✅ |
+| ui.js: tab-saglik Vaka Aç butonu eklendi | ✅ |
+| **AÇIK SORUN:** Sayfada `loadDash is not defined` hatası — script sırası değişikliğine rağmen devam ediyor, tarayıcı cache'i temizlenince düzelecek mi test edilmedi | 🔴 |
+
 ## 4. KISA DERS LİSTESİ
 
 | Konu | Kural |
