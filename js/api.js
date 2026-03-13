@@ -191,6 +191,10 @@ const RPC_TABLES = {
   abort_kaydet:      ['tohumlama','gorev_log'],
   hayvan_not_ekle:   ['hayvanlar'],
   cikis_yap:         ['hayvanlar'],
+  create_case:       ['cases'],
+  close_case:        ['cases'],
+  add_treatment_day: ['cases'],
+  add_drug_administration: ['cases'],
   geri_al:           ['hayvanlar','tohumlama','hastalik_log','dogum','gorev_log','islem_log'],
 };
 
