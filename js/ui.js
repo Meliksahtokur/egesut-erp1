@@ -1268,7 +1268,7 @@ async function openCaseDet(caseId) {
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
 
-  await _loadCaseDrugsCache();
+  await loadDrugsCache();
   await renderCaseTimeline(caseId);
   openM('m-case-det');
 }
@@ -1327,7 +1327,7 @@ function caseDrugFormAc(dayId) {
   document.querySelectorAll('.cd-drug-form').forEach(f => f.remove());
   const container = document.getElementById('drugs-' + dayId);
   if (!container) return;
-  const drugs = _caseDrugsCache || [];
+  const drugs = _drugsCache || [];
   const opts = drugs.map(d => `<option value="${d.id}">${d.name}${d.default_unit?' ('+d.default_unit+')':''}</option>`).join('');
   const form = document.createElement('div');
   form.className = 'cd-drug-form';
@@ -1354,7 +1354,7 @@ function caseDrugFormAc(dayId) {
 
 function onCdfDrugChange() {
   const sel  = document.getElementById('cdf-drug');
-  const drug = (_caseDrugsCache||[]).find(d => d.id === sel?.value);
+  const drug = (_drugsCache||[]).find(d => d.id === sel?.value);
   if (drug?.default_unit)  document.getElementById('cdf-unit').value  = drug.default_unit;
   if (drug?.default_route) document.getElementById('cdf-route').value = drug.default_route;
 }
