@@ -4,30 +4,21 @@
 // ══════════════════════════════════════════
 
 // ── SABİT VERİLER ──────────────────────────
-// HEKIMLER ve VARSAYILAN_HEKIM config.js'den geliyor
-// Fallback: config.js yüklenmemişse window'a ata
-if (typeof HEKIMLER === 'undefined') {
-  window.HEKIMLER = [
-    { id: 'H1', ad: 'Melik Tokur' },
-    { id: 'H2', ad: 'Hüseyin Aygün' },
-    { id: 'H3', ad: 'Süleyman Kocabaş' },
-  ];
-} else {
-  window.HEKIMLER = HEKIMLER;
-}
-if (typeof VARSAYILAN_HEKIM === 'undefined') {
-  window.VARSAYILAN_HEKIM = 'H1';
-} else {
-  window.VARSAYILAN_HEKIM = VARSAYILAN_HEKIM;
-}
+// HEKIMLER artık DB'den geliyor (migration 009)
+// Fallback: DB erişilemezse bu liste kullanılır
+let HEKIMLER = [
+  { id: 'H1', ad: 'Melik Tokur' },
+  { id: 'H2', ad: 'Hüseyin Aygün' },
+  { id: 'H3', ad: 'Süleyman Kocabaş' },
+];
+const VARSAYILAN_HEKIM = 'H1';
 
 // DB'den hekimleri yükle
 async function loadHekimler() {
   try {
     const { data, error } = await db.rpc('hekim_listesi');
     if (!error && data && data.length > 0) {
-      // window.HEKIMLER'i güncelle
-      window.HEKIMLER = data.map(h => ({ id: h.id, ad: h.ad, telefon: h.telefon }));
+      HEKIMLER = data.map(h => ({ id: h.id, ad: h.ad, telefon: h.telefon }));
     }
   } catch (e) {
     console.warn('Hekimler DB\'den yüklenemedi, fallback kullanılıyor:', e.message);
@@ -35,13 +26,36 @@ async function loadHekimler() {
   populateHekimSelects();
 }
 
-// HASTALIK_LISTESI config.js'den geliyor
+const HASTALIK_LISTESI = [
+  'Mastit','Subklinik Mastit','Klinik Mastit',
+  'Metrit','Endometrit','Pyometra','Retensiyo Sekundinarum','Kistik Over','Anoestrus',
+  'Hipokalsemi (Süt Humması)','Ketozis','Ruminal Asidoz','Timpani','Şirden Deplasmanı',
+  'Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı','Tırnak Yarası',
+  'Pnömoni','Buzağı İshali','Buzağı Göbek İltihabı','Neonatal Zayıflık',
+];
 
-// HASTALIK_KAT config.js'den geliyor
+const HASTALIK_KAT = {
+  'Meme':    ['Mastit','Subklinik Mastit','Klinik Mastit'],
+  'Üreme':   ['Metrit','Endometrit','Pyometra','Retensiyo Sekundinarum','Kistik Over','Anoestrus'],
+  'Metabolik':['Hipokalsemi (Süt Humması)','Ketozis','Ruminal Asidoz','Timpani','Şirden Deplasmanı'],
+  'Ayak':    ['Topallık (Dermatit)','Topallık (Laminit)','Beyaz Çizgi Hastalığı','Tırnak Yarası'],
+  'Solunum': ['Pnömoni'],
+  'Sindirim':['Ruminal Asidoz','Timpani','Şirden Deplasmanı'],
+  'Buzağı':  ['Buzağı İshali','Buzağı Göbek İltihabı','Neonatal Zayıflık'],
+  'Diğer':   [],
+};
 
-// LOKASYON_KAT config.js'den geliyor
+const LOKASYON_KAT = {
+  'Meme': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'],
+  'Ayak': ['Sol Ön','Sol Arka','Sağ Ön','Sağ Arka'],
+  'Göz':  ['Sol Göz','Sağ Göz'],
+};
 
-// SPERMA_LISTESI config.js'den geliyor
+const SPERMA_LISTESI = [
+  'ABK-Zenith-ET','ABK-Parfect-ET','ABK-Iconic-ET',
+  'CRI-Crushabull','CRI-Extreme-ET','Alta-Kalahari','Alta-Achiever',
+  'Semex-O-Man','Semex-Planet',
+];
 
 let _customHekimler = [];
 let _customSperma   = [];
@@ -76,9 +90,17 @@ function caseKatFiltrele() {
 }
 
 // ── GLOBAL STATE ────────────────────────────
-// let _S = [], _curStk = null, _curPg = 'dash';
-// let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
-// let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today';
+let _A = [], _S = [], _curStk = null, _curPg = 'dash';
+let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
+let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today';
+let _curTaskDet  = null, _curHst = null, _curToh = null;
+let _curBildirimTab = 'bekliyor';
+
+// ── YARDIMCILAR ─────────────────────────────
+function g(id)   { return document.getElementById(id); }
+function v(id)   { return g(id)?.value || ''; }
+function cl(id)  { const el = g(id); if (el) el.value = ''; }
+
 function dAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
 function dFwd(base, n) { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; }
 function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso; }
@@ -99,6 +121,13 @@ function openM(id) {
       window._TH = data || [];
     }).catch(console.warn);
     setTimeout(() => spermaModStok(), 100);
+  }
+  if (id === 'm-disease') {
+    _semptomSecili = [];
+    if(g('sempt-chips')) g('sempt-chips').innerHTML = '';
+    if(g('d-sempt')) g('d-sempt').value = '';
+    updateSemptomDropdown('');
+    filterHastalikList();
   }
   if (id === 'm-disease') {
     _diseasesCache = [];
@@ -127,142 +156,7 @@ function toast(msg, err = false) {
   el._tid = setTimeout(() => el.className = '', 3200);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// HATA YÖNETİMİ SİSTEMİ
-// ═══════════════════════════════════════════════════════════════
-
-// Hata logları array'i (session-based)
-let _errorLog = [];
-const MAX_ERRORS = 100;
-
-function showDebug(msg) { 
-  console.warn('[debug]', msg); 
-}
-
-function logError(msg, context = 'general') {
-  const error = {
-    id: Date.now() + Math.random().toString(36).substr(2, 9),
-    timestamp: new Date().toISOString(),
-    message: msg,
-    context: context,
-    userAgent: navigator.userAgent,
-    url: window.location.href
-  };
-  _errorLog.unshift(error);
-  if (_errorLog.length > MAX_ERRORS) _errorLog.pop();
-  console.error(`[${context}]`, msg);
-  updateErrorBadge();
-}
-
-function addError(msg, file = null, line = null, stack = null) {
-  const error = {
-    id: Date.now() + Math.random().toString(36).substr(2, 9),
-    timestamp: new Date().toISOString(),
-    message: msg,
-    file: file,
-    line: line,
-    stack: stack,
-    context: 'exception',
-    userAgent: navigator.userAgent,
-    url: window.location.href
-  };
-  _errorLog.unshift(error);
-  if (_errorLog.length > MAX_ERRORS) _errorLog.pop();
-  console.error('[EXCEPTION]', msg, stack || '');
-  updateErrorBadge();
-}
-
-function updateErrorBadge() {
-  const btn = document.getElementById('errorbtn');
-  if (!btn) return;
-  const count = _errorLog.length;
-  if (count > 0) {
-    btn.innerHTML = `🐞 Hata (${count})`;
-    btn.style.background = 'rgba(255,68,68,0.4)';
-    btn.style.borderColor = '#ff4444';
-    btn.style.color = '#ffaaaa';
-  } else {
-    btn.innerHTML = '🐞 Hata';
-    btn.style.background = 'rgba(255,68,68,0.2)';
-    btn.style.borderColor = '#ff4444';
-    btn.style.color = '#ff8888';
-  }
-}
-
-function renderErrorLog() {
-  const container = document.getElementById('error-list');
-  const stats = document.getElementById('error-stats');
-  if (!container) return;
-  
-  if (_errorLog.length === 0) {
-    container.innerHTML = '<div style="text-align:center; padding:40px; color:#888; font-size:1.1rem;">✅ Henüz hata kaydı yok</div>';
-    if (stats) stats.innerHTML = 'Toplam: 0 hata';
-    return;
-  }
-  
-  if (stats) stats.innerHTML = `Toplam: ${_errorLog.length} hata | Son: ${_errorLog[0].timestamp.split('T')[1].split('.')[0]}`;
-  
-  container.innerHTML = _errorLog.map((err, idx) => `
-    <div style="background:rgba(255,68,68,0.1); border:1px solid rgba(255,68,68,0.3); border-radius:8px; padding:12px; ${idx === 0 ? 'border-left:4px solid #ff4444;' : ''}">
-      <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:8px;">
-        <span style="color:#ff6b6b; font-weight:700; font-size:0.9rem;">#${idx + 1} ${err.context}</span>
-        <span style="color:#888; font-size:0.75rem;">${err.timestamp.replace('T', ' ').split('.')[0]}</span>
-      </div>
-      <div style="color:#fff; margin-bottom:8px; word-break:break-word; line-height:1.5;">${escapeHtml(err.message)}</div>
-      ${err.file ? `<div style="color:#aaa; font-size:0.8rem; margin-bottom:4px;">📁 ${err.file}${err.line ? ':' + err.line : ''}</div>` : ''}
-      ${err.stack ? `<details style="margin-top:8px;"><summary style="color:#888; cursor:pointer; font-size:0.8rem;">Stack Trace</summary><pre style="color:#666; font-size:0.75rem; overflow-x:auto; margin-top:8px; padding:8px; background:rgba(0,0,0,0.3); border-radius:4px;">${escapeHtml(err.stack)}</pre></details>` : ''}
-      <div style="display:flex; gap:8px; margin-top:10px;">
-        <button onclick="copyError('${err.id}')" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#ccc; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.75rem;">📋 Kopyala</button>
-        <button onclick="deleteError('${err.id}')" style="background:rgba(255,68,68,0.2); border:1px solid rgba(255,68,68,0.4); color:#ff8888; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:0.75rem;">🗑 Sil</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function escapeHtml(text) {
-  if (!text) return '';
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function copyError(id) {
-  const err = _errorLog.find(e => e.id === id);
-  if (!err) return;
-  const text = `[${err.timestamp}] ${err.context}: ${err.message}${err.file ? ' (' + err.file + ')' : ''}`;
-  navigator.clipboard.writeText(text).then(() => {
-    toast('Hata kopyalandı');
-  });
-}
-
-function deleteError(id) {
-  _errorLog = _errorLog.filter(e => e.id !== id);
-  renderErrorLog();
-  updateErrorBadge();
-}
-
-function clearErrorLog() {
-  if (!confirm('Tüm hata logları silinecek. Emin misiniz?')) return;
-  _errorLog = [];
-  renderErrorLog();
-  updateErrorBadge();
-  toast('Hata logları temizlendi');
-}
-
-function refreshErrorLog() {
-  renderErrorLog();
-  toast('Hata logları yenilendi');
-}
-
-// Global error handler
-window.onerror = function(msg, url, line, col, error) {
-  addError(msg, url, line, error ? error.stack : null);
-  return false;
-};
-
-window.onunhandledrejection = function(event) {
-  addError('Unhandled Promise Rejection: ' + event.reason, null, null, event.reason && event.reason.stack ? event.reason.stack : null);
-};
+function showDebug(msg) { console.warn('[debug]', msg); }
 
 // Sync bar
 function updateSyncBar() {
@@ -301,36 +195,18 @@ function goTo(pg) {
 
 // ── RENDER FROM LOCAL ────────────────────────
 async function renderFromLocal() {
-  try {
-    await Promise.all([loadAnimals(), loadStock()]);
-    const pg = _curPg || 'dash';
-    
-    if (pg === 'dash') {
-      await Promise.all([loadDash(), loadStokList()]);
-    } else if (pg === 'tasks') {
-      await loadTasks(_curTaskFilter || 'today');
-    } else if (pg === 'gecmis') {
-      await loadGecmis(_curGecmisFilter || 'hepsi');
-    } else if (pg === 'log') {
-      await Promise.all([loadBirths(), loadStokList()]);
-    } else if (pg === 'ureme') {
-      await loadUreme(_curUremeTab || 'kizginlik');
-    } else if (pg === 'bildirim') {
-      await loadBildirimler(_curBildirimTab || 'bekliyor');
-    } else if (pg === 'raporlar') {
-      await loadRaporlar();
-    }
-    
-    if (pg !== 'dash') {
-      await loadDash();
-    }
-    
-    checkSpermaUyari();
-    updateBildirimBadge();
-  } catch (e) {
-    console.error('renderFromLocal hatası:', e);
-    throw e;
-  }
+  await Promise.all([loadAnimals(), loadStock()]);
+  const pg = _curPg || 'dash';
+  if (pg === 'dash')     await Promise.all([loadDash(), loadStokList()]);
+  if (pg === 'tasks')    await loadTasks(_curTaskFilter || 'today');
+  if (pg === 'gecmis')   await loadGecmis(_curGecmisFilter || 'hepsi');
+  if (pg === 'log')      await Promise.all([loadBirths(), loadStokList()]);
+  if (pg === 'ureme')    loadUreme(_curUremeTab || 'kizginlik');
+  if (pg === 'bildirim') loadBildirimler(_curBildirimTab || 'bekliyor');
+  if (pg === 'raporlar') loadRaporlar();
+  if (pg !== 'dash')     loadDash();
+  checkSpermaUyari();
+  updateBildirimBadge();
 }
 
 function updateBildirimBadge() { /* Sprint 3 — bildirim modülü */ }
@@ -457,7 +333,16 @@ function getIrkValue() {
 // ── AKTİF HAYVAN FORMU ──────────────────────
 // Cinsiyet + yaş → grup seçenekleri
 // Grup → padok seçenekleri
-// GRUP_PADOK config.js'den geliyor
+const GRUP_PADOK = {
+  'Sağmal (Laktasyonda)':      ['Sağmal Padok'],
+  'Sağmal (Kuru)':             ['Kuru/Gebe Padok'],
+  'Gebe Düve':                 ['Kuru/Gebe Padok'],
+  'Düve (Büyük)':              ['Düve Padok (Büyük)'],
+  'Düve (Küçük)':              ['Düve Padok (Küçük)'],
+  'Süt İçen Buzağı':           ['Buzağı Padok (Süt İçenler)'],
+  'Sütten Kesilmiş Buzağı':    ['Buzağı Padok (Sütten Kesilmiş)'],
+  'Besi':                      ['Düve Padok (Büyük)', 'Düve Padok (Küçük)', 'Sağmal Padok'],
+};
 
 function animalFormGuncelle() {
   const cinsiyet = v('a-cinsiyet');
@@ -592,7 +477,16 @@ async function buildDiseaseFreq() {
   _disFreq = {}; // hastalik_log kaldırıldı — diseases tablosu kullanılıyor
 }
 // Kategoriye göre semptom listesi
-// SEMPTOM_KAT ve SEMPTOM_GENEL config.js'den geliyor
+const SEMPTOM_KAT = {
+  'Solunum': ['Öksürük','Burun Akıntısı','Nefes Darlığı','Ateş','Hırıltı','İştahsızlık','Halsizlik'],
+  'Sindirim': ['İshal','Kabızlık','Şişkinlik','İştahsızlık','Ateş','Halsizlik','Ağız Kokusu'],
+  'Üreme':   ['Akıntı','Ateş','İştahsızlık','Halsizlik','Yememe','Ödem'],
+  'Ayak':    ['Topallık','Şişlik','Isı Artışı','Yara','Ağrı'],
+  'Meme':    ['Süt Değişimi','Meme Şişliği','Ateş','Ağrı','İştahsızlık','Halsizlik'],
+  'Metabolik':['Sallantı','Düşkünlük','Ateş','Halsizlik','Titreme','Yememe','Ödem'],
+  'Buzağı':  ['İshal','Halsizlik','Ateş','Göbek Şişliği','İştahsızlık','Solunum Güçlüğü'],
+};
+const SEMPTOM_GENEL = ['Ateş','Halsizlik','İştahsızlık','Ağrı','Ödem','Titreme','Yememe','Düşkünlük'];
 
 function filterHastalikList() {
   const kat     = g('d-kat')?.value || '';
@@ -793,39 +687,19 @@ document.addEventListener('keydown', e => {
 
 // ── INIT ─────────────────────────────────────
 window.addEventListener('load', async () => {
-  try { 
-    await openDB(); 
-    console.log('✅ IndexedDB açıldı');
-  } catch (e) { 
-    console.error('❌ DB hatası:', e.message);
-    const el = document.getElementById('dash-body');
-    if(el) el.innerHTML = `<div class="empty" style="padding:20px">❌ Veritabanı açılamadı: ${e.message}</div>`;
-    return;
-  }
+  try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
 
-  // Tarih alanlarını doldur
   const t = new Date().toISOString().split('T')[0];
-  ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { 
-    const el = g(id); 
-    if (el) el.value = t; 
-  });
+  ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { const el = g(id); if (el) el.value = t; });
 
-  try {
-    await loadHekimler();  // DB'den + fallback
-    await loadIrkDropdown();
-  } catch (e) {
-    console.warn('loadHekimler/irk hatası:', e);
-  }
+  await loadHekimler();  // DB'den + fallback
+  await loadIrkDropdown();
 
-  try { 
-    await renderFromLocal(); 
-    console.log('✅ renderFromLocal tamamlandı');
-  } catch (e) {
-    console.error('❌ render hatası:', e);
+  try { await renderFromLocal(); } catch (e) {
+    console.warn('render err:', e);
     const el = g('dash-body');
     if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: ${e.message}<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
   }
-  
   updateSyncBar();
 
   if (navigator.onLine) {

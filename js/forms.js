@@ -8,26 +8,16 @@
 
 // ── YENİ HAYVAN ─────────────────────────────
 async function submitAnimal(btn) {
-  if (!navigator.onLine) { 
-    toast('⚠️ İnternet bağlantısı gerekli', true); 
-    return; 
-  }
+  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
 
   const modal   = g('m-animal');
   const editId  = modal?.dataset.editId || null;
-  const devlet  = (v('a-devlet') || '').trim();
-  const kupe    = (v('a-kupe') || '').trim();
+  const devlet  = v('a-devlet').trim();
+  const kupe    = v('a-kupe').trim();
   const irk     = getIrkValue();
 
-  if (!editId && !devlet && !kupe) { 
-    toast('Devlet küpesi veya işletme küpesi girin', true); 
-    return; 
-  }
-  
-  if (btn) { 
-    btn.disabled = true; 
-    btn.textContent = 'Kaydediliyor…'; 
-  }
+  if (!editId && !devlet && !kupe) { toast('Devlet küpesi veya işletme küpesi girin', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
 
   try {
     if (editId) {
@@ -51,7 +41,7 @@ async function submitAnimal(btn) {
       closeAnimalEdit();
       await pullTables(['hayvanlar']);
       await renderFromLocal();
-      if (editId) openDet(editId);
+      openDet(editId);
     } else {
       // EKLEME MODU
       const data = await rpc('hayvan_ekle', {
@@ -68,22 +58,12 @@ async function submitAnimal(btn) {
         p_renk:           v('a-renk') || null,
         p_ayirici_ozellik: v('a-ozellik') || null,
       });
-      
-      toast(`✅ ${devlet || kupe} eklendi (ID: ${data?.hayvan_id || '?'})`);
+      toast(`✅ ${devlet || kupe} eklendi (ID: ${data.hayvan_id})`);
       closeM('m-animal');
-      
-      // Formu temizle
-      ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(id => {
-        const el = g(id); if (el) el.value = '';
-      });
-      
+      ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
       const cins = g('a-cinsiyet'); if (cins) cins.value = '';
       const sel  = g('a-irk-sel');  if (sel)  sel.value  = '';
-      
-      // Arka planda verileri yenile
-      pullTables(['hayvanlar'])
-        .then(() => Promise.all([renderSafe(), loadIrkDropdown()]))
-        .catch(err => console.warn('pullTables hatası:', err));
+      pullTables(['hayvanlar']).then(() => Promise.all([renderSafe(), loadIrkDropdown()])).catch(console.warn);
     }
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = editId ? '💾 Güncelle' : 'Kaydet'; } }
@@ -104,7 +84,7 @@ async function submitBirth(btn) {
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
   if (tarih > new Date().toISOString().split('T')[0]) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
 
-  const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
+  const anne = _A.find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -144,7 +124,7 @@ async function submitInsem(btn) {
   if (!hid || !tarih || !sperma) { toast('Küpe, Tarih ve Sperma zorunlu', true); return; }
   if (tarih > new Date().toISOString().split('T')[0]) { toast('Tohumlama tarihi ileri tarih olamaz', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -172,7 +152,7 @@ async function submitKizginlik(btn) {
   const tarih = v('k-tarih');
   if (!hid || !tarih) { toast('Küpe ve Tarih zorunlu', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -246,7 +226,7 @@ async function submitCase(btn) {
   if (!hid)       { toast('Hayvan seçilmedi', true); return; }
   if (!diseaseId) { toast('Hastalık seçilmedi', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = _A.find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
@@ -337,9 +317,8 @@ async function submitCikis(btn) {
   if (tip === 'olum' && !sebep) { toast('Ölüm sebebi girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    const animals = getState('animals') || [];
-  const hayvan = animals.find(a => a.id === hayvanId);
-    if (!hayvan) { toast('Hayvan bulunamadı', true); return; } // getState('animals') henüz değişmedi ama forms.js'de tanımlı değil? Bu satırı da getState ile değiştirelim.
+    const hayvan = _A.find(a => a.id === hayvanId);
+    if (!hayvan) { toast('Hayvan bulunamadı', true); return; }
 
     await rpc('cikis_yap', {
       p_hayvan_id:    hayvanId,
@@ -360,7 +339,7 @@ async function submitCikis(btn) {
 
 // ── SÜTTEN KESME ─────────────────────────────
 function openSuttenKesModal() {
-  const sutIcenler = getState('animals').filter(a => a.hesap_kategori === 'sut_icen');
+  const sutIcenler = _A.filter(a => a.hesap_kategori === 'sut_icen');
   if (!sutIcenler.length) { toast('Süt içen buzağı yok'); return; }
   const liste = g('sk-liste');
   liste.innerHTML = sutIcenler.map(a => `
@@ -389,7 +368,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
   let basari = 0;
   try {
     for (const id of hayvanIdList) {
-      const h = getState('animals').find(a => a.id === id);
+      const h = _A.find(a => a.id === id);
       if (!h || h.hesap_kategori !== 'sut_icen') continue;
       await write('hayvanlar', { suttten_kesme_tarihi: bugun }, 'PATCH', `id=eq.${id}`);
       basari++;
@@ -402,7 +381,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
 }
 async function suttenKesTekil(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const h = getState('animals').find(a => a.id === hayvanId);
+  const h = _A.find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (h.hesap_kategori !== 'sut_icen') { toast('Bu hayvan süt içen kategorisinde değil', true); return; }
   if (!confirm(`${getDisplayKupe(h)} sütten kesilecek. Onaylıyor musunuz?`)) return;
@@ -420,7 +399,7 @@ async function suttenKesTekil(hayvanId, btn) {
 // ── TOHUMLANABILIR ONAY ──────────────────────
 async function submitTohumOnayla(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const h = getState('animals').find(a => a.id === hayvanId);
+  const h = _A.find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
@@ -433,7 +412,7 @@ async function submitTohumOnayla(hayvanId, btn) {
 }
 async function submitTohumErtele(hayvanId, ay, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const h = getState('animals').find(a => a.id === hayvanId);
+  const h = _A.find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   const erteleme = dFwd(new Date().toISOString().split('T')[0], ay * 30);
@@ -459,7 +438,7 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
   btn.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
   try {
     await write('gorev_log', { id, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString() }, 'PATCH', `id=eq.${id}`);
-    const _stokKontrol = stokId ? getState('stock').find(s => s.id === stokId) : null;
+    const _stokKontrol = stokId ? _S.find(s => s.id === stokId) : null;
     if (stokId && miktar > 0 && _stokKontrol)
       await write('stok_hareket', { id: crypto.randomUUID(), stok_id: stokId, tur: 'Görev', miktar, notlar: 'GorevID:' + id, iptal: false });
     if (padok && hid)
@@ -480,7 +459,7 @@ async function openTaskDet(id) {
   const task = (await getData('gorev_log', t => t.id === id))[0];
   if (!task) return;
   _curTaskDet = task;
-  const h = getState('animals').find(a => a.id === task.hayvan_id);
+  const h = _A.find(a => a.id === task.hayvan_id);
   g('td-title').textContent  = task.aciklama || '';
   g('td-hayvan').textContent = h ? getDisplayKupe(h) : (task.hayvan_id || '—');
   g('td-tarih').textContent  = fmtTarih(task.hedef_tarih);
@@ -529,7 +508,7 @@ async function submitTaskAdd(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Oluşturuluyor…'; }
   try {
     const hid    = v('ta-hid').trim();
-    const hayvan = hid ? (getState('animals').find(a => a.kupe_no === hid || a.id === hid)) : null;
+    const hayvan = hid ? (_A.find(a => a.kupe_no === hid || a.id === hid)) : null;
     await write('gorev_log', {
       id: crypto.randomUUID(), hayvan_id: hayvan?.id || hid || null,
       gorev_tipi: v('ta-tip'), aciklama: desc, hedef_tarih: tarih,
@@ -586,7 +565,7 @@ function hstDuzenleAc() {
   if (t) t.textContent = '✏️ Hastalık Düzenle';
   const dHid = document.getElementById('d-hid');
   if (dHid) {
-    const hayvan = getState('animals').find(a => a.id === _curHst.hayvan_id);
+    const hayvan = _A.find(a => a.id === _curHst.hayvan_id);
     dHid.value = hayvan ? (hayvan.kupe_no || hayvan.devlet_kupe || '') : '';
     dHid.readOnly = true;
     dHid.style.opacity = '0.6';
@@ -697,7 +676,7 @@ async function gebeIsaretle() {
   if (!box) { box = document.createElement('div'); box.id = 'gebe-isaret-modal'; box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end'; box.onclick = e => { if (e.target === box) box.remove(); }; document.body.appendChild(box); }
 
   const rows = adaylar.map(t => {
-    const h    = getState('animals').find(a => a.id === t.hayvan_id);
+    const h    = _A.find(a => a.id === t.hayvan_id);
     const kupe = getDisplayKupe(h, t.hayvan_id);
     const gun  = Math.floor((Date.now() - new Date(t.tarih)) / 86400000);
     return `<label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #eee;cursor:pointer">

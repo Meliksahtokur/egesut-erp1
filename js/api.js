@@ -27,8 +27,6 @@ async function rpc(name, params = {}) {
 
 // ── INDEXEDDB ───────────────────────────────
 let _idb;
-let _dbReady = false;
-let _dbPromise = null;
 
 async function clearAndReloadIDB() {
   return new Promise((res, rej) => {
@@ -46,15 +44,12 @@ async function openDB() {
       TABLES.forEach(t => { if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: 'id' }); });
       if (!d.objectStoreNames.contains('_queue')) d.createObjectStore('_queue', { keyPath: '_qid', autoIncrement: true });
     };
-    req.onsuccess = e => { _idb = e.target.result; _dbReady = true; res(_idb); };
+    req.onsuccess = e => { _idb = e.target.result; res(_idb); };
     req.onerror   = e => rej(e.target.error);
   });
 }
 
 async function idbGetAll(store) {
-  if (!_dbReady || !_idb) {
-    await openDB();
-  }
   return new Promise((res, rej) => {
     const tx = _idb.transaction(store, 'readonly');
     const req = tx.objectStore(store).getAll();
@@ -125,7 +120,7 @@ async function removeFromQueue(qid) {
 async function dbUpdate(table, id, changes) {
   const clean = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== null && v !== undefined && v !== ''));
   const { error } = await db.from(table).update(clean).eq('id', id);
-  if (error) throw new Error("[dbUpdate:" + table + "] " + error.message);
+  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
 }
 
 async function dbInsert(table, rows) {
@@ -133,7 +128,7 @@ async function dbInsert(table, rows) {
   arr.forEach(r => { if (!r.id) r.id = crypto.randomUUID(); });
   const clean = arr.map(r => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null && v !== undefined && v !== '')));
   const { error } = await db.from(table).insert(clean);
-  if (error) throw new Error("[dbInsert:" + table + "] " + error.message);
+  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
   return arr;
 }
 
@@ -223,19 +218,11 @@ let _pulling = false;
 
 // Sadece belirtilen tabloları Supabase'den çek
 async function pullTables(tables = []) {
-  console.log('📡 pullTables çağrıldı, tablolar:', tables);
-  if (!tables.length || _pulling) {
-    console.log('⏭️ pullTables atlandı:', !tables.length ? 'tablo yok' : 'zaten çalışıyor');
-    return;
-  }
+  if (!tables.length || _pulling) return;
   _pulling = true;
   try {
-    console.log('🚀 pullTables başlıyor...');
     const FETCHERS = {
-      hayvanlar:    () => {
-        console.log('🔄 hayvanlar çekiliyor...');
-        return db.from('hayvan_durum_view').select('*');
-      },
+      hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
       gorev_log:    () => db.from('gorev_log').select('*').eq('tamamlandi', false),
       stok:         () => db.from('stok').select('*'),
       stok_hareket: () => db.from('stok_hareket').select('*').eq('iptal', false),
@@ -250,28 +237,9 @@ async function pullTables(tables = []) {
       tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
-    console.log('📥 Veriler çekiliyor...');
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
-    
-    // Hata kontrolü
-    results.forEach((r, i) => {
-      if (r.error) {
-        console.error(`❌ ${uniq[i]} çekilemedi:`, r.error);
-        logError(`${uniq[i]} çekilemedi: ${r.error.message}`, 'pullTables');
-      } else {
-        console.log(`✅ ${uniq[i]}: ${r.data?.length || 0} kayıt`);
-      }
-    });
-    
-    console.log('💾 IndexedDB\'ye yazılıyor...');
     await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
-    
-    if (uniq.includes('tohumlanabilir_hayvanlar')) {
-      window._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
-      console.log(`✅ tohumlanabilir_hayvanlar: ${window._TH.length} kayıt`);
-    }
-    
-    console.log('✅ pullTables tamamlandı');
+    if (uniq.includes('tohumlanabilir_hayvanlar')) window._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
   } finally {
     _pulling = false;
   }
@@ -303,38 +271,15 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 // ── PULL FROM SUPABASE ──────────────────────
 async function pullFromSupabase() {
   try {
-    console.log('📡 Supabase\'den veri çekiliyor...');
-    const tables = [
+    await pullTables([
       'hayvanlar','gorev_log','stok','stok_hareket',
       'tohumlama','dogum','bildirim_log','islem_log',
       'cases','diseases','drugs',
-    ];
-    
-    for (const table of tables) {
-      console.log(`⏳ ${table} çekiliyor...`);
-    }
-    
-    await pullTables(tables);
-    
-    console.log('✅ Veriler başarıyla çekildi');
+    ]);
     document.getElementById('dot')?.classList.remove('off', 'warn');
   } catch(e) {
-    console.error('❌ pullFromSupabase hatası:', e);
-    addError('pullFromSupabase: ' + e.message, 'api.js', null, e.stack);
+    console.warn('pull failed:', e.message);
     document.getElementById('dot')?.classList.add('off');
-  }
-}
-
-async function getData(table, filterFn) {
-  try {
-    console.log(`🔍 getData: ${table} çağrılıyor...`);
-    const data = await idbGetAll(table);
-    console.log(`✅ getData: ${table} → ${data.length} kayıt bulundu`);
-    return filterFn ? data.filter(filterFn) : data;
-  } catch(e) {
-    console.error(`❌ getData hatası (${table}):`, e);
-    addError(`getData(${table}): ${e.message}`, 'api.js', null, e.stack);
-    return [];
   }
 }
 
@@ -371,3 +316,7 @@ async function syncNow() {
 // Her 5sn offline queue'yu otomatik gönderir
 setInterval(syncNow, 5000);
 window.addEventListener('online', syncNow);
+async function getData(table, filterFn) {
+  const data = await idbGetAll(table);
+  return filterFn ? data.filter(filterFn) : data;
+}
