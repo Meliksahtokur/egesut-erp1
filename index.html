@@ -252,7 +252,7 @@ button,input,select,textarea{font-family:inherit}
     <div id="dot"></div>
     <button id="refbtn" onclick="this.classList.add('spinning');refreshAll().finally(()=>this.classList.remove('spinning'))">↻</button>
     <button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
-    <button id="errorbtn" onclick="document.getElementById('error-panel').style.display='block'" style="background:rgba(255,68,68,.2);border:1px solid #ff4444;color:#ff8888;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">🐞 Hata</button>
+    <button id="errorbtn" onclick="document.getElementById('error-panel').style.display='block'; renderErrorLog();" style="background:rgba(255,68,68,.2);border:1px solid #ff4444;color:#ff8888;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">🐞 Hata</button>
   </div>
 </div>
 
@@ -888,7 +888,7 @@ button,input,select,textarea{font-family:inherit}
     <div>
       <button onclick="copyErrors()" style="background:#4CAF50; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">📋 Kopyala</button>
       <button onclick="clearErrors()" style="background:#ff4444; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">🗑 Temizle</button>
-      <button onclick="document.getElementById('error-panel').style.display='none'" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">✕ Kapat</button>
+      <button onclick="clearErrorLog()" style="background:#ff4444; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:600; margin-right:10px;">🗑 Temizle</button><button onclick="refreshErrorLog()" style="background:#4e9a2a; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:600; margin-right:10px;">↻ Yenile</button><button onclick="document.getElementById('error-panel').style.display='none'" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">✕ Kapat</button>
     </div>
   </div>
   <div id="error-list" style="white-space:pre-wrap; word-break:break-all;"></div>
