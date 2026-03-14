@@ -676,19 +676,39 @@ document.addEventListener('keydown', e => {
 
 // ── INIT ─────────────────────────────────────
 window.addEventListener('load', async () => {
-  try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
+  try { 
+    await openDB(); 
+    console.log('✅ IndexedDB açıldı');
+  } catch (e) { 
+    console.error('❌ DB hatası:', e.message);
+    const el = document.getElementById('dash-body');
+    if(el) el.innerHTML = `<div class="empty" style="padding:20px">❌ Veritabanı açılamadı: ${e.message}</div>`;
+    return;
+  }
 
+  // Tarih alanlarını doldur
   const t = new Date().toISOString().split('T')[0];
-  ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { const el = g(id); if (el) el.value = t; });
+  ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { 
+    const el = g(id); 
+    if (el) el.value = t; 
+  });
 
-  await loadHekimler();  // DB'den + fallback
-  await loadIrkDropdown();
+  try {
+    await loadHekimler();  // DB'den + fallback
+    await loadIrkDropdown();
+  } catch (e) {
+    console.warn('loadHekimler/irk hatası:', e);
+  }
 
-  try { await renderFromLocal(); } catch (e) {
-    console.warn('render err:', e);
+  try { 
+    await renderFromLocal(); 
+    console.log('✅ renderFromLocal tamamlandı');
+  } catch (e) {
+    console.error('❌ render hatası:', e);
     const el = g('dash-body');
     if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: ${e.message}<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
   }
+  
   updateSyncBar();
 
   if (navigator.onLine) {
