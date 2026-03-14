@@ -218,11 +218,19 @@ let _pulling = false;
 
 // Sadece belirtilen tabloları Supabase'den çek
 async function pullTables(tables = []) {
-  if (!tables.length || _pulling) return;
+  console.log('📡 pullTables çağrıldı, tablolar:', tables);
+  if (!tables.length || _pulling) {
+    console.log('⏭️ pullTables atlandı:', !tables.length ? 'tablo yok' : 'zaten çalışıyor');
+    return;
+  }
   _pulling = true;
   try {
+    console.log('🚀 pullTables başlıyor...');
     const FETCHERS = {
-      hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
+      hayvanlar:    () => {
+        console.log('🔄 hayvanlar çekiliyor...');
+        return db.from('hayvan_durum_view').select('*');
+      },
       gorev_log:    () => db.from('gorev_log').select('*').eq('tamamlandi', false),
       stok:         () => db.from('stok').select('*'),
       stok_hareket: () => db.from('stok_hareket').select('*').eq('iptal', false),
@@ -237,9 +245,28 @@ async function pullTables(tables = []) {
       tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
+    console.log('📥 Veriler çekiliyor...');
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
+    
+    // Hata kontrolü
+    results.forEach((r, i) => {
+      if (r.error) {
+        console.error(`❌ ${uniq[i]} çekilemedi:`, r.error);
+        logError(`${uniq[i]} çekilemedi: ${r.error.message}`, 'pullTables');
+      } else {
+        console.log(`✅ ${uniq[i]}: ${r.data?.length || 0} kayıt`);
+      }
+    });
+    
+    console.log('💾 IndexedDB\'ye yazılıyor...');
     await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
-    if (uniq.includes('tohumlanabilir_hayvanlar')) window._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
+    
+    if (uniq.includes('tohumlanabilir_hayvanlar')) {
+      window._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
+      console.log(`✅ tohumlanabilir_hayvanlar: ${window._TH.length} kayıt`);
+    }
+    
+    console.log('✅ pullTables tamamlandı');
   } finally {
     _pulling = false;
   }
