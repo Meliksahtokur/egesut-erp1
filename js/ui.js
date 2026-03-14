@@ -215,6 +215,7 @@ async function loadAnimals(){
     _hastaIds=new Set(hastaLogs.map(d=>d.hayvan_id));
     _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     window._appState=window._appState||{}; window._appState.hayvanlar=_A;
+    if(typeof setState==='function') setState('animals',_A);
     renderAnimals(_A);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
