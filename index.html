@@ -942,6 +942,66 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- FORCE DEBUG -->
+<script>
+// Tüm hataları yakala ve alert ile göster
+window.onerror = function(msg, src, line, col, error) {
+  const errorMsg = "❌ HATA: " + msg + "\\nDosya: " + src + "\\nSatır: " + line;
+  console.error(errorMsg);
+  alert(errorMsg);
+  return false;
+};
+
+window.addEventListener('unhandledrejection', function(e) {
+  const errorMsg = "❌ PROMISE HATASI: " + (e.reason?.message || 'Bilinmeyen hata');
+  console.error(errorMsg);
+  alert(errorMsg);
+});
+
+// Veri akışını kontrol et
+setTimeout(async function() {
+  console.log("🔍 DEBUG: Veri akışı kontrol ediliyor...");
+  
+  try {
+    // 1. Supabase bağlantısını kontrol et
+    console.log("1️⃣ Supabase bağlantısı kontrol ediliyor...");
+    const { data, error } = await db.from('hayvan_durum_view').select('count').limit(1);
+    if (error) {
+      console.error("❌ Supabase bağlantı hatası:", error);
+      alert("Supabase bağlantı hatası: " + error.message);
+    } else {
+      console.log("✅ Supabase bağlantısı başarılı");
+    }
+  } catch (e) {
+    console.error("❌ Supabase bağlantı hatası:", e);
+    alert("Supabase bağlantı hatası: " + e.message);
+  }
+  
+  try {
+    // 2. IndexedDB'yi kontrol et
+    console.log("2️⃣ IndexedDB kontrol ediliyor...");
+    await openDB();
+    console.log("✅ IndexedDB başarıyla açıldı");
+    
+    // 3. pullTables'ı dene
+    console.log("3️⃣ pullTables çağrılıyor...");
+    await pullTables(['hayvanlar']);
+    console.log("✅ pullTables tamamlandı");
+    
+    // 4. loadAnimals'ı dene
+    console.log("4️⃣ loadAnimals çağrılıyor...");
+    await loadAnimals();
+    console.log("✅ loadAnimals tamamlandı");
+    
+    console.log("🎉 Tüm kontroller başarılı!");
+    alert("✅ Tüm sistemler çalışıyor!");
+  } catch (e) {
+    console.error("❌ İşlem hatası:", e);
+    alert("İşlem hatası: " + e.message);
+  }
+}, 2000);
+</script>
     <!-- EgeSüt JS modülleri -->
     <script src="js/config.js"></script>
     <script src="js/state.js"></script>
