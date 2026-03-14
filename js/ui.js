@@ -936,7 +936,7 @@ async function loadGecmis(f,btn){
       const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
       const hkName=hk?` · ${hk.ad}`:'';
       const hayvanKey=data.hayvan_id||data.anne_id;
-      const hayvanKey=data.hayvan_id||data.anne_id;
+      const hKey2=data.hayvan_id||data.anne_id;
       const hayvanObj=getState('animals').find(a=>hayvan.id===hayvanKey||hayvan.kupe_no===hayvanKey);
       const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;
       const hayvanVarMi=hayvanKey&&hayvanObj;
