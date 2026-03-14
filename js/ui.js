@@ -221,17 +221,38 @@ async function doneTask(id,hid,stokId,miktar,padok,btn){
 async function loadAnimals(){
   const el=document.getElementById('suru-body');
   try {
-    getState('animals')=await getData('hayvanlar',a=>a.durum==='Aktif');
-    setState('animals', getState('animals')); // getState('animals')'yı state'e de ata
-    const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
-    getState('gebeIds')=[...new Set([...gebeTohs.map(t=>t.hayvan_id),...animals.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
-    const hastaLogs=await getData('cases',c=>c.status==='active');
-    getState('hastaIds')=new Set(hastaLogs.map(d=>d.hayvan_id));
-    getState('animals').sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
-    // state zaten güncellendi, renderAnimals'da state.animals kullanılacak
-    window._appState=window._appState||{}; window._appState.hayvanlar=getState('animals');
-    renderAnimals(getState('animals'));
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
+    // Hayvanları çek
+    const animalsData = await getData('hayvanlar', a => a.durum === 'Aktif');
+    setState('animals', animalsData);
+    
+    // Gebe ID'lerini hesapla
+    const gebeTohs = await getData('tohumlama', t => t.sonuc === 'Gebe');
+    const gebeIds = [...new Set([
+      ...gebeTohs.map(t => t.hayvan_id),
+      ...animalsData.filter(a => a.durum === 'Gebe').map(a => a.id)
+    ])];
+    setState('gebeIds', gebeIds);
+    
+    // Hasta ID'lerini hesapla (aktif vakalar)
+    const hastaLogs = await getData('cases', c => c.status === 'active');
+    const hastaIds = new Set(hastaLogs.map(d => d.hayvan_id));
+    setState('hastaIds', Array.from(hastaIds));
+    
+    // Sırala
+    const sorted = [...animalsData].sort((a,b) => 
+      (a.kupe_no || a.id || '').localeCompare(b.kupe_no || b.id || '')
+    );
+    setState('animals', sorted);
+    
+    // Eski uyumluluk için window._appState
+    window._appState = window._appState || {};
+    window._appState.hayvanlar = sorted;
+    
+    renderAnimals(sorted);
+  } catch(e){ 
+    if(el) el.innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+    console.error('loadAnimals hatası:', e);
+  }
 }
 function renderAnimals(list){
   const el=document.getElementById('suru-body');
