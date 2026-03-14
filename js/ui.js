@@ -257,8 +257,10 @@ async function loadAnimals(){
     
     renderAnimals(sorted);
   } catch(e){ 
-    if(el) el.innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
     console.error('loadAnimals hatası:', e);
+    if(el) {
+      el.innerHTML = `<div class="empty">⚠️ Yükleme hatası: ${e.message}</div>`;
+    }
   }
 }
 function renderAnimals(list){
