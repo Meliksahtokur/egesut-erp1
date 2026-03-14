@@ -970,15 +970,87 @@ button,input,select,textarea{font-family:inherit}
 
 <div id="err-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0321a;color:#fff;font-size:.72rem;padding:8px 12px;z-index:9999;word-break:break-all" onclick="this.style.display='none'"></div>
 <script>
-window.onerror=function(msg,src,line){
-  const b=document.getElementById('err-bar');
-  if(b){b.textContent='❌ '+msg+' ('+src?.split('/').pop()+':'+line+')';b.style.display='block';}
+// Hata listesi
+window.errorLog = [];
+
+function addError(msg, src, line, stack) {
+  const timestamp = new Date().toLocaleTimeString();
+  const errorObj = {
+    timestamp,
+    message: msg,
+    source: src,
+    line: line,
+    stack: stack
+  };
+  
+  window.errorLog.push(errorObj);
+  
+  // Console'a da yaz
+  console.error(`[${timestamp}]`, msg, src, line);
+  
+  // Hata panelini güncelle
+  updateErrorPanel();
+  
+  // Err-bar'ı da güncelle (son hata)
+  const b = document.getElementById('err-bar');
+  if(b) {
+    b.textContent = `❌ [${timestamp}] ${msg}`;
+    b.style.display = 'block';
+  }
+}
+
+function updateErrorPanel() {
+  const list = document.getElementById('error-list');
+  if(!list) return;
+  
+  list.innerHTML = window.errorLog.map(e => `
+    <div style="border-bottom:1px solid #333; padding:10px; margin-bottom:5px;">
+      <div style="color:#ff8888; font-weight:bold;">🕐 ${e.timestamp}</div>
+      <div style="color:#ffaa00; margin-top:5px;">📌 ${e.message}</div>
+      ${e.source ? `<div style="color:#88ff88; margin-top:3px; font-size:11px;">📍 ${e.source}${e.line ? ':'+e.line : ''}</div>` : ''}
+      ${e.stack ? `<div style="color:#aaa; margin-top:5px; font-size:11px; white-space:pre-wrap;">🔍 ${e.stack}</div>` : ''}
+    </div>
+  `).join('');
+  
+  // Otomatik scroll en alta
+  list.scrollTop = list.scrollHeight;
+}
+
+function copyErrors() {
+  const text = window.errorLog.map(e => 
+    `[${e.timestamp}] ${e.message}\n${e.source ? '  at ' + e.source + (e.line ? ':' + e.line : '') : ''}\n${e.stack ? '  ' + e.stack : ''}`
+  ).join('\n---\n');
+  
+  navigator.clipboard.writeText(text).then(() => {
+    alert('✅ Hatalar panoya kopyalandı!');
+  }).catch(() => {
+    alert('❌ Kopyalama başarısız');
+  });
+}
+
+function clearErrors() {
+  window.errorLog = [];
+  updateErrorPanel();
+  const b = document.getElementById('err-bar');
+  if(b) b.style.display = 'none';
+}
+
+// Global hata yakalama
+window.onerror = function(msg, src, line, col, error) {
+  addError(msg, src, line, error?.stack);
   return false;
 };
-window.addEventListener('unhandledrejection',function(e){
-  const b=document.getElementById('err-bar');
-  if(b){b.textContent='❌ '+e.reason?.message;b.style.display='block';}
+
+window.addEventListener('unhandledrejection', function(e) {
+  addError(e.reason?.message || 'Promise rejection', e.reason?.stack);
 });
+
+// Console hatalarını da yakala (opsiyonel)
+const originalConsoleError = console.error;
+console.error = function(...args) {
+  addError(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
+  originalConsoleError.apply(console, args);
+};
 </script>
 </body>
 </html>
