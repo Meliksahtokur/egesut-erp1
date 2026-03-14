@@ -252,6 +252,7 @@ button,input,select,textarea{font-family:inherit}
     <div id="dot"></div>
     <button id="refbtn" onclick="this.classList.add('spinning');refreshAll().finally(()=>this.classList.remove('spinning'))">↻</button>
     <button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
+    <button id="errorbtn" onclick="document.getElementById('error-panel').style.display='block'" style="background:rgba(255,68,68,.2);border:1px solid #ff4444;color:#ff8888;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">🐞 Hata</button>
   </div>
 </div>
 
