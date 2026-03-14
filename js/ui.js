@@ -146,7 +146,6 @@ async function loadTasks(f,btn){
       return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id));
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 function renderTask(t,cls='',subs=[]){
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
