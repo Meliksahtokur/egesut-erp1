@@ -209,14 +209,14 @@ async function loadAnimals(){
   const el=document.getElementById('suru-body');
   try {
     _A=await getData('hayvanlar',a=>a.durum==='Aktif');
+    if(typeof setState==='function') setState('animals',_A);
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
-    _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),...getState('animals').filter(a=>a.durum==='Gebe').map(a=>a.id)])];
+    _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
     const hastaLogs=await getData('cases',c=>c.status==='active');
     _hastaIds=new Set(hastaLogs.map(d=>d.hayvan_id));
-    getState('animals').sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
-    window._appState=window._appState||{}; window._appState.hayvanlar=getState('animals');
-    if(typeof setState==='function') setState('animals',getState('animals'));
-    renderAnimals(getState('animals'));
+    _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
+    window._appState=window._appState||{}; window._appState.hayvanlar=_A;
+    renderAnimals(_A);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 function renderAnimals(list){
