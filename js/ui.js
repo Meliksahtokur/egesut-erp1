@@ -125,7 +125,7 @@ async function loadTasks(f,btn){
       el.innerHTML=done.slice(0,150).map(t=>`<div class="task-card" style="border-left-color:var(--ink3);opacity:.65">
         <div class="tc-header"><div class="tc-main">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span class="tc-id">${(()=>{const h=animals.find(a=>hayvan.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'GENEL');})()} </span>
+            <span class="tc-id">${(()=>{const h=animals.find(x=>x.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'GENEL');})()} </span>
             <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           </div>
           <div class="tc-desc">${t.aciklama||''}</div>
@@ -163,7 +163,7 @@ function renderTask(t,cls='',subs=[]){
       <div class="tc-main">
         const animals = getState('animals');
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-          <span class="tc-id">${(()=>{const h=animals.find(a=>hayvan.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
+          <span class="tc-id">${(()=>{const h=animals.find(x=>x.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
         <div class="tc-desc">${t.aciklama||''}</div>
@@ -379,7 +379,7 @@ async function openDet(id){
   showTab('ozet',document.querySelector('.tab'));
   try {
     const animals = getState('animals');
-    const hayvan = animals.find(a => hayvan.id === id || hayvan.kupe_no === id || hayvan.devlet_kupe === id);
+    const hayvan = animals.find(a => a.id === id || a.kupe_no === id || a.devlet_kupe === id);
     const [diseases,tohs,tasks,births,subs,yavrular,activeCases]=await Promise.all([
       getData('hayvanlar',a=>hayvan.id===id||hayvan.kupe_no===id||hayvan.devlet_kupe===id),
       getData('cases',c=>c.animal_id===id),
@@ -390,7 +390,7 @@ async function openDet(id){
       getData('hayvanlar',a=>hayvan.anne_id===id),
       getData('cases',c=>c.animal_id===id&&c.status==='active'),
     ]);
-    const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
+    const foundAnimal=aArr[0]; if(!foundAnimal){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
     const yasRaw=hayvan.dogum_tarihi?Math.floor((Date.now()-new Date(hayvan.dogum_tarihi))/86400000):null;
