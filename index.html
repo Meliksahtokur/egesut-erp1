@@ -1037,14 +1037,44 @@ function clearErrors() {
 }
 
 // Global hata yakalama
+// Basit hata loglama
+window.errorLog = [];
+
+function logError(msg, src, line, stack) {
+  const error = {
+    time: new Date().toISOString(),
+    msg: msg,
+    src: src,
+    line: line,
+    stack: stack
+  };
+  window.errorLog.push(error);
+  localStorage.setItem('errorLog', JSON.stringify(window.errorLog));
+  console.error('❌', msg, src, line);
+  
+  // Sayfada göster
+  const el = document.getElementById('simple-error');
+  if(el) {
+    el.innerHTML = `❌ ${msg} ${src ? 'at ' + src : ''}${line ? ':' + line : ''}`;
+    el.style.display = 'block';
+  }
+}
+
 window.onerror = function(msg, src, line, col, error) {
-  addError(msg, src, line, error?.stack);
+  logError(msg, src, line, error?.stack);
   return false;
 };
 
 window.addEventListener('unhandledrejection', function(e) {
-  addError(e.reason?.message || 'Promise rejection', e.reason?.stack);
+  logError(e.reason?.message || 'Promise rejection', null, null, e.reason?.stack);
 });
+
+// console.error'ü de yakala
+const origError = console.error;
+console.error = function(...args) {
+  logError(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
+  origError.apply(console, args);
+};
 
 // Console hatalarını da yakala (opsiyonel)
 const originalConsoleError = console.error;
