@@ -5,7 +5,7 @@
 
 // ── SABİT VERİLER ──────────────────────────
 // HEKIMLER config.js'den geliyor (const), burada tanımlanmaz
-const VARSAYILAN_HEKIM = 'H1';
+// VARSAYILAN_HEKIM config.js'den geliyor
 
 // DB'den hekimleri yükle
 async function loadHekimler() {
