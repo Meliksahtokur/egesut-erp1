@@ -125,7 +125,7 @@ async function removeFromQueue(qid) {
 async function dbUpdate(table, id, changes) {
   const clean = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== null && v !== undefined && v !== ''));
   const { error } = await db.from(table).update(clean).eq('id', id);
-  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
+  if (error) throw new Error("[dbUpdate:" + table + "] " + error.message);
 }
 
 async function dbInsert(table, rows) {
@@ -133,7 +133,7 @@ async function dbInsert(table, rows) {
   arr.forEach(r => { if (!r.id) r.id = crypto.randomUUID(); });
   const clean = arr.map(r => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null && v !== undefined && v !== '')));
   const { error } = await db.from(table).insert(clean);
-  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
+  if (error) throw new Error("[dbInsert:" + table + "] " + error.message);
   return arr;
 }
 
