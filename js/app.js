@@ -388,9 +388,9 @@ async function spermaModStok() {
   if (!sel) return;
 
   // _S henüz yüklenmediyse yükle
-  if (!_S || !_S.length) await loadStock();
+  if (!getState('stock') || !getState('stock').length) await loadStock();
 
-  const stoklar = (window._appState?.stok || _S || []).filter(s => s.kategori === 'Sperma' && (s.guncel ?? s.miktar ?? 0) > 0);
+  const stoklar = (getState('stock') || []).filter(s => s.kategori === 'Sperma' && (s.guncel ?? s.miktar ?? 0) > 0);
 
   if (stoklar.length === 0) {
     sel.innerHTML = '<option value="">— Stokta sperma yok —</option>';
