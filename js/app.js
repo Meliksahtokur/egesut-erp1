@@ -184,18 +184,36 @@ function goTo(pg) {
 
 // ── RENDER FROM LOCAL ────────────────────────
 async function renderFromLocal() {
-  await Promise.all([loadAnimals(), loadStock()]);
-  const pg = _curPg || 'dash';
-  if (pg === 'dash')     await Promise.all([loadDash(), loadStokList()]);
-  if (pg === 'tasks')    await loadTasks(_curTaskFilter || 'today');
-  if (pg === 'gecmis')   await loadGecmis(_curGecmisFilter || 'hepsi');
-  if (pg === 'log')      await Promise.all([loadBirths(), loadStokList()]);
-  if (pg === 'ureme')    loadUreme(_curUremeTab || 'kizginlik');
-  if (pg === 'bildirim') loadBildirimler(_curBildirimTab || 'bekliyor');
-  if (pg === 'raporlar') loadRaporlar();
-  if (pg !== 'dash')     loadDash();
-  checkSpermaUyari();
-  updateBildirimBadge();
+  try {
+    await Promise.all([loadAnimals(), loadStock()]);
+    const pg = _curPg || 'dash';
+    
+    if (pg === 'dash') {
+      await Promise.all([loadDash(), loadStokList()]);
+    } else if (pg === 'tasks') {
+      await loadTasks(_curTaskFilter || 'today');
+    } else if (pg === 'gecmis') {
+      await loadGecmis(_curGecmisFilter || 'hepsi');
+    } else if (pg === 'log') {
+      await Promise.all([loadBirths(), loadStokList()]);
+    } else if (pg === 'ureme') {
+      await loadUreme(_curUremeTab || 'kizginlik');
+    } else if (pg === 'bildirim') {
+      await loadBildirimler(_curBildirimTab || 'bekliyor');
+    } else if (pg === 'raporlar') {
+      await loadRaporlar();
+    }
+    
+    if (pg !== 'dash') {
+      await loadDash();
+    }
+    
+    checkSpermaUyari();
+    updateBildirimBadge();
+  } catch (e) {
+    console.error('renderFromLocal hatası:', e);
+    throw e;
+  }
 }
 
 function updateBildirimBadge() { /* Sprint 3 — bildirim modülü */ }
