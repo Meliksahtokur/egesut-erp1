@@ -271,15 +271,38 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 // ── PULL FROM SUPABASE ──────────────────────
 async function pullFromSupabase() {
   try {
-    await pullTables([
+    console.log('📡 Supabase\'den veri çekiliyor...');
+    const tables = [
       'hayvanlar','gorev_log','stok','stok_hareket',
       'tohumlama','dogum','bildirim_log','islem_log',
       'cases','diseases','drugs',
-    ]);
+    ];
+    
+    for (const table of tables) {
+      console.log(`⏳ ${table} çekiliyor...`);
+    }
+    
+    await pullTables(tables);
+    
+    console.log('✅ Veriler başarıyla çekildi');
     document.getElementById('dot')?.classList.remove('off', 'warn');
   } catch(e) {
-    console.warn('pull failed:', e.message);
+    console.error('❌ pullFromSupabase hatası:', e);
+    addError('pullFromSupabase: ' + e.message, 'api.js', null, e.stack);
     document.getElementById('dot')?.classList.add('off');
+  }
+}
+
+async function getData(table, filterFn) {
+  try {
+    console.log(`🔍 getData: ${table} çağrılıyor...`);
+    const data = await idbGetAll(table);
+    console.log(`✅ getData: ${table} → ${data.length} kayıt bulundu`);
+    return filterFn ? data.filter(filterFn) : data;
+  } catch(e) {
+    console.error(`❌ getData hatası (${table}):`, e);
+    addError(`getData(${table}): ${e.message}`, 'api.js', null, e.stack);
+    return [];
   }
 }
 
