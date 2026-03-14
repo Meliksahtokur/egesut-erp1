@@ -27,6 +27,8 @@ async function rpc(name, params = {}) {
 
 // ── INDEXEDDB ───────────────────────────────
 let _idb;
+let _dbReady = false;
+let _dbPromise = null;
 
 async function clearAndReloadIDB() {
   return new Promise((res, rej) => {
@@ -44,12 +46,15 @@ async function openDB() {
       TABLES.forEach(t => { if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: 'id' }); });
       if (!d.objectStoreNames.contains('_queue')) d.createObjectStore('_queue', { keyPath: '_qid', autoIncrement: true });
     };
-    req.onsuccess = e => { _idb = e.target.result; res(_idb); };
+    req.onsuccess = e => { _idb = e.target.result; _dbReady = true; res(_idb); };
     req.onerror   = e => rej(e.target.error);
   });
 }
 
 async function idbGetAll(store) {
+  if (!_dbReady || !_idb) {
+    await openDB();
+  }
   return new Promise((res, rej) => {
     const tx = _idb.transaction(store, 'readonly');
     const req = tx.objectStore(store).getAll();
@@ -366,7 +371,3 @@ async function syncNow() {
 // Her 5sn offline queue'yu otomatik gönderir
 setInterval(syncNow, 5000);
 window.addEventListener('online', syncNow);
-async function getData(table, filterFn) {
-  const data = await idbGetAll(table);
-  return filterFn ? data.filter(filterFn) : data;
-}

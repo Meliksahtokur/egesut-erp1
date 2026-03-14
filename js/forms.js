@@ -337,7 +337,8 @@ async function submitCikis(btn) {
   if (tip === 'olum' && !sebep) { toast('Ölüm sebebi girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    const hayvan = getState('animals').find(a => a.id === hayvanId);
+    const animals = getState('animals') || [];
+  const hayvan = animals.find(a => a.id === hayvanId);
     if (!hayvan) { toast('Hayvan bulunamadı', true); return; } // getState('animals') henüz değişmedi ama forms.js'de tanımlı değil? Bu satırı da getState ile değiştirelim.
 
     await rpc('cikis_yap', {
