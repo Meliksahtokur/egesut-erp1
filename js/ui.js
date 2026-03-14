@@ -219,10 +219,17 @@ async function doneTask(id,hid,stokId,miktar,padok,btn){
 // SÜRÜ
 // ──────────────────────────────────────────
 async function loadAnimals(){
+  console.log('🔄 loadAnimals başladı');
   const el=document.getElementById('suru-body');
   try {
-    // Hayvanları çek
+    console.log('📥 getData(\'hayvanlar\') çağrılıyor...');
     const animalsData = await getData('hayvanlar', a => a.durum === 'Aktif');
+    console.log(`✅ ${animalsData.length} hayvan bulundu`);
+    
+    if (animalsData.length === 0) {
+      console.warn('⚠️ Hiç hayvan bulunamadı!');
+    }
+    
     setState('animals', animalsData);
     
     // Gebe ID'lerini hesapla
