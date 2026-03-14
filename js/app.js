@@ -8,13 +8,15 @@
 // ══════════════════════════════════════════
 
 // ── SABİT VERİLER ──────────────────────────
-// HEKIMLER artık DB'den geliyor (migration 009)
-// Fallback: DB erişilemezse bu liste kullanılır
-let HEKIMLER = [
-  { id: 'H1', ad: 'Melik Tokur' },
-  { id: 'H2', ad: 'Hüseyin Aygün' },
-  { id: 'H3', ad: 'Süleyman Kocabaş' },
-];
+// HEKIMLER artık config.js'den geliyor
+// Eğer config.js yüklenmemişse fallback
+if (typeof window.HEKIMLER === 'undefined') {
+  window.HEKIMLER = [
+    { id: 'H1', ad: 'Melik Tokur' },
+    { id: 'H2', ad: 'Hüseyin Aygün' },
+    { id: 'H3', ad: 'Süleyman Kocabaş' },
+  ];
+}
 const VARSAYILAN_HEKIM = 'H1';
 
 // DB'den hekimleri yükle
