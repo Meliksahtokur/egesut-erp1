@@ -1063,7 +1063,7 @@ async function loadRaporlar(){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const animals = getState('animals');
-    const [animals,tohs,diseases,births,moves,stock]=await Promise.all([
+    const [animalsData2,tohs,diseases,births,moves,stock]=await Promise.all([
       idbGetAll('hayvanlar'),
       idbGetAll('tohumlama'),
       idbGetAll('cases'),
