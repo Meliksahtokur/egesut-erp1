@@ -935,13 +935,7 @@ async function loadGecmis(f,btn){
       const d=fmtTarih(date);
       const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
       const hkName=hk?` · ${hk.ad}`:'';
-      const hayvanKey=data.hayvan_id||data.anne_id;
-      const hKey2=data.hayvan_id||data.anne_id;
-      const hayvanObj=getState('animals').find(a=>hayvan.id===hayvanKey||hayvan.kupe_no===hayvanKey);
-      const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;
-      const hayvanVarMi=hayvanKey&&hayvanObj;
-      let oc='';
-      if(type==='hastalik') oc=''; // eski hastalik_log — tıklanamaz
+      const hayvanKey=data.hayvan_id||data.anne_id;      const hayvanObj=getState('animals').find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);      const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;      if(type==='hastalik') oc=''; // eski hastalik_log — tıklanamaz
       else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
       else if(type==='dogum'&&hayvanVarMi) oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
       const ISLEM_ICO={'HAYVAN_EKLENDI':'🐮','ABORT_KAYDI':'⚠️','KIZGINLIK_KAYDI':'🔴'};
