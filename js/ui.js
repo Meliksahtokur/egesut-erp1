@@ -1409,9 +1409,10 @@ async function caseKapat() {
   try {
     await rpc('close_case', { p_case_id: _curCase.id });
     toast('✅ Vaka kapatıldı');
-    await pullTables(['cases']);
-    await renderFromLocal();
+    const _closedAnimalId = _curCase.animal_id;
+    await pullTables(['cases','diseases']);
     closeM('m-case-det');
+    if(_closedAnimalId) openDet(_closedAnimalId);
   } catch(e) { toast(e.message, true); }
 }
 
