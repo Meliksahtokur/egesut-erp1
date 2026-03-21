@@ -1385,15 +1385,7 @@ async function loadDrugsCache() {
       const guncel = (+s.baslangic_miktar || 0) - used;
       return { ...d, guncel, birim: s.birim || d.default_unit || '' };
     });
-    // stokta var ama drugs'ta bağlı değil olanları da ekle (stok_item_id yoksa)
-    const baglıStokIds = new Set(drugs.map(d => d.stock_item_id).filter(Boolean));
-    const ilacKatlar = ['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
-    stok.filter(s => ilacKatlar.includes(s.kategori) && !baglıStokIds.has(s.id)).forEach(s => {
-      const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
-      const guncel = (+s.baslangic_miktar || 0) - used;
-      _drugsCache.push({ id: '_stok_' + s.id, name: s.urun_adi, stock_item_id: s.id, guncel, birim: s.birim || '', default_unit: s.birim || '', default_route: null, _stokOnly: true });
-    });
-    _drugsCache.sort((a, b) => (b.guncel || 0) - (a.guncel || 0));
+    _drugsCache.sort((a, b) => (b.guncel !== null ? b.guncel : -1) - (a.guncel !== null ? a.guncel : -1));
   }
   return _drugsCache;
 }
