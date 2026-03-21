@@ -1232,6 +1232,7 @@ async function renderCasesForAnimal(animalId) {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   if (!animalCases.length) return '<div class="empty"><div class="empty-ico">✅</div>Aktif vaka yok</div>';
   const allDiseases = await idbGetAll('diseases');
+  console.log('DEBUG diseases:', allDiseases.length, allDiseases[0]?.id, 'case disease_id:', animalCases[0]?.disease_id);
   return animalCases.map(c => {
     const dis = allDiseases.find(d => d.id === c.disease_id);
     const isActive = c.status === 'active';
