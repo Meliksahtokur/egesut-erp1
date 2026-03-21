@@ -792,8 +792,8 @@ async function submitStokAdd(btn) {
     closeM('m-stok-add');
     ['sa-ad','sa-mik','sa-esik'].forEach(id=>{const e=g(id);if(e)e.value=''});
     await loadStock();
-    if(document.getElementById('stok-panel').style.transform==='translateX(0px)') loadStokPanel();
-    else loadStokList();
+    const _sp = document.getElementById('stok-panel');
+    if(_sp && _sp.style.transform !== 'translateX(100%)') await loadStokPanel();
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Ekle'; } }
 }
