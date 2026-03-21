@@ -331,6 +331,7 @@ async function openDet(id){
   document.getElementById('det-name').textContent='Yükleniyor…';
   ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   showTab('ozet',document.querySelector('.tab'));
+  await pullTables(['cases','diseases','drugs']);
   try {
     const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
