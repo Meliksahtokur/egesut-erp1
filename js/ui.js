@@ -870,7 +870,13 @@ async function loadGecmis(f,btn){
     const entries=[];
     if(f==='hepsi'||f==='dogum')  (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,data:r}));
     if(f==='hepsi'||f==='tohumlama') (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
-    if(f==='hepsi'||f==='hastalik') (await idbGetAll('cases')).forEach(r=>entries.push({type:'hastalik',date:r.start_date,data:r}));
+    if(f==='hepsi'||f==='hastalik') {
+      const _dis = await idbGetAll('diseases');
+      (await idbGetAll('cases')).forEach(r=>{
+        const _d = _dis.find(d=>d.id===r.disease_id);
+        entries.push({type:'hastalik',date:r.start_date,data:{...r,disease_name:_d?.name||'?',tani:_d?.name||'?'}});
+      });
+    }
     if(f==='hepsi'||f==='gorev') (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>entries.push({type:'gorev',date:r.tamamlanma_tarihi||r.hedef_tarih,data:r}));
     if(f==='hepsi'||f==='hayvan'){
       const islemTipler=['HAYVAN_EKLENDI','ABORT_KAYDI','KIZGINLIK_KAYDI'];
