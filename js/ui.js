@@ -896,9 +896,9 @@ async function loadGecmis(f,btn){
       const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;
       const hayvanVarMi=hayvanKey&&hayvanObj;
       let oc='';
-      if(type==='hastalik') oc=''; // eski hastalik_log — tıklanamaz
+      if(type==='hastalik') oc=`onclick="openCaseDet('${data.id}')" style="cursor:pointer"`;
       else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
-      else if(type==='dogum'&&hayvanVarMi) oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
+      else if(type==='dogum') oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
       const ISLEM_ICO={'HAYVAN_EKLENDI':'🐮','ABORT_KAYDI':'⚠️','KIZGINLIK_KAYDI':'🔴'};
       const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',islem:ISLEM_ICO[data.tip]||'📋'}[type];
       const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)'}[type];
