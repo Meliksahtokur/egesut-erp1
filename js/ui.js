@@ -1017,9 +1017,17 @@ async function loadStokPanel(){
             <div style="height:100%;width:${pct}%;background:${barClr};border-radius:2px"></div>
           </div>
           <div style="display:flex;gap:6px;margin-top:8px">
-            <button onclick="openStk('${s.id}')" style="flex:1;padding:6px;background:var(--green);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">+ Stok Ekle</button>
+            <button onclick="openStk('${s.id}')" style="flex:1;padding:6px;background:var(--green);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">+ Miktar Ekle</button>
             <button onclick="stokHareketGor('${s.id}')" style="flex:1;padding:6px;background:var(--card2);color:var(--ink3);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">Hareketler</button>
           </div>
+          ${['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'].includes(s.kategori)?`
+          <div style="margin-top:6px;display:flex;align-items:center;gap:6px">
+            <select onchange="stokDrugBagla('${s.id}',this)" style="flex:1;font-size:.72rem;padding:5px 8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink)">
+              <option value="">🔗 Tedavi ilaç adı seç…</option>
+              ${(_drugsCache||[]).filter(d=>!d._stokOnly).map(d=>`<option value="${d.id}" ${d.stock_item_id===s.id?'selected':''} style="${d.stock_item_id===s.id?'color:var(--green);font-weight:700':''}">${d.name}</option>`).join('')}
+            </select>
+            ${(_drugsCache||[]).find(d=>d.stock_item_id===s.id)?`<span style="color:var(--green);font-size:.7rem;font-weight:700;flex-shrink:0">✅ Bağlı</span>`:`<span style="color:var(--ink3);font-size:.7rem;flex-shrink:0">Bağlı değil</span>`}
+          </div>`:''}
         </div>`;
       }).join('');
     });
