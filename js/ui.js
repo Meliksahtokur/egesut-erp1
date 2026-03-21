@@ -1325,6 +1325,8 @@ async function caseGunEkle() {
   try {
     await rpc('add_treatment_day', { p_case_id: _curCase.id });
     toast('✅ Tedavi günü eklendi');
+    _drugsCache = [];
+    await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
   } catch(e) { toast(e.message, true); }
 }
