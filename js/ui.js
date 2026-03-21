@@ -1582,25 +1582,11 @@ async function caseDrugKaydet(btn) {
   if (!dose || dose<=0){ toast('Geçerli doz girin', true); return; }
   if (!unit)           { toast('Birim girin', true); return; }
   if (!_activeDayId)   return;
-  // stokOnly ilaç ise önce drugs tablosuna ekle + bağla
-  let realDrugId = drugId;
-  if (drugId.startsWith('_stok_')) {
-    const stokId = drugId.replace('_stok_', '');
-    const d = (_drugsCache||[]).find(x => x.id === drugId);
-    const { data: nd } = await db.from('drugs').insert([{
-      name: d?.name || 'İlaç',
-      stock_item_id: stokId,
-      default_unit: unit,
-      default_route: (route||'').split(' ')[0] || null,
-    }]).select('id').single();
-    if (nd?.id) { realDrugId = nd.id; _drugsCache = []; }
-    else { toast('İlaç kaydedilemedi', true); return; }
-  }
   btn.disabled = true; btn.textContent = 'Kaydediliyor…';
   try {
     await rpc('add_drug_administration', {
       p_day_id:  _activeDayId,
-      p_drug_id: realDrugId,
+      p_drug_id: drugId,
       p_dose:    dose,
       p_unit:    unit,
       p_route:   (route||'').split(' ')[0] || null,
