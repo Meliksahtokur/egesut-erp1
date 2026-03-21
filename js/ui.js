@@ -946,6 +946,20 @@ function openStk(id){
   g('se-mik').value=''; g('se-not').value='';
   openM('m-stk');
 }
+async function stokDrugBagla(stokId, sel) {
+  const drugId = sel.value || null;
+  try {
+    await rpc('link_drug_to_stock', { p_drug_id: drugId, p_stock_item_id: drugId ? stokId : null });
+    if (drugId) {
+      // diğer ilaçlardan bu stok bağlantısını kaldır
+      await db.from('drugs').update({ stock_item_id: null }).eq('stock_item_id', stokId).neq('id', drugId);
+    }
+    toast('✅ Bağlantı kaydedildi');
+    _drugsCache = [];
+    await loadDrugsCache();
+    loadStokPanel();
+  } catch(e) { toast(e.message, true); }
+}
 function openStokPanel(){
   document.getElementById('stok-panel').style.transform='translateX(0)';
   loadStokPanel();
