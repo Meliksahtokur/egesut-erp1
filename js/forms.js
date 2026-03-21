@@ -241,10 +241,14 @@ async function submitCase(btn) {
     cl('d-hid'); cl('d-case-notes');
     g('d-disease-id').value = '';
     g('d-disease-cat').style.display = 'none';
-    await pullTables(['cases']);
-    await renderFromLocal();
-    // Açılan vakayı göster
-    if (res?.case_id) { await loadDrugsCache(); openCaseDet(res.case_id); }
+    await pullTables(['cases','diseases','drugs']);
+    _drugsCache = [];
+    await loadDrugsCache();
+    // Hayvan kartını güncelle + vakayı göster
+    if (res?.case_id) {
+      await openDet(hayvan.id);
+      openCaseDet(res.case_id);
+    }
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
 }
