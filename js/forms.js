@@ -761,19 +761,39 @@ async function submitStokAdd(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   const kat = g('sa-kat')?.value || 'İlaç';
   try {
+    const stokId = crypto.randomUUID();
     await write('stok', {
-      id: crypto.randomUUID(), urun_adi: urun,
+      id: stokId, urun_adi: urun,
       birim: g('sa-birim')?.value || 'adet',
       baslangic_miktar: bslg || 0,
       esik: parseFloat(g('sa-esik')?.value||'0') || 0,
       kategori: kat,
       tur: kat,
     });
+    // İlaç kategorisinde drugs tablosuna da kayıt at
+    const ilacKatlar = ['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
+    if (ilacKatlar.includes(kat) && navigator.onLine) {
+      try {
+        await rpc('link_drug_to_stock', {
+          p_drug_id: null,
+          p_stock_item_id: null,
+        });
+      } catch(_){}
+      // drugs tablosuna ekle + bağla
+      const { data: drugData } = await db.from('drugs').insert([{
+        name: urun,
+        stock_item_id: stokId,
+        default_unit: g('sa-birim')?.value || 'ml',
+        default_route: 'IM',
+      }]).select('id').single();
+      if (drugData?.id) { _drugsCache = []; }
+    }
     toast(`✅ ${urun} stoka eklendi`);
     closeM('m-stok-add');
     ['sa-ad','sa-mik','sa-esik'].forEach(id=>{const e=g(id);if(e)e.value=''});
     await loadStock();
-    await loadStokList();
+    if(document.getElementById('stok-panel').style.transform==='translateX(0px)') loadStokPanel();
+    else loadStokList();
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Ekle'; } }
 }
