@@ -1351,7 +1351,27 @@ let _drugsCache = [];
 
 async function loadDrugsCache() {
   if (!_drugsCache.length) {
-    _drugsCache = await idbGetAll('drugs');
+    const [drugs, stok, moves] = await Promise.all([
+      idbGetAll('drugs'),
+      idbGetAll('stok'),
+      getData('stok_hareket', m => !m.iptal),
+    ]);
+    _drugsCache = drugs.map(d => {
+      const s = stok.find(x => x.id === d.stock_item_id);
+      if (!s) return { ...d, guncel: null, birim: d.default_unit || '' };
+      const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
+      const guncel = (+s.baslangic_miktar || 0) - used;
+      return { ...d, guncel, birim: s.birim || d.default_unit || '' };
+    });
+    // stokta var ama drugs'ta bağlı değil olanları da ekle (stok_item_id yoksa)
+    const baglıStokIds = new Set(drugs.map(d => d.stock_item_id).filter(Boolean));
+    const ilacKatlar = ['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
+    stok.filter(s => ilacKatlar.includes(s.kategori) && !baglıStokIds.has(s.id)).forEach(s => {
+      const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
+      const guncel = (+s.baslangic_miktar || 0) - used;
+      _drugsCache.push({ id: '_stok_' + s.id, name: s.urun_adi, stock_item_id: s.id, guncel, birim: s.birim || '', default_unit: s.birim || '', default_route: null, _stokOnly: true });
+    });
+    _drugsCache.sort((a, b) => (b.guncel || 0) - (a.guncel || 0));
   }
   return _drugsCache;
 }
@@ -1475,36 +1495,68 @@ function caseDrugFormAc(dayId) {
   document.querySelectorAll('.cd-drug-form').forEach(f => f.remove());
   const container = document.getElementById('drugs-' + dayId);
   if (!container) return;
-  const drugs = _drugsCache || [];
-  const opts = drugs.map(d => `<option value="${d.id}">${d.name}${d.default_unit?' ('+d.default_unit+')':''}</option>`).join('');
   const form = document.createElement('div');
   form.className = 'cd-drug-form';
   form.style.cssText = 'margin-top:8px;background:var(--card2);border-radius:8px;padding:8px';
   form.innerHTML = `
-    <select id="cdf-drug" class="fsel" style="margin-bottom:6px" onchange="onCdfDrugChange()">
-      <option value="">— İlaç seçin —</option>${opts}
-    </select>
+    <div style="position:relative;margin-bottom:6px">
+      <input id="cdf-drug-ac" class="fi" placeholder="İlaç adı yaz… (mar, pen, oks…)" autocomplete="off" style="margin:0"
+        oninput="cdfDrugAc(this)" onfocus="cdfDrugAc(this)">
+      <input type="hidden" id="cdf-drug">
+      <div id="cdf-drug-list" style="display:none;position:absolute;z-index:200;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>
+    </div>
+    <div id="cdf-secili" style="display:none;background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.25);border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:.78rem;color:var(--green);font-weight:700"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-      <input id="cdf-dose" class="fi" type="number" min="0.01" step="0.01" placeholder="Doz" style="margin:0">
-      <input id="cdf-unit" class="fi" placeholder="Birim" style="margin:0">
+      <input id="cdf-dose" class="fi" type="number" min="0.01" step="0.01" placeholder="Doz miktarı" style="margin:0">
+      <input id="cdf-unit" class="fi" placeholder="Birim (ml, gr…)" style="margin:0">
     </div>
     <select id="cdf-route" class="fsel" style="margin-bottom:6px">
-      <option value="">Uygulama yolu…</option>
-      <option>IM</option><option>IV</option><option>SC</option>
-      <option>PO</option><option>Topikal</option><option>Intrauterin</option>
+      <option value="">Uygulama yolu (opsiyonel)</option>
+      <option>IM — Kas içi</option><option>IV — Damar içi</option><option>SC — Deri altı</option>
+      <option>PO — Ağızdan</option><option>Topikal — Dıştan</option><option>Intrauterin — Rahim içi</option>
     </select>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       <button onclick="caseDrugKaydet(this)" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:7px;font-weight:700;cursor:pointer">💾 Kaydet</button>
       <button onclick="this.closest('.cd-drug-form').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:7px;cursor:pointer">İptal</button>
     </div>`;
   container.appendChild(form);
+  document.getElementById('cdf-drug-ac')?.focus();
 }
 
-function onCdfDrugChange() {
-  const sel  = document.getElementById('cdf-drug');
-  const drug = (_drugsCache||[]).find(d => d.id === sel?.value);
-  if (drug?.default_unit)  document.getElementById('cdf-unit').value  = drug.default_unit;
-  if (drug?.default_route) document.getElementById('cdf-route').value = drug.default_route;
+function cdfDrugAc(inp) {
+  const q = (inp.value || '').toLowerCase().trim();
+  const ac = document.getElementById('cdf-drug-list');
+  if (!ac) return;
+  const all = _drugsCache || [];
+  const filtered = q ? all.filter(d => d.name.toLowerCase().includes(q)) : all.slice(0, 15);
+  if (!filtered.length) { ac.style.display = 'none'; return; }
+  ac.innerHTML = filtered.map(d => {
+    const stokBilgi = d.guncel !== null
+      ? `<span style="color:${d.guncel <= 0 ? 'var(--red)' : d.guncel <= 10 ? 'var(--amber)' : 'var(--green)'};font-weight:700">${d.guncel.toFixed(1)} ${d.birim}</span>`
+      : `<span style="color:var(--ink3);font-size:.65rem">stok yok</span>`;
+    return `<div onclick="cdfDrugSec('${d.id}','${d.name.replace(/'/g,"\\'")}','${d.default_unit||d.birim||''}','${d.default_route||''}')"
+      style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center"
+      onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+      <span style="font-weight:600;font-size:.84rem">${d.name}</span>
+      ${stokBilgi}
+    </div>`;
+  }).join('');
+  ac.style.display = 'block';
+}
+
+function cdfDrugSec(id, name, unit, route) {
+  document.getElementById('cdf-drug').value = id;
+  document.getElementById('cdf-drug-ac').value = name;
+  document.getElementById('cdf-drug-list').style.display = 'none';
+  if (unit) document.getElementById('cdf-unit').value = unit;
+  if (route) document.getElementById('cdf-route').value = route.split(' ')[0];
+  const d = (_drugsCache||[]).find(x => x.id === id);
+  const secili = document.getElementById('cdf-secili');
+  if (secili && d) {
+    const stokTxt = d.guncel !== null ? ` · Stok: ${d.guncel.toFixed(1)} ${d.birim}` : ' · Stokta kayıtlı değil';
+    secili.textContent = '✅ ' + name + stokTxt;
+    secili.style.display = 'block';
+  }
 }
 
 async function caseDrugKaydet(btn) {
