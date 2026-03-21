@@ -1012,6 +1012,72 @@ async function loadStokPanel(){
   });
   el.innerHTML=html||'<div class="empty">Kayıt yok</div>';
 }
+function openStokPanel(){
+  document.getElementById('stok-panel').style.transform='translateX(0)';
+  loadStokPanel();
+}
+function closeStokPanel(){
+  document.getElementById('stok-panel').style.transform='translateX(100%)';
+}
+async function loadStokPanel(){
+  const el=document.getElementById('stok-panel-body'); if(!el) return;
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  await loadStock();
+  const stok=getState('stock');
+  if(!stok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📦</div>Henüz stok ürünü eklenmemiş</div>'; return; }
+  const GRUPLAR=[
+    {baslik:'💊 Sağlık',ikon:'💊',alt:[
+      {ad:'Sperma',   filtre:s=>s.kategori==='Sperma'},
+      {ad:'İlaç',     filtre:s=>['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'].includes(s.kategori)},
+      {ad:'Sarf & Ekipman', filtre:s=>['Ekipman','Sarf','Malzeme'].includes(s.kategori)},
+    ]},
+    {baslik:'🌾 Yem',ikon:'🌾',alt:[
+      {ad:'Yem & Katkı', filtre:s=>s.kategori==='Yem'},
+    ]},
+  ];
+  let html='';
+  GRUPLAR.forEach(grup=>{
+    const grupStok=stok.filter(s=>grup.alt.some(a=>a.filtre(s)));
+    if(!grupStok.length && grup.baslik.includes('Yem')){
+      html+=`<div style="background:var(--bg2);border:1px dashed var(--bg3);border-radius:12px;padding:14px;margin-bottom:10px;opacity:.5">
+        <div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em">${grup.baslik}</div>
+        <div style="font-size:.75rem;color:var(--ink3);margin-top:6px">Yakında — yem modülü</div>
+      </div>`;
+      return;
+    }
+    html+=`<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px">${grup.baslik}</div>`;
+    grup.alt.forEach(alt=>{
+      const liste=stok.filter(alt.filtre);
+      if(!liste.length) return;
+      html+=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);margin:8px 0 4px;padding-left:4px">${alt.ad} (${liste.length})</div>`;
+      html+=liste.map(s=>{
+        const pct=Math.max(0,Math.min(100,(+s.baslangic_miktar||1)>0?(s.guncel/(+s.baslangic_miktar||1))*100:100));
+        const barClr=s.durum==='neg'?'var(--red)':s.durum==='crit'?'var(--amber)':'var(--green)';
+        const durmTxt=s.durum==='neg'?'🆘 Negatif':s.durum==='crit'?'⚠️ Kritik':'✅ Normal';
+        return `<div style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${barClr};border-radius:10px;padding:11px 13px;margin-bottom:7px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${s.urun_adi}</div>
+              <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${s.kategori||'—'} · Eşik: ${s.esik||0} ${s.birim||''}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:10px">
+              <div style="font-size:1.3rem;font-weight:800;color:${barClr};line-height:1">${(s.guncel||0).toFixed(s.birim==='adet'?0:1)}</div>
+              <div style="font-size:.6rem;color:var(--ink3)">${s.birim||''}</div>
+            </div>
+          </div>
+          <div style="height:4px;background:var(--card2);border-radius:2px;margin-top:8px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${barClr};border-radius:2px"></div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button onclick="openStk('${s.id}')" style="flex:1;padding:6px;background:var(--green);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">+ Stok Ekle</button>
+            <button onclick="stokHareketGor('${s.id}')" style="flex:1;padding:6px;background:var(--card2);color:var(--ink3);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">Hareketler</button>
+          </div>
+        </div>`;
+      }).join('');
+    });
+  });
+  el.innerHTML=html||'<div class="empty">Kayıt yok</div>';
+}
 async function loadStokList(){
   const el=document.getElementById('stok-list-body'); if(!el) return;
   try {
