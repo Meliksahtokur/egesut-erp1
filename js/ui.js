@@ -899,7 +899,7 @@ async function loadGecmis(f,btn){
       let title='', sub='';
       if(type==='dogum'){ const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id); const anneLabel=anneObj?(anneObj.kupe_no||anneObj.devlet_kupe||data.anne_id):data.anne_id; title=`${anneLabel||'?'} → ${data.yavru_kupe||'?'} (${data.yavru_cins||'?'})`; sub=`${data.dogum_tipi||'Normal'}${hkName}`; }
       if(type==='tohumlama'){ title=`${hayvanLabel||'?'} — ${data.sperma||'?'}`; const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)'; sub=`${data.deneme_no||1}. deneme · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`; }
-      if(type==='hastalik'){ title=`${hayvanLabel||'?'} — ${data.tani||'?'}`; const sc=data.durum==='Aktif'?'var(--red)':'var(--green)'; sub=`${data.siddet||''} · <b style="color:${sc}">${data.durum||''}</b>${hkName}`; }
+      if(type==='hastalik'){ title=`${hayvanLabel||'?'} — ${data.disease_name||data.tani||'?'}`; const sc=data.status==='active'?'var(--red)':'var(--green)'; sub=`<b style="color:${sc}">${data.status==='active'?'Aktif':'Kapalı'}</b>${hkName}`; }
       if(type==='gorev'){ const gHayvan=getState('animals').find(a=>a.id===data.hayvan_id); const gLabel=gHayvan?(gHayvan.kupe_no||gHayvan.devlet_kupe):data.hayvan_id; title=`${gLabel||'GENEL'} — ${data.aciklama||''}`; sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span>${hkName}`; }
       if(type==='islem'){
         const snap=data.snapshot||{}; 
