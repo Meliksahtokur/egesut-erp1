@@ -787,24 +787,24 @@ async function submitStokAdd(btn) {
         id: stokId, urun_adi: urun,
         birim, baslangic_miktar: bslg, esik, kategori: kat, tur: kat,
       });
-      // İlaç ise drug_products'a da ekle
+      // İlaç ise drug_products'a da ekle (etken madde zorunlu)
       if (isIlac && navigator.onLine) {
         const etkenId = g('sa-etken')?.value || null;
-        const konst   = g('sa-konst')?.value?.trim() || null;
-        const route   = g('sa-route')?.value || 'IM';
-        if (etkenId) {
-          const { data: dp } = await db.from('drug_products').insert([{
-            drug_class_id:      etkenId,
-            brand_name:         urun,
-            concentration:      konst ? parseFloat(konst) : null,
-            concentration_unit: konst || null,
-            default_route:      route,
-            default_unit:       birim,
-          }]).select('id').single();
-          if (dp?.id) {
-            await db.from('stok').update({ drug_product_id: dp.id }).eq('id', stokId);
-            _drugsCache = [];
-          }
+        if (!etkenId) { toast('Etken madde seçilmedi', true); return; }
+        const konst = g('sa-konst')?.value?.trim() || null;
+        const route = g('sa-route')?.value || 'IM';
+        const { data: dp, error: dpErr } = await db.from('drug_products').insert([{
+          drug_class_id:      etkenId,
+          brand_name:         urun,
+          concentration:      konst ? parseFloat(konst) : null,
+          concentration_unit: konst || null,
+          default_route:      route,
+          default_unit:       birim,
+        }]).select('id').single();
+        if (dpErr) throw new Error('İlaç kaydı oluşturulamadı: ' + dpErr.message);
+        if (dp?.id) {
+          await db.from('stok').update({ drug_product_id: dp.id }).eq('id', stokId);
+          _drugsCache = [];
         }
       }
       toast(`✅ ${urun} eklendi`);
