@@ -1046,18 +1046,22 @@ async function loadStokPanel(){
   const el=document.getElementById('stok-panel-body'); if(!el) return;
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   await Promise.all([loadStock(), loadDrugsCache()]);
-  const _dbgStok = getState('stock');
-  el.innerHTML = `<div style="background:#ff0;color:#000;padding:6px;font-size:.7rem;border-radius:6px;margin-bottom:8px">DEBUG: ${_dbgStok.length} stok kalemi, ${(_drugsCache||[]).length} ilaç</div>`;
   const stok=getState('stock');
   if(!stok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📦</div>Henüz stok ürünü eklenmemiş</div>'; return; }
+  const ILAC_KATLAR=['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
   const GRUPLAR=[
-    {baslik:'💊 Sağlık',ikon:'💊',alt:[
-      {ad:'Sperma',   filtre:s=>s.kategori==='Sperma'},
-      {ad:'İlaç',     filtre:s=>['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'].includes(s.kategori)},
-      {ad:'Sarf & Ekipman', filtre:s=>['Ekipman','Sarf','Malzeme'].includes(s.kategori)},
+    {baslik:'💊 Sağlık',alt:[
+      {ad:'💉 Sperma',         filtre:s=>s.kategori==='Sperma'},
+      {ad:'💊 Antibiyotik',    filtre:s=>s.kategori==='Antibiyotik'},
+      {ad:'🩹 NSAID',          filtre:s=>s.kategori==='NSAID'},
+      {ad:'⚗️ Hormon',         filtre:s=>s.kategori==='Hormon'},
+      {ad:'🌿 Vitamin',        filtre:s=>s.kategori==='Vitamin'},
+      {ad:'🦠 Antiparaziter',  filtre:s=>s.kategori==='Antiparaziter'},
+      {ad:'💊 Diğer İlaç',     filtre:s=>s.kategori==='Diğer İlaç'},
+      {ad:'🔧 Sarf & Ekipman', filtre:s=>['Ekipman','Sarf','Diğer'].includes(s.kategori)},
     ]},
-    {baslik:'🌾 Yem',ikon:'🌾',alt:[
-      {ad:'Yem & Katkı', filtre:s=>s.kategori==='Yem'},
+    {baslik:'🌾 Yem',alt:[
+      {ad:'🌾 Yem & Katkı', filtre:s=>s.kategori==='Yem'},
     ]},
   ];
   let html='';
