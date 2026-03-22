@@ -974,6 +974,63 @@ async function stokDrugBagla(stokId, sel) {
     loadStokPanel();
   } catch(e) { toast(e.message, true); }
 }
+async function saTipSec(tip) {
+  ['ilac','sperma','ekipman'].forEach(t => {
+    const btn = document.getElementById('sa-tip-'+t);
+    if (!btn) return;
+    if (t === tip) {
+      btn.style.border = '2px solid var(--green)';
+      btn.style.background = 'rgba(78,154,42,.12)';
+      btn.style.color = 'var(--green)';
+    } else {
+      btn.style.border = '1.5px solid var(--card3)';
+      btn.style.background = 'var(--card)';
+      btn.style.color = 'var(--ink3)';
+    }
+  });
+  const ilacAl  = document.getElementById('sa-ilac-alani');
+  const digerAl = document.getElementById('sa-diger-alani');
+  const title   = document.getElementById('sa-modal-title');
+  const katInp  = document.getElementById('sa-kat');
+  if (tip === 'ilac') {
+    ilacAl.style.display  = 'block';
+    digerAl.style.display = 'none';
+    title.textContent = '💊 Yeni İlaç Ekle';
+    katInp.value = 'Antibiyotik';
+    // Etken madde dropdown'ı doldur
+    const drugClasses = await idbGetAll('drug_classes');
+    const sel = document.getElementById('sa-etken');
+    if (sel) {
+      const grouped = {};
+      drugClasses.forEach(dc => {
+        if (!grouped[dc.group_name]) grouped[dc.group_name] = [];
+        grouped[dc.group_name].push(dc);
+      });
+      sel.innerHTML = '<option value="">— Seçin veya boş bırakın —</option>' +
+        Object.entries(grouped).map(([g, list]) =>
+          `<optgroup label="${g}">${list.map(dc =>
+            `<option value="${dc.id}" data-group="${dc.group_name}">${dc.active_ingredient}</option>`
+          ).join('')}</optgroup>`
+        ).join('');
+    }
+  } else if (tip === 'sperma') {
+    ilacAl.style.display  = 'none';
+    digerAl.style.display = 'block';
+    title.textContent = '💉 Yeni Sperma Ekle';
+    document.getElementById('sa-ad-lbl').textContent = 'Boğa Kodu / Adı *';
+    document.getElementById('sa-ad-diger').placeholder = 'Örn: Darius, ABK-Zenith';
+    katInp.value = 'Sperma';
+    document.getElementById('sa-birim').value = 'adet';
+  } else {
+    ilacAl.style.display  = 'none';
+    digerAl.style.display = 'block';
+    title.textContent = '🔧 Yeni Ekipman / Sarf Ekle';
+    document.getElementById('sa-ad-lbl').textContent = 'Ürün Adı *';
+    document.getElementById('sa-ad-diger').placeholder = 'Şırınga, Sonda, Buzağı Ceketi…';
+    katInp.value = 'Ekipman';
+  }
+  document.getElementById('sa-ad-diger')?.focus();
+}
 function openStokPanel(){
   document.getElementById('stok-panel').style.transform='translateX(0)';
   loadStokPanel();
