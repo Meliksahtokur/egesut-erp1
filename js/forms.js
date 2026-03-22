@@ -744,8 +744,7 @@ async function submitStk(btn) {
   if (!mik || mik <= 0) { toast('Geçerli miktar girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   try {
-    const updated = { ..._curStk, baslangic_miktar: (+_curStk.baslangic_miktar || 0) + mik };
-    await write('stok', updated, 'PATCH', `id=eq.${_curStk.id}`);
+    await write('stok', { baslangic_miktar: (+_curStk.baslangic_miktar || 0) + mik }, 'PATCH', `id=eq.${_curStk.id}`);
     toast(`✅ ${_curStk.urun_adi}: +${mik} ${_curStk.birim || ''}`);
     closeM('m-stk');
     await pullTables(['stok','stok_hareket']);
