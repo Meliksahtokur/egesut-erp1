@@ -755,47 +755,66 @@ async function submitStk(btn) {
 }
 
 async function submitStokAdd(btn) {
-  const urun = (g('sa-ad')?.value||'').trim();
+  const kat  = g('sa-kat')?.value || 'Antibiyotik';
+  const ilacKatlar = ['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
+  const isIlac = ilacKatlar.includes(kat);
+  const isSperma = kat === 'Sperma';
+  // İsim alanı tipe göre değişiyor
+  const urun = isIlac
+    ? (g('sa-ad')?.value||'').trim()
+    : (g('sa-ad-diger')?.value||'').trim();
+  if (!urun) { toast('İsim zorunlu', true); return; }
   const bslg = parseFloat(g('sa-mik')?.value||'0');
-  if (!urun) { toast('Ürün adı zorunlu', true); return; }
-  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
-  const kat = g('sa-kat')?.value || 'İlaç';
+  const birim = g('sa-birim')?.value || 'adet';
+  const esik  = parseFloat(g('sa-esik')?.value||'0') || 0;
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    const stokId = crypto.randomUUID();
-    await write('stok', {
-      id: stokId, urun_adi: urun,
-      birim: g('sa-birim')?.value || 'adet',
-      baslangic_miktar: bslg || 0,
-      esik: parseFloat(g('sa-esik')?.value||'0') || 0,
-      kategori: kat,
-      tur: kat,
-    });
-    // İlaç kategorisinde drugs tablosuna da kayıt at
-    const ilacKatlar = ['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
-    if (ilacKatlar.includes(kat) && navigator.onLine) {
-      try {
-        await rpc('link_drug_to_stock', {
-          p_drug_id: null,
-          p_stock_item_id: null,
-        });
-      } catch(_){}
-      // drugs tablosuna ekle + bağla
-      const { data: drugData } = await db.from('drugs').insert([{
-        name: urun,
-        stock_item_id: stokId,
-        default_unit: g('sa-birim')?.value || 'ml',
-        default_route: 'IM',
-      }]).select('id').single();
-      if (drugData?.id) { _drugsCache = []; }
+    // Aynı isimde stok var mı? Varsa miktarı ekle
+    const mevcutlar = await idbGetAll('stok');
+    const mevcut = mevcutlar.find(s => s.urun_adi?.toLowerCase() === urun.toLowerCase() && s.kategori === kat);
+    let stokId;
+    if (mevcut) {
+      // Miktarı güncelle
+      stokId = mevcut.id;
+      await write('stok', { baslangic_miktar: (+mevcut.baslangic_miktar||0) + bslg }, 'PATCH', `id=eq.${stokId}`);
+      toast(`✅ ${urun} stoku güncellendi (+${bslg} ${birim})`);
+    } else {
+      // Yeni kayıt
+      stokId = crypto.randomUUID();
+      await write('stok', {
+        id: stokId, urun_adi: urun,
+        birim, baslangic_miktar: bslg, esik, kategori: kat, tur: kat,
+      });
+      // İlaç ise drug_products'a da ekle
+      if (isIlac && navigator.onLine) {
+        const etkenId = g('sa-etken')?.value || null;
+        const konst   = g('sa-konst')?.value?.trim() || null;
+        const route   = g('sa-route')?.value || 'IM';
+        if (etkenId) {
+          const { data: dp } = await db.from('drug_products').insert([{
+            drug_class_id:      etkenId,
+            brand_name:         urun,
+            concentration:      konst ? parseFloat(konst) : null,
+            concentration_unit: konst || null,
+            default_route:      route,
+            default_unit:       birim,
+          }]).select('id').single();
+          if (dp?.id) {
+            await db.from('stok').update({ drug_product_id: dp.id }).eq('id', stokId);
+            _drugsCache = [];
+          }
+        }
+      }
+      toast(`✅ ${urun} eklendi`);
     }
-    toast(`✅ ${urun} stoka eklendi`);
     closeM('m-stok-add');
-    ['sa-ad','sa-mik','sa-esik'].forEach(id=>{const e=g(id);if(e)e.value=''});
-    await loadStock();
+    ['sa-ad','sa-ad-diger','sa-mik','sa-esik','sa-konst'].forEach(id=>{const e=g(id);if(e)e.value='';});
+    await pullTables(['stok','drug_products']);
+    _drugsCache = [];
     const _sp = document.getElementById('stok-panel');
     if(_sp && _sp.style.transform !== 'translateX(100%)') await loadStokPanel();
   } catch (e) { toast(e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Ekle'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; } }
 }
 
 
