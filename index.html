@@ -716,47 +716,84 @@ button,input,select,textarea{font-family:inherit}
 
 <!-- YENİ STOK ÜRÜNÜ EKLE -->
 <div id="m-stok-add" class="mo" onclick="mClose(event,this)">
-  <div class="modal"><div class="m-handle"></div><div class="m-title">📦 Yeni Stok Ürünü</div>
+  <div class="modal"><div class="m-handle"></div><div class="m-title" id="sa-modal-title">💊 Yeni İlaç Ekle</div>
     <div class="m-body">
-      <div class="fg"><label class="flbl">Ürün Adı *</label><input id="sa-ad" class="fi" placeholder="Oksitosin, Mastit Tüpü, Şırınga…" autocomplete="off"></div>
+      <!-- Kategori seçimi -->
+      <div class="fg">
+        <label class="flbl">Tür *</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:4px">
+          <button type="button" id="sa-tip-ilac" onclick="saTipSec('ilac')" style="padding:8px;border:2px solid var(--green);border-radius:8px;background:rgba(78,154,42,.12);color:var(--green);font-size:.75rem;font-weight:700;cursor:pointer">💊 İlaç</button>
+          <button type="button" id="sa-tip-sperma" onclick="saTipSec('sperma')" style="padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink3);font-size:.75rem;font-weight:700;cursor:pointer">💉 Sperma</button>
+          <button type="button" id="sa-tip-ekipman" onclick="saTipSec('ekipman')" style="padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink3);font-size:.75rem;font-weight:700;cursor:pointer">🔧 Ekipman</button>
+        </div>
+      </div>
+
+      <!-- İLAÇ ALANLARI -->
+      <div id="sa-ilac-alani">
+        <div class="fg">
+          <label class="flbl">Preparat Adı * <span style="color:var(--ink3);font-weight:400">(Marbox, Florkem, Enrox…)</span></label>
+          <input id="sa-ad" class="fi" placeholder="Preparat / marka adı" autocomplete="off">
+        </div>
+        <div class="fg">
+          <label class="flbl">Etken Madde <span style="color:var(--ink3);font-weight:400">(opsiyonel)</span></label>
+          <select id="sa-etken" class="fsel" style="margin-bottom:4px">
+            <option value="">— Seçin veya boş bırakın —</option>
+          </select>
+          <div style="font-size:.62rem;color:var(--ink3)">Seçilirse tedavide etken madde ile gruplandırılır</div>
+        </div>
+        <div class="r2">
+          <div class="fg">
+            <label class="flbl">Konsantrasyon <span style="color:var(--ink3);font-weight:400">(opsiyonel)</span></label>
+            <input id="sa-konst" class="fi" placeholder="100mg/ml" autocomplete="off">
+          </div>
+          <div class="fg">
+            <label class="flbl">Uygulama Yolu</label>
+            <select id="sa-route" class="fsel">
+              <option value="IM">IM — Kas içi</option>
+              <option value="IV">IV — Damar içi</option>
+              <option value="SC">SC — Deri altı</option>
+              <option value="PO">PO — Ağızdan</option>
+              <option value="Topikal">Topikal</option>
+              <option value="Intrauterin">Intrauterin</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPERMA / EKİPMAN ALANLARI -->
+      <div id="sa-diger-alani" style="display:none">
+        <div class="fg">
+          <label class="flbl" id="sa-ad-lbl">Adı *</label>
+          <input id="sa-ad-diger" class="fi" placeholder="Ürün adı" autocomplete="off">
+        </div>
+      </div>
+
+      <!-- ORTAK ALANLAR -->
       <div class="r2">
-        <div class="fg"><label class="flbl">Birim *</label>
+        <div class="fg">
+          <label class="flbl">Birim *</label>
           <select id="sa-birim" class="fsel">
-            <option value="ml">ml (sıvı ilaç)</option>
-            <option value="adet">adet (ekipman)</option>
+            <option value="ml">ml</option>
+            <option value="adet">adet</option>
             <option value="tüp">tüp</option>
             <option value="kutu">kutu</option>
             <option value="kg">kg</option>
             <option value="lt">lt</option>
+            <option value="gr">gr</option>
           </select>
         </div>
-        <div class="fg"><label class="flbl">Başlangıç Miktarı</label><input id="sa-mik" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
-      </div>
-      <div class="r2">
-        <div class="fg"><label class="flbl">Kritik Eşik</label><input id="sa-esik" class="fi" type="number" placeholder="Uyarı sınırı" inputmode="decimal"></div>
-        <div class="fg"><label class="flbl">Kategori</label>
-          <select id="sa-kat" class="fsel">
-            <optgroup label="İlaç">
-              <option value="Antibiyotik">Antibiyotik</option>
-              <option value="NSAID">NSAID / Ağrı Kesici</option>
-              <option value="Hormon">Hormon</option>
-              <option value="Vitamin">Vitamin / Mineral</option>
-              <option value="Antiparaziter">Antiparaziter</option>
-              <option value="Diğer İlaç">Diğer İlaç</option>
-            </optgroup>
-            <optgroup label="Sperma">
-              <option value="Sperma">Sperma</option>
-            </optgroup>
-            <optgroup label="Ekipman & Sarf">
-              <option value="Ekipman">Ekipman</option>
-              <option value="Sarf">Sarf Malzeme</option>
-              <option value="Diğer">Diğer</option>
-            </optgroup>
-          </select>
+        <div class="fg">
+          <label class="flbl">Başlangıç Miktarı</label>
+          <input id="sa-mik" class="fi" type="number" placeholder="0" inputmode="decimal">
         </div>
       </div>
-      <button class="btn btn-g" onclick="submitStokAdd(this)">Ürünü Ekle</button>
-      <button class="btn btn-o" onclick="closeM('m-stok-add')">İptal</button>
+      <div class="fg">
+        <label class="flbl">Kritik Eşik</label>
+        <input id="sa-esik" class="fi" type="number" placeholder="Uyarı sınırı" inputmode="decimal">
+      </div>
+      <input type="hidden" id="sa-kat" value="Antibiyotik">
+      <button class="btn btn-g" onclick="submitStokAdd(this)">💾 Kaydet</button>
+      <button class="btn btn-o" onclick="closeM('m-stok-add')" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
