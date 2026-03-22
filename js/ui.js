@@ -1607,8 +1607,13 @@ async function caseDrugKaydet(btn) {
     });
     toast('✅ İlaç eklendi');
     btn.closest('.cd-drug-form').remove();
-    await pullTables(['stok','stok_hareket']);
+    _drugsCache = [];
+    await pullTables(['stok','stok_hareket','drugs']);
+    await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
+    // Stok paneli açıksa yenile
+    const _sp = document.getElementById('stok-panel');
+    if(_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
   } catch(e) { toast(e.message, true); }
   finally { btn.disabled = false; btn.textContent = '💾 Kaydet'; }
 }
