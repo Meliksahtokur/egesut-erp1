@@ -985,6 +985,8 @@ async function loadStokPanel(){
   const el=document.getElementById('stok-panel-body'); if(!el) return;
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   await Promise.all([loadStock(), loadDrugsCache()]);
+  const _dbgStok = getState('stock');
+  el.innerHTML = `<div style="background:#ff0;color:#000;padding:6px;font-size:.7rem;border-radius:6px;margin-bottom:8px">DEBUG: ${_dbgStok.length} stok kalemi, ${(_drugsCache||[]).length} ilaç</div>`;
   const stok=getState('stock');
   if(!stok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📦</div>Henüz stok ürünü eklenmemiş</div>'; return; }
   const GRUPLAR=[
