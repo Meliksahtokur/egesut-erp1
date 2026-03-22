@@ -1050,19 +1050,8 @@ async function loadStokPanel(){
   });
   el.innerHTML=html||'<div class="empty">Kayıt yok</div>';
 }
-function openStokPanel(){
-  document.getElementById('stok-panel').style.transform='translateX(0)';
-  loadStokPanel();
-}
-function closeStokPanel(){
-  document.getElementById('stok-panel').style.transform='translateX(100%)';
-}
-async function loadStokPanel(){
-  const el=document.getElementById('stok-panel-body'); if(!el) return;
-  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
-  await loadStock();
-  const stok=getState('stock');
-  if(!stok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📦</div>Henüz stok ürünü eklenmemiş</div>'; return; }
+async function loadStokPanel_DEPRECATED(){
+  const el=document.getElementById('stok-panel-body-OLD'); if(!el) return;
   const GRUPLAR=[
     {baslik:'💊 Sağlık',ikon:'💊',alt:[
       {ad:'Sperma',   filtre:s=>s.kategori==='Sperma'},
