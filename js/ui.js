@@ -974,6 +974,10 @@ async function stokDrugBagla(stokId, sel) {
     loadStokPanel();
   } catch(e) { toast(e.message, true); }
 }
+async function openStokAdd() {
+  openM('m-stok-add');
+  await saTipSec('ilac');
+}
 async function saTipSec(tip) {
   ['ilac','sperma','ekipman'].forEach(t => {
     const btn = document.getElementById('sa-tip-'+t);
