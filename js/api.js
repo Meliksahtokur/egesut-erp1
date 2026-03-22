@@ -273,11 +273,7 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 // ── PULL FROM SUPABASE ──────────────────────
 async function pullFromSupabase() {
   try {
-    await pullTables([
-      'hayvanlar','gorev_log','stok','stok_hareket',
-      'tohumlama','dogum','bildirim_log','islem_log',
-      'cases','diseases','drugs',
-    ]);
+    await pullTables(TABLES.filter(t => t !== '_queue'));
     document.getElementById('dot')?.classList.remove('off', 'warn');
   } catch(e) {
     console.warn('pull failed:', e.message);
