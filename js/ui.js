@@ -1001,21 +1001,26 @@ async function saTipSec(tip) {
     digerAl.style.display = 'none';
     title.textContent = '💊 Yeni İlaç Ekle';
     katInp.value = 'Antibiyotik';
-    // Etken madde dropdown'ı doldur
+    // Etken madde dropdown'ı doldur — önce pull et
+    if (navigator.onLine) await pullTables(['drug_classes']);
     const drugClasses = await idbGetAll('drug_classes');
     const sel = document.getElementById('sa-etken');
     if (sel) {
-      const grouped = {};
-      drugClasses.forEach(dc => {
-        if (!grouped[dc.group_name]) grouped[dc.group_name] = [];
-        grouped[dc.group_name].push(dc);
-      });
-      sel.innerHTML = '<option value="">— Seçin veya boş bırakın —</option>' +
-        Object.entries(grouped).map(([g, list]) =>
-          `<optgroup label="${g}">${list.map(dc =>
-            `<option value="${dc.id}" data-group="${dc.group_name}">${dc.active_ingredient}</option>`
-          ).join('')}</optgroup>`
-        ).join('');
+      if (!drugClasses.length) {
+        sel.innerHTML = '<option value="">⚠️ Yüklenemedi — yenile</option>';
+      } else {
+        const grouped = {};
+        drugClasses.forEach(dc => {
+          if (!grouped[dc.group_name]) grouped[dc.group_name] = [];
+          grouped[dc.group_name].push(dc);
+        });
+        sel.innerHTML = '<option value="">— Etken madde seçin (zorunlu) —</option>' +
+          Object.entries(grouped).sort().map(([grp, list]) =>
+            `<optgroup label="${grp}">${list.map(dc =>
+              `<option value="${dc.id}">${dc.class_name ? dc.class_name+' › ' : ''}${dc.active_ingredient}</option>`
+            ).join('')}</optgroup>`
+          ).join('');
+      }
     }
   } else if (tip === 'sperma') {
     ilacAl.style.display  = 'none';
