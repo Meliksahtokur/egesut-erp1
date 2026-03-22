@@ -1606,12 +1606,14 @@ async function caseDrugKaydet(btn) {
   if (!_activeDayId)   return;
   btn.disabled = true; btn.textContent = 'Kaydediliyor…';
   try {
+    const _selDrug = (_drugsCache||[]).find(d => d.id === drugId);
     await rpc('add_drug_administration', {
-      p_day_id:  _activeDayId,
-      p_drug_id: drugId,
-      p_dose:    dose,
-      p_unit:    unit,
-      p_route:   (route||'').split(' ')[0] || null,
+      p_day_id:          _activeDayId,
+      p_drug_product_id: drugId,
+      p_stok_id:         _selDrug?.stock_id || null,
+      p_dose:            dose,
+      p_unit:            unit,
+      p_route:           (route||'').split(' ')[0] || null,
     });
     toast('✅ İlaç eklendi');
     btn.closest('.cd-drug-form').remove();
