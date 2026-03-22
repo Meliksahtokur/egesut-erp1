@@ -934,8 +934,8 @@ async function loadStock(){
   try {
     const [stk,moves]=await Promise.all([idbGetAll('stok'),getData('stok_hareket',m=>!m.iptal)]);
     _S=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok'}; });
-    window._appState=window._appState||{}; window._appState.stok=getState('stock');
-    if(typeof setState==='function') setState('stock',getState('stock'));
+    setState('stock', _S);
+    window._appState=window._appState||{}; window._appState.stok=_S;
   } catch(e){ console.error(e); }
 }
 function openStk(id){
