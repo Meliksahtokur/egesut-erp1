@@ -44,7 +44,7 @@ async function openDB() {
       TABLES.forEach(t => { if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: 'id' }); });
       if (!d.objectStoreNames.contains('_queue')) d.createObjectStore('_queue', { keyPath: '_qid', autoIncrement: true });
     };
-    req.onsuccess = e => { _idb = e.target.result; res(_idb); };
+    req.onsuccess = e => { _idb = e.target.result; _dbReady = true; res(_idb); };
     req.onerror   = e => rej(e.target.error);
   });
 }
