@@ -984,7 +984,7 @@ function closeStokPanel(){
 async function loadStokPanel(){
   const el=document.getElementById('stok-panel-body'); if(!el) return;
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
-  await loadStock();
+  await Promise.all([loadStock(), loadDrugsCache()]);
   const stok=getState('stock');
   if(!stok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📦</div>Henüz stok ürünü eklenmemiş</div>'; return; }
   const GRUPLAR=[
