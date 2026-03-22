@@ -1383,12 +1383,30 @@ async function loadDrugsCache() {
       idbGetAll('stok'),
       getData('stok_hareket', m => !m.iptal),
     ]);
-    _drugsCache = drugs.map(d => {
-      const s = stok.find(x => x.id === d.stock_item_id);
-      if (!s) return { ...d, guncel: null, birim: d.default_unit || '' };
-      const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
-      const guncel = (+s.baslangic_miktar || 0) - used;
-      return { ...d, guncel, birim: s.birim || d.default_unit || '' };
+    const drugClasses  = await idbGetAll('drug_classes');
+    const drugProducts = await idbGetAll('drug_products');
+    // Her drug_product için stok miktarını hesapla
+    _drugsCache = drugProducts.map(dp => {
+      const dc   = drugClasses.find(c => c.id === dp.drug_class_id) || {};
+      const s    = stok.find(x => x.drug_product_id === dp.id);
+      let guncel = null;
+      if (s) {
+        const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
+        guncel = (+s.baslangic_miktar || 0) - used;
+      }
+      return {
+        id:               dp.id,
+        name:             dp.brand_name,
+        active_ingredient: dc.active_ingredient || '',
+        group_name:       dc.group_name || '',
+        class_name:       dc.class_name || '',
+        drug_class_id:    dp.drug_class_id,
+        default_unit:     dp.default_unit || (s?.birim) || 'ml',
+        default_route:    dp.default_route || 'IM',
+        stock_id:         s?.id || null,
+        guncel,
+        birim:            s?.birim || dp.default_unit || 'ml',
+      };
     });
     _drugsCache.sort((a, b) => (b.guncel !== null ? b.guncel : -1) - (a.guncel !== null ? a.guncel : -1));
   }
