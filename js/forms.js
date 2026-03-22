@@ -748,8 +748,11 @@ async function submitStk(btn) {
     await write('stok', updated, 'PATCH', `id=eq.${_curStk.id}`);
     toast(`✅ ${_curStk.urun_adi}: +${mik} ${_curStk.birim || ''}`);
     closeM('m-stk');
+    await pullTables(['stok','stok_hareket']);
     await loadStock();
     loadDash();
+    const _sp = document.getElementById('stok-panel');
+    if(_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Stok Ekle'; } }
 }
