@@ -1378,8 +1378,7 @@ let _drugsCache = [];
 
 async function loadDrugsCache() {
   if (!_drugsCache.length) {
-    const [drugs, stok, moves] = await Promise.all([
-      idbGetAll('drugs'),
+    const [stok, moves] = await Promise.all([
       idbGetAll('stok'),
       getData('stok_hareket', m => !m.iptal),
     ]);
