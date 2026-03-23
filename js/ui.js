@@ -1593,10 +1593,29 @@ async function renderCaseTimeline(caseId) {
       if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, drugs: [] };
       if (r.administration_id) byDay[r.day_id].drugs.push(r);
     });
+  // Aynı tarihe birden fazla gün varsa A/B/C suffix ekle
+  const tarihSayac = {};
+  const tarihSuffix = {};
+  const SUFFIKLER = ['A','B','C','D','E','F'];
+  Object.values(byDay).sort((a,b)=>a.day_no-b.day_no).forEach(day => {
+    const d = day.date;
+    tarihSayac[d] = (tarihSayac[d]||0) + 1;
+  });
+  const tarihIdx = {};
+  Object.values(byDay).sort((a,b)=>a.day_no-b.day_no).forEach(day => {
+    const d = day.date;
+    if (tarihSayac[d] > 1) {
+      tarihIdx[d] = (tarihIdx[d]||0);
+      tarihSuffix[day.day_id] = ' ' + (SUFFIKLER[tarihIdx[d]] || (tarihIdx[d]+1));
+      tarihIdx[d]++;
+    } else {
+      tarihSuffix[day.day_id] = '';
+    }
+  });
     el.innerHTML = Object.values(byDay).map(day => `
       <div style="border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:700;font-size:.8rem">Gün ${day.day_no} — ${fmtTarih(day.date)}</span>
+          <span style="font-weight:700;font-size:.8rem">Gün ${day.day_no}${tarihSuffix[day.day_id]||""} — ${fmtTarih(day.date)}</span>
           ${_curCase?.status==='active'?`<button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;cursor:pointer">+ İlaç</button>`:''}
         </div>
         <div id="drugs-${day.day_id}">
