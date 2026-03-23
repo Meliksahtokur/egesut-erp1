@@ -1593,13 +1593,40 @@ async function renderCaseTimeline(caseId) {
       if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, drugs: [] };
       if (r.administration_id) byDay[r.day_id].drugs.push(r);
     });
-  // Aynı tarihe birden fazla gün varsa A/B/C suffix ekle
-  const tarihSayac = {};
+  // Tarih gruplama: her benzersiz tarih bir grup numarasi alir, icinde A/B/C
   const tarihSuffix = {};
+  const tarihGunNo = {};
   const SUFFIKLER = ['A','B','C','D','E','F'];
-  Object.values(byDay).sort((a,b)=>a.day_no-b.day_no).forEach(day => {
+  let gunSayaci = 0;
+  const tarihSira = {};
+  Object.values(byDay).sort((a,b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.day_no - b.day_no;
+  }).forEach(day => {
     const d = day.date;
-    tarihSayac[d] = (tarihSayac[d]||0) + 1;
+    if (tarihSira[d] === undefined) {
+      gunSayaci++;
+      tarihSira[d] = { no: gunSayaci, idx: 0, count: 0 };
+    }
+    tarihSira[d].count++;
+  });
+  // Ikinci gecis: suffix ata
+  const tarihIdx2 = {};
+  Object.values(byDay).sort((a,b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return a.day_no - b.day_no;
+  }).forEach(day => {
+    const d = day.date;
+    const grup = tarihSira[d];
+    tarihIdx2[d] = (tarihIdx2[d] || 0);
+    if (grup.count > 1) {
+      tarihGunNo[day.day_id] = grup.no;
+      tarihSuffix[day.day_id] = SUFFIKLER[tarihIdx2[d]] || String(tarihIdx2[d]+1);
+    } else {
+      tarihGunNo[day.day_id] = grup.no;
+      tarihSuffix[day.day_id] = '';
+    }
+    tarihIdx2[d]++;
   });
   const tarihIdx = {};
   Object.values(byDay).sort((a,b)=>a.day_no-b.day_no).forEach(day => {
@@ -1615,7 +1642,7 @@ async function renderCaseTimeline(caseId) {
     el.innerHTML = Object.values(byDay).map(day => `
       <div style="border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:700;font-size:.8rem">Gün ${day.day_no}${tarihSuffix[day.day_id]||""} — ${fmtTarih(day.date)}</span>
+          <span style="font-weight:700;font-size:.8rem">Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||""} — ${fmtTarih(day.date)}</span>
           ${_curCase?.status==='active'?`<button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;cursor:pointer">+ İlaç</button>`:''}
         </div>
         <div id="drugs-${day.day_id}">
