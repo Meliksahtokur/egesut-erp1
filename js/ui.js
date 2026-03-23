@@ -1593,40 +1593,26 @@ async function renderCaseTimeline(caseId) {
       if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, drugs: [] };
       if (r.administration_id) byDay[r.day_id].drugs.push(r);
     });
-  // Tarih gruplama: her benzersiz tarih bir grup numarasi alir, icinde A/B/C
+  // Tarih gruplama: benzersiz tarihler sıralı grup numarası alır, aynı tarihtekiler A/B/C
+  const SUFFIKLER = ['A','B','C','D','E','F','G'];
   const tarihSuffix = {};
   const tarihGunNo = {};
-  const SUFFIKLER = ['A','B','C','D','E','F'];
-  let gunSayaci = 0;
-  const tarihSira = {};
-  Object.values(byDay).sort((a,b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.day_no - b.day_no;
-  }).forEach(day => {
-    const d = day.date;
-    if (tarihSira[d] === undefined) {
-      gunSayaci++;
-      tarihSira[d] = { no: gunSayaci, idx: 0, count: 0 };
-    }
-    tarihSira[d].count++;
-  });
-  // Ikinci gecis: suffix ata
-  const tarihIdx2 = {};
-  Object.values(byDay).sort((a,b) => {
-    if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.day_no - b.day_no;
-  }).forEach(day => {
-    const d = day.date;
-    const grup = tarihSira[d];
-    tarihIdx2[d] = (tarihIdx2[d] || 0);
-    if (grup.count > 1) {
-      tarihGunNo[day.day_id] = grup.no;
-      tarihSuffix[day.day_id] = SUFFIKLER[tarihIdx2[d]] || String(tarihIdx2[d]+1);
-    } else {
-      tarihGunNo[day.day_id] = grup.no;
-      tarihSuffix[day.day_id] = '';
-    }
-    tarihIdx2[d]++;
+  // Benzersiz tarihleri sırala
+  const benzersizTarihler = [...new Set(Object.values(byDay).map(d => d.date))].sort();
+  // Her tarihe grup no ata
+  const tarihGrupNo = {};
+  benzersizTarihler.forEach((t, i) => { tarihGrupNo[t] = i + 1; });
+  // Her tarihin kaç günü var
+  const tarihCount = {};
+  Object.values(byDay).forEach(day => { tarihCount[day.date] = (tarihCount[day.date]||0) + 1; });
+  // Her güne no ve suffix ata
+  const tarihKullanım = {};
+  Object.values(byDay).sort((a,b) => a.date.localeCompare(b.date) || a.day_no - b.day_no).forEach(day => {
+    const t = day.date;
+    tarihGunNo[day.day_id] = tarihGrupNo[t];
+    tarihKullanım[t] = (tarihKullanım[t]||0);
+    tarihSuffix[day.day_id] = tarihCount[t] > 1 ? SUFFIKLER[tarihKullanım[t]] || String(tarihKullanım[t]+1) : '';
+    tarihKullanım[t]++;
   });
   const tarihIdx = {};
   Object.values(byDay).sort((a,b)=>a.day_no-b.day_no).forEach(day => {
