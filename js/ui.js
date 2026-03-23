@@ -1614,14 +1614,41 @@ async function renderCaseTimeline(caseId) {
 
 async function caseGunEkle() {
   if (!_curCase) return;
+  const today = new Date().toISOString().split('T')[0];
+  // Tarih secici modal
+  let box = document.getElementById('gun-tarih-modal');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'gun-tarih-modal';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end';
+    box.onclick = e => { if (e.target === box) box.remove(); };
+    document.body.appendChild(box);
+  }
+  box.innerHTML =
+    '<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;padding:20px">' +
+    '<div style="font-weight:800;font-size:1rem;margin-bottom:12px">Tedavi Tarihi Sec</div>' +
+    '<input id="gun-tarih-inp" type="date" value="'+today+'" style="width:100%;padding:11px;border:1.5px solid var(--green);border-radius:10px;font-size:.95rem;margin-bottom:12px">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<button onclick="caseGunEkleOnayla()" style="padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Ekle</button>' +
+    '<button onclick="document.getElementById(\'gun-tarih-modal\').remove()" style="padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">Iptal</button>' +
+    '</div></div>';
+  box.style.display = 'flex';
+}
+
+async function caseGunEkleOnayla() {
+  if (!_curCase) return;
+  const tarih = document.getElementById('gun-tarih-inp')?.value;
+  if (!tarih) { toast('Tarih secin', true); return; }
+  document.getElementById('gun-tarih-modal')?.remove();
   try {
-    await rpc('add_treatment_day', { p_case_id: _curCase.id });
-    toast('✅ Tedavi günü eklendi');
+    await rpc('add_treatment_day', { p_case_id: _curCase.id, p_date: tarih });
+    toast('Tedavi gunu eklendi');
     _drugsCache = [];
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
   } catch(e) { toast(e.message, true); }
 }
+
 
 let _activeDayId = null;
 function caseDrugFormAc(dayId) {
