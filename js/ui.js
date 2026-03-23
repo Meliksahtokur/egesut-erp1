@@ -1710,36 +1710,45 @@ function cdfChkChange(chk) {
 function cdfDrugAc() {}
 function cdfDrugSec() {}
 async function caseDrugKaydet(btn) {
-  const drugId = document.getElementById('cdf-drug')?.value;
-  const dose   = parseFloat(document.getElementById('cdf-dose')?.value);
-  const unit   = document.getElementById('cdf-unit')?.value?.trim();
-  const route  = document.getElementById('cdf-route')?.value || null;
-  if (!drugId)         { toast('İlaç seçin', true); return; }
-  if (!dose || dose<=0){ toast('Geçerli doz girin', true); return; }
-  if (!unit)           { toast('Birim girin', true); return; }
-  if (!_activeDayId)   return;
-  btn.disabled = true; btn.textContent = 'Kaydediliyor…';
+  if (!_activeDayId) return;
+  // Secili checkbox'lardan doz satirlarini topla
+  const secililar = [];
+  document.querySelectorAll('.cdf-chk:checked').forEach(chk => {
+    const id = chk.dataset.id;
+    const doseInp = document.querySelector('.cdf-dose-inp[data-drug-id="'+id+'"]');
+    const unitInp = document.querySelector('.cdf-unit-inp[data-drug-id="'+id+'"]');
+    const routeInp = document.querySelector('.cdf-route-inp[data-drug-id="'+id+'"]');
+    const dose = parseFloat(doseInp?.value);
+    const unit = (unitInp?.value||'').trim();
+    const route = routeInp?.value || null;
+    if (!dose || dose <= 0) { toast(id + ': Gecerli doz girin', true); return; }
+    if (!unit) { toast(id + ': Birim girin', true); return; }
+    secililar.push({ id, dose, unit, route });
+  });
+  if (!secililar.length) { toast('Ilac secin', true); return; }
+  btn.disabled = true; btn.textContent = 'Kaydediliyor...';
   try {
-    const _selDrug = (_drugsCache||[]).find(d => d.id === drugId);
-    await rpc('add_drug_administration', {
-      p_day_id:          _activeDayId,
-        p_drug_product_id: _selDrug?._legacy ? null : drugId,
-      p_stok_id:         _selDrug?.stock_id || null,
-      p_dose:            dose,
-      p_unit:            unit,
-      p_route:           (route||'').split(' ')[0] || null,
-    });
-    toast('✅ İlaç eklendi');
+    for (const item of secililar) {
+      const d = (_drugsCache||[]).find(x => x.id === item.id);
+      await rpc('add_drug_administration', {
+        p_day_id:          _activeDayId,
+        p_drug_product_id: d?._legacy ? null : item.id,
+        p_stok_id:         d?.stock_id || null,
+        p_dose:            item.dose,
+        p_unit:            item.unit,
+        p_route:           (item.route||'').split(' ')[0] || null,
+      });
+    }
+    toast('✅ ' + secililar.length + ' ilac eklendi');
     btn.closest('.cd-drug-form').remove();
     _drugsCache = [];
-    await pullTables(['stok','stok_hareket','drugs']);
+    await pullTables(['stok','stok_hareket','drug_products']);
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
-    // Stok paneli açıksa yenile
     const _sp = document.getElementById('stok-panel');
-    if(_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
+    if (_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
   } catch(e) { toast(e.message, true); }
-  finally { btn.disabled = false; btn.textContent = '💾 Kaydet'; }
+  finally { btn.disabled = false; btn.textContent = 'Kaydet'; }
 }
 
 async function caseDrugSil(adminId) {
