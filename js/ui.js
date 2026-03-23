@@ -1537,7 +1537,7 @@ async function openCaseDet(caseId) {
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
 
-  await loadDrugsCache();
+  try { await loadDrugsCache(); } catch(e) { console.warn('loadDrugsCache hata:', e.message); }
   await renderCaseTimeline(caseId);
   openM('m-case-det');
 }
