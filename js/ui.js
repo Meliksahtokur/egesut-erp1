@@ -1552,7 +1552,10 @@ async function renderCaseTimeline(caseId) {
       .select('*')
       .eq('case_id', caseId)
       .order('day_no', { ascending: true });
-    if (error) throw error;
+    if (error) {
+      el.innerHTML = `<div style="color:var(--red);font-size:.78rem;padding:8px;background:rgba(192,50,26,.08);border-radius:8px">⚠️ Timeline yüklenemedi: ${error.message}</div>`;
+      return;
+    }
     if (!data || !data.length) {
       el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Henüz tedavi günü yok</span>';
       return;
