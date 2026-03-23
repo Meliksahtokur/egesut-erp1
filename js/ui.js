@@ -1441,6 +1441,10 @@ let _drugsCache = [];
 
 async function loadDrugsCache() {
   if (!_drugsCache.length) {
+    // IDB boşsa önce Supabase'den çek
+    if (navigator.onLine) {
+      try { await pullTables(['drug_classes','drug_products','stok','stok_hareket']); } catch(e) { console.warn('pull drugs:', e.message); }
+    }
     const [stok, moves] = await Promise.all([
       idbGetAll('stok'),
       getData('stok_hareket', m => !m.iptal),
