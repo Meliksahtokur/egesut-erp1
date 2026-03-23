@@ -1007,7 +1007,17 @@ async function saTipSec(tip) {
     const sel = document.getElementById('sa-etken');
     if (sel) {
       if (!drugClasses.length) {
-        sel.innerHTML = '<option value="">⚠️ Yüklenemedi — yenile</option>';
+          sel.innerHTML = '<option value="">⚠️ Yüklenemedi</option>';
+          // DEBUG: Supabase direkt kontrol
+          try {
+            db.from('drug_classes').select('id').limit(1).then(({data,error}) => {
+              sel.innerHTML = error
+                ? '<option value="">❌ SB hata: ' + error.message + '</option>'
+                : (data && data.length
+                    ? '<option value="">✅ SB var ama IDB boş — yenile</option>'
+                    : '<option value="">⚠️ SB de boş</option>');
+            });
+          } catch(e) { sel.innerHTML = '<option value="">❌ ' + e.message + '</option>'; }
       } else {
         const grouped = {};
         drugClasses.forEach(dc => {
