@@ -1579,7 +1579,7 @@ async function renderCaseTimeline(caseId) {
       .from('treatment_timeline')
       .select('*')
       .eq('case_id', caseId)
-      .order('day_no', { ascending: true });
+      .order('treatment_date', { ascending: true });
     if (error) {
       el.innerHTML = `<div style="color:var(--red);font-size:.78rem;padding:8px;background:rgba(192,50,26,.08);border-radius:8px">⚠️ Timeline yüklenemedi: ${error.message}</div>`;
       return;
