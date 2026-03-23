@@ -1614,8 +1614,19 @@ async function renderCaseTimeline(caseId) {
 
 async function caseGunEkle() {
   if (!_curCase) return;
-  const today = new Date().toISOString().split('T')[0];
-  // Tarih secici modal
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  _gunSecimAy = month;
+  _gunSecimYil = year;
+  _gunSecimSecili = new Set();
+  caseGunModalRender();
+}
+
+let _gunSecimAy = 0, _gunSecimYil = 0;
+let _gunSecimSecili = new Set();
+
+function caseGunModalRender() {
   let box = document.getElementById('gun-tarih-modal');
   if (!box) {
     box = document.createElement('div');
@@ -1624,10 +1635,44 @@ async function caseGunEkle() {
     box.onclick = e => { if (e.target === box) box.remove(); };
     document.body.appendChild(box);
   }
+  const ay = _gunSecimAy, yil = _gunSecimYil;
+  const ilkGun = new Date(yil, ay, 1).getDay();
+  const bosluk = (ilkGun + 6) % 7;
+  const sonGun = new Date(yil, ay + 1, 0).getDate();
+  const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', {month:'long', year:'numeric'});
+  const bugun = new Date().toISOString().split('T')[0];
+
+  let kareler = '';
+  for (let i = 0; i < bosluk; i++) kareler += '<div></div>';
+  for (let g = 1; g <= sonGun; g++) {
+    const iso = yil + '-' + String(ay+1).padStart(2,'0') + '-' + String(g).padStart(2,'0');
+    const secili = _gunSecimSecili.has(iso);
+    const bugunMu = iso === bugun;
+    kareler += '<div onclick="caseGunToggle(&quot;' + iso + '&quot;)" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;' +
+      (secili ? 'background:var(--green);color:#fff;' : bugunMu ? 'background:rgba(78,154,42,.15);color:var(--green);border:1.5px solid var(--green);' : 'color:var(--ink);') +
+      '">' + g + '</div>';
+  }
+
+  const seciliList = [..._gunSecimSecili].sort();
+  const seciliHtml = seciliList.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">' +
+      seciliList.map(d => '<span style="background:rgba(78,154,42,.12);border:1px solid var(--green);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;color:var(--green)">' + d.slice(5).replace('-','.') + '</span>').join('') +
+      '</div>'
+    : '<div style="font-size:.75rem;color:var(--ink3);margin-bottom:10px">Tarih secin</div>';
+
   box.innerHTML =
-    '<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;padding:20px">' +
-    '<div style="font-weight:800;font-size:1rem;margin-bottom:12px">Tedavi Tarihi Sec</div>' +
-    '<input id="gun-tarih-inp" type="date" value="'+today+'" style="width:100%;padding:11px;border:1.5px solid var(--green);border-radius:10px;font-size:.95rem;margin-bottom:12px">' +
+    '<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<button onclick="_gunSecimAy--;if(_gunSecimAy<0){_gunSecimAy=11;_gunSecimYil--;}caseGunModalRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
+    '<span style="font-weight:800;font-size:.9rem">' + ayAdi + '</span>' +
+    '<button onclick="_gunSecimAy++;if(_gunSecimAy>11){_gunSecimAy=0;_gunSecimYil++;}caseGunModalRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
+    ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">' + kareler + '</div>' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Secili Gunler (' + seciliList.length + ')</div>' +
+    seciliHtml +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
     '<button onclick="caseGunEkleOnayla()" style="padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Ekle</button>' +
     '<button onclick="document.getElementById(\'gun-tarih-modal\').remove()" style="padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">Iptal</button>' +
@@ -1635,19 +1680,28 @@ async function caseGunEkle() {
   box.style.display = 'flex';
 }
 
+function caseGunToggle(iso) {
+  if (_gunSecimSecili.has(iso)) _gunSecimSecili.delete(iso);
+  else _gunSecimSecili.add(iso);
+  caseGunModalRender();
+}
+
 async function caseGunEkleOnayla() {
   if (!_curCase) return;
-  const tarih = document.getElementById('gun-tarih-inp')?.value;
-  if (!tarih) { toast('Tarih secin', true); return; }
+  const secili = [..._gunSecimSecili].sort();
+  if (!secili.length) { toast('En az bir gun secin', true); return; }
   document.getElementById('gun-tarih-modal')?.remove();
   try {
-    await rpc('add_treatment_day', { p_case_id: _curCase.id, p_date: tarih });
-    toast('Tedavi gunu eklendi');
+    for (const tarih of secili) {
+      await rpc('add_treatment_day', { p_case_id: _curCase.id, p_date: tarih });
+    }
+    toast(secili.length + ' tedavi gunu eklendi');
     _drugsCache = [];
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
   } catch(e) { toast(e.message, true); }
 }
+
 
 
 let _activeDayId = null;
