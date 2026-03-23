@@ -74,25 +74,46 @@ CREATE TABLE public.dogum (
 CREATE TABLE public.drug_administrations (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   treatment_day_id uuid NOT NULL,
-  drug_id uuid NOT NULL,
   dose numeric NOT NULL CHECK (dose > 0::numeric),
   unit text NOT NULL,
   route text CHECK (route IS NULL OR (route = ANY (ARRAY['IM'::text, 'IV'::text, 'SC'::text, 'PO'::text, 'Topikal'::text, 'Intrauterin'::text]))),
   notes text,
   created_at timestamp with time zone DEFAULT now(),
+  drug_product_id uuid,
+  stok_id text,
   CONSTRAINT drug_administrations_pkey PRIMARY KEY (id),
   CONSTRAINT drug_administrations_treatment_day_id_fkey FOREIGN KEY (treatment_day_id) REFERENCES public.treatment_days(id),
-  CONSTRAINT drug_administrations_drug_id_fkey FOREIGN KEY (drug_id) REFERENCES public.drugs(id)
+  CONSTRAINT drug_administrations_drug_product_id_fkey FOREIGN KEY (drug_product_id) REFERENCES public.drug_products(id),
+  CONSTRAINT drug_administrations_stok_id_fkey FOREIGN KEY (stok_id) REFERENCES public.stok(id)
+);
+CREATE TABLE public.drug_classes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  drug_id uuid NOT NULL,
+  group_name text NOT NULL,
+  class_name text,
+  active_ingredient text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT drug_classes_pkey PRIMARY KEY (id),
+  CONSTRAINT drug_classes_drug_id_fkey FOREIGN KEY (drug_id) REFERENCES public.drugs(id)
+);
+CREATE TABLE public.drug_products (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  drug_class_id uuid NOT NULL,
+  brand_name text NOT NULL,
+  concentration numeric,
+  concentration_unit text,
+  default_route text,
+  default_unit text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT drug_products_pkey PRIMARY KEY (id),
+  CONSTRAINT drug_products_drug_class_id_fkey FOREIGN KEY (drug_class_id) REFERENCES public.drug_classes(id)
 );
 CREATE TABLE public.drugs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   name text NOT NULL UNIQUE,
-  stock_item_id text,
-  default_unit text,
-  default_route text,
   created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT drugs_pkey PRIMARY KEY (id),
-  CONSTRAINT drugs_stock_item_id_fkey FOREIGN KEY (stock_item_id) REFERENCES public.stok(id)
+  description text,
+  CONSTRAINT drugs_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.gorev_log (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -132,6 +153,13 @@ CREATE TABLE public.hastalik_log (
   kapanma_tarihi date,
   lokasyon text,
   CONSTRAINT hastalik_log_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.hayvan_override (
+  kupe_no text NOT NULL,
+  pasif_mi boolean DEFAULT false,
+  notlar text,
+  guncelleme_tarihi date DEFAULT CURRENT_DATE,
+  CONSTRAINT hayvan_override_pkey PRIMARY KEY (kupe_no)
 );
 CREATE TABLE public.hayvanlar (
   id text NOT NULL,
@@ -208,7 +236,9 @@ CREATE TABLE public.stok (
   notlar text,
   created_at timestamp with time zone DEFAULT now(),
   kategori text,
-  CONSTRAINT stok_pkey PRIMARY KEY (id)
+  drug_product_id uuid,
+  CONSTRAINT stok_pkey PRIMARY KEY (id),
+  CONSTRAINT stok_drug_product_id_fkey FOREIGN KEY (drug_product_id) REFERENCES public.drug_products(id)
 );
 CREATE TABLE public.stok_hareket (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -269,4 +299,19 @@ CREATE TABLE public.treatment_days (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT treatment_days_pkey PRIMARY KEY (id),
   CONSTRAINT treatment_days_case_id_fkey FOREIGN KEY (case_id) REFERENCES public.cases(id)
+);
+CREATE TABLE public.vethek_tohumlamalar (
+  id bigint NOT NULL DEFAULT nextval('vethek_tohumlamalar_id_seq'::regclass),
+  hayvan_id integer NOT NULL,
+  sperma text,
+  belge_no text,
+  kupe_no text,
+  irk text,
+  not_ text,
+  tohumlama_tar date,
+  gebe boolean,
+  scrape_tarihi date NOT NULL,
+  kaynak_url text,
+  olusturulma_zamani timestamp with time zone DEFAULT now(),
+  CONSTRAINT vethek_tohumlamalar_pkey PRIMARY KEY (id)
 );
