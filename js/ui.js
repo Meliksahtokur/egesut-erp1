@@ -1614,17 +1614,6 @@ async function renderCaseTimeline(caseId) {
     tarihSuffix[day.day_id] = tarihCount[t] > 1 ? SUFFIKLER[tarihKullanım[t]] || String(tarihKullanım[t]+1) : '';
     tarihKullanım[t]++;
   });
-  const tarihIdx = {};
-  Object.values(byDay).sort((a,b)=>a.day_no-b.day_no).forEach(day => {
-    const d = day.date;
-    if (tarihSayac[d] > 1) {
-      tarihIdx[d] = (tarihIdx[d]||0);
-      tarihSuffix[day.day_id] = ' ' + (SUFFIKLER[tarihIdx[d]] || (tarihIdx[d]+1));
-      tarihIdx[d]++;
-    } else {
-      tarihSuffix[day.day_id] = '';
-    }
-  });
     el.innerHTML = Object.values(byDay).map(day => `
       <div style="border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
