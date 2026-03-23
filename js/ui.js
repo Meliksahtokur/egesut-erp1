@@ -1484,6 +1484,24 @@ async function loadDrugsCache() {
         birim:            s?.birim || dp.default_unit || 'ml',
       };
     });
+      // Fallback: drug_product_id olmayan eski stok kalemleri de ekle
+      const linkedStokIds = new Set(_drugsCache.map(d => d.stock_id).filter(Boolean));
+      const unlinkedStok = stok.filter(s =>
+        !s.drug_product_id &&
+        !linkedStokIds.has(s.id) &&
+        ['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diger Ilac','Ilac'].includes(s.kategori)
+      );
+      unlinkedStok.forEach(s => {
+        const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
+        const guncel = (+s.baslangic_miktar || 0) - used;
+        _drugsCache.push({
+          id: s.id, name: s.urun_adi, active_ingredient: '',
+          group_name: s.kategori || '', class_name: '',
+          drug_class_id: null, default_unit: s.birim || 'ml',
+          default_route: 'IM', stock_id: s.id, guncel,
+          birim: s.birim || 'ml', _legacy: true,
+        });
+      });
     _drugsCache.sort((a, b) => (b.guncel !== null ? b.guncel : -1) - (a.guncel !== null ? a.guncel : -1));
   }
   return _drugsCache;
