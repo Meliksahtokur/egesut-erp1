@@ -1707,7 +1707,7 @@ async function caseDrugKaydet(btn) {
     const _selDrug = (_drugsCache||[]).find(d => d.id === drugId);
     await rpc('add_drug_administration', {
       p_day_id:          _activeDayId,
-      p_drug_product_id: drugId,
+        p_drug_product_id: _selDrug?._legacy ? null : drugId,
       p_stok_id:         _selDrug?.stock_id || null,
       p_dose:            dose,
       p_unit:            unit,
