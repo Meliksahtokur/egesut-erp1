@@ -1618,13 +1618,13 @@ async function renderCaseTimeline(caseId) {
       <div style="border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <span style="font-weight:700;font-size:.8rem">Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||""} — ${fmtTarih(day.date)}</span>
-          ${_curCase?.status==='active'?`<button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;cursor:pointer">+ İlaç</button>`:''}
+          ${_curCase?.status==='active'?`<div style='display:flex;gap:4px'><button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;cursor:pointer">+ İlaç</button><button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.12);color:var(--red);border:1px solid rgba(192,50,26,.2);border-radius:7px;padding:3px 8px;font-size:.7rem;cursor:pointer">🗑 Gün</button></div>`:''}
         </div>
         <div id="drugs-${day.day_id}">
           ${day.drugs.length ? day.drugs.map(d => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--card2)">
               <span><b>${d.drug}</b> ${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span>
-              ${_curCase?.status==='active'?`<button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem">🗑</button>`:''}
+              ${_curCase?.status==='active'?`<div style='display:flex;gap:4px'><button onclick="caseDrugDuzenle('${d.administration_id}','${d.dose}','${d.unit}','${d.route||''}')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.9rem">✏️</button><button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem">🗑</button></div>`:''}
             </div>`).join('') : '<span style="color:var(--ink3);font-size:.75rem">İlaç eklenmemiş</span>'}
         </div>
       </div>`).join('');
@@ -1862,6 +1862,71 @@ async function caseDrugSil(adminId) {
     await renderCaseTimeline(_curCase.id);
   } catch(e) { toast(e.message, true); }
 }
+
+async function caseDaySil(dayId) {
+  if (!confirm('Bu tedavi gunu ve icindeki tum ilaclar silinecek. Emin misin?')) return;
+  try {
+    await rpc('delete_treatment_day', { p_day_id: dayId });
+    toast('Tedavi gunu silindi');
+    _drugsCache = [];
+    await pullTables(['stok','stok_hareket']);
+    await loadDrugsCache();
+    await renderCaseTimeline(_curCase.id);
+    const _sp = document.getElementById('stok-panel');
+    if (_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
+  } catch(e) { toast(e.message, true); }
+}
+
+function caseDrugDuzenle(adminId, dose, unit, route) {
+  // Inline edit — satiri bul ve form ac
+  const satirlar = document.querySelectorAll('[data-admin-id]');
+  document.querySelectorAll('.drug-edit-form').forEach(f => f.remove());
+  // Admin satırının parent div'ini bul
+  const btn = document.querySelector(`button[onclick*="${adminId}"][onclick*="caseDrugDuzenle"]`);
+  if (!btn) return;
+  const row = btn.closest('div[style*="border-bottom"]');
+  if (!row) return;
+  const form = document.createElement('div');
+  form.className = 'drug-edit-form';
+  form.style.cssText = 'background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:8px;margin-top:4px';
+  form.innerHTML =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
+    '<input id="ded-dose" type="number" min="0.01" step="0.01" value="'+dose+'" class="fi" style="margin:0" placeholder="Doz">' +
+    '<input id="ded-unit" type="text" value="'+unit+'" class="fi" style="margin:0" placeholder="Birim">' +
+    '</div>' +
+    '<select id="ded-route" class="fsel" style="margin-bottom:6px">' +
+    '<option value="">Uygulama yolu</option>' +
+    '<option '+(route==='IM'?'selected':'')+' value="IM">IM — Kas ici</option>' +
+    '<option '+(route==='IV'?'selected':'')+' value="IV">IV — Damar ici</option>' +
+    '<option '+(route==='SC'?'selected':'')+' value="SC">SC — Deri alti</option>' +
+    '<option '+(route==='PO'?'selected':'')+' value="PO">PO — Agizdan</option>' +
+    '<option '+(route==='Topikal'?'selected':'')+' value="Topikal">Topikal</option>' +
+    '<option '+(route==='Intrauterin'?'selected':'')+' value="Intrauterin">Intrauterin</option>' +
+    '</select>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
+    '<button onclick="caseDrugDuzenleKaydet(\''+adminId+'\')" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:7px;font-weight:700;cursor:pointer">Kaydet</button>' +
+    '<button onclick="this.closest(\'.drug-edit-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:7px;cursor:pointer">Iptal</button>' +
+    '</div>';
+  row.insertAdjacentElement('afterend', form);
+}
+
+async function caseDrugDuzenleKaydet(adminId) {
+  const dose = parseFloat(document.getElementById('ded-dose')?.value);
+  const unit = document.getElementById('ded-unit')?.value?.trim();
+  const route = document.getElementById('ded-route')?.value || null;
+  if (!dose || dose <= 0) { toast('Gecerli doz girin', true); return; }
+  if (!unit) { toast('Birim girin', true); return; }
+  try {
+    await rpc('update_drug_administration', { p_admin_id: adminId, p_dose: dose, p_unit: unit, p_route: route });
+    toast('Ilac guncellendi');
+    document.querySelector('.drug-edit-form')?.remove();
+    _drugsCache = [];
+    await pullTables(['stok','stok_hareket']);
+    await loadDrugsCache();
+    await renderCaseTimeline(_curCase.id);
+  } catch(e) { toast(e.message, true); }
+}
+
 
 async function caseKapat() {
   if (!_curCase) return;
