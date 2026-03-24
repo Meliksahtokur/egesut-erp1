@@ -1,7 +1,7 @@
 # EgeSüt ERP — SonarCloud Remediation Plan
 > Kaynak: sonarcloud_issues-2026-03-22_10-48-52.csv | Toplam: 517 issue
 > Bu dosya her sprint tamamlandıkça güncellenir. Biten adımlar ✅ ile işaretlenir.
-
+> !!!KULLANICIYA DEĞİŞİKLİKLER patch.py FORMAINDA VERİLECEKTİR VE KULLANİCİ TERMİNALE DOGRUDAN KOPYALA YAPIŞTIR YAPARAK ÇALIŞACAKTIR!!!
 ---
 
 ## ÖZET TABLO
