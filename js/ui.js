@@ -146,8 +146,8 @@ async function loadTasks(f,btn){
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
     const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
     el.innerHTML=data.slice(0,150).map(t=>{
-      const cls=t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':
-        (()=>{ const diff=Math.floor((new Date(t.hedef_tarih)-new Date())/86400000); return diff<=3?'near':''; })();
+      const _diff=Math.floor((new Date(t.hedef_tarih)-Date.now())/86400000);
+      const cls=t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':_diff<=3?'near':'';
       return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id));
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
@@ -241,7 +241,8 @@ function renderAnimals(list){
   const gebeSet=new Set(_gebeIds||[]);
   el.innerHTML=list.map(a=>{
     const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
-    const subId=a.kupe_no&&a.devlet_kupe?`<span style="font-size:.65rem;color:var(--ink3);font-weight:400"> · ${a.devlet_kupe}</span>`:'';
+    const _hasDevlet=a.kupe_no&&a.devlet_kupe;
+    const subId=_hasDevlet?`<span style="font-size:.65rem;color:var(--ink3);font-weight:400"> · ${a.devlet_kupe}</span>`:'';
     const init=mainId.replace(/\D/g,'').slice(-3)||mainId.slice(0,2).toUpperCase();
     const yas=yasHesapla(a.dogum_tarihi);
     const isGebe=gebeSet.has(a.id)||a.durum==='Gebe';
@@ -794,8 +795,12 @@ async function loadUreme(tab='kizginlik'){
         (list.length?list.map(t=>{
           const h=getState('animals').find(a=>a.id===t.hayvan_id);
           const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
-          const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red)':'var(--amber)';
-          const dot=t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red2)':'var(--amber)';
+          const _sc2Gebe=t.sonuc==='Gebe';
+          const _sc2Kotu=t.sonuc==='Boş'||t.sonuc==='Abort';
+          const sc=_sc2Gebe?'var(--green)':_sc2Kotu?'var(--red)':'var(--amber)';
+          const _sonucGebe=t.sonuc==='Gebe';
+      const _sonucKotu=t.sonuc==='Boş'||t.sonuc==='Abort';
+      const dot=_sonucGebe?'var(--green2)':_sonucKotu?'var(--red2)':'var(--amber)';
           return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
             <div class="hist-dot" style="background:${dot}"></div>
             <div class="hist-main">
@@ -2000,7 +2005,8 @@ async function openTohDet(id){
   const hayvanLabel=hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||t.hayvan_id;
   document.getElementById('td2-hayvan').textContent=hayvanLabel||'?';
   document.getElementById('td2-sperma').textContent=`💉 ${t.sperma||'?'}`;
-  const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'?'var(--red)':'var(--amber)';
+  const _tohGebe=t.sonuc==='Gebe';
+  const sc=_tohGebe?'var(--green)':t.sonuc==='Boş'?'var(--red)':'var(--amber)';
   const chips=[
     `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc||'Bekliyor'}</span>`,
     `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no||1}. deneme</span>`,
