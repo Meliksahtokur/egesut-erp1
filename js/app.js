@@ -12,7 +12,7 @@ async function loadHekimler() {
   try {
     const { data, error } = await db.rpc('hekim_listesi');
     if (!error && data && data.length > 0) {
-      HEKIMLER = data.map(h => ({ id: h.id, ad: h.ad, telefon: h.telefon }));
+      window.HEKIMLER = data.map(h => ({ id: h.id, ad: h.ad, telefon: h.telefon }));
     }
   } catch (e) {
     console.warn('Hekimler DB\'den yüklenemedi, fallback kullanılıyor:', e.message);

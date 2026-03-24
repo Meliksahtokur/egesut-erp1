@@ -2,6 +2,22 @@
 // ui.js — EgeSüt render & UI fonksiyonları
 // ═══════════════════════════════════════════════════════
 
+/* global
+   _A, _S, _gebeIds, _hastaIds,
+   _curTaskFilter, _curUremeTab, _curGecmisFilter, _curStk,
+   _curTaskDet, _curToh,
+   _customHekimler, _customSperma,
+   _ilacCache, _drugsCache, _disFreq,
+   HEKIMLER, VARSAYILAN_HEKIM,
+   HASTALIK_LISTESI, HASTALIK_KAT, LOKASYON_KAT, SEMPTOM_KAT, SEMPTOM_GENEL,
+   SPERMA_LISTESI, GRUP_PADOK,
+   getState, setState,
+   g, v, cl, dAgo, dFwd, fmtTarih, toast, openM, closeM, mClose,
+   db, rpc, rpcOptimistic, pullTables, renderSafe, renderFromLocal,
+   idbGetAll, idbPut, idbClearAndPut, getData, getQueue, removeFromQueue,
+   openDB, syncNow, updateSyncBar
+*/
+
 // ──────────────────────────────────────────
 // YARDIMCI RENDER
 // ──────────────────────────────────────────
