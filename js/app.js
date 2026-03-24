@@ -335,13 +335,12 @@ function animalFormGuncelle() {
       gruplar = ['Düve (Büyük)', 'Düve (Küçük)'];
     else
       gruplar = ['Sağmal (Laktasyonda)', 'Sağmal (Kuru)', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)', 'Sütten Kesilmiş Buzağı', 'Süt İçen Buzağı'];
-  } else { // Erkek
-    if (yasGun !== null && yasGun <= 75)
-      gruplar = ['Süt İçen Buzağı'];
-    else if (yasGun !== null && yasGun > 75 && yasGun <= 180)
-      gruplar = ['Sütten Kesilmiş Buzağı'];
-    else
-      gruplar = ['Besi', 'Sütten Kesilmiş Buzağı'];
+  } else if (yasGun !== null && yasGun <= 75) { // Erkek
+    gruplar = ['Süt İçen Buzağı'];
+  } else if (yasGun !== null && yasGun > 75 && yasGun <= 180) {
+    gruplar = ['Sütten Kesilmiş Buzağı'];
+  } else {
+    gruplar = ['Besi', 'Sütten Kesilmiş Buzağı'];
   }
 
   grupSel.innerHTML = '<option value="">Seçin</option>' +
