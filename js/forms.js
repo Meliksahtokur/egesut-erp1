@@ -6,6 +6,22 @@
 // yazIslemLog() KALDIRILDI → DB trigger yapıyor
 // ══════════════════════════════════════════
 
+/* global
+   _curTaskDet, _curToh, _curHst, _curBildirimTab, _curStk,
+   _editMode, _semptomSecili, _hdeSmptSecili,
+   _ilacCache, _drugsCache, _hdiIlacCache,
+   _customHekimler, _customSperma, _disFreq,
+   HEKIMLER, VARSAYILAN_HEKIM,
+   HASTALIK_LISTESI, HASTALIK_KAT, LOKASYON_KAT, SEMPTOM_KAT, SEMPTOM_GENEL,
+   getState, setState,
+   g, v, cl, dAgo, dFwd, fmtTarih, toast, openM, closeM,
+   db, rpc, pullTables, renderSafe, renderFromLocal,
+   idbGetAll, getData, write,
+   loadDrugsCache, loadStock, loadDash, loadTasks, loadUreme, loadGecmis,
+   loadBildirimler, loadStokPanel, openDet, closeDet, openStokPanel,
+   openAnimalEdit, closeAnimalEdit, getDisplayKupe, yasHesapla, loadIrkDropdown
+*/
+
 // ── YENİ HAYVAN ─────────────────────────────
 async function submitAnimal(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
