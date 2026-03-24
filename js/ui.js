@@ -960,20 +960,7 @@ async function stokDrugBagla(stokId, sel) {
     loadStokPanel();
   } catch(e) { toast(e.message, true); }
 }
-async function stokDrugBagla(stokId, sel) {
-  const drugId = sel.value || null;
-  try {
-    await rpc('link_drug_to_stock', { p_drug_id: drugId, p_stock_item_id: drugId ? stokId : null });
-    if (drugId) {
-      // diğer ilaçlardan bu stok bağlantısını kaldır
-      await db.from('drugs').update({ stock_item_id: null }).eq('stock_item_id', stokId).neq('id', drugId);
-    }
-    toast('✅ Bağlantı kaydedildi');
-    _drugsCache = [];
-    await loadDrugsCache();
-    loadStokPanel();
-  } catch(e) { toast(e.message, true); }
-}
+
 async function openStokAdd() {
   openM('m-stok-add');
   await saTipSec('ilac');
@@ -2301,9 +2288,7 @@ async function openGebelikEkle(hayvanId){
 async function acDisease(){
   const q=(document.getElementById('d-tani')?.value||'').toLowerCase().trim();
   const ac=document.getElementById('ac-dis');
-  const logs=[]; // hastalik_log kaldirildi
-  const usedDis=[...new Set(logs.map(l=>l.tani).filter(Boolean))];
-  const all=[...new Set([...HASTALIK_LISTESI,...usedDis])];
+  const all=[...HASTALIK_LISTESI];
   all.sort((a,b)=>(_disFreq[b]||0)-(_disFreq[a]||0));
   const filtered=q?all.filter(d=>d.toLowerCase().includes(q)):all.slice(0,12);
   if(!filtered.length){ ac.style.display='none'; return; }
