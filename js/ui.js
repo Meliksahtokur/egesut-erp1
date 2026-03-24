@@ -389,7 +389,7 @@ async function openDet(id){
       </div>
       ${(()=>{
         const anneObj=a.anne_id?getState('animals').find(x=>x.id===a.anne_id):null;
-        const anneKupe=anneObj?(anneObj.kupe_no||anneObj.devlet_kupe):a.anne_id;
+        const anneKupe=anneObj?.kupe_no||anneObj?.devlet_kupe||a.anne_id;
         let ht='';
         if(anneKupe) ht+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
           <span style="color:var(--ink3)">Anne: </span>
@@ -777,7 +777,7 @@ async function loadUreme(tab='kizginlik'){
       el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`+
         (list.length?list.map(k=>{
           const h=getState('animals').find(a=>a.id===k.hayvan_id);
-          const kupe=h?(h.kupe_no||h.devlet_kupe):k.hayvan_id;
+          const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
           return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
             <div class="hist-dot" style="background:#e74c3c"></div>
             <div class="hist-main">
@@ -793,7 +793,7 @@ async function loadUreme(tab='kizginlik'){
       el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
         (list.length?list.map(t=>{
           const h=getState('animals').find(a=>a.id===t.hayvan_id);
-          const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
+          const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
           const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red)':'var(--amber)';
           const dot=t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'||t.sonuc==='Abort'?'var(--red2)':'var(--amber)';
           return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
@@ -846,7 +846,7 @@ async function loadUreme(tab='kizginlik'){
       el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-birth')">🐄 Doğum Kaydet</button></div>`+
         (list.length?list.map(b=>{
           const anne=getState('animals').find(a=>a.id===b.anne_id);
-          const anneKupe=anne?(anne.kupe_no||anne.devlet_kupe):b.anne_id;
+          const anneKupe=anne?.kupe_no||anne?.devlet_kupe||b.anne_id;
           return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${b.anne_id}')">
             <div class="hist-dot" style="background:var(--green2)"></div>
             <div class="hist-main">
@@ -909,7 +909,7 @@ async function loadGecmis(f,btn){
       const hkName=hk?` · ${hk.ad}`:'';
       const hayvanKey=data.hayvan_id||data.anne_id||data.animal_id;
       const hayvanObj=getState('animals').find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);
-      const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||hayvanKey):hayvanKey;
+      const hayvanLabel=hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||hayvanKey;
       const hayvanVarMi=hayvanKey&&hayvanObj;
       let oc='';
       if(type==='hastalik') oc=`onclick="openCaseDet('${data.id}')" style="cursor:pointer"`;
@@ -919,14 +919,14 @@ async function loadGecmis(f,btn){
       const ico={dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',islem:ISLEM_ICO[data.tip]||'📋'}[type];
       const icoBg={dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)'}[type];
       let title='', sub='';
-      if(type==='dogum'){ const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id); const anneLabel=anneObj?(anneObj.kupe_no||anneObj.devlet_kupe||data.anne_id):data.anne_id; title=`${anneLabel||'?'} → ${data.yavru_kupe||'?'} (${data.yavru_cins||'?'})`; sub=`${data.dogum_tipi||'Normal'}${hkName}`; }
+      if(type==='dogum'){ const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id); const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id; title=`${anneLabel||'?'} → ${data.yavru_kupe||'?'} (${data.yavru_cins||'?'})`; sub=`${data.dogum_tipi||'Normal'}${hkName}`; }
       if(type==='tohumlama'){ title=`${hayvanLabel||'?'} — ${data.sperma||'?'}`; const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)'; sub=`${data.deneme_no||1}. deneme · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`; }
       if(type==='hastalik'){ title=`${hayvanLabel||'?'} — ${data.disease_name||data.tani||'?'}`; const sc=data.status==='active'?'var(--red)':'var(--green)'; sub=`<b style="color:${sc}">${data.status==='active'?'Aktif':'Kapalı'}</b>${hkName}`; }
       if(type==='gorev'){ const gHayvan=getState('animals').find(a=>a.id===data.hayvan_id); const gLabel=gHayvan?(gHayvan.kupe_no||gHayvan.devlet_kupe):data.hayvan_id; title=`${gLabel||'GENEL'} — ${data.aciklama||''}`; sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span>${hkName}`; }
       if(type==='islem'){
         const snap=data.snapshot||{}; 
         const hayvanObj2=getState('animals').find(a=>a.id===data.ana_hayvan_id);
-        const kupe=hayvanObj2?(hayvanObj2.kupe_no||hayvanObj2.devlet_kupe):snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
+        const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
         const etiket={'HAYVAN_EKLENDI':'🐮 Hayvan Eklendi','ABORT_KAYDI':'⚠️ Abort','KIZGINLIK_KAYDI':'🔴 Kızgınlık'}[data.tip]||data.tip;
         title=`${kupe} — ${etiket}`; sub=snap.irk||snap.grup||'';
         if(snap.kupe_no||snap.devlet_kupe) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
@@ -1997,7 +1997,7 @@ async function openTohDet(id){
   const hk=[...HEKIMLER,...(_customHekimler||[])].find(x=>x.id===t.hekim_id);
   // Küpe çözümle
   const hayvanObj=getState('animals').find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
-  const hayvanLabel=hayvanObj?(hayvanObj.kupe_no||hayvanObj.devlet_kupe||t.hayvan_id):t.hayvan_id;
+  const hayvanLabel=hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||t.hayvan_id;
   document.getElementById('td2-hayvan').textContent=hayvanLabel||'?';
   document.getElementById('td2-sperma').textContent=`💉 ${t.sperma||'?'}`;
   const sc=t.sonuc==='Gebe'?'var(--green)':t.sonuc==='Boş'?'var(--red)':'var(--amber)';
