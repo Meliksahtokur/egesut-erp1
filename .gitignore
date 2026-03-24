@@ -5,3 +5,25 @@ node_modules
 *.bak
 apply_*.py
 asama*.patch
+
+# Cache
+.pycache_hidden/
+__pycache__/
+*.pyc
+
+# Gizlenen klasörler
+.sonarqube_dl/
+.watchman/
+.atsiki/
+
+# Supabase migrations
+
+# Loglar ve geçici
+log.txt
+calendar_events.py
+
+# VSCode workspace
+.vscode/settings.json
+
+# Repomix
+.repomixignore
