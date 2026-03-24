@@ -736,9 +736,9 @@ Tamamlanan her fix için bu tabloya ✅ işareti koy ve commit hash ekle.
 | FIX-1.3 | Constant truthiness | ui.js | ✅ | f8874a0 |
 | FIX-1.4 | Empty logs array | ui.js | ✅ | f8874a0 |
 | FIX-1.5 | Duplicate stokDrugBagla | ui.js | ✅ | f8874a0 |
-| FIX-2.1 | Global annotation ui.js | ui.js | ⏳ | — |
-| FIX-2.2 | Global annotation forms.js | forms.js | ⏳ | — |
-| FIX-2.3 | HEKIMLER const→let | config.js, app.js | ⏳ | — |
+| FIX-2.1 | Global annotation ui.js | ui.js | ✅ | 14cda49 |
+| FIX-2.2 | Global annotation forms.js | forms.js | ✅ | 14cda49 |
+| FIX-2.3 | HEKIMLER const→let | config.js, app.js | ✅ | 14cda49 |
 | FIX-3.1 | S2681 misleading if/else | app.js, ui.js | ⏳ | — |
 | FIX-3.2 | S1871 duplicate branch | app.js | ⏳ | — |
 | FIX-3.3 | S6660 if-in-else | app.js | ⏳ | — |
