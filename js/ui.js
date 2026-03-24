@@ -788,28 +788,7 @@ async function loadUreme(tab='kizginlik'){
           </div>`;
         }).join(''):'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
     }
-    else if(tab==='tohumlama'){
-      const list=await idbGetAll('tohumlama');
-      list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-      el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
-        (list.length?list.map(t=>{
-          const h=getState('animals').find(a=>a.id===t.hayvan_id);
-          const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
-          const _sc2Gebe=t.sonuc==='Gebe';
-          const _sc2Kotu=t.sonuc==='Boş'||t.sonuc==='Abort';
-          const sc=_sc2Gebe?'var(--green)':_sc2Kotu?'var(--red)':'var(--amber)';
-          const _sonucGebe=t.sonuc==='Gebe';
-      const _sonucKotu=t.sonuc==='Boş'||t.sonuc==='Abort';
-      const dot=_sonucGebe?'var(--green2)':_sonucKotu?'var(--red2)':'var(--amber)';
-          return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
-            <div class="hist-dot" style="background:${dot}"></div>
-            <div class="hist-main">
-              <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
-              <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
-            </div>
-          </div>`;
-        }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
-    }
+    else if(tab==='tohumlama') await _uremeTohumlama(el);
     else if(tab==='gebelik'){
       const tohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
       const gebeHayvanlar=getState('animals').filter(a=>a.durum==='Gebe');
