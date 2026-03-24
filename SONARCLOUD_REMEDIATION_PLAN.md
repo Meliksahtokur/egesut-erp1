@@ -792,3 +792,97 @@ Her sprint başında AI'ya şu bağlamı ver:
 *\*\* Accessibility WONTFIX olarak işaretlenecek, sayı değişmez ama "Won't Fix" kategorisinde olur*
 
 **Not:** SonarCloud bazı issue'ları iki kez sayıyor (aynı issue iki farklı tarihte scan edilmiş). Gerçek unique fix sayısı daha az, ama plan tutarlı.
+
+---
+
+## OTURUM NOTU — 2026-03-24
+
+### Tamamlanan
+- FIX-4.1 kısmen: `loadUreme` helper'lara bölündü (`_uremeKizginlik`, `_uremeGebelik`, `_uremeDogum`, `_uremeAbort`)
+- `_gecmisEntryHtml` helper eklendi, `loadGecmis` temizlendi
+
+### KRİTİK EKSİK — Bir sonraki oturumda ÖNCE bunlar
+1. **`_uremeTohumlama` KAYIP** — patch sırasında düştü, `_uremeTohumlama is not a function` hatası veriyor
+   - Fix: `_uremeAbort`'tan önce ekle, içerik `js/ui.js` commit geçmişinde veya aşağıda:
+   ```js
+   async function _uremeTohumlama(el){
+     const list=await idbGetAll('tohumlama');
+     list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+     el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
+       (list.length?list.map(t=>{
+         const h=getState('animals').find(a=>a.id===t.hayvan_id);
+         const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
+         const _gebe=t.sonuc==='Gebe';
+         const _kotu=t.sonuc==='Boş'||t.sonuc==='Abort';
+         const dot=_gebe?'var(--green2)':_kotu?'var(--red2)':'var(--amber)';
+         const sc=_gebe?'var(--green)':_kotu?'var(--red)':'var(--amber)';
+         return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
+           <div class="hist-dot" style="background:${dot}"></div>
+           <div class="hist-main">
+             <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
+             <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
+           </div>
+         </div>`;
+       }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
+   }
+Gebelik hesabı bozuk — eski tarihli kayıtlar var (örn. 1994), dFwd hesabı yanlış değil, veri sorunu. Kontrol: SELECT * FROM tohumlama WHERE sonuc='Gebe' ORDER BY tarih — muhtemelen test kayıtları.
+Kızgınlık kaydı eklenemiyor — kizginlik_log tablosunda anon INSERT policy eksik (LastSpec.md'de zaten 🔴 olarak işaretli). Migration gerekiyor.
+Tohumlama eklenemiyor — yeni stok mimarisinde spermaModStok fonksiyonu getState('stock') yerine eski _S kullanıyor olabilir. app.js'deki spermaModStok kontrol edilmeli.
+Görevler tam çalışmıyor — detay belirsiz, bir sonraki oturumda konsoldan hata mesajı alınacak.
+FIX-4.1 Durumu
+loadUreme ✅ bölündü (ama _uremeTohumlama eksik — yukarıya ekle)
+loadGecmis ✅ bölündü
+loadDash, openDet, renderAnimals → henüz bölünmedi
+Sonraki Adım Sırası
+_uremeTohumlama patch (1 dk)
+kizginlik_log INSERT policy migration
+Tohumlama sorunu debug
+Görevler debug
+FIX-4.1 kalan: loadDash → _dashRenderBands + _dashRenderStats
+
+---
+
+## OTURUM NOTU — 2026-03-24
+
+### Tamamlanan
+- FIX-4.1 kısmen: `loadUreme` helper'lara bölündü (`_uremeKizginlik`, `_uremeGebelik`, `_uremeDogum`, `_uremeAbort`)
+- `_gecmisEntryHtml` helper eklendi, `loadGecmis` temizlendi
+
+### KRİTİK EKSİK — Bir sonraki oturumda ÖNCE bunlar
+1. **`_uremeTohumlama` KAYIP** — patch sırasında düştü, `_uremeTohumlama is not a function` hatası veriyor
+   - Fix: `_uremeAbort`'tan önce ekle, içerik `js/ui.js` commit geçmişinde veya aşağıda:
+   ```js
+   async function _uremeTohumlama(el){
+     const list=await idbGetAll('tohumlama');
+     list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+     el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
+       (list.length?list.map(t=>{
+         const h=getState('animals').find(a=>a.id===t.hayvan_id);
+         const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
+         const _gebe=t.sonuc==='Gebe';
+         const _kotu=t.sonuc==='Boş'||t.sonuc==='Abort';
+         const dot=_gebe?'var(--green2)':_kotu?'var(--red2)':'var(--amber)';
+         const sc=_gebe?'var(--green)':_kotu?'var(--red)':'var(--amber)';
+         return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
+           <div class="hist-dot" style="background:${dot}"></div>
+           <div class="hist-main">
+             <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
+             <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
+           </div>
+         </div>`;
+       }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
+   }
+Gebelik hesabı bozuk — eski tarihli kayıtlar var (örn. 1994), dFwd hesabı yanlış değil, veri sorunu. Kontrol: SELECT * FROM tohumlama WHERE sonuc='Gebe' ORDER BY tarih — muhtemelen test kayıtları.
+Kızgınlık kaydı eklenemiyor — kizginlik_log tablosunda anon INSERT policy eksik (LastSpec.md'de zaten 🔴 olarak işaretli). Migration gerekiyor.
+Tohumlama eklenemiyor — yeni stok mimarisinde spermaModStok fonksiyonu getState('stock') yerine eski _S kullanıyor olabilir. app.js'deki spermaModStok kontrol edilmeli.
+Görevler tam çalışmıyor — detay belirsiz, bir sonraki oturumda konsoldan hata mesajı alınacak.
+FIX-4.1 Durumu
+loadUreme ✅ bölündü (ama _uremeTohumlama eksik — yukarıya ekle)
+loadGecmis ✅ bölündü
+loadDash, openDet, renderAnimals → henüz bölünmedi
+Sonraki Adım Sırası
+_uremeTohumlama patch (1 dk)
+kizginlik_log INSERT policy migration
+Tohumlama sorunu debug
+Görevler debug
+FIX-4.1 kalan: loadDash → _dashRenderBands + _dashRenderStats
