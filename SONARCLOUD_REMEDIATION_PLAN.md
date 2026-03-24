@@ -731,11 +731,11 @@ Tamamlanan her fix için bu tabloya ✅ işareti koy ve commit hash ekle.
 | Fix ID | Açıklama | Dosya(lar) | Durum | Commit |
 |--------|----------|-----------|-------|--------|
 | WONTFIX | SonarCloud'da işaretleme | SonarCloud UI | ⏳ | — |
-| FIX-1.1 | Duplicate ID'ler | index.html | ⏳ | — |
-| FIX-1.2 | NullComparison SQL | faz1_core.sql | ⏳ | — |
-| FIX-1.3 | Constant truthiness | ui.js | ⏳ | — |
-| FIX-1.4 | Empty logs array | ui.js | ⏳ | — |
-| FIX-1.5 | Duplicate stokDrugBagla | ui.js | ⏳ | — |
+| FIX-1.1 | Duplicate ID'ler | index.html | ✅ | f8874a0 |
+| FIX-1.2 | NullComparison SQL | faz1_core.sql | ⏭ WONTFIX | — |
+| FIX-1.3 | Constant truthiness | ui.js | ✅ | f8874a0 |
+| FIX-1.4 | Empty logs array | ui.js | ✅ | f8874a0 |
+| FIX-1.5 | Duplicate stokDrugBagla | ui.js | ✅ | f8874a0 |
 | FIX-2.1 | Global annotation ui.js | ui.js | ⏳ | — |
 | FIX-2.2 | Global annotation forms.js | forms.js | ⏳ | — |
 | FIX-2.3 | HEKIMLER const→let | config.js, app.js | ⏳ | — |
