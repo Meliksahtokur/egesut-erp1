@@ -2420,8 +2420,8 @@ async function dataTrafficYenile(){
     </div>`;
   }).join('');
 }
-async function dataTrafficGonder(){
-  const btn=event.target;
+async function dataTrafficGonder(e){
+  const btn=(e||window.event).target;
   btn.disabled=true; btn.textContent='Gönderiliyor…';
   await syncNow();
   await dataTrafficYenile();
