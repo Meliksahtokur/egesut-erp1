@@ -154,28 +154,26 @@ function goTo(pg) {
   if (pgEl) pgEl.classList.add('on');
   if (nbEl) nbEl.classList.add('on');
 
-  if (pg === 'dash')     Promise.all([loadDash(), loadStokList()]);
-  if (pg === 'tasks')    loadTasks(_curTaskFilter || 'today');
-  if (pg === 'gecmis')   loadGecmis(_curGecmisFilter || 'hepsi');
-  if (pg === 'log')      Promise.all([loadBirths(), loadStokList()]);
-  if (pg === 'ureme')    loadUreme(_curUremeTab || 'kizginlik');
-  if (pg === 'bildirim') loadBildirimler(_curBildirimTab || 'bekliyor');
-  if (pg === 'raporlar') loadRaporlar();
-  if (pg !== 'dash')     loadDash();
+  if (pg === 'dash')     { Promise.all([loadDash(), loadStokList()]); }
+  else if (pg === 'tasks')    { loadTasks(_curTaskFilter || 'today'); loadDash(); }
+  else if (pg === 'gecmis')   { loadGecmis(_curGecmisFilter || 'hepsi'); loadDash(); }
+  else if (pg === 'log')      { Promise.all([loadBirths(), loadStokList()]); loadDash(); }
+  else if (pg === 'ureme')    { loadUreme(_curUremeTab || 'kizginlik'); loadDash(); }
+  else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
+  else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
 }
 
 // ── RENDER FROM LOCAL ────────────────────────
 async function renderFromLocal() {
   await Promise.all([loadAnimals(), loadStock()]);
   const pg = _curPg || 'dash';
-  if (pg === 'dash')     await Promise.all([loadDash(), loadStokList()]);
-  if (pg === 'tasks')    await loadTasks(_curTaskFilter || 'today');
-  if (pg === 'gecmis')   await loadGecmis(_curGecmisFilter || 'hepsi');
-  if (pg === 'log')      await Promise.all([loadBirths(), loadStokList()]);
-  if (pg === 'ureme')    loadUreme(_curUremeTab || 'kizginlik');
-  if (pg === 'bildirim') loadBildirimler(_curBildirimTab || 'bekliyor');
-  if (pg === 'raporlar') loadRaporlar();
-  if (pg !== 'dash')     loadDash();
+  if (pg === 'dash')     { await Promise.all([loadDash(), loadStokList()]); }
+  else if (pg === 'tasks')    { await loadTasks(_curTaskFilter || 'today'); await loadDash(); }
+  else if (pg === 'gecmis')   { await loadGecmis(_curGecmisFilter || 'hepsi'); await loadDash(); }
+  else if (pg === 'log')      { await Promise.all([loadBirths(), loadStokList()]); await loadDash(); }
+  else if (pg === 'ureme')    { loadUreme(_curUremeTab || 'kizginlik'); loadDash(); }
+  else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
+  else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
   checkSpermaUyari();
   updateBildirimBadge();
 }
