@@ -95,13 +95,11 @@ function openM(id) {
   }
   if (id === 'm-disease') {
     _semptomSecili = [];
+    _diseasesCache = [];
     if(g('sempt-chips')) g('sempt-chips').innerHTML = '';
     if(g('d-sempt')) g('d-sempt').value = '';
     updateSemptomDropdown('');
     filterHastalikList();
-  }
-  if (id === 'm-disease') {
-    _diseasesCache = [];
     loadDiseasesDropdown('');
   }
 }

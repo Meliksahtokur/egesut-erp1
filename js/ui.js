@@ -815,7 +815,7 @@ async function loadUreme(tab='kizginlik'){
         (tohs.length||extra.length?[...tohs.map(t=>{
           const h=getState('animals').find(a=>a.id===t.hayvan_id);
           const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
-          const gun=Math.floor((new Date()-new Date(t.tarih))/86400000);
+          const gun=Math.floor((Date.now()-new Date(t.tarih).getTime())/86400000);
           const ay=Math.floor(gun/30), gKalan=gun%30;
           const dogumTahmini=dFwd(t.tarih,280);
           const kalanGun=Math.floor((new Date(dogumTahmini)-new Date())/86400000);
