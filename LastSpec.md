@@ -127,6 +127,8 @@ drug_classes (grup/sınıf/etken madde — 29 kayıt seed)
 | Migration 013-014 repo'da yok | 🟠 | Drift devam ediyor |
 | `kizginlik_log` anon INSERT policy yok | 🔴 | Migration ile eklenecek |
 | Üreme sekmesi yazı rengi koyu — dark bg'da zor okunuyor | 🟡 | CSS fix bekliyor |
+| `kizginlik_log` anon INSERT policy yok | 🔴 | Migration ile eklenecek |
+| Üreme sekmesi yazı rengi koyu — dark bg'da zor okunuyor | 🟡 | CSS fix bekliyor |
 | `stok_hareket` hekim takibi yok | 🟡 | Auth bekliyor |
 
 ---
