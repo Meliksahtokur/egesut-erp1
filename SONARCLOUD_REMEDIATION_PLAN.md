@@ -741,10 +741,10 @@ Tamamlanan her fix için bu tabloya ✅ işareti koy ve commit hash ekle.
 | FIX-2.3 | HEKIMLER const→let | config.js, app.js | ✅ | 14cda49 |
 | FIX-3.1 | S2681 misleading if/else | app.js, ui.js | ⏳ | — |
 | FIX-3.2 | S1871 duplicate branch | app.js | ⏳ | — |
-| FIX-3.3 | S6660 if-in-else | app.js | ⏳ | — |
+| FIX-3.3 | S6660 if-in-else | app.js | ✅ | commit:S3a |
 | FIX-3.4 | S1854+S1481 useless vars | ui.js | ⏳ | — |
 | FIX-3.5 | S2486 empty catch | app.js, forms.js, ui.js | ⏳ | — |
-| FIX-3.6 | S1874 deprecated event | api.js, ui.js | ⏳ | — |
+| FIX-3.6 | S1874 deprecated event | api.js, ui.js | ✅ | commit:S3a |
 | FIX-3.7 | S7735 negated conditions | api.js, ui.js | ⏳ | — |
 | FIX-3.8 | S7754 some vs find | app.js, ui.js | ⏳ | — |
 | FIX-3.9 | S7759 Date.now | ui.js | ⏳ | — |
