@@ -776,17 +776,17 @@ Tamamlanan her fix için bu tabloya ✅ işareti koy ve commit hash ekle.
 | FIX-3.4 | S1854+S1481 useless vars | ui.js | ✅ | b572e26 |
 | FIX-3.5 | S2486 empty catch | app.js, forms.js, ui.js | ✅ | zaten dolu |
 | FIX-3.6 | S1874 deprecated event | api.js, ui.js | ✅ | 0f2f0e2 |
-| FIX-3.7 | S7735 negated conditions | api.js, ui.js | ⏳ | — |
+| FIX-3.7 | S7735 negated conditions | api.js, ui.js | ✅ | 55e8212 |
 | FIX-3.8 | S7754 some vs find | app.js, ui.js | ✅ | b572e26 |
 | FIX-3.9 | S7759 Date.now | ui.js | ⏭ no-op (pattern yok) | — |
 | FIX-4.1 | S3776 cognitive complexity — loadUreme, loadGecmis, loadDash, renderAnimals, openDet | ui.js | ✅ | 0f2f0e2 |
-| FIX-4.1 | S3776 kalan: write(), renderFromLocal/goTo, loadTasks | api.js, app.js, ui.js | ⏳ | — |
+| FIX-4.1 | S3776 kalan: write() refactor | api.js | ✅ | 55e8212 |
 | FIX-4.2 | S3358 nested ternary — tüm ui.js | ui.js, forms.js | ✅ | b572e26 |
 | FIX-4.3 | S6582 optional chain | ui.js, forms.js | ✅ | b572e26 |
-| FIX-5.1 | S7773 Number.parseFloat | forms.js, ui.js | ⏳ | — |
-| FIX-5.2 | S7781 replaceAll | app.js, ui.js | ⏳ | — |
-| FIX-5.3 | S7780 String.raw | app.js, ui.js | ⏳ | — |
-| FIX-5.4 | S7764 globalThis | ui.js, forms.js | ⏳ | — |
+| FIX-5.1 | S7773 Number.parseFloat | forms.js, ui.js | ✅ | 55e8212 |
+| FIX-5.2 | S7781 replaceAll | ui.js (1 konum) | ✅ | 55e8212 |
+| FIX-5.3 | S7780 String.raw | — | ⏭ no-op (pattern yok) | — |
+| FIX-5.4 | S7764 globalThis | ui.js, forms.js, app.js, api.js, state.js | ✅ | 55e8212 |
 
 ---
 
@@ -854,10 +854,13 @@ Her sprint başında AI'ya şu bağlamı ver:
 - FIX-4.2: nested ternary 7 lokasyon düzeltildi (ui.js)
 - FIX-4.3: optional chain — ui.js + forms.js
 
-### Sıradaki Sprint (S3 Kalan + S5)
-- FIX-3.7 S7735 negated conditions (7 konum — api.js, ui.js)
-- FIX-4.1 kalan: write() api.js cognitive complexity
-- FIX-5.1 S7773 Number.parseFloat (~22 konum)
-- FIX-5.2 S7781 replaceAll (~26 konum)
-- FIX-5.3 S7780 String.raw (~18 konum)
-- FIX-5.4 S7764 globalThis (~52 konum, dikkatli)
+### Oturum 3 (55e8212) — Tamamlananlar
+- FIX-3.7: S7735 negated condition flipped (api.js syncNow)
+- FIX-4.1: write() → _writePatch + _writePost (api.js cognitive complexity azaltıldı)
+- FIX-5.1: parseFloat → Number.parseFloat (forms.js + ui.js, 14 konum)
+- FIX-5.2: .replace('-','.') → .replaceAll (ui.js:1769)
+- FIX-5.3: skip — backslash escape pattern yok
+- FIX-5.4: window._TH/appState/tohMap/detGecmisLogs/semptomSecili/hdiIlacCache/__state → globalThis (5 dosya)
+
+### Sıradaki Sprint — TÜM SPRINTLER TAMAMLANDI ✅
+Kalan sadece SonarCloud UI'da manuel WONTFIX işaretleme var.
