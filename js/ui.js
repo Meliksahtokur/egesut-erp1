@@ -626,7 +626,7 @@ async function openAnimalEdit(id){
     }
 
     // Grup + padok
-    animalFormGuncelle();
+    await animalFormGuncelle();
     setTimeout(()=>{
       const grupSel=document.getElementById('a-grup');
       if(grupSel && a.grup){
