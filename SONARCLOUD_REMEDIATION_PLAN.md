@@ -20,6 +20,37 @@
 
 ---
 
+## TEST & DEPLOY PROTOKOLÜ
+
+### Sprint Sonu Akışı
+
+1. **AI sprint'i tamamlar** — tüm fix'ler uygulanır, `node --check` ile syntax doğrulanır.
+2. **AI test listesi üretir** — değiştirilen her kod bölgesi için "ne tıklanır, ne kontrol edilir" maddeleri açıklanır.
+3. **Kullanıcı lokalden test eder** — tarayıcı konsolunu açık tutarak AI'ın belirttiği noktaları manuel olarak test eder.
+4. **Konsol hatası yoksa** → `git commit` + `git push` → SonarCloud yeni scan'ı bekler.
+5. **Hata varsa** → hata mesajı AI'ya iletilir, aynı oturumda düzeltilir, test tekrar edilir.
+
+### Test Sırasında Konsol İçin Kurallar
+
+- Tarayıcıda **F12 → Console** sekmesi açık olsun.
+- `is not a function`, `Cannot read properties of`, `Uncaught ReferenceError` gibi hatalar varsa tam hata metnini + hangi işlemi yaparken çıktığını not et.
+- Network sekmesinde kırmızı (4xx/5xx) istek varsa URL ve status kodunu not et.
+
+### AI'ın Test Listesini Nasıl Üreteceği
+
+Sprint bitti mesajından sonra AI her değişen **fonksiyon/bölge** için şu formatta test maddesi yazar:
+
+```
+## [Sprint kodu] Test Listesi
+
+### [Fonksiyon / Bölge Adı]
+- Adım: [ne yapılır]
+- Beklenen: [ne görülmeli]
+- Konsol riski: [hangi hata çıkabilir, neden]
+```
+
+---
+
 ## BÖLÜM 0 — WONTFIX KATALOG (~188 issue)
 
 Bu issue'lar SonarCloud'da "Won't Fix" olarak işaretlenecek. Kod değişikliği YOK.
@@ -741,15 +772,16 @@ Tamamlanan her fix için bu tabloya ✅ işareti koy ve commit hash ekle.
 | FIX-2.3 | HEKIMLER const→let | config.js, app.js | ✅ | 14cda49 |
 | FIX-3.1 | S2681 misleading if/else | app.js, ui.js | ⏳ | — |
 | FIX-3.2 | S1871 duplicate branch | app.js | ⏳ | — |
-| FIX-3.3 | S6660 if-in-else | app.js | ✅ | commit:S3a |
+| FIX-3.3 | S6660 if-in-else | app.js | ✅ | 20f60ba |
 | FIX-3.4 | S1854+S1481 useless vars | ui.js | ⏳ | — |
 | FIX-3.5 | S2486 empty catch | app.js, forms.js, ui.js | ⏳ | — |
-| FIX-3.6 | S1874 deprecated event | api.js, ui.js | ✅ | commit:S3a |
+| FIX-3.6 | S1874 deprecated event | api.js, ui.js | ✅ | 0f2f0e2 |
 | FIX-3.7 | S7735 negated conditions | api.js, ui.js | ⏳ | — |
 | FIX-3.8 | S7754 some vs find | app.js, ui.js | ⏳ | — |
 | FIX-3.9 | S7759 Date.now | ui.js | ⏳ | — |
-| FIX-4.1 | S3776 cognitive complexity | ui.js, app.js, api.js | ⏳ | — |
-| FIX-4.2 | S3358 nested ternary | ui.js, forms.js | ⏳ | — |
+| FIX-4.1 | S3776 cognitive complexity — loadUreme, loadGecmis, loadDash, renderAnimals, openDet | ui.js | ✅ | 0f2f0e2 |
+| FIX-4.1 | S3776 kalan: write(), renderFromLocal/goTo, loadTasks | api.js, app.js, ui.js | ⏳ | — |
+| FIX-4.2 | S3358 nested ternary — forms.js + ui.js kısmi | ui.js, forms.js | 🔶 kısmi | 0f2f0e2 |
 | FIX-4.3 | S6582 optional chain | ui.js, forms.js | ⏳ | — |
 | FIX-5.1 | S7773 Number.parseFloat | forms.js, ui.js | ⏳ | — |
 | FIX-5.2 | S7781 replaceAll | app.js, ui.js | ⏳ | — |
@@ -795,94 +827,33 @@ Her sprint başında AI'ya şu bağlamı ver:
 
 ---
 
-## OTURUM NOTU — 2026-03-24
+## OTURUM NOTU — 2026-03-25
 
-### Tamamlanan
-- FIX-4.1 kısmen: `loadUreme` helper'lara bölündü (`_uremeKizginlik`, `_uremeGebelik`, `_uremeDogum`, `_uremeAbort`)
-- `_gecmisEntryHtml` helper eklendi, `loadGecmis` temizlendi
+### Sonar Fixleri (commit'lendi)
+- FIX-4.1: `loadUreme` → `_uremeKizginlik`, `_uremeTohumlama`, `_uremeGebelik`, `_uremeDogum`, `_uremeAbort`
+- FIX-4.1: `loadGecmis` → `_gecmisEntryHtml`
+- FIX-4.1: `loadDash` → `_dashStatRow` + `_dashBands`
+- FIX-4.1: `renderAnimals` → `_animalTagsHtml` + `_animalCardHtml`
+- FIX-4.1: `openDet` → `_detSaglikRender` + `_detGorevHtml`
+- FIX-4.2: forms.js nested ternary (`openTohDet`, `tohSonuc`)
+- FIX-3.3: app.js `else{if}` → `else if`
+- FIX-3.6: `dataTrafficGonder(e)` deprecated event fix
 
-### KRİTİK EKSİK — Bir sonraki oturumda ÖNCE bunlar
-1. **`_uremeTohumlama` KAYIP** — patch sırasında düştü, `_uremeTohumlama is not a function` hatası veriyor
-   - Fix: `_uremeAbort`'tan önce ekle, içerik `js/ui.js` commit geçmişinde veya aşağıda:
-   ```js
-   async function _uremeTohumlama(el){
-     const list=await idbGetAll('tohumlama');
-     list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-     el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
-       (list.length?list.map(t=>{
-         const h=getState('animals').find(a=>a.id===t.hayvan_id);
-         const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
-         const _gebe=t.sonuc==='Gebe';
-         const _kotu=t.sonuc==='Boş'||t.sonuc==='Abort';
-         const dot=_gebe?'var(--green2)':_kotu?'var(--red2)':'var(--amber)';
-         const sc=_gebe?'var(--green)':_kotu?'var(--red)':'var(--amber)';
-         return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
-           <div class="hist-dot" style="background:${dot}"></div>
-           <div class="hist-main">
-             <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
-             <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
-           </div>
-         </div>`;
-       }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
-   }
-Gebelik hesabı bozuk — eski tarihli kayıtlar var (örn. 1994), dFwd hesabı yanlış değil, veri sorunu. Kontrol: SELECT * FROM tohumlama WHERE sonuc='Gebe' ORDER BY tarih — muhtemelen test kayıtları.
-Kızgınlık kaydı eklenemiyor — kizginlik_log tablosunda anon INSERT policy eksik (LastSpec.md'de zaten 🔴 olarak işaretli). Migration gerekiyor.
-Tohumlama eklenemiyor — yeni stok mimarisinde spermaModStok fonksiyonu getState('stock') yerine eski _S kullanıyor olabilir. app.js'deki spermaModStok kontrol edilmeli.
-Görevler tam çalışmıyor — detay belirsiz, bir sonraki oturumda konsoldan hata mesajı alınacak.
-FIX-4.1 Durumu
-loadUreme ✅ bölündü (ama _uremeTohumlama eksik — yukarıya ekle)
-loadGecmis ✅ bölündü
-loadDash, openDet, renderAnimals → henüz bölünmedi
-Sonraki Adım Sırası
-_uremeTohumlama patch (1 dk)
-kizginlik_log INSERT policy migration
-Tohumlama sorunu debug
-Görevler debug
-FIX-4.1 kalan: loadDash → _dashRenderBands + _dashRenderStats
+### Plan Dışı Bug Fixleri (aynı oturumda test edildi ✅)
+- `openTaskDet` `getDisplayKupe` hatası: script versiyonları güncellenerek cache bust yapıldı
+- `loadBirths`: hardcode `#fff`/`#1a2010` → `var(--card2)`/`var(--ink2)` (dark mode uyumu)
+- `loadBirths`: `b.anne_id` raw → küpe_no lookup + doğum tipi renkli chip
+- Gebe badge: tohumlama tarihinden gebelik günü gösterimi, 400 gün cap kaldırıldı
+- `_uremeTohumlama` + `_uremeDogum`: `hist-title` `var(--ink)` → `var(--ink2)` (okunabilirlik)
 
----
-
-## OTURUM NOTU — 2026-03-24
-
-### Tamamlanan
-- FIX-4.1 kısmen: `loadUreme` helper'lara bölündü (`_uremeKizginlik`, `_uremeGebelik`, `_uremeDogum`, `_uremeAbort`)
-- `_gecmisEntryHtml` helper eklendi, `loadGecmis` temizlendi
-
-### KRİTİK EKSİK — Bir sonraki oturumda ÖNCE bunlar
-1. **`_uremeTohumlama` KAYIP** — patch sırasında düştü, `_uremeTohumlama is not a function` hatası veriyor
-   - Fix: `_uremeAbort`'tan önce ekle, içerik `js/ui.js` commit geçmişinde veya aşağıda:
-   ```js
-   async function _uremeTohumlama(el){
-     const list=await idbGetAll('tohumlama');
-     list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-     el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
-       (list.length?list.map(t=>{
-         const h=getState('animals').find(a=>a.id===t.hayvan_id);
-         const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
-         const _gebe=t.sonuc==='Gebe';
-         const _kotu=t.sonuc==='Boş'||t.sonuc==='Abort';
-         const dot=_gebe?'var(--green2)':_kotu?'var(--red2)':'var(--amber)';
-         const sc=_gebe?'var(--green)':_kotu?'var(--red)':'var(--amber)';
-         return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
-           <div class="hist-dot" style="background:${dot}"></div>
-           <div class="hist-main">
-             <div class="hist-title">${kupe} — ${t.sperma||'?'}</div>
-             <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
-           </div>
-         </div>`;
-       }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
-   }
-Gebelik hesabı bozuk — eski tarihli kayıtlar var (örn. 1994), dFwd hesabı yanlış değil, veri sorunu. Kontrol: SELECT * FROM tohumlama WHERE sonuc='Gebe' ORDER BY tarih — muhtemelen test kayıtları.
-Kızgınlık kaydı eklenemiyor — kizginlik_log tablosunda anon INSERT policy eksik (LastSpec.md'de zaten 🔴 olarak işaretli). Migration gerekiyor.
-Tohumlama eklenemiyor — yeni stok mimarisinde spermaModStok fonksiyonu getState('stock') yerine eski _S kullanıyor olabilir. app.js'deki spermaModStok kontrol edilmeli.
-Görevler tam çalışmıyor — detay belirsiz, bir sonraki oturumda konsoldan hata mesajı alınacak.
-FIX-4.1 Durumu
-loadUreme ✅ bölündü (ama _uremeTohumlama eksik — yukarıya ekle)
-loadGecmis ✅ bölündü
-loadDash, openDet, renderAnimals → henüz bölünmedi
-Sonraki Adım Sırası
-_uremeTohumlama patch (1 dk)
-kizginlik_log INSERT policy migration
-Tohumlama sorunu debug
-Görevler debug
-FIX-4.1 kalan: loadDash → _dashRenderBands + _dashRenderStats
+### Sıradaki Sprint (S3 Kalan + S4 Kalan)
+- FIX-3.1 S2681 misleading if/else (5 konum)
+- FIX-3.2 S1871 duplicate branch app.js:292
+- FIX-3.4 S1854+S1481 useless vars (ui.js)
+- FIX-3.5 S2486 empty catch (3 konum)
+- FIX-3.7 S7735 negated conditions (7 konum)
+- FIX-3.8 S7754 .some() vs .find() (4 konum)
+- FIX-3.9 S7759 Date.now (4 konum)
+- FIX-4.1 kalan: write(), renderFromLocal/goTo, loadTasks
+- FIX-4.2 ui.js nested ternary (~16 konum kaldı)
+- FIX-4.3 optional chain (17 konum)

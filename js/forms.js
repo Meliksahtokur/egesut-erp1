@@ -475,50 +475,7 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
 }
 
 // Görev detay modal
-async function openTaskDet(id) {
-  const task = (await getData('gorev_log', t => t.id === id))[0];
-  if (!task) return;
-  _curTaskDet = task;
-  const h = getState('animals').find(a => a.id === task.hayvan_id);
-  g('td-title').textContent  = task.aciklama || '';
-  g('td-hayvan').textContent = h ? getDisplayKupe(h) : (task.hayvan_id || '—');
-  g('td-tarih').textContent  = fmtTarih(task.hedef_tarih);
-  g('td-tip').textContent    = task.gorev_tipi || '';
-
-  // Sub-görevler
-  const subs = await getData('gorev_log', t => t.parent_id === id);
-  const subEl = g('td-subs');
-  if (subEl) subEl.innerHTML = subs.length
-    ? subs.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--card2)">
-        <input type="checkbox" ${s.tamamlandi ? 'checked' : ''} onchange="toggleSub('${s.id}','${id}',this)" style="width:16px;height:16px">
-        <span style="font-size:.8rem;${s.tamamlandi ? 'text-decoration:line-through;color:var(--ink3)' : ''}">${s.aciklama}</span>
-      </div>`).join('')
-    : '';
-  openM('m-task-det');
-}
-
-async function toggleSub(subId, parentId, el) {
-  const tamamlandi = el.checked;
-  await write('gorev_log', { tamamlandi, tamamlanma_tarihi: tamamlandi ? new Date().toISOString() : null }, 'PATCH', `id=eq.${subId}`);
-}
-
-async function detayTamamla() {
-  if (!_curTaskDet) return;
-  await write('gorev_log', { ..._curTaskDet, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString() }, 'PATCH', `id=eq.${_curTaskDet.id}`);
-  toast('✅ Görev tamamlandı');
-  closeM('m-task-det');
-  await loadTasks(_curTaskFilter || 'today');
-  loadDash();
-}
-async function detayIptal() {
-  if (!_curTaskDet) return;
-  if (!confirm('Bu görevi iptal etmek istediğinize emin misiniz?')) return;
-  await write('gorev_log', { ..._curTaskDet, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString() }, 'PATCH', `id=eq.${_curTaskDet.id}`);
-  toast('Görev iptal edildi');
-  closeM('m-task-det');
-  await loadTasks(_curTaskFilter || 'today');
-  loadDash();
-}
+// openTaskDet, detayTamamla, detayIptal → ui.js'te tanımlı (daha tam versiyon)
 
 // Manuel görev ekle
 async function submitTaskAdd(btn) {
@@ -666,7 +623,8 @@ async function openTohDet(id) {
   const hk = HEKIMLER.find(x => x.id === t.hekim_id) || _customHekimler.find(x => x.id === t.hekim_id);
   g('td2-hayvan').textContent = t.hayvan_id || '?';
   g('td2-sperma').textContent = `💉 ${t.sperma || '?'}`;
-  const sc    = t.sonuc === 'Gebe' ? 'var(--green)' : t.sonuc === 'Boş' ? 'var(--red)' : 'var(--amber)';
+  const scBoş = t.sonuc === 'Boş' ? 'var(--red)' : 'var(--amber)';
+  const sc    = t.sonuc === 'Gebe' ? 'var(--green)' : scBoş;
   const chips = [
     `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc || 'Bekliyor'}</span>`,
     `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no || 1}. deneme</span>`,
@@ -679,7 +637,8 @@ async function openTohDet(id) {
 async function tohSonuc(sonuc) {
   if (!_curToh) return;
   await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
-  toast(sonuc === 'Gebe' ? '✅ Gebe olarak işaretlendi' : sonuc === 'Boş' ? 'Boş olarak işaretlendi' : 'Güncellendi');
+  const msg = sonuc === 'Gebe' ? '✅ Gebe olarak işaretlendi' : sonuc === 'Boş' ? 'Boş olarak işaretlendi' : 'Güncellendi';
+  toast(msg);
   closeM('m-toh-det');
   renderSafe();
 }

@@ -252,7 +252,7 @@ button,input,select,textarea{font-family:inherit}
     <div id="dot"></div>
     <button id="refbtn" onclick="this.classList.add('spinning');refreshAll().finally(()=>this.classList.remove('spinning'))">↻</button>
     <button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
-    <button id="errorbtn" onclick="document.getElementById('error-panel').style.display='block'; renderErrorLog();" style="background:rgba(255,68,68,.2);border:1px solid #ff4444;color:#ff8888;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">🐞 Hata</button>
+    <button id="errorbtn" onclick="document.getElementById('error-panel').style.display='block'; renderErrorLog();" style="background:rgba(78,154,42,.15);border:1px solid #4e9a2a;color:#4e9a2a;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">✅ All is well</button>
   </div>
 </div>
 
@@ -932,16 +932,14 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
-<div id="simple-error" style="display:none; position:fixed; top:60px; left:10px; right:10px; background:#c0321a; color:#fff; padding:10px; border-radius:8px; font-size:12px; z-index:9999; word-break:break-all;"></div>
-
 <!-- ═══ HATA PANELİ ═══ -->
 <div id="error-panel" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.95); z-index:10000; padding:20px; overflow:auto; color:#fff; font-family:monospace; font-size:12px;">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; position:sticky; top:0; background:#000; padding:10px 0;">
-    <h3 style="color:#ff4444; margin:0;">❌ Hata Konsolu</h3>
+    <h3 id="error-panel-title" style="color:#ff4444; margin:0;">🐞 Hata Konsolu</h3>
     <div>
       <button onclick="copyErrors()" style="background:#4CAF50; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">📋 Kopyala</button>
       <button onclick="clearErrors()" style="background:#ff4444; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">🗑 Temizle</button>
-      <button onclick="clearErrorLog()" style="background:#ff4444; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:600; margin-right:10px;">🗑 Temizle</button><button onclick="refreshErrorLog()" style="background:#4e9a2a; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer; font-weight:600; margin-right:10px;">↻ Yenile</button><button onclick="document.getElementById('error-panel').style.display='none'" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">✕ Kapat</button>
+      <button onclick="document.getElementById('error-panel').style.display='none'" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">✕ Kapat</button>
     </div>
   </div>
   <div id="error-list" style="white-space:pre-wrap; word-break:break-all;"></div>
@@ -996,72 +994,13 @@ button,input,select,textarea{font-family:inherit}
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-<!-- FORCE DEBUG -->
-<script>
-// Tüm hataları yakala ve alert ile göster
-window.onerror = function(msg, src, line, col, error) {
-  const errorMsg = "❌ HATA: " + msg + "\\nDosya: " + src + "\\nSatır: " + line;
-  console.error(errorMsg);
-  alert(errorMsg);
-  return false;
-};
-
-window.addEventListener('unhandledrejection', function(e) {
-  const errorMsg = "❌ PROMISE HATASI: " + (e.reason?.message || 'Bilinmeyen hata');
-  console.error(errorMsg);
-  alert(errorMsg);
-});
-
-// Veri akışını kontrol et
-setTimeout(async function() {
-  console.log("🔍 DEBUG: Veri akışı kontrol ediliyor...");
-  
-  try {
-    // 1. Supabase bağlantısını kontrol et
-    console.log("1️⃣ Supabase bağlantısı kontrol ediliyor...");
-    const { data, error } = await db.from('hayvan_durum_view').select('count').limit(1);
-    if (error) {
-      console.error("❌ Supabase bağlantı hatası:", error);
-      alert("Supabase bağlantı hatası: " + error.message);
-    } else {
-      console.log("✅ Supabase bağlantısı başarılı");
-    }
-  } catch (e) {
-    console.error("❌ Supabase bağlantı hatası:", e);
-    alert("Supabase bağlantı hatası: " + e.message);
-  }
-  
-  try {
-    // 2. IndexedDB'yi kontrol et
-    console.log("2️⃣ IndexedDB kontrol ediliyor...");
-    await openDB();
-    console.log("✅ IndexedDB başarıyla açıldı");
-    
-    // 3. pullTables'ı dene
-    console.log("3️⃣ pullTables çağrılıyor...");
-    await pullTables(['hayvanlar']);
-    console.log("✅ pullTables tamamlandı");
-    
-    // 4. loadAnimals'ı dene
-    console.log("4️⃣ loadAnimals çağrılıyor...");
-    await loadAnimals();
-    console.log("✅ loadAnimals tamamlandı");
-    
-    console.log("🎉 Tüm kontroller başarılı!");
-    alert("✅ Tüm sistemler çalışıyor!");
-  } catch (e) {
-    console.error("❌ İşlem hatası:", e);
-    alert("İşlem hatası: " + e.message);
-  }
-}, 2000);
-</script>
     <!-- EgeSüt JS modülleri -->
-    <script src="js/config.js?v=1774263758"></script>
-    <script src="js/state.js?v=1774263758"></script>
-    <script src="js/api.js?v=1774263758"></script>
-    <script src="js/ui.js?v=1774265454"></script>
-    <script src="js/forms.js?v=1774263758"></script>
-    <script src="js/app.js?v=1774264548"></script>
+    <script src="js/config.js?v=1774900000"></script>
+    <script src="js/state.js?v=1774900000"></script>
+    <script src="js/api.js?v=1774900000"></script>
+    <script src="js/ui.js?v=1774900100"></script>
+    <script src="js/forms.js?v=1774900000"></script>
+    <script src="js/app.js?v=1774900000"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" onclick="mClose(event,this)">
@@ -1083,119 +1022,93 @@ setTimeout(async function() {
   </div>
 </div>
 
-<div id="err-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0321a;color:#fff;font-size:.72rem;padding:8px 12px;z-index:9999;word-break:break-all" onclick="this.style.display='none'"></div>
+<div id="err-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0321a;color:#fff;font-size:.72rem;padding:8px 48px 8px 12px;z-index:9999;word-break:break-all;cursor:pointer" onclick="document.getElementById('error-panel').style.display='block';renderErrorLog()">
+  <span id="err-bar-text"></span>
+  <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:.8rem;opacity:.7">→ Detay</span>
+</div>
 <script>
-// Hata listesi
 window.errorLog = [];
+const _origConsoleError = console.error;
 
-function addError(msg, src, line, stack) {
-  const timestamp = new Date().toLocaleTimeString();
-  const errorObj = {
-    timestamp,
-    message: msg,
-    source: src,
-    line: line,
-    stack: stack
-  };
-  
-  window.errorLog.push(errorObj);
-  
-  // Console'a da yaz
-  console.error(`[${timestamp}]`, msg, src, line);
-  
-  // Hata panelini güncelle
-  updateErrorPanel();
-  
-  // Err-bar'ı da güncelle (son hata)
-  const b = document.getElementById('err-bar');
-  if(b) {
-    b.textContent = `❌ [${timestamp}] ${msg}`;
-    b.style.display = 'block';
+function _captureError(msg, src, line, stack) {
+  const entry = { t: new Date().toLocaleTimeString(), msg, src, line, stack };
+  window.errorLog.push(entry);
+  // Err-bar güncelle
+  const bar = document.getElementById('err-bar');
+  const txt = document.getElementById('err-bar-text');
+  if (bar && txt) { txt.textContent = '❌ [' + entry.t + '] ' + msg; bar.style.display = 'block'; }
+  // Hata butonu kırmızıya dön
+  const btn = document.getElementById('errorbtn');
+  if (btn) {
+    btn.textContent = '🐞 Hata (' + window.errorLog.length + ')';
+    btn.style.background = 'rgba(255,68,68,.2)';
+    btn.style.borderColor = '#ff4444';
+    btn.style.color = '#ff8888';
   }
+  // Panel açıksa canlı güncelle
+  const panel = document.getElementById('error-panel');
+  if (panel && panel.style.display !== 'none') renderErrorLog();
 }
 
-function updateErrorPanel() {
-  const list = document.getElementById('error-list');
-  if(!list) return;
-  
-  list.innerHTML = window.errorLog.map(e => `
-    <div style="border-bottom:1px solid #333; padding:10px; margin-bottom:5px;">
-      <div style="color:#ff8888; font-weight:bold;">🕐 ${e.timestamp}</div>
-      <div style="color:#ffaa00; margin-top:5px;">📌 ${e.message}</div>
-      ${e.source ? `<div style="color:#88ff88; margin-top:3px; font-size:11px;">📍 ${e.source}${e.line ? ':'+e.line : ''}</div>` : ''}
-      ${e.stack ? `<div style="color:#aaa; margin-top:5px; font-size:11px; white-space:pre-wrap;">🔍 ${e.stack}</div>` : ''}
-    </div>
-  `).join('');
-  
-  // Otomatik scroll en alta
-  list.scrollTop = list.scrollHeight;
-}
+console.error = function(...args) {
+  const msg = args.map(a => (a instanceof Error) ? a.message : typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+  _captureError(msg, null, null, args[0]?.stack || null);
+  _origConsoleError.apply(console, args);
+};
 
-function copyErrors() {
-  const text = window.errorLog.map(e => 
-    `[${e.timestamp}] ${e.message}\n${e.source ? '  at ' + e.source + (e.line ? ':' + e.line : '') : ''}\n${e.stack ? '  ' + e.stack : ''}`
-  ).join('\n---\n');
-  
-  navigator.clipboard.writeText(text).then(() => {
-    alert('✅ Hatalar panoya kopyalandı!');
-  }).catch(() => {
-    alert('❌ Kopyalama başarısız');
-  });
-}
-
-function clearErrors() {
-  window.errorLog = [];
-  updateErrorPanel();
-  const b = document.getElementById('err-bar');
-  if(b) b.style.display = 'none';
-}
-
-// Global hata yakalama
-// Basit hata loglama
-window.errorLog = [];
-
-function logError(msg, src, line, stack) {
-  const error = {
-    time: new Date().toISOString(),
-    msg: msg,
-    src: src,
-    line: line,
-    stack: stack
-  };
-  window.errorLog.push(error);
-  localStorage.setItem('errorLog', JSON.stringify(window.errorLog));
-  console.error('❌', msg, src, line);
-  
-  // Sayfada göster
-  const el = document.getElementById('simple-error');
-  if(el) {
-    el.innerHTML = `❌ ${msg} ${src ? 'at ' + src : ''}${line ? ':' + line : ''}`;
-    el.style.display = 'block';
-  }
-}
-
-window.onerror = function(msg, src, line, col, error) {
-  logError(msg, src, line, error?.stack);
+window.onerror = function(msg, src, line, col, err) {
+  _captureError(msg, src, line, err?.stack || null);
   return false;
 };
 
 window.addEventListener('unhandledrejection', function(e) {
-  logError(e.reason?.message || 'Promise rejection', null, null, e.reason?.stack);
+  const msg = e.reason?.message || String(e.reason) || 'Unhandled promise rejection';
+  _captureError(msg, null, null, e.reason?.stack || null);
 });
 
-// console.error'ü de yakala
-const origError = console.error;
-console.error = function(...args) {
-  logError(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
-  origError.apply(console, args);
-};
+function renderErrorLog() {
+  const list = document.getElementById('error-list');
+  const title = document.getElementById('error-panel-title');
+  if (!list) return;
+  if (!window.errorLog.length) {
+    if (title) { title.textContent = '✅ Hata Konsolu'; title.style.color = '#4e9a2a'; }
+    list.innerHTML = '<div style="text-align:center;padding:40px 0;color:#4e9a2a;font-size:1rem;font-weight:700">✅ All is well — hata yok</div>';
+    return;
+  }
+  if (title) { title.textContent = '🐞 Hata Konsolu (' + window.errorLog.length + ')'; title.style.color = '#ff4444'; }
+  list.innerHTML = window.errorLog.map((e, i) => `
+    <div style="border-bottom:1px solid #333;padding:10px;margin-bottom:5px">
+      <div style="color:#ff8888;font-weight:bold;font-size:11px">#${i+1} · ${e.t}</div>
+      <div style="color:#ffcc44;margin-top:4px">${e.msg}</div>
+      ${e.src ? `<div style="color:#88ff88;margin-top:3px;font-size:10px">📍 ${e.src}${e.line ? ':'+e.line : ''}</div>` : ''}
+      ${e.stack ? `<div style="color:#999;margin-top:4px;font-size:10px;white-space:pre-wrap">${e.stack}</div>` : ''}
+    </div>`).join('');
+  list.scrollTop = list.scrollHeight;
+}
 
-// Console hatalarını da yakala (opsiyonel)
-const originalConsoleError = console.error;
-console.error = function(...args) {
-  addError(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '));
-  originalConsoleError.apply(console, args);
-};
+function clearErrors() {
+  window.errorLog = [];
+  const bar = document.getElementById('err-bar');
+  if (bar) bar.style.display = 'none';
+  const btn = document.getElementById('errorbtn');
+  if (btn) {
+    btn.textContent = '✅ All is well';
+    btn.style.background = 'rgba(78,154,42,.15)';
+    btn.style.borderColor = '#4e9a2a';
+    btn.style.color = '#4e9a2a';
+  }
+  renderErrorLog();
+}
+
+function copyErrors() {
+  const text = window.errorLog.map((e, i) =>
+    `#${i+1} [${e.t}] ${e.msg}${e.src ? '\n  at ' + e.src + (e.line ? ':'+e.line : '') : ''}${e.stack ? '\n' + e.stack : ''}`
+  ).join('\n---\n');
+  navigator.clipboard.writeText(text || '(hata yok)').then(
+    () => { const b = document.getElementById('err-bar'); if(b){ b.style.background='#2a7a2a'; setTimeout(()=>{ b.style.background='#c0321a'; },1500); } },
+    () => {}
+  );
+}
 </script>
 </body>
 </html>
