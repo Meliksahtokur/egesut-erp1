@@ -875,7 +875,22 @@ Kalan sadece SonarCloud UI'da manuel WONTFIX işaretleme var (~188 issue).
 - Buzağı padok 6ay kuralı: form seçeneği kaldırıldı + save validasyonu + liste filtresi
 - Tedavi günü saat ikonu (🕐) + caseDaySaatAc/Kaydet + migration 025
 
-### ⏳ Sonraki Oturum
+### ⏳ Sonraki Oturum — Sıralı
+
+**1. İLK İŞ: Supabase MCP kurulumu**
+Claude Code'un Supabase'e doğrudan erişimi. Credentials api.js'de mevcut.
+
+**2. Tedavi saat kaydet**
+Migration 025 henüz apply edilmedi. MCP sonrası uygula + test.
+
+**3. Tohumlama küpe stuck (3152 hâlâ geliyor)**
+openM'deki cl('i-hid') fix yetersiz. i-hid'in nereden set edildiği trace edilecek.
+
+**4. Buzağı 6ay+ kural — tam düzeltme**
+Mevcut fix çalışmıyor, 3 yaşındaki hayvan hâlâ buzağı gruplarını görebiliyor.
+Kural: 180 gün+ hayvanlar için Süt İçen VE Sütten Kesilmiş Buzağı seçenekleri hiç görünmemeli.
+animalFormGuncelle tüm dalları tekrar incelenmeli.
+
 - **Tedavi ilaç seçim ekranı dark mode** — Autocomplete dropdown beyaz fon (`background:#fff` hardcode var, `var(--card)` olmalı)
 - **Görev sistemi entegrasyonu** (BÜYÜK):
   - Tedavi günleri → gorev_log task olarak (case_id + day_id bağlantılı)
