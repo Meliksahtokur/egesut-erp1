@@ -24,6 +24,10 @@
   --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;
   --nav:60px;--safe:env(safe-area-inset-bottom,0px);--r:16px;--r2:10px;
 }
+body.dark{
+  --card:#182010;--card2:#1e2a15;--card3:#263518;
+  --ink:#d8ecc8;--ink2:#a8c890;--ink3:#6a8c58;
+}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overscroll-behavior:none;background:var(--bg)}
 body{font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);overflow:hidden;-webkit-font-smoothing:antialiased}
@@ -114,13 +118,13 @@ button,input,select,textarea{font-family:inherit}
 .pill.TOHUMLAMA_HAZIRLIK{background:#f0ddff;color:#5a0a9a}
 .pill.MANUEL{background:#fff0f0;color:#8a1a1a}
 .pill.DIGER{background:var(--card2);color:var(--ink3)}
-.ck-btn{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:2px solid var(--card3);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:var(--ink3)}
+.ck-btn{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:2px solid var(--card3);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:var(--ink3)}
 .ck-btn:active{background:var(--green2);border-color:var(--green2);color:#fff;transform:scale(.88)}
 
 /* SUB-TASKS */
 .subtasks{border-top:1px solid var(--card2);padding-top:8px;display:flex;flex-direction:column;gap:5px}
 .st-row{display:flex;align-items:center;gap:8px;padding:5px 0}
-.st-check{width:22px;height:22px;border-radius:50%;border:2px solid var(--card3);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s}
+.st-check{width:22px;height:22px;border-radius:50%;border:2px solid var(--card3);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s}
 .st-check.done{background:var(--green2);border-color:var(--green2)}
 .st-check:active{transform:scale(.85)}
 .st-label{font-size:.78rem;color:var(--ink2);flex:1}
@@ -207,7 +211,7 @@ button,input,select,textarea{font-family:inherit}
 .fg{margin-bottom:12px}
 .flbl{font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;display:block}
 .fhint{font-size:.62rem;color:var(--ink3);margin-top:-2px;margin-bottom:6px}
-.fi,.fsel,.fta{width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px 13px;font-size:.9rem;background:#fff;outline:none;color:var(--ink);-webkit-appearance:none;transition:border-color .15s}
+.fi,.fsel,.fta{width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px 13px;font-size:.9rem;background:var(--card);outline:none;color:var(--ink);-webkit-appearance:none;transition:border-color .15s}
 .fi:focus,.fsel:focus,.fta:focus{border-color:var(--green)}
 .fi:read-only{background:var(--card);opacity:.6}
 .fta{resize:none;height:72px}
@@ -277,7 +281,7 @@ button,input,select,textarea{font-family:inherit}
       <div class="search-bar" style="position:relative">
         <div style="flex:1;position:relative">
           <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" oninput="filterA();srchDropdown()" onfocus="srchDropdown()" autocomplete="off" onkeydown="acNav(event,'ac-srch')">
-          <div id="ac-srch" class="ac-box" style="display:none;position:absolute;z-index:100;width:100%;background:#fff;border:1px solid var(--card3);border-radius:10px;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1)"></div>
+          <div id="ac-srch" class="ac-box" style="display:none;position:absolute;z-index:100;width:100%;background:var(--card);border:1px solid var(--card3);border-radius:10px;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1)"></div>
         </div>
         <select class="psel" id="pflt" onchange="filterA()">
           <option value="">Tüm Padoklar</option>
@@ -569,7 +573,7 @@ button,input,select,textarea{font-family:inherit}
         <div id="b-anne-manual" style="display:none;position:relative">
           <input id="b-anne" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
             oninput="acHayvan('b-anne','ac-banne')" onfocus="acHayvan('b-anne','ac-banne')" onkeydown="acNav(event,'ac-banne')">
-          <div id="ac-banne" style="display:none;background:#fff;border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
+          <div id="ac-banne" style="display:none;background:var(--card);border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
         </div>
         <div id="anne-secili-card" style="display:none;background:rgba(78,154,42,.08);border:1.5px solid var(--green);border-radius:var(--r1);padding:10px 13px;font-size:.8rem">
           <div id="anne-secili-adi" style="font-weight:700;color:var(--green3)"></div>
@@ -839,6 +843,11 @@ button,input,select,textarea{font-family:inherit}
       <div class="sh"><span class="sh-title">🔔 Bildirimler</span></div>
       <div style="font-size:.72rem;color:var(--ink3);margin-bottom:6px">Tedavi görevleri için 3 saat öncesinde ve sabah uyarısı alırsınız.</div>
       <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:6px" onclick="bildirimAc()">🔔 Bildirimleri Aç / Aktifleştir</button>
+      <div class="sh"><span class="sh-title">Ekran Modu</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button id="btn-saha-mod" class="btn" onclick="setTheme('light')" style="flex:1;font-weight:700;font-size:.82rem">☀️ Saha Modu</button>
+        <button id="btn-koyu-mod" class="btn" onclick="setTheme('dark')" style="flex:1;font-weight:700;font-size:.82rem">🌙 Koyu Mod</button>
+      </div>
       <div class="sh"><span class="sh-title">Versiyon</span></div>
       <div style="font-size:.75rem;color:var(--ink3);padding:4px 0">EgeSüt v9 · IndexedDB + Supabase offline-first</div>
       <button class="btn btn-o" onclick="closeM('m-ayarlar')" style="margin-top:12px">Kapat</button>
@@ -907,6 +916,7 @@ button,input,select,textarea{font-family:inherit}
         <button onclick="tohSonuc('Boş')" class="btn" style="flex:1;background:var(--red);color:#fff;padding:10px">❌ Boş</button>
         <button onclick="tohSonuc('Bekliyor')" class="btn" style="flex:1;background:var(--amber);color:#fff;padding:10px">⏳ Bekliyor</button>
       </div>
+      <button id="td2-tekrar-btn" class="btn btn-g" style="margin-top:4px;display:none">💉 Tekrar Tohumla</button>
       <button id="td2-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:4px;display:none">🔄 Bu Kaydı Geri Al</button>
       <button class="btn btn-o" onclick="closeM('m-toh-det')" style="margin-top:2px">Kapat</button>
     </div>

@@ -291,7 +291,8 @@ function irkSecimDegisti() {
 function getIrkValue() {
   const sel = g('a-irk-sel');
   const txt = g('a-irk-txt');
-  return (sel?.value) || (txt?.value?.trim()) || '';
+  if (sel?.value === '__diger__') return txt?.value?.trim() || '';
+  return sel?.value || '';
 }
 
 // ── AKTİF HAYVAN FORMU ──────────────────────

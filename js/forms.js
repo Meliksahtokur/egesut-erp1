@@ -74,12 +74,13 @@ async function submitAnimal(btn) {
         p_renk:           v('a-renk') || null,
         p_ayirici_ozellik: v('a-ozellik') || null,
       });
-      toast(`✅ ${devlet || kupe} eklendi (ID: ${data.hayvan_id})`);
+      toast(`✅ ${devlet || kupe} eklendi`);
       closeM('m-animal');
       ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
       const cins = g('a-cinsiyet'); if (cins) cins.value = '';
       const sel  = g('a-irk-sel');  if (sel)  sel.value  = '';
-      pullTables(['hayvanlar']).then(() => Promise.all([renderSafe(), loadIrkDropdown()])).catch(console.warn);
+      await pullTables(['hayvanlar']);
+      await Promise.all([renderSafe(), loadIrkDropdown()]);
     }
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = editId ? '💾 Güncelle' : 'Kaydet'; } }
