@@ -902,12 +902,14 @@ async function _uremeTohumlama(el){
       const dot=_gebe?'var(--green2)':_dotMid;
       const _scMid=_kotu?'var(--red)':'var(--amber)';
       const sc=_gebe?'var(--green)':_scMid;
-      return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
-        <div class="hist-dot" style="background:${dot}"></div>
-        <div class="hist-main">
+      const _bekliyor=!_gebe&&!_kotu;
+      return `<div class="hist-row" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="openTohDet('${t.id}')">
+        <div class="hist-dot" style="background:${dot};flex-shrink:0"></div>
+        <div class="hist-main" style="flex:1;min-width:0">
           <div class="hist-title" style="color:var(--ink2)">${kupe} — ${t.sperma||'?'}</div>
           <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
         </div>
+        ${_bekliyor?`<button onclick="event.stopPropagation();tekrarTohumla('${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">💉 Tekrar</button>`:''}
       </div>`;
     }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
 }
@@ -2108,7 +2110,16 @@ async function openTohDet(id){
     if(islemKayit){ td2GeriAlBtn.style.display='block'; td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`); }
     else { td2GeriAlBtn.style.display='none'; }
   }
+  const td2TekrarBtn=document.getElementById('td2-tekrar-btn');
+  if(td2TekrarBtn){
+    if(t.sonuc!=='Gebe'){ td2TekrarBtn.style.display='block'; td2TekrarBtn.onclick=()=>tekrarTohumla(hayvanLabel||t.hayvan_id); }
+    else { td2TekrarBtn.style.display='none'; }
+  }
   openM('m-toh-det');
+}
+function tekrarTohumla(kupe) {
+  closeM('m-toh-det');
+  openMWithHayvan('m-insem','i-hid', kupe);
 }
 async function tohSonuc(sonuc){
   if(!_curToh) return;
@@ -2430,11 +2441,32 @@ document.addEventListener('click',e=>{
 // ──────────────────────────────────────────
 // AYARLAR & DATA TRAFFIC
 // ──────────────────────────────────────────
+function setTheme(mode) {
+  if (mode === 'dark') {
+    document.body.classList.add('dark');
+    localStorage.setItem('ege_theme','dark');
+  } else {
+    document.body.classList.remove('dark');
+    localStorage.setItem('ege_theme','light');
+  }
+  const btnSaha = document.getElementById('btn-saha-mod');
+  const btnKoyu = document.getElementById('btn-koyu-mod');
+  if (btnSaha) btnSaha.style.background = mode === 'light' ? 'rgba(78,154,42,.18)' : '';
+  if (btnKoyu) btnKoyu.style.background = mode === 'dark'  ? 'rgba(78,154,42,.18)' : '';
+}
+(function(){ const t = localStorage.getItem('ege_theme'); if (t) setTheme(t); })();
+
 function ayarlarAc(){
   renderAyarlarHekimList();
   renderAyarlarSpermaList();
   renderDrugStokList();
   dataTrafficYenile();
+  // tema butonlarını senkronize et
+  const cur = localStorage.getItem('ege_theme') || 'light';
+  const btnSaha = document.getElementById('btn-saha-mod');
+  const btnKoyu = document.getElementById('btn-koyu-mod');
+  if (btnSaha) btnSaha.style.background = cur === 'light' ? 'rgba(78,154,42,.18)' : '';
+  if (btnKoyu) btnKoyu.style.background = cur === 'dark'  ? 'rgba(78,154,42,.18)' : '';
   openM('m-ayarlar');
 }
 async function renderDrugStokList() {
