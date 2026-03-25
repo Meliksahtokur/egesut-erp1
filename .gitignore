@@ -25,5 +25,8 @@ calendar_events.py
 # VSCode workspace
 .vscode/settings.json
 
+# MCP config (token içeriyor)
+.mcp.json
+
 # Repomix
 .repomixignore
