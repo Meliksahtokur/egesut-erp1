@@ -210,6 +210,7 @@ const RPC_TABLES = {
   add_drug_administration:   ['stok','stok_hareket'],
   remove_drug_administration:['stok','stok_hareket'],
   close_case:                ['cases'],
+  update_treatment_time:     [],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────

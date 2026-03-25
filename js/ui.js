@@ -358,7 +358,15 @@ function filterA(){
     const gebeSet=new Set(_gebeIds||[]);
     let f=getState('animals');
     if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
-    if(p) f=f.filter(a=>a.padok===p);
+    if(p) {
+      f=f.filter(a=>a.padok===p);
+      if(p==='Buzağı Padok (Süt İçenler)'){
+        f=f.filter(a=>{
+          if(!a.dogum_tarihi) return true;
+          return Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000)<=180;
+        });
+      }
+    }
     if(_fchip.cinsiyet==='disi') f=f.filter(a=>a.cinsiyet==='Dişi'||!a.cinsiyet);
     else if(_fchip.cinsiyet==='erkek') f=f.filter(a=>a.cinsiyet==='Erkek');
     if(_fchip.gebelik==='gebe') f=f.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe');
@@ -1679,7 +1687,7 @@ async function renderCaseTimeline(caseId) {
     }
     const byDay = {};
     data.forEach(r => {
-      if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, drugs: [] };
+      if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, time: r.treatment_time || '', drugs: [] };
       if (r.administration_id) byDay[r.day_id].drugs.push(r);
     });
   // Tarih gruplama: benzersiz tarihler sıralı grup numarası alır, aynı tarihtekiler A/B/C
@@ -1703,10 +1711,14 @@ async function renderCaseTimeline(caseId) {
     tarihSuffix[day.day_id] = tarihCount[t] > 1 ? SUFFIKLER[tarihKullanım[t]] || String(tarihKullanım[t]+1) : '';
     tarihKullanım[t]++;
   });
-    el.innerHTML = Object.values(byDay).map(day => `
+    el.innerHTML = Object.values(byDay).map(day => {
+      const saatStr = day.time ? ` <span style="font-size:.72rem;color:var(--ink3);font-weight:400">${day.time.slice(0,5)}</span>` : '';
+      return `
       <div style="border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:700;font-size:.8rem">Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||""} — ${fmtTarih(day.date)}</span>
+          <span style="font-weight:700;font-size:.8rem">Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||""} — ${fmtTarih(day.date)}${saatStr}
+            <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" title="Saat ayarla" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:.8rem;padding:0 2px;vertical-align:middle">🕐</button>
+          </span>
           ${_curCase?.status==='active'?`<div style='display:flex;gap:4px'><button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;cursor:pointer">+ İlaç</button><button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.12);color:var(--red);border:1px solid rgba(192,50,26,.2);border-radius:7px;padding:3px 8px;font-size:.7rem;cursor:pointer">🗑 Gün</button></div>`:''}
         </div>
         <div id="drugs-${day.day_id}">
@@ -1716,10 +1728,42 @@ async function renderCaseTimeline(caseId) {
               ${_curCase?.status==='active'?`<div style='display:flex;gap:4px'><button onclick="caseDrugDuzenle('${d.administration_id}','${d.dose}','${d.unit}','${d.route||''}')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.9rem">✏️</button><button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem">🗑</button></div>`:''}
             </div>`).join('') : '<span style="color:var(--ink3);font-size:.75rem">İlaç eklenmemiş</span>'}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e) {
     el.innerHTML = `<span style="color:var(--red);font-size:.78rem">Yüklenemedi: ${e.message}</span>`;
   }
+}
+
+function caseDaySaatAc(dayId, currentTime) {
+  let box = document.getElementById('saat-modal');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'saat-modal';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) box.remove(); };
+  const saatVal = currentTime ? currentTime.slice(0,5) : '';
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.9rem;margin-bottom:14px">🕐 Tedavi Saatini Ayarla</div>
+    <input type="time" id="saat-input" value="${saatVal}" style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:1.1rem;background:var(--card);color:var(--ink);outline:none;margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button onclick="caseDaySaatKaydet('${dayId}')" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Kaydet</button>
+      <button onclick="document.getElementById('saat-modal').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">İptal</button>
+    </div>
+  </div>`;
+  document.body.appendChild(box);
+  setTimeout(() => document.getElementById('saat-input')?.focus(), 100);
+}
+
+async function caseDaySaatKaydet(dayId) {
+  const timeVal = document.getElementById('saat-input')?.value;
+  if (!timeVal) { toast('Saat seçin', true); return; }
+  try {
+    await rpc('update_treatment_time', { p_day_id: dayId, p_treatment_time: timeVal });
+    document.getElementById('saat-modal')?.remove();
+    toast('✅ Saat kaydedildi');
+    if (_curCase) renderCaseTimeline(_curCase.id);
+  } catch(e) { toast('❌ ' + e.message, true); }
 }
 
 async function caseGunEkle() {

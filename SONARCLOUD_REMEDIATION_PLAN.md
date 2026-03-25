@@ -862,5 +862,24 @@ Her sprint başında AI'ya şu bağlamı ver:
 - FIX-5.3: skip — backslash escape pattern yok
 - FIX-5.4: window._TH/appState/tohMap/detGecmisLogs/semptomSecili/hdiIlacCache/__state → globalThis (5 dosya)
 
-### Sıradaki Sprint — TÜM SPRINTLER TAMAMLANDI ✅
-Kalan sadece SonarCloud UI'da manuel WONTFIX işaretleme var.
+### Sıradaki Sprint — TÜM SONAR SPRINTLERİ TAMAMLANDI ✅
+Kalan sadece SonarCloud UI'da manuel WONTFIX işaretleme var (~188 issue).
+
+---
+
+## FEATURE BACKLOG (Sonar dışı)
+
+### ✅ Tamamlananlar (Oturum 4)
+- Geriye dön butonu büyütüldü (min-height:44px, padding artırıldı)
+- Tohumlama küpe dropdown stuck fix (openM'de i-hid temizleniyor)
+- Buzağı padok 6ay kuralı: form seçeneği kaldırıldı + save validasyonu + liste filtresi
+- Tedavi günü saat ikonu (🕐) + caseDaySaatAc/Kaydet + migration 025
+
+### ⏳ Sonraki Oturum
+- **Tedavi ilaç seçim ekranı dark mode** — Autocomplete dropdown beyaz fon (`background:#fff` hardcode var, `var(--card)` olmalı)
+- **Görev sistemi entegrasyonu** (BÜYÜK):
+  - Tedavi günleri → gorev_log task olarak (case_id + day_id bağlantılı)
+  - Tohumlama kontrol görevleri zaten var, erken uyarı filtresi eklenecek (today filtresi 3 gün önceden göster)
+  - Görev tamamlama → case/tohumlama kaydına bağlanır
+  - Eksik uygulama akışı: "Eksik uygulama ile tamamlamak istiyor musunuz?" confirm dialog
+  - DB: gorev_log'a case_id, day_id kolonları gerekiyor (migration)
