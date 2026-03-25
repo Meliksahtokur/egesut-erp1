@@ -745,25 +745,25 @@ async function gebeledenSec(){
         const _badgeMid=urgent?_badgeUrgent:_badgeNormal;
         const badge=overdue?`<span style="background:#c0321a;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">GECİKTİ ${Math.abs(g.kalanGun)} GÜN</span>`:_badgeMid;
         return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
-          style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;background:${bg};display:flex;justify-content:space-between;align-items:center">
+          style="padding:12px 14px;border-bottom:1px solid var(--card3);cursor:pointer;background:${bg};display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-weight:700;font-size:.88rem;color:${color}">${kupe}</div>
-            <div style="font-size:.68rem;color:#666;margin-top:2px">${g.hayvan?.irk||'—'} · ${g.toh.tarih} · ${g.toh.sperma||'?'}</div>
+            <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${g.hayvan?.irk||'—'} · ${g.toh.tarih} · ${g.toh.sperma||'?'}</div>
             <div style="font-size:.65rem;color:#888;margin-top:1px">Tahmini doğum: ${fmtTarih(g.dogumTahmini)}</div>
           </div>${badge}
         </div>`;
       }).join('');
-  box.innerHTML=`<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-height:75vh;display:flex;flex-direction:column">
+  box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;display:flex;flex-direction:column">
     <div style="padding:14px 16px 0;display:flex;justify-content:space-between;align-items:center">
       <div style="font-weight:800;font-size:1rem">🤰 Gebe Hayvanlar</div>
       <button onclick="document.getElementById('gebe-sec-modal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#999">✕</button>
     </div>
     <div style="font-size:.68rem;color:#999;padding:4px 16px 10px">280 güne yakınlığa göre sıralandı</div>
-    <div style="padding:12px 14px;border-bottom:1px solid #eee">
+    <div style="padding:12px 14px;border-bottom:1px solid var(--card3)">
       <input id="gebe-srch" oninput="gebeFiltrele()" placeholder="Küpe no ara…" style="width:100%;padding:8px 12px;border:1.5px solid var(--green);border-radius:8px;font-size:.85rem;outline:none;box-sizing:border-box">
     </div>
     <div id="gebe-list" style="overflow-y:auto;flex:1">${listHtml}</div>
-    <div style="padding:12px 16px;border-top:1px solid #eee">
+    <div style="padding:12px 16px;border-top:1px solid var(--card3)">
       <button onclick="document.getElementById('gebe-sec-modal').remove()" style="width:100%;padding:11px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">Kapat</button>
     </div>
   </div>`;
@@ -786,9 +786,9 @@ function gebeFiltrele(){
     const _colorMidF=urgent?'#b84c00':'#1a5c1a';
     const color=overdue?'#c0321a':_colorMidF;
     return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
-      style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer">
+      style="padding:12px 14px;border-bottom:1px solid var(--card3);cursor:pointer">
       <div style="font-weight:700;font-size:.88rem;color:${color}">${kupe} — ${overdue?'GECİKTİ '+Math.abs(g.kalanGun)+' gün':g.kalanGun+' gün kaldı'}</div>
-      <div style="font-size:.68rem;color:#666;margin-top:2px">${g.hayvan?.irk||'—'} · ${g.toh.sperma||'?'} · Tahmini: ${fmtTarih(g.dogumTahmini)}</div>
+      <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${g.hayvan?.irk||'—'} · ${g.toh.sperma||'?'} · Tahmini: ${fmtTarih(g.dogumTahmini)}</div>
     </div>`;
   }).join('')||'<div style="padding:20px;text-align:center;color:#999">Eşleşen hayvan yok</div>';
 }
@@ -1341,11 +1341,11 @@ async function stokHareketGor(stokId){
     box.onclick=e=>{if(e.target===box)box.remove();};
     document.body.appendChild(box);
   }
-  box.innerHTML=`<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-height:70vh;overflow-y:auto;padding:16px">
+  box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:70vh;overflow-y:auto;padding:16px">
     <div style="font-weight:800;font-size:1rem;margin-bottom:4px">${s.urun_adi}</div>
-    <div style="font-size:.75rem;color:#666;margin-bottom:12px">Başlangıç: <b>${s.baslangic_miktar||0} ${s.birim||''}</b> · Kullanılan: <b>${used.toFixed(1)} ${s.birim||''}</b> · Kalan: <b style="color:${kalan<=(s.esik||0)?'#c0321a':'#2d6a2d'}">${kalan.toFixed(1)} ${s.birim||''}</b></div>
+    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">Başlangıç: <b>${s.baslangic_miktar||0} ${s.birim||''}</b> · Kullanılan: <b>${used.toFixed(1)} ${s.birim||''}</b> · Kalan: <b style="color:${kalan<=(s.esik||0)?'#c0321a':'#2d6a2d'}">${kalan.toFixed(1)} ${s.birim||''}</b></div>
     ${mvs.length===0?'<div style="color:#999;text-align:center;padding:20px">Henüz hareket yok</div>':
-      mvs.map(m=>`<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:.8rem;display:flex;justify-content:space-between">
+      mvs.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between">
         <div><div style="font-weight:600">${m.tur||'Kullanım'}</div><div style="color:#999;font-size:.7rem">${m.notlar||''}</div><div style="color:#888;font-size:.7rem;font-weight:600">${m.tarih?(new Date(m.tarih).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})):''}</div></div>
         <div style="text-align:right"><div style="font-weight:700;color:${m.miktar<0?'var(--green)':'#c0321a'}">${m.miktar<0?'+':'-'}${Math.abs(m.miktar)} ${s.birim||''}</div></div>
       </div>`).join('')}
@@ -1815,7 +1815,7 @@ function caseGunModalRender() {
     : '<div style="font-size:.75rem;color:var(--ink3);margin-bottom:10px">Tarih secin</div>';
 
   box.innerHTML =
-    '<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
+    '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
     '<button onclick="_gunSecimAy--;if(_gunSecimAy<0){_gunSecimAy=11;_gunSecimYil--;}caseGunModalRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
     '<span style="font-weight:800;font-size:.9rem">' + ayAdi + '</span>' +
@@ -1895,7 +1895,7 @@ function caseDrugFormAc(dayId) {
   form.style.cssText = 'margin-top:8px;background:var(--card2);border-radius:10px;padding:10px';
   form.innerHTML =
     '<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Ilac Sec</div>'+
-    '<div style="max-height:220px;overflow-y:auto;background:#fff;border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">'+
+    '<div style="max-height:220px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">'+
     (groupHtml || '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Stokta ilac yok</div>')+
     '</div>'+
     '<div id="cdf-doz-alani" style="display:none">'+
@@ -2186,7 +2186,7 @@ async function acSperma(){
     const adet=stokMap[s];
     const warn=adet!==undefined&&adet<=5;
     const adetTxt=adet!==undefined?`<span style="color:${warn?'var(--red)':'var(--green)'};font-weight:700">${adet} doz</span>`:'';
-    return `<div onclick="selSperma('${s.replace(/'/g,"\\'")}');event.stopPropagation()" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center">
+    return `<div onclick="selSperma('${s.replace(/'/g,"\\'")}');event.stopPropagation()" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center">
       <span>${s}${warn?' ⚠️':''}</span>${adetTxt}
     </div>`;
   }).join('');
@@ -2299,7 +2299,7 @@ async function acIlac(){
     const _stokColorMid=s.guncel<=5?'var(--amber)':'var(--green)';
     const _stokColor=warn?'var(--red)':_stokColorMid;
     return `<div onclick="selIlac('${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||'ml'}',${s.guncel});event.stopPropagation()"
-      style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;${warn?'opacity:.5':''}">
+      style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center;${warn?'opacity:.5':''}">
       <div><div style="font-weight:600">${s.urun_adi}</div><div style="font-size:.65rem;color:var(--ink3)">${s.kategori||''}</div></div>
       <span style="color:${_stokColor};font-weight:700;font-size:.78rem">${s.guncel.toFixed(s.birim==='adet'?0:1)} ${s.birim||''}</span>
     </div>`;
@@ -2322,7 +2322,7 @@ function ilacSatirEkle(){
     <input class="fi ilac-stok-ac" placeholder="İlaç ara…" autocomplete="off" style="margin:0"
       oninput="acDilacSatir(this)" onfocus="acDilacSatir(this)">
     <input type="hidden" class="ilac-stok-id">
-    <div class="ac-box ilac-ac" style="display:none;position:absolute;z-index:200;background:#fff;border:1px solid var(--card3);border-radius:8px;max-height:160px;overflow-y:auto;width:100%"></div>
+    <div class="ac-box ilac-ac" style="display:none;position:absolute;z-index:200;background:var(--card);border:1px solid var(--card3);border-radius:8px;max-height:160px;overflow-y:auto;width:100%"></div>
   </div>
   <input class="fi ilac-mik" type="number" min="0" placeholder="ml/adet" style="flex:1;margin:0">
   <button type="button" onclick="this.closest('.ilac-satir').remove()" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;flex-shrink:0">✕</button>`;
@@ -2334,7 +2334,7 @@ function acDilacSatir(inp){
   const stoklar=getState('stock').filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'));
   const filtered=q?stoklar.filter(s=>(s.urun_adi||'').toLowerCase().includes(q)):stoklar.slice(0,8);
   if(!filtered.length){ac.style.display='none';return;}
-  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid #eee">${s.urun_adi} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
+  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">${s.urun_adi} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
   ac.style.display='block';
 }
 function selDilacSatir(el,id,ad,birim){
@@ -2378,7 +2378,7 @@ function acHayvan(inputId,listId){
   }
   ac.innerHTML=filtered.map(a=>{
     const kupe=a.kupe_no||a.devlet_kupe||a.id;
-    return `<div onclick="selHayvan('${inputId}','${listId}','${kupe}')" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee;display:flex;justify-content:space-between">
+    return `<div onclick="selHayvan('${inputId}','${listId}','${kupe}')" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between">
       <span style="font-weight:600">${kupe}</span>
       <span style="color:var(--ink3);font-size:.7rem">${a.irk||''} · ${a.padok||''}</span>
     </div>`;
@@ -2463,7 +2463,7 @@ async function acDisease(){
   const filtered=q?all.filter(d=>d.toLowerCase().includes(q)):all.slice(0,12);
   if(!filtered.length){ ac.style.display='none'; return; }
   ac.innerHTML=filtered.map(d=>`<div onclick="selDis('${d.replace(/'/g,"\\'")}');event.stopPropagation()"
-    style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee">
+    style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3)">
     ${d}${_disFreq[d]?` <span style="color:#aaa;font-size:.6rem">(${_disFreq[d]}x)</span>`:''}
   </div>`).join('');
   ac.style.display='block';
