@@ -28,5 +28,9 @@ calendar_events.py
 # MCP config (token içeriyor)
 .mcp.json
 
+# Claude Code ayarları (lokal)
+.claude/settings.json
+.claude/settings.local.json
+
 # Repomix
 .repomixignore
