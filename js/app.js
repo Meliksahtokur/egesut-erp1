@@ -381,10 +381,13 @@ async function spermaModStok() {
   const sel = g('i-sperma-select');
   if (!sel) return;
 
-  // _S henüz yüklenmediyse yükle
   if (!getState('stock') || !getState('stock').length) await loadStock();
 
-  const stoklar = (getState('stock') || []).filter(s => s.kategori === 'Sperma' && (s.guncel ?? s.miktar ?? 0) > 0);
+  const stoklar = (getState('stock') || []).filter(s =>
+    s.kategori === 'Sperma' || s.grup === 'Sperma' ||
+    (s.urun_adi || '').toLowerCase().includes('sperma') ||
+    (s.urun_adi || '').toLowerCase().includes('doz')
+  );
 
   if (stoklar.length === 0) {
     sel.innerHTML = '<option value="">— Stokta sperma yok —</option>';
@@ -392,8 +395,7 @@ async function spermaModStok() {
   } else {
     sel.innerHTML =
       '<option value="">— Seçin —</option>' +
-      stoklar.map(s => `<option value="${s.ad}">${s.ad} (${s.miktar} doz)</option>`).join('');
-
+      stoklar.map(s => `<option value="${s.urun_adi}" data-stok="${s.guncel ?? 0}">${s.urun_adi} (${s.guncel ?? 0} doz)</option>`).join('');
     g('sperma-hint').textContent = '';
   }
 

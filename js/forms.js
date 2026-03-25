@@ -80,7 +80,7 @@ async function submitAnimal(btn) {
       const cins = g('a-cinsiyet'); if (cins) cins.value = '';
       const sel  = g('a-irk-sel');  if (sel)  sel.value  = '';
       await pullTables(['hayvanlar']);
-      await Promise.all([renderSafe(), loadIrkDropdown()]);
+      await Promise.all([renderFromLocal(), loadIrkDropdown()]);
     }
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = editId ? '💾 Güncelle' : 'Kaydet'; } }
