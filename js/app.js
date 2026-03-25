@@ -201,7 +201,7 @@ function renderAyarlarHekimList() {
   const all = [...HEKIMLER, ..._customHekimler];
   el.innerHTML = all.map(h => `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--card2)">
     <span style="font-size:.84rem">${h.ad}</span>
-    ${_customHekimler.find(c => c.id === h.id) ? `<button onclick="customHekimSil('${h.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">Sil</button>` : ''}
+    ${_customHekimler.some(c => c.id === h.id) ? `<button onclick="customHekimSil('${h.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">Sil</button>` : ''}
   </div>`).join('');
 }
 function renderAyarlarSpermaList() {
@@ -282,10 +282,6 @@ function irkSecimDegisti() {
     txt.style.display = 'block';
     txt.disabled = false;
     txt.focus();
-  } else if (sel.value) {
-    txt.style.display = 'none';
-    txt.disabled = true;
-    txt.value = '';
   } else {
     txt.style.display = 'none';
     txt.disabled = true;
@@ -326,16 +322,17 @@ function animalFormGuncelle() {
   }
 
   if (cinsiyet === 'Dişi') {
-    if (yasGun !== null && yasGun <= 75)
+    if (yasGun !== null && yasGun <= 75) {
       gruplar = ['Süt İçen Buzağı'];
-    else if (yasGun !== null && yasGun > 75 && yasGun <= 180)
+    } else if (yasGun !== null && yasGun > 75 && yasGun <= 180) {
       gruplar = ['Sütten Kesilmiş Buzağı'];
-    else if (yasGun !== null && yasGun > 180 && yasGun <= 365)
+    } else if (yasGun !== null && yasGun > 180 && yasGun <= 365) {
       gruplar = ['Düve (Küçük)', 'Sütten Kesilmiş Buzağı'];
-    else if (yasGun !== null && yasGun > 365 && yasGun <= 730)
+    } else if (yasGun !== null && yasGun > 365 && yasGun <= 730) {
       gruplar = ['Düve (Büyük)', 'Düve (Küçük)'];
-    else
+    } else {
       gruplar = ['Sağmal (Laktasyonda)', 'Sağmal (Kuru)', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)', 'Sütten Kesilmiş Buzağı', 'Süt İçen Buzağı'];
+    }
   } else if (yasGun !== null && yasGun <= 75) { // Erkek
     gruplar = ['Süt İçen Buzağı'];
   } else if (yasGun !== null && yasGun > 75 && yasGun <= 180) {

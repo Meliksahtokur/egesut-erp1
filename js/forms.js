@@ -726,7 +726,7 @@ async function submitStk(btn) {
     await loadStock();
     loadDash();
     const _sp = document.getElementById('stok-panel');
-    if(_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
+    if(_sp?.style.transform !== 'translateX(100%)') loadStokPanel();
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Stok Ekle'; } }
 }
@@ -789,7 +789,7 @@ async function submitStokAdd(btn) {
     await pullTables(['stok','drug_products']);
     _drugsCache = [];
     const _sp = document.getElementById('stok-panel');
-    if(_sp && _sp.style.transform !== 'translateX(100%)') await loadStokPanel();
+    if(_sp?.style.transform !== 'translateX(100%)') await loadStokPanel();
   } catch (e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; } }
 }

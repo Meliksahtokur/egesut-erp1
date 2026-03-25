@@ -155,7 +155,9 @@ async function loadTasks(f,btn){
     const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
     el.innerHTML=data.slice(0,150).map(t=>{
       const _diff=Math.floor((new Date(t.hedef_tarih)-Date.now())/86400000);
-      const cls=t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':_diff<=3?'near':'';
+      const _clsBase=_diff<=3?'near':'';
+      const _clsMid=t.hedef_tarih===today?'soon':_clsBase;
+      const cls=t.hedef_tarih<today?'late':_clsMid;
       return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id));
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
@@ -296,7 +298,7 @@ function updatePadokOzet(list){
   const erkek=list.filter(a=>a.cinsiyet==='Erkek').length;
   const gebe=list.filter(a=>gebeSet.has(a.id)||a.durum==='Gebe').length;
   const bos=disi-gebe;
-  const isBuzagi=padok&&padok.toLowerCase().includes('buzağı');
+  const isBuzagi=padok?.toLowerCase().includes('buzağı');
   const chip=(txt,color)=>`<span style="background:${color};border-radius:8px;padding:3px 9px;font-size:.68rem;font-weight:700;color:#fff">${txt}</span>`;
   let html=chip(`Toplam: ${toplam}`,'rgba(61,74,50,.7)');
   if(isBuzagi||erkek>0){
@@ -469,7 +471,7 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a){
 function _detGorevHtml(a,tasks,subs,today){
   const kupe=a.kupe_no||a.devlet_kupe||a.id;
   const liste=tasks.length
-    ?tasks.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); const state=t.hedef_tarih<today?'late':t.hedef_tarih===today?'soon':''; return renderTask(t,state,ts); }).join('')
+    ?tasks.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); const _stateMid=t.hedef_tarih===today?'soon':''; const state=t.hedef_tarih<today?'late':_stateMid; return renderTask(t,state,ts); }).join('')
     :'<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>';
   return `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-task-add','ta-hid','${kupe}')">➕ Görev Ekle</button></div>`+liste;
 }
@@ -495,7 +497,8 @@ async function openDet(id){
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
     const yasRaw=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):null;
-    const yasGun=yasRaw===null?'—':yasRaw<0||yasRaw>36500?'Geçersiz tarih':yasHesapla(a.dogum_tarihi);
+    const _yasGunBase=yasRaw<0||yasRaw>36500?'Geçersiz tarih':yasHesapla(a.dogum_tarihi);
+    const yasGun=yasRaw===null?'—':_yasGunBase;
     const aktifHst=diseases.filter(c=>c.status==='active').length;
     const today=new Date().toISOString().split('T')[0];
     const displayId=a.devlet_kupe||a.kupe_no||a.id;
@@ -505,7 +508,7 @@ async function openDet(id){
       {cls:'chip-k',txt:a.grup||'?'},
       {cls:'chip-k',txt:a.padok||'?'},
       aktifHst>0||activeCases.length>0?{cls:'chip-r',txt:`🚨 ${activeCases.length||aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
-      tohs.find(t=>t.sonuc==='Gebe')?{cls:'chip-g',txt:'🤰 Gebe'}:null,
+      tohs.some(t=>t.sonuc==='Gebe')?{cls:'chip-g',txt:'🤰 Gebe'}:null,
     ].filter(Boolean).map(c=>`<div class="chip ${c.cls}">${c.txt}</div>`).join('');
 
     document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
@@ -555,10 +558,10 @@ function openIslemDetay(idx){
   </div>`;
   // Aynı panel açıksa kapat, yoksa ekle
   const gecmisEl=document.getElementById('tab-gecmis');
-  const existing=gecmisEl&&gecmisEl.querySelector('.islem-detay-panel');
+  const existing=gecmisEl?.querySelector('.islem-detay-panel');
   if(existing) existing.remove();
-  const rows=gecmisEl&&gecmisEl.querySelectorAll('.hist-row');
-  const clickedRow=rows&&rows[idx];
+  const rows=gecmisEl?.querySelectorAll('.hist-row');
+  const clickedRow=rows?.[idx];
   if(clickedRow){
     const panel=document.createElement('div');
     panel.className='islem-detay-panel';
@@ -725,11 +728,14 @@ async function gebeledenSec(){
     :gebeList.map(g=>{
         const kupe=g.hayvan?.kupe_no||g.hayvan?.devlet_kupe||g.toh.hayvan_id;
         const urgent=g.kalanGun<=7, overdue=g.kalanGun<0;
-        const color=overdue?'#c0321a':urgent?'#b84c00':'#1a5c1a';
-        const bg=overdue?'rgba(192,50,26,.06)':urgent?'rgba(184,76,0,.06)':'rgba(78,154,42,.04)';
-        const badge=overdue?`<span style="background:#c0321a;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">GECİKTİ ${Math.abs(g.kalanGun)} GÜN</span>`
-          :urgent?`<span style="background:#b84c00;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">⚡ ${g.kalanGun} GÜN</span>`
-          :`<span style="background:rgba(78,154,42,.15);color:#1a5c1a;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">${g.kalanGun} gün kaldı</span>`;
+        const _colorMid=urgent?'#b84c00':'#1a5c1a';
+        const color=overdue?'#c0321a':_colorMid;
+        const _bgMid=urgent?'rgba(184,76,0,.06)':'rgba(78,154,42,.04)';
+        const bg=overdue?'rgba(192,50,26,.06)':_bgMid;
+        const _badgeUrgent=`<span style="background:#b84c00;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">⚡ ${g.kalanGun} GÜN</span>`;
+        const _badgeNormal=`<span style="background:rgba(78,154,42,.15);color:#1a5c1a;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">${g.kalanGun} gün kaldı</span>`;
+        const _badgeMid=urgent?_badgeUrgent:_badgeNormal;
+        const badge=overdue?`<span style="background:#c0321a;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">GECİKTİ ${Math.abs(g.kalanGun)} GÜN</span>`:_badgeMid;
         return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
           style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer;background:${bg};display:flex;justify-content:space-between;align-items:center">
           <div>
@@ -769,7 +775,8 @@ function gebeFiltrele(){
   listEl.innerHTML=filtered.map(g=>{
     const kupe=g.hayvan?.kupe_no||g.hayvan?.devlet_kupe||g.toh.hayvan_id;
     const overdue=g.kalanGun<0, urgent=g.kalanGun<=7&&!overdue;
-    const color=overdue?'#c0321a':urgent?'#b84c00':'#1a5c1a';
+    const _colorMidF=urgent?'#b84c00':'#1a5c1a';
+    const color=overdue?'#c0321a':_colorMidF;
     return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
       style="padding:12px 14px;border-bottom:1px solid #eee;cursor:pointer">
       <div style="font-weight:700;font-size:.88rem;color:${color}">${kupe} — ${overdue?'GECİKTİ '+Math.abs(g.kalanGun)+' gün':g.kalanGun+' gün kaldı'}</div>
@@ -891,8 +898,10 @@ async function _uremeTohumlama(el){
       const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
       const _gebe=t.sonuc==='Gebe';
       const _kotu=t.sonuc==='Boş'||t.sonuc==='Abort';
-      const dot=_gebe?'var(--green2)':_kotu?'var(--red2)':'var(--amber)';
-      const sc=_gebe?'var(--green)':_kotu?'var(--red)':'var(--amber)';
+      const _dotMid=_kotu?'var(--red2)':'var(--amber)';
+      const dot=_gebe?'var(--green2)':_dotMid;
+      const _scMid=_kotu?'var(--red)':'var(--amber)';
+      const sc=_gebe?'var(--green)':_scMid;
       return `<div class="hist-row" style="cursor:pointer" onclick="openTohDet('${t.id}')">
         <div class="hist-dot" style="background:${dot}"></div>
         <div class="hist-main">
@@ -1352,7 +1361,7 @@ async function loadRaporlar(){
     const gebeOran=aktif.length?Math.round(gebe.length/aktif.length*100):0;
     const tohToplam=tohs.length;
     const tohGebe=tohs.filter(t=>t.sonuc==='Gebe').length;
-    const tohBos=tohs.filter(t=>t.sonuc==='Boş').length;
+
     const gebelikOran=tohToplam?Math.round(tohGebe/tohToplam*100):0;
     const abortlar=tohs.filter(t=>t.abort||t.sonuc==='Abort').length;
 
@@ -2082,7 +2091,8 @@ async function openTohDet(id){
   document.getElementById('td2-hayvan').textContent=hayvanLabel||'?';
   document.getElementById('td2-sperma').textContent=`💉 ${t.sperma||'?'}`;
   const _tohGebe=t.sonuc==='Gebe';
-  const sc=_tohGebe?'var(--green)':t.sonuc==='Boş'?'var(--red)':'var(--amber)';
+  const _scMidToh=t.sonuc==='Boş'?'var(--red)':'var(--amber)';
+  const sc=_tohGebe?'var(--green)':_scMidToh;
   const chips=[
     `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc||'Bekliyor'}</span>`,
     `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no||1}. deneme</span>`,
@@ -2236,10 +2246,12 @@ async function acIlac(){
   }
   ac.innerHTML=filtered.map(s=>{
     const warn=s.guncel<=0;
+    const _stokColorMid=s.guncel<=5?'var(--amber)':'var(--green)';
+    const _stokColor=warn?'var(--red)':_stokColorMid;
     return `<div onclick="selIlac('${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||'ml'}',${s.guncel});event.stopPropagation()"
       style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;${warn?'opacity:.5':''}">
       <div><div style="font-weight:600">${s.urun_adi}</div><div style="font-size:.65rem;color:var(--ink3)">${s.kategori||''}</div></div>
-      <span style="color:${warn?'var(--red)':s.guncel<=5?'var(--amber)':'var(--green)'};font-weight:700;font-size:.78rem">${s.guncel.toFixed(s.birim==='adet'?0:1)} ${s.birim||''}</span>
+      <span style="color:${_stokColor};font-weight:700;font-size:.78rem">${s.guncel.toFixed(s.birim==='adet'?0:1)} ${s.birim||''}</span>
     </div>`;
   }).join('');
   ac.style.display='block';
