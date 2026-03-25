@@ -47,9 +47,9 @@ async function submitAnimal(btn) {
         p_dogum_tarihi:   v('a-dt') || null,
         p_grup:           v('a-grup') || null,
         p_padok:          v('a-padok') || null,
-        p_dogum_kg:       parseFloat(v('a-dkg')) || null,
-        p_canli_agirlik:  parseFloat(v('a-agirlik')) || null,
-        p_boy:            parseFloat(v('a-boy')) || null,
+        p_dogum_kg:       Number.parseFloat(v('a-dkg')) || null,
+        p_canli_agirlik:  Number.parseFloat(v('a-agirlik')) || null,
+        p_boy:            Number.parseFloat(v('a-boy')) || null,
         p_renk:           v('a-renk') || null,
         p_ayirici_ozellik: v('a-ozellik') || null,
       });
@@ -68,9 +68,9 @@ async function submitAnimal(btn) {
         p_dogum_tarihi:   v('a-dt') || null,
         p_grup:           v('a-grup') || 'Genel',
         p_padok:          v('a-padok') || 'P1',
-        p_dogum_kg:       parseFloat(v('a-dkg')) || null,
-        p_canli_agirlik:  parseFloat(v('a-agirlik')) || null,
-        p_boy:            parseFloat(v('a-boy')) || null,
+        p_dogum_kg:       Number.parseFloat(v('a-dkg')) || null,
+        p_canli_agirlik:  Number.parseFloat(v('a-agirlik')) || null,
+        p_boy:            Number.parseFloat(v('a-boy')) || null,
         p_renk:           v('a-renk') || null,
         p_ayirici_ozellik: v('a-ozellik') || null,
       });
@@ -94,7 +94,7 @@ async function submitBirth(btn) {
   const kupe   = v('b-kupe');
   const cins   = v('b-cins');
   const tip    = v('b-tip');
-  const kg     = parseFloat(g('b-dogum-kg')?.value || '') || null;
+  const kg     = Number.parseFloat(g('b-dogum-kg')?.value || '') || null;
   const baba   = v('b-baba');
 
   if (!anneId) { toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir', true); return; }
@@ -333,7 +333,7 @@ async function submitCikis(btn) {
   const tip      = g('cikis-tip').value;
   const tarih    = g('cikis-tarih').value;
   const sebep    = g('cikis-sebep').value.trim();
-  const fiyat    = parseFloat(g('cikis-fiyat').value) || null;
+  const fiyat    = Number.parseFloat(g('cikis-fiyat').value) || null;
   if (!tarih) { toast('Tarih zorunlu', true); return; }
   if (tip === 'olum' && !sebep) { toast('Ölüm sebebi girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -531,7 +531,7 @@ function closeDisease() {
   if(g('d-lokasyon-wrap')) g('d-lokasyon-wrap').style.display='none';
   const gunWrap = document.getElementById('d-tedavi-gun')?.closest('.fg');
   if(gunWrap) gunWrap.style.display='';
-  window._semptomSecili = [];
+  globalThis._semptomSecili = [];
   _ilacCache = [];
   closeM('m-disease');
 }
@@ -554,7 +554,7 @@ function hstDuzenleAc() {
   if (dSid) dSid.value = _curHst.siddet || '';
   const dTani = document.getElementById('d-tani');
   if (dTani) dTani.value = _curHst.tani || '';
-  window._semptomSecili = [];
+  globalThis._semptomSecili = [];
   const semptChips = g('sempt-chips');
   if (semptChips) semptChips.innerHTML = '';
   if (g('d-sempt')) g('d-sempt').value = '';
@@ -716,7 +716,7 @@ async function geriAl(islemLogId, btn) {
 
 // ── STOK ─────────────────────────────────────
 async function submitStk(btn) {
-  const mik = parseFloat(g('se-mik').value);
+  const mik = Number.parseFloat(g('se-mik').value);
   if (!mik || mik <= 0) { toast('Geçerli miktar girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   try {
@@ -742,9 +742,9 @@ async function submitStokAdd(btn) {
     ? (g('sa-ad')?.value||'').trim()
     : (g('sa-ad-diger')?.value||'').trim();
   if (!urun) { toast('İsim zorunlu', true); return; }
-  const bslg = parseFloat(g('sa-mik')?.value||'0');
+  const bslg = Number.parseFloat(g('sa-mik')?.value||'0');
   const birim = g('sa-birim')?.value || 'adet';
-  const esik  = parseFloat(g('sa-esik')?.value||'0') || 0;
+  const esik  = Number.parseFloat(g('sa-esik')?.value||'0') || 0;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     // Aynı isimde stok var mı? Varsa miktarı ekle
@@ -772,7 +772,7 @@ async function submitStokAdd(btn) {
         const { data: dp, error: dpErr } = await db.from('drug_products').insert([{
           drug_class_id:      etkenId,
           brand_name:         urun,
-          concentration:      konst ? parseFloat(konst) : null,
+          concentration:      konst ? Number.parseFloat(konst) : null,
           concentration_unit: konst || null,
           default_route:      route,
           default_unit:       birim,
@@ -873,13 +873,13 @@ function hstIlacFormToggle() {
     document.getElementById('hdi-yol').value = '';
     document.getElementById('hdi-bekleme').value = '';
     document.getElementById('ac-hdi').style.display = 'none';
-    window._hdiIlacCache = [];
+    globalThis._hdiIlacCache = [];
   }
 }
 
 async function hstIlacEkle(btn) {
   const stokId  = document.getElementById('hdi-stok-id').value.trim();
-  const miktar  = parseFloat(document.getElementById('hdi-miktar').value);
+  const miktar  = Number.parseFloat(document.getElementById('hdi-miktar').value);
   const yol     = document.getElementById('hdi-yol').value;
   const bekleme = parseInt(document.getElementById('hdi-bekleme').value) || null;
   if (!stokId)       { toast('❌ İlaç seçin', true); return; }

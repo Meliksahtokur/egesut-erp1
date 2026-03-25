@@ -73,12 +73,12 @@ class AppState {
 }
 
 const AppStateInstance = new AppState();
-window.__state = AppStateInstance;
+globalThis.__state = AppStateInstance;
 
 function getState(key) {
-  return window.__state.get(key);
+  return globalThis.__state.get(key);
 }
 
 function setState(key, value) {
-  return window.__state.set(key, value);
+  return globalThis.__state.set(key, value);
 }

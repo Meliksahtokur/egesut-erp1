@@ -239,12 +239,12 @@ async function loadAnimals(){
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
     _gebeIds=[...new Set([...gebeTohs.map(t=>t.hayvan_id),..._A.filter(a=>a.durum==='Gebe').map(a=>a.id)])];
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
-    window._tohMap={};
-    gebeTohs.forEach(t=>{ if(!window._tohMap[t.hayvan_id]||t.tarih>window._tohMap[t.hayvan_id]) window._tohMap[t.hayvan_id]=t.tarih; });
+    globalThis._tohMap={};
+    gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
     const hastaLogs=await getData('cases',c=>c.status==='active');
     _hastaIds=new Set(hastaLogs.map(d=>d.animal_id));
     _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
-    window._appState=window._appState||{}; window._appState.hayvanlar=_A;
+    globalThis._appState=globalThis._appState||{}; globalThis._appState.hayvanlar=_A;
     renderAnimals(_A);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
@@ -253,7 +253,7 @@ function _animalTagsHtml(a,gebeSet){
   let gebeBadge='';
   if(isGebe){
     // Tohumlama tarihinden gün hesapla
-    const tohMap=window._tohMap||{};
+    const tohMap=globalThis._tohMap||{};
     const tohTarih=tohMap[a.id];
     let gunYazi='';
     if(tohTarih){
@@ -444,7 +444,7 @@ async function _detRenderGecmis(id,el){
     const ETIKET={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme'};
     const GERI_AL=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI'];
     if(!logs.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>'; return; }
-    window._detGecmisLogs=logs;
+    globalThis._detGecmisLogs=logs;
     el.innerHTML=logs.map((l,i)=>{
       const ico=ICO[l.tip]||'📋';
       const tarih=(l.created_at||l.tarih||'').slice(0,10);
@@ -528,7 +528,7 @@ async function openDet(id){
 function closeDet(){ document.getElementById('det').classList.remove('on'); }
 
 function openIslemDetay(idx){
-  const l=(window._detGecmisLogs||[])[idx];
+  const l=(globalThis._detGecmisLogs||[])[idx];
   if(!l) return;
   // ref_tablo varsa doğrudan ilgili detay modalını aç
   if(l.ref_tablo==='tohumlama' && l.ref_id){ openTohDet(l.ref_id); return; }
@@ -1045,7 +1045,7 @@ async function loadStock(){
     const [stk,moves]=await Promise.all([idbGetAll('stok'),getData('stok_hareket',m=>!m.iptal)]);
     _S=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok'}; });
     setState('stock', _S);
-    window._appState=window._appState||{}; window._appState.stok=_S;
+    globalThis._appState=globalThis._appState||{}; globalThis._appState.stok=_S;
   } catch(e){ console.error(e); }
 }
 function openStk(id){
@@ -1766,7 +1766,7 @@ function caseGunModalRender() {
   const seciliList = [..._gunSecimSecili].sort();
   const seciliHtml = seciliList.length
     ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">' +
-      seciliList.map(d => '<span style="background:rgba(78,154,42,.12);border:1px solid var(--green);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;color:var(--green)">' + d.slice(5).replace('-','.') + '</span>').join('') +
+      seciliList.map(d => '<span style="background:rgba(78,154,42,.12);border:1px solid var(--green);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;color:var(--green)">' + d.slice(5).replaceAll('-','.') + '</span>').join('') +
       '</div>'
     : '<div style="font-size:.75rem;color:var(--ink3);margin-bottom:10px">Tarih secin</div>';
 
@@ -1910,7 +1910,7 @@ async function caseDrugKaydet(btn) {
     const doseInp = document.querySelector('.cdf-dose-inp[data-drug-id="'+id+'"]');
     const unitInp = document.querySelector('.cdf-unit-inp[data-drug-id="'+id+'"]');
     const routeInp = document.querySelector('.cdf-route-inp[data-drug-id="'+id+'"]');
-    const dose = parseFloat(doseInp?.value);
+    const dose = Number.parseFloat(doseInp?.value);
     const unit = (unitInp?.value||'').trim();
     const route = routeInp?.value || null;
     if (!dose || dose <= 0) { toast(id + ': Gecerli doz girin', true); return; }
@@ -2001,7 +2001,7 @@ function caseDrugDuzenle(adminId, dose, unit, route) {
 }
 
 async function caseDrugDuzenleKaydet(adminId) {
-  const dose = parseFloat(document.getElementById('ded-dose')?.value);
+  const dose = Number.parseFloat(document.getElementById('ded-dose')?.value);
   const unit = document.getElementById('ded-unit')?.value?.trim();
   const route = document.getElementById('ded-route')?.value || null;
   if (!dose || dose <= 0) { toast('Gecerli doz girin', true); return; }
@@ -2321,8 +2321,8 @@ function _eligibleHayvanlar(){
 function acHayvan(inputId,listId){
   const q=(document.getElementById(inputId)?.value||'').toLowerCase().trim();
   const ac=document.getElementById(listId); if(!ac) return;
-  const src=listId==='ac-ihid'?(window._TH||[]):listId==='ac-khid'?_eligibleHayvanlar():(getState('animals').length?getState('animals'):[]);
-  if(listId==='ac-ihid'&&!window._TH){
+  const src=listId==='ac-ihid'?(globalThis._TH||[]):listId==='ac-khid'?_eligibleHayvanlar():(getState('animals').length?getState('animals'):[]);
+  if(listId==='ac-ihid'&&!globalThis._TH){
     const ac=document.getElementById(listId); if(ac){ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--ink3)">⏳ Yükleniyor…</div>';ac.style.display='block';} return;
   }
   const filtered=q
