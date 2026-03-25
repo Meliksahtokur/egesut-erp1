@@ -20,6 +20,31 @@
 
 ---
 
+## BUG FIX OTURUMLARI (SonarCloud dışı)
+
+### Oturum 2026-03-25
+
+#### ✅ Tamamlanan Fixler
+
+| Fix | Dosyalar | Açıklama |
+|-----|----------|----------|
+| CI: Migration versiyon uyuşmazlığı | `supabase/migrations/` | `apply_migration` ile DB'ye uygulanan migration Supabase'in kendi timestamp'ini (075027) üretiyordu. Lokal dosya 000026 ile adlandırılmıştı → GitHub Actions `db push` red yiyordu. Rename ile çözüldü. |
+| Hayvan grubu kuralları | `js/app.js`, `js/ui.js` | `animalFormGuncelle` async yapıldı. Doğum/abort kaydı → sadece Sağmal/Kuru. Tohumlanmış → yetişkin gruplar. 12ay+ → buzağı grubu yok. `openAnimalEdit`'te `await animalFormGuncelle()`. |
+| Doğum tarihi ileri tarih engeli | `js/app.js`, `js/forms.js` | `openM('m-animal')`'de `a-dt` inputuna `max=bugün` set edildi. Submit'te `yasGun < 0` guard eklendi. |
+| Dark mode: beyaz fon / hardcoded renkler | `js/ui.js` | `background:#fff` → `var(--card)` (bottom sheet + autocomplete kutular). `border:1px solid #eee` → `var(--card3)`. `color:#666` → `var(--ink3)`. Toplu replace. |
+
+#### ⏳ Ertelenen / Araştırma Gerektiren
+
+| Bug | Durum | Notlar |
+|-----|-------|--------|
+| Yeni hayvan ekleme — liste anlık güncellenmiyor | Ertelendi | `submitAnimal`'da `pullTables(['hayvanlar'])` → `renderFromLocal()` zinciri teorik olarak doğru. En olası neden: `_pulling` guard başka bir concurrent pull sırasında silently drop ediyor. Yeniden açmak için: `api.js:230` `_pulling` guard'ını izle, ya da `hayvan_durum_view` propagation gecikmesini MCP ile test et. |
+
+#### 📝 Dikkat: MCP apply_migration Kuralı
+`mcp__supabase__apply_migration` kullandığında Supabase kendi timestamp'ini üretir (örn. `20260325075027`).
+Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase db push` hata verir.
+
+---
+
 ## TEST & DEPLOY PROTOKOLÜ
 
 ### Sprint Sonu Akışı
