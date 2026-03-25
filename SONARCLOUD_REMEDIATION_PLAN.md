@@ -1,7 +1,6 @@
 # EgeSüt ERP — SonarCloud Remediation Plan
 > Kaynak: sonarcloud_issues-2026-03-22_10-48-52.csv | Toplam: 517 issue
 > Bu dosya her sprint tamamlandıkça güncellenir. Biten adımlar ✅ ile işaretlenir.
-> !!!KULLANICIYA DEĞİŞİKLİKLER patch.py FORMAINDA VERİLECEKTİR VE KULLANİCİ TERMİNALE DOGRUDAN KOPYALA YAPIŞTIR YAPARAK ÇALIŞACAKTIR!!!
 ---
 
 ## ÖZET TABLO
@@ -37,7 +36,7 @@
 
 | Bug | Durum | Notlar |
 |-----|-------|--------|
-| Yeni hayvan ekleme — liste anlık güncellenmiyor | Ertelendi | `submitAnimal`'da `pullTables(['hayvanlar'])` → `renderFromLocal()` zinciri teorik olarak doğru. En olası neden: `_pulling` guard başka bir concurrent pull sırasında silently drop ediyor. Yeniden açmak için: `api.js:230` `_pulling` guard'ını izle, ya da `hayvan_durum_view` propagation gecikmesini MCP ile test et. |
+| Yeni hayvan ekleme — liste anlık güncellenmiyor | Ertelendi — **~15-25 dk** | `submitAnimal`'da `pullTables(['hayvanlar'])` → `renderFromLocal()` zinciri teorik doğru ama reload'dan sonra çalışıyor. En olası neden: `api.js:230` `_pulling` guard concurrent pull'da silently drop ediyor. Başlangıç noktası: `_pulling` true mu diye log ekle ya da MCP ile `hayvan_durum_view` propagation gecikmesini test et. |
 
 #### 📝 Dikkat: MCP apply_migration Kuralı
 `mcp__supabase__apply_migration` kullandığında Supabase kendi timestamp'ini üretir (örn. `20260325075027`).
