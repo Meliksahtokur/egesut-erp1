@@ -33,6 +33,12 @@ async function submitAnimal(btn) {
   const irk     = getIrkValue();
 
   if (!editId && !devlet && !kupe) { toast('Devlet küpesi veya işletme küpesi girin', true); return; }
+  const _grup = v('a-grup');
+  const _dt   = v('a-dt');
+  if (_grup === 'Süt İçen Buzağı' && _dt) {
+    const _yasGun = Math.floor((Date.now() - new Date(_dt)) / 86400000);
+    if (_yasGun > 180) { toast('⚠️ 6 aylıktan büyük hayvan "Süt İçen Buzağı" grubuna eklenemez', true); return; }
+  }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
 
   try {

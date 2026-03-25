@@ -89,6 +89,8 @@ function openM(id) {
     animalFormGuncelle();
   }
   if (id === 'm-insem') {
+    cl('i-hid');
+    const acIhid = g('ac-ihid'); if (acIhid) acIhid.style.display = 'none';
     db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
       globalThis._TH = data || [];
     }).catch(console.warn);
@@ -332,7 +334,7 @@ function animalFormGuncelle() {
     } else if (yasGun !== null && yasGun > 365 && yasGun <= 730) {
       gruplar = ['Düve (Büyük)', 'Düve (Küçük)'];
     } else {
-      gruplar = ['Sağmal (Laktasyonda)', 'Sağmal (Kuru)', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)', 'Sütten Kesilmiş Buzağı', 'Süt İçen Buzağı'];
+      gruplar = ['Sağmal (Laktasyonda)', 'Sağmal (Kuru)', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)', 'Sütten Kesilmiş Buzağı'];
     }
   } else if (yasGun !== null && yasGun <= 75) { // Erkek
     gruplar = ['Süt İçen Buzağı'];
