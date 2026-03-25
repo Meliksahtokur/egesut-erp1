@@ -35,9 +35,15 @@ async function submitAnimal(btn) {
   if (!editId && !devlet && !kupe) { toast('Devlet küpesi veya işletme küpesi girin', true); return; }
   const _grup = v('a-grup');
   const _dt   = v('a-dt');
-  if (_grup === 'Süt İçen Buzağı' && _dt) {
+  if (_dt) {
     const _yasGun = Math.floor((Date.now() - new Date(_dt)) / 86400000);
-    if (_yasGun > 180) { toast('⚠️ 6 aylıktan büyük hayvan "Süt İçen Buzağı" grubuna eklenemez', true); return; }
+    if (_yasGun < 0) { toast('⚠️ Doğum tarihi ileri tarih olamaz', true); return; }
+    if (_grup === 'Süt İçen Buzağı' && _yasGun > 180) {
+      toast('⚠️ 6 aylıktan büyük hayvan "Süt İçen Buzağı" grubuna eklenemez', true); return;
+    }
+    if ((_grup === 'Süt İçen Buzağı' || _grup === 'Sütten Kesilmiş Buzağı') && _yasGun > 365) {
+      toast('⚠️ 12 aylıktan büyük hayvan buzağı grubuna eklenemez', true); return;
+    }
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
 
