@@ -770,19 +770,19 @@ Tamamlanan her fix için bu tabloya ✅ işareti koy ve commit hash ekle.
 | FIX-2.1 | Global annotation ui.js | ui.js | ✅ | 14cda49 |
 | FIX-2.2 | Global annotation forms.js | forms.js | ✅ | 14cda49 |
 | FIX-2.3 | HEKIMLER const→let | config.js, app.js | ✅ | 14cda49 |
-| FIX-3.1 | S2681 misleading if/else | app.js, ui.js | ⏳ | — |
-| FIX-3.2 | S1871 duplicate branch | app.js | ⏳ | — |
+| FIX-3.1 | S2681 misleading if/else | app.js, ui.js | ✅ | b572e26 |
+| FIX-3.2 | S1871 duplicate branch | app.js | ✅ | b572e26 |
 | FIX-3.3 | S6660 if-in-else | app.js | ✅ | 20f60ba |
-| FIX-3.4 | S1854+S1481 useless vars | ui.js | ⏳ | — |
-| FIX-3.5 | S2486 empty catch | app.js, forms.js, ui.js | ⏳ | — |
+| FIX-3.4 | S1854+S1481 useless vars | ui.js | ✅ | b572e26 |
+| FIX-3.5 | S2486 empty catch | app.js, forms.js, ui.js | ✅ | zaten dolu |
 | FIX-3.6 | S1874 deprecated event | api.js, ui.js | ✅ | 0f2f0e2 |
 | FIX-3.7 | S7735 negated conditions | api.js, ui.js | ⏳ | — |
-| FIX-3.8 | S7754 some vs find | app.js, ui.js | ⏳ | — |
-| FIX-3.9 | S7759 Date.now | ui.js | ⏳ | — |
+| FIX-3.8 | S7754 some vs find | app.js, ui.js | ✅ | b572e26 |
+| FIX-3.9 | S7759 Date.now | ui.js | ⏭ no-op (pattern yok) | — |
 | FIX-4.1 | S3776 cognitive complexity — loadUreme, loadGecmis, loadDash, renderAnimals, openDet | ui.js | ✅ | 0f2f0e2 |
 | FIX-4.1 | S3776 kalan: write(), renderFromLocal/goTo, loadTasks | api.js, app.js, ui.js | ⏳ | — |
-| FIX-4.2 | S3358 nested ternary — forms.js + ui.js kısmi | ui.js, forms.js | 🔶 kısmi | 0f2f0e2 |
-| FIX-4.3 | S6582 optional chain | ui.js, forms.js | ⏳ | — |
+| FIX-4.2 | S3358 nested ternary — tüm ui.js | ui.js, forms.js | ✅ | b572e26 |
+| FIX-4.3 | S6582 optional chain | ui.js, forms.js | ✅ | b572e26 |
 | FIX-5.1 | S7773 Number.parseFloat | forms.js, ui.js | ⏳ | — |
 | FIX-5.2 | S7781 replaceAll | app.js, ui.js | ⏳ | — |
 | FIX-5.3 | S7780 String.raw | app.js, ui.js | ⏳ | — |
@@ -827,7 +827,7 @@ Her sprint başında AI'ya şu bağlamı ver:
 
 ---
 
-## OTURUM NOTU — 2026-03-25
+## OTURUM NOTU — 2026-03-25 (2. Oturum)
 
 ### Sonar Fixleri (commit'lendi)
 - FIX-4.1: `loadUreme` → `_uremeKizginlik`, `_uremeTohumlama`, `_uremeGebelik`, `_uremeDogum`, `_uremeAbort`
@@ -846,14 +846,18 @@ Her sprint başında AI'ya şu bağlamı ver:
 - Gebe badge: tohumlama tarihinden gebelik günü gösterimi, 400 gün cap kaldırıldı
 - `_uremeTohumlama` + `_uremeDogum`: `hist-title` `var(--ink)` → `var(--ink2)` (okunabilirlik)
 
-### Sıradaki Sprint (S3 Kalan + S4 Kalan)
-- FIX-3.1 S2681 misleading if/else (5 konum)
-- FIX-3.2 S1871 duplicate branch app.js:292
-- FIX-3.4 S1854+S1481 useless vars (ui.js)
-- FIX-3.5 S2486 empty catch (3 konum)
-- FIX-3.7 S7735 negated conditions (7 konum)
-- FIX-3.8 S7754 .some() vs .find() (4 konum)
-- FIX-3.9 S7759 Date.now (4 konum)
-- FIX-4.1 kalan: write(), renderFromLocal/goTo, loadTasks
-- FIX-4.2 ui.js nested ternary (~16 konum kaldı)
-- FIX-4.3 optional chain (17 konum)
+### Yapılanlar (2. Oturum — b572e26)
+- FIX-3.1: animalFormGuncelle if/else chain → braces eklendi (app.js)
+- FIX-3.2: irkSecimDegisti duplicate else-if/else merged (app.js)
+- FIX-3.4: tohBos unused variable removed (ui.js)
+- FIX-3.8: .find() → .some() for boolean checks (app.js, ui.js)
+- FIX-4.2: nested ternary 7 lokasyon düzeltildi (ui.js)
+- FIX-4.3: optional chain — ui.js + forms.js
+
+### Sıradaki Sprint (S3 Kalan + S5)
+- FIX-3.7 S7735 negated conditions (7 konum — api.js, ui.js)
+- FIX-4.1 kalan: write() api.js cognitive complexity
+- FIX-5.1 S7773 Number.parseFloat (~22 konum)
+- FIX-5.2 S7781 replaceAll (~26 konum)
+- FIX-5.3 S7780 String.raw (~18 konum)
+- FIX-5.4 S7764 globalThis (~52 konum, dikkatli)
