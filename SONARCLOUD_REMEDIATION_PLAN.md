@@ -7,13 +7,13 @@
 
 | Sprint | Kapsam | Issue Sayısı | Tahmini Süre | Durum |
 |--------|--------|-------------|--------------|-------|
-| WONTFIX | Dokümantasyon (kapatılacak) | ~188 | — | ⏳ |
-| S1 | Gerçek Bug'lar | ~10 | 25 dk | ⏳ |
-| S2 | BLOCKER Globals | 28 | 20 dk | ⏳ |
-| S3 | Mantık Tutarsızlıkları | ~35 | 40 dk | ⏳ |
-| S4 | Cognitive Complexity + Nested Ternary | ~75 | 75 dk | ⏳ |
-| S5 | Minor Modernizasyon (Bulk) | ~100 | 45 dk | ⏳ |
-| **Toplam** | | **~436** | **~4 saat** | |
+| WONTFIX | Dokümantasyon (SonarCloud UI'da işaretlenecek) | ~188 | — | ⏳ Manuel işaretleme bekliyor |
+| S1 | Gerçek Bug'lar | ~10 | 25 dk | ✅ Tamamlandı (f8874a0) |
+| S2 | BLOCKER Globals | 28 | 20 dk | ✅ Tamamlandı (14cda49) |
+| S3 | Mantık Tutarsızlıkları | ~35 | 40 dk | ✅ Tamamlandı (b572e26) |
+| S4 | Cognitive Complexity + Nested Ternary | ~75 | 75 dk | ✅ Tamamlandı (0f2f0e2) |
+| S5 | Minor Modernizasyon (Bulk) | ~100 | 45 dk | ✅ Tamamlandı (55e8212) |
+| **Toplam** | | **~436** | **~4 saat** | ✅ Kod fixleri bitti |
 
 **Kural:** Her sprint ayrı bir AI oturumudur. Oturum başında bu dosyanın ilgili sprint bölümü + etkilenen dosyalar kontekst olarak verilir. Sprint bitince bu dosyadaki checkbox'lar güncellenir, `git commit` atılır.
 
@@ -104,11 +104,11 @@ Bu issue'lar SonarCloud'da "Won't Fix" olarak işaretlenecek. Kod değişikliği
 
 ### Görev Listesi
 
-- [ ] **FIX-1.1** — Duplicate ID'ler `index.html` (S7930 CRITICAL)
-- [ ] **FIX-1.2** — SQL NullComparison `faz1_core.sql` (plsql:NullComparison MAJOR)
-- [ ] **FIX-1.3** — Constant truthiness `js/ui.js:1131` (S6638 MAJOR BUG)
-- [ ] **FIX-1.4** — Always-empty `logs` array `js/ui.js:2000` (S4158 MINOR BUG)
-- [ ] **FIX-1.5** — Duplicate `stokDrugBagla` fonksiyonu `js/ui.js:949-963` (S4144 MAJOR)
+- [x] **FIX-1.1** — Duplicate ID'ler `index.html` (S7930 CRITICAL) → f8874a0
+- [x] **FIX-1.2** — SQL NullComparison `faz1_core.sql` (plsql:NullComparison MAJOR) → ⏭ WONTFIX (migration dosyası)
+- [x] **FIX-1.3** — Constant truthiness `js/ui.js:1131` (S6638 MAJOR BUG) → f8874a0
+- [x] **FIX-1.4** — Always-empty `logs` array `js/ui.js:2000` (S4158 MINOR BUG) → f8874a0
+- [x] **FIX-1.5** — Duplicate `stokDrugBagla` fonksiyonu `js/ui.js:949-963` (S4144 MAJOR) → f8874a0
 
 ---
 
@@ -249,9 +249,9 @@ Her dosyanın EN BAŞINA (ilk satır olarak) ilgili cross-file global'lerin list
 
 ### Görev Listesi
 
-- [ ] **FIX-2.1** — `js/ui.js` başına `/* global */` bloğu ekle
-- [ ] **FIX-2.2** — `js/forms.js` başına `/* global */` bloğu ekle  
-- [ ] **FIX-2.3** — `js/app.js` — `HEKIMLER` re-declaration (app.js içindeki S2703)
+- [x] **FIX-2.1** — `js/ui.js` başına `/* global */` bloğu ekle → 14cda49
+- [x] **FIX-2.2** — `js/forms.js` başına `/* global */` bloğu ekle → 14cda49
+- [x] **FIX-2.3** — `js/app.js` — `HEKIMLER` re-declaration (app.js içindeki S2703) → 14cda49
 
 ---
 
@@ -356,15 +356,15 @@ let HEKIMLER = [ ... ];
 
 ### Görev Listesi
 
-- [ ] **FIX-3.1** — S2681 Misleading if/else (5 konum, 2 dosya)
-- [ ] **FIX-3.2** — S1871 Duplicate branch `app.js:292`
-- [ ] **FIX-3.3** — S6660 If-in-else `app.js:343`
-- [ ] **FIX-3.4** — S1854+S1481 Useless assignments (9 konum, `ui.js`)
-- [ ] **FIX-3.5** — S2486 Empty catch blocks (3 konum)
-- [ ] **FIX-3.6** — S1874 Deprecated `event` (4 konum)
-- [ ] **FIX-3.7** — S7735 Negated conditions (7 konum)
-- [ ] **FIX-3.8** — S7754 `.find()` → `.some()` (4 konum)
-- [ ] **FIX-3.9** — S7759 `new Date()` → `Date.now()` (4 konum)
+- [x] **FIX-3.1** — S2681 Misleading if/else (5 konum, 2 dosya) → b572e26
+- [x] **FIX-3.2** — S1871 Duplicate branch `app.js:292` → b572e26
+- [x] **FIX-3.3** — S6660 If-in-else `app.js:343` → 20f60ba
+- [x] **FIX-3.4** — S1854+S1481 Useless assignments (9 konum, `ui.js`) → b572e26
+- [x] **FIX-3.5** — S2486 Empty catch blocks (3 konum) → zaten dolu, değişiklik gerekmedi
+- [x] **FIX-3.6** — S1874 Deprecated `event` (4 konum) → 0f2f0e2
+- [x] **FIX-3.7** — S7735 Negated conditions (7 konum) → 55e8212
+- [x] **FIX-3.8** — S7754 `.find()` → `.some()` (4 konum) → b572e26
+- [x] **FIX-3.9** — S7759 `new Date()` → `Date.now()` (4 konum) → ⏭ no-op (pattern yok)
 
 ---
 
@@ -583,9 +583,9 @@ const ms = Date.now() - startDate;
 
 ### Görev Listesi
 
-- [ ] **FIX-4.1** — S3776 Cognitive Complexity — 9 fonksiyon (CRITICAL)
-- [ ] **FIX-4.2** — S3358 Nested Ternary — 51 konum (MAJOR)
-- [ ] **FIX-4.3** — S6582 Optional Chain — 17 konum (MAJOR)
+- [x] **FIX-4.1** — S3776 Cognitive Complexity — 9 fonksiyon (CRITICAL) → 0f2f0e2 + 55e8212
+- [x] **FIX-4.2** — S3358 Nested Ternary — 51 konum (MAJOR) → b572e26
+- [x] **FIX-4.3** — S6582 Optional Chain — 17 konum (MAJOR) → b572e26
 
 ---
 
@@ -701,10 +701,10 @@ const val = obj?.prop?.sub;
 
 ### Görev Listesi
 
-- [ ] **FIX-5.1** — S7773: `parseFloat(` → `Number.parseFloat(` (~22 konum)
-- [ ] **FIX-5.2** — S7781: `.replace(` → `.replaceAll(` (~26 konum)
-- [ ] **FIX-5.3** — S7780: Regex escaping → `String.raw` (~18 konum)
-- [ ] **FIX-5.4** — S7764: `window.` → `globalThis.` (~52 konum, dikkatli)
+- [x] **FIX-5.1** — S7773: `parseFloat(` → `Number.parseFloat(` (~22 konum) → 55e8212
+- [x] **FIX-5.2** — S7781: `.replace(` → `.replaceAll(` (~26 konum) → 55e8212
+- [x] **FIX-5.3** — S7780: Regex escaping → `String.raw` (~18 konum) → ⏭ no-op (pattern yok)
+- [x] **FIX-5.4** — S7764: `window.` → `globalThis.` (~52 konum, dikkatli) → 55e8212
 
 ---
 
@@ -899,26 +899,26 @@ Kalan sadece SonarCloud UI'da manuel WONTFIX işaretleme var (~188 issue).
 - Buzağı padok 6ay kuralı: form seçeneği kaldırıldı + save validasyonu + liste filtresi
 - Tedavi günü saat ikonu (🕐) + caseDaySaatAc/Kaydet + migration 025
 
-### ⏳ Sonraki Oturum — Sıralı
+### ⏳ Açık Bug'lar — Sıralı
 
-**1. İLK İŞ: Supabase MCP kurulumu**
-Claude Code'un Supabase'e doğrudan erişimi. Credentials api.js'de mevcut.
+**1. Migration 025 (tedavi saat kaydet)**
+Tedavi günü saat ikonu + caseDaySaatAc/Kaydet hazır. Migration apply edilmedi → Supabase MCP ile uygula + test.
 
-**2. Tedavi saat kaydet**
-Migration 025 henüz apply edilmedi. MCP sonrası uygula + test.
-
-**3. Tohumlama küpe stuck (3152 hâlâ geliyor)**
+**2. Tohumlama küpe stuck (3152 hâlâ geliyor)**
 openM'deki cl('i-hid') fix yetersiz. i-hid'in nereden set edildiği trace edilecek.
 
-**4. Buzağı 6ay+ kural — tam düzeltme**
+**3. Buzağı 6ay+ kural — tam düzeltme**
 Mevcut fix çalışmıyor, 3 yaşındaki hayvan hâlâ buzağı gruplarını görebiliyor.
 Kural: 180 gün+ hayvanlar için Süt İçen VE Sütten Kesilmiş Buzağı seçenekleri hiç görünmemeli.
-animalFormGuncelle tüm dalları tekrar incelenmeli.
+`animalFormGuncelle` tüm dalları tekrar incelenmeli.
 
-- **Tedavi ilaç seçim ekranı dark mode** — Autocomplete dropdown beyaz fon (`background:#fff` hardcode var, `var(--card)` olmalı)
-- **Görev sistemi entegrasyonu** (BÜYÜK):
+**4. Yeni hayvan ekleme — liste anlık güncellenmiyor**
+`submitAnimal`'da `pullTables(['hayvanlar'])` → `renderFromLocal()` zinciri teorik doğru ama reload'dan sonra çalışıyor.
+Başlangıç noktası: `api.js:230` `_pulling` guard → concurrent pull'u silently drop ediyor olabilir.
+
+**5. Görev sistemi entegrasyonu** (BÜYÜK — ayrı sprint):
   - Tedavi günleri → gorev_log task olarak (case_id + day_id bağlantılı)
-  - Tohumlama kontrol görevleri zaten var, erken uyarı filtresi eklenecek (today filtresi 3 gün önceden göster)
+  - Tohumlama kontrol görevleri: erken uyarı filtresi (today filtresi 3 gün önceden göster)
   - Görev tamamlama → case/tohumlama kaydına bağlanır
   - Eksik uygulama akışı: "Eksik uygulama ile tamamlamak istiyor musunuz?" confirm dialog
   - DB: gorev_log'a case_id, day_id kolonları gerekiyor (migration)
