@@ -2414,7 +2414,7 @@ function acNav(e,listId){
 // ──────────────────────────────────────────
 function openMWithHayvan(modalId,inputId,kupeNo){
   openM(modalId);
-  setTimeout(()=>{
+  const _tid=setTimeout(()=>{
     const el=document.getElementById(inputId);
     if(el){
       el.value=kupeNo;
@@ -2426,8 +2426,8 @@ function openMWithHayvan(modalId,inputId,kupeNo){
     if(modalId==='m-disease'){
       if(typeof loadDiseasesDropdown==='function') loadDiseasesDropdown();
     }
-
   },150);
+  if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
 }
 async function tohSonucGuncelle(tohId, sonuc, hayvanId){
   try{
