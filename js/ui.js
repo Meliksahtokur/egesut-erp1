@@ -1008,23 +1008,26 @@ async function loadGecmis(f,btn){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const entries=[];
-    if(f==='hepsi'||f==='dogum')  (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,data:r}));
-    if(f==='hepsi'||f==='tohumlama') (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,data:r}));
+    if(f==='hepsi'||f==='dogum')
+      (await idbGetAll('dogum')).forEach(r=>entries.push({type:'dogum',date:r.tarih,sortKey:r.created_at||r.tarih||'',data:r}));
+    if(f==='hepsi'||f==='tohumlama')
+      (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,sortKey:r.created_at||r.tarih||'',data:r}));
     if(f==='hepsi'||f==='hastalik') {
       const _dis = await idbGetAll('diseases');
       (await idbGetAll('cases')).forEach(r=>{
         const _d = _dis.find(d=>d.id===r.disease_id);
-        entries.push({type:'hastalik',date:r.start_date,data:{...r,disease_name:_d?.name||'?',tani:_d?.name||'?'}});
+        entries.push({type:'hastalik',date:r.start_date,sortKey:r.created_at||r.start_date||'',data:{...r,disease_name:_d?.name||'?',tani:_d?.name||'?'}});
       });
     }
-    if(f==='hepsi'||f==='gorev') (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>entries.push({type:'gorev',date:r.tamamlanma_tarihi||r.hedef_tarih,data:r}));
+    if(f==='hepsi'||f==='gorev')
+      (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>entries.push({type:'gorev',date:(r.tamamlanma_tarihi||r.hedef_tarih||'').slice(0,10),sortKey:r.tamamlanma_tarihi||r.hedef_tarih||'',data:r}));
     if(f==='hepsi'||f==='hayvan'){
       const islemTipler=['HAYVAN_EKLENDI','ABORT_KAYDI','KIZGINLIK_KAYDI'];
       (await idbGetAll('islem_log'))
         .filter(r=>islemTipler.includes(r.tip))
-        .forEach(r=>entries.push({type:'islem',date:(r.tarih||r.created_at||'').slice(0,10),data:r}));
+        .forEach(r=>entries.push({type:'islem',date:(r.tarih||r.created_at||'').slice(0,10),sortKey:r.tarih||r.created_at||'',data:r}));
     }
-    entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    entries.sort((a,b)=>(b.sortKey||b.date||'').localeCompare(a.sortKey||a.date||''));
     if(!entries.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>'; return; }
     el.innerHTML=entries.slice(0,300).map(e=>_gecmisEntryHtml(e)).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
