@@ -89,6 +89,7 @@ function openM(id) {
     animalFormGuncelle();
   }
   if (id === 'm-insem') {
+    clearTimeout(globalThis._insemKupeTid);
     cl('i-hid');
     const acIhid = g('ac-ihid'); if (acIhid) acIhid.style.display = 'none';
     db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
