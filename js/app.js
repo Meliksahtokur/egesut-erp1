@@ -90,7 +90,7 @@ function openM(id) {
   }
   if (id === 'm-insem') {
     db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
-      window._TH = data || [];
+      globalThis._TH = data || [];
     }).catch(console.warn);
     setTimeout(() => spermaModStok(), 100);
   }

@@ -135,35 +135,34 @@ async function dbInsert(table, rows) {
 // ── OFFLINE-FIRST WRITE ─────────────────────
 // Basit tablo işlemleri için (görev tamamla, stok hareketi vb.)
 // Karmaşık işlemler → rpc() kullanır, bu fonksiyon değil
-async function write(table, data, method = 'POST', filter = '') {
-  const arr = Array.isArray(data) ? data : [data];
-
-  if (method === 'PATCH') {
-    const idMatch = filter.match(/id=eq\.([^&]+)/);
-    const targetId = idMatch ? idMatch[1] : null;
-    if (targetId) {
-      const existing = await idbGetAll(table);
-      const base = existing.find(r => r.id === targetId) || { id: targetId };
-      const merged = { ...base, ...arr[0], id: targetId };
-      await idbPut(table, [merged]);
-      if (navigator.onLine) {
-        try {
-          await dbUpdate(table, targetId, arr[0]);
-          const q = await getQueue();
-          for (const op of q) { if (op.table === table && op.filter === filter) await removeFromQueue(op._qid); }
-        } catch (e) {
-          console.warn(`PATCH ${table}:`, e.message);
-          await queueOp({ table, method: 'PATCH', data: [merged], filter });
-          updateSyncBar();
-        }
-      } else {
-        await queueOp({ table, method: 'PATCH', data: [merged], filter });
-        updateSyncBar();
+async function _writePatch(table, filter, arr) {
+  const idMatch = filter.match(/id=eq\.([^&]+)/);
+  const targetId = idMatch ? idMatch[1] : null;
+  if (!targetId) return null;
+  const existing = await idbGetAll(table);
+  const base = existing.find(r => r.id === targetId) || { id: targetId };
+  const merged = { ...base, ...arr[0], id: targetId };
+  await idbPut(table, [merged]);
+  if (navigator.onLine) {
+    try {
+      await dbUpdate(table, targetId, arr[0]);
+      const q = await getQueue();
+      for (const op of q) {
+        if (op.table === table && op.filter === filter) await removeFromQueue(op._qid);
       }
-      return [merged];
+    } catch (e) {
+      console.warn(`PATCH ${table}:`, e.message);
+      await queueOp({ table, method: 'PATCH', data: [merged], filter });
+      updateSyncBar();
     }
+  } else {
+    await queueOp({ table, method: 'PATCH', data: [merged], filter });
+    updateSyncBar();
   }
+  return [merged];
+}
 
+async function _writePost(table, arr, method, filter) {
   arr.forEach(r => { if (!r.id) r.id = crypto.randomUUID(); });
   await idbPut(table, arr);
   if (navigator.onLine) {
@@ -184,6 +183,15 @@ async function write(table, data, method = 'POST', filter = '') {
     updateSyncBar();
   }
   return arr;
+}
+
+async function write(table, data, method = 'POST', filter = '') {
+  const arr = Array.isArray(data) ? data : [data];
+  if (method === 'PATCH') {
+    const result = await _writePatch(table, filter, arr);
+    if (result) return result;
+  }
+  return _writePost(table, arr, method, filter);
 }
 
 // ── RPC TABLOLARI MAP ───────────────────────
@@ -241,7 +249,7 @@ async function pullTables(tables = []) {
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
     await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
-    if (uniq.includes('tohumlanabilir_hayvanlar')) window._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
+    if (uniq.includes('tohumlanabilir_hayvanlar')) globalThis._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
   } finally {
     _pulling = false;
   }
@@ -304,7 +312,7 @@ async function syncNow() {
       }
     }
     const remaining = await getQueue();
-    if (!remaining.length) hideSyncBar(); else updateSyncBar();
+    if (remaining.length) updateSyncBar(); else hideSyncBar();
   } finally {
     _syncing = false;
   }
