@@ -2449,7 +2449,7 @@ function setTheme(mode) {
   if (btnSaha) btnSaha.style.background = mode === 'light' ? 'rgba(78,154,42,.18)' : '';
   if (btnKoyu) btnKoyu.style.background = mode === 'dark'  ? 'rgba(78,154,42,.18)' : '';
 }
-(function(){ const t = localStorage.getItem('ege_theme'); if (t) setTheme(t); })();
+(function(){ const t = localStorage.getItem('ege_theme') || 'dark'; setTheme(t); })();
 
 function ayarlarAc(){
   renderAyarlarHekimList();
@@ -2457,7 +2457,7 @@ function ayarlarAc(){
   renderDrugStokList();
   dataTrafficYenile();
   // tema butonlarını senkronize et
-  const cur = localStorage.getItem('ege_theme') || 'light';
+  const cur = localStorage.getItem('ege_theme') || 'dark';
   const btnSaha = document.getElementById('btn-saha-mod');
   const btnKoyu = document.getElementById('btn-koyu-mod');
   if (btnSaha) btnSaha.style.background = cur === 'light' ? 'rgba(78,154,42,.18)' : '';
