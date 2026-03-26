@@ -588,13 +588,6 @@ button,input,select,textarea{font-family:inherit}
       </div>
       <div class="fg-row">
         <div class="fg"><label class="flbl">Doğum Ağırlığı (kg) *</label><input id="b-dogum-kg" type="number" step="0.1" min="0" max="100" class="fi" placeholder="Örn: 38.5"></div>
-        <div class="fg"><label class="flbl">Baba Bilgisi</label>
-          <select id="b-baba-select" class="fsel" onchange="if(this.value==='__elle__'){this.style.display='none';document.getElementById('b-baba-text').style.display='block';document.getElementById('b-baba').value='';}else{document.getElementById('b-baba').value=this.value;}">
-            <option value="">Stoktan seç…</option>
-          </select>
-          <input id="b-baba-text" class="fi" placeholder="Boğa adı / kodu" style="display:none" oninput="document.getElementById('b-baba').value=this.value">
-          <input type="hidden" id="b-baba">
-        </div>
       </div>
       <div class="fg-row">
         <div class="fg"><label class="flbl">Doğum Tipi</label><select id="b-tip" class="fsel"><option>Normal</option><option>Güç</option><option>Sezaryen</option></select></div>

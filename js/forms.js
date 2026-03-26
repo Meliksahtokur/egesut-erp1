@@ -107,8 +107,6 @@ async function submitBirth(btn) {
   const cins   = v('b-cins');
   const tip    = v('b-tip');
   const kg     = Number.parseFloat(g('b-dogum-kg')?.value || '') || null;
-  const baba   = v('b-baba');
-
   if (!anneId) { toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir', true); return; }
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
   if (tarih > new Date().toISOString().split('T')[0]) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
@@ -125,7 +123,6 @@ async function submitBirth(btn) {
       p_cins:     cins,
       p_tip:      tip,
       p_kg:       kg,
-      p_baba:     baba || null,
       p_hekim_id: v('b-hekim') || null,
     });
 
@@ -137,7 +134,7 @@ async function submitBirth(btn) {
     g('anne-secili-card').style.display = 'none';
     g('btn-gebe-sec').style.display = '';
     g('b-anne-manual').style.display = 'none';
-    ['b-kupe','b-dogum-kg','b-baba','b-baba-text'].forEach(id => { const el = g(id); if (el) el.value = ''; });
+    ['b-kupe','b-dogum-kg'].forEach(id => { const el = g(id); if (el) el.value = ''; });
 
     pullTables(['hayvanlar','dogum','gorev_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast('❌ Doğum kaydedilemedi: ' + e.message, true); }
@@ -629,24 +626,7 @@ async function hstSilOnay() {
 }
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
-async function openTohDet(id) {
-  const all = await idbGetAll('tohumlama');
-  const t   = all.find(x => x.id === id); if (!t) return;
-  _curToh = t;
-  const hk = HEKIMLER.find(x => x.id === t.hekim_id) || _customHekimler.find(x => x.id === t.hekim_id);
-  g('td2-hayvan').textContent = t.hayvan_id || '?';
-  g('td2-sperma').textContent = `💉 ${t.sperma || '?'}`;
-  const scBoş = t.sonuc === 'Boş' ? 'var(--red)' : 'var(--amber)';
-  const sc    = t.sonuc === 'Gebe' ? 'var(--green)' : scBoş;
-  const chips = [
-    `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc || 'Bekliyor'}</span>`,
-    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no || 1}. deneme</span>`,
-    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(t.tarih)}</span>`,
-    hk ? `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>` : '',
-  ];
-  g('td2-meta').innerHTML = chips.filter(Boolean).join('');
-  openM('m-toh-det');
-}
+// openTohDet → ui.js'de tanımlı
 async function tohSonuc(sonuc) {
   if (!_curToh) return;
   await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
