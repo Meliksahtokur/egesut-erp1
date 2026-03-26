@@ -107,6 +107,7 @@ async function submitBirth(btn) {
   const cins   = v('b-cins');
   const tip    = v('b-tip');
   const kg     = Number.parseFloat(g('b-dogum-kg')?.value || '') || null;
+  const baba   = v('b-baba') || v('b-baba-text') || null;
   if (!anneId) { toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir', true); return; }
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
   if (tarih > new Date().toISOString().split('T')[0]) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
@@ -123,6 +124,7 @@ async function submitBirth(btn) {
       p_cins:     cins,
       p_tip:      tip,
       p_kg:       kg,
+      p_baba:     baba,
       p_hekim_id: v('b-hekim') || null,
     });
 
@@ -134,7 +136,9 @@ async function submitBirth(btn) {
     g('anne-secili-card').style.display = 'none';
     g('btn-gebe-sec').style.display = '';
     g('b-anne-manual').style.display = 'none';
-    ['b-kupe','b-dogum-kg'].forEach(id => { const el = g(id); if (el) el.value = ''; });
+    ['b-kupe','b-dogum-kg','b-baba','b-baba-text'].forEach(id => { const el = g(id); if (el) el.value = ''; });
+    const babaAuto = g('b-baba-auto'); if (babaAuto) babaAuto.style.display = 'none';
+    const babaText = g('b-baba-text'); if (babaText) babaText.style.display = 'none';
 
     pullTables(['hayvanlar','dogum','gorev_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast('❌ Doğum kaydedilemedi: ' + e.message, true); }
