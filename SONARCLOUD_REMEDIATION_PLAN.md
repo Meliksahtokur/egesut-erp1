@@ -63,11 +63,104 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 | Fix 10: Geçmiş doğum listesinde buzağı kartına gitme | 4abf4dd | `js/ui.js` | Anne + buzağı küpesi ayrı tıklanabilir. `openDetByKupe()` eklendi. |
 | Fix 11: Hayvan kartında baba bilgisi görünmüyor | 4abf4dd | `js/ui.js` | `_detOzetHtml` infoFields'a `baba_bilgi` eklendi. |
 
-#### ⏳ Devam Eden
+---
 
-| Fix | Durum |
-|-----|-------|
-| Fix 12: Tohumlama listesinden yanlış gebe işaretleme | 🔄 Araştırılıyor |
+## 🔴 TOHUMLAMA MODÜLÜ — ERTELENMİŞ BÜYÜK REFAKTÖRİNG
+
+> **Durum:** Sonraki oturumda ele alınacak. Mevcut kod çalışıyor ancak mimari olarak kırık. Dokunmadan bırak.
+
+### Tespit Edilen Sorunlar (2026-03-26 analizi)
+
+#### Sorun 1: Geri Al (td2-geri-al-btn) hiç görünmüyor
+
+**Kök neden:** `js/ui.js` `openTohDet` fonksiyonunda islem_log sorgusu yanlış alanları arıyor:
+```js
+// YANLIŞ (mevcut):
+l.tip === 'TOHUMLAMA' && (l.payload?.kaynak_id === id || l.snapshot?.id === id)
+// DOĞRU:
+l.tip === 'TOHUMLAMA' && l.ref_id === id
+```
+`payload.kaynak_id` hiç doldurulmadı. `ref_id` migration 016'da eklendi, migration 028 sonrası kayıtlarda dolu.
+
+**Fix:** `js/ui.js:2215` — tek satır değişikliği.
+
+---
+
+#### Sorun 2: `tohSonuc` fonksiyon isim çakışması
+
+**Kök neden:** Aynı isimde iki fonksiyon tanımlı:
+- `js/forms.js:634` — guard'lı versiyon (Gebe/DoğumYaptı kontrolü var)
+- `js/ui.js:2232` — korumasız versiyon (direkt `write()`, hiç kontrol yok)
+
+Browser son yüklenen dosyayı kullanır → `ui.js` sonra yüklendiği için korumasız versiyon aktif. Guard hiç çalışmıyor.
+
+**Fix:** `ui.js:2232-2238` arasındaki 7 satırlık korumasız `tohSonuc` fonksiyonunu sil. `forms.js`'tekini kullan.
+
+---
+
+#### Sorun 3: `tohSonucGuncelle` tamamen korumasız
+
+**Kök neden:** `js/ui.js:2501` — hayvan kartındaki "🤰 Gebe" / "❌ Boş" butonları buraya bağlı:
+```js
+async function tohSonucGuncelle(tohId, sonuc, hayvanId){
+  await db.from('tohumlama').update({sonuc}).eq('id',tohId);
+  // Hiçbir kontrol yok
+}
+```
+Mevcut `sonuc` değerine bakılmaksızın her durumda yazılıyor. Gebe hayvan tek tıkla Boş yapılabiliyor.
+
+**Fix:** Fonksiyon başına guard ekle:
+1. IDB'den mevcut kaydı oku
+2. `sonuc === 'Gebe'` veya `sonuc === 'Doğum Yaptı'` ise toast + return
+3. Her iki işlem için `confirm()` ekle
+
+---
+
+#### Sorun 4: 3 Farklı Yazma Yolu (mimari kırıklık)
+
+| Yol | Nerede | Validation |
+|---|---|---|
+| `tohumlama_kaydet` RPC | `submitInsem()` | ✅ Tam |
+| `write()` REST PATCH | `tohSonuc()`, `gebeIsaretKaydet()` | ❌ Yok |
+| `db.from().update()` | `tohSonucGuncelle()` | ❌ Yok |
+
+RPC'yi bypass eden her path: yaş/cinsiyet/aktif gebelik kontrolü yok, sperma stok düşmüyor, görev oluşturulmuyor.
+
+---
+
+#### Sorun 5: State Tutarsızlıkları
+
+- `hayvanlar.tohumlama_durumu` ↔ `tohumlama.sonuc` hiç senkronize değil
+- `hayvanlar.grup` Gebe olunca güncellenmiyor (trigger migration 027'de kaldırıldı, yerine yenisi eklenmedi)
+- `islem_log`'da 5 farklı trigger versiyonu; `ref_id` sadece migration 028 sonrası kayıtlarda dolu
+
+---
+
+### Önerilen Çözüm Mimarisi (Sonraki Oturum)
+
+**Temel ilke:** Tohumlama verisi yalnızca RPC üzerinden değişir. Frontend tabloya direkt yazmaz.
+
+**Eklenecek RPC'ler:**
+| RPC | Geçiş | İş Kuralı |
+|---|---|---|
+| `tohumlama_kaydet` | yeni kayıt | mevcut (tam) |
+| `tohumlama_sonuc_gebe` | Bekliyor → Gebe | sadece Bekliyor'dan, grup güncelle |
+| `tohumlama_sonuc_bos` | Bekliyor → Boş | sadece Bekliyor'dan |
+| `tohumlama_abort` | Gebe → Abort | sadece Gebe'den, not al |
+| `dogum_kaydet` | Gebe → Doğum Yaptı | mevcut (tam) |
+
+**Kaldırılacaklar:**
+- `tohSonucGuncelle()` → `tohumlama_sonuc_gebe/bos` RPC'sine taşı
+- `gebeIsaretKaydet()` içindeki direkt `write()` → `tohumlama_sonuc_gebe` RPC
+- `ui.js`'teki korumasız `tohSonuc` → sil
+
+**Durum makinesi:**
+```
+[Bekliyor] → [Gebe]        → hayvanlar.grup güncelle
+    ↓             ↓
+  [Boş]      [Doğum Yaptı] → dogum tablosu INSERT
+               [Abort]     → islem_log ABORT_KAYDI
+```
 
 ---
 
