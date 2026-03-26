@@ -2212,7 +2212,7 @@ async function openTohDet(id){
 
   // islem_log'dan bu kaydın id'sini bul (geri alma için)
   const islemLog=await idbGetAll('islem_log');
-  const islemKayit=islemLog.find(l=>l.tip==='TOHUMLAMA'&&(l.payload?.kaynak_id===id||l.snapshot?.id===id));
+  const islemKayit=islemLog.find(l=>l.tip==='TOHUMLAMA'&&l.ref_id===id);
   const td2GeriAlBtn=document.getElementById('td2-geri-al-btn');
   if(td2GeriAlBtn){
     if(islemKayit){ td2GeriAlBtn.style.display='block'; td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`); }
@@ -2229,13 +2229,7 @@ function tekrarTohumla(kupe) {
   closeM('m-toh-det');
   openMWithHayvan('m-insem','i-hid', kupe);
 }
-async function tohSonuc(sonuc){
-  if(!_curToh) return;
-  await write('tohumlama',{..._curToh,sonuc},'PATCH',`id=eq.${_curToh.id}`);
-  toast(sonuc==='Gebe'?'✅ Gebe olarak işaretlendi':sonuc==='Boş'?'Boş olarak işaretlendi':'Güncellendi');
-  closeM('m-toh-det');
-  await renderFromLocal();
-}
+// tohSonuc → forms.js'de tanımlı (guard'lı versiyon)
 
 // ──────────────────────────────────────────
 // SPERMA AUTOCOMPLETE
@@ -2500,6 +2494,15 @@ function openMWithHayvan(modalId,inputId,kupeNo){
 }
 async function tohSonucGuncelle(tohId, sonuc, hayvanId){
   try{
+    const tohs=await idbGetAll('tohumlama');
+    const kayit=tohs.find(t=>t.id===tohId);
+    if(kayit&&(kayit.sonuc==='Gebe'||kayit.sonuc==='Doğum Yaptı')){
+      toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın',true); return;
+    }
+    const onayMesaj=sonuc==='Gebe'
+      ?'Bu tohumlama kaydı "Gebe" olarak işaretlenecek. Emin misiniz?'
+      :'Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?';
+    if(!confirm(onayMesaj)) return;
     await db.from('tohumlama').update({sonuc}).eq('id',tohId);
     await pullTables(['tohumlama','hayvanlar']);
     renderSafe();
