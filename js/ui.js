@@ -806,6 +806,21 @@ function anneSeç(hayvanId,kupe,dogumTahmini,sperma){
   document.getElementById('b-anne-manual').style.display='none';
   document.getElementById('btn-gebe-sec').style.display='none';
   document.getElementById('gebe-sec-modal')?.remove();
+  // Baba otomasyonu
+  const babaAuto=document.getElementById('b-baba-auto');
+  const babaText=document.getElementById('b-baba-text');
+  const babaHid=document.getElementById('b-baba');
+  if(sperma){
+    babaHid.value=sperma;
+    babaAuto.textContent=`💉 ${sperma} — otomatik`;
+    babaAuto.style.display='block';
+    babaText.style.display='none';
+    babaText.value='';
+  } else {
+    babaHid.value='';
+    babaAuto.style.display='none';
+    babaText.style.display='block';
+  }
 }
 function anneSecimSifirla(){
   const el=document.getElementById('b-anne'); if(el) el.value='';
