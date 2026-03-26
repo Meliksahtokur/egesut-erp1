@@ -44,6 +44,28 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 
 ---
 
+### Oturum 2026-03-26
+
+#### ✅ Tamamlanan Fixler
+
+| Fix | Commit | Dosyalar | Açıklama |
+|-----|--------|----------|----------|
+| Fix 1: pullTables Promise-based lock | 9d1db71 | `js/api.js` | `_pulling` boolean → Promise-based lock. Concurrent pull'larda silent drop yerine bekle. Yeni hayvan eklenince liste anlık güncelleniyor. |
+| Fix 2: Grup/padok kuralları + gebe trigger | 5d5a577 | `js/app.js`, `js/config.js`, `js/forms.js`, `supabase/migrations/` | Grup değişiminde padok otomatik. Gebe trigger DB'de. Tohumlama dropdown fix. |
+| Fix 3: Tedavi ilaç seçim dark mode | 68940bf | `js/ui.js` | Hardcoded renkler CSS var'a çevrildi. |
+| Fix 4: Tedavi saat görünmüyor | d97486a | `supabase/migrations/` | `treatment_timeline` view'a `treatment_time` eklendi. |
+| Fix 5: Besi padok split + _TH ön yükleme | 12b5657 | `js/config.js`, `js/app.js` | Besi padok → Erkek/Dişi ayrı. Cinsiyet bazlı otomatik padok seçimi. `_TH` tohumlama dropdown'ı için ön yükleme. |
+| Fix 6: Tohumlama modal küpe + tıklanabilir hayvan | 12b5657 | `js/ui.js`, `js/forms.js` | `td2-hayvan` raw ID yerine kupe_no gösteriyor. Tıklayınca modal kapanıp hayvan kartı açılıyor. Duplicate `openTohDet` (forms.js) silindi. |
+| Fix 7: Doğum formunda baba otomasyonu | ⏳ bu oturum | `index.html`, `js/forms.js`, `js/ui.js` | Anne seçilince tohumlama kaydından sperma → otomatik baba. Kayıt yoksa serbest metin alanı gösterilir. |
+
+#### ⏳ Devam Eden
+
+| Fix | Durum |
+|-----|-------|
+| Fix 7: Doğum baba otomasyonu | Uygulanıyor |
+
+---
+
 ## TEST & DEPLOY PROTOKOLÜ
 
 ### Sprint Sonu Akışı
