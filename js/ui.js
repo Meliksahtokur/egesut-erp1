@@ -385,7 +385,7 @@ function filterA(){
 // HAYVAN DETAY — helpers
 // ──────────────────────────────────────────
 function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId){
-  const infoFields=[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Cinsiyet',v:a.cinsiyet||'—'},{l:'Grup',v:a.grup||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Doğum Kg',v:a.dogum_kg?a.dogum_kg+' kg':'—'},{l:'Canlı Ağırlık',v:a.canli_agirlik?a.canli_agirlik+' kg':'—'},{l:'Boy',v:a.boy?a.boy+' cm':'—'},{l:'Renk',v:a.renk||'—'},{l:'Ayırt Edici',v:a.ayirici_ozellik||'—'},{l:'Durum',v:a.durum||'—'}];
+  const infoFields=[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Cinsiyet',v:a.cinsiyet||'—'},{l:'Grup',v:a.grup||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Doğum Kg',v:a.dogum_kg?a.dogum_kg+' kg':'—'},{l:'Canlı Ağırlık',v:a.canli_agirlik?a.canli_agirlik+' kg':'—'},{l:'Boy',v:a.boy?a.boy+' cm':'—'},{l:'Renk',v:a.renk||'—'},{l:'Ayırt Edici',v:a.ayirici_ozellik||'—'},{l:'Durum',v:a.durum||'—'},{l:'Baba (Sperma)',v:a.baba_bilgi||'—'}];
   const anneObj=a.anne_id?getState('animals').find(x=>x.id===a.anne_id):null;
   const anneKupe=anneObj?.kupe_no||anneObj?.devlet_kupe||a.anne_id;
   let extra='';
@@ -425,14 +425,18 @@ function _detUremeHtml(a,tohs){
     return `${ay} ay ${kalanGun} gün (${gunler}. gün) · Tahmini: ${dFwd(gebeTohumlama.tarih,280)}`;
   })():null;
   const bekleyenToh=tohs.find(t=>t.sonuc==='Bekliyor');
+  const dogumYaptiToh=tohs.find(t=>t.sonuc==='Doğum Yaptı');
   const hid=a.kupe_no||a.devlet_kupe||a.id;
   let h=`<div style="padding:10px 0 6px;display:flex;gap:6px;flex-wrap:wrap">`;
   if(gebeTohumlama){
     h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.1);color:var(--red);font-weight:700" onclick="abortKaydet('${a.id}','${gebeTohumlama.id}')">⚠️ Abort / Erken Doğum</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px;font-weight:700" onclick="dogumYaptiAc('${a.id}','${hid}','${gebeTohumlama.tarih}','${gebeTohumlama.sperma||''}')">🐄 Doğum Yaptı</button>`;
   } else if(bekleyenToh){
     h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(78,154,42,.1);color:var(--green);font-weight:700" onclick="tohSonucGuncelle('${bekleyenToh.id}','Gebe','${a.id}')">🤰 Gebe</button>`;
     h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.08);color:var(--red);font-weight:700" onclick="tohSonucGuncelle('${bekleyenToh.id}','Boş','${a.id}')">❌ Boş</button>`;
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Tohumlama Ekle</button>`;
+  } else if(dogumYaptiToh){
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Yeni Tohumlama Ekle</button>`;
   } else {
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Tohumlama Ekle</button>`;
   }
@@ -713,7 +717,7 @@ async function gebeledenSec(){
     const kalanGun=Math.floor((dogumTahmini-today2)/86400000);
     const hayvan=getState('animals').find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
     return {toh:t,hayvan,kalanGun,dogumTahmini:dogumTahmini.toISOString().split('T')[0]};
-  }).filter(g=>g.hayvan&&g.kalanGun>=-14);
+  }).filter(g=>g.hayvan);
   const tohHayvanIds=new Set(listFromToh.map(g=>g.hayvan?.id));
   const listFromHayvan=gebeHayvanlar.filter(a=>!tohHayvanIds.has(a.id)).map(a=>({
     toh:{hayvan_id:a.id,tarih:a.tohumlama_tarihi||'',sperma:a.baba_bilgi||''},
@@ -827,6 +831,19 @@ function anneSecimSifirla(){
   document.getElementById('anne-secili-card').style.display='none';
   document.getElementById('btn-gebe-sec').style.display='';
 }
+function openDetByKupe(kupe){
+  if(!kupe) return;
+  const a=getState('animals').find(x=>x.kupe_no===kupe||x.devlet_kupe===kupe);
+  if(a) openDet(a.id);
+  else toast('Hayvan bulunamadı: '+kupe);
+}
+function dogumYaptiAc(hayvanId,kupe,tohTarih,sperma){
+  const dogumTahmini=dFwd(tohTarih,280);
+  anneSeç(hayvanId,kupe,dogumTahmini,sperma);
+  const tarihEl=document.getElementById('b-tarih');
+  if(tarihEl) tarihEl.value=new Date().toISOString().split('T')[0];
+  openM('m-birth');
+}
 
 // ──────────────────────────────────────────
 // ÜREME SEKMESİ
@@ -902,10 +919,13 @@ async function _uremeDogum(el){
       const tip=b.dogum_tipi||'Normal';
       const tipRenk=tip==='Sezaryan'?'#c0321a':tip==='Güç'?'#b07800':'#2a7a2a';
       const tipBg=tip==='Sezaryan'?'rgba(192,50,26,.1)':tip==='Güç'?'rgba(176,120,0,.1)':'rgba(42,122,42,.1)';
-      return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${b.anne_id}')">
+      return `<div class="hist-row">
         <div class="hist-dot" style="background:var(--green2)"></div>
         <div class="hist-main">
-          <div class="hist-title" style="color:var(--ink2)">🐄 ${anneKupe} → <b>${b.yavru_kupe}</b> (${b.yavru_cins||'?'})</div>
+          <div class="hist-title" style="color:var(--ink2)">
+            <span onclick="openDet('${b.anne_id}')" style="cursor:pointer">🐄 ${anneKupe}</span>
+            → <b onclick="openDetByKupe('${b.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${b.yavru_kupe}</b> (${b.yavru_cins||'?'})
+          </div>
           <div class="hist-sub">${fmtTarih(b.tarih)} · <span style="background:${tipBg};color:${tipRenk};border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem">${tip}</span></div>
         </div>
       </div>`;
@@ -987,11 +1007,11 @@ function _gecmisEntryHtml(e){
   let oc='',title='',sub='';
   if(type==='hastalik') oc=`onclick="openCaseDet('${data.id}')" style="cursor:pointer"`;
   else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
-  else if(type==='dogum') oc=`onclick="openDet('${hayvanKey}')" style="cursor:pointer"`;
+  else if(type==='dogum') oc='';
   if(type==='dogum'){
     const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id);
     const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
-    title=`${anneLabel||'?'} → ${data.yavru_kupe||'?'} (${data.yavru_cins||'?'})`;
+    title=`<span onclick="openDet('${data.anne_id}')" style="cursor:pointer">${anneLabel||'?'}</span> → <b onclick="openDetByKupe('${data.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${data.yavru_kupe||'?'}</b> (${data.yavru_cins||'?'})`;
     sub=`${data.dogum_tipi||'Normal'}${hkName}`;
   } else if(type==='tohumlama'){
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';

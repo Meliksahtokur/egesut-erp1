@@ -334,7 +334,7 @@ async function animalFormGuncelle() {
     const hayvanTohumlar = tohumlar.filter(t => t.hayvan_id === editId);
     tohumlanmis = hayvanTohumlar.length > 0;
     dogumAbortVar = dogumlar.some(d => d.anne_id === editId) ||
-                   hayvanTohumlar.some(t => t.sonuc === 'Doğum' || t.sonuc === 'Abort');
+                   hayvanTohumlar.some(t => t.sonuc === 'Doğum Yaptı' || t.sonuc === 'Abort');
   }
 
   let gruplar = [];
