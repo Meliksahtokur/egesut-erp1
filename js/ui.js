@@ -2129,7 +2129,15 @@ async function openTohDet(id){
   // Küpe çözümle
   const hayvanObj=getState('animals').find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
   const hayvanLabel=hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||t.hayvan_id;
-  document.getElementById('td2-hayvan').textContent=hayvanLabel||'?';
+  const td2Hayvan=document.getElementById('td2-hayvan');
+  td2Hayvan.textContent=hayvanLabel||'?';
+  if(hayvanObj){
+    td2Hayvan.style.cursor='pointer';
+    td2Hayvan.onclick=()=>{ closeM('m-toh-det'); openDet(hayvanObj.id); };
+  } else {
+    td2Hayvan.style.cursor='';
+    td2Hayvan.onclick=null;
+  }
   document.getElementById('td2-sperma').textContent=`💉 ${t.sperma||'?'}`;
   const _tohGebe=t.sonuc==='Gebe';
   const _scMidToh=t.sonuc==='Boş'?'var(--red)':'var(--amber)';

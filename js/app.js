@@ -402,7 +402,13 @@ function animalGrupDegisti() {
     return;
   }
   padokSel.innerHTML = padoklar.map(p => `<option value="${p}">${p}</option>`).join('');
-  padokSel.value = padoklar[0];
+  // Besi grubunda cinsiyet bazlı varsayılan padok
+  if (grup === 'Besi') {
+    const cins = v('a-cinsiyet');
+    padokSel.value = cins === 'Erkek' ? 'Besi Padok (Erkek)' : 'Besi Padok (Dişi)';
+  } else {
+    padokSel.value = padoklar[0];
+  }
 }
 
 // ── SPERMA LİSTESİ ──────────────────────────
@@ -691,6 +697,10 @@ window.addEventListener('load', async () => {
       await pullFromSupabase();
       await renderFromLocal();
       syncNow();
+      // _TH ön yükleme — tohumlama modalı açıldığında dropdown hazır olsun
+      db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
+        globalThis._TH = data || [];
+      }).catch(console.warn);
     } catch (e) { console.warn('Pull failed:', e.message); }
   } else {
     g('dot')?.classList.add('warn');
