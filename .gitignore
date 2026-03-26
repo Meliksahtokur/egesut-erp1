@@ -39,3 +39,7 @@ calendar_events.py
 tests/report/
 tests/results/
 playwright-report/
+test-results/
+
+# Claude runtime dosyaları
+.claude/arge-pending.flag
