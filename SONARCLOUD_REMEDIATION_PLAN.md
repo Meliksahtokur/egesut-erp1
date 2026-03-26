@@ -56,13 +56,18 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 | Fix 4: Tedavi saat görünmüyor | d97486a | `supabase/migrations/` | `treatment_timeline` view'a `treatment_time` eklendi. |
 | Fix 5: Besi padok split + _TH ön yükleme | 12b5657 | `js/config.js`, `js/app.js` | Besi padok → Erkek/Dişi ayrı. Cinsiyet bazlı otomatik padok seçimi. `_TH` tohumlama dropdown'ı için ön yükleme. |
 | Fix 6: Tohumlama modal küpe + tıklanabilir hayvan | 12b5657 | `js/ui.js`, `js/forms.js` | `td2-hayvan` raw ID yerine kupe_no gösteriyor. Tıklayınca modal kapanıp hayvan kartı açılıyor. Duplicate `openTohDet` (forms.js) silindi. |
-| Fix 7: Doğum formunda baba otomasyonu | ⏳ bu oturum | `index.html`, `js/forms.js`, `js/ui.js` | Anne seçilince tohumlama kaydından sperma → otomatik baba. Kayıt yoksa serbest metin alanı gösterilir. |
+| Fix 7: Doğum formunda baba otomasyonu | a9dc587 | `index.html`, `js/forms.js`, `js/ui.js` | Anne seçilince tohumlama kaydından sperma → otomatik baba. Kayıt yoksa serbest metin alanı gösterilir. |
+| Özellik A: Gebe kartına "Doğum Yaptı" butonu | 4abf4dd | `js/ui.js` | Abort butonu yanına "🐄 Doğum Yaptı" eklendi. `dogumYaptiAc()` annenin verisiyle doğum modalı açar. |
+| Fix 8: Gebelerden Seç — tüm gebeler listelenir | 4abf4dd | `js/ui.js` | `kalanGun >= -14` filtresi kaldırıldı, gecikmiş gebeler de listelenir. |
+| Fix 9: Trigger — doğumlar abort görünüyor | 4abf4dd | `js/ui.js`, `supabase/migrations/028` | `fn_islem_log`: `sonuc='Doğum Yaptı'` artık `DOGUM_KAYDI` yazar. DB'ye uygulandı. |
+| Fix 10: Geçmiş doğum listesinde buzağı kartına gitme | 4abf4dd | `js/ui.js` | Anne + buzağı küpesi ayrı tıklanabilir. `openDetByKupe()` eklendi. |
+| Fix 11: Hayvan kartında baba bilgisi görünmüyor | 4abf4dd | `js/ui.js` | `_detOzetHtml` infoFields'a `baba_bilgi` eklendi. |
 
 #### ⏳ Devam Eden
 
 | Fix | Durum |
 |-----|-------|
-| Fix 7: Doğum baba otomasyonu | ✅ Tamamlandı (a9dc587) |
+| Fix 12: Tohumlama listesinden yanlış gebe işaretleme | 🔄 Araştırılıyor |
 
 ---
 
