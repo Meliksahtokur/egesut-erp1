@@ -653,7 +653,8 @@ async function tohSonuc(sonuc) {
   const msg = sonuc === 'Gebe' ? '✅ Gebe olarak işaretlendi' : sonuc === 'Boş' ? 'Boş olarak işaretlendi' : 'Güncellendi';
   toast(msg);
   closeM('m-toh-det');
-  renderSafe();
+  // Trigger hayvanlar.grup'u güncelledi — IDB'yi tazele
+  pullTables(['hayvanlar', 'tohumlama']).then(renderSafe).catch(console.warn);
 }
 
 // ── GEBELİK İŞARETLE ────────────────────────
@@ -704,6 +705,8 @@ async function gebeIsaretKaydet() {
   }
   g('gebe-isaret-modal')?.remove();
   toast(`✅ ${n} hayvan gebe olarak işaretlendi`);
+  // Trigger hayvanlar.grup'u güncelledi — IDB'yi tazele, sonra render
+  await pullTables(['hayvanlar', 'tohumlama']);
   renderSafe();
   loadUreme('gebelik');
 }
