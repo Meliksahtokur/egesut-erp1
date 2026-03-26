@@ -9,6 +9,10 @@ At session start, activate the following skills based on context:
 - **superpowers:executing-plans** — planı uygulamak için
 - **superpowers:dispatching-parallel-agents** — keşif aşamasında paralel analiz
 - **superpowers:systematic-debugging** — bug bulma
+- **superpowers:test-driven-development** — her yeni fonksiyon/RPC implementasyonundan önce
+- **superpowers:verification-before-completion** — "düzelttim/tamamladım" demeden önce kanıt topla
+- **coderabbit:code-review** — push öncesi otomatik review
+- **commit-commands:commit-push-pr** — commit + push + PR tek adımda
 - **frontend-design** — UI geliştirirken
 - **feature-dev** — özellik geliştirme sürecinde
 
