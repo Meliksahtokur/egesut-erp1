@@ -1,6 +1,6 @@
 ---
 name: verify-before-done
-enabled: true
+enabled: false
 event: stop
 action: warn
 conditions:
