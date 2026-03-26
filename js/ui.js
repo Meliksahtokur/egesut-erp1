@@ -2184,6 +2184,32 @@ async function openTohDet(id){
     hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
   ];
   document.getElementById('td2-meta').innerHTML=chips.filter(Boolean).join('');
+
+  // Durum bazlı buton görünürlüğü
+  const sonucBtnRow=document.getElementById('td2-sonuc-btns');
+  const td2Info=document.getElementById('td2-info-msg');
+  if(t.sonuc==='Doğum Yaptı'){
+    if(sonucBtnRow) sonucBtnRow.style.display='none';
+    if(td2Info){ td2Info.textContent='✅ Bu kayıt doğum ile tamamlandı.'; td2Info.style.display='block'; }
+  } else if(t.sonuc==='Boş'){
+    // Sadece "Bekliyor" düzeltme butonu
+    if(sonucBtnRow) sonucBtnRow.style.display='none';
+    if(td2Info){ td2Info.textContent=''; td2Info.style.display='none'; }
+    const td2BosFixed=document.getElementById('td2-bos-fixed');
+    if(td2BosFixed) td2BosFixed.style.display='block';
+  } else if(t.sonuc==='Gebe'){
+    if(sonucBtnRow) sonucBtnRow.style.display='none';
+    if(td2Info){ td2Info.textContent='🤰 Gebe — hayvan kartından Abort veya Doğum Yaptı işlemi yapın.'; td2Info.style.display='block'; }
+    const td2BosFixed=document.getElementById('td2-bos-fixed');
+    if(td2BosFixed) td2BosFixed.style.display='none';
+  } else {
+    // Bekliyor — tüm butonlar görünür
+    if(sonucBtnRow) sonucBtnRow.style.display='flex';
+    if(td2Info){ td2Info.textContent=''; td2Info.style.display='none'; }
+    const td2BosFixed=document.getElementById('td2-bos-fixed');
+    if(td2BosFixed) td2BosFixed.style.display='none';
+  }
+
   // islem_log'dan bu kaydın id'sini bul (geri alma için)
   const islemLog=await idbGetAll('islem_log');
   const islemKayit=islemLog.find(l=>l.tip==='TOHUMLAMA'&&(l.payload?.kaynak_id===id||l.snapshot?.id===id));
@@ -2194,7 +2220,7 @@ async function openTohDet(id){
   }
   const td2TekrarBtn=document.getElementById('td2-tekrar-btn');
   if(td2TekrarBtn){
-    if(t.sonuc!=='Gebe'){ td2TekrarBtn.style.display='block'; td2TekrarBtn.onclick=()=>tekrarTohumla(hayvanLabel||t.hayvan_id); }
+    if(t.sonuc!=='Gebe'&&t.sonuc!=='Doğum Yaptı'){ td2TekrarBtn.style.display='block'; td2TekrarBtn.onclick=()=>tekrarTohumla(hayvanLabel||t.hayvan_id); }
     else { td2TekrarBtn.style.display='none'; }
   }
   openM('m-toh-det');
