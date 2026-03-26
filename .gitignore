@@ -34,3 +34,8 @@ calendar_events.py
 
 # Repomix
 .repomixignore
+
+# Playwright
+tests/report/
+tests/results/
+playwright-report/
