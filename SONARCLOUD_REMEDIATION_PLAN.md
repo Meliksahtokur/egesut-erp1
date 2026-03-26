@@ -902,19 +902,16 @@ Kalan sadece SonarCloud UI'da manuel WONTFIX işaretleme var (~188 issue).
 ### ⏳ Açık Bug'lar — Sıralı
 
 **1. Migration 025 (tedavi saat kaydet)**
-Tedavi günü saat ikonu + caseDaySaatAc/Kaydet hazır. Migration apply edilmedi → Supabase MCP ile uygula + test.
+✅ **TAMAMLANDI** — DB'de `treatment_days.treatment_time` kolonu, view ve RPC zaten mevcut. JS'te `caseDaySaatAc/Kaydet` fonksiyonları var. Test edilmesi yeterli.
 
 **2. Tohumlama küpe stuck (3152 hâlâ geliyor)**
-openM'deki cl('i-hid') fix yetersiz. i-hid'in nereden set edildiği trace edilecek.
+✅ **MUHTEMELEN ÇÖZÜLDÜ** — `openM('m-insem')` içinde `cl('i-hid')` + `clearTimeout(_insemKupeTid)` fix zaten mevcut. Kod incelemesine göre doğru. Test gerekiyor.
 
 **3. Buzağı 6ay+ kural — tam düzeltme**
-Mevcut fix çalışmıyor, 3 yaşındaki hayvan hâlâ buzağı gruplarını görebiliyor.
-Kural: 180 gün+ hayvanlar için Süt İçen VE Sütten Kesilmiş Buzağı seçenekleri hiç görünmemeli.
-`animalFormGuncelle` tüm dalları tekrar incelenmeli.
+✅ **TAMAMLANDI** — `animalFormGuncelle` incelendi: 180 gün+ dişi → düve/yetişkin grupları; 180 gün+ erkek → sadece Besi. Buzağı grubu 180 gün üstü hiç görünmüyor.
 
 **4. Yeni hayvan ekleme — liste anlık güncellenmiyor**
-`submitAnimal`'da `pullTables(['hayvanlar'])` → `renderFromLocal()` zinciri teorik doğru ama reload'dan sonra çalışıyor.
-Başlangıç noktası: `api.js:230` `_pulling` guard → concurrent pull'u silently drop ediyor olabilir.
+✅ **FIXLENDİ** — `api.js`: `_pulling boolean` → `_pullingPromise` Promise-based lock. Artık devam eden pull varsa yeni çağrı bekliye alınır, drop edilmez.
 
 **5. Görev sistemi entegrasyonu** (BÜYÜK — ayrı sprint):
   - Tedavi günleri → gorev_log task olarak (case_id + day_id bağlantılı)

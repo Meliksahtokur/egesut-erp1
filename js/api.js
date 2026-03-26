@@ -222,13 +222,15 @@ function renderSafe() {
 }
 
 // ── PULL LOCK ───────────────────────────────
-// Aynı anda iki pullTables çalışmasını önler
-let _pulling = false;
+// Devam eden pull varsa yeni çağrılar onu bekler, drop edilmez
+let _pullingPromise = null;
 
 // Sadece belirtilen tabloları Supabase'den çek
 async function pullTables(tables = []) {
-  if (!tables.length || _pulling) return;
-  _pulling = true;
+  if (!tables.length) return;
+  if (_pullingPromise) await _pullingPromise;
+  let resolve;
+  _pullingPromise = new Promise(r => { resolve = r; });
   try {
     const FETCHERS = {
       hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
@@ -252,7 +254,8 @@ async function pullTables(tables = []) {
     await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
     if (uniq.includes('tohumlanabilir_hayvanlar')) globalThis._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
   } finally {
-    _pulling = false;
+    _pullingPromise = null;
+    resolve();
   }
 }
 
