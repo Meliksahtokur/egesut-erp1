@@ -62,7 +62,7 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 
 | Fix | Durum |
 |-----|-------|
-| Fix 7: Doğum baba otomasyonu | Uygulanıyor |
+| Fix 7: Doğum baba otomasyonu | ✅ Tamamlandı (a9dc587) |
 
 ---
 
