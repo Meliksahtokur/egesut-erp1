@@ -633,6 +633,10 @@ async function hstSilOnay() {
 // openTohDet → ui.js'de tanımlı
 async function tohSonuc(sonuc) {
   if (!_curToh) return;
+  if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {
+    toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın', true); return;
+  }
+  if (sonuc === 'Boş' && !confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
   await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
   const msg = sonuc === 'Gebe' ? '✅ Gebe olarak işaretlendi' : sonuc === 'Boş' ? 'Boş olarak işaretlendi' : 'Güncellendi';
   toast(msg);
