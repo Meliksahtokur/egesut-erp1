@@ -1,20 +1,99 @@
 # EgeSüt ERP — Claude Instructions
 
-## Session Start Skills
+## Oturum Başlangıcı
 
-At session start, activate the following skills based on context:
+Her yeni oturumda SessionStart hook otomatik çalışır ve sistem durumunu `systemMessage` olarak sağlar.
+**Bu mesajı kullanıcıya göster** — kısa, temiz formatta. Hata varsa ne yapılması gerektiğini söyle.
+Sistem 🟢 ise: "Sistem hazır. Ne yapalım?" ile bekle.
 
-- **superpowers:brainstorming** — yeni özellik fikirleri için
-- **superpowers:writing-plans** — plan çıkarmak için
-- **superpowers:executing-plans** — planı uygulamak için
-- **superpowers:dispatching-parallel-agents** — keşif aşamasında paralel analiz
-- **superpowers:systematic-debugging** — bug bulma
-- **superpowers:test-driven-development** — her yeni fonksiyon/RPC implementasyonundan önce
-- **superpowers:verification-before-completion** — "düzelttim/tamamladım" demeden önce kanıt topla
-- **coderabbit:code-review** — push öncesi otomatik review
-- **commit-commands:commit-push-pr** — commit + push + PR tek adımda
-- **frontend-design** — UI geliştirirken
-- **feature-dev** — özellik geliştirme sürecinde
+---
+
+## Autonomous Tool & Skill Activation
+
+Claude, aşağıdaki kurallara göre araçları **kendi kararıyla** aktive eder. Kullanıcı ayrıca sormak zorunda değildir.
+
+### MCP — Otomatik Kullanım Kuralları
+
+**Serena MCP** (semantik kod navigasyonu)
+- Bir fonksiyonun nerede tanımlı veya çağrıldığını bulmak → Serena kullan, grep'e başvurma
+- Büyük dosyalarda (özellikle ui.js 2804 satır) referans zinciri takibi → Serena
+- Refactor öncesi etki analizi → Serena ile "bu değişken kaç yerde kullanılıyor?" sorgula
+
+**Supabase MCP** (`mcp__supabase__*`)
+- Tablo yapısı, kolon adları veya mevcut veri hakkında herhangi bir şey yazmadan önce → `execute_sql` ile sorgula, tahmin etme
+- Migration geçmişi gerektiğinde → `list_migrations`
+- SQL yazarken performans/güvenlik riski varsa → `get_advisors`
+- Hata ayıklarken → `get_logs`
+- Yeni RPC veya tablo tasarımı yapılırken → önce `list_tables` ile mevcut şemayı al
+
+**Context7 MCP** (`mcp__context7__*`)
+- Supabase JS client API'si kullanılırken (`.from()`, `.rpc()`, `.select()` vb.) → context7'den güncel dokümantasyon çek
+- IndexedDB, Service Worker, Web API'leri hakkında implementasyon yapılırken → context7 kullan
+- Bir kütüphane metodunun davranışından emin olunmadığında → tahmin etme, context7'ye sor
+
+**GitHub MCP** (`mcp__github__*`)
+- Bug fix tamamlandığında ve issue varsa → `add_issue_comment` ile kapat
+- Yeni bir sorun keşfedildiğinde → `create_issue` ile belgele
+- PR durumu sorgulandığında → `get_pull_request_status`
+
+**Playwright MCP** (`mcp__plugin_playwright__*`)
+- UI değişikliği yapıldıktan sonra doğrulama gerektiğinde → browser ile test et
+- Kullanıcı "test et" veya "doğrula" dediğinde → otomatik browser aç
+
+### Skills — Otomatik Aktivasyon Kuralları
+
+**Her zaman:**
+- Herhangi bir şeyi "düzelttim" veya "tamamladım" demeden önce → `superpowers:verification-before-completion`
+
+**Görev türüne göre:**
+- Bug veya beklenmedik davranış → `superpowers:systematic-debugging` (tahminle ilerlemeden önce)
+- 2+ modül/dosya analiz veya implementasyon kapsamındaysa → `superpowers:dispatching-parallel-agents`
+- Aynı modülün farklı bölümleri paralel incelenecekse (ör: ui.js hem read hem write path) → `superpowers:dispatching-parallel-agents`
+- ui.js tek başına kapsam dahilindeyse → paralel subagent kullan (2804 satır, bölümlere ayır)
+- Yeni özellik tasarımı → `superpowers:brainstorming` → ardından `superpowers:writing-plans`
+- Plan dosyası uygulanacaksa → `superpowers:executing-plans`
+- Plan'daki görevler bağımsız ve paralel yapılabilirse → `superpowers:subagent-driven-development`
+- Feature branch tamamlandığında → `superpowers:finishing-a-development-branch`
+- Push/commit öncesi → `coderabbit:code-review`
+- Commit + push + PR → `commit-commands:commit-push-pr`
+- Yeni UI bileşeni → `frontend-design`
+- Greenfield özellik → `feature-dev`
+
+### Ne Zaman Kullanıcıya Sor
+
+Aşağıdaki durumlarda **önce sor, sonra ilerle:**
+- Bir MCP işlemi geri alınamaz ve yüksek etkili (ör: migration silme, bulk update)
+- İki farklı yaklaşım arasında karar vermek gerekiyor ve seçim mimariyi etkiliyor
+- Token maliyeti yüksek bir keşif başlatılacak (ör: tüm codebase'i tara)
+- Scope belirsiz: görev 1 dosyayı mı yoksa 10 dosyayı mı kapsıyor?
+
+**Sormadan ilerle:** Okuma, analiz, tek dosya değişikliği, bilinen RPC çağrıları, syntax kontrolü.
+
+---
+
+## Codebase Map
+
+### Modüller (js/)
+| Dosya | Satır | Sorumluluk |
+|---|---|---|
+| `ui.js` | 2804 | Tüm DOM render, modal, autocomplete, tab UI — **bölüm haritası: `.claude/ui-map.md`** |
+| `forms.js` | 938 | Form submit handler'ları, validasyon, RPC çağrıları |
+| `app.js` | 737 | App init, routing, IndexedDB sync, event delegation |
+| `api.js` | 332 | Supabase client, tüm RPC wrapper fonksiyonları |
+| `state.js` | 84 | Global in-memory state (`getState`, `setState`) |
+| `config.js` | 68 | GRUP_PADOK mapping, domain sabitleri |
+
+### Custom RPC'ler (api.js'in çağırdıkları)
+Tam imzalar için: `.claude/rpc-reference.md`
+
+**Hayvan:** `hayvan_ekle` · `hayvan_guncelle` · `hayvan_not_ekle`
+**Üreme:** `tohumlama_kaydet` · `dogum_kaydet` · `abort_kaydet` · `kizginlik_kaydet`
+**Hastalık:** `hastalik_kaydet` · `hastalik_guncelle` · `hastalik_kapat` · `hastalik_sil`
+**Tedavi:** `tedavi_ekle` · `tedavi_sil` · `tedavi_guncelle` · `update_treatment_time`
+**Vaka (yeni):** `create_case` · `add_treatment_day` · `add_drug_administration` · `close_case`
+**Diğer:** `geri_al` · `irk_listesi` · `hekim_ekle`
+
+Tüm RPC'ler `jsonb` döndürür: `{ ok: boolean, ... }`
 
 ---
 
