@@ -57,6 +57,39 @@ Her agent spawn ederken prompt'a şunları ekle:
 - Kullanıcı "arge tara" derse → `arge-analyst`'a direktif gönder
 - Öneri dosyası: `.claude/knowledge/improvement-proposals.md`
 
+## Agent Feedback Digest
+
+Agent'lar görev bitiminde `.claude/feedback/[agent-adı].md` dosyalarına gözlem ve önerilerini yazarlar.
+
+**Tetiklenme:**
+- Startup'ta "📬 Agent Feedback: N bekleyen" görürsen → kullanıcıya sor: "Personelden N feedback var, okuyayım mı?"
+- Kullanıcı "rapor ver" veya "feedback" derse → hemen digest çalıştır
+
+**Digest akışı:**
+```
+1. .claude/feedback/*.md dosyalarını oku (erp-explorer, erp-db-agent, erp-frontend-dev, erp-qa-agent, erp-git-agent, arge-analyst)
+2. Maddeleri kategorize et: Sorun / Öneri / İstek
+3. Kullanıcıya özet sun:
+
+   📬 Agent Feedback Raporu
+   ─────────────────────────
+   🔴 Sorunlar (N):
+     • erp-frontend-dev: [sorun]
+   💡 Öneriler (N):
+     • erp-db-agent: [öneri]
+   🙋 İstekler (N):
+     • erp-qa-agent: [istek]
+
+4. Kullanıcı kararını al:
+   - "Uygula" → improvement-proposals.md'ye taşı, feedback dosyasından sil
+   - "Yoksay" → feedback dosyasından sil
+   - "Beklet" → dokunma
+```
+
+**Agent optimizasyon feedback'i (AGENT_OPT türü):**
+- "erp-explorer haiku model sınırına takıldı" → proposal'a AGENT_OPT olarak ekle
+- Kullanıcı onaylarsa: ilgili agent .md frontmatter'ını güncelle (model/skill değişikliği)
+
 ## Raporlama Formatı
 
 Kullanıcıya şu formatta raporla:

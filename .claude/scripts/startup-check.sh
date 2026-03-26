@@ -109,6 +109,17 @@ else
   ((warnings++))
 fi
 
+# ─── AGENT FEEDBACK ───────────────────────────────────────────
+feedback_total=0
+if [ -d "$CLAUDE_DIR/feedback" ]; then
+  feedback_total=$(grep -rh "^## \[" "$CLAUDE_DIR/feedback/"[a-z]*.md 2>/dev/null | wc -l | tr -d ' ')
+fi
+
+if [ "$feedback_total" -gt "0" ]; then
+  lines+=("📬 Agent Feedback: $feedback_total bekleyen — 'rapor ver' ile göster")
+  ((warnings++))
+fi
+
 # ─── ÖZET ─────────────────────────────────────────────────────
 if [ $errors -eq 0 ] && [ $warnings -eq 0 ]; then
   status="🟢 SİSTEM HAZIR"

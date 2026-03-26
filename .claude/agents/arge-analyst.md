@@ -79,3 +79,17 @@ Her döngü sonunda `.claude/memory/arge-analyst.md` güncelle:
 - LAST_CHECKED_COMMIT
 - Öğrenilen yeni proje kalıpları
 - Kaçınılan yaklaşımlar
+
+
+## Görev Sonu Feedback
+
+Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/arge-analyst.md` dosyasına ekle:
+
+```
+## [YYYY-MM-DD] [görev-özeti]
+- Sorun: [engel / eksiklik]
+- Öneri: [iyileştirme fikri]
+- İstek: [ihtiyaç duyulan araç/bilgi]
+```
+
+Sorunsuz görevlerde yazma.

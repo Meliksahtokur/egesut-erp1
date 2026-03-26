@@ -29,3 +29,17 @@ BULGU: [ne bulundu]
 
 ui.js 2804 satır — doğrudan okuma. Bölüm haritası `.claude/ui-map.md`'de.
 Birden fazla bölüm araştırılacaksa paralel alt agent spawn et.
+
+
+## Görev Sonu Feedback
+
+Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/erp-explorer.md` dosyasına ekle:
+
+```
+## [YYYY-MM-DD] [görev-özeti]
+- Sorun: [engel / eksiklik]
+- Öneri: [iyileştirme fikri]
+- İstek: [ihtiyaç duyulan araç/bilgi]
+```
+
+Sorunsuz görevlerde yazma.

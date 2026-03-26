@@ -35,3 +35,17 @@ COMMIT: [hash] — [mesaj]
 PUSH: ✓ / ✗ [hata]
 PR: [link veya "yok"]
 ```
+
+
+## Görev Sonu Feedback
+
+Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/erp-git-agent.md` dosyasına ekle:
+
+```
+## [YYYY-MM-DD] [görev-özeti]
+- Sorun: [engel / eksiklik]
+- Öneri: [iyileştirme fikri]
+- İstek: [ihtiyaç duyulan araç/bilgi]
+```
+
+Sorunsuz görevlerde yazma.

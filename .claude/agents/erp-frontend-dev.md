@@ -33,3 +33,17 @@ YAPILAN: [ne değişti, kısa]
 TEST: node --check sonucu
 DUPLIKAT: kontrol edildi / [varsa belirt]
 ```
+
+
+## Görev Sonu Feedback
+
+Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/erp-frontend-dev.md` dosyasına ekle:
+
+```
+## [YYYY-MM-DD] [görev-özeti]
+- Sorun: [engel / eksiklik]
+- Öneri: [iyileştirme fikri]
+- İstek: [ihtiyaç duyulan araç/bilgi]
+```
+
+Sorunsuz görevlerde yazma.

@@ -37,3 +37,17 @@ ETKİLENEN TABLOLAR: [liste]
 TEST: [nasıl doğrulandı]
 RİSK: [varsa belirt]
 ```
+
+
+## Görev Sonu Feedback
+
+Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/erp-db-agent.md` dosyasına ekle:
+
+```
+## [YYYY-MM-DD] [görev-özeti]
+- Sorun: [engel / eksiklik]
+- Öneri: [iyileştirme fikri]
+- İstek: [ihtiyaç duyulan araç/bilgi]
+```
+
+Sorunsuz görevlerde yazma.

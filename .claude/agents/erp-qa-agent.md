@@ -29,3 +29,17 @@ SYNTAX: ✓ [dosya] / ✗ [dosya]:[satır] [hata]
 PLAYWRIGHT: ✓ geçti / ✗ [test adı] başarısız
 ÖZET: [genel durum — devam edilebilir mi?]
 ```
+
+
+## Görev Sonu Feedback
+
+Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/erp-qa-agent.md` dosyasına ekle:
+
+```
+## [YYYY-MM-DD] [görev-özeti]
+- Sorun: [engel / eksiklik]
+- Öneri: [iyileştirme fikri]
+- İstek: [ihtiyaç duyulan araç/bilgi]
+```
+
+Sorunsuz görevlerde yazma.
