@@ -97,6 +97,12 @@ function openM(id) {
     const acIhid = g('ac-ihid'); if (acIhid) acIhid.style.display = 'none';
     db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
       globalThis._TH = data || [];
+      // Fetch bitti — input hâlâ focus'taysa veya dropdown açıksa güncelle
+      const inp = g('i-hid');
+      const ac  = g('ac-ihid');
+      if (inp && (document.activeElement === inp || ac?.style.display !== 'none')) {
+        acHayvan('i-hid', 'ac-ihid');
+      }
     }).catch(console.warn);
     setTimeout(() => spermaModStok(), 100);
   }

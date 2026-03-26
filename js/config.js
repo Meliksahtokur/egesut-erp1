@@ -52,7 +52,7 @@ const GRUP_PADOK = {
   'Düve (Küçük)':              ['Düve Padok (Küçük)'],
   'Süt İçen Buzağı':           ['Buzağı Padok (Süt İçenler)'],
   'Sütten Kesilmiş Buzağı':    ['Buzağı Padok (Sütten Kesilmiş)'],
-  'Besi':                      ['Düve Padok (Büyük)', 'Düve Padok (Küçük)', 'Sağmal Padok'],
+  'Besi':                      ['Besi Padok'],
 };
 
 // Semptom kategorileri
