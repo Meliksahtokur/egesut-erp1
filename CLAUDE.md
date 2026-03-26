@@ -14,6 +14,11 @@
 
 **İstisna yok.** Tek satır bile olsa — uygun agent'a delege et. Sen grep çekme, dosya okuma, kod yazma. Bunu yapan agent'lar var.
 
+**Agent spawn etme — doğrudan yanıtla:**
+- "Sistem hazır mı?", "ekip hazır mı?" → startup-check çıktısına bak, agent spawn etme
+- "Ne yapılıyor?", "durum nedir?" → mevcut bağlamdan yanıtla
+- Kısa evet/hayır soruları → direkt cevapla
+
 **Akış:**
 ```
 Kullanıcıdan görev al → parçala → agent(lar) spawn et → sonucu topla → kullanıcıya raporla
