@@ -2281,18 +2281,21 @@ async function openTohDet(id){
     }
   }
 
-  // Eski kayıt uyarısı
+  // Eski kayıt uyarısı — her açılışta önce temizle, sonra koşula göre ekle
   const mevcutUyari=document.getElementById('td2-eski-kayit-uyari');
+  if(mevcutUyari) mevcutUyari.remove();
   if(!isSonToh){
-    if(!mevcutUyari){
-      const uyari=document.createElement('p');
-      uyari.id='td2-eski-kayit-uyari';
-      uyari.style.cssText='color:var(--ink3);font-size:.85rem;text-align:center;margin:8px 0;padding:6px 12px;background:var(--card2);border-radius:8px';
-      uyari.textContent='Bu kayıt geçmişe ait — sadece bilgi amaçlı görüntüleniyor.';
-      td2GeriAlBtn?.parentNode?.insertBefore(uyari,td2GeriAlBtn.nextSibling);
-    }
-  } else if(mevcutUyari){
-    mevcutUyari.remove();
+    // Geçmiş kayıt: action butonlarını gizle
+    if(sonucBtnRow) sonucBtnRow.style.display='none';
+    if(td2Info){ td2Info.textContent=''; td2Info.style.display='none'; }
+    const td2BosFixed2=document.getElementById('td2-bos-fixed');
+    if(td2BosFixed2) td2BosFixed2.style.display='none';
+    // Uyarı göster
+    const uyari=document.createElement('p');
+    uyari.id='td2-eski-kayit-uyari';
+    uyari.style.cssText='color:var(--ink3);font-size:.85rem;text-align:center;margin:8px 0;padding:6px 12px;background:var(--card2);border-radius:8px';
+    uyari.textContent='Bu kayıt geçmişe ait — sadece bilgi amaçlı görüntüleniyor.';
+    td2GeriAlBtn?.parentNode?.insertBefore(uyari,td2GeriAlBtn.nextSibling);
   }
   const td2TekrarBtn=document.getElementById('td2-tekrar-btn');
   if(td2TekrarBtn){
