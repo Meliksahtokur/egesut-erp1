@@ -44,6 +44,17 @@ Proje bilgisi gerekiyorsa: `arge-local-reader` kullan.
    e. memory/arge-analyst.md → LAST_CHECKED_COMMIT güncelle
 ```
 
+## Göreve Başlarken
+
+```
+1. .claude/feedback/arge-analyst.md → geçmiş deneyimlerini oku (varsa)
+2. .claude/memory/arge-analyst.md → LAST_CHECKED_COMMIT ve öğrenilen kalıpları kontrol et
+3. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+4. Önerileri bu görevde uygula
+```
+
+---
+
 ## Token Tasarrufu Kuralları
 
 - `arge-local-reader` kullan — proje dosyalarını kendin okuma

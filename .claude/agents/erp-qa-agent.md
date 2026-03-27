@@ -31,6 +31,16 @@ PLAYWRIGHT: ✓ geçti / ✗ [test adı] başarısız
 ```
 
 
+## Göreve Başlarken
+
+```
+1. .claude/feedback/erp-qa-agent.md → geçmiş deneyimlerini oku (varsa)
+2. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+3. Önerileri bu görevde uygula
+```
+
+---
+
 ## Görev Sonu Feedback
 
 Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/erp-qa-agent.md` dosyasına ekle:

@@ -9,6 +9,30 @@ skills:
 
 Sen EgeSüt ERP codebase'ini hızlıca keşfeden bir araştırma agent'ısın.
 
+## Proje Hızlı Referans (araştırmadan önce oku)
+
+### Modül Haritası
+| Dosya | Satır | Ne yapar |
+|---|---|---|
+| `js/ui.js` | 2804 | DOM render, modal, autocomplete — bölüm haritası: `.claude/ui-map.md` |
+| `js/forms.js` | 938 | Form submit, validasyon, RPC çağrıları |
+| `js/app.js` | 737 | App init, routing, IndexedDB sync, event delegation |
+| `js/api.js` | 332 | Supabase client, tüm RPC wrapper'ları + `pullTables` + `renderSafe` |
+| `js/state.js` | 84 | `getState` / `setState` — in-memory cache |
+| `js/config.js` | 68 | GRUP_PADOK mapping, domain sabitleri |
+
+### Referans Dosyaları (önce bunlara bak)
+- `.claude/ui-map.md` — ui.js bölüm haritası (hangi satırda ne var)
+- `.claude/rpc-reference.md` — tüm RPC imzaları
+- `.claude/domain-rules.md` — 13 kritik iş kuralı
+
+### Kritik Bilinen Noktalar
+- `pullTables` → `api.js:229-258`, `renderSafe` → `api.js:219-221`
+- `geriAl()` → `forms.js:708-718`
+- `openTohDet` → `ui.js:2159-2226`
+- `RPC_INVALIDATION_MAP` → `api.js:~200-215`
+- `idbGetAll` → IndexedDB okuma; `getState('animals')` → in-memory
+
 ## Kurallar
 
 - **Sadece oku** — dosya değiştirme, SQL çalıştırma, commit yapma
@@ -30,6 +54,16 @@ BULGU: [ne bulundu]
 ui.js 2804 satır — doğrudan okuma. Bölüm haritası `.claude/ui-map.md`'de.
 Birden fazla bölüm araştırılacaksa paralel alt agent spawn et.
 
+
+## Göreve Başlarken
+
+```
+1. .claude/feedback/erp-explorer.md → geçmiş deneyimlerini oku (varsa)
+2. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+3. Önerileri bu görevde uygula
+```
+
+---
 
 ## Görev Sonu Feedback
 

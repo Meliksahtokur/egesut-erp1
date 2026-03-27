@@ -83,6 +83,16 @@ Dosya: .claude/knowledge/bugs.md
 
 ---
 
+## Göreve Başlarken
+
+```
+1. .claude/feedback/erp-debug-agent.md → geçmiş deneyimlerini oku (varsa)
+2. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+3. Önerileri bu görevde uygula
+```
+
+---
+
 ## Görev Sonu Feedback
 
 Görev bitiminde `.claude/feedback/erp-debug-agent.md` dosyasına ekle:

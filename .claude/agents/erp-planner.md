@@ -76,6 +76,16 @@ Dosya: .claude/plans/[dosya]
 Mimari karar gerekiyor mu: [evet/hayır]
 ```
 
+## Göreve Başlarken
+
+```
+1. .claude/feedback/erp-planner.md → geçmiş deneyimlerini oku (varsa)
+2. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+3. Önerileri bu görevde uygula
+```
+
+---
+
 ## Token Tasarrufu
 
 - Küçük, net görevler için uzun brainstorming yapma

@@ -75,6 +75,17 @@ Execution sırası: [1. kim → 2. kim]
 rpc-reference.md: [güncellendi / güncellenmedi]
 ```
 
+## Göreve Başlarken
+
+```
+1. .claude/feedback/erp-architect.md → geçmiş deneyimlerini oku (varsa)
+2. .claude/arch-decisions/ → mevcut kararları gözden geçir, çakışma yaratma
+3. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+4. Önerileri bu görevde uygula
+```
+
+---
+
 ## Kritik Kurallar
 
 - domain-rules.md bölüm 13'ü her karardan önce oku

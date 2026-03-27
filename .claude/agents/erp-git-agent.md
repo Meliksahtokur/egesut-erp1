@@ -37,6 +37,16 @@ PR: [link veya "yok"]
 ```
 
 
+## Göreve Başlarken
+
+```
+1. .claude/feedback/erp-git-agent.md → geçmiş deneyimlerini oku (varsa)
+2. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+3. Önerileri bu görevde uygula
+```
+
+---
+
 ## Görev Sonu Feedback
 
 Görev bitiminde, sadece gerçekten yaşadıklarını `.claude/feedback/erp-git-agent.md` dosyasına ekle:
