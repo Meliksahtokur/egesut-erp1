@@ -873,40 +873,94 @@ async function _uremeKizginlik(el){
 }
 
 async function _uremeGebelik(el){
+  // ── Bekleyen tohumlamalar bölümü ──
+  const tumTohlar=await idbGetAll('tohumlama');
+  const hayvanlar=getState('animals')||[];
+
+  // Her hayvan için en son tohumlama (deneme_no azalan)
+  const hayvanSonToh={};
+  [...tumTohlar]
+    .sort((a,b)=>(b.deneme_no||0)-(a.deneme_no||0))
+    .forEach(t=>{ if(!hayvanSonToh[t.hayvan_id]) hayvanSonToh[t.hayvan_id]=t; });
+
+  const bekleyenler=Object.values(hayvanSonToh)
+    .filter(t=>t.sonuc==='Bekliyor')
+    .sort((a,b)=>new Date(a.tarih)-new Date(b.tarih));
+
+  let bekleyenHtml='';
+  if(bekleyenler.length){
+    bekleyenHtml=`<div style="margin-bottom:12px">
+      <div style="font-size:.72rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 4px">
+        ⏳ Sonuç Bekleyen Tohumlamalar (${bekleyenler.length})
+      </div>`+
+      bekleyenler.map(t=>{
+        const h=hayvanlar.find(h2=>h2.id===t.hayvan_id||h2.kupe_no===t.hayvan_id);
+        const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
+        const gun=t.tarih?Math.floor((Date.now()-new Date(t.tarih))/86400000):'?';
+        return `<div class="hist-row" style="align-items:center;gap:8px">
+          <div class="hist-dot" style="background:var(--amber);flex-shrink:0"></div>
+          <div class="hist-main" style="flex:1;min-width:0;cursor:pointer" onclick="openDetByKupe('${kupe}')">
+            <div class="hist-title" style="color:var(--amber)">${kupe}</div>
+            <div class="hist-sub">${t.sperma||'?'} · ${fmtTarih(t.tarih)} · ${gun} gün</div>
+          </div>
+          <button class="btn" style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:6px 10px;font-size:.75rem"
+            onclick="gebeAta('${t.id}','${kupe}')">Gebe Ata</button>
+        </div>`;
+      }).join('')+
+      `</div>`;
+  }
+
+  // ── Mevcut gebe hayvanlar bölümü ──
   const tohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
   const gebeHayvanlar=getState('animals').filter(a=>a.durum==='Gebe');
   const gebeIds=new Set(tohs.map(t=>t.hayvan_id));
   const extra=gebeHayvanlar.filter(a=>!gebeIds.has(a.id));
   tohs.sort((a,b)=>(a.tarih||'').localeCompare(b.tarih||''));
+
+  const gebeHtml=(tohs.length||extra.length?[...tohs.map(t=>{
+    const h=getState('animals').find(a=>a.id===t.hayvan_id);
+    const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
+    const gun=Math.floor((Date.now()-new Date(t.tarih).getTime())/86400000);
+    const ay=Math.floor(gun/30), gKalan=gun%30;
+    const dogumTahmini=dFwd(t.tarih,280);
+    const kalanGun=Math.floor((new Date(dogumTahmini).getTime()-Date.now())/86400000);
+    const gunBilgi=gun>400?`<b style="color:var(--red);font-size:.7rem">⚠️ Geçersiz/çok eski kayıt</b>`:`${ay} ay ${gKalan} gün (${gun}. gün) · Tahmini: ${fmtTarih(dogumTahmini)}`;
+    const kalanBilgi=kalanGun<0?`<b style="color:var(--red)">⚠️ ${Math.abs(kalanGun)} gün gecikmiş — doğum kaydı girilmeli</b>`:kalanGun<=14?`<b style="color:var(--red)">⚡ ${kalanGun} gün kaldı!</b>`:`${kalanGun} gün kaldı`;
+    return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${t.hayvan_id}')">
+      <div class="hist-dot" style="background:${kalanGun<0?'var(--red2)':'var(--green2)'}"></div>
+      <div class="hist-main">
+        <div class="hist-title" style="color:${kalanGun<0?'var(--red)':'var(--green)'}">🤰 ${kupe}</div>
+        <div class="hist-sub">${gunBilgi}</div>
+        <div class="hist-sub">${kalanBilgi}</div>
+      </div>
+    </div>`;
+  }),...extra.map(a=>{
+    const kupe=a.kupe_no||a.devlet_kupe||a.id;
+    return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${a.id}')">
+      <div class="hist-dot" style="background:var(--green2)"></div>
+      <div class="hist-main">
+        <div class="hist-title" style="color:var(--green)">🤰 ${kupe} (manuel gebe)</div>
+        <div class="hist-sub">Tohumlama kaydı yok</div>
+      </div>
+    </div>`;
+  })].join('')
+  :'<div class="empty"><div class="empty-ico">🤰</div>Gebe hayvan yok</div>');
+
   el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Yeni Tohumlama</button></div>`+
-    (tohs.length||extra.length?[...tohs.map(t=>{
-      const h=getState('animals').find(a=>a.id===t.hayvan_id);
-      const kupe=h?(h.kupe_no||h.devlet_kupe):t.hayvan_id;
-      const gun=Math.floor((Date.now()-new Date(t.tarih).getTime())/86400000);
-      const ay=Math.floor(gun/30), gKalan=gun%30;
-      const dogumTahmini=dFwd(t.tarih,280);
-      const kalanGun=Math.floor((new Date(dogumTahmini).getTime()-Date.now())/86400000);
-      const gunBilgi=gun>400?`<b style="color:var(--red);font-size:.7rem">⚠️ Geçersiz/çok eski kayıt</b>`:`${ay} ay ${gKalan} gün (${gun}. gün) · Tahmini: ${fmtTarih(dogumTahmini)}`;
-      const kalanBilgi=kalanGun<0?`<b style="color:var(--red)">⚠️ ${Math.abs(kalanGun)} gün gecikmiş — doğum kaydı girilmeli</b>`:kalanGun<=14?`<b style="color:var(--red)">⚡ ${kalanGun} gün kaldı!</b>`:`${kalanGun} gün kaldı`;
-      return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${t.hayvan_id}')">
-        <div class="hist-dot" style="background:${kalanGun<0?'var(--red2)':'var(--green2)'}"></div>
-        <div class="hist-main">
-          <div class="hist-title" style="color:${kalanGun<0?'var(--red)':'var(--green)'}">🤰 ${kupe}</div>
-          <div class="hist-sub">${gunBilgi}</div>
-          <div class="hist-sub">${kalanBilgi}</div>
-        </div>
-      </div>`;
-    }),...extra.map(a=>{
-      const kupe=a.kupe_no||a.devlet_kupe||a.id;
-      return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${a.id}')">
-        <div class="hist-dot" style="background:var(--green2)"></div>
-        <div class="hist-main">
-          <div class="hist-title" style="color:var(--green)">🤰 ${kupe} (manuel gebe)</div>
-          <div class="hist-sub">Tohumlama kaydı yok</div>
-        </div>
-      </div>`;
-    })].join('')
-    :'<div class="empty"><div class="empty-ico">🤰</div>Gebe hayvan yok</div>');
+    bekleyenHtml+gebeHtml;
+}
+
+async function gebeAta(tohId, kupe){
+  if(!confirm(`${kupe} — gebe olarak işaretlensin mi?`)) return;
+  try {
+    await rpc('tohumlama_sonuc_gebe',{p_tohumlama_id:tohId});
+    toast('Gebe olarak işaretlendi');
+    await pullTables(['hayvanlar','tohumlama','islem_log']);
+    renderSafe();
+    loadUreme('gebelik');
+  } catch(e){
+    toast(e.message, true);
+  }
 }
 
 async function _uremeDogum(el){
