@@ -22,10 +22,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: ui.js
 - Önem: kritik
-- Durum: yeni
+- Durum: çözüldü
 - Açıklama: ui.js:2583'te rpcOptimistic'e string RPC adı yerine callback fonksiyon geçiliyor. Fonksiyon imzası 1. parametre olarak string bekliyor (rpcOptimistic(name, params, opts)). Callback hiç yürütülmüyor — tohumlama sonucu DB'ye yazılmıyor.
 - Tetikleyici: Tohumlama sonucu güncelleme (Gebe/Boş/Abort) akışı tetiklendiğinde
-- İlgili commit: bilinmiyor
+- İlgili commit: 7b40d1d
 
 ## [2026-03-27] BUG-002 openNotModal duplikat — yükleme sırasına göre farklı davranış
 - Kaynak: erp-explorer (sistem denetimi)
