@@ -32,6 +32,7 @@ DECLARE
   v_gorev1_id uuid := gen_random_uuid();
   v_gorev2_id uuid := gen_random_uuid();
   v_islem_id  text := gen_random_uuid()::text;
+  v_stok_id   uuid;
 BEGIN
   SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
   IF NOT FOUND THEN
@@ -76,7 +77,8 @@ BEGIN
   FROM public.stok s
   WHERE (s.urun_adi ILIKE '%' || p_sperma || '%' OR s.urun_adi = p_sperma)
     AND s.kategori = 'Sperma'
-  LIMIT 1;
+  LIMIT 1
+  RETURNING id INTO v_stok_id;
 
   -- islem_log: tohumlama + gorev_log ID'leri olusturulan array'ine ekle (geri alınabilmesi için)
   INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
@@ -91,7 +93,11 @@ BEGIN
         jsonb_build_object('tablo', 'tohumlama',  'id', v_toh_id::text),
         jsonb_build_object('tablo', 'gorev_log',  'id', v_gorev1_id::text),
         jsonb_build_object('tablo', 'gorev_log',  'id', v_gorev2_id::text)
-      ),
+      ) ||
+      CASE WHEN v_stok_id IS NOT NULL
+        THEN jsonb_build_array(jsonb_build_object('tablo', 'stok_hareket', 'id', v_stok_id::text))
+        ELSE '[]'::jsonb
+      END,
       'guncellenen', '[]'::jsonb
     )
   );
@@ -126,21 +132,28 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'error', 'Sadece Bekliyor durumundaki tohumlama gebe ilanı alabilir');
   END IF;
 
-  -- Bu hayvanın son tohumlaması mı?
+  -- Bu hayvanın son tohumlaması mı? (FOR UPDATE: race condition önleme)
   SELECT id::text INTO v_son_toh_id
   FROM public.tohumlama
   WHERE hayvan_id = v_toh.hayvan_id
   ORDER BY deneme_no DESC
-  LIMIT 1;
+  LIMIT 1
+  FOR UPDATE;
 
   IF v_son_toh_id != p_tohumlama_id THEN
     RETURN jsonb_build_object('ok', false, 'error', 'Sadece son tohumlama gebe ilanı alabilir');
   END IF;
 
   -- Hayvanın önceki tohumlama_durumu kaydet (geri alınabilmesi için)
+  -- AND durum = 'Aktif' guard: pasif/ölü hayvan işlemi engellensin
   SELECT tohumlama_durumu INTO v_onceki_durum
   FROM public.hayvanlar
-  WHERE id = v_toh.hayvan_id::uuid;
+  WHERE id = v_toh.hayvan_id::uuid
+    AND durum = 'Aktif';
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Hayvan aktif değil');
+  END IF;
 
   UPDATE public.tohumlama SET sonuc = 'Gebe' WHERE id::text = p_tohumlama_id;
 
