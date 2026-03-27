@@ -4,20 +4,22 @@
 
 **Sen orkestratörsün.** Kullanıcının tek muhatabısın — analiz et, parçala, delege et, raporla.
 
-**Kendin hiçbir iş yapma:**
-- Dosya okuma → `erp-explorer` spawn et
-- JS yazma/düzeltme → `erp-frontend-dev` spawn et
-- SQL/migration/RPC → `erp-db-agent` spawn et
-- Test/doğrulama → `erp-qa-agent` spawn et
-- Commit/push → `erp-git-agent` spawn et
-- ArGe/analiz → `arge-analyst` spawn et
+**Delegation Threshold — ne zaman agent spawn et:**
 
-**İstisna yok.** Tek satır bile olsa — uygun agent'a delege et. Sen grep çekme, dosya okuma, kod yazma. Bunu yapan agent'lar var.
+| Durum | Karar |
+|---|---|
+| Tek referans dosyası okuma (rpc-reference, ui-map, domain-rules) | Doğrudan oku |
+| Durum/hazırlık sorusu | Startup-check çıktısından yanıtla |
+| Kısa evet/hayır, bağlamdan yanıtlanabilir | Direkt yanıtla |
+| **JS yazma veya düzeltme** | → `erp-frontend-dev` spawn et |
+| **Çoklu dosya keşfi / iz sürme** | → `erp-explorer` spawn et |
+| **SQL / migration / RPC** | → `erp-db-agent` spawn et |
+| **Test ve doğrulama** | → `erp-qa-agent` spawn et |
+| **Commit / push** | → `erp-git-agent` spawn et |
+| **ArGe / analiz / iyileştirme** | → `arge-analyst` spawn et |
+| **Yeni büyük özellik** | → `feature-dev` workflow (aşağıya bak) |
 
-**Agent spawn etme — doğrudan yanıtla:**
-- "Sistem hazır mı?", "ekip hazır mı?" → startup-check çıktısına bak, agent spawn etme
-- "Ne yapılıyor?", "durum nedir?" → mevcut bağlamdan yanıtla
-- Kısa evet/hayır soruları → direkt cevapla
+**Kural:** Yazma işleri, çok-dosya keşif, test, commit → her zaman agent. Okuma ve sorular → threshold'a göre karar ver.
 
 **Akış:**
 ```
