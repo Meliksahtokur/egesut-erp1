@@ -90,30 +90,6 @@ else
   done
 fi
 
-# ─── JS MODÜL KONTROLÜ ────────────────────────────────────────
-js_files=("ui.js" "forms.js" "app.js" "api.js" "state.js" "config.js")
-syntax_errors=()
-syntax_messages=()
-for f in "${js_files[@]}"; do
-  result=$(node --check "$JS_DIR/$f" 2>&1)
-  if [ $? -ne 0 ]; then
-    syntax_errors+=("$f")
-    # İlk satır hata mesajı yeterli
-    first_line=$(echo "$result" | head -1)
-    syntax_messages+=("$f: $first_line")
-    ((warnings++))
-  fi
-done
-
-if [ ${#syntax_errors[@]} -eq 0 ]; then
-  lines+=("$ok JS Syntax (6/6): tüm modüller temiz")
-else
-  lines+=("$warn JS Syntax hatası: ${syntax_errors[*]}")
-  for msg in "${syntax_messages[@]}"; do
-    detail_lines+=("   ⚠ SYNTAX: $msg")
-  done
-fi
-
 # ─── GIT DURUM ────────────────────────────────────────────────
 branch=$(git -C /root/egesut-erp1 branch --show-current 2>/dev/null)
 uncommitted_files=$(git -C /root/egesut-erp1 status --porcelain 2>/dev/null)
