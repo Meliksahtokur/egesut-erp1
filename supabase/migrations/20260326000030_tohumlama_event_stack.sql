@@ -130,7 +130,7 @@ BEGIN
   SELECT id::text INTO v_son_toh_id
   FROM public.tohumlama
   WHERE hayvan_id = v_toh.hayvan_id
-  ORDER BY created_at DESC
+  ORDER BY deneme_no DESC
   LIMIT 1;
 
   IF v_son_toh_id != p_tohumlama_id THEN
@@ -140,14 +140,13 @@ BEGIN
   -- Hayvanın önceki tohumlama_durumu kaydet (geri alınabilmesi için)
   SELECT tohumlama_durumu INTO v_onceki_durum
   FROM public.hayvanlar
-  WHERE id::text = v_toh.hayvan_id OR kupe_no = v_toh.hayvan_id
-  LIMIT 1;
+  WHERE id = v_toh.hayvan_id::uuid;
 
   UPDATE public.tohumlama SET sonuc = 'Gebe' WHERE id::text = p_tohumlama_id;
 
   UPDATE public.hayvanlar
   SET tohumlama_durumu = 'Gebe'
-  WHERE id::text = v_toh.hayvan_id OR kupe_no = v_toh.hayvan_id;
+  WHERE id = v_toh.hayvan_id::uuid;
 
   INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
   VALUES (
