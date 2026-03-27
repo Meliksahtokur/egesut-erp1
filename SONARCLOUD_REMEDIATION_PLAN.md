@@ -32,6 +32,13 @@
 | Doğum tarihi ileri tarih engeli | `js/app.js`, `js/forms.js` | `openM('m-animal')`'de `a-dt` inputuna `max=bugün` set edildi. Submit'te `yasGun < 0` guard eklendi. |
 | Dark mode: beyaz fon / hardcoded renkler | `js/ui.js` | `background:#fff` → `var(--card)` (bottom sheet + autocomplete kutular). `border:1px solid #eee` → `var(--card3)`. `color:#666` → `var(--ink3)`. Toplu replace. |
 
+#### ⏳ Kalan REST Write Path'ler (sonraki oturum)
+
+| Sorun | Dosya | Açıklama |
+|-------|-------|----------|
+| `write('tohumlama', ...)` — tohumlama sonuç güncelleme | `js/forms.js:640` | `m-toh-det` modal sonuç güncelleme — RPC'ye taşınmalı |
+| `write('tohumlama', ...)` — gebelik INSERT | `js/forms.js:804` | Gebelik kaydı — `tohumlama_sonuc_gebe` RPC'ye taşınmalı |
+
 #### ⏳ Ertelenen / Araştırma Gerektiren
 
 | Bug | Durum | Notlar |
@@ -65,6 +72,7 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 | Fix 12: Tohumlama modal durum bazlı buton kontrolü + confirm guard | ba4612d | `index.html`, `js/forms.js`, `js/ui.js` | Bekleyen/Gebe/Boş durumuna göre butonlar gösterilir/gizlenir. Sonuç değiştirmeden önce `confirm()` istenir. |
 | Fix 13: `tohSonuc` çakışması + geri al sorgusu | 205231c | `js/ui.js` | ui.js'deki korumasız `tohSonuc` silindi, islem_log sorgusu `ref_id` ile düzeltildi. |
 | Migration 029: `geri_al` RPC kalıcı hale getirildi | 1839249 | `supabase/migrations/20260326000029_geri_al_rpc.sql` | geri_al RPC fonksiyonu migration dosyasına alındı, DB'ye uygulandı. |
+| Tohumlama Event Stack + Gebelik Tabı | migration:20260326000030 + birden fazla commit | `supabase/migrations/030`, `js/api.js`, `js/ui.js`, `js/forms.js` | Tohumlama = immutable event. Yeni tohumlama → önceki Bekliyor otomatik Boş. Sadece son tohumlama aktif (geri al, frozen kontrol). Gebelik ataması `_uremeGebelik` + `gebeAta()` → `tohumlama_sonuc_gebe` RPC. `tohSonucGuncelle` + `gebeIsaretKaydet` REST path'leri kaldırıldı. |
 
 ---
 
