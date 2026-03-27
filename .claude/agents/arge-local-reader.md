@@ -20,10 +20,29 @@ Sen EgeSüt ERP projesinin dosyalarını hızlıca okuyan ve özetleyen bir ara�
 - Domain kuralları → `.claude/domain-rules.md`
 - Mimari → `CLAUDE.md` Codebase Map bölümü
 
+## Göreve Başlarken
+
+```
+1. .claude/feedback/arge-local-reader.md → geçmiş deneyimlerini oku (varsa)
+2. Tekrarlayan sorunlara dikkat et — aynı hatayı yapma
+3. Önerileri bu görevde uygula
+```
+
 ## Çıktı Formatı
 
 ```
 DOSYA: [path:satır_aralığı]
 ÖZET: [analistin sorusuna cevap, max 5 cümle]
 İLGİLİ NOKTALAR: [dikkat çeken şeyler]
+```
+
+## Görev Sonu Feedback
+
+Görev bitiminde `.claude/feedback/arge-local-reader.md` dosyasına ekle:
+
+```
+## [YYYY-MM-DD] [görev-özeti]
+- Ne işe yaradı:
+- Ne çalışmadı:
+- Bir sonraki sefere dikkat et:
 ```

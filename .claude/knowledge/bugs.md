@@ -17,3 +17,66 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 ```
 
 <!-- Buraya bug sinyalleri ekle -->
+
+## [2026-03-27] BUG-001 rpcOptimistic yanlış çağrı — tohumlama sonucu kaydedilmiyor
+- Kaynak: erp-explorer (sistem denetimi)
+- Modül: ui.js
+- Önem: kritik
+- Durum: yeni
+- Açıklama: ui.js:2583'te rpcOptimistic'e string RPC adı yerine callback fonksiyon geçiliyor. Fonksiyon imzası 1. parametre olarak string bekliyor (rpcOptimistic(name, params, opts)). Callback hiç yürütülmüyor — tohumlama sonucu DB'ye yazılmıyor.
+- Tetikleyici: Tohumlama sonucu güncelleme (Gebe/Boş/Abort) akışı tetiklendiğinde
+- İlgili commit: bilinmiyor
+
+## [2026-03-27] BUG-002 openNotModal duplikat — yükleme sırasına göre farklı davranış
+- Kaynak: erp-explorer (sistem denetimi)
+- Modül: forms.js + ui.js
+- Önem: orta
+- Durum: yeni
+- Açıklama: openNotModal fonksiyonu forms.js:319 ve ui.js:663'te iki kez tanımlı. ui.js versiyonu input temizleme adımını içermiyor. Hangisinin geçerli olduğu script yükleme sırasına bağlı.
+- Tetikleyici: Not ekleme modalı açılırken
+- İlgili commit: bilinmiyor
+
+## [2026-03-27] BUG-003 selDis duplikat — ui.js versiyonunda tani-btn reset eksik
+- Kaynak: erp-explorer (sistem denetimi)
+- Modül: app.js + ui.js
+- Önem: orta
+- Durum: yeni
+- Açıklama: selDis app.js:647'de 2 parametreli, ui.js:2605'te 1 parametreli tanımlı. ui.js versiyonu tani-btn butonlarını reset etmiyor. Aktif seçim görseli yanlış kalabilir.
+- Tetikleyici: Tanı seçimi yapıldığında
+- İlgili commit: bilinmiyor
+
+## [2026-03-27] BUG-004 Direkt REST bypass — drug_products insert (forms.js:765)
+- Kaynak: erp-explorer (sistem denetimi)
+- Modül: forms.js
+- Önem: yüksek
+- Durum: yeni
+- Açıklama: drug_products tablosuna direkt .insert() çağrılıyor. RLS policy, trigger ve backend validasyonu atlanıyor.
+- Tetikleyici: Yeni ilaç ürünü eklenirken
+- İlgili commit: bilinmiyor
+
+## [2026-03-27] BUG-005 Direkt REST bypass — stok update (forms.js:775)
+- Kaynak: erp-explorer (sistem denetimi)
+- Modül: forms.js
+- Önem: yüksek
+- Durum: yeni
+- Açıklama: stok tablosuna direkt .update() çağrılıyor. Stok tablosu RPC üzerinden yönetilmeli.
+- Tetikleyici: İlaç-stok bağlantısı güncellenirken
+- İlgili commit: bilinmiyor
+
+## [2026-03-27] BUG-006 Direkt REST bypass — drugs update (ui.js:1160)
+- Kaynak: erp-explorer (sistem denetimi)
+- Modül: ui.js
+- Önem: yüksek
+- Durum: yeni
+- Açıklama: drugs tablosuna direkt batch .update() çağrılıyor. RLS policy kontrolü yapılmamış.
+- Tetikleyici: Stok-ilaç bağlantısı silinirken
+- İlgili commit: bilinmiyor
+
+## [2026-03-27] BUG-007 Offline kuyruk gönderiminde direkt REST bypass (ui.js:2745,2749)
+- Kaynak: erp-explorer (sistem denetimi)
+- Modül: ui.js
+- Önem: yüksek
+- Durum: yeni
+- Açıklama: dataTrafficTekGonder fonksiyonu offline kuyruğu gönderirken ilgili tablolara direkt insert/update yapıyor. Backend validasyonu ve RPC guard'ları atlanıyor.
+- Tetikleyici: Offline'dan online'a geçişte kuyruk gönderilirken
+- İlgili commit: bilinmiyor
