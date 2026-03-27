@@ -15,7 +15,7 @@ errors=0
 warnings=0
 
 # ─── AGENT KONTROLÜ ───────────────────────────────────────────
-agents=("orchestrator" "erp-explorer" "erp-db-agent" "erp-frontend-dev" "erp-qa-agent" "erp-git-agent" "erp-debug-agent" "arge-analyst" "arge-web-researcher" "arge-local-reader")
+agents=("orchestrator" "erp-planner" "erp-architect" "erp-explorer" "erp-db-agent" "erp-frontend-dev" "erp-qa-agent" "erp-git-agent" "erp-debug-agent" "arge-analyst" "arge-web-researcher" "arge-local-reader")
 missing_agents=()
 for agent in "${agents[@]}"; do
   if [ ! -f "$CLAUDE_DIR/agents/$agent.md" ]; then
@@ -28,7 +28,7 @@ total_agents=${#agents[@]}
 found_agents=$((total_agents - ${#missing_agents[@]}))
 
 if [ ${#missing_agents[@]} -eq 0 ]; then
-  lines+=("$ok Agents ($total_agents/$total_agents): orchestrator · explorer · db · frontend · qa · git · debug · arge×3")
+  lines+=("$ok Agents ($total_agents/$total_agents): orchestrator · planner · architect · explorer · db · frontend · qa · git · debug · arge×3")
 else
   lines+=("$fail Agents ($found_agents/$total_agents): ${#missing_agents[@]} eksik")
   for a in "${missing_agents[@]}"; do
