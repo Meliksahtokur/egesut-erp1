@@ -432,8 +432,6 @@ function _detUremeHtml(a,tohs){
     h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.1);color:var(--red);font-weight:700" onclick="abortKaydet('${a.id}','${gebeTohumlama.id}')">⚠️ Abort / Erken Doğum</button>`;
     h+=`<button class="btn btn-g" style="flex:1;padding:9px;font-weight:700" onclick="dogumYaptiAc('${a.id}','${hid}','${gebeTohumlama.tarih}','${gebeTohumlama.sperma||''}')">🐄 Doğum Yaptı</button>`;
   } else if(bekleyenToh){
-    h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(78,154,42,.1);color:var(--green);font-weight:700" onclick="tohSonucGuncelle('${bekleyenToh.id}','Gebe','${a.id}')">🤰 Gebe</button>`;
-    h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.08);color:var(--red);font-weight:700" onclick="tohSonucGuncelle('${bekleyenToh.id}','Boş','${a.id}')">❌ Boş</button>`;
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Tohumlama Ekle</button>`;
   } else if(dogumYaptiToh){
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Yeni Tohumlama Ekle</button>`;
@@ -2570,31 +2568,7 @@ function openMWithHayvan(modalId,inputId,kupeNo){
   },150);
   if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
 }
-async function tohSonucGuncelle(tohId, sonuc, hayvanId){
-  try{
-    const tohs=await idbGetAll('tohumlama');
-    const kayit=tohs.find(t=>t.id===tohId);
-    if(kayit&&(kayit.sonuc==='Gebe'||kayit.sonuc==='Doğum Yaptı')){
-      toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın',true); return;
-    }
-    if(sonuc==='Gebe'&&hayvanId){
-      const hayvanlar=await idbGetAll('hayvanlar');
-      const hayvan=hayvanlar.find(h=>h.id===hayvanId);
-      if(hayvan&&hayvan.durum==='Gebe'){
-        toast('⛔ Bu hayvan zaten gebe olarak kayıtlı!',true); return;
-      }
-    }
-    const onayMesaj=sonuc==='Gebe'
-      ?'Bu tohumlama kaydı "Gebe" olarak işaretlenecek. Emin misiniz?'
-      :'Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?';
-    if(!confirm(onayMesaj)) return;
-    await db.from('tohumlama').update({sonuc}).eq('id',tohId);
-    await pullTables(['tohumlama','hayvanlar']);
-    renderSafe();
-    toast(sonuc==='Gebe'?'✅ Gebe işaretlendi':'✅ Boş işaretlendi');
-    openDet(hayvanId);
-  }catch(e){ toast(e.message,true); }
-}
+
 async function openGebelikEkle(hayvanId){
   const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvanId);
   tohs.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
