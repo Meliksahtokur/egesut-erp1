@@ -62,6 +62,9 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 | Fix 9: Trigger — doğumlar abort görünüyor | 4abf4dd | `js/ui.js`, `supabase/migrations/028` | `fn_islem_log`: `sonuc='Doğum Yaptı'` artık `DOGUM_KAYDI` yazar. DB'ye uygulandı. |
 | Fix 10: Geçmiş doğum listesinde buzağı kartına gitme | 4abf4dd | `js/ui.js` | Anne + buzağı küpesi ayrı tıklanabilir. `openDetByKupe()` eklendi. |
 | Fix 11: Hayvan kartında baba bilgisi görünmüyor | 4abf4dd | `js/ui.js` | `_detOzetHtml` infoFields'a `baba_bilgi` eklendi. |
+| Fix 12: Tohumlama modal durum bazlı buton kontrolü + confirm guard | ba4612d | `index.html`, `js/forms.js`, `js/ui.js` | Bekleyen/Gebe/Boş durumuna göre butonlar gösterilir/gizlenir. Sonuç değiştirmeden önce `confirm()` istenir. |
+| Fix 13: `tohSonuc` çakışması + geri al sorgusu | 205231c | `js/ui.js` | ui.js'deki korumasız `tohSonuc` silindi, islem_log sorgusu `ref_id` ile düzeltildi. |
+| Migration 029: `geri_al` RPC kalıcı hale getirildi | 1839249 | `supabase/migrations/20260326000029_geri_al_rpc.sql` | geri_al RPC fonksiyonu migration dosyasına alındı, DB'ye uygulandı. |
 
 ---
 
@@ -71,7 +74,7 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 
 ### Tespit Edilen Sorunlar (2026-03-26 analizi)
 
-#### Sorun 1: Geri Al (td2-geri-al-btn) hiç görünmüyor
+#### ✅ Sorun 1: Geri Al (td2-geri-al-btn) hiç görünmüyor — Fix 13 ile çözüldü (205231c)
 
 **Kök neden:** `js/ui.js` `openTohDet` fonksiyonunda islem_log sorgusu yanlış alanları arıyor:
 ```js
@@ -86,7 +89,7 @@ l.tip === 'TOHUMLAMA' && l.ref_id === id
 
 ---
 
-#### Sorun 2: `tohSonuc` fonksiyon isim çakışması
+#### ✅ Sorun 2: `tohSonuc` fonksiyon isim çakışması — Fix 13 ile çözüldü (205231c)
 
 **Kök neden:** Aynı isimde iki fonksiyon tanımlı:
 - `js/forms.js:634` — guard'lı versiyon (Gebe/DoğumYaptı kontrolü var)
@@ -98,7 +101,7 @@ Browser son yüklenen dosyayı kullanır → `ui.js` sonra yüklendiği için ko
 
 ---
 
-#### Sorun 3: `tohSonucGuncelle` tamamen korumasız
+#### ✅ Sorun 3: `tohSonucGuncelle` tamamen korumasız — Fix 12 ile kısmen çözüldü (ba4612d) — confirm guard eklendi
 
 **Kök neden:** `js/ui.js:2501` — hayvan kartındaki "🤰 Gebe" / "❌ Boş" butonları buraya bağlı:
 ```js
