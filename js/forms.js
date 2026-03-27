@@ -684,19 +684,8 @@ async function gebeIsaretle() {
 }
 
 async function gebeIsaretKaydet() {
-  const secili = [...document.querySelectorAll('.gebe-chk:checked')];
-  if (!secili.length) { toast('En az bir hayvan seçin', true); return; }
-  let n = 0;
-  for (const chk of secili) {
-    await write('tohumlama', { sonuc: 'Gebe' }, 'PATCH', `id=eq.${chk.dataset.tohId}`);
-    n++;
-  }
-  g('gebe-isaret-modal')?.remove();
-  toast(`✅ ${n} hayvan gebe olarak işaretlendi`);
-  // Trigger hayvanlar.grup'u güncelledi — IDB'yi tazele, sonra render
-  await pullTables(['hayvanlar', 'tohumlama']);
-  renderSafe();
-  loadUreme('gebelik');
+  // Gebelik ataması gebelik tabına taşındı — tohumlama_sonuc_gebe RPC kullanılmalı
+  toast('Gebelik ataması için Gebelik tabını kullanın', true);
 }
 
 // ── GERİ ALMA ────────────────────────────────
@@ -712,6 +701,7 @@ async function geriAl(islemLogId, btn) {
     await rpc('geri_al', { p_islem_id: islemLogId });
     toast('✅ İşlem geri alındı');
     closeM('m-geri-al');
+    closeM('m-toh-det');
     pullTables(['hayvanlar','tohumlama','dogum','gorev_log','islem_log']).then(renderSafe).catch(console.warn);
   } catch (e) { toast('❌ ' + e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🔄 Evet, Geri Al'; } }
