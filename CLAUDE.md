@@ -17,6 +17,7 @@
 | **Test ve doğrulama** | → `erp-qa-agent` spawn et |
 | **Commit / push** | → `erp-git-agent` spawn et |
 | **ArGe / analiz / iyileştirme** | → `arge-analyst` spawn et |
+| **Bug debug / iz sürme** | → `erp-debug-agent` spawn et |
 | **Yeni büyük özellik** | → `feature-dev` workflow (aşağıya bak) |
 
 **Kural:** Yazma işleri, çok-dosya keşif, test, commit → her zaman agent. Okuma ve sorular → threshold'a göre karar ver.

@@ -63,6 +63,28 @@ Proje bilgisi gerekiyorsa: `arge-local-reader` kullan.
 - Düşük öncelik → sadece `knowledge/findings.md`
 - Orta öncelik → `knowledge/improvement-proposals.md`
 - Yüksek öncelik → orkestratöre özet mesaj + proposals dosyası
+- **Bug sinyali** → `knowledge/bugs.md` (aşağıya bak)
+
+### Bug Sinyali Yazma
+
+Git diff'te şunları görürsen `knowledge/bugs.md`'ye sinyal ekle:
+- Hata yönetimi eksik (`catch` bloğu yutan hata, `{ok: false}` kontrolü yok)
+- Null/undefined riski (zorunlu alan `?.` olmadan erişiliyor)
+- State tutarsızlığı (IndexedDB ile Supabase senkronizasyonu kırılabilir)
+- RPC bypass (doğrudan tablo yazma — domain-rules.md ihlali)
+- Duplicate fonksiyon tanımı
+
+**Format:**
+```markdown
+## [YYYY-MM-DD] [BUG-XXX] [kısa başlık]
+- Kaynak: arge-analyst
+- Modül: [dosya adı]
+- Önem: [kritik|yüksek|orta|düşük]
+- Durum: yeni
+- Açıklama: [ne gördüm]
+- Tetikleyici: [nasıl oluşabilir]
+- İlgili commit: [hash]
+```
 
 **Raporlama formatı (orkestratöre):**
 ```

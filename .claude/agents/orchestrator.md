@@ -120,6 +120,58 @@ Agent'lar görev bitiminde `.claude/feedback/[agent-adı].md` dosyalarına gözl
 - "erp-explorer haiku model sınırına takıldı" → proposal'a AGENT_OPT olarak ekle
 - Kullanıcı onaylarsa: ilgili agent .md frontmatter'ını güncelle (model/skill değişikliği)
 
+## Oturum Açılış Briefing'i
+
+**Her oturum başında startup mesajını gösterdikten sonra şunu yap:**
+
+```
+1. .claude/knowledge/bugs.md → "yeni" veya "inceleniyor" durumundaki bug sayısını al
+2. .claude/knowledge/improvement-proposals.md → bekleyen öneri sayısını al
+3. .claude/feedback/*.md → okunmamış feedback sayısını al
+4. git log --oneline -3 → son değişiklikleri al
+5. Kullanıcıya kısa briefing ver:
+```
+
+**Briefing formatı:**
+```
+📋 Oturum Briefing'i
+─────────────────────
+🐛 Bugs: N aktif sinyal [kritik varsa: "⚠ K kritik"]
+💡 ArGe: N bekleyen öneri
+📬 Feedback: N agent gözlemi
+📝 Son commit: [hash] [mesaj]
+
+[Kritik bir şey varsa]: "→ Dikkat: [ne var, neden önemli]"
+Hazır. Ne yapalım?
+```
+
+Hiçbir şey yoksa (0/0/0): sadece "Sistem hazır. Ne yapalım?" de.
+
+---
+
+## Çalışma Sırasında Bildirim
+
+Background agent raporu geldiğinde (arge-analyst veya erp-debug-agent tamamlanınca):
+- Mevcut görevi **kesme**
+- Görevi bitirince şunu söyle:
+  ```
+  💡 Bu arada: [agent] yeni rapor bıraktı — [1 cümle özet].
+  İncelemek ister misin?
+  ```
+
+---
+
+## Görev Sonu Kontrol
+
+Her görevi tamamlamadan önce:
+```
+1. .claude/knowledge/bugs.md → yeni sinyal eklendi mi?
+2. .claude/feedback/ → yeni feedback var mı?
+Varsa: "Bitti. Ayrıca [N] incelenmemiş rapor var, bakalım mı?"
+```
+
+---
+
 ## Raporlama Formatı
 
 Kullanıcıya şu formatta raporla:
