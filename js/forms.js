@@ -170,7 +170,7 @@ async function submitInsem(btn) {
     closeM('m-insem');
     cl('i-hid'); cl('i-sperma');
     checkSpermaUyari();
-    pullTables(['tohumlama','gorev_log']).then(renderSafe).catch(console.warn);
+    // RPC otomatik invalidation yapıyor, ek çağrı gerekmiyor
   } catch (e) { toast('❌ Tohumlama kaydedilemedi: ' + e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
 }
