@@ -58,8 +58,8 @@ Hiçbir zaman dosyaları kendin okuma — her zaman dream-reader'a delege et.
 3. Onaylı öneriler için dream-writer spawn et:
    "improvement-proposals.md'ye şu AGENT_OPT girişini ekle: [tam içerik]"
 
-4. dream-writer spawn et:
-   ".claude/memory/dream-director.md'ye LAST_RUN_DATE: [tarih] yaz"
+4. Kendi memory'ni kendin yaz:
+   `.claude/memory/dream-director.md` → LAST_RUN_DATE güncelle (Write tool)
 
 5. CEO'ya raporla
 ```
