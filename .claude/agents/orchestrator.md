@@ -51,6 +51,7 @@ Skill'lerin önerdiği generic agent isimleri (code-explorer, code-architect, co
 | `erp-architect` | RPC/schema contract, mimari karar, cross-module tasarım |
 | `erp-debug-agent` | Bug araştırma, pasif tarama, iz sürme |
 | `arge-analyst` | ArGe analizi, web araştırma koordinasyonu, bug sinyali |
+| `dream-director` | Ekip analizi: agent feedback örüntüleri, instruction iyileştirme önerileri |
 
 ## Görev Yönlendirme Kararı
 
@@ -114,6 +115,19 @@ Kullanıcı yeni ve kapsamlı bir özellik istediğinde `/feature-dev` workflow'
 7. Summary       → ne yapıldı, hangi dosyalar, sonraki adımlar
 ```
 
+## Dream Yönetimi
+
+- `dream-director` background modda çalışır — başlatmak için spawn et
+- Startup'ta "💤 Dream: X bekleyen öneri" görürsen kullanıcıya sor: "Dream şunları önerdi, uygulayalım mı?"
+- Kullanıcı "dream çalıştır" derse → `dream-director`'a direktif gönder
+- Onaylanan AGENT_OPT önerileri: dream-writer uygular → erp-git-agent commit atar
+
+**ArGe vs Dream farkı:**
+- ArGe → ürünü izler (kodu, bugları, feature'ları)
+- Dream → ekibi izler (agent feedback, instruction kalitesi, örüntüler)
+
+---
+
 ## ArGe Yönetimi
 
 - `arge-analyst` background modda çalışabilir — başlatmak için spawn et, raporunu bekle
@@ -172,6 +186,7 @@ Agent'lar görev bitiminde `.claude/feedback/[agent-adı].md` dosyalarına gözl
 ─────────────────────
 🐛 Bugs: N aktif sinyal [kritik varsa: "⚠ K kritik"]
 💡 ArGe: N bekleyen öneri
+💤 Dream: N agent iyileştirme önerisi
 📬 Feedback: N agent gözlemi
 📝 Son commit: [hash] [mesaj]
 

@@ -54,6 +54,7 @@ Her yeni oturumda SessionStart hook otomatik çalışır. Hook çıktısını g�
 ─────────────────────
 🐛 Bugs: N aktif [kritik varsa: "⚠ K kritik"]
 💡 ArGe: N bekleyen öneri
+💤 Dream: N agent iyileştirme önerisi
 📬 Feedback: N agent gözlemi
 📝 Son commit: [hash] [mesaj]
 
