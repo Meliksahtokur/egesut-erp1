@@ -51,3 +51,17 @@
 **Özet:** arge-local-reader ve arge-web-researcher feedback formatı diğer agent'lardan farklı. Tüm agent'lar aynı format kullanmalı: `Ne işe yaradı / Ne çalışmadı / Bir sonraki sefere dikkat et`.
 **Gerekçe:** Sistem denetimi 2026-03-27.
 **Durum:** bekliyor
+
+## [İ-007] JS syntax check startup'a geri eklensin — veya CI/pre-commit hook yapılsın
+**Öncelik:** orta
+**Etkilenen:** .claude/scripts/startup-check.sh, CI
+**Özet:** startup-check.sh'ten JS syntax kontrolü kaldırıldı (6d9b0d8, "node-check kaldırıldı"). Bu hızlandırma makul ama JS hataları artık oturum briefing'inde görünmüyor. Alternatif: pre-commit hook olarak `node --check` ekle — commit sırasında yakala, oturum başında değil.
+**Gerekçe:** arge-analyst tespiti, commit 6d9b0d8. Syntax hatası sessiz kalırsa runtime'da zor debug edilir.
+**Durum:** bekliyor
+
+## [İ-008] haiku agent'lar için "escalation path" protokolü tanımlanmalı
+**Öncelik:** orta
+**Etkilenen:** .claude/agents/erp-db-agent.md, erp-frontend-dev.md
+**Özet:** erp-db-agent ve erp-frontend-dev haiku'ya düşürüldü ("uygularsın, düşünmezsin" modeli). Ancak agent'ın mimari karar gerektiğini nasıl tespit edeceği ve erp-architect'e nasıl geri döneceği protokolü eksik. Haiku agent belirsizlikle karşılaşırsa sessiz kalabilir veya yanlış uygulayabilir.
+**Gerekçe:** arge-analyst tespiti, commit 5da2ef6. Escalation path eksikliği hatalı uygulamalara yol açabilir.
+**Durum:** bekliyor

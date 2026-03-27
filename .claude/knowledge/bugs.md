@@ -80,3 +80,12 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Açıklama: dataTrafficTekGonder fonksiyonu offline kuyruğu gönderirken ilgili tablolara direkt insert/update yapıyor. Backend validasyonu ve RPC guard'ları atlanıyor.
 - Tetikleyici: Offline'dan online'a geçişte kuyruk gönderilirken
 - İlgili commit: bilinmiyor
+
+## [2026-03-27] BUG-008 submitInsem sonrası UI refresh garantisiz — pullTables kaldırıldı
+- Kaynak: arge-analyst
+- Modül: forms.js
+- Önem: orta
+- Durum: yeni
+- Açıklama: d562d03 commit'inde submitInsem() içindeki `pullTables(['tohumlama','gorev_log']).then(renderSafe)` çağrısı "RPC otomatik invalidation yapıyor" yorumuyla kaldırıldı. Ancak RPC'nin gerçekten otomatik UI invalidation tetikleyip tetiklemediği doğrulanmamış. Eğer RPC'nin Realtime/websocket kanalı aktif değilse veya invalidation mekanizması çalışmazsa, tohumlama ve görev listesi eski veriyi göstermeye devam eder.
+- Tetikleyici: Tohumlama kaydı yapıldıktan sonra liste ekranına dönüldüğünde
+- İlgili commit: d562d03
