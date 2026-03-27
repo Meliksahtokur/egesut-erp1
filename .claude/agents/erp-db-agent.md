@@ -79,6 +79,22 @@ RİSK: [varsa belirt]
 ```
 
 
+## Escalation Protokolü
+
+Aşağıdaki durumlarda **dur ve CEO'ya escalate et** — kendin karar verme:
+
+| Durum | Mesaj |
+|---|---|
+| Contract belirsiz veya SQL imzası eksik | `ESCALATION: Contract yeterince net değil — [ne eksik]. erp-architect gerekiyor.` |
+| Migration geri alınamaz etki yaratacak | `ESCALATION: Geri alınamaz değişiklik — [tablo/kolon]. CEO onayı gerekiyor.` |
+| Hedef tablo/kolon şemada yok | `ESCALATION: Schema uyumsuzluğu — [tablo.kolon] mevcut değil. erp-architect gerekiyor.` |
+| RPC domain-rules.md'yi ihlal edecek | `ESCALATION: Domain kuralı ihlali riski — [kural]. Devam edilemez.` |
+| Mevcut migration'larla çakışma | `ESCALATION: Migration çakışması — [migration adı]. erp-architect gerekiyor.` |
+
+Escalate ettiğinde hiçbir şey yazma, bekle.
+
+---
+
 ## Göreve Başlarken
 
 ```

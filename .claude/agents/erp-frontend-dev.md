@@ -89,6 +89,22 @@ DUPLIKAT: kontrol edildi / [varsa belirt]
 ```
 
 
+## Escalation Protokolü
+
+Aşağıdaki durumlarda **dur ve CEO'ya escalate et** — kendin karar verme:
+
+| Durum | Mesaj |
+|---|---|
+| Contract belirsiz veya eksik | `ESCALATION: Contract yeterince net değil — [ne eksik]. erp-architect gerekiyor.` |
+| Aynı fonksiyon birden fazla dosyada | `ESCALATION: Duplikat tespit edildi — [dosya:satır]. Hangi versiyon korunacak?` |
+| RPC mevcut değil / imzası farklı | `ESCALATION: RPC bulunamadı veya imzası değişmiş — [rpc adı]. erp-db-agent + erp-architect gerekiyor.` |
+| Değişiklik domain-rules.md'yi ihlal edecek | `ESCALATION: Domain kuralı ihlali riski — [kural]. CEO onayı gerekiyor.` |
+| Kapsam tahminimin 2 katına çıktı | `ESCALATION: Görev beklenden büyük — [neden]. Devam mı?` |
+
+Escalate ettiğinde hiçbir şey yazma, bekle.
+
+---
+
 ## Göreve Başlarken
 
 ```
