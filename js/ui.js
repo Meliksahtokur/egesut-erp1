@@ -2213,10 +2213,34 @@ async function openTohDet(id){
   // islem_log'dan bu kaydın id'sini bul (geri alma için)
   const islemLog=await idbGetAll('islem_log');
   const islemKayit=islemLog.find(l=>l.tip==='TOHUMLAMA'&&l.ref_id===id);
+
+  // Son tohumlama kontrolü (event stack kuralı)
+  const tumTohlar=await idbGetAll('tohumlama');
+  const hayvanTohlar=tumTohlar
+    .filter(t2=>t2.hayvan_id===t.hayvan_id)
+    .sort((a,b)=>(b.deneme_no||0)-(a.deneme_no||0));
+  const isSonToh=hayvanTohlar.length>0&&hayvanTohlar[0].id===id;
+
   const td2GeriAlBtn=document.getElementById('td2-geri-al-btn');
   if(td2GeriAlBtn){
-    if(islemKayit){ td2GeriAlBtn.style.display='block'; td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`); }
-    else { td2GeriAlBtn.style.display='none'; }
+    td2GeriAlBtn.style.display=(isSonToh&&islemKayit)?'block':'none';
+    if(isSonToh&&islemKayit){
+      td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`);
+    }
+  }
+
+  // Eski kayıt uyarısı
+  const mevcutUyari=document.getElementById('td2-eski-kayit-uyari');
+  if(!isSonToh){
+    if(!mevcutUyari){
+      const uyari=document.createElement('p');
+      uyari.id='td2-eski-kayit-uyari';
+      uyari.style.cssText='color:var(--ink3);font-size:.85rem;text-align:center;margin:8px 0;padding:6px 12px;background:var(--card2);border-radius:8px';
+      uyari.textContent='Bu kayıt geçmişe ait — sadece bilgi amaçlı görüntüleniyor.';
+      td2GeriAlBtn?.parentNode?.insertBefore(uyari,td2GeriAlBtn.nextSibling);
+    }
+  } else if(mevcutUyari){
+    mevcutUyari.remove();
   }
   const td2TekrarBtn=document.getElementById('td2-tekrar-btn');
   if(td2TekrarBtn){
@@ -2498,6 +2522,13 @@ async function tohSonucGuncelle(tohId, sonuc, hayvanId){
     const kayit=tohs.find(t=>t.id===tohId);
     if(kayit&&(kayit.sonuc==='Gebe'||kayit.sonuc==='Doğum Yaptı')){
       toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın',true); return;
+    }
+    if(sonuc==='Gebe'&&hayvanId){
+      const hayvanlar=await idbGetAll('hayvanlar');
+      const hayvan=hayvanlar.find(h=>h.id===hayvanId);
+      if(hayvan&&hayvan.durum==='Gebe'){
+        toast('⛔ Bu hayvan zaten gebe olarak kayıtlı!',true); return;
+      }
     }
     const onayMesaj=sonuc==='Gebe'
       ?'Bu tohumlama kaydı "Gebe" olarak işaretlenecek. Emin misiniz?'
