@@ -2580,8 +2580,7 @@ async function openGebelikEkle(hayvanId){
   const sure=confirm('Son tohumlama ('+fmtTarih(son.tarih)+' · '+(son.sperma||'—')+') Gebe olarak işaretlensin mi?');
   if(!sure) return;
   try{
-    await rpcOptimistic(()=>db.from('tohumlama').update({sonuc:'Gebe'}).eq('id',son.id),['tohumlama','hayvanlar']);
-    toast('✅ Gebe işaretlendi');
+    await rpcOptimistic('tohumlama_sonuc_gebe', { p_tohumlama_id: son.id }, { successMsg: '✅ Gebe işaretlendi' });
     openDet(hayvanId);
   }catch(e){ toast(e.message,true); }
 }
