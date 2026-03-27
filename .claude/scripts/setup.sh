@@ -67,37 +67,25 @@ echo ""
 
 # ─── 3. API ANAHTARLARI ───────────────────────────────────────
 echo "── API Anahtarları ──────────────────────────────────────"
-echo "  (mevcut değeri korumak için boş bırak)"
-echo ""
-
-# Anthropic API Key
-if [ -n "$ANTHROPIC_API_KEY" ]; then
-  warn "ANTHROPIC_API_KEY zaten ortam değişkeninde tanımlı"
-else
-  read -rp "  Anthropic API Key (sk-ant-...): " ANTHROPIC_KEY
-  if [ -z "$ANTHROPIC_KEY" ]; then
-    warn "Anthropic API Key atlandı — claude çalışmaz. Sonra export ANTHROPIC_API_KEY=... ile ekle"
-  else
-    echo "export ANTHROPIC_API_KEY='$ANTHROPIC_KEY'" >> ~/.bashrc
-    export ANTHROPIC_API_KEY="$ANTHROPIC_KEY"
-    ok "Anthropic API Key kaydedildi (~/.bashrc)"
-  fi
-fi
-
+echo "  (boş bırakırsan atlanır, oturum içinde sonradan eklenebilir)"
 echo ""
 
 # Supabase Token
-read -rp "  Supabase Access Token (sbp_...): " SUPABASE_TOKEN
+read -rp "  Supabase Access Token (sbp_...) [Enter=atla]: " SUPABASE_TOKEN
 if [ -z "$SUPABASE_TOKEN" ]; then
-  warn "Supabase token atlandı — DB MCP çalışmaz"
+  warn "Supabase token atlandı — DB MCP çalışmaz (sonradan .mcp.json'a ekle)"
   SUPABASE_TOKEN="SUPABASE_TOKEN_BURAYA"
+else
+  ok "Supabase token alındı"
 fi
 
 # GitHub Token
-read -rp "  GitHub Personal Access Token (ghp_...): " GITHUB_TOKEN
+read -rp "  GitHub Personal Access Token (ghp_...) [Enter=atla]: " GITHUB_TOKEN
 if [ -z "$GITHUB_TOKEN" ]; then
-  warn "GitHub token atlandı — GitHub MCP çalışmaz"
+  warn "GitHub token atlandı — GitHub MCP çalışmaz (sonradan .mcp.json'a ekle)"
   GITHUB_TOKEN="GITHUB_TOKEN_BURAYA"
+else
+  ok "GitHub token alındı"
 fi
 
 echo ""
@@ -113,9 +101,6 @@ fi
 
 cat > "$CLAUDE_DIR/settings.json" <<EOF
 {
-  "env": {
-    "SUPABASE_ACCESS_TOKEN": "$SUPABASE_TOKEN"
-  },
   "permissions": {
     "allow": [
       "Read", "Grep", "Glob", "WebFetch",
@@ -278,6 +263,6 @@ echo "Sonraki adım:"
 echo "  cd $PROJECT_ROOT"
 echo "  claude"
 echo ""
-echo "Not: Yeni terminal açarsan API key için:"
-echo "  source ~/.bashrc"
+echo "Token eklemek istersen:"
+echo "  nano .mcp.json  →  SUPABASE_TOKEN_BURAYA / GITHUB_TOKEN_BURAYA kısımlarını değiştir"
 echo ""
