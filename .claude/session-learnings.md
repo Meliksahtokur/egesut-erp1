@@ -33,9 +33,36 @@ Three write paths exist, only one goes through the validated RPC:
 Full refactor plan is in `SONARCLOUD_REMEDIATION_PLAN.md` under "🔴 TOHUMLAMA MODÜLÜ".
 Proposed new RPCs: `tohumlama_sonuc_gebe`, `tohumlama_sonuc_bos`, `tohumlama_abort`.
 
+## Oturum 2026-03-26 Ek Öğrenmeler
+
+### Stok Sistemi
+- Stok tabloları: `stok` + `stok_hareket` + `stok_tuketim_view`
+- Sperma **dropdown'dan seçilir** — `stok` tablosundan `kategori='Sperma'` filtreyle gelir
+- `tohumlama_kaydet` RPC stok düşer ama `ILIKE` eşleşmesi başarısızsa **sessizce atlar** — hata fırlatmaz
+- Stok UI'da görünmüyorsa: `RPC_INVALIDATION_MAP`'te `stok`/`stok_hareket` eksik olabilir
+
+### Geri Al Modal Sorunu
+- `geriAl()` başarısında `closeM('m-geri-al')` var ama tohumlama detay modal (`m-td2`) açık kalıyor
+- Geri al sonrası: `closeM('m-geri-al')` + `closeM('m-td2')` ikisi de çağrılmalı
+- `renderSafe()` sayfayı yeniliyor ama açık modal içeriğini güncellemiyor
+
+### Migration 028 Sınırı
+- Migration 028 öncesi `islem_log.ref_id` = NULL → geri alma butonu görünmüyor (expected)
+- 028 sonrası kayıtlarda `ref_id` = `tohumlama.id` (dolu)
+- Eski kayıtları temizlemek için: `DELETE FROM tohumlama WHERE id NOT IN (SELECT ref_id FROM islem_log WHERE tip='TOHUMLAMA' AND ref_id IS NOT NULL)`
+
+### Çoklu Gebe Kirli Veri
+- `tohSonucGuncelle` / `gebeIsaretKaydet` hayvanın mevcut durumunu kontrol etmediğinden birden fazla "Gebe" kayıt oluşabiliyor
+- Guard: `if (hayvan?.tohumlama_durumu === 'Gebe') { toast(...); return; }`
+
+### Agent Knowledge Gap
+- Agent dosyaları (`erp-db-agent.md`, `erp-frontend-dev.md`, `erp-explorer.md`) projeye özgü mekaniklerle güncellendi (2026-03-26)
+- Her yeni proje mekaniği keşfedilince → ilgili agent dosyasına eklenmeli
+
 ## What to Avoid
 
 - Don't add `console.log` debug lines to production files without removing them
 - Don't assume `hayvan_id` is always UUID — can also be `kupe_no` (see domain-rules.md §1)
-- Don't touch `Gebe` or `Doğum Yaptı` tohumlama records from frontend directly — RPC only
+- Don't touch `Gebe` veya `Doğum Yaptı` tohumlama records from frontend directly — RPC only
 - Don't skip confirm dialogs for destructive state transitions (Gebe→Boş, Gebe→Abort)
+- **Agent'lara "stok sistemi nedir?" veya "sperma nasıl seçilir?" sormayın** — cevap artık agent dosyalarında mevcut

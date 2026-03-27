@@ -153,6 +153,13 @@ Tüm RPC'ler `jsonb` döndürür: `{ ok: boolean, ... }`
 - Non-trivial changes → update `SONARCLOUD_REMEDIATION_PLAN.md` first, then implement
 - Architecture decisions belong in the plan file, not in memory
 
+### Test Protokolü
+- **Her teslimden önce (zorunlu):** `node --check` + duplikat grep + temel RPC doğrulaması — `erp-qa-agent`
+- **Küçük fixlerde:** Playwright YOK — sadece syntax + logic kontrolü
+- **Büyük feature/Playwright:** Kullanıcıdan izin al
+- **Push kuralı:** Lokal test geçmeden push yok; commit hazır olabilir
+- **Amaç:** Küçük hataları erkenden yakalayarak kullanıcıya çalışan feature teslim etmek
+
 ### Session End
 - Update this file with any new project decisions or conventions
 - Update `.claude/session-learnings.md` with: what worked, what didn't, MCP patterns, what to avoid
