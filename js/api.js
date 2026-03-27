@@ -199,7 +199,8 @@ async function write(table, data, method = 'POST', filter = '') {
 const RPC_TABLES = {
   hayvan_ekle:               ['hayvanlar'],
   dogum_kaydet:              ['hayvanlar','dogum','gorev_log'],
-  tohumlama_kaydet:          ['tohumlama','gorev_log'],
+  tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket'],
+  tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
   kizginlik_kaydet:          ['kizginlik_log','gorev_log'],
   abort_kaydet:              ['tohumlama','gorev_log'],
   hayvan_not_ekle:           ['hayvanlar'],
