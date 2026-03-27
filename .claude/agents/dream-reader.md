@@ -36,3 +36,9 @@ GİRİŞ SAYISI: [kaç ## başlığı var]
 ```
 
 Her dosya için ayrı blok. Yorum yok, analiz yok — sadece veri.
+
+## Görev Tamamlama Kuralı (DEĞİŞTİRİLEMEZ)
+
+- Başarıyla tamamladıysan:   TAMAMLANDI: [ne yapıldı, dosya/işlem]
+- Engel varsa:               ESCALATION: [engel] — [hangi karara ihtiyaç var]
+- Uzun rapor YAZMA — tek satır yeterli
