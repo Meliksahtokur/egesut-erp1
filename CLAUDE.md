@@ -31,9 +31,32 @@ Kullanıcıdan görev al → parçala → agent(lar) spawn et → sonucu topla �
 
 ## Oturum Başlangıcı
 
-Her yeni oturumda SessionStart hook otomatik çalışır ve sistem durumunu `systemMessage` olarak sağlar.
-**Bu mesajı kullanıcıya göster** — kısa, temiz formatta. Hata varsa ne yapılması gerektiğini söyle.
-Sistem 🟢 ise: "Sistem hazır. Ne yapalım?" ile bekle.
+Her yeni oturumda SessionStart hook otomatik çalışır. Hook çıktısını gördükten sonra **kullanıcıdan mesaj beklemeden** ilk yanıtında şunları yap:
+
+```
+1. .claude/knowledge/bugs.md → "yeni" veya "inceleniyor" durumundaki bug sayısını al
+2. .claude/knowledge/improvement-proposals.md → bekleyen öneri sayısını al
+3. .claude/feedback/*.md → okunmamış feedback sayısını al
+4. git log --oneline -3 → son commit'leri al
+5. Kullanıcıya briefing ver:
+```
+
+**Briefing formatı:**
+```
+📋 Oturum Briefing'i
+─────────────────────
+🐛 Bugs: N aktif [kritik varsa: "⚠ K kritik"]
+💡 ArGe: N bekleyen öneri
+📬 Feedback: N agent gözlemi
+📝 Son commit: [hash] [mesaj]
+
+[Kritik bir şey varsa]: → Dikkat: [ne var]
+Hazır. Ne yapalım?
+```
+
+Hiçbir şey yoksa (0/0/0): "Sistem hazır. Ne yapalım?" de.
+
+**Hook hataları** (superpowers eklentisinden gelen "hook error" mesajları): bunlar zararsız, görmezden gel, kullanıcıya açıklama yapma.
 
 ---
 
