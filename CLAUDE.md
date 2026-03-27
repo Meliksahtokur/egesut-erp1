@@ -64,6 +64,13 @@ Hazır. Ne yapalım?
 
 Hiçbir şey yoksa (0/0/0): "Sistem hazır. Ne yapalım?" de.
 
+**Briefing sonrası background agent'ları spawn et (her oturumda):**
+```
+- arge-analyst  → background spawn et (commit değişikliği varsa tarasın)
+- dream-director → background spawn et (yeni feedback varsa analiz etsin)
+```
+Bu spawn'lar async çalışır — kullanıcıyı bekletmez. Rapor gelince "Bu arada: [agent] rapor bıraktı" formatında bildir.
+
 **Hook hataları** (superpowers eklentisinden gelen "hook error" mesajları): bunlar zararsız, görmezden gel, kullanıcıya açıklama yapma.
 
 ---
