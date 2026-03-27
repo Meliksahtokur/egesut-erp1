@@ -20,8 +20,8 @@ CREATE FUNCTION public.tohumlama_kaydet(
   p_hayvan_id    text,
   p_tarih        date,
   p_sperma       text,
-  p_hekim_id     text,
-  p_irk_bilgisi  text
+  p_hekim_id     text    DEFAULT NULL,
+  p_irk_bilgisi  text    DEFAULT NULL
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
