@@ -660,13 +660,6 @@ function closeAnimalEdit(){
   closeM('m-animal');
 }
 
-function openNotModal(hayvanId,kupe){
-  document.getElementById('not-hid').value=hayvanId;
-  document.getElementById('not-title').textContent='📝 '+kupe+' — Not Ekle';
-  document.getElementById('not-input').value='';
-  openM('m-not');
-}
-
 // Çıkış modal
 function openCikisModal(hayvanId,kupe){
   document.getElementById('cx-hid').value=hayvanId;
