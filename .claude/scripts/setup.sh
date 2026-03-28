@@ -119,13 +119,11 @@ cat > "$CLAUDE_DIR/settings.json" <<EOF
   "enabledPlugins": {
     "github@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
-    "feature-dev@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true,
     "hookify@claude-plugins-official": true,
-    "coderabbit@claude-plugins-official": true,
-    "supabase@claude-plugins-official": true
+    "coderabbit@claude-plugins-official": true
   }
 }
 EOF
@@ -224,17 +222,7 @@ cat > "$PROJECT_ROOT/.claude/settings.local.json" <<EOF
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $PROJECT_ROOT/.claude/scripts/arge-dirty-flag.sh"
-          }
-        ]
-      }
-    ]
+    "PostToolUse": []
   }
 }
 EOF
