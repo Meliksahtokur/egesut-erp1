@@ -44,3 +44,5 @@ test-results/
 # Claude runtime dosyaları
 .claude/arge-pending.flag
 repomix-output.xml
+.aider.chat.history.md
+.aider.tags.cache.v3/
