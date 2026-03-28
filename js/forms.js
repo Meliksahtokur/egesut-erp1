@@ -637,12 +637,25 @@ async function tohSonuc(sonuc) {
     toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın', true); return;
   }
   if (sonuc === 'Boş' && !confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
-  await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
-  const msg = sonuc === 'Gebe' ? '✅ Gebe olarak işaretlendi' : sonuc === 'Boş' ? 'Boş olarak işaretlendi' : 'Güncellendi';
-  toast(msg);
-  closeM('m-toh-det');
-  // Trigger hayvanlar.grup'u güncelledi — IDB'yi tazele
-  pullTables(['hayvanlar', 'tohumlama']).then(renderSafe).catch(console.warn);
+
+  try {
+    let rpcName, successMsg;
+    if (sonuc === 'Gebe') {
+      rpcName = 'tohumlama_sonuc_gebe';
+      successMsg = '✅ Gebe olarak işaretlendi';
+    } else if (sonuc === 'Boş') {
+      rpcName = 'tohumlama_sonuc_bos';
+      successMsg = 'Boş olarak işaretlendi';
+    } else {
+      rpcName = 'tohumlama_sonuc_bekliyor';
+      successMsg = 'Bekliyor\'a alındı';
+    }
+
+    await rpcOptimistic(rpcName, { p_tohumlama_id: _curToh.id }, { successMsg });
+    closeM('m-toh-det');
+  } catch (e) {
+    console.warn('tohSonuc error:', e.message);
+  }
 }
 
 // ── GEBELİK İŞARETLE ────────────────────────
