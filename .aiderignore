@@ -1,0 +1,41 @@
+# Bağımlılıklar
+node_modules/
+package-lock.json
+
+# Test altyapısı
+tests/
+test-results/
+playwright-report/
+playwright.config.js
+
+# Claude iç dosyaları (okuma için --read ile verilecek)
+.claude/agents/
+.claude/scripts/
+.claude/hookify*.md
+.claude/settings*.json
+.claude/session-learnings.md
+.claude/knowledge/improvement-proposals.md
+.claude/knowledge/audit*.md
+.claude/knowledge/findings.md
+.claude/knowledge/applied-improvements.md
+.claude/arge-pending.flag
+
+# Eski / eskimiş dökümanlar
+PROJE_DURUMU.md
+SPEC.md
+LastSpec.md
+database_snapshot-1.md
+SONARCLOUD_REMEDIATION_PLAN.md
+ReFactorRoadmap.md
+RefactorRoadmap.md
+
+# Yardımcı scriptler
+patch.py
+apply.py
+
+# Üretilen dosyalar
+repomix-output.xml
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
