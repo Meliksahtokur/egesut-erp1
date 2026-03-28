@@ -43,3 +43,4 @@ test-results/
 
 # Claude runtime dosyaları
 .claude/arge-pending.flag
+repomix-output.xml
