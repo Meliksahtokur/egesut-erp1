@@ -1147,11 +1147,9 @@ function openStk(id){
 async function stokDrugBagla(stokId, sel) {
   const drugId = sel.value || null;
   try {
+    // RPC: link_drug_to_stock artık drugs tablosunu düzgün güncelliyor
+    // Ek batch update'e gerek yok, çünkü RPC içinde tek bir UPDATE yapılıyor
     await rpc('link_drug_to_stock', { p_drug_id: drugId, p_stock_item_id: drugId ? stokId : null });
-    if (drugId) {
-      // diğer ilaçlardan bu stok bağlantısını kaldır
-      await db.from('drugs').update({ stock_item_id: null }).eq('stock_item_id', stokId).neq('id', drugId);
-    }
     toast('✅ Bağlantı kaydedildi');
     _drugsCache = [];
     await loadDrugsCache();
