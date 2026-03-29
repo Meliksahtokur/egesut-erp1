@@ -660,13 +660,6 @@ function closeAnimalEdit(){
   closeM('m-animal');
 }
 
-function openNotModal(hayvanId,kupe){
-  document.getElementById('not-hid').value=hayvanId;
-  document.getElementById('not-title').textContent='📝 '+kupe+' — Not Ekle';
-  document.getElementById('not-input').value='';
-  openM('m-not');
-}
-
 // Çıkış modal
 function openCikisModal(hayvanId,kupe){
   document.getElementById('cx-hid').value=hayvanId;
@@ -2595,15 +2588,19 @@ async function acDisease(){
   all.sort((a,b)=>(_disFreq[b]||0)-(_disFreq[a]||0));
   const filtered=q?all.filter(d=>d.toLowerCase().includes(q)):all.slice(0,12);
   if(!filtered.length){ ac.style.display='none'; return; }
-  ac.innerHTML=filtered.map(d=>`<div onclick="selDis('${d.replace(/'/g,"\\'")}');event.stopPropagation()"
+  ac.innerHTML=filtered.map(d=>`<div onclick="selDis('${d.replace(/'/g,"\\'")}',this);event.stopPropagation()"
     style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3)">
     ${d}${_disFreq[d]?` <span style="color:#aaa;font-size:.6rem">(${_disFreq[d]}x)</span>`:''}
   </div>`).join('');
   ac.style.display='block';
 }
-function selDis(val){
+function selDis(val, btn){
   document.getElementById('d-tani').value=val;
   document.getElementById('ac-dis').style.display='none';
+  document.querySelectorAll('.tani-btn').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.borderColor = 'var(--card3)'; b.style.color = 'var(--ink2)';
+  });
+  if (btn) { btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff'; }
 }
 document.addEventListener('click',e=>{
   const ac=document.getElementById('ac-dis');
