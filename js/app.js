@@ -639,7 +639,7 @@ async function acDisease() {
   const all     = [...new Set([...base, ...usedDis])];
   const filtered = all.filter(d => d.toLowerCase().includes(q));
   if (!filtered.length) { ac.style.display = 'none'; return; }
-  ac.innerHTML = filtered.map(d => `<div onclick="selDis('${d.replace(/'/g,"\\'")}');event.stopPropagation()"
+  ac.innerHTML = filtered.map(d => `<div onclick="selDis('${d.replace(/'/g,"\\'")}',this);event.stopPropagation()"
     style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee">${d}</div>`).join('');
   ac.style.display = 'block';
 }

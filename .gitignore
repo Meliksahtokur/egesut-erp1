@@ -1,45 +1,53 @@
-node_modules
-# Geçici dosyalar
-*.orig
-*.rej
-*.bak
-apply_*.py
-asama*.patch
+```
+# Dependencies
+node_modules/
 
-# Cache
-.pycache_hidden/
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Gizlenen klasörler
-.sonarqube_dl/
-.watchman/
-.atsiki/
+# Build outputs
+dist/
+build/
+*.min.js
+*.bundle.js
 
-# Supabase migrations
-
-# Loglar ve geçici
-log.txt
-calendar_events.py
-
-# VSCode workspace
-.vscode/settings.json
-
-# MCP config (token içeriyor)
-.mcp.json
-
-# Claude Code ayarları (lokal)
-.claude/settings.json
-.claude/settings.local.json
-
-# Repomix
-.repomixignore
-
-# Playwright
-tests/report/
-tests/results/
-playwright-report/
-test-results/
-
-# Claude runtime dosyaları
-.claude/arge-pending.flag
+# Compression
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+```
