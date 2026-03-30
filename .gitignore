@@ -45,4 +45,19 @@ htmlcov/
 # System
 .DS_Store
 Thumbs.db
-```
+
+# Qwen Code
+.qwen/
+gha-creds-*.json
+
+# Aider
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+
+# Test Results
+test-results/
+
+# Claude Local Settings
+.claude/settings.local.json
+.claude/arge-pending.flag
