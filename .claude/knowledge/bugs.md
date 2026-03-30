@@ -40,10 +40,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: app.js + ui.js
 - Önem: orta
-- Durum: yeni
-- Açıklama: selDis app.js:647'de 2 parametreli, ui.js:2605'te 1 parametreli tanımlı. ui.js versiyonu tani-btn butonlarını reset etmiyor. Aktif seçim görseli yanlış kalabilir.
+- Durum: **çözüldü** ✅
+- Açıklama: selDis app.js:647'de 2 parametreli, ui.js:2684'te tanımlıydı. ui.js versiyonu silindi, app.js versiyonuna form.reset() eklendi. Duplikat temizlendi.
 - Tetikleyici: Tanı seçimi yapıldığında
-- İlgili commit: bilinmiyor
+- İlgili commit: feature/gwen-bug003-fix
 
 ## [2026-03-27] BUG-004 Direkt REST bypass — drug_products insert (forms.js:765)
 - Kaynak: erp-explorer (sistem denetimi)

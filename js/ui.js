@@ -2681,14 +2681,7 @@ async function acDisease(){
   </div>`).join('');
   ac.style.display='block';
 }
-function selDis(val, btn){
-  document.getElementById('d-tani').value=val;
-  document.getElementById('ac-dis').style.display='none';
-  document.querySelectorAll('.tani-btn').forEach(b => {
-    b.style.background = 'var(--card)'; b.style.borderColor = 'var(--card3)'; b.style.color = 'var(--ink2)';
-  });
-  if (btn) { btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff'; }
-}
+// selDis fonksiyonu ui.js'de tanımlı değil — app.js'den çağrılıyor (BUG-003 fix)
 document.addEventListener('click',e=>{
   const ac=document.getElementById('ac-dis');
   if(ac&&!e.target.closest('#d-tani')&&!e.target.closest('#ac-dis')) ac.style.display='none';
