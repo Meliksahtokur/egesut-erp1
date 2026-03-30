@@ -696,6 +696,9 @@ window.addEventListener('load', async () => {
   }
   updateSyncBar();
 
+  // Background sync başlat (organik realtime geçişi — 30sn interval)
+  startBackgroundSync(30000);
+
   if (navigator.onLine) {
     try {
       await pullFromSupabase();
@@ -723,6 +726,8 @@ window.addEventListener('load', async () => {
 window.addEventListener('online', async () => {
   g('dot')?.classList.remove('off', 'warn');
   toast('🌐 Bağlantı geldi');
+  // Background sync yeniden başlat
+  startBackgroundSync(30000);
   await syncNow();
   await pullFromSupabase();
   renderFromLocal();
@@ -731,6 +736,8 @@ window.addEventListener('online', async () => {
 window.addEventListener('offline', () => {
   g('dot')?.classList.add('off');
   toast('📵 Çevrimdışı — kayıtlar cihazda saklanacak');
+  // Background sync durdur (internet yokken gereksiz)
+  stopBackgroundSync();
 });
 
 // Service Worker — tüm kayıtları temizle
