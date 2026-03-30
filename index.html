@@ -242,7 +242,6 @@ button,input,select,textarea{font-family:inherit}
 #toast.err{background:var(--red)}
 #toast.sync{background:var(--blue)}
 .divider{height:1px;background:var(--card2);margin:12px 0}
-.btn-gebe-ata{padding:3px 6px !important;font-size:.65rem !important;line-height:1.2;border-radius:6px}
 </style>
 </head>
 <body>
@@ -477,6 +476,7 @@ button,input,select,textarea{font-family:inherit}
           oninput="acHayvan('k-hid','ac-khid')" onfocus="acHayvan('k-hid','ac-khid')" onkeydown="acNav(event,'ac-khid')"
           onclick="acHayvan('k-hid','ac-khid'); this.focus()">
         <div id="ac-khid" class="ac-box" style="display:none"></div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
       <div class="fg"><label class="flbl">Tarih *</label><input id="k-tarih" class="fi" type="date"></div>
       <div class="fg"><label class="flbl">Kızgınlık Belirtisi</label>
@@ -505,7 +505,7 @@ button,input,select,textarea{font-family:inherit}
           oninput="acHayvan('i-hid','ac-ihid')" onfocus="acHayvan('i-hid','ac-ihid')" onkeydown="acNav(event,'ac-ihid')"
           onclick="acHayvan('i-hid','ac-ihid'); this.focus()">
         <div id="ac-ihid" class="ac-box" style="display:none"></div>
-        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — tohumlanabilir hayvanlar listelenir</div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
       <div class="fg"><label class="flbl">Tohumlama Tarihi *</label><input id="i-tarih" class="fi" type="date"></div>
       <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
@@ -544,7 +544,7 @@ button,input,select,textarea{font-family:inherit}
           oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')"
           onclick="acHayvan('d-hid','ac-dhid'); this.focus()">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
-        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — tohumlanabilir, boş veya kızgın hayvanlar listelenir</div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
       </div>
 
       <!-- TANI — DB'den controlled dropdown -->
