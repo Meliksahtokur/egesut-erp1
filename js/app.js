@@ -647,10 +647,14 @@ async function acDisease() {
 function selDis(val, btn) {
   g('d-tani').value = val;
   g('ac-dis').style.display = 'none';
+  // Tanı butonlarını resetle
   document.querySelectorAll('.tani-btn').forEach(b => {
     b.style.background = 'var(--card)'; b.style.borderColor = 'var(--card3)'; b.style.color = 'var(--ink2)';
   });
   if (btn) { btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff'; }
+  // Form alanlarını temizle (BUG-003 fix)
+  const form = g('ac-dis')?.closest('form') || document.querySelector('.vaka-form');
+  if (form) form.reset();
 }
 
 document.addEventListener('click', e => {
