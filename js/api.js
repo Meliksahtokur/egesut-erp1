@@ -325,9 +325,37 @@ async function syncNow() {
 }
 
 // ── AUTO SYNC ───────────────────────────────
-// Her 5sn offline queue'yu otomatik gönderir
-setInterval(syncNow, 5000);
+// Online event'te syncNow tetiklenir (polling kaldırıldı — organik realtime geçişi)
 window.addEventListener('online', syncNow);
+
+// ── REALTIME SUBSCRIPTIONS (Organik geçiş — yeni özellikler kullanır) ─────
+// Sprint 5 — Realtime kanalları:
+// - hayvanlar: INSERT/UPDATE/DELETE → renderFromLocal()
+// - gorev_log: INSERT → task badge güncelle
+// - stok_hareket: INSERT → stok hesapla
+//
+// Geçici çözüm: Her 30sn'de bir arka plan sync (polling'den 6x daha yavaş)
+// Hedef: Supabase Realtime WebSocket kanalları (sonraki sprint)
+let _backgroundSyncInterval = null;
+
+function startBackgroundSync(intervalMs = 30000) {
+  if (_backgroundSyncInterval) clearInterval(_backgroundSyncInterval);
+  _backgroundSyncInterval = setInterval(() => {
+    if (navigator.onLine && !_syncing) {
+      syncNow().catch(console.warn);
+    }
+  }, intervalMs);
+  console.log(`🔄 Background sync başladı (her ${intervalMs/1000}sn)`);
+}
+
+function stopBackgroundSync() {
+  if (_backgroundSyncInterval) {
+    clearInterval(_backgroundSyncInterval);
+    _backgroundSyncInterval = null;
+    console.log('⏹️ Background sync durduruldu');
+  }
+}
+
 async function getData(table, filterFn) {
   const data = await idbGetAll(table);
   return filterFn ? data.filter(filterFn) : data;
