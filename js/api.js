@@ -9,7 +9,7 @@ const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsIn
 const DB_VER  = 13;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu',
-                  'cases','diseases','drugs','drug_classes','drug_products'];
+                  'cases','diseases','drugs','drug_classes','drug_products','drug_administrations'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
@@ -208,8 +208,8 @@ const RPC_TABLES = {
   geri_al:                   ['hayvanlar','tohumlama','dogum','gorev_log','islem_log'],
   create_case:               ['cases'],
   add_treatment_day:         ['cases'],
-  add_drug_administration:   ['stok','stok_hareket'],
-  remove_drug_administration:['stok','stok_hareket'],
+  add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
+  remove_drug_administration:['stok','stok_hareket','drug_administrations'],
   close_case:                ['cases'],
   update_treatment_time:     [],
 };
@@ -243,6 +243,7 @@ async function pullTables(tables = []) {
       drugs:        () => db.from('drugs').select('*').order('name'),
       drug_classes: () => db.from('drug_classes').select('*').order('group_name'),
       drug_products:() => db.from('drug_products').select('*').order('brand_name'),
+      drug_administrations: () => db.from('drug_administrations').select('*'),
       tohumlama:    () => db.from('tohumlama').select('*'),
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),

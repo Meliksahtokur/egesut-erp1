@@ -894,7 +894,7 @@ async function _uremeGebelik(el){
             <div class="hist-title" style="color:var(--amber)">${kupe}</div>
             <div class="hist-sub">${t.sperma||'?'} · ${fmtTarih(t.tarih)} · ${gun} gün</div>
           </div>
-          <button class="btn" style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:6px 10px;font-size:.75rem"
+          <button class="btn btn-gebe-ata" style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:3px 6px !important;font-size:.65rem !important;min-width:auto;line-height:1.2;border-radius:6px"
             onclick="gebeAta('${t.id}','${kupe}')">Gebe Ata</button>
         </div>`;
       }).join('')+
@@ -1306,6 +1306,45 @@ async function loadStokPanel(){
   });
   el.innerHTML=html||'<div class="empty">Kayıt yok</div>';
 }
+
+async function tumStokHareketleriniGoster(){
+  const el=document.getElementById('stok-hareketler-body');
+  if(!el) return;
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  openM('m-stok-hareketler');
+  try {
+    const moves=await getData('stok_hareket',m=>!m.iptal);
+    const stok=getState('stock')||[];
+    moves.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+    if(!moves.length){
+      el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Henüz stok hareketi yok</div>';
+      return;
+    }
+    let html='';
+    moves.forEach(m=>{
+      const urun=stok.find(s=>s.id===m.stok_id);
+      const urunAd=urun?.urun_adi||'Silinmiş Ürün';
+      const turRenk=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'?'var(--green)':'var(--red)';
+      const turIsaret=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'?'+':'−';
+      const tarihFmt=fmtTarih(m.tarih);
+      html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-weight:700;font-size:.85rem;color:var(--ink)">${urunAd}</div>
+          <div style="font-size:.85rem;font-weight:800;color:${turRenk}">${turIsaret}${(m.miktar||0).toFixed(urun?.birim==='adet'?0:1)} ${urun?.birim||''}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.68rem;color:var(--ink3)">
+          <div>📅 ${tarihFmt}</div>
+          <div>📝 ${m.tur||'—'}</div>
+        </div>
+        ${m.notlar?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${m.notlar}</div>`:''}
+      </div>`;
+    });
+    el.innerHTML=html;
+  } catch(e){
+    el.innerHTML=`<div class="empty">⚠️ ${e.message}<br><button class="btn btn-g" style="margin-top:12px" onclick="tumStokHareketleriniGoster()">Tekrar Dene</button></div>`;
+  }
+}
+
 async function loadStokPanel_DEPRECATED(){
   const el=document.getElementById('stok-panel-body-OLD'); if(!el) return;
   const GRUPLAR=[
@@ -2042,23 +2081,54 @@ async function caseDrugKaydet(btn) {
   if (!secililar.length) { toast('Ilac secin', true); return; }
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
   try {
+    const isOnline = navigator.onLine;
     for (const item of secililar) {
       const d = (_drugsCache||[]).find(x => x.id === item.id);
-      await rpc('add_drug_administration', {
-        p_day_id:          _activeDayId,
-        p_drug_product_id: d?._legacy ? null : item.id,
-        p_stok_id:         d?.stock_id || null,
-        p_dose:            item.dose,
-        p_unit:            item.unit,
-        p_route:           (item.route||'').split(' ')[0] || null,
-      });
+      if (isOnline) {
+        // Online: RPC kullan
+        await rpc('add_drug_administration', {
+          p_day_id:          _activeDayId,
+          p_drug_product_id: d?._legacy ? null : item.id,
+          p_stok_id:         d?.stock_id || null,
+          p_dose:            item.dose,
+          p_unit:            item.unit,
+          p_route:           (item.route||'').split(' ')[0] || null,
+        });
+      } else {
+        // Offline: write() kullan + queue'ya ekle
+        const adminId = crypto.randomUUID();
+        const stokId = d?.stock_id || null;
+        // drug_administrations tablosuna ekle (offline)
+        await write('drug_administrations', {
+          id: adminId,
+          day_id: _activeDayId,
+          drug_product_id: d?._legacy ? null : item.id,
+          stok_id: stokId,
+          dose: item.dose,
+          unit: item.unit,
+          route: (item.route||'').split(' ')[0] || null,
+        });
+        // Stok hareketi de ekle (offline)
+        if (stokId) {
+          await write('stok_hareket', {
+            id: crypto.randomUUID(),
+            stok_id: stokId,
+            tur: 'Ilac',
+            miktar: item.dose,
+            notlar: 'DrugAdmin:' + adminId,
+            iptal: false,
+          });
+        }
+      }
     }
     toast('✅ ' + secililar.length + ' ilac eklendi');
     btn.closest('.cd-drug-form').remove();
+    // Cache'i temizle ve yeniden yükle
     _drugsCache = [];
-    await pullTables(['stok','stok_hareket','drug_products']);
     await loadDrugsCache();
+    // Timeline'i yeniden render et
     await renderCaseTimeline(_curCase.id);
+    // Stok panelini güncelle
     const _sp = document.getElementById('stok-panel');
     if (_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
   } catch(e) { toast(e.message, true); }
@@ -2496,7 +2566,8 @@ function _eligibleHayvanlar(){
   });
 }
 function acHayvan(inputId,listId){
-  const q=(document.getElementById(inputId)?.value||'').toLowerCase().trim();
+  const inp=document.getElementById(inputId);
+  const q=(inp?.value||'').toLowerCase().trim();
   const ac=document.getElementById(listId); if(!ac) return;
   const src=listId==='ac-ihid'?(globalThis._TH||[]):listId==='ac-khid'?_eligibleHayvanlar():(getState('animals').length?getState('animals'):[]);
   if(listId==='ac-ihid'&&!globalThis._TH){
@@ -2517,6 +2588,8 @@ function acHayvan(inputId,listId){
     </div>`;
   }).join('');
   ac.style.display='block';
+  // Ensure focus stays on input after first click
+  if(inp && document.activeElement!==inp){ inp.focus(); }
 }
 function selHayvan(inputId,listId,val){
   const el=document.getElementById(inputId); if(el) el.value=val;
