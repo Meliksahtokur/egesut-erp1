@@ -2555,20 +2555,10 @@ document.addEventListener('click',e=>{
 // ──────────────────────────────────────────
 // HAYVAN KÜPE AUTOCOMPLETE
 // ──────────────────────────────────────────
-function _tohumlanabilirHayvanlar(){
-  const gebeSet=new Set(_gebeIds||[]);
-  const minMs=330*86400000; // 330 gün (~11 ay)
-  return getState('animals').filter(a=>{
-    if(a.cinsiyet==='Erkek') return false;
-    if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
-    if(!a.dogum_tarihi) return false;
-    return (Date.now()-new Date(a.dogum_tarihi).getTime())>=minMs;
-  });
-}
 
 function _eligibleHayvanlar(){
   const gebeSet=new Set(_gebeIds||[]);
-  const minMs=330*86400000; // 330 gün (~11 ay)
+  const minMs=330*86400000; // 330 gün (~11 ay) — Dişi dana tohumlama yaşı
   return getState('animals').filter(a=>{
     if(a.cinsiyet==='Erkek') return false;
     if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
@@ -2586,7 +2576,16 @@ function acHayvan(inputId,listId){
   const q=(inp?.value||'').toLowerCase().trim();
   const ac=document.getElementById(listId); if(!ac) return;
   // DB view öncelikli, yoksa UI fallback (hybrid approach)
-  const src=listId==='ac-ihid'?(globalThis._TH?.length>0?globalThis._TH:_tohumlanabilirHayvanlar()):listId==='ac-khid'?_eligibleHayvanlar():listId==='ac-dhid'?_activeAnimalsOnly():(getState('animals').length?getState('animals'):[]);
+  let src;
+  if (listId === 'ac-ihid') {
+    src = globalThis._TH?.length > 0 ? globalThis._TH : _eligibleHayvanlar();
+  } else if (listId === 'ac-khid') {
+    src = _eligibleHayvanlar();
+  } else if (listId === 'ac-dhid') {
+    src = _activeAnimalsOnly();
+  } else {
+    src = getState('animals').length ? getState('animals') : [];
+  }
   if(listId==='ac-ihid'&&!globalThis._TH){
     const ac=document.getElementById(listId); if(ac){ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--ink3)">⏳ Yükleniyor…</div>';ac.style.display='block';} return;
   }
