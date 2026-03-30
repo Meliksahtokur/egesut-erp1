@@ -894,7 +894,7 @@ async function _uremeGebelik(el){
             <div class="hist-title" style="color:var(--amber)">${kupe}</div>
             <div class="hist-sub">${t.sperma||'?'} · ${fmtTarih(t.tarih)} · ${gun} gün</div>
           </div>
-          <button class="btn btn-gebe-ata" style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:3px 6px !important;font-size:.65rem !important;min-width:auto;line-height:1.2;border-radius:6px"
+          <button style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:2px 5px;font-size:.62rem;min-width:auto;line-height:1.1;border-radius:4px;border:none;cursor:pointer;font-weight:700"
             onclick="gebeAta('${t.id}','${kupe}')">Gebe Ata</button>
         </div>`;
       }).join('')+
@@ -2557,7 +2557,7 @@ document.addEventListener('click',e=>{
 // ──────────────────────────────────────────
 function _eligibleHayvanlar(){
   const gebeSet=new Set(_gebeIds||[]);
-  const minMs=365*86400000;
+  const minMs=330*86400000; // 330 gün (~11 ay)
   return getState('animals').filter(a=>{
     if(a.cinsiyet==='Erkek') return false;
     if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
@@ -2565,11 +2565,15 @@ function _eligibleHayvanlar(){
     return (Date.now()-new Date(a.dogum_tarihi).getTime())>=minMs;
   });
 }
+
+function _activeAnimalsOnly(){
+  return getState('animals').filter(a=>a.durum==='Aktif');
+}
 function acHayvan(inputId,listId){
   const inp=document.getElementById(inputId);
   const q=(inp?.value||'').toLowerCase().trim();
   const ac=document.getElementById(listId); if(!ac) return;
-  const src=listId==='ac-ihid'?(globalThis._TH||[]):listId==='ac-khid'?_eligibleHayvanlar():(getState('animals').length?getState('animals'):[]);
+  const src=listId==='ac-ihid'?(globalThis._TH||[]):listId==='ac-khid'?_eligibleHayvanlar():listId==='ac-dhid'?_activeAnimalsOnly():(getState('animals').length?getState('animals'):[]);
   if(listId==='ac-ihid'&&!globalThis._TH){
     const ac=document.getElementById(listId); if(ac){ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--ink3)">⏳ Yükleniyor…</div>';ac.style.display='block';} return;
   }
