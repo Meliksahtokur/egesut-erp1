@@ -3,12 +3,17 @@ name: Deploy to Supabase
 on:
   push:
     branches: [main, feature/*]
+    paths:
+      - 'supabase/migrations/**/*.sql'
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Tüm migration'ları görmek için
 
       - uses: supabase/setup-cli@v1
         with:
