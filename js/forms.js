@@ -115,6 +115,18 @@ async function submitBirth(btn) {
   const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
 
+  // ✅ EVENT LOG: Form submit
+  window.eventLog?.log('form_submit', {
+    form: 'dogum',
+    anne_id: anneId,
+    tarih,
+    kupe,
+    cins,
+    tip,
+    kg,
+    baba
+  });
+
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     const data = await rpc('dogum_kaydet', {
@@ -126,6 +138,15 @@ async function submitBirth(btn) {
       p_kg:       kg,
       p_baba:     baba,
       p_hekim_id: v('b-hekim') || null,
+    });
+
+    // ✅ EVENT LOG: RPC success
+    window.eventLog?.log('rpc_success', {
+      rpc: 'dogum_kaydet',
+      result: 'created',
+      anne_id: anne.id,
+      buzağı_kupe: kupe,
+      gorev_sayisi: data?.gorev_sayisi || 0
     });
 
     toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${data.gorev_sayisi} görev oluşturuldu`);
@@ -141,8 +162,17 @@ async function submitBirth(btn) {
     const babaText = g('b-baba-text'); if (babaText) babaText.style.display = 'none';
 
     pullTables(['hayvanlar','dogum','gorev_log']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast('❌ Doğum kaydedilemedi: ' + e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
+  } catch (e) {
+    // ✅ EVENT LOG: RPC error
+    window.eventLog?.log('rpc_error', {
+      rpc: 'dogum_kaydet',
+      error: e.message,
+      anne_id: anne?.id,
+      details: { kupe, tarih }
+    });
+
+    toast('❌ Doğum kaydedilemedi: ' + e.message, true);
+  } finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
 }
 
 // ── TOHUMLAMA ────────────────────────────────
@@ -157,13 +187,29 @@ async function submitInsem(btn) {
   const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
+  // ✅ EVENT LOG: Form submit
+  window.eventLog?.log('form_submit', {
+    form: 'tohumlama',
+    hayvan_id: hid,
+    tarih,
+    sperma,
+    hekim_id: v('i-hekim') || null
+  });
+
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    await rpc('tohumlama_kaydet', {
+    const result = await rpc('tohumlama_kaydet', {
       p_hayvan_id: hayvan.id,
       p_tarih:     tarih,
       p_sperma:    sperma,
       p_hekim_id:  v('i-hekim') || null,
+    });
+
+    // ✅ EVENT LOG: RPC success
+    window.eventLog?.log('rpc_success', {
+      rpc: 'tohumlama_kaydet',
+      result: 'created',
+      hayvan_id: hayvan.id
     });
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
@@ -172,8 +218,17 @@ async function submitInsem(btn) {
     checkSpermaUyari();
     // RPC otomatik invalidation yapıyor, ek çağrı gerekmiyor
     pullTables(['tohumlama','gorev_log','hayvanlar']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast('❌ Tohumlama kaydedilemedi: ' + e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
+  } catch (e) {
+    // ✅ EVENT LOG: RPC error
+    window.eventLog?.log('rpc_error', {
+      rpc: 'tohumlama_kaydet',
+      error: e.message,
+      hayvan_id: hayvan?.id,
+      details: { hid, tarih, sperma }
+    });
+
+    toast('❌ Tohumlama kaydedilemedi: ' + e.message, true);
+  } finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
 }
 
 // ── KIZGINLIK ────────────────────────────────
@@ -290,12 +345,14 @@ async function abortKaydet(hayvanId, tohId) {
   if (!confirm('Bu hayvanda abort / erken doğum mu oldu? Gebelik kaydı kapatılacak.')) return;
   const notlar = prompt('Abort detayı (opsiyonel):') || '';
   try {
-    await rpc('abort_kaydet', {
+    // Yeni tohumlama_abort RPC kullan (islem_log kaydı oluşturur)
+    const result = await rpc('tohumlama_abort', {
       p_tohumlama_id: tohId,
       p_notlar:       notlar || null,
     });
+    if (result?.ok === false) { toast('❌ ' + (result.error || result.mesaj), true); return; }
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
-    pullTables(['tohumlama','gorev_log','hayvanlar']).then(renderSafe).catch(console.warn);
+    pullTables(['tohumlama','hayvanlar','islem_log']).then(renderSafe).catch(console.warn);
     openDet(hayvanId);
   } catch (e) { toast('❌ Abort kaydedilemedi: ' + e.message, true); }
 }
@@ -632,18 +689,41 @@ async function hstSilOnay() {
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
 // openTohDet → ui.js'de tanımlı
-async function tohSonuc(sonuc) {
+async function tohSonuc(sonuc, btn) {
   if (!_curToh) return;
   if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {
     toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın', true); return;
   }
-  if (sonuc === 'Boş' && !confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
-  await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
-  const msg = sonuc === 'Gebe' ? '✅ Gebe olarak işaretlendi' : sonuc === 'Boş' ? 'Boş olarak işaretlendi' : 'Güncellendi';
-  toast(msg);
-  closeM('m-toh-det');
-  // Trigger hayvanlar.grup'u güncelledi — IDB'yi tazele
-  pullTables(['hayvanlar', 'tohumlama']).then(renderSafe).catch(console.warn);
+  
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  
+  try {
+    let result;
+    if (sonuc === 'Gebe') {
+      // tohumlama_sonuc_gebe RPC kullan
+      result = await rpc('tohumlama_sonuc_gebe', { p_tohumlama_id: _curToh.id });
+      if (result?.ok === false) { toast('❌ ' + (result.error || result.mesaj), true); return; }
+      toast('✅ Gebe olarak işaretlendi');
+    } else if (sonuc === 'Boş') {
+      if (!confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
+      // tohumlama_sonuc_bos RPC kullan
+      result = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: _curToh.id });
+      if (result?.ok === false) { toast('❌ ' + (result.error || result.mesaj), true); return; }
+      toast('✅ Boş olarak işaretlendi');
+    } else {
+      // Diğer durumlar için direkt write (backward compat)
+      await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
+      toast('✅ Güncellendi');
+    }
+    
+    closeM('m-toh-det');
+    // RPC otomatik invalidation yapıyor, ek çağrı gerekmiyor
+    pullTables(['hayvanlar', 'tohumlama', 'islem_log']).then(renderSafe).catch(console.warn);
+  } catch (e) {
+    toast('❌ ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; }
+  }
 }
 
 // ── GEBELİK İŞARETLE ────────────────────────
