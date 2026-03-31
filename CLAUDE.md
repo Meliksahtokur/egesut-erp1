@@ -15,7 +15,25 @@ erp-qa-git      (Haiku)  → syntax kontrolü + commit/push
 erp-explorer    (Haiku)  → okuma/keşif (gerektiğinde geçici alt-ajan)
 ```
 
-**Delegasyon:**
+## ⚠️ KRİTİK: İki Paralel Sistem
+
+Bu projede **İKİ FARKLI orkestratör sistemi** çalışıyor:
+
+| Sistem | Branch | Orkestratör | Agent'lar |
+|--------|--------|-------------|-----------|
+| **Claude Code** | `main` (üretim) | Sen (bu dosya) | 15 haiku/sonnet agent (`.claude/agents/`) |
+| **Qwen Code** | `feature/gwen-*` | Qwen Code (`.qwen/QWEN.md`) | 4 native + 3 custom skills |
+
+**Detaylı hiyerarşi:** `.claude/AGENT_HIERARCHY.md` (bu dosya) · `.qwen/AGENT_HIERARCHY.md` (Qwen için)
+
+### Yasaklar
+- Qwen/Gwen agent'larını spawn etme (onlar `.qwen/` kullanır)
+- `main` branch'e direkt push yapma (GitHub MCP koruma)
+- `.qwen/` dizinine müdahale etme (Qwen Code'un alanı)
+
+---
+
+**Delegation Threshold — ne zaman agent spawn et:**
 
 | Durum | Karar |
 |---|---|

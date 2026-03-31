@@ -1,13 +1,14 @@
 # EgeSüt ERP — SonarCloud Remediation Plan
 > Kaynak: sonarcloud_issues-2026-03-22_10-48-52.csv | Toplam: 517 issue
 > Bu dosya her sprint tamamlandıkça güncellenir. Biten adımlar ✅ ile işaretlenir.
+> **Son güncelleme:** 2026-03-30 — S1-S5 tamamlandı, WONTFIX kaldı.
 ---
 
 ## ÖZET TABLO
 
 | Sprint | Kapsam | Issue Sayısı | Tahmini Süre | Durum |
 |--------|--------|-------------|--------------|-------|
-| WONTFIX | Dokümantasyon (SonarCloud UI'da işaretlenecek) | ~188 | — | ⏳ Manuel işaretleme bekliyor |
+| WONTFIX | Dokümantasyon (SonarCloud UI'da işaretlenecek) | ~188 | 30-45 dk | ⏳ Manuel işaretleme bekliyor |
 | S1 | Gerçek Bug'lar | ~10 | 25 dk | ✅ Tamamlandı (f8874a0) |
 | S2 | BLOCKER Globals | 28 | 20 dk | ✅ Tamamlandı (14cda49) |
 | S3 | Mantık Tutarsızlıkları | ~35 | 40 dk | ✅ Tamamlandı (b572e26) |

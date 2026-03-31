@@ -1,0 +1,31 @@
+name: Test — Migration Ready
+
+on:
+  push:
+    branches:
+      - feature/gwen-arge
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check Migration File
+        run: |
+          echo "📋 Migration dosyası kontrol ediliyor..."
+          ls -la supabase/migrations/
+          cat supabase/migrations/20260331000001_agent_db_telemetry.sql
+          echo "✅ Migration ready!"
+      
+      - name: Migration Status
+        run: |
+          echo "📊 CDC Migration Status"
+          echo "- Migration file: ✅ EXISTS"
+          echo "- Publication: gwen_db_watch"
+          echo "- Tables: islem_log, stok_hareket, gorev_log, hayvanlar"
+          echo ""
+          echo "⚠️ MANUEL EXECUTION REQUIRED:"
+          echo "1. Open Supabase Dashboard SQL Editor"
+          echo "2. Run migration SQL"
+          echo "3. Verify publication created"
