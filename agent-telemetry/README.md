@@ -4,21 +4,29 @@ Browser'daki kullanıcı işlemlerini real-time olarak AI Agent'a aktaran sistem
 
 ---
 
-## 🎯 Ne İşe Yarar?
+## 🎯 Özellikler
 
-Sen browser'da test yaparken, agent senin her işlemini görebilir:
+### ✅ Incremental Okuma
+- Agent her seferinde **SADECE YENİ event'leri** okur
+- Context dolmaz, full log okunmaz
+- State tracking (hangi satırda kaldık)
 
-- 🖱️ **Click** - Hangi butona/form'a tıklandın
-- 📝 **Submit** - Hangi form submit edildi
-- 🌐 **Fetch/XHR** - Hangi API çağrıları yapıldı
-- ❌ **Error** - Hangi hatalar oluştu
-- 📋 **Console** - Console log'ları
+### ✅ Real-Time Tracking
+- Click, submit, fetch, error otomatik track
+- WebSocket ile anlık iletim
+- Session-based grouping
+
+### ✅ Özet Çıktı
+- Son işlemler (max 5)
+- API çağrıları (max 3)
+- Hatalar (tümü)
+- Context-friendly format
 
 ---
 
 ## 🚀 Kullanım
 
-### 1. WebSocket Server'ı Başlat
+### 1. Server'ı Başlat
 
 ```bash
 cd /root/egesut-erp1/agent-telemetry
@@ -27,78 +35,72 @@ npm start
 
 **Output:**
 ```
-📡 Telemetry WebSocket Server started on ws://localhost:3002
+📡 Telemetry WebSocket Server started on ws://localhost:3003
+🌐 Browser UI: http://localhost:3003/test
+📄 Test UI: http://localhost:13003/test
 ```
 
-### 2. Agent Analyzer'ı Başlat (Opsiyonel)
+### 2. EgeSüt'ü Aç
 
 ```bash
-npm run agent
+cd /root/egesut-erp1
+python3 -m http.server 8080
 ```
 
-**Output:**
+**Browser:** http://localhost:8080
+
+### 3. Agent Event'leri Oku
+
+**Node.js ile:**
+```bash
+npm run read
 ```
-🤖 Agent Analyzer starting...
-✅ Connected to telemetry server
-🎧 Listening for browser events...
+
+**Programmatic:**
+```javascript
+import { readAgentEvents } from './agent-telemetry/agent-event-reader.js';
+
+const result = readAgentEvents();
+
+if (result.hasNew) {
+  console.log('Yeni aktivite:', result.summary);
+  console.log('Context:', result.context);
+  console.log('Event sayısı:', result.count);
+} else {
+  console.log('Yeni aktivite yok');
+}
 ```
-
-### 3. Browser'da Test Et
-
-`index.html`'i aç ve normal şekilde test yap.
-
-Tracker otomatik olarak:
-- Her tıklamayı
-- Her form submit'i
-- Her API çağrısını
-- Her hatayı
-
-loglar ve WebSocket server'a gönderir.
 
 ---
 
-## 📊 Event Örnekleri
+## 📊 Çıktı Örneği
 
-### Click Event
-```json
-{
-  "type": "click",
-  "payload": {
-    "tagName": "BUTTON",
-    "id": "tohumlamaKaydet",
-    "className": "btn btn-primary",
-    "text": "Kaydet...",
-    "selector": "#tohumlamaKaydet"
-  },
-  "timestamp": "2026-03-31T12:30:45.123Z"
-}
+### `npm run read` Output:
+
 ```
+=== AGENT EVENT READER ===
 
-### Submit Event
-```json
-{
-  "type": "submit",
-  "payload": {
-    "action": "javascript:void(0)",
-    "id": "tohumlamaForm",
-    "method": "POST"
-  },
-  "timestamp": "2026-03-31T12:30:46.456Z"
-}
-```
+Yeni event var mı: true
+Event sayısı: 10
 
-### Fetch Event
-```json
-{
-  "type": "fetch",
-  "payload": {
-    "url": "https://abc123.supabase.co/rest/v1/tohumlama",
-    "method": "POST",
-    "status": 201,
-    "duration": 145
-  },
-  "timestamp": "2026-03-31T12:30:46.789Z"
-}
+📊 ÖZET:
+Son işlem: click "Kaydet" • 3 API çağrı başarılı
+
+📝 CONTEXT:
+
+📋 Son İşlemler:
+  [08:13:07] CLICK 115
+  [08:13:09] CLICK svg
+  [08:13:10] CLICK İlaç, sperma, sarf malzeme
+  [08:13:11] CLICK 📋 Tüm Hareketler
+  [08:13:13] CLICK 📋 Tüm Stok Hareketleri
+
+🌐 API Çağrıları:
+  [08:13:02] POST rpc/rpc/add_drug_administration → 200 (360ms)
+  [08:13:02] GET rpc/drug_classes → 200 (231ms)
+  [08:13:03] GET rpc/treatment_timeline → 200 (196ms)
+
+========================
 ```
 
 ---
@@ -107,33 +109,88 @@ loglar ve WebSocket server'a gönderir.
 
 ```
 agent-telemetry/
-├── package.json          # Dependencies
-├── server.js             # WebSocket relay (port 3002)
-├── agent-analyzer.js     # AI listener (opsiyonel)
-├── tracker.js            # Browser inject script
-├── events.jsonl          # Event log (JSONL format)
-└── README.md             # Bu dosya
+├── package.json              # Dependencies + exports
+├── server.js                 # WebSocket relay (dinamik port)
+├── tracker.js                # Browser inject (auto-discover)
+├── agent-analyzer.js         # Real-time listener (opsiyonel)
+├── agent-event-reader.js     # ✅ Incremental okuma (YENİ!)
+├── events.jsonl              # Event log (JSONL)
+├── .agent-state.json         # State tracking (hangi satırda kaldık)
+├── .port                     # Aktif port
+└── README.md
 ```
 
 ---
 
-## 🔧 Ayarlar
+## 🔧 Agent Entegrasyonu
 
-### tracker.js İçinde
+### Gwen Agent için:
 
 ```javascript
-const WS_URL = 'ws://localhost:3002';  // WebSocket URL
-const THROTTLE_MS = 200;               // Event throttle (ms)
-const MAX_TEXT_LENGTH = 50;            // Text truncation
+// Agent task başında oku
+import { readAgentEvents } from '../agent-telemetry/agent-event-reader.js';
+
+const events = readAgentEvents();
+
+if (events.hasNew) {
+  // Kullanıcı test etmiş, sonuçları kullan
+  console.log('Kullanıcı şunları yaptı:', events.summary);
+  console.log('Detay:', events.context);
+  
+  // Test PASS mi?
+  const hasErrors = events.errors.length > 0;
+  if (hasErrors) {
+    // Hata düzelt
+  } else {
+    // Task tamamlandı
+  }
+}
+```
+
+---
+
+## 📊 Event Tipleri
+
+| Tip | Payload | Örnek |
+|-----|---------|-------|
+| `click` | tagName, id, className, text, selector | `BUTTON#tohumlamaKaydet` |
+| `submit` | action, id, method | `FORM#tohumlamaForm` |
+| `fetch` | url, method, status, duration | `POST /rpc/add_drug → 200 (360ms)` |
+| `xhr` | url, method, status, duration | `GET /hayvanlar → 200 (45ms)` |
+| `error` | message, source, lineno | `ReferenceError: x is not defined` |
+| `console_*` | args | `["Test log", "123"]` |
+
+---
+
+## ⚙️ Ayarlar
+
+### Tracker.js (Browser)
+
+```javascript
+// Otomatik port bulur (3002-3006 dener)
+const TELEMETRY_PORTS = [3002, 3003, 3004, 3005, 3006];
+
+// Throttle (ms)
+const THROTTLE_MS = 200;
+```
+
+### Agent Reader (Node.js)
+
+```javascript
+// Son N event oku
+const lines = readLastNLines(LOG_FILE, 200);
+
+// State dosyası
+.agent-state.json // lastLine, lastReadTime
 ```
 
 ---
 
 ## 🛡️ Güvenlik
 
-- Sadece localhost'ta çalışır
+- Sadece localhost
 - External bağlantı YOK
-- events.jsonl sadece local dosya
+- .gitignore: `.port`, `events.jsonl`, `.agent-state.json`
 - Production'da tracker.js'i kaldır
 
 ---
@@ -145,56 +202,62 @@ const MAX_TEXT_LENGTH = 50;            // Text truncation
 cd agent-telemetry
 npm start
 
-# Terminal 2: Analyzer (opsiyonel)
-npm run agent
+# Terminal 2: EgeSüt
+cd /root/egesut-erp1
+python3 -m http.server 8080
 
-# Browser: index.html'i aç
-# Test yap, console'da event loglarını gör
+# Terminal 3: Event oku
+cd agent-telemetry
+npm run read
 ```
 
 ---
 
-## 📝 Agent Nasıl Okur?
+## 📝 State Management
 
-Agent `events.jsonl` dosyasını okur:
+### `.agent-state.json`:
 
-```javascript
-// Her satır bir JSON event
-const events = readFileSync('events.jsonl', 'utf-8')
-  .trim()
-  .split('\n')
-  .map(line => JSON.parse(line));
-
-// Son 10 event
-const recent = events.slice(-10);
+```json
+{
+  "lastLine": 156,
+  "lastReadTime": "2026-03-31T08:13:00.000Z",
+  "lastSession": "session-1774944730815-p76nr"
+}
 ```
+
+**Ne Zaman Güncellenir:**
+- `readAgentEvents()` çağrıldığında
+- Son okunan timestamp kaydedilir
+- Sonraki okuma sadece daha yeni event'leri getirir
 
 ---
 
 ## ⚠️ Sorun Giderme
 
-### "WebSocket connected ama event gelmiyor"
+### "Yeni event yok" diyor ama browser'da test yaptım
 
-- Tracker.js inject edildi mi? (F12 → Network → WS kontrol et)
-- Port 3002 açık mı? (lsof -i :3002)
+- Tracker.js inject edildi mi? (F12 → Sources)
+- Console'da "✅ Telemetry connected" var mı?
+- Server çalışıyor mu? (`lsof -i :3003`)
 
-### "Events.jsonl boş"
+### "Context çok uzun"
 
-- Server.js çalışıyor mu?
-- Browser'da console'da "✅ Telemetry connected" var mı?
+- `readLastNLines(LOG_FILE, 200)` → `50`'ye düşür
+- `summarizeEvents()` max action/API sayısını azalt
 
-### "Çok fazla event, spam oluyor"
+### "Port çakışması"
 
-- THROTTLE_MS değerini artır (200 → 500)
-- Click event'lerini kapat (tracker.js'de yorum yap)
+- Server otomatik boş port bulur
+- `.port` dosyasını sil, restart et
 
 ---
 
 ## 🎯 Sonraki Adımlar
 
 1. ✅ Sistem hazır
-2. 🧪 Test et
-3. 📊 Agent okuma entegrasyonu yap
+2. ✅ Incremental okuma çalışıyor
+3. 📊 Agent entegrasyonu yap
+4. 🧪 Real test senaryoları
 
 ---
 
