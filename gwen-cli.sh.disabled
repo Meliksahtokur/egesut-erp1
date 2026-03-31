@@ -48,31 +48,18 @@ start_watchdog() {
     # Watchdog'u arka planda daemon olarak başlat
     nohup bash -c '
         while true; do
-            PID_FILE="/tmp/gwen-mcp.pid"
             LOG_FILE="/var/log/gwen-mcp.log"
 
-            # Health check yap (PID kontrolü)
-            pid=$(cat "$PID_FILE" 2>/dev/null)
-            healthy=false
-
-            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                healthy=true
-            fi
-
-            if [ "$healthy" = false ]; then
+            # Health check yap (node processini kontrol et, watchdog hariç)
+            local mcp_count=$(ps aux | grep "node.*gwen-mcp-server" | grep -v "grep" | grep -v "bash -c" | wc -l)
+            
+            if [ "$mcp_count" -eq 0 ]; then
                 echo "[$(date "+%Y-%m-%d %H:%M:%S")] ⚠️  MCP server down, restart ediliyor..." >> "$LOG_FILE"
 
-                # MCPyi kill et
-                if [ -n "$pid" ]; then
-                    kill "$pid" 2>/dev/null
-                fi
-
                 # Yeniden başlat
-                rm -f "$PID_FILE"
-                nohup node "$GWEN_MCP_SERVER" >> "$LOG_FILE" 2>&1 &
-                echo $! > "$PID_FILE"
+                cd /root/egesut-erp1 && node /root/egesut-erp1/gwen-mcp-server.js < /dev/null &
 
-                echo "[$(date "+%Y-%m-%d %H:%M:%S")] MCP server restart edildi (PID: $!)" >> "$LOG_FILE"
+                echo "[$(date "+%Y-%m-%d %H:%M:%S")] MCP server restart edildi" >> "$LOG_FILE"
             fi
 
             sleep 30
@@ -121,32 +108,37 @@ cleanup_proot() {
 # ============================================================================
 start_server() {
     log "MCP server başlatılıyor..."
-    
+
     echo -e "${BLUE}Gwen MCP sunucusu başlatılıyor...${NC}"
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-        echo -e "${YELLOW}⚠️  Gwen MCP zaten çalışıyor (PID: $(cat "$PID_FILE"))${NC}"
-        log "MCP server zaten çalışıyor (PID: $(cat "$PID_FILE"))"
+    
+    # Çalışan MCP server kontrolü (node processini ara, watchdog hariç)
+    local mcp_count=$(ps aux | grep "node.*gwen-mcp-server" | grep -v "grep" | grep -v "bash -c" | wc -l)
+    if [ "$mcp_count" -gt 0 ]; then
+        echo -e "${YELLOW}⚠️  Gwen MCP zaten çalışıyor${NC}"
+        log "MCP server zaten çalışıyor"
         return 0
     fi
+    
     if [ ! -f "$GWEN_MCP_SERVER" ]; then
         echo -e "${RED}❌ gwen-mcp-server.js bulunamadı!${NC}"
         log "HATA: gwen-mcp-server.js bulunamadı"
         return 1
     fi
-    rm -f "$PID_FILE"
-    nohup node "$GWEN_MCP_SERVER" > "$SCRIPT_DIR/gwen-mcp.log" 2>&1 &
-    echo $! > "$PID_FILE"
-    sleep 1
-    if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-        echo -e "${GREEN}✅ Gwen MCP sunucusu başlatıldı (PID: $(cat "$PID_FILE"))${NC}"
-        log "MCP server başlatıldı (PID: $(cat "$PID_FILE"))"
+    
+    # Arka planda başlat (nohup ile)
+    nohup node "$GWEN_MCP_SERVER" < /dev/null > /dev/null 2>&1 &
+    sleep 2
+    
+    mcp_count=$(ps aux | grep "node.*gwen-mcp-server" | grep -v "grep" | grep -v "bash -c" | wc -l)
+    if [ "$mcp_count" -gt 0 ]; then
+        echo -e "${GREEN}✅ Gwen MCP sunucusu başlatıldı${NC}"
+        log "MCP server başlatıldı"
         
         # Watchdog'u başlat
         start_watchdog
     else
         echo -e "${RED}❌ Sunucu başlatılamadı!${NC}"
         log "HATA: MCP server başlatılamadı"
-        rm -f "$PID_FILE"
         return 1
     fi
 }
@@ -156,21 +148,21 @@ start_server() {
 # ============================================================================
 stop_server() {
     log "MCP server durduruluyor..."
-    
+
     echo -e "${BLUE}Gwen MCP sunucusu durduruluyor...${NC}"
-    
+
     # Önce watchdog'u durdur
     stop_watchdog
-    
-    # Sonra MCP server'ı durdur
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-        kill "$(cat "$PID_FILE")"
-        rm -f "$PID_FILE"
+
+    # MCP server'ı durdur
+    local mcp_pid=$(ps aux | grep "node.*gwen-mcp-server" | grep -v "grep" | grep -v "bash -c" | awk '{print $2}')
+    if [ -n "$mcp_pid" ]; then
+        kill "$mcp_pid" 2>/dev/null
+        sleep 1
         echo -e "${GREEN}✅ Sunucu durduruldu${NC}"
         log "MCP server durduruldu"
     else
         echo -e "${YELLOW}○ Sunucu zaten duruyor${NC}"
-        rm -f "$PID_FILE"
         log "MCP server zaten duruyordu"
     fi
 }
@@ -181,40 +173,38 @@ stop_server() {
 check_status() {
     echo -e "${CYAN}🔹 Gwen MCP Server Durumu${NC}"
     echo "━━━━━━━━━━━━━━━━━━━━━━"
-    
-    local mcp_pid=$(cat "$PID_FILE" 2>/dev/null)
-    local watchdog_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null)
-    
+
     # MCP Server durumu
-    if [ -n "$mcp_pid" ] && kill -0 "$mcp_pid" 2>/dev/null; then
+    local mcp_pid=$(ps aux | grep "node.*gwen-mcp-server" | grep -v "grep" | grep -v "bash -c" | awk '{print $2}')
+    if [ -n "$mcp_pid" ]; then
         echo -e "Server:  ${GREEN}🟢 Çalışıyor${NC} (PID: $mcp_pid)"
     else
         echo -e "Server:  ${RED}🔴 Çalışmıyor${NC}"
-        rm -f "$PID_FILE"
     fi
-    
+
     # Watchdog durumu
+    local watchdog_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null)
     if [ -n "$watchdog_pid" ] && kill -0 "$watchdog_pid" 2>/dev/null; then
         echo -e "Watchdog: ${GREEN}🟢 Çalışıyor${NC} (PID: $watchdog_pid)"
     else
         echo -e "Watchdog: ${RED}🔴 Çalışmıyor${NC}"
         rm -f "$WATCHDOG_PID_FILE"
     fi
-    
+
     # Health check (eğer MCP çalışıyorsa)
-    if [ -n "$mcp_pid" ] && kill -0 "$mcp_pid" 2>/dev/null; then
+    if [ -n "$mcp_pid" ]; then
         if health_check; then
             echo -e "Health:  ${GREEN}✅ Sağlıklı${NC} (son kontrol: şimdi)"
         else
             echo -e "Health:  ${RED}❌ Down${NC}"
         fi
     fi
-    
+
     echo ""
     echo -e "${CYAN}🔹 Aktif PRoot Session'ları${NC}"
     echo "━━━━━━━━━━━━━━━━━━━━━━"
     echo -e "${BLUE}PID     Başlangıç   Komut${NC}"
-    
+
     local proot_procs=$(ps aux | grep "proot" | grep -v grep)
     if [ -n "$proot_procs" ]; then
         echo "$proot_procs" | awk '{printf "%-8s %-12s %s\n", $2, $9, $11}'
@@ -229,25 +219,18 @@ check_status() {
 do_health() {
     echo -e "${BLUE}Health check yapılıyor...${NC}"
 
-    local pid=$(cat "$PID_FILE" 2>/dev/null)
-
-    # PID kontrolü
-    if [ -z "$pid" ]; then
-        echo -e "${RED}🔴 Down${NC} (PID dosyası yok)"
-        log "Health check: Down (PID dosyası yok)"
-        return 1
-    fi
-
-    if ! kill -0 "$pid" 2>/dev/null; then
+    # Process kontrolü
+    local mcp_pid=$(ps aux | grep "node.*gwen-mcp-server" | grep -v "grep" | grep -v "bash -c" | awk '{print $2}')
+    
+    if [ -z "$mcp_pid" ]; then
         echo -e "${RED}🔴 Down${NC} (Process çalışmıyor)"
-        log "Health check: Down (Process çalışmıyor - PID: $pid)"
-        rm -f "$PID_FILE"
+        log "Health check: Down (Process çalışmıyor)"
         return 1
     fi
 
     # Process çalışıyor = healthy
-    echo -e "${GREEN}✅ Sağlıklı${NC} (PID: $pid)"
-    log "Health check: Sağlıklı (PID: $pid)"
+    echo -e "${GREEN}✅ Sağlıklı${NC} (PID: $mcp_pid)"
+    log "Health check: Sağlıklı (PID: $mcp_pid)"
     return 0
 }
 

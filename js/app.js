@@ -115,6 +115,13 @@ function openM(id) {
     filterHastalikList();
     loadDiseasesDropdown('');
   }
+  if (id === 'm-vaccine') {
+    loadVaccinesDropdown();
+    // Bugünün tarihini varsayılan yap
+    if(g('v-date')) g('v-date').value = new Date().toISOString().split('T')[0];
+    // Info alanı gizle
+    if(g('v-vaccine-info')) g('v-vaccine-info').style.display = 'none';
+  }
 }
 function closeM(id) {
   g(id)?.classList.remove('on');
