@@ -28,19 +28,15 @@ log() {
 # ============================================================================
 health_check() {
     local pid=$(cat "$PID_FILE" 2>/dev/null)
-    
-    # 1. PID kontrolü
+
+    # PID kontrolü - process çalışıyor mu?
     if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
         return 1
     fi
-    
-    # 2. JSON-RPC ping (stdio)
-    local response=$(echo '{"jsonrpc":"2.0","method":"ping","id":1}' | timeout 5 node "$GWEN_MCP_SERVER" 2>/dev/null)
-    if echo "$response" | grep -q '"result"\|"id":1'; then
-        return 0
-    fi
-    
-    return 1
+
+    # Process çalışıyor = healthy
+    # Not: stdio mode'da çalışan MCP server'a doğrudan ping atılamaz
+    return 0
 }
 
 # ============================================================================
@@ -48,45 +44,41 @@ health_check() {
 # ============================================================================
 start_watchdog() {
     log "Watchdog başlatılıyor..."
-    
+
     # Watchdog'u arka planda daemon olarak başlat
     nohup bash -c '
         while true; do
             PID_FILE="/tmp/gwen-mcp.pid"
-            GWEN_MCP_SERVER="/root/egesut-erp1/gwen-mcp-server.js"
             LOG_FILE="/var/log/gwen-mcp.log"
-            
-            # Health check yap
+
+            # Health check yap (PID kontrolü)
             pid=$(cat "$PID_FILE" 2>/dev/null)
             healthy=false
-            
+
             if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-                response=$(echo "{\"jsonrpc\":\"2.0\",\"method\":\"ping\",\"id\":1}" | timeout 5 node "$GWEN_MCP_SERVER" 2>/dev/null)
-                if echo "$response" | grep -q "\"result\"\|\"id\":1"; then
-                    healthy=true
-                fi
+                healthy=true
             fi
-            
+
             if [ "$healthy" = false ]; then
                 echo "[$(date "+%Y-%m-%d %H:%M:%S")] ⚠️  MCP server down, restart ediliyor..." >> "$LOG_FILE"
-                
+
                 # MCPyi kill et
                 if [ -n "$pid" ]; then
                     kill "$pid" 2>/dev/null
                 fi
-                
+
                 # Yeniden başlat
                 rm -f "$PID_FILE"
                 nohup node "$GWEN_MCP_SERVER" >> "$LOG_FILE" 2>&1 &
                 echo $! > "$PID_FILE"
-                
+
                 echo "[$(date "+%Y-%m-%d %H:%M:%S")] MCP server restart edildi (PID: $!)" >> "$LOG_FILE"
             fi
-            
+
             sleep 30
         done
     ' > /dev/null 2>&1 &
-    
+
     echo $! > "$WATCHDOG_PID_FILE"
     log "Watchdog başlatıldı (PID: $(cat "$WATCHDOG_PID_FILE"))"
 }
@@ -236,36 +228,27 @@ check_status() {
 # ============================================================================
 do_health() {
     echo -e "${BLUE}Health check yapılıyor...${NC}"
-    
+
     local pid=$(cat "$PID_FILE" 2>/dev/null)
-    
+
     # PID kontrolü
     if [ -z "$pid" ]; then
         echo -e "${RED}🔴 Down${NC} (PID dosyası yok)"
         log "Health check: Down (PID dosyası yok)"
         return 1
     fi
-    
+
     if ! kill -0 "$pid" 2>/dev/null; then
         echo -e "${RED}🔴 Down${NC} (Process çalışmıyor)"
         log "Health check: Down (Process çalışmıyor - PID: $pid)"
         rm -f "$PID_FILE"
         return 1
     fi
-    
-    # JSON-RPC ping
-    echo "  → JSON-RPC ping gönderiliyor..."
-    local response=$(echo '{"jsonrpc":"2.0","method":"ping","id":1}' | timeout 5 node "$GWEN_MCP_SERVER" 2>/dev/null)
-    
-    if echo "$response" | grep -q '"result"\|"id":1'; then
-        echo -e "${GREEN}✅ Sağlıklı${NC}"
-        log "Health check: Sağlıklı (PID: $pid)"
-        return 0
-    else
-        echo -e "${RED}🔴 Down${NC} (Ping yanıt alınamadı)"
-        log "Health check: Down (Ping yanıt alınamadı - PID: $pid)"
-        return 1
-    fi
+
+    # Process çalışıyor = healthy
+    echo -e "${GREEN}✅ Sağlıklı${NC} (PID: $pid)"
+    log "Health check: Sağlıklı (PID: $pid)"
+    return 0
 }
 
 # ============================================================================
