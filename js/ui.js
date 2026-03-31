@@ -660,13 +660,6 @@ function closeAnimalEdit(){
   closeM('m-animal');
 }
 
-function openNotModal(hayvanId,kupe){
-  document.getElementById('not-hid').value=hayvanId;
-  document.getElementById('not-title').textContent='📝 '+kupe+' — Not Ekle';
-  document.getElementById('not-input').value='';
-  openM('m-not');
-}
-
 // Çıkış modal
 function openCikisModal(hayvanId,kupe){
   document.getElementById('cx-hid').value=hayvanId;
@@ -901,7 +894,7 @@ async function _uremeGebelik(el){
             <div class="hist-title" style="color:var(--amber)">${kupe}</div>
             <div class="hist-sub">${t.sperma||'?'} · ${fmtTarih(t.tarih)} · ${gun} gün</div>
           </div>
-          <button class="btn" style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:6px 10px;font-size:.75rem"
+          <button style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:2px 5px;font-size:.62rem;min-width:auto;line-height:1.1;border-radius:4px;border:none;cursor:pointer;font-weight:700"
             onclick="gebeAta('${t.id}','${kupe}')">Gebe Ata</button>
         </div>`;
       }).join('')+
@@ -1154,11 +1147,9 @@ function openStk(id){
 async function stokDrugBagla(stokId, sel) {
   const drugId = sel.value || null;
   try {
+    // RPC: link_drug_to_stock artık drugs tablosunu düzgün güncelliyor
+    // Ek batch update'e gerek yok, çünkü RPC içinde tek bir UPDATE yapılıyor
     await rpc('link_drug_to_stock', { p_drug_id: drugId, p_stock_item_id: drugId ? stokId : null });
-    if (drugId) {
-      // diğer ilaçlardan bu stok bağlantısını kaldır
-      await db.from('drugs').update({ stock_item_id: null }).eq('stock_item_id', stokId).neq('id', drugId);
-    }
     toast('✅ Bağlantı kaydedildi');
     _drugsCache = [];
     await loadDrugsCache();
@@ -1315,6 +1306,45 @@ async function loadStokPanel(){
   });
   el.innerHTML=html||'<div class="empty">Kayıt yok</div>';
 }
+
+async function tumStokHareketleriniGoster(){
+  const el=document.getElementById('stok-hareketler-body');
+  if(!el) return;
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  openM('m-stok-hareketler');
+  try {
+    const moves=await getData('stok_hareket',m=>!m.iptal);
+    const stok=getState('stock')||[];
+    moves.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+    if(!moves.length){
+      el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Henüz stok hareketi yok</div>';
+      return;
+    }
+    let html='';
+    moves.forEach(m=>{
+      const urun=stok.find(s=>s.id===m.stok_id);
+      const urunAd=urun?.urun_adi||'Silinmiş Ürün';
+      const turRenk=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'?'var(--green)':'var(--red)';
+      const turIsaret=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'?'+':'−';
+      const tarihFmt=fmtTarih(m.tarih);
+      html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="font-weight:700;font-size:.85rem;color:var(--ink)">${urunAd}</div>
+          <div style="font-size:.85rem;font-weight:800;color:${turRenk}">${turIsaret}${(m.miktar||0).toFixed(urun?.birim==='adet'?0:1)} ${urun?.birim||''}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.68rem;color:var(--ink3)">
+          <div>📅 ${tarihFmt}</div>
+          <div>📝 ${m.tur||'—'}</div>
+        </div>
+        ${m.notlar?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${m.notlar}</div>`:''}
+      </div>`;
+    });
+    el.innerHTML=html;
+  } catch(e){
+    el.innerHTML=`<div class="empty">⚠️ ${e.message}<br><button class="btn btn-g" style="margin-top:12px" onclick="tumStokHareketleriniGoster()">Tekrar Dene</button></div>`;
+  }
+}
+
 async function loadStokPanel_DEPRECATED(){
   const el=document.getElementById('stok-panel-body-OLD'); if(!el) return;
   const GRUPLAR=[
@@ -2051,23 +2081,54 @@ async function caseDrugKaydet(btn) {
   if (!secililar.length) { toast('Ilac secin', true); return; }
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
   try {
+    const isOnline = navigator.onLine;
     for (const item of secililar) {
       const d = (_drugsCache||[]).find(x => x.id === item.id);
-      await rpc('add_drug_administration', {
-        p_day_id:          _activeDayId,
-        p_drug_product_id: d?._legacy ? null : item.id,
-        p_stok_id:         d?.stock_id || null,
-        p_dose:            item.dose,
-        p_unit:            item.unit,
-        p_route:           (item.route||'').split(' ')[0] || null,
-      });
+      if (isOnline) {
+        // Online: RPC kullan
+        await rpc('add_drug_administration', {
+          p_day_id:          _activeDayId,
+          p_drug_product_id: d?._legacy ? null : item.id,
+          p_stok_id:         d?.stock_id || null,
+          p_dose:            item.dose,
+          p_unit:            item.unit,
+          p_route:           (item.route||'').split(' ')[0] || null,
+        });
+      } else {
+        // Offline: write() kullan + queue'ya ekle
+        const adminId = crypto.randomUUID();
+        const stokId = d?.stock_id || null;
+        // drug_administrations tablosuna ekle (offline)
+        await write('drug_administrations', {
+          id: adminId,
+          day_id: _activeDayId,
+          drug_product_id: d?._legacy ? null : item.id,
+          stok_id: stokId,
+          dose: item.dose,
+          unit: item.unit,
+          route: (item.route||'').split(' ')[0] || null,
+        });
+        // Stok hareketi de ekle (offline)
+        if (stokId) {
+          await write('stok_hareket', {
+            id: crypto.randomUUID(),
+            stok_id: stokId,
+            tur: 'Ilac',
+            miktar: item.dose,
+            notlar: 'DrugAdmin:' + adminId,
+            iptal: false,
+          });
+        }
+      }
     }
     toast('✅ ' + secililar.length + ' ilac eklendi');
     btn.closest('.cd-drug-form').remove();
+    // Cache'i temizle ve yeniden yükle
     _drugsCache = [];
-    await pullTables(['stok','stok_hareket','drug_products']);
     await loadDrugsCache();
+    // Timeline'i yeniden render et
     await renderCaseTimeline(_curCase.id);
+    // Stok panelini güncelle
     const _sp = document.getElementById('stok-panel');
     if (_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
   } catch(e) { toast(e.message, true); }
@@ -2494,9 +2555,10 @@ document.addEventListener('click',e=>{
 // ──────────────────────────────────────────
 // HAYVAN KÜPE AUTOCOMPLETE
 // ──────────────────────────────────────────
+
 function _eligibleHayvanlar(){
   const gebeSet=new Set(_gebeIds||[]);
-  const minMs=365*86400000;
+  const minMs=330*86400000; // 330 gün (~11 ay) — Dişi dana tohumlama yaşı
   return getState('animals').filter(a=>{
     if(a.cinsiyet==='Erkek') return false;
     if(gebeSet.has(a.id)||a.durum==='Gebe') return false;
@@ -2504,10 +2566,26 @@ function _eligibleHayvanlar(){
     return (Date.now()-new Date(a.dogum_tarihi).getTime())>=minMs;
   });
 }
+
+function _activeAnimalsOnly(){
+  return getState('animals').filter(a=>a.durum==='Aktif');
+}
+
 function acHayvan(inputId,listId){
-  const q=(document.getElementById(inputId)?.value||'').toLowerCase().trim();
+  const inp=document.getElementById(inputId);
+  const q=(inp?.value||'').toLowerCase().trim();
   const ac=document.getElementById(listId); if(!ac) return;
-  const src=listId==='ac-ihid'?(globalThis._TH||[]):listId==='ac-khid'?_eligibleHayvanlar():(getState('animals').length?getState('animals'):[]);
+  // DB view öncelikli, yoksa UI fallback (hybrid approach)
+  let src;
+  if (listId === 'ac-ihid') {
+    src = globalThis._TH?.length > 0 ? globalThis._TH : _eligibleHayvanlar();
+  } else if (listId === 'ac-khid') {
+    src = _eligibleHayvanlar();
+  } else if (listId === 'ac-dhid') {
+    src = _activeAnimalsOnly();
+  } else {
+    src = getState('animals').length ? getState('animals') : [];
+  }
   if(listId==='ac-ihid'&&!globalThis._TH){
     const ac=document.getElementById(listId); if(ac){ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--ink3)">⏳ Yükleniyor…</div>';ac.style.display='block';} return;
   }
@@ -2526,6 +2604,8 @@ function acHayvan(inputId,listId){
     </div>`;
   }).join('');
   ac.style.display='block';
+  // Ensure focus stays on input after first click
+  if(inp && document.activeElement!==inp){ inp.focus(); }
 }
 function selHayvan(inputId,listId,val){
   const el=document.getElementById(inputId); if(el) el.value=val;
@@ -2595,15 +2675,19 @@ async function acDisease(){
   all.sort((a,b)=>(_disFreq[b]||0)-(_disFreq[a]||0));
   const filtered=q?all.filter(d=>d.toLowerCase().includes(q)):all.slice(0,12);
   if(!filtered.length){ ac.style.display='none'; return; }
-  ac.innerHTML=filtered.map(d=>`<div onclick="selDis('${d.replace(/'/g,"\\'")}');event.stopPropagation()"
+  ac.innerHTML=filtered.map(d=>`<div onclick="selDis('${d.replace(/'/g,"\\'")}',this);event.stopPropagation()"
     style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3)">
     ${d}${_disFreq[d]?` <span style="color:#aaa;font-size:.6rem">(${_disFreq[d]}x)</span>`:''}
   </div>`).join('');
   ac.style.display='block';
 }
-function selDis(val){
+function selDis(val, btn){
   document.getElementById('d-tani').value=val;
   document.getElementById('ac-dis').style.display='none';
+  document.querySelectorAll('.tani-btn').forEach(b => {
+    b.style.background = 'var(--card)'; b.style.borderColor = 'var(--card3)'; b.style.color = 'var(--ink2)';
+  });
+  if (btn) { btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff'; }
 }
 document.addEventListener('click',e=>{
   const ac=document.getElementById('ac-dis');
