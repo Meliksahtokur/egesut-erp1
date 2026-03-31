@@ -1,7 +1,8 @@
 /**
- * Agent Event Reader - Incremental Log Okuma
+ * Agent Event Reader - Incremental Log Okuma + DB Telemetry
  * 
  * Her seferinde SADECE YENİ event'leri okur
+ * Browser + DB event'lerini birleştirir
  * Context'i doldurmaz, özet çıkarır
  */
 
@@ -18,7 +19,7 @@ function loadState() {
   if (existsSync(STATE_FILE)) {
     return JSON.parse(readFileSync(STATE_FILE, 'utf-8'));
   }
-  return { lastLine: 0, lastSession: null, lastReadTime: null };
+  return { lastLine: 0, lastSession: null, lastReadTime: null, testStart: null, testEnd: null };
 }
 
 function saveState(state) {
@@ -219,8 +220,27 @@ function buildContext(actions, apiCalls, errors) {
 }
 
 // Ana fonksiyon: Agent bunu çağırır
-export function readAgentEvents() {
+export function readAgentEvents(options = {}) {
   const state = loadState();
+  
+  // Eğer test session varsa, o session'ı oku
+  if (options.testSession || state.testStart) {
+    const startTime = options.testSession?.startTime || state.testStart;
+    const endTime = options.testSession?.endTime || state.testEnd || new Date().toISOString();
+    
+    if (startTime) {
+      // DB telemetry çağrısı için state hazırla
+      return {
+        hasNew: true,
+        isDbTelemetry: true,
+        testSession: { startTime, endTime },
+        summary: `Test session: ${new Date(startTime).toLocaleTimeString('tr-TR')} - ${new Date(endTime).toLocaleTimeString('tr-TR')}`,
+        context: `📊 DB Telemetry için MCP çağır:\n  get_db_telemetry("${startTime}", "${endTime}")\n  verify_transaction_integrity("ISLEM_TIP", "ref_id")`,
+        raw: []
+      };
+    }
+  }
+  
   const newEvents = getNewEvents(state);
   
   if (!newEvents.length) {
@@ -238,6 +258,18 @@ export function readAgentEvents() {
   state.lastReadTime = new Date().toISOString();
   state.lastLine = newEvents.length;
   state.lastSession = newEvents[0]?.sessionId || null;
+  
+  // Test session bilgisi varsa kaydet
+  const testStartEvent = newEvents.find(e => e.type === 'test_start');
+  const testEndEvent = newEvents.find(e => e.type === 'test_end');
+  
+  if (testStartEvent) {
+    state.testStart = testStartEvent.payload.timestamp;
+  }
+  if (testEndEvent) {
+    state.testEnd = testEndEvent.payload.timestamp || new Date().toISOString();
+  }
+  
   saveState(state);
   
   return {

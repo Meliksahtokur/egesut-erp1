@@ -254,6 +254,226 @@ server.tool(
   }
 );
 
+/**
+ * DB Telemetry — Session bazlı değişiklikleri çek
+ */
+server.tool(
+  "get_db_telemetry",
+  "Test session'ındaki DB değişikliklerini çek (islem_log, stok_hareket, gorev_log, hayvanlar)",
+  {
+    startTime: z.string().describe("Başlangıç timestamp (ISO format)"),
+    endTime: z.string().optional().describe("Bitiş timestamp (ISO format, varsayılan: şimdi)"),
+    tables: z.array(z.string()).optional().describe("Tablolar (varsayılan: tüm kritik tablolar)")
+  },
+  async ({ startTime, endTime, tables }) => {
+    try {
+      const targetTables = tables || ['islem_log', 'stok_hareket', 'gorev_log', 'hayvanlar'];
+      const endTs = endTime || new Date().toISOString();
+      
+      const results = {};
+      const summary = {};
+      
+      // Her tablo için değişiklikleri çek
+      for (const table of targetTables) {
+        try {
+          let query = supabase
+            .from(table)
+            .select('*')
+            .gte('created_at', startTime)
+            .lte('created_at', endTs)
+            .order('created_at', { ascending: false })
+            .limit(100); // Max 100 kayıt/tablo
+          
+          const { data, error } = await query;
+          
+          if (error) {
+            results[table] = { error: error.message };
+            summary[table] = 0;
+          } else {
+            results[table] = data;
+            summary[table] = data?.length || 0;
+          }
+        } catch (err) {
+          results[table] = { error: err.message };
+          summary[table] = 0;
+        }
+      }
+      
+      // Özet + detay output
+      const output = {
+        session: {
+          startTime,
+          endTime: endTs,
+          duration: new Date(endTs) - new Date(startTime)
+        },
+        summary,
+        details: results
+      };
+      
+      return {
+        content: [{
+          type: "text",
+          text: `📊 DB Telemetry (Son Session)\n\n` +
+                `⏱️ Süre: ${output.session.duration}ms\n\n` +
+                `📋 Özet:\n` +
+                `  - islem_log: ${summary.islem_log || 0} kayıt\n` +
+                `  - stok_hareket: ${summary.stok_hareket || 0} değişiklik\n` +
+                `  - gorev_log: ${summary.gorev_log || 0} görev\n` +
+                `  - hayvanlar: ${summary.hayvanlar || 0} güncelleme\n\n` +
+                `🔍 Detaylar için 'details' alanına bak.\n\n` +
+                `💡 İpucu: "verify_transaction_integrity" ile bütünlük kontrolü yap.`
+        }]
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `❌ DB Telemetry hatası: ${err.message}` }]
+      };
+    }
+  }
+);
+
+/**
+ * Transaction Integrity Check — Bütünlük kontrolü
+ */
+server.tool(
+  "verify_transaction_integrity",
+  "Yapılan işlemin DB bütünlüğünü kontrol et (trigger'lar, görevler, stok)",
+  {
+    transactionType: z.string().describe("İşlem tipi: TOHUMLAMA, DOGUM_KAYDI, ILAC_EKLE, etc."),
+    refId: z.string().describe("Referans ID (örn: tohumlama_id, hayvan_id)"),
+    expectedActions: z.array(z.string()).optional().describe("Beklenen aksiyonlar (örn: ['stok_dus', 'gorev_olustur'])")
+  },
+  async ({ transactionType, refId, expectedActions }) => {
+    try {
+      const issues = [];
+      const checks = {};
+      
+      // 1. islem_log kontrolü
+      const { data: islemLog } = await supabase
+        .from('islem_log')
+        .select('*')
+        .eq('ref_id', refId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      checks.islem_log = {
+        found: islemLog?.length > 0,
+        count: islemLog?.length || 0,
+        logs: islemLog?.slice(0, 3) || []
+      };
+      
+      if (!checks.islem_log.found) {
+        issues.push({
+          type: 'MISSING_ISLEM_LOG',
+          severity: 'critical',
+          description: `İşlem log'u bulunamadı (ref_id: ${refId})`
+        });
+      }
+      
+      // 2. Stok kontrolü (eğer bekleniyorsa)
+      if (expectedActions?.includes('stok_dus')) {
+        const { data: stokHareket } = await supabase
+          .from('stok_hareket')
+          .select('*')
+          .eq('notlar', transactionType)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        
+        checks.stok_hareket = {
+          found: stokHareket?.length > 0,
+          count: stokHareket?.length || 0
+        };
+        
+        if (!checks.stok_hareket.found) {
+          issues.push({
+            type: 'STOK_LEDGER_BUG',
+            severity: 'critical',
+            description: 'Stok hareketi oluşmadı — Ledger hatası!'
+          });
+        }
+      }
+      
+      // 3. Görev kontrolü (eğer bekleniyorsa)
+      if (expectedActions?.includes('gorev_olustur')) {
+        const { data: gorevLog } = await supabase
+          .from('gorev_log')
+          .select('*')
+          .eq('ref_id', refId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        checks.gorev_log = {
+          found: gorevLog?.length > 0,
+          count: gorevLog?.length || 0,
+          tasks: gorevLog?.map(g => g.tip) || []
+        };
+        
+        if (!checks.gorev_log.found) {
+          issues.push({
+            type: 'MISSING_GOREV',
+            severity: 'high',
+            description: 'Görev log\'u oluşmadı — Trigger hatası!'
+          });
+        }
+      }
+      
+      // 4. Hayvan durumu kontrolü (tohumlama/doğum için)
+      if (['TOHUMLAMA', 'DOGUM_KAYDI'].includes(transactionType)) {
+        const { data: hayvan } = await supabase
+          .from('hayvanlar')
+          .select('id, kupe_no, tohumlama_durumu, gebelik_var')
+          .eq('id', refId)
+          .single();
+        
+        checks.hayvan_durum = {
+          found: !!hayvan,
+          durum: hayvan?.tohumlama_durumu || 'unknown'
+        };
+        
+        if (transactionType === 'TOHUMLAMA' && hayvan?.tohumlama_durumu !== 'Tohumlandı') {
+          issues.push({
+            type: 'HAYVAN_STATUS_BUG',
+            severity: 'high',
+            description: `Hayvan durumu güncellenmedi: ${hayvan?.tohumlama_durumu}`
+          });
+        }
+      }
+      
+      // Output
+      const hasCriticalIssues = issues.some(i => i.severity === 'critical');
+      const hasIssues = issues.length > 0;
+      
+      let status = '✅ TEMİZ';
+      if (hasCriticalIssues) status = '❌ KRİTİK HATA';
+      else if (hasIssues) status = '⚠️ SORUN VAR';
+      
+      return {
+        content: [{
+          type: "text",
+          text: `🔍 Transaction Integrity Check\n\n` +
+                `İşlem: ${transactionType}\n` +
+                `Ref ID: ${refId}\n` +
+                `Durum: ${status}\n\n` +
+                `📊 Kontroller:\n` +
+                `  - islem_log: ${checks.islem_log?.found ? '✅' : '❌'} (${checks.islem_log?.count} kayıt)\n` +
+                `  - stok_hareket: ${checks.stok_hareket?.found !== undefined ? (checks.stok_hareket.found ? '✅' : '❌') : '⏭️'} (${checks.stok_hareket?.count || 0})\n` +
+                `  - gorev_log: ${checks.gorev_log?.found !== undefined ? (checks.gorev_log.found ? '✅' : '❌') : '⏭️'} (${checks.gorev_log?.count || 0} görev)\n` +
+                `  - hayvan_durum: ${checks.hayvan_durum?.found ? '✅' : '❌'} (${checks.hayvan_durum?.durum})\n\n` +
+                (issues.length > 0 ? `❌ Sorunlar:\n${issues.map(i => `  - [${i.severity}] ${i.description}`).join('\n')}\n\n` : '') +
+                (hasCriticalIssues ? `🚨 KRİTİK HATA: Fix öncesi bu sorunlar çözülmeli!` : '') +
+                (hasIssues && !hasCriticalIssues ? `💡 ÖNERİ: Bu sorunları düzeltmek ister misin?` : '')
+        }]
+      };
+    } catch (err) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `❌ Integrity check hatası: ${err.message}` }]
+      };
+    }
+  }
+);
+
 // Bağlan (tüm araçlar kaydedildikten sonra)
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -377,6 +377,37 @@
   
   // === INIT ===
   console.log('✅ Browser telemetry initialized');
-  connect();
+  
+  // Session tracking (test başlangıç/bitiş)
+  window.agentTestSession = {
+    start: function() {
+      const ts = Date.now();
+      sessionStorage.setItem('test_start', ts);
+      console.log('🎯 Test session started:', new Date(ts).toISOString());
+      sendEvent('test_start', { timestamp: new Date(ts).toISOString() });
+    },
+    end: function() {
+      const start = sessionStorage.getItem('test_start');
+      const end = Date.now();
+      sessionStorage.setItem('test_end', end);
+      const duration = end - parseInt(start);
+      console.log('🏁 Test session ended:', new Date(end).toISOString(), `Duration: ${duration}ms`);
+      sendEvent('test_end', { 
+        timestamp: new Date(end).toISOString(),
+        startTime: start ? new Date(parseInt(start)).toISOString() : null,
+        duration
+      });
+    },
+    getTimestamps: function() {
+      const start = sessionStorage.getItem('test_start');
+      const end = sessionStorage.getItem('test_end');
+      return {
+        startTime: start ? new Date(parseInt(start)).toISOString() : null,
+        endTime: end ? new Date(parseInt(end)).toISOString() : null
+      };
+    }
+  };
+  
+  console.log('💡 Usage: window.agentTestSession.start() / end()');
   
 })();
