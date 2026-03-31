@@ -67,3 +67,9 @@ agent-telemetry/.port
 agent-telemetry/events.jsonl
 agent-telemetry/node_modules/
 agent-telemetry/.agent-state.json
+
+# Repomix
+repomix-output.xml
+
+# Aider cache variants
+.aider.tags.cache.v3/
