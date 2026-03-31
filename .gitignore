@@ -1,4 +1,3 @@
-```
 # Supabase migrations
 supabase/migrations/*.sql
 
@@ -53,18 +52,17 @@ playwright-report/
 test-results/
 
 # Claude runtime dosyaları
+.claude/settings.local.json
 .claude/arge-pending.flag
 repomix-output.xml
 .aider.chat.history.md
 .aider.tags.cache.v3/
+.aider.tags.cache.v4/
+.aider.input.history
 
 # Qwen Code
 .qwen/
 gha-creds-*.json
-
-# Aider
-.aider.input.history
-.aider.tags.cache.v4/
 
 # Agent Telemetry
 agent-telemetry/.port
@@ -72,28 +70,11 @@ agent-telemetry/events.jsonl
 agent-telemetry/node_modules/
 agent-telemetry/.agent-state.json
 
-# Playwright
-tests/report/
-tests/results/
-playwright-report/
+# Test Results
 test-results/
 
-# Claude runtime dosyaları
-.claude/arge-pending.flag
+# Repomix
 repomix-output.xml
-.aider.chat.history.md
+
+# Aider cache variants
 .aider.tags.cache.v3/
-
-# Qwen Code
-.qwen/
-gha-creds-*.json
-
-# Aider
-.aider.input.history
-.aider.tags.cache.v4/
-
-# Agent Telemetry
-agent-telemetry/.port
-agent-telemetry/events.jsonl
-agent-telemetry/node_modules/
-agent-telemetry/.agent-state.json

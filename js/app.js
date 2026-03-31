@@ -115,6 +115,13 @@ function openM(id) {
     filterHastalikList();
     loadDiseasesDropdown('');
   }
+  if (id === 'm-vaccine') {
+    loadVaccinesDropdown();
+    // Bugünün tarihini varsayılan yap
+    if(g('v-date')) g('v-date').value = new Date().toISOString().split('T')[0];
+    // Info alanı gizle
+    if(g('v-vaccine-info')) g('v-vaccine-info').style.display = 'none';
+  }
 }
 function closeM(id) {
   g(id)?.classList.remove('on');
@@ -647,10 +654,14 @@ async function acDisease() {
 function selDis(val, btn) {
   g('d-tani').value = val;
   g('ac-dis').style.display = 'none';
+  // Tanı butonlarını resetle
   document.querySelectorAll('.tani-btn').forEach(b => {
     b.style.background = 'var(--card)'; b.style.borderColor = 'var(--card3)'; b.style.color = 'var(--ink2)';
   });
   if (btn) { btn.style.background = 'var(--green)'; btn.style.borderColor = 'var(--green)'; btn.style.color = '#fff'; }
+  // Form alanlarını temizle (BUG-003 fix)
+  const form = g('ac-dis')?.closest('form') || document.querySelector('.vaka-form');
+  if (form) form.reset();
 }
 
 document.addEventListener('click', e => {
@@ -692,6 +703,9 @@ window.addEventListener('load', async () => {
   }
   updateSyncBar();
 
+  // Background sync başlat (organik realtime geçişi — 30sn interval)
+  startBackgroundSync(30000);
+
   if (navigator.onLine) {
     try {
       await pullFromSupabase();
@@ -719,6 +733,8 @@ window.addEventListener('load', async () => {
 window.addEventListener('online', async () => {
   g('dot')?.classList.remove('off', 'warn');
   toast('🌐 Bağlantı geldi');
+  // Background sync yeniden başlat
+  startBackgroundSync(30000);
   await syncNow();
   await pullFromSupabase();
   renderFromLocal();
@@ -727,6 +743,8 @@ window.addEventListener('online', async () => {
 window.addEventListener('offline', () => {
   g('dot')?.classList.add('off');
   toast('📵 Çevrimdışı — kayıtlar cihazda saklanacak');
+  // Background sync durdur (internet yokken gereksiz)
+  stopBackgroundSync();
 });
 
 // Service Worker — tüm kayıtları temizle
