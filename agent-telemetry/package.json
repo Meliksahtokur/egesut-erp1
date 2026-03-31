@@ -1,0 +1,19 @@
+{
+  "name": "agent-telemetry",
+  "version": "1.0.0",
+  "description": "Browser → Agent Real-Time Telemetry Pipeline",
+  "type": "module",
+  "main": "server.js",
+  "exports": {
+    ".": "./agent-event-reader.js",
+    "./reader": "./agent-event-reader.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "agent": "node agent-analyzer.js",
+    "read": "node agent-event-reader.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  }
+}

@@ -1,0 +1,1 @@
+/root/egesut-erp1/gwen-mcp-servers/consolidated/index.js
