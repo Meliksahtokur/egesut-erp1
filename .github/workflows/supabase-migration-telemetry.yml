@@ -18,6 +18,11 @@ jobs:
         with:
           version: latest
       
+      - name: Repair Migration History
+        run: |
+          echo "Repairing migration history..."
+          supabase migration repair --status reverted 20260327195814 || echo "Repair failed, continuing..."
+      
       - name: Apply migration
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -25,7 +30,7 @@ jobs:
           SUPABASE_PROJECT_ID: zqnexqbdfvbhlxzelzju
         run: |
           supabase link --project-ref $SUPABASE_PROJECT_ID
-          supabase db push
+          supabase db push --include-all
 
       - name: Verify Publication
         run: |
