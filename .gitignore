@@ -1,48 +1,75 @@
-node_modules
-# Geçici dosyalar
-*.orig
-*.rej
-*.bak
-apply_*.py
-asama*.patch
-
-# Cache
-.pycache_hidden/
-__pycache__/
-*.pyc
-
-# Gizlenen klasörler
-.sonarqube_dl/
-.watchman/
-.atsiki/
-
+```
 # Supabase migrations
+supabase/migrations/*.sql
 
-# Loglar ve geçici
-log.txt
-calendar_events.py
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
 
-# VSCode workspace
-.vscode/settings.json
+# Compiled files
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
 
-# MCP config (token içeriyor)
-.mcp.json
+# Build artifacts
+dist/
+build/
+coverage/
+htmlcov/
+*.log
+*.tmp
 
-# Claude Code ayarları (lokal)
-.claude/settings.json
-.claude/settings.local.json
+# Environment
+.env
+.env.local
+*.env.*
 
-# Repomix
-.repomixignore
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Playwright
-tests/report/
-tests/results/
-playwright-report/
+# System
+.DS_Store
+Thumbs.db
+
+# Qwen Code
+.qwen/
+gha-creds-*.json
+
+# Aider
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v4/
+
+# Test Results
 test-results/
 
-# Claude runtime dosyaları
+# Claude Local Settings
+.claude/settings.local.json
 .claude/arge-pending.flag
+
+# Agent Telemetry
+agent-telemetry/.port
+agent-telemetry/events.jsonl
+agent-telemetry/node_modules/
+agent-telemetry/.agent-state.json
+
+# Repomix
 repomix-output.xml
-.aider.chat.history.md
+
+# Aider cache variants
 .aider.tags.cache.v3/
