@@ -11,7 +11,24 @@
   'use strict';
   
   // === CONFIG ===
-  const WS_URL = 'ws://localhost:3002';
+  // Dinamik port bul (server'dan)
+  let WS_PORT = 3002; // Fallback
+  let WS_URL = 'ws://localhost:' + WS_PORT;
+  
+  // Port dosyasını kontrol et
+  fetch('/agent-telemetry/.port')
+    .then(r => r.text())
+    .then(port => {
+      WS_PORT = parseInt(port);
+      WS_URL = 'ws://localhost:' + WS_PORT;
+      console.log('✅ Telemetry port:', WS_PORT);
+      connect();
+    })
+    .catch(() => {
+      console.log('⚠️ Using default port:', WS_PORT);
+      connect();
+    });
+  
   const THROTTLE_MS = 200;
   const MAX_TEXT_LENGTH = 50;
   
@@ -170,7 +187,7 @@
       const startTime = performance.now();
       
       // Skip telemetry WS traffic
-      if (url.includes('localhost:3002') || url.includes('ws://')) {
+      if (url.includes('localhost:3002') || url.includes('ws://') || url.includes('.port')) {
         return originalFetch.apply(this, arguments);
       }
       
@@ -316,7 +333,6 @@
   }
   
   // === INIT ===
-  connect();
   console.log('✅ Browser telemetry initialized');
   
 })();
