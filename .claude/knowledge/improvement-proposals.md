@@ -29,7 +29,7 @@
 **Etkilenen:** forms.js, ui.js, supabase
 **Özet:** forms.js:634 `tohSonuc()` ve forms.js:804 gebelik INSERT → `tohumlama_sonuc_gebe`, `tohumlama_sonuc_bos`, `tohumlama_abort` RPC'lerine taşınsın. SONARCLOUD_REMEDIATION_PLAN.md'de zaten planlandı.
 **Gerekçe:** 3 farklı write-path var, sadece biri RPC üzerinden. Duplication ve validasyon riski. Sistem denetimi 2026-03-27.
-**Durum:** bekliyor
+**Durum:** kısmen tamamlandı — `tohumlama_sonuc_gebe/bos/bekliyor` RPC'leri oluşturuldu (migration 20260327000001), forms.js:640 `tohSonuc()` frontend güncellemesi eksik → BUG-009
 
 ## [İ-004] erp-planner vs feature-dev ayrımı CLAUDE.md'de netleştirilsin
 **Öncelik:** orta
@@ -64,4 +64,4 @@
 **Etkilenen:** .claude/agents/erp-db-agent.md, erp-frontend-dev.md
 **Özet:** erp-db-agent ve erp-frontend-dev haiku'ya düşürüldü ("uygularsın, düşünmezsin" modeli). Ancak agent'ın mimari karar gerektiğini nasıl tespit edeceği ve erp-architect'e nasıl geri döneceği protokolü eksik. Haiku agent belirsizlikle karşılaşırsa sessiz kalabilir veya yanlış uygulayabilir.
 **Gerekçe:** arge-analyst tespiti, commit 5da2ef6. Escalation path eksikliği hatalı uygulamalara yol açabilir.
-**Durum:** bekliyor
+**Durum:** tamamlandı — commit e4158d9, tüm haiku agent'lara ESCALATION protokolü eklendi

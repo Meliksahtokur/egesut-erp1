@@ -3,7 +3,6 @@
 # Çıktı: JSON systemMessage → Claude'a enjekte edilir
 
 CLAUDE_DIR="/root/egesut-erp1/.claude"
-JS_DIR="/root/egesut-erp1/js"
 
 ok="✓"
 fail="✗"
@@ -14,8 +13,8 @@ detail_lines=()   # Hata detayları — ayrı bölümde gösterilir
 errors=0
 warnings=0
 
-# ─── AGENT KONTROLÜ ───────────────────────────────────────────
-agents=("orchestrator" "erp-planner" "erp-architect" "erp-explorer" "erp-db-agent" "erp-frontend-dev" "erp-qa-agent" "erp-git-agent" "erp-debug-agent" "arge-analyst" "arge-web-researcher" "arge-local-reader" "dream-director" "dream-reader" "dream-writer")
+# ─── AGENT KONTROLÜ (4-agent mimari) ──────────────────────────
+agents=("orchestrator" "erp-implementer" "erp-qa-git" "erp-explorer")
 missing_agents=()
 for agent in "${agents[@]}"; do
   if [ ! -f "$CLAUDE_DIR/agents/$agent.md" ]; then
@@ -28,7 +27,7 @@ total_agents=${#agents[@]}
 found_agents=$((total_agents - ${#missing_agents[@]}))
 
 if [ ${#missing_agents[@]} -eq 0 ]; then
-  lines+=("$ok Agents ($total_agents/$total_agents): orchestrator · planner · architect · explorer · db · frontend · qa · git · debug · arge×3 · dream×3")
+  lines+=("$ok Agents ($total_agents/$total_agents): orchestrator · implementer · qa-git · explorer")
 else
   lines+=("$fail Agents ($found_agents/$total_agents): ${#missing_agents[@]} eksik")
   for a in "${missing_agents[@]}"; do
@@ -46,7 +45,6 @@ for hook in "${hooks[@]}"; do
     missing_hooks+=("$hook")
     ((errors++))
   else
-    # enabled: false kontrolü
     if grep -q "^enabled: false" "$fpath" 2>/dev/null; then
       disabled_hooks+=("$hook")
     fi
@@ -100,7 +98,6 @@ uncommitted="${uncommitted//[[:space:]]/}"
 if [ "$uncommitted" -gt "0" ]; then
   lines+=("$warn Git: branch=$branch · $uncommitted uncommitted değişiklik")
   ((warnings++))
-  # İlk 5 dosyayı göster
   while IFS= read -r line && [ "${#detail_lines[@]}" -lt 30 ]; do
     [ -z "$line" ] && continue
     detail_lines+=("   ⚠ GIT: $line")
@@ -110,51 +107,12 @@ else
   lines+=("$ok Git: branch=$branch · temiz")
 fi
 
-# ─── ARGE DURUMU ──────────────────────────────────────────────
-arge_agents=("arge-analyst" "arge-web-researcher" "arge-local-reader")
-missing_arge=()
-for agent in "${arge_agents[@]}"; do
-  [ ! -f "$CLAUDE_DIR/agents/$agent.md" ] && missing_arge+=("$agent")
-done
-
-if [ ${#missing_arge[@]} -eq 0 ]; then
-  proposal_count=$(grep -c "^## \[" "$CLAUDE_DIR/knowledge/improvement-proposals.md" 2>/dev/null || echo 0)
-  pending_flag=""
-  [ -f "$CLAUDE_DIR/arge-pending.flag" ] && pending_flag=" · 🔔 commit analiz bekliyor"
-
-  if [ "$proposal_count" -gt "0" ]; then
-    lines+=("🔬 ArGe: aktif · $proposal_count bekleyen öneri$pending_flag")
-    ((warnings++))
-  else
-    lines+=("🔬 ArGe: aktif · öneri yok$pending_flag")
-  fi
-else
-  lines+=("$fail ArGe: eksik agent → ${missing_arge[*]}")
-  ((errors++))
-fi
-
-# ─── DREAM DURUMU ─────────────────────────────────────────────
-dream_proposals=0
-if [ -f "$CLAUDE_DIR/knowledge/improvement-proposals.md" ]; then
-  dream_proposals=$(grep -c "Tür: AGENT_OPT" "$CLAUDE_DIR/knowledge/improvement-proposals.md" 2>/dev/null || echo 0)
-  dream_proposals="${dream_proposals//[[:space:]]/}"
-  [ -z "$dream_proposals" ] && dream_proposals=0
-fi
-
-if [ "$dream_proposals" -gt "0" ]; then
-  lines+=("💤 Dream: $dream_proposals agent iyileştirme önerisi — 'dream raporu' ile göster")
-  ((warnings++))
-fi
-
 # ─── BUG SİNYALLERİ ───────────────────────────────────────────
-bug_total=0
 bug_critical=0
 if [ -f "$CLAUDE_DIR/knowledge/bugs.md" ]; then
-  bug_total=$(grep -c "^## \[" "$CLAUDE_DIR/knowledge/bugs.md" 2>/dev/null || echo 0)
   bug_critical=$(grep -A5 "^## \[" "$CLAUDE_DIR/knowledge/bugs.md" 2>/dev/null | grep -c "Önem: kritik" || echo 0)
 fi
 
-# Sadece çözülmemiş bug'lar sayılsın
 active_bugs=$(grep -c "Durum: yeni\|Durum: inceleniyor" "$CLAUDE_DIR/knowledge/bugs.md" 2>/dev/null || echo 0)
 active_bugs="${active_bugs//[[:space:]]/}"
 [ -z "$active_bugs" ] && active_bugs=0
@@ -162,18 +120,22 @@ active_bugs="${active_bugs//[[:space:]]/}"
 if [ "$active_bugs" -gt "0" ]; then
   critical_note=""
   [ "$bug_critical" -gt "0" ] && critical_note=" · ⚠ $bug_critical kritik"
-  lines+=("🐛 Bugs: $active_bugs aktif sinyal$critical_note — 'bug raporu' ile göster")
+  lines+=("🐛 Bugs: $active_bugs aktif$critical_note — 'bug raporu' ile göster")
   ((warnings++))
+else
+  lines+=("$ok Bugs: temiz")
 fi
 
-# ─── AGENT FEEDBACK ───────────────────────────────────────────
-feedback_total=0
-if [ -d "$CLAUDE_DIR/feedback" ]; then
-  feedback_total=$(grep -rh "^## \[" "$CLAUDE_DIR/feedback/"[a-z]*.md 2>/dev/null | wc -l | tr -d ' ')
+# ─── İYİLEŞTİRME ÖNERİLERİ ───────────────────────────────────
+pending_proposals=0
+if [ -f "$CLAUDE_DIR/knowledge/improvement-proposals.md" ]; then
+  pending_proposals=$(grep -c "Durum:\*\* bekliyor\|Durum: bekliyor" "$CLAUDE_DIR/knowledge/improvement-proposals.md" 2>/dev/null || echo 0)
+  pending_proposals="${pending_proposals//[[:space:]]/}"
+  [ -z "$pending_proposals" ] && pending_proposals=0
 fi
 
-if [ "$feedback_total" -gt "0" ]; then
-  lines+=("📬 Feedback: $feedback_total agent gözlemi — 'rapor ver' ile göster")
+if [ "$pending_proposals" -gt "0" ]; then
+  lines+=("💡 Öneriler: $pending_proposals bekliyor — 'öneri raporu' ile göster")
   ((warnings++))
 fi
 

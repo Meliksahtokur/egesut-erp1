@@ -81,6 +81,15 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Tetikleyici: Offline'dan online'a geçişte kuyruk gönderilirken
 - İlgili commit: bilinmiyor
 
+## [2026-03-27] BUG-009 tohSonuc() direkt REST PATCH — RPC'ye geçiş yarım kaldı
+- Kaynak: erp-debug-agent
+- Modül: forms.js
+- Önem: kritik
+- Durum: inceleniyor
+- Açıklama: forms.js:640 — `write()` REST PATCH kaldırılacak. `tohumlama_sonuc_gebe/bos/bekliyor` RPC'leri oluşturuldu (migration 20260327000001), frontend güncellemesi yapılmadı. Sonraki oturumda `tohSonuc()` fonksiyonu rpcOptimistic'e geçirilecek.
+- Tetikleyici: Tohumlama detay modalındaki Gebe/Boş/Bekliyor butonları
+- İlgili commit: —
+
 ## [2026-03-27] BUG-008 submitInsem sonrası UI refresh garantisiz — pullTables kaldırıldı
 - Kaynak: arge-analyst
 - Modül: forms.js

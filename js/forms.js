@@ -694,9 +694,9 @@ async function tohSonuc(sonuc, btn) {
   if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {
     toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın', true); return;
   }
-  
+
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
-  
+
   try {
     let result;
     if (sonuc === 'Gebe') {
@@ -715,7 +715,7 @@ async function tohSonuc(sonuc, btn) {
       await write('tohumlama', { ..._curToh, sonuc }, 'PATCH', `id=eq.${_curToh.id}`);
       toast('✅ Güncellendi');
     }
-    
+
     closeM('m-toh-det');
     // RPC otomatik invalidation yapıyor, ek çağrı gerekmiyor
     pullTables(['hayvanlar', 'tohumlama', 'islem_log']).then(renderSafe).catch(console.warn);

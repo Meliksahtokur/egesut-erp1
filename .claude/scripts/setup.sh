@@ -119,13 +119,11 @@ cat > "$CLAUDE_DIR/settings.json" <<EOF
   "enabledPlugins": {
     "github@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
-    "feature-dev@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true,
     "hookify@claude-plugins-official": true,
-    "coderabbit@claude-plugins-official": true,
-    "supabase@claude-plugins-official": true
+    "coderabbit@claude-plugins-official": true
   }
 }
 EOF
@@ -224,17 +222,7 @@ cat > "$PROJECT_ROOT/.claude/settings.local.json" <<EOF
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $PROJECT_ROOT/.claude/scripts/arge-dirty-flag.sh"
-          }
-        ]
-      }
-    ]
+    "PostToolUse": []
   }
 }
 EOF
@@ -252,7 +240,13 @@ echo "── Doğrulama ──────────────────�
 [ -f "$CLAUDE_DIR/settings.json" ]             && ok "~/.claude/settings.json" || warn "settings.json eksik"
 [ -f "$PROJECT_ROOT/.mcp.json" ]               && ok ".mcp.json" || warn ".mcp.json eksik"
 [ -f "$PROJECT_ROOT/.claude/settings.local.json" ] && ok ".claude/settings.local.json" || warn "settings.local.json eksik"
-[ -f "$PROJECT_ROOT/.claude/agents/orchestrator.md" ] && ok "Agent'lar mevcut ($(ls "$PROJECT_ROOT/.claude/agents/"*.md | wc -l) agent)" || warn "Agent dosyaları eksik"
+required_agents=("orchestrator" "erp-implementer" "erp-qa-git" "erp-explorer")
+missing_ag=0
+for ag in "${required_agents[@]}"; do
+  [ ! -f "$PROJECT_ROOT/.claude/agents/$ag.md" ] && ((missing_ag++))
+done
+found_ag=$((${#required_agents[@]} - missing_ag))
+[ "$missing_ag" -eq 0 ] && ok "Agent'lar mevcut (4/4): orchestrator · implementer · qa-git · explorer" || warn "Agent eksik ($found_ag/4)"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"

@@ -23,6 +23,15 @@ Frontend'de `api.js` üzerinden çağrılır. Asla doğrudan `db.from().insert/u
 **`tohumlama_kaydet(p_hayvan_id, p_tarih, p_sperma, p_hekim_id?, p_irk_bilgisi?)`**
 → Tohumlama kaydeder. State machine: boş → gebe.
 
+**`tohumlama_sonuc_gebe(p_tohumlama_id)`**
+→ Tohumlama sonucunu "Gebe" yap. Hayvan durumu "Gebe" → islem_log kaydı.
+
+**`tohumlama_sonuc_bos(p_tohumlama_id)`**
+→ Tohumlama sonucunu "Boş" yap (muayenede gebe değil). Hayvan durumu "Boş" → islem_log kaydı.
+
+**`tohumlama_sonuc_bekliyor(p_tohumlama_id)`**
+→ Hatalı kaydı düzelt: sonuç → "Bekliyor", hayvan durumu → "Tohumlanabilir" → islem_log kaydı.
+
 **`dogum_kaydet(p_anne_id, p_tarih, p_kupe, p_cins?, p_tip?, p_kg?, p_baba?, p_hekim_id?)`**
 → Doğum kaydeder + buzağı oluşturur + 14 doğum sonrası görev üretir.
 
