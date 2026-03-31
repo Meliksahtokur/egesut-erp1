@@ -380,15 +380,22 @@
   
   // Session tracking (test başlangıç/bitiş)
   window.agentTestSession = {
+    autoStart: true, // Otomatik başlat
+    startTime: null,
+    endTime: null,
+    
     start: function() {
       const ts = Date.now();
+      this.startTime = ts;
       sessionStorage.setItem('test_start', ts);
       console.log('🎯 Test session started:', new Date(ts).toISOString());
       sendEvent('test_start', { timestamp: new Date(ts).toISOString() });
     },
+    
     end: function() {
-      const start = sessionStorage.getItem('test_start');
+      const start = sessionStorage.getItem('test_start') || this.startTime;
       const end = Date.now();
+      this.endTime = end;
       sessionStorage.setItem('test_end', end);
       const duration = end - parseInt(start);
       console.log('🏁 Test session ended:', new Date(end).toISOString(), `Duration: ${duration}ms`);
@@ -398,16 +405,33 @@
         duration
       });
     },
+    
     getTimestamps: function() {
-      const start = sessionStorage.getItem('test_start');
-      const end = sessionStorage.getItem('test_end');
+      const start = sessionStorage.getItem('test_start') || this.startTime;
+      const end = sessionStorage.getItem('test_end') || this.endTime;
       return {
         startTime: start ? new Date(parseInt(start)).toISOString() : null,
         endTime: end ? new Date(parseInt(end)).toISOString() : null
       };
+    },
+    
+    // Otomatik başlat (sayfa yüklendiğinde)
+    init: function() {
+      if (this.autoStart && !sessionStorage.getItem('test_start')) {
+        this.start();
+      }
     }
   };
   
+  // Sayfa yüklendiğinde otomatik başlat
+  window.agentTestSession.init();
+  
+  // Sayfa kapanınca otomatik bitir
+  window.addEventListener('beforeunload', () => {
+    window.agentTestSession.end();
+  });
+  
   console.log('💡 Usage: window.agentTestSession.start() / end()');
+  console.log('🚀 Auto-start: ON (session otomatik başlar)');
   
 })();
