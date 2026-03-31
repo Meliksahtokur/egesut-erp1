@@ -430,7 +430,10 @@ button,input,select,textarea{font-family:inherit}
     <div style="font-size:.72rem;color:var(--ink3);margin-top:4px">Envanter yönetimi</div>
   </div>
   <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 80px">
-    <button onclick="openStokAdd()" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-bottom:12px">＋ Yeni Ürün Ekle</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+      <button onclick="openStokAdd()" style="padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer">＋ Yeni Ürün Ekle</button>
+      <button onclick="tumStokHareketleriniGoster()" style="padding:13px;background:rgba(42,107,181,.12);border:2px dashed rgba(42,107,181,.4);border-radius:10px;color:var(--blue);font-size:.88rem;font-weight:800;cursor:pointer">📋 Tüm Hareketler</button>
+    </div>
     <div id="stok-panel-body"><div class="loader"><div class="spin"></div></div></div>
   </div>
 </div>
@@ -470,8 +473,10 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="k-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('k-hid','ac-khid')" onfocus="acHayvan('k-hid','ac-khid')" onkeydown="acNav(event,'ac-khid')">
+          oninput="acHayvan('k-hid','ac-khid')" onfocus="acHayvan('k-hid','ac-khid')" onkeydown="acNav(event,'ac-khid')"
+          onclick="acHayvan('k-hid','ac-khid'); this.focus()">
         <div id="ac-khid" class="ac-box" style="display:none"></div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
       <div class="fg"><label class="flbl">Tarih *</label><input id="k-tarih" class="fi" type="date"></div>
       <div class="fg"><label class="flbl">Kızgınlık Belirtisi</label>
@@ -497,8 +502,10 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="i-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('i-hid','ac-ihid')" onfocus="acHayvan('i-hid','ac-ihid')" onkeydown="acNav(event,'ac-ihid')">
+          oninput="acHayvan('i-hid','ac-ihid')" onfocus="acHayvan('i-hid','ac-ihid')" onkeydown="acNav(event,'ac-ihid')"
+          onclick="acHayvan('i-hid','ac-ihid'); this.focus()">
         <div id="ac-ihid" class="ac-box" style="display:none"></div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
       <div class="fg"><label class="flbl">Tohumlama Tarihi *</label><input id="i-tarih" class="fi" type="date"></div>
       <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
@@ -534,8 +541,10 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="d-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')">
+          oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')"
+          onclick="acHayvan('d-hid','ac-dhid'); this.focus()">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
       </div>
 
       <!-- TANI — DB'den controlled dropdown -->
@@ -572,7 +581,8 @@ button,input,select,textarea{font-family:inherit}
         </div>
         <div id="b-anne-manual" style="display:none;position:relative">
           <input id="b-anne" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
-            oninput="acHayvan('b-anne','ac-banne')" onfocus="acHayvan('b-anne','ac-banne')" onkeydown="acNav(event,'ac-banne')">
+            oninput="acHayvan('b-anne','ac-banne')" onfocus="acHayvan('b-anne','ac-banne')" onkeydown="acNav(event,'ac-banne')"
+            onclick="acHayvan('b-anne','ac-banne'); this.focus()">
           <div id="ac-banne" style="display:none;background:var(--card);border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
         </div>
         <div id="anne-secili-card" style="display:none;background:rgba(78,154,42,.08);border:1.5px solid var(--green);border-radius:var(--r1);padding:10px 13px;font-size:.8rem">
@@ -798,6 +808,18 @@ button,input,select,textarea{font-family:inherit}
       <input type="hidden" id="sa-kat" value="Antibiyotik">
       <button class="btn btn-g" onclick="submitStokAdd(this)">💾 Kaydet</button>
       <button class="btn btn-o" onclick="closeM('m-stok-add')" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- TÜM STOK HAREKETLERİ MODAL -->
+<div id="m-stok-hareketler" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">📋 Tüm Stok Hareketleri</div>
+    <div class="m-body">
+      <div id="stok-hareketler-body" style="max-height:60vh;overflow-y:auto">
+        <div class="loader"><div class="spin"></div></div>
+      </div>
+      <button class="btn btn-o" onclick="closeM('m-stok-hareketler')" style="margin-top:12px">Kapat</button>
     </div>
   </div>
 </div>
