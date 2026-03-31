@@ -1,0 +1,5 @@
+-- Bu migration Gwen tarafından 2026-03-27 19:58:14'te direkt DB'ye uygulandı.
+-- Dosya oluşturulmadan DB'ye basıldığı için CI/CD version uyuşmazlığı oluştu.
+-- İçerik remote DB'de mevcut — bu dosya sadece supabase migration history
+-- ile local dosya listesini eşleştirmek için oluşturuldu.
+-- Gerçek içeriği görmek için: supabase db pull veya migration history tablosunu sorgula.
