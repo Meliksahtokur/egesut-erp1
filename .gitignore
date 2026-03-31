@@ -46,3 +46,6 @@ test-results/
 repomix-output.xml
 .aider.chat.history.md
 .aider.tags.cache.v3/
+
+# Qwen settings (secrets)
+.qwen/
