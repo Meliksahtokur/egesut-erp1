@@ -2,35 +2,16 @@
  * Browser Event Tracker - Client-side Instrumentation
  * 
  * Kullanım: <script src="tracker.js"></script> index.html'e ekle
- * 
- * Track edilen event'ler:
- * - click, submit, fetch, xhr, error, console_log
+ * Otomatik olarak telemetry server'ı bulur ve bağlanır
  */
 
 (function() {
   'use strict';
   
   // === CONFIG ===
-  // Dinamik port bul (server'dan)
-  let WS_PORT = 3002; // Fallback
-  let WS_URL = 'ws://localhost:' + WS_PORT;
-  
-  // Port dosyasını kontrol et
-  fetch('/agent-telemetry/.port')
-    .then(r => r.text())
-    .then(port => {
-      WS_PORT = parseInt(port);
-      WS_URL = 'ws://localhost:' + WS_PORT;
-      console.log('✅ Telemetry port:', WS_PORT);
-      connect();
-    })
-    .catch(() => {
-      console.log('⚠️ Using default port:', WS_PORT);
-      connect();
-    });
-  
-  const THROTTLE_MS = 200;
-  const MAX_TEXT_LENGTH = 50;
+  // Telemetry server port'unu bul (dene-yanıl)
+  const TELEMETRY_PORTS = [3002, 3003, 3004, 3005, 3006]; // Denenecek port'lar
+  let WS_URL = null;
   
   // === STATE ===
   let ws = null;
@@ -40,10 +21,65 @@
   let reconnectAttempts = 0;
   const MAX_RECONNECT_ATTEMPTS = 5;
   
+  // === FIND TELEMETRY SERVER ===
+  async function findTelemetryServer() {
+    for (const port of TELEMETRY_PORTS) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 500);
+        
+        const response = await fetch(`http://localhost:${port}/.port`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeout);
+        
+        if (response.ok) {
+          const telemetryPort = await response.text();
+          WS_URL = `ws://localhost:${telemetryPort.trim()}`;
+          console.log('✅ Telemetry server found:', WS_URL);
+          return true;
+        }
+      } catch (err) {
+        // Port dolu değil veya server yok, devam et
+      }
+    }
+    
+    // Fallback: direkt WebSocket dene
+    for (const port of TELEMETRY_PORTS) {
+      try {
+        const testWs = new WebSocket(`ws://localhost:${port}`);
+        await new Promise((resolve, reject) => {
+          testWs.onopen = () => { testWs.close(); resolve(); };
+          testWs.onerror = () => reject();
+          setTimeout(reject, 500);
+        });
+        WS_URL = `ws://localhost:${port}`;
+        console.log('✅ Telemetry server found (fallback):', WS_URL);
+        return true;
+      } catch (err) {
+        // Continue
+      }
+    }
+    
+    console.warn('⚠️ No telemetry server found, will retry on connect');
+    return false;
+  }
+  
   // === CORE TRANSPORT ===
-  function connect() {
+  async function connect() {
     if (ws && ws.readyState === WebSocket.OPEN) {
       return;
+    }
+    
+    // Find server if not found yet
+    if (!WS_URL) {
+      const found = await findTelemetryServer();
+      if (!found) {
+        // Retry later
+        setTimeout(connect, 2000);
+        return;
+      }
     }
     
     try {
@@ -70,6 +106,8 @@
       
     } catch (err) {
       console.error('❌ Failed to connect telemetry:', err.message);
+      WS_URL = null; // Reset, retry find
+      setTimeout(connect, 2000);
     }
   }
   
@@ -78,6 +116,11 @@
       reconnectAttempts++;
       console.log(`🔄 Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
       setTimeout(connect, 1000 * reconnectAttempts);
+    } else {
+      // Reset and try to find server again
+      reconnectAttempts = 0;
+      WS_URL = null;
+      setTimeout(connect, 2000);
     }
   }
   
@@ -99,7 +142,7 @@
     try {
       // Throttle check
       const now = Date.now();
-      if (now - lastEventTime < THROTTLE_MS) {
+      if (now - lastEventTime < 200) { // 200ms throttle
         // Queue high-frequency events
         eventQueue.push({ type, payload });
         return;
@@ -146,8 +189,8 @@
     
     // Get text content (truncated)
     let text = target.innerText || target.textContent || '';
-    text = text.trim().slice(0, MAX_TEXT_LENGTH);
-    if (text.length === MAX_TEXT_LENGTH) text += '...';
+    text = text.trim().slice(0, 50);
+    if (text.length === 50) text += '...';
     
     // Ignore if no actionable identifiers
     if (!id && !className && tagName === 'DIV') {
@@ -187,7 +230,7 @@
       const startTime = performance.now();
       
       // Skip telemetry WS traffic
-      if (url.includes('localhost:3002') || url.includes('ws://') || url.includes('.port')) {
+      if (url.includes('localhost:300') || url.includes('ws://') || url.includes('.port')) {
         return originalFetch.apply(this, arguments);
       }
       
@@ -236,7 +279,7 @@
         telemetry.startTime = performance.now();
         
         // Skip telemetry WS traffic
-        if (telemetry.url.includes('localhost:3002') || telemetry.url.includes('ws://')) {
+        if (telemetry.url.includes('localhost:300') || telemetry.url.includes('ws://')) {
           return originalSend.apply(this, args);
         }
         
@@ -334,5 +377,6 @@
   
   // === INIT ===
   console.log('✅ Browser telemetry initialized');
+  connect();
   
 })();
