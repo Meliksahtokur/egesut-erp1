@@ -698,6 +698,7 @@ window.addEventListener('load', async () => {
 
   // Background sync başlat (organik realtime geçişi — 30sn interval)
   startBackgroundSync(30000);
+  initRealtime(); // Realtime WebSocket — bağlanırsa polling durur
 
   if (navigator.onLine) {
     try {
