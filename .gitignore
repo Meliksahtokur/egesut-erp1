@@ -47,21 +47,6 @@ repomix-output.xml
 .aider.chat.history.md
 .aider.tags.cache.v3/
 
-# SQL dump dosyaları
-dbsnapshot*.sql
-*snapshot*.sql
-
-# Aider editor dosyaları
-.aider*
-.aider.tags.cache.v4/
-
-# Log dosyaları
-*.log
-.update-logs/
-
-# Agent telemetri
-agent-telemetry/
-
 # Qwen agent dosyaları
 .qwen/
 gwen-mcp.log

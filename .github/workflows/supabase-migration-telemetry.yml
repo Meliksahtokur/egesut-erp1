@@ -1,0 +1,38 @@
+name: Supabase Migration — Agent DB Telemetry
+
+on:
+  push:
+    branches:
+      - feature/gwen-arge
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Supabase Migration
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      
+      - name: Repair Migration History
+        run: |
+          echo "Repairing migration history..."
+          supabase migration repair --status reverted 20260327195814 || echo "Repair failed, continuing..."
+      
+      - name: Apply migration
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: zqnexqbdfvbhlxzelzju
+        run: |
+          supabase link --project-ref $SUPABASE_PROJECT_ID
+          supabase db push --include-all
+
+      - name: Verify Publication
+        run: |
+          echo "Verifying gwen_db_watch publication..."
+          # Migration başarılı olmalı

@@ -1,0 +1,7 @@
+{
+    "timestamp": "2026-03-31T12:04:31+00:00",
+    "current_step": "completed",
+    "status": "success",
+    "message": "update-cli başarıyla tamamlandı",
+    "log_file": "/root/egesut-erp1/.update-logs/update-20260331_120402.log"
+}
