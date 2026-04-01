@@ -49,7 +49,7 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: forms.js
 - Önem: yüksek
-- Durum: yeni
+- Durum: **çözüldü** ✅
 - Açıklama: drug_products tablosuna direkt .insert() çağrılıyor. RLS policy, trigger ve backend validasyonu atlanıyor.
 - Tetikleyici: Yeni ilaç ürünü eklenirken
 - İlgili commit: bilinmiyor
@@ -58,10 +58,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: forms.js
 - Önem: yüksek
-- Durum: yeni
+- Durum: **çözüldü** ✅
 - Açıklama: stok tablosuna direkt .update() çağrılıyor. Stok tablosu RPC üzerinden yönetilmeli.
 - Tetikleyici: İlaç-stok bağlantısı güncellenirken
-- İlgili commit: bilinmiyor
+- İlgili commit: gwen/dev-005-clean (drug_product_ekle RPC içine p_stok_id ile taşındı)
 
 ## [2026-03-27] BUG-006 Direkt REST bypass — drugs update (ui.js:1160)
 - Kaynak: erp-explorer (sistem denetimi)

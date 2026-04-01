@@ -61,30 +61,32 @@ Her push'ta otomatik çalışır:
 - Hayvan fiziksel özellikler (boy, kilo, renk) ✅
 - GitHub Actions → Supabase otomatik migration ✅
 - Null field filtering (schema cache hataları çözüldü) ✅
+- Tohumlama Event Stack (Bekliyor→Boş otomatik) ✅
+- `tohumlama_sonuc_gebe` RPC ✅
+- `tohumlama_kaydet` RPC (islem_log + geri al desteği) ✅
+- SonarCloud S2 — BLOCKER Globals (28 issue) ✅
+- SonarCloud S3 — Mantık tutarsızlıkları (~35 issue) ✅
+- Input validation — İleri tarih engeli ✅
+- Tohumlama modal — Durum bazlı buton kontrolü ✅
+- Geri al (islem_log) — `ref_id` fix ✅
 
 ## Devam Eden / Yarım Kalan İşler
 Şu sırayla yapılıyor, Actions yeşil oldukça devam et:
 
-### Prompt 2 — Doğum ↔ Tohumlama Bağlantısı
-`submitBirth`'te tohumlama sonucunu `Doğurdu` yap,
-anne seçilince sperma bilgisini baba alanına doldur,
-`loadBirths`'te sperma bilgisini göster.
-Sadece: `submitBirth`, `loadBirths`, `anneSeç` fonksiyonları
+### 🔴 Tohumlama — Kalan Write Path Refaktöring (KRİTİK)
+`tohSonuc()` fonksiyonu hala REST PATCH kullanıyor (`forms.js:656`).
+Yapılacak: `tohumlama_sonuc_bos` RPC ekle, `tohSonuc()`'u RPC'ye çevir.
+Ayrıca: `tohumlama_abort` RPC (Gebe → Abort için)
 
-### Prompt 3 — Hayvan Detayı Anne/Yavru İlişkisi
-`openDet`'te anne kartı ve yavru listesi göster,
-`info-grid`'e `anne_id`, `cinsiyet`, `canli_agirlik` ekle.
-Sadece: `openDet` fonksiyonu, `tab-ozet` HTML
+### 🟠 LOGIC-003: Offline Klinik Cache Merge
+Offline modda eklenen ilaçlar UI'da görünmüyor.
+Yapılacak: `renderCaseTimeline()` cache + DB merge etsin.
 
-### Prompt 4 — Raporlama
+### 🟡 Prompt 4 — Raporlama Modülü
 Alt navda yeni RAPOR sekmesi,
 gebe oranı / doğum / hastalık / ilaç tüketimi kartları.
 
-### Prompt 5 — Input Validation
-Formlarda Türkçe hata mesajları,
-`dogum_kg` 20-80 arası, tarih gelecekte olamaz vb.
-
-### Prompt 6 — Push Notifications
+### 🟢 Prompt 6 — Push Notifications
 Görev gecikince / stok kritikse / doğum yaklaşınca
 browser notification, 30 dakikada bir kontrol.
 
