@@ -782,7 +782,7 @@ async function submitStokAdd(btn) {
         const konst = g('sa-konst')?.value?.trim() || null;
         const route = g('sa-route')?.value || 'IM';
         // RPC ile drug_product ekle (stok bağlantısı atomik)
-        const dp = await rpc('drug_product_ekle', {
+        const { data: dp, error: dpErr } = await db.rpc('drug_product_ekle', {
           p_drug_class_id:      etkenId,
           p_brand_name:         urun,
           p_concentration:      konst ? Number.parseFloat(konst) : null,
@@ -791,6 +791,7 @@ async function submitStokAdd(btn) {
           p_default_unit:       birim,
           p_stok_id:            stokId || null
         });
+        if (dpErr) throw new Error(dpErr.message);
         if (!dp) throw new Error('İlaç kaydı oluşturulamadı');
         _drugsCache = [];
       }
