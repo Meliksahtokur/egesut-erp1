@@ -1,0 +1,319 @@
+#!/usr/bin/env bash
+# ─────────────────────────────────────────────────────────────
+# gwen — Claude'un Qwen CLI orchestrasyon aracı
+#
+# Kullanım:
+#   gwen <tip> task "görev"    → talimat gönder + DONE monitor
+#   gwen <tip> send "mesaj"    → araya gir, yönlendir
+#   gwen <tip> start           → session aç, tip kilitle
+#   gwen <tip> wait            → DONE commit bekle, diff göster
+#   gwen <tip> read            → ekranı oku
+#   gwen <tip> status          → session durumu
+#   gwen <tip> stop            → session kapat
+#   gwen status                → tüm session'ların durumu
+#
+#   <tip>: dev | arge
+# ─────────────────────────────────────────────────────────────
+
+WORKDIR="/root/egesut-erp1"
+QWEN_CMD="qwen"
+POLL_INTERVAL=30
+STUCK_THRESHOLD=4
+MAX_RETRIES=2
+
+# ─── Tip → Session adı ──────────────────────────────────────
+_resolve_session() {
+  case "$1" in
+    dev)  echo "gwen-dev"  ;;
+    arge) echo "gwen-arge" ;;
+    *)    return 1 ;;
+  esac
+}
+
+_type_label() {
+  case "$1" in
+    dev)  echo "🔨 DEV"  ;;
+    arge) echo "🔬 ARGE" ;;
+  esac
+}
+
+_type_context() {
+  case "$1" in
+    dev)
+      echo "# SESSION CONTEXT
+TIP: development
+REPO: /root/egesut-erp1
+KURAL: Bu session sadece ERP geliştirme içindir. AR-GE işlemi yapılamaz.
+KURAL: Her task ayrı branch (gwen/task-XXX formatı).
+KURAL: Task bitince commit mesajının ilk satırı mutlaka DONE: ile başlasın.
+KURAL: Paralel subagent açabilirsin (backend + frontend) ama aynı dosyaya dokunma.
+KURAL: Test çalıştırmak için ayrı ekran açma — subagent kullan."
+      ;;
+    arge)
+      echo "# SESSION CONTEXT
+TIP: arge
+REPO: /root/egesut-erp1
+KURAL: Bu session sadece AR-GE işleri içindir. ERP development yapılamaz.
+KURAL: Qwen skills, agents, tools ve workflow geliştirme.
+KURAL: Task bitince commit mesajının ilk satırı mutlaka DONE: ile başlasın."
+      ;;
+  esac
+}
+
+# ─── Yardımcılar ────────────────────────────────────────────
+_capture() {
+  tmux capture-pane -t "$1" -p 2>/dev/null
+}
+
+_last_commit() {
+  git -C "$WORKDIR" log -1 --format="%H" 2>/dev/null
+}
+
+_detect_state() {
+  local session="$1"
+  tmux has-session -t "$session" 2>/dev/null   || { echo "no_session"; return; }
+  pgrep -f "qwen-code/cli.js" >/dev/null 2>&1  || { echo "no_qwen";   return; }
+  local screen
+  screen=$(_capture "$session")
+  echo "$screen" | grep -q "Start new chat session" && { echo "welcome";   return; }
+  echo "$screen" | grep -q "Continue previous"      && { echo "selecting"; return; }
+  echo "$screen" | grep -q "Type your message"      && { echo "idle";      return; }
+  echo "busy"
+}
+
+_activate_yolo() {
+  local session="$1"
+  for i in 1 2 3; do
+    tmux send-keys -t "$session" $'\e[Z' ""
+    sleep 1
+    _capture "$session" | grep -q "YOLO mode" && return 0
+  done
+}
+
+_send() {
+  local session="$1"
+  local msg="$2"
+  tmux send-keys -t "$session" "$msg" Enter
+  sleep 1
+  tmux send-keys -t "$session" "" Enter
+}
+
+_escape_stuck() {
+  local session="$1"
+  tmux send-keys -t "$session" Escape; sleep 1
+  tmux send-keys -t "$session" Escape; sleep 2
+}
+
+# ─── CMD: start ─────────────────────────────────────────────
+cmd_start() {
+  local tip="$1"
+  local session
+  session=$(_resolve_session "$tip") || { echo "❌ Tip: dev | arge"; exit 1; }
+
+  local state
+  state=$(_detect_state "$session")
+
+  if [ "$state" = "idle" ] || [ "$state" = "busy" ]; then
+    echo "✅ $(_type_label $tip) zaten çalışıyor"
+    return 0
+  fi
+
+  if [ "$state" = "no_session" ]; then
+    echo "🆕 $(_type_label $tip) session oluşturuluyor..."
+    tmux new-session -d -s "$session" -c "$WORKDIR"
+    sleep 1
+    state=$(_detect_state "$session")
+  fi
+
+  if [ "$state" = "no_qwen" ] || [ "$state" = "no_session" ]; then
+    echo "🚀 Qwen başlatılıyor..."
+    tmux send-keys -t "$session" "$QWEN_CMD" Enter
+    sleep 10
+    state=$(_detect_state "$session")
+  fi
+
+  if [ "$state" = "selecting" ]; then
+    tmux send-keys -t "$session" "2" Enter; sleep 3
+  elif [ "$state" = "welcome" ]; then
+    tmux send-keys -t "$session" "1" Enter; sleep 3
+  fi
+
+  echo "⚡ YOLO aktive ediliyor..."
+  _activate_yolo "$session"
+  sleep 1
+
+  state=$(_detect_state "$session")
+  if [ "$state" = "idle" ]; then
+    echo "📋 Session tipi kilitleniyor ($(_type_label $tip))..."
+    _send "$session" "$(_type_context $tip)"
+    sleep 5
+    echo "✅ $(_type_label $tip) hazır"
+  else
+    echo "⚠️  Durum: $state"
+  fi
+}
+
+# ─── CMD: task ──────────────────────────────────────────────
+cmd_task() {
+  local tip="$1"
+  shift
+  local task="$*"
+  local session
+  session=$(_resolve_session "$tip") || { echo "❌ Tip: dev | arge"; exit 1; }
+  [ -z "$task" ] && { echo "Kullanım: gwen $tip task \"görev\""; exit 1; }
+
+  local state
+  state=$(_detect_state "$session")
+  if [ "$state" != "idle" ]; then
+    cmd_start "$tip"
+    state=$(_detect_state "$session")
+    [ "$state" != "idle" ] && { echo "❌ Qwen idle değil"; exit 1; }
+  fi
+
+  local start_commit
+  start_commit=$(_last_commit)
+
+  local full_task="${task}
+
+---
+Görev tamamlanınca tüm değişiklikleri commit et.
+Commit mesajının ilk satırı mutlaka 'DONE:' ile başlasın."
+
+  echo "📤 $(_type_label $tip) → görev gönderiliyor..."
+  _send "$session" "$full_task"
+
+  cmd_wait "$tip" "$start_commit"
+}
+
+# ─── CMD: send ──────────────────────────────────────────────
+cmd_send() {
+  local tip="$1"
+  shift
+  local msg="$*"
+  local session
+  session=$(_resolve_session "$tip") || { echo "❌ Tip: dev | arge"; exit 1; }
+  [ -z "$msg" ] && { echo "Kullanım: gwen $tip send \"mesaj\""; exit 1; }
+  tmux has-session -t "$session" 2>/dev/null || { echo "❌ Session yok — gwen $tip start"; exit 1; }
+  _send "$session" "$msg"
+  echo "✉️  → $session"
+}
+
+# ─── CMD: wait ──────────────────────────────────────────────
+cmd_wait() {
+  local tip="$1"
+  local start_commit="${2:-$(_last_commit)}"
+  local session
+  session=$(_resolve_session "$tip") || { echo "❌ Tip: dev | arge"; exit 1; }
+
+  echo "⏳ $(_type_label $tip) DONE bekleniyor..."
+
+  local stuck_count=0 last_hash="" retry=0
+
+  while true; do
+    sleep $POLL_INTERVAL
+
+    local cur_commit
+    cur_commit=$(_last_commit)
+    if [ "$cur_commit" != "$start_commit" ]; then
+      local msg
+      msg=$(git -C "$WORKDIR" log -1 --format="%s")
+      echo ""
+      echo "✅ DONE — $msg"
+      echo "── Değişen dosyalar ──"
+      git -C "$WORKDIR" diff --name-status HEAD~1
+      echo ""
+      echo "── Diff ──"
+      git -C "$WORKDIR" diff HEAD~1
+      return 0
+    fi
+
+    local cur_hash
+    cur_hash=$(_capture "$session" | tail -10 | md5sum)
+
+    if [ "$cur_hash" = "$last_hash" ]; then
+      stuck_count=$((stuck_count + 1))
+      echo "  ⏸ değişim yok ($stuck_count/$STUCK_THRESHOLD)..."
+    else
+      stuck_count=0
+      last_hash="$cur_hash"
+    fi
+
+    if [ $stuck_count -ge $STUCK_THRESHOLD ]; then
+      retry=$((retry + 1))
+      if [ $retry -gt $MAX_RETRIES ]; then
+        echo ""
+        echo "🔴 STUCK — müdahale gerekiyor. Son ekran:"
+        _capture "$session" | tail -20
+        echo ""
+        echo "→ gwen $tip send \"...\" ile yönlendir"
+        return 1
+      fi
+      echo "⚠️  STUCK (retry $retry/$MAX_RETRIES)"
+      _escape_stuck "$session"
+      _send "$session" "Devam et. Yarım kalan görevi tamamla, DONE: ile commit at."
+      stuck_count=0; last_hash=""
+    fi
+  done
+}
+
+# ─── CMD: read ──────────────────────────────────────────────
+cmd_read() {
+  local tip="$1"
+  local session
+  session=$(_resolve_session "$tip") || { echo "❌ Tip: dev | arge"; exit 1; }
+  _capture "$session"
+}
+
+# ─── CMD: status ────────────────────────────────────────────
+cmd_status_all() {
+  for tip in dev arge; do
+    local session
+    session=$(_resolve_session "$tip")
+    local state
+    state=$(_detect_state "$session")
+    case "$state" in
+      no_session) echo "$(_type_label $tip) [$session]: ❌ session yok" ;;
+      no_qwen)    echo "$(_type_label $tip) [$session]: ⚠️  session var, Qwen kapalı" ;;
+      welcome)    echo "$(_type_label $tip) [$session]: 🟡 başlangıç menüsü" ;;
+      selecting)  echo "$(_type_label $tip) [$session]: 🟡 session seçimi" ;;
+      idle)       echo "$(_type_label $tip) [$session]: ✅ hazır" ;;
+      busy)       echo "$(_type_label $tip) [$session]: ⏳ çalışıyor" ;;
+    esac
+  done
+}
+
+# ─── CMD: stop ──────────────────────────────────────────────
+cmd_stop() {
+  local tip="$1"
+  local session
+  session=$(_resolve_session "$tip") || { echo "❌ Tip: dev | arge"; exit 1; }
+  tmux kill-session -t "$session" 2>/dev/null \
+    && echo "🛑 $(_type_label $tip) session kapatıldı" \
+    || echo "Session zaten kapalı"
+}
+
+# ─── MAIN ───────────────────────────────────────────────────
+TIP="${1:-}"
+CMD="${2:-}"
+
+# gwen / gwen status → tüm durumlar
+if [ -z "$TIP" ] || [ "$TIP" = "status" ]; then
+  cmd_status_all; exit 0
+fi
+
+# gwen <tip> → tip status
+if [ -z "$CMD" ]; then
+  session=$(_resolve_session "$TIP") || { echo "Kullanım: gwen <dev|arge> <task|send|start|wait|read|status|stop>"; exit 1; }
+  _detect_state "$session"; exit 0
+fi
+
+case "$CMD" in
+  task)   cmd_task   "$TIP" "${@:3}" ;;
+  send)   cmd_send   "$TIP" "${@:3}" ;;
+  start)  cmd_start  "$TIP" ;;
+  wait)   cmd_wait   "$TIP" ;;
+  read)   cmd_read   "$TIP" ;;
+  status) session=$(_resolve_session "$TIP") && _detect_state "$session" ;;
+  stop)   cmd_stop   "$TIP" ;;
+  *)      echo "Kullanım: gwen <dev|arge> <task|send|start|wait|read|status|stop>" ;;
+esac
