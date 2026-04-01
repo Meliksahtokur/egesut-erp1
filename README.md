@@ -27,7 +27,7 @@
 | **Sürü** | ✅ Tamamlandı | Hayvan kaydı, kart, grup/padok, filtre |
 | **Görev** | ✅ Tamamlandı | Otomatik görev üretimi, tamamlama, aşılama |
 | **Stok** | ✅ Tamamlandı | İlaç/malzeme, ledger, kritik eşik |
-| **Üreme** | 🟡 Kısmen | Tohumlama → gebelik → doğum akışı çalışıyor; RPC refaktörü eksik |
+| **Üreme** | 🟡 Kısmen | Tohumlama → gebelik → doğum akışı çalışıyor; aşılama frontend eksik |
 | **Klinik** | 🟡 Kısmen | DB hazır (cases sistemi, mig-022), frontend tamamlanmadı |
 
 ---
