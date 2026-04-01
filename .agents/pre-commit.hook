@@ -1,0 +1,33 @@
+#!/bin/bash
+branch=$(git branch --show-current)
+
+# main yasak
+if [ "$branch" = "main" ]; then
+  echo "❌ YASAK: main branch'e commit yapamazsın. gwen/dev veya gwen/arge kullan."
+  exit 1
+fi
+
+# Cross-session kirlilik kontrolü
+if [ "$branch" = "gwen/dev" ]; then
+  # Dev'de arge dosyaları yasak
+  bad=$(git diff --cached --name-only | grep -E "^\.qwen/|^skills/|gwen-mcp-servers/|agent-telemetry/" | head -3)
+  if [ -n "$bad" ]; then
+    echo "❌ YASAK: gwen/dev branch'inde arge dosyalarına dokunulamaz!"
+    echo "   Yasak dosyalar: $bad"
+    echo "   Arge işleri için gwen/arge branch'ini kullan."
+    exit 1
+  fi
+fi
+
+if [ "$branch" = "gwen/arge" ]; then
+  # Arge'de ERP kodu yasak
+  bad=$(git diff --cached --name-only | grep -E "^js/|^supabase/migrations/|^index\.html$" | head -3)
+  if [ -n "$bad" ]; then
+    echo "❌ YASAK: gwen/arge branch'inde ERP kodu değiştirilemez!"
+    echo "   Yasak dosyalar: $bad"
+    echo "   Dev işleri için gwen/dev branch'ini kullan."
+    exit 1
+  fi
+fi
+
+exit 0

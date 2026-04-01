@@ -1,0 +1,13 @@
+{
+  "security": { "auth": { "selectedType": "qwen-oauth" } },
+  "model": { "name": "coder-model" },
+  "tools": { "approvalMode": "yolo", "shell": { "enableInteractiveShell": true } },
+  "ui": { "hideTips": false },
+  "general": { "language": "auto" },
+  "mcpServers": {
+    "context7": {
+      "command": "node",
+      "args": ["REPO_PATH/.agents/mcp/context7/index.js"]
+    }
+  }
+}
