@@ -15,11 +15,17 @@
 #   <tip>: dev | arge
 # ─────────────────────────────────────────────────────────────
 
+export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
 WORKDIR="/root/egesut-erp1"
 QWEN_CMD="qwen"
 POLL_INTERVAL=30
 STUCK_THRESHOLD=4
 MAX_RETRIES=2
+# Default socket kullan — hem Claude hem kullanıcı terminali erişebilir
+# tmux komutları normal çalışır (extra -S flag yok)
+tmux() { command tmux "$@"; }
+export -f tmux 2>/dev/null || true
 
 # ─── Tip → Session adı ──────────────────────────────────────
 _resolve_session() {
@@ -110,6 +116,8 @@ cmd_start() {
   local session
   session=$(_resolve_session "$tip") || { echo "❌ Tip: dev | arge"; exit 1; }
 
+  local LOGFILE="/tmp/gwen-${tip}.log"
+
   local state
   state=$(_detect_state "$session")
 
@@ -147,7 +155,11 @@ cmd_start() {
     echo "📋 Session tipi kilitleniyor ($(_type_label $tip))..."
     _send "$session" "$(_type_context $tip)"
     sleep 5
+    # Log pipe başlat — kullanıcı tail -f ile izleyebilir
+    tmux pipe-pane -t "$session" -o "sed 's/\x1b\[[0-9;]*[mGKHF]//g; s/\x1b\[[0-9]*[ABCD]//g; s/\r//g' >> $LOGFILE" 2>/dev/null || true
+    chmod 666 "$LOGFILE" 2>/dev/null || true
     echo "✅ $(_type_label $tip) hazır"
+    echo "👁  Canlı izlemek için: tail -f $LOGFILE"
   else
     echo "⚠️  Durum: $state"
   fi

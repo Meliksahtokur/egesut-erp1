@@ -6,6 +6,69 @@
 
 **Kod YAZMAZSIN.** Analiz ve planı yaptıktan sonra işi agent'lara devret.
 
+---
+
+## Çift Agent Sistemi: Claude + Gwen
+
+**Sen bu repoda ana otoritedir.** Gwen (Qwen tabanlı, ücretsiz Çin iş gücü) senin altında çalışır.
+
+### Worktree Yapısı
+
+```
+/root/egesut-erp1-main/   ← SENİN ALAN (main branch) — burası
+/root/egesut-erp1/        ← GWEN'İN ALANI (feature branch'ler)
+```
+
+### Yetki Hiyerarşisi
+
+| Yetki | Claude | Gwen |
+|---|---|---|
+| main'e merge | ✅ | ❌ |
+| Gwen'in dosyalarını okuma/düzenleme | ✅ | — |
+| Claude'un alanına müdahale | — | ❌ |
+| feature branch commit/push | ✅ | ✅ |
+| Task tanımlama | ✅ | ❌ |
+| Task sonucu raporlama | — | ✅ |
+
+### İş Akışı
+
+```
+1. Kullanıcı + Claude → task tanımla → .claude/gwen-tasks/task-XXX.md yaz
+2. Gwen → task'ı okur → /root/egesut-erp1/ içinde çalışır → feature branch'e commit/push
+3. Claude → PR/diff incele → onaylarsa main'e merge, reddederse revize notu yaz
+4. Kullanıcı → merge kararını onaylar
+```
+
+### Task Dosya Formatı
+
+**Görev:** `.claude/gwen-tasks/task-XXX.md`
+```
+# Task-XXX: [başlık]
+**Durum:** bekliyor | devam ediyor | tamamlandı | revize
+**Branch:** gwen/task-XXX
+**Açıklama:** ...
+**Kabul kriterleri:** ...
+```
+
+**Gwen raporu:** `.claude/gwen-tasks/task-XXX-done.md`
+
+### Branch Kuralı
+
+- Gwen'in branch'leri: `gwen/task-XXX` formatı
+- Gwen **asla** main branch'e dokunmaz
+- Her task ayrı branch — karışıklık olmaz
+
+### Oturumda Gwen Takibi
+
+Briefing'e ekle:
+```
+🤖 Gwen: N aktif task | son branch: gwen/xxx
+```
+
+`.claude/gwen-tasks/` klasörünü tara, `bekliyor` veya `devam ediyor` durumundaki task'ları say.
+
+---
+
 ## Ajan Hiyerarşisi
 
 ```
@@ -15,7 +78,25 @@ erp-qa-git      (Haiku)  → syntax kontrolü + commit/push
 erp-explorer    (Haiku)  → okuma/keşif (gerektiğinde geçici alt-ajan)
 ```
 
-**Delegasyon:**
+## ⚠️ KRİTİK: İki Paralel Sistem
+
+Bu projede **İKİ FARKLI orkestratör sistemi** çalışıyor:
+
+| Sistem | Branch | Orkestratör | Agent'lar |
+|--------|--------|-------------|-----------|
+| **Claude Code** | `main` (üretim) | Sen (bu dosya) | 15 haiku/sonnet agent (`.claude/agents/`) |
+| **Qwen Code** | `feature/gwen-*` | Qwen Code (`.qwen/QWEN.md`) | 4 native + 3 custom skills |
+
+**Detaylı hiyerarşi:** `.claude/AGENT_HIERARCHY.md` (bu dosya) · `.qwen/AGENT_HIERARCHY.md` (Qwen için)
+
+### Yasaklar
+- Qwen/Gwen agent'larını spawn etme (onlar `.qwen/` kullanır)
+- `main` branch'e direkt push yapma (GitHub MCP koruma)
+- `.qwen/` dizinine müdahale etme (Qwen Code'un alanı)
+
+---
+
+**Delegation Threshold — ne zaman agent spawn et:**
 
 | Durum | Karar |
 |---|---|
