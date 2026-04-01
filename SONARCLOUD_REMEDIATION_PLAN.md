@@ -33,18 +33,28 @@
 | Doğum tarihi ileri tarih engeli | `js/app.js`, `js/forms.js` | `openM('m-animal')`'de `a-dt` inputuna `max=bugün` set edildi. Submit'te `yasGun < 0` guard eklendi. |
 | Dark mode: beyaz fon / hardcoded renkler | `js/ui.js` | `background:#fff` → `var(--card)` (bottom sheet + autocomplete kutular). `border:1px solid #eee` → `var(--card3)`. `color:#666` → `var(--ink3)`. Toplu replace. |
 
-#### ⏳ Kalan REST Write Path'ler (sonraki oturum)
+#### ⏳ Kalan REST Write Path'ler (SONRAKİ SPRİNT — Mart'ta tamamlandı)
 
-| Sorun | Dosya | Açıklama |
-|-------|-------|----------|
-| `write('tohumlama', ...)` — tohumlama sonuç güncelleme | `js/forms.js:640` | `m-toh-det` modal sonuç güncelleme — RPC'ye taşınmalı |
-| `write('tohumlama', ...)` — gebelik INSERT | `js/forms.js:804` | Gebelik kaydı — `tohumlama_sonuc_gebe` RPC'ye taşınmalı |
+| Sorun | Dosya | Durum |
+|-------|-------|-------|
+| ~~`write('tohumlama', ...)` — tohumlama sonuç~~ | ~~`js/forms.js:640`~~ | ✅ **BUG-009 tamamlandı** — `rpcOptimistic` kullanıyor |
+| ~~`write('tohumlama', ...)` — gebelik~~ | ~~`js/forms.js:804`~~ | ✅ **Tamamlandı** — `tohumlama_sonuc_gebe` RPC |
+| ~~`drug_products` direkt insert~~ | ~~`js/forms.js:765`~~ | ✅ **BUG-004 tamamlandı** — RPC'ye taşındı |
+| ~~`stok` direkt update~~ | ~~`js/forms.js:775`~~ | ✅ **BUG-005 tamamlandı** — RPC'ye taşındı |
+| ~~`drugs` batch update~~ | ~~`js/ui.js:1160`~~ | ✅ **BUG-006 tamamlandı** — RPC'ye taşındı |
+
+**Hâlâ Açık Olan:**
+| Sorun | Dosya | Durum |
+|-------|-------|-------|
+| `dataTrafficTekGonder` direkt REST bypass | `js/ui.js:2822` | 🔴 **BUG-007** — Ertelendi |
 
 #### ⏳ Ertelenen / Araştırma Gerektiren
 
 | Bug | Durum | Notlar |
 |-----|-------|--------|
-| Yeni hayvan ekleme — liste anlık güncellenmiyor | Ertelendi — **~15-25 dk** | `submitAnimal`'da `pullTables(['hayvanlar'])` → `renderFromLocal()` zinciri teorik doğru ama reload'dan sonra çalışıyor. En olası neden: `api.js:230` `_pulling` guard concurrent pull'da silently drop ediyor. Başlangıç noktası: `_pulling` true mu diye log ekle ya da MCP ile `hayvan_durum_view` propagation gecikmesini test et. |
+| ~~Yeni hayvan ekleme — liste anlık güncellenmiyor~~ | ✅ **Tamamlandı** — `9d1db71` | `pullTables` Promise-based lock eklendi |
+| BUG-007: Offline kuyruk | 🔴 **Ertelendi** | RPC gateway gerekli |
+| LOGIC-003: Offline tedavi UI | 🔴 **Ertelendi** | Cache merge mekanizması gerekli |
 
 #### 📝 Dikkat: MCP apply_migration Kuralı
 `mcp__supabase__apply_migration` kullandığında Supabase kendi timestamp'ini üretir (örn. `20260325075027`).
@@ -52,9 +62,9 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 
 ---
 
-### Oturum 2026-03-26
+### Oturum 2026-03-26 — ✅ TAMAMLANDI (Mart Sprinti)
 
-#### ✅ Tamamlanan Fixler
+#### ✅ Tamamlanan Fixler (2026-03-26)
 
 | Fix | Commit | Dosyalar | Açıklama |
 |-----|--------|----------|----------|
@@ -77,102 +87,39 @@ Lokal dosyayı da aynı versiyon numarasıyla adlandır. Aksi hâlde `supabase d
 
 ---
 
-## 🔴 TOHUMLAMA MODÜLÜ — ERTELENMİŞ BÜYÜK REFAKTÖRİNG
+## 🔴 TOHUMLAMA MODÜLÜ — ✅ MART 2026'DA TAMAMLANDI
 
-> **Durum:** Sonraki oturumda ele alınacak. Mevcut kod çalışıyor ancak mimari olarak kırık. Dokunmadan bırak.
+> **Durum:** Tohumlama modülü RPC refaktörü Mart 2026'da tamamlandı.
+> - `tohSonuc()` artık `rpcOptimistic` kullanıyor (BUG-009 ✅)
+> - `tohSonucGuncelle()` temizlendi
+> - `tohumlama_sonuc_gebe/bos/bekliyor` RPC'leri eklendi
+> - `gebeIsaretKaydet()` deprecated (kullanılmıyor)
 
-### Tespit Edilen Sorunlar (2026-03-26 analizi)
+### ✅ Çözülen Sorunlar (Mart 2026)
 
-#### ✅ Sorun 1: Geri Al (td2-geri-al-btn) hiç görünmüyor — Fix 13 ile çözüldü (205231c)
+| Sorun | Durum | Commit |
+|-------|-------|--------|
+| Sorun 1: Geri Al butonu görünmüyor | ✅ Çözüldü | `205231c` |
+| Sorun 2: `tohSonuc` isim çakışması | ✅ Çözüldü | `205231c` |
+| Sorun 3: `tohSonucGuncelle` korumasız | ✅ Çözüldü | `ba4612d`, `77d319d` |
+| Sorun 4: 3 Farklı Yazma Yolu | ✅ Çözüldü | `0357872`, `77d319d` |
+| Sorun 5: State Tutarsızlıkları | 🟡 Kısmen | Trigger migration 027 ile grup güncelleme eklendi |
 
-**Kök neden:** `js/ui.js` `openTohDet` fonksiyonunda islem_log sorgusu yanlış alanları arıyor:
-```js
-// YANLIŞ (mevcut):
-l.tip === 'TOHUMLAMA' && (l.payload?.kaynak_id === id || l.snapshot?.id === id)
-// DOĞRU:
-l.tip === 'TOHUMLAMA' && l.ref_id === id
-```
-`payload.kaynak_id` hiç doldurulmadı. `ref_id` migration 016'da eklendi, migration 028 sonrası kayıtlarda dolu.
+### Kalan İyileştirmeler (Düşük Öncelik)
 
-**Fix:** `js/ui.js:2215` — tek satır değişikliği.
-
----
-
-#### ✅ Sorun 2: `tohSonuc` fonksiyon isim çakışması — Fix 13 ile çözüldü (205231c)
-
-**Kök neden:** Aynı isimde iki fonksiyon tanımlı:
-- `js/forms.js:634` — guard'lı versiyon (Gebe/DoğumYaptı kontrolü var)
-- `js/ui.js:2232` — korumasız versiyon (direkt `write()`, hiç kontrol yok)
-
-Browser son yüklenen dosyayı kullanır → `ui.js` sonra yüklendiği için korumasız versiyon aktif. Guard hiç çalışmıyor.
-
-**Fix:** `ui.js:2232-2238` arasındaki 7 satırlık korumasız `tohSonuc` fonksiyonunu sil. `forms.js`'tekini kullan.
+- `hayvanlar.tohumlama_durumu` ↔ `tohumlama.sonuc` senkronizasyonu (otomatik, organik geçiş)
+- `islem_log` trigger versiyonları (migration 028 sonrası kayıtlar düzgün)
 
 ---
 
-#### ✅ Sorun 3: `tohSonucGuncelle` tamamen korumasız — Fix 12 ile kısmen çözüldü (ba4612d) — confirm guard eklendi
+## 🟠 KALAN BUG'LAR (Sonraki Sprint)
 
-**Kök neden:** `js/ui.js:2501` — hayvan kartındaki "🤰 Gebe" / "❌ Boş" butonları buraya bağlı:
-```js
-async function tohSonucGuncelle(tohId, sonuc, hayvanId){
-  await db.from('tohumlama').update({sonuc}).eq('id',tohId);
-  // Hiçbir kontrol yok
-}
-```
-Mevcut `sonuc` değerine bakılmaksızın her durumda yazılıyor. Gebe hayvan tek tıkla Boş yapılabiliyor.
+| Bug | Açıklama | Dosya | Öncelik |
+|-----|----------|-------|---------|
+| **BUG-007** | Offline kuyruk REST bypass | `js/ui.js:2822` | 🔴 Yüksek |
+| **LOGIC-003** | Offline tedavi UI görünmüyor | `js/ui.js:1787` | 🔴 Yüksek |
 
-**Fix:** Fonksiyon başına guard ekle:
-1. IDB'den mevcut kaydı oku
-2. `sonuc === 'Gebe'` veya `sonuc === 'Doğum Yaptı'` ise toast + return
-3. Her iki işlem için `confirm()` ekle
-
----
-
-#### Sorun 4: 3 Farklı Yazma Yolu (mimari kırıklık)
-
-| Yol | Nerede | Validation |
-|---|---|---|
-| `tohumlama_kaydet` RPC | `submitInsem()` | ✅ Tam |
-| `write()` REST PATCH | `tohSonuc()`, `gebeIsaretKaydet()` | ❌ Yok |
-| `db.from().update()` | `tohSonucGuncelle()` | ❌ Yok |
-
-RPC'yi bypass eden her path: yaş/cinsiyet/aktif gebelik kontrolü yok, sperma stok düşmüyor, görev oluşturulmuyor.
-
----
-
-#### Sorun 5: State Tutarsızlıkları
-
-- `hayvanlar.tohumlama_durumu` ↔ `tohumlama.sonuc` hiç senkronize değil
-- `hayvanlar.grup` Gebe olunca güncellenmiyor (trigger migration 027'de kaldırıldı, yerine yenisi eklenmedi)
-- `islem_log`'da 5 farklı trigger versiyonu; `ref_id` sadece migration 028 sonrası kayıtlarda dolu
-
----
-
-### Önerilen Çözüm Mimarisi (Sonraki Oturum)
-
-**Temel ilke:** Tohumlama verisi yalnızca RPC üzerinden değişir. Frontend tabloya direkt yazmaz.
-
-**Eklenecek RPC'ler:**
-| RPC | Geçiş | İş Kuralı |
-|---|---|---|
-| `tohumlama_kaydet` | yeni kayıt | mevcut (tam) |
-| `tohumlama_sonuc_gebe` | Bekliyor → Gebe | sadece Bekliyor'dan, grup güncelle |
-| `tohumlama_sonuc_bos` | Bekliyor → Boş | sadece Bekliyor'dan |
-| `tohumlama_abort` | Gebe → Abort | sadece Gebe'den, not al |
-| `dogum_kaydet` | Gebe → Doğum Yaptı | mevcut (tam) |
-
-**Kaldırılacaklar:**
-- `tohSonucGuncelle()` → `tohumlama_sonuc_gebe/bos` RPC'sine taşı
-- `gebeIsaretKaydet()` içindeki direkt `write()` → `tohumlama_sonuc_gebe` RPC
-- `ui.js`'teki korumasız `tohSonuc` → sil
-
-**Durum makinesi:**
-```
-[Bekliyor] → [Gebe]        → hayvanlar.grup güncelle
-    ↓             ↓
-  [Boş]      [Doğum Yaptı] → dogum tablosu INSERT
-               [Abort]     → islem_log ABORT_KAYDI
-```
+**Not:** Tohumlama modülü sorunları (Sorun 1-5) Mart 2026'da tamamlandı — detaylar yukarıda.
 
 ---
 
