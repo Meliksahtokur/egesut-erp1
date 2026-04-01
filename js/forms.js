@@ -72,6 +72,9 @@ async function submitAnimal(btn) {
       openDet(editId);
     } else {
       // EKLEME MODU
+      // UI Telemetry: hayvan ekle submit
+      uiLog('action', 'hayvan_ekle_submit', { kupe_no: kupe || devlet, grup: v('a-grup') });
+
       const data = await rpc('hayvan_ekle', {
         p_kupe_no:        kupe || null,
         p_devlet_kupe:    devlet || null,
@@ -115,6 +118,9 @@ async function submitBirth(btn) {
   const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
 
+  // UI Telemetry: doğum submit
+  uiLog('action', 'dogum_submit', { anne_id: anne.id, tarih, kupe });
+
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     const data = await rpc('dogum_kaydet', {
@@ -157,6 +163,9 @@ async function submitInsem(btn) {
 
   const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
+
+  // UI Telemetry: tohumlama submit
+  uiLog('action', 'tohumlama_submit', { hayvan_id: hayvan.id, tarih });
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {

@@ -67,17 +67,23 @@ gwen arge task "Yeni session-rules skill'i oluştur"
 
 ### Dev Session Kuralları
 
+**Branch Koruması (KRİTİK):**
+- Fullstack skill SADECE `gwen/dev` ve `gwen/task-*` branch'lerinde çalışır
+- `main`, `development`, `gwen-arge` branch'lerine geçiş YASAK
+- Pre-commit hook ile otomatik engellenir
+
 ```
 ✅ Yapılabilir:
 - Tohumlama, doğum, hayvan yönetimi geliştirme
 - UI bug fix'leri (fix-ui skill)
 - RPC/schema değişiklikleri
-- Feature branch'lerde kod üretimi
+- Feature branch'lerde kod üretimi (gwen/task-*)
 
 ❌ Yasak:
 - Arge işleri (skill/agent/MCP geliştirme)
 - .qwen/ dizininde değişiklik
 - session-rules ihlali
+- main/development/gwen-arge branch'lerine geçiş
 ```
 
 ### Arge Session Kuralları
