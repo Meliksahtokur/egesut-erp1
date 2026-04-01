@@ -362,7 +362,7 @@ function stopBackgroundSync() {
 // ── REALTIME SUBSCRIPTIONS ──────────────────
 // supabase_realtime publication aktif → WebSocket kanalları
 
-const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','islem_log'];
+const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','islem_log','ui_logs'];
 let _realtimeChannel = null;
 
 function initRealtime() {
@@ -377,6 +377,7 @@ function initRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tohumlama' },    () => pullTables(['tohumlama']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dogum' },        () => pullTables(['dogum']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'islem_log' },    () => pullTables(['islem_log']))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  payload => console.log('[ui_log]', payload.new))
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
         console.log('✅ Realtime aktif');
