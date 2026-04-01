@@ -359,6 +359,35 @@ function stopBackgroundSync() {
   }
 }
 
+// ── REALTIME SUBSCRIPTIONS ──────────────────
+// supabase_realtime publication aktif → WebSocket kanalları
+
+const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','islem_log'];
+let _realtimeChannel = null;
+
+function initRealtime() {
+  if (_realtimeChannel) return; // zaten başlatıldı
+
+  _realtimeChannel = db
+    .channel('erp-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'hayvanlar' },    () => pullTables(['hayvanlar']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'gorev_log' },    () => pullTables(['gorev_log']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'stok' },         () => pullTables(['stok','stok_hareket']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'stok_hareket' }, () => pullTables(['stok','stok_hareket']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tohumlama' },    () => pullTables(['tohumlama']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'dogum' },        () => pullTables(['dogum']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'islem_log' },    () => pullTables(['islem_log']))
+    .subscribe(status => {
+      if (status === 'SUBSCRIBED') {
+        console.log('✅ Realtime aktif');
+        stopBackgroundSync(); // polling artık gereksiz
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('⚠️ Realtime bağlantı hatası, polling devam ediyor');
+        startBackgroundSync(30000); // fallback
+      }
+    });
+}
+
 async function getData(table, filterFn) {
   const data = await idbGetAll(table);
   return filterFn ? data.filter(filterFn) : data;
