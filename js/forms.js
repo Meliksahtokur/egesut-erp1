@@ -141,8 +141,9 @@ async function submitBirth(btn) {
     const babaText = g('b-baba-text'); if (babaText) babaText.style.display = 'none';
 
     pullTables(['hayvanlar','dogum','gorev_log']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast('❌ Doğum kaydedilemedi: ' + e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
+  } catch (e) {
+    toast('❌ Doğum kaydedilemedi: ' + e.message, true);
+  } finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
 }
 
 // ── TOHUMLAMA ────────────────────────────────
@@ -159,7 +160,7 @@ async function submitInsem(btn) {
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    await rpc('tohumlama_kaydet', {
+    const result = await rpc('tohumlama_kaydet', {
       p_hayvan_id: hayvan.id,
       p_tarih:     tarih,
       p_sperma:    sperma,
@@ -172,8 +173,10 @@ async function submitInsem(btn) {
     checkSpermaUyari();
     // RPC otomatik invalidation yapıyor, ek çağrı gerekmiyor
     pullTables(['tohumlama','gorev_log','hayvanlar']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast('❌ Tohumlama kaydedilemedi: ' + e.message, true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
+  } catch (e) {
+
+    toast('❌ Tohumlama kaydedilemedi: ' + e.message, true);
+  } finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
 }
 
 // ── KIZGINLIK ────────────────────────────────
@@ -290,12 +293,14 @@ async function abortKaydet(hayvanId, tohId) {
   if (!confirm('Bu hayvanda abort / erken doğum mu oldu? Gebelik kaydı kapatılacak.')) return;
   const notlar = prompt('Abort detayı (opsiyonel):') || '';
   try {
-    await rpc('abort_kaydet', {
+    // Yeni tohumlama_abort RPC kullan (islem_log kaydı oluşturur)
+    const result = await rpc('tohumlama_abort', {
       p_tohumlama_id: tohId,
       p_notlar:       notlar || null,
     });
+    if (result?.ok === false) { toast('❌ ' + (result.error || result.mesaj), true); return; }
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
-    pullTables(['tohumlama','gorev_log','hayvanlar']).then(renderSafe).catch(console.warn);
+    pullTables(['tohumlama','hayvanlar','islem_log']).then(renderSafe).catch(console.warn);
     openDet(hayvanId);
   } catch (e) { toast('❌ Abort kaydedilemedi: ' + e.message, true); }
 }
@@ -632,7 +637,7 @@ async function hstSilOnay() {
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
 // openTohDet → ui.js'de tanımlı
-async function tohSonuc(sonuc) {
+async function tohSonuc(sonuc, btn) {
   if (!_curToh) return;
   if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {
     toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın', true); return;

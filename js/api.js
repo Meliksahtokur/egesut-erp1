@@ -203,6 +203,7 @@ const RPC_TABLES = {
   tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
   tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log'],
   tohumlama_sonuc_bekliyor:  ['hayvanlar','tohumlama','islem_log'],
+  tohumlama_abort:           ['hayvanlar','tohumlama','islem_log'],
   kizginlik_kaydet:          ['kizginlik_log','gorev_log'],
   abort_kaydet:              ['tohumlama','gorev_log'],
   hayvan_not_ekle:           ['hayvanlar'],
