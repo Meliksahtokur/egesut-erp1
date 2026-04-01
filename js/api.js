@@ -6,11 +6,12 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 13;
+const DB_VER  = 14;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu',
-                  'cases','diseases','drugs','drug_classes','drug_products','drug_administrations'];
-const APP_VERSION = '2026-03-12-cln03';
+                  'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
+                  'vaccines','vaccination_schedule','vaccination_log'];
+const APP_VERSION = '2026-03-31-vac01';
 
 // ── SUPABASE SDK ────────────────────────────
 const { createClient } = window.supabase;
@@ -202,6 +203,7 @@ const RPC_TABLES = {
   tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket'],
   tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
   tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log'],
+  tohumlama_abort:           ['hayvanlar','tohumlama','islem_log'],
   tohumlama_sonuc_bekliyor:  ['hayvanlar','tohumlama','islem_log'],
   kizginlik_kaydet:          ['kizginlik_log','gorev_log'],
   abort_kaydet:              ['tohumlama','gorev_log'],
@@ -214,6 +216,7 @@ const RPC_TABLES = {
   remove_drug_administration:['stok','stok_hareket','drug_administrations'],
   close_case:                ['cases'],
   update_treatment_time:     [],
+  add_vaccination:           ['vaccination_log','gorev_log','islem_log'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────
@@ -252,6 +255,9 @@ async function pullTables(tables = []) {
       islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
       tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
+      vaccines:     () => db.from('vaccines').select('*').order('name'),
+      vaccination_schedule: () => db.from('vaccination_schedule').select('*').order('sequence_order'),
+      vaccination_log: () => db.from('vaccination_log').select('*').order('vaccination_date', { ascending: false }),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
@@ -327,9 +333,37 @@ async function syncNow() {
 }
 
 // ── AUTO SYNC ───────────────────────────────
-// Her 5sn offline queue'yu otomatik gönderir
-setInterval(syncNow, 5000);
+// Online event'te syncNow tetiklenir (polling kaldırıldı — organik realtime geçişi)
 window.addEventListener('online', syncNow);
+
+// ── REALTIME SUBSCRIPTIONS (Organik geçiş — yeni özellikler kullanır) ─────
+// Sprint 5 — Realtime kanalları:
+// - hayvanlar: INSERT/UPDATE/DELETE → renderFromLocal()
+// - gorev_log: INSERT → task badge güncelle
+// - stok_hareket: INSERT → stok hesapla
+//
+// Geçici çözüm: Her 30sn'de bir arka plan sync (polling'den 6x daha yavaş)
+// Hedef: Supabase Realtime WebSocket kanalları (sonraki sprint)
+let _backgroundSyncInterval = null;
+
+function startBackgroundSync(intervalMs = 30000) {
+  if (_backgroundSyncInterval) clearInterval(_backgroundSyncInterval);
+  _backgroundSyncInterval = setInterval(() => {
+    if (navigator.onLine && !_syncing) {
+      syncNow().catch(console.warn);
+    }
+  }, intervalMs);
+  console.log(`🔄 Background sync başladı (her ${intervalMs/1000}sn)`);
+}
+
+function stopBackgroundSync() {
+  if (_backgroundSyncInterval) {
+    clearInterval(_backgroundSyncInterval);
+    _backgroundSyncInterval = null;
+    console.log('⏹️ Background sync durduruldu');
+  }
+}
+
 async function getData(table, filterFn) {
   const data = await idbGetAll(table);
   return filterFn ? data.filter(filterFn) : data;
