@@ -3,6 +3,34 @@
 // Global state, routing, init
 // ══════════════════════════════════════════
 
+// ── UI TELEMETRY ─────────────────────────────
+// Test sırasında kullanıcı hareketleri ve UI hatalarını Supabase'e loglar
+const _sessionId = Math.random().toString(36).slice(2, 9);
+
+async function uiLog(level, message, extra = {}) {
+  try {
+    await db.from('ui_logs').insert({
+      level, message,
+      source: extra.source || null,
+      payload: Object.keys(extra).length ? extra : null,
+      session_id: _sessionId
+    });
+  } catch (_) {}  // log hatası uygulamayı durdurmasın
+}
+
+// Global hata yakalayıcılar
+window.onerror = (msg, src, line, col, err) => {
+  uiLog('error', msg, { source: `${src}:${line}`, stack: err?.stack });
+};
+window.addEventListener('unhandledrejection', e => {
+  uiLog('error', e.reason?.message || String(e.reason), { type: 'unhandled_rejection' });
+});
+const _origConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  uiLog('error', args.join(' '));
+  _origConsoleError(...args);
+};
+
 // ── SABİT VERİLER ──────────────────────────
 // HEKIMLER config.js'den geliyor (const), burada tanımlanmaz
 // VARSAYILAN_HEKIM config.js'den geliyor
