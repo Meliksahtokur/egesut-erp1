@@ -191,6 +191,33 @@ showToast('Uyarı mesajı', 'warning');
 
 ---
 
+## 🔍 Push Öncesi Review (ZORUNLU)
+
+**Workflow:**
+```bash
+# 1. Commit
+git commit -m "DONE: dev — [açıklama]"
+
+# 2. Review (gwen-reviewer agent)
+/review
+
+# Agent şunları yapar:
+# - git diff HEAD alır
+# - Native /review skill'ini çağırır (Qwen Code)
+# - Custom check yapar (domain/RPC/security)
+# - Tek rapor üretir
+
+# 3. Push (sadece onaylı ise)
+git push origin <branch>
+```
+
+**Review Kriterleri:**
+- ✅ Native review: Syntax, best practice, code quality
+- ✅ Custom check: Domain rules, RPC contract, security, Türkçe mesaj
+- ✅ Push kararı: ✅ ONAYLI / ❌ BLOKE
+
+---
+
 ## 📋 Checklist (Her Task'ta)
 
 ```
@@ -201,6 +228,8 @@ showToast('Uyarı mesajı', 'warning');
 [ ] Türkçe toast/error mesajları var mı?
 [ ] Branch: gwen/task-* kullanıldı mı?
 [ ] DONE: commit mesajı hazır mı?
+[ ] /review çağrıldı mı?
+[ ] Review onayı alındı mı?
 ```
 
 ---

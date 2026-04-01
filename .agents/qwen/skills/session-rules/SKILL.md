@@ -153,6 +153,63 @@ git commit -m "DONE: arge — [açıklama]"
 
 ---
 
+## 🔍 HİBRİT REVIEW WORKFLOW (ZORUNLU)
+
+**Her push öncesi review yapılmalıdır.**
+
+### Workflow
+
+```bash
+# 1. Commit
+git commit -m "DONE: [session-tipi] — [açıklama]"
+
+# 2. Review (gwen-reviewer agent)
+/review
+
+# Agent şunları yapar:
+# - git diff HEAD alır
+# - Native /review skill'ini çağırır (Qwen Code)
+# - Custom check yapar (domain/RPC/security/Türkçe mesaj)
+# - Tek rapor üretir
+
+# 3. Push (sadece onaylı ise)
+git push origin <branch>
+```
+
+### Review Kriterleri
+
+| Session | Native Review | Custom Check |
+|---------|--------------|--------------|
+| **dev** | Syntax, best practice | Domain rules, RPC contract, security, Türkçe mesaj |
+| **arge** | Syntax, best practice | Architecture consistency, security, Türkçe dokümantasyon |
+
+### Push Kararı
+
+```
+✅ ONAYLI → Push yapılabilir
+❌ BLOKE → Reviewer düzeltme ister → Fix → Tekrar review
+```
+
+### Dev Session Review
+
+```bash
+# ERP geliştirme sonrası
+git commit -m "DONE: dev — Tohumlama tarih validasyonu"
+/review
+# ✅ ONAYLI → git push origin feature/gwen-dev
+```
+
+### Arge Session Review
+
+```bash
+# Skill/agent geliştirme sonrası
+git commit -m "DONE: arge — session-rules skill güncellendi"
+/review
+# ✅ ONAYLI → git push origin feature/gwen-arge
+```
+
+---
+
 ## 📋 Session Checklist
 
 ### Session Başlangıcı
@@ -180,6 +237,8 @@ git commit -m "DONE: arge — [açıklama]"
 [ ] Syntax kontrolü geçti (node --check)
 [ ] Duplikat kontrolü yapıldı (grep)
 [ ] DONE: commit mesajı hazır
+[ ] /review çağrıldı mı?
+[ ] Review onayı alındı mı?
 ```
 
 ---
@@ -237,7 +296,7 @@ git commit -m "DONE: arge — [açıklama]"
 
 ```
 ┌─────────────────────────────────────────────┐
-│  SESSION RULES — 3 KRİTİK KURAL             │
+│  SESSION RULES — 4 KRİTİK KURAL             │
 ├─────────────────────────────────────────────┤
 │  1. Session tipi kilidi (dev/arge)          │
 │     → Başında belirlenir, değişmez          │
@@ -251,6 +310,11 @@ git commit -m "DONE: arge — [açıklama]"
 │     → İlk satır DONE: ile başlar            │
 │     → Session tipi belirtilir               │
 │     → Türkçe mesaj                          │
+├─────────────────────────────────────────────┤
+│  4. HİBRİT REVIEW WORKFLOW                  │
+│     → Commit → /review → Push               │
+│     → Native + Custom check                 │
+│     → ONAYLI/BLOKE kararı                   │
 └─────────────────────────────────────────────┘
 ```
 

@@ -179,7 +179,32 @@ cat gwen-cli.sh
 # MCP bağlantı test
 ```
 
-### 5. Dokümantasyon
+### 5. Review (ZORUNLU)
+
+**Workflow:**
+```bash
+# 1. Commit
+git commit -m "DONE: arge — [iyileştirme özeti]"
+
+# 2. Review (gwen-reviewer agent)
+/review
+
+# Agent şunları yapar:
+# - git diff HEAD alır
+# - Native /review skill'ini çağırır (Qwen Code)
+# - Custom check yapar (architecture/security/consistency)
+# - Tek rapor üretir
+
+# 3. Push (sadece onaylı ise)
+git push origin feature/gwen-arge
+```
+
+**Review Kriterleri:**
+- ✅ Native review: Syntax, best practice, code quality
+- ✅ Custom check: Architecture consistency, security, Türkçe dokümantasyon
+- ✅ Push kararı: ✅ ONAYLI / ❌ BLOKE
+
+### 6. Dokümantasyon
 
 ```markdown
 # Değişiklik Log
@@ -213,6 +238,8 @@ Her iyileştirme sonrası:
 [ ] Test edildi (./gwen-cli.sh)
 [ ] Dokümantasyon güncellendi
 [ ] DONE: commit mesajı hazır
+[ ] /review çağrıldı mı?
+[ ] Review onayı alındı mı?
 ```
 
 ---
