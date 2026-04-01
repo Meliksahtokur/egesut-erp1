@@ -1,0 +1,53 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx *)",
+      "Bash(sleep *)",
+      "Bash(curl *)",
+      "Bash(python3 *)",
+      "Bash(git add *)",
+      "Bash(git restore *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(pkill *)",
+      "Read(//root/.qwen/**)",
+      "Bash(mkdir *)",
+      "Bash(chmod *)",
+      "Bash(/root/egesut-erp1/gwen-cli.sh)",
+      "Bash(which *)",
+      "Bash(ls *)",
+      "Bash(qwen *)",
+      "Bash(source *)",
+      "Bash(gwen *)",
+      "Bash(alias *)",
+      "Bash(head *)",
+      "Bash(/root/egesut-erp1/qwen-gwen.sh *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Read(//root/.claude/**)",
+      "Bash(node *)",
+      "Bash(npm install)",
+      "Bash(timeout *)",
+      "Bash(apt-get *)",
+      "Bash(dnf *)",
+      "Bash(bash *)"
+    ]
+  },
+  "$version": 3,
+  "tools": {
+    "approvalMode": "yolo"
+  },
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {
+        "CONTEXT7_API_KEY": "ctx7sk-3690ea35-9122-479a-b65b-d4fe04478ff1"
+      },
+      "trust": true
+    }
+  }
+}
