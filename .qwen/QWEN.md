@@ -285,4 +285,22 @@ cat file3
 
 ---
 
+## 🧪 Test Protokolü (ui_logs + Realtime)
+
+Test sırasında Gwen şunları yapar:
+
+1. **Kullanıcı test başlamadan önce:** `ui_logs` tablosunu temizle (opsiyonel) veya `session_id` not al
+2. **Test sırasında:** `ui_logs` realtime kanalını izle — her INSERT gelince ekrana yaz
+3. **Test bittikten sonra:**
+   ```sql
+   select level, message, source, payload, created_at
+   from ui_logs
+   where session_id = '[session_id]'
+   order by created_at;
+   ```
+4. **Hata varsa:** `level = 'error'` kayıtlarına bak → DB ile karşılaştır (`islem_log`)
+5. **Rapor:** Hata + aksiyon zinciri özeti çıkar
+
+---
+
 **Son Güncelleme:** 2026-04-01 — Claude orkestratör sistemi, session tipi kilidi
