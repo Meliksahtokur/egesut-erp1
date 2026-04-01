@@ -31,10 +31,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: forms.js + ui.js
 - Önem: orta
-- Durum: yeni
+- Durum: **çözüldü** ✅
 - Açıklama: openNotModal fonksiyonu forms.js:319 ve ui.js:663'te iki kez tanımlı. ui.js versiyonu input temizleme adımını içermiyor. Hangisinin geçerli olduğu script yükleme sırasına bağlı.
 - Tetikleyici: Not ekleme modalı açılırken
-- İlgili commit: bilinmiyor
+- İlgili commit: gwen/dev-005
 
 ## [2026-03-27] BUG-003 selDis duplikat — ui.js versiyonunda tani-btn reset eksik
 - Kaynak: erp-explorer (sistem denetimi)
@@ -67,10 +67,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: ui.js
 - Önem: yüksek
-- Durum: yeni
+- Durum: **çözüldü** ✅
 - Açıklama: drugs tablosuna direkt batch .update() çağrılıyor. RLS policy kontrolü yapılmamış.
 - Tetikleyici: Stok-ilaç bağlantısı silinirken
-- İlgili commit: bilinmiyor
+- İlgili commit: gwen/dev-005
 
 ## [2026-03-27] BUG-007 Offline kuyruk gönderiminde direkt REST bypass (ui.js:2745,2749)
 - Kaynak: erp-explorer (sistem denetimi)
@@ -85,16 +85,16 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-debug-agent
 - Modül: forms.js
 - Önem: kritik
-- Durum: inceleniyor
+- Durum: **çözüldü** ✅
 - Açıklama: forms.js:640 — `write()` REST PATCH kaldırılacak. `tohumlama_sonuc_gebe/bos/bekliyor` RPC'leri oluşturuldu (migration 20260327000001), frontend güncellemesi yapılmadı. Sonraki oturumda `tohSonuc()` fonksiyonu rpcOptimistic'e geçirilecek.
 - Tetikleyici: Tohumlama detay modalındaki Gebe/Boş/Bekliyor butonları
-- İlgili commit: —
+- İlgili commit: gwen/dev-005
 
 ## [2026-03-27] BUG-008 submitInsem sonrası UI refresh garantisiz — pullTables kaldırıldı
 - Kaynak: arge-analyst
 - Modül: forms.js
 - Önem: orta
-- Durum: yeni
+- Durum: **çözüldü** ✅
 - Açıklama: d562d03 commit'inde submitInsem() içindeki `pullTables(['tohumlama','gorev_log']).then(renderSafe)` çağrısı "RPC otomatik invalidation yapıyor" yorumuyla kaldırıldı. Ancak RPC'nin gerçekten otomatik UI invalidation tetikleyip tetiklemediği doğrulanmamış. Eğer RPC'nin Realtime/websocket kanalı aktif değilse veya invalidation mekanizması çalışmazsa, tohumlama ve görev listesi eski veriyi göstermeye devam eder.
 - Tetikleyici: Tohumlama kaydı yapıldıktan sonra liste ekranına dönüldüğünde
-- İlgili commit: d562d03
+- İlgili commit: gwen/dev-005

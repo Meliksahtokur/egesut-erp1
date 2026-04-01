@@ -65,3 +65,6 @@ agent-telemetry/
 # Qwen agent dosyaları
 .qwen/
 gwen-mcp.log
+
+# Qwen backup
+.qwen-backup/
