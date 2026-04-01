@@ -781,19 +781,19 @@ async function submitStokAdd(btn) {
         if (!etkenId) { toast('Etken madde seçilmedi', true); return; }
         const konst = g('sa-konst')?.value?.trim() || null;
         const route = g('sa-route')?.value || 'IM';
-        const { data: dp, error: dpErr } = await db.from('drug_products').insert([{
-          drug_class_id:      etkenId,
-          brand_name:         urun,
-          concentration:      konst ? Number.parseFloat(konst) : null,
-          concentration_unit: konst || null,
-          default_route:      route,
-          default_unit:       birim,
-        }]).select('id').single();
-        if (dpErr) throw new Error('İlaç kaydı oluşturulamadı: ' + dpErr.message);
-        if (dp?.id) {
-          await db.from('stok').update({ drug_product_id: dp.id }).eq('id', stokId);
-          _drugsCache = [];
-        }
+        // RPC ile drug_product ekle (stok bağlantısı atomik)
+        const { data: dp, error: dpErr } = await db.rpc('drug_product_ekle', {
+          p_drug_class_id:      etkenId,
+          p_brand_name:         urun,
+          p_concentration:      konst ? Number.parseFloat(konst) : null,
+          p_concentration_unit: konst || null,
+          p_default_route:      route,
+          p_default_unit:       birim,
+          p_stok_id:            stokId || null
+        });
+        if (dpErr) throw new Error(dpErr.message);
+        if (!dp) throw new Error('İlaç kaydı oluşturulamadı');
+        _drugsCache = [];
       }
       toast(`✅ ${urun} eklendi`);
     }

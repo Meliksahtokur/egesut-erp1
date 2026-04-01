@@ -467,7 +467,7 @@ async function _detRenderGecmis(id,el){
 // ──────────────────────────────────────────
 // HAYVAN DETAY — ana fonksiyon
 // ──────────────────────────────────────────
-async function _detSaglikRender(el,activeCases,allDiseasesList,a){
+async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[]){
   const activeCaseChips=activeCases.length
     ?`<div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px">`+activeCases.map(c=>{
         const dis=allDiseasesList.find(d=>d.id===c.disease_id);
@@ -475,8 +475,35 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a){
       }).join('')+`</div>`
     :'';
   const _caseListHtml=await renderCasesForAnimal(a.id);
-  el.innerHTML=activeCaseChips+
-    `<div style="padding:6px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Yeni Vaka Aç</button></div>`+_caseListHtml;
+  const vaxButton = `<div style="padding:6px 0 6px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button>
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${a.kupe_no||a.devlet_kupe||a.id}')">💉 Aşı Uygula</button>
+  </div>`;
+  
+  // Aşı geçmişi
+  const vaccines = await idbGetAll('vaccines');
+  const vaxHistory = vaxLogs.length
+    ? `<div style="margin-top:12px;border-top:2px solid var(--card3);padding-top:8px">
+        <div style="font-size:.7rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">💉 Aşı Geçmişi</div>
+        ` + vaxLogs.map(log => {
+          const vac = vaccines.find(v => v.id === log.vaccine_id);
+          const vacName = vac?.name || '?';
+          const disease = vac?.disease_target ? ` — ${vac.disease_target}` : '';
+          const nextDue = log.next_due_date ? `<div style="font-size:.68rem;color:var(--amber);margin-top:3px">⏰ Sonraki: ${fmtTarih(log.next_due_date)}</div>` : '';
+          return `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--card2)">
+              <div style="flex:1">
+                <div style="font-weight:600;font-size:.8rem;color:var(--ink)">💉 ${vacName}${disease}</div>
+                <div style="font-size:.68rem;color:var(--ink3)">${fmtTarih(log.vaccination_date)} · ${log.dose_given}${log.unit} ${log.route}</div>
+                ${nextDue}
+              </div>
+            </div>
+          `;
+        }).join('') +
+      `</div>`
+    : `<div style="margin-top:12px;border-top:2px solid var(--card3);padding-top:8px"><div style="font-size:.75rem;color:var(--ink3)">💉 Aşı kaydı yok</div></div>`;
+  
+  el.innerHTML=activeCaseChips+vaxButton+_caseListHtml+vaxHistory;
 }
 function _detGorevHtml(a,tasks,subs,today){
   const kupe=a.kupe_no||a.devlet_kupe||a.id;
@@ -490,9 +517,9 @@ async function openDet(id){
   document.getElementById('det-name').textContent='Yükleniyor…';
   ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   showTab('ozet',document.querySelector('.tab'));
-  await pullTables(['cases','diseases','drugs']);
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log']);
   try {
-    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases]=await Promise.all([
+    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('cases',c=>c.animal_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
@@ -501,11 +528,13 @@ async function openDet(id){
       getData('gorev_log',t=>t.hayvan_id===id&&!t.tamamlandi&&!!t.parent_id),
       getData('hayvanlar',a=>a.anne_id===id),
       getData('cases',c=>c.animal_id===id&&c.status==='active'),
+      getData('vaccination_log',v=>v.animal_id===id),
     ]);
     const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
+    vaxLogs.sort((x,y)=>(y.vaccination_date||'').localeCompare(x.vaccination_date||''));
     const yasRaw=a.dogum_tarihi?Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000):null;
     const _yasGunBase=yasRaw<0||yasRaw>36500?'Geçersiz tarih':yasHesapla(a.dogum_tarihi);
     const yasGun=yasRaw===null?'—':_yasGunBase;
@@ -524,7 +553,7 @@ async function openDet(id){
     document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
 
     const allDiseasesList=await idbGetAll('diseases');
-    await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a);
+    await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a,vaxLogs);
 
     document.getElementById('tab-ureme').innerHTML=_detUremeHtml(a,tohs);
 

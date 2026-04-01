@@ -47,21 +47,23 @@ repomix-output.xml
 .aider.chat.history.md
 .aider.tags.cache.v3/
 
-# SQL dump dosyaları
-dbsnapshot*.sql
-*snapshot*.sql
-
-# Aider editor dosyaları
-.aider*
-.aider.tags.cache.v4/
-
-# Log dosyaları
-*.log
-.update-logs/
-
-# Agent telemetri
-agent-telemetry/
-
 # Qwen agent dosyaları
 .qwen/
 gwen-mcp.log
+
+# Qwen backup
+.qwen-backup/
+
+# Gwen araçları (repoya girmez)
+gwen-mcp-servers/
+agent-telemetry/
+*.sh.backup
+*.sh.disabled
+gwen-mcp-server.js
+mcp-watchdog.sh
+fedora-optimized.sh
+proot-simple.sh
+session-clean.sh
+update-cli
+"$WATCHDOG_PID_FILE"
+.update-status.json
