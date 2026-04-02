@@ -6,6 +6,8 @@
 `.claude/tasks/arge/ACTIVE.md` dosyasını kontrol et.
 
 ## Son Tamamlanan Task
+- `task-arge-015-done.md` — Gwen Orchestrator (Qwen Code için) ✅
+- `task-arge-014-done.md` — Bekleyen eksikler kapatıldı (9 agent) ✅
 - `task-arge-013-done.md` — Operator pattern fix + Git hook'lar ✅
 - `task-arge-012-done.md` — Operator pattern: 4 agent + gwen.md workflow ✅
 - `task-arge-011-done.md` — Operator mimarisi tasarımı ✅
