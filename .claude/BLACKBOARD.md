@@ -1,6 +1,6 @@
 # Gwen Task Board
 
-**Güncelleme:** 2026-04-02 17:30
+**Güncelleme:** 2026-04-01 17:30
 
 > Canlı task dağıtım tablosu. Her Gwen giriş yapar, task alır, çıkış yapar.
 
@@ -37,7 +37,7 @@
 
 | Task | Session | Agent | Durum | Başlangıç | Dosyalar |
 |------|---------|-------|-------|-----------|----------|
-| task-bug003-revize | dev | Gwen | devam ediyor | 2026-04-02 | .gitignore, forms.js |
+| — | — | — | — | — | — |
 
 ### 📋 Bekleyen Dev Task'ları
 
@@ -50,6 +50,7 @@
 
 | Task | Session | Bitiş | Merge |
 |------|---------|-------|-------|
+| task-bug003-revize | dev | 2026-04-02 05:50 | ⏳ review bekliyor |
 | task-dev-006 | dev | 14:00 | ✅ |
 
 ---
