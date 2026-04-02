@@ -104,11 +104,12 @@ ARGE session → SADECE gwen/arge branch
 
 ### Task Queue
 
-**Görev:** `/root/egesut-erp1-main/.claude/gwen-tasks/task-XXX.md` dosyasını oku
+**Görev:** DEV session → `/root/egesut-erp1-main/.claude/tasks/dev/task-XXX.md` dosyasını oku
+- ARGE session → `/root/egesut-erp1-main/.claude/tasks/arge/task-XXX.md` dosyasını oku
 
 **Tamamlanınca:**
 1. `git push origin gwen/dev` (veya gwen/arge) — push et
-2. `/root/egesut-erp1-main/.claude/gwen-tasks/task-XXX-done.md` yaz:
+2. Done raporu yaz (DEV: `.claude/tasks/dev/`, ARGE: `.claude/tasks/arge/`):
 ```
 # Task-XXX Tamamlandı
 **Branch:** gwen/dev (veya gwen/arge)
@@ -124,7 +125,8 @@ ARGE session → SADECE gwen/arge branch
 
 ```
 1. TASK AL
-   - /root/egesut-erp1-main/.claude/gwen-tasks/ klasörünü tara
+   - DEV session  → /root/egesut-erp1-main/.claude/tasks/dev/ klasörünü tara
+   - ARGE session → /root/egesut-erp1-main/.claude/tasks/arge/ klasörünü tara
    - "bekliyor" durumundaki task-XXX.md'yi al
    - Veya kullanıcıdan direkt komut
    - ⚠️ Branch kontrol et: DEV task → gwen/dev, ARGE task → gwen/arge
