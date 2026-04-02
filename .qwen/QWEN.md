@@ -22,7 +22,7 @@ Claude (orkestratör)
 │                 ├── Test runner kendi subagenti
 │                 └── Sadece ERP geliştirme — arge işi yasak
 └── gwen-arge    → AR-GE Qwen (sistem geliştirme)
-                  ├── Qwen skills, agents, settings geliştirme
+                  ├── Qwen skills, agents, MCP geliştirme
                   ├── Workflow iyileştirme
                   └── Sadece AR-GE işleri — ERP dev yasak
 ```
@@ -279,22 +279,37 @@ cat file3
 
 ---
 
-## 🧪 Test Protokolü (ui_logs + Realtime)
+## 🔒 4 DEMİR KURAL (Gwen Workflow)
 
-Test sırasında Gwen şunları yapar:
+### Kural 1: Task İzolasyonu
+- **gwen/arge** → SADECE `.claude/tasks/arge/*` task'larını yapar
+- **gwen/dev** → SADECE `.claude/tasks/dev/*` task'larını yapar
+- ❌ ASLA diğer departmanın task'ına müdahale etme
 
-1. **Kullanıcı test başlamadan önce:** `ui_logs` tablosunu temizle (opsiyonel) veya `session_id` not al
-2. **Test sırasında:** `ui_logs` realtime kanalını izle — her INSERT gelince ekrana yaz
-3. **Test bittikten sonra:**
-   ```sql
-   select level, message, source, payload, created_at
-   from ui_logs
-   where session_id = '[session_id]'
-   order by created_at;
-   ```
-4. **Hata varsa:** `level = 'error'` kayıtlarına bak → DB ile karşılaştır (`islem_log`)
-5. **Rapor:** Hata + aksiyon zinciri özeti çıkar
+### Kural 2: Otonom Workflow Zorunluluğu
+Her task'ta:
+1. ✅ Task dosyasını oku (`.claude/tasks/{departman}/task-*.md`)
+2. ✅ Plan hazırla (en az 3 adım)
+3. ✅ Adım adım uygula
+4. ✅ Her adımda doğrula
+5. ✅ `.claude/tasks/{departman}/task-xxx-done.md` raporu oluştur
+6. ✅ Commit + Push yap
+7. ✅ DONE raporu ver
+
+### Kural 3: Context7 MCP Kullanımı
+Yeni library/framework kullanmadan ÖNCE:
+1. ✅ `mcp__context7__resolve-library-id` ile library ID bul
+2. ✅ `mcp__context7__query-docs` ile güncel dokümantasyon al
+3. ❌ ASLA eski bilgiyle kod yazma
+
+### Kural 4: DONE Raporu Zorunluluğu
+Her task bitiminde:
+1. ✅ `task-xxx-done.md` dosyası oluştur
+2. ✅ Yapılan değişiklikleri listele
+3. ✅ Commit mesajı hazırla (format: `DONE: {departman} — {açıklama}`)
+4. ✅ git add + commit + push
+5. ✅ Kullanıcıya özet rapor ver
 
 ---
 
-**Son Güncelleme:** 2026-04-01 — Claude orkestratör sistemi, session tipi kilidi
+**Son Güncelleme:** 2026-04-02 — Task izolasyonu + blackboard sistemi (TASK-ARGE-008)
