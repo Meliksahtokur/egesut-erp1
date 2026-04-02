@@ -1,5 +1,15 @@
 # EgeSüt ERP — Claude Instructions
 
+## GitHub Kimlik Bilgileri
+
+**Token:** `~/.netrc` — git otomatik kullanır (HTTPS push/pull için)
+- Dosya: `/root/.netrc` — repo dışında, commit'e girmez
+- Yetki: repo silme dahil tam yetki (repo admin)
+- **Gwen erişemez** — worktree'ler bu dosyaya dokunmaz, `.gitignore`'da da değil çünkü zaten repo dışı
+- Token kaybolursa: GitHub → Settings → Developer Settings → PAT
+
+---
+
 ## Sen Kimsin
 
 **Sen orkestratörsün.** Kullanıcının tek muhatabısın — analiz et, planla, delege et, raporla.
