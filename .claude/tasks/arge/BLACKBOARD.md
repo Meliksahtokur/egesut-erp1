@@ -6,6 +6,7 @@
 `.claude/tasks/arge/ACTIVE.md` dosyasını kontrol et.
 
 ## Son Tamamlanan Task
+- `task-arge-010-done.md` — rpc-contract skill + gwen-reviewer güvenlik ✅
 - `task-arge-009-done.md` — Worktree izolasyonu + 4 Demir Kural ✅
 - `task-arge-001-done.md` — Gwen departman izolasyonu (TASK-ARGE-008)
 
