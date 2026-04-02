@@ -31,7 +31,7 @@ CLAUDE_DIR="$HOME/.claude"
 info "Proje dizini: $PROJECT_ROOT"
 echo ""
 
-# ─── 1. ÖN KOŞULLAR ───────────────────────────────────────────
+# ─── 1. ÖN KOŞULLAR ──────────────────────────────────────────
 echo "── Ön Koşullar ──────────────────────────────────────────"
 
 # Node.js
@@ -65,7 +65,52 @@ fi
 
 echo ""
 
-# ─── 3. API ANAHTARLARI ───────────────────────────────────────
+# ─── 3. GITHUB CLI (gh) ───────────────────────────────────────
+echo "── GitHub CLI (gh) ──────────────────────────────────────"
+
+GH_INSTALLED=false
+if command -v gh &>/dev/null; then
+  GH_VER=$(gh --version 2>&1 | head -1)
+  if [ $? -eq 0 ] && [ -n "$GH_VER" ]; then
+    ok "GitHub CLI kurulu: $GH_VER"
+    GH_INSTALLED=true
+  else
+    warn "gh komutu bulundu ama çalışmıyor (binary uyumsuzluğu)"
+  fi
+fi
+
+if [ "$GH_INSTALLED" = false ]; then
+  info "GitHub CLI kurulumu deneniyor..."
+  
+  # npm ile dene
+  if command -v npm &>/dev/null; then
+    npm install -g gh 2>/dev/null && ok "GitHub CLI npm ile kuruldu" || true
+  fi
+  
+  # Binary ile dene
+  if ! command -v gh &>/dev/null; then
+    info "GitHub CLI binary indiriliyor..."
+    curl -sL -o /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v2.69.0/gh_2.69.0_linux_amd64.tar.gz" 2>/dev/null && \
+    tar xzf /tmp/gh.tar.gz -C /tmp/ 2>/dev/null && \
+    cp /tmp/gh_2.69.0_linux_amd64/bin/gh /usr/local/bin/ 2>/dev/null && \
+    ok "GitHub CLI binary olarak kuruldu" || \
+    warn "GitHub CLI kurulumu başarısız — GitHub MCP token ile çalışır (CLI opsiyonel)"
+  fi
+fi
+
+# gh auth kontrolü
+if command -v gh &>/dev/null; then
+  GH_AUTH=$(gh auth status 2>&1)
+  if echo "$GH_AUTH" | grep -q "Logged in"; then
+    ok "GitHub CLI auth durumu: Aktif"
+  else
+    warn "GitHub CLI auth gerekli: gh auth login"
+  fi
+fi
+
+echo ""
+
+# ─── 4. API ANAHTARLARI ───────────────────────────────────────
 echo "── API Anahtarları ──────────────────────────────────────"
 echo "  (boş bırakırsan atlanır, oturum içinde sonradan eklenebilir)"
 echo ""
@@ -90,7 +135,7 @@ fi
 
 echo ""
 
-# ─── 4. ~/.claude/settings.json ───────────────────────────────
+# ─── 5. ~/.claude/settings.json ───────────────────────────────
 echo "── Global Claude Ayarları (~/.claude/settings.json) ─────"
 
 mkdir -p "$CLAUDE_DIR"
@@ -131,7 +176,7 @@ EOF
 ok "~/.claude/settings.json oluşturuldu"
 echo ""
 
-# ─── 5. .mcp.json ─────────────────────────────────────────────
+# ─── 6. .mcp.json ─────────────────────────────────────────────
 echo "── MCP Sunucu Konfigürasyonu (.mcp.json) ─────────────────"
 
 cat > "$PROJECT_ROOT/.mcp.json" <<EOF
@@ -159,7 +204,7 @@ EOF
 ok ".mcp.json oluşturuldu"
 echo ""
 
-# ─── 6. .claude/settings.local.json ──────────────────────────
+# ─── 7. .claude/settings.local.json ──────────────────────────
 echo "── Proje İzinleri (.claude/settings.local.json) ──────────"
 
 mkdir -p "$PROJECT_ROOT/.claude"
@@ -230,16 +275,31 @@ EOF
 ok ".claude/settings.local.json oluşturuldu"
 echo ""
 
-# ─── 7. SCRIPT İZİNLERİ ───────────────────────────────────────
+# ─── 8. SCRIPT İZİNLERİ ───────────────────────────────────────
 chmod +x "$PROJECT_ROOT/.claude/scripts/"*.sh 2>/dev/null || true
 ok "Script izinleri ayarlandı"
 echo ""
 
-# ─── 8. DOĞRULAMA ─────────────────────────────────────────────
+# ─── 9. DOĞRULAMA ─────────────────────────────────────────────
 echo "── Doğrulama ─────────────────────────────────────────────"
 [ -f "$CLAUDE_DIR/settings.json" ]             && ok "~/.claude/settings.json" || warn "settings.json eksik"
 [ -f "$PROJECT_ROOT/.mcp.json" ]               && ok ".mcp.json" || warn ".mcp.json eksik"
 [ -f "$PROJECT_ROOT/.claude/settings.local.json" ] && ok ".claude/settings.local.json" || warn "settings.local.json eksik"
+
+# GitHub token kontrolü
+if grep -q "ghp_" "$PROJECT_ROOT/.mcp.json" 2>/dev/null; then
+  ok ".mcp.json: GitHub token ayarlı"
+else
+  warn ".mcp.json: GitHub token PLACEHOLDER"
+fi
+
+# gh CLI kontrolü
+if command -v gh &>/dev/null && gh --version &>/dev/null; then
+  ok "GitHub CLI (gh) çalışıyor"
+else
+  warn "GitHub CLI (gh) çalışmıyor — opsiyonel, GitHub MCP token ile çalışır"
+fi
+
 required_agents=("orchestrator" "erp-implementer" "erp-qa-git" "erp-explorer")
 missing_ag=0
 for ag in "${required_agents[@]}"; do
