@@ -14,6 +14,7 @@
    getState, setState,
    g, v, cl, dAgo, dFwd, fmtTarih, toast, openM, closeM, mClose,
    db, rpc, rpcOptimistic, pullTables, renderSafe, renderFromLocal,
+   RPC_TABLES,
    idbGetAll, idbPut, idbClearAndPut, getData, getQueue, removeFromQueue,
    openDB, syncNow, updateSyncBar
 */
@@ -2844,20 +2845,131 @@ async function dataTrafficGonder(e){
 async function dataTrafficTekGonder(qid){
   const q=await getQueue();
   const op=q.find(o=>o._qid===qid); if(!op) return;
+  
+  // RPC mapping tablosu — her tablo/method için hangi RPC kullanılacak
+  const RPC_MAP = {
+    hayvanlar: { POST: 'hayvan_ekle', PATCH: 'hayvan_guncelle' },
+    tohumlama: { POST: 'tohumlama_kaydet' },
+    dogum: { POST: 'dogum_kaydet' },
+    gorev_log: { PATCH: 'gorev_guncelle' },
+    stok_hareket: { POST: 'stok_hareket_ekle' },
+    kizginlik_log: { POST: 'kizginlik_kaydet' },
+    cases: { POST: 'create_case' },
+    drug_administrations: { POST: 'add_drug_administration', PATCH: 'update_drug_administration' }
+  };
+  
   try {
-    if(op.method==='POST'){
-      const clean=op.data.map(item=>Object.fromEntries(Object.entries(item).filter(([k,v])=>v!==null&&v!==undefined&&v!=='')));
-      for(const item of clean) await db.from(op.table).insert([item]);
-    } else if(op.method==='PATCH'){
-      const clean=Object.fromEntries(Object.entries(op.data[0]).filter(([k,v])=>v!==null&&v!==undefined&&v!==''));
-      const [col,val]=op.filter.split('=eq.');
-      await db.from(op.table).update(clean).eq(col,val);
-    }
+    const rpcInfo = RPC_MAP[op.table];
+    if(!rpcInfo) throw new Error(`Tablo "${op.table}" için RPC tanımlı değil`);
+    
+    const rpcName = op.method === 'POST' ? rpcInfo.POST : rpcInfo.PATCH;
+    if(!rpcName) throw new Error(`${op.method} için RPC tanımlı değil`);
+    
+    // Veriyi temizle (null/undefined/boş string'leri çıkar)
+    const clean = op.method === 'POST'
+      ? op.data.map(item => Object.fromEntries(Object.entries(item).filter(([k,v]) => v !== null && v !== undefined && v !== '')))
+      : Object.fromEntries(Object.entries(op.data[0]).filter(([k,v]) => v !== null && v !== undefined && v !== ''));
+    
+    // RPC parametrelerini hazırla
+    const rpcParams = buildRpcParams(rpcName, clean, op);
+    
+    // RPC çağrısı — REST bypass yerine backend validasyon + trigger'lar çalışır
+    await rpc(rpcName, rpcParams);
+    
     await removeFromQueue(qid);
     toast('✅ Kayıt gönderildi');
-  } catch(e){ toast('❌ '+e.message,true); }
+    
+    // İlgili tabloları çek + UI refresh
+    const tables = RPC_TABLES[rpcName] || [op.table];
+    pullTables(tables).then(renderSafe).catch(console.warn);
+    
+  } catch(e){
+    toast('❌ '+e.message, true);
+  }
+  
   await dataTrafficYenile();
   updateSyncBar();
+}
+
+// RPC parametre builder — her RPC için doğru parametre yapısını oluştur
+function buildRpcParams(rpcName, data, op) {
+  switch(rpcName) {
+    case 'hayvan_ekle':
+      return {
+        p_kupe_no: data.kupe_no,
+        p_grup_id: data.grup_id,
+        p_dogum_tarihi: data.dogum_tarihi,
+        p_cinsiyet: data.cinsiyet,
+        p_irk_id: data.irk_id
+      };
+    case 'hayvan_guncelle': {
+      // PATCH için: hangi alan güncellenecek?
+      const [col, val] = op.filter.split('=eq.');
+      return {
+        p_id: data[col] || val,
+        p_alan: Object.keys(data)[0],
+        p_deger: Object.values(data)[0]
+      };
+    }
+    case 'tohumlama_kaydet':
+      return {
+        p_hayvan_id: data.hayvan_id,
+        p_tarih: data.tarih,
+        p_sperma_kodu: data.sperma_kodu,
+        p_teknisyen: data.teknisyen
+      };
+    case 'dogum_kaydet':
+      return {
+        p_anne_id: data.anne_id,
+        p_tarih: data.tarih,
+        p_buzagi_cinsiyet: data.buzagi_cinsiyet,
+        p_buzagi_kupe: data.buzagi_kupe
+      };
+    case 'stok_hareket_ekle':
+      return {
+        p_stok_id: data.stok_id,
+        p_tur: data.tur,
+        p_miktar: data.miktar,
+        p_notlar: data.notlar
+      };
+    case 'kizginlik_kaydet':
+      return {
+        p_hayvan_id: data.hayvan_id,
+        p_tarih: data.tarih,
+        p_gozlem: data.gozlem
+      };
+    case 'create_case':
+      return {
+        p_hayvan_id: data.hayvan_id,
+        p_tanis: data.tanis,
+        p_tarih: data.tarih
+      };
+    case 'add_drug_administration':
+      return {
+        p_day_id: data.day_id,
+        p_drug_product_id: data.drug_product_id,
+        p_dose: data.dose,
+        p_unit: data.unit,
+        p_route: data.route,
+        p_time: data.time
+      };
+    case 'update_drug_administration':
+      return {
+        p_admin_id: data.id,
+        p_dose: data.dose,
+        p_unit: data.unit,
+        p_route: data.route
+      };
+    case 'gorev_guncelle':
+      return {
+        p_id: data.id,
+        p_alan: Object.keys(data)[0],
+        p_deger: Object.values(data)[0]
+      };
+    default:
+      // Fallback — doğrudan veriyi geç
+      return data;
+  }
 }
 async function dataTrafficSil(qid){
   if(!confirm('Bu kaydı kuyruktan sil? (Supabase\'e gönderilmeyecek)')) return;
