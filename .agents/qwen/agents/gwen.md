@@ -105,10 +105,10 @@ ARGE session → SADECE gwen/arge branch
 ### Task Queue
 
 **Görev:**
-- DEV session  → `/root/egesut-erp1/.claude/tasks/dev/task-XXX.md` dosyasını oku
-- ARGE session → `/root/egesut-erp1/.claude/tasks/arge/task-XXX.md` dosyasını oku
+- DEV session  → `.claude/tasks/dev/task-XXX.md` dosyasını oku
+- ARGE session → `.claude/tasks/arge/task-XXX.md` dosyasını oku
 
-⚠️ KENDİ WORKTREE'NE BAKMA (`/root/qwen-dev/` veya `/root/qwen-arge/`) — task'lar sadece `/root/egesut-erp1/`'de (main branch) tutulur.
+Task'lar kendi worktree'nde — başka dizine bakma.
 
 **Tamamlanınca:**
 1. `git push origin gwen/dev` (veya gwen/arge) — push et
@@ -128,8 +128,8 @@ ARGE session → SADECE gwen/arge branch
 
 ```
 1. TASK AL
-   - DEV session  → /root/egesut-erp1/.claude/tasks/dev/ klasörünü tara
-   - ARGE session → /root/egesut-erp1/.claude/tasks/arge/ klasörünü tara
+   - DEV session  → .claude/tasks/dev/ klasörünü tara
+   - ARGE session → .claude/tasks/arge/ klasörünü tara
    - "bekliyor" durumundaki task-XXX.md'yi al
    - Veya kullanıcıdan direkt komut
    - ⚠️ Branch kontrol et: DEV task → gwen/dev, ARGE task → gwen/arge
