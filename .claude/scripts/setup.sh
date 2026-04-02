@@ -280,7 +280,44 @@ chmod +x "$PROJECT_ROOT/.claude/scripts/"*.sh 2>/dev/null || true
 ok "Script izinleri ayarlandı"
 echo ""
 
-# ─── 9. DOĞRULAMA ─────────────────────────────────────────────
+# ─── 9. QWEN SKILLS/AGENTS SYNC ───────────────────────────────
+echo "── Qwen Skills & Agents Sync ─────────────────────────────"
+
+# ~/.qwen dizini oluştur
+mkdir -p "$HOME/.qwen/skills" "$HOME/.qwen/agents"
+
+# .agents/qwen/ varsa sync et
+if [ -d "$PROJECT_ROOT/.agents/qwen" ]; then
+  info ".agents/qwen/ dizininden ~/.qwen/ kopyalanıyor..."
+  
+  # Skills sync
+  if [ -d "$PROJECT_ROOT/.agents/qwen/skills" ]; then
+    for skill in "$PROJECT_ROOT/.agents/qwen/skills"/*; do
+      if [ -d "$skill" ]; then
+        skill_name=$(basename "$skill")
+        cp -r "$skill" "$HOME/.qwen/skills/$skill_name"
+        ok "Skill: $skill_name"
+      fi
+    done
+  fi
+  
+  # Agents sync
+  if [ -d "$PROJECT_ROOT/.agents/qwen/agents" ]; then
+    for agent in "$PROJECT_ROOT/.agents/qwen/agents"/*.md; do
+      if [ -f "$agent" ]; then
+        agent_name=$(basename "$agent" .md)
+        cp "$agent" "$HOME/.qwen/agents/$agent_name.md"
+        ok "Agent: $agent_name"
+      fi
+    done
+  fi
+else
+  warn ".agents/qwen/ dizini bulunamadı — skills/agents kopyalanmadı"
+fi
+
+echo ""
+
+# ─── 10. DOĞRULAMA ─────────────────────────────────────────────
 echo "── Doğrulama ─────────────────────────────────────────────"
 [ -f "$CLAUDE_DIR/settings.json" ]             && ok "~/.claude/settings.json" || warn "settings.json eksik"
 [ -f "$PROJECT_ROOT/.mcp.json" ]               && ok ".mcp.json" || warn ".mcp.json eksik"
@@ -300,13 +337,25 @@ else
   warn "GitHub CLI (gh) çalışmıyor — opsiyonel, GitHub MCP token ile çalışır"
 fi
 
-required_agents=("orchestrator" "erp-implementer" "erp-qa-git" "erp-explorer")
-missing_ag=0
-for ag in "${required_agents[@]}"; do
-  [ ! -f "$PROJECT_ROOT/.claude/agents/$ag.md" ] && ((missing_ag++))
+# Qwen skills kontrolü
+info "Qwen Skills kontrolü..."
+required_skills=("egesut-fullstack" "fix-ui" "gwen-self-improvement" "session-rules" "rpc-contract")
+missing_skills=0
+for skill in "${required_skills[@]}"; do
+  [ ! -d "$HOME/.qwen/skills/$skill" ] && ((missing_skills++))
 done
-found_ag=$((${#required_agents[@]} - missing_ag))
-[ "$missing_ag" -eq 0 ] && ok "Agent'lar mevcut (4/4): orchestrator · implementer · qa-git · explorer" || warn "Agent eksik ($found_ag/4)"
+found_skills=$((${#required_skills[@]} - missing_skills))
+[ "$missing_skills" -eq 0 ] && ok "Skills mevcut (5/5): egesut-fullstack · fix-ui · gwen-self-improvement · session-rules · rpc-contract" || warn "Skill eksik ($found_skills/5)"
+
+# Qwen agents kontrolü
+info "Qwen Agents kontrolü..."
+required_agents=("gwen" "gwen-reviewer" "gwen-architect")
+missing_agents=0
+for agent in "${required_agents[@]}"; do
+  [ ! -f "$HOME/.qwen/agents/$agent.md" ] && ((missing_agents++))
+done
+found_agents=$((${#required_agents[@]} - missing_agents))
+[ "$missing_agents" -eq 0 ] && ok "Agents mevcut (3/3): gwen · gwen-reviewer · gwen-architect" || warn "Agent eksik ($found_agents/3)"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
