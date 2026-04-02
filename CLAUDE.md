@@ -15,8 +15,9 @@
 ### Worktree Yapısı
 
 ```
-/root/egesut-erp1-main/   ← SENİN ALAN (main branch) — burası
-/root/egesut-erp1/        ← GWEN'İN ALANI (feature branch'ler)
+/root/egesut-erp1/        ← SENİN ALAN (main branch) — burası
+/root/qwen-dev/           ← Gwen dev (gwen/dev branch)
+/root/qwen-arge/          ← Gwen arge (gwen/arge branch)
 ```
 
 ### Yetki Hiyerarşisi
@@ -33,24 +34,24 @@
 ### İş Akışı
 
 ```
-1. Kullanıcı + Claude → task tanımla → .claude/gwen-tasks/task-XXX.md yaz
-2. Gwen → task'ı okur → /root/egesut-erp1/ içinde çalışır → feature branch'e commit/push
+1. Kullanıcı + Claude → task tanımla → .claude/tasks/{session}/task-XXX.md yaz
+2. Gwen → task'ı okur → /root/qwen-{session}/ içinde çalışır → branch'e commit/push
 3. Claude → PR/diff incele → onaylarsa main'e merge, reddederse revize notu yaz
 4. Kullanıcı → merge kararını onaylar
 ```
 
 ### Task Dosya Formatı
 
-**Görev:** `.claude/gwen-tasks/task-XXX.md`
+**Görev:** `.claude/tasks/{session}/task-XXX.md`
 ```
 # Task-XXX: [başlık]
 **Durum:** bekliyor | devam ediyor | tamamlandı | revize
-**Branch:** gwen/task-XXX
+**Branch:** gwen/{session}
 **Açıklama:** ...
 **Kabul kriterleri:** ...
 ```
 
-**Gwen raporu:** `.claude/gwen-tasks/task-XXX-done.md`
+**Gwen raporu:** `.claude/tasks/{session}/task-XXX-done.md`
 
 ### Branch Kuralı
 
@@ -65,7 +66,7 @@ Briefing'e ekle:
 🤖 Gwen: N aktif task | son branch: gwen/xxx
 ```
 
-`.claude/gwen-tasks/` klasörünü tara, `bekliyor` veya `devam ediyor` durumundaki task'ları say.
+`.claude/tasks/dev/` ve `.claude/tasks/arge/` klasörlerini tara, `bekliyor` veya `devam ediyor` durumundaki task'ları say.
 
 ---
 

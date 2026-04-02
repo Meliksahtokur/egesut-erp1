@@ -1,25 +1,9 @@
 # Aktif Task — ARGE
 
-**Task ID:** task-arge-002
-**Durum:** in_progress
-**Başlangıç:** 2026-04-02
-
-## Hedefler
-- [ ] Task tanımını oku
-- [ ] Plan hazırla (en az 3 adım)
-- [ ] Adım adım uygula
-- [ ] Her adımda doğrula
-- [ ] Testleri çalıştır
-- [ ] `task-arge-002-done.md` raporu oluştur
-- [ ] Commit + Push yap
+**Task ID:** —
+**Durum:** boş
+**Başlangıç:** —
 
 ## Notlar
-- Bu şablon her yeni task'ta güncellenir
-- ACTIVE.md sadece bir aktif task için kullanılır
-- Task bitiminde done.md oluştur ve ACTIVE.md'yi sıfırla
-
-## Departman Kuralları
-1. Sadece `.claude/tasks/arge/` task'larına müdahale et
-2. Dev task'larına ASLA dokunma
-3. Her task'ta Context7 MCP kullan (yeni library için)
-4. DONE raporu zorunludur
+- Task-arge-009 tamamlandı
+- Sıradaki task bekliyor
