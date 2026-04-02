@@ -73,6 +73,7 @@
 
 | Task | Session | Bitiş | Merge |
 |------|---------|-------|-------|
+| task-arge-009 | arge | 07:20 | ✅ PUSH EDİLDİ |
 | task-arge-004 | arge | 21:35 | ✅ (repo dışı) |
 | task-arge-006 | arge | 17:45 | ✅ |
 | task-arge-002 | arge | 15:45 | ⏳ bekliyor |
