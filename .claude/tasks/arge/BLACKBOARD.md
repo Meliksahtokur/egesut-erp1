@@ -6,6 +6,7 @@
 `.claude/tasks/arge/ACTIVE.md` dosyasını kontrol et.
 
 ## Son Tamamlanan Task
+- `task-arge-016-done.md` — supa-query wrapper script ✅
 - `task-arge-015-done.md` — Gwen Orchestrator (Qwen Code için) ✅
 - `task-arge-014-done.md` — Bekleyen eksikler kapatıldı (9 agent) ✅
 - `task-arge-013-done.md` — Operator pattern fix + Git hook'lar ✅
