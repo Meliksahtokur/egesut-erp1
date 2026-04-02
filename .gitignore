@@ -67,4 +67,6 @@ session-clean.sh
 update-cli
 "$WATCHDOG_PID_FILE"
 .update-status.json
-.agents/
+
+# DB snapshot (büyük dosya)
+dbsnapshot_full.sql
