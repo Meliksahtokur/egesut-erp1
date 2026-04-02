@@ -76,10 +76,11 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: ui.js
 - Önem: yüksek
-- Durum: yeni
-- Açıklama: dataTrafficTekGonder fonksiyonu offline kuyruğu gönderirken ilgili tablolara direkt insert/update yapıyor. Backend validasyonu ve RPC guard'ları atlanıyor.
+- Durum: **çözüldü** ✅
+- Açıklama: dataTrafficTekGonder fonksiyonu offline kuyruğu gönderirken ilgili tablolara direkt insert/update yapıyordu. Backend validasyonu ve RPC guard'ları atlanıyordu.
 - Tetikleyici: Offline'dan online'a geçişte kuyruk gönderilirken
-- İlgili commit: bilinmiyor
+- İlgili commit: feature/gwen-bug007-fix → gwen/dev (19ecaf8)
+- Çözüm: RPC_MAP tablosu + buildRpcParams() helper ile tüm offline işlemler artık RPC kullanıyor
 
 ## [2026-03-27] BUG-009 tohSonuc() direkt REST PATCH — RPC'ye geçiş yarım kaldı
 - Kaynak: erp-debug-agent
