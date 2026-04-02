@@ -1,4 +1,4 @@
-# Task-arge-006: Repo Temizliği — Root Dosyaları .agents/'a Taşı
+# Task-arge-006: Root Dosyaları .agents/'a Taşı
 
 **Durum:** bekliyor
 **Branch:** gwen/arge
@@ -8,82 +8,82 @@
 
 ## Açıklama
 
-Merge sonrası repo kökünde dağınık Gwen dosyaları var. Bunları `.agents/` altına taşı, kurulum için tek nokta olsun. Yeni cihazda `git clone` + `.agents/setup.sh` yeterli olacak.
+Root dizininde dağınık dokümantasyon dosyaları var. Bunları `.agents/` klasörüne taşıyarak düzen sağla.
 
 ---
 
-## 1. Taşınacak Dosyalar
+## Taşınacak Dosyalar
 
-```bash
-git mv QUICK_START.md .agents/QUICK_START.md
-git mv SESSION_STABILITY.md .agents/SESSION_STABILITY.md
-git mv "FULLSTACK_AGENT ihtiyaclar.md" ".agents/FULLSTACK_AGENT_ihtiyaclar.md"
-git mv gwen-self-improvement-wrapper.sh .agents/gwen-self-improvement-wrapper.sh
 ```
+ROOT'teki dağınık dosyalar:
+- QUICK_START.md
+- QWEN.md
+- SESSION_STABILITY.md
+- FULLSTACK_AGENT ihtiyaclar.md
+- gwen-self-improvement-wrapper.sh
 
-`QWEN.md` root'ta kalabilir (Qwen Code otomatik okur) — taşıma.
-
----
-
-## 2. .agents/setup.sh güncelle
-
-Mevcut `setup.sh`'e şunları ekle/güncelle:
-
-```bash
-#!/bin/bash
-# EgeSüt ERP — Yeni Cihaz Kurulumu
-# Kullanım: bash .agents/setup.sh
-
-echo "=== EgeSüt ERP Agent Kurulumu ==="
-
-# 1. Qwen agents → global config
-mkdir -p /root/.qwen/agents /root/.qwen/skills
-cp .agents/qwen/agents/*.md /root/.qwen/agents/
-cp -r .agents/qwen/skills/* /root/.qwen/skills/
-
-# 2. Gwen wrapper script
-cp .agents/gwen-self-improvement-wrapper.sh /root/egesut-erp1/
-chmod +x /root/egesut-erp1/gwen-self-improvement-wrapper.sh
-
-# 3. Git hooks (Gwen worktree)
-# Not: hooks repo'da yok, manuel kurulumu gerekiyor
-echo "⚠️  Git hooks için .claude/HOOK_SYSTEM.md'i oku"
-
-echo "✅ Kurulum tamamlandı"
-echo "Başlamak için: QUICK_START.md oku"
+HEDEF: .agents/ klasörü
 ```
 
 ---
 
-## 3. .agents/README.md güncelle (varsa) veya oluştur
+## Yapılacaklar
 
-```markdown
-# .agents/ — Kurulum Paketi
+### 1. .agents/ Klasörü Oluştur
 
-Yeni cihazda kurulum:
-\`\`\`bash
-git clone <repo>
-cd egesut-erp1-main
-bash .agents/setup.sh
-\`\`\`
+```bash
+mkdir -p /root/egesut-erp1/.agents
+```
 
-## İçerik
-- `setup.sh` — Otomatik kurulum scripti
-- `qwen/agents/` — Gwen agent tanımları
-- `qwen/skills/` — Gwen skill tanımları
-- `QUICK_START.md` — Hızlı başlangıç rehberi
-- `SESSION_STABILITY.md` — Session kararlılık kuralları
-- `gwen-self-improvement-wrapper.sh` — Arge session wrapper
+### 2. Dosyaları Taşı
+
+```bash
+# Dokümantasyon
+mv /root/egesut-erp1/QUICK_START.md /root/egesut-erp1/.agents/
+mv /root/egesut-erp1/QWEN.md /root/egesut-erp1/.agents/
+mv /root/egesut-erp1/SESSION_STABILITY.md /root/egesut-erp1/.agents/
+mv "/root/egesut-erp1/FULLSTACK_AGENT ihtiyaclar.md" /root/egesut-erp1/.agents/
+
+# Script
+mv /root/egesut-erp1/gwen-self-improvement-wrapper.sh /root/egesut-erp1/.agents/
+```
+
+### 3. .gitignore Güncelle
+
+`.agents/` klasörünü gitignore'a ekle (eğer değilse):
+```
+.agents/
+```
+
+### 4. README.md Güncelle (Opsiyonel)
+
+Eğer root'ta README.md varsa, dosya konumlarını güncelle.
+
+### 5. Commit + Review + Push
+
+```bash
+git add .agents/
+git add .gitignore  # Eğer değiştiyse
+git commit -m "DONE: arge — task-arge-006: Root dosyaları .agents/'a taşındı"
+/review
+# ✅ PUSH ONAYLI → git push origin gwen/arge
 ```
 
 ---
 
 ## Kabul Kriterleri
 
-- [ ] Root'ta QUICK_START.md, SESSION_STABILITY.md, FULLSTACK_AGENT dosyası yok
-- [ ] Bunlar `.agents/` altında var
-- [ ] `setup.sh` güncel ve çalışır
-- [ ] QWEN.md root'ta kaldı
+- [ ] .agents/ klasörü oluşturuldu
+- [ ] 5 dosya taşındı (QUICK_START, QWEN, SESSION_STABILITY, FULLSTACK_AGENT, wrapper)
+- [ ] .gitignore güncellendi
 - [ ] Branch: gwen/arge
 - [ ] js/ dosyalarına dokunma
 - [ ] Tamamlanınca `task-arge-006-done.md` yaz
+
+---
+
+## Notlar
+
+- Dosya içeriklerini DEĞİŞTİRME — sadece taşı
+- .agents/ klasörü git'e commit edilmeyecek (gitignore)
+- Review zorunlu!

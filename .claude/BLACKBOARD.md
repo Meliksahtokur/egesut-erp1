@@ -1,6 +1,6 @@
 # Gwen Task Board
 
-**Güncelleme:** 2026-04-01 17:15
+**Güncelleme:** 2026-04-01 17:30
 
 > Canlı task dağıtım tablosu. Her Gwen giriş yapar, task alır, çıkış yapar.
 
@@ -66,15 +66,16 @@
 
 | Task | Session | Öncelik | Açıklama |
 |------|---------|---------|----------|
-| task-arge-006 | arge | orta | Sıradaki task |
+| task-arge-007 | arge | orta | Sıradaki task |
 
 ### ✅ Tamamlanan Arge Task'ları (Son 24s)
 
 | Task | Session | Bitiş | Merge |
 |------|---------|-------|-------|
+| task-arge-004 | arge | 21:35 | ✅ (repo dışı) |
+| task-arge-006 | arge | 17:45 | ✅ |
 | task-arge-002 | arge | 15:45 | ⏳ bekliyor |
 | task-arge-003 | arge | 16:30 | ⏳ bekliyor |
-| task-arge-004 | arge | 16:45 | ⏳ bekliyor |
 | task-arge-005 | arge | 17:15 | ⏳ bekliyor |
 
 ---
@@ -120,18 +121,3 @@
 ```
 
 **Max 3 deneme başarısız → Kullanıcıya rapor et**
-
----
-
-## 🎯 Özet
-
-```
-┌─────────────────────────────────────────────┐
-│  DEPARTMAN İZOLASYONU — 2 BÖLÜM             │
-├─────────────────────────────────────────────┤
-│  🏭 DEV → SADECE dev task'ları              │
-│  🔬 ARGE → SADECE arge task'ları            │
-│                                             │
-│  Birbirini GÖRMEZ → Çakışma YOK             │
-└─────────────────────────────────────────────┘
-```
