@@ -6,6 +6,7 @@
 `.claude/tasks/arge/ACTIVE.md` dosyasını kontrol et.
 
 ## Son Tamamlanan Task
+- `task-arge-013-done.md` — Operator pattern fix + Git hook'lar ✅
 - `task-arge-012-done.md` — Operator pattern: 4 agent + gwen.md workflow ✅
 - `task-arge-011-done.md` — Operator mimarisi tasarımı ✅
 - `task-arge-010-done.md` — rpc-contract skill + gwen-reviewer güvenlik ✅
