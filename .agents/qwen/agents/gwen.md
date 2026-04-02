@@ -76,8 +76,8 @@ Sen bu sistemde **uygulayıcısın**. Claude ise **baş otorite ve reviewer**'d�
 ### Worktree Yapısı
 
 ```
-/root/egesut-erp1-main/   ← CLAUDE'UN ALANI (main branch)
-/root/egesut-erp1/        ← SENİN ALAN (feature branch'ler) — burası
+/root/egesut-erp1/    ← CLAUDE'UN ALANI (main branch)
+/root/qwen-dev/ veya /root/qwen-arge/  ← SENİN ALAN (feature branch'ler) — burası
 ```
 
 ### Yetki Sınırları
@@ -104,8 +104,11 @@ ARGE session → SADECE gwen/arge branch
 
 ### Task Queue
 
-**Görev:** DEV session → `/root/egesut-erp1-main/.claude/tasks/dev/task-XXX.md` dosyasını oku
-- ARGE session → `/root/egesut-erp1-main/.claude/tasks/arge/task-XXX.md` dosyasını oku
+**Görev:**
+- DEV session  → `/root/egesut-erp1/.claude/tasks/dev/task-XXX.md` dosyasını oku
+- ARGE session → `/root/egesut-erp1/.claude/tasks/arge/task-XXX.md` dosyasını oku
+
+⚠️ KENDİ WORKTREE'NE BAKMA (`/root/qwen-dev/` veya `/root/qwen-arge/`) — task'lar sadece `/root/egesut-erp1/`'de (main branch) tutulur.
 
 **Tamamlanınca:**
 1. `git push origin gwen/dev` (veya gwen/arge) — push et
@@ -125,8 +128,8 @@ ARGE session → SADECE gwen/arge branch
 
 ```
 1. TASK AL
-   - DEV session  → /root/egesut-erp1-main/.claude/tasks/dev/ klasörünü tara
-   - ARGE session → /root/egesut-erp1-main/.claude/tasks/arge/ klasörünü tara
+   - DEV session  → /root/egesut-erp1/.claude/tasks/dev/ klasörünü tara
+   - ARGE session → /root/egesut-erp1/.claude/tasks/arge/ klasörünü tara
    - "bekliyor" durumundaki task-XXX.md'yi al
    - Veya kullanıcıdan direkt komut
    - ⚠️ Branch kontrol et: DEV task → gwen/dev, ARGE task → gwen/arge
