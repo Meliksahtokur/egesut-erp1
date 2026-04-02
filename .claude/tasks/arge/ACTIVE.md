@@ -1,16 +1,17 @@
 # Aktif Task — ARGE
 
-**Task ID:** task-arge-010
+**Task ID:** task-arge-013
 **Durum:** tamamlandı
 **Başlangıç:** 2026-04-02
 **Bitiş:** 2026-04-02
 
 ## Yapılanlar
-- rpc-contract skill oluşturuldu
-- gwen-reviewer güvenlik kontrolleri eklendi
-- setup.sh sync mekanizması eklendi
+- Git hook'ları oluşturuldu (post-checkout, pre-push)
+- gwen.md agent tool çağrıları eklendi
+- Operator pattern artık çalışıyor
+- task-arge-013-done.md oluşturuldu
 
 ## Notlar
-- Task-arge-010 tamamlandı
-- Push edildi: 6f570b8
-- done.md oluşturuldu
+- Task-arge-013 tamamlandı
+- Kritik eksikler fix edildi
+- Operator pattern + Git hook'lar aktif

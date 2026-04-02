@@ -349,13 +349,13 @@ found_skills=$((${#required_skills[@]} - missing_skills))
 
 # Qwen agents kontrolü
 info "Qwen Agents kontrolü..."
-required_agents=("gwen" "gwen-reviewer" "gwen-architect")
+required_agents=("gwen" "gwen-reviewer" "gwen-architect" "gwen-researcher" "gwen-analyst" "gwen-coder" "gwen-tester")
 missing_agents=0
 for agent in "${required_agents[@]}"; do
   [ ! -f "$HOME/.qwen/agents/$agent.md" ] && ((missing_agents++))
 done
 found_agents=$((${#required_agents[@]} - missing_agents))
-[ "$missing_agents" -eq 0 ] && ok "Agents mevcut (3/3): gwen · gwen-reviewer · gwen-architect" || warn "Agent eksik ($found_agents/3)"
+[ "$missing_agents" -eq 0 ] && ok "Agents mevcut (7/7): gwen · gwen-reviewer · gwen-architect · gwen-researcher · gwen-analyst · gwen-coder · gwen-tester" || warn "Agent eksik ($found_agents/7)"
 
 echo ""
 echo "╔══════════════════════════════════════════╗"
