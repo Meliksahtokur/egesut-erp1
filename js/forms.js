@@ -134,14 +134,14 @@ async function submitBirth(btn) {
       p_hekim_id: v('b-hekim') || null,
     });
 
-    toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${data.gorev_sayisi} görev oluşturuldu`);
+    toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${data?.gorev_sayisi ?? 0} görev oluşturuldu`);
     closeM('m-birth');
 
     // Formu sıfırla
     const anneEl = g('b-anne'); if (anneEl) anneEl.value = '';
-    g('anne-secili-card').style.display = 'none';
-    g('btn-gebe-sec').style.display = '';
-    g('b-anne-manual').style.display = 'none';
+    const anneCard = g('anne-secili-card'); if (anneCard) anneCard.style.display = 'none';
+    const gebeBtn = g('btn-gebe-sec'); if (gebeBtn) gebeBtn.style.display = '';
+    const anneManual = g('b-anne-manual'); if (anneManual) anneManual.style.display = 'none';
     ['b-kupe','b-dogum-kg','b-baba','b-baba-text'].forEach(id => { const el = g(id); if (el) el.value = ''; });
     const babaAuto = g('b-baba-auto'); if (babaAuto) babaAuto.style.display = 'none';
     const babaText = g('b-baba-text'); if (babaText) babaText.style.display = 'none';
@@ -309,7 +309,8 @@ async function abortKaydet(hayvanId, tohId) {
     });
     if (result?.ok === false) { toast('❌ ' + (result.error || result.mesaj), true); return; }
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
-    pullTables(['tohumlama','hayvanlar','islem_log']).then(renderSafe).catch(console.warn);
+    await pullTables(['tohumlama','hayvanlar','islem_log']);
+    renderSafe();
     openDet(hayvanId);
   } catch (e) { toast('❌ Abort kaydedilemedi: ' + e.message, true); }
 }
@@ -835,7 +836,8 @@ async function submitGebelikEkle(btn) {
     });
     toast('✅ Gebelik kaydedildi');
     closeM('m-gebelik');
-    pullTables(['tohumlama','hayvanlar']).then(renderSafe);
+    await pullTables(['tohumlama','hayvanlar']);
+    renderSafe();
   } catch(e) { toast(e.message, true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
