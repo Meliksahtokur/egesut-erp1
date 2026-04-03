@@ -2,6 +2,28 @@
 
 Bu dosya AI agent'ları için proje kurallarını tanımlar. Her yeni oturumda oku.
 
+---
+
+## ⚠️ MUTLAK YASAKLAR — İhlal Etme
+
+1. **`main` branch'e direkt push YASAK** — sadece Claude merge eder
+2. **Paralel dosya yazma YASAK** — bir dosyayı bitir, sonra diğerine geç
+3. **Direkt REST write YASAK** — sadece RPC kullan
+
+**Çalışma branch'in:** `.claude/tasks/task-XXX.md` dosyasında belirtilir. Belirtilmemişse `fix/tech-debt` kullan.
+
+```bash
+# Her oturumun başında branch'ini kontrol et
+git branch
+git checkout fix/tech-debt  # değilsen geç
+
+# Push sadece kendi branch'ine
+git push origin fix/tech-debt  # ✅
+git push origin main           # ❌ YASAK
+```
+
+---
+
 ## Stack
 
 - Vanilla JS PWA, tek `index.html`, framework yok, build step yok
