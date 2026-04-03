@@ -18,18 +18,7 @@ async function uiLog(level, message, extra = {}) {
   } catch (_) {}  // log hatası uygulamayı durdurmasın
 }
 
-// Global hata yakalayıcılar
-window.onerror = (msg, src, line, col, err) => {
-  uiLog('error', msg, { source: `${src}:${line}`, stack: err?.stack });
-};
-window.addEventListener('unhandledrejection', e => {
-  uiLog('error', e.reason?.message || String(e.reason), { type: 'unhandled_rejection' });
-});
-const _origConsoleError = console.error.bind(console);
-console.error = (...args) => {
-  uiLog('error', args.join(' '));
-  _origConsoleError(...args);
-};
+// Global hata yakalayıcılar — index.html'deki _captureError uiLog'u çağırır
 
 // ── SABİT VERİLER ──────────────────────────
 // HEKIMLER config.js'den geliyor (const), burada tanımlanmaz
