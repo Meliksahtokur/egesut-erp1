@@ -1109,6 +1109,7 @@ const _origConsoleError = console.error;
 function _captureError(msg, src, line, stack) {
   const entry = { t: new Date().toLocaleTimeString(), msg, src, line, stack };
   window.errorLog.push(entry);
+  if (typeof uiLog === 'function') uiLog('error', msg, { source: src ? `${src}:${line}` : null, stack });
   // Err-bar güncelle
   const bar = document.getElementById('err-bar');
   const txt = document.getElementById('err-bar-text');
