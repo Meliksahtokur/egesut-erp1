@@ -86,11 +86,17 @@ Mimari kararlar: [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 | Sorun | Önem |
 |-------|------|
-| Tohumlama: 2 write path RPC'yi bypass ediyor (`tohSonuc` direkt PATCH) | 🔴 Kritik |
 | Klinik frontend tamamlanmadı (DB hazır, UI eksik) | 🟡 Yüksek |
-| `openNotModal` ve `selDis` fonksiyonları 2 farklı dosyada tanımlı | 🟡 Orta |
-| `drug_products` / `stok` direkt REST yazmaları var | 🟡 Yüksek |
+| tohumlama_sonuc_bos RPC 42883 hatası (DB'de fonksiyon yok/yanlış) | 🔴 Kritik |
 | Migration 013-014 repo'da yok (SQL Editor'dan uygulandı) | 🟠 Orta |
+| ui.js monolitik (3000+ satır) - refactor gerekli | 🟠 Orta |
+
+**Düzeltilen (2026-04-03):**
+- ✅ vaccines + vaccination_log IDB store eklendi (DB_VER 14)
+- ✅ tohumlama write path rpcOptimistic'e geçirildi
+- ✅ `openNotModal` / `selDis` duplicate temizlendi
+- ✅ drug_products/stok REST → RPC
+- ✅ Offline kuyruk RPC_MAP ile RPC'ye yönlendiriliyor
 
 ---
 
