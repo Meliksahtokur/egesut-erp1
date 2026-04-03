@@ -241,3 +241,173 @@ let _A = [], _S = []; // animals, stock
 ```
 
 **Öneri:** Tutarlılık için AppState kullan veya global değişkenlere devam et — karışık kullanma.
+---
+
+## Backend & DevOps
+
+### Kimlik Bilgileri
+
+Tokenlar `.claude/CREDENTIALS.md` dosyasında (gitignore'lu, lokal). **Her oturumun başında oku.**
+
+```bash
+cat .claude/CREDENTIALS.md
+```
+
+---
+
+### Supabase
+
+**Project ref:** `zqnexqbdfvbhlxzelzju`
+**URL:** `https://zqnexqbdfvbhlxzelzju.supabase.co`
+
+#### Migration Yazma Kuralları
+
+```
+supabase/migrations/YYYYMMDDHHMMSS_aciklama.sql
+```
+
+Her migration:
+```sql
+-- Migration: ne yapıyor
+-- Etkiler: hangi tablo/fonksiyon değişiyor
+-- Geri alınabilir: nasıl geri alınır
+
+-- İdempotent yaz:
+CREATE OR REPLACE FUNCTION ...
+DROP FUNCTION IF EXISTS ...
+ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...
+```
+
+#### Migration Deploy — 3 Yöntem
+
+**Yöntem 1 — GitHub Actions (tercih edilen):**
+```bash
+git add supabase/migrations/yeni_migration.sql
+git commit -m "migration: açıklama"
+git push origin main  # Actions otomatik tetiklenir → Supabase'e push
+```
+
+**Yöntem 2 — Supabase CLI:**
+```bash
+export SUPABASE_ACCESS_TOKEN=sbp_xxx  # .claude/CREDENTIALS.md'den al
+npx supabase db push --project-ref zqnexqbdfvbhlxzelzju
+```
+
+**Yöntem 3 — SQL Editor (token yoksa):**
+SQL'i kopyala → https://supabase.com/dashboard/project/zqnexqbdfvbhlxzelzju/sql/new → çalıştır
+Sonra migration dosyasını repoya ekle (izleme için).
+
+#### Migration Doğrulama
+
+```bash
+# Fonksiyon var mı kontrol et
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/rpc/fonksiyon_adi" \
+  -X POST \
+  -H "apikey: ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_param": "test"}' | head -c 200
+
+# Tablo kolonları
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/tablo_adi?limit=1" \
+  -H "apikey: ANON_KEY" | head -c 300
+```
+
+ANON_KEY değeri: `.claude/CREDENTIALS.md`'de.
+
+#### GitHub Actions Hata Aldığında
+
+```bash
+# Actions loglarını görüntüle (gh CLI tablet'te çalışmayabilir)
+# Alternatif: https://github.com/Meliksahtokur/egesut-erp1/actions
+
+# Actions sırrı eksikse → repo sahibine bildir:
+# Settings → Secrets → Actions → SUPABASE_ACCESS_TOKEN ekle
+```
+
+---
+
+### GitHub
+
+**Repo:** `Meliksahtokur/egesut-erp1`
+**Auth:** `~/.netrc` — push otomatik çalışır, ekstra token gerekmez
+
+#### Push & Branch
+
+```bash
+# Normal push
+git push origin fix/tech-debt
+
+# Main'e push (sadece Claude yapabilir)
+git push origin master:main
+
+# PR açmak (gh CLI çalışmıyorsa browser'dan)
+# https://github.com/Meliksahtokur/egesut-erp1/compare
+```
+
+#### Actions Başarısız Olursa
+
+1. `.github/workflows/` klasörünü oku — hangi step hata verdi
+2. Migration syntax hatası mı? → SQL'i kontrol et
+3. Secret eksik mi? → Claude'a bildir, Claude repo sahibine iletir
+4. Hata düzelmiyorsa → Claude'a `task-XXX-done.md` ile rapor ver
+
+---
+
+### Telemetri ile Test
+
+Frontend hataları otomatik `ui_logs` tablosuna yazılır (`js/app.js` → `uiLog()`).
+
+#### Log Okuma
+
+```bash
+# Son 20 hata
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/ui_logs?select=level,message,source,created_at&order=created_at.desc&limit=20" \
+  -H "apikey: ANON_KEY" \
+  -H "Authorization: Bearer ANON_KEY"
+```
+
+#### Log Seviyeleri
+
+| Seviye | Ne zaman | Örnek |
+|---|---|---|
+| `error` | JS hatası, uncaught exception | SyntaxError, null reference |
+| `action` | Kullanıcı aksiyonu | tohumlama_submit, dogum_kaydet |
+| `warn` | Uyarı | offline mod, fallback |
+
+#### Test Protokolü
+
+1. Değişikliği deploy et (push → GitHub Pages ~1 dk)
+2. Canlıda işlemi yap
+3. Log oku → hata var mı kontrol et
+4. Temizse tamamlandı, değilse düzelt
+
+---
+
+### RPC Test Etme
+
+```bash
+# RPC'yi direkt test et
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/rpc/RPC_ADI" \
+  -X POST \
+  -H "apikey: ANON_KEY" \
+  -H "Authorization: Bearer ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_param1": "deger1"}'
+
+# Beklenen: {"ok": true, ...} veya {"ok": false, "error": "..."}
+# Hata: {"code": "42883"} → fonksiyon bulunamadı (imza hatası)
+# Hata: {"code": "42501"} → permission hatası (RLS)
+```
+
+---
+
+### Sık Karşılaşılan Backend Hataları
+
+| Hata kodu | Anlam | Çözüm |
+|---|---|---|
+| `42883` | Fonksiyon bulunamadı | İmza uyuşmuyor, param sayısı/tipi kontrol et |
+| `42501` | Permission denied | RLS policy eksik, `SECURITY DEFINER` ekle |
+| `23505` | Unique constraint | Duplicate kayıt, önce kontrol et |
+| `23503` | Foreign key violation | İlgili kayıt yok, önce parent ekle |
+| `PGRST116` | Row not found | `.single()` yerine `.maybeSingle()` kullan |
+
