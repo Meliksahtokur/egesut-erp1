@@ -72,3 +72,5 @@ update-cli
 dbsnapshot_full.sql
 session-*.md
 .opencode/
+.claude/CREDENTIALS.md
+AGENTS.local.md
