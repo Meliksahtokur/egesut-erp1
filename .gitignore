@@ -70,3 +70,5 @@ update-cli
 
 # DB snapshot (büyük dosya)
 dbsnapshot_full.sql
+session-*.md
+.opencode/
