@@ -115,7 +115,18 @@ gh run watch        # tamamlanana kadar bekle
 gh run view --log-failed  # hata varsa
 ```
 
-**Actions başarısız → Claude'a rapor ver, merge yapma.**
+**Actions başarısız olursa — önce kendin dene (max 5 deneme):**
+
+```
+Deneme 1: gh run view --log-failed → hatayı oku → SQL düzelt → yeni migration → push
+Deneme 2-4: Farklı yaklaşım dene, DB'yi yeniden sorgula
+Deneme 5: Son deneme
+```
+
+5 denemede çözülmezse:
+1. `git revert HEAD` — migration'ı geri al
+2. `.claude/tasks/BLOCKED-migration-[func_adi].md` yaz (hata + 5 deneme özeti)
+3. Push et → Claude görecek, **merge yapma, bekle**
 
 ### 4. Doğrula — fonksiyon çalışıyor mu?
 

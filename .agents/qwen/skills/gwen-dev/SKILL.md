@@ -93,4 +93,5 @@ Migration protokolü `QWEN.md`'de tam olarak tanımlı — her adımı uygula:
 3. **Push sonrası** → `gh run watch` ile Actions'ı bekle, başarılı mı kontrol et
 4. **Doğrula** → curl ile fonksiyonun aktif olduğunu teyit et
 
-**Actions başarısız olursa → commit yapma, Claude'a hata raporunu ilet.**
+**Actions başarısız olursa → önce kendin çöz (max 5 deneme), sonra BLOCKED raporu yaz.**
+Detay: `QWEN.md` → Migration Protokolü → "Actions Başarısız Olursa"

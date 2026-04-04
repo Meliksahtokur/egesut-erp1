@@ -176,7 +176,28 @@ curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/rpc/FUNC_ADI" \
 # {"code":"42P13"} veya başka → ✅ fonksiyon var (parametre hatası beklenir)
 ```
 
-**Actions başarısız olursa → Claude'a rapor ver, merge yapma.**
+### Actions Başarısız Olursa — Kendi Kendine Düzelt (max 5 deneme)
+
+```
+Deneme 1: gh run view --log-failed → hata mesajını oku → SQL'i düzelt → yeni migration yaz → push
+Deneme 2: Aynı döngü — farklı yaklaşım dene
+Deneme 3: DB'yi yeniden sorgula, mevcut durumu anla
+Deneme 4: Minimal SQL ile dene (bölüp parça parça uygula)
+Deneme 5: Son deneme
+```
+
+**5 denemede de başarısız olursa:**
+1. Kodu geri al: `git revert HEAD` (migration'ı main'den çıkar)
+2. `.claude/tasks/BLOCKED-migration-[func_adi].md` yaz:
+   ```
+   # BLOCKED: [func_adi] Migration
+   **Deneme sayısı:** 5
+   **Hata:** [Actions log'dan kopyala]
+   **Denenen çözümler:** [her denemeyi listele]
+   **DB mevcut durum:** [sorgu sonucu]
+   ```
+3. Push et → Claude otomatik görecek
+4. **Merge YAPMA, bekle**
 
 ## Commit Formatı
 
