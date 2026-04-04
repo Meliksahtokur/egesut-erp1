@@ -9,6 +9,7 @@ Bu dosya AI agent'ları için proje kurallarını tanımlar. Her yeni oturumda o
 1. **`main` branch'e direkt push YASAK** — sadece Claude merge eder
 2. **Paralel dosya yazma YASAK** — bir dosyayı bitir, sonra diğerine geç
 3. **Direkt REST write YASAK** — sadece RPC kullan
+4. **Task dosyasını güncellemeden commit YASAK** — her görev bitişinde task dosyası güncellenmeli
 
 **Çalışma branch'in:** `.claude/tasks/task-XXX.md` dosyasında belirtilir. Belirtilmemişse `fix/tech-debt` kullan.
 
@@ -222,9 +223,54 @@ const TABLES = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
 
 ```
 fix: kısa açıklama
-feat: kısa açıklama  
+feat: kısa açıklama
 chore: kısa açıklama
 ```
+
+---
+
+## Task Dosyası Güncelleme Kuralı (ZORUNLU)
+
+Her görev tamamlandığında, commit atmadan önce task dosyasını güncelle:
+
+### 1. Task dosyasındaki durumu güncelle
+```
+**Durum:** bekliyor  →  **Durum:** tamamlandı
+```
+
+### 2. Done raporu yaz
+`task-XXX-done.md` dosyası oluştur, şunları içermeli:
+```markdown
+# Task-XXX Done
+
+**Tarih:** YYYY-MM-DD
+**Süre:** ~X saat
+
+## Yapılanlar
+- [ ] Adım 1 — ne yapıldı
+- [ ] Adım 2 — ne yapıldı
+
+## Doğrulama
+Kabul kriterlerini buraya kopyala, her birinin sonucunu yaz.
+
+## Commit(ler)
+- abc1234 — commit mesajı
+```
+
+### 3. Commit sırası
+```bash
+# Önce task dosyasını güncelle
+git add .claude/tasks/task-XXX.md .claude/tasks/task-XXX-done.md
+git commit -m "chore: task-XXX tamamlandı"
+
+# Sonra kod commitlerini at
+git add ...
+git commit -m "fix/feat: ..."
+
+git push origin fix/tech-debt
+```
+
+**Bu kural Claude dahil tüm agentler için geçerlidir.**
 
 ---
 
