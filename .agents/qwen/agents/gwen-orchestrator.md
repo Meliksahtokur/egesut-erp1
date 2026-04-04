@@ -169,9 +169,13 @@ gh pr diff <number> | grep -n "api_key\|apikey\|password\|secret\|token\|ghp_"
 ```
 - Bulunan → ❌ REVIZE: "Hardcoded credential yasak — environment variable kullan"
 
-**3. node --check:**
+**3. Task Durum Güncellemesi:**
 - done.md dosyasını oku: `cat .claude/tasks/[dev|arge]/task-XXX-done.md`
-- `node --check` geçti mi?
+- task-XXX.md'de `**Durum:** tamamlandı` yazıyor mu?
+- Yazmıyorsa → ❌ REVIZE: "Task dosyası güncellenmemiş — Durum: tamamlandı yap"
+
+**4. node --check:**
+- done.md'de `node --check` geçti mi?
 - Geçmedi → ❌ REVIZE: "Syntax hatası — node --check çalıştır"
 
 **4. Domain Kuralları:**

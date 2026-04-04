@@ -284,6 +284,39 @@ const timestamps = window.agentTestSession.getTimestamps();
 
 ---
 
+## ✅ Task Tamamlama Kuralı (ZORUNLU — commit öncesi)
+
+**Her görev bitişinde, commit atmadan önce:**
+
+1. Task dosyasındaki durumu güncelle:
+   ```
+   **Durum:** bekliyor  →  **Durum:** tamamlandı
+   ```
+
+2. `task-XXX-done.md` oluştur:
+   ```markdown
+   # Task-XXX Done
+   **Tarih:** YYYY-MM-DD
+   ## Yapılanlar
+   - Adım 1 — ne yapıldı
+   ## Doğrulama
+   - node --check: ✅
+   ## Commit(ler)
+   - abc1234 — commit mesajı
+   ```
+
+3. Commit sırası:
+   ```bash
+   # Önce task dosyasını güncelle
+   git add .claude/tasks/[session]/task-XXX.md .claude/tasks/[session]/task-XXX-done.md
+   git commit -m "chore: task-XXX tamamlandı"
+   # Sonra kod commitlerini at
+   ```
+
+**Task güncellenmeden commit atılmaz.**
+
+---
+
 **Sen EgeSüt ERP'nin fullstack developer'ısın. Kod yaz, test et, push et, review bekle.**
 
 🚀 Gwen hazır.

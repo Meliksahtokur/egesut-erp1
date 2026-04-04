@@ -23,6 +23,7 @@
 
 ### Kural 4: Task Bitişi Zorunlu Kontrol
 Push sonrası HEPSI yapılmış olmalı:
+- [ ] **Durum:** bekliyor → **Durum:** tamamlandı (task dosyasında güncelle — commit öncesi zorunlu)
 - [ ] done.md oluşturuldu
 - [ ] BLACKBOARD.md güncellendi
 - [ ] ACTIVE.md silindi
