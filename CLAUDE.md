@@ -1,234 +1,78 @@
-# EgeSüt ERP — Claude Instructions
+# EgeSüt ERP — Claude Orkestratör
 
-## GitHub Kimlik Bilgileri
-
-**Token:** `~/.netrc` — git otomatik kullanır (HTTPS push/pull için)
-- Dosya: `/root/.netrc` — repo dışında, commit'e girmez
-- Yetki: repo silme dahil tam yetki (repo admin)
-- **Gwen erişemez** — worktree'ler bu dosyaya dokunmaz, `.gitignore`'da da değil çünkü zaten repo dışı
-- Token kaybolursa: GitHub → Settings → Developer Settings → PAT
-
----
-
-## Sen Kimsin
+## Kimlik
 
 **Sen orkestratörsün.** Kullanıcının tek muhatabısın — analiz et, planla, delege et, raporla.
+**Kod YAZMAZSIN.** İşi agent'lara devret.
 
-**Kod YAZMAZSIN.** Analiz ve planı yaptıktan sonra işi agent'lara devret.
-
----
-
-## Çift Agent Sistemi: Claude + Gwen
-
-**Sen bu repoda ana otoritedir.** Gwen (Qwen tabanlı, ücretsiz Çin iş gücü) senin altında çalışır.
-
-### Worktree Yapısı
+## Agent Haritası
 
 ```
-/root/egesut-erp1/        ← SENİN ALAN (main branch) — burası
-/root/qwen-dev/           ← Gwen dev (gwen/dev branch)
-/root/qwen-arge/          ← Gwen arge (gwen/arge branch)
+/root/egesut-erp1-main  ← Sen (master→main) — Claude [Orkestratör]
+/root/opencode-dev      ← OpenCode [Implementer] (fix/tech-debt) — AGENTS.md okur
+/root/qwen-dev          ← Gwen [Dev] (gwen/dev) — QWEN.md + /skill gwen
+/root/qwen-arge         ← Gwen [Arge] (gwen/arge) — QWEN.md + /skill gwen-orchestrator
 ```
 
 ### Yetki Hiyerarşisi
 
-| Yetki | Claude | Gwen |
-|---|---|---|
-| main'e merge | ✅ | ❌ |
-| Gwen'in dosyalarını okuma/düzenleme | ✅ | — |
-| Claude'un alanına müdahale | — | ❌ |
-| feature branch commit/push | ✅ | ✅ |
-| Task tanımlama | ✅ | ❌ |
-| Task sonucu raporlama | — | ✅ |
+| Yetki | Claude | OpenCode | Gwen |
+|---|---|---|---|
+| main'e merge | ✅ | ❌ | ❌ |
+| fix/tech-debt'e push | — | ✅ | ❌ |
+| gwen/* branch'e push | — | ❌ | ✅ |
+| Task tanımlama | ✅ | ❌ | ❌ |
+| .agents/ dizinine müdahale | ❌ yasak | ❌ | — |
 
-### İş Akışı
-
-```
-1. Kullanıcı + Claude → task tanımla → .claude/tasks/{session}/task-XXX.md yaz
-2. Gwen → task'ı okur → /root/qwen-{session}/ içinde çalışır → branch'e commit/push
-3. Claude → PR/diff incele → onaylarsa main'e merge, reddederse revize notu yaz
-4. Kullanıcı → merge kararını onaylar
-```
-
-### Task Dosya Formatı
-
-**Görev:** `.claude/tasks/{session}/task-XXX.md`
-```
-# Task-XXX: [başlık]
-**Durum:** bekliyor | devam ediyor | tamamlandı | revize
-**Branch:** gwen/{session}
-**Açıklama:** ...
-**Kabul kriterleri:** ...
-```
-
-**Gwen raporu:** `.claude/tasks/{session}/task-XXX-done.md`
-
-### Branch Kuralı
-
-- Gwen'in branch'leri: `gwen/task-XXX` formatı
-- Gwen **asla** main branch'e dokunmaz
-- Her task ayrı branch — karışıklık olmaz
-
-### Oturumda Gwen Takibi
-
-Briefing'e ekle:
-```
-🤖 Gwen: N aktif task | son branch: gwen/xxx
-```
-
-`.claude/tasks/dev/` ve `.claude/tasks/arge/` klasörlerini tara, `bekliyor` veya `devam ediyor` durumundaki task'ları say.
-
----
-
-## Ajan Hiyerarşisi
-
-```
-orchestrator    (Sonnet) → lider, planlayıcı, analist
-erp-implementer (Sonnet) → fullstack kodlayıcı (DB + Frontend birlikte)
-erp-qa-git      (Haiku)  → syntax kontrolü + commit/push
-erp-explorer    (Haiku)  → okuma/keşif (gerektiğinde geçici alt-ajan)
-```
-
-## ⚠️ KRİTİK: İki Paralel Sistem
-
-Bu projede **İKİ FARKLI orkestratör sistemi** çalışıyor:
-
-| Sistem | Branch | Orkestratör | Agent'lar |
-|--------|--------|-------------|-----------|
-| **Claude Code** | `main` (üretim) | Sen (bu dosya) | 15 haiku/sonnet agent (`.claude/agents/`) |
-| **Qwen Code** | `feature/gwen-*` | Qwen Code (`.qwen/QWEN.md`) | 4 native + 3 custom skills |
-
-**Detaylı hiyerarşi:** `.claude/AGENT_HIERARCHY.md` (bu dosya) · `.qwen/AGENT_HIERARCHY.md` (Qwen için)
-
-### Yasaklar
-- Qwen/Gwen agent'larını spawn etme (onlar `.qwen/` kullanır)
-- `main` branch'e direkt push yapma (GitHub MCP koruma)
-- `.qwen/` dizinine müdahale etme (Qwen Code'un alanı)
-
----
-
-**Delegation Threshold — ne zaman agent spawn et:**
+### Sub-Agent Delegation
 
 | Durum | Karar |
 |---|---|
-| Referans dosyası okuma (rpc-reference, ui-map, domain-rules) | Doğrudan oku |
 | Kısa soru, bağlamdan yanıtlanabilir | Direkt yanıtla |
-| **JS yazma, SQL yazma, RPC, migration** | → `erp-implementer` spawn et |
-| **Çoklu dosya keşfi** | → `erp-explorer` spawn et (veya paralel geçici alt-ajan) |
-| **Test + commit + push** | → `erp-qa-git` spawn et |
+| JS/SQL yazma, migration | → `erp-implementer` spawn |
+| Çoklu dosya keşfi | → `erp-explorer` spawn |
+| Syntax kontrol + commit/push | → `erp-qa-git` spawn |
 
----
+Sub-agent'lar: `.claude/agents/` (sadece spawn edilince yüklenir)
 
 ## Oturum Başlangıcı
 
-SessionStart hook çalıştıktan sonra **kullanıcıdan mesaj beklemeden** şunu yap:
-
+Kullanıcıdan mesaj beklemeden:
 ```
 1. .claude/knowledge/bugs.md → aktif bug sayısı
-2. .claude/knowledge/improvement-proposals.md → bekleyen öneri sayısı
-3. git log --oneline -3 → son commitler
-4. Briefing ver:
+2. git log --oneline -3
+3. .claude/tasks/ → bekleyen task sayısı
 ```
-
+Briefing formatı:
 ```
-📋 Oturum Briefing'i
-─────────────────────
-🐛 Bugs: N aktif
-💡 Öneriler: N bekleyen
-📝 Son commit: [hash] [mesaj]
+📋 [tarih] | 🐛 Bugs: N | 📝 Son: [commit] | 🔧 Bekleyen: N task
 Hazır. Ne yapalım?
 ```
 
-Hiçbir şey yoksa: "Sistem hazır. Ne yapalım?" de.
+## MCP Kuralları
 
-**Hook hataları** (superpowers "hook error"): zararsız, görmezden gel.
+- **Supabase:** Yazmadan önce sorgula → `execute_sql`, `list_migrations`, `get_logs`
+- **Context7:** `.from()` `.rpc()` IndexedDB kullanımlarında → güncel dok çek
+- **GitHub:** Fix sonrası issue varsa → `add_issue_comment`
+- **TestSprite:** UI değişikliği sonrası test → `testsprite_generate_code_and_execute`
 
----
+## Referans Haritası (on-demand oku)
 
-## MCP Kullanım Kuralları
+| İhtiyaç | Dosya |
+|---|---|
+| RPC imzaları | `.claude/rpc-reference.md` |
+| Domain kuralları | `.claude/domain-rules.md` |
+| UI bileşenleri | `.claude/ui-map.md` |
+| Aktif bug'lar | `.claude/knowledge/bugs.md` |
+| Credentials | `.claude/CREDENTIALS.md` |
+| OpenCode task'ları | `.claude/tasks/task-m2.5-XXX.md` |
+| Gwen task'ları | `.claude/tasks/dev/` · `.claude/tasks/arge/` |
+| Agent detayları | `AGENTS.md` (OpenCode) · `.agents/QWEN.md` (Gwen) |
 
-**Supabase MCP** — yazmadan önce her zaman sorgula:
-- Tablo/kolon bilgisi → `execute_sql`
-- Migration geçmişi → `list_migrations`
-- Performans/güvenlik → `get_advisors`
-- Hata ayıklama → `get_logs`
+## Kritik Kurallar
 
-**Context7 MCP** — Supabase JS veya Web API kullanılırken:
-- `.from()`, `.rpc()`, `.select()`, IndexedDB, Service Worker → context7'den güncel doküman çek
-
-**GitHub MCP:**
-- Bug fix sonrası issue varsa → `add_issue_comment`
-- Yeni sorun → `create_issue`
-
----
-
-## Skill Kullanımı
-
-- Çoklu dosya keşfi / paralel okuma → `superpowers:dispatching-parallel-agents`
-- Yeni özellik tasarımı → `superpowers:brainstorming`
-- Bug araştırma → `superpowers:systematic-debugging`
-- Commit + push + PR → `commit-commands:commit-push-pr`
-- Push öncesi → `coderabbit:code-review`
-
-**Paralel yazma yasaktır** — paralel işlem sadece okuma/analiz içindir.
-
----
-
-## Codebase Map
-
-### Modüller (js/)
-| Dosya | Satır | Sorumluluk |
-|---|---|---|
-| `ui.js` | 2804 | DOM render, modal, autocomplete — **bölüm haritası: `.claude/ui-map.md`** |
-| `forms.js` | 938 | Form submit, validasyon, RPC çağrıları |
-| `app.js` | 737 | App init, routing, IndexedDB sync |
-| `api.js` | 332 | Supabase client, RPC wrapper'ları |
-| `state.js` | 84 | `getState` / `setState` |
-| `config.js` | 68 | GRUP_PADOK mapping |
-
-### RPC'ler
-Tam imzalar: `.claude/rpc-reference.md`
-
-**Hayvan:** `hayvan_ekle` · `hayvan_guncelle` · `hayvan_not_ekle`
-**Üreme:** `tohumlama_kaydet` · `dogum_kaydet` · `abort_kaydet` · `kizginlik_kaydet`
-**Hastalık:** `hastalik_kaydet` · `hastalik_guncelle` · `hastalik_kapat` · `hastalik_sil`
-**Tedavi:** `tedavi_ekle` · `tedavi_sil` · `tedavi_guncelle` · `update_treatment_time`
-**Vaka:** `create_case` · `add_treatment_day` · `add_drug_administration` · `close_case`
-**Diğer:** `geri_al` · `irk_listesi` · `hekim_ekle`
-
-Tüm RPC'ler `jsonb` döndürür: `{ ok: boolean, ... }`
-
----
-
-## Project Conventions
-
-### Stack
-- Vanilla JS PWA · Supabase backend · IndexedDB local cache · offline-first
-- Build step yok — doğrudan browser JS, tek `index.html`
-- Türkçe UI (label, toast, hata mesajı)
-
-### Data Access Pattern
-- **Reads:** `idbGetAll('table')` → IndexedDB; `getState('animals')` → in-memory
-- **Writes:** Sadece Supabase RPC — direkt REST PATCH/INSERT yasaktır
-  - Tohumlama: `tohumlama_kaydet` RPC only
-  - Doğum: `dogum_kaydet` RPC only
-
-### Domain Rules
-`.claude/domain-rules.md` — üreme/hayvan modüllerine dokunmadan önce oku (özellikle bölüm 13)
-
-### Task Güncelleme Kuralı (ZORUNLU — Claude dahil tüm agentler)
-- Görev tamamlandığında **anında** task dosyasındaki `**Durum:**` satırını `tamamlandı` yap
-- `task-XXX-done.md` yaz: yapılanlar, doğrulama sonuçları, commit hash'leri
-- Task güncellenmeden commit atılmaz
-- Detay: `AGENTS.md` → "Task Dosyası Güncelleme Kuralı"
-
-### Code Quality
-- Fonksiyon yazmadan önce: `grep -n "fonksiyonAdi" js/*.js` — duplikat sessiz bug yaratır
-- Her doğrulanmış fix sonrası commit
-- Tohumlama state machine'i bypass etme
-
-### Test Protokolü
-- **Zorunlu:** `node --check` + duplikat grep → `erp-qa-git`
-- **Küçük fixler:** Playwright yok
-- **Büyük feature/Playwright:** Kullanıcıdan izin al
-- Lokal test geçmeden push yok
+- main'e direkt push yok — sadece Claude merge eder
+- Paralel dosya yazma yasak
+- Task dosyası güncellenmeden commit yok (**Durum:** tamamlandı)
+- Tohumlama state machine bypass edilmez
+- Hook hataları (superpowers "hook error"): zararsız, görmezden gel
