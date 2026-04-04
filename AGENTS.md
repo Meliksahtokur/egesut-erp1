@@ -109,6 +109,75 @@ Tam RPC imzaları: `.claude/rpc-reference.md`
 | UI bileşenleri | `.claude/ui-map.md` |
 | Credentials | `.claude/CREDENTIALS.md` |
 
+## Migration Protokolü (ZORUNLU — sıra değiştirilemez)
+
+### Adım 1 — Mevcut fonksiyonu sorgula (yazmadan önce)
+
+```bash
+ANON_KEY=$(grep -A5 'Anon key' .claude/CREDENTIALS.md | grep -oP 'eyJ[A-Za-z0-9._-]+')
+
+# Fonksiyon DB'de var mı? İmzası ne?
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/rpc/FUNC_ADI" \
+  -X POST \
+  -H "apikey: $ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}' | head -c 200
+# {"code":"42883"} → yok, CREATE yaz
+# Başka hata → var, DROP + CREATE yaz
+```
+
+### Adım 2 — Migration yaz
+
+**KURAL: `CREATE OR REPLACE` YASAK — her zaman `DROP + CREATE`:**
+
+```sql
+-- ✅ DOĞRU
+DROP FUNCTION IF EXISTS public.func_adi(uuid, text);
+CREATE FUNCTION public.func_adi(...) ...
+
+-- ❌ YANLIŞ — 42P13 hatasına yol açar
+CREATE OR REPLACE FUNCTION public.func_adi(...) ...
+```
+
+Birden fazla overload olabilirse hepsini temizle:
+```sql
+DO $$ DECLARE r record;
+BEGIN
+  FOR r IN SELECT oid::regprocedure FROM pg_proc
+           WHERE proname = 'func_adi' AND pronamespace = 'public'::regnamespace
+  LOOP EXECUTE 'DROP FUNCTION IF EXISTS ' || r.oid::regprocedure; END LOOP;
+END $$;
+```
+
+### Adım 3 — Push sonrası Actions kontrolü (ZORUNLU)
+
+```bash
+# Push'tan sonra bekle ve kontrol et
+sleep 10
+gh run list --limit 3
+
+# Durumu izle (tamamlanana kadar)
+gh run watch
+
+# Hata varsa log'a bak
+gh run view --log-failed
+```
+
+### Adım 4 — Fonksiyon doğrula
+
+```bash
+# Fonksiyon oluştu mu?
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/rpc/FUNC_ADI" \
+  -X POST \
+  -H "apikey: $ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"yanlis_param": "test"}'
+# {"code":"42883"} → HATA, fonksiyon hâlâ yok
+# {"code":"42P13"} veya başka → ✅ fonksiyon var (parametre hatası beklenir)
+```
+
+**Actions başarısız olursa → Claude'a rapor ver, merge yapma.**
+
 ## Commit Formatı
 
 ```

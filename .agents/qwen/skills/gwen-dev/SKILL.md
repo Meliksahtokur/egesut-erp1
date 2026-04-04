@@ -83,3 +83,14 @@ Tüm imzalar: `.claude/rpc-reference.md`
 node --check js/api.js js/forms.js js/app.js js/ui.js js/state.js js/config.js
 grep -n "fonksiyonAdi" js/*.js  # duplikat kontrol
 ```
+
+## Migration Yazıyorsan (ZORUNLU PROTOKOL)
+
+Migration protokolü `QWEN.md`'de tam olarak tanımlı — her adımı uygula:
+
+1. **Yazmadan önce** → DB'de fonksiyon var mı sorgula (curl veya gwen-supabase MCP)
+2. **Yazarken** → `CREATE OR REPLACE` YASAK, her zaman `DROP + CREATE` kullan
+3. **Push sonrası** → `gh run watch` ile Actions'ı bekle, başarılı mı kontrol et
+4. **Doğrula** → curl ile fonksiyonun aktif olduğunu teyit et
+
+**Actions başarısız olursa → commit yapma, Claude'a hata raporunu ilet.**

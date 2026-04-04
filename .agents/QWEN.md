@@ -67,6 +67,65 @@ Kod değişken adları, API/RPC isimleri İngilizce kalabilir. UI metinleri Tür
 | UI bileşenleri | `.claude/ui-map.md` |
 | Credentials | `.claude/CREDENTIALS.md` |
 
+## Migration Protokolü (ZORUNLU — sıra değiştirilemez)
+
+### 1. Yazmadan önce — DB'yi sorgula
+
+```bash
+ANON_KEY=$(grep -A5 'Anon key' .claude/CREDENTIALS.md | grep -oP 'eyJ[A-Za-z0-9._-]+')
+
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/rpc/FUNC_ADI" \
+  -X POST -H "apikey: $ANON_KEY" -H "Content-Type: application/json" -d '{}'
+# {"code":"42883"} → fonksiyon yok → CREATE yaz
+# Başka sonuç → fonksiyon VAR → DROP + CREATE yaz
+```
+
+Veya `gwen-supabase` MCP ile:
+```
+execute_sql: SELECT proname, pg_get_function_arguments(oid) FROM pg_proc WHERE proname = 'func_adi';
+```
+
+### 2. Migration kuralı — CREATE OR REPLACE YASAK
+
+```sql
+-- ✅ DOĞRU — her zaman böyle yaz
+DROP FUNCTION IF EXISTS public.func_adi(uuid, text);
+CREATE FUNCTION public.func_adi(...) RETURNS jsonb ...
+
+-- ❌ YANLIŞ — 42P13 hatasına yol açar
+CREATE OR REPLACE FUNCTION public.func_adi(...) ...
+```
+
+Overload belirsizse hepsini temizle:
+```sql
+DO $$ DECLARE r record;
+BEGIN
+  FOR r IN SELECT oid::regprocedure FROM pg_proc
+           WHERE proname = 'func_adi' AND pronamespace = 'public'::regnamespace
+  LOOP EXECUTE 'DROP FUNCTION IF EXISTS ' || r.oid::regprocedure; END LOOP;
+END $$;
+```
+
+### 3. Push sonrası — GitHub Actions kontrol et
+
+```bash
+sleep 15
+gh run list --limit 3
+gh run watch        # tamamlanana kadar bekle
+gh run view --log-failed  # hata varsa
+```
+
+**Actions başarısız → Claude'a rapor ver, merge yapma.**
+
+### 4. Doğrula — fonksiyon çalışıyor mu?
+
+```bash
+curl -s "https://zqnexqbdfvbhlxzelzju.supabase.co/rest/v1/rpc/FUNC_ADI" \
+  -X POST -H "apikey: $ANON_KEY" -H "Content-Type: application/json" -d '{}'
+# {"code":"42883"} → HATA, hâlâ yok
+# Başka → ✅ fonksiyon aktif
+```
+
 ## Hata Çözme
 
 Bir sorunla max 4-5 kere uğraş. Çözemezsen kullanıcıya detaylı hata raporu ver, dur.
