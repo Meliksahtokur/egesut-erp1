@@ -15,17 +15,17 @@ Bu dosya AI agent'ları için proje kurallarını tanımlar. Her yeni oturumda o
 
 ## 🗺️ Worktree Haritası
 
-| Agent | Path | Branch |
-|---|---|---|
-| Claude (orkestratör) | `/root/egesut-erp1-main` | `master → main` |
-| MiniMax M2.5 (implementer) | `/root/m25-dev` | `fix/tech-debt` |
-| Gwen dev | `/root/qwen-dev` | `gwen/dev` |
-| Gwen arge | `/root/qwen-arge` | `gwen/arge` |
+| Agent | Path | Branch | Git Kimliği |
+|---|---|---|---|
+| Claude (orkestratör) | `/root/egesut-erp1-main` | `master → main` | `Claude [Orkestratör]` |
+| OpenCode (implementer) | `/root/opencode-dev` | `fix/tech-debt` | `OpenCode [Implementer]` |
+| Gwen dev | `/root/qwen-dev` | `gwen/dev` | `Gwen [Dev]` |
+| Gwen arge | `/root/qwen-arge` | `gwen/arge` | `Gwen [Arge]` |
 
-**MiniMax M2.5 için:**
+**OpenCode (implementer) için — hangi model olursa olsun:**
 ```bash
 # Çalışma dizini
-cd /root/m25-dev
+cd /root/opencode-dev
 
 # Her oturumun başında branch'ini kontrol et
 git branch  # fix/tech-debt olmalı
@@ -34,6 +34,8 @@ git branch  # fix/tech-debt olmalı
 git push origin fix/tech-debt  # ✅
 git push origin main           # ❌ YASAK
 ```
+
+Bağlam dosyası: `/root/opencode-dev/.claude/AGENT_CONTEXT.md`
 
 ---
 
