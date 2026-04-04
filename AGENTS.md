@@ -13,10 +13,22 @@ Bu dosya AI agent'ları için proje kurallarını tanımlar. Her yeni oturumda o
 
 **Çalışma branch'in:** `.claude/tasks/task-XXX.md` dosyasında belirtilir. Belirtilmemişse `fix/tech-debt` kullan.
 
+## 🗺️ Worktree Haritası
+
+| Agent | Path | Branch |
+|---|---|---|
+| Claude (orkestratör) | `/root/egesut-erp1-main` | `master → main` |
+| MiniMax M2.5 (implementer) | `/root/m25-dev` | `fix/tech-debt` |
+| Gwen dev | `/root/qwen-dev` | `gwen/dev` |
+| Gwen arge | `/root/qwen-arge` | `gwen/arge` |
+
+**MiniMax M2.5 için:**
 ```bash
+# Çalışma dizini
+cd /root/m25-dev
+
 # Her oturumun başında branch'ini kontrol et
-git branch
-git checkout fix/tech-debt  # değilsen geç
+git branch  # fix/tech-debt olmalı
 
 # Push sadece kendi branch'ine
 git push origin fix/tech-debt  # ✅
