@@ -1,6 +1,14 @@
 -- Migration: update_drug_administration RPC
 -- Etkiler: Yeni RPC — ilaç uygulaması güncelle, stok delta kaydet
 -- Geri alınabilir: DROP FUNCTION IF EXISTS public.update_drug_administration(uuid, numeric, text, text);
+-- Fix: Mevcut fonksiyon DEFAULT parametrelerle tanımlı — önce DROP, sonra CREATE
+
+-- Tüm overload'ları temizle (DEFAULT farkından kaynaklanan 42P13 hatası)
+DO $$ DECLARE r record;
+BEGIN
+  FOR r IN SELECT oid::regprocedure FROM pg_proc WHERE proname = 'update_drug_administration' AND pronamespace = 'public'::regnamespace
+  LOOP EXECUTE 'DROP FUNCTION IF EXISTS ' || r.oid::regprocedure; END LOOP;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.update_drug_administration(
   p_admin_id  uuid,
