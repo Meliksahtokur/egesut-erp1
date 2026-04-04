@@ -216,6 +216,12 @@ Tüm RPC'ler `jsonb` döndürür: `{ ok: boolean, ... }`
 ### Domain Rules
 `.claude/domain-rules.md` — üreme/hayvan modüllerine dokunmadan önce oku (özellikle bölüm 13)
 
+### Task Güncelleme Kuralı (ZORUNLU — Claude dahil tüm agentler)
+- Görev tamamlandığında **anında** task dosyasındaki `**Durum:**` satırını `tamamlandı` yap
+- `task-XXX-done.md` yaz: yapılanlar, doğrulama sonuçları, commit hash'leri
+- Task güncellenmeden commit atılmaz
+- Detay: `AGENTS.md` → "Task Dosyası Güncelleme Kuralı"
+
 ### Code Quality
 - Fonksiyon yazmadan önce: `grep -n "fonksiyonAdi" js/*.js` — duplikat sessiz bug yaratır
 - Her doğrulanmış fix sonrası commit
