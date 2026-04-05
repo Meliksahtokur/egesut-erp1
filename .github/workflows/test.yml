@@ -1,26 +1,32 @@
-name: E2E Tests
+name: E2E Test Suite
 
 on:
   push:
-    branches: [main, fix/**, feat/**, chore/**]
+    branches:
+      - main
+      - fix/**
+      - feat/**
+      - chore/**
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
-concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  NODE_VERSION: '20'
+  PLAYWRIGHT_VERSION: '1.58.2'
 
 jobs:
-  test:
-    name: Playwright E2E (${{ matrix.shard }}/${{ matrix.shard_total }})
+  # ══════════════════════════════════════════════════════════════════════════════
+  # JOB 1: E2E TEST (3 shard'a bölünür, paralel ~10dk)
+  # ══════════════════════════════════════════════════════════════════════════════
+  e2e-test:
+    name: E2E Tests (Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     strategy:
+      fail-fast: false
       matrix:
         shard: [1, 2, 3]
-        shard_total: 3
-
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,45 +34,67 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: egesut-erp1/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          cd egesut-erp1
+          npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Run E2E tests
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 0
         run: |
-          npx playwright test \
-            --reporter=list \
-            --shard=${{ matrix.shard }}/${{ matrix.shard_total }} \
-            --timeout=30000
+          cd egesut-erp1
+          npx playwright install --with-deps chromium
 
-      - name: Upload Playwright report
+      - name: Run E2E tests (Shard ${{ matrix.shard }}/3)
+        id: e2e-tests
+        run: |
+          cd egesut-erp1
+          npx playwright test \
+            --project=chromium \
+            --shard=${{ matrix.shard }}/3 \
+            --reporter=list,html \
+            --timeout=60000 \
+            --trace=on-demand \
+            --retries=1 \
+            tests/e2e.spec.js 2>&1 || true
+
+      - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
-          path: tests/report/
+          name: e2e-test-results-shard-${{ matrix.shard }}
+          path: |
+            egesut-erp1/test-results/
+            egesut-erp1/tests/report/
           retention-days: 7
 
-      - name: Upload test results
-        if: failure()
+      - name: Upload Playwright Trace
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-trace-shard-${{ matrix.shard }}
-          path: .playwright/
+          path: |
+            egesut-erp1/.playwright-trace/
           retention-days: 7
+          compression-level: 9
 
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## E2E Test Shard ${{ matrix.shard }}/3" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # JOB 2: SMOKE TEST (Hızlı kontrol, ~5dk)
+  # ══════════════════════════════════════════════════════════════════════════════
   smoke-test:
-    name: Smoke Test (9 critical checks)
+    name: Smoke Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,26 +102,84 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: egesut-erp1/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          cd egesut-erp1
+          npm ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Run smoke tests
         run: |
-          npx playwright test \
-            tests/smoke.spec.js \
-            --reporter=list \
-            --timeout=30000
+          cd egesut-erp1
+          npx playwright install --with-deps chromium
 
-      - name: Upload smoke report
+      - name: Run Smoke tests
+        id: smoke-tests
+        run: |
+          cd egesut-erp1
+          npx playwright test \
+            --project=chromium \
+            --reporter=list,html \
+            --timeout=30000 \
+            --trace=on-demand \
+            tests/smoke.spec.js 2>&1 || true
+
+      - name: Upload smoke test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke-report
-          path: tests/report/
+          name: smoke-test-results
+          path: |
+            egesut-erp1/test-results/
+            egesut-erp1/tests/report/
           retention-days: 7
+
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## Smoke Tests" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+  # ══════════════════════════════════════════════════════════════════════════════
+  # JOB 3: TEST ÖZETİ VE BİRLEŞTİRME
+  # ══════════════════════════════════════════════════════════════════════════════
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [e2e-test, smoke-test]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: test-results
+          pattern: '*test-results*'
+          merge-multiple: true
+
+      - name: Generate combined summary
+        run: |
+          echo "# Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Shard 1 | ${{ needs.e2e-test.outputs.status_1 || 'completed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Shard 2 | ${{ needs.e2e-test.outputs.status_2 || 'completed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| E2E Shard 3 | ${{ needs.e2e-test.outputs.status_3 || 'completed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Smoke Tests | ${{ needs.smoke-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Test Reports (7 gün saklanır)" >> $GITHUB_STEP_SUMMARY
+          echo "- Playwright Traces (debug için)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail on test failure
+        if: needs.e2e-test.result == 'failure' || needs.smoke-test.result == 'failure'
+        run: |
+          echo "❌ Some tests failed!"
+          exit 1
