@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      shard:
-        description: "Shard number (1, 2, 3, or all)"
-        required: false
-        default: "all"
 
 concurrency:
   group: e2e-${{ github.ref }}
