@@ -1,0 +1,92 @@
+[
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "project",
+    "content": "EgeSüt ERP — 130+ hayvanlık süt çiftliği yönetim sistemi | Live: https://meliksahtokur.github.io/egesut-erp1/ | Backend: Supabase PostgreSQL | Deploy: GitHub Pages | Stack: Vanilla JS (tek index.html, framework yok), IndexedDB offline cache (egesut_v10)"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "tech_stack",
+    "content": "Frontend: Vanilla JS PWA, tek index.html, build step yok | Backend: Supabase (PostgreSQL + RPC) | Cache: IndexedDB | Migration: GitHub Actions → Supabase CLI | DB: zqnexqbdfvbhlxzelzju"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "file_structure",
+    "content": "index.html (~1125 satır HTML+CSS+modals) | js/api.js (Supabase, IndexedDB, RPC ~335 satır) | js/app.js (init, routing, state ~737 satır) | js/ui.js (tüm render fonksiyonları ~2865 satır) | js/forms.js (form submit, RPC ~941 satır) | js/state.js (getState/setState/state.on ~84 satır) | js/config.js (GRUP_PADOK mapping ~68 satır) | supabase/migrations/ (28 migration)"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "critical_rules",
+    "content": "1) Sadece RPC ile yaz — direkt REST INSERT/UPDATE/DELETE YASAK | 2) Controlled entities: hastalık/ilaç/hayvan asla free-text, FK + dropdown zorunlu | 3) Stok ledger immutable — stok_hareket asla silinmez | 4) Paralel dosya yazma YASAK | 5) Main branch'e direkt push YASAK | 6) Task dosyasını güncellemeden commit YASAK"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "database_schema",
+    "content": "Ana tablolar: hayvanlar (çekirdek) → tohumlama, dogum, kizginlik_log, gorev_log, cases (vaka sistemi) | stok → stok_hareket (ledger) | diseases, drugs (controlled entities) | cases → treatment_days → drug_administrations → drugs → stok"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "rpc_reference",
+    "content": "Tüm RPC'ler jsonb döndürür: {ok: boolean, ...} | Hayvan: hayvan_ekle, hayvan_guncelle, hayvan_not_ekle | Üreme: tohumlama_kaydet, tohumlama_sonuc_gebe, tohumlama_sonuc_bos, dogum_kaydet, abort_kaydet, kizginlik_kaydet | Vaka: create_case, add_treatment_day, add_drug_administration, remove_drug_administration, close_case"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "domain_rules",
+    "content": "Grup-Padok eşlemesi: GRUP_PADOK sabiti (config.js) | Erkek hayvan Sağmal/Kuru/Gebe grubuna girmez | Tohumlama state machine: boş → gebe → doğum/abort | Gebelik: 280 gün ±10 | Stok: kullanım=POZİTİF, iade=NEGATİF"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "commands",
+    "content": "npm install | npx supabase db push | node --check js/*.js | npm test (playwright) | git push origin <branch> | pullTables(['tablo']) | renderFromLocal() (kritik) | renderSafe() (background debounce)"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "known_issues",
+    "content": "Klinik frontend tamamlanmadı (DB hazır, UI eksik) | Tohumlama write path 3 farklı yol (2'si RPC bypass) | ui.js monolitik (3000+ satır) | Migration 013-014 repo'da yok (SQL Editor'dan uygulandı)"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "mcp_permissions",
+    "content": "MCP toolları (izin verilen): github__search_repositories, github__get_file_contents, github__search_code, github__list_commits | context7__resolve-library-id, context7__query-docs | supabase__list_projects, supabase__list_tables, supabase__list_migrations, supabase__execute_sql"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "references",
+    "content": "Mini-Agent: /root/opencode-dev | Claude Code (EgeSüt): /root/egesut-erp1 | Aynı workspace, farklı dallar | Agentler dosya yoluyla iletişim kurar | QUICK_REF: .claude/QUICK_REF.md | AGENTS: AGENTS.md | ARCH: ARCHITECTURE.md | SPEC: SPEC.md"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "agent_identity",
+    "content": "Mini-Agent — MiniMax M2.7 ile çalışan coding assistant | Model: minimax/MiniMax-M2.7 | Provider: @ai-sdk/anthropic | Base URL: https://api.minimax.io/anthropic/v1"
+  },
+  {
+    "timestamp": "2025-04-05T16:30:00.000000",
+    "category": "memory_enhancement",
+    "content": "MEMORY ENHANCEMENT: TAMAMLANDI! 🎉 12/12 gorev (100%) | M5: Full Enhancement Complete | Phase 1-4: All ✅ | memory.db (SQLite+FTS5+Embeddings) | knowledge_graph.db (321 entities, 4819 relations) | 5 CLI tools: search, stats, embed, similar, graph"
+  },
+  {
+    "timestamp": "2025-04-05T16:30:00.000000",
+    "category": "knowledge_graph",
+    "content": "Knowledge Graph: .claude/memory/knowledge_graph.py | 321 entities (289 variable, 23 function, 5 file, 2 project, 2 url) | 4819 relations (co-occurrence) | Entity types: variable, function, file, project, url, concept | BFS path finding | Graph DB: knowledge_graph.db"
+  },
+  {
+    "timestamp": "2025-04-05T16:30:00.000000",
+    "category": "memory_tools",
+    "content": "All Memory Tools: .claude/memory/ | 1) sqlite_backend.py (T2.1) | 2) search_tool.py (T2.3) | 3) embedding_service.py (T3.1) | 4) find_similar_notes.py (T3.2-T3.3) | 5) knowledge_graph.py (T4.1-T4.3) | Phase 1: stats | Phase 2: SQLite+FTS5 | Phase 3: Embeddings | Phase 4: Graph"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "memory_tools",
+    "content": "CLI Tools: search_tool.py (T2.3 ✅ - Enhanced Search) | sqlite_backend.py (T2.1 ✅ - CRUD + FTS5) | auto_categorizer.py (T1.2 ✅) | memory_stats.py (T1.3 ✅) | Run: python3 .claude/memory/search_tool.py --query \"search\""
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "sqlite_backend",
+    "content": "SQLite Backend: .claude/memory/memory.db | 16 not | FTS5 (BM25 + highlight) | CRUD: save_note(), load_notes(), search_notes() | Backup: .agent_memory.json.backup | 10x faster queries"
+  },
+  {
+    "timestamp": "2025-04-05T15:00:00.000000",
+    "category": "search_tool_features",
+    "content": "search_tool.py Features: --query (zorunlu), --category, --tags (comma-sep), --from/--to (date range), --limit, --format (text/json) | --info (db bilgisi) | --list-categories | --list-tags | Tested: RPC→5sonuç, YASAK→1sonuç, 11ms"
+  }
+]

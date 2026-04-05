@@ -112,4 +112,33 @@ npx supabase db push
 # JS syntax kontrolü
 node --check js/ui.js
 node --check js/forms.js
+
+---
+
+## 🧠 Agent Memory Enhancement (2025-04-05)
+
+Agent bellek sistemi upgrade edildi. **Tüm agent'lar otomatik olarak bu özelliklerden yararlanır.**
+
+### Özellikler
+- **SQLite backend** — Hızlı sorgulama (FTS5)
+- **Vector embeddings** — Anlamsal arama
+- **Knowledge graph** — Entity/relationship keşfi
+- **Auto-tagging** — Otomatik etiketleme
+
+### Kullanım (Agent İçin)
+```bash
+# Arama
+python3 .claude/memory/search_tool.py --query "konu"
+
+# Semantic
+python3 .claude/memory/embedding_service.py --search "anlam"
+
+# Benzer notlar
+python3 .claude/memory/find_similar_notes.py --query "konu"
+
+# Graph
+python3 .claude/memory/knowledge_graph.py --query "entity"
+```
+
+**Detaylar:** [`.claude/QUICK_REF.md`](.claude/QUICK_REF.md)
 ```

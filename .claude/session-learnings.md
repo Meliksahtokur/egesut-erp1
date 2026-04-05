@@ -66,3 +66,39 @@ Proposed new RPCs: `tohumlama_sonuc_gebe`, `tohumlama_sonuc_bos`, `tohumlama_abo
 - Don't touch `Gebe` veya `Doğum Yaptı` tohumlama records from frontend directly — RPC only
 - Don't skip confirm dialogs for destructive state transitions (Gebe→Boş, Gebe→Abort)
 - **Agent'lara "stok sistemi nedir?" veya "sperma nasıl seçilir?" sormayın** — cevap artık agent dosyalarında mevcut
+
+## Memory Enhancement System (2025-04-05)
+
+### Yeni Özellikler
+- **SQLite backend** — `.claude/memory/memory.db` (FTS5 full-text search)
+- **Vector embeddings** — Semantic arama (1024-dimension)
+- **Knowledge graph** — 321 entities, 4819 relations
+- **Auto-tagging** — Notlar otomatik etiketleniyor
+
+### Kullanım
+```bash
+# Arama (FTS5)
+python3 .claude/memory/search_tool.py --query "konu" --category <cat>
+
+# Semantic (embedding tabanlı)
+python3 .claude/memory/embedding_service.py --search "anlamlı cümle"
+
+# Benzer notlar
+python3 .claude/memory/find_similar_notes.py --query "konu"
+
+# Graph sorgula
+python3 .claude/memory/knowledge_graph.py --query "entity"
+python3 .claude/memory/knowledge_graph.py --path "e1" "e2"
+
+# İstatistikler
+python3 .claude/memory/sqlite_backend.py --stats
+python3 .claude/memory/knowledge_graph.py --graph
+```
+
+### Otomatik Özellikler
+`record_note()` çağrıldığında otomatik:
+- ✅ SQLite'e kayıt
+- ✅ FTS5 index güncelleme
+- ✅ Embedding oluşturma
+- ✅ Entity çıkarma
+- ✅ Graph güncelleme

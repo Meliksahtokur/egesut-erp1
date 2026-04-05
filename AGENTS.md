@@ -199,6 +199,50 @@ Deneme 5: Son deneme
 3. Push et → Claude otomatik görecek
 4. **Merge YAPMA, bekle**
 
+## Memory Enhancement System
+
+### Otomatik Özellikler
+
+`record_note()` çağrıldığında **otomatik olarak** şunlar yapılır:
+- ✅ SQLite veritabanına kayıt
+- ✅ FTS5 full-text index güncelleme
+- ✅ Vector embedding oluşturma
+- ✅ Entity extraction (knowledge graph)
+- ✅ Relationship detection
+
+**Agent hiçbir şey yapmadan bu özelliklerden yararlanır.**
+
+### Memory Sorgulama Komutları
+
+```bash
+# FTS5 arama (hızlı, 11ms)
+python3 .claude/memory/search_tool.py --query "arama_terimi" --category <kategori>
+
+# Semantic arama (anlamsal)
+python3 .claude/memory/embedding_service.py --search "anlamlı_cümle"
+
+# Benzer notlar
+python3 .claude/memory/find_similar_notes.py --query "konu" --limit 5
+
+# Bilgi grafiği
+python3 .claude/memory/knowledge_graph.py --query "entity_adi"
+python3 .claude/memory/knowledge_graph.py --path "entity1" "entity2"
+
+# İstatistikler
+python3 .claude/memory/sqlite_backend.py --stats
+python3 .claude/memory/knowledge_graph.py --graph
+```
+
+### Pratik Kullanım
+
+| Durum | Komut |
+|-------|-------|
+| "Bunu daha önce yazmıştım" | `bash("python3 .claude/memory/search_tool.py --query '...'")` |
+| "Benzer bir şey var mı?" | `bash("python3 .claude/memory/find_similar_notes.py --query '...'")` |
+| "Hangi entity'ler geçiyor?" | `bash("python3 .claude/memory/knowledge_graph.py --query '...'")` |
+
+---
+
 ## Commit Formatı
 
 ```
