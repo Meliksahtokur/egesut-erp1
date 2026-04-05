@@ -1,17 +1,23 @@
-// playwright.config.js
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
   timeout: 30000,
   retries: 1,
+  workers: process.env.CI ? 1 : undefined,
+  fullyParallel: !process.env.CI,
+  reporter: [
+    ['list'],
+    ['html', { open: 'never', outputFolder: 'tests/report' }],
+  ],
   use: {
     baseURL: 'https://meliksahtokur.github.io/egesut-erp1/',
     headless: true,
-    viewport: { width: 390, height: 844 }, // iPhone 14 — mobil PWA
+    viewport: { width: 390, height: 844 },
     locale: 'tr-TR',
-    // Supabase çağrıları için yeterli bekleme
     actionTimeout: 10000,
   },
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'tests/report' }]],
+  projects: [
+    { name: 'chromium', use: { ...devices['iPhone 14'] } },
+  ],
 });
