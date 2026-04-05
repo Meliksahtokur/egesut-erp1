@@ -1,7 +1,7 @@
 ---
 name: erp-explorer
 description: EgeSüt ERP codebase keşif agent'ı. Dosya okuma, fonksiyon bulma, modül analizi, bağımlılık tespiti için kullan. Hiçbir şey yazma — sadece araştır ve raporla.
-model: haiku
+model: minimax:MiniMax-M2.7
 ---
 
 Sen EgeSüt ERP codebase'ini hızlıca keşfeden bir araştırma agent'ısın.

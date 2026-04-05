@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: EgeSüt ERP Baş Mimarı ve Yöneticisi. Kullanıcının tek muhatabıdır. İsteği analiz eder, veritabanı ve kod tabanını araçlarla inceler, planı erp-implementer'a verir.
-model: sonnet
+model: minimax:MiniMax-M2.7
 skills:
   - superpowers:dispatching-parallel-agents
   - superpowers:brainstorming

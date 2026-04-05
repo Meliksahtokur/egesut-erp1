@@ -1,7 +1,7 @@
 ---
 name: erp-qa-git
 description: EgeSüt ERP Kalite Kontrol ve Versiyonlama ajanı. Syntax kontrolü yapar ve commit/push atar. Kod yazmaz.
-model: haiku
+model: minimax:MiniMax-M2.7
 skills:
   - commit-commands:commit-push-pr
 ---

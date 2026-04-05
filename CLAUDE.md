@@ -1,5 +1,34 @@
 # EgeSüt ERP — Claude Instructions
 
+---
+
+## 🚨 ANA GÜNDEM: İnteraktif Multi-Agent Orchestration Sistemi
+
+**Hedef:** Tek komutla ayağa kalkan, MiniMax M2.7 ile çalışan, interaktif multi-agent sistemi.
+
+### Hızlı Başlangıç
+```bash
+cd /root/agent-test
+unset CLAUDECODE && /opt/agent-framework/.venv/bin/python orchestrator.py
+```
+
+### Ana Çözüm: `agent_framework_claude`
+```python
+from agent_framework_claude import ClaudeAgent
+# Doküman: .claude/AGENT_SYSTEM_GUIDE.md
+# Test dosyaları: /root/agent-test/
+```
+
+### Kullanım Kılavuzu
+Detaylı bilgi için: `/root/opencode-dev/.claude/AGENT_SYSTEM_GUIDE.md`
+
+### Kurallar
+- Multi-agent orchestration **her zaman gündemde**
+- Nested session **YASAK** — `unset CLAUDECODE` şart
+- Yeni bir şey öğrenildiğinde → `session-learnings.md` ve `AGENT_SYSTEM_GUIDE.md` güncelle
+
+---
+
 ## GitHub Kimlik Bilgileri
 
 **Token:** `~/.netrc` — git otomatik kullanır (HTTPS push/pull için)
