@@ -13,14 +13,14 @@ concurrency:
 
 jobs:
   test:
-    name: Playwright E2E (${{ matrix.shard }}/${{ matrix.shard_total }})
+    name: Playwright E2E (shard ${{ matrix.part }}/${{ matrix.total }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     strategy:
       matrix:
-        shard: [1, 2, 3]
-        shard_total: 3
+        part: [1, 2, 3]
+        total: 3
 
     steps:
       - name: Checkout
@@ -44,14 +44,14 @@ jobs:
         run: |
           npx playwright test \
             --reporter=list \
-            --shard=${{ matrix.shard }}/${{ matrix.shard_total }} \
+            --shard=${{ matrix.part }}/${{ matrix.total }} \
             --timeout=30000
 
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
+          name: playwright-report-shard-${{ matrix.part }}
           path: tests/report/
           retention-days: 7
 
@@ -59,7 +59,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-trace-shard-${{ matrix.shard }}
+          name: playwright-trace-shard-${{ matrix.part }}
           path: .playwright/
           retention-days: 7
 
