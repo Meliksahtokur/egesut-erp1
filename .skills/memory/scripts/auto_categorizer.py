@@ -1,0 +1,1 @@
+/root/egesut-erp1/.claude/memory/auto_categorizer.py

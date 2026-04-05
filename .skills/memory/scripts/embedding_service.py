@@ -1,0 +1,1 @@
+/root/egesut-erp1/.claude/memory/embedding_service.py

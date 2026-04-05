@@ -1,0 +1,36 @@
+{
+  "name": "memory-agent",
+  "description": "Advanced memory operations and intelligent search",
+  "version": "1.0.0",
+  "capabilities": [
+    "memory_search",
+    "semantic_search",
+    "knowledge_graph_query",
+    "memory_categorization",
+    "context_analysis"
+  ],
+  "tools": {
+    "memory_search": {
+      "enabled": true,
+      "path": "../memory/search_tool.py"
+    },
+    "embedding_service": {
+      "enabled": true,
+      "path": "../memory/embedding_service.py"
+    },
+    "knowledge_graph": {
+      "enabled": true,
+      "path": "../memory/knowledge_graph.py"
+    }
+  },
+  "parameters": {
+    "max_results": 10,
+    "search_timeout": 30,
+    "memory_threshold": 0.7
+  },
+  "integration": {
+    "claude_skills": ["memory-intelligence"],
+    "mcp_servers": ["github", "supabase"],
+    "background_execution": true
+  }
+}
