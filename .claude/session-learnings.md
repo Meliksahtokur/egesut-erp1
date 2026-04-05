@@ -286,3 +286,122 @@ Gerçek NofX crypto trading OS — yazılımla ilgisi yok.
 ### Alternatifler
 - Cline: `npm install -g cline` (npm cache bozuktu, düzeltilmeli)
 - code-server binary: manuel indirilebilir
+
+---
+
+## 2026-04-05 — MiniMax M2.7 + Agent Sistemi Güncelleme
+
+### Araştırma Sonuçları
+
+#### 1. MiniMax Official: Mini Agent
+- **Repo:** github.com/MiniMax-AI/mini-agent
+- **Model:** M2.5/M2.1 tabanlı, M2.7 uyumluluğu TEST EDİLDİ ✅
+- **Mimari:** Direct HTTP API (subprocess yok!)
+- **Kurulum:** `uv tool install git+https://github.com/MiniMax-AI/Mini-Agent.git`
+- **Config:** `~/.mini-agent/config/config.yaml`
+- **MCP:** `~/.mini-agent/config/mcp.json`
+- **Kullanım:** `mini-agent --workspace /path`
+- **Tool'lar:** ReadTool, WriteTool, EditTool, BashTool
+- **Skills:** 15 hazır skill (PDF, DOCX, XLSX, PPTX, Canvas, MCP-Builder, etc.)
+- **⚠️ Kritik:** Multi-agent yok — tek instance, subagent spawn yok
+
+#### 2. ClawTeam — Framework-Agnostic Agent Coordinator
+- **Repo:** PyPI: clawteam (v0.2.0)
+- **Kurulum:** `pip install clawteam`
+- **Özellikler:**
+  - `spawn` — agent başlatma (tmux veya subprocess backend)
+  - `board` — canlı dashboard (live, serve web UI)
+  - `team` — ekip yönetimi (spawn-team, status, snapshot)
+  - `session` — persistence (resume, snapshot/restore)
+  - `task` — görev kuyruğu
+  - `lifecycle` — agent lifecycle management
+  - `template` — hazır team template'leri (software-dev, code-review, etc.)
+- **Komut:** `clawteam spawn --backend subprocess --command "..."`
+- **⚠️ Kritik:** Varsayılan Claude CLI kullanıyor, `--command` ile MiniMax'e yönlendirilebilir
+
+### Test Sonuçları
+
+#### MiniMax M2.7 + Mini Agent ✅
+```
+Test 1: Basit query
+- Süre: 10.6 saniye
+- Sonuç: ✅ Çalışıyor
+
+Test 2: Tool kullanımı (write_file + bash)
+- Süre: 15.8 saniye (4 adım)
+- Sonuç: ✅ Çalışıyor, self-correction da çalışıyor
+```
+
+#### ClawTeam + MiniMax (test edilmedi henüz)
+- Kuruldu ✅
+- CLI anlaşıldı ✅
+- MiniMax ile entegrasyon: **TEST EDİLMEDİ**
+
+### Mimari Önerileri (Karar Bekliyor)
+
+#### Yol A: ClawTeam + MiniMax
+```
+SEN (orchestrator)
+  └── ClawTeam (agent coordinator)
+        ├── Mini Agent #1 (worker)
+        ├── Mini Agent #2 (worker)
+        └── Mini Agent #3 (worker)
+```
+- ✅ Hazır, kuruldu
+- ✅ Board/dashboard var
+- ✅ Session persistence var
+- ⚠️ MiniMax entegrasyonu test edilmedi
+
+#### Yol B: Mini Agent Base + Custom Multi-Agent Layer
+```
+MiniMax M2.7 (direct HTTP)
+  └── Mini Agent (base)
+        └── Custom Layer (biz yazacağız)
+              ├── Agent Pool
+              ├── Task Router
+              └── Result Aggregator
+```
+- ✅ Direct API, subprocess yok
+- ✅ Tam kontrol
+- ❌ Baştan yazmak gerekiyor (8-12 gün)
+
+### Karar Bekleyen Konular
+1. ClawTeam + MiniMax entegrasyonu test edilecek
+2. Board web UI test edilecek
+3. Multi-agent team oluşturulacak
+4. Fail recovery test edilecek
+
+### Öğrenilen Dersler
+- Kritik kararlarda (kurulum, mimari değişikliği) ÖNCE kullanıcıya danış
+- Araştırma sonuçlarını paylaş, kararı birlikte ver
+- Memory'yi güncelle — öğrenilenleri kaydet
+
+---
+
+## 2026-04-05 — Araç Karşılaştırması Güncelleme
+
+### Araştırılan / Test Edilen Araçlar
+
+| Araç | Tip | MiniMax Uyumu | Durum |
+|------|-----|---------------|-------|
+| **ClawTeam** | CLI | ⚠️ `--command` ile yönlendirilebilir | ✅ Kuruldu, test edilmedi |
+| **Animus** | ML Experiment Framework | ❌ Uyumsuz | ❌ Yanlış seçim — ML için, agent coordination değil |
+| **Strands Agents** | Python SDK | ✅ Python ile entegre edilebilir | ✅ Kuruldu, test edilmedi |
+| **agent_framework_claude** | Python SDK | ✅ Claude Code CLI wrapper | ✅ Kuruldu, timeout sorunu var |
+
+### Önemli Not
+- Araştırma sonuçlarına göre kurulum yapmadan önce TÜM seçenekleri test et
+- Sadece ilk bulunanı değil, hepsini karşılaştır
+- Kritik kararlarda kullanıcıya danış
+
+### Strands Agents Özellikleri (İnceleme Bekliyor)
+- AWS açık kaynak agent SDK
+- Python native
+- `Agent` class + tool/function calling
+- MCP desteği olabilir
+- MiniMax M2.7 ile direct API kullanılabilir mi test edilmeli
+
+### Sonraki Adım
+1. Strands Agents + MiniMax M2.7 test et
+2. ClawTeam + MiniMax test et  
+3. Karşılaştır, karar ver
