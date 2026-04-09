@@ -889,12 +889,14 @@ async function _uremeKizginlik(el){
     (list.length?list.map(k=>{
       const h=getState('animals').find(a=>a.id===k.hayvan_id);
       const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
-      return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
-        <div class="hist-dot" style="background:#e74c3c"></div>
-        <div class="hist-main">
+      return `<div class="hist-row">
+        <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
+        <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
           <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'}</div>
           <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
         </div>
+        <button class="btn btn-g" style="padding:4px 10px;font-size:.72rem;white-space:nowrap;flex-shrink:0"
+          onclick="event.stopPropagation();openMWithHayvan('m-insem','i-hid','${kupe}')">💉 Tohumla</button>
       </div>`;
     }).join(''):'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
 }
