@@ -383,6 +383,7 @@ function initRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'stok_hareket' }, () => pullTables(['stok','stok_hareket']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tohumlama' },    () => pullTables(['tohumlama']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dogum' },        () => pullTables(['dogum']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kizginlik_log' }, () => pullTables(['kizginlik_log']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'islem_log' },    () => pullTables(['islem_log']))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  payload => console.log('[ui_log]', payload.new))
     .subscribe(status => {

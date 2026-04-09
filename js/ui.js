@@ -446,7 +446,7 @@ function _detUremeHtml(a,tohs,kizgs){
     :'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
   if(kizgs&&kizgs.length){
     h+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:.72rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Kızgınlık Geçmişi</div>';
-    h+=kizgs.map(k=>`<div class="hist-row"><div class="hist-dot" style="background:var(--amber)"></div><div class="hist-main"><div class="hist-title">${k.kaynak==='otomatik'?'🤖 Otomatik':'📋 Manuel'}</div><div class="hist-sub">${(k.tarih||k.created_at||'').slice(0,10)}</div></div></div>`).join('');
+    h+=kizgs.map(k=>`<div class="hist-row"><div class="hist-dot" style="background:var(--red2)"></div><div class="hist-main"><div class="hist-title">${k.belirti||'Kızgınlık'}</div><div class="hist-sub">${(k.tarih||k.created_at||'').slice(0,10)}</div></div></div>`).join('');
     h+='</div>';
   }
   return h;
@@ -2942,7 +2942,8 @@ function buildRpcParams(rpcName, data, op) {
       return {
         p_hayvan_id: data.hayvan_id,
         p_tarih: data.tarih,
-        p_gozlem: data.gozlem
+        p_belirti: data.belirti || null,
+        p_notlar: data.notlar || null
       };
     case 'create_case':
       return {
