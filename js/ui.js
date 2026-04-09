@@ -895,7 +895,7 @@ async function _uremeKizginlik(el){
           <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'}</div>
           <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
         </div>
-        <button class="btn btn-g" style="padding:4px 10px;font-size:.72rem;white-space:nowrap;flex-shrink:0"
+        <button class="btn btn-g" style="padding:9px;white-space:nowrap;flex-shrink:0"
           onclick="event.stopPropagation();openMWithHayvan('m-insem','i-hid','${kupe}')">💉 Tohumla</button>
       </div>`;
     }).join(''):'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
