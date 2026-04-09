@@ -587,6 +587,7 @@ button,input,select,textarea{font-family:inherit}
           <option value="">— Aşı seçin —</option>
         </select>
         <div id="v-vaccine-info" style="font-size:.75rem;color:var(--ink3);margin-top:6px;display:none"></div>
+        <div id="v-protocol-hint" style="display:none;margin-top:4px;padding:6px 10px;border-radius:8px;background:rgba(78,154,42,.12);border:1px solid rgba(78,154,42,.25);font-size:.72rem;color:var(--ink2);line-height:1.5"></div>
       </div>
 
       <!-- TARİH -->
@@ -597,6 +598,7 @@ button,input,select,textarea{font-family:inherit}
       <!-- DOZ OVERRIDE (OPSIYONEL) -->
       <div class="fg"><label class="flbl">Doz (opsiyonel)</label>
         <input id="v-dose-override" class="fi" type="number" step="0.1" placeholder="Boş bırakılırsa standart doz kullanılır">
+        <span id="v-dose-unit" style="font-size:.68rem;color:var(--ink3);margin-left:6px"></span>
         <div class="fhint" style="font-size:.62rem;color:var(--ink3);margin-top:3px">Sadece standart dozdan farklı ise girin</div>
       </div>
 
@@ -889,6 +891,9 @@ button,input,select,textarea{font-family:inherit}
           <button class="btn btn-o btn-sm" onclick="document.getElementById('ay-sperma-form').style.display='none'">İptal</button>
         </div>
       </div>
+      <div class="divider"></div>
+      <div class="sh"><span class="sh-title">💉 Aşı Kataloğu</span></div>
+      <div id="ay-vaksiyon-list" style="margin-bottom:12px"></div>
       <div class="divider"></div>
       <div class="divider"></div>
       <div class="sh"><span class="sh-title">💊 İlaç–Stok Bağlantıları</span></div>
