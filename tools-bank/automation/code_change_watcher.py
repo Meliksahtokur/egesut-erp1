@@ -289,12 +289,106 @@ def check_once() -> int:
     return len(note_ids)
 
 
+PIDFILE = "/tmp/egesut-daemon.pid"
+
+
+def is_daemon_running() -> bool:
+    """Daemon çalışıyor mu?"""
+    if os.path.exists(PIDFILE):
+        try:
+            with open(PIDFILE) as f:
+                pid = int(f.read().strip())
+            os.kill(pid, 0)
+            return True
+        except (ProcessLookupError, ValueError, OSError):
+            os.unlink(PIDFILE)
+    return False
+
+
+HOURLY_MASTER_CHECK_FILE = "/tmp/egesut-last-master-check.lock"
+
+
+def is_hourly_tick() -> bool:
+    """Her saat başı True döner, yoksa False"""
+    lock_dir = Path("/tmp")
+    lock_file = lock_dir / "egesut-last-master-check.lock"
+
+    try:
+        now = datetime.now()
+        current_hour = now.hour
+
+        if lock_file.exists():
+            try:
+                saved_hour = int(lock_file.read_text().strip())
+                if saved_hour == current_hour:
+                    return False
+            except ValueError:
+                pass
+
+        lock_file.write_text(str(current_hour))
+        return True
+    except Exception:
+        return False
+
+
+def sync_from_master() -> bool:
+    """Master branch'den pull et, yeni commit varsa not ekle"""
+    print(f"\n🕐 [{datetime.now().strftime('%H:%M:%S')}] Hourly master check...")
+
+    try:
+        # Fetch latest
+        run_cmd(["git", "fetch", "origin", "master"], cwd=REPO_ROOT)
+
+        # Master'da yeni var mı?
+        stdout, _, rc = run_cmd(
+            ["git", "log", "@{u}..origin/master", "--oneline"],
+            cwd=REPO_ROOT
+        )
+
+        if rc != 0 or not stdout.strip():
+            print(f"   ✓ Master up-to-date")
+            return False
+
+        commits = [c for c in stdout.strip().split("\n") if c]
+        print(f"   📦 {len(commits)} yeni commit var, pulling...")
+
+        # Pull
+        run_cmd(["git", "stash"], cwd=REPO_ROOT)
+        pull_out, pull_err, pull_rc = run_cmd(
+            ["git", "pull", "origin", "master"],
+            cwd=REPO_ROOT
+        )
+
+        if pull_rc == 0:
+            print(f"   ✓ Pulled: {pull_out[:100]}")
+
+            # Yeni commit'leri process et
+            changes = get_git_changes()
+            if changes:
+                note_ids = process_changes(changes)
+                print(f"   → {len(note_ids)} note(s) created from pulled commits")
+
+            return True
+        else:
+            print(f"   ✗ Pull failed: {pull_err}")
+            return False
+
+    except Exception as e:
+        print(f"   ⚠ Master sync error: {e}")
+        return False
+
+
 def run_daemon(poll_interval: int = 30):
     """ Sürekli git değişikliği izle """
+    # PIDfile kaydet
+    with open(PIDFILE, "w") as f:
+        f.write(str(os.getpid()))
+
     print(f"👁  Code watcher running (poll every {poll_interval}s)")
     print(f"   Repo: {REPO_ROOT}")
     print(f"   Memory DB: {MEMORY_DB}")
     print(f"   KG DB: {KG_DB}")
+    print(f"   PID: {os.getpid()}")
 
     last_hash = None
 
@@ -307,6 +401,10 @@ def run_daemon(poll_interval: int = 30):
                     note_ids = process_changes(changes)
                     print(f"   → {len(note_ids)} note(s) created")
                 last_hash = changes["hash"]
+
+            # Her saat başı master check
+            if is_hourly_tick():
+                sync_from_master()
 
         except KeyboardInterrupt:
             print("\n👋 Watcher stopped")
