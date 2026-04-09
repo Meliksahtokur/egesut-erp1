@@ -180,8 +180,13 @@ async function submitInsem(btn) {
     closeM('m-insem');
     cl('i-hid'); cl('i-sperma');
     checkSpermaUyari();
-    // RPC otomatik invalidation yapıyor, ek çağrı gerekmiyor
-    pullTables(['tohumlama','gorev_log','hayvanlar']).then(renderSafe).catch(console.warn);
+    pullTables(['tohumlama','gorev_log','hayvanlar']).then(() => {
+      renderSafe();
+      // Kızgınlık sekmesindeyse liste yenilensin
+      if (typeof loadUreme === 'function' && window._curUremeTab === 'kizginlik') {
+        loadUreme('kizginlik');
+      }
+    }).catch(console.warn);
   } catch (e) {
 
     toast('❌ Tohumlama kaydedilemedi: ' + e.message, true);
