@@ -11,9 +11,11 @@ import sys
 from pathlib import Path
 
 # Paths
-MEMORY_TOOLS = "/root/opencode-dev/.claude/memory"
-MINI_AGENT = "/root/.local/bin/mini-agent"
-WORKSPACE = "/root/opencode-dev"
+TOOLSBANK_ROOT = "/root/egesut-erp1/tools-bank"
+MEMORY_TOOLS = f"{TOOLSBANK_ROOT}/memory"
+MEMORY_DB = f"{TOOLSBANK_ROOT}/memory/memory.db"
+KNOWLEDGE_GRAPH_DB = f"{TOOLSBANK_ROOT}/memory/knowledge_graph.db"
+WORKSPACE = "/root/egesut-erp1"
 
 def memory_search(query, category=None, limit=5):
     """Smart memory search with optional filtering"""
@@ -21,7 +23,8 @@ def memory_search(query, category=None, limit=5):
         "python3", f"{MEMORY_TOOLS}/search_tool.py",
         "--query", query,
         "--limit", str(limit),
-        "--format", "json"
+        "--format", "json",
+        "--db", MEMORY_DB
     ]
 
     if category:
@@ -40,13 +43,15 @@ def knowledge_graph_query(entity, relation_target=None):
     """Query knowledge graph for entity relationships"""
     cmd = [
         "python3", f"{MEMORY_TOOLS}/knowledge_graph.py",
-        "--query", entity
+        "--query", entity,
+        "--graph-db", KNOWLEDGE_GRAPH_DB
     ]
 
     if relation_target:
         cmd = [
             "python3", f"{MEMORY_TOOLS}/knowledge_graph.py",
-            "--relate", entity, relation_target
+            "--relate", entity, relation_target,
+            "--graph-db", KNOWLEDGE_GRAPH_DB
         ]
 
     try:
@@ -59,7 +64,8 @@ def semantic_search(query, limit=5):
     """Vector-based semantic search"""
     cmd = [
         "python3", f"{MEMORY_TOOLS}/embedding_service.py",
-        "--search", query
+        "--search", query,
+        "--db", MEMORY_DB
     ]
 
     try:
@@ -91,12 +97,17 @@ def spawn_agent(task_description, workspace=None):
 
 def memory_stats():
     """Get memory system health and statistics"""
-    cmd = ["python3", f"{MEMORY_TOOLS}/memory_stats.py", "--json"]
+    # Use embedding_service --stats as primary stats source
+    cmd = ["python3", f"{MEMORY_TOOLS}/embedding_service.py", "--stats", "--db", MEMORY_DB]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
-            return json.loads(result.stdout)
+            # embedding_service --stats returns text, not JSON
+            try:
+                return json.loads(result.stdout)
+            except json.JSONDecodeError:
+                return {"success": True, "output": result.stdout}
         else:
             return {"error": result.stderr}
     except Exception as e:

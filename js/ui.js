@@ -60,6 +60,44 @@ function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
     <div class="sc ${badge>0?'alert':_taskCls}" onclick="goTo('tasks')"><div class="sv">${tasks.length}</div><div class="sl">Bekleyen Görev ›</div></div>
   </div>`;
 }
+function _dashVacAlerts(today,vaxLogs,vaccines){
+  if(!vaxLogs||!vaxLogs.length) return '';
+  const withDue=vaxLogs.filter(v=>v.next_due_date);
+  if(!withDue.length) return '';
+
+  const vaxMap={};
+  (vaccines||[]).forEach(v=>vaxMap[v.id]=v);
+
+  const categorized=withDue.map(v=>{
+    const due=new Date(v.next_due_date);
+    const todayD=new Date(today);
+    const days=Math.floor((due-todayD)/86400000);
+    return{...v,days,vaxName:vaxMap[v.vaccine_id]?.name||'?'};
+  }).sort((a,b)=>a.days-b.days);
+
+  const overdue=categorized.filter(v=>v.days<0);
+  const thisWeek=categorized.filter(v=>v.days>=0&&v.days<=7);
+  const thisMonth=categorized.filter(v=>v.days>7&&v.days<=30);
+
+  let priority='blue', rows=[];
+  if(overdue.length){ priority='red'; rows=overdue; }
+  else if(thisWeek.length){ priority='amber'; rows=thisWeek; }
+  else { priority='blue'; rows=thisMonth; }
+
+  const total=categorized.length;
+  const display=rows.slice(0,5);
+  const more=total-5;
+
+  return band(priority,`💉 Yaklaşan Aşılar (${total})`,
+    display.map(v=>`<div class="arow" onclick="openDet('${v.animal_id}')">
+      <div class="arow-left">
+        <div class="arow-main">${v.vaxName}</div>
+        <div class="arow-sub">${v.days<0?'⚠️ '+Math.abs(v.days)+' gün gecikti':'⏰ '+v.days+' gün kaldı'}</div>
+      </div>
+      <div class="arow-right">${fmtTarih(v.next_due_date)}</div>
+    </div>`).join('')+(more>0?`<div class="arow" style="opacity:.5;font-size:.68rem;text-align:center">+${more} daha</div>`:''));
+}
+
 function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet){
   let h='';
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
@@ -89,7 +127,7 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=new Date().toISOString().split('T')[0];
-    const [animals,diseases,tasks,stock,moves,births60,gebeTohs]=await Promise.all([
+    const [animals,diseases,tasks,stock,moves,births60,gebeTohs,vaxLogs,vaccines]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi),
@@ -97,6 +135,8 @@ async function loadDash(){
       getData('stok_hareket',m=>!m.iptal),
       getData('dogum',b=>b.tarih>=dAgo(63)&&b.tarih<=dAgo(58)),
       getData('tohumlama',t=>t.sonuc==='Gebe'),
+      getData('vaccination_log'),
+      getData('vaccines'),
     ]);
     const stkNet={};
     stock.forEach(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); stkNet[s.id]=(+s.baslangic_miktar||0)-used; });
@@ -108,7 +148,7 @@ async function loadDash(){
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
     const nearBirth=gebeTohs.filter(t=>{ if(!t.tarih)return false; const d=Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000); return d>=0&&d<=7; });
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${e.message}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
@@ -180,7 +220,7 @@ function renderTask(t,cls='',subs=[]){
       <div class="tc-main">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
-          <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
+          <span class="pill ${t.gorev_tipi||'DIGER'}">${t.gorev_tipi==='ASI_HATIRLATMA'?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
         <div class="tc-desc">${t.aciklama||''}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
@@ -485,9 +525,31 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[]){
     <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button>
     <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${a.kupe_no||a.devlet_kupe||a.id}')">💉 Aşı Uygula</button>
   </div>`;
-  
-  // Aşı geçmişi
+
+  // Sonraki aşı chip'i
   const vaccines = await idbGetAll('vaccines');
+  const vaxMap = {};
+  vaccines.forEach(v => vaxMap[v.id] = v);
+  const nextDueVax = vaxLogs
+    .filter(v => v.next_due_date)
+    .sort((a, b) => (a.next_due_date || '').localeCompare(b.next_due_date || ''))[0];
+  let nextVaxChip = '';
+  if (nextDueVax) {
+    const dueDate = new Date(nextDueVax.next_due_date);
+    const today2 = new Date();
+    today2.setHours(0,0,0,0);
+    const daysDiff = Math.floor((dueDate - today2) / 86400000);
+    const vaxName = vaxMap[nextDueVax.vaccine_id]?.name || '?';
+    if (daysDiff < 0) {
+      nextVaxChip = `<div style="margin-bottom:8px;font-size:.68rem;font-weight:700;color:var(--red);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:8px;padding:5px 10px">⚠️ Sonraki: ${vaxName} — ${fmtTarih(nextDueVax.next_due_date)} (${Math.abs(daysDiff)} gün gecikti)</div>`;
+    } else if (daysDiff <= 14) {
+      nextVaxChip = `<div style="margin-bottom:8px;font-size:.68rem;font-weight:700;color:var(--amber);background:rgba(208,162,34,.1);border:1px solid rgba(208,162,34,.3);border-radius:8px;padding:5px 10px">⏰ Sonraki: ${vaxName} — ${fmtTarih(nextDueVax.next_due_date)} (${daysDiff} gün kaldı)</div>`;
+    } else {
+      nextVaxChip = `<div style="margin-bottom:8px;font-size:.68rem;color:var(--ink3);background:rgba(42,107,181,.08);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:5px 10px">⏰ Sonraki: ${vaxName} — ${fmtTarih(nextDueVax.next_due_date)}</div>`;
+    }
+  }
+
+  // Aşı geçmişi
   const vaxHistory = vaxLogs.length
     ? `<div style="margin-top:12px;border-top:2px solid var(--card3);padding-top:8px">
         <div style="font-size:.7rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">💉 Aşı Geçmişi</div>
@@ -509,7 +571,7 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[]){
       `</div>`
     : `<div style="margin-top:12px;border-top:2px solid var(--card3);padding-top:8px"><div style="font-size:.75rem;color:var(--ink3)">💉 Aşı kaydı yok</div></div>`;
   
-  el.innerHTML=activeCaseChips+vaxButton+_caseListHtml+vaxHistory;
+  el.innerHTML=activeCaseChips+vaxButton+nextVaxChip+_caseListHtml+vaxHistory;
 }
 function _detGorevHtml(a,tasks,subs,today){
   const kupe=a.kupe_no||a.devlet_kupe||a.id;
@@ -889,12 +951,14 @@ async function _uremeKizginlik(el){
     (list.length?list.map(k=>{
       const h=getState('animals').find(a=>a.id===k.hayvan_id);
       const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
-      return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
-        <div class="hist-dot" style="background:#e74c3c"></div>
-        <div class="hist-main">
+      return `<div class="hist-row">
+        <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
+        <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
           <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'}</div>
           <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
         </div>
+        <button style="background:var(--blue);color:#fff;white-space:nowrap;flex-shrink:0;padding:2px 5px;font-size:.62rem;min-width:auto;line-height:1.1;border-radius:4px;border:none;cursor:pointer;font-weight:700"
+          onclick="event.stopPropagation();openMWithHayvan('m-insem','i-hid','${kupe}')">💉 Tohumla</button>
       </div>`;
     }).join(''):'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
 }
@@ -2684,6 +2748,9 @@ function openMWithHayvan(modalId,inputId,kupeNo){
     if(modalId==='m-disease'){
       if(typeof loadDiseasesDropdown==='function') loadDiseasesDropdown();
     }
+    if(modalId==='m-vaccine'){
+      if(typeof loadVaccinesDropdown==='function') loadVaccinesDropdown();
+    }
   },150);
   if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
 }
@@ -2744,6 +2811,7 @@ function setTheme(mode) {
 function ayarlarAc(){
   renderAyarlarHekimList();
   renderAyarlarSpermaList();
+  renderAyarlarVaccineList();
   renderDrugStokList();
   dataTrafficYenile();
   // tema butonlarını senkronize et
@@ -2992,6 +3060,18 @@ function renderAyarlarHekimList(){
     <span style="font-size:.85rem;color:var(--ink)">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
     ${i>=HEKIMLER.length?`<button onclick="customHekimSil('${h.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>`:'<span style="font-size:.65rem;color:var(--ink3)">Sistem</span>'}
   </div>`).join('');
+}
+function renderAyarlarVaccineList(){
+  const el=document.getElementById('ay-vaksiyon-list'); if(!el) return;
+  const vaxs=getData('vaccines')||[];
+  if(!vaxs.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Aşı tanımlı değil</div>'; return; }
+  el.innerHTML='<div style="display:grid;gap:4px">'+vaxs.map(v=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
+    <div style="flex:1">
+      <div style="font-size:.8rem;color:var(--ink)">${v.name}</div>
+      <div style="font-size:.65rem;color:var(--ink3)">${v.disease_target||'—'} · ${v.standard_dose||'?'} ${v.unit||''} · ${v.route||''}</div>
+    </div>
+    <div style="font-size:.62rem;color:${v.is_mandatory?'var(--green)':'var(--ink3)'};font-weight:${v.is_mandatory?'700':'400'};white-space:nowrap">${v.is_mandatory?'✔ Zorunlu':'○ Opsiyonel'}</div>
+  </div>`).join('')+'</div>';
 }
 function renderAyarlarSpermaList(){
   const el=document.getElementById('ay-sperma-list'); if(!el) return;
