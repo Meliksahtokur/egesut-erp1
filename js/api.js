@@ -215,6 +215,7 @@ const RPC_TABLES = {
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
   remove_drug_administration:['stok','stok_hareket','drug_administrations'],
   close_case:                ['cases'],
+  add_vaccination:           ['vaccination_log','gorev_log','stok_hareket'],
   update_treatment_time:     [],
 };
 
