@@ -417,7 +417,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
     <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>`;
 }
-function _detUremeHtml(a,tohs){
+function _detUremeHtml(a,tohs,kizgs){
   const gebeTohumlama=tohs.find(t=>t.sonuc==='Gebe');
   const gebeBilgi=gebeTohumlama?(()=>{
     const toh=new Date(gebeTohumlama.tarih);
@@ -444,6 +444,11 @@ function _detUremeHtml(a,tohs){
   h+=(tohs.length
     ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'} · ${t.deneme_no||1}. deneme</div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
     :'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
+  if(kizgs&&kizgs.length){
+    h+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:.72rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Kızgınlık Geçmişi</div>';
+    h+=kizgs.map(k=>`<div class="hist-row"><div class="hist-dot" style="background:var(--red2)"></div><div class="hist-main"><div class="hist-title">${k.belirti||'Kızgınlık'}</div><div class="hist-sub">${(k.tarih||k.created_at||'').slice(0,10)}</div></div></div>`).join('');
+    h+='</div>';
+  }
   return h;
 }
 async function _detRenderGecmis(id,el){
@@ -518,9 +523,9 @@ async function openDet(id){
   document.getElementById('det-name').textContent='Yükleniyor…';
   ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   showTab('ozet',document.querySelector('.tab'));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log']);
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log']);
   try {
-    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs]=await Promise.all([
+    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('cases',c=>c.animal_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
@@ -530,6 +535,7 @@ async function openDet(id){
       getData('hayvanlar',a=>a.anne_id===id),
       getData('cases',c=>c.animal_id===id&&c.status==='active'),
       getData('vaccination_log',v=>v.animal_id===id),
+      getData('kizginlik_log',k=>k.hayvan_id===id),
     ]);
     const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
@@ -556,7 +562,7 @@ async function openDet(id){
     const allDiseasesList=await idbGetAll('diseases');
     await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a,vaxLogs);
 
-    document.getElementById('tab-ureme').innerHTML=_detUremeHtml(a,tohs);
+    document.getElementById('tab-ureme').innerHTML=_detUremeHtml(a,tohs,kizgs);
 
     document.getElementById('tab-gorev').innerHTML=_detGorevHtml(a,tasks,subs,today);
 
@@ -2936,7 +2942,8 @@ function buildRpcParams(rpcName, data, op) {
       return {
         p_hayvan_id: data.hayvan_id,
         p_tarih: data.tarih,
-        p_gozlem: data.gozlem
+        p_belirti: data.belirti || null,
+        p_notlar: data.notlar || null
       };
     case 'create_case':
       return {

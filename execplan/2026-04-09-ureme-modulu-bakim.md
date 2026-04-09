@@ -15,6 +15,8 @@ Bu plan 5 bug'ı düzeltir ve üreme modülünü (kızgınlık kaydı + tohumlam
 - [ ] (2026-04-09) BUG-3: `submitKizginlik` — ulaşılamaz kod, `result.oneri` yanlış gösteriliyor (Düşük)
 - [ ] (2026-04-09) BUG-4: Offline queue — `kizginlik_kaydet` parametre uyumsuzluğu (Orta)
 - [ ] (2026-04-09) BUG-5: Üreme sekmesi — kızgınlık geçmişi gösterilmiyor (Orta)
+- [ ] (2026-04-09) BUG-6: `tohumlama_sonuc_gebe` — `operator does not exist: text = uuid` (Kritik)
+- [ ] (2026-04-09) BUG-6b: `tohumlama_sonuc_bos` — aynı cast hatası (Kritik)
 
 ## Surprises & Discoveries
 
@@ -29,6 +31,9 @@ Bu plan 5 bug'ı düzeltir ve üreme modülünü (kızgınlık kaydı + tohumlam
 
 - Observation: `RPC_TABLES` (api.js:208) `kizginlik_kaydet: ['kizginlik_log','gorev_log']` girdisini **zaten içeriyor** — bu satır mevcut. Asıl sorun farklı: `buildRpcParams()` fonksiyonu (ui.js:2935-2940) offline queue'daki `kizginlik_kaydet` kayıtları için yanlış parametre adı kullanıyor. `p_gozlem: data.gozlem` gönderiyor; RPC `p_belirti` ve `p_notlar` bekliyor. `p_notlar` da eksik.
   Evidence: `ui.js:2935-2940` — `p_gozlem` kullanılıyor, RPC imzası `p_belirti, p_notlar` bekliyor
+
+- Observation: `tohumlama_sonuc_gebe` ve `tohumlama_sonuc_bos` fonksiyonlarında `WHERE id = v_toh.hayvan_id::uuid` kullanılıyor. `hayvanlar.id` TEXT tipinde ('H000013' gibi) ama ::uuid cast'i 'H000013' gibi bir string UUID olmadığı için başarısız oluyor. Hata: `operator does not exist: text = uuid`. Frontend'deki log: `tohSonuc error: [tohumlama_sonuc_gebei] operator does not exist`.
+  Evidence: `tohumlama_sonuc_gebe` prosrc + `information_schema.columns` — `hayvanlar.id` = text, `hayvanlar.durum` = text
 
 ## Decision Log
 
