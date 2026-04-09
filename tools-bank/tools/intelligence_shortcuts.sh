@@ -3,7 +3,7 @@
 # Source this file in your Claude Agent environment
 
 # Wrapper path
-WRAPPER="/root/.claude/intelligence_wrapper.py"
+WRAPPER="/root/egesut-erp1/tools-bank/tools/intelligence_wrapper.py"
 
 # Memory functions
 ai_search() {
