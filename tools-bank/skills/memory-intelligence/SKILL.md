@@ -22,24 +22,24 @@
 
 **Quick search in memory database:**
 ```bash
-python3 /root/opencode-dev/.claude/memory/search_tool.py --query "search_term" --limit 5
+python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "search_term" --limit 5
 ```
 
 **Advanced search with filters:**
 ```bash
 # Category-specific search
-python3 /root/opencode-dev/.claude/memory/search_tool.py --query "RPC" --category "critical_rules"
+python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "RPC" --category "critical_rules"
 
 # Date range search
-python3 /root/opencode-dev/.claude/memory/search_tool.py --query "bug" --from "2026-04-01" --to "2026-04-05"
+python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "bug" --from "2026-04-01" --to "2026-04-05"
 
 # JSON output for programmatic use
-python3 /root/opencode-dev/.claude/memory/search_tool.py --query "memory" --format json
+python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "memory" --format json
 ```
 
 **List available categories:**
 ```bash
-python3 /root/opencode-dev/.claude/memory/search_tool.py --list-categories
+python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --list-categories
 ```
 
 ---
@@ -49,16 +49,16 @@ python3 /root/opencode-dev/.claude/memory/search_tool.py --list-categories
 **Query entities and relationships:**
 ```bash
 # Find entity
-python3 /root/opencode-dev/.claude/memory/knowledge_graph.py --query "entity_name"
+python3 /home/user/egesut-erp1/.claude/memory/knowledge_graph.py --query "entity_name"
 
 # Graph statistics
-python3 /root/opencode-dev/.claude/memory/knowledge_graph.py --graph
+python3 /home/user/egesut-erp1/.claude/memory/knowledge_graph.py --graph
 
 # Find relationship between entities
-python3 /root/opencode-dev/.claude/memory/knowledge_graph.py --relate "Entity1" "Entity2"
+python3 /home/user/egesut-erp1/.claude/memory/knowledge_graph.py --relate "Entity1" "Entity2"
 
 # Path between entities
-python3 /root/opencode-dev/.claude/memory/knowledge_graph.py --path "Entity1" "Entity2"
+python3 /home/user/egesut-erp1/.claude/memory/knowledge_graph.py --path "Entity1" "Entity2"
 ```
 
 ---
@@ -68,13 +68,13 @@ python3 /root/opencode-dev/.claude/memory/knowledge_graph.py --path "Entity1" "E
 **Vector-based semantic search:**
 ```bash
 # Semantic search (meaning-based, not keyword)
-python3 /root/opencode-dev/.claude/memory/embedding_service.py --search "project management workflow"
+python3 /home/user/egesut-erp1/.claude/memory/embedding_service.py --search "project management workflow"
 
 # Get embedding statistics
-python3 /root/opencode-dev/.claude/memory/embedding_service.py --stats
+python3 /home/user/egesut-erp1/.claude/memory/embedding_service.py --stats
 
 # Generate embeddings for all notes
-python3 /root/opencode-dev/.claude/memory/embedding_service.py --embed-all
+python3 /home/user/egesut-erp1/.claude/memory/embedding_service.py --embed-all
 ```
 
 ---
@@ -84,13 +84,13 @@ python3 /root/opencode-dev/.claude/memory/embedding_service.py --embed-all
 **Get memory health and metrics:**
 ```bash
 # Detailed memory report
-python3 /root/opencode-dev/.claude/memory/memory_stats.py
+python3 /home/user/egesut-erp1/.claude/memory/memory_stats.py
 
 # JSON output
-python3 /root/opencode-dev/.claude/memory/memory_stats.py --json
+python3 /home/user/egesut-erp1/.claude/memory/memory_stats.py --json
 
 # Cleanup suggestions
-python3 /root/opencode-dev/.claude/memory/memory_stats.py --suggest-cleanup
+python3 /home/user/egesut-erp1/.claude/memory/memory_stats.py --suggest-cleanup
 ```
 
 ---
@@ -102,20 +102,20 @@ python3 /root/opencode-dev/.claude/memory/memory_stats.py --suggest-cleanup
 1. **Context-Aware Decisions:**
    ```bash
    # Before making technical decisions
-   search_result=$(python3 /root/opencode-dev/.claude/memory/search_tool.py --query "similar_problem" --format json)
+   search_result=$(python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "similar_problem" --format json)
    # Use results to inform current decision
    ```
 
 2. **Pattern Recognition:**
    ```bash
    # Analyze historical patterns
-   python3 /root/opencode-dev/.claude/memory/knowledge_graph.py --query "bug_pattern"
+   python3 /home/user/egesut-erp1/.claude/memory/knowledge_graph.py --query "bug_pattern"
    ```
 
 3. **Quality Assurance:**
    ```bash
    # Check memory health before important operations
-   python3 /root/opencode-dev/.claude/memory/memory_stats.py --suggest-cleanup
+   python3 /home/user/egesut-erp1/.claude/memory/memory_stats.py --suggest-cleanup
    ```
 
 ---

@@ -11,6 +11,8 @@ Sen EgeSüt ERP'nin Fullstack uygulayıcısısın. Düşünmezsin, sadece verile
 1. **Dokümantasyon Şartı:** Supabase JS (`.rpc`, `.from` vb.) kullanacaksan KESİNLİKLE `mcp__context7` ile güncel dokümanı çek. Tahmin etme.
 2. **Şema Kontrolü:** Veritabanına dokunmadan önce KESİNLİKLE `mcp__supabase__execute_sql` ile tablo yapısını sorgula.
 3. **Duplikat Kontrolü:** Yeni bir fonksiyon yazmadan önce KESİNLİKLE `grep -n "fonksiyonAdı" js/*.js` komutunu çalıştır (Örn: geçmişte `openNotModal` ve `tohSonuc` duplikatları sistemi bozdu).
+4. **Bellek Kontrolü:** Benzer bir sorunu daha önce çözmedik mi? Implement öncesi geçmişi sorgula:
+   `python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "<konu>" --limit 3`
 
 ## KURUMSAL HAFIZA VE KRİTİK KURALLAR
 

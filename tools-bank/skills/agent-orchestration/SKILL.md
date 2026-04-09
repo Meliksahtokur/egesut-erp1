@@ -18,24 +18,20 @@
 
 ---
 
-## Mini-Agent Spawning
+## Agent Spawning
 
-**Basic task delegation:**
+> **NOT:** `mini-agent` CLI bu sistemde kurulu değil. Aşağıdaki pattern'ler
+> Claude Code'un native `Agent` tool'u ile uygulanır.
+
+**EgeSüt ERP Agent Tipleri:**
+- `erp-explorer` — keşif, okuma, analiz
+- `erp-implementer` — DB migration, RPC, frontend yazma
+- `erp-qa-git` — syntax kontrol, commit/push
+
+**Eski mini-agent karşılıkları (referans için):**
 ```bash
-# Single task execution
-mini-agent --workspace /root/opencode-dev --task "analyze codebase for RPC violations"
-
-# With specific workspace
-mini-agent --workspace /path/to/project --task "generate comprehensive documentation"
-```
-
-**Background execution:**
-```bash
-# Long-running task in background
-mini-agent --workspace /root/opencode-dev --task "comprehensive security audit" &
-
-# Monitor completion
-# Results appear in /root/.mini-agent/log/agent_run_*.log
+# mini-agent --workspace /home/user/egesut-erp1 --task "analyze codebase for RPC violations"
+# → Artık: Agent(subagent_type="erp-explorer", prompt="RPC violations analiz et")
 ```
 
 ---
@@ -87,7 +83,7 @@ fi
 ### 4. **Memory-Informed Orchestration**
 ```bash
 # Check historical patterns first
-PATTERNS=$(python3 /root/opencode-dev/.claude/memory/search_tool.py --query "similar_task" --format json)
+PATTERNS=$(python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "similar_task" --format json)
 
 # Delegate based on memory
 if echo "$PATTERNS" | grep -q "successful_approach"; then
@@ -116,7 +112,7 @@ mini-agent --task "process analysis from /tmp/shared_analysis.json and generate 
 mini-agent --task "analyze patterns and update memory database with findings"
 
 # Subsequent agent using updated memory
-python3 /root/opencode-dev/.claude/memory/search_tool.py --query "latest_findings"
+python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "latest_findings"
 mini-agent --task "apply latest findings to optimize current process"
 ```
 
@@ -199,7 +195,7 @@ mini-agent --task "apply suggested improvements to feature X"
 
 ```bash
 # Pre-execution memory check
-memory_context=$(python3 /root/opencode-dev/.claude/memory/search_tool.py --query "task_context" --format json)
+memory_context=$(python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "task_context" --format json)
 
 # Task execution with context
 mini-agent --task "execute task with context: $memory_context"

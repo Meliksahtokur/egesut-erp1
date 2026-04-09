@@ -69,6 +69,14 @@ Hazır. Ne yapalım?
 | Gwen task'ları | `.claude/tasks/dev/` · `.claude/tasks/arge/` |
 | Agent detayları | `AGENTS.md` (OpenCode) · `.agents/QWEN.md` (Gwen) |
 
+## Bellek Arama
+
+Tekrar eden sorularda, domain kararlarında veya RPC referanslarında önce belleği sorgula:
+```bash
+python3 /home/user/egesut-erp1/.claude/memory/search_tool.py --query "TERM" --limit 5
+# ya da /skill memory-intelligence
+```
+
 ## Kritik Kurallar
 
 - main'e direkt push yok — sadece Claude merge eder

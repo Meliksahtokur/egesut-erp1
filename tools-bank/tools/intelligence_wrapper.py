@@ -11,9 +11,9 @@ import sys
 from pathlib import Path
 
 # Paths
-MEMORY_TOOLS = "/root/opencode-dev/.claude/memory"
-MINI_AGENT = "/root/.local/bin/mini-agent"
-WORKSPACE = "/root/opencode-dev"
+MEMORY_TOOLS = "/home/user/egesut-erp1/.claude/memory"
+MINI_AGENT = "/root/.local/bin/mini-agent"  # Not installed — spawn_agent() will return error
+WORKSPACE = "/home/user/egesut-erp1"
 
 def memory_search(query, category=None, limit=5):
     """Smart memory search with optional filtering"""
@@ -69,12 +69,22 @@ def semantic_search(query, limit=5):
         return {"success": False, "error": str(e)}
 
 def spawn_agent(task_description, workspace=None):
-    """Spawn mini-agent for autonomous task execution"""
+    """Spawn mini-agent for autonomous task execution.
+
+    NOTE: mini-agent CLI is not installed in this environment.
+    Use Claude Code's native Agent tool for task delegation instead.
+    """
+    import shutil
+    if not shutil.which("mini-agent"):
+        return {
+            "success": False,
+            "error": "mini-agent CLI not installed. Use Claude Code Agent tool (subagent_type: erp-implementer/erp-explorer/erp-qa-git) instead."
+        }
+
     ws = workspace or WORKSPACE
     cmd = [MINI_AGENT, "--workspace", ws, "--task", task_description]
 
     try:
-        # Run in background
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
