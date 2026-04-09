@@ -27,13 +27,17 @@ Bu plan 5 bug'ı düzeltir ve üreme modülünü (kızgınlık kaydı + tohumlam
 - Observation: `_detUremeHtml` (ui.js:420-448) sadece `tohumlama` tablosundan gelen `tohs` parametresine bağlı. Kızgınlık geçmişi (`kizginlik_log`) bu fonksiyona hiç aktarılmıyor. `openDet` çağrıldığında `_detRender` üreme sekmesi için `_detUremeHtml`'i çağırıyor ama `kizginlik_log` verisi gönderilmiyor.
   Evidence: `ui.js:420` — fonksiyon sadece `tohs` (tohumlama) alıyor, `kizginlik_log` için parametre yok
 
-- Observation: `RPC_TABLES` (api.js:200-205) `kizginlik_kaydet` için bir girdi içermiyor. `submitKizginlik` doğrudan `pullTables` çağırıyor (forms.js:219) — bu yüzden online modda çalışıyor. Ama offline queue'dan gelen `kizginlik_kaydet` çağrıları `RPC_TABLES` mapping'ini kullandığı için (ui.js:2883) `kizginlik_log` ve `gorev_log` tabloları çekilmez.
-  Evidence: `api.js:200-205` — `kizginlik_kaydet` yok; `ui.js:2883`
+- Observation: `RPC_TABLES` (api.js:208) `kizginlik_kaydet: ['kizginlik_log','gorev_log']` girdisini **zaten içeriyor** — bu satır mevcut. Asıl sorun farklı: `buildRpcParams()` fonksiyonu (ui.js:2935-2940) offline queue'daki `kizginlik_kaydet` kayıtları için yanlış parametre adı kullanıyor. `p_gozlem: data.gozlem` gönderiyor; RPC `p_belirti` ve `p_notlar` bekliyor. `p_notlar` da eksik.
+  Evidence: `ui.js:2935-2940` — `p_gozlem` kullanılıyor, RPC imzası `p_belirti, p_notlar` bekliyor
 
 ## Decision Log
 
-- Decision: BUG-3'ün asıl sorunu `result.oneri` formatı değil, backend'in döndüğü `oneri` değerinin kullanıcı için anlamsız olması ("Hayvan kartındaki Notlar bölümüne ekleyin"). Frontend kodu doğru. Kapatılacak.
+- Decision: BUG-3'ün asıl sorunu `result.oneri` formatı değil, backend'in döndürdüğü `oneri` değerinin kullanıcı için anlamsız olması ("Hayvan kartındaki Notlar bölümüne ekleyin"). Frontend kodu doğru. Kapatılacak.
   Rationale: Backend `ok:false` + `oneri` döndüğünde frontend 211-214 satırları ile doğru şekilde yakalıyor ve toast gösteriyor.
+  Date/Author: 2026-04-09
+
+- Decision: BUG-4'ün fix hedefi düzeltildi — `RPC_TABLES`'a ekleme değil, `buildRpcParams()` case düzeltmesi.
+  Rationale: Kod incelemesinde `kizginlik_kaydet: ['kizginlik_log','gorev_log']` `api.js:208`'de zaten mevcut. Asıl hata `ui.js:2935-2940`'ta: `p_gozlem` alanı RPC'de yok, `p_belirti`/`p_notlar` olmalı.
   Date/Author: 2026-04-09
 
 ## Outcomes & Retrospective
@@ -80,9 +84,9 @@ Backend `ok:false` + `oneri` döndüğünde frontend 211-214 satırları doğru 
 
 ### BUG-4: Offline queue parametre uyumsuzluğu (Orta)
 
-`RPC_TABLES` map'ine `kizginlik_kaydet: ['kizginlik_log','gorev_log']` girdisi eklenecek. Offline queue işlenirken doğru tablolar çekilecek.
+`RPC_TABLES` map'inde `kizginlik_kaydet` **zaten mevcut** (`api.js:208`). Asıl sorun `buildRpcParams()` fonksiyonunda: offline queue gönderiminde `kizginlik_kaydet` case'i yanlış parametre adı (`p_gozlem`) kullanıyor. RPC `p_belirti` ve `p_notlar` bekliyor; `p_notlar` da eksik.
 
-Dosya: `js/api.js`, satır 200
+Dosya: `js/ui.js`, satır 2935-2940
 
 ### BUG-5: Üreme sekmesi kızgınlık geçmişi yok (Orta)
 
@@ -145,30 +149,32 @@ Yeni:
 const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs'];
 ```
 
-### Step 4 — BUG-4: RPC_TABLES'a kizginlik_kaydet ekle
+### Step 4 — BUG-4: buildRpcParams kizginlik_kaydet case düzelt
 
-`js/api.js` satır 200-205'i bul ve `kizginlik_kaydet` ekle:
+`js/ui.js` satır 2935-2940'ı değiştir:
 
 Mevcut:
 ```javascript
-const RPC_TABLES = {
-  hayvan_ekle:               ['hayvanlar'],
-  dogum_kaydet:              ['hayvanlar','dogum','gorev_log'],
-  tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket'],
-  tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
-  tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log'],
+    case 'kizginlik_kaydet':
+      return {
+        p_hayvan_id: data.hayvan_id,
+        p_tarih: data.tarih,
+        p_gozlem: data.gozlem
+      };
 ```
 
 Yeni:
 ```javascript
-const RPC_TABLES = {
-  hayvan_ekle:               ['hayvanlar'],
-  dogum_kaydet:              ['hayvanlar','dogum','gorev_log'],
-  tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket'],
-  tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
-  tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log'],
-  kizginlik_kaydet:          ['kizginlik_log','gorev_log'],
+    case 'kizginlik_kaydet':
+      return {
+        p_hayvan_id: data.hayvan_id,
+        p_tarih:     data.tarih,
+        p_belirti:   data.belirti || null,
+        p_notlar:    data.notlar  || null
+      };
 ```
+
+Not: `RPC_TABLES` map'inde `kizginlik_kaydet: ['kizginlik_log','gorev_log']` zaten mevcut (`api.js:208`) — dokunma.
 
 ### Step 5 — BUG-5: Kızgınlık geçmişi üreme sekmesinde
 
@@ -178,7 +184,7 @@ Bu adım kod okunarak detaylı halledilecek. `_detUremeHtml` şu anda `tohs` (to
 
 Mevcut çağrı `_detUremeHtml(a, tohs)` şeklinde. Bu çağrının yapıldığı yeri bulup, kızgınlık log'larını filtreleyip aktar.
 
-Kızgınlık listesi UI'ı gebelik bilgisi kadar önemli olmasa da tarihçe olarak listelenebilir. Implementasyon sırasında en temiz yaklaşım belirlenecek.
+Kızgınlık listesi UI'ı gebelik bilgisi kadar önemli olmasa da tarihçe olarak listelenebilir. İmplementasyon sırasında en temiz yaklaşım belirlenecek.
 
 ### Step 6 — Syntax check
 
