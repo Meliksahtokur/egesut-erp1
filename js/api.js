@@ -257,7 +257,13 @@ async function pullTables(tables = []) {
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
-    await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
+    await Promise.all(uniq.map((t, i) => {
+      if (results[i].error) {
+        console.warn(`⚠️ pullTables ${t}: ${results[i].error.message}`);
+        return Promise.resolve();
+      }
+      return idbClearAndPut(t, results[i].data || []);
+    }));
     if (uniq.includes('tohumlanabilir_hayvanlar')) globalThis._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
   } finally {
     _pullingPromise = null;
@@ -363,7 +369,7 @@ function stopBackgroundSync() {
 // ── REALTIME SUBSCRIPTIONS ──────────────────
 // supabase_realtime publication aktif → WebSocket kanalları
 
-const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','islem_log','ui_logs'];
+const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs'];
 let _realtimeChannel = null;
 
 function initRealtime() {
@@ -377,6 +383,7 @@ function initRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'stok_hareket' }, () => pullTables(['stok','stok_hareket']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'tohumlama' },    () => pullTables(['tohumlama']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dogum' },        () => pullTables(['dogum']).then(renderSafe))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kizginlik_log' }, () => pullTables(['kizginlik_log']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'islem_log' },    () => pullTables(['islem_log']))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  payload => console.log('[ui_log]', payload.new))
     .subscribe(status => {
