@@ -257,7 +257,13 @@ async function pullTables(tables = []) {
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
-    await Promise.all(uniq.map((t, i) => idbClearAndPut(t, results[i].data || [])));
+    await Promise.all(uniq.map((t, i) => {
+      if (results[i].error) {
+        console.warn(`⚠️ pullTables ${t}: ${results[i].error.message}`);
+        return Promise.resolve();
+      }
+      return idbClearAndPut(t, results[i].data || []);
+    }));
     if (uniq.includes('tohumlanabilir_hayvanlar')) globalThis._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
   } finally {
     _pullingPromise = null;
@@ -363,7 +369,7 @@ function stopBackgroundSync() {
 // ── REALTIME SUBSCRIPTIONS ──────────────────
 // supabase_realtime publication aktif → WebSocket kanalları
 
-const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','islem_log','ui_logs'];
+const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs'];
 let _realtimeChannel = null;
 
 function initRealtime() {
