@@ -505,7 +505,7 @@ Beklenen: JSON yanıt içinde `memory_search`, `semantic_search`, `knowledge_gra
 
 ```bash
 printf '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"memory_search","arguments":{"query":"RPC","limit":2}}}\n' | \
-  MINIMAX_API_KEY="sk-cp-4ErelSlnFkyo49Uc8H8RRZXr56LTT2jMrCRnWZp7aS0pmsJhfgNWn5VXX5aN9evd_XR5ExUknnFQSMBq6g4aeQrM2b5x2B1tuQARg076L81g3PBTJJmnH6A" \
+  MINIMAX_API_KEY="<MINIMAX_API_KEY>" \
   python3 /root/tools-bank/mcp/server.py 2>/dev/null
 ```
 
@@ -570,7 +570,7 @@ cat /root/.claude/settings.json
       "command": "python3",
       "args": ["/root/tools-bank/mcp/server.py"],
       "env": {
-        "MINIMAX_API_KEY": "sk-cp-4ErelSlnFkyo49Uc8H8RRZXr56LTT2jMrCRnWZp7aS0pmsJhfgNWn5VXX5aN9evd_XR5ExUknnFQSMBq6g4aeQrM2b5x2B1tuQARg076L81g3PBTJJmnH6A"
+        "MINIMAX_API_KEY": "<MINIMAX_API_KEY>"
       }
     }
   }
