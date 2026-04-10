@@ -56,6 +56,11 @@ Hazır. Ne yapalım?
 - **GitHub:** Fix sonrası issue varsa → `add_issue_comment`
 - **TestSprite:** UI değişikliği sonrası test → `testsprite_generate_code_and_execute`
 
+## Tools-Bank
+
+MCP tools (memory_search, file_read, task_claim vb.) + task/blackboard sistemi.  
+Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
+
 ## Referans Haritası (on-demand oku)
 
 | İhtiyaç | Dosya |
