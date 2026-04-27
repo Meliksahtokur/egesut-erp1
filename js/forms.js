@@ -1128,7 +1128,7 @@ async function loadBulkVaccineHayvanlar() {
 }
 
 async function loadBulkVaccineVaccines() {
-  const vaccines = getData('vaccines');
+  const vaccines = await getData('vaccines');
   const sel = document.getElementById('bv-vaccine-sel');
   if (!sel) return;
 
@@ -1237,11 +1237,11 @@ async function loadBulkIlacHayvanlar() {
 }
 
 async function loadBulkIlacDropdown() {
-  const stoklar = getState('stok') || [];
+  const stoklar = (getState('stok') || []).filter(s => s.kategori === 'İlaç' && (s.miktar || 0) > 0);
   const sel = document.getElementById('bi-ilac-sel');
   if (!sel) return;
   sel.innerHTML = '<option value="">— İlaç seçin —</option>' +
-    stoklar.map(s => `<option value="${s.id}">${s.urun_adi} (${s.baslangic_miktar || 0} ${s.birim || 'adet'})</option>`).join('');
+    stoklar.map(s => `<option value="${s.id}">${s.urun_adi} (${s.miktar || 0} ${s.birim || 'adet'})</option>`).join('');
 }
 
 async function submitBulkIlac() {
