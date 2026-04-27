@@ -1237,7 +1237,8 @@ async function loadBulkIlacHayvanlar() {
 }
 
 async function loadBulkIlacDropdown() {
-  const stoklar = (getState('stok') || []).filter(s => s.kategori === 'İlaç' && (s.miktar || 0) > 0);
+  const DRUG_KATEGORI = ['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
+  const stoklar = (getState('stock') || []).filter(s => DRUG_KATEGORI.includes(s.kategori) && (s.miktar || 0) > 0);
   const sel = document.getElementById('bi-ilac-sel');
   if (!sel) return;
   sel.innerHTML = '<option value="">— İlaç seçin —</option>' +
@@ -1313,7 +1314,7 @@ function applyBulkFiltre(prefix) {
   let filtered = animals;
   if (durum) {
     filtered = filtered.filter(a => 
-      a.tohumlama_durumu === durum || a.durum === durum
+      a.tohumlama_durumu === durum
     );
   }
   if (yasMin || yasMax < 9999) {
