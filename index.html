@@ -372,6 +372,11 @@ button,input,select,textarea{font-family:inherit}
         <div class="log-text"><div class="log-title">Vaka Aç</div><div class="log-sub">Tanı, günlük tedavi, ilaç — stok otomatik düşer</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
+      <div onclick="openM('m-bulk-vaccine')" class="log-btn">
+        <div class="log-ico" style="background:rgba(78,154,42,.2)">💉💉</div>
+        <div class="log-text"><div class="log-title">Toplu Aşılama</div><div class="log-sub">Padok bazlı toplu aşı uygulaması</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
       <div onclick="openM('m-animal')" class="log-btn">
         <div class="log-ico a">➕</div>
         <div class="log-text"><div class="log-title">Yeni Hayvan</div><div class="log-sub">Sürüye hayvan ekle</div></div>
@@ -609,6 +614,59 @@ button,input,select,textarea{font-family:inherit}
 
       <button class="btn btn-g" onclick="submitVaccination(this)">💉 Aşı Uygula</button>
       <button class="btn btn-o" onclick="closeM('m-vaccine')" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOPLU AŞILAMA -->
+<div id="m-bulk-vaccine" class="mo" onclick="mClose(event,this)">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">💉💉 Toplu Aşılama</div>
+    <div class="m-body">
+      <!-- Padok Seç -->
+      <div class="fg"><label class="flbl">Padok *</label>
+        <select id="bv-padok" class="fsel">
+          <option value="">— Padok Seç —</option>
+        </select>
+        <div class="fhint" style="font-size:.62rem;color:var(--ink3);margin-top:3px">Padok seçip hayvanları getirin</div>
+      </div>
+
+      <!-- Hayvanları Getir -->
+      <button type="button" class="btn" onclick="loadBulkVaccineHayvanlar()" style="margin-bottom:8px;background:rgba(78,154,42,.15);border:1.5px solid var(--green);color:var(--green3);font-weight:700">
+        🔍 Hayvanları Getir <span id="bv-count" style="background:var(--green);color:#fff;border-radius:10px;padding:1px 7px;font-size:.68rem;margin-left:6px"></span>
+      </button>
+
+      <!-- Animal preview list -->
+      <div id="bv-hayvan-list" style="max-height:120px;overflow-y:auto;margin-bottom:12px;display:none;border:1px solid var(--card3);border-radius:var(--r1);padding:8px;background:var(--card2)">
+      </div>
+
+      <!-- Aşı Seç -->
+      <div class="fg"><label class="flbl">Aşı *</label>
+        <select id="bv-vaccine-sel" class="fsel">
+          <option value="">— Aşı seçin —</option>
+        </select>
+        <div id="bv-vaccine-info" style="font-size:.75rem;color:var(--ink3);margin-top:6px;display:none"></div>
+      </div>
+
+      <!-- Tarih -->
+      <div class="fg"><label class="flbl">Uygulama Tarihi *</label>
+        <input id="bv-tarih" class="fi" type="date">
+      </div>
+
+      <!-- Doz (ml) -->
+      <div class="fg"><label class="flbl">Doz (ml, opsiyonel)</label>
+        <input id="bv-doz" class="fi" type="number" step="0.1" placeholder="Boş bırakılırsa standart doz">
+      </div>
+
+      <!-- Notlar -->
+      <div class="fg"><label class="flbl">Notlar</label>
+        <input id="bv-notes" class="fi" type="text" placeholder="Uygulama detayları…">
+      </div>
+
+      <button class="btn btn-g" onclick="submitBulkVaccination()">💉💉 Toplu Aşı Uygula</button>
+      <button class="btn btn-o" onclick="closeM('m-bulk-vaccine')" style="margin-top:6px">İptal</button>
+
+      <!-- Sonuç -->
+      <div id="bv-result" style="margin-top:10px"></div>
     </div>
   </div>
 </div>
