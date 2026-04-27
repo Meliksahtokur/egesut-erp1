@@ -132,6 +132,14 @@ function openM(id) {
     filterHastalikList();
     loadDiseasesDropdown('');
   }
+  if (id === 'm-bulk-vaccine') {
+    if(typeof loadBulkVaccinePadoklar==='function') loadBulkVaccinePadoklar();
+    if(typeof loadBulkVaccineVaccines==='function') loadBulkVaccineVaccines();
+  }
+  if (id === 'm-bulk-ilac') {
+    if(typeof loadBulkIlacPadoklar==='function') loadBulkIlacPadoklar();
+    if(typeof loadBulkIlacDropdown==='function') loadBulkIlacDropdown();
+  }
 }
 function closeM(id) {
   g(id)?.classList.remove('on');
