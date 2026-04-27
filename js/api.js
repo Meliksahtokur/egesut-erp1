@@ -216,6 +216,8 @@ const RPC_TABLES = {
   remove_drug_administration:['stok','stok_hareket','drug_administrations'],
   close_case:                ['cases'],
   add_vaccination:           ['vaccination_log','gorev_log','stok_hareket'],
+  bulk_vaccination:          ['vaccination_log','gorev_log','stok_hareket'],
+  bulk_ilac:                  ['islem_log','stok','stok_hareket'],
   update_treatment_time:     [],
 };
 
