@@ -1091,3 +1091,109 @@ async function submitDrugStokLink(drugId, stockItemId) {
     await pullTables(['drugs']);
   } catch(e) { toast('❌ ' + e.message, true); }
 }
+
+// ── TOPLU AŞILAMA ─────────────────────────────────────────────
+async function loadBulkVaccinePadoklar() {
+  const animals = getState('animals');
+  if (!animals || !animals.length) return;
+  const padoklar = [...new Set(animals.map(a => a.padok).filter(Boolean))].sort();
+  const sel = document.getElementById('bv-padok');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Padok Seç —</option>' +
+    padoklar.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+
+async function loadBulkVaccineHayvanlar() {
+  const padok = document.getElementById('bv-padok')?.value;
+  if (!padok) { toast('Padok seçin'); return; }
+  const animals = getState('animals').filter(a => a.padok === padok);
+  const list = document.getElementById('bv-hayvan-list');
+  const count = document.getElementById('bv-count');
+  if (count) count.textContent = animals.length > 0 ? animals.length : '';
+  if (list) {
+    if (!animals.length) {
+      list.style.display = 'none';
+      list.innerHTML = '';
+    } else {
+      list.style.display = 'block';
+      list.innerHTML = animals.map(a =>
+        `<span style="font-size:.72rem;background:var(--card2);padding:2px 6px;border-radius:4px;margin:2px;display:inline-block">
+          ${a.kupe_no || a.devlet_kupe || a.id}
+        </span>`
+      ).join('');
+    }
+  }
+  // Store selected animal IDs for submit
+  window._bvAnimalIds = animals.map(a => a.id);
+}
+
+async function loadBulkVaccineVaccines() {
+  const vaccines = getData('vaccines');
+  const sel = document.getElementById('bv-vaccine-sel');
+  if (!sel) return;
+
+  if (!vaccines || !vaccines.length) {
+    sel.innerHTML = '<option value="" disabled>Aşı listesi yüklenemedi</option>';
+    return;
+  }
+
+  const mandatory = vaccines.filter(v => v.is_mandatory);
+  const optional = vaccines.filter(v => !v.is_mandatory);
+
+  let html = '';
+  if (mandatory.length) {
+    html += '<optgroup label="Zorunlu Aşılar">';
+    mandatory.forEach(v => { html += `<option value="${v.id}">${v.name} — ${v.disease_target || ''}</option>`; });
+    html += '</optgroup>';
+  }
+  if (optional.length) {
+    html += '<optgroup label="Diğer Aşılar">';
+    optional.forEach(v => { html += `<option value="${v.id}">${v.name} — ${v.disease_target || ''}</option>`; });
+    html += '</optgroup>';
+  }
+  sel.innerHTML = '<option value="">— Aşı seçin —</option>' + html;
+
+  // Set default date
+  const today = new Date().toISOString().split('T')[0];
+  const dateEl = document.getElementById('bv-tarih');
+  if (dateEl) dateEl.value = today;
+}
+
+async function submitBulkVaccination() {
+  const animalIds = window._bvAnimalIds || [];
+  if (!animalIds.length) { toast('Önce padok seçip hayvanları getirin'); return; }
+  const vaccineId = document.getElementById('bv-vaccine-sel')?.value;
+  if (!vaccineId) { toast('Aşı seçin'); return; }
+  const tarih = document.getElementById('bv-tarih')?.value;
+  if (!tarih) { toast('Tarih girin'); return; }
+  const doz = parseFloat(document.getElementById('bv-doz')?.value) || null;
+  const notes = document.getElementById('bv-notes')?.value || null;
+
+  try {
+    const result = await rpc('bulk_vaccination', {
+      p_animal_ids: animalIds,
+      p_vaccine_id: vaccineId,
+      p_date: tarih,
+      p_dose_ml: doz,
+      p_notes: notes
+    });
+
+    const div = document.getElementById('bv-result');
+    if (div) {
+      const errors = result.errors || [];
+      div.innerHTML = `<div style="margin-top:8px;font-size:.8rem">
+        ✅ ${result.success}/${result.total} başarılı
+        ${errors.length ? `<br>⚠️ ${errors.length} hata: ${errors.map(e=>e.error).join(', ')}` : ''}
+      </div>`;
+    }
+    if (result.success > 0) {
+      toast(`✅ ${result.success} hayvan aşılandı`);
+      // Refresh data
+      pullTables(['vaccination_log','gorev_log','stok_hareket']).catch(console.warn);
+    }
+  } catch(e) {
+    toast('❌ ' + e.message, true);
+    const div = document.getElementById('bv-result');
+    if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
+  }
+}

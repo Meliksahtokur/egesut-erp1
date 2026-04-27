@@ -2751,6 +2751,10 @@ function openMWithHayvan(modalId,inputId,kupeNo){
     if(modalId==='m-vaccine'){
       if(typeof loadVaccinesDropdown==='function') loadVaccinesDropdown();
     }
+    if(modalId==='m-bulk-vaccine'){
+      if(typeof loadBulkVaccinePadoklar==='function') loadBulkVaccinePadoklar();
+      if(typeof loadBulkVaccineVaccines==='function') loadBulkVaccineVaccines();
+    }
   },150);
   if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
 }
