@@ -1197,3 +1197,184 @@ async function submitBulkVaccination() {
     if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
   }
 }
+
+// ============================================================
+// TOPLU İLAÇ — m-bulk-ilac modal
+// ============================================================
+
+async function loadBulkIlacPadoklar() {
+  const animals = getState('animals');
+  if (!animals || !animals.length) return;
+  const padoklar = [...new Set(animals.map(a => a.padok).filter(Boolean))].sort();
+  const sel = document.getElementById('bi-padok');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Padok Seç —</option>' +
+    padoklar.map(p => `<option value="${p}">${p}</option>`).join('');
+}
+
+async function loadBulkIlacHayvanlar() {
+  const padok = document.getElementById('bi-padok')?.value;
+  if (!padok) { toast('Padok seçin'); return; }
+  const animals = getState('animals').filter(a => a.padok === padok);
+  const list = document.getElementById('bi-hayvan-list');
+  const count = document.getElementById('bi-count');
+  if (count) count.textContent = animals.length > 0 ? animals.length : '';
+  if (list) {
+    if (!animals.length) {
+      list.style.display = 'none';
+      list.innerHTML = '';
+    } else {
+      list.style.display = 'block';
+      list.innerHTML = animals.map(a =>
+        `<span style="font-size:.72rem;background:var(--card2);padding:2px 6px;border-radius:4px;margin:2px;display:inline-block">
+          ${a.kupe_no || a.devlet_kupe || a.id}
+        </span>`
+      ).join('');
+    }
+  }
+  // Store selected animal IDs for submit
+  window._biAnimalIds = animals.map(a => a.id);
+}
+
+async function loadBulkIlacDropdown() {
+  const stoklar = getState('stok') || [];
+  const sel = document.getElementById('bi-ilac-sel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— İlaç seçin —</option>' +
+    stoklar.map(s => `<option value="${s.id}">${s.urun_adi} (${s.baslangic_miktar || 0} ${s.birim || 'adet'})</option>`).join('');
+}
+
+async function submitBulkIlac() {
+  const animalIds = window._biAnimalIds || [];
+  if (!animalIds.length) { toast('Önce padok seçip hayvanları getirin'); return; }
+  const ilacId = document.getElementById('bi-ilac-sel')?.value;
+  if (!ilacId) { toast('İlaç seçin'); return; }
+  const miktar = parseFloat(document.getElementById('bi-miktar')?.value);
+  if (!miktar) { toast('Miktar girin'); return; }
+  const notes = document.getElementById('bi-notes')?.value || null;
+
+  try {
+    const result = await rpc('bulk_ilac', {
+      p_animal_ids: animalIds,
+      p_ilac_stok_id: ilacId,
+      p_miktar: miktar,
+      p_notlar: notes
+    });
+
+    const div = document.getElementById('bi-result');
+    if (div) {
+      const errors = result.errors || [];
+      div.innerHTML = `<div style="margin-top:8px;font-size:.8rem">
+        ${result.ok === false
+          ? `⚠️ ${result.mesaj}`
+          : `✅ ${result.success}/${result.total} hayvana uygulandı
+             ${errors.length ? '<br>⚠️ ' + errors.map(e=>e.error).join(', ') : ''}`
+        }
+      </div>`;
+    }
+    if (result.success > 0) {
+      toast(`✅ ${result.success} hayvana ilaç uygulandı`);
+      // Refresh data
+      pullTables(['stok','stok_hareket','islem_log']).catch(console.warn);
+    }
+  } catch(e) {
+    toast('❌ ' + e.message, true);
+    const div = document.getElementById('bi-result');
+    if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
+  }
+}
+
+// ============================================================
+// SHARED BULK SELECTION FUNCTIONS (prefix: bv or bi)
+// ============================================================
+
+// Tab switcher — works for both modals via prefix
+function bulkTabSwitch(prefix, tab) {
+  ['padok','filtre','serbest'].forEach(t => {
+    const sec = document.getElementById(prefix + '-section-' + t);
+    const btn = document.getElementById(prefix + '-tab-' + t);
+    if (sec) sec.style.display = t === tab ? '' : 'none';
+    if (btn) {
+      btn.style.opacity = t === tab ? '1' : '0.5';
+      btn.className = t === tab ? 'btn btn-g' : 'btn btn-o';
+    }
+  });
+  // Load serbest list on first click
+  if (tab === 'serbest') loadBulkSerbest(prefix);
+}
+
+// Filter-based selection
+function applyBulkFiltre(prefix) {
+  const animals = getState('animals');
+  const durum = document.getElementById(prefix + '-f-durum')?.value;
+  const yasMin = parseInt(document.getElementById(prefix + '-f-yas-min')?.value) || 0;
+  const yasMax = parseInt(document.getElementById(prefix + '-f-yas-max')?.value) || 9999;
+
+  let filtered = animals;
+  if (durum) {
+    filtered = filtered.filter(a => 
+      a.tohumlama_durumu === durum || a.durum === durum
+    );
+  }
+  if (yasMin || yasMax < 9999) {
+    const now = new Date();
+    filtered = filtered.filter(a => {
+      if (!a.dogum_tarihi) return false;
+      const ayFark = (now - new Date(a.dogum_tarihi)) / (1000 * 60 * 60 * 24 * 30);
+      return ayFark >= yasMin && ayFark <= yasMax;
+    });
+  }
+
+  // Update animal IDs and show preview
+  const idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
+  window[idKey] = filtered.map(a => a.id);
+  const count = document.getElementById(prefix + '-count');
+  const list = document.getElementById(prefix + '-hayvan-list');
+  if (count) count.textContent = filtered.length > 0 ? filtered.length : '';
+  if (list) {
+    if (!filtered.length) {
+      list.style.display = 'none';
+      list.innerHTML = '';
+    } else {
+      list.style.display = 'block';
+      list.innerHTML = filtered.slice(0, 20).map(a =>
+        '<span style="font-size:.72rem;background:var(--card2);padding:2px 6px;border-radius:4px;margin:2px;display:inline-block">' +
+        (a.kupe_no || a.devlet_kupe || a.id) + '</span>'
+      ).join('') + (filtered.length > 20 ? '<span style="font-size:.68rem;color:var(--ink3)">+' + (filtered.length - 20) + ' daha</span>' : '');
+    }
+  }
+  toast(filtered.length + ' hayvan seçildi');
+}
+
+// Populate serbest seçim checkbox list
+function loadBulkSerbest(prefix) {
+  const animals = getState('animals');
+  const div = document.getElementById(prefix + '-s-list');
+  if (!div) return;
+  div.innerHTML = animals.map(a => {
+    const kupe = a.kupe_no || a.devlet_kupe || a.id;
+    return '<label style="display:flex;align-items:center;gap:6px;padding:4px;font-size:.78rem;cursor:pointer">' +
+      '<input type="checkbox" value="' + a.id + '" onchange="updateBulkSerbest(\'' + prefix + '\')">' +
+      '<span>' + kupe + '</span>' +
+      '<span style="color:var(--ink3);font-size:.68rem">' + (a.padok || '') + ' · ' + (a.irk || '') + '</span>' +
+      '</label>';
+  }).join('');
+}
+
+// Filter checkbox list by search
+function filterBulkSerbest(prefix) {
+  const q = document.getElementById(prefix + '-s-ara')?.value?.toLowerCase() || '';
+  const labels = document.querySelectorAll('#' + prefix + '-s-list label');
+  labels.forEach(l => {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// Update selected IDs from checkboxes
+function updateBulkSerbest(prefix) {
+  const boxes = document.querySelectorAll('#' + prefix + '-s-list input[type=checkbox]:checked');
+  const idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
+  window[idKey] = [...boxes].map(b => b.value);
+  const countEl = document.getElementById(prefix + '-s-count');
+  if (countEl) countEl.textContent = window[idKey].length;
+}

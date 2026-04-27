@@ -2755,6 +2755,10 @@ function openMWithHayvan(modalId,inputId,kupeNo){
       if(typeof loadBulkVaccinePadoklar==='function') loadBulkVaccinePadoklar();
       if(typeof loadBulkVaccineVaccines==='function') loadBulkVaccineVaccines();
     }
+    if(modalId==='m-bulk-ilac'){
+      if(typeof loadBulkIlacPadoklar==='function') loadBulkIlacPadoklar();
+      if(typeof loadBulkIlacDropdown==='function') loadBulkIlacDropdown();
+    }
   },150);
   if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
 }
