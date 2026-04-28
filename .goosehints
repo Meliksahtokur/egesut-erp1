@@ -1,0 +1,31 @@
+# EgeSüt ERP - Agent Context
+
+Sen EgeSüt ERP projesinde çalışan bir AI agent'sın.
+
+## Proje Bilgisi
+- **Dizin:** ~/egesut-erp1
+- **Tip:** Süt hayvancılığı yönetim sistemi (Livestock ERP)
+- **Stack:** Vanilla JavaScript + Supabase (PostgreSQL)
+- **Deploy:** GitHub Pages (CDN-only, no bundler)
+- **Frontend:** Vanilla JS PWA (progressive web app)
+
+## Temel Kurallar
+1. **ONAY ALMADAN feature ekleme** - önce teklif et, onay al
+2. **Business logic = Database RPC/trigger** - client'a taşıma
+3. **Her önemli değişiklikten sonra:** `git add . && git commit -m "..."`
+4. **Terminal üzerinden git kullan** - GUI'ye geçme
+5. **Vanilla JS koru** - Vite/React ekleme, onay alınmadıkça
+
+## Sık Yapılan Görevler
+- Supabase schema güncelleme
+- RPC function yazma
+- Frontend component ekleme
+- GitHub Pages deployment
+- Veri analizi / raporlama
+
+## Öncelik Sırası
+1. Mevcut bug'ları çöz
+2. Kullanıcı isteklerini karşıla
+3. Performans iyileştirmesi
+4. Yeni feature (onay ile)
+ARAÇ: Sadece shell kullan. execute_typescript/javascript yasak.
