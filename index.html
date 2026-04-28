@@ -718,18 +718,54 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-bulk-ilac" class="mo" onclick="mClose(event,this)">
   <div class="modal"><div class="m-handle"></div><div class="m-title">💊💊 Toplu İlaç Uygulama</div>
     <div class="m-body">
-      <!-- Padok Seç -->
-      <div class="fg"><label class="flbl">Padok *</label>
-        <select id="bi-padok" class="fsel">
-          <option value="">— Padok Seç —</option>
-        </select>
-        <div class="fhint" style="font-size:.62rem;color:var(--ink3);margin-top:3px">Padok seçip hayvanları getirin</div>
+      <!-- Tab Buttons -->
+      <div style="display:flex;gap:4px;margin-bottom:8px">
+        <button onclick="bulkTabSwitch('bi','padok')" id="bi-tab-padok" class="btn btn-g" style="font-size:.72rem;padding:4px 10px">Padok</button>
+        <button onclick="bulkTabSwitch('bi','filtre')" id="bi-tab-filtre" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Filtre</button>
+        <button onclick="bulkTabSwitch('bi','serbest')" id="bi-tab-serbest" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Serbest Seçim</button>
       </div>
 
-      <!-- Hayvanları Getir -->
-      <button type="button" class="btn" onclick="loadBulkIlacHayvanlar()" style="margin-bottom:8px;background:rgba(220,53,69,.15);border:1.5px solid var(--red);color:var(--red2);font-weight:700">
-        🔍 Hayvanları Getir <span id="bi-count" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.68rem;margin-left:6px"></span>
-      </button>
+      <!-- Tab: Padok -->
+      <div id="bi-section-padok">
+        <div class="fg"><label class="flbl">Padok *</label>
+          <select id="bi-padok" class="fsel">
+            <option value="">— Padok Seç —</option>
+          </select>
+          <div class="fhint" style="font-size:.62rem;color:var(--ink3);margin-top:3px">Padok seçip hayvanları getirin</div>
+        </div>
+        <button type="button" class="btn" onclick="loadBulkIlacHayvanlar()" style="margin-bottom:8px;background:rgba(220,53,69,.15);border:1.5px solid var(--red);color:var(--red2);font-weight:700">
+          🔍 Hayvanları Getir <span id="bi-count" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.68rem;margin-left:6px"></span>
+        </button>
+      </div>
+
+      <!-- Tab: Filtre -->
+      <div id="bi-section-filtre" style="display:none">
+        <select id="bi-f-durum" class="fsel" style="margin-bottom:6px">
+          <option value="">Tüm Durumlar</option>
+          <option value="tohumlanabilir">Tohumlanabilir</option>
+          <option value="gebe">Gebe</option>
+          <option value="laktasyonda">Laktasyonda</option>
+          <option value="kuru">Kuru</option>
+        </select>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+          <label style="font-size:.75rem;white-space:nowrap">Yaş (ay):</label>
+          <input id="bi-f-yas-min" type="number" placeholder="min" style="width:60px" class="fi">
+          <span style="font-size:.75rem">–</span>
+          <input id="bi-f-yas-max" type="number" placeholder="max" style="width:60px" class="fi">
+        </div>
+        <button onclick="applyBulkFiltre('bi')" class="btn btn-o" style="font-size:.75rem">Filtrele</button>
+      </div>
+
+      <!-- Tab: Serbest Seçim -->
+      <div id="bi-section-serbest" style="display:none">
+        <input id="bi-s-ara" class="fi" placeholder="Küpe ara..." style="margin-bottom:6px"
+          oninput="filterBulkSerbest('bi')">
+        <div id="bi-s-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--card3);border-radius:6px;padding:4px">
+        </div>
+        <div style="margin-top:4px;font-size:.72rem;color:var(--ink3)">
+          <span id="bi-s-count">0</span> hayvan seçildi
+        </div>
+      </div>
 
       <!-- Animal preview list -->
       <div id="bi-hayvan-list" style="max-height:120px;overflow-y:auto;margin-bottom:12px;display:none;border:1px solid var(--card3);border-radius:var(--r1);padding:8px;background:var(--card2)">
