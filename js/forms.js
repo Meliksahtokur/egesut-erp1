@@ -489,7 +489,7 @@ function openTohumErtele(hayvanId, kupe) {
 
 // ── AŞI DROPDOWN ─────────────────────────────
 async function loadVaccinesDropdown() {
-  const vaccines = getData('vaccines');
+  const vaccines = await getData('vaccines');
   const sel = document.getElementById('v-vaccine-id');
   if (!sel) return;
 
@@ -537,7 +537,7 @@ function onVaccineSelect() {
     return;
   }
 
-  const vaccines = getData('vaccines') || [];
+  const vaccines = await getData('vaccines') || [];
   const vax = vaccines.find(v => v.id === val);
   if (!vax) return;
 
@@ -1238,11 +1238,11 @@ async function loadBulkIlacHayvanlar() {
 
 async function loadBulkIlacDropdown() {
   const DRUG_KATEGORI = ['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
-  const stoklar = (getState('stock') || []).filter(s => DRUG_KATEGORI.includes(s.kategori) && (s.miktar || 0) > 0);
+  const stoklar = (getState('stock') || []).filter(s => DRUG_KATEGORI.includes(s.kategori));
   const sel = document.getElementById('bi-ilac-sel');
   if (!sel) return;
   sel.innerHTML = '<option value="">— İlaç seçin —</option>' +
-    stoklar.map(s => `<option value="${s.id}">${s.urun_adi} (${s.miktar || 0} ${s.birim || 'adet'})</option>`).join('');
+    stoklar.map(s => `<option value="${s.id}">${s.urun_adi} (${s.guncel ?? 0} ${s.birim || 'adet'})</option>`).join('');
 }
 
 async function submitBulkIlac() {
