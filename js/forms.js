@@ -521,7 +521,7 @@ async function loadVaccinesDropdown() {
   if (dateEl) dateEl.value = today;
 }
 
-function onVaccineSelect() {
+async function onVaccineSelect() {
   const sel = document.getElementById('v-vaccine-id');
   const info = document.getElementById('v-vaccine-info');
   const hint = document.getElementById('v-protocol-hint');
