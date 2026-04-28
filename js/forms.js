@@ -1291,17 +1291,21 @@ async function submitBulkIlac() {
 
 // Tab switcher — works for both modals via prefix
 function bulkTabSwitch(prefix, tab) {
-  ['padok','filtre','serbest'].forEach(t => {
-    const sec = document.getElementById(prefix + '-section-' + t);
-    const btn = document.getElementById(prefix + '-tab-' + t);
-    if (sec) sec.style.display = t === tab ? '' : 'none';
-    if (btn) {
-      btn.style.opacity = t === tab ? '1' : '0.5';
-      btn.className = t === tab ? 'btn btn-g' : 'btn btn-o';
-    }
-  });
-  // Load serbest list on first click
-  if (tab === 'serbest') loadBulkSerbest(prefix);
+  try {
+    ['padok','filtre','serbest'].forEach(t => {
+      const sec = document.getElementById(prefix + '-section-' + t);
+      const btn = document.getElementById(prefix + '-tab-' + t);
+      if (sec) sec.style.display = t === tab ? '' : 'none';
+      if (btn) {
+        btn.style.opacity = t === tab ? '1' : '0.5';
+        btn.className = t === tab ? 'btn btn-g' : 'btn btn-o';
+      }
+    });
+    // Load serbest list on first click
+    if (tab === 'serbest') loadBulkSerbest(prefix);
+  } catch(e) {
+    console.error('bulkTabSwitch error:', e);
+  }
 }
 
 // Filter-based selection

@@ -1404,6 +1404,25 @@ async function loadStokPanel(){
       }).join('');
     });
   });
+// Vaccines section
+  const vaxList=await getData('vaccines');
+  if(vaxList&&vaxList.length){
+    html+=`<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px">💉 Aşı</div>`;
+    html+=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);margin:8px 0 4px;padding-left:4px">💉 Kayıtlı Aşılar (${vaxList.length})</div>`;
+    html+=vaxList.map(v=>{
+      const interval=v.repeat_interval_days?(v.repeat_interval_days===365?'Yıllık':v.repeat_interval_days===180?'6 Aylık':v.repeat_interval_days+' günde bir'):'Tek Doz';
+      const mandatory=v.is_mandatory?'🔴 Zorunlu':'🔵 Opsiyonel';
+      return `<div style="background:var(--card);border:1px solid var(--card3);border-left:3px solid var(--blue);border-radius:10px;padding:11px 13px;margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1">
+            <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${v.name}</div>
+            <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${v.disease_target||'—'} · ${interval} · ${mandatory}</div>
+            ${v.dosage_ml?`<div style="font-size:.62rem;color:var(--ink3)">Standart doz: ${v.dosage_ml} ml</div>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
   el.innerHTML=html||'<div class="empty">Kayıt yok</div>';
 }
 
