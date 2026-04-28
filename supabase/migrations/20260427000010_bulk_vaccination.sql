@@ -20,7 +20,7 @@ DECLARE
   v_errors      jsonb := '[]'::jsonb;
 BEGIN
   FOREACH v_animal_id IN ARRAY p_animal_ids LOOP
-    v_result := public.add_vaccination(v_animal_id, p_vaccine_id, p_date, p_dose_ml, p_notes);
+    v_result := public.add_vaccination(v_animal_id, p_vaccine_id::uuid, p_date, p_dose_ml, p_notes);
     IF (v_result->>'ok')::boolean THEN
       v_success := v_success + 1;
     ELSE
