@@ -1310,7 +1310,13 @@ function bulkTabSwitch(prefix, tab) {
 
 // Filter-based selection
 function applyBulkFiltre(prefix) {
-  const animals = getState('animals');
+  // Start from current filtered list (padok selection), not all animals
+  const idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
+  const currentIds = window[idKey] || [];
+  const allAnimals = getState('animals');
+  const animals = currentIds.length > 0
+    ? allAnimals.filter(a => currentIds.includes(a.id))
+    : allAnimals;
   const durum = document.getElementById(prefix + '-f-durum')?.value;
   const yasMin = parseInt(document.getElementById(prefix + '-f-yas-min')?.value) || 0;
   const yasMax = parseInt(document.getElementById(prefix + '-f-yas-max')?.value) || 9999;
