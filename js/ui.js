@@ -62,7 +62,16 @@ function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
 }
 function _dashVacAlerts(today,vaxLogs,vaccines){
   if(!vaxLogs||!vaxLogs.length) return '';
-  const withDue=vaxLogs.filter(v=>v.next_due_date);
+  // Keep only latest non-dismissed entry per (animal_id, vaccine_id)
+  const latestMap = {};
+  vaxLogs
+    .filter(v => !v.ertelendi)
+    .sort((a, b) => (b.vaccination_date || '').localeCompare(a.vaccination_date || ''))
+    .forEach(v => {
+      const key = v.animal_id + '|' + v.vaccine_id;
+      if (!latestMap[key]) latestMap[key] = v;
+    });
+  const withDue = Object.values(latestMap).filter(v => v.next_due_date);
   if(!withDue.length) return '';
 
   const vaxMap={};
@@ -90,12 +99,16 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
   const more=total-5;
 
   return band(priority,`💉 Yaklaşan Aşılar (${total})`,
-    display.map(v=>`<div class="arow" onclick="openDet('${v.animal_id}')">
-      <div class="arow-left">
-        <div class="arow-main">${v.vaxName}</div>
-        <div class="arow-sub">${v.days<0?'⚠️ '+Math.abs(v.days)+' gün gecikti':'⏰ '+v.days+' gün kaldı'}</div>
+    display.map(v=>`<div class="arow" style="display:flex;align-items:center;gap:6px">
+      <div style="flex:1;cursor:pointer" onclick="openDet('${v.animal_id}')">
+        <div class="arow-left">
+          <div class="arow-main">${v.vaxName}</div>
+          <div class="arow-sub">${v.days<0?'⚠️ '+Math.abs(v.days)+' gün gecikti':'⏰ '+v.days+' gün kaldı'}</div>
+        </div>
+        <div class="arow-right">${fmtTarih(v.next_due_date)}</div>
       </div>
-      <div class="arow-right">${fmtTarih(v.next_due_date)}</div>
+      <button class="btn btn-g" style="padding:4px 8px;font-size:.7rem;flex-shrink:0"
+        onclick="event.stopPropagation();asiDismiss('${v.id}','${v.vaxName}')">✕</button>
     </div>`).join('')+(more>0?`<div class="arow" style="opacity:.5;font-size:.68rem;text-align:center">+${more} daha</div>`:''));
 }
 
@@ -187,6 +200,28 @@ async function kizginlikYoktu(hayvanId, dogumId) {
     }
   } catch(e) { toast('❌ ' + e.message, true); }
 }
+
+async function asiDismiss(vacLogId, vaxName) {
+  const note = prompt(`"${vaxName}" aşı uyarısını kapat\nNot giriniz (zorunlu):`);
+  if (note === null) return; // cancelled
+  if (!note.trim()) { toast('⚠️ Not zorunlu', true); return; }
+  try {
+    const res = await rpc('vaccination_dismiss', {
+      p_vaccination_id: vacLogId,
+      p_note: note.trim()
+    });
+    if (res?.ok) {
+      toast('⏸️ Aşı uyarısı kapatıldı');
+      await pullTables(['vaccination_log', 'islem_log']);
+      loadDash();
+    } else {
+      toast('❌ ' + (res?.mesaj || 'Hata'), true);
+    }
+  } catch (e) {
+    toast('❌ ' + e.message, true);
+  }
+}
+
 async function showGebe(){
   goTo('suru');
   const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
