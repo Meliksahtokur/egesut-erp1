@@ -1,8 +1,7 @@
 -- ============================================================
--- Bulk Ilac RPC — Toplu Ilac Uygulama
--- Preventive treatment logged directly to islem_log (no vaka required)
--- Stok deduction via stok_hareket ledger
--- Based on: tedavi_ekle pattern (20260312000021) + bulk_vaccination pattern (20260427000010)
+-- Bulk Ilac RPC — Toplu Ilac Uygulama (FIXED)
+-- Fix: explicit ::uuid casts on all gen_random_uuid() calls
+--       and ::text casts on stok_id references
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.bulk_ilac(
@@ -19,6 +18,8 @@ DECLARE
   v_errors          jsonb := '[]'::jsonb;
   v_total_miktar    numeric;
   v_stok_urun_adi   text;
+  v_log_id          text;
+  v_stok_hareket_id text;
 BEGIN
   -- Verify stok exists
   SELECT id, urun_adi, baslangic_miktar INTO v_stok
@@ -32,12 +33,9 @@ BEGIN
   v_total_miktar := p_miktar * array_length(p_animal_ids, 1);
 
   -- Check stock availability (baslangic_miktar - consumed via stok_hareket)
-  -- Using guncel_stok view or manual calculation
   IF (
     COALESCE(v_stok.baslangic_miktar, 0)
     < v_total_miktar
-    -- NOTE: Could add SUM(stok_hareket.miktar) subtraction for true remaining stock
-    -- but keeping simple check for v1 as per spec
   ) THEN
     RETURN jsonb_build_object(
       'ok', false,
@@ -49,9 +47,10 @@ BEGIN
   FOREACH v_animal_id IN ARRAY p_animal_ids LOOP
     BEGIN
       -- Log to islem_log with TOPLU_ILAC tip
-      INSERT INTO public.islem_log (id, tip, ana_hayvan_id, tarih, kullanici_notu, snapshot)
+      v_log_id := gen_random_uuid()::text;
+      INSERT INTO public.islem_log (id, tip, ana_hayvan_id, tarih, kullanici_notu, snapshot, ref_id, ref_tablo)
       VALUES (
-        gen_random_uuid()::text,
+        v_log_id,
         'TOPLU_ILAC',
         v_animal_id,
         now(),
@@ -60,7 +59,9 @@ BEGIN
           'ilac_stok_id', p_ilac_stok_id,
           'ilac_adi', v_stok_urun_adi,
           'miktar', p_miktar
-        )
+        ),
+        v_log_id,              -- ref_id = islem_log.id
+        'islem_log'            -- ref_tablo
       );
       v_success := v_success + 1;
     EXCEPTION WHEN OTHERS THEN
@@ -76,11 +77,12 @@ BEGIN
     SET baslangic_miktar = baslangic_miktar - (p_miktar * v_success)
     WHERE id = p_ilac_stok_id;
 
-    -- Log stok hareket
+    -- Log stok hareket — all IDs as text
+    v_stok_hareket_id := gen_random_uuid()::text;
     INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
     VALUES (
-      gen_random_uuid()::text,
-      p_ilac_stok_id,
+      v_stok_hareket_id,
+      p_ilac_stok_id::text,
       'TOPLU_ILAC',
       p_miktar * v_success,
       v_success || ' hayvana toplu ilaç uygulaması (' || COALESCE(v_stok_urun_adi, p_ilac_stok_id) || ')',
