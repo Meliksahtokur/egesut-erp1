@@ -1,3 +1,13 @@
+## Resolution
+
+BUG-6/6b/4 fixed in migrations 20260409000001/02. tohumlama_sonuc_gebe and tohumlama_sonuc_bos UUID casts resolved. BUG-2 partially fixed (policy done, REALTIME_TABLES flag pending separate spec). BUG-1 pullTables error handling, BUG-2 kizginlik_log realtime, BUG-4 buildRpcParams fix, BUG-5 kızgınlık geçmişi implemented.
+
+**resolved_date:** 2026-05-02
+**status:** implemented
+**documentation_date:** 2026-04-09
+
+---
+
 # Üreme Modülü Bakım — Bug Fix Plan
 
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
