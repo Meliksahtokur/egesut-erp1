@@ -1134,10 +1134,10 @@ async function loadUreme(tab='kizginlik'){
 // ──────────────────────────────────────────
 // GEÇMİŞ
 // ──────────────────────────────────────────
-const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅'};
-const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)'};
-const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴'};
-const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık'};
+const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',ASI_KAYDI:'💉',TOPLU_ILAC:'💊'};
+const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)'};
+const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴',ASI_KAYDI:'💉',TOPLU_ILAC:'💊'};
+const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık',ASI_KAYDI:'💉 Aşı Kaydı',TOPLU_ILAC:'💊 Toplu İlaç'};
 
 function _gecmisEntryHtml(e){
   const {type,date,data}=e;
@@ -1177,7 +1177,7 @@ function _gecmisEntryHtml(e){
     const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
     title=`${kupe} — ${_ISLEM_ETK[data.tip]||data.tip}`;
     sub=snap.irk||snap.grup||'';
-    if(snap.kupe_no||snap.devlet_kupe) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
+    if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
   }
   return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>
     <div style="width:36px;height:36px;border-radius:10px;background:${icoBg};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${ico}</div>
@@ -1210,7 +1210,7 @@ async function loadGecmis(f,btn){
     if(f==='hepsi'||f==='gorev')
       (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>entries.push({type:'gorev',date:(r.tamamlanma_tarihi||r.hedef_tarih||'').slice(0,10),sortKey:r.tamamlanma_tarihi||r.hedef_tarih||'',data:r}));
     if(f==='hepsi'||f==='hayvan'){
-      const islemTipler=['HAYVAN_EKLENDI','ABORT_KAYDI','KIZGINLIK_KAYDI'];
+      const islemTipler=['HAYVAN_EKLENDI','ABORT_KAYDI','KIZGINLIK_KAYDI','ASI_KAYDI','TOPLU_ILAC'];
       (await idbGetAll('islem_log'))
         .filter(r=>islemTipler.includes(r.tip))
         .forEach(r=>entries.push({type:'islem',date:(r.tarih||r.created_at||'').slice(0,10),sortKey:r.tarih||r.created_at||'',data:r}));
