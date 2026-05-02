@@ -19,7 +19,7 @@ DECLARE
   v_total_miktar    numeric;
   v_stok_urun_adi   text;
   v_log_id          text;
-  v_stok_hareket_id text;
+  v_stok_hareket_id uuid;
 BEGIN
   -- Verify stok exists
   SELECT id, urun_adi, baslangic_miktar INTO v_stok
@@ -77,12 +77,12 @@ BEGIN
     SET baslangic_miktar = baslangic_miktar - (p_miktar * v_success)
     WHERE id = p_ilac_stok_id;
 
-    -- Log stok hareket — all IDs as text
-    v_stok_hareket_id := gen_random_uuid()::text;
+    -- Log stok hareket
+    v_stok_hareket_id := gen_random_uuid();
     INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
     VALUES (
       v_stok_hareket_id,
-      p_ilac_stok_id::text,
+      p_ilac_stok_id,
       'TOPLU_ILAC',
       p_miktar * v_success,
       v_success || ' hayvana toplu ilaç uygulaması (' || COALESCE(v_stok_urun_adi, p_ilac_stok_id) || ')',
