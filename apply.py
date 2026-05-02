@@ -1,10 +1,19 @@
-import subprocess, sys, os, tempfile
+import subprocess, sys, os, tempfile, shlex
 REPO_DIR = '/root/egesut-erp1'
 os.chdir(REPO_DIR)
 
+def safe_path(user_path):
+    """Validate path stays within REPO_DIR to prevent path traversal."""
+    base = os.path.abspath(REPO_DIR)
+    target = os.path.abspath(os.path.join(base, user_path.lstrip('/')))
+    if not target.startswith(base + os.sep) and target != base:
+        raise ValueError(f"Path traversal detected: {user_path}")
+    return target
+
 def do_replace(target, raw):
+    safe_target = safe_path(target)
     blocks = raw.split('---\n')
-    with open(target, encoding='utf-8') as f: content = f.read()
+    with open(safe_target, encoding='utf-8') as f: content = f.read()
     for block in blocks:
         if 'SEARCH:' not in block or 'REPLACE:' not in block: continue
         parts = block.split('SEARCH:', 1)[1].split('REPLACE:', 1)
@@ -14,7 +23,7 @@ def do_replace(target, raw):
             print(f"HATA: bulunamadi → {target}: {s[:60]}"); return False
         content = content.replace(s, r, 1)
         print(f"OK: {target}")
-    with open(target, 'w', encoding='utf-8') as f: f.write(content)
+    with open(safe_target, 'w', encoding='utf-8') as f: f.write(content)
     return True
 
 if len(sys.argv) > 1 and sys.argv[1] == '--replace':
@@ -22,7 +31,7 @@ if len(sys.argv) > 1 and sys.argv[1] == '--replace':
     raw = open(sys.argv[3], encoding='utf-8').read() if len(sys.argv) >= 4 else sys.stdin.read()
     if not do_replace(target, raw): sys.exit(1)
     subprocess.run(["git", "add", target])
-    subprocess.run(["git", "commit", "-m", f"AI replace: {target}"])
+    subprocess.run(["git", "commit", "-m", "AI replace: " + shlex.quote(target)])
     push = subprocess.run(["git", "push"], capture_output=True, text=True)
     print("Tamam" if push.returncode == 0 else f"Push hatasi:\n{push.stderr}")
     sys.exit(0)
