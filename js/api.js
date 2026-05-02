@@ -10,7 +10,7 @@ const DB_VER  = 14;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','buzagi_takip','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
-                  'vaccines','vaccination_log'];
+                  'vaccination_log'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
