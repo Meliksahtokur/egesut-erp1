@@ -1,0 +1,77 @@
+#!/bin/bash
+# Pre-push hook: migration + JS syntax check
+# Runs before every git push — rejects push if any migration or JS file has errors
+
+JS_FILES="js/forms.js js/ui.js js/app.js js/api.js js/state.js"
+REPO="/root/egesut-erp1"
+FAIL=0
+
+# ── Migration validation ──────────────────────────────────────
+MIGRATIONS_DIR="$REPO/supabase/migrations"
+MIGRATION_FAIL=0
+
+if [ -d "$MIGRATIONS_DIR" ]; then
+  echo "→ Migration validation..."
+
+  # 1. Check for duplicate version numbers (same numeric prefix)
+  VERSIONS=$(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | xargs -I{} basename {} | grep -oE '^[0-9]+' | sort)
+  DUPES=$(echo "$VERSIONS" | uniq -d)
+  if [ -n "$DUPES" ]; then
+    echo "✗ DUPLICATE MIGRATION VERSION(S): $DUPES"
+    echo "  Files with these versions:"
+    for v in $DUPES; do
+      ls "$MIGRATIONS_DIR"/${v}_*.sql 2>/dev/null | sed 's/^/    /'
+    done
+    MIGRATION_FAIL=1
+  fi
+
+  # 2. Check for invalid SQL patterns
+  # CREATE POLICY IF NOT EXISTS — not valid in PostgreSQL
+  BAD_POLICY=$(grep -rln "CREATE POLICY IF NOT EXISTS" "$MIGRATIONS_DIR"/*.sql 2>/dev/null)
+  if [ -n "$BAD_POLICY" ]; then
+    echo "✗ INVALID SYNTAX 'CREATE POLICY IF NOT EXISTS' (not valid PostgreSQL) in:"
+    echo "$BAD_POLICY" | sed 's/^/    /'
+    echo "  Fix: use DO \$\$ BEGIN CREATE POLICY ... EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;"
+    MIGRATION_FAIL=1
+  fi
+
+  # 3. Check for CREATE INDEX without IF NOT EXISTS (common mistake)
+  BAD_INDEX=$(grep -rln "^CREATE INDEX [^I]" "$MIGRATIONS_DIR"/*.sql 2>/dev/null)
+  if [ -n "$BAD_INDEX" ]; then
+    echo "⚠ WARNING: CREATE INDEX without IF NOT EXISTS in:"
+    echo "$BAD_INDEX" | sed 's/^/    /'
+    echo "  Consider: CREATE INDEX IF NOT EXISTS ..."
+    # Warning only, not blocking
+  fi
+
+  if [ "$MIGRATION_FAIL" -eq 1 ]; then
+    echo ""
+    echo "❌ Push rejected: fix migration errors above before pushing."
+    exit 1
+  fi
+
+  echo "✓ Migrations OK"
+fi
+# ─────────────────────────────────────────────────────────────
+
+echo "→ JS syntax check..."
+for f in $JS_FILES; do
+  if [ -f "$REPO/$f" ]; then
+    if ! node --check "$REPO/$f" 2>/dev/null; then
+      echo "✗ SYNTAX ERROR: $f"
+      node --check "$REPO/$f"
+      FAIL=1
+    else
+      echo "✓ $f"
+    fi
+  fi
+done
+
+if [ "$FAIL" -eq 1 ]; then
+  echo ""
+  echo "❌ Push rejected: fix syntax errors above before pushing."
+  exit 1
+fi
+
+echo "✓ All JS files OK — push allowed."
+exit 0
