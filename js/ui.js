@@ -125,7 +125,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,m
   }
   if(births60.length){
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
-      births60.map(b=>`<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${b.tarih} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button class="btn btn-g" style="padding:4px 9px;font-size:.7rem;flex-shrink:0" onclick="event.stopPropagation();kizginlikYoktu('${b.anne_id}','${b.id||''}')">❌ Yoktu</button></div>`).join(''));
+      births60.map(b=>`<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${b.tarih} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button style="font-size:.65rem;font-weight:700;color:var(--red2);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap" onclick="event.stopPropagation();kizginlikYoktu('${b.anne_id}','${b.id||''}')">❌ Yoktu</button></div>`).join(''));
   }
   if((muayeneGerekli||[]).length){
     h+=band('red','🚨 Muayene Gerekli (90+ gün, kayıt yok)',
