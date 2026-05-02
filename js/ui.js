@@ -99,7 +99,7 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
     </div>`).join('')+(more>0?`<div class="arow" style="opacity:.5;font-size:.68rem;text-align:center">+${more} daha</div>`:''));
 }
 
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,muayeneGerekli){
   let h='';
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
   if(late.length){
@@ -112,7 +112,11 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet){
   }
   if(births60.length){
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
-      births60.map(b=>`<div class="arow" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${b.tarih} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
+      births60.map(b=>`<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${b.tarih} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button class="btn btn-g" style="padding:4px 9px;font-size:.7rem;flex-shrink:0" onclick="event.stopPropagation();kizginlikYoktu('${b.anne_id}','${b.id||''}')">❌ Yoktu</button></div>`).join(''));
+  }
+  if((muayeneGerekli||[]).length){
+    h+=band('red','🚨 Muayene Gerekli (90+ gün, kayıt yok)',
+      muayeneGerekli.map(b=>`<div class="arow" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün — kızgınlık/tohumlama kaydı yok</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
   }
   if(nearBirth.length){
     h+=band('blue','🤰 Yaklaşan Doğumlar (≤7 gün)',
@@ -128,16 +132,19 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=new Date().toISOString().split('T')[0];
-    const [animals,diseases,tasks,stock,moves,births60,gebeTohs,vaxLogs,vaccines]=await Promise.all([
+    const [animals,diseases,tasks,stock,moves,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi),
       idbGetAll('stok'),
       getData('stok_hareket',m=>!m.iptal),
       getData('dogum',b=>b.tarih>=dAgo(63)&&b.tarih<=dAgo(58)),
+      getData('dogum',b=>b.tarih>=dAgo(150)&&b.tarih<dAgo(89)),
       getData('tohumlama',t=>t.sonuc==='Gebe'),
       getData('vaccination_log'),
       getData('vaccines'),
+      getData('kizginlik_log'),
+      getData('tohumlama'),
     ]);
     const stkNet={};
     stock.forEach(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); stkNet[s.id]=(+s.baslangic_miktar||0)-used; });
@@ -149,11 +156,36 @@ async function loadDash(){
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
     const nearBirth=gebeTohs.filter(t=>{ if(!t.tarih)return false; const d=Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000); return d>=0&&d<=7; });
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet)+_dashVacAlerts(today,vaxLogs,vaccines);
+    // Filter births60: hide if kizginlik or tohumlama recorded after birth
+    const births60F=births60.filter(b=>{
+      const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
+      const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
+      return !hasK&&!hasT;
+    });
+    // 90-day: births 90-150 days ago with no kizginlik/tohumlama since
+    const muayeneGerekli=births90.filter(b=>{
+      const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
+      const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
+      return !hasK&&!hasT;
+    });
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${e.message}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
   }
+}
+async function kizginlikYoktu(hayvanId, dogumId) {
+  if (!confirm('Bu hayvanda kızgınlık gözlemlenmedi olarak kaydet?')) return;
+  try {
+    const res = await rpc('kizginlik_yok_kaydet', { p_hayvan_id: hayvanId, p_dogum_id: dogumId || null, p_notlar: null });
+    if (res?.ok) {
+      toast('📋 Kızgınlık yoktu kaydedildi');
+      await pullTables(['kizginlik_log']);
+      loadDash();
+    } else {
+      toast('❌ ' + (res?.mesaj || 'Hata'), true);
+    }
+  } catch(e) { toast('❌ ' + e.message, true); }
 }
 async function showGebe(){
   goTo('suru');
