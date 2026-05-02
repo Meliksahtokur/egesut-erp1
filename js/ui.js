@@ -82,7 +82,8 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
   let priority='blue', rows=[];
   if(overdue.length){ priority='red'; rows=overdue; }
   else if(thisWeek.length){ priority='amber'; rows=thisWeek; }
-  else { priority='blue'; rows=thisMonth; }
+  else if(thisMonth.length){ priority='blue'; rows=thisMonth; }
+  else { priority='blue'; rows=categorized.slice(0,5); }
 
   const total=categorized.length;
   const display=rows.slice(0,5);
@@ -1176,7 +1177,9 @@ function _gecmisEntryHtml(e){
     const hayvanObj2=getState('animals').find(a=>a.id===data.ana_hayvan_id);
     const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
     title=`${kupe} — ${_ISLEM_ETK[data.tip]||data.tip}`;
-    sub=snap.irk||snap.grup||'';
+    if(data.tip==='ASI_KAYDI') sub=snap.vaccine_name||'';
+    else if(data.tip==='TOPLU_ILAC') sub=snap.ilac_adi||'';
+    else sub=snap.irk||snap.grup||'';
     if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
   }
   return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>
@@ -1357,6 +1360,9 @@ async function loadStokPanel(){
       {ad:'🦠 Antiparaziter',  filtre:s=>s.kategori==='Antiparaziter'},
       {ad:'💊 Diğer İlaç',     filtre:s=>s.kategori==='Diğer İlaç'},
       {ad:'🔧 Sarf & Ekipman', filtre:s=>['Ekipman','Sarf','Diğer'].includes(s.kategori)},
+    ]},
+    {baslik:'💉 Aşılar',alt:[
+      {ad:'💉 Aşı Ürünleri', filtre:s=>s.isVaccine||s.kategori==='Aşı'},
     ]},
     {baslik:'🌾 Yem',alt:[
       {ad:'🌾 Yem & Katkı', filtre:s=>s.kategori==='Yem'},
