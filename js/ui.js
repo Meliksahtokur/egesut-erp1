@@ -1230,8 +1230,8 @@ function _durumTxt(d){ if(d==='neg')return'🆘 Negatif'; if(d==='crit')return'�
 // ──────────────────────────────────────────
 async function loadStock(){
   try {
-    const [stk,moves]=await Promise.all([idbGetAll('stok'),getData('stok_hareket',m=>!m.iptal)]);
-    _S=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok'}; });
+    const [stk,moves,vacs]=await Promise.all([idbGetAll('stok'),getData('stok_hareket',m=>!m.iptal),idbGetAll('vaccines')]);
+    _S=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; const isVaccine=(s.id||'').startsWith('STOK-AŞI-')||(vacs||[]).some(v=>v.stock_item_id===s.id); return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok',isVaccine}; });
     setState('stock', _S);
     globalThis._appState=globalThis._appState||{}; globalThis._appState.stok=_S;
   } catch(e){ console.error(e); }
@@ -1384,7 +1384,7 @@ async function loadStokPanel(){
         return `<div style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${barClr};border-radius:10px;padding:11px 13px;margin-bottom:7px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div style="flex:1">
-              <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${s.urun_adi}</div>
+              <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${s.urun_adi}${s.isVaccine?' <span style="background:var(--blue);color:#fff;padding:1px 5px;border-radius:4px;font-size:.6rem;font-weight:700">💉 Aşı Stoğu</span>':''}</div>
               <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${s.kategori||'—'} · Eşik: ${s.esik||0} ${s.birim||''}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:10px">
