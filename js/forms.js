@@ -1337,7 +1337,7 @@ function applyBulkFiltre(prefix) {
   }
 
   // Update animal IDs and show preview
-  const idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
+  idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
   window[idKey] = filtered.map(a => a.id);
   const count = document.getElementById(prefix + '-count');
   const list = document.getElementById(prefix + '-hayvan-list');
