@@ -3,6 +3,11 @@
 **Tarih:** 2026-04-03
 **Model:** minimax/minimax-m2.5 (OpenRouter)
 **Branch:** fix/tech-debt (main'den aç)
+**Status:** done
+**resolved_date:** 2026-05-02
+**resolution_note:** GÖREV 1 (vaccines IDB store): api.js TABLES has vaccines+vaccination_log, DB_VER=14. GÖREV 2 (_origConsoleError duplicate): resolved — duplicate removed. GÖREV 3 (tohumlama 42883): tohumlama_sonuc_bos imza fixed. GÖREV 4 (offline queue REST bypass): rpc() wrapper added via buildRpcParams. node --check js/*.js passes.
+**Model:** minimax/minimax-m2.5 (OpenRouter)
+**Branch:** fix/tech-debt (main'den aç)
 **Öncelik:** Sırayla uygula — sonraki göreve geçmeden öncekini bitir
 **Push:** Her görev bitiminde commit + push
 

@@ -1,5 +1,9 @@
 # Task-Claude-TestSprite: TestSprite MCP Entegrasyonu
 
+**Durum:** done
+**resolved_date:** 2026-05-02
+**resolution_note:** Stale — PRoot limitation still exists, Playwright cannot run in this environment. TestSprite integration incomplete. The use case (automated browser testing in cloud) is not actionable in current environment. This task is closed as not applicable.
+
 **Durum:** bekliyor
 **Tarih:** 2026-04-04
 **Branch:** fix/tech-debt (veya feature/testsprite-setup)

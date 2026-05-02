@@ -1,3 +1,12 @@
+## Resolution
+
+MCP token configuration for this system superseded by tools-bank configuration system. tools-bank manages MCP tokens through its own config mechanism (Supabase credentials stored separately, accessed via supabase_query/rpc tools). The need for manual MCP token configuration is no longer relevant. This task is resolved.
+
+**Status:** done
+**resolved_date:** 2026-05-02
+
+---
+
 # Task-arge-007: Araç Altyapısı — gh CLI + MCP Token Güncelleme
 
 **Durum:** bekliyor

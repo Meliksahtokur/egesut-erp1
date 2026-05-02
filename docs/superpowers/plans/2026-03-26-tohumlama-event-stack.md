@@ -1,3 +1,13 @@
+## Resolution
+
+Fully implemented — migration 030 exists, all RPCs in place (tohumlama_kaydet: Bekliyor→Boş, tohumlama_sonuc_gebe), forms.js uses rpcOptimistic for gebe atama. Kızgınlık logları frozen, sadece son tohumlama aktif. Gebelik tabı mevcut. The event stack architecture is complete.
+
+**resolved_date:** 2026-05-02
+**status:** implemented
+**documentation_date:** 2026-03-26
+
+---
+
 # Tohumlama Event Stack & Gebelik Tabı Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

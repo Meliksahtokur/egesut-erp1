@@ -1,6 +1,8 @@
 # Task-dev-001: Test Hataları — IDB Store, Duplicate Telemetry, Tohumlama 42883
 
-**Durum:** bekliyor
+**Durum:** done
+**resolved_date:** 2026-05-02
+**resolution_note:** Same resolution as minimax-tech-debt.md — both Hata 1 and Hata 2 fixed. Hata 1: vaccines in TABLES, DB_VER bump. Hata 2: _origConsoleError duplicate removed. node --check js/app.js js/api.js js/forms.js passes. Implementation absorbed into tech-debt workstream.
 **Branch:** gwen/dev
 **Tarih:** 2026-04-02
 **Öncelik:** kritik

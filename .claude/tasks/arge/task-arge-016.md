@@ -1,3 +1,12 @@
+## Resolution
+
+Supabase MCP integration superseded by tools-bank supabase tools (tools-bank__supabase_query, tools-bank__supabase_rpc, etc.). The MCP-based supa-query approach was abandoned in favor of tools-bank's Supabase integration which provides richer functionality. This task is resolved as the underlying need is fulfilled through a different system.
+
+**Status:** done
+**resolved_date:** 2026-05-02
+
+---
+
 # Task-arge-016: supa-query Native Tool / Wrapper Script
 
 **Durum:** bekliyor

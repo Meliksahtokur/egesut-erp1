@@ -1,6 +1,8 @@
 # Task-M2.5-002: Klinik Modülü — 3 Eksik RPC
 
-**Durum:** bekliyor
+**Durum:** done
+**resolved_date:** 2026-05-02
+**resolution_note:** All 3 clinical RPCs implemented (migrations 20260403000002/03/04). delete_treatment_day: treatment_day + drug_administrations deleted, stock ledger reversed. update_drug_administration: dose change triggers stock delta. link_drug_to_stock: drugs.stock_item_id updated. Frontend calls exist in ui.js:2270,2321 and forms.js:1083. Node --check passes for all files.
 **Tarih:** 2026-04-03
 **Branch:** fix/tech-debt
 **Öncelik:** Yüksek

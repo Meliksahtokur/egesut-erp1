@@ -1,5 +1,9 @@
 # Task-Claude-SharedMCP: Ortak MCP Sunucuları
 
+**Durum:** done
+**resolved_date:** 2026-05-02
+**resolution_note:** tools-bank repo achieved MCP integration independently via separate system. Supabase MCP tools (supabase_query, supabase_rpc, supabase_migrate, etc.) are available via tools-bank extension. Shared MCP server approach via supergateway was not pursued; each system uses its own MCP configuration.
+
 **Durum:** bekliyor
 **Tarih:** 2026-04-04
 **Branch:** fix/tech-debt

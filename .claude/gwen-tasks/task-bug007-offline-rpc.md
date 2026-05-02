@@ -1,3 +1,12 @@
+## Resolution
+
+RPC_MAP exists in ui.js:2951-2978. dataTrafficTekGonder routes through rpc() wrapper, not direct REST. All table→RPC mappings implemented. node --check js/ui.js passes.
+
+**Status:** done
+**resolved_date:** 2026-05-02
+
+---
+
 # Task: BUG-007 — Offline Kuyruk RPC'ye Çevir
 
 **Önem:** Yüksek  
