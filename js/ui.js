@@ -1167,10 +1167,10 @@ async function loadUreme(tab='kizginlik'){
 // ──────────────────────────────────────────
 // GEÇMİŞ
 // ──────────────────────────────────────────
-const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',ASI_KAYDI:'💉',TOPLU_ILAC:'💊'};
-const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)'};
-const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴',ASI_KAYDI:'💉',TOPLU_ILAC:'💊'};
-const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık',ASI_KAYDI:'💉 Aşı Kaydı',TOPLU_ILAC:'💊 Toplu İlaç'};
+const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
+const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',ASI_ERTELEME:'rgba(120,120,120,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)'};
+const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
+const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık',ASI_KAYDI:'💉 Aşı Kaydı',ASI_ERTELEME:'⏸️ Aşı Ertelendi',TOPLU_ILAC:'💊 Toplu İlaç'};
 
 function _gecmisEntryHtml(e){
   const {type,date,data}=e;
@@ -1210,6 +1210,7 @@ function _gecmisEntryHtml(e){
     const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
     title=`${kupe} — ${_ISLEM_ETK[data.tip]||data.tip}`;
     if(data.tip==='ASI_KAYDI') sub=snap.vaccine_name||'';
+    else if(data.tip==='ASI_ERTELEME') sub=snap.erteleme_notu||snap.vaccine_name||'';
     else if(data.tip==='TOPLU_ILAC') sub=snap.ilac_adi||'';
     else sub=snap.irk||snap.grup||'';
     if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
