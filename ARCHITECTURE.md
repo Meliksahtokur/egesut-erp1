@@ -206,8 +206,8 @@ route text CHECK('IM','IV','SC','PO','Topikal','Intrauterin')
 |-------|------|------|
 | Tohumlama: 3 write path, 2'si RPC'yi bypass ediyor | 🔴 | Sonraki sprint — `tohumlama_sonuc_gebe/bos`, `tohumlama_abort` RPC'leri |
 | `state.js` benimseme tamamlanmadı, `_appState` paralel yaşıyor | 🟡 | Organik geçiş — yeni kod `setState/getState` kullanır |
-| `hastalik_log.ilac_stok_id` ve `ilac_miktar` orphan kolonlar | 🟡 | mig-029'da DROP |
-| `buzagi_takip` tablosu orphan, hiç kullanılmıyor | 🟡 | mig-029'da DROP veya entegre et |
+| `hastalik_log.ilac_stok_id` ve `ilac_miktar` orphan kolonlar | 🟢 | **Migration 029'da DROP** → mig-011 + mig-026 |
+| `buzagi_takip` tablosu orphan, hiç kullanılmıyor | 🟢 | **Migration 026'da DROP** → `20260502000003_drop_orphan_objects.sql` |
 | Migration 013-014 repo'da yok | 🟠 | Ground truth sync migration yaz |
 | `setInterval(syncNow, 5000)` polling | 🟢 | Realtime'a organik geçiş |
 
