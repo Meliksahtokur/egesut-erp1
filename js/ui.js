@@ -122,7 +122,7 @@ async function ileriGebeKontrol(){
     }
   } catch(e){ toast('❌ '+e.message,true); }
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye){
   let h='';
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
   if(late.length){
@@ -132,6 +132,14 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,m
   if(todayT.length){
     h+=`<div class="sh"><span class="sh-title">⏳ Bugün</span></div>`;
     h+=todayT.slice(0,4).map(t=>renderTask(t,'soon')).join('');
+  }
+  if((yakAsi||[]).length){
+    h+=`<div class="sh"><span class="sh-title">💉 Yaklaşan Aşı Görevleri (7 gün)</span><button class="sh-link" onclick="goTo('tasks')">Tümü →</button></div>`;
+    h+=(yakAsi||[]).slice(0,6).map(t=>renderTask(t,'near')).join('');
+  }
+  if((yakTakviye||[]).length){
+    h+=`<div class="sh"><span class="sh-title">💊 Yarın Takviye</span></div>`;
+    h+=(yakTakviye||[]).slice(0,4).map(t=>renderTask(t,'')).join('');
   }
   if(births60.length){
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
@@ -192,6 +200,10 @@ async function loadDash(){
     const negStk=stock.filter(s=>stkNet[s.id]<0).length;
     const late=tasks.filter(t=>t.hedef_tarih<today&&!t.parent_id);
     const todayT=tasks.filter(t=>t.hedef_tarih===today&&!t.parent_id);
+    const d7str=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
+    const d1str=new Date(Date.now()+86400000).toISOString().split('T')[0];
+    const yakAsi=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE_ASI'&&!t.parent_id&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
+    const yakTakviye=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE'&&!t.parent_id&&t.hedef_tarih>today&&t.hedef_tarih<=d1str);
     const badge=late.length;
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
@@ -215,7 +227,7 @@ async function loadDash(){
       const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
       return !hasK&&!hasT;
     });
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap)+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${e.message}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
