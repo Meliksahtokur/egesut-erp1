@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="40" fill="#111a0a"/>
+  <!-- Cow body -->
+  <ellipse cx="96" cy="115" rx="52" ry="38" fill="#e8f5e1"/>
+  <!-- Head -->
+  <ellipse cx="96" cy="72" rx="28" ry="24" fill="#e8f5e1"/>
+  <!-- Ears -->
+  <ellipse cx="68" cy="60" rx="10" ry="7" fill="#e8f5e1"/>
+  <ellipse cx="124" cy="60" rx="10" ry="7" fill="#e8f5e1"/>
+  <ellipse cx="68" cy="60" rx="6" ry="4" fill="#f4a3b0"/>
+  <ellipse cx="124" cy="60" rx="6" ry="4" fill="#f4a3b0"/>
+  <!-- Eyes -->
+  <circle cx="87" cy="68" r="3.5" fill="#222"/>
+  <circle cx="105" cy="68" r="3.5" fill="#222"/>
+  <circle cx="88.2" cy="67" r="1.2" fill="#fff"/>
+  <circle cx="106.2" cy="67" r="1.2" fill="#fff"/>
+  <!-- Nose -->
+  <ellipse cx="96" cy="80" rx="10" ry="7" fill="#f4a3b0"/>
+  <circle cx="92" cy="80" r="2" fill="#c06"/>
+  <circle cx="100" cy="80" r="2" fill="#c06"/>
+  <!-- Spots -->
+  <ellipse cx="78" cy="108" rx="12" ry="9" fill="#4ea92a" opacity="0.5"/>
+  <ellipse cx="112" cy="122" rx="10" ry="8" fill="#4ea92a" opacity="0.5"/>
+  <!-- Legs -->
+  <rect x="68" y="148" width="12" height="24" rx="6" fill="#e8f5e1"/>
+  <rect x="84" y="148" width="12" height="24" rx="6" fill="#e8f5e1"/>
+  <rect x="100" y="148" width="12" height="24" rx="6" fill="#e8f5e1"/>
+  <rect x="116" y="148" width="12" height="24" rx="6" fill="#e8f5e1"/>
+  <!-- Udder -->
+  <ellipse cx="96" cy="150" rx="20" ry="10" fill="#f4a3b0"/>
+</svg>
