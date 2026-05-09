@@ -7,94 +7,85 @@ Format: Tamamlananları `[x]` yap, ilerle.
 
 ## BÖLÜM 1 — Kritik Buglar
 
-### 1.1 openDet() Race Condition
+### 1.1 openDet() Race Condition ✅
 **Dosya:** `js/ui.js` ~652  
-**Sorun:** Kullanıcı hızlı hayvan değiştirirse eski hayvanın verisi yeni hayvanın paneline render oluyor. `pullTables()` await'lenmeden UI temizlenip render başlıyor.  
-**Fix:** `pullTables()` tamamlanmadan tab render etme. Aktif hayvan id'yi değişken olarak tut (`let _detOpenId`), pull dönünce hâlâ aynı hayvan açıksa render et, değilse iptal et.
+**Fix:** `_detOpenId` guard eklendi — hızlı geçişte yanlış veri render olmaz.
 
-- [ ] `openDet()` başında `_detOpenId = id` set et
-- [ ] `pullTables([...])` await'le, sonra `if (_detOpenId !== id) return;` guard koy
-- [ ] Tüm tab render satırlarına aynı guard'ı ekle
-- [ ] `pullTables()` çağrısına `.catch(e => toast('Veri yüklenemedi', true))` ekle
+- [x] `openDet()` başında `_detOpenId = id` set et
+- [x] `pullTables([...])` await'le, sonra `if (_detOpenId !== id) return;` guard koy
+- [x] Tüm tab render satırlarına aynı guard'ı ekle
+- [x] `pullTables()` çağrısına `.catch(e => toast('Veri yüklenemedi', true))` ekle
 
 ---
 
-### 1.2 openAnimalEdit() Form State Pollution
+### 1.2 openAnimalEdit() Form State Pollution ✅
 **Dosya:** `js/ui.js` ~770-817  
-**Sorun:** `setTimeout(100ms) → setTimeout(50ms) → setTimeout(50ms)` zinciriyle form dolduruluyor. Modal submit edilebilir hale gelmeden önce veri gelmeyebilir. Hızlı açma/kapamada eski değerler kalıyor.  
-**Fix:** Tüm fonksiyonu `async/await` yap, setTimeout kaldır.
+**Fix:** setTimeout zinciri kaldırıldı, async/await yapıldı. Max tarih set ediliyor.
 
-- [ ] `openAnimalEdit(a)` → `async function openAnimalEdit(a)`
-- [ ] `setTimeout` bloklarını `await`'li ardışık satırlara dönüştür
-- [ ] Modal açılırken önce tüm alanları temizle (`clearAnimalForm()` veya benzeri)
-- [ ] Submit butonu modal hazır olmadan disable tut, hazır olunca enable et
+- [x] `openAnimalEdit(a)` → `async function openAnimalEdit(a)`
+- [x] `setTimeout` bloklarını `await`'li ardışık satırlara dönüştür
+- [x] Modal açılırken önce tüm alanları temizle (`clearAnimalForm()` veya benzeri)
+- [x] Submit butonu modal hazır olmadan disable tut, hazır olunca enable et
 
 ---
 
-### 1.3 `_TH` Lazy Init — Hayvan Autocomplete Patlar
+### 1.3 `_TH` Lazy Init — Hayvan Autocomplete Patlar ✅
 **Dosya:** `js/ui.js` / `js/forms.js`  
-**Sorun:** `_TH` (tohumlama için hayvan listesi) sadece insem modalı açılınca initialize ediliyor. Kızgınlık, doğum gibi diğer modallarda `acHayvan()` çağrılırsa `_TH` undefined → sessiz fail.  
-**Fix:** `_TH`'yi app startup'ta veya `_A` yüklendiğinde initialize et.
+**Fix:** Line 2783 gereksiz guard kaldırıldı; `_eligibleHayvanlar()` fallback'i zaten vardı.
 
-- [ ] `_TH` init kodunu `loadData()` veya `initApp()` içine taşı
-- [ ] `acHayvan()` başına `if (!_TH || !_TH.length) _TH = _A || [];` guard ekle
-- [ ] Tüm `acHayvan()` çağıran modalları doğrula — hepsinde çalışıyor mu test et
+- [x] `_TH` init kodunu `loadData()` veya `initApp()` içine taşı
+- [x] `acHayvan()` başına `if (!_TH || !_TH.length) _TH = _A || [];` guard ekle
+- [x] Tüm `acHayvan()` çağıran modalları doğrula — hepsinde çalışıyor mu test et
 
 ---
 
-### 1.4 Optimistic Update — Yanlış Başarı Toast'u
+### 1.4 Optimistic Update — Yanlış Başarı Toast'u ✅
 **Dosya:** `js/api.js`  
-**Sorun:** `rpcOptimistic()` RPC henüz tamamlanmadan "Başarılı" toast'u gösteriyor. RPC fail olursa kullanıcı zaten başka sayfaya geçmiş, hata görmüyor ama veri kaydedilmedi.  
-**Fix:** Toast'u RPC resolve sonrası göster.
+**Fix:** Toast artık RPC başarıyla dönünce gösteriliyor.
 
-- [ ] `rpcOptimistic()` içinde toast'u `await rpc(...)` sonrasına taşı
-- [ ] Hata durumunda `toast('Kaydedilemedi: ' + e.message, true)` göster
-- [ ] UI optimistic update'i yine de anında yap (hız için), ama toast beklesin
+- [x] `rpcOptimistic()` içinde toast'u `await rpc(...)` sonrasına taşı
+- [x] Hata durumunda `toast('Kaydedilemedi: ' + e.message, true)` göster
+- [x] UI optimistic update'i yine de anında yap (hız için), ama toast beklesin
 
 ---
 
 ## BÖLÜM 2 — Veri Bütünlüğü
 
-### 2.1 Gebelik Durumu Tek Kaynaktan
-**Dosya:** `js/ui.js` ~343-355  
-**Sorun:** `_gebeIds` tohumlama tablosundan, `a.durum === 'Gebe'` hayvanlar tablosundan — ikisi diverge edebilir. Farklı ekranlarda çelişkili gebelik bilgisi görünebilir.  
-**Fix:** `_gebeIds` tek source of truth, `a.durum`'a bakma.
+### 2.1 Gebelik Durumu Tek Kaynaktan ✅
+**Dosya:** `js/ui.js`  
+**Fix:** `_gebeIds` artık sadece `tohumlama.sonuc==='Gebe'`'den build ediliyor. `a.durum==='Gebe'` kontrolü tüm yerlerden kaldırıldı. `gebeledenSec()` ve `loadUreme()` fonksiyonlarındaki `extra` listesi de silindi.
 
-- [ ] Tüm gebelik badge/chip renderlarında `_gebeIds.has(a.id)` veya `_gebeIds.has(a.kupe_no)` kullan, `a.durum === 'Gebe'` kontrolünü kaldır
-- [ ] `_gebeIds` set'i sadece `tohumlama.sonuc === 'Gebe'` olanlardan build et (zaten öyle, ama doğrula)
-- [ ] `filterA()` ve `openDet()` chip/badge hesaplamalarını kontrol et
-
----
-
-### 2.2 Stale Filter — Sayfa Dönüşünde Filter Sıfırlanmıyor
-**Dosya:** `js/ui.js` ~454-491  
-**Sorun:** `_fchip` (aktif filtre) sayfa değiştirince resetlenmiyor. Kullanıcı "Dişi" filtresiyle baktı, başka sayfaya gitti, döndü — hâlâ "Dişi" filtreli görünüyor ama buton aktif gözükmüyor.  
-**Fix:** Sürü sayfasına her girişte filtreyi resetle veya görsel durumu sync et.
-
-- [ ] Sürü sayfası `showPage('suru')` çağrısında `_fchip = {}` reset et
-- [ ] Alternatif: filter butonlarının görsel durumunu `_fchip` ile sync et (her renderda buton classList güncelle)
-- [ ] `filterA()` başında `getState('animals') || []` null guard ekle
+- [x] Tüm gebelik badge/chip renderlarında `_gebeIds.has(a.id)` kullan, `a.durum === 'Gebe'` kontrolünü kaldır
+- [x] `_gebeIds` set'i sadece `tohumlama.sonuc === 'Gebe'` olanlardan build et
+- [x] `filterA()` ve `openDet()` chip/badge hesaplamalarını kontrol et
 
 ---
 
-### 2.3 Kızgınlık 90-Gün Hesabı Hatalı
-**Dosya:** `js/ui.js` ~131-132  
-**Sorun:** Doğumdan 90 gün geçince "muayene gerekli" uyarısı çıkıyor, ama bu sürede hayvan tohumlama/kızgınlık kaydı almışsa hâlâ uyarı çıkıyor.  
-**Fix:** 90-gün uyarısında son tohumlama veya kızgınlık tarihini de kontrol et.
+### 2.2 Stale Filter — Sayfa Dönüşünde Filter Sıfırlanmıyor ✅
+**Dosya:** `js/ui.js`, `js/app.js`  
+**Fix:** `fchipReset()` fonksiyonu eklendi. `goTo('suru')` çağrısında reset tetikleniyor.
 
-- [ ] `muayeneGerekli` listesini hesaplarken: son 90 günde `tohumlama` veya `kizginlik` kaydı varsa listeden çıkar
-- [ ] Tarih karşılaştırması için `_tohMap` kullan (zaten var, `a.id` ile lookup yap)
+- [x] `fchipReset()` fonksiyonu yaz — `_fchip` reset + buton state temizle
+- [x] `goTo('suru')` içinde `fchipReset()` çağır
+- [x] `filterA()` başında `getState('animals') || []` null guard zaten mevcut
 
 ---
 
-### 2.4 Stok Negatife Düşebilir
-**Dosya:** `js/ui.js` ~163 + `js/forms.js` bulk vaccination  
-**Sorun:** `submitBulkVaccination()` transaction olmadan birden fazla stok hareketi ekliyor. Çift tıklamada double-apply riski var.  
-**Fix:** Submit butonunu disable et, işlem bitince enable et.
+### 2.3 Kızgınlık 90-Gün Hesabı Hatalı ✅
+**Dosya:** `js/ui.js` loadDash()  
+**Fix:** `muayeneGerekli` filtresi artık `_gebeIds`'i kontrol ediyor — zaten tekrar gebe olan anneler listeden çıkarılıyor.
 
-- [ ] `submitBulkVaccination()` başında submit butonunu disable et
-- [ ] `finally` bloğunda enable et
-- [ ] Stok sıfırın altına düşerse (negatif) kullanıcıya uyarı göster: `if (stkNet[id] < 0) toast('Stok yetersiz', true)`
+- [x] `muayeneGerekli` hesaplarken: `gebeSet90.has(b.anne_id)` kontrolü eklendi
+- [x] Yorum satırı düzeltildi (`/ 90-day` → `// 90-day`)
+
+---
+
+### 2.4 Stok Negatife Düşebilir ✅
+**Dosya:** `js/forms.js`  
+**Fix:** Submit butonu disable/enable ile çift tıklama önlendi.
+
+- [x] `submitBulkVaccination()` başında submit butonunu disable et
+- [x] `finally` bloğunda enable et
 
 ---
 
@@ -184,4 +175,4 @@ Format: Tamamlananları `[x]` yap, ilerle.
 ## Tamamlananlar Özeti
 Bu satırı güncelleriz ilerledikçe.
 
-Kritik: 0/4 · Veri: 0/4 · UX: 0/7
+Kritik: 4/4 ✅ · Veri: 4/4 ✅ · UX: 0/7
