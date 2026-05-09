@@ -782,6 +782,11 @@ async function hstSilOnay() {
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
 // openTohDet → ui.js'de tanımlı
+async function tohSonucKaydet() {
+  const sel = document.querySelector('input[name="toh-sonuc"]:checked');
+  if (!sel) { toast('Sonuç seçin'); return; }
+  await tohSonuc(sel.value);
+}
 async function tohSonuc(sonuc, btn) {
   if (!_curToh) return;
   if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {

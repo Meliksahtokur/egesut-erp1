@@ -351,6 +351,22 @@ async function toggleSub(subId,parentId,el){
   await loadTasks(_curTaskFilter||'today');
   loadDash();
 }
+function openConfirm(title, desc, onConfirm){
+  document.getElementById('m-confirm-title').textContent=title;
+  document.getElementById('m-confirm-desc').textContent=desc;
+  const ok=document.getElementById('m-confirm-ok');
+  ok.onclick=()=>{ closeM('m-confirm'); onConfirm(); };
+  openM('m-confirm');
+}
+async function updateTaskBadge(){
+  try{
+    const today=new Date().toISOString().split('T')[0];
+    const tasks=await getData('gorev_log',t=>!t.tamamlandi&&!t.parent_id);
+    const late=tasks.filter(t=>t.hedef_tarih<today).length;
+    const tb=document.getElementById('tbadge');
+    if(tb){ tb.textContent=late>99?'99+':late; tb.style.display=late>0?'flex':'none'; }
+  } catch(e){ /* sessiz fail */ }
+}
 async function doneTask(id,hid,stokId,miktar,padok,btn){
   btn.disabled=true;
   btn.innerHTML='<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
@@ -363,6 +379,7 @@ async function doneTask(id,hid,stokId,miktar,padok,btn){
     const elT=document.getElementById('tc-'+id);
     if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
     toast('✅ Tamamlandı');
+    updateTaskBadge();
     loadDash();
   } catch(e){
     btn.disabled=false;
@@ -702,8 +719,11 @@ async function openDet(id){
   _detOpenId=id;
   history.pushState({pg:_curPg||'dash',det:id},'','#'+(_curPg||'dash'));
   document.getElementById('det').classList.add('on');
-  document.getElementById('det-name').textContent='Yükleniyor…';
-  ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
+  document.getElementById('det-name').textContent=' ';
+  document.getElementById('det-meta').textContent=' ';
+  const _skelHtml='<div style="padding:16px 0">'+['80%','60%','90%','50%'].map(w=>`<div class="skel" style="height:14px;width:${w};margin-bottom:12px"></div>`).join('')+'</div>';
+  ['det-chips','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
+  const _ozetEl=document.getElementById('tab-ozet'); if(_ozetEl) _ozetEl.innerHTML=_skelHtml;
   showTab('ozet',document.querySelector('.tab'));
   await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(_detOpenId!==id) return;
@@ -1135,16 +1155,17 @@ async function _uremeGebelik(el){
 }
 
 async function gebeAta(tohId, kupe){
-  if(!confirm(`${kupe} — gebe olarak işaretlensin mi?`)) return;
-  try {
-    await rpc('tohumlama_sonuc_gebe',{p_tohumlama_id:tohId});
-    toast('Gebe olarak işaretlendi');
-    await pullTables(['hayvanlar','tohumlama','islem_log']);
-    renderSafe();
-    loadUreme('gebelik');
-  } catch(e){
-    toast(e.message, true);
-  }
+  openConfirm('Gebe İşaretle',`${kupe} — gebe olarak işaretlensin mi?`,async()=>{
+    try {
+      await rpc('tohumlama_sonuc_gebe',{p_tohumlama_id:tohId});
+      toast('Gebe olarak işaretlendi');
+      await pullTables(['hayvanlar','tohumlama','islem_log']);
+      renderSafe();
+      loadUreme('gebelik');
+    } catch(e){
+      toast(e.message, true);
+    }
+  });
 }
 
 async function _uremeDogum(el){
@@ -1866,15 +1887,17 @@ async function detayTamamla(){
 }
 async function detayIptal(){
   if(!_curTaskDet) return;
-  if(!confirm('Bu görevi iptal etmek istediğinizden emin misiniz?')) return;
   const t=_curTaskDet;
-  await write('gorev_log',{...t,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString(),iptal:true},'PATCH',`id=eq.${t.id}`);
-  const subs=await getData('gorev_log',s=>s.parent_id===t.id&&!s.tamamlandi);
-  for(const s of subs) await write('gorev_log',{...s,tamamlandi:true,iptal:true},'PATCH',`id=eq.${s.id}`);
-  closeM('m-task-det');
-  toast('🗑 Görev iptal edildi');
-  loadTasks(_curTaskFilter||'today');
-  loadDash();
+  openConfirm('Görevi İptal Et','Bu görevi iptal etmek istediğinizden emin misiniz?',async()=>{
+    await write('gorev_log',{...t,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString(),iptal:true},'PATCH',`id=eq.${t.id}`);
+    const subs=await getData('gorev_log',s=>s.parent_id===t.id&&!s.tamamlandi);
+    for(const s of subs) await write('gorev_log',{...s,tamamlandi:true,iptal:true},'PATCH',`id=eq.${s.id}`);
+    closeM('m-task-det');
+    toast('🗑 Görev iptal edildi');
+    updateTaskBadge();
+    loadTasks(_curTaskFilter||'today');
+    loadDash();
+  });
 }
 
 // ──────────────────────────────────────────
@@ -2516,29 +2539,28 @@ async function openTohDet(id){
   ];
   document.getElementById('td2-meta').innerHTML=chips.filter(Boolean).join('');
 
-  // Durum bazlı buton görünürlüğü
-  const sonucBtnRow=document.getElementById('td2-sonuc-btns');
+  // Durum bazlı görünürlük
+  const sonucRadios=document.getElementById('td2-sonuc-radios');
   const td2Info=document.getElementById('td2-info-msg');
+  const td2BosFixed=document.getElementById('td2-bos-fixed');
+  // reset
+  if(sonucRadios) sonucRadios.style.display='none';
+  if(td2BosFixed) td2BosFixed.style.display='none';
+  if(td2Info){ td2Info.textContent=''; td2Info.style.display='none'; }
   if(t.sonuc==='Doğum Yaptı'){
-    if(sonucBtnRow) sonucBtnRow.style.display='none';
     if(td2Info){ td2Info.textContent='✅ Bu kayıt doğum ile tamamlandı.'; td2Info.style.display='block'; }
-  } else if(t.sonuc==='Boş'){
-    // Sadece "Bekliyor" düzeltme butonu
-    if(sonucBtnRow) sonucBtnRow.style.display='none';
-    if(td2Info){ td2Info.textContent=''; td2Info.style.display='none'; }
-    const td2BosFixed=document.getElementById('td2-bos-fixed');
-    if(td2BosFixed) td2BosFixed.style.display='block';
   } else if(t.sonuc==='Gebe'){
-    if(sonucBtnRow) sonucBtnRow.style.display='none';
     if(td2Info){ td2Info.textContent='🤰 Gebe — hayvan kartından Abort veya Doğum Yaptı işlemi yapın.'; td2Info.style.display='block'; }
-    const td2BosFixed=document.getElementById('td2-bos-fixed');
-    if(td2BosFixed) td2BosFixed.style.display='none';
+  } else if(t.sonuc==='Boş'){
+    // Düzeltme: Boş → Bekliyor geri alma
+    if(td2BosFixed) td2BosFixed.style.display='block';
   } else {
-    // Bekliyor — tüm butonlar görünür
-    if(sonucBtnRow) sonucBtnRow.style.display='flex';
-    if(td2Info){ td2Info.textContent=''; td2Info.style.display='none'; }
-    const td2BosFixed=document.getElementById('td2-bos-fixed');
-    if(td2BosFixed) td2BosFixed.style.display='none';
+    // Bekliyor — radio + kaydet
+    if(sonucRadios){
+      sonucRadios.style.display='block';
+      const sel=sonucRadios.querySelector(`input[value="${t.sonuc||'Bekliyor'}"]`);
+      if(sel) sel.checked=true;
+    }
   }
 
   // islem_log'dan bu kaydın id'sini bul (geri alma için)
