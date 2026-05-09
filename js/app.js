@@ -734,6 +734,8 @@ window.addEventListener('load', async () => {
       db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
         globalThis._TH = data || [];
       }).catch(console.warn);
+      // İleri gebe görev kontrolü — sessiz, fire-and-forget
+      rpc('ileri_gebe_gorev_kontrol').catch(console.warn);
     } catch (e) { console.warn('Pull failed:', e.message); }
   } else {
     g('dot')?.classList.add('warn');
