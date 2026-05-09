@@ -308,7 +308,8 @@ async function loadTasks(f,btn){
     // parent_id olan ama parent'ı tamamlanmış görevler top-level sayılır
     const _doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
     let data=all.filter(t=>!t.tamamlandi&&(!t.parent_id||_doneIds.has(t.parent_id)));
-    if(f==='today') data=data.filter(t=>t.hedef_tarih<=today);
+    const _d7=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
+    if(f==='today') data=data.filter(t=>t.hedef_tarih<=today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
