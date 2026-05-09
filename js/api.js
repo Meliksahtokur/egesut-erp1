@@ -283,10 +283,10 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
     toast(msg, true);
     throw new Error(msg);
   }
-  // Kullanıcıya anında geri bildirim
-  if (successMsg) toast(successMsg);
   try {
     const data = await rpc(name, params);
+    // RPC başarılıysa toast göster
+    if (successMsg) toast(successMsg);
     // Arka planda sadece ilgili tabloları çek, UI'ı bloklamaz
     const tables = RPC_TABLES[name] || [];
     if (tables.length) pullTables(tables).then(renderSafe).catch(console.warn);

@@ -452,6 +452,7 @@ document.addEventListener('click',e=>{
     { const ac=document.getElementById('ac-srch'); if(ac) ac.style.display='none'; }
 });
 let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null};
+let _detOpenId=null;
 function fchipSec(grup,deger,btn){
   if(_fchip[grup]===deger){ _fchip[grup]=null; btn.classList.remove('on'); }
   else {
@@ -650,11 +651,13 @@ function _detGorevHtml(a,tasks,subs,today){
   return `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-task-add','ta-hid','${kupe}')">➕ Görev Ekle</button></div>`+liste;
 }
 async function openDet(id){
+  _detOpenId=id;
   document.getElementById('det').classList.add('on');
   document.getElementById('det-name').textContent='Yükleniyor…';
   ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   showTab('ozet',document.querySelector('.tab'));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log']);
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
+  if(_detOpenId!==id) return;
   try {
     const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
@@ -668,6 +671,7 @@ async function openDet(id){
       getData('vaccination_log',v=>v.animal_id===id),
       getData('kizginlik_log',k=>k.hayvan_id===id),
     ]);
+    if(_detOpenId!==id) return;
     const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
@@ -766,55 +770,46 @@ async function openAnimalEdit(id){
 
   openM('m-animal');
 
-  // Mevcut değerleri doldur
-  setTimeout(async()=>{
-    if(a.devlet_kupe) document.getElementById('a-devlet').value=a.devlet_kupe;
-    if(a.kupe_no)     document.getElementById('a-kupe').value=a.kupe_no;
-    if(a.cinsiyet){
-      document.getElementById('a-cinsiyet').value=a.cinsiyet;
-    }
-    if(a.dogum_tarihi) document.getElementById('a-dt').value=a.dogum_tarihi;
-    if(a.dogum_kg)    document.getElementById('a-dkg').value=a.dogum_kg;
-    if(a.canli_agirlik) document.getElementById('a-agirlik').value=a.canli_agirlik;
-    if(a.boy)         document.getElementById('a-boy').value=a.boy;
-    if(a.renk)        document.getElementById('a-renk').value=a.renk||'';
-    if(a.ayirici_ozellik) document.getElementById('a-ozellik').value=a.ayirici_ozellik||'';
+  // Mevcut değerleri doldur — async/await, setTimeout yok
+  if(a.devlet_kupe) document.getElementById('a-devlet').value=a.devlet_kupe;
+  if(a.kupe_no)     document.getElementById('a-kupe').value=a.kupe_no;
+  if(a.cinsiyet)    document.getElementById('a-cinsiyet').value=a.cinsiyet;
+  if(a.dogum_tarihi) document.getElementById('a-dt').value=a.dogum_tarihi;
+  document.getElementById('a-dt').max=new Date().toISOString().slice(0,10);
+  if(a.dogum_kg)    document.getElementById('a-dkg').value=a.dogum_kg;
+  if(a.canli_agirlik) document.getElementById('a-agirlik').value=a.canli_agirlik;
+  if(a.boy)         document.getElementById('a-boy').value=a.boy;
+  if(a.renk)        document.getElementById('a-renk').value=a.renk||'';
+  if(a.ayirici_ozellik) document.getElementById('a-ozellik').value=a.ayirici_ozellik||'';
 
-    // Irk dropdown
-    await loadIrkDropdown();
-    const irkSel=document.getElementById('a-irk-sel');
-    if(irkSel && a.irk){
-      // Seçeneklerde var mı?
-      const opt=[...irkSel.options].find(o=>o.value===a.irk);
-      if(opt){ irkSel.value=a.irk; }
-      else {
-        irkSel.value='__diger__';
-        const txt=document.getElementById('a-irk-txt');
-        if(txt){ txt.style.display='block'; txt.disabled=false; txt.value=a.irk; }
-      }
+  // Irk dropdown
+  await loadIrkDropdown();
+  const irkSel=document.getElementById('a-irk-sel');
+  if(irkSel && a.irk){
+    const opt=[...irkSel.options].find(o=>o.value===a.irk);
+    if(opt){ irkSel.value=a.irk; }
+    else {
+      irkSel.value='__diger__';
+      const txt=document.getElementById('a-irk-txt');
+      if(txt){ txt.style.display='block'; txt.disabled=false; txt.value=a.irk; }
     }
+  }
 
-    // Grup + padok
-    await animalFormGuncelle();
-    setTimeout(()=>{
-      const grupSel=document.getElementById('a-grup');
-      if(grupSel && a.grup){
-        // Seçenekte varsa set et, yoksa ekle
-        const opt=[...grupSel.options].find(o=>o.value===a.grup);
-        if(!opt) grupSel.innerHTML+=`<option value="${a.grup}">${a.grup}</option>`;
-        grupSel.value=a.grup;
-        animalGrupDegisti();
-        setTimeout(()=>{
-          const padokSel=document.getElementById('a-padok');
-          if(padokSel && a.padok){
-            const popt=[...padokSel.options].find(o=>o.value===a.padok);
-            if(!popt) padokSel.innerHTML+=`<option value="${a.padok}">${a.padok}</option>`;
-            padokSel.value=a.padok;
-          }
-        },50);
-      }
-    },50);
-  },100);
+  // Grup + padok
+  await animalFormGuncelle();
+  const grupSel=document.getElementById('a-grup');
+  if(grupSel && a.grup){
+    const opt=[...grupSel.options].find(o=>o.value===a.grup);
+    if(!opt) grupSel.innerHTML+=`<option value="${a.grup}">${a.grup}</option>`;
+    grupSel.value=a.grup;
+    animalGrupDegisti();
+    const padokSel=document.getElementById('a-padok');
+    if(padokSel && a.padok){
+      const popt=[...padokSel.options].find(o=>o.value===a.padok);
+      if(!popt) padokSel.innerHTML+=`<option value="${a.padok}">${a.padok}</option>`;
+      padokSel.value=a.padok;
+    }
+  }
 }
 
 function closeAnimalEdit(){
@@ -2779,9 +2774,6 @@ function acHayvan(inputId,listId){
     src = _activeAnimalsOnly();
   } else {
     src = getState('animals').length ? getState('animals') : [];
-  }
-  if(listId==='ac-ihid'&&!globalThis._TH){
-    const ac=document.getElementById(listId); if(ac){ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--ink3)">⏳ Yükleniyor…</div>';ac.style.display='block';} return;
   }
   const filtered=q
     ?src.filter(a=>(a.kupe_no||'').toLowerCase().includes(q)||(a.devlet_kupe||'').toLowerCase().includes(q)||(a.id||'').toLowerCase().includes(q)).slice(0,12)
