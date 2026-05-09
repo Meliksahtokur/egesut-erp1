@@ -198,12 +198,15 @@ async function loadDash(){
     stock.forEach(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); stkNet[s.id]=(+s.baslangic_miktar||0)-used; });
     const critStk=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0)).length;
     const negStk=stock.filter(s=>stkNet[s.id]<0).length;
-    const late=tasks.filter(t=>t.hedef_tarih<today&&!t.parent_id);
-    const todayT=tasks.filter(t=>t.hedef_tarih===today&&!t.parent_id);
+    // parent_id olan ama parent'ı tamamlanmış görevler de top-level sayılır
+    const _activePids=new Set(tasks.map(t=>t.id));
+    const _isTop=t=>!t.parent_id||!_activePids.has(t.parent_id);
+    const late=tasks.filter(t=>t.hedef_tarih<today&&_isTop(t));
+    const todayT=tasks.filter(t=>t.hedef_tarih===today&&_isTop(t));
     const d7str=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
     const d1str=new Date(Date.now()+86400000).toISOString().split('T')[0];
-    const yakAsi=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE_ASI'&&!t.parent_id&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
-    const yakTakviye=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE'&&!t.parent_id&&t.hedef_tarih>today&&t.hedef_tarih<=d1str);
+    const yakAsi=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE_ASI'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
+    const yakTakviye=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d1str);
     const badge=late.length;
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
@@ -302,7 +305,9 @@ async function loadTasks(f,btn){
       </div>`).join('');
       return;
     }
-    let data=all.filter(t=>!t.tamamlandi&&!t.parent_id);
+    // parent_id olan ama parent'ı tamamlanmış görevler top-level sayılır
+    const _doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
+    let data=all.filter(t=>!t.tamamlandi&&(!t.parent_id||_doneIds.has(t.parent_id)));
     if(f==='today') data=data.filter(t=>t.hedef_tarih<=today);
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
@@ -373,7 +378,9 @@ function openConfirm(title, desc, onConfirm){
 async function updateTaskBadge(){
   try{
     const today=new Date().toISOString().split('T')[0];
-    const tasks=await getData('gorev_log',t=>!t.tamamlandi&&!t.parent_id);
+    const all=await idbGetAll('gorev_log');
+    const doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
+    const tasks=all.filter(t=>!t.tamamlandi&&(!t.parent_id||doneIds.has(t.parent_id)));
     const late=tasks.filter(t=>t.hedef_tarih<today).length;
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=late>99?'99+':late; tb.style.display=late>0?'flex':'none'; }
