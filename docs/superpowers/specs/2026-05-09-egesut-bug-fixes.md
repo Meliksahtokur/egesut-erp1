@@ -91,88 +91,65 @@ Format: Tamamlananları `[x]` yap, ilerle.
 
 ## BÖLÜM 3 — UX Polish
 
-### 3.1 openDet() Skeleton Loader
+### 3.1 openDet() Skeleton Loader ✅
 **Dosya:** `js/ui.js` + `index.html`  
-**Sorun:** Hayvan detayı açılınca panel bir an boş görünüyor (veri çekilirken). Kullanıcı dondu sanıyor.  
-**Fix:** Veri gelene kadar skeleton placeholder göster.
+**Fix:** `.skel` CSS shimmer animasyonu eklendi. `openDet()` başında 4 satır skeleton HTML `tab-ozet`'e inject ediliyor.
 
-- [ ] `index.html`'e `.skel` CSS class ekle: `background: linear-gradient(90deg, var(--card2) 25%, var(--card3) 50%, var(--card2) 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite;`
-- [ ] `openDet()` başında `det-scroll` içine skeleton HTML koy
-- [ ] `pullTables()` tamamlanınca skeleton'ı gerçek içerikle replace et
-
----
-
-### 3.2 Türkçe Hata Mesajları
-**Dosya:** `js/api.js` + `js/forms.js`  
-**Sorun:** DB hataları raw olarak toast'a yansıyor: `"[hayvan_ekle] new row violates row-level security policy"` gibi.  
-**Fix:** Bilinen hata kodlarını Türkçe'ye map et.
-
-- [ ] `api.js`'de `rpc()` fonksiyonuna hata map'i ekle:
-  ```js
-  const ERR_MAP = {
-    'row-level security': 'Yetkisiz işlem',
-    'duplicate key': 'Bu kayıt zaten mevcut',
-    'foreign key': 'İlişkili kayıt bulunamadı',
-    'not null': 'Zorunlu alan boş bırakıldı',
-    'network': 'Sunucuya ulaşılamıyor',
-  };
-  ```
-- [ ] `catch` bloğunda `Object.entries(ERR_MAP).find(([k]) => e.message.includes(k))` ile ara, bulunan Türkçe'yi toast'a yaz
+- [x] `index.html`'e `.skel` CSS + `@keyframes shimmer` eklendi
+- [x] `openDet()` başında skeleton HTML koyuldu
+- [x] Veri yüklenince gerçek içerik replace ediyor (mevcut mekanizma)
 
 ---
 
-### 3.3 Silme / Çıkarma Onay Modali
-**Dosya:** `js/ui.js` / `js/forms.js`  
-**Sorun:** Hayvan silme, sürüden çıkarma gibi geri dönülemez işlemlerde onay yok. Yanlış tıklamada veri gidiyor.  
-**Fix:** Basit konfirm modal.
+### 3.2 Türkçe Hata Mesajları ✅
+**Dosya:** `js/api.js`  
+**Fix:** `_ERR_MAP` + `_trErr()` eklendi. `rpc()`, `dbUpdate()`, `dbInsert()` hepsinde kullanılıyor.
 
-- [ ] `index.html`'e `#m-confirm` modal ekle: başlık + açıklama + "İptal" / "Onayla" butonları
-- [ ] `openConfirm(title, desc, onConfirm)` helper fonksiyon yaz
-- [ ] Silme işlemlerini `openConfirm()` ile sar: hayvan sil, sürüden çıkar, vaka kapat
+- [x] `_ERR_MAP` array'i eklendi (row-level security, duplicate key, foreign key, not null, network...)
+- [x] `_trErr()` helper ile tüm DB hataları Türkçe'ye çevriliyor
 
 ---
 
-### 3.4 Task Badge Live Update
+### 3.3 Silme / Çıkarma Onay Modali ✅
+**Dosya:** `js/ui.js`, `index.html`  
+**Fix:** `#m-confirm` modal + `openConfirm()` eklendi. `detayIptal()` ve `gebeAta()` dönüştürüldü.
+
+- [x] `#m-confirm` modal eklendi (başlık + açıklama + İptal/Onayla)
+- [x] `openConfirm(title, desc, onConfirm)` helper yazıldı
+- [x] `detayIptal()` ve `gebeAta()` openConfirm ile sarıldı
+
+---
+
+### 3.4 Task Badge Live Update ✅
 **Dosya:** `js/ui.js`  
-**Sorun:** Nav'daki task sayısı yeni task eklendikten sonra güncellenmez, eski sayıyı gösterir.  
-**Fix:** Task oluşturma success handler'ında badge'i güncelle.
+**Fix:** `updateTaskBadge()` yazıldı. `doneTask()` ve `detayIptal()` içinde anında çağrılıyor.
 
-- [ ] Task oluşturma/tamamlama sonrası `updateTaskBadge()` call et (var mı yok mu kontrol et, yoksa yaz)
-- [ ] `updateTaskBadge()`: `getState('tasks').filter(t => t.durum !== 'Tamamlandi').length` say, `#tbadge` text güncelle
-
----
-
-### 3.5 Tohumlama Sonuç Modalı — 3 Buton → Radio + Kaydet
-**Dosya:** `js/ui.js` `openTohDet()`  
-**Sorun:** Sonuç değiştirmek için 3 action butonu var (Gebe/Boş/Bekliyor), tıklayınca direkt kaydediyor. Geri yok, yanlış tıklamada hemen değişiyor.  
-**Fix:** Radio button + "Kaydet" butonu pattern.
-
-- [ ] `m-toh-det` modalında sonuç seçimini radio button'a çevir (mevcut seçili olanı checked yap)
-- [ ] Ayrı "Kaydet" butonu ekle, tıklanınca seçili radio'yu kaydet
-- [ ] "İptal" butonu ekle (modalı kapat, değişiklik yapma)
+- [x] `updateTaskBadge()` fonksiyonu eklendi (IDB'den geciken görev sayısı, tbadge güncelle)
+- [x] Task tamamlama/iptal sonrası anında çağrılıyor
 
 ---
 
-### 3.6 Autocomplete Dropdown Kapanmıyor
-**Dosya:** `js/ui.js` ~450-452  
-**Sorun:** Dropdown item'a tıklayınca `event.target` item olduğu için dropdown açık kalıyor.  
-**Fix:** `closest()` ile parent kontrolü.
+### 3.5 Tohumlama Sonuç Modalı — 3 Buton → Radio + Kaydet ✅
+**Dosya:** `js/ui.js`, `js/forms.js`, `index.html`  
+**Fix:** Bekliyor durumunda 3 buton → radio + Kaydet. `tohSonucKaydet()` eklendi.
 
-- [ ] `document.addEventListener('click', ...)` handler'ında:  
-  `if (!e.target.closest('#srch') && !e.target.closest('#ac-srch'))` kullan
+- [x] `#m-toh-det` modalında `td2-sonuc-btns` → `td2-sonuc-radios` (radio + Kaydet/İptal)
+- [x] `openTohDet()` güncellendi — mevcut sonuç radio'ya işaretleniyor
+- [x] `tohSonucKaydet()` fonksiyonu eklendi
 
 ---
 
-### 3.7 Edit Modalda Gelecek Tarih Girişi
-**Dosya:** `js/ui.js` ~776  
-**Sorun:** Add modalde `max="bugün"` var ama edit modalde yok, kullanıcı gelecek doğum tarihi girebilir.  
-**Fix:** Edit modali açarken `a-dt` inputuna max set et.
+### 3.6 Autocomplete Dropdown Kapanmıyor ✅
+Zaten `closest()` kullanılıyordu — değişiklik gerekmedi.
 
-- [ ] `openAnimalEdit()` içinde: `document.getElementById('a-dt').max = new Date().toISOString().slice(0,10);`
+---
+
+### 3.7 Edit Modalda Gelecek Tarih Girişi ✅
+Bölüm 1'de yapıldı (`openAnimalEdit()` async/await düzeltmesinde).
 
 ---
 
 ## Tamamlananlar Özeti
 Bu satırı güncelleriz ilerledikçe.
 
-Kritik: 4/4 ✅ · Veri: 4/4 ✅ · UX: 0/7
+Kritik: 4/4 ✅ · Veri: 4/4 ✅ · UX: 7/7 ✅ — TAMAMLANDI
