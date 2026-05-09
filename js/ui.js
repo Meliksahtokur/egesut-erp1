@@ -5,7 +5,7 @@
 /* global
    _A, _S, _gebeIds, _hastaIds,
    _curTaskFilter, _curUremeTab, _curGecmisFilter, _curStk,
-   _curTaskDet, _curToh,
+   _curTaskDet, _curTaskVaccineId, _curToh,
    _customHekimler, _customSperma,
    _ilacCache, _drugsCache, _disFreq,
    HEKIMLER, VARSAYILAN_HEKIM,
@@ -1873,6 +1873,57 @@ async function openTaskDet(id){
         <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${s.aciklama}</span>
       </div>`).join('');
   } else { subsEl.style.display='none'; }
+
+  // Butonları reset et
+  const tamamBtn=document.getElementById('td-tamam-btn');
+  const asiAcBtn=document.getElementById('td-asi-ac-btn');
+  const asiForm =document.getElementById('td-asi-form');
+  const rapelForm=document.getElementById('td-rapel-form');
+  if(tamamBtn)  tamamBtn.style.display='block';
+  if(asiAcBtn)  asiAcBtn.style.display='none';
+  if(asiForm)   asiForm.style.display='none';
+  if(rapelForm) rapelForm.style.display='none';
+  _curTaskVaccineId=null;
+
+  // ILERI_GEBE_ASI: standart tamamla gizle, aşı butonu göster
+  if(t.gorev_tipi==='ILERI_GEBE_ASI'){
+    if(tamamBtn) tamamBtn.style.display='none';
+    if(asiAcBtn) asiAcBtn.style.display='block';
+    try{
+      const vaccines=await getData('vaccines');
+      const vax=vaccines.find(v=>v.stock_item_id===t.stok_id);
+      if(vax){
+        _curTaskVaccineId=vax.id;
+        document.getElementById('td-asi-adi').textContent=vax.name||'Rota-Corona';
+        const dozEl=document.getElementById('td-asi-doz');
+        if(dozEl&&vax.dose) dozEl.value=vax.dose;
+      }
+    }catch(e){ console.warn('vaccine lookup:',e.message); }
+    const tarihEl=document.getElementById('td-asi-tarih');
+    const todayStr=new Date().toISOString().split('T')[0];
+    if(tarihEl){tarihEl.value=todayStr;tarihEl.max=todayStr;}
+  }
+
+  // Rapel görevi: parent_id varsa tarih picker göster
+  if(t.parent_id&&t.gorev_tipi==='ILERI_GEBE_ASI'){
+    try{
+      const parent=all.find(p=>p.id===t.parent_id);
+      if(parent&&parent.tamamlanma_tarihi){
+        const pd=new Date(parent.tamamlanma_tarihi);
+        const minD=new Date(pd); minD.setDate(minD.getDate()+14);
+        const maxD=new Date(pd); maxD.setDate(maxD.getDate()+21);
+        const fmt=d=>d.toISOString().split('T')[0];
+        const rapelTarihEl=document.getElementById('td-rapel-tarih');
+        if(rapelTarihEl){
+          rapelTarihEl.min=fmt(minD);
+          rapelTarihEl.max=fmt(maxD);
+          rapelTarihEl.value=t.hedef_tarih||fmt(maxD);
+        }
+        if(rapelForm) rapelForm.style.display='block';
+      }
+    }catch(e){ console.warn('parent lookup:',e.message); }
+  }
+
   openM('m-task-det');
 }
 async function detayTamamla(){
@@ -1884,6 +1935,50 @@ async function detayTamamla(){
     closeM('m-task-det');
   } catch(e){ toast(e.message,true); }
   if(btn){btn.disabled=false;btn.textContent='✅ Tamamlandı Olarak İşaretle';}
+}
+function asiFormAc(){
+  document.getElementById('td-asi-form').style.display='block';
+  document.getElementById('td-asi-ac-btn').style.display='none';
+}
+async function asiUygulaVeTamamla(){
+  if(!_curTaskDet||!_curTaskVaccineId){ toast('Aşı bilgisi eksik',true); return; }
+  const btn=document.getElementById('td-asi-uygula-btn');
+  if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
+  try{
+    const tarih=document.getElementById('td-asi-tarih').value||new Date().toISOString().split('T')[0];
+    const dozRaw=document.getElementById('td-asi-doz').value;
+    const doz=dozRaw?parseFloat(dozRaw):null;
+    const res=await rpc('ileri_gebe_asi_tamamla',{
+      p_gorev_id:  _curTaskDet.id,
+      p_vaccine_id:_curTaskVaccineId,
+      p_tarih:     tarih,
+      p_doz:       doz,
+    });
+    if(!res.ok){ toast(_trErr(res.mesaj||'Hata'),true); return; }
+    closeM('m-task-det');
+    updateTaskBadge();
+    loadTasks(_curTaskFilter||'today');
+    loadDash();
+    const rapelTarih=res.rapel_tarih?fmtTarih(res.rapel_tarih):null;
+    toast(rapelTarih?`✅ Aşı kaydedildi · Rapel: ${rapelTarih}`:'✅ Aşı kaydedildi');
+  }catch(e){
+    toast(_trErr(e.message),true);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Uygula ve Tamamla';}
+  }
+}
+async function rapelTarihiKaydet(){
+  if(!_curTaskDet) return;
+  const tarihEl=document.getElementById('td-rapel-tarih');
+  const yeniTarih=tarihEl?.value;
+  if(!yeniTarih){ toast('Tarih seçin',true); return; }
+  try{
+    await write('gorev_log',{hedef_tarih:yeniTarih},'PATCH',`id=eq.${_curTaskDet.id}`);
+    toast('📅 Rapel tarihi güncellendi');
+    loadTasks(_curTaskFilter||'today');
+  }catch(e){
+    toast(_trErr(e.message),true);
+  }
 }
 async function detayIptal(){
   if(!_curTaskDet) return;
