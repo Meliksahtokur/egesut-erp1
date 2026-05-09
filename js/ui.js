@@ -694,6 +694,7 @@ function _detGorevHtml(a,tasks,subs,today){
 }
 async function openDet(id){
   _detOpenId=id;
+  history.pushState({pg:_curPg||'dash',det:id},'','#'+(_curPg||'dash'));
   document.getElementById('det').classList.add('on');
   document.getElementById('det-name').textContent='Yükleniyor…';
   ['det-chips','tab-ozet','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});

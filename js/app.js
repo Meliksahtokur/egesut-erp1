@@ -181,8 +181,9 @@ function setSyncBar(type, txt) {
 function hideSyncBar() { const bar = g('sync-bar'); if (bar) bar.className = ''; }
 
 // ── ROUTING ─────────────────────────────────
-function goTo(pg) {
+function goTo(pg, push = true) {
   _curPg = pg;
+  if (push) history.pushState({pg}, '', '#' + pg);
   document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
   document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
   const pgEl = g('pg-' + pg);
@@ -198,6 +199,14 @@ function goTo(pg) {
   else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
 }
+
+window.addEventListener('popstate', e => {
+  // Detay paneli açıksa önce onu kapat
+  const det = document.getElementById('det');
+  if (det?.classList.contains('on')) { closeDet(); return; }
+  // Sayfalar arası geri — history.back() ile geldiğimizde push etme
+  goTo(e.state?.pg || 'dash', false);
+});
 
 // ── RENDER FROM LOCAL ────────────────────────
 async function renderFromLocal() {
@@ -706,6 +715,8 @@ document.addEventListener('keydown', e => {
 
 // ── INIT ─────────────────────────────────────
 window.addEventListener('load', async () => {
+  // İlk yüklemede history state'i set et — geri tuşu çalışsın
+  history.replaceState({pg:'dash'}, '', location.hash || '#dash');
   try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
 
   const t = new Date().toISOString().split('T')[0];
