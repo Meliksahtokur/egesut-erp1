@@ -191,7 +191,8 @@ function goTo(pg, push = true) {
   if (pgEl) pgEl.classList.add('on');
   if (nbEl) nbEl.classList.add('on');
 
-  if (pg === 'dash')     { Promise.all([loadDash(), loadStokList()]); }
+  if (pg === 'suru')     { if (typeof fchipReset === 'function') fchipReset(); filterA(); }
+  else if (pg === 'dash')     { Promise.all([loadDash(), loadStokList()]); }
   else if (pg === 'tasks')    { loadTasks(_curTaskFilter || 'today'); loadDash(); }
   else if (pg === 'gecmis')   { loadGecmis(_curGecmisFilter || 'hepsi'); loadDash(); }
   else if (pg === 'log')      { Promise.all([loadBirths(), loadStokList()]); loadDash(); }

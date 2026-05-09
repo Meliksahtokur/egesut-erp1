@@ -1169,6 +1169,8 @@ async function submitBulkVaccination() {
   const doz = parseFloat(document.getElementById('bv-doz')?.value) || null;
   const notes = document.getElementById('bv-notes')?.value || null;
 
+  const submitBtn = document.querySelector('[onclick="submitBulkVaccination()"]');
+  if (submitBtn) submitBtn.disabled = true;
   try {
     const result = await rpc('bulk_vaccination', {
       p_animal_ids: animalIds,
@@ -1195,6 +1197,8 @@ async function submitBulkVaccination() {
     toast('❌ ' + e.message, true);
     const div = document.getElementById('bv-result');
     if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
   }
 }
 
