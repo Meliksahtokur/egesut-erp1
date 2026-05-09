@@ -730,8 +730,12 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[]){
 }
 function _detGorevHtml(a,tasks,subs,today){
   const kupe=a.kupe_no||a.devlet_kupe||a.id;
-  const liste=tasks.length
-    ?tasks.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); const _stateMid=t.hedef_tarih===today?'soon':''; const state=t.hedef_tarih<today?'late':_stateMid; return renderTask(t,state,ts); }).join('')
+  // Parent'ı tamamlanmış olan rapel görevleri de üst seviyede göster
+  const taskIds=new Set(tasks.map(t=>t.id));
+  const orphanSubs=subs.filter(s=>!taskIds.has(s.parent_id));
+  const allTop=[...tasks,...orphanSubs].sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
+  const liste=allTop.length
+    ?allTop.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); const _stateMid=t.hedef_tarih===today?'soon':''; const state=t.hedef_tarih<today?'late':_stateMid; return renderTask(t,state,ts); }).join('')
     :'<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>';
   return `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-task-add','ta-hid','${kupe}')">➕ Görev Ekle</button></div>`+liste;
 }
