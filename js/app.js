@@ -802,22 +802,21 @@ window.addEventListener('beforeinstallprompt', e => {
 });
 window.addEventListener('appinstalled', () => {
   _pwaPrompt = null;
-  const btn = document.getElementById('pwa-install-btn');
-  if (btn) btn.style.display = 'none';
   toast('✅ EgeSüt ana ekrana eklendi!');
 });
 function pwaInstall() {
-  if (!_pwaPrompt) {
-    toast('Tarayıcı menüsünden "Ana Ekrana Ekle" seçin', false);
-    return;
+  if (_pwaPrompt) {
+    _pwaPrompt.prompt();
+    _pwaPrompt.userChoice.then(r => {
+      if (r.outcome === 'accepted') toast('✅ Kurulum başladı');
+      _pwaPrompt = null;
+    });
+  } else {
+    // Zaten kuruluysa veya tarayıcı prompt'u desteklemiyorsa talimat
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isIOS) toast('Safari\'de: Paylaş → Ana Ekrana Ekle');
+    else toast('Tarayıcı menüsü (⋮) → Ana Ekrana Ekle / Uygulamayı Kur');
   }
-  _pwaPrompt.prompt();
-  _pwaPrompt.userChoice.then(r => {
-    if (r.outcome === 'accepted') toast('✅ Kurulum başladı');
-    _pwaPrompt = null;
-    const btn = document.getElementById('pwa-install-btn');
-    if (btn) btn.style.display = 'none';
-  });
 }
 
 if ('serviceWorker' in navigator) {

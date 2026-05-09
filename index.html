@@ -256,8 +256,7 @@ button,input,select,textarea{font-family:inherit}
   <div id="top-right">
     <div id="dot"></div>
     <button id="refbtn" onclick="this.classList.add('spinning');refreshAll().finally(()=>this.classList.remove('spinning'))">↻</button>
-    <button id="pwa-install-btn" onclick="pwaInstall()" style="display:none;background:rgba(78,154,42,.2);border:1px solid #4ea92a;color:#4ea92a;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;font-weight:700">⬇ Kur</button>
-    <button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
+<button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
     <button id="errorbtn" onclick="document.getElementById('error-panel').style.display='block'; renderErrorLog();" style="background:rgba(78,154,42,.15);border:1px solid #4e9a2a;color:#4e9a2a;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">✅ All is well</button>
   </div>
 </div>
@@ -1098,6 +1097,8 @@ button,input,select,textarea{font-family:inherit}
       <div class="sh"><span class="sh-title">🔔 Bildirimler</span></div>
       <div style="font-size:.72rem;color:var(--ink3);margin-bottom:6px">Tedavi görevleri için 3 saat öncesinde ve sabah uyarısı alırsınız.</div>
       <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:6px" onclick="bildirimAc()">🔔 Bildirimleri Aç / Aktifleştir</button>
+      <div class="sh"><span class="sh-title">Uygulama</span></div>
+      <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:14px" onclick="pwaInstall()">⬇ Ana Ekrana Ekle (PWA)</button>
       <div class="sh"><span class="sh-title">Ekran Modu</span></div>
       <div style="display:flex;gap:8px;margin-bottom:14px">
         <button id="btn-saha-mod" class="btn" onclick="setTheme('light')" style="flex:1;font-weight:700;font-size:.82rem">☀️ Saha Modu</button>
