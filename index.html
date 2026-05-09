@@ -165,6 +165,8 @@ button,input,select,textarea{font-family:inherit}
 .chip-g{background:rgba(106,191,61,.15);color:var(--green3)}
 .chip-r{background:rgba(192,50,26,.15);color:#ff6644}
 .chip-k{background:rgba(255,255,255,.08);color:var(--ink3)}
+.skel{background:linear-gradient(90deg,var(--card2) 25%,var(--card3,#2a3520) 50%,var(--card2) 75%);background-size:200% 100%;animation:shimmer 1.3s infinite;border-radius:8px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .tabs{display:flex;border-bottom:1px solid var(--card2);background:var(--card);position:sticky;top:0;z-index:5}
 .tab{flex:1;padding:12px 4px;font-size:.68rem;font-weight:700;text-align:center;color:var(--ink3);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
 .tab.on{color:var(--green);border-bottom-color:var(--green)}
@@ -1166,11 +1168,15 @@ button,input,select,textarea{font-family:inherit}
       <div id="td2-meta" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
     <div class="m-body">
-      <div style="font-size:.75rem;font-weight:700;color:var(--ink3);margin-bottom:8px;text-transform:uppercase">Sonuç Güncelle</div>
-      <div id="td2-sonuc-btns" style="display:flex;gap:6px;margin-bottom:10px">
-        <button onclick="tohSonuc('Gebe')" class="btn" style="flex:1;background:var(--green);color:#fff;padding:10px">✅ Gebe</button>
-        <button onclick="tohSonuc('Boş')" class="btn" style="flex:1;background:var(--red);color:#fff;padding:10px">❌ Boş</button>
-        <button onclick="tohSonuc('Bekliyor')" class="btn" style="flex:1;background:var(--amber);color:#fff;padding:10px">⏳ Bekliyor</button>
+      <div id="td2-sonuc-radios" style="display:none;margin-bottom:10px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--ink3);margin-bottom:6px;text-transform:uppercase">Sonuç Güncelle</div>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--card2);cursor:pointer"><input type="radio" name="toh-sonuc" value="Gebe" style="accent-color:var(--green);width:18px;height:18px"> ✅ Gebe</label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--card2);cursor:pointer"><input type="radio" name="toh-sonuc" value="Boş" style="accent-color:var(--red);width:18px;height:18px"> ❌ Boş</label>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer"><input type="radio" name="toh-sonuc" value="Bekliyor" style="accent-color:var(--amber);width:18px;height:18px"> ⏳ Bekliyor</label>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-o" style="flex:1" onclick="closeM('m-toh-det')">İptal</button>
+          <button class="btn btn-g" style="flex:1" onclick="tohSonucKaydet()">💾 Kaydet</button>
+        </div>
       </div>
       <div id="td2-info-msg" style="display:none;font-size:.8rem;color:var(--ink3);background:var(--card2);border-radius:8px;padding:9px 12px;margin-bottom:8px"></div>
       <button id="td2-bos-fixed" class="btn" onclick="tohSonuc('Bekliyor')" style="display:none;background:var(--amber);color:#fff;margin-bottom:8px">⏳ Hatalı Kayıt — Bekliyor'a Al</button>
@@ -1379,6 +1385,20 @@ function copyErrors() {
   );
 }
 </script>
+
+<!-- ONAY MODALI -->
+<div id="m-confirm" class="mo" style="z-index:9999">
+  <div class="modal" style="max-width:340px;border-radius:18px;padding:0">
+    <div style="padding:20px 20px 0">
+      <div id="m-confirm-title" style="font-size:1rem;font-weight:700;color:var(--ink);margin-bottom:8px"></div>
+      <div id="m-confirm-desc" style="font-size:.85rem;color:var(--ink2);line-height:1.4"></div>
+    </div>
+    <div style="display:flex;gap:8px;padding:16px 20px 20px;margin-top:8px">
+      <button class="btn btn-o" style="flex:1;padding:11px" onclick="closeM('m-confirm')">İptal</button>
+      <button id="m-confirm-ok" class="btn btn-g" style="flex:1;padding:11px">Onayla</button>
+    </div>
+  </div>
+</div>
 
 <!-- Agent Telemetry Tracker -->
 <script src="agent-telemetry/tracker.js"></script>

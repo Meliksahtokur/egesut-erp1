@@ -17,11 +17,27 @@ const APP_VERSION = '2026-03-12-cln03';
 const { createClient } = window.supabase;
 const db = createClient(SB_URL, SB_KEY);
 
+// ── HATA MAP ────────────────────────────────
+const _ERR_MAP = [
+  ['row-level security',  'Yetkisiz işlem'],
+  ['duplicate key',       'Bu kayıt zaten mevcut'],
+  ['foreign key',         'İlişkili kayıt bulunamadı'],
+  ['not-null',            'Zorunlu alan boş bırakıldı'],
+  ['not null',            'Zorunlu alan boş bırakıldı'],
+  ['network',             'Sunucuya ulaşılamıyor'],
+  ['Failed to fetch',     'Sunucuya ulaşılamıyor'],
+];
+function _trErr(msg) {
+  const m = String(msg || '');
+  const found = _ERR_MAP.find(([k]) => m.toLowerCase().includes(k.toLowerCase()));
+  return found ? found[1] : m;
+}
+
 // ── RPC WRAPPER ─────────────────────────────
 async function rpc(name, params = {}) {
   if (!navigator.onLine) throw new Error('İnternet bağlantısı gerekli');
   const { data, error } = await db.rpc(name, params);
-  if (error) throw new Error("[" + name + "] " + error.message + " | kod: " + (error.code||"?"));
+  if (error) throw new Error(_trErr(error.message));
   if (data && data.ok === false) throw new Error(data.mesaj || 'İşlem başarısız');
   return data;
 }
@@ -121,7 +137,7 @@ async function removeFromQueue(qid) {
 async function dbUpdate(table, id, changes) {
   const clean = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== null && v !== undefined && v !== ''));
   const { error } = await db.from(table).update(clean).eq('id', id);
-  if (error) throw new Error("[" + table + "] " + error.message + " | kod: " + (error.code||"?"));
+  if (error) throw new Error(_trErr(error.message));
 }
 
 async function dbInsert(table, rows) {
@@ -129,7 +145,7 @@ async function dbInsert(table, rows) {
   arr.forEach(r => { if (!r.id) r.id = crypto.randomUUID(); });
   const clean = arr.map(r => Object.fromEntries(Object.entries(r).filter(([, v]) => v !== null && v !== undefined && v !== '')));
   const { error } = await db.from(table).insert(clean);
-  if (error) throw new Error("[" + table + "] " + error.message + " | kod: " + (error.code||"?"));
+  if (error) throw new Error(_trErr(error.message));
   return arr;
 }
 
