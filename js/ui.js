@@ -142,14 +142,15 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,m
       muayeneGerekli.map(b=>`<div class="arow" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün — kızgınlık/tohumlama kaydı yok</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
   }
   if((ileriGebeler||[]).length){
-    const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap">🔔 Kontrol</button>`;
-    h+=band('amber','🤰 İleri Gebeler (210+ gün)',
+    const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
+    const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
+    h+=band('amber',title,
       (ileriGebeler||[]).map(b=>{
         const a=aMap&&aMap[b.hayvan_id];
         const kid=a?.kupe_no||a?.devlet_kupe||b.hayvan_id;
         const gun=Math.floor((Date.now()-new Date(b.tarih))/86400000);
         return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${gun}. gün · ${a?.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
-      }).join('')+`<div style="padding:8px 14px 4px">${kontrolBtn}</div>`);
+      }).join(''));
   }
   if(nearBirth.length){
     const nearSorted=[...nearBirth].sort((a,b)=>new Date(a.tarih)-new Date(b.tarih));
@@ -426,7 +427,17 @@ function renderAnimals(list){
   const el=document.getElementById('suru-body');
   if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
   const gebeSet=new Set(_gebeIds||[]);
-  el.innerHTML=list.map((a,i)=>_animalCardHtml(a,gebeSet,i)).join('');
+  const tohMap=globalThis._tohMap||{};
+  // Gebe hayvanları gebelik gününe göre (en ileri önce), gebe olmayanlar küpe sırasıyla
+  const sorted=[...list].sort((a,b)=>{
+    const aT=gebeSet.has(a.id)||gebeSet.has(a.kupe_no)?tohMap[a.id]:null;
+    const bT=gebeSet.has(b.id)||gebeSet.has(b.kupe_no)?tohMap[b.id]:null;
+    if(aT&&bT) return aT.localeCompare(bT); // eskiden yeniye → daha erken tarih = daha fazla gün = önce
+    if(aT) return -1;
+    if(bT) return 1;
+    return (a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||'');
+  });
+  el.innerHTML=sorted.map((a,i)=>_animalCardHtml(a,gebeSet,i)).join('');
   updatePadokOzet(list);
 }
 function updatePadokOzet(list){
