@@ -234,6 +234,7 @@ const RPC_TABLES = {
   add_vaccination:           ['vaccination_log','gorev_log','stok_hareket'],
   bulk_vaccination:          ['vaccination_log','gorev_log','stok_hareket'],
   bulk_ilac:                  ['islem_log','stok','stok_hareket'],
+  ileri_gebe_asi_tamamla:    ['vaccination_log','gorev_log','stok_hareket'],
   update_treatment_time:     [],
 };
 

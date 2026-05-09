@@ -1124,7 +1124,37 @@ button,input,select,textarea{font-family:inherit}
     </div>
     <div id="td-subs" style="padding:12px 16px;border-bottom:1px solid var(--card2);display:none"></div>
     <div class="m-body" style="padding-top:10px">
+      <!-- ILERI_GEBE_ASI: aşı mini formu -->
+      <div id="td-asi-form" style="display:none;background:var(--card2);border-radius:12px;padding:12px 14px;margin-bottom:10px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--ink3);margin-bottom:8px">💉 Aşı Uygula</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:.7rem;color:var(--ink3);margin-bottom:3px">Aşı</div>
+          <div id="td-asi-adi" style="font-size:.85rem;font-weight:600;color:var(--ink)">—</div>
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Tarih</label>
+          <input type="date" id="td-asi-tarih" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.85rem">
+        </div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Doz (ml)</label>
+          <input type="number" id="td-asi-doz" step="0.5" min="0.5" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.85rem">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="td-asi-uygula-btn" class="btn btn-g" style="flex:1" onclick="asiUygulaVeTamamla()">Uygula ve Tamamla</button>
+          <button class="btn btn-o" style="flex:0 0 auto" onclick="document.getElementById('td-asi-form').style.display='none';document.getElementById('td-asi-ac-btn').style.display='block'">İptal</button>
+        </div>
+      </div>
+      <!-- Rapel görevi: tarih güncelleme -->
+      <div id="td-rapel-form" style="display:none;background:#fff8e1;border-radius:12px;padding:12px 14px;margin-bottom:10px;border:1px solid #ffe082">
+        <div style="font-size:.75rem;font-weight:700;color:#b8860b;margin-bottom:8px">📅 Rapel Tarihi</div>
+        <div style="margin-bottom:10px">
+          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Planlanan tarih (14–21 gün)</label>
+          <input type="date" id="td-rapel-tarih" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid #ffe082;background:var(--bg);color:var(--ink);font-size:.85rem">
+        </div>
+        <button class="btn btn-g" onclick="rapelTarihiKaydet()" style="background:#f9a825;color:#fff">📅 Tarihi Kaydet</button>
+      </div>
       <button id="td-tamam-btn" class="btn btn-g" onclick="detayTamamla()">✅ Tamamlandı Olarak İşaretle</button>
+      <button id="td-asi-ac-btn" class="btn btn-g" style="display:none;background:#1e88e5" onclick="asiFormAc()">💉 Aşıyı Uygula</button>
       <button class="btn" style="background:#fff3e0;color:#b84c00;margin-top:6px;border:1px solid #f0b060;font-weight:700" onclick="detayIptal()">🗑 Görevi İptal Et</button>
       <button class="btn btn-o" onclick="closeM('m-task-det')" style="margin-top:6px">Kapat</button>
     </div>
