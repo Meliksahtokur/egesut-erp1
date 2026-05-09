@@ -201,6 +201,17 @@ function goTo(pg, push = true) {
 }
 
 window.addEventListener('popstate', e => {
+  // Sentinel: history stack'in dibine ulaştık — uygulamadan çıkılacak
+  if (e.state?.sentinel) {
+    if (confirm('Uygulamadan çıkmak istediğinizden emin misiniz?')) {
+      // Onayladı — tarayıcı/PWA kapanabilir, geri gidebilir
+      return;
+    }
+    // İptal — dash'e geri dön
+    history.pushState({pg:'dash'}, '', '#dash');
+    goTo('dash', false);
+    return;
+  }
   // Detay paneli açıksa önce onu kapat
   const det = document.getElementById('det');
   if (det?.classList.contains('on')) { closeDet(); return; }
@@ -715,8 +726,9 @@ document.addEventListener('keydown', e => {
 
 // ── INIT ─────────────────────────────────────
 window.addEventListener('load', async () => {
-  // İlk yüklemede history state'i set et — geri tuşu çalışsın
-  history.replaceState({pg:'dash'}, '', location.hash || '#dash');
+  // Sentinel state — stack'in dibini işaretle (çıkış onayı için)
+  history.replaceState({sentinel:true}, '', '#');
+  history.pushState({pg:'dash'}, '', '#dash');
   try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
 
   const t = new Date().toISOString().split('T')[0];
@@ -780,6 +792,34 @@ window.addEventListener('offline', () => {
 });
 
 // Service Worker — tüm kayıtları temizle
+// ── PWA INSTALL ──────────────────────────────
+let _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaPrompt = e;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'inline-block';
+});
+window.addEventListener('appinstalled', () => {
+  _pwaPrompt = null;
+  const btn = document.getElementById('pwa-install-btn');
+  if (btn) btn.style.display = 'none';
+  toast('✅ EgeSüt ana ekrana eklendi!');
+});
+function pwaInstall() {
+  if (!_pwaPrompt) {
+    toast('Tarayıcı menüsünden "Ana Ekrana Ekle" seçin', false);
+    return;
+  }
+  _pwaPrompt.prompt();
+  _pwaPrompt.userChoice.then(r => {
+    if (r.outcome === 'accepted') toast('✅ Kurulum başladı');
+    _pwaPrompt = null;
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) btn.style.display = 'none';
+  });
+}
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(r => r.unregister());
