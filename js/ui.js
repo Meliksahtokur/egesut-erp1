@@ -375,13 +375,14 @@ function _animalTagsHtml(a,gebeSet){
   const abortBadge=a.abort_sayisi>0?`<span class="tag" style="background:rgba(192,50,26,.18);color:var(--red);font-size:.65rem;font-weight:700;border:1px solid rgba(192,50,26,.3)">⚠️ ${a.abort_sayisi}x abort</span>`:'';
   return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}`;
 }
-function _animalCardHtml(a,gebeSet){
+function _animalCardHtml(a,gebeSet,idx){
   const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
   const subId=a.kupe_no&&a.devlet_kupe?`<span style="font-size:.65rem;color:var(--ink3);font-weight:400"> · ${a.devlet_kupe}</span>`:'';
   const init=mainId.replace(/\D/g,'').slice(-3)||mainId.slice(0,2).toUpperCase();
   const yas=yasHesapla(a.dogum_tarihi);
+  const seqHtml=idx!=null?`<span class="a-seq">${String(idx+1).padStart(2,'0')}</span>`:'';
   return `<div class="animal-card" onclick="openDet('${a.id}')">
-    <div class="avt">${init}</div>
+    ${seqHtml}<div class="avt">${init}</div>
     <div class="ainfo">
       <div class="a-id">${mainId}${subId}</div>
       <div class="a-sub">${a.irk||'—'}${yas?' · '+yas:''}</div>
@@ -394,7 +395,7 @@ function renderAnimals(list){
   const el=document.getElementById('suru-body');
   if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
   const gebeSet=new Set(_gebeIds||[]);
-  el.innerHTML=list.map(a=>_animalCardHtml(a,gebeSet)).join('');
+  el.innerHTML=list.map((a,i)=>_animalCardHtml(a,gebeSet,i)).join('');
   updatePadokOzet(list);
 }
 function updatePadokOzet(list){
