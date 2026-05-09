@@ -112,7 +112,17 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
     </div>`).join('')+(more>0?`<div class="arow" style="opacity:.5;font-size:.68rem;text-align:center">+${more} daha</div>`:''));
 }
 
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,muayeneGerekli){
+async function ileriGebeKontrol(){
+  try {
+    const res=await rpc('ileri_gebe_gorev_kontrol');
+    if(res?.ok){
+      const n=res.olusturulan||0;
+      toast(n>0?`✅ ${n} yeni görev oluşturuldu`:'✅ Tüm görevler güncel');
+      if(n>0) pullTables(['gorev_log']).then(loadDash).catch(console.warn);
+    }
+  } catch(e){ toast('❌ '+e.message,true); }
+}
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap){
   let h='';
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
   if(late.length){
@@ -131,9 +141,25 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,m
     h+=band('red','🚨 Muayene Gerekli (90+ gün, kayıt yok)',
       muayeneGerekli.map(b=>`<div class="arow" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün — kızgınlık/tohumlama kaydı yok</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
   }
+  if((ileriGebeler||[]).length){
+    const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap">🔔 Kontrol</button>`;
+    h+=band('amber','🤰 İleri Gebeler (210+ gün)',
+      (ileriGebeler||[]).map(b=>{
+        const a=aMap&&aMap[b.hayvan_id];
+        const kid=a?.kupe_no||a?.devlet_kupe||b.hayvan_id;
+        const gun=Math.floor((Date.now()-new Date(b.tarih))/86400000);
+        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${gun}. gün · ${a?.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+      }).join('')+`<div style="padding:8px 14px 4px">${kontrolBtn}</div>`);
+  }
   if(nearBirth.length){
+    const nearSorted=[...nearBirth].sort((a,b)=>new Date(a.tarih)-new Date(b.tarih));
     h+=band('blue','🤰 Yaklaşan Doğumlar (≤7 gün)',
-      nearBirth.map(b=>`<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${b.hayvan_id}</div><div class="arow-sub">${Math.floor((new Date(b.tarih).getTime()+280*86400000-Date.now())/86400000)} gün kaldı</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
+      nearSorted.map(b=>{
+        const a=aMap&&aMap[b.hayvan_id];
+        const kid=a?.kupe_no||a?.devlet_kupe||b.hayvan_id;
+        const gun=Math.floor((Date.now()-new Date(b.tarih))/86400000);
+        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${gun}. gün · ${Math.floor((new Date(b.tarih).getTime()+280*86400000-Date.now())/86400000)} gün kaldı</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+      }).join(''));
   }
   if(critStk>0){
     const cl2=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0));
@@ -168,7 +194,12 @@ async function loadDash(){
     const badge=late.length;
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
+    const aMap={}; animals.forEach(a=>aMap[a.id]=a);
     const nearBirth=gebeTohs.filter(t=>{ if(!t.tarih)return false; const d=Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000); return d>=0&&d<=7; });
+    const ileriGebeler=gebeTohs
+      .map(t=>({...t,gun:Math.floor((Date.now()-new Date(t.tarih))/86400000)}))
+      .filter(t=>t.gun>=210)
+      .sort((a,b)=>b.gun-a.gun);
     // Filter births60: hide if kizginlik or tohumlama recorded after birth
     const births60F=births60.filter(b=>{
       const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
@@ -181,7 +212,7 @@ async function loadDash(){
       const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
       return !hasK&&!hasT;
     });
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli)+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${e.message}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
@@ -689,7 +720,7 @@ async function openDet(id){
       {cls:'chip-k',txt:a.grup||'?'},
       {cls:'chip-k',txt:a.padok||'?'},
       aktifHst>0||activeCases.length>0?{cls:'chip-r',txt:`🚨 ${activeCases.length||aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
-      tohs.some(t=>t.sonuc==='Gebe')?{cls:'chip-g',txt:'🤰 Gebe'}:null,
+      (()=>{const gToh=tohs.filter(t=>t.sonuc==='Gebe').sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''))[0]; if(!gToh)return null; const gun=Math.floor((Date.now()-new Date(gToh.tarih))/86400000); return {cls:'chip-g',txt:`🤰 ${gun}. gün · Tahmini: ${dFwd(gToh.tarih,280)}`};})(),
     ].filter(Boolean).map(c=>`<div class="chip ${c.cls}">${c.txt}</div>`).join('');
 
     document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
