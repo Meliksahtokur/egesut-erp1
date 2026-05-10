@@ -34,7 +34,7 @@ BEGIN
   ORDER BY created_at DESC LIMIT 1;
 
   IF v_vax_id IS NOT NULL THEN
-    DELETE FROM stok_hareket WHERE kaynak = 'vaccination' AND kaynak_id = v_vax_id::text;
+    DELETE FROM stok_hareket WHERE referans_tipi = 'vaccination' AND referans_id = v_vax_id::text;
     DELETE FROM vaccination_log WHERE id = v_vax_id;
   END IF;
 
