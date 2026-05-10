@@ -288,6 +288,7 @@ async function loadTasks(f,btn){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const today=new Date().toISOString().split('T')[0];
+    if(navigator.onLine) await pullTables(['gorev_log']).catch(()=>{});
     const all=await idbGetAll('gorev_log');
     if(f==='done'){
       let done=all.filter(t=>t.tamamlandi&&!t.parent_id);
@@ -749,7 +750,7 @@ async function openDet(id){
   ['det-chips','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   const _ozetEl=document.getElementById('tab-ozet'); if(_ozetEl) _ozetEl.innerHTML=_skelHtml;
   showTab('ozet',document.querySelector('.tab'));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(_detOpenId!==id) return;
   try {
     const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs]=await Promise.all([
@@ -1980,6 +1981,7 @@ async function asiUygulaVeTamamla(){
     });
     if(!res.ok){ toast(_trErr(res.mesaj||'Hata'),true); return; }
     closeM('m-task-det');
+    await pullTables(['gorev_log']).catch(()=>{});
     updateTaskBadge();
     loadTasks(_curTaskFilter||'today');
     loadDash();
