@@ -19,6 +19,21 @@
    openDB, syncNow, updateSyncBar
 */
 
+let _taskKategori='all';
+const _katTipMap={
+  asi:['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
+  vitamin:['ILERI_GEBE'],
+  kontrol:['MUAYENE','GEBELIK_KONTROL','TARTIM'],
+  tedavi:['TEDAVI','ILAC_UYGULAMA'],
+  bakim:['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP']
+};
+function setTaskKat(kat,btn){
+  _taskKategori=kat;
+  document.querySelectorAll('.kat-btn').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  loadTasks(_curTaskFilter||'today');
+}
+
 // ──────────────────────────────────────────
 // YARDIMCI RENDER
 // ──────────────────────────────────────────
@@ -293,17 +308,23 @@ async function loadTasks(f,btn){
     if(f==='done'){
       let done=all.filter(t=>t.tamamlandi&&!t.parent_id);
       done.sort((a,b)=>(b.tamamlanma_tarihi||b.hedef_tarih||'').localeCompare(a.tamamlanma_tarihi||a.hedef_tarih||''));
+      if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; done=done.filter(t=>tips.includes(t.gorev_tipi)); }
       if(!done.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Henüz tamamlanan görev yok</div>'; return; }
-      el.innerHTML=done.slice(0,150).map(t=>`<div class="task-card" style="border-left-color:var(--ink3);opacity:.65">
+      el.innerHTML=done.slice(0,150).map(t=>{
+        const rapelChild=all.find(c=>c.parent_id===t.id&&!c.tamamlandi);
+        const rapelStr=rapelChild?`<div style="font-size:.7rem;color:var(--blue);margin-top:2px">📅 Rapel: ${fmtTarih(rapelChild.hedef_tarih)}</div>`:'';
+        return `<div class="task-card" style="border-left-color:var(--ink3);opacity:.75;cursor:pointer" onclick="openDoneTaskDet('${t.id}')">
         <div class="tc-header"><div class="tc-main">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'GENEL');})()} </span>
             <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           </div>
           <div class="tc-desc">${t.aciklama||''}</div>
-          <div class="tc-meta" style="color:var(--green)">✅ Tamamlandı: ${fmtTarih(t.tamamlanma_tarihi||t.hedef_tarih)}</div>
+          <div class="tc-meta" style="color:var(--green)">✅ ${fmtTarih(t.tamamlanma_tarihi||t.hedef_tarih)}</div>
+          ${rapelStr}
         </div></div>
-      </div>`).join('');
+      </div>`;
+      }).join('');
       return;
     }
     // parent_id olan ama parent'ı tamamlanmış görevler top-level sayılır
@@ -312,6 +333,7 @@ async function loadTasks(f,btn){
     const _d7=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
     if(f==='today') data=data.filter(t=>t.hedef_tarih<=today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
+    if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
     data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
     const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
@@ -1873,7 +1895,7 @@ async function loadCikanlar(){
 async function openTaskDet(id){
   const all=await idbGetAll('gorev_log');
   const t=all.find(x=>x.id===id); if(!t) return;
-  if(t.tamamlandi){ toast('Bu görev zaten tamamlanmış'); return; }
+  if(t.tamamlandi){ openDoneTaskDet(id); return; }
   _curTaskDet=t;
   const today=new Date().toISOString().split('T')[0];
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
@@ -2018,6 +2040,60 @@ async function detayIptal(){
     updateTaskBadge();
     loadTasks(_curTaskFilter||'today');
     loadDash();
+  });
+}
+async function openDoneTaskDet(id){
+  const all=await idbGetAll('gorev_log');
+  const t=all.find(x=>x.id===id); if(!t) return;
+  _curTaskDet=t;
+  const hayvan=getState('animals').find(a=>a.id===t.hayvan_id);
+  document.getElementById('dd-hayvan').textContent=(hayvan?.kupe_no||hayvan?.devlet_kupe)||t.hayvan_id||'GENEL';
+  document.getElementById('dd-aciklama').textContent=t.aciklama||'';
+  const meta=[];
+  meta.push(`📅 Hedef: ${fmtTarih(t.hedef_tarih)}`);
+  meta.push(`✅ Tamamlandı: ${fmtTarih(t.tamamlanma_tarihi)}`);
+  meta.push(`🏷 ${(t.gorev_tipi||'DIGER').replace(/_/g,' ')}`);
+  document.getElementById('dd-meta').innerHTML=meta.map(m=>`<span style="background:var(--card2);padding:3px 8px;border-radius:10px">${m}</span>`).join('');
+  const rapelEl=document.getElementById('dd-rapel');
+  const rapelChild=all.find(c=>c.parent_id===id);
+  if(rapelChild){
+    rapelEl.style.display='block';
+    rapelEl.innerHTML=rapelChild.tamamlandi
+      ?`📅 Rapel: ${fmtTarih(rapelChild.hedef_tarih)} — <span style="color:var(--green)">✅ Yapıldı</span>`
+      :`📅 Rapel: ${fmtTarih(rapelChild.hedef_tarih)} — <span style="color:var(--orange)">Bekliyor</span>`;
+  } else { rapelEl.style.display='none'; }
+  const geriBtn=document.getElementById('dd-geri-al-btn');
+  const daysSince=Math.floor((Date.now()-new Date(t.tamamlanma_tarihi||0))/86400000);
+  const childDone=rapelChild&&rapelChild.tamamlandi;
+  if(daysSince>7||childDone){
+    geriBtn.disabled=true;
+    geriBtn.textContent=childDone?'Rapel yapılmış (geri alınamaz)':'7 günden eski';
+  } else {
+    geriBtn.disabled=false;
+    geriBtn.textContent='↩️ Geri Al';
+  }
+  openM('m-done-det');
+}
+function gorevGeriAl(){
+  if(!_curTaskDet) return;
+  const t=_curTaskDet;
+  openConfirm('Görevi Geri Al','Bu işlem aşı kaydını ve rapel görevini silecektir. Stok miktarı düzeltilecektir.',async()=>{
+    const btn=document.getElementById('dd-geri-al-btn');
+    if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
+    try{
+      const res=await rpc('gorev_geri_al',{p_gorev_id:t.id});
+      if(!res.ok){ toast(_trErr(res.mesaj||'Hata'),true); return; }
+      closeM('m-done-det');
+      await pullTables(['gorev_log','vaccination_log','stok_hareket']).catch(()=>{});
+      updateTaskBadge();
+      loadTasks(_curTaskFilter||'today');
+      loadDash();
+      toast(`↩️ Görev geri alındı${res.silinen_rapel?' · Rapel silindi':''}`);
+    }catch(e){
+      toast(_trErr(e.message),true);
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='↩️ Geri Al';}
+    }
   });
 }
 
