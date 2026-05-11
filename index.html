@@ -1089,6 +1089,20 @@ button,input,select,textarea{font-family:inherit}
         </div>
       </div>
       <div class="divider"></div>
+      <div class="sh"><span class="sh-title">🏠 Padoklar</span><button class="sh-link" onclick="ayarlarPadokEkle()">+ Ekle</button></div>
+      <div id="ay-padok-list" style="margin-bottom:12px"></div>
+      <div id="ay-padok-form" style="display:none;margin-bottom:12px">
+        <div class="fg"><label class="flbl">Padok Adı</label><input id="ay-padok-ad" class="fi" placeholder="Yeni Padok" autocomplete="off"></div>
+        <div class="fg"><label class="flbl">Kapasite (opsiyonel)</label><input id="ay-padok-kap" class="fi" type="number" placeholder="0" min="0"></div>
+        <div class="r2">
+          <button class="btn btn-g btn-sm" onclick="ayarlarPadokKaydet()">Kaydet</button>
+          <button class="btn btn-o btn-sm" onclick="document.getElementById('ay-padok-form').style.display='none'">İptal</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="sh"><span class="sh-title">🔗 Grup → Padok Eşlemesi</span></div>
+      <div id="ay-grup-padok-list" style="margin-bottom:12px;font-size:.8rem"></div>
+      <div class="divider"></div>
       <div class="sh"><span class="sh-title">💉 Aşı Kataloğu</span></div>
       <div id="ay-vaksiyon-list" style="margin-bottom:12px"></div>
       <div class="divider"></div>

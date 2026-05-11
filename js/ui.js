@@ -920,10 +920,10 @@ async function openAnimalEdit(id){
     grupSel.value=a.grup;
     animalGrupDegisti();
     const padokSel=document.getElementById('a-padok');
-    if(padokSel && a.padok){
-      const popt=[...padokSel.options].find(o=>o.value===a.padok);
-      if(!popt) padokSel.innerHTML+=`<option value="${a.padok}">${a.padok}</option>`;
-      padokSel.value=a.padok;
+    if(padokSel && a.padok_id){
+      const popt=[...padokSel.options].find(o=>o.value===a.padok_id);
+      if(!popt) padokSel.innerHTML+=`<option value="${a.padok_id}">${a.padok||a.padok_id}</option>`;
+      padokSel.value=a.padok_id;
     }
   }
 }
@@ -3155,6 +3155,8 @@ function ayarlarAc(){
   renderAyarlarSpermaList();
   renderAyarlarVaccineList();
   renderDrugStokList();
+  renderAyarlarPadokList();
+  renderGrupPadokEslem();
   dataTrafficYenile();
   // tema butonlarını senkronize et
   const cur = localStorage.getItem('ege_theme') || 'dark';
@@ -3395,12 +3397,13 @@ async function dataTrafficSil(qid){
   await dataTrafficYenile();
   updateSyncBar();
 }
-function renderAyarlarHekimList(){
+async function renderAyarlarHekimList(){
   const el=document.getElementById('ay-hekim-list'); if(!el) return;
-  const all=[...HEKIMLER,...(_customHekimler||[])];
-  el.innerHTML=all.map((h,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2)">
+  const hekimler=await getData('hekimler');
+  const all=hekimler.length?hekimler:HEKIMLER;
+  el.innerHTML=all.map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2)">
     <span style="font-size:.85rem;color:var(--ink)">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
-    ${i>=HEKIMLER.length?`<button onclick="customHekimSil('${h.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>`:'<span style="font-size:.65rem;color:var(--ink3)">Sistem</span>'}
+    <button onclick="hekimSil('${h.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
   </div>`).join('');
 }
 function renderAyarlarVaccineList(){
@@ -3424,36 +3427,133 @@ function renderAyarlarSpermaList(){
   </div>`).join('');
 }
 function ayarlarHekimEkle(){ document.getElementById('ay-hekim-form').style.display='block'; }
-function ayarlarHekimKaydet(){
+async function ayarlarHekimKaydet(){
   const ad=v('ay-hek-ad').trim(); if(!ad) return;
-  const id='CH'+Date.now();
-  _customHekimler.push({id,ad});
-  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(sid=>{ const el=document.getElementById(sid); if(!el) return; el.innerHTML+=`<option value="${id}">${ad}</option>`; });
+  const id='H'+Date.now();
+  const{error}=await db.from('hekimler').insert({id,ad,aktif:true});
+  if(error){ toast('Hata: '+error.message,true); return; }
+  await pullTables(['hekimler']);
+  await loadHekimlerFromDB();
+  populateHekimSelects();
   cl('ay-hek-ad');
   document.getElementById('ay-hekim-form').style.display='none';
   renderAyarlarHekimList();
   toast(`✅ ${ad} eklendi`);
 }
-function customHekimSil(id){
-  _customHekimler=_customHekimler.filter(h=>h.id!==id);
-  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(sid=>{ const el=document.getElementById(sid); if(!el) return; const opt=el.querySelector(`option[value="${id}"]`); if(opt) opt.remove(); });
+async function hekimSil(id){
+  const res=await rpc('hekim_sil',{p_hekim_id:id});
+  if(!res.ok){ toast(res.mesaj||'Silinemedi',true); return; }
+  await pullTables(['hekimler']);
+  await loadHekimlerFromDB();
+  populateHekimSelects();
   renderAyarlarHekimList();
+  toast('Hekim silindi');
 }
 function ayarlarSpermaEkle(){ document.getElementById('ay-sperma-form').style.display='block'; }
-function ayarlarSpermaKaydet(){
+async function ayarlarSpermaKaydet(){
   const kod=v('ay-sp-kod').trim(); if(!kod) return;
-  _customSperma.push(kod);
-  const dl=document.getElementById('dl-sperma');
-  if(dl) dl.innerHTML+=`<option value="${kod}">`;
+  // Stok tablosuna Sperma kategorisinde ekle
+  const{error}=await db.from('stok').insert({
+    id:'SP'+Date.now(), urun_adi:kod, kategori:'Sperma',
+    birim:'doz', baslangic_miktar:0, esik:0
+  });
+  if(error){ toast('Hata: '+error.message,true); return; }
+  await pullTables(['stok']);
   cl('ay-sp-kod');
   document.getElementById('ay-sperma-form').style.display='none';
   renderAyarlarSpermaList();
+  buildSpermaList();
   toast(`✅ ${kod} eklendi`);
 }
-function customSpermaSil(kod){
-  _customSperma=_customSperma.filter(s=>s!==kod);
-  buildSpermaList();
+async function renderAyarlarSpermaList(){
+  const el=document.getElementById('ay-sperma-list'); if(!el) return;
+  const stoklar=await getData('stok');
+  const spermalar=stoklar.filter(s=>s.kategori==='Sperma');
+  if(!spermalar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Henüz sperma eklenmedi</div>'; return; }
+  el.innerHTML=spermalar.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
+    <span style="font-size:.8rem;color:var(--ink)">${s.urun_adi}</span>
+    <button onclick="spermaSil('${s.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
+  </div>`).join('');
+}
+async function spermaSil(stokId){
+  const res=await rpc('sperma_sil',{p_stok_id:stokId});
+  if(!res.ok){ toast(res.mesaj||'Silinemedi',true); return; }
+  await pullTables(['stok','stok_hareket']);
   renderAyarlarSpermaList();
+  buildSpermaList();
+  toast('Sperma silindi');
+}
+
+// ── PADOK CRUD ──────────────────────────────
+async function renderAyarlarPadokList(){
+  const el=document.getElementById('ay-padok-list'); if(!el) return;
+  const padoklar=await getData('padoklar');
+  if(!padoklar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Henüz padok tanımlı değil</div>'; return; }
+  el.innerHTML=padoklar.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
+    <span style="font-size:.82rem;color:var(--ink)">${p.ad}${p.kapasite?' <span style="font-size:.65rem;color:var(--ink3)">(${p.kapasite} baş)</span>':''}</span>
+    <button onclick="padokSil('${p.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
+  </div>`).join('');
+}
+
+async function renderGrupPadokEslem(){
+  const el=document.getElementById('ay-grup-padok-list'); if(!el) return;
+  const [padoklar,eslem]=await Promise.all([getData('padoklar'),getData('grup_padok_eslem')]);
+  const gruplar=Object.keys(GRUP_PADOK);
+  if(!padoklar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Önce padok ekleyin</div>'; return; }
+  const padokMap=Object.fromEntries(padoklar.map(p=>[p.id,p.ad]));
+  const eslemMap={};
+  eslem.forEach(e=>{ if(!eslemMap[e.grup]) eslemMap[e.grup]=[]; eslemMap[e.grup].push(e.padok_id); });
+  el.innerHTML=gruplar.map(g=>{
+    const secili=eslemMap[g]?.[0]||'';
+    const opts=`<option value="">—</option>`+padoklar.map(p=>`<option value="${p.id}"${p.id===secili?' selected':''}>${p.ad}</option>`).join('');
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--card2)">
+      <span style="color:var(--ink)">${g}</span>
+      <select onchange="grupPadokDegistir('${g}',this.value)" style="padding:3px 6px;border:1px solid var(--brd);border-radius:6px;font-size:.72rem">${opts}</select>
+    </div>`;
+  }).join('');
+}
+
+function ayarlarPadokEkle(){ document.getElementById('ay-padok-form').style.display='block'; }
+
+async function ayarlarPadokKaydet(){
+  const ad=v('ay-padok-ad').trim(); if(!ad){ toast('Padok adı boş olamaz',true); return; }
+  const kap=parseInt(v('ay-padok-kap'))||null;
+  const{error}=await db.from('padoklar').insert({ad,kapasite:kap,aktif:true});
+  if(error){ toast('Hata: '+error.message,true); return; }
+  await pullTables(['padoklar']);
+  await loadPadokConfig();
+  cl('ay-padok-ad'); cl('ay-padok-kap');
+  document.getElementById('ay-padok-form').style.display='none';
+  renderAyarlarPadokList();
+  toast('✅ Padok eklendi');
+}
+
+async function padokSil(id){
+  // hayvanlar bağlıysa silme
+  const hayvanlar=await getData('hayvanlar');
+  const count=hayvanlar.filter(h=>h.padok_id===id&&h.durum==='Aktif').length;
+  if(count>0){ toast(`Bu padokta ${count} aktif hayvan var, önce taşıyın`,true); return; }
+  openConfirm('Padok Sil','Bu padoku silmek istediğinizden emin misiniz?',async()=>{
+    await db.from('grup_padok_eslem').delete().eq('padok_id',id);
+    const{error}=await db.from('padoklar').delete().eq('id',id);
+    if(error){ toast('Hata: '+error.message,true); return; }
+    await pullTables(['padoklar','grup_padok_eslem']);
+    await loadPadokConfig();
+    renderAyarlarPadokList();
+    renderGrupPadokEslem();
+    toast('Padok silindi');
+  });
+}
+
+async function grupPadokDegistir(grup, padokId){
+  // Eski eşlemi sil, yenisini ekle
+  await db.from('grup_padok_eslem').delete().eq('grup',grup);
+  if(padokId){
+    await db.from('grup_padok_eslem').insert({grup,padok_id:padokId});
+  }
+  await pullTables(['grup_padok_eslem']);
+  await loadPadokConfig();
+  toast('Eşleme güncellendi');
 }
 
 // ──────────────────────────────────────────

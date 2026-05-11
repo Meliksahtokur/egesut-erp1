@@ -442,18 +442,23 @@ function animalGrupDegisti() {
   const grup    = v('a-grup');
   const padokSel = g('a-padok');
   if (!padokSel) return;
-  const padoklar = GRUP_PADOK[grup] || [];
-  if (!padoklar.length) {
+  const padokAdlari = GRUP_PADOK[grup] || [];
+  if (!padokAdlari.length) {
     padokSel.innerHTML = '<option value="">Önce grup seçin</option>';
     return;
   }
-  padokSel.innerHTML = padoklar.map(p => `<option value="${p}">${p}</option>`).join('');
+  // PADOKLAR dizisinden UUID'leri bul (DB yüklüyse), yoksa ad kullan
+  const opts = padokAdlari.map(ad => {
+    const p = PADOKLAR.find(x => x.ad === ad);
+    return p ? `<option value="${p.id}">${p.ad}</option>` : `<option value="">${ad}</option>`;
+  });
+  padokSel.innerHTML = opts.join('');
   // Besi grubunda cinsiyet bazlı varsayılan padok
   if (grup === 'Besi') {
     const cins = v('a-cinsiyet');
-    padokSel.value = cins === 'Erkek' ? 'Besi Padok (Erkek)' : 'Besi Padok (Dişi)';
-  } else {
-    padokSel.value = padoklar[0];
+    const hedef = cins === 'Erkek' ? 'Besi Padok (Erkek)' : 'Besi Padok (Dişi)';
+    const p = PADOKLAR.find(x => x.ad === hedef);
+    if (p) padokSel.value = p.id;
   }
 }
 
@@ -754,6 +759,9 @@ window.addEventListener('load', async () => {
       await pullFromSupabase();
       await renderFromLocal();
       syncNow();
+      // Padok + hekim config yükle (IDB dolu olduktan sonra)
+      await Promise.all([loadPadokConfig(), loadHekimlerFromDB()]);
+      populateHekimSelects();
       // _TH ön yükleme — tohumlama modalı açıldığında dropdown hazır olsun
       db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
         globalThis._TH = data || [];
@@ -764,6 +772,8 @@ window.addEventListener('load', async () => {
   } else {
     g('dot')?.classList.add('warn');
     toast('Çevrimdışı — yerel veri gösteriliyor');
+    // Çevrimdışı: IDB'den yükle
+    Promise.all([loadPadokConfig(), loadHekimlerFromDB()]).then(() => populateHekimSelects()).catch(console.warn);
   }
 
   buildSpermaList();
