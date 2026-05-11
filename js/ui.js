@@ -1616,17 +1616,19 @@ async function loadStokPanel(){
 }
 
 async function openStokDet(stokId){
-  const stoklar=await getData('stok');
-  const s=stoklar.find(x=>x.id===stokId);
+  const allStok=getState('stock');
+  const s=allStok.find(x=>x.id===stokId);
   if(!s) return;
   _curStokDet=s;
-  document.getElementById('stok-det-title').textContent=s.urun_adi;
-  document.getElementById('sd-ad').value=s.urun_adi||'';
-  document.getElementById('sd-kat').value=s.kategori||'';
-  document.getElementById('sd-birim').value=s.birim||'adet';
-  document.getElementById('sd-esik').value=s.esik||'';
-  document.getElementById('sd-guncel').textContent=(s.guncel||0)+' '+(s.birim||'');
-  document.getElementById('sd-yeni-miktar').value='';
+  const modal=document.getElementById('m-stok-det');
+  if(!modal){ toast('Sayfayı yenileyiniz (Ctrl+Shift+R)',true); return; }
+  const t=g('stok-det-title'); if(t) t.textContent=s.urun_adi;
+  const ad=g('sd-ad'); if(ad) ad.value=s.urun_adi||'';
+  const kat=g('sd-kat'); if(kat) kat.value=s.kategori||'';
+  const birim=g('sd-birim'); if(birim) birim.value=s.birim||'adet';
+  const esik=g('sd-esik'); if(esik) esik.value=s.esik||'';
+  const guncel=g('sd-guncel'); if(guncel) guncel.textContent=(s.guncel||0)+' '+(s.birim||'');
+  const yeni=g('sd-yeni-miktar'); if(yeni) yeni.value='';
   openM('m-stok-det');
 }
 
