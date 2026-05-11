@@ -3484,9 +3484,9 @@ async function renderAyarlarHekimList(){
   const el=document.getElementById('ay-hekim-list'); if(!el) return;
   const hekimler=await getData('hekimler');
   const all=hekimler.length?hekimler:HEKIMLER;
-  el.innerHTML=all.map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2)">
-    <span style="font-size:.85rem;color:var(--ink)">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
-    <button onclick="hekimDetAc('${h.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">✏️</button>
+  el.innerHTML=all.map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2)" onclick="hekimDetAc('${h.id}')" style="cursor:pointer">
+    <span style="font-size:.85rem;color:var(--ink);cursor:pointer">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
+    <button onclick="event.stopPropagation();hekimDetAc('${h.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">🔍</button>
   </div>`).join('');
 }
 async function renderAyarlarVaccineList(){
