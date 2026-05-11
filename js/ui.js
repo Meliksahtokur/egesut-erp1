@@ -3486,7 +3486,7 @@ async function renderAyarlarHekimList(){
   const all=hekimler.length?hekimler:HEKIMLER;
   el.innerHTML=all.map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2)">
     <span style="font-size:.85rem;color:var(--ink)">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
-    <button onclick="hekimSil('${h.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
+    <button onclick="hekimDetAc('${h.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">✏️</button>
   </div>`).join('');
 }
 async function renderAyarlarVaccineList(){
@@ -3542,18 +3542,136 @@ async function ayarlarHekimKaydet(){
   renderAyarlarHekimList();
   toast(`✅ ${ad} eklendi`);
 }
-async function hekimSil(id){
+
+let _curHekimDet = null;
+let _hekimPeriodDays = 'all';
+
+async function hekimDetAc(id) {
+  const hekimler = await getData('hekimler');
+  const h = hekimler.find(x => x.id === id);
+  if (!h) return;
+  _curHekimDet = h;
+  _hekimPeriodDays = 'all';
+  const title = g('hk-title'); if (title) title.textContent = h.ad;
+  const ad = g('hk-ad'); if (ad) ad.value = h.ad || '';
+  // Reset period tabs
+  document.querySelectorAll('#hk-period-tabs .kat-btn').forEach(b => b.classList.remove('on'));
+  document.querySelector('#hk-period-tabs .kat-btn').classList.add('on');
+  await renderHekimStats();
+  openM('m-hekim-det');
+}
+
+function hekimPeriod(days, e) {
+  _hekimPeriodDays = days;
+  document.querySelectorAll('#hk-period-tabs .kat-btn').forEach(b => b.classList.remove('on'));
+  if (e && e.target) e.target.classList.add('on');
+  renderHekimStats();
+}
+
+async function renderHekimStats() {
+  const el = g('hk-stats');
+  if (!el || !_curHekimDet) return;
+  el.innerHTML = '<div class="loader" style="padding:20px"><div class="spin"></div></div>';
+
+  const hid = _curHekimDet.id;
+  const [tohumlar, dogumlar] = await Promise.all([
+    getData('tohumlama'),
+    getData('dogum')
+  ]);
+
+  // Period filter
+  const cutoff = _hekimPeriodDays === 'all' ? null : new Date(Date.now() - _hekimPeriodDays * 86400000).toISOString().split('T')[0];
+  const hToh = tohumlar.filter(t => t.hekim_id === hid && (!cutoff || t.tarih >= cutoff));
+  const hDog = dogumlar.filter(d => d.hekim_id === hid && (!cutoff || d.tarih >= cutoff));
+
+  // Stats
+  const toplamToh = hToh.length;
+  const gebeToh = hToh.filter(t => t.sonuc === 'Gebe').length;
+  const bosToh = hToh.filter(t => t.sonuc === 'Boş').length;
+  const bekliyorToh = hToh.filter(t => t.sonuc === 'Bekliyor').length;
+  const basariOrani = toplamToh > 0 ? Math.round((gebeToh / (gebeToh + bosToh || 1)) * 100) : 0;
+  const toplamDog = hDog.length;
+
+  // Sperma breakdown
+  const spermaMap = {};
+  hToh.forEach(t => {
+    const sp = t.sperma || 'Bilinmiyor';
+    if (!spermaMap[sp]) spermaMap[sp] = { toplam: 0, gebe: 0 };
+    spermaMap[sp].toplam++;
+    if (t.sonuc === 'Gebe') spermaMap[sp].gebe++;
+  });
+
+  const spermaRows = Object.entries(spermaMap)
+    .sort((a, b) => b[1].toplam - a[1].toplam)
+    .map(([sp, d]) => {
+      const oran = d.toplam > 0 ? Math.round((d.gebe / d.toplam) * 100) : 0;
+      return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:.72rem">
+        <span style="color:var(--ink)">${sp}</span>
+        <span style="color:var(--ink3)">${d.toplam} toh · %${oran} gebe</span>
+      </div>`;
+    }).join('');
+
+  const barClr = basariOrani >= 50 ? 'var(--green)' : basariOrani >= 30 ? 'var(--orange)' : 'var(--red)';
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="background:var(--card2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:1.3rem;font-weight:800;color:var(--ink)">${toplamToh}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">Tohumlama</div>
+      </div>
+      <div style="background:var(--card2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:1.3rem;font-weight:800;color:${barClr}">%${basariOrani}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">Gebelik Oranı</div>
+      </div>
+      <div style="background:var(--card2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:1.3rem;font-weight:800;color:var(--green)">${gebeToh}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">Gebe</div>
+      </div>
+      <div style="background:var(--card2);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:1.3rem;font-weight:800;color:var(--ink)">${toplamDog}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">Doğum</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;font-size:.65rem;color:var(--ink3)">
+      <span>${bosToh} Boş</span> · <span>${bekliyorToh} Bekliyor</span>
+    </div>
+    ${spermaRows ? `<div style="background:var(--card2);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+      <div style="font-size:.65rem;font-weight:700;color:var(--ink3);margin-bottom:4px">Sperma Kullanımı</div>
+      ${spermaRows}
+    </div>` : ''}
+  `;
+}
+
+async function hekimDetKaydet() {
+  if (!_curHekimDet) return;
+  const ad = v('hk-ad').trim();
+  if (!ad) { toast('Hekim adı boş olamaz', true); return; }
+  const { error } = await db.from('hekimler').update({ ad }).eq('id', _curHekimDet.id);
+  if (error) { toast('Hata: ' + error.message, true); return; }
+  await pullTables(['hekimler']);
+  await loadHekimlerFromDB();
+  populateHekimSelects();
+  closeM('m-hekim-det');
+  renderAyarlarHekimList();
+  toast('Hekim güncellendi');
+}
+
+async function hekimDetSil() {
+  if (!_curHekimDet) return;
   try {
-    await rpc('hekim_sil',{p_hekim_id:id});
-  } catch(e) {
-    toast(e.message||'Silinemedi',true); return;
+    await rpc('hekim_sil', { p_hekim_id: _curHekimDet.id });
+  } catch (e) {
+    toast(e.message || 'Silinemedi', true);
+    return;
   }
   await pullTables(['hekimler']);
   await loadHekimlerFromDB();
   populateHekimSelects();
+  closeM('m-hekim-det');
   renderAyarlarHekimList();
   toast('Hekim silindi');
 }
+
 function ayarlarSpermaEkle(){ document.getElementById('ay-sperma-form').style.display='block'; }
 async function ayarlarSpermaKaydet(){
   const kod=v('ay-sp-kod').trim(); if(!kod) return;
