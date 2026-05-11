@@ -363,7 +363,7 @@ function renderTask(t,cls='',subs=[]){
       <div class="tc-main">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
-          <span class="pill ${t.gorev_tipi||'DIGER'}">${t.gorev_tipi==='ASI_HATIRLATMA'?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
+          <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
         <div class="tc-desc">${t.aciklama||''}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
@@ -3406,17 +3406,36 @@ async function renderAyarlarHekimList(){
     <button onclick="hekimSil('${h.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
   </div>`).join('');
 }
-function renderAyarlarVaccineList(){
+async function renderAyarlarVaccineList(){
   const el=document.getElementById('ay-vaksiyon-list'); if(!el) return;
-  const vaxs=getData('vaccines')||[];
+  const vaxs=await getData('vaccines');
   if(!vaxs.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Aşı tanımlı değil</div>'; return; }
-  el.innerHTML='<div style="display:grid;gap:4px">'+vaxs.map(v=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
-    <div style="flex:1">
-      <div style="font-size:.8rem;color:var(--ink)">${v.name}</div>
-      <div style="font-size:.65rem;color:var(--ink3)">${v.disease_target||'—'} · ${v.standard_dose||'?'} ${v.unit||''} · ${v.route||''}</div>
-    </div>
-    <div style="font-size:.62rem;color:${v.is_mandatory?'var(--green)':'var(--ink3)'};font-weight:${v.is_mandatory?'700':'400'};white-space:nowrap">${v.is_mandatory?'✔ Zorunlu':'○ Opsiyonel'}</div>
-  </div>`).join('')+'</div>';
+  const intervals=[
+    {val:'',lbl:'Tek Doz'},
+    {val:'21',lbl:'21 gün'},
+    {val:'90',lbl:'90 gün'},
+    {val:'180',lbl:'180 gün'},
+    {val:'365',lbl:'365 gün'}
+  ];
+  el.innerHTML='<div style="display:grid;gap:4px">'+vaxs.map(vac=>{
+    const cur=vac.repeat_interval_days!=null?String(vac.repeat_interval_days):'';
+    const opts=intervals.map(i=>`<option value="${i.val}"${cur===i.val?' selected':''}>${i.lbl}</option>`).join('');
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
+      <div style="flex:1">
+        <div style="font-size:.8rem;color:var(--ink)">${vac.name}${vac.is_mandatory?' <span style="font-size:.6rem;color:var(--red)">Zorunlu</span>':''}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">${vac.disease_target||'—'} · ${vac.dose||'?'} ${vac.unit||''}</div>
+      </div>
+      <select onchange="vaccineRapelGuncelle('${vac.id}',this.value)" style="padding:3px 5px;border:1px solid var(--brd);border-radius:6px;font-size:.7rem;min-width:80px">${opts}</select>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+async function vaccineRapelGuncelle(vaccineId,val){
+  const days=val===''?null:parseInt(val);
+  const{error}=await db.from('vaccines').update({repeat_interval_days:days}).eq('id',vaccineId);
+  if(error){toast('Hata: '+error.message,true);return;}
+  await pullTables(['vaccines']);
+  toast('Rapel süresi güncellendi');
 }
 function renderAyarlarSpermaList(){
   const el=document.getElementById('ay-sperma-list'); if(!el) return;
