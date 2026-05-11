@@ -3484,7 +3484,7 @@ async function renderAyarlarHekimList(){
   const el=document.getElementById('ay-hekim-list'); if(!el) return;
   const hekimler=await getData('hekimler');
   const all=hekimler.length?hekimler:HEKIMLER;
-  el.innerHTML=all.map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2)" onclick="hekimDetAc('${h.id}')" style="cursor:pointer">
+  el.innerHTML=all.map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2);cursor:pointer" onclick="hekimDetAc('${h.id}')">
     <span style="font-size:.85rem;color:var(--ink);cursor:pointer">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
     <button onclick="event.stopPropagation();hekimDetAc('${h.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">🔍</button>
   </div>`).join('');
@@ -3548,7 +3548,7 @@ let _hekimPeriodDays = 'all';
 
 async function hekimDetAc(id) {
   const hekimler = await getData('hekimler');
-  const h = hekimler.find(x => x.id === id);
+  const h = hekimler.find(x => x.id === id) || HEKIMLER.find(x => x.id === id);
   if (!h) return;
   _curHekimDet = h;
   _hekimPeriodDays = 'all';
