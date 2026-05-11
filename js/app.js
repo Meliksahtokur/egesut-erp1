@@ -254,14 +254,7 @@ function populateHekimSelects() {
 }
 
 // Hekim/sperma ayarları
-function renderAyarlarHekimList() {
-  const el = g('ay-hekim-list'); if (!el) return;
-  const all = [...HEKIMLER, ..._customHekimler];
-  el.innerHTML = all.map(h => `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--card2)">
-    <span style="font-size:.84rem">${h.ad}</span>
-    ${_customHekimler.some(c => c.id === h.id) ? `<button onclick="customHekimSil('${h.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">Sil</button>` : ''}
-  </div>`).join('');
-}
+// renderAyarlarHekimList — defined in ui.js (Supabase-backed, with hekim card)
 function renderAyarlarSpermaList() {
   const el = g('ay-sperma-list'); if (!el) return;
   const all = [...new Set([...SPERMA_LISTESI, ..._customSperma])];
