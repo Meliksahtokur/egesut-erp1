@@ -3190,7 +3190,7 @@ async function openGebelikEkle(hayvanId){
   const sure=confirm('Son tohumlama ('+fmtTarih(son.tarih)+' · '+(son.sperma||'—')+') Gebe olarak işaretlensin mi?');
   if(!sure) return;
   try{
-    await rpcOptimistic('tohumlama_sonuc_gebe', { p_tohumlama_id: son.id }, { successMsg: '✅ Gebe işaretlendi' });
+    const { error } = await rpc('tohumlama_sonuc_gebe', { p_tohumlama_id: son.id }); if (error) throw error; toast('✅ Gebe işaretlendi');
     openDet(hayvanId);
   }catch(e){ toast(e.message,true); }
 }

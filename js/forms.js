@@ -807,7 +807,7 @@ async function tohSonuc(sonuc, btn) {
       successMsg = 'Bekliyor\'a alındı';
     }
 
-    await rpcOptimistic(rpcName, { p_tohumlama_id: _curToh.id }, { successMsg });
+    const { error } = await rpc(rpcName, { p_tohumlama_id: _curToh.id }); if (error) throw error; toast(successMsg);
     closeM('m-toh-det');
   } catch (e) {
     console.warn('tohSonuc error:', e.message);
