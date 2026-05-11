@@ -3235,9 +3235,7 @@ function setTheme(mode) {
 
 function ayarlarAc(){
   renderAyarlarHekimList();
-  renderAyarlarSpermaList();
   renderAyarlarVaccineList();
-  renderDrugStokList();
   renderAyarlarPadokList();
   renderGrupPadokEslem();
   dataTrafficYenile();
@@ -3543,8 +3541,11 @@ async function ayarlarHekimKaydet(){
   toast(`✅ ${ad} eklendi`);
 }
 async function hekimSil(id){
-  const res=await rpc('hekim_sil',{p_hekim_id:id});
-  if(!res.ok){ toast(res.mesaj||'Silinemedi',true); return; }
+  try {
+    await rpc('hekim_sil',{p_hekim_id:id});
+  } catch(e) {
+    toast(e.message||'Silinemedi',true); return;
+  }
   await pullTables(['hekimler']);
   await loadHekimlerFromDB();
   populateHekimSelects();
@@ -3593,8 +3594,54 @@ async function renderAyarlarPadokList(){
   if(!padoklar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Henüz padok tanımlı değil</div>'; return; }
   el.innerHTML=padoklar.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
     <span style="font-size:.82rem;color:var(--ink)">${p.ad}${p.kapasite?' <span style="font-size:.65rem;color:var(--ink3)">(${p.kapasite} baş)</span>':''}</span>
-    <button onclick="padokSil('${p.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
+    <button onclick="padokDuzenleAc('${p.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">✏️</button>
   </div>`).join('');
+}
+
+let _curPadokDet=null;
+async function padokDuzenleAc(id){
+  const padoklar=await getData('padoklar');
+  const p=padoklar.find(x=>x.id===id);
+  if(!p) return;
+  _curPadokDet=p;
+  document.getElementById('padok-det-title').textContent=p.ad;
+  document.getElementById('pd-ad').value=p.ad||'';
+  document.getElementById('pd-kap').value=p.kapasite||'';
+  openM('m-padok-det');
+}
+
+async function padokDuzenleKaydet(){
+  if(!_curPadokDet) return;
+  const ad=document.getElementById('pd-ad').value.trim();
+  if(!ad){ toast('Padok adı boş olamaz',true); return; }
+  const kap=parseInt(document.getElementById('pd-kap').value)||null;
+  const{error}=await db.from('padoklar').update({ad,kapasite:kap}).eq('id',_curPadokDet.id);
+  if(error){ toast('Hata: '+error.message,true); return; }
+  await pullTables(['padoklar']);
+  await loadPadokConfig();
+  closeM('m-padok-det');
+  renderAyarlarPadokList();
+  renderGrupPadokEslem();
+  toast('Padok güncellendi');
+}
+
+async function padokSilOnay(){
+  if(!_curPadokDet) return;
+  const id=_curPadokDet.id;
+  const hayvanlar=await getData('hayvanlar');
+  const count=hayvanlar.filter(h=>h.padok_id===id&&h.durum==='Aktif').length;
+  if(count>0){ toast(`Bu padokta ${count} aktif hayvan var — önce hayvanları başka padoğa taşıyın`,true); return; }
+  openConfirm('Padok Sil',`"${_curPadokDet.ad}" silinecek. Emin misiniz?`,async()=>{
+    await db.from('grup_padok_eslem').delete().eq('padok_id',id);
+    const{error}=await db.from('padoklar').delete().eq('id',id);
+    if(error){ toast('Hata: '+error.message,true); return; }
+    await pullTables(['padoklar','grup_padok_eslem']);
+    await loadPadokConfig();
+    closeM('m-padok-det');
+    renderAyarlarPadokList();
+    renderGrupPadokEslem();
+    toast('Padok silindi');
+  });
 }
 
 async function renderGrupPadokEslem(){
@@ -3602,17 +3649,32 @@ async function renderGrupPadokEslem(){
   const [padoklar,eslem]=await Promise.all([getData('padoklar'),getData('grup_padok_eslem')]);
   const gruplar=Object.keys(GRUP_PADOK);
   if(!padoklar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Önce padok ekleyin</div>'; return; }
-  const padokMap=Object.fromEntries(padoklar.map(p=>[p.id,p.ad]));
   const eslemMap={};
-  eslem.forEach(e=>{ if(!eslemMap[e.grup]) eslemMap[e.grup]=[]; eslemMap[e.grup].push(e.padok_id); });
+  eslem.forEach(e=>{ if(!eslemMap[e.grup]) eslemMap[e.grup]=new Set(); eslemMap[e.grup].add(e.padok_id); });
   el.innerHTML=gruplar.map(g=>{
-    const secili=eslemMap[g]?.[0]||'';
-    const opts=`<option value="">—</option>`+padoklar.map(p=>`<option value="${p.id}"${p.id===secili?' selected':''}>${p.ad}</option>`).join('');
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--card2)">
-      <span style="color:var(--ink)">${g}</span>
-      <select onchange="grupPadokDegistir('${g}',this.value)" style="padding:3px 6px;border:1px solid var(--brd);border-radius:6px;font-size:.72rem">${opts}</select>
+    const secili=eslemMap[g]||new Set();
+    const boxes=padoklar.map(p=>`
+      <label style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:var(--ink);padding:2px 0;cursor:pointer">
+        <input type="checkbox" value="${p.id}" ${secili.has(p.id)?'checked':''} onchange="grupPadokCheckbox('${g}',this)">
+        ${p.ad}
+      </label>`).join('');
+    return `<div style="padding:6px 0;border-bottom:1px solid var(--card2)">
+      <div style="font-size:.75rem;font-weight:700;color:var(--ink);margin-bottom:4px">${g}</div>
+      <div style="padding-left:8px">${boxes}</div>
     </div>`;
   }).join('');
+}
+
+async function grupPadokCheckbox(grup, checkbox){
+  const padokId=checkbox.value;
+  if(checkbox.checked){
+    await db.from('grup_padok_eslem').insert({grup,padok_id:padokId}).select();
+  } else {
+    await db.from('grup_padok_eslem').delete().eq('grup',grup).eq('padok_id',padokId);
+  }
+  await pullTables(['grup_padok_eslem']);
+  await loadPadokConfig();
+  toast('Eşleme güncellendi');
 }
 
 function ayarlarPadokEkle(){ document.getElementById('ay-padok-form').style.display='block'; }
@@ -3630,33 +3692,6 @@ async function ayarlarPadokKaydet(){
   toast('✅ Padok eklendi');
 }
 
-async function padokSil(id){
-  // hayvanlar bağlıysa silme
-  const hayvanlar=await getData('hayvanlar');
-  const count=hayvanlar.filter(h=>h.padok_id===id&&h.durum==='Aktif').length;
-  if(count>0){ toast(`Bu padokta ${count} aktif hayvan var, önce taşıyın`,true); return; }
-  openConfirm('Padok Sil','Bu padoku silmek istediğinizden emin misiniz?',async()=>{
-    await db.from('grup_padok_eslem').delete().eq('padok_id',id);
-    const{error}=await db.from('padoklar').delete().eq('id',id);
-    if(error){ toast('Hata: '+error.message,true); return; }
-    await pullTables(['padoklar','grup_padok_eslem']);
-    await loadPadokConfig();
-    renderAyarlarPadokList();
-    renderGrupPadokEslem();
-    toast('Padok silindi');
-  });
-}
-
-async function grupPadokDegistir(grup, padokId){
-  // Eski eşlemi sil, yenisini ekle
-  await db.from('grup_padok_eslem').delete().eq('grup',grup);
-  if(padokId){
-    await db.from('grup_padok_eslem').insert({grup,padok_id:padokId});
-  }
-  await pullTables(['grup_padok_eslem']);
-  await loadPadokConfig();
-  toast('Eşleme güncellendi');
-}
 
 // ──────────────────────────────────────────
 // BİLDİRİM SİSTEMİ
