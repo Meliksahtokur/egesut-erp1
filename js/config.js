@@ -43,17 +43,49 @@ const SPERMA_LISTESI = [
   'Semex-O-Man','Semex-Planet',
 ];
 
-// Grup -> Padok eşlemesi
-const GRUP_PADOK = {
+// Grup -> Padok eşlemesi (DB'den yüklenir, fallback hardcoded)
+let GRUP_PADOK = {
   'Sağmal (Laktasyonda)':      ['Sağmal Padok'],
   'Sağmal (Kuru)':             ['Kuru/Gebe Padok'],
   'Gebe Düve':                 ['Kuru/Gebe Padok'],
+  'Gebe İnek':                 ['Kuru/Gebe Padok'],
   'Düve (Büyük)':              ['Düve Padok (Büyük)'],
   'Düve (Küçük)':              ['Düve Padok (Küçük)'],
   'Süt İçen Buzağı':           ['Buzağı Padok (Süt İçenler)'],
   'Sütten Kesilmiş Buzağı':    ['Buzağı Padok (Sütten Kesilmiş)'],
   'Besi':                      ['Besi Padok (Erkek)', 'Besi Padok (Dişi)'],
 };
+
+// Padoklar listesi (DB'den yüklenir)
+let PADOKLAR = [];
+
+async function loadPadokConfig() {
+  try {
+    const [padoklar, eslem] = await Promise.all([
+      getData('padoklar'),
+      getData('grup_padok_eslem'),
+    ]);
+    if (!padoklar.length) return;
+    PADOKLAR = padoklar;
+    // grup -> [padok adları] haritasını yeniden oluştur
+    const padokMap = Object.fromEntries(padoklar.map(p => [p.id, p.ad]));
+    const newGP = {};
+    eslem.forEach(e => {
+      const padAd = padokMap[e.padok_id];
+      if (!padAd) return;
+      if (!newGP[e.grup]) newGP[e.grup] = [];
+      if (!newGP[e.grup].includes(padAd)) newGP[e.grup].push(padAd);
+    });
+    if (Object.keys(newGP).length) GRUP_PADOK = newGP;
+  } catch(e) { console.warn('loadPadokConfig failed:', e.message); }
+}
+
+async function loadHekimlerFromDB() {
+  try {
+    const rows = await getData('hekimler');
+    if (rows.length) HEKIMLER = rows.map(h => ({ id: h.id, ad: h.ad }));
+  } catch(e) { console.warn('loadHekimlerFromDB failed:', e.message); }
+}
 
 // Semptom kategorileri
 const SEMPTOM_KAT = {
