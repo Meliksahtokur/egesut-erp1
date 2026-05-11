@@ -48,7 +48,7 @@ let _idb;
 async function clearAndReloadIDB() {
   return new Promise((res, rej) => {
     const req = indexedDB.deleteDatabase('egesut_v9');
-    req.onsuccess = () => { console.log('IDB temizlendi, yeniden yükleniyor...'); location.reload(); };
+    req.onsuccess = () => { location.reload(); };
     req.onerror = () => rej('IDB silinemedi');
   });
 }
@@ -380,14 +380,14 @@ function startBackgroundSync(intervalMs = 30000) {
       syncNow().catch(console.warn);
     }
   }, intervalMs);
-  console.log(`🔄 Background sync başladı (her ${intervalMs/1000}sn)`);
+  
 }
 
 function stopBackgroundSync() {
   if (_backgroundSyncInterval) {
     clearInterval(_backgroundSyncInterval);
     _backgroundSyncInterval = null;
-    console.log('⏹️ Background sync durduruldu');
+    
   }
 }
 
@@ -410,10 +410,10 @@ function initRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'dogum' },        () => pullTables(['dogum']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'kizginlik_log' }, () => pullTables(['kizginlik_log']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'islem_log' },    () => pullTables(['islem_log']))
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  payload => console.log('[ui_log]', payload.new))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  () => {})
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
-        console.log('✅ Realtime aktif');
+        
         stopBackgroundSync(); // polling artık gereksiz
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         console.warn('⚠️ Realtime bağlantı hatası, polling devam ediyor');
