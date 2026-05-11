@@ -1,91 +1,46 @@
-# Spec: Yönetim Paneli CRUD İyileştirmesi
+# Spec: Yonetim Paneli CRUD — Hard FK
 
-**Tarih:** 2026-05-10
-**Öncelik:** ORTA
-**Bağımlılık:** Yok (bağımsız)
+**Tarih:** 2026-05-10 (guncelleme: 2026-05-11)
+**Oncelik:** YUKSEK
+**Bagimsizlik:** Yok
+
+---
+
+## Karar Logu
+
+- **Padok FK yaklaşımı:** Hard FK secildi (2026-05-11 brainstorming).
+  - `hayvanlar.padok_id uuid REFERENCES padoklar(id)` — DB seviyesinde referential integrity
+  - `hayvanlar.padok` TEXT kolonu gecis doneminde kalir, view her iki alani da dondurur
+  - Rename bedava: sadece `padoklar.ad` guncellenir, hayvanlar.padok_id degismez
+  - Delete guvenli: FK constraint icinde hayvan varsa DB reddeder
+- **GRUP_PADOK:** Dinamik olacak. `grup_padok_eslem` tablosunda saklanir, kullanici yonetir.
+- **Domain Engine (gelecek):** Padok bazli otomasyonlar (kuruluk esiğı, gorev kurallari) ayri spec olarak ele alinacak (Spec 5).
 
 ---
 
 ## Mevcut Durum
 
 ### Ayarlar Paneli (m-ayarlar)
-- Hekimler: Ekle ✅ | Sil ❌ | Düzenle ❌
-- Sperma: Ekle ✅ | Sil ❌ | Düzenle ❌
-- Aşı Kataloğu: Salt okunur liste ✅ | CRUD ❌
-- İlaç–Stok Bağlantıları: Sadece bağlama ✅
+- Hekimler: Ekle (local array) | Sil (local array) | DB persist YOK
+- Sperma: Ekle (local array) | Sil (local array) | DB persist YOK
+- Padok: CRUD YOK, `GRUP_PADOK` config.js'te hardcoded
+- `hayvanlar.padok` TEXT alani — FK yok, string esleme
 
-### Padok
-- `GRUP_PADOK` → `js/config.js` hardcoded
-- Kullanıcı padok oluşturamaz/silemez
-- DB'de padok tablosu YOK (hayvanlar.padok TEXT alanı)
-
-### Sperma Mock Verisi
-- Stok tablosunda "Starred" (50 adet) → muhtemelen mock/test
-
----
-
-## 1. Hekim CRUD
-
-### Mevcut
-- `ayarlarHekimEkle()` → form göster
-- `ayarlarHekimKaydet()` → DB'ye yaz
-- Liste render'ı → silme yok
-
-### Eklenmesi Gereken
-- Her hekim satırının yanına 🗑 sil butonu
-- Onay modal: "Bu hekimi silmek istediğinizden emin misiniz?"
-- Silme: `DELETE FROM hekimler WHERE id = ?` (soft delete değil, hard delete)
-- Constraint: Tohumlama kaydı varsa silinemez → uyarı
-
-### UI
-```
-Hekimler:
-├── Dr. Ahmet Yılmaz  [🗑]
-├── Dr. Fatma Kaya     [🗑]
-└── [+ Ekle]
-```
+### Etkilenen Tablolar
+- `hayvanlar` — padok TEXT → padok_id UUID FK eklenir
+- `hekimler` — mevcut, silme RPC gerekli
+- `stok` (kategori='Sperma') — silme constraint check
+- `tohumlama` — hekim_id + sperma constraint bagimliliklari
+- `dogum`, `hastalik_log` — hekim_id bagimliliklari
 
 ---
 
-## 2. Sperma CRUD + Mock Temizleme
+## 1. Padok CRUD (Hard FK)
 
-### Mevcut
-- Sperma listesi ayarlardan ekleniyor
-- Ama nereye yazıldığı belirsiz — stok tablosu mu, ayrı tablo mu?
+### Yeni Tablolar
 
-### Kontrol Noktaları
-- `stok` tablosunda `kategori='Sperma'` olan kayıtlar sperma
-- "Starred" kaydı mock → silinecek veya kullanıcıya sorulacak
-
-### Eklenmesi Gereken
-- Sperma satırına 🗑 sil butonu
-- Düzenleme: isim değiştirme (urun_adi UPDATE)
-- Mock temizleme: "Starred" gibi anlamsız kayıtları tespit et
-
-### Constraint
-- `tohumlama.sperma` alanında kullanılmışsa: silinemez, uyarı ver
-
----
-
-## 3. Padok Yönetimi (YENİ)
-
-### Mevcut Mimari
-```js
-// config.js — HARDCODED
-const GRUP_PADOK = {
-  'Sağmal (Laktasyonda)': ['Sağmal Padok'],
-  'Sağmal (Kuru)': ['Kuru/Gebe Padok'],
-  ...
-};
-```
-
-- `hayvanlar.padok` → TEXT (serbest string)
-- Padok listesi config'den geliyor, DB'de tablo yok
-
-### Hedef Mimari
-
-**Yeni tablo: `padoklar`**
 ```sql
+-- padoklar
 CREATE TABLE padoklar (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   ad text NOT NULL UNIQUE,
@@ -94,59 +49,118 @@ CREATE TABLE padoklar (
   sira integer DEFAULT 0,
   created_at timestamptz DEFAULT now()
 );
+
+-- grup_padok_eslem (GRUP_PADOK yerine)
+CREATE TABLE grup_padok_eslem (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  grup text NOT NULL,
+  padok_id uuid NOT NULL REFERENCES padoklar(id) ON DELETE CASCADE,
+  UNIQUE(grup, padok_id)
+);
 ```
 
-**Migration adımları:**
-1. Tablo oluştur
-2. Mevcut config'deki padokları INSERT et (seed)
-3. `js/config.js` GRUP_PADOK → kaldırılmaz, ama UI artık `padoklar` tablosundan okusun
-4. GRUP_PADOK sadece varsayılan mapping olarak kalsın (yeni padok eklenince grup eşleşmesi kullanıcı seçsin)
+### hayvanlar Degisikligi
 
-### Ayarlar UI
-```
-🏠 Padoklar:
-├── Sağmal Padok        [kapasite: 55] [🗑]
-├── Kuru/Gebe Padok     [kapasite: 15] [🗑]
-├── Düve Padok (Büyük)  [kapasite: 20] [🗑]
-├── Buzağı Padok (Süt)  [kapasite: 10] [🗑]
-└── [+ Yeni Padok Ekle]
+```sql
+ALTER TABLE hayvanlar ADD COLUMN padok_id uuid REFERENCES padoklar(id);
+-- Migrasyon: mevcut TEXT degerlerinden esle
+UPDATE hayvanlar h SET padok_id = p.id FROM padoklar p WHERE h.padok = p.ad;
 ```
 
-### CRUD
-- **Ekle:** Ad + kapasite (opsiyonel)
-- **Sil:** İçinde hayvan varsa silinemez → "Önce hayvanları taşıyın"
-- **Düzenle:** Ad değiştirme, kapasite güncelleme
+### hayvan_durum_view Guncelleme
+- `h.padok` yerinde `p.ad AS padok` (JOIN ile)
+- `h.padok_id` de SELECT'e eklenir
+- Frontend `a.padok` okumaya devam eder (display icin), `a.padok_id` yazma icin kullanir
 
-### Config.js ile uyum
-- `GRUP_PADOK` mapping hâlâ var ama UI'da padok seçilirken `padoklar` tablosundan okunur
-- Yeni padok eklenince hangi gruba ait olduğu sorulur (veya "Özel" kategorisi)
+### CRUD Operasyonlari
+- **Ekle:** ad + kapasite → INSERT padoklar
+- **Yeniden Adlandir:** padoklar.ad UPDATE (ID degismez, tum hayvanlar otomatik dogru)
+- **Sil:** FK constraint — icinde hayvan varsa DB reddeder, UI uyari verir
+- **Grup Esleme:** grup_padok_eslem tablosunda hangi grup hangi padoğa gider, kullanici yonetir
+
+### Config.js Degisikligi
+- `GRUP_PADOK` hardcode kaldirilir
+- `let _padoklar = []` ve `let _grupPadokEslem = []` IDB'den yuklenir
+- Fonksiyon: `getPadoklarForGrup(grup)` → esleme tablosundan filtrele
 
 ---
 
-## 4. Genel Ayarlar UX İyileştirmesi
+## 2. Hekim DB Silme
 
-### Mevcut Sorunlar
-- Tek uzun scroll panel (hekim, sperma, aşı, ilaç, data traffic, sistem, bildirimler hepsi üst üste)
-- Aradığını bulmak zor
+### Mevcut
+- `_customHekimler` local array'den silme var
+- DB'ye hic yazilmiyor
 
 ### Hedef
-- Sekmeli yapı (tabs): "Hayvan Yönetimi" | "İlaç & Aşı" | "Stok" | "Sistem"
-- VEYA accordion/collapse ile bölümler
+- Tum hekimler DB'de (`hekimler` tablosu)
+- Silme: RPC ile constraint check (tohumlama, dogum, hastalik_log)
+- Kullaniliyorsa silinemez, uyari mesaji
 
-### Sekme Önerisi
-| Sekme | İçerik |
-|-------|--------|
-| 🐄 Çiftlik | Padoklar, Hekimler, Sperma |
-| 💊 İlaç & Aşı | Aşı Kataloğu, İlaç-Stok Bağlantıları |
-| ⚙️ Sistem | Data Traffic, Bildirimler, PWA, Tema |
+### RPC: hekim_sil
+```sql
+CREATE OR REPLACE FUNCTION public.hekim_sil(p_hekim_id text)
+RETURNS jsonb AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM tohumlama WHERE hekim_id = p_hekim_id) THEN
+    RETURN '{"ok":false,"mesaj":"Tohumlama kaydı olan hekim silinemez"}'::jsonb;
+  END IF;
+  IF EXISTS (SELECT 1 FROM dogum WHERE hekim_id = p_hekim_id) THEN
+    RETURN '{"ok":false,"mesaj":"Doğum kaydı olan hekim silinemez"}'::jsonb;
+  END IF;
+  DELETE FROM hekimler WHERE id = p_hekim_id;
+  RETURN '{"ok":true}'::jsonb;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
 
 ---
 
-## Test Senaryosu
+## 3. Sperma DB Silme
 
-1. Hekim sil → tohumlama kaydı yoksa silinir ✅
-2. Hekim sil → tohumlama kaydı varsa uyarı ❌ (silinemez)
-3. Sperma sil → kullanılmamışsa silinir
-4. Padok ekle → "Test Padok" → listede görünür → hayvan taşınabilir
-5. Padok sil → içi boşsa silinir → doluysa uyarı
-6. "Starred" mock sperma → temizle/sil
+### Constraint
+- `tohumlama.sperma` TEXT alani — sperma adi burada string olarak sakli
+- Kullanilmissa silinemez
+
+### Implementasyon
+- `stok` tablosundan DELETE WHERE id = ? AND kategori = 'Sperma'
+- Once `tohumlama.sperma` kontrolu: eslesme varsa red
+
+---
+
+## 4. IDB Sync Degisiklikleri
+
+- `padoklar` ve `grup_padok_eslem` tablolari FETCHERS'a eklenir
+- `hekimler` tablosu FETCHERS'a eklenir (su an sync edilmiyor)
+- DB_VER bump (14 → 15) — yeni object store'lar
+- `onupgradeneeded` callback'te: `padoklar`, `grup_padok_eslem`, `hekimler` store olustur
+
+---
+
+## 5. Frontend Degisiklikleri
+
+### forms.js
+- Hayvan ekleme/guncelleme: `p_padok: v('a-padok')` → `p_padok_id: v('a-padok')` (artik UUID secilir)
+- Padok dropdown: `padoklar` IDB tablosundan doldurulur
+
+### ui.js
+- Display: `a.padok` (view'dan gelen ad) → degismez
+- Filtre: `a.padok === selectedPadok` → degismez (view ad donduruyor)
+- Ayarlar: padok/hekim/sperma CRUD bolumu yeniden yazilir
+
+### config.js
+- `GRUP_PADOK` const kaldirilir
+- `HEKIMLER` hardcode yerine DB'den yukle (fallback olarak kalir)
+- `SPERMA_LISTESI` hardcode kalir (stok tablosu zaten var)
+
+---
+
+## Test Senaryolari
+
+1. Padok ekle → listede gorunur → hayvan bu padoğa atanabilir
+2. Padok yeniden adlandir → tum hayvanlarda yeni isim gorunur (ID degismedi)
+3. Padok sil (bos) → basarili
+4. Padok sil (icinde hayvan var) → hata mesaji
+5. Hekim sil → tohumlama kaydi yoksa basarili
+6. Hekim sil → tohumlama kaydi varsa hata mesaji
+7. Sperma sil → tohumlama kaydi yoksa basarili
+8. Grup→padok esleme degistir → yeni hayvan ekleme formunda dogru padok onerilir
