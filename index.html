@@ -1526,5 +1526,33 @@ function copyErrors() {
   </div>
 </div>
 
+<div id="m-hekim-det" class="mo" onclick="mClose(event,this)">
+  <div class="modal" style="max-width:400px">
+    <div class="mh">
+      <h3 id="hk-title">Hekim</h3>
+      <button class="mc" onclick="closeM('m-hekim-det')">×</button>
+    </div>
+    <div class="mb" style="padding:12px 16px">
+      <label style="font-size:.7rem;color:var(--ink3)">Hekim Adı</label>
+      <input id="hk-ad" class="fi" style="margin-bottom:10px">
+
+      <div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto" id="hk-period-tabs">
+        <button class="kat-btn on" onclick="hekimPeriod('all',event)">Tümü</button>
+        <button class="kat-btn" onclick="hekimPeriod(30,event)">1 Ay</button>
+        <button class="kat-btn" onclick="hekimPeriod(90,event)">3 Ay</button>
+        <button class="kat-btn" onclick="hekimPeriod(180,event)">6 Ay</button>
+        <button class="kat-btn" onclick="hekimPeriod(365,event)">1 Yıl</button>
+      </div>
+
+      <div id="hk-stats" style="margin-bottom:12px"></div>
+
+      <div style="display:flex;gap:8px">
+        <button onclick="hekimDetKaydet()" class="btn btn-g" style="flex:1">Kaydet</button>
+        <button onclick="hekimDetSil()" class="btn" style="flex:1;background:var(--red);color:#fff">Sil</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
