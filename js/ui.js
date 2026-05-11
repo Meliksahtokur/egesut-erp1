@@ -20,6 +20,9 @@
 */
 
 let _taskKategori='all';
+let _stokTab='tumu';
+let _curStokDet=null;
+
 const _katTipMap={
   asi:['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE'],
@@ -1504,12 +1507,30 @@ function openStokPanel(){
 function closeStokPanel(){
   document.getElementById('stok-panel').style.transform='translateX(100%)';
 }
+function setStokTab(tab,e){
+  _stokTab=tab;
+  document.querySelectorAll('#stok-tabs .kat-btn').forEach(b=>b.classList.remove('on'));
+  if(e&&e.target) e.target.classList.add('on');
+  loadStokPanel();
+}
+
+const _TAB_FILTER={
+  tumu:()=>true,
+  ilac:s=>['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','Diger Ilac'].includes(s.kategori),
+  asi:s=>s.isVaccine||s.kategori==='Aşı'||s.kategori==='Asi',
+  sperma:s=>s.kategori==='Sperma',
+  diger:s=>['Yem','Sarf','Ekipman','Diğer','Diger'].includes(s.kategori)
+};
+
 async function loadStokPanel(){
   const el=document.getElementById('stok-panel-body'); if(!el) return;
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   await Promise.all([loadStock(), loadDrugsCache()]);
-  const stok=getState('stock');
-  if(!stok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📦</div>Henüz stok ürünü eklenmemiş</div>'; return; }
+  const allStok=getState('stock');
+  const tabFn=_TAB_FILTER[_stokTab]||_TAB_FILTER.tumu;
+  const stok=allStok.filter(tabFn);
+  if(!allStok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📦</div>Henüz stok ürünü eklenmemiş</div>'; return; }
+  if(!stok.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🔍</div>Bu sekmede ürün yok</div>'; return; }
   const ILAC_KATLAR=['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
   const GRUPLAR=[
     {baslik:'💊 Sağlık',alt:[
@@ -1564,7 +1585,8 @@ async function loadStokPanel(){
           </div>
           <div style="display:flex;gap:6px;margin-top:8px">
             <button onclick="openStk('${s.id}')" style="flex:1;padding:6px;background:var(--green);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">+ Miktar Ekle</button>
-            <button onclick="stokHareketGor('${s.id}')" style="flex:1;padding:6px;background:var(--card2);color:var(--ink3);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">Hareketler</button>
+            <button onclick="stokHareketGor('${s.id}')" style="padding:6px 10px;background:var(--card2);color:var(--ink3);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">Hareketler</button>
+            <button onclick="openStokDet('${s.id}')" style="padding:6px 10px;background:var(--card2);color:var(--ink3);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">Düzenle</button>
           </div>
           ${s.drug_product_id?`<div style="margin-top:5px;font-size:.65rem;color:var(--green);font-weight:700">✅ Tedaviye bağlı</div>`:''}
         </div>`;
@@ -1591,6 +1613,67 @@ async function loadStokPanel(){
     }).join('');
   }
   el.innerHTML=html||'<div class="empty">Kayıt yok</div>';
+}
+
+async function openStokDet(stokId){
+  const stoklar=await getData('stok');
+  const s=stoklar.find(x=>x.id===stokId);
+  if(!s) return;
+  _curStokDet=s;
+  document.getElementById('stok-det-title').textContent=s.urun_adi;
+  document.getElementById('sd-ad').value=s.urun_adi||'';
+  document.getElementById('sd-kat').value=s.kategori||'';
+  document.getElementById('sd-birim').value=s.birim||'adet';
+  document.getElementById('sd-esik').value=s.esik||'';
+  document.getElementById('sd-guncel').textContent=(s.guncel||0)+' '+(s.birim||'');
+  document.getElementById('sd-yeni-miktar').value='';
+  openM('m-stok-det');
+}
+
+async function stokDetKaydet(){
+  if(!_curStokDet) return;
+  const updates={
+    urun_adi:v('sd-ad').trim(),
+    kategori:v('sd-kat'),
+    birim:v('sd-birim'),
+    esik:parseFloat(v('sd-esik'))||0
+  };
+  if(!updates.urun_adi){ toast('Ürün adı boş olamaz',true); return; }
+  const{error}=await db.from('stok').update(updates).eq('id',_curStokDet.id);
+  if(error){ toast('Hata: '+error.message,true); return; }
+  await pullTables(['stok']);
+  closeM('m-stok-det');
+  loadStokPanel();
+  toast('Ürün güncellendi');
+}
+
+async function stokDetArsivle(){
+  if(!_curStokDet) return;
+  const hareketler=await getData('stok_hareket');
+  const count=hareketler.filter(h=>h.stok_id===_curStokDet.id&&!h.iptal).length;
+  const msg=count>0
+    ?`Bu üründe ${count} hareket kaydı var. Arşivlenecek (silinmeyecek). Devam?`
+    :'Bu ürünü arşivlemek istediğinizden emin misiniz?';
+  openConfirm('Ürün Arşivle',msg,async()=>{
+    const{error}=await db.from('stok').update({kategori:'Arsiv'}).eq('id',_curStokDet.id);
+    if(error){ toast('Hata: '+error.message,true); return; }
+    await pullTables(['stok']);
+    closeM('m-stok-det');
+    loadStokPanel();
+    toast('Ürün arşivlendi');
+  });
+}
+
+async function stokDuzeltKaydet(){
+  if(!_curStokDet) return;
+  const yeni=parseFloat(v('sd-yeni-miktar'));
+  if(isNaN(yeni)||yeni<0){ toast('Geçerli bir miktar girin',true); return; }
+  const res=await rpc('stok_duzelt',{p_stok_id:_curStokDet.id,p_yeni_miktar:yeni});
+  if(!res.ok){ toast(res.mesaj||'Hata',true); return; }
+  await pullTables(['stok','stok_hareket']);
+  document.getElementById('sd-guncel').textContent=yeni+' '+(_curStokDet.birim||'');
+  document.getElementById('sd-yeni-miktar').value='';
+  toast('Stok düzeltildi: '+res.eski+' → '+res.yeni);
 }
 
 async function tumStokHareketleriniGoster(){
