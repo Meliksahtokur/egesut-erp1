@@ -3768,7 +3768,10 @@ async function renderAyarlarPadokList(){
   if(!padoklar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Henüz padok tanımlı değil</div>'; return; }
   el.innerHTML=padoklar.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
     <span style="font-size:.82rem;color:var(--ink)">${p.ad}${p.kapasite?' <span style="font-size:.65rem;color:var(--ink3)">(${p.kapasite} baş)</span>':''}</span>
-    <button onclick="padokDuzenleAc('${p.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">✏️</button>
+    <div style="display:flex;gap:4px">
+      <button onclick="padokDetayAc('${p.id}')" style="background:none;border:none;color:var(--blue);font-size:.72rem;cursor:pointer;padding:4px 6px">📋</button>
+      <button onclick="padokDuzenleAc('${p.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">✏️</button>
+    </div>
   </div>`).join('');
 }
 
@@ -3817,6 +3820,140 @@ async function padokSilOnay(){
     toast('Padok silindi');
   });
 }
+
+// ── Padok Detay + Transfer Functions ──
+
+let _pdHayvanIds = []; // selected hayvan IDs for bulk transfer
+let _pdTransferHayvanIds = []; // hayvan IDs pending transfer
+let _pdKaynakPadokId = null; // source padok for transfer
+
+async function padokDetayAc(id) {
+  const padoklar = await getData('padoklar');
+  const p = padoklar.find(x => x.id === id);
+  if (!p) return;
+  _curPadokDet = p;
+  document.getElementById('padok-det-title').textContent = p.ad;
+  document.getElementById('pd-ad').value = p.ad || '';
+  document.getElementById('pd-kap').value = p.kapasite || '';
+  _pdHayvanIds = [];
+  _pdKaynakPadokId = id;
+  document.getElementById('pd-toplu-tasi-btn').style.display = 'none';
+  openM('m-padok-det');
+  await renderPadokHayvanlar(id);
+}
+
+async function renderPadokHayvanlar(padokId) {
+  const el = document.getElementById('pd-hayvan-listesi');
+  const sayiEl = document.getElementById('pd-hayvan-sayisi');
+  if (!el) return;
+  try {
+    const hayvanlar = await getData('hayvanlar');
+    const filtre = (document.getElementById('pd-hayvan-filtre')?.value || '').toLowerCase().trim();
+    let padokHayvanlar = hayvanlar.filter(h => h.padok_id === padokId && h.durum === 'Aktif');
+    if (filtre) {
+      padokHayvanlar = padokHayvanlar.filter(h =>
+        (h.kupe_no || '').toLowerCase().includes(filtre) ||
+        (h.devlet_kupe || '').toLowerCase().includes(filtre) ||
+        (h.irk || '').toLowerCase().includes(filtre)
+      );
+    }
+    sayiEl.textContent = padokHayvanlar.length;
+    if (!padokHayvanlar.length) {
+      el.innerHTML = '<div class="empty"><div class="empty-ico">🐄</div>Bu padokta hayvan yok</div>';
+      return;
+    }
+    el.innerHTML = padokHayvanlar.map(h => {
+      const yas = h.dogum_tarihi ? (() => {
+        const diff = Date.now() - new Date(h.dogum_tarihi).getTime();
+        const gun = Math.floor(diff / 86400000);
+        const ay = Math.floor(gun / 30);
+        return ay > 0 ? `${ay} ay` : `${gun} gün`;
+      })() : '—';
+      const secili = _pdHayvanIds.includes(h.id);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--card3)">
+        <input type="checkbox" ${secili ? 'checked' : ''} onchange="pdToggleHayvan('${h.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">
+        <span style="flex:1;font-weight:600;color:var(--ink);font-size:.8rem">${h.kupe_no || h.devlet_kupe || h.id}</span>
+        <span style="font-size:.7rem;color:var(--ink3)">${h.grup || '—'} · ${h.cinsiyet || '—'} · ${yas}</span>
+        <button class="btn" style="padding:3px 8px;font-size:.7rem;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokTekliTasi('${h.id}','${h.kupe_no || h.devlet_kupe || h.id}')">➡️</button>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ ${e.message}</div>`;
+  }
+}
+
+function pdToggleHayvan(id, checked) {
+  if (checked) {
+    if (!_pdHayvanIds.includes(id)) _pdHayvanIds.push(id);
+  } else {
+    _pdHayvanIds = _pdHayvanIds.filter(x => x !== id);
+  }
+  document.getElementById('pd-toplu-tasi-btn').style.display = _pdHayvanIds.length > 0 ? 'inline-block' : 'none';
+}
+
+function padokTekliTasi(hayvanId, kupe) {
+  _pdTransferHayvanIds = [hayvanId];
+  document.getElementById('pt-bilgi').textContent = `🐄 ${kupe} → hedef padok seçin:`;
+  _pdTransferAcSelector();
+}
+
+function padokTopluTasi() {
+  if (!_pdHayvanIds.length) { toast('⚠️ Lütfen en az bir hayvan seçin', true); return; }
+  _pdTransferHayvanIds = [..._pdHayvanIds];
+  document.getElementById('pt-bilgi').textContent = `📦 ${_pdHayvanIds.length} hayvan → hedef padok seçin:`;
+  _pdTransferAcSelector();
+}
+
+async function _pdTransferAcSelector() {
+  const sel = document.getElementById('pt-select');
+  sel.innerHTML = '<option value="">Seçiniz...</option>';
+  const padoklar = await getData('padoklar');
+  const hedefPadoklar = padoklar.filter(p => p.id !== _pdKaynakPadokId);
+  hedefPadoklar.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.ad;
+    sel.appendChild(opt);
+  });
+  openM('m-padok-transfer');
+}
+
+async function padokTransferOnayla() {
+  const sel = document.getElementById('pt-select');
+  const hedefId = sel.value;
+  if (!hedefId) { toast('⚠️ Lütfen bir hedef padok seçin', true); return; }
+  const hedefAd = sel.options[sel.selectedIndex]?.text || '?';
+  closeM('m-padok-transfer');
+  const ids = _pdTransferHayvanIds;
+  if (!ids.length) return;
+  try {
+    if (ids.length === 1) {
+      // Single transfer via existing RPC
+      const res = await rpc('padok_degistir', { p_hayvan_id: ids[0], p_yeni_padok_id: hedefId });
+      if (res && res.success) {
+        toast(`✅ ${res.yeni_padok} taşındı`);
+      } else {
+        toast(`⚠️ ${res?.error || 'İşlem başarısız'}`, true);
+      }
+    } else {
+      // Bulk transfer
+      const res = await rpc('padok_degistir_toplu', { p_hayvan_ids: ids, p_yeni_padok_id: hedefId });
+      if (res && res.success) {
+        toast(`✅ ${res.basarili} hayvan ${res.yeni_padok} taşındı${res.basarisiz > 0 ? `, ${res.basarisiz} başarısız` : ''}`);
+      } else {
+        toast(`⚠️ ${res?.error || 'Toplu işlem başarısız'}`, true);
+      }
+    }
+    // Refresh
+    _pdHayvanIds = [];
+    document.getElementById('pd-toplu-tasi-btn').style.display = 'none';
+    await renderPadokHayvanlar(_pdKaynakPadokId);
+  } catch (e) {
+    toast(`⚠️ ${e.message}`, true);
+  }
+}
+
+// ── End Padok Detay + Transfer ──
 
 async function renderGrupPadokEslem(){
   const el=document.getElementById('ay-grup-padok-list'); if(!el) return;
