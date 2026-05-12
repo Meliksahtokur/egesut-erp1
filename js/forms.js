@@ -800,8 +800,11 @@ async function tohSonuc(sonuc, btn) {
       rpcName = 'tohumlama_sonuc_gebe';
       successMsg = '✅ Gebe olarak işaretlendi';
     } else if (sonuc === 'Boş') {
-      rpcName = 'tohumlama_sonuc_bos';
-      successMsg = 'Boş olarak işaretlendi';
+      const res = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: _curToh.id });
+      if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
+      toast('Boş olarak işaretlendi');
+      closeM('m-toh-det');
+      return;
     } else {
       rpcName = 'tohumlama_sonuc_bekliyor';
       successMsg = 'Bekliyor\'a alındı';
