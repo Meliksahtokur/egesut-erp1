@@ -18,7 +18,7 @@ SELECT
     'dogum_kg',   d.dogum_kg,
     'hekim_id',   d.hekim_id
   )                                AS detay,
-  d.id                             AS kaynak_id
+  d.id::text                       AS kaynak_id
 FROM public.dogum d
 
 UNION ALL
@@ -53,7 +53,7 @@ SELECT
     'durum',     hl.durum,
     'hekim_id',  hl.hekim_id
   )                                AS detay,
-  hl.id                            AS kaynak_id
+  hl.id::text                       AS kaynak_id
 FROM public.hastalik_log hl
 
 UNION ALL
@@ -68,7 +68,7 @@ SELECT
     'belirti', kl.belirti,
     'notlar',  kl.notlar
   )                                AS detay,
-  kl.id                            AS kaynak_id
+  kl.id::text                       AS kaynak_id
 FROM public.kizginlik_log kl
 
 UNION ALL
@@ -92,7 +92,7 @@ SELECT
     )
     ELSE jsonb_build_object('padok_degisti', false)
   END                               AS detay,
-  il.id                             AS kaynak_id
+  il.id::text                        AS kaynak_id
 FROM public.islem_log il
 WHERE il.tip IN ('HAYVAN_GUNCELLENDI', 'HAYVAN_EKLENDI')
 
@@ -105,7 +105,7 @@ SELECT
   COALESCE(il.payload->>'event_type', lower(il.tip)) AS event_type,
   il.tarih                         AS zaman,
   COALESCE(il.payload->'meta', il.snapshot) AS detay,
-  il.id                            AS kaynak_id
+  il.id                             AS kaynak_id
 FROM public.islem_log il
 WHERE il.tip IN ('ABORT_KAYDI', 'SATIS_KAYDI', 'OLUM_KAYDI', 'SUTTEN_KESME')
 
