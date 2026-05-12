@@ -806,11 +806,16 @@ async function tohSonuc(sonuc, btn) {
       closeM('m-toh-det');
       return;
     } else {
-      rpcName = 'tohumlama_sonuc_bekliyor';
-      successMsg = 'Bekliyor\'a alındı';
+      const res = await rpc('tohumlama_sonuc_bekliyor', { p_tohumlama_id: _curToh.id });
+      if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
+      toast('Bekliyor\'a alındı');
+      closeM('m-toh-det');
+      return;
     }
 
-    const { error } = await rpc(rpcName, { p_tohumlama_id: _curToh.id }); if (error) throw error; toast(successMsg);
+    const res = await rpc(rpcName, { p_tohumlama_id: _curToh.id });
+    if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
+    toast(successMsg);
     closeM('m-toh-det');
   } catch (e) {
     console.warn('tohSonuc error:', e.message);
