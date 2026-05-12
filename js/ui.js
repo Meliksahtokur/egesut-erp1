@@ -688,14 +688,25 @@ async function _detRenderGecmis(id,el){
     logs.sort((x,y)=>(y.created_at||y.tarih||'').localeCompare(x.created_at||x.tarih||''));
     const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
     const ETIKET={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme'};
-    const GERI_AL=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI'];
+    const GERI_AL=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI','HAYVAN_GUNCELLENDI'];
     if(!logs.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>'; return; }
     globalThis._detGecmisLogs=logs;
     el.innerHTML=logs.map((l,i)=>{
       const ico=ICO[l.tip]||'📋';
       const tarih=(l.created_at||l.tarih||'').slice(0,10);
       const gaIcon=GERI_AL.includes(l.tip)?'<span style="font-size:.6rem;color:var(--ink3);margin-left:4px">↩</span>':'';
-      return `<div class="hist-row" style="cursor:pointer" onclick="openIslemDetay(${i})"><div class="hist-dot" style="background:var(--green2)"></div><div class="hist-main"><div class="hist-title">${ico} ${ETIKET[l.tip]||l.tip||'—'}${gaIcon}</div><div class="hist-sub">${tarih}</div></div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;opacity:.4;margin-top:2px"><path d="M9 18l6-6-6-6"/></svg></div>`;
+      // Padok değişikliği tespiti
+      let padokHtml='';
+      if (l.tip === 'HAYVAN_GUNCELLENDI' && l.snapshot && l.snapshot.old && l.snapshot.new) {
+        const eskiPadokId = l.snapshot.old.padok_id;
+        const yeniPadokId = l.snapshot.new.padok_id;
+        if (eskiPadokId && yeniPadokId && eskiPadokId !== yeniPadokId) {
+          const eskiAd = l.snapshot.old.padok || eskiPadokId;
+          const yeniAd = l.snapshot.new.padok || yeniPadokId;
+          padokHtml = `<div style="font-size:.65rem;color:var(--green);font-weight:600;margin-top:2px">🔀 Padok: ${eskiAd} → ${yeniAd}</div>`;
+        }
+      }
+      return `<div class="hist-row" style="cursor:pointer" onclick="openIslemDetay(${i})"><div class="hist-dot" style="background:${padokHtml ? 'var(--green)' : 'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${ico} ${ETIKET[l.tip]||l.tip||'—'}${gaIcon}</div><div class="hist-sub">${tarih}${padokHtml}</div></div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;opacity:.4;margin-top:2px"><path d="M9 18l6-6-6-6"/></svg></div>`;
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
@@ -881,6 +892,19 @@ async function padokDegistir(hayvanId, displayId) {
   }
 }
 
+// ── İŞLEM GERİ AL (genel — padok ve görev güncellemeleri) ──
+async function islemGeriAl(islemId) {
+  if (!confirm('Bu işlemi geri almak istediğinize emin misiniz?')) return;
+  try {
+    const res = await rpc('islem_geri_al', { p_islem_id: islemId });
+    toast('✅ İşlem geri alındı');
+    await pullTables(['hayvanlar', 'islem_log']);
+    if (typeof openDet === 'function' && window._detOpenId) openDet(window._detOpenId);
+  } catch (e) {
+    toast('❌ ' + e.message, true);
+  }
+}
+
 function openIslemDetay(idx){
   const l=(globalThis._detGecmisLogs||[])[idx];
   if(!l) return;
@@ -893,13 +917,17 @@ function openIslemDetay(idx){
   const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼'};
   const ALAN={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe'};
   const tarih=(l.created_at||l.tarih||'').slice(0,10);
-  const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI'];
+  const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI','HAYVAN_GUNCELLENDI'];
   const payload=l.payload&&typeof l.payload==='object'?l.payload:{};
   const satirlar=Object.entries(payload)
     .filter(([k,v])=>!['hayvan_id','id','ana_hayvan_id'].includes(k)&&v!==null&&v!==undefined&&v!=='')
     .map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card3);font-size:.78rem"><span style="color:var(--ink3)">${ALAN[k]||k}</span><span style="font-weight:600;color:var(--ink);text-align:right;max-width:60%">${v}</span></div>`)
     .join('');
-  const gaBtn=GeriAlabilir.includes(l.tip)?`<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="openGeriAl('${l.id}','${LABEL[l.tip]||l.tip} — ${tarih} tarihli kayıt geri alınacak.')">↩ Geri Al</button>`:'';
+  const gaBtn=GeriAlabilir.includes(l.tip)
+    ? (l.tip === 'HAYVAN_GUNCELLENDI'
+      ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="islemGeriAl('${l.id}')">↩️ Geri Al</button>`
+      : `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="openGeriAl('${l.id}','${LABEL[l.tip]||l.tip} — ${tarih} tarihli kayıt geri alınacak.')">↩ Geri Al</button>`)
+    : '';
   const html=`<div style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px;margin-top:8px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <span style="font-size:1.1rem">${ICO[l.tip]||'📋'}</span>
