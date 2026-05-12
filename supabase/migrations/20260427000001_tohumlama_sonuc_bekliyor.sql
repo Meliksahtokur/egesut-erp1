@@ -37,8 +37,8 @@ BEGIN
   FROM public.islem_log
   WHERE ref_id = p_tohumlama_id
     AND ref_tablo = 'tohumlama'
-    AND tip = 'BOS_ATAMA'
-  ORDER BY olusturuldu DESC
+    AND tip = 'TOHUMLAMA_SONUC'
+  ORDER BY tarih DESC
   LIMIT 1;
 
   IF v_snapshot IS NOT NULL THEN
@@ -59,7 +59,7 @@ BEGIN
   -- 4. Revert hayvanlar.tohumlama_durumu to prior state
   UPDATE public.hayvanlar
   SET tohumlama_durumu = v_onceki_durum
-  WHERE id = v_toh.hayvan_id::uuid
+  WHERE id = v_toh.hayvan_id
     AND durum = 'Aktif';
 
   -- 5. Write islem_log with tip='TOHUMLAMA_SONUC'

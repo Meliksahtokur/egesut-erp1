@@ -35,7 +35,7 @@ BEGIN
   -- AND durum = 'Aktif' guard: pasif/ölü hayvan işlemi engellensin
   SELECT tohumlama_durumu INTO v_onceki_durum
   FROM public.hayvanlar
-  WHERE id = v_toh.hayvan_id::uuid
+  WHERE id = v_toh.hayvan_id
     AND durum = 'Aktif';
 
   IF NOT FOUND THEN
@@ -48,7 +48,7 @@ BEGIN
   -- Hayvanlar.tohumlama_durumu Boş yap
   UPDATE public.hayvanlar
   SET tohumlama_durumu = 'Boş'
-  WHERE id = v_toh.hayvan_id::uuid;
+  WHERE id = v_toh.hayvan_id;
 
   -- islem_log: değişikliği geri alınabilir hale getir
   INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
@@ -112,7 +112,7 @@ BEGIN
   -- AND durum = 'Aktif' guard: pasif/ölü hayvan işlemi engellensin
   SELECT tohumlama_durumu INTO v_onceki_durum
   FROM public.hayvanlar
-  WHERE id = v_toh.hayvan_id::uuid
+  WHERE id = v_toh.hayvan_id
     AND durum = 'Aktif';
 
   IF NOT FOUND THEN
@@ -129,7 +129,7 @@ BEGIN
   -- (Bu, sistem hatası düzeltme işlemi olduğundan, güvenli default olarak tohumlanabilir yapıyoruz)
   UPDATE public.hayvanlar
   SET tohumlama_durumu = 'Tohumlanabilir'
-  WHERE id = v_toh.hayvan_id::uuid;
+  WHERE id = v_toh.hayvan_id;
 
   -- islem_log: değişikliği geri alınabilir hale getir
   INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
