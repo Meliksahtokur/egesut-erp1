@@ -10,7 +10,7 @@
    _ilacCache, _drugsCache, _disFreq,
    HEKIMLER, VARSAYILAN_HEKIM,
    HASTALIK_LISTESI, HASTALIK_KAT, LOKASYON_KAT, SEMPTOM_KAT, SEMPTOM_GENEL,
-   SPERMA_LISTESI, GRUP_PADOK,
+   SPERMA_LISTESI, GRUP_PADOK, PADOKLAR,
    getState, setState,
    g, v, cl, dAgo, dFwd, fmtTarih, toast, openM, closeM, mClose,
    db, rpc, rpcOptimistic, pullTables, renderSafe, renderFromLocal,
@@ -634,6 +634,15 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
       ${infoFields.map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
     </div>
     ${extra}
+    <div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
+      <div style="color:var(--ink3);margin-bottom:4px">📍 Padok Değiştir:</div>
+      <div style="display:flex;gap:6px">
+        <select id="det-padok-select" style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--card);color:var(--ink);font-size:.8rem">
+          ${PADOKLAR.length ? PADOKLAR.map(p => `<option value="${p.id}" ${a.padok_id === p.id ? 'selected' : ''}>${p.ad}</option>`).join('') : `<option value="">Padok yüklenmedi</option>`}
+        </select>
+        <button class="btn" style="padding:6px 12px;font-size:.8rem;background:rgba(42,107,181,.12);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokDegistir('${a.id}','${displayId}')">🔄 Değiştir</button>
+      </div>
+    </div>
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
     <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>`;
@@ -826,6 +835,51 @@ async function openDet(id){
   } catch(e){ document.getElementById('det-name').textContent='Hata: '+e.message; }
 }
 function closeDet(){ document.getElementById('det').classList.remove('on'); }
+
+// ── PADOK DEĞİŞTİR (hayvan kartı özet tab) ──
+async function padokDegistir(hayvanId, displayId) {
+  const sel = document.getElementById('det-padok-select');
+  if (!sel) return;
+  const yeniPadokId = sel.value;
+  if (!yeniPadokId) { toast('⚠️ Lütfen bir padok seçin', true); return; }
+  const yeniPadokAd = sel.options[sel.selectedIndex]?.text || '?';
+  // Mevcut hayvanı bul
+  const hayvanlar = getState('animals');
+  const a = hayvanlar.find(x => x.id === hayvanId);
+  if (!a) { toast('⚠️ Hayvan bulunamadı', true); return; }
+  const eskiPadok = a.padok || '—';
+  if (a.padok_id === yeniPadokId) { toast('⚠️ Hayvan zaten bu padokta', true); return; }
+  try {
+    const res = await rpc('padok_degistir', { p_hayvan_id: hayvanId, p_yeni_padok_id: yeniPadokId });
+    if (res && res.success) {
+      // Update local state
+      const idx = hayvanlar.findIndex(x => x.id === hayvanId);
+      if (idx !== -1) {
+        hayvanlar[idx] = { ...hayvanlar[idx], padok_id: yeniPadokId, padok: yeniPadokAd };
+        setState('animals', [...hayvanlar]);
+      }
+      // Update det-meta
+      const metaEl = document.getElementById('det-meta');
+      if (metaEl) {
+        const irk = a.irk || '—';
+        metaEl.textContent = `${irk} · ${yeniPadokAd}`;
+      }
+      // Update chips
+      const chipsEl = document.getElementById('det-chips');
+      if (chipsEl) {
+        const chips = chipsEl.querySelectorAll('.chip-k');
+        if (chips.length >= 2) {
+          chips[1].textContent = yeniPadokAd;
+        }
+      }
+      toast(`✅ Padok değiştirildi: ${eskiPadok} → ${yeniPadokAd}`);
+    } else {
+      toast(`⚠️ ${res?.error || 'İşlem başarısız'}`, true);
+    }
+  } catch (e) {
+    toast(`⚠️ ${e.message}`, true);
+  }
+}
 
 function openIslemDetay(idx){
   const l=(globalThis._detGecmisLogs||[])[idx];
