@@ -48,6 +48,11 @@
         "CONTEXT7_API_KEY": "ctx7sk-3690ea35-9122-479a-b65b-d4fe04478ff1"
       },
       "trust": true
+    },
+    "tools-bank": {
+      "command": "python3",
+      "args": ["/root/tools-bank/mcp_server/server.py", "--stdio"],
+      "trust": true
     }
   }
 }

@@ -28,10 +28,11 @@ Kod değişken adları, API/RPC isimleri İngilizce kalabilir. UI metinleri Tür
 - Repo: `Meliksahtokur/egesut-erp1`
 - Auth: `~/.netrc` — push otomatik çalışır
 
-**MCP Sunucuları (Gwen'e özel):**
-- `gwen-supabase` — execute_sql, get_table_schema, get_db_telemetry
-- `gwen-context7` — fetch_docs
-- `gwen-github` — get_repo_info, create_pull_request
+**MCP Sunucuları:**
+- `context7` — fetch_docs (kütüphane dokümanları)
+- `tools-bank` — memory_search, semantic_search, task_create/list/get/claim/complete, file_read/write, supabase_query/rpc/migrate, knowledge_graph_query
+
+> tools-bank MCP = Claude'un tüm backend altyapısına erişim. Supabase için curl yerine `supabase_query`/`supabase_rpc` kullan.
 
 ## ⚠️ 4 Demir Kural
 
