@@ -2,26 +2,34 @@
 
 > **REQUIRED SUB-SKILL:** Use the executing-plans skill to implement this plan task-by-task.
 > **Neye dokunma:** config.js'ye dokunma (tamamlandı), Supabase migration'larına dokunma, mevcut iş mantığını değiştirme — sadece taşı/tekilleştir.
+> **ÖNCE OKU:** `write()` imzası: `async function write(table, data, method = 'POST', filter = '')` (api.js:205). 19 çağrı var. Bu plan write()'a DOKUNMAZ — o Plan 3'te (Aşama 2).
 
 **Goal:** Aşama 1'in kalan 3 maddesini tamamla: yardımcı fonksiyonları utils/'e taşı, autocomplete'i tekilleştir, global state referanslarını AppState'e geçir.
 
-**Architecture:** `app.js`'teki `g()`, `v()`, `cl()`, `toast()`, `openM()`, `closeM()`, `dAgo()`, `dFwd()`, `fmtTarih()` → `js/utils/helpers.js` ve `js/utils/modal.js`. `acHdeTani` + `acDisease` → tek `setupAutocomplete()`. `ui.js`'teki `_A`/`_S` referansları → `getState('animals')`/`setState(...)`.
+**Architecture:** `app.js`'teki `g()`, `v()`, `cl()`, `toast()`, `openM()`, `closeM()`, `dAgo()`, `dFwd()`, `fmtTarih()` → `js/utils/helpers.js` ve `js/utils/modal.js` (TEK COMMIT). `acHdeTani` + `acDisease` → tek `setupAutocomplete()`. `ui.js`'teki `_A`/`_S`/`_gebeIds`/`_hastaIds`/`_taskKategori`/`_stokTab` → `getState()`/`setState()`.
 
 **Tech Stack:** Vanilla JS
 
-**⚠️ İNSAN ONAYI GEREKİR:** Task 5 (state migration) — 24 adet `_A`/`_S` referansı değişecek. Yanlış referans = hayvan listesi boş gelir. Gözden geçirilmeden uygulanmasın.
+**⚠️ İNSAN ONAYI GEREKİR:** Task 3 (state migration) — ~24 global referans değişecek. Yanlış referans = hayvan listesi boş gelir.
 
 ---
 
-### Task 1: `utils/helpers.js` Oluştur
+### Task 1: `utils/helpers.js` + `utils/modal.js` Oluştur (TEK COMMIT)
 
 **TDD scenario:** Modifying tested code — run existing tests first
 
 **Files:**
-- Create: `js/utils/helpers.js`
-- Modify: `js/app.js` (g, v, cl, dAgo, dFwd, fmtTarih, toast'u kaldır)
+- Create: `js/utils/helpers.js`, `js/utils/modal.js`
+- Modify: `js/app.js` (88-158 arası tüm fonksiyonları kaldır)
+- Modify: `index.html` (her iki script'i başa ekle)
 
-**Step 1: helpers.js oluştur, DOM yardımcılarını taşı**
+**Step 1: utils/ dizini oluştur**
+
+```bash
+mkdir -p js/utils
+```
+
+**Step 2: helpers.js oluştur**
 
 ```js
 // js/utils/helpers.js
@@ -30,24 +38,9 @@
 function g(id)   { return document.getElementById(id); }
 function v(id)   { return g(id)?.value || ''; }
 function cl(id)  { const el = g(id); if (el) el.value = ''; }
-
-function dAgo(n) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().split('T')[0];
-}
-
-function dFwd(base, n) {
-  const d = base ? new Date(base) : new Date();
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split('T')[0];
-}
-
-function fmtTarih(iso) {
-  if (!iso) return '—';
-  const p = iso.slice(0, 10).split('-');
-  return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso;
-}
+function dAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
+function dFwd(base, n) { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; }
+function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso; }
 
 function toast(msg, err = false) {
   const t = document.createElement('div');
@@ -57,43 +50,15 @@ function toast(msg, err = false) {
   setTimeout(() => t.classList.add('show'), 10);
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
 }
+
+function esc(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
 ```
 
-**Step 2: helpers.js'in çalıştığını doğrula**
-
-Bash test: `grep -c "function " /root/egesut-erp1/js/utils/helpers.js` → 8
-
-**Step 3: index.html'de helpers.js'i diğer scriptlerden önce yükle**
-
-```html
-<script src="js/utils/helpers.js?v=3"></script>
-<script src="js/config.js?v=3"></script>
-<script src="js/state.js?v=3"></script>
-...
-```
-
-**Step 4: app.js'den taşınan fonksiyonları sil**
-
-`app.js`'ten `g()`, `v()`, `cl()`, `dAgo()`, `dFwd()`, `fmtTarih()`, `toast()` fonksiyon tanımlarını kaldır (satır 88-158 arası).
-
-**Step 5: Commit**
-
-```bash
-git add js/utils/helpers.js js/app.js index.html
-git commit -m "refactor: helpers.js olustur, DOM yardimcilari ve toast tasindi"
-```
-
----
-
-### Task 2: `utils/modal.js` Oluştur
-
-**TDD scenario:** Modifying tested code — run existing tests first
-
-**Files:**
-- Create: `js/utils/modal.js`
-- Modify: `js/app.js` (openM, closeM, mClose'u kaldır)
-
-**Step 1: modal.js oluştur**
+**Step 3: modal.js oluştur**
 
 ```js
 // js/utils/modal.js
@@ -104,16 +69,9 @@ function openM(id) {
   if (!el) return;
   el.classList.add('on');
   el.setAttribute('aria-hidden', 'false');
-
-  // ESC ile kapat
-  const escHandler = (e) => {
-    if (e.key === 'Escape') {
-      closeM(id);
-      document.removeEventListener('keydown', escHandler);
-    }
-  };
-  document.addEventListener('keydown', escHandler);
-  el._escHandler = escHandler;
+  const handler = (e) => { if (e.key === 'Escape') { closeM(id); document.removeEventListener('keydown', handler); } };
+  document.addEventListener('keydown', handler);
+  el._esc = handler;
 }
 
 function closeM(id) {
@@ -121,10 +79,7 @@ function closeM(id) {
   if (!el) return;
   el.classList.remove('on');
   el.setAttribute('aria-hidden', 'true');
-  if (el._escHandler) {
-    document.removeEventListener('keydown', el._escHandler);
-    delete el._escHandler;
-  }
+  if (el._esc) { document.removeEventListener('keydown', el._esc); delete el._esc; }
 }
 
 function mClose(e, el) {
@@ -132,317 +87,233 @@ function mClose(e, el) {
 }
 ```
 
-**Step 2: index.html'de modal.js yükle**
+**Step 4: index.html'de HER İKİSİNİ en başa ekle**
 
-Helpers.js'den sonra, diğerlerinden önce.
+```html
+<!-- MEVCUT SIRA: config → state → api → app → ui → forms -->
+<!-- YENİ SIRA (helpers + modal en başta): -->
+<script src="js/utils/helpers.js?v=3"></script>
+<script src="js/utils/modal.js?v=3"></script>
+<script src="js/config.js?v=3"></script>
+<script src="js/state.js?v=3"></script>
+<script src="js/api.js?v=3"></script>
+<script src="js/app.js?v=3"></script>
+<script src="js/ui.js?v=3"></script>
+<script src="js/forms.js?v=3"></script>
+```
 
-**Step 3: app.js'den eski openM/closeM/mClose tanımlarını kaldır**
+**Step 5: app.js'den taşınan tüm fonksiyonları tek seferde sil**
 
-**Step 4: Commit**
+`app.js` satır 88-158 arasındaki `g()`, `v()`, `cl()`, `dAgo()`, `dFwd()`, `fmtTarih()`, `toast()`, `openM()`, `closeM()`, `mClose()` tanımlarını kaldır.
+
+**Step 6: TEK COMMIT**
 
 ```bash
-git add js/utils/modal.js js/app.js index.html
-git commit -m "refactor: modal.js olustur, openM/closeM/mClose tasindi"
+git add js/utils/ js/app.js index.html
+git commit -m "refactor: helpers.js + modal.js olusturuldu, app.js temizlendi"
 ```
+
+Neden tek commit: helpers.js ve modal.js aynı anda index.html'de yüklü olmalı, yoksa `openM` undefined kalarak sonraki script'leri kırar.
 
 ---
 
-### Task 3: `setupAutocomplete()` Tekilleştirme
+### Task 2: `setupAutocomplete()` Tekilleştirme
 
 **TDD scenario:** New feature — full TDD cycle
 
 **Files:**
-- Modify: `js/app.js` (acHdeTani, acDisease → setupAutocomplete)
+- Modify: `js/utils/helpers.js` (setupAutocomplete ekle)
+- Modify: `js/app.js` (acHdeTani satır 631, acDisease satır 676 → kaldır, setupAutocomplete çağrılarıyla değiştir)
 
-**Step 1: setupAutocomplete fonksiyonunu helpers.js'e ekle**
+**Step 1: helpers.js'e sadeleştirilmiş setupAutocomplete ekle**
 
 ```js
 /**
- * Genel autocomplete fonksiyonu
- * @param {string} inputId - Input element ID'si
- * @param {object} options
- * @param {string[]|function} options.dataSource - Statik liste veya async fonksiyon
- * @param {string} options.displayField - Görüntülenecek alan (obje datasource için)
- * @param {string} options.valueField - Değer alanı (obje datasource için)
- * @param {function} options.onSelect - Seçim yapıldığında çağrılır (value, item)
+ * Genel autocomplete
+ * @param {string} inputId
+ * @param {object} opts - { source: string[] | async (q) => string[], onSelect: (val) => void }
  */
-function setupAutocomplete(inputId, options) {
+function setupAutocomplete(inputId, opts) {
   const input = g(inputId);
   if (!input) return;
 
-  let list = [];
-  let selectedIndex = -1;
+  let list = [], idx = -1;
+  const wrap = document.createElement('div');
+  wrap.className = 'ac-wrapper';
+  input.parentNode.insertBefore(wrap, input.nextSibling);
+  const ul = document.createElement('ul');
+  ul.className = 'ac-list';
+  wrap.appendChild(ul);
 
-  const wrapper = document.createElement('div');
-  wrapper.className = 'ac-wrapper';
-  input.parentNode.insertBefore(wrapper, input.nextSibling);
-
-  const listEl = document.createElement('ul');
-  listEl.className = 'ac-list';
-  wrapper.appendChild(listEl);
-
-  async function loadData(query) {
-    if (typeof options.dataSource === 'function') {
-      list = await options.dataSource(query);
-    } else {
-      const q = query.toLowerCase();
-      list = options.dataSource.filter(item => {
-        const text = typeof item === 'string' ? item : item[options.displayField];
-        return text.toLowerCase().includes(q);
-      });
-    }
+  async function load(q) {
+    if (typeof opts.source === 'function') list = await opts.source(q);
+    else { const lq = q.toLowerCase(); list = opts.source.filter(s => s.toLowerCase().includes(lq)); }
   }
 
-  function renderList() {
-    listEl.innerHTML = '';
-    selectedIndex = -1;
+  function render() {
+    ul.innerHTML = ''; idx = -1;
     list.slice(0, 10).forEach((item, i) => {
       const li = document.createElement('li');
-      li.textContent = typeof item === 'string' ? item : item[options.displayField];
-      li.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        selectItem(i);
-      });
-      listEl.appendChild(li);
+      li.textContent = item;
+      li.addEventListener('mousedown', e => { e.preventDefault(); select(i); });
+      ul.appendChild(li);
     });
-    if (list.length) listEl.style.display = 'block';
-    else listEl.style.display = 'none';
+    ul.style.display = list.length ? 'block' : 'none';
   }
 
-  function selectItem(idx) {
-    const item = list[idx];
-    const value = typeof item === 'string' ? item : item[options.valueField];
-    input.value = typeof item === 'string' ? item : item[options.displayField];
-    listEl.style.display = 'none';
-    if (options.onSelect) options.onSelect(value, item);
+  function select(i) {
+    input.value = list[i];
+    ul.style.display = 'none';
+    if (opts.onSelect) opts.onSelect(list[i]);
   }
 
   input.addEventListener('input', async () => {
     const q = input.value.trim();
-    if (q.length < 1) { listEl.style.display = 'none'; return; }
-    await loadData(q);
-    renderList();
+    if (!q) { ul.style.display = 'none'; return; }
+    await load(q); render();
   });
 
-  input.addEventListener('keydown', (e) => {
-    const items = listEl.querySelectorAll('li');
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (selectedIndex < items.length - 1) selectedIndex++;
-      highlightItem(items);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (selectedIndex > 0) selectedIndex--;
-      highlightItem(items);
-    } else if (e.key === 'Enter' && selectedIndex >= 0) {
-      e.preventDefault();
-      selectItem(selectedIndex);
-    } else if (e.key === 'Escape') {
-      listEl.style.display = 'none';
-    }
+  input.addEventListener('keydown', e => {
+    const items = ul.querySelectorAll('li');
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (idx < items.length - 1) idx++; }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (idx > 0) idx--; }
+    else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); select(idx); return; }
+    else if (e.key === 'Escape') { ul.style.display = 'none'; return; }
+    items.forEach((li, i) => li.classList.toggle('active', i === idx));
   });
 
-  function highlightItem(items) {
-    items.forEach((li, i) => li.classList.toggle('active', i === selectedIndex));
-  }
-
-  document.addEventListener('click', (e) => {
-    if (!wrapper.contains(e.target) && e.target !== input) {
-      listEl.style.display = 'none';
-    }
+  document.addEventListener('click', e => {
+    if (!wrap.contains(e.target) && e.target !== input) ul.style.display = 'none';
   });
 }
 ```
 
-**Step 2: Mevcut autocomplete çağrılarını değiştir**
+**Step 2: Mevcut autocomplete'leri setupAutocomplete ile değiştir**
 
-`acHdeTani(inp)` çağrısını değiştir:
+Önce `acHdeTani` (app.js:631) ve `acDisease` (app.js:676) fonksiyonlarını oku, ne yaptıklarını anla.
 
 ```js
-// ESKI:
-acHdeTani('hdeTaniInp');
-
-// YENI:
+// acHdeTani(inp) → setupAutocomplete:
 setupAutocomplete('hdeTaniInp', {
-  dataSource: async (query) => {
+  source: async (q) => {
     const all = await getData('hastalik_katalog');
-    return all.filter(h => h.tani_ad.toLowerCase().includes(query.toLowerCase()));
+    return all.filter(h => h.tani_ad.toLowerCase().includes(q.toLowerCase())).map(h => h.tani_ad);
   },
-  displayField: 'tani_ad',
-  valueField: 'id',
-  onSelect: (value, item) => {
-    // mevcut callback mantığı
-  }
+  onSelect: (val) => { /* mevcut callback mantığını kopyala */ }
+});
+
+// acDisease() → setupAutocomplete:
+setupAutocomplete('diseaseInp', {
+  source: HASTALIK_LISTESI,
+  onSelect: (val) => { /* mevcut callback */ }
 });
 ```
 
-`acDisease()` çağrısını değiştir (benzer şekilde).
+**Step 3: app.js'den eski acHdeTani ve acDisease tanımlarını sil**
 
-**Step 3: app.js'den eski acHdeTani ve acDisease fonksiyonlarını kaldır**
-
-**Step 4: test — input'a yazıp autocomplete'in çalıştığını doğrula**
-
-Manuel test: tarayıcıda hastalık tanı input'una yaz → autocomplete listesi görünmeli.
-
-**Step 5: Commit**
+**Step 4: Commit**
 
 ```bash
 git add js/utils/helpers.js js/app.js
-git commit -m "refactor: setupAutocomplete tekillestirildi, acHdeTani/acDisease kaldirildi"
+git commit -m "refactor: setupAutocomplete tekillestirildi"
 ```
 
 ---
 
-### Task 4: State Migration — `_A`/`_S` → `getState`/`setState`
+### Task 3: Global State Referansları → AppState
 
 **⚠️ İNSAN ONAYI GEREKİR**
 
 **TDD scenario:** Modifying tested code — run existing tests first, verify after every change
 
 **Files:**
-- Modify: `js/ui.js` (18 `_A`/`_S` referansı)
+- Modify: `js/state.js` (constructor'a yeni key'ler ekle)
+- Modify: `js/ui.js` (~24 global referans)
 - Modify: `js/app.js` (6 `_A`/`_S` referansı)
 
-**Mevcut durum:**
-- `state.js`'te `AppState` class'ı var, `globalThis.__state` olarak erişilebilir
-- `getState(key)` / `setState(key, value)` yardımcıları var
-- `ui.js` hala `_A` (animals array), `_S` (stock array) gibi global değişkenleri direkt kullanıyor
+**Step 1: state.js constructor'ına yeni key'ler ekle**
 
-**Step 1: ui.js ve app.js'teki tüm `_A`/`_S` referanslarını listele**
+```js
+// state.js constructor'ına ekle:
+animals: [],        // _A
+stock: [],           // _S
+gebeIds: new Set(),  // _gebeIds
+hastaIds: new Set(), // _hastaIds
+taskKategori: 'all', // _taskKategori
+stokTab: 'tumu',     // _stokTab
+curStokDet: null,    // _curStokDet
+```
+
+**Step 2: Referansları tara**
 
 ```bash
-grep -n "_A\b\|_S\b" /root/egesut-erp1/js/ui.js /root/egesut-erp1/js/app.js
+grep -n "_A\b\|_S\b\|_gebeIds\|_hastaIds\|_taskKategori\|_stokTab\|_curStokDet" js/ui.js js/app.js
 ```
 
-**Step 2: Her referansı değiştir**
+**Step 3: Değiştir**
 
-| Eski | Yeni |
-|------|------|
-| `_A` (okuma) | `getState('animals')` |
-| `_A = x` (yazma) | `setState('animals', x)` |
-| `_S` (okuma) | `getState('stock')` |
-| `_S = x` (yazma) | `setState('stock', x)` |
+| Eski | Yeni (okuma) | Yeni (yazma) |
+|------|-------------|-------------|
+| `_A` | `getState('animals')` | `setState('animals', x)` |
+| `_S` | `getState('stock')` | `setState('stock', x)` |
+| `_gebeIds` | `getState('gebeIds')` | `setState('gebeIds', x)` |
+| `_hastaIds` | `getState('hastaIds')` | `setState('hastaIds', x)` |
+| `_taskKategori` | `getState('taskKategori')` | `setState('taskKategori', x)` |
+| `_stokTab` | `getState('stokTab')` | `setState('stokTab', x)` |
+| `_curStokDet` | `getState('curStokDet')` | `setState('curStokDet', x)` |
 
-Örnek:
+**⚠️ KRİTİK: Array/Set'i doğrudan mutate etme!**
+
 ```js
-// ESKI:
-_A.forEach(a => { ... });
-_S.push(newItem);
+// YANLIŞ — event emit tetiklenmez:
+const arr = getState('animals'); arr.push(x);  // ❌
 
-// YENI:
-getState('animals').forEach(a => { ... });
-const stock = getState('stock');
-stock.push(newItem);
-setState('stock', stock);
+// DOĞRU — her zaman setState ile yeni referans:
+setState('animals', [...getState('animals'), x]);  // ✅
+setState('gebeIds', new Set([...getState('gebeIds'), id]));  // ✅
+setState('hastaIds', new Set([...getState('hastaIds')].filter(id => id !== x)));  // ✅
 ```
 
-**Step 3: ui.js'in başındaki `/* global _A, _S */` yorumunu güncelle**
+**Step 4: ui.js başındaki `/* global _A, _S, _gebeIds, _hastaIds */` yorumunu güncelle**
 
 ```js
 /* global
    getState, setState,
-   _gebeIds, _hastaIds,
+   HEKIMLER, VARSAYILAN_HEKIM,
    ...
 */
 ```
 
-**Step 4: Syntax check**
+**Step 5: Syntax check + commit**
 
 ```bash
-grep -rn "\.js" /root/egesut-erp1/js/*.js | grep -v "node_modules" | head -5
-```
-
-**Step 5: Commit**
-
-```bash
-git add js/ui.js js/app.js
-git commit -m "refactor: _A/_S global referanslar getState/setState'e gecirildi"
-```
-
----
-
-### Task 5: Diğer Global Referansları Temizleme
-
-**TDD scenario:** Modifying tested code — run existing tests first
-
-**Files:**
-- Modify: `js/ui.js` (global değişkenleri state'e taşı)
-
-**Mevcut global değişkenler (`ui.js` içinde `let` ile tanımlanmış):**
-
-```
-_taskKategori, _stokTab, _curStokDet
-```
-
-**Step 1: Bu değişkenleri module-scope'dan kaldırıp state'e taşı**
-
-```js
-// ESKI (ui.js tepesi):
-let _taskKategori='all';
-let _stokTab='tumu';
-let _curStokDet=null;
-
-// YENI:
-// Bu değişkenler state üzerinden yönetilsin
-// Kullanan yerler: getState('taskKategori'), setState('taskKategori', 'all')
-```
-
-**Step 2: state.js'ye yeni key'ler ekle**
-
-```js
-// state.js constructor'ına ekle:
-taskKategori: 'all',
-stokTab: 'tumu',
-curStokDet: null,
-```
-
-**Step 3: Tüm referansları değiştir**
-
-```bash
-grep -n "_taskKategori\|_stokTab\|_curStokDet" js/ui.js
-```
-
-Her referansı `getState`/`setState` ile değiştir.
-
-**Step 4: Commit**
-
-```bash
-git add js/ui.js js/state.js
-git commit -m "refactor: _taskKategori/_stokTab/_curStokDet state'e tasindi"
+for f in js/state.js js/app.js js/ui.js; do node --check "$f" && echo "✓ $f"; done
+git add js/state.js js/app.js js/ui.js
+git commit -m "refactor: tum global referanslar state'e gecirildi"
 ```
 
 ---
 
 ## Test Instructions
 
-Tüm task'lardan sonra:
-
 ```bash
 cd /root/egesut-erp1
-# Syntax check
+
+# 1. Yeni dosyalar var mi?
+ls -la js/utils/helpers.js js/utils/modal.js
+
+# 2. app.js'de eski fonksiyonlar kaldirildi mi? (0 olmali)
+grep -c "function g(\|function v(\|function cl(\|function openM(\|function closeM(" js/app.js
+
+# 3. Yeni fonksiyonlar utils'te mi?
+grep -c "function g(\|function toast(\|function esc(" js/utils/helpers.js  # >= 8
+grep -c "function openM(\|function closeM(" js/utils/modal.js              # >= 2
+
+# 4. Global referans kaldi mi? (0 olmali — sadece comment/string'te olabilir)
+grep -n "_A\b\|_S\b" js/ui.js js/app.js | grep -v "//\|getState"
+
+# 5. Syntax check
 for f in js/utils/*.js js/state.js js/config.js js/api.js js/app.js js/forms.js js/ui.js; do
   node --check "$f" 2>&1 && echo "✓ $f" || echo "✗ $f"
 done
-
-# Kullanim kontrolü — tasinan fonksiyonlarin artik app.js'te tanimli OLMADIGINI dogrula
-grep -c "^function g(\|^function v(\|^function cl(\|^function openM(\|^function closeM(" js/app.js
-# Yukaridaki 0 dönmeli (hepsi tasindi)
-
-# Yeni fonksiyonlarin utils'te oldugunu dogrula
-grep -c "^function g(\|^function v(\|^function toast(" js/utils/helpers.js
-# Yukaridaki 7+ dönmeli
-
-grep -c "^function openM(\|^function closeM(" js/utils/modal.js
-# Yukaridaki 2 dönmeli
 ```
-
----
-
-## Onay Gerektiren İşler
-
-| Task | Risk | Neden |
-|------|------|-------|
-| Task 4 | **YÜKSEK** | 24 adet `_A`/`_S` referansı değişecek. Yanlış `getState` çağrısı = boş liste, render hatası |
-| Task 5 | Orta | 3 global değişken state'e taşınıyor, görev filtresi ve stok sekmesi etkilenir |
-
-**Task 1-3** risksiz, hemen başlanabilir. Task 4-5 için onay iste.
