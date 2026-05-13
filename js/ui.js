@@ -470,7 +470,8 @@ function _animalTagsHtml(a,gebeSet){
   }
   const hastaBadge=(_hastaIds||new Set()).has(a.id)?`<span class="tag" style="background:rgba(192,50,26,.12);color:var(--red);font-weight:700">🏥 Hasta</span>`:'';
   const abortBadge=a.abort_sayisi>0?`<span class="tag" style="background:rgba(192,50,26,.18);color:var(--red);font-size:.65rem;font-weight:700;border:1px solid rgba(192,50,26,.3)">⚠️ ${a.abort_sayisi}x abort</span>`:'';
-  return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}`;
+  const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">🔴 Kısır</span>`:'';
+  return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${kisirBadge}`;
 }
 function _animalCardHtml(a,gebeSet,idx){
   const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
@@ -558,10 +559,10 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#srch')&&!e.target.closest('#ac-srch'))
     { const ac=document.getElementById('ac-srch'); if(ac) ac.style.display='none'; }
 });
-let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null};
+let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null};
 let _detOpenId=null;
 function fchipReset(){
-  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null};
+  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null};
   document.querySelectorAll('[id^="fc-"]').forEach(b=>b.classList.remove('on'));
 }
 function fchipSec(grup,deger,btn){
@@ -599,6 +600,7 @@ function filterA(){
       return (Date.now()-new Date(a.dogum_tarihi).getTime())>=365*86400000;
     });
     if(_fchip.saglik==='hasta') f=f.filter(a=>_hastaIds.has(a.id));
+    if(_fchip.kisir==='kisir') f=f.filter(a=>a.kisir);
     renderAnimals(f);
   },250);
 }
@@ -642,6 +644,11 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
         </select>
         <button class="btn" style="padding:6px 12px;font-size:.8rem;background:rgba(42,107,181,.12);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokDegistir('${a.id}','${displayId}')">🔄 Değiştir</button>
       </div>
+    </div>
+    <div style="margin-top:8px">
+      <button class="btn ${a.kisir?'btn-warn':'btn-outline'}" style="width:100%;padding:8px;font-size:.82rem" onclick="toggleKisir('${a.id}',${!a.kisir})">
+        ${a.kisir ? '🔴 Kısır — Satılabilir' : '⚪ Kısır İşaretle'}
+      </button>
     </div>
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
@@ -884,6 +891,26 @@ async function padokDegistir(hayvanId, displayId) {
         }
       }
       toast(`✅ Padok değiştirildi: ${eskiPadok} → ${yeniPadokAd}`);
+    } else {
+      toast(`⚠️ ${res?.error || 'İşlem başarısız'}`, true);
+    }
+  } catch (e) {
+    toast(`⚠️ ${e.message}`, true);
+  }
+}
+
+async function toggleKisir(hayvanId, yeniDurum) {
+  try {
+    const res = await rpc('hayvan_kisir_isaretle', { p_hayvan_id: hayvanId, p_kisir: yeniDurum });
+    if (res && res.ok) {
+      const hayvanlar = getState('animals');
+      const idx = hayvanlar.findIndex(x => x.id === hayvanId);
+      if (idx !== -1) {
+        hayvanlar[idx] = { ...hayvanlar[idx], kisir: yeniDurum };
+        setState('animals', [...hayvanlar]);
+      }
+      toast(yeniDurum ? '🔴 Kısır olarak işaretlendi' : '✅ Kısır işareti kaldırıldı');
+      showDet(hayvanId);
     } else {
       toast(`⚠️ ${res?.error || 'İşlem başarısız'}`, true);
     }
