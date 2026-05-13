@@ -177,13 +177,24 @@ Bu aşama, projenin gelecekteki geliştirmeler için daha sağlam bir temele otu
 
 ## İlerleme Takibi
 
-Her aşama tamamlandığında, bu dosyanın altına tarih ve yapılan işler not edilecektir. Örneğin:
+## İlerleme Durumu (2026-05-13)
 
-**Aşama 1 Tamamlandı – 2026-03-14**
-- Global state havuzu oluşturuldu.
-- Sabitler `config.js`'e taşındı.
-- Yardımcı fonksiyonlar `utils/` klasörüne ayrıldı.
-- Autocomplete sistemi tekilleştirildi.
+| Aşama | Durum |
+|-------|-------|
+| 1.1 Global State | ⚠️ Kısmen — `state.js`/`AppState` var, ama `_A`/`_S` referansları hala global (ui.js:18, app.js:6) |
+| 1.2 Sabitler → config.js | ✅ Bitti — Tüm sabitler `config.js`'te, hiç tekrar tanım yok |
+| 1.3 Yardımcılar → utils/ | ❌ Yapılmadı |
+| 1.4 Autocomplete tekilleştirme | ❌ Yapılmadı |
+| 2. Veri Yönetimi | ❌ Yapılmadı |
+| 3. UI/Render | ❌ Yapılmadı |
+| 4. Hata Yönetimi | ❌ Yapılmadı |
+| 5. Migration | ❌ Yapılmadı |
+| 6. Güvenlik/XSS | ❌ Yapılmadı |
+| 7. Performans | ❌ Yapılmadı |
+| 8. Test/Kod Kalitesi | ❌ Yapılmadı |
+| 9. Dokümantasyon | ❌ Yapılmadı |
+
+**Son kontrol:** 2026-05-13
 
 ---
 
