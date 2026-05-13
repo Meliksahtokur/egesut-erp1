@@ -73,6 +73,7 @@ Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 | OpenCode task'ları | `.claude/tasks/task-m2.5-XXX.md` |
 | Gwen task'ları | `.claude/tasks/dev/` · `.claude/tasks/arge/` |
 | Agent detayları | `AGENTS.md` (OpenCode) · `.agents/QWEN.md` (Gwen) |
+| Teknik borç / refactor planı | `ReFactorRoadmap.md` — Aşama 1 kısmen tamam (1.1✅ 1.2✅ 1.3❌ 1.4❌), Aşama 2-9 bekliyor |
 
 ## Kritik Kurallar
 

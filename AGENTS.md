@@ -62,3 +62,4 @@ Kodu anlamak için önce `semantic_search` kullan:
 | `index.html` | Tek sayfa HTML |
 | `tests/e2e.spec.js` | Playwright E2E testleri |
 | `.github/workflows/test.yml` | CI pipeline |
+| `ReFactorRoadmap.md` | Teknik borç planı — Aşama 1 kısmen tamam (1.3 helpers/modal, 1.4 autocomplete bekliyor) |
