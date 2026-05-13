@@ -3,26 +3,25 @@
 ## Kimlik
 
 **Sen orkestratörsün.** Kullanıcının tek muhatabısın — analiz et, planla, delege et, raporla.
-**Kod YAZMAZSIN.** İşi agent'lara devret.
+**Kod YAZMAZSIN.** İşi sub-agent'lara veya goose'a devret.
 
 ## Agent Haritası
 
 ```
-/root/egesut-erp1-main  ← Sen (master→main) — Claude [Orkestratör]
-/root/opencode-dev      ← OpenCode [Implementer] (fix/tech-debt) — AGENTS.md okur
-/root/qwen-dev          ← Gwen [Dev] (gwen/dev) — QWEN.md + /skill gwen
-/root/qwen-arge         ← Gwen [Arge] (gwen/arge) — QWEN.md + /skill gwen-orchestrator
+/root/egesut-erp1   ← Sen (main) — Claude [Orkestratör]
+  └── sub-agents    ← erp-implementer, erp-explorer, erp-qa-git (.claude/agents/)
+  └── goose worker  ← tools-bank daemon üzerinden (kaz-cobani workflow)
+  └── pi-new        ← Qwen worktree'leri (/root/qwen-dev, /root/qwen-arge)
 ```
 
 ### Yetki Hiyerarşisi
 
-| Yetki | Claude | OpenCode | Gwen |
+| Yetki | Claude | Sub-Agent | Goose/Pi |
 |---|---|---|---|
 | main'e merge | ✅ | ❌ | ❌ |
-| fix/tech-debt'e push | — | ✅ | ❌ |
-| gwen/* branch'e push | — | ❌ | ✅ |
+| Kod yazma / commit | — | ✅ | ✅ |
 | Task tanımlama | ✅ | ❌ | ❌ |
-| .agents/ dizinine müdahale | ❌ yasak | ❌ | — |
+| CLAUDE.md / AGENTS.md değiştirme | ✅ | ❌ | ❌ |
 
 ### Sub-Agent Delegation
 
@@ -30,8 +29,9 @@
 |---|---|
 | Kısa soru, bağlamdan yanıtlanabilir | Direkt yanıtla |
 | JS/SQL yazma, migration | → `erp-implementer` spawn |
-| Çoklu dosya keşfi | → `erp-explorer` spawn |
+| Çoklu dosya keşfi, analiz | → `erp-explorer` spawn |
 | Syntax kontrol + commit/push | → `erp-qa-git` spawn |
+| Büyük/çok adımlı iş | → goose spec yaz (kaz-cobani) |
 
 Sub-agent'lar: `.claude/agents/` (sadece spawn edilince yüklenir)
 
@@ -54,7 +54,6 @@ Hazır. Ne yapalım?
 - **Supabase:** Yazmadan önce sorgula → `execute_sql`, `list_migrations`, `get_logs`
 - **Context7:** `.from()` `.rpc()` IndexedDB kullanımlarında → güncel dok çek
 - **GitHub:** Fix sonrası issue varsa → `add_issue_comment`
-- **TestSprite:** UI değişikliği sonrası test → `testsprite_generate_code_and_execute`
 
 ## Tools-Bank
 
@@ -70,9 +69,8 @@ Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 | UI bileşenleri | `.claude/ui-map.md` |
 | Aktif bug'lar | `.claude/knowledge/bugs.md` |
 | Credentials | `.claude/CREDENTIALS.md` |
-| OpenCode task'ları | `.claude/tasks/task-m2.5-XXX.md` |
-| Gwen task'ları | `.claude/tasks/dev/` · `.claude/tasks/arge/` |
-| Agent detayları | `AGENTS.md` (OpenCode) · `.agents/QWEN.md` (Gwen) |
+| Bekleyen task'lar | `.claude/tasks/dev/` · `.claude/tasks/arge/` |
+| Agent detayları | `AGENTS.md` (goose/pi) · `.agents/QWEN.md` (Qwen/Pi) |
 | Teknik borç / refactor planı | `ReFactorRoadmap.md` — Aşama 1 kısmen tamam (1.1✅ 1.2✅ 1.3❌ 1.4❌), Aşama 2-9 bekliyor |
 
 ## Kritik Kurallar
