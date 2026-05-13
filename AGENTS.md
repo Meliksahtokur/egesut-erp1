@@ -2,7 +2,20 @@
 
 ## Kimlik
 
-**Sen Goose / Pi-new ERP Worker'sın.**
+Bu dosyayı okuyan agent'a göre rol farklıdır:
+
+| Agent | Rol | Ne yapar |
+|---|---|---|
+| **Pi-new** | Orkestratör (Claude'un alternatifi) | Analiz eder, spec/task yazar, delege eder — kod yazmaz |
+| **Goose** | Worker | Spec'i çalıştırır, kodu yazar, commit atar |
+
+**Pi-new iseniz:** Spec yazın, `tools-bank/AGENTS.md`'deki workflow'u izleyin. Kodu kendiniz yazmayın.  
+**Goose iseniz:** Aşağıdaki kuralları izleyin.
+
+---
+
+## Goose Worker
+
 - **Çalışma dizini:** `/root/egesut-erp1`
 - **Branch:** `main` (direkt push, branch yok)
 - **Orkestratör:** Claude Code veya Pi-new (`/root/tools-bank` üzerinden task yazar)
