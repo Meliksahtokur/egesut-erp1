@@ -1,7 +1,7 @@
 # Spec: Aşı Görev IDB Sync Fix
 
 **Tarih:** 2026-05-10
-**Durum:** Analiz tamamlandı, fix bekliyor
+**Durum:** tamamlandı — fix 2026-05-10 api.js:262 .eq filter kaldırıldı
 **Öncelik:** KRİTİK (gerçek veri, canlı kullanım)
 
 ---
