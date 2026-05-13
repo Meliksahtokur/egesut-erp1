@@ -308,7 +308,7 @@ button,input,select,textarea{font-family:inherit}
         <span class="fchip-sep">|</span>
         <button class="fchip" id="fc-saglik-hasta" onclick="fchipSec('saglik','hasta',this)">🏥 Hasta</button>
         <span class="fchip-sep">|</span>
-        <button class="fchip" id="fc-kisir-kisir" onclick="fchipSec('kisir','kisir',this)">🔴 Kısır</button>
+        <button class="fchip" id="fc-kisir-kisir" onclick="fchipSec('kisir','kisir',this)">💲 Kısır</button>
       </div>
       <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 2px"></div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
@@ -938,6 +938,15 @@ button,input,select,textarea{font-family:inherit}
         <div class="fg"><label class="flbl">Renk / Desen</label><input id="a-renk" class="fi" placeholder="Siyah-beyaz" autocomplete="off"></div>
       </div>
       <div class="fg"><label class="flbl">Ayırt Edici Özellik</label><input id="a-ozellik" class="fi" placeholder="Sol kulakta çentik, alın beyazı vb." autocomplete="off"></div>
+
+      <!-- KISIR — sadece düzenleme modunda görünür -->
+      <div id="a-kisir-wrap" style="display:none;margin-bottom:10px">
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(255,160,0,.08);border:1px solid rgba(255,160,0,.2);border-radius:8px;cursor:pointer">
+          <input id="a-kisir" type="checkbox" style="width:18px;height:18px;accent-color:var(--amber);cursor:pointer">
+          <span style="font-size:.82rem;font-weight:600;color:var(--ink)">💲 Kısır — Satılabilir <span id="a-kisir-hint" style="font-weight:400;color:var(--ink3);font-size:.72rem"></span></span>
+        </label>
+      </div>
+
       <button id="m-animal-btn" class="btn btn-g" onclick="submitAnimal(this)">Kaydet</button>
       <button class="btn btn-o" onclick="closeAnimalEdit()">İptal</button>
     </div>
