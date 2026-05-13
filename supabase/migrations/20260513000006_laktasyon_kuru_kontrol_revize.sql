@@ -1,5 +1,6 @@
 -- Migration: laktasyon_kuru_kontrol RPC (revize) — dogum tablosu olmadan
 -- Sağmal grupta olup gebe olmayan hayvanlar → kuru dönem transfer görevi
+-- gorev_log.id uuid tipinde olduğu için gen_random_uuid() direkt kullanılır
 BEGIN;
 
 CREATE OR REPLACE FUNCTION public.laktasyon_kuru_kontrol()
@@ -8,8 +9,8 @@ DECLARE
   v_olusturulan int := 0;
   v_sayac       int := 0;
   v_rec         record;
+  v_id          uuid;
 BEGIN
-  -- Sağmal grupta olup gebe olmayan aktif hayvanları bul
   FOR v_rec IN
     SELECT h.id, h.kupe_no, h.grup, h.padok
     FROM hayvanlar h
@@ -21,8 +22,9 @@ BEGIN
         WHERE t.hayvan_id = h.id AND t.sonuc = 'Gebe'
       )
   LOOP
+    v_id := gen_random_uuid();
     INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, padok_hedef)
-    SELECT gen_random_uuid()::text, v_rec.id, 'PADOK_DEGISIM',
+    SELECT v_id, v_rec.id, 'PADOK_DEGISIM',
            '⚠️ Kuru döneme geçiş zamanı — Kuru/Gebe padoğuna transfer',
            CURRENT_DATE, false,
            (SELECT ad FROM padoklar WHERE ad ILIKE '%Kuru%' LIMIT 1)
@@ -35,9 +37,7 @@ BEGIN
     );
     GET DIAGNOSTICS v_sayac = ROW_COUNT;
     v_olusturulan := v_olusturulan + v_sayac;
-
   END LOOP;
-
   RETURN jsonb_build_object('ok', true, 'olusturulan', v_olusturulan);
 END;
 $$;
