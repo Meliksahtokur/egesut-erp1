@@ -64,7 +64,7 @@ async function submitAnimal(btn) {
         p_boy:            Number.parseFloat(v('a-boy')) || null,
         p_renk:           v('a-renk') || null,
         p_ayirici_ozellik: v('a-ozellik') || null,
-        p_kisir:          document.getElementById('a-kisir')?.checked || null,
+        p_kisir:          document.getElementById('a-kisir')?.checked === true || (document.getElementById('a-kisir')?.checked === false ? false : null),
       });
       toast(`✅ ${devlet || kupe} güncellendi`);
       closeAnimalEdit();
