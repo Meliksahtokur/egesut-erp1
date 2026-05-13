@@ -235,32 +235,59 @@ git commit -m "refactor: setupAutocomplete tekillestirildi"
 
 ```js
 // state.js constructor'ına ekle:
-animals: [],        // _A
-stock: [],           // _S
-gebeIds: new Set(),  // _gebeIds
-hastaIds: new Set(), // _hastaIds
-taskKategori: 'all', // _taskKategori
-stokTab: 'tumu',     // _stokTab
-curStokDet: null,    // _curStokDet
+// app.js:81'deki TÜM global'ler:
+let _A=[], _S=[], _curStk=null, _curPg='dash',
+    _suruFilter='tumuu', _suruSiralama='kupe',
+    _curUremeTab='kizginlik', _curGecmisFilter='hepsi', _curTaskFilter='today',
+    _curTaskDet=null, _curHst=null, _curToh=null, _curBildirimTab='bekliyor';
+
+// state.js constructor'ına TÜMÜ eklenecek:
+animals: [],              // _A
+stock: [],                 // _S
+curStok: null,             // _curStk
+currentPage: 'dash',       // _curPg (zaten var)
+suruFilter: 'tumuu',       // _suruFilter
+suruSiralama: 'kupe',      // _suruSiralama
+currentUremeTab: 'kizginlik',     // _curUremeTab (zaten var)
+currentHistoryFilter: 'hepsi',   // _curGecmisFilter (zaten var)
+currentTaskFilter: 'today',      // _curTaskFilter (zaten var)
+currentTaskDetail: null,         // _curTaskDet (zaten var)
+currentDisease: null,            // _curHst (zaten var)
+currentInsem: null,              // _curToh (zaten var)
+currentNotificationTab: 'bekliyor', // _curBildirimTab (zaten var)
+gebeIds: [],               // _gebeIds — ⚠️ ARRAY! (kullanimda new Set() sarilir)
+hastaIds: new Set(),       // _hastaIds — ⚠️ SET! (direkt .has() ile kullanilir)
+taskKategori: 'all',       // _taskKategori
+stokTab: 'tumu',           // _stokTab
+curStokDet: null,          // _curStokDet
 ```
 
 **Step 2: Referansları tara**
 
 ```bash
-grep -n "_A\b\|_S\b\|_gebeIds\|_hastaIds\|_taskKategori\|_stokTab\|_curStokDet" js/ui.js js/app.js
+grep -n "_A\b\|_S\b\|_gebeIds\|_hastaIds\|_curStk\|_curPg\|_suruFilter\|_suruSiralama\|_curTaskFilter\|_curTaskDet\|_curHst\|_curToh\|_curBildirimTab\|_taskKategori\|_stokTab\|_curStokDet" js/ui.js js/app.js
 ```
 
-**Step 3: Değiştir**
+**Step 3: Değiştir — tam eşleme tablosu**
 
-| Eski | Yeni (okuma) | Yeni (yazma) |
-|------|-------------|-------------|
-| `_A` | `getState('animals')` | `setState('animals', x)` |
-| `_S` | `getState('stock')` | `setState('stock', x)` |
-| `_gebeIds` | `getState('gebeIds')` | `setState('gebeIds', x)` |
-| `_hastaIds` | `getState('hastaIds')` | `setState('hastaIds', x)` |
-| `_taskKategori` | `getState('taskKategori')` | `setState('taskKategori', x)` |
-| `_stokTab` | `getState('stokTab')` | `setState('stokTab', x)` |
-| `_curStokDet` | `getState('curStokDet')` | `setState('curStokDet', x)` |
+| Eski | Yeni (okuma) | Yeni (yazma) | Not |
+|------|-------------|-------------|-----|
+| `_A` | `getState('animals')` | `setState('animals', x)` | |
+| `_S` | `getState('stock')` | `setState('stock', x)` | |
+| `_curStk` | `getState('curStok')` | `setState('curStok', x)` | |
+| `_curPg` | `getState('currentPage')` | `setState('currentPage', x)` | |
+| `_suruFilter` | `getState('suruFilter')` | `setState('suruFilter', x)` | |
+| `_suruSiralama` | `getState('suruSiralama')` | `setState('suruSiralama', x)` | |
+| `_curTaskFilter` | `getState('currentTaskFilter')` | `setState('currentTaskFilter', x)` | |
+| `_curTaskDet` | `getState('currentTaskDetail')` | `setState('currentTaskDetail', x)` | |
+| `_curHst` | `getState('currentDisease')` | `setState('currentDisease', x)` | |
+| `_curToh` | `getState('currentInsem')` | `setState('currentInsem', x)` | |
+| `_curBildirimTab` | `getState('currentNotificationTab')` | `setState('currentNotificationTab', x)` | |
+| `_gebeIds` | `getState('gebeIds')` | `setState('gebeIds', x)` | ⚠️ ARRAY — `new Set()` sarılarak kullanılır |
+| `_hastaIds` | `getState('hastaIds')` | `setState('hastaIds', x)` | ⚠️ SET — direkt `.has()` ile kullanılır |
+| `_taskKategori` | `getState('taskKategori')` | `setState('taskKategori', x)` | |
+| `_stokTab` | `getState('stokTab')` | `setState('stokTab', x)` | |
+| `_curStokDet` | `getState('curStokDet')` | `setState('curStokDet', x)` | |
 
 **⚠️ KRİTİK: Array/Set'i doğrudan mutate etme!**
 
@@ -270,17 +297,43 @@ const arr = getState('animals'); arr.push(x);  // ❌
 
 // DOĞRU — her zaman setState ile yeni referans:
 setState('animals', [...getState('animals'), x]);  // ✅
-setState('gebeIds', new Set([...getState('gebeIds'), id]));  // ✅
-setState('hastaIds', new Set([...getState('hastaIds')].filter(id => id !== x)));  // ✅
+setState('gebeIds', [...getState('gebeIds'), id]);  // ✅ (ARRAY)
+setState('hastaIds', new Set([...getState('hastaIds'), id]));  // ✅ (SET)
 ```
 
-**Step 4: ui.js başındaki `/* global _A, _S, _gebeIds, _hastaIds */` yorumunu güncelle**
+**Step 3b: globalThis._appState satırlarını SİL**
+
+```js
+// ui.js:476 ve ui.js:1480 — BU SATIRLARI SİL:
+globalThis._appState = globalThis._appState || {}; globalThis._appState.hayvanlar = _A;
+globalThis._appState = globalThis._appState || {}; globalThis._appState.stok = _S;
+// setState zaten aynı işi yapıyor, bu satırlar gereksiz
+```
+
+**Step 3c: Hibrit pattern'i koru**
+
+```js
+// ui.js:466-467 — mevcut pattern DOĞRU, koru:
+_A = await getData('hayvanlar', ...);
+if (typeof setState === 'function') setState('animals', _A);
+
+// SADECE _A = ... atamasını _A = ... bırak, sonra setState çağrısını ekle:
+const animals = await getData('hayvanlar', a => a.durum === 'Aktif');
+setState('animals', animals);
+```
+
+**Step 4: ui.js ve app.js başındaki `/* global */` yorumlarını güncelle**
 
 ```js
 /* global
    getState, setState,
    HEKIMLER, VARSAYILAN_HEKIM,
-   ...
+   HASTALIK_LISTESI, HASTALIK_KAT, LOKASYON_KAT, SEMPTOM_KAT, SEMPTOM_GENEL,
+   SPERMA_LISTESI, GRUP_PADOK, PADOKLAR,
+   g, v, cl, dAgo, dFwd, fmtTarih, toast, esc, openM, closeM, mClose,
+   registerAction, registerActions, setupAutocomplete,
+   db, rpc, rpcOptimistic, getData, idbPut, openDB,
+   pullTables, renderSafe, syncNow
 */
 ```
 
