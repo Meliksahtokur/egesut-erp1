@@ -255,23 +255,11 @@ async function loadDash(){
       const resBuz=await rpc('buzagi_sutten_kesme_kontrol');
       if(resBuz&&resBuz.ok&&resBuz.olusturulan>0) toast('🍼 '+resBuz.olusturulan+' buzağı sütten kesme görevi oluşturuldu');
     } catch(e){ /* sessiz */ }
-    // Kuru adayı: Sağmal grupta olup gebe olmayan hayvanlar
-    const gebeSetKuru=new Set(gebeTohs.map(t=>t.hayvan_id));
-    const kuruAdaylari=animals.filter(a=>a.durum==='Aktif'&&a.grup&&a.grup.includes('Sağmal')&&!a.grup.includes('Kuru')&&!gebeSetKuru.has(a.id));
     try {
       const resLak=await rpc('laktasyon_kuru_kontrol');
       if(resLak&&resLak.ok&&resLak.olusturulan>0) toast('⚠️ '+resLak.olusturulan+' inek kuru döneme geçirilmeli');
     } catch(e){ /* sessiz */ }
-    // Kuru adayı bandı — ileri gebeler bandının hemen altında
-    let kuruHtml='';
-    if(kuruAdaylari.length){
-      kuruHtml=band('red','⚠️ Kuru Adayları (Sağmal, gebe değil)',
-        kuruAdaylari.map(a=>{
-          const kid=a.kupe_no||a.devlet_kupe||a.id;
-          return `<div class="arow" onclick="openDet('${a.id}')" style="background:rgba(192,50,26,.06);border-radius:6px"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${a.grup||''} · ${a.padok||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
-        }).join(''));
-    }
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+kuruHtml+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${e.message}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
