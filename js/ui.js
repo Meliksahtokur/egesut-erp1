@@ -3134,7 +3134,7 @@ async function acIlac(){
     const warn=s.guncel<=0;
     const _stokColorMid=s.guncel<=5?'var(--amber)':'var(--green)';
     const _stokColor=warn?'var(--red)':_stokColorMid;
-    return `<div onclick="selIlac('${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||'ml'}',${s.guncel});event.stopPropagation()"
+    return `<div onclick="selIlac('${s.id}','${s.urun_adi.replace(/"/g,'&quot;').replace(/'/g,"\\'")}','${s.birim||'ml'}',${s.guncel});event.stopPropagation()"
       style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center;${warn?'opacity:.5':''}">
       <div><div style="font-weight:600">${esc(s.urun_adi)}</div><div style="font-size:.65rem;color:var(--ink3)">${s.kategori||''}</div></div>
       <span style="color:${_stokColor};font-weight:700;font-size:.78rem">${s.guncel.toFixed(s.birim==='adet'?0:1)} ${s.birim||''}</span>
@@ -3171,15 +3171,22 @@ async function acDilacSatir(inp){
   const stoklar=getState('stock').filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'));
   const filtered=q?stoklar.filter(s=>(s.urun_adi||'').toLowerCase().includes(q)):stoklar.slice(0,8);
   if(!filtered.length){ac.style.display='none';return;}
-  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">${esc(s.urun_adi)} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
+  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/"/g,'&quot;').replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">${esc(s.urun_adi)} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
   ac.style.display='block';
 }
 function selDilacSatir(el,id,ad,birim){
-  const row=el.closest('.ilac-satir');
-  row.querySelector('.ilac-stok-ac').value=ad;
-  row.querySelector('.ilac-stok-id').value=id;
-  row.querySelector('.ilac-mik').placeholder=birim||'miktar';
-  el.closest('.ilac-ac').style.display='none';
+  try {
+    const row=el.closest('.ilac-satir');
+    if(!row) { console.warn('selDilacSatir: row not found'); return; }
+    const acInp=row.querySelector('.ilac-stok-ac');
+    const hidInp=row.querySelector('.ilac-stok-id');
+    const mikInp=row.querySelector('.ilac-mik');
+    if(acInp) acInp.value=ad;
+    if(hidInp) hidInp.value=id;
+    if(mikInp) mikInp.placeholder=birim||'miktar';
+    const acBox=el.closest('.ilac-ac');
+    if(acBox) acBox.style.display='none';
+  } catch(e) { console.error('selDilacSatir error:', e); toast('İlaç seçim hatası: '+e.message, true); }
 }
 document.addEventListener('click',e=>{
   const ac=document.getElementById('ac-dilac');
