@@ -4,16 +4,21 @@
 class AppState {
   constructor() {
     this._state = {
-      animals: [],
-      stock: [],
-      currentPage: 'dash',
-      currentTaskFilter: 'today',
-      currentTaskDetail: null,
-      currentDisease: null,
-      currentInsem: null,
-      currentUremeTab: 'kizginlik',
-      currentHistoryFilter: 'hepsi',
-      currentNotificationTab: 'bekliyor',
+      animals: [],              // _A
+      stock: [],                 // _S
+      curStok: null,             // _curStk
+      currentPage: 'dash',       // _curPg
+      suruFilter: 'tumuu',       // _suruFilter
+      suruSiralama: 'kupe',      // _suruSiralama
+      currentUremeTab: 'kizginlik',     // _curUremeTab (zaten var)
+      currentHistoryFilter: 'hepsi',   // _curGecmisFilter (zaten var)
+      currentTaskFilter: 'today',      // _curTaskFilter (zaten var)
+      currentTaskDetail: null,         // _curTaskDet (zaten var)
+      currentDisease: null,            // _curHst (zaten var)
+      currentInsem: null,              // _curToh (zaten var)
+      currentNotificationTab: 'bekliyor', // _curBildirimTab (zaten var)
+      gebeIds: [],               // _gebeIds — ARRAY (new Set() sarilarak kullanilir)
+      hastaIds: new Set(),       // _hastaIds — SET (direkt .has() ile)
     };
     this._listeners = {};
   }

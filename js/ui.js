@@ -3,8 +3,8 @@
 // ═══════════════════════════════════════════════════════
 
 /* global
-   _A, _S, _gebeIds, _hastaIds,
-   _curTaskFilter, _curUremeTab, _curGecmisFilter, _curStk,
+  /* global
+   _curTaskFilter, _curUremeTab, _curGecmisFilter,
    _curTaskDet, _curTaskVaccineId, _curToh,
    _customHekimler, _customSperma,
    _ilacCache, _drugsCache, _disFreq,
@@ -243,7 +243,7 @@ async function loadDash(){
       return !hasK&&!hasT;
     });
     // 90-day: births 90-150 days ago with no kizginlik/tohumlama since
-    const gebeSet90=new Set(_gebeIds||[]);
+    const gebeSet90=new Set(getState('gebeIds')||[]);
     const muayeneGerekli=births90.filter(b=>{
       if(gebeSet90.has(b.anne_id)) return false; // zaten tekrar gebe
       const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
@@ -463,18 +463,17 @@ async function doneTask(id,hid,stokId,miktar,padok,btn){
 async function loadAnimals(){
   const el=document.getElementById('suru-body');
   try {
-    _A=await getData('hayvanlar',a=>a.durum==='Aktif');
-    if(typeof setState==='function') setState('animals',_A);
+    const animals=await getData('hayvanlar',a=>a.durum==='Aktif');
+    if(typeof setState==='function') setState('animals',animals);
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
-    _gebeIds=[...new Set(gebeTohs.map(t=>t.hayvan_id))];
+    setState('gebeIds', [...new Set(gebeTohs.map(t=>t.hayvan_id))]);
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
     globalThis._tohMap={};
     gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
     const hastaLogs=await getData('cases',c=>c.status==='active');
-    _hastaIds=new Set(hastaLogs.map(d=>d.animal_id));
-    _A.sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
-    globalThis._appState=globalThis._appState||{}; globalThis._appState.hayvanlar=_A;
-    renderAnimals(_A);
+    setState('hastaIds', new Set(hastaLogs.map(d=>d.animal_id)));
+    const sorted=[...animals].sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
+    renderAnimals(sorted);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${e.message}</div>`; }
 }
 function _animalTagsHtml(a,gebeSet){
@@ -491,7 +490,7 @@ function _animalTagsHtml(a,gebeSet){
     }
     gebeBadge=`<span class="tag" style="background:rgba(78,154,42,.15);color:var(--green);font-weight:700">🤰 Gebe${gunYazi}</span>`;
   }
-  const hastaBadge=(_hastaIds||new Set()).has(a.id)?`<span class="tag" style="background:rgba(192,50,26,.12);color:var(--red);font-weight:700">🏥 Hasta</span>`:'';
+  const hastaBadge=(getState('hastaIds')||new Set()).has(a.id)?`<span class="tag" style="background:rgba(192,50,26,.12);color:var(--red);font-weight:700">🏥 Hasta</span>`:'';
   const abortBadge=a.abort_sayisi>0?`<span class="tag" style="background:rgba(192,50,26,.18);color:var(--red);font-size:.65rem;font-weight:700;border:1px solid rgba(192,50,26,.3)">⚠️ ${a.abort_sayisi}x abort</span>`:'';
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
   return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${kisirBadge}`;
@@ -515,7 +514,7 @@ function _animalCardHtml(a,gebeSet,idx){
 function renderAnimals(list){
   const el=document.getElementById('suru-body');
   if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
-  const gebeSet=new Set(_gebeIds||[]);
+  const gebeSet=new Set(getState('gebeIds')||[]);
   const tohMap=globalThis._tohMap||{};
   // Gebe hayvanları gebelik gününe göre (en ileri önce), gebe olmayanlar küpe sırasıyla
   const sorted=[...list].sort((a,b)=>{
@@ -531,7 +530,7 @@ function renderAnimals(list){
 }
 function updatePadokOzet(list){
   const el=document.getElementById('padok-ozet'); if(!el) return;
-  const gebeSet=new Set(_gebeIds||[]);
+  const gebeSet=new Set(getState('gebeIds')||[]);
   const padok=document.getElementById('pflt')?.value;
   if(!list.length){ el.innerHTML=''; return; }
   const toplam=list.length;
@@ -555,7 +554,7 @@ function srchDropdown(){
   const ac=document.getElementById('ac-srch');
   if(!ac) return;
   if(!q){ ac.style.display='none'; return; }
-  const gebeSet=new Set(_gebeIds||[]);
+  const gebeSet=new Set(getState('gebeIds')||[]);
   const matches=getState('animals').filter(a=>{
     const k=(a.kupe_no||'').toLowerCase(), d=(a.devlet_kupe||'').toLowerCase();
     return k.includes(q)||d.includes(q)||(a.irk||'').toLowerCase().includes(q);
@@ -601,7 +600,7 @@ function filterA(){
   _filterTimer=setTimeout(()=>{
     const q=document.getElementById('srch')?.value.toLowerCase()||'';
     const p=document.getElementById('pflt')?.value||'';
-    const gebeSet=new Set(_gebeIds||[]);
+    const gebeSet=new Set(getState('gebeIds')||[]);
     let f=getState('animals');
     if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
     if(p) {
@@ -622,7 +621,7 @@ function filterA(){
       if(!a.dogum_tarihi) return false;
       return (Date.now()-new Date(a.dogum_tarihi).getTime())>=365*86400000;
     });
-    if(_fchip.saglik==='hasta') f=f.filter(a=>_hastaIds.has(a.id));
+    if(_fchip.saglik==='hasta') f=f.filter(a=>getState('hastaIds').has(a.id));
     if(_fchip.kisir==='kisir') f=f.filter(a=>a.kisir);
     renderAnimals(f);
   },250);
@@ -803,7 +802,8 @@ function _detGorevHtml(a,tasks,subs,today){
 }
 async function openDet(id){
   _detOpenId=id;
-  history.pushState({pg:_curPg||'dash',det:id},'','#'+(_curPg||'dash'));
+  const curPg=getState('currentPage')||'dash';
+  history.pushState({pg:curPg||'dash',det:id},'','#'+(curPg||'dash'));
   document.getElementById('det').classList.add('on');
   document.getElementById('det-name').textContent=' ';
   document.getElementById('det-meta').textContent=' ';
@@ -976,7 +976,7 @@ async function openAnimalEdit(id){
     kw.style.display='block';
     kc.checked=!!a.kisir;
     // Gebe kontrolü — gebe hayvan kısır işaretlenemez
-    const gebeSet=new Set(_gebeIds||[]);
+    const gebeSet=new Set(getState('gebeIds')||[]);
     if(gebeSet.has(a.id)){
       kc.disabled=true;
       kh.textContent='(gebe hayvan kısır işaretlenemez)';
@@ -1475,16 +1475,16 @@ function _durumTxt(d){ if(d==='neg')return'🆘 Negatif'; if(d==='crit')return'�
 async function loadStock(){
   try {
     const [stk,moves,vacs]=await Promise.all([idbGetAll('stok'),getData('stok_hareket',m=>!m.iptal),idbGetAll('vaccines')]);
-    _S=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; const isVaccine=(s.id||'').startsWith('STOK-AŞI-')||(vacs||[]).some(v=>v.stock_item_id===s.id); return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok',isVaccine}; });
-    setState('stock', _S);
-    globalThis._appState=globalThis._appState||{}; globalThis._appState.stok=_S;
+    const stockData=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; const isVaccine=(s.id||'').startsWith('STOK-AŞI-')||(vacs||[]).some(v=>v.stock_item_id===s.id); return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok',isVaccine}; });
+    setState('stock', stockData);
   } catch(e){ console.error(e); }
 }
 function openStk(id){
-  _curStk=getState('stock').find(s=>s.id===id); if(!_curStk) return;
-  document.getElementById('m-stk-title').textContent='📦 '+_curStk.urun_adi;
-  document.getElementById('se-urun').value=_curStk.urun_adi;
-  document.getElementById('se-birim').textContent=_curStk.birim||'?';
+  setState('curStok', getState('stock').find(s=>s.id===id)||null);
+  const curStk=getState('curStok'); if(!curStk) return;
+  document.getElementById('m-stk-title').textContent='📦 '+curStk.urun_adi;
+  document.getElementById('se-urun').value=curStk.urun_adi;
+  document.getElementById('se-birim').textContent=curStk.birim||'?';
   g('se-mik').value=''; g('se-not').value='';
   openM('m-stk');
 }
@@ -3156,7 +3156,7 @@ document.addEventListener('click',e=>{
 // ──────────────────────────────────────────
 
 function _eligibleHayvanlar(){
-  const gebeSet=new Set(_gebeIds||[]);
+  const gebeSet=new Set(getState('gebeIds')||[]);
   const minMs=330*86400000; // 330 gün (~11 ay) — Dişi dana tohumlama yaşı
   return getState('animals').filter(a=>{
     if(a.cinsiyet==='Erkek') return false;
