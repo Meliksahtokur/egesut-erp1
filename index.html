@@ -259,9 +259,9 @@ button,input,select,textarea{font-family:inherit}
   </div>
   <div id="top-right">
     <div id="dot"></div>
-    <button id="refbtn" onclick="this.classList.add('spinning');refreshAll().finally(()=>this.classList.remove('spinning'))">↻</button>
-<button id="ayarlarbtn" onclick="ayarlarAc()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
-    <button id="errorbtn" onclick="document.getElementById('error-panel').style.display='block'; renderErrorLog();" style="background:rgba(78,154,42,.15);border:1px solid #4e9a2a;color:#4e9a2a;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">✅ All is well</button>
+    <button id="refbtn" data-action="refresh">↻</button>
+<button id="ayarlarbtn" data-action="open-ayarlar" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
+    <button id="errorbtn" data-action="show-error-panel" style="background:rgba(78,154,42,.15);border:1px solid #4e9a2a;color:#4e9a2a;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">✅ All is well</button>
   </div>
 </div>
 
@@ -285,10 +285,10 @@ button,input,select,textarea{font-family:inherit}
     <div class="pg-inner">
       <div class="search-bar" style="position:relative">
         <div style="flex:1;position:relative">
-          <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" oninput="filterA();srchDropdown()" onfocus="srchDropdown()" autocomplete="off" onkeydown="acNav(event,'ac-srch')">
+          <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" data-action="search-input" data-action-event="input" data-action="search-focus" data-action-event="focus" autocomplete="off" data-action="ac-srch-keydown" data-action-event="keydown">
           <div id="ac-srch" class="ac-box" style="display:none;position:absolute;z-index:100;width:100%;background:var(--card);border:1px solid var(--card3);border-radius:10px;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1)"></div>
         </div>
-        <select class="psel" id="pflt" onchange="filterA()">
+        <select class="psel" id="pflt" data-action="search-change" data-action-event="change">
           <option value="">Tüm Padoklar</option>
           <option>Sağmal Padok</option>
           <option>Kuru/Gebe Padok</option>
@@ -299,16 +299,16 @@ button,input,select,textarea{font-family:inherit}
         </select>
       </div>
       <div id="filtre-strip" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 0">
-        <button class="fchip on" id="fc-cinsiyet-hepsi" onclick="fchipSec('cinsiyet','hepsi',this)">Tümü</button>
-        <button class="fchip" id="fc-cinsiyet-disi" onclick="fchipSec('cinsiyet','disi',this)">🐄 Dişi</button>
-        <button class="fchip" id="fc-cinsiyet-erkek" onclick="fchipSec('cinsiyet','erkek',this)">🐂 Erkek</button>
+        <button class="fchip on" id="fc-cinsiyet-hepsi" data-action="fchip-cinsiyet-hepsi">Tümü</button>
+        <button class="fchip" id="fc-cinsiyet-disi" data-action="fchip-cinsiyet-disi">🐄 Dişi</button>
+        <button class="fchip" id="fc-cinsiyet-erkek" data-action="fchip-cinsiyet-erkek">🐂 Erkek</button>
         <span class="fchip-sep">|</span>
-        <button class="fchip" id="fc-gebelik-gebe" onclick="fchipSec('gebelik','gebe',this)">🤰 Gebe</button>
-        <button class="fchip" id="fc-gebelik-bos" onclick="fchipSec('gebelik','bos',this)">⭕ Boş</button>
+        <button class="fchip" id="fc-gebelik-gebe" data-action="fchip-gebelik-gebe">🤰 Gebe</button>
+        <button class="fchip" id="fc-gebelik-bos" data-action="fchip-gebelik-bos">⭕ Boş</button>
         <span class="fchip-sep">|</span>
-        <button class="fchip" id="fc-saglik-hasta" onclick="fchipSec('saglik','hasta',this)">🏥 Hasta</button>
+        <button class="fchip" id="fc-saglik-hasta" data-action="fchip-saglik-hasta">🏥 Hasta</button>
         <span class="fchip-sep">|</span>
-        <button class="fchip" id="fc-kisir-kisir" onclick="fchipSec('kisir','kisir',this)">💲 Kısır</button>
+        <button class="fchip" id="fc-kisir-kisir" data-action="fchip-kisir-kisir">💲 Kısır</button>
       </div>
       <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 2px"></div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
@@ -319,11 +319,11 @@ button,input,select,textarea{font-family:inherit}
   <div id="pg-ureme" class="pg">
     <div class="pg-inner">
       <div class="filter-strip" style="overflow-x:auto;white-space:nowrap">
-        <button class="fs-btn on" id="ureme-tab-kizginlik" onclick="uremeTab('kizginlik',this)">🔴 Kızgınlık</button>
-        <button class="fs-btn" id="ureme-tab-tohumlama" onclick="uremeTab('tohumlama',this)">💉 Tohumlama</button>
-        <button class="fs-btn" id="ureme-tab-gebelik" onclick="uremeTab('gebelik',this)">🤰 Gebelik</button>
-        <button class="fs-btn" id="ureme-tab-dogum" onclick="uremeTab('dogum',this)">🐄 Doğum</button>
-        <button class="fs-btn" id="ureme-tab-abort" onclick="uremeTab('abort',this)">⚠️ Abort</button>
+        <button class="fs-btn on" id="ureme-tab-kizginlik" data-action="ureme-kizginlik">🔴 Kızgınlık</button>
+        <button class="fs-btn" id="ureme-tab-tohumlama" data-action="ureme-tohumlama">💉 Tohumlama</button>
+        <button class="fs-btn" id="ureme-tab-gebelik" data-action="ureme-gebelik">🤰 Gebelik</button>
+        <button class="fs-btn" id="ureme-tab-dogum" data-action="ureme-dogum">🐄 Doğum</button>
+        <button class="fs-btn" id="ureme-tab-abort" data-action="ureme-abort">⚠️ Abort</button>
       </div>
       <div id="ureme-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -333,23 +333,23 @@ button,input,select,textarea{font-family:inherit}
   <div id="pg-tasks" class="pg">
     <div class="pg-inner">
       <div class="filter-strip">
-        <button class="fs-btn on" onclick="loadTasks('today',this)">Bugün</button>
-        <button class="fs-btn" onclick="loadTasks('late',this)">Geciken</button>
-        <button class="fs-btn" onclick="loadTasks('all',this)">Bekleyen</button>
-        <button class="fs-btn" onclick="loadTasks('done',this)">Tamamlanan</button>
+        <button class="fs-btn on" data-action="tasks-today">Bugün</button>
+        <button class="fs-btn" data-action="tasks-late">Geciken</button>
+        <button class="fs-btn" data-action="tasks-all">Bekleyen</button>
+        <button class="fs-btn" data-action="tasks-done">Tamamlanan</button>
       </div>
       <div id="task-kategori-bar" style="display:flex;gap:6px;padding:0 14px 10px;overflow-x:auto;-webkit-overflow-scrolling:touch">
-        <button class="kat-btn on" onclick="setTaskKat('all',this)">Tümü</button>
-        <button class="kat-btn" onclick="setTaskKat('asi',this)">💉 Aşı</button>
-        <button class="kat-btn" onclick="setTaskKat('vitamin',this)">💊 Takviye</button>
-        <button class="kat-btn" onclick="setTaskKat('kontrol',this)">🔍 Kontrol</button>
-        <button class="kat-btn" onclick="setTaskKat('tedavi',this)">🩺 Tedavi</button>
-        <button class="kat-btn" onclick="setTaskKat('bakim',this)">🐄 Bakım</button>
+        <button class="kat-btn on" data-action="task-kat-all">Tümü</button>
+        <button class="kat-btn" data-action="task-kat-asi">💉 Aşı</button>
+        <button class="kat-btn" data-action="task-kat-vitamin">💊 Takviye</button>
+        <button class="kat-btn" data-action="task-kat-kontrol">🔍 Kontrol</button>
+        <button class="kat-btn" data-action="task-kat-tedavi">🩺 Tedavi</button>
+        <button class="kat-btn" data-action="task-kat-bakim">🐄 Bakım</button>
       </div>
       <div id="tasks-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
     <!-- FAB: görev ekle -->
-    <button class="fab" onclick="openM('m-task-add')" title="Görev Ekle">+</button>
+    <button class="fab" data-action="open-task-add-modal" title="Görev Ekle">+</button>
   </div>
 
 
@@ -357,12 +357,12 @@ button,input,select,textarea{font-family:inherit}
   <div id="pg-gecmis" class="pg">
     <div class="pg-inner">
       <div style="display:flex;gap:6px;margin-bottom:9px;overflow-x:auto;padding-bottom:2px">
-        <button class="fs-btn on" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('hepsi',this)">Hepsi</button>
-        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('dogum',this)">🐄 Doğum</button>
-        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('tohumlama',this)">💉 Tohumlama</button>
-        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('hastalik',this)">🏥 Hastalık</button>
-        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('gorev',this)">✅ Görev</button>
-        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" onclick="loadGecmis('hayvan',this)">🐮 Hayvan</button>
+        <button class="fs-btn on" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-hepsi">Hepsi</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-dogum">🐄 Doğum</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-tohumlama">💉 Tohumlama</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-hastalik">🏥 Hastalık</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-gorev">✅ Görev</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-hayvan">🐮 Hayvan</button>
       </div>
       <div id="gecmis-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -372,37 +372,37 @@ button,input,select,textarea{font-family:inherit}
   <div id="pg-log" class="pg">
     <div class="pg-inner">
       <div class="sh"><span class="sh-title">Hızlı Kayıt</span></div>
-      <div onclick="openM('m-birth')" class="log-btn">
+      <div data-action="open-birth-modal" class="log-btn">
         <div class="log-ico g">🐄</div>
         <div class="log-text"><div class="log-title">Doğum Kaydı</div><div class="log-sub">Anne, yavru, protokol + buzağı alt görevleri otomatik</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div onclick="openM('m-insem')" class="log-btn">
+      <div data-action="open-insem-modal" class="log-btn">
         <div class="log-ico b">💉</div>
         <div class="log-text"><div class="log-title">Tohumlama</div><div class="log-sub">Sperma, tarih, kontrol görevleri otomatik</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div onclick="openM('m-disease')" class="log-btn">
+      <div data-action="open-disease-modal" class="log-btn">
         <div class="log-ico r">🏥</div>
         <div class="log-text"><div class="log-title">Vaka Aç</div><div class="log-sub">Tanı, günlük tedavi, ilaç — stok otomatik düşer</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div onclick="openM('m-bulk-vaccine')" class="log-btn">
+      <div data-action="open-bulk-vaccine-modal" class="log-btn">
         <div class="log-ico" style="background:rgba(78,154,42,.2)">💉💉</div>
         <div class="log-text"><div class="log-title">Toplu Aşılama</div><div class="log-sub">Padok bazlı toplu aşı uygulaması</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div onclick="openM('m-bulk-ilac')" class="log-btn">
+      <div data-action="open-bulk-ilac-modal" class="log-btn">
         <div class="log-ico" style="background:rgba(220,53,69,.15)">💊💊</div>
         <div class="log-text"><div class="log-title">Toplu İlaç</div><div class="log-sub">Padok bazlı toplu ilaç uygulaması</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div onclick="openM('m-animal')" class="log-btn">
+      <div data-action="open-animal-modal" class="log-btn">
         <div class="log-ico a">➕</div>
         <div class="log-text"><div class="log-title">Yeni Hayvan</div><div class="log-sub">Sürüye hayvan ekle</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div onclick="openStokPanel()" class="log-btn" style="margin-top:6px">
+      <div data-action="open-stok-panel" class="log-btn" style="margin-top:6px">
         <div class="log-ico" style="background:rgba(201,125,10,.12)">📦</div>
         <div class="log-text"><div class="log-title">Stok Modülü</div><div class="log-sub">İlaç, sperma, sarf malzeme — envanter yönetimi</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
@@ -416,28 +416,28 @@ button,input,select,textarea{font-family:inherit}
 </div><!-- /pages -->
 
 <nav id="nav">
-  <button class="nb on" id="nb-dash" onclick="goTo('dash')">
+  <button class="nb on" id="nb-dash" data-action="go-dash">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span class="nb-lbl">Panel</span>
   </button>
-  <button class="nb" id="nb-suru" onclick="goTo('suru')">
+  <button class="nb" id="nb-suru" data-action="go-suru">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="9" r="2"/><path d="M2 21v-1a5 5 0 015-5h4a5 5 0 015 5v1"/><path d="M22 21v-1a4 4 0 00-3-3.87"/></svg>
     <span class="nb-lbl">Sürü</span>
   </button>
-  <button class="nb" id="nb-tasks" onclick="goTo('tasks')">
+  <button class="nb" id="nb-tasks" data-action="go-tasks">
     <div id="tbadge" class="nbadge" style="display:none">0</div>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
     <span class="nb-lbl">Görevler</span>
   </button>
-  <button class="nb" id="nb-ureme" onclick="goTo('ureme')">
+  <button class="nb" id="nb-ureme" data-action="go-ureme">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M12 12v4m0 0l-2 2m2-2l2 2"/><path d="M8 20h8"/></svg>
     <span class="nb-lbl">Üreme</span>
   </button>
-  <button class="nb" id="nb-gecmis" onclick="goTo('gecmis')">
+  <button class="nb" id="nb-gecmis" data-action="go-gecmis">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     <span class="nb-lbl">Geçmiş</span>
   </button>
-  <button class="nb" id="nb-log" onclick="goTo('log')">
+  <button class="nb" id="nb-log" data-action="go-log">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     <span class="nb-lbl">Kayıt</span>
   </button>
@@ -447,7 +447,7 @@ button,input,select,textarea{font-family:inherit}
 <!-- STOK PANEL -->
 <div id="stok-panel" style="position:fixed;inset:0;z-index:50;background:var(--card);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .3s cubic-bezier(.32,0,.67,0)">
   <div style="background:var(--bg);padding:16px 16px 12px;padding-top:max(16px,env(safe-area-inset-top,16px));flex-shrink:0">
-    <button onclick="closeStokPanel()" style="display:flex;align-items:center;gap:6px;color:var(--green3);font-size:.88rem;font-weight:700;background:none;border:none;cursor:pointer;margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em;padding:10px 16px 10px 4px;min-height:44px">
+    <button data-action="close-stok-panel" style="display:flex;align-items:center;gap:6px;color:var(--green3);font-size:.88rem;font-weight:700;background:none;border:none;cursor:pointer;margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em;padding:10px 16px 10px 4px;min-height:44px">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
       Kayda Dön
     </button>
@@ -455,16 +455,16 @@ button,input,select,textarea{font-family:inherit}
     <div style="font-size:.72rem;color:var(--ink3);margin-top:4px">Envanter yönetimi</div>
   </div>
   <div id="stok-tabs" style="display:flex;gap:4px;padding:8px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;background:var(--bg)">
-    <button class="kat-btn on" onclick="setStokTab('tumu',event)">Tümü</button>
-    <button class="kat-btn" onclick="setStokTab('ilac',event)">İlaç</button>
-    <button class="kat-btn" onclick="setStokTab('asi',event)">Aşı</button>
-    <button class="kat-btn" onclick="setStokTab('sperma',event)">Sperma</button>
-    <button class="kat-btn" onclick="setStokTab('diger',event)">Diğer</button>
+    <button class="kat-btn on" data-action="stok-tab-tumu">Tümü</button>
+    <button class="kat-btn" data-action="stok-tab-ilac">İlaç</button>
+    <button class="kat-btn" data-action="stok-tab-asi">Aşı</button>
+    <button class="kat-btn" data-action="stok-tab-sperma">Sperma</button>
+    <button class="kat-btn" data-action="stok-tab-diger">Diğer</button>
   </div>
   <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 80px">
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-      <button onclick="openStokAdd()" style="padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer">＋ Yeni Ürün Ekle</button>
-      <button onclick="tumStokHareketleriniGoster()" style="padding:13px;background:rgba(42,107,181,.12);border:2px dashed rgba(42,107,181,.4);border-radius:10px;color:var(--blue);font-size:.88rem;font-weight:800;cursor:pointer">📋 Tüm Hareketler</button>
+      <button data-action="stok-add-open" style="padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer">＋ Yeni Ürün Ekle</button>
+      <button data-action="stok-hareketler" style="padding:13px;background:rgba(42,107,181,.12);border:2px dashed rgba(42,107,181,.4);border-radius:10px;color:var(--blue);font-size:.88rem;font-weight:800;cursor:pointer">📋 Tüm Hareketler</button>
     </div>
     <div id="stok-panel-body"><div class="loader"><div class="spin"></div></div></div>
   </div>
@@ -473,7 +473,7 @@ button,input,select,textarea{font-family:inherit}
 <!-- ANIMAL DETAIL -->
 <div id="det">
   <div class="det-hero">
-    <button class="det-back" onclick="history.back()">
+    <button class="det-back" data-action="go-back">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
       Sürüye Dön
     </button>
@@ -483,11 +483,11 @@ button,input,select,textarea{font-family:inherit}
   </div>
   <div id="det-scroll">
     <div class="tabs">
-      <button class="tab on" onclick="showTab('ozet',this)">Özet</button>
-      <button class="tab" onclick="showTab('saglik',this)">Sağlık</button>
-      <button class="tab" onclick="showTab('ureme',this)">Üreme</button>
-      <button class="tab" onclick="showTab('gorev',this)">Görevler</button>
-      <button class="tab" onclick="showTab('gecmis',this)">Geçmiş</button>
+      <button class="tab on" data-action="tab-ozet">Özet</button>
+      <button class="tab" data-action="tab-saglik">Sağlık</button>
+      <button class="tab" data-action="tab-ureme">Üreme</button>
+      <button class="tab" data-action="tab-gorev">Görevler</button>
+      <button class="tab" data-action="tab-gecmis">Geçmiş</button>
     </div>
     <div id="tab-ozet" class="tab-pane on"></div>
     <div id="tab-saglik" class="tab-pane"></div>
@@ -500,13 +500,13 @@ button,input,select,textarea{font-family:inherit}
 <!-- ═══ MODALS ═══ -->
 
 <!-- KIZGINLIK -->
-<div id="m-kizginlik" class="mo" onclick="mClose(event,this)">
+<div id="m-kizginlik" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🔴 Kızgınlık Kaydı</div>
     <div class="m-body">
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="k-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('k-hid','ac-khid')" onfocus="acHayvan('k-hid','ac-khid')" onkeydown="acNav(event,'ac-khid')"
-          onclick="acHayvan('k-hid','ac-khid'); this.focus()">
+          data-action="k-hid-input" data-action-event="input" data-action="k-hid-focus" data-action-event="focus" data-action="ac-khid-keydown" data-action-event="keydown"
+          data-action="k-hid-ac">
         <div id="ac-khid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
@@ -522,66 +522,66 @@ button,input,select,textarea{font-family:inherit}
       <div style="background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.15);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:.72rem;color:var(--ink3)">
         💡 Tohumlama için 12-18 saat sonra uyarı görevi otomatik oluşturulur
       </div>
-      <button class="btn btn-g" onclick="submitKizginlik(this)">🔴 Kaydet + Görev Oluştur</button>
-      <button class="btn btn-o" onclick="closeM('m-kizginlik')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="submit-kizginlik">🔴 Kaydet + Görev Oluştur</button>
+      <button class="btn btn-o" data-action="close-kizginlik" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- TOHUMLAMA -->
-<div id="m-insem" class="mo" onclick="mClose(event,this)">
+<div id="m-insem" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">💉 Tohumlama Kaydı</div>
     <div class="m-body">
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="i-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('i-hid','ac-ihid')" onfocus="acHayvan('i-hid','ac-ihid')" onkeydown="acNav(event,'ac-ihid')"
-          onclick="acHayvan('i-hid','ac-ihid'); this.focus()">
+          data-action="i-hid-input" data-action-event="input" data-action="i-hid-focus" data-action-event="focus" data-action="ac-ihid-keydown" data-action-event="keydown"
+          data-action="i-hid-ac">
         <div id="ac-ihid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
       <div class="fg"><label class="flbl">Tohumlama Tarihi *</label><input id="i-tarih" class="fi" type="date"></div>
       <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
         <div style="display:flex;gap:6px;margin-bottom:6px">
-          <button type="button" id="btn-sperma-stok" onclick="spermaModStok()" style="flex:1;padding:7px;background:rgba(42,107,181,.1);border:1.5px solid var(--blue);border-radius:var(--r1);font-size:.75rem;font-weight:700;color:var(--blue);cursor:pointer">📦 Stoktan Seç</button>
-          <button type="button" id="btn-sperma-elle" onclick="spermaModElle()" style="flex:1;padding:7px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);font-size:.75rem;font-weight:700;color:var(--ink3);cursor:pointer">✏️ Elle Gir</button>
+          <button type="button" id="btn-sperma-stok" data-action="sperma-stok" style="flex:1;padding:7px;background:rgba(42,107,181,.1);border:1.5px solid var(--blue);border-radius:var(--r1);font-size:.75rem;font-weight:700;color:var(--blue);cursor:pointer">📦 Stoktan Seç</button>
+          <button type="button" id="btn-sperma-elle" data-action="sperma-elle" style="flex:1;padding:7px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);font-size:.75rem;font-weight:700;color:var(--ink3);cursor:pointer">✏️ Elle Gir</button>
         </div>
         <div id="sperma-stok-area">
-          <select id="i-sperma-select" class="fsel" onchange="onSpermaSelect(this)">
+          <select id="i-sperma-select" class="fsel" data-action="sperma-select" data-action-event="change">
             <option value="">Sperma seçin…</option>
           </select>
           <input type="hidden" id="i-sperma" value="">
         </div>
         <div id="sperma-elle-area" style="display:none">
           <input id="i-sperma-text" class="fi" placeholder="Boğa kodu yazın…" autocomplete="off"
-            oninput="document.getElementById('i-sperma').value=this.value"
+            data-action="sperma-input" data-action-event="input"
             onfocus="" onkeydown="">
           <div id="ac-isperma" class="ac-box" style="display:none"></div>
         </div>
         <div id="sperma-hint" style="font-size:.7rem;color:var(--ink3);margin-top:4px"></div>
       </div>
       <div class="fg"><label class="flbl">Hekim</label><select id="i-hekim" class="fsel"></select></div>
-      <button class="btn btn-g" onclick="submitInsem(this)">💉 Kaydet + Kontrol Görevleri</button>
-      <button class="btn btn-o" onclick="closeM('m-insem')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="submit-insem">💉 Kaydet + Kontrol Görevleri</button>
+      <button class="btn btn-o" data-action="close-insem" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- HASTALIK -->
 <!-- HASTALIK / TEDAVİ (ESKİ SİSTEM — korunuyor) -->
-<div id="m-disease" class="mo" onclick="mClose(event,this)">
+<div id="m-disease" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div id="m-disease-title" class="m-title">🏥 Yeni Vaka Aç</div>
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="d-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('d-hid','ac-dhid')" onfocus="acHayvan('d-hid','ac-dhid')" onkeydown="acNav(event,'ac-dhid')"
-          onclick="acHayvan('d-hid','ac-dhid'); this.focus()">
+          data-action="d-hid-input" data-action-event="input" data-action="d-hid-focus" data-action-event="focus" data-action="ac-dhid-keydown" data-action-event="keydown"
+          data-action="d-hid-ac">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
       </div>
 
       <!-- TANI — DB'den controlled dropdown -->
       <div class="fg"><label class="flbl">Hastalık / Tanı *</label>
-        <select id="d-disease-id" class="fsel" onchange="onDiseaseSelect()">
+        <select id="d-disease-id" class="fsel" data-action="disease-select" data-action-event="change">
           <option value="">— Hastalık seçin —</option>
         </select>
         <div id="d-disease-cat" style="font-size:.68rem;color:var(--ink3);margin-top:3px;display:none"></div>
@@ -593,8 +593,8 @@ button,input,select,textarea{font-family:inherit}
       </div>
 
       <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
-      <button class="btn btn-g" onclick="submitCase(this)">🏥 Vakayı Aç</button>
-      <button class="btn btn-o" onclick="closeM('m-disease')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="submit-case">🏥 Vakayı Aç</button>
+      <button class="btn btn-o" data-action="close-disease" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
@@ -602,20 +602,20 @@ button,input,select,textarea{font-family:inherit}
 <!-- VAKA AÇ (YENİ SİSTEM — migration 022) -->
 
 <!-- AŞILAMA -->
-<div id="m-vaccine" class="mo" onclick="mClose(event,this)">
+<div id="m-vaccine" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div id="m-vaccine-title" class="m-title">💉 Aşı Uygula</div>
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="v-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          oninput="acHayvan('v-hid','ac-vhid')" onfocus="acHayvan('v-hid','ac-vhid')" onkeydown="acNav(event,'ac-vhid')"
-          onclick="acHayvan('v-hid','ac-vhid'); this.focus()">
+          data-action="v-hid-input" data-action-event="input" data-action="v-hid-focus" data-action-event="focus" data-action="ac-vhid-keydown" data-action-event="keydown"
+          data-action="v-hid-ac">
         <div id="ac-vhid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
       </div>
 
       <!-- AŞI SEÇİM — DB'den controlled dropdown -->
       <div class="fg"><label class="flbl">Aşı *</label>
-        <select id="v-vaccine-id" class="fsel" onchange="onVaccineSelect()">
+        <select id="v-vaccine-id" class="fsel" data-action="vaccine-select" data-action-event="change">
           <option value="">— Aşı seçin —</option>
         </select>
         <div id="v-vaccine-info" style="font-size:.75rem;color:var(--ink3);margin-top:6px;display:none"></div>
@@ -639,33 +639,33 @@ button,input,select,textarea{font-family:inherit}
         <textarea id="v-notes" class="fta" rows="2" placeholder="Uygulama detayları, semptomlar…" style="resize:vertical"></textarea>
       </div>
 
-      <button class="btn btn-g" onclick="submitVaccination(this)">💉 Aşı Uygula</button>
-      <button class="btn btn-o" onclick="closeM('m-vaccine')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="submit-vaccine">💉 Aşı Uygula</button>
+      <button class="btn btn-o" data-action="close-vaccine" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- TOPLU AŞILAMA -->
-<div id="m-bulk-vaccine" class="mo" onclick="mClose(event,this)">
+<div id="m-bulk-vaccine" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">💉💉 Toplu Aşılama</div>
     <div class="m-body">
       <!-- Tab Buttons -->
       <div style="display:flex;gap:4px;margin-bottom:8px">
-        <button onclick="bulkTabSwitch('bv','padok')" id="bv-tab-padok" class="btn btn-g" style="font-size:.72rem;padding:4px 10px">Padok</button>
-        <button onclick="bulkTabSwitch('bv','filtre')" id="bv-tab-filtre" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Filtre</button>
-        <button onclick="bulkTabSwitch('bv','serbest')" id="bv-tab-serbest" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Serbest Seçim</button>
+        <button data-action="bv-tab-padok" id="bv-tab-padok" class="btn btn-g" style="font-size:.72rem;padding:4px 10px">Padok</button>
+        <button data-action="bv-tab-filtre" id="bv-tab-filtre" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Filtre</button>
+        <button data-action="bv-tab-serbest" id="bv-tab-serbest" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Serbest Seçim</button>
       </div>
 
       <!-- Tab: Padok -->
       <div id="bv-section-padok">
         <div class="fg"><label class="flbl">Padok *</label>
-          <select id="bv-padok" class="fsel" onchange="loadBulkVaccineHayvanlar()">
+          <select id="bv-padok" class="fsel" data-action="bv-load" data-action-event="change">
             <option value="">— Padok Seç —</option>
           </select>
           <div class="fhint" style="font-size:.62rem;color:var(--ink3);margin-top:3px">Padok seçip hayvanları getirin</div>
         </div>
 
-        <button type="button" class="btn" onclick="loadBulkVaccineHayvanlar()" style="margin-bottom:8px;background:rgba(78,154,42,.15);border:1.5px solid var(--green);color:var(--green3);font-weight:700">
+        <button type="button" class="btn" data-action="bv-load" style="margin-bottom:8px;background:rgba(78,154,42,.15);border:1.5px solid var(--green);color:var(--green3);font-weight:700">
           🔍 Hayvanları Getir <span id="bv-count" style="background:var(--green);color:#fff;border-radius:10px;padding:1px 7px;font-size:.68rem;margin-left:6px"></span>
         </button>
       </div>
@@ -685,13 +685,13 @@ button,input,select,textarea{font-family:inherit}
           <span style="font-size:.75rem">–</span>
           <input id="bv-f-yas-max" type="number" placeholder="max" style="width:60px" class="fi">
         </div>
-        <button onclick="applyBulkFiltre('bv')" class="btn btn-o" style="font-size:.75rem">Filtrele</button>
+        <button data-action="bv-apply-filtre" class="btn btn-o" style="font-size:.75rem">Filtrele</button>
       </div>
 
       <!-- Tab: Serbest Seçim -->
       <div id="bv-section-serbest" style="display:none">
         <input id="bv-s-ara" class="fi" placeholder="Küpe ara..." style="margin-bottom:6px"
-          oninput="filterBulkSerbest('bv')">
+          data-action="bv-filter-input" data-action-event="input">
         <div id="bv-s-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--card3);border-radius:6px;padding:4px">
         </div>
         <div style="margin-top:4px;font-size:.72rem;color:var(--ink3)">
@@ -726,8 +726,8 @@ button,input,select,textarea{font-family:inherit}
         <input id="bv-notes" class="fi" type="text" placeholder="Uygulama detayları…">
       </div>
 
-      <button class="btn btn-g" onclick="submitBulkVaccination()">💉💉 Toplu Aşı Uygula</button>
-      <button class="btn btn-o" onclick="closeM('m-bulk-vaccine')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="submit-bv">💉💉 Toplu Aşı Uygula</button>
+      <button class="btn btn-o" data-action="close-bulk-vaccine" style="margin-top:6px">İptal</button>
 
       <!-- Sonuç -->
       <div id="bv-result" style="margin-top:10px"></div>
@@ -737,25 +737,25 @@ button,input,select,textarea{font-family:inherit}
 
 
 <!-- TOPLU İLAÇ -->
-<div id="m-bulk-ilac" class="mo" onclick="mClose(event,this)">
+<div id="m-bulk-ilac" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">💊💊 Toplu İlaç Uygulama</div>
     <div class="m-body">
       <!-- Tab Buttons -->
       <div style="display:flex;gap:4px;margin-bottom:8px">
-        <button onclick="bulkTabSwitch('bi','padok')" id="bi-tab-padok" class="btn btn-g" style="font-size:.72rem;padding:4px 10px">Padok</button>
-        <button onclick="bulkTabSwitch('bi','filtre')" id="bi-tab-filtre" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Filtre</button>
-        <button onclick="bulkTabSwitch('bi','serbest')" id="bi-tab-serbest" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Serbest Seçim</button>
+        <button data-action="bi-tab-padok" id="bi-tab-padok" class="btn btn-g" style="font-size:.72rem;padding:4px 10px">Padok</button>
+        <button data-action="bi-tab-filtre" id="bi-tab-filtre" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Filtre</button>
+        <button data-action="bi-tab-serbest" id="bi-tab-serbest" class="btn btn-o" style="font-size:.72rem;padding:4px 10px">Serbest Seçim</button>
       </div>
 
       <!-- Tab: Padok -->
       <div id="bi-section-padok">
         <div class="fg"><label class="flbl">Padok *</label>
-          <select id="bi-padok" class="fsel" onchange="loadBulkIlacHayvanlar()">
+          <select id="bi-padok" class="fsel" data-action="bi-load" data-action-event="change">
             <option value="">— Padok Seç —</option>
           </select>
           <div class="fhint" style="font-size:.62rem;color:var(--ink3);margin-top:3px">Padok seçip hayvanları getirin</div>
         </div>
-        <button type="button" class="btn" onclick="loadBulkIlacHayvanlar()" style="margin-bottom:8px;background:rgba(220,53,69,.15);border:1.5px solid var(--red);color:var(--red2);font-weight:700">
+        <button type="button" class="btn" data-action="bi-load" style="margin-bottom:8px;background:rgba(220,53,69,.15);border:1.5px solid var(--red);color:var(--red2);font-weight:700">
           🔍 Hayvanları Getir <span id="bi-count" style="background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.68rem;margin-left:6px"></span>
         </button>
       </div>
@@ -775,13 +775,13 @@ button,input,select,textarea{font-family:inherit}
           <span style="font-size:.75rem">–</span>
           <input id="bi-f-yas-max" type="number" placeholder="max" style="width:60px" class="fi">
         </div>
-        <button onclick="applyBulkFiltre('bi')" class="btn btn-o" style="font-size:.75rem">Filtrele</button>
+        <button data-action="bi-apply-filtre" class="btn btn-o" style="font-size:.75rem">Filtrele</button>
       </div>
 
       <!-- Tab: Serbest Seçim -->
       <div id="bi-section-serbest" style="display:none">
         <input id="bi-s-ara" class="fi" placeholder="Küpe ara..." style="margin-bottom:6px"
-          oninput="filterBulkSerbest('bi')">
+          data-action="bi-filter-input" data-action-event="input">
         <div id="bi-s-list" style="max-height:150px;overflow-y:auto;border:1px solid var(--card3);border-radius:6px;padding:4px">
         </div>
         <div style="margin-top:4px;font-size:.72rem;color:var(--ink3)">
@@ -811,8 +811,8 @@ button,input,select,textarea{font-family:inherit}
         <input id="bi-notes" class="fi" type="text" placeholder="Uygulama detayları…">
       </div>
 
-      <button class="btn btn-g" onclick="submitBulkIlac()">💊💊 Toplu İlaç Uygula</button>
-      <button class="btn btn-o" onclick="closeM('m-bulk-ilac')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="submit-bi">💊💊 Toplu İlaç Uygula</button>
+      <button class="btn btn-o" data-action="close-bulk-ilac" style="margin-top:6px">İptal</button>
 
       <!-- Sonuç -->
       <div id="bi-result" style="margin-top:10px"></div>
@@ -821,24 +821,24 @@ button,input,select,textarea{font-family:inherit}
 </div>
 
 <!-- DOĞUM -->
-<div id="m-birth" class="mo" onclick="mClose(event,this)">
+<div id="m-birth" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🐄 Doğum Kaydı</div>
     <div class="m-body">
       <div class="fg"><label class="flbl">Anne *</label>
         <div style="display:flex;gap:6px;margin-bottom:6px">
-          <button type="button" id="btn-gebe-sec" onclick="gebeledenSec()" style="flex:1;padding:8px;background:rgba(78,154,42,.1);border:1.5px solid var(--green);border-radius:var(--r1);font-size:.78rem;font-weight:700;color:var(--green3);cursor:pointer">🤰 Gebelerden Seç</button>
-          <button type="button" onclick="this.style.display='none';document.getElementById('b-anne-manual').style.display='block'" style="flex:1;padding:8px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);font-size:.78rem;font-weight:700;color:var(--ink3);cursor:pointer">✏️ Manuel Gir</button>
+          <button type="button" id="btn-gebe-sec" data-action="birth-gebeden-sec" style="flex:1;padding:8px;background:rgba(78,154,42,.1);border:1.5px solid var(--green);border-radius:var(--r1);font-size:.78rem;font-weight:700;color:var(--green3);cursor:pointer">🤰 Gebelerden Seç</button>
+          <button type="button" data-action="birth-manual" style="flex:1;padding:8px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);font-size:.78rem;font-weight:700;color:var(--ink3);cursor:pointer">✏️ Manuel Gir</button>
         </div>
         <div id="b-anne-manual" style="display:none;position:relative">
           <input id="b-anne" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
-            oninput="acHayvan('b-anne','ac-banne')" onfocus="acHayvan('b-anne','ac-banne')" onkeydown="acNav(event,'ac-banne')"
-            onclick="acHayvan('b-anne','ac-banne'); this.focus()">
+            data-action="b-anne-input" data-action-event="input" data-action="b-anne-focus" data-action-event="focus" data-action="ac-banne-keydown" data-action-event="keydown"
+            data-action="b-anne-ac">
           <div id="ac-banne" style="display:none;background:var(--card);border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
         </div>
         <div id="anne-secili-card" style="display:none;background:rgba(78,154,42,.08);border:1.5px solid var(--green);border-radius:var(--r1);padding:10px 13px;font-size:.8rem">
           <div id="anne-secili-adi" style="font-weight:700;color:var(--green3)"></div>
           <div id="anne-secili-bilgi" style="color:var(--ink3);font-size:.7rem;margin-top:2px"></div>
-          <button type="button" onclick="anneSecimSifirla()" style="background:none;border:none;color:var(--ink3);font-size:.7rem;cursor:pointer;margin-top:4px">↩ Değiştir</button>
+          <button type="button" data-action="birth-anne-sifirla" style="background:none;border:none;color:var(--ink3);font-size:.7rem;cursor:pointer;margin-top:4px">↩ Değiştir</button>
         </div>
       </div>
       <div class="fg"><label class="flbl">Doğum Tarihi *</label><input id="b-tarih" class="fi" type="date"></div>
@@ -861,14 +861,14 @@ button,input,select,textarea{font-family:inherit}
       </div>
       
             <div class="fg"><label class="flbl">Hekim</label><select id="b-hekim" class="fsel"></select></div>
-      <button class="btn btn-g" onclick="submitBirth(this)">🐄 Kaydet + Protokol Görevleri</button>
-      <button class="btn btn-o" onclick="closeM('m-birth')">İptal</button>
+      <button class="btn btn-g" data-action="submit-birth">🐄 Kaydet + Protokol Görevleri</button>
+      <button class="btn btn-o" data-action="close-birth">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- YENİ HAYVAN — sadeleştirilmiş -->
-<div id="m-animal" class="mo" onclick="mClose(event,this)">
+<div id="m-animal" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div id="m-animal-title" class="m-title">➕ Yeni Hayvan</div>
     <div class="m-body">
       <!-- KÜPE -->
@@ -888,7 +888,7 @@ button,input,select,textarea{font-family:inherit}
       <div class="r2">
         <div class="fg">
           <label class="flbl">Cinsiyet *</label>
-          <select id="a-cinsiyet" class="fsel" onchange="animalFormGuncelle()">
+          <select id="a-cinsiyet" class="fsel" data-action="animal-guncelle" data-action-event="change">
             <option value="">Seçin</option>
             <option value="Dişi">Dişi</option>
             <option value="Erkek">Erkek</option>
@@ -896,14 +896,14 @@ button,input,select,textarea{font-family:inherit}
         </div>
         <div class="fg">
           <label class="flbl">Doğum Tarihi</label>
-          <input id="a-dt" class="fi" type="date" onchange="animalFormGuncelle()" autocomplete="off" placeholder="gg.aa.yyyy">
+          <input id="a-dt" class="fi" type="date" data-action="animal-guncelle" data-action-event="change" autocomplete="off" placeholder="gg.aa.yyyy">
         </div>
       </div>
 
       <!-- IRK -->
       <div class="fg">
         <label class="flbl">Irk</label>
-        <select id="a-irk-sel" class="fsel" onchange="irkSecimDegisti()">
+        <select id="a-irk-sel" class="fsel" data-action="irk-secim-degisti" data-action-event="change">
           <option value="">Yükleniyor…</option>
         </select>
         <input id="a-irk-txt" class="fi" placeholder="Irk adı yazın…" autocomplete="off"
@@ -913,7 +913,7 @@ button,input,select,textarea{font-family:inherit}
       <!-- GRUP — cinsiyet/yaşa göre dinamik -->
       <div class="fg" id="a-grup-wrap">
         <label class="flbl">Grup *</label>
-        <select id="a-grup" class="fsel" onchange="animalGrupDegisti()">
+        <select id="a-grup" class="fsel" data-action="grup-degisti" data-action-event="change">
           <option value="">Önce cinsiyet seçin</option>
         </select>
         <div id="a-grup-hint" style="font-size:.62rem;color:var(--amber);margin-top:3px;display:none"></div>
@@ -947,27 +947,27 @@ button,input,select,textarea{font-family:inherit}
         </label>
       </div>
 
-      <button id="m-animal-btn" class="btn btn-g" onclick="submitAnimal(this)">Kaydet</button>
-      <button class="btn btn-o" onclick="closeAnimalEdit()">İptal</button>
+      <button id="m-animal-btn" class="btn btn-g" data-action="submit-animal">Kaydet</button>
+      <button class="btn btn-o" data-action="close-animal-edit">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- STOK GİRİŞİ -->
-<div id="m-stk" class="mo" onclick="mClose(event,this)">
+<div id="m-stk" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title" id="m-stk-title">📦 Stok Girişi</div>
     <div class="m-body">
       <div class="fg"><label class="flbl">Ürün</label><input id="se-urun" class="fi" readonly></div>
       <div class="fg"><label class="flbl">Miktar (<span id="se-birim">?</span>) *</label><input id="se-mik" class="fi" type="number" placeholder="0" inputmode="decimal"></div>
       <div class="fg"><label class="flbl">Not</label><input id="se-not" class="fi" placeholder="Tedarikçi, kaynak…"></div>
-      <button class="btn btn-g" onclick="submitStk(this)">Stok Ekle</button>
-      <button class="btn btn-o" onclick="closeM('m-stk')">İptal</button>
+      <button class="btn btn-g" data-action="submit-stk">Stok Ekle</button>
+      <button class="btn btn-o" data-action="close-stk">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- GÖREV EKLE (Manuel) -->
-<div id="m-task-add" class="mo" onclick="mClose(event,this)">
+<div id="m-task-add" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">📋 Manuel Görev Ekle</div>
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan Küpesi</label><input id="ta-hid" class="fi" placeholder="Küpe no (opsiyonel)" autocomplete="off"></div>
@@ -981,23 +981,23 @@ button,input,select,textarea{font-family:inherit}
           <option value="DIGER">Diğer</option>
         </select>
       </div>
-      <button class="btn btn-g" onclick="submitTaskAdd(this)">Görev Oluştur</button>
-      <button class="btn btn-o" onclick="closeM('m-task-add')">İptal</button>
+      <button class="btn btn-g" data-action="submit-task-add">Görev Oluştur</button>
+      <button class="btn btn-o" data-action="close-task-add">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- YENİ STOK ÜRÜNÜ EKLE -->
-<div id="m-stok-add" class="mo" onclick="mClose(event,this)">
+<div id="m-stok-add" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title" id="sa-modal-title">💊 Yeni İlaç Ekle</div>
     <div class="m-body">
       <!-- Kategori seçimi -->
       <div class="fg">
         <label class="flbl">Tür *</label>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:4px">
-          <button type="button" id="sa-tip-ilac" onclick="saTipSec('ilac')" style="padding:8px;border:2px solid var(--green);border-radius:8px;background:rgba(78,154,42,.12);color:var(--green);font-size:.75rem;font-weight:700;cursor:pointer">💊 İlaç</button>
-          <button type="button" id="sa-tip-sperma" onclick="saTipSec('sperma')" style="padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink3);font-size:.75rem;font-weight:700;cursor:pointer">💉 Sperma</button>
-          <button type="button" id="sa-tip-ekipman" onclick="saTipSec('ekipman')" style="padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink3);font-size:.75rem;font-weight:700;cursor:pointer">🔧 Ekipman</button>
+          <button type="button" id="sa-tip-ilac" data-action="stok-add-tip-ilac" style="padding:8px;border:2px solid var(--green);border-radius:8px;background:rgba(78,154,42,.12);color:var(--green);font-size:.75rem;font-weight:700;cursor:pointer">💊 İlaç</button>
+          <button type="button" id="sa-tip-sperma" data-action="stok-add-tip-sperma" style="padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink3);font-size:.75rem;font-weight:700;cursor:pointer">💉 Sperma</button>
+          <button type="button" id="sa-tip-ekipman" data-action="stok-add-tip-ekipman" style="padding:8px;border:1.5px solid var(--card3);border-radius:8px;background:var(--card);color:var(--ink3);font-size:.75rem;font-weight:700;cursor:pointer">🔧 Ekipman</button>
         </div>
       </div>
 
@@ -1065,46 +1065,46 @@ button,input,select,textarea{font-family:inherit}
         <input id="sa-esik" class="fi" type="number" placeholder="Uyarı sınırı" inputmode="decimal">
       </div>
       <input type="hidden" id="sa-kat" value="Antibiyotik">
-      <button class="btn btn-g" onclick="submitStokAdd(this)">💾 Kaydet</button>
-      <button class="btn btn-o" onclick="closeM('m-stok-add')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="submit-stok-add">💾 Kaydet</button>
+      <button class="btn btn-o" data-action="close-stok-add" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- TÜM STOK HAREKETLERİ MODAL -->
-<div id="m-stok-hareketler" class="mo" onclick="mClose(event,this)">
+<div id="m-stok-hareketler" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">📋 Tüm Stok Hareketleri</div>
     <div class="m-body">
       <div id="stok-hareketler-body" style="max-height:60vh;overflow-y:auto">
         <div class="loader"><div class="spin"></div></div>
       </div>
-      <button class="btn btn-o" onclick="closeM('m-stok-hareketler')" style="margin-top:12px">Kapat</button>
+      <button class="btn btn-o" data-action="close-stok-hareketler" style="margin-top:12px">Kapat</button>
     </div>
   </div>
 </div>
 
 <!-- AYARLAR -->
-<div id="m-ayarlar" class="mo" onclick="mClose(event,this)">
+<div id="m-ayarlar" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">⚙️ Ayarlar</div>
     <div class="m-body">
-      <div class="sh" style="margin-top:0"><span class="sh-title">Hekimler</span><button class="sh-link" onclick="ayarlarHekimEkle()">+ Ekle</button></div>
+      <div class="sh" style="margin-top:0"><span class="sh-title">Hekimler</span><button class="sh-link" data-action="ayar-hekim-ekle">+ Ekle</button></div>
       <div id="ay-hekim-list" style="margin-bottom:12px"></div>
       <div id="ay-hekim-form" style="display:none;margin-bottom:12px">
         <div class="fg"><label class="flbl">Hekim Adı</label><input id="ay-hek-ad" class="fi" placeholder="Ad Soyad" autocomplete="off"></div>
         <div class="r2">
-          <button class="btn btn-g btn-sm" onclick="ayarlarHekimKaydet()">Kaydet</button>
-          <button class="btn btn-o btn-sm" onclick="document.getElementById('ay-hekim-form').style.display='none'">İptal</button>
+          <button class="btn btn-g btn-sm" data-action="ayar-hekim-kaydet">Kaydet</button>
+          <button class="btn btn-o btn-sm" data-action="ayar-hekim-form-gizle">İptal</button>
         </div>
       </div>
       <div class="divider"></div>
-      <div class="sh"><span class="sh-title">🏠 Padoklar</span><button class="sh-link" onclick="ayarlarPadokEkle()">+ Ekle</button></div>
+      <div class="sh"><span class="sh-title">🏠 Padoklar</span><button class="sh-link" data-action="ayar-padok-ekle">+ Ekle</button></div>
       <div id="ay-padok-list" style="margin-bottom:12px"></div>
       <div id="ay-padok-form" style="display:none;margin-bottom:12px">
         <div class="fg"><label class="flbl">Padok Adı</label><input id="ay-padok-ad" class="fi" placeholder="Yeni Padok" autocomplete="off"></div>
         <div class="fg"><label class="flbl">Kapasite (opsiyonel)</label><input id="ay-padok-kap" class="fi" type="number" placeholder="0" min="0"></div>
         <div class="r2">
-          <button class="btn btn-g btn-sm" onclick="ayarlarPadokKaydet()">Kaydet</button>
-          <button class="btn btn-o btn-sm" onclick="document.getElementById('ay-padok-form').style.display='none'">İptal</button>
+          <button class="btn btn-g btn-sm" data-action="ayar-padok-kaydet">Kaydet</button>
+          <button class="btn btn-o btn-sm" data-action="ayar-padok-form-gizle">İptal</button>
         </div>
       </div>
       <div class="divider"></div>
@@ -1114,35 +1114,35 @@ button,input,select,textarea{font-family:inherit}
       <div class="sh"><span class="sh-title">💉 Aşı Kataloğu</span></div>
       <div id="ay-vaksiyon-list" style="margin-bottom:12px"></div>
       <div class="divider"></div>
-      <div class="sh"><span class="sh-title">📡 Data Traffic</span><button class="sh-link" onclick="dataTrafficYenile()">Yenile</button></div>
+      <div class="sh"><span class="sh-title">📡 Data Traffic</span><button class="sh-link" data-action="data-traffic-yenile">Yenile</button></div>
       <div id="dt-summary" style="font-size:.72rem;color:var(--ink3);margin-bottom:8px">Yükleniyor…</div>
       <div id="dt-list" style="max-height:220px;overflow-y:auto;margin-bottom:10px"></div>
       <div style="display:flex;gap:6px;margin-bottom:14px">
-        <button class="btn" style="flex:1;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2);font-weight:700;font-size:.72rem" onclick="dataTrafficGonder()">↑ Tümünü Gönder</button>
-        <button class="btn" style="flex:1;background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;font-size:.72rem" onclick="kuyrukuTemizle()">🗑 Temizle</button>
+        <button class="btn" style="flex:1;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2);font-weight:700;font-size:.72rem" data-action="data-traffic-gonder">↑ Tümünü Gönder</button>
+        <button class="btn" style="flex:1;background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;font-size:.72rem" data-action="kuyrugu-temizle">🗑 Temizle</button>
       </div>
       <div class="sh"><span class="sh-title">Sistem</span></div>
-      <button class="btn" style="background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;margin-bottom:6px" onclick="stokHareketiTemizle()">🗑 Geçersiz Stok Hareketlerini Temizle</button>
+      <button class="btn" style="background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700;margin-bottom:6px" data-action="stok-hareketi-temizle">🗑 Geçersiz Stok Hareketlerini Temizle</button>
       <div class="sh"><span class="sh-title">🔔 Bildirimler</span></div>
       <div style="font-size:.72rem;color:var(--ink3);margin-bottom:6px">Tedavi görevleri için 3 saat öncesinde ve sabah uyarısı alırsınız.</div>
-      <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:6px" onclick="bildirimAc()">🔔 Bildirimleri Aç / Aktifleştir</button>
+      <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:6px" data-action="bildirim-ac">🔔 Bildirimleri Aç / Aktifleştir</button>
       <div class="sh"><span class="sh-title">Uygulama</span></div>
-      <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:14px" onclick="pwaInstall()">⬇ Ana Ekrana Ekle (PWA)</button>
+      <button class="btn" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.3);font-weight:700;margin-bottom:14px" data-action="pwa-install">⬇ Ana Ekrana Ekle (PWA)</button>
       <div class="sh"><span class="sh-title">Ekran Modu</span></div>
       <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button id="btn-saha-mod" class="btn" onclick="setTheme('light')" style="flex:1;font-weight:700;font-size:.82rem">☀️ Saha Modu</button>
-        <button id="btn-koyu-mod" class="btn" onclick="setTheme('dark')" style="flex:1;font-weight:700;font-size:.82rem">🌙 Koyu Mod</button>
+        <button id="btn-saha-mod" class="btn" data-action="theme-light" style="flex:1;font-weight:700;font-size:.82rem">☀️ Saha Modu</button>
+        <button id="btn-koyu-mod" class="btn" data-action="theme-dark" style="flex:1;font-weight:700;font-size:.82rem">🌙 Koyu Mod</button>
       </div>
       <div class="sh"><span class="sh-title">Versiyon</span></div>
       <div style="font-size:.75rem;color:var(--ink3);padding:4px 0">EgeSüt v10 · Padok yönetimi + Aşı rapel + Stok düzeltme</div>
-      <button class="btn btn-o" onclick="closeM('m-ayarlar')" style="margin-top:12px">Kapat</button>
+      <button class="btn btn-o" data-action="close-ayarlar" style="margin-top:12px">Kapat</button>
     </div>
   </div>
 </div>
 
 
 <!-- GÖREV DETAY -->
-<div id="m-task-det" class="mo" onclick="mClose(event,this)">
+<div id="m-task-det" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div>
     <div id="td-header" style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
       <div id="td-hayvan" style="font-size:.68rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em"></div>
@@ -1167,8 +1167,8 @@ button,input,select,textarea{font-family:inherit}
           <input type="number" id="td-asi-doz" step="0.5" min="0.5" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.85rem">
         </div>
         <div style="display:flex;gap:8px">
-          <button id="td-asi-uygula-btn" class="btn btn-g" style="flex:1" onclick="asiUygulaVeTamamla()">Uygula ve Tamamla</button>
-          <button class="btn btn-o" style="flex:0 0 auto" onclick="document.getElementById('td-asi-form').style.display='none';document.getElementById('td-asi-ac-btn').style.display='block'">İptal</button>
+          <button id="td-asi-uygula-btn" class="btn btn-g" style="flex:1" data-action="asi-uygula-tamamla">Uygula ve Tamamla</button>
+          <button class="btn btn-o" style="flex:0 0 auto" data-action="asi-form-gizle">İptal</button>
         </div>
       </div>
       <!-- Rapel görevi: tarih güncelleme -->
@@ -1178,17 +1178,17 @@ button,input,select,textarea{font-family:inherit}
           <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Planlanan tarih (14–21 gün)</label>
           <input type="date" id="td-rapel-tarih" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid #ffe082;background:var(--bg);color:var(--ink);font-size:.85rem">
         </div>
-        <button class="btn btn-g" onclick="rapelTarihiKaydet()" style="background:#f9a825;color:#fff">📅 Tarihi Kaydet</button>
+        <button class="btn btn-g" data-action="rapel-tarihi-kaydet" style="background:#f9a825;color:#fff">📅 Tarihi Kaydet</button>
       </div>
-      <button id="td-tamam-btn" class="btn btn-g" onclick="detayTamamla()">✅ Tamamlandı Olarak İşaretle</button>
-      <button id="td-asi-ac-btn" class="btn btn-g" style="display:none;background:#1e88e5" onclick="asiFormAc()">💉 Aşıyı Uygula</button>
-      <button class="btn" style="background:#fff3e0;color:#b84c00;margin-top:6px;border:1px solid #f0b060;font-weight:700" onclick="detayIptal()">🗑 Görevi İptal Et</button>
-      <button class="btn btn-o" onclick="closeM('m-task-det')" style="margin-top:6px">Kapat</button>
+      <button id="td-tamam-btn" class="btn btn-g" data-action="detay-tamamla">✅ Tamamlandı Olarak İşaretle</button>
+      <button id="td-asi-ac-btn" class="btn btn-g" style="display:none;background:#1e88e5" data-action="asi-form-ac">💉 Aşıyı Uygula</button>
+      <button class="btn" style="background:#fff3e0;color:#b84c00;margin-top:6px;border:1px solid #f0b060;font-weight:700" data-action="detay-iptal">🗑 Görevi İptal Et</button>
+      <button class="btn btn-o" data-action="close-task-det" style="margin-top:6px">Kapat</button>
     </div>
   </div>
 </div>
 
-<div id="m-done-det" class="mo" onclick="mClose(event,this)">
+<div id="m-done-det" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">✅ Tamamlanan Görev</div>
     <div class="m-body">
       <div id="dd-hayvan" style="font-size:1.1rem;font-weight:800;margin-bottom:6px"></div>
@@ -1196,8 +1196,8 @@ button,input,select,textarea{font-family:inherit}
       <div id="dd-meta" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;font-size:.72rem"></div>
       <div id="dd-rapel" style="display:none;background:rgba(42,107,181,.08);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:.8rem"></div>
       <div style="display:flex;gap:8px;margin-top:14px">
-        <button id="dd-geri-al-btn" class="btn" style="flex:1;background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700" onclick="gorevGeriAl()">↩️ Geri Al</button>
-        <button class="btn btn-o" style="flex:1" onclick="closeM('m-done-det')">Kapat</button>
+        <button id="dd-geri-al-btn" class="btn" style="flex:1;background:#fff3e0;color:#b84c00;border:1px solid #f0b060;font-weight:700" data-action="gorev-geri-al">↩️ Geri Al</button>
+        <button class="btn btn-o" style="flex:1" data-action="close-done-det">Kapat</button>
       </div>
     </div>
   </div>
@@ -1207,7 +1207,7 @@ button,input,select,textarea{font-family:inherit}
 
 
 <!-- VAKA DETAY -->
-<div id="m-case-det" class="mo" onclick="mClose(event,this)">
+<div id="m-case-det" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div>
     <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
       <div id="cd-hayvan" style="font-size:.68rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.07em"></div>
@@ -1218,21 +1218,21 @@ button,input,select,textarea{font-family:inherit}
       <div id="cd-notes" style="font-size:.82rem;color:var(--ink2);line-height:1.55;margin-bottom:10px"></div>
       <div id="cd-gun-bolum">
         <button class="btn" style="background:var(--blue);color:#fff;width:100%;margin-bottom:10px"
-          onclick="caseGunEkle()">➕ Bugün Tedavi Günü Ekle</button>
+          data-action="case-gun-ekle">➕ Bugün Tedavi Günü Ekle</button>
       </div>
       <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Tedavi Günleri</div>
       <div id="cd-timeline" style="font-size:.82rem"></div>
       <div id="cd-kapat-bolum" style="margin-top:12px">
         <button class="btn" style="background:var(--green);color:#fff;width:100%"
-          onclick="caseKapat()">✅ Vakayı Kapat (İyileşti)</button>
+          data-action="case-kapat">✅ Vakayı Kapat (İyileşti)</button>
       </div>
-      <button class="btn btn-o" onclick="closeM('m-case-det')" style="margin-top:6px;width:100%">Kapat</button>
+      <button class="btn btn-o" data-action="close-case-det" style="margin-top:6px;width:100%">Kapat</button>
     </div>
   </div>
 </div>
 
 <!-- TOHUMLAMA DETAY -->
-<div id="m-toh-det" class="mo" onclick="mClose(event,this)">
+<div id="m-toh-det" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div>
     <div style="padding:4px 16px 12px;border-bottom:1px solid var(--card2)">
       <div id="td2-hayvan" style="font-size:.68rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.07em"></div>
@@ -1246,15 +1246,15 @@ button,input,select,textarea{font-family:inherit}
         <label style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--card2);cursor:pointer"><input type="radio" name="toh-sonuc" value="Boş" style="accent-color:var(--red);width:18px;height:18px"> ❌ Boş</label>
         <label style="display:flex;align-items:center;gap:10px;padding:10px 0;cursor:pointer"><input type="radio" name="toh-sonuc" value="Bekliyor" style="accent-color:var(--amber);width:18px;height:18px"> ⏳ Bekliyor</label>
         <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="btn btn-o" style="flex:1" onclick="closeM('m-toh-det')">İptal</button>
-          <button class="btn btn-g" style="flex:1" onclick="tohSonucKaydet()">💾 Kaydet</button>
+          <button class="btn btn-o" style="flex:1" data-action="close-toh-det">İptal</button>
+          <button class="btn btn-g" style="flex:1" data-action="toh-sonuc-kaydet">💾 Kaydet</button>
         </div>
       </div>
       <div id="td2-info-msg" style="display:none;font-size:.8rem;color:var(--ink3);background:var(--card2);border-radius:8px;padding:9px 12px;margin-bottom:8px"></div>
-      <button id="td2-bos-fixed" class="btn" onclick="tohSonuc('Bekliyor')" style="display:none;background:var(--amber);color:#fff;margin-bottom:8px">⏳ Hatalı Kayıt — Bekliyor'a Al</button>
+      <button id="td2-bos-fixed" class="btn" data-action="toh-sonuc-bekliyor" style="display:none;background:var(--amber);color:#fff;margin-bottom:8px">⏳ Hatalı Kayıt — Bekliyor'a Al</button>
       <button id="td2-tekrar-btn" class="btn btn-g" style="margin-top:4px;display:none">💉 Tekrar Tohumla</button>
       <button id="td2-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:4px;display:none">🔄 Bu Kaydı Geri Al</button>
-      <button class="btn btn-o" onclick="closeM('m-toh-det')" style="margin-top:2px">Kapat</button>
+      <button class="btn btn-o" data-action="close-toh-det" style="margin-top:2px">Kapat</button>
     </div>
   </div>
 </div>
@@ -1262,7 +1262,7 @@ button,input,select,textarea{font-family:inherit}
 
 
 <!-- GERİ ALMA ONAY MODALI -->
-<div id="m-geri-al" class="mo" onclick="mClose(event,this)">
+<div id="m-geri-al" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div>
     <div style="padding:12px 16px;border-bottom:1px solid var(--card2);text-align:center">
       <div style="font-size:1.6rem;margin-bottom:4px">🔄</div>
@@ -1272,8 +1272,8 @@ button,input,select,textarea{font-family:inherit}
       <div id="ga-ozet" style="font-size:.85rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:12px 14px;margin-bottom:14px;line-height:1.5"></div>
       <div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px;text-align:center">⚠️ Bu işlem kalıcı olarak geri alınacak.</div>
       <input type="hidden" id="ga-hid">
-      <button class="btn" style="background:var(--red);color:#fff;width:100%" onclick="geriAl(document.getElementById('ga-hid').value, this)">🔄 Evet, Geri Al</button>
-      <button class="btn btn-o" onclick="closeM('m-geri-al')" style="margin-top:6px">Vazgeç</button>
+      <button class="btn" style="background:var(--red);color:#fff;width:100%" data-action="geri-al">🔄 Evet, Geri Al</button>
+      <button class="btn btn-o" data-action="close-geri-al" style="margin-top:6px">Vazgeç</button>
     </div>
   </div>
 </div>
@@ -1283,16 +1283,16 @@ button,input,select,textarea{font-family:inherit}
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; position:sticky; top:0; background:#000; padding:10px 0;">
     <h3 id="error-panel-title" style="color:#ff4444; margin:0;">🐞 Hata Konsolu</h3>
     <div>
-      <button onclick="copyErrors()" style="background:#4CAF50; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">📋 Kopyala</button>
-      <button onclick="clearErrors()" style="background:#ff4444; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">🗑 Temizle</button>
-      <button onclick="document.getElementById('error-panel').style.display='none'" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">✕ Kapat</button>
+      <button data-action="copy-errors" style="background:#4CAF50; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">📋 Kopyala</button>
+      <button data-action="clear-errors" style="background:#ff4444; color:white; border:none; padding:8px 15px; border-radius:5px; margin-right:10px; cursor:pointer;">🗑 Temizle</button>
+      <button data-action="hide-error-panel" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">✕ Kapat</button>
     </div>
   </div>
   <div id="error-list" style="white-space:pre-wrap; word-break:break-all;"></div>
 </div>
 
 <!-- ═══ NOT MODAL ═══ -->
-<div id="m-not" class="mo" onclick="mClose(event,this)">
+<div id="m-not" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div>
     <div class="m-title" id="not-title">📝 Not Ekle</div>
     <input type="hidden" id="not-hid">
@@ -1300,14 +1300,14 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Not *</label>
         <textarea id="not-input" class="fta" style="height:100px" placeholder="Hayvan hakkında not…"></textarea>
       </div>
-      <button class="btn btn-g" onclick="hayvanNotEkle(g('not-hid').value,this)">💾 Kaydet</button>
-      <button class="btn btn-o" onclick="closeM('m-not')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-g" data-action="hayvan-not-ekle">💾 Kaydet</button>
+      <button class="btn btn-o" data-action="close-not" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
 
 <!-- ═══ ÇIKIŞ MODAL ═══ -->
-<div id="m-cikis" class="mo" onclick="mClose(event,this)">
+<div id="m-cikis" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div>
     <div class="m-title" id="cx-title">🚪 Hayvan Çıkışı</div>
     <input type="hidden" id="cx-hid">
@@ -1329,8 +1329,8 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Sebep / Not</label>
         <input id="cx-sebep" class="fi" placeholder="Opsiyonel…">
       </div>
-      <button class="btn btn-r" onclick="submitCikis(this)">🚪 Çıkışı Onayla</button>
-      <button class="btn btn-o" onclick="closeM('m-cikis')" style="margin-top:6px">İptal</button>
+      <button class="btn btn-r" data-action="submit-cikis">🚪 Çıkışı Onayla</button>
+      <button class="btn btn-o" data-action="close-cikis" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
@@ -1354,7 +1354,7 @@ button,input,select,textarea{font-family:inherit}
     <script src="js/utils/handlers.js?v=3"></script>
 
     <!-- GEBELİK EKLE MODAL -->
-<div id="m-gebelik" class="mo" onclick="mClose(event,this)">
+<div id="m-gebelik" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">🤰 Gebelik Ekle</div>
     <div class="m-body">
       <div id="gebelik-hayvan-label" style="font-size:.8rem;font-weight:700;color:var(--ink3);margin-bottom:10px;padding:8px;background:var(--card2);border-radius:8px"></div>
@@ -1367,13 +1367,13 @@ button,input,select,textarea{font-family:inherit}
         <label class="flbl">Sperma / Boğa Kodu</label>
         <input id="geb-sperma" class="fi" placeholder="Boş bırakılabilir" autocomplete="off">
       </div>
-      <button class="btn btn-g" onclick="submitGebelikEkle(this)">Kaydet</button>
-      <button class="btn btn-o" onclick="closeM('m-gebelik')">İptal</button>
+      <button class="btn btn-g" data-action="submit-gebelik">Kaydet</button>
+      <button class="btn btn-o" data-action="close-gebelik">İptal</button>
     </div>
   </div>
 </div>
 
-<div id="err-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0321a;color:#fff;font-size:.72rem;padding:8px 48px 8px 12px;z-index:9999;word-break:break-all;cursor:pointer" onclick="document.getElementById('error-panel').style.display='block';renderErrorLog()">
+<div id="err-bar" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#c0321a;color:#fff;font-size:.72rem;padding:8px 48px 8px 12px;z-index:9999;word-break:break-all;cursor:pointer" data-action="show-error-panel">
   <span id="err-bar-text"></span>
   <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:.8rem;opacity:.7">→ Detay</span>
 </div>
@@ -1471,7 +1471,7 @@ function copyErrors() {
       <div id="m-confirm-desc" style="font-size:.85rem;color:var(--ink2);line-height:1.4"></div>
     </div>
     <div style="display:flex;gap:8px;padding:16px 20px 20px;margin-top:8px">
-      <button class="btn btn-o" style="flex:1;padding:11px" onclick="closeM('m-confirm')">İptal</button>
+      <button class="btn btn-o" style="flex:1;padding:11px" data-action="close-confirm">İptal</button>
       <button id="m-confirm-ok" class="btn btn-g" style="flex:1;padding:11px">Onayla</button>
     </div>
   </div>
@@ -1481,11 +1481,11 @@ function copyErrors() {
 <script src="agent-telemetry/tracker.js"></script>
 
 <!-- PADOK DÜZENLE -->
-<div id="m-padok-det" class="mo" onclick="mClose(event,this)">
+<div id="m-padok-det" class="mo" data-action="mclose-overlay">
   <div class="modal" style="max-width:520px">
     <div class="mh">
       <h3 id="padok-det-title">Padok</h3>
-      <button class="mc" onclick="closeM('m-padok-det')">×</button>
+      <button class="mc" data-action="close-padok-det">×</button>
     </div>
     <div class="mb" style="padding:12px 16px">
       <!-- Edit Section -->
@@ -1495,8 +1495,8 @@ function copyErrors() {
         <label style="font-size:.7rem;color:var(--ink3)">Kapasite (opsiyonel)</label>
         <input id="pd-kap" type="number" class="fi" style="margin-bottom:12px" min="0">
         <div style="display:flex;gap:8px;margin-bottom:12px">
-          <button onclick="padokDuzenleKaydet()" class="btn btn-g" style="flex:1">Kaydet</button>
-          <button onclick="padokSilOnay()" class="btn" style="flex:1;background:var(--red);color:#fff">Sil</button>
+          <button data-action="padok-duzenle-kaydet" class="btn btn-g" style="flex:1">Kaydet</button>
+          <button data-action="padok-sil-onay" class="btn" style="flex:1;background:var(--red);color:#fff">Sil</button>
         </div>
       </div>
       <!-- Hayvan Listesi Section -->
@@ -1504,8 +1504,8 @@ function copyErrors() {
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-size:.75rem;font-weight:600;color:var(--ink2)">🐄 Padoktaki Hayvanlar (<span id="pd-hayvan-sayisi">0</span>)</span>
           <div style="display:flex;gap:6px">
-            <input id="pd-hayvan-filtre" class="fi" style="padding:4px 8px;font-size:.75rem;width:120px" placeholder="🔍 Küpe/İsim ara..." oninput="if(_pdKaynakPadokId) renderPadokHayvanlar(_pdKaynakPadokId)">
-            <button id="pd-toplu-tasi-btn" class="btn" style="padding:4px 10px;font-size:.72rem;background:rgba(42,107,181,.12);color:var(--blue);border:1px solid rgba(42,107,181,.2);display:none" onclick="padokTopluTasi()">📦 Seçilenleri Taşı</button>
+            <input id="pd-hayvan-filtre" class="fi" style="padding:4px 8px;font-size:.75rem;width:120px" placeholder="🔍 Küpe/İsim ara..." data-action="padok-input" data-action-event="input">
+            <button id="pd-toplu-tasi-btn" class="btn" style="padding:4px 10px;font-size:.72rem;background:rgba(42,107,181,.12);color:var(--blue);border:1px solid rgba(42,107,181,.2);display:none" data-action="padok-toplu-tasi">📦 Seçilenleri Taşı</button>
           </div>
         </div>
         <div id="pd-hayvan-listesi" style="max-height:260px;overflow-y:auto;font-size:.78rem">
@@ -1517,28 +1517,28 @@ function copyErrors() {
 </div>
 
 <!-- Padok Transfer Modal (small selector) -->
-<div id="m-padok-transfer" class="mo" onclick="mClose(event,this)">
+<div id="m-padok-transfer" class="mo" data-action="mclose-overlay">
   <div class="modal" style="max-width:320px">
     <div class="mh">
       <h3 id="pt-title">Padok Seç</h3>
-      <button class="mc" onclick="closeM('m-padok-transfer')">×</button>
+      <button class="mc" data-action="close-padok-transfer">×</button>
     </div>
     <div class="mb" style="padding:12px 16px">
       <div style="font-size:.78rem;color:var(--ink3);margin-bottom:8px" id="pt-bilgi">Hedef padok seçin:</div>
       <select id="pt-select" class="fi" style="margin-bottom:12px">
         <option value="">Seçiniz...</option>
       </select>
-      <button onclick="padokTransferOnayla()" class="btn btn-g" style="width:100%;padding:9px">✅ Taşı</button>
+      <button data-action="padok-transfer-onay" class="btn btn-g" style="width:100%;padding:9px">✅ Taşı</button>
     </div>
   </div>
 </div>
 
 <!-- STOK ÜRÜN DETAY -->
-<div id="m-stok-det" class="mo" onclick="mClose(event,this)">
+<div id="m-stok-det" class="mo" data-action="mclose-overlay">
   <div class="modal" style="max-width:380px">
     <div class="mh">
       <h3 id="stok-det-title">Ürün Detay</h3>
-      <button class="mc" onclick="closeM('m-stok-det')">×</button>
+      <button class="mc" data-action="close-stok-det">×</button>
     </div>
     <div class="mb" style="padding:12px 16px">
       <label style="font-size:.7rem;color:var(--ink3)">Ürün Adı</label>
@@ -1564,40 +1564,40 @@ function copyErrors() {
         <div style="font-size:.7rem;color:var(--ink3);margin-bottom:4px">Stok Düzelt (sayım sonrası)</div>
         <div style="display:flex;gap:6px">
           <input id="sd-yeni-miktar" type="number" placeholder="Gerçek miktar" class="fi" style="flex:1">
-          <button onclick="stokDuzeltKaydet()" class="btn btn-g" style="padding:8px 14px;font-size:.75rem">Düzelt</button>
+          <button data-action="stok-duzelt-kaydet" class="btn btn-g" style="padding:8px 14px;font-size:.75rem">Düzelt</button>
         </div>
       </div>
       <div style="display:flex;gap:8px">
-        <button onclick="stokDetKaydet()" class="btn btn-g" style="flex:1">Kaydet</button>
-        <button onclick="stokDetArsivle()" class="btn" style="flex:1;background:var(--red);color:#fff">Arşivle</button>
+        <button data-action="stok-det-kaydet" class="btn btn-g" style="flex:1">Kaydet</button>
+        <button data-action="stok-det-arsivle" class="btn" style="flex:1;background:var(--red);color:#fff">Arşivle</button>
       </div>
     </div>
   </div>
 </div>
 
-<div id="m-hekim-det" class="mo" onclick="mClose(event,this)">
+<div id="m-hekim-det" class="mo" data-action="mclose-overlay">
   <div class="modal">
     <div class="mh">
       <h3 id="hk-title">Hekim</h3>
-      <button class="mc" onclick="closeM('m-hekim-det')">×</button>
+      <button class="mc" data-action="close-hekim-det">×</button>
     </div>
     <div class="mb" style="padding:12px 16px">
       <label style="font-size:.7rem;color:var(--ink3)">Hekim Adı</label>
       <input id="hk-ad" class="fi" style="margin-bottom:10px">
 
       <div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto" id="hk-period-tabs">
-        <button class="kat-btn on" onclick="hekimPeriod('all',event)">Tümü</button>
-        <button class="kat-btn" onclick="hekimPeriod(30,event)">1 Ay</button>
-        <button class="kat-btn" onclick="hekimPeriod(90,event)">3 Ay</button>
-        <button class="kat-btn" onclick="hekimPeriod(180,event)">6 Ay</button>
-        <button class="kat-btn" onclick="hekimPeriod(365,event)">1 Yıl</button>
+        <button class="kat-btn on" data-action="hekim-period-'all'">Tümü</button>
+        <button class="kat-btn" data-action="hekim-period-30">1 Ay</button>
+        <button class="kat-btn" data-action="hekim-period-90">3 Ay</button>
+        <button class="kat-btn" data-action="hekim-period-180">6 Ay</button>
+        <button class="kat-btn" data-action="hekim-period-365">1 Yıl</button>
       </div>
 
       <div id="hk-stats" style="margin-bottom:12px"></div>
 
       <div style="display:flex;gap:8px">
-        <button onclick="hekimDetKaydet()" class="btn btn-g" style="flex:1">Kaydet</button>
-        <button onclick="hekimDetSil()" class="btn btn-sm" style="background:var(--red);color:#fff;padding:8px 16px">Sil</button>
+        <button data-action="hekim-det-kaydet" class="btn btn-g" style="flex:1">Kaydet</button>
+        <button data-action="hekim-det-sil" class="btn btn-sm" style="background:var(--red);color:#fff;padding:8px 16px">Sil</button>
       </div>
     </div>
   </div>
