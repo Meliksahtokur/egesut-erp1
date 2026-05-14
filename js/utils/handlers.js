@@ -210,11 +210,11 @@ registerActions({
   'stok-det-arsivle':   () => stokDetArsivle(),
 
   // ═══ HEKİM ═══
-  'hekim-period-all': (el) => hekimPeriod('all', el),
-  'hekim-period-30':  (el) => hekimPeriod(30, el),
-  'hekim-period-90':  (el) => hekimPeriod(90, el),
-  'hekim-period-180': (el) => hekimPeriod(180, el),
-  'hekim-period-365': (el) => hekimPeriod(365, el),
+  'hekim-period-all': (el, e) => hekimPeriod('all', e),
+  'hekim-period-30':  (el, e) => hekimPeriod(30, e),
+  'hekim-period-90':  (el, e) => hekimPeriod(90, e),
+  'hekim-period-180': (el, e) => hekimPeriod(180, e),
+  'hekim-period-365': (el, e) => hekimPeriod(365, e),
   'hekim-det-kaydet': () => hekimDetKaydet(),
   'hekim-det-sil':    () => hekimDetSil(),
 
