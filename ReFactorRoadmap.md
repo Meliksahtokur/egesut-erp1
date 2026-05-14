@@ -181,18 +181,18 @@ Bu aşama, projenin gelecekteki geliştirmeler için daha sağlam bir temele otu
 
 | Aşama | Durum |
 |-------|-------|
-| 1.1 Global State | ⚠️ Kısmen — `state.js`/`AppState` var, ama `_A`/`_S` referansları hala global (ui.js:18, app.js:6) |
+| 1.1 Global State | ⚠️ Kısmen — `state.js`/`AppState` var, ama 13 global hala `app.js:81`'de. **RİSKLİ → BEKLİYOR** |
 | 1.2 Sabitler → config.js | ✅ Bitti — Tüm sabitler `config.js`'te, hiç tekrar tanım yok |
-| 1.3 Yardımcılar → utils/ | ❌ Yapılmadı |
-| 1.4 Autocomplete tekilleştirme | ❌ Yapılmadı |
-| 2. Veri Yönetimi | ❌ Yapılmadı |
-| 3. UI/Render | ❌ Yapılmadı |
-| 4. Hata Yönetimi | ❌ Yapılmadı |
-| 5. Migration | ❌ Yapılmadı |
-| 6. Güvenlik/XSS | ❌ Yapılmadı |
-| 7. Performans | ❌ Yapılmadı |
-| 8. Test/Kod Kalitesi | ❌ Yapılmadı |
-| 9. Dokümantasyon | ❌ Yapılmadı |
+| 1.3 Yardımcılar → utils/ | ✅ **DONE (review gerekli)** — `helpers.js` + `modal.js` oluşturuldu, app.js temizlendi |
+| 1.4 Autocomplete tekilleştirme | ⚠️ `setupAutocomplete()` helpers.js'e eklendi. `acHdeTani`/`acDisease` dönüşümü **BEKLİYOR** |
+| 2. Veri Yönetimi | ✅ **DONE (review gerekli)** — `insertOffline`/`updateOffline`, IndexedDB index'leri, `rpcOptimistic` (zaten vardı) |
+| 3. UI/Render | ⏸️ **RİSKLİ → BEKLİYOR** (event delegation ~150 handler) |
+| 4. Hata Yönetimi | ✅ **DONE (review gerekli)** — `errorHandler.js`, `withErrorHandling` ile load/online handler sarıldı |
+| 5. Migration | ✅ **DONE (review gerekli)** — Idempotent kontrolü, ground truth (7576 satır) |
+| 6. Güvenlik/XSS | ⏸️ `esc()` helpers.js'te mevcut, innerHTML sarması **test gerekli** |
+| 7. Performans | ✅ **DONE:** debounce/throttle helpers.js'e eklendi |
+| 8. Test/Kod Kalitesi | ✅ **DONE (review gerekli)** — ESLint/Prettier kurulumu, JSDoc yorumları |
+| 9. Dokümantasyon | ✅ **DONE (review gerekli)** — README güncellendi, ground truth migration |
 
 **Son kontrol:** 2026-05-13
 
