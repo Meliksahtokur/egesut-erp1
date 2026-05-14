@@ -548,29 +548,6 @@ function hdeSmptomKaldir(val, chip) {
 }
 
 // ── DÜZENLEME FORMU TANI AUTOCOMPLETE ────────────
-function acHdeTani(inp) {
-  const q = (inp.value || '').toLowerCase().trim();
-  const ac = g('ac-hde-tani'); if (!ac) return;
-  const kat = _curHst?.kategori || '';
-  const base = (kat && HASTALIK_KAT[kat]) ? HASTALIK_KAT[kat] : HASTALIK_LISTESI;
-  const filtered = q ? base.filter(h => h.toLowerCase().includes(q)) : base.slice(0, 12);
-  if (!filtered.length) { ac.style.display = 'none'; return; }
-  ac.innerHTML = filtered.map(h =>
-    `<div onclick="hdeSelTani('${h.replace(/'/g, "\\'")}','${kat}')"
-      style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card2)"
-      onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''>${h}</div>`
-  ).join('');
-  ac.style.display = 'block';
-}
-
-function hdeSelTani(val, kat) {
-  const inp = g('hde-tani'); if (!inp) return;
-  inp.value = val;
-  inp.dataset.kat = kat;
-  g('ac-hde-tani').style.display = 'none';
-  hdeUpdateSmptDropdown(kat);
-}
-
 function hdeToggleLok(val, btn) {
   btn.classList.toggle('lok-on');
   if (btn.classList.contains('lok-on')) {
@@ -591,21 +568,6 @@ function toggleLokasyon(val, btn) {
   }
   const secili = [...document.querySelectorAll('.lok-btn.lok-on')].map(b => b.textContent.trim());
   g('d-lokasyon').value = secili.join(', ');
-}
-
-async function acDisease() {
-  const q   = (g('d-tani')?.value || '').toLowerCase().trim();
-  const kat = g('d-kat')?.value || '';
-  const ac  = g('ac-dis');
-  if (!q) { ac.style.display = 'none'; return; }
-  const usedDis = []; // hastalik_log kaldırıldı
-  const base    = kat && HASTALIK_KAT[kat] ? HASTALIK_KAT[kat] : HASTALIK_LISTESI;
-  const all     = [...new Set([...base, ...usedDis])];
-  const filtered = all.filter(d => d.toLowerCase().includes(q));
-  if (!filtered.length) { ac.style.display = 'none'; return; }
-  ac.innerHTML = filtered.map(d => `<div onclick="selDis('${d.replace(/'/g,"\\'")}',this);event.stopPropagation()"
-    style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid #eee">${d}</div>`).join('');
-  ac.style.display = 'block';
 }
 
 function selDis(val, btn) {
@@ -659,7 +621,7 @@ window.addEventListener('load', withErrorHandling(async () => {
   try { await renderFromLocal(); } catch (e) {
     console.warn('render err:', e);
     const el = g('dash-body');
-    if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: ${e.message}<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
+    if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: esc(e.message)<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
   }
   updateSyncBar();
 
