@@ -1660,8 +1660,17 @@ async function loadStokPanel(){
     ]},
   ];
   let html='';
+  // Arama çubuğu
+  const aramaQ = (typeof _stokAramaFilter !== 'undefined' && _stokAramaFilter || '').toLowerCase().trim();
+  html+=`<input id="stok-arama" type="text" value="${aramaQ?esc(aramaQ):''}" placeholder="🔍 Ürün ara…" oninput="stokFiltrele(this.value)" style="width:100%;padding:10px 12px;border:1px solid var(--card3);border-radius:8px;margin-bottom:10px;font-size:.82rem;background:var(--card2);color:var(--ink);box-sizing:border-box">`;
+  html+=`<div id="stok-arama-sonuc" style="font-size:.65rem;color:var(--ink3);margin:-6px 0 8px">${aramaQ ? (getState('stock').filter(s=>_stokAramaFiltersiz(s)).length+' sonuç') : ''}</div>`;
+
+  const _stokAramaFilterli = aramaQ 
+    ? (s => (s.urun_adi||'').toLowerCase().includes(aramaQ) 
+        || (s.kategori||'').toLowerCase().includes(aramaQ))
+    : (() => true);
   GRUPLAR.forEach(grup=>{
-    const grupStok=stok.filter(s=>grup.alt.some(a=>a.filtre(s)));
+    const grupStok=stok.filter(s=>_stokAramaFilterli(s) && grup.alt.some(a=>a.filtre(s)));
     if(!grupStok.length && grup.baslik.includes('Yem')){
       html+=`<div style="background:var(--bg2);border:1px dashed var(--bg3);border-radius:12px;padding:14px;margin-bottom:10px;opacity:.5">
         <div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em">${grup.baslik}</div>
@@ -1671,7 +1680,7 @@ async function loadStokPanel(){
     }
     html+=`<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px">${grup.baslik}</div>`;
     grup.alt.forEach(alt=>{
-      const liste=stok.filter(alt.filtre);
+      const liste=stok.filter(s=>_stokAramaFilterli(s) && alt.filtre(s));
       if(!liste.length) return;
       html+=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);margin:8px 0 4px;padding-left:4px">${alt.ad} (${liste.length})</div>`;
       html+=liste.map(s=>{
@@ -1838,8 +1847,17 @@ async function loadStokPanel_DEPRECATED(){
     ]},
   ];
   let html='';
+  // Arama çubuğu
+  const aramaQ = (typeof _stokAramaFilter !== 'undefined' && _stokAramaFilter || '').toLowerCase().trim();
+  html+=`<input id="stok-arama" type="text" value="${aramaQ?esc(aramaQ):''}" placeholder="🔍 Ürün ara…" oninput="stokFiltrele(this.value)" style="width:100%;padding:10px 12px;border:1px solid var(--card3);border-radius:8px;margin-bottom:10px;font-size:.82rem;background:var(--card2);color:var(--ink);box-sizing:border-box">`;
+  html+=`<div id="stok-arama-sonuc" style="font-size:.65rem;color:var(--ink3);margin:-6px 0 8px">${aramaQ ? (getState('stock').filter(s=>_stokAramaFiltersiz(s)).length+' sonuç') : ''}</div>`;
+
+  const _stokAramaFilterli = aramaQ 
+    ? (s => (s.urun_adi||'').toLowerCase().includes(aramaQ) 
+        || (s.kategori||'').toLowerCase().includes(aramaQ))
+    : (() => true);
   GRUPLAR.forEach(grup=>{
-    const grupStok=stok.filter(s=>grup.alt.some(a=>a.filtre(s)));
+    const grupStok=stok.filter(s=>_stokAramaFilterli(s) && grup.alt.some(a=>a.filtre(s)));
     if(!grupStok.length && grup.baslik.includes('Yem')){
       html+=`<div style="background:var(--bg2);border:1px dashed var(--bg3);border-radius:12px;padding:14px;margin-bottom:10px;opacity:.5">
         <div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em">${grup.baslik}</div>
@@ -1849,7 +1867,7 @@ async function loadStokPanel_DEPRECATED(){
     }
     html+=`<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px">${grup.baslik}</div>`;
     grup.alt.forEach(alt=>{
-      const liste=stok.filter(alt.filtre);
+      const liste=stok.filter(s=>_stokAramaFilterli(s) && alt.filtre(s));
       if(!liste.length) return;
       html+=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);margin:8px 0 4px;padding-left:4px">${alt.ad} (${liste.length})</div>`;
       html+=liste.map(s=>{
@@ -3162,7 +3180,8 @@ function ilacSatirEkle(){
   <button type="button" onclick="this.closest('.ilac-satir').remove()" style="background:var(--red);color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;flex-shrink:0">✕</button>`;
   container.appendChild(row);
 }
-function acDilacSatir(inp){
+async function acDilacSatir(inp){
+  if (!getState('stock') || !getState('stock').length) await loadStock();
   const q=(inp.value||'').toLowerCase().trim();
   const ac=inp.closest('.ilac-satir').querySelector('.ilac-ac');
   const stoklar=getState('stock').filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'));
@@ -4109,4 +4128,11 @@ async function buildDataLists(){
   const stk=await idbGetAll('stok');
   const dlI=document.getElementById('dl-ilac');
   if(dlI) dlI.innerHTML=stk.map(s=>`<option value="${s.id}">${esc(s.urun_adi)}</option>`).join('');
+}
+
+// ═══ STOK ARAMA ═══
+let _stokAramaFilter = '';
+function stokFiltrele(q){
+  _stokAramaFilter = q;
+  loadStokPanel();
 }
