@@ -34,6 +34,12 @@ function _trErr(msg) {
 }
 
 // ── RPC WRAPPER ─────────────────────────────
+/**
+ * Supabase RPC çağrısı
+ * @param {string} name - RPC fonksiyon adı
+ * @param {object} [params] - Parametreler
+ * @returns {Promise<any>} RPC sonucu
+ */
 async function rpc(name, params = {}) {
   if (!navigator.onLine) throw new Error('İnternet bağlantısı gerekli');
   const { data, error } = await db.rpc(name, params);
@@ -60,6 +66,17 @@ async function openDB() {
       const d = e.target.result;
       TABLES.forEach(t => { if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: 'id' }); });
       if (!d.objectStoreNames.contains('_queue')) d.createObjectStore('_queue', { keyPath: '_qid', autoIncrement: true });
+      // Index'ler: gorev_log, tohumlama, dogum
+      ['gorev_log','tohumlama','dogum'].forEach(t => {
+        if (d.objectStoreNames.contains(t)) {
+          const st = req.transaction.objectStore(t);
+          if (!st.indexNames.contains('hayvan_id_idx')) st.createIndex('hayvan_id_idx', 'hayvan_id', { unique: false });
+        }
+      });
+      if (d.objectStoreNames.contains('gorev_log')) {
+        const st = req.transaction.objectStore('gorev_log');
+        if (!st.indexNames.contains('tamamlandi_idx')) st.createIndex('tamamlandi_idx', 'tamamlandi', { unique: false });
+      }
     };
     req.onsuccess = e => { _idb = e.target.result; _dbReady = true; res(_idb); };
     req.onerror   = e => rej(e.target.error);
@@ -209,6 +226,33 @@ async function write(table, data, method = 'POST', filter = '') {
     if (result) return result;
   }
   return _writePost(table, arr, method, filter);
+}
+
+
+// ── OFFLINE QUEUE HELPERS ───────────────────
+async function insertOffline(table, data) {
+  const db = await openDB();
+  const tx = db.transaction(['offline_queue'], 'readwrite');
+  const store = tx.objectStore('offline_queue');
+  await store.put({
+    id: crypto.randomUUID(),
+    method: 'POST', table, data,
+    createdAt: new Date().toISOString(), retryCount: 0
+  });
+  await idbPut(table, data);
+}
+
+async function updateOffline(table, id, changes) {
+  const db = await openDB();
+  const tx = db.transaction(['offline_queue'], 'readwrite');
+  const store = tx.objectStore('offline_queue');
+  await store.put({
+    id: crypto.randomUUID(),
+    method: 'PATCH', table, data: changes,
+    filter: `id=eq.${id}`,
+    createdAt: new Date().toISOString(), retryCount: 0
+  });
+  await idbPut(table, { id, ...changes });
 }
 
 // ── RPC TABLOLARI MAP ───────────────────────
