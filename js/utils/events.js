@@ -1,5 +1,5 @@
 // js/utils/events.js
-// Merkezi event delegation
+// Merkezi event delegation — her event tipi icin ayri attribute
 
 const ACTIONS = {};
 
@@ -11,38 +11,38 @@ function registerActions(map) {
   Object.entries(map).forEach(([k, v]) => ACTIONS[k] = v);
 }
 
-// Click delegation — data-action="..." (data-action-event OLMADAN)
+// Click delegation — data-action
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
-  if (!el || el.dataset.actionEvent) return;
-  const action = el.dataset.action;
-  if (ACTIONS[action]) { e.preventDefault(); ACTIONS[action](el, e); }
+  if (!el || !ACTIONS[el.dataset.action]) return;
+  e.preventDefault();
+  ACTIONS[el.dataset.action](el, e);
 });
 
-// Input delegation — data-action="..." data-action-event="input"
+// Input delegation — data-input
 document.addEventListener('input', e => {
-  const el = e.target.closest('[data-action][data-action-event="input"]');
-  if (!el || !ACTIONS[el.dataset.action]) return;
-  ACTIONS[el.dataset.action](el, e);
+  const el = e.target.closest('[data-input]');
+  if (!el || !ACTIONS[el.dataset.input]) return;
+  ACTIONS[el.dataset.input](el, e);
 });
 
-// Change delegation
-document.addEventListener('change', e => {
-  const el = e.target.closest('[data-action][data-action-event="change"]');
-  if (!el || !ACTIONS[el.dataset.action]) return;
-  ACTIONS[el.dataset.action](el, e);
-});
-
-// Focus delegation
+// Focus delegation — data-focus
 document.addEventListener('focusin', e => {
-  const el = e.target.closest('[data-action][data-action-event="focus"]');
-  if (!el || !ACTIONS[el.dataset.action]) return;
-  ACTIONS[el.dataset.action](el, e);
+  const el = e.target.closest('[data-focus]');
+  if (!el || !ACTIONS[el.dataset.focus]) return;
+  ACTIONS[el.dataset.focus](el, e);
 });
 
-// Keydown delegation
+// Keydown delegation — data-keydown
 document.addEventListener('keydown', e => {
-  const el = e.target.closest('[data-action][data-action-event="keydown"]');
-  if (!el || !ACTIONS[el.dataset.action]) return;
-  ACTIONS[el.dataset.action](el, { key: e.key, event: e });
+  const el = e.target.closest('[data-keydown]');
+  if (!el || !ACTIONS[el.dataset.keydown]) return;
+  ACTIONS[el.dataset.keydown](el, { key: e.key, event: e });
+});
+
+// Change delegation — data-change
+document.addEventListener('change', e => {
+  const el = e.target.closest('[data-change]');
+  if (!el || !ACTIONS[el.dataset.change]) return;
+  ACTIONS[el.dataset.change](el, e);
 });
