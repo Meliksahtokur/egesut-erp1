@@ -98,7 +98,7 @@ async function submitAnimal(btn) {
       await pullTables(['hayvanlar']);
       await Promise.all([renderFromLocal(), loadIrkDropdown()]);
     }
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = editId ? '💾 Güncelle' : 'Kaydet'; } }
 }
 
@@ -149,7 +149,7 @@ async function submitBirth(btn) {
 
     pullTables(['hayvanlar','dogum','gorev_log']).then(renderSafe).catch(console.warn);
   } catch (e) {
-    toast('❌ Doğum kaydedilemedi: ' + e.message, true);
+    toast('❌ Doğum kaydedilemedi: ' + getUserMessage(e), true);
   } finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
 }
 
@@ -190,7 +190,7 @@ async function submitInsem(btn) {
     }).catch(console.warn);
   } catch (e) {
 
-    toast('❌ Tohumlama kaydedilemedi: ' + e.message, true);
+    toast('❌ Tohumlama kaydedilemedi: ' + getUserMessage(e), true);
   } finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
 }
 
@@ -223,7 +223,7 @@ async function submitKizginlik(btn) {
     closeM('m-kizginlik');
     ['k-hid','k-notlar'].forEach(cl);
     pullTables(['kizginlik_log','gorev_log']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
 
@@ -298,7 +298,7 @@ async function submitCase(btn) {
       await openDet(hayvan.id);
       openCaseDet(res.case_id);
     }
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
 }
 
@@ -318,7 +318,7 @@ async function abortKaydet(hayvanId, tohId) {
     await pullTables(['tohumlama','hayvanlar','islem_log']);
     renderSafe();
     openDet(hayvanId);
-  } catch (e) { toast('❌ Abort kaydedilemedi: ' + e.message, true); }
+  } catch (e) { toast('❌ Abort kaydedilemedi: ' + getUserMessage(e), true); }
 }
 
 // ── HAYVAN NOTU EKLE ─────────────────────────
@@ -334,7 +334,7 @@ async function hayvanNotEkle(hayvanId, btn) {
     cl('not-input');
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
     openDet(hayvanId);
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Not Ekle'; } }
 }
 
@@ -389,7 +389,7 @@ async function submitCikis(btn) {
     closeM('m-cikis');
     closeDet();
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '📤 Sürüden Çıkar'; } }
 }
 
@@ -432,7 +432,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
     toast(`✅ ${basari} buzağı sütten kesildi`);
     closeM('m-sutten-kes');
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
 async function suttenKesTekil(hayvanId, btn) {
@@ -448,7 +448,7 @@ async function suttenKesTekil(hayvanId, btn) {
     toast(`✅ ${getDisplayKupe(h)} sütten kesildi`);
     closeDet();
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
 
@@ -463,7 +463,7 @@ async function submitTohumOnayla(hayvanId, btn) {
     toast(`✅ ${getDisplayKupe(h)} tohumlanabilir olarak onaylandı`);
     closeDet();
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '✅ Tohumlanabilir Onayla'; } }
 }
 async function submitTohumErtele(hayvanId, ay, btn) {
@@ -478,7 +478,7 @@ async function submitTohumErtele(hayvanId, ay, btn) {
     closeM('m-tohum-ertele');
     closeDet();
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '⏰ Ertele'; } }
 }
 function openTohumErtele(hayvanId, kupe) {
@@ -601,7 +601,7 @@ async function submitVaccination(btn) {
     await pullTables(['vaccination_log', 'gorev_log', 'hayvanlar']);
     renderSafe();
   } catch (e) {
-    toast('❌ Aşı kaydedilemedi: ' + e.message, true);
+    toast('❌ Aşı kaydedilemedi: ' + getUserMessage(e), true);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '💉 Aşı Uygula'; }
   }
@@ -636,7 +636,7 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
   } catch (e) {
     btn.disabled = false;
     btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
-    toast(e.message, true);
+    toast(getUserMessage(e), true);
   }
 }
 
@@ -662,7 +662,7 @@ async function submitTaskAdd(btn) {
     ['ta-hid','ta-desc'].forEach(cl);
     await loadTasks(_curTaskFilter || 'today');
     loadDash();
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Görev Oluştur'; } }
 }
 
@@ -675,7 +675,7 @@ async function hstKapat() {
     toast('✅ Hastalık kaydı kapatıldı');
     closeM('m-hst-det');
     await pullTables(['cases']); renderSafe();
-  } catch(e) { toast('❌ ' + e.message, true); }
+  } catch(e) { toast('❌ ' + getUserMessage(e), true); }
 }
 
 // _editMode: true iken submitDisease → hastalik_guncelle çağırır
@@ -764,7 +764,7 @@ async function hstGuncelle(btn) {
     closeDisease();
     await pullTables(['cases']);
     await renderFromLocal();
-  } catch(e) { toast('❌ ' + e.message, true); }
+  } catch(e) { toast('❌ ' + getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Kaydet + Görevler'; } }
 }
 
@@ -778,7 +778,7 @@ async function hstSilOnay() {
     toast('🗑 Kayıt silindi');
     closeM('m-hst-det');
     await pullTables(['cases']); renderSafe();
-  } catch(e) { toast('❌ ' + e.message, true); }
+  } catch(e) { toast('❌ ' + getUserMessage(e), true); }
 }
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
@@ -881,7 +881,7 @@ async function geriAl(islemLogId, btn) {
     closeM('m-geri-al');
     closeM('m-toh-det');
     pullTables(['hayvanlar','tohumlama','dogum','gorev_log','islem_log']).then(renderSafe).catch(console.warn);
-  } catch (e) { toast('❌ ' + e.message, true); }
+  } catch (e) { toast('❌ ' + getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🔄 Evet, Geri Al'; } }
 }
 
@@ -900,7 +900,7 @@ async function submitStk(btn) {
     loadDash();
     const _sp = document.getElementById('stok-panel');
     if(_sp?.style.transform !== 'translateX(100%)') loadStokPanel();
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Stok Ekle'; } }
 }
 
@@ -963,7 +963,7 @@ async function submitStokAdd(btn) {
     _drugsCache = [];
     const _sp = document.getElementById('stok-panel');
     if(_sp?.style.transform !== 'translateX(100%)') await loadStokPanel();
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; } }
 }
 
@@ -988,7 +988,7 @@ async function submitGebelikEkle(btn) {
     closeM('m-gebelik');
     await pullTables(['tohumlama','hayvanlar']);
     renderSafe();
-  } catch(e) { toast(e.message, true); }
+  } catch(e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
 
@@ -998,7 +998,7 @@ async function bildirimGoruldu(bildirimId) {
     await write('bildirim_log', { durum: 'goruldu' }, 'PATCH', `id=eq.${bildirimId}`);
     loadBildirimler(_curBildirimTab || 'bekliyor');
     updateBildirimBadge();
-  } catch (e) { toast(e.message, true); }
+  } catch (e) { toast(getUserMessage(e), true); }
 }
 
 async function bildirimKontrol() {
@@ -1074,7 +1074,7 @@ async function hstIlacEkle(btn) {
     hstIlacFormToggle();
     await renderHstIlaclar(_curHst.id);
     pullTables(['tedavi','stok','stok_hareket']).then(renderSafe).catch(console.warn);
-  } catch(e) { toast('❌ ' + e.message, true); }
+  } catch(e) { toast('❌ ' + getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '💾 İlaç Kaydet'; } }
 }
 
@@ -1087,7 +1087,7 @@ async function hstIlacSil(tedaviId) {
     toast('✅ İlaç silindi');
     await renderHstIlaclar(_curHst.id);
     pullTables(['tedavi','stok','stok_hareket']).then(renderSafe).catch(console.warn);
-  } catch(e) { toast('❌ ' + e.message, true); }
+  } catch(e) { toast('❌ ' + getUserMessage(e), true); }
 }
 
 // ── İLAÇ–STOK BAĞLAMA ────────────────────────────────────────
@@ -1104,7 +1104,7 @@ async function submitDrugStokLink(drugId, stockItemId) {
     // drugs cache'ini güncelle (IDB + _drugsCache)
     _drugsCache = [];
     await pullTables(['drugs']);
-  } catch(e) { toast('❌ ' + e.message, true); }
+  } catch(e) { toast('❌ ' + getUserMessage(e), true); }
 }
 
 // ── TOPLU AŞILAMA ─────────────────────────────────────────────
@@ -1209,7 +1209,7 @@ async function submitBulkVaccination() {
       pullTables(['vaccination_log','gorev_log','stok_hareket']).catch(console.warn);
     }
   } catch(e) {
-    toast('❌ ' + e.message, true);
+    toast('❌ ' + getUserMessage(e), true);
     const div = document.getElementById('bv-result');
     if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
   } finally {
@@ -1261,7 +1261,7 @@ async function loadBulkIlacDropdown() {
   const sel = document.getElementById('bi-ilac-sel');
   if (!sel) return;
   sel.innerHTML = '<option value="">— İlaç seçin —</option>' +
-    stoklar.map(s => `<option value="${s.id}">${s.urun_adi} (${s.guncel ?? 0} ${s.birim || 'adet'})</option>`).join('');
+    stoklar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.guncel ?? 0} ${s.birim || 'adet'})</option>`).join('');
 }
 
 async function submitBulkIlac() {
@@ -1298,7 +1298,7 @@ async function submitBulkIlac() {
       pullTables(['stok','stok_hareket','islem_log']).catch(console.warn);
     }
   } catch(e) {
-    toast('❌ ' + e.message, true);
+    toast('❌ ' + getUserMessage(e), true);
     const div = document.getElementById('bi-result');
     if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
   }

@@ -643,11 +643,11 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
   </div>`;
   if(yavrular.length) extra+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
     <div style="color:var(--ink3);margin-bottom:4px">Yavrular (${yavrular.length}):</div>
-    <div style="display:flex;flex-wrap:wrap;gap:5px">${yavrular.map(y=>`<span onclick="openDet('${y.id}')" style="background:var(--card);border:1px solid var(--card3);border-radius:7px;padding:3px 8px;font-size:.75rem;font-weight:700;cursor:pointer;color:var(--ink)">🐄 ${y.kupe_no||y.devlet_kupe||y.id}</span>`).join('')}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px">${yavrular.map(y=>`<span onclick="openDet('${y.id}')" style="background:var(--card);border:1px solid var(--card3);border-radius:7px;padding:3px 8px;font-size:.75rem;font-weight:700;cursor:pointer;color:var(--ink)">🐄 ${esc(y.kupe_no||y.devlet_kupe||y.id)}</span>`).join('')}</div>
   </div>`;
   if(a.notlar) extra+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
     <div style="color:var(--ink3);margin-bottom:4px">📝 Notlar:</div>
-    <div style="color:var(--ink)">${a.notlar}</div>
+    <div style="color:var(--ink)">${esc(a.notlar)}</div>
   </div>`;
   return `
     <div class="stats-strip">
