@@ -902,7 +902,7 @@ function openIslemDetay(idx){
       ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="islemGeriAl('${l.id}')">↩️ Geri Al</button>`
       : `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="openGeriAl('${l.id}','${LABEL[l.tip]||l.tip} — ${tarih} tarihli kayıt geri alınacak.')">↩ Geri Al</button>`)
     : '';
-  const html=`<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px;margin-top:8px">
+  const html=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px;margin-top:8px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <span style="font-size:1.1rem">${ICO[l.tip]||'📋'}</span>
       <span style="font-weight:700;font-size:.88rem">${LABEL[l.tip]||l.tip}</span>
@@ -1455,7 +1455,7 @@ function _gecmisEntryHtml(e){
     else sub=snap.irk||snap.grup||'';
     if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
   }
-  return `<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>
+  return `<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>
     <div style="width:36px;height:36px;border-radius:10px;background:${icoBg};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${ico}</div>
     <div style="flex:1;min-width:0">
       <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${title}</div>
