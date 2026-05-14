@@ -1,0 +1,25 @@
+{
+  "env": { "browser": true, "es2021": true },
+  "extends": "eslint:recommended",
+  "parserOptions": { "ecmaVersion": 2021 },
+  "rules": {
+    "no-unused-vars": "warn",
+    "no-undef": "warn",
+    "no-extra-semi": "warn"
+  },
+  "globals": {
+    "g": "readonly", "v": "readonly", "cl": "readonly",
+    "toast": "readonly", "openM": "readonly", "closeM": "readonly",
+    "mClose": "readonly",
+    "esc": "readonly", "fmtTarih": "readonly", "dAgo": "readonly", "dFwd": "readonly", "getDisplayKupe": "readonly",
+    "getState": "readonly", "setState": "readonly",
+    "registerAction": "readonly", "registerActions": "readonly",
+    "setupAutocomplete": "readonly",
+    "debounce": "readonly", "throttle": "readonly",
+    "withErrorHandling": "readonly", "getUserMessage": "readonly", "showDebug": "readonly",
+    "getData": "readonly", "idbPut": "readonly", "openDB": "readonly",
+    "db": "readonly", "rpc": "readonly", "rpcOptimistic": "readonly",
+    "pullTables": "readonly", "renderSafe": "readonly", "syncNow": "readonly",
+    "supabase": "readonly"
+  }
+}
