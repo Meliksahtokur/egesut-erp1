@@ -46,15 +46,19 @@
 ## Kaynak Dosyalar
 
 ```
-index.html          — HTML yapısı + CSS + tüm modaller (1125 satır)
+index.html              — HTML yapısı + CSS + tüm modaller (1125 satır)
 js/
-  api.js            — Supabase client, IndexedDB sync, RPC wrapper (335 satır)
-  app.js            — Uygulama init, routing, global state (737 satır)
-  ui.js             — Tüm render fonksiyonları (2865 satır)
-  forms.js          — Form submit, validasyon, RPC çağrıları (941 satır)
-  state.js          — getState / setState / state.on (84 satır)
-  config.js         — GRUP_PADOK mapping, sabitler (68 satır)
-supabase/migrations/ — 28 migration dosyası (PostgreSQL)
+  config.js             — GRUP_PADOK mapping, sabitler (68 satır)
+  state.js              — getState / setState / state.on (84 satır)
+  api.js                — Supabase client, IndexedDB sync, RPC wrapper (335 satır)
+  app.js                — Uygulama init, routing, global state (750 satır)
+  ui.js                 — Tüm render fonksiyonları (2865 satır)
+  forms.js              — Form submit, validasyon, RPC çağrıları (941 satır)
+  utils/
+    helpers.js          — DOM yardımcıları, toast, autocomplete, debounce
+    modal.js            — Modal yönetimi (openM/closeM/mClose)
+    errorHandler.js     — Merkezi hata yönetimi (withErrorHandling)
+supabase/migrations/      — 31 migration dosyası (PostgreSQL)
 ```
 
 ---
