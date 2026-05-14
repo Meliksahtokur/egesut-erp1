@@ -644,7 +644,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ── INIT ─────────────────────────────────────
-window.addEventListener('load', async () => {
+window.addEventListener('load', withErrorHandling(async () => {
   // Sentinel state — stack'in dibini işaretle (çıkış onayı için)
   history.replaceState({sentinel:true}, '', '#');
   history.pushState({pg:'dash'}, '', '#dash');
@@ -696,9 +696,9 @@ window.addEventListener('load', async () => {
     bildirimKontrol();
     setInterval(bildirimKontrol, 3600000);
   }
-});
+}));
 
-window.addEventListener('online', async () => {
+window.addEventListener('online', withErrorHandling(async () => {
   g('dot')?.classList.remove('off', 'warn');
   toast('🌐 Bağlantı geldi');
   // Background sync yeniden başlat
@@ -706,7 +706,7 @@ window.addEventListener('online', async () => {
   await syncNow();
   await pullFromSupabase();
   renderFromLocal();
-});
+}));
 
 window.addEventListener('offline', () => {
   g('dot')?.classList.add('off');
