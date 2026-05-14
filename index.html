@@ -466,6 +466,8 @@ button,input,select,textarea{font-family:inherit}
       <button data-action="stok-add-open" style="padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer">＋ Yeni Ürün Ekle</button>
       <button data-action="stok-hareketler" style="padding:13px;background:rgba(42,107,181,.12);border:2px dashed rgba(42,107,181,.4);border-radius:10px;color:var(--blue);font-size:.88rem;font-weight:800;cursor:pointer">📋 Tüm Hareketler</button>
     </div>
+    <input id="stok-arama" type="text" placeholder="🔍 Ürün ara…" oninput="stokFiltrele(this.value)" style="width:100%;padding:10px 12px;border:1px solid var(--card3);border-radius:8px;margin-bottom:10px;font-size:.82rem;background:var(--card2);color:var(--ink);box-sizing:border-box">
+    <div id="stok-arama-sonuc" style="font-size:.65rem;color:var(--ink3);margin:-6px 0 8px"></div>
     <div id="stok-panel-body"><div class="loader"><div class="spin"></div></div></div>
   </div>
 </div>
@@ -1342,17 +1344,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1778763981"></script>
-    <script src="js/utils/modal.js?v=1778763981"></script>
-    <script src="js/utils/errorHandler.js?v=1778763981"></script>
-    <script src="js/utils/events.js?v=1778763981"></script>
-    <script src="js/config.js?v=1778763981"></script>
-    <script src="js/state.js?v=1778763981"></script>
-    <script src="js/api.js?v=1778763981"></script>
-    <script src="js/ui.js?v=1778763981"></script>
-    <script src="js/forms.js?v=1778763981"></script>
-    <script src="js/app.js?v=1778763981"></script>
-    <script src="js/utils/handlers.js?v=1778763981"></script>
+    <script src="js/utils/helpers.js?v=1778764717"></script>
+    <script src="js/utils/modal.js?v=1778764717"></script>
+    <script src="js/utils/errorHandler.js?v=1778764717"></script>
+    <script src="js/utils/events.js?v=1778764717"></script>
+    <script src="js/config.js?v=1778764717"></script>
+    <script src="js/state.js?v=1778764717"></script>
+    <script src="js/api.js?v=1778764717"></script>
+    <script src="js/ui.js?v=1778764717"></script>
+    <script src="js/forms.js?v=1778764717"></script>
+    <script src="js/app.js?v=1778764717"></script>
+    <script src="js/utils/handlers.js?v=1778764717"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
