@@ -2756,6 +2756,7 @@ async function caseDrugKaydet(btn) {
       }
     }
     toast('✅ ' + secililar.length + ' ilac eklendi');
+    await pullTables(['stok','stok_hareket','drug_administrations']);
     btn.closest('.cd-drug-form').remove();
     // Cache'i temizle ve yeniden yükle
     _drugsCache = [];
