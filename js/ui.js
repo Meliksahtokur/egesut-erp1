@@ -1711,7 +1711,7 @@ async function loadStokPanel(){
     html+=vaxList.map(v=>{
       const interval=v.repeat_interval_days?(v.repeat_interval_days===365?'Yıllık':v.repeat_interval_days===180?'6 Aylık':v.repeat_interval_days+' günde bir'):'Tek Doz';
       const mandatory=v.is_mandatory?'🔴 Zorunlu':'🔵 Opsiyonel';
-      return `<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid var(--blue);border-radius:10px;padding:11px 13px;margin-bottom:7px">
+      return `<div class="stok-item" data-ad="${esc(v.name)}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid var(--blue);border-radius:10px;padding:11px 13px;margin-bottom:7px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1">
             <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${v.name}</div>
@@ -1993,7 +1993,7 @@ async function loadRaporlar(){
     const kritikStok=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0));
     const negStk=stock.filter(s=>stkNet[s.id]<0);
 
-    const statKart=(label,val,sub='',clr='var(--green)')=>`<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;flex:1;min-width:130px">
+    const statKart=(label,val,sub='',clr='var(--green)')=>`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;flex:1;min-width:130px">
       <div style="font-size:1.6rem;font-weight:800;color:${clr}">${val}</div>
       <div style="font-size:.78rem;font-weight:700;color:var(--ink);margin-top:2px">${label}</div>
       ${sub?`<div style="font-size:.65rem;color:var(--ink3);margin-top:2px">${sub}</div>`:''}
@@ -2009,7 +2009,7 @@ async function loadRaporlar(){
     </div>`;
 
     if(irkSorted.length){
-      h+=`<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
+      h+=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">🐄 Irk Dağılımı</div>
         ${irkSorted.map(([irk,sayi])=>{
           const pct=aktif.length?Math.round(sayi/aktif.length*100):0;
@@ -2026,7 +2026,7 @@ async function loadRaporlar(){
     }
 
     if(katSorted.length){
-      h+=`<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
+      h+=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">🏥 Hastalık Kategorileri</div>
         ${katSorted.map(([kat,sayi])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.8rem">
           <span>${kat}</span><span style="font-weight:700;color:var(--red)">${sayi}</span>
@@ -2035,7 +2035,7 @@ async function loadRaporlar(){
     }
 
     if(negStk.length||kritikStok.length){
-      h+=`<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
+      h+=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">📦 Stok Durumu</div>
         ${negStk.map(s=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.8rem">
           <span>🆘 ${esc(s.urun_adi)}</span><span style="font-weight:700;color:var(--red)">${stkNet[s.id].toFixed(1)} ${s.birim||''}</span>
@@ -2068,7 +2068,7 @@ async function loadCikanlar(){
     el.innerHTML=cikanlar.map(a=>{
       const kupe=a.kupe_no||a.devlet_kupe||a.id;
       const clr=durumRenk[a.durum]||'var(--ink3)';
-      return `<div class="stok-item" data-ad="${esc(s.urun_adi)}" style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:11px 13px;margin-bottom:6px">
+      return `<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:11px 13px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-weight:700;font-size:.88rem">${kupe}</div>
