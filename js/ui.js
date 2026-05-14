@@ -1663,7 +1663,7 @@ async function loadStokPanel(){
   // Arama çubuğu
   const aramaQ = (typeof _stokAramaFilter !== 'undefined' && _stokAramaFilter || '').toLowerCase().trim();
   html+=`<input id="stok-arama" type="text" value="${aramaQ?esc(aramaQ):''}" placeholder="🔍 Ürün ara…" oninput="stokFiltrele(this.value)" style="width:100%;padding:10px 12px;border:1px solid var(--card3);border-radius:8px;margin-bottom:10px;font-size:.82rem;background:var(--card2);color:var(--ink);box-sizing:border-box">`;
-  html+=`<div id="stok-arama-sonuc" style="font-size:.65rem;color:var(--ink3);margin:-6px 0 8px">${aramaQ ? (getState('stock').filter(s=>_stokAramaFiltersiz(s)).length+' sonuç') : ''}</div>`;
+  html+=`<div id="stok-arama-sonuc" style="font-size:.65rem;color:var(--ink3);margin:-6px 0 8px">${aramaQ ? (getState('stock').length+' sonuç') : ''}</div>`;
 
   const _stokAramaFilterli = aramaQ 
     ? (s => (s.urun_adi||'').toLowerCase().includes(aramaQ) 
@@ -1850,7 +1850,7 @@ async function loadStokPanel_DEPRECATED(){
   // Arama çubuğu
   const aramaQ = (typeof _stokAramaFilter !== 'undefined' && _stokAramaFilter || '').toLowerCase().trim();
   html+=`<input id="stok-arama" type="text" value="${aramaQ?esc(aramaQ):''}" placeholder="🔍 Ürün ara…" oninput="stokFiltrele(this.value)" style="width:100%;padding:10px 12px;border:1px solid var(--card3);border-radius:8px;margin-bottom:10px;font-size:.82rem;background:var(--card2);color:var(--ink);box-sizing:border-box">`;
-  html+=`<div id="stok-arama-sonuc" style="font-size:.65rem;color:var(--ink3);margin:-6px 0 8px">${aramaQ ? (getState('stock').filter(s=>_stokAramaFiltersiz(s)).length+' sonuç') : ''}</div>`;
+  html+=`<div id="stok-arama-sonuc" style="font-size:.65rem;color:var(--ink3);margin:-6px 0 8px">${aramaQ ? (getState('stock').length+' sonuç') : ''}</div>`;
 
   const _stokAramaFilterli = aramaQ 
     ? (s => (s.urun_adi||'').toLowerCase().includes(aramaQ) 
