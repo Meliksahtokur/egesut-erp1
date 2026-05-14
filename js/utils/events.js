@@ -37,7 +37,7 @@ document.addEventListener('focusin', e => {
 document.addEventListener('keydown', e => {
   const el = e.target.closest('[data-keydown]');
   if (!el || !ACTIONS[el.dataset.keydown]) return;
-  ACTIONS[el.dataset.keydown](el, { key: e.key, event: e });
+  ACTIONS[el.dataset.keydown]({ key: e.key, event: e });
 });
 
 // Change delegation — data-change

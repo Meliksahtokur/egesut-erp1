@@ -93,6 +93,7 @@ registerActions({
   'close-stk':       () => closeM('m-stk'),
   'close-ayarlar':   () => closeM('m-ayarlar'),
   'close-stok-panel': () => closeStokPanel(),
+  'close-stok-add':   () => closeM('m-stok-add'),
 
   // ═══ HAYVAN DETAY SEKMELERİ ═══
   'tab-ozet':   (el) => showTab('ozet', el),

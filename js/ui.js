@@ -192,7 +192,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,m
   }
   if(critStk>0){
     const cl2=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0));
-    h+=band('amber','⚠️ Kritik Stok',cl2.map(s=>`<div class="arow"><div class="arow-left"><div class="arow-id">esc(s.urun_adi)</div><div class="arow-sub">${(stkNet[s.id]||0).toFixed(0)} ${s.birim||''} kaldı — eşik: ${s.esik}</div></div></div>`).join(''));
+    h+=band('amber','⚠️ Kritik Stok',cl2.map(s=>`<div class="arow"><div class="arow-left"><div class="arow-id">${esc(s.urun_adi)}</div><div class="arow-sub">${(stkNet[s.id]||0).toFixed(0)} ${s.birim||''} kaldı — eşik: ${s.esik}</div></div></div>`).join(''));
   }
   return h;
 }
@@ -262,7 +262,7 @@ async function loadDash(){
     const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
-    el.innerHTML=`<div class="empty">⚠️ esc(e.message)<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
+    el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
   }
 }
 async function kizginlikYoktu(hayvanId, dogumId) {
@@ -358,7 +358,7 @@ async function loadTasks(f,btn){
       const cls=t.hedef_tarih<today?'late':_clsMid;
       return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id));
     }).join('');
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 function renderTask(t,cls='',subs=[]){
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
@@ -474,7 +474,7 @@ async function loadAnimals(){
     setState('hastaIds', new Set(hastaLogs.map(d=>d.animal_id)));
     const sorted=[...animals].sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     renderAnimals(sorted);
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 function _animalTagsHtml(a,gebeSet){
   const isGebe=gebeSet.has(a.id);
@@ -725,7 +725,7 @@ async function _detRenderGecmis(id,el){
       }
       return `<div class="hist-row" style="cursor:pointer" onclick="openIslemDetay(${i})"><div class="hist-dot" style="background:${padokHtml ? 'var(--green)' : 'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${ico} ${ETIKET[l.tip]||l.tip||'—'}${gaIcon}</div><div class="hist-sub">${tarih}${padokHtml}</div></div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;opacity:.4;margin-top:2px"><path d="M9 18l6-6-6-6"/></svg></div>`;
     }).join('');
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
 // ──────────────────────────────────────────
@@ -993,13 +993,13 @@ async function openAnimalEdit(id){
   const grupSel=document.getElementById('a-grup');
   if(grupSel && a.grup){
     const opt=[...grupSel.options].find(o=>o.value===a.grup);
-    if(!opt) grupSel.innerHTML+=`<option value="esc(a.grup)">esc(a.grup)</option>`;
+    if(!opt) grupSel.innerHTML+=`<option value="${esc(a.grup)}">${esc(a.grup)}</option>`;
     grupSel.value=a.grup;
     animalGrupDegisti();
     const padokSel=document.getElementById('a-padok');
     if(padokSel && a.padok_id){
       const popt=[...padokSel.options].find(o=>o.value===a.padok_id);
-      if(!popt) padokSel.innerHTML+=`<option value="esc(a.padok_id)">${a.padok||a.padok_id}</option>`;
+      if(!popt) padokSel.innerHTML+=`<option value="${esc(a.padok_id)}">${a.padok||a.padok_id}</option>`;
       padokSel.value=a.padok_id;
     }
   }
@@ -1052,7 +1052,7 @@ async function loadBirths(){
     </div>
   </div>`;
     }).join('');
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
 // ──────────────────────────────────────────
@@ -1401,7 +1401,7 @@ async function loadUreme(tab='kizginlik'){
     else if(tab==='gebelik')   await _uremeGebelik(el);
     else if(tab==='dogum')     await _uremeDogum(el);
     else if(tab==='abort')     await _uremeAbort(el);
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
 // ──────────────────────────────────────────
@@ -1494,7 +1494,7 @@ async function loadGecmis(f,btn){
     entries.sort((a,b)=>(b.sortKey||b.date||'').localeCompare(a.sortKey||a.date||''));
     if(!entries.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>'; return; }
     el.innerHTML=entries.slice(0,300).map(e=>_gecmisEntryHtml(e)).join('');
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
 // ──────────────────────────────────────────
@@ -1681,7 +1681,7 @@ async function loadStokPanel(){
         return `<div style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${barClr};border-radius:10px;padding:11px 13px;margin-bottom:7px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div style="flex:1">
-              <div style="font-weight:700;font-size:.88rem;color:var(--ink)">esc(s.urun_adi)${s.isVaccine?' <span style="background:var(--blue);color:#fff;padding:1px 5px;border-radius:4px;font-size:.6rem;font-weight:700">💉 Aşı Stoğu</span>':''}</div>
+              <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(s.urun_adi)}${s.isVaccine?' <span style="background:var(--blue);color:#fff;padding:1px 5px;border-radius:4px;font-size:.6rem;font-weight:700">💉 Aşı Stoğu</span>':''}</div>
               <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${s.kategori||'—'} · Eşik: ${s.esik||0} ${s.birim||''}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:10px">
@@ -1821,7 +1821,7 @@ async function tumStokHareketleriniGoster(){
     });
     el.innerHTML=html;
   } catch(e){
-    el.innerHTML=`<div class="empty">⚠️ esc(e.message)<br><button class="btn btn-g" style="margin-top:12px" onclick="tumStokHareketleriniGoster()">Tekrar Dene</button></div>`;
+    el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-g" style="margin-top:12px" onclick="tumStokHareketleriniGoster()">Tekrar Dene</button></div>`;
   }
 }
 
@@ -1859,7 +1859,7 @@ async function loadStokPanel_DEPRECATED(){
         return `<div style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${barClr};border-radius:10px;padding:11px 13px;margin-bottom:7px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div style="flex:1">
-              <div style="font-weight:700;font-size:.88rem;color:var(--ink)">esc(s.urun_adi)</div>
+              <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(s.urun_adi)}</div>
               <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${s.kategori||'—'} · Eşik: ${s.esik||0} ${s.birim||''}</div>
             </div>
             <div style="text-align:right;flex-shrink:0;margin-left:10px">
@@ -1898,7 +1898,7 @@ async function loadStokList(){
       const barClr=_durumClr(s.durum);
       return `<div style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:11px 13px;margin-bottom:7px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-weight:700;font-size:.88rem;color:var(--ink)">esc(s.urun_adi)</div>
+          <div><div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(s.urun_adi)}</div>
             <div style="font-size:.65rem;color:var(--ink3);margin-top:2px">Eşik: ${s.esik||0} ${s.birim||''}</div></div>
           <div style="text-align:right">
             <div style="font-size:1.2rem;font-weight:800;color:${barClr}">${(s.guncel||0).toFixed(s.birim==='adet'?0:1)}</div>
@@ -1922,7 +1922,7 @@ async function loadStokList(){
       html+=liste.map(stokKart).join('');
     });
     el.innerHTML=html;
-  } catch(e){ if(el) el.innerHTML=`<div style="color:var(--red);padding:8px;font-size:.75rem">⚠️ esc(e.message)</div>`; }
+  } catch(e){ if(el) el.innerHTML=`<div style="color:var(--red);padding:8px;font-size:.75rem">⚠️ ${esc(e.message)}</div>`; }
 }
 async function stokHareketGor(stokId){
   const s=getState('stock').find(x=>x.id===stokId); if(!s) return;
@@ -1939,7 +1939,7 @@ async function stokHareketGor(stokId){
     document.body.appendChild(box);
   }
   box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:70vh;overflow-y:auto;padding:16px">
-    <div style="font-weight:800;font-size:1rem;margin-bottom:4px">esc(s.urun_adi)</div>
+    <div style="font-weight:800;font-size:1rem;margin-bottom:4px">${esc(s.urun_adi)}</div>
     <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">Başlangıç: <b>${s.baslangic_miktar||0} ${s.birim||''}</b> · Kullanılan: <b>${used.toFixed(1)} ${s.birim||''}</b> · Kalan: <b style="color:${kalan<=(s.esik||0)?'#c0321a':'#2d6a2d'}">${kalan.toFixed(1)} ${s.birim||''}</b></div>
     ${mvs.length===0?'<div style="color:#999;text-align:center;padding:20px">Henüz hareket yok</div>':
       mvs.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between">
@@ -2036,10 +2036,10 @@ async function loadRaporlar(){
       h+=`<div style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">📦 Stok Durumu</div>
         ${negStk.map(s=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.8rem">
-          <span>🆘 esc(s.urun_adi)</span><span style="font-weight:700;color:var(--red)">${stkNet[s.id].toFixed(1)} ${s.birim||''}</span>
+          <span>🆘 ${esc(s.urun_adi)}</span><span style="font-weight:700;color:var(--red)">${stkNet[s.id].toFixed(1)} ${s.birim||''}</span>
         </div>`).join('')}
         ${kritikStok.map(s=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.8rem">
-          <span>⚠️ esc(s.urun_adi)</span><span style="font-weight:700;color:var(--amber)">${stkNet[s.id].toFixed(1)} ${s.birim||''}</span>
+          <span>⚠️ ${esc(s.urun_adi)}</span><span style="font-weight:700;color:var(--amber)">${stkNet[s.id].toFixed(1)} ${s.birim||''}</span>
         </div>`).join('')}
       </div>`;
     }
@@ -2050,7 +2050,7 @@ async function loadRaporlar(){
       </div>`;
     }
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
 // ──────────────────────────────────────────
@@ -2080,7 +2080,7 @@ async function loadCikanlar(){
         ${a.cikis_sebebi?`<div style="font-size:.7rem;color:var(--ink3);margin-top:5px;padding-top:5px;border-top:1px solid var(--card2)">${a.cikis_sebebi}${a.satis_fiyati?' · '+a.satis_fiyati+' ₺':''}</div>`:''}
       </div>`;
     }).join('');
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ esc(e.message)</div>`; }
+  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
 // ──────────────────────────────────────────
@@ -2480,7 +2480,7 @@ async function renderCaseTimeline(caseId) {
       </div>`;
     }).join('');
   } catch(e) {
-    el.innerHTML = `<span style="color:var(--red);font-size:.78rem">Yüklenemedi: esc(e.message)</span>`;
+    el.innerHTML = `<span style="color:var(--red);font-size:.78rem">Yüklenemedi: ${esc(e.message)}</span>`;
   }
 }
 
@@ -2888,7 +2888,7 @@ async function acHdiStok(inp){
   if(!filtered.length){ ac.style.display='none'; return; }
   ac.innerHTML=filtered.map(s=>`<div onclick="hdiStokSec('${s.id}','${s.urun_adi.replace(/'/g,"\'")}','${s.birim||''}')"
     style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card2)"
-    onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">esc(s.urun_adi) <span style="color:var(--ink3)">${s.birim||''}</span></div>`).join('');
+    onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">${esc(s.urun_adi)} <span style="color:var(--ink3)">${s.birim||''}</span></div>`).join('');
   ac.style.display='block';
 }
 function hdiStokSec(id,ad,birim){
@@ -3060,7 +3060,7 @@ async function checkSpermaUyari(){
   const bnd=document.getElementById('sperma-warn-band'); if(!bnd) return;
   if(critik.length>0){
     bnd.style.display='flex';
-    bnd.textContent='⚠️ Kritik sperma stoku: '+critik.map(s=>`esc(s.urun_adi) (${s.guncel} doz)`).join(', ');
+    bnd.textContent='⚠️ Kritik sperma stoku: '+critik.map(s=>`${esc(s.urun_adi)} (${s.guncel} doz)`).join(', ');
   } else { bnd.style.display='none'; }
 }
 function spermaModStok(){
@@ -3070,7 +3070,7 @@ function spermaModStok(){
   document.getElementById('btn-sperma-elle').style.background='var(--card2)';
   const spermalar=getState('stock').filter(s=>s.kategori==='Sperma'||s.grup==='Sperma'||(s.urun_adi||'').toLowerCase().includes('sperma')||(s.urun_adi||'').toLowerCase().includes('doz'));
   const sel=document.getElementById('i-sperma-select');
-  sel.innerHTML='<option value="">Sperma seçin…</option>'+spermalar.map(s=>`<option value="esc(s.urun_adi)" data-stok="${s.guncel||0}">esc(s.urun_adi) (${s.guncel||0} doz kaldı)</option>`).join('');
+  sel.innerHTML='<option value="">Sperma seçin…</option>'+spermalar.map(s=>`<option value="${esc(s.urun_adi)}" data-stok="${s.guncel||0}">${esc(s.urun_adi)} (${s.guncel||0} doz kaldı)</option>`).join('');
   if(!spermalar.length) sel.innerHTML='<option value="">Stokta sperma yok — Elle Gir kullanın</option>';
   document.getElementById('i-sperma').value='';
   document.getElementById('sperma-hint').textContent='';
@@ -3134,7 +3134,7 @@ async function acIlac(){
     const _stokColor=warn?'var(--red)':_stokColorMid;
     return `<div onclick="selIlac('${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||'ml'}',${s.guncel});event.stopPropagation()"
       style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center;${warn?'opacity:.5':''}">
-      <div><div style="font-weight:600">esc(s.urun_adi)</div><div style="font-size:.65rem;color:var(--ink3)">${s.kategori||''}</div></div>
+      <div><div style="font-weight:600">${esc(s.urun_adi)}</div><div style="font-size:.65rem;color:var(--ink3)">${s.kategori||''}</div></div>
       <span style="color:${_stokColor};font-weight:700;font-size:.78rem">${s.guncel.toFixed(s.birim==='adet'?0:1)} ${s.birim||''}</span>
     </div>`;
   }).join('');
@@ -3168,7 +3168,7 @@ function acDilacSatir(inp){
   const stoklar=getState('stock').filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'));
   const filtered=q?stoklar.filter(s=>(s.urun_adi||'').toLowerCase().includes(q)):stoklar.slice(0,8);
   if(!filtered.length){ac.style.display='none';return;}
-  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">esc(s.urun_adi) <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
+  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">${esc(s.urun_adi)} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
   ac.style.display='block';
 }
 function selDilacSatir(el,id,ad,birim){
@@ -3369,7 +3369,7 @@ async function renderDrugStokList() {
     }
     const stokOpts = stokList
       .sort((a, b) => (a.urun_adi || '').localeCompare(b.urun_adi || '', 'tr'))
-      .map(s => `<option value="${s.id}">esc(s.urun_adi)</option>`)
+      .map(s => `<option value="${s.id}">${esc(s.urun_adi)}</option>`)
       .join('');
     el.innerHTML = drugs
       .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'tr'))
@@ -3385,13 +3385,13 @@ async function renderDrugStokList() {
             <option value="">— Bağlantı yok —</option>
             ${stokList
               .sort((a, b) => (a.urun_adi || '').localeCompare(b.urun_adi || '', 'tr'))
-              .map(s => `<option value="${s.id}"${s.id === linked ? ' selected' : ''}>esc(s.urun_adi)</option>`)
+              .map(s => `<option value="${s.id}"${s.id === linked ? ' selected' : ''}>${esc(s.urun_adi)}</option>`)
               .join('')}
           </select>
         </div>`;
       }).join('');
   } catch (e) {
-    el.innerHTML = `<div style="color:var(--red);font-size:.75rem">⚠️ esc(e.message)</div>`;
+    el.innerHTML = `<div style="color:var(--red);font-size:.75rem">⚠️ ${esc(e.message)}</div>`;
   }
 }
 
@@ -3799,7 +3799,7 @@ async function renderAyarlarSpermaList(){
   const spermalar=stoklar.filter(s=>s.kategori==='Sperma');
   if(!spermalar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Henüz sperma eklenmedi</div>'; return; }
   el.innerHTML=spermalar.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
-    <span style="font-size:.8rem;color:var(--ink)">esc(s.urun_adi)</span>
+    <span style="font-size:.8rem;color:var(--ink)">${esc(s.urun_adi)}</span>
     <button onclick="spermaSil('${s.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
   </div>`).join('');
 }
@@ -3929,7 +3929,7 @@ async function renderPadokHayvanlar(padokId) {
       </div>`;
     }).join('');
   } catch (e) {
-    el.innerHTML = `<div class="empty">⚠️ esc(e.message)</div>`;
+    el.innerHTML = `<div class="empty">⚠️ ${esc(e.message)}</div>`;
   }
 }
 
@@ -4000,7 +4000,7 @@ async function padokTransferOnayla() {
     document.getElementById('pd-toplu-tasi-btn').style.display = 'none';
     await renderPadokHayvanlar(_pdKaynakPadokId);
   } catch (e) {
-    toast(`⚠️ esc(e.message)`, true);
+    toast(`⚠️ ${esc(e.message)}`, true);
   }
 }
 
@@ -4108,5 +4108,5 @@ async function bildirimAc(){
 async function buildDataLists(){
   const stk=await idbGetAll('stok');
   const dlI=document.getElementById('dl-ilac');
-  if(dlI) dlI.innerHTML=stk.map(s=>`<option value="${s.id}">esc(s.urun_adi)</option>`).join('');
+  if(dlI) dlI.innerHTML=stk.map(s=>`<option value="${s.id}">${esc(s.urun_adi)}</option>`).join('');
 }

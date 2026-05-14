@@ -285,7 +285,7 @@ button,input,select,textarea{font-family:inherit}
     <div class="pg-inner">
       <div class="search-bar" style="position:relative">
         <div style="flex:1;position:relative">
-          <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" data-input="search-focus" data-focus="search-focus" autocomplete="off" data-keydown="ac-srch-keydown">
+          <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" data-input="search-focus" data-focus="search-focus" autocomplete="off" data-keydown="search-keydown">
           <div id="ac-srch" class="ac-box" style="display:none;position:absolute;z-index:100;width:100%;background:var(--card);border:1px solid var(--card3);border-radius:10px;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1)"></div>
         </div>
         <select class="psel" id="pflt" data-change="search-change">
@@ -308,7 +308,7 @@ button,input,select,textarea{font-family:inherit}
         <span class="fchip-sep">|</span>
         <button class="fchip" id="fc-saglik-hasta" data-action="fchip-saglik-hasta">🏥 Hasta</button>
         <span class="fchip-sep">|</span>
-        <button class="fchip" id="fc-kisir-kisir" data-action="fchip-kisir-kisir">💲 Kısır</button>
+        <button class="fchip" id="fc-kisir-kisir" data-action="fchip-kisir">💲 Kısır</button>
       </div>
       <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 2px"></div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
@@ -387,12 +387,12 @@ button,input,select,textarea{font-family:inherit}
         <div class="log-text"><div class="log-title">Vaka Aç</div><div class="log-sub">Tanı, günlük tedavi, ilaç — stok otomatik düşer</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div data-action="open-bulk-vaccine-modal" class="log-btn">
+      <div data-action="open-bulk-vaccine" class="log-btn">
         <div class="log-ico" style="background:rgba(78,154,42,.2)">💉💉</div>
         <div class="log-text"><div class="log-title">Toplu Aşılama</div><div class="log-sub">Padok bazlı toplu aşı uygulaması</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
-      <div data-action="open-bulk-ilac-modal" class="log-btn">
+      <div data-action="open-bulk-ilac" class="log-btn">
         <div class="log-ico" style="background:rgba(220,53,69,.15)">💊💊</div>
         <div class="log-text"><div class="log-title">Toplu İlaç</div><div class="log-sub">Padok bazlı toplu ilaç uygulaması</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
@@ -506,7 +506,7 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="k-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
           data-input="kizginlik-focus" data-focus="kizginlik-focus" data-keydown="kizginlik-keydown"
-          data-action="k-hid-ac">
+          data-action="kizginlik-ac">
         <div id="ac-khid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
@@ -535,7 +535,7 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="i-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
           data-input="insem-focus" data-focus="insem-focus" data-keydown="insem-keydown"
-          data-action="i-hid-ac">
+          data-action="insem-ac">
         <div id="ac-ihid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
       </div>
@@ -574,7 +574,7 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="d-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
           data-input="disease-focus" data-focus="disease-focus" data-keydown="disease-keydown"
-          data-action="d-hid-ac">
+          data-action="disease-focus">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
       </div>
@@ -608,7 +608,7 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="v-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
           data-input="vaccine-focus" data-focus="vaccine-focus" data-keydown="vaccine-keydown"
-          data-action="v-hid-ac">
+          data-action="vaccine-focus">
         <div id="ac-vhid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
       </div>
@@ -832,7 +832,7 @@ button,input,select,textarea{font-family:inherit}
         <div id="b-anne-manual" style="display:none;position:relative">
           <input id="b-anne" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
             data-input="birth-focus" data-focus="birth-focus" data-keydown="birth-keydown"
-            data-action="b-anne-ac">
+            data-action="birth-manual">
           <div id="ac-banne" style="display:none;background:var(--card);border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
         </div>
         <div id="anne-secili-card" style="display:none;background:rgba(78,154,42,.08);border:1.5px solid var(--green);border-radius:var(--r1);padding:10px 13px;font-size:.8rem">
@@ -1587,7 +1587,7 @@ function copyErrors() {
       <input id="hk-ad" class="fi" style="margin-bottom:10px">
 
       <div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto" id="hk-period-tabs">
-        <button class="kat-btn on" data-action="hekim-period-'all'">Tümü</button>
+        <button class="kat-btn on" data-action="hekim-period-all">Tümü</button>
         <button class="kat-btn" data-action="hekim-period-30">1 Ay</button>
         <button class="kat-btn" data-action="hekim-period-90">3 Ay</button>
         <button class="kat-btn" data-action="hekim-period-180">6 Ay</button>
