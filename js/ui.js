@@ -1298,9 +1298,38 @@ async function gebeAta(tohId, kupe){
 }
 
 async function _uremeDogum(el){
-  const list=await idbGetAll('dogum');
-  list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-birth')">🐄 Doğum Kaydet</button></div>`+
+  // Yaklasan dogumlar (7+ ay gebe)
+  const tohList=(await idbGetAll('tohumlama')).filter(t=>t.sonuc==='Gebe');
+  const bugun=new Date();
+  const yaklasan=tohList.filter(t=>{
+    const gun=Math.floor((bugun-new Date(t.tarih))/86400000);
+    return gun>=210;
+  }).sort((a,b)=>{
+    const ga=Math.floor((bugun-new Date(a.tarih))/86400000);
+    const gb=Math.floor((bugun-new Date(b.tarih))/86400000);
+    return gb-ga; // en yakin dogum en uste
+  });
+  const yakHtml=yaklasan.length?`<div style="margin-bottom:14px"><div style="font-weight:800;font-size:.75rem;color:var(--amber);text-transform:uppercase;margin-bottom:8px">🐄 Yaklasan Dogumlar</div>`+
+    yaklasan.slice(0,10).map(t=>{
+      const an=getState('animals').find(a=>a.id===t.hayvan_id);
+      const kupe=an?.kupe_no||an?.devlet_kupe||t.hayvan_id;
+      const gun=Math.floor((bugun-new Date(t.tarih))/86400000);
+      const kalan=280-gun;
+      const renk=kalan<=7?'var(--red)':kalan<=30?'var(--amber)':'var(--green)';
+      const bg=kalan<=7?'rgba(192,50,26,.12)':kalan<=30?'rgba(176,120,0,.1)':'rgba(42,122,42,.08)';
+      const dogumTahmin=dFwd(t.tarih,280);
+      return `<div class="hist-row" onclick="openDet('${t.hayvan_id}')" style="cursor:pointer">
+        <div class="hist-dot" style="background:${renk}"></div>
+        <div class="hist-main">
+          <div class="hist-title">${kupe} · ${t.sperma||'?'}</div>
+          <div class="hist-sub">🐮 ${fmtTarih(t.tarih)} → Tahmini doğum: <b>${fmtTarih(dogumTahmin)}</b> · <span style="background:${bg};color:${renk};border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem">⏳ ${kalan} gun kaldi</span></div>
+        </div>
+      </div>`;
+    }).join('')+'</div>':'';
+
+  // Gecmis dogumlar
+  const list=(await idbGetAll('dogum')).sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+  const dogHtml=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" data-action="open-birth-modal">🐄 Dogum Kaydet</button></div>`+
     (list.length?list.map(b=>{
       const anne=getState('animals').find(a=>a.id===b.anne_id);
       const anneKupe=anne?.kupe_no||anne?.devlet_kupe||b.anne_id;
@@ -1317,13 +1346,14 @@ async function _uremeDogum(el){
           <div class="hist-sub">${fmtTarih(b.tarih)} · <span style="background:${tipBg};color:${tipRenk};border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem">${tip}</span></div>
         </div>
       </div>`;
-    }).join(''):'<div class="empty"><div class="empty-ico">🐄</div>Doğum kaydı yok</div>');
+    }).join(''):'<div class="empty"><div class="empty-ico">🐄</div>Dogum kaydi yok</div>');
+  el.innerHTML=yakHtml+dogHtml;
 }
 
 async function _uremeTohumlama(el){
   const list=await idbGetAll('tohumlama');
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Tohumlama Ekle</button></div>`+
+  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" data-action="open-insem-modal">💉 Tohumlama Ekle</button></div>`+
     (list.length?list.map(t=>{
       const h=getState('animals').find(a=>a.id===t.hayvan_id);
       const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;

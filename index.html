@@ -285,7 +285,7 @@ button,input,select,textarea{font-family:inherit}
     <div class="pg-inner">
       <div class="search-bar" style="position:relative">
         <div style="flex:1;position:relative">
-          <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" data-input="search-input" data-focus="search-focus" autocomplete="off" data-keydown="ac-srch-keydown">
+          <input class="srch" id="srch" placeholder="🔍 Küpe veya ID…" data-input="search-focus" data-focus="search-focus" autocomplete="off" data-keydown="ac-srch-keydown">
           <div id="ac-srch" class="ac-box" style="display:none;position:absolute;z-index:100;width:100%;background:var(--card);border:1px solid var(--card3);border-radius:10px;max-height:220px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.1)"></div>
         </div>
         <select class="psel" id="pflt" data-change="search-change">
@@ -505,7 +505,7 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="k-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          data-input="k-hid-input" data-focus="k-hid-focus" data-keydown="ac-khid-keydown"
+          data-input="kizginlik-focus" data-focus="kizginlik-focus" data-keydown="kizginlik-keydown"
           data-action="k-hid-ac">
         <div id="ac-khid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
@@ -534,7 +534,7 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Küpe No *</label>
         <input id="i-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          data-input="i-hid-input" data-focus="i-hid-focus" data-keydown="ac-ihid-keydown"
+          data-input="insem-focus" data-focus="insem-focus" data-keydown="insem-keydown"
           data-action="i-hid-ac">
         <div id="ac-ihid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — 11+ aylık gebe olmayan dişi hayvanlar listelenir</div>
@@ -573,7 +573,7 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="d-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          data-input="d-hid-input" data-focus="d-hid-focus" data-keydown="ac-dhid-keydown"
+          data-input="disease-focus" data-focus="disease-focus" data-keydown="disease-keydown"
           data-action="d-hid-ac">
         <div id="ac-dhid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
@@ -607,7 +607,7 @@ button,input,select,textarea{font-family:inherit}
     <div class="m-body">
       <div class="fg"><label class="flbl">Hayvan *</label>
         <input id="v-hid" class="fi" placeholder="İşletme veya devlet küpesi" autocomplete="off"
-          data-input="v-hid-input" data-focus="v-hid-focus" data-keydown="ac-vhid-keydown"
+          data-input="vaccine-focus" data-focus="vaccine-focus" data-keydown="vaccine-keydown"
           data-action="v-hid-ac">
         <div id="ac-vhid" class="ac-box" style="display:none"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
@@ -831,7 +831,7 @@ button,input,select,textarea{font-family:inherit}
         </div>
         <div id="b-anne-manual" style="display:none;position:relative">
           <input id="b-anne" class="fi" placeholder="Küpe no yazın…" autocomplete="off"
-            data-input="b-anne-input" data-focus="b-anne-focus" data-keydown="ac-banne-keydown"
+            data-input="birth-focus" data-focus="birth-focus" data-keydown="birth-keydown"
             data-action="b-anne-ac">
           <div id="ac-banne" style="display:none;background:var(--card);border:1.5px solid var(--green);border-top:none;border-radius:0 0 10px 10px;max-height:180px;overflow-y:auto;z-index:20;position:absolute;left:0;right:0"></div>
         </div>
@@ -976,6 +976,7 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Tür</label>
         <select id="ta-tip" class="fsel">
           <option value="MANUEL">Genel Görev</option>
+          <option value="TEDAVI">Tedavi</option>
           <option value="ILAC">İlaç Uygulama</option>
           <option value="PADOK_GECIS">Padok Geçişi</option>
           <option value="DIGER">Diğer</option>
