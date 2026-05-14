@@ -1,6 +1,5 @@
 -- Migration: delete_treatment_day RPC
--- Etkiler: Yeni RPC — tedavi günü + ilaçları sil, stok ledger'ı tersle
--- Geri alınabilir: DROP FUNCTION IF EXISTS public.delete_treatment_day(uuid);
+-- Duzeltildi: 2026-05-13 — drug_id→drug_product_id, stock_item_id JOIN kaldirildi (stok_id direkt kullan)
 
 CREATE OR REPLACE FUNCTION public.delete_treatment_day(
   p_day_id uuid
@@ -11,19 +10,18 @@ DECLARE
 BEGIN
   -- Stok geri yaz (her ilaç uygulaması için ters hareket)
   FOR v_admin IN
-    SELECT da.id, da.drug_id, da.dose, da.unit, d.stock_item_id
+    SELECT da.id, da.dose, da.stok_id
     FROM drug_administrations da
-    JOIN drugs d ON d.id = da.drug_id
     WHERE da.treatment_day_id = p_day_id
-      AND d.stock_item_id IS NOT NULL
+      AND da.stok_id IS NOT NULL
   LOOP
     INSERT INTO stok_hareket (id, stok_id, tur, miktar, notlar)
     VALUES (
       gen_random_uuid(),
-      v_admin.stock_item_id::uuid,
-      'Tedavi Düzelt',
+      v_admin.stok_id,
+      'Tedavi Duzelt',
       v_admin.dose,
-      'drug_admin:' || v_admin.id::text || ' — tedavi günü silindi, iade'
+      'drug_admin:' || v_admin.id::text || ' — tedavi gunu silindi, iade'
     );
   END LOOP;
 
