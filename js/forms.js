@@ -928,6 +928,7 @@ async function submitStokAdd(btn) {
       stokId = mevcut.id;
       await write('stok', { baslangic_miktar: (+mevcut.baslangic_miktar||0) + bslg }, 'PATCH', `id=eq.${stokId}`);
       toast(`✅ ${urun} stoku güncellendi (+${bslg} ${birim})`);
+      await write('stok_hareket', { id:crypto.randomUUID(), stok_id:stokId, tur:'Ekleme', miktar:bslg, notlar:`Stok güncellendi: ${urun}`, iptal:false });
     } else {
       // Yeni kayıt
       stokId = crypto.randomUUID();
@@ -956,6 +957,7 @@ async function submitStokAdd(btn) {
         _drugsCache = [];
       }
       toast(`✅ ${urun} eklendi`);
+      await write('stok_hareket', { id:crypto.randomUUID(), stok_id:stokId, tur:'Ekleme', miktar:bslg, notlar:`Stok eklendi: ${urun}`, iptal:false });
     }
     closeM('m-stok-add');
     ['sa-ad','sa-ad-diger','sa-mik','sa-esik','sa-konst'].forEach(id=>{const e=g(id);if(e)e.value='';});
