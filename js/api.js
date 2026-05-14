@@ -358,7 +358,7 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
     return data;
   } catch (e) {
     if (onError) onError(e);
-    else toast('❌ ' + e.message, true);
+    else toast('❌ ' + getUserMessage(e), true);
     throw e;
   }
 }
