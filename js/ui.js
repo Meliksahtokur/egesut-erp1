@@ -3157,12 +3157,19 @@ document.addEventListener('click',e=>{
 
 function _eligibleHayvanlar(){
   const gebeSet=new Set(getState('gebeIds')||[]);
-  const minMs=330*86400000; // 330 gün (~11 ay) — Dişi dana tohumlama yaşı
+  const minMs=330*86400000; // 330 gun (~11 ay) — Disi dana tohumlama yasi
   return getState('animals').filter(a=>{
     if(a.cinsiyet==='Erkek') return false;
+    if(a.kisir) return false;
     if(gebeSet.has(a.id)) return false;
-    if(!a.dogum_tarihi) return false;
-    return (Date.now()-new Date(a.dogum_tarihi).getTime())>=minMs;
+    // yas biliniyorsa: 330+ gun kontrolu
+    if(a.dogum_tarihi){
+      return (Date.now()-new Date(a.dogum_tarihi).getTime())>=minMs;
+    }
+    // dogum_tarihi YOK — zeki tahmin: laktasyon/gebe grubu → yetiskin
+    // Grup adlari DB'den Turkce karakterli gelir
+    if(['Sağmal (Laktasyonda)','Sağmal (Kuru)','Gebe İnek','Gebe Düve','Düve (Büyük)'].includes(a.grup)) return true;
+    return true; // varsayilan: dahil et (asil filtreyi DB view yapar)
   });
 }
 
