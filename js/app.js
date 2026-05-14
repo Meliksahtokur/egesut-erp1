@@ -78,7 +78,7 @@ function caseKatFiltrele() {
 }
 
 // ── GLOBAL STATE ────────────────────────────
-let _A = [], _S = [], _curStk = null, _curPg = 'dash';
+// let _A=[], _S[], _curStk... state'e tasindi (state.js + getState/setState)
 let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
 let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today';
 let _curTaskDet  = null, _curHst = null, _curToh = null;
@@ -102,7 +102,7 @@ function hideSyncBar() { const bar = g('sync-bar'); if (bar) bar.className = '';
 
 // ── ROUTING ─────────────────────────────────
 function goTo(pg, push = true) {
-  _curPg = pg;
+  setState('currentPage', pg);
   if (push) history.pushState({pg}, '', '#' + pg);
   document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
   document.querySelectorAll('.nb').forEach(b => b.classList.remove('on'));
@@ -143,7 +143,7 @@ window.addEventListener('popstate', e => {
 // ── RENDER FROM LOCAL ────────────────────────
 async function renderFromLocal() {
   await Promise.all([loadAnimals(), loadStock()]);
-  const pg = _curPg || 'dash';
+  const pg = getState('currentPage') || 'dash';
   if (pg === 'dash')     { await Promise.all([loadDash(), loadStokList()]); }
   else if (pg === 'tasks')    { await loadTasks(_curTaskFilter || 'today'); await loadDash(); }
   else if (pg === 'gecmis')   { await loadGecmis(_curGecmisFilter || 'hepsi'); await loadDash(); }

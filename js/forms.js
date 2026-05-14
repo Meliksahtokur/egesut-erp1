@@ -7,7 +7,7 @@
 // ══════════════════════════════════════════
 
 /* global
-   _curTaskDet, _curToh, _curHst, _curBildirimTab, _curStk,
+   _curTaskDet, _curToh, _curHst, _curBildirimTab,
    _editMode, _semptomSecili, _hdeSmptSecili,
    _ilacCache, _drugsCache, _hdiIlacCache,
    _customHekimler, _customSperma, _disFreq,
@@ -891,8 +891,9 @@ async function submitStk(btn) {
   if (!mik || mik <= 0) { toast('Geçerli miktar girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   try {
-    await write('stok', { baslangic_miktar: (+_curStk.baslangic_miktar || 0) + mik }, 'PATCH', `id=eq.${_curStk.id}`);
-    toast(`✅ ${_curStk.urun_adi}: +${mik} ${_curStk.birim || ''}`);
+    const curStk=getState('curStok');
+    await write('stok', { baslangic_miktar: (+curStk.baslangic_miktar || 0) + mik }, 'PATCH', `id=eq.${curStk.id}`);
+    toast(`✅ ${curStk.urun_adi}: +${mik} ${curStk.birim || ''}`);
     closeM('m-stk');
     await pullTables(['stok','stok_hareket']);
     await loadStock();
