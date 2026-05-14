@@ -1805,8 +1805,8 @@ async function tumStokHareketleriniGoster(){
     moves.forEach(m=>{
       const urun=stok.find(s=>s.id===m.stok_id);
       const urunAd=urun?.urun_adi||'Silinmiş Ürün';
-      const turRenk=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'?'var(--green)':'var(--red)';
-      const turIsaret=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'?'+':'−';
+      const turRenk=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'var(--green)':'var(--red)';
+      const turIsaret=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'+':'−';
       const tarihFmt=fmtTarih(m.tarih);
       html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
