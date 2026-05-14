@@ -15,7 +15,9 @@ function registerActions(map) {
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-action]');
   if (!el || !ACTIONS[el.dataset.action]) return;
-  e.preventDefault();
+  // Form elemanlarının default davranışını engelleme (checkbox, input, select vb.)
+  const tag = e.target.tagName;
+  if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA' && tag !== 'LABEL') e.preventDefault();
   ACTIONS[el.dataset.action](el, e);
 });
 
