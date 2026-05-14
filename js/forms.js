@@ -961,7 +961,7 @@ async function submitStokAdd(btn) {
     }
     closeM('m-stok-add');
     ['sa-ad','sa-ad-diger','sa-mik','sa-esik','sa-konst'].forEach(id=>{const e=g(id);if(e)e.value='';});
-    await pullTables(['stok','drug_products','stok_hareket']);
+    await pullTables(['stok','drug_products']);
     _drugsCache = [];
     const _sp = document.getElementById('stok-panel');
     if(_sp?.style.transform !== 'translateX(100%)') await loadStokPanel();
