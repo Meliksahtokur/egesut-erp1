@@ -618,8 +618,10 @@ function filterA(){
     else if(_fchip.gebelik==='bos') f=f.filter(a=>{
       if(gebeSet.has(a.id)) return false;
       if(a.cinsiyet==='Erkek') return false;
-      if(!a.dogum_tarihi) return false;
-      return (Date.now()-new Date(a.dogum_tarihi).getTime())>=365*86400000;
+      if(a.kisir) return false;
+      if(a.dogum_tarihi) return (Date.now()-new Date(a.dogum_tarihi).getTime())>=365*86400000;
+      // dogum_tarihi yoksa yetiskin grubunda mi kontrol et
+      return ['Sağmal (Laktasyonda)','Sağmal (Kuru)','Gebe İnek','Gebe Düve','Düve (Büyük)'].includes(a.grup);
     });
     if(_fchip.saglik==='hasta') f=f.filter(a=>getState('hastaIds').has(a.id));
     if(_fchip.kisir==='kisir') f=f.filter(a=>a.kisir);
