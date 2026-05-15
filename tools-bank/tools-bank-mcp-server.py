@@ -13,6 +13,12 @@ from pathlib import Path
 # Set API key from hardcoded value
 os.environ["MINIMAX_API_KEY"] = "sk-cp-4ErelSlnFkyo49Uc8H8RRZXr56LTT2jMrCRnWZp7aS0pmsJhfgNWn5VXX5aN9evd_XR5ExUknnFQSMBq6g4aeQrM2b5x2B1tuQARg076L81g3PBTJJmnH6A"
 
+# Supabase config for entity_graph and memory_notes
+SB_URL = "https://zqnexqbdfvbhlxzelzju.supabase.co"
+SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc"
+SB_HEADERS = {"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"}
+import urllib.request, urllib.parse
+
 # Paths
 TOOLSBANK_ROOT = "/root/egesut-erp1/tools-bank"
 MEMORY_TOOLS = f"{TOOLSBANK_ROOT}/memory"
@@ -36,23 +42,48 @@ def send_error(req_id, code, message):
     response = {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
     print(json.dumps(response), flush=True)
 
+def get_supabase(table, filters="", select="*", limit=20):
+    """Supabase REST GET with urllib (no external deps)"""
+    url = f"{SB_URL}/rest/v1/{table}?select={urllib.parse.quote(select)}"
+    if filters:
+        url += f"&{filters}"
+    url += f"&limit={limit}"
+    req = urllib.request.Request(url, headers=SB_HEADERS)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            return {"content": [{"type": "text", "text": json.dumps(data, ensure_ascii=False, indent=2)}]}
+    except Exception as e:
+        return {"content": [{"type": "text", "text": f"Supabase error: {str(e)}"}]}
+
 def call_memory_search(args):
-    """Call intelligence_wrapper.memory_search via subprocess"""
+    """Search memory_notes table in Supabase (fallback: old SQLite)"""
+    query = args.get("query", "")
+    category = args.get("category")
+    limit = args.get("limit", 10)
+
+    # Build Supabase filter: content ILIKE %query% + optional category filter
+    filters = f"content=ilike.%{urllib.parse.quote(query)}%"
+    if category:
+        filters += f"&category=eq.{urllib.parse.quote(category)}"
+
+    result = get_supabase("memory_notes", filters=filters, select="id,category,priority,tags,source,substring(content,1,200) as preview", limit=limit)
+    # If Supabase returns empty, fallback to old SQLite
+    text = result["content"][0]["text"]
+    if text == "[]" or '"count":0' in text:
+        return call_legacy_memory_search(args)
+    return result
+
+def call_legacy_memory_search(args):
+    """Fallback: old SQLite memory search via subprocess"""
     import subprocess
     query = args.get("query", "")
     category = args.get("category")
     limit = args.get("limit", 5)
 
-    cmd = [
-        "python3", f"{MEMORY_TOOLS}/search_tool.py",
-        "--query", query,
-        "--limit", str(limit),
-        "--format", "json",
-        "--db", MEMORY_DB
-    ]
+    cmd = ["python3", f"{MEMORY_TOOLS}/search_tool.py", "--query", query, "--limit", str(limit), "--format", "json", "--db", MEMORY_DB]
     if category:
         cmd.extend(["--category", category])
-
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode == 0:
@@ -85,31 +116,19 @@ def call_semantic_search(args):
         return {"content": [{"type": "text", "text": f"Error: {str(e)}"}]}
 
 def call_knowledge_graph_query(args):
-    """Call knowledge_graph query via subprocess"""
-    import subprocess
+    """Query entity_graph table in Supabase (fallback: old SQLite)"""
     entity = args.get("entity", "")
     relation_target = args.get("relation_target")
 
+    filters = f"entity=ilike.%{urllib.parse.quote(entity)}%"
     if relation_target:
-        cmd = [
-            "python3", f"{MEMORY_TOOLS}/knowledge_graph.py",
-            "--relate", entity, relation_target,
-            "--graph-db", KNOWLEDGE_GRAPH_DB
-        ]
-    else:
-        cmd = [
-            "python3", f"{MEMORY_TOOLS}/knowledge_graph.py",
-            "--query", entity,
-            "--graph-db", KNOWLEDGE_GRAPH_DB
-        ]
+        filters += f"&relationships=cs.%{urllib.parse.quote(relation_target)}%"
 
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        return {"content": [{"type": "text", "text": result.stdout}]}
-    except subprocess.TimeoutExpired:
-        return {"content": [{"type": "text", "text": "Error: Timeout (30s)"}]}
-    except Exception as e:
-        return {"content": [{"type": "text", "text": f"Error: {str(e)}"}]}
+    result = get_supabase("entity_graph", filters=filters, select="*", limit=10)
+    text = result["content"][0]["text"]
+    if text == "[]":
+        return {"content": [{"type": "text", "text": f"'{entity}' için graph verisi yok."}]}
+    return result
 
 def call_memory_stats(args):
     """Call memory stats via subprocess"""
