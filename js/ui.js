@@ -28,7 +28,7 @@ const _katTipMap={
   vitamin:['ILERI_GEBE'],
   muayene:['MUAYENE'],
   tedavi:['TEDAVI','ILAC_UYGULAMA'],
-  bakim:['SUTTEN_KESME','DOGUM_TAKIP'],
+  bakim:['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP'],
   diger:null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();

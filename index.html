@@ -979,13 +979,17 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Hayvan Küpesi</label><input id="ta-hid" class="fi" placeholder="Küpe no (opsiyonel)" autocomplete="off"></div>
       <div class="fg"><label class="flbl">Görev Açıklaması *</label><textarea id="ta-desc" class="fta" placeholder="Yapılacak iş…"></textarea></div>
       <div class="fg"><label class="flbl">Hedef Tarih *</label><input id="ta-tarih" class="fi" type="date"></div>
-      <div class="fg"><label class="flbl">Tür</label>
+      <div class="fg"><label class="flbl">Tür (hangi kategoride görünecek?)</label>
         <select id="ta-tip" class="fsel">
-          <option value="MANUEL">Genel Görev</option>
-          <option value="TEDAVI">Tedavi</option>
-          <option value="ILAC">İlaç Uygulama</option>
-          <option value="PADOK_GECIS">Padok Geçişi</option>
-          <option value="DIGER">Diğer</option>
+          <option value="MANUEL">📋 Genel Görev</option>
+          <option value="TEDAVI">🩸 Tedavi</option>
+          <option value="ILAC_UYGULAMA">💊 İlaç Uygulama</option>
+          <option value="PADOK_DEGISIM">🐄 Padok Geçişi</option>
+          <option value="MUAYENE">🩺 Muayene</option>
+          <option value="ILERI_GEBE_ASI">💉 Aşı</option>
+          <option value="ILERI_GEBE">💊 Takviye</option>
+          <option value="SUTTEN_KESME">🍼 Sütten Kesme</option>
+          <option value="DIGER">📂 Diğer</option>
         </select>
       </div>
       <button class="btn btn-g" data-action="submit-task-add">Görev Oluştur</button>
