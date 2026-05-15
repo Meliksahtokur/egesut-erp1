@@ -26,10 +26,12 @@ let _curStokDet=null;
 const _katTipMap={
   asi:['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE'],
-  kontrol:['MUAYENE','GEBELIK_KONTROL','TARTIM'],
+  muayene:['MUAYENE'],
   tedavi:['TEDAVI','ILAC_UYGULAMA'],
-  bakim:['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP']
+  bakim:['SUTTEN_KESME','DOGUM_TAKIP'],
+  diger:null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
+const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
 function setTaskKat(kat,btn){
   _taskKategori=kat;
   document.querySelectorAll('.kat-btn').forEach(b=>b.classList.remove('on'));
@@ -324,7 +326,8 @@ async function loadTasks(f,btn){
     if(f==='done'){
       let done=all.filter(t=>t.tamamlandi&&!t.parent_id);
       done.sort((a,b)=>(b.tamamlanma_tarihi||b.hedef_tarih||'').localeCompare(a.tamamlanma_tarihi||a.hedef_tarih||''));
-      if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; done=done.filter(t=>tips.includes(t.gorev_tipi)); }
+      if(_taskKategori==='diger'){ done=done.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
+      else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; done=done.filter(t=>tips.includes(t.gorev_tipi)); }
       if(!done.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Henüz tamamlanan görev yok</div>'; return; }
       el.innerHTML=done.slice(0,150).map(t=>{
         const rapelChild=all.find(c=>c.parent_id===t.id&&!c.tamamlandi);
@@ -349,7 +352,8 @@ async function loadTasks(f,btn){
     const _d7=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
     if(f==='today') data=data.filter(t=>t.hedef_tarih<=today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
-    if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
+    if(_taskKategori==='diger'){ data=data.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
+    else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
     data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
     const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);

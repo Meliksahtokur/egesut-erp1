@@ -45,9 +45,10 @@ registerActions({
   'task-kat-all':     (el) => setTaskKat('all', el),
   'task-kat-asi':     (el) => setTaskKat('asi', el),
   'task-kat-vitamin': (el) => setTaskKat('vitamin', el),
-  'task-kat-kontrol': (el) => setTaskKat('kontrol', el),
+  'task-kat-muayene': (el) => setTaskKat('muayene', el),
   'task-kat-tedavi':  (el) => setTaskKat('tedavi', el),
   'task-kat-bakim':   (el) => setTaskKat('bakim', el),
+  'task-kat-diger':   (el) => setTaskKat('diger', el),
 
   // ═══ GEÇMİŞ FİLTRELERİ ═══
   'gecmis-hepsi':     (el) => loadGecmis('hepsi', el),
