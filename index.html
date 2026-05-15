@@ -346,6 +346,9 @@ button,input,select,textarea{font-family:inherit}
         <button class="kat-btn" data-action="task-kat-tedavi">🩺 Tedavi</button>
         <button class="kat-btn" data-action="task-kat-bakim">🐄 Bakım</button>
       </div>
+      <div id="task-search-bar" style="padding:0 14px 8px">
+        <input class="fi" id="task-srch" placeholder="🔍 Küpe no ara…" autocomplete="off" oninput="taskSrch()" style="width:100%;padding:8px 12px;border:1px solid var(--brd);border-radius:8px;font-size:.78rem">
+      </div>
       <div id="tasks-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
     <!-- FAB: görev ekle -->
