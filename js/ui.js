@@ -315,6 +315,8 @@ async function loadTasks(f,btn){
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
   const el=document.getElementById('tasks-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  const srchEl=document.getElementById('task-srch');
+  if(srchEl){ srchEl.value=''; }
   try {
     const today=new Date().toISOString().split('T')[0];
     if(navigator.onLine) await pullTables(['gorev_log']).catch(()=>{});
@@ -4141,4 +4143,23 @@ function stokFiltrele(q){
   });
   const sonuc = document.getElementById('stok-arama-sonuc');
   if (sonuc) sonuc.textContent = q ? visible+' sonuç' : '';
+}
+
+// ═══ GÖREV KÜPE ARAMA ═══
+function taskSrch(){
+  const q = (document.getElementById('task-srch')?.value||'').toLowerCase().trim();
+  const cards = document.querySelectorAll('#tasks-body .task-card');
+  let visible = 0;
+  cards.forEach(card => {
+    const idSpan = card.querySelector('.tc-id');
+    const text = (idSpan?.textContent||'').toLowerCase();
+    if (!q || text.includes(q)) { card.style.display = ''; visible++; }
+    else { card.style.display = 'none'; }
+  });
+  // Boş sonuç mesajını güncelle
+  const body = document.getElementById('tasks-body');
+  const emptyMsg = body?.querySelector('.empty:only-child');
+  if (emptyMsg && visible === 0) {
+    emptyMsg.innerHTML = '<div class="empty-ico">🔍</div>Eşleşen görev bulunamadı';
+  }
 }
