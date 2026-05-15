@@ -1,3 +1,5 @@
+> **🟡 KISMEN TAMAMLANDI** — Commit'ler: `ab4f4ee` (helpers.js+modal.js), `7f6ee42` (state migration), `3a2b328` (config.js fix). **Eksik:** 1.1 Global state (13 global hala app.js:81'de) ve 1.4 Autocomplete tekilleştirme (acHdeTani/acDisease dönüşümü) insan onayı bekliyor.
+
 # Aşama 1 Altyapı Tamamlama — Implementation Plan
 
 > **REQUIRED SUB-SKILL:** Use the executing-plans skill to implement this plan task-by-task.

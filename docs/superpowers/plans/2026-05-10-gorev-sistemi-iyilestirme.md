@@ -1,3 +1,5 @@
+> **🟡 KISMEN TAMAMLANDI** — Commit: `d833be8` (gorev_geri_al RPC fix). Görev geri alma çalışıyor ancak rapel tarihi gösterme, done görev detayı, kategori filtresi henüz implemente edilmedi.
+
 # Görev Sistemi İyileştirmeleri Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

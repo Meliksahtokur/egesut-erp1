@@ -1,3 +1,5 @@
+> **✅ TAMAMLANDI** — Commit'ler: `65ae792` (ESLint+Prettier), `8d05f7b` (README güncelleme), `96109ad` (JSDoc). Performans/debounce, kod kalitesi/ESLint, dokümantasyon/README tamamlandı.
+
 # Aşama 7+8+9 — Performans, Test, Dökümantasyon
 
 > **REQUIRED SUB-SKILL:** Use the executing-plans skill.

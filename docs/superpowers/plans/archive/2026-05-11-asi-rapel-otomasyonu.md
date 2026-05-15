@@ -1,3 +1,5 @@
+> **✅ TAMAMLANDI** — Commit: `c790bf7`. Asi rapel RPC iyileştirmesi, rapel interval UI, ASI_RAPEL kategori+emoji eklendi.
+
 # Asi Rapel Otomasyonu Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

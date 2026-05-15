@@ -1,3 +1,5 @@
+> **✅ TAMAMLANDI** — Commit'ler: `b9d20a2` (ground truth migration 7576 satır), `30fc4a1` (realtime idempotent fix). Migration idempotent kontrolleri ve ground truth referansı hazır.
+
 # Aşama 5 — Migration ve Drift Yönetimi
 
 > **REQUIRED SUB-SKILL:** Use the executing-plans skill.

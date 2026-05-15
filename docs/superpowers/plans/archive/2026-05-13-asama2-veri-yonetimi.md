@@ -1,3 +1,5 @@
+> **✅ TAMAMLANDI** — Commit'ler: `96109ad` (insertOffline+updateOffline+IDB index+JSDoc), `c9f4088` (rpcOptimistic fix). Veri yönetimi katmanı tamamlandı.
+
 # Aşama 2 — Veri Yönetimi İyileştirmeleri
 
 > **REQUIRED SUB-SKILL:** Use the executing-plans skill.

@@ -1,3 +1,5 @@
+> **✅ TAMAMLANDI** — Commit'ler: `6c1b038` (buzagi_sutten_kesme_kontrol RPC), `66159e5` (dashboard + sayaç). 60. gün otomatik sütten kesme görevi çalışıyor.
+
 # 60. Gün Buzağı Sütten Kesme Uyarı/Görev Sistemi Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

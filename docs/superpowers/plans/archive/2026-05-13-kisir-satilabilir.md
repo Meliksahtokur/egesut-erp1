@@ -1,3 +1,5 @@
+> **✅ TAMAMLANDI** — Commit'ler: `cb1a714` (kısır flag RPC+migration), `009cb42` (UI toggle+badge+filtre), `51d33d3` (islem geçmişi desteği), `a74a47a` (view güncelleme), `68790e4` (modal fix), `d6c215f` (kriter düzeltme). Kısır flag → modal'dan işaretleme, dashboard'da kuru adayı, doneTask RPC kullanımı çalışıyor.
+
 # Kısır / Satılabilir Statüsü Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
