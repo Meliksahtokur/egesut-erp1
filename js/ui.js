@@ -476,12 +476,10 @@ async function loadAnimals(){
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
     globalThis._tohMap={};
     gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
-    // Non-Gebe tohumlama haritası (boş badge'de gün hesabı için)
-    const bosTohs=await getData('tohumlama',t=>t.sonuc!=='Gebe');
+    // Bekleyen tohumlama haritası (sadece sonuc=Bekliyor — badge için)
+    const bosTohs=await getData('tohumlama',t=>t.sonuc==='Bekliyor');
     globalThis._bosTohMap={};
-    globalThis._bekliyorSet=new Set();
     bosTohs.forEach(t=>{
-      if(t.sonuc==='Bekliyor') globalThis._bekliyorSet.add(t.hayvan_id);
       if(!globalThis._bosTohMap[t.hayvan_id]||t.tarih>globalThis._bosTohMap[t.hayvan_id]) globalThis._bosTohMap[t.hayvan_id]=t.tarih;
     });
     const hastaLogs=await getData('cases',c=>c.status==='active');
@@ -512,9 +510,7 @@ function _animalTagsHtml(a,gebeSet){
     const tohTarih=bosTohMap[a.id];
     if(tohTarih){
       const gun=Math.floor((Date.now()-new Date(tohTarih).getTime())/86400000);
-      // Sadece 285 günden yeni veya Bekliyor ise göster (eski kayıtlar artık anlamsız)
-      const bekliyor=(globalThis._bekliyorSet||new Set()).has(a.id);
-      if(gun>0&&(bekliyor||gun<=285)) bosTohBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">💉 ${gun} gün önce tohumlandı</span>`;
+      if(gun>0) bosTohBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">💉 ${gun} gün önce tohumlandı</span>`;
     }
   }
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
@@ -541,24 +537,16 @@ function renderAnimals(list){
   if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
   const gebeSet=new Set(getState('gebeIds')||[]);
   const tohMap=globalThis._tohMap||{};
-  // Gebe → gebelik günü; Boş (toh. ≤285g veya Bekliyor) → toh_gun DESC; diğer → küpe no
+  // Gebe → gebelik günü; Bekliyor tohumlama → tarih DESC; diğer → küpe no
   const bosTohMap=globalThis._bosTohMap||{};
-  const bekliyorSet=globalThis._bekliyorSet||new Set();
-  function _isRecentBos(id){
-    const t=bosTohMap[id];
-    if(!t) return false;
-    if(bekliyorSet.has(id)) return true;
-    const gun=Math.floor((Date.now()-new Date(t).getTime())/86400000);
-    return gun<=285;
-  }
   const sorted=[...list].sort((a,b)=>{
     const aT=gebeSet.has(a.id)||gebeSet.has(a.kupe_no)?tohMap[a.id]:null;
     const bT=gebeSet.has(b.id)||gebeSet.has(b.kupe_no)?tohMap[b.id]:null;
     if(aT&&bT) return aT.localeCompare(bT);
     if(aT) return -1;
     if(bT) return 1;
-    const aBos=_isRecentBos(a.id)?bosTohMap[a.id]:null;
-    const bBos=_isRecentBos(b.id)?bosTohMap[b.id]:null;
+    const aBos=bosTohMap[a.id]||null;
+    const bBos=bosTohMap[b.id]||null;
     if(aBos&&bBos) return aBos.localeCompare(bBos);
     if(aBos) return -1;
     if(bBos) return 1;
