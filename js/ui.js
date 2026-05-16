@@ -2230,6 +2230,14 @@ async function rapelTarihiKaydet(){
     toast(_trErr(e.message),true);
   }
 }
+async function openTaskEdit(){
+  if(!_curTaskDet) return;
+  const t=_curTaskDet;
+  document.getElementById('te-desc').value=t.aciklama||'';
+  document.getElementById('te-tarih').value=t.hedef_tarih||'';
+  document.getElementById('te-tip').value=t.gorev_tipi||'MANUEL';
+  openM('m-task-edit');
+}
 async function detayIptal(){
   if(!_curTaskDet) return;
   const t=_curTaskDet;
