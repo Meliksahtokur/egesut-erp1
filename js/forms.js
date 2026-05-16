@@ -420,13 +420,12 @@ async function submitSuttenKes(hayvanIdList, btn) {
   if (!hayvanIdList || !hayvanIdList.length) { toast('Hayvan seçilmedi', true); return; }
   if (!confirm(`${hayvanIdList.length} buzağı sütten kesilecek. Onaylıyor musunuz?`)) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
-  const bugun = new Date().toISOString().split('T')[0];
   let basari = 0;
   try {
     for (const id of hayvanIdList) {
       const h = getState('animals').find(a => a.id === id);
       if (!h || h.hesap_kategori !== 'sut_icen') continue;
-      await write('hayvanlar', { suttten_kesme_tarihi: bugun }, 'PATCH', `id=eq.${id}`);
+      await rpc('buzagi_sutten_kesme_onayla', { p_hayvan_id: id });
       basari++;
     }
     toast(`✅ ${basari} buzağı sütten kesildi`);
@@ -442,9 +441,8 @@ async function suttenKesTekil(hayvanId, btn) {
   if (h.hesap_kategori !== 'sut_icen') { toast('Bu hayvan süt içen kategorisinde değil', true); return; }
   if (!confirm(`${getDisplayKupe(h)} sütten kesilecek. Onaylıyor musunuz?`)) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
-  const bugun = new Date().toISOString().split('T')[0];
   try {
-    await write('hayvanlar', { suttten_kesme_tarihi: bugun }, 'PATCH', `id=eq.${hayvanId}`);
+    await rpc('buzagi_sutten_kesme_onayla', { p_hayvan_id: hayvanId });
     toast(`✅ ${getDisplayKupe(h)} sütten kesildi`);
     closeDet();
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
@@ -459,7 +457,7 @@ async function submitTohumOnayla(hayvanId, btn) {
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    await write('hayvanlar', { tohumlama_durumu: 'tohumlanabilir', tohumlama_onay_tarihi: new Date().toISOString().split('T')[0] }, 'PATCH', `id=eq.${hayvanId}`);
+    await rpc('hayvan_tohumlanabilir_onayla', { p_hayvan_id: hayvanId });
     toast(`✅ ${getDisplayKupe(h)} tohumlanabilir olarak onaylandı`);
     closeDet();
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
@@ -471,10 +469,9 @@ async function submitTohumErtele(hayvanId, ay, btn) {
   const h = getState('animals').find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
-  const erteleme = dFwd(new Date().toISOString().split('T')[0], ay * 30);
   try {
-    await write('hayvanlar', { tohumlama_durumu: 'ertelendi', tohumlama_onay_tarihi: erteleme }, 'PATCH', `id=eq.${hayvanId}`);
-    toast(`✅ ${getDisplayKupe(h)} tohumlama ${ay} ay ertelendi`);
+    const res = await rpc('hayvan_tohumlama_ertele', { p_hayvan_id: hayvanId, p_ay: ay });
+    toast(`✅ ${getDisplayKupe(h)} tohumlama ${ay} ay ertelendi${res?.hedef_tarih ? ' (hedef: ' + res.hedef_tarih + ')' : ''}`);
     closeM('m-tohum-ertele');
     closeDet();
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
@@ -623,12 +620,7 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
   btn.disabled = true;
   btn.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
   try {
-    await write('gorev_log', { id, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString() }, 'PATCH', `id=eq.${id}`);
-    const _stokKontrol = stokId ? getState('stock').find(s => s.id === stokId) : null;
-    if (stokId && miktar > 0 && _stokKontrol)
-      await write('stok_hareket', { id: crypto.randomUUID(), stok_id: stokId, tur: 'Görev', miktar, notlar: 'GorevID:' + id, iptal: false });
-    if (padok && hid)
-      await write('hayvanlar', { id: hid, padok }, 'PATCH', `id=eq.${hid}`);
+    await rpc('gorev_tamamla', { p_gorev_id: id, p_padok_hedef: padok || null });
     const el = document.getElementById('tc-' + id);
     if (el) { el.classList.add('done'); setTimeout(() => el.remove(), 320); }
     toast('✅ Tamamlandı');
@@ -938,7 +930,7 @@ async function submitStk(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   try {
     const curStk=getState('curStok');
-    await write('stok', { baslangic_miktar: (+curStk.baslangic_miktar || 0) + mik }, 'PATCH', `id=eq.${curStk.id}`);
+    await rpc('stok_ekleme', { p_stok_id: curStk.id, p_miktar: mik, p_notlar: 'Manuel ekleme' });
     toast(`✅ ${curStk.urun_adi}: +${mik} ${curStk.birim || ''}`);
     closeM('m-stk');
     await pullTables(['stok','stok_hareket']);
@@ -970,18 +962,14 @@ async function submitStokAdd(btn) {
     const mevcut = mevcutlar.find(s => s.urun_adi?.toLowerCase() === urun.toLowerCase() && s.kategori === kat);
     let stokId;
     if (mevcut) {
-      // Miktarı güncelle
+      // Miktarı güncelle (RPC — stok_hareket ile immutable)
       stokId = mevcut.id;
-      await write('stok', { baslangic_miktar: (+mevcut.baslangic_miktar||0) + bslg }, 'PATCH', `id=eq.${stokId}`);
+      const r = await rpc('stok_ekleme', { p_stok_id: stokId, p_miktar: bslg, p_notlar: `Stok güncellendi: ${urun}` });
       toast(`✅ ${urun} stoku güncellendi (+${bslg} ${birim})`);
-      await write('stok_hareket', { id:crypto.randomUUID(), stok_id:stokId, tur:'Ekleme', miktar:-bslg, notlar:`Stok güncellendi: ${urun}`, iptal:false });
     } else {
-      // Yeni kayıt
-      stokId = crypto.randomUUID();
-      await write('stok', {
-        id: stokId, urun_adi: urun,
-        birim, baslangic_miktar: bslg, esik, kategori: kat, tur: kat,
-      });
+      // Yeni kayıt (RPC — atomik)
+      const r = await rpc('stok_ekle', { p_urun_adi: urun, p_kategori: kat, p_birim: birim, p_baslangic_miktar: bslg, p_esik: esik });
+      stokId = r?.id;
       // İlaç ise drug_products'a da ekle (etken madde zorunlu)
       if (isIlac && navigator.onLine) {
         const etkenId = g('sa-etken')?.value || null;
@@ -1003,7 +991,6 @@ async function submitStokAdd(btn) {
         _drugsCache = [];
       }
       toast(`✅ ${urun} eklendi`);
-      await write('stok_hareket', { id:crypto.randomUUID(), stok_id:stokId, tur:'Ekleme', miktar:-bslg, notlar:`Stok eklendi: ${urun}`, iptal:false });
     }
     closeM('m-stok-add');
     ['sa-ad','sa-ad-diger','sa-mik','sa-esik','sa-konst'].forEach(id=>{const e=g(id);if(e)e.value='';});
@@ -1028,10 +1015,7 @@ async function submitGebelikEkle(btn) {
   const sperma = (g('geb-sperma')?.value||'').trim();
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    await write('tohumlama', {
-      id: crypto.randomUUID(), hayvan_id: hayvanId,
-      tarih, sperma: sperma || null, sonuc: 'Gebe', deneme_no: 1
-    });
+    await rpc('gebelik_kaydet_manual', { p_hayvan_id: hayvanId, p_tarih: tarih, p_sperma: sperma || null });
     toast('✅ Gebelik kaydedildi');
     closeM('m-gebelik');
     await pullTables(['tohumlama','hayvanlar']);
