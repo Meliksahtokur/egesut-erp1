@@ -3,14 +3,15 @@
 > **Tarih:** 2026-05-16
 > **Kapsam:** "Frontend asla iş mantığı yapmaz" prensibine aykırı kodlar
 > **Kaynaks:** `egesut-erp-architecture` skill'inden otomatik türetilmiştir
+> **Son Guncelleme:** 2026-05-16 — Faz 1/2/3 tamamlandi
 
-## Özet
+## Ozet
 
-| Kategori | İhlal Sayısı | Risk |
-|----------|-------------|------|
-| Grup A — RPC Bypass (`write()` ile direkt PATCH) | 6+ lokasyon | 🔴 Yüksek |
-| Grup B — Direkt REST (`db.from().insert/update/delete`) | 10+ lokasyon | 🔴 Yüksek |
-| Grup C — Frontend hesaplama (DB view'ı bypass) | 8+ lokasyon | 🟡 Orta |
+| Kategori | Toplam | Cozuldu | Kalan | Risk |
+|----------|--------|---------|-------|------|
+| Grup A — RPC Bypass (`write()` ile direkt PATCH) | 6 | 6 | 0 | ✅ Kapatildi |
+| Grup B — Direkt REST (`db.from().insert/update/delete`) | 10+ | 9 | 1-2 | 🟡 Az kaldi |
+| Grup C — Frontend hesaplama (DB view'i bypass) | 8+ | 6 | 2 | 🟡 Az kaldi |
 
 ---
 
@@ -20,64 +21,35 @@ Frontend `write()` fonksiyonunu kullanarak REST PATCH yapıyor.
 `write()` offline queue'ya yazıp REST'e gönderir, RPC'yi bypass eder.
 Online'ken bu işlemler RPC'siz çalışır → state machine bypass, validasyon atlanır.
 
-### A1 — Sütten Kesme Tarihi
+### A1 — Sütten Kesme Tarihi ✅ COZULDU (Faz 1)
 
-**Dosya:** `js/forms.js:429, 447`
-**Kod:**
-```js
-await write('hayvanlar', { suttten_kesme_tarihi: bugun }, 'PATCH', `id=eq.${id}`);
-```
-**Sorun:** `hayvan_guncelle` RPC'si var ama kullanılmıyor. Sütten kesme tarihi iş mantığıdır (laktasyon süresi, buzağı yaşı validasyonu DB'de yapılmalı).
-**Yapılması Gereken:** `hayvan_guncelle` RPC'sine `p_suttten_kesme_tarihi` parametresi ekle, frontend'den `rpc('hayvan_guncelle', {...})` çağır.
+**Fix:** `buzagi_sutten_kesme_onayla` RPC yazildi. Frontend `rpc()` kullaniyor.
+**Commit:** 2bf381c (impl) + 76add8d (review fix)
 
-### A2 — Tohumlanabilir Onay
+### A2 — Tohumlanabilir Onay ✅ COZULDU (Faz 1)
 
-**Dosya:** `js/forms.js:462`
-**Kod:**
-```js
-await write('hayvanlar', { tohumlama_durumu: 'tohumlanabilir', tohumlama_onay_tarihi: new Date().toISOString().split('T')[0] }, 'PATCH', `id=eq.${hayvanId}`);
-```
-**Sorun:** Tohumlama state machine'i frontend'den direkt PATCH ile değiştiriliyor. Tarih de frontend'de hesaplanıyor.
-**Yapılması Gereken:** `hayvan_guncelle` RPC'sine taşı veya ayrı RPC yaz (`tohumlama_onay`).
+**Fix:** `hayvan_tohumlanabilir_onayla` RPC yazildi. Yas >= 365 gun kontrolu, cinsiyet/kisir validasyonu DB'de.
+**Commit:** 2bf381c (impl) + 76add8d (review fix — M1 yas check eklendi)
 
-### A3 — Tohumlama Erteleme
+### A3 — Tohumlama Erteleme ✅ COZULDU (Faz 1)
 
-**Dosya:** `js/forms.js:476`
-**Kod:**
-```js
-const erteleme = dFwd(new Date().toISOString().split('T')[0], ay * 30);
-await write('hayvanlar', { tohumlama_durumu: 'ertelendi', tohumlama_onay_tarihi: erteleme }, 'PATCH', `id=eq.${hayvanId}`);
-```
-**Sorun:** Erteleme tarihi frontend'de `dFwd()` ile hesaplanıyor (business logic). `ay * 30` gün hesabı da frontend'de. State machine bypass.
-**Yapılması Gereken:** Yeni RPC (`tohumlama_ertele`) — parametre olarak `p_ay` alır, tarihi DB'de hesaplar.
+**Fix:** `hayvan_tohumlama_ertele` RPC yazildi. Tarih hesabi DB'de `(p_ay || ' months')::interval` ile.
+**Commit:** 2bf381c (impl) + 76add8d (review fix — M2 interval duzeltildi)
 
-### A4 — Görev Tamamlama
+### A4 — Görev Tamamlama ✅ COZULDU (Faz 1)
 
-**Dosya:** `js/forms.js:626-631`
-**Kod:**
-```js
-await write('gorev_log', { id, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString() }, 'PATCH', `id=eq.${id}`);
-await write('stok_hareket', { id: crypto.randomUUID(), stok_id: stokId, tur: 'Görev', miktar, notlar: 'GorevID:' + id, iptal: false });
-await write('hayvanlar', { id: hid, padok }, 'PATCH', `id=eq.${hid}`);
-```
-**Sorun:** 3 farklı tabloya aynı anda direkt yazılıyor (gorev_log + stok_hareket + hayvanlar). Transaction yok. `gorev_guncelle` RPC'si zaten var ama kullanılmıyor.
-**Yapılması Gereken:** `gorev_guncelle` RPC'sini kullan. RPC içinde tüm yan etkileri (stok düşümü, padok değişimi) yönet.
+**Fix:** `gorev_tamamla` RPC yazildi. Tek RPC icinde: gorev_log UPDATE + stok_hareket INSERT + hayvanlar padok UPDATE. Iptal check eklendi.
+**Commit:** 2bf381c (impl) + 76add8d (review fix — H2 iptal check eklendi)
 
-### A5 — Stok Ekleme/Güncelleme
+### A5 — Stok Ekleme/Güncelleme ✅ COZULDU (Faz 1)
 
-**Dosya:** `js/forms.js:941, 975-981`
-**Sorun:** Stok miktarı doğrudan güncelleniyor. Oysa stok ledger immutable'dır — `stok_hareket` INSERT ile çalışır, `stok.baslangic_miktar` asla değişmez (ARCHITECTURE.md §3.3).
-**Yapılması Gereken:** Stok işlemleri için RPC yaz (`stok_guncelle`). Miktar değişikliği `stok_hareket` INSERT + view üzerinden hesaplanmalı.
+**Fix:** `stok_ekle` ve `stok_ekleme` RPC'leri yazildi. Ledger immutability korunuyor: stok_ekleme negatif hareket INSERT yapar (`-p_miktar`).
+**Commit:** 2bf381c (impl) + 76add8d (review fix — C2 double-subtract, C3 negatif miktar)
 
-### A6 — Tohumlama Direkt INSERT
+### A6 — Tohumlama Direkt INSERT ✅ COZULDU (Faz 1)
 
-**Dosya:** `js/forms.js:1031`
-**Kod:**
-```js
-await write('tohumlama', { ... });
-```
-**Sorun:** `tohumlama_kaydet` RPC'si zaten var offline queue RPC_MAP'inde tanımlı. Ancak online'da `write()` direkt REST INSERT yapar → RPC bypass edilir.
-**Yapılması Gereken:** RPC_MAP'i çevrimiçi durumda da kullanacak şekilde düzelt, veya frontend'de `rpc('tohumlama_kaydet', {...})` çağır.
+**Fix:** `gebelik_kaydet_manual` RPC yazildi. `deneme_no` otomatik hesaplaniyor (MAX+1). Frontend `rpc()` kullaniyor.
+**Commit:** 2bf381c (impl) + 76add8d (review fix — C1 iptal kolonu, M3 deneme_no)
 
 ---
 
@@ -85,26 +57,17 @@ await write('tohumlama', { ... });
 
 Frontend doğrudan Supabase REST API'ye yazıyor. Bunların çoğu admin/yönetim arayüzü işlemleri.
 
-### B1 — Stok İşlemleri
+### B1 — Stok İşlemleri ✅ COZULDU (Faz 3)
 
-| Satır | İşlem |
-|-------|-------|
-| `ui.js:1781` | `db.from('stok').update(...)` — stok güncelleme |
-| `ui.js:1797` | `db.from('stok').update({kategori:'Arsiv'})` — stok arşivleme |
-| `ui.js:3830` | `db.from('stok').insert(...)` — yeni stok ekleme |
+**Fix:** `stok_guncelle`, `stok_arsivle` RPC'leri yazildi. Frontend `rpc()` kullaniyor.
+**Commit:** 1eddb2b (impl) + 76add8d (review fix — parametre isimleri duzeltildi)
 
-### B2 — Admin CRUD (RPC'siz)
+### B2 — Admin CRUD ✅ COZULDU (Faz 3)
 
-| Satır | İşlem |
-|-------|-------|
-| `ui.js:3669` | `db.from('vaccines').update(...)` — aşı güncelleme |
-| `ui.js:3686` | `db.from('hekimler').insert(...)` — hekim ekleme |
-| `ui.js:3800` | `db.from('hekimler').update(...)` — hekim güncelleme |
-| `ui.js:3892` | `db.from('padoklar').update(...)` — padok güncelleme |
-| `ui.js:3909-3910` | `db.from('grup_padok_eslem').delete()` + `db.from('padoklar').delete()` — padok silme |
-| `ui.js:4079-4093` | `db.from('grup_padok_eslem').insert/delete` + `db.from('padoklar').insert` — padok CRUD |
+**Fix:** 9 RPC yazildi: `vaccine_rapel_guncelle`, `hekim_ekle`, `hekim_guncelle`, `padok_ekle`, `padok_guncelle`, `padok_sil`, `grup_padok_eslem_toggle`. Tumu `islem_log` snapshot + audit ile.
+**Commit:** 1eddb2b (impl) + 76add8d (review fix — kolon isimleri, tip/kapasite, id tipi)
 
-**Not:** Admin CRUD işlemleri kullanıcı sayısı az olduğu için şimdilik tolere edilebilir. Ancak yine de RPC'ye taşınmalıdır (RLS bypass riski, audit eksikliği).
+**Dogrulama:** `ui.js`'te `db.from()` ile yazma (insert/update/delete) calisi **kalmadi**. Kalan 4 `db.from()` cagrisi hep SELECT (okuma) — kabul edilebilir.
 
 ---
 
@@ -112,75 +75,42 @@ Frontend doğrudan Supabase REST API'ye yazıyor. Bunların çoğu admin/yöneti
 
 DB'de view/RPC ile yapılan hesaplamalar frontend'de tekrar ediliyor.
 
-### C1 — Stok Net Hesaplama (6 Kopya!)
+### C1 — Stok Net Hesaplama (6 Kopya!) ✅ COZULDU (Faz 2)
 
-Aynı mantık 6 farklı yerde tekrarlanmış:
+**Fix:** 6 lokasyondaki `moves.filter().reduce()` stok hesabi kaldirildi. Frontend artik `stok_tuketim_view`'dan `s.guncel_stok` / `s.stok_durum` kullaniyor. FETCHERS'ta `stok` → `stok_tuketim_view` cevirildi.
+**Fallback:** `+(s.guncel_stok ?? s.baslangic_miktar ?? 0)` — view'dan veri gelmezse guvenli.
+**Commit:** a9ba636
 
-```
-ui.js:220    — dashboard stok özeti
-ui.js:1537   — stok listesi render
-ui.js:2019   — dashboard istatistik
-ui.js:2361   — stok detay sayfası
-ui.js:3087   — stok kartı
-ui.js:3158   — stok seçici
-```
+### C2 — Tarih Hesaplamaları 🟡 KISMI
 
-**Kod:**
-```js
-const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
-const guncel = (+s.baslangic_miktar || 0) - used;
-```
+| Satir | Hesaplama | Durum |
+|-------|-----------|-------|
+| `forms.js:474` | `dFwd(... ay * 30)` — erteleme tarihi | ✅ COZULDU — `hayvan_tohumlama_ertele` RPC interval kullaniyor |
+| `forms.js:886` | `Math.floor((Date.now()-new Date(t.tarih))/86400000)` — gun farki | ⚠️ KALDI — render amacli, dusuk risk |
+| `ui.js:2000,2004` | `Math.round(gebe.length/aktif.length*100)` — yuzde | ⚠️ KALDI — raporlama, dusuk risk |
 
-**Çözüm:** `stok_tuketim_view` DB'de zaten var. `guncel_stok` ve `stok_durum` alanlarını hesaplar:
-```sql
-SELECT s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) AS guncel_stok,
-  CASE ... END AS stok_durum
-FROM stok s LEFT JOIN stok_hareket sh ON sh.stok_id = s.id;
-```
+### C3 — Dashboard Istatistikleri ⚠️ KALDI
 
-Frontend sadece `getData('stok_tuketim_view')` yapıp `row.guncel_stok`'u göstermeli.
-
-### C2 — Tarih Hesaplamaları
-
-| Satır | Hesaplama | Risk |
-|-------|-----------|------|
-| `forms.js:474` | `dFwd(... ay * 30)` — erteleme tarihi | State machine parçası, DB'de yapılmalı |
-| `forms.js:886` | `Math.floor((Date.now()-new Date(t.tarih))/86400000)` — gün farkı | Render amaçlı tolere edilebilir ama view'dan gelse daha iyi |
-| `ui.js:2000,2004` | `Math.round(gebe.length/aktif.length*100)` — yüzde | Raporlama, view veya RPC olabilir |
-
-### C3 — Dashboard İstatistikleri
-
-`ui.js:2000-2042` tüm dashboard istatistikleri (gebe/boş oranı, kritik stok sayısı) 
-frontend'de hesaplanıyor. DB view'ı (`dashboard_stats` gibi) yazılıp tek kaynaktan 
-çekilebilir.
+`ui.js:2000-2042` dashboard istatistikleri (gebe/bos orani, kritik stok sayisi) hala frontend'de hesaplaniyor. Stok durumu artik view'dan geliyor ama gebelik oranlari hala frontend hesabi. `gebelik_ozet_view` FETCHERS'a eklendi (Faz 2) — kullanimi genisletilebilir.
+**Risk:** Dusuk — sadece goruntuleme, veri degistirmiyor.
 
 ---
 
-## Remediation Plan
+## Remediation Plan — TAMAMLANDI
 
-### Aşama 1 — Kritik (Grup A)
+| Asama | Durum | Commitler |
+|-------|-------|-----------|
+| Faz 1 — Grup A (RPC Bypass) | ✅ 6/6 cozuldu | 2bf381c + 76add8d |
+| Faz 2 — Grup C1 (Stok hesaplama) | ✅ 6/6 lokasyon temizlendi | a9ba636 |
+| Faz 3 — Grup B (Admin CRUD) | ✅ 9 RPC yazildi, tum db.from() yazma kaldirildi | 1eddb2b + 76add8d |
 
-| # | İhlal | İş | Tahmini |
-|---|-------|-----|---------|
-| 1 | A1 Sütten kesme | `hayvan_guncelle` RPC'sine parametre ekle | 1 saat |
-| 2 | A2 Tohumlanabilir onay | `hayvan_guncelle` RPC'sine taşı | 1 saat |
-| 3 | A3 Tohumlama erteleme | Yeni RPC `tohumlama_ertele` | 2 saat |
-| 4 | A4 Görev tamamlama | `gorev_guncelle` RPC'sine taşı | 2 saat |
-| 5 | A6 Tohumlama direkt INSERT | RPC_MAP online düzelt | 30 dk |
+### Kalan (dusuk oncelik, scope disinda birakildi)
 
-### Aşama 2 — Stok (Grup B1 + C1)
-
-| # | İş | Tahmini |
-|---|-----|---------|
-| 6 | `stok_guncelle` RPC'si yaz | 2 saat |
-| 7 | Frontend stok hesaplamalarını `stok_tuketim_view` ile değiştir | 3 saat |
-
-### Aşama 3 — Admin CRUD (Grup B2)
-
-| # | İş | Tahmini |
-|---|-----|---------|
-| 8 | hekim/padok/vaccine RPC'leri yaz | 4 saat |
-| 9 | Frontend `db.from()` çağrılarını RPC'ye çevir | 2 saat |
+| # | Ihlal | Risk | Neden kaldi |
+|---|-------|------|-------------|
+| C2-b | `forms.js:886` gun farki hesabi | LOW | Sadece render, veri degistirmiyor |
+| C2-c | `ui.js:2000` gebelik yuzde hesabi | LOW | Sadece istatistik gosterim |
+| C3 | Dashboard istatistikleri frontend'de | LOW | View'a tasima opsiyonel iyilestirme |
 
 ---
 
