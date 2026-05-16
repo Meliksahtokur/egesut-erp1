@@ -3661,8 +3661,8 @@ function renderAyarlarSpermaList(){
 function ayarlarHekimEkle(){ document.getElementById('ay-hekim-form').style.display='block'; }
 async function ayarlarHekimKaydet(){
   const ad=v('ay-hek-ad').trim(); if(!ad) return;
-  const tel=v('ay-hek-tel')||null, kurum=v('ay-hek-kurum')||null;
-  const{error}=await rpc('hekim_ekle',{p_ad:ad,p_telefon:tel,p_kurum:kurum});
+  const tel=v('ay-hek-tel')||null;
+  const{error}=await rpc('hekim_ekle',{p_ad:ad,p_telefon:tel});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['hekimler']);
   await loadHekimlerFromDB();
@@ -3776,8 +3776,8 @@ async function hekimDetKaydet() {
   if (!_curHekimDet) return;
   const ad = v('hk-ad').trim();
   if (!ad) { toast('Hekim adı boş olamaz', true); return; }
-  const tel=v('hk-tel')||null, kurum=v('hk-kurum')||null;
-  const { error } = await rpc('hekim_guncelle',{p_hekim_id:_curHekimDet.id,p_ad:ad,p_telefon:tel,p_kurum:kurum});
+  const tel=v('hk-tel')||null;
+  const { error } = await rpc('hekim_guncelle',{p_hekim_id:_curHekimDet.id,p_ad:ad,p_telefon:tel});
   if (error) { toast('Hata: ' + error.message, true); return; }
   await pullTables(['hekimler']);
   await loadHekimlerFromDB();
@@ -3865,8 +3865,8 @@ async function padokDuzenleKaydet(){
   if(!_curPadokDet) return;
   const ad=document.getElementById('pd-ad').value.trim();
   if(!ad){ toast('Padok adı boş olamaz',true); return; }
-  const kap=parseInt(document.getElementById('pd-kap').value)||null, tip=v('pd-tip')||null;
-  const{error}=await rpc('padok_guncelle',{p_padok_id:_curPadokDet.id,p_ad:ad,p_tip:tip,p_sira:null});
+  const kap=parseInt(document.getElementById('pd-kap').value)||null;
+  const{error}=await rpc('padok_guncelle',{p_padok_id:_curPadokDet.id,p_ad:ad,p_kapasite:kap,p_sira:null});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['padoklar']);
   await loadPadokConfig();
@@ -4061,8 +4061,8 @@ function ayarlarPadokEkle(){ document.getElementById('ay-padok-form').style.disp
 
 async function ayarlarPadokKaydet(){
   const ad=v('ay-padok-ad').trim(); if(!ad){ toast('Padok adı boş olamaz',true); return; }
-  const kap=parseInt(v('ay-padok-kap'))||null, tip=v('ay-padok-tip')||null;
-  const{error}=await rpc('padok_ekle',{p_ad:ad,p_tip:tip,p_sira:kap||0});
+  const kap=parseInt(v('ay-padok-kap'))||null;
+  const{error}=await rpc('padok_ekle',{p_ad:ad,p_kapasite:kap,p_sira:0});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['padoklar']);
   await loadPadokConfig();

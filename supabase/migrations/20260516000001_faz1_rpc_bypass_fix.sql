@@ -502,7 +502,7 @@ CREATE OR REPLACE FUNCTION public.vaccine_rapel_guncelle(p_vaccine_id uuid, p_re
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_vac record;
 BEGIN
-  IF p_repeat_days <= 0 THEN RAISE EXCEPTION 'Rapel süresi pozitif olmalıdır'; END IF;
+  IF p_repeat_days IS NOT NULL AND p_repeat_days <= 0 THEN RAISE EXCEPTION 'Rapel süresi pozitif olmalıdır'; END IF;
   SELECT * INTO v_vac FROM public.vaccines WHERE id = p_vaccine_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Aşı bulunamadı'; END IF;
 
@@ -526,22 +526,22 @@ GRANT EXECUTE ON FUNCTION public.vaccine_rapel_guncelle(uuid,integer) TO anon, a
 
 -- ── B4: HEKIM EKLE ─────────────────────────────
 CREATE OR REPLACE FUNCTION public.hekim_ekle(
-  p_ad text, p_telefon text DEFAULT NULL, p_kurum text DEFAULT NULL
+  p_ad text, p_telefon text DEFAULT NULL
 )
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_id uuid;
+DECLARE v_id text;
 BEGIN
   IF NULLIF(p_ad, '') IS NULL THEN RAISE EXCEPTION 'Hekim adı zorunlu'; END IF;
-  v_id := gen_random_uuid();
+  v_id := 'H' || extract(epoch from now())::bigint::text;
 
-  INSERT INTO public.hekimler (id, ad, telefon, kurum, aktif)
-  VALUES (v_id, p_ad, p_telefon, p_kurum, true);
+  INSERT INTO public.hekimler (id, ad, telefon, aktif)
+  VALUES (v_id, p_ad, p_telefon, true);
 
   INSERT INTO public.islem_log (tip, ref_id, ref_tablo, snapshot, kullanici_notu)
-  VALUES ('HEKIM_EKLE', v_id::text, 'hekimler', jsonb_build_object(
+  VALUES ('HEKIM_EKLE', v_id, 'hekimler', jsonb_build_object(
     'olusturulan', jsonb_build_array(jsonb_build_object(
       'tablo', 'hekimler', 'id', v_id,
-      'veri', jsonb_build_object('ad', p_ad, 'telefon', p_telefon, 'kurum', p_kurum)
+      'veri', jsonb_build_object('ad', p_ad, 'telefon', p_telefon)
     )),
     'guncellenen', '[]'::jsonb,
     'silinen', '[]'::jsonb
@@ -550,12 +550,12 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'id', v_id);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.hekim_ekle(text,text,text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.hekim_ekle(text,text) TO anon, authenticated;
 
 -- ── B5: HEKIM GUNCELLE ─────────────────────────
 CREATE OR REPLACE FUNCTION public.hekim_guncelle(
-  p_hekim_id uuid, p_ad text DEFAULT NULL, p_telefon text DEFAULT NULL,
-  p_kurum text DEFAULT NULL, p_aktif boolean DEFAULT NULL
+  p_hekim_id text, p_ad text DEFAULT NULL, p_telefon text DEFAULT NULL,
+  p_aktif boolean DEFAULT NULL
 )
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_hekim record;
@@ -566,12 +566,11 @@ BEGIN
   UPDATE public.hekimler SET
     ad     = COALESCE(NULLIF(p_ad, ''), ad),
     telefon = COALESCE(NULLIF(p_telefon, ''), telefon),
-    kurum  = COALESCE(NULLIF(p_kurum, ''), kurum),
     aktif  = COALESCE(p_aktif, aktif)
   WHERE id = p_hekim_id;
 
   INSERT INTO public.islem_log (tip, ref_id, ref_tablo, snapshot, kullanici_notu)
-  VALUES ('HEKIM_GUNCELLE', p_hekim_id::text, 'hekimler', jsonb_build_object(
+  VALUES ('HEKIM_GUNCELLE', p_hekim_id, 'hekimler', jsonb_build_object(
     'olusturulan', '[]'::jsonb,
     'guncellenen', jsonb_build_array(jsonb_build_object(
       'tablo', 'hekimler', 'id', p_hekim_id,
@@ -584,11 +583,11 @@ BEGIN
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.hekim_guncelle(uuid,text,text,text,boolean) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.hekim_guncelle(text,text,text,boolean) TO anon, authenticated;
 
 -- ── B6: PADOK EKLE ─────────────────────────────
 CREATE OR REPLACE FUNCTION public.padok_ekle(
-  p_ad text, p_tip text DEFAULT NULL, p_sira integer DEFAULT 0
+  p_ad text, p_kapasite integer DEFAULT NULL, p_sira integer DEFAULT 0
 )
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_id uuid;
@@ -596,14 +595,14 @@ BEGIN
   IF NULLIF(p_ad, '') IS NULL THEN RAISE EXCEPTION 'Padok adı zorunlu'; END IF;
   v_id := gen_random_uuid();
 
-  INSERT INTO public.padoklar (id, ad, tip, sira, aktif)
-  VALUES (v_id, p_ad, COALESCE(p_tip, 'Genel'), p_sira, true);
+  INSERT INTO public.padoklar (id, ad, kapasite, sira, aktif)
+  VALUES (v_id, p_ad, p_kapasite, p_sira, true);
 
   INSERT INTO public.islem_log (tip, ref_id, ref_tablo, snapshot, kullanici_notu)
   VALUES ('PADOK_EKLE', v_id::text, 'padoklar', jsonb_build_object(
     'olusturulan', jsonb_build_array(jsonb_build_object(
       'tablo', 'padoklar', 'id', v_id,
-      'veri', jsonb_build_object('ad', p_ad, 'tip', p_tip, 'sira', p_sira)
+      'veri', jsonb_build_object('ad', p_ad, 'kapasite', p_kapasite, 'sira', p_sira)
     )),
     'guncellenen', '[]'::jsonb,
     'silinen', '[]'::jsonb
@@ -612,11 +611,11 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'id', v_id);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.padok_ekle(text,text,integer) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.padok_ekle(text,integer,integer) TO anon, authenticated;
 
 -- ── B7: PADOK GUNCELLE ─────────────────────────
 CREATE OR REPLACE FUNCTION public.padok_guncelle(
-  p_padok_id uuid, p_ad text DEFAULT NULL, p_tip text DEFAULT NULL,
+  p_padok_id uuid, p_ad text DEFAULT NULL, p_kapasite integer DEFAULT NULL,
   p_sira integer DEFAULT NULL, p_aktif boolean DEFAULT NULL
 )
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -627,7 +626,7 @@ BEGIN
 
   UPDATE public.padoklar SET
     ad   = COALESCE(NULLIF(p_ad, ''), ad),
-    tip  = COALESCE(NULLIF(p_tip, ''), tip),
+    kapasite = COALESCE(p_kapasite, kapasite),
     sira = COALESCE(p_sira, sira),
     aktif = COALESCE(p_aktif, aktif)
   WHERE id = p_padok_id;
@@ -646,7 +645,7 @@ BEGIN
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.padok_guncelle(uuid,text,text,integer,boolean) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.padok_guncelle(uuid,text,integer,integer,boolean) TO anon, authenticated;
 
 -- ── B8: PADOK SIL ──────────────────────────────
 CREATE OR REPLACE FUNCTION public.padok_sil(p_padok_id uuid)
@@ -682,11 +681,11 @@ GRANT EXECUTE ON FUNCTION public.padok_sil(uuid) TO anon, authenticated;
 CREATE OR REPLACE FUNCTION public.grup_padok_eslem_toggle(p_grup_adi text, p_padok_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.grup_padok_eslem WHERE grup_adi = p_grup_adi AND padok_id = p_padok_id) THEN
-    DELETE FROM public.grup_padok_eslem WHERE grup_adi = p_grup_adi AND padok_id = p_padok_id;
+  IF EXISTS (SELECT 1 FROM public.grup_padok_eslem WHERE grup = p_grup_adi AND padok_id = p_padok_id) THEN
+    DELETE FROM public.grup_padok_eslem WHERE grup = p_grup_adi AND padok_id = p_padok_id;
     RETURN jsonb_build_object('ok', true, 'durum', 'silindi');
   ELSE
-    INSERT INTO public.grup_padok_eslem (grup_adi, padok_id)
+    INSERT INTO public.grup_padok_eslem (grup, padok_id)
     VALUES (p_grup_adi, p_padok_id);
     RETURN jsonb_build_object('ok', true, 'durum', 'eklendi');
   END IF;
