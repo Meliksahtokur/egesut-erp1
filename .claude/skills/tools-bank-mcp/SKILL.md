@@ -20,12 +20,12 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 | Blackboard task | `task_*` (create, get, list, claim, complete, review) | SQLite |
 | tools-bank file DB | `file_*` (write, read, list, flush, commit) | SQLite |
 
-### Memory (SQLite FTS5 + MiniMax embedding)
+### Memory (SQLite FTS5 + Jina AI embedding)
 | İhtiyaç | Araç | Not |
 |---------|------|-----|
 | Not ekle (karar/hata/bilgi kaydet) | `memory_add(content, category?, priority?, tags?)` | SQLite, anında |
 | FTS5 arama | `memory_search(query, category?, limit?)` | unicode61 tokenizer |
-| Semantik arama | `semantic_search(query, limit?)` | Jina AI (jina-embeddings-v3, 1024-dim) |
+| Semantik arama | `semantic_search(query, limit?)` | Jina AI (jina-embeddings-v5-text-small, 1024-dim) |
 | DB istatistik | `memory_stats()` | Note/embedding sayısı + kategori dağılımı |
 
 ### GitNexus (knowledge graph — tools-bank MCP içinde 8 CLI wrapper)
@@ -73,7 +73,7 @@ cd /root/egesut-erp1 && npx gitnexus analyze
 - `query`: arama sorgusu
 - `category` (opsiyonel): critical_rules, rpc_reference, domain_rules, tech_stack
 - `limit`: varsayılan 5
-- Kaynak: `memory_notes` (21 kayıt)
+- Kaynak: `memory_notes` (local SQLite, not sayısı `memory_stats()` ile görülür)
 
 ### memory_add
 - `content`: not içeriği (zorunlu)
@@ -89,7 +89,7 @@ cd /root/egesut-erp1 && npx gitnexus analyze
 ### semantic_search
 - `query`: doğal dil sorgusu
 - `limit`: max sonuç (default 5)
-- **NOT:** Jina AI (jina-embeddings-v3), 1024-dim, ~200ms/call
+- **NOT:** Jina AI (jina-embeddings-v5-text-small), 1024-dim, ~200ms/call
 
 ### memory_stats
 - Parametre yok — note/embedding sayısı + kategori dağılımı
@@ -214,7 +214,8 @@ supabase_migrate({sql: "CREATE TABLE ..."})
 3. `entity_graph` tablosuna anon key SELECT için RLS policy gerekli
 4. `knowledge_graph_query` Supabase'deki `entity_graph` tablosunu sorgular
 5. **Memory sistemi local SQLite kullanır** — `memory_search`, `memory_add`, `memory_stats` local DB'ye gider. Supabase fallback var ama boş.
-6. `semantic_search` Jina AI (jina-embeddings-v3) kullanır — 1024-dim, ~200ms/call. API key: `jina_a9b0ff962ff94ee98f9d7f8d4f7feee9_-qMCCMAbTSnJHf6m7vOaCGbloC0`.
+6. `semantic_search` / `memory_add` Jina AI (jina-embeddings-v5-text-small) kullanır — 1024-dim, ~200ms/call. API key: `jina_a9b0ff962ff94ee98f9d7f8d4f7feee9_-qMCCMAbTSnJHf6m7vOaCGbloC0` (kod içinde default, env `JINA_API_KEY` ile override edilebilir).
 7. **GitNexus araçları CLI wrapper'dır** — MCP'den çağrılınca `npx gitnexus <komut>` çalıştırır. Index zaten varsa ~1-3sn döner.
 8. Index yoksa `"Run 'npx gitnexus analyze' first"` uyarısı döner — terminalde bir kere `npx gitnexus analyze` çalıştır yeter.
 9. `gitnexus_impact` dönen sonuçlar approximate'dir — mutlaka verify et.
+10. **`memory_add` / `vec_notes` / `vec_goose` INSERT yaparken MUTLAKA `_get_db()` kullan.** `sqlite3.connect(MEMORY_DB)` ile açılan bağlantıda `vec0` extension yüklü olmaz → `no such module: vec0` hatası → `embedded: false`. Düzeltme için bkz `memory_search({query: "_get_db fix"})`.
