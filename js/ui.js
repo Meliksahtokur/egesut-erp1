@@ -144,7 +144,7 @@ async function ileriGebeKontrol(){
     }
   } catch(e){ toast('❌ '+e.message,true); }
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye){
   let h='';
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
   if(late.length){
@@ -193,8 +193,8 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,stkNet,m
       }).join(''));
   }
   if(critStk>0){
-    const cl2=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0));
-    h+=band('amber','⚠️ Kritik Stok',cl2.map(s=>`<div class="arow"><div class="arow-left"><div class="arow-id">${esc(s.urun_adi)}</div><div class="arow-sub">${(stkNet[s.id]||0).toFixed(0)} ${s.birim||''} kaldı — eşik: ${s.esik}</div></div></div>`).join(''));
+    const cl2=stock.filter(s=>s.stok_durum==='kritik');
+    h+=band('amber','⚠️ Kritik Stok',cl2.map(s=>`<div class="arow"><div class="arow-left"><div class="arow-id">${esc(s.urun_adi)}</div><div class="arow-sub">${(s.guncel_stok||0).toFixed(0)} ${s.birim||''} kaldı — eşik: ${s.esik}</div></div></div>`).join(''));
   }
   return h;
 }
@@ -202,12 +202,11 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=new Date().toISOString().split('T')[0];
-    const [animals,diseases,tasks,stock,moves,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
+    const [animals,diseases,tasks,stock,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi),
       idbGetAll('stok'),
-      getData('stok_hareket',m=>!m.iptal),
       getData('dogum',b=>b.tarih>=dAgo(63)&&b.tarih<=dAgo(58)),
       getData('dogum',b=>b.tarih>=dAgo(150)&&b.tarih<dAgo(89)),
       getData('tohumlama',t=>t.sonuc==='Gebe'),
@@ -216,10 +215,8 @@ async function loadDash(){
       getData('kizginlik_log'),
       getData('tohumlama'),
     ]);
-    const stkNet={};
-    stock.forEach(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); stkNet[s.id]=(+s.baslangic_miktar||0)-used; });
-    const critStk=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0)).length;
-    const negStk=stock.filter(s=>stkNet[s.id]<0).length;
+    const critStk=stock.filter(s=>s.stok_durum==='kritik').length;
+    const negStk=stock.filter(s=>s.stok_durum==='tukendi').length;
     // parent_id olan ama parent'ı tamamlanmış görevler de top-level sayılır
     const _activePids=new Set(tasks.map(t=>t.id));
     const _isTop=t=>!t.parent_id||!_activePids.has(t.parent_id);
@@ -261,7 +258,7 @@ async function loadDash(){
       const resLak=await rpc('laktasyon_kuru_kontrol');
       if(resLak&&resLak.ok&&resLak.olusturulan>0) toast('⚠️ '+resLak.olusturulan+' inek kuru döneme geçirilmeli');
     } catch(e){ /* sessiz */ }
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,stkNet,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
@@ -1533,8 +1530,8 @@ function _durumTxt(d){ if(d==='neg')return'🆘 Negatif'; if(d==='crit')return'�
 // ──────────────────────────────────────────
 async function loadStock(){
   try {
-    const [stk,moves,vacs]=await Promise.all([idbGetAll('stok'),getData('stok_hareket',m=>!m.iptal),idbGetAll('vaccines')]);
-    const stockData=stk.map(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); const guncel=(+s.baslangic_miktar||0)-used; const isVaccine=(s.id||'').startsWith('STOK-AŞI-')||(vacs||[]).some(v=>v.stock_item_id===s.id); return{...s,guncel,durum:guncel<0?'neg':guncel<=(+s.esik||0)?'crit':'ok',isVaccine}; });
+    const [stk,vacs]=await Promise.all([idbGetAll('stok'),idbGetAll('vaccines')]);
+    const stockData=stk.map(s=>{ const guncel=+(s.guncel_stok??s.baslangic_miktar??0); const durum=s.stok_durum==='tukendi'?'neg':s.stok_durum==='kritik'?'crit':'ok'; const isVaccine=(s.id||'').startsWith('STOK-AŞI-')||(vacs||[]).some(v=>v.stock_item_id===s.id); return{...s,guncel,durum,isVaccine}; });
     setState('stock', stockData);
   } catch(e){ console.error(e); }
 }
@@ -1987,12 +1984,11 @@ async function loadRaporlar(){
   const el=document.getElementById('raporlar-body'); if(!el) return;
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
-    const [animals,tohs,diseases,births,moves,stock]=await Promise.all([
+    const [animals,tohs,diseases,births,stock]=await Promise.all([
       idbGetAll('hayvanlar'),
       idbGetAll('tohumlama'),
       idbGetAll('cases'),
       idbGetAll('dogum'),
-      getData('stok_hareket',m=>!m.iptal),
       idbGetAll('stok'),
     ]);
     const aktif=animals.filter(a=>a.durum==='Aktif');
@@ -2014,11 +2010,9 @@ async function loadRaporlar(){
     diseases.forEach(d=>{ const k=d.kategori||'Diğer'; katMap[k]=(katMap[k]||0)+1; });
     const katSorted=Object.entries(katMap).sort((a,b)=>b[1]-a[1]);
 
-    // Stok durumu
-    const stkNet={};
-    stock.forEach(s=>{ const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); stkNet[s.id]=(+s.baslangic_miktar||0)-used; });
-    const kritikStok=stock.filter(s=>stkNet[s.id]>=0&&stkNet[s.id]<=(+s.esik||0));
-    const negStk=stock.filter(s=>stkNet[s.id]<0);
+    // Stok durumu (stok_tuketim_view'dan hazır gelir)
+    const kritikStok=stock.filter(s=>s.stok_durum==='kritik');
+    const negStk=stock.filter(s=>s.stok_durum==='tukendi');
 
     const statKart=(label,val,sub='',clr='var(--green)')=>`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;flex:1;min-width:130px">
       <div style="font-size:1.6rem;font-weight:800;color:${clr}">${val}</div>
@@ -2346,21 +2340,14 @@ async function loadDrugsCache() {
     if (navigator.onLine) {
       try { await pullTables(['drug_classes','drug_products','stok','stok_hareket']); } catch(e) { console.warn('pull drugs:', e.message); }
     }
-    const [stok, moves] = await Promise.all([
-      idbGetAll('stok'),
-      getData('stok_hareket', m => !m.iptal),
-    ]);
+    const stok = await idbGetAll('stok');
     const drugClasses  = await idbGetAll('drug_classes');
     const drugProducts = await idbGetAll('drug_products');
-    // Her drug_product için stok miktarını hesapla
+    // Her drug_product için stok miktarını (view'dan hazır)
     _drugsCache = drugProducts.map(dp => {
       const dc   = drugClasses.find(c => c.id === dp.drug_class_id) || {};
       const s    = stok.find(x => x.drug_product_id === dp.id);
-      let guncel = null;
-      if (s) {
-        const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
-        guncel = (+s.baslangic_miktar || 0) - used;
-      }
+      const guncel = s?.guncel_stok ?? null;
       return {
         id:               dp.id,
         name:             dp.brand_name,
@@ -2383,8 +2370,7 @@ async function loadDrugsCache() {
         ['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diger Ilac','Ilac'].includes(s.kategori)
       );
       unlinkedStok.forEach(s => {
-        const used = moves.filter(m => m.stok_id === s.id).reduce((a, m) => a + (+m.miktar || 0), 0);
-        const guncel = (+s.baslangic_miktar || 0) - used;
+        const guncel = +(s.guncel_stok ?? s.baslangic_miktar ?? 0);
         _drugsCache.push({
           id: s.id, name: s.urun_adi, active_ingredient: '',
           group_name: s.kategori || '', class_name: '',
@@ -3081,11 +3067,7 @@ async function updateSpermaHint(val){
 }
 async function getSpermaStok(){
   const all=await idbGetAll('stok');
-  const mvs=await getData('stok_hareket',m=>!m.iptal);
-  return all.filter(s=>s.kategori==='Sperma').map(s=>{
-    const used=mvs.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0);
-    return {...s,guncel:(+s.baslangic_miktar||0)-used};
-  });
+  return all.filter(s=>s.kategori==='Sperma').map(s=>({...s,guncel:+s.guncel_stok||0}));
 }
 async function dusSpermaStok(spermaAdi){
   const st=await getSpermaStok();
@@ -3152,10 +3134,9 @@ function spermaModElle(){
 // ──────────────────────────────────────────
 async function refreshIlacCache(){
   const stk=await idbGetAll('stok');
-  const mvs=await getData('stok_hareket',m=>!m.iptal);
   _ilacCache=stk
     .filter(s=>s.kategori&&['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','İlaç'].includes(s.kategori))
-    .map(s=>{ const used=mvs.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0); return {...s,guncel:(+s.baslangic_miktar||0)-used}; });
+    .map(s=>({...s,guncel:+s.guncel_stok||0}));
 }
 async function acIlac(){
   const q=(document.getElementById('d-stok-ac')?.value||'').toLowerCase().trim();

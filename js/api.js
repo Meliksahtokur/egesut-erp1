@@ -304,7 +304,7 @@ async function pullTables(tables = []) {
     const FETCHERS = {
       hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
       gorev_log:    () => db.from('gorev_log').select('*'),
-      stok:         () => db.from('stok').select('*'),
+      stok:         () => db.from('stok_tuketim_view').select('*'),
       stok_hareket: () => db.from('stok_hareket').select('*').eq('iptal', false),
       cases:        () => db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
       diseases:     () => db.from('diseases').select('*').order('category').order('name'),
@@ -323,6 +323,7 @@ async function pullTables(tables = []) {
       padoklar:         () => db.from('padoklar').select('*').eq('aktif', true).order('sira'),
       grup_padok_eslem: () => db.from('grup_padok_eslem').select('*'),
       hekimler:         () => db.from('hekimler').select('*').eq('aktif', true),
+      gebelik_ozet:     () => db.from('gebelik_ozet_view').select('*'),
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
