@@ -681,17 +681,18 @@ async function submitTaskEdit(btn) {
     toast('Hiçbir değişiklik yapılmadı'); return;
   }
   // Diff mesajı oluştur
-  const diffSatirlari=[];
   const tipEtiket={MANUEL:'📋 Genel',TEDAVI:'🚑 Tedavi',ILAC_UYGULAMA:'💊 İlaç',PADOK_DEGISIM:'🐄 Padok',MUAYENE:'🩺 Muayene',ILERI_GEBE_ASI:'💉 Aşı',ILERI_GEBE:'💊 Takviye',SUTTEN_KESME:'🍼 Sütten',DIGER:'📂 Diğer'};
-  if('aciklama' in degisen) diffSatirlari.push(`📝 Açıklama: "${t.aciklama}" → "${desc}"`);
-  if('hedef_tarih' in degisen) diffSatirlari.push(`📅 Tarih: ${fmtTarih(t.hedef_tarih)} → ${fmtTarih(tarih)}`);
-  if('gorev_tipi' in degisen) diffSatirlari.push(`🏷 Tür: ${tipEtiket[t.gorev_tipi]||t.gorev_tipi} → ${tipEtiket[tip]||tip}`);
-  const onay=confirm('Aşağıdaki değişiklikler kaydedilecek:\n\n'+diffSatirlari.join('\n')+'\n\nOnaylıyor musunuz?');
-  if(!onay) return;
+  const diffSatirlari=[];
+  if('aciklama' in degisen) diffSatirlari.push('📝 Açıklama: "'+(t.aciklama||'')+'" → "'+desc+'"');
+  if('hedef_tarih' in degisen) diffSatirlari.push('📅 Tarih: '+(t.hedef_tarih||'')+' → '+tarih);
+  if('gorev_tipi' in degisen) diffSatirlari.push('🏷 Tür: '+(tipEtiket[t.gorev_tipi]||t.gorev_tipi)+' → '+(tipEtiket[tip]||tip));
+  openConfirm('✏️ Görevi Düzenle', diffSatirlari.join('\n'), async() => kaydetTaskEdit(btn, t, degisen, desc, tarih, tip));
+}
+
+async function kaydetTaskEdit(btn, t, degisen) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     await write('gorev_log',degisen,'PATCH',`id=eq.${t.id}`);
-    // islem_log kaydı
     try {
       await db.from('islem_log').insert({
         ana_hayvan_id: t.hayvan_id||null,
@@ -700,12 +701,11 @@ async function submitTaskEdit(btn) {
         tarih: new Date().toISOString(),
         kullanici: null, kaynak: 'MANUEL'
       });
-    } catch(_){ /* islem_log optional */ }
+    } catch(_){}
     toast('✅ Görev güncellendi');
     closeM('m-task-edit');
     await loadTasks(_curTaskFilter||'today');
     loadDash();
-    // Task detay modal'ını yeniden içerikle aç
     _curTaskDet={...t,...degisen};
     openTaskDet(t.id);
   } catch(e){ toast(getUserMessage(e), true); }
