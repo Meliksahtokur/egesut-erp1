@@ -998,31 +998,6 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
-<!-- GÖREV DÜZENLEME MODALI -->
-<div id="m-task-edit" class="mo" data-action="mclose-overlay">
-  <div class="modal"><div class="m-handle"></div><div class="m-title">✏️ Görevi Düzenle</div>
-    <div class="m-body">
-      <div class="fg"><label class="flbl">Görev Açıklaması *</label><textarea id="te-desc" class="fta" placeholder="Yapılacak iş…"></textarea></div>
-      <div class="fg"><label class="flbl">Hedef Tarih *</label><input id="te-tarih" class="fi" type="date"></div>
-      <div class="fg"><label class="flbl">Görev Türü</label>
-        <select id="te-tip" class="fsel">
-          <option value="MANUEL">📋 Genel Görev</option>
-          <option value="TEDAVI">🚑 Tedavi</option>
-          <option value="ILAC_UYGULAMA">💊 İlaç Uygulama</option>
-          <option value="PADOK_DEGISIM">🐄 Padok Geçişi</option>
-          <option value="MUAYENE">🩺 Muayene</option>
-          <option value="ILERI_GEBE_ASI">💉 Aşı</option>
-          <option value="ILERI_GEBE">💊 Takviye</option>
-          <option value="SUTTEN_KESME">🍼 Sütten Kesme</option>
-          <option value="DIGER">📂 Diğer</option>
-        </select>
-      </div>
-      <button class="btn btn-g" data-action="submit-task-edit">💾 Kaydet</button>
-      <button class="btn btn-o" data-action="close-task-edit">İptal</button>
-    </div>
-  </div>
-</div>
-
 <!-- YENİ STOK ÜRÜNÜ EKLE -->
 <div id="m-stok-add" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title" id="sa-modal-title">💊 Yeni İlaç Ekle</div>
@@ -1221,6 +1196,31 @@ button,input,select,textarea{font-family:inherit}
       <button class="btn" style="background:#e3f2fd;color:#1565c0;margin-top:6px;border:1px solid #90caf9;font-weight:700" data-action="detay-duzenle">✏️ Görevi Düzenle</button>
       <button class="btn" style="background:#fff3e0;color:#b84c00;margin-top:6px;border:1px solid #f0b060;font-weight:700" data-action="detay-iptal">🗑 Görevi İptal Et</button>
       <button class="btn btn-o" data-action="close-task-det" style="margin-top:6px">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- GÖREV DÜZENLEME MODALI (m-task-det üzerinde açılır) -->
+<div id="m-task-edit" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">✏️ Görevi Düzenle</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Görev Açıklaması *</label><textarea id="te-desc" class="fta" placeholder="Yapılacak iş…"></textarea></div>
+      <div class="fg"><label class="flbl">Hedef Tarih *</label><input id="te-tarih" class="fi" type="date"></div>
+      <div class="fg"><label class="flbl">Görev Türü</label>
+        <select id="te-tip" class="fsel">
+          <option value="MANUEL">📋 Genel Görev</option>
+          <option value="TEDAVI">🚑 Tedavi</option>
+          <option value="ILAC_UYGULAMA">💊 İlaç Uygulama</option>
+          <option value="PADOK_DEGISIM">🐄 Padok Geçişi</option>
+          <option value="MUAYENE">🩺 Muayene</option>
+          <option value="ILERI_GEBE_ASI">💉 Aşı</option>
+          <option value="ILERI_GEBE">💊 Takviye</option>
+          <option value="SUTTEN_KESME">🍼 Sütten Kesme</option>
+          <option value="DIGER">📂 Diğer</option>
+        </select>
+      </div>
+      <button class="btn btn-g" data-action="submit-task-edit">💾 Kaydet</button>
+      <button class="btn btn-o" data-action="close-task-edit">İptal</button>
     </div>
   </div>
 </div>
