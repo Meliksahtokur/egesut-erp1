@@ -671,17 +671,25 @@ async function submitTaskEdit(btn) {
   const desc  = v('te-desc');
   const tarih = v('te-tarih');
   if (!desc || !tarih) { toast('Açıklama ve Tarih zorunlu', true); return; }
+  const t=_curTaskDet;
+  const tip=v('te-tip');
+  const degisen={};
+  if(t.aciklama!==desc) degisen.aciklama=desc;
+  if(t.hedef_tarih!==tarih) degisen.hedef_tarih=tarih;
+  if(t.gorev_tipi!==tip) degisen.gorev_tipi=tip;
+  if(Object.keys(degisen).length===0){
+    toast('Hiçbir değişiklik yapılmadı'); return;
+  }
+  // Diff mesajı oluştur
+  const diffSatirlari=[];
+  const tipEtiket={MANUEL:'📋 Genel',TEDAVI:'🚑 Tedavi',ILAC_UYGULAMA:'💊 İlaç',PADOK_DEGISIM:'🐄 Padok',MUAYENE:'🩺 Muayene',ILERI_GEBE_ASI:'💉 Aşı',ILERI_GEBE:'💊 Takviye',SUTTEN_KESME:'🍼 Sütten',DIGER:'📂 Diğer'};
+  if('aciklama' in degisen) diffSatirlari.push(`📝 Açıklama: "${t.aciklama}" → "${desc}"`);
+  if('hedef_tarih' in degisen) diffSatirlari.push(`📅 Tarih: ${fmtTarih(t.hedef_tarih)} → ${fmtTarih(tarih)}`);
+  if('gorev_tipi' in degisen) diffSatirlari.push(`🏷 Tür: ${tipEtiket[t.gorev_tipi]||t.gorev_tipi} → ${tipEtiket[tip]||tip}`);
+  const onay=confirm('Aşağıdaki değişiklikler kaydedilecek:\n\n'+diffSatirlari.join('\n')+'\n\nOnaylıyor musunuz?');
+  if(!onay) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    const t=_curTaskDet;
-    const tip=v('te-tip');
-    const degisen={};
-    if(t.aciklama!==desc) degisen.aciklama=desc;
-    if(t.hedef_tarih!==tarih) degisen.hedef_tarih=tarih;
-    if(t.gorev_tipi!==tip) degisen.gorev_tipi=tip;
-    if(Object.keys(degisen).length===0){
-      toast('Hiçbir değişiklik yapılmadı'); if(btn){btn.disabled=false;btn.textContent='💾 Kaydet';} return;
-    }
     await write('gorev_log',degisen,'PATCH',`id=eq.${t.id}`);
     // islem_log kaydı
     try {
