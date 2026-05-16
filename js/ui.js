@@ -541,17 +541,24 @@ function renderAnimals(list){
   if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
   const gebeSet=new Set(getState('gebeIds')||[]);
   const tohMap=globalThis._tohMap||{};
-  // Gebe → gebelik günü; Boş (tohumlanmış) → toh_gun DESC; diğer → küpe no
+  // Gebe → gebelik günü; Boş (toh. ≤285g veya Bekliyor) → toh_gun DESC; diğer → küpe no
   const bosTohMap=globalThis._bosTohMap||{};
+  const bekliyorSet=globalThis._bekliyorSet||new Set();
+  function _isRecentBos(id){
+    const t=bosTohMap[id];
+    if(!t) return false;
+    if(bekliyorSet.has(id)) return true;
+    const gun=Math.floor((Date.now()-new Date(t).getTime())/86400000);
+    return gun<=285;
+  }
   const sorted=[...list].sort((a,b)=>{
     const aT=gebeSet.has(a.id)||gebeSet.has(a.kupe_no)?tohMap[a.id]:null;
     const bT=gebeSet.has(b.id)||gebeSet.has(b.kupe_no)?tohMap[b.id]:null;
-    if(aT&&bT) return aT.localeCompare(bT); // eskiden yeniye → daha erken tarih = daha fazla gün = önce
+    if(aT&&bT) return aT.localeCompare(bT);
     if(aT) return -1;
     if(bT) return 1;
-    // Non-gebe: son tohumlama tarihine göre (en eski önce = en çok gün önce)
-    const aBos=bosTohMap[a.id]||null;
-    const bBos=bosTohMap[b.id]||null;
+    const aBos=_isRecentBos(a.id)?bosTohMap[a.id]:null;
+    const bBos=_isRecentBos(b.id)?bosTohMap[b.id]:null;
     if(aBos&&bBos) return aBos.localeCompare(bBos);
     if(aBos) return -1;
     if(bBos) return 1;
