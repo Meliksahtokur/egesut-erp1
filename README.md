@@ -34,8 +34,8 @@
 
 ## Mimari Prensipler
 
-- **İş mantığı DB'de** — frontend sadece render ve input toplar, hesap yapmaz
-- **Sadece RPC ile yaz** — direkt REST INSERT/UPDATE/DELETE yasak; tüm yazma işlemleri Supabase RPC üzerinden geçer
+- **İş mantığı DB'de** — frontend sadece render ve input toplar, **hesap yapmaz, state machine işletmez, validasyon yapmaz**. Frontend ERP'de güvenilmezdir (DevTools override, çoklu cihaz versiyon farkı, offline güncellik sorunu). Tüm iş mantığı PostgreSQL'de (RPC + trigger + view).
+- **Sadece RPC ile yaz** — direkt REST INSERT/UPDATE/DELETE yasak; tüm yazma işlemleri Supabase RPC üzerinden geçer. `write()` fonksiyonu geçici offline queue çözümüdür, yeni kodda RPC tercih edilir.
 - **Controlled entities** — hastalık, ilaç, hayvan asla free-text; FK + dropdown zorunlu
 - **Stok ledger immutable** — `stok_hareket` asla silinmez; düzeltme yeni kayıt olarak girilir
 - **Offline-first** — tüm okumalar IndexedDB'den, yazma Supabase'e kuyruğa alınır
