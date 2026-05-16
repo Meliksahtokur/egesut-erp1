@@ -3503,7 +3503,7 @@ async function dataTrafficTekGonder(qid){
     hayvanlar: { POST: 'hayvan_ekle', PATCH: 'hayvan_guncelle' },
     tohumlama: { POST: 'tohumlama_kaydet' },
     dogum: { POST: 'dogum_kaydet' },
-    gorev_log: { PATCH: 'gorev_guncelle' },
+    gorev_log: { PATCH: 'gorev_tamamla' },
     stok_hareket: { POST: 'stok_hareket_ekle' },
     kizginlik_log: { POST: 'kizginlik_kaydet' },
     cases: { POST: 'create_case' },
@@ -3613,12 +3613,10 @@ function buildRpcParams(rpcName, data, op) {
         p_unit: data.unit,
         p_route: data.route
       };
+    case 'gorev_tamamla':
+      return { p_gorev_id: data.id, p_padok_hedef: data.padok || null };
     case 'gorev_guncelle':
-      return {
-        p_id: data.id,
-        p_alan: Object.keys(data)[0],
-        p_deger: Object.values(data)[0]
-      };
+      return { p_gorev_id: data.id, p_padok_hedef: data.padok || null };
     default:
       // Fallback — doğrudan veriyi geç
       return data;
