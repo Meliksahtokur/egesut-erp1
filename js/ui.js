@@ -1775,7 +1775,7 @@ async function stokDetKaydet(){
     esik:parseFloat(v('sd-esik'))||0
   };
   if(!updates.urun_adi){ toast('Ürün adı boş olamaz',true); return; }
-  const{error}=await db.from('stok').update(updates).eq('id',_curStokDet.id);
+  const{error}=await rpc('stok_guncelle',{p_stok_id:_curStokDet.id,...updates});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['stok']);
   closeM('m-stok-det');
@@ -1791,7 +1791,7 @@ async function stokDetArsivle(){
     ?`Bu üründe ${count} hareket kaydı var. Arşivlenecek (silinmeyecek). Devam?`
     :'Bu ürünü arşivlemek istediğinizden emin misiniz?';
   openConfirm('Ürün Arşivle',msg,async()=>{
-    const{error}=await db.from('stok').update({kategori:'Arsiv'}).eq('id',_curStokDet.id);
+    const{error}=await rpc('stok_arsivle',{p_stok_id:_curStokDet.id});
     if(error){ toast('Hata: '+error.message,true); return; }
     await pullTables(['stok']);
     closeM('m-stok-det');
@@ -3645,7 +3645,7 @@ async function renderAyarlarVaccineList(){
 
 async function vaccineRapelGuncelle(vaccineId,val){
   const days=val===''?null:parseInt(val);
-  const{error}=await db.from('vaccines').update({repeat_interval_days:days}).eq('id',vaccineId);
+  const{error}=await rpc('vaccine_rapel_guncelle',{p_vaccine_id:vaccineId,p_repeat_days:days});
   if(error){toast('Hata: '+error.message,true);return;}
   await pullTables(['vaccines']);
   toast('Rapel süresi güncellendi');
@@ -3661,8 +3661,8 @@ function renderAyarlarSpermaList(){
 function ayarlarHekimEkle(){ document.getElementById('ay-hekim-form').style.display='block'; }
 async function ayarlarHekimKaydet(){
   const ad=v('ay-hek-ad').trim(); if(!ad) return;
-  const id='H'+Date.now();
-  const{error}=await db.from('hekimler').insert({id,ad,aktif:true});
+  const tel=v('ay-hek-tel')||null, kurum=v('ay-hek-kurum')||null;
+  const{error}=await rpc('hekim_ekle',{p_ad:ad,p_telefon:tel,p_kurum:kurum});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['hekimler']);
   await loadHekimlerFromDB();
@@ -3776,7 +3776,8 @@ async function hekimDetKaydet() {
   if (!_curHekimDet) return;
   const ad = v('hk-ad').trim();
   if (!ad) { toast('Hekim adı boş olamaz', true); return; }
-  const { error } = await db.from('hekimler').update({ ad }).eq('id', _curHekimDet.id);
+  const tel=v('hk-tel')||null, kurum=v('hk-kurum')||null;
+  const { error } = await rpc('hekim_guncelle',{p_hekim_id:_curHekimDet.id,p_ad:ad,p_telefon:tel,p_kurum:kurum});
   if (error) { toast('Hata: ' + error.message, true); return; }
   await pullTables(['hekimler']);
   await loadHekimlerFromDB();
@@ -3805,11 +3806,8 @@ async function hekimDetSil() {
 function ayarlarSpermaEkle(){ document.getElementById('ay-sperma-form').style.display='block'; }
 async function ayarlarSpermaKaydet(){
   const kod=v('ay-sp-kod').trim(); if(!kod) return;
-  // Stok tablosuna Sperma kategorisinde ekle
-  const{error}=await db.from('stok').insert({
-    id:'SP'+Date.now(), urun_adi:kod, kategori:'Sperma',
-    birim:'doz', baslangic_miktar:0, esik:0
-  });
+  // Stok tablosuna Sperma kategorisinde ekle (RPC)
+  const{error}=await rpc('stok_ekle',{p_urun_adi:kod,p_kategori:'Sperma',p_birim:'doz',p_baslangic_miktar:0,p_esik:0});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['stok']);
   cl('ay-sp-kod');
@@ -3867,8 +3865,8 @@ async function padokDuzenleKaydet(){
   if(!_curPadokDet) return;
   const ad=document.getElementById('pd-ad').value.trim();
   if(!ad){ toast('Padok adı boş olamaz',true); return; }
-  const kap=parseInt(document.getElementById('pd-kap').value)||null;
-  const{error}=await db.from('padoklar').update({ad,kapasite:kap}).eq('id',_curPadokDet.id);
+  const kap=parseInt(document.getElementById('pd-kap').value)||null, tip=v('pd-tip')||null;
+  const{error}=await rpc('padok_guncelle',{p_padok_id:_curPadokDet.id,p_ad:ad,p_tip:tip,p_sira:null});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['padoklar']);
   await loadPadokConfig();
@@ -3885,8 +3883,7 @@ async function padokSilOnay(){
   const count=hayvanlar.filter(h=>h.padok_id===id&&h.durum==='Aktif').length;
   if(count>0){ toast(`Bu padokta ${count} aktif hayvan var — önce hayvanları başka padoğa taşıyın`,true); return; }
   openConfirm('Padok Sil',`"${_curPadokDet.ad}" silinecek. Emin misiniz?`,async()=>{
-    await db.from('grup_padok_eslem').delete().eq('padok_id',id);
-    const{error}=await db.from('padoklar').delete().eq('id',id);
+    const{error}=await rpc('padok_sil',{p_padok_id:id});
     if(error){ toast('Hata: '+error.message,true); return; }
     await pullTables(['padoklar','grup_padok_eslem']);
     await loadPadokConfig();
@@ -4054,11 +4051,7 @@ async function renderGrupPadokEslem(){
 
 async function grupPadokCheckbox(grup, checkbox){
   const padokId=checkbox.value;
-  if(checkbox.checked){
-    await db.from('grup_padok_eslem').insert({grup,padok_id:padokId}).select();
-  } else {
-    await db.from('grup_padok_eslem').delete().eq('grup',grup).eq('padok_id',padokId);
-  }
+  await rpc('grup_padok_eslem_toggle',{p_grup_adi:grup,p_padok_id:padokId});
   await pullTables(['grup_padok_eslem']);
   await loadPadokConfig();
   toast('Eşleme güncellendi');
@@ -4068,8 +4061,8 @@ function ayarlarPadokEkle(){ document.getElementById('ay-padok-form').style.disp
 
 async function ayarlarPadokKaydet(){
   const ad=v('ay-padok-ad').trim(); if(!ad){ toast('Padok adı boş olamaz',true); return; }
-  const kap=parseInt(v('ay-padok-kap'))||null;
-  const{error}=await db.from('padoklar').insert({ad,kapasite:kap,aktif:true});
+  const kap=parseInt(v('ay-padok-kap'))||null, tip=v('ay-padok-tip')||null;
+  const{error}=await rpc('padok_ekle',{p_ad:ad,p_tip:tip,p_sira:kap||0});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['padoklar']);
   await loadPadokConfig();
