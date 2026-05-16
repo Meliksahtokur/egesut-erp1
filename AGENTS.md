@@ -63,6 +63,31 @@ Kodu anlamak için önce `semantic_search` kullan — dosya okumayı minimize et
 - Raw SQL string birleştirme — YASAK (SQL injection)
 - `npx playwright test` local çalıştırma — YASAK (PRoot'ta CPU krizi yapar, CI'da otomatik çalışır)
 
+## Tools-Bank MCP (Memory + GitNexus)
+
+`/root/egesut-erp1/tools-bank/tools-bank-mcp-server.py` üzerinden **13 tool** sunulur:
+
+### Memory (SQLite FTS5 + local ONNX embedding)
+- `memory_add(content, category?, priority?, tags?)` — not ekle (karar/hata/bilgi kaydet)
+- `memory_search(query, category?, limit?)` — FTS5 full-text arama
+- `semantic_search(query, limit?)` — Jina AI embeddings (1024-dim, ~200ms)
+- `memory_stats()` — DB istatistik (note/embedding sayısı)
+
+Her oturum **sonunda kritik kararları/hataları** `memory_add` ile kaydet.
+Yeni oturum **başında** `memory_search` ile ilgili geçmiş notları getir.
+Embedding yenileme: `python3 tools-bank/memory/embedding_service.py --rebuild`
+
+### GitNexus (knowledge graph)
+- `gitnexus_list_repos()` — indekslenmiş repolar
+- `gitnexus_query(query, repo?, limit?)` — execution flow keşfi
+- `gitnexus_context(symbol, repo?)` — 360° sembol görünümü
+- `gitnexus_impact(target, direction?, depth?)` — blast radius
+- `gitnexus_cypher(query)` — Cypher sorgusu
+- `gitnexus_detect_changes(scope?, base_ref?)` — değişiklik etkisi
+- `gitnexus_group_list(name?)` / `gitnexus_group_sync(name)` — grup yönetimi
+
+Detaylı kullanım: `.claude/skills/tools-bank-mcp/SKILL.md`
+
 ## Key Dosyalar
 
 | Dosya | İçerik |
@@ -75,4 +100,7 @@ Kodu anlamak için önce `semantic_search` kullan — dosya okumayı minimize et
 | `js/config.js` | Sabit listeler (HEKIMLER, GRUP_PADOK vb.) |
 | `index.html` | Tek sayfa HTML |
 | `supabase/migrations/` | DB migration dosyaları |
+| `tools-bank/tools-bank-mcp-server.py` | MCP sunucusu (13 tool: memory + gitnexus) |
+| `tools-bank/memory/` | SQLite FTS5 DB + ONNX embedding model |
+| `.claude/skills/tools-bank-mcp/SKILL.md` | tools-bank MCP kullanım kılavuzu |
 | `ReFactorRoadmap.md` | Teknik borç planı — Aşama 1 kısmen tamam (1.3 helpers/modal, 1.4 autocomplete bekliyor) |
