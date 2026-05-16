@@ -3002,7 +3002,7 @@ async function openTohDet(id){
   if(mevcutUyari) mevcutUyari.remove();
   if(!isSonToh){
     // Geçmiş kayıt: action butonlarını gizle
-    if(sonucBtnRow) sonucBtnRow.style.display='none';
+    if(sonucRadios) sonucRadios.style.display='none';
     if(td2Info){ td2Info.textContent=''; td2Info.style.display='none'; }
     const td2BosFixed2=document.getElementById('td2-bos-fixed');
     if(td2BosFixed2) td2BosFixed2.style.display='none';
