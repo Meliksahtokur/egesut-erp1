@@ -1,9 +1,17 @@
--- Migration: Faz 1 — RPC Bypass Düzeltmeleri (v2)
+-- Migration: Faz 1 — RPC Bypass Düzeltmeleri (v3)
 -- A1-A6 + Phantom RPC'ler
 -- Tarih: 2026-05-16 (CRITICAL: +B1-B10)
 -- Review fix'leri: C1-C4, H2-H3, M1-M3
+-- Deploy fix: uuid/text cast, eski overload DROP
 
 BEGIN;
+
+-- Eski overload'lari temizle (Faz 3 ilk implementasyondan kalan)
+DROP FUNCTION IF EXISTS public.hekim_ekle(text, text, text);
+DROP FUNCTION IF EXISTS public.hekim_guncelle(uuid, text, text, text, boolean);
+DROP FUNCTION IF EXISTS public.padok_ekle(text, text, integer);
+DROP FUNCTION IF EXISTS public.padok_guncelle(uuid, text, text, integer, boolean);
+DROP FUNCTION IF EXISTS public.grup_padok_eslem_toggle(text, text, uuid);
 
 -- ── A1: BUZAĞI SÜTTEN KESME ONAYLA ─────────────
 CREATE OR REPLACE FUNCTION public.buzagi_sutten_kesme_onayla(p_hayvan_id text)
@@ -169,7 +177,7 @@ DECLARE
   v_olusturulan jsonb := '[]'::jsonb;
   v_guncellenen jsonb := '[]'::jsonb;
 BEGIN
-  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id;
+  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id::uuid;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Görev bulunamadı: %', p_gorev_id;
   END IF;
@@ -191,7 +199,7 @@ BEGIN
   UPDATE public.gorev_log SET
     tamamlandi = true,
     tamamlanma_tarihi = now()
-  WHERE id = p_gorev_id;
+  WHERE id = p_gorev_id::uuid;
 
   -- b) Stok düşümü (görevde stok_id + miktar varsa)
   IF v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL AND v_gorev.miktar > 0 THEN
@@ -261,9 +269,9 @@ CREATE OR REPLACE FUNCTION public.stok_hareket_ekle(
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_id text;
+  v_id uuid;
 BEGIN
-  v_id := gen_random_uuid()::text;
+  v_id := gen_random_uuid();
 
   INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
   VALUES (v_id, p_stok_id, p_tur, p_miktar, COALESCE(p_notlar, ''), false);
@@ -332,7 +340,7 @@ RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_stok record;
-  v_hareket_id text;
+  v_hareket_id uuid;
 BEGIN
   IF p_miktar <= 0 THEN
     RAISE EXCEPTION 'Miktar pozitif olmalıdır (%)', p_miktar;
@@ -343,7 +351,7 @@ BEGIN
     RAISE EXCEPTION 'Stok kaydı bulunamadı: %', p_stok_id;
   END IF;
 
-  v_hareket_id := gen_random_uuid()::text;
+  v_hareket_id := gen_random_uuid();
 
   -- C3: NEGATİF miktar = stok artışı (view: guncel = baslangic - SUM(hareket))
   INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
