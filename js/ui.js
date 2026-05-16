@@ -479,7 +479,11 @@ async function loadAnimals(){
     // Non-Gebe tohumlama haritası (boş badge'de gün hesabı için)
     const bosTohs=await getData('tohumlama',t=>t.sonuc!=='Gebe');
     globalThis._bosTohMap={};
-    bosTohs.forEach(t=>{ if(!globalThis._bosTohMap[t.hayvan_id]||t.tarih>globalThis._bosTohMap[t.hayvan_id]) globalThis._bosTohMap[t.hayvan_id]=t.tarih; });
+    globalThis._bekliyorSet=new Set();
+    bosTohs.forEach(t=>{
+      if(t.sonuc==='Bekliyor') globalThis._bekliyorSet.add(t.hayvan_id);
+      if(!globalThis._bosTohMap[t.hayvan_id]||t.tarih>globalThis._bosTohMap[t.hayvan_id]) globalThis._bosTohMap[t.hayvan_id]=t.tarih;
+    });
     const hastaLogs=await getData('cases',c=>c.status==='active');
     setState('hastaIds', new Set(hastaLogs.map(d=>d.animal_id)));
     const sorted=[...animals].sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
@@ -508,7 +512,9 @@ function _animalTagsHtml(a,gebeSet){
     const tohTarih=bosTohMap[a.id];
     if(tohTarih){
       const gun=Math.floor((Date.now()-new Date(tohTarih).getTime())/86400000);
-      if(gun>0) bosTohBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">💉 ${gun} gün önce tohumlandı</span>`;
+      // Sadece 285 günden yeni veya Bekliyor ise göster (eski kayıtlar artık anlamsız)
+      const bekliyor=(globalThis._bekliyorSet||new Set()).has(a.id);
+      if(gun>0&&(bekliyor||gun<=285)) bosTohBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">💉 ${gun} gün önce tohumlandı</span>`;
     }
   }
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
