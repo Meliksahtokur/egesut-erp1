@@ -1769,12 +1769,12 @@ async function openStokDet(stokId){
 async function stokDetKaydet(){
   if(!_curStokDet) return;
   const updates={
-    urun_adi:v('sd-ad').trim(),
-    kategori:v('sd-kat'),
-    birim:v('sd-birim'),
-    esik:parseFloat(v('sd-esik'))||0
+    p_urun_adi:v('sd-ad').trim(),
+    p_kategori:v('sd-kat'),
+    p_birim:v('sd-birim'),
+    p_esik:parseFloat(v('sd-esik'))||0
   };
-  if(!updates.urun_adi){ toast('Ürün adı boş olamaz',true); return; }
+  if(!updates.p_urun_adi){ toast('Ürün adı boş olamaz',true); return; }
   const{error}=await rpc('stok_guncelle',{p_stok_id:_curStokDet.id,...updates});
   if(error){ toast('Hata: '+error.message,true); return; }
   await pullTables(['stok']);

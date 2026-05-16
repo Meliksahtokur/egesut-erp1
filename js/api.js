@@ -280,6 +280,25 @@ const RPC_TABLES = {
   bulk_ilac:                  ['islem_log','stok','stok_hareket'],
   ileri_gebe_asi_tamamla:    ['vaccination_log','gorev_log','stok_hareket'],
   update_treatment_time:     [],
+  // Faz 1 — RPC bypass fix
+  buzagi_sutten_kesme_onayla:  ['hayvanlar'],
+  hayvan_tohumlanabilir_onayla:['hayvanlar'],
+  hayvan_tohumlama_ertele:     ['hayvanlar'],
+  gorev_tamamla:               ['gorev_log', 'stok_hareket', 'hayvanlar'],
+  stok_hareket_ekle:           ['stok_hareket'],
+  stok_ekle:                   ['stok'],
+  stok_ekleme:                 ['stok_hareket'],
+  gebelik_kaydet_manual:       ['tohumlama', 'islem_log'],
+  // Faz 3 — db.from() REST → RPC
+  stok_guncelle:               ['stok'],
+  stok_arsivle:                ['stok'],
+  vaccine_rapel_guncelle:      ['vaccines'],
+  hekim_ekle:                  ['hekimler'],
+  hekim_guncelle:              ['hekimler'],
+  padok_ekle:                  ['padoklar', 'grup_padok_eslem'],
+  padok_guncelle:              ['padoklar'],
+  padok_sil:                   ['padoklar', 'grup_padok_eslem'],
+  grup_padok_eslem_toggle:     ['grup_padok_eslem'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────
