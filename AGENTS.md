@@ -87,6 +87,7 @@ Embedding yenileme: `python3 tools-bank/memory/embedding_service.py --rebuild`
 - `gitnexus_group_list(name?)` / `gitnexus_group_sync(name)` — grup yönetimi
 
 Detaylı kullanım: `.claude/skills/tools-bank-mcp/SKILL.md`
+Memory güncelleme: `load_skill("memory-update")` — oturum sonu kayıt workflow'u
 
 ## Key Dosyalar
 
