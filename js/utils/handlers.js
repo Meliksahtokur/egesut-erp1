@@ -77,6 +77,7 @@ registerActions({
   'close-bulk-ilac': () => closeM('m-bulk-ilac'),
   'close-kizginlik': () => closeM('m-kizginlik'),
   'close-task-add':  () => closeM('m-task-add'),
+  'close-task-edit': () => closeM('m-task-edit'),
   'close-task-det':  () => closeM('m-task-det'),
   'close-done-det':  () => closeM('m-done-det'),
   'close-case-det':  () => closeM('m-case-det'),
@@ -184,6 +185,7 @@ registerActions({
   'rapel-tarihi-kaydet':() => rapelTarihiKaydet(),
   'detay-tamamla':      () => detayTamamla(),
   'asi-form-ac':        () => asiFormAc(),
+  'detay-duzenle':      () => openTaskEdit(),
   'detay-iptal':        () => detayIptal(),
   'gorev-geri-al':      () => gorevGeriAl(),
   'case-gun-ekle':      () => caseGunEkle(),
@@ -194,6 +196,7 @@ registerActions({
   'submit-cikis':       (el) => submitCikis(el),
   'submit-gebelik':     (el) => submitGebelikEkle(el),
   'submit-task-add':    (el) => submitTaskAdd(el),
+  'submit-task-edit':   (el) => submitTaskEdit(el),
 
   // ═══ HAYVAN İŞLEMLERİ ═══
   'hayvan-not-ekle':  (el) => hayvanNotEkle(g('not-hid').value, el),

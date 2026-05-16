@@ -666,6 +666,44 @@ async function submitTaskAdd(btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Görev Oluştur'; } }
 }
 
+async function submitTaskEdit(btn) {
+  if(!_curTaskDet) return;
+  const desc  = v('te-desc');
+  const tarih = v('te-tarih');
+  if (!desc || !tarih) { toast('Açıklama ve Tarih zorunlu', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  try {
+    const t=_curTaskDet;
+    const tip=v('te-tip');
+    const degisen={};
+    if(t.aciklama!==desc) degisen.aciklama=desc;
+    if(t.hedef_tarih!==tarih) degisen.hedef_tarih=tarih;
+    if(t.gorev_tipi!==tip) degisen.gorev_tipi=tip;
+    if(Object.keys(degisen).length===0){
+      toast('Hiçbir değişiklik yapılmadı'); if(btn){btn.disabled=false;btn.textContent='💾 Kaydet';} return;
+    }
+    await write('gorev_log',degisen,'PATCH',`id=eq.${t.id}`);
+    // islem_log kaydı
+    try {
+      await db.from('islem_log').insert({
+        ana_hayvan_id: t.hayvan_id||null,
+        islem_tipi: 'gorev_duzenle',
+        islem_detay: JSON.stringify({gorev_id:t.id,...degisen}),
+        tarih: new Date().toISOString(),
+        kullanici: null, kaynak: 'MANUEL'
+      });
+    } catch(_){ /* islem_log optional */ }
+    toast('✅ Görev güncellendi');
+    closeM('m-task-edit');
+    await loadTasks(_curTaskFilter||'today');
+    loadDash();
+    // Task detay modal'ını yeniden içerikle aç
+    _curTaskDet={...t,...degisen};
+    openTaskDet(t.id);
+  } catch(e){ toast(getUserMessage(e), true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; } }
+}
+
 // ── HASTALIK KAPAT ───────────────────────────
 async function hstKapat() {
   if (!_curHst) return;
