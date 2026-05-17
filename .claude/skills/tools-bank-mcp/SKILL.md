@@ -36,9 +36,9 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 | Cypher sorgusu | `gitnexus_cypher(query)` | npx gitnexus cypher |
 | Sembolün 360° görünümü (callers/callees) | `gitnexus_context(symbol, repo?)` | npx gitnexus context |
 | Uncommitted değişikliklerin etkisi | `gitnexus_detect_changes(scope?, base_ref?)` | npx gitnexus detect-changes |
-| Blast radius (refactor öncesi) | `gitnexus_impact(target, direction?, depth?, includeTests?)` | npx gitnexus impact |
+| Blast radius (refactor öncesi) | `gitnexus_impact(target, direction?, depth?, include_tests?)` | npx gitnexus impact |
 | Grupları listele | `gitnexus_group_list(name?)` | npx gitnexus group list |
-| Contract Registry sync | `gitnexus_group_sync(name, skipEmbeddings?, exactOnly?)` | npx gitnexus group sync |
+| Contract Registry sync | `gitnexus_group_sync(name, skip_embeddings?, exact_only?)` | npx gitnexus group sync |
 
 **NOT:** `route_map`, `tool_map`, `shape_check`, `api_impact`, `rename` GitNexus MCP-only tool'lardır — CLI wrapper olarak kullanılamaz. Gerekirse `npx gitnexus mcp` ile ayrı MCP sunucusu başlat.
 
@@ -119,7 +119,7 @@ cd /root/egesut-erp1 && npx gitnexus analyze
 - `target`: değiştirmeyi düşündüğün sembol
 - `direction`: yön — `upstream` (kullananlar, default), `downstream` (çağırdıkları)
 - `depth`: ilişki derinliği (default 3)
-- `includeTests`: test dosyalarını dahil et (default false)
+- `include_tests`: test dosyalarını dahil et (default false)
 - `repo`: repo adı (opsiyonel)
 
 ### gitnexus_group_list
@@ -127,8 +127,8 @@ cd /root/egesut-erp1 && npx gitnexus analyze
 
 ### gitnexus_group_sync
 - `name`: grup adı (zorunlu)
-- `skipEmbeddings`: embedding atla (default false)
-- `exactOnly`: sadece exact match (default false)
+- `skip_embeddings`: embedding atla (default false)
+- `exact_only`: sadece exact match (default false)
 
 ## Örnek Kullanımlar
 
