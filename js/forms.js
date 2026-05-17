@@ -183,6 +183,7 @@ async function submitInsem(btn) {
     checkSpermaUyari();
     pullTables(['tohumlama','gorev_log','hayvanlar']).then(() => {
       renderSafe();
+      if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
       // Kızgınlık sekmesindeyse liste yenilensin
       if (typeof loadUreme === 'function' && window._curUremeTab === 'kizginlik') {
         loadUreme('kizginlik');
@@ -222,7 +223,10 @@ async function submitKizginlik(btn) {
     toast('✅ Kızgınlık kaydedildi');
     closeM('m-kizginlik');
     ['k-hid','k-notlar'].forEach(cl);
-    pullTables(['kizginlik_log','gorev_log']).then(renderSafe).catch(console.warn);
+    pullTables(['kizginlik_log','gorev_log']).then(() => {
+      renderSafe();
+      if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
+    }).catch(console.warn);
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }

@@ -56,6 +56,13 @@ button,input,select,textarea{font-family:inherit}
 #sync-bar.warn{background:var(--amber)}
 #sync-bar-txt{font-size:.72rem;font-weight:700;color:#fff;flex:1}
 
+/* KIZGINLIK BAR — tüm ekranlarda görünen uyarı şeridi */
+#kizginlik-bar{display:none;padding:6px 14px;flex-shrink:0;align-items:center;gap:8px;cursor:pointer}
+#kizginlik-bar.on{display:flex}
+#kizginlik-bar.on.red{background:var(--red);color:#fff}
+#kizginlik-bar.on.amber{background:var(--amber);color:#fff}
+#kizginlik-bar-txt{font-size:.72rem;font-weight:700;color:#fff;flex:1}
+
 /* PAGES */
 #pages{flex:1;overflow:hidden;position:relative}
 .pg{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;padding-bottom:calc(var(--nav) + var(--safe) + 8px)}
@@ -70,6 +77,8 @@ button,input,select,textarea{font-family:inherit}
 .nb svg{width:23px;height:23px;stroke-width:1.8}
 .nb-lbl{font-size:.52rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .nbadge{position:absolute;top:5px;right:calc(50% - 20px);background:var(--red);color:#fff;font-size:.52rem;font-weight:800;min-width:16px;height:16px;border-radius:8px;padding:0 3px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
+/* NB-UREME kırmızı nokta — kızgınlık uyarısı var/yok */
+#nb-ureme.has-alert::after{content:'';position:absolute;top:4px;right:calc(50% - 19px);width:8px;height:8px;border-radius:50%;background:var(--red);border:2px solid var(--bg)}
 
 /* DASHBOARD */
 .stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
@@ -270,6 +279,7 @@ button,input,select,textarea{font-family:inherit}
   <span id="sync-bar-txt"></span>
 </div>
 <div id="sperma-warn-band" style="display:none;background:#7a3a00;color:#fff;padding:5px 14px;font-size:.68rem;font-weight:700;align-items:center"></div>
+<div id="kizginlik-bar" onclick="goTo('ureme')"><span id="kizginlik-bar-txt"></span></div>
 
 <div id="pages">
 
