@@ -119,6 +119,7 @@ function goTo(pg, push = true) {
   else if (pg === 'ureme')    { loadUreme(_curUremeTab || 'kizginlik'); loadDash(); }
   else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
+  if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
 }
 
 window.addEventListener('popstate', e => {
@@ -151,6 +152,7 @@ async function renderFromLocal() {
   else if (pg === 'ureme')    { loadUreme(_curUremeTab || 'kizginlik'); loadDash(); }
   else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
+  if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
   checkSpermaUyari();
   updateBildirimBadge();
 }

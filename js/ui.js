@@ -272,10 +272,32 @@ async function kizginlikYoktu(hayvanId, dogumId) {
       toast('📋 Kızgınlık yoktu kaydedildi');
       await pullTables(['kizginlik_log']);
       loadDash();
+      if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
     } else {
       toast('❌ ' + (res?.mesaj || 'Hata'), true);
     }
   } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+// ── KIZGINLIK BAR ALERT ──────────────────────
+async function updateKizginlikAlert() {
+  try {
+    const { data } = await db.from('cozulmemis_kizginlik_view')
+      .select('hayvan_id,durum')
+      .neq('durum', 'cozuldu');
+    const bar = document.getElementById('kizginlik-bar');
+    const txt = document.getElementById('kizginlik-bar-txt');
+    const nb = document.getElementById('nb-ureme');
+    if (data?.length) {
+      const uyariSayisi = data.filter(d => d.durum === 'uyari').length;
+      bar.className = 'on ' + (uyariSayisi > 0 ? 'red' : 'amber');
+      txt.textContent = '🔴 ' + data.length + ' hayvan kızgınlıkta — tohumlanmadı';
+      if (nb) nb.classList.add('has-alert');
+    } else {
+      bar.className = '';
+      if (nb) nb.classList.remove('has-alert');
+    }
+  } catch(e) { /* sessiz */ }
 }
 
 async function asiDismiss(vacLogId, vaxName) {
