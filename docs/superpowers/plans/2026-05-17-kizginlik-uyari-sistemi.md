@@ -139,8 +139,8 @@ Frontend view'ı doğrudan sorgulayabilir — RPC sadece count yetiyorsa alterna
 #ubadge.nbadge.on{display:flex}
 ```
 
-`#ubadge`, `#tbadge` ile aynı `.nbadge` class'ını kullanır. `display:none`
-default, `.on` class'ı ile görünür. İçerik `!` işareti — count gerekmez.
+`#ubadge`, `#tbadge` ile birebir aynı mantık: count gösterir, `99+` kırpımı.
+`display:none` default, `.on` class'ı ile görünür.
 
 ---
 
