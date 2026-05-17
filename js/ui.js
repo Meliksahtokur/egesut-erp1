@@ -287,15 +287,15 @@ async function updateKizginlikAlert() {
       .neq('durum', 'cozuldu');
     const bar = document.getElementById('kizginlik-bar');
     const txt = document.getElementById('kizginlik-bar-txt');
-    const nb = document.getElementById('nb-ureme');
+    const badge = document.getElementById('ubadge');
     if (data?.length) {
       const uyariSayisi = data.filter(d => d.durum === 'uyari').length;
       bar.className = 'on ' + (uyariSayisi > 0 ? 'red' : 'amber');
       txt.textContent = '🔴 ' + data.length + ' hayvan kızgınlıkta — tohumlanmadı';
-      if (nb) nb.classList.add('has-alert');
+      if (badge) { badge.style.display = 'flex'; badge.className = 'nbadge on'; }
     } else {
       bar.className = '';
-      if (nb) nb.classList.remove('has-alert');
+      if (badge) { badge.style.display = 'none'; badge.className = 'nbadge'; }
     }
   } catch(e) { /* sessiz */ }
 }
