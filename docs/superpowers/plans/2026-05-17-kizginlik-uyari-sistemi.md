@@ -126,26 +126,21 @@ Frontend view'ı doğrudan sorgulayabilir — RPC sadece count yetiyorsa alterna
 #kizginlik-bar-txt{font-size:.72rem;font-weight:700;color:#fff;flex:1}
 ```
 
-#### B3. Nav Indicator (CSS)
+#### B3. Nav Indicator (HTML + CSS)
 
-```css
-#nb-ureme.has-alert::after{
-  content:'';
-  position:absolute;
-  top:4px;
-  right:calc(50% - 19px);
-  width:8px;height:8px;
-  border-radius:50%;
-  background:var(--red);
-  border:2px solid var(--bg);
-}
+```html
+<!-- #nb-ureme içinde, #tbadge ile aynı desen -->
+<div id="ubadge" class="nbadge" style="display:none">!</div>
 ```
 
-Sadece var/yok bildirir. Count gerekmez — `nbadge` pattern'i kullanılmaz.
+```css
+/* #ubadge .nbadge class'ını kullanır (tbadge ile aynı stil) */
+#ubadge.nbadge{display:none}
+#ubadge.nbadge.on{display:flex}
+```
 
-`.nb` class'ı zaten `position:relative` içerir (index.html:67), `.nb.on::after`
-de aynı pseudo-element tekniğini kullanır. Ek CSS gerekmez — implementasyonda
-kontrol edilmeli.
+`#ubadge`, `#tbadge` ile aynı `.nbadge` class'ını kullanır. `display:none`
+default, `.on` class'ı ile görünür. İçerik `!` işareti — count gerekmez.
 
 ---
 

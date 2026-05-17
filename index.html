@@ -77,8 +77,9 @@ button,input,select,textarea{font-family:inherit}
 .nb svg{width:23px;height:23px;stroke-width:1.8}
 .nb-lbl{font-size:.52rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .nbadge{position:absolute;top:5px;right:calc(50% - 20px);background:var(--red);color:#fff;font-size:.52rem;font-weight:800;min-width:16px;height:16px;border-radius:8px;padding:0 3px;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
-/* NB-UREME kırmızı nokta — kızgınlık uyarısı var/yok */
-#nb-ureme.has-alert::after{content:'';position:absolute;top:4px;right:calc(50% - 19px);width:8px;height:8px;border-radius:50%;background:var(--red);border:2px solid var(--bg)}
+/* UBADGE — nb-ureme uyarı rozeti (tbadge pattern'ı ile aynı) */
+#ubadge.nbadge{display:none}
+#ubadge.nbadge.on{display:flex}
 
 /* DASHBOARD */
 .stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
@@ -444,6 +445,7 @@ button,input,select,textarea{font-family:inherit}
     <span class="nb-lbl">Görevler</span>
   </button>
   <button class="nb" id="nb-ureme" data-action="go-ureme">
+    <div id="ubadge" class="nbadge" style="display:none">!</div>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="8" r="4"/><path d="M12 12v4m0 0l-2 2m2-2l2 2"/><path d="M8 20h8"/></svg>
     <span class="nb-lbl">Üreme</span>
   </button>
