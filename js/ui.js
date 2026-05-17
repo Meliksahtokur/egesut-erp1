@@ -292,7 +292,12 @@ async function updateKizginlikAlert() {
       const uyariSayisi = data.filter(d => d.durum === 'uyari').length;
       bar.className = 'on ' + (uyariSayisi > 0 ? 'red' : 'amber');
       txt.textContent = '🔴 ' + data.length + ' hayvan kızgınlıkta — tohumlanmadı';
-      if (badge) { badge.style.display = 'flex'; badge.className = 'nbadge on'; }
+      if (badge) {
+        const n = data.length;
+        badge.textContent = n > 99 ? '99+' : n;
+        badge.style.display = 'flex';
+        badge.className = 'nbadge on';
+      }
     } else {
       bar.className = '';
       if (badge) { badge.style.display = 'none'; badge.className = 'nbadge'; }
