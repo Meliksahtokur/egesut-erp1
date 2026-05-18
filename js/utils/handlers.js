@@ -13,7 +13,20 @@ registerActions({
   'go-ureme':   () => goTo('ureme'),
   'go-gecmis':  () => goTo('gecmis'),
   'go-log':     () => goTo('log'),
-  'go-back':    () => history.back(),
+  'go-back': () => {
+    if (window._prevTaskId) {
+      const tid = window._prevTaskId;
+      window._prevTaskId = null;
+      closeDet();
+      openTaskDet(tid);
+    } else {
+      history.back();
+    }
+  },
+  'hayvan-git': () => {
+    if (!_curTaskDet) return;
+    fromTaskOpenDet(_curTaskDet.hayvan_id, _curTaskDet.id);
+  },
 
   // ═══ ARAMA ═══
   'search-input': () => { filterA(); srchDropdown(); },

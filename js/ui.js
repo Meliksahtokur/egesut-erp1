@@ -22,6 +22,7 @@
 let _taskKategori='all';
 let _stokTab='tumu';
 let _curStokDet=null;
+let _prevTaskId=null;
 
 const _katTipMap={
   asi:['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
@@ -205,7 +206,7 @@ async function loadDash(){
     const [animals,diseases,tasks,stock,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
-      getData('gorev_log',t=>!t.tamamlandi),
+      getData('gorev_log',t=>!t.tamamlandi&&!t.iptal),
       idbGetAll('stok'),
       getData('dogum',b=>b.tarih>=dAgo(63)&&b.tarih<=dAgo(58)),
       getData('dogum',b=>b.tarih>=dAgo(150)&&b.tarih<dAgo(89)),
@@ -858,6 +859,11 @@ async function openDet(id){
   const curPg=getState('currentPage')||'dash';
   history.pushState({pg:curPg||'dash',det:id},'','#'+(curPg||'dash'));
   document.getElementById('det').classList.add('on');
+  const _backBtn = document.querySelector('.det-back');
+  if (_backBtn) {
+    const _svg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>';
+    _backBtn.innerHTML = _svg + (window._prevTaskId ? ' Göreve Dön' : ' Sürüye Dön');
+  }
   document.getElementById('det-name').textContent=' ';
   document.getElementById('det-meta').textContent=' ';
   const _skelHtml='<div style="padding:16px 0">'+['80%','60%','90%','50%'].map(w=>`<div class="skel" style="height:14px;width:${w};margin-bottom:12px"></div>`).join('')+'</div>';
@@ -915,6 +921,12 @@ async function openDet(id){
   } catch(e){ document.getElementById('det-name').textContent='Hata: '+e.message; }
 }
 function closeDet(){ document.getElementById('det').classList.remove('on'); }
+function fromTaskOpenDet(hayvanId, taskId) {
+  window._prevTaskId = taskId;
+  closeM('m-task-det');
+  closeM('m-done-det');
+  openDet(hayvanId);
+}
 
 // ── PADOK DEĞİŞTİR (hayvan kartı özet tab) ──
 // ── İŞLEM GERİ AL (genel — padok ve görev güncellemeleri) ──
@@ -2215,6 +2227,8 @@ async function openTaskDet(id){
     }catch(e){ console.warn('parent lookup:',e.message); }
   }
 
+  const hayvanGitBtn = document.getElementById('td-hayvan-git-btn');
+  if (hayvanGitBtn) hayvanGitBtn.style.display = t.hayvan_id ? 'block' : 'none';
   openM('m-task-det');
 }
 async function detayTamamla(){
@@ -2324,6 +2338,8 @@ async function openDoneTaskDet(id){
     geriBtn.disabled=false;
     geriBtn.textContent='↩️ Geri Al';
   }
+  const ddHayvanGitBtn = document.getElementById('dd-hayvan-git-btn');
+  if (ddHayvanGitBtn) ddHayvanGitBtn.style.display = t.hayvan_id ? 'block' : 'none';
   openM('m-done-det');
 }
 function gorevGeriAl(){

@@ -628,6 +628,7 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
     const el = document.getElementById('tc-' + id);
     if (el) { el.classList.add('done'); setTimeout(() => el.remove(), 320); }
     toast('✅ Tamamlandı');
+    await pullTables(['hayvanlar']).catch(()=>{});
     loadDash();
   } catch (e) {
     btn.disabled = false;
