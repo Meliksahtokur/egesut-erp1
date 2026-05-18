@@ -1,8 +1,8 @@
 # ADR-007 — Multi-Tier Goose Orchestration Mimarisi
 
 **Tarih:** 2026-05-18  
-**Durum:** TASARIM ONAYLANDI — summon MCP testi geçti, goused-api geliştirmeleri bekliyor  
-**Sonraki adım:** goused-api commit lock → tier slots → cascade kill → goose-ops recipe
+**Durum:** IMPLEMENT TAMAMLANDI — sistem hazır, ilk gerçek bug fix testi bekleniyor  
+**Sonraki adım:** Adım 8 — gerçek bug fix görevini goose-ops üzerinden Goose'a ver
 
 ---
 
@@ -248,9 +248,9 @@ Kullanıcı notu: "şu an sorun yok ama tablet bir aşamada ciğer sokabilir"
 [x] 2. goused-api: commit lock endpoint — TAMAMLANDI (2026-05-18)
 [x] 3. goused-api: parent_session_id + tier slots + cascade kill — TAMAMLANDI (2026-05-18)
 [x] 4. goused-api: heartbeat watchdog — TAMAMLANDI (2026-05-18)
-[ ] 5. goose-ops.yaml recipe yaz (orchestrator)
-[ ] 6. egesut-telsiz.yaml: commit lock acquire/release ekle
-[ ] 7. kaz-cobani skill güncelle (Claude + deepseek-tui)
+[x] 5. goose-ops.yaml recipe yaz (orchestrator) — TAMAMLANDI (2026-05-18)
+[x] 6. egesut-telsiz.yaml: commit lock acquire/release ekle — TAMAMLANDI (2026-05-18)
+[x] 7. kaz-cobani skill güncelle (Claude + Goose) — TAMAMLANDI (2026-05-18)
 [ ] 8. Gerçek bug fix → bu sistemle Goose'a ver (ilk gerçek orkestrasyon testi)
 ```
 
