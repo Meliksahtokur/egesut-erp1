@@ -9,6 +9,11 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 
 | İhtiyaç | Araç | Not |
 |---------|------|-----|
+| Goose worker başlat | `goose_start(recipe, session_id, params, tier, parent_session_id)` | goused-api :8743 |
+| Goose durum sorgula | `goose_status(session_id)` | running/done/crashed/stopped |
+| Telsiz'e kaydol | `agent_register(agent_id, capabilities)` | goused-telsiz :8744 |
+| Telsiz mesaj gönder | `agent_send(to, from_, message, message_type, priority)` | long-poll kuyruk |
+| Telsiz mesaj bekle | `agent_receive(agent_id, timeout)` | timeout=30 default |
 | Veritabanı sorgusu (SELECT) | `supabase_query(table, filters, select, limit, order)` | Direkt Supabase REST |
 | RPC çağrısı | `supabase_rpc(function_name, params)` | Tüm yazma işlemleri |
 | DDL/Migration | `supabase_migrate(sql)` | Management API |
@@ -46,6 +51,133 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 ```bash
 cd /root/egesut-erp1 && npx gitnexus analyze
 ```
+
+---
+
+## Goose & Telsiz — Agent Sistemi
+
+### Mimari
+
+```
+Tier 0 — Claude (orkestratör)
+  ↓ goose_start(recipe="goose-ops", tier=1) + agent_send(type="task")
+Tier 1 — Goose Orchestrator: goose-ops recipe (max 3 eşzamanlı)
+  ↓ native summon — MCP paylaşılıyor (test edildi 2026-05-18)
+Tier 2 — Goose Workers: egesut-telsiz recipe (max 3 per orchestrator)
+```
+
+### goose_start
+
+```
+goose_start(
+  recipe="goose-ops",          # recipe adı (GOOSE_RECIPE_PATH'te aranır)
+  session_id="goose-ops-A",    # benzersiz ID
+  params='{"ops_id":"goose-ops-A"}',  # JSON string
+  tier=1,                      # 1=orchestrator, 2=worker, 0=default
+  parent_session_id=""         # tier=2 için orchestrator session_id
+)
+# → {"session_id":"...", "pid":..., "log_path":"/tmp/goose-X.log", "status":"running"}
+```
+
+**Slot enforcement (HTTP 429 → sıra bekliyor):**
+- tier=1: max 3 eşzamanlı orchestrator
+- tier=2: max 3 eşzamanlı worker per parent_session_id
+
+**Log takibi:** `tail -f /tmp/goose-{session_id}.log`
+
+### goused-api Ek Endpointler (HTTP — MCP değil)
+
+```bash
+# Cascade kill (orchestrator + tüm children)
+curl -X POST http://localhost:8743/goose/stop-tree/{id}
+
+# Heartbeat (orchestrator 30s'de bir çağırmalı — 90s timeout → cascade kill)
+curl -X POST http://localhost:8743/goose/heartbeat/{id}
+
+# Commit lock — git race condition önleme (3 worker aynı anda commit yaparsa bozulur)
+curl -X POST http://localhost:8743/commit-lock/acquire \
+  -H "Content-Type: application/json" -d '{"session_id":"WORKER_ID"}'
+# → 200 {"status":"acquired"} | 423 {"error":"locked by X"} → 5s bekle, retry
+
+curl -X POST http://localhost:8743/commit-lock/release \
+  -H "Content-Type: application/json" -d '{"session_id":"WORKER_ID"}'
+```
+
+### agent_register / agent_send / agent_receive
+
+```
+agent_register(agent_id="claude", capabilities='["orchestrate","approve"]')
+
+agent_send(
+  to="goose-ops-A",
+  from_="claude",
+  message="Görev: ...",
+  message_type="task",   # task|result|question|answer|approval_req|heartbeat
+  priority="high"        # high|normal|low (high → cooldown atlar)
+)
+# → {"id":"uuid", "status":"queued"}
+
+agent_receive(agent_id="claude", timeout=120)
+# mesaj: {"id":..., "from_agent":..., "message":..., "message_type":..., ...}
+# timeout: {"message": null, "timeout": true}
+```
+
+**Spam koruması:** aynı (from, to, mesaj) 5s içinde → 409 | aynı (from, to) 3s → 429
+
+### Tipik Orkestrasyon Akışı (Claude → Goose-Ops)
+
+```python
+# 1. Kayıt
+agent_register(agent_id="claude", capabilities='["orchestrate","approve"]')
+
+# 2. Orchestrator spawn
+goose_start(recipe="goose-ops", session_id="goose-ops-A",
+            params='{"ops_id":"goose-ops-A"}', tier=1)
+
+# 3. Görev ver
+agent_send(to="goose-ops-A", from_="claude",
+           message="Görev: [ne yapılacak]\nKabul: [kriterler]",
+           message_type="task", priority="high")
+
+# 4. Sonuç bekle
+result = agent_receive(agent_id="claude", timeout=900)
+# → "TAMAMLANDI: abc123 — [özet]"
+```
+
+### Commit Lock Kullanımı (Worker — ZORUNLU)
+
+```bash
+# Commit öncesi lock al
+curl -s -X POST http://localhost:8743/commit-lock/acquire \
+  -H "Content-Type: application/json" -d '{"session_id":"WORKER_ID"}'
+# 423 gelirse: sleep 5 && retry (max 10 deneme)
+
+git add -A && git commit -m "..." && git push origin main
+
+# Commit sonrası lock bırak
+curl -s -X POST http://localhost:8743/commit-lock/release \
+  -H "Content-Type: application/json" -d '{"session_id":"WORKER_ID"}'
+```
+
+### Recipes (GOOSE_RECIPE_PATH=/root/tools-bank/recipes)
+
+| Recipe | Rol |
+|--------|-----|
+| `goose-ops` | Tier-1 Orchestrator — analiz+plan+worker yönet+review+exit |
+| `egesut-telsiz` | Tier-2 Worker — EgeSüt kod yazar, commit lock kullanır |
+| `reviewer` | Bağımsız reviewer — orchestrator kendi işini review ETMEZ |
+| `conductor` | Spec dosyası adım adım executor |
+| `researcher` | Web araştırma (DuckDuckGo + semantic search) |
+
+### Servis Durumu
+
+```bash
+curl -s http://localhost:8742/health  # goused-proxy (deepseek)
+curl -s http://localhost:8743/health  # goused-api (process manager)
+curl -s http://localhost:8744/health  # goused-telsiz (mesaj kuyruğu)
+```
+
+---
 
 ## Önemli Parametreler
 
