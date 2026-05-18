@@ -55,6 +55,51 @@ Kodu anlamak için önce `semantic_search` kullan — dosya okumayı minimize et
 - Yeni fonksiyon yazmadan önce duplikat kontrolü: `grep -n "fonksiyon" js/*.js`
 - Tablo/RPC yazmadan önce şema kontrol: `execute_sql` ile mevcut yapıyı sorgula
 
+## SQL / RPC Pre-Check (ZORUNLU — Bu Adımları Atla)
+
+**Her SQL veya RPC yazmadan önce sırayla:**
+
+1. **Canonical referans oku** (ara migration'lar YASAK — kırık olabilir):
+   ```bash
+   file_read("supabase/migrations/99999999999999_ground_truth.sql")
+   file_read(".claude/rpc-reference.md")
+   ```
+   `*_revize.sql`, `*_fix.sql` gibi ara dosyalar YANLIŞ referanstır.
+
+2. **Tablo şemasını doğrula:**
+   ```sql
+   SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'TABLO';
+   ```
+
+3. **Domain kuralını oku:**
+   ```bash
+   file_read(".claude/domain-rules.md")
+   ```
+
+4. **ID tiplerine dikkat:**
+   - `text` id: `hayvanlar`, `stok`, `hekimler`, `tohumlama`
+   - `uuid` id: `gorev_log`, `stok_hareket`, `padoklar`, `vaccines`, `islem_log`
+   - uuid INSERT: `gen_random_uuid()` kullan (`::text` YAPMA)
+
+## DB Değişikliği — Approval Gate (ZORUNLU)
+
+Herhangi bir `CREATE/ALTER/UPDATE/INSERT/DELETE` yazmadan önce orchestrator/kullanıcıya sor:
+
+```
+"ONAY GEREKLİ: [ne yapılacak]
+Etkilenecek tablolar: [...]
+Risk: [veri kaybı var mı?]
+SQL taslağı: [sql]"
+```
+
+"Onaylıyorum" mesajını alana kadar hiçbir DB yazma yapma.
+
+## Deploy Süreci
+
+- Migration dosyası repoda olması = canlıda çalışıyor DEĞİL
+- `supabase_migrate` MCP aracıyla ayrıca deploy et
+- GitHub Pages sadece JS günceller, Supabase SQL'i göndermez
+
 ## Yasaklar
 
 - `main` dışında branch — YASAK
@@ -109,7 +154,7 @@ Memory güncelleme: `load_skill("memory-update")` — oturum sonu kayıt workflo
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **egesut-erp1** (3046 symbols, 5447 relationships, 263 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **egesut-erp1** (3173 symbols, 5572 relationships, 274 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
