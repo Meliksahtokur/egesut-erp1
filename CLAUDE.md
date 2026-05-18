@@ -42,10 +42,11 @@ Kullanıcıdan mesaj beklemeden:
 1. .claude/knowledge/bugs.md → aktif bug sayısı
 2. git log --oneline -3
 3. .claude/tasks/ → bekleyen task sayısı
+4. agent_receive("claude", timeout=1) → bekleyen telsiz mesajı varsa briefing'e ekle
 ```
 Briefing formatı:
 ```
-📋 [tarih] | 🐛 Bugs: N | 📝 Son: [commit] | 🔧 Bekleyen: N task
+📋 [tarih] | 🐛 Bugs: N | 📝 Son: [commit] | 🔧 Bekleyen: N task | 📡 Telsiz: N mesaj
 Hazır. Ne yapalım?
 ```
 
@@ -84,7 +85,7 @@ Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **egesut-erp1** (3046 symbols, 5447 relationships, 263 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **egesut-erp1** (3173 symbols, 5572 relationships, 274 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
