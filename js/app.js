@@ -136,7 +136,11 @@ window.addEventListener('popstate', e => {
   }
   // Detay paneli açıksa önce onu kapat
   const det = document.getElementById('det');
-  if (det?.classList.contains('on')) { closeDet(); return; }
+  if (det?.classList.contains('on')) {
+    closeDet();
+    window._prevTaskId = null;
+    return;
+  }
   // Sayfalar arası geri — history.back() ile geldiğimizde push etme
   goTo(e.state?.pg || 'dash', false);
 });
