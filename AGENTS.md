@@ -77,9 +77,11 @@ Kodu anlamak için önce `semantic_search` kullan — dosya okumayı minimize et
    ```
 
 4. **ID tiplerine dikkat:**
-   - `text` id: `hayvanlar`, `stok`, `hekimler`, `tohumlama`
-   - `uuid` id: `gorev_log`, `stok_hareket`, `padoklar`, `vaccines`, `islem_log`
-   - uuid INSERT: `gen_random_uuid()` kullan (`::text` YAPMA)
+   - `text` id: `hayvanlar`, `stok`, `hekimler`, `tohumlama`, **`gorev_log`**
+   - `uuid` id: `stok_hareket`, `padoklar`, `vaccines`, `islem_log`
+   - `gorev_log.id` = text ama UUID string saklar → INSERT: `gen_random_uuid()::text` veya `gen_random_uuid()` (implicit cast)
+   - WHERE karşılaştırma: `WHERE id = p_gorev_id` (text=text, cast GEREKMİYOR)
+   - uuid kolona INSERT: `gen_random_uuid()` kullan (`::text` YAPMA)
 
 ## DB Değişikliği — Approval Gate (ZORUNLU)
 

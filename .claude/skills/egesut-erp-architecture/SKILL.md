@@ -94,7 +94,7 @@ Olmayan kolon referans etme! (kurum, tip, grup_adi gibi hatalar bundan çıktı)
 | stok | **text** | 'e45e1a66-...' |
 | hekimler | **text** | 'H1778958770' |
 | tohumlama | **text** | uuid string |
-| gorev_log | **uuid** | uuid native |
+| gorev_log | **text** | UUID string saklar |
 | stok_hareket | **uuid** | uuid native |
 | padoklar | **uuid** | uuid native |
 | vaccines | **uuid** | uuid native |
