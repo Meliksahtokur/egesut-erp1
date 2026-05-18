@@ -73,6 +73,7 @@ Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 | Bekleyen task'lar | `.claude/tasks/dev/` · `.claude/tasks/arge/` |
 | Agent detayları | `AGENTS.md` (goose/pi) · `.agents/QWEN.md` (Qwen/Pi) |
 | Teknik borç / refactor planı | `ReFactorRoadmap.md` — Aşama 1 kısmen tamam (1.1✅ 1.2✅ 1.3❌ 1.4❌), Aşama 2-9 bekliyor |
+| **Multi-tier Goose mimarisi** | `.claude/arch-decisions/ADR-007-multi-tier-goose-orchestration.md` — Tier0/1/2 tasarım, goose-ops, commit lock, summon testi, uygulama sırası |
 
 ## Kritik Kurallar
 
