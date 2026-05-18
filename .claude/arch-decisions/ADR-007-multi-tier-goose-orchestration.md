@@ -21,12 +21,12 @@ Tier 0 — Claude (CEO)
   • Kullanıcının tek muhatabı
   • Üst kararlar, onay/ret
   • telsiz üzerinden orchestrator'a direktif gönderir
-  • Max 2 orchestrator slot yönetir
+  • Max 3 orchestrator slot yönetir
   
   agent_send(to="goose-ops-A", message="görevi şu...", type="task")
   agent_receive(agent_id="claude", timeout=600)  ← sonucu bekler
 
-Tier 1 — Goose Orchestrator / goose-ops (max 2 eşzamanlı)
+Tier 1 — Goose Orchestrator / goose-ops (max 3 eşzamanlı)
   • Görevi analiz eder, planlar, parçalar
   • Worker'ları spawn eder ve yönetir
   • Blackboard'a plan + checkpoint yazar
@@ -40,7 +40,7 @@ Tier 2 — Goose Workers (max 3 per orchestrator = 6 toplam)
   • Tek bir task, bitince exit
   • task_claim → çalış → git commit (lock ile) → task_complete
 
-TOPLAM MAX: 1 Claude + 2 Orchestrator + 6 Worker = 9 agent
+TOPLAM MAX: 1 Claude + 3 Orchestrator + 9 Worker = 13 agent
 ```
 
 ---
@@ -176,7 +176,7 @@ reviewer.yaml zaten mevcut (`/root/tools-bank/recipes/reviewer.yaml`).
 ### 2. Tier-Based Slot Enforcement
 ```go
 // goose_sessions tablosuna tier INT kolonu ekle
-// Tier1 (orchestrator): max 2 running
+// Tier1 (orchestrator): max 3 running
 // Tier2 (worker): max 3 per parent_session_id
 // HTTP 429 döner slot doluysa
 ```
@@ -245,9 +245,9 @@ Kullanıcı notu: "şu an sorun yok ama tablet bir aşamada ciğer sokabilir"
 
 ```
 [x] 1. summon MCP paylaşım testi — TAMAMLANDI, MCP paylaşılıyor (2026-05-18)
-[ ] 2. goused-api: commit lock endpoint
-[ ] 3. goused-api: parent_session_id + tier slots + cascade kill
-[ ] 4. goosed-api: heartbeat watchdog
+[x] 2. goused-api: commit lock endpoint — TAMAMLANDI (2026-05-18)
+[x] 3. goused-api: parent_session_id + tier slots + cascade kill — TAMAMLANDI (2026-05-18)
+[x] 4. goused-api: heartbeat watchdog — TAMAMLANDI (2026-05-18)
 [ ] 5. goose-ops.yaml recipe yaz (orchestrator)
 [ ] 6. egesut-telsiz.yaml: commit lock acquire/release ekle
 [ ] 7. kaz-cobani skill güncelle (Claude + deepseek-tui)
