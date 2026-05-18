@@ -1,6 +1,6 @@
 ---
 name: egesut-erp-architecture
-description: EgeSüt ERP mimari felsefesi — frontend asla iş mantığı yapmaz, tüm iş backend'de (PostgreSQL RPC/trigger/view). Bu skill her oturumda yüklenir, mimari ihlalleri önler.
+description: EgeSüt ERP mimari felsefesi + zorunlu pre-check kuralları. Her oturumda yüklenir.
 ---
 
 # EgeSüt ERP — Mimari Felsefe
@@ -23,135 +23,163 @@ PostgreSQL'de bu sorunlar yoktur: ACID, RLS, trigger, CHECK constraint.
 ## Katman Sorumlulukları
 
 ```
-┌─────────────────────────────────────────────┐
-│  UI Layer (index.html + js/*.js)            │
-│  • Form input toplama                       │
-│  • Veri görüntüleme (render)                │
-│  • Kullanıcı etkileşimi → RPC çağrısı      │
-│  ✗ Hesap yapmaz                             │
-│  ✗ State machine işletmez                  │
-│  ✗ Validasyon yapmaz (sadece UX guard)     │
-└──────────────────────┬──────────────────────┘
-                       │ RPC
-┌──────────────────────▼──────────────────────┐
-│  DB Layer (PostgreSQL / Supabase)           │
-│  • Tüm iş mantığı                           │
-│  • Validasyon (CHECK, trigger)              │
-│  • Hesaplama (view, RPC)                    │
-│  • State machine (trigger, RPC)             │
-│  • Yetkilendirme (RLS)                      │
-│  • Ledger (immutable)                       │
-└─────────────────────────────────────────────┘
+UI Layer (index.html + js/*.js)
+  • Form input toplama
+  • Veri görüntüleme (render)
+  • Kullanıcı etkileşimi → RPC çağrısı
+  ✗ Hesap yapmaz
+  ✗ State machine işletmez
+  ✗ Validasyon yapmaz (sadece UX guard)
+
+DB Layer (PostgreSQL / Supabase)
+  • Tüm iş mantığı (RPC)
+  • Validasyon (CHECK, trigger)
+  • Hesaplama (view, RPC)
+  • State machine (trigger, RPC)
+  • Yetkilendirme (RLS)
+  • Ledger (immutable)
 ```
 
 ## Operasyonel Kurallar
 
 ### Kural 1 — Sadece RPC ile yaz
-
-Tüm yazma işlemleri Supabase RPC üzerinden geçer.
-
-```sql
--- YANLIŞ ❌ — frontend direkt REST kullanıyor
+```js
+// YANLIŞ ❌
 await db.from('hayvanlar').update({...}).eq('id', id);
-
--- YANLIŞ ❌ — write() da REST kullanır (offline queue geçici çözüm)
 await write('hayvanlar', {...}, 'PATCH', `id=eq.${id}`);
 
--- DOĞRU ✅ — backend RPC
+// DOĞRU ✅
 await rpc('hayvan_guncelle', { p_id: id, p_grup: '...' });
 ```
 
-Ancak **admin/yönetim işlemleri** (padok/hekim/vaccine CRUD) için RPC yoksa `db.from()` kullanılabilir — ama bu işlemlerin de RPC'ye taşınması gerekir.
-
 ### Kural 2 — Hesap backend'de
-
-DB'de hesaplanan her şey frontend'de tekrar hesaplanmaz.
-
 ```js
-// YANLIŞ ❌ — frontend stok hesabı yapıyor
-const used=moves.filter(m=>m.stok_id===s.id).reduce((a,m)=>a+(+m.miktar||0),0);
-const guncel=(+s.baslangic_miktar||0)-used;
+// YANLIŞ ❌
+const guncel = baslangic_miktar - moves.reduce(...);
 
-// DOĞRU ✅ — view'dan hazır al
-const { data } = await db.from('stok_tuketim_view').select('*');
-// guncel_stok, stok_durum zaten hesaplanmış gelir
+// DOĞRU ✅
+const { guncel_stok, stok_durum } = row; // stok_tuketim_view'dan
 ```
 
 ### Kural 3 — State machine backend'de
-
-State geçişleri (bekliyor→gebe/boş/abort, gebe→doğum) trigger veya RPC ile yönetilir.
-
-```sql
--- RPC içinde state geçişi
-UPDATE public.tohumlama SET sonuc = 'Gebe' WHERE id = p_tohumlama_id;
-UPDATE public.hayvanlar SET tohumlama_durumu = 'gebe' WHERE id = v_hayvan_id;
-```
-
-Frontend asla `write('hayvanlar', { tohumlama_durumu: 'gebe' }, 'PATCH')` yapmaz.
+Frontend asla `tohumlama_durumu`, `tamamlandi`, `iptal` gibi state alanlarını direkt yazmaz.
 
 ### Kural 4 — View'lar hazır veri döndürür
+| View | Hesapladığı |
+|------|-------------|
+| `stok_tuketim_view` | guncel_stok, stok_durum |
+| `gebelik_ozet_view` | gebelik istatistikleri |
+| `tohumlanabilir_hayvanlar` | tohumlanabilir liste |
 
-| View | Kullanım | Hesapladığı |
-|------|----------|-------------|
-| `hayvan_durum_view` | Hayvan kartı, sürü listesi | yaş, toh_gun, toh_sonuc, stok_durum |
-| `stok_tuketim_view` | Stok listesi | guncel_stok, stok_durum (kritik/normal) |
-| `tohumlanabilir_hayvanlar` | Tohumlama dropdown | toh durumu hesaplanmış hayvanlar |
+---
 
-Frontend bu view'lardan gelen hazır alanları kullanır, tekrar `baslangic_miktar - SUM(miktar)` yapmaz.
+## ZORUNLU PRE-CHECK KURALLARI
 
-## Bilinen İhlaller (Refactor Gerekir)
+**RPC yazmadan ÖNCE mutlaka yap:**
 
-Tespit: 2026-05-16 — Bu ihlaller felsefeye aykırıdır, yavaş yavaş RPC/view'lara taşınmalıdır.
+### 1. Tablo şemasını oku
+```sql
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'HEDEF_TABLO'
+ORDER BY ordinal_position;
+```
+Olmayan kolon referans etme! (kurum, tip, grup_adi gibi hatalar bundan çıktı)
 
-### Grup A — RPC Bypass (`write()` ile direkt PATCH)
+### 2. ID Tipleri Haritası (EZBERle!)
 
-| Dosya | Satır | İşlem | Yapılması Gereken |
-|-------|-------|-------|-------------------|
-| `forms.js` | 429, 447 | Sütten kesme tarihi güncelleme | `hayvan_guncelle` RPC'sine taşı |
-| `forms.js` | 462 | Tohumlanabilir onay | Yeni RPC veya `hayvan_guncelle` genişlet |
-| `forms.js` | 476 | Tohumlama erteleme (+ tarih hesabı frontend'de) | Yeni RPC (`tohumlama_ertele`) |
-| `forms.js` | 626-631 | Görev tamamlama (gorev_log + stok + padok) | `gorev_guncelle` RPC'si zaten var, ona taşı |
-| `forms.js` | 941, 975-981 | Stok güncelleme / ekleme | `stok_guncelle` RPC'si yok, yazılmalı |
-| `forms.js` | 1031 | Tohumlama direkt INSERT (offline queue üzerinden) | `tohumlama_kaydet` zaten var, offline queue RPC_MAP'i düzelt |
+| Tablo | id tipi | Örnek |
+|-------|---------|-------|
+| hayvanlar | **text** | 'f454bdd3-...' |
+| stok | **text** | 'e45e1a66-...' |
+| hekimler | **text** | 'H1778958770' |
+| tohumlama | **text** | uuid string |
+| gorev_log | **uuid** | uuid native |
+| stok_hareket | **uuid** | uuid native |
+| padoklar | **uuid** | uuid native |
+| vaccines | **uuid** | uuid native |
+| grup_padok_eslem | **uuid** | uuid native |
+| islem_log | **uuid** | uuid native |
 
-### Grup B — Direkt REST (`db.from(...).insert/update/delete`)
+**KURAL:** 
+- uuid kolonuna INSERT ederken `gen_random_uuid()` kullan (`::text` YAPMA!)
+- text parametre ile uuid kolon karşılaştırırken `WHERE id = p_id::uuid` cast kullan
+- PostgREST aynı isimde farklı parametreli fonksiyon görürse PGRST203 hatası verir — eski versiyonu `DROP FUNCTION IF EXISTS` ile sil
 
-| Dosya | Satır | İşlem |
-|-------|-------|-------|
-| `ui.js` | 1781, 1797 | Stok güncelleme / arşivleme |
-| `ui.js` | 3669 | Vaccine güncelleme |
-| `ui.js` | 3686, 3800 | Hekim ekleme / güncelleme |
-| `ui.js` | 3830 | Stok direkt insert |
-| `ui.js` | 3892, 3909-3910, 4079-4093 | Padok CRUD (tamamen REST) |
+### 3. Stok Math (KRİTİK!)
 
-### Grup C — Frontend Hesaplama
+```
+stok_tuketim_view formülü:
+  guncel_stok = baslangic_miktar - SUM(stok_hareket.miktar WHERE NOT iptal)
 
-| Dosya | Satır | Hesaplama | DB'deki Karşılığı |
-|-------|-------|-----------|-------------------|
-| `ui.js` | 220, 1537, 2019, 2361, 3087, 3158 | `baslangic_miktar - SUM(miktar)` (6 kopya!) | `stok_tuketim_view.guncel_stok` |
-| `forms.js` | 474 | `dFwd(... ay * 30)` — erteleme tarihi | RPC'de hesaplanmalı |
-| `ui.js` | 2000, 2004 | Gebelik/boş oranı yüzdesi | View veya RPC |
+POZİTİF hareket = stok AZALIR (kullanım, görev düşümü)
+NEGATİF hareket = stok ARTAR (ekleme, iade)
+
+Stok eklemek için: INSERT stok_hareket ... miktar = -p_miktar
+Stok düşmek için: INSERT stok_hareket ... miktar = +p_miktar
+```
+
+### 4. Mevcut RPC pattern'ini oku
+Aynı tabloya yazan başka RPC varsa, o pattern'i takip et. Özellikle:
+- islem_log snapshot formatı: `{olusturulan: [], guncellenen: [], silinen: []}`
+- ref_id ve ref_tablo kolonları dolu olmalı
+- GRANT EXECUTE ... TO anon, authenticated unutma
+
+### 5. Deploy Süreci
+- Migration dosyası repoda olması = canlıda çalışıyor DEĞİL
+- `supabase_migrate` MCP aracı veya `supabase db push` ile ayrıca deploy et
+- GitHub Pages sadece JS'i günceller, SQL'i Supabase'e göndermez
+
+---
+
+### 6. Referans Migration Seçimi (KRİTİK!)
+
+**`*_revize.sql`, `*_fix.sql`, ara migration'lar YANLIŞ referanstır — kırık versiyon olabilir.**
+
+| Doğru | Yanlış |
+|-------|--------|
+| `supabase/migrations/99999999999999_ground_truth.sql` | `20260513000006_laktasyon_kuru_kontrol_revize.sql` |
+| `.claude/rpc-reference.md` | Herhangi ara `*_revize.sql`, `*_fix.sql` |
+
+```bash
+# Her SQL görevine başlamadan önce oku:
+file_read("supabase/migrations/99999999999999_ground_truth.sql")
+file_read(".claude/rpc-reference.md")
+```
+
+Neden: Goose revize migration'ı referans alınca 30 hayvan için yanlış görev açtı, tüm veri bozuldu (2026-05-18).
+
+### 7. DB Değişikliği — Approval Gate (ZORUNLU)
+
+Herhangi bir `CREATE/ALTER/UPDATE/INSERT/DELETE` yazmadan önce orchestrator'a sor:
+
+```
+agent_send(
+  to="{from_agent}",
+  message="ONAY GEREKLİ: [ne yapılacak]\nEtkilenecek tablolar: [...]\nRisk: [veri kaybı var mı?]\nSQL taslağı:\n[yazmak istediğin SQL]",
+  message_type="approval_req"
+)
+# → "Onaylıyorum" mesajını BEKLE. Gelene kadar hiçbir DB yazma yapma.
+```
+
+**İstisna:** Sadece SELECT / okuma — onay gerekmez.
+
+---
+
+## Referans Dosyaları (task başında oku)
+
+| Dosya | İçerik |
+|-------|--------|
+| `.claude/rpc-reference.md` | Tüm mevcut RPC imzaları |
+| `.claude/domain-rules.md` | İş kuralları (yaş, state machine, ledger) |
+| `supabase/migrations/99999999999999_ground_truth.sql` | Canonical DB state |
+| `docs/architecture-violations.md` | Çözülen + kalan ihlaller |
 
 ## Acil Durum — Yeni Özellik Eklerken
 
-1. **Önce DB'de RPC/trigger/view var mı kontrol et** — yoksa yaz, sonra frontend'i bağla
-2. **`write()` kullanma** — `rpc()` kullan
-3. **View varsa frontend'de hesaplama yapma** — view'dan gelen hazır alanı kullan
-4. **State machine'i frontend'de işletme** — backend RPC/trigger yapsın
-5. **Tarih/yaş/gün hesabını frontend'de yapma** — DB `CURRENT_DATE - dogum_tarihi` yapar
-
-## Okuma Alışkanlığı
-
-```js
-// DOĞRU — view'dan hazır veri
-getData('stok_tuketim_view').then(rows => render(rows));
-// rows[0].guncel_stok, rows[0].stok_durum hazır
-
-// DOĞRU — RPC'den dönen hazır sonuç
-const { data } = await rpc('hayvan_guncelle', { ... });
-// data.ok, data.mesaj zaten backend'de hesaplanmış
-
-// YANLIŞ — aynı veriyi frontend'de tekrar hesaplama
-const used = moves.reduce(...); // ❌
-const guncel = baslangic - used;  // ❌
-```
+1. Önce DB'de RPC/trigger/view var mı kontrol et
+2. `write()` kullanma — `rpc()` kullan
+3. View varsa frontend'de hesaplama yapma
+4. State machine'i frontend'de işletme
+5. Tarih/yaş/gün hesabını frontend'de yapma — DB yapar
+6. SQL yazmadan önce ground_truth.sql oku, onay al
