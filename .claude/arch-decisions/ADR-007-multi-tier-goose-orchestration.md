@@ -1,8 +1,8 @@
 # ADR-007 — Multi-Tier Goose Orchestration Mimarisi
 
 **Tarih:** 2026-05-18  
-**Durum:** TASARIM AŞAMASI — henüz implement edilmedi  
-**Sonraki adım:** summon MCP paylaşım testi → goused-api geliştirmeleri → goose-ops recipe
+**Durum:** TASARIM ONAYLANDI — summon MCP testi geçti, goused-api geliştirmeleri bekliyor  
+**Sonraki adım:** goused-api commit lock → tier slots → cascade kill → goose-ops recipe
 
 ---
 
@@ -203,7 +203,11 @@ goused-api 90s heartbeat gelmezse: cascade kill + slot serbest bırak
 
 ## Açık Sorular — Test Edilmesi Gereken
 
-### KRİTİK: Goose Native Subagent MCP Paylaşımı
+### ✅ TAMAMLANDI: Goose Native Subagent MCP Paylaşımı
+
+**Test tarihi:** 2026-05-18  
+**Test recipe:** `/root/tools-bank/recipes/summon-test.yaml`  
+**Sonuç:** `MCP_ACCESSIBLE=true` — **PAYLAŞILIYOR**
 
 Binary analizi (2026-05-18) şunları gösterdi:
 - `sub_agent` session tipi mevcut
@@ -213,17 +217,10 @@ Binary analizi (2026-05-18) şunları gösterdi:
 - `delegatesubagent` + `resuming builtin` → subagent resumable
 - Native tools fire-and-forget DEĞİL: interrupt + stop mevcut
 
-**Test edilmesi gereken:**
-Summon ile spawn edilen subagent, parent'ın MCP bağlantılarını paylaşıyor mu?
-
-```yaml
-# Test recipe: summon-test.yaml
-# Spawn subagent → subagent tools-bank'a erişip erişemiyor mu?
-```
-
-**Sonuca göre strateji:**
-- **MCP paylaşılıyor** → Tier-2 workers için native summon kullan. Avantaj: 8 goose için sadece 2 MCP process (parent'ınkiler). Tier-1 orchestrator hâlâ goused-api ile spawn edilir (Claude görür).
-- **MCP paylaşılmıyor** → goused-api full hiyerarşi. 8 goose × 2 MCP = 16 process — tablet riski var, max eşzamanlı worker'ı sınırla.
+**Karar:** Tier-2 workers için native summon kullanılacak.
+- 8 goose için sadece **2 MCP process** (orchestrator'ın mcp'leri, workers inherit eder)
+- Tier-1 orchestrator hâlâ goused-api ile spawn edilir (Claude tarafından görülebilir)
+- Tablet "ciğer sokma" riski ortadan kalktı
 
 ---
 
@@ -234,12 +231,12 @@ goused-api spawn modeli (şu an):
   8 goose × 2 MCP (tools-bank + duckduckgo) = 16 ekstra process
   Azaltma: duckduckgo sadece researcher recipe → gerçek max ~10 process
 
-Native summon MCP paylaşım modeli (test bekleniyor):
+Native summon MCP paylaşım modeli (✅ TEST GEÇTİ — 2026-05-18):
   2 orchestrator × 2 MCP = 4 ekstra process (workers inherit)
-  Çok daha verimli
+  Çok daha verimli — KULLANILACAK MODEL BU
 
 Kullanıcı notu: "şu an sorun yok ama tablet bir aşamada ciğer sokabilir"
-→ Şimdilik izle, summon testine göre karar ver
+→ Summon paylaşım testi geçti — 4 process yeterli, tablet riski yok
 ```
 
 ---
@@ -247,7 +244,7 @@ Kullanıcı notu: "şu an sorun yok ama tablet bir aşamada ciğer sokabilir"
 ## Uygulama Sırası
 
 ```
-[ ] 1. summon MCP paylaşım testi (küçük test recipe, 10dk)
+[x] 1. summon MCP paylaşım testi — TAMAMLANDI, MCP paylaşılıyor (2026-05-18)
 [ ] 2. goused-api: commit lock endpoint
 [ ] 3. goused-api: parent_session_id + tier slots + cascade kill
 [ ] 4. goosed-api: heartbeat watchdog
