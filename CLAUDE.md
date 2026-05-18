@@ -83,6 +83,39 @@ Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 - Tohumlama state machine bypass edilmez
 - Hook hataları (superpowers "hook error"): zararsız, görmezden gel
 
+## Goose SQL Approval Gate (ZORUNLU)
+
+**Herhangi bir DB değişikliği (migration/RPC/UPDATE/INSERT) yazmadan önce Goose Claude'dan onay almalı.**
+
+### Orchestrator Olarak Claude'un Sorumluluğu
+
+Goose'a SQL içeren görev verirken spec'e ekle:
+```
+⚠️ DB DEĞİŞİKLİĞİ ONAY ZORUNLU: Herhangi bir CREATE/ALTER/UPDATE/INSERT
+yazmadan önce approval_req mesajıyla bana sor. Ben "Onaylıyorum" diyene kadar duraksa.
+```
+
+Goose `approval_req` gönderince Claude **inceleyip onaylamalı** — "onaylıyorum" demeden devam etmemeli.
+
+### Referans Dosya Seçimi
+
+**ASLA** ara migration'ı referans alma:
+
+| Doğru | Yanlış |
+|-------|--------|
+| `99999999999999_ground_truth.sql` | `*_revize.sql`, `*_fix.sql`, herhangi ara migration |
+| `.claude/rpc-reference.md` | Eski versiyon migration'lar |
+
+### Goose SQL Pre-Check (spec'e her zaman ekle)
+
+```
+SQL yazmadan önce:
+1. file_read("supabase/migrations/99999999999999_ground_truth.sql") — canonical referans
+2. file_read(".claude/rpc-reference.md") — mevcut RPC imzaları
+3. Tablo şemasını supabase_query ile doğrula
+4. Domain kuralını .claude/domain-rules.md'den oku
+```
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
