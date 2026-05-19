@@ -317,7 +317,7 @@ async function submitCase(btn) {
     cl('d-hid'); cl('d-case-notes');
     g('d-disease-id').value = '';
     g('d-disease-cat').style.display = 'none';
-    await pullTables(['cases','diseases','drugs']);
+    await pullTables(['cases','diseases','drugs','kizginlik_log']);
     _drugsCache = [];
     await loadDrugsCache();
     // Kızgınlık tedavi bağlantısı
