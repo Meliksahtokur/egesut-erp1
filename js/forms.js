@@ -970,9 +970,10 @@ async function islemGeriAl(btn, islemLogId) {
       rpcName = 'tohumlama_geri_al';
       rpcParams = { p_tohumlama_id: islem.ref_id };
     } else if (islem.tip === 'HASTALIK_KAYDI') {
-      const caseId = islem.snapshot?.case_id || islem.ref_id;
-      rpcName = 'case_geri_al';
-      rpcParams = { p_case_id: caseId };
+      // islem_log'daki HASTALIK_KAYDI eski hastalik_log tablosundan gelir
+      // cases tablosu icin trigger henuz eklenmedi, generic geri_al RPC kullan
+      rpcName = 'geri_al';
+      rpcParams = { p_islem_id: islemLogId };
     }
 
     const res = await rpc(rpcName, rpcParams);
