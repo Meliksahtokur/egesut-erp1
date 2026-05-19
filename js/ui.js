@@ -275,8 +275,8 @@ async function kizginlikYoktu(hayvanId, dogumId) {
 
 // ── Kızgınlık → Tedavi Aç ────────────────────
 function kizginlikTedaviAc(kayitId, kupe) {
-  openMWithHayvan('m-disease', 'd-hid', kupe);
   globalThis._kizginlikTedaviId = kayitId;
+  openMWithHayvan('m-disease', 'd-hid', kupe);
 }
 
 // ── Kızgınlık Sil ────────────────────────────
