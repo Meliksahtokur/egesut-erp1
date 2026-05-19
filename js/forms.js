@@ -308,6 +308,10 @@ async function submitCase(btn) {
       p_disease_id: diseaseId,
       p_notes:      v('d-case-notes') || null,
     });
+    if (!res?.ok) {
+      toast('❌ ' + (res?.mesaj || 'Vaka açılamadı'), true);
+      return;
+    }
     toast('✅ Vaka açıldı');
     closeM('m-disease');
     cl('d-hid'); cl('d-case-notes');
@@ -316,19 +320,20 @@ async function submitCase(btn) {
     await pullTables(['cases','diseases','drugs']);
     _drugsCache = [];
     await loadDrugsCache();
-      // Kızgınlık tedavi bağlantısı
-      if (globalThis._kizginlikTedaviId) {
-        const kid = globalThis._kizginlikTedaviId;
-        globalThis._kizginlikTedaviId = null;
-        try {
-          await rpc('kizginlik_tedavi_baglanti_kur', {
-            p_kayit_id: kid,
-            p_case_id:  res.case_id
-          });
-        } catch (e) {
-          console.warn('Kızgınlık-case bağlantısı kurulamadı:', e);
-        }
+    // Kızgınlık tedavi bağlantısı
+    if (globalThis._kizginlikTedaviId && res?.case_id) {
+      const kid = globalThis._kizginlikTedaviId;
+      globalThis._kizginlikTedaviId = null;
+      try {
+        await rpc('kizginlik_tedavi_baglanti_kur', {
+          p_kayit_id: kid,
+          p_case_id:  res.case_id
+        });
+        toast('🔗 Kızgınlık tedaviye bağlandı');
+      } catch (e) {
+        toast('⚠️ Kızgınlık-case bağlantısı kurulamadı: ' + e.message, true);
       }
+    }
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
       await openDet(hayvan.id);
