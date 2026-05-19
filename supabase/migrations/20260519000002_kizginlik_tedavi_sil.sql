@@ -76,4 +76,23 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.kizginlik_tedavi_baglanti_kur(text, uuid) TO anon, authenticated;
 
+-- 5. Tohumlama kaydı → kızgınlığı otomatik kapat
+CREATE OR REPLACE FUNCTION public._tohumlama_kizginlik_kapat()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  UPDATE public.kizginlik_log
+  SET cozuldu = true
+  WHERE hayvan_id = NEW.hayvan_id
+    AND tarih <= NEW.tarih
+    AND cozuldu = false;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_tohumlama_kizginlik ON public.tohumlama;
+CREATE TRIGGER trg_tohumlama_kizginlik
+  AFTER INSERT ON public.tohumlama
+  FOR EACH ROW
+  EXECUTE FUNCTION public._tohumlama_kizginlik_kapat();
+
 COMMIT;
