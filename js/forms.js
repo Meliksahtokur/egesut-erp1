@@ -985,7 +985,8 @@ async function islemGeriAl(btn, islemLogId) {
     await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','cases','treatment_days','stok_hareket','islem_log']);
     renderSafe();
   } catch (e) {
-    toast('❌ Geri alma başarısız: ' + getUserMessage(e), true);
+    const sebep = e?.message || String(e);
+    toast('❌ Geri alma başarısız: ' + sebep, true);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'İşlemi Geri Al'; }
   }
