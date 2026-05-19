@@ -966,7 +966,7 @@ async function islemGeriAl(btn, islemLogId) {
     let rpcParams = { p_islem_id: islemLogId };
 
     // Domain-specific geri alma
-    if (islem.tip === 'TOHUMLAMA' || islem.tip === 'TOHUMLAMA_GUNCELLENDI') {
+    if ((islem.tip === 'TOHUMLAMA' || islem.tip === 'TOHUMLAMA_GUNCELLENDI') && islem.ref_id) {
       rpcName = 'tohumlama_geri_al';
       rpcParams = { p_tohumlama_id: islem.ref_id };
     } else if (islem.tip === 'HASTALIK_KAYDI') {
