@@ -137,7 +137,7 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
 
 async function ileriGebeKontrol(){
   try {
-    const res=await rpc('ileri_gebe_gorev_kontrol');
+    const res=await rpc('gebelik_protokol_kontrol');
     if(res?.ok){
       const n=res.olusturulan||0;
       toast(n>0?`✅ ${n} yeni görev oluşturuldu`:'✅ Tüm görevler güncel');
@@ -177,10 +177,8 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneG
     const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
     h+=band('amber',title,
       (ileriGebeler||[]).map(b=>{
-        const a=aMap&&aMap[b.hayvan_id];
-        const kid=a?.kupe_no||a?.devlet_kupe||b.hayvan_id;
-        const gun=Math.floor((Date.now()-new Date(b.tarih))/86400000);
-        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${gun}. gün · ${a?.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+        const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
+        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${b.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if(nearBirth.length){
@@ -203,7 +201,7 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=new Date().toISOString().split('T')[0];
-    const [animals,diseases,tasks,stock,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
+    const [animals,diseases,tasks,stock,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum,ileriGebeView]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi&&!t.iptal),
@@ -215,6 +213,7 @@ async function loadDash(){
       getData('vaccines'),
       getData('kizginlik_log'),
       getData('tohumlama'),
+      idbGetAll('ileri_gebe_view'),
     ]);
     const critStk=stock.filter(s=>s.stok_durum==='kritik').length;
     const negStk=stock.filter(s=>s.stok_durum==='tukendi').length;
@@ -232,10 +231,7 @@ async function loadDash(){
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
     const aMap={}; animals.forEach(a=>aMap[a.id]=a);
     const nearBirth=gebeTohs.filter(t=>{ if(!t.tarih)return false; const d=Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000); return d>=0&&d<=7; });
-    const ileriGebeler=gebeTohs
-      .map(t=>({...t,gun:Math.floor((Date.now()-new Date(t.tarih))/86400000)}))
-      .filter(t=>t.gun>=210)
-      .sort((a,b)=>b.gun-a.gun);
+    const ileriGebeler=ileriGebeView||[];
     // Filter births60: hide if kizginlik or tohumlama recorded after birth
     const births60F=births60.filter(b=>{
       const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
@@ -255,10 +251,7 @@ async function loadDash(){
       const resBuz=await rpc('buzagi_sutten_kesme_kontrol');
       if(resBuz&&resBuz.ok&&resBuz.olusturulan>0) toast('🍼 '+resBuz.olusturulan+' buzağı sütten kesme görevi oluşturuldu');
     } catch(e){ /* sessiz */ }
-    try {
-      const resLak=await rpc('laktasyon_kuru_kontrol');
-      if(resLak&&resLak.ok&&resLak.olusturulan>0) toast('⚠️ '+resLak.olusturulan+' inek kuru döneme geçirilmeli');
-    } catch(e){ /* sessiz */ }
+
     const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){

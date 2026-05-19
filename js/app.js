@@ -648,7 +648,7 @@ window.addEventListener('load', withErrorHandling(async () => {
         globalThis._TH = data || [];
       }).catch(console.warn);
       // İleri gebe görev kontrolü — sessiz, fire-and-forget
-      rpc('ileri_gebe_gorev_kontrol').catch(console.warn);
+      rpc('gebelik_protokol_kontrol').catch(console.warn);
     } catch (e) { console.warn('Pull failed:', e.message); }
   } else {
     g('dot')?.classList.add('warn');
