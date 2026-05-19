@@ -1,6 +1,6 @@
 # Gebelik Protokol Birleştirme — Implementasyon Planı
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers (Goose):** Planı task-by-task uygula. Adımları tamamladıkça `- [ ]` → `- [x]` işaretle. Working doc: `blackboard/working/{task_id}.md`
 
 **Goal:** `ileri_gebe_gorev_kontrol()` ve `laktasyon_kuru_kontrol()` kaldırılıp tek `gebelik_protokol_kontrol()` RPC'sine birleştirilecek; `ileri_gebe_view` VIEW oluşturulup dashboard bu view'dan beslenecek, frontend'deki hesap kodu kaldırılacak.
 
