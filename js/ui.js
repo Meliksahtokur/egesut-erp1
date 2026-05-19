@@ -273,6 +273,26 @@ async function kizginlikYoktu(hayvanId, dogumId) {
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
+// ── Kızgınlık → Tedavi Aç ────────────────────
+function kizginlikTedaviAc(kayitId, kupe) {
+  openMWithHayvan('m-disease', 'd-hid', kupe);
+  globalThis._kizginlikTedaviId = kayitId;
+}
+
+// ── Kızgınlık Sil ────────────────────────────
+async function kizginlikSil(kayitId) {
+  if (!confirm('Bu kızgınlık kaydını silmek istediğinize emin misiniz?')) return;
+  try {
+    const res = await rpc('kizginlik_sil', { p_kayit_id: kayitId });
+    if (!res?.ok) throw new Error(res?.hata || 'Silme başarısız');
+    toast('🗑️ Kızgınlık kaydı silindi');
+    await pullTables(['kizginlik_log']);
+    if (typeof loadUreme === 'function') loadUreme('kizginlik');
+  } catch (e) {
+    toast('❌ ' + e.message, true);
+  }
+}
+
 // ── KIZGINLIK BAR ALERT ──────────────────────
 async function updateKizginlikAlert() {
   try {
@@ -1256,19 +1276,28 @@ function uremeTab(tab,btn){
 // ── ÜREME TAB HELPER'LAR ────────────────────
 async function _uremeKizginlik(el){
   const list=await idbGetAll('kizginlik_log');
-  list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||'')); 
+  list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
   el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`+
     (list.length?list.map(k=>{
       const h=getState('animals').find(a=>a.id===k.hayvan_id);
       const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
+      const cozulduKulp=k.cozuldu
+        ? `<span style="font-size:.6rem;color:var(--green);background:rgba(78,154,42,.1);border-radius:4px;padding:1px 5px;margin-left:4px">✅ Tedavi</span>`
+        : '';
       return `<div class="hist-row">
         <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
         <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
-          <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'}</div>
+          <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'} ${cozulduKulp}</div>
           <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
         </div>
-        <button style="background:var(--blue);color:#fff;white-space:nowrap;flex-shrink:0;padding:2px 5px;font-size:.62rem;min-width:auto;line-height:1.1;border-radius:4px;border:none;cursor:pointer;font-weight:700"
-          onclick="event.stopPropagation();openMWithHayvan('m-insem','i-hid','${kupe}')">💉 Tohumla</button>
+        <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
+          <button style="background:var(--blue);color:#fff;padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700"
+            onclick="event.stopPropagation();openMWithHayvan('m-insem','i-hid','${kupe}')">💉 Tohumla</button>
+          <button style="background:rgba(42,107,181,.15);color:var(--blue);padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;white-space:nowrap"
+            onclick="event.stopPropagation();kizginlikTedaviAc('${k.id}','${kupe}')">🏥 Tedavi</button>
+          <button style="background:rgba(192,50,26,.1);color:var(--red2);padding:2px 5px;font-size:.6rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;line-height:1"
+            onclick="event.stopPropagation();kizginlikSil('${k.id}')">🗑️</button>
+        </div>
       </div>`;
     }).join(''):'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
 }
@@ -3522,7 +3551,7 @@ async function dataTrafficTekGonder(qid){
     dogum: { POST: 'dogum_kaydet' },
     gorev_log: { PATCH: 'gorev_tamamla' },
     stok_hareket: { POST: 'stok_hareket_ekle' },
-    kizginlik_log: { POST: 'kizginlik_kaydet' },
+    kizginlik_log: { POST: 'kizginlik_kaydet', DELETE: 'kizginlik_sil' },
     cases: { POST: 'create_case' },
     drug_administrations: { POST: 'add_drug_administration', PATCH: 'update_drug_administration' }
   };
@@ -3607,6 +3636,10 @@ function buildRpcParams(rpcName, data, op) {
         p_tarih: data.tarih,
         p_belirti: data.belirti || null,
         p_notlar: data.notlar || null
+      };
+    case 'kizginlik_sil':
+      return {
+        p_kayit_id: data.id || op.filter?.replace('id=eq.', '')
       };
     case 'create_case':
       return {

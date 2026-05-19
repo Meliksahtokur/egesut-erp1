@@ -238,9 +238,16 @@ async function loadDiseasesDropdown() {
   const sel = g('d-disease-id');
   if (!sel) return;
   const list = await idbGetAll('diseases');
+  
+  // Kızgınlık tedavi akışından geliniyorsa sadece Üreme hastalıklarını göster
+  const sadeceUreme = !!globalThis._kizginlikTedaviId;
+  const filtrelenmis = sadeceUreme
+    ? list.filter(d => (d.category || '').toLowerCase() === 'üreme')
+    : list;
+
   // Kategoriye göre grupla
   const grouped = {};
-  list.forEach(d => {
+  filtrelenmis.forEach(d => {
     const cat = d.category || 'Diğer';
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(d);
@@ -258,6 +265,18 @@ async function loadDiseasesDropdown() {
     });
     sel.appendChild(og);
   });
+
+  // Sadece Üreme ise info notu ekle
+  if (sadeceUreme) {
+    // Önceki notu temizle
+    const prev = sel.parentNode.querySelector('.kizginlik-info');
+    if (prev) prev.remove();
+    const info = document.createElement('div');
+    info.style.cssText = 'font-size:.68rem;color:var(--ink3);padding:4px 0;text-align:center';
+    info.textContent = '🔴 Kızgınlık tedavisi için üreme hastalıkları listeleniyor';
+    info.className = 'kizginlik-info';
+    sel.parentNode.insertBefore(info, sel.nextSibling);
+  }
 }
 
 function onDiseaseSelect() {
@@ -297,6 +316,19 @@ async function submitCase(btn) {
     await pullTables(['cases','diseases','drugs']);
     _drugsCache = [];
     await loadDrugsCache();
+      // Kızgınlık tedavi bağlantısı
+      if (globalThis._kizginlikTedaviId) {
+        const kid = globalThis._kizginlikTedaviId;
+        globalThis._kizginlikTedaviId = null;
+        try {
+          await rpc('kizginlik_tedavi_baglanti_kur', {
+            p_kayit_id: kid,
+            p_case_id:  res.case_id
+          });
+        } catch (e) {
+          console.warn('Kızgınlık-case bağlantısı kurulamadı:', e);
+        }
+      }
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
       await openDet(hayvan.id);
@@ -726,6 +758,7 @@ let _editMode = false;
 
 function closeDisease() {
   _editMode = false;
+  globalThis._kizginlikTedaviId = null;
   const t = document.getElementById('m-disease-title');
   if (t) t.textContent = '🏥 Hastalık / Tedavi';
   ['d-hid','d-tani','d-sempt','d-lokasyon'].forEach(id => { const e = document.getElementById(id); if(e) e.value=''; });
