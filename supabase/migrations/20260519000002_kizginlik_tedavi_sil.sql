@@ -65,7 +65,8 @@ CREATE OR REPLACE FUNCTION public.kizginlik_tedavi_baglanti_kur(p_kayit_id text,
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   UPDATE public.kizginlik_log
-  SET tedavi_case_id = p_case_id
+  SET tedavi_case_id = p_case_id,
+      cozuldu       = true
   WHERE id = p_kayit_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'hata', 'Kayıt bulunamadı');
