@@ -205,7 +205,7 @@ registerActions({
   'case-kapat':         () => caseKapat(),
   'toh-sonuc-kaydet':   () => tohSonucKaydet(),
   'toh-sonuc-bekliyor': () => tohSonuc('Bekliyor'),
-  'geri-al':            (el) => geriAl(g('ga-hid').value, el),
+  'geri-al':            (el) => islemGeriAl(el, g('ga-hid').value),
   'submit-cikis':       (el) => submitCikis(el),
   'submit-gebelik':     (el) => submitGebelikEkle(el),
   'submit-task-add':    (el) => submitTaskAdd(el),
