@@ -959,7 +959,8 @@ async function islemGeriAl(btn, islemLogId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Geri alınıyor…'; }
 
   try {
-    const islem = await idbGet('islem_log', islemLogId);
+    const islemList = await idbGetAll('islem_log');
+    const islem = islemList.find(i => i.id === islemLogId);
     if (!islem) { toast('⚠️ İşlem bulunamadı', true); return; }
 
     let rpcName = 'geri_al';
