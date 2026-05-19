@@ -1277,29 +1277,42 @@ function uremeTab(tab,btn){
 async function _uremeKizginlik(el){
   const list=await idbGetAll('kizginlik_log');
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`+
-    (list.length?list.map(k=>{
-      const h=getState('animals').find(a=>a.id===k.hayvan_id);
-      const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
-      const cozulduKulp=k.cozuldu
-        ? `<span style="font-size:.6rem;color:var(--green);background:rgba(78,154,42,.1);border-radius:4px;padding:1px 5px;margin-left:4px">✅ Tedavi</span>`
-        : '';
-      return `<div class="hist-row">
-        <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
-        <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
-          <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'} ${cozulduKulp}</div>
-          <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
-        </div>
-        <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
+  const aktif=list.filter(k=>!k.cozuldu);
+  const cozulmus=list.filter(k=>k.cozuldu);
+  const card=(k,cozulduMi)=>{
+    const h=getState('animals').find(a=>a.id===k.hayvan_id);
+    const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
+    const badge=cozulduMi
+      ? `<span style="font-size:.6rem;color:var(--green);background:rgba(78,154,42,.1);border-radius:4px;padding:1px 5px;margin-left:4px">✅ Tedavi</span>`
+      : '';
+    return `<div class="hist-row">
+      <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
+      <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
+        <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'} ${badge}</div>
+        <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
+      </div>
+      <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
+        ${cozulduMi?'':`
           <button style="background:var(--blue);color:#fff;padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700"
             onclick="event.stopPropagation();openMWithHayvan('m-insem','i-hid','${kupe}')">💉 Tohumla</button>
           <button style="background:rgba(42,107,181,.15);color:var(--blue);padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;white-space:nowrap"
             onclick="event.stopPropagation();kizginlikTedaviAc('${k.id}','${kupe}')">🏥 Tedavi</button>
-          <button style="background:rgba(192,50,26,.1);color:var(--red2);padding:2px 5px;font-size:.6rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;line-height:1"
-            onclick="event.stopPropagation();kizginlikSil('${k.id}')">🗑️</button>
-        </div>
-      </div>`;
-    }).join(''):'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
+        `}
+        <button style="background:rgba(192,50,26,.1);color:var(--red2);padding:2px 5px;font-size:.6rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;line-height:1"
+          onclick="event.stopPropagation();kizginlikSil('${k.id}')">🗑️</button>
+      </div>
+    </div>`;
+  };
+  const aktifHtml=aktif.length
+    ? `<div style="margin-bottom:8px;font-size:.72rem;font-weight:700;color:var(--red2);text-transform:uppercase;letter-spacing:.06em;padding:4px 0">🔴 Bekleyen Kızgınlıklar (${aktif.length})</div>`
+      +aktif.map(k=>card(k,false)).join('')
+    : '';
+  const cozulmusHtml=cozulmus.length
+    ? `<div style="margin-top:12px;border-top:1px solid var(--card3);padding-top:8px;font-size:.72rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px">✅ Sonuçlanan (${cozulmus.length})</div>`
+      +cozulmus.map(k=>card(k,true)).join('')
+    : '';
+  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`
+    +(list.length?aktifHtml+cozulmusHtml:'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
 }
 
 async function _uremeGebelik(el){
