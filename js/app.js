@@ -49,33 +49,7 @@ let _customHekimler = [];
 let _customSperma   = [];
 let _disFreq        = {};
 let _ilacCache      = [];
-let _diseasesCache  = [];  // migration 022 diseases tablosu
 
-async function loadDiseasesDropdown(kategori) {
-  const sel = g('d-disease-id');
-  if (!sel) return;
-  if (!_diseasesCache.length) {
-    _diseasesCache = await idbGetAll('diseases');
-  }
-  const filtered = kategori
-    ? _diseasesCache.filter(d => d.category === kategori)
-    : _diseasesCache;
-  const grouped = {};
-  filtered.forEach(d => {
-    const cat = d.category || 'Diğer';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(d);
-  });
-  sel.innerHTML = '<option value="">— Hastalık seçin —</option>'
-    + Object.keys(grouped).sort().map(cat =>
-        `<optgroup label="${cat}">${grouped[cat].map(d => `<option value="${d.id}" data-category="${d.category||''}">${d.name}</option>`).join('')}</optgroup>`
-      ).join('');
-}
-
-function caseKatFiltrele() {
-  const kat = g('case-kat')?.value || '';
-  loadDiseasesDropdown(kat);
-}
 
 // ── GLOBAL STATE ────────────────────────────
 // let _A=[], _S[], _curStk... state'e tasindi (state.js + getState/setState)
