@@ -35,6 +35,7 @@ SELECT DISTINCT ON (kl.hayvan_id)
   kl.belirti,
   EXTRACT(EPOCH FROM (NOW() - kl.olusturma))/3600 AS gecen_saat,
   CASE
+    WHEN kl.cozuldu = true THEN 'cozuldu'
     WHEN EXISTS (
       SELECT 1 FROM tohumlama t
       WHERE t.hayvan_id = kl.hayvan_id

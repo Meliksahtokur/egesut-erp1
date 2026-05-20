@@ -28,6 +28,7 @@ BEGIN
   WHERE hayvan_id = v_tohumlama.hayvan_id
     AND tarih <= v_tohumlama.tarih
     AND cozuldu = true
+    AND tedavi_case_id IS NULL
     AND NOT EXISTS (
       SELECT 1 FROM public.tohumlama t2
       WHERE t2.hayvan_id = v_tohumlama.hayvan_id
