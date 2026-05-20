@@ -114,14 +114,28 @@ description: tools-bank MCP araç rehberi — memory, DeerFlow araştırma,
 6. **Supabase** — kısa referans, canonical dosyaya pointer
 7. **CLI fallback** — MCP yoksa ne yapılır
 
-### Gateway fallback notu (agent'lar için)
-TUI bölümü yok — TUI kullanıcıya özel, agent'lar için geçersiz.
+### `deerflow_gateway_restart()` — yeni araç
 
-Skill'e sadece şu not eklenir:
+Agent'ların gateway'i kendi başlatabilmesi için. TUI açmaz, sadece uvicorn'u başlatır.
+
+**Mantık (`tui+.sh`'dan alınır, Python'a çevrilir):**
+1. `deerflow_health()` → zaten çalışıyorsa erken dön: `"✅ Gateway zaten çalışıyor"`
+2. Eski process varsa öldür (`pkill -f "uvicorn app.gateway.app"`)
+3. `subprocess.Popen(["uv", "run", "uvicorn", "app.gateway.app:app", "--host", "0.0.0.0", "--port", "8001", ...])` — `cwd=/root/deer-flow/backend`
+4. Max 60sn health check döngüsü (2sn aralık)
+5. Başarıda: `"✅ Gateway başlatıldı (Xs)"` — başarısızda: `"❌ Gateway başlatılamadı, log: ..."`
+
+**Agent workflow:**
 ```
-Gateway erişilemiyorsa (deerflow_health ❌):
-- MCP server otomatik başlatır, kısa süre bekle ve tekrar dene
-- Hala başlamazsa kullanıcıyı bilgilendir: "tui+ --status ile kontrol et"
+deerflow_health() → ❌
+  → deerflow_gateway_restart()
+  → deerflow_health() → ✅ → devam
+```
+
+**Skill'deki agent notu:**
+```
+Gateway düşerse: deerflow_gateway_restart() çağır, dönen mesajı kontrol et.
+Hala ❌ ise kullanıcıya bildir.
 ```
 
 ### Eski `mem-tools` skill
@@ -143,6 +157,8 @@ Gateway erişilemiyorsa (deerflow_health ❌):
 
 ## Başarı Kriterleri
 
+- [ ] `deerflow_gateway_restart()` gateway'i başlatır ve health onayı döndürür
+- [ ] Gateway zaten çalışıyorsa restart erken çıkar, process öldürmez
 - [ ] `deerflow_chat` çağrılınca thread_id döndürür
 - [ ] Aynı thread_id ile ikinci çağrı önceki context'i hatırlar
 - [ ] `deerflow_agents()` mevcut agent listesini döndürür
