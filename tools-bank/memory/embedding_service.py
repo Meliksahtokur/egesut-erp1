@@ -99,6 +99,43 @@ def cosine_similarity(a, b):
     return dot / (na * nb)
 
 
+def rebuild_missing():
+    """Yeniden dene: embedding'i olmayan notları Jina API ile embed et."""
+    ensure_embeddings_table()
+    conn = get_conn()
+    c = conn.cursor()
+
+    missing = c.execute("""
+        SELECT n.id, n.content FROM memory_notes n
+        LEFT JOIN memory_embeddings e ON e.note_id = n.id
+        WHERE e.note_id IS NULL
+    """).fetchall()
+    if not missing:
+        print("Tüm notlar zaten embed edilmiş.")
+        conn.close()
+        return
+
+    total = len(missing)
+    print(f"{total} not embedding bekliyor, Jina API'ye gönderiliyor...")
+    for i in range(0, total, 10):
+        batch = missing[i:i+10]
+        texts = [n["content"] for n in batch]
+        try:
+            vectors = get_embeddings(texts)
+            for n, vec in zip(batch, vectors):
+                blob = float_list_to_blob(vec)
+                c.execute(
+                    "INSERT OR REPLACE INTO memory_embeddings (note_id, embedding) VALUES (?, ?)",
+                    (n["id"], blob)
+                )
+            conn.commit()
+            print(f"  {i+len(batch)}/{total}")
+        except Exception as e:
+            print(f"  Hata (batch {i}-{i+len(batch)}): {e}", file=sys.stderr)
+    conn.close()
+    print(f"Done: {total} not embed edildi.")
+
+
 def rebuild_embeddings():
     """Rebuild all embeddings via Jina AI API."""
     ensure_embeddings_table()
@@ -132,13 +169,36 @@ def rebuild_embeddings():
 
 
 def semantic_search(query, limit=10):
-    """Search by embedding cosine similarity."""
+    """Search by embedding cosine similarity. Auto-retry missing embeddings."""
     ensure_embeddings_table()
     conn = get_conn()
     c = conn.cursor()
 
+    note_count = c.execute("SELECT COUNT(*) FROM memory_notes").fetchone()[0]
     embed_count = c.execute("SELECT COUNT(*) FROM memory_embeddings").fetchone()[0]
-    if embed_count == 0:
+
+    # Eksik embedding varsa otomatik dene (en fazla 5, arama gecikmesin)
+    if embed_count < note_count:
+        missing = c.execute("""
+            SELECT n.id, n.content FROM memory_notes n
+            LEFT JOIN memory_embeddings e ON e.note_id = n.id
+            WHERE e.note_id IS NULL LIMIT 5
+        """).fetchall()
+        if missing:
+            texts = [n["content"] for n in missing]
+            try:
+                vectors = get_embeddings(texts)
+                for n, vec in zip(missing, vectors):
+                    blob = float_list_to_blob(vec)
+                    c.execute(
+                        "INSERT OR REPLACE INTO memory_embeddings (note_id, embedding) VALUES (?, ?)",
+                        (n["id"], blob)
+                    )
+                conn.commit()
+            except Exception:
+                pass  # sessiz — hata yoksa güzel, yoksa FTS5 fallback çalışır
+
+    if embed_count == 0 and not missing:
         conn.close()
         return {"results": [], "total": 0, "message": "No embeddings. Run --rebuild first."}
 
@@ -200,6 +260,8 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "--rebuild":
         rebuild_embeddings()
+    elif sys.argv[1] == "--retry-pending":
+        rebuild_missing()
     elif sys.argv[1] == "--search":
         query = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else ""
         if not query:
