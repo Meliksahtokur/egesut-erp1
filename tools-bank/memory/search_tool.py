@@ -148,7 +148,7 @@ def _auto_embed(conn, note_id, content):
         headers={
             "Authorization": "Bearer jina_a9b0ff962ff94ee98f9d7f8d4f7feee9_-qMCCMAbTSnJHf6m7vOaCGbloC0",
             "Content-Type": "application/json",
-            "User-Agent": "curl/8.0",
+            "User-Agent": "Mozilla/5.0",
         },
         method="POST"
     )

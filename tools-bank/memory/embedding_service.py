@@ -63,7 +63,7 @@ def get_embeddings(texts):
         headers={
             "Authorization": f"Bearer {JINA_API_KEY}",
             "Content-Type": "application/json",
-            "User-Agent": "curl/8.0",
+            "User-Agent": "Mozilla/5.0",
         },
         method="POST"
     )
