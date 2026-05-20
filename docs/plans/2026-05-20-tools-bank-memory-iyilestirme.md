@@ -1,6 +1,10 @@
 # Tools-Bank Memory İyileştirme Planı
 
-> **REQUIRED SUB-SKILL:** Use the executing-plans skill to implement this plan task-by-task.
+> ✅ **TAMAMLANDI** — 2026-05-20
+> Phase 1 (Task 1-1 → 1-4) + Jina fix + Füzyon arama. Commit: 2ec32fa
+> Kalan (Phase 2-3): memory_update MCP tool, memory_obsolete MCP tool, Jina API key externalize, async embedding
+
+> **REQUIRED SUB-SKILL:** ~~Use the executing-plans skill to implement this plan task-by-task.~~ ✅ Done
 
 **Goal:** Tools-bank memory sistemini daha güvenilir, sürdürülebilir ve kullanışlı hale getirmek.
 
