@@ -10,7 +10,7 @@ const DB_VER  = 18;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
-                  'vaccination_log','padoklar','grup_padok_eslem','hekimler','ileri_gebe_view'];
+                  'vaccination_log','padoklar','grup_padok_eslem','hekimler'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
@@ -348,7 +348,7 @@ async function pullTables(tables = []) {
       grup_padok_eslem: () => db.from('grup_padok_eslem').select('*'),
       hekimler:         () => db.from('hekimler').select('*').eq('aktif', true),
       gebelik_ozet:     () => db.from('gebelik_ozet_view').select('*'),
-      ileri_gebe_view:  () => db.from('ileri_gebe_view').select('*'),
+      // ileri_gebe_view: () => db.from('ileri_gebe_view').select('*'), — dashboard RPC sonucu kullanıyor
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
