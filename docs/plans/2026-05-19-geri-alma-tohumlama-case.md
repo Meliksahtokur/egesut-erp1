@@ -1,6 +1,6 @@
 # Tohumlama + Cases Geri Alma — Implementation Plan
 
-> **REQUIRED SUB-SKILL:** Use the executing-plans skill to implement this plan task-by-task.
+> ~~REQUIRED SUB-SKILL~~ → **✅ TAMAMLANDI (2026-05-20)**
 
 **Goal:** Tohumlama ve cases (vaka) kayıtlarını tüm yan etkileriyle (stok, görev, tedavi) geri alınabilir hale getirmek.
 
@@ -297,10 +297,13 @@ Mevcut `islemGeriAl` zaten `forms.js`'de tanımlı. Sadece routing'den çağrıl
 
 ## Commit Planı
 
-| Task | Commit Mesajı |
-|------|--------------|
-| Task 1 + 2 | `feat(db): tohumlama_geri_al + case_geri_al RPC` |
-| Task 3 + 4 | `feat(ui): islemGeriAl domain-specific RPC yonlendirmesi` |
+| Task | Commit | Durum |
+|------|--------|-------|
+| Task 1 + 2 — RPC'ler | `ffaaa1d` | ✅ |
+| Task 3 + 4 — Frontend | `ffaaa1d` + `78fc454` + `fecc173` + `6176e8a` | ✅ |
+| Task 5 — Deploy | Supabase + GitHub Pages | ✅ |
+
+**Not:** Sub-agent `idbGet` hatası (`6176e8a`), `getUserMessage` generic mesaj sorunu (`78fc454`), null ref_id koruması (`fecc173`) ve `HASTALIK_KAYDI` yönlendirme düzeltmesi (`d6bd420`) ayrı commitlerle fixlendi. Planın asıl RPC'leri ve UI değişiklikleri `ffaaa1d` ile geldi.
 
 ---
 
