@@ -114,25 +114,14 @@ description: tools-bank MCP araç rehberi — memory, DeerFlow araştırma,
 6. **Supabase** — kısa referans, canonical dosyaya pointer
 7. **CLI fallback** — MCP yoksa ne yapılır
 
-### DeepSeek TUI bölümü
+### Gateway fallback notu (agent'lar için)
+TUI bölümü yok — TUI kullanıcıya özel, agent'lar için geçersiz.
 
+Skill'e sadece şu not eklenir:
 ```
-# DeepSeek TUI
-
-MCP araçları programatik erişim sağlar. TUI interaktif terminal UI'ı.
-
-## Ne zaman TUI tercih et
-- Uzun araştırma (MCP timeout riski)
-- İnteraktif multi-turn sohbet
-- Gateway'i başlatman gerektiğinde
-
-## Başlatma
-tui+                  # Gateway + TUI tek komutla
-tui+ --status         # Servis durumu
-tui+ --stop           # Durdur
-
-Script: /root/deer-flow/scripts/tui+.sh
-Gateway port: 8001
+Gateway erişilemiyorsa (deerflow_health ❌):
+- MCP server otomatik başlatır, kısa süre bekle ve tekrar dene
+- Hala başlamazsa kullanıcıyı bilgilendir: "tui+ --status ile kontrol et"
 ```
 
 ### Eski `mem-tools` skill
