@@ -122,6 +122,10 @@ registerActions({
   'kizginlik-focus': (el) => acHayvan('k-hid', 'ac-khid'),
   'kizginlik-keydown': (opts) => acNav(opts.event, 'ac-khid'),
   'submit-kizginlik':  (el) => submitKizginlik(el),
+  'kizginlik-search':  () => kizginlikSearch(),
+  'kizginlik-filtre-tumu':        (el) => kizginlikFiltre('tumu', el),
+  'kizginlik-filtre-bekleyen':    (el) => kizginlikFiltre('bekleyen', el),
+  'kizginlik-filtre-sonuclanan':  (el) => kizginlikFiltre('sonuclanan', el),
 
   // ═══ TOHUMLAMA ═══
   'insem-ac':     (el) => { acHayvan('i-hid', 'ac-ihid'); el.focus(); },

@@ -336,6 +336,18 @@ button,input,select,textarea{font-family:inherit}
         <button class="fs-btn" id="ureme-tab-dogum" data-action="ureme-dogum">🐄 Doğum</button>
         <button class="fs-btn" id="ureme-tab-abort" data-action="ureme-abort">⚠️ Abort</button>
       </div>
+      <div id="kizginlik-toolbar" style="display:none;padding:4px 0">
+        <div class="search-bar" style="position:relative">
+          <div style="flex:1;position:relative">
+            <input class="srch" id="kizginlik-srch" placeholder="🔍 Küpe ara…" data-input="kizginlik-search" autocomplete="off">
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0">
+          <button class="fchip on" id="fc-kizginlik-tumu" data-action="kizginlik-filtre-tumu">Tümü</button>
+          <button class="fchip" id="fc-kizginlik-bekleyen" data-action="kizginlik-filtre-bekleyen">🔴 Bekleyen</button>
+          <button class="fchip" id="fc-kizginlik-sonuclanan" data-action="kizginlik-filtre-sonuclanan">✅ Sonuçlanan</button>
+        </div>
+      </div>
       <div id="ureme-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>

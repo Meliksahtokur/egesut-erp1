@@ -1275,10 +1275,28 @@ function uremeTab(tab,btn){
 }
 // ── ÜREME TAB HELPER'LAR ────────────────────
 async function _uremeKizginlik(el){
-  const list=await idbGetAll('kizginlik_log');
+  // Toolbar'ı göster
+  const tb=document.getElementById('kizginlik-toolbar');
+  if(tb) tb.style.display='block';
+  // Filtre + search oku
+  const q=(document.getElementById('kizginlik-srch')?.value||'').toLowerCase().trim();
+  const flt=globalThis._kizginlikFilter||'tumu';
+  let list=await idbGetAll('kizginlik_log');
+  const animals=getState('animals')||[];
+  // Search filtresi
+  if(q){
+    list=list.filter(k=>{
+      const h=animals.find(a=>a.id===k.hayvan_id);
+      const kupe=(h?.kupe_no||h?.devlet_kupe||'').toLowerCase();
+      return kupe.includes(q)||k.hayvan_id.toLowerCase().includes(q);
+    });
+  }
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-  const aktif=list.filter(k=>!k.cozuldu);
-  const cozulmus=list.filter(k=>k.cozuldu);
+  // Durum filtresi
+  let aktif=list.filter(k=>!k.cozuldu);
+  let cozulmus=list.filter(k=>k.cozuldu);
+  if(flt==='bekleyen') cozulmus=[];
+  else if(flt==='sonuclanan') aktif=[];
   const card=(k,cozulduMi)=>{
     const h=getState('animals').find(a=>a.id===k.hayvan_id);
     const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
@@ -1313,6 +1331,23 @@ async function _uremeKizginlik(el){
     : '';
   el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`
     +(list.length?aktifHtml+cozulmusHtml:'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
+}
+
+let _kizginlikSearchTimer=null;
+function kizginlikSearch(){
+  clearTimeout(_kizginlikSearchTimer);
+  _kizginlikSearchTimer=setTimeout(()=>{
+    if(typeof loadUreme==='function') loadUreme('kizginlik');
+  },250);
+}
+function kizginlikFiltre(deger,btn){
+  const onceki=globalThis._kizginlikFilter||'tumu';
+  globalThis._kizginlikFilter=onceki===deger?null:deger;
+  ['fc-kizginlik-tumu','fc-kizginlik-bekleyen','fc-kizginlik-sonuclanan'].forEach(id=>{
+    const b=document.getElementById(id);
+    if(b) b.classList.toggle('on',b===btn);
+  });
+  if(typeof loadUreme==='function') loadUreme('kizginlik');
 }
 
 async function _uremeGebelik(el){
@@ -1493,6 +1528,9 @@ async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
   const el=document.getElementById('ureme-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  // Kizginlik disindaki tablerde toolbar'i gizle
+  const tb=document.getElementById('kizginlik-toolbar');
+  if(tb&&tab!=='kizginlik') tb.style.display='none';
   try {
     if(tab==='kizginlik')      await _uremeKizginlik(el);
     else if(tab==='tohumlama') await _uremeTohumlama(el);
