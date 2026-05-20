@@ -15,8 +15,8 @@ import sys
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory.db")
 
 
-def search(query, category=None, limit=10, json_output=False):
-    """FTS5 search with optional category filter and priority boost."""
+def search(query, category=None, limit=10, json_output=False, include_obsolete=False):
+    """FTS5 search with optional category filter, priority boost, and obsolete filter."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -45,6 +45,9 @@ def search(query, category=None, limit=10, json_output=False):
     """
     params = [fts_query]
 
+    if not include_obsolete:
+        sql += " AND n.obsolete = 0"
+
     if category:
         sql += " AND n.category = ?"
         params.append(category)
@@ -64,6 +67,8 @@ def search(query, category=None, limit=10, json_output=False):
             WHERE n.content LIKE ?
         """
         like_params = [like_q]
+        if not include_obsolete:
+            sql_like += " AND n.obsolete = 0"
         if category:
             sql_like += " AND n.category = ?"
             like_params.append(category)
@@ -97,7 +102,9 @@ def search(query, category=None, limit=10, json_output=False):
         for r in results:
             prio = {"high": "🔴", "medium": "🟡", "low": "⚪"}.get(r["priority"], "⚪")
             preview = r["content"][:150] + "..." if len(r["content"]) > 150 else r["content"]
-            print(f"  [{r['id']}] {prio} {r['category']} (relevance: {r['relevance']})")
+            src = r.get("source", "?")
+            dt = r.get("created_at", "?")
+            print(f"  [{r['id']}] {prio} {r['category']} (src:{src}, {dt[:10]})")
             print(f"       {preview}")
             print()
 
@@ -165,6 +172,7 @@ if __name__ == "__main__":
     parser.add_argument("--category", "-c", help="Category filter")
     parser.add_argument("--limit", "-l", type=int, default=10, help="Max results")
     parser.add_argument("--json", action="store_true", help="JSON output")
+    parser.add_argument("--include-obsolete", action="store_true", help="Include obsolete notes (hidden by default)")
     parser.add_argument("--add", action="store_true", help="Add a new note")
     parser.add_argument("--content", help="Note content (for --add)")
     parser.add_argument("--priority", choices=["high", "medium", "low"], default="medium", help="Priority")
@@ -183,6 +191,6 @@ if __name__ == "__main__":
         note_id = add_note(args.content, args.category or "general", args.priority, args.tags, args.source)
         print(json.dumps({"id": note_id, "status": "created"}))
     elif args.query:
-        search(args.query, args.category, args.limit, args.json)
+        search(args.query, args.category, args.limit, args.json, args.include_obsolete)
     else:
         parser.print_help()

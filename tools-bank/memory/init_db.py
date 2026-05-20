@@ -68,6 +68,16 @@ def init_db(path=None):
         END
     """)
 
+    # Schema migration: obsolete + superseded_by (safe to run multiple times)
+    try:
+        c.execute("ALTER TABLE memory_notes ADD COLUMN obsolete INTEGER NOT NULL DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # already exists
+    try:
+        c.execute("ALTER TABLE memory_notes ADD COLUMN superseded_by INTEGER REFERENCES memory_notes(id)")
+    except sqlite3.OperationalError:
+        pass  # already exists
+
     # Index for category queries
     c.execute("""
         CREATE INDEX IF NOT EXISTS idx_memory_notes_category
@@ -80,6 +90,10 @@ def init_db(path=None):
     c.execute("""
         CREATE INDEX IF NOT EXISTS idx_memory_notes_created
         ON memory_notes(created_at DESC)
+    """)
+    c.execute("""
+        CREATE INDEX IF NOT EXISTS idx_memory_notes_obsolete
+        ON memory_notes(obsolete)
     """)
 
     conn.commit()
