@@ -622,7 +622,7 @@ window.addEventListener('load', withErrorHandling(async () => {
         globalThis._TH = data || [];
       }).catch(console.warn);
       // İleri gebe görev kontrolü — sessiz, fire-and-forget
-      rpc('gebelik_protokol_kontrol').catch(console.warn);
+      rpc('gebelik_protokol_kontrol').then(res=>{ if(res?.hayvanlar) window.__ileriGebeListesi=res.hayvanlar; }).catch(console.warn);
     } catch (e) { console.warn('Pull failed:', e.message); }
   } else {
     g('dot')?.classList.add('warn');

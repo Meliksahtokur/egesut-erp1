@@ -141,7 +141,9 @@ async function ileriGebeKontrol(){
     if(res?.ok){
       const n=res.olusturulan||0;
       toast(n>0?`✅ ${n} yeni görev oluşturuldu`:'✅ Tüm görevler güncel');
+      if(res.hayvanlar) window.__ileriGebeListesi=res.hayvanlar;
       if(n>0) pullTables(['gorev_log']).then(loadDash).catch(console.warn);
+      else loadDash();
     }
   } catch(e){ toast('❌ '+e.message,true); }
 }
@@ -201,7 +203,7 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=new Date().toISOString().split('T')[0];
-    const [animals,diseases,tasks,stock,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum,ileriGebeView]=await Promise.all([
+    const [animals,diseases,tasks,stock,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi&&!t.iptal),
@@ -213,7 +215,6 @@ async function loadDash(){
       getData('vaccines'),
       getData('kizginlik_log'),
       getData('tohumlama'),
-      idbGetAll('ileri_gebe_view'),
     ]);
     const critStk=stock.filter(s=>s.stok_durum==='kritik').length;
     const negStk=stock.filter(s=>s.stok_durum==='tukendi').length;
@@ -231,7 +232,7 @@ async function loadDash(){
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
     const aMap={}; animals.forEach(a=>aMap[a.id]=a);
     const nearBirth=gebeTohs.filter(t=>{ if(!t.tarih)return false; const d=Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000); return d>=0&&d<=7; });
-    const ileriGebeler=ileriGebeView||[];
+    const ileriGebeler=window.__ileriGebeListesi||[];
     // Filter births60: hide if kizginlik or tohumlama recorded after birth
     const births60F=births60.filter(b=>{
       const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
