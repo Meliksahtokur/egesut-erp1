@@ -11,6 +11,20 @@ import argparse
 import json
 import os
 import sys
+import importlib.util
+
+# Embedding servisini import et (semantic search için)
+_embedding_module = None
+def _get_embedding_service():
+    global _embedding_module
+    if _embedding_module is None:
+        spec = importlib.util.spec_from_file_location(
+            "embedding_service",
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "embedding_service.py")
+        )
+        _embedding_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_embedding_module)
+    return _embedding_module
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory.db")
 
@@ -109,6 +123,135 @@ def search(query, category=None, limit=10, json_output=False, include_obsolete=F
             print()
 
 
+def _normalize_fts_score(rank):
+    """FTS5 rank (negative) → 0-1 skor. 0=perfect match."""
+    return 1.0 / (1.0 + abs(rank))
+
+
+def _priority_boost(priority):
+    return {"high": 1.15, "medium": 1.0, "low": 0.85}.get(priority, 1.0)
+
+
+def hybrid_search(query, category=None, limit=10, json_output=False, include_obsolete=False):
+    """FTS5 + semantic search fusion. Varsayılan arama — weighted 0.6 FTS + 0.4 semantic."""
+    # FTS5 results
+    fts_conn = sqlite3.connect(DB_PATH)
+    fts_conn.row_factory = sqlite3.Row
+    c = fts_conn.cursor()
+
+    safe_query = query.replace('"', '""')
+    fts_q = f'"{safe_query}"'
+
+    sql = """
+        SELECT n.id, n.content, n.category, n.priority, n.tags, n.source, n.created_at,
+               rank as relevance
+        FROM memory_notes_fts
+        JOIN memory_notes n ON n.id = memory_notes_fts.rowid
+        WHERE memory_notes_fts MATCH ?
+    """
+    params = [fts_q]
+    if not include_obsolete:
+        sql += " AND n.obsolete = 0"
+    if category:
+        sql += " AND n.category = ?"
+        params.append(category)
+    sql += " LIMIT ?"
+    params.append(limit * 3)
+
+    try:
+        fts_rows = c.execute(sql, params).fetchall()
+    except sqlite3.OperationalError:
+        fts_rows = []
+    fts_conn.close()
+
+    # Semantic results (via Jina embedding)
+    sem_results = []
+    try:
+        emb = _get_embedding_service()
+        sem_raw = emb.semantic_search(query, limit * 3)
+        if sem_raw.get("results"):
+            for r in sem_raw["results"]:
+                if include_obsolete or not r.get("obsolete"):
+                    sem_results.append(r)
+    except Exception:
+        pass  # embedding servisi yoksa sadece FTS5 ile devam et
+
+    # Fusion — merge + score normalize + dedup
+    seen = set()
+    scored = []
+
+    for r in fts_rows:
+        nid = r["id"]
+        if nid in seen:
+            continue
+        seen.add(nid)
+        fts_score = _normalize_fts_score(r["relevance"])
+        bio = _priority_boost(r["priority"])
+        scored.append({
+            "id": nid,
+            "content": r["content"],
+            "category": r["category"],
+            "priority": r["priority"],
+            "tags": r["tags"].split(",") if r["tags"] else [],
+            "source": r["source"],
+            "created_at": r["created_at"],
+            "score": round(fts_score * bio * 0.6, 4),
+            "fts_score": round(fts_score, 4),
+            "sem_score": 0,
+        })
+
+    for r in sem_results:
+        nid = r["id"]
+        bio = _priority_boost(r.get("priority", "medium"))
+        sem_sim = r.get("similarity", 0)
+        if nid in seen:
+            # Mevcut kaydı güncelle
+            for item in scored:
+                if item["id"] == nid:
+                    item["sem_score"] = round(sem_sim, 4)
+                    item["score"] = round(
+                        item["score"] + sem_sim * bio * 0.4, 4
+                    )
+                    break
+        else:
+            seen.add(nid)
+            scored.append({
+                "id": nid,
+                "content": r["content"],
+                "category": r["category"],
+                "priority": r.get("priority", "medium"),
+                "tags": r.get("tags", []),
+                "source": r.get("source", "?"),
+                "created_at": r.get("created_at", "?"),
+                "score": round(sem_sim * bio * 0.4, 4),
+                "fts_score": 0,
+                "sem_score": round(sem_sim, 4),
+            })
+
+    scored.sort(key=lambda x: (-x["score"], x["id"]))
+
+    results = scored[:limit]
+    output = {"results": results, "total": len(results), "hybrid": True}
+
+    if json_output:
+        print(json.dumps(output, ensure_ascii=False, indent=2))
+    else:
+        if not results:
+            print(f"No results for '{query}'.")
+            return
+        print(f"Found {len(results)} result(s) (hybrid) for '{query}':\n")
+        for r in results:
+            prio = {"high": "🔴", "medium": "🟡", "low": "⚪"}.get(r["priority"], "⚪")
+            preview = r["content"][:150] + "..." if len(r["content"]) > 150 else r["content"]
+            src = r.get("source", "?")
+            dt = r.get("created_at", "?")
+            hyb = f"🤖 FTS:{r['fts_score']} SEM:{r['sem_score']} = {r['score']}"
+            print(f"  [{r['id']}] {prio} {r['category']} (src:{src}, {dt[:10]})")
+            print(f"       {hyb}")
+            print(f"       {preview}")
+            print()
+
+
 def add_note(content, category="general", priority="medium", tags="", source="manual"):
     """Add a new note to memory + auto-embed via Jina AI."""
     conn = sqlite3.connect(DB_PATH)
@@ -172,6 +315,7 @@ if __name__ == "__main__":
     parser.add_argument("--category", "-c", help="Category filter")
     parser.add_argument("--limit", "-l", type=int, default=10, help="Max results")
     parser.add_argument("--json", action="store_true", help="JSON output")
+    parser.add_argument("--hybrid", action="store_true", help="FTS5 + semantic fusion search (better quality)")
     parser.add_argument("--include-obsolete", action="store_true", help="Include obsolete notes (hidden by default)")
     parser.add_argument("--add", action="store_true", help="Add a new note")
     parser.add_argument("--content", help="Note content (for --add)")
@@ -191,6 +335,9 @@ if __name__ == "__main__":
         note_id = add_note(args.content, args.category or "general", args.priority, args.tags, args.source)
         print(json.dumps({"id": note_id, "status": "created"}))
     elif args.query:
-        search(args.query, args.category, args.limit, args.json, args.include_obsolete)
+        if args.hybrid:
+            hybrid_search(args.query, args.category, args.limit, args.json, args.include_obsolete)
+        else:
+            search(args.query, args.category, args.limit, args.json, args.include_obsolete)
     else:
         parser.print_help()
