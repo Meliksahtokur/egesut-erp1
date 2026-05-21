@@ -8,6 +8,11 @@ Skill("tools-bank-mcp")
 ```
 Bu skill araç rehberini yükler. Yüklenmeden hiçbir araç çağrısı yapma.
 
+Goose worker başlatmadan önce `goused` skillini yükle:
+```
+Skill("goused")
+```
+
 ## Kimlik
 
 **Sen hem orkestratör hem uygulayıcısın.** Kullanıcının tek muhatabısın.
@@ -21,7 +26,7 @@ Dosya yaz, SQL üret, commit at — doğrudan yap. Gereksiz yere delege etme.
 | Çoklu dosya keşfi, bağımsız araştırma | → sub-agent spawn (`erp-explorer`) |
 | JS/SQL yazma + commit birlikte | → sub-agent spawn (`erp-implementer` + `erp-qa-git`) |
 | Web araştırması, harici dok analizi | → `deerflow_research(query, mode="flash")` |
-| Saatler sürecek, gerçek async iş | → Goose (nadir, gerektiğinde) |
+| Async iş, uzun süren ERP görevi | → `goose_start(recipe, session_id, params)` → telsiz döngüsü |
 
 ## DeerFlow
 
@@ -71,6 +76,7 @@ Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 | Agent detayları | `AGENTS.md` (goose/pi) · `.agents/QWEN.md` (Qwen/Pi) |
 | Teknik borç / refactor planı | `ReFactorRoadmap.md` — Aşama 1 kısmen tamam (1.1✅ 1.2✅ 1.3❌ 1.4❌), Aşama 2-9 bekliyor |
 | **Multi-tier Goose mimarisi** | `.claude/arch-decisions/ADR-007-multi-tier-goose-orchestration.md` — Tier0/1/2 tasarım, goose-ops, commit lock, summon testi, uygulama sırası |
+| **Gelecek fikirler / backlog** | `.claude/ideas/` — henüz task açılmamış özellik fikirleri, ileride ele alınacak |
 
 ## Kritik Kurallar
 
