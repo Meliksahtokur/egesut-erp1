@@ -1356,10 +1356,10 @@ async function _uremeGebelik(el){
   const tumTohlar=await idbGetAll('tohumlama');
   const hayvanlar=getState('animals')||[];
 
-  // Her hayvan için en son tohumlama (deneme_no azalan)
+  // Her hayvan için en son tohumlama (tarih azalan)
   const hayvanSonToh={};
   [...tumTohlar]
-    .sort((a,b)=>(b.deneme_no||0)-(a.deneme_no||0))
+    .sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''))
     .forEach(t=>{ if(!hayvanSonToh[t.hayvan_id]) hayvanSonToh[t.hayvan_id]=t; });
 
   const bekleyenler=Object.values(hayvanSonToh)
@@ -3103,7 +3103,7 @@ async function openTohDet(id){
   const tumTohlar=await idbGetAll('tohumlama');
   const hayvanTohlar=tumTohlar
     .filter(t2=>t2.hayvan_id===t.hayvan_id)
-    .sort((a,b)=>(b.deneme_no||0)-(a.deneme_no||0));
+    .sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
   const isSonToh=hayvanTohlar.length>0&&hayvanTohlar[0].id===id;
 
   const td2GeriAlBtn=document.getElementById('td2-geri-al-btn');
