@@ -1,3 +1,6 @@
+> ⚠️ **FUZULİ — Bu araştırma uygulanmamıştır.**
+> Sadece fantezi/düşünce egzersizi olarak yapılmıştır. Uygulamayın. İleride çok boş vakit olursa denenebilir.
+
 # Dashy Nedir ve EgeSüt ERP'de Nasıl Kullanılır?
 
 **Tarih:** 2026-05-21
