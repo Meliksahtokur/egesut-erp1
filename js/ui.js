@@ -180,7 +180,8 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneG
     h+=band('amber',title,
       (ileriGebeler||[]).map(b=>{
         const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
-        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${b.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+        const besUyari=b.gebelik_gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 5px;font-weight:700;font-size:.65rem;margin-left:4px">⚠️ Anyonik</span>`:'';
+        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}${besUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${b.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if(nearBirth.length){
@@ -512,7 +513,10 @@ async function beslemeGunTamam(id,btn){
   try {
     const r=await rpc('besleme_tamam',{p_gorev_id:id});
     if(!r?.ok) throw new Error(r?.mesaj||'Hata');
-    toast('✅ Besleme tamamlandı — yarın için görev oluşturuldu');
+    const msg=r.zincir==='hayvan_artik_gebe_degil'
+      ?'✅ Besleme tamamlandı — hayvan artık gebe değil, zincir kapandı'
+      :'✅ Besleme tamamlandı — yarın için görev oluşturuldu';
+    toast(msg);
     const elT=document.getElementById('tc-'+id);
     if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
     updateTaskBadge();
