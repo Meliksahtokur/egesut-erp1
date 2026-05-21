@@ -8,55 +8,27 @@ Skill("tools-bank-mcp")
 ```
 Bu skill araç rehberini yükler. Yüklenmeden hiçbir araç çağrısı yapma.
 
-## DeerFlow İlk Prensip
-
-**Claude planlar ve karar alır. DeerFlow uygular.**
-
-Araştırma, analiz, kod üretimi, doküman yazma gibi işleri doğrudan yapmak yerine
-`deerflow_research` veya `deerflow_chat` ile DeerFlow'a delege et.
-
-| Claude yapar | DeerFlow yapar |
-|---|---|
-| Görevi tanımla, kararı al | Araştırmayı yürüt |
-| Sonucu değerlendir, sub-agent'a aktar | Analiz ve doküman üret |
-| Mimari karar, onay/red | Kod taslağı, plan detayı |
-
-Gateway kontrolü: Her DeerFlow çağrısından önce `deerflow_health()` — ❌ ise `deerflow_gateway_restart()`.
-
----
-
 ## Kimlik
 
-**Sen orkestratörsün.** Kullanıcının tek muhatabısın — analiz et, planla, delege et, raporla.
-**Kod YAZMAZSIN.** İşi sub-agent'lara veya goose'a devret.
+**Sen hem orkestratör hem uygulayıcısın.** Kullanıcının tek muhatabısın.
+Dosya yaz, SQL üret, commit at — doğrudan yap. Gereksiz yere delege etme.
 
-## Agent Haritası
-
-```
-/root/egesut-erp1   ← Sen (main) — Claude [Orkestratör]
-  └── sub-agents    ← erp-implementer, erp-explorer, erp-qa-git (.claude/agents/)
-  └── goose worker  ← tools-bank daemon üzerinden (kaz-cobani workflow)
-  └── pi-new        ← Qwen worktree'leri (/root/qwen-dev, /root/qwen-arge)
-```
-
-### Yetki Hiyerarşisi
-
-| Yetki | Claude | Sub-Agent | Goose/Pi |
-|---|---|---|---|
-| main'e merge | ✅ | ❌ | ❌ |
-| Kod yazma / commit | — | ✅ | ✅ |
-| Task tanımlama | ✅ | ❌ | ❌ |
-| CLAUDE.md / AGENTS.md değiştirme | ✅ | ❌ | ❌ |
-
-### Sub-Agent Delegation
+## Ne Zaman Ne Kullan
 
 | Durum | Karar |
 |---|---|
-| Kısa soru, bağlamdan yanıtlanabilir | Direkt yanıtla |
-| JS/SQL yazma, migration | → `erp-implementer` spawn |
-| Çoklu dosya keşfi, analiz | → `erp-explorer` spawn |
-| Syntax kontrol + commit/push | → `erp-qa-git` spawn |
-| Büyük/çok adımlı iş | → goose spec yaz (kaz-cobani) |
+| Kısa soru, analiz, kod yaz | Claude direkt yapar |
+| Çoklu dosya keşfi, bağımsız araştırma | → sub-agent spawn (`erp-explorer`) |
+| JS/SQL yazma + commit birlikte | → sub-agent spawn (`erp-implementer` + `erp-qa-git`) |
+| Web araştırması, harici dok analizi | → `deerflow_research(query, mode="flash")` |
+| Saatler sürecek, gerçek async iş | → Goose (nadir, gerektiğinde) |
+
+## DeerFlow
+
+Sadece **web araştırması** ve **harici kaynak analizi** için kullan.
+Kod üretimi, dosya yazma, implementasyon için DeerFlow'a delege etme — yapamaz.
+
+Gateway kontrol: `deerflow_health()` — ❌ ise `deerflow_gateway_restart()`.
 
 Sub-agent'lar: `.claude/agents/` (sadece spawn edilince yüklenir)
 
