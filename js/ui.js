@@ -427,7 +427,10 @@ function renderTask(t,cls='',subs=[]){
         <div class="tc-desc">${t.aciklama||''}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
-      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'?`<button class="ck-btn" onclick="event.stopPropagation();doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
+      ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)" style="background:var(--amber)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+      </button>`:''}
+      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -491,6 +494,25 @@ async function doneTask(id,hid,stokId,miktar,padok,btn){
     } else {
       toast('✅ Tamamlandı');
     }
+    const elT=document.getElementById('tc-'+id);
+    if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
+    updateTaskBadge();
+    loadDash();
+  } catch(e){
+    btn.disabled=false;
+    btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
+    toast(e.message,true);
+  }
+}
+
+// ── BESLEME tamamlama ─────────────────────
+async function beslemeGunTamam(id,btn){
+  btn.disabled=true;
+  btn.innerHTML='<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
+  try {
+    const r=await rpc('besleme_tamam',{p_gorev_id:id});
+    if(!r?.ok) throw new Error(r?.mesaj||'Hata');
+    toast('✅ Besleme tamamlandı — yarın için görev oluşturuldu');
     const elT=document.getElementById('tc-'+id);
     if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
     updateTaskBadge();
@@ -1454,10 +1476,11 @@ async function _uremeDogum(el){
       const renk=kalan<=7?'var(--red)':kalan<=30?'var(--amber)':'var(--green)';
       const bg=kalan<=7?'rgba(192,50,26,.12)':kalan<=30?'rgba(176,120,0,.1)':'rgba(42,122,42,.08)';
       const dogumTahmin=dFwd(t.tarih,280);
+      const beslemeUyari=gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem;margin-left:4px">⚠️ Anyonik Besleme</span>`:'';
       return `<div class="hist-row" onclick="openDet('${t.hayvan_id}')" style="cursor:pointer">
         <div class="hist-dot" style="background:${renk}"></div>
         <div class="hist-main">
-          <div class="hist-title">${kupe} · ${t.sperma||'?'}</div>
+          <div class="hist-title">${kupe} · ${t.sperma||'?'}${beslemeUyari}</div>
           <div class="hist-sub">🐮 ${fmtTarih(t.tarih)} → Tahmini doğum: <b>${fmtTarih(dogumTahmin)}</b> · <span style="background:${bg};color:${renk};border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem">⏳ ${kalan} gun kaldi</span></div>
         </div>
       </div>`;
