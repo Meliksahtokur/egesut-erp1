@@ -1302,7 +1302,9 @@ async function _uremeKizginlik(el){
     const h=getState('animals').find(a=>a.id===k.hayvan_id);
     const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
     const badge=cozulduMi
-      ? `<span style="font-size:.6rem;color:var(--green);background:rgba(78,154,42,.1);border-radius:4px;padding:1px 5px;margin-left:4px">✅ Tedavi</span>`
+      ? k.tedavi_case_id
+        ? `<span style="font-size:.6rem;color:var(--green);background:rgba(78,154,42,.1);border-radius:4px;padding:1px 5px;margin-left:4px">✅ Tedavi</span>`
+        : `<span style="font-size:.6rem;color:var(--blue);background:rgba(52,152,219,.1);border-radius:4px;padding:1px 5px;margin-left:4px">💉 Tohumlandı</span>`
       : '';
     return `<div class="hist-row">
       <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
