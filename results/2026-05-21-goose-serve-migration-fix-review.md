@@ -118,23 +118,11 @@ canRestart(t) → effectiveCooldown(t) → last restart check
 | `_parse_sse_done` (7 test case) | ✅ Tümü geçti |
 | Go build `goused-watchdog` | ✅ (8.6 MB) |
 | **Önceki endpoint testleri** | ✅ (değişmedi) |
-| PROXY health check fix | ⏳ **Önerildi, henüz eklenmedi** |
+| PROXY health check fix | ✅ **Eklendi (commit 77acfe4)** |
 
 ---
 
 ## 4. Kalan Eksikler (Pre-existing)
-
-### Proxy Health Check (ÖNERİLEN İYİLEŞTİRME)
-
-`goose_start`'te ACP initialize öncesi proxy health check yok. Proxy down ise 30s timeout → "session/new failed" hatası.
-
-```python
-# goose_start içinde, acp_client.health()'ten sonra
-try:
-    requests.get("http://localhost:8742/health", timeout=2)
-except:
-    return json.dumps({"error": "LLM proxy (port 8742) unreachable"})
-```
 
 ### Watchdog Child PID Tracking
 Restart sonrası eski process öldürülmez. goose-serve `exec` kullandığı için port çakışması olasılığı düşük. Pre-existing.
@@ -146,4 +134,4 @@ Restart sonrası eski process öldürülmez. goose-serve `exec` kullandığı i�
 
 ## 5. Final Karar
 
-**✅ Kod üretim için hazır.** Tüm plan task'leri tamamlandı. 2 kritik bug fix'lendi. 5 commit atıldı (tools-bank). Tek önerilen iyileştirme proxy health check — eğer istenirse 3 dakikada eklenir.
+**✅ Kod üretim için hazır.** Tüm plan task'leri tamamlandı. 2 kritik bug fix'lendi. 6 commit atıldı (tools-bank). Proxy health check eklendi — 30s timeout önlendi. Önerilen iyileştirme kalmadı.
