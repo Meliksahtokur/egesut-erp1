@@ -286,6 +286,7 @@ const RPC_TABLES = {
   buzagi_sutten_kesme_onayla:  ['hayvanlar'],
   hayvan_tohumlanabilir_onayla:['hayvanlar'],
   gebelik_protokol_kontrol:   ['gorev_log'],
+  besleme_tamam:              ['gorev_log'],
   hayvan_tohumlama_ertele:     ['hayvanlar'],
   gorev_tamamla:               ['gorev_log', 'stok_hareket', 'hayvanlar'],
   stok_hareket_ekle:           ['stok_hareket'],
