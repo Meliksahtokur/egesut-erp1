@@ -521,6 +521,7 @@ async function beslemeGunTamam(id,btn){
     if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
     updateTaskBadge();
     loadDash();
+    loadTasks();
   } catch(e){
     btn.disabled=false;
     btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
