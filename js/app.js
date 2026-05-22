@@ -146,7 +146,7 @@ async function refreshAll() {
 // ── HEKİM SELECTS ───────────────────────────
 function populateHekimSelects() {
   const all = [...HEKIMLER, ..._customHekimler];
-  ['b-hekim','i-hekim','d-hekim','ta-hekim'].forEach(id => {
+  ['b-hekim','i-hekim','d-hekim','ta-hekim','tr-hekim'].forEach(id => {
     const el = g(id); if (!el) return;
     el.innerHTML = all.map(h => `<option value="${h.id}">${h.ad}</option>`).join('');
     el.value = VARSAYILAN_HEKIM;

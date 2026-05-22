@@ -233,10 +233,17 @@ function openTekrarAsim(hayvanId, kupeNo) {
   document.getElementById('tr-tarih').value = new Date().toISOString().split('T')[0];
   document.getElementById('tr-sperma').value = '';
   document.getElementById('tr-sperma-select').value = '';
+  // Hekim: önce i-hekim'den kopyala, boşsa populateHekimSelects ile doldur
   const hekimSel = document.getElementById('tr-hekim');
   const insemHekimSel = document.getElementById('i-hekim');
-  if (insemHekimSel && hekimSel) hekimSel.innerHTML = insemHekimSel.innerHTML;
+  if (insemHekimSel && hekimSel && insemHekimSel.innerHTML.trim()) {
+    hekimSel.innerHTML = insemHekimSel.innerHTML;
+  } else if (typeof populateHekimSelects === 'function') {
+    populateHekimSelects();
+  }
   openM('m-insem-tekrar');
+  // Sperma dropdown'ı otomatik yükle
+  if (typeof trSpermaModStok === 'function') trSpermaModStok();
 }
 
 // ── KIZGINLIK ────────────────────────────────
