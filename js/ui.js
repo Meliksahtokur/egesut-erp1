@@ -428,7 +428,7 @@ function renderTask(t,cls='',subs=[]){
         <div class="tc-desc">${t.aciklama||''}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
-      ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)" style="background:var(--amber)">
+      ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
       ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
