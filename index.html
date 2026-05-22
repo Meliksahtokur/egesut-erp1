@@ -590,7 +590,8 @@ button,input,select,textarea{font-family:inherit}
         <div id="sperma-hint" style="font-size:.7rem;color:var(--ink3);margin-top:4px"></div>
       </div>
       <div class="fg"><label class="flbl">Hekim</label><select id="i-hekim" class="fsel"></select></div>
-      <button class="btn btn-g" data-action="submit-insem">💉 Kaydet + Kontrol Görevleri</button>
+      <div id="insem-tekrar-uyari" style="display:none;font-size:.75rem;color:#92400e;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:8px 10px;margin-bottom:8px">⚠️ Son 15 gün içinde tohumlama mevcut. <b>🔁 Tekrar Aşım</b> butonunu kullanın.</div>
+      <button class="btn btn-g" id="insem-submit-btn" data-action="submit-insem">💉 Kaydet + Kontrol Görevleri</button>
       <button class="btn btn-o" data-action="close-insem" style="margin-top:6px">İptal</button>
     </div>
   </div>
@@ -1441,17 +1442,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1779444305"></script>
-    <script src="js/utils/modal.js?v=1779444305"></script>
-    <script src="js/utils/errorHandler.js?v=1779444305"></script>
-    <script src="js/utils/events.js?v=1779444305"></script>
-    <script src="js/config.js?v=1779444305"></script>
-    <script src="js/state.js?v=1779444305"></script>
-    <script src="js/api.js?v=1779444305"></script>
-    <script src="js/ui.js?v=1779444305"></script>
-    <script src="js/forms.js?v=1779444305"></script>
-    <script src="js/app.js?v=1779444305"></script>
-    <script src="js/utils/handlers.js?v=1779444305"></script>
+    <script src="js/utils/helpers.js?v=1779445801"></script>
+    <script src="js/utils/modal.js?v=1779445801"></script>
+    <script src="js/utils/errorHandler.js?v=1779445801"></script>
+    <script src="js/utils/events.js?v=1779445801"></script>
+    <script src="js/config.js?v=1779445801"></script>
+    <script src="js/state.js?v=1779445801"></script>
+    <script src="js/api.js?v=1779445801"></script>
+    <script src="js/ui.js?v=1779445801"></script>
+    <script src="js/forms.js?v=1779445801"></script>
+    <script src="js/app.js?v=1779445801"></script>
+    <script src="js/utils/handlers.js?v=1779445801"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

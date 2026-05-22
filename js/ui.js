@@ -3546,8 +3546,28 @@ function openMWithHayvan(modalId,inputId,kupeNo){
       if(typeof loadBulkIlacPadoklar==='function') loadBulkIlacPadoklar();
       if(typeof loadBulkIlacDropdown==='function') loadBulkIlacDropdown();
     }
+    if(modalId==='m-insem') _checkInsemTekrarMode(kupeNo);
   },150);
   if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
+}
+
+async function _checkInsemTekrarMode(kupeNo){
+  const uyari=document.getElementById('insem-tekrar-uyari');
+  const btn=document.getElementById('insem-submit-btn');
+  if(!uyari||!btn) return;
+  // Reset
+  uyari.style.display='none'; btn.disabled=false; btn.style.opacity=''; btn.style.cursor='';
+  if(!kupeNo) return;
+  const hayvan=(getState('animals')||[]).find(a=>a.kupe_no===kupeNo||a.devlet_kupe===kupeNo);
+  if(!hayvan) return;
+  const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvan.id);
+  const bekliyor=tohs.find(t=>t.sonuc==='Bekliyor');
+  if(!bekliyor) return;
+  const gun=Math.floor((Date.now()-new Date(bekliyor.tarih))/86400000);
+  if(gun>=0&&gun<=15){
+    uyari.style.display='';
+    btn.disabled=true; btn.style.opacity='0.4'; btn.style.cursor='not-allowed';
+  }
 }
 
 async function openGebelikEkle(hayvanId){
