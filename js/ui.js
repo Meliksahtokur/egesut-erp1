@@ -29,7 +29,7 @@ const _katTipMap={
   vitamin:['ILERI_GEBE'],
   muayene:['MUAYENE'],
   tedavi:['TEDAVI','ILAC_UYGULAMA'],
-  bakim:['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP'],
+  bakim:['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME'],
   diger:null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
@@ -394,7 +394,7 @@ async function loadTasks(f,btn){
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     if(_taskKategori==='diger'){ data=data.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
     else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
-    data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
+    data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||'')||( a.aciklama||'').localeCompare(b.aciklama||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
     const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
     el.innerHTML=data.slice(0,150).map(t=>{
