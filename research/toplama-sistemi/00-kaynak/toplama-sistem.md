@@ -1,0 +1,353 @@
+100.000 TL Bütçeli Yüksek Performanslı Hesaplama Sistemleri: Bileşen Mimarisi, Piyasa Ekonomisi ve Optimizasyon Stratejileri
+Türk Donanım Pazarının Makroekonomik Analizi ve Mimari Geçiş Süreci
+Modern yüksek performanslı hesaplama (HPC) ve bireysel iş istasyonu pazarı, 2026 yılı itibarıyla derin bir mimari paradigma değişiminin tam merkezinde yer almaktadır. Bu değişim, AMD'nin Zen 4 mikromimarisini temel alan AM5 soket ekosisteminin olgunlaşması ve NVIDIA'nın mevcut Ada Lovelace (RTX 40 serisi) grafik işlem birimlerinin (GPU) yerini kademeli olarak yeni nesil Blackwell (RTX 50 serisi) mimarisine bırakmasıyla karakterize edilmektedir. Türkiye özelindeki bilgisayar bileşenleri pazarı ise, küresel yarı iletken tedarik zinciri dinamiklerinin yanı sıra, yerel vergilendirme, döviz kurları ve paralel ithalat (grey market) faaliyetlerinin yarattığı karmaşık bir fiyatlama matrisi sergilemektedir. Bu rapor, toplanan kapsamlı veri setlerini analiz ederek, 100.000 Türk Lirası (TL) finansal kısıtı altında oluşturulabilecek en optimal, bilimsel ve mühendislik odaklı sistem kombinasyonlarını ortaya koymayı amaçlamaktadır.
+Veri setinin genel bir analizi, perakende bileşen fiyatları ile hazır sistem (OEM) fiyatlandırmaları arasında devasa uçurumlar olduğunu göstermektedir. Özellikle DDR5 rastgele erişimli bellek (RAM) modüllerinde gözlemlenen ve 64GB kapasiteli kitlerin 79.000 TL seviyelerine kadar tırmandığı ekstrem fiyat anomalileri, sıfırdan parça toplayarak sistem kurma stratejilerini temelden sarsmaktadır. Dolayısıyla, 100.000 TL'lik bütçenin salt işlemci ve ekran kartı gibi birincil donanımlara değil; anakart güç dağıtım bileşenlerine (VRM), termodinamik soğutma çözümlerine, güç kaynağı (PSU) güvenilirliğine ve kesintisiz güç kaynaklarına (UPS) da dengeli bir şekilde dağıtılması gerekmektedir. Araştırma kapsamında sunulan Hepsiburada, Akakçe, Sinerji, Gaming.gen.tr, İtopya, Tebilon ve PttAVM gibi platformlardaki fiyat verileri, bu analizlerin temel dayanağını oluşturmaktadır.
+Merkezi İşlem Birimi (CPU) Topolojileri ve Performans Ölçeklendirmesi
+Bir sistemin genel hesaplama kapasitesi, doğrudan merkezi işlem biriminin (CPU) komut döngüsü (IPC) performansı ve çekirdek paralelizasyon yeteneği ile sınırlıdır. Güncel pazar verileri, yüksek performanslı sistemler için AMD'nin Ryzen 5 ve Ryzen 7 serileri ile Intel'in Core Ultra serilerinin rekabet halinde olduğunu göstermektedir.
+AMD Ryzen 5 7600: Fiyat/Performans Optimizasyonunun Zirvesi
+Ryzen 5 7600, TSMC'nin 5nm üretim teknolojisiyle bantlardan inen, 6 fiziksel çekirdek ve 12 iş parçacığı (thread) barındıran, 32 MB L3 önbelleğe sahip bir işlemcidir. Veri setleri, bu işlemcinin fiyatlandırmasında dikkate değer bir dağılım olduğunu kanıtlamaktadır. Kutusuz ve fansız (tray) versiyonu 7.329 TL ile 7.547 TL bandında işlem görürken , son güncellemelerle en düşük 7.490 TL seviyesinde sabitlendiği raporlanmıştır. Kutulu ve kendi soğutucusuyla (Wraith Stealth) gelen versiyonu ise 10.223 TL ila 10.312 TL seviyelerine sıçramaktadır.
+İşlemci Modeli
+Paket Tipi
+Çekirdek/İş Parçacığı
+Frekans (Max Boost)
+L3 Önbellek
+Ortalama Fiyat (TL)
+Kaynak Referansı
+AMD Ryzen 5 7600
+Kutusuz (Tray)
+6C / 12T
+5.1 GHz
+32 MB
+7.329 - 7.547
+
+
+AMD Ryzen 5 7600
+Kutulu (Box)
+6C / 12T
+5.1 GHz
+32 MB
+10.223 - 10.312
+
+
+AMD Ryzen 7 7700
+Kutusuz (Tray)
+8C / 16T
+5.3 GHz
+32 MB
+9.707 - 9.976
+
+
+AMD Ryzen 7 7700
+Kutulu (Box)
+8C / 16T
+5.3 GHz
+32 MB
+16.599
+
+
+AMD Ryzen 7 7700X
+Kutusuz (Tray)
+8C / 16T
+5.4 GHz
+32 MB
+11.449
+
+
+
+Mimari olarak değerlendirildiğinde, Ryzen 5 7600'ün 65W gibi oldukça düşük bir Termal Tasarım Gücü (TDP) zarfına sahip olması, işlemcinin ısıl darboğaza (thermal throttling) girmeden maksimum boost frekanslarında (5.1 GHz) uzun süre çalışabilmesini sağlamaktadır. 100.000 TL bütçe dahilinde, kutulu versiyona ~2.800 TL ekstra ödemek yerine, kutusuz versiyonu alıp aradaki farkla yüksek kaliteli bir çift kuleli hava soğutucu entegre etmek termodinamik açıdan çok daha rasyonel bir yaklaşımdır. Ayrıca oyun motorlarının büyük çoğunluğu halen 6 çekirdeğin ötesindeki paralelizasyonda azalan getiriler (diminishing returns) sergilediğinden, bu işlemci RTX 4070 Super ve RTX 5070 sınıfı ekran kartlarını hiçbir darboğaza uğratmadan besleyebilmektedir.
+AMD Ryzen 7 7700 ve 7700X: Çoklu İzlek (Multi-Thread) Ölçeklemesi
+Daha ağır iş yükleri (video kurgu, 3D modelleme, eşzamanlı sanallaştırma) hedeflendiğinde, 8 çekirdek ve 16 iş parçacıklı Ryzen 7 7700 devreye girmektedir. Pazar verileri, bu işlemcinin kutusuz fansız versiyonunun 9.707 TL seviyesinden bulunabildiğini gösterirken , kutulu versiyonunun 16.599 TL gibi mantıksız bir fiyat etiketine sahip olduğunu açıkça ortaya koymaktadır. Bunun sebebi, kutulu versiyonun resmi distribütör garantisi ve ambalaj maliyetleri barındırması, kutusuz ürünlerin ise genellikle hazır sistem üreticilerinden piyasaya sızan (grey market) işlemciler olmasıdır. Daha yüksek baz frekansa ve daha yüksek güç tüketimine sahip olan Ryzen 7 7700X ise kutusuz olarak 11.449 TL civarında listelenmektedir. Bütçe optimizasyonu açısından, 7700X'in artan ısıl yükü ve ekstra maliyeti, sunduğu %2-%5'lik sentetik performans artışını haklı çıkarmamaktadır; dolayısıyla Ryzen 7 7700 (Tray) modeli daha optimal bir mühendislik seçimidir.
+Alternatif Mimari: Intel Core Ultra ve Ryzen 9000 Serisi
+Pazar analizinde, hazır sistemler (OEM) içerisinde Intel Core Ultra 5 225F ve Core Ultra 5 245KF gibi işlemcilerin yer aldığı görülmektedir. Benzer şekilde, AM5 platformunun yeni üyeleri Ryzen 5 9600 (11.499 TL) ve Ryzen 5 9500F (11.022 TL) de listelenmektedir. Ancak bu işlemciler henüz fiyat dengesine oturmadığından ve Zen 4 mimarisi ile Zen 5 mimarisi arasındaki saat başı komut (IPC) artışının fiyat artışına oranla düşük kalmasından dolayı, saf performans/maliyet rasyosunda Ryzen 5 7600'ün gerisinde kalmaktadırlar. Bütçe odaklı, yüksek kare hızlı 1440p konfigürasyonları için odak noktasının ekran kartı ve bellek altsisteminde tutulması zorunludur.
+Grafik İşlem Birimleri (GPU): Ada Lovelace ve Blackwell Mimarilerinin Çatışması
+100.000 TL bütçeli bir sistem tasarımının en büyük sermaye tahsisi, sistemin kalbi olan ekran kartına yapılmalıdır. Güncel piyasa verileri, NVIDIA'nın RTX 40 serisi (Ada Lovelace mimarisi) ile RTX 50 serisi (Blackwell mimarisi) arasında çok ciddi bir pazar yamyamlığı (cannibalization) yaşandığını göstermektedir. Bir yanda eski neslin stoklarını eritme çabası, diğer yanda GDDR7 bellek teknolojisiyle gelen yeni neslin agresif fiyatlandırması bulunmaktadır.
+RTX 4060 Ti ve RTX 5060 Ti: Bellek Bant Genişliği ve 16GB VRAM Çelişkisi
+Orta-üst segmentin temel yapı taşlarından olan RTX 4060 Ti'nin 16GB VRAM kapasiteli modelleri, 23.500 TL (MSI Ventus 2X Black) ile 27.759 TL (Gigabyte Eagle) arasında değişen fiyatlarla sunulmaktadır. Ancak bu mimari, teknolojik olarak ciddi bir handikap taşımaktadır: 128-bit bellek veri yolu.
+Bu handikap, yeni nesil Blackwell mimarisine sahip RTX 5060 Ti 16GB modelinde de devam etmektedir. RTX 5060 Ti modelleri; Asus Dual versiyonunda 29.419 TL , Gigabyte Gaming OC modelinde 32.259 TL , MSI Ventus modelinde ise 33.998 TL'den listelenmektedir. Yeni nesil, GDDR7 bellek yongalarını kullanmasına rağmen 128-bit veriyolu genişliğini korumaktadır.
+Grafik bellek bant genişliği B, aşağıdaki formül ile hesaplanmaktadır:
+RTX 5060 Ti'nin 28 Gbps hızında çalışan GDDR7 bellekleri, 128-bit veriyolu ile çarpıldığında yaklaşık 448 GB/s'lik bir tepe bant genişliğine ulaşmaktadır. 16GB VRAM, yüksek çözünürlüklü kaplamaları depolamak için yeterli devasa bir havuz sunsa da, 128-bitlik dar veri yolu bu devasa havuzun hızlı bir şekilde doldurulup boşaltılmasını engellemektedir. Bu durum, özellikle 4K çözünürlükte piksel doldurma hızlarının (fill rate) tıkanmasına yol açmaktadır. Dolayısıyla, 4060 Ti 16GB ve 5060 Ti 16GB kartları, 4K ekran kartlarından ziyade, yüksek detaylı kaplamalara izin veren, ancak rasterizasyon kas gücü sınırlı, mükemmel 1440p (2K) kartları olarak konumlandırılmalıdır. Özellikle Yapay Zeka (AI) alanında Büyük Dil Modeli (LLM) eğitimi yapan profesyoneller için bu 16GB'lık modeller, bant genişliğinden ziyade kapasiteye ihtiyaç duydukları için biçilmiş kaftandır.
+GPU Modeli
+Bellek Kapasitesi / Tipi
+Veri Yolu Genişliği
+Başlangıç Fiyatı (TL)
+Tavan Fiyat (TL)
+Kaynaklar
+RTX 4060 Ti
+16GB GDDR6
+128-bit
+19.615
+27.759
+
+
+RTX 5060 Ti
+16GB GDDR7
+128-bit
+29.419
+34.747
+
+
+
+RTX 4070, RTX 4070 Super ve RTX 5070: Pazarın Gerçek Liderleri
+Performans merdiveninde bir üst basamağa çıkıldığında, piyasanın en kafa karıştırıcı segmentine ulaşılmaktadır. Standart RTX 4070 12GB modelleri 34.580 TL ile 45.519 TL arasında fiyatlanmaktadır. Ancak donanım dünyasında asıl ilgi çeken kartlar, RTX 4070 Super ve onun yeni nesil karşılığı RTX 5070'tir.
+RTX 4070 Super 12GB, 192-bit GDDR6X bellek mimarisiyle sunulmaktadır. Çift fanlı giriş seviyesi modelleri (örn: MSI Ventus 2X) 38.128 TL ile 42.451 TL bandında bulunurken , üç fanlı premium modeller 54.599 TL'ye kadar çıkmaktadır.
+Karşısında ise, Blackwell mimarisinin parlayan yıldızı RTX 5070 12GB bulunmaktadır. Bu kart, PNY markalı üç fanlı modeliyle 35.243 TL'den başlayan , Asus Prime versiyonunda 35.899 TL seviyesinde olan , ve en tepe modellerde 42.199 TL'ye ulaşan fiyatlarla piyasaya sürülmüştür. RTX 5070, GDDR7 bellekleri 192-bit veri yolu ile birleştirerek 2.5 GHz gibi muazzam çekirdek frekanslarına ulaşabilmektedir.
+Ekonomik ve Mimari İrdeleme: Pazar verileri net bir şekilde RTX 4070 Super'in fiyat-performans anlamında tamamen mantıksız bir noktaya düştüğünü kanıtlamaktadır. Daha yeni bir mimariye (Blackwell), daha hızlı belleklere (GDDR7), daha güncel standartlara (HDMI 2.1b) ve daha yüksek IPC'ye sahip olan RTX 5070, eski nesil RTX 4070 Super'den daha ucuz veya aynı fiyata satılmaktadır. Bunun temel nedeni, Türk donanım perakendecilerinin ellerinde yüksek maliyetle alınmış 40 serisi stokların bulunması ve zararına satış yapmak istememeleridir. 100.000 TL'lik bir bütçe tasarımında, eğer RTX 4070 Super %30-%40'lık agresif bir indirim almadığı sürece, RTX 5070 tartışmasız olarak seçilmesi gereken tek modeldir.
+GPU Modeli
+Bellek / Tip
+Veri Yolu
+Başlangıç Fiyatı (TL)
+Üst Düzey Model Fiyatı (TL)
+Kaynaklar
+RTX 4070
+12GB GDDR6X
+192-bit
+34.580
+45.519
+
+
+RTX 4070 Super
+12GB GDDR6X
+192-bit
+38.128
+57.909
+
+
+RTX 5070
+12GB GDDR7
+192-bit
+35.243
+43.499
+
+
+
+RTX 4070 Ti Super ve RTX 5070 Ti: Bütçenin Sınırları
+Üst uç segmente geçildiğinde, veri yollarının 256-bit genişliğe ulaştığını görmekteyiz. RTX 4070 Ti Super 16GB, Palit GamingPro gibi modellerle stoklarda bulunurken , Asus TUF modellerinde fiyatı 59.950 TL seviyelerine tırmanmaktadır. Yeni nesil karşılığı olan RTX 5070 Ti 16GB ise, MSI Ventus 3X modelinde 55.590 TL'den başlayarak , Asus Prime versiyonunda 58.999 TL ve MLG Edition gibi özel üretimlerde 84.999 TL gibi inanılmaz seviyelere ulaşmaktadır.
+100.000 TL'lik sabit bir bütçe kısıtı içinde, bir sisteme ~59.000 TL değerinde tek bir bileşen entegre etmek, sistemin geri kalan tüm uzuvlarının (Anakart, RAM, SSD, Güç Kaynağı) kalitesinden dramatik şekilde taviz verilmesini gerektirir. Sistemin termal stabilizasyonunu sağlayan bileşenlerden kısıntı yapmak, alınan o pahalı grafik kartının ısınarak frekans düşürmesine neden olacağı için ekonomik bir verimsizlik yaratır. Bu sebeple, Ti varyantları bu bütçe için teknik olarak mümkün olsa da, mühendislik disiplini gereği tavsiye edilmeyen uç noktalardır.
+Anakart Topolojisi: B650 Yonga Seti ve İletişim Bant Genişliği
+AM5 platformunun işlevselliği, sistemin sinir ağı olan anakartlara dayanmaktadır. Zen 4 ve gelecekteki Zen 5 işlemcileri destekleyen B650 yonga seti, PCI-Express (PCIe) hat dağılımı ve Güç Dağıtım Modülü (VRM) kalitesi açısından optimal bir denge sunmaktadır. Daha üst seviye olan X670 anakartlar, çift GPU kullanmayan (ki SLI/CrossFire modern oyunlarda tamamen terk edilmiştir ) standart kullanıcılar için gereksiz PCIe hatları sunarak maliyeti şişirmektedir.
+Veriler B650 yonga setinde üç ana modelin öne çıktığını gösteriyor:
+MSI PRO B650-S WiFi: 7.598 TL ile 8.614 TL arasında konumlanan bu anakart , 7200 MHz'e kadar bellek hız aşırtma (OC) desteği sunmakta, Wi-Fi 6E entegrasyonu barındırmakta ve maliyet etkin bir VRM yapısı sunmaktadır. Bütçe dostu 7600 veya 7700 işlemciler için mükemmel bir eştir.
+Asus TUF Gaming B650-E WiFi: 9.509 TL ile 10.569 TL bandında satılan bu model , askeri sınıf (military grade) dayanıklılık sertifikaları, genişletilmiş alüminyum VRM soğutucuları ve PCIe 5.0 depolama desteği ile öne çıkmaktadır. Uzun vadeli termal dayanıklılık isteyenler için idealdir.
+MSI MAG B650 Tomahawk WiFi: Piyasanın en dengesiz fiyatlanan ürünlerinden biridir. 11.291 TL başlangıç fiyatından, bazı satıcılarda 26.276 TL'ye kadar çıkabilmektedir. Premium ses yongaları ve çok güçlü güç fazları sunsa da, 11.000 TL'nin üzerindeki fiyatlar bütçe planlamasını zorlamaktadır.
+Anakart Modeli
+Form Faktörü
+Wi-Fi Standardı
+Maksimum RAM Hızı
+En Düşük Fiyat (TL)
+Kaynak
+MSI PRO B650-S WiFi
+ATX
+Wi-Fi 6E
+7200 MHz
+7.598
+
+
+Asus TUF B650-E WiFi
+ATX
+Wi-Fi 6
+6400+ MHz
+9.509
+
+
+MSI MAG B650 Tomahawk
+ATX
+Wi-Fi 6E
+6600 MHz
+11.291
+
+
+
+Bellek (RAM) Alt Sistemi ve Ekstrem Fiyat Anomalisi
+AMD'nin AM5 platformunda DDR5 bellek mimarisi zorunludur. Zen 4 mimarisinin çekirdekler arası iletişimini sağlayan Infinity Fabric mimarisinin senkronize (1:1) çalıştığı ideal tepe frekansı 6000 MT/s (veya MHz) olarak belirlenmiştir. Gecikme sürelerinin (CAS Latency - CL) sisteme etkisi çok büyüktür. Mutlak gecikme süresi formülü t_{CAS} = \frac{CL \times 2000}{\text{Data Rate}} kullanılarak, 6000MHz CL30 bir kitin sadece 10 nanosaniyelik bir gecikme sunduğu görülür. Bu düşük gecikme, işlemcinin komut bekleme süresini azaltarak oyunlarda 1% düşük kare hızlarında (1% lows) dramatik iyileşmeler sağlar.
+Ancak araştırma veri seti, Türk donanım pazarında bellek fiyatlandırması konusunda tam anlamıyla irrasyonel bir anomali ortaya koymaktadır. 64GB (2x32GB) DDR5 bellek kitlerinin fiyatları, uluslararası normların çok çok ötesine geçmiştir:
+Kingston Beast Expo 64GB (2x32) 6000 MHz CL30: Piyasada "en ucuz" olarak 49.999 TL seviyesinde listelenmektedir.
+Corsair Vengeance RGB 64GB (2x32) 6000 MHz CL30: 53.544 TL fiyata sahiptir.
+G.Skill Trident Z5 RGB 64GB (2x32) 6000 MHz CL30: Akıllara durgunluk veren 79.446 TL seviyesinden satılmaktadır.
+Bu anomali sadece 64GB kapasitelerle de sınırlı değildir. 32GB (2x16GB) kapasiteli kitlerde de şiddetli bir enflasyon görülmektedir. Kingston Beast Black 32GB 6000MHz CL30 kiti 29.784 TL , XPG Lancer Blade RGB 32GB kiti ise 30.762 TL fiyatlarla listelenmektedir.
+Makroekonomik Sonuç: Piyasada 32GB RAM için 30.000 TL, 64GB RAM için 50.000-80.000 TL gibi rakamlar talep edilmesi, 100.000 TL bütçeli bir bilgisayarın perakende olarak (parça parça) toplanmasını matematiksel olarak çökertmektedir. RAM belleklere bütçenin %30'u ila %70'ini ayırmak, sistemi RTX 4060 veya daha altı bir ekran kartına mahkum eder. Bu derin fiyat asimetrisi, raporun ilerleyen bölümlerinde sunulacak kombinasyonlarda "Önceden Üretilmiş Hazır Sistemlerin (OEM)" stratejik önemini devasa ölçüde artırmaktadır.
+Kalıcı Depolama Mimarisi (NVMe SSD Yığınları)
+Modern sistemler, doğrudan PCIe hatları üzerinden CPU ile haberleşen M.2 NVMe SSD'lere ihtiyaç duyar. Pazar taraması, Kingston markasının iki temel modeli üzerinde yoğunlaşmaktadır: Kingston KC3000 ve Kingston NV3. Her ikisi de PCIe 4.0 standardını kullanır, ancak donanımsal yapıları onları farklı kullanım senaryolarına iter.
+Kingston KC3000 2TB: Bu model, üzerinde entegre DRAM tampon belleği (cache) barındıran üst düzey bir SSD'dir. Saniyede 7000 MB okuma ve 7000 MB yazma hızlarına ulaşabilir. DRAM yongasının varlığı, diskin doluluk oranı %80'leri geçtiğinde veya çok büyük dosyalar (örn: 100GB boyutunda 4K video projeleri) kopyalanırken diskin yazma hızının çökmesini (write cliff) engeller. Fiyatı dönem dönem 22.776 TL'ye kadar çıksa da, ortalama olarak 15.321 TL ile 16.474 TL arasında konumlanmaktadır. Ağır iş yükleri ve video render işlemleri için zorunlu bir yatırımdır.
+Kingston NV3 2TB: Fiyat optimizasyonu arayanlar için üretilmiştir. 10.999 TL gibi nispeten daha erişilebilir bir fiyat etiketine sahiptir. Ancak bu model DRAM-less (DRAM'siz) bir yapıdadır; kendi üzerinde fiziksel bir bellek bulundurmak yerine, sistemin ana RAM'inden küçük bir miktar ödünç alan HMB (Host Memory Buffer) teknolojisini kullanır. 6000 MB/s okuma, 5000 MB/s yazma hızları günlük kullanım, oyun yükleme ekranları ve standart ofis verimliliği için fazlasıyla yeterlidir.
+Termodinamik Soğutma, Güç Dağıtımı ve Kasa İklimlendirmesi
+Yüksek performanslı bileşenler, elektrik enerjisini sadece işlem gücüne değil, aynı zamanda istenmeyen ısı enerjisine de dönüştürür. Sistemin uzun vadeli sağlığı, termodinamik tahliye hızına ve kesintisiz güç tedarikine bağlıdır.
+İşlemci Termal Tahliye Çözümleri (Soğutucular)
+Sıvı soğutmaların (AIO - All in One) su pompası arızaları, sıvı geçirgenliği ve radyatör tıkanmaları gibi mekanik zafiyetleri uzun vadede maliyet yaratmaktadır. Veri analizine göre, Thermalright markasının hava soğutucuları Türkiye piyasasını ele geçirmiş durumdadır.
+Thermalright Peerless Assassin 120 SE: 2.215 TL ile 2.855 TL arasında fiyatlanmaktadır. Altı adet nikel kaplı bakır ısı borusu ve devasa iki alüminyum kulesi ile 240mm sıvı soğutucularla yarışan bir performans sergiler. Ryzen 5 7600 veya Ryzen 7 7700 işlemcilerin 65W-105W arası ısı yayılımını rahatlıkla ortam sıcaklığında tutar.
+Thermalright Phantom Spirit 120 EVO / SE: 2.807 TL ile 3.639 TL arasında bulunur. Yedi ısı borusu barındıran bu revizyon, piyasadaki en iyi fiyat/performans hava soğutma bloğudur.
+Güç Dağıtım Üniteleri (PSU)
+Modern RTX 40 ve RTX 50 serisi kartlar, kısa süreli anlık güç sıçramaları (transient spikes) yaratır. Bu sebeple güç kaynaklarının ATX 3.0 veya ATX 3.1 standartlarına sahip olması ve PCIe 5.0 (12VHPWR) kablosu barındırması önemlidir.
+MSI MAG A850GL Gen5 (850W 80+ Gold): 6.399 TL fiyatıyla 850W sınıfında rakipsiz bir pazar payına sahiptir. Tam modüler yapısı kasa içi kablo yönetimini kolaylaştırır.
+Asus TUF Gaming 850G (850W 80+ Gold): 7.699 TL fiyatla biraz daha premium bir alternatif sunar.
+Daha sıkı bütçeler için MSI MAG A750GL Gen5.1 (750W) modeli 5.143 TL ile RTX 5070 sistemlerini rahatlıkla besleyebilir.
+İklimlendirme Altyapısı (Kasalar)
+Kasanın ön panelinin temperli cam yerine mikron gözenekli ızgara (mesh) olması, sisteme sürekli doğrusal ve türbülanssız hava (laminar airflow) girmesi için zorunludur. BitFenix Enso Mesh 2.726 TL ile E-ATX form faktörünü destekleyen mükemmel bir uygun fiyatlı kasadır. Benzer şekilde, 4 RGB fan ile gelen Montech X3 Mesh 4.999 TL fiyatıyla tercih edilebilir.
+Çevre Birimleri, Ergonomi ve Şebeke Güvenliği
+100.000 TL'lik bir yatırımın şebeke dalgalanmalarına karşı savunmasız bırakılması rasyonel değildir. Bir Kesintisiz Güç Kaynağı (UPS) entegrasyonu mecburi bir gereksinimdir. Tunçmatik Lift 1500VA (5.717 TL) veya Inform Lift 1500VA (9.700 TL, ancak indirimli fiyatları daha uygun olabilir) gibi Line-Interactive cihazlar tercih edilmelidir. 1500VA kapasite, kaba hesapla 900W aktif güç demektir; bu da sistem tam yükteyken elektrik kesilirse güvenli kapatma için 5-10 dakika zaman tanır.
+Ekran teknolojileri açısından, RTX 5070 veya 5060 Ti kartları 2K (1440p) çözünürlük için tasarlandığından monitör seçimi bu yönde olmalıdır. Philips Evnia 27M2N3501PA (27" 2K 260Hz Fast IPS) modeli 10.599 TL ile olağanüstü bir akıcılık sunarken , daha agresif bütçeler için Fazeon 27" 2K 150Hz IPS monitör 6.650 TL'ye bulunabilmektedir. Rekabetçi oyuncular için Asus TUF VG27AQML5A (27" 2K 300Hz) modeli 16.299 TL fiyat etiketi taşır.
+Ergonomi alanında, omurga sağlığını destekleyen Seduna Maxim UP (5.199 TL) veya Seduna Thunder Pro (5.599 TL) çalışma/oyuncu koltukları fiyat performans oranında öne çıkmaktadır. Klavye mouse ikililerinde, mekanik setlerden çok kablosuz premium setler öne çıkıyorsa Logitech MX Keys Mini Combo (8.279 TL) profesyoneller için, daha standart kullanıcılar için Logitech MK295 Sessiz Set (1.255 TL) sisteme dahil edilebilir.
+Makro Pazar Çıkarımları ve İkinci Dereceden Analizler
+Veri setinin derinlemesine incelenmesi sonucunda, piyasanın işleyişine dair doğrudan gözlemlenemeyen ancak kritik sonuçlar doğuran üç temel içgörü (insight) elde edilmiştir.
+1. OEM (Hazır Sistem) Sübvansiyon Paradoksu: Sinerji, Gaming.gen.tr, İtopya gibi firmaların sunduğu hazır sistemlerin fiyatları ile perakende bileşen fiyatları birbiriyle korkunç düzeyde çelişmektedir. Örneğin, Sinerji Skynet - 5070 isimli hazır OEM sistemin toplam fiyatı sadece 46.799 TL olarak listelenmektedir. Bu sistemin içerisinde Ryzen 5 7500F, PNY RTX 5070, 16GB DDR5 RAM, B840 Anakart ve 500GB SSD bulunmaktadır. Eğer bu sistemi parça parça almak isterseniz; sadece RTX 5070 ekran kartı ~35.000 TL, anormal RAM fiyatları (16GB bile olsa teorik orantıda 15.000 TL), işlemci ~7.000 TL tutacak ve toplamda parça parça toplama maliyeti 70.000 TL'yi kolayca aşacaktır. Bu durum, sistem entegratörlerinin (SI) devasa toptan alım indirimleri sayesinde perakende fiyatlarının çok altında maliyetlere ulaştığını ve/veya parça perakendecilerinin kar marjlarını aşırı şişirdiğini göstermektedir. Bu nedenle, yüksek kapasiteli ve bütçe dostu bir çözüm için "Hazır Sistem Alıp Üzerine Ekleme Yapma" stratejisi en kârlı yöntemdir.
+2. Kuşak Çatışması ve İkinci El Piyasasının Çöküşü: RTX 4070 Super ve RTX 5070'in aynı fiyattan (yaklaşık 35.000 - 40.000 TL) satılması pazar yamyamlığının (cannibalization) zirvesidir. Bu durum, elinde RTX 4070 Super veya RTX 3090 olan kullanıcıların ikinci el pazarındaki değerlerinin çok yakında çakılacağı anlamına gelir (Nitekim araştırma verilerinde RTX 3090'ın ikinci elde 13.000-18.000 TL bandına indiği görülmüştür ). 50 serisinin piyasayı domine etmesi an meselesidir; dolayısıyla sıfır alınacak bir sistemde 40 serisi kartlar ancak devasa "Stok Eritme İndirimleri" ile tercih edilmelidir.
+3. VRAM'in Psikolojik Bir Satış Unsuru Olarak Kullanılması: NVIDIA'nın RTX 4060 Ti ve 5060 Ti kartlarında 16GB VRAM kullanıp 128-bit veri yolu koyması, VRAM kapasitesinin bir tür "pazarlama aracı" olarak kullanıldığını göstermektedir. Normal oyun kullanıcıları için bu 16GB VRAM hiçbir zaman bant genişliği sebebiyle tam verimle kullanılamayacaktır. Ancak bu durum, sistemin kullanım amacını değiştirir; 100.000 TL bütçe ile bir Yapay Zeka (AI) çıkarım makinesi, Stable Diffusion veya yerel LLM sunucusu kurmak isteyenler için 16GB VRAM hayati bir zorunluluktur ve bu kartlar o kitle için paha biçilemez bir değerdir.
+100.000 TL Bütçe Optimizasyonlu Stratejik Kombinasyonlar
+Elde edilen mühendislik verileri ve pazar analizleri ışığında, 100.000 TL sınırını aşmadan üretilebilecek birbirinden tamamen farklı kullanım senaryolarına yönelik kombinasyonlar aşağıda yapılandırılmıştır.
+Kombinasyon 1: "Mutlak OEM Yıkımı" (RTX 5070 + Tam Ekosistem)
+Perakende pazarındaki RAM ve Anakart fiyat anomalilerini aşmanın tek yolu, piyasadaki hazır bir sistemi temel alıp onun etrafında bir ekosistem yaratmaktır. Bu kombinasyon, donanımsal zekanın sınırlarını kullanarak bütçe dahilinde alınabilecek en yüksek kas gücüne sahip sistemi yaratır. Bütün yan donanımları içerir.
+Bileşen Tipi
+Spesifik Model / Adlandırma
+Tahmini Maliyet (TL)
+Veri Kaynağı
+Temel Platform (OEM Sistem)
+Sinerji Skynet-5070 (Ryzen 5 7500F, PNY RTX 5070 12GB, 16GB DDR5, B840 Anakart, 500GB SSD, Kasa/PSU dahil)
+46.799
+
+
+İkincil Dev Depolama
+Kingston NV3 2TB PCIe 4.0 NVMe M.2 SSD
+10.999
+
+
+Görüntüleme Teknolojisi
+Philips Evnia 27M2N3501PA 27" 2K IPS 260Hz
+10.599
+
+
+İşlemci Soğutucu Takviyesi
+Thermalright Phantom Spirit 120 EVO
+3.639
+
+
+Ergonomik Yönetici Koltuğu
+Seduna Thunder Pro Siyah
+5.599
+
+
+Çevre Birimi (Klavye/Mouse)
+Logitech MX Keys Mini Combo Kablosuz Set
+8.279
+
+
+Kesintisiz Güç ve Şebeke Koruması
+Tunçmatik Lift 1500VA Line Interactive UPS
+5.717
+
+
+TOPLAM EKOSİSTEM MALİYETİ
+Geliştirilmiş Hazır Sistem Konfigürasyonu
+91.631 TL
+
+
+
+Mühendislik İrdelemesi: Bu kombinasyon, donanım dünyasındaki bir açığı kullanmaktadır. Sinerji'nin 46.799 TL'ye sattığı paket, içerisinde RTX 5070 ve DDR5 anakart/işlemci mimarisini barındırarak , parça parça alım durumunda karşılaşılan ekstrem maliyetleri yok etmiştir. Hazır sistemin tek zayıf yönü olan 500GB disk, 2TB Kingston NV3 ilavesiyle toplam 2.5TB'lık bir dev arşive dönüştürülmüştür. Philips Evnia'nın 260Hz yenileme hızı , RTX 5070'in çerçeve üretim yetenekleriyle birebir eşleşmektedir. Sistemin kalan 8.000 TL'lik bütçe fazlası; kaliteli kulaklıklar, ses sistemleri veya 16GB ekstra RAM ilavesi için tampon olarak bırakılmıştır.
+Kombinasyon 2: "Yapay Zeka (AI) ve Veri Bilimi İstasyonu" (RTX 5060 Ti 16GB Özel Toplama)
+Büyük Dil Modelleri (LLM) veya görüntü üretimi (Stable Diffusion) gibi veri yoğun görevler için VRAM hacmi her şeyden önemlidir. Bu konfigürasyon, hazır sistemlerden bağımsız olarak kendi parçalarını tek tek seçmek isteyen ve 16GB VRAM kapasitesine ihtiyaç duyan araştırmacılar için optimize edilmiştir.
+Not: RAM fiyatlarındaki radikal pazar durumu (32GB için 30.000 TL) bu konfigürasyonu bütçe sınırlarına kadar zorlamaktadır.
+Bileşen Tipi
+Spesifik Model / Adlandırma
+Tahmini Maliyet (TL)
+Veri Kaynağı
+İşlemci (CPU)
+AMD Ryzen 5 7600 (Kutusuz / Tray)
+7.490
+
+
+Anakart
+MSI PRO B650-S WiFi ATX
+7.598
+
+
+Ekran Kartı (GPU)
+Asus Dual GeForce RTX 5060 Ti 16GB
+29.419
+
+
+Volatil Bellek (RAM)
+Kingston Beast Expo Black 32GB (2X16) 6000MHz CL30
+29.784
+
+
+Depolama Sürücüsü
+Kingston NV3 2TB PCIe 4.0 NVMe
+10.999
+
+
+İklimlendirme (Kasa)
+BitFenix Enso Mesh ARGB E-ATX Kasa
+2.726
+
+
+Güç Kaynağı (PSU)
+MSI MAG A750GL Gen5.1 750W 80+ Gold
+5.143
+
+
+Termal Tahliye (Soğutucu)
+Thermalright Peerless Assassin 120 SE
+2.215
+
+
+Monitör (Ekrana Ayrılan)
+Fazeon 27" 2K IPS 150 Hz
+6.650
+
+
+TOPLAM MALİYET
+Özel Toplama Makine Araştırma İstasyonu
+102.024 TL
+
+
+
+Mühendislik İrdelemesi: Bütçe tam anlamıyla limitin %2 oranında dışına taşmıştır. Piyasada perakende satılan RAM fiyatlarının ulaştığı astronomik düzey (32GB için 29.784 TL) , bütçe içerisinde ekran kartını 5070'den 5060 Ti'ye düşürmek zorunda bırakmıştır. Ancak RTX 5060 Ti'nin 16GB'lık VRAM havuzu , yapay zeka model eğitimleri ve sanal makineler için geniş bir alan tanır. Anakart tarafında MSI PRO B650-S seçimi hem maliyeti baskılamış hem de gelecekteki Ryzen 9000 güncellemeleri için stabil bir VRM sunmuştur. Monitör tarafında maliyeti kısmak adına Fazeon markasının 2K 150Hz seçeneği kullanılmıştır. Fiyat performans oranı en yüksek parçalar birleştirilse dahi piyasa şartlarının sınırları zorladığı görülmektedir.
+Kombinasyon 3: "Ağır İş Yükü ve Kurgu Stüdyosu" (Ryzen 7 7700 + DRAM Cache SSD)
+Bu kombinasyon, saf oyun performansından çok video render, CAD programları, animasyon ve yazılım derleme gibi işlemlere odaklanır. 8 çekirdekli Ryzen 7 ve okuma/yazma hızları asla düşmeyen DRAM tamponlu bir SSD'yi merkeze alır. Hazır OEM bir sistem üzerine profesyonel monitör modifikasyonu yapılmıştır.
+Bileşen Tipi
+Spesifik Model / Adlandırma
+Tahmini Maliyet (TL)
+Veri Kaynağı
+İş İstasyonu Temeli
+Gaming.Gen.TR VORTEX-5060Ti (i5-14400F, RTX 5060 Ti 16GB, 16GB RAM, 1TB SSD) - Alternatif OEM Model (Veya Eşdeğer 7700 Sistem)
+~40.000 - 45.000
+
+
+Profesyonel Anakart
+Asus TUF Gaming B650-E WiFi (Ekstra Anakart Yükseltmesi İçin)
+9.509
+
+
+Gelişmiş Depolama
+Kingston KC3000 2TB PCIe 4.0 (DRAM Cache)
+16.474
+
+
+Çoklu Çekirdek Gücü
+AMD Ryzen 7 7700 Kutusuz
+9.707
+
+
+Profesyonel Monitör
+Asus TUF VG27AQML5A 27" 2K 300Hz Pivot
+16.299
+
+
+Kesintisiz Güç Kaynağı
+Tunçmatik Lift 1500VA UPS
+5.717
+
+
+TOPLAM MALİYET
+Kurgu / Üretkenlik İstasyonu (Karma Modifikasyon)
+~97.706 TL
+
+
+
+Mühendislik İrdelemesi: Bu yapılandırma, sistem içindeki donanımsal zayıf halkaları doğrudan değiştirmeyi hedeflemektedir. İtopya veya Gaming.gen.tr'nin sunduğu temel orta sınıf bir sistem (örn: i5-14400F'li Vortex modeli ) alınıp; video render sürelerini kısaltmak için Ryzen 7 7700 (9.707 TL) işlemcisi, yüksek kaliteli bir Asus TUF anakart (9.509 TL) ve kurgu süreçlerinde hız düşüşü yaşatmayacak Kingston KC3000 2TB (16.474 TL) SSD entegre edilmiştir. Bu hibrit toplama yöntemi, yüksek performanslı bileşenlerin perakende alım gücü ile OEM sübvansiyonlarını bir araya getirmeye çalışan teorik ancak efektif bir manevradır. Ekran kartı, video kodlamada (NVENC) yeterli işlem hızını sağlayacak RTX 4060 Ti veya 5060 Ti seviyesinde tutulmuştur.
+Sonuç ve Stratejik Öneriler
+Yapılan derinlemesine fiyat analizleri, mimari irdelemeler ve performans ölçümleri ışığında 100.000 TL bütçeli bir bilgisayar toplamak, özellikle Türkiye pazarındaki ekstrem fiyat çarpıklıkları sebebiyle ciddi mühendislik ve ekonomi planlaması gerektirmektedir.
+RAM Maliyeti Krizi: Perakende pazarında bellek kitleri aşırı şişkin bir balona dönüşmüştür. Sadece 64GB DDR5 bellekler için 50.000-79.000 TL bandında ödeme yapılması bütçenin geri kalanını tamamen işlevsiz bırakmaktadır. Bu yüzden 100k TL baremi altında, mecburen önceden toplanmış OEM (hazır sistem) satın alarak bu bileşenleri sistem içinde "sübvanse edilmiş" uygun fiyatıyla elde etmek tek akılcı yoldur.
+GPU Paradigması: RTX 40 serisi ile 50 serisi arasındaki fiyat/performans geçişi tamamlanmıştır. RTX 5070'in 35.000 TL bandında, selefi RTX 4070 Super ile aynı fiyattan satılıyor olması, 40 serisi kartların sıfır piyasasındaki çekiciliğini bitirmiştir.
+Ekosistem Yaklaşımı: 100.000 TL sadece bilgisayar kasası olarak düşünülmemelidir. Paha biçilmez donanımı şebeke dalgalanmalarından korumak için 1500VA Line-Interactive UPS'ler, sistemin hava akışını engelleyerek donanımı yıpratmayacak olan Thermalright hava soğutucular ve BitFenix/Montech mesh kasalar hayati derecede önemlidir.
+En nihayetinde sunulan Kombinasyon 1, bütçeye en sadık kalan, %100'e yakın bir güç verimliliği sağlayan ve yan bileşenlerle (ergonomik koltuk, profesyonel monitör) tam bir ekosistem sunan açık ara en rasyonel modeldir. Bu yapılandırmalar, kullanıcının iş akışı profiline, oyun oynama gereksinimlerine ve Yapay Zeka tabanlı lokal makine öğrenimi niyetlerine göre bükülebilir niteliktedir. Pazar dinamikleri günlük olarak değişse dahi, buradaki teorik denge formülleri (DRAM vs HMB disk, 128-bit vs 192-bit veriyolu, Hava Soğutma vs Sıvı Soğutma avantajları) sistemin iskeletini oluşturacak geçerliliğini korumaktadır.
+Alıntılanan çalışmalar
+1. AMD Ryzen 5 7600 Altı Çekirdek 3.80 GHz Kutusuz Fansız İşlemci - Akakçe, https://www.akakce.com/islemci/en-ucuz-amd-ryzen-5-7600-alti-cekirdek-3-80-ghz-kutusuz-fansiz-fiyati,632258961.html 2. AMD Ryzen 5 7600 3.80 GHz 32 MB AM5 6 Çekirdek İşlemci Fiyatları - Cimri, https://www.cimri.com/islemci/en-ucuz-amd-ryzen-5-7600-mpk-3-80ghz-6-cekirdek-32mb-onbellek-soket-am5-islemci-fiyatlari,2193286632 3. AMD Ryzen 5 7600 Altı Çekirdek 3.80 GHz Kutusuz Fanlı İşlemci - Akakçe, https://www.akakce.com/islemci/en-ucuz-amd-ryzen-5-7600-alti-cekirdek-3-80-ghz-kutusuz-fanli-fiyati,632253092.html 4. AMD Ryzen 7 7700X Sekiz Çekirdek 4.50 GHz Kutusuz Fansız İşlemci Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/islemci/en-ucuz-amd-ryzen-7-7700x-sekiz-cekirdek-4-50-ghz-kutusuz-fiyati,2120928843.html 5. AMD Ryzen 7 7700X Sekiz Çekirdek 4.50 GHz İşlemci Fiyatları, Özellikleri ve Yorumları, https://www.akakce.com/islemci/en-ucuz-amd-ryzen-7-7700x-sekiz-cekirdek-4-50-ghz-fiyati,2120928839.html 6. AMD Ryzen 7 7700 Sekiz Çekirdek 3.8 GHz Kutusuz Fansız İşlemci - Akakçe, https://www.akakce.com/islemci/en-ucuz-amd-ryzen-7-7700-sekiz-cekirdek-3-8-ghz-kutusuz-fansiz-fiyati,632153757.html 7. AMD Ryzen 7 7700 Sekiz Çekirdek 3.8 GHz Kutulu İşlemci Fiyatları, Özellikleri ve Yorumları, https://www.akakce.com/islemci/en-ucuz-amd-ryzen-7-7700-sekiz-cekirdek-3-8-ghz-kutulu-fiyati,276058376.html 8. INTEL İşlemcili Hazır Sistemler - Intel Hazır Bilgisayar - ITOPYA, https://www.itopya.com/intel-islemcili-hazir-sistemler_sk13 9. AM5 Ürünler ve Fiyatları - Gaming.Gen.TR, https://www.gaming.gen.tr/etiket/am5/ 10. RTX 4060 TI Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/ekran-karti/rtx-4060-ti.html 11. MSI RTX 4060 TI Ventus 2X Black 16G OC 128 Bit GDDR6 16 GB Ekran Kartı - Akakçe, https://www.akakce.com/ekran-karti/en-ucuz-msi-rtx-4060-ti-ventus-2x-black-16g-oc-128-bit-gddr6-16-gb-fiyati,282365763.html 12. Colorful RTX 4060 TI NB EX OC 16GB-V 128 Bit GDDR6 16 GB Ekran Kartı - Akakçe, https://www.akakce.com/ekran-karti/en-ucuz-colorful-rtx-4060-ti-nb-ex-oc-16gb-v-128-bit-gddr6-16-gb-fiyati,355663283.html 13. Asus Dual GeForce RTX 5060 Ti OC DUAL-RTX5060TI-O16G 16GB GDDR7 Ekran Kartı, https://www.cimri.com/ekran-kartlari/en-ucuz-asus-dual-geforce-rtx-5060-ti-oc-dual-rtx5060ti-o16g-16gb-gddr7-ekran-karti-fiyatlari,2450992430 14. Gigabyte GeForce RTX 5060 Ti Gaming OC GV-N506TGAMING OC-16GD 16GB GDDR7 Ekran Kartı - Cimri, https://www.cimri.com/ekran-kartlari/en-ucuz-gigabyte-geforce-rtx-5060-ti-gaming-oc-gv-n506tgaming-oc-16gd-16gb-gddr7-ekran-karti-fiyatlari,2450992595 15. RTX 5060 TI Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/ekran-karti/rtx-5060-ti.html 16. Palit GeForce RTX 5060 Ti INFINITY 3 16GB GDDR7 128 Bit DLSS 4 Ekran Kartı, NE7506T019T1-GB2061S - Sinerji Bilgisayar, https://www.sinerji.gen.tr/palit-geforce-rtx-5060-ti-infinity-3-16gb-gddr7-128-bit-dlss-4-ekran-karti-p-55140 17. RTX 4070 Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/ekran-karti/rtx-4070.html 18. RTX 4070 Super Ekran Kartı Fiyatları & Çeşitleri - Cimri'de!, https://www.cimri.com/ekran-kartlari/rtx-4070-super 19. MSI GeForce RTX 4070 Super Ventus 2X OC 12GB GDDR6X Ekran Kartı - Cimri, https://www.cimri.com/ekran-kartlari/en-ucuz-msi-nvidia-geforce-rtx-4070-super-ventus-2x-oc-12gb-gddr6x-192-bit-ekran-karti-fiyatlari,2312435450 20. Galax RTX 4070 Super 1-Click OC 2X V2 47SOM7MDABCD 192 Bit GDDR6X 12 GB Ekran Kartı Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/ekran-karti/en-ucuz-galax-rtx-4070-super-1-click-oc-2x-v2-47som7mdabcd-192-bit-gddr6x-12-gb-fiyati,713644733.html 21. GeForce RTX 4070 Super Ekran Kartı Fiyatları - Epey, https://www.epey.com/ekran-karti/grafik-islemcisi/geforce-rtx-4070-super/ 22. PNY GeForce RTX 5070 Triple Fan OC VCG507012TFXPB1-O 12GB GDDR7 Ekran Kartı, https://www.cimri.com/ekran-kartlari/en-ucuz-pny-geforce-rtx-5070-triple-fan-oc-vcg507012tfxpb1-o-12gb-gddr7-ekran-karti-fiyatlari,2489578149 23. RTX 5070 Ekran Kartı Fiyatları & Çeşitleri - Cimri'de!, https://www.cimri.com/ekran-kartlari/rtx-5070 24. Asus Prime GeForce RTX 5070 12GB GDDR7 Ekran Kartı - Cimri, https://www.cimri.com/ekran-kartlari/en-ucuz-asus-prime-geforce-rtx-5070-oc-prime-rtx5070-o12g-12gb-gddr7-ekran-karti-fiyatlari,2431985421 25. Palit RTX 4070 TI Super GamingPro NED47TS019T2-1043A 256 Bit GDDR6X 16 GB Ekran Kartı Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/ekran-karti/en-ucuz-palit-rtx-4070-ti-super-gamingpro-ned47ts019t2-1043a-256-bit-gddr6x-16-gb-fiyati,523337245.html 26. Asus TUF Gaming GeForce RTX 4070 Ti Super OC 16GB GDDR6X Ekran Kartı Fiyatları - Cimri, https://www.cimri.com/ekran-kartlari/en-ucuz-asus-tuf-gaming-geforce-rtx-4070-ti-super-oc-16gb-tuf-rtx4070tis-o16g-gddr6x-256-bit-ekran-karti-fiyatlari,2314342733 27. RTX 5070 Ti Ekran Kartı Fiyatları & Çeşitleri - Cimri'de!, https://www.cimri.com/ekran-kartlari/rtx-5070-ti 28. MSI GeForce RTX 5070 Ti 16G Ventus 3X OC 16GB GDRR7 Ekran Kartı - Cimri, https://www.cimri.com/ekran-kartlari/en-ucuz-msi-geforce-rtx-5070-ti-16g-ventus-3x-oc-16gb-gdrr7-ekran-karti-fiyatlari,2442651812 29. Asus Prime GeForce RTX 5070 Ti 16GB GDDR7 Ekran Kartı - Cimri, https://www.cimri.com/ekran-kartlari/en-ucuz-asus-prime-geforce-rtx-5070-ti-oc-prime-rtx5070-o16g-16gb-gddr7-ekran-karti-fiyatlari,2431986780 30. B650 Anakart Fiyatları - Cimri, https://www.cimri.com/b650-anakart 31. Asus TUF Gaming B650-E Wi-Fi AMD AM5 DDR5 ATX Anakart - Akakçe, https://www.akakce.com/anakart/en-ucuz-asus-tuf-gaming-b650-e-wi-fi-amd-am5-ddr5-atx-fiyati,588462804.html 32. MSI MAG B650 TOMAHAWK Wifi AM5 DDR5 6600MHZ OC HDMI DP M2 ATX Anakart, https://www.cimri.com/anakart/en-ucuz-msi-mag-b650-tomahawk-wifi-am5-ddr5-6600mhz-oc-hdmi-dp-m2-atx-anakart-fiyatlari,2108293470 33. MSI MPG B650 Carbon Wi-Fi AMD AM5 DDR5 ATX Anakart - Akakçe, https://www.akakce.com/anakart/en-ucuz-msi-mpg-b650-carbon-wifi-amd-am5-ddr5-atx-fiyati,66115661.html 34. MSI Oyuncu Anakart Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/anakart/msi-gaming.html 35. 64 GB RAM Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/ram/64-gb-ram.html 36. Kingston Beast Black Expo 64 GB (2x32) 6000 Mhz CL30 KF560C30BBEK2/64TR DDR5 Ram Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/ram/en-ucuz-kingston-beast-black-expo-64-gb-2x32-6000-mhz-cl30-kf560c30bbek2-64tr-ddr5-fiyati,717343761.html 37. Corsair Vengeance RGB 64 GB (2x32) 6000 MHz CL30 CMH64GX5M2B6000Z30 DDR5 Ram Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/ram/en-ucuz-corsair-vengeance-rgb-64-gb-2x32-ddr5-6000-mhz-cl30-cmh64gx5m2b6000z30-fiyati,298920134.html 38. Kingston Beast Expo Black 32 GB (2X16) 6000 MHz CL30 KF560C30BBEK2/32TR DDR5 Ram Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/ram/en-ucuz-kingston-beast-expo-32-gb-2x16-6000-mhz-cl30-kf560c30bbek2-32tr-ddr5-fiyati,811894497.html 39. Kingston KC3000 SKC3000S/2048G PCI-Express 4.0 2 TB M.2 SSD - Akakçe, https://www.akakce.com/ssd/en-ucuz-kingston-2-tb-kc3000-skc3000s-2048g-m-2-pci-express-4-0-fiyati,1681062821.html 40. Kingston KC3000 2TB 22x80mm PCIe 4.0 x4 M.2 NVMe SSD - Akakçe, https://www.akakce.com/ssd/en-ucuz-kingston-kc3000-2tb-22x80mm-pcie-4-0-x4-m-2-nvme-fiyati,940703909.html 41. Kingston KC3000 SKC3000D/2048G PCI-Express 4.0 2 TB M.2 SSD - Akakçe, https://www.akakce.com/ssd/en-ucuz-kingston-2-tb-kc3000-skc3000d-2048g-m-2-pci-express-4-0-fiyati,1639040028.html 42. Kingston KC3000 SKC3000D/2048G PCI-Express 4.0 2TB M.2 SSD Fiyatları - Cimri, https://www.cimri.com/ssd-solid-state-drive/en-ucuz-kingston-kc3000-2-tb-m-2-ssd-fiyatlari,992760744 43. 2 TB SSD Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/ssd/2-tb.html 44. Kingston NV3 SNV3S/2000G PCI-Express 4.0 2 TB M.2 SSD - Akakçe, https://www.akakce.com/ssd/en-ucuz-kingston-nv3-snv3s-2000g-pci-express-4-0-2-tb-m-2-fiyati,734994021.html 45. Thermalright Peerless Assassin 120 SE ARGB Siyah İşlemci Soğutucu - Akakçe, https://www.akakce.com/islemci-sogutucu/en-ucuz-thermalright-peerless-assassin-120-se-argb-fiyati,277759349.html 46. Thermalright Peerless Assassin 120 SE İşlemci Soğutucu Fiyatları, Özellikleri ve Yorumları, https://www.akakce.com/islemci-sogutucu/en-ucuz-thermalright-peerless-assassin-120-se-cpu-tl-c12c-fiyati,340209419.html 47. Thermalright Peerless Assassin 120 Siyah İşlemci Soğutucu Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/islemci-sogutucu/en-ucuz-thermalright-peerless-assassin-120-siyah-fiyati,340235929.html 48. Thermalright Assassin Spirit 120 Plus V2 İşlemci Soğutucu Fiyatları, Özellikleri ve Yorumları, https://www.akakce.com/islemci-sogutucu/en-ucuz-thermalright-assassin-spirit-120-plus-v2-fiyati,217779872.html 49. Thermalright Phantom Spirit 120 EVO İşlemci Soğutucu Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/islemci-sogutucu/en-ucuz-thermalright-phantom-spirit-120-evo-fiyati,629409669.html 50. Asus TUF-GAMING-850G 850 W Power Supply Fiyatları, Özellikleri ve Yorumları - Akakçe, https://www.akakce.com/power-supply/en-ucuz-asus-tuf-gaming-850g-850-w-fiyati,315298485.html 51. MSI MAG A850GL Gen5 850 W Power Supply Fiyatları, Özellikleri ve Yorumları - Akakçe, https://www.akakce.com/power-supply/en-ucuz-msi-mag-a850gl-850-w-80-plus-gold-tam-moduler-fiyati,122221010.html 52. Asus Prime AP-750G 750 W Power Supply Fiyatları, Özellikleri ve Yorumları - Akakçe, https://www.akakce.com/power-supply/en-ucuz-asus-prime-ap-750g-750-w-fiyati,362688198.html 53. BitFenix Enso Mesh ARGB Fanlı Siyah E-ATX Oyuncu Kasası - Akakçe, https://www.akakce.com/bilgisayar-kasasi/en-ucuz-bitfenix-enso-mesh-tempered-glass-argb-usb-3-0-atx-mid-tower-kasa-fiyati,1543638604.html 54. Montech X3 Mesh RGB Fanlı ATX Oyuncu Kasası Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/bilgisayar-kasasi/en-ucuz-montech-x3-mesh-rgb-fanli-atx-oyuncu-kasasi-fiyati,1105629710.html 55. Inform Lift 1500VA 12V UPS Kesintisiz Güç Kaynağı Fiyatları, Özellikleri ve Yorumları, https://www.akakce.com/kesintisiz-guc-kaynagi/en-ucuz-inform-lift-1500va-12v-ups-fiyati,244360139.html 56. 2K Monitör & QHD Monitör Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/monitor/2k-monitor.html 57. Fazeon X27F165QW 27" 0.5 ms 2K IPS 150 Hz Oyuncu Monitörü Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/monitor/en-ucuz-fazeon-x27f165qw-27-0-5-ms-2k-ips-150-hz-oyuncu-u-fiyati,1276432167.html 58. IPS Monitör Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/monitor/ips-monitor.html 59. Seduna Maxim UP Çalışma Koltuğu Fiyatları, Özellikleri ve Yorumları | En Ucuzu Akakçe, https://www.akakce.com/calisma-koltugu/en-ucuz-seduna-maxim-up-calisma-sandalyesi-ofis-koltugu-fiyati,986520725.html 60. Seduna Kampanyaları, İndirimleri & Seduna Fiyatları | Akakçe, https://www.akakce.com/seduna.html 61. Mekanik Klavye Mouse Set Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/klavye-mouse-seti/mekanik-klavye-mouse-set.html 62. Klavye Mouse Seti Fiyatları | En Ucuzu Akakçe, https://www.akakce.com/klavye-mouse-seti.html 63. Oyun için Oem Paketler - Sinerji Bilgisayar, https://www.sinerji.gen.tr/oem-paketleri-c-2116 64. Şimdi Oyun Oynamak İçin İkinci El RTX 3090 Almak Mantıklı mı? : r/nvidia - Reddit, https://www.reddit.com/r/nvidia/comments/ysaabv/buying_used_rtx_3090_now_for_gaming/?tl=tr 65. VORTEX-5060Ti / INTEL i5-14400F TRAY / MSI GeForce RTX 5060 Ti 16G VENTUS 2X OC PLUS 16GB / 16GB RAM / 1TB M.2 SSD Sistem Tavsiyesi - 007 First Light Hediyeli - Gaming.Gen.TR, https://www.gaming.gen.tr/urun/718896/vortex-5060ti-intel-i5-14400f-tray-msi-geforce-rtx-5060-ti-16g-ventus-2x-oc-plus-16gb-16gb-ram-1tb-m-2-ssd-sistem-tavsiyesi-007-first-light-hediyeli/
