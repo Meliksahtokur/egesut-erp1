@@ -773,7 +773,11 @@ function _detUremeHtml(a,tohs,kizgs){
     h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.1);color:var(--red);font-weight:700" onclick="abortKaydet('${a.id}','${gebeTohumlama.id}')">⚠️ Abort / Erken Doğum</button>`;
     h+=`<button class="btn btn-g" style="flex:1;padding:9px;font-weight:700" onclick="dogumYaptiAc('${a.id}','${hid}','${gebeTohumlama.tarih}','${gebeTohumlama.sperma||''}')">🐄 Doğum Yaptı</button>`;
   } else if(bekleyenToh){
+    const _tohGun=Math.floor((Date.now()-new Date(bekleyenToh.tarih))/86400000);
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Tohumlama Ekle</button>`;
+    if(_tohGun>=0&&_tohGun<=15){
+      h+=`<button class="btn" style="flex:1;padding:9px;font-weight:700;background:var(--amber);color:#fff;border:none" onclick="openTekrarAsim('${a.id}','${hid}')">🔁 Tekrar Aşım</button>`;
+    }
   } else if(dogumYaptiToh){
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Yeni Tohumlama Ekle</button>`;
   } else {
@@ -782,7 +786,7 @@ function _detUremeHtml(a,tohs,kizgs){
   h+='</div>';
   if(gebeBilgi) h+=`<div style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:.8rem;color:var(--ink2)"><b style="color:var(--green)">🤰 Gebe</b> — ${gebeBilgi}</div>`;
   h+=(tohs.length
-    ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'} · ${t.deneme_no||1}. deneme</div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
+    ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'}${t.deneme_sayisi > 1 ? ` <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_sayisi}. Deneme</span>` : ''}</div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
     :'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
   if(kizgs&&kizgs.length){
     h+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:.72rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Kızgınlık Geçmişi</div>';
@@ -1531,10 +1535,19 @@ async function _uremeTohumlama(el){
       return `<div class="hist-row" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="openTohDet('${t.id}')">
         <div class="hist-dot" style="background:${dot};flex-shrink:0"></div>
         <div class="hist-main" style="flex:1;min-width:0">
-          <div class="hist-title" style="color:var(--ink2)">${kupe} — ${t.sperma||'?'}</div>
-          <div class="hist-sub">${t.tarih} · ${t.deneme_no||1}. deneme · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
+          <div class="hist-title" style="color:var(--ink2)">${kupe} — ${t.sperma||'?'}${t.deneme_sayisi > 1 ? ` <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_sayisi}. Deneme</span>` : ''}</div>
+          <div class="hist-sub">${t.tarih} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
         </div>
-        ${_bekliyor?`<button onclick="event.stopPropagation();tekrarTohumla('${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">💉 Tekrar</button>`:''}
+        ${_bekliyor && t.tarih
+          ? (()=>{
+              const _uretGun=Math.floor((Date.now()-new Date(t.tarih))/86400000);
+              return _uretGun>=0&&_uretGun<=15
+                ? `<button onclick="event.stopPropagation();openTekrarAsim('${t.hayvan_id}','${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--amber);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">🔁 Tekrar Aşım</button>`
+                : '<span style="flex-shrink:0;font-size:.65rem;color:var(--ink3)">' + _uretGun + ' gün</span>';
+            })()
+          : (_bekliyor
+            ? `<button onclick="event.stopPropagation();tekrarTohumla('${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">💉 Tohumla</button>`
+            : '')}
       </div>`;
     }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
 }
@@ -3095,7 +3108,7 @@ async function openTohDet(id){
   const sc=_tohGebe?'var(--green)':_scMidToh;
   const chips=[
     `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc||'Bekliyor'}</span>`,
-    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no||1}. deneme</span>`,
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_sayisi||1}. deneme</span>`,
     `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(t.tarih)}</span>`,
     hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
   ];
@@ -3165,6 +3178,25 @@ async function openTohDet(id){
     if(t.sonuc!=='Gebe'&&t.sonuc!=='Doğum Yaptı'){ td2TekrarBtn.style.display='block'; td2TekrarBtn.onclick=()=>tekrarTohumla(hayvanLabel||t.hayvan_id); }
     else { td2TekrarBtn.style.display='none'; }
   }
+
+  // ── Önceki denemeler history ──
+  const td2Denemeler=document.getElementById('td2-denemeler');
+  if(td2Denemeler){
+    if(t.denemeler&&t.denemeler.length>0){
+      td2Denemeler.innerHTML=`<div style="padding-top:10px;border-top:1px solid var(--card3)">
+        <div style="font-size:.72rem;font-weight:700;color:var(--ink3);margin-bottom:6px">Önceki Denemeler</div>
+        ${t.denemeler.map(d=>`
+          <div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.78rem">
+            <span style="background:var(--card2);border-radius:6px;padding:1px 6px;font-weight:700">${d.no}.</span>
+            <span>${d.tarih||'?'}</span>
+            <span style="color:var(--ink3)">· ${d.sperma||'?'}</span>
+          </div>`).join('')}
+      </div>`;
+    } else {
+      td2Denemeler.innerHTML='';
+    }
+  }
+
   openM('m-toh-det');
 }
 function tekrarTohumla(kupe) {
@@ -3697,6 +3729,13 @@ function buildRpcParams(rpcName, data, op) {
         p_tarih: data.tarih,
         p_sperma_kodu: data.sperma_kodu,
         p_teknisyen: data.teknisyen
+      };
+    case 'tohumlama_tekrar_kaydet':
+      return {
+        p_hayvan_id: data.hayvan_id,
+        p_tarih:     data.tarih,
+        p_sperma:    data.sperma,
+        p_hekim_id:  data.hekim_id || null,
       };
     case 'dogum_kaydet':
       return {

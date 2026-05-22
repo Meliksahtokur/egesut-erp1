@@ -195,6 +195,50 @@ async function submitInsem(btn) {
   } finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
 }
 
+// ── TEKRAR AŞIM ───────────────────────────────
+async function submitTekrarAsim(btn) {
+  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  const hid    = document.getElementById('tr-hid').value;
+  const tarih  = document.getElementById('tr-tarih').value;
+  const sperma = document.getElementById('tr-sperma').value;
+  if (!hid || !tarih || !sperma) { toast('Tarih ve Sperma zorunlu', true); return; }
+  if (tarih > new Date().toISOString().split('T')[0]) { toast('Tarih ileri olamaz', true); return; }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  try {
+    await rpc('tohumlama_tekrar_kaydet', {
+      p_hayvan_id: hid,
+      p_tarih:     tarih,
+      p_sperma:    sperma,
+      p_hekim_id:  document.getElementById('tr-hekim').value || null,
+    });
+    toast('✅ Tekrar aşım kaydedildi, görevler güncellendi');
+    closeM('m-insem-tekrar');
+    document.getElementById('tr-hid').value = '';
+    document.getElementById('tr-sperma').value = '';
+    pullTables(['tohumlama','gorev_log','hayvanlar']).then(() => {
+      renderSafe();
+      if (typeof loadUreme === 'function' && window._curUremeTab === 'tohumlama') {
+        loadUreme('tohumlama');
+      }
+    }).catch(console.warn);
+  } catch (e) {
+    toast('❌ Tekrar aşım kaydedilemedi: ' + getUserMessage(e), true);
+  } finally { if (btn) { btn.disabled = false; btn.textContent = '🔁 Tekrar Kaydet + Görevleri Güncelle'; } }
+}
+
+function openTekrarAsim(hayvanId, kupeNo) {
+  document.getElementById('tr-hid').value = hayvanId;
+  document.getElementById('tr-kupe-label').textContent = kupeNo;
+  document.getElementById('tr-tarih').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tr-sperma').value = '';
+  document.getElementById('tr-sperma-select').value = '';
+  const hekimSel = document.getElementById('tr-hekim');
+  const insemHekimSel = document.getElementById('i-hekim');
+  if (insemHekimSel && hekimSel) hekimSel.innerHTML = insemHekimSel.innerHTML;
+  openM('m-insem-tekrar');
+}
+
 // ── KIZGINLIK ────────────────────────────────
 async function submitKizginlik(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
