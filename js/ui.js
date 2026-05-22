@@ -3262,6 +3262,52 @@ async function checkSpermaUyari(){
     bnd.textContent='⚠️ Kritik sperma stoku: '+critik.map(s=>`${esc(s.urun_adi)} (${s.guncel} doz)`).join(', ');
   } else { bnd.style.display='none'; }
 }
+function trSpermaModStok(){
+  document.getElementById('tr-sperma-stok-area').style.display='block';
+  document.getElementById('tr-sperma-elle-area').style.display='none';
+  document.getElementById('btn-tr-sperma-stok').style.background='rgba(42,107,181,.2)';
+  document.getElementById('btn-tr-sperma-elle').style.background='var(--card2)';
+  const spermalar=getState('stock').filter(s=>s.kategori==='Sperma'||s.grup==='Sperma'||(s.urun_adi||'').toLowerCase().includes('sperma')||(s.urun_adi||'').toLowerCase().includes('doz'));
+  const sel=document.getElementById('tr-sperma-select');
+  sel.innerHTML='<option value="">Sperma seçin…</option>'+spermalar.map(s=>`<option value="${esc(s.urun_adi)}" data-stok="${s.guncel||0}">${esc(s.urun_adi)} (${s.guncel||0} doz kaldı)</option>`).join('');
+  if(!spermalar.length) sel.innerHTML='<option value="">Stokta sperma yok — Elle Gir kullanın</option>';
+  document.getElementById('tr-sperma').value='';
+  document.getElementById('tr-sperma-hint').textContent='';
+  const kaydetBtn=document.querySelector('#m-insem-tekrar .btn-g');
+  if(kaydetBtn) kaydetBtn.disabled=false;
+}
+function onTrSpermaSelect(sel){
+  const val=sel.value;
+  const stok=parseInt(sel.selectedOptions[0]?.dataset?.stok??'-1',10);
+  document.getElementById('tr-sperma').value=val;
+  const hint=document.getElementById('tr-sperma-hint');
+  const kaydetBtn=document.querySelector('#m-insem-tekrar .btn-g');
+  if(!val){ hint.textContent=''; if(kaydetBtn) kaydetBtn.disabled=false; return; }
+  if(stok<=0){
+    hint.style.color='var(--red,#c0392b)';
+    hint.textContent='⛔ Bu sperma stoku tükendi, kayıt yapılamaz.';
+    if(kaydetBtn){ kaydetBtn.disabled=true; kaydetBtn.title='Stok yok'; }
+  } else if(stok<=5){
+    hint.style.color='var(--orange,#e67e22)';
+    hint.textContent=`⚠️ Dikkat: Sadece ${stok} doz kaldı.`;
+    if(kaydetBtn){ kaydetBtn.disabled=false; kaydetBtn.title=''; }
+  } else {
+    hint.style.color='var(--green,#27ae60)';
+    hint.textContent=`✅ Stokta ${stok} doz mevcut.`;
+    if(kaydetBtn){ kaydetBtn.disabled=false; kaydetBtn.title=''; }
+  }
+}
+function trSpermaModElle(){
+  document.getElementById('tr-sperma-stok-area').style.display='none';
+  document.getElementById('tr-sperma-elle-area').style.display='block';
+  document.getElementById('btn-tr-sperma-elle').style.background='rgba(61,74,50,.15)';
+  document.getElementById('btn-tr-sperma-stok').style.background='var(--card2)';
+  document.getElementById('tr-sperma').value='';
+  document.getElementById('tr-sperma-hint').textContent='';
+  const kaydetBtn=document.querySelector('#m-insem-tekrar .btn-g');
+  if(kaydetBtn){ kaydetBtn.disabled=false; kaydetBtn.title=''; }
+}
+
 function spermaModStok(){
   document.getElementById('sperma-stok-area').style.display='block';
   document.getElementById('sperma-elle-area').style.display='none';
