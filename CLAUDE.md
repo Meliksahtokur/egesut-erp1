@@ -27,6 +27,7 @@ Dosya yaz, SQL üret, commit at — doğrudan yap. Gereksiz yere delege etme.
 | JS/SQL yazma + commit birlikte | → sub-agent spawn (`erp-implementer` + `erp-qa-git`) |
 | Web araştırması, harici dok analizi | → `deerflow_research(query, mode="flash")` |
 | Async iş, uzun süren ERP görevi | → `goose_start(recipe, session_id, params)` → telsiz döngüsü |
+| **Goose çalışmıyor, implementasyon görevi var** | → `Skill("deepseek-tui-plan")` → plan yaz → kullanıcıya dosya yolu + ilk prompt ver |
 
 ## DeerFlow
 
