@@ -774,14 +774,14 @@ function _detUremeHtml(a,tohs,kizgs){
     h+=`<button class="btn btn-g" style="flex:1;padding:9px;font-weight:700" onclick="dogumYaptiAc('${a.id}','${hid}','${gebeTohumlama.tarih}','${gebeTohumlama.sperma||''}')">🐄 Doğum Yaptı</button>`;
   } else if(bekleyenToh){
     const _tohGun=Math.floor((Date.now()-new Date(bekleyenToh.tarih))/86400000);
-    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Tohumlama Ekle</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Tohumlama Ekle</button>`;
     if(_tohGun>=0&&_tohGun<=15){
       h+=`<button class="btn" style="flex:1;padding:9px;font-weight:700;background:var(--amber);color:#fff;border:none" onclick="openTekrarAsim('${a.id}','${hid}')">🔁 Tekrar Aşım</button>`;
     }
   } else if(dogumYaptiToh){
-    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Yeni Tohumlama Ekle</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Yeni Tohumlama Ekle</button>`;
   } else {
-    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openMWithHayvan('m-insem','i-hid','${hid}')">💉 Tohumlama Ekle</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Tohumlama Ekle</button>`;
   }
   h+='</div>';
   if(gebeBilgi) h+=`<div style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:.8rem;color:var(--ink2)"><b style="color:var(--green)">🤰 Gebe</b> — ${gebeBilgi}</div>`;
@@ -1346,7 +1346,7 @@ async function _uremeKizginlik(el){
       <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
         ${cozulduMi?'':`
           <button style="background:var(--blue);color:#fff;padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700"
-            onclick="event.stopPropagation();openMWithHayvan('m-insem','i-hid','${kupe}')">💉 Tohumla</button>
+            onclick="event.stopPropagation();openInsemSafe('${kupe}')">💉 Tohumla</button>
           <button style="background:rgba(42,107,181,.15);color:var(--blue);padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;white-space:nowrap"
             onclick="event.stopPropagation();kizginlikTedaviAc('${k.id}','${kupe}')">🏥 Tedavi</button>
         `}
@@ -1614,7 +1614,7 @@ function _gecmisEntryHtml(e){
   } else if(type==='tohumlama'){
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
     title=`${hayvanLabel||'?'} — ${data.sperma||'?'}`;
-    sub=`${data.deneme_no||1}. deneme · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`;
+    sub=`${data.deneme_no||1}. Tohumlama · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`;
   } else if(type==='hastalik'){
     const sc=data.status==='active'?'var(--red)':'var(--green)';
     title=`${hayvanLabel||'?'} — ${data.disease_name||data.tani||'?'}`;
@@ -3201,7 +3201,7 @@ async function openTohDet(id){
 }
 function tekrarTohumla(kupe) {
   closeM('m-toh-det');
-  openMWithHayvan('m-insem','i-hid', kupe);
+  openInsemSafe(kupe);
 }
 // tohSonuc → forms.js'de tanımlı (guard'lı versiyon)
 
@@ -3546,28 +3546,29 @@ function openMWithHayvan(modalId,inputId,kupeNo){
       if(typeof loadBulkIlacPadoklar==='function') loadBulkIlacPadoklar();
       if(typeof loadBulkIlacDropdown==='function') loadBulkIlacDropdown();
     }
-    if(modalId==='m-insem') _checkInsemTekrarMode(kupeNo);
   },150);
   if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
 }
 
-async function _checkInsemTekrarMode(kupeNo){
-  const uyari=document.getElementById('insem-tekrar-uyari');
-  const btn=document.getElementById('insem-submit-btn');
-  if(!uyari||!btn) return;
-  // Reset
-  uyari.style.display='none'; btn.disabled=false; btn.style.opacity=''; btn.style.cursor='';
-  if(!kupeNo) return;
+async function openInsemSafe(kupeNo){
   const hayvan=(getState('animals')||[]).find(a=>a.kupe_no===kupeNo||a.devlet_kupe===kupeNo);
-  if(!hayvan) return;
+  if(!hayvan){ openMWithHayvan('m-insem','i-hid',kupeNo); return; }
   const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvan.id);
   const bekliyor=tohs.find(t=>t.sonuc==='Bekliyor');
-  if(!bekliyor) return;
-  const gun=Math.floor((Date.now()-new Date(bekliyor.tarih))/86400000);
-  if(gun>=0&&gun<=15){
-    uyari.style.display='';
-    btn.disabled=true; btn.style.opacity='0.4'; btn.style.cursor='not-allowed';
+  if(bekliyor){
+    const gun=Math.floor((Date.now()-new Date(bekliyor.tarih))/86400000);
+    if(gun>=0&&gun<=15){ _openInsemIntercept(hayvan,bekliyor); return; }
   }
+  openMWithHayvan('m-insem','i-hid',kupeNo);
+}
+
+function _openInsemIntercept(hayvan,bekliyor){
+  const gun=Math.floor((Date.now()-new Date(bekliyor.tarih))/86400000);
+  const hid=hayvan.kupe_no||hayvan.devlet_kupe||hayvan.id;
+  const infoEl=document.getElementById('insem-intercept-info');
+  if(infoEl) infoEl.innerHTML=`<b>${hid}</b> — ${bekliyor.sperma||'?'} · <b>${gun}. gün</b> (${(bekliyor.tarih||'').slice(0,10)})`;
+  globalThis._insemInterceptHayvan={id:hayvan.id,kupeNo:hid,tohId:bekliyor.id};
+  openM('m-insem-intercept');
 }
 
 async function openGebelikEkle(hayvanId){
