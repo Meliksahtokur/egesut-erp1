@@ -1,5 +1,7 @@
-# Tekrar Aşım — Implementasyon Planı
+# ✅ Tekrar Aşım — Implementasyon Planı (TAMAMLANDI)
 
+> **Durum:** 2026-05-22 tarihinde implemente edildi. Tüm task'ler tamamlandı ve `main`'e push edildi (`542a092`).
+> 
 > Soru varsa devam etmeden önce sor. Bulk UPDATE/DELETE içeren adımlarda onay bekle.
 
 **Hedef:** Aynı tohumlama kaydını güncelleyerek tekrar aşım kaydet; her deneme stok düşsün, görevler son tarihten hesaplansın, geçmiş denemeler detayda görünsün.
