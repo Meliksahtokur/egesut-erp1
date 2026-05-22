@@ -38,16 +38,6 @@ supabase_query({
 })
 ```
 
-**ONAY GEREKLİ:**
-```
-ALTER TABLE public.gorev_log ADD COLUMN IF NOT EXISTS ref_tohumlama_id text;
-CREATE INDEX IF NOT EXISTS idx_gorev_log_ref_tohumlama
-  ON public.gorev_log(ref_tohumlama_id) WHERE ref_tohumlama_id IS NOT NULL;
-
-Etkilenen: gorev_log (DDL — veri kaybı yok, sadece kolon ekleme)
-Onaylıyor musunuz?
-```
-
 **Uygulama:**
 ```
 supabase_migrate({sql: `
@@ -89,18 +79,6 @@ Bu trigger iki durumda ateşlenir:
 # Mevcut tohumlama trigger var mı kontrol et
 grep -n "tohumlama_cycle\|cycle_iptal\|gorevcil_iptal" \
   /root/egesut-erp1/supabase/migrations/99999999999999_ground_truth.sql
-```
-
-**ONAY GEREKLİ:**
-```
-Yeni trigger: tohumlama_cycle_iptal_trigger
-  AFTER INSERT OR UPDATE OF sonuc ON tohumlama
-  → gorev_log'da ILERI_GEBE, ILERI_GEBE_ASI, PADOK_DEGISIM, BESLEME, TOHUMLAMA_HAZIRLIK
-    tipindeki açık görevleri iptal eder
-
-Etkilenen: gorev_log (UPDATE iptal=true), trigger ekleme
-Risk: yok — sadece açık+iptal=false görevlere dokunur
-Onaylıyor musunuz?
 ```
 
 **Uygulama — migration dosyasına ekle:**
@@ -180,17 +158,6 @@ grep -n "gorev_log.*trigger\|BEFORE INSERT.*gorev" \
   /root/egesut-erp1/supabase/migrations/99999999999999_ground_truth.sql | head -10
 ```
 
-**ONAY GEREKLİ:**
-```
-BEFORE INSERT trigger: gorev_log_cycle_guard_trigger
-  ref_tohumlama_id varsa → tohumlama sonucu kontrol et
-  Aktif değilse (Boş/Abort/Doğum Yaptı) → NEW.iptal = true set et
-
-Etkilenen: gorev_log INSERT behavior
-Risk: düşük — sadece ref_tohumlama_id dolu satırları etkiler (null olanlara dokunmaz)
-Onaylıyor musunuz?
-```
-
 **Uygulama:**
 ```
 supabase_migrate({sql: `
@@ -251,20 +218,6 @@ grep -n "INSERT INTO.*gorev_log\|v_gorev1_id\|v_gorev2_id" \
 ```
 
 Sonra her fonksiyonun tam `INSERT INTO gorev_log` satırlarını bul.
-
-**ONAY GEREKLİ:**
-```
-gebelik_protokol_kontrol: tüm INSERT INTO gorev_log ifadelerine
-  kolon listesine `ref_tohumlama_id` ekle,
-  değer olarak `v_toh.id::text` geç
-
-tohumlama_kaydet: gorev1_id + gorev2_id INSERT'lerine
-  kolon listesine `ref_tohumlama_id` ekle,
-  değer olarak `v_toh_id::text` geç
-
-Her ikisi CREATE OR REPLACE ile deploy edilecek.
-SQL taslağını önce göster, onay bekle.
-```
 
 **Uygulama:**
 - `gebelik_protokol_kontrol` için: 20260521000001 migration'daki tam fonksiyonu oku, INSERT INTO gorev_log satırlarına `ref_tohumlama_id` ekle, `supabase_migrate` ile REPLACE et.

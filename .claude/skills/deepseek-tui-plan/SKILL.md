@@ -86,8 +86,9 @@ Sonra planı oku, net olmayan şey varsa sor.
 **Okuma:**
 [Exact komut — hangi dosya/tablo, hangi araç]
 
-**ONAY GEREKLİ:** (DB değişikliği varsa bu blok)
-[SQL/değişiklik özetini göster → "Onaylıyor musunuz?" sorusunu sor → cevap gelmeden devam etme]
+**ONAY GEREKLİ:** (sadece veri kaybı riski / geri alınamaz işlemler için — bulk UPDATE, DELETE, DROP, canlı veri değişimi)
+[SQL taslağını göster → "Onaylıyor musunuz?" sorusunu sor → cevap gelmeden devam etme]
+Rutin DDL (ADD COLUMN, CREATE FUNCTION, CREATE TRIGGER, CREATE INDEX) → onay bloğu KOYMA, direkt uygula.
 
 **Uygulama:**
 [Exact araç çağrısı veya bash komutu — tam SQL içerik dahil]
@@ -103,7 +104,7 @@ Sonra planı oku, net olmayan şey varsa sor.
 
 - **Tam SQL yaz** — "şunu ekle" değil, migration bloğunun tamamını ver
 - **Exact araç** — "sorgula" değil `supabase_query({table: "gorev_log", filters: "gorev_tipi=eq.BESLEME", limit: 5})` yaz
-- **Onay noktası açık** — DeepSeek onayı beklemeden geçemesin
+- **Onay noktası sadece gerçek risk için** — rutin DDL (ADD COLUMN, CREATE TRIGGER, CREATE FUNCTION) onay gerektirmez; sadece veri kaybı riski olan veya geri alınamaz işlemlerde (bulk UPDATE/DELETE, DROP, canlı veri değişimi) onay bloğu koy
 - **Referans:** sadece `ground_truth.sql` + `rpc-reference.md` — `*_revize.sql` yasak
 - **Migration ≠ canlı** — `supabase_migrate({sql: "..."})` ile ayrıca deploy et
 
