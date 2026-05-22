@@ -596,6 +596,42 @@ button,input,select,textarea{font-family:inherit}
   </div>
 </div>
 
+<!-- TEKRAR AŞIM MODALI -->
+<div id="m-insem-tekrar" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div><div class="m-title">🔁 Tekrar Aşım</div>
+    <div class="m-body">
+      <input type="hidden" id="tr-hid">
+      <div class="fg"><label class="flbl">Küpe No</label>
+        <div id="tr-kupe-label" class="fi" style="background:var(--card2);color:var(--ink2);cursor:default"></div>
+      </div>
+      <div class="fg"><label class="flbl">Tohumlama Tarihi *</label><input id="tr-tarih" class="fi" type="date"></div>
+      <div class="fg"><label class="flbl">Sperma / Boğa Kodu *</label>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <button type="button" id="btn-tr-sperma-stok" data-action="tr-sperma-stok" style="flex:1;padding:7px;background:rgba(42,107,181,.1);border:1.5px solid var(--blue);border-radius:var(--r1);font-size:.75rem;font-weight:700;color:var(--blue);cursor:pointer">📦 Stoktan Seç</button>
+          <button type="button" id="btn-tr-sperma-elle" data-action="tr-sperma-elle" style="flex:1;padding:7px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);font-size:.75rem;font-weight:700;color:var(--ink3);cursor:pointer">✏️ Elle Gir</button>
+        </div>
+        <div id="tr-sperma-stok-area">
+          <select id="tr-sperma-select" class="fsel" data-change="tr-sperma-select">
+            <option value="">Sperma seçin…</option>
+          </select>
+          <input type="hidden" id="tr-sperma" value="">
+        </div>
+        <div id="tr-sperma-elle-area" style="display:none">
+          <input id="tr-sperma-text" class="fi" placeholder="Boğa kodu yazın…" autocomplete="off" data-input="tr-sperma-text">
+          <div id="ac-trsperma" class="ac-box" style="display:none"></div>
+        </div>
+        <div id="tr-sperma-hint" style="font-size:.7rem;color:var(--ink3);margin-top:4px"></div>
+      </div>
+      <div class="fg"><label class="flbl">Hekim</label><select id="tr-hekim" class="fsel"></select></div>
+      <div style="font-size:.75rem;color:var(--amber);background:rgba(245,158,11,.08);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        ⚠️ Mevcut tohumlama kaydı güncellenecek, görevler yeni tarihten hesaplanacak, stok düşülecek.
+      </div>
+      <button class="btn btn-g" data-action="submit-tekrar-asim">🔁 Tekrar Kaydet + Görevleri Güncelle</button>
+      <button class="btn btn-o" data-action="close-tekrar-asim" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
 <!-- HASTALIK -->
 <!-- HASTALIK / TEDAVİ (ESKİ SİSTEM — korunuyor) -->
 <div id="m-disease" class="mo" data-action="mclose-overlay">
@@ -1314,6 +1350,7 @@ button,input,select,textarea{font-family:inherit}
         </div>
       </div>
       <div id="td2-info-msg" style="display:none;font-size:.8rem;color:var(--ink3);background:var(--card2);border-radius:8px;padding:9px 12px;margin-bottom:8px"></div>
+      <div id="td2-denemeler" style="margin-top:8px"></div>
       <button id="td2-bos-fixed" class="btn" data-action="toh-sonuc-bekliyor" style="display:none;background:var(--amber);color:#fff;margin-bottom:8px">⏳ Hatalı Kayıt — Bekliyor'a Al</button>
       <button id="td2-tekrar-btn" class="btn btn-g" style="margin-top:4px;display:none">💉 Tekrar Tohumla</button>
       <button id="td2-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:4px;display:none">🔄 Bu Kaydı Geri Al</button>
@@ -1404,17 +1441,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1779440912"></script>
-    <script src="js/utils/modal.js?v=1779440912"></script>
-    <script src="js/utils/errorHandler.js?v=1779440912"></script>
-    <script src="js/utils/events.js?v=1779440912"></script>
-    <script src="js/config.js?v=1779440912"></script>
-    <script src="js/state.js?v=1779440912"></script>
-    <script src="js/api.js?v=1779440912"></script>
-    <script src="js/ui.js?v=1779440912"></script>
-    <script src="js/forms.js?v=1779440912"></script>
-    <script src="js/app.js?v=1779440912"></script>
-    <script src="js/utils/handlers.js?v=1779440912"></script>
+    <script src="js/utils/helpers.js?v=1779443130"></script>
+    <script src="js/utils/modal.js?v=1779443130"></script>
+    <script src="js/utils/errorHandler.js?v=1779443130"></script>
+    <script src="js/utils/events.js?v=1779443130"></script>
+    <script src="js/config.js?v=1779443130"></script>
+    <script src="js/state.js?v=1779443130"></script>
+    <script src="js/api.js?v=1779443130"></script>
+    <script src="js/ui.js?v=1779443130"></script>
+    <script src="js/forms.js?v=1779443130"></script>
+    <script src="js/app.js?v=1779443130"></script>
+    <script src="js/utils/handlers.js?v=1779443130"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

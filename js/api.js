@@ -261,6 +261,7 @@ const RPC_TABLES = {
   hayvan_ekle:               ['hayvanlar'],
   dogum_kaydet:              ['hayvanlar','dogum','gorev_log'],
   tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket'],
+  tohumlama_tekrar_kaydet:   ['tohumlama','gorev_log','stok_hareket'],
   tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
   tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log'],
   tohumlama_sonuc_bekliyor:  ['hayvanlar','tohumlama','islem_log'],

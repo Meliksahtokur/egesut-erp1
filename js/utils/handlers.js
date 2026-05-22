@@ -259,4 +259,12 @@ registerActions({
   'copy-errors':   () => copyErrors(),
   'clear-errors':  () => clearErrors(),
   'hide-error-panel': () => { g('error-panel').style.display = 'none'; },
+
+  // ═══ TEKRAR AŞIM ═══
+  'submit-tekrar-asim': (el) => submitTekrarAsim(el),
+  'close-tekrar-asim':  () => closeM('m-insem-tekrar'),
+  'tr-sperma-stok':     () => { g('tr-sperma-stok-area').style.display = ''; g('tr-sperma-elle-area').style.display = 'none'; },
+  'tr-sperma-elle':     () => { g('tr-sperma-stok-area').style.display = 'none'; g('tr-sperma-elle-area').style.display = ''; },
+  'tr-sperma-select':   (el) => { g('tr-sperma').value = el.value; },
+  'tr-sperma-text':     (el) => { g('tr-sperma').value = el.value; },
 });
