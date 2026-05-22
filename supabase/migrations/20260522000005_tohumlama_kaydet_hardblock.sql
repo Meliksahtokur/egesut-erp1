@@ -54,7 +54,7 @@ BEGIN
     SELECT 1 FROM public.tohumlama
     WHERE hayvan_id = p_hayvan_id
       AND sonuc = 'Bekliyor'
-      AND p_tarih - tarih BETWEEN 0 AND 15
+      AND tarih BETWEEN p_tarih - 15 AND p_tarih + 15
   ) THEN
     RAISE EXCEPTION 'Son 15 gün içinde bekleyen tohumlama mevcut — Tekrar Aşım kullanın';
   END IF;

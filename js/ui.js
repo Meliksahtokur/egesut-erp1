@@ -3556,14 +3556,16 @@ async function openInsemSafe(kupeNo){
   const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvan.id);
   const bekliyor=tohs.find(t=>t.sonuc==='Bekliyor');
   if(bekliyor){
-    const gun=Math.floor((Date.now()-new Date(bekliyor.tarih))/86400000);
+    const today=new Date().toISOString().split('T')[0];
+    const gun=Math.floor((new Date(today)-new Date(bekliyor.tarih))/86400000);
     if(gun>=0&&gun<=15){ _openInsemIntercept(hayvan,bekliyor); return; }
   }
   openMWithHayvan('m-insem','i-hid',kupeNo);
 }
 
 function _openInsemIntercept(hayvan,bekliyor){
-  const gun=Math.floor((Date.now()-new Date(bekliyor.tarih))/86400000);
+  const today=new Date().toISOString().split('T')[0];
+  const gun=Math.floor((new Date(today)-new Date(bekliyor.tarih))/86400000);
   const hid=hayvan.kupe_no||hayvan.devlet_kupe||hayvan.id;
   const infoEl=document.getElementById('insem-intercept-info');
   if(infoEl) infoEl.innerHTML=`<b>${hid}</b> — ${bekliyor.sperma||'?'} · <b>${gun}. gün</b> (${(bekliyor.tarih||'').slice(0,10)})`;
