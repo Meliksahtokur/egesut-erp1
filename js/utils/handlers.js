@@ -263,6 +263,12 @@ registerActions({
   // ═══ TEKRAR AŞIM ═══
   'submit-tekrar-asim': (el) => submitTekrarAsim(el),
   'close-tekrar-asim':  () => closeM('m-insem-tekrar'),
+  'close-insem-intercept': () => closeM('m-insem-intercept'),
+  'intercept-tekrar-asim': () => {
+    closeM('m-insem-intercept');
+    const h=globalThis._insemInterceptHayvan;
+    if(h) openTekrarAsim(h.id, h.kupeNo);
+  },
   'tr-sperma-stok':     () => trSpermaModStok(),
   'tr-sperma-elle':     () => trSpermaModElle(),
   'tr-sperma-select':   (el) => onTrSpermaSelect(el),
