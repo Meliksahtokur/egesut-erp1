@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "feature-dev": {
+      "source": "notedit/happy-skills",
+      "sourceType": "github",
+      "skillPath": "skills/dev/feature-dev/SKILL.md",
+      "computedHash": "88689be79a44bac2873145d149cc7bd120f6f3eb896bbab99609cd05a58ecbcb"
+    }
+  }
+}

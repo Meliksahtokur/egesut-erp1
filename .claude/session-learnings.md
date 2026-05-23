@@ -66,3 +66,58 @@ Proposed new RPCs: `tohumlama_sonuc_gebe`, `tohumlama_sonuc_bos`, `tohumlama_abo
 - Don't touch `Gebe` veya `Doğum Yaptı` tohumlama records from frontend directly — RPC only
 - Don't skip confirm dialogs for destructive state transitions (Gebe→Boş, Gebe→Abort)
 - **Agent'lara "stok sistemi nedir?" veya "sperma nasıl seçilir?" sormayın** — cevap artık agent dosyalarında mevcut
+
+---
+
+## Oturum 2026-05-23 — Orchestrator-Master Skill Tasarımı
+
+### Ne Yapıldı
+`orchestrator-master` adında tek bir DeepSeek TUI skill'i oluşturuldu. İki modu var: **research** (flat, parallel) ve **hierarchical** (recursive, depth-controlled).
+
+### Skill Yeri
+- `.agents/skills/orchestrator-master/SKILL.md` — proje kökünde
+- `feature-dev` skill'i ile yan yana duruyor
+
+### Mimari Kararlar
+
+| Karar | Sebep |
+|-------|-------|
+| **Tek skill, iki mod** | Kullanıcı tek bir `/skill orchestrator-master` ile her iki işi de yapabilir. Mode auto-detect. |
+| **Sub-agent'lar read-only (research modu)** | `type: explore` ile garanti. Keşif için paralel, yazma için serial. |
+| **Hierarchical modda herkes yazabilir** | Ama sadece kendi territory'sinde. Territory disjoint olduğu sürece çakışma olmaz. |
+| **max_depth ile recursion kontrolü** | DeepSeek TUI'nin built-in `agent_open(max_depth=N)` parametresi kullanılır. Main=3, Sub=2, Sub-sub=1, Leaf=0. |
+| **Quota sistemi (≤20)** | Total agent sayısı 20 ile sınırlı. Her sub-orch kendi quota'sını yönetir. Prompt ile enforce edilir. |
+| **Dil ayrımı** | Skill body ve sub-agent iletişimi İngilizce. Main agent kullanıcıyla Türkçe konuşur. |
+| **fork_context: true her zaman** | Prefix cache korunur, context şişmesi azalır. |
+| **handle_read büyük çıktılar için** | Sub-agent çıktısı >50 satır ise context'e kopyalama, handle_read ile projeksiyon al. |
+| **Janitor agent yok** | Checklist + PLAN.md yeterli. Fazladan agent context şişirir. |
+| **feature-dev silinmedi** | Eski skill geriye dönük uyumluluk için duruyor. orchestrator-master onun yerini alabilir. |
+
+### Kullanım
+
+```bash
+# Research modu (otomatik)
+/skill orchestrator-master
+Görev: Şu konuyu araştır...
+
+# Hierarchical modu (otomatik)
+/skill orchestrator-master  
+Görev: Kullanıcı giriş sistemi implemente et...
+
+# Hem araştırma hem implementasyon
+/skill orchestrator-master
+Görev: Web'den auth pattern'lerini araştır, sonra implemente et.
+```
+
+### Sub-agent Prompt Dili
+- Tüm sub-agent prompt'ları **İngilizce** yazılır
+- Sub-agent'lar kendi arasında **İngilizce** konuşur
+- Alt seviye orkestratörler kendi children'larına İngilizce prompt verir
+- Sadece main agent kullanıcıya cevap yazarken kullanıcının dilini kullanır
+
+### Önemli Uyarılar
+- Research modunda batch aç (tüm agent'ları tek turda). Serial açma.
+- Hierarchical modda territory'ler disjoint olmalı. İki agent aynı dosyayı sahiplenemez.
+- Quota aşımı → sub-orch reddeder, parent'a rapor eder. Parent yeniden dağıtır.
+- Test gate: her dosya sonrası test. FAIL → `git revert HEAD`, düzelt, tekrar dene.
+- Son çare çakışma çözümü: projeyi klonla, her ekibe ayrı workspace ver, sonra merge.

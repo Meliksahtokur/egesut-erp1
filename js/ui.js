@@ -678,7 +678,7 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#srch')&&!e.target.closest('#ac-srch'))
     { const ac=document.getElementById('ac-srch'); if(ac) ac.style.display='none'; }
 });
-let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null};
+let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null};
 let _detOpenId=null;
 function fchipReset(){
   _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null};
@@ -722,6 +722,14 @@ function filterA(){
     });
     if(_fchip.saglik==='hasta') f=f.filter(a=>getState('hastaIds').has(a.id));
     if(_fchip.kisir==='kisir') f=f.filter(a=>a.kisir);
+    if(_fchip.tekrar==='tekrar') {
+      f=f.filter(a=>a.repeat_breed_active||a.repeat_breed_past);
+      f.sort((a,b)=>{
+        if(a.repeat_breed_active!==b.repeat_breed_active) return a.repeat_breed_active?-1:1;
+        if(a.repeat_breed_past!==b.repeat_breed_past) return a.repeat_breed_past?-1:1;
+        return (b.repeat_breed_count||0)-(a.repeat_breed_count||0);
+      });
+    }
     renderAnimals(f);
   },250);
 }

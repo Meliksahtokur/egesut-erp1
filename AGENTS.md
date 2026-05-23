@@ -29,24 +29,30 @@ Hosting:   GitHub Pages (index.html)
 CI/Test:   Playwright E2E — GitHub Actions'da otomatik çalışır (local'de çalıştırma)
 ```
 
-## İş Akışı
+## İş Akışı (ACP — Güncel)
 
 ```
-Claude/Pi-new → /root/tools-bank/blackboard/specs/<spec>.md yazar
-              → event_daemon_v2.sh goose'u spawn eder
-              → goose egesut.yaml recipe'si ile çalışır
-              → /root/egesut-erp1'de implementasyon yapar
-              → commit + push → task_complete
+Claude → goose_start(recipe="egesut-telsiz", session_id="w-001", params='{"agent_id":"w-001"}')
+       → Goose: agent_register + agent_receive(timeout=60) [bekler]
+       → Claude: agent_send(to="w-001", message="görev detayı")
+       → Goose: görevi alır → implementasyon → commit + push → agent_send(to="claude", "TAMAMLANDI")
+       → Claude: agent_receive("claude") → sonucu alır
 ```
 
-## Başlarken
+**Eski akış (artık kullanılmıyor):** `event_daemon_v2.sh` subprocess spawn → PRoot ENOSYS crash nedeniyle devre dışı.
+
+## Goose Olarak Başlarken
 
 ```bash
+# Telsizden gelen görevi al (recipe zaten çağırır — bu sadece bilgi)
+# ACP parametreleri recipe'den otomatik gelir: agent_id, cwd
+
 cd /root/egesut-erp1
 git pull origin main
 ```
 
 Kodu anlamak için önce `semantic_search` kullan — dosya okumayı minimize et.
+
 
 ## Kod Kuralları
 

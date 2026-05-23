@@ -1,7 +1,7 @@
 version: 1.0.0
-title: EgeSüt ERP Gebelik Protokol Birleştirme
-description: Bir plan dosyasını analiz edip mevcut EgeSüt ERP orkestrasyon araçları (native subagent'lar, skill'ler, recipe'ler, tools-bank Go daemon) ile implemente etme ve reviewer recipe'sini kullanarak review yapma.
-instructions: 'Önce plan dosyasını oku (örn. docs/superpowers/plans/*.md). Mevcut orkestrasyon araçlarını, skill''leri ve recipe''leri değerlendir: erp-implementer recipe''si EgeSüt kurallarını (pre-check, ground_truth okuma, RPC wrapper zorunluluğu) garanti eder. Subagent''ların provider model ayarlarını kontrol et (deepseek-v4-flash/pro kullan, sonnet gönderme). Reviewer recipe''sini bu oturumda load edip adımlarını takip ederek kullan — Blackboard modunda task_get bekler, agent_id parametresi yoksa direkt kriterleri elle doğrula. Dosya syntax kontrolü (node --check) ve DB sorguları (supabase_rpc, supabase_query) ile doğrulama yap. Commit sonrası memory_add ile kodu belleğe kaydet.'
+title: Goose Worker Orchestration with Telsiz Pattern
+description: A recipe for launching and managing Goose ACP workers using the tools-bank goused system, with telsiz (wireless) agent communication protocol.
+instructions: Use goose_start to launch workers with specific recipes (e.g., from /root/tools-bank/recipes/) and unique session_ids. Monitor worker status with goose_status. Stop workers with goose_stop when done. The telsiz pattern enables agent-to-agent messaging via agent_register (capabilities), agent_send, and agent_receive (long-poll). Register agents with their capabilities before sending messages. Use agent_receive with appropriate timeout (default 30s) to wait for responses. Always use unique session_ids and track active sessions.
 extensions:
 - type: platform
   name: analyze
@@ -97,10 +97,10 @@ settings:
   goose_model: deepseek-v4-flash
   temperature: 0.0
 activities:
-- Plan dosyasını oku ve analiz et
-- Subagent'larla paralel implementasyon
-- Reviewer recipe'si ile doğrulama
-- DB migration deploy ve test
-- Commit + push + bellek güncelleme
+- Launch a goose worker with a recipe
+- Check worker status and health
+- Stop a running goose session
+- Register and communicate via telsiz
+- Orchestrate multi-agent workflows
 author:
   contact: root
