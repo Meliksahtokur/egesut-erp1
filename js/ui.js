@@ -542,6 +542,22 @@ async function loadAnimals(){
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
     globalThis._tohMap={};
     gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
+    // Repeat breed haritası — cycle bazında max deneme_no
+    const allToh=await getData('tohumlama');
+    globalThis._repeatMap={};
+    allToh.sort((a,b)=>(a.tarih||'').localeCompare(b.tarih||'')||(a.id||'').localeCompare(b.id||''));
+    for(const t of allToh){
+      if(!globalThis._repeatMap[t.hayvan_id])
+        globalThis._repeatMap[t.hayvan_id]={currentMax:0,pastMax:0};
+      const e=globalThis._repeatMap[t.hayvan_id];
+      if(t.sonuc==='Doğum Yaptı'||t.sonuc==='Abort'){
+        const cycleMax=Math.max(e.currentMax,t.deneme_no||0);
+        if(cycleMax>e.pastMax) e.pastMax=cycleMax;
+        e.currentMax=0;
+      } else {
+        if((t.deneme_no||0)>e.currentMax) e.currentMax=t.deneme_no||0;
+      }
+    }
     // Bekleyen tohumlama haritası (sadece sonuc=Bekliyor — badge için)
     const bosTohs=await getData('tohumlama',t=>t.sonuc==='Bekliyor');
     globalThis._bosTohMap={};
@@ -580,7 +596,17 @@ function _animalTagsHtml(a,gebeSet){
     }
   }
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
-  return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${kisirBadge}`;
+  // Repeat breed badge
+  const _repeatE=(globalThis._repeatMap||{})[a.id];
+  let repeatBadge='';
+  if(_repeatE){
+    if(_repeatE.currentMax>=2){
+      repeatBadge=`<span class="repeat-badge amber">🔁 ${_repeatE.currentMax}x Aşım</span>`;
+    } else if(_repeatE.pastMax>=2){
+      repeatBadge=`<span class="repeat-badge green">🔁 ${_repeatE.pastMax}x Aşım</span>`;
+    }
+  }
+  return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${kisirBadge}${repeatBadge}`;
 }
 function _animalCardHtml(a,gebeSet,idx){
   const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
@@ -776,7 +802,7 @@ function _detUremeHtml(a,tohs,kizgs){
     const _tohGun=Math.floor((Date.now()-new Date(bekleyenToh.tarih))/86400000);
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Tohumlama Ekle</button>`;
     if(_tohGun>=0&&_tohGun<=15){
-      h+=`<button class="btn" style="flex:1;padding:9px;font-weight:700;background:var(--amber);color:#fff;border:none" onclick="openTekrarAsim('${a.id}','${hid}')">🔁 Tekrar Aşım</button>`;
+      h+=`<button class="btn" style="flex:1;padding:9px;font-weight:700;background:var(--purple);color:#fff;border:none" onclick="openTekrarAsim('${a.id}','${hid}')">🔁 Tekrar Aşım</button>`;
     }
   } else if(dogumYaptiToh){
     h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Yeni Tohumlama Ekle</button>`;
@@ -1542,7 +1568,7 @@ async function _uremeTohumlama(el){
           ? (()=>{
               const _uretGun=Math.floor((Date.now()-new Date(t.tarih))/86400000);
               return _uretGun>=0&&_uretGun<=15
-                ? `<button onclick="event.stopPropagation();openTekrarAsim('${t.hayvan_id}','${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--amber);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">🔁 Tekrar Aşım</button>`
+                ? `<button onclick="event.stopPropagation();openTekrarAsim('${t.hayvan_id}','${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">🔁 Tekrar Aşım</button>`
                 : '<span style="flex-shrink:0;font-size:.65rem;color:var(--ink3)">' + _uretGun + ' gün</span>';
             })()
           : (_bekliyor

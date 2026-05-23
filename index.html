@@ -21,7 +21,7 @@
   --card:#f7f4ee;--card2:#edeae2;--card3:#e2ddd3;
   --ink:#1a1f14;--ink2:#3d4a32;--ink3:#6b7a5c;
   --green:#4e9a2a;--green2:#6abf3d;--green3:#98d96e;
-  --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;
+  --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;--purple:#7c3aed;
   --nav:60px;--safe:env(safe-area-inset-bottom,0px);--r:16px;--r2:10px;
 }
 body.dark{
@@ -159,6 +159,8 @@ button,input,select,textarea{font-family:inherit}
 .tag{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:6px}
 .tg{background:#ddffee;color:#0a5a2a}.ta{background:#fff3dd;color:#7a3a00}
 .tb{background:#ddeeff;color:#1a3a8a}.tk{background:var(--card2);color:var(--ink3)}
+.repeat-badge{display:inline-block;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:6px}
+.repeat-badge.amber{background:rgba(201,125,10,.15);color:#c97d0a}.repeat-badge.green{background:rgba(78,154,42,.15);color:#4e9a2a}
 .a-arr{color:var(--card3);flex-shrink:0}
 .a-seq{font-size:.6rem;font-weight:700;color:var(--ink3);opacity:.5;min-width:18px;text-align:right;flex-shrink:0;line-height:1;align-self:center}
 
@@ -639,7 +641,7 @@ button,input,select,textarea{font-family:inherit}
       <div style="padding:16px">
         <div id="insem-intercept-info" style="font-size:.82rem;color:var(--ink2);margin-bottom:12px;padding:8px 10px;background:rgba(245,158,11,.1);border-radius:8px;border:1px solid rgba(245,158,11,.3)"></div>
         <p style="font-size:.82rem;color:var(--ink2);margin-bottom:16px">Son 15 gün içinde bekleyen tohumlama var. Ne yapmak istersiniz?</p>
-        <button class="btn" style="width:100%;margin-bottom:8px;background:var(--amber);color:#fff;border:none;padding:10px;font-weight:700" data-action="intercept-tekrar-asim">🔁 Tekrar Aşım Yap</button>
+        <button class="btn" style="width:100%;margin-bottom:8px;background:var(--purple);color:#fff;border:none;padding:10px;font-weight:700" data-action="intercept-tekrar-asim">🔁 Tekrar Aşım Yap</button>
         <button class="btn btn-o" style="width:100%;padding:10px" data-action="close-insem-intercept">↩️ İptal</button>
       </div>
     </div>
@@ -1454,17 +1456,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1779515541"></script>
-    <script src="js/utils/modal.js?v=1779515541"></script>
-    <script src="js/utils/errorHandler.js?v=1779515541"></script>
-    <script src="js/utils/events.js?v=1779515541"></script>
-    <script src="js/config.js?v=1779515541"></script>
-    <script src="js/state.js?v=1779515541"></script>
-    <script src="js/api.js?v=1779515541"></script>
-    <script src="js/ui.js?v=1779515541"></script>
-    <script src="js/forms.js?v=1779515541"></script>
-    <script src="js/app.js?v=1779515541"></script>
-    <script src="js/utils/handlers.js?v=1779515541"></script>
+    <script src="js/utils/helpers.js?v=1779515834"></script>
+    <script src="js/utils/modal.js?v=1779515834"></script>
+    <script src="js/utils/errorHandler.js?v=1779515834"></script>
+    <script src="js/utils/events.js?v=1779515834"></script>
+    <script src="js/config.js?v=1779515834"></script>
+    <script src="js/state.js?v=1779515834"></script>
+    <script src="js/api.js?v=1779515834"></script>
+    <script src="js/ui.js?v=1779515834"></script>
+    <script src="js/forms.js?v=1779515834"></script>
+    <script src="js/app.js?v=1779515834"></script>
+    <script src="js/utils/handlers.js?v=1779515834"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
