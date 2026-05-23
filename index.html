@@ -1239,34 +1239,38 @@ button,input,select,textarea{font-family:inherit}
     </div>
     <div id="td-subs" style="padding:12px 16px;border-bottom:1px solid var(--card2);display:none"></div>
     <div class="m-body" style="padding-top:10px">
-      <!-- ILERI_GEBE_ASI: aşı mini formu -->
+      <!-- ILERI_GEBE_ASI: birleşik aşı + rapel kartı -->
       <div id="td-asi-form" style="display:none;background:var(--card2);border-radius:12px;padding:12px 14px;margin-bottom:10px">
         <div style="font-size:.75rem;font-weight:700;color:var(--ink3);margin-bottom:8px">💉 Aşı Uygula</div>
-        <div style="margin-bottom:8px">
-          <div style="font-size:.7rem;color:var(--ink3);margin-bottom:3px">Aşı</div>
-          <div id="td-asi-adi" style="font-size:.85rem;font-weight:600;color:var(--ink)">—</div>
+        <div style="padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span id="td-asi-adi" style="font-size:.85rem;font-weight:600;color:var(--ink)">—</span>
+            <span id="td-asi-doz-info" style="font-size:.68rem;color:var(--ink3);padding:2px 6px;background:var(--card2);border-radius:6px">St: —</span>
+          </div>
         </div>
         <div style="margin-bottom:8px">
-          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Tarih</label>
+          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Uygulama Tarihi</label>
           <input type="date" id="td-asi-tarih" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.85rem">
         </div>
-        <div style="margin-bottom:10px">
-          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Doz (ml)</label>
-          <input type="number" id="td-asi-doz" step="0.5" min="0.5" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.85rem">
+        <div style="margin-bottom:8px">
+          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Doz <span id="td-asi-doz-unit" style="color:var(--ink3)">(ml)</span></label>
+          <input type="number" id="td-asi-doz" step="0.5" min="0.5" placeholder="" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.85rem">
+        </div>
+        <!-- Rapel bilgisi: inline, ayrı form değil -->
+        <div id="td-rapel-info" style="display:none;margin-bottom:10px;padding:8px 10px;background:#fff8e1;border-radius:8px;border:1px solid #ffe082;font-size:.75rem">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span>📅 Rapel: <b id="td-rapel-tarih-goster">—</b></span>
+            <button id="td-rapel-duzenle-btn" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.7rem;text-decoration:underline;padding:0" onclick="g('td-rapel-edit').style.display='block';this.style.display='none'">Düzenle</button>
+          </div>
+          <div id="td-rapel-edit" style="display:none;margin-top:6px">
+            <input type="date" id="td-rapel-tarih" style="width:100%;padding:4px 6px;border-radius:6px;border:1px solid #ffe082;font-size:.75rem">
+            <button class="btn btn-g" style="margin-top:4px;font-size:.7rem;padding:3px 10px" data-action="rapel-tarihi-kaydet">📅 Kaydet</button>
+          </div>
         </div>
         <div style="display:flex;gap:8px">
-          <button id="td-asi-uygula-btn" class="btn btn-g" style="flex:1" data-action="asi-uygula-tamamla">Uygula ve Tamamla</button>
+          <button id="td-asi-uygula-btn" class="btn btn-g" style="flex:1" data-action="asi-uygula-tamamla">💉 Uygula ve Tamamla</button>
           <button class="btn btn-o" style="flex:0 0 auto" data-action="asi-form-gizle">İptal</button>
         </div>
-      </div>
-      <!-- Rapel görevi: tarih güncelleme -->
-      <div id="td-rapel-form" style="display:none;background:#fff8e1;border-radius:12px;padding:12px 14px;margin-bottom:10px;border:1px solid #ffe082">
-        <div style="font-size:.75rem;font-weight:700;color:#b8860b;margin-bottom:8px">📅 Rapel Tarihi</div>
-        <div style="margin-bottom:10px">
-          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Planlanan tarih (14–21 gün)</label>
-          <input type="date" id="td-rapel-tarih" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid #ffe082;background:var(--bg);color:var(--ink);font-size:.85rem">
-        </div>
-        <button class="btn btn-g" data-action="rapel-tarihi-kaydet" style="background:#f9a825;color:#fff">📅 Tarihi Kaydet</button>
       </div>
       <button id="td-tamam-btn" class="btn btn-g" data-action="detay-tamamla">✅ Tamamlandı Olarak İşaretle</button>
       <button id="td-asi-ac-btn" class="btn btn-g" style="display:none;background:#1e88e5" data-action="asi-form-ac">💉 Aşıyı Uygula</button>
@@ -1457,17 +1461,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1779524136"></script>
-    <script src="js/utils/modal.js?v=1779524136"></script>
-    <script src="js/utils/errorHandler.js?v=1779524136"></script>
-    <script src="js/utils/events.js?v=1779524136"></script>
-    <script src="js/config.js?v=1779524136"></script>
-    <script src="js/state.js?v=1779524136"></script>
-    <script src="js/api.js?v=1779524136"></script>
-    <script src="js/ui.js?v=1779524136"></script>
-    <script src="js/forms.js?v=1779524136"></script>
-    <script src="js/app.js?v=1779524136"></script>
-    <script src="js/utils/handlers.js?v=1779524136"></script>
+    <script src="js/utils/helpers.js?v=1779534949"></script>
+    <script src="js/utils/modal.js?v=1779534949"></script>
+    <script src="js/utils/errorHandler.js?v=1779534949"></script>
+    <script src="js/utils/events.js?v=1779534949"></script>
+    <script src="js/config.js?v=1779534949"></script>
+    <script src="js/state.js?v=1779534949"></script>
+    <script src="js/api.js?v=1779534949"></script>
+    <script src="js/ui.js?v=1779534949"></script>
+    <script src="js/forms.js?v=1779534949"></script>
+    <script src="js/app.js?v=1779534949"></script>
+    <script src="js/utils/handlers.js?v=1779534949"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

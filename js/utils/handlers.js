@@ -199,7 +199,7 @@ registerActions({
 
   // ═══ GÖREV DETAY ═══
   'asi-uygula-tamamla': () => asiUygulaVeTamamla(),
-  'asi-form-gizle':     () => { g('td-asi-form').style.display = 'none'; g('td-asi-ac-btn').style.display = 'block'; },
+  'asi-form-gizle':     () => { g('td-asi-form').style.display = 'none'; g('td-asi-ac-btn').style.display = 'block'; const ri=g('td-rapel-info'); if(ri) ri.style.display='none'; },
   'rapel-tarihi-kaydet':() => rapelTarihiKaydet(),
   'detay-tamamla':      () => detayTamamla(),
   'asi-form-ac':        () => asiFormAc(),
