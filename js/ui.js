@@ -378,7 +378,7 @@ async function loadTasks(f,btn){
             <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'GENEL');})()} </span>
             <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           </div>
-          <div class="tc-desc">${t.aciklama||''}</div>
+          <div class="tc-desc">${esc(t.aciklama||'')}</div>
           <div class="tc-meta" style="color:var(--green)">✅ ${fmtTarih(t.tamamlanma_tarihi||t.hedef_tarih)}</div>
           ${rapelStr}
         </div></div>
@@ -414,7 +414,7 @@ function renderTask(t,cls='',subs=[]){
       <div class="st-check ${s.tamamlandi?'done':''}" onclick="toggleSub('${s.id}','${t.id}',this)">
         ${s.tamamlandi?`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>`:''}
       </div>
-      <span class="st-label ${s.tamamlandi?'done':''}">${s.aciklama}</span>
+      <span class="st-label ${s.tamamlandi?'done':''}">${esc(s.aciklama)}</span>
     </div>`).join('')}
     <div class="st-prog">${doneSubs}/${subs.length} tamamlandı</div>
   </div>`:'';
@@ -425,7 +425,7 @@ function renderTask(t,cls='',subs=[]){
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
-        <div class="tc-desc">${t.aciklama||''}</div>
+        <div class="tc-desc">${esc(t.aciklama||'')}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)">
@@ -798,11 +798,11 @@ function _detUremeHtml(a,tohs,kizgs){
   h+='</div>';
   if(gebeBilgi) h+=`<div style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:.8rem;color:var(--ink2)"><b style="color:var(--green)">🤰 Gebe</b> — ${gebeBilgi}</div>`;
   h+=(tohs.length
-    ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'} <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span></div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
+    ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${esc(t.sperma||'—')} <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span></div><div class="hist-sub">${esc(t.tarih||'')} · <b>${esc(t.sonuc||'Bekliyor')}</b></div></div></div>`).join('')
     :'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
   if(kizgs&&kizgs.length){
     h+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:.72rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Kızgınlık Geçmişi</div>';
-    h+=kizgs.map(k=>`<div class="hist-row"><div class="hist-dot" style="background:var(--red2)"></div><div class="hist-main"><div class="hist-title">${k.belirti||'Kızgınlık'}</div><div class="hist-sub">${(k.tarih||k.created_at||'').slice(0,10)}</div></div></div>`).join('');
+    h+=kizgs.map(k=>`<div class="hist-row"><div class="hist-dot" style="background:var(--red2)"></div><div class="hist-main"><div class="hist-title">${esc(k.belirti||'Kızgınlık')}</div><div class="hist-sub">${esc((k.tarih||k.created_at||'').slice(0,10))}</div></div></div>`).join('');
     h+='</div>';
   }
   return h;
@@ -1352,8 +1352,8 @@ async function _uremeKizginlik(el){
     return `<div class="hist-row">
       <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
       <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
-        <div class="hist-title">🔴 ${kupe} — ${k.belirti||'Kızgınlık'} ${badge}</div>
-        <div class="hist-sub">${k.tarih} ${k.notlar?'· '+k.notlar:''}</div>
+        <div class="hist-title">🔴 ${esc(kupe)} — ${esc(k.belirti||'Kızgınlık')} ${badge}</div>
+        <div class="hist-sub">${esc(k.tarih)} ${k.notlar?'· '+esc(k.notlar):''}</div>
       </div>
       <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
         ${cozulduMi?'':`
@@ -2310,7 +2310,7 @@ async function openTaskDet(id){
     subsEl.innerHTML=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Alt Görevler (${subsDone.length}/${subs.length+subsDone.length})</div>`
       +[...subsDone,...subs].map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
         <div style="width:18px;height:18px;border-radius:50%;background:${s.tamamlandi?'var(--green)':'var(--card2)'};border:2px solid ${s.tamamlandi?'var(--green)':'var(--card3)'};flex-shrink:0"></div>
-        <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${s.aciklama}</span>
+        <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${esc(s.aciklama)}</span>
       </div>`).join('');
   } else { subsEl.style.display='none'; }
 
@@ -3922,7 +3922,7 @@ async function renderAyarlarHekimList(){
   const hekimler=await getData('hekimler');
   const all=hekimler.length?hekimler:HEKIMLER;
   el.innerHTML=all.map(h=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--card2);cursor:pointer" onclick="hekimDetAc('${h.id}')">
-    <span style="font-size:.85rem;color:var(--ink);cursor:pointer">${h.ad}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
+    <span style="font-size:.85rem;color:var(--ink);cursor:pointer">${esc(h.ad)}${h.id===VARSAYILAN_HEKIM?' <span style="font-size:.6rem;color:var(--green)">(varsayılan)</span>':''}</span>
     <button onclick="event.stopPropagation();hekimDetAc('${h.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">🔍</button>
   </div>`).join('');
 }

@@ -229,32 +229,6 @@ async function write(table, data, method = 'POST', filter = '') {
 }
 
 
-// ── OFFLINE QUEUE HELPERS ───────────────────
-async function insertOffline(table, data) {
-  const db = await openDB();
-  const tx = db.transaction(['offline_queue'], 'readwrite');
-  const store = tx.objectStore('offline_queue');
-  await store.put({
-    id: crypto.randomUUID(),
-    method: 'POST', table, data,
-    createdAt: new Date().toISOString(), retryCount: 0
-  });
-  await idbPut(table, data);
-}
-
-async function updateOffline(table, id, changes) {
-  const db = await openDB();
-  const tx = db.transaction(['offline_queue'], 'readwrite');
-  const store = tx.objectStore('offline_queue');
-  await store.put({
-    id: crypto.randomUUID(),
-    method: 'PATCH', table, data: changes,
-    filter: `id=eq.${id}`,
-    createdAt: new Date().toISOString(), retryCount: 0
-  });
-  await idbPut(table, { id, ...changes });
-}
-
 // ── RPC TABLOLARI MAP ───────────────────────
 // Her RPC hangi tabloları etkiliyor — sadece onlar çekilir
 const RPC_TABLES = {
