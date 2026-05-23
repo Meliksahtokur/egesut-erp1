@@ -786,7 +786,7 @@ function _detUremeHtml(a,tohs,kizgs){
   h+='</div>';
   if(gebeBilgi) h+=`<div style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:.8rem;color:var(--ink2)"><b style="color:var(--green)">🤰 Gebe</b> — ${gebeBilgi}</div>`;
   h+=(tohs.length
-    ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'}${t.deneme_sayisi > 1 ? ` <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_sayisi}. Deneme</span>` : ''}</div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
+    ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${t.sperma||'—'} <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span></div><div class="hist-sub">${t.tarih||''} · <b>${t.sonuc||'Bekliyor'}</b></div></div></div>`).join('')
     :'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
   if(kizgs&&kizgs.length){
     h+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:.72rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Kızgınlık Geçmişi</div>';
@@ -1535,7 +1535,7 @@ async function _uremeTohumlama(el){
       return `<div class="hist-row" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="openTohDet('${t.id}')">
         <div class="hist-dot" style="background:${dot};flex-shrink:0"></div>
         <div class="hist-main" style="flex:1;min-width:0">
-          <div class="hist-title" style="color:var(--ink2)">${kupe} — ${t.sperma||'?'}${t.deneme_sayisi > 1 ? ` <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_sayisi}. Deneme</span>` : ''}</div>
+          <div class="hist-title" style="color:var(--ink2)">${kupe} — ${t.sperma||'?'} <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span></div>
           <div class="hist-sub">${t.tarih} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
         </div>
         ${_bekliyor && t.tarih
@@ -3108,7 +3108,7 @@ async function openTohDet(id){
   const sc=_tohGebe?'var(--green)':_scMidToh;
   const chips=[
     `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc||'Bekliyor'}</span>`,
-    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_sayisi||1}. deneme</span>`,
+    `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no||1}. deneme</span>`,
     `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(t.tarih)}</span>`,
     hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
   ];
