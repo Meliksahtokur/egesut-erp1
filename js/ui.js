@@ -2318,11 +2318,10 @@ async function openTaskDet(id){
   const tamamBtn=document.getElementById('td-tamam-btn');
   const asiAcBtn=document.getElementById('td-asi-ac-btn');
   const asiForm =document.getElementById('td-asi-form');
-  const rapelForm=document.getElementById('td-rapel-form');
+  // rapelForm removed — merged into td-asi-form
   if(tamamBtn)  tamamBtn.style.display='block';
   if(asiAcBtn)  asiAcBtn.style.display='none';
   if(asiForm)   asiForm.style.display='none';
-  if(rapelForm) rapelForm.style.display='none';
   _curTaskVaccineId=null;
 
   // ILERI_GEBE_ASI: standart tamamla gizle, aşı butonu göster
@@ -2336,7 +2335,14 @@ async function openTaskDet(id){
         _curTaskVaccineId=vax.id;
         document.getElementById('td-asi-adi').textContent=vax.name||'Rota-Corona';
         const dozEl=document.getElementById('td-asi-doz');
-        if(dozEl&&vax.dose) dozEl.value=vax.dose;
+        if(dozEl){
+          if(vax.dose) dozEl.value=vax.dose;
+          dozEl.placeholder=vax.dose||'';
+        }
+        const dozInfo=document.getElementById('td-asi-doz-info');
+        if(dozInfo) dozInfo.textContent='St: '+(vax.dose||'?')+' '+(vax.unit||'ml');
+        const dozUnit=document.getElementById('td-asi-doz-unit');
+        if(dozUnit) dozUnit.textContent='('+(vax.unit||'ml')+')';
       }
     }catch(e){ console.warn('vaccine lookup:',e.message); }
     const tarihEl=document.getElementById('td-asi-tarih');
@@ -2359,7 +2365,17 @@ async function openTaskDet(id){
           rapelTarihEl.max=fmt(maxD);
           rapelTarihEl.value=t.hedef_tarih||fmt(maxD);
         }
-        if(rapelForm) rapelForm.style.display='block';
+        const rapelInfo=document.getElementById('td-rapel-info');
+      if(rapelInfo){
+        rapelInfo.style.display='block';
+        const goster=document.getElementById('td-rapel-tarih-goster');
+        if(goster) goster.textContent=t.hedef_tarih?fmtTarih(t.hedef_tarih):fmt(maxD);
+        // Reset edit state
+        const editDiv=document.getElementById('td-rapel-edit');
+        if(editDiv) editDiv.style.display='none';
+        const duzenleBtn=document.getElementById('td-rapel-duzenle-btn');
+        if(duzenleBtn) duzenleBtn.style.display='inline';
+      }
       }
     }catch(e){ console.warn('parent lookup:',e.message); }
   }
