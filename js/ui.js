@@ -3066,9 +3066,14 @@ async function caseKapat() {
     await rpc('close_case', { p_case_id: _curCase.id });
     toast('✅ Vaka kapatıldı');
     const _closedAnimalId = _curCase.animal_id;
-    await pullTables(['cases','diseases']);
+    await pullTables(['cases','diseases','kizginlik_log']);
     closeM('m-case-det');
-    if(_closedAnimalId) openDet(_closedAnimalId);
+    const detEl = document.getElementById('det');
+    if (detEl && detEl.classList.contains('on') && _closedAnimalId) {
+      await openDet(_closedAnimalId, true);
+    } else {
+      await renderFromLocal();
+    }
   } catch(e) { toast(e.message, true); }
 }
 
