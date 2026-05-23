@@ -127,9 +127,9 @@ async function renderFromLocal() {
   else if (pg === 'tasks')    { await loadTasks(_curTaskFilter || 'today'); await loadDash(); }
   else if (pg === 'gecmis')   { await loadGecmis(_curGecmisFilter || 'hepsi'); await loadDash(); }
   else if (pg === 'log')      { await Promise.all([loadBirths(), loadStokList()]); await loadDash(); }
-  else if (pg === 'ureme')    { loadUreme(_curUremeTab || 'kizginlik'); loadDash(); }
-  else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
-  else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
+  else if (pg === 'ureme')    { await loadUreme(_curUremeTab || 'kizginlik'); await loadDash(); }
+  else if (pg === 'bildirim') { await loadBildirimler(_curBildirimTab || 'bekliyor'); await loadDash(); }
+  else if (pg === 'raporlar') { await loadRaporlar(); await loadDash(); }
   if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
   checkSpermaUyari();
   updateBildirimBadge();
