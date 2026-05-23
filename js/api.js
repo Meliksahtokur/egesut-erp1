@@ -6,11 +6,11 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 18;
+const DB_VER  = 19;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
-                  'vaccination_log','padoklar','grup_padok_eslem','hekimler'];
+                  'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
@@ -248,7 +248,7 @@ const RPC_TABLES = {
   cikis_yap:                 ['hayvanlar'],
   geri_al:                   ['hayvanlar','tohumlama','dogum','gorev_log','islem_log'],
   create_case:               ['cases'],
-  add_treatment_day:         ['cases'],
+  add_treatment_day:         ['cases','treatment_days'],
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
   remove_drug_administration:['stok','stok_hareket','drug_administrations'],
   close_case:                ['cases'],
@@ -256,7 +256,8 @@ const RPC_TABLES = {
   bulk_vaccination:          ['vaccination_log','gorev_log','stok_hareket'],
   bulk_ilac:                  ['islem_log','stok','stok_hareket'],
   ileri_gebe_asi_tamamla:    ['vaccination_log','gorev_log','stok_hareket'],
-  update_treatment_time:     [],
+  delete_treatment_day:      ['cases','treatment_days','drug_administrations','stok','stok_hareket'],
+  update_treatment_time:     ['treatment_days'],
   // Faz 1 — RPC bypass fix
   buzagi_sutten_kesme_onayla:  ['hayvanlar'],
   hayvan_tohumlanabilir_onayla:['hayvanlar'],
@@ -312,6 +313,7 @@ async function pullTables(tables = []) {
       drug_classes: () => db.from('drug_classes').select('*').order('group_name'),
       drug_products:() => db.from('drug_products').select('*').order('brand_name'),
       drug_administrations: () => db.from('drug_administrations').select('*'),
+      treatment_days: () => db.from('treatment_days').select('*'),
       tohumlama:    () => db.from('tohumlama').select('*'),
       vaccines:     () => db.from('vaccines').select('*'),
       vaccination_log: () => db.from('vaccination_log').select('*'),

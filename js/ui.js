@@ -778,7 +778,8 @@ function _detUremeHtml(a,tohs,kizgs){
 async function _detRenderGecmis(id,el){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
-    const {data:logs=[]}=await db.from('islem_log').select('*').eq('ana_hayvan_id',id).order('tarih',{ascending:false});
+    const allLogs=await idbGetAll('islem_log');
+    const logs=allLogs.filter(l=>l.ana_hayvan_id===id);
     logs.sort((x,y)=>(y.created_at||y.tarih||'').localeCompare(x.created_at||x.tarih||''));
     const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼','KISIR_ISARETLE':'💲','KISIR_KALDIR':'⭕'};
     const ETIKET={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme','KISIR_ISARETLE':'Kısır İşareti','KISIR_KALDIR':'Kısır Kaldırıldı'};
@@ -2623,16 +2624,29 @@ async function renderCaseTimeline(caseId) {
   if (!el) return;
   el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Yükleniyor…</span>';
   try {
-    const { data, error } = await db
-      .from('treatment_timeline')
-      .select('*')
-      .eq('case_id', caseId)
-      .order('treatment_date', { ascending: true });
-    if (error) {
-      el.innerHTML = `<div style="color:var(--red);font-size:.78rem;padding:8px;background:rgba(192,50,26,.08);border-radius:8px">⚠️ Timeline yüklenemedi: ${error.message}</div>`;
-      return;
-    }
-    if (!data || !data.length) {
+    const [allDays, allAdmins, allProducts, allStok] = await Promise.all([
+      idbGetAll('treatment_days'),
+      idbGetAll('drug_administrations'),
+      idbGetAll('drug_products'),
+      idbGetAll('stok')
+    ]);
+    const days = allDays.filter(d => d.case_id === caseId).sort((a,b) => (a.treatment_date||'').localeCompare(b.treatment_date||''));
+    const prodMap = {}; allProducts.forEach(p => { prodMap[p.id] = p; });
+    const stokMap = {}; allStok.forEach(s => { stokMap[s.id] = s; });
+    const data = [];
+    days.forEach(td => {
+      const dayAdmins = allAdmins.filter(da => da.treatment_day_id === td.id);
+      if (!dayAdmins.length) {
+        data.push({ day_id: td.id, day_no: td.day_no, treatment_date: td.treatment_date, treatment_time: td.treatment_time || '', case_id: caseId });
+      } else {
+        dayAdmins.forEach(da => {
+          const dp = prodMap[da.drug_product_id];
+          const s = stokMap[da.stok_id];
+          data.push({ day_id: td.id, day_no: td.day_no, treatment_date: td.treatment_date, treatment_time: td.treatment_time || '', case_id: caseId, administration_id: da.id, drug: dp?.brand_name || s?.urun_adi || '?', dose: da.dose, unit: da.unit, route: da.route, drug_id: dp?.id, stok_id: da.stok_id });
+        });
+      }
+    });
+    if (!data.length) {
       el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Henüz tedavi günü yok</span>';
       return;
     }
