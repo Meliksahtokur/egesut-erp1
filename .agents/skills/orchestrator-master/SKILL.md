@@ -43,8 +43,8 @@ elif both:
 |---|-------|-----------|
 | **S** | **Scout** | Read workspace, instructions, create plan. |
 | **A** | **Ask** | If ambiguous, ask the user. Wait. |
-| **F** | **Fork** | Dispatch sub-agents (research = parallel explores; hierarchical = sub-orchestrators with quotas). |
-| **E** | **Evaluate** | Collect results, cross-check, merge. |
+| **F** | **Fork** | Dispatch sub-agents (research = parallel explores; hierarchical = sub-orchestrators with quotas). **Parallel vs Sequential** decision: tightly-coupled files (HTML+JS) → sequential; independent files → parallel. |
+| **E** | **Evaluate** | Collect results, cross-check, merge. Sub-agent output unavailable → manual verify. |
 | **R** | **Review & Refine** | Self-score 1-10. < 8 → iterate. ≥ 8 → commit. |
 
 ---
@@ -81,6 +81,29 @@ If the task is ambiguous:
 - If clear: skip
 
 ### F — Fork
+
+#### Fork Decision: Parallel vs Sequential
+
+Before dispatching, assess coupling:
+
+```yaml
+if task has tightly-coupled files (e.g. HTML + JS must change together,
+   or two files share IDs/function names that must match):
+  strategy: sequential
+  reason: Tight coupling — parallel agents would need to agree on
+          shared identifiers, which adds overhead and risks mismatch.
+  execution: Main implements directly, sub-agents for isolated review.
+
+elif task has independent files (e.g. separate modules, unrelated dirs):
+  strategy: parallel
+  reason: No shared state — agents work independently, results merge cleanly.
+
+elif task is research (read-only, no writes):
+  strategy: parallel
+  reason: Read-only agents never conflict. Use explore type.
+```
+
+**Rule of thumb:** If changing file A would break file B without coordinated edits → sequential. If files can be edited independently → parallel.
 
 #### Research Mode (Flat, Parallel)
 
@@ -150,7 +173,11 @@ Auth-team (quota: 5, depth: 2)
         └── leaf-2 (depth: 0, territory: auth/utils/hash.ts)       
 ```
 
-**Territory enforcement:** Each agent writes ONLY to files inside its territory. If an agent needs to touch a file outside its territory, it must ask the parent orchestrator. Parent reassigns or rejects.
+**Territory enforcement:**
+- **Write territory**: disjoint — each agent writes ONLY to files inside its territory. If an agent needs to touch a file outside, it must ask the parent orchestrator.
+- **Read territory**: overlapping allowed — agents can read any file for context (e.g., JS agent can read HTML to verify ID names).
+- If territory collision on write → parent renegotiates boundaries.
+- **Frontend HTML+JS tight coupling**: when HTML and JS must change together, the main orchestrator or a single agent handles both to avoid ID/class mismatch.
 
 ### E — Evaluate
 
@@ -168,6 +195,21 @@ Auth-team (quota: 5, depth: 2)
 3. If a sub-orch fails: retry, reassign, or absorb its territory
 4. Cross-check file boundaries: `git diff --stat` to verify territory compliance
 5. Run integration tests after all sub-orchs complete
+
+#### Sub-agent Output Unavailable Fallback
+
+If `agent_eval` returns "result not available yet" or similar for a completed agent:
+
+```
+1. Try agent_eval(block=false, timeout_ms=5000) for a fresh projection
+2. If still empty → try `handle_read` on agent name (format: "session_name/agent_id")
+3. If still empty → check agent summary from `<deepseek:subagent.done>` event
+4. If summary insufficient → fall back to manual verification: read_file, grep_files,
+   exec_shell to check the files the agent was supposed to modify
+5. Continue with what you have — do NOT block indefinitely on missing sub-agent output
+```
+
+**Key insight:** Sub-agent side-effects (file writes, git commits) persist even if the output report is lost. Verify the files, not the agent's self-report.
 
 ### R — Review & Refine
 
@@ -223,6 +265,7 @@ Auth-team (quota: 5, depth: 2)
 | Situation | Action |
 |-----------|--------|
 | Sub-agent fails | Simplify prompt, retry. If still fails, absorb territory. |
+| Sub-agent output unavailable | Manual verify via read_file/grep on affected files. Side-effects persist. |
 | Test fails | `git revert HEAD` last change, fix, retry |
 | Web search empty | Try alternative query, note the gap |
 | Territory collision | Parent renegotiates boundaries. Last resort: clone project. |
@@ -238,11 +281,12 @@ Auth-team (quota: 5, depth: 2)
 2. **MCP before file.** `supabase_query` for live schema, `gitnexus_context` for code understanding, `memory_search` for past decisions. Files are stale; MCP is live.
 3. **Research mode: batch all sub-agents** in one turn. Never serialize.
 4. **Hierarchical mode: depth before breadth.** Allocate quota wisely.
-5. **Territories must be disjoint.** No two agents own the same file.
-6. **Sub-agents speak English.** Prompts, reports, internal messages.
-7. **User-facing output in user's language.** Turkish in this session.
-8. **verify side-effects.** Sub-agent says "done" → `read_file` to confirm.
-9. **Small commits.** One logical change per commit.
-10. **No janitor agent.** Checklist + PLAN.md is the truth.
-11. **fork_context: true always.** Cache is expensive.
-12. **handle_read for big results.** Don't bloat main context.
+5. **Write territory disjoint, read territory overlapping.** Writing agents must not touch the same file. Reading any file for context is always allowed.
+6. **Tightly-coupled files (HTML+JS) → sequential execution.** Parallel agents on shared IDs/classes risk mismatch. Main orchestrator handles.
+7. **Sub-agents speak English.** Prompts, reports, internal messages.
+8. **User-facing output in user's language.** Turkish in this session.
+9. **Verify side-effects.** Sub-agent says "done" → `read_file` to confirm. Output may be unavailable but files persist.
+10. **Small commits.** One logical change per commit.
+11. **No janitor agent.** Checklist + PLAN.md is the truth.
+12. **fork_context: true always.** Cache is expensive.
+13. **handle_read for big results.** Don't bloat main context.
