@@ -1,24 +1,30 @@
 # Nihai Karşılaştırma Raporu — AMD vs Intel
 
-> **100.000 TL Bütçe — Yazılım Geliştirme + AI**
-> **Tarih:** 22 Mayıs 2026
-> **Durum:** Sıfırdan kurulum (monitör, koltuk, UPS, klavye/mouse dahil)
+> ## ⚡ Paradigma Değişikliği (23 Mayıs 2026)
+> **Eski hedef:** Lokal LLM çalıştırmak için VRAM biriktir, GPU'ya yatırım yap.
+> **Yeni hedef:** API tabanlı otonom Multi-Agent, paralel süreçler, Docker ve mikroservisler için saf işlemci/okuma-yazma gücüne odaklan.
+> *"Ekran kartı yarı yolda bırakmasın yeter"* — VRAM'a para vermek yerine parayı CPU'ya yatır.
+> **★ Yeni öneri:** [Setup 0](../01-setup-detay/setup-api-multi-agent.md) — Ryzen 9 9900X (12C/24T) + RTX 4060 Ti 8GB + KC3000 = ~99.335 TL
+
+**100.000 TL Bütçe — Yazılım Geliştirme + AI (API tabanlı)**
+**Tarih:** 23 Mayıs 2026 (Güncelleme: Paradigma Değişikliği)
+**Durum:** Sıfırdan kurulum (monitör, koltuk, UPS, klavye/mouse dahil)
 
 ---
 
 ## Hızlı Özet
 
-| # | Setup | Platform | Maliyet | Kalan | GPU | VRAM | RAM | 
-|---|-------|----------|---------|-------|-----|------|-----|
-| **★ 1** | OEM RTX 5070 | **AMD AM5** | **~89.434 TL** | **10.566 TL** | RTX 5070 | 12GB | 16GB |
-| 2 | Custom RTX 5070 | AMD AM5 | ~96.427 TL | 3.573 TL | RTX 5070 | 12GB | 32GB |
-| 3 | AI 16GB VRAM | AMD AM5 | ~93.682 TL | 6.318 TL | RTX 5060 Ti | **16GB** | 32GB |
-| 4 | Intel DDR4 Bütçe | Intel LGA1700 | ~88.444 TL ✅ | 11.556 TL | RTX 5070 | 12GB | 32GB DDR4 |
-| 5 | Arrow Lake | Intel LGA1851 | ~97.510 TL ✅ | 2.490 TL | RTX 5070 | 12GB | 32GB |
-| **6** | **AMD GPU (yeni)** | **AMD AM5** | **~90.047 TL** | **~9.953 TL** | RX 9070 XT 16GB | **16GB** | 32GB |
-| **7** | **2. El GPU (yeni)** | **AMD AM5** | **~86.492 TL** | **~13.508 TL** | RTX 3090 (2. el) | **24GB** | 32GB |
-
-> ✅ = Doğrulanmış fiyat
+| # | Setup | Platform | Maliyet | Kalan | GPU | CPU | RAM | 
+|---|-------|----------|---------|-------|-----|-----|-----|
+| **★ 0** | **API+Agent (YENİ)** | **AMD AM5** | **~99.335 TL** | **~665 TL** | RTX 4060 Ti 8GB | **R9 9900X 12C/24T 🏆** | 32GB |
+| 1 | OEM RTX 5070 | AMD AM5 | ~89.434 TL | 10.566 TL | RTX 5070 12GB | R5 7500F 6C | 16GB |
+| 2 | Custom RTX 5070 | AMD AM5 | ~96.427 TL | 3.573 TL | RTX 5070 12GB | R5 7600 6C | 32GB |
+| 3 | AI 16GB VRAM | AMD AM5 | ~93.682 TL | 6.318 TL | RTX 5060 Ti 16GB | R5 7600 6C | 32GB |
+| 4 | Intel DDR4 Bütçe | Intel LGA1700 | ~88.444 TL | 11.556 TL | RTX 5070 12GB | i5-14400F 10C | 32GB DDR4 |
+| 5 | Arrow Lake | Intel LGA1851 | ~97.510 TL | 2.490 TL | RTX 5070 12GB | U5 245KF 14C | 32GB |
+| 6 | AMD RX 9070 XT | AMD AM5 | ~90.047 TL | 9.953 TL | RX 9070 XT 16GB | R5 7600 6C | 32GB |
+| 7 | 2. El RTX 3090 | AMD AM5 | ~86.492 TL | 13.508 TL | RTX 3090 24GB | R5 7600 6C | 32GB |
+✅ = Doğrulanmış fiyat
 
 ---
 
@@ -150,45 +156,53 @@
 ## Nihai Karar Akışı
 
 ```
-                 ┌─────────────────────────────────────┐
-                 │     100.000 TL — Yazılım + AI       │
-                 └───────────────┬─────────────────────┘
+                 ┌──────────────────────────────────────────┐
+                 │     100.000 TL — API + Multi-Agent      │
+                 └───────────────┬──────────────────────────┘
                                  │
-                      ┌──────────┴──────────────┐
-                      ▼                          ▼
-             ┌────────────────────┐    ┌───────────────────────┐
-             │  Lokal LLM 30B+   │    │ API AI + Yazılım      │
-             │  çalıştıracak mı? │    │ (çoğu kullanım)       │
-             └──────┬────────────┘    └───────┬───────────────┘
-                    ▼                         ▼
-           ┌──────────────────┐     ┌─────────────────────┐
-           │ 2. el almaktan  │     │ Bütçe kritik mi?    │
-           │ çekiniyor musun?│     └──┬───────────────┬──┘
-           └──┬──────────┬──┘        ▼               ▼
-              ▼          ▼     ┌──────────┐   ┌────────────┐
-      ┌────────────┐ ┌────────┐│ Intel    │   │ ★ Setup 1 │
-      │★ Setup 7   │ │Setup 6 ││ Setup 4  │   │ OEM 5070  │
-      │2. El 3090  │ │S6 AMD  ││ 88.444 TL│   │ 89.434 TL │
-      │86.492 TL   │ │90.047TL│└──────────┘   └────────────┘
-      │24GB VRAM 🏆│ │16GB    │
-      └────────────┘ └────────┘
-      
-      Alternatif: Setup 3 (AI 16GB VRAM, 93.682 TL)
-      → Orijinal AI önerisi, ROCm riski almak istemeyenler için
+                      ┌──────────┴──────────────────┐
+                      ▼                              ▼
+             ┌────────────────────┐       ┌─────────────────────┐
+             │  Lokal LLM 30B+   │       │ API AI + Multi-Agent│
+             │  şart mı?         │       │ (★ varsayılan)      │
+             └──────┬────────────┘       └──────────┬──────────┘
+                    ▼                               ▼
+           ┌──────────────────┐           ┌───────────────────┐
+           │ 2. el riski?    │           │ ★ Setup 0         │
+           ├──────────────────┤           │ Ryzen 9 9900X     │
+           │ EVET → Setup 6  │           │ 12C/24T CPU 🏆    │
+           │ AMD RX 9070 XT  │           │ RTX 4060 Ti 8GB   │
+           │ 16GB VRAM       │           │ KC3000+32GB       │
+           │ 90.047 TL       │           │ ~99.335 TL        │
+           ├──────────────────┤           └───────────────────┘
+           │ HAYIR → ★ S7    │
+           │ 2. El 3090 24GB │           Eski alternatifler:
+           │ 86.492 TL       │           Setup 1 (OEM 89.434 TL)
+           └──────────────────┘           Setup 3 (AI 93.682 TL)
 ```
 
 ---
 
 ## Öneri
 
-### ★ Setup 1 (AMD AM5 OEM RTX 5070) — En Genel
+### ★★ YENİ: Setup 0 (API + Multi-Agent) — Nihai Öneri
 
-Yazılım geliştirme + API ile AI + 1440p oyun için en dengeli seçim:
+> Paradigma değişikliği sonrası yeni birincil öneri.
+
+Multi-Agent, Docker, mikroservis ve API tabanlı AI için tasarlanmış saf işlem gücü istasyonu:
+- **~99.335 TL** — bütçenin milimetrik kullanımı (sadece 665 TL kaldı)
+- **Ryzen 9 9900X 12C/24T** 🏆 — 24 thread ile 6 çekirdekliye göre %100+ daha hızlı
+- **RTX 4060 Ti 8GB** — "yarı yolda bırakmayan" kart, 15.000 TL GPU'dan tasarruf
+- **KC3000 2TB DRAM'li SSD** — agent logları ve container yazmalarında sıfır darboğaz
+- **32GB 6400MHz CL32** — stabil Dual-Channel
+- Detay: `01-setup-detay/setup-api-multi-agent.md`
+
+### ★ Setup 1 (AMD AM5 OEM RTX 5070) — Eski Öneri (Hâlâ Geçerli)
+
+Yazılım geliştirme + API ile AI + 1440p oyun için eski ana öneri:
 - **89.434 TL** — bütçede 10k TL tampon
 - OEM sübvansiyonu sayesinde en iyi f/p
-- AM5 platform ömrü 2027+
-- 260Hz monitör + premium koltuk/KM + UPS dahil
-- 16GB RAM ile başla, ileride 32GB'a yükselt
+- **⚠ Not:** Paradigma değişikliği sonrası Setup 0 daha iyi bir alternatif sunuyor
 
 ### Setup 3 (AMD AM5 16GB VRAM) — AI Ağırlıklı
 
@@ -229,9 +243,9 @@ Lokal LLM birincil hedefse en mantıklı seçim:
 
 1. ~~Intel fiyatları doğrulandı — ⚠️ işaretleri kaldırıldı~~ ✅
 2. ~~Ryzen 9000 serisi, AMD GPU ve ikinci el RTX 3090 seçenekleri eklendi~~ ✅
-3. OEM (Sinerji) sistem stoğu güncel durumu web'den kontrol edilecek
-4. Gerçek benchmark verileri (derleme süresi, AI çıkarım hızı) eklenecek
-5. AI yazılım kurulum rehberi (Ollama/vLLM/llama.cpp) ayrı dosyaya taşınacak
+3. ~~Paradigma değişikliği: Setup 0 (API+Multi-Agent) eklendi, Ryzen 9 9900X + RTX 4060 Ti~~ ✅
+4. OEM (Sinerji) sistem stoğu güncel durumu web'den kontrol edilecek
+5. AI yazılım kurulum rehberi ayrı dosyaya taşınacak
 
 ---
 

@@ -1,9 +1,18 @@
 # 100.000 TL AM5 Yazılım + AI İş İstasyonu — Araştırma Raporu
 
-**Tarih:** 22 Mayıs 2026
-**Kullanım:** Yazılım geliştirme + AI/LLM (API ağırlıklı, ileride lokal agent)
+**Tarih:** 23 Mayıs 2026 (Güncelleme: Paradigma Değişikliği)
+**Kullanım:** Yazılım geliştirme + API tabanlı AI/Multi-Agent + Docker/mikroservis
 **Durum:** Sıfırdan kurulum (monitör, koltuk, UPS, klavye/mouse dahil)
 **Kaynak:** `00-kaynak/toplama-sistem.md` ön araştırması + canlı fiyat doğrulama + `00-kaynak/sinerji-oem-raw-data.txt` ham veri
+
+> ## ⚡ Paradigma Değişikliği (23 Mayıs 2026)
+> 
+> **Eski hedef:** Lokal LLM çalıştırmak için VRAM biriktir, GPU'ya yatırım yap.
+> **Yeni hedef:** API tabanlı otonom Multi-Agent, paralel süreçler, Docker ve mikroservisler için saf işlemci/okuma-yazma gücüne odaklan.
+> 
+> *"Ekran kartı yarı yolda bırakmasın yeter"* — VRAM'a para vermek yerine parayı CPU'ya yatır.
+> 
+> **★ Yeni öneri:** `01-setup-detay/setup-api-multi-agent.md` — Ryzen 9 9900X (12C/24T) + RTX 4060 Ti 8GB + KC3000 DRAM SSD = ~99.335 TL
 
 ---
 
