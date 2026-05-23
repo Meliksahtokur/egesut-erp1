@@ -780,12 +780,10 @@ Doğum (Buzağı) → Süt İçen → Sütten Kesilmiş → Düve → Tohumlama 
 
 ### 6.2 Yüksek Öncelikli (Gelecek Sprint)
 
-#### LOGIC-003: Offline Modda Tedavi Günleri Görünmüyor
-- **Sorun:** Offline modda eklenen tedavi günleri ve ilaç uygulamaları, online moda geçilene kadar UI'da görünmüyor
-- **Kök Sebep:** renderCaseTimeline() fonksiyonu tedavi ve drug_administrations tablolarını IndexedDB'den okuyor, ancak offline modda write() ile eklenen kayıtlar timeline render'ından önce cache'e yansımıyor
-- **Çözüm:** caseDrugKaydet() fonksiyonunda offline modda local cache oluştur, renderCaseTimeline() cache + DB merge refactor et
-- **Tahmini:** 4-6 saat
-- **Risk:** Orta
+#### LOGIC-003: Offline Modda Tedavi Günleri Görünmüyor — ✅ DONE (2026-05-23)
+- **Sorun:** renderCaseTimeline() ve _detRenderGecmis() direkt Supabase çağrısı yapıyordu → offline'da kırılıyordu
+- **Çözüm:** Her iki fonksiyon idbGetAll'a çevrildi, treatment_days TABLES'a eklendi (DB_VER 19), tüm çağıran fonksiyonlara pullTables eklendi, caseKapat UX düzeltildi (openCaseDet ile vaka detayında kalma)
+- **Commitler:** `4a9ba2f`, `85e8553`
 
 #### UI-003: Hayvan Listeleme — Input Odaklı Arama
 - **Durum:** Kısmen çalışıyor
@@ -857,7 +855,7 @@ Doğum (Buzağı) → Süt İçen → Sütten Kesilmiş → Düve → Tohumlama 
 
 1. **~~🔴 Tohumlama — Kalan Write Path Refaktöring (KRİTİK)~~** ✅ DONE (2026-05-23): tohSonuc() full RPC, UI refresh, XSS fix, dead code temizliği, hayvan kartı tab korunması. Kalan: tohumlama_abort RPC
 
-2. **🟠 LOGIC-003: Offline Klinik Cache Merge:** Offline modda eklenen ilaçlar UI'da görünmüyor. Yapılacak: renderCaseTimeline() cache + DB merge etsin.
+2. **~~🟠 LOGIC-003: Offline Klinik Cache Merge~~** ✅ DONE (2026-05-23): renderCaseTimeline + _detRenderGecmis → idbGetAll, treatment_days cache eklendi, tüm çağıranlara pullTables, caseKapat UX fix
 
 3. **🟡 Prompt 4 — Raporlama Modülü:** Alt navda yeni RAPOR sekmesi, gebe oranı / doğum / hastalık / ilaç tüketimi kartları.
 

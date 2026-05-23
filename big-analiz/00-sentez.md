@@ -63,7 +63,7 @@ Tüm iş kuralları, validasyonlar ve state machine'ler PostgreSQL'de (RPC + tri
 |---|-------|------|-------|
 | 4 | **~150 inline onclick handler** | Event delegation yok → bakım zorluğu | index.html (209 data-action) |
 | 5 | **ui.js 2804 satır** | Tek dosyada çok sorumluluk → code review zorluğu | js/ui.js |
-| 6 | **Offline klinik cache merge** | Offline eklenen ilaçlar UI'da görünmüyor | LOGIC-003 |
+| 6 | **Offline klinik cache merge** | Offline eklenen ilaçlar UI'da görünmüyor | LOGIC-003 | ✅ DONE (2026-05-23) — renderCaseTimeline + _detRenderGecmis idbGetAll'a çevrildi, treatment_days cache eklendi, tüm çağıranlara pullTables eklendi |
 | 7 | **Frontend filtreleme** | loadTasks DB'de değil UI'da filtre → büyük datada slow | ui.js:354 |
 | 8 | **Polling → Realtime geçişi** | 30s polling yerine Supabase Realtime kullanılabilir | api.js |
 
@@ -164,6 +164,8 @@ Tüm iş kuralları, validasyonlar ve state machine'ler PostgreSQL'de (RPC + tri
 | `e2c72fd` | renderFromLocal ureme/bildirim/raporlar await eksikleri | app.js |
 | `190f8ce` | tohSonuc sonrası hayvan kartı üreme tabını yenile | forms.js |
 | `12dbccf` | hayvan kartı yenilendiğinde aktif tab korunması (openDet keepTab) | ui.js, forms.js |
+| `4a9ba2f` | LOGIC-003: _detRenderGecmis + renderCaseTimeline → idbGetAll offline cache | ui.js, api.js |
+| `85e8553` | klinik timeline cache sync — tüm çağıranlara pullTables + caseKapat UX fix | ui.js |
 
 ---
 
@@ -175,7 +177,7 @@ Tüm iş kuralları, validasyonlar ve state machine'ler PostgreSQL'de (RPC + tri
 
 ### Kısa Vade (2 Hafta)
 3. **Aşama 1.1 tamamla** — 13 global'i AppState'e taşı
-4. **Offline klinik cache** — LOGIC-003 fix
+4. ~~**Offline klinik cache** — LOGIC-003 fix~~ ✅ DONE (2026-05-23)
 5. **loadTasks server-side filtreleme** — büyük veri hazırlığı
 
 ### Orta Vade (1 Ay)
