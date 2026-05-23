@@ -611,6 +611,7 @@ async function loadVaccinesDropdown() {
   if (dateEl) dateEl.value = today;
 }
 
+let _onDoseInput; // dose override visual feedback handler
 async function onVaccineSelect() {
   const sel = document.getElementById('v-vaccine-id');
   const info = document.getElementById('v-vaccine-info');
@@ -639,7 +640,25 @@ async function onVaccineSelect() {
   }
 
   if (unit) unit.textContent = vax.unit || 'ml';
-  if (doseOverride) doseOverride.placeholder = vax.dose || '';
+  if (doseOverride) {
+    doseOverride.placeholder = vax.dose || '';
+    doseOverride.dataset.stdDose = vax.dose || '';
+    // Kaldir eski listener'i (varsa)
+    doseOverride.removeEventListener('input', _onDoseInput);
+    _onDoseInput = function(){
+      const std = doseOverride.dataset.stdDose;
+      const val = doseOverride.value;
+      if (info) {
+        let base = `Standart doz: ${std || '?'} ${vax.unit || 'ml'} · Uygulama: ${vax.route || '?'}`;
+        if (vax.repeat_interval_days) base += ` · Her ${vax.repeat_interval_days} günde bir`;
+        if (val && val !== std) {
+          base += `<br><span style="color:var(--orange);font-weight:600">→ Uygulanacak: ${val} ${vax.unit || 'ml'}</span>`;
+        }
+        info.innerHTML = base;
+      }
+    };
+    doseOverride.addEventListener('input', _onDoseInput);
+  }
 
   if (hint) {
     hint.style.display = 'block';
