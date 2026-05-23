@@ -2727,7 +2727,8 @@ async function caseDaySaatKaydet(dayId) {
     await rpc('update_treatment_time', { p_day_id: dayId, p_treatment_time: timeVal });
     document.getElementById('saat-modal')?.remove();
     toast('✅ Saat kaydedildi');
-    if (_curCase) renderCaseTimeline(_curCase.id);
+    await pullTables(['treatment_days']);
+    if (_curCase) await renderCaseTimeline(_curCase.id);
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
@@ -2815,6 +2816,7 @@ async function caseGunEkleOnayla() {
       await rpc('add_treatment_day', { p_case_id: _curCase.id, p_date: tarih });
     }
     toast(secili.length + ' tedavi gunu eklendi');
+    await pullTables(['cases','treatment_days']);
     _drugsCache = [];
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
@@ -2970,12 +2972,10 @@ async function caseDrugKaydet(btn) {
       }
     }
     toast('✅ ' + secililar.length + ' ilac eklendi');
-    await pullTables(['stok','stok_hareket','drug_administrations']);
+    await pullTables(['stok','stok_hareket','drug_administrations','treatment_days']);
     btn.closest('.cd-drug-form').remove();
-    // Cache'i temizle ve yeniden yükle
     _drugsCache = [];
     await loadDrugsCache();
-    // Timeline'i yeniden render et
     await renderCaseTimeline(_curCase.id);
     // Stok panelini güncelle
     const _sp = document.getElementById('stok-panel');
@@ -2989,7 +2989,7 @@ async function caseDrugSil(adminId) {
   try {
     await rpc('remove_drug_administration', { p_admin_id: adminId });
     toast('✅ Silindi');
-    await pullTables(['stok','stok_hareket']);
+    await pullTables(['stok','stok_hareket','drug_administrations']);
     await renderCaseTimeline(_curCase.id);
   } catch(e) { toast(e.message, true); }
 }
@@ -3000,7 +3000,7 @@ async function caseDaySil(dayId) {
     await rpc('delete_treatment_day', { p_day_id: dayId });
     toast('Tedavi gunu silindi');
     _drugsCache = [];
-    await pullTables(['stok','stok_hareket']);
+    await pullTables(['stok','stok_hareket','drug_administrations','treatment_days','cases']);
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
     const _sp = document.getElementById('stok-panel');
@@ -3052,7 +3052,7 @@ async function caseDrugDuzenleKaydet(adminId) {
     toast('Ilac guncellendi');
     document.querySelector('.drug-edit-form')?.remove();
     _drugsCache = [];
-    await pullTables(['stok','stok_hareket']);
+    await pullTables(['stok','stok_hareket','drug_administrations']);
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
   } catch(e) { toast(e.message, true); }
@@ -3065,15 +3065,8 @@ async function caseKapat() {
   try {
     await rpc('close_case', { p_case_id: _curCase.id });
     toast('✅ Vaka kapatıldı');
-    const _closedAnimalId = _curCase.animal_id;
     await pullTables(['cases','diseases','kizginlik_log']);
-    closeM('m-case-det');
-    const detEl = document.getElementById('det');
-    if (detEl && detEl.classList.contains('on') && _closedAnimalId) {
-      await openDet(_closedAnimalId, true);
-    } else {
-      await renderFromLocal();
-    }
+    await openCaseDet(_curCase.id);
   } catch(e) { toast(e.message, true); }
 }
 
