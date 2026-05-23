@@ -2278,7 +2278,15 @@ async function openTaskDet(id){
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
   const isLate=t.hedef_tarih<today;
   const hayvanLabel=getState('animals').find(a=>a.id===t.hayvan_id);
-  document.getElementById('td-hayvan').textContent=(hayvanLabel?.kupe_no||hayvanLabel?.devlet_kupe)||(t.hayvan_id?.length>20?'Buzağı-'+t.hayvan_id.slice(-6):t.hayvan_id)||'GENEL GÖREV';
+  const tdHayvan=document.getElementById('td-hayvan');
+  tdHayvan.textContent=(hayvanLabel?.kupe_no||hayvanLabel?.devlet_kupe)||(t.hayvan_id?.length>20?'Buzağı-'+t.hayvan_id.slice(-6):t.hayvan_id)||'GENEL GÖREV';
+  if(t.hayvan_id){
+    tdHayvan.style.cursor='pointer';
+    tdHayvan.onclick=()=>{ closeM('m-task-det'); openDet(t.hayvan_id); };
+  } else {
+    tdHayvan.style.cursor='';
+    tdHayvan.onclick=null;
+  }
   document.getElementById('td-aciklama').textContent=t.aciklama||'';
   const meta=[];
   meta.push(`📅 ${fmtTarih(t.hedef_tarih)}${isLate?' ⚠️ Gecikmiş':''}`);
@@ -2348,8 +2356,6 @@ async function openTaskDet(id){
     }catch(e){ console.warn('parent lookup:',e.message); }
   }
 
-  const hayvanGitBtn = document.getElementById('td-hayvan-git-btn');
-  if (hayvanGitBtn) hayvanGitBtn.style.display = t.hayvan_id ? 'block' : 'none';
   openM('m-task-det');
 }
 async function detayTamamla(){
@@ -2434,7 +2440,15 @@ async function openDoneTaskDet(id){
   const t=all.find(x=>x.id===id); if(!t) return;
   _curTaskDet=t;
   const hayvan=getState('animals').find(a=>a.id===t.hayvan_id);
-  document.getElementById('dd-hayvan').textContent=(hayvan?.kupe_no||hayvan?.devlet_kupe)||t.hayvan_id||'GENEL';
+  const ddHayvan=document.getElementById('dd-hayvan');
+  ddHayvan.textContent=(hayvan?.kupe_no||hayvan?.devlet_kupe)||t.hayvan_id||'GENEL';
+  if(t.hayvan_id){
+    ddHayvan.style.cursor='pointer';
+    ddHayvan.onclick=()=>{ closeM('m-done-det'); openDet(t.hayvan_id); };
+  } else {
+    ddHayvan.style.cursor='';
+    ddHayvan.onclick=null;
+  }
   document.getElementById('dd-aciklama').textContent=t.aciklama||'';
   const meta=[];
   meta.push(`📅 Hedef: ${fmtTarih(t.hedef_tarih)}`);
@@ -2459,8 +2473,6 @@ async function openDoneTaskDet(id){
     geriBtn.disabled=false;
     geriBtn.textContent='↩️ Geri Al';
   }
-  const ddHayvanGitBtn = document.getElementById('dd-hayvan-git-btn');
-  if (ddHayvanGitBtn) ddHayvanGitBtn.style.display = t.hayvan_id ? 'block' : 'none';
   openM('m-done-det');
 }
 function gorevGeriAl(){
@@ -2582,7 +2594,15 @@ async function openCaseDet(caseId) {
   const hayvan  = getState('animals').find(a => a.id === c.animal_id);
   const kupe    = hayvan ? (hayvan.kupe_no || hayvan.devlet_kupe || c.animal_id) : c.animal_id;
 
-  document.getElementById('cd-hayvan').textContent  = kupe;
+  const cdHayvan=document.getElementById('cd-hayvan');
+  cdHayvan.textContent=kupe;
+  if(hayvan){
+    cdHayvan.style.cursor='pointer';
+    cdHayvan.onclick=()=>{ closeM('m-case-det'); openDet(hayvan.id); };
+  } else {
+    cdHayvan.style.cursor='';
+    cdHayvan.onclick=null;
+  }
   document.getElementById('cd-disease').textContent = '🏥 ' + (disease?.name || '?');
   document.getElementById('cd-notes').textContent   = c.notes || '';
 
