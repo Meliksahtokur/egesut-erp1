@@ -40,8 +40,7 @@ BEGIN
   -- 4. Update hayvan — both padok_id (FK) and padok (TEXT fallback)
   UPDATE public.hayvanlar
   SET padok_id = p_yeni_padok_id,
-      padok = v_yeni_padok_adi,
-      updated_at = now()
+      padok = v_yeni_padok_adi
   WHERE id = p_hayvan_id;
 
   -- 5. Log to islem_log
