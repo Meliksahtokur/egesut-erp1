@@ -879,22 +879,25 @@ function _detGorevHtml(a,tasks,subs,today){
     :'<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>';
   return `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-task-add','ta-hid','${kupe}')">➕ Görev Ekle</button></div>`+liste;
 }
-async function openDet(id){
+async function openDet(id, keepTab){
   _detOpenId=id;
+  const activeTab = keepTab ? document.querySelector('.tab.on')?.dataset?.action?.replace('tab-','') : null;
   const curPg=getState('currentPage')||'dash';
-  history.pushState({pg:curPg||'dash',det:id},'','#'+(curPg||'dash'));
+  if (!keepTab) history.pushState({pg:curPg||'dash',det:id},'','#'+(curPg||'dash'));
   document.getElementById('det').classList.add('on');
-  const _backBtn = document.querySelector('.det-back');
-  if (_backBtn) {
-    const _svg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>';
-    _backBtn.innerHTML = _svg + (window._prevTaskId ? ' Göreve Dön' : ' Sürüye Dön');
+  if (!keepTab) {
+    const _backBtn = document.querySelector('.det-back');
+    if (_backBtn) {
+      const _svg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>';
+      _backBtn.innerHTML = _svg + (window._prevTaskId ? ' Göreve Dön' : ' Sürüye Dön');
+    }
   }
   document.getElementById('det-name').textContent=' ';
   document.getElementById('det-meta').textContent=' ';
   const _skelHtml='<div style="padding:16px 0">'+['80%','60%','90%','50%'].map(w=>`<div class="skel" style="height:14px;width:${w};margin-bottom:12px"></div>`).join('')+'</div>';
   ['det-chips','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   const _ozetEl=document.getElementById('tab-ozet'); if(_ozetEl) _ozetEl.innerHTML=_skelHtml;
-  showTab('ozet',document.querySelector('.tab'));
+  showTab(activeTab||'ozet',document.querySelector(activeTab?`.tab[data-action="tab-${activeTab}"]`:'.tab'));
   await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(_detOpenId!==id) return;
   try {

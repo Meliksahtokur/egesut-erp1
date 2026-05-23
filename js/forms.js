@@ -970,7 +970,7 @@ async function tohSonuc(sonuc, btn) {
     closeM('m-toh-det');
     const detEl = document.getElementById('det');
     if (detEl && detEl.classList.contains('on') && _curToh.hayvan_id) {
-      await openDet(_curToh.hayvan_id);
+      await openDet(_curToh.hayvan_id, true);
     }
     await renderFromLocal();
   } catch (e) {
