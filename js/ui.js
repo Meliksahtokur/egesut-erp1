@@ -542,22 +542,6 @@ async function loadAnimals(){
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
     globalThis._tohMap={};
     gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
-    // Repeat breed haritası — cycle bazında max deneme_no
-    const allToh=await getData('tohumlama');
-    globalThis._repeatMap={};
-    allToh.sort((a,b)=>(a.tarih||'').localeCompare(b.tarih||'')||(a.id||'').localeCompare(b.id||''));
-    for(const t of allToh){
-      if(!globalThis._repeatMap[t.hayvan_id])
-        globalThis._repeatMap[t.hayvan_id]={currentMax:0,pastMax:0};
-      const e=globalThis._repeatMap[t.hayvan_id];
-      if(t.sonuc==='Doğum Yaptı'||t.sonuc==='Abort'){
-        const cycleMax=Math.max(e.currentMax,t.deneme_no||0);
-        if(cycleMax>e.pastMax) e.pastMax=cycleMax;
-        e.currentMax=0;
-      } else {
-        if((t.deneme_no||0)>e.currentMax) e.currentMax=t.deneme_no||0;
-      }
-    }
     // Bekleyen tohumlama haritası (sadece sonuc=Bekliyor — badge için)
     const bosTohs=await getData('tohumlama',t=>t.sonuc==='Bekliyor');
     globalThis._bosTohMap={};
@@ -596,16 +580,10 @@ function _animalTagsHtml(a,gebeSet){
     }
   }
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
-  // Repeat breed badge
-  const _repeatE=(globalThis._repeatMap||{})[a.id];
+  // Repeat breed badge (backend view'dan gelir: repeat_breed_active, repeat_breed_past)
   let repeatBadge='';
-  if(_repeatE){
-    if(_repeatE.currentMax>=2){
-      repeatBadge=`<span class="repeat-badge amber">🔁 ${_repeatE.currentMax}x Aşım</span>`;
-    } else if(_repeatE.pastMax>=2){
-      repeatBadge=`<span class="repeat-badge green">🔁 ${_repeatE.pastMax}x Aşım</span>`;
-    }
-  }
+  if(a.repeat_breed_active) repeatBadge+=`<span class="repeat-badge active">🔁 Tekrar Aşım</span>`;
+  if(a.repeat_breed_past)   repeatBadge+=`<span class="repeat-badge past">↻ Tekrar</span>`;
   return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${kisirBadge}${repeatBadge}`;
 }
 function _animalCardHtml(a,gebeSet,idx){
