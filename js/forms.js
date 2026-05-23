@@ -967,8 +967,8 @@ async function tohSonuc(sonuc, btn) {
     }
     toast(successMsg);
     await pullTables(['tohumlama', 'hayvanlar', 'islem_log']);
-    renderSafe();
     closeM('m-toh-det');
+    await renderFromLocal();
   } catch (e) {
     toast('❌ Sonuç kaydedilemedi: ' + getUserMessage(e), true);
   }
