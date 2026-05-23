@@ -968,6 +968,10 @@ async function tohSonuc(sonuc, btn) {
     toast(successMsg);
     await pullTables(['tohumlama', 'hayvanlar', 'islem_log']);
     closeM('m-toh-det');
+    const detEl = document.getElementById('det');
+    if (detEl && detEl.classList.contains('on') && _curToh.hayvan_id) {
+      await openDet(_curToh.hayvan_id);
+    }
     await renderFromLocal();
   } catch (e) {
     toast('❌ Sonuç kaydedilemedi: ' + getUserMessage(e), true);
