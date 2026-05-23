@@ -954,69 +954,27 @@ async function tohSonuc(sonuc, btn) {
     } else if (sonuc === 'Boş') {
       const res = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: _curToh.id });
       if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
-      toast('Boş olarak işaretlendi');
-      closeM('m-toh-det');
-      return;
+      successMsg = 'Boş olarak işaretlendi';
     } else {
       const res = await rpc('tohumlama_sonuc_bekliyor', { p_tohumlama_id: _curToh.id });
       if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
-      toast('Bekliyor\'a alındı');
-      closeM('m-toh-det');
-      return;
+      successMsg = 'Bekliyor\'a alındı';
     }
 
-    const res = await rpc(rpcName, { p_tohumlama_id: _curToh.id });
-    if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
+    if (rpcName) {
+      const res = await rpc(rpcName, { p_tohumlama_id: _curToh.id });
+      if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
+    }
     toast(successMsg);
+    await pullTables(['tohumlama', 'hayvanlar', 'islem_log']);
+    renderSafe();
     closeM('m-toh-det');
   } catch (e) {
-    console.warn('tohSonuc error:', e.message);
+    toast('❌ Sonuç kaydedilemedi: ' + getUserMessage(e), true);
   }
 }
 
 // ── GEBELİK İŞARETLE ────────────────────────
-async function gebeIsaretle() {
-  const tohs         = await idbGetAll('tohumlama');
-  const hayvanTohMap = {};
-  tohs.forEach(t => { if (!hayvanTohMap[t.hayvan_id] || t.tarih > hayvanTohMap[t.hayvan_id].tarih) hayvanTohMap[t.hayvan_id] = t; });
-  const adaylar = Object.values(hayvanTohMap).filter(t => t.sonuc === 'Bekliyor');
-  if (!adaylar.length) { toast('Bekleyen tohumlama kaydı yok'); return; }
-
-  let box = g('gebe-isaret-modal');
-  if (!box) { box = document.createElement('div'); box.id = 'gebe-isaret-modal'; box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end'; box.onclick = e => { if (e.target === box) box.remove(); }; document.body.appendChild(box); }
-
-  const rows = adaylar.map(t => {
-    const h    = getState('animals').find(a => a.id === t.hayvan_id);
-    const kupe = getDisplayKupe(h, t.hayvan_id);
-    const gun  = Math.floor((Date.now() - new Date(t.tarih)) / 86400000);
-    return `<label style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid #eee;cursor:pointer">
-      <input type="checkbox" class="gebe-chk" data-toh-id="${t.id}" data-hayvan-id="${t.hayvan_id}" style="width:20px;height:20px;accent-color:var(--green);cursor:pointer">
-      <div>
-        <div style="font-weight:700;color:var(--ink)">${kupe}</div>
-        <div style="font-size:.7rem;color:var(--ink3)">${t.sperma || '?'} · ${t.tarih} · ${gun}. gün</div>
-      </div>
-    </label>`;
-  }).join('');
-
-  box.innerHTML = `<div style="background:#fff;border-radius:18px 18px 0 0;width:100%;max-height:80vh;display:flex;flex-direction:column">
-    <div style="padding:14px 16px 0;display:flex;justify-content:space-between;align-items:center">
-      <div style="font-weight:800;font-size:1rem">🤰 Gebe İşaretle</div>
-      <button onclick="g('gebe-isaret-modal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#999">✕</button>
-    </div>
-    <div style="font-size:.7rem;color:#999;padding:4px 16px 10px">Gebe olduğunu onayladığınız hayvanları seçin</div>
-    <div style="overflow-y:auto;flex:1">${rows}</div>
-    <div style="padding:12px 16px;display:flex;gap:8px;border-top:1px solid #eee">
-      <button onclick="gebeIsaretKaydet()" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:.9rem;cursor:pointer">✅ Gebe Olarak Kaydet</button>
-      <button onclick="g('gebe-isaret-modal').remove()" style="padding:12px 16px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">İptal</button>
-    </div>
-  </div>`;
-}
-
-async function gebeIsaretKaydet() {
-  // Gebelik ataması gebelik tabına taşındı — tohumlama_sonuc_gebe RPC kullanılmalı
-  toast('Gebelik ataması için Gebelik tabını kullanın', true);
-}
-
 // ── GERİ ALMA ────────────────────────────────
 function openGeriAl(islemLogId, ozet) {
   g('ga-hid').value = islemLogId;

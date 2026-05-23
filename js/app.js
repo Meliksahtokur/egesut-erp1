@@ -148,7 +148,7 @@ function populateHekimSelects() {
   const all = [...HEKIMLER, ..._customHekimler];
   ['b-hekim','i-hekim','d-hekim','ta-hekim','tr-hekim'].forEach(id => {
     const el = g(id); if (!el) return;
-    el.innerHTML = all.map(h => `<option value="${h.id}">${h.ad}</option>`).join('');
+    el.innerHTML = all.map(h => `<option value="${h.id}">${esc(h.ad)}</option>`).join('');
     el.value = VARSAYILAN_HEKIM;
   });
 }
@@ -601,7 +601,7 @@ window.addEventListener('load', withErrorHandling(async () => {
   try { await renderFromLocal(); } catch (e) {
     console.warn('render err:', e);
     const el = g('dash-body');
-    if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: esc(e.message)<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
+    if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: ${esc(e.message)}<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
   }
   updateSyncBar();
 
