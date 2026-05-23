@@ -42,6 +42,7 @@ registerActions({
   'fchip-gebelik-bos':     (el) => fchipSec('gebelik', 'bos', el),
   'fchip-saglik-hasta':    (el) => fchipSec('saglik', 'hasta', el),
   'fchip-kisir':           (el) => fchipSec('kisir', 'kisir', el),
+  'fchip-tekrar':          (el) => fchipSec('tekrar', 'tekrar', el),
 
   // ═══ ÜREME SEKMELERİ ═══
   'ureme-kizginlik': (el) => uremeTab('kizginlik', el),
