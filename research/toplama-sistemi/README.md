@@ -12,7 +12,7 @@
 > 
 > *"Ekran kartı yarı yolda bırakmasın yeter"* — VRAM'a para vermek yerine parayı CPU'ya yatır.
 > 
-> **★ Yeni öneri:** `01-setup-detay/setup-api-multi-agent.md` — Ryzen 9 9900X (12C/24T) + RTX 4060 Ti 8GB + KC3000 DRAM SSD = ~99.335 TL
+> **★ Yeni öneri:** `01-setup-detay/setup-api-multi-agent.md` — Ryzen 9 9900X (12C/24T) + RTX 4060 Ti 8GB + KC3000 DRAM SSD = ~96.646-100.945 TL (100-105K bant)
 
 ---
 
@@ -67,16 +67,17 @@ Sinerji Tavsiye Sistem RTX 5070 (~46.242 TL) içinde: Ryzen 5 7500F + RTX 5070 +
 
 ## Setup Karşılaştırması (Hızlı Bakış)
 
-| Kriter | ★ Setup 1 OEM 5070 | Setup 2 Custom 5070 | Setup 3 AI 16GB | **🆕 Setup 6 AMD GPU** | **🆕 Setup 7 2. El** |
-|--------|-------------------|--------------------|----------------|----------------------|---------------------|
-| **Toplam** | **~90.000 TL** | **~96.500 TL** | **~93.700 TL** | **~90.047 TL** | **~86.492 TL** |
-| **GPU** | RTX 5070 12GB | RTX 5070 12GB | RTX 5060 Ti 16GB | RX 9070 XT 16GB | RTX 3090 2. El **24GB** |
-| **RAM** | 16GB (OEM) | 32GB 6400MHz | 32GB 6400MHz | 32GB 6400MHz | 32GB 6400MHz |
-| **VRAM** | 12GB GDDR7 | 12GB GDDR7 | **16GB GDDR7** | 16GB GDDR6 | **24GB GDDR6X** 🏆 |
-| **Monitör** | Philips 27" 260Hz | Fazeon 27" 150Hz | Philips 27" 260Hz | Philips 27" 260Hz | Fazeon 27" 150Hz |
-| **Koltuk+KM** | Thunder Pro + MX Keys | Maxim UP + MK295 | Maxim UP + MK295 | Maxim UP + MK295 | Maxim UP + MK295 |
-| **UPS** | Var | Var | Var | Var | Var |
-| **Kalan Bütçe** | ~10.000 TL | ~3.500 TL | ~6.300 TL | ~9.953 TL | **~13.500 TL** 🏆 |
+| Kriter | **★★ Setup 0 API** | ★ Setup 1 OEM | Setup 2 Custom | Setup 3 AI | **🆕 Setup 6 AMD** | **🆕 Setup 7 2. El** |
+|--------|-------------------|---------------|----------------|------------|-------------------|-----------------|
+| **Toplam** | **~96.646-100.945** | **~90.000 TL** | **~96.500 TL** | **~93.700 TL** | **~90.047 TL** | **~86.492 TL** |
+| **CPU** | **R9 9900X 12C/24T** 🏆 | R5 7500F 6C | R5 7600 6C | R5 7600 6C | R5 7600 6C | R5 7600 6C |
+| **GPU** | RTX 4060 Ti 8GB | RTX 5070 12GB | RTX 5070 12GB | RTX 5060 Ti 16GB | RX 9070 XT 16GB | RTX 3090 24GB |
+| **VRAM** | 8GB | 12GB | 12GB | **16GB** | 16GB | **24GB** 🏆 |
+| **RAM** | **32GB 6400MHz** | 16GB OEM | 32GB 6400MHz | 32GB 6400MHz | 32GB 6400MHz | 32GB 6400MHz |
+| **SSD** | **KC3000 DRAM** 🏆 | NV3 2TB | NV3 2TB | NV3 2TB | NV3 2TB | NV3 2TB |
+| **Monitör** | Fazeon 27" 150Hz | Philips 260Hz | Fazeon 150Hz | Philips 260Hz | Philips 260Hz | Fazeon 150Hz |
+| **Koltuk+KM** | Maxim UP + MK295 | Thunder+MX Keys | Maxim+MK295 | Maxim+MK295 | Maxim+MK295 | Maxim+MK295 |
+| **Bütçe** | **100-105K bant** | ~10K fazla | ~3.5K fazla | ~6.3K fazla | ~10K fazla | **~13.5K fazla** |
 
 ---
 
@@ -126,11 +127,16 @@ RTX 3090 24GB (2. el ~25.000-30.000 TL) bu bütçede en yüksek VRAM seçeneği:
 
 ## Nihai Öneri (Güncellenmiş)
 
-**★ Setup 1** (OEM RTX 5070) — hâlâ en genel öneri:
+**★★ Setup 0** (API+Multi-Agent) — yeni birincil öneri:
+- ~96.646-100.945 TL (100-105K bantta esneme kabul edilebilir)
+- **Ryzen 9 9900X 12C/24T** — 24 thread ile paralel agent'larda rakipsiz
+- RTX 4060 Ti 8GB — "yarı yolda bırakmayan" kart
+- KC3000 DRAM'li SSD — sıfır I/O darboğazı
+- Detay: `01-setup-detay/setup-api-multi-agent.md`
+
+**★ Setup 1** (OEM RTX 5070) — eski öneri (hâlâ geçerli alternatif):
 - ~90.000 TL, bütçede ~10.000 TL tampon
 - OEM sübvansiyonu sayesinde en iyi f/p
-- AM5 platform ömrü 2027+
-- 260Hz monitör + premium koltuk/KM + UPS dahil
 
 **Setup 7** (2. El RTX 3090) — lokal LLM hedefse en iyi VRAM/bütçe:
 - **24GB VRAM** — bu bütçede rakipsiz

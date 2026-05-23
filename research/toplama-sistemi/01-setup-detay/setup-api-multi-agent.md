@@ -49,7 +49,7 @@ Bu setup'ın temel kuralı: GPU'nun görevi 2 adet 2K monitörü beslemek, hardw
 | 10 | **UPS** | Tunçmatik Lift 1500VA Line-Interactive | **5.717** | Şebeke koruması, ani kapanmalarda veri kaybı önleme. |
 | 11 | **Koltuk** | Seduna Maxim UP Çalışma Koltuğu | **5.199** | Uzun oturumlar için ergonomi. |
 | 12 | **Klavye+Mouse** | Logitech MK295 Silent Kablosuz Set | **1.255** | Sessiz, güvenilir, pil ömrü uzun. |
-| | | **TOPLAM** | **~99.335 TL** | **100.000 TL bütçenin milimetrik kullanımı ✅** |
+| | | **TOPLAM** | **~96.646 - 100.945 TL** | **100-105K TL bantta esneme kabul edilebilir ✅** |
 
 ---
 
@@ -66,8 +66,8 @@ Bu setup'ın temel kuralı: GPU'nun görevi 2 adet 2K monitörü beslemek, hardw
 | **Kod Derleme (Linux kernel)** | ~178 sn | **~95 sn** | **%47 daha hızlı** |
 | **Fiyat** | ~7.313 TL | ~19.739 TL | +12.426 TL |
 
-> 12.426 TL farka 2× çekirdek, %117 çoklu işlem performansı, %47 daha hızlı derleme.
-> GPU'dan tasarruf ettiğimiz ~15.000 TL'nin ~12.500 TL'sini CPU'ya harcadık, kalan ~2.500 TL SSD'ye.
+> 12.426 TL farka 2× çekirdek, ~%112 çoklu işlem performansı, %47 daha hızlı derleme.
+> GPU'dan tasarruf ettiğimiz ~12.500-15.000 TL'nin büyük kısmı CPU'ya, kalanı SSD'ye gitti.
 
 ---
 
@@ -103,7 +103,7 @@ Bu setup'ın temel kuralı: GPU'nun görevi 2 adet 2K monitörü beslemek, hardw
 | **Derleme Hızı** | ~178 sn (Linux kernel) | **~95 sn** 🏆 |
 | **1440p Oyun** | ⭐⭐⭐⭐⭐ 🏆 | ⭐⭐⭐ |
 | **Garanti** | OEM tek | Parça parça |
-| **Bütçe Kullanımı** | ~10.000 TL fazla | **Milimetrik** 🏆 |
+| **Bütçe Kullanımı** | ~10.000 TL fazla | **100-105K bantta esnek** 🏆 |
 
 ---
 

@@ -4,7 +4,7 @@
 > **Eski hedef:** Lokal LLM çalıştırmak için VRAM biriktir, GPU'ya yatırım yap.
 > **Yeni hedef:** API tabanlı otonom Multi-Agent, paralel süreçler, Docker ve mikroservisler için saf işlemci/okuma-yazma gücüne odaklan.
 > *"Ekran kartı yarı yolda bırakmasın yeter"* — VRAM'a para vermek yerine parayı CPU'ya yatır.
-> **★ Yeni öneri:** [Setup 0](../01-setup-detay/setup-api-multi-agent.md) — Ryzen 9 9900X (12C/24T) + RTX 4060 Ti 8GB + KC3000 = ~99.335 TL
+> **★ Yeni öneri:** [Setup 0](../01-setup-detay/setup-api-multi-agent.md) — Ryzen 9 9900X (12C/24T) + RTX 4060 Ti 8GB + KC3000 = ~96.646-100.945 TL (100-105K bant)
 
 **100.000 TL Bütçe — Yazılım Geliştirme + AI (API tabanlı)**
 **Tarih:** 23 Mayıs 2026 (Güncelleme: Paradigma Değişikliği)
@@ -16,7 +16,7 @@
 
 | # | Setup | Platform | Maliyet | Kalan | GPU | CPU | RAM | 
 |---|-------|----------|---------|-------|-----|-----|-----|
-| **★ 0** | **API+Agent (YENİ)** | **AMD AM5** | **~99.335 TL** | **~665 TL** | RTX 4060 Ti 8GB | **R9 9900X 12C/24T 🏆** | 32GB |
+| **★ 0** | **API+Agent (YENİ)** | **AMD AM5** | **~96.646-100.945 TL** | **100-105K bant** | RTX 4060 Ti 8GB | **R9 9900X 12C/24T 🏆** | 32GB |
 | 1 | OEM RTX 5070 | AMD AM5 | ~89.434 TL | 10.566 TL | RTX 5070 12GB | R5 7500F 6C | 16GB |
 | 2 | Custom RTX 5070 | AMD AM5 | ~96.427 TL | 3.573 TL | RTX 5070 12GB | R5 7600 6C | 32GB |
 | 3 | AI 16GB VRAM | AMD AM5 | ~93.682 TL | 6.318 TL | RTX 5060 Ti 16GB | R5 7600 6C | 32GB |
@@ -173,7 +173,7 @@
            │ EVET → Setup 6  │           │ 12C/24T CPU 🏆    │
            │ AMD RX 9070 XT  │           │ RTX 4060 Ti 8GB   │
            │ 16GB VRAM       │           │ KC3000+32GB       │
-           │ 90.047 TL       │           │ ~99.335 TL        │
+           │ 90.047 TL       │           │ 100-105K bant     │
            ├──────────────────┤           └───────────────────┘
            │ HAYIR → ★ S7    │
            │ 2. El 3090 24GB │           Eski alternatifler:
@@ -190,7 +190,7 @@
 > Paradigma değişikliği sonrası yeni birincil öneri.
 
 Multi-Agent, Docker, mikroservis ve API tabanlı AI için tasarlanmış saf işlem gücü istasyonu:
-- **~99.335 TL** — bütçenin milimetrik kullanımı (sadece 665 TL kaldı)
+- **~96.646-100.945 TL** — 100-105K TL bantta esneme kabul edilebilir
 - **Ryzen 9 9900X 12C/24T** 🏆 — 24 thread ile 6 çekirdekliye göre %100+ daha hızlı
 - **RTX 4060 Ti 8GB** — "yarı yolda bırakmayan" kart, 15.000 TL GPU'dan tasarruf
 - **KC3000 2TB DRAM'li SSD** — agent logları ve container yazmalarında sıfır darboğaz
