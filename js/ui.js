@@ -473,40 +473,8 @@ async function updateTaskBadge(){
     if(tb){ tb.textContent=late>99?'99+':late; tb.style.display=late>0?'flex':'none'; }
   } catch(e){ /* sessiz fail */ }
 }
-async function doneTask(id,hid,stokId,miktar,padok,btn){
-  btn.disabled=true;
-  btn.innerHTML='<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
-  try {
-    const task=(await getData('gorev_log',t=>t.id===id))[0]||{};
-    await write('gorev_log',{...task,id,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString()},'PATCH',`id=eq.${id}`);
-    const _stokKontrol=stokId?getState('stock').find(s=>s.id===stokId):null;
-    if(stokId&&miktar>0&&_stokKontrol) await write('stok_hareket',{id:crypto.randomUUID(),stok_id:stokId,tur:'Görev',miktar,notlar:'GorevID:'+id,iptal:false});
-    if(padok&&hid){
-      // padok_degistir RPC ile (islem_log + undo destekli)
-      const padokObj=typeof PADOKLAR!=='undefined'?PADOKLAR.find(p=>p.ad===padok):null;
-      if(padokObj){
-        const r=await rpc('padok_degistir',{p_hayvan_id:hid,p_yeni_padok_id:padokObj.id});
-        if(r&&r.success) toast('✅ Görev başarılı, padok değiştirme başarılı');
-        else toast('⚠️ Görev tamamlandı, padok değişmedi: '+(r?.error||'bilinmeyen hata'),true);
-      } else {
-        await write('hayvanlar',{id:hid,padok},'PATCH',`id=eq.${hid}`);
-        toast('✅ Görev başarılı, padok değiştirildi');
-      }
-    } else {
-      toast('✅ Tamamlandı');
-    }
-    const elT=document.getElementById('tc-'+id);
-    if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
-    updateTaskBadge();
-    loadDash();
-  } catch(e){
-    btn.disabled=false;
-    btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
-    toast(e.message,true);
-  }
-}
+// doneTask removed — forms.js versiyonu kullaniliyor (RPC ile)
 
-// ── BESLEME tamamlama ─────────────────────
 async function beslemeGunTamam(id,btn){
   btn.disabled=true;
   btn.innerHTML='<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
