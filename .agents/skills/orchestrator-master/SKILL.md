@@ -67,6 +67,13 @@ Always:
 - `checklist_write` with the full plan
 - Check AGENTS.md / CLAUDE.md / project-specific instructions
 
+**Pre-task memory load** (before any sub-agent is spawned):
+1. `memory_search(task_topic)` — pull past patterns, decisions, and errors
+   similar to the current task
+2. `semantic_search(task_description)` — find semantically related code/patterns
+3. If matches found → add to context as reference (max 3 most relevant)
+4. If no matches → proceed fresh; `note` the new task type for future
+
 **Hierarchical mode** also:
 - `gitnexus_detect_changes()` to understand live state
 - Define **territories** (each sub-orch owns a file/directory scope)
@@ -84,46 +91,135 @@ If the task is ambiguous:
 
 #### Spawn Gate — Do I Need A Sub-Agent?
 
-Before dispatching, assess scope:
+Before dispatching, assess scope with the full decision framework:
 
 ```
-├── 1 file / minor fix?
-│   → request_user_input: "Bunu direkt yapayım mı, yoksa sub-agent açayım mı?"
+📋 GÖREV DEĞERLENDİRME
 │
-├── 2-3 tightly-coupled files (HTML+JS that share IDs)?
-│   → request_user_input: "Tightly-coupled değişiklik, ben yapayım mı?"
+├── 1. BOYUT: Karmaşıklık
+│   ├── Tek dosya / basit fix?
+│   │   → request_user_input: "Bunu direkt yapayım mı, yoksa sub-agent açayım mı?"
+│   │
+│   ├── 2-3 tightly-coupled dosya? (HTML+JS, shared IDs)
+│   │   → Spawn gate: Sor kullanıcıya
+│   │   → Topoloji: Hierarchical (main handles, sub-agents isolated)
+│   │   → Agent tipi: implementer
+│   │
+│   ├── 3+ bağımsız modül?
+│   │   → Spawn: Direkt sub-agent aç (sorma)
+│   │   → Topoloji: Mesh veya Star
+│   │   → Agent tipi: implementer (per module) veya explorer (read-only)
+│   │
+│   ├── Pipeline / zincir? (output→input)
+│   │   → Spawn: Direkt aç
+│   │   → Topoloji: Ring
+│   │   → Agent tipi: implementer
+│   │   → Ek: checkpoint=true
+│   │
+│   └── Read-only araştırma?
+│       → Spawn: Paralel explorer aç (sorma)
+│       → Topoloji: Star
+│       → Agent tipi: explorer (birden çok)
+│       → Profile: research
 │
-├── 3+ independent modules?
-│   → Sub-agent aç (sorma — bariz büyük iş)
+├── 2. BOYUT: Kritiklik
+│   ├── Sıradan işlem?
+│   │   → Profile: default veya fast
+│   │   → Consensus: none
+│   │
+│   ├── Riskli işlem? (bulk UPDATE, migration, geri alınamaz)
+│   │   → Profile: critical
+│   │   → Consensus: majority (3 implementer + 3 reviewer)
+│   │   → Agent tipi: implementer + reviewer
+│   │
+│   └── Deneysel / keşif?
+│       → Profile: fast veya research
+│       → Agent tipi: explorer
+│       → Consensus: none
 │
-└── Read-only research?
-    → Paralel explore agent'ları (sorma)
+├── 3. BOYUT: Agent Tipi Seçimi
+│   ├── Sadece okuyacak → explorer
+│   ├── Kod yazacak → implementer (varsayılan)
+│   ├── İnceleme yapacak → reviewer
+│   └── Çıktıları birleştirecek → consolidator
+│
+└── 4. BOYUT: Memory
+    ├── Pre-task: memory_search(task_topic) → referans yükle
+    └── Post-task: memory_add() → pattern kaydet
 ```
 
-**Rule:** Sub-agent overhead > the work itself? Don't spawn. Ask the user.
+**Rules:**
+- Sub-agent overhead > the work itself? Don't spawn. Ask the user.
+- Kritik işlem + geri alınamaz → profile=critical (consensus zorunlu)
+- Araştırma → profile=research, explorer tipi
+- Pipeline → Ring topolojisi, checkpoint açık
+- Varsayılan: Star topoloji, implementer tipi, consensus kapalı
 
-#### Fork Decision: Parallel vs Sequential
+**Config reference:** Agent types, quotas, model, and concurrency are defined in
+`config.toml` (companion file). Profile seçimi: `profile=fast`, `profile=deep`,
+`profile=critical`, `profile=research`. See [Configuration](#configuration) section.
 
-After spawn gate confirms we need sub-agents, decide execution strategy:
+#### Fork Decision: Topology Selection
+
+After spawn gate confirms we need sub-agents, choose the execution topology.
+Topology defines HOW agents connect, share state, and pass results.
+
+### Topology Reference
+
+```
+Hierarchical          Mesh                  Ring                  Star
+─────────────────     ────────────────      ────────────────      ────────────────
+    Queen              A ←→ B ←→ C          A → B → C → D        A, B, C → Hub
+   /  |   \            ↑         ↓          ↓         ↑              ↓    ↓
+  W1  W2   W3          D ←────── E          D ←────── A           Hub→Result
+```
+
+| Topology | Bağımlılık | Ne Zaman | Örnek |
+|----------|-----------|----------|-------|
+| **Hierarchical** | Sıralı, bağımlı | Task'ların çıktısı bir sonrakini besler | Plan → Tasarım → Kod → Test → Deploy |
+| **Mesh** | Bağımsız, eşit | Modüller birbirinden bağımsız değişir | JS frontend + SQL migration + Doküman |
+| **Ring** | Pipeline | Çıktı bir sonraki adımın girdisi | Parse → Transform → Validate → Load |
+| **Star** | Merkezi hub | 1 orkestratör, N worker, sonuçları toplar | tools-bank ACP (Claude ↔ Goose worker) |
+
+### Selection Logic
 
 ```yaml
-if task has tightly-coupled files (e.g. HTML + JS must change together,
-   or two files share IDs/function names that must match):
-  strategy: sequential
-  reason: Tight coupling — parallel agents would need to agree on
-          shared identifiers, which adds overhead and risks mismatch.
-  execution: Main implements directly, sub-agents for isolated review.
+if task is research (read-only, no writes):
+  topology: star
+  agent_type: explorer
+  reason: Flat parallel research, main orchestrator collects results.
 
-elif task has independent files (e.g. separate modules, unrelated dirs):
-  strategy: parallel
-  reason: No shared state — agents work independently, results merge cleanly.
+elif task has tightly-coupled files (HTML+JS, shared IDs):
+  topology: hierarchical
+  profile: deep
+  reason: Tight coupling — sequential processing avoids mismatch.
+  execution: Main handles the coupled files, sub-agents for isolated parts.
 
-elif task is research (read-only, no writes):
-  strategy: parallel
-  reason: Read-only agents never conflict. Use explore type.
+elif task is a pipeline (output→input chain):
+  topology: ring
+  agent_type: implementer
+  reason: Each step produces input for the next.
+  checkpoint: true  # memory_add after each step for recoverability
+
+elif task has 3+ independent modules:
+  topology: mesh
+  agent_type: implementer (per module)
+  reason: No shared state — modules change independently.
+
+elif task is critical (bulk update, irreversible):
+  topology: hierarchical + consensus
+  profile: critical
+  reason: Requires review gate before execution.
+
+else:
+  topology: star
+  agent_type: implementer
+  reason: Default — main orchestrator, one or more workers.
 ```
 
-**Rule of thumb:** If changing file A would break file B without coordinated edits → sequential. If files can be edited independently → parallel.
+**Rule of thumb:** Choose based on data flow — if outputs chain together → Ring.
+If outputs merge → Star. If outputs are independent → Mesh.
+If outputs are sequential dependencies → Hierarchical.
 
 #### Research Mode (Flat, Parallel)
 
@@ -142,6 +238,9 @@ agent_open(name="researcher-B", type="explore",
 **Key:**
 - `type: "explore"` guarantees read-only
 - `fork_context: true` preserves cache
+- Agent type: `explorer` (read-only) by default for research
+- Profile override: add `profile=research` for higher concurrency limits
+- See [Agent Types](#agent-types) for available types
 - Prompts in **English**
 - Sub-agents return findings in **English**
 - I synthesize in my head, report to user in **user's language**
@@ -163,6 +262,9 @@ agent_open(name="researcher-B", type="explore",
 Sub-orch example:
   name: "auth-service"
   type: custom
+  agent_type: "implementer"    # or explorer / reviewer / consolidator
+  profile: "deep"              # optional, overrides defaults from config.toml
+  config_path: ".claude/skills/orchestrator-master/config.toml"  # loaded automatically
   allowed_tools: ["write_file", "edit_file", "read_file", "exec_shell"]
   prompt: (WORKER.md template filled for this territory)
   max_depth: 2
@@ -211,6 +313,49 @@ Me (1) + Direct agents (2) + Auth-team (5) + API-team (6) + UI-team (4) + Reserv
 4. Cross-check file boundaries: `git diff --stat` to verify territory compliance
 5. Run integration tests after all sub-orchs complete
 
+#### Consensus Mode (profile=critical)
+
+When `profile=critical` is active (consensus=majority), use 3-way review:
+
+```
+Critical Task
+     │
+     ├── Worker 1 (implementer) → produces output
+     ├── Worker 2 (implementer) → produces output
+     └── Worker 3 (implementer) → produces output
+     │
+     ├── Reviewer 1 (reviewer) → evaluates all 3
+     ├── Reviewer 2 (reviewer) → evaluates all 3
+     └── Reviewer 3 (reviewer) → evaluates all 3
+     │
+     └── Majority vote → select best result
+          (≥2/3 agreement required)
+```
+
+**Workflow:**
+1. Dispatch 3x `implementer` agents with the same task (parallel, Mesh topology)
+2. Wait for all 3 to complete
+3. Dispatch 3x `reviewer` agents — each reviews all 3 outputs
+4. Collect reviewer scores (1-10 scale) + rationale
+5. **Majority rule**: if ≥2/3 reviewers agree on one output, that wins
+6. **Weighted tiebreak**: if split, main orchestrator picks by:
+   - Best verification gate results
+   - Most conservative output (for destructive operations)
+   - Fastest execution time (for performance-sensitive tasks)
+7. Winner's output becomes the final result
+8. Losers' outputs are logged via `note` for audit trail
+
+**When to use:**
+- Bulk UPDATE/DELETE operations (no rollback)
+- Migration deployment to production
+- Any task where failure costs > 3× the agent cost
+- User explicitly says "bu kritik, dikkatli ol"
+
+**When NOT to use:**
+- Research/read-only tasks (waste of tokens)
+- Rapid prototyping (slows velocity)
+- Simple 1-file fixes (overkill)
+
 #### Sub-agent Output Unavailable Fallback
 
 If `agent_eval` returns empty/"not available" for a completed agent:
@@ -239,8 +384,148 @@ If `agent_eval` returns empty/"not available" for a completed agent:
 2. Score < 8: identify gaps, dispatch fixes, re-evaluate
 3. Score ≥ 8: finalize
 
-4. **Memory**: `mcp_tools--bank_memory_add` (if available) or `note` for key decisions
+4. **Memory — post-task save**:
+   - **Başarılı** task → `memory_add(category="code_change", priority="medium")`:
+     - Ne yapıldı, hangi dosyalar değişti, hangi RPC/kural kullanıldı
+     - Etiketler: dosya adları, migration no, hata kodları
+   - **Başarısız** task → `note` ile hata kaydı:
+     - Ne denendi, nerede takıldı, alternatif ne olabilir
+   - **Yeni kural keşfi** → `memory_add(category="critical_rules", priority="high")`:
+     - "X asla Y yapılmaz" tipi domain kuralı
+   - **Yeni RPC/view** → `memory_add(category="rpc_reference", priority="high")`:
+     - RPC adı, parametreleri, hangi migration'da eklendi
 5. **Git**: `git add` + `git commit` + `git push`
+
+---
+
+## Configuration
+
+The skill reads parameters from `config.toml` (companion file). This separates
+runtime settings from workflow instructions.
+
+### Defaults
+
+| Param | Default | Açıklama |
+|-------|---------|----------|
+| `max_concurrent_agents` | 10 | Max concurrent sub-agents |
+| `reserve_slots` | 2 | Emergency slots |
+| `default_model` | `deepseek-v4-flash` | Model for sub-agents |
+| `fork_context` | true | Prefix-cache sharing |
+| `max_depth` | 3 | Max recursion depth |
+| `default_agent_type` | `implementer` | Default agent type |
+| `consensus` | `none` | Consensus mode |
+| `failure_budget` | 3 | Max retries |
+
+### Profiles
+
+```yaml
+fast:     max_depth=1, concurrency=4  — lightweight, single depth
+deep:     max_depth=3, concurrency=10 — full recursive mode
+critical: max_depth=2, concurrency=6, consensus=majority — max quality
+research: max_depth=0, concurrency=8, default_agent_type=explorer — read-only
+```
+
+Override at spawn: `agent_open(..., profile="research")`
+
+### Per-Type Tool Restrictions
+
+Tool access per agent type:
+
+| Type | Allowed Tools | Can Spawn? |
+|------|--------------|------------|
+| `explorer` | read_file, list_dir, grep_files, file_search, fetch_url, web_search | No |
+| `implementer` | read/write/edit, exec_shell, agent_open/eval/close | Yes |
+| `reviewer` | read_file, review, exec_shell | No |
+| `consolidator` | read, write_file, edit_file, handle_read | No |
+
+---
+
+## Agent Types
+
+4 specialized agent types, selected at spawn time:
+
+| Type | Role | When to Use |
+|------|------|-------------|
+| `explorer` | **Keşif** — read-only araştırma | Web araştırması, kod okuma, doküman analizi. Asla yazma yapmaz. |
+| `implementer` | **Uygulama** — kod yazma, test | Feature implementasyonu, hata düzeltme, refactor. Varsayılan tip. |
+| `reviewer` | **İnceleme** — kod review, hata bulma | Sub-agent output'larını kontrol, kod kalitesi denetimi. |
+| `consolidator` | **Birleştirme** — çıktıları sentezleme | Çoklu sub-agent çıktısını birleştirme, rapor yazma. |
+
+**Seçim kuralı:**
+- Read-only task → `explorer` (en hızlı, en güvenli)
+- Write task → `implementer` (full tool set)
+- Quality gate → `reviewer` (consensus için)
+- Merge task → `consolidator` (sentez için)
+
+**Agent type overrides in config.toml:**
+Each type has its own `[agent_types.<type>]` section defining allowed tools,
+max_depth, and spawn capability. Override per-session via `profile=` parameter.
+
+---
+
+## Hooks
+
+Lifecycle hooks fire at key points during task execution. All hooks are
+**optional** — they implement behavior (log, notify, learn, escalate) without
+blocking the main execution.
+
+| Hook | When | Purpose |
+|------|------|---------|
+| `pre-dispatch` | Before sub-agent is opened | Validate inputs, check quota, load context from `memory_search` |
+| `post-task` | After sub-agent completes successfully | Save pattern to `memory_add`, update checklist, log success |
+| `on-failure` | When sub-agent fails (budget exhausted) | Escalate to parent, `note` the error, suggest alternative |
+
+Hooks are configured in `config.toml` under `[hooks]`. Default: all enabled.
+
+### Hook Implementation Templates
+
+#### pre-dispatch
+```yaml
+when: before agent_open(name="X")
+do:
+  1. memory_search(query=task_topic, limit=3)
+     → if result: add to agent prompt as "Geçmiş pattern'ler"
+     → if empty: proceed fresh
+  2. quota_check: available_slots > 0?
+     → if no: queue task, notify user "Kota doldu, beklemeye alındı"
+     → if yes: proceed
+  3. profile_load: load config.toml[profile=current]
+     → override agent params
+```
+
+#### post-task
+```yaml
+when: after agent_eval(name="X") → status=completed
+do:
+  1. if success:
+     memory_add(content="Başarılı: [task summary]", 
+                category="code_change", 
+                priority="medium",
+                tags="[dosya_adi],[migration_no]")
+     checklist_update(id=X, status=completed)
+  2. if new domain rule discovered:
+     memory_add(content="Kural: [rule description]",
+                category="critical_rules",
+                priority="high")
+```
+
+#### on-failure
+```yaml
+when: agent retry budget exhausted
+do:
+  1. note("HATA: [task] — [error description]")
+  2. memory_add(content="Başarısız: [task] — [error]",
+                category="general",
+                priority="low",
+                tags="hata,cozulmedi")
+  3. suggest_alternative:
+     - Retry with different agent_type (explorer → implementer)
+     - Retry with profile=critical (consensus)
+     - Report to user: "X başarısız oldu, alternatif önerim: Y"
+  4. absorb_territory: parent takes over if sub-orch failed
+```
+
+Hooks are optional. Enable/disable in `config.toml` under `[hooks]`.
 
 ---
 
@@ -298,9 +583,13 @@ If `agent_eval` returns empty/"not available" for a completed agent:
 
 See companion file `WORKER.md` in this directory. It provides a standardized prompt template for sub-agents, with:
 - Territory declaration
+- Agent type selection (explorer / implementer / reviewer / consolidator)
 - Failure budget (max retries before reporting to parent)
 - Output file requirement (results written to file for persistence)
 - Sub-agent spawning rules (leaf agents CANNOT spawn)
+
+**Agent type** determines available tools and spawn capability for the worker.
+See [Agent Types](#agent-types) section for details.
 
 Load it with `load_skill("orchestrator-master")` or inline the template when spawning agents.
 

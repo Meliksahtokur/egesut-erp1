@@ -1,0 +1,88 @@
+# Orchestrator-Master Configuration
+# 
+# This file controls default parameters for the orchestrator-master skill.
+# Profiles allow quick switching between different operation modes.
+# 
+# Usage: load_skill("orchestrator-master") loads this config automatically.
+# Override at runtime by passing profile=<name> in the agent_open prompt.
+
+[defaults]
+# Maximum concurrent sub-agents (system-level cap is 20)
+max_concurrent_agents = 10
+
+# Slots reserved for emergency/priority work
+reserve_slots = 2
+
+# Default model for sub-agents
+default_model = "deepseek-v4-flash"
+
+# Enable prefix-cache sharing across sub-agents
+fork_context = true
+
+# Maximum recursion depth (0=leaf, 1=spawn leaves, 2=spawn sub-orchs, 3=spawn sub-sub-orchs)
+max_depth = 3
+
+# Default agent type for sub-agents (see SKILL.md Agent Types section)
+default_agent_type = "implementer"
+
+# Consensus mode: "none" | "majority" | "reviewer"
+consensus = "none"
+
+# Maximum retry attempts per sub-agent before reporting failure
+failure_budget = 3
+
+[profiles]
+
+[profiles.fast]
+# Lightweight mode — single depth, limited concurrency
+max_depth = 1
+max_concurrent_agents = 4
+reserve_slots = 1
+
+[profiles.deep]
+# Full recursive mode — sub-orchs with multi-level decomposition
+max_depth = 3
+max_concurrent_agents = 10
+reserve_slots = 2
+consensus = "none"
+
+[profiles.critical]
+# Maximum quality — triple review, Byzantine consensus
+max_depth = 2
+max_concurrent_agents = 6
+reserve_slots = 3
+consensus = "majority"
+failure_budget = 5
+
+[profiles.research]
+# Read-only exploration — flat, parallel, no recursion
+max_depth = 0
+max_concurrent_agents = 8
+default_agent_type = "explorer"
+fork_context = true
+consensus = "none"
+
+# Hook settings — enable/disable lifecycle hooks
+[hooks]
+enabled = true
+pre_dispatch = true
+post_task = true
+on_failure = true
+
+# Agent type defaults (per-type overrides)
+[agent_types.explorer]
+allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "fetch_url", "web_search"]
+max_depth = 0
+can_spawn = false
+
+[agent_types.implementer]
+allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "write_file", "edit_file", "apply_patch", "exec_shell", "agent_open", "agent_eval", "agent_close"]
+can_spawn = true
+
+[agent_types.reviewer]
+allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "review", "exec_shell"]
+can_spawn = false
+
+[agent_types.consolidator]
+allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "write_file", "edit_file", "handle_read"]
+can_spawn = false
