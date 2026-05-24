@@ -292,6 +292,32 @@ Me (1) + Direct agents (2) + Auth-team (5) + API-team (6) + UI-team (4) + Reserv
 - If territory collision on write → parent renegotiates boundaries.
 - **Frontend HTML+JS tight coupling**: when HTML and JS must change together, the main orchestrator or a single agent handles both to avoid ID/class mismatch.
 
+**Commit Lock (Parallel Write Koruma):**
+
+Paralel Mesh topolojisinde birden çok agent aynı anda `git commit` yapabilir.
+Bu race condition'lara ve merge conflict'lerine yol açar. Commit Lock bunu engeller.
+
+```
+Mesh:
+  Agent A (JS) ──→ commit(lock)
+  Agent B (SQL) ──→ commit(lock)   ← aynı anda sadece 1 commit
+  Agent C (Docs) ──→ commit(wait)  ← sıradaki lock'u bekler
+```
+
+**Kilit işleyişi:**
+1. Her yazma agent'ı commit öncesi lock alır: `agent_aquire_commit_lock(session_id)`
+2. Lock varsa (423): 3 saniye bekle, tekrar dene (max 5)
+3. Lock alındı: `git add` + `git commit` + `git push`
+4. Lock bırak: `agent_release_commit_lock(session_id)`
+5. Sonraki agent lock'u alıp commit yapar
+
+**Kurallar:**
+- Her agent commit öncesi lock almak ZORUNDADIR
+- Lock timeout: 30 saniye (max bekleme)
+- Lock sahibi crash olursa 60 saniye sonra otomatik release
+- Aynı anda sadece 1 commit (sequentialized)
+- lock alınamazsa agent retry eder, commit'siz rapor döner
+
 **Agent model:**
 - Default model is **deepseek-v4-flash**. Always.
 - Never switch to pro without user explicitly requesting it.
@@ -356,6 +382,39 @@ Critical Task
 - Rapid prototyping (slows velocity)
 - Simple 1-file fixes (overkill)
 
+#### Checkpoint Pattern (Ring Topology)
+
+Ring topolojisinde her adım bir sonrakinin girdisini üretir. Adımlardan
+biri başarısız olursa tüm zincir bozulur. Checkpoint'ler zinciri kurtarılabilir
+kılar.
+
+```
+Pipeline (Ring):
+  Step A → [CHECKPOINT] → Step B → [CHECKPOINT] → Step C → [CHECKPOINT]
+     │                        │                        │
+     └── memory_add(A)        └── memory_add(B)        └── memory_add(C)
+         + checklist_mid         + checklist_mid           + finalize
+```
+
+**Ne zaman kullanılır:**
+- 5+ adımlı pipeline'lar (ETL, migration, veri dönüşümü)
+- Her adımı ≥30 saniye olan uzun işlemler
+- Adımlar arasında dış sisteme bağımlılık olan işler (Supabase RPC, GitHub API)
+
+**Checkpoint işleyişi:**
+1. Her başarılı adım sonrası `memory_add` ile ara durumu kaydet:
+   - Adım çıktısı (dosya adı, hash, satır sayısı)
+   - Sonraki adımın girdi olarak ne kullanacağı
+   - Şu ana kadar tamamlanan adımların listesi
+2. `checklist_update` ile ilerlemeyi işaretle
+3. Bir adım başarısız olursa:
+   - Son checkpoint'i `memory_search` ile bul
+   - Hangi adımda kaldığını tespit et
+   - Başarısız adımı tekrar dene (farklı agent_type veya profile ile)
+   - Checkpoint'ten devam et, başa dönme
+
+**Checkpoint yapılandırması:** `config.toml` altında `[checkpoint]` bölümü.
+
 #### Sub-agent Output Unavailable Fallback
 
 If `agent_eval` returns empty/"not available" for a completed agent:
@@ -415,6 +474,12 @@ runtime settings from workflow instructions.
 | `default_agent_type` | `implementer` | Default agent type |
 | `consensus` | `none` | Consensus mode |
 | `failure_budget` | 3 | Max retries |
+| `checkpoint.enabled` | true | Ring topology checkpoint |
+| `checkpoint.interval` | 3 | Checkpoint every N steps |
+| `checkpoint.recovery` | true | Auto-recover on failure |
+| `workers.audit.interval` | 5 | Audit every N tasks |
+| `workers.consolidate.interval` | 10 | Consolidate every N tasks |
+| `workers.learn.interval` | 20 | Learn every N tasks |
 
 ### Profiles
 
@@ -526,6 +591,68 @@ do:
 ```
 
 Hooks are optional. Enable/disable in `config.toml` under `[hooks]`.
+
+---
+
+## Background Workers
+
+Background workers are long-running periodic tasks that operate alongside
+the main orchestration. They don't block the main workflow — they fire
+at configured intervals.
+
+### Worker Types
+
+| Worker | Frequency | Purpose |
+|--------|-----------|---------|
+| `audit` | Her 5. task'ta bir | Kod kalitesi kontrolü, hata taraması |
+| `consolidate` | Her 10. task'ta bir | `memory_add` ile pattern'leri birleştir, eski notları temizle |
+| `learn` | Her 20. task'ta bir | Başarılı pattern'leri analiz et, sık kullanılan akışları `note` |
+
+### Worker Lifecycle
+
+```
+Ana akış                       Background
+─────────                      ──────────
+Task 1 ──┐
+         ├── task_complete →   Worker: audit()
+         │                     → checklist consistency check
+Task 2 ──┤                     → error pattern scan
+         ├── task_complete
+Task 3 ──┤
+...       │
+Task 5 ──┤
+         ├── task_complete →   Worker: consolidate()
+         │                     → memory_add geçmiş pattern'leri
+Task 6 ──┤                     → remove stale checkpoint'ler
+...       │
+Task 10 ─┤
+         ├── task_complete →   Worker: learn()
+                              → analyze success patterns
+                              → note("sık kullanılan akış: ...")
+```
+
+### Config (config.toml)
+
+```toml
+[workers]
+enabled = true
+
+[workers.audit]
+enabled = true
+interval = 5     # her 5 task'ta bir
+
+[workers.consolidate]
+enabled = true
+interval = 10    # her 10 task'ta bir
+
+[workers.learn]
+enabled = true
+interval = 20    # her 20 task'ta bir
+```
+
+Her worker, ana orchestrator tarafından `post-task` hook'u içinden
+tetiklenir. Worker'ın kendisi bir sub-agent değildir — ana orchestrator
+kendi context'inde worker fonksiyonlarını çalıştırır.
 
 ---
 

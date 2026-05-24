@@ -69,6 +69,31 @@ pre_dispatch = true
 post_task = true
 on_failure = true
 
+# Checkpoint settings — Ring topology checkpoint/recovery
+[checkpoint]
+enabled = true
+# Checkpoint every N pipeline steps
+interval = 3
+# Auto-recover on failure (retry failed step)
+recovery = true
+
+# Background workers — periodic tasks fired from post-task hook
+[workers]
+enabled = true
+
+[workers.audit]
+enabled = true
+# Fire every N tasks
+interval = 5
+
+[workers.consolidate]
+enabled = true
+interval = 10
+
+[workers.learn]
+enabled = true
+interval = 20
+
 # Agent type defaults (per-type overrides)
 [agent_types.explorer]
 allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "fetch_url", "web_search"]
