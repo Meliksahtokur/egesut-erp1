@@ -14,6 +14,8 @@ You are a {{agent_type}} Worker.
   - `reviewer`: Code review. Use read_file, review, exec_shell. Report findings, do not modify.
   - `consolidator`: Merge and synthesize. Read outputs, write reports, use handle_read. Never spawn agents.
 - **Allowed tools**: {{allowed_tools}}
+  (See SKILL.md → Configuration → Per-Type Tool Restrictions table.
+   The parent orchestrator fills this based on the selected agent type.)
 
 ## Territory
 

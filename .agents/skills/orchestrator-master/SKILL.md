@@ -41,7 +41,7 @@ elif both:
 |---|-------|-----------|
 | **S** | **Scout** | Read workspace, instructions, create plan. |
 | **A** | **Ask** | If ambiguous, ask the user. Wait. |
-| **F** | **Fork** | Dispatch sub-agents (research = parallel explores; hierarchical = sub-orchestrators with quotas). **Parallel vs Sequential** decision: tightly-coupled files (HTML+JS) → sequential; independent files → parallel. |
+| **F** | **Fork** | Dispatch sub-agents (research = parallel explores; hierarchical = sub-orchestrators with quotas). **Topology selection** decides execution pattern: Hierarchical / Mesh / Ring / Star. |
 | **E** | **Evaluate** | Collect results, cross-check, merge. Sub-agent output unavailable → manual verify. |
 | **R** | **Review & Refine** | Self-score 1-10. < 8 → iterate. ≥ 8 → commit. |
 
@@ -164,7 +164,7 @@ Before dispatching, assess scope with the full decision framework:
 After spawn gate confirms we need sub-agents, choose the execution topology.
 Topology defines HOW agents connect, share state, and pass results.
 
-### Topology Reference
+##### Topology Reference
 
 ```
 Hierarchical          Mesh                  Ring                  Star
@@ -181,7 +181,7 @@ Hierarchical          Mesh                  Ring                  Star
 | **Ring** | Pipeline | Çıktı bir sonraki adımın girdisi | Parse → Transform → Validate → Load |
 | **Star** | Merkezi hub | 1 orkestratör, N worker, sonuçları toplar | tools-bank ACP (Claude ↔ Goose worker) |
 
-### Selection Logic
+##### Selection Logic
 
 ```yaml
 if task is research (read-only, no writes):
@@ -305,7 +305,7 @@ Mesh:
 ```
 
 **Kilit işleyişi:**
-1. Her yazma agent'ı commit öncesi lock alır: `agent_aquire_commit_lock(session_id)`
+1. Her yazma agent'ı commit öncesi lock alır: `agent_acquire_commit_lock(session_id)`
 2. Lock varsa (423): 3 saniye bekle, tekrar dene (max 5)
 3. Lock alındı: `git add` + `git commit` + `git push`
 4. Lock bırak: `agent_release_commit_lock(session_id)`
@@ -616,19 +616,21 @@ Ana akış                       Background
 Task 1 ──┐
          ├── task_complete →   Worker: audit()
          │                     → checklist consistency check
-Task 2 ──┤                     → error pattern scan
+         │                     → error pattern scan
+Task 2 ──┤
          ├── task_complete
 Task 3 ──┤
 ...       │
-Task 5 ──┤
+Task 5 ──┐
          ├── task_complete →   Worker: consolidate()
          │                     → memory_add geçmiş pattern'leri
-Task 6 ──┤                     → remove stale checkpoint'ler
+         │                     → remove stale checkpoint'ler
+Task 6 ──┤
 ...       │
-Task 10 ─┤
+Task 10 ─┐
          ├── task_complete →   Worker: learn()
-                              → analyze success patterns
-                              → note("sık kullanılan akış: ...")
+         │                     → analyze success patterns
+         │                     → note("sık kullanılan akış: ...")
 ```
 
 ### Config (config.toml)
@@ -734,6 +736,9 @@ Load it with `load_skill("orchestrator-master")` or inline the template when spa
 | `exec_shell` timeout (>120s) | Use `task_shell_start` + `task_shell_wait` for long tasks |
 | Quota exceeded | Sub-orch must reject new work and report back to parent |
 | Interface mismatch | Update INTERFACES.md (written by main, read by all) |
+| Commit Lock failure | Retry with exponential backoff (3s → 6s → 12s). If still locked after 5 retries, skip commit and report. |
+| Checkpoint recovery fails | Fall back to previous checkpoint. Manual review required before retry. |
+| Background worker error | Log via `note`, disable that worker, continue main workflow. Report to user at next interaction. |
 
 ---
 
