@@ -98,18 +98,93 @@ interval = 20
 
 # Agent type defaults (per-type overrides)
 [agent_types.explorer]
-allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "fetch_url", "web_search"]
+allowed_tools = [
+  # Core read tools
+  "read_file", "list_dir", "grep_files", "file_search",
+  # Web/API
+  "fetch_url", "web_search",
+  # Code intelligence
+  "gitnexus_query", "gitnexus_context", "gitnexus_impact", "gitnexus_detect_changes",
+  # Semantic search
+  "semantic_search",
+  # Memory
+  "memory_search", "note",
+  # Supabase (read-only)
+  "supabase_query", "supabase_rpc",
+  # Graph analysis
+  "graphify",
+]
 max_depth = 0
 can_spawn = false
 
 [agent_types.implementer]
-allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "write_file", "edit_file", "apply_patch", "exec_shell", "agent_open", "agent_eval", "agent_close"]
+allowed_tools = [
+  # Core read + write
+  "read_file", "list_dir", "grep_files", "file_search",
+  "write_file", "edit_file", "apply_patch",
+  # Shell
+  "exec_shell",
+  # Agent management
+  "agent_open", "agent_eval", "agent_close",
+  # Code intelligence
+  "gitnexus_query", "gitnexus_context", "gitnexus_impact",
+  "gitnexus_detect_changes", "gitnexus_cypher",
+  # Semantic search
+  "semantic_search",
+  # Memory
+  "memory_search", "memory_add", "note",
+  # Supabase (full access)
+  "supabase_query", "supabase_rpc",
+  "supabase_insert", "supabase_delete",
+  # Graph analysis
+  "graphify",
+  # Validation
+  "validate_data",
+  # Git
+  "git_status", "git_diff", "git_log", "git_blame",
+]
 can_spawn = true
 
 [agent_types.reviewer]
-allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "review", "exec_shell"]
+allowed_tools = [
+  # Core read
+  "read_file", "list_dir", "grep_files", "file_search",
+  # Review
+  "review", "exec_shell",
+  # Code intelligence
+  "gitnexus_query", "gitnexus_context", "gitnexus_impact",
+  "gitnexus_detect_changes",
+  # Semantic search
+  "semantic_search",
+  # Memory
+  "memory_search", "memory_add", "note",
+  # Supabase (read-only)
+  "supabase_query", "supabase_rpc",
+  # Graph analysis
+  "graphify",
+  # Git
+  "git_diff", "git_log", "git_blame",
+  # Validation
+  "validate_data",
+]
 can_spawn = false
 
 [agent_types.consolidator]
-allowed_tools = ["read_file", "list_dir", "grep_files", "file_search", "write_file", "edit_file", "handle_read"]
+allowed_tools = [
+  # Core read + limited write
+  "read_file", "list_dir", "grep_files", "file_search",
+  "write_file", "edit_file",
+  # Handle large outputs
+  "handle_read",
+  # Code intelligence
+  "gitnexus_query", "gitnexus_context",
+  # Semantic search
+  "semantic_search",
+  # Memory
+  "memory_search", "memory_add", "note",
+  # Supabase (read-only)
+  "supabase_query", "supabase_rpc",
+  # Graph analysis
+  "graphify",
+]
 can_spawn = false

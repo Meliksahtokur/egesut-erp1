@@ -74,6 +74,46 @@ Always:
 3. If matches found → add to context as reference (max 3 most relevant)
 4. If no matches → proceed fresh; `note` the new task type for future
 
+**Domain context injection** (BEFORE any code-writing agent is spawned):
+
+Kod yazan her sub-agent, projenin domain kurallarını, mimarisini ve RPC
+yapısını BİLMELİDİR. Aksi halde rastgele fonksiyon kullanımı kodu kırabilir,
+mimariyi bozabilir. Orkestratör aşağıdaki adımları uygular:
+
+```
+1. memory_search(category="critical_rules", query="<domain>")
+   → Projenin kritik kurallarını yükle (ör: "raw SQL yasak", "sadece RPC ile yaz")
+2. memory_search(category="rpc_reference", query="<task>")
+   → İlgili RPC'lerin imzalarını ve parametrelerini yükle
+3. memory_search(category="domain_rules", query="<task>")
+   → Domain-spesifik kuralları yükle (ör: "stok hareketleri immutable")
+4. semantic_search(query="<task_description>")
+   → Benzer kod pattern'lerini bul
+5. gitnexus_context(symbol="<hedef_fonksiyon>")
+   → Değiştirilecek fonksiyonun 360° görünümü (callers/callees)
+6. gitnexus_impact(target="<hedef_fonksiyon>")
+   → Blast radius — değişiklik neleri kırar?
+```
+
+Bu bilgileri birleştirip sub-agent'ın prompt'una **domain context** olarak ekle.
+Örnek prompt içeriği:
+
+```
+## Domain Context (Orkestratör Tarafından Sağlanır)
+
+### Kritik Kurallar
+- Tüm yazma işlemleri RPC üzerinden yapılır. Direkt INSERT/UPDATE/DELETE YASAK.
+- Stok hareketleri immutable'dır. Asla silinmez. Düzeltme yeni kayıt olarak girilir.
+- Her migration idempotent olmalıdır (DROP IF EXISTS + CREATE OR REPLACE).
+
+### İlgili RPC'ler
+- hayvan_ekle(params) → yeni hayvan kaydı oluşturur
+- hayvan_guncelle(hayvan_id, params) → hayvan bilgilerini günceller
+
+### Blast Radius
+- Bu fonksiyonu değiştirirsen şu 3 fonksiyon etkilenir: [...]
+```
+
 **Hierarchical mode** also:
 - `gitnexus_detect_changes()` to understand live state
 - Define **territories** (each sub-orch owns a file/directory scope)
@@ -362,6 +402,14 @@ Critical Task
 1. Dispatch 3x `implementer` agents with the same task (parallel, Mesh topology)
 2. Wait for all 3 to complete
 3. Dispatch 3x `reviewer` agents — each reviews all 3 outputs
+   
+   **Reviewer her 3 çıktıyı şunlarla birlikte alır:**
+   - **Task context**: "Bu SQL migration'ının amacı X tablosuna Y kolonunu eklemekti"
+   - **Domain rules**: "Migration'lar idempotent olmalı, DROP IF EXISTS kullan"
+   - **Acceptance criteria**: "Migration sonrası Z sorgusu çalışmalı"
+   
+   Reviewer sadece koda bakmaz — **kodun amaca uygunluğunu** değerlendirir.
+   
 4. Collect reviewer scores (1-10 scale) + rationale
 5. **Majority rule**: if ≥2/3 reviewers agree on one output, that wins
 6. **Weighted tiebreak**: if split, main orchestrator picks by:
@@ -496,12 +544,14 @@ Override at spawn: `agent_open(..., profile="research")`
 
 Tool access per agent type:
 
-| Type | Allowed Tools | Can Spawn? |
-|------|--------------|------------|
-| `explorer` | read_file, list_dir, grep_files, file_search, fetch_url, web_search | No |
-| `implementer` | read/write/edit, exec_shell, agent_open/eval/close | Yes |
-| `reviewer` | read_file, review, exec_shell | No |
-| `consolidator` | read, write_file, edit_file, handle_read | No |
+| Type | Allowed Tools (categories) | Can Spawn? |
+|------|---------------------------|------------|
+| `explorer` | read, search, web, gitnexus(read), semantic_search, supabase(read), graphify | No |
+| `implementer` | read/write/edit, exec_shell, agent_open/eval/close, gitnexus(full), semantic_search, memory, supabase(full), graphify, validate, git | Yes |
+| `reviewer` | read, review, exec_shell, gitnexus(read), semantic_search, memory, supabase(read), graphify, git(diff/log) | No |
+| `consolidator` | read, write_file, edit_file, handle_read, gitnexus(read), semantic_search, memory, supabase(read), graphify | No |
+
+Full tool lists per type in `config.toml` → `[agent_types.<type>]`.
 
 ---
 
@@ -687,6 +737,7 @@ kendi context'inde worker fonksiyonlarını çalıştırır.
 | `mcp_tools--bank_supabase_rpc(function)` | Live RPC call | Reading RPC definition + guessing params |
 | `mcp_tools--bank_knowledge_graph_query(entity)` | Entity relationship lookup | Reading architecture docs |
 | `mcp_tools--bank_memory_add(content)` | Persist decision to memory | Losing context in next session |
+| `graphify` | Codebase graph analysis — dependencies, call graphs | Manual trace through code |
 | `request_user_input` | Ask user 1-3 questions when ambiguous | Guessing user intent |
 
 ---
