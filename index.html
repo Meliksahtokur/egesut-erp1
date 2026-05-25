@@ -251,6 +251,24 @@ button,input,select,textarea{font-family:inherit}
 .modal-hdr span{font-size:1rem;font-weight:800;color:var(--ink)}
 .mcls{background:none;border:none;font-size:1.4rem;color:var(--ink3);cursor:pointer;padding:2px 6px;line-height:1;border-radius:6px}
 
+/* TREATMENT TIMELINE */
+.cd-progress{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.cd-progress-lbl{font-size:.72rem;font-weight:700;color:var(--ink3);white-space:nowrap}
+.cd-progress-track{flex:1;height:3px;background:var(--card2);border-radius:2px;overflow:hidden}
+.cd-progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .5s ease}
+.cd-tl-wrap{position:relative}
+.cd-tl-item{display:flex;gap:12px;position:relative;padding-bottom:12px}
+.cd-tl-item:not(:last-child)::before{content:'';position:absolute;left:9px;top:22px;width:2px;height:calc(100% - 10px);background:var(--card3)}
+.cd-tl-item.tl-done::before{background:rgba(78,154,42,.3)}
+.cd-tl-node{width:20px;height:20px;border-radius:50%;border:2px solid var(--card3);flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;background:var(--card);transition:all .2s;font-size:.65rem}
+.cd-tl-item.tl-done .cd-tl-node{background:var(--green);border-color:var(--green);color:#fff}
+.cd-tl-item.tl-locked{opacity:.5}
+.cd-tl-content{flex:1;min-width:0;background:var(--card);border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:0}
+.cd-tl-item.tl-done .cd-tl-content{border-color:rgba(78,154,42,.3);background:rgba(78,154,42,.04)}
+.cd-day-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.cd-day-title{font-weight:700;font-size:.8rem;color:var(--ink)}
+.cd-day-not{margin-top:6px;font-size:.72rem;color:var(--ink3);font-style:italic;line-height:1.4}
+
 /* MISC */
 .sh{display:flex;align-items:center;justify-content:space-between;margin:14px 0 7px}
 .sh-title{font-size:.68rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em}
@@ -1472,17 +1490,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1779710415"></script>
-    <script src="js/utils/modal.js?v=1779710415"></script>
-    <script src="js/utils/errorHandler.js?v=1779710415"></script>
-    <script src="js/utils/events.js?v=1779710415"></script>
-    <script src="js/config.js?v=1779710415"></script>
-    <script src="js/state.js?v=1779710415"></script>
-    <script src="js/api.js?v=1779710415"></script>
-    <script src="js/ui.js?v=1779710415"></script>
-    <script src="js/forms.js?v=1779710415"></script>
-    <script src="js/app.js?v=1779710415"></script>
-    <script src="js/utils/handlers.js?v=1779710415"></script>
+    <script src="js/utils/helpers.js?v=1779712724"></script>
+    <script src="js/utils/modal.js?v=1779712724"></script>
+    <script src="js/utils/errorHandler.js?v=1779712724"></script>
+    <script src="js/utils/events.js?v=1779712724"></script>
+    <script src="js/config.js?v=1779712724"></script>
+    <script src="js/state.js?v=1779712724"></script>
+    <script src="js/api.js?v=1779712724"></script>
+    <script src="js/ui.js?v=1779712724"></script>
+    <script src="js/forms.js?v=1779712724"></script>
+    <script src="js/app.js?v=1779712724"></script>
+    <script src="js/utils/handlers.js?v=1779712724"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

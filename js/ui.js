@@ -2649,7 +2649,7 @@ async function renderCaseTimeline(caseId) {
     const data = [];
     days.forEach(td => {
       const dayAdmins = allAdmins.filter(da => da.treatment_day_id === td.id);
-      const doneFields = { tamamlandi: td.tamamlandi, tamamlanma_tarihi: td.tamamlanma_tarihi, tamamlanma_notu: td.tamamlanma_notu };
+      const doneFields = { tamamlandi: td.tamamlandi, tamamlanma_tarihi: td.tamamlanma_tarihi, tamamlanma_notu: td.tamamlanma_notu, notes: td.notes };
       if (!dayAdmins.length) {
         data.push({ day_id: td.id, day_no: td.day_no, treatment_date: td.treatment_date, treatment_time: td.treatment_time || '', case_id: caseId, ...doneFields });
       } else {
@@ -2666,7 +2666,7 @@ async function renderCaseTimeline(caseId) {
     }
     const byDay = {};
     data.forEach(r => {
-      if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, time: r.treatment_time || '', drugs: [], tamamlandi: r.tamamlandi, tamamlanma_tarihi: r.tamamlanma_tarihi, tamamlanma_notu: r.tamamlanma_notu };
+      if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, time: r.treatment_time || '', drugs: [], tamamlandi: r.tamamlandi, tamamlanma_tarihi: r.tamamlanma_tarihi, tamamlanma_notu: r.tamamlanma_notu, notes: r.notes };
       if (r.administration_id) byDay[r.day_id].drugs.push(r);
     });
   // Tarih gruplama: benzersiz tarihler sıralı grup numarası alır, aynı tarihtekiler A/B/C
@@ -2694,45 +2694,74 @@ async function renderCaseTimeline(caseId) {
   const sortedDays = Object.values(byDay).sort((a,b) => a.day_no - b.day_no);
   sortedDays.forEach((day, idx) => {
     day._locked = idx > 0 && !sortedDays[idx-1].tamamlandi;
+    day.notB64 = day.notes ? btoa(unescape(encodeURIComponent(day.notes))) : '';
   });
-    el.innerHTML = Object.values(byDay).map(day => {
-      const saatStr = day.time ? ` <span style="font-size:.72rem;color:var(--ink3);font-weight:400">${day.time.slice(0,5)}</span>` : '';
-      const isDone   = day.tamamlandi;
-      const isLocked = !isDone && day._locked;
-      const canDone  = !isDone && !isLocked && _curCase?.status === 'active';
-      const cardStyle = isDone
-        ? 'border:1px solid rgba(78,154,42,.35);background:rgba(78,154,42,.05)'
-        : isLocked
-          ? 'border:1px solid var(--card2);opacity:.65'
-          : 'border:1px solid var(--card2)';
+  // Progress hesapla
+  const totalDays = sortedDays.length;
+  const doneDays  = sortedDays.filter(d => d.tamamlandi).length;
+  const pct       = totalDays ? Math.round(doneDays / totalDays * 100) : 0;
+
+  const progressHtml = totalDays > 0 ? `
+    <div class="cd-progress">
+      <span class="cd-progress-lbl">${doneDays}/${totalDays} Tamamlandı</span>
+      <div class="cd-progress-track"><div class="cd-progress-fill" style="width:${pct}%"></div></div>
+    </div>` : '';
+
+  const aktif = _curCase?.status === 'active';
+
+  el.innerHTML = progressHtml + '<div class="cd-tl-wrap">' +
+    sortedDays.map(day => {
+      const saatStr   = day.time ? ` <span style="font-size:.7rem;color:var(--ink3);font-weight:400">${day.time.slice(0,5)}</span>` : '';
+      const isDone    = day.tamamlandi;
+      const isLocked  = !isDone && day._locked;
+      const tlCls     = isDone ? 'tl-done' : isLocked ? 'tl-locked' : 'tl-active';
+      const nodeIcon  = isDone ? '✓' : '';
+
+      // Sağ taraf: done badge / locked / aksiyon butonları
       const rightSide = isDone
-        ? `<span style="background:rgba(78,154,42,.12);color:var(--green);padding:3px 9px;border-radius:8px;font-size:.7rem;font-weight:700">✅ ${fmtGunSaat(day.tamamlanma_tarihi)}</span>`
+        ? `<span style="background:rgba(78,154,42,.12);color:var(--green);padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700">✅ ${fmtGunSaat(day.tamamlanma_tarihi)}</span>`
         : isLocked
-          ? `<span style="color:var(--ink3);font-size:.75rem">🔒 Önceki bekleniyor</span>`
-          : _curCase?.status==='active'
-            ? `<div style='display:flex;gap:4px'><button onclick="caseDayTamamlaAc('${day.day_id}')" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;font-weight:700;cursor:pointer">✅ Tamamla</button><button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 10px;font-size:.7rem;cursor:pointer">+ İlaç</button><button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.12);color:var(--red);border:1px solid rgba(192,50,26,.2);border-radius:7px;padding:3px 8px;font-size:.7rem;cursor:pointer">🗑</button></div>`
+          ? `<span style="color:var(--ink3);font-size:.72rem">🔒</span>`
+          : aktif
+            ? `<div style="display:flex;gap:4px;flex-shrink:0">
+                 <button onclick="caseDayTamamla('${day.day_id}')" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:.7rem;font-weight:700;cursor:pointer">✅</button>
+                 <button onclick="caseDayNotAc('${day.day_id}','${day.notB64 ? decodeURIComponent(escape(atob(day.notB64))) : ''}')" style="background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:7px;padding:3px 8px;font-size:.7rem;cursor:pointer">📝</button>
+                 <button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 8px;font-size:.7rem;cursor:pointer">+</button>
+                 <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:3px 6px;font-size:.7rem;color:var(--ink3);cursor:pointer">🕐</button>
+                 <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2);border-radius:7px;padding:3px 6px;font-size:.7rem;cursor:pointer">🗑</button>
+               </div>`
             : '';
-      const notSatiri = isDone && day.tamamlanma_notu
-        ? `<div style="margin-top:6px;font-size:.72rem;color:var(--ink3);font-style:italic">📝 "${esc(day.tamamlanma_notu)}"</div>`
+
+      // Not satırı: treatment_days.notes — done'dan bağımsız
+      const notSatiri = day.notes
+        ? `<div class="cd-day-not">📝 ${esc(day.notes)}</div>`
         : '';
-      return `
-      <div style="${cardStyle};border-radius:10px;padding:10px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:700;font-size:.8rem">Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||""} — ${fmtTarih(day.date)}${saatStr}
-            <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" title="Saat ayarla" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:.8rem;padding:0 2px;vertical-align:middle">🕐</button>
-          </span>
-          ${rightSide}
-        </div>
-        ${notSatiri}
-        <div id="drugs-${day.day_id}">
-          ${day.drugs.length ? day.drugs.map(d => `
+
+      // İlaç listesi — done günlerde düzenleme butonları gizlenir
+      const drugHtml = day.drugs.length
+        ? day.drugs.map(d => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--card2)">
-              <span><b>${d.drug}</b> ${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span>
-              ${_curCase?.status==='active'?`<div style='display:flex;gap:4px'><button onclick="caseDrugDuzenle('${d.administration_id}','${d.dose}','${d.unit}','${d.route||''}')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.9rem">✏️</button><button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem">🗑</button></div>`:''}
-            </div>`).join('') : '<span style="color:var(--ink3);font-size:.75rem">İlaç eklenmemiş</span>'}
-        </div>
-      </div>`;
-    }).join('');
+              <span style="font-size:.8rem"><b>${esc(d.drug)}</b> <span style="color:var(--ink3)">${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span></span>
+              ${aktif && !isDone ? `<div style="display:flex;gap:4px">
+                <button onclick="caseDrugDuzenle('${d.administration_id}','${d.dose}','${d.unit}','${d.route||''}')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.9rem">✏️</button>
+                <button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem">🗑</button>
+              </div>` : ''}
+            </div>`).join('')
+        : `<span style="color:var(--ink3);font-size:.75rem">İlaç eklenmemiş</span>`;
+
+      return `
+        <div class="cd-tl-item ${tlCls}">
+          <div class="cd-tl-node">${nodeIcon}</div>
+          <div class="cd-tl-content">
+            <div class="cd-day-hdr">
+              <span class="cd-day-title">Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||''} — ${fmtTarih(day.date)}${saatStr}</span>
+              ${rightSide}
+            </div>
+            ${notSatiri}
+            <div id="drugs-${day.day_id}" style="margin-top:${notSatiri||day.drugs.length?'6px':'0'}">${drugHtml}</div>
+          </div>
+        </div>`;
+    }).join('') + '</div>';
   } catch(e) {
     el.innerHTML = `<span style="color:var(--red);font-size:.78rem">Yüklenemedi: ${esc(e.message)}</span>`;
   }
@@ -2770,40 +2799,49 @@ async function caseDaySaatKaydet(dayId) {
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
-function caseDayTamamlaAc(dayId) {
-  let box = document.getElementById('tamamla-modal');
-  if (box) box.remove();
-  box = document.createElement('div');
-  box.id = 'tamamla-modal';
-  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
-  box.onclick = e => { if (e.target === box) box.remove(); };
-  box.innerHTML = `
-    <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
-      <div style="font-weight:800;font-size:.9rem;margin-bottom:14px">✅ Tedaviyi Tamamla</div>
-      <input type="text" id="tamamla-not-inp" placeholder="Not ekle (opsiyonel)"
-        style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:.9rem;background:var(--card);color:var(--ink);outline:none;margin-bottom:12px;box-sizing:border-box">
-      <div style="display:flex;gap:8px">
-        <button onclick="caseDayTamamla('${dayId}')"
-          style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">✅ Tamamla</button>
-        <button onclick="document.getElementById('tamamla-modal').remove()"
-          style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;cursor:pointer">İptal</button>
-      </div>
-    </div>`;
-  document.body.appendChild(box);
-  setTimeout(() => document.getElementById('tamamla-not-inp')?.focus(), 100);
-}
-
 async function caseDayTamamla(dayId) {
-  const not = document.getElementById('tamamla-not-inp')?.value?.trim() || null;
   try {
-    await rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: not });
-    document.getElementById('tamamla-modal')?.remove();
+    await rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: null });
     toast('✅ Tedavi tamamlandı');
     await pullTables(['treatment_days']);
     if (_curCase) {
       await renderCaseTimeline(_curCase.id);
       _updateKapatBtn(_curCase.id);
     }
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+function caseDayNotAc(dayId, mevcutNot) {
+  let box = document.getElementById('not-modal');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'not-modal';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) box.remove(); };
+  box.innerHTML = `
+    <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+      <div style="font-weight:800;font-size:.9rem;margin-bottom:12px">📝 Tedavi Notu</div>
+      <textarea id="not-ta" rows="3" placeholder="Gözlem, reaksiyon, ek bilgi..."
+        style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:.9rem;background:var(--card);color:var(--ink);outline:none;resize:none;box-sizing:border-box;margin-bottom:12px">${esc(mevcutNot||'')}</textarea>
+      <div style="display:flex;gap:8px">
+        <button onclick="caseDayNotKaydet('${dayId}')"
+          style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">💾 Kaydet</button>
+        <button onclick="document.getElementById('not-modal').remove()"
+          style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;cursor:pointer">İptal</button>
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+  setTimeout(() => document.getElementById('not-ta')?.focus(), 100);
+}
+
+async function caseDayNotKaydet(dayId) {
+  const not = document.getElementById('not-ta')?.value?.trim() || '';
+  try {
+    await rpc('treatment_day_not_guncelle', { p_day_id: dayId, p_notes: not || null });
+    document.getElementById('not-modal')?.remove();
+    toast('📝 Not kaydedildi');
+    await pullTables(['treatment_days']);
+    if (_curCase) await renderCaseTimeline(_curCase.id);
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 

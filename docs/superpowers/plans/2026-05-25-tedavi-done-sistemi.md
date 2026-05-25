@@ -2,7 +2,12 @@
 
 > Topoloji: Hierarchical | 4 task | 0 paralel blok
 > Model: deepseek-chat (flash) — aksi belirtilmedi
-> Soru varsa devam etmeden önce sor. DB değişikliklerinde onay bekle.
+> **DURUM: ✅ TAMAMLANDI — 2026-05-25 | Commit: 400d4bd + 8def478**
+
+**Bilinen küçük eksikler (kritik değil, ileride fix):**
+- Done günlerde ✏️/🗑 ilaç butonları gizlenmeli (isDone kontrolü yok)
+- Done günlerde 🕐 saat butonu gizlenmeli
+- Render sırası: `Object.values(byDay)` day_no'ya göre explicit sort edilmeli
 
 **Hedef:** Vaka modalındaki her tedavi gününe "Tamamla" butonu ekle; sıralı tamamlama zorunlu; tüm günler done olunca vaka kapatılabilir; opsiyonel not.
 
