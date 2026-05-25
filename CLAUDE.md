@@ -85,6 +85,27 @@ Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 | **Multi-tier Goose mimarisi** | `.claude/arch-decisions/ADR-007-multi-tier-goose-orchestration.md` — Tier0/1/2 tasarım, goose-ops, commit lock, summon testi, uygulama sırası |
 | **Gelecek fikirler / backlog** | `.claude/ideas/` — henüz task açılmamış özellik fikirleri, ileride ele alınacak |
 
+## Vanilla JS UI Kuralları
+
+`ui.js` içindeki `innerHTML = template literal` pattern kullanılıyor. Sorunsuz çalışması için:
+
+**Accordion / show-hide:** `display:none` / `display:block` toggle — her zaman ilk tercih.
+`max-height` transition mobilde `overflow:hidden` parent içinde render etmeyebilir.
+`<details>/<summary>` mobile Safari'de buton onclick'ini yutabilir, modal scroll kaymasına neden olur. **Yasak.**
+
+**openAttr mantığı (default açık/kapalı):**
+```js
+// Sadece aktif vakada, sadece ilk aksiyon bekleyen öğe açık
+const firstActive = aktif ? items.find(d => !d.done && !d.locked) : null;
+const isOpen = aktif && item === firstActive;
+```
+Kapalı vaka veya done/locked öğeler → her zaman kapalı başlar.
+
+**Yeni UI bölümü yazarken:**
+1. Önce edge case'leri listele (kapalı/aktif/done/locked kombinasyonları)
+2. Büyük template → küçük helper fonksiyonlara böl (`_buildDayHeader`, `_buildDrugList` vb.)
+3. Gerekirse önce statik HTML prototip yaz, sonra template'e çevir
+
 ## Kritik Kurallar
 
 - main'e direkt push yok — sadece Claude merge eder
