@@ -3062,6 +3062,26 @@ BEGIN
 END;
 $$;
 
+-- 9f. treatment_day_not_guncelle
+DROP FUNCTION IF EXISTS public.treatment_day_not_guncelle(uuid, text);
+CREATE OR REPLACE FUNCTION public.treatment_day_not_guncelle(
+  p_day_id  uuid,
+  p_notes   text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE public.treatment_days
+  SET notes = p_notes
+  WHERE id = p_day_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Tedavi günü bulunamadı: %', p_day_id;
+  END IF;
+END;
+$$;
+
 -- ──────────────────────────────────────────────────────────────
 -- 10. RLS
 -- ──────────────────────────────────────────────────────────────
@@ -3089,6 +3109,7 @@ GRANT EXECUTE ON FUNCTION public.add_treatment_day       TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.add_drug_administration TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.close_case              TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.treatment_day_tamamla   TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.treatment_day_not_guncelle TO anon, authenticated;
 
 -- ──────────────────────────────────────────────────────────────
 -- 11. SEED DATA — Diseases
