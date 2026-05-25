@@ -2692,8 +2692,10 @@ async function renderCaseTimeline(caseId) {
   });
   // Sıralı lock: önceki gün done değilse bu gün kilitli
   const sortedDays = Object.values(byDay).sort((a,b) => a.day_no - b.day_no);
+  // Lock: sadece aktif vakalarda — kapalı vakalarda tüm günler açılabilir
+  const lockAktif = _curCase?.status === 'active';
   sortedDays.forEach((day, idx) => {
-    day._locked = idx > 0 && !sortedDays[idx-1].tamamlandi;
+    day._locked = lockAktif && idx > 0 && !sortedDays[idx-1].tamamlandi;
   });
   // Progress hesapla
   const totalDays = sortedDays.length;
