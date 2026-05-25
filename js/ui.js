@@ -2716,7 +2716,7 @@ async function renderCaseTimeline(caseId) {
       const isDone   = day.tamamlandi;
       const isLocked = !isDone && day._locked;
       const tlCls    = isDone ? 'tl-done' : isLocked ? 'tl-locked' : 'tl-active';
-      const openAttr = (!isDone && !isLocked) ? 'open' : '';  // aktif gün açık, diğerleri kapalı
+      const openAttr = (aktif && !isDone && !isLocked && day === sortedDays.find(d => !d.tamamlandi && !d._locked)) ? 'open' : '';
       const nodeIcon = isDone ? '✓' : '';
       const gunNo    = `Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||''}`;
 
@@ -2868,7 +2868,9 @@ async function caseDayNotKaydet(dayId) {
 
 function cdAccToggle(dayId) {
   const acc = document.getElementById('acc-' + dayId);
-  if (acc) acc.classList.toggle('open');
+  if (!acc) return;
+  const isOpen = acc.classList.contains('open');
+  acc.classList.toggle('open', !isOpen);
 }
 
 function caseDayNotAcById(dayId) {
