@@ -23,11 +23,17 @@ Dosya yaz, SQL üret, commit at — doğrudan yap. Gereksiz yere delege etme.
 | Durum | Karar |
 |---|---|
 | Kısa soru, analiz, kod yaz | Claude direkt yapar |
-| Çoklu dosya keşfi, bağımsız araştırma | → sub-agent spawn (`erp-explorer`) |
-| JS/SQL yazma + commit birlikte | → sub-agent spawn (`erp-implementer` + `erp-qa-git`) |
+| Çoklu dosya keşfi, bağımsız araştırma | → `mcp__deepseek__deepseek_chat` ile DeepSeek'e delege et |
+| JS/SQL yazma + commit birlikte | → `mcp__deepseek__deepseek_chat` ile DeepSeek'e delege et |
 | Web araştırması, harici dok analizi | → `deerflow_research(query, mode="flash")` |
 | Async iş, uzun süren ERP görevi | → `goose_start(recipe, session_id, params)` → telsiz döngüsü |
-| **Goose çalışmıyor, implementasyon görevi var** | → `Skill("deepseek-tui-plan")` → plan yaz → kullanıcıya dosya yolu + ilk prompt ver |
+| **Goose çalışmıyor, implementasyon görevi var** | → `mcp__deepseek__deepseek_chat` ile DeepSeek'e delege et |
+
+## DeepSeek Subagent Kuralları (ZORUNLU)
+
+- **Subagent görevi için MUTLAKA `mcp__deepseek__deepseek_chat` kullan** — Claude Agent tool'u (erp-explorer, erp-implementer vb.) subagent olarak spawn etme, aynı model = gereksiz maliyet.
+- **Model parametresi ASLA belirtme** — default `deepseek-chat` (v4-flash) kullanılır. Kullanıcı açıkça söylemedikçe `deepseek-reasoner` veya başka model geçme.
+- DeepSeek'e dosya okuma/yazma yetkisi yok — önce Claude okur, içeriği prompt'a ekler, DeepSeek analiz/üretim yapar, Claude sonucu uygular.
 
 ## DeerFlow
 
@@ -123,7 +129,7 @@ SQL yazmadan önce:
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **egesut-erp1** (3173 symbols, 5572 relationships, 274 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **egesut-erp1** (3978 symbols, 6556 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
