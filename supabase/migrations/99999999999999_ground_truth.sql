@@ -4751,7 +4751,7 @@ $$ LANGUAGE plpgsql
    SET search_path = public, pg_temp;
 
 GRANT EXECUTE ON FUNCTION public.drug_product_ekle(UUID, TEXT, NUMERIC, TEXT, TEXT, TEXT, UUID)
-  TO authenticated;
+  TO anon, authenticated;
 -- Migration: Realtime publication aktif (idempotent)
 -- Tablolar zaten publication'daysa hata vermez
 
