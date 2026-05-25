@@ -2694,7 +2694,6 @@ async function renderCaseTimeline(caseId) {
   const sortedDays = Object.values(byDay).sort((a,b) => a.day_no - b.day_no);
   sortedDays.forEach((day, idx) => {
     day._locked = idx > 0 && !sortedDays[idx-1].tamamlandi;
-    day.notB64 = day.notes ? btoa(unescape(encodeURIComponent(day.notes))) : '';
   });
   // Progress hesapla
   const totalDays = sortedDays.length;
