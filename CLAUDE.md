@@ -59,12 +59,6 @@ Briefing formatı:
 Hazır. Ne yapalım?
 ```
 
-## MCP Kuralları
-
-- **Supabase:** Yazmadan önce sorgula → `execute_sql`, `list_migrations`, `get_logs`
-- **Context7:** `.from()` `.rpc()` IndexedDB kullanımlarında → güncel dok çek
-- **GitHub:** Fix sonrası issue varsa → `add_issue_comment`
-
 ## Tools-Bank
 
 MCP tools (memory_search, file_read, task_claim vb.) + task/blackboard sistemi.  
@@ -108,51 +102,35 @@ Kapalı vaka veya done/locked öğeler → her zaman kapalı başlar.
 
 ## Kritik Kurallar
 
-- main'e direkt push yok — sadece Claude merge eder
 - Paralel dosya yazma yasak
-- Task dosyası güncellenmeden commit yok (**Durum:** tamamlandı)
+- Plan/task/spec dosyaları tamamlanınca done olarak işaretle
 - Tohumlama state machine bypass edilmez
 - Hook hataları (superpowers "hook error"): zararsız, görmezden gel
 
-## Goose SQL Approval Gate (ZORUNLU)
+## DB Değişikliği Öncesi (ZORUNLU)
 
-**Herhangi bir DB değişikliği (migration/RPC/UPDATE/INSERT) yazmadan önce Goose Claude'dan onay almalı.**
+**Bulk UPDATE/DELETE/DROP** → önce taslağı göster, onay al, sonra uygula.
+Rutin DDL (ADD COLUMN, CREATE FUNCTION, CREATE INDEX) → doğrudan uygula.
 
-### Orchestrator Olarak Claude'un Sorumluluğu
-
-Goose'a SQL içeren görev verirken spec'e ekle:
-```
-⚠️ DB DEĞİŞİKLİĞİ ONAY ZORUNLU: Herhangi bir CREATE/ALTER/UPDATE/INSERT
-yazmadan önce approval_req mesajıyla bana sor. Ben "Onaylıyorum" diyene kadar duraksa.
-```
-
-Goose `approval_req` gönderince Claude **inceleyip onaylamalı** — "onaylıyorum" demeden devam etmemeli.
-
-### Referans Dosya Seçimi
-
-**ASLA** ara migration'ı referans alma:
+**Referans dosya seçimi — ASLA ara migration kullanma:**
 
 | Doğru | Yanlış |
 |-------|--------|
 | `99999999999999_ground_truth.sql` | `*_revize.sql`, `*_fix.sql`, herhangi ara migration |
 | `.claude/rpc-reference.md` | Eski versiyon migration'lar |
 
-### Goose SQL Pre-Check (spec'e her zaman ekle)
-
-```
-SQL yazmadan önce:
-1. file_read("supabase/migrations/99999999999999_ground_truth.sql") — canonical referans
-2. file_read(".claude/rpc-reference.md") — mevcut RPC imzaları
-3. Tablo şemasını supabase_query ile doğrula
-4. Domain kuralını .claude/domain-rules.md'den oku
-```
+**SQL yazmadan önce oku:**
+1. `supabase/migrations/99999999999999_ground_truth.sql` — canonical referans
+2. `.claude/rpc-reference.md` — mevcut RPC imzaları
+3. `.claude/domain-rules.md` — domain kuralı
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **egesut-erp1** (3978 symbols, 6556 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+GitNexus bu projede **hook** olarak çalışır (Grep/Glob/Bash tool çağrılarında otomatik devreye girer).
+Index stale ise veya hook timeout'a düşerse → terminalde `npx gitnexus analyze` çalıştır.
 
-> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+> **graphify** pipx paketi olarak kurulu (`graphifyy`), Claude Code MCP'sine bağlı değil. `/graphify` komutu skill ile tetiklenir.
 
 ## Always Do
 
@@ -166,7 +144,7 @@ This project is indexed by GitNexus as **egesut-erp1** (3978 symbols, 6556 relat
 
 - NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER rename symbols with find-and-replace — `gitnexus_rename` CLI mevcut değil (sadece MCP-only). Manuel rename + `gitnexus_detect_changes` ile doğrula.
 - NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
 
 ## Resources
