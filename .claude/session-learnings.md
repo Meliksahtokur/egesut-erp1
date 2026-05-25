@@ -1,5 +1,65 @@
 # Session Learnings — EgeSüt ERP
 
+---
+
+## Oturum 2026-05-25 — Treatment Timeline + Accordion
+
+### Accordion Teknoloji Seçimi (KRİTİK)
+
+**Sıralama (güvenilirlik sırasına göre):**
+1. `display:none` / `display:block` toggle — en güvenilir, tüm tarayıcı/mobil ✅
+2. `max-height:0 → max-height:Xpx` CSS transition — çoğu zaman çalışır, ama `overflow:hidden` parent içinde bazı mobillerde render etmez ⚠️
+3. `<details>/<summary>` native HTML — masaüstü iyi, mobile Safari: summary click buton onclick'ini yutabilir, toggle → modal scroll kayması ❌
+
+**Kural:** Vanilla JS template string içinde accordion → her zaman `display:none` ile başla.
+
+### openAttr Mantığı (Accordion Default State)
+
+```js
+// YANLIŞ — kapalı vakada tüm günler açılır
+const openAttr = (!isDone && !isLocked) ? 'open' : '';
+
+// DOĞRU — sadece aktif vakada, sadece ilk aksiyon bekleyen gün açık
+const firstActiveDay = aktif ? sortedDays.find(d => !d.tamamlandi && !d._locked) : null;
+const openAttr = aktif && day === firstActiveDay;
+```
+
+### Template String UI'da Patinaj Neden Olur?
+
+1. **Kör kodlama** — `innerHTML = template literal` çıktısı görünmez, her iterasyon push → test döngüsü
+2. **Edge case körlüğü** — closed/active/locked state kombinasyonları template'de zihinsel simülasyon gerektirir
+3. **Protokol:** Önce edge case'leri listele, sonra kodu yaz
+
+### Frontend Patinaj Neden — YouTube vs Biz
+
+YouTube'daki "1 prompt harika site" videoları şu koşullarda çalışır:
+- Greenfield, standalone HTML dosyası — mevcut kod yok
+- React/Tailwind/Next — framework semantik garantiler verir
+- LLM çıktısı direkt tarayıcıda görünür — visual feedback loop hızlı
+- Edge case yok — "kayıtlı vaka kapalıysa tüm günler lock'lu" gibi domain mantığı yok
+
+**Bizim durumumuz:**
+- Vanilla JS + `innerHTML` string templates — görünmez output, IDE yardımı yok
+- Mevcut codebase constraints (CSS variables, inline handlers, IDB cache)
+- Domain mantığı karmaşık (active/closed/locked/done state combinations)
+- LLM + DeepSeek chain — plan → implement → test → fix döngüsü
+
+**Ne yapmalı:**
+1. **Önce statik HTML** — template'i JS'e koymadan önce plain HTML yaz, tarayıcıda gör
+2. **Edge case listesi önce** — "kapalı vaka", "0 done", "hepsi done" → her birini açıkla
+3. **Teknoloji seçimi önce** — accordion için hangi yöntem? → kararı planın başına yaz
+4. **CSS class > inline style** — test edilebilir, tekrar kullanılabilir
+
+### Yeni RPC'ler (2026-05-25)
+
+| RPC | Açıklama |
+|-----|----------|
+| `treatment_day_tamamla(uuid, text)` | Sıralı done — önceki bitmeden sonraki done edilemez |
+| `treatment_day_not_guncelle(uuid, text)` | treatment_days.notes güncelle (done'dan bağımsız) |
+| `update_treatment_time(uuid, time)` | Tedavi saati güncelle (mevcut) |
+
+---
+
 ## What Worked Well
 
 - **Parallel agents for multi-issue discovery** — dispatching 2-3 agents to explore different aspects simultaneously (UI patterns, data flow, duplicate code) gave comprehensive context fast
