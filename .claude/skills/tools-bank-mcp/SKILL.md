@@ -339,6 +339,77 @@ gitnexus_impact({target: "rpcOptimistic", depth: 2})
 supabase_migrate({sql: "CREATE TABLE ..."})
 ```
 
+---
+
+## DeerFlow — Web Araştırması
+
+DeerFlow sadece **web araştırması** ve **harici kaynak analizi** için kullanılır. Kod yazma, dosya değiştirme, implementasyon yapamaz.
+
+### Araçlar
+
+| İhtiyaç | Araç | Not |
+|---------|------|-----|
+| Tek seferlik araştırma | `deerflow_research(query, mode?)` | Stateless, her çağrı yeni thread |
+| Stateful sohbet — yeni | `deerflow_chat(message)` → thread_id sakla | Context korunur |
+| Stateful sohbet — devam | `deerflow_chat(message, thread_id="...")` | Aynı thread |
+| Gateway sağlık kontrolü | `deerflow_health()` | `200 healthy` beklenir |
+| Gateway restart | `deerflow_gateway_restart()` | DOWN ise çağır |
+| Agent listesi | `deerflow_agents()` | Varsayılan: `lead_agent` |
+| Thread listesi | `deerflow_threads(limit=10)` | Geçmiş thread_id'leri |
+| Model listesi | `deerflow_list_models()` | deepseek-v4-flash / deepseek-v4-pro |
+| Skill listesi | `deerflow_list_skills()` | Yüklü DeerFlow skill'leri |
+| Memory özeti | `deerflow_memory("status")` | DeerFlow kendi memory'si |
+| Memory'e yaz | `deerflow_memory("add", content="...", category="workContext")` | — |
+
+### ⚠️ Model / Mod Kuralı (ZORUNLU)
+
+| Mod | Model | İzin |
+|-----|-------|------|
+| `flash` | deepseek-v4-flash | ✅ Varsayılan — izinsiz kullanılır |
+| `standard` | deepseek-v4-flash | ✅ Kullanıcı onayı ile |
+| `pro` | deepseek-v4-pro | ❌ İzinsiz KULLANMA — kullanıcı onayı zorunlu |
+| `ultra` | deepseek-v4-pro + sub-agent | ❌ İzinsiz KULLANMA — kullanıcı onayı zorunlu |
+
+- Default (parametre verilmezse) → `flash` modu çalışır
+- `standard` mod gerekiyorsa kullanıcıya bildir ve onay al
+- `pro` / `ultra` → **deepseek-v4-pro** modeli demektir, her ikisi de izinsiz yasak
+
+```python
+# DOĞRU — varsayılan flash
+deerflow_research(query="...")
+
+# DOĞRU — kullanıcı onaylıyorsa
+deerflow_research(query="...", mode="standard")
+
+# YANLIŞ — izinsiz v4-pro
+deerflow_research(query="...", mode="pro")
+deerflow_research(query="...", mode="ultra")
+```
+
+### Gateway DOWN ise
+
+```python
+# 1. Kontrol
+deerflow_health()  # → ❌
+
+# 2. Restart (tools-bank üzerinden)
+deerflow_gateway_restart()  # max 60sn bekler
+
+# 3. Tekrar kontrol
+deerflow_health()  # → ✅ devam et
+```
+
+Manuel başlatma (restart tool çalışmazsa):
+```bash
+cd /root/deer-flow/backend && PYTHONPATH=. nohup uv run uvicorn app.gateway.app:app \
+  --host 0.0.0.0 --port 8001 --log-level warning \
+  > /root/deer-flow/logs/gateway.log 2>&1 &
+```
+
+**Not:** DeerFlow her sistem restart'ında DOWN düşer — oturum başında `deerflow_health()` ile kontrol et.
+
+---
+
 ## Önemli Uyarılar
 
 1. `supabase_migrate` Management API kullanır — DDL için güvenli

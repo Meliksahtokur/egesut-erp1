@@ -42,6 +42,8 @@ Kod üretimi, dosya yazma, implementasyon için DeerFlow'a delege etme — yapam
 
 Gateway kontrol: `deerflow_health()` — ❌ ise `deerflow_gateway_restart()`.
 
+**Model kuralı:** `deerflow_research` çağrısında `mode` parametresi ASLA belirtme — default `flash` (deepseek-v4-flash) kullanılır. Kullanıcı açıkça söylemedikçe `standard`, `pro`, `ultra` veya başka mod geçme.
+
 Sub-agent'lar: `.claude/agents/` (sadece spawn edilince yüklenir)
 
 ## Oturum Başlangıcı
