@@ -1750,9 +1750,14 @@ async function saTipSec(tip) {
         sel.innerHTML = '<option value="">— Etken madde seçin (zorunlu) —</option>' +
           Object.entries(grouped).sort().map(([grp, list]) =>
             `<optgroup label="${grp}">${list.map(dc =>
-              `<option value="${dc.id}">${dc.class_name ? dc.class_name+' › ' : ''}${dc.active_ingredient}</option>`
+              `<option value="${dc.id}" data-group="${dc.group_name}">${dc.class_name ? dc.class_name+' › ' : ''}${dc.active_ingredient}</option>`
             ).join('')}</optgroup>`
           ).join('');
+        const KAT_MAP = {Antibiyotik:'Antibiyotik',NSAID:'NSAID',Hormon:'Hormon',Vitamin:'Vitamin',Antiparaziter:'Antiparaziter'};
+        sel.onchange = () => {
+          const opt = sel.selectedOptions[0];
+          if (katInp && opt) katInp.value = KAT_MAP[opt.dataset.group] || 'Diğer İlaç';
+        };
       }
     }
   } else if (tip === 'sperma') {
