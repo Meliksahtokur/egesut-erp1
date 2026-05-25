@@ -252,22 +252,33 @@ button,input,select,textarea{font-family:inherit}
 .mcls{background:none;border:none;font-size:1.4rem;color:var(--ink3);cursor:pointer;padding:2px 6px;line-height:1;border-radius:6px}
 
 /* TREATMENT TIMELINE */
-.cd-progress{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.cd-progress{display:flex;align-items:center;gap:10px;margin-bottom:16px}
 .cd-progress-lbl{font-size:.72rem;font-weight:700;color:var(--ink3);white-space:nowrap}
 .cd-progress-track{flex:1;height:3px;background:var(--card2);border-radius:2px;overflow:hidden}
 .cd-progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .5s ease}
 .cd-tl-wrap{position:relative}
-.cd-tl-item{display:flex;gap:12px;position:relative;padding-bottom:12px}
-.cd-tl-item:not(:last-child)::before{content:'';position:absolute;left:9px;top:22px;width:2px;height:calc(100% - 10px);background:var(--card3)}
+.cd-tl-item{display:flex;gap:12px;position:relative;padding-bottom:10px}
+.cd-tl-item:not(:last-child)::before{content:'';position:absolute;left:9px;top:22px;width:2px;height:calc(100% - 8px);background:var(--card3)}
 .cd-tl-item.tl-done::before{background:rgba(78,154,42,.3)}
-.cd-tl-node{width:20px;height:20px;border-radius:50%;border:2px solid var(--card3);flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:1px;background:var(--card);transition:all .2s;font-size:.65rem}
+.cd-tl-node{width:20px;height:20px;border-radius:50%;border:2px solid var(--card3);flex-shrink:0;display:flex;align-items:center;justify-content:center;margin-top:2px;background:var(--card);font-size:.7rem;font-weight:900;transition:all .2s}
 .cd-tl-item.tl-done .cd-tl-node{background:var(--green);border-color:var(--green);color:#fff}
 .cd-tl-item.tl-locked{opacity:.5}
-.cd-tl-content{flex:1;min-width:0;background:var(--card);border:1px solid var(--card2);border-radius:10px;padding:10px;margin-bottom:0}
-.cd-tl-item.tl-done .cd-tl-content{border-color:rgba(78,154,42,.3);background:rgba(78,154,42,.04)}
-.cd-day-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.cd-day-title{font-weight:700;font-size:.8rem;color:var(--ink)}
-.cd-day-not{margin-top:6px;font-size:.72rem;color:var(--ink3);font-style:italic;line-height:1.4}
+.cd-tl-content{flex:1;min-width:0}
+.cd-acc{background:var(--card);border:1px solid var(--card2);border-radius:10px;overflow:hidden;transition:border-color .2s}
+.cd-tl-item.tl-done .cd-acc{border-color:rgba(78,154,42,.28);background:rgba(78,154,42,.03)}
+.cd-acc summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;gap:8px}
+.cd-acc summary::-webkit-details-marker{display:none}
+.cd-acc summary::after{content:'▸';font-size:.75rem;color:var(--ink3);flex-shrink:0;transition:transform .2s}
+.cd-acc[open] summary::after{transform:rotate(90deg)}
+.cd-acc-title{font-weight:700;font-size:.8rem;color:var(--ink);display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.cd-acc-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.cd-acc-body{padding:0 12px 10px;border-top:1px solid var(--card2)}
+.cd-day-not{font-size:.72rem;color:var(--ink3);font-style:italic;padding:6px 0 4px;line-height:1.4}
+.cd-drug-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--card2)}
+.cd-drug-row:last-child{border-bottom:none}
+.cd-drug-name{font-size:.8rem;font-weight:700;color:var(--ink)}
+.cd-drug-meta{font-size:.78rem;color:var(--ink3)}
+.cd-acc-actions{display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--card2);margin-top:6px}
 
 /* MISC */
 .sh{display:flex;align-items:center;justify-content:space-between;margin:14px 0 7px}
@@ -1490,17 +1501,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1779712724"></script>
-    <script src="js/utils/modal.js?v=1779712724"></script>
-    <script src="js/utils/errorHandler.js?v=1779712724"></script>
-    <script src="js/utils/events.js?v=1779712724"></script>
-    <script src="js/config.js?v=1779712724"></script>
-    <script src="js/state.js?v=1779712724"></script>
-    <script src="js/api.js?v=1779712724"></script>
-    <script src="js/ui.js?v=1779712724"></script>
-    <script src="js/forms.js?v=1779712724"></script>
-    <script src="js/app.js?v=1779712724"></script>
-    <script src="js/utils/handlers.js?v=1779712724"></script>
+    <script src="js/utils/helpers.js?v=1779714068"></script>
+    <script src="js/utils/modal.js?v=1779714068"></script>
+    <script src="js/utils/errorHandler.js?v=1779714068"></script>
+    <script src="js/utils/events.js?v=1779714068"></script>
+    <script src="js/config.js?v=1779714068"></script>
+    <script src="js/state.js?v=1779714068"></script>
+    <script src="js/api.js?v=1779714068"></script>
+    <script src="js/ui.js?v=1779714068"></script>
+    <script src="js/forms.js?v=1779714068"></script>
+    <script src="js/app.js?v=1779714068"></script>
+    <script src="js/utils/handlers.js?v=1779714068"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

@@ -2711,54 +2711,70 @@ async function renderCaseTimeline(caseId) {
 
   el.innerHTML = progressHtml + '<div class="cd-tl-wrap">' +
     sortedDays.map(day => {
-      const saatStr   = day.time ? ` <span style="font-size:.7rem;color:var(--ink3);font-weight:400">${day.time.slice(0,5)}</span>` : '';
-      const isDone    = day.tamamlandi;
-      const isLocked  = !isDone && day._locked;
-      const tlCls     = isDone ? 'tl-done' : isLocked ? 'tl-locked' : 'tl-active';
-      const nodeIcon  = isDone ? '✓' : '';
+      const saatStr  = day.time ? `<span style="font-size:.68rem;color:var(--ink3);font-weight:400;margin-left:4px">${day.time.slice(0,5)}</span>` : '';
+      const isDone   = day.tamamlandi;
+      const isLocked = !isDone && day._locked;
+      const tlCls    = isDone ? 'tl-done' : isLocked ? 'tl-locked' : 'tl-active';
+      const openAttr = (!isDone && !isLocked) ? 'open' : '';  // aktif gün açık, diğerleri kapalı
+      const nodeIcon = isDone ? '✓' : '';
+      const gunNo    = `Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||''}`;
 
-      // Sağ taraf: done badge / locked / aksiyon butonları
-      const rightSide = isDone
+      // Başlık sağ taraf
+      const badge = isDone
         ? `<span style="background:rgba(78,154,42,.12);color:var(--green);padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700">✅ ${fmtGunSaat(day.tamamlanma_tarihi)}</span>`
         : isLocked
           ? `<span style="color:var(--ink3);font-size:.72rem">🔒</span>`
-          : aktif
-            ? `<div style="display:flex;gap:4px;flex-shrink:0">
-                 <button onclick="caseDayTamamla('${day.day_id}')" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:3px 9px;font-size:.7rem;font-weight:700;cursor:pointer">✅</button>
-                 <button onclick="caseDayNotAc('${day.day_id}','${day.notB64 ? decodeURIComponent(escape(atob(day.notB64))) : ''}')" style="background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:7px;padding:3px 8px;font-size:.7rem;cursor:pointer">📝</button>
-                 <button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:7px;padding:3px 8px;font-size:.7rem;cursor:pointer">+</button>
-                 <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:3px 6px;font-size:.7rem;color:var(--ink3);cursor:pointer">🕐</button>
-                 <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2);border-radius:7px;padding:3px 6px;font-size:.7rem;cursor:pointer">🗑</button>
-               </div>`
-            : '';
+          : '';
 
-      // Not satırı: treatment_days.notes — done'dan bağımsız
-      const notSatiri = day.notes
+      // Not satırı (treatment_days.notes)
+      const notHtml = day.notes
         ? `<div class="cd-day-not">📝 ${esc(day.notes)}</div>`
         : '';
 
-      // İlaç listesi — done günlerde düzenleme butonları gizlenir
+      // İlaç listesi
       const drugHtml = day.drugs.length
-        ? day.drugs.map(d => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--card2)">
-              <span style="font-size:.8rem"><b>${esc(d.drug)}</b> <span style="color:var(--ink3)">${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span></span>
-              ${aktif && !isDone ? `<div style="display:flex;gap:4px">
-                <button onclick="caseDrugDuzenle('${d.administration_id}','${d.dose}','${d.unit}','${d.route||''}')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.9rem">✏️</button>
-                <button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.9rem">🗑</button>
+        ? `<div style="margin-top:2px">${day.drugs.map(d => `
+            <div class="cd-drug-row">
+              <div><span class="cd-drug-name">${esc(d.drug)}</span> <span class="cd-drug-meta">${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span></div>
+              ${aktif && !isDone ? `<div style="display:flex;gap:2px">
+                <button onclick="caseDrugDuzenle('${d.administration_id}','${d.dose}','${d.unit}','${d.route||''}')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.85rem;padding:2px">✏️</button>
+                <button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.85rem;padding:2px">🗑</button>
               </div>` : ''}
-            </div>`).join('')
-        : `<span style="color:var(--ink3);font-size:.75rem">İlaç eklenmemiş</span>`;
+            </div>`).join('')}</div>`
+        : `<span style="color:var(--ink3);font-size:.75rem;display:block;padding:4px 0">İlaç eklenmemiş</span>`;
+
+      // Aksiyon butonları (sadece aktif + done değil + locked değil)
+      const actionsHtml = aktif && !isDone && !isLocked ? `
+        <div class="cd-acc-actions">
+          <button onclick="caseDayTamamla('${day.day_id}')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer">✅ Tamamla</button>
+          <button onclick="caseDayNotAcById('${day.day_id}')" style="background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">📝 Not</button>
+          <button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">+ İlaç</button>
+          <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:7px 10px;font-size:.78rem;color:var(--ink3);cursor:pointer">🕐</button>
+          <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.18);border-radius:8px;padding:7px 10px;font-size:.78rem;cursor:pointer">🗑</button>
+        </div>` : '';
+
+      // data-not-b64: base64 encode ile özel karakter güvenliği
+      const notB64 = day.notes ? btoa(unescape(encodeURIComponent(day.notes))) : '';
 
       return `
         <div class="cd-tl-item ${tlCls}">
           <div class="cd-tl-node">${nodeIcon}</div>
           <div class="cd-tl-content">
-            <div class="cd-day-hdr">
-              <span class="cd-day-title">Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||''} — ${fmtTarih(day.date)}${saatStr}</span>
-              ${rightSide}
-            </div>
-            ${notSatiri}
-            <div id="drugs-${day.day_id}" style="margin-top:${notSatiri||day.drugs.length?'6px':'0'}">${drugHtml}</div>
+            <details class="cd-acc" ${openAttr}>
+              <summary>
+                <div class="cd-acc-title">
+                  <span>${gunNo} — ${fmtTarih(day.date)}${saatStr}</span>
+                </div>
+                <div class="cd-acc-right">${badge}</div>
+              </summary>
+              <div class="cd-acc-body" id="drugs-${day.day_id}">
+                ${notHtml}
+                ${drugHtml}
+                ${actionsHtml}
+              </div>
+            </details>
+            <button data-day-id="${day.day_id}" data-not-b64="${notB64}"
+              style="display:none" id="not-trigger-${day.day_id}"></button>
           </div>
         </div>`;
     }).join('') + '</div>';
@@ -2843,6 +2859,13 @@ async function caseDayNotKaydet(dayId) {
     await pullTables(['treatment_days']);
     if (_curCase) await renderCaseTimeline(_curCase.id);
   } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+function caseDayNotAcById(dayId) {
+  const trigger = document.getElementById('not-trigger-' + dayId);
+  const b64 = trigger?.dataset?.notB64 || '';
+  const mevcutNot = b64 ? decodeURIComponent(escape(atob(b64))) : '';
+  caseDayNotAc(dayId, mevcutNot);
 }
 
 async function _updateKapatBtn(caseId) {
