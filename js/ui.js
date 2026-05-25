@@ -2757,25 +2757,29 @@ async function renderCaseTimeline(caseId) {
       // data-not-b64: base64 encode ile özel karakter güvenliği
       const notB64 = day.notes ? btoa(unescape(encodeURIComponent(day.notes))) : '';
 
+      const openCls = openAttr ? 'open' : '';
       return `
         <div class="cd-tl-item ${tlCls}">
           <div class="cd-tl-node">${nodeIcon}</div>
           <div class="cd-tl-content">
-            <details class="cd-acc" ${openAttr}>
-              <summary>
+            <div class="cd-acc ${openCls}" id="acc-${day.day_id}">
+              <div class="cd-acc-hdr" onclick="cdAccToggle('${day.day_id}')">
                 <div class="cd-acc-title">
                   <span>${gunNo} — ${fmtTarih(day.date)}${saatStr}</span>
                 </div>
-                <div class="cd-acc-right">${badge}</div>
-              </summary>
-              <div class="cd-acc-body" id="drugs-${day.day_id}">
-                ${notHtml}
-                ${drugHtml}
-                ${actionsHtml}
+                <div class="cd-acc-right">
+                  ${badge}
+                  <span class="cd-acc-arrow">▸</span>
+                </div>
               </div>
-            </details>
-            <button data-day-id="${day.day_id}" data-not-b64="${notB64}"
-              style="display:none" id="not-trigger-${day.day_id}"></button>
+              <div class="cd-acc-body" id="drugs-${day.day_id}">
+                <div class="cd-acc-body-inner" data-not-b64="${notB64}">
+                  ${notHtml}
+                  ${drugHtml}
+                  ${actionsHtml}
+                </div>
+              </div>
+            </div>
           </div>
         </div>`;
     }).join('') + '</div>';
@@ -2862,9 +2866,14 @@ async function caseDayNotKaydet(dayId) {
   } catch(e) { toast('❌ ' + e.message, true); }
 }
 
+function cdAccToggle(dayId) {
+  const acc = document.getElementById('acc-' + dayId);
+  if (acc) acc.classList.toggle('open');
+}
+
 function caseDayNotAcById(dayId) {
-  const trigger = document.getElementById('not-trigger-' + dayId);
-  const b64 = trigger?.dataset?.notB64 || '';
+  const inner = document.querySelector(`#drugs-${dayId} .cd-acc-body-inner`);
+  const b64 = inner?.dataset?.notB64 || '';
   const mevcutNot = b64 ? decodeURIComponent(escape(atob(b64))) : '';
   caseDayNotAc(dayId, mevcutNot);
 }

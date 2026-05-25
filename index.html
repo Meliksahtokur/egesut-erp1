@@ -266,13 +266,14 @@ button,input,select,textarea{font-family:inherit}
 .cd-tl-content{flex:1;min-width:0}
 .cd-acc{background:var(--card);border:1px solid var(--card2);border-radius:10px;overflow:hidden;transition:border-color .2s}
 .cd-tl-item.tl-done .cd-acc{border-color:rgba(78,154,42,.28);background:rgba(78,154,42,.03)}
-.cd-acc summary{list-style:none;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;gap:8px}
-.cd-acc summary::-webkit-details-marker{display:none}
-.cd-acc summary::after{content:'▸';font-size:.75rem;color:var(--ink3);flex-shrink:0;transition:transform .2s}
-.cd-acc[open] summary::after{transform:rotate(90deg)}
+.cd-acc-hdr{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;gap:8px}
+.cd-acc-arrow{font-size:.72rem;color:var(--ink3);flex-shrink:0;transition:transform .22s;display:inline-block}
+.cd-acc.open .cd-acc-arrow{transform:rotate(90deg)}
 .cd-acc-title{font-weight:700;font-size:.8rem;color:var(--ink);display:flex;align-items:center;gap:6px;flex:1;min-width:0}
 .cd-acc-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
-.cd-acc-body{padding:0 12px 10px;border-top:1px solid var(--card2)}
+.cd-acc-body{max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(.4,0,.2,1);border-top:0px solid var(--card2)}
+.cd-acc.open .cd-acc-body{max-height:600px;border-top-width:1px}
+.cd-acc-body-inner{padding:6px 12px 10px}
 .cd-day-not{font-size:.72rem;color:var(--ink3);font-style:italic;padding:6px 0 4px;line-height:1.4}
 .cd-drug-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--card2)}
 .cd-drug-row:last-child{border-bottom:none}
@@ -1501,17 +1502,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1779714716"></script>
-    <script src="js/utils/modal.js?v=1779714716"></script>
-    <script src="js/utils/errorHandler.js?v=1779714716"></script>
-    <script src="js/utils/events.js?v=1779714716"></script>
-    <script src="js/config.js?v=1779714716"></script>
-    <script src="js/state.js?v=1779714716"></script>
-    <script src="js/api.js?v=1779714716"></script>
-    <script src="js/ui.js?v=1779714716"></script>
-    <script src="js/forms.js?v=1779714716"></script>
-    <script src="js/app.js?v=1779714716"></script>
-    <script src="js/utils/handlers.js?v=1779714716"></script>
+    <script src="js/utils/helpers.js?v=1779715990"></script>
+    <script src="js/utils/modal.js?v=1779715990"></script>
+    <script src="js/utils/errorHandler.js?v=1779715990"></script>
+    <script src="js/utils/events.js?v=1779715990"></script>
+    <script src="js/config.js?v=1779715990"></script>
+    <script src="js/state.js?v=1779715990"></script>
+    <script src="js/api.js?v=1779715990"></script>
+    <script src="js/ui.js?v=1779715990"></script>
+    <script src="js/forms.js?v=1779715990"></script>
+    <script src="js/app.js?v=1779715990"></script>
+    <script src="js/utils/handlers.js?v=1779715990"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
