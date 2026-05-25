@@ -2725,6 +2725,12 @@ COMMENT ON COLUMN public.treatment_days.day_no IS 'Trigger ile otomatik artar �
 
 CREATE INDEX IF NOT EXISTS treatment_days_case_id_idx ON public.treatment_days(case_id);
 
+-- done tracking (migration 20260525000002)
+ALTER TABLE public.treatment_days
+  ADD COLUMN IF NOT EXISTS tamamlandi         boolean     DEFAULT false,
+  ADD COLUMN IF NOT EXISTS tamamlanma_tarihi  timestamptz,
+  ADD COLUMN IF NOT EXISTS tamamlanma_notu    text;
+
 -- ──────────────────────────────────────────────────────────────
 -- 5. DRUG ADMINISTRATIONS — İlaç uygulama (controlled FK)
 -- ──────────────────────────────────────────────────────────────
@@ -3012,6 +3018,50 @@ BEGIN
 END;
 $$;
 
+-- 9e. treatment_day_tamamla
+DROP FUNCTION IF EXISTS public.treatment_day_tamamla(uuid, text);
+CREATE OR REPLACE FUNCTION public.treatment_day_tamamla(
+  p_day_id  uuid,
+  p_not     text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_day     public.treatment_days%ROWTYPE;
+  v_onceki  boolean;
+BEGIN
+  SELECT * INTO v_day FROM public.treatment_days WHERE id = p_day_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Tedavi günü bulunamadı: %', p_day_id;
+  END IF;
+
+  IF v_day.tamamlandi THEN
+    RAISE EXCEPTION 'Bu tedavi günü zaten tamamlandı';
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM public.treatment_days
+    WHERE case_id = v_day.case_id
+      AND day_no  < v_day.day_no
+      AND (tamamlandi IS NULL OR tamamlandi = false)
+  ) INTO v_onceki;
+
+  IF v_onceki THEN
+    RAISE EXCEPTION 'Önceki tedavi günleri tamamlanmadan bu gün tamamlanamaz';
+  END IF;
+
+  UPDATE public.treatment_days
+  SET tamamlandi        = true,
+      tamamlanma_tarihi = now(),
+      tamamlanma_notu   = p_not
+  WHERE id = p_day_id;
+
+  RETURN jsonb_build_object('ok', true, 'day_id', p_day_id);
+END;
+$$;
+
 -- ──────────────────────────────────────────────────────────────
 -- 10. RLS
 -- ──────────────────────────────────────────────────────────────
@@ -3038,6 +3088,7 @@ GRANT EXECUTE ON FUNCTION public.create_case             TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.add_treatment_day       TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.add_drug_administration TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.close_case              TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.treatment_day_tamamla   TO anon, authenticated;
 
 -- ──────────────────────────────────────────────────────────────
 -- 11. SEED DATA — Diseases
