@@ -83,6 +83,9 @@ CREATE TABLE IF NOT EXISTS public.tohumlama (
   deneme_no integer DEFAULT 1
 );
 
+ALTER TABLE public.tohumlama
+  ADD COLUMN IF NOT EXISTS ek_uygulamalar jsonb DEFAULT '[]'::jsonb;
+
 CREATE TABLE IF NOT EXISTS public.dogum (
   id text PRIMARY KEY,
   anne_id text,
@@ -1464,11 +1467,12 @@ ORDER BY zaman DESC;
 --    (009a'yı içerir, ayrıca hekim_ad parametresi eklendi)
 -- ──────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.tohumlama_kaydet(
-  p_hayvan_id   text,
-  p_tarih       date,
-  p_sperma      text,
-  p_hekim_id    text  DEFAULT NULL,
-  p_irk_bilgisi text  DEFAULT NULL
+  p_hayvan_id      text,
+  p_tarih          date,
+  p_sperma         text,
+  p_hekim_id       text    DEFAULT NULL,
+  p_irk_bilgisi    text    DEFAULT NULL,
+  p_ek_uygulamalar jsonb   DEFAULT '[]'::jsonb
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -1476,6 +1480,8 @@ DECLARE
   v_yas_gun  integer;
   v_deneme   integer;
   v_toh_id   uuid := gen_random_uuid();
+  v_ek       jsonb;
+  v_ek_stok  uuid;
 BEGIN
   -- Hayvan var mı?
   SELECT * INTO v_hayvan
@@ -1517,11 +1523,11 @@ BEGIN
   FROM public.tohumlama
   WHERE hayvan_id = p_hayvan_id;
 
-  -- Tohumlama kaydı
+  -- Tohumlama kaydı (ek_uygulamalar dahil)
   INSERT INTO public.tohumlama
-    (id, hayvan_id, tarih, sperma, irk_bilgisi, hekim_id, sonuc, deneme_no)
+    (id, hayvan_id, tarih, sperma, irk_bilgisi, hekim_id, sonuc, deneme_no, ek_uygulamalar)
   VALUES
-    (v_toh_id, p_hayvan_id, p_tarih, p_sperma, p_irk_bilgisi, p_hekim_id, 'Bekliyor', v_deneme);
+    (v_toh_id, p_hayvan_id, p_tarih, p_sperma, p_irk_bilgisi, p_hekim_id, 'Bekliyor', v_deneme, p_ek_uygulamalar);
 
   -- Kontrol görevleri
   INSERT INTO public.gorev_log
@@ -1542,6 +1548,23 @@ BEGIN
   WHERE (s.urun_adi ILIKE '%' || p_sperma || '%' OR s.urun_adi = p_sperma)
     AND s.kategori = 'Sperma'
   LIMIT 1;
+
+  -- Ek uygulama stok düşüm döngüsü
+  IF p_ek_uygulamalar IS NOT NULL AND jsonb_array_length(p_ek_uygulamalar) > 0 THEN
+    FOR v_ek IN SELECT * FROM jsonb_array_elements(p_ek_uygulamalar) LOOP
+      IF (v_ek->>'stok_id') IS NOT NULL AND (v_ek->>'stok_id') <> '' THEN
+        v_ek_stok := (v_ek->>'stok_id')::uuid;
+        INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar, iptal)
+        VALUES (
+          v_ek_stok,
+          'Tohumlama',
+          COALESCE((v_ek->>'doz')::numeric, 1),
+          'Tohumlama ek uygulama: ' || COALESCE(v_ek->>'tur', '') || ' — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id),
+          false
+        );
+      END IF;
+    END LOOP;
+  END IF;
 
   RETURN jsonb_build_object(
     'ok',           true,
@@ -1584,7 +1607,7 @@ GRANT SELECT ON public.hekimler TO anon, authenticated;
 GRANT SELECT ON public.hayvan_timeline_view TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.hekim_listesi() TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.hekim_ekle(text, text, text) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.tohumlama_kaydet(text, date, text, text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tohumlama_kaydet(text, date, text, text, text, jsonb) TO anon, authenticated;
 -- ═══════════════════════════════════════════════════════════════
 -- Migration 010 — hayvan_guncelle RPC
 -- Hayvan kartından bilgi/padok düzenleme
