@@ -836,6 +836,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+GRANT EXECUTE ON FUNCTION public.kizginlik_kaydet(text, date, text, text) TO anon, authenticated;
+
 -- ──────────────────────────────────────────────────────────────
 -- 6. HASTALIK_KAYDET
 -- ──────────────────────────────────────────────────────────────
