@@ -3859,6 +3859,13 @@ function openMWithHayvan(modalId,inputId,kupeNo){
       if(typeof loadBulkIlacPadoklar==='function') loadBulkIlacPadoklar();
       if(typeof loadBulkIlacDropdown==='function') loadBulkIlacDropdown();
     }
+    if(modalId==='m-insem'){
+      const cb=document.getElementById('i-sorun-toggle');
+      const thumb=document.getElementById('i-sorun-thumb');
+      if(cb) cb.checked=false;
+      if(thumb) thumb.style.background='var(--card3)';
+      globalThis._insemSorunVar=false;
+    }
   },150);
   if(inputId==='i-hid') globalThis._insemKupeTid=_tid;
 }
