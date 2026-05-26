@@ -247,7 +247,18 @@ async function submitInsem(btn) {
     });
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
-    closeM('m-insem');
+
+    // Sorun toggle açıksa bottom sheet aç
+    if (globalThis._insemSorunVar) {
+      const tohId = result?.tohumlama_id || null;
+      const kizId = globalThis._insemKizginlikId || null;
+      closeM('m-insem');
+      setTimeout(() => sorunBottomSheet(tohId, kizId), 200);
+    } else {
+      closeM('m-insem');
+      globalThis._insemSorunVar = false;
+      globalThis._insemKizginlikId = null;
+    }
     cl('i-hid'); cl('i-sperma');
     _ekUygulamalar = [];
     _ekListeGoster();

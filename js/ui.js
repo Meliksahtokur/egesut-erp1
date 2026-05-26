@@ -1335,7 +1335,7 @@ async function _uremeKizginlik(el){
       <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
         ${cozulduMi?'':`
           <button style="background:var(--blue);color:#fff;padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700"
-            onclick="event.stopPropagation();openInsemSafe('${kupe}')">💉 Tohumla</button>
+            onclick="event.stopPropagation();globalThis._insemKizginlikId='${k.id}';openInsemSafe('${kupe}')">💉 Tohumla</button>
           <button style="background:rgba(42,107,181,.15);color:var(--blue);padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;white-space:nowrap"
             onclick="event.stopPropagation();kizginlikTedaviAc('${k.id}','${kupe}')">🏥 Tedavi</button>
         `}
@@ -1354,6 +1354,115 @@ async function _uremeKizginlik(el){
     : '';
   el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`
     +(list.length?aktifHtml+cozulmusHtml:'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
+}
+
+// ── İN-FLOW VAKA AÇMA (Plan-E) ─────────────
+function sorunBottomSheet(tohId, kizId) {
+  let box = document.getElementById('sorun-bs');
+  if (box) box.remove();
+
+  const sorunlar = [
+    { id: 'endometrit',  label: '🦠 Endometrit',    tani: 'Endometrit' },
+    { id: 'kist',        label: '🔵 Kist',           tani: 'Over Kisti' },
+    { id: 'tumor',       label: '🎗 Tümör',          tani: 'Tümör' },
+    { id: 'pg',          label: '💊 PG Protokolü',   tani: 'PG Protokolü' },
+    { id: 'prit',        label: '💉 PRIT',            tani: 'PRIT Protokolü' },
+    { id: 'diger',       label: '+ Serbest Giriş',   tani: null },
+  ];
+
+  box = document.createElement('div');
+  box.id = 'sorun-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) { box.remove(); _sorunBsTemizle(); } };
+
+  box.innerHTML = `
+    <div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+      <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">⚠️ Tespit edilen sorunu seçin</div>
+      <div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">Tohumlama kaydedildi — şimdi vaka açılıyor</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px">
+        ${sorunlar.map(s => `
+          <button type="button" onclick="sorunSec('${s.id}','${esc(s.tani||'')}',event)"
+            style="padding:7px 13px;border-radius:20px;border:1.5px solid var(--card3);background:var(--card);color:var(--ink2);font-size:.78rem;font-weight:600;cursor:pointer">
+            ${s.label}
+          </button>`).join('')}
+      </div>
+      <div id="sorun-serbest" style="display:none;margin-bottom:12px">
+        <input id="sorun-serbest-input" class="fi" placeholder="Tanı / notlar…">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="sorunVakaAc('${tohId||''}','${kizId||''}')"
+          style="flex:1;padding:12px;background:var(--red2);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">
+          🏥 Vaka Aç
+        </button>
+        <button onclick="document.getElementById('sorun-bs').remove();_sorunBsTemizle()"
+          style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;cursor:pointer">
+          Şimdi Değil
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+}
+
+let _sorunSecilen = null;
+
+function sorunSec(id, tani, e) {
+  _sorunSecilen = { id, tani };
+  document.querySelectorAll('#sorun-bs button[onclick^="sorunSec"]').forEach(b => {
+    b.style.background = 'var(--card)';
+    b.style.borderColor = 'var(--card3)';
+    b.style.color = 'var(--ink2)';
+  });
+  e.target.style.background = 'var(--red2)';
+  e.target.style.borderColor = 'var(--red2)';
+  e.target.style.color = '#fff';
+  const serbest = document.getElementById('sorun-serbest');
+  if (id === 'diger') serbest.style.display = 'block';
+  else serbest.style.display = 'none';
+}
+
+async function sorunVakaAc(tohId, kizId) {
+  if (!_sorunSecilen) { toast('Sorun türü seçin', true); return; }
+  let tani = _sorunSecilen.id === 'diger'
+    ? (document.getElementById('sorun-serbest-input')?.value?.trim() || 'Bilinmiyor')
+    : _sorunSecilen.tani;
+
+  try {
+    let caseId;
+    if (kizId) {
+      const res = await rpc('kizginlik_vaka_ac', {
+        p_kizginlik_id: kizId,
+        p_tani: tani,
+        p_tohumlama_id: tohId || null,
+        p_notlar: 'Tohumlama sırasında tespit edildi'
+      });
+      caseId = res?.case_id;
+    } else {
+      _sorunPreFill = { tani, kategori: 'Üreme', notlar: 'Tohumlama sırasında tespit edildi' };
+      document.getElementById('sorun-bs')?.remove();
+      _sorunBsTemizle();
+      openM('m-disease');
+      return;
+    }
+
+    document.getElementById('sorun-bs')?.remove();
+    _sorunBsTemizle();
+    toast('🏥 Vaka açıldı');
+
+    await pullTables(['cases','kizginlik_log','tohumlama']);
+    renderSafe();
+
+    if (caseId) {
+      setTimeout(() => {
+        if (typeof openCaseById === 'function') openCaseById(caseId);
+      }, 400);
+    }
+  } catch(e) { toast('❌ ' + e.message, true); }
+}
+
+function _sorunBsTemizle() {
+  _sorunSecilen = null;
+  globalThis._insemSorunVar = false;
+  globalThis._insemKizginlikId = null;
 }
 
 let _kizginlikSearchTimer=null;
