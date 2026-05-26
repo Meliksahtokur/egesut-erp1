@@ -1323,11 +1323,14 @@ async function _uremeKizginlik(el){
       : k.sonuc === 'POSTPARTUM_GOZLEM'
         ? `<span style="font-size:.6rem;color:var(--ink3);background:var(--card2);border-radius:4px;padding:1px 5px;margin-left:4px">👁 Gözlem</span>`
       : '';
+    const caseBadge = k.tedavi_case_id && !cozulduMi
+      ? `<span style="font-size:.6rem;color:var(--blue);background:rgba(42,107,181,.1);border-radius:4px;padding:1px 5px;margin-left:4px;cursor:pointer" onclick="event.stopPropagation();toast('🏥 Vaka açıldı — Tedavi sekmesinden görüntüleyin')">🔗 Vaka</span>`
+      : '';
     return `<div class="hist-row">
       <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
       <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
         <div class="hist-title">🔴 ${esc(kupe)} — ${esc(k.belirti||'Kızgınlık')} ${badge}</div>
-        <div class="hist-sub">${esc(k.tarih)} ${k.notlar?'· '+esc(k.notlar):''}</div>
+        <div class="hist-sub">${esc(k.tarih)} ${k.notlar?'· '+esc(k.notlar):''} ${caseBadge}</div>
       </div>
       <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
         ${cozulduMi?'':`

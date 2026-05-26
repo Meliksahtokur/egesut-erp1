@@ -153,6 +153,74 @@ async function submitBirth(btn) {
   } finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
 }
 
+// ── EK UYGULAMA (tohumlama modalı) ──────────
+let _ekUygulamalar = [];
+let _ekSeciliTur = null;
+
+function ekChipSec(btn) {
+  _ekSeciliTur = btn.dataset.tur;
+  document.querySelectorAll('.ek-chip').forEach(b => b.classList.remove('aktif'));
+  btn.classList.add('aktif');
+  document.getElementById('ek-stok-row').style.display = 'flex';
+  _ekStokYukle(_ekSeciliTur);
+}
+
+async function _ekStokYukle(tur) {
+  const tum = await idbGetAll('stok');
+  const sel = document.getElementById('ek-stok-sel');
+  const esTablo = {
+    'GnRH':       ['Diğer İlaç', 'Diger Ilac', 'Hormon'],
+    'PG':         ['Diğer İlaç', 'Diger Ilac', 'Hormon'],
+    'E Vitamini': ['Vitamin'],
+    'B12':        ['Vitamin'],
+    'Selenium':   ['Vitamin', 'Diğer İlaç', 'Diger Ilac'],
+    'Diğer':      null
+  };
+  const kategoriler = esTablo[tur] || null;
+  const filtreli = kategoriler
+    ? tum.filter(s => kategoriler.some(k => (s.kategori||'').toLowerCase().includes(k.toLowerCase())))
+    : tum;
+  sel.innerHTML = '<option value="">Stoktan seç…</option>' +
+    filtreli.map(s => `<option value="${s.id}" data-ad="${esc(s.urun_adi)}" data-birim="${s.birim||'adet'}">${esc(s.urun_adi)} (${s.miktar||0} ${s.birim||'adet'})</option>`).join('');
+}
+
+function ekUygulamaEkle() {
+  const sel = document.getElementById('ek-stok-sel');
+  const doz = parseFloat(document.getElementById('ek-doz').value) || 0;
+  const yol = document.getElementById('ek-yol').value;
+  const stokId = sel.value;
+  const stokAd = sel.options[sel.selectedIndex]?.dataset?.ad || '';
+  const birim = sel.options[sel.selectedIndex]?.dataset?.birim || 'ml';
+
+  if (!_ekSeciliTur) { toast('Uygulama türü seçin', true); return; }
+  if (doz <= 0) { toast('Doz girin', true); return; }
+
+  _ekUygulamalar.push({ tur: _ekSeciliTur, stok_id: stokId, stok_ad: stokAd, doz, birim, yol });
+  _ekListeGoster();
+
+  document.getElementById('ek-doz').value = '';
+  document.querySelectorAll('.ek-chip').forEach(b => b.classList.remove('aktif'));
+  document.getElementById('ek-stok-row').style.display = 'none';
+  _ekSeciliTur = null;
+}
+
+function ekUygulama_sil(idx) {
+  _ekUygulamalar.splice(idx, 1);
+  _ekListeGoster();
+}
+
+function _ekListeGoster() {
+  const el = document.getElementById('ek-liste');
+  if (!_ekUygulamalar.length) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = _ekUygulamalar.map((u, i) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--card3);font-size:.75rem">
+      <span><b>${esc(u.tur)}</b> ${u.stok_ad ? '– ' + esc(u.stok_ad) : ''} · ${u.doz} ${u.birim} · ${u.yol}</span>
+      <button type="button" onclick="ekUygulama_sil(${i})" style="background:none;border:none;color:var(--red2);cursor:pointer;font-size:.85rem">🗑</button>
+    </div>`
+  ).join('');
+}
+
 // ── TOHUMLAMA ────────────────────────────────
 async function submitInsem(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -171,15 +239,18 @@ async function submitInsem(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     const result = await rpc('tohumlama_kaydet', {
-      p_hayvan_id: hayvan.id,
-      p_tarih:     tarih,
-      p_sperma:    sperma,
-      p_hekim_id:  v('i-hekim') || null,
+      p_hayvan_id:      hayvan.id,
+      p_tarih:          tarih,
+      p_sperma:         sperma,
+      p_hekim_id:       v('i-hekim') || null,
+      p_ek_uygulamalar: JSON.stringify(_ekUygulamalar),
     });
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
     closeM('m-insem');
     cl('i-hid'); cl('i-sperma');
+    _ekUygulamalar = [];
+    _ekListeGoster();
     checkSpermaUyari();
     pullTables(['tohumlama','gorev_log','hayvanlar']).then(() => {
       renderSafe();
@@ -1541,4 +1612,11 @@ function updateBulkSerbest(prefix) {
   window[idKey] = [...boxes].map(b => b.value);
   const countEl = document.getElementById(prefix + '-s-count');
   if (countEl) countEl.textContent = window[idKey].length;
+}
+
+// ── SORUN TESPİT TOGGLE (tohumlama modalı) ──
+function sorunToggle(cb) {
+  const thumb = document.getElementById('i-sorun-thumb');
+  thumb.style.background = cb.checked ? 'var(--red2)' : 'var(--card3)';
+  globalThis._insemSorunVar = cb.checked;
 }
