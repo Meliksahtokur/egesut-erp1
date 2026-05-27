@@ -2782,7 +2782,8 @@ ALTER TABLE public.treatment_days
 CREATE TABLE IF NOT EXISTS public.drug_administrations (
   id                uuid    PRIMARY KEY DEFAULT gen_random_uuid(),
   treatment_day_id  uuid    NOT NULL REFERENCES public.treatment_days(id) ON DELETE CASCADE,
-  drug_id           uuid    NOT NULL REFERENCES public.drugs(id),
+  stok_id           text    REFERENCES public.stok(id),
+  drug_product_id   uuid    REFERENCES public.drug_products(id),
   dose              numeric NOT NULL CHECK (dose > 0),
   unit              text    NOT NULL,
   route             text,
@@ -2792,7 +2793,7 @@ CREATE TABLE IF NOT EXISTS public.drug_administrations (
     CHECK (route IS NULL OR route IN ('IM','IV','SC','PO','Topikal','Intrauterin'))
 );
 
-COMMENT ON TABLE  public.drug_administrations  IS 'Controlled ilaç uygulama — drug_id FK zorunlu';
+COMMENT ON TABLE  public.drug_administrations  IS 'İlaç uygulama — stok_id + drug_product_id FK (drug_id kaldırıldı)';
 COMMENT ON COLUMN public.drug_administrations.route IS 'IM | IV | SC | PO | Topikal | Intrauterin';
 
 CREATE INDEX IF NOT EXISTS drug_admin_day_id_idx ON public.drug_administrations(treatment_day_id);
@@ -2819,81 +2820,22 @@ CREATE TRIGGER trg_set_day_no
   FOR EACH ROW EXECUTE FUNCTION public.set_treatment_day_no();
 
 -- ──────────────────────────────────────────────────────────────
--- 7. TRIGGER: drug_administrations → stok_hareket ledger
+-- 7. TRIGGER: drug_administration → stok_hareket (KALDIRILDI)
 --
--- Mevcut ledger mantığı korunur:
---   stok_hareket.miktar POZİTİF = kullanım
---   frontend: guncel = baslangic_miktar - SUM(miktar WHERE NOT iptal)
+-- stok hareketi artık RPC içinde yapılıyor:
+--   add_drug_administration() → kendisi INSERT INTO stok_hareket
+--   delete_treatment_day()    → UPDATE stok_hareket SET iptal=true
+--   geri_al()                 → UPDATE stok_hareket SET iptal=true
+-- Trigger kaldırıldı çünkü drug_id kolonu yok (stok_id + drug_product_id kullanılıyor)
 -- ──────────────────────────────────────────────────────────────
+-- Trigger kaldırıldı: stok hareketi add_drug_administration RPC içinde yapılıyor
 CREATE OR REPLACE FUNCTION public.drug_administration_stok_dusum()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  v_stok_id   text;
-  v_drug_name text;
-  v_animal_id text;
-  v_kupe_no   text;
-  v_guncel    numeric;
 BEGIN
-  -- İlacın stok bağlantısını kontrol et
-  SELECT d.stock_item_id, d.name
-  INTO   v_stok_id, v_drug_name
-  FROM   public.drugs d
-  WHERE  d.id = NEW.drug_id;
-
-  -- Stok bağlantısı yoksa ledger kaydı yapmadan geç
-  IF v_stok_id IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- Hayvan küpe no'sunu bul (notlar için)
-  SELECT c.animal_id INTO v_animal_id
-  FROM   public.treatment_days td
-  JOIN   public.cases c ON c.id = td.case_id
-  WHERE  td.id = NEW.treatment_day_id;
-
-  SELECT kupe_no INTO v_kupe_no
-  FROM   public.hayvanlar
-  WHERE  id = v_animal_id;
-
-  -- Stok yeterliliği kontrolü
-  SELECT COALESCE(s.baslangic_miktar, 0)
-         - COALESCE((
-             SELECT SUM(sh.miktar)
-             FROM   public.stok_hareket sh
-             WHERE  sh.stok_id = v_stok_id
-               AND  NOT sh.iptal
-           ), 0)
-  INTO v_guncel
-  FROM public.stok s
-  WHERE s.id = v_stok_id;
-
-  IF v_guncel < NEW.dose THEN
-    RAISE EXCEPTION 'Yetersiz stok: % (mevcut: %, istenen: %)',
-      v_drug_name, v_guncel, NEW.dose;
-  END IF;
-
-  -- Ledger: pozitif = kullanım (frontend bu değeri SUM'dan düşürür)
-  INSERT INTO public.stok_hareket (
-    stok_id, tur, miktar, notlar, iptal,
-    referans_tipi, referans_id
-  ) VALUES (
-    v_stok_id,
-    'Tedavi',
-    NEW.dose,   -- POZİTİF — mevcut ledger mantığıyla uyumlu
-    v_drug_name || ' — ' || COALESCE(v_kupe_no, v_animal_id),
-    false,
-    'drug_administration',
-    NEW.id::text
-  );
-
+  -- This trigger is disabled. Stock ledger is handled by RPC.
   RETURN NEW;
 END;
 $$;
-
-DROP TRIGGER IF EXISTS trg_drug_administration_stok ON public.drug_administrations;
-CREATE TRIGGER trg_drug_administration_stok
-  AFTER INSERT ON public.drug_administrations
-  FOR EACH ROW EXECUTE FUNCTION public.drug_administration_stok_dusum();
 
 -- ──────────────────────────────────────────────────────────────
 -- 8. VIEW: treatment_timeline
@@ -2901,31 +2843,34 @@ CREATE TRIGGER trg_drug_administration_stok
 DROP VIEW IF EXISTS public.treatment_timeline CASCADE;
 CREATE VIEW public.treatment_timeline AS
 SELECT
-  h.id          AS animal_id,
-  h.kupe_no     AS kupe_no,
-  c.id          AS case_id,
-  c.status      AS case_status,
-  c.start_date  AS case_start,
-  dis.name      AS disease,
-  dis.category  AS disease_category,
-  td.id         AS day_id,
+  h.id            AS animal_id,
+  h.kupe_no,
+  c.id            AS case_id,
+  c.status        AS case_status,
+  c.start_date    AS case_start,
+  dis.name        AS disease,
+  dis.category    AS disease_category,
+  td.id           AS day_id,
   td.day_no,
   td.treatment_date,
-  dr.id         AS drug_id,
-  dr.name       AS drug,
-  da.id         AS administration_id,
+  dp.id           AS drug_id,
+  COALESCE(dp.brand_name, s.urun_adi, '?'::text) AS drug,
+  da.id           AS administration_id,
   da.dose,
   da.unit,
   da.route,
-  da.notes      AS admin_notes
-FROM public.drug_administrations da
-JOIN public.treatment_days  td  ON td.id  = da.treatment_day_id
-JOIN public.cases           c   ON c.id   = td.case_id
-JOIN public.hayvanlar       h   ON h.id   = c.animal_id
-JOIN public.drugs           dr  ON dr.id  = da.drug_id
-JOIN public.diseases        dis ON dis.id = c.disease_id;
+  da.notes        AS admin_notes,
+  da.stok_id,
+  td.treatment_time
+FROM public.treatment_days td
+JOIN public.cases                c   ON c.id   = td.case_id
+JOIN public.hayvanlar            h   ON h.id   = c.animal_id
+JOIN public.diseases             dis ON dis.id = c.disease_id
+LEFT JOIN public.drug_administrations da ON da.treatment_day_id = td.id
+LEFT JOIN public.drug_products       dp ON dp.id = da.drug_product_id
+LEFT JOIN public.stok                s  ON s.id  = da.stok_id;
 
-COMMENT ON VIEW public.treatment_timeline IS 'Vaka → gün → ilaç timeline, frontend için hazır';
+COMMENT ON VIEW public.treatment_timeline IS 'Vaka → gün → ilaç timeline (drug_products + stok), frontend için hazır';
 
 -- ──────────────────────────────────────────────────────────────
 -- 9. RPC FONKSİYONLARI
@@ -2966,6 +2911,22 @@ BEGIN
   INSERT INTO public.cases (animal_id, disease_id, notes)
   VALUES (p_animal_id, p_disease_id, p_notes)
   RETURNING id INTO v_new_id;
+
+  -- islem_log: geri alma icin snapshot
+  INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+  VALUES (
+    gen_random_uuid()::text,
+    'VAKA_ACILDI',
+    p_animal_id,
+    v_new_id::text,
+    'cases',
+    jsonb_build_object(
+      'olusturulan', jsonb_build_array(
+        jsonb_build_object('tablo', 'cases', 'id', v_new_id::text)
+      ),
+      'guncellenen', '[]'::jsonb
+    )
+  );
 
   RETURN jsonb_build_object('ok', true, 'case_id', v_new_id);
 END;
@@ -3044,14 +3005,23 @@ $$;
 GRANT EXECUTE ON FUNCTION public.kizginlik_vaka_ac(text, text, text, text) TO anon, authenticated;
 
 -- 9b. add_treatment_day
-DROP FUNCTION IF EXISTS public.add_treatment_day(uuid);
+DROP FUNCTION IF EXISTS public.add_treatment_day(uuid, date);
 CREATE OR REPLACE FUNCTION public.add_treatment_day(
-  p_case_id uuid
+  p_case_id uuid,
+  p_date    date
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_new_id uuid;
-  v_case   record;
+  v_day_id        uuid;
+  v_gorev_id      uuid;
+  v_prev_gorev_id uuid := NULL;
+  v_day_no        int;
+  v_case          record;
+  v_gecmis        boolean;
 BEGIN
+  SELECT COALESCE(MAX(day_no), 0) + 1 INTO v_day_no
+  FROM public.treatment_days
+  WHERE case_id = p_case_id;
+
   SELECT * INTO v_case FROM public.cases WHERE id = p_case_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Vaka bulunamadı');
@@ -3061,58 +3031,90 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Kapalı vakaya gün eklenemez');
   END IF;
 
-  INSERT INTO public.treatment_days (case_id)
-  VALUES (p_case_id)
-  RETURNING id INTO v_new_id;
+  v_gecmis := p_date < CURRENT_DATE;
 
-  RETURN jsonb_build_object('ok', true, 'day_id', v_new_id);
+  -- Zincir: önceki günün gorev_log ID'sini bul
+  IF v_day_no > 1 THEN
+    SELECT g.id INTO v_prev_gorev_id
+    FROM public.gorev_log g
+    JOIN public.treatment_days td ON (g.aciklama::jsonb->>'day_id')::uuid = td.id
+    WHERE td.case_id = p_case_id
+      AND td.day_no  = v_day_no - 1
+      AND g.gorev_tipi = 'TEDAVI_GUN'
+    LIMIT 1;
+  END IF;
+
+  INSERT INTO public.treatment_days(id, case_id, day_no, treatment_date, tamamlandi, tamamlanma_tarihi)
+  VALUES (
+    gen_random_uuid(), p_case_id, v_day_no, p_date,
+    v_gecmis,
+    CASE WHEN v_gecmis THEN p_date::timestamptz ELSE NULL END
+  )
+  RETURNING id INTO v_day_id;
+
+  INSERT INTO public.gorev_log(
+    id, gorev_tipi, hayvan_id, hedef_tarih, aciklama,
+    tamamlandi, tamamlanma_tarihi, parent_id
+  )
+  VALUES (
+    gen_random_uuid(),
+    'TEDAVI_GUN',
+    v_case.animal_id,
+    p_date,
+    jsonb_build_object(
+      'day_id', v_day_id,
+      'gun_no', v_day_no,
+      'label',  'Gün ' || v_day_no || ' tedavisi — ' || to_char(p_date, 'DD.MM.YYYY')
+    )::text,
+    v_gecmis,
+    CASE WHEN v_gecmis THEN p_date::timestamptz ELSE NULL END,
+    v_prev_gorev_id  -- NULL = ilk gün, dolu = önceki günün gorev_id
+  )
+  RETURNING id INTO v_gorev_id;
+
+  INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+  VALUES (
+    gen_random_uuid()::text,
+    'TEDAVI_GUN_EKLENDI',
+    v_case.animal_id,
+    v_day_id::text,
+    'treatment_days',
+    jsonb_build_object(
+      'olusturulan', jsonb_build_array(
+        jsonb_build_object('tablo', 'treatment_days', 'id', v_day_id::text),
+        jsonb_build_object('tablo', 'gorev_log',      'id', v_gorev_id::text)
+      ),
+      'guncellenen', '[]'::jsonb
+    )
+  );
+
+  RETURN jsonb_build_object('ok', true, 'day_id', v_day_id, 'day_no', v_day_no, 'gecmis', v_gecmis);
 END;
 $$;
 
--- 9c. add_drug_administration
-DROP FUNCTION IF EXISTS public.add_drug_administration(uuid, uuid, numeric, text, text);
+-- 9c. add_drug_administration (stok_id + drug_product_id — drug_id kaldırıldı)
+DROP FUNCTION IF EXISTS public.add_drug_administration(uuid, text, uuid, numeric, text, text);
 CREATE OR REPLACE FUNCTION public.add_drug_administration(
-  p_day_id   uuid,
-  p_drug_id  uuid,
-  p_dose     numeric,
-  p_unit     text,
-  p_route    text DEFAULT NULL
+  p_day_id           uuid,
+  p_stok_id          text,
+  p_drug_product_id  uuid,
+  p_dose             numeric,
+  p_unit             text,
+  p_route            text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_new_id   uuid;
-  v_day      record;
-  v_case     record;
-  v_drug     record;
+  v_id uuid;
 BEGIN
-  SELECT * INTO v_day FROM public.treatment_days WHERE id = p_day_id;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Tedavi günü bulunamadı');
+  INSERT INTO public.drug_administrations (treatment_day_id, drug_product_id, stok_id, dose, unit, route)
+  VALUES (p_day_id, p_drug_product_id, p_stok_id, p_dose, p_unit, p_route)
+  RETURNING id INTO v_id;
+
+  IF p_stok_id IS NOT NULL AND p_dose > 0 THEN
+    INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar)
+    VALUES (p_stok_id, 'Tedavi', p_dose, 'drug_admin:' || v_id::text);
   END IF;
 
-  SELECT * INTO v_case FROM public.cases WHERE id = v_day.case_id;
-  IF v_case.status = 'closed' THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Kapalı vakaya ilaç eklenemez');
-  END IF;
-
-  SELECT * INTO v_drug FROM public.drugs WHERE id = p_drug_id;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'İlaç kaydı bulunamadı');
-  END IF;
-
-  IF p_dose IS NULL OR p_dose <= 0 THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçerli bir doz girin');
-  END IF;
-
-  INSERT INTO public.drug_administrations (
-    treatment_day_id, drug_id, dose, unit, route
-  ) VALUES (
-    p_day_id, p_drug_id, p_dose,
-    COALESCE(p_unit, v_drug.default_unit, ''),
-    COALESCE(p_route, v_drug.default_route)
-  )
-  RETURNING id INTO v_new_id;
-
-  RETURN jsonb_build_object('ok', true, 'administration_id', v_new_id);
+  RETURN jsonb_build_object('ok', true, 'id', v_id);
 END;
 $$;
 
@@ -3223,7 +3225,7 @@ CREATE POLICY drug_administrations_all ON public.drug_administrations FOR ALL   
 -- SECURITY DEFINER GRANTS
 GRANT EXECUTE ON FUNCTION public.create_case             TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.add_treatment_day       TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.add_drug_administration TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.add_drug_administration(uuid, text, uuid, numeric, text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.close_case              TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.treatment_day_tamamla   TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.treatment_day_not_guncelle TO anon, authenticated;
@@ -3815,7 +3817,6 @@ DECLARE
   v_set_parts text[] := '{}';
   v_sql       text;
 BEGIN
-  -- İşlem kaydını al
   SELECT snapshot INTO v_snapshot
   FROM islem_log
   WHERE id = p_islem_id;
@@ -3824,15 +3825,51 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'hata', 'islem bulunamadi');
   END IF;
 
-  -- Oluşturulan kayıtları sil
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_snapshot->'olusturulan')
   LOOP
     v_tablo := v_item->>'tablo';
     v_pk    := v_item->>'id';
-    EXECUTE format('DELETE FROM %I WHERE id = $1', v_tablo) USING v_pk;
+
+    IF v_tablo = 'treatment_days' THEN
+      UPDATE public.stok_hareket
+      SET iptal = true
+      WHERE notlar IN (
+        SELECT 'drug_admin:' || da.id::text
+        FROM public.drug_administrations da
+        WHERE da.treatment_day_id = v_pk::uuid
+      );
+      DELETE FROM public.treatment_days WHERE id = v_pk::uuid;
+
+    ELSIF v_tablo = 'cases' THEN
+      DELETE FROM public.gorev_log g
+      WHERE g.gorev_tipi = 'TEDAVI_GUN'
+        AND EXISTS (
+          SELECT 1 FROM public.treatment_days td
+          WHERE td.case_id = v_pk::uuid
+            AND g.aciklama IS NOT NULL
+            AND (g.aciklama::jsonb->>'day_id')::uuid = td.id
+        );
+
+      UPDATE public.stok_hareket
+      SET iptal = true
+      WHERE notlar IN (
+        SELECT 'drug_admin:' || da.id::text
+        FROM public.drug_administrations da
+        JOIN public.treatment_days td ON da.treatment_day_id = td.id
+        WHERE td.case_id = v_pk::uuid
+      );
+
+      DELETE FROM public.cases WHERE id = v_pk::uuid;
+
+    ELSE
+      BEGIN
+        EXECUTE format('DELETE FROM %I WHERE id = $1', v_tablo) USING v_pk;
+      EXCEPTION WHEN others THEN
+        EXECUTE format('DELETE FROM %I WHERE id = $1::uuid', v_tablo) USING v_pk;
+      END;
+    END IF;
   END LOOP;
 
-  -- Güncellenen kayıtları geri al
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_snapshot->'guncellenen')
   LOOP
     v_tablo  := v_item->>'tablo';
@@ -3858,16 +3895,12 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- İşlem durumunu güncelle
   UPDATE islem_log SET durum = 'geri_alindi' WHERE id = p_islem_id;
-
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.geri_al(text) TO anon, authenticated;
-
-NOTIFY pgrst, 'reload schema';
 -- Migration: tohumlama event stack — önceki Bekliyor→Boş + islem_log snapshot + tohumlama_sonuc_gebe RPC
 -- Etkiler: tohumlama_kaydet RPC (güncelleme), tohumlama_sonuc_gebe RPC (yeni)
 --          Tablolar: tohumlama, gorev_log, islem_log, hayvanlar
@@ -5001,34 +5034,31 @@ CREATE OR REPLACE FUNCTION public.delete_treatment_day(
   p_day_id uuid
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  v_admin record;
 BEGIN
-  -- Stok geri yaz (her ilaç uygulaması için ters hareket)
-  FOR v_admin IN
-    SELECT da.id, da.drug_id, da.dose, da.unit, d.stock_item_id
-    FROM drug_administrations da
-    JOIN drugs d ON d.id = da.drug_id
+  -- Stok iade: iptal=true (audit trail, çift düşüm bug'u fix)
+  UPDATE public.stok_hareket
+  SET iptal = true
+  WHERE notlar IN (
+    SELECT 'drug_admin:' || da.id::text
+    FROM public.drug_administrations da
     WHERE da.treatment_day_id = p_day_id
-      AND d.stock_item_id IS NOT NULL
-  LOOP
-    INSERT INTO stok_hareket (id, stok_id, tur, miktar, notlar)
-    VALUES (
-      gen_random_uuid(),
-      v_admin.stock_item_id::uuid,
-      'Tedavi Düzelt',
-      v_admin.dose,
-      'drug_admin:' || v_admin.id::text || ' — tedavi günü silindi, iade'
-    );
-  END LOOP;
+  );
 
-  -- Kayıtları sil (drug_administrations önce, sonra treatment_day)
-  DELETE FROM drug_administrations WHERE treatment_day_id = p_day_id;
-  DELETE FROM treatment_days WHERE id = p_day_id;
+  -- Bağlı TEDAVI_GUN gorevini de sil
+  DELETE FROM public.gorev_log
+  WHERE gorev_tipi = 'TEDAVI_GUN'
+    AND aciklama IS NOT NULL
+    AND (aciklama::jsonb->>'day_id')::uuid = p_day_id;
+
+  -- Kayıtları sil
+  DELETE FROM public.drug_administrations WHERE treatment_day_id = p_day_id;
+  DELETE FROM public.treatment_days WHERE id = p_day_id;
 
   RETURN jsonb_build_object('ok', true);
 END;
-$$;-- Migration: update_drug_administration RPC
+$$;
+
+-- Migration: update_drug_administration RPC
 -- Etkiler: Yeni RPC — ilaç uygulaması güncelle, stok delta kaydet
 -- Geri alınabilir: DROP FUNCTION IF EXISTS public.update_drug_administration(uuid, numeric, text, text);
 -- Fix: Mevcut fonksiyon DEFAULT parametrelerle tanımlı — önce DROP, sonra CREATE
