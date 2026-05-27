@@ -28,7 +28,7 @@ const _katTipMap={
   asi:['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE'],
   muayene:['MUAYENE'],
-  tedavi:['TEDAVI','ILAC_UYGULAMA'],
+  tedavi:['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN'],
   bakim:['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME'],
   diger:null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
@@ -2923,20 +2923,15 @@ async function renderCaseTimeline(caseId) {
             </div>`).join('')}</div>`
         : `<span style="color:var(--ink3);font-size:.75rem;display:block;padding:4px 0">İlaç eklenmemiş</span>`;
 
-      // Planlama butonları — lock durumundan bağımsız (tüm aktif non-done günlerde)
-      const planHtml = aktif && !isDone ? `
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-          <button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">+ İlaç</button>
-          <button onclick="caseDayNotAcById('${day.day_id}')" style="background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">📝 Not</button>
-        </div>` : '';
-      // Faz 2: done butonu kaldırıldı — görev listesinden yapılıyor
-      const doneHtml = aktif && !isDone ? `
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-          <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:7px 10px;font-size:.78rem;color:var(--ink3);cursor:pointer">🕐</button>
-          <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.18);border-radius:8px;padding:7px 10px;font-size:.78rem;cursor:pointer">🗑</button>
-          ${isLocked ? '<span style="font-size:.7rem;color:var(--ink3)">⏳ Görev listesinden tamamla</span>' : ''}
-        </div>` : '';
-      const actionsHtml = planHtml + doneHtml;
+      // Eylem çubuğu — lock'tan bağımsız planlama + ikincil eylemler tek satırda
+      const actionsHtml = aktif && !isDone ? `
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--card3);align-items:center">
+          <button onclick="caseDrugFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:var(--blue);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">+ İlaç</button>
+          <button onclick="caseDayNotAcById('${day.day_id}')" style="flex:1;min-width:64px;background:var(--card2);color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer">📝 Not</button>
+          <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;color:var(--ink3);cursor:pointer" title="Saat ekle">🕐</button>
+          <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.06);color:var(--red);border:1px solid rgba(192,50,26,.15);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer" title="Günü sil">🗑</button>
+        </div>
+        ${isLocked ? '<div style="margin-top:4px;font-size:.68rem;color:var(--ink3);padding:0 2px">⏳ Önceki günü görev listesinden tamamla</div>' : ''}` : '';
 
       // data-not-b64: base64 encode ile özel karakter güvenliği
       const notB64 = day.notes ? btoa(unescape(encodeURIComponent(day.notes))) : '';
