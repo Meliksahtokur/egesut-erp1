@@ -431,7 +431,7 @@ function renderTask(t,cls='',subs=[]){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
+      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'?`<button class="ck-btn" onclick="event.stopPropagation();doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -2441,6 +2441,15 @@ async function openTaskDet(id){
     if(tarihEl){tarihEl.value=todayStr;tarihEl.max=todayStr;}
   }
 
+  // TEDAVI_GUN: standart tamamla gizle, tedavi butonu göster
+  const tedaviGunBtn=document.getElementById('td-tedavi-gun-btn');
+  if(t.gorev_tipi==='TEDAVI_GUN'){
+    if(tamamBtn) tamamBtn.style.display='none';
+    if(tedaviGunBtn) tedaviGunBtn.style.display='block';
+  } else {
+    if(tedaviGunBtn) tedaviGunBtn.style.display='none';
+  }
+
   // Rapel görevi: parent_id varsa tarih picker göster
   if(t.parent_id&&t.gorev_tipi==='ILERI_GEBE_ASI'){
     try{
@@ -2482,6 +2491,31 @@ async function detayTamamla(){
     closeM('m-task-det');
   } catch(e){ toast(e.message,true); }
   if(btn){btn.disabled=false;btn.textContent='✅ Tamamlandı Olarak İşaretle';}
+}
+async function gorevTedaviGunDone(){
+  if(!_curTaskDet) return;
+  const btn=document.getElementById('td-tedavi-gun-btn');
+  if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
+  try {
+    // aciklama JSON: {day_id: "...", gun_no: N, label: "..."}
+    let meta;
+    try { meta = JSON.parse(_curTaskDet.aciklama); } catch(e){
+      toast('❌ Geçersiz görev verisi', true); return;
+    }
+    if(!meta.day_id){ toast('❌ Tedavi günü ID bulunamadı', true); return; }
+    // 1. Treatment day'i tamamla (sequential kontrolü RPC yapar)
+    await rpc('treatment_day_tamamla', { p_day_id: meta.day_id, p_not: null });
+    // 2. Görevi de tamamla
+    await rpc('gorev_tamamla', { p_gorev_id: _curTaskDet.id });
+    toast('✅ Tedavi günü tamamlandı');
+    closeM('m-task-det');
+    await pullTables(['treatment_days', 'gorev_log']);
+    loadTasks(_curTaskFilter||'today');
+    loadDash();
+    // Tedavi modal açıksa güncelle
+    if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
+  } catch(e){ toast('❌ ' + e.message, true); }
+  if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
 }
 function asiFormAc(){
   document.getElementById('td-asi-form').style.display='block';
@@ -2864,16 +2898,13 @@ async function renderCaseTimeline(caseId) {
           <button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">+ İlaç</button>
           <button onclick="caseDayNotAcById('${day.day_id}')" style="background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">📝 Not</button>
         </div>` : '';
-      // Done butonu — sadece locked değilse
-      const doneHtml = aktif && !isDone && !isLocked ? `
+      // Faz 2: done butonu kaldırıldı — görev listesinden yapılıyor
+      const doneHtml = aktif && !isDone ? `
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-          <button onclick="caseDayTamamla('${day.day_id}')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer">✅ Tamamla</button>
           <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:7px 10px;font-size:.78rem;color:var(--ink3);cursor:pointer">🕐</button>
           <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.18);border-radius:8px;padding:7px 10px;font-size:.78rem;cursor:pointer">🗑</button>
-        </div>` : (aktif && !isDone && isLocked ? `
-        <div style="margin-top:4px">
-          <span style="font-size:.7rem;color:var(--ink3)">⏳ Önceki günü tamamla</span>
-        </div>` : '');
+          ${isLocked ? '<span style="font-size:.7rem;color:var(--ink3)">⏳ Görev listesinden tamamla</span>' : ''}
+        </div>` : '';
       const actionsHtml = planHtml + doneHtml;
 
       // data-not-b64: base64 encode ile özel karakter güvenliği

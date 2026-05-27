@@ -202,6 +202,7 @@ registerActions({
   'asi-form-gizle':     () => { g('td-asi-form').style.display = 'none'; g('td-asi-ac-btn').style.display = 'block'; const ri=g('td-rapel-info'); if(ri) ri.style.display='none'; },
   'rapel-tarihi-kaydet':() => rapelTarihiKaydet(),
   'detay-tamamla':      () => detayTamamla(),
+  'tedavi-gun-tamamla': () => gorevTedaviGunDone(),
   'asi-form-ac':        () => asiFormAc(),
   'detay-duzenle':      () => openTaskEdit(),
   'detay-iptal':        () => detayIptal(),
