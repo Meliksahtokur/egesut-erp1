@@ -979,11 +979,11 @@ function openIslemDetay(idx){
   // TOHUMLAMA tipinde snapshot id varsa direkt aç
   const snapId=l.snapshot?.id;
   if(l.tip==='TOHUMLAMA' && snapId){ openTohDet(snapId); return; }
-  const LABEL={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme','KISIR_ISARETLE':'Kısır İşareti','KISIR_KALDIR':'Kısır Kaldırıldı'};
-  const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼','KISIR_ISARETLE':'💲','KISIR_KALDIR':'⭕'};
+  const LABEL={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme','KISIR_ISARETLE':'Kısır İşareti','KISIR_KALDIR':'Kısır Kaldırıldı','VAKA_ACILDI':'Vaka Açılışı','TEDAVI_GUN_EKLENDI':'Tedavi Günü Eklendi'};
+  const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼','KISIR_ISARETLE':'💲','KISIR_KALDIR':'⭕','VAKA_ACILDI':'🏥','TEDAVI_GUN_EKLENDI':'💊'};
   const ALAN={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe'};
   const tarih=(l.created_at||l.tarih||'').slice(0,10);
-  const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI','HAYVAN_GUNCELLENDI'];
+  const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI','HAYVAN_GUNCELLENDI','VAKA_ACILDI','TEDAVI_GUN_EKLENDI'];
   const payload=l.payload&&typeof l.payload==='object'?l.payload:{};
   const satirlar=Object.entries(payload)
     .filter(([k,v])=>!['hayvan_id','id','ana_hayvan_id'].includes(k)&&v!==null&&v!==undefined&&v!=='')
