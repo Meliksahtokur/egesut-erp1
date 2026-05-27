@@ -2830,7 +2830,7 @@ async function renderCaseTimeline(caseId) {
       const isDone   = day.tamamlandi;
       const isLocked = !isDone && day._locked;
       const tlCls    = isDone ? 'tl-done' : isLocked ? 'tl-locked' : 'tl-active';
-      const openAttr = (aktif && !isDone && !isLocked && day === sortedDays.find(d => !d.tamamlandi && !d._locked)) ? 'open' : '';
+      const openAttr = (aktif && !isDone && day === sortedDays.find(d => !d.tamamlandi)) ? 'open' : '';
       const nodeIcon = isDone ? '✓' : '';
       const gunNo    = `Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||''}`;
 
@@ -2858,15 +2858,23 @@ async function renderCaseTimeline(caseId) {
             </div>`).join('')}</div>`
         : `<span style="color:var(--ink3);font-size:.75rem;display:block;padding:4px 0">İlaç eklenmemiş</span>`;
 
-      // Aksiyon butonları (sadece aktif + done değil + locked değil)
-      const actionsHtml = aktif && !isDone && !isLocked ? `
-        <div class="cd-acc-actions">
-          <button onclick="caseDayTamamla('${day.day_id}')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer">✅ Tamamla</button>
-          <button onclick="caseDayNotAcById('${day.day_id}')" style="background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">📝 Not</button>
+      // Planlama butonları — lock durumundan bağımsız (tüm aktif non-done günlerde)
+      const planHtml = aktif && !isDone ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
           <button onclick="caseDrugFormAc('${day.day_id}')" style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">+ İlaç</button>
+          <button onclick="caseDayNotAcById('${day.day_id}')" style="background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:8px;padding:7px 12px;font-size:.78rem;cursor:pointer">📝 Not</button>
+        </div>` : '';
+      // Done butonu — sadece locked değilse
+      const doneHtml = aktif && !isDone && !isLocked ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <button onclick="caseDayTamamla('${day.day_id}')" style="background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:.78rem;font-weight:700;cursor:pointer">✅ Tamamla</button>
           <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:7px 10px;font-size:.78rem;color:var(--ink3);cursor:pointer">🕐</button>
           <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.18);border-radius:8px;padding:7px 10px;font-size:.78rem;cursor:pointer">🗑</button>
-        </div>` : '';
+        </div>` : (aktif && !isDone && isLocked ? `
+        <div style="margin-top:4px">
+          <span style="font-size:.7rem;color:var(--ink3)">⏳ Önceki günü tamamla</span>
+        </div>` : '');
+      const actionsHtml = planHtml + doneHtml;
 
       // data-not-b64: base64 encode ile özel karakter güvenliği
       const notB64 = day.notes ? btoa(unescape(encodeURIComponent(day.notes))) : '';
