@@ -1089,6 +1089,9 @@ async function islemGeriAl(btn, islemLogId) {
       // cases tablosu icin trigger henuz eklenmedi, generic geri_al RPC kullan
       rpcName = 'geri_al';
       rpcParams = { p_islem_id: islemLogId };
+    } else if (islem.tip === 'VAKA_ACILDI' || islem.tip === 'TEDAVI_GUN_EKLENDI') {
+      rpcName = 'geri_al';
+      rpcParams = { p_islem_id: islemLogId };
     }
 
     const res = await rpc(rpcName, rpcParams);

@@ -2767,6 +2767,20 @@ async function openCaseDet(caseId) {
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
 
+  // Geri Al butonu kontrolü — islem_log'da VAKA_ACILDI kaydı varsa göster
+  const islemler = await idbGetAll('islem_log');
+  const vakaIslem = islemler.find(l => l.tip === 'VAKA_ACILDI' && l.ref_id === caseId);
+  const geriAlBtn = document.getElementById('cd-geri-al-btn');
+  if (geriAlBtn) {
+    if (vakaIslem && aktif) {
+      const diseaseName = disease?.name || '?';
+      geriAlBtn.style.display = 'block';
+      geriAlBtn.onclick = () => openGeriAl(vakaIslem.id, `Vaka geri alınacak: ${diseaseName} — tüm tedavi günleri silinir.`);
+    } else {
+      geriAlBtn.style.display = 'none';
+    }
+  }
+
   try { await loadDrugsCache(); } catch(e) { console.warn('loadDrugsCache hata:', e.message); }
   await renderCaseTimeline(caseId);
   _updateKapatBtn(caseId);
