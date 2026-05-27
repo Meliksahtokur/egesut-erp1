@@ -1100,7 +1100,8 @@ async function islemGeriAl(btn, islemLogId) {
     toast('✅ İşlem geri alındı');
     closeM('m-geri-al');
     closeM('m-toh-det');
-    await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','cases','treatment_days','stok_hareket','islem_log']);
+    closeM('m-case-det');
+    await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','cases','treatment_days','stok_hareket','islem_log','drug_administrations']);
     renderSafe();
   } catch (e) {
     const sebep = e?.message || String(e);
