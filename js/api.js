@@ -246,7 +246,7 @@ const RPC_TABLES = {
   abort_kaydet:              ['tohumlama','gorev_log'],
   hayvan_not_ekle:           ['hayvanlar'],
   cikis_yap:                 ['hayvanlar'],
-  geri_al:                   ['hayvanlar','tohumlama','dogum','gorev_log','islem_log'],
+  geri_al:                   ['hayvanlar','tohumlama','dogum','gorev_log','islem_log','cases','treatment_days'],
   create_case:               ['cases'],
   add_treatment_day:         ['cases','treatment_days'],
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
