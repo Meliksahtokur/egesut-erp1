@@ -397,16 +397,26 @@ async function loadTasks(f,btn){
     data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||'')||( a.aciklama||'').localeCompare(b.aciklama||''));
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
     const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
+    // TEDAVI_GUN için ilaç listesi: drug_administrations + stok isim haritası
+    const _allDrugAdmins=await idbGetAll('drug_administrations').catch(()=>[]);
+    const _allStokItems=await idbGetAll('stok').catch(()=>[]);
+    const _stokNameMap=Object.fromEntries(_allStokItems.map(s=>[s.id,s.urun_adi||s.id]));
+    const _dayDrugMap={};
+    _allDrugAdmins.forEach(da=>{
+      if(!_dayDrugMap[da.treatment_day_id])_dayDrugMap[da.treatment_day_id]=[];
+      _dayDrugMap[da.treatment_day_id].push({name:_stokNameMap[da.stok_id]||'İlaç',dose:da.dose,unit:da.unit,route:da.route});
+    });
     el.innerHTML=data.slice(0,150).map(t=>{
       const _diff=Math.floor((new Date(t.hedef_tarih)-Date.now())/86400000);
       const _clsBase=_diff<=3?'near':'';
       const _clsMid=t.hedef_tarih===today?'soon':_clsBase;
       const cls=t.hedef_tarih<today?'late':_clsMid;
-      return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id));
+      const _tDrugs=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return _dayDrugMap[JSON.parse(t.aciklama||'{}').day_id]||[];}catch(e){return [];}})():[];
+      return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id),_tDrugs);
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
-function renderTask(t,cls='',subs=[]){
+function renderTask(t,cls='',subs=[],drugs=[]){
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
   const allDone=subs.length>0&&doneSubs===subs.length;
   const subHtml=subs.length?`<div class="subtasks">
@@ -417,6 +427,13 @@ function renderTask(t,cls='',subs=[]){
       <span class="st-label ${s.tamamlandi?'done':''}">${esc(s.aciklama)}</span>
     </div>`).join('')}
     <div class="st-prog">${doneSubs}/${subs.length} tamamlandı</div>
+  </div>`:'';
+  const drugHtml=drugs.length?`<div class="subtasks" style="margin-top:4px">
+    ${drugs.map(d=>`<div class="st-row">
+      <span style="font-size:.7rem;min-width:16px;text-align:center;color:var(--blue)">💊</span>
+      <span class="st-label" style="font-size:.72rem">${esc(d.name)}<span style="color:var(--ink3);margin-left:4px">${d.dose}${d.unit}${d.route?' · '+d.route:''}</span></span>
+    </div>`).join('')}
+    <div class="st-prog">${drugs.length} ilaç planlandı</div>
   </div>`:'';
   return `<div class="task-card ${cls}${allDone?' done':''}" id="tc-${t.id}" onclick="openTaskDet('${t.id}')" style="cursor:pointer">
     <div class="tc-header">
@@ -435,7 +452,7 @@ function renderTask(t,cls='',subs=[]){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
-    ${subHtml}
+    ${drugHtml}${subHtml}
   </div>`;
 }
 async function toggleSub(subId,parentId,el){
