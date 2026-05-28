@@ -80,8 +80,14 @@ Frontend'de `api.js` üzerinden çağrılır. Asla doğrudan `db.from().insert/u
 **`create_case(p_animal_id, p_disease_id uuid, p_notes?)`**
 → Kontrollü hastalık listesinden yeni vaka oluşturur.
 
-**`add_treatment_day(p_case_id uuid)`**
-→ Vakaya tedavi günü ekler (day_no otomatik).
+**`add_treatment_day(p_case_id, p_date, p_planned_time time?)`**
+→ Vakaya tedavi günü ekler (day_no otomatik). planned_time varsa gorev_log JSON'a eklenir.
+
+**`treatment_day_tamamla(p_day_id, p_not?, p_uygulanmadi_ids uuid[]?)`**
+→ Tedavi gününü tamamlar (sequential check + tamamlandi). p_uygulanmadi_ids'deki ilaçlar uygulanmadi=true + stok_hareket iptal.
+
+**`case_plan_notu_guncelle(p_case_id, p_plan_notu)`**
+→ cases.plan_notu güncelle.
 
 **`add_drug_administration(p_day_id uuid, p_drug_id uuid, p_dose, p_unit, p_route?)`**
 → İlaç uygulaması kaydeder + stok düşer.
