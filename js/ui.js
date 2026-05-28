@@ -2410,7 +2410,7 @@ async function openTaskDet(id){
     tdHayvan.style.cursor='';
     tdHayvan.onclick=null;
   }
-  document.getElementById('td-aciklama').textContent=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'';
+  const _acEl=document.getElementById('td-aciklama');if(_acEl){_acEl.textContent=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'';delete _acEl.dataset.diseaseAppended;}
   const meta=[];
   meta.push(`📅 ${fmtTarih(t.hedef_tarih)}${isLate?' ⚠️ Gecikmiş':''}`);
   if(hekim) meta.push(`👨‍⚕️ ${hekim.ad}`);
@@ -2480,17 +2480,21 @@ async function openTaskDet(id){
       try{ meta=JSON.parse(t.aciklama||'{}'); }catch(e){}
       const dayId=meta.day_id;
       if(dayId){
-        await pullTables(['drug_administrations','treatment_days','cases','stok']);
-        const [allAdmins,allDays,allCases,allStok]=await Promise.all([
+        await pullTables(['drug_administrations','treatment_days','cases','stok','diseases']);
+        const [allAdmins,allDays,allCases,allStok,allDiseases]=await Promise.all([
           idbGetAll('drug_administrations'),
           idbGetAll('treatment_days'),
           idbGetAll('cases'),
           idbGetAll('stok'),
+          idbGetAll('diseases'),
         ]);
         const stokMap=Object.fromEntries(allStok.map(s=>[s.id,s.urun_adi||s.id]));
         const dayDrugs=allAdmins.filter(da=>da.treatment_day_id===dayId);
         const day=allDays.find(d=>d.id===dayId);
         const theCase=day?allCases.find(c=>c.id===day.case_id):null;
+        const disease=theCase?allDiseases.find(d=>d.id===theCase.disease_id):null;
+        // Teshis adını aciklama alanına ekle
+        if(disease?.name){const acEl=document.getElementById('td-aciklama');if(acEl&&!acEl.dataset.diseaseAppended){acEl.textContent+=' · '+disease.name;acEl.dataset.diseaseAppended='1';}}
         // Master planlayıcı notu
         const planWrap=document.getElementById('td-plan-notu-wrap');
         const planEl=document.getElementById('td-plan-notu');
@@ -2627,7 +2631,7 @@ async function _tedaviGunExecute(uygulanmadiIds){
       : '✅ Tedavi günü tamamlandı';
     toast(msg);
     closeM('m-task-det');
-    await pullTables(['treatment_days','gorev_log','drug_administrations','stok_hareket']);
+    await pullTables(['treatment_days','gorev_log','drug_administrations','stok_hareket','stok']);
     loadTasks(_curTaskFilter||'today');
     loadDash();
     if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
@@ -2899,6 +2903,8 @@ async function openCaseDet(caseId) {
   }
 
   try { await loadDrugsCache(); } catch(e) { console.warn('loadDrugsCache hata:', e.message); }
+  // Tedavi günlerini taze çek (kapat butonu ve timeline doğru görünsün)
+  await pullTables(['treatment_days','drug_administrations']).catch(()=>{});
   await renderCaseTimeline(caseId);
   _updateKapatBtn(caseId);
   openM('m-case-det');
@@ -3026,12 +3032,13 @@ async function renderCaseTimeline(caseId) {
       // Eylem çubuğu — lock'tan bağımsız planlama + ikincil eylemler tek satırda
       const actionsHtml = aktif && !isDone ? `
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--card3);align-items:center">
+          ${!isLocked ? `<button onclick="caseDayTamamla('${day.day_id}')" style="flex:1;min-width:80px;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:700">✅ Tamamla</button>` : ''}
           <button onclick="caseDrugFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:var(--blue);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">+ İlaç</button>
           <button onclick="caseDayNotAcById('${day.day_id}')" style="flex:1;min-width:64px;background:var(--card2);color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer">📝 Not</button>
           <button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;color:var(--ink3);cursor:pointer" title="Saat ekle">🕐</button>
           <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.06);color:var(--red);border:1px solid rgba(192,50,26,.15);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer" title="Günü sil">🗑</button>
         </div>
-        ${isLocked ? '<div style="margin-top:4px;font-size:.68rem;color:var(--ink3);padding:0 2px">⏳ Önceki günü görev listesinden tamamla</div>' : ''}` : '';
+        ${isLocked ? '<div style="margin-top:4px;font-size:.68rem;color:var(--ink3);padding:0 2px">⏳ Önceki gün tamamlanmadan bu gün tamamlanamaz</div>' : ''}` : '';
 
       // data-not-b64: base64 encode ile özel karakter güvenliği
       const notB64 = day.notes ? btoa(unescape(encodeURIComponent(day.notes))) : '';
@@ -3100,15 +3107,24 @@ async function caseDaySaatKaydet(dayId) {
 }
 
 async function caseDayTamamla(dayId) {
+  const btn = event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     await rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: null });
+    // İlgili TEDAVI_GUN gorev_log kaydını da tamamla
+    const allGorevler = await idbGetAll('gorev_log');
+    const tedaviGorev = allGorevler.find(g => {
+      if (g.gorev_tipi !== 'TEDAVI_GUN' || g.tamamlandi) return false;
+      try { return JSON.parse(g.aciklama||'{}').day_id === dayId; } catch(e) { return false; }
+    });
+    if (tedaviGorev) await rpc('gorev_tamamla', { p_gorev_id: tedaviGorev.id }).catch(()=>{});
     toast('✅ Tedavi tamamlandı');
-    await pullTables(['treatment_days']);
+    await pullTables(['treatment_days','gorev_log']);
     if (_curCase) {
       await renderCaseTimeline(_curCase.id);
       _updateKapatBtn(_curCase.id);
     }
-  } catch(e) { toast('❌ ' + e.message, true); }
+  } catch(e) { toast('❌ ' + e.message, true); if (btn) { btn.disabled = false; btn.textContent = '✅ Tamamla'; } }
 }
 
 function caseDayNotAc(dayId, mevcutNot) {
