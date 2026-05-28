@@ -394,7 +394,12 @@ async function loadTasks(f,btn){
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     if(_taskKategori==='diger'){ data=data.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
     else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
-    data.sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||'')||( a.aciklama||'').localeCompare(b.aciklama||''));
+    data.sort((a,b)=>{
+      const dCmp=(a.hedef_tarih||'').localeCompare(b.hedef_tarih||'');
+      if(dCmp!==0) return dCmp;
+      const getTime=t=>t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
+      return getTime(a).localeCompare(getTime(b))||(a.aciklama||'').localeCompare(b.aciklama||'');
+    });
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
     const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
     // TEDAVI_GUN için ilaç listesi: drug_administrations + stok isim haritası
@@ -417,6 +422,7 @@ async function loadTasks(f,btn){
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 function renderTask(t,cls='',subs=[],drugs=[]){
+  const planTime=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
   const allDone=subs.length>0&&doneSubs===subs.length;
   const subHtml=subs.length?`<div class="subtasks">
@@ -443,7 +449,7 @@ function renderTask(t,cls='',subs=[],drugs=[]){
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
         <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
-        <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
+        <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
@@ -891,7 +897,8 @@ function _detGorevHtml(a,tasks,subs,today){
   // Parent'ı tamamlanmış olan rapel görevleri de üst seviyede göster
   const taskIds=new Set(tasks.map(t=>t.id));
   const orphanSubs=subs.filter(s=>!taskIds.has(s.parent_id));
-  const allTop=[...tasks,...orphanSubs].sort((a,b)=>(a.hedef_tarih||'').localeCompare(b.hedef_tarih||''));
+  const getTime=t=>t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
+  const allTop=[...tasks,...orphanSubs].sort((a,b)=>{const d=(a.hedef_tarih||'').localeCompare(b.hedef_tarih||'');return d||getTime(a).localeCompare(getTime(b));});
   const liste=allTop.length
     ?allTop.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); const _stateMid=t.hedef_tarih===today?'soon':''; const state=t.hedef_tarih<today?'late':_stateMid; return renderTask(t,state,ts); }).join('')
     :'<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>';
@@ -2458,13 +2465,67 @@ async function openTaskDet(id){
     if(tarihEl){tarihEl.value=todayStr;tarihEl.max=todayStr;}
   }
 
-  // TEDAVI_GUN: standart tamamla gizle, tedavi butonu göster
+  // TEDAVI_GUN: standart tamamla gizle, detay panel + tedavi butonu göster
   const tedaviGunBtn=document.getElementById('td-tedavi-gun-btn');
+  const tedaviPanel=document.getElementById('td-tedavi-gun-panel');
+  const uygNotuEl=document.getElementById('td-uygulayici-notu');
   if(t.gorev_tipi==='TEDAVI_GUN'){
     if(tamamBtn) tamamBtn.style.display='none';
     if(tedaviGunBtn) tedaviGunBtn.style.display='block';
+    if(tedaviPanel) tedaviPanel.style.display='block';
+    if(uygNotuEl) uygNotuEl.value='';
+    // Notlar + ilaç listesi async yükle
+    try{
+      let meta={};
+      try{ meta=JSON.parse(t.aciklama||'{}'); }catch(e){}
+      const dayId=meta.day_id;
+      if(dayId){
+        await pullTables(['drug_administrations','treatment_days','cases','stok']);
+        const [allAdmins,allDays,allCases,allStok]=await Promise.all([
+          idbGetAll('drug_administrations'),
+          idbGetAll('treatment_days'),
+          idbGetAll('cases'),
+          idbGetAll('stok'),
+        ]);
+        const stokMap=Object.fromEntries(allStok.map(s=>[s.id,s.urun_adi||s.id]));
+        const dayDrugs=allAdmins.filter(da=>da.treatment_day_id===dayId);
+        const day=allDays.find(d=>d.id===dayId);
+        const theCase=day?allCases.find(c=>c.id===day.case_id):null;
+        // Master planlayıcı notu
+        const planWrap=document.getElementById('td-plan-notu-wrap');
+        const planEl=document.getElementById('td-plan-notu');
+        if(theCase?.plan_notu&&planEl){planEl.textContent=theCase.plan_notu;if(planWrap)planWrap.style.display='block';}
+        else if(planWrap) planWrap.style.display='none';
+        // Gün planlayıcı notu
+        const gunWrap=document.getElementById('td-gun-notu-wrap');
+        const gunEl=document.getElementById('td-gun-notu');
+        if(day?.notes&&gunEl){gunEl.textContent=day.notes;if(gunWrap)gunWrap.style.display='block';}
+        else if(gunWrap) gunWrap.style.display='none';
+        // İlaç listesi
+        const ilacEl=document.getElementById('td-ilac-listesi');
+        if(ilacEl){
+          if(dayDrugs.length){
+            ilacEl.innerHTML=`<div style="font-size:.62rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">💊 İlaçlar — ${dayDrugs.length} kalem</div>`
+              +dayDrugs.map(da=>`<div class="td-ilac-row" data-admin-id="${da.id}" data-uygulanmadi="false" onclick="toggleTedaviIlac('${da.id}',this)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent">
+                <div id="td-ic-${da.id}" style="width:26px;height:26px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s,transform .15s">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:.88rem;font-weight:600;color:var(--ink);line-height:1.2">${esc(stokMap[da.stok_id]||'İlaç')}</div>
+                  <div style="font-size:.7rem;color:var(--ink3);margin-top:1px">${da.dose}${da.unit}${da.route?' · <b>'+da.route+'</b>':''}</div>
+                  ${da.notes?`<div style="font-size:.68rem;color:var(--ink3);margin-top:3px;font-style:italic;opacity:.8">📝 ${esc(da.notes)}</div>`:''}
+                </div>
+                <div id="td-ic-lbl-${da.id}" style="font-size:.65rem;font-weight:700;color:var(--green);min-width:52px;text-align:right;transition:color .2s">Uygulandı</div>
+              </div>`).join('');
+          } else {
+            ilacEl.innerHTML='<div style="font-size:.8rem;color:var(--ink3);padding:6px 0">İlaç planı yok</div>';
+          }
+        }
+      }
+    }catch(e){ console.warn('TEDAVI_GUN detay yüklenemedi:',e.message); }
   } else {
     if(tedaviGunBtn) tedaviGunBtn.style.display='none';
+    if(tedaviPanel) tedaviPanel.style.display='none';
   }
 
   // Rapel görevi: parent_id varsa tarih picker göster
@@ -2509,27 +2570,66 @@ async function detayTamamla(){
   } catch(e){ toast(e.message,true); }
   if(btn){btn.disabled=false;btn.textContent='✅ Tamamlandı Olarak İşaretle';}
 }
+function toggleTedaviIlac(adminId, el){
+  const isRed = el.dataset.uygulanmadi === 'true';
+  const nowRed = !isRed;
+  el.dataset.uygulanmadi = nowRed ? 'true' : 'false';
+  const iconEl = document.getElementById('td-ic-'+adminId);
+  const lblEl = document.getElementById('td-ic-lbl-'+adminId);
+  if(iconEl){
+    iconEl.style.background = nowRed ? '#ef4444' : 'var(--green)';
+    iconEl.style.transform = 'scale(1.15)';
+    setTimeout(()=>{ if(iconEl) iconEl.style.transform='scale(1)'; }, 150);
+    iconEl.innerHTML = nowRed
+      ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg>`
+      : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>`;
+  }
+  if(lblEl){
+    lblEl.style.color = nowRed ? '#ef4444' : 'var(--green)';
+    lblEl.textContent = nowRed ? 'Uygulanmadı' : 'Uygulandı';
+  }
+  el.style.background = nowRed ? '#fff5f5' : 'var(--card2)';
+}
+
 async function gorevTedaviGunDone(){
   if(!_curTaskDet) return;
+  // Uygulanmadı işaretli ilaçları topla
+  const rows = document.querySelectorAll('#m-task-det .td-ilac-row[data-uygulanmadi="true"]');
+  const uygulanmadiIds = Array.from(rows).map(r=>r.dataset.adminId).filter(Boolean);
+  const totalRows = document.querySelectorAll('#m-task-det .td-ilac-row').length;
+  if(uygulanmadiIds.length > 0){
+    openConfirm(
+      'Eksik Uygulama',
+      `${uygulanmadiIds.length}/${totalRows} ilaç uygulanmadı olarak işaretlendi. Stok iadesi yapılacak. Devam?`,
+      () => _tedaviGunExecute(uygulanmadiIds)
+    );
+    return;
+  }
+  await _tedaviGunExecute([]);
+}
+
+async function _tedaviGunExecute(uygulanmadiIds){
   const btn=document.getElementById('td-tedavi-gun-btn');
   if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
+  const uygNotu=document.getElementById('td-uygulayici-notu')?.value?.trim()||null;
   try {
-    // aciklama JSON: {day_id: "...", gun_no: N, label: "..."}
-    let meta;
-    try { meta = JSON.parse(_curTaskDet.aciklama); } catch(e){
-      toast('❌ Geçersiz görev verisi', true); return;
-    }
+    let meta={};
+    try { meta=JSON.parse(_curTaskDet.aciklama||'{}'); } catch(e){}
     if(!meta.day_id){ toast('❌ Tedavi günü ID bulunamadı', true); return; }
-    // 1. Treatment day'i tamamla (sequential kontrolü RPC yapar)
-    await rpc('treatment_day_tamamla', { p_day_id: meta.day_id, p_not: null });
-    // 2. Görevi de tamamla
+    await rpc('treatment_day_tamamla', {
+      p_day_id: meta.day_id,
+      p_not: uygNotu,
+      p_uygulanmadi_ids: uygulanmadiIds.length ? uygulanmadiIds : null
+    });
     await rpc('gorev_tamamla', { p_gorev_id: _curTaskDet.id });
-    toast('✅ Tedavi günü tamamlandı');
+    const msg = uygulanmadiIds.length
+      ? `✅ Tamamlandı — ${uygulanmadiIds.length} ilaç iade edildi`
+      : '✅ Tedavi günü tamamlandı';
+    toast(msg);
     closeM('m-task-det');
-    await pullTables(['treatment_days', 'gorev_log']);
+    await pullTables(['treatment_days','gorev_log','drug_administrations','stok_hareket']);
     loadTasks(_curTaskFilter||'today');
     loadDash();
-    // Tedavi modal açıksa güncelle
     if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
   } catch(e){ toast('❌ ' + e.message, true); }
   if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
