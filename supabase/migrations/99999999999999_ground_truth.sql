@@ -2743,6 +2743,7 @@ CREATE TABLE IF NOT EXISTS public.cases (
   start_date  date  NOT NULL DEFAULT CURRENT_DATE,
   status      text  NOT NULL DEFAULT 'active',
   notes       text,
+  plan_notu   text,
   created_at  timestamptz DEFAULT now(),
   closed_at   timestamptz,
   CONSTRAINT cases_status_check CHECK (status IN ('active','closed'))
@@ -2776,6 +2777,10 @@ ALTER TABLE public.treatment_days
   ADD COLUMN IF NOT EXISTS tamamlanma_tarihi  timestamptz,
   ADD COLUMN IF NOT EXISTS tamamlanma_notu    text;
 
+-- planned_time (migration 20260528000001)
+ALTER TABLE public.treatment_days
+  ADD COLUMN IF NOT EXISTS planned_time TIME;
+
 -- ──────────────────────────────────────────────────────────────
 -- 5. DRUG ADMINISTRATIONS — İlaç uygulama (controlled FK)
 -- ──────────────────────────────────────────────────────────────
@@ -2788,6 +2793,7 @@ CREATE TABLE IF NOT EXISTS public.drug_administrations (
   unit              text    NOT NULL,
   route             text,
   notes             text,
+  uygulanmadi       boolean DEFAULT false,
   created_at        timestamptz DEFAULT now(),
   CONSTRAINT drug_administrations_route_check
     CHECK (route IS NULL OR route IN ('IM','IV','SC','PO','Topikal','Intrauterin'))
@@ -3006,9 +3012,11 @@ GRANT EXECUTE ON FUNCTION public.kizginlik_vaka_ac(text, text, text, text) TO an
 
 -- 9b. add_treatment_day
 DROP FUNCTION IF EXISTS public.add_treatment_day(uuid, date);
+DROP FUNCTION IF EXISTS public.add_treatment_day(uuid, date, time);
 CREATE OR REPLACE FUNCTION public.add_treatment_day(
-  p_case_id uuid,
-  p_date    date
+  p_case_id      uuid,
+  p_date         date,
+  p_planned_time time DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_day_id        uuid;
@@ -3044,11 +3052,12 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  INSERT INTO public.treatment_days(id, case_id, day_no, treatment_date, tamamlandi, tamamlanma_tarihi)
+  INSERT INTO public.treatment_days(id, case_id, day_no, treatment_date, tamamlandi, tamamlanma_tarihi, planned_time)
   VALUES (
     gen_random_uuid(), p_case_id, v_day_no, p_date,
     v_gecmis,
-    CASE WHEN v_gecmis THEN p_date::timestamptz ELSE NULL END
+    CASE WHEN v_gecmis THEN p_date::timestamptz ELSE NULL END,
+    p_planned_time
   )
   RETURNING id INTO v_day_id;
 
@@ -3062,9 +3071,10 @@ BEGIN
     v_case.animal_id,
     p_date,
     jsonb_build_object(
-      'day_id', v_day_id,
-      'gun_no', v_day_no,
-      'label',  'Gün ' || v_day_no || ' tedavisi — ' || to_char(p_date, 'DD.MM.YYYY')
+      'day_id',       v_day_id,
+      'gun_no',       v_day_no,
+      'label',        'Gün ' || v_day_no || ' tedavisi — ' || to_char(p_date, 'DD.MM.YYYY'),
+      'planned_time', COALESCE(p_planned_time::text, '')
     )::text,
     v_gecmis,
     CASE WHEN v_gecmis THEN p_date::timestamptz ELSE NULL END,
@@ -3139,17 +3149,21 @@ $$;
 
 -- 9e. treatment_day_tamamla
 DROP FUNCTION IF EXISTS public.treatment_day_tamamla(uuid, text);
+DROP FUNCTION IF EXISTS public.treatment_day_tamamla(uuid, text, uuid[]);
 CREATE OR REPLACE FUNCTION public.treatment_day_tamamla(
-  p_day_id  uuid,
-  p_not     text DEFAULT NULL
+  p_day_id           uuid,
+  p_not              text    DEFAULT NULL,
+  p_uygulanmadi_ids  uuid[]  DEFAULT '{}'
 )
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_day     public.treatment_days%ROWTYPE;
-  v_onceki  boolean;
+  v_day       public.treatment_days%ROWTYPE;
+  v_onceki    boolean;
+  v_admin_id  uuid;
+  v_stok_id   text;
 BEGIN
   SELECT * INTO v_day FROM public.treatment_days WHERE id = p_day_id;
   IF NOT FOUND THEN
@@ -3177,6 +3191,25 @@ BEGIN
       tamamlanma_notu   = p_not
   WHERE id = p_day_id;
 
+  -- YENİ: Uygulanmayan ilaçlar — uygulanmadi=true + stok iadesi --
+  IF array_length(p_uygulanmadi_ids, 1) > 0 THEN
+    FOREACH v_admin_id IN ARRAY p_uygulanmadi_ids
+    LOOP
+      UPDATE public.drug_administrations
+      SET uygulanmadi = true
+      WHERE id = v_admin_id
+        AND treatment_day_id = p_day_id
+      RETURNING stok_id INTO v_stok_id;
+
+      IF v_stok_id IS NOT NULL THEN
+        UPDATE public.stok_hareket
+        SET iptal = true
+        WHERE notlar = 'drug_admin:' || v_admin_id::text
+          AND iptal = false;
+      END IF;
+    END LOOP;
+  END IF;
+
   RETURN jsonb_build_object('ok', true, 'day_id', p_day_id);
 END;
 $$;
@@ -3198,6 +3231,24 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Tedavi günü bulunamadı: %', p_day_id;
   END IF;
+END;
+$$;
+
+-- 9g. case_plan_notu_guncelle
+CREATE OR REPLACE FUNCTION public.case_plan_notu_guncelle(
+  p_case_id   uuid,
+  p_plan_notu text
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.cases
+  SET plan_notu = p_plan_notu
+  WHERE id = p_case_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Vaka bulunamadı: %', p_case_id;
+  END IF;
+
+  RETURN jsonb_build_object('ok', true);
 END;
 $$;
 
@@ -3229,6 +3280,7 @@ GRANT EXECUTE ON FUNCTION public.add_drug_administration(uuid, text, uuid, numer
 GRANT EXECUTE ON FUNCTION public.close_case              TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.treatment_day_tamamla   TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.treatment_day_not_guncelle TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.case_plan_notu_guncelle(uuid, text) TO anon, authenticated;
 
 -- ──────────────────────────────────────────────────────────────
 -- 11. SEED DATA — Diseases
