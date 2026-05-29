@@ -2069,6 +2069,23 @@ async function loadTanimlarPanel(){
   else if(_tanimlarTab==='kategoriler') await _renderKategoriler(el);
 }
 
+function _tanimSearchBar(){
+  return `<input type="text" id="tanim-search" placeholder="🔍 Ara…" oninput="_tanimFiltrele(this.value)" style="width:100%;padding:9px 12px;border:1px solid var(--card3);border-radius:8px;margin-bottom:10px;font-size:.82rem;background:var(--card2);color:var(--ink);box-sizing:border-box">`;
+}
+function _tanimFiltrele(q){
+  const s=q.toLowerCase().trim();
+  document.querySelectorAll('.tanimlar-card').forEach(c=>{
+    const txt=(c.getAttribute('data-search')||'').toLowerCase();
+    c.style.display=!s||txt.includes(s)?'':'none';
+  });
+  document.querySelectorAll('.tanim-grup').forEach(g=>{
+    const visible=g.querySelectorAll('.tanimlar-card:not([style*="display: none"])').length;
+    const badge=g.querySelector('.tanim-grup-count');
+    if(badge) badge.textContent=visible;
+    g.style.display=visible||!s?'':'none';
+  });
+}
+
 async function _renderHastaliklar(el){
   await pullTables(['diseases','cases']);
   const diseases=await idbGetAll('diseases');
@@ -2078,25 +2095,40 @@ async function _renderHastaliklar(el){
     return;
   }
   const KAT_RENK={Meme:'#e91e63',Üreme:'#9c27b0',Metabolik:'#ff9800',Ayak:'#795548',Solunum:'#2196f3',Sindirim:'#4caf50',Buzağı:'#00bcd4',Diğer:'#607d8b'};
-  let html=diseases.map(d=>{
-    const aktif=cases.filter(c=>c.disease_id===d.id&&c.status==='active').length;
-    const kapali=cases.filter(c=>c.disease_id===d.id&&c.status==='closed').length;
-    const toplam=aktif+kapali;
-    const renk=KAT_RENK[d.category]||'#607d8b';
-    return `<div class="tanimlar-card" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${renk};border-radius:10px;padding:11px 13px;margin-bottom:7px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(d.name)}</div>
-          <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">
-            <span style="background:${renk}22;color:${renk};padding:1px 6px;border-radius:4px;font-weight:700">${d.category||'—'}</span>
-            ${toplam?' · '+toplam+' vaka'+(aktif?' ('+aktif+' aktif)':''):''}
-          </div>
-        </div>
-        <button onclick="_tanimEditForm('disease','${d.id}')" style="padding:6px 10px;background:var(--card2);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+  const KAT_SIRA=['Meme','Üreme','Metabolik','Ayak','Solunum','Sindirim','Buzağı','Diğer'];
+  const grouped={};
+  diseases.forEach(d=>{const k=d.category||'Diğer';if(!grouped[k])grouped[k]=[];grouped[k].push(d);});
+  let html=_tanimSearchBar();
+  KAT_SIRA.forEach(kat=>{
+    const items=grouped[kat];if(!items||!items.length)return;
+    const renk=KAT_RENK[kat]||'#607d8b';
+    const katAktif=items.reduce((n,d)=>n+cases.filter(c=>c.disease_id===d.id&&c.status==='active').length,0);
+    html+=`<div class="tanim-grup" style="margin-bottom:6px">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.tanim-chev').classList.toggle('tanim-chev-open')" style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:${renk}15;border:1px solid ${renk}30;border-radius:8px;cursor:pointer;user-select:none">
+        <span style="width:4px;height:22px;border-radius:2px;background:${renk};flex-shrink:0"></span>
+        <span style="font-weight:800;font-size:.82rem;color:${renk};flex:1">${kat}</span>
+        ${katAktif?`<span style="background:${renk}22;color:${renk};padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700">${katAktif} aktif</span>`:''}
+        <span class="tanim-grup-count" style="background:var(--card3);color:var(--ink3);padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700">${items.length}</span>
+        <svg class="tanim-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${renk}" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
       </div>
-      <div id="tdf-disease-${d.id}"></div>
-    </div>`;
-  }).join('');
+      <div style="display:none;padding:4px 0 0 0">`;
+    items.forEach(d=>{
+      const aktif=cases.filter(c=>c.disease_id===d.id&&c.status==='active').length;
+      const kapali=cases.filter(c=>c.disease_id===d.id&&c.status==='closed').length;
+      const toplam=aktif+kapali;
+      html+=`<div class="tanimlar-card" data-search="${esc(d.name)} ${kat}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${renk};border-radius:8px;padding:9px 11px;margin:4px 0 0 12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${esc(d.name)}</div>
+            ${toplam?`<div style="font-size:.6rem;color:var(--ink3);margin-top:1px">${toplam} vaka${aktif?' ('+aktif+' aktif)':''}</div>`:''}
+          </div>
+          <button onclick="_tanimEditForm('disease','${d.id}')" style="padding:5px 9px;background:var(--card2);border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+        </div>
+        <div id="tdf-disease-${d.id}"></div>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  });
   html+=`<button onclick="_tanimEditForm('disease','new')" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni Hastalık Ekle</button>`;
   html+=_tanimVarsayilanBtn('diseases');
   el.innerHTML=html;
@@ -2184,27 +2216,63 @@ async function _renderIlaclar(el){
     return;
   }
   const YOL_RENK={IM:'#2196f3',IV:'#e91e63',SC:'#ff9800',PO:'#4caf50',Topikal:'#9c27b0',Intrauterin:'#795548'};
-  let html=drugs.map(d=>{
-    const s=d.stock_item_id?stok.find(x=>x.id===d.stock_item_id):null;
-    const yolRenk=YOL_RENK[d.default_route]||'#607d8b';
-    const stokInfo=s
-      ?`<span style="color:var(--green);font-size:.65rem;font-weight:700">📦 ${esc(s.urun_adi)} (${(s.guncel||0).toFixed(s.birim==='adet'?0:1)} ${s.birim||''})</span>`
-      :`<span style="color:var(--ink3);font-size:.65rem">⚠️ Stok bağlantısı yok</span>`;
-    return `<div class="tanimlar-card" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${yolRenk};border-radius:10px;padding:11px 13px;margin-bottom:7px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(d.name)}</div>
-          <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">
-            ${d.default_route?`<span style="background:${yolRenk}22;color:${yolRenk};padding:1px 6px;border-radius:4px;font-weight:700">${d.default_route}</span>`:''}
-            ${d.default_unit?' · '+d.default_unit:''}
-          </div>
-          <div style="margin-top:3px">${stokInfo}</div>
-        </div>
-        <button onclick="_tanimEditForm('drug','${d.id}')" style="padding:6px 10px;background:var(--card2);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+  const YOL_AD={IM:'İntramüsküler (IM)',IV:'İntravenöz (IV)',SC:'Subkutan (SC)',PO:'Oral (PO)',Topikal:'Topikal',Intrauterin:'İntrauterin'};
+  const YOL_SIRA=['IM','IV','SC','PO','Topikal','Intrauterin'];
+  const grouped={};
+  drugs.forEach(d=>{const r=d.default_route||'Diğer';if(!grouped[r])grouped[r]=[];grouped[r].push(d);});
+  let html=_tanimSearchBar();
+  YOL_SIRA.forEach(yol=>{
+    const items=grouped[yol];if(!items||!items.length)return;
+    const renk=YOL_RENK[yol]||'#607d8b';
+    const stoklu=items.filter(d=>d.stock_item_id).length;
+    html+=`<div class="tanim-grup" style="margin-bottom:6px">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.tanim-chev').classList.toggle('tanim-chev-open')" style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:${renk}15;border:1px solid ${renk}30;border-radius:8px;cursor:pointer;user-select:none">
+        <span style="width:4px;height:22px;border-radius:2px;background:${renk};flex-shrink:0"></span>
+        <span style="font-weight:800;font-size:.82rem;color:${renk};flex:1">${YOL_AD[yol]||yol}</span>
+        ${stoklu?`<span style="background:rgba(78,154,42,.15);color:var(--green);padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700">📦 ${stoklu}</span>`:''}
+        <span class="tanim-grup-count" style="background:var(--card3);color:var(--ink3);padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700">${items.length}</span>
+        <svg class="tanim-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${renk}" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
       </div>
-      <div id="tdf-drug-${d.id}"></div>
-    </div>`;
-  }).join('');
+      <div style="display:none;padding:4px 0 0 0">`;
+    items.forEach(d=>{
+      const s=d.stock_item_id?stok.find(x=>x.id===d.stock_item_id):null;
+      const stokInfo=s
+        ?`<span style="color:var(--green);font-size:.62rem;font-weight:700">📦 ${esc(s.urun_adi)}</span>`
+        :`<span style="color:var(--ink3);font-size:.62rem">⚠️ Stok bağlantısı yok</span>`;
+      html+=`<div class="tanimlar-card" data-search="${esc(d.name)} ${yol} ${d.default_unit||''}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${renk};border-radius:8px;padding:9px 11px;margin:4px 0 0 12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${esc(d.name)}</div>
+            <div style="font-size:.6rem;color:var(--ink3);margin-top:1px">${d.default_unit||''} · ${stokInfo}</div>
+          </div>
+          <button onclick="_tanimEditForm('drug','${d.id}')" style="padding:5px 9px;background:var(--card2);border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+        </div>
+        <div id="tdf-drug-${d.id}"></div>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  });
+  if(grouped['Diğer']){
+    const items=grouped['Diğer'];
+    html+=`<div class="tanim-grup" style="margin-bottom:6px">
+      <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.tanim-chev').classList.toggle('tanim-chev-open')" style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:#607d8b15;border:1px solid #607d8b30;border-radius:8px;cursor:pointer;user-select:none">
+        <span style="width:4px;height:22px;border-radius:2px;background:#607d8b;flex-shrink:0"></span>
+        <span style="font-weight:800;font-size:.82rem;color:#607d8b;flex:1">Diğer</span>
+        <span class="tanim-grup-count" style="background:var(--card3);color:var(--ink3);padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700">${items.length}</span>
+        <svg class="tanim-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#607d8b" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
+      <div style="display:none;padding:4px 0 0 0">`;
+    items.forEach(d=>{
+      html+=`<div class="tanimlar-card" data-search="${esc(d.name)}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid #607d8b;border-radius:8px;padding:9px 11px;margin:4px 0 0 12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-weight:700;font-size:.84rem;color:var(--ink)">${esc(d.name)}</div></div>
+          <button onclick="_tanimEditForm('drug','${d.id}')" style="padding:5px 9px;background:var(--card2);border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+        </div>
+        <div id="tdf-drug-${d.id}"></div>
+      </div>`;
+    });
+    html+=`</div></div>`;
+  }
   html+=`<button onclick="_tanimEditForm('drug','new')" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni İlaç Ekle</button>`;
   html+=_tanimVarsayilanBtn('drugs');
   el.innerHTML=html;
@@ -2283,9 +2351,10 @@ async function _renderKategoriler(el){
     return;
   }
   const sorted=[...kats].sort((a,b)=>(a.sira||0)-(b.sira||0));
-  let html=sorted.map(k=>{
+  let html=_tanimSearchBar();
+  html+=sorted.map(k=>{
     const count=stok.filter(s=>s.kategori===k.ad).length;
-    return `<div class="tanimlar-card" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid var(--blue);border-radius:10px;padding:11px 13px;margin-bottom:7px">
+    return `<div class="tanimlar-card" data-search="${esc(k.ad)}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid var(--blue);border-radius:10px;padding:11px 13px;margin-bottom:7px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(k.ad)}</div>
