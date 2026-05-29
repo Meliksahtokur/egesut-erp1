@@ -1802,7 +1802,7 @@ function _gecmisSearchText(e){
   if(e.type==='dogum'){parts.push(d.yavru_kupe||'',d.yavru_cins||'',d.dogum_tipi||'');pushAnimal(d.anne_id);}
   else if(e.type==='tohumlama'){parts.push(d.sperma||'',d.sonuc||'','tohumlama');}
   else if(e.type==='hastalik'){parts.push(d.disease_name||'',d.tani||'',d.status==='active'?'aktif':'kapalı','hastalık');}
-  else if(e.type==='gorev'){parts.push(d.aciklama||'',d.gorev_tipi||'');}
+  else if(e.type==='gorev'){parts.push(d.aciklama||'',d.gorev_tipi||'',...(d._drugNames||[]));}
   else if(e.type==='islem'){
     const snap=d.snapshot||{};
     parts.push(_ISLEM_ETK[d.tip]||d.tip||'',snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||'');
@@ -1843,8 +1843,23 @@ async function loadGecmis(f,btn){
         entries.push({type:'hastalik',date:r.start_date,sortKey:r.created_at||r.start_date||'',data:{...r,disease_name:_d?.name||'?',tani:_d?.name||'?'}});
       });
     }
-    if(f==='hepsi'||f==='gorev')
-      (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>entries.push({type:'gorev',date:(r.tamamlanma_tarihi||r.hedef_tarih||'').slice(0,10),sortKey:r.tamamlanma_tarihi||r.hedef_tarih||'',data:r}));
+    if(f==='hepsi'||f==='gorev'){
+      const _allDrugs=await idbGetAll('drug_administrations').catch(()=>[]);
+      const _allStok=await idbGetAll('stok').catch(()=>[]);
+      const _stokById=Object.fromEntries(_allStok.map(s=>[s.id,s.urun_adi||'']));
+      const _drugsByDay={};
+      _allDrugs.forEach(da=>{
+        if(!da.treatment_day_id)return;
+        const name=_stokById[da.stok_id]||da.drug_name||'';
+        if(name)(_drugsByDay[da.treatment_day_id]=_drugsByDay[da.treatment_day_id]||[]).push(name);
+      });
+      (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>{
+        let dayId=null;
+        try{dayId=JSON.parse(r.aciklama||'{}').day_id;}catch(e){}
+        const _drugNames=(dayId&&_drugsByDay[dayId])||[];
+        entries.push({type:'gorev',date:(r.tamamlanma_tarihi||r.hedef_tarih||'').slice(0,10),sortKey:r.tamamlanma_tarihi||r.hedef_tarih||'',data:{...r,_drugNames}});
+      });
+    }
     if(f==='hepsi'||f==='hayvan'){
       const islemTipler=['HAYVAN_EKLENDI','ABORT_KAYDI','KIZGINLIK_KAYDI','ASI_KAYDI','TOPLU_ILAC'];
       (await idbGetAll('islem_log'))
