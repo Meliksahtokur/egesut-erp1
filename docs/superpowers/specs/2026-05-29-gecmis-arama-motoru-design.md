@@ -1,7 +1,7 @@
 # Gecmis Sekmesi — Arama Motoru UX Tasarimi
 
 **Tarih:** 2026-05-29
-**Durum:** Onaylandi
+**Durum:** ✅ Done
 
 ## Amac
 
