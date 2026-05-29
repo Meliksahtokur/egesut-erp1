@@ -411,17 +411,26 @@ async function loadTasks(f,btn){
       if(!_dayDrugMap[da.treatment_day_id])_dayDrugMap[da.treatment_day_id]=[];
       _dayDrugMap[da.treatment_day_id].push({name:_stokNameMap[da.stok_id]||'İlaç',dose:da.dose,unit:da.unit,route:da.route});
     });
+    // TEDAVI_GUN için teshis adı: treatment_days → cases → diseases
+    const _allTDays=await idbGetAll('treatment_days').catch(()=>[]);
+    const _allTaskCases=await idbGetAll('cases').catch(()=>[]);
+    const _allTaskDiseases=await idbGetAll('diseases').catch(()=>[]);
+    const _caseById=Object.fromEntries(_allTaskCases.map(c=>[c.id,c]));
+    const _diseaseById=Object.fromEntries(_allTaskDiseases.map(d=>[d.id,d.name||'']));
+    const _dayDiseaseMap={};
+    _allTDays.forEach(td=>{ const c=_caseById[td.case_id]; if(c?.disease_id)_dayDiseaseMap[td.id]=_diseaseById[c.disease_id]||''; });
     el.innerHTML=data.slice(0,150).map(t=>{
       const _diff=Math.floor((new Date(t.hedef_tarih)-Date.now())/86400000);
       const _clsBase=_diff<=3?'near':'';
       const _clsMid=t.hedef_tarih===today?'soon':_clsBase;
       const cls=t.hedef_tarih<today?'late':_clsMid;
       const _tDrugs=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return _dayDrugMap[JSON.parse(t.aciklama||'{}').day_id]||[];}catch(e){return [];}})():[];
-      return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id),_tDrugs);
+      const _tDisease=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return _dayDiseaseMap[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}})():'';
+      return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id),_tDrugs,_tDisease);
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
-function renderTask(t,cls='',subs=[],drugs=[]){
+function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
   const planTime=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
   const allDone=subs.length>0&&doneSubs===subs.length;
@@ -448,7 +457,7 @@ function renderTask(t,cls='',subs=[],drugs=[]){
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
         </div>
-        <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
+        <div class="tc-desc">${diseaseName?`<span style="font-size:.63rem;font-weight:700;color:var(--red);opacity:.85;margin-right:4px">🏥 ${esc(diseaseName)}</span>`:''}${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)">
@@ -2493,8 +2502,11 @@ async function openTaskDet(id){
         const day=allDays.find(d=>d.id===dayId);
         const theCase=day?allCases.find(c=>c.id===day.case_id):null;
         const disease=theCase?allDiseases.find(d=>d.id===theCase.disease_id):null;
-        // Teshis adını aciklama alanına ekle
-        if(disease?.name){const acEl=document.getElementById('td-aciklama');if(acEl&&!acEl.dataset.diseaseAppended){acEl.textContent+=' · '+disease.name;acEl.dataset.diseaseAppended='1';}}
+        // Teshis adını hem başlığa hem panele ekle
+        const acEl=document.getElementById('td-aciklama');
+        if(acEl&&disease?.name&&!acEl.dataset.diseaseAppended){acEl.textContent+=' · '+disease.name;acEl.dataset.diseaseAppended='1';}
+        const diseaseBadgeHtml=disease?.name?`<div style="font-size:.7rem;font-weight:700;color:var(--red);background:rgba(192,50,26,.08);padding:4px 10px;border-radius:7px;margin-bottom:10px;display:inline-block">🏥 ${esc(disease.name)}</div>`:'';
+
         // Master planlayıcı notu
         const planWrap=document.getElementById('td-plan-notu-wrap');
         const planEl=document.getElementById('td-plan-notu');
@@ -2509,7 +2521,7 @@ async function openTaskDet(id){
         const ilacEl=document.getElementById('td-ilac-listesi');
         if(ilacEl){
           if(dayDrugs.length){
-            ilacEl.innerHTML=`<div style="font-size:.62rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">💊 İlaçlar — ${dayDrugs.length} kalem</div>`
+            ilacEl.innerHTML=diseaseBadgeHtml+`<div style="font-size:.62rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">💊 İlaçlar — ${dayDrugs.length} kalem</div>`
               +dayDrugs.map(da=>`<div class="td-ilac-row" data-admin-id="${da.id}" data-uygulanmadi="false" onclick="toggleTedaviIlac('${da.id}',this)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--card2);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent">
                 <div id="td-ic-${da.id}" style="width:26px;height:26px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s,transform .15s">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
@@ -2522,7 +2534,7 @@ async function openTaskDet(id){
                 <div id="td-ic-lbl-${da.id}" style="font-size:.65rem;font-weight:700;color:var(--green);min-width:52px;text-align:right;transition:color .2s">Uygulandı</div>
               </div>`).join('');
           } else {
-            ilacEl.innerHTML='<div style="font-size:.8rem;color:var(--ink3);padding:6px 0">İlaç planı yok</div>';
+            ilacEl.innerHTML=diseaseBadgeHtml+'<div style="font-size:.8rem;color:var(--ink3);padding:6px 0">İlaç planı yok</div>';
           }
         }
       }
