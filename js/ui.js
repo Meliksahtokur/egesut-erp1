@@ -1797,7 +1797,7 @@ function _gecmisEntryHtml(e){
     <div style="flex:1;min-width:0">
       <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${title}</div>
       <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${sub}</div>
-      <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${type==='gorev'?'✅ '+d:d}</div>
+      <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${type==='gorev'?(data.tamamlandi?'✅ ':'⏳ ')+d:d}</div>
     </div>
   </div>`;
 }
@@ -1814,7 +1814,7 @@ function _gecmisSearchText(e){
   pushAnimal(d.hayvan_id||d.anne_id||d.animal_id||d.ana_hayvan_id);
   if(e.type==='dogum'){parts.push(d.yavru_kupe||'',d.yavru_cins||'',d.dogum_tipi||'');pushAnimal(d.anne_id);}
   else if(e.type==='tohumlama'){parts.push(d.sperma||'',d.sonuc||'','tohumlama');}
-  else if(e.type==='hastalik'){parts.push(d.disease_name||'',d.tani||'',d.status==='active'?'aktif':'kapalı','hastalık');}
+  else if(e.type==='hastalik'){parts.push(d.disease_name||'',d.tani||'',d.status==='active'?'aktif':'kapalı','hastalık',...(d._drugNames||[]));}
   else if(e.type==='gorev'){
     parts.push(d._lbl||'',d.gorev_tipi||'',d._disName||'',d.tamamlandi?'tamamlandı':'bekliyor',...(d._drugNames||[]));
   }
@@ -1853,9 +1853,25 @@ async function loadGecmis(f,btn){
       (await idbGetAll('tohumlama')).forEach(r=>entries.push({type:'tohumlama',date:r.tarih,sortKey:r.created_at||r.tarih||'',data:r}));
     if(f==='hepsi'||f==='hastalik') {
       const _dis = await idbGetAll('diseases');
+      const _hTdays=await idbGetAll('treatment_days').catch(()=>[]);
+      const _hDadm=await idbGetAll('drug_administrations').catch(()=>[]);
+      const _hStok=await idbGetAll('stok').catch(()=>[]);
+      const _hStokById=Object.fromEntries(_hStok.map(s=>[s.id,s.urun_adi||'']));
+      const _hDrugsByCase={};
+      const _hDayCase=Object.fromEntries(_hTdays.map(td=>[td.id,td.case_id]));
+      _hDadm.forEach(da=>{
+        const cid=_hDayCase[da.treatment_day_id];
+        if(!cid)return;
+        const name=_hStokById[da.stok_id]||'';
+        if(name){
+          if(!_hDrugsByCase[cid])_hDrugsByCase[cid]=new Set();
+          _hDrugsByCase[cid].add(name);
+        }
+      });
       (await idbGetAll('cases')).forEach(r=>{
         const _d = _dis.find(d=>d.id===r.disease_id);
-        entries.push({type:'hastalik',date:r.start_date,sortKey:r.created_at||r.start_date||'',data:{...r,disease_name:_d?.name||'?',tani:_d?.name||'?'}});
+        const _drugNames=[...(_hDrugsByCase[r.id]||[])];
+        entries.push({type:'hastalik',date:r.start_date,sortKey:r.created_at||r.start_date||'',data:{...r,disease_name:_d?.name||'?',tani:_d?.name||'?',_drugNames}});
       });
     }
     if(f==='hepsi'||f==='gorev'){
@@ -1874,7 +1890,7 @@ async function loadGecmis(f,btn){
       const _caseById=Object.fromEntries(_cases.map(c=>[c.id,c]));
       const _dis=await idbGetAll('diseases').catch(()=>[]);
       const _disById=Object.fromEntries(_dis.map(d=>[d.id,d.name||'']));
-      (await getData('gorev_log',t=>(_gecmisTumu||t.tamamlandi)&&!t.parent_id)).forEach(r=>{
+      (await getData('gorev_log',t=>(_gecmisTumu||t.tamamlandi)&&(_gecmisTumu||!t.parent_id))).forEach(r=>{
         let dayId=null,_lbl='',_gunNo='';
         try{const p=typeof r.aciklama==='string'?JSON.parse(r.aciklama):r.aciklama;dayId=p?.day_id;_lbl=p?.label||'';_gunNo=p?.gun_no||'';}catch(e){}
         const _drugNames=(dayId&&_drugsByDay[dayId])||[];
