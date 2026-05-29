@@ -93,6 +93,7 @@ registerActions({
   'open-animal-modal':   () => openM('m-animal'),
   'open-task-add-modal': () => openM('m-task-add'),
   'open-stok-panel':     () => openStokPanel(),
+  'open-tanimlar-panel':  () => openTanimlarPanel(),
   'close-birth':     () => closeM('m-birth'),
   'close-insem':     () => closeM('m-insem'),
   'close-disease':   () => closeM('m-disease'),
@@ -119,6 +120,7 @@ registerActions({
   'close-stk':       () => closeM('m-stk'),
   'close-ayarlar':   () => closeM('m-ayarlar'),
   'close-stok-panel': () => closeStokPanel(),
+  'close-tanimlar-panel': () => closeTanimlarPanel(),
   'close-stok-add':   () => closeM('m-stok-add'),
 
   // ═══ HAYVAN DETAY SEKMELERİ ═══
@@ -199,6 +201,9 @@ registerActions({
   'stok-tab-asi':     (el) => setStokTab('asi', el),
   'stok-tab-sperma':  (el) => setStokTab('sperma', el),
   'stok-tab-diger':   (el) => setStokTab('diger', el),
+  'tanimlar-tab-hastaliklar': (el) => setTanimlarTab('hastaliklar', {target:el}),
+  'tanimlar-tab-ilaclar':     (el) => setTanimlarTab('ilaclar', {target:el}),
+  'tanimlar-tab-kategoriler':  (el) => setTanimlarTab('kategoriler', {target:el}),
   'stok-add-open':    () => openStokAdd(),
   'stok-hareketler':  () => tumStokHareketleriniGoster(),
   'stok-add-tip-ilac':   () => saTipSec('ilac'),
