@@ -71,6 +71,7 @@ registerActions({
   'gecmis-hastalik':  (el) => loadGecmis('hastalik', el),
   'gecmis-gorev':     (el) => loadGecmis('gorev', el),
   'gecmis-hayvan':    (el) => loadGecmis('hayvan', el),
+  'gecmis-search':    (() => { let _t; return (el) => { clearTimeout(_t); _t = setTimeout(() => _gecmisRender(el.value), 200); }; })(),
 
   // ═══ MODAL AÇ/KAPAT ═══
   'open-modal': (el) => openM(el.dataset.modal),
