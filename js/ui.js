@@ -147,24 +147,27 @@ async function ileriGebeKontrol(){
     }
   } catch(e){ toast('❌ '+e.message,true); }
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap){
+  const _dd=ddMap||{};
+  const _getDis=t=>{if(t.gorev_tipi!=='TEDAVI_GUN')return '';try{return _dd[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}};
+  const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
   let h='';
   if(negStk>0) h+=band('red','🆘 Negatif Stok',`<div class="arow" onclick="goTo('log')"><div class="arow-left"><div class="arow-sub">${negStk} üründe stok sıfırın altında. Stok sekmesine git.</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`);
   if(late.length){
     h+=`<div class="sh"><span class="sh-title">🔴 Geciken Görevler</span><button class="sh-link" onclick="goTo('tasks')">Tümü →</button></div>`;
-    h+=late.slice(0,4).map(t=>renderTask(t,'late')).join('');
+    h+=late.slice(0,4).map(t=>_rt(t,'late')).join('');
   }
   if(todayT.length){
     h+=`<div class="sh"><span class="sh-title">⏳ Bugün</span></div>`;
-    h+=todayT.slice(0,4).map(t=>renderTask(t,'soon')).join('');
+    h+=todayT.slice(0,4).map(t=>_rt(t,'soon')).join('');
   }
   if((yakAsi||[]).length){
     h+=`<div class="sh"><span class="sh-title">💉 Yaklaşan Aşı Görevleri (7 gün)</span><button class="sh-link" onclick="goTo('tasks')">Tümü →</button></div>`;
-    h+=(yakAsi||[]).slice(0,6).map(t=>renderTask(t,'near')).join('');
+    h+=(yakAsi||[]).slice(0,6).map(t=>_rt(t,'near')).join('');
   }
   if((yakTakviye||[]).length){
     h+=`<div class="sh"><span class="sh-title">💊 Yarın Takviye</span></div>`;
-    h+=(yakTakviye||[]).slice(0,4).map(t=>renderTask(t,'')).join('');
+    h+=(yakTakviye||[]).slice(0,4).map(t=>_rt(t,'')).join('');
   }
   if(births60.length){
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
@@ -254,7 +257,16 @@ async function loadDash(){
       if(resBuz&&resBuz.ok&&resBuz.olusturulan>0) toast('🍼 '+resBuz.olusturulan+' buzağı sütten kesme görevi oluşturuldu');
     } catch(e){ /* sessiz */ }
 
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye)+_dashVacAlerts(today,vaxLogs,vaccines);
+    // TEDAVI_GUN teşhis haritası (dashboard kartları için)
+    const _dtDays=await idbGetAll('treatment_days').catch(()=>[]);
+    const _dtDiseases=await idbGetAll('diseases').catch(()=>[]);
+    const _dtDById=Object.fromEntries(_dtDiseases.map(d=>[d.id,d.name||'']));
+    const _dtCases=await idbGetAll('cases').catch(()=>[]);
+    const _dtCById=Object.fromEntries(_dtCases.map(c=>[c.id,c]));
+    const _ddMap={};
+    _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
+
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
