@@ -2191,7 +2191,7 @@ async function _diseaseSave(id){
 
 async function _diseaseDelete(id){
   if(!confirm('Bu hastalığı silmek istediğinize emin misiniz?')) return;
-  const res=await rpcOptimistic('disease_sil',{p_id:id},null,['diseases']);
+  const res=await rpcOptimistic('disease_sil',{p_id:id});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   toast('Hastalık silindi');
   loadTanimlarPanel();
@@ -2200,8 +2200,7 @@ async function _diseaseDelete(id){
 async function _tanimVarsayilan(tip){
   const labels={diseases:'hastalık',drugs:'ilaç',kategoriler:'kategori'};
   if(!confirm(`Standart ${labels[tip]||tip} tanımları geri yüklenecek. Mevcut özel tanımlarınız silinmez. Devam?`)) return;
-  const res=await rpcOptimistic('seed_defaults',{p_tip:tip},null,
-    tip==='diseases'?['diseases']:tip==='drugs'?['drugs']:['stok_kategorileri']);
+  const res=await rpcOptimistic('seed_defaults',{p_tip:tip});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   toast(`${res.eklenen||0} yeni ${labels[tip]} eklendi`);
   loadTanimlarPanel();
@@ -2316,15 +2315,14 @@ async function _drugSave(id){
   const isNew=id==='new';
   const res=await rpcOptimistic(isNew?'drug_ekle':'drug_guncelle',
     isNew?{p_name:name,p_default_unit:unit,p_default_route:route,p_stock_item_id:stokId,p_kategori:kategori}
-         :{p_id:id,p_name:name,p_default_unit:unit,p_default_route:route,p_stock_item_id:stokId,p_kategori:kategori},
-    null,['drugs']);
+         :{p_id:id,p_name:name,p_default_unit:unit,p_default_route:route,p_stock_item_id:stokId,p_kategori:kategori});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   loadTanimlarPanel();
 }
 
 async function _drugDelete(id){
   if(!confirm('Bu ilacı silmek istediğinize emin misiniz?')) return;
-  const res=await rpcOptimistic('drug_sil',{p_id:id},null,['drugs']);
+  const res=await rpcOptimistic('drug_sil',{p_id:id});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   toast('İlaç silindi');
   loadTanimlarPanel();
@@ -2399,15 +2397,14 @@ async function _kategoriSave(id){
   if(!ad){toast('Kategori adı zorunlu','warn');return;}
   const isNew=id==='new';
   const res=await rpcOptimistic(isNew?'kategori_ekle':'kategori_guncelle',
-    isNew?{p_ad:ad,p_tip:tip}:{p_id:id,p_new_ad:ad,p_tip:tip},
-    null,['stok_kategorileri','stok']);
+    isNew?{p_ad:ad,p_tip:tip}:{p_id:id,p_new_ad:ad,p_tip:tip});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   loadTanimlarPanel();
 }
 
 async function _kategoriDelete(id){
   if(!confirm('Bu kategoriyi silmek istediğinize emin misiniz?')) return;
-  const res=await rpcOptimistic('kategori_sil',{p_id:id},null,['stok_kategorileri']);
+  const res=await rpcOptimistic('kategori_sil',{p_id:id});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   toast('Kategori silindi');
   loadTanimlarPanel();
