@@ -2711,9 +2711,10 @@ CREATE TABLE IF NOT EXISTS public.stok_kategorileri (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ad         text UNIQUE NOT NULL,
   sira       integer DEFAULT 0,
+  tip        text NOT NULL DEFAULT 'genel',
   created_at timestamptz DEFAULT now()
 );
-COMMENT ON TABLE public.stok_kategorileri IS 'Stok kategori tanımları — Tanımlar panelinden yönetilir';
+COMMENT ON TABLE public.stok_kategorileri IS 'Stok kategori tanımları — tip: ilac|genel, Tanımlar panelinden yönetilir';
 ALTER TABLE public.stok_kategorileri ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='stok_kategorileri' AND policyname='stok_kat_select') THEN
@@ -2723,10 +2724,10 @@ DO $$ BEGIN
     CREATE POLICY stok_kat_all ON public.stok_kategorileri FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
-INSERT INTO public.stok_kategorileri (ad, sira) VALUES
-  ('Antibiyotik',1),('NSAID',2),('Hormon',3),('Vitamin',4),
-  ('Antiparaziter',5),('Diğer İlaç',6),('Aşı',7),('Sperma',8),
-  ('Yem',9),('Sarf',10),('Ekipman',11),('Diğer',12)
+INSERT INTO public.stok_kategorileri (ad, sira, tip) VALUES
+  ('Antibiyotik',1,'ilac'),('NSAID',2,'ilac'),('Hormon',3,'ilac'),('Vitamin',4,'ilac'),
+  ('Antiparaziter',5,'ilac'),('Diğer İlaç',6,'ilac'),('Aşı',7,'genel'),('Sperma',8,'genel'),
+  ('Yem',9,'genel'),('Sarf',10,'genel'),('Ekipman',11,'genel'),('Diğer',12,'genel')
 ON CONFLICT (ad) DO NOTHING;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.stok_kategorileri TO anon, authenticated;
 
@@ -2752,12 +2753,14 @@ CREATE TABLE IF NOT EXISTS public.drugs (
   stock_item_id  text  REFERENCES public.stok(id) ON DELETE SET NULL,
   default_unit   text,
   default_route  text,
+  kategori       text,
   created_at     timestamptz DEFAULT now()
 );
 
 COMMENT ON TABLE  public.drugs                IS 'Controlled ilaç listesi — free text yasak';
 COMMENT ON COLUMN public.drugs.stock_item_id  IS 'stok.id FK — NULL ise stok düşümü yapılmaz';
 COMMENT ON COLUMN public.drugs.default_route  IS 'IM | IV | SC | PO | Topikal | Intrauterin';
+COMMENT ON COLUMN public.drugs.kategori       IS 'İlaç sınıfı — stok_kategorileri.ad (tip=ilac) ile eşleşir';
 
 -- ──────────────────────────────────────────────────────────────
 -- 3. CASES — Vaka katmanı
@@ -3340,27 +3343,33 @@ ON CONFLICT (name) DO NOTHING;
 -- 12. SEED DATA — Drugs (stock_item_id başlangıçta NULL)
 --     UI'dan stok kalemini drugs tablosuna bağlamak gerekir
 -- ──────────────────────────────────────────────────────────────
-INSERT INTO public.drugs (name, default_unit, default_route) VALUES
-  ('Enrofloksasin',    'ml',  'IM'),
-  ('Oksitetrasiklin',  'ml',  'IM'),
-  ('Penisilin',        'ml',  'IM'),
-  ('Meloksikam',       'ml',  'IM'),
-  ('Ketoprofen',       'ml',  'IM'),
-  ('Flunixin',         'ml',  'IV'),
-  ('Deksametazon',     'ml',  'IM'),
-  ('B Kompleks',       'ml',  'IM'),
-  ('Kalsiyum Boroglukonat', 'ml', 'IV'),
-  ('Magnezyum Sülfat', 'ml',  'IV'),
-  ('Glukoz %50',       'ml',  'IV'),
-  ('Elektrolit',       'gr',  'PO'),
-  ('Rumen Stimülanı',  'ml',  'PO'),
-  ('Oksitoksin',       'ml',  'IM'),
-  ('Progesteron',      'ml',  'IM'),
-  ('GnRH',             'ml',  'IM'),
-  ('PGF2α',            'ml',  'IM'),
-  ('Antiparaziter',    'ml',  'SC'),
-  ('Vitamin AD3E',     'ml',  'IM'),
-  ('Vitamin C',        'ml',  'IV')
+INSERT INTO public.drugs (name, default_unit, default_route, kategori) VALUES
+  ('Enrofloksasin',    'ml',  'IM', 'Antibiyotik'),
+  ('Oksitetrasiklin',  'ml',  'IM', 'Antibiyotik'),
+  ('Penisilin',        'ml',  'IM', 'Antibiyotik'),
+  ('Makrovil',         'ml',  'IM', 'Antibiyotik'),
+  ('Enrolen',          'ml',  'IM', 'Antibiyotik'),
+  ('Florkem',          'ml',  'IM', 'Antibiyotik'),
+  ('Meloksikam',       'ml',  'IV', 'NSAID'),
+  ('Ketoprofen',       'ml',  'IM', 'NSAID'),
+  ('Flunixin',         'ml',  'IV', 'NSAID'),
+  ('Deksametazon',     'ml',  'IM', 'Kortikosteroid'),
+  ('B Kompleks',       'ml',  'IM', 'Vitamin'),
+  ('B12 Vitamini',     'ml',  'IM', 'Vitamin'),
+  ('AD3E Vitamini',    'ml',  'IM', 'Vitamin'),
+  ('Vitamin AD3E',     'ml',  'IM', 'Vitamin'),
+  ('Vitamin C',        'ml',  'IV', 'Vitamin'),
+  ('Kalsiyum Boroglukonat', 'ml', 'IV', 'Metabolik'),
+  ('Magnezyum Sülfat', 'ml',  'IV', 'Metabolik'),
+  ('Glukoz %50',       'ml',  'IV', 'Metabolik'),
+  ('Elektrolit',       'gr',  'PO', 'Metabolik'),
+  ('Rumen Stimülanı',  'ml',  'PO', 'Metabolik'),
+  ('Oksitoksin',       'ml',  'IM', 'Hormon'),
+  ('Progesteron',      'ml',  'IM', 'Hormon'),
+  ('GnRH',             'ml',  'IM', 'Hormon'),
+  ('PGF2α',            'ml',  'IM', 'Hormon'),
+  ('Albendazol',       'ml',  'PO', 'Antiparaziter'),
+  ('İvermektin',       'ml',  'SC', 'Antiparaziter')
 ON CONFLICT (name) DO NOTHING;
 
 -- ──────────────────────────────────────────────────────────────
@@ -7974,26 +7983,26 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.drug_ekle(p_name text, p_default_unit text DEFAULT NULL, p_default_route text DEFAULT NULL, p_stock_item_id text DEFAULT NULL)
+CREATE OR REPLACE FUNCTION public.drug_ekle(p_name text, p_default_unit text DEFAULT NULL, p_default_route text DEFAULT NULL, p_stock_item_id text DEFAULT NULL, p_kategori text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_id uuid;
 BEGIN
   IF EXISTS (SELECT 1 FROM drugs WHERE LOWER(name) = LOWER(p_name)) THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu ilaç zaten var');
   END IF;
-  INSERT INTO drugs (name, default_unit, default_route, stock_item_id)
-  VALUES (p_name, p_default_unit, p_default_route, p_stock_item_id) RETURNING id INTO v_id;
+  INSERT INTO drugs (name, default_unit, default_route, stock_item_id, kategori)
+  VALUES (p_name, p_default_unit, p_default_route, p_stock_item_id, p_kategori) RETURNING id INTO v_id;
   RETURN jsonb_build_object('ok', true, 'id', v_id);
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.drug_guncelle(p_id uuid, p_name text, p_default_unit text DEFAULT NULL, p_default_route text DEFAULT NULL, p_stock_item_id text DEFAULT NULL)
+CREATE OR REPLACE FUNCTION public.drug_guncelle(p_id uuid, p_name text DEFAULT NULL, p_default_unit text DEFAULT NULL, p_default_route text DEFAULT NULL, p_stock_item_id text DEFAULT NULL, p_kategori text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM drugs WHERE LOWER(name) = LOWER(p_name) AND id != p_id) THEN
+  IF p_name IS NOT NULL AND EXISTS (SELECT 1 FROM drugs WHERE LOWER(name) = LOWER(p_name) AND id != p_id) THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu isimde başka bir ilaç var');
   END IF;
-  UPDATE drugs SET name=p_name, default_unit=p_default_unit, default_route=p_default_route, stock_item_id=p_stock_item_id WHERE id=p_id;
+  UPDATE drugs SET name=COALESCE(NULLIF(trim(p_name),''),name), default_unit=p_default_unit, default_route=p_default_route, stock_item_id=p_stock_item_id, kategori=p_kategori WHERE id=p_id;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'İlaç bulunamadı'); END IF;
   RETURN jsonb_build_object('ok', true);
 END;
@@ -8016,29 +8025,34 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.kategori_ekle(p_ad text)
+CREATE OR REPLACE FUNCTION public.kategori_ekle(p_ad text, p_tip text DEFAULT 'genel')
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_id uuid;
 BEGIN
   IF EXISTS (SELECT 1 FROM stok_kategorileri WHERE LOWER(ad) = LOWER(p_ad)) THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu kategori zaten var');
   END IF;
-  INSERT INTO stok_kategorileri (ad, sira) VALUES (p_ad, COALESCE((SELECT MAX(sira) FROM stok_kategorileri),0)+1) RETURNING id INTO v_id;
+  INSERT INTO stok_kategorileri (ad, sira, tip) VALUES (p_ad, COALESCE((SELECT MAX(sira) FROM stok_kategorileri),0)+1, p_tip) RETURNING id INTO v_id;
   RETURN jsonb_build_object('ok', true, 'id', v_id);
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.kategori_guncelle(p_id uuid, p_new_ad text)
+CREATE OR REPLACE FUNCTION public.kategori_guncelle(p_id uuid, p_new_ad text DEFAULT NULL, p_tip text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_old_ad text;
 BEGIN
-  IF EXISTS (SELECT 1 FROM stok_kategorileri WHERE LOWER(ad) = LOWER(p_new_ad) AND id != p_id) THEN
+  IF p_new_ad IS NOT NULL AND EXISTS (SELECT 1 FROM stok_kategorileri WHERE LOWER(ad) = LOWER(p_new_ad) AND id != p_id) THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu isimde başka bir kategori var');
   END IF;
   SELECT ad INTO v_old_ad FROM stok_kategorileri WHERE id = p_id;
   IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Kategori bulunamadı'); END IF;
-  UPDATE stok SET kategori = p_new_ad WHERE kategori = v_old_ad;
-  UPDATE stok_kategorileri SET ad = p_new_ad WHERE id = p_id;
+  IF p_new_ad IS NOT NULL THEN
+    UPDATE stok SET kategori = p_new_ad WHERE kategori = v_old_ad;
+    UPDATE stok_kategorileri SET ad = p_new_ad WHERE id = p_id;
+  END IF;
+  IF p_tip IS NOT NULL THEN
+    UPDATE stok_kategorileri SET tip = p_tip WHERE id = p_id;
+  END IF;
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
