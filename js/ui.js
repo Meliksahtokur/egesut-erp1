@@ -2134,24 +2134,41 @@ async function tumStokHareketleriniGoster(){
     moves.forEach(m=>{
       const urun=stok.find(s=>s.id===m.stok_id);
       const urunAd=urun?.urun_adi||'Silinmiş Ürün';
-      const isIade=m.iptal&&(m.notlar||'').startsWith('drug_admin:');
-      const turLabel=isIade?'↩ Tedavi İadesi':m.tur||'—';
-      const turRenk=isIade?'var(--green)':(m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'var(--green)':'var(--red)');
-      const turIsaret=isIade?'+':(m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'+':'−');
+      const birim=urun?.birim||'';
+      const dec=birim==='adet'?0:1;
       const tarihFmt=fmtTarih(m.tarih);
-      const iadeStil=isIade?'opacity:.75;border-left:3px solid var(--green);':'';
-      const notDisplay=isIade?'':(m.notlar||'');
-      html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px;${iadeStil}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-weight:700;font-size:.85rem;color:var(--ink)${isIade?';text-decoration:line-through':''}">${urunAd}</div>
-          <div style="font-size:.85rem;font-weight:800;color:${turRenk}">${turIsaret}${(m.miktar||0).toFixed(urun?.birim==='adet'?0:1)} ${urun?.birim||''}</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.68rem;color:var(--ink3)">
-          <div>📅 ${tarihFmt}</div>
-          <div>📝 ${turLabel}</div>
-        </div>
-        ${notDisplay?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${notDisplay}</div>`:''}
-      </div>`;
+      const isIade=m.iptal&&(m.notlar||'').startsWith('drug_admin:');
+      if(isIade){
+        html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px;border-left:3px solid var(--red);opacity:.6">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-weight:700;font-size:.85rem;color:var(--ink);text-decoration:line-through">${urunAd}</div>
+            <div style="font-size:.85rem;font-weight:800;color:var(--red);text-decoration:line-through">−${(m.miktar||0).toFixed(dec)} ${birim}</div>
+          </div>
+          <div style="font-size:.68rem;color:var(--red)">❌ ${m.tur||'Tedavi'} — iptal edildi · 📅 ${tarihFmt}</div>
+        </div>`;
+        html+=`<div style="background:rgba(45,106,45,.06);border:1px solid rgba(45,106,45,.2);border-radius:8px;padding:10px;margin-bottom:6px;border-left:3px solid var(--green)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-weight:700;font-size:.85rem;color:var(--green)">${urunAd}</div>
+            <div style="font-size:.85rem;font-weight:800;color:var(--green)">+${(m.miktar||0).toFixed(dec)} ${birim}</div>
+          </div>
+          <div style="font-size:.68rem;color:var(--green)">↩ Tedavi İadesi · 📅 ${tarihFmt}</div>
+        </div>`;
+      } else {
+        if(m.iptal) return;
+        const turRenk=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'var(--green)':'var(--red)';
+        const turIsaret=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'+':'−';
+        html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="font-weight:700;font-size:.85rem;color:var(--ink)">${urunAd}</div>
+            <div style="font-size:.85rem;font-weight:800;color:${turRenk}">${turIsaret}${(m.miktar||0).toFixed(dec)} ${birim}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.68rem;color:var(--ink3)">
+            <div>📅 ${tarihFmt}</div>
+            <div>📝 ${m.tur||'—'}</div>
+          </div>
+          ${m.notlar?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${m.notlar}</div>`:''}
+        </div>`;
+      }
     });
     el.innerHTML=html;
   } catch(e){
@@ -2279,13 +2296,21 @@ async function stokHareketGor(stokId){
     ${mvs.length===0?'<div style="color:#999;text-align:center;padding:20px">Henüz hareket yok</div>':
       mvs.map(m=>{
         const _isIade=m.iptal&&(m.notlar||'').startsWith('drug_admin:');
-        const _label=_isIade?'↩ Tedavi İadesi':(m.tur||'Kullanım');
-        const _renk=_isIade?'var(--green)':(m.miktar<0?'var(--green)':'#c0321a');
-        const _isaret=_isIade?'+':m.miktar<0?'+':'-';
-        const _stil=_isIade?'opacity:.75;border-left:3px solid var(--green);padding-left:8px;':'';
-        return `<div style="padding:8px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between;${_stil}">
-        <div><div style="font-weight:600${_isIade?';color:var(--green)':''}">${_label}</div>${_isIade?'':`<div style="color:#999;font-size:.7rem">${m.notlar||''}</div>`}<div style="color:#888;font-size:.7rem;font-weight:600">${m.tarih?(new Date(m.tarih).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})):''}</div></div>
-        <div style="text-align:right"><div style="font-weight:700;color:${_renk}">${_isaret}${Math.abs(m.miktar)} ${s.birim||''}</div></div>
+        const _tarih=m.tarih?(new Date(m.tarih).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})):'';
+        if(_isIade){
+          return `<div style="padding:6px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between;border-left:3px solid var(--red);padding-left:8px;opacity:.6">
+            <div><div style="font-weight:600;color:var(--red);text-decoration:line-through">${m.tur||'Tedavi'}</div><div style="color:#888;font-size:.7rem">${_tarih}</div></div>
+            <div style="text-align:right"><div style="font-weight:700;color:var(--red);text-decoration:line-through">-${Math.abs(m.miktar)} ${s.birim||''}</div></div>
+          </div>
+          <div style="padding:6px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between;border-left:3px solid var(--green);padding-left:8px">
+            <div><div style="font-weight:600;color:var(--green)">↩ Tedavi İadesi</div><div style="color:#888;font-size:.7rem">${_tarih}</div></div>
+            <div style="text-align:right"><div style="font-weight:700;color:var(--green)">+${Math.abs(m.miktar)} ${s.birim||''}</div></div>
+          </div>`;
+        }
+        if(m.iptal) return '';
+        return `<div style="padding:8px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between">
+        <div><div style="font-weight:600">${m.tur||'Kullanım'}</div><div style="color:#999;font-size:.7rem">${m.notlar||''}</div><div style="color:#888;font-size:.7rem;font-weight:600">${_tarih}</div></div>
+        <div style="text-align:right"><div style="font-weight:700;color:${m.miktar<0?'var(--green)':'#c0321a'}">${m.miktar<0?'+':'-'}${Math.abs(m.miktar)} ${s.birim||''}</div></div>
       </div>`;}).join('')}
     <button onclick="document.getElementById('stok-hrkt-modal').remove()" style="width:100%;margin-top:12px;padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">Kapat</button>
   </div>`;
