@@ -72,6 +72,15 @@ registerActions({
   'gecmis-gorev':     (el) => loadGecmis('gorev', el),
   'gecmis-hayvan':    (el) => loadGecmis('hayvan', el),
   'gecmis-search':    (() => { let _t; return (el) => { clearTimeout(_t); _t = setTimeout(() => _gecmisRender(el.value), 200); }; })(),
+  'gecmis-tumu-toggle': () => {
+    _gecmisTumu = !_gecmisTumu;
+    const tog = document.getElementById('gecmis-toggle');
+    if (tog) {
+      tog.style.background = _gecmisTumu ? 'var(--green)' : 'var(--card3)';
+      tog.firstElementChild.style.left = _gecmisTumu ? '16px' : '2px';
+    }
+    loadGecmis(_curGecmisFilter);
+  },
 
   // ═══ MODAL AÇ/KAPAT ═══
   'open-modal': (el) => openM(el.dataset.modal),
