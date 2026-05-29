@@ -2176,7 +2176,8 @@ async function _tanimVarsayilan(tip){
 
 async function _renderIlaclar(el){
   await pullTables(['drugs','stok']);
-  const drugs=await idbGetAll('drugs');
+  const allDrugs=await idbGetAll('drugs');
+  const drugs=allDrugs.filter(d=>d.default_route||d.default_unit);
   const stok=getState('stock');
   if(!drugs.length){
     el.innerHTML='<div class="empty"><div class="empty-ico">💊</div>Henüz ilaç tanımı yok</div>'+_tanimVarsayilanBtn('drugs');
