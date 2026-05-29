@@ -361,7 +361,7 @@ async function loadTasks(f,btn){
   if(srchEl){ srchEl.value=''; }
   try {
     const today=new Date().toISOString().split('T')[0];
-    if(navigator.onLine) await pullTables(['gorev_log']).catch(()=>{});
+    if(navigator.onLine) await pullTables(['gorev_log','treatment_days','cases','diseases']).catch(()=>{});
     const all=await idbGetAll('gorev_log');
     if(f==='done'){
       let done=all.filter(t=>t.tamamlandi&&!t.iptal&&!t.parent_id);
@@ -456,8 +456,9 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
+          ${diseaseName?`<span class="pill" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2)">🏥 ${esc(diseaseName)}</span>`:''}
         </div>
-        <div class="tc-desc">${diseaseName?`<span style="font-size:.63rem;font-weight:700;color:var(--red);opacity:.85;margin-right:4px">🏥 ${esc(diseaseName)}</span>`:''}${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
+        <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)">
