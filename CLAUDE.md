@@ -66,6 +66,17 @@ Hazır. Ne yapalım?
 MCP tools (memory_search, file_read, task_claim vb.) + task/blackboard sistemi.  
 Kullanım kılavuzu: `/root/tools-bank/docs/USAGE_GUIDE.md`
 
+### ast-grep (Yapısal Kod Arama)
+
+`ast_grep_search(pattern, lang?, path?, max_results?, context_lines?)` — kod AST'sinde desen araması.
+
+**2 Aşamalı Protokol:**
+1. `max_results=10` ile özet çek → hangi dosya/satırda match var gör
+2. İlgili bloğu `read_file` ile o satır aralığından oku
+
+Joker: `$$$` (herhangi node), `$NAME` (değişken yakalama).
+Pattern + lang zorunlu. Detaylar: `AGENTS.md` > ast-grep Yapısal Arama Protokolü
+
 ## Referans Haritası (on-demand oku)
 
 | İhtiyaç | Dosya |
@@ -108,6 +119,7 @@ Kapalı vaka veya done/locked öğeler → her zaman kapalı başlar.
 - Plan/task/spec dosyaları tamamlanınca done olarak işaretle
 - Tohumlama state machine bypass edilmez
 - Hook hataları (superpowers "hook error"): zararsız, görmezden gel
+- **İş bitince commit + push**: Bir görev tamamlandığında otomatik olarak commit oluştur ve `git push origin main` yap. Kullanıcıdan onay bekleme.
 
 ## DB Değişikliği Öncesi (ZORUNLU)
 
