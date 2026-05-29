@@ -2123,7 +2123,7 @@ async function tumStokHareketleriniGoster(){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   openM('m-stok-hareketler');
   try {
-    const moves=await getData('stok_hareket',m=>!m.iptal);
+    const moves=await getData('stok_hareket');
     const stok=getState('stock')||[];
     moves.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
     if(!moves.length){
@@ -2134,19 +2134,23 @@ async function tumStokHareketleriniGoster(){
     moves.forEach(m=>{
       const urun=stok.find(s=>s.id===m.stok_id);
       const urunAd=urun?.urun_adi||'Silinmiş Ürün';
-      const turRenk=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'var(--green)':'var(--red)';
-      const turIsaret=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'+':'−';
+      const isIade=m.iptal&&(m.notlar||'').startsWith('drug_admin:');
+      const turLabel=isIade?'↩ Tedavi İadesi':m.tur||'—';
+      const turRenk=isIade?'var(--green)':(m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'var(--green)':'var(--red)');
+      const turIsaret=isIade?'+':(m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'+':'−');
       const tarihFmt=fmtTarih(m.tarih);
-      html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px">
+      const iadeStil=isIade?'opacity:.75;border-left:3px solid var(--green);':'';
+      const notDisplay=isIade?'':(m.notlar||'');
+      html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px;${iadeStil}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <div style="font-weight:700;font-size:.85rem;color:var(--ink)">${urunAd}</div>
+          <div style="font-weight:700;font-size:.85rem;color:var(--ink)${isIade?';text-decoration:line-through':''}">${urunAd}</div>
           <div style="font-size:.85rem;font-weight:800;color:${turRenk}">${turIsaret}${(m.miktar||0).toFixed(urun?.birim==='adet'?0:1)} ${urun?.birim||''}</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.68rem;color:var(--ink3)">
           <div>📅 ${tarihFmt}</div>
-          <div>📝 ${m.tur||'—'}</div>
+          <div>📝 ${turLabel}</div>
         </div>
-        ${m.notlar?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${m.notlar}</div>`:''}
+        ${notDisplay?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${notDisplay}</div>`:''}
       </div>`;
     });
     el.innerHTML=html;
@@ -2257,9 +2261,9 @@ async function loadStokList(){
 }
 async function stokHareketGor(stokId){
   const s=getState('stock').find(x=>x.id===stokId); if(!s) return;
-  const mvs=await getData('stok_hareket',m=>m.stok_id===stokId&&!m.iptal);
+  const mvs=await getData('stok_hareket',m=>m.stok_id===stokId);
   mvs.sort((a,b)=>((b.tarih||b.id)||'').localeCompare((a.tarih||a.id)||''));
-  const used=mvs.reduce((t,m)=>t+(+m.miktar||0),0);
+  const used=mvs.filter(m=>!m.iptal).reduce((t,m)=>t+(+m.miktar||0),0);
   const kalan=(+s.baslangic_miktar||0)-used;
   let box=document.getElementById('stok-hrkt-modal');
   if(!box){
@@ -2273,10 +2277,16 @@ async function stokHareketGor(stokId){
     <div style="font-weight:800;font-size:1rem;margin-bottom:4px">${esc(s.urun_adi)}</div>
     <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">Başlangıç: <b>${s.baslangic_miktar||0} ${s.birim||''}</b> · Kullanılan: <b>${used.toFixed(1)} ${s.birim||''}</b> · Kalan: <b style="color:${kalan<=(s.esik||0)?'#c0321a':'#2d6a2d'}">${kalan.toFixed(1)} ${s.birim||''}</b></div>
     ${mvs.length===0?'<div style="color:#999;text-align:center;padding:20px">Henüz hareket yok</div>':
-      mvs.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between">
-        <div><div style="font-weight:600">${m.tur||'Kullanım'}</div><div style="color:#999;font-size:.7rem">${m.notlar||''}</div><div style="color:#888;font-size:.7rem;font-weight:600">${m.tarih?(new Date(m.tarih).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})):''}</div></div>
-        <div style="text-align:right"><div style="font-weight:700;color:${m.miktar<0?'var(--green)':'#c0321a'}">${m.miktar<0?'+':'-'}${Math.abs(m.miktar)} ${s.birim||''}</div></div>
-      </div>`).join('')}
+      mvs.map(m=>{
+        const _isIade=m.iptal&&(m.notlar||'').startsWith('drug_admin:');
+        const _label=_isIade?'↩ Tedavi İadesi':(m.tur||'Kullanım');
+        const _renk=_isIade?'var(--green)':(m.miktar<0?'var(--green)':'#c0321a');
+        const _isaret=_isIade?'+':m.miktar<0?'+':'-';
+        const _stil=_isIade?'opacity:.75;border-left:3px solid var(--green);padding-left:8px;':'';
+        return `<div style="padding:8px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between;${_stil}">
+        <div><div style="font-weight:600${_isIade?';color:var(--green)':''}">${_label}</div>${_isIade?'':`<div style="color:#999;font-size:.7rem">${m.notlar||''}</div>`}<div style="color:#888;font-size:.7rem;font-weight:600">${m.tarih?(new Date(m.tarih).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})):''}</div></div>
+        <div style="text-align:right"><div style="font-weight:700;color:${_renk}">${_isaret}${Math.abs(m.miktar)} ${s.birim||''}</div></div>
+      </div>`;}).join('')}
     <button onclick="document.getElementById('stok-hrkt-modal').remove()" style="width:100%;margin-top:12px;padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">Kapat</button>
   </div>`;
   box.style.display='flex';
