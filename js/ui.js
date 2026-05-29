@@ -2273,6 +2273,77 @@ async function _drugDelete(id){
   loadTanimlarPanel();
 }
 
+async function _renderKategoriler(el){
+  await pullTables(['stok_kategorileri','stok']);
+  const kats=await idbGetAll('stok_kategorileri');
+  const stok=getState('stock');
+  if(!kats.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">📂</div>Henüz kategori tanımı yok</div>'+_tanimVarsayilanBtn('kategoriler');
+    return;
+  }
+  const sorted=[...kats].sort((a,b)=>(a.sira||0)-(b.sira||0));
+  let html=sorted.map(k=>{
+    const count=stok.filter(s=>s.kategori===k.ad).length;
+    return `<div class="tanimlar-card" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid var(--blue);border-radius:10px;padding:11px 13px;margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(k.ad)}</div>
+          <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${count} ürün</div>
+        </div>
+        <button onclick="_tanimEditForm('kategori','${k.id}')" style="padding:6px 10px;background:var(--card2);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+      </div>
+      <div id="tdf-kategori-${k.id}"></div>
+    </div>`;
+  }).join('');
+  html+=`<button onclick="_tanimEditForm('kategori','new')" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni Kategori Ekle</button>`;
+  html+=_tanimVarsayilanBtn('kategoriler');
+  el.innerHTML=html;
+}
+
+async function _kategoriEditForm(id){
+  const isNew=id==='new';
+  let ad='';
+  if(!isNew){
+    const all=await idbGetAll('stok_kategorileri');
+    const k=all.find(x=>x.id===id);
+    if(k) ad=k.ad;
+  }
+  const formHtml=`<div class="tanim-edit-form" style="background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:10px;margin-top:6px">
+    <div style="margin-bottom:8px"><input id="tef-kat-ad" class="fi" value="${esc(ad)}" placeholder="Kategori adı" style="margin:0"></div>
+    <div style="display:flex;gap:6px">
+      <button onclick="_kategoriSave('${id}')" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px;font-weight:700;cursor:pointer">${isNew?'Ekle':'Kaydet'}</button>
+      ${isNew?'':`<button onclick="_kategoriDelete('${id}')" style="padding:8px 12px;background:#ffebee;color:#c62828;border:none;border-radius:7px;font-weight:700;cursor:pointer">Sil</button>`}
+      <button onclick="document.querySelectorAll('.tanim-edit-form').forEach(f=>f.remove())" style="padding:8px 12px;background:var(--card3);border:none;border-radius:7px;cursor:pointer">İptal</button>
+    </div>
+  </div>`;
+  if(isNew){
+    const btn=document.querySelector('#tanimlar-panel-body button[onclick*="kategori"][onclick*="new"]');
+    if(btn) btn.insertAdjacentHTML('beforebegin',formHtml);
+  } else {
+    const wrap=document.getElementById('tdf-kategori-'+id);
+    if(wrap) wrap.innerHTML=formHtml;
+  }
+}
+
+async function _kategoriSave(id){
+  const ad=document.getElementById('tef-kat-ad')?.value.trim();
+  if(!ad){toast('Kategori adı zorunlu','warn');return;}
+  const isNew=id==='new';
+  const res=await rpcOptimistic(isNew?'kategori_ekle':'kategori_guncelle',
+    isNew?{p_ad:ad}:{p_id:id,p_new_ad:ad},
+    null,['stok_kategorileri','stok']);
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  loadTanimlarPanel();
+}
+
+async function _kategoriDelete(id){
+  if(!confirm('Bu kategoriyi silmek istediğinize emin misiniz?')) return;
+  const res=await rpcOptimistic('kategori_sil',{p_id:id},null,['stok_kategorileri']);
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast('Kategori silindi');
+  loadTanimlarPanel();
+}
+
 const _TAB_FILTER={
   tumu:()=>true,
   ilac:s=>['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','Diger Ilac'].includes(s.kategori),
