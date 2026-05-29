@@ -2046,6 +2046,134 @@ function setStokTab(tab,e){
   loadStokPanel();
 }
 
+/* ═══ TANIMLAR PANELİ ═══ */
+function openTanimlarPanel(){
+  document.getElementById('tanimlar-panel').style.transform='translateX(0)';
+  loadTanimlarPanel();
+}
+function closeTanimlarPanel(){
+  document.getElementById('tanimlar-panel').style.transform='translateX(100%)';
+}
+function setTanimlarTab(tab,e){
+  _tanimlarTab=tab;
+  document.querySelectorAll('#tanimlar-tabs .kat-btn').forEach(b=>b.classList.remove('on'));
+  if(e&&e.target) e.target.classList.add('on');
+  loadTanimlarPanel();
+}
+
+async function loadTanimlarPanel(){
+  const el=document.getElementById('tanimlar-panel-body'); if(!el) return;
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  if(_tanimlarTab==='hastaliklar') await _renderHastaliklar(el);
+  else if(_tanimlarTab==='ilaclar') await _renderIlaclar(el);
+  else if(_tanimlarTab==='kategoriler') await _renderKategoriler(el);
+}
+
+async function _renderHastaliklar(el){
+  await pullTables(['diseases','cases']);
+  const diseases=await idbGetAll('diseases');
+  const cases=await idbGetAll('cases');
+  if(!diseases.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">🏥</div>Henüz hastalık tanımı yok</div>'+_tanimVarsayilanBtn('diseases');
+    return;
+  }
+  const KAT_RENK={Meme:'#e91e63',Üreme:'#9c27b0',Metabolik:'#ff9800',Ayak:'#795548',Solunum:'#2196f3',Sindirim:'#4caf50',Buzağı:'#00bcd4',Diğer:'#607d8b'};
+  let html=diseases.map(d=>{
+    const aktif=cases.filter(c=>c.disease_id===d.id&&c.status==='active').length;
+    const kapali=cases.filter(c=>c.disease_id===d.id&&c.status==='closed').length;
+    const toplam=aktif+kapali;
+    const renk=KAT_RENK[d.category]||'#607d8b';
+    return `<div class="tanimlar-card" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${renk};border-radius:10px;padding:11px 13px;margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(d.name)}</div>
+          <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">
+            <span style="background:${renk}22;color:${renk};padding:1px 6px;border-radius:4px;font-weight:700">${d.category||'—'}</span>
+            ${toplam?' · '+toplam+' vaka'+(aktif?' ('+aktif+' aktif)':''):''}
+          </div>
+        </div>
+        <button onclick="_tanimEditForm('disease','${d.id}')" style="padding:6px 10px;background:var(--card2);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+      </div>
+      <div id="tdf-disease-${d.id}"></div>
+    </div>`;
+  }).join('');
+  html+=`<button onclick="_tanimEditForm('disease','new')" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni Hastalık Ekle</button>`;
+  html+=_tanimVarsayilanBtn('diseases');
+  el.innerHTML=html;
+}
+
+function _tanimVarsayilanBtn(tip){
+  return `<div style="text-align:center;margin-top:14px">
+    <button onclick="_tanimVarsayilan('${tip}')" style="background:none;border:none;color:var(--ink3);font-size:.72rem;cursor:pointer;text-decoration:underline">🔄 Varsayılana Dön</button>
+  </div>`;
+}
+
+function _tanimEditForm(tip, id){
+  document.querySelectorAll('.tanim-edit-form').forEach(f=>f.remove());
+  if(tip==='disease') _diseaseEditForm(id);
+  else if(tip==='drug') _drugEditForm(id);
+  else if(tip==='kategori') _kategoriEditForm(id);
+}
+
+async function _diseaseEditForm(id){
+  const isNew=id==='new';
+  let name='',category='';
+  if(!isNew){
+    const all=await idbGetAll('diseases');
+    const d=all.find(x=>x.id===id);
+    if(d){name=d.name;category=d.category||'';}
+  }
+  const KATS=['Meme','Üreme','Metabolik','Ayak','Solunum','Sindirim','Buzağı','Diğer'];
+  const katOpts=KATS.map(k=>`<option ${k===category?'selected':''} value="${k}">${k}</option>`).join('');
+  const formHtml=`<div class="tanim-edit-form" style="background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:10px;margin-top:6px">
+    <div style="margin-bottom:6px"><input id="tef-disease-name" class="fi" value="${esc(name)}" placeholder="Hastalık adı" style="margin:0"></div>
+    <div style="margin-bottom:8px"><select id="tef-disease-cat" class="fsel" style="margin:0"><option value="">Kategori seç…</option>${katOpts}</select></div>
+    <div style="display:flex;gap:6px">
+      <button onclick="_diseaseSave('${id}')" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px;font-weight:700;cursor:pointer">${isNew?'Ekle':'Kaydet'}</button>
+      ${isNew?'':`<button onclick="_diseaseDelete('${id}')" style="padding:8px 12px;background:#ffebee;color:#c62828;border:none;border-radius:7px;font-weight:700;cursor:pointer">Sil</button>`}
+      <button onclick="document.querySelectorAll('.tanim-edit-form').forEach(f=>f.remove())" style="padding:8px 12px;background:var(--card3);border:none;border-radius:7px;cursor:pointer">İptal</button>
+    </div>
+  </div>`;
+  if(isNew){
+    const btn=document.querySelector('#tanimlar-panel-body button[onclick*="disease"][onclick*="new"]');
+    if(btn) btn.insertAdjacentHTML('beforebegin',formHtml);
+  } else {
+    const wrap=document.getElementById('tdf-disease-'+id);
+    if(wrap) wrap.innerHTML=formHtml;
+  }
+}
+
+async function _diseaseSave(id){
+  const name=document.getElementById('tef-disease-name')?.value.trim();
+  const cat=document.getElementById('tef-disease-cat')?.value;
+  if(!name){toast('Hastalık adı zorunlu','warn');return;}
+  if(!cat){toast('Kategori seçin','warn');return;}
+  const isNew=id==='new';
+  const res=await rpcOptimistic(isNew?'disease_ekle':'disease_guncelle',
+    isNew?{p_name:name,p_category:cat}:{p_id:id,p_name:name,p_category:cat},
+    null,['diseases']);
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  loadTanimlarPanel();
+}
+
+async function _diseaseDelete(id){
+  if(!confirm('Bu hastalığı silmek istediğinize emin misiniz?')) return;
+  const res=await rpcOptimistic('disease_sil',{p_id:id},null,['diseases']);
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast('Hastalık silindi');
+  loadTanimlarPanel();
+}
+
+async function _tanimVarsayilan(tip){
+  const labels={diseases:'hastalık',drugs:'ilaç',kategoriler:'kategori'};
+  if(!confirm(`Standart ${labels[tip]||tip} tanımları geri yüklenecek. Mevcut özel tanımlarınız silinmez. Devam?`)) return;
+  const res=await rpcOptimistic('seed_defaults',{p_tip:tip},null,
+    tip==='diseases'?['diseases']:tip==='drugs'?['drugs']:['stok_kategorileri']);
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast(`${res.eklenen||0} yeni ${labels[tip]} eklendi`);
+  loadTanimlarPanel();
+}
+
 const _TAB_FILTER={
   tumu:()=>true,
   ilac:s=>['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','Diger Ilac'].includes(s.kategori),
