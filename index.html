@@ -430,7 +430,15 @@ button,input,select,textarea{font-family:inherit}
   <!-- GEÇMİŞ -->
   <div id="pg-gecmis" class="pg">
     <div class="pg-inner">
-      <input id="gecmis-search" type="text" class="srch" placeholder="🔍 Küpe no, hastalık, aşı, işlem ara…" style="width:100%;margin-bottom:8px;box-sizing:border-box" autocomplete="off" data-input="gecmis-search">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <input id="gecmis-search" type="text" class="srch" placeholder="🔍 Küpe no, hastalık, aşı, işlem ara…" style="flex:1;box-sizing:border-box" autocomplete="off" data-input="gecmis-search">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;font-size:.68rem;font-weight:600;color:var(--ink3);flex-shrink:0" data-action="gecmis-tumu-toggle">
+          <span>Tümü</span>
+          <span id="gecmis-toggle" style="width:32px;height:18px;border-radius:9px;background:var(--card3);position:relative;transition:background .2s;display:inline-block">
+            <span style="width:14px;height:14px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)"></span>
+          </span>
+        </label>
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:9px;overflow-x:auto;padding-bottom:2px">
         <button class="fs-btn on" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-hepsi">Hepsi</button>
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-dogum">🐄 Doğum</button>
@@ -1558,17 +1566,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1780056481"></script>
-    <script src="js/utils/modal.js?v=1780056481"></script>
-    <script src="js/utils/errorHandler.js?v=1780056481"></script>
-    <script src="js/utils/events.js?v=1780056481"></script>
-    <script src="js/config.js?v=1780056481"></script>
-    <script src="js/state.js?v=1780056481"></script>
-    <script src="js/api.js?v=1780056481"></script>
-    <script src="js/ui.js?v=1780056481"></script>
-    <script src="js/forms.js?v=1780056481"></script>
-    <script src="js/app.js?v=1780056481"></script>
-    <script src="js/utils/handlers.js?v=1780056481"></script>
+    <script src="js/utils/helpers.js?v=1780057392"></script>
+    <script src="js/utils/modal.js?v=1780057392"></script>
+    <script src="js/utils/errorHandler.js?v=1780057392"></script>
+    <script src="js/utils/events.js?v=1780057392"></script>
+    <script src="js/config.js?v=1780057392"></script>
+    <script src="js/state.js?v=1780057392"></script>
+    <script src="js/api.js?v=1780057392"></script>
+    <script src="js/ui.js?v=1780057392"></script>
+    <script src="js/forms.js?v=1780057392"></script>
+    <script src="js/app.js?v=1780057392"></script>
+    <script src="js/utils/handlers.js?v=1780057392"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
