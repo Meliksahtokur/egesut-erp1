@@ -1789,6 +1789,42 @@ function _gecmisEntryHtml(e){
   </div>`;
 }
 
+function _gecmisSearchText(e){
+  const d=e.data, animals=getState('animals');
+  const parts=[e.type, fmtTarih(e.date)];
+  const pushAnimal=(id)=>{
+    if(!id)return;
+    const a=animals.find(x=>x.id===id||x.kupe_no===id);
+    if(a){parts.push(a.kupe_no||'',a.devlet_kupe||'',a.isim||'');}
+    else parts.push(id);
+  };
+  pushAnimal(d.hayvan_id||d.anne_id||d.animal_id||d.ana_hayvan_id);
+  if(e.type==='dogum'){parts.push(d.yavru_kupe||'',d.yavru_cins||'',d.dogum_tipi||'');pushAnimal(d.anne_id);}
+  else if(e.type==='tohumlama'){parts.push(d.sperma||'',d.sonuc||'','tohumlama');}
+  else if(e.type==='hastalik'){parts.push(d.disease_name||'',d.tani||'',d.status==='active'?'aktif':'kapalı','hastalık');}
+  else if(e.type==='gorev'){parts.push(d.aciklama||'',d.gorev_tipi||'');}
+  else if(e.type==='islem'){
+    const snap=d.snapshot||{};
+    parts.push(_ISLEM_ETK[d.tip]||d.tip||'',snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||'');
+  }
+  const hk=HEKIMLER.find(h=>h.id===d.hekim_id);
+  if(hk)parts.push(hk.ad);
+  return parts.join(' ').toLowerCase().replace(/\s+/g,' ');
+}
+
+let _gecmisAllEntries=[];
+function _gecmisRender(q){
+  const el=document.getElementById('gecmis-body');
+  let list=_gecmisAllEntries;
+  if(q){
+    const terms=q.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    if(terms.length) list=list.filter(e=>terms.every(t=>e._s.includes(t)));
+  }
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>';return;}
+  const countHint=q&&list.length<_gecmisAllEntries.length?`<div style="font-size:.65rem;color:var(--ink3);margin-bottom:6px;padding:0 2px">${list.length} / ${_gecmisAllEntries.length} sonuç</div>`:'';
+  el.innerHTML=countHint+list.slice(0,300).map(e=>_gecmisEntryHtml(e)).join('');
+}
+
 async function loadGecmis(f,btn){
   _curGecmisFilter=f;
   if(btn){ document.querySelectorAll('#pg-gecmis .fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
@@ -1816,8 +1852,10 @@ async function loadGecmis(f,btn){
         .forEach(r=>entries.push({type:'islem',date:(r.tarih||r.created_at||'').slice(0,10),sortKey:r.tarih||r.created_at||'',data:r}));
     }
     entries.sort((a,b)=>(b.sortKey||b.date||'').localeCompare(a.sortKey||a.date||''));
-    if(!entries.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>'; return; }
-    el.innerHTML=entries.slice(0,300).map(e=>_gecmisEntryHtml(e)).join('');
+    entries.forEach(e=>e._s=_gecmisSearchText(e));
+    _gecmisAllEntries=entries;
+    const q=(document.getElementById('gecmis-search')||{}).value||'';
+    _gecmisRender(q);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
