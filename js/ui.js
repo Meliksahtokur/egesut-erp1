@@ -1802,7 +1802,10 @@ function _gecmisSearchText(e){
   if(e.type==='dogum'){parts.push(d.yavru_kupe||'',d.yavru_cins||'',d.dogum_tipi||'');pushAnimal(d.anne_id);}
   else if(e.type==='tohumlama'){parts.push(d.sperma||'',d.sonuc||'','tohumlama');}
   else if(e.type==='hastalik'){parts.push(d.disease_name||'',d.tani||'',d.status==='active'?'aktif':'kapalı','hastalık');}
-  else if(e.type==='gorev'){parts.push(d.aciklama||'',d.gorev_tipi||'',...(d._drugNames||[]));}
+  else if(e.type==='gorev'){
+    let _lbl='';try{const _p=typeof d.aciklama==='string'?JSON.parse(d.aciklama):d.aciklama;_lbl=_p?.label||'';}catch(e){_lbl=d.aciklama||'';}
+    parts.push(_lbl,d.gorev_tipi||'',...(d._drugNames||[]));
+  }
   else if(e.type==='islem'){
     const snap=d.snapshot||{};
     parts.push(_ISLEM_ETK[d.tip]||d.tip||'',snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||'');
@@ -1855,7 +1858,7 @@ async function loadGecmis(f,btn){
       });
       (await getData('gorev_log',t=>t.tamamlandi&&!t.parent_id)).forEach(r=>{
         let dayId=null;
-        try{dayId=JSON.parse(r.aciklama||'{}').day_id;}catch(e){}
+        try{const p=typeof r.aciklama==='string'?JSON.parse(r.aciklama):r.aciklama;dayId=p?.day_id;}catch(e){}
         const _drugNames=(dayId&&_drugsByDay[dayId])||[];
         entries.push({type:'gorev',date:(r.tamamlanma_tarihi||r.hedef_tarih||'').slice(0,10),sortKey:r.tamamlanma_tarihi||r.hedef_tarih||'',data:{...r,_drugNames}});
       });
