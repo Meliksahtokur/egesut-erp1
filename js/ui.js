@@ -2174,6 +2174,105 @@ async function _tanimVarsayilan(tip){
   loadTanimlarPanel();
 }
 
+async function _renderIlaclar(el){
+  await pullTables(['drugs','stok']);
+  const drugs=await idbGetAll('drugs');
+  const stok=getState('stock');
+  if(!drugs.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">💊</div>Henüz ilaç tanımı yok</div>'+_tanimVarsayilanBtn('drugs');
+    return;
+  }
+  const YOL_RENK={IM:'#2196f3',IV:'#e91e63',SC:'#ff9800',PO:'#4caf50',Topikal:'#9c27b0',Intrauterin:'#795548'};
+  let html=drugs.map(d=>{
+    const s=d.stock_item_id?stok.find(x=>x.id===d.stock_item_id):null;
+    const yolRenk=YOL_RENK[d.default_route]||'#607d8b';
+    const stokInfo=s
+      ?`<span style="color:var(--green);font-size:.65rem;font-weight:700">📦 ${esc(s.urun_adi)} (${(s.guncel||0).toFixed(s.birim==='adet'?0:1)} ${s.birim||''})</span>`
+      :`<span style="color:var(--ink3);font-size:.65rem">⚠️ Stok bağlantısı yok</span>`;
+    return `<div class="tanimlar-card" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${yolRenk};border-radius:10px;padding:11px 13px;margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(d.name)}</div>
+          <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">
+            ${d.default_route?`<span style="background:${yolRenk}22;color:${yolRenk};padding:1px 6px;border-radius:4px;font-weight:700">${d.default_route}</span>`:''}
+            ${d.default_unit?' · '+d.default_unit:''}
+          </div>
+          <div style="margin-top:3px">${stokInfo}</div>
+        </div>
+        <button onclick="_tanimEditForm('drug','${d.id}')" style="padding:6px 10px;background:var(--card2);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+      </div>
+      <div id="tdf-drug-${d.id}"></div>
+    </div>`;
+  }).join('');
+  html+=`<button onclick="_tanimEditForm('drug','new')" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni İlaç Ekle</button>`;
+  html+=_tanimVarsayilanBtn('drugs');
+  el.innerHTML=html;
+}
+
+async function _drugEditForm(id){
+  const isNew=id==='new';
+  let name='',unit='',route='',stockId='';
+  if(!isNew){
+    const all=await idbGetAll('drugs');
+    const d=all.find(x=>x.id===id);
+    if(d){name=d.name;unit=d.default_unit||'';route=d.default_route||'';stockId=d.stock_item_id||'';}
+  }
+  const BIRIMLER=['ml','mg','cc','adet'];
+  const YOLLAR=['IM','IV','SC','PO','Topikal','Intrauterin'];
+  const birimOpts=BIRIMLER.map(b=>`<option ${b===unit?'selected':''} value="${b}">${b}</option>`).join('');
+  const yolOpts=YOLLAR.map(y=>`<option ${y===route?'selected':''} value="${y}">${y}</option>`).join('');
+
+  const stok=getState('stock');
+  const drugs=await idbGetAll('drugs');
+  const usedIds=drugs.filter(d=>d.stock_item_id&&d.id!==id).map(d=>d.stock_item_id);
+  const freeStok=stok.filter(s=>!usedIds.includes(s.id));
+  const stokOpts=freeStok.map(s=>`<option ${s.id===stockId?'selected':''} value="${s.id}">${esc(s.urun_adi)} (${s.kategori})</option>`).join('');
+
+  const formHtml=`<div class="tanim-edit-form" style="background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:10px;margin-top:6px">
+    <div style="margin-bottom:6px"><input id="tef-drug-name" class="fi" value="${esc(name)}" placeholder="İlaç adı" style="margin:0"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+      <select id="tef-drug-unit" class="fsel" style="margin:0"><option value="">Birim…</option>${birimOpts}</select>
+      <select id="tef-drug-route" class="fsel" style="margin:0"><option value="">Uygulama yolu…</option>${yolOpts}</select>
+    </div>
+    <div style="margin-bottom:8px"><select id="tef-drug-stok" class="fsel" style="margin:0"><option value="">Stok bağlantısı (opsiyonel)</option>${stokOpts}</select></div>
+    <div style="display:flex;gap:6px">
+      <button onclick="_drugSave('${id}')" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px;font-weight:700;cursor:pointer">${isNew?'Ekle':'Kaydet'}</button>
+      ${isNew?'':`<button onclick="_drugDelete('${id}')" style="padding:8px 12px;background:#ffebee;color:#c62828;border:none;border-radius:7px;font-weight:700;cursor:pointer">Sil</button>`}
+      <button onclick="document.querySelectorAll('.tanim-edit-form').forEach(f=>f.remove())" style="padding:8px 12px;background:var(--card3);border:none;border-radius:7px;cursor:pointer">İptal</button>
+    </div>
+  </div>`;
+  if(isNew){
+    const btn=document.querySelector('#tanimlar-panel-body button[onclick*="drug"][onclick*="new"]');
+    if(btn) btn.insertAdjacentHTML('beforebegin',formHtml);
+  } else {
+    const wrap=document.getElementById('tdf-drug-'+id);
+    if(wrap) wrap.innerHTML=formHtml;
+  }
+}
+
+async function _drugSave(id){
+  const name=document.getElementById('tef-drug-name')?.value.trim();
+  const unit=document.getElementById('tef-drug-unit')?.value||null;
+  const route=document.getElementById('tef-drug-route')?.value||null;
+  const stokId=document.getElementById('tef-drug-stok')?.value||null;
+  if(!name){toast('İlaç adı zorunlu','warn');return;}
+  const isNew=id==='new';
+  const res=await rpcOptimistic(isNew?'drug_ekle':'drug_guncelle',
+    isNew?{p_name:name,p_default_unit:unit,p_default_route:route,p_stock_item_id:stokId}
+         :{p_id:id,p_name:name,p_default_unit:unit,p_default_route:route,p_stock_item_id:stokId},
+    null,['drugs']);
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  loadTanimlarPanel();
+}
+
+async function _drugDelete(id){
+  if(!confirm('Bu ilacı silmek istediğinize emin misiniz?')) return;
+  const res=await rpcOptimistic('drug_sil',{p_id:id},null,['drugs']);
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast('İlaç silindi');
+  loadTanimlarPanel();
+}
+
 const _TAB_FILTER={
   tumu:()=>true,
   ilac:s=>['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','Diger Ilac'].includes(s.kategori),
