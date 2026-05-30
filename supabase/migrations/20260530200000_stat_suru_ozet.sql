@@ -1,13 +1,14 @@
 -- Sürü istatistik RPC — hayvan demografisi + gebelik istatistikleri
 CREATE OR REPLACE FUNCTION public.stat_suru_ozet(
-  p_padok text DEFAULT NULL
+  p_padok     text    DEFAULT NULL,
+  p_son_donem boolean DEFAULT true
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_hayvan jsonb;
   v_gebelik jsonb;
 BEGIN
-  -- ── CTE 1: Hayvan demografisi ──
+  -- ── Hayvan demografisi (dönemden bağımsız) ──
   SELECT jsonb_build_object(
     'toplam', COUNT(*),
     'inek',   COUNT(*) FILTER (WHERE
@@ -38,8 +39,19 @@ BEGIN
   WHERE h.durum = 'Aktif'
     AND (p_padok IS NULL OR h.padok = p_padok);
 
-  -- ── CTE 2: Gebelik istatistikleri ──
-  WITH tohum AS (
+  -- ── Gebelik istatistikleri ──
+  WITH son_basari AS (
+    -- Her hayvanın "önceki dönem sonu": sonrası olan en son Gebe/Doğum kaydı
+    SELECT t1.hayvan_id, MAX(t1.tarih) AS onceki_tarih
+    FROM public.tohumlama t1
+    WHERE t1.sonuc IN ('Gebe', 'Doğum Yaptı')
+      AND EXISTS (
+        SELECT 1 FROM public.tohumlama t2
+        WHERE t2.hayvan_id = t1.hayvan_id AND t2.tarih > t1.tarih
+      )
+    GROUP BY t1.hayvan_id
+  ),
+  tohum AS (
     SELECT
       t.id,
       t.hayvan_id,
@@ -56,9 +68,11 @@ BEGIN
       END AS kategori
     FROM public.tohumlama t
     JOIN public.hayvanlar h ON h.id = t.hayvan_id
+    LEFT JOIN son_basari sb ON sb.hayvan_id = t.hayvan_id
     WHERE h.cinsiyet = 'Dişi'
       AND h.durum = 'Aktif'
       AND (p_padok IS NULL OR h.padok = p_padok)
+      AND (NOT p_son_donem OR sb.onceki_tarih IS NULL OR t.tarih > sb.onceki_tarih)
   )
   SELECT jsonb_build_object(
     'ozet', jsonb_build_object(

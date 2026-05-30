@@ -8514,7 +8514,8 @@ GRANT EXECUTE ON FUNCTION public.stat_gebelik_ozet(date, date, text, text, text)
 
 -- ── stat_suru_ozet — hayvan demografisi + gebelik istatistikleri ──
 CREATE OR REPLACE FUNCTION public.stat_suru_ozet(
-  p_padok text DEFAULT NULL
+  p_padok     text    DEFAULT NULL,
+  p_son_donem boolean DEFAULT true
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -8551,7 +8552,17 @@ BEGIN
   WHERE h.durum = 'Aktif'
     AND (p_padok IS NULL OR h.padok = p_padok);
 
-  WITH tohum AS (
+  WITH son_basari AS (
+    SELECT t1.hayvan_id, MAX(t1.tarih) AS onceki_tarih
+    FROM public.tohumlama t1
+    WHERE t1.sonuc IN ('Gebe', 'Doğum Yaptı')
+      AND EXISTS (
+        SELECT 1 FROM public.tohumlama t2
+        WHERE t2.hayvan_id = t1.hayvan_id AND t2.tarih > t1.tarih
+      )
+    GROUP BY t1.hayvan_id
+  ),
+  tohum AS (
     SELECT
       t.id,
       t.hayvan_id,
@@ -8568,9 +8579,11 @@ BEGIN
       END AS kategori
     FROM public.tohumlama t
     JOIN public.hayvanlar h ON h.id = t.hayvan_id
+    LEFT JOIN son_basari sb ON sb.hayvan_id = t.hayvan_id
     WHERE h.cinsiyet = 'Dişi'
       AND h.durum = 'Aktif'
       AND (p_padok IS NULL OR h.padok = p_padok)
+      AND (NOT p_son_donem OR sb.onceki_tarih IS NULL OR t.tarih > sb.onceki_tarih)
   )
   SELECT jsonb_build_object(
     'ozet', jsonb_build_object(
@@ -8645,6 +8658,6 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenticated;
 
 END;
