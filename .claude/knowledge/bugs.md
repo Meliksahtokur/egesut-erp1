@@ -82,6 +82,23 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - İlgili commit: feature/gwen-bug007-fix → gwen/dev (19ecaf8)
 - Çözüm: RPC_MAP tablosu + buildRpcParams() helper ile tüm offline işlemler artık RPC kullanıyor
 
+## [2026-05-30] BUG-010 Tanımlar Panel Scroll Reset (Kronik)
+- Kaynak: kullanıcı
+- Modül: ui.js
+- Önem: orta (UX irritant)
+- Durum: yeni — 3 deneme başarısız
+- Açıklama: Tanımlar panelinde (İlaç Sınıfları, Hastalıklar, Kategoriler) herhangi bir CRUD işleminden sonra scroll en başa dönüyor.
+- Tetikleyici: loadTanimlarPanel() çağrılması — ekleme/silme/düzenleme
+- İlgili commit: d59bb70 (son deneme)
+- Denenen çözümler:
+  1. el.parentElement.scrollTop save + requestAnimationFrame restore — başarısız
+  2. Loader innerHTML kaldırma + setTimeout(0) — başarısız
+  3. _keepScroll overflow-y:hidden freeze tekniği — başarısız
+- HTML yapısı: div#tanimlar-panel > div(header) > div#tanimlar-tabs > div(overflow-y:auto) > div#tanimlar-panel-body
+- Scroll container: tanimlar-panel-body'nin parentElement (flex:1;overflow-y:auto)
+- _findScroller + _keepScroll utility mevcut (ui.js top-level)
+- Araştırılacak: prompt() native dialog scroll bozuyor olabilir, mobile Safari position:fixed + overflow uyumsuzluğu, accordion display:none toggle etkisi, çift loadTanimlarPanel çağrısı yarışı
+
 ## [2026-03-27] BUG-009 tohSonuc() direkt REST PATCH — RPC'ye geçiş yarım kaldı
 - Kaynak: erp-debug-agent
 - Modül: forms.js

@@ -91,6 +91,9 @@ Pattern + lang zorunlu. Detaylar: `AGENTS.md` > ast-grep Yapısal Arama Protokol
 | Teknik borç / refactor planı | `ReFactorRoadmap.md` — Aşama 1 kısmen tamam (1.1✅ 1.2✅ 1.3❌ 1.4❌), Aşama 2-9 bekliyor |
 | **Multi-tier Goose mimarisi** | `.claude/arch-decisions/ADR-007-multi-tier-goose-orchestration.md` — Tier0/1/2 tasarım, goose-ops, commit lock, summon testi, uygulama sırası |
 | **Gelecek fikirler / backlog** | `.claude/ideas/` — henüz task açılmamış özellik fikirleri, ileride ele alınacak |
+| **İlaç Sınıflandırma Faz 2** | Kalan iş: `stok.kategori` string→UUID FK, `drugs` DROP, drug_products kategori propagasyonu. Spec: `docs/superpowers/specs/2026-05-30-ilac-siniflandirma-refactor.md` §Faz 2 |
+| **Kırık RPC'ler** | `update_drug_administration` ve `remove_drug_administration` — ground_truth'ta da kırık, düzeltilmeli. Bkz. `.claude/tasks/dev/task-042` |
+| **Scroll reset (BUG-010)** | Tanımlar paneli kronik scroll sorunu — 3 deneme başarısız. `_keepScroll` utility mevcut. Detay: `.claude/knowledge/bugs.md` |
 
 ## Vanilla JS UI Kuralları
 
