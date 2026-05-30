@@ -2237,12 +2237,22 @@ async function _renderIlacSiniflari(el){
   const GRP_RENK={'Antimikrobiyaller (Antibiyotikler)':'#2196f3','Anti-inflamatuar İlaçlar':'#e91e63','Hormonlar ve Üreme İlaçları':'#9c27b0','Antiparaziter İlaçlar':'#ff9800','Vitaminler ve Mineraller':'#4caf50','Metabolik / Sıvı Tedavi':'#00bcd4','Gastrointestinal İlaçlar':'#795548','Topikal / Harici İlaçlar':'#607d8b','Anestezik / Sedatif':'#f44336'};
 
   const tree={};
+  const placeholders=[];
   allDC.forEach(dc=>{
     const g=dc.group_name||'Diğer';
     const c=dc.class_name||'Genel';
     if(!tree[g]) tree[g]={};
     if(!tree[g][c]) tree[g][c]=[];
+    if(dc.active_ingredient==='(tanımsız)'){placeholders.push(dc);return;}
     tree[g][c].push(dc);
+  });
+  // placeholder'ları sadece o grp+cls'de başka madde yoksa göster
+  placeholders.forEach(dc=>{
+    const g=dc.group_name||'Diğer';
+    const c=dc.class_name||'Genel';
+    if(!tree[g]) tree[g]={};
+    if(!tree[g][c]) tree[g][c]=[];
+    if(!tree[g][c].length) tree[g][c].push(dc);
   });
 
   const dpCount={};
@@ -2337,6 +2347,8 @@ async function _dcAddIngredient(grp,cls){
   const katId=sameGrp?sameGrp.kategori_id:null;
   const res=await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:cls,p_active_ingredient:name.trim(),p_kategori_id:katId});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  const placeholder=allDC.find(dc=>dc.group_name===grp&&dc.class_name===cls&&dc.active_ingredient==='(tanımsız)');
+  if(placeholder) await rpcOptimistic('drug_class_sil',{p_id:placeholder.id});
   toast('Etken madde eklendi');
   loadTanimlarPanel();
 }
