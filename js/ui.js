@@ -664,11 +664,12 @@ function renderAnimals(list){
 let _suruStatCache={};
 let _suruStatOpen=false;
 let _suruDenemeOpen=false;
+let _suruStatMode='son';
 
 function _renderSuruStat(){
   const el=document.getElementById('suru-stat-card'); if(!el) return;
   const padok=document.getElementById('pflt')?.value||'';
-  const key=padok;
+  const key=padok+'_'+_suruStatMode;
   if(_suruStatCache[key]){
     _applySuruStatHtml(el,_suruStatCache[key],padok);
     _fetchSuruStat(el,padok,key);
@@ -679,13 +680,20 @@ function _renderSuruStat(){
 }
 
 function _fetchSuruStat(el,padok,key){
-  const params=padok?{p_padok:padok}:{};
+  const params={p_son_donem:_suruStatMode==='son'};
+  if(padok) params.p_padok=padok;
   db.rpc('stat_suru_ozet',params).then(({data})=>{
     if(data){
       _suruStatCache[key]=data;
       _applySuruStatHtml(el,data,padok);
     }
   }).catch(e=>console.warn('stat_suru_ozet:',e.message));
+}
+
+function _toggleStatMode(e){
+  e.stopPropagation();
+  _suruStatMode=_suruStatMode==='son'?'tum':'son';
+  _renderSuruStat();
 }
 
 function _showStatLoading(el,show){
@@ -738,7 +746,7 @@ function _applySuruStatHtml(el,d,padok){
 
   el.innerHTML=`<div class="stat-card${_suruStatOpen?' open':''}" onclick="_toggleSuruStat(event)">
     <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🔬 ${h.tohumlanan||0} tohumlanan · 🤰 ${g.gebe||0} gebe (${oran}) · 🏥 ${h.hasta||0} hasta</span><span class="stat-arrow">▼</span></div>
-    <div class="stat-detail">${demoHtml}${gebHtml}${spSection}${dnSection}</div>
+    <div class="stat-detail"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><span onclick="_toggleStatMode(event)" style="cursor:pointer;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ink1);color:var(--ink4)">${_suruStatMode==='son'?'Son Dönem':'Tüm Zamanlar'} ↻</span></div>${demoHtml}${gebHtml}${spSection}${dnSection}</div>
   </div>`;
 }
 
@@ -754,7 +762,7 @@ function _toggleDenemeRest(){
   const rest=document.getElementById('deneme-rest');
   if(rest) rest.style.display=_suruDenemeOpen?'block':'none';
   const padok=document.getElementById('pflt')?.value||'';
-  const data=_suruStatCache[padok];
+  const data=_suruStatCache[padok+'_'+_suruStatMode];
   if(data){
     const el=document.getElementById('suru-stat-card');
     if(el) _applySuruStatHtml(el,data,padok);
