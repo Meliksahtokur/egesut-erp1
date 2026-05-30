@@ -2066,7 +2066,7 @@ async function loadTanimlarPanel(){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   _ilacKatAdlari=null;
   if(_tanimlarTab==='hastaliklar') await _renderHastaliklar(el);
-  else if(_tanimlarTab==='ilaclar') await _renderIlaclar(el);
+  else if(_tanimlarTab==='ilaclar') await _renderIlacSiniflari(el);
   else if(_tanimlarTab==='kategoriler') await _renderKategoriler(el);
 }
 
@@ -2144,7 +2144,6 @@ function _tanimVarsayilanBtn(tip){
 function _tanimEditForm(tip, id){
   document.querySelectorAll('.tanim-edit-form').forEach(f=>f.remove());
   if(tip==='disease') _diseaseEditForm(id);
-  else if(tip==='drug') _drugEditForm(id);
   else if(tip==='kategori') _kategoriEditForm(id);
 }
 
@@ -2198,6 +2197,17 @@ async function _diseaseDelete(id){
 }
 
 async function _tanimVarsayilan(tip){
+  if(tip==='drug_classes'){
+    const a=Math.floor(Math.random()*10)+1;
+    const b=Math.floor(Math.random()*10)+1;
+    const ans=prompt(`Varsayılan sistem düzenine dönülecek. Eksik varsayılanlar eklenecektir.\n\nDevam etmek için ${a} + ${b} = ? yazın:`);
+    if(parseInt(ans)!==(a+b)){toast('Yanlış cevap — işlem iptal','warn');return;}
+    const res=await rpcOptimistic('drug_class_varsayilan_yukle',{});
+    if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+    toast(`${res.eklenen||0} yeni ilaç sınıfı eklendi`);
+    loadTanimlarPanel();
+    return;
+  }
   const labels={diseases:'hastalık',drugs:'ilaç',kategoriler:'kategori'};
   if(!confirm(`Standart ${labels[tip]||tip} tanımları geri yüklenecek. Mevcut özel tanımlarınız silinmez. Devam?`)) return;
   const res=await rpcOptimistic('seed_defaults',{p_tip:tip});
@@ -2206,125 +2216,205 @@ async function _tanimVarsayilan(tip){
   loadTanimlarPanel();
 }
 
-async function _renderIlaclar(el){
-  await pullTables(['drugs','stok','stok_kategorileri']);
-  const allDrugs=await idbGetAll('drugs');
-  const drugs=allDrugs.filter(d=>d.default_route||d.default_unit);
-  const stok=getState('stock');
-  if(!drugs.length){
-    el.innerHTML='<div class="empty"><div class="empty-ico">💊</div>Henüz ilaç tanımı yok</div>'+_tanimVarsayilanBtn('drugs');
+async function _renderIlacSiniflari(el){
+  await pullTables(['drug_classes','drug_products','stok_kategorileri']);
+  const allDC=await idbGetAll('drug_classes');
+  const allDP=await idbGetAll('drug_products');
+
+  if(!allDC.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">💊</div>Henüz ilaç sınıfı tanımı yok</div>'+_tanimVarsayilanBtn('drug_classes');
     return;
   }
-  const ilacKats=((await idbGetAll('stok_kategorileri'))||[]).filter(k=>k.tip==='ilac').sort((a,b)=>(a.sira||0)-(b.sira||0));
-  const KAT_RENK={Antibiyotik:'#2196f3',NSAID:'#e91e63',Hormon:'#9c27b0',Vitamin:'#4caf50',Antiparaziter:'#ff9800',Kortikosteroid:'#795548',Metabolik:'#00bcd4','Diğer İlaç':'#607d8b'};
-  const YOL_AD={IM:'IM',IV:'IV',SC:'SC',PO:'PO',Topikal:'Top.',Intrauterin:'IU'};
-  const katSira=ilacKats.map(k=>k.ad);
-  const grouped={};
-  drugs.forEach(d=>{const k=d.kategori||'Diğer İlaç';if(!grouped[k])grouped[k]=[];grouped[k].push(d);});
+
+  const GRP_RENK={'Antimikrobiyaller (Antibiyotikler)':'#2196f3','Anti-inflamatuar İlaçlar':'#e91e63','Hormonlar ve Üreme İlaçları':'#9c27b0','Antiparaziter İlaçlar':'#ff9800','Vitaminler ve Mineraller':'#4caf50','Metabolik / Sıvı Tedavi':'#00bcd4','Gastrointestinal İlaçlar':'#795548','Topikal / Harici İlaçlar':'#607d8b','Anestezik / Sedatif':'#f44336'};
+
+  const tree={};
+  allDC.forEach(dc=>{
+    const g=dc.group_name||'Diğer';
+    const c=dc.class_name||'Genel';
+    if(!tree[g]) tree[g]={};
+    if(!tree[g][c]) tree[g][c]=[];
+    tree[g][c].push(dc);
+  });
+
+  const dpCount={};
+  allDP.forEach(dp=>{dpCount[dp.drug_class_id]=(dpCount[dp.drug_class_id]||0)+1;});
+
   let html=_tanimSearchBar();
-  const allKats=[...katSira];
-  Object.keys(grouped).forEach(k=>{if(!allKats.includes(k))allKats.push(k);});
-  allKats.forEach(kat=>{
-    const items=grouped[kat];if(!items||!items.length)return;
-    const renk=KAT_RENK[kat]||'#607d8b';
-    const stoklu=items.filter(d=>d.stock_item_id).length;
+  const gruplar=Object.keys(tree).sort();
+
+  gruplar.forEach(grp=>{
+    const renk=GRP_RENK[grp]||'#607d8b';
+    const altGruplar=tree[grp];
+    const toplamMadde=Object.values(altGruplar).reduce((s,arr)=>s+arr.length,0);
+
     html+=`<div class="tanim-grup" style="margin-bottom:6px">
       <div onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.tanim-chev').classList.toggle('tanim-chev-open')" style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:${renk}15;border:1px solid ${renk}30;border-radius:8px;cursor:pointer;user-select:none">
         <span style="width:4px;height:22px;border-radius:2px;background:${renk};flex-shrink:0"></span>
-        <span style="font-weight:800;font-size:.82rem;color:${renk};flex:1">${esc(kat)}</span>
-        ${stoklu?`<span style="background:rgba(78,154,42,.15);color:var(--green);padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700">📦 ${stoklu}</span>`:''}
-        <span class="tanim-grup-count" style="background:var(--card3);color:var(--ink3);padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700">${items.length}</span>
+        <span style="font-weight:800;font-size:.82rem;color:${renk};flex:1">${esc(grp)}</span>
+        <span class="tanim-grup-count" style="background:var(--card3);color:var(--ink3);padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700">${toplamMadde}</span>
+        <button onclick="event.stopPropagation();_dcEditInline('group','${esc(grp)}',null)" style="padding:2px 6px;background:none;border:none;cursor:pointer;font-size:.7rem" title="Düzenle">✏️</button>
+        <button onclick="event.stopPropagation();_dcDeleteGroup('${esc(grp)}')" style="padding:2px 6px;background:none;border:none;cursor:pointer;font-size:.7rem" title="Sil">🗑</button>
         <svg class="tanim-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${renk}" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
       </div>
       <div style="display:none;padding:4px 0 0 0">`;
-    items.forEach(d=>{
-      const s=d.stock_item_id?stok.find(x=>x.id===d.stock_item_id):null;
-      const stokInfo=s
-        ?`<span style="color:var(--green);font-size:.62rem;font-weight:700">📦 ${esc(s.urun_adi)}</span>`
-        :`<span style="color:var(--ink3);font-size:.62rem">⚠️ Stok bağlantısı yok</span>`;
-      const yolBadge=d.default_route?`<span style="background:${renk}18;color:${renk};padding:1px 5px;border-radius:3px;font-size:.58rem;font-weight:700">${YOL_AD[d.default_route]||d.default_route}</span>`:'';
-      html+=`<div class="tanimlar-card" data-search="${esc(d.name)} ${kat} ${d.default_route||''} ${d.default_unit||''}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${renk};border-radius:8px;padding:9px 11px;margin:4px 0 0 12px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="display:flex;align-items:center;gap:5px"><span style="font-weight:700;font-size:.84rem;color:var(--ink)">${esc(d.name)}</span>${yolBadge}</div>
-            <div style="font-size:.6rem;color:var(--ink3);margin-top:1px">${d.default_unit||''} · ${stokInfo}</div>
-          </div>
-          <button onclick="_tanimEditForm('drug','${d.id}')" style="padding:5px 9px;background:var(--card2);border:none;border-radius:6px;font-size:.7rem;font-weight:700;cursor:pointer;color:var(--ink3)">Düzenle</button>
+
+    Object.keys(altGruplar).sort().forEach(cls=>{
+      const maddeler=altGruplar[cls];
+      html+=`<div style="margin:4px 0 0 12px">
+        <div onclick="const n=this.nextElementSibling;n.style.display=n.style.display==='none'?'block':'none';this.querySelector('.tanim-chev').classList.toggle('tanim-chev-open')" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--card2);border-radius:6px;cursor:pointer;user-select:none">
+          <span style="width:3px;height:16px;border-radius:2px;background:${renk}60;flex-shrink:0"></span>
+          <span style="font-weight:700;font-size:.78rem;color:var(--ink);flex:1">${esc(cls)}</span>
+          <span style="font-size:.6rem;color:var(--ink3)">${maddeler.length}</span>
+          <button onclick="event.stopPropagation();_dcEditInline('class','${esc(grp)}','${esc(cls)}')" style="padding:2px 4px;background:none;border:none;cursor:pointer;font-size:.65rem" title="Düzenle">✏️</button>
+          <button onclick="event.stopPropagation();_dcDeleteClass('${esc(grp)}','${esc(cls)}')" style="padding:2px 4px;background:none;border:none;cursor:pointer;font-size:.65rem" title="Sil">🗑</button>
+          <svg class="tanim-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
         </div>
-        <div id="tdf-drug-${d.id}"></div>
-      </div>`;
+        <div style="display:none;padding:2px 0 0 0">`;
+
+      maddeler.forEach(dc=>{
+        const dpBadge=dpCount[dc.id]?`<span style="background:rgba(78,154,42,.15);color:var(--green);padding:1px 5px;border-radius:4px;font-size:.58rem;font-weight:700">📦 ${dpCount[dc.id]}</span>`:'';
+        html+=`<div class="tanimlar-card" data-search="${esc(dc.active_ingredient)} ${esc(grp)} ${esc(cls)}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${renk};border-radius:6px;padding:7px 10px;margin:3px 0 0 20px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="font-weight:700;font-size:.8rem;color:var(--ink)">${esc(dc.active_ingredient)}</span>
+              ${dpBadge}
+            </div>
+            <div style="display:flex;gap:2px">
+              <button onclick="_dcEditIngredient('${dc.id}')" style="padding:3px 6px;background:var(--card2);border:none;border-radius:5px;font-size:.65rem;cursor:pointer" title="Düzenle">✏️</button>
+              <button onclick="_dcDeleteIngredient('${dc.id}')" style="padding:3px 6px;background:var(--card2);border:none;border-radius:5px;font-size:.65rem;cursor:pointer" title="Sil">🗑</button>
+            </div>
+          </div>
+        </div>`;
+      });
+
+      html+=`<button onclick="_dcAddIngredient('${esc(grp)}','${esc(cls)}')" style="display:block;width:calc(100% - 20px);margin:3px 0 0 20px;padding:6px;background:none;border:1px dashed var(--card3);border-radius:5px;color:var(--ink3);font-size:.7rem;cursor:pointer;text-align:left">＋ Etken Madde Ekle</button>`;
+      html+=`</div></div>`;
     });
+
+    html+=`<button onclick="_dcAddClass('${esc(grp)}')" style="display:block;width:calc(100% - 12px);margin:4px 0 0 12px;padding:6px;background:none;border:1px dashed var(--card3);border-radius:5px;color:var(--ink3);font-size:.7rem;cursor:pointer;text-align:left">＋ Alt Grup Ekle</button>`;
     html+=`</div></div>`;
   });
-  html+=`<button onclick="_tanimEditForm('drug','new')" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni İlaç Ekle</button>`;
-  html+=_tanimVarsayilanBtn('drugs');
+
+  html+=`<button onclick="_dcAddGroup()" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni Grup Ekle</button>`;
+  html+=_tanimVarsayilanBtn('drug_classes');
   el.innerHTML=html;
 }
 
-async function _drugEditForm(id){
-  const isNew=id==='new';
-  let name='',unit='',route='',stockId='',kategori='';
-  if(!isNew){
-    const all=await idbGetAll('drugs');
-    const d=all.find(x=>x.id===id);
-    if(d){name=d.name;unit=d.default_unit||'';route=d.default_route||'';stockId=d.stock_item_id||'';kategori=d.kategori||'';}
-  }
-  const BIRIMLER=['ml','mg','cc','adet'];
-  const YOLLAR=['IM','IV','SC','PO','Topikal','Intrauterin'];
-  const ilacKats=((await idbGetAll('stok_kategorileri'))||[]).filter(k=>k.tip==='ilac').sort((a,b)=>(a.sira||0)-(b.sira||0));
-  const katOpts=ilacKats.map(k=>`<option ${k.ad===kategori?'selected':''} value="${esc(k.ad)}">${esc(k.ad)}</option>`).join('');
-  const birimOpts=BIRIMLER.map(b=>`<option ${b===unit?'selected':''} value="${b}">${b}</option>`).join('');
-  const yolOpts=YOLLAR.map(y=>`<option ${y===route?'selected':''} value="${y}">${y}</option>`).join('');
+// ── drug_class inline CRUD ──
 
-  const stok=getState('stock');
-  const drugs=await idbGetAll('drugs');
-  const usedIds=drugs.filter(d=>d.stock_item_id&&d.id!==id).map(d=>d.stock_item_id);
-  const freeStok=stok.filter(s=>!usedIds.includes(s.id));
-  const stokOpts=freeStok.map(s=>`<option ${s.id===stockId?'selected':''} value="${s.id}">${esc(s.urun_adi)} (${s.kategori})</option>`).join('');
-
-  const formHtml=`<div class="tanim-edit-form" style="background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:10px;margin-top:6px">
-    <div style="margin-bottom:6px"><input id="tef-drug-name" class="fi" value="${esc(name)}" placeholder="İlaç adı" style="margin:0"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:6px">
-      <select id="tef-drug-kat" class="fsel" style="margin:0"><option value="">Kategori…</option>${katOpts}</select>
-      <select id="tef-drug-unit" class="fsel" style="margin:0"><option value="">Birim…</option>${birimOpts}</select>
-      <select id="tef-drug-route" class="fsel" style="margin:0"><option value="">Yol…</option>${yolOpts}</select>
-    </div>
-    <div style="margin-bottom:8px"><select id="tef-drug-stok" class="fsel" style="margin:0"><option value="">Stok bağlantısı (opsiyonel)</option>${stokOpts}</select></div>
-    <div style="display:flex;gap:6px">
-      <button onclick="_drugSave('${id}')" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px;font-weight:700;cursor:pointer">${isNew?'Ekle':'Kaydet'}</button>
-      ${isNew?'':`<button onclick="_drugDelete('${id}')" style="padding:8px 12px;background:#ffebee;color:#c62828;border:none;border-radius:7px;font-weight:700;cursor:pointer">Sil</button>`}
-      <button onclick="document.querySelectorAll('.tanim-edit-form').forEach(f=>f.remove())" style="padding:8px 12px;background:var(--card3);border:none;border-radius:7px;cursor:pointer">İptal</button>
-    </div>
-  </div>`;
-  if(isNew){
-    const btn=document.querySelector('#tanimlar-panel-body button[onclick*="drug"][onclick*="new"]');
-    if(btn) btn.insertAdjacentHTML('beforebegin',formHtml);
-  } else {
-    const wrap=document.getElementById('tdf-drug-'+id);
-    if(wrap) wrap.innerHTML=formHtml;
-  }
-}
-
-async function _drugSave(id){
-  const name=document.getElementById('tef-drug-name')?.value.trim();
-  const unit=document.getElementById('tef-drug-unit')?.value||null;
-  const route=document.getElementById('tef-drug-route')?.value||null;
-  const stokId=document.getElementById('tef-drug-stok')?.value||null;
-  const kategori=document.getElementById('tef-drug-kat')?.value||null;
-  if(!name){toast('İlaç adı zorunlu','warn');return;}
-  const isNew=id==='new';
-  const res=await rpcOptimistic(isNew?'drug_ekle':'drug_guncelle',
-    isNew?{p_name:name,p_default_unit:unit,p_default_route:route,p_stock_item_id:stokId,p_kategori:kategori}
-         :{p_id:id,p_name:name,p_default_unit:unit,p_default_route:route,p_stock_item_id:stokId,p_kategori:kategori});
+async function _dcAddGroup(){
+  const name=prompt('Yeni grup adı:');
+  if(!name||!name.trim()) return;
+  const res=await rpcOptimistic('drug_class_ekle',{p_group_name:name.trim(),p_class_name:'Genel',p_active_ingredient:'(tanımsız)'});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast('Grup eklendi');
   loadTanimlarPanel();
 }
 
-async function _drugDelete(id){
-  if(!confirm('Bu ilacı silmek istediğinize emin misiniz?')) return;
-  const res=await rpcOptimistic('drug_sil',{p_id:id});
+async function _dcAddClass(grp){
+  const name=prompt('Yeni alt grup adı:');
+  if(!name||!name.trim()) return;
+  const res=await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:name.trim(),p_active_ingredient:'(tanımsız)'});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
-  toast('İlaç silindi');
+  toast('Alt grup eklendi');
+  loadTanimlarPanel();
+}
+
+async function _dcAddIngredient(grp,cls){
+  const name=prompt('Yeni etken madde adı:');
+  if(!name||!name.trim()) return;
+  const allDC=await idbGetAll('drug_classes');
+  const sameGrp=allDC.find(dc=>dc.group_name===grp);
+  const katId=sameGrp?sameGrp.kategori_id:null;
+  const res=await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:cls,p_active_ingredient:name.trim(),p_kategori_id:katId});
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast('Etken madde eklendi');
+  loadTanimlarPanel();
+}
+
+async function _dcEditInline(level,grp,cls){
+  if(level==='group'){
+    const newName=prompt('Grup adını düzenle:',grp);
+    if(!newName||!newName.trim()||newName.trim()===grp) return;
+    const allDC=await idbGetAll('drug_classes');
+    const targets=allDC.filter(dc=>dc.group_name===grp);
+    for(const dc of targets){
+      await rpcOptimistic('drug_class_guncelle',{p_id:dc.id,p_group_name:newName.trim()});
+    }
+    toast('Grup güncellendi');
+    loadTanimlarPanel();
+  } else if(level==='class'){
+    const newName=prompt('Alt grup adını düzenle:',cls);
+    if(!newName||!newName.trim()||newName.trim()===cls) return;
+    const allDC=await idbGetAll('drug_classes');
+    const targets=allDC.filter(dc=>dc.group_name===grp&&dc.class_name===cls);
+    for(const dc of targets){
+      await rpcOptimistic('drug_class_guncelle',{p_id:dc.id,p_class_name:newName.trim()});
+    }
+    toast('Alt grup güncellendi');
+    loadTanimlarPanel();
+  }
+}
+
+async function _dcEditIngredient(id){
+  const allDC=await idbGetAll('drug_classes');
+  const dc=allDC.find(x=>x.id===id);
+  if(!dc) return;
+  const newName=prompt('Etken madde adını düzenle:',dc.active_ingredient);
+  if(!newName||!newName.trim()||newName.trim()===dc.active_ingredient) return;
+  const res=await rpcOptimistic('drug_class_guncelle',{p_id:id,p_active_ingredient:newName.trim()});
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast('Güncellendi');
+  loadTanimlarPanel();
+}
+
+async function _dcDeleteGroup(grp){
+  const allDC=await idbGetAll('drug_classes');
+  const allDP=await idbGetAll('drug_products');
+  const targets=allDC.filter(dc=>dc.group_name===grp);
+  const linkedDP=allDP.filter(dp=>targets.some(dc=>dc.id===dp.drug_class_id));
+  if(linkedDP.length){
+    toast(`Bu grubun altında ${linkedDP.length} preparat bağlı. Önce preparatları taşıyın.`,'error');
+    return;
+  }
+  const subCount=targets.length;
+  if(!confirm(`"${grp}" grubu ve altındaki ${subCount} kayıt silinecek. Emin misiniz?`)) return;
+  for(const dc of targets){
+    await rpcOptimistic('drug_class_sil',{p_id:dc.id});
+  }
+  toast('Grup silindi');
+  loadTanimlarPanel();
+}
+
+async function _dcDeleteClass(grp,cls){
+  const allDC=await idbGetAll('drug_classes');
+  const allDP=await idbGetAll('drug_products');
+  const targets=allDC.filter(dc=>dc.group_name===grp&&dc.class_name===cls);
+  const linkedDP=allDP.filter(dp=>targets.some(dc=>dc.id===dp.drug_class_id));
+  if(linkedDP.length){
+    toast(`Bu alt grupta ${linkedDP.length} preparat bağlı. Önce preparatları taşıyın.`,'error');
+    return;
+  }
+  if(!confirm(`"${cls}" alt grubu ve altındaki ${targets.length} etken madde silinecek. Emin misiniz?`)) return;
+  for(const dc of targets){
+    await rpcOptimistic('drug_class_sil',{p_id:dc.id});
+  }
+  toast('Alt grup silindi');
+  loadTanimlarPanel();
+}
+
+async function _dcDeleteIngredient(id){
+  const allDP=await idbGetAll('drug_products');
+  const linked=allDP.filter(dp=>dp.drug_class_id===id);
+  if(linked.length){
+    toast(`Bu etken maddeye ${linked.length} preparat bağlı. Önce preparatları taşıyın.`,'error');
+    return;
+  }
+  if(!confirm('Bu etken maddeyi silmek istediğinize emin misiniz?')) return;
+  const res=await rpcOptimistic('drug_class_sil',{p_id:id});
+  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  toast('Silindi');
   loadTanimlarPanel();
 }
 
