@@ -1132,8 +1132,8 @@ async function submitStk(btn) {
 
 async function submitStokAdd(btn) {
   const kat  = g('sa-kat')?.value || 'Antibiyotik';
-  const ilacKatlar = ['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
-  const isIlac = ilacKatlar.includes(kat);
+  const allKats = (await idbGetAll('stok_kategorileri')) || [];
+  const isIlac = allKats.some(k => k.tip === 'ilac' && k.ad === kat);
   const isSperma = kat === 'Sperma';
   // İsim alanı tipe göre değişiyor
   const urun = isIlac
