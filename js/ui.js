@@ -1733,8 +1733,53 @@ async function _uremeAbort(el){
   }).join(''):'<div class="empty"><div class="empty-ico">⚠️</div>Abort kaydı yok</div>');
 }
 
+// ── ÜREME STAT KARTI ────────────────────────
+let _uremStatCache=null;
+let _uremStatOpen=false;
+
+async function _renderUremeStat(){
+  const el=document.getElementById('ureme-stat-card'); if(!el) return;
+  if(_uremStatCache){_applyStatHtml(el,_uremStatCache);return;}
+  try{
+    const {data}=await db.rpc('stat_gebelik_ozet',{});
+    if(data){_uremStatCache=data;_applyStatHtml(el,data);}
+  }catch(e){console.warn('stat_gebelik_ozet:',e.message);}
+}
+
+function _applyStatHtml(el,d){
+  const o=d.ozet||{};
+  const oran=o.oran!=null?`%${o.oran}`:'Veri yok';
+  const katHtml=(d.kategori||[]).map(k=>{
+    const ico=k.ad==='İnek'?'🐄':k.ad==='Düve'?'🐮':'❓';
+    return `<div class="stat-row">${ico} ${esc(k.ad)}: ${k.toplam} tohum · ${k.gebe} gebe · <b>${k.oran!=null?'%'+k.oran:'—'}</b></div>`;
+  }).join('');
+  const spHtml=(d.sperma_top5||[]).map(s=>
+    `<div class="stat-row">${esc(s.ad)} — ${s.toplam} tohum → <b>${s.oran!=null?'%'+s.oran:'—'}</b></div>`
+  ).join('')||'<div class="stat-row" style="color:var(--ink3)">Yeterli veri yok</div>';
+  const dnHtml=(d.deneme||[]).map(dn=>{
+    const label=dn.no>=3?'3+':dn.no;
+    return `<div class="stat-row">${label}. deneme: ${dn.gebe} gebe / ${dn.toplam} (${dn.oran!=null?'%'+dn.oran:'—'})</div>`;
+  }).join('')||'<div class="stat-row" style="color:var(--ink3)">Veri yok</div>';
+  el.innerHTML=`<div class="stat-card${_uremStatOpen?' open':''}" onclick="_toggleUremeStat()">
+    <div class="stat-header"><span>📊 Sürü Gebelik</span><span class="stat-arrow">▼</span></div>
+    <div class="stat-summary">💉 ${o.toplam||0} tohumlama · ✅ ${o.gebe||0} gebe · 📊 ${oran}</div>
+    <div class="stat-detail">
+      <div class="stat-section">${katHtml||'<div class="stat-row">Kategori verisi yok</div>'}</div>
+      <div class="stat-section"><div class="stat-section-title">🏆 Top Spermalar (≥3 tohumlama)</div>${spHtml}</div>
+      <div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnHtml}</div>
+    </div>
+  </div>`;
+}
+
+function _toggleUremeStat(){
+  _uremStatOpen=!_uremStatOpen;
+  const c=document.querySelector('#ureme-stat-card .stat-card');
+  if(c) c.classList.toggle('open',_uremStatOpen);
+}
+
 async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
+  _renderUremeStat();
   const el=document.getElementById('ureme-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   // Kizginlik disindaki tablerde toolbar'i gizle
