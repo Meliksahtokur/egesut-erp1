@@ -82,7 +82,7 @@ button,input,select,textarea{font-family:inherit}
 #ubadge.nbadge.on{display:flex}
 
 /* DASHBOARD */
-.stat-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
+.dash-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
 .sc{background:var(--bg2);border:1px solid var(--bg3);border-radius:var(--r2);padding:14px 12px;position:relative;overflow:hidden;cursor:pointer;transition:opacity .12s}
 .sc:active{opacity:.75}
 .sc::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(106,191,61,.06) 0%,transparent 60%)}
@@ -153,6 +153,7 @@ button,input,select,textarea{font-family:inherit}
 .stat-header{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:.85rem}
 .stat-summary{font-size:.8rem;color:var(--ink2);margin-top:4px}
 .stat-arrow{font-size:.7rem;color:var(--ink3);transition:transform .2s}
+.stat-loading{display:inline-block;width:12px;height:12px;border:2px solid var(--ink3);border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;margin-left:6px;vertical-align:middle}
 .stat-card.open .stat-arrow{transform:rotate(180deg)}
 .stat-detail{display:none;padding-top:8px;border-top:1px solid var(--border);margin-top:8px}
 .stat-card.open .stat-detail{display:block}
@@ -380,7 +381,7 @@ button,input,select,textarea{font-family:inherit}
         <span class="fchip-sep">|</span>
         <button class="fchip" id="fc-tekrar-tekrar" data-action="fchip-tekrar">🔁 Tekrar</button>
       </div>
-      <div id="padok-ozet" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 2px"></div>
+      <div id="suru-stat-card"></div>
       <div id="suru-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>
@@ -407,7 +408,6 @@ button,input,select,textarea{font-family:inherit}
           <button class="fchip" id="fc-kizginlik-sonuclanan" data-action="kizginlik-filtre-sonuclanan">✅ Sonuçlanan</button>
         </div>
       </div>
-      <div id="ureme-stat-card"></div>
       <div id="ureme-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>
@@ -1603,17 +1603,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1780151581"></script>
-    <script src="js/utils/modal.js?v=1780151581"></script>
-    <script src="js/utils/errorHandler.js?v=1780151581"></script>
-    <script src="js/utils/events.js?v=1780151581"></script>
-    <script src="js/config.js?v=1780151581"></script>
-    <script src="js/state.js?v=1780151581"></script>
-    <script src="js/api.js?v=1780151581"></script>
-    <script src="js/ui.js?v=1780151581"></script>
-    <script src="js/forms.js?v=1780151581"></script>
-    <script src="js/app.js?v=1780151581"></script>
-    <script src="js/utils/handlers.js?v=1780151581"></script>
+    <script src="js/utils/helpers.js?v=1780160054"></script>
+    <script src="js/utils/modal.js?v=1780160054"></script>
+    <script src="js/utils/errorHandler.js?v=1780160054"></script>
+    <script src="js/utils/events.js?v=1780160054"></script>
+    <script src="js/config.js?v=1780160054"></script>
+    <script src="js/state.js?v=1780160054"></script>
+    <script src="js/api.js?v=1780160054"></script>
+    <script src="js/ui.js?v=1780160054"></script>
+    <script src="js/forms.js?v=1780160054"></script>
+    <script src="js/app.js?v=1780160054"></script>
+    <script src="js/utils/handlers.js?v=1780160054"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

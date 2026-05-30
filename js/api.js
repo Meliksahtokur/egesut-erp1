@@ -301,7 +301,7 @@ let _pullingPromise = null;
 
 // Sadece belirtilen tabloları Supabase'den çek
 async function pullTables(tables = []) {
-  _uremStatCache=null;
+  _suruStatCache={};
   if (!tables.length) return;
   if (_pullingPromise) await _pullingPromise;
   let resolve;
