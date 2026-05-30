@@ -11,7 +11,8 @@ BEGIN
   SELECT jsonb_build_object(
     'toplam', COUNT(*),
     'inek',   COUNT(*) FILTER (WHERE
-                grup ILIKE '%inek%' OR grup ILIKE '%sağmal%' OR grup ILIKE '%sagmal%'
+                grup ILIKE '%inek%' OR grup LIKE '%İnek%'
+                OR grup ILIKE '%sağmal%' OR grup ILIKE '%sagmal%'
                 OR grup ILIKE '%kuru%'
                 OR EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = h.id)),
     'duve',   COUNT(*) FILTER (WHERE
@@ -41,7 +42,9 @@ BEGIN
       CASE
         WHEN h.grup ILIKE '%düve%' OR h.grup ILIKE '%duve%' THEN 'Düve'
         WHEN EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = h.id) THEN 'İnek'
-        WHEN h.grup ILIKE '%inek%' OR h.grup ILIKE '%sağmal%' OR h.grup ILIKE '%sagmal%' THEN 'İnek'
+        WHEN h.grup ILIKE '%inek%' OR h.grup LIKE '%İnek%'
+             OR h.grup ILIKE '%sağmal%' OR h.grup ILIKE '%sagmal%'
+             OR h.grup ILIKE '%kuru%' THEN 'İnek'
         ELSE 'Bilinmiyor'
       END AS kategori
     FROM public.tohumlama t
