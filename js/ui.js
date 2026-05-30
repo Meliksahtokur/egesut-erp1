@@ -705,6 +705,7 @@ function _applySuruStatHtml(el,d,padok){
   const demoHtml=`<div class="stat-section">
     <div class="stat-section-title">📋 Demografik</div>
     <div class="stat-row">🐄 İnek: ${h.inek||0} · 🐮 Düve: ${h.duve||0} · 🐂 Erkek: ${h.erkek||0} · 🍼 Buzağı: ${h.buzagi||0} · 💲 Kısır: ${h.kisir||0}</div>
+    <div class="stat-row">🔬 Tohumlanan: ${h.tohumlanan||0}/${h.toplam||0}</div>
   </div>`;
 
   const katHtml=(d.gebelik?.kategori||[]).map(k=>{
@@ -714,7 +715,7 @@ function _applySuruStatHtml(el,d,padok){
 
   const gebHtml=`<div class="stat-section">
     <div class="stat-section-title">🤰 Gebelik</div>
-    <div class="stat-row">💉 ${g.toplam||0} tohumlama · ✅ ${g.gebe||0} gebe · ⭕ ${g.bos||0} boş · ⏳ ${g.bekleyen||0} bekleyen</div>
+    <div class="stat-row">💉 ${g.toplam||0} tohumlama · ✅ ${g.gebe||0} gebe · ⭕ ${g.bos||0} boş${g.abort?` · ❌ ${g.abort} abort`:''}</div>${g.bekleyen?`<div class="stat-row" style="color:var(--ink3);font-size:.7rem">⏳ ${g.bekleyen} sonuç bekliyor (hesaba dahil değil)</div>`:''}
     <div class="stat-row">${katHtml}</div>
   </div>`;
 
@@ -736,7 +737,7 @@ function _applySuruStatHtml(el,d,padok){
   const dnSection=`<div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnFirst}${restBtn}</div>`;
 
   el.innerHTML=`<div class="stat-card${_suruStatOpen?' open':''}" onclick="_toggleSuruStat(event)">
-    <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🤰 ${g.gebe||0} gebe (${oran}) · 🏥 ${h.hasta||0} hasta</span><span class="stat-arrow">▼</span></div>
+    <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🔬 ${h.tohumlanan||0} tohumlanan · 🤰 ${g.gebe||0} gebe (${oran}) · 🏥 ${h.hasta||0} hasta</span><span class="stat-arrow">▼</span></div>
     <div class="stat-detail">${demoHtml}${gebHtml}${spSection}${dnSection}</div>
   </div>`;
 }

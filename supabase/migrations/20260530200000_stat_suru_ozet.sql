@@ -26,7 +26,13 @@ BEGIN
                JOIN public.hayvanlar h2 ON h2.id = c.animal_id
                WHERE c.status = 'active'
                  AND h2.durum = 'Aktif'
-                 AND (p_padok IS NULL OR h2.padok = p_padok))
+                 AND (p_padok IS NULL OR h2.padok = p_padok)),
+    'tohumlanan', (SELECT COUNT(DISTINCT t2.hayvan_id)
+                   FROM public.tohumlama t2
+                   JOIN public.hayvanlar h3 ON h3.id = t2.hayvan_id
+                   WHERE h3.durum = 'Aktif'
+                     AND h3.cinsiyet = 'Dişi'
+                     AND (p_padok IS NULL OR h3.padok = p_padok))
   ) INTO v_hayvan
   FROM public.hayvanlar h
   WHERE h.durum = 'Aktif'
@@ -36,6 +42,7 @@ BEGIN
   WITH tohum AS (
     SELECT
       t.id,
+      t.hayvan_id,
       t.sonuc,
       t.deneme_no,
       LOWER(TRIM(split_part(t.sperma, '|', 1))) AS sperma_norm,
@@ -55,11 +62,12 @@ BEGIN
   )
   SELECT jsonb_build_object(
     'ozet', jsonb_build_object(
-      'toplam', COUNT(*),
+      'toplam', COUNT(*) FILTER (WHERE sonuc != 'Bekliyor'),
       'gebe',   COUNT(*) FILTER (WHERE sonuc IN ('Gebe','Doğum Yaptı')),
       'bos',    COUNT(*) FILTER (WHERE sonuc = 'Boş'),
       'abort',  COUNT(*) FILTER (WHERE sonuc = 'Abort'),
       'bekleyen', COUNT(*) FILTER (WHERE sonuc = 'Bekliyor'),
+      'hayvan_sayisi', COUNT(DISTINCT hayvan_id) FILTER (WHERE sonuc != 'Bekliyor'),
       'oran',   ROUND(
                   100.0 * COUNT(*) FILTER (WHERE sonuc IN ('Gebe','Doğum Yaptı'))
                   / NULLIF(COUNT(*) FILTER (WHERE sonuc != 'Bekliyor'), 0), 1)
@@ -119,7 +127,7 @@ BEGIN
   FROM tohum;
 
   RETURN jsonb_build_object(
-    'hayvan', COALESCE(v_hayvan, '{"toplam":0,"inek":0,"duve":0,"buzagi":0,"erkek":0,"kisir":0,"hasta":0}'::jsonb),
+    'hayvan', COALESCE(v_hayvan, '{"toplam":0,"inek":0,"duve":0,"buzagi":0,"erkek":0,"kisir":0,"hasta":0,"tohumlanan":0}'::jsonb),
     'gebelik', COALESCE(v_gebelik, '{"ozet":{"toplam":0,"gebe":0,"bos":0,"abort":0,"bekleyen":0,"oran":null},"kategori":[],"sperma_top5":[],"deneme":[]}'::jsonb)
   );
 END;

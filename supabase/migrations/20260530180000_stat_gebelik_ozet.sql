@@ -42,7 +42,7 @@ BEGIN
   )
   SELECT jsonb_build_object(
     'ozet', jsonb_build_object(
-      'toplam', COUNT(*),
+      'toplam', COUNT(*) FILTER (WHERE sonuc != 'Bekliyor'),
       'gebe',   COUNT(*) FILTER (WHERE sonuc IN ('Gebe','Doğum Yaptı')),
       'bos',    COUNT(*) FILTER (WHERE sonuc = 'Boş'),
       'abort',  COUNT(*) FILTER (WHERE sonuc = 'Abort'),
