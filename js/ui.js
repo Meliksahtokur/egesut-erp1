@@ -96,7 +96,7 @@ function showTab2(name,btn){
 function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
   const _taskCls=tasks.length>0?'warn':'ok';
   const sutBuzagiSayisi=animals.filter(a=>a.grup&&a.grup.includes('Süt İçen Buzağı')&&a.dogum_tarihi&&Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000)>=60).length;
-  return `<div class="stat-row">
+  return `<div class="dash-row">
     <div class="sc ok" onclick="goTo('suru')"><div class="sv">${animals.length}</div><div class="sl">Aktif Hayvan ›</div></div>
     <div class="sc ok" onclick="showGebe()"><div class="sv">${gebeTohs.length}</div><div class="sl">Gebe ›</div></div>
     <div class="sc ${diseases.length>0?'alert':'ok'}" onclick="goTo('gecmis');loadGecmis('hastalik')"><div class="sv">${diseases.length}</div><div class="sl">Aktif Hastalık ›</div></div>
@@ -586,6 +586,7 @@ async function loadAnimals(){
     setState('hastaIds', new Set(hastaLogs.map(d=>d.animal_id)));
     const sorted=[...animals].sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     renderAnimals(sorted);
+    _renderSuruStat();
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 function _animalTagsHtml(a,gebeSet){
@@ -638,7 +639,7 @@ function _animalCardHtml(a,gebeSet,idx){
 }
 function renderAnimals(list){
   const el=document.getElementById('suru-body');
-  if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; updatePadokOzet(list); return; }
+  if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; return; }
   const gebeSet=new Set(getState('gebeIds')||[]);
   const tohMap=globalThis._tohMap||{};
   // Gebe → gebelik günü; Bekliyor tohumlama → tarih DESC; diğer → küpe no
@@ -657,27 +658,106 @@ function renderAnimals(list){
     return (a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||'');
   });
   el.innerHTML=sorted.map((a,i)=>_animalCardHtml(a,gebeSet,i)).join('');
-  updatePadokOzet(list);
 }
-function updatePadokOzet(list){
-  const el=document.getElementById('padok-ozet'); if(!el) return;
-  const gebeSet=new Set(getState('gebeIds')||[]);
-  const padok=document.getElementById('pflt')?.value;
-  if(!list.length){ el.innerHTML=''; return; }
-  const toplam=list.length;
-  const disi=list.filter(a=>a.cinsiyet==='Dişi'||!a.cinsiyet).length;
-  const erkek=list.filter(a=>a.cinsiyet==='Erkek').length;
-  const gebe=list.filter(a=>gebeSet.has(a.id)).length;
-  const bos=disi-gebe;
-  const isBuzagi=padok?.toLowerCase().includes('buzağı');
-  const chip=(txt,color)=>`<span style="background:${color};border-radius:8px;padding:3px 9px;font-size:.68rem;font-weight:700;color:#fff">${txt}</span>`;
-  let html=chip(`Toplam: ${toplam}`,'rgba(61,74,50,.7)');
-  if(isBuzagi||erkek>0){
-    html+=chip(`Dişi: ${disi}`,'rgba(78,154,42,.7)')+chip(`Erkek: ${erkek}`,'rgba(42,107,181,.7)');
-  } else {
-    html+=chip(`Gebe: ${gebe}`,'rgba(78,154,42,.8)')+chip(`Boş: ${bos}`,'rgba(180,140,0,.7)');
+
+// ── SÜRÜ STAT KARTI ─────────────────────────
+let _suruStatCache={};
+let _suruStatOpen=false;
+let _suruDenemeOpen=false;
+
+function _renderSuruStat(){
+  const el=document.getElementById('suru-stat-card'); if(!el) return;
+  const padok=document.getElementById('pflt')?.value||'';
+  const key=padok;
+  if(_suruStatCache[key]){
+    _applySuruStatHtml(el,_suruStatCache[key],padok);
+    _fetchSuruStat(el,padok,key);
+    return;
   }
-  el.innerHTML=html;
+  if(el.innerHTML) _showStatLoading(el,true);
+  _fetchSuruStat(el,padok,key);
+}
+
+function _fetchSuruStat(el,padok,key){
+  const params=padok?{p_padok:padok}:{};
+  db.rpc('stat_suru_ozet',params).then(({data})=>{
+    if(data){
+      _suruStatCache[key]=data;
+      _applySuruStatHtml(el,data,padok);
+    }
+  }).catch(e=>console.warn('stat_suru_ozet:',e.message));
+}
+
+function _showStatLoading(el,show){
+  const sp=el.querySelector('.stat-loading');
+  if(show&&!sp){
+    const h=el.querySelector('.stat-header');
+    if(h){const s=document.createElement('span');s.className='stat-loading';h.appendChild(s);}
+  } else if(!show&&sp){ sp.remove(); }
+}
+
+function _applySuruStatHtml(el,d,padok){
+  const h=d.hayvan||{};
+  const g=(d.gebelik||{}).ozet||{};
+  const oran=g.oran!=null?`%${g.oran}`:'—';
+  const padokLabel=padok?`🏠 ${esc(padok)} — `:'';
+
+  const demoHtml=`<div class="stat-section">
+    <div class="stat-section-title">📋 Demografik</div>
+    <div class="stat-row">🐄 İnek: ${h.inek||0} · 🐮 Düve: ${h.duve||0} · 🐂 Erkek: ${h.erkek||0} · 🍼 Buzağı: ${h.buzagi||0} · 💲 Kısır: ${h.kisir||0}</div>
+  </div>`;
+
+  const katHtml=(d.gebelik?.kategori||[]).map(k=>{
+    const ico=k.ad==='İnek'?'🐄':k.ad==='Düve'?'🐮':'❓';
+    return `${ico} ${esc(k.ad)}: %${k.oran!=null?k.oran:'—'} (${k.toplam} tohum)`;
+  }).join(' · ')||'Veri yok';
+
+  const gebHtml=`<div class="stat-section">
+    <div class="stat-section-title">🤰 Gebelik</div>
+    <div class="stat-row">💉 ${g.toplam||0} tohumlama · ✅ ${g.gebe||0} gebe · ⭕ ${g.bos||0} boş · ⏳ ${g.bekleyen||0} bekleyen</div>
+    <div class="stat-row">${katHtml}</div>
+  </div>`;
+
+  const spHtml=(d.gebelik?.sperma_top5||[]).map(s=>
+    `<div class="stat-row">${esc(s.ad)} — ${s.toplam} tohum → <b>%${s.oran!=null?s.oran:'—'}</b></div>`
+  ).join('')||'<div class="stat-row" style="color:var(--ink3)">Yeterli veri yok</div>';
+  const spSection=`<div class="stat-section"><div class="stat-section-title">🏆 Top Spermalar (≥3 tohum)</div>${spHtml}</div>`;
+
+  const deneme=d.gebelik?.deneme||[];
+  const first3=deneme.filter(dn=>dn.no<=3);
+  const rest=deneme.filter(dn=>dn.no>3);
+  const dnFirst=first3.map(dn=>
+    `<div class="stat-row">${dn.no}. deneme: ${dn.gebe} gebe / ${dn.toplam} → <b>%${dn.oran!=null?dn.oran:'—'}</b></div>`
+  ).join('');
+  const dnRest=rest.map(dn=>
+    `<div class="stat-row">${dn.no}. deneme: ${dn.gebe} gebe / ${dn.toplam} → <b>%${dn.oran!=null?dn.oran:'—'}</b></div>`
+  ).join('');
+  const restBtn=rest.length>0?`<div id="deneme-rest" style="display:${_suruDenemeOpen?'block':'none'}">${dnRest}</div><div class="stat-row"><span onclick="_toggleDenemeRest()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">${_suruDenemeOpen?'Daralt':'[+'+rest.length+' daha]'}</span></div>`:'';
+  const dnSection=`<div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnFirst}${restBtn}</div>`;
+
+  el.innerHTML=`<div class="stat-card${_suruStatOpen?' open':''}" onclick="_toggleSuruStat(event)">
+    <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🤰 ${g.gebe||0} gebe (${oran}) · 🏥 ${h.hasta||0} hasta</span><span class="stat-arrow">▼</span></div>
+    <div class="stat-detail">${demoHtml}${gebHtml}${spSection}${dnSection}</div>
+  </div>`;
+}
+
+function _toggleSuruStat(e){
+  if(e.target.closest('#deneme-rest')||e.target.onclick) return;
+  _suruStatOpen=!_suruStatOpen;
+  const c=document.querySelector('#suru-stat-card .stat-card');
+  if(c) c.classList.toggle('open',_suruStatOpen);
+}
+
+function _toggleDenemeRest(){
+  _suruDenemeOpen=!_suruDenemeOpen;
+  const rest=document.getElementById('deneme-rest');
+  if(rest) rest.style.display=_suruDenemeOpen?'block':'none';
+  const padok=document.getElementById('pflt')?.value||'';
+  const data=_suruStatCache[padok];
+  if(data){
+    const el=document.getElementById('suru-stat-card');
+    if(el) _applySuruStatHtml(el,data,padok);
+  }
 }
 let _filterTimer=null;
 function srchDropdown(){
@@ -765,6 +845,7 @@ function filterA(){
       });
     }
     renderAnimals(f);
+    _renderSuruStat();
   },250);
 }
 
@@ -1733,53 +1814,8 @@ async function _uremeAbort(el){
   }).join(''):'<div class="empty"><div class="empty-ico">⚠️</div>Abort kaydı yok</div>');
 }
 
-// ── ÜREME STAT KARTI ────────────────────────
-let _uremStatCache=null;
-let _uremStatOpen=false;
-
-async function _renderUremeStat(){
-  const el=document.getElementById('ureme-stat-card'); if(!el) return;
-  if(_uremStatCache){_applyStatHtml(el,_uremStatCache);return;}
-  try{
-    const {data}=await db.rpc('stat_gebelik_ozet',{});
-    if(data){_uremStatCache=data;_applyStatHtml(el,data);}
-  }catch(e){console.warn('stat_gebelik_ozet:',e.message);}
-}
-
-function _applyStatHtml(el,d){
-  const o=d.ozet||{};
-  const oran=o.oran!=null?`%${o.oran}`:'Veri yok';
-  const katHtml=(d.kategori||[]).map(k=>{
-    const ico=k.ad==='İnek'?'🐄':k.ad==='Düve'?'🐮':'❓';
-    return `<div class="stat-row">${ico} ${esc(k.ad)}: ${k.toplam} tohum · ${k.gebe} gebe · <b>${k.oran!=null?'%'+k.oran:'—'}</b></div>`;
-  }).join('');
-  const spHtml=(d.sperma_top5||[]).map(s=>
-    `<div class="stat-row">${esc(s.ad)} — ${s.toplam} tohum → <b>${s.oran!=null?'%'+s.oran:'—'}</b></div>`
-  ).join('')||'<div class="stat-row" style="color:var(--ink3)">Yeterli veri yok</div>';
-  const dnHtml=(d.deneme||[]).map(dn=>{
-    const label=dn.no>=3?'3+':dn.no;
-    return `<div class="stat-row">${label}. deneme: ${dn.gebe} gebe / ${dn.toplam} (${dn.oran!=null?'%'+dn.oran:'—'})</div>`;
-  }).join('')||'<div class="stat-row" style="color:var(--ink3)">Veri yok</div>';
-  el.innerHTML=`<div class="stat-card${_uremStatOpen?' open':''}" onclick="_toggleUremeStat()">
-    <div class="stat-header"><span>📊 Sürü Gebelik</span><span class="stat-arrow">▼</span></div>
-    <div class="stat-summary">💉 ${o.toplam||0} tohumlama · ✅ ${o.gebe||0} gebe · 📊 ${oran}</div>
-    <div class="stat-detail">
-      <div class="stat-section">${katHtml||'<div class="stat-row">Kategori verisi yok</div>'}</div>
-      <div class="stat-section"><div class="stat-section-title">🏆 Top Spermalar (≥3 tohumlama)</div>${spHtml}</div>
-      <div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnHtml}</div>
-    </div>
-  </div>`;
-}
-
-function _toggleUremeStat(){
-  _uremStatOpen=!_uremStatOpen;
-  const c=document.querySelector('#ureme-stat-card .stat-card');
-  if(c) c.classList.toggle('open',_uremStatOpen);
-}
-
 async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
-  _renderUremeStat();
   const el=document.getElementById('ureme-body');
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   // Kizginlik disindaki tablerde toolbar'i gizle
