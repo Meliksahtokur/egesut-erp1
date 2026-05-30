@@ -281,6 +281,10 @@ const RPC_TABLES = {
   grup_padok_eslem_toggle:     ['grup_padok_eslem'],
   tohumlama_geri_al: ['tohumlama','gorev_log','kizginlik_log','stok_hareket'],
   case_geri_al:      ['cases','treatment_days','drug_administrations','stok_hareket','kizginlik_log'],
+  drug_class_ekle:               ['drug_classes'],
+  drug_class_guncelle:           ['drug_classes'],
+  drug_class_sil:                ['drug_classes'],
+  drug_class_varsayilan_yukle:   ['drug_classes'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────
