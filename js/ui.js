@@ -24,6 +24,27 @@ let _stokTab='tumu';
 let _curStokDet=null;
 let _prevTaskId=null;
 
+function _findScroller(el){
+  let n=el?.parentElement;
+  while(n&&n!==document.body){
+    const s=getComputedStyle(n).overflowY;
+    if(s==='auto'||s==='scroll') return n;
+    n=n.parentElement;
+  }
+  return null;
+}
+async function _keepScroll(contentEl,fn){
+  const sc=_findScroller(contentEl);
+  if(!sc){await fn();return;}
+  const y=sc.scrollTop;
+  const orig=sc.style.overflowY;
+  sc.style.overflowY='hidden';
+  try{await fn();}finally{
+    sc.style.overflowY=orig;
+    sc.scrollTop=y;
+  }
+}
+
 const _katTipMap={
   asi:['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE'],
@@ -2069,13 +2090,12 @@ function setTanimlarTab(tab,e){
 
 async function loadTanimlarPanel(){
   const el=document.getElementById('tanimlar-panel-body'); if(!el) return;
-  const scroller=el.parentElement;
-  const scrollY=scroller?scroller.scrollTop:0;
-  _ilacKatAdlari=null;
-  if(_tanimlarTab==='hastaliklar') await _renderHastaliklar(el);
-  else if(_tanimlarTab==='ilaclar') await _renderIlacSiniflari(el);
-  else if(_tanimlarTab==='kategoriler') await _renderKategoriler(el);
-  if(scroller&&scrollY>0) setTimeout(()=>{scroller.scrollTop=scrollY;},0);
+  await _keepScroll(el,async()=>{
+    _ilacKatAdlari=null;
+    if(_tanimlarTab==='hastaliklar') await _renderHastaliklar(el);
+    else if(_tanimlarTab==='ilaclar') await _renderIlacSiniflari(el);
+    else if(_tanimlarTab==='kategoriler') await _renderKategoriler(el);
+  });
 }
 
 function _tanimSearchBar(){
