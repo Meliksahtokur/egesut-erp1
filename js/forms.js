@@ -1132,6 +1132,7 @@ async function submitStk(btn) {
 
 async function submitStokAdd(btn) {
   const kat  = g('sa-kat')?.value || 'Antibiyotik';
+  if(navigator.onLine) await pullTables(['stok_kategorileri']);
   const allKats = (await idbGetAll('stok_kategorileri')) || [];
   const isIlac = allKats.some(k => k.tip === 'ilac' && k.ad === kat);
   const isSperma = kat === 'Sperma';
@@ -1186,7 +1187,7 @@ async function submitStokAdd(btn) {
     _drugsCache = [];
     const _sp = document.getElementById('stok-panel');
     if(_sp?.style.transform !== 'translateX(100%)') await loadStokPanel();
-  } catch (e) { toast(getUserMessage(e), true); }
+  } catch (e) { console.error('[StokAdd]', e); toast('❌ Stok eklenemedi: ' + (e?.message || getUserMessage(e)), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; } }
 }
 

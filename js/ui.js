@@ -2069,13 +2069,14 @@ function setTanimlarTab(tab,e){
 
 async function loadTanimlarPanel(){
   const el=document.getElementById('tanimlar-panel-body'); if(!el) return;
-  const scrollY=el.scrollTop;
+  const scroller=el.parentElement;
+  const scrollY=scroller?scroller.scrollTop:0;
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   _ilacKatAdlari=null;
   if(_tanimlarTab==='hastaliklar') await _renderHastaliklar(el);
   else if(_tanimlarTab==='ilaclar') await _renderIlacSiniflari(el);
   else if(_tanimlarTab==='kategoriler') await _renderKategoriler(el);
-  requestAnimationFrame(()=>{el.scrollTop=scrollY;});
+  if(scroller) requestAnimationFrame(()=>{scroller.scrollTop=scrollY;});
 }
 
 function _tanimSearchBar(){
