@@ -107,3 +107,29 @@ Frontend'de `api.js` üzerinden çağrılır. Asla doğrudan `db.from().insert/u
 
 **`hekim_ekle(p_id, p_ad, p_telefon?)`**
 → Veteriner kaydı ekler.
+
+---
+
+## İlaç Sınıflandırma (drug_classes)
+
+**`drug_class_ekle(p_group_name, p_class_name, p_active_ingredient, p_kategori_id?)`**
+→ Yeni etken madde sınıfı ekler. `{ ok, id, mesaj }`
+
+**`drug_class_guncelle(p_id, p_group_name?, p_class_name?, p_active_ingredient?, p_kategori_id?)`**
+→ Sınıf bilgilerini günceller. `{ ok, mesaj }`
+
+**`drug_class_sil(p_id)`**
+→ Sınıfı siler. drug_products bağlıysa engeller. `{ ok, mesaj }`
+
+**`drug_class_varsayilan_yukle()`**
+→ 44 referans etken maddeyi seed eder (ON CONFLICT DO NOTHING). `{ ok, eklenen }`
+
+---
+
+## Stok Yönetimi
+
+**`stok_ekle(p_urun_adi, p_kategori, p_birim, p_baslangic_miktar, p_esik?)`**
+→ Yeni stok kaydı. Kategori stok_kategorileri'nde olmalı. `{ ok, id }`
+
+**`stok_guncelle(p_stok_id, p_urun_adi?, p_kategori?, p_birim?, p_esik?)`**
+→ Stok günceller. Kategori değiştiriliyorsa validate edilir. `{ ok }`
