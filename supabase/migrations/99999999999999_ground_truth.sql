@@ -5106,10 +5106,10 @@ BEGIN
   END;
 
   IF p_stok_id IS NOT NULL THEN
-    IF NOT EXISTS (SELECT 1 FROM stok WHERE id = p_stok_id) THEN
+    IF NOT EXISTS (SELECT 1 FROM stok WHERE id = p_stok_id::text) THEN
       RAISE EXCEPTION 'Stok kaydı bulunamadı: %', p_stok_id;
     END IF;
-    UPDATE stok SET drug_product_id = v_id WHERE id = p_stok_id;
+    UPDATE stok SET drug_product_id = v_id WHERE id = p_stok_id::text;
   END IF;
 
   RETURN v_id;
