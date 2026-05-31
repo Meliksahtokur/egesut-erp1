@@ -664,6 +664,14 @@ function renderAnimals(list){
 let _suruStatCache={};
 let _suruStatOpen=false;
 let _suruDenemeOpen=false;
+let _suruSpermaOpen=false;
+function _toggleSpermaRest(){
+  _suruSpermaOpen=!_suruSpermaOpen;
+  const el=document.getElementById('sperma-rest');
+  if(el)el.style.display=_suruSpermaOpen?'block':'none';
+  const parent=el?.parentElement;
+  if(parent){const btn=parent.querySelector('[onclick*="toggleSpermaRest"]');if(btn)btn.textContent=_suruSpermaOpen?'Daralt':'[+'+(document.querySelectorAll('#sperma-rest .stat-row').length)+' daha]';}
+}
 let _suruStatMode='son';
 
 function _renderSuruStat(){
@@ -734,10 +742,17 @@ function _applySuruStatHtml(el,d,padok){
     <div class="stat-row">Ort deneme: ${co.ort_deneme!=null?co.ort_deneme:'—'}</div>
   </div>`;
 
-  const spHtml=(d.gebelik?.sperma_top5||[]).map(s=>
+  const spAll=d.gebelik?.sperma_all||d.gebelik?.sperma_top5||[];
+  const spFirst=spAll.slice(0,5);
+  const spRest=spAll.slice(5);
+  const spFirstHtml=spFirst.map(s=>
     `<div class="stat-row">${esc(s.ad)} — ${s.cycle_toplam} cycle → <b>%${s.cycle_oran!=null?s.cycle_oran:'—'}</b></div>`
   ).join('')||'<div class="stat-row" style="color:var(--ink3)">Yeterli veri yok</div>';
-  const spSection=`<div class="stat-section"><div class="stat-section-title">🏆 Top Spermalar (≥3 cycle)</div>${spHtml}</div>`;
+  const spRestHtml=spRest.map(s=>
+    `<div class="stat-row">${esc(s.ad)} — ${s.cycle_toplam} cycle → <b>%${s.cycle_oran!=null?s.cycle_oran:'—'}</b></div>`
+  ).join('');
+  const spRestBtn=spRest.length>0?`<div id="sperma-rest" style="display:${_suruSpermaOpen?'block':'none'}">${spRestHtml}</div><div class="stat-row"><span onclick="_toggleSpermaRest()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">${_suruSpermaOpen?'Daralt':'[+'+spRest.length+' daha]'}</span></div>`:'';
+  const spSection=`<div class="stat-section"><div class="stat-section-title">🏆 Sperma Performansı (≥3 cycle)</div>${spFirstHtml}${spRestBtn}</div>`;
 
   const deneme=d.gebelik?.deneme||[];
   const first3=deneme.filter(dn=>dn.no<=3);
