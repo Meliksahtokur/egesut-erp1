@@ -70,6 +70,9 @@ update-cli
 
 # DB snapshot (büyük dosya)
 dbsnapshot_full.sql
+
+# Remember plugin loglari (Claude Code, DeepSeek ile ilgisi yok)
+.remember/
 session-*.md
 .opencode/
 .claude/CREDENTIALS.md
