@@ -8668,6 +8668,7 @@ WHERE h.cinsiyet = 'Dişi'
   AND h.durum = 'Aktif'
   AND h.kisir IS NOT TRUE
   AND h.grup NOT ILIKE '%buzağı%' AND h.grup NOT ILIKE '%buzagi%'
+  AND h.grup NOT ILIKE '%Küçük%' AND h.grup NOT ILIKE '%Kucuk%'
   AND (h.dogum_tarihi IS NULL OR h.dogum_tarihi <= CURRENT_DATE - INTERVAL '13 months')
   AND NOT EXISTS (SELECT 1 FROM public.tohumlama t WHERE t.hayvan_id = h.id AND t.sonuc = 'Gebe')
   AND NOT EXISTS (SELECT 1 FROM public.cases c WHERE c.animal_id = h.id AND c.status = 'active')
