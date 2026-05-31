@@ -1,0 +1,35 @@
+name: DB Backup
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # 00:00 UTC = 03:00 TSİ
+  workflow_dispatch:       # elle de tetiklenebilir
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Dump database
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          pg_dump \
+            --no-owner \
+            --no-acl \
+            --host=db.zqnexqbdfvbhlxzelzju.supabase.co \
+            --port=5432 \
+            --username=postgres \
+            --dbname=postgres \
+            --format=custom \
+            --compress=9 \
+            --file=egesut_$(date +%Y%m%d).dump
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: egesut-backup-${{ github.run_id }}
+          path: egesut_*.dump
+          retention-days: 30
