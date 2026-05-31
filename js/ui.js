@@ -168,7 +168,7 @@ async function ileriGebeKontrol(){
     }
   } catch(e){ toast('❌ '+e.message,true); }
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList){
   const _dd=ddMap||{};
   const _getDis=t=>{if(t.gorev_tipi!=='TEDAVI_GUN')return '';try{return _dd[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}};
   const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
@@ -206,6 +206,14 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneG
         const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
         const besUyari=b.gebelik_gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 5px;font-weight:700;font-size:.65rem;margin-left:4px">⚠️ Anyonik</span>`:'';
         return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}${besUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${b.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+      }).join(''));
+  }
+  if((sessizList||[]).length){
+    const sTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">❗ Sessiz Hayvanlar (${sessizList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
+    h+=band('red',sTitle,
+      sessizList.slice(0,5).map(s=>{
+        const gunTxt=s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz';
+        return `<div class="arow" onclick="openDet('${s.hayvan_id}')"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${gunTxt} · Son: ${s.son_aktivite||'—'}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if(nearBirth.length){
@@ -278,6 +286,10 @@ async function loadDash(){
       if(resBuz&&resBuz.ok&&resBuz.olusturulan>0) toast('🍼 '+resBuz.olusturulan+' buzağı sütten kesme görevi oluşturuldu');
     } catch(e){ /* sessiz */ }
 
+    // Sessiz hayvanlar listesi (dashboard band için)
+    let sessizList=[];
+    try{ const sl=await rpc('sessiz_hayvanlar_listele',{}); if(sl&&sl.length) sessizList=sl; }catch(e){/* sessiz */}
+
     // TEDAVI_GUN teşhis haritası (dashboard kartları için)
     const _dtDays=await idbGetAll('treatment_days').catch(()=>[]);
     const _dtDiseases=await idbGetAll('diseases').catch(()=>[]);
@@ -287,7 +299,7 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap)+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
@@ -776,7 +788,7 @@ function _applySuruStatHtml(el,d,padok){
   const dnSection=`<div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnFirst}${restBtn}</div>`;
 
   const sessizCount=h.sessiz||0;
-  const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">60+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
+  const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">55+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
 
   el.innerHTML=`<div class="stat-card${_suruStatOpen?' open':''}" onclick="_toggleSuruStat(event)">
     <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🔬 ${h.tohumlanan||0} tohumlanan · 🤰 ${ho.gebe||0} gebe (${oran})</span><span class="stat-arrow">▼</span></div>
