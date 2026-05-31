@@ -244,7 +244,9 @@ async function submitInsem(btn) {
       p_sperma:         sperma,
       p_hekim_id:       v('i-hekim') || null,
       p_ek_uygulamalar: JSON.stringify(_ekUygulamalar),
+      p_vwp_override:   globalThis._vwpOverride || false,
     });
+    globalThis._vwpOverride = false;
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
 
@@ -272,7 +274,19 @@ async function submitInsem(btn) {
       }
     }).catch(console.warn);
   } catch (e) {
-
+    const msg = e?.message || e?.toString() || '';
+    const vwpMatch = msg.match(/VWP_VIOLATION:(\d+):(\d+)/);
+    if (vwpMatch) {
+      const gun = vwpMatch[1];
+      const limit = vwpMatch[2];
+      if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; }
+      const ok = confirm(`❗ VWP dolmadı: ${gun}/${limit} gün.\n\nDoğumdan sonra yeterli süre geçmemiş.\nYine de kaydetmek istiyor musunuz?`);
+      if (ok) {
+        globalThis._vwpOverride = true;
+        return submitTohumlama();
+      }
+      return;
+    }
     toast('❌ Tohumlama kaydedilemedi: ' + getUserMessage(e), true);
   } finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet + Kontrol Görevleri'; } }
 }
