@@ -1,6 +1,9 @@
 name: DB Backup
 
 on:
+  push:
+    paths:
+      - '.github/workflows/db-backup.yml'
   schedule:
     - cron: '0 0 * * *'   # 00:00 UTC = 03:00 TSİ
   workflow_dispatch:       # elle de tetiklenebilir
@@ -32,4 +35,4 @@ jobs:
         with:
           name: egesut-backup-${{ github.run_id }}
           path: egesut_*.dump
-          retention-days: 30
+          retention-days: 90
