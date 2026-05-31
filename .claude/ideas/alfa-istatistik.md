@@ -230,10 +230,19 @@ $$;
 - Cases tablosundaki `disease_name` ile tohumlama başarısı çapraz
 - "Endometrit geçirmiş ineklerin gebelik oranı %42 (sürü ortalaması %68)"
 
-### Faz 5 — İstatistik Sekmesi (dedicated tab)
+### Faz 5 — Hekim Performansı
+- `hekim_id` tohumlama tablosunda mevcut, analizde kullanılmıyor
+- Hekim bazlı gebelik oranı: "Dr. X: %72, Dr. Y: %58"
+- `v_ureme_dongusu` view'ına `hekim_id` kolonu eklenirse cycle bazlı hekim performansı çıkar
+
+### Faz 6 — İstatistik Sekmesi (dedicated tab)
 - Tüm view'lar hazır olunca 1 günde sekme açılır
 - Dönem karşılaştırma: Bu ay vs geçen ay, bu yıl vs geçen yıl
 - Export (CSV/PDF) ileride
+
+### Faz 7 — Materialized View (performans gerekirse)
+- 234 kayıt için gereksiz, binlerce kayda ulaşınca değerlendirilecek
+- `v_ureme_dongusu` → `mv_ureme_dongusu` + REFRESH trigger
 
 ---
 
