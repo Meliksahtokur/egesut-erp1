@@ -6,7 +6,7 @@ on:
       - '.github/workflows/db-backup.yml'
   schedule:
     - cron: '0 0 * * *'   # 00:00 UTC = 03:00 TSİ
-  workflow_dispatch:       # elle de tetiklenebilir
+  workflow_dispatch:
 
 jobs:
   backup:
@@ -28,11 +28,21 @@ jobs:
             --dbname=postgres \
             --format=custom \
             --compress=9 \
-            --file=egesut_$(date +%Y%m%d).dump
+            --file=dump.pg
 
-      - name: Upload artifact
+      - name: Encrypt dump
+        env:
+          BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -pass pass:"$BACKUP_PASSWORD" \
+            -in dump.pg \
+            -out egesut_$(date +%Y%m%d).pg.enc
+          rm -f dump.pg
+
+      - name: Upload encrypted artifact
         uses: actions/upload-artifact@v4
         with:
           name: egesut-backup-${{ github.run_id }}
-          path: egesut_*.dump
+          path: egesut_*.pg.enc
           retention-days: 90
