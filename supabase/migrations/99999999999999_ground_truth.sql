@@ -8601,7 +8601,7 @@ BEGIN
     'kisir',  COUNT(*) FILTER (WHERE kisir = true),
     'hasta',  (SELECT COUNT(DISTINCT c.animal_id) FROM public.cases c JOIN public.hayvanlar h2 ON h2.id = c.animal_id WHERE c.status = 'active' AND h2.durum = 'Aktif' AND (p_padok IS NULL OR h2.padok = p_padok)),
     'tohumlanan', (SELECT COUNT(DISTINCT t2.hayvan_id) FROM public.tohumlama t2 JOIN public.hayvanlar h3 ON h3.id = t2.hayvan_id WHERE h3.durum = 'Aktif' AND h3.cinsiyet = 'Dişi' AND (p_padok IS NULL OR h3.padok = p_padok)),
-    'sessiz', (SELECT COUNT(*) FROM public.v_eligible e WHERE (p_padok IS NULL OR e.padok = p_padok) AND COALESCE(e.sessiz_gun, 9999) >= 60)
+    'sessiz', (SELECT COUNT(*) FROM public.v_eligible e WHERE (p_padok IS NULL OR e.padok = p_padok) AND COALESCE(e.sessiz_gun, 9999) >= 55)
   ) INTO v_hayvan
   FROM public.hayvanlar h
   WHERE h.durum = 'Aktif' AND (p_padok IS NULL OR h.padok = p_padok);
@@ -8639,7 +8639,7 @@ GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenti
 -- Faz C: v_eligible view + sessiz hayvanlar RPC'leri
 -- ═══════════════════════════════════════════════════════════════
 
--- ── v_eligible — tohumlama için uygun hayvanlar ──
+-- ── v_eligible — tohumlama için uygun hayvanlar (buzağı hariç, 13+ ay) ──
 CREATE OR REPLACE VIEW public.v_eligible AS
 SELECT
   h.id, h.kupe_no, h.grup, h.padok,
@@ -8648,8 +8648,10 @@ SELECT
   son_aktivite.tarih                 AS son_aktivite_tarihi,
   CASE
     WHEN son_aktivite.tarih IS NOT NULL THEN CURRENT_DATE - son_aktivite.tarih
-    WHEN son_dogum.tarih IS NOT NULL THEN CURRENT_DATE - son_dogum.tarih
-    ELSE NULL
+    ELSE CASE
+      WHEN h.dogum_tarihi IS NOT NULL THEN CURRENT_DATE - h.dogum_tarihi
+      ELSE NULL
+    END
   END                                AS sessiz_gun
 FROM public.hayvanlar h
 LEFT JOIN LATERAL (
@@ -8665,6 +8667,8 @@ LEFT JOIN LATERAL (
 WHERE h.cinsiyet = 'Dişi'
   AND h.durum = 'Aktif'
   AND h.kisir IS NOT TRUE
+  AND h.grup NOT ILIKE '%buzağı%' AND h.grup NOT ILIKE '%buzagi%'
+  AND (h.dogum_tarihi IS NULL OR h.dogum_tarihi <= CURRENT_DATE - INTERVAL '13 months')
   AND NOT EXISTS (SELECT 1 FROM public.tohumlama t WHERE t.hayvan_id = h.id AND t.sonuc = 'Gebe')
   AND NOT EXISTS (SELECT 1 FROM public.cases c WHERE c.animal_id = h.id AND c.status = 'active')
   AND (son_dogum.tarih IS NULL OR son_dogum.tarih < CURRENT_DATE - 55);
@@ -8673,7 +8677,7 @@ GRANT SELECT ON public.v_eligible TO anon, authenticated;
 -- ── sessiz_hayvanlar_listele ──
 CREATE OR REPLACE FUNCTION public.sessiz_hayvanlar_listele(
   p_padok   text    DEFAULT NULL,
-  p_min_gun integer DEFAULT 60
+  p_min_gun integer DEFAULT 55
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   RETURN (SELECT COALESCE(jsonb_agg(
@@ -8693,7 +8697,7 @@ DECLARE v_count integer := 0; v_rec record;
 BEGIN
   FOR v_rec IN
     SELECT e.id, e.kupe_no, e.sessiz_gun FROM public.v_eligible e
-    WHERE COALESCE(e.sessiz_gun, 9999) >= 60
+    WHERE COALESCE(e.sessiz_gun, 9999) >= 55
       AND NOT EXISTS (SELECT 1 FROM public.gorev_log g WHERE g.hayvan_id = e.id AND g.gorev_tipi = 'VETERINER_KONTROL' AND g.tamamlandi = false)
   LOOP
     INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi)
