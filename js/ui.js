@@ -672,6 +672,15 @@ function _toggleSpermaRest(){
   const parent=el?.parentElement;
   if(parent){const btn=parent.querySelector('[onclick*="toggleSpermaRest"]');if(btn)btn.textContent=_suruSpermaOpen?'Daralt':'[+'+(document.querySelectorAll('#sperma-rest .stat-row').length)+' daha]';}
 }
+async function _showSessizList(){
+  try{
+    const list=await rpc('sessiz_hayvanlar_listele',{});
+    if(!list||!list.length){toast('Sessiz hayvan yok');return;}
+    const rows=list.map(s=>`<tr><td>${esc(s.kupe_no||'?')}</td><td>${s.sessiz_gun>=9999?'—':s.sessiz_gun+' gün'}</td><td>${s.son_aktivite||'—'}</td></tr>`).join('');
+    const html=`<div style="padding:12px"><h3 style="margin:0 0 8px">❗ Sessiz Hayvanlar</h3><table class="mini-tbl"><thead><tr><th>Küpe</th><th>Sessiz</th><th>Son Aktivite</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    openBottomSheet(html);
+  }catch(e){toast('Hata: '+e.message);}
+}
 let _suruStatMode='son';
 
 function _renderSuruStat(){
@@ -766,9 +775,12 @@ function _applySuruStatHtml(el,d,padok){
   const restBtn=rest.length>0?`<div id="deneme-rest" style="display:${_suruDenemeOpen?'block':'none'}">${dnRest}</div><div class="stat-row"><span onclick="_toggleDenemeRest()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">${_suruDenemeOpen?'Daralt':'[+'+rest.length+' daha]'}</span></div>`:'';
   const dnSection=`<div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnFirst}${restBtn}</div>`;
 
+  const sessizCount=h.sessiz||0;
+  const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">60+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
+
   el.innerHTML=`<div class="stat-card${_suruStatOpen?' open':''}" onclick="_toggleSuruStat(event)">
     <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🔬 ${h.tohumlanan||0} tohumlanan · 🤰 ${ho.gebe||0} gebe (${oran})</span><span class="stat-arrow">▼</span></div>
-    <div class="stat-detail"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><span onclick="_toggleStatMode(event)" style="cursor:pointer;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ink1);color:var(--ink4)">${_suruStatMode==='son'?'Son Dönem':'Tüm Zamanlar'} ↻</span></div>${demoHtml}${gebHtml}${cycleHtml}${spSection}${dnSection}</div>
+    <div class="stat-detail"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><span onclick="_toggleStatMode(event)" style="cursor:pointer;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ink1);color:var(--ink4)">${_suruStatMode==='son'?'Son Dönem':'Tüm Zamanlar'} ↻</span></div>${demoHtml}${gebHtml}${cycleHtml}${spSection}${sessizSection}${dnSection}</div>
   </div>`;
 }
 
