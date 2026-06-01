@@ -24,6 +24,14 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 | Goose dokümantasyonu | `goose_search(query, limit)` | goose_embeddings |
 | Blackboard task | `task_*` (create, get, list, claim, complete, review) | SQLite |
 | tools-bank file DB | `file_*` (write, read, list, flush, commit) | SQLite |
+| Kodda yapısal (AST) arama | `ast_grep_search(pattern, lang?, path?, max_results?, context_lines?)` | ast-grep, ~50ms, joker: `$$$` |
+| GitHub remote kod arama | `github_code_search(query, repo?)` | GitHub API, token gerekli |
+| Greptile - PR review listeleme | `list_pull_requests(...)` / `list_merge_requests(...)` | GREPTILE_API_KEY (.mcp.json) |
+| Greptile - PR review detay | `get_merge_request(name, remote, defaultBranch, prNumber)` | Repo + PR no |
+| Greptile - PR yorumlari | `list_merge_request_comments(...)` / `search_greptile_comments(...)` | Filtreleme destegi |
+| Greptile - Review tetikle | `trigger_code_review(name, remote, prNumber)` | Kalici MCP server |
+| Greptile - Custom context | `list_custom_context / get_custom_context / search_custom_context` | Organizasyon seviyesi |
+| Greptile - Code review | `list_code_reviews / get_code_review` | Headless/PR destegi |
 
 ### Memory (SQLite FTS5 + Jina AI embedding)
 | İhtiyaç | Araç | Not |
@@ -52,7 +60,41 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 cd /root/egesut-erp1 && npx gitnexus analyze
 ```
 
+### ast-grep — Yapısal Kod Arama
+
+`ast_grep_search` ile kodun AST yapısında desen araması yapılır.
+
+| Parametre | Zorunlu | Açıklama | Örnek |
+|-----------|---------|----------|-------|
+| `pattern` | ✅ | AST pattern (joker: `$$$`, `$NAME`) | `function $$$($$$) { $$$ }` |
+| `lang` | ❌ | Programlama dili | `javascript`, `go`, `typescript`, `python`, `rust` |
+| `path` | ❌ | Arama yapılacak yol (default: `.`) | `js/`, `supabase/migrations/` |
+| `max_results` | ❌ | Maksimum sonuç (default: 20) | `10` |
+| `context_lines` | ❌ | Her sonuç için bağlam satırı (default: 0) | `2` |
+
+**2 Aşamalı Protokol (Token Tasarrufu):**
+
+1. **Özet:** `max_results=10` ile çağır, sadece dosya/konum bilgisine bak
+2. **Nokta atışı:** İlgili dosyayı `read_file` ile o satır aralığından oku
+
+**Pattern Örnekleri:**
+```
+JavaScript: function $$$($$$) { $$$ }    → tüm fonksiyon tanımları
+JavaScript: await supabase.rpc($$$)      → tüm RPC çağrıları
+JavaScript: import $$$ from '$$$'        → tüm import'lar
+JavaScript: if ($$$) { $$$ }             → tüm if blokları
+Go:         if err != nil { $$$ }        → hata kontrol blokları
+Python:     def $$$($$$):                → tüm fonksiyon tanımları
+```
+
+**Token Koruma:**
+- `--json=compact` kullanılır → sadece konum bilgisi döner, kod içeriğini ham basmaz
+- `max_results` aşımında uyarı verir → aramayı daraltman gerekir
+- Büyük dosyalarda (300+ satır) önce AST ile hedef bloğu bul, sonra `read_file`
+
 ---
+
+
 
 ## Goose & Telsiz — Agent Sistemi
 
