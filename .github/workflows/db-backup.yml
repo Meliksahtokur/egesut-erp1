@@ -12,10 +12,7 @@ jobs:
   backup:
     runs-on: ubuntu-latest
     steps:
-      - name: Install PostgreSQL client
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-
-      - name: Dump database via Supabase pooler (IPv4-compatible)
+      - name: Dump database via Docker pg_dump (PG17 server)
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
@@ -24,20 +21,24 @@ jobs:
           # Solution: use Supabase session pooler which has IPv4.
           #   Pooler host: aws-1-eu-west-1.pooler.supabase.com  →  18.202.64.2
           #   Username format for pooler: postgres.<project-ref>
-          pg_dump \
-            --dbname="postgresql://postgres.zqnexqbdfvbhlxzelzju@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require" \
-            --no-owner --no-acl \
-            --exclude-schema='extensions' \
-            --exclude-schema='graphql' \
-            --exclude-schema='graphql_public' \
-            --exclude-schema='net' \
-            --exclude-schema='pgbouncer' \
-            --exclude-schema='pgsodium' \
-            --exclude-schema='pgsodium_masks' \
-            --exclude-schema='realtime' \
-            --exclude-schema='supabase_functions' \
-            --format=custom --compress=9 \
-            --file="dump.pg"
+          #
+          # Docker postgres:17 ensures pg_dump version matches server PG 17.6.
+          docker run --rm -v "$PWD":/out -e PGPASSWORD \
+            postgres:17 \
+            pg_dump \
+              --dbname="postgresql://postgres.zqnexqbdfvbhlxzelzju@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require" \
+              --no-owner --no-acl \
+              --exclude-schema='extensions' \
+              --exclude-schema='graphql' \
+              --exclude-schema='graphql_public' \
+              --exclude-schema='net' \
+              --exclude-schema='pgbouncer' \
+              --exclude-schema='pgsodium' \
+              --exclude-schema='pgsodium_masks' \
+              --exclude-schema='realtime' \
+              --exclude-schema='supabase_functions' \
+              --format=custom --compress=9 \
+              --file=/out/dump.pg
           echo "SUCCESS: $(stat -c%s dump.pg) bytes"
 
       - name: Encrypt dump
