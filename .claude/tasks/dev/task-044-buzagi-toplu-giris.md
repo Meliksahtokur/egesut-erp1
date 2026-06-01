@@ -2,7 +2,7 @@
 id: "044"
 title: "Buzağı Toplu Giriş — 49 kayıt (Eylül 2025 – Nisan 2026)"
 status: completed
-phase: "2-toplu-insert"
+phase: "3-asi-kayitlari"
 created: 2026-05-31
 updated: 2026-06-01
 completed: 2026-06-01
@@ -12,210 +12,219 @@ completed: 2026-06-01
 
 ## Özet
 
-46 buzağı doğum kaydı sisteme girilecek. Faz 1 tamamlandı: 11 eksik anneden 3'ü eşleştirildi, 7'si bulunamadı (piç kayıt — anne_id NULL), 1'i arşivlendi.
+49 buzağı kaydı sisteme girildi. Faz 1-2-3 tamamlandı. Tüm veri tutarlı.
 
 ---
 
 ## Faz 1 — Eksik Anne Eşleştirme ✅ TAMAMLANDI
 
-### Sonuç: 3 eşleşme, 7 bulunamadı, 1 arşiv
+### Ham veri
 
-| Eski Küpe | Yeni Küpe (Supabase) | Kanıt | Durum |
-|-----------|---------------------|-------|-------|
-| **2045** | **905** | Toh.tarihi birebir: 2025-02-17 | ✅ Kesin |
-| **1956** | **903** (4aee4470) | Toh.tarihi birebir: 2025-03-17 | ✅ Kesin |
-| **162** | **904** (00ca7aa3) | Toh: 01-27→doğum 11-07=284g, kullanıcı onayı | ✅ Onaylı |
-| **106** | — | Buzağı ex (erken doğum), anne satıldı | ⏭️ Arşiv/seed |
+| Sıra | Anne Küpe | Durum | Sonuç |
+|------|-----------|-------|-------|
+| 33 | 5621 | dana, satıldı (₺) | UUID: `87323e7b-…` |
+| 34 | 145 | dana, satıldı (₺) | UUID: `a4c61f97-…` |
+| 35 | **177** | dana, satıldı (₺) | **DB'de yok → NULL** |
+| 36 | 142 | düve | UUID: `143fbad6-…` |
+| 37 | 153 | düve, ölü | UUID: `6f4f3c76-…` |
+| 38 | 182 | düve | UUID: `ff007c90-…` |
+| 39 | **107** | dana | **NULL** |
+| 40 | **Küpesiz düve** | dana, satıldı | **NULL** |
+| 41 | 008 | dana, satıldı | UUID: `fa8e6daa-…` |
+| 42 | 167 | dana, satıldı | UUID: `4211de36-…` |
+| 43 | 178 | dana | UUID: `1ae146e4-…` |
+| 44 | **162→904** | dana | UUID: `00ca7aa3-…` ✅ Eskij (çift küpe) |
+| 45 | 197 | düve | UUID: `9dc8cbae-…` |
+| 46 | 191 | düve | UUID: `01ae80a9-…` |
+| 47 | 155 | dana | UUID: `115011e1-…` |
+| 48 | 5708 | dana | UUID: `c8861b6f-…` |
+| 49 | **2045→905** | dana | UUID: `d607db2d-…` ✅ Eskij (çift küpe) |
+| 50 | **179** | düve, ölü | **NULL** |
+| 51 | 195 | düve | UUID: `bac3b8f8-…` |
+| 52 | 181 | dana, ölü | UUID: `c4c1c3d6-…` |
+| 53 | 199 | dana, Alaca Holstein | UUID: `e31a60e5-…` |
+| 54 | 147 | dana, Norveç | UUID: `3b8b66ba-…` |
+| 55 | **196** | düve, Alaca Holstein | **NULL** |
+| 56 | 101 | düve, Red Holstein | UUID: `e9d582a1-…` |
+| 57 | 5638 | düve, Red Holstein, ölü | UUID: `456d7c6d-…` |
+| 58 | **Minik panda** | dana, Red Holstein, ölü | **NULL** |
+| 59 | **5748** | dana, Red Holstein | **NULL** |
+| 60 | **7125** | dana, Red Holstein | **NULL** |
+| 61 | **1956→903** | düve, Red Holstein | UUID: `4aee4470-…` ✅ Eskij |
+| 62 | 154 | düve, Alaca Holstein | UUID: `34e04643-…` |
+| 63 | **159** | düve, Alaca Holstein, ölü | **NULL** |
+| 64 | 187 | dana | UUID: `acbbc7ce-…` |
+| 65 | **161** | dana | **NULL** |
+| 66 | 189 | dana, ölü | UUID: `1433f5f2-…` |
+| xx | **106** | dana, ölü, erken doğum | **Arşiv** ✔ |
+| 67 | 141 | dana | UUID: `1f0706c0-…` |
+| 68 | 176 | düve | UUID: `629a040e-…` |
+| 69 | 152 | düve | UUID: `e641d149-…` |
+| 70 | 115 | dana, ölü | UUID: `d9e1838e-…` |
+| 71 | 134 | dana | UUID: `38e3ec48-…` |
+| 72 | 175 | dana, ölü | UUID: `995c15e1-…` |
+| 73 | 183 | dana | UUID: `f454bdd3-…` |
+| 74 | 121 | düve | UUID: `f7ae4a63-…` |
+| 75 | 146 | düve | UUID: `4f56df98-…` |
+| 76 | 192 | dana | UUID: `1841c6e0-…` |
+| 77 | 901 | düve (ikiz) | UUID: `88449c15-…` |
+| 78 | 901 | düve (ikiz) | UUID: `88449c15-…` |
+| 79 | 173 | düve | UUID: `548df203-…` |
+| 80 | 180 | dana | UUID: `b6053753-…` |
 
-### Bulunamayan Anneler (anne_id = NULL olacak)
+### Sonuç
 
-| Eski Küpe | SURU-TAKIP Bilgisi | İpucu | Not |
-|-----------|-------------------|-------|-----|
-| **107** | Toh: 2025-01-17, GEBE, Holstein | Supabase'de eşleşme yok | Küpesi değişmiş, yeni küpe bilinmiyor |
-| **179** | Toh: 2025-02-10, GEBE, Holstein | Supabase'de eşleşme yok | Buzağısı ex |
-| **196** | Toh: 2025-03-05, GEBE, Holstein | 101'in küpesi 900-serisi olmuş olabilir | Alaca holstein buzağı |
-| **159** | Toh: 2025-03-19, GEBE, Holstein | Supabase'de eşleşme yok | Buzağısı ex |
-| **161** | Toh: 2025-04-13, GEBE, Holstein | Supabase'de eşleşme yok | |
-| **5748** | SURU'da sadece BOŞ kayıtlar | Devlet küpe sonu 2073 olabilir | DB'de devlet_kupe NULL |
-| **7125** | SURU'da GEBE ama pencere dışı (322g) | Küpe 190 olabilir | DB'de 190 yok |
+- **37 eşleşme** → UUID alındı
+- **1 eksik (177)** → DB sorgulandı, kayıt yok → `anne_id = NULL`
+- **10 NULL** (107, 179, 196, 5748, 7125, 159, 161, 106, Küpesiz düve, Minik panda)
+- **1 arşiv (106)** → seed kabul edildi, `dogum_tipi = 'Erken Doğum'`
 
-### Küpesiz Anneler (kimliği belirsiz)
-
-| Liste Adı | Buzağı | Not |
-|-----------|--------|-----|
-| **Küpesiz düve** | #40 (21.10.2025, dana, ₺) | Fiziksel küpe yok, anne_id NULL |
-| **Minik panda** | #58 (12.12.2025, dana, ex) | Lakap, anne_id NULL |
-
-**Detaylı araştırma raporu:** `docs/superpowers/plans/2026-05-31-buzagi-toplu-giris-faz1-sonuc.md`
+Detaylı rapor: `docs/superpowers/plans/2026-05-31-buzagi-toplu-giris-faz1-sonuc.md`
 
 ---
 
-## Faz 2 — Toplu Insert (SIRADA)
+## Faz 2 — Toplu Insert ✅ TAMAMLANDI
 
-**Güncel durum (2026-06-01, tamamlandı):** Faz 1-2 tamam. 49 buzağı kaydı girildi (hayvanlar + dogum). 177 DB'de yok → anne_id NULL. Faz 3 (aşılama) opsiyonel, bu task kapsamı dışında.
+**Migration:** `supabase/migrations/20260601000001_buzagi_toplu_giris.sql`
 
 ### Adım 1: Anne UUID Haritası
+- 38/38 tamam (37 UUID + 1 NULL)
 
-Eşleşen anneler (35 bilinen + 3 bulunan = 38):
+### Adım 2: `hayvanlar` INSERT
+- 49 kayıt eklendi
+- `gen_random_uuid()::text` ile ID üretildi
 
-| Liste Küpe | Supabase küpe_no | UUID |
-|-----------|-----------------|------|
-| 5621 | 5621 | 87323e7b-c8e7-4d48-aaea-36644684b14a |
-| 145 | 145 | a4c61f97-64d4-403c-b6d2-878195020a44 |
-| 177 | — | ❓ DB'de aranacak |
-| 142 | 142 | 143fbad6-2d0b-494b-9da6-d5db896bc095 |
-| 153 | 153 | 6f4f3c76-6ff8-4d72-b224-560a3c8230d3 |
-| 182 | 182 | ff007c90-6bdb-463c-8773-1af57bf30bc9 |
-| 008 | 008 | fa8e6daa-d73b-4bf0-97d8-3ff1e597256a |
-| 167 | 167 | 4211de36-69f3-4148-b9f8-9fc88c35653e |
-| 178 | 178 | 1ae146e4-916b-4337-a256-f05a22ae9ec6 |
-| 197 | 197 | 9dc8cbae-529c-42c0-ab9f-abd855949faa |
-| 191 | 191 | 01ae80a9-a05b-4b38-b2df-76992beff9bb |
-| 155 | 155 | 115011e1-5d34-483f-ad89-f2bd69fd8697 |
-| 5708 | 5708 | c8861b6f-b96a-42ef-94b7-1591729396ac |
-| 2045 | **905** | d607db2d-3af5-4303-9528-159021e917d4 |
-| 195 | 195 | bac3b8f8-43c3-4cf5-83ed-6e1073c16fec |
-| 181 | 181 | c4c1c3d6-747e-4536-82e8-f9b5250220de |
-| 199 | 199 | e31a60e5-0fe8-4a1a-882b-3b0ab0bd61f5 |
-| 147 | 147 | 3b8b66ba-3c29-4e20-b494-043737125fef |
-| 196 | — | NULL (bulunamadı) |
-| 101 | 101 | e9d582a1-cf08-4619-adda-9812048e6647 |
-| 5638 | 5638 | 456d7c6d-e1cf-4500-a325-7afe9be15260 |
-| 154 | 154 | 34e04643-713a-4646-a9e1-190cc5b3ec3d |
-| 162 | **904** | 00ca7aa3-5650-4379-a930-80a8970bfe6a |
-| 187 | 187 | acbbc7ce-3aff-4ed4-9600-5dd74ea5a9b2 |
-| 161 | — | NULL (bulunamadı) |
-| 189 | 189 | 1433f5f2-b60a-425e-9ab8-897ab089a711 |
-| 141 | 141 | 1f0706c0-e89c-42a4-a8a5-27d6d0e0a3cd |
-| 176 | 176 | 629a040e-8f9d-4e38-9742-db6db23b3f5d |
-| 152 | 152 | e641d149-a928-4624-b1f4-a4821f601e62 |
-| 115 | 115 | d9e1838e-ae5f-405d-b1aa-9a59835e345d |
-| 134 | 134 | 38e3ec48-ae34-436c-bd32-6562f969c576 |
-| 175 | 175 | 995c15e1-29d8-420d-a22d-4f58bae2c5ab |
-| 183 | 183 | f454bdd3-6b76-48dd-98c7-f68ba8635b96 |
-| 121 | 121 | f7ae4a63-65a0-444e-a3ab-a22a0a241828 |
-| 146 | 146 | 4f56df98-403f-4894-96ff-8b9dbfce8368 |
-| 192 | 192 | 1841c6e0-16ea-4d43-a25d-a65352f99718 |
-| 901 | 901 | 88449c15-0915-4cd3-a2ac-83c88bcecfb1 |
-| 1956 | **903** | 4aee4470-0101-4c2d-9f65-a28e02238634 |
-| 173 | 173 | 548df203-5c9c-4620-8858-8de93ef13841 |
-| 180 | 180 | b6053753-b612-4040-82b6-e06f4c947bb2 |
+### Adım 3: `dogum` INSERT
+- 49 kayıt eklendi (1 Erken Doğum, 48 Normal)
 
-**Hâlâ UUID'si eksik:** 177 (DB'de aranacak)
-**anne_id NULL olacaklar:** 107, 179, 196, 5748, 7125, 159, 161, 106, Küpesiz düve, Minik panda
+### Adım 4: Duplicate cleanup
+- `kupe_no=78` seed'da zaten vardı (`2026-05-27`)
+- Seed kaydı (`daaa2054`) korundu, yeni kayıt (`b315771e`) silindi
+- `cases` FK hatası temizlendi
+- 78'in `anne_id`'si NULL kalmıştı → `88449c15` (anne 901) atandı
 
-#### 🔍 Alt-adım: 177 UUID çözümü
+### Veri Doğrulama
 
-```sql
--- DB'de 177 küpeli hayvan var mı?
-SELECT id, kupe_no, durum FROM hayvanlar WHERE kupe_no = '177';
--- Yoksa → anne_id = NULL ile devam
--- Varsa → UUID'yi haritaya ekle
-```
-
-### Adım 2: Buzağıları `hayvanlar` tablosuna ekle (46 kayıt)
-
-```
-id:            gen_random_uuid()
-kupe_no:       sıra numarası string ('33', '34', ... '80') — 106'nın buzağısı 'xx'
-cinsiyet:      dana → 'Erkek', düve → 'Dişi'
-dogum_tarihi:  listeden
-anne_id:       UUID haritasından (bulunamayanlar NULL)
-grup:          yaşa göre belirlenecek (şu an çoğu 7-8 aylık = Düve Küçük/Büyük)
-durum:         normal → 'Aktif', ex → 'Ölü', ₺ → 'Satıldı'
-irk:           notlardaki (Alaca holstein, red holstein, Norveç) veya NULL
-```
-
-**Grup ataması (doğum tarihine göre, bugün 2026-05-31):**
-- Eylül-Ekim 2025 doğumlu (8-9 ay) → 'Düve (Büyük)' veya dana ise satıldı/öldü
-- Kasım-Aralık 2025 doğumlu (6-7 ay) → 'Düve (Küçük)' veya dana ise satıldı/öldü
-- Ocak-Şubat 2026 doğumlu (3-5 ay) → 'Süt İçen Buzağı'
-- Mart-Nisan 2026 doğumlu (1-3 ay) → 'Süt İçen Buzağı'
-- Ex/Satıldı olanlar → durum güncellenir, grup son bilinen
-
-**Durum atamaları:**
-- **Ölü (ex):** #37(153), #50(179), #52(181), #57(5638), #58(Minik panda), #63(159), #66(189), #xx(106), #70(115), #72(175)
-- **Satıldı (₺):** #33(5621), #34(145), #35(177), #40(Küpesiz düve), #41(008), #42(167)
-- **Aktif:** geri kalan 30 buzağı
-
-### Adım 3: Doğum kayıtlarını `dogum` tablosuna ekle (46 kayıt)
-
-```
-id:          gen_random_uuid()
-anne_id:     UUID haritasından (bulunamayanlar NULL)
-tarih:       doğum tarihi
-yavru_cins:  dana → 'Erkek', düve → 'Dişi'
-yavru_kupe:  buzağı küpe_no (sıra numarası string)
-dogum_tipi:  'Normal' (106 → 'Erken Doğum')
-```
-
-### Adım 4: Anne 106 seed data
-
-```sql
--- 106 Supabase'e eklenmeyecek, sadece doğum kaydı tutulacak
--- anne_id = NULL, buzağı durum = 'Ölü', doğum_tipi = 'Erken Doğum'
--- Not: Anne satıldı bilgisi bu dosyada arşivlendi
-```
+| Metrik | Değer |
+|--------|-------|
+| hayvanlar | 49 (unique) |
+| dogum | 49 (unique) |
+| Durum | 33 Aktif, 10 Ölü, 6 Satıldı |
+| Cinsiyet | 20 Dişi, 29 Erkek |
+| Anne NULL | 11 (bulunamayan) |
 
 ---
 
-## Faz 3 — Aşılama Kayıtları (opsiyonel, tablo varsa)
+## Faz 3 — Aşılama Kayıtları ✅ TAMAMLANDI
 
-- Sıra 33-76: Coglavax + Feedlot aşıları yapıldı (rapelli)
-- Sıra 77-80: Coglavax + Feedlot 25 Mayıs 2026'da yapıldı (rapel yok)
+### Grup 33-76 (44 buzağı) — Direct INSERT
+- Coglavax (`1705d3a1`, 4ml, SC, 365g rapel)
+- Feedlot (`785eeb55`, 5ml, SC, 365g rapel)
+- Her buzağı: 1.doz (doğum+60g) + rapel (doğum+90g)
+- **176 kayıt** `vaccination_log`'a eklendi
+
+### Grup 77-80 (4 buzağı) — `add_vaccination` RPC
+- Tarih: 2026-05-25
+- Her buzağı: Coglavax + Feedlot (2 kayıt)
+- **8 kayıt** `vaccination_log`'a eklendi
+- **8 ASI_RAPEL görevi** `gorev_log`'a oluşturuldu
+  - Hedef tarih: 2027-05-25
+  - Durum: `tamamlandi=false` (bekliyor)
+  - Sistem 2027'de kullanıcıya hatırlatacak
+
+### Toplam Aşı Kaydı
+- **184 kayıt** `vaccination_log`'da
+- **8 açık ASI_RAPEL görevi** `gorev_log`'da
 
 ---
 
-## Ham Veri (referans)
+## İstatistik
 
-| Anne Küpe | Doğum Tarihi | Cinsiyet | Sıra | Not | Anne UUID |
-|-----------|-------------|----------|------|-----|-----------|
-| 5621 | 2025-09-15 | dana | 33 | ₺ | 87323e7b |
-| 145 | 2025-09-17 | dana | 34 | ₺ | a4c61f97 |
-| 177 | 2025-09-17 | dana | 35 | ₺ | ❓ |
-| 142 | 2025-10-06 | düve | 36 | ++ | 143fbad6 |
-| 153 | 2025-10-08 | düve | 37 | ex, tendon kontraktürü | 6f4f3c76 |
-| 182 | 2025-10-14 | düve | 38 | ++ | ff007c90 |
-| 107 | 2025-10-19 | dana | 39 | - | **NULL** |
-| Küpesiz düve | 2025-10-21 | dana | 40 | ₺ | **NULL** |
-| 008 | 2025-10-29 | dana | 41 | ₺ | fa8e6daa |
-| 167 | 2025-11-02 | dana | 42 | ₺ | 4211de36 |
-| 178 | 2025-11-03 | dana | 43 | - | 1ae146e4 |
-| 162→904 | 2025-11-07 | dana | 44 | - | 00ca7aa3 |
-| 197 | 2025-11-09 | düve | 45 | - | 9dc8cbae |
-| 191 | 2025-11-13 | düve | 46 | - | 01ae80a9 |
-| 155 | 2025-11-13 | dana | 47 | - | 115011e1 |
-| 5708 | 2025-11-15 | dana | 48 | | c8861b6f |
-| 2045→905 | 2025-11-16 | dana | 49 | +- | d607db2d |
-| 179 | 2025-11-16 | düve | 50 | ex | **NULL** |
-| 195 | 2025-11-17 | düve | 51 | +- | bac3b8f8 |
-| 181 | 2025-11-23 | dana | 52 | ex | c4c1c3d6 |
-| 199 | 2025-11-29 | dana | 53 | Alaca holstein | e31a60e5 |
-| 147 | 2025-12-03 | dana | 54 | Norveç | 3b8b66ba |
-| 196 | 2025-12-04 | düve | 55 | Alaca holstein | **NULL** |
-| 101 | 2025-12-08 | düve | 56 | red holstein | e9d582a1 |
-| 5638 | 2025-12-09 | düve | 57 | ex, red holstein | 456d7c6d |
-| Minik panda | 2025-12-12 | dana | 58 | ex, red | **NULL** |
-| 5748 | 2025-12-14 | dana | 59 | red | **NULL** |
-| 7125 | 2025-12-15 | dana | 60 | red | **NULL** |
-| 1956→903 | 2025-12-18 | düve | 61 | red | 4aee4470 |
-| 154 | 2025-12-23 | düve | 62 | alaca iri | 34e04643 |
-| 159 | 2025-12-23 | düve | 63 | ex, alaca küçük | **NULL** |
-| 187 | 2026-01-12 | dana | 64 | -- | acbbc7ce |
-| 161 | 2026-01-17 | dana | 65 | -- | **NULL** |
-| 189 | 2026-02-02 | dana | 66 | ex (kronik pnömoni) | 1433f5f2 |
-| 106 | 2026-02-03 | dana | xx | ex (erken doğum), anne satıldı | **NULL** |
-| 141 | 2026-02-05 | dana | 67 | -- | 1f0706c0 |
-| 176 | 2026-02-06 | düve | 68 | -- | 629a040e |
-| 152 | 2026-02-07 | düve | 69 | -- | e641d149 |
-| 115 | 2026-02-09 | dana | 70 | ex (diyafram spazmı) | d9e1838e |
-| 134 | 2026-02-10 | dana | 71 | -- | 38e3ec48 |
-| 175 | 2026-02-15 | dana | 72 | ex (rota ishali) | 995c15e1 |
-| 183 | 2026-02-16 | dana | 73 | -- | f454bdd3 |
-| 121 | 2026-02-19 | düve | 74 | -- | f7ae4a63 |
-| 146 | 2026-03-19 | düve | 75 | -- | 4f56df98 |
-| 192 | 2026-03-19 | dana | 76 | -- | 1841c6e0 |
-| 901 | 2026-04-08 | düve | 77 | -- İKİZ | 88449c15 |
-| 901 | 2026-04-08 | düve | 78 | -- İKİZ | 88449c15 |
-| 173 | 2026-04-14 | düve | 79 | -- | 548df203 |
-| 180 | 2026-04-16 | dana | 80 | -- | b6053753 |
+| Buzağı # | Anne Küpe | Cinsiyet | Doğum Tarihi | Durum | Anne UUID | Aşı |
+|----------|-----------|----------|--------------|-------|-----------|-----|
+| 33 | 5621 | Erkek | 2025-09-15 | Satıldı | ✅ | ✅ |
+| 34 | 145 | Erkek | 2025-09-17 | Satıldı | ✅ | ✅ |
+| 35 | 177 | Erkek | 2025-09-17 | Satıldı | ❌ NULL | ✅ |
+| 36 | 142 | Dişi | 2025-10-06 | Aktif | ✅ | ✅ |
+| 37 | 153 | Dişi | 2025-10-08 | Ölü | ✅ | ✅ |
+| 38 | 182 | Dişi | 2025-10-14 | Aktif | ✅ | ✅ |
+| 39 | 107 | Erkek | 2025-10-19 | Aktif | ❌ NULL | ✅ |
+| 40 | Küpesiz düve | Erkek | 2025-10-21 | Satıldı | ❌ NULL | ✅ |
+| 41 | 008 | Erkek | 2025-10-29 | Satıldı | ✅ | ✅ |
+| 42 | 167 | Erkek | 2025-11-02 | Satıldı | ✅ | ✅ |
+| 43 | 178 | Erkek | 2025-11-03 | Aktif | ✅ | ✅ |
+| 44 | 162→904 | Erkek | 2025-11-07 | Aktif | ✅ | ✅ |
+| 45 | 197 | Dişi | 2025-11-09 | Aktif | ✅ | ✅ |
+| 46 | 191 | Dişi | 2025-11-13 | Aktif | ✅ | ✅ |
+| 47 | 155 | Erkek | 2025-11-13 | Aktif | ✅ | ✅ |
+| 48 | 5708 | Erkek | 2025-11-15 | Aktif | ✅ | ✅ |
+| 49 | 2045→905 | Erkek | 2025-11-16 | Aktif | ✅ | ✅ |
+| 50 | 179 | Dişi | 2025-11-16 | Ölü | ❌ NULL | ✅ |
+| 51 | 195 | Dişi | 2025-11-17 | Aktif | ✅ | ✅ |
+| 52 | 181 | Erkek | 2025-11-23 | Ölü | ✅ | ✅ |
+| 53 | 199 | Erkek | 2025-11-29 | Aktif | ✅ | ✅ |
+| 54 | 147 | Erkek | 2025-12-03 | Aktif | ✅ | ✅ |
+| 55 | 196 | Dişi | 2025-12-04 | Aktif | ❌ NULL | ✅ |
+| 56 | 101 | Dişi | 2025-12-08 | Aktif | ✅ | ✅ |
+| 57 | 5638 | Dişi | 2025-12-09 | Ölü | ✅ | ✅ |
+| 58 | Minik panda | Erkek | 2025-12-12 | Ölü | ❌ NULL | ✅ |
+| 59 | 5748 | Erkek | 2025-12-14 | Aktif | ❌ NULL | ✅ |
+| 60 | 7125 | Erkek | 2025-12-15 | Aktif | ❌ NULL | ✅ |
+| 61 | 1956→903 | Dişi | 2025-12-18 | Aktif | ✅ | ✅ |
+| 62 | 154 | Dişi | 2025-12-23 | Aktif | ✅ | ✅ |
+| 63 | 159 | Dişi | 2025-12-23 | Ölü | ❌ NULL | ✅ |
+| 64 | 187 | Erkek | 2026-01-12 | Aktif | ✅ | ✅ |
+| 65 | 161 | Erkek | 2026-01-17 | Aktif | ❌ NULL | ✅ |
+| 66 | 189 | Erkek | 2026-02-02 | Ölü | ✅ | ✅ |
+| xx | 106 | Erkek | 2026-02-03 | Ölü | ❌ Arşiv | ✅ |
+| 67 | 141 | Erkek | 2026-02-05 | Aktif | ✅ | ✅ |
+| 68 | 176 | Dişi | 2026-02-06 | Aktif | ✅ | ✅ |
+| 69 | 152 | Dişi | 2026-02-07 | Aktif | ✅ | ✅ |
+| 70 | 115 | Erkek | 2026-02-09 | Ölü | ✅ | ✅ |
+| 71 | 134 | Erkek | 2026-02-10 | Aktif | ✅ | ✅ |
+| 72 | 175 | Erkek | 2026-02-15 | Ölü | ✅ | ✅ |
+| 73 | 183 | Erkek | 2026-02-16 | Aktif | ✅ | ✅ |
+| 74 | 121 | Dişi | 2026-02-19 | Aktif | ✅ | ✅ |
+| 75 | 146 | Dişi | 2026-03-19 | Aktif | ✅ | ✅ |
+| 76 | 192 | Erkek | 2026-03-19 | Aktif | ✅ | ✅ |
+| 77 | 901 | Dişi | 2026-04-08 | Aktif | ✅ | ✅* |
+| 78 | 901 | Dişi | 2026-04-08 | Aktif | ✅ | ✅* |
+| 79 | 173 | Dişi | 2026-04-14 | Aktif | ✅ | ✅* |
+| 80 | 180 | Erkek | 2026-04-16 | Aktif | ✅ | ✅* |
+
+\* 77-80: ASI_RAPEL görevi oluşturuldu (hedef: 2027-05-25)
+
+---
+
+## Blokerler & Tespitler
+
+### 🔴 Sistem Sorunları (Sistem — görevle ilgili değil, genel)
+
+Aşağıdaki sorunlar `top` çıktısında tespit edildi:
+
+| Sorun | PID | Süre | Detay |
+|-------|-----|------|-------|
+| **Stuck git pre-push hook** | 14499 | 615 dk (10+ saat!) | `bash .git/hooks/pre-push` — 100% CPU, stuck `git rm --cached -r .remember/` |
+| **İkinci pre-push hook** | 14498 | 560 dk | `sh -c cd ... && git rm --cached -r .remember/` — beklemede |
+| **Zombie process** | 14493 | — | `git` zombie (zombie parent) |
+| **Zombie process** | 14503 | — | `sort` zombie |
+| **Zombie process** | 14502 | — | `grep` zombie |
+| **Swap kullanımı** | — | — | 1.9GB / 4.8GB swap dolu (~40%) |
+| **RAM** | — | — | 6.3GB / 7.7GB kullanımda (~82%) |
+
+**En kritik:** Pre-push hook'u `.remember/` dizinini git'ten untrack etmeye çalışırken takılıp kalmış, 10+ saattir bir CPU core'u tüketiyor. Bu hook muhtemelen `.git/hooks/pre-push` içinde tanımlı ve her push'ta tetikleniyor. PID 14499 kill edilmeli veya hook devre dışı bırakılmalı.
+
+```bash
+# 1. Stuck hook'u öldür
+kill 14499 14498
+
+# 2. Zombie temizleme (parent process kill)
+kill -9 14493 14503 14502   # veya wait ile temizlenir
+
+# 3. Hook'u incele/devre dışı bırak
+cat .git/hooks/pre-push
+
+# 4. .remember/ varsa handle et
+ls -la .remember/
+git rm -r --cached .remember/ 2>/dev/null || true
+```
