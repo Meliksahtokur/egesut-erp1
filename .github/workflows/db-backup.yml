@@ -15,20 +15,35 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
-      - name: Dump database via Supavisor (pooler port 6543)
+      - name: Resolve IPv4 and dump database
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
+          # GitHub Actions runner IPv6 desteklemez (Network is unreachable).
+          # Supabase DNS AAAA kaydını öncelikli döndürür.
+          # Çözüm: hostname'i Python ile IPv4'e resolve et, pg_dump'a IPv4 adresini ver.
+          HOST="db.zqnexqbdfvbhlxzelzju.supabase.co"
+          PG_HOST=$(python3 -c "
+import socket, sys
+try:
+    addr = socket.getaddrinfo('$HOST', 5432, socket.AF_INET)
+    print(addr[0][4][0])
+except Exception as e:
+    print(f'IPv4 resolve failed: {e}', file=sys.stderr)
+    sys.exit(1)
+")
+          echo "Resolved: $HOST → $PG_HOST:5432"
           pg_dump \
             --no-owner \
             --no-acl \
-            --host=db.zqnexqbdfvbhlxzelzju.supabase.co \
-            --port=6543 \
-            --username=postgres.db.zqnexqbdfvbhlxzelzju \
+            --host="$PG_HOST" \
+            --port=5432 \
+            --username=postgres \
             --dbname=postgres \
             --format=custom \
             --compress=9 \
             --file=dump.pg
+          echo "SUCCESS: dump.pg created ($(stat -c%s dump.pg) bytes)"
 
       - name: Encrypt dump
         env:
