@@ -1,6 +1,6 @@
 # Task 043 — Stok İade Görünürlüğü [FOR OPUS]
 
-**Durum:** Açık  
+**Durum:** ✅ Tamamlandı (2026-05-29)  
 **Öncelik:** Orta  
 **Etiket:** stok, tedavi, ux
 

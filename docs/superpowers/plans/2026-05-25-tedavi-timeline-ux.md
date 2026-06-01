@@ -2,7 +2,7 @@
 
 > Topoloji: Hierarchical | 3 task | 0 paralel blok
 > Model: deepseek-chat (flash)
-> Soru varsa sor. DB değişikliklerinde onay bekle.
+> **DURUM: ✅ TAMAMLANDI — 2026-05-25**
 
 **Hedef:**
 1. Not eklemeyi done'dan ayır — 📝 butonu bağımsız çalışır

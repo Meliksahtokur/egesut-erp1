@@ -73,6 +73,15 @@ dbsnapshot_full.sql
 
 # Remember plugin loglari (Claude Code, DeepSeek ile ilgisi yok)
 .remember/
+
+# Supabase temporary files
+supabase/.temp/
+
+# DeepSeek TUI runtime state
+.deepseek/
+
+# Database backups
+egesut-backup-*/
 session-*.md
 .opencode/
 .claude/CREDENTIALS.md

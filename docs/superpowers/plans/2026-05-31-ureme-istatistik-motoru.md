@@ -30,7 +30,7 @@
 **Files:**
 - Create: `supabase/migrations/20260531100000_faz_a_42gun_kisir_sperma.sql`
 
-- [ ] **Step 1: Migration dosyası oluştur — view rebuild**
+- [x] **Step 1: Migration dosyası oluştur — view rebuild**
 
 ```sql
 -- Faz A: 42-gün kuralı + kısır dışlama + sperma limit kaldırma
@@ -86,7 +86,7 @@ GROUP BY hayvan_id, padok, durum, kategori, cycle_no;
 GRANT SELECT ON public.v_ureme_dongusu TO anon, authenticated;
 ```
 
-- [ ] **Step 2: Aynı dosyaya stat_suru_ozet v3 ekle — 42-gün kuralı + sperma limit kaldırma**
+- [x] **Step 2: Aynı dosyaya stat_suru_ozet v3 ekle — 42-gün kuralı + sperma limit kaldırma**
 
 Aynı migration dosyasına append et:
 
@@ -259,19 +259,19 @@ $$;
 GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenticated;
 ```
 
-- [ ] **Step 3: Migration'ı uygula**
+- [x] **Step 3: Migration'ı uygula**
 
 Run: `supabase_migrate` with the full SQL from steps 1-2 concatenated.
 
 Expected: Migration applied successfully.
 
-- [ ] **Step 4: Doğrula — RPC çağrısı**
+- [x] **Step 4: Doğrula — RPC çağrısı**
 
 Run: `supabase_rpc({function_name: "stat_suru_ozet", params: "{}"})`
 
 Expected: JSON response with `sperma_all` key (not `sperma_top5`), `devam_eden` counts present, 42-gün öncesi cycle'lar dahil.
 
-- [ ] **Step 5: UI güncelle — sperma section expand pattern**
+- [x] **Step 5: UI güncelle — sperma section expand pattern**
 
 Modify `js/ui.js:737-740`. Replace:
 
@@ -298,7 +298,7 @@ With:
   const spSection=`<div class="stat-section"><div class="stat-section-title">🏆 Sperma Performansı (≥3 cycle)</div>${spFirstHtml}${spRestBtn}</div>`;
 ```
 
-- [ ] **Step 6: Sperma toggle state + handler ekle**
+- [x] **Step 6: Sperma toggle state + handler ekle**
 
 Find `let _suruDenemeOpen=false;` in ui.js (around line 760-770) and add after it:
 
@@ -313,7 +313,7 @@ function _toggleSpermaRest(){
 }
 ```
 
-- [ ] **Step 7: Commit Faz A**
+- [x] **Step 7: Commit Faz A**
 
 ```bash
 git add supabase/migrations/20260531100000_faz_a_42gun_kisir_sperma.sql js/ui.js
@@ -328,7 +328,7 @@ git commit -m "feat(stat): Faz A — 42-gün kuralı + kısır dışlama + sperm
 - Create: `supabase/migrations/20260531200000_faz_b_vwp_enforcement.sql`
 - Modify: `js/forms.js:240-270`
 
-- [ ] **Step 1: Migration oluştur — kolon + RPC güncelleme**
+- [x] **Step 1: Migration oluştur — kolon + RPC güncelleme**
 
 ```sql
 -- Faz B: VWP Enforcement — tohumlama.vwp_override kolonu + tohumlama_kaydet güncelleme
@@ -479,13 +479,13 @@ $$;
 GRANT EXECUTE ON FUNCTION public.tohumlama_kaydet(text, date, text, text, text, jsonb, boolean) TO anon, authenticated;
 ```
 
-- [ ] **Step 2: Migration'ı uygula**
+- [x] **Step 2: Migration'ı uygula**
 
 Run: `supabase_migrate` with the full SQL from step 1.
 
 Expected: Migration applied successfully.
 
-- [ ] **Step 3: Doğrula — VWP exception test**
+- [x] **Step 3: Doğrula — VWP exception test**
 
 Doğum kaydı olan bir hayvan bul ve 55 gün içinde tohumlama dene:
 
@@ -493,7 +493,7 @@ Run: `supabase_rpc({function_name: "tohumlama_kaydet", params: "{\"p_hayvan_id\"
 
 Expected: Exception with `VWP_VIOLATION:X:55` message (or normal success if no recent birth).
 
-- [ ] **Step 4: Frontend — VWP error handling + override modal**
+- [x] **Step 4: Frontend — VWP error handling + override modal**
 
 Modify `js/forms.js:240-270`. Replace the try block:
 
@@ -523,7 +523,7 @@ With:
     globalThis._vwpOverride = false;
 ```
 
-- [ ] **Step 5: Frontend — VWP exception catch**
+- [x] **Step 5: Frontend — VWP exception catch**
 
 In the same function, find the `catch` block (around line 275-280) and add VWP handling BEFORE the generic error handler. Find:
 
@@ -550,7 +550,7 @@ And replace the catch block with:
     }
 ```
 
-- [ ] **Step 6: Commit Faz B**
+- [x] **Step 6: Commit Faz B**
 
 ```bash
 git add supabase/migrations/20260531200000_faz_b_vwp_enforcement.sql js/forms.js
@@ -565,7 +565,7 @@ git commit -m "feat(stat): Faz B — VWP enforcement (55 gün) + override modal"
 - Create: `supabase/migrations/20260531300000_faz_c_eligible_sessiz.sql`
 - Modify: `js/ui.js:707-757`
 
-- [ ] **Step 1: Migration oluştur — v_eligible view**
+- [x] **Step 1: Migration oluştur — v_eligible view**
 
 ```sql
 -- Faz C: Eligible view + Sessiz hayvanlar RPC'leri
@@ -618,7 +618,7 @@ WHERE h.cinsiyet = 'Dişi'
 GRANT SELECT ON public.v_eligible TO anon, authenticated;
 ```
 
-- [ ] **Step 2: Aynı dosyaya sessiz hayvanlar RPC'leri ekle**
+- [x] **Step 2: Aynı dosyaya sessiz hayvanlar RPC'leri ekle**
 
 ```sql
 -- ═══ 2. sessiz_hayvanlar_listele ═══
@@ -686,7 +686,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.sessiz_hayvanlar_gorev_olustur() TO anon, authenticated;
 ```
 
-- [ ] **Step 3: stat_suru_ozet'e sessiz hayvanlar ekleme**
+- [x] **Step 3: stat_suru_ozet'e sessiz hayvanlar ekleme**
 
 Aynı migration dosyasına append et. `stat_suru_ozet`'in RETURN satırını güncelle — `sessiz_hayvanlar_gorev_olustur()` çağrısı + dönüşe sessiz sayısı ekle:
 
@@ -867,25 +867,25 @@ $$;
 GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenticated;
 ```
 
-- [ ] **Step 4: Migration'ı uygula**
+- [x] **Step 4: Migration'ı uygula**
 
 Run: `supabase_migrate` with full SQL from steps 1-3 concatenated.
 
 Expected: Migration applied successfully.
 
-- [ ] **Step 5: Doğrula — v_eligible view**
+- [x] **Step 5: Doğrula — v_eligible view**
 
 Run: `supabase_query({table: "v_eligible", select: "*", limit: 5})`
 
 Expected: Eligible hayvanlar listesi — dişi, aktif, gebe değil, kısır değil, VWP geçmiş.
 
-- [ ] **Step 6: Doğrula — sessiz_hayvanlar_listele**
+- [x] **Step 6: Doğrula — sessiz_hayvanlar_listele**
 
 Run: `supabase_rpc({function_name: "sessiz_hayvanlar_listele", params: "{}"})`
 
 Expected: JSON array with sessiz_gun >= 60 olan hayvanlar (veya boş array).
 
-- [ ] **Step 7: UI — Sessiz hayvanlar kartı ekle**
+- [x] **Step 7: UI — Sessiz hayvanlar kartı ekle**
 
 Modify `js/ui.js`. Find the line with `${dnSection}</div>` (around line 756) inside `_applySuruStatHtml`. Before `${dnSection}`, add the sessiz section:
 
@@ -907,7 +907,7 @@ With:
 ${spSection}${sessizSection}${dnSection}</div>
 ```
 
-- [ ] **Step 8: UI — Sessiz hayvanlar liste modal**
+- [x] **Step 8: UI — Sessiz hayvanlar liste modal**
 
 Add after `_toggleSpermaRest` function:
 
@@ -923,7 +923,7 @@ async function _showSessizList(){
 }
 ```
 
-- [ ] **Step 9: Commit Faz C**
+- [x] **Step 9: Commit Faz C**
 
 ```bash
 git add supabase/migrations/20260531300000_faz_c_eligible_sessiz.sql js/ui.js
@@ -937,7 +937,7 @@ git commit -m "feat(stat): Faz C — v_eligible view + sessiz hayvanlar listesi 
 **Files:**
 - Modify: `supabase/migrations/99999999999999_ground_truth.sql`
 
-- [ ] **Step 1: ground_truth.sql'i güncelle**
+- [x] **Step 1: ground_truth.sql'i güncelle**
 
 Ground truth dosyasında aşağıdaki bölümleri güncelle:
 
@@ -948,7 +948,7 @@ Ground truth dosyasında aşağıdaki bölümleri güncelle:
 5. `v_eligible` view tanımı ekle (yeni bölüm)
 6. `sessiz_hayvanlar_listele` + `sessiz_hayvanlar_gorev_olustur` fonksiyonları ekle (yeni bölüm)
 
-- [ ] **Step 2: Commit + Push**
+- [x] **Step 2: Commit + Push**
 
 ```bash
 git add supabase/migrations/99999999999999_ground_truth.sql

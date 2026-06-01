@@ -116,15 +116,17 @@ SQL taslağı: [sql]"
 - Raw SQL string birleştirme — YASAK (SQL injection)
 - `npx playwright test` local çalıştırma — YASAK (PRoot'ta CPU krizi yapar, CI'da otomatik çalışır)
 
-## Tools-Bank MCP (Memory + GitNexus)
+## Tools-Bank MCP (51+ tool)
 
-`/root/egesut-erp1/tools-bank/tools-bank-mcp-server.py` üzerinden **13 tool** sunulur:
+`/root/tools-bank/mcp_server/server.py` üzerinden sunulur (FastMCP, `--stdio` modu).
+Hem DeepSeek TUI hem Claude Code aynı MCP server'a bağlanır.
 
-### Memory (SQLite FTS5 + local ONNX embedding)
-- `memory_add(content, category?, priority?, tags?)` — not ekle (karar/hata/bilgi kaydet)
+### Bellek & Arama
+- `memory_add(content, category?, priority?, tags?)` — not ekle
 - `memory_search(query, category?, limit?)` — FTS5 full-text arama
-- `semantic_search(query, limit?)` — Jina AI embeddings (1024-dim, ~200ms)
-- `memory_stats()` — DB istatistik (note/embedding sayısı)
+- `semantic_search(query, limit?)` — Jina AI embedding (1024-dim, ~200ms)
+- `memory_stats()` — DB istatistik
+- `ast_grep_search(pattern, lang?, path?, max_results?, context_lines?)` — yapısal AST araması (aşağıdaki protokole bak)
 
 Her oturum **sonunda kritik kararları/hataları** `memory_add` ile kaydet.
 Yeni oturum **başında** `memory_search` ile ilgili geçmiş notları getir.
@@ -138,6 +140,29 @@ Embedding yenileme: `python3 tools-bank/memory/embedding_service.py --rebuild`
 - `gitnexus_cypher(query)` — Cypher sorgusu
 - `gitnexus_detect_changes(scope?, base_ref?)` — değişiklik etkisi
 - `gitnexus_group_list(name?)` / `gitnexus_group_sync(name)` — grup yönetimi
+
+### ast-grep Yapısal Arama Protokolü
+
+`ast_grep_search` ile kodun AST yapısında arama yaparken **token bütçesini korumak için şu 2 aşamalı protokolü uygula:**
+
+**AŞAMA 1 — Özet:** Pattern'i dene, `max_results=10` ile başla. Çıktı JSON compact formatındadır — sadece dosya yolu ve satır bilgisi taşır, kod bloğunu ham olarak basmaz.
+
+**AŞAMA 2 — Nokta atışı:** Özetten hangi dosya/satır aralığının ilgili olduğunu belirle, ardından `read_file` ile sadece o satır aralığını oku.
+
+**Kurallar:**
+- Büyük dosyalarda (300+ satır) doğrudan `read_file` yerine önce `ast_grep_search` ile hedef fonksiyonu cımbızla
+- `lang` parametresini her zaman belirt (örn: `javascript`, `sql`, `typescript`, `go`, `python`)
+- Çok fazla sonuç gelirse (max_results aşımı), `lang` veya `path` ile daralt
+- Joker: `$$$` herhangi bir AST node'unu eşleştirir, `$NAME` bir değişkeni yakalar
+
+**Örnekler:**
+| Amaç | Pattern | Lang |
+|------|---------|------|
+| Tüm fonksiyon tanımlarını bul | `function $$$($$$) { $$$ }` | javascript |
+| if err != nil bloklarını bul | `if err != nil { $$$ }` | go |
+| Belirli bir RPC çağrısını bul | `rpcOptimistic($$$)` | javascript |
+| Tüm import'ları bul | `import $$$ from '$$$'` | javascript |
+| Python fonksiyon tanımları | `def $$$($$$):` | python |
 
 Detaylı kullanım: `.claude/skills/tools-bank-mcp/SKILL.md`
 Memory güncelleme: `load_skill("memory-update")` — oturum sonu kayıt workflow'u
@@ -154,7 +179,7 @@ Memory güncelleme: `load_skill("memory-update")` — oturum sonu kayıt workflo
 | `js/config.js` | Sabit listeler (HEKIMLER, GRUP_PADOK vb.) |
 | `index.html` | Tek sayfa HTML |
 | `supabase/migrations/` | DB migration dosyaları |
-| `tools-bank/tools-bank-mcp-server.py` | MCP sunucusu (13 tool: memory + gitnexus) |
+| `/root/tools-bank/mcp_server/server.py` | MCP sunucusu (51+ tool: memory, gitnexus, ast-grep, goose, deerflow, supabase) |
 | `tools-bank/memory/` | SQLite FTS5 DB + ONNX embedding model |
 | `.claude/skills/tools-bank-mcp/SKILL.md` | tools-bank MCP kullanım kılavuzu |
 | `ReFactorRoadmap.md` | Teknik borç planı — Aşama 1 kısmen tamam (1.3 helpers/modal, 1.4 autocomplete bekliyor) |
