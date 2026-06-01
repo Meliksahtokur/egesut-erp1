@@ -4649,10 +4649,10 @@ async function refreshIlacCache(){
     .map(s=>({...s,guncel:+s.guncel_stok||0}));
 }
 async function acIlac(){
-  const q=(document.getElementById('d-stok-ac')?.value||'').toLowerCase().trim();
+  const q=(document.getElementById('d-stok-ac')?.value||'').trim();
   const ac=document.getElementById('ac-dilac'); if(!ac) return;
   if(!_ilacCache.length) await refreshIlacCache();
-  const filtered=q?_ilacCache.filter(s=>s.urun_adi.toLowerCase().includes(q)):_ilacCache.slice(0,12);
+  const filtered=q?_ilacCache.filter(s=>trLower(s.urun_adi||'').includes(trLower(q))):_ilacCache.slice(0,12);
   if(!filtered.length){
     ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--red)">⚠️ Stokta eşleşen ilaç yok — önce stoka ekleyin</div>';
     ac.style.display='block'; return;
@@ -4693,10 +4693,10 @@ function ilacSatirEkle(){
 }
 async function acDilacSatir(inp){
   if (!getState('stock') || !getState('stock').length) await loadStock();
-  const q=(inp.value||'').toLowerCase().trim();
+  const q=(inp.value||'').trim();
   const ac=inp.closest('.ilac-satir').querySelector('.ilac-ac');
   const stoklar=getState('stock').filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'));
-  const filtered=q?stoklar.filter(s=>(s.urun_adi||'').toLowerCase().includes(q)):stoklar.slice(0,8);
+  const filtered=q?stoklar.filter(s=>trLower(s.urun_adi||'').includes(trLower(q))):stoklar.slice(0,8);
   if(!filtered.length){ac.style.display='none';return;}
   ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/"/g,'&quot;').replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">${esc(s.urun_adi)} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
   ac.style.display='block';
@@ -5682,12 +5682,12 @@ async function buildDataLists(){
 
 // ═══ STOK ARAMA ═══
 function stokFiltrele(q){
-  q = (q||'').toLowerCase().trim();
+  q = trLower(q||'').trim();
   // Filtre: data-ad attribute ile case-insensitive match
   const rows = document.querySelectorAll('#stok-panel-body .stok-item');
   let visible = 0;
   rows.forEach(row => {
-    const ad = (row.dataset.ad || '').toLowerCase();
+    const ad = trLower(row.dataset.ad || '');
     if (!q || ad.includes(q)) { row.style.display = ''; visible++; }
     else { row.style.display = 'none'; }
   });

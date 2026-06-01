@@ -25,6 +25,7 @@ function esc(str) {
   div.textContent = str || '';
   return div.innerHTML;
 }
+function trLower(s) { return s.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase(); }
 
 /**
  * Genel autocomplete
@@ -45,7 +46,7 @@ function setupAutocomplete(inputId, opts) {
 
   async function load(q) {
     if (typeof opts.source === 'function') list = await opts.source(q);
-    else { const lq = q.toLowerCase(); list = opts.source.filter(s => s.toLowerCase().includes(lq)); }
+    else { const lq = trLower(q); list = opts.source.filter(s => trLower(s).includes(lq)); }
   }
 
   function render() {
