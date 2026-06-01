@@ -243,7 +243,7 @@ async function submitInsem(btn) {
       p_tarih:          tarih,
       p_sperma:         sperma,
       p_hekim_id:       v('i-hekim') || null,
-      p_ek_uygulamalar: JSON.stringify(_ekUygulamalar),
+      p_ek_uygulamalar: _ekUygulamalar,
       p_vwp_override:   globalThis._vwpOverride || false,
     });
     globalThis._vwpOverride = false;
@@ -283,7 +283,7 @@ async function submitInsem(btn) {
       const ok = confirm(`❗ VWP dolmadı: ${gun}/${limit} gün.\n\nDoğumdan sonra yeterli süre geçmemiş.\nYine de kaydetmek istiyor musunuz?`);
       if (ok) {
         globalThis._vwpOverride = true;
-        return submitTohumlama();
+        return submitInsem();
       }
       return;
     }
