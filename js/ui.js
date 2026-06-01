@@ -168,7 +168,7 @@ async function ileriGebeKontrol(){
     }
   } catch(e){ toast('❌ '+e.message,true); }
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList){
   const _dd=ddMap||{};
   const _getDis=t=>{if(t.gorev_tipi!=='TEDAVI_GUN')return '';try{return _dd[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}};
   const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
@@ -193,10 +193,6 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,muayeneG
   if(births60.length){
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
       births60.map(b=>`<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${b.tarih} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button style="font-size:.65rem;font-weight:700;color:var(--red2);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap" onclick="event.stopPropagation();kizginlikYoktu('${b.anne_id}','${b.id||''}')">✕</button></div>`).join(''));
-  }
-  if((muayeneGerekli||[]).length){
-    h+=band('red','🚨 Muayene Gerekli (90+ gün, kayıt yok)',
-      muayeneGerekli.map(b=>`<div class="arow" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün — kızgınlık/tohumlama kaydı yok</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
   }
   if((ileriGebeler||[]).length){
     const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
@@ -236,13 +232,12 @@ async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
     const today=new Date().toISOString().split('T')[0];
-    const [animals,diseases,tasks,stock,births60,births90,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
+    const [animals,diseases,tasks,stock,births60,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
       getData('gorev_log',t=>!t.tamamlandi&&!t.iptal),
       idbGetAll('stok'),
       getData('dogum',b=>b.tarih>=dAgo(63)&&b.tarih<=dAgo(58)),
-      getData('dogum',b=>b.tarih>=dAgo(150)&&b.tarih<dAgo(89)),
       getData('tohumlama',t=>t.sonuc==='Gebe'),
       getData('vaccination_log'),
       getData('vaccines'),
@@ -272,14 +267,6 @@ async function loadDash(){
       const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
       return !hasK&&!hasT;
     });
-    // 90-day: births 90-150 days ago with no kizginlik/tohumlama since
-    const gebeSet90=new Set(getState('gebeIds')||[]);
-    const muayeneGerekli=births90.filter(b=>{
-      if(gebeSet90.has(b.anne_id)) return false; // zaten tekrar gebe
-      const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
-      const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
-      return !hasK&&!hasT;
-    });
     // Buzağı sütten kesme otomatik kontrolü
     try {
       const resBuz=await rpc('buzagi_sutten_kesme_kontrol');
@@ -299,7 +286,7 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,muayeneGerekli,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
