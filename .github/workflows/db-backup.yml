@@ -15,16 +15,29 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
-      - name: Resolve IPv4 and dump database
+      - name: Dump database via Supabase pooler (IPv4-compatible)
         env:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          # GitHub Actions runner IPv6 desteklemez (Network is unreachable).
-          # Supabase DNS AAAA öncelikli döndürür.
-          # Çözüm: Python ile IPv4'e resolve et, pg_dump'a IPv4 adresini ver.
-          PG_HOST=$(python3 -c "import socket; print(socket.getaddrinfo('db.zqnexqbdfvbhlxzelzju.supabase.co', 5432, socket.AF_INET)[0][4][0])")
-          echo "Resolved → $PG_HOST:5432"
-          pg_dump --no-owner --no-acl --host="$PG_HOST" --port=5432 --username=postgres --dbname=postgres --format=custom --compress=9 --file=dump.pg
+          # Direct host db.zqnexqbdfvbhlxzelzju.supabase.co has NO IPv4 record
+          # (only AAAA/IPv6). GitHub Actions cannot use IPv6.
+          # Solution: use Supabase session pooler which has IPv4.
+          #   Pooler host: aws-1-eu-west-1.pooler.supabase.com  →  18.202.64.2
+          #   Username format for pooler: postgres.<project-ref>
+          pg_dump \
+            --dbname="postgresql://postgres.zqnexqbdfvbhlxzelzju@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require" \
+            --no-owner --no-acl \
+            --exclude-schema='extensions' \
+            --exclude-schema='graphql' \
+            --exclude-schema='graphql_public' \
+            --exclude-schema='net' \
+            --exclude-schema='pgbouncer' \
+            --exclude-schema='pgsodium' \
+            --exclude-schema='pgsodium_masks' \
+            --exclude-schema='realtime' \
+            --exclude-schema='supabase_functions' \
+            --format=custom --compress=9 \
+            --file="dump.pg"
           echo "SUCCESS: $(stat -c%s dump.pg) bytes"
 
       - name: Encrypt dump
