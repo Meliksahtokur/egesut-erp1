@@ -1628,10 +1628,10 @@ function loadBulkSerbest(prefix) {
 
 // Filter checkbox list by search
 function filterBulkSerbest(prefix) {
-  const q = document.getElementById(prefix + '-s-ara')?.value?.toLowerCase() || '';
+  const q = trLower(document.getElementById(prefix + '-s-ara')?.value || '') || '';
   const labels = document.querySelectorAll('#' + prefix + '-s-list label');
   labels.forEach(l => {
-    l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none';
+    l.style.display = trLower(l.textContent).includes(q) ? '' : 'none';
   });
 }
 
