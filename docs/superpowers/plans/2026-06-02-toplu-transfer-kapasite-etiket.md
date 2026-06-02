@@ -514,16 +514,15 @@ let _btEtiketMod = null;       // 'toplu' | 'tektek' | null
 
 - [ ] **Step 2: renderPadokDolulukBar fonksiyonunu ekle**
 
-`loadPadokConfig()` fonksiyonunun hemen altına ekle:
+`js/ui.js` içinde uygun bir yere (örn. `renderAnimals` fonksiyonundan sonra) ekle. `PADOKLAR` zaten `js/config.js`'den ui.js satır 13'te import edilmiştir — `window._padoklar` kullanma:
 
 ```javascript
 function renderPadokDolulukBar() {
   const el = document.getElementById('padok-doluluk-bar');
   if (!el) return;
 
-  // _padoklar global'ı kullan (loadPadokConfig tarafından set edilir)
-  const padoklar = window._padoklar || [];
-  if (!padoklar.length) { el.innerHTML = ''; return; }
+  // PADOKLAR config.js'den import edilmiş (ui.js satır 13) — window._ kullanma
+  if (!PADOKLAR.length) { el.innerHTML = ''; return; }
 
   // Padok bazlı sayım — O(n) tek geçiş
   const animals = getState('animals') || [];
@@ -534,7 +533,7 @@ function renderPadokDolulukBar() {
     }
   });
 
-  el.innerHTML = padoklar.map(p => {
+  el.innerHTML = PADOKLAR.map(p => {
     if (!p.kapasite) return '';
     const dolu = padokSayac[p.id] || 0;
     const kap = p.kapasite;
@@ -559,11 +558,11 @@ function setPadokFiltreBt(padokId, padokAdi) {
 }
 ```
 
-**Not:** `window._padoklar` ve `getState('animals')` global değişken isimlerini kontrol et — mevcut kodda farklı isimler kullanılıyorsa (örn. `_padoklarData`, `_hayvanlarCache`) onları kullan.
+**Not:** `PADOKLAR` config.js'den import edilmiş (ui.js satır 13). `getState('animals')` state management API — her zaman `|| []` ile kullan.
 
 - [ ] **Step 3: loadPadokConfig'dan sonra doluluk bar'ı çağır**
 
-`loadPadokConfig()` fonksiyonu içinde, padok verisi yüklendikten sonra:
+`js/config.js` içinde `loadPadokConfig()` fonksiyonunda, `PADOKLAR = padoklar;` satırından hemen sonra ekle:
 
 ```javascript
 renderPadokDolulukBar();
@@ -711,33 +710,38 @@ function _btRenderSuru() {
 
 - [ ] **Step 2: Mevcut animal card render'ına checkbox ekle**
 
-`js/ui.js` içinde animal card HTML üreten template literal'i bul (muhtemelen `renderSuruList` veya benzeri bir fonksiyon). Her kartın başına checkbox ekle:
+`js/ui.js` satır ~629'da animal card HTML'i üretiliyor. Card şablonu:
+```
+<div class="animal-card" onclick="openDet('${a.id}')">
+```
+`data-id` attribute'u yok — ekle. Checkbox'ı da başa ekle:
+
+Mevcut card template'ini (satır ~629) şu hale getir:
 
 ```javascript
-// Animal card template'inin içine (mevcut ilk içerik elementinden önce):
-<input type="checkbox" class="bt-cb" ${_btSecilenIds.includes(h.id)?'checked':''} 
-       onchange="event.stopPropagation();btCbDegisti('${h.id}',this.checked)">
+return `<div class="animal-card" data-id="${a.id}"
+     onclick="if(_btSecimModu){_btKartTikla('${a.id}',event)}else{openDet('${a.id}')}">
+  <input type="checkbox" class="bt-cb"
+         ${_btSecilenIds.includes(a.id)?'checked':''}
+         onchange="event.stopPropagation();btCbDegisti('${a.id}',this.checked)">
+  ${seqHtml}<div class="avt">${init}</div>
+  ...
 ```
 
-Kartın `onclick` handler'ında seçim modunu kontrol et:
+`data-id` attribute'u _btRenderSuru tarafından highlight için kullanılır. `openDet` zaten mevcut onclick fonksiyonu (satır 629 doğrulandı).
+
+Kart tıklama fonksiyonu:
 
 ```javascript
 // Mevcut onclick fonksiyonuna (örn. openAnimalDet(id)) ekle:
 function _btKartTikla(id, event) {
-  if (!_btSecimModu) return false;  // Normal click devam etsin
   event.stopPropagation();
   const idx = _btSecilenIds.indexOf(id);
   if (idx > -1) _btSecilenIds.splice(idx, 1);
   else _btSecilenIds.push(id);
   _btGuncelleActionBar();
   _btRenderSuru();
-  return true;  // Seçim yapıldı, detay açılmasın
 }
-```
-
-Mevcut animal card onclick'ini güncelle:
-```javascript
-onclick="if(_btSecimModu){_btKartTikla('${h.id}',event)}else{openAnimalDet('${h.id}')}"
 ```
 
 - [ ] **Step 3: btCbDegisti fonksiyonu ekle**
@@ -802,20 +806,19 @@ function openBulkTransfer() {
   _btHedefPadokId = null;
   _btEtiketMod = null;
 
-  // Grup filtresi dropdown'ını doldur
+  // Grup filtresi dropdown'ını doldur (GRUP_PADOK ui.js satır 13'te import edilmiş)
   const grupSel = document.getElementById('bt-f-grup');
   if (grupSel) {
-    const gruplar = Object.keys(window.GRUP_PADOK || {});
+    const gruplar = Object.keys(GRUP_PADOK);
     grupSel.innerHTML = '<option value="">Tüm Gruplar</option>' +
       gruplar.map(g => `<option>${g}</option>`).join('');
   }
 
-  // Kaynak padok dropdown'ını doldur
+  // Kaynak padok dropdown'ını doldur (PADOKLAR ui.js satır 13'te import edilmiş)
   const kaynakSel = document.getElementById('bt-kaynak-padok-sel');
   if (kaynakSel) {
-    const padoklar = window._padoklar || [];
     kaynakSel.innerHTML = '<option value="">— Padok Seç —</option>' +
-      padoklar.map(p => `<option value="${p.id}">${p.ad}</option>`).join('');
+      PADOKLAR.map(p => `<option value="${p.id}">${p.ad}</option>`).join('');
   }
 
   // Serbest liste'yi doldur
@@ -879,18 +882,9 @@ function btSecilidenKaldir(id) {
 }
 ```
 
-- [ ] **Step 4: Tab switch fonksiyonu ekle**
+- [ ] **Step 4: Tab switch — mevcut `bulkTabSwitch` yeniden kullan**
 
-```javascript
-function btTabSwitch(tabId) {
-  ['padok', 'filtre', 'serbest'].forEach(t => {
-    const panel = document.getElementById('bt-tab-' + t);
-    const btn   = document.getElementById('bt-tab-btn-' + t);
-    if (panel) panel.classList.toggle('on', t === tabId);
-    if (btn)   btn.classList.toggle('on', t === tabId);
-  });
-}
-```
+`btTabSwitch` yeni fonksiyon yazmak yerine `forms.js:1547`'deki mevcut `bulkTabSwitch(prefix, tab)` fonksiyonunu `'bt'` prefix ile çağır. Yeni bir wrapper fonksiyon gerekmez — handler kayıtlarında direkt `bulkTabSwitch('bt', tab)` kullanılır (bkz. Task 11).
 
 - [ ] **Step 5: _btRenderSerbestListe fonksiyonu ekle**
 
@@ -998,7 +992,7 @@ git commit -m "feat(ui): openBulkTransfer + seçili hayvanlar render + tab switc
 ```javascript
 function _btGrupUygunMu(padok, gruplar) {
   if (!gruplar.length) return true;
-  const GRUP_PADOK = window.GRUP_PADOK || {};
+  // GRUP_PADOK config.js'den ui.js satır 13'te import edilmiş — window._ değil
   return gruplar.every(g => {
     const uygunAdlar = GRUP_PADOK[g] || [];
     return uygunAdlar.length === 0 || uygunAdlar.includes(padok.ad);
@@ -1017,7 +1011,7 @@ function _btRenderHedefPadoklar() {
   const el = document.getElementById('bt-hedef-liste');
   if (!el) return;
 
-  const padoklar = window._padoklar || [];
+  // PADOKLAR config.js'den import edilmiş (ui.js satır 13)
   const suruData = getState('animals') || [];
 
   if (!_btModalSecilenIds.length) {
@@ -1031,7 +1025,7 @@ function _btRenderHedefPadoklar() {
   // Kaynakları bul (kaynak padokları hedef listesinden çıkarmak için)
   const kaynakPadoklar = new Set(secilenHayvanlar.map(h => h.padok_id).filter(Boolean));
 
-  el.innerHTML = padoklar.map(p => {
+  el.innerHTML = PADOKLAR.map(p => {
     const dolu = suruData.filter(h => h.padok_id === p.id && h.durum === 'Aktif').length;
     const kap = p.kapasite;
     const yuzde = kap ? Math.round((dolu / kap) * 100) : 0;
@@ -1093,9 +1087,9 @@ function _btGuncelleOzet() {
     return;
   }
 
-  const padoklar = window._padoklar || [];
+  // PADOKLAR config.js'den import edilmiş (ui.js satır 13)
   const suruData = getState('animals') || [];
-  const hedef = padoklar.find(p => p.id === _btHedefPadokId);
+  const hedef = PADOKLAR.find(p => p.id === _btHedefPadokId);
   if (!hedef) return;
 
   const secilenHayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
@@ -1291,10 +1285,9 @@ async function btTransferOnayla() {
   onayBtn.textContent = '⏳ Taşınıyor…';
 
   try {
-    // Etiket parametresini hazırla
+    // Etiket parametresini hazırla (PADOKLAR config.js'den import edilmiş)
     let etiketParam = null;
-    const padoklar = window._padoklar || [];
-    const hedef = padoklar.find(p => p.id === _btHedefPadokId);
+    const hedef = PADOKLAR.find(p => p.id === _btHedefPadokId);
     const suruData = getState('animals') || [];
     const secilenHayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
     const gruplar = [...new Set(secilenHayvanlar.map(h => h.grup).filter(Boolean))];
@@ -1384,9 +1377,10 @@ git commit -m "feat(ui): btTransferOnayla RPC çağrısı + hata yönetimi + pad
 'bt-transfer':     () => { if (_btSecilenIds.length) openBulkTransfer(); },
 'bt-cancel':       () => exitBtSecimModu(),
 'close-bulk-transfer': () => closeM('m-bulk-transfer'),
-'bt-tab-padok':    () => btTabSwitch('padok'),
-'bt-tab-filtre':   () => btTabSwitch('filtre'),
-'bt-tab-serbest':  () => btTabSwitch('serbest'),
+// bulkTabSwitch(prefix, tab) forms.js:1547'de mevcut — yeni fonksiyon yazmak gerekmez
+'bt-tab-padok':    () => bulkTabSwitch('bt', 'padok'),
+'bt-tab-filtre':   () => bulkTabSwitch('bt', 'filtre'),
+'bt-tab-serbest':  () => bulkTabSwitch('bt', 'serbest'),
 ```
 
 - [ ] **Step 2: Commit**
@@ -1466,3 +1460,9 @@ git push origin main
 9. **Eski akış temizliği:** `padokTopluTasi()` yeni modala yönlendirildikten sonra `_pdTransferAcSelector()` ve `padokTransferOnayla()` fonksiyonları ve `m-padok-transfer` modal'ı silinebilir. Ancak `padokTekliTasi()` hala `_pdTransferAcSelector()`'ı kullanıyor — bunu da yeni akışa yönlendir veya eski akışı koru.
 
 10. **Seçim terk uyarısı:** En basit yaklaşım — `openM()` fonksiyonunu override etmek yerine ana sekme değiştirme handler'larına (`pg-suru` dışına çıkış) `_btSecimTerkUyari` kontrolü ekle.
+
+11. **`PADOKLAR` ve `GRUP_PADOK` import** — `js/ui.js` satır 13'te her ikisi de config.js'den import edilmiş. `window.PADOKLAR`, `window.GRUP_PADOK`, `window._padoklar` gibi global erişim kullanma.
+
+12. **`padoklar.kapasite` production'da NULL** — Tüm mevcut padokların kapasite değeri NULL. Kapasite sistemi admin bir değer girene kadar `renderPadokDolulukBar`'da `if (!p.kapasite) return ''` ile chip gösterilmez. Bu beklenen davranış — kapasite kontrolü devreye girmeden transfer çalışmaya devam eder.
+
+13. **`bulkTabSwitch(prefix, tab)` — forms.js:1547** — Zaten mevcut. `btTabSwitch` adında yeni fonksiyon yazmak yerine `bulkTabSwitch('bt', 'padok')` gibi çağır.
