@@ -5656,6 +5656,32 @@ function _btRenderSerbestListe() {
   if (sonuc) sonuc.textContent = '';
 }
 
+function btSerbestYukle() {
+  const input = document.getElementById('bt-serbest-input');
+  const sonuc = document.getElementById('bt-serbest-sonuc');
+  if (!input || !sonuc) return;
+  const satirlar = input.value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (!satirlar.length) { sonuc.textContent = ''; return; }
+  const suruData = getState('animals') || [];
+  let eslesen = 0, bulunamayan = [];
+  satirlar.forEach(aranan => {
+    const hayvan = suruData.find(h =>
+      h.kupe_no === aranan || h.devlet_kupe === aranan || h.id === aranan
+    );
+    if (hayvan && !_btModalSecilenIds.includes(hayvan.id)) {
+      _btModalSecilenIds.push(hayvan.id);
+      eslesen++;
+    } else if (!hayvan) {
+      bulunamayan.push(aranan);
+    }
+  });
+  sonuc.textContent = `${eslesen} hayvan eklendi` + (bulunamayan.length ? ` · ${bulunamayan.length} bulunamadı: ${bulunamayan.slice(0,3).join(', ')}${bulunamayan.length > 3 ? '…' : ''}` : '');
+  sonuc.style.color = bulunamayan.length ? 'var(--amber)' : 'var(--green3)';
+  _btRenderSeciliHayvanlar();
+  _btRenderHedefPadoklar();
+  _btGuncelleOzet();
+}
+
 function _btGrupUygunMu(padok, gruplar) {
   if (!gruplar.length) return true;
   return gruplar.some(g => {
@@ -5835,20 +5861,50 @@ async function btTransferOnayla() {
     const gruplar = [...new Set(secilenHayvanlar.map(h => h.grup).filter(Boolean))];
     if (_btBesiPadokMu(hedef) && !_btGrupUygunMu(hedef, gruplar)) {
       const etiketBilgi = _btEtiketleriBir();
-      if (etiketBilgi.mod === 'toplu') etiketParam = etiketBilgi.etiketler;
-      else etiketParam = [...new Set(Object.values(etiketBilgi.map).flat())];
+      if (etiketBilgi.mod === 'tektek') {
+        // Per-animal etiket — her hayvan için ayrı RPC çağrısı
+        for (const hayvanId of _btModalSecilenIds) {
+          const hayvanEtiketler = etiketBilgi.map[hayvanId] || [];
+          const { data: d, error: e } = await db.rpc('padok_degistir_toplu', {
+            p_hayvan_ids: [hayvanId], p_yeni_padok_id: _btHedefPadokId,
+            p_etiketler: hayvanEtiketler.length ? hayvanEtiketler : null
+          });
+          if (e) throw e;
+          if (!d.success) {
+            if (d.error === 'kapasite_dolu') toast(`❌ Kapasite dolu: ${d.detay || ''}. Transfer iptal edildi.`, true);
+            else toast(`❌ Transfer başarısız: ${d.mesaj || d.error || 'Hata'}`, true);
+            if (onayBtn) { onayBtn.disabled = false; onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`; }
+            return;
+          }
+        }
+        toast(`✅ ${_btModalSecilenIds.length} hayvan ${hedef.ad}'a taşındı`);
+      } else {
+        etiketParam = etiketBilgi.etiketler;
+        const { data, error } = await db.rpc('padok_degistir_toplu', {
+          p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: etiketParam
+        });
+        if (error) throw error;
+        if (!data.success) {
+          if (data.error === 'kapasite_dolu') toast(`❌ Kapasite dolu: ${data.detay || ''}. Transfer iptal edildi.`, true);
+          else toast(`❌ Transfer başarısız: ${data.mesaj || data.error || 'Hata'}`, true);
+          if (onayBtn) { onayBtn.disabled = false; onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`; }
+          return;
+        }
+        toast(`✅ ${data.hayvan_sayisi} hayvan ${data.yeni_padok}'a taşındı`);
+      }
+    } else {
+      const { data, error } = await db.rpc('padok_degistir_toplu', {
+        p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: null
+      });
+      if (error) throw error;
+      if (!data.success) {
+        if (data.error === 'kapasite_dolu') toast(`❌ Kapasite dolu: ${data.detay || ''}. Transfer iptal edildi.`, true);
+        else toast(`❌ Transfer başarısız: ${data.mesaj || data.error || 'Hata'}`, true);
+        if (onayBtn) { onayBtn.disabled = false; onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`; }
+        return;
+      }
+      toast(`✅ ${data.hayvan_sayisi} hayvan ${data.yeni_padok}'a taşındı`);
     }
-    const { data, error } = await db.rpc('padok_degistir_toplu', {
-      p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: etiketParam
-    });
-    if (error) throw error;
-    if (!data.success) {
-      if (data.error === 'kapasite_dolu') toast(`❌ Kapasite dolu: ${data.detay || ''}. Transfer iptal edildi.`, true);
-      else toast(`❌ Transfer başarısız: ${data.mesaj || data.error || 'Hata'}`, true);
-      if (onayBtn) { onayBtn.disabled = false; onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`; }
-      return;
-    }
-    toast(`✅ ${data.hayvan_sayisi} hayvan ${data.yeni_padok}'a taşındı`);
     closeM('m-bulk-transfer');
     if (typeof loadAnimals === 'function') await loadAnimals();
     if (typeof renderPadokDolulukBar === 'function') renderPadokDolulukBar();
@@ -5972,7 +6028,7 @@ async function padokTransferOnayla() {
       // Bulk transfer
       const res = await rpc('padok_degistir_toplu', { p_hayvan_ids: ids, p_yeni_padok_id: hedefId });
       if (res && res.success) {
-        toast(`✅ ${res.basarili} hayvan ${res.yeni_padok} taşındı${res.basarisiz > 0 ? `, ${res.basarisiz} başarısız` : ''}`);
+        toast(`✅ ${res.hayvan_sayisi} hayvan ${res.yeni_padok}'a taşındı`);
       } else {
         toast(`⚠️ ${res?.error || 'Toplu işlem başarısız'}`, true);
       }
