@@ -242,6 +242,15 @@ registerActions({
   'padok-toplu-tasi':     () => padokTopluTasi(),
   'padok-transfer-onay':  () => padokTransferOnayla(),
 
+  // ── Toplu Transfer ──
+  'bt-toggle-mode':  () => btToggleSecimModu(),
+  'bt-transfer':     () => { if (_btSecilenIds.length) openBulkTransfer(); },
+  'bt-cancel':       () => exitBtSecimModu(),
+  'close-bulk-transfer': () => closeM('m-bulk-transfer'),
+  'bt-tab-padok':    () => bulkTabSwitch('bt', 'padok'),
+  'bt-tab-filtre':   () => bulkTabSwitch('bt', 'filtre'),
+  'bt-tab-serbest':  () => bulkTabSwitch('bt', 'serbest'),
+
   // ═══ STOK DETAY ═══
   'stok-duzelt-kaydet': () => stokDuzeltKaydet(),
   'stok-det-kaydet':    () => stokDetKaydet(),
