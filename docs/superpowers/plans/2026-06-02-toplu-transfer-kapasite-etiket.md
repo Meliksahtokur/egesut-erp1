@@ -322,15 +322,15 @@ Sürü listesi div'inin (`<div id="suru-body">` veya `id="suru-list"`) hemen ön
     </div>
     <div class="mo-body">
 
-      <!-- Tab butonları -->
+      <!-- Tab butonları — bulkTabSwitch('bt', tab) forms.js:1547 bekler: id=bt-tab-* class=btn btn-g/btn-o -->
       <div style="display:flex;gap:4px;margin-bottom:12px;overflow-x:auto">
-        <button class="tab-btn on" id="bt-tab-btn-padok" data-action="bt-tab-padok">📋 Padok</button>
-        <button class="tab-btn" id="bt-tab-btn-filtre" data-action="bt-tab-filtre">🎯 Filtre</button>
-        <button class="tab-btn" id="bt-tab-btn-serbest" data-action="bt-tab-serbest">✋ Serbest</button>
+        <button class="btn btn-g" id="bt-tab-padok" data-action="bt-tab-padok">📋 Padok</button>
+        <button class="btn btn-o" id="bt-tab-filtre" data-action="bt-tab-filtre">🎯 Filtre</button>
+        <button class="btn btn-o" id="bt-tab-serbest" data-action="bt-tab-serbest">✋ Serbest</button>
       </div>
 
-      <!-- Tab: Padok -->
-      <div id="bt-tab-padok" class="tab-panel on">
+      <!-- Tab: Padok — bulkTabSwitch bekler: id=bt-section-padok -->
+      <div id="bt-section-padok">
         <div class="fg">
           <label class="flbl">Kaynak Padok</label>
           <select class="fsel" id="bt-kaynak-padok-sel" onchange="btKaynakPadokSec(this.value)">
@@ -340,8 +340,8 @@ Sürü listesi div'inin (`<div id="suru-body">` veya `id="suru-list"`) hemen ön
         <button class="btn btn-g" onclick="btGetKaynakHayvanlar()" style="width:100%;margin-bottom:10px">🔍 Hayvanları Getir</button>
       </div>
 
-      <!-- Tab: Filtre -->
-      <div id="bt-tab-filtre" class="tab-panel">
+      <!-- Tab: Filtre — bulkTabSwitch bekler: id=bt-section-filtre style="display:none" -->
+      <div id="bt-section-filtre" style="display:none">
         <div class="fg">
           <label class="flbl">Grup</label>
           <select class="fsel" id="bt-f-grup">
@@ -369,8 +369,8 @@ Sürü listesi div'inin (`<div id="suru-body">` veya `id="suru-list"`) hemen ön
         <button class="btn btn-b" onclick="btApplyFiltre()" style="width:100%">🎯 Filtrele</button>
       </div>
 
-      <!-- Tab: Serbest -->
-      <div id="bt-tab-serbest" class="tab-panel">
+      <!-- Tab: Serbest — bulkTabSwitch bekler: id=bt-section-serbest style="display:none" -->
+      <div id="bt-section-serbest" style="display:none">
         <input class="fi" id="bt-serbest-ara" placeholder="🔍 Küpe ara…" style="margin-bottom:6px" oninput="btSerbestAra(this.value)">
         <div id="bt-serbest-liste" style="max-height:150px;overflow-y:auto;border:1px solid var(--card3);border-radius:var(--r1);padding:6px;margin-bottom:6px"></div>
       </div>
@@ -474,11 +474,9 @@ Padok doluluk bar'ın altına, filter chips'in üstüne:
 .bt-padok-opt .bpo-bar-wrap{width:60px;height:4px;background:var(--card2);border-radius:2px;overflow:hidden}
 .bt-padok-opt .bpo-bar-fill{height:100%;border-radius:2px}
 
-/* Tab paneller */
-.tab-panel{display:none}
-.tab-panel.on{display:block}
-.tab-btn{padding:6px 14px;border-radius:20px;border:1.5px solid var(--card3);background:none;color:var(--ink2);font-size:.75rem;font-weight:600;white-space:nowrap;transition:all .12s;cursor:pointer}
-.tab-btn.on{background:rgba(42,107,181,.15);border-color:var(--blue);color:var(--blue)}
+/* Tab paneller — .tab-panel/.tab-btn KULLANILMIYOR
+   bulkTabSwitch('bt',tab) forms.js:1547 inline style + btn btn-g/btn-o class kullanır
+   id: bt-section-padok/filtre/serbest, butonlar: bt-tab-padok/filtre/serbest */
 
 /* Seçili hayvan satırı (modal içi) */
 .bt-hayvan-satir{display:flex;align-items:center;gap:6px;padding:5px 2px;border-bottom:1px solid var(--card2);font-size:.78rem}
@@ -1434,7 +1432,7 @@ git push origin main
 
 1. **`getState('animals')` YOK** — Hayvan verisi `getState('animals')` ile gelir (`ui.js:1684`). Tüm `getState('animals')` kullanımlarını `getState('animals') || []` ile değiştir.
 
-2. **`window._padoklar` YOK** — `loadPadokConfig()` içinde padoklar yüklenince `window._padoklar = padoklar` ile set et. Sonrasında tüm `window._padoklar` kullanımları çalışır.
+2. **`PADOKLAR` kullan** — `js/config.js:60`'ta `let PADOKLAR = []` tanımlı, `loadPadokConfig()` içinde `PADOKLAR = padoklar` ile doldurulur. `ui.js` satır 13'te import edilmiş — direkt `PADOKLAR` kullan. `window._padoklar` gibi yeni bir global **oluşturma**.
 
 3. **`loadSuru()` YOK** — Sürü listesini yenileyen fonksiyon `loadAnimals()` (`ui.js:568`). `btTransferOnayla` içinde `loadAnimals()` kullan.
 
