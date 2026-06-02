@@ -76,6 +76,9 @@ $$;
 
 GRANT EXECUTE ON FUNCTION padok_degistir(text, uuid, text) TO anon, authenticated;
 
+-- Drop old overload (without p_etiketler) to avoid ambiguity
+DROP FUNCTION IF EXISTS padok_degistir_toplu(text[], uuid);
+
 CREATE OR REPLACE FUNCTION padok_degistir_toplu(
   p_hayvan_ids   text[],
   p_yeni_padok_id uuid,
