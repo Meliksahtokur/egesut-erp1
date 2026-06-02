@@ -7038,170 +7038,163 @@ $$;
 GRANT EXECUTE ON FUNCTION public.stok_duzelt(text, numeric, text) TO anon, authenticated;
 
 END;
--- Migration: padok_degistir RPC — safe, logged padok change
-BEGIN;
 
 CREATE OR REPLACE FUNCTION public.padok_degistir(
   p_hayvan_id text,
   p_yeni_padok_id uuid,
   p_not text DEFAULT NULL
-) RETURNS jsonb
+)
+RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_hayvan record;
-  v_eski_padok text;
-  v_eski_padok_id uuid;
-  v_yeni_padok_adi text;
+  v_hayvan        hayvanlar%ROWTYPE;
+  v_yeni_padok    padoklar%ROWTYPE;
+  v_aktif_sayisi  integer;
+  v_doluluk_yuzde integer;
+  v_kapasite_uyari boolean := false;
 BEGIN
-  -- 1. Validate hayvan exists
-  SELECT id, kupe_no, padok, padok_id INTO v_hayvan
-  FROM public.hayvanlar WHERE id = p_hayvan_id;
+  -- Hayvan var mı?
+  SELECT * INTO v_hayvan FROM hayvanlar WHERE id = p_hayvan_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Hayvan bulunamadı');
   END IF;
 
-  -- 2. Validate target padok exists
-  SELECT ad INTO v_yeni_padok_adi
-  FROM public.padoklar WHERE id = p_yeni_padok_id;
+  -- Hedef padok var mı?
+  SELECT * INTO v_yeni_padok FROM padoklar WHERE id = p_yeni_padok_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Hedef padok bulunamadı');
   END IF;
 
-  -- 3. Check if already in that padok
+  -- Zaten aynı padokta mı?
   IF v_hayvan.padok_id = p_yeni_padok_id THEN
     RETURN jsonb_build_object('success', false, 'error', 'Hayvan zaten bu padokta');
   END IF;
 
-  v_eski_padok := v_hayvan.padok;
-  v_eski_padok_id := v_hayvan.padok_id;
+  -- Kapasite kontrolü
+  IF v_yeni_padok.kapasite IS NOT NULL THEN
+    SELECT COUNT(*) INTO v_aktif_sayisi
+      FROM hayvanlar
+      WHERE padok_id = p_yeni_padok_id AND durum = 'Aktif';
 
-  -- 4. Update hayvan — both padok_id (FK) and padok (TEXT fallback)
-  UPDATE public.hayvanlar
-  SET padok_id = p_yeni_padok_id,
-      padok = v_yeni_padok_adi,
-      updated_at = now()
-  WHERE id = p_hayvan_id;
+    IF v_aktif_sayisi >= v_yeni_padok.kapasite THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error',   'kapasite_dolu',
+        'detay',   v_aktif_sayisi::text || '/' || v_yeni_padok.kapasite::text
+      );
+    END IF;
 
-  -- 5. Log to islem_log
-  INSERT INTO public.islem_log (islem, aciklama, ref_id, created_at)
-  VALUES (
-    'padok_degistir',
-    format(
-      'Hayvan %s (%s): %s (%s) → %s (%s)',
-      v_hayvan.kupe_no, p_hayvan_id,
-      COALESCE(v_eski_padok, '—'), COALESCE(v_eski_padok_id::text, '—'),
-      v_yeni_padok_adi, p_yeni_padok_id::text
-    ),
-    p_hayvan_id,
-    now()
-  );
+    v_doluluk_yuzde  := ROUND((v_aktif_sayisi::numeric / v_yeni_padok.kapasite) * 100);
+    v_kapasite_uyari := v_doluluk_yuzde >= 80;
+  END IF;
+
+  -- Güncelle
+  UPDATE hayvanlar
+     SET padok_id   = p_yeni_padok_id,
+         padok      = v_yeni_padok.ad,
+         updated_at = now()
+   WHERE id = p_hayvan_id;
+
+  -- İşlem logu (correct columns for islem_log table)
+  INSERT INTO islem_log (tip, ana_hayvan_id, ref_id, snapshot, kullanici_notu)
+  VALUES ('padok_degisim', p_hayvan_id, p_hayvan_id, '{}'::jsonb,
+          COALESCE(p_not, 'Padok değiştirildi → ' || v_yeni_padok.ad));
 
   RETURN jsonb_build_object(
-    'success', true,
-    'hayvan_id', p_hayvan_id,
-    'eski_padok', v_eski_padok,
-    'eski_padok_id', v_eski_padok_id,
-    'yeni_padok', v_yeni_padok_adi,
-    'yeni_padok_id', p_yeni_padok_id
+    'success',         true,
+    'yeni_padok',      v_yeni_padok.ad,
+    'yeni_padok_id',   p_yeni_padok_id,
+    'kapasite_uyari',  v_kapasite_uyari
   );
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.padok_degistir(text, uuid, text) TO anon, authenticated;
 
-COMMIT;
--- Migration: padok_degistir_toplu RPC — bulk padok transfer with per-animal logging
-BEGIN;
-
 CREATE OR REPLACE FUNCTION public.padok_degistir_toplu(
   p_hayvan_ids text[],
-  p_yeni_padok_id uuid
-) RETURNS jsonb
+  p_yeni_padok_id uuid,
+  p_etiketler text[] DEFAULT NULL
+)
+RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-  v_hayvan record;
-  v_yeni_padok_adi text;
-  v_basarili int := 0;
-  v_basarisiz int := 0;
-  v_hatalar text[] := '{}';
-  v_eski_padok text;
-  v_eski_padok_id uuid;
+  v_yeni_padok   padoklar%ROWTYPE;
+  v_aktif_sayisi integer;
+  v_hayvan_id    text;
+  v_hayvan       hayvanlar%ROWTYPE;
 BEGIN
-  -- Validate target padok exists
-  SELECT ad INTO v_yeni_padok_adi
-  FROM public.padoklar WHERE id = p_yeni_padok_id;
+  -- Hedef padok var mı?
+  SELECT * INTO v_yeni_padok FROM padoklar WHERE id = p_yeni_padok_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Hedef padok bulunamadı');
   END IF;
 
-  -- Loop through each hayvan
-  FOR i IN 1..array_length(p_hayvan_ids, 1) LOOP
-    BEGIN
-      -- Validate hayvan exists
-      SELECT id, kupe_no, padok, padok_id INTO v_hayvan
-      FROM public.hayvanlar WHERE id = p_hayvan_ids[i];
-      IF NOT FOUND THEN
-        v_basarisiz := v_basarisiz + 1;
-        v_hatalar := v_hatalar || format('Hayvan %s bulunamadı', p_hayvan_ids[i]);
-        CONTINUE;
-      END IF;
+  -- Kapasite hard block (validasyon, yazma yok)
+  IF v_yeni_padok.kapasite IS NOT NULL THEN
+    SELECT COUNT(*) INTO v_aktif_sayisi
+      FROM hayvanlar
+      WHERE padok_id = p_yeni_padok_id AND durum = 'Aktif';
 
-      -- Skip if already in that padok
-      IF v_hayvan.padok_id = p_yeni_padok_id THEN
-        v_basarisiz := v_basarisiz + 1;
-        v_hatalar := v_hatalar || format('Hayvan %s (%s) zaten bu padokta', v_hayvan.kupe_no, p_hayvan_ids[i]);
-        CONTINUE;
-      END IF;
-
-      v_eski_padok := v_hayvan.padok;
-      v_eski_padok_id := v_hayvan.padok_id;
-
-      -- Update hayvan — both padok_id (FK) and padok (TEXT fallback)
-      UPDATE public.hayvanlar
-      SET padok_id = p_yeni_padok_id,
-          padok = v_yeni_padok_adi,
-          updated_at = now()
-      WHERE id = p_hayvan_ids[i];
-
-      -- Log to islem_log
-      INSERT INTO public.islem_log (islem, aciklama, ref_id, created_at)
-      VALUES (
-        'padok_degistir',
-        format(
-          'Hayvan %s (%s): %s (%s) → %s (%s) [toplu]',
-          v_hayvan.kupe_no, p_hayvan_ids[i],
-          COALESCE(v_eski_padok, '—'), COALESCE(v_eski_padok_id::text, '—'),
-          v_yeni_padok_adi, p_yeni_padok_id::text
-        ),
-        p_hayvan_ids[i],
-        now()
+    IF v_aktif_sayisi + array_length(p_hayvan_ids, 1) > v_yeni_padok.kapasite THEN
+      RETURN jsonb_build_object(
+        'success', false,
+        'error',   'kapasite_dolu',
+        'detay',   (v_aktif_sayisi + array_length(p_hayvan_ids, 1))::text
+                   || '/' || v_yeni_padok.kapasite::text
       );
+    END IF;
+  END IF;
 
-      v_basarili := v_basarili + 1;
-    EXCEPTION WHEN OTHERS THEN
-      v_basarisiz := v_basarisiz + 1;
-      v_hatalar := v_hatalar || format('Hayvan %s: %s', p_hayvan_ids[i], SQLERRM);
-    END;
+  -- Hayvan validasyonları (validasyon, yazma yok)
+  FOREACH v_hayvan_id IN ARRAY p_hayvan_ids LOOP
+    SELECT * INTO v_hayvan FROM hayvanlar WHERE id = v_hayvan_id;
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Hayvan bulunamadı: ' || v_hayvan_id);
+    END IF;
+    IF v_hayvan.padok_id = p_yeni_padok_id THEN
+      RETURN jsonb_build_object('success', false, 'error', 'Hayvan zaten bu padokta: ' || v_hayvan_id);
+    END IF;
   END LOOP;
 
+  -- Tüm validasyonlar geçti — yazma işlemleri
+  FOREACH v_hayvan_id IN ARRAY p_hayvan_ids LOOP
+    UPDATE hayvanlar
+       SET padok_id   = p_yeni_padok_id,
+           padok      = v_yeni_padok.ad,
+           updated_at = now()
+     WHERE id = v_hayvan_id;
+
+    INSERT INTO islem_log (tip, ana_hayvan_id, ref_id, snapshot, kullanici_notu)
+    VALUES ('padok_degisim', v_hayvan_id, v_hayvan_id, '{}'::jsonb,
+            'Toplu padok değişimi → ' || v_yeni_padok.ad);
+  END LOOP;
+
+  -- Etiket güncelleme (varsa, mevcut etiketlerle birleştir)
+  IF p_etiketler IS NOT NULL AND array_length(p_etiketler, 1) > 0 THEN
+    UPDATE hayvanlar
+       SET etiketler = array(
+             SELECT DISTINCT unnest(COALESCE(etiketler, '{}') || p_etiketler)
+           )
+     WHERE id = ANY(p_hayvan_ids);
+  END IF;
+
   RETURN jsonb_build_object(
-    'success', true,
-    'basarili', v_basarili,
-    'basarisiz', v_basarisiz,
-    'hatalar', v_hatalar,
-    'yeni_padok', v_yeni_padok_adi,
+    'success',       true,
+    'hayvan_sayisi', array_length(p_hayvan_ids, 1),
+    'yeni_padok',    v_yeni_padok.ad,
     'yeni_padok_id', p_yeni_padok_id
   );
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.padok_degistir_toplu(text[], uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.padok_degistir_toplu(text[], uuid, text[]) TO anon, authenticated;
 
-COMMIT;-- Migration: islem_log trigger'a OLD snapshot desteği
+-- Migration: islem_log trigger'a OLD snapshot desteği
 -- hayvanlar UPDATE ve gorev_log UPDATE için OLD+NEW kaydedilir
 BEGIN;
 
