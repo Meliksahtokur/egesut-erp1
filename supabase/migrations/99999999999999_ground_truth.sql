@@ -3500,12 +3500,12 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Kapalı vakadan ilaç silinemez');
   END IF;
 
-  -- Bağlı stok_hareket satırını iptal et (ledger'ı geri al)
-  -- referans_tipi='drug_administration' AND referans_id=p_admin_id::text ile eşleştir
+  -- Bağlı stok_hareket satırlarını iptal et
+  -- add_drug_administration: notlar='drug_admin:{id}'
+  -- update_drug_administration delta: notlar='drug_admin:{id}:duz:*'
   UPDATE public.stok_hareket
   SET    iptal = true
-  WHERE  referans_tipi = 'drug_administration'
-    AND  referans_id   = p_admin_id::text
+  WHERE  notlar LIKE 'drug_admin:' || p_admin_id::text || '%'
     AND  NOT iptal;
 
   -- Kaydı sil (ON DELETE CASCADE: yoksa gün silerken zaten temizlenir ama burada explicit)
@@ -5253,11 +5253,10 @@ DECLARE
   v_admin  record;
   v_delta  numeric;
 BEGIN
-  SELECT da.*, d.stock_item_id
-  INTO v_admin
-  FROM drug_administrations da
-  JOIN drugs d ON d.id = da.drug_id
-  WHERE da.id = p_admin_id;
+  -- Fix: drug_id kolonu yok — drug_administrations.stok_id direkt kullan
+  SELECT * INTO v_admin
+  FROM drug_administrations
+  WHERE id = p_admin_id;
 
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'error', 'Kayıt bulunamadı');
@@ -5265,14 +5264,13 @@ BEGIN
 
   -- Doz farkı varsa stok hareketi ekle
   v_delta := p_dose - v_admin.dose;
-  IF v_delta <> 0 AND v_admin.stock_item_id IS NOT NULL THEN
-    INSERT INTO stok_hareket (id, stok_id, tur, miktar, notlar)
+  IF v_delta <> 0 AND v_admin.stok_id IS NOT NULL THEN
+    INSERT INTO stok_hareket (stok_id, tur, miktar, notlar)
     VALUES (
-      gen_random_uuid(),
-      v_admin.stock_item_id::uuid,
+      v_admin.stok_id,
       'Tedavi Düzelt',
       ABS(v_delta),
-      'drug_admin:' || p_admin_id::text || ' — doz güncellendi, delta: ' || v_delta::text
+      'drug_admin:' || p_admin_id::text || ':duz:' || v_delta::text
     );
   END IF;
 
