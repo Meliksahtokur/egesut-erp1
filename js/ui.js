@@ -586,6 +586,7 @@ async function loadAnimals(){
     const sorted=[...animals].sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     renderAnimals(sorted);
     _renderSuruStat();
+    if (typeof renderPadokDolulukBar === 'function') renderPadokDolulukBar();
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 function _animalTagsHtml(a,gebeSet){
@@ -626,7 +627,11 @@ function _animalCardHtml(a,gebeSet,idx){
   const init=mainId.replace(/\D/g,'').slice(-3)||mainId.slice(0,2).toUpperCase();
   const yas=yasHesapla(a.dogum_tarihi);
   const seqHtml=idx!=null?`<span class="a-seq">${String(idx+1).padStart(2,'0')}</span>`:'';
-  return `<div class="animal-card" onclick="openDet('${a.id}')">
+  return `<div class="animal-card" data-id="${a.id}"
+       onclick="if(typeof _btSecimModu!=='undefined'&&_btSecimModu){_btKartTikla('${a.id}',event)}else{openDet('${a.id}')}">
+    <input type="checkbox" class="bt-cb"
+           ${typeof _btSecilenIds!=='undefined'&&_btSecilenIds.includes(a.id)?'checked':''}
+           onchange="event.stopPropagation();btCbDegisti('${a.id}',this.checked)">
     ${seqHtml}<div class="avt">${init}</div>
     <div class="ainfo">
       <div class="a-id">${mainId}${subId}</div>
@@ -5451,6 +5456,409 @@ let _pdHayvanIds = []; // selected hayvan IDs for bulk transfer
 let _pdTransferHayvanIds = []; // hayvan IDs pending transfer
 let _pdKaynakPadokId = null; // source padok for transfer
 
+// ── Toplu Transfer state ──
+let _btSecimModu = false;
+let _btSecilenIds = [];        // Cross-padok, filtreden bağımsız korunur
+let _btModalSecilenIds = [];   // Modal içinde onaylanan hayvanlar
+let _btHedefPadokId = null;    // Seçilen hedef padok ID
+let _btEtiketMod = null;       // 'toplu' | 'tektek' | null
+
+function renderPadokDolulukBar() {
+  const el = document.getElementById('padok-doluluk-bar');
+  if (!el) return;
+  if (!PADOKLAR.length) { el.innerHTML = ''; return; }
+  const animals = getState('animals') || [];
+  const padokSayac = {};
+  animals.forEach(h => {
+    if (h.durum === 'Aktif' && h.padok_id) {
+      padokSayac[h.padok_id] = (padokSayac[h.padok_id] || 0) + 1;
+    }
+  });
+  el.innerHTML = PADOKLAR.map(p => {
+    if (!p.kapasite) return '';
+    const dolu = padokSayac[p.id] || 0;
+    const kap = p.kapasite;
+    const yuzde = Math.round((dolu / kap) * 100);
+    const renk = yuzde >= 100 ? 'var(--red)' : yuzde >= 80 ? 'var(--amber)' : 'var(--green)';
+    const padokAdi = (p.ad || '').replace(' Padok', '');
+    return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${p.ad}')" title="${p.ad}: ${dolu}/${kap}">
+      <span class="pdoluluk-ad">${padokAdi}</span>
+      <div class="pdoluluk-bar-wrap"><div class="pdoluluk-fill" style="width:${Math.min(yuzde,100)}%;background:${renk}"></div></div>
+      <span class="pdoluluk-sayi" style="color:${renk}">${dolu}/${kap}</span>
+    </div>`;
+  }).join('');
+}
+
+function setPadokFiltreBt(padokId, padokAdi) {
+  const sel = document.getElementById('bi-padok') || document.getElementById('suru-padok-filtre');
+  if (sel) {
+    sel.value = padokAdi;
+    sel.dispatchEvent(new Event('change'));
+  }
+}
+
+function enterBtSecimModu() {
+  _btSecimModu = true;
+  _btSecilenIds = [];
+  const btn = document.getElementById('bt-toggle-btn');
+  if (btn) {
+    btn.textContent = '✕ İptal';
+    btn.style.borderColor = 'var(--red)';
+    btn.style.color = 'var(--red)';
+    btn.style.background = 'rgba(192,50,26,.1)';
+  }
+  const banner = document.getElementById('bt-banner');
+  if (banner) banner.style.display = 'flex';
+  const bar = document.getElementById('bt-action-bar');
+  if (bar) bar.style.display = 'block';
+  _btGuncelleActionBar();
+  _btRenderSuru();
+}
+
+function exitBtSecimModu() {
+  _btSecimModu = false;
+  _btSecilenIds = [];
+  const btn = document.getElementById('bt-toggle-btn');
+  if (btn) {
+    btn.textContent = '🔀 Toplu Taşı';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+    btn.style.background = '';
+  }
+  const banner = document.getElementById('bt-banner');
+  if (banner) banner.style.display = 'none';
+  const bar = document.getElementById('bt-action-bar');
+  if (bar) bar.style.display = 'none';
+  const transferBtn = document.getElementById('bt-transfer-btn');
+  if (transferBtn) transferBtn.disabled = true;
+  _btRenderSuru();
+}
+
+function btToggleSecimModu() {
+  if (_btSecimModu) exitBtSecimModu();
+  else enterBtSecimModu();
+}
+
+function _btRenderSuru() {
+  const suruEl = document.getElementById('suru-body') || document.getElementById('suru-list');
+  if (!suruEl) return;
+  if (_btSecimModu) {
+    suruEl.classList.add('bt-mode');
+  } else {
+    suruEl.classList.remove('bt-mode');
+  }
+  document.querySelectorAll('.animal-card').forEach(card => {
+    const id = card.dataset.id || card.dataset.hayvanId;
+    if (id) card.classList.toggle('bt-selected', _btSecilenIds.includes(id));
+  });
+}
+
+function _btKartTikla(id, event) {
+  event.stopPropagation();
+  const idx = _btSecilenIds.indexOf(id);
+  if (idx > -1) _btSecilenIds.splice(idx, 1);
+  else _btSecilenIds.push(id);
+  _btGuncelleActionBar();
+  _btRenderSuru();
+}
+
+function btCbDegisti(id, checked) {
+  if (checked) {
+    if (!_btSecilenIds.includes(id)) _btSecilenIds.push(id);
+  } else {
+    _btSecilenIds = _btSecilenIds.filter(x => x !== id);
+  }
+  _btGuncelleActionBar();
+  _btRenderSuru();
+}
+
+function _btGuncelleActionBar() {
+  const count = _btSecilenIds.length;
+  const countEl = document.getElementById('bt-count');
+  if (countEl) countEl.textContent = `${count} hayvan seçildi`;
+  const suruData = getState('animals') || [];
+  const padoklar = new Set(
+    suruData.filter(h => _btSecilenIds.includes(h.id)).map(h => h.padok_id).filter(Boolean)
+  );
+  const padokCountEl = document.getElementById('bt-padok-count');
+  if (padokCountEl) padokCountEl.textContent = padoklar.size > 0 ? `(${padoklar.size} padok)` : '';
+  const transferBtn = document.getElementById('bt-transfer-btn');
+  if (transferBtn) {
+    transferBtn.disabled = count === 0;
+    transferBtn.textContent = count > 0 ? `🔀 ${count} Taşı` : '🔀 Taşı';
+  }
+}
+
+function openBulkTransfer() {
+  if (!_btSecilenIds.length) return;
+  _btModalSecilenIds = [..._btSecilenIds];
+  _btHedefPadokId = null;
+  _btEtiketMod = null;
+  const grupSel = document.getElementById('bt-f-grup');
+  if (grupSel) {
+    const gruplar = Object.keys(GRUP_PADOK);
+    grupSel.innerHTML = '<option value="">Tüm Gruplar</option>' +
+      gruplar.map(g => `<option>${g}</option>`).join('');
+  }
+  const kaynakSel = document.getElementById('bt-kaynak-padok-sel');
+  if (kaynakSel) {
+    kaynakSel.innerHTML = '<option value="">— Padok Seç —</option>' +
+      PADOKLAR.map(p => `<option value="${p.id}">${p.ad}</option>`).join('');
+  }
+  _btRenderSerbestListe();
+  _btRenderSeciliHayvanlar();
+  _btRenderHedefPadoklar();
+  const ozet = document.getElementById('bt-ozet');
+  if (ozet) ozet.style.display = 'none';
+  const etiketBolum = document.getElementById('bt-etiket-bolum');
+  if (etiketBolum) etiketBolum.style.display = 'none';
+  const onayBtn = document.getElementById('bt-onay-btn');
+  if (onayBtn) onayBtn.disabled = true;
+  openM('m-bulk-transfer');
+  exitBtSecimModu();
+}
+
+function _btRenderSeciliHayvanlar() {
+  const liste = document.getElementById('bt-secili-liste');
+  const sayac = document.getElementById('bt-secili-sayac');
+  if (!liste) return;
+  const suruData = getState('animals') || [];
+  const hayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
+  sayac.textContent = `${hayvanlar.length} hayvan`;
+  if (!hayvanlar.length) {
+    liste.innerHTML = '<div style="color:var(--ink3);font-size:.78rem;padding:8px;text-align:center">Hayvan seçilmedi</div>';
+    return;
+  }
+  liste.innerHTML = hayvanlar.map(h => `
+    <div class="bt-hayvan-satir">
+      <span style="font-weight:600;font-size:.8rem">${h.kupe_no || h.id}</span>
+      <span style="font-size:.68rem;color:var(--ink3);flex:1;margin:0 6px">${h.grup || ''} · ${h.padok || ''}</span>
+      <button onclick="btSecilidenKaldir('${h.id}')" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:1rem;padding:2px 4px;line-height:1" title="Çıkar">×</button>
+    </div>
+  `).join('');
+}
+
+function btSecilidenKaldir(id) {
+  _btModalSecilenIds = _btModalSecilenIds.filter(x => x !== id);
+  _btRenderSeciliHayvanlar();
+  _btRenderHedefPadoklar();
+  _btGuncelleOzet();
+  if (!_btModalSecilenIds.length) {
+    const onayBtn = document.getElementById('bt-onay-btn');
+    if (onayBtn) onayBtn.disabled = true;
+  }
+}
+
+function _btRenderSerbestListe() {
+  const el = document.getElementById('bt-serbest-input');
+  if (el) el.value = '';
+  const sonuc = document.getElementById('bt-serbest-sonuc');
+  if (sonuc) sonuc.textContent = '';
+}
+
+function _btGrupUygunMu(padok, gruplar) {
+  if (!gruplar.length) return true;
+  return gruplar.some(g => {
+    const uyumluPadoklar = GRUP_PADOK[g];
+    return uyumluPadoklar && uyumluPadoklar.includes(padok.ad);
+  });
+}
+
+function _btBesiPadokMu(padok) {
+  const ad = (padok.ad || '').toLowerCase();
+  return ad.includes('besi');
+}
+
+function _btRenderHedefPadoklar() {
+  const el = document.getElementById('bt-hedef-liste');
+  if (!el) return;
+  const suruData = getState('animals') || [];
+  const secilenHayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
+  const gruplar = [...new Set(secilenHayvanlar.map(h => h.grup).filter(Boolean))];
+  const kaynakPadoklar = new Set(secilenHayvanlar.map(h => h.padok_id).filter(Boolean));
+  el.innerHTML = PADOKLAR.map(p => {
+    const dolu = suruData.filter(h => h.padok_id === p.id && h.durum === 'Aktif').length;
+    const kap = p.kapasite;
+    const yuzde = kap ? Math.round((dolu / kap) * 100) : 0;
+    const tamDolu = kap && dolu >= kap;
+    const uyari = kap && yuzde >= 80 && !tamDolu;
+    const uygun = _btGrupUygunMu(p, gruplar);
+    const besi = _btBesiPadokMu(p);
+    if (kaynakPadoklar.size === 1 && kaynakPadoklar.has(p.id)) return '';
+    const disabled = tamDolu || (!uygun && !besi);
+    const renk = yuzde >= 100 ? 'var(--red)' : yuzde >= 80 ? 'var(--amber)' : 'var(--green)';
+    const selected = _btHedefPadokId === p.id;
+    let badge = '';
+    if (tamDolu) badge = '<span style="font-size:.6rem;color:var(--red);font-weight:700">DOLU</span>';
+    else if (!uygun && !besi) badge = '<span style="font-size:.6rem;color:var(--red)">❌ Uyumsuz</span>';
+    else if (!uygun && besi) badge = '<span style="font-size:.6rem;color:var(--amber)">⚠️ Etiket gerekli</span>';
+    else if (uyari) badge = '<span style="font-size:.6rem;color:var(--amber)">⚠️ Dolmak üzere</span>';
+    else badge = '<span style="font-size:.6rem;color:var(--green3)">✅ Uyumlu</span>';
+    return `<div class="bt-padok-opt ${disabled?'disabled':''} ${selected?'selected':''}"
+                 onclick="${disabled?'':'btHedefSec(\''+p.id+'\')'}">
+      <span class="bpo-ad">${p.ad}</span>
+      ${badge}
+      ${kap ? `<div>
+        <div class="bpo-bar-wrap"><div class="bpo-bar-fill" style="width:${Math.min(yuzde,100)}%;background:${renk}"></div></div>
+        <div style="font-size:.6rem;color:${renk};text-align:right">${dolu}/${kap}</div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function btHedefSec(padokId) {
+  _btHedefPadokId = padokId;
+  _btGuncelleOzet();
+  _btRenderHedefPadoklar();
+}
+
+function _btGuncelleOzet() {
+  const ozet = document.getElementById('bt-ozet');
+  const etiketBolum = document.getElementById('bt-etiket-bolum');
+  const onayBtn = document.getElementById('bt-onay-btn');
+  if (!_btModalSecilenIds.length || !_btHedefPadokId) {
+    if (ozet) ozet.style.display = 'none';
+    if (etiketBolum) etiketBolum.style.display = 'none';
+    if (onayBtn) onayBtn.disabled = true;
+    return;
+  }
+  const suruData = getState('animals') || [];
+  const hedef = PADOKLAR.find(p => p.id === _btHedefPadokId);
+  if (!hedef) return;
+  const secilenHayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
+  const gruplar = [...new Set(secilenHayvanlar.map(h => h.grup).filter(Boolean))];
+  const dolu = suruData.filter(h => h.padok_id === hedef.id && h.durum === 'Aktif').length;
+  const kap = hedef.kapasite;
+  const uygun = _btGrupUygunMu(hedef, gruplar);
+  const besi = _btBesiPadokMu(hedef);
+  const kapUygun = !kap || (dolu + _btModalSecilenIds.length <= kap);
+  const yeniDoluluk = kap ? Math.round(((dolu + _btModalSecilenIds.length) / kap) * 100) : 0;
+  if (ozet) ozet.style.display = 'block';
+  const trEl = document.getElementById('bt-ozet-transfer');
+  if (trEl) { trEl.textContent = `${_btModalSecilenIds.length} hayvan → ${hedef.ad}`; trEl.className = 'ozet-value ok'; }
+  const kapEl = document.getElementById('bt-ozet-kap');
+  if (kapEl) {
+    if (!kap) { kapEl.textContent = 'Kapasite tanımsız'; kapEl.style.color = 'var(--ink3)'; }
+    else if (kapUygun) { kapEl.textContent = `✓ ${dolu + _btModalSecilenIds.length}/${kap} (%${yeniDoluluk})`; kapEl.style.color = yeniDoluluk >= 80 ? 'var(--amber)' : 'var(--green3)'; }
+    else { kapEl.textContent = `✗ ${dolu + _btModalSecilenIds.length}/${kap} — Kapasite aşımı!`; kapEl.style.color = 'var(--red)'; }
+  }
+  const gpEl = document.getElementById('bt-ozet-grup');
+  if (gpEl) {
+    if (uygun) { gpEl.textContent = '✓ Tüm hayvanlar için uyumlu'; gpEl.style.color = 'var(--green3)'; }
+    else if (besi) { gpEl.textContent = '⚠️ Etiket gerekli (besi transferi)'; gpEl.style.color = 'var(--amber)'; }
+    else { gpEl.textContent = '✗ Grup uyumsuz'; gpEl.style.color = 'var(--red)'; }
+  }
+  const etiketGerekli = besi && !uygun;
+  if (etiketBolum) etiketBolum.style.display = etiketGerekli ? 'block' : 'none';
+  if (etiketGerekli) _btRenderEtiketTekkek();
+  const etiketOk = !etiketGerekli || _btEtiketleriKontrolEt();
+  if (onayBtn) {
+    onayBtn.disabled = !(kapUygun && (uygun || besi) && etiketOk);
+    onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`;
+  }
+}
+
+function _btRenderEtiketTekkek() {
+  const el = document.getElementById('bt-etiket-tektek-liste');
+  if (!el) return;
+  const suruData = getState('animals') || [];
+  const hayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
+  el.innerHTML = hayvanlar.map(h => `
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.78rem;border-bottom:1px solid var(--card2)">
+      <span style="font-weight:600;min-width:60px">${h.kupe_no||h.id}</span>
+      <span style="font-size:.68rem;color:var(--ink3);flex:1">${h.grup||''}</span>
+      <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+        <input type="checkbox" data-hayvan="${h.id}" data-etiket="kisir" onchange="btEtiketTekkekDegisti()" style="accent-color:var(--blue)"> Kısır
+      </label>
+      <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
+        <input type="checkbox" data-hayvan="${h.id}" data-etiket="satista" onchange="btEtiketTekkekDegisti()" style="accent-color:var(--blue)"> Satışta
+      </label>
+    </div>
+  `).join('');
+}
+
+function btEtiketTopluDegisti() {
+  _btEtiketMod = 'toplu';
+  document.querySelectorAll('#bt-etiket-tektek-liste input[type=checkbox]').forEach(cb => { cb.checked = false; });
+  _btGuncelleOzet();
+}
+
+function btEtiketTekkekDegisti() {
+  _btEtiketMod = 'tektek';
+  const topluKisir = document.getElementById('bt-et-toplu-kisir');
+  if (topluKisir) topluKisir.checked = false;
+  const topluSatista = document.getElementById('bt-et-toplu-satista');
+  if (topluSatista) topluSatista.checked = false;
+  _btGuncelleOzet();
+}
+
+function _btEtiketleriKontrolEt() {
+  const topluKisir = document.getElementById('bt-et-toplu-kisir')?.checked;
+  const topluSatista = document.getElementById('bt-et-toplu-satista')?.checked;
+  if (topluKisir || topluSatista) return true;
+  const tekTekCbs = document.querySelectorAll('#bt-etiket-tektek-liste input[type=checkbox]');
+  if (!tekTekCbs.length) return false;
+  const hayvanEtiketler = {};
+  tekTekCbs.forEach(cb => { if (cb.checked) hayvanEtiketler[cb.dataset.hayvan] = true; });
+  return _btModalSecilenIds.every(id => hayvanEtiketler[id]);
+}
+
+function _btEtiketleriBir() {
+  const topluKisir = document.getElementById('bt-et-toplu-kisir')?.checked;
+  const topluSatista = document.getElementById('bt-et-toplu-satista')?.checked;
+  if (topluKisir || topluSatista) {
+    const etiketler = [];
+    if (topluKisir) etiketler.push('kisir');
+    if (topluSatista) etiketler.push('satista');
+    return { mod: 'toplu', etiketler };
+  }
+  const tekTekCbs = document.querySelectorAll('#bt-etiket-tektek-liste input[type=checkbox]');
+  const map = {};
+  tekTekCbs.forEach(cb => {
+    if (cb.checked) {
+      if (!map[cb.dataset.hayvan]) map[cb.dataset.hayvan] = [];
+      map[cb.dataset.hayvan].push(cb.dataset.etiket);
+    }
+  });
+  return { mod: 'tektek', map };
+}
+
+async function btTransferOnayla() {
+  if (!_btModalSecilenIds.length || !_btHedefPadokId) return;
+  const onayBtn = document.getElementById('bt-onay-btn');
+  if (onayBtn) { onayBtn.disabled = true; onayBtn.textContent = '⏳ Taşınıyor…'; }
+  try {
+    let etiketParam = null;
+    const hedef = PADOKLAR.find(p => p.id === _btHedefPadokId);
+    const suruData = getState('animals') || [];
+    const secilenHayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
+    const gruplar = [...new Set(secilenHayvanlar.map(h => h.grup).filter(Boolean))];
+    if (_btBesiPadokMu(hedef) && !_btGrupUygunMu(hedef, gruplar)) {
+      const etiketBilgi = _btEtiketleriBir();
+      if (etiketBilgi.mod === 'toplu') etiketParam = etiketBilgi.etiketler;
+      else etiketParam = [...new Set(Object.values(etiketBilgi.map).flat())];
+    }
+    const { data, error } = await db.rpc('padok_degistir_toplu', {
+      p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: etiketParam
+    });
+    if (error) throw error;
+    if (!data.success) {
+      if (data.error === 'kapasite_dolu') toast(`❌ Kapasite dolu: ${data.detay || ''}. Transfer iptal edildi.`, true);
+      else toast(`❌ Transfer başarısız: ${data.mesaj || data.error || 'Hata'}`, true);
+      if (onayBtn) { onayBtn.disabled = false; onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`; }
+      return;
+    }
+    toast(`✅ ${data.hayvan_sayisi} hayvan ${data.yeni_padok}'a taşındı`);
+    closeM('m-bulk-transfer');
+    if (typeof loadAnimals === 'function') await loadAnimals();
+    if (typeof renderPadokDolulukBar === 'function') renderPadokDolulukBar();
+  } catch (err) {
+    console.error('btTransferOnayla hata:', err);
+    toast('❌ Beklenmeyen hata: ' + (err.message || err), true);
+    if (onayBtn) { onayBtn.disabled = false; onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`; }
+  }
+}
+
 async function padokDetayAc(id) {
   const padoklar = await getData('padoklar');
   const p = padoklar.find(x => x.id === id);
@@ -5523,9 +5931,10 @@ function padokTekliTasi(hayvanId, kupe) {
 
 function padokTopluTasi() {
   if (!_pdHayvanIds.length) { toast('⚠️ Lütfen en az bir hayvan seçin', true); return; }
-  _pdTransferHayvanIds = [..._pdHayvanIds];
-  document.getElementById('pt-bilgi').textContent = `📦 ${_pdHayvanIds.length} hayvan → hedef padok seçin:`;
-  _pdTransferAcSelector();
+  _btSecilenIds = [..._pdHayvanIds];
+  _btModalSecilenIds = [..._pdHayvanIds];
+  _btHedefPadokId = null;
+  openBulkTransfer();
 }
 
 async function _pdTransferAcSelector() {

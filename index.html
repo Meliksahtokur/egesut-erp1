@@ -149,6 +149,43 @@ button,input,select,textarea{font-family:inherit}
 .fchip.on{background:var(--green);border-color:var(--green);color:#fff}
 .fchip-sep{color:var(--card3);font-size:.8rem;line-height:28px;padding:0 2px}
 .psel{background:var(--card);border:1.5px solid var(--card3);border-radius:var(--r2);padding:10px;font-size:.75rem;outline:none;color:var(--ink);-webkit-appearance:none;min-width:80px}
+/* Padok doluluk chip */
+.pdoluluk-chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1.5px solid var(--card3);border-radius:20px;padding:4px 10px;cursor:pointer;flex-shrink:0;transition:border-color .12s}
+.pdoluluk-chip:hover{border-color:var(--ink3)}
+.pdoluluk-ad{font-size:.68rem;font-weight:700;color:var(--ink2);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis}
+.pdoluluk-bar-wrap{width:36px;height:4px;background:var(--card3);border-radius:2px;overflow:hidden}
+.pdoluluk-fill{height:100%;border-radius:2px;transition:width .3s}
+.pdoluluk-sayi{font-size:.62rem;font-weight:700;white-space:nowrap}
+/* Seçim modu — hayvan kartı */
+.animal-card.bt-selected{border-color:var(--blue)!important;background:rgba(42,107,181,.07)!important}
+.bt-cb{width:18px;height:18px;cursor:pointer;flex-shrink:0;accent-color:var(--blue);opacity:0;transition:opacity .15s;pointer-events:none}
+.bt-mode .bt-cb{opacity:1;pointer-events:auto}
+/* Hedef padok seçim listesi */
+.bt-padok-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r1);border:1.5px solid var(--card2);cursor:pointer;transition:all .1s;margin-bottom:4px}
+.bt-padok-opt:hover:not(.disabled){border-color:var(--card3)}
+.bt-padok-opt.selected{border-color:var(--blue);background:rgba(42,107,181,.07)}
+.bt-padok-opt.disabled{opacity:.35;pointer-events:none}
+.bt-padok-opt .bpo-ad{flex:1;font-weight:600;font-size:.82rem}
+.bt-padok-opt .bpo-bar-wrap{width:60px;height:4px;background:var(--card2);border-radius:2px;overflow:hidden}
+.bt-padok-opt .bpo-bar-fill{height:100%;border-radius:2px}
+/* Bottom action bar */
+#bt-action-bar{display:none;background:var(--card);border:1px solid var(--card3);border-radius:var(--r1);padding:10px 12px;margin-bottom:8px}
+#bt-action-bar.show{display:block}
+#bt-action-bar .bar-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#bt-action-bar .bar-count{font-weight:700;font-size:.85rem;color:var(--blue)}
+#bt-action-bar .bar-sub{font-size:.68rem;color:var(--ink3)}
+/* Modal: seçili hayvan satırı */
+.bt-hayvan-satir{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.78rem}
+/* Modal: özet */
+.ozet-row{display:flex;justify-content:space-between;padding:4px 0;font-size:.75rem}
+.ozet-label{color:var(--ink3)}
+.ozet-value{font-weight:600}
+.ozet-value.ok{color:var(--green3)}
+.ozet-value.warn{color:var(--amber)}
+.ozet-value.err{color:var(--red)}
+/* Etiket checkbox row */
+.et-label{display:inline-flex;align-items:center;gap:4px;cursor:pointer;padding:4px 8px;border:1px solid var(--card3);border-radius:var(--r1);font-size:.75rem;transition:all .1s}
+.et-label:has(input:checked){border-color:var(--blue);background:rgba(42,107,181,.07)}
 .stat-card{background:var(--card);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
 .stat-header{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:.85rem}
 .stat-summary{font-size:.8rem;color:var(--ink2);margin-top:4px}
@@ -366,6 +403,26 @@ button,input,select,textarea{font-family:inherit}
           <option>Buzağı Padok (Sütten Kesilmiş)</option>
           <option>Buzağı Padok (Süt İçenler)</option>
         </select>
+        <button id="bt-toggle-btn" class="btn btn-sm" 
+                style="background:rgba(42,107,181,.12);color:var(--blue);border:1px solid rgba(42,107,181,.2);white-space:nowrap"
+                data-action="bt-toggle-mode">🔀 Toplu Taşı</button>
+      </div>
+      <!-- Padok Doluluk Bar -->
+      <div id="padok-doluluk-bar" style="overflow-x:auto;white-space:nowrap;padding:4px 0 8px;display:flex;gap:6px;-webkit-overflow-scrolling:touch"></div>
+      <div id="bt-banner" style="display:none;background:rgba(42,107,181,.1);border:1px solid rgba(42,107,181,.25);border-radius:var(--r1);padding:8px 12px;font-size:.75rem;color:var(--blue);margin-bottom:8px;align-items:center;gap:8px">
+        <span>🔀</span>
+        <span>Seçim modu: hayvanlara tıklayarak seçin</span>
+      </div>
+      <div id="bt-action-bar" style="display:none">
+        <div class="bar-header">
+          <span>🔀</span>
+          <span class="bar-count" id="bt-count">0 hayvan seçildi</span>
+          <span class="bar-sub" id="bt-padok-count"></span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button id="bt-transfer-btn" class="btn btn-g" style="flex:1" data-action="bt-transfer" disabled>🔀 Taşı</button>
+          <button class="btn btn-o" data-action="bt-cancel" style="flex:0">İptal</button>
+        </div>
       </div>
       <div id="filtre-strip" style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 0">
         <button class="fchip on" id="fc-cinsiyet-hepsi" data-action="fchip-cinsiyet-hepsi">Tümü</button>
@@ -1603,17 +1660,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1780405077"></script>
-    <script src="js/utils/modal.js?v=1780405077"></script>
-    <script src="js/utils/errorHandler.js?v=1780405077"></script>
-    <script src="js/utils/events.js?v=1780405077"></script>
-    <script src="js/config.js?v=1780405077"></script>
-    <script src="js/state.js?v=1780405077"></script>
-    <script src="js/api.js?v=1780405077"></script>
-    <script src="js/ui.js?v=1780405077"></script>
-    <script src="js/forms.js?v=1780405077"></script>
-    <script src="js/app.js?v=1780405077"></script>
-    <script src="js/utils/handlers.js?v=1780405077"></script>
+    <script src="js/utils/helpers.js?v=1780406379"></script>
+    <script src="js/utils/modal.js?v=1780406379"></script>
+    <script src="js/utils/errorHandler.js?v=1780406379"></script>
+    <script src="js/utils/events.js?v=1780406379"></script>
+    <script src="js/config.js?v=1780406379"></script>
+    <script src="js/state.js?v=1780406379"></script>
+    <script src="js/api.js?v=1780406379"></script>
+    <script src="js/ui.js?v=1780406379"></script>
+    <script src="js/forms.js?v=1780406379"></script>
+    <script src="js/app.js?v=1780406379"></script>
+    <script src="js/utils/handlers.js?v=1780406379"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
@@ -1774,6 +1831,89 @@ function copyErrors() {
           <div class="empty"><div class="empty-ico">🐄</div>Yükleniyor...</div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOPLU TRANSFER MODAL ═══ -->
+<div id="m-bulk-transfer" class="mo" data-action="mclose-overlay">
+  <div class="modal" style="max-width:380px">
+    <div class="mh">
+      <h3>🔀 Toplu Taşı</h3>
+      <button class="mc" data-action="close-bulk-transfer">×</button>
+    </div>
+    <div class="mb">
+
+      <!-- Tab nav -->
+      <div style="display:flex;gap:4px;margin-bottom:10px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <button class="btn btn-g" id="bt-tab-padok" data-action="bt-tab-padok" style="flex:1;padding:7px">Padok</button>
+        <button class="btn btn-o" id="bt-tab-filtre" data-action="bt-tab-filtre" style="flex:1;padding:7px">Filtre</button>
+        <button class="btn btn-o" id="bt-tab-serbest" data-action="bt-tab-serbest" style="flex:1;padding:7px">Elle</button>
+      </div>
+
+      <!-- Tab: Padok (varsayılan) -->
+      <div id="bt-section-padok" class="bt-section">
+
+        <!-- Grup filtresi -->
+        <select id="bt-f-grup" class="fi" style="margin-bottom:8px;font-size:.78rem"></select>
+
+        <!-- Kaynak padok seç -->
+        <select id="bt-kaynak-padok-sel" class="fi" style="margin-bottom:8px;font-size:.78rem"></select>
+
+        <!-- Seçili hayvanlar -->
+        <div style="font-weight:700;font-size:.8rem;margin-bottom:4px">Seçili Hayvanlar (<span id="bt-secili-sayac">0</span>)</div>
+        <div id="bt-secili-liste" style="max-height:120px;overflow-y:auto;margin-bottom:6px"></div>
+
+        <!-- Hedef padok listesi -->
+        <div style="font-weight:700;font-size:.8rem;margin-bottom:4px">Hedef Padok</div>
+        <div id="bt-hedef-liste" style="max-height:180px;overflow-y:auto"></div>
+      </div>
+
+      <!-- Tab: Filtre -->
+      <div id="bt-section-filtre" class="bt-section" style="display:none">
+        <div style="font-size:.78rem;color:var(--ink3);margin-bottom:8px">Filtre seçenekleri burada olacak.</div>
+      </div>
+
+      <!-- Tab: Serbest liste -->
+      <div id="bt-section-serbest" class="bt-section" style="display:none">
+        <textarea id="bt-serbest-input" class="fi" style="width:100%;min-height:80px;resize:vertical;font-size:.78rem" placeholder="Küpe no veya ID, satır başına bir tane"></textarea>
+        <button class="btn btn-g" style="width:100%;margin-top:6px;padding:8px" onclick="btSerbestYukle()">Yükle</button>
+        <div id="bt-serbest-sonuc" style="margin-top:6px;font-size:.75rem"></div>
+      </div>
+
+      <!-- Özet -->
+      <div id="bt-ozet" style="display:none;margin:10px 0;padding:10px;background:var(--card2);border-radius:var(--r1)">
+        <div class="ozet-row"><span class="ozet-label">Transfer</span><span class="ozet-value ok" id="bt-ozet-transfer"></span></div>
+        <div class="ozet-row"><span class="ozet-label">Kapasite</span><span class="ozet-value" id="bt-ozet-kap"></span></div>
+        <div class="ozet-row"><span class="ozet-label">Grup Uyum</span><span class="ozet-value" id="bt-ozet-grup"></span></div>
+      </div>
+
+      <!-- Besi etiket bölümü -->
+      <div id="bt-etiket-bolum" style="display:none;margin:10px 0;padding:10px;background:rgba(192,50,26,.06);border:1px solid rgba(192,50,26,.15);border-radius:var(--r1)">
+        <div style="font-weight:700;font-size:.78rem;color:var(--red);margin-bottom:8px">⚠️ Besi Transferi — Etiket Gerekli</div>
+
+        <!-- Toplu etiket -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:.7rem;color:var(--ink3);margin-bottom:4px">Toplu Ata:</div>
+          <div style="display:flex;gap:8px">
+            <label class="et-label"><input type="checkbox" id="bt-et-toplu-kisir" data-etiket="kisir" onchange="btEtiketTopluDegisti()"> Kısır</label>
+            <label class="et-label"><input type="checkbox" id="bt-et-toplu-satista" data-etiket="satista" onchange="btEtiketTopluDegisti()"> Satışta</label>
+          </div>
+        </div>
+
+        <!-- Tek tek etiket -->
+        <div>
+          <div style="font-size:.7rem;color:var(--ink3);margin-bottom:4px">— veya Tek Tek —</div>
+          <div id="bt-etiket-tektek-liste" style="max-height:120px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <!-- Aksiyonlar -->
+      <button id="bt-onay-btn" class="btn btn-g" onclick="btTransferOnayla()" style="width:100%;margin-top:12px;padding:12px" disabled>
+        🔀 Hayvanları Taşı
+      </button>
+      <button class="btn btn-o" data-action="close-bulk-transfer" style="width:100%;margin-top:6px">İptal</button>
+
     </div>
   </div>
 </div>
