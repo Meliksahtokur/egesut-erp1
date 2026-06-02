@@ -20,8 +20,12 @@ CREATE TABLE IF NOT EXISTS public.hayvanlar (
   baba_bilgi text,
   grup text,
   padok text,
-  durum text DEFAULT 'Aktif'
+  durum text DEFAULT 'Aktif',
+  etiketler text[] DEFAULT '{}'
 );
+
+CREATE INDEX IF NOT EXISTS idx_hayvanlar_etiketler
+  ON public.hayvanlar USING GIN(etiketler);
 
 CREATE TABLE IF NOT EXISTS public.stok (
   id text PRIMARY KEY,
