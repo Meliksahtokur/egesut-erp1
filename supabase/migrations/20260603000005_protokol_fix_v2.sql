@@ -270,7 +270,7 @@ BEGIN
         'adim', v_rec.aciklama,
         'etken_kod', v_rec.ek,
         'hedef_tarih', v_hedef,
-        'gecikme_gun', GREATEST(v_gecikme, 0),
+        'gecikme_gun', v_gecikme,
         'durum', v_durum,
         'tamamlanma_tarihi', v_tamamlanma,
         'kapatan_ref', v_kapatan
@@ -365,7 +365,7 @@ BEGIN
             'adim', v_a.aciklama,
             'etken_kod', v_a.ek,
             'hedef_tarih', v_hedef,
-            'gecikme_gun', GREATEST(v_gecikme, 0),
+            'gecikme_gun', v_gecikme,
             'durum', v_durum,
             'tamamlanma_tarihi', v_tamamlanma,
             'kapatan_ref', v_kapatan
@@ -447,7 +447,7 @@ BEGIN
         'adim', '⚡ 58-63. gün kızgınlık takibi',
         'etken_kod', NULL,
         'hedef_tarih', v_hedef,
-        'gecikme_gun', GREATEST(v_gecikme, 0),
+        'gecikme_gun', v_gecikme,
         'durum', v_durum,
         'tamamlanma_tarihi', v_tamamlanma,
         'kapatan_ref', v_kapatan
