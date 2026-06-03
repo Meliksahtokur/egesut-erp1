@@ -6,11 +6,12 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 20;
+const DB_VER  = 21;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
-                  'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days','stok_kategorileri'];
+                  'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days','stok_kategorileri',
+                  'uygulama_log'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
