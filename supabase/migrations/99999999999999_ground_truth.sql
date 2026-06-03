@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.stok_hareket (
 );
 
 CREATE TABLE IF NOT EXISTS public.gorev_log (
-  id text PRIMARY KEY,
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   hayvan_id text,
   gorev_tipi text,
   aciklama text,
@@ -9057,7 +9057,7 @@ CREATE OR REPLACE FUNCTION public._gorev_dinle(
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_gorev_id text;
+  v_gorev_id uuid;
 BEGIN
   IF p_etken_kod IS NULL OR p_hayvan_id IS NULL THEN
     RETURN;
