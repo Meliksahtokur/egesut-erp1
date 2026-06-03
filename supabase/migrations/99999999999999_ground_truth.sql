@@ -59,8 +59,43 @@ CREATE TABLE IF NOT EXISTS public.gorev_log (
   hekim_id text,
   kaynak text,
   padok_hedef text,
-  iptal boolean DEFAULT false
+  iptal boolean DEFAULT false,
+  etken_kod text,
+  kapatan_ref text
 );
+
+-- uygulama_log: Case-free hızlı ilaç/vitamin uygulama kaydı (Task 6)
+CREATE TABLE IF NOT EXISTS public.uygulama_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  hayvan_id text NOT NULL REFERENCES public.hayvanlar(id),
+  stok_id text REFERENCES public.stok(id),
+  etken_kod text,
+  doz numeric NOT NULL,
+  birim text NOT NULL,
+  rota text NOT NULL CHECK (rota IN ('IM','IV','SC','PO','Topikal','Intrauterin')),
+  tarih date NOT NULL DEFAULT CURRENT_DATE,
+  notlar text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_uygulama_log_hayvan ON public.uygulama_log(hayvan_id);
+CREATE INDEX IF NOT EXISTS idx_uygulama_log_tarih ON public.uygulama_log(tarih);
+ALTER TABLE public.uygulama_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY anon_all_uygulama_log ON public.uygulama_log FOR ALL USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.uygulama_log TO anon, authenticated;
+
+-- protokol_dismiss: Kullanıcı tarafından geçersiz kılınan protokol uyarıları (Task 10)
+CREATE TABLE IF NOT EXISTS public.protokol_dismiss (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  hayvan_id text NOT NULL REFERENCES public.hayvanlar(id),
+  etken_kod text NOT NULL,
+  protokol text NOT NULL,
+  tarih timestamptz DEFAULT now(),
+  neden text,
+  UNIQUE(hayvan_id, etken_kod, protokol)
+);
+ALTER TABLE public.protokol_dismiss ENABLE ROW LEVEL SECURITY;
+CREATE POLICY anon_all_protokol_dismiss ON public.protokol_dismiss FOR ALL USING (true) WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.protokol_dismiss TO anon, authenticated;
 
 CREATE TABLE IF NOT EXISTS public.hastalik_log (
   id text PRIMARY KEY,
@@ -3798,7 +3833,7 @@ SET padok = CASE
 END
 WHERE grup = 'Besi';
 
--- ── 3. dogum_kaydet — baba_bilgi aktif Gebe tohumlamadan al ─
+-- ── 3. dogum_kaydet — etken_kod'lu + 9 anne görevi (gorev_sayisi 16) ─
 CREATE OR REPLACE FUNCTION public.dogum_kaydet(
   p_anne_id    text,
   p_tarih      date,
@@ -3818,62 +3853,56 @@ DECLARE
   v_dup         text;
   v_baba_bilgi  text;
 BEGIN
-  -- Anne var mı?
   SELECT * INTO v_anne FROM public.hayvanlar WHERE id = p_anne_id AND durum = 'Aktif';
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Anne bulunamadı');
   END IF;
 
-  -- Küpe daha önce var mı?
   SELECT id INTO v_dup FROM public.hayvanlar WHERE kupe_no = p_kupe OR devlet_kupe = p_kupe LIMIT 1;
   IF FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu küpe zaten kayıtlı: ' || p_kupe);
   END IF;
 
-  -- Baba bilgisini aktif Gebe tohumlamadan al (UI p_baba göndermiyorsa)
   IF p_baba IS NULL OR p_baba = '' THEN
     SELECT sperma INTO v_baba_bilgi
     FROM public.tohumlama
     WHERE hayvan_id = p_anne_id AND sonuc = 'Gebe'
-    ORDER BY tarih DESC
-    LIMIT 1;
+    ORDER BY tarih DESC LIMIT 1;
   ELSE
     v_baba_bilgi := p_baba;
   END IF;
 
-  -- 1. Doğum kaydı
   INSERT INTO public.dogum (id, anne_id, tarih, yavru_cins, yavru_kupe, yavru_irk, dogum_tipi, hekim_id, dogum_kg, baba_bilgi)
   VALUES (v_dogum_id, p_anne_id, p_tarih, p_cins, p_kupe, v_anne.irk, p_tip, p_hekim_id, p_kg, v_baba_bilgi);
 
-  -- 2. Buzağı ID
   SELECT 'H' || LPAD((COUNT(*)+1)::text, 6, '0') INTO v_buzagi_id FROM public.hayvanlar;
 
-  -- 3. Buzağıyı sürüye ekle
   INSERT INTO public.hayvanlar (id, kupe_no, irk, dogum_tarihi, anne_id, baba_bilgi, cinsiyet, grup, padok, durum, dogum_kg)
   VALUES (v_buzagi_id, p_kupe, v_anne.irk, p_tarih, p_anne_id, v_baba_bilgi, p_cins,
           'Süt İçen Buzağı', 'Buzağı Padok (Süt İçenler)', 'Aktif', p_kg);
 
-  -- 4. Anne grup + padok güncelle
   UPDATE public.hayvanlar
   SET grup = 'Sağmal (Laktasyonda)', padok = 'Sağmal Padok'
   WHERE id = p_anne_id;
 
-  -- 5. Anne protokol görevleri (7 görev)
-  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak)
+  -- Anne protokol görevleri (9 görev — etken_kod ile)
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, etken_kod)
   VALUES
-    (gen_random_uuid(), p_anne_id, 'ILAC',  'Doğum günü: Oksitosin + Ademin + Kalsiyum', p_tarih,        false, 'DOGUM-' || p_anne_id),
-    (gen_random_uuid(), p_anne_id, 'ILAC',  '2. Gün PG',                                  p_tarih + 2,   false, 'DOGUM-' || p_anne_id),
-    (gen_random_uuid(), p_anne_id, 'ILAC',  '11. Gün PG',                                 p_tarih + 11,  false, 'DOGUM-' || p_anne_id),
-    (gen_random_uuid(), p_anne_id, 'ILAC',  '25. Gün PG',                                 p_tarih + 25,  false, 'DOGUM-' || p_anne_id),
-    (gen_random_uuid(), p_anne_id, 'ILAC',  '53. Gün: Ademin + Yeldif',                   p_tarih + 53,  false, 'DOGUM-' || p_anne_id),
-    (gen_random_uuid(), p_anne_id, 'ILAC',  '54. Gün: Yeldif',                            p_tarih + 54,  false, 'DOGUM-' || p_anne_id),
-    (gen_random_uuid(), p_anne_id, 'DIGER', '⚡ 58-63. gün kızgınlık takibi',             p_tarih + 58,  false, 'DOGUM-' || p_anne_id);
+    (gen_random_uuid(), p_anne_id, 'ILAC', 'Doğum günü: Oksitosin', p_tarih, false, 'DOGUM-' || p_anne_id, 'OKSITOSIN'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', 'Doğum günü: Ademin',    p_tarih, false, 'DOGUM-' || p_anne_id, 'ADEMIN'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', 'Doğum günü: Kalsiyum',  p_tarih, false, 'DOGUM-' || p_anne_id, 'KALSIYUM'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', '2. Gün PG',             p_tarih + 2,  false, 'DOGUM-' || p_anne_id, 'PG'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', '11. Gün PG',            p_tarih + 11, false, 'DOGUM-' || p_anne_id, 'PG'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', '25. Gün PG',            p_tarih + 25, false, 'DOGUM-' || p_anne_id, 'PG'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Ademin',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'ADEMIN'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', '54. Gün: Yeldif',       p_tarih + 54, false, 'DOGUM-' || p_anne_id, 'E_VIT'),
+    (gen_random_uuid(), p_anne_id, 'DIGER', '⚡ 58-63. gün kızgınlık takibi', p_tarih + 58, false, 'DOGUM-' || p_anne_id, NULL);
 
-  -- 6. Buzağı ana görev
+  -- Buzağı ana görev
   INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak)
   VALUES (v_ana_gorev, v_buzagi_id, 'BUZAGI_BAKIM', 'Buzağı İlk Gün Bakımı (' || p_kupe || ')', p_tarih, false, 'DOGUM-' || p_anne_id);
 
-  -- 7. Buzağı alt görevler (6 görev)
+  -- Buzağı alt görevler (6 görev)
   INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, parent_id, kaynak)
   VALUES
     (gen_random_uuid(), v_buzagi_id, 'BUZAGI_BAKIM', 'Kolostrum ver (doğumdan sonra ilk 2 saat)', p_tarih, false, v_ana_gorev, 'DOGUM-' || p_anne_id),
@@ -3883,7 +3912,6 @@ BEGIN
     (gen_random_uuid(), v_buzagi_id, 'BUZAGI_BAKIM', 'Maya ver (1. gün)',                           p_tarih, false, v_ana_gorev, 'DOGUM-' || p_anne_id),
     (gen_random_uuid(), v_buzagi_id, 'BUZAGI_BAKIM', 'Probiyotik ver (1. gün)',                     p_tarih, false, v_ana_gorev, 'DOGUM-' || p_anne_id);
 
-  -- 8. Açık gebe tohumlama kaydını kapat
   UPDATE public.tohumlama
   SET sonuc = 'Doğum Yaptı', dogum_tarihi = p_tarih, buzagi_kupe = p_kupe
   WHERE hayvan_id = p_anne_id AND sonuc = 'Gebe';
@@ -3894,7 +3922,7 @@ BEGIN
     'ok', true,
     'buzagi_id', v_buzagi_id,
     'dogum_id', v_dogum_id,
-    'gorev_sayisi', 14,
+    'gorev_sayisi', 16,
     'tohumlama_kapatildi', v_sayac
   );
 END;
@@ -6408,41 +6436,35 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_stok_id text;
 BEGIN
-  -- Sadece 'Gebe' olarak değiştiğinde çalış
   IF NEW.sonuc != 'Gebe' OR OLD.sonuc = 'Gebe' THEN
     RETURN NEW;
   END IF;
 
   SELECT stock_item_id INTO v_stok_id FROM vaccines WHERE name ILIKE '%Rota%' LIMIT 1;
 
-  -- 240. gün: Rota-Corona 1. doz (tüm gebeler)
-  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, kaynak)
+  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, kaynak, etken_kod)
   SELECT gen_random_uuid(), NEW.hayvan_id, 'ILERI_GEBE_ASI',
-         '💉 Rota-Corona Aşısı (1. doz)', NEW.tarih::date + 240, false, v_stok_id, 1, 'ILERI_GEBE'
+         '💉 Rota-Corona Aşısı (1. doz)', NEW.tarih::date + 240, false, v_stok_id, 1, 'ILERI_GEBE', 'ROTA'
   WHERE NOT EXISTS (
     SELECT 1 FROM gorev_log
     WHERE hayvan_id = NEW.hayvan_id AND aciklama = '💉 Rota-Corona Aşısı (1. doz)' AND tamamlandi = false
   );
 
-  -- 260. gün: SC Ademin (ilaç, aşı değil — doneTask ile tamamlanır)
-  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak)
+  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, etken_kod)
   SELECT gen_random_uuid(), NEW.hayvan_id, 'ILERI_GEBE',
-         '💊 SC Ademin uygulaması', NEW.tarih::date + 260, false, 'ILERI_GEBE'
+         '💊 SC Ademin uygulaması', NEW.tarih::date + 260, false, 'ILERI_GEBE', 'ADEMIN'
   WHERE NOT EXISTS (
     SELECT 1 FROM gorev_log
     WHERE hayvan_id = NEW.hayvan_id AND aciklama = '💊 SC Ademin uygulaması' AND tamamlandi = false
   );
 
-  -- 265. gün: IM E Vitamini
-  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak)
+  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, etken_kod)
   SELECT gen_random_uuid(), NEW.hayvan_id, 'ILERI_GEBE',
-         '💊 IM E Vitamini uygulaması', NEW.tarih::date + 265, false, 'ILERI_GEBE'
+         '💊 IM E Vitamini uygulaması', NEW.tarih::date + 265, false, 'ILERI_GEBE', 'E_VIT'
   WHERE NOT EXISTS (
     SELECT 1 FROM gorev_log
     WHERE hayvan_id = NEW.hayvan_id AND aciklama = '💊 IM E Vitamini uygulaması' AND tamamlandi = false
   );
-
-  -- NOT: 2. doz rapeli ileri_gebe_asi_tamamla RPC tarafından yaratılır (parent_id ile)
 
   RETURN NEW;
 END;
@@ -8973,3 +8995,322 @@ $$;
 GRANT EXECUTE ON FUNCTION public.tohumlama_sonuc_bos(text, text) TO anon, authenticated;
 
 END;
+
+-- ══════════════════════════════════════════════════════════════
+-- Protokol Uyarı Sistemi (Task 1-11, 2026-06-03)
+-- Yeni fonksiyonlar ve trigger'lar
+-- ══════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public._etken_kod_bul(
+  p_stok_id text DEFAULT NULL,
+  p_vaccine_id uuid DEFAULT NULL
+) RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_class_name text;
+  v_group_name text;
+  v_active_ing text;
+  v_stok_ad text;
+  v_vaccine_name text;
+BEGIN
+  -- Aşı yolu
+  IF p_vaccine_id IS NOT NULL THEN
+    SELECT name INTO v_vaccine_name FROM public.vaccines WHERE id = p_vaccine_id;
+    IF v_vaccine_name ILIKE '%Rota%' THEN RETURN 'ROTA'; END IF;
+    RETURN NULL;
+  END IF;
+
+  -- İlaç yolu: stok → drug_products → drug_classes
+  IF p_stok_id IS NOT NULL THEN
+    SELECT s.urun_adi INTO v_stok_ad FROM public.stok s WHERE s.id = p_stok_id;
+
+    SELECT dc.group_name, dc.class_name, dc.active_ingredient
+    INTO v_group_name, v_class_name, v_active_ing
+    FROM public.drug_products dp
+    JOIN public.drug_classes dc ON dc.id = dp.drug_class_id
+    WHERE dp.id = (
+      SELECT drug_product_id FROM public.drug_administrations
+      WHERE stok_id = p_stok_id LIMIT 1
+    )
+    OR dp.brand_name ILIKE '%' || COALESCE(v_stok_ad,'') || '%'
+    LIMIT 1;
+
+    -- Sınıf bazlı eşleşme
+    IF v_class_name ILIKE '%oksitosin%' OR v_active_ing ILIKE '%oxytocin%' THEN RETURN 'OKSITOSIN'; END IF;
+    IF v_class_name ILIKE '%prostaglandin%' OR v_group_name ILIKE '%PG%' OR v_active_ing ILIKE '%dinoprost%' OR v_active_ing ILIKE '%cloprostenol%' THEN RETURN 'PG'; END IF;
+    IF v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%' THEN RETURN 'E_VIT'; END IF;
+    IF v_class_name ILIKE '%ademin%' OR v_stok_ad ILIKE '%ademin%' THEN RETURN 'ADEMIN'; END IF;
+    IF v_class_name ILIKE '%kalsiyum%' OR v_class_name ILIKE '%calcium%' OR v_stok_ad ILIKE '%kalsiyum%' THEN RETURN 'KALSIYUM'; END IF;
+
+    RETURN NULL;
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public._gorev_dinle(
+  p_hayvan_id text,
+  p_etken_kod text,
+  p_ref text
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_gorev_id text;
+BEGIN
+  IF p_etken_kod IS NULL OR p_hayvan_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT id INTO v_gorev_id
+  FROM public.gorev_log
+  WHERE hayvan_id = p_hayvan_id
+    AND etken_kod = p_etken_kod
+    AND tamamlandi = false
+    AND iptal = false
+  ORDER BY hedef_tarih ASC
+  LIMIT 1;
+
+  IF v_gorev_id IS NOT NULL THEN
+    UPDATE public.gorev_log
+    SET tamamlandi = true,
+        tamamlanma_tarihi = now(),
+        kapatan_ref = p_ref
+    WHERE id = v_gorev_id;
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.hizli_uygulama(
+  p_hayvan_id text,
+  p_stok_id text,
+  p_doz numeric,
+  p_birim text,
+  p_rota text,
+  p_notlar text
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_hayvan record;
+  v_stok record;
+  v_etken text;
+  v_id uuid;
+  v_kalan numeric;
+BEGIN
+  SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı veya aktif değil');
+  END IF;
+
+  SELECT * INTO v_stok FROM public.stok WHERE id = p_stok_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Stok bulunamadı');
+  END IF;
+
+  IF p_notlar IS NULL OR TRIM(p_notlar) = '' THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Not alanı zorunludur');
+  END IF;
+
+  v_etken := public._etken_kod_bul(p_stok_id, NULL);
+
+  INSERT INTO public.uygulama_log (hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar)
+  VALUES (p_hayvan_id, p_stok_id, v_etken, p_doz, p_birim, p_rota, p_notlar)
+  RETURNING id INTO v_id;
+
+  -- Stok düşüm
+  INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
+  VALUES (gen_random_uuid()::text, p_stok_id, 'Hızlı Uygulama', p_doz,
+          'Hızlı Uygulama — ' || v_hayvan.kupe_no || ' — ' || v_stok.urun_adi, false);
+
+  SELECT COALESCE(s.baslangic_miktar, 0) - COALESCE(SUM(CASE WHEN sh.iptal = false THEN sh.miktar ELSE 0 END), 0)
+  INTO v_kalan
+  FROM public.stok s
+  LEFT JOIN public.stok_hareket sh ON sh.stok_id = s.id
+  WHERE s.id = p_stok_id
+  GROUP BY s.baslangic_miktar;
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'id', v_id,
+    'etken_kod', v_etken,
+    'stok_kalan', COALESCE(v_kalan, 0)
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.hizli_uygulama_geri_al(
+  p_uygulama_id uuid
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_uyg record;
+  v_hayvan record;
+BEGIN
+  SELECT * INTO v_uyg FROM public.uygulama_log WHERE id = p_uygulama_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Uygulama kaydı bulunamadı');
+  END IF;
+
+  SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = v_uyg.hayvan_id;
+
+  -- Stok iade (ters hareket)
+  IF v_uyg.stok_id IS NOT NULL THEN
+    INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
+    VALUES (gen_random_uuid()::text, v_uyg.stok_id, 'İade (Hızlı Uyg.)', -v_uyg.doz,
+            'Geri Al — ' || COALESCE(v_hayvan.kupe_no, v_uyg.hayvan_id), false);
+  END IF;
+
+  -- Bu uygulama ile kapanan görevi tekrar aç
+  UPDATE public.gorev_log
+  SET tamamlandi = false,
+      tamamlanma_tarihi = NULL,
+      kapatan_ref = NULL
+  WHERE kapatan_ref = 'uygulama_log:' || p_uygulama_id::text;
+
+  DELETE FROM public.uygulama_log WHERE id = p_uygulama_id;
+
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
+
+-- Protokol eksik tara scanner (Task 11)
+CREATE OR REPLACE FUNCTION public.protokol_eksik_tara()
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_result jsonb := '[]'::jsonb;
+  v_today date := CURRENT_DATE;
+  v_rec record;
+  v_found boolean;
+  v_tamamlanma timestamptz;
+  v_kapatan text;
+BEGIN
+  -- A. DOĞUM SONRASI PROTOKOL
+  FOR v_rec IN
+    SELECT d.id, d.anne_id AS hayvan_id, d.tarih AS dogum_tarihi, h.kupe_no, h.grup, a.gun, a.ek, a.aciklama
+    FROM public.dogum d
+    JOIN public.hayvanlar h ON h.id = d.anne_id AND h.durum = 'Aktif'
+    CROSS JOIN (VALUES
+      (0,'OKSITOSIN','Doğum günü: Oksitosin'),(0,'ADEMIN','Doğum günü: Ademin'),(0,'KALSIYUM','Doğum günü: Kalsiyum'),
+      (2,'PG','2. Gün PG'),(11,'PG','11. Gün PG'),(25,'PG','25. Gün PG'),
+      (53,'ADEMIN','53. Gün: Ademin'),(53,'E_VIT','53. Gün: Yeldif'),(54,'E_VIT','54. Gün: Yeldif')
+    ) AS a(gun,ek,aciklama)
+    WHERE d.tarih >= v_today - 70 AND d.tarih <= v_today
+  LOOP
+    DECLARE
+      v_hedef date := v_rec.dogum_tarihi + v_rec.gun;
+      v_gecikme int; v_durum text;
+    BEGIN
+      IF v_hedef > v_today + 7 THEN CONTINUE; END IF;
+      v_found := false; v_tamamlanma := NULL; v_kapatan := NULL;
+
+      SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan
+      FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_rec.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
+
+      IF NOT v_found THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_rec.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+      IF NOT v_found THEN SELECT true INTO v_found FROM drug_administrations da JOIN treatment_days td ON td.id=da.treatment_day_id JOIN cases c ON c.id=td.case_id WHERE c.animal_id=v_rec.hayvan_id AND public._etken_kod_bul(da.stok_id,NULL)=v_rec.ek AND da.created_at::date BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+      IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_rec.ek AND pd.protokol='DOGUM_PROTOKOL' LIMIT 1; END IF;
+
+      v_gecikme := v_today - v_hedef;
+      IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma >= now()-interval '24 hours' THEN v_durum:='tamamlandi';
+      ELSIF v_found THEN CONTINUE;
+      ELSIF v_gecikme >= 0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
+
+      v_result := v_result || jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','DOGUM_PROTOKOL','adim',v_rec.aciklama,'etken_kod',v_rec.ek,'hedef_tarih',v_hedef,'gecikme_gun',GREATEST(v_gecikme,0),'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
+    END;
+  END LOOP;
+
+  -- B. İLERI GEBE PROTOKOL
+  FOR v_rec IN
+    SELECT t.id,t.hayvan_id,t.tarih::date AS toh_tarihi,h.kupe_no,h.grup
+    FROM public.tohumlama t JOIN public.hayvanlar h ON h.id=t.hayvan_id AND h.durum='Aktif'
+    WHERE t.sonuc='Gebe' AND (v_today-t.tarih::date)>=230
+  LOOP
+    DECLARE v_a record;
+    BEGIN
+      FOR v_a IN SELECT * FROM (VALUES(240,'ROTA','Rota-Corona Aşısı'),(260,'ADEMIN','SC Ademin uygulaması'),(265,'E_VIT','IM E Vitamini uygulaması')) AS t(gun,ek,aciklama) LOOP
+        DECLARE v_hedef date:=v_rec.toh_tarihi+v_a.gun; v_gecikme int; v_durum text;
+        BEGIN
+          IF v_hedef>v_today+7 THEN CONTINUE; END IF;
+          v_found:=false; v_tamamlanma:=NULL; v_kapatan:=NULL;
+          SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_a.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
+          IF NOT v_found AND v_a.ek='ROTA' THEN SELECT true INTO v_found FROM vaccination_log vl JOIN vaccines v ON v.id=vl.vaccine_id WHERE vl.animal_id=v_rec.hayvan_id AND v.name ILIKE '%Rota%' AND vl.vaccination_date BETWEEN v_hedef-7 AND v_hedef+7 LIMIT 1; END IF;
+          IF NOT v_found THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_a.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+          IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_a.ek AND pd.protokol='ILERI_GEBE_PROTOKOL' LIMIT 1; END IF;
+          v_gecikme:=v_today-v_hedef;
+          IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
+          v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','ILERI_GEBE_PROTOKOL','adim',v_a.aciklama,'etken_kod',v_a.ek,'hedef_tarih',v_hedef,'gecikme_gun',GREATEST(v_gecikme,0),'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
+        END;
+      END LOOP;
+    END;
+  END LOOP;
+
+  -- C. KIZGINLIK TAKİBİ
+  FOR v_rec IN
+    SELECT d.id,d.anne_id AS hayvan_id,d.tarih AS dogum_tarihi,h.kupe_no,h.grup
+    FROM public.dogum d JOIN public.hayvanlar h ON h.id=d.anne_id AND h.durum='Aktif'
+    WHERE (v_today-d.tarih) BETWEEN 55 AND 75
+  LOOP
+    DECLARE v_hedef date:=v_rec.dogum_tarihi+58; v_gecikme int:=v_today-v_hedef; v_durum text;
+    BEGIN
+      v_found:=false; v_tamamlanma:=NULL; v_kapatan:=NULL;
+      SELECT true,g.tamamlanma_tarihi INTO v_found,v_tamamlanma FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.aciklama ILIKE '%kizginlik%' AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+7 LIMIT 1;
+      IF NOT v_found THEN SELECT true INTO v_found FROM kizginlik_log k WHERE k.hayvan_id=v_rec.hayvan_id AND k.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
+      IF NOT v_found THEN SELECT true INTO v_found FROM tohumlama t WHERE t.hayvan_id=v_rec.hayvan_id AND t.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
+      IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.protokol='KIZGINLIK_TAKIP' LIMIT 1; END IF;
+      IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
+      v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','KIZGINLIK_TAKIP','adim','58-63. gun kizginlik takibi','etken_kod',NULL,'hedef_tarih',v_hedef,'gecikme_gun',GREATEST(v_gecikme,0),'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
+    END;
+  END LOOP;
+
+  RETURN v_result;
+END;
+$$;
+
+-- Dinleme trigger fonksiyonları + trigger'lar
+CREATE OR REPLACE FUNCTION public.fn_dinle_vaccination()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_etken text;
+BEGIN
+  v_etken := public._etken_kod_bul(NULL, NEW.vaccine_id);
+  IF v_etken IS NOT NULL THEN
+    PERFORM public._gorev_dinle(NEW.animal_id, v_etken, 'vaccination_log:' || NEW.id::text);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_dinle_vaccination ON public.vaccination_log;
+CREATE TRIGGER trg_dinle_vaccination AFTER INSERT ON public.vaccination_log FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_vaccination();
+
+CREATE OR REPLACE FUNCTION public.fn_dinle_uygulama()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NEW.etken_kod IS NOT NULL THEN
+    PERFORM public._gorev_dinle(NEW.hayvan_id, NEW.etken_kod, 'uygulama_log:' || NEW.id::text);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_dinle_uygulama ON public.uygulama_log;
+CREATE TRIGGER trg_dinle_uygulama AFTER INSERT ON public.uygulama_log FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_uygulama();
+
+CREATE OR REPLACE FUNCTION public.fn_dinle_drug_admin()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_etken text;
+  v_animal_id text;
+BEGIN
+  v_etken := public._etken_kod_bul(NEW.stok_id, NULL);
+  IF v_etken IS NULL THEN RETURN NEW; END IF;
+  SELECT c.animal_id INTO v_animal_id
+  FROM public.treatment_days td JOIN public.cases c ON c.id = td.case_id
+  WHERE td.id = NEW.treatment_day_id;
+  IF v_animal_id IS NOT NULL THEN
+    PERFORM public._gorev_dinle(v_animal_id, v_etken, 'drug_admin:' || NEW.id::text);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_dinle_drug_admin ON public.drug_administrations;
+CREATE TRIGGER trg_dinle_drug_admin AFTER INSERT ON public.drug_administrations FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_drug_admin();
