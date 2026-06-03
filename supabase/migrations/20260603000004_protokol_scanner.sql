@@ -251,7 +251,7 @@ BEGIN
            h.kupe_no, h.grup
     FROM public.dogum d
     JOIN public.hayvanlar h ON h.id = d.anne_id AND h.durum = 'Aktif'
-    WHERE (v_today - d.tarih) BETWEEN 55 AND 75
+    WHERE (v_today - d.tarih) BETWEEN 55 AND 70
   LOOP
     DECLARE
       v_hedef date := v_rec.dogum_tarihi + 58;
@@ -324,5 +324,9 @@ BEGIN
   RETURN v_result;
 END;
 $$;
+
+-- Scanner performans index'leri
+CREATE INDEX IF NOT EXISTS idx_dogum_anne_tarih ON public.dogum(anne_id, tarih);
+CREATE INDEX IF NOT EXISTS idx_tohumlama_hayvan_sonuc_tarih ON public.tohumlama(hayvan_id, sonuc, tarih);
 
 COMMIT;

@@ -190,7 +190,7 @@ BEGIN
   SET grup = 'Sağmal (Laktasyonda)', padok = 'Sağmal Padok'
   WHERE id = p_anne_id;
 
-  -- Anne protokol görevleri (9 görev — etken_kod ile)
+  -- Anne protokol görevleri (10 görev — etken_kod ile)
   INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, etken_kod)
   VALUES
     (gen_random_uuid(), p_anne_id, 'ILAC', 'Doğum günü: Oksitosin', p_tarih, false, 'DOGUM-' || p_anne_id, 'OKSITOSIN'),
@@ -200,6 +200,7 @@ BEGIN
     (gen_random_uuid(), p_anne_id, 'ILAC', '11. Gün PG',            p_tarih + 11, false, 'DOGUM-' || p_anne_id, 'PG'),
     (gen_random_uuid(), p_anne_id, 'ILAC', '25. Gün PG',            p_tarih + 25, false, 'DOGUM-' || p_anne_id, 'PG'),
     (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Ademin',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'ADEMIN'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Yeldif',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'E_VIT'),
     (gen_random_uuid(), p_anne_id, 'ILAC', '54. Gün: Yeldif',       p_tarih + 54, false, 'DOGUM-' || p_anne_id, 'E_VIT'),
     (gen_random_uuid(), p_anne_id, 'DIGER', '⚡ 58-63. gün kızgınlık takibi', p_tarih + 58, false, 'DOGUM-' || p_anne_id, NULL);
 
@@ -227,7 +228,7 @@ BEGIN
     'ok', true,
     'buzagi_id', v_buzagi_id,
     'dogum_id', v_dogum_id,
-    'gorev_sayisi', 16,
+    'gorev_sayisi', 17,
     'tohumlama_kapatildi', v_sayac
   );
 END;
