@@ -3833,7 +3833,7 @@ SET padok = CASE
 END
 WHERE grup = 'Besi';
 
--- ── 3. dogum_kaydet — etken_kod'lu + 9 anne görevi (gorev_sayisi 16) ─
+-- ── 3. dogum_kaydet — etken_kod'lu + 10 anne görevi (gorev_sayisi 17) ─
 CREATE OR REPLACE FUNCTION public.dogum_kaydet(
   p_anne_id    text,
   p_tarih      date,
@@ -3885,7 +3885,7 @@ BEGIN
   SET grup = 'Sağmal (Laktasyonda)', padok = 'Sağmal Padok'
   WHERE id = p_anne_id;
 
-  -- Anne protokol görevleri (9 görev — etken_kod ile)
+  -- Anne protokol görevleri (10 görev — etken_kod ile)
   INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, etken_kod)
   VALUES
     (gen_random_uuid(), p_anne_id, 'ILAC', 'Doğum günü: Oksitosin', p_tarih, false, 'DOGUM-' || p_anne_id, 'OKSITOSIN'),
@@ -3895,6 +3895,7 @@ BEGIN
     (gen_random_uuid(), p_anne_id, 'ILAC', '11. Gün PG',            p_tarih + 11, false, 'DOGUM-' || p_anne_id, 'PG'),
     (gen_random_uuid(), p_anne_id, 'ILAC', '25. Gün PG',            p_tarih + 25, false, 'DOGUM-' || p_anne_id, 'PG'),
     (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Ademin',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'ADEMIN'),
+    (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Yeldif',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'E_VIT'),
     (gen_random_uuid(), p_anne_id, 'ILAC', '54. Gün: Yeldif',       p_tarih + 54, false, 'DOGUM-' || p_anne_id, 'E_VIT'),
     (gen_random_uuid(), p_anne_id, 'DIGER', '⚡ 58-63. gün kızgınlık takibi', p_tarih + 58, false, 'DOGUM-' || p_anne_id, NULL);
 
@@ -3922,7 +3923,7 @@ BEGIN
     'ok', true,
     'buzagi_id', v_buzagi_id,
     'dogum_id', v_dogum_id,
-    'gorev_sayisi', 16,
+    'gorev_sayisi', 17,
     'tohumlama_kapatildi', v_sayac
   );
 END;
@@ -9249,7 +9250,7 @@ BEGIN
   FOR v_rec IN
     SELECT d.id,d.anne_id AS hayvan_id,d.tarih AS dogum_tarihi,h.kupe_no,h.grup
     FROM public.dogum d JOIN public.hayvanlar h ON h.id=d.anne_id AND h.durum='Aktif'
-    WHERE (v_today-d.tarih) BETWEEN 55 AND 75
+    WHERE (v_today-d.tarih) BETWEEN 55 AND 70
   LOOP
     DECLARE v_hedef date:=v_rec.dogum_tarihi+58; v_gecikme int:=v_today-v_hedef; v_durum text;
     BEGIN
@@ -9314,3 +9315,7 @@ END;
 $$;
 DROP TRIGGER IF EXISTS trg_dinle_drug_admin ON public.drug_administrations;
 CREATE TRIGGER trg_dinle_drug_admin AFTER INSERT ON public.drug_administrations FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_drug_admin();
+
+-- Scanner performans index'leri (Review Fix — Task 17)
+CREATE INDEX IF NOT EXISTS idx_dogum_anne_tarih ON public.dogum(anne_id, tarih);
+CREATE INDEX IF NOT EXISTS idx_tohumlama_hayvan_sonuc_tarih ON public.tohumlama(hayvan_id, sonuc, tarih);
