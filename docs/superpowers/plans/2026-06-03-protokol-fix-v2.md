@@ -1,12 +1,48 @@
 # Protokol Uyarı Sistemi Fix v2 — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use `/skill:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix broken protokol uyarı sistemi — IDB crash, uuid=text error, duplicate alerts, missing integration with existing task modals, and add navigation between screens.
 
 **Architecture:** Fix DB type mismatches and backfill data first (Tasks 1-3), then fix scanner SQL (Task 4), then refactor UI to integrate with existing modal system and add screen stack navigation (Tasks 5-8), finally sync ground_truth (Task 9).
 
 **Tech Stack:** PostgreSQL (Supabase migrations), Vanilla JS (ui.js, api.js, app.js), IndexedDB
+
+---
+
+## Execution Batches
+
+| Batch | Tasks | İçerik | Bağımlılık |
+|-------|-------|--------|------------|
+| **Batch 1** | Task 1-4 | DB fixes: IDB + migration + deploy + test | Yok — önce çalışır |
+| **Batch 2** | Task 5-7 | UI: satır tıklama + popstate + güncelleme | Batch 1 tamamlanmalı |
+| **Batch 3** | Task 9 | ground_truth sync | Batch 1-2 tamamlanmalı |
+
+## Tools-Bank Araç Haritası
+
+Bu planda kullanılacak tools-bank MCP araçları:
+
+| Araç | Kullanım | Örnek |
+|------|----------|-------|
+| `file_read(path)` | Dosya oku — edit öncesi ZORUNLU | `file_read("/root/egesut-erp1/js/api.js")` |
+| `file_write(path, content, patch?)` | Dosya yaz/patch | `file_write("/root/egesut-erp1/js/api.js", "...", true)` |
+| `supabase_migrate(sql)` | SQL migration deploy (Management API) | `supabase_migrate("CREATE OR REPLACE FUNCTION...")` |
+| `supabase_query(table, filters, select, limit)` | SELECT sorgusu — test/doğrulama | `supabase_query("protokol_dismiss", "", "*", 10)` |
+| `supabase_rpc(function_name, params)` | RPC çağrısı — test | `supabase_rpc("protokol_eksik_tara", "{}")` |
+| `memory_search(query)` | Bağlam ara (önceki kararlar/hatalar) | `memory_search("uuid text cast")` |
+| `semantic_search(query)` | Kod arama (vektör) | `semantic_search("protokol ekranı bottom sheet")` |
+
+### Referans Dosyalar (edit öncesi oku)
+
+```
+file_read("/root/egesut-erp1/supabase/migrations/99999999999999_ground_truth.sql")
+file_read("/root/egesut-erp1/.claude/rpc-reference.md")
+file_read("/root/egesut-erp1/.claude/domain-rules.md")
+```
+
+### Commit Kuralı
+
+Her commit sonrası: `cd /root/egesut-erp1 && git push origin main`
 
 ---
 
@@ -27,7 +63,17 @@
 **Files:**
 - Modify: `js/api.js:9-13`
 
-- [ ] **Step 1: Add `uygulama_log` to TABLES and bump DB_VER**
+**Tools:** `file_read` → `file_write`
+
+- [ ] **Step 1: Dosyayı oku**
+
+```
+file_read("/root/egesut-erp1/js/api.js")
+```
+
+Satır 9-13 arasında `DB_VER` ve `TABLES` dizisini bul.
+
+- [ ] **Step 2: Add `uygulama_log` to TABLES and bump DB_VER**
 
 `js/api.js:9-13` — mevcut TABLES dizisine `'uygulama_log'` ekle ve `DB_VER` 20→21 yap:
 
@@ -42,17 +88,18 @@ const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
 
 NOT: `protokol_dismiss` IDB'ye eklenmeyecek — sadece RPC/insert ile kullanılıyor, client-side cache'e gerek yok.
 
-- [ ] **Step 2: Test — hayvan kartı açılıyor mu**
+`file_write` ile `js/api.js` dosyasını güncelle. Sadece değişen satırları patch olarak gönder.
+
+- [ ] **Step 3: Test — hayvan kartı açılıyor mu**
 
 Tarayıcıyı aç → Dashboard → herhangi bir hayvanın adına tıkla → hayvan kartı açılmalı (IDB hatasız). Konsol'da `object store was not found` hatası OLMAMALI.
 
 NOT: DB_VER artırıldığı için tarayıcı IDB'yi upgrade edecek. Eski versiyon kullanıcıları ilk açılışta auto-upgrade alır.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit + Push**
 
 ```bash
-git add js/api.js
-git commit -m "fix: add uygulama_log to IDB TABLES, bump DB_VER to 21"
+cd /root/egesut-erp1 && git add js/api.js && git commit -m "fix: add uygulama_log to IDB TABLES, bump DB_VER to 21" && git push origin main
 ```
 
 ---
@@ -62,7 +109,17 @@ git commit -m "fix: add uygulama_log to IDB TABLES, bump DB_VER to 21"
 **Files:**
 - Create: `supabase/migrations/20260603000005_protokol_fix_v2.sql`
 
-- [ ] **Step 1: Create migration with uuid cast fixes**
+**Tools:** `file_read` (ground_truth referans) → `file_write` (migration oluştur) → `supabase_migrate` (deploy)
+
+- [ ] **Step 1: Referans dosyayı oku**
+
+```
+file_read("/root/egesut-erp1/supabase/migrations/99999999999999_ground_truth.sql")
+```
+
+`ileri_gebe_asi_tamamla` fonksiyonunu bul — satır ~6356-6410. `WHERE id = p_gorev_id::uuid` satırlarını not et.
+
+- [ ] **Step 2: Create migration with uuid cast fixes**
 
 `supabase/migrations/20260603000005_protokol_fix_v2.sql` dosyasını oluştur. Bu migration TÜM DB fix'lerini içerecek (Task 2-4 SQL'leri tek dosyada).
 
@@ -147,18 +204,7 @@ DEĞİŞEN SATIRLAR (öncekiyle karşılaştırma):
 - Satır `WHERE id = p_gorev_id::uuid` → `WHERE id = p_gorev_id` (2 yerde)
 - Geri kalan fonksiyon AYNI — değişiklik sadece `::uuid` kaldırma
 
-- [ ] **Step 2: Test — aşı uygulama çalışıyor mu**
-
-Supabase Dashboard → SQL Editor → migration SQL'ini çalıştır.
-Sonra uygulamada: Görevler sekmesi → bir `ILERI_GEBE_ASI` görevi bul → Aşıyı Uygula → uuid=text hatası OLMAMALI.
-
-Hata hala varsa, PostgreSQL loglarından tam hata mesajını oku:
-```sql
-SELECT * FROM postgres_log ORDER BY timestamp DESC LIMIT 10;
-```
-veya Supabase Dashboard → Logs → Postgres bölümünden kontrol et.
-
-- [ ] **Step 3: Not — henüz COMMIT ETME, Task 3-4 SQL'leri de aynı migration dosyasına eklenecek**
+- [ ] **Step 3: Not — henüz DEPLOY ETME ve COMMIT ETME, Task 3-4 SQL'leri de aynı migration dosyasına eklenecek**
 
 ---
 
@@ -166,6 +212,8 @@ veya Supabase Dashboard → Logs → Postgres bölümünden kontrol et.
 
 **Files:**
 - Modify: `supabase/migrations/20260603000005_protokol_fix_v2.sql` (Task 2'de oluşturuldu)
+
+**Tools:** `file_read` → `file_write` (migration'a append) → `supabase_query` (doğrulama)
 
 - [ ] **Step 1: Tamamlanmış görevlere etken_kod backfill SQL ekle**
 
@@ -236,25 +284,16 @@ WHERE (CURRENT_DATE - d.tarih) BETWEEN 55 AND 75
 ON CONFLICT (hayvan_id, etken_kod, protokol) DO NOTHING;
 ```
 
-- [ ] **Step 3: Test — dismiss kayıtları oluştu mu**
-
-Supabase SQL Editor'da çalıştır:
-```sql
-SELECT COUNT(*) FROM protokol_dismiss WHERE neden = 'Otomatik: migration öncesi doğum';
-```
-Sonuç > 0 olmalı.
-
-```sql
-SELECT * FROM protokol_dismiss LIMIT 10;
-```
-İnceleyerek doğrula — son 4 buzağı anneleri (küpe 80/79/78/77) listede OLMAMALI.
+- [ ] **Step 3: Not — henüz DEPLOY ETME, Task 4 SQL'leri de aynı dosyaya eklenecek**
 
 ---
 
-### Task 4: Scanner Düzeltmeleri — DISTINCT ON, E_VIT, Index'ler
+### Task 4: Scanner Düzeltmeleri — DISTINCT ON, E_VIT, Index'ler + TÜM SQL DEPLOY
 
 **Files:**
 - Modify: `supabase/migrations/20260603000005_protokol_fix_v2.sql` (devam)
+
+**Tools:** `file_read` → `file_write` (append) → `supabase_migrate` (TÜM migration deploy) → `supabase_rpc` + `supabase_query` (test)
 
 - [ ] **Step 1: Düzeltilmiş scanner fonksiyonunu ekle**
 
@@ -590,14 +629,27 @@ CREATE INDEX IF NOT EXISTS idx_tohumlama_hayvan_sonuc
 COMMIT;
 ```
 
-- [ ] **Step 3: Migration'ı Supabase'de çalıştır**
+- [ ] **Step 3: Migration'ı Supabase'e deploy et**
 
-Supabase Dashboard → SQL Editor → `20260603000005_protokol_fix_v2.sql` dosyasının TAMAMINI yapıştır ve çalıştır.
+Migration dosyasının TAMAMINI `supabase_migrate` ile deploy et:
+
+```
+file_read("/root/egesut-erp1/supabase/migrations/20260603000005_protokol_fix_v2.sql")
+```
+
+Dosya içeriğini oku, sonra:
+
+```
+supabase_migrate(sql="<dosyanın tam içeriği>")
+```
+
+**ÖNEMLİ:** `BEGIN;` ve `COMMIT;` satırlarını çıkar — `supabase_migrate` zaten transaction içinde çalışır.
 
 - [ ] **Step 4: Test — scanner düzeltmeleri**
 
-```sql
-SELECT * FROM protokol_eksik_tara();
+Scanner'ı çağır:
+```
+supabase_rpc("protokol_eksik_tara", "{}")
 ```
 
 Kontrol et:
@@ -605,11 +657,21 @@ Kontrol et:
 - Eski doğumlar (küpe 80/79/78/77 HARİÇ) "eksik" olarak görünmemeli
 - `+53 E_VIT` satırı artık yok, sadece `+54 E_VIT` var
 
-- [ ] **Step 5: Commit**
+Dismiss kayıtlarını doğrula:
+```
+supabase_query("protokol_dismiss", "neden=eq.Otomatik: migration öncesi doğum", "*", 10)
+```
+Sonuç > 0 satır olmalı.
+
+Backfill'i doğrula:
+```
+supabase_query("gorev_log", "tamamlandi=eq.true,etken_kod=neq.null", "id,hayvan_id,etken_kod,aciklama", 10)
+```
+
+- [ ] **Step 5: Commit + Push**
 
 ```bash
-git add supabase/migrations/20260603000005_protokol_fix_v2.sql
-git commit -m "fix: uuid cast, etken_kod backfill, dismiss backfill, scanner DISTINCT ON"
+cd /root/egesut-erp1 && git add supabase/migrations/20260603000005_protokol_fix_v2.sql && git commit -m "fix: uuid cast, etken_kod backfill, dismiss backfill, scanner DISTINCT ON" && git push origin main
 ```
 
 ---
@@ -619,9 +681,19 @@ git commit -m "fix: uuid cast, etken_kod backfill, dismiss backfill, scanner DIS
 **Files:**
 - Modify: `js/ui.js:705-750` (`_showProtokolEkran` fonksiyonu)
 
+**Tools:** `file_read` → `file_write`
+
 Bu task protokol listesindeki satırları tıklanabilir yapar ve iş detay bottom-sheet'ini oluşturur.
 
-- [ ] **Step 1: `_showProtokolEkran` satır HTML'ini güncelle**
+- [ ] **Step 1: Dosyayı oku**
+
+```
+file_read("/root/egesut-erp1/js/ui.js")
+```
+
+`_showProtokolEkran` fonksiyonunu bul (satır ~705), `_satirHtml` alt fonksiyonunu bul (satır ~727-738).
+
+- [ ] **Step 2: `_showProtokolEkran` satır HTML'ini güncelle**
 
 `js/ui.js` dosyasında `_showProtokolEkran` fonksiyonundaki `_satirHtml` fonksiyonunu bul (satır ~727-738). Satırın tamamını tıklanabilir yap — butonlar hariç gövdeye tıklayınca `_showProtokolDetay` açılır.
 
@@ -646,9 +718,9 @@ DEĞİŞİKLİKLER:
 - Satır `<div class="arow">`'a `cursor:pointer` ve `onclick="_showProtokolDetay(...)` eklendi
 - Buton container'a `onclick="event.stopPropagation()"` eklendi — butonlara tıklayınca detay açılmaz
 
-- [ ] **Step 2: `_showProtokolDetay` fonksiyonunu ekle**
+- [ ] **Step 3: `_showProtokolDetay` fonksiyonunu ekle**
 
-`js/ui.js` dosyasında `_showProtokolEkran` fonksiyonundan HEMEN SONRA (satır ~750'den sonra, `_ETKEN_FILTERE`'den ÖNCE) şu fonksiyonu ekle:
+`js/ui.js` dosyasında `_showProtokolEkran` fonksiyonundan HEMEN SONRA (satır ~750'den sonra, `_ETKEN_FILTERE`'den ÖNCE) şu fonksiyonu ekle. `file_write` ile patch olarak ekle:
 
 ```javascript
 function _showProtokolDetay(hayvanId, protokol, activeIdx){
@@ -725,11 +797,10 @@ function _protoDetayHayvanGit(hayvanId){
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit + Push**
 
 ```bash
-git add js/ui.js
-git commit -m "feat: protokol satır tıklama → iş detay timeline bottom-sheet"
+cd /root/egesut-erp1 && git add js/ui.js && git commit -m "feat: protokol satır tıklama → iş detay timeline bottom-sheet" && git push origin main
 ```
 
 ---
@@ -738,8 +809,21 @@ git commit -m "feat: protokol satır tıklama → iş detay timeline bottom-shee
 
 **Files:**
 - Modify: `js/app.js:100-118` (popstate handler)
+- Modify: `js/ui.js` (`_showProtokolEkran` — pushState ekle)
 
-- [ ] **Step 1: popstate handler'a protokol bottom-sheet desteği ekle**
+**Tools:** `file_read` → `file_write`
+
+- [ ] **Step 1: Dosyaları oku**
+
+```
+file_read("/root/egesut-erp1/js/app.js")
+file_read("/root/egesut-erp1/js/ui.js")
+```
+
+`app.js` satır ~100-118: mevcut popstate handler'ı bul.
+`ui.js`: `_showProtokolEkran` fonksiyonunda `document.body.appendChild(box)` satırını bul.
+
+- [ ] **Step 2: popstate handler'a protokol bottom-sheet desteği ekle**
 
 `js/app.js:100-118` — mevcut popstate handler'ın başına (sentinel kontrolünden SONRA, det kontrolünden ÖNCE) protokol kontrolleri ekle:
 
@@ -784,7 +868,7 @@ Mevcut silinen kod:
   }
 ```
 
-- [ ] **Step 2: `_showProtokolEkran` fonksiyonuna history.pushState ekle**
+- [ ] **Step 3: `_showProtokolEkran` fonksiyonuna history.pushState ekle**
 
 `js/ui.js` dosyasında `_showProtokolEkran` fonksiyonunda, `document.body.appendChild(box);` satırından HEMEN ÖNCE şu satırı ekle:
 
@@ -792,7 +876,7 @@ Mevcut silinen kod:
   history.pushState({protokol:true}, '', '');
 ```
 
-- [ ] **Step 3: Test — ekran stack'i**
+- [ ] **Step 4: Test — ekran stack'i**
 
 1. Dashboard → Zil ikonu → Protokol ekranı açılır
 2. Bir satıra tıkla → İş detay bottom-sheet açılır (protokol ekranı arkada kalır)
@@ -801,11 +885,10 @@ Mevcut silinen kod:
 5. Geri tuşu → İş detay kapanır, protokol ekranı kalır
 6. Geri tuşu → Protokol ekranı kapanır, dashboard görünür
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit + Push**
 
 ```bash
-git add js/app.js js/ui.js
-git commit -m "feat: protokol ekran stack — geri tuşu ile state koruma"
+cd /root/egesut-erp1 && git add js/app.js js/ui.js && git commit -m "feat: protokol ekran stack — geri tuşu ile state koruma" && git push origin main
 ```
 
 ---
@@ -815,9 +898,19 @@ git commit -m "feat: protokol ekran stack — geri tuşu ile state koruma"
 **Files:**
 - Modify: `js/ui.js:805-826` (`_protokolUygulaKaydet`), `js/ui.js:828-845` (`_protokolDismiss`), `js/ui.js:847-865` (`_protokolGeriAl`)
 
+**Tools:** `file_read` → `file_write`
+
 Şu an işlem sonrası tüm ekranlar kapanıp `loadDash()` çağrılıyor. Bunun yerine sadece ilgili satır güncellenip ekranlar açık kalacak.
 
-- [ ] **Step 1: `_protokolUygulaKaydet` — işlem sonrası ekranları kapatma**
+- [ ] **Step 1: Dosyayı oku**
+
+```
+file_read("/root/egesut-erp1/js/ui.js")
+```
+
+Üç fonksiyonu bul: `_protokolUygulaKaydet` (~805), `_protokolDismiss` (~828), `_protokolGeriAl` (~847).
+
+- [ ] **Step 2: `_protokolUygulaKaydet` — işlem sonrası ekranları kapatma**
 
 `js/ui.js` dosyasında `_protokolUygulaKaydet` fonksiyonundaki başarılı sonuç bloğunu (satır ~817-822) şununla DEĞİŞTİR:
 
@@ -861,7 +954,7 @@ Yeni:
     }
 ```
 
-- [ ] **Step 2: `_protokolDismiss` — işlem sonrası ekranları kapatma**
+- [ ] **Step 3: `_protokolDismiss` — işlem sonrası ekranları kapatma**
 
 `js/ui.js` dosyasında `_protokolDismiss` fonksiyonundaki başarılı sonuç bloğunu (satır ~841-843) şununla DEĞİŞTİR:
 
@@ -895,7 +988,7 @@ Yeni:
     if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
 ```
 
-- [ ] **Step 3: `_protokolGeriAl` — işlem sonrası ekranları kapatma**
+- [ ] **Step 4: `_protokolGeriAl` — işlem sonrası ekranları kapatma**
 
 `js/ui.js` dosyasında `_protokolGeriAl` fonksiyonundaki başarılı sonuç bloğunu (satır ~854-857) şununla DEĞİŞTİR:
 
@@ -927,17 +1020,16 @@ Yeni:
       }
 ```
 
-- [ ] **Step 4: Test — işlem sonrası ekran durumu**
+- [ ] **Step 5: Test — işlem sonrası ekran durumu**
 
 1. Protokol ekranı → bir satıra "Uygula" → Kaydet → toast görünür, ekranlar kapanmaz, liste güncellenir
 2. Protokol ekranı → "✕" dismiss → toast görünür, liste güncellenir
 3. Badge sayısı işlem sonrası güncellenir
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit + Push**
 
 ```bash
-git add js/ui.js
-git commit -m "fix: protokol işlem sonrası ekranları kapatma yerine yerinde güncelle"
+cd /root/egesut-erp1 && git add js/ui.js && git commit -m "fix: protokol işlem sonrası ekranları kapatma yerine yerinde güncelle" && git push origin main
 ```
 
 ---
@@ -974,7 +1066,17 @@ Ek commit gerekmiyor — Task 5'teki `_showProtokolDetay` kodu zaten doğru koş
 **Files:**
 - Modify: `supabase/migrations/99999999999999_ground_truth.sql`
 
-- [ ] **Step 1: `ileri_gebe_asi_tamamla` fonksiyonunu güncelle**
+**Tools:** `file_read` → `file_write`
+
+- [ ] **Step 1: ground_truth dosyasını oku**
+
+```
+file_read("/root/egesut-erp1/supabase/migrations/99999999999999_ground_truth.sql")
+```
+
+Büyük dosya — ilgili fonksiyonları bul: `ileri_gebe_asi_tamamla` (~satır 6356), `protokol_eksik_tara`.
+
+- [ ] **Step 2: `ileri_gebe_asi_tamamla` fonksiyonunu güncelle**
 
 `supabase/migrations/99999999999999_ground_truth.sql` dosyasında `ileri_gebe_asi_tamamla` fonksiyonunu bul (satır ~6356). İki yerde `p_gorev_id::uuid` → `p_gorev_id` olarak değiştir:
 
@@ -994,13 +1096,13 @@ Satır ~6391:
   UPDATE gorev_log SET tamamlandi = true, tamamlanma_tarihi = now() WHERE id = p_gorev_id;
 ```
 
-- [ ] **Step 2: `protokol_eksik_tara` fonksiyonunu güncelle**
+- [ ] **Step 3: `protokol_eksik_tara` fonksiyonunu güncelle**
 
 ground_truth.sql dosyasında mevcut `protokol_eksik_tara` fonksiyonunu bul. Task 4'teki düzeltilmiş versiyon ile DEĞİŞTİR (DISTINCT ON + E_VIT fix). Bu fonksiyon zaten ground_truth'a eklenmiş olabilir — eğer öyleyse sadece DISTINCT ON ve VALUES değişikliğini yap.
 
 Eğer fonksiyon ground_truth'ta yoksa, Task 4'teki tam fonksiyon kodunu scanner bölümüne ekle.
 
-- [ ] **Step 3: Doğrulama — diğer yeni objeler ground_truth'ta var mı**
+- [ ] **Step 4: Doğrulama — diğer yeni objeler ground_truth'ta var mı**
 
 `supabase/migrations/99999999999999_ground_truth.sql` dosyasında şunların mevcut olduğunu doğrula (önceki migration'lar eklemişse):
 
@@ -1016,11 +1118,10 @@ Eğer fonksiyon ground_truth'ta yoksa, Task 4'teki tam fonksiyon kodunu scanner 
 
 Eksik olan varsa ekle. Fazla olan (eski versiyon duplike fonksiyonlar) varsa son versiyonu bırak, öncekini sil.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit + Push**
 
 ```bash
-git add supabase/migrations/99999999999999_ground_truth.sql
-git commit -m "fix: ground_truth sync — uuid cast fix, scanner DISTINCT ON, tüm yeni objeler"
+cd /root/egesut-erp1 && git add supabase/migrations/99999999999999_ground_truth.sql && git commit -m "fix: ground_truth sync — uuid cast fix, scanner DISTINCT ON, tüm yeni objeler" && git push origin main
 ```
 
 ---
