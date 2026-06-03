@@ -109,11 +109,27 @@ window.addEventListener('popstate', e => {
     goTo('dash', false);
     return;
   }
-  // Detay paneli açıksa önce onu kapat
+  // Protokol iş detay bottom-sheet açıksa kapat, protokol ekranına dön
+  const protoDetay = document.getElementById('proto-detay-bs');
+  if (protoDetay && protoDetay.style.display !== 'none') {
+    protoDetay.remove();
+    // Protokol ekranı ve hayvan kartı tekrar göster
+    const protokolBs = document.getElementById('protokol-bs');
+    if (protokolBs) protokolBs.style.display = 'flex';
+    return;
+  }
+
+  // Hayvan kartı açıksa ve protokol ekranı gizliyse — kartı kapat, protokol ekranlarını göster
   const det = document.getElementById('det');
   if (det?.classList.contains('on')) {
     closeDet();
     window._prevTaskId = null;
+    const protokolBs2 = document.getElementById('protokol-bs');
+    if (protokolBs2 && protokolBs2.style.display === 'none') {
+      protokolBs2.style.display = 'flex';
+      const protoDetay2 = document.getElementById('proto-detay-bs');
+      if (protoDetay2) protoDetay2.style.display = 'flex';
+    }
     return;
   }
   // Sayfalar arası geri — history.back() ile geldiğimizde push etme
