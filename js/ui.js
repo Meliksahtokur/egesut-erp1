@@ -288,6 +288,17 @@ async function loadDash(){
 
     const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
+    // Protokol uyarı scanner
+    try {
+      const proto = await rpc('protokol_eksik_tara', {});
+      window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
+      const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
+      const bb = document.getElementById('bellbadge');
+      if (bb) {
+        bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
+        bb.style.display = aktif.length > 0 ? 'flex' : 'none';
+      }
+    } catch(e) { console.warn('protokol_eksik_tara:', e.message); }
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
   }
@@ -690,6 +701,148 @@ async function _showSessizList(){
     box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${list.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">55+ gündür kızgınlık/tohumlama kaydı yok</div>${rows}</div>`;
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}
+}
+async function _showProtokolEkran(){
+  let data = window.__protokolUyarilar;
+  if (!data || !data.length) {
+    try { data = await rpc('protokol_eksik_tara', {}); } catch(e) { toast('Hata: '+e.message, true); return; }
+  }
+  if (!data || !data.length) { toast('Protokol uyarısı yok'); return; }
+
+  let box = document.getElementById('protokol-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'protokol-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) box.remove(); };
+
+  const eksik = data.filter(u => u.durum === 'eksik');
+  const yaklasan = data.filter(u => u.durum === 'yaklasan');
+  const tamamlandi = data.filter(u => u.durum === 'tamamlandi');
+
+  const _renk = d => d.durum === 'eksik' ? 'var(--red2)' : d.durum === 'yaklasan' ? '#b8860b' : '#2e7d32';
+  const _ikon = d => d.durum === 'eksik' ? '🔴' : d.durum === 'yaklasan' ? '🟡' : '✅';
+  const _gun = d => d.durum === 'eksik' ? d.gecikme_gun + ' gün gecikmiş' : d.durum === 'yaklasan' ? Math.abs(d.gecikme_gun || 0) + ' gün kaldı' : '';
+
+  const _satirHtml = (d, i) => `<div class="arow" style="border-left:3px solid ${_renk(d)};margin-bottom:6px;padding:8px 10px">
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:.8rem">${_ikon(d)} ${esc(d.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(d.grup||'')}</span></div>
+      <div style="font-size:.7rem;color:var(--ink3)">${esc(d.adim)} · ${_gun(d)}</div>
+      <div style="font-size:.6rem;opacity:.5">${esc(d.protokol)}</div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      ${d.durum !== 'tamamlandi' && d.etken_kod ? `<button onclick="_protokolUygula(${i})" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.1);color:var(--blue);cursor:pointer">💉 Uygula</button>` : ''}
+      ${d.durum !== 'tamamlandi' ? `<button onclick="_protokolDismiss(${i})" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>` : ''}
+      ${d.durum === 'tamamlandi' && d.kapatan_ref ? `<button onclick="_protokolGeriAl('${esc(d.kapatan_ref)}')" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩ Geri Al</button>` : ''}
+    </div>
+  </div>`;
+
+  const eksikHtml = eksik.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🔴 Gecikmiş (${eksik.length})</div>${eksik.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
+  const yakHtml = yaklasan.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:#b8860b">🟡 Yaklaşan (${yaklasan.length})</div>${yaklasan.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
+  const tamHtml = tamamlandi.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:#2e7d32">✅ Son 24 Saat (${tamamlandi.length})</div>${tamamlandi.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
+
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:1rem;margin-bottom:4px">📋 Protokol Uyarıları</div>
+    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">Doğum sonrası, ileri gebe, kızgınlık takibi</div>
+    ${eksikHtml}${yakHtml}${tamHtml}
+  </div>`;
+  document.body.appendChild(box);
+}
+
+async function _protokolUygula(idx){
+  const d = window.__protokolUyarilar[idx];
+  if (!d) return;
+  const stoklar = await idbGetAll('stok');
+  const ilaclar = stoklar.filter(s => s.kategori && !['Yem','Sperma'].includes(s.kategori));
+
+  let mini = document.getElementById('proto-mini');
+  if (mini) mini.remove();
+  mini = document.createElement('div');
+  mini.id = 'proto-mini';
+  mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:flex-end';
+  mini.onclick = e => { if (e.target === mini) mini.remove(); };
+
+  const stokOpts = ilaclar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
+  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+
+  mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💉 Protokol Uygula</div>
+    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">${esc(d.kupe_no||'?')} · ${esc(d.adim)} · ${esc(d.etken_kod||'')}</div>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Stok</label>
+    <select id="pu-stok" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${stokOpts}</select>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" value="10" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="ml" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+    </div>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
+    <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${rotaOpts}</select>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (zorunlu)</label>
+    <input id="pu-not" placeholder="Uygulama notu..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">
+    <button onclick="_protokolUygulaKaydet('${d.hayvan_id}',${idx})" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
+  </div>`;
+  document.body.appendChild(mini);
+}
+
+async function _protokolUygulaKaydet(hayvanId, idx){
+  const stok = document.getElementById('pu-stok')?.value;
+  const doz = parseFloat(document.getElementById('pu-doz')?.value);
+  const birim = document.getElementById('pu-birim')?.value;
+  const rota = document.getElementById('pu-rota')?.value;
+  const not_ = document.getElementById('pu-not')?.value?.trim();
+  if (!stok || !doz || !birim || !rota || !not_) { toast('Tüm alanları doldurun', true); return; }
+
+  try {
+    const res = await rpc('hizli_uygulama', {
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_
+    });
+    if (res?.ok) {
+      toast('✅ Uygulama kaydedildi');
+      document.getElementById('proto-mini')?.remove();
+      document.getElementById('protokol-bs')?.remove();
+      loadDash();
+    } else {
+      toast(res?.mesaj || 'Hata', true);
+    }
+  } catch(e) { toast('Hata: '+e.message, true); }
+}
+
+async function _protokolDismiss(idx){
+  const d = window.__protokolUyarilar[idx];
+  if (!d) return;
+  const neden = prompt('Geçersiz kılma nedeni (opsiyonel):');
+  if (neden === null) return; // iptal
+
+  try {
+    await db.from('protokol_dismiss').insert({
+      hayvan_id: d.hayvan_id,
+      etken_kod: d.etken_kod || 'MANUAL',
+      protokol: d.protokol,
+      neden: neden || null
+    });
+    toast('Uyarı geçersiz kılındı');
+    document.getElementById('protokol-bs')?.remove();
+    loadDash();
+  } catch(e) { toast('Hata: '+e.message, true); }
+}
+
+async function _protokolGeriAl(ref){
+  if (!confirm('Bu işlemi geri almak istediğinize emin misiniz?')) return;
+
+  const parts = ref.split(':');
+  if (parts[0] === 'uygulama_log' && parts[1]) {
+    try {
+      const res = await rpc('hizli_uygulama_geri_al', { p_uygulama_id: parts[1] });
+      if (res?.ok) {
+        toast('İşlem geri alındı');
+        document.getElementById('protokol-bs')?.remove();
+        loadDash();
+      } else {
+        toast(res?.mesaj || 'Hata', true);
+      }
+    } catch(e) { toast('Hata: '+e.message, true); }
+  } else {
+    toast('Bu işlem geri alınamaz (farklı kaynak)', true);
+  }
 }
 let _suruStatMode='son';
 
