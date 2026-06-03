@@ -749,11 +749,30 @@ async function _showProtokolEkran(){
   document.body.appendChild(box);
 }
 
+const _ETKEN_FILTERE = {
+  'OKSITOSIN': s => /oksitosin/i.test(s.urun_adi),
+  'PG':        s => /pg\b|pgf|cloprostenol|dalmazin/i.test(s.urun_adi),
+  'E_VIT':     s => /e[ .-]?vit|yeldif/i.test(s.urun_adi),
+  'ADEMIN':    s => /ademin/i.test(s.urun_adi),
+  'KALSIYUM':  s => /kalsiyum/i.test(s.urun_adi),
+  'ROTA':      s => /rota|corona|e\.?\s*coli/i.test(s.urun_adi),
+};
+
 async function _protokolUygula(idx){
   const d = window.__protokolUyarilar[idx];
   if (!d) return;
   const stoklar = await idbGetAll('stok');
-  const ilaclar = stoklar.filter(s => s.kategori && !['Yem','Sperma'].includes(s.kategori));
+  const fn = d.etken_kod ? _ETKEN_FILTERE[d.etken_kod] : null;
+  const ilaclar = stoklar.filter(s => {
+    if (!s.kategori || ['Yem','Sperma'].includes(s.kategori)) return false;
+    if (fn) return fn(s);
+    return false;
+  });
+
+  if (!ilaclar.length) {
+    toast(`"${d.etken_kod || 'Bu protokol'}" için uygun stok bulunamadı. Lütfen stok girişi yapın.`, true);
+    return;
+  }
 
   let mini = document.getElementById('proto-mini');
   if (mini) mini.remove();
