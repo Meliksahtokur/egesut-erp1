@@ -844,6 +844,60 @@ async function _protokolGeriAl(ref){
     toast('Bu işlem geri alınamaz (farklı kaynak)', true);
   }
 }
+async function _hayvanHizliUygulama(hayvanId){
+  const stoklar = await idbGetAll('stok');
+  const ilaclar = stoklar.filter(s => s.kategori && !['Yem','Sperma'].includes(s.kategori));
+  if (!ilaclar.length) { toast('Stokta ilaç/vitamin bulunamadı', true); return; }
+
+  let mini = document.getElementById('proto-mini');
+  if (mini) mini.remove();
+  mini = document.createElement('div');
+  mini.id = 'proto-mini';
+  mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:flex-end';
+  mini.onclick = e => { if (e.target === mini) mini.remove(); };
+
+  const stokOpts = ilaclar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
+  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+
+  mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💉 Hızlı Uygulama</div>
+    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">${esc(hayvanId)} — case açmadan ilaç/vitamin kaydı</div>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Stok</label>
+    <select id="pu-stok" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${stokOpts}</select>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" value="10" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="ml" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+    </div>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
+    <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${rotaOpts}</select>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (zorunlu)</label>
+    <input id="pu-not" placeholder="Uygulama notu..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">
+    <button onclick="_hayvanHizliUygulaKaydet('${hayvanId}')" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
+  </div>`;
+  document.body.appendChild(mini);
+}
+
+async function _hayvanHizliUygulaKaydet(hayvanId){
+  const stok = document.getElementById('pu-stok')?.value;
+  const doz = parseFloat(document.getElementById('pu-doz')?.value);
+  const birim = document.getElementById('pu-birim')?.value;
+  const rota = document.getElementById('pu-rota')?.value;
+  const not_ = document.getElementById('pu-not')?.value?.trim();
+  if (!stok || !doz || !birim || !rota || !not_) { toast('Tüm alanları doldurun', true); return; }
+
+  try {
+    const res = await rpc('hizli_uygulama', {
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_
+    });
+    if (res?.ok) {
+      toast('✅ Uygulama kaydedildi');
+      document.getElementById('proto-mini')?.remove();
+      openDet(hayvanId, true);
+    } else {
+      toast(res?.mesaj || 'Hata', true);
+    }
+  } catch(e) { toast('Hata: '+e.message, true); }
+}
 let _suruStatMode='son';
 
 function _renderSuruStat(){
@@ -1088,6 +1142,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     ${extra}
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
+    <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı Uygulama</button>
     <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>`;
 }
 function _detUremeHtml(a,tohs,kizgs){
@@ -1162,7 +1217,7 @@ async function _detRenderGecmis(id,el){
 // ──────────────────────────────────────────
 // HAYVAN DETAY — ana fonksiyon
 // ──────────────────────────────────────────
-async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[]){
+async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygulamaLogs=[]){
   const activeCaseChips=activeCases.length
     ?`<div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px">`+activeCases.map(c=>{
         const dis=allDiseasesList.find(d=>d.id===c.disease_id);
@@ -1220,7 +1275,22 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[]){
       `</div>`
     : `<div style="margin-top:12px;border-top:2px solid var(--card3);padding-top:8px"><div style="font-size:.75rem;color:var(--ink3)">💉 Aşı kaydı yok</div></div>`;
   
-  el.innerHTML=activeCaseChips+vaxButton+nextVaxChip+_caseListHtml+vaxHistory;
+  // Hızlı uygulama geçmişi
+  const stokList = await idbGetAll('stok');
+  const uygulamaHtml = uygulamaLogs.length ? `<div style="margin-top:12px;border-top:2px solid var(--card3);padding-top:8px">
+    <div style="font-size:.7rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">💉 Hızlı Uygulamalar</div>
+    ${uygulamaLogs.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||'')).map(u => {
+      const stok = stokList.find(s => s.id === u.stok_id);
+      return `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--card2)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:.8rem;color:var(--ink)">💊 ${esc(stok?.urun_adi||'?')}</div>
+          <div style="font-size:.68rem;color:var(--ink3)">${u.tarih||'?'} · ${u.doz} ${u.birim} (${u.rota}) · ${esc(u.notlar||'')}</div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>` : '';
+
+  el.innerHTML=activeCaseChips+vaxButton+nextVaxChip+_caseListHtml+vaxHistory+uygulamaHtml;
 }
 function _detGorevHtml(a,tasks,subs,today){
   const kupe=a.kupe_no||a.devlet_kupe||a.id;
@@ -1253,10 +1323,10 @@ async function openDet(id, keepTab){
   ['det-chips','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   const _ozetEl=document.getElementById('tab-ozet'); if(_ozetEl) _ozetEl.innerHTML=_skelHtml;
   showTab(activeTab||'ozet',document.querySelector(activeTab?`.tab[data-action="tab-${activeTab}"]`:'.tab'));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(_detOpenId!==id) return;
   try {
-    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs]=await Promise.all([
+    const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs,uygulamaLogs]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
       getData('cases',c=>c.animal_id===id),
       getData('tohumlama',t=>t.hayvan_id===id),
@@ -1267,6 +1337,7 @@ async function openDet(id, keepTab){
       getData('cases',c=>c.animal_id===id&&c.status==='active'),
       getData('vaccination_log',v=>v.animal_id===id),
       getData('kizginlik_log',k=>k.hayvan_id===id),
+      getData('uygulama_log',u=>u.hayvan_id===id),
     ]);
     if(_detOpenId!==id) return;
     const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
@@ -1292,7 +1363,7 @@ async function openDet(id, keepTab){
     document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
 
     const allDiseasesList=await idbGetAll('diseases');
-    await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a,vaxLogs);
+    await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a,vaxLogs,uygulamaLogs);
 
     document.getElementById('tab-ureme').innerHTML=_detUremeHtml(a,tohs,kizgs);
 
