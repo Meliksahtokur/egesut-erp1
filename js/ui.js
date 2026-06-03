@@ -926,12 +926,13 @@ async function _protokolDismiss(idx){
   if (neden === null) return; // iptal
 
   try {
-    await db.from('protokol_dismiss').insert({
+    const { error: insErr } = await db.from('protokol_dismiss').insert({
       hayvan_id: d.hayvan_id,
       etken_kod: d.etken_kod || 'MANUAL',
       protokol: d.protokol,
       neden: neden || null
     });
+    if (insErr) { toast('Hata: ' + (insErr.message || insErr.details || 'Dismiss başarısız'), true); return; }
     toast('Uyarı geçersiz kılındı');
     try {
       const proto = await rpc('protokol_eksik_tara', {});
