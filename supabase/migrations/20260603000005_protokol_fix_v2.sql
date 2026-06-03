@@ -1,10 +1,46 @@
 -- Migration: Protokol Fix v2 — uuid cast, backfill, scanner, indexes
--- Sorunlar: ileri_gebe_asi_tamamla uuid=text, eksik backfill, scanner duplikasyon
-BEGIN;
+-- Root cause: _gorev_dinle v_gorev_id text→uuid, gorev_log.id UUID (ground_truth yanlış yazmış)
 
 -- ============================================================
--- Fix 1: ileri_gebe_asi_tamamla — uuid cast kaldır
--- gorev_log.id TEXT, ::uuid cast text ile karşılaştırılamaz
+-- Fix 0: _gorev_dinle — v_gorev_id text → uuid
+-- gorev_log.id UUID iken text değişken uuid=text hatası veriyordu
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public._gorev_dinle(
+  p_hayvan_id text,
+  p_etken_kod text,
+  p_ref text
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_gorev_id uuid;
+BEGIN
+  IF p_etken_kod IS NULL OR p_hayvan_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT id INTO v_gorev_id
+  FROM public.gorev_log
+  WHERE hayvan_id = p_hayvan_id
+    AND etken_kod = p_etken_kod
+    AND tamamlandi = false
+    AND iptal = false
+  ORDER BY hedef_tarih ASC
+  LIMIT 1;
+
+  IF v_gorev_id IS NOT NULL THEN
+    UPDATE public.gorev_log
+    SET tamamlandi = true,
+        tamamlanma_tarihi = now(),
+        kapatan_ref = p_ref
+    WHERE id = v_gorev_id;
+  END IF;
+END;
+$$;
+
+-- ============================================================
+-- Fix 1: ileri_gebe_asi_tamamla — ::uuid cast geri eklendi
+-- gorev_log.id UUID, p_gorev_id text → cast gerekli
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.ileri_gebe_asi_tamamla(
@@ -21,7 +57,7 @@ DECLARE
   v_rapel_tarih date;
   v_is_first    boolean;
 BEGIN
-  SELECT * INTO v_gorev FROM gorev_log WHERE id = p_gorev_id;
+  SELECT * INTO v_gorev FROM gorev_log WHERE id = p_gorev_id::uuid;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
   END IF;
@@ -39,7 +75,7 @@ BEGIN
 
   UPDATE gorev_log
   SET tamamlandi = true, tamamlanma_tarihi = now()
-  WHERE id = p_gorev_id;
+  WHERE id = p_gorev_id::uuid;
 
   v_is_first := v_gorev.aciklama ILIKE '%1. doz%';
   IF v_is_first THEN
@@ -120,7 +156,7 @@ ON CONFLICT (hayvan_id, etken_kod, protokol) DO NOTHING;
 INSERT INTO public.protokol_dismiss (hayvan_id, etken_kod, protokol, neden)
 SELECT DISTINCT d.anne_id, 'MANUAL', 'KIZGINLIK_TAKIP', 'Otomatik: migration öncesi doğum'
 FROM public.dogum d
-WHERE (CURRENT_DATE - d.tarih) BETWEEN 55 AND 70
+WHERE (CURRENT_DATE - d.tarih) BETWEEN 55 AND 75
   AND d.yavru_kupe NOT IN ('80','79','78','77')
 ON CONFLICT (hayvan_id, etken_kod, protokol) DO NOTHING;
 
@@ -349,7 +385,7 @@ BEGIN
       ORDER BY anne_id, tarih DESC
     ) d
     JOIN public.hayvanlar h ON h.id = d.anne_id AND h.durum = 'Aktif'
-    WHERE (v_today - d.tarih) BETWEEN 55 AND 70
+    WHERE (v_today - d.tarih) BETWEEN 55 AND 75
   LOOP
     DECLARE
       v_hedef date := v_rec.dogum_tarihi + 58;
@@ -433,4 +469,4 @@ CREATE INDEX IF NOT EXISTS idx_dogum_anne_tarih
 CREATE INDEX IF NOT EXISTS idx_tohumlama_hayvan_sonuc
   ON public.tohumlama(hayvan_id, sonuc, tarih);
 
-COMMIT;
+-- end of migration
