@@ -9217,7 +9217,7 @@ BEGIN
       ELSIF v_found THEN CONTINUE;
       ELSIF v_gecikme >= 0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
 
-      v_result := v_result || jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','DOGUM_PROTOKOL','adim',v_rec.aciklama,'etken_kod',v_rec.ek,'hedef_tarih',v_hedef,'gecikme_gun',GREATEST(v_gecikme,0),'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
+      v_result := v_result || jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','DOGUM_PROTOKOL','adim',v_rec.aciklama,'etken_kod',v_rec.ek,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
     END;
   END LOOP;
 
@@ -9240,7 +9240,7 @@ BEGIN
           IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_a.ek AND pd.protokol='ILERI_GEBE_PROTOKOL' LIMIT 1; END IF;
           v_gecikme:=v_today-v_hedef;
           IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
-          v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','ILERI_GEBE_PROTOKOL','adim',v_a.aciklama,'etken_kod',v_a.ek,'hedef_tarih',v_hedef,'gecikme_gun',GREATEST(v_gecikme,0),'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
+          v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','ILERI_GEBE_PROTOKOL','adim',v_a.aciklama,'etken_kod',v_a.ek,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
         END;
       END LOOP;
     END;
@@ -9260,7 +9260,7 @@ BEGIN
       IF NOT v_found THEN SELECT true INTO v_found FROM tohumlama t WHERE t.hayvan_id=v_rec.hayvan_id AND t.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
       IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.protokol='KIZGINLIK_TAKIP' LIMIT 1; END IF;
       IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
-      v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','KIZGINLIK_TAKIP','adim','58-63. gun kizginlik takibi','etken_kod',NULL,'hedef_tarih',v_hedef,'gecikme_gun',GREATEST(v_gecikme,0),'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
+      v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','KIZGINLIK_TAKIP','adim','58-63. gun kizginlik takibi','etken_kod',NULL,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
     END;
   END LOOP;
 
