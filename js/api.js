@@ -17,6 +17,7 @@ const APP_VERSION = '2026-03-12-cln03';
 // ── SUPABASE SDK ────────────────────────────
 const { createClient } = window.supabase;
 const db = createClient(SB_URL, SB_KEY);
+window.db = db;
 
 // ── HATA MAP ────────────────────────────────
 const _ERR_MAP = [
