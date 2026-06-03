@@ -746,6 +746,7 @@ async function _showProtokolEkran(){
     <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">Doğum sonrası, ileri gebe, kızgınlık takibi</div>
     ${eksikHtml}${yakHtml}${tamHtml}
   </div>`;
+  history.pushState({protokol:true}, '', '');
   document.body.appendChild(box);
 }
 
@@ -890,8 +891,28 @@ async function _protokolUygulaKaydet(hayvanId, idx){
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
-      document.getElementById('protokol-bs')?.remove();
-      loadDash();
+      // Scanner'ı arka planda yenile, ekranlar açık kalsın
+      try {
+        const proto = await rpc('protokol_eksik_tara', {});
+        window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
+        // Badge güncelle
+        const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
+        const bb = document.getElementById('bellbadge');
+        if (bb) {
+          bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
+          bb.style.display = aktif.length > 0 ? 'flex' : 'none';
+        }
+      } catch(e) { console.warn('scanner refresh:', e.message); }
+      // İş detay açıksa yenile
+      const detayBs = document.getElementById('proto-detay-bs');
+      if (detayBs) {
+        detayBs.remove();
+        const d = window.__protokolUyarilar[idx];
+        if (d) _showProtokolDetay(d.hayvan_id, d.protokol, idx);
+      }
+      // Protokol listesini yenile
+      const protokolBs = document.getElementById('protokol-bs');
+      if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
     } else {
       toast(res?.mesaj || 'Hata', true);
     }
@@ -912,8 +933,24 @@ async function _protokolDismiss(idx){
       neden: neden || null
     });
     toast('Uyarı geçersiz kılındı');
-    document.getElementById('protokol-bs')?.remove();
-    loadDash();
+    try {
+      const proto = await rpc('protokol_eksik_tara', {});
+      window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
+      const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
+      const bb = document.getElementById('bellbadge');
+      if (bb) {
+        bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
+        bb.style.display = aktif.length > 0 ? 'flex' : 'none';
+      }
+    } catch(e) { console.warn('scanner refresh:', e.message); }
+    const detayBs = document.getElementById('proto-detay-bs');
+    if (detayBs) {
+      detayBs.remove();
+      const d2 = window.__protokolUyarilar.find(x => x.hayvan_id === d.hayvan_id && x.protokol === d.protokol);
+      if (d2) _showProtokolDetay(d2.hayvan_id, d2.protokol, window.__protokolUyarilar.indexOf(d2));
+    }
+    const protokolBs = document.getElementById('protokol-bs');
+    if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
   } catch(e) { toast('Hata: '+e.message, true); }
 }
 
@@ -926,8 +963,18 @@ async function _protokolGeriAl(ref){
       const res = await rpc('hizli_uygulama_geri_al', { p_uygulama_id: parts[1] });
       if (res?.ok) {
         toast('İşlem geri alındı');
-        document.getElementById('protokol-bs')?.remove();
-        loadDash();
+        try {
+          const proto = await rpc('protokol_eksik_tara', {});
+          window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
+          const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
+          const bb = document.getElementById('bellbadge');
+          if (bb) {
+            bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
+            bb.style.display = aktif.length > 0 ? 'flex' : 'none';
+          }
+        } catch(e) { console.warn('scanner refresh:', e.message); }
+        const protokolBs = document.getElementById('protokol-bs');
+        if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
       } else {
         toast(res?.mesaj || 'Hata', true);
       }
