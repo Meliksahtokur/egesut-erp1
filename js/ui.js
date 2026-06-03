@@ -724,13 +724,13 @@ async function _showProtokolEkran(){
   const _ikon = d => d.durum === 'eksik' ? '🔴' : d.durum === 'yaklasan' ? '🟡' : '✅';
   const _gun = d => d.durum === 'eksik' ? d.gecikme_gun + ' gün gecikmiş' : d.durum === 'yaklasan' ? Math.abs(d.gecikme_gun || 0) + ' gün kaldı' : '';
 
-  const _satirHtml = (d, i) => `<div class="arow" style="border-left:3px solid ${_renk(d)};margin-bottom:6px;padding:8px 10px">
+  const _satirHtml = (d, i) => `<div class="arow" style="border-left:3px solid ${_renk(d)};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_showProtokolDetay('${d.hayvan_id}','${esc(d.protokol)}',${i})">
     <div style="flex:1">
       <div style="font-weight:700;font-size:.8rem">${_ikon(d)} ${esc(d.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(d.grup||'')}</span></div>
       <div style="font-size:.7rem;color:var(--ink3)">${esc(d.adim)} · ${_gun(d)}</div>
       <div style="font-size:.6rem;opacity:.5">${esc(d.protokol)}</div>
     </div>
-    <div style="display:flex;gap:6px;align-items:center">
+    <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
       ${d.durum !== 'tamamlandi' && d.etken_kod ? `<button onclick="_protokolUygula(${i})" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.1);color:var(--blue);cursor:pointer">💉 Uygula</button>` : ''}
       ${d.durum !== 'tamamlandi' ? `<button onclick="_protokolDismiss(${i})" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>` : ''}
       ${d.durum === 'tamamlandi' && d.kapatan_ref ? `<button onclick="_protokolGeriAl('${esc(d.kapatan_ref)}')" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩ Geri Al</button>` : ''}
@@ -747,6 +747,79 @@ async function _showProtokolEkran(){
     ${eksikHtml}${yakHtml}${tamHtml}
   </div>`;
   document.body.appendChild(box);
+}
+
+function _showProtokolDetay(hayvanId, protokol, activeIdx){
+  const data = window.__protokolUyarilar;
+  if (!data) return;
+
+  const items = data.filter(d => d.hayvan_id === hayvanId && d.protokol === protokol);
+  if (!items.length) return;
+
+  const d0 = items[0];
+  const _renk = d => d.durum === 'eksik' ? 'var(--red2)' : d.durum === 'yaklasan' ? '#b8860b' : '#2e7d32';
+  const _ikon = d => d.durum === 'eksik' ? '🔴' : d.durum === 'yaklasan' ? '🟡' : '✅';
+
+  let box = document.getElementById('proto-detay-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'proto-detay-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:350;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) { box.remove(); history.back(); } };
+
+  const _adimHtml = items.map((d, i) => {
+    const globalIdx = data.indexOf(d);
+    const tamamTarih = d.tamamlanma_tarihi ? fmtTarih(d.tamamlanma_tarihi) : '';
+    const gecikme = d.durum === 'eksik' ? `<span style="color:var(--red2);font-weight:700">${d.gecikme_gun} gün gecikmiş</span>` :
+                    d.durum === 'yaklasan' ? `<span style="color:#b8860b">${Math.abs(d.gecikme_gun||0)} gün kaldı</span>` :
+                    `<span style="color:#2e7d32">${tamamTarih}</span>`;
+    const butonlar = d.durum !== 'tamamlandi' && d.etken_kod
+      ? `<button onclick="_protokolUygula(${globalIdx})" style="font-size:.6rem;font-weight:700;padding:3px 8px;border-radius:6px;border:1px solid var(--blue);background:rgba(30,100,200,.1);color:var(--blue);cursor:pointer">💉</button>
+         <button onclick="_protokolDismiss(${globalIdx})" style="font-size:.6rem;padding:3px 6px;border-radius:6px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`
+      : d.durum !== 'tamamlandi'
+      ? `<button onclick="_protokolDismiss(${globalIdx})" style="font-size:.6rem;padding:3px 6px;border-radius:6px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`
+      : d.kapatan_ref
+      ? `<button onclick="_protokolGeriAl('${esc(d.kapatan_ref)}')" style="font-size:.6rem;padding:3px 8px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩</button>`
+      : '';
+
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--card2)">
+      <div style="font-size:1rem">${_ikon(d)}</div>
+      <div style="flex:1">
+        <div style="font-size:.78rem;font-weight:600">${esc(d.adim)}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">${fmtTarih(d.hedef_tarih)} · ${gecikme}</div>
+      </div>
+      <div style="display:flex;gap:4px">${butonlar}</div>
+    </div>`;
+  }).join('');
+
+  const protokolLabel = protokol === 'DOGUM_PROTOKOL' ? 'Doğum Protokolü' :
+                        protokol === 'ILERI_GEBE_PROTOKOL' ? 'İleri Gebe Protokolü' :
+                        'Kızgınlık Takibi';
+
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div style="font-weight:800;font-size:.95rem">
+          <a href="javascript:void(0)" onclick="_protoDetayHayvanGit('${hayvanId}')" style="color:var(--blue);text-decoration:underline">${esc(d0.kupe_no||'?')}</a>
+          <span style="font-size:.65rem;opacity:.6;margin-left:6px">${esc(d0.grup||'')}</span>
+        </div>
+        <div style="font-size:.72rem;color:var(--ink3);margin-top:2px">${protokolLabel}</div>
+      </div>
+      <button onclick="document.getElementById('proto-detay-bs')?.remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--ink3)">✕</button>
+    </div>
+    ${_adimHtml}
+  </div>`;
+
+  history.pushState({proto_detay:true}, '', '');
+  document.body.appendChild(box);
+}
+
+function _protoDetayHayvanGit(hayvanId){
+  const detayBs = document.getElementById('proto-detay-bs');
+  if (detayBs) detayBs.style.display = 'none';
+  const protokolBs = document.getElementById('protokol-bs');
+  if (protokolBs) protokolBs.style.display = 'none';
+  openDet(hayvanId);
 }
 
 const _ETKEN_FILTERE = {
