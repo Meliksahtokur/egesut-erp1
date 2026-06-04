@@ -832,6 +832,7 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
     if (el) { el.classList.add('done'); setTimeout(() => el.remove(), 320); }
     toast('✅ Tamamlandı');
     await pullTables(['hayvanlar']).catch(()=>{});
+    if (typeof _islemSonrasiRefresh === 'function') _islemSonrasiRefresh();
     loadDash();
   } catch (e) {
     btn.disabled = false;
