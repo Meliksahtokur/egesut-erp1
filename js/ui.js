@@ -922,16 +922,15 @@ async function _protokolUygulaKaydet(hayvanId, idx){
 async function _protokolDismiss(idx){
   const d = window.__protokolUyarilar[idx];
   if (!d) return;
-  const neden = prompt('Geçersiz kılma nedeni (opsiyonel):');
-  if (neden === null) return; // iptal
+  if (!confirm('Bu uyarıyı geçersiz kılmak istediğinize emin misiniz?')) return;
 
   try {
-    const { error: insErr } = await db.from('protokol_dismiss').insert({
+    const { error: insErr } = await db.from('protokol_dismiss').upsert({
       hayvan_id: d.hayvan_id,
       etken_kod: d.etken_kod || 'MANUAL',
       protokol: d.protokol,
-      neden: neden || null
-    });
+      neden: 'Manuel dismiss'
+    }, { onConflict: 'hayvan_id,etken_kod,protokol' });
     if (insErr) { toast('Hata: ' + (insErr.message || insErr.details || 'Dismiss başarısız'), true); return; }
     toast('Uyarı geçersiz kılındı');
     try {

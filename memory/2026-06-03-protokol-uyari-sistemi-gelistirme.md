@@ -124,10 +124,10 @@ Plan: `docs/superpowers/plans/2026-06-03-protokol-fix-v2.md`
 - Hata mesajı dönmez, her zaman `[]` döner
 
 ### 6.2 `gorev_log.id` Tipi
-- **Tip:** TEXT (UUID formatında string saklar)
-- **INSERT:** `gen_random_uuid()` veya `gen_random_uuid()::text` — ikisi de çalışır (implicit cast)
-- **WHERE karşılaştırma:** `WHERE id = p_gorev_id` (text=text) — `::uuid` YAPMA
-- **uuid kolona INSERT:** `gen_random_uuid()` kullan, `::text` YAPMA
+- **Tip:** UUID (ground_truth'ta TEXT yazıyordu ama DB'de UUID — düzeltildi)
+- **INSERT:** `gen_random_uuid()` kullan
+- **WHERE karşılaştırma:** `WHERE id = p_gorev_id::uuid` (text param → uuid kolon cast gerekli)
+- **`_gorev_dinle` fix:** `v_gorev_id text` → `v_gorev_id uuid` (root cause of uuid=text error)
 
 ### 6.3 `ileri_gebe_asi_tamamla` — İki Versiyon
 - ground_truth'ta 2 versiyon var: satır 4852 (eski) ve satır 6922 (yeni — `_gorev_dinle` trigger kullanır)
@@ -163,16 +163,22 @@ Plan: `docs/superpowers/plans/2026-06-03-protokol-fix-v2.md`
 
 | # | Sorun | Önem | Durum |
 |---|-------|------|-------|
-| 1 | İlaç uygulama butonu — stok filtreleme eşleşmiyor | 🔴 Kritik | Çözüm bekliyor |
-| 2 | Dismiss butonu — `window.db` fix test edilmedi | 🟡 Orta | Canlıda test bekliyor |
+| 1 | İlaç uygulama butonu — stok filtreleme eşleşmiyor | ✅ Çözüldü | Kullanıcı ilaçları stok'a girdi |
+| 2 | Dismiss butonu — scanner dismiss'i filtrelemiyordu | ✅ Çözüldü | `NOT v_found` → `v_found IS NOT TRUE` fix (2026-06-04) |
 | 3 | Aşı uygulama (ileri_gebe_asi_tamamla) — deploy test edilmedi | 🟡 Orta | Canlıda test bekliyor |
 | 4 | ground_truth'ta `ileri_gebe_asi_tamamla` 3 versiyon var — hangisi canlıda? | 🟠 Düşük | Araştırma gerek |
+
+### 8.1 Scanner `NOT v_found` Bug (2026-06-04 Fix)
+- **Kök neden:** PL/pgSQL'de `SELECT true INTO v_found FROM ... WHERE ...` satır bulamazsa v_found'u NULL yapar (false DEĞİL)
+- `NOT NULL` → NULL (falsy) → sonraki tüm kontroller (uygulama_log, drug_admin, **protokol_dismiss**) atlanıyor
+- **Fix:** Tüm `IF NOT v_found` → `IF v_found IS NOT TRUE` (`NULL IS NOT TRUE` = TRUE → kontrol çalışır)
+- **Etki:** 3 bölüm (A: dogum, B: ileri gebe, C: kızgınlık) — toplam 12 kontrol düzeltildi
+- **Deploy:** `supabase_migrate` ile canlıya aktarıldı, ground_truth güncellendi
 
 ---
 
 ## 9. Sonraki Adımlar
 
-1. **İlaç uygulama butonu fix:** `stok_etken_kod_bul` RPC oluştur veya IDB join yap
-2. **Canlı test:** Dismiss + aşı uygulama butonlarını test et
-3. **Task 8-9:** Plan'da kalan UI iyileştirmeleri + ground_truth final sync
-4. **Memory güncelle:** `tools-bank` memory'sine kritik kuralları ekle
+1. **Canlı test:** Dismiss butonunu test et — scanner artık dismiss kayıtlarını filtreliyor
+2. **Task 8-9:** Plan'da kalan UI iyileştirmeleri + ground_truth final sync
+3. **Memory güncelle:** `tools-bank` memory'sine kritik kuralları ekle
