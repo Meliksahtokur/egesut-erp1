@@ -1684,6 +1684,7 @@ async function openAnimalEdit(id){
 function closeAnimalEdit(){
   const modal=document.getElementById('m-animal');
   if(modal){ delete modal.dataset.editId; }
+  ['a-devlet-warn','a-kupe-warn'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='';});
   // Kısır checkbox'ı gizle
   const kw=document.getElementById('a-kisir-wrap');
   if(kw) kw.style.display='none';
