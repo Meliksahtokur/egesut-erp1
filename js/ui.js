@@ -3798,7 +3798,7 @@ async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
   const doz = parseFloat(document.getElementById('pu-doz')?.value);
   const birim = document.getElementById('pu-birim')?.value;
   const rota = document.getElementById('pu-rota')?.value;
-  if (!stok || !doz || !birim || !rota) { toast('Tüm alanları doldurun', true); return; }
+  if (!stok || !doz || !birim) { toast('Stok ve doz alanlarını doldurun', true); return; }
 
   try {
     const res = await rpc('gorev_tamamla', {
@@ -3806,8 +3806,8 @@ async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
       p_padok_hedef: padokHedef || null,
       p_stok_id: stok,
       p_doz: doz,
-      p_birim: birim,
-      p_rota: rota
+      p_birim: birim || 'ml',
+      p_rota: rota || 'IM'
     });
     if (res?.ok) {
       toast('✅ Görev tamamlandı');

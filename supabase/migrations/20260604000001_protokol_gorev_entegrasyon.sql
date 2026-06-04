@@ -26,7 +26,7 @@ DECLARE
   v_active_ing text;
   v_stok_ad text;
   v_vaccine_name text;
-  v_dp_id text;
+  v_dp_id uuid;  -- stok.drug_product_id ve drug_products.id uuid tipinde
 BEGIN
   -- Aşı yolu
   IF p_vaccine_id IS NOT NULL THEN
@@ -147,7 +147,7 @@ BEGIN
     );
 
     INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
-    VALUES (gen_random_uuid()::text, p_stok_id, 'Görev', p_doz,
+    VALUES (gen_random_uuid(), p_stok_id, 'Görev', p_doz,
       'GorevID:' || p_gorev_id, false);
 
     -- Uygulama log kaydı → trigger fn_dinle_uygulama tetiklenir
@@ -188,7 +188,7 @@ BEGIN
     );
 
     INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
-    VALUES (gen_random_uuid()::text, v_gorev.stok_id, 'Görev', v_gorev.miktar,
+    VALUES (gen_random_uuid(), v_gorev.stok_id, 'Görev', v_gorev.miktar,
       'GorevID:' || p_gorev_id, false);
   END IF;
 
