@@ -5928,12 +5928,17 @@ function renderPadokDolulukBar() {
     }
   });
   el.innerHTML = PADOKLAR.map(p => {
-    if (!p.kapasite) return '';
     const dolu = padokSayac[p.id] || 0;
     const kap = p.kapasite;
+    const padokAdi = (p.ad || '').replace(' Padok', '');
+    if (!kap) {
+      return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${p.ad}')" title="${p.ad}: ${dolu} hayvan">
+        <span class="pdoluluk-ad">${padokAdi}</span>
+        <span class="pdoluluk-sayi">${dolu}</span>
+      </div>`;
+    }
     const yuzde = Math.round((dolu / kap) * 100);
     const renk = yuzde >= 100 ? 'var(--red)' : yuzde >= 80 ? 'var(--amber)' : 'var(--green)';
-    const padokAdi = (p.ad || '').replace(' Padok', '');
     return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${p.ad}')" title="${p.ad}: ${dolu}/${kap}">
       <span class="pdoluluk-ad">${padokAdi}</span>
       <div class="pdoluluk-bar-wrap"><div class="pdoluluk-fill" style="width:${Math.min(yuzde,100)}%;background:${renk}"></div></div>
