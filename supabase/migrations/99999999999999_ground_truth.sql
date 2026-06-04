@@ -9189,12 +9189,16 @@ BEGIN
   -- A. DOĞUM SONRASI PROTOKOL
   FOR v_rec IN
     SELECT d.id, d.anne_id AS hayvan_id, d.tarih AS dogum_tarihi, h.kupe_no, h.grup, a.gun, a.ek, a.aciklama
-    FROM public.dogum d
+    FROM (
+      SELECT DISTINCT ON (anne_id) *
+      FROM public.dogum
+      ORDER BY anne_id, tarih DESC
+    ) d
     JOIN public.hayvanlar h ON h.id = d.anne_id AND h.durum = 'Aktif'
     CROSS JOIN (VALUES
-      (0,'OKSITOSIN','Doğum günü: Oksitosin'),(0,'ADEMIN','Doğum günü: Ademin'),(0,'KALSIYUM','Doğum günü: Kalsiyum'),
-      (2,'PG','2. Gün PG'),(11,'PG','11. Gün PG'),(25,'PG','25. Gün PG'),
-      (53,'ADEMIN','53. Gün: Ademin'),(53,'E_VIT','53. Gün: Yeldif'),(54,'E_VIT','54. Gün: Yeldif')
+      (0,'OKSITOSIN','Dogum gunu: Oksitosin'),(0,'ADEMIN','Dogum gunu: Ademin'),(0,'KALSIYUM','Dogum gunu: Kalsiyum'),
+      (2,'PG','2. Gun PG'),(11,'PG','11. Gun PG'),(25,'PG','25. Gun PG'),
+      (53,'ADEMIN','53. Gun: Ademin'),(54,'E_VIT','54. Gun: Yeldif')
     ) AS a(gun,ek,aciklama)
     WHERE d.tarih >= v_today - 70 AND d.tarih <= v_today
   LOOP
@@ -9208,13 +9212,13 @@ BEGIN
       SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan
       FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_rec.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
 
-      IF NOT v_found THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_rec.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
-      IF NOT v_found THEN SELECT true INTO v_found FROM drug_administrations da JOIN treatment_days td ON td.id=da.treatment_day_id JOIN cases c ON c.id=td.case_id WHERE c.animal_id=v_rec.hayvan_id AND public._etken_kod_bul(da.stok_id,NULL)=v_rec.ek AND da.created_at::date BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
-      IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_rec.ek AND pd.protokol='DOGUM_PROTOKOL' LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_rec.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM drug_administrations da JOIN treatment_days td ON td.id=da.treatment_day_id JOIN cases c ON c.id=td.case_id WHERE c.animal_id=v_rec.hayvan_id AND public._etken_kod_bul(da.stok_id,NULL)=v_rec.ek AND da.created_at::date BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_rec.ek AND pd.protokol='DOGUM_PROTOKOL' LIMIT 1; END IF;
 
       v_gecikme := v_today - v_hedef;
-      IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma >= now()-interval '24 hours' THEN v_durum:='tamamlandi';
-      ELSIF v_found THEN CONTINUE;
+      IF v_found IS TRUE AND v_tamamlanma IS NOT NULL AND v_tamamlanma >= now()-interval '24 hours' THEN v_durum:='tamamlandi';
+      ELSIF v_found IS TRUE THEN CONTINUE;
       ELSIF v_gecikme >= 0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
 
       v_result := v_result || jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','DOGUM_PROTOKOL','adim',v_rec.aciklama,'etken_kod',v_rec.ek,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
@@ -9235,11 +9239,11 @@ BEGIN
           IF v_hedef>v_today+7 THEN CONTINUE; END IF;
           v_found:=false; v_tamamlanma:=NULL; v_kapatan:=NULL;
           SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_a.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
-          IF NOT v_found AND v_a.ek='ROTA' THEN SELECT true INTO v_found FROM vaccination_log vl JOIN vaccines v ON v.id=vl.vaccine_id WHERE vl.animal_id=v_rec.hayvan_id AND v.name ILIKE '%Rota%' AND vl.vaccination_date BETWEEN v_hedef-7 AND v_hedef+7 LIMIT 1; END IF;
-          IF NOT v_found THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_a.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
-          IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_a.ek AND pd.protokol='ILERI_GEBE_PROTOKOL' LIMIT 1; END IF;
+          IF v_found IS NOT TRUE AND v_a.ek='ROTA' THEN SELECT true INTO v_found FROM vaccination_log vl JOIN vaccines v ON v.id=vl.vaccine_id WHERE vl.animal_id=v_rec.hayvan_id AND v.name ILIKE '%Rota%' AND vl.vaccination_date BETWEEN v_hedef-7 AND v_hedef+7 LIMIT 1; END IF;
+          IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_a.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+          IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_a.ek AND pd.protokol='ILERI_GEBE_PROTOKOL' LIMIT 1; END IF;
           v_gecikme:=v_today-v_hedef;
-          IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
+          IF v_found IS TRUE AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found IS TRUE THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
           v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','ILERI_GEBE_PROTOKOL','adim',v_a.aciklama,'etken_kod',v_a.ek,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
         END;
       END LOOP;
@@ -9249,17 +9253,22 @@ BEGIN
   -- C. KIZGINLIK TAKİBİ
   FOR v_rec IN
     SELECT d.id,d.anne_id AS hayvan_id,d.tarih AS dogum_tarihi,h.kupe_no,h.grup
-    FROM public.dogum d JOIN public.hayvanlar h ON h.id=d.anne_id AND h.durum='Aktif'
-    WHERE (v_today-d.tarih) BETWEEN 55 AND 70
+    FROM (
+      SELECT DISTINCT ON (anne_id) *
+      FROM public.dogum
+      ORDER BY anne_id, tarih DESC
+    ) d
+    JOIN public.hayvanlar h ON h.id=d.anne_id AND h.durum='Aktif'
+    WHERE (v_today-d.tarih) BETWEEN 55 AND 75
   LOOP
     DECLARE v_hedef date:=v_rec.dogum_tarihi+58; v_gecikme int:=v_today-v_hedef; v_durum text;
     BEGIN
       v_found:=false; v_tamamlanma:=NULL; v_kapatan:=NULL;
       SELECT true,g.tamamlanma_tarihi INTO v_found,v_tamamlanma FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.aciklama ILIKE '%kizginlik%' AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+7 LIMIT 1;
-      IF NOT v_found THEN SELECT true INTO v_found FROM kizginlik_log k WHERE k.hayvan_id=v_rec.hayvan_id AND k.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
-      IF NOT v_found THEN SELECT true INTO v_found FROM tohumlama t WHERE t.hayvan_id=v_rec.hayvan_id AND t.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
-      IF NOT v_found THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.protokol='KIZGINLIK_TAKIP' LIMIT 1; END IF;
-      IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM kizginlik_log k WHERE k.hayvan_id=v_rec.hayvan_id AND k.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM tohumlama t WHERE t.hayvan_id=v_rec.hayvan_id AND t.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.protokol='KIZGINLIK_TAKIP' LIMIT 1; END IF;
+      IF v_found IS TRUE AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found IS TRUE THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
       v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','KIZGINLIK_TAKIP','adim','58-63. gun kizginlik takibi','etken_kod',NULL,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
     END;
   END LOOP;
