@@ -1138,11 +1138,13 @@ button,input,select,textarea{font-family:inherit}
       <div class="r2">
         <div class="fg">
           <label class="flbl">Devlet Küpe No</label>
-          <input id="a-devlet" class="fi" placeholder="TR-1234567" autocomplete="off">
+          <input id="a-devlet" class="fi" placeholder="TR-1234567" autocomplete="off" onblur="_kupeKontrolEt('a-devlet')">
+          <div id="a-devlet-warn" style="font-size:.62rem;color:var(--red);min-height:.9em;margin-top:2px"></div>
         </div>
         <div class="fg">
           <label class="flbl">İşletme Küpe No</label>
-          <input id="a-kupe" class="fi" placeholder="001" autocomplete="off">
+          <input id="a-kupe" class="fi" placeholder="001" autocomplete="off" onblur="_kupeKontrolEt('a-kupe')">
+          <div id="a-kupe-warn" style="font-size:.62rem;color:var(--red);min-height:.9em;margin-top:2px"></div>
         </div>
       </div>
       <div style="font-size:.62rem;color:var(--ink3);margin-top:-8px;margin-bottom:10px">İkisinden biri zorunlu. İkisi de girilirse ikisi de kaydedilir.</div>
@@ -1661,17 +1663,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1780602100"></script>
-    <script src="js/utils/modal.js?v=1780602100"></script>
-    <script src="js/utils/errorHandler.js?v=1780602100"></script>
-    <script src="js/utils/events.js?v=1780602100"></script>
-    <script src="js/config.js?v=1780602100"></script>
-    <script src="js/state.js?v=1780602100"></script>
-    <script src="js/api.js?v=1780602100"></script>
-    <script src="js/ui.js?v=1780602100"></script>
-    <script src="js/forms.js?v=1780602100"></script>
-    <script src="js/app.js?v=1780602100"></script>
-    <script src="js/utils/handlers.js?v=1780602100"></script>
+    <script src="js/utils/helpers.js?v=1780604755"></script>
+    <script src="js/utils/modal.js?v=1780604755"></script>
+    <script src="js/utils/errorHandler.js?v=1780604755"></script>
+    <script src="js/utils/events.js?v=1780604755"></script>
+    <script src="js/config.js?v=1780604755"></script>
+    <script src="js/state.js?v=1780604755"></script>
+    <script src="js/api.js?v=1780604755"></script>
+    <script src="js/ui.js?v=1780604755"></script>
+    <script src="js/forms.js?v=1780604755"></script>
+    <script src="js/app.js?v=1780604755"></script>
+    <script src="js/utils/handlers.js?v=1780604755"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

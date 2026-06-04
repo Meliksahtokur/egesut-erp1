@@ -22,9 +22,39 @@
    openAnimalEdit, closeAnimalEdit, getDisplayKupe, yasHesapla, loadIrkDropdown
 */
 
+// ── KÜPE ÇAKIŞMA KONTROLÜ (blur) ────────────
+async function _kupeKontrolEt(alan) {
+  const deger = v(alan).trim();
+  const warnId = alan + '-warn';
+  const warnEl = g(warnId);
+  if (!warnEl) return;
+  if (!deger) { warnEl.textContent = ''; return; }
+
+  const modal  = g('m-animal');
+  const editId = modal?.dataset.editId || null;
+  try {
+    const params = {
+      p_kupe_no:     alan === 'a-kupe'    ? deger : null,
+      p_devlet_kupe: alan === 'a-devlet'  ? deger : null,
+    };
+    if (editId) params.p_hayvan_id = editId;
+    const res = await db.rpc('kupe_musait_mi', params);
+    if (res.data && res.data.musait === false) {
+      warnEl.textContent = '⚠️ Bu küpe zaten kayıtlı';
+    } else {
+      warnEl.textContent = '';
+    }
+  } catch (_) { warnEl.textContent = ''; }
+}
+
 // ── YENİ HAYVAN ─────────────────────────────
 async function submitAnimal(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+
+  // Küpe çakışma uyarısı varsa durdur
+  if (g('a-devlet-warn')?.textContent || g('a-kupe-warn')?.textContent) {
+    toast('⚠️ Küpe çakışması var — formu kontrol edin', true); return;
+  }
 
   const modal   = g('m-animal');
   const editId  = modal?.dataset.editId || null;
