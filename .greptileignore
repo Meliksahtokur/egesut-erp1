@@ -1,0 +1,15 @@
+# Greptile review — sadece kaynak kodu
+.claude/
+docs/
+research/
+review/
+node_modules/
+supabase/migrations/
+supabase/functions/stat-hesapla/
+tests/
+*.md
+*.json
+*.log
+*.yml
+*.yaml
+.vscode/
