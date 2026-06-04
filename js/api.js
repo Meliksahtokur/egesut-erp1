@@ -266,7 +266,7 @@ const RPC_TABLES = {
   gebelik_protokol_kontrol:   ['gorev_log'],
   besleme_tamam:              ['gorev_log'],
   hayvan_tohumlama_ertele:     ['hayvanlar'],
-  gorev_tamamla:               ['gorev_log', 'stok_hareket', 'hayvanlar'],
+  gorev_tamamla:               ['gorev_log', 'stok_hareket', 'hayvanlar', 'uygulama_log'],
   stok_hareket_ekle:           ['stok_hareket'],
   stok_ekle:                   ['stok'],
   stok_ekleme:                 ['stok_hareket'],

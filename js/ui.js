@@ -288,7 +288,7 @@ async function loadDash(){
 
     const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
-    // Protokol uyarı scanner
+    // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
       const proto = await rpc('protokol_eksik_tara', {});
       window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
@@ -299,6 +299,7 @@ async function loadDash(){
         bb.style.display = aktif.length > 0 ? 'flex' : 'none';
       }
     } catch(e) { console.warn('protokol_eksik_tara:', e.message); }
+    updateTaskBadge();
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
   }
@@ -823,25 +824,52 @@ function _protoDetayHayvanGit(hayvanId){
   openDet(hayvanId);
 }
 
-const _ETKEN_FILTERE = {
+// §2: drug_class bazlı etken filtreleme (aktif ingredient üzerinden)
+const _ETKEN_INGREDIENT = {
+  'OKSITOSIN': /oxytocin|oksitosin/i,
+  'PG':        /dinoprost|cloprostenol|prostaglandin/i,
+  'E_VIT':     /e vitamini|vitamin e|tocopherol/i,
+  'ADEMIN':    /ademin|ade\b/i,
+  'KALSIYUM':  /kalsiyum|calcium/i,
+  'ROTA':      /rota|corona|e\.?\s*coli/i,
+};
+
+// Legacy regex fallback (drug_product_id olmayan eski stoklar için)
+const _ETKEN_FILTERE_LEGACY = {
   'OKSITOSIN': s => /oksitosin/i.test(s.urun_adi),
   'PG':        s => /pg\b|pgf|cloprostenol|dalmazin/i.test(s.urun_adi),
-  'E_VIT':     s => /e[ .-]?vit|yeldif/i.test(s.urun_adi),
+  'E_VIT':     s => /e[ .-]?vit|yeldif|carofertin/i.test(s.urun_adi),
   'ADEMIN':    s => /ademin/i.test(s.urun_adi),
   'KALSIYUM':  s => /kalsiyum/i.test(s.urun_adi),
   'ROTA':      s => /rota|corona|e\.?\s*coli/i.test(s.urun_adi),
 };
 
+function _etkenFiltrele(etkenKod, stoklar) {
+  const rx = _ETKEN_INGREDIENT[etkenKod];
+  if (!rx) return [];
+  const dcMap = {};  // drug_class_id → active_ingredient
+  try { idbGetAll('drug_classes').forEach(dc => { dcMap[dc.id] = dc.active_ingredient||''; }); } catch(e) {}
+  const dpMap = {};  // drug_product_id → drug_class_id
+  try { idbGetAll('drug_products').forEach(dp => { dpMap[dp.id] = dp.drug_class_id; }); } catch(e) {}
+
+  return stoklar.filter(s => {
+    if (!s.kategori || ['Yem','Sperma'].includes(s.kategori)) return false;
+    if (s.drug_product_id) {
+      const classId = dpMap[s.drug_product_id];
+      const activeIng = classId ? (dcMap[classId] || '') : '';
+      if (activeIng && rx.test(activeIng)) return true;
+    }
+    // Fallback: urun_adi (drug_product_id olmayan eski stoklar)
+    const oldFn = _ETKEN_FILTERE_LEGACY[etkenKod];
+    return oldFn ? oldFn(s) : false;
+  });
+}
+
 async function _protokolUygula(idx){
   const d = window.__protokolUyarilar[idx];
   if (!d) return;
   const stoklar = await idbGetAll('stok');
-  const fn = d.etken_kod ? _ETKEN_FILTERE[d.etken_kod] : null;
-  const ilaclar = stoklar.filter(s => {
-    if (!s.kategori || ['Yem','Sperma'].includes(s.kategori)) return false;
-    if (fn) return fn(s);
-    return false;
-  });
+  const ilaclar = d.etken_kod ? _etkenFiltrele(d.etken_kod, stoklar) : [];
 
   if (!ilaclar.length) {
     toast(`"${d.etken_kod || 'Bu protokol'}" için uygun stok bulunamadı. Lütfen stok girişi yapın.`, true);
@@ -891,28 +919,13 @@ async function _protokolUygulaKaydet(hayvanId, idx){
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
-      // Scanner'ı arka planda yenile, ekranlar açık kalsın
-      try {
-        const proto = await rpc('protokol_eksik_tara', {});
-        window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
-        // Badge güncelle
-        const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
-        const bb = document.getElementById('bellbadge');
-        if (bb) {
-          bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
-          bb.style.display = aktif.length > 0 ? 'flex' : 'none';
-        }
-      } catch(e) { console.warn('scanner refresh:', e.message); }
-      // İş detay açıksa yenile
+      await _islemSonrasiRefresh();
       const detayBs = document.getElementById('proto-detay-bs');
       if (detayBs) {
         detayBs.remove();
         const d = window.__protokolUyarilar[idx];
         if (d) _showProtokolDetay(d.hayvan_id, d.protokol, idx);
       }
-      // Protokol listesini yenile
-      const protokolBs = document.getElementById('protokol-bs');
-      if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
     } else {
       toast(res?.mesaj || 'Hata', true);
     }
@@ -933,24 +946,13 @@ async function _protokolDismiss(idx){
     }, { onConflict: 'hayvan_id,etken_kod,protokol' });
     if (insErr) { toast('Hata: ' + (insErr.message || insErr.details || 'Dismiss başarısız'), true); return; }
     toast('Uyarı geçersiz kılındı');
-    try {
-      const proto = await rpc('protokol_eksik_tara', {});
-      window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
-      const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
-      const bb = document.getElementById('bellbadge');
-      if (bb) {
-        bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
-        bb.style.display = aktif.length > 0 ? 'flex' : 'none';
-      }
-    } catch(e) { console.warn('scanner refresh:', e.message); }
+    await _islemSonrasiRefresh();
     const detayBs = document.getElementById('proto-detay-bs');
     if (detayBs) {
       detayBs.remove();
       const d2 = window.__protokolUyarilar.find(x => x.hayvan_id === d.hayvan_id && x.protokol === d.protokol);
       if (d2) _showProtokolDetay(d2.hayvan_id, d2.protokol, window.__protokolUyarilar.indexOf(d2));
     }
-    const protokolBs = document.getElementById('protokol-bs');
-    if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
   } catch(e) { toast('Hata: '+e.message, true); }
 }
 
@@ -963,18 +965,7 @@ async function _protokolGeriAl(ref){
       const res = await rpc('hizli_uygulama_geri_al', { p_uygulama_id: parts[1] });
       if (res?.ok) {
         toast('İşlem geri alındı');
-        try {
-          const proto = await rpc('protokol_eksik_tara', {});
-          window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
-          const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
-          const bb = document.getElementById('bellbadge');
-          if (bb) {
-            bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
-            bb.style.display = aktif.length > 0 ? 'flex' : 'none';
-          }
-        } catch(e) { console.warn('scanner refresh:', e.message); }
-        const protokolBs = document.getElementById('protokol-bs');
-        if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
+        await _islemSonrasiRefresh();
       } else {
         toast(res?.mesaj || 'Hata', true);
       }
@@ -983,6 +974,34 @@ async function _protokolGeriAl(ref){
     toast('Bu işlem geri alınamaz (farklı kaynak)', true);
   }
 }
+
+// §5: Ortak işlem sonrası yenileme — scanner + badge + açık ekranlar
+async function _islemSonrasiRefresh(){
+  try {
+    const proto = await rpc('protokol_eksik_tara', {});
+    window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
+  } catch(e) { console.warn('scanner refresh:', e.message); }
+
+  // Badge güncelle
+  try {
+    const aktif = (window.__protokolUyarilar||[]).filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
+    const bb = document.getElementById('bellbadge');
+    if (bb) {
+      bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
+      bb.style.display = aktif.length > 0 ? 'flex' : 'none';
+    }
+  } catch(e) {}
+
+  // Görev badge güncelle
+  try { updateTaskBadge(); } catch(e) {}
+
+  // Protokol listesi açıksa yenile
+  try {
+    const protokolBs = document.getElementById('protokol-bs');
+    if (protokolBs) { protokolBs.remove(); _showProtokolEkran(); }
+  } catch(e) {}
+}
+
 async function _hayvanHizliUygulama(hayvanId){
   const stoklar = await idbGetAll('stok');
   const ilaclar = stoklar.filter(s => s.kategori && !['Yem','Sperma'].includes(s.kategori));
@@ -1031,6 +1050,7 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
+      _islemSonrasiRefresh();
       openDet(hayvanId, true);
     } else {
       toast(res?.mesaj || 'Hata', true);
@@ -1462,7 +1482,7 @@ async function openDet(id, keepTab){
   ['det-chips','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   const _ozetEl=document.getElementById('tab-ozet'); if(_ozetEl) _ozetEl.innerHTML=_skelHtml;
   showTab(activeTab||'ozet',document.querySelector(activeTab?`.tab[data-action="tab-${activeTab}"]`:'.tab'));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(_detOpenId!==id) return;
   try {
     const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs,uygulamaLogs]=await Promise.all([
@@ -3725,6 +3745,10 @@ async function openTaskDet(id){
 }
 async function detayTamamla(){
   if(!_curTaskDet) return;
+  // §3: etken_kod varsa ama stok_id yoksa → önce stok seçtir
+  if (_curTaskDet.etken_kod && !_curTaskDet.stok_id) {
+    return _gorevStokSecVeTamamla(_curTaskDet);
+  }
   const btn=document.getElementById('td-tamam-btn');
   if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
   try {
@@ -3732,6 +3756,71 @@ async function detayTamamla(){
     closeM('m-task-det');
   } catch(e){ toast(e.message,true); }
   if(btn){btn.disabled=false;btn.textContent='✅ Tamamlandı Olarak İşaretle';}
+}
+
+// §3: Görev detayında stok seçimi (etken_kod varsa, stok_id boşsa)
+async function _gorevStokSecVeTamamla(gorev){
+  const stoklar = await idbGetAll('stok');
+  const ilaclar = _etkenFiltrele(gorev.etken_kod, stoklar);
+  if (!ilaclar.length) {
+    toast(`"${gorev.etken_kod}" için uygun stok bulunamadı.`, true);
+    return;
+  }
+
+  let mini = document.getElementById('proto-mini');
+  if (mini) mini.remove();
+  mini = document.createElement('div');
+  mini.id = 'proto-mini';
+  mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:flex-end';
+  mini.onclick = e => { if (e.target === mini) mini.remove(); };
+
+  const stokOpts = ilaclar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
+  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+
+  mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💊 Görev Tamamlama — Stok Seç</div>
+    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">${esc(gorev.aciklama||'')} · ${esc(gorev.etken_kod)}</div>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Stok</label>
+    <select id="pu-stok" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${stokOpts}</select>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" value="10" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="ml" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+    </div>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
+    <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
+    <button onclick="_gorevStokTamamlaSubmit('${gorev.id}','${gorev.hayvan_id||''}','${gorev.padok_hedef||''}')" class="btn" style="width:100%;padding:10px;font-weight:700">Tamamla</button>
+  </div>`;
+  document.body.appendChild(mini);
+}
+
+async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
+  const stok = document.getElementById('pu-stok')?.value;
+  const doz = parseFloat(document.getElementById('pu-doz')?.value);
+  const birim = document.getElementById('pu-birim')?.value;
+  const rota = document.getElementById('pu-rota')?.value;
+  if (!stok || !doz || !birim || !rota) { toast('Tüm alanları doldurun', true); return; }
+
+  try {
+    const res = await rpc('gorev_tamamla', {
+      p_gorev_id: gorevId,
+      p_padok_hedef: padokHedef || null,
+      p_stok_id: stok,
+      p_doz: doz,
+      p_birim: birim,
+      p_rota: rota
+    });
+    if (res?.ok) {
+      toast('✅ Görev tamamlandı');
+      document.getElementById('proto-mini')?.remove();
+      closeM('m-task-det');
+      await pullTables(['hayvanlar','gorev_log']).catch(()=>{});
+      _islemSonrasiRefresh();
+      loadTasks(_curTaskFilter||'today');
+      loadDash();
+    } else {
+      toast(res?.mesaj || 'Hata', true);
+    }
+  } catch(e) { toast('Hata: '+e.message, true); }
 }
 function toggleTedaviIlac(adminId, el){
   const isRed = el.dataset.uygulanmadi === 'true';
