@@ -29,7 +29,7 @@ registerActions({
   },
 
   // ═══ ARAMA ═══
-  'search-input': () => { filterA(); srchDropdown(); },
+  'search-input': (() => { let _t; return () => { filterA(); clearTimeout(_t); _t = setTimeout(srchDropdown, 200); }; })(),
   'search-focus': () => srchDropdown(),
   'search-keydown': (opts) => acNav(opts.event, 'ac-srch'),
   'search-change': () => filterA(),
