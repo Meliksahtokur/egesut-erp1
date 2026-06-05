@@ -3919,6 +3919,14 @@ BEGIN
 
   GET DIAGNOSTICS v_sayac = ROW_COUNT;
 
+  -- Doğumda aktif BESLEME görevlerini iptal et
+  UPDATE gorev_log
+  SET iptal = true
+  WHERE hayvan_id = p_anne_id
+    AND gorev_tipi = 'BESLEME'
+    AND tamamlandi = false
+    AND iptal = false;
+
   RETURN jsonb_build_object(
     'ok', true,
     'buzagi_id', v_buzagi_id,
