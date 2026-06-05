@@ -31,9 +31,8 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: kullanıcı
 - Modül: forms.js + ui.js + supabase
 - Önem: orta
-- Durum: yeni — scout gerekiyor
-- Açıklama: Sistemde birden fazla doğum kontrol, tohumlama kontrol ve gebelik kontrol mekanizması var. Hangi mekanizmanın ne zaman devreye girdiği belirsiz, çakışma riski var. Tüm kontrol noktaları tespit edilip haritalanmalı.
-- Tetikleyici: Tohumlama / doğum / gebelik kontrol akışları
+- Durum: **kapatıldı — gerçek bug yok** ✅
+- Açıklama: Scout tamamlandı (~20 kontrol noktası). ÇAKIŞMA-3 (fn_gebe_gorev_yarat trigger + ileri_gebe_gorev_kontrol RPC) incelendi — her ikisinde de WHERE NOT EXISTS guard var, idempotent. Canlıda 0 duplicate gorev_log satırı doğrulandı. Tasarım gereği ikili koruma.
 - İlgili commit: bilinmiyor — BUG-012 ile ilişkili
 
 ## [2026-06-05] BUG-051 Doğum sonrası stale state — Anyonik görev devam ediyor, ileri gebeler güncellenmez
