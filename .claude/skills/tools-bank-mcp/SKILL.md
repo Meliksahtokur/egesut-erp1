@@ -452,6 +452,57 @@ cd /root/deer-flow/backend && PYTHONPATH=. nohup uv run uvicorn app.gateway.app:
 
 ---
 
+---
+
+## Repomix MCP — Codebase Haritası
+
+Repomix MCP (`npx repomix --mcp`) Tree-sitter ile kod iskeletini çıkarır.
+Fonksiyon gövdelerini keser, sadece imza + yapı bırakır. Token-verimli genel oryantasyon için.
+
+| İhtiyaç | Araç | Not |
+|---------|------|-----|
+| Proje iskelet haritası | `pack_codebase(directory, compress=true)` | ~2-4k token, gövdeler yok |
+| Uzak repo analizi | `pack_remote_repository(url, compress=true)` | GitHub URL |
+| Üretilen haritayı oku | `read_repomix_output(outputId)` | pack sonrası |
+| Haritada arama | `grep_repomix_output(outputId, pattern)` | regex destekli |
+
+**Ne zaman kullan:**
+- Oturum başında yön bulmak için (bir kez yeterli, her mesajda değil)
+- "Bu projede tohumlama ile ilgili ne var?" gibi genel sorularda
+- Yeni bir modüle dokunmadan önce dosya/fonksiyon listesi almak için
+
+**Ne zaman kullanma:**
+- Spesifik fonksiyon araması için → `ast_grep_search` daha hızlı
+- Blast radius için → `gitnexus_impact` daha doğru
+- Her mesajda → gereksiz token tüketimi
+
+---
+
+## Domain Fonksiyon Pre-Check Protokolü
+
+**Tohumlama / Doğum / Görev gibi domain fonksiyonlarına dokunmadan önce ZORUNLUdur.**
+
+```
+Adım 1 — Blast Radius (kim etkilenir?)
+  gitnexus_impact(target="değişen_fonksiyon", direction="upstream")
+  → HIGH veya CRITICAL risk dönerse kullanıcıya bildir, onay al
+
+Adım 2 — Benzer Fonksiyon Tespiti (duplikat var mı?)
+  ast_grep_search(pattern="function $NAME($$$) { $$$ }", lang="javascript", path="js/")
+  → Aynı domain'de benzer isimli fonksiyonları listele
+  → Örnekler: toh*, insem*, dogum*, gorev*, submitToh*, submitBirth*
+
+Adım 3 — Mevcut SonarCloud Bulguları (bu alanda duplikat kayıtlı mı?)
+  Bash: curl -s "https://sonarcloud.io/api/issues/search?componentKeys=Meliksahtokur_egesut-erp1\
+        &resolved=false&types=CODE_SMELL&tags=clones&severities=MAJOR,CRITICAL,BLOCKER" \
+        -H "Authorization: Bearer $SONAR_TOKEN" | python3 -m json.tool
+  → Sadece duplikat issue'ları (tag=clones) çek, MINOR/INFO atla
+```
+
+**Kural:** Adım 1 HIGH/CRITICAL dönerse implementasyona geçme — önce kullanıcıya göster.
+
+---
+
 ## Önemli Uyarılar
 
 1. `supabase_migrate` Management API kullanır — DDL için güvenli
