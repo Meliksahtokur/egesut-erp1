@@ -22,10 +22,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: kullanıcı
 - Modül: supabase (RPC / DB fonksiyonları)
 - Önem: yüksek
-- Durum: yeni
-- Açıklama: 02:00 Türkiye saatinde (UTC+3) doğum kaydı girildi, sistem bir gün geriden işliyordu ve reddetti. DB/backend UTC kullanıyor; 02:00 TR = 23:00 UTC bir önceki gün olduğu için tarih karşılaştırması başarısız. Saat dilimi tüm RPC date karşılaştırmalarında `Europe/Istanbul` olarak sabitlenmeli. İleride auth sisteminde kullanıcı bazlı timezone ayarı.
-- Tetikleyici: Gece 00:00-02:59 arası yapılan her türlü kayıt işlemi
-- İlgili commit: bilinmiyor
+- Durum: **çözüldü** ✅
+- Açıklama: DB UTC çalışıyor, TR UTC+3. Gece 00:00–02:59 arası `p_tarih > CURRENT_DATE` guard yanlış fırlıyordu.
+- Fix: 3 fonksiyonda `CURRENT_DATE` → `(NOW() AT TIME ZONE 'Europe/Istanbul')::date` (tohumlama_kaydet, tohumlama_tekrar_kaydet, gebelik_kaydet_manual)
+- İlgili commit: 20260605000002_timezone_fix.sql
 
 ## [2026-06-05] BUG-050 Duplikat kontrol mekanizmaları — doğum / tohumlama / gebelik
 - Kaynak: kullanıcı
@@ -40,10 +40,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: kullanıcı
 - Modül: ui.js + supabase (dogum_kaydet RPC sonrası)
 - Önem: yüksek
-- Durum: yeni
-- Açıklama: Doğum kaydedildikten sonra: (1) Anyonik besleme görevi iptal edilmiyor, hayvan doğum yaptı ama görev aktif kalıyor. (2) Hayvan ileri gebeler tablosunda görünmeye devam ediyor. Hard refresh ile düzeliyor → UI invalidation problemi veya dogum_kaydet RPC'si gerekli yan etkileri tetiklemiyor.
+- Durum: **çözüldü** ✅
+- Açıklama: (1) `20260603000001` migration CREATE OR REPLACE sırasında BESLEME iptal bloğu düşürülmüştü. (2) `submitBirth` pullTables'ında `tohumlama` eksikti. (3) `window.__ileriGebeListesi` in-memory cache doğum sonrası temizlenmiyordu.
 - Tetikleyici: Doğum kaydedildikten sonra UI yenilemeden kontrol edildiğinde
-- İlgili commit: bilinmiyor
+- İlgili commit: a45fc0d (migration+ground_truth+api.js), 3141568 (forms.js filter+pullTables)
 
 ## [2026-06-05] BUG-011 Duplikat fonksiyon tanımları — ayarlar modülü
 - Kaynak: repomix analizi

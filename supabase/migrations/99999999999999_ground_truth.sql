@@ -1555,7 +1555,7 @@ BEGIN
     RAISE EXCEPTION 'Hayvan zaten gebe — önce gebeliği kapatın';
   END IF;
 
-  IF p_tarih > CURRENT_DATE THEN
+  IF p_tarih > (NOW() AT TIME ZONE 'Europe/Istanbul')::date THEN
     RAISE EXCEPTION 'Tohumlama tarihi ileri tarih olamaz';
   END IF;
 
