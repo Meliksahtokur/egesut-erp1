@@ -18,6 +18,33 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 
 <!-- Buraya bug sinyalleri ekle -->
 
+## [2026-06-05] BUG-049 Timezone — 02:00 TR saatinde doğum kaydı reddediliyor
+- Kaynak: kullanıcı
+- Modül: supabase (RPC / DB fonksiyonları)
+- Önem: yüksek
+- Durum: yeni
+- Açıklama: 02:00 Türkiye saatinde (UTC+3) doğum kaydı girildi, sistem bir gün geriden işliyordu ve reddetti. DB/backend UTC kullanıyor; 02:00 TR = 23:00 UTC bir önceki gün olduğu için tarih karşılaştırması başarısız. Saat dilimi tüm RPC date karşılaştırmalarında `Europe/Istanbul` olarak sabitlenmeli. İleride auth sisteminde kullanıcı bazlı timezone ayarı.
+- Tetikleyici: Gece 00:00-02:59 arası yapılan her türlü kayıt işlemi
+- İlgili commit: bilinmiyor
+
+## [2026-06-05] BUG-050 Duplikat kontrol mekanizmaları — doğum / tohumlama / gebelik
+- Kaynak: kullanıcı
+- Modül: forms.js + ui.js + supabase
+- Önem: orta
+- Durum: yeni — scout gerekiyor
+- Açıklama: Sistemde birden fazla doğum kontrol, tohumlama kontrol ve gebelik kontrol mekanizması var. Hangi mekanizmanın ne zaman devreye girdiği belirsiz, çakışma riski var. Tüm kontrol noktaları tespit edilip haritalanmalı.
+- Tetikleyici: Tohumlama / doğum / gebelik kontrol akışları
+- İlgili commit: bilinmiyor — BUG-012 ile ilişkili
+
+## [2026-06-05] BUG-051 Doğum sonrası stale state — Anyonik görev devam ediyor, ileri gebeler güncellenmez
+- Kaynak: kullanıcı
+- Modül: ui.js + supabase (dogum_kaydet RPC sonrası)
+- Önem: yüksek
+- Durum: yeni
+- Açıklama: Doğum kaydedildikten sonra: (1) Anyonik besleme görevi iptal edilmiyor, hayvan doğum yaptı ama görev aktif kalıyor. (2) Hayvan ileri gebeler tablosunda görünmeye devam ediyor. Hard refresh ile düzeliyor → UI invalidation problemi veya dogum_kaydet RPC'si gerekli yan etkileri tetiklemiyor.
+- Tetikleyici: Doğum kaydedildikten sonra UI yenilemeden kontrol edildiğinde
+- İlgili commit: bilinmiyor
+
 ## [2026-06-05] BUG-011 Duplikat fonksiyon tanımları — ayarlar modülü
 - Kaynak: repomix analizi
 - Modül: app.js + ui.js (veya forms.js)
