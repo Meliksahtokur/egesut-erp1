@@ -32,6 +32,10 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 | Greptile - Review tetikle | `trigger_code_review(name, remote, prNumber)` | Kalici MCP server |
 | Greptile - Custom context | `list_custom_context / get_custom_context / search_custom_context` | Organizasyon seviyesi |
 | Greptile - Code review | `list_code_reviews / get_code_review` | Headless/PR destegi |
+| SonarCloud issue ara | `sonar_issues(project_key?, types?, severities?, tags?, page_size?)` | SONARQUBE_TOKEN gerekli |
+| SonarCloud duplikat dosyalar | `sonar_duplications(project_key?, page_size?)` | En yüksek % önce |
+| SonarCloud metrikler | `sonar_measures(project_key?, metrics?)` | LOC, dup%, bug sayısı |
+| SonarCloud quality gate | `sonar_quality_gate(project_key?)` | OK/ERROR + fail koşullar |
 
 ### Memory (SQLite FTS5 + Jina AI embedding)
 | İhtiyaç | Araç | Not |
