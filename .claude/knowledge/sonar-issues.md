@@ -153,7 +153,26 @@ JS-only analiz tamamlandığında SQL kaynaklı gürültü düşecek.
 
 ---
 
-## 6. ACCESSIBILITY
+## 6. KOD DUPLIKASYONLARI — JS (Gerçek)
+
+> 555 blok / 45.1% rakamı SQL migration gürültüsü. Aşağıdakiler sadece JS dosyalarındaki gerçek duplikasyonlar.
+
+| # | Blok A | Blok B | Boyut | Durum |
+|---|--------|--------|-------|-------|
+| DUP-01 | `ui.js:876–890` | `ui.js:3768–3782` | 15 satır | incelenmeli |
+| DUP-02 | `ui.js:908–922` | `ui.js:1039–1053` | 15 satır | incelenmeli |
+| DUP-03 | `ui.js:3108–3132` | `ui.js:3308–3332` | 25 satır | incelenmeli |
+| DUP-04 | `ui.js:5009–5022` | `ui.js:5055–5068` | 14 satır | incelenmeli |
+| DUP-05 | `ui.js:5023–5043` | `ui.js:5069–5089` | 21 satır | incelenmeli |
+| DUP-06 | `ui.js:6547–6562` | `forms.js:1280–1291` | 16 satır | cross-file |
+| DUP-07 | `forms.js:716–739` | `forms.js:1418–1442` | 24 satır | incelenmeli |
+| DUP-08 | `forms.js:1388–1407` | `forms.js:1501–1520` | 20 satır | incelenmeli |
+
+**app.js:** Duplikat yok.
+
+---
+
+## 7. ACCESSIBILITY
 
 ### A11Y-001 · Keyboard event eksik
 - **Dosya:** `index.html:378`
