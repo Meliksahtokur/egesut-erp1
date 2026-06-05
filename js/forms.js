@@ -177,7 +177,10 @@ async function submitBirth(btn) {
     const babaAuto = g('b-baba-auto'); if (babaAuto) babaAuto.style.display = 'none';
     const babaText = g('b-baba-text'); if (babaText) babaText.style.display = 'none';
 
-    pullTables(['hayvanlar','dogum','gorev_log']).then(renderSafe).catch(console.warn);
+    if (window.__ileriGebeListesi) {
+      window.__ileriGebeListesi = window.__ileriGebeListesi.filter(h => h.hayvan_id !== anne.id);
+    }
+    pullTables(['hayvanlar','dogum','gorev_log','tohumlama']).then(renderSafe).catch(console.warn);
   } catch (e) {
     toast('❌ Doğum kaydedilemedi: ' + getUserMessage(e), true);
   } finally { if (btn) { btn.disabled = false; btn.textContent = '🐄 Kaydet + Protokol Görevleri'; } }
