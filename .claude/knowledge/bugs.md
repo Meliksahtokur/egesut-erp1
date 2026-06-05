@@ -18,6 +18,50 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 
 <!-- Buraya bug sinyalleri ekle -->
 
+## [2026-06-05] BUG-011 Duplikat fonksiyon tanımları — ayarlar modülü
+- Kaynak: repomix analizi
+- Modül: app.js + ui.js (veya forms.js)
+- Önem: orta
+- Durum: yeni
+- Açıklama: Aşağıdaki fonksiyonlar birden fazla dosyada tanımlı. Hangisinin aktif olduğu script yükleme sırasına bağlı.
+  - `ayarlarHekimEkle()` — 2x
+  - `ayarlarHekimKaydet()` — 2x
+  - `ayarlarSpermaEkle()` — 2x
+  - `ayarlarSpermaKaydet()` — 2x
+  - `bildirimAc()` — 2x
+  - `bildirimIzniAl()` — 2x
+  - `bildirimKontrol()` — 2x
+- Tetikleyici: Ayarlar/bildirim modülü kullanıldığında (hangi versiyon çalışacağı belirsiz)
+- İlgili commit: repomix-2026-06-05
+
+## [2026-06-05] BUG-012 Benzer işlev — tohumlama/doğum entry point'leri
+- Kaynak: repomix analizi
+- Modül: forms.js + ui.js
+- Önem: orta
+- Durum: yeni — incelenmeli
+- Açıklama: Aynı domain akışına birden fazla entry point var, çakışma riski yüksek:
+  - `tohSonuc(sonuc, btn)` vs `tohSonucKaydet()` — forms.js içinde, biri diğerini çağırıyor mu?
+  - `submitInsem(btn)` vs `openInsemSafe(kupeNo)` vs `_openInsemIntercept(hayvan, bekliyor)` — 3 farklı tohumlama başlatıcı
+  - `dogumYaptiAc(hayvanId,kupe,tohTarih,sperma)` vs `submitBirth(btn)` — 2 doğum başlatıcı
+  - `_uremeDogum(el)` vs `dogumYaptiAc(...)` — üreme panel vs direkt açma
+  - `_uremeTohumlama(el)` vs `submitInsem(btn)` — üreme panel vs form submit
+- Tetikleyici: Tohumlama/doğum kaydı yapılırken hangi fonksiyonun DB'ye yazdığı belirsiz
+- İlgili commit: repomix-2026-06-05
+
+## [2026-06-05] BUG-013 Benzer işlev — görev tamamlama akışı
+- Kaynak: repomix analizi
+- Modül: ui.js
+- Önem: orta
+- Durum: yeni — incelenmeli
+- Açıklama: Görev tamamlama için birden fazla fonksiyon:
+  - `gorevTedaviGunDone()` — tedavi günü tamamlama
+  - `_gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef)` — stok gerektiren görev
+  - `_gorevStokSecVeTamamla(gorev)` — stok seçim + tamamla
+  - `kaydetTaskEdit(btn, t, degisen)` — görev düzenleme kaydı
+  Ortak bir `gorevTamamla(gorevId, params)` helper'ı eksik olabilir.
+- Tetikleyici: Farklı görev tipleri tamamlandığında
+- İlgili commit: repomix-2026-06-05
+
 ## [2026-03-27] BUG-001 rpcOptimistic yanlış çağrı — tohumlama sonucu kaydedilmiyor
 - Kaynak: erp-explorer (sistem denetimi)
 - Modül: ui.js
