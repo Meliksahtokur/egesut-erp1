@@ -32,10 +32,17 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 | Greptile - Review tetikle | `trigger_code_review(name, remote, prNumber)` | Kalici MCP server |
 | Greptile - Custom context | `list_custom_context / get_custom_context / search_custom_context` | Organizasyon seviyesi |
 | Greptile - Code review | `list_code_reviews / get_code_review` | Headless/PR destegi |
-| SonarCloud issue ara | `sonar_issues(project_key?, types?, severities?, tags?, page_size?)` | SONARQUBE_TOKEN gerekli |
+| SonarCloud issue ara | `sonar_issues(project_key?, types?, severities?, tags?, page_size?)` | BUG/CODE_SMELL/VULNERABILITY |
 | SonarCloud duplikat dosyalar | `sonar_duplications(project_key?, page_size?)` | En yüksek % önce |
+| SonarCloud dosya duplikat blokları | `sonar_file_duplications(file_key)` | `proje:js/ui.js` formatı |
 | SonarCloud metrikler | `sonar_measures(project_key?, metrics?)` | LOC, dup%, bug sayısı |
 | SonarCloud quality gate | `sonar_quality_gate(project_key?)` | OK/ERROR + fail koşullar |
+| SonarCloud security hotspots | `sonar_hotspots(project_key?, status?, page_size?)` | TO_REVIEW/REVIEWED |
+| SonarCloud PR kalite durumu | `sonar_pull_requests(project_key?)` | PR'lar + gate status |
+| SonarCloud kural detayı | `sonar_rule(rule_key)` | Neden hata, nasıl düzeltilir |
+| SonarCloud kaynak kodu | `sonar_source(file_key, from_line?, to_line?)` | Issue satırları işaretli |
+| SonarCloud düşük coverage | `sonar_coverage(project_key?, max_coverage?, page_size?)` | Kapsanmayan satırlar |
+| SonarCloud issue kapat | `sonar_change_issue_status(issue_key, status, comment?)` | accept/falsepositive/reopen |
 
 ### Memory (SQLite FTS5 + Jina AI embedding)
 | İhtiyaç | Araç | Not |
