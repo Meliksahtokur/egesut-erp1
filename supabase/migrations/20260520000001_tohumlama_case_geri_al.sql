@@ -8,7 +8,7 @@ BEGIN;
 
 -- 1. Tohumlama Geri Alma RPC
 CREATE OR REPLACE FUNCTION public.tohumlama_geri_al(
-  p_tohumlama_id text
+  p_tohumlama_id uuid
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -64,13 +64,13 @@ BEGIN
   -- 5. islem_log'u işaretle
   UPDATE public.islem_log
   SET durum = 'geri_alindi', geri_alma_tarihi = now()
-  WHERE ref_tablo = 'tohumlama' AND ref_id = p_tohumlama_id::uuid;
+  WHERE ref_tablo = 'tohumlama' AND ref_id = p_tohumlama_id;
 
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.tohumlama_geri_al(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tohumlama_geri_al(uuid) TO anon, authenticated;
 
 -- 2. Case Geri Alma RPC (Soft Delete)
 CREATE OR REPLACE FUNCTION public.case_geri_al(
