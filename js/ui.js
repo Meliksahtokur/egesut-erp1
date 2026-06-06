@@ -2335,7 +2335,8 @@ function _gecmisEntryHtml(e){
   } else if(type==='islem'){
     const snap=data.snapshot||{};
     const hayvanObj2=getState('animals').find(a=>a.id===data.ana_hayvan_id);
-    const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||data.ana_hayvan_id||'?';
+    const _exitedCache=JSON.parse(localStorage.getItem('ege_exited_kupe')||'{}');
+    const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_exitedCache[data.ana_hayvan_id]||data.ana_hayvan_id||'?';
     title=`${kupe} — ${_ISLEM_ETK[data.tip]||data.tip}`;
     if(data.tip==='ASI_KAYDI') sub=snap.vaccine_name||'';
     else if(data.tip==='ASI_ERTELEME') sub=snap.erteleme_notu||snap.vaccine_name||'';
