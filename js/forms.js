@@ -567,31 +567,16 @@ function openNotModal(hayvanId, kupe) {
 }
 
 // ── SÜRÜDEN ÇIKIŞ ────────────────────────────
-function openCikis(hayvanId, kupe, tip = 'olum') {
-  g('cikis-hid').value = hayvanId;
-  g('cikis-title').textContent = tip === 'satis' ? `💰 Satış Kaydı — ${kupe}` : `💀 Ölüm Kaydı — ${kupe}`;
-  g('cikis-tip').value = tip;
-  g('cikis-tarih').value = new Date().toISOString().split('T')[0];
-  g('cikis-sebep').value = '';
-  g('cikis-fiyat').value = '';
-  g('cikis-notlar').value = '';
-  cikisTipDegisti();
-  openM('m-cikis');
-}
-function cikisTipDegisti() {
-  const tip = g('cikis-tip').value;
-  g('cikis-olum-alan').style.display = tip === 'olum' ? '' : 'none';
-  g('cikis-satis-alan').style.display = tip === 'satis' ? '' : 'none';
-}
 async function submitCikis(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const hayvanId = g('cikis-hid').value;
-  const tip      = g('cikis-tip').value;
-  const tarih    = g('cikis-tarih').value;
-  const sebep    = g('cikis-sebep').value.trim();
-  const fiyat    = Number.parseFloat(g('cikis-fiyat').value) || null;
+  const hayvanId  = g('cx-hid').value;
+  const cxTip     = g('cx-tip').value;           // 'Satıldı' | 'Kesildi' | 'Öldü' | 'Kayıp'
+  const tarih     = g('cx-tarih').value;
+  const sebep     = g('cx-sebep').value.trim();
+  const fiyat     = Number.parseFloat(g('cx-fiyat').value) || null;
+  // cikis_yap RPC sadece 'olum' | 'satis' kabul eder
+  const rpcTip    = cxTip === 'Satıldı' ? 'satis' : 'olum';
   if (!tarih) { toast('Tarih zorunlu', true); return; }
-  if (tip === 'olum' && !sebep) { toast('Ölüm sebebi girin', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     const hayvan = getState('animals').find(a => a.id === hayvanId);
@@ -599,19 +584,18 @@ async function submitCikis(btn) {
 
     await rpc('cikis_yap', {
       p_hayvan_id:    hayvanId,
-      p_cikis_tipi:   tip,
+      p_cikis_tipi:   rpcTip,
       p_cikis_tarihi: tarih,
-      p_cikis_sebebi: tip === 'olum' ? sebep : (g('cikis-notlar').value.trim() || null),
-      p_satis_fiyati: tip === 'satis' ? fiyat : null,
+      p_cikis_sebebi: sebep || cxTip || null,
+      p_satis_fiyati: rpcTip === 'satis' ? fiyat : null,
     });
 
-    const tipTxt = tip === 'olum' ? 'Ölüm' : 'Satış';
-    toast(`✅ ${getDisplayKupe(hayvan)} sürüden çıkarıldı (${tipTxt})`);
+    toast(`✅ ${getDisplayKupe(hayvan)} sürüden çıkarıldı (${cxTip})`);
     closeM('m-cikis');
     closeDet();
-    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
+    pullTables(['hayvanlar','gorev_log','protokol_instance']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(getUserMessage(e), true); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '📤 Sürüden Çıkar'; } }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '🚪 Çıkışı Onayla'; } }
 }
 
 // ── SÜTTEN KESME ─────────────────────────────
