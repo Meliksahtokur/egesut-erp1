@@ -1,7 +1,7 @@
 # Protokol Instance + Lifecycle Cancel Guarantee
 
 **Tarih:** 2026-06-05  
-**Durum:** TAMAMLANDI ✅ — Tüm 12 adım uygulandı (2026-06-06)  
+**Durum:** APPROVED ✅ — Tüm 12 adım uygulandı + canlıda test edildi (2026-06-06, commit fe4c926)  
 **Scope:** DB schema + RPC güncelleme + filtrasyon fix  
 **Backup notu:** Implement öncesi Supabase DB snapshot alınacak (tools-bank MCP ile)
 
