@@ -6542,6 +6542,58 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.gorev_geri_al(text) TO anon, authenticated;
 
+-- ── gorev_tamamla ──
+CREATE OR REPLACE FUNCTION public.gorev_tamamla(
+  p_gorev_id text,
+  p_padok_hedef text DEFAULT NULL
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_gorev record; v_hayvan record; v_snapshot jsonb;
+  v_stok_dusuldu boolean := false; v_padok_guncellendi boolean := false;
+  v_olusturulan jsonb := '[]'::jsonb; v_guncellenen jsonb := '[]'::jsonb;
+BEGIN
+  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id::uuid;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Görev bulunamadı: %', p_gorev_id; END IF;
+  IF v_gorev.tamamlandi THEN RETURN jsonb_build_object('ok', true, 'mesaj', 'Görev zaten tamamlanmış'); END IF;
+  IF v_gorev.iptal THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev iptal edilmiş, tamamlanamaz'); END IF;
+
+  v_guncellenen := v_guncellenen || jsonb_build_object(
+    'tablo','gorev_log','id',p_gorev_id,
+    'onceki', jsonb_build_object('tamamlandi',v_gorev.tamamlandi,'tamamlanma_tarihi',v_gorev.tamamlanma_tarihi),
+    'sonraki', jsonb_build_object('tamamlandi',true,'tamamlanma_tarihi',now())
+  );
+  UPDATE public.gorev_log SET tamamlandi=true, tamamlanma_tarihi=now() WHERE id=p_gorev_id::uuid;
+
+  IF v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL AND v_gorev.miktar > 0 THEN
+    v_stok_dusuldu := true;
+    INSERT INTO public.stok_hareket (id,stok_id,tur,miktar,notlar,iptal)
+    VALUES (gen_random_uuid(),v_gorev.stok_id,'Görev',v_gorev.miktar,'GorevID:'||p_gorev_id,false);
+  END IF;
+
+  IF p_padok_hedef IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
+    SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id=v_gorev.hayvan_id;
+    IF FOUND THEN
+      v_padok_guncellendi := true;
+      UPDATE public.hayvanlar SET padok=p_padok_hedef WHERE id=v_gorev.hayvan_id;
+      IF v_gorev.gorev_tipi='PADOK_DEGISIM' AND v_gorev.aciklama ILIKE '%Kuru döneme%' THEN
+        UPDATE public.hayvanlar SET grup='Sağmal (Kuru Dönem)' WHERE id=v_gorev.hayvan_id;
+      END IF;
+    END IF;
+  END IF;
+
+  v_snapshot := jsonb_build_object('olusturulan',v_olusturulan,'guncellenen',v_guncellenen,'silinen','[]'::jsonb);
+  INSERT INTO public.islem_log (tip,ana_hayvan_id,ref_id,ref_tablo,snapshot,kullanici_notu)
+  VALUES ('GOREV_TAMAMLA',v_gorev.hayvan_id,p_gorev_id,'gorev_log',v_snapshot,
+    format('Görev tamamlandı (stok: %s, padok: %s)',
+      CASE WHEN v_stok_dusuldu THEN 'evet' ELSE 'hayır' END,
+      CASE WHEN v_padok_guncellendi THEN 'evet' ELSE 'hayır' END));
+
+  RETURN jsonb_build_object('ok',true,'gorev_id',p_gorev_id,'stok_dusuldu',v_stok_dusuldu,'padok_guncellendi',v_padok_guncellendi);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.gorev_tamamla(text,text) TO anon, authenticated;
+
 END;
 -- Migration: padoklar + grup_padok_eslem tables, hayvanlar.padok_id FK, view update
 -- Note: View DROP CASCADE was needed due to tohumlanabilir_hayvanlar dependency
@@ -8728,18 +8780,90 @@ BEGIN
   FOR v_rec IN
     SELECT e.id, e.kupe_no, e.sessiz_gun FROM public.v_eligible e
     WHERE COALESCE(e.sessiz_gun, 9999) >= 55
-      AND NOT EXISTS (SELECT 1 FROM public.gorev_log g WHERE g.hayvan_id = e.id AND g.gorev_tipi = 'VETERINER_KONTROL' AND g.tamamlandi = false)
+      AND NOT EXISTS (
+        SELECT 1 FROM public.gorev_log g
+        WHERE g.hayvan_id = e.id
+          AND g.gorev_tipi = 'VETERINER_KONTROL'
+          AND g.tamamlandi = false
+          AND g.iptal = false
+      )
   LOOP
-    INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi)
-    VALUES (gen_random_uuid(), v_rec.id, 'VETERINER_KONTROL',
-      format('Sessiz hayvan: %s gündür üreme aktivitesi yok (%s)', COALESCE(v_rec.sessiz_gun, 0), v_rec.kupe_no),
-      CURRENT_DATE, false);
+    INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal)
+    VALUES (
+      gen_random_uuid(), v_rec.id, 'VETERINER_KONTROL',
+      CASE
+        WHEN v_rec.sessiz_gun IS NULL
+          THEN format('Sessiz hayvan: hiç üreme kaydı yok (%s)', v_rec.kupe_no)
+        ELSE format('Sessiz hayvan: %s gündür üreme aktivitesi yok (%s)', v_rec.sessiz_gun, v_rec.kupe_no)
+      END,
+      CURRENT_DATE, false, false
+    );
     v_count := v_count + 1;
   END LOOP;
   RETURN v_count;
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.sessiz_hayvanlar_gorev_olustur() TO anon, authenticated;
+
+-- ── _sessiz_gorev_iptal helper ──
+CREATE OR REPLACE FUNCTION public._sessiz_gorev_iptal(p_hayvan_id text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.gorev_log
+  SET iptal = true, kapatan_ref = 'sessiz-auto-iptal'
+  WHERE hayvan_id = p_hayvan_id
+    AND gorev_tipi = 'VETERINER_KONTROL'
+    AND tamamlandi = false AND iptal = false;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public._sessiz_gorev_iptal(text) TO anon, authenticated;
+
+-- ── Sessiz hayvan auto-cancel triggerları ──
+-- tohumlama INSERT
+CREATE OR REPLACE FUNCTION public._trg_tohumlama_sessiz_iptal()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN PERFORM public._sessiz_gorev_iptal(NEW.hayvan_id); RETURN NEW; END;
+$$;
+DROP TRIGGER IF EXISTS trg_tohumlama_sessiz_iptal ON public.tohumlama;
+CREATE TRIGGER trg_tohumlama_sessiz_iptal
+  AFTER INSERT ON public.tohumlama FOR EACH ROW EXECUTE FUNCTION public._trg_tohumlama_sessiz_iptal();
+
+-- tohumlama UPDATE → Gebe
+CREATE OR REPLACE FUNCTION public._trg_tohumlama_gebe_sessiz_iptal()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NEW.sonuc = 'Gebe' AND (OLD.sonuc IS DISTINCT FROM 'Gebe') THEN
+    PERFORM public._sessiz_gorev_iptal(NEW.hayvan_id);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_tohumlama_gebe_sessiz_iptal ON public.tohumlama;
+CREATE TRIGGER trg_tohumlama_gebe_sessiz_iptal
+  AFTER UPDATE OF sonuc ON public.tohumlama FOR EACH ROW EXECUTE FUNCTION public._trg_tohumlama_gebe_sessiz_iptal();
+
+-- kizginlik_log INSERT
+CREATE OR REPLACE FUNCTION public._trg_kizginlik_sessiz_iptal()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN PERFORM public._sessiz_gorev_iptal(NEW.hayvan_id); RETURN NEW; END;
+$$;
+DROP TRIGGER IF EXISTS trg_kizginlik_sessiz_iptal ON public.kizginlik_log;
+CREATE TRIGGER trg_kizginlik_sessiz_iptal
+  AFTER INSERT ON public.kizginlik_log FOR EACH ROW EXECUTE FUNCTION public._trg_kizginlik_sessiz_iptal();
+
+-- cases INSERT → sadece Üreme kategorisi
+CREATE OR REPLACE FUNCTION public._trg_case_ureme_sessiz_iptal()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_cat text;
+BEGIN
+  SELECT d.category INTO v_cat FROM public.diseases d WHERE d.id = NEW.disease_id;
+  IF v_cat = 'Üreme' THEN PERFORM public._sessiz_gorev_iptal(NEW.animal_id); END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_case_ureme_sessiz_iptal ON public.cases;
+CREATE TRIGGER trg_case_ureme_sessiz_iptal
+  AFTER INSERT ON public.cases FOR EACH ROW EXECUTE FUNCTION public._trg_case_ureme_sessiz_iptal();
 
 -- ── Gebelik kontrol görev iptali fix ─────────────────────────────────────────
 -- Sorun: tohumlama_kaydet / sonuc_gebe / sonuc_bos, GEBELIK_KONTROL ve

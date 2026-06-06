@@ -12,7 +12,7 @@
    HASTALIK_LISTESI, HASTALIK_KAT, LOKASYON_KAT, SEMPTOM_KAT, SEMPTOM_GENEL,
    SPERMA_LISTESI, GRUP_PADOK, PADOKLAR,
    getState, setState,
-   g, v, cl, dAgo, dFwd, fmtTarih, toast, openM, closeM, mClose,
+   g, v, cl, dAgo, dFwd, fmtTarih, fmtTarihSaat, toast, openM, closeM, mClose,
    db, rpc, rpcOptimistic, pullTables, renderSafe, renderFromLocal,
    RPC_TABLES,
    idbGetAll, idbPut, idbClearAndPut, getData, getQueue, removeFromQueue,
@@ -424,7 +424,7 @@ async function loadTasks(f,btn){
             <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           </div>
           <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
-          <div class="tc-meta" style="color:var(--green)">✅ ${fmtTarih(t.tamamlanma_tarihi||t.hedef_tarih)}</div>
+          <div class="tc-meta" style="color:var(--green)">✅ ${t.tamamlanma_tarihi ? fmtTarihSaat(t.tamamlanma_tarihi) : fmtTarih(t.hedef_tarih)}</div>
           ${rapelStr}
         </div></div>
       </div>`;
