@@ -1699,9 +1699,21 @@ function closeAnimalEdit(){
 
 // Çıkış modal
 function openCikisModal(hayvanId,kupe){
+  const a=Math.floor(Math.random()*9)+1;
+  const b=Math.floor(Math.random()*9)+1;
   document.getElementById('cx-hid').value=hayvanId;
   document.getElementById('cx-title').textContent='🚪 '+kupe+' — Çıkış';
   document.getElementById('cx-tarih').value=new Date().toISOString().split('T')[0];
+  document.getElementById('cx-math-label').textContent=`${a} + ${b}`;
+  document.getElementById('cx-math-ans').value='';
+  document.getElementById('cx-math-ok').value=String(a+b);
+  const hayvan=(getState('animals')||[]).find(h=>h.id===hayvanId);
+  const infoEl=document.getElementById('cx-info');
+  if(infoEl&&hayvan){
+    const yas=hayvan.dogum_tarihi?Math.floor((Date.now()-new Date(hayvan.dogum_tarihi))/86400000)+' gün':'—';
+    infoEl.innerHTML=`<b>${kupe}</b> · ${hayvan.irk||'—'} · ${hayvan.hesap_kategori||hayvan.grup||'—'}<br>Yaş: ${yas}`;
+    infoEl.style.display='block';
+  }
   openM('m-cikis');
 }
 
@@ -4138,8 +4150,13 @@ async function openCaseDet(caseId) {
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
 
   // Geri Al butonu kontrolü — islem_log'da VAKA_ACILDI kaydı varsa göster
-  const islemler = await idbGetAll('islem_log');
-  const vakaIslem = islemler.find(l => l.tip === 'VAKA_ACILDI' && l.ref_id === caseId);
+  let islemler = await idbGetAll('islem_log');
+  let vakaIslem = islemler.find(l => l.tip === 'VAKA_ACILDI' && l.ref_id === caseId);
+  if (!vakaIslem && aktif) {
+    await pullTables(['islem_log']);
+    islemler = await idbGetAll('islem_log');
+    vakaIslem = islemler.find(l => l.tip === 'VAKA_ACILDI' && l.ref_id === caseId);
+  }
   const geriAlBtn = document.getElementById('cd-geri-al-btn');
   if (geriAlBtn) {
     if (vakaIslem && aktif) {
