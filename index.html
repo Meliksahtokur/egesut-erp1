@@ -1591,9 +1591,11 @@ button,input,select,textarea{font-family:inherit}
       <div style="font-size:1rem;font-weight:800;color:var(--ink)">İşlemi Geri Al</div>
     </div>
     <div class="m-body">
-      <div id="ga-ozet" style="font-size:.85rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:12px 14px;margin-bottom:14px;line-height:1.5"></div>
-      <div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px;text-align:center">⚠️ Bu işlem kalıcı olarak geri alınacak.</div>
-      <input type="hidden" id="ga-hid">
+      <div id="ga-ozet" style="font-size:.85rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:12px 14px;margin-bottom:12px;line-height:1.5"></div>
+      <div style="font-size:.8rem;color:var(--ink3);margin-bottom:8px;text-align:center">⚠️ Bu işlem kalıcı olarak geri alınacak. Onaylamak için:</div>
+      <div style="font-size:.92rem;font-weight:800;color:var(--red);text-align:center;margin-bottom:8px"><span id="ga-math-label">? + ?</span> = ?</div>
+      <input type="number" id="ga-math-ans" class="fi" inputmode="numeric" placeholder="Cevabınız" style="text-align:center;margin-bottom:12px">
+      <input type="hidden" id="ga-math-ok">
       <button class="btn" style="background:var(--red);color:#fff;width:100%" data-action="geri-al">🔄 Evet, Geri Al</button>
       <button class="btn btn-o" data-action="close-geri-al" style="margin-top:6px">Vazgeç</button>
     </div>
@@ -1651,6 +1653,11 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Sebep / Not</label>
         <input id="cx-sebep" class="fi" placeholder="Opsiyonel…">
       </div>
+      <div id="cx-info" style="display:none;font-size:.8rem;color:var(--ink2);background:rgba(192,50,26,.07);border-radius:8px;padding:10px 12px;margin-bottom:10px;line-height:1.55"></div>
+      <div style="font-size:.8rem;color:var(--ink3);margin-bottom:6px;text-align:center">Onaylamak için:</div>
+      <div style="font-size:.92rem;font-weight:800;color:var(--red);text-align:center;margin-bottom:8px"><span id="cx-math-label">? + ?</span> = ?</div>
+      <input type="number" id="cx-math-ans" class="fi" inputmode="numeric" placeholder="Cevabınız" style="text-align:center;margin-bottom:12px">
+      <input type="hidden" id="cx-math-ok">
       <button class="btn btn-r" data-action="submit-cikis">🚪 Çıkışı Onayla</button>
       <button class="btn btn-o" data-action="close-cikis" style="margin-top:6px">İptal</button>
     </div>
@@ -1663,17 +1670,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1780744465"></script>
-    <script src="js/utils/modal.js?v=1780744465"></script>
-    <script src="js/utils/errorHandler.js?v=1780744465"></script>
-    <script src="js/utils/events.js?v=1780744465"></script>
-    <script src="js/config.js?v=1780744465"></script>
-    <script src="js/state.js?v=1780744465"></script>
-    <script src="js/api.js?v=1780744465"></script>
-    <script src="js/ui.js?v=1780744465"></script>
-    <script src="js/forms.js?v=1780744465"></script>
-    <script src="js/app.js?v=1780744465"></script>
-    <script src="js/utils/handlers.js?v=1780744465"></script>
+    <script src="js/utils/helpers.js?v=1780746489"></script>
+    <script src="js/utils/modal.js?v=1780746489"></script>
+    <script src="js/utils/errorHandler.js?v=1780746489"></script>
+    <script src="js/utils/events.js?v=1780746489"></script>
+    <script src="js/config.js?v=1780746489"></script>
+    <script src="js/state.js?v=1780746489"></script>
+    <script src="js/api.js?v=1780746489"></script>
+    <script src="js/ui.js?v=1780746489"></script>
+    <script src="js/forms.js?v=1780746489"></script>
+    <script src="js/app.js?v=1780746489"></script>
+    <script src="js/utils/handlers.js?v=1780746489"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

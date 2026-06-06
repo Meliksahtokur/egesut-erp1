@@ -497,7 +497,7 @@ async function submitCase(btn) {
     cl('d-hid'); cl('d-case-notes');
     g('d-disease-id').value = '';
     g('d-disease-cat').style.display = 'none';
-    await pullTables(['cases','diseases','drugs','kizginlik_log']);
+    await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log']);
     _drugsCache = [];
     await loadDrugsCache();
     // Kızgınlık tedavi bağlantısı
@@ -568,6 +568,9 @@ function openNotModal(hayvanId, kupe) {
 
 // ── SÜRÜDEN ÇIKIŞ ────────────────────────────
 async function submitCikis(btn) {
+  const expected = parseInt(g('cx-math-ok').value);
+  const given    = parseInt(g('cx-math-ans').value);
+  if (isNaN(given) || given !== expected) { toast('⚠️ Hatalı onay cevabı', true); return; }
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const hayvanId  = g('cx-hid').value;
   const cxTip     = g('cx-tip').value;           // 'Satıldı' | 'Kesildi' | 'Öldü' | 'Kayıp'
@@ -1095,12 +1098,20 @@ async function tohSonuc(sonuc, btn) {
 // ── GEBELİK İŞARETLE ────────────────────────
 // ── GERİ ALMA ────────────────────────────────
 function openGeriAl(islemLogId, ozet) {
+  const a = Math.floor(Math.random()*9)+1;
+  const b = Math.floor(Math.random()*9)+1;
   g('ga-hid').value = islemLogId;
   g('ga-ozet').textContent = ozet || 'Bu işlem geri alınacak.';
+  g('ga-math-label').textContent = `${a} + ${b}`;
+  g('ga-math-ans').value = '';
+  g('ga-math-ok').value = String(a + b);
   openM('m-geri-al');
 }
 // ── İşlem Geri Al ──────────────────────────
 async function islemGeriAl(btn, islemLogId) {
+  const expected = parseInt(g('ga-math-ok').value);
+  const given    = parseInt(g('ga-math-ans').value);
+  if (isNaN(given) || given !== expected) { toast('⚠️ Hatalı onay cevabı', true); return; }
   if (!navigator.onLine) { toast('⚠️ Geri alma için internet gerekli', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Geri alınıyor…'; }
 
