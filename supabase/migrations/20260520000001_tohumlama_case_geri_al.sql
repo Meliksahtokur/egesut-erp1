@@ -8,7 +8,7 @@ BEGIN;
 
 -- 1. Tohumlama Geri Alma RPC
 CREATE OR REPLACE FUNCTION public.tohumlama_geri_al(
-  p_tohumlama_id uuid
+  p_tohumlama_id text
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
@@ -70,7 +70,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.tohumlama_geri_al(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tohumlama_geri_al(text) TO anon, authenticated;
 
 -- 2. Case Geri Alma RPC (Soft Delete)
 CREATE OR REPLACE FUNCTION public.case_geri_al(
