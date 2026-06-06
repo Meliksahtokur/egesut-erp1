@@ -1,7 +1,7 @@
 # Protokol Instance + Lifecycle Cancel Guarantee
 
 **Tarih:** 2026-06-05  
-**Durum:** Onaylandı — Implementation bekliyor  
+**Durum:** TAMAMLANDI ✅ — Tüm 12 adım uygulandı (2026-06-06)  
 **Scope:** DB schema + RPC güncelleme + filtrasyon fix  
 **Backup notu:** Implement öncesi Supabase DB snapshot alınacak (tools-bank MCP ile)
 
@@ -368,18 +368,18 @@ const _katTipMap={
 
 > Implement öncesi: Supabase DB snapshot (tools-bank `supabase_migrate` ile `pg_dump` veya manual backup)
 
-1. **Migration 1** — `protokol_instance` tablosu + index
-2. **Migration 2** — `gorev_log.protokol_instance_id` FK kolonu
-3. **Migration 3** — `_protokol_kapat` helper + `cikis_yap` RPC (sıfırdan)
-4. **Migration 4** — Kaynak string'leri standardize et (`ILERI_GEBE` → `ILERI_GEBE-{id}`, `BESLEME_OTOMATIK` → `BESLEME-{id}` vb.)
-5. **Migration 5** — Backfill: `protokol_instance` satırlarını mevcut `kaynak`'tan türet
-6. **Migration 6** — Backfill: `gorev_log.protokol_instance_id` doldur
-7. **Migration 7** — `dogum_kaydet` güncelle (2 instance, buzağı kaynak değişimi)
-8. **Migration 8** — `tohumlama_kaydet` güncelle (TOHUMLAMA instance)
-9. **Migration 9** — `fn_gebe_gorev_yarat` trigger + `ileri_gebe_gorev_kontrol` güncelle (GEBELIK instance)
-10. **Migration 10** — `besleme_gorev_olustur` güncelle (BESLEME instance)
-11. **Migration 11** — `ground_truth.sql` güncellemesi
-12. **Frontend** — `_katTipMap` 3 satır fix + `pullTables`'a `protokol_instance` ekle
+1. ✅ **Migration 1** — `protokol_instance` tablosu + index → `20260605000003_protokol_instance_schema.sql`
+2. ✅ **Migration 2** — `gorev_log.protokol_instance_id` FK kolonu → `20260605000003_protokol_instance_schema.sql`
+3. ✅ **Migration 3** — `_protokol_kapat` helper + `cikis_yap` RPC (sıfırdan) → `20260605000004_cikis_yap_rpc.sql`
+4. ✅ **Migration 4** — Kaynak string'leri standardize et (`ILERI_GEBE` → `ILERI_GEBE-{id}`, `BESLEME_OTOMATIK` → `BESLEME-{id}` vb.) → `20260605000005_kaynak_backfill.sql`
+5. ✅ **Migration 5** — Backfill: `protokol_instance` satırlarını mevcut `kaynak`'tan türet → `20260605000005_kaynak_backfill.sql`
+6. ✅ **Migration 6** — Backfill: `gorev_log.protokol_instance_id` doldur → `20260605000005_kaynak_backfill.sql`
+7. ✅ **Migration 7** — `dogum_kaydet` güncelle (2 instance, buzağı kaynak değişimi) → `20260605000006_dogum_kaydet_update.sql`
+8. ✅ **Migration 8** — `tohumlama_kaydet` güncelle (TOHUMLAMA instance) → `20260605000007_tohumlama_kaydet_update.sql`
+9. ✅ **Migration 9** — `fn_gebe_gorev_yarat` trigger + `ileri_gebe_gorev_kontrol` güncelle (GEBELIK instance) → `20260605000008_gebe_trigger_update.sql`
+10. ✅ **Migration 10** — `gebelik_protokol_kontrol` + `besleme_tamam` güncelle (BAKIM/BESLEME instance) → `20260605000009_besleme_protokol_instance.sql`
+11. ✅ **Migration 11** — `ground_truth.sql` güncellemesi (tüm yeni fonksiyonlar eklendi)
+12. ✅ **Frontend** — `_katTipMap` güncellendi + `api.js` TABLES'a `protokol_instance` eklendi
 
 ---
 

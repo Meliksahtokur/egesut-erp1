@@ -46,12 +46,12 @@ async function _keepScroll(contentEl,fn){
 }
 
 const _katTipMap={
-  asi:['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
-  vitamin:['ILERI_GEBE'],
-  muayene:['MUAYENE'],
-  tedavi:['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN'],
-  bakim:['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME'],
-  diger:null // özel mantık: _katTipMap'te olmayan tüm tipler
+  asi:    ['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
+  vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
+  muayene:['MUAYENE','GEBELIK_KONTROL','VETERINER_KONTROL'],
+  tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN'],
+  bakim:  ['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME','BUZAGI_BAKIM'],
+  diger:  null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
 function setTaskKat(kat,btn){
