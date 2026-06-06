@@ -11,7 +11,7 @@ const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
                   'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days','stok_kategorileri',
-                  'uygulama_log'];
+                  'uygulama_log','protokol_instance'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
