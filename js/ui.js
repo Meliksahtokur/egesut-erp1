@@ -1724,6 +1724,7 @@ function openCikisModal(hayvanId,kupe){
 // ──────────────────────────────────────────
 async function loadBirths(){
   const el=document.getElementById('births-body');
+  await _keepScroll(el,async()=>{
   try {
     const data=await idbGetAll('dogum');
     data.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
@@ -1744,6 +1745,7 @@ async function loadBirths(){
   </div>`;
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+  });
 }
 
 // ──────────────────────────────────────────
@@ -2268,17 +2270,18 @@ async function _uremeAbort(el){
 async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
   const el=document.getElementById('ureme-body');
-  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
-  // Kizginlik disindaki tablerde toolbar'i gizle
   const tb=document.getElementById('kizginlik-toolbar');
   if(tb&&tab!=='kizginlik') tb.style.display='none';
-  try {
-    if(tab==='kizginlik')      await _uremeKizginlik(el);
-    else if(tab==='tohumlama') await _uremeTohumlama(el);
-    else if(tab==='gebelik')   await _uremeGebelik(el);
-    else if(tab==='dogum')     await _uremeDogum(el);
-    else if(tab==='abort')     await _uremeAbort(el);
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+  await _keepScroll(el,async()=>{
+    el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+    try {
+      if(tab==='kizginlik')      await _uremeKizginlik(el);
+      else if(tab==='tohumlama') await _uremeTohumlama(el);
+      else if(tab==='gebelik')   await _uremeGebelik(el);
+      else if(tab==='dogum')     await _uremeDogum(el);
+      else if(tab==='abort')     await _uremeAbort(el);
+    } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+  });
 }
 
 // ──────────────────────────────────────────
@@ -2398,6 +2401,7 @@ async function loadGecmis(f,btn){
   _curGecmisFilter=f;
   if(btn){ document.querySelectorAll('#pg-gecmis .fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
   const el=document.getElementById('gecmis-body');
+  await _keepScroll(el,async()=>{
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const entries=[];
@@ -2467,6 +2471,7 @@ async function loadGecmis(f,btn){
     const q=(document.getElementById('gecmis-search')||{}).value||'';
     _gecmisRender(q);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+  });
 }
 
 // ──────────────────────────────────────────
@@ -3457,6 +3462,7 @@ async function stokHareketGor(stokId){
 // ──────────────────────────────────────────
 async function loadRaporlar(){
   const el=document.getElementById('raporlar-body'); if(!el) return;
+  await _keepScroll(el,async()=>{
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const [animals,tohs,diseases,births,stock]=await Promise.all([
@@ -3549,6 +3555,7 @@ async function loadRaporlar(){
     }
     el.innerHTML=h;
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+  });
 }
 
 // ──────────────────────────────────────────
