@@ -585,6 +585,13 @@ async function submitCikis(btn) {
     const hayvan = getState('animals').find(a => a.id === hayvanId);
     if (!hayvan) { toast('Hayvan bulunamadı', true); return; }
 
+    // Küpeyi localStorage'a kaydet — çıkan hayvan view'dan düşünce UUID görünmesin
+    try {
+      const cache = JSON.parse(localStorage.getItem('ege_exited_kupe') || '{}');
+      cache[hayvanId] = getDisplayKupe(hayvan);
+      localStorage.setItem('ege_exited_kupe', JSON.stringify(cache));
+    } catch(_) {}
+
     await rpc('cikis_yap', {
       p_hayvan_id:    hayvanId,
       p_cikis_tipi:   rpcTip,
