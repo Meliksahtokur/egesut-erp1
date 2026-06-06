@@ -400,9 +400,10 @@ async function loadTasks(f,btn){
   _curTaskFilter=f;
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
   const el=document.getElementById('tasks-body');
-  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   const srchEl=document.getElementById('task-srch');
   if(srchEl){ srchEl.value=''; }
+  await _keepScroll(el,async()=>{
+  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const today=new Date().toISOString().split('T')[0];
     if(navigator.onLine) await pullTables(['gorev_log','treatment_days','cases','diseases']).catch(()=>{});
@@ -473,6 +474,7 @@ async function loadTasks(f,btn){
       return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id),_tDrugs,_tDisease);
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+  });
 }
 function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
   const planTime=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
