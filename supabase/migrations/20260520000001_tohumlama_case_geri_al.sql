@@ -8,7 +8,7 @@ BEGIN;
 
 -- 1. Tohumlama Geri Alma RPC
 CREATE OR REPLACE FUNCTION public.tohumlama_geri_al(
-  p_tohumlama_id uuid
+  p_tohumlama_id text
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
