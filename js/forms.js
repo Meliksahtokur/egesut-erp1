@@ -1123,6 +1123,18 @@ async function islemGeriAl(btn, islemLogId) {
   if (btn) { btn.disabled = true; btn.textContent = 'Geri alınıyor…'; }
 
   try {
+    // Doğrudan tohumlama silme (islem_log olmayan kayıtlar — agent/manuel)
+    if (String(islemLogId).startsWith('toh:')) {
+      const tohId = islemLogId.slice(4);
+      const res = await rpc('tohumlama_geri_al', { p_tohumlama_id: tohId });
+      if (!res?.ok) throw new Error(res?.hata || 'Geri alma başarısız');
+      toast('✅ Kayıt silindi');
+      closeM('m-geri-al'); closeM('m-toh-det');
+      await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','islem_log']);
+      renderSafe();
+      return;
+    }
+
     const islemList = await idbGetAll('islem_log');
     const islem = islemList.find(i => i.id === islemLogId);
     if (!islem) { toast('⚠️ İşlem bulunamadı', true); return; }

@@ -4907,14 +4907,22 @@ async function openTohDet(id){
   const tumTohlar=await idbGetAll('tohumlama');
   const hayvanTohlar=tumTohlar
     .filter(t2=>t2.hayvan_id===t.hayvan_id)
-    .sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+    .sort((a,b)=>{const d=(b.tarih||'').localeCompare(a.tarih||'');return d!==0?d:(b.created_at||'').localeCompare(a.created_at||'');});
   const isSonToh=hayvanTohlar.length>0&&hayvanTohlar[0].id===id;
 
   const td2GeriAlBtn=document.getElementById('td2-geri-al-btn');
   if(td2GeriAlBtn){
-    td2GeriAlBtn.style.display=(isSonToh&&islemKayit)?'block':'none';
     if(isSonToh&&islemKayit){
+      td2GeriAlBtn.style.display='block';
+      td2GeriAlBtn.textContent='🔄 Bu Kaydı Geri Al';
       td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`);
+    } else if(isSonToh&&!islemKayit&&t.sonuc==='Bekliyor'){
+      // Agent/manuel kayıt — islem_log yok, doğrudan sil
+      td2GeriAlBtn.style.display='block';
+      td2GeriAlBtn.textContent='⚠️ Hatalı Kaydı Sil';
+      td2GeriAlBtn.onclick=()=>openGeriAl('toh:'+id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)}) [islem_log yok]`);
+    } else {
+      td2GeriAlBtn.style.display='none';
     }
   }
 
