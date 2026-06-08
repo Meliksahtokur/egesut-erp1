@@ -9379,7 +9379,7 @@ BEGIN
       SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan
       FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_rec.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
 
-      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_rec.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true, u.created_at, 'uygulama_log:'||u.id::text INTO v_found, v_tamamlanma, v_kapatan FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_rec.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 ORDER BY u.created_at DESC LIMIT 1; END IF;
       IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM drug_administrations da JOIN treatment_days td ON td.id=da.treatment_day_id JOIN cases c ON c.id=td.case_id WHERE c.animal_id=v_rec.hayvan_id AND public._etken_kod_bul(da.stok_id,NULL)=v_rec.ek AND da.created_at::date BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
       IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_rec.ek AND pd.protokol='DOGUM_PROTOKOL' LIMIT 1; END IF;
 
@@ -9407,7 +9407,7 @@ BEGIN
           v_found:=false; v_tamamlanma:=NULL; v_kapatan:=NULL;
           SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_a.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
           IF v_found IS NOT TRUE AND v_a.ek='ROTA' THEN SELECT true INTO v_found FROM vaccination_log vl JOIN vaccines v ON v.id=vl.vaccine_id WHERE vl.animal_id=v_rec.hayvan_id AND v.name ILIKE '%Rota%' AND vl.vaccination_date BETWEEN v_hedef-7 AND v_hedef+7 LIMIT 1; END IF;
-          IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_a.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+          IF v_found IS NOT TRUE THEN SELECT true, u.created_at, 'uygulama_log:'||u.id::text INTO v_found, v_tamamlanma, v_kapatan FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_a.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 ORDER BY u.created_at DESC LIMIT 1; END IF;
           IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_a.ek AND pd.protokol='ILERI_GEBE_PROTOKOL' LIMIT 1; END IF;
           v_gecikme:=v_today-v_hedef;
           IF v_found IS TRUE AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found IS TRUE THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
