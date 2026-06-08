@@ -3340,6 +3340,15 @@ BEGIN
       tamamlanma_notu   = p_not
   WHERE id = p_day_id;
 
+  -- Bağlı TEDAVI_GUN görevini atomik olarak kapat
+  UPDATE public.gorev_log
+  SET tamamlandi = true,
+      tamamlanma_tarihi = now()
+  WHERE gorev_tipi = 'TEDAVI_GUN'
+    AND tamamlandi = false
+    AND iptal = false
+    AND (aciklama::jsonb->>'day_id')::uuid = p_day_id;
+
   -- YENİ: Uygulanmayan ilaçlar — uygulanmadi=true + stok iadesi --
   IF array_length(p_uygulanmadi_ids, 1) > 0 THEN
     FOREACH v_admin_id IN ARRAY p_uygulanmadi_ids
@@ -9157,16 +9166,23 @@ BEGIN
   IF p_stok_id IS NOT NULL THEN
     SELECT s.urun_adi INTO v_stok_ad FROM public.stok s WHERE s.id = p_stok_id;
 
+    -- Önce stok.drug_product_id FK kullan (en doğru yol)
     SELECT dc.group_name, dc.class_name, dc.active_ingredient
     INTO v_group_name, v_class_name, v_active_ing
     FROM public.drug_products dp
     JOIN public.drug_classes dc ON dc.id = dp.drug_class_id
-    WHERE dp.id = (
-      SELECT drug_product_id FROM public.drug_administrations
-      WHERE stok_id = p_stok_id LIMIT 1
-    )
-    OR dp.brand_name ILIKE '%' || COALESCE(v_stok_ad,'') || '%'
+    WHERE dp.id = (SELECT drug_product_id FROM public.stok WHERE id = p_stok_id)
     LIMIT 1;
+
+    -- Fallback: brand_name eşleşmesi
+    IF v_class_name IS NULL THEN
+      SELECT dc.group_name, dc.class_name, dc.active_ingredient
+      INTO v_group_name, v_class_name, v_active_ing
+      FROM public.drug_products dp
+      JOIN public.drug_classes dc ON dc.id = dp.drug_class_id
+      WHERE dp.brand_name ILIKE '%' || COALESCE(v_stok_ad,'') || '%'
+      LIMIT 1;
+    END IF;
 
     -- Sınıf bazlı eşleşme
     IF v_class_name ILIKE '%oksitosin%' OR v_active_ing ILIKE '%oxytocin%' THEN RETURN 'OKSITOSIN'; END IF;
