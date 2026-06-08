@@ -52,11 +52,14 @@ mcp__gitnexus__impact({ target: "pullTables", direction: "upstream" })
 
 Çıktıda risk level'i not et. HIGH veya CRITICAL ise kullanıcıya bildir, onay al.
 
-- [ ] **Step 2: Caller listesini gözden geçir**
+- [ ] **Step 2: Caller listesini ast_grep ile gözden geçir**
 
-```bash
-grep -n "pullTables(" js/ui.js js/forms.js js/app.js js/api.js | grep -v "catch\|//\|function pullTables" | head -30
+```js
+// pullTables çağrılarını bul:
+mcp__tools_bank__ast_grep_search({ pattern: "pullTables($$$)", lang: "javascript", path: "js/", max_results: 30 })
 ```
+
+Çıktıda `.catch` olmayan çağrıları işaretle — bunlar Task 2'nin hedefi.
 
 `.catch(console.warn)` olmayan caller'ları bul. Bunlar throw'dan etkilenecek — toast görecekler ama crash olmayacak (UI async handler'da try/catch var genelde).
 
@@ -121,14 +124,24 @@ Online'a geri geç → normal çalışması kontrol et.
 
 - [ ] **Step 5: Caller uyumluluğunu kontrol et**
 
-```bash
-# .catch() olmayan pullTables çağrılarını bul:
-grep -n "await pullTables\|pullTables(" js/ui.js js/forms.js js/app.js | grep -v "\.catch\|catch(" | grep -v "function pullTables\|//"
+```js
+// await pullTables — .catch olmayan:
+mcp__tools_bank__ast_grep_search({ pattern: "await pullTables($$$)", lang: "javascript", path: "js/", max_results: 20 })
 ```
+
+ast_grep çıktısında `.catch` veya try/catch içinde olmayan satırları listele → bunlar Task 2 hedefi.
 
 Eğer bare `await pullTables(...)` olan caller try/catch içinde değilse, o caller'a `.catch(e => toast(e.message, true))` ekle veya try/catch içine al.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit öncesi — detect changes**
+
+```js
+mcp__gitnexus__detect_changes()
+```
+
+Beklenen: sadece `pullTables` fonksiyonu. CRITICAL blast radius nedeniyle beklenmedik sembol çıkarsa kullanıcıya bildir.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add js/api.js
@@ -166,7 +179,13 @@ Offline modda uygulama genel akışını test et:
 4. Toast "Veri senkronizasyon hatası" görünmeli
 5. Uygulama crash etmemeli — eski data gösteriyor olmalı
 
-- [ ] **Step 3: Commit (eğer değişiklik yapıldıysa)**
+- [ ] **Step 3: Commit öncesi — detect changes**
+
+```js
+mcp__gitnexus__detect_changes()
+```
+
+- [ ] **Step 4: Commit (eğer değişiklik yapıldıysa)**
 
 ```bash
 git add js/ui.js js/forms.js js/app.js  # hangisi değiştiyse

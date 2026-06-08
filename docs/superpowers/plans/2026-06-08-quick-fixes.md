@@ -37,6 +37,30 @@
 - Modify: `js/forms.js:1397` (sort → localeCompare)
 - Modify: `js/forms.js:1510` (sort → localeCompare)
 
+- [ ] **Step 0: Impact analizi**
+
+```js
+// MCP tool çağrısı:
+mcp__gitnexus__impact({ target: "kaydetTaskEdit", direction: "upstream" })
+```
+
+Risk level notu: kaydetTaskEdit 1 caller — LOW/MEDIUM beklenir. CRITICAL gelirse kullanıcıya sor.
+
+- [ ] **Step 0b: Satır numaralarını doğrula (ast_grep)**
+
+```js
+// const idKey satırını bul:
+mcp__tools_bank__ast_grep_search({ pattern: "const idKey = $$$", lang: "javascript", path: "js/forms.js", max_results: 5 })
+
+// kaydetTaskEdit çağrısını bul:
+mcp__tools_bank__ast_grep_search({ pattern: "kaydetTaskEdit($$$)", lang: "javascript", path: "js/forms.js", max_results: 5 })
+
+// sort() çağrılarını bul (localeCompare olmayan):
+mcp__tools_bank__ast_grep_search({ pattern: ".sort()", lang: "javascript", path: "js/forms.js", max_results: 10 })
+```
+
+Çıktıdaki satır numaralarını aşağıdaki adımlarda kullan (plan numaraları kaymış olabilir).
+
 - [ ] **Step 1: const → let düzelt (forms.js:1616)**
 
 `forms.js:1616` satırını bul (function içinde `const idKey = prefix === 'bv'...` olan satır):
@@ -107,7 +131,15 @@ Browser console'da:
 // Padok seçicide: "Üretim Padok" gibi Ü ile başlayanlar Z'den önce gelmeli
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Commit öncesi — detect changes**
+
+```js
+mcp__gitnexus__detect_changes()
+```
+
+Beklenen: sadece `forms.js` içindeki sort fonksiyonları ve `kaydetTaskEdit` caller'ı etkilenmiş.
+
+- [ ] **Step 8: Commit**
 
 ```bash
 git add js/forms.js
@@ -123,6 +155,15 @@ git commit -m "fix: forms.js — const→let, kaydetTaskEdit 3 arg, sort localeC
 - Modify: `js/ui.js:2838` (ilaç sınıf adları sort)
 - Modify: `js/ui.js:2564` (etken madde grubu sort)
 - Modify: `js/ui.js:4582` (stok grup adları sort)
+
+- [ ] **Step 0: Satır numaralarını doğrula (ast_grep)**
+
+```js
+// localeCompare olmayan tüm .sort() çağrılarını bul:
+mcp__tools_bank__ast_grep_search({ pattern: ".sort()", lang: "javascript", path: "js/ui.js", max_results: 20 })
+```
+
+Çıktıdaki satır numaralarını aşağıdaki adımlarda kullan.
 
 - [ ] **Step 1: ui.js:2820 — ilaç grup adları**
 
@@ -176,7 +217,15 @@ const groupHtml = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'tr',{sensit
 
 Browser'da tanımlar panelini aç → İlaç sınıfları listesinde "Antimikrobiyaller" "Anti-inflamatuar"dan önce gelmiyor mu? Türkçe sıralaması kontrol et.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Commit öncesi — detect changes**
+
+```js
+mcp__gitnexus__detect_changes()
+```
+
+Beklenen: sadece sort call'larının bulunduğu render fonksiyonları etkilenmiş.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add js/ui.js
@@ -193,6 +242,27 @@ git commit -m "fix: ui.js — sort localeCompare ekle (4 lokasyon, ilaç grubu/s
 - Modify: `js/ui.js` ~6457 (kupe_no in padokTekliTasi)
 
 `esc()` helper zaten tanımlı — DOM textContent tabanlı, doğru implementasyon.
+
+- [ ] **Step 0: XSS lokasyonlarını ast_grep ile bul**
+
+```js
+// onclick içinde esc() olmayan kupe_no interpolasyonlarını bul:
+mcp__tools_bank__ast_grep_search({ pattern: "onclick=\"$$$kupe_no$$$\"", lang: "javascript", path: "js/ui.js", max_results: 10 })
+
+// p.ad onclick içinde:
+mcp__tools_bank__ast_grep_search({ pattern: "onclick=\"$$$p.ad$$$\"", lang: "javascript", path: "js/ui.js", max_results: 10 })
+```
+
+Çıktıdaki satır numaralarını aşağıdaki adımlarda kullan.
+
+- [ ] **Step 0b: Impact analizi**
+
+```js
+mcp__gitnexus__impact({ target: "setPadokFiltreBt", direction: "upstream" })
+mcp__gitnexus__impact({ target: "padokTekliTasi", direction: "upstream" })
+```
+
+Bu fonksiyonlar onclick string'ini alıyor — sadece string parametresi ekleniyor, imza değişmiyor. Risk LOW beklenir.
 
 - [ ] **Step 1: ui.js:1390-1391 — hayvan detay paneli, Vaka Aç / Aşı Uygula butonları**
 
@@ -249,7 +319,15 @@ esc("test'injection")
 // Tek tırnak escape edilmişse onclick string kırılmaz
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit öncesi — detect changes**
+
+```js
+mcp__gitnexus__detect_changes()
+```
+
+Beklenen: sadece template literal string'lerin bulunduğu render fonksiyonları — davranış değişikliği yok, sadece esc() wrapper eklendi.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add js/ui.js
@@ -264,6 +342,18 @@ git commit -m "fix: ui.js — onclick XSS esc() eklendi (kupe_no, p.ad, padokTek
 - Modify: `js/ui.js:853-855` (`_etkenFiltrele` fonksiyonu — sync fonksiyon içinde async call)
 
 **Bağlam:** `_etkenFiltrele` sync fonksiyon. `idbGetAll()` async döner — `.forEach()` Promise üzerinde çağrılıyor, map'ler her zaman boş kalıyor. Bu `dcMap`/`dpMap` lookup'larını tamamen devre dışı bırakıyor. Düzeltme: fonksiyonu `async` yap ve `await` ekle. Caller'ları kontrol etmek gerekiyor.
+
+- [ ] **Step 0: Impact analizi + caller'ları bul**
+
+```js
+// Blast radius — async yapmak tüm caller'ları etkiler:
+mcp__gitnexus__impact({ target: "_etkenFiltrele", direction: "upstream" })
+
+// ast_grep ile caller'ları bul (await olmadan çağrılan):
+mcp__tools_bank__ast_grep_search({ pattern: "_etkenFiltrele($$$)", lang: "javascript", path: "js/ui.js", max_results: 10 })
+```
+
+Risk: async'e çevirmek caller'ların da async olmasını gerektirebilir. Impact çıktısındaki caller listesini not et.
 
 - [ ] **Step 1: _etkenFiltrele caller'larını kontrol et**
 
@@ -320,7 +410,15 @@ Alternatif console testi:
 _etkenFiltrele('PENISILIN', await idbGetAll('stok')).then(r => console.log('Sonuç:', r.length))
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit öncesi — detect changes**
+
+```js
+mcp__gitnexus__detect_changes()
+```
+
+Beklenen: `_etkenFiltrele` ve caller'lar. Beklenmedik sembol varsa kullanıcıya bildir.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add js/ui.js
@@ -335,6 +433,16 @@ git commit -m "fix: ui.js — _etkenFiltrele async yap, idbGetAll await eksik d�
 - Modify: `js/app.js:~494`
 
 **Bağlam:** `const val = sel.value || sel._noReset && sel.value === '' ? sel.value : sel.value;` — operatör önceliği nedeniyle her zaman `sel.value` döner. `_noReset` flag'inin `val` hesaplamasında etkisi yok. Güvenli fix: dead ternary'yi kaldır, eşdeğer sadeleştirilmiş kod yaz.
+
+- [ ] **Step 0: Satırı doğrula + impact analizi**
+
+```js
+// Fonksiyonu bul:
+mcp__tools_bank__ast_grep_search({ pattern: "function semptomEkle($$$) { $$$ }", lang: "javascript", path: "js/app.js", max_results: 3 })
+
+// Blast radius:
+mcp__gitnexus__impact({ target: "semptomEkle", direction: "upstream" })
+```
 
 - [ ] **Step 1: Ternary'yi sadeleştir**
 
@@ -356,7 +464,15 @@ function semptomEkle(sel) {
 
 Browser'da semptom ekleme modalını aç (klinik form varsa) → semptom seçici dropdown'ından bir değer seç → chip eklendiğini doğrula → seçici sıfırlanıyor mu?
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit öncesi — detect changes**
+
+```js
+mcp__gitnexus__detect_changes()
+```
+
+Beklenen: sadece `semptomEkle`.
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add js/app.js
@@ -423,7 +539,15 @@ node .claude/scripts/supa-query.js "SELECT 1"
 SUPABASE_KEY=sbp_... node .claude/scripts/supa-query.js "SELECT 1"
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Token hâlâ git history'de mi? Kontrol et**
+
+```bash
+git log --all --oneline --follow -p .claude/scripts/supa-query.js | grep -c "sbp_"
+```
+
+Sayı > 0 ise: token git history'de var demektir. Kullanıcıyı bildir — `git filter-repo` veya token rotation gerekebilir.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add .claude/scripts/supa-query.js .claude/scripts/supa-query.sh
