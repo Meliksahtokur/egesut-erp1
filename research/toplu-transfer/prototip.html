@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>Toplu Transfer Prototipi — EgeSüt ERP</title>
+<style>
+/* ═══ RESET & BASE ═══ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e130c;
+  --card:#171f14;
+  --card2:#1e281a;
+  --card3:#2d3a27;
+  --ink:#e3e6d9;
+  --ink2:#b0b8a5;
+  --ink3:#79846b;
+  --green:#4e9a2a;
+  --green2:#3d7a21;
+  --green3:#6abf3a;
+  --blue:#2a6bb5;
+  --blue2:#1f5591;
+  --amber:#e8900c;
+  --red:#c0321a;
+  --red2:#962613;
+  --nav:62px;
+  --safe:env(safe-area-inset-bottom,0px);
+  --r:12px;
+  --r1:10px;
+  --font:'Trebuchet MS','Segoe UI',system-ui,-apple-system,sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100dvh;overflow-x:hidden}
+button{cursor:pointer;font-family:inherit}
+select{font-family:inherit}
+input{font-family:inherit}
+
+/* ═══ LAYOUT ═══ */
+.app{max-width:600px;margin:0 auto;padding:0 16px;padding-bottom:calc(80px + var(--safe))}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px;border-bottom:1px solid var(--card3);margin-bottom:10px}
+.hdr-title{font-size:1.05rem;font-weight:800;color:var(--ink)}
+.hdr-badge{font-size:.65rem;background:var(--green);color:#fff;border-radius:8px;padding:2px 8px;font-weight:700}
+.search-bar{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.search-bar .srch{flex:1;background:var(--card);border:1.5px solid var(--card3);border-radius:var(--r1);padding:10px 12px;font-size:.85rem;color:var(--ink);outline:none;transition:border-color .15s}
+.search-bar .srch:focus{border-color:var(--green)}
+.search-bar .srch::placeholder{color:var(--ink3)}
+.psel{background:var(--card);border:1.5px solid var(--card3);border-radius:var(--r1);padding:9px 12px;font-size:.8rem;color:var(--ink);outline:none;min-width:130px}
+
+/* ═══ FILTER CHIPS ═══ */
+.filtre-strip{display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 8px}
+.fchip{background:none;border:1.5px solid var(--card3);border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:600;color:var(--ink2);transition:all .12s}
+.fchip.on{background:rgba(78,154,42,.15);border-color:var(--green);color:var(--green3)}
+.fchip:active{transform:scale(.94)}
+.fchip-sep{color:var(--card3);padding:0 2px;display:flex;align-items:center}
+
+/* ═══ ANIMAL CARDS ═══ */
+.animal-card{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:var(--r);padding:10px 12px;margin-bottom:6px;border:1.5px solid var(--card2);transition:all .12s;cursor:pointer;position:relative}
+.animal-card:active{transform:scale(.99);background:var(--card2)}
+.animal-card.bt-selected{border-color:var(--blue);background:rgba(42,107,181,.07)}
+.animal-card.bt-selected::before{content:'';position:absolute;left:0;top:4px;bottom:4px;width:3px;background:var(--blue);border-radius:0 3px 3px 0}
+
+/* Checkbox — selection mode */
+.bt-cb{width:18px;height:18px;cursor:pointer;flex-shrink:0;accent-color:var(--blue);opacity:0;transition:opacity .15s;pointer-events:none}
+.bt-mode .bt-cb{opacity:1;pointer-events:auto}
+
+.avt{width:36px;height:36px;border-radius:50%;background:var(--card3);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:var(--ink2);flex-shrink:0}
+.ainfo{flex:1;min-width:0}
+.a-id{font-weight:700;font-size:.85rem;color:var(--ink)}
+.a-sub{font-size:.68rem;color:var(--ink3);margin-top:1px}
+.a-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.a-tags .tag{font-size:.6rem;padding:2px 6px;border-radius:4px;font-weight:600}
+.tag.tb{background:rgba(78,154,42,.12);color:var(--green3)}
+.tag.tk{background:rgba(42,107,181,.12);color:var(--blue)}
+.a-arr{color:var(--card3);flex-shrink:0}
+.seq{font-size:.65rem;color:var(--ink3);font-weight:700;width:20px;text-align:right;flex-shrink:0}
+
+/* ═══ SELECTION MODE BANNER ═══ */
+.bt-banner{background:rgba(42,107,181,.1);border:1px solid rgba(42,107,181,.25);border-radius:var(--r1);padding:8px 12px;font-size:.75rem;color:var(--blue);margin-bottom:8px;display:none;align-items:center;gap:8px}
+.bt-banner.show{display:flex}
+.bt-banner .ico{font-size:1rem}
+
+/* ═══ BOTTOM ACTION BAR ═══ */
+#bt-action-bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:2px solid var(--blue);padding:10px 16px;padding-bottom:calc(10px + var(--safe));z-index:30;display:none;animation:slideup .25s cubic-bezier(.22,1,.36,1);box-shadow:0 -6px 24px rgba(0,0,0,.4)}
+#bt-action-bar.show{display:block}
+#bt-action-bar .inner{display:flex;align-items:center;gap:10px;max-width:600px;margin:0 auto}
+#bt-action-bar .count{font-weight:800;font-size:.85rem;color:var(--blue)}
+#bt-action-bar .sub{font-size:.7rem;color:var(--ink3)}
+
+/* ═══ BUTTONS ═══ */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border:none;border-radius:var(--r1);font-weight:700;font-size:.82rem;cursor:pointer;transition:all .1s;white-space:nowrap}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn-g{background:var(--green);color:#fff}
+.btn-b{background:var(--blue);color:#fff}
+.btn-r{background:var(--red);color:#fff}
+.btn-o{background:none;border:1.5px solid var(--card3);color:var(--ink2)}
+.btn-sm{padding:7px 14px;font-size:.75rem}
+.btn-ghost{background:rgba(42,107,181,.1);border:1px solid rgba(42,107,181,.2);color:var(--blue)}
+.btn-ghost.active{background:rgba(192,50,26,.1);border-color:var(--red);color:var(--red)}
+
+/* ═══ MODALS ═══ */
+.mo{position:fixed;inset:0;background:rgba(10,20,5,.85);backdrop-filter:blur(8px);z-index:80;display:none;align-items:flex-end;justify-content:center}
+.mo.on{display:flex}
+.modal{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-width:540px;max-height:92dvh;overflow-y:auto;padding-bottom:calc(16px + var(--safe));animation:slideup .28s cubic-bezier(.22,1,.36,1)}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.m-handle{width:38px;height:4px;background:var(--card3);border-radius:2px;margin:11px auto}
+.m-title{font-size:1.05rem;font-weight:800;padding:2px 18px 14px;border-bottom:1px solid var(--card2);color:var(--ink);display:flex;align-items:center;gap:8px}
+.m-body{padding:14px 18px}
+.m-close{background:none;border:none;font-size:1.4rem;color:var(--ink3);cursor:pointer;padding:2px 6px;line-height:1;border-radius:6px;margin-left:auto}
+.m-close:hover{background:var(--card2)}
+
+/* Tab buttons */
+.tab-row{display:flex;gap:4px;margin-bottom:12px;overflow-x:auto}
+.tab-btn{padding:6px 14px;border-radius:20px;border:1.5px solid var(--card3);background:none;color:var(--ink2);font-size:.75rem;font-weight:600;white-space:nowrap;transition:all .12s;cursor:pointer}
+.tab-btn.on{background:rgba(42,107,181,.15);border-color:var(--blue);color:var(--blue)}
+.tab-btn:active{transform:scale(.95)}
+
+/* Tab content panels */
+.tab-panel{display:none}
+.tab-panel.on{display:block}
+
+/* Form elements */
+.fg{margin-bottom:14px}
+.flbl{font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;display:block}
+.fi,.fsel{width:100%;border:1.5px solid var(--card3);border-radius:var(--r1);padding:11px 13px;font-size:.85rem;background:var(--card);outline:none;color:var(--ink);-webkit-appearance:none;transition:border-color .15s}
+.fi:focus,.fsel:focus{border-color:var(--green)}
+
+/* Hayvan listesi (modal içi) */
+.bt-hayvan-item{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--card2);font-size:.78rem}
+.bt-hayvan-item:last-child{border-bottom:none}
+.bt-hayvan-item .kaldir{background:none;border:none;color:var(--ink3);cursor:pointer;font-size:1rem;padding:2px 4px;border-radius:4px;line-height:1}
+.bt-hayvan-item .kaldir:hover{background:var(--card2);color:var(--red)}
+.bt-hayvan-item .kup{font-weight:600;color:var(--ink)}
+.bt-hayvan-item .det{font-size:.68rem;color:var(--ink3)}
+.bt-hayvan-item .grup-tag{font-size:.6rem;padding:2px 6px;border-radius:4px;background:rgba(78,154,42,.1);color:var(--green3)}
+
+/* Capacity meter */
+.pk-info{display:flex;align-items:center;gap:10px;margin-top:4px;font-size:.75rem}
+.pk-bar{flex:1;height:5px;background:var(--card2);border-radius:3px;overflow:hidden}
+.pk-fill{height:100%;border-radius:3px;transition:width .4s}
+.pk-fill.uygun{background:var(--green)}
+.pk-fill.uyari{background:var(--amber)}
+.pk-fill.dolu{background:var(--red)}
+.pk-label{font-size:.72rem;font-weight:600;white-space:nowrap}
+.pk-label.uygun{color:var(--green3)}
+.pk-label.uyari{color:var(--amber)}
+.pk-label.dolu{color:var(--red)}
+
+/* Padok grid (önerilen) */
+.padok-grid{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.padok-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r1);border:1.5px solid var(--card2);cursor:pointer;transition:all .1s}
+.padok-opt:hover{border-color:var(--card3)}
+.padok-opt.selected{border-color:var(--blue);background:rgba(42,107,181,.07)}
+.padok-opt.disabled{opacity:.35;pointer-events:none}
+.padok-opt .ad{flex:1;font-weight:600;font-size:.82rem}
+.padok-opt .uyum-badge{font-size:.6rem;padding:2px 6px;border-radius:4px;font-weight:700}
+.padok-opt .uyum-badge.ok{background:rgba(78,154,42,.12);color:var(--green3)}
+.padok-opt .uyum-badge.no{background:rgba(192,50,26,.12);color:var(--red)}
+
+/* Özet kartı */
+.ozet-card{background:var(--card2);border-radius:var(--r1);padding:10px 12px;margin-top:8px;font-size:.75rem}
+.ozet-row{display:flex;justify-content:space-between;padding:3px 0}
+.ozet-label{color:var(--ink3)}
+.ozet-value{font-weight:600}
+.ozet-value.ok{color:var(--green3)}
+.ozet-value.warn{color:var(--amber)}
+.ozet-value.fail{color:var(--red)}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--card3);border-radius:2px}
+
+/* Toast */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--card3);padding:10px 20px;border-radius:var(--r1);font-size:.82rem;font-weight:600;z-index:99;animation:toastIn .25s ease;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.toast.err{border-color:var(--red);color:var(--red)}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* Sayaç pulse */
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+.count-pulse{animation:pulse .3s ease}
+
+/* Serbest seçim listesi */
+.scroll-list{max-height:160px;overflow-y:auto;border:1px solid var(--card3);border-radius:var(--r1);padding:6px;margin-bottom:6px}
+.scroll-list label{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:.78rem}
+.scroll-list label:hover{background:var(--card2)}
+.scroll-list input[type=checkbox]{accent-color:var(--blue);width:16px;height:16px}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <span class="hdr-title">🐄 Sürü</span>
+    <span class="hdr-badge">128 aktif</span>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div class="search-bar">
+    <input class="srch" placeholder="🔍 Küpe veya ID…" id="srch">
+    <select class="psel" id="pflt" onchange="filterPadok()">
+      <option value="">Tüm Padoklar</option>
+      <option>Sağmal Padok</option>
+      <option>Kuru/Gebe Padok</option>
+      <option>Düve Padok (Büyük)</option>
+      <option>Düve Padok (Küçük)</option>
+      <option>Buzağı Padok (Sütten Kesilmiş)</option>
+      <option>Buzağı Padok (Süt İçenler)</option>
+    </select>
+    <button class="btn btn-sm btn-ghost" id="bt-toggle-btn" onclick="toggleSecimModu()">🔀 Toplu Taşı</button>
+  </div>
+
+  <!-- FILTER CHIPS -->
+  <div class="filtre-strip">
+    <button class="fchip on">Tümü</button>
+    <button class="fchip">🐄 Dişi</button>
+    <button class="fchip">🐂 Erkek</button>
+    <span class="fchip-sep">|</span>
+    <button class="fchip">🤰 Gebe</button>
+    <button class="fchip">⭕ Boş</button>
+    <span class="fchip-sep">|</span>
+    <button class="fchip">🏥 Hasta</button>
+  </div>
+
+  <!-- SELECTION MODE BANNER -->
+  <div class="bt-banner" id="bt-banner">
+    <span class="ico">🔀</span>
+    <span>Seçim modu: hayvanlara tıklayarak seçin</span>
+  </div>
+
+  <!-- ANIMAL LIST -->
+  <div id="suru-list"></div>
+
+</div>
+
+<!-- BOTTOM ACTION BAR -->
+<div id="bt-action-bar">
+  <div class="inner">
+    <span class="count" id="bt-count">0 hayvan seçildi</span>
+    <span class="sub" id="bt-padok-count">(0 padok)</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-sm btn-b" id="bt-transfer-btn" onclick="openBulkTransfer()" disabled>🔀 Taşı</button>
+    <button class="btn btn-sm btn-o" onclick="exitSecimModu()" style="margin:0">İptal</button>
+  </div>
+</div>
+
+<!-- ═══ m-bulk-transfer MODAL ═══ -->
+<div id="m-bulk-transfer" class="mo" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="m-handle"></div>
+    <div class="m-title">
+      🔀 Toplu Padok Değişimi
+      <button class="m-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="m-body">
+
+      <!-- TAB BUTTONS -->
+      <div class="tab-row">
+        <button class="tab-btn on" data-tab="bt-tab-padok" onclick="switchTab('bt-tab-padok')">📋 Padok</button>
+        <button class="tab-btn" data-tab="bt-tab-filtre" onclick="switchTab('bt-tab-filtre')">🎯 Filtre</button>
+        <button class="tab-btn" data-tab="bt-tab-serbest" onclick="switchTab('bt-tab-serbest')">✋ Serbest</button>
+      </div>
+
+      <!-- TAB: PADOK -->
+      <div class="tab-panel on" id="bt-tab-padok">
+        <div class="fg">
+          <label class="flbl">Kaynak Padok</label>
+          <select class="fsel" onchange="btPadokSec(this.value)">
+            <option value="">— Padok Seç —</option>
+            <option value="sagmal">Sağmal Padok</option>
+            <option value="kuru">Kuru/Gebe Padok</option>
+            <option value="duve-b">Düve Padok (Büyük)</option>
+            <option value="duve-k">Düve Padok (Küçük)</option>
+          </select>
+        </div>
+        <button class="btn btn-g" onclick="btGetHayvanlar()" style="width:100%;margin-bottom:12px">
+          🔍 Hayvanları Getir <span id="bt-padok-count-badge" style="background:rgba(255,255,255,.2);border-radius:10px;padding:1px 7px;font-size:.68rem;margin-left:6px"></span>
+        </button>
+      </div>
+
+      <!-- TAB: FILTRE -->
+      <div class="tab-panel" id="bt-tab-filtre">
+        <div class="fg">
+          <label class="flbl">Grup</label>
+          <select class="fsel" id="bt-f-grup">
+            <option value="">Tüm Gruplar</option>
+            <option>Sağmal (Laktasyonda)</option>
+            <option>Sağmal (Kuru)</option>
+            <option>Gebe Düve</option>
+            <option>Düve (Büyük)</option>
+            <option>Düve (Küçük)</option>
+            <option>Besi</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <div style="flex:1">
+            <label class="flbl">Cinsiyet</label>
+            <select class="fsel">
+              <option value="">Tümü</option>
+              <option>Dişi</option>
+              <option>Erkek</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label class="flbl">Yaş (ay)</label>
+            <div style="display:flex;gap:4px;align-items:center">
+              <input type="number" placeholder="min" class="fi" style="padding:8px 10px;font-size:.8rem">
+              <span style="color:var(--ink3);font-size:.75rem">–</span>
+              <input type="number" placeholder="max" class="fi" style="padding:8px 10px;font-size:.8rem">
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-b" onclick="btApplyFiltre()" style="width:100%">🎯 Filtrele</button>
+      </div>
+
+      <!-- TAB: SERBEST -->
+      <div class="tab-panel" id="bt-tab-serbest">
+        <input class="fi" placeholder="🔍 Küpe ara…" style="margin-bottom:6px" oninput="btSerbestAra(this.value)">
+        <div class="scroll-list" id="bt-serbest-list">
+          <label><input type="checkbox" value="101"> 🐄 101 · Sağmal · 🟢</label>
+          <label><input type="checkbox" value="102"> 🐄 102 · Sağmal · 🟢</label>
+          <label><input type="checkbox" value="201"> 🐄 201 · Kuru/Gebe · 🤰</label>
+          <label><input type="checkbox" value="301"> 🐄 301 · Düve (B) · 🟢</label>
+          <label><input type="checkbox" value="302"> 🐄 302 · Düve (B) · 🟢</label>
+        </div>
+        <div style="font-size:.72rem;color:var(--ink3)">
+          <span id="bt-serbest-count">0</span> hayvan seçildi
+        </div>
+      </div>
+
+      <!-- SELECTED ANIMALS LIST -->
+      <div style="border-top:1px solid var(--card2);padding-top:10px;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <label class="flbl" style="text-transform:none;letter-spacing:0">Seçili Hayvanlar</label>
+          <span id="bt-secili-sayac" style="font-size:.72rem;font-weight:700;color:var(--blue)">0 hayvan</span>
+        </div>
+        <div id="bt-secili-liste" style="max-height:160px;overflow-y:auto;margin-bottom:8px;border:1px solid var(--card2);border-radius:var(--r1);padding:4px 8px;min-height:40px;display:flex;align-items:center;justify-content:center;color:var(--ink3);font-size:.78rem">
+          Henüz hayvan seçilmedi
+        </div>
+      </div>
+
+      <!-- TARGET PADOK SELECTION -->
+      <div style="border-top:1px solid var(--card2);padding-top:10px;margin-top:4px">
+        <label class="flbl">Hedef Padok</label>
+
+        <!-- Dropdown version (simple) -->
+        <select class="fsel" id="bt-hedef-padok" onchange="btHedefSec(this)" style="margin-bottom:8px">
+          <option value="">— Hedef Padok Seç —</option>
+        </select>
+
+        <!-- Capacity & Group info -->
+        <div id="bt-hedef-bilgi" style="font-size:.72rem;color:var(--ink3);min-height:20px"></div>
+
+        <!-- Önerilen padoklar grid -->
+        <div class="padok-grid" id="bt-padok-grid"></div>
+      </div>
+
+      <!-- SUMMARY -->
+      <div id="bt-ozet" style="display:none" class="ozet-card">
+        <div class="ozet-row">
+          <span class="ozet-label">📦 Transfer</span>
+          <span class="ozet-value" id="bt-ozet-transfer">—</span>
+        </div>
+        <div class="ozet-row">
+          <span class="ozet-label">📊 Kapasite</span>
+          <span class="ozet-value" id="bt-ozet-kap">—</span>
+        </div>
+        <div class="ozet-row">
+          <span class="ozet-label">✅ Grup Uyumu</span>
+          <span class="ozet-value" id="bt-ozet-grup">—</span>
+        </div>
+      </div>
+
+      <!-- ACTIONS -->
+      <button class="btn btn-g" onclick="btOnayla()" style="width:100%;margin-top:12px;padding:12px" id="bt-onay-btn" disabled>
+        🔀 Hayvanları Taşı
+      </button>
+      <button class="btn btn-o" onclick="closeModal()" style="width:100%;margin-top:6px">İptal</button>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// DATA
+// ══════════════════════════════════════════════
+
+const PADOKLAR = [
+  { id: 'sagmal', ad: 'Sağmal Padok', kapasite: 20, hayvanSayisi: 18 },
+  { id: 'kuru',   ad: 'Kuru/Gebe Padok', kapasite: 20, hayvanSayisi: 12 },
+  { id: 'duve-b', ad: 'Düve Padok (Büyük)', kapasite: 15, hayvanSayisi: 5 },
+  { id: 'duve-k', ad: 'Düve Padok (Küçük)', kapasite: 12, hayvanSayisi: 8 },
+  { id: 'buz-sut', ad: 'Buzağı Padok (Süt İçenler)', kapasite: 10, hayvanSayisi: 7 },
+  { id: 'buz-kes', ad: 'Buzağı Padok (Sütten Kesilmiş)', kapasite: 10, hayvanSayisi: 4 },
+];
+
+const GRUP_PADOK = {
+  'Sağmal (Laktasyonda)': ['Sağmal Padok'],
+  'Sağmal (Kuru)':        ['Kuru/Gebe Padok'],
+  'Gebe Düve':            ['Kuru/Gebe Padok'],
+  'Gebe İnek':            ['Kuru/Gebe Padok'],
+  'Düve (Büyük)':         ['Düve Padok (Büyük)'],
+  'Düve (Küçük)':         ['Düve Padok (Küçük)'],
+  'Süt İçen Buzağı':      ['Buzağı Padok (Süt İçenler)'],
+  'Sütten Kesilmiş Buzağı': ['Buzağı Padok (Sütten Kesilmiş)'],
+  'Besi':                 ['Besi Padok (Erkek)', 'Besi Padok (Dişi)'],
+};
+
+const HAYVANLAR = [
+  { id:'101', kupe:'101', padok:'Sağmal Padok', padok_id:'sagmal', grup:'Sağmal (Laktasyonda)', cinsiyet:'Dişi', irk:'Holstein', dogum:'2022-03-15', durum:'Aktif', gebe:false },
+  { id:'102', kupe:'102', padok:'Sağmal Padok', padok_id:'sagmal', grup:'Sağmal (Laktasyonda)', cinsiyet:'Dişi', irk:'Holstein', dogum:'2023-01-20', durum:'Aktif', gebe:false },
+  { id:'103', kupe:'103', padok:'Sağmal Padok', padok_id:'sagmal', grup:'Sağmal (Laktasyonda)', cinsiyet:'Dişi', irk:'Simental', dogum:'2021-07-10', durum:'Aktif', gebe:true },
+  { id:'104', kupe:'104', padok:'Sağmal Padok', padok_id:'sagmal', grup:'Sağmal (Laktasyonda)', cinsiyet:'Dişi', irk:'Holstein', dogum:'2022-09-05', durum:'Aktif', gebe:false },
+  { id:'105', kupe:'105', padok:'Sağmal Padok', padok_id:'sagmal', grup:'Sağmal (Laktasyonda)', cinsiyet:'Dişi', irk:'Montofon', dogum:'2023-05-30', durum:'Aktif', gebe:false },
+  { id:'201', kupe:'201', padok:'Kuru/Gebe Padok', padok_id:'kuru', grup:'Gebe İnek', cinsiyet:'Dişi', irk:'Holstein', dogum:'2020-11-12', durum:'Aktif', gebe:true },
+  { id:'202', kupe:'202', padok:'Kuru/Gebe Padok', padok_id:'kuru', grup:'Gebe Düve', cinsiyet:'Dişi', irk:'Simental', dogum:'2022-04-18', durum:'Aktif', gebe:true },
+  { id:'203', kupe:'203', padok:'Kuru/Gebe Padok', padok_id:'kuru', grup:'Sağmal (Kuru)', cinsiyet:'Dişi', irk:'Holstein', dogum:'2019-08-22', durum:'Aktif', gebe:false },
+  { id:'301', kupe:'301', padok:'Düve Padok (Büyük)', padok_id:'duve-b', grup:'Düve (Büyük)', cinsiyet:'Dişi', irk:'Montofon', dogum:'2023-08-14', durum:'Aktif', gebe:false },
+  { id:'302', kupe:'302', padok:'Düve Padok (Büyük)', padok_id:'duve-b', grup:'Düve (Büyük)', cinsiyet:'Dişi', irk:'Holstein', dogum:'2023-10-01', durum:'Aktif', gebe:false },
+  { id:'401', kupe:'401', padok:'Düve Padok (Küçük)', padok_id:'duve-k', grup:'Düve (Küçük)', cinsiyet:'Dişi', irk:'Simental', dogum:'2024-02-28', durum:'Aktif', gebe:false },
+  { id:'402', kupe:'402', padok:'Düve Padok (Küçük)', padok_id:'duve-k', grup:'Düve (Küçük)', cinsiyet:'Dişi', irk:'Holstein', dogum:'2024-04-10', durum:'Aktif', gebe:false },
+  { id:'500', kupe:'500', padok:'Sağmal Padok', padok_id:'sagmal', grup:'Sağmal (Laktasyonda)', cinsiyet:'Dişi', irk:'Holstein', dogum:'2022-06-15', durum:'Aktif', gebe:false },
+  { id:'501', kupe:'501', padok:'Sağmal Padok', padok_id:'sagmal', grup:'Sağmal (Laktasyonda)', cinsiyet:'Dişi', irk:'Simental', dogum:'2023-03-08', durum:'Aktif', gebe:true },
+];
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+
+let secimModu = false;
+let secilenIds = [];
+let kaynakPadokId = null;
+let modalSecilenIds = []; // seçili hayvanlar (modal içi)
+let modalHedefPadok = null;
+let gosterilenHayvanlar = [...HAYVANLAR];
+
+// ══════════════════════════════════════════════
+// ANIMAL LIST RENDER
+// ══════════════════════════════════════════════
+
+function renderHayvanlar(list) {
+  const el = document.getElementById('suru-list');
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--ink3);font-size:.85rem">🐄 Hayvan bulunamadı</div>';
+    return;
+  }
+  el.innerHTML = list.map((h, i) => {
+    const secili = secilenIds.includes(h.id);
+    const yas = yasHesapla(h.dogum);
+    const gTag = h.gebe ? '<span class="tag" style="background:rgba(78,154,42,.12);color:var(--green3);font-weight:700">🤰 Gebe</span>' : '';
+    return `<div class="animal-card ${secili?'bt-selected':''}" data-id="${h.id}" onclick="kartTikla('${h.id}')">
+      <input type="checkbox" class="bt-cb" ${secili?'checked':''} onchange="event.stopPropagation();cbDegisti('${h.id}',this.checked)">
+      <span class="seq">${String(i+1).padStart(2,'0')}</span>
+      <div class="avt">${h.kupe.slice(-3)}</div>
+      <div class="ainfo">
+        <div class="a-id">${h.kupe}</div>
+        <div class="a-sub">${h.irk||'—'} ${yas?' · '+yas:''}</div>
+        <div class="a-tags">
+          <span class="tag tb">${h.padok||'?'}</span>
+          <span class="tag tk">${h.grup||''}</span>
+          ${gTag}
+        </div>
+      </div>
+      <svg class="a-arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+    </div>`;
+  }).join('');
+  document.querySelector('.app').classList.toggle('bt-mode', secimModu);
+}
+
+function yasHesapla(dogum) {
+  if (!dogum) return '';
+  const diff = Date.now() - new Date(dogum).getTime();
+  const gun = Math.floor(diff / 86400000);
+  const ay = Math.floor(gun / 30);
+  return ay > 0 ? `${ay} ay` : `${gun} gün`;
+}
+
+function filterPadok() {
+  const val = document.getElementById('pflt').value;
+  if (!val) { gosterilenHayvanlar = [...HAYVANLAR]; }
+  else { gosterilenHayvanlar = HAYVANLAR.filter(h => h.padok === val); }
+  renderHayvanlar(gosterilenHayvanlar);
+}
+
+// ══════════════════════════════════════════════
+// SELECTION MODE
+// ══════════════════════════════════════════════
+
+function toggleSecimModu() {
+  if (secimModu) exitSecimModu();
+  else enterSecimModu();
+}
+
+function enterSecimModu() {
+  secimModu = true;
+  secilenIds = [];
+  document.getElementById('bt-toggle-btn').textContent = '✕ İptal';
+  document.getElementById('bt-toggle-btn').classList.add('active');
+  document.getElementById('bt-banner').classList.add('show');
+  document.getElementById('bt-action-bar').classList.add('show');
+  updateActionBar();
+  renderHayvanlar(gosterilenHayvanlar);
+}
+
+function exitSecimModu() {
+  secimModu = false;
+  secilenIds = [];
+  document.getElementById('bt-toggle-btn').textContent = '🔀 Toplu Taşı';
+  document.getElementById('bt-toggle-btn').classList.remove('active');
+  document.getElementById('bt-banner').classList.remove('show');
+  document.getElementById('bt-action-bar').classList.remove('show');
+  document.getElementById('bt-transfer-btn').disabled = true;
+  renderHayvanlar(gosterilenHayvanlar);
+}
+
+function kartTikla(id) {
+  if (!secimModu) {
+    toast('Hayvan detayı (prototipte pasif)');
+    return;
+  }
+  const idx = secilenIds.indexOf(id);
+  if (idx > -1) secilenIds.splice(idx, 1);
+  else secilenIds.push(id);
+  updateActionBar();
+  renderHayvanlar(gosterilenHayvanlar);
+}
+
+function cbDegisti(id, checked) {
+  if (checked) {
+    if (!secilenIds.includes(id)) secilenIds.push(id);
+  } else {
+    secilenIds = secilenIds.filter(x => x !== id);
+  }
+  updateActionBar();
+  renderHayvanlar(gosterilenHayvanlar);
+}
+
+function updateActionBar() {
+  const count = secilenIds.length;
+  document.getElementById('bt-count').textContent = `${count} hayvan seçildi`;
+
+  // Kaç farklı padok?
+  const padoklar = new Set(HAYVANLAR.filter(h => secilenIds.includes(h.id)).map(h => h.padok));
+  document.getElementById('bt-padok-count').textContent = `(${padoklar.size} padok)`;
+
+  const btn = document.getElementById('bt-transfer-btn');
+  btn.disabled = count === 0;
+  btn.textContent = count > 0 ? `🔀 ${count} Taşı` : '🔀 Taşı';
+
+  // Sayaç animasyonu
+  document.getElementById('bt-count').classList.remove('count-pulse');
+  void document.getElementById('bt-count').offsetWidth;
+  if (count > 0) document.getElementById('bt-count').classList.add('count-pulse');
+}
+
+// ══════════════════════════════════════════════
+// MODAL
+// ══════════════════════════════════════════════
+
+function openBulkTransfer() {
+  if (!secilenIds.length) return;
+
+  // State'i modala aktar
+  modalSecilenIds = [...secilenIds];
+  modalHedefPadok = null;
+
+  // Kaynak padok bilgisi
+  const hayvanlar = HAYVANLAR.filter(h => modalSecilenIds.includes(h.id));
+  const padoklar = [...new Set(hayvanlar.map(h => h.padok))];
+  kaynakPadokId = padoklar.length === 1 ? (HAYVANLAR.find(h => h.id === modalSecilenIds[0])?.padok_id) : null;
+
+  // Modal içini doldur
+  renderBtSeciliHayvanlar();
+  renderBtHedefPadoklar();
+  updateBtOzet();
+
+  document.getElementById('m-bulk-transfer').classList.add('on');
+  exitSecimModu();
+}
+
+function closeModal() {
+  document.getElementById('m-bulk-transfer').classList.remove('on');
+}
+
+// Modal içi seçili hayvanlar listesi
+function renderBtSeciliHayvanlar() {
+  const el = document.getElementById('bt-secili-liste');
+  const sayac = document.getElementById('bt-secili-sayac');
+
+  if (!modalSecilenIds.length) {
+    el.innerHTML = '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Henüz hayvan seçilmedi</div>';
+    sayac.textContent = '0 hayvan';
+    return;
+  }
+
+  const hayvanlar = HAYVANLAR.filter(h => modalSecilenIds.includes(h.id));
+  sayac.textContent = `${hayvanlar.length} hayvan`;
+
+  el.innerHTML = hayvanlar.map(h => {
+    const yas = yasHesapla(h.dogum);
+    return `<div class="bt-hayvan-item">
+      <span class="kup">${h.kupe}</span>
+      <span class="det">${h.grup}${yas?' · '+yas:''}</span>
+      <span class="grup-tag">${h.padok}</span>
+      <div style="flex:1"></div>
+      <button class="kaldir" onclick="btSecilidenKaldir('${h.id}')" title="Çıkar">×</button>
+    </div>`;
+  }).join('');
+}
+
+function btSecilidenKaldir(id) {
+  modalSecilenIds = modalSecilenIds.filter(x => x !== id);
+  renderBtSeciliHayvanlar();
+  renderBtHedefPadoklar();
+  updateBtOzet();
+  // Modal'a geri bildirim
+  if (!modalSecilenIds.length) {
+    document.getElementById('bt-onay-btn').disabled = true;
+  }
+}
+
+// ═══ PADOK TAB ═══
+function btPadokSec(val) {
+  // placeholder
+}
+
+function btGetHayvanlar() {
+  toast('🔍 Padoktaki hayvanlar getirildi (prototip)');
+}
+
+// ═══ FILTRE TAB ═══
+function btApplyFiltre() {
+  toast('🎯 Filtre uygulandı (prototip)');
+}
+
+// ═══ SERBEST TAB ═══
+let serbestSecilen = [];
+function btSerbestAra(q) {
+  // placeholder — prototipte statik liste
+}
+
+// ═══ TAB SWITCH ═══
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('on'));
+  document.querySelector(`[data-tab="${tabId}"]`).classList.add('on');
+  document.getElementById(tabId).classList.add('on');
+}
+
+// ═══ HEDEF PADOK SEÇİMİ ═══
+function renderBtHedefPadoklar() {
+  const sel = document.getElementById('bt-hedef-padok');
+  const grid = document.getElementById('bt-padok-grid');
+  const bilgi = document.getElementById('bt-hedef-bilgi');
+
+  if (!modalSecilenIds.length) {
+    sel.innerHTML = '<option value="">— Hedef Padok Seç —</option>';
+    grid.innerHTML = '';
+    bilgi.textContent = 'Önce hayvan seçin';
+    return;
+  }
+
+  // Seçili hayvanların grupları
+  const hayvanlar = HAYVANLAR.filter(h => modalSecilenIds.includes(h.id));
+  const gruplar = [...new Set(hayvanlar.map(h => h.grup))].filter(Boolean);
+
+  // Dropdown doldur
+  sel.innerHTML = '<option value="">— Hedef Padok Seç —</option>';
+  PADOKLAR.forEach(p => {
+    // Kaynak padok'u hariç tut (sadece tek kaynaktan geliyorsa)
+    if (kaynakPadokId && p.id === kaynakPadokId && gruplar.length === 1) return;
+
+    const uygun = _grupUygunMu(p, gruplar);
+    const doluYuzde = Math.round((p.hayvanSayisi / p.kapasite) * 100);
+    const doluMu = doluYuzde >= 100;
+    const klz = doluMu ? ' (DOLU)' : uygun ? '' : ' (Uygun değil)';
+
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.ad} — ${p.hayvanSayisi}/${p.kapasite}${klz}`;
+    if (doluMu || (!uygun && gruplar.length > 0)) {
+      opt.disabled = true;
+      opt.style.color = 'var(--ink3)';
+    }
+    if (uygun && !doluMu) opt.style.fontWeight = '600';
+    sel.appendChild(opt);
+  });
+
+  // Grid görünümü (önerilen padoklar)
+  grid.innerHTML = PADOKLAR.map(p => {
+    if (kaynakPadokId && p.id === kaynakPadokId) return '';
+
+    const uygun = _grupUygunMu(p, gruplar);
+    const doluYuzde = Math.round((p.hayvanSayisi / p.kapasite) * 100);
+    const doluMu = doluYuzde >= 100;
+    const sinif = doluMu ? 'dolu' : doluYuzde >= 80 ? 'uyari' : 'uygun';
+
+    return `<div class="padok-opt ${!uygun||doluMu?'disabled':''}" onclick="${!uygun||doluMu?'':'btHedefGridSec(\''+p.id+'\')'}">
+      <div class="ad">${p.ad}</div>
+      <span class="uyum-badge ${uygun?'ok':'no'}">${uygun?'✅ Uyumlu':'❌ Uygun değil'}</span>
+      <div>
+        <div style="width:80px">
+          <div class="pk-bar"><div class="pk-fill ${sinif}" style="width:${Math.min(doluYuzde,100)}%"></div></div>
+          <div class="pk-label ${sinif}" style="font-size:.6rem;text-align:right">${p.hayvanSayisi}/${p.kapasite}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Kapasite bilgisi
+  if (hayvanlar.length > 0) {
+    const gosterim = gruplar.map(g => `"${g}"`).join(', ');
+    bilgi.textContent = `Seçili hayvan grupları: ${gosterim}`;
+  }
+}
+
+function _grupUygunMu(padok, gruplar) {
+  if (!gruplar.length) return true;
+  return gruplar.every(g => {
+    const uygunAdlar = GRUP_PADOK[g] || [];
+    return uygunAdlar.length === 0 || uygunAdlar.includes(padok.ad);
+  });
+}
+
+function btHedefSec(sel) {
+  modalHedefPadok = sel.value;
+  updateBtOzet();
+}
+
+function btHedefGridSec(id) {
+  modalHedefPadok = id;
+  document.getElementById('bt-hedef-padok').value = id;
+  document.querySelectorAll('.padok-opt').forEach(el => el.classList.remove('selected'));
+  // find the grid item that matches
+  updateBtOzet();
+}
+
+// ═══ ÖZET ═══
+function updateBtOzet() {
+  const ozet = document.getElementById('bt-ozet');
+  const btn = document.getElementById('bt-onay-btn');
+
+  if (!modalSecilenIds.length || !modalHedefPadok) {
+    ozet.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = '🔀 Hayvanları Taşı';
+    return;
+  }
+
+  const hayvanlar = HAYVANLAR.filter(h => modalSecilenIds.includes(h.id));
+  const hedef = PADOKLAR.find(p => p.id === modalHedefPadok);
+  if (!hedef) return;
+
+  const gruplar = [...new Set(hayvanlar.map(h => h.grup))].filter(Boolean);
+  const uygun = _grupUygunMu(hedef, gruplar);
+  const kapUygun = hedef.hayvanSayisi + hayvanlar.length <= hedef.kapasite;
+  const doluYuzde = Math.round(((hedef.hayvanSayisi + hayvanlar.length) / hedef.kapasite) * 100);
+
+  ozet.style.display = 'block';
+
+  document.getElementById('bt-ozet-transfer').textContent =
+    `${hayvanlar.length} hayvan → ${hedef.ad}`;
+  document.getElementById('bt-ozet-transfer').className = 'ozet-value ok';
+
+  const kapEl = document.getElementById('bt-ozet-kap');
+  if (kapUygun) {
+    kapEl.textContent = `✓ ${hedef.hayvanSayisi + hayvanlar.length}/${hedef.kapasite} (${doluYuzde}%)`;
+    kapEl.className = 'ozet-value ok';
+  } else {
+    kapEl.textContent = `✗ ${hedef.hayvanSayisi + hayvanlar.length}/${hedef.kapasite} — Kapasite aşımı!`;
+    kapEl.className = 'ozet-value fail';
+  }
+
+  const gpEl = document.getElementById('bt-ozet-grup');
+  if (uygun) {
+    gpEl.textContent = '✓ Tüm hayvanlar için uygun padok';
+    gpEl.className = 'ozet-value ok';
+  } else {
+    gpEl.textContent = '✗ Bazı hayvan grupları bu padok için uygun değil';
+    gpEl.className = 'ozet-value warn';
+  }
+
+  btn.disabled = !(kapUygun && uygun);
+  btn.textContent = `🔀 ${hayvanlar.length} Hayvanı ${hedef.ad}'a Taşı`;
+}
+
+// ═══ ONAY ═══
+function btOnayla() {
+  toast(`✅ ${modalSecilenIds.length} hayvan başarıyla taşındı!`);
+  closeModal();
+  // Gerçek uygulamada: rpc('padok_degistir_toplu', ...)
+}
+
+// ═══ UTILITY ═══
+function toast(msg, err) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = `toast${err?' err':''}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// ═══ INIT ═══
+renderHayvanlar(HAYVANLAR);
+
+// Hedef padok dropdown'ını başlangıçta doldur
+(function initHedefPadok() {
+  const sel = document.getElementById('bt-hedef-padok');
+  sel.innerHTML = '<option value="">— Hedef Padok Seç —</option>';
+  PADOKLAR.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.ad + ' — ' + p.hayvanSayisi + '/' + p.kapasite;
+    sel.appendChild(opt);
+  });
+})();
+</script>
+
+</body>
+</html>
