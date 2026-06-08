@@ -154,7 +154,7 @@ async function removeFromQueue(qid) {
 
 // ── SDK YARDIMCILARI ────────────────────────
 async function dbUpdate(table, id, changes) {
-  const clean = Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== null && v !== undefined && v !== ''));
+  const clean = Object.fromEntries(Object.entries(changes).filter(([k, v]) => k !== 'id' && v !== null && v !== undefined && v !== ''));
   const { error } = await db.from(table).update(clean).eq('id', id);
   if (error) throw new Error(_trErr(error.message));
 }
@@ -267,6 +267,8 @@ const RPC_TABLES = {
   besleme_tamam:              ['gorev_log'],
   hayvan_tohumlama_ertele:     ['hayvanlar'],
   gorev_tamamla:               ['gorev_log', 'stok_hareket', 'hayvanlar', 'uygulama_log'],
+  hizli_uygulama:              ['uygulama_log', 'stok_hareket'],
+  gorev_guncelle:              ['gorev_log'],
   stok_hareket_ekle:           ['stok_hareket'],
   stok_ekle:                   ['stok'],
   stok_ekleme:                 ['stok_hareket'],
