@@ -433,7 +433,7 @@ async function loadDiseasesDropdown() {
     grouped[cat].push(d);
   });
   sel.innerHTML = '<option value="">— Hastalık seçin —</option>';
-  Object.keys(grouped).sort().forEach(cat => {
+  Object.keys(grouped).sort((a,b) => a.localeCompare(b, 'tr', {sensitivity:'base'})).forEach(cat => {
     const og = document.createElement('optgroup');
     og.label = cat;
     grouped[cat].forEach(d => {
@@ -914,7 +914,7 @@ async function submitTaskEdit(btn) {
   if('aciklama' in degisen) diffSatirlari.push('📝 Açıklama: "'+(t.aciklama||'')+'" → "'+desc+'"');
   if('hedef_tarih' in degisen) diffSatirlari.push('📅 Tarih: '+(t.hedef_tarih||'')+' → '+tarih);
   if('gorev_tipi' in degisen) diffSatirlari.push('🏷 Tür: '+(tipEtiket[t.gorev_tipi]||t.gorev_tipi)+' → '+(tipEtiket[tip]||tip));
-  openConfirm('✏️ Görevi Düzenle', diffSatirlari.join('\n'), async() => kaydetTaskEdit(btn, t, degisen, desc, tarih, tip));
+  openConfirm('✏️ Görevi Düzenle', diffSatirlari.join('\n'), async() => kaydetTaskEdit(btn, t, degisen));
 }
 
 async function kaydetTaskEdit(btn, t, degisen) {
@@ -1394,7 +1394,7 @@ async function submitDrugStokLink(drugId, stockItemId) {
 async function loadBulkVaccinePadoklar() {
   const animals = getState('animals');
   if (!animals || !animals.length) return;
-  const padoklar = [...new Set(animals.map(a => a.padok).filter(Boolean))].sort();
+  const padoklar = [...new Set(animals.map(a => a.padok).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'tr', {sensitivity:'base'}));
   const sel = document.getElementById('bv-padok');
   if (!sel) return;
   sel.innerHTML = '<option value="">— Padok Seç —</option>' +
@@ -1507,7 +1507,7 @@ async function submitBulkVaccination() {
 async function loadBulkIlacPadoklar() {
   const animals = getState('animals');
   if (!animals || !animals.length) return;
-  const padoklar = [...new Set(animals.map(a => a.padok).filter(Boolean))].sort();
+  const padoklar = [...new Set(animals.map(a => a.padok).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'tr', {sensitivity:'base'}));
   const sel = document.getElementById('bi-padok');
   if (!sel) return;
   sel.innerHTML = '<option value="">— Padok Seç —</option>' +
@@ -1613,7 +1613,7 @@ function bulkTabSwitch(prefix, tab) {
 // Filter-based selection
 function applyBulkFiltre(prefix) {
   // Start from current filtered list (padok selection), not all animals
-  const idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
+  let idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
   const currentIds = window[idKey] || [];
   const allAnimals = getState('animals');
   const animals = currentIds.length > 0
