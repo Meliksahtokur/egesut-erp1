@@ -26,7 +26,7 @@ jobs:
             -Dsonar.projectKey=Meliksahtokur_egesut-erp1
             -Dsonar.sources=js,index.html
             -Dsonar.inclusions=js/**/*.js,index.html
-            -Dsonar.exclusions=js/lib/**,node_modules/**,tests/**,supabase/**,docs/**,research/**,review/**,**/*.min.js
+            -Dsonar.exclusions=js/lib/**,node_modules/**,tests/**,supabase/**,docs/**,research/**,review/**,**/*.min.js,**/*.sql,**/*.yml,**/*.yaml
             -Dsonar.javascript.file.suffixes=.js
             -Dsonar.cpd.js.minimumTokens=50
         env:
