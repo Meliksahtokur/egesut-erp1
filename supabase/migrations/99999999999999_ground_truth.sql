@@ -6552,6 +6552,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.gorev_geri_al(text) TO anon, authenticated;
 
 -- ── gorev_tamamla ──
+DROP FUNCTION IF EXISTS public.gorev_tamamla(text, text, text, numeric, text, text);
 CREATE OR REPLACE FUNCTION public.gorev_tamamla(
   p_gorev_id text,
   p_padok_hedef text DEFAULT NULL
