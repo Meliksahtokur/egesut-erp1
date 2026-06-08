@@ -920,7 +920,12 @@ async function submitTaskEdit(btn) {
 async function kaydetTaskEdit(btn, t, degisen) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    await write('gorev_log',degisen,'PATCH',`id=eq.${t.id}`);
+    await rpc('gorev_guncelle', {
+      p_id: t.id,
+      p_aciklama: degisen.aciklama ?? null,
+      p_hedef_tarih: degisen.hedef_tarih ?? null,
+      p_gorev_tipi: degisen.gorev_tipi ?? null
+    });
     await write('islem_log', {
       id: crypto.randomUUID(),
       ana_hayvan_id: t.hayvan_id || null,
