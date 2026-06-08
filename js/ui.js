@@ -889,8 +889,8 @@ function _puDozPrefill(stokId) {
     if (!d) return;
     const dozEl = document.getElementById('pu-doz');
     const birimEl = document.getElementById('pu-birim');
-    if (dozEl) dozEl.value = d.doz;
-    if (birimEl) birimEl.value = d.birim;
+    if (dozEl && d.doz) dozEl.value = d.doz;
+    if (birimEl && d.birim) birimEl.value = d.birim;
   });
 }
 
