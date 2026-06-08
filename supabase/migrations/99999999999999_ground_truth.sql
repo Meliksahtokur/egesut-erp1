@@ -6604,6 +6604,28 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.gorev_tamamla(text,text) TO anon, authenticated;
 
+-- ── gorev_guncelle ──
+CREATE OR REPLACE FUNCTION public.gorev_guncelle(
+  p_id text,
+  p_aciklama text DEFAULT NULL,
+  p_hedef_tarih text DEFAULT NULL,
+  p_gorev_tipi text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.gorev_log
+  SET
+    aciklama    = COALESCE(p_aciklama,    aciklama),
+    hedef_tarih = COALESCE(p_hedef_tarih::date, hedef_tarih),
+    gorev_tipi  = COALESCE(p_gorev_tipi,  gorev_tipi)
+  WHERE id = p_id::uuid;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
+  END IF;
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.gorev_guncelle(text, text, text, text) TO anon, authenticated;
+
 END;
 -- Migration: padoklar + grup_padok_eslem tables, hayvanlar.padok_id FK, view update
 -- Note: View DROP CASCADE was needed due to tohumlanabilir_hayvanlar dependency

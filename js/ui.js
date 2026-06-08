@@ -874,11 +874,12 @@ async function _etkenFiltrele(etkenKod, stoklar) {
 
 async function _sonDozGetir(stokId) {
   try {
-    const admins = await idbGetAll('drug_administrations');
-    const match = admins
-      .filter(a => a.stok_id === stokId && !a.uygulanmadi)
-      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-    if (match.length) return { doz: match[0].dose, birim: match[0].unit || 'ml' };
+    // hizli_uygulama → uygulama_log'a yazıyor (drug_administrations değil)
+    const logs = await idbGetAll('uygulama_log');
+    const match = logs
+      .filter(a => a.stok_id === stokId)
+      .sort((a, b) => (b.created_at || b.tarih || '').localeCompare(a.created_at || a.tarih || ''));
+    if (match.length) return { doz: match[0].doz, birim: match[0].birim || 'ml' };
   } catch(e) {}
   return null;
 }
