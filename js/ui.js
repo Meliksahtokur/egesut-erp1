@@ -197,11 +197,16 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   if((ileriGebeler||[]).length){
     const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
     const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
+    let inekNo=0,duveNo=0;
     h+=band('amber',title,
       (ileriGebeler||[]).map(b=>{
+        const isDuve=(b.grup||'').includes('Düve');
+        const no=isDuve?`D-${++duveNo}`:`${++inekNo}`;
         const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
         const besUyari=b.gebelik_gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 5px;font-weight:700;font-size:.65rem;margin-left:4px">⚠️ Anyonik</span>`:'';
-        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}${besUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${b.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+        const padokYanlis=b.padok!=='Kuru/Gebe Padok';
+        const padokUyari=padokYanlis?`<span style="color:#ef4444;font-weight:700;font-size:.6rem;margin-left:4px">🔴 Yanlış padok</span>`:'';
+        return `<div class="arow" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span style="color:var(--ink3);font-size:.65rem;margin-right:3px">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if((sessizList||[]).length){
@@ -4387,13 +4392,6 @@ async function caseDayTamamla(dayId) {
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     await rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: null });
-    // İlgili TEDAVI_GUN gorev_log kaydını da tamamla
-    const allGorevler = await idbGetAll('gorev_log');
-    const tedaviGorev = allGorevler.find(g => {
-      if (g.gorev_tipi !== 'TEDAVI_GUN' || g.tamamlandi) return false;
-      try { return JSON.parse(g.aciklama||'{}').day_id === dayId; } catch(e) { return false; }
-    });
-    if (tedaviGorev) await rpc('gorev_tamamla', { p_gorev_id: tedaviGorev.id }).catch(()=>{});
     toast('✅ Tedavi tamamlandı');
     await pullTables(['treatment_days','gorev_log']);
     if (_curCase) {
