@@ -846,13 +846,13 @@ const _ETKEN_FILTERE_LEGACY = {
   'ROTA':      s => /rota|corona|e\.?\s*coli/i.test(s.urun_adi),
 };
 
-function _etkenFiltrele(etkenKod, stoklar) {
+async function _etkenFiltrele(etkenKod, stoklar) {
   const rx = _ETKEN_INGREDIENT[etkenKod];
   if (!rx) return [];
   const dcMap = {};  // drug_class_id → active_ingredient
-  try { idbGetAll('drug_classes').forEach(dc => { dcMap[dc.id] = dc.active_ingredient||''; }); } catch(e) {}
+  try { (await idbGetAll('drug_classes')).forEach(dc => { dcMap[dc.id] = dc.active_ingredient||''; }); } catch(e) {}
   const dpMap = {};  // drug_product_id → drug_class_id
-  try { idbGetAll('drug_products').forEach(dp => { dpMap[dp.id] = dp.drug_class_id; }); } catch(e) {}
+  try { (await idbGetAll('drug_products')).forEach(dp => { dpMap[dp.id] = dp.drug_class_id; }); } catch(e) {}
 
   return stoklar.filter(s => {
     if (!s.kategori || ['Yem','Sperma'].includes(s.kategori)) return false;
@@ -871,7 +871,7 @@ async function _protokolUygula(idx){
   const d = window.__protokolUyarilar[idx];
   if (!d) return;
   const stoklar = await idbGetAll('stok');
-  const ilaclar = d.etken_kod ? _etkenFiltrele(d.etken_kod, stoklar) : [];
+  const ilaclar = d.etken_kod ? await _etkenFiltrele(d.etken_kod, stoklar) : [];
 
   if (!ilaclar.length) {
     toast(`"${d.etken_kod || 'Bu protokol'}" için uygun stok bulunamadı. Lütfen stok girişi yapın.`, true);
@@ -1387,8 +1387,8 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
     :'';
   const _caseListHtml=await renderCasesForAnimal(a.id);
   const vaxButton = `<div style="padding:6px 0 6px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button>
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${a.kupe_no||a.devlet_kupe||a.id}')">💉 Aşı Uygula</button>
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">🏥 Vaka Aç</button>
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">💉 Aşı Uygula</button>
   </div>`;
 
   // Sonraki aşı chip'i
@@ -2561,7 +2561,7 @@ async function saTipSec(tip) {
           grouped[dc.group_name].push(dc);
         });
         sel.innerHTML = '<option value="">— Etken madde seçin (zorunlu) —</option>' +
-          Object.entries(grouped).sort().map(([grp, list]) =>
+          Object.entries(grouped).sort(([a],[b])=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(([grp, list]) =>
             `<optgroup label="${grp}">${list.map(dc =>
               `<option value="${dc.id}" data-group="${dc.group_name}">${dc.class_name ? dc.class_name+' › ' : ''}${dc.active_ingredient}</option>`
             ).join('')}</optgroup>`
@@ -2817,7 +2817,7 @@ async function _renderIlacSiniflari(el){
   allDP.forEach(dp=>{dpCount[dp.drug_class_id]=(dpCount[dp.drug_class_id]||0)+1;});
 
   let html=_tanimSearchBar();
-  const gruplar=Object.keys(tree).sort();
+  const gruplar=Object.keys(tree).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'}));
 
   gruplar.forEach(grp=>{
     const renk=GRP_RENK[grp]||'#607d8b';
@@ -2835,7 +2835,7 @@ async function _renderIlacSiniflari(el){
       </div>
       <div style="display:none;padding:4px 0 0 0">`;
 
-    Object.keys(altGruplar).sort().forEach(cls=>{
+    Object.keys(altGruplar).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).forEach(cls=>{
       const maddeler=altGruplar[cls];
       html+=`<div style="margin:4px 0 0 12px">
         <div onclick="const n=this.nextElementSibling;n.style.display=n.style.display==='none'?'block':'none';this.querySelector('.tanim-chev').classList.toggle('tanim-chev-open')" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--card2);border-radius:6px;cursor:pointer;user-select:none">
@@ -3784,7 +3784,7 @@ async function detayTamamla(){
 // §3: Görev detayında stok seçimi (etken_kod varsa, stok_id boşsa)
 async function _gorevStokSecVeTamamla(gorev){
   const stoklar = await idbGetAll('stok');
-  const ilaclar = _etkenFiltrele(gorev.etken_kod, stoklar);
+  const ilaclar = await _etkenFiltrele(gorev.etken_kod, stoklar);
   if (!ilaclar.length) {
     toast(`"${gorev.etken_kod}" için uygun stok bulunamadı.`, true);
     return;
@@ -4579,7 +4579,7 @@ function caseDrugFormAc(dayId) {
     groups[g].push(d);
   });
 
-  const groupHtml = Object.keys(groups).sort().map(grp => {
+  const groupHtml = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(grp => {
     const items = groups[grp].map(d => {
       const stokClrPos = d.guncel <= 0 ? 'var(--red)' : d.guncel <= 10 ? 'var(--amber)' : 'var(--green)';
       const stokClr = d.guncel === null ? 'var(--ink3)' : stokClrPos;
@@ -5967,14 +5967,14 @@ function renderPadokDolulukBar() {
     const kap = p.kapasite;
     const padokAdi = (p.ad || '').replace(' Padok', '');
     if (!kap) {
-      return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${p.ad}')" title="${p.ad}: ${dolu} hayvan">
+      return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${esc(p.ad)}')" title="${p.ad}: ${dolu} hayvan">
         <span class="pdoluluk-ad">${padokAdi}</span>
         <span class="pdoluluk-sayi">${dolu}</span>
       </div>`;
     }
     const yuzde = Math.round((dolu / kap) * 100);
     const renk = yuzde >= 100 ? 'var(--red)' : yuzde >= 80 ? 'var(--amber)' : 'var(--green)';
-    return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${p.ad}')" title="${p.ad}: ${dolu}/${kap}">
+    return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${esc(p.ad)}')" title="${p.ad}: ${dolu}/${kap}">
       <span class="pdoluluk-ad">${padokAdi}</span>
       <div class="pdoluluk-bar-wrap"><div class="pdoluluk-fill" style="width:${Math.min(yuzde,100)}%;background:${renk}"></div></div>
       <span class="pdoluluk-sayi" style="color:${renk}">${dolu}/${kap}</span>
@@ -6455,7 +6455,7 @@ async function renderPadokHayvanlar(padokId) {
         <input type="checkbox" ${secili ? 'checked' : ''} onchange="pdToggleHayvan('${h.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">
         <span style="flex:1;font-weight:600;color:var(--ink);font-size:.8rem">${h.kupe_no || h.devlet_kupe || h.id}</span>
         <span style="font-size:.7rem;color:var(--ink3)">${h.grup || '—'} · ${h.cinsiyet || '—'} · ${yas}</span>
-        <button class="btn" style="padding:3px 8px;font-size:.7rem;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokTekliTasi('${h.id}','${h.kupe_no || h.devlet_kupe || h.id}')">➡️</button>
+        <button class="btn" style="padding:3px 8px;font-size:.7rem;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokTekliTasi('${h.id}','${esc(h.kupe_no || h.devlet_kupe || h.id)}')">➡️</button>
       </div>`;
     }).join('');
   } catch (e) {

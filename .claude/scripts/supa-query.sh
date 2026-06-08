@@ -1,11 +1,12 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
 # EgeSüt Supabase Query Tool
-# Kullanım: ./supa-query.sh "SELECT * FROM hayvanlar LIMIT 5"
-# veya:     ./supa-query.sh -f query.sql
+# Kullanım: SUPABASE_ACCESS_TOKEN=sbp_xxx ./supa-query.sh "SELECT * FROM hayvanlar LIMIT 5"
+# veya:     SUPABASE_KEY=sbp_xxx ./supa-query.sh -f query.sql
 # ═══════════════════════════════════════════════════════════════
 
-SUPABASE_ACCESS_TOKEN="sbp_235a8cfe38b40eb8c5f9bde9e31301d97cbc89c9"
+SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN:-${SUPABASE_KEY}}"
+if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "SUPABASE_ACCESS_TOKEN veya SUPABASE_KEY env var gerekli" >&2; exit 1; fi
 PROJECT_REF="zqnexqbdfvbhlxzelzju"
 
 # Renkli output
