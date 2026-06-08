@@ -9328,7 +9328,7 @@ BEGIN
   -- Stok iade (ters hareket)
   IF v_uyg.stok_id IS NOT NULL THEN
     INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
-    VALUES (gen_random_uuid()::text, v_uyg.stok_id, 'İade (Hızlı Uyg.)', -v_uyg.doz,
+    VALUES (gen_random_uuid(), v_uyg.stok_id, 'İade (Hızlı Uyg.)', -v_uyg.doz,
             'Geri Al — ' || COALESCE(v_hayvan.kupe_no, v_uyg.hayvan_id), false);
   END IF;
 
