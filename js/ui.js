@@ -1387,8 +1387,8 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
     :'';
   const _caseListHtml=await renderCasesForAnimal(a.id);
   const vaxButton = `<div style="padding:6px 0 6px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${a.kupe_no||a.devlet_kupe||a.id}')">🏥 Vaka Aç</button>
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${a.kupe_no||a.devlet_kupe||a.id}')">💉 Aşı Uygula</button>
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">🏥 Vaka Aç</button>
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">💉 Aşı Uygula</button>
   </div>`;
 
   // Sonraki aşı chip'i
@@ -5967,14 +5967,14 @@ function renderPadokDolulukBar() {
     const kap = p.kapasite;
     const padokAdi = (p.ad || '').replace(' Padok', '');
     if (!kap) {
-      return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${p.ad}')" title="${p.ad}: ${dolu} hayvan">
+      return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${esc(p.ad)}')" title="${p.ad}: ${dolu} hayvan">
         <span class="pdoluluk-ad">${padokAdi}</span>
         <span class="pdoluluk-sayi">${dolu}</span>
       </div>`;
     }
     const yuzde = Math.round((dolu / kap) * 100);
     const renk = yuzde >= 100 ? 'var(--red)' : yuzde >= 80 ? 'var(--amber)' : 'var(--green)';
-    return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${p.ad}')" title="${p.ad}: ${dolu}/${kap}">
+    return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${esc(p.ad)}')" title="${p.ad}: ${dolu}/${kap}">
       <span class="pdoluluk-ad">${padokAdi}</span>
       <div class="pdoluluk-bar-wrap"><div class="pdoluluk-fill" style="width:${Math.min(yuzde,100)}%;background:${renk}"></div></div>
       <span class="pdoluluk-sayi" style="color:${renk}">${dolu}/${kap}</span>
@@ -6455,7 +6455,7 @@ async function renderPadokHayvanlar(padokId) {
         <input type="checkbox" ${secili ? 'checked' : ''} onchange="pdToggleHayvan('${h.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">
         <span style="flex:1;font-weight:600;color:var(--ink);font-size:.8rem">${h.kupe_no || h.devlet_kupe || h.id}</span>
         <span style="font-size:.7rem;color:var(--ink3)">${h.grup || '—'} · ${h.cinsiyet || '—'} · ${yas}</span>
-        <button class="btn" style="padding:3px 8px;font-size:.7rem;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokTekliTasi('${h.id}','${h.kupe_no || h.devlet_kupe || h.id}')">➡️</button>
+        <button class="btn" style="padding:3px 8px;font-size:.7rem;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokTekliTasi('${h.id}','${esc(h.kupe_no || h.devlet_kupe || h.id)}')">➡️</button>
       </div>`;
     }).join('');
   } catch (e) {
