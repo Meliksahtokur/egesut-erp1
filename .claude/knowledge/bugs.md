@@ -18,6 +18,34 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 
 <!-- Buraya bug sinyalleri ekle -->
 
+## [2026-06-06] BUG-054 Çıkan hayvan işlem geçmişinde UUID görünüyor
+- Kaynak: kullanıcı
+- Modül: ui.js (global geçmiş render)
+- Önem: düşük
+- Durum: kısmen çözüldü — yeni çıkışlar için fix var, eski çıkışlar hâlâ UUID
+- Açıklama: hayvan_durum_view WHERE durum='Aktif' → çıkan hayvan state'den düşüyor → kupe çözülemiyor → UUID fallback
+- Fix: submitCikis localStorage ege_exited_kupe cache, render fallback eklendi (commit 90720bf)
+- Kalıcı çözüm: BUG-053 ile birlikte — cikis_yap RPC islem_log'a CIKIS_YAPILDI yazmalı, snapshot'ta kupe_no saklanmalı
+- İlgili commit: 90720bf
+
+## [2026-06-06] BUG-053 Sürüden çıkma islem_log'a loglanmıyor
+- Kaynak: kullanıcı
+- Modül: supabase (cikis_yap RPC)
+- Önem: düşük
+- Durum: yeni — acelesi yok
+- Açıklama: cikis_yap RPC çalışıyor ama islem_log'a CIKIS_YAPILDI tipi kaydı atmıyor. İşlem geçmişinde çıkış görünmüyor.
+- Tetikleyici: Hayvan sürüden çıkarıldığında islem_log boş kalıyor
+- İlgili commit: bilinmiyor
+
+## [2026-06-06] BUG-052 Vaka iptali (geri al) çalışmıyor
+- Kaynak: kullanıcı
+- Modül: forms.js + ui.js
+- Önem: yüksek
+- Durum: **çözüldü** ✅
+- Açıklama: pullTables'ta islem_log eksikti → VAKA_ACILDI IDB'ye gelmiyordu → ✕ Sil butonu gizli kalıyordu. ga-hid input da editde kayboldu → crash.
+- Fix: pullTables + islem_log, openCaseDet retry, math onay (geri-al + çıkış), ga-hid geri eklendi
+- İlgili commit: 33ce85f, 418e5c0
+
 ## [2026-06-05] BUG-049 Timezone — 02:00 TR saatinde doğum kaydı reddediliyor
 - Kaynak: kullanıcı
 - Modül: supabase (RPC / DB fonksiyonları)

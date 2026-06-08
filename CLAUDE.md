@@ -144,10 +144,9 @@ Rutin DDL (ADD COLUMN, CREATE FUNCTION, CREATE INDEX) → doğrudan uygula.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-GitNexus bu projede **hook** olarak çalışır (Grep/Glob/Bash tool çağrılarında otomatik devreye girer).
-Index stale ise veya hook timeout'a düşerse → terminalde `npx gitnexus analyze` çalıştır.
+This project is indexed by GitNexus as **egesut-erp1** (6099 symbols, 8969 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
-> **graphify** pipx paketi olarak kurulu (`graphifyy`), Claude Code MCP'sine bağlı değil. `/graphify` komutu skill ile tetiklenir.
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
 ## Always Do
 
@@ -157,24 +156,11 @@ Index stale ise veya hook timeout'a düşerse → terminalde `npx gitnexus analy
 - When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
 
-## Domain Fonksiyon Pre-Check (tohumlama / doğum / görev)
-
-Bu domainlerdeki herhangi bir fonksiyona dokunmadan önce **3 adım zorunludur:**
-
-```
-1. gitnexus_impact(hedef_sembol)          → blast radius, HIGH/CRITICAL ise dur
-2. ast_grep_search("function $NAME($$$)…") → aynı domain'de benzer fonksiyon var mı?
-3. memory_search("domain duplikat")       → önceden not alınmış duplikat var mı?
-```
-
-Benzer fonksiyon bulunursa → kullanıcıya göster, birleştirme kararını kullanıcı verir.
-Repomix genel oryantasyon için: `pack_codebase(directory=".", compress=true)` — oturum başında bir kez.
-
 ## Never Do
 
 - NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
 - NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — `gitnexus_rename` CLI mevcut değil (sadece MCP-only). Manuel rename + `gitnexus_detect_changes` ile doğrula.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
 - NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
 
 ## Resources
