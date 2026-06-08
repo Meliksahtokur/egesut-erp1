@@ -44,6 +44,15 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Fix: `treatment_day_tamamla` DB'de gorev_log'u da atomik kapatıyor. `caseDayTamamla` js'den IDB lookup kaldırıldı.
 - İlgili commit: hotfix/2026-06-08
 
+## [2026-06-08] BUG-059 Tedavi günü alt seans (sabah/öğle/akşam bölünmesi)
+- Kaynak: kullanıcı
+- Modül: ui.js + supabase (treatment_days, add_treatment_day)
+- Önem: orta
+- Durum: beklemede — özellik isteği, önce tasarım gerekli
+- Açıklama: Aynı tedavi günü içinde birden fazla seans yapılamıyor (sabah/öğle/akşam). Önceki tasarımda Gün 1a, 1b, 1c gibi sub-gün yapısı planlanmıştı ama uygulanmamış.
+- Önerilen: treatment_days.seans_no veya sub-day tablosu. Tasarım kararı alındıktan sonra implemente edilecek.
+- İlgili commit: —
+
 ## [2026-06-08] BUG-058 Done olan görevler stoktan ürün çekmedi
 - Kaynak: kullanıcı
 - Modül: supabase (gorev_tamamla RPC)
