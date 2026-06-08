@@ -9291,7 +9291,7 @@ BEGIN
 
   -- Stok düşüm
   INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
-  VALUES (gen_random_uuid()::text, p_stok_id, 'Hızlı Uygulama', p_doz,
+  VALUES (gen_random_uuid(), p_stok_id, 'Hızlı Uygulama', p_doz,
           'Hızlı Uygulama — ' || v_hayvan.kupe_no || ' — ' || v_stok.urun_adi, false);
 
   SELECT COALESCE(s.baslangic_miktar, 0) - COALESCE(SUM(CASE WHEN sh.iptal = false THEN sh.miktar ELSE 0 END), 0)
