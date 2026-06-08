@@ -926,7 +926,7 @@ async function _protokolUygula(idx){
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${rotaOpts}</select>
-    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (zorunlu)</label>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (opsiyonel)</label>
     <input id="pu-not" placeholder="Uygulama notu..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">
     <button onclick="_protokolUygulaKaydet('${d.hayvan_id}',${idx})" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
@@ -941,11 +941,11 @@ async function _protokolUygulaKaydet(hayvanId, idx){
   const birim = document.getElementById('pu-birim')?.value;
   const rota = document.getElementById('pu-rota')?.value;
   const not_ = document.getElementById('pu-not')?.value?.trim();
-  if (!stok || !doz || !birim || !rota || !not_) { toast('Tüm alanları doldurun', true); return; }
+  if (!stok || !doz || !birim || !rota) { toast('Tüm alanları doldurun', true); return; }
 
   try {
     const res = await rpc('hizli_uygulama', {
-      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_ || ''
     });
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
@@ -1059,7 +1059,7 @@ async function _hayvanHizliUygulama(hayvanId){
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${rotaOpts}</select>
-    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (zorunlu)</label>
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (opsiyonel)</label>
     <input id="pu-not" placeholder="Uygulama notu..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">
     <button onclick="_hayvanHizliUygulaKaydet('${hayvanId}')" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
@@ -1074,11 +1074,11 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
   const birim = document.getElementById('pu-birim')?.value;
   const rota = document.getElementById('pu-rota')?.value;
   const not_ = document.getElementById('pu-not')?.value?.trim();
-  if (!stok || !doz || !birim || !rota || !not_) { toast('Tüm alanları doldurun', true); return; }
+  if (!stok || !doz || !birim || !rota) { toast('Tüm alanları doldurun', true); return; }
 
   try {
     const res = await rpc('hizli_uygulama', {
-      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_ || ''
     });
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
