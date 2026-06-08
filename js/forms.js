@@ -921,15 +921,15 @@ async function kaydetTaskEdit(btn, t, degisen) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     await write('gorev_log',degisen,'PATCH',`id=eq.${t.id}`);
-    try {
-      await db.from('islem_log').insert({
-        ana_hayvan_id: t.hayvan_id||null,
-        islem_tipi: 'gorev_duzenle',
-        islem_detay: JSON.stringify({gorev_id:t.id,...degisen}),
-        tarih: new Date().toISOString(),
-        kullanici: null, kaynak: 'MANUEL'
-      });
-    } catch(_){}
+    await write('islem_log', {
+      id: crypto.randomUUID(),
+      ana_hayvan_id: t.hayvan_id || null,
+      islem_tipi: 'gorev_duzenle',
+      islem_detay: JSON.stringify({ gorev_id: t.id, ...degisen }),
+      tarih: new Date().toISOString(),
+      kullanici: null,
+      kaynak: 'MANUEL'
+    }).catch(() => {});
     toast('✅ Görev güncellendi');
     closeM('m-task-edit');
     await loadTasks(_curTaskFilter||'today');
