@@ -329,6 +329,7 @@ async function pullTables(tables = []) {
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
       islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
+      uygulama_log: () => db.from('uygulama_log').select('*').order('created_at', { ascending: false }).limit(500),
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
       tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
       padoklar:         () => db.from('padoklar').select('*').eq('aktif', true).order('sira'),
