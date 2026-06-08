@@ -846,13 +846,13 @@ const _ETKEN_FILTERE_LEGACY = {
   'ROTA':      s => /rota|corona|e\.?\s*coli/i.test(s.urun_adi),
 };
 
-function _etkenFiltrele(etkenKod, stoklar) {
+async function _etkenFiltrele(etkenKod, stoklar) {
   const rx = _ETKEN_INGREDIENT[etkenKod];
   if (!rx) return [];
   const dcMap = {};  // drug_class_id → active_ingredient
-  try { idbGetAll('drug_classes').forEach(dc => { dcMap[dc.id] = dc.active_ingredient||''; }); } catch(e) {}
+  try { (await idbGetAll('drug_classes')).forEach(dc => { dcMap[dc.id] = dc.active_ingredient||''; }); } catch(e) {}
   const dpMap = {};  // drug_product_id → drug_class_id
-  try { idbGetAll('drug_products').forEach(dp => { dpMap[dp.id] = dp.drug_class_id; }); } catch(e) {}
+  try { (await idbGetAll('drug_products')).forEach(dp => { dpMap[dp.id] = dp.drug_class_id; }); } catch(e) {}
 
   return stoklar.filter(s => {
     if (!s.kategori || ['Yem','Sperma'].includes(s.kategori)) return false;
@@ -871,7 +871,7 @@ async function _protokolUygula(idx){
   const d = window.__protokolUyarilar[idx];
   if (!d) return;
   const stoklar = await idbGetAll('stok');
-  const ilaclar = d.etken_kod ? _etkenFiltrele(d.etken_kod, stoklar) : [];
+  const ilaclar = d.etken_kod ? await _etkenFiltrele(d.etken_kod, stoklar) : [];
 
   if (!ilaclar.length) {
     toast(`"${d.etken_kod || 'Bu protokol'}" için uygun stok bulunamadı. Lütfen stok girişi yapın.`, true);
@@ -3784,7 +3784,7 @@ async function detayTamamla(){
 // §3: Görev detayında stok seçimi (etken_kod varsa, stok_id boşsa)
 async function _gorevStokSecVeTamamla(gorev){
   const stoklar = await idbGetAll('stok');
-  const ilaclar = _etkenFiltrele(gorev.etken_kod, stoklar);
+  const ilaclar = await _etkenFiltrele(gorev.etken_kod, stoklar);
   if (!ilaclar.length) {
     toast(`"${gorev.etken_kod}" için uygun stok bulunamadı.`, true);
     return;
