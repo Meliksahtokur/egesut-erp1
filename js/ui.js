@@ -912,43 +912,44 @@ async function _protokolUygula(idx){
   mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:flex-end';
   mini.onclick = e => { if (e.target === mini) mini.remove(); };
 
-  const stokOpts = ilaclar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
+  const stokOpts = ilaclar.map(s => `<option value="${s.id}" data-birim="${esc(s.birim||'ml')}">${esc(s.urun_adi)}</option>`).join('');
   const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+  const ilkBirim = ilaclar[0]?.birim || 'ml';
 
   mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💉 Protokol Uygula</div>
-    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">${esc(d.kupe_no||'?')} · ${esc(d.adim)} · ${esc(d.etken_kod||'')}</div>
+    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">${esc(d.kupe_no||'?')} · ${esc(d.adim)}</div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Stok</label>
     <select id="pu-stok" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${stokOpts}</select>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" value="10" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
-      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="ml" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:2"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" min="0.1" value="1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="${ilkBirim}" readonly style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem;background:var(--card2);color:var(--ink3)"></div>
     </div>
-    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
-    <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${rotaOpts}</select>
-    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (opsiyonel)</label>
-    <input id="pu-not" placeholder="Uygulama notu..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
+    <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
     <button onclick="_protokolUygulaKaydet('${d.hayvan_id}',${idx})" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
   document.body.appendChild(mini);
-  if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
-  document.getElementById('pu-stok')?.addEventListener('change', e => _puDozPrefill(e.target.value));
+  _puDozPrefill(ilaclar[0]?.id);
+  document.getElementById('pu-stok')?.addEventListener('change', e => {
+    _puDozPrefill(e.target.value);
+    const opt = e.target.selectedOptions[0];
+    const birimEl = document.getElementById('pu-birim');
+    if (birimEl && opt?.dataset?.birim) birimEl.value = opt.dataset.birim;
+  });
 }
 
 async function _protokolUygulaKaydet(hayvanId, idx){
   const stok = document.getElementById('pu-stok')?.value;
   const doz = parseFloat(document.getElementById('pu-doz')?.value);
-  const birim = document.getElementById('pu-birim')?.value;
-  const rota = document.getElementById('pu-rota')?.value;
-  const not_ = document.getElementById('pu-not')?.value?.trim();
+  const birim = document.getElementById('pu-birim')?.value || 'ml';
+  const rota = document.getElementById('pu-rota')?.value || 'IM';
   if (!stok) { toast('Stok seçilmedi', true); return; }
-  if (!doz || isNaN(doz)) { toast('Geçerli doz girin', true); return; }
-  if (!birim) { toast('Birim boş', true); return; }
-  if (!rota) { toast('Rota seçilmedi', true); return; }
+  if (!doz || isNaN(doz) || doz <= 0) { toast('Geçerli doz girin', true); return; }
 
   try {
     const res = await rpc('hizli_uygulama', {
-      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_ || ''
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: ''
     });
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
@@ -1048,39 +1049,41 @@ async function _hayvanHizliUygulama(hayvanId){
   mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:flex-end';
   mini.onclick = e => { if (e.target === mini) mini.remove(); };
 
-  const stokOpts = ilaclar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
+  const stokOpts = ilaclar.map(s => `<option value="${s.id}" data-birim="${esc(s.birim||'ml')}">${esc(s.urun_adi)}</option>`).join('');
   const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+  const ilkBirim2 = ilaclar[0]?.birim || 'ml';
+  const hayvanKupe = getState('animals')?.find(a=>a.id===hayvanId)?.kupe_no || hayvanId;
 
   mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💉 Hızlı Uygulama</div>
-    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">${esc(hayvanId)} — case açmadan ilaç/vitamin kaydı</div>
+    <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">${esc(hayvanKupe)} — case açmadan ilaç/vitamin kaydı</div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Stok</label>
     <select id="pu-stok" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${stokOpts}</select>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" value="10" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
-      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="ml" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:2"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" min="0.1" value="1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="${ilkBirim2}" readonly style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem;background:var(--card2);color:var(--ink3)"></div>
     </div>
-    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
-    <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${rotaOpts}</select>
-    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Not (opsiyonel)</label>
-    <input id="pu-not" placeholder="Uygulama notu..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">
+    <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
+    <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
     <button onclick="_hayvanHizliUygulaKaydet('${hayvanId}')" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
   document.body.appendChild(mini);
   if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
-  document.getElementById('pu-stok')?.addEventListener('change', e => _puDozPrefill(e.target.value));
+  document.getElementById('pu-stok')?.addEventListener('change', e => {
+    _puDozPrefill(e.target.value);
+    const opt = e.target.selectedOptions[0];
+    const birimEl = document.getElementById('pu-birim');
+    if (birimEl && opt?.dataset?.birim) birimEl.value = opt.dataset.birim;
+  });
 }
 
 async function _hayvanHizliUygulaKaydet(hayvanId){
   const stok = document.getElementById('pu-stok')?.value;
   const doz = parseFloat(document.getElementById('pu-doz')?.value);
-  const birim = document.getElementById('pu-birim')?.value;
-  const rota = document.getElementById('pu-rota')?.value;
-  const not_ = document.getElementById('pu-not')?.value?.trim();
+  const birim = document.getElementById('pu-birim')?.value || 'ml';
+  const rota = document.getElementById('pu-rota')?.value || 'IM';
   if (!stok) { toast('Stok seçilmedi', true); return; }
-  if (!doz || isNaN(doz)) { toast('Geçerli doz girin', true); return; }
-  if (!birim) { toast('Birim boş', true); return; }
-  if (!rota) { toast('Rota seçilmedi', true); return; }
+  if (!doz || isNaN(doz) || doz <= 0) { toast('Geçerli doz girin', true); return; }
 
   try {
     const res = await rpc('hizli_uygulama', {
