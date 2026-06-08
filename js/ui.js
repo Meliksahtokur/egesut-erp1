@@ -941,7 +941,10 @@ async function _protokolUygulaKaydet(hayvanId, idx){
   const birim = document.getElementById('pu-birim')?.value;
   const rota = document.getElementById('pu-rota')?.value;
   const not_ = document.getElementById('pu-not')?.value?.trim();
-  if (!stok || !doz || !birim || !rota) { toast('Tüm alanları doldurun', true); return; }
+  if (!stok) { toast('Stok seçilmedi', true); return; }
+  if (!doz || isNaN(doz)) { toast('Geçerli doz girin', true); return; }
+  if (!birim) { toast('Birim boş', true); return; }
+  if (!rota) { toast('Rota seçilmedi', true); return; }
 
   try {
     const res = await rpc('hizli_uygulama', {
@@ -1074,7 +1077,10 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
   const birim = document.getElementById('pu-birim')?.value;
   const rota = document.getElementById('pu-rota')?.value;
   const not_ = document.getElementById('pu-not')?.value?.trim();
-  if (!stok || !doz || !birim || !rota) { toast('Tüm alanları doldurun', true); return; }
+  if (!stok) { toast('Stok seçilmedi', true); return; }
+  if (!doz || isNaN(doz)) { toast('Geçerli doz girin', true); return; }
+  if (!birim) { toast('Birim boş', true); return; }
+  if (!rota) { toast('Rota seçilmedi', true); return; }
 
   try {
     const res = await rpc('hizli_uygulama', {
@@ -1420,6 +1426,7 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
   const vaxButton = `<div style="padding:6px 0 6px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
     <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">🏥 Vaka Aç</button>
     <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">💉 Aşı Uygula</button>
+    <button class="btn btn-o" style="padding:9px;grid-column:1/-1" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı İlaç/Vitamin Uygula</button>
   </div>`;
 
   // Sonraki aşı chip'i
