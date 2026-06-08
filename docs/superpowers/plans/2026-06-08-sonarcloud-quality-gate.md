@@ -1,6 +1,6 @@
 # SonarCloud Quality Gate Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** SonarCloud Quality Gate'i ERROR'dan PASS'e taşı — 3 fail koşulunu kapat.
 
@@ -39,7 +39,7 @@ Executor bu araçları kullanmalı:
 
 Bu merge `new_reliability_rating`'i C(3) → A(1)'e taşır.
 
-- [ ] **Step 1: Branch durumunu doğrula**
+- [x] **Step 1: Branch durumunu doğrula**
 
 ```bash
 git log fix/big-analysis-2026-06-08 --oneline -5
@@ -48,7 +48,7 @@ git diff main..fix/big-analysis-2026-06-08 --stat
 
 Beklenen: `fix/big-analysis-2026-06-08` branch'inde 6+ commit, değişiklikler `js/forms.js`, `js/ui.js`, `js/app.js`, `.claude/scripts/` içeriyor.
 
-- [ ] **Step 2: main'e geç ve merge et**
+- [x] **Step 2: main'e geç ve merge et**
 
 ```bash
 git checkout main
@@ -57,7 +57,7 @@ git merge fix/big-analysis-2026-06-08 --no-ff -m "merge: fix/big-analysis-2026-0
 
 Beklenen: conflict yok, fast-forward veya merge commit.
 
-- [ ] **Step 3: Mevcut gate durumunu kaydet (referans için)**
+- [x] **Step 3: Mevcut gate durumunu kaydet (referans için)**
 
 ```
 sonar_quality_gate()
@@ -88,7 +88,7 @@ Bu değerleri not al — Task 2 ve 3 sonrasında karşılaştırmak için.
 sonar.exclusions=js/lib/**,node_modules/**,tests/**,supabase/**,docs/**,research/**,review/**,**/*.min.js
 ```
 
-- [ ] **Step 1: sonar-project.properties'i güncelle**
+- [x] **Step 1: sonar-project.properties'i güncelle**
 
 `sonar-project.properties` dosyasının 10. satırını değiştir:
 
@@ -100,7 +100,7 @@ sonar.exclusions=js/lib/**,node_modules/**,tests/**,supabase/**,docs/**,research
 sonar.exclusions=js/lib/**,node_modules/**,tests/**,supabase/**,docs/**,research/**,review/**,**/*.min.js,**/*.sql,**/*.yml,**/*.yaml
 ```
 
-- [ ] **Step 2: sonarcloud.yml workflow'unu güncelle**
+- [x] **Step 2: sonarcloud.yml workflow'unu güncelle**
 
 `.github/workflows/sonarcloud.yml` dosyasında `-Dsonar.exclusions` argümanını güncelle:
 
@@ -112,7 +112,7 @@ sonar.exclusions=js/lib/**,node_modules/**,tests/**,supabase/**,docs/**,research
             -Dsonar.exclusions=js/lib/**,node_modules/**,tests/**,supabase/**,docs/**,research/**,review/**,**/*.min.js,**/*.sql,**/*.yml,**/*.yaml
 ```
 
-- [ ] **Step 3: Değişiklik kapsamını doğrula**
+- [x] **Step 3: Değişiklik kapsamını doğrula**
 
 ```
 gitnexus_detect_changes()
@@ -120,7 +120,7 @@ gitnexus_detect_changes()
 
 Beklenen: sadece `sonar-project.properties` ve `.github/workflows/sonarcloud.yml` değişmiş.
 
-- [ ] **Step 4: Commit ve push**
+- [x] **Step 4: Commit ve push**
 
 ```bash
 git add sonar-project.properties .github/workflows/sonarcloud.yml
@@ -130,7 +130,7 @@ git push origin main
 
 Push sonrası GitHub Actions otomatik olarak SonarCloud taramasını tetikler (~2-3 dakika). Tamamlanınca `sonar_quality_gate()` ile kontrol et.
 
-- [ ] **Step 5: Yeni gate durumunu kontrol et**
+- [x] **Step 5: Yeni gate durumunu kontrol et**
 
 Push'tan 3-5 dakika sonra:
 
@@ -166,7 +166,7 @@ Beklenen: `files` sayısı 175'ten ~12'ye düşmüş, `new_duplicated_lines_dens
 | `index.html:17` SRI | LOW | SAFE — PWA'da CDN SRI opsiyonel |
 | `index.html:1663` SRI | LOW | SAFE — PWA'da CDN SRI opsiyonel |
 
-- [ ] **Step 1: Hotspot key'lerini API ile al**
+- [x] **Step 1: Hotspot key'lerini API ile al**
 
 ```bash
 curl -s -u "$SONAR_TOKEN:" \
@@ -176,7 +176,7 @@ curl -s -u "$SONAR_TOKEN:" \
 
 Bu komut her hotspot için `key component line` formatında liste üretir. Key'leri bir sonraki adım için kopyala.
 
-- [ ] **Step 2: Math.random() hotspot'larını SAFE olarak işaretle**
+- [x] **Step 2: Math.random() hotspot'larını SAFE olarak işaretle**
 
 `js/app.js:8`, `js/ui.js:2747`, `js/ui.js:2748` için:
 
@@ -189,7 +189,7 @@ curl -s -X POST -u "$SONAR_TOKEN:" \
 
 Beklenen HTTP 200 dönmeli.
 
-- [ ] **Step 3: GitHub Actions SHA hotspot'larını ACKNOWLEDGED olarak işaretle**
+- [x] **Step 3: GitHub Actions SHA hotspot'larını ACKNOWLEDGED olarak işaretle**
 
 6 adet workflow SHA hotspot için:
 
@@ -199,7 +199,7 @@ curl -s -X POST -u "$SONAR_TOKEN:" \
   -d "hotspot=KEY&status=REVIEWED&resolution=ACKNOWLEDGED&comment=Resmi+Supabase+SonarSource+action+sha-pin+gereksinimi+kabul+edildi"
 ```
 
-- [ ] **Step 4: Secrets ve SRI hotspot'larını işaretle**
+- [x] **Step 4: Secrets ve SRI hotspot'larını işaretle**
 
 2 adet secrets hotspot → ACKNOWLEDGED, 2 adet SRI hotspot → SAFE:
 
@@ -215,7 +215,7 @@ curl -s -X POST -u "$SONAR_TOKEN:" \
   -d "hotspot=KEY&status=REVIEWED&resolution=SAFE&comment=PWA+CDN+SRI+opsiyonel"
 ```
 
-- [ ] **Step 5: Review durumunu doğrula**
+- [x] **Step 5: Review durumunu doğrula**
 
 ```bash
 curl -s -u "$SONAR_TOKEN:" \
@@ -236,7 +236,7 @@ Beklenen: boş liste.
 
 ## Task 4: Final Gate Doğrulaması
 
-- [ ] **Step 1: Gate durumunu kontrol et**
+- [x] **Step 1: Gate durumunu kontrol et**
 
 ```
 sonar_quality_gate()
@@ -250,7 +250,7 @@ Quality Gate: PASS ✅
 - new_security_hotspots_reviewed: 100 ✅ (eşik: 100)
 ```
 
-- [ ] **Step 2: Gate hâlâ ERROR ise teşhis**
+- [x] **Step 2: Gate hâlâ ERROR ise teşhis**
 
 `sonar_quality_gate()` sonucundaki fail eden koşula göre:
 
@@ -258,7 +258,7 @@ Quality Gate: PASS ✅
 - `new_reliability_rating` hâlâ C ise: `sonar_issues(types="BUG", severities="BLOCKER,CRITICAL,MAJOR")` ile kalan JS buglarını listele ve düzelt.
 - `new_security_hotspots_reviewed` hâlâ 0 ise: Sonar API yerine UI üzerinden manuel review gerekebilir (SonarCloud proje ayarları → Security Hotspots sekmesi).
 
-- [ ] **Step 3: PASS olunca memory'e not ekle**
+- [x] **Step 3: PASS olunca memory'e not ekle**
 
 ```
 memory_add(
