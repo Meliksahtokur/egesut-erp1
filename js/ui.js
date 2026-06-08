@@ -1012,6 +1012,7 @@ async function _protokolGeriAl(ref){
 
 // §5: Ortak işlem sonrası yenileme — scanner + badge + açık ekranlar
 async function _islemSonrasiRefresh(){
+  try { await pullTables(['uygulama_log', 'stok_hareket']); } catch(e) {}
   try {
     const proto = await rpc('protokol_eksik_tara', {});
     window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
@@ -2328,8 +2329,8 @@ async function loadUreme(tab='kizginlik'){
 // ──────────────────────────────────────────
 // GEÇMİŞ
 // ──────────────────────────────────────────
-const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
-const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',ASI_ERTELEME:'rgba(120,120,120,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)'};
+const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',uygulama:'💊',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
+const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',uygulama:'rgba(120,80,200,.1)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',ASI_ERTELEME:'rgba(120,120,120,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)'};
 const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
 const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık',ASI_KAYDI:'💉 Aşı Kaydı',ASI_ERTELEME:'⏸️ Aşı Ertelendi',TOPLU_ILAC:'💊 Toplu İlaç'};
 
@@ -2378,6 +2379,12 @@ function _gecmisEntryHtml(e){
       sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span> · ${_pill}${hkName}`;
       if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
     }
+  } else if(type==='uygulama'){
+    const uHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
+    const uLabel=uHayvan?(uHayvan.kupe_no||uHayvan.devlet_kupe):data.hayvan_id;
+    title=`${uLabel||'?'} — ${esc(data._stokAdi||'?')}`;
+    sub=`${data.doz||'?'} ${data.birim||'ml'} · ${data.rota||'IM'}${data.notlar?' · '+esc(data.notlar):''}`;
+    if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
   } else if(type==='islem'){
     const snap=data.snapshot||{};
     const hayvanObj2=getState('animals').find(a=>a.id===data.ana_hayvan_id);
@@ -2415,6 +2422,9 @@ function _gecmisSearchText(e){
   else if(e.type==='hastalik'){parts.push(d.disease_name||'',d.tani||'',d.status==='active'?'aktif':'kapalı','hastalık',...(d._drugNames||[]));}
   else if(e.type==='gorev'){
     parts.push(d._lbl||'',d.gorev_tipi||'',d._disName||'',d.tamamlandi?'tamamlandı':'bekliyor',...(d._drugNames||[]));
+  }
+  else if(e.type==='uygulama'){
+    parts.push(d._stokAdi||'',d.etken_kod||'',d.birim||'',d.rota||'','hızlı uygulama','ilaç','vitamin');
   }
   else if(e.type==='islem'){
     const snap=d.snapshot||{};
@@ -2498,6 +2508,13 @@ async function loadGecmis(f,btn){
         const _disName=_cs&&_disById[_cs.disease_id]||'';
         const _caseId=_cs?.id||'';
         entries.push({type:'gorev',date:(r.tamamlanma_tarihi||r.hedef_tarih||'').slice(0,10),sortKey:r.tamamlanma_tarihi||r.hedef_tarih||'',data:{...r,_drugNames,_lbl,_gunNo,_disName,_caseId}});
+      });
+    }
+    if(f==='hepsi'||f==='gorev'){
+      const _uyStok=await idbGetAll('stok').catch(()=>[]);
+      const _uyStokById=Object.fromEntries(_uyStok.map(s=>[s.id,s.urun_adi||'']));
+      (await idbGetAll('uygulama_log').catch(()=>[])).forEach(r=>{
+        entries.push({type:'uygulama',date:(r.tarih||r.created_at||'').slice(0,10),sortKey:r.created_at||r.tarih||'',data:{...r,_stokAdi:_uyStokById[r.stok_id]||'?'}});
       });
     }
     if(f==='hepsi'||f==='hayvan'){
