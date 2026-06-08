@@ -489,7 +489,7 @@ function updateSemptomDropdown(kat) {
 }
 
 function semptomEkle(sel) {
-  const val = sel.value || sel._noReset && sel.value === '' ? sel.value : sel.value; if (!val) return;
+  const val = sel.value; if (!val) return;
   if (!sel._noReset) sel.value = '';
   if (_semptomSecili.includes(val)) return;
   _semptomSecili.push(val);
