@@ -44,6 +44,26 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Fix: `treatment_day_tamamla` DB'de gorev_log'u da atomik kapatıyor. `caseDayTamamla` js'den IDB lookup kaldırıldı.
 - İlgili commit: hotfix/2026-06-08
 
+## [2026-06-08] BUG-060 hizli_uygulama stok_hareket.id UUID type hatası
+- Kaynak: kullanıcı (canlı test)
+- Modül: supabase (hizli_uygulama RPC)
+- Önem: kritik
+- Durum: **çözüldü** ✅
+- Açıklama: `hizli_uygulama` içinde `gen_random_uuid()::text` → `stok_hareket.id uuid` kolonuna text insert ediliyordu. PostgreSQL'de text→uuid implicit cast yok → "column 'id' is of type uuid but expression is of type text" hatası.
+- Root cause: `stok_hareket.id` uuid column, ama DB fonksiyonu `::text` cast ile yazılmış.
+- Fix: `gen_random_uuid()::text` → `gen_random_uuid()` (migration + ground_truth güncellendi)
+- Tetikleyici: ILAC tipli görev "Tamamlandı Olarak İşaretle" → hizli_uygulama RPC çağrısı
+- İlgili commit: hotfix/2026-06-08 b2e870e
+
+## [2026-06-08] BUG-055 İleri gebeler listesi sıra + yanlış padok uyarısı
+- Kaynak: kullanıcı
+- Modül: ui.js (renderIleriGebeler)
+- Önem: orta
+- Durum: **çözüldü** ✅
+- Açıklama: İleri gebeler listesinde sıra numarası yoktu ve Kuru/Gebe Padok dışındaki hayvanlar görsel uyarı almıyordu.
+- Fix: İnekler `1)`, `2)`, düveler `D-1)`, `D-2)` format. `gebelik_protokol_kontrol` RPC artık padok alanı döndürüyor; yanlış padokta kırmızı arka plan + 🔴 Transfer! etiketi.
+- İlgili commit: hotfix/2026-06-08 be2fe62
+
 ## [2026-06-08] BUG-059 Tedavi günü alt seans (sabah/öğle/akşam bölünmesi)
 - Kaynak: kullanıcı
 - Modül: ui.js + supabase (treatment_days, add_treatment_day)
