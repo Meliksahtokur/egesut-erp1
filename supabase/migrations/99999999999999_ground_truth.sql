@@ -9279,10 +9279,6 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Stok bulunamadı');
   END IF;
 
-  IF p_notlar IS NULL OR TRIM(p_notlar) = '' THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Not alanı zorunludur');
-  END IF;
-
   v_etken := public._etken_kod_bul(p_stok_id, NULL);
 
   INSERT INTO public.uygulama_log (hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar)
