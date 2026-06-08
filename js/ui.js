@@ -197,11 +197,16 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   if((ileriGebeler||[]).length){
     const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
     const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
+    let inekNo=0,duveNo=0;
     h+=band('amber',title,
       (ileriGebeler||[]).map(b=>{
+        const isDuve=(b.grup||'').includes('Düve');
+        const no=isDuve?`D-${++duveNo}`:`${++inekNo}`;
         const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
         const besUyari=b.gebelik_gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 5px;font-weight:700;font-size:.65rem;margin-left:4px">⚠️ Anyonik</span>`:'';
-        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}${besUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${b.grup||''}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+        const padokYanlis=b.padok!=='Kuru/Gebe Padok';
+        const padokUyari=padokYanlis?`<span style="color:#ef4444;font-weight:700;font-size:.6rem;margin-left:4px">🔴 Transfer!</span>`:'';
+        return `<div class="arow" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span style="color:var(--ink3);font-size:.65rem;margin-right:3px">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if((sessizList||[]).length){
@@ -485,7 +490,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       <div class="st-check ${s.tamamlandi?'done':''}" onclick="toggleSub('${s.id}','${t.id}',this)">
         ${s.tamamlandi?`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>`:''}
       </div>
-      <span class="st-label ${s.tamamlandi?'done':''}">${esc(s.aciklama)}</span>
+      <span class="st-label ${s.tamamlandi?'done':''}">${(()=>{try{const p=JSON.parse(s.aciklama||'{}');return esc(p.label||s.aciklama);}catch(e){return esc(s.aciklama);}})()}</span>
     </div>`).join('')}
     <div class="st-prog">${doneSubs}/${subs.length} tamamlandı</div>
   </div>`:'';
@@ -867,6 +872,28 @@ async function _etkenFiltrele(etkenKod, stoklar) {
   });
 }
 
+async function _sonDozGetir(stokId) {
+  try {
+    // hizli_uygulama → uygulama_log'a yazıyor (drug_administrations değil)
+    const logs = await idbGetAll('uygulama_log');
+    const match = logs
+      .filter(a => a.stok_id === stokId)
+      .sort((a, b) => (b.created_at || b.tarih || '').localeCompare(a.created_at || a.tarih || ''));
+    if (match.length) return { doz: match[0].doz, birim: match[0].birim || 'ml' };
+  } catch(e) {}
+  return null;
+}
+
+function _puDozPrefill(stokId) {
+  _sonDozGetir(stokId).then(d => {
+    if (!d) return;
+    const dozEl = document.getElementById('pu-doz');
+    const birimEl = document.getElementById('pu-birim');
+    if (dozEl) dozEl.value = d.doz;
+    if (birimEl) birimEl.value = d.birim;
+  });
+}
+
 async function _protokolUygula(idx){
   const d = window.__protokolUyarilar[idx];
   if (!d) return;
@@ -904,6 +931,8 @@ async function _protokolUygula(idx){
     <button onclick="_protokolUygulaKaydet('${d.hayvan_id}',${idx})" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
   document.body.appendChild(mini);
+  if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
+  document.getElementById('pu-stok')?.addEventListener('change', e => _puDozPrefill(e.target.value));
 }
 
 async function _protokolUygulaKaydet(hayvanId, idx){
@@ -1035,6 +1064,8 @@ async function _hayvanHizliUygulama(hayvanId){
     <button onclick="_hayvanHizliUygulaKaydet('${hayvanId}')" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
   document.body.appendChild(mini);
+  if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
+  document.getElementById('pu-stok')?.addEventListener('change', e => _puDozPrefill(e.target.value));
 }
 
 async function _hayvanHizliUygulaKaydet(hayvanId){
@@ -3624,7 +3655,7 @@ async function openTaskDet(id){
     subsEl.innerHTML=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Alt Görevler (${subsDone.length}/${subs.length+subsDone.length})</div>`
       +[...subsDone,...subs].map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
         <div style="width:18px;height:18px;border-radius:50%;background:${s.tamamlandi?'var(--green)':'var(--card2)'};border:2px solid ${s.tamamlandi?'var(--green)':'var(--card3)'};flex-shrink:0"></div>
-        <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${esc(s.aciklama)}</span>
+        <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${(()=>{try{const p=JSON.parse(s.aciklama||'{}');return esc(p.label||s.aciklama);}catch(e){return esc(s.aciklama);}})()}</span>
       </div>`).join('');
   } else { subsEl.style.display='none'; }
 
@@ -3814,6 +3845,8 @@ async function _gorevStokSecVeTamamla(gorev){
     <button onclick="_gorevStokTamamlaSubmit('${gorev.id}','${gorev.hayvan_id||''}','${gorev.padok_hedef||''}')" class="btn" style="width:100%;padding:10px;font-weight:700">Tamamla</button>
   </div>`;
   document.body.appendChild(mini);
+  if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
+  document.getElementById('pu-stok')?.addEventListener('change', e => _puDozPrefill(e.target.value));
 }
 
 async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
@@ -3824,14 +3857,11 @@ async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
   if (!stok || !doz || !birim) { toast('Stok ve doz alanlarını doldurun', true); return; }
 
   try {
-    const res = await rpc('gorev_tamamla', {
-      p_gorev_id: gorevId,
-      p_padok_hedef: padokHedef || null,
-      p_stok_id: stok,
-      p_doz: doz,
-      p_birim: birim || 'ml',
-      p_rota: rota || 'IM'
+    await rpc('hizli_uygulama', {
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz,
+      p_birim: birim || 'ml', p_rota: rota || 'IM', p_notlar: 'Görev tamamlama'
     });
+    const res = await rpc('gorev_tamamla', { p_gorev_id: gorevId, p_padok_hedef: padokHedef || null });
     if (res?.ok) {
       toast('✅ Görev tamamlandı');
       document.getElementById('proto-mini')?.remove();
@@ -4387,13 +4417,6 @@ async function caseDayTamamla(dayId) {
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     await rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: null });
-    // İlgili TEDAVI_GUN gorev_log kaydını da tamamla
-    const allGorevler = await idbGetAll('gorev_log');
-    const tedaviGorev = allGorevler.find(g => {
-      if (g.gorev_tipi !== 'TEDAVI_GUN' || g.tamamlandi) return false;
-      try { return JSON.parse(g.aciklama||'{}').day_id === dayId; } catch(e) { return false; }
-    });
-    if (tedaviGorev) await rpc('gorev_tamamla', { p_gorev_id: tedaviGorev.id }).catch(()=>{});
     toast('✅ Tedavi tamamlandı');
     await pullTables(['treatment_days','gorev_log']);
     if (_curCase) {

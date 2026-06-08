@@ -18,34 +18,69 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 
 <!-- Buraya bug sinyalleri ekle -->
 
+## [2026-06-08] BUG-054 Doğum sonrası laktasyon padok geçişi
+- Kaynak: kullanıcı
+- Modül: supabase (dogum_kaydet)
+- Önem: düşük
+- Durum: **çözüldü — zaten çalışıyordu** ✅
+- Açıklama: dogum_kaydet RPC anne hayvanı SET grup='Sağmal (Laktasyonda)', padok='Sağmal Padok' yapıyor. Canlı DB incelendi, son 3 doğum (148, 168, Test inek 3) hepsi Sağmal Padok'ta.
+- İlgili commit: mevcut
+
 ## [2026-06-08] BUG-056 Protokol ilaç uygulaması: modal açılıyor ama görev kapanmıyor
 - Kaynak: kullanıcı
 - Modül: ui.js + supabase (hizli_uygulama RPC + _etken_kod_bul + trg_dinle_uygulama)
 - Önem: yüksek
-- Durum: yeni
-- Açıklama: `_protokolUygulaKaydet` → `hizli_uygulama` RPC çalışıyor, kayıt oluşuyor. Ama `hizli_uygulama` içinde `_etken_kod_bul(p_stok_id)` bazı ürünler için NULL döndürüyor (CAROFERTIN-E vb.) → `uygulama_log.etken_kod = NULL` → `trg_dinle_uygulama` trigger'ı `fn_dinle_uygulama` içinde `IF NEW.etken_kod IS NOT NULL` guard'ına takılıyor → `_gorev_dinle` hiç çağrılmıyor → eşleşen görev kapanmıyor.
-- Tetikleyici: drug_product_id → drug_class_id FK zinciri doğru kurulmuş ama `_etken_kod_bul` text-matching fallback'te takılıyor, FK zinciri kullanmıyor.
-- Kalıcı çözüm: `_etken_kod_bul` fonksiyonunu spec'te tarif edildiği gibi FK zinciri öncelikli yapacak şekilde güncelle (bkz. `docs/superpowers/specs/2026-06-04-protokol-gorev-entegrasyon-design.md` §1)
-- İlgili commit: bilinmiyor
+- Durum: **çözüldü** ✅
+- Açıklama: `_etken_kod_bul` `drug_administrations` lookup yapıyor (ilk kullanımda boş olduğu için NULL dönüyor) → trigger skip → görev kapanmıyor.
+- Fix: `_etken_kod_bul` önce `stok.drug_product_id` FK kullanıyor, fallback olarak brand_name ILIKE.
+- İlgili commit: hotfix/2026-06-08
 
 ## [2026-06-08] BUG-057 Tedavi planı/görev entegrasyonu eksik — 3. gün kabul etmiyor
 - Kaynak: kullanıcı
 - Modül: ui.js (gorevTedaviGunDone) + supabase (treatment_day_tamamla, gorev_tamamla)
 - Önem: yüksek
-- Durum: yeni
-- Açıklama: `_tedaviGunExecute` içinde `treatment_day_tamamla` → `gorev_tamamla` zinciri çalışıyor ama 2. gün done sonrası 3. gün görevi "kabul etmiyor". Muhtemelen `treatment_day_tamamla` sequential guard devreye giriyor (önceki gün tamamlanmamış sayılıyor) veya 3. gün görevi `meta.day_id` olmadan oluşturuluyor (JSON.parse aciklama alanı boş/hatalı → "Tedavi günü ID bulunamadı" toast).
-- Tetikleyici: Çok günlü tedavi planı → 2. gün done → 3. güne geçiş
-- İlgili commit: bilinmiyor
+- Durum: **çözüldü** ✅
+- Açıklama: `caseDayTamamla` (plan view'dan) `treatment_day_tamamla` çağırıyor ama gorev_log'u kapatmıyor. IDB stale cache → `gorev_tamamla` için gorev bulunamıyor, `.catch(()=>{})` ile sessiz geçiyor. DB incelemede: Day 3 treatment_days.tamamlandi=true ama gorev_log.tamamlandi=false.
+- Fix: `treatment_day_tamamla` DB'de gorev_log'u da atomik kapatıyor. `caseDayTamamla` js'den IDB lookup kaldırıldı.
+- İlgili commit: hotfix/2026-06-08
+
+## [2026-06-08] BUG-060 hizli_uygulama stok_hareket.id UUID type hatası
+- Kaynak: kullanıcı (canlı test)
+- Modül: supabase (hizli_uygulama RPC)
+- Önem: kritik
+- Durum: **çözüldü** ✅
+- Açıklama: `hizli_uygulama` içinde `gen_random_uuid()::text` → `stok_hareket.id uuid` kolonuna text insert ediliyordu. PostgreSQL'de text→uuid implicit cast yok → "column 'id' is of type uuid but expression is of type text" hatası.
+- Root cause: `stok_hareket.id` uuid column, ama DB fonksiyonu `::text` cast ile yazılmış.
+- Fix: `gen_random_uuid()::text` → `gen_random_uuid()` (migration + ground_truth güncellendi)
+- Tetikleyici: ILAC tipli görev "Tamamlandı Olarak İşaretle" → hizli_uygulama RPC çağrısı
+- İlgili commit: hotfix/2026-06-08 b2e870e
+
+## [2026-06-08] BUG-055 İleri gebeler listesi sıra + yanlış padok uyarısı
+- Kaynak: kullanıcı
+- Modül: ui.js (renderIleriGebeler)
+- Önem: orta
+- Durum: **çözüldü** ✅
+- Açıklama: İleri gebeler listesinde sıra numarası yoktu ve Kuru/Gebe Padok dışındaki hayvanlar görsel uyarı almıyordu.
+- Fix: İnekler `1)`, `2)`, düveler `D-1)`, `D-2)` format. `gebelik_protokol_kontrol` RPC artık padok alanı döndürüyor; yanlış padokta kırmızı arka plan + 🔴 Transfer! etiketi.
+- İlgili commit: hotfix/2026-06-08 be2fe62
+
+## [2026-06-08] BUG-059 Tedavi günü alt seans (sabah/öğle/akşam bölünmesi)
+- Kaynak: kullanıcı
+- Modül: ui.js + supabase (treatment_days, add_treatment_day)
+- Önem: orta
+- Durum: beklemede — özellik isteği, önce tasarım gerekli
+- Açıklama: Aynı tedavi günü içinde birden fazla seans yapılamıyor (sabah/öğle/akşam). Önceki tasarımda Gün 1a, 1b, 1c gibi sub-gün yapısı planlanmıştı ama uygulanmamış.
+- Önerilen: treatment_days.seans_no veya sub-day tablosu. Tasarım kararı alındıktan sonra implemente edilecek.
+- İlgili commit: —
 
 ## [2026-06-08] BUG-058 Done olan görevler stoktan ürün çekmedi
 - Kaynak: kullanıcı
 - Modül: supabase (gorev_tamamla RPC)
 - Önem: yüksek
-- Durum: yeni
-- Açıklama: `gorev_tamamla` RPC stok düşümü için `v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL` kontrolü yapıyor. Tedavi görevi oluşturulurken `gorev_log.stok_id` ve `gorev_log.miktar` set edilmemiş → stok düşümü hiç gerçekleşmiyor.
-- Tetikleyici: Tedavi planından görev done edildiğinde
-- Kalıcı çözüm: Tedavi görevi oluşturan trigger/RPC'nin `stok_id` + `miktar` alanlarını gorev_log'a yazması gerekiyor. Alternatif: `treatment_day_tamamla` içinde stok düşümünü kendisi yapsın (ilaç administrations bazlı).
-- İlgili commit: bilinmiyor
+- Durum: tasarım kararı bekleniyor
+- Açıklama: `add_drug_administration` çağrılınca stok ANINDA düşülüyor. TEDAVI_GUN gorev_log'da stok_id/miktar yok. ILAC tipi görevler (dogum_kaydet'ten) de stok_id içermiyor.
+- Seçenekler: A) Görev done'da stok seçtir (hizli_uygulama yönlendir), B) Mevcut tasarım koru + dokümante et
+- İlgili commit: —
 
 ## [2026-06-06] BUG-054 Çıkan hayvan işlem geçmişinde UUID görünüyor
 - Kaynak: kullanıcı
