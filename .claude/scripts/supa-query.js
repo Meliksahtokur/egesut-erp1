@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // ═══════════════════════════════════════════════════════════════
 // EgeSüt Supabase Query Tool — Node.js + @supabase/supabase-js
-// Kullanım: node supa-query.js "SELECT * FROM hayvanlar LIMIT 5"
+// Kullanım: SUPABASE_KEY=sbp_xxx node supa-query.js "SELECT * FROM hayvanlar LIMIT 5"
 // ═══════════════════════════════════════════════════════════════
 
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sbp_235a8cfe38b40eb8c5f9bde9e31301d97cbc89c9';
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+if (!SUPABASE_KEY) { console.error('SUPABASE_KEY env var gerekli'); process.exit(1); }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
