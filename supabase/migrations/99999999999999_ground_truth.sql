@@ -2602,7 +2602,7 @@ BEGIN
   INSERT INTO public.stok_hareket (
     id, stok_id, tur, miktar, notlar, iptal, referans_tipi, referans_id
   ) VALUES (
-    gen_random_uuid()::text,
+    gen_random_uuid(),
     p_ilac_stok_id,
     'Tedavi',
     -p_miktar,
@@ -2644,7 +2644,7 @@ BEGIN
   INSERT INTO public.stok_hareket (
     id, stok_id, tur, miktar, notlar, iptal, referans_tipi, referans_id
   ) VALUES (
-    gen_random_uuid()::text,
+    gen_random_uuid(),
     v_tedavi.ilac_stok_id,
     'Tedavi İptal',
     v_tedavi.miktar,   -- pozitif = iade
@@ -2705,7 +2705,7 @@ BEGIN
     INSERT INTO public.stok_hareket (
       id, stok_id, tur, miktar, notlar, iptal, referans_tipi, referans_id
     ) VALUES (
-      gen_random_uuid()::text,
+      gen_random_uuid(),
       v_tedavi.ilac_stok_id,
       'Tedavi Düzeltme',
       v_fark,   -- pozitif = iade, negatif = ek kullanım
