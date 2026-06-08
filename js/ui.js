@@ -2561,7 +2561,7 @@ async function saTipSec(tip) {
           grouped[dc.group_name].push(dc);
         });
         sel.innerHTML = '<option value="">— Etken madde seçin (zorunlu) —</option>' +
-          Object.entries(grouped).sort().map(([grp, list]) =>
+          Object.entries(grouped).sort(([a],[b])=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(([grp, list]) =>
             `<optgroup label="${grp}">${list.map(dc =>
               `<option value="${dc.id}" data-group="${dc.group_name}">${dc.class_name ? dc.class_name+' › ' : ''}${dc.active_ingredient}</option>`
             ).join('')}</optgroup>`
@@ -2817,7 +2817,7 @@ async function _renderIlacSiniflari(el){
   allDP.forEach(dp=>{dpCount[dp.drug_class_id]=(dpCount[dp.drug_class_id]||0)+1;});
 
   let html=_tanimSearchBar();
-  const gruplar=Object.keys(tree).sort();
+  const gruplar=Object.keys(tree).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'}));
 
   gruplar.forEach(grp=>{
     const renk=GRP_RENK[grp]||'#607d8b';
@@ -2835,7 +2835,7 @@ async function _renderIlacSiniflari(el){
       </div>
       <div style="display:none;padding:4px 0 0 0">`;
 
-    Object.keys(altGruplar).sort().forEach(cls=>{
+    Object.keys(altGruplar).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).forEach(cls=>{
       const maddeler=altGruplar[cls];
       html+=`<div style="margin:4px 0 0 12px">
         <div onclick="const n=this.nextElementSibling;n.style.display=n.style.display==='none'?'block':'none';this.querySelector('.tanim-chev').classList.toggle('tanim-chev-open')" style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--card2);border-radius:6px;cursor:pointer;user-select:none">
@@ -4579,7 +4579,7 @@ function caseDrugFormAc(dayId) {
     groups[g].push(d);
   });
 
-  const groupHtml = Object.keys(groups).sort().map(grp => {
+  const groupHtml = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(grp => {
     const items = groups[grp].map(d => {
       const stokClrPos = d.guncel <= 0 ? 'var(--red)' : d.guncel <= 10 ? 'var(--amber)' : 'var(--green)';
       const stokClr = d.guncel === null ? 'var(--ink3)' : stokClrPos;
