@@ -1257,7 +1257,7 @@ document.addEventListener('click',e=>{
 let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null};
 let _detOpenId=null;
 function fchipReset(){
-  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null};
+  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null};
   document.querySelectorAll('[id^="fc-"]').forEach(b=>b.classList.remove('on'));
 }
 function fchipSec(grup,deger,btn){
@@ -6095,6 +6095,13 @@ function renderPadokDolulukBar() {
   const el = document.getElementById('padok-doluluk-bar');
   if (!el) return;
   if (!PADOKLAR.length) { el.innerHTML = ''; return; }
+  const pfltSel = document.getElementById('pflt');
+  if (pfltSel) {
+    const cur = pfltSel.value;
+    pfltSel.innerHTML = '<option value="">Tüm Padoklar</option>' +
+      PADOKLAR.map(p => `<option value="${esc(p.ad)}">${esc(p.ad)}</option>`).join('');
+    pfltSel.value = cur;
+  }
   const animals = getState('animals') || [];
   const padokSayac = {};
   animals.forEach(h => {
@@ -6123,10 +6130,10 @@ function renderPadokDolulukBar() {
 }
 
 function setPadokFiltreBt(padokId, padokAdi) {
-  const sel = document.getElementById('bi-padok') || document.getElementById('suru-padok-filtre');
+  const sel = document.getElementById('pflt');
   if (sel) {
     sel.value = padokAdi;
-    sel.dispatchEvent(new Event('change'));
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
   }
 }
 
