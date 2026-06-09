@@ -1490,6 +1490,8 @@ async function _detRenderGecmis(id,el){
       if(!list.length){bodyEl.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>';return;}
       bodyEl.innerHTML=list.map(e=>{
         if(e.type==='islem') return _gecmisEntryHtml(e,`onclick="openIslemDetay(${e._islemIdx})" style="cursor:pointer"`);
+        if(e.type==='gorev' && e.data?.gorev_tipi!=='TEDAVI_GUN') return _gecmisEntryHtml(e,'');
+        if(e.type==='uygulama') return _gecmisEntryHtml(e,'');
         return _gecmisEntryHtml(e);
       }).join('');
     }
