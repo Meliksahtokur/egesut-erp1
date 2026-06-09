@@ -6548,6 +6548,7 @@ async function btTransferOnayla() {
       toast(`✅ ${data.hayvan_sayisi} hayvan ${data.yeni_padok}'a taşındı`);
     }
     closeM('m-bulk-transfer');
+    await pullTables(['hayvanlar']);
     if (typeof loadAnimals === 'function') await loadAnimals();
     if (typeof renderPadokDolulukBar === 'function') renderPadokDolulukBar();
   } catch (err) {
@@ -6678,6 +6679,7 @@ async function padokTransferOnayla() {
     // Refresh
     _pdHayvanIds = [];
     document.getElementById('pd-toplu-tasi-btn').style.display = 'none';
+    await pullTables(['hayvanlar']);
     await renderPadokHayvanlar(_pdKaynakPadokId);
   } catch (e) {
     toast(`⚠️ ${esc(e.message)}`, true);
