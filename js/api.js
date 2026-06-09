@@ -289,6 +289,9 @@ const RPC_TABLES = {
   drug_class_guncelle:           ['drug_classes'],
   drug_class_sil:                ['drug_classes'],
   drug_class_varsayilan_yukle:   ['drug_classes'],
+  disease_ekle:                  ['diseases'],
+  disease_guncelle:              ['diseases'],
+  disease_sil:                   ['diseases'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────

@@ -2898,8 +2898,7 @@ async function _diseaseSave(id){
   if(!cat){toast('Kategori seçin','warn');return;}
   const isNew=id==='new';
   const res=await rpcOptimistic(isNew?'disease_ekle':'disease_guncelle',
-    isNew?{p_name:name,p_category:cat}:{p_id:id,p_name:name,p_category:cat},
-    null,['diseases']);
+    isNew?{p_name:name,p_category:cat}:{p_id:id,p_name:name,p_category:cat});
   if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   loadTanimlarPanel();
 }
