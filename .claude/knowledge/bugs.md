@@ -18,6 +18,23 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 
 <!-- Buraya bug sinyalleri ekle -->
 
+## [2026-06-09] BUG-061 Hayvan kartı geçmiş — gorev/uygulama girişlerine tıklayınca hayvan kartı yeniden açılıyor
+- Kaynak: kullanıcı
+- Modül: ui.js (_gecmisEntryHtml, _detRenderGecmis)
+- Önem: orta
+- Durum: yeni
+- Açıklama: Hayvan kartı Geçmiş sekmesinde görev (gorev) ve uygulama (uygulama) girişlerine tıklayınca ilgili detay açılmak yerine hayvan kartı kendisi yeniden açılıyor. İslem girişleri düzeldi (overrideOc fix). Görev ve uygulama tipleri hâlâ `openDet(hayvan_id)` çağırıyor.
+- Root cause:
+  - `gorev` tipi (TEDAVI_GUN dışı): `oc = onclick="openDet('${data.hayvan_id}')"` → kendi kartını açıyor
+  - `uygulama` tipi: `oc = onclick="openDet('${data.hayvan_id}')"` → kendi kartını açıyor
+  - `_detRenderGecmis` bu tipler için overrideOc geçmiyor
+  - `overrideOc` fix'i sadece `islem` tipi kapsıyor
+- Fix yaklaşımı:
+  - `_detRenderGecmis`'te `gorev` için: TEDAVI_GUN → openCaseDet korunsun, diğerleri → `overrideOc=''` (tıklama yok, henüz görev detay modal'ı yok)
+  - `_detRenderGecmis`'te `uygulama` için: `overrideOc=''` (zaten sağlık tabında gösteriliyor)
+  - Görev detay modal'ı eklenirse o açılabilir (BUG-059 ile ilişkili)
+- İlgili commit: 7fd4752
+
 ## [2026-06-08] BUG-054 Doğum sonrası laktasyon padok geçişi
 - Kaynak: kullanıcı
 - Modül: supabase (dogum_kaydet)
