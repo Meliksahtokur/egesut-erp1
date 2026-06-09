@@ -1388,30 +1388,91 @@ function _detUremeHtml(a,tohs,kizgs){
 async function _detRenderGecmis(id,el){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
-    const allLogs=await idbGetAll('islem_log');
-    const logs=allLogs.filter(l=>l.ana_hayvan_id===id);
-    logs.sort((x,y)=>(y.created_at||y.tarih||'').localeCompare(x.created_at||x.tarih||''));
-    const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼','KISIR_ISARETLE':'💲','KISIR_KALDIR':'⭕'};
-    const ETIKET={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme','KISIR_ISARETLE':'Kısır İşareti','KISIR_KALDIR':'Kısır Kaldırıldı'};
-    const GERI_AL=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI','HAYVAN_GUNCELLENDI'];
-    if(!logs.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>'; return; }
-    globalThis._detGecmisLogs=logs;
-    el.innerHTML=logs.map((l,i)=>{
-      const ico=ICO[l.tip]||'📋';
-      const tarih=(l.created_at||l.tarih||'').slice(0,10);
-      const gaIcon=GERI_AL.includes(l.tip)?'<span style="font-size:.6rem;color:var(--ink3);margin-left:4px">↩</span>':'';
-      // Padok değişikliği tespiti
-      let padokHtml='';
-      if (l.tip === 'HAYVAN_GUNCELLENDI' && l.snapshot && l.snapshot.old && l.snapshot.new) {
-        const eskiPadokId = l.snapshot.old.padok_id;
-        const yeniPadokId = l.snapshot.new.padok_id;
-        if (eskiPadokId && yeniPadokId && eskiPadokId !== yeniPadokId) {
-          const eskiAd = l.snapshot.old.padok || eskiPadokId;
-          const yeniAd = l.snapshot.new.padok || yeniPadokId;
-          padokHtml = `<div style="font-size:.65rem;color:var(--green);font-weight:600;margin-top:2px">🔀 Padok: ${eskiAd} → ${yeniAd}</div>`;
-        }
-      }
-      return `<div class="hist-row" style="cursor:pointer" onclick="openIslemDetay(${i})"><div class="hist-dot" style="background:${padokHtml ? 'var(--green)' : 'var(--green2)'}"></div><div class="hist-main"><div class="hist-title">${ico} ${ETIKET[l.tip]||l.tip||'—'}${gaIcon}</div><div class="hist-sub">${tarih}${padokHtml}</div></div><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;opacity:.4;margin-top:2px"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const entries=[];
+
+    // tohumlama
+    (await idbGetAll('tohumlama').catch(()=>[])).filter(r=>r.hayvan_id===id).forEach(r=>{
+      const sk=r.created_at||r.tarih||'';
+      entries.push({type:'tohumlama',date:sk,sortKey:sk,data:r});
+    });
+
+    // dogum (anne)
+    (await idbGetAll('dogum').catch(()=>[])).filter(r=>r.anne_id===id).forEach(r=>{
+      const sk=r.created_at||r.tarih||'';
+      entries.push({type:'dogum',date:sk,sortKey:sk,data:r});
+    });
+
+    // hastalik (cases)
+    {
+      const _dis=await idbGetAll('diseases').catch(()=>[]);
+      const _hStok=await idbGetAll('stok').catch(()=>[]);
+      const _hStokById=Object.fromEntries(_hStok.map(s=>[s.id,s.urun_adi||'']));
+      const _hTdays=await idbGetAll('treatment_days').catch(()=>[]);
+      const _hDadm=await idbGetAll('drug_administrations').catch(()=>[]);
+      const _hDrugsByCase={};
+      const _hDayCase=Object.fromEntries(_hTdays.map(td=>[td.id,td.case_id]));
+      _hDadm.forEach(da=>{const cid=_hDayCase[da.treatment_day_id];if(!cid)return;const name=_hStokById[da.stok_id]||'';if(!name)return;if(!_hDrugsByCase[cid])_hDrugsByCase[cid]=new Set();_hDrugsByCase[cid].add(name);});
+      (await idbGetAll('cases').catch(()=>[])).filter(r=>r.animal_id===id).forEach(r=>{
+        const _d=_dis.find(d=>d.id===r.disease_id);
+        const _drugNames=[...(_hDrugsByCase[r.id]||[])];
+        const sk=r.created_at||r.start_date||'';
+        entries.push({type:'hastalik',date:sk,sortKey:sk,data:{...r,disease_name:_d?.name||'?',tani:_d?.name||'?',_drugNames}});
+      });
+    }
+
+    // gorev_log (tümü — pending + tamamlanmış, sadece parent_id olmayan)
+    {
+      const _allDrugs=await idbGetAll('drug_administrations').catch(()=>[]);
+      const _allStok=await idbGetAll('stok').catch(()=>[]);
+      const _stokById=Object.fromEntries(_allStok.map(s=>[s.id,s.urun_adi||'']));
+      const _drugsByDay={};
+      _allDrugs.forEach(da=>{if(!da.treatment_day_id)return;const name=_stokById[da.stok_id]||'';if(name)(_drugsByDay[da.treatment_day_id]=_drugsByDay[da.treatment_day_id]||[]).push(name);});
+      const _tDays=await idbGetAll('treatment_days').catch(()=>[]);
+      const _tDayById=Object.fromEntries(_tDays.map(td=>[td.id,td]));
+      const _caseArr=await idbGetAll('cases').catch(()=>[]);
+      const _caseById=Object.fromEntries(_caseArr.map(c=>[c.id,c]));
+      const _dis=await idbGetAll('diseases').catch(()=>[]);
+      const _disById=Object.fromEntries(_dis.map(d=>[d.id,d.name||'']));
+      (await idbGetAll('gorev_log').catch(()=>[])).filter(r=>r.hayvan_id===id&&!r.parent_id).forEach(r=>{
+        let dayId=null,_lbl='',_gunNo='';
+        try{const p=typeof r.aciklama==='string'?JSON.parse(r.aciklama):r.aciklama;dayId=p?.day_id;_lbl=p?.label||'';_gunNo=p?.gun_no||'';}catch(e){}
+        const _drugNames=(dayId&&_drugsByDay[dayId])||[];
+        const _td=dayId&&_tDayById[dayId];
+        const _cs=_td&&_caseById[_td.case_id];
+        const _disName=_cs&&_disById[_cs.disease_id]||'';
+        const _caseId=_cs?.id||'';
+        const sk=r.tamamlanma_tarihi||r.created_at||r.hedef_tarih||'';
+        entries.push({type:'gorev',date:sk,sortKey:sk,data:{...r,_drugNames,_lbl,_gunNo,_disName,_caseId}});
+      });
+    }
+
+    // uygulama_log
+    {
+      const _uyStok=await idbGetAll('stok').catch(()=>[]);
+      const _uyStokById=Object.fromEntries(_uyStok.map(s=>[s.id,s.urun_adi||'']));
+      (await idbGetAll('uygulama_log').catch(()=>[])).filter(r=>r.hayvan_id===id).forEach(r=>{
+        const sk=r.created_at||r.tarih||'';
+        entries.push({type:'uygulama',date:sk,sortKey:sk,data:{...r,_stokAdi:_uyStokById[r.stok_id]||'?'}});
+      });
+    }
+
+    // islem_log — Geri Al modal desteği için ayrı indeks tutulur
+    {
+      const islemLogs=(await idbGetAll('islem_log').catch(()=>[])).filter(r=>r.ana_hayvan_id===id);
+      globalThis._detGecmisLogs=islemLogs;
+      islemLogs.forEach((r,i)=>{
+        const sk=r.created_at||r.tarih||'';
+        entries.push({type:'islem',date:sk,sortKey:sk,data:r,_islemIdx:i});
+      });
+    }
+
+    entries.sort((a,b)=>(b.sortKey||'').localeCompare(a.sortKey||''));
+    if(!entries.length){el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>';return;}
+
+    el.innerHTML=entries.map(e=>{
+      // islem_log: Geri Al modal onclick override
+      if(e.type==='islem') return _gecmisEntryHtml(e,`onclick="openIslemDetay(${e._islemIdx})" style="cursor:pointer"`);
+      return _gecmisEntryHtml(e);
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
@@ -2334,9 +2395,9 @@ const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',
 const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
 const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık',ASI_KAYDI:'💉 Aşı Kaydı',ASI_ERTELEME:'⏸️ Aşı Ertelendi',TOPLU_ILAC:'💊 Toplu İlaç'};
 
-function _gecmisEntryHtml(e){
+function _gecmisEntryHtml(e, overrideOc){
   const {type,date,data}=e;
-  const d=fmtTarih(date);
+  const d=date&&date.length>10?fmtTarihSaat(date):fmtTarih(date);
   const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
   const hkName=hk?` · ${hk.ad}`:'';
   const hayvanKey=data.hayvan_id||data.anne_id||data.animal_id;
@@ -2348,6 +2409,7 @@ function _gecmisEntryHtml(e){
   if(type==='hastalik') oc=`onclick="openCaseDet('${data.id}')" style="cursor:pointer"`;
   else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
   else if(type==='dogum') oc='';
+  if(overrideOc!==undefined) oc=overrideOc;
   if(type==='dogum'){
     const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id);
     const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
