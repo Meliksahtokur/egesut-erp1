@@ -1469,11 +1469,39 @@ async function _detRenderGecmis(id,el){
     entries.sort((a,b)=>(b.sortKey||'').localeCompare(a.sortKey||''));
     if(!entries.length){el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>';return;}
 
-    el.innerHTML=entries.map(e=>{
-      // islem_log: Geri Al modal onclick override
-      if(e.type==='islem') return _gecmisEntryHtml(e,`onclick="openIslemDetay(${e._islemIdx})" style="cursor:pointer"`);
-      return _gecmisEntryHtml(e);
-    }).join('');
+    // Arama metni hesapla
+    entries.forEach(e=>{
+      const d=e.data;
+      const parts=[e.type,fmtTarih(e.date),fmtTarihSaat(e.date)];
+      if(e.type==='tohumlama') parts.push(d.sperma||'',d.sonuc||'','tohumlama');
+      else if(e.type==='dogum') parts.push(d.yavru_kupe||'',d.yavru_cins||'',d.dogum_tipi||'','doğum');
+      else if(e.type==='hastalik') parts.push(d.disease_name||'',d.tani||'',d.status==='active'?'aktif':'kapalı',...(d._drugNames||[]));
+      else if(e.type==='gorev') parts.push(d._lbl||'',d.gorev_tipi||'',d._disName||'',d.tamamlandi?'tamamlandı':'bekliyor',...(d._drugNames||[]));
+      else if(e.type==='uygulama') parts.push(d._stokAdi||'',d.etken_kod||'',d.rota||'','uygulama','ilaç');
+      else if(e.type==='islem'){const sn=d.snapshot||{};parts.push(d.tip||'',sn.vaccine_name||'',sn.ilac_adi||'','işlem');}
+      e._s=parts.join(' ').toLowerCase();
+    });
+    globalThis._detGecmisEntries=entries;
+
+    function _renderDetGecmisList(q){
+      const list=q?entries.filter(e=>q.trim().toLowerCase().split(/\s+/).every(t=>e._s.includes(t))):entries;
+      const bodyEl=document.getElementById('det-gecmis-body');
+      if(!bodyEl) return;
+      if(!list.length){bodyEl.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>';return;}
+      bodyEl.innerHTML=list.map(e=>{
+        if(e.type==='islem') return _gecmisEntryHtml(e,`onclick="openIslemDetay(${e._islemIdx})" style="cursor:pointer"`);
+        return _gecmisEntryHtml(e);
+      }).join('');
+    }
+    globalThis._renderDetGecmisList=_renderDetGecmisList;
+
+    el.innerHTML=`<div style="padding:0 0 8px">
+      <input id="det-gecmis-search" type="search" placeholder="Ara… (sperma, ilaç, tanı)" autocomplete="off"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--card3);border-radius:10px;background:var(--card);color:var(--ink);font-size:.82rem"
+        oninput="globalThis._renderDetGecmisList(this.value)">
+    </div>
+    <div id="det-gecmis-body"></div>`;
+    _renderDetGecmisList('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
 
@@ -2409,7 +2437,6 @@ function _gecmisEntryHtml(e, overrideOc){
   if(type==='hastalik') oc=`onclick="openCaseDet('${data.id}')" style="cursor:pointer"`;
   else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
   else if(type==='dogum') oc='';
-  if(overrideOc!==undefined) oc=overrideOc;
   if(type==='dogum'){
     const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id);
     const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
@@ -2459,6 +2486,7 @@ function _gecmisEntryHtml(e, overrideOc){
     else sub=snap.irk||snap.grup||'';
     if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
   }
+  if(overrideOc!==undefined) oc=overrideOc;
   return `<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>
     <div style="width:36px;height:36px;border-radius:10px;background:${icoBg};display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${ico}</div>
     <div style="flex:1;min-width:0">
