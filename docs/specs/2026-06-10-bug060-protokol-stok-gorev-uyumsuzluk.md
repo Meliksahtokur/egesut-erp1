@@ -137,6 +137,19 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 **Onaylanan (subagent reviewer #2) kısımlar:** Deploy-safe SQL, NULL handling, trigger mimarisi, vaka çalışması — tüm değişiklikler implementasyona hazır.
 
 ### Revizyon 7 (2026-06-10 Faz 0 doğrulama sonrası — canlı DB imzaları + kolon doğrulaması)
+- 5 fonksiyon canlı `pg_get_functiondef` ile doğrulandı
+- `v_uyg.aktif_ing` kolonu YOK (Faz 0.2) → Bonus SQL'de format sadeleştirildi
+- `v_hayvan` DECLARE mevcut (Faz 0.2) → Bonus'ta `v_hayvan.kupe_no` güvenli
+- `fn_dinle_uygulama` ref format kesinleşti
+
+### Revizyon 8 (2026-06-10 Faz 0.4 sonrası — gerçek `hizli_uygulama` imzası + plan/migration düzeltme)
+- **Faz 0.4 ile tespit edilen KRİTİK HATA:** Spec §3.2'de `hizli_uygulama` 11 parametreli (`p_uygulama_tipi, p_uygulayan, p_protokol_id, p_gun_no, p_padok_hedef, p_kullanici_notu` + 5 mevcut) ve `uuid` return olarak yazılmıştı — **gerçekte 6 parametreli, return `jsonb`**
+- **Kanıt:** 3 JS caller (`js/ui.js` L951, L1090, L3978) `p_rota` parametresi gönderiyor ve `res.ok`/`res.mesaj` dönüş yapısını bekliyor; ground truth + canlı DB birebir aynı (Faz 0.2)
+- **Düzeltme:**
+  1. §3.2 başına "GERÇEK İMZA" notu eklendi (aşağıda)
+  2. Migration dosyası silindi + 6 parametreli yapıya göre yeniden yazıldı (mevcut yapı korundu, sadece `islem_log` INSERT eklendi)
+  3. Plan dosyası §Blok 2 + Senaryolar 6 parametreli RPC imzasına güncellendi
+- **Arşiv:** 11 parametreli idealize edilmiş imza `docs/ideas/2026-06-10-hizli-uygulama-genisletilmis-imza.md`'ya kaydedildi — ileride refactor adayı
 
 **Faz 0 kapsamı:** `supabase_migrate({sql: "SELECT pg_get_functiondef(...)"})` ile 5 fonksiyonun canlı body'si çekildi, spec L referansları + DECLARE bölümleri + kolon varlıkları doğrulandı.
 
