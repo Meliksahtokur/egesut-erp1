@@ -90,6 +90,31 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 
 **Onaylanan (reviewer #2) kısımlar:** Fix #1 + Fix #2 SQL'leri deploy-ready, trigger mimarisi doğru, felsefe sağlam, test senaryoları kapsamlı, §4 başlık "11 adım" doğru.
 
+### Revizyon 5 (2026-06-10 subagent review + kullanıcı feedback sonrası — minor iyileştirmeler)
+
+**Subagent review sonucu:** APPROVED — kritik hata yok, 6 minor + 7 edge case önerisi.
+
+**Kullanıcı feedback:** "Çift tıklama değil — biri görevler aracılığı ile yapıldı, diğeri doğrudan protokol ile. Görevler ile yapılanı protokol dome kabul etti ama protokol modali üzerinden gerçekleşen işlem döne kabul edilmedi."
+
+**Uygulanan düzeltmeler:**
+
+1. **§5.5 Senaryo E düzeltme:** C_VIT yerine **NULL** yazıldı (`_etken_kod_bul` C vitamini için explicit kontrol YOK → NULL döner → trigger tetiklenmez → görev açık kalır). Sonuç aynı ama teknik akış doğru.
+
+2. **§7 Risk tablosu güncelleme:** "JS tarafında race condition (kullanıcı çift tıklama)" riski **kaldırıldı** — kullanıcı bunun gerçek senaryo olmadığını teyit etti. Yerine "Çift işlem senaryosu (kullanıcı 2 farklı yoldan aynı görevi tamamlar)" eklendi — gerçek risk analizi.
+
+3. **§8 Gelecek iyileştirmeler — 2 yeni madde:**
+   - Madde 6: Audit simetrisi standardizasyonu (tüm RPC'ler aynı `islem_log` pattern'i kullanmalı)
+   - Madde 7: Çift işlem senaryosu için UI uyarısı (görev zaten tamamlandı, yine de stok düşecek)
+
+4. **§8.1 Vaka Çalışması (YENİ BÖLÜM):** 135 numaralı hayvanın gerçek çift işlem senaryosu — kullanıcının açıklaması, 2 işlemin atomik akışı, audit trail eksikliğinin kanıtı, Fix #2 sonrası beklenen davranış, çözülmeyen UI uyarısı sorunu.
+
+**Önceki review turu tarafından önerilen ama uygulanmayanlar (nedeni):**
+- Subagent Minor 1-5 (kozmetik): Migration adı + yorum detaylandırması + opsiyonel notlar — spec zaten yeterince açık, gereksiz bloat
+- Subagent Edge 1-2, 4-7: Mevcut kapsamda yeterince ele alınmış, Gelecek §8'e zaten not edilmiş
+- Subagent Edge 3 (çift tıklama): **Kullanıcı tarafından reddedildi** — gerçek senaryo farklı (çift işlem, çift tıklama değil)
+
+**Onaylanan (subagent reviewer) kısımlar:** Fix #1 + Fix #2 + bonus Fix SQL'leri deploy-ready, "İki kapı aynı yer" felsefesi sağlam, 5 test senaryosu kapsamlı, geri alma simetrisi Rev 4'te düzeltildi.
+
 ---
 
 ## 1. Sorunun Doğrulanması (Kanıt)
@@ -497,17 +522,18 @@ VALUES (
 
 **Adımlar:**
 1. 135'te E_VIT görevi `tamamlandi=false`, `etken_kod='E_VIT'` olarak mevcut
-2. C vitamini stoğu seç (etken_kod='C_VIT' veya NULL)
+2. C vitamini stoğu seç (`_etken_kod_bul` C vitamini için explicit kontrol YOK → NULL döner)
 3. Kaydet
 
 **Beklenen sonuç:**
-- `uygulama_log.etken_kod` 'C_VIT' veya NULL olur
-- `fn_dinle_uygulama` → `_gorev_dinle(135, 'C_VIT', ...)` çağrılır
-- `_gorev_dinle` SELECT: `WHERE hayvan_id=135 AND etken_kod='C_VIT' AND tamamlandi=false` → E_VIT görevi `etken_kod='E_VIT'` olduğu için **EŞLEŞMEZ** ✅
-- E_VIT görevi `tamamlandi=false` kalır ✅
+- `uygulama_log.etken_kod` **NULL** kaydedilir (önceki taslak "C_VIT veya NULL" yazıyordu — düzeltildi, gerçek davranış NULL)
+- `fn_dinle_uygulama` → trigger `IF NEW.etken_kod IS NOT NULL` → **FALSE** → `_gorev_dinle` çağrılmaz (görev eşleşmesi atomik aşamada atlanır)
+- E_VIT görevi `tamamlandi=false` kalır ✅ (yanlış kapama YOK — trigger tetiklenmedi)
 - `islem_log` yazılır (C vitamini uygulandı kaydı) ✅
 - C vitamini stoğu düşer ✅
 - `protokol_eksik_tara` E_VIT görevini hâlâ "eksik" gösterir (doğru davranış) ✅
+
+**Subagent notu (Rev 5):** Spec'te önceki taslak `_gorev_dinle(135, 'C_VIT', ...)` çağrısı varsayıyordu — gerçek davranış NULL etken_kod yüzünden trigger'ın hiç tetiklenmemesi. Sonuç aynı (görev açık kalır) ama teknik akış farklı.
 
 **Bu testin önemi:** Yanlış eşleşme YOK — trigger sadece `etken_kod` eşleşmesine bakar, tarih/akıllı tahmin yok. **Güvenli davranış.**
 
@@ -544,7 +570,7 @@ VALUES (
 | D vitamini preparatı girilirse yanlış eşleşme | Düşük | Orta | `v_class_name ILIKE '%Yağda Eriyen%` EKLENMEDİ (review feedback) |
 | NULL etken_kod'da görev kapatılmıyor (yanlış görev kapatma riski alınmadı) | Kesin | Düşük | Kasıtlı — Senaryo D testi, güvenli tarafta kalmak |
 | `hizli_uygulama_geri_al` audit simetrisi unutulursa log tutarsızlığı | Orta | Düşük | Bu PR'da 1 satır ekle (`tip='HIZLI_UYGULAMA_GERI_AL'`, `v_uyg.hayvan_id` kullan, DELETE'den önce) |
-| JS tarafında race condition (kullanıcı çift tıklama) | Düşük | Düşük | `_gorev_dinle` `ORDER BY hedef_tarih LIMIT 1` ile atomik, çift tetikleme görevi tekrar kapatmaya çalışır ama `tamamlandi=true` zaten |
+| Çift işlem senaryosu (kullanıcı 2 farklı yoldan aynı görevi tamamlar) | Orta | Orta | Audit trail her 2 yolda da yazılmalı (Fix #2) + UI "görev zaten tamamlandı" uyarısı verebilir (Gelecek §8'e eklendi) |
 
 ---
 
@@ -555,6 +581,45 @@ VALUES (
 3. **`_etken_kod_bul` fonksiyonu diğer vitaminler için de genişletilebilir** — D vitamini, A vitamini, K vitamini preparatları için
 4. **Tüm uygulama kapıları (hizli, drug_admin, vaccination) için audit trail standardizasyonu** — `islem_log.tip` kolonu için CHECK constraint veya enum standardizasyonu + UI'da audit log görüntüleme
 5. **"İki kapı, aynı yer" görselleştirmesi** — UI'da hangi uygulama hangi trigger'dan geçti, hangi görevi neden kapattı — debug için
+6. **Audit simetrisi standardizasyonu** — Tüm RPC'ler (`hizli_uygulama`, `hizli_uygulama_geri_al`, `gorev_tamamla`, `drug_admin_*`, `vaccination_*`) aynı `islem_log` INSERT pattern'ini kullanmalı. Şu an `gorev_tamamla` ve Fix #2 sonrası `hizli_uygulama` uyumlu, diğerleri denetlenmeli.
+7. **Çift işlem senaryosu için UI uyarısı** — Kullanıcı bir görevi `gorev_tamamla` ile kapattıktan sonra `hizli_uygulama` ile aynı stoğu tekrar kullanırsa "Bu görev zaten tamamlandı, yine de stok düşecek" uyarısı gösterilebilir.
+
+---
+
+### 8.1 Vaka Çalışması: 135 Numaralı Hayvan — Gerçek Çift İşlem Senaryosu (2026-06-10)
+
+**Kullanıcı açıklaması:** "Çift tıklama yok — biri görevler aracılığı ile yapıldı, diğeri doğrudan protokol ile. Görevler ile yapılanı protokol dome kabul etti ama protokol modali üzerinden gerçekleşen işlem döne kabul edilmedi."
+
+**İşlem #1 — Görevler sekmesi (04:30 civarı):**
+- Kullanıcı 135'in E_VIT görevini "Tamamla" butonu ile kapatır
+- `gorev_tamamla` RPC çalışır:
+  - `gorev_log.tamamlandi=true`, `tamamlanma_tarihi=04:30` ✅
+  - `stok_hareket` INSERT (CAROFERTIN-E düşer) ✅
+  - `islem_log` INSERT (`tip='GOREV_TAMAMLA'`, audit trail var) ✅
+- `protokol_eksik_tara` → "tamamlandı" kabul eder ✅
+
+**İşlem #2 — Protokol modal (04:50 civarı):**
+- Kullanıcı aynı hayvana aynı stoğu protokol modal üzerinden uygular
+- `hizli_uygulama` RPC çalışır:
+  - `uygulama_log` INSERT (`etken_kod=NULL` — 060b bug)
+  - `stok_hareket` INSERT (CAROFERTIN-E tekrar düşer) ✅
+  - `islem_log` INSERT ❌ (060 audit eksik — Fix #2 bunu çözecek)
+  - `gorev_log` güncellenmedi (zaten tamamlandı, trigger `etken_kod IS NULL` yüzünden tetiklenmedi)
+- `protokol_eksik_tara` → "döne" kabul etmedi ❌
+
+**Sonuç:**
+- Stok **2 kez düştü** (1'i geçerli, 1'i audit'siz)
+- `islem_log`'da sadece 1 kayıt var (görev tamamlama — hızlı uygulamanın kaydı yok)
+- Protokol kullanıcıya "E_VIT eksik" demeye devam etti (audit'siz uygulama "görünmez" kaldı)
+- Kullanıcı kafası karıştı: "tamamlanmadı gösteriyor ama stok düşmüş"
+
+**Fix #2 (bu PR) sonrası davranış:**
+- İşlem #2 audit trail'e yazılır (`tip='HIZLI_UYGULAMA'`)
+- Stok 2 kez düşer ama **her 2 işlem de takip edilebilir**
+- `islem_log` sorgusuyla "135'e ne zaman, ne uygulandı?" sorusu cevaplanabilir
+- Protokol hâlâ "E_VIT eksik" der çünkü gerçekten 2. uygulama geçerli bir "E_VIT tamamlama" değil (etken_kod NULL, görev tetiklenmedi)
+
+**Çözülmeyen (kapsam dışı):** 2. uygulamayı otomatik engellemek (UI uyarısı + buton disable). Bu Gelecek §8 madde 7'de not edildi.
 
 ---
 
