@@ -1,9 +1,14 @@
-# BUG-060: Protokol Uygulama — Stok Düşüyor Ama Görev Tamamlanmıyor
+# BUG-060v2: Protokol Uygulama — Stok Düşüyor Ama Görev Tamamlanmıyor
 
 **Tarih:** 2026-06-10
 **Önem:** 🔴 Kritik (veri bütünlüğü + kullanıcı güveni)
 **Durum:** 📋 Spec yazıldı, uygulama bekliyor
-**Bildirim kaynağı:** Kullanıcı (canlı test)
+**Bildirim kaynağı:** Kullanıcı (canlı test, 2026-06-10)
+
+**⚠️ İSİM ÇAKIŞMASI UYARISI:**
+Eski BUG-060 (e0f563d, 2026-06-08) = "hizli_uygulama stok_hareket UUID type hatası" — zaten çözülmüş.
+Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verdi, bizim sistemimizdeki BUG-060 ile ilgisi yok.
+**Bu spec BUG-060v2 olarak adlandırıldı** — uygulama sonrası `.claude/knowledge/bugs.md`'ye yeni ID ile (BUG-064+) eklenecek.
 
 **Kullanıcı bildirimi (aynen):**
 > "60) 135 numaranın e vitamini görevi görevler sekmesinden tamamlanabildi ama protokol uygulama butonu ile tamamlanamadı, araştır. UI da tamamlanamadi göstermesine rağmen stoktan ürün çekmiş. bu bugu arastir."
@@ -12,6 +17,21 @@
 - Aynı görev 2 farklı yoldan tamamlanabiliyor gibi görünüyor ama davranışları farklı
 - Stok gerçekten düşmüş (yan etki: stok yanlış eksiye gidebilir, uygulamayı tekrar denerse çift düşer)
 - UI tutarsızlığı → kullanıcı neye güveneceğini bilemez
+- Eski BUG-060 (UUID cast) ile ilgisi yok — bu yeni bir bug
+
+---
+
+## ⚠️ Spec Revizyonu (2026-06-10 review sonrası)
+
+**İlk yazılan spec'te 3 kritik hata vardı:**
+
+1. **060a fix stratejisi yanlıştı** — Custom SQL bloğu öneriliyordu, ama `fn_dinle_uygulama` trigger'ı ZATEN `_gorev_dinle`'yi çağırıyor. Asıl sorun trigger'ın `IF NEW.etken_kod IS NOT NULL` koşulu.
+2. **NULL etken_kod fallback'i tehlikeliydi** — Yanlış görevi kapatma riski (kalsiyum uygulaması oksitosin görevini kapatabilirdi)
+3. **`v_class_name ILIKE '%Yağda Eriyen%'` çok geniş** — A, D, E, K vitaminlerinin hepsini E_VIT yapar
+
+**Düzeltme sonrası gerçek kök neden:**
+- Tek fix yeterli: **060b** — `_etken_kod_bul` düzeltilince `etken_kod` dolu kaydedilecek → trigger çalışacak → `_gorev_dinle` görevi kapatacak
+- 060a için **ek kod değişikliği gerekmez** (trigger mimarisi zaten doğru)
 
 ---
 
@@ -34,11 +54,10 @@
 - `js/ui.js:1080-1102` (`_hayvanHizliUygulaKaydet`) ve `js/ui.js:940-970` (`_protokolUygulaKaydet`)
 - İkisi de aynı RPC'yi çağırır: `rpc('hizli_uygulama', {...})`
 - RPC (`ground_truth.sql:9256-9298`):
-  1. `uygulama_log` INSERT (etken_kod NULL olarak!) ⚠️
-  2. `stok_hareket` INSERT (stok düşer) ✅
-  3. Stok kalan hesapla, return OK
-  4. **`gorev_log`'a DOKUNMUYOR** ❌
-- **Sonuç:** Stok düşer ama görev tamamlanmaz — UI "tamamlanmadı" gösterir.
+  1. `uygulama_log` INSERT
+  2. **`fn_dinle_uygulama` trigger tetiklenir** (L9463-9470) — ama `IF NEW.etken_kod IS NOT NULL` koşulu var
+  3. `stok_hareket` INSERT (stok düşer) ✅
+  4. Stok kalan hesapla, return OK
 
 ### 1.2 DB'den alınan kanıt (2026-06-10)
 
@@ -60,246 +79,146 @@
 
 ---
 
-## 2. Kök Neden Analizi
+## 2. Kök Neden Analizi (REVİZE EDİLMİŞ)
 
-İki ayrı bug birlikte aynı semptomu üretiyor:
-
-### 2.1 BUG-060a: `hizli_uygulama` RPC `gorev_log`'u güncellemiyor
-
-**Dosya:** `supabase/migrations/99999999999999_ground_truth.sql`
-**Satır:** 9256-9298
-
-**Mevcut kod (özet):**
-```sql
-INSERT INTO public.uygulama_log (hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar)
-  VALUES (p_hayvan_id, p_stok_id, v_etken, p_doz, p_birim, p_rota, p_notlar)
-  RETURNING id INTO v_id;
-
--- Stok düşüm
-INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
-  VALUES (gen_random_uuid(), p_stok_id, 'Hızlı Uygulama', p_doz, ...);
-```
-
-**Eksik olan:** `gorev_log` tablosunda eşleşen bekleyen görevin `tamamlandi=true` yapılmaması.
-
-**Neden tehlikeli:**
-- Stok düşer → stok sayımı yanlış olur
-- Aynı uygulamayı tekrar denerse çift stok düşer
-- `protokol_eksik_tara` fonksiyonu (L9326 fallback) uygulama_log'a yazılan kaydı geçici olarak "tamamlandı" sayıyor — bu da ek bir tutarsızlık yaratıyor
-
-**Doğru davranış:** `hizli_uygulama` çağrıldığında:
-1. `uygulama_log` INSERT
-2. `stok_hareket` INSERT
-3. **`gorev_log` UPDATE** — eşleşen bekleyen görevi atomik olarak kapat
-4. Tek `islem_log` snapshot'ı oluştur (audit)
-
-### 2.2 BUG-060b: `_etken_kod_bul` "E Vitamini" class_name'ini tanımıyor
+### 2.1 Asıl kök neden: `_etken_kod_bul` "E Vitamini" class_name'ini tanımıyor
 
 **Dosya:** `supabase/migrations/99999999999999_ground_truth.sql`
 **Satır:** 9169-9224
 
-**Mevcut kod (özet):**
+**Mevcut kod (L9210):**
 ```sql
 IF v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%' THEN RETURN 'E_VIT';
 ```
 
 **Sorun:** CAROFERTIN-E stoğunun `drug_classes.class_name` = **"Yağda Eriyen Vitaminler"** → `"%E Vit%"` substring'i **YOK** ("E"den sonra " " değil "riyen " geliyor).
 
-**Doğru eşleşme için:**
-- `v_class_name` "Yağda Eriyen" içeriyor (vitamin olduğu anlaşılıyor)
-- `v_active_ing` "E Vitamini" içeriyor
-- Fallback: `v_class_name` "vitamin" kelimesini içeriyor (gelecek yeni vitamin preparatları için)
+**Doğru eşleşme sırası (en spesifikten genele):**
+1. `v_active_ing ILIKE '%E Vitamini%'` — **en spesifik**, önce kontrol
+2. `v_class_name ILIKE '%E Vit%'` — mevcut fallback (uyumluluk)
+3. `v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%'` — bilinen marka adları
 
-**Simetri notu — diğer etkenler için kontrol tablosu:**
+**❌ YAPILMAYACAK (review feedback):** `v_class_name ILIKE '%Yağda Eriyen%'` eklemek — A, D, E, K vitaminlerinin hepsini E_VIT yapar, gelecekte D vitamini preparatı girilince yanlış eşleşme olur.
+
+### 2.2 Neden `hizli_uygulama` çalıştırdığında görev kapanmıyor (DÜZELTİLDİ)
+
+**İlk yazılan spec'te hatalı varsayım:** "`hizli_uygulama` `gorev_log`'a hiç dokunmuyor"
+
+**Gerçek mimari (ground truth'tan doğrulandı, L9463-9470):**
+```sql
+CREATE OR REPLACE FUNCTION public.fn_dinle_uygulama()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NEW.etken_kod IS NOT NULL THEN
+    PERFORM public._gorev_dinle(NEW.hayvan_id, NEW.etken_kod, 'uygulama_log:' || NEW.id::text);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_dinle_uygulama ON public.uygulama_log;
+CREATE TRIGGER trg_dinle_uygulama AFTER INSERT ON public.uygulama_log FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_uygulama();
+```
+
+**Akış:**
+- `hizli_uygulama` → `uygulama_log` INSERT
+- INSERT trigger `fn_dinle_uygulama`'yı çağırır
+- Trigger `etken_kod` NULL değilse `_gorev_dinle` çağırır
+- `_gorev_dinle` (L9224-9251) `gorev_log`'da eşleşen bekleyen görevi `tamamlandi=true` yapar
+
+**Kırılma noktası:** `etken_kod` NULL kaydedildiği için trigger'ın koşulu FALSE → `_gorev_dinle` hiç çağrılmıyor.
+
+**060b fix uygulandığında:** `etken_kod='E_VIT'` dolu kaydedilecek → trigger çalışacak → `_gorev_dinle` görevi kapatacak.
+
+### 2.3 `_gorev_dinle` simetri kontrolü (doğrulandı)
+
+`hizli_uygulama_geri_al` (ground truth L9320-9355) zaten `kapatan_ref` üzerinden görevi geri açıyor:
+```sql
+UPDATE public.gorev_log SET tamamlandi = false, tamamlanma_tarihi = NULL, kapatan_ref = NULL
+WHERE kapatan_ref = 'uygulama_log:' || p_uygulama_id::text;
+```
+
+**Simetri ✅ doğrulandı** — geri alma mevcut, ek değişiklik gerekmez.
+
+### 2.4 Diğer etkenler için kontrol tablosu (referans)
 
 | Etken | Mevcut kontrol | Yeterli mi? |
 |---|---|---|
 | OKSITOSIN | `v_class_name ILIKE '%oksitosin%' OR v_active_ing ILIKE '%oxytocin%'` | ✅ |
 | PG | `v_class_name ILIKE '%prostaglandin%' OR v_group_name ILIKE '%PG%' OR v_active_ing ILIKE '%dinoprost%' OR v_active_ing ILIKE '%cloprostenol%'` | ✅ |
-| **E_VIT** | `v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%'` | ❌ |
-| ADEMIN | `v_class_name ILIKE '%ademin%' OR v_stok_ad ILIKE '%ademin%'` | ✅ (sadece ademin için) |
+| **E_VIT** | `v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%'` | ❌ (eşleşmiyor) |
+| ADEMIN | `v_class_name ILIKE '%ademin%' OR v_stok_ad ILIKE '%ademin%'` | ✅ |
 | KALSIYUM | `v_class_name ILIKE '%kalsiyum%' OR v_class_name ILIKE '%calcium%' OR v_stok_ad ILIKE '%kalsiyum%'` | ✅ |
 
-### 2.3 Semptom neden iki bug'ın bileşimi?
+---
 
-- **060a olmasaydı:** Sadece yanlış class eşleşmesi olurdu, görev `gorev_tamamla` ile yine tamamlanırdı.
-- **060b olmasaydı:** 060a fix uygulansa bile `protokol_eksik_tara` SQL'inde `g.etken_kod = v_rec.ek` sorgusu boşa çıkardı — scanner "E vitamini eksik" göstermeye devam ederdi.
+## 3. Önerilen Çözüm (REVİZE)
 
-**İkisi birlikte tam senaryo:**
-1. Kullanıcı 135 için "E vitamini" görevi oluşturur → `gorev_log` kaydı oluşur (etken_kod NULL — bu da ayrı bir sorun ama spec kapsamı dışı)
-2. Kullanıcı protokol uygulama butonuna basar → `hizli_uygulama` çalışır
-3. Stok düşer, uygulama_log NULL etken_kod ile yazılır
-4. `gorev_log` güncellenmez → UI "tamamlanmadı" gösterir
-5. `protokol_eksik_tara` uygulama_log'a yazılan kaydı bulur (L9326 fallback) ama `kapatan_ref` set edilmediği için protokol eşleştirmesi de yarım kalır
+### 3.1 Fix: `_etken_kod_bul` — E_VIT eşleşmesi
+
+**Migration:** `supabase/migrations/20260610000001_bug060v2_etken_kod_vitamin.sql` (TEK DOSYA)
+
+**Değişiklik:** Sadece E_VIT bloğu güncellenir, diğer etkenler aynen kalır.
+
+**ESKİ (L9210):**
+```sql
+IF v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%' THEN RETURN 'E_VIT';
+```
+
+**YENİ (active_ingredient öncelikli):**
+```sql
+IF v_active_ing ILIKE '%E Vitamini%'           -- en spesifik, önce kontrol
+   OR v_class_name ILIKE '%E Vit%'              -- mevcut fallback (uyumluluk)
+   OR v_stok_ad ILIKE '%yeldif%' 
+   OR v_stok_ad ILIKE '%e vit%'
+THEN RETURN 'E_VIT'; END IF;
+```
+
+**Neden bu sıra:**
+1. `v_active_ing` en güvenilir — DB'de doğrudan "E Vitamini" yazıyor
+2. `v_class_name` mevcut fallback — gelecekte başka marka eklenirse de yakalar
+3. `v_stok_ad` — bilinen marka adları (yeldif), spesifik fallback
+
+**Yapılmayacaklar (review feedback):**
+- ❌ `v_class_name ILIKE '%Yağda Eriyen%'` — A/D/E/K hepsini yakalar, yanlış pozitif
+- ❌ NULL etken_kod fallback'i — yanlış görevi kapatma riski
+- ❌ `hizli_uygulama` RPC'ye custom SQL ekleme — trigger mimarisi zaten doğru
+
+### 3.2 `hizli_uygulama` RPC'ye dokunulmayacak
+
+**Neden:** Trigger mimarisi zaten doğru kurulmuş (`fn_dinle_uygulama` + `_gorev_dinle`). 060b fix uygulandığında:
+1. `hizli_uygulama` → `uygulama_log` INSERT (etken_kod='E_VIT' artık dolu)
+2. Trigger `fn_dinle_uygulama` → `IF NEW.etken_kod IS NOT NULL` → TRUE
+3. `_gorev_dinle` çağrılır → `gorev_log` UPDATE → `tamamlandi=true`
+4. UI "tamamlandı" gösterir
+
+**Bu nedenle 060a için custom SQL bloğu gerekmez, sadece 060b fix yeterlidir.**
 
 ---
 
-## 3. Önerilen Çözüm
-
-### 3.1 BUG-060a Fix: `hizli_uygulama` RPC'ye `gorev_log` UPDATE ekle
-
-**Migration:** `supabase/migrations/20260610000001_bug060_hizli_uygulama_gorev_log.sql`
-
-**Strateji:** Eşleşen bekleyen görevi bul ve kapat. Eşleştirme iki katmanlı:
-1. **Birincil:** `etken_kod` biliniyorsa → en yakın tarihli bekleyen görevi eşle
-2. **Fallback:** `etken_kod` NULL ise → aynı hayvanın son 30 gün içindeki ILAC/ASI/VITAMIN/PROTOKOL görevlerinden en yakın tarihli olanı eşle
-
-**SQL:**
-```sql
--- BUG-060a fix: hizli_uygulama artık eşleşen bekleyen gorev'i atomik kapatır
-CREATE OR REPLACE FUNCTION public.hizli_uygulama(
-  p_hayvan_id text,
-  p_stok_id text,
-  p_doz numeric,
-  p_birim text,
-  p_rota text,
-  p_notlar text
-) RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE
-  v_hayvan record;
-  v_stok record;
-  v_etken text;
-  v_id uuid;
-  v_kalan numeric;
-  v_gorev_id text;
-  v_gorev_guncellendi boolean := false;
-BEGIN
-  SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı veya aktif değil');
-  END IF;
-
-  SELECT * INTO v_stok FROM public.stok WHERE id = p_stok_id;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Stok bulunamadı');
-  END IF;
-
-  v_etken := public._etken_kod_bul(p_stok_id, NULL);
-
-  INSERT INTO public.uygulama_log (hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar)
-  VALUES (p_hayvan_id, p_stok_id, v_etken, p_doz, p_birim, p_rota, p_notlar)
-  RETURNING id INTO v_id;
-
-  -- Stok düşüm
-  INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
-  VALUES (gen_random_uuid(), p_stok_id, 'Hızlı Uygulama', p_doz,
-          'Hızlı Uygulama — ' || v_hayvan.kupe_no || ' — ' || v_stok.urun_adi, false);
-
-  -- BUG-060a: eşleşen bekleyen gorev'i kapat
-  IF v_etken IS NOT NULL THEN
-    -- Etken kodu biliniyor: en yakın tarihli bekleyen görevi kapat
-    SELECT id INTO v_gorev_id
-    FROM public.gorev_log
-    WHERE hayvan_id = p_hayvan_id
-      AND etken_kod = v_etken
-      AND tamamlandi = false
-      AND iptal = false
-      AND hedef_tarih >= CURRENT_DATE - 30
-      AND hedef_tarih <= CURRENT_DATE + 7
-    ORDER BY ABS(hedef_tarih - CURRENT_DATE)
-    LIMIT 1;
-  ELSE
-    -- Etken kodu bulunamadı: en son bekleyen ilaç/aşı/vitamin görevini kapat (güvenli fallback)
-    SELECT id INTO v_gorev_id
-    FROM public.gorev_log
-    WHERE hayvan_id = p_hayvan_id
-      AND tamamlandi = false
-      AND iptal = false
-      AND gorev_tipi IN ('ILAC', 'ASI', 'VITAMIN', 'PROTOKOL')
-      AND hedef_tarih >= CURRENT_DATE - 30
-      AND hedef_tarih <= CURRENT_DATE + 7
-    ORDER BY hedef_tarih ASC
-    LIMIT 1;
-  END IF;
-
-  IF v_gorev_id IS NOT NULL THEN
-    UPDATE public.gorev_log
-    SET tamamlandi = true,
-        tamamlanma_tarihi = now(),
-        kapatan_ref = 'uygulama_log:' || v_id::text
-    WHERE id = v_gorev_id;
-    v_gorev_guncellendi := true;
-  END IF;
-
-  SELECT COALESCE(s.baslangic_miktar, 0) - COALESCE(SUM(CASE WHEN sh.iptal = false THEN sh.miktar ELSE 0 END), 0)
-  INTO v_kalan
-  FROM public.stok s
-  LEFT JOIN public.stok_hareket sh ON sh.stok_id = s.id
-  WHERE s.id = p_stok_id
-  GROUP BY s.baslangic_miktar;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'id', v_id,
-    'etken_kod', v_etken,
-    'stok_kalan', COALESCE(v_kalan, 0),
-    'gorev_guncellendi', v_gorev_guncellendi,
-    'gorev_id', v_gorev_id
-  );
-END;
-$$;
-GRANT EXECUTE ON FUNCTION public.hizli_uygulama(text, text, numeric, text, text, text) TO anon, authenticated;
-```
-
-**Simetri:** `hizli_uygulama_geri_al` zaten `kapatan_ref` üzerinden görevi geri açıyor (L9350-9355) — bu fix geri alma simetrisini korur.
-
-### 3.2 BUG-060b Fix: `_etken_kod_bul` vitamin sınıf eşleşmesi
-
-**Migration:** Aynı dosyada (`20260610000001_bug060_etken_kod_vitamin.sql` adıyla, veya tek dosyada birleşik)
-
-**Strateji:** "E Vit" kontrolünü genişlet:
-1. `v_class_name` "Yağda Eriyen" içeriyorsa → E_VIT
-2. `v_active_ing` "E Vitamini" içeriyorsa → E_VIT
-3. Mevcut fallback'ler korunur (yeldif, e vit stok adı)
-4. Ek güvenlik: gelecekte farklı vitamin preparatları eklense de `v_class_name` "vitamin" içeriyorsa E_VIT sayılabilir (ama sadece E vitamini için; B/C/D vitaminleri için ayrı etken_kod gerekli)
-
-**SQL (sadece E_VIT bloğu değişir, diğerleri aynen kalır):**
-```sql
--- BUG-060b fix: "Yağda Eriyen Vitaminler" class_name'i artık E_VIT olarak tanınıyor
-  IF v_class_name ILIKE '%Yağda Eriyen%'           -- CAROFERTIN-E ve benzerleri
-     OR v_class_name ILIKE '%E Vit%'                -- mevcut fallback
-     OR v_active_ing ILIKE '%E Vitamini%'           -- active_ingredient bazlı
-     OR v_stok_ad ILIKE '%yeldif%'                 -- mevcut fallback
-     OR v_stok_ad ILIKE '%e vit%'                  -- mevcut fallback
-  THEN RETURN 'E_VIT'; END IF;
-```
-
-**Etki:** CAROFERTIN-E ve gelecekte eklenecek tüm E vitamini preparatları artık doğru eşleşecek. Diğer etkenler etkilenmez.
-
----
-
-## 4. Uygulama Planı
-
-### 4.1 Adım sırası
+## 4. Uygulama Planı (SADE — 3 adım)
 
 | # | Adım | Araç | Süre |
 |---|------|------|------|
-| 1 | Migration dosyasını yaz (`20260610000001_bug060_hizli_uygulama_gorev_log.sql`) | `write` | 5 dk |
-| 2 | Ground truth'taki `hizli_uygulama` ve `_etken_kod_bul` fonksiyonlarını yeni kodla değiştir | `edit` | 5 dk |
-| 3 | `git add` + commit (`fix(BUG-060): hizli_uygulama artık gorev kapatıyor + E vitamini etken kodu tanınıyor`) | `shell` | 2 dk |
-| 4 | `supabase_migrate` ile SQL'i canlı DB'ye deploy et | MCP | 1 dk |
-| 5 | Test: 135 numaralı hayvana yeni E vitamini uygulaması yap → `gorev_log.tamamlandi=true` doğrula | `supabase_query` | 5 dk |
-| 6 | Test: `_etken_kod_bul('99e2349b-...')` → 'E_VIT' dönmeli | `supabase_rpc` | 1 dk |
-| 7 | Regression: görevler sekmesinden `gorev_tamamla` hâlâ çalışıyor mu? | `supabase_rpc` | 2 dk |
-| 8 | Spec'i "ÇÖZÜLDÜ" olarak işaretle, commit + push | `edit` + `shell` | 3 dk |
+| 1 | Migration dosyasını yaz (`20260610000001_bug060v2_etken_kod_vitamin.sql`) | `write` (parçalı) | 3 dk |
+| 2 | Ground truth'taki `_etken_kod_bul` (L9210) güncelle — atomik commit | `edit` + `git add` + `commit` | 2 dk |
+| 3 | `supabase_migrate` ile SQL'i canlı DB'ye deploy et | MCP | 1 dk |
+| 4 | Test: `_etken_kod_bul('99e2349b-...')` → 'E_VIT' doğrula | `supabase_rpc` | 1 dk |
+| 5 | Test: 135 için yeni E vitamini uygulaması → `gorev_log.tamamlandi=true` | `supabase_query` | 3 dk |
+| 6 | Test: Geri alma simetrisi (`hizli_uygulama_geri_al` çalışıyor mu) | `supabase_rpc` | 2 dk |
+| 7 | Regression: `gorev_tamamla` hâlâ çalışıyor | `supabase_rpc` | 2 dk |
+| 8 | Spec'i "ÇÖZÜLDÜ" işaretle, commit + push | `edit` + `shell` | 3 dk |
 
-**Toplam tahmini süre:** 25-30 dakika
+**Toplam tahmini süre:** ~20 dakika (önceki 30 dk'dan düştü — sadece 1 fix var)
 
-### 4.2 Ground truth senkronizasyonu kritik
+### 4.1 Ground truth senkronizasyonu
 
-Migration dosyası yazıldıktan sonra **aynı anda** `99999999999999_ground_truth.sql` de güncellenmeli. Aksi halde:
-- `gitnexus analyze` tutarsızlık yakalar
-- Sonraki geliştirici eski kodu görür, geri alır
-- `supabase_migrate` ile deploy edilen kod ile repodaki kod farklılaşır
-
-**Kural:** Migration + ground truth aynı commit'te, atomik.
+Migration + ground truth aynı commit'te, atomik. Farklı commit'lerde olursa GitNexus tutarsızlık yakalar, sonraki geliştirici eski kodu görür.
 
 ---
 
-## 5. Test Senaryoları
+## 5. Test Senaryoları (Sadeleştirilmiş)
 
-### 5.1 Senaryo A: 135 numaralı hayvan, E vitamini, normal akış (BUG-060a + 060b fix doğrulaması)
+### 5.1 Senaryo A: 135 numaralı hayvan, E vitamini (ana test)
 
 **Önkoşul:** Migration deploy edilmiş, 135 için bekleyen E vitamini `gorev_log` kaydı var.
 
@@ -313,7 +232,7 @@ Migration dosyası yazıldıktan sonra **aynı anda** `99999999999999_ground_tru
 **Beklenen sonuç:**
 - `uygulama_log`'a yeni kayıt, `etken_kod='E_VIT'` (artık NULL değil)
 - `stok_hareket`'e yeni kayıt
-- `gorev_log`'daki bekleyen E vitamini kaydı `tamamlandi=true`, `tamamlanma_tarihi` set, `kapatan_ref='uygulama_log:<yeni_id>'`
+- **Trigger otomatik çalışır:** `_gorev_dinle` → `gorev_log` UPDATE → `tamamlandi=true`, `kapatan_ref='uygulama_log:<yeni_id>'`
 - UI "tamamlandı" gösterir (hem görevler sekmesi hem detaylı geçmiş)
 - `protokol_eksik_tara` artık 135 için E vitamini "eksik" göstermez
 
@@ -327,50 +246,54 @@ Migration dosyası yazıldıktan sonra **aynı anda** `99999999999999_ground_tru
 3. Onayla
 
 **Beklenen sonuç:**
-- `uygulama_log` kaydı silindi
+- `uygulama_log` kaydı silindi (veya iptal işaretlendi)
 - `stok_hareket`'e ters kayıt (iade) eklendi
-- `gorev_log`'daki görev tekrar `tamamlandi=false` yapıldı (mevcut `hizli_uygulama_geri_al` mantığı sayesinde)
+- `gorev_log`'daki görev tekrar `tamamlandi=false` yapıldı (mevcut `hizli_uygulama_geri_al` mantığı)
 - UI "bekliyor" gösterir
 
 ### 5.3 Senaryo C: Regression — görevler sekmesinden tamamlama hâlâ çalışıyor mu?
 
 **Adımlar:**
-1. 135 için yeni bir bekleyen görev oluştur (veya başka hayvanda dene)
+1. Yeni bir bekleyen görev oluştur (farklı hayvanda veya 135'te)
 2. Görevler sekmesinden "Tamamlandı" işaretle
-3. `gorev_tamamla` RPC'sini doğrudan çağır
 
 **Beklenen sonuç:**
 - `gorev_log.tamamlandi=true`
 - `stok_hareket` INSERT
 - `islem_log` INSERT
-- 060a/060b değişiklikleri `gorev_tamamla`'yı etkilememeli
+- 060b değişikliği `gorev_tamamla`'yı etkilememeli
 
-### 5.4 Senaryo D: Etken kodu NULL olan stok (edge case)
+### 5.4 Senaryo D: NULL etken_kod edge case (review feedback testi)
+
+**Senaryo:** `_etken_kod_bul` NULL dönen bir stok kullanılırsa görev kapatılmamalı.
 
 **Adımlar:**
-1. `_etken_kod_bul` NULL dönen bir stok seç
+1. drug_product_id NULL olan bir stok seç (drug_classes eşleşmeyecek)
 2. Bu stokla hizli_uygulama çağır
-3. Aynı hayvan için birden fazla bekleyen görev olduğunda hangisinin kapatıldığını kontrol et
 
 **Beklenen sonuç:**
-- Fallback mekanizması (`gorev_tipi IN ('ILAC', 'ASI', 'VITAMIN', 'PROTOKOL')`) en yakın tarihli görevi kapatır
-- Birden fazla eşleşme varsa `hedef_tarih ASC` ile en eski bekleyen görev kapatılır (Mantık: "şu an vakti gelmiş olan önce yapılır")
-- Hiç eşleşme yoksa `gorev_guncellendi=false` döner, ama RPC hata vermez, stok yine düşer
+- `uygulama_log.etken_kod` NULL kaydedilir
+- Trigger `IF NEW.etken_kod IS NOT NULL` → FALSE → `_gorev_dinle` çağrılmaz
+- `gorev_log.tamamlandi` DEĞİŞMEZ
+- Stok yine düşer (bu kabul edilebilir — stok hareketi tetikleyici mantıktan bağımsız)
+
+**Bu davranış kasıtlıdır:** NULL etken_kod'da yanlış görevi kapatma riski almaktansa, görevi açık bırakmak daha güvenli.
 
 ---
 
 ## 6. Kabul Kriterleri
 
 - [ ] Migration dosyası `supabase/migrations/20260610000001_*.sql` yazıldı
-- [ ] Ground truth'taki `hizli_uygulama` ve `_etken_kod_bul` güncellendi (aynı commit)
+- [ ] Ground truth'taki `_etken_kod_bul` L9210 güncellendi (aynı commit)
 - [ ] `supabase_migrate` ile canlı DB'ye deploy edildi
-- [ ] Senaryo A başarılı: 135 için `uygulama_log.etken_kod='E_VIT'` ve `gorev_log.tamamlandi=true`
+- [ ] `_etken_kod_bul('99e2349b-...')` → 'E_VIT' dönüyor
+- [ ] Senaryo A başarılı: 135 için `uygulama_log.etken_kod='E_VIT'` + `gorev_log.tamamlandi=true`
 - [ ] Senaryo B başarılı: geri alma simetrisi çalışıyor
 - [ ] Senaryo C başarılı: `gorev_tamamla` regression yok
-- [ ] Senaryo D başarılı: edge case (etken_kod NULL) fallback çalışıyor
-- [ ] `_etken_kod_bul('99e2349b-...')` çağrısı → 'E_VIT' dönüyor
-- [ ] Spec dosyası "ÇÖZÜLDÜ" olarak işaretlendi
+- [ ] Senaryo D başarılı: NULL etken_kod'da görev kapatılmıyor
+- [ ] Spec dosyası "ÇÖZÜLDÜ" işaretlendi
 - [ ] Commit + push yapıldı
+- [ ] `.claude/knowledge/bugs.md`'ye yeni ID ile (BUG-064+) eklendi (eski BUG-060 ile karışmaması için)
 
 ---
 
@@ -378,21 +301,21 @@ Migration dosyası yazıldıktan sonra **aynı anda** `99999999999999_ground_tru
 
 | Risk | Olasılık | Etki | Önlem |
 |------|----------|------|-------|
-| Migration hatası → canlı DB bozulur | Düşük | Yüksek | `supabase_migrate` öncesi SQL syntax kontrolü, mümkünse staging |
-| `gorev_log` UPDATE yanlış görevi kapatır (yanlış eşleşme) | Orta | Yüksek | `hedef_tarih` filtresi (-30 +7 gün) + `gorev_tipi` filtresi + LIMIT 1 ile sınırla |
-| `gorev_tamamla` artık çalışmıyor (regression) | Çok düşük | Orta | Senaryo C testi zorunlu |
-| Birden fazla bekleyen görev varsa hangisi kapatılacak belirsiz | Orta | Düşük | Dokümante edildi: en yakın tarihli, sonra en eski |
-| `_etken_kod_bul` değişikliği diğer etkenleri etkiler | Çok düşük | Orta | Sadece E_VIT bloğu değişti, diğerleri aynen kaldı |
-| 135 için **geçmiş** orphan kayıtlar (etken_kod NULL uygulama_log'lar) | Kesin | Düşük | Yeni uygulama bunları etkilemez, orphan kalır — ayrı temizlik task'ı gerekebilir |
+| Migration hatası → canlı DB bozulur | Düşük | Yüksek | `supabase_migrate` öncesi SQL syntax kontrolü |
+| `v_active_ing ILIKE '%E Vitamini%'` çok spesifik, başka markayı yakalamaz | Çok düşük | Düşük | `v_class_name` ve `v_stok_ad` fallback'leri korundu |
+| `gorev_tamamla` artık çalışmıyor (regression) | Çok düşük | Orta | Senaryo C testi zorunlu, `_etken_kod_bul` değişikliği `gorev_tamamla` path'ini etkilemez |
+| 135 için geçmiş orphan kayıtlar (etken_kod NULL) | Kesin | Düşük | Yeni uygulama bunları etkilemez, orphan kalır — ayrı temizlik task'ı |
+| D vitamini preparatı girilirse yanlış eşleşme | Düşük | Orta | `v_class_name ILIKE '%Yağda Eriyen%` EKLENMEDİ (review feedback) |
+| NULL etken_kod'da görev kapatılmıyor (yanlış görev kapatma riski alınmadı) | Kesin | Düşük | Kasıtlı — Senaryo D testi, güvenli tarafta kalmak |
 
 ---
 
 ## 8. Gelecek İyileştirmeler (Spec Kapsamı Dışı)
 
-1. **`gorev_log` oluşturulurken `etken_kod` her zaman set edilsin** — şu an NULL olarak oluşabiliyor, bu da 060b fix'in tam faydasını sınırlıyor
-2. **`protokol_eksik_tara` L9326 fallback'i** — uygulama_log'a yazılan kaydı geçici "tamamlandı" sayıyor ama `kapatan_ref` set edilmiyor. Bu fallback ya kaldırılmalı ya da daha güvenli hale getirilmeli
-3. **Orphan `uygulama_log` kayıtları için temizlik scripti** — 135'teki 04:30 ve 04:50 kayıtları gibi etken_kod NULL olan kayıtlar raporlanmalı
-4. **Stok düşüşü + görev kapatma transaction'ı** — PL/pgSQL zaten tek transaction içinde çalışıyor ama `islem_log` snapshot'ı eklemek audit trail için faydalı olur
+1. **`gorev_log` oluşturulurken `etken_kod` her zaman set edilsin** — şu an NULL olarak oluşabiliyor, bu da 060b fix'in tam faydasını sınırlıyor (135'in tüm görevlerinde `etken_kod` NULL)
+2. **Orphan `uygulama_log` kayıtları için temizlik scripti** — 135'teki 04:30 ve 04:50 kayıtları gibi etken_kod NULL olan kayıtlar raporlanmalı
+3. **`_etken_dinle` fonksiyonu diğer vitaminler için de genişletilebilir** — D vitamini, A vitamini, K vitamini preparatları için
+4. **Stok düşüşü + görev kapatma transaction'ı** — trigger PL/pgSQL içinde çalışıyor ama hata durumunda rollback davranışı test edilmeli
 
 ---
 
@@ -402,12 +325,14 @@ Migration dosyası yazıldıktan sonra **aynı anda** `99999999999999_ground_tru
 - `js/ui.js:940-970` — `_protokolUygulaKaydet` (handler)
 - `js/ui.js:3982` — görevler sekmesi `gorev_tamamla` çağrısı
 - `supabase/migrations/99999999999999_ground_truth.sql:6556-6645` — `gorev_tamamla` RPC
-- `supabase/migrations/99999999999999_ground_truth.sql:9169-9224` — `_etken_kod_bul` RPC
-- `supabase/migrations/99999999999999_ground_truth.sql:9256-9298` — `hizli_uygulama` RPC (BUG-060a kaynağı)
-- `supabase/migrations/99999999999999_ground_truth.sql:9320-9395` — `hizli_uygulama_geri_al` (simetri için)
-- `supabase/migrations/99999999999999_ground_truth.sql:9300-9350` — `protokol_eksik_tara` (060b'yi gören scanner)
-- `.claude/knowledge/bugs.md` — eski BUG-060 kaydı (UUID cast fix, e0f563d)
+- `supabase/migrations/...ground_truth.sql:9169-9224` — `_etken_kod_bul` RPC (060b fix yeri)
+- `supabase/migrations/...ground_truth.sql:9224-9251` — `_gorev_dinle` (trigger tarafından çağrılır)
+- `supabase/migrations/...ground_truth.sql:9256-9298` — `hizli_uygulama` RPC
+- `supabase/migrations/...ground_truth.sql:9320-9355` — `hizli_uygulama_geri_al` (simetri)
+- `supabase/migrations/...ground_truth.sql:9463-9470` — `fn_dinle_uygulama` trigger fonksiyonu
+- `supabase/migrations/...ground_truth.sql:9472-9473` — `trg_dinle_uygulama` trigger tanımı
+- `.claude/knowledge/bugs.md` — eski BUG-060 kaydı (UUID cast fix, e0f563d, farklı bug)
 
 ---
 
-**Spec durumu:** 📋 Yazıldı, onay + uygulama bekliyor
+**Spec durumu:** 📋 Yazıldı, review sonrası revize edildi, uygulama bekliyor
