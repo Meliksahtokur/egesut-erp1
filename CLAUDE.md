@@ -144,7 +144,7 @@ Rutin DDL (ADD COLUMN, CREATE FUNCTION, CREATE INDEX) → doğrudan uygula.
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **egesut-erp1** (6099 symbols, 8969 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **egesut-erp1** (6262 symbols, 9161 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
