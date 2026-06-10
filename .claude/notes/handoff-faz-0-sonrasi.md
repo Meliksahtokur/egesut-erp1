@@ -40,22 +40,23 @@
 
 ---
 
-## 📊 Mevcut Durum (2026-06-10 akşam)
+## 📊 Mevcut Durum (2026-06-10 akşam — 5. oturum güncellemesi)
 
 | Öğe | Durum |
 |---|---|
-| Aktif bug | **0** (BUG-064 spec FINAL yazıldı, fix uygulanmadı) |
-| BUG-064 spec | ✅ 470 satır, 2 revizyon geçmişi, Yaklaşım 2 scope |
-| BUG-064 fix | ⏳ Uygulanmadı, sırada (20 dk, 2 SQL fix) |
+| Aktif bug | **0** (BUG-064 spec FINAL, fix uygulanmadı) |
+| BUG-064 spec | ✅ **665 satır, 6 revizyon geçmişi, subagent tarafından onaylandı** |
+| BUG-064 fix | ⏳ Uygulanmadı, sırada (~20 dk, 2 SQL fix + 1 bonus) |
 | Faz A.1 | ✅ Tamamlandı |
 | Faz A.1b backlog | 9 satır `toISOString()` refactor (low risk) |
 | Faz A.2+ | Planlanmadı |
 | ReFactorRoadmap.md | Okunmadı |
-| Son commit | `e0e6a52` (main, push edildi) |
+| Son commit | `6d16040` (main, push edildi, senkron doğrulandı) |
+| Bu oturumda yapılan | Spec Rev 3-4-5-6 (kolon düzeltme, subquery, subagent review, line referans) |
 
 ---
 
-## 🧠 Bu Oturumlarda Öğrendiklerimiz (6 kritik pattern)
+## 🧠 Bu Oturumlarda Öğrendiklerimiz (8 kritik pattern)
 
 ### 1. Spec doğrulama — "phantom bug" tespiti
 - BUG-061: Spec yazarı eski kodu görmüş, fix zaten 302d6e1'de uygulanmış
@@ -85,6 +86,17 @@
   - İş mantığı frontend'e kaçar
   - Trigger mimarisini bozar
 - **Doğru yaklaşım:** Tetikleyici mimariyi KORU, sadece beslenecek veriyi düzelt + audit boşluğunu kapat
+
+### 7. Spec yazımında SQL kolon adı tuzağı (YENİ — Oturum 5)
+- BUG-064 spec Rev 2'de `islem_log` INSERT'i uydurma kolonlarla yazılmıştı (hayvan_id, islem_tipi, aciklama, referans_id)
+- **Gerçek:** tip, ana_hayvan_id, kullanici_notu, ref_id+ref_tablo (2 ayrı), snapshot jsonb NOT NULL
+- **Kural:** Spec'te SQL bloğu yazarken mutlaka `information_schema.columns` veya ground truth'tan kolon adlarını doğrula. `gorev_tamamla` gibi benzer pattern'i kopyala-ya-pıştır yap, ama kolon adlarını ASLA varsayma
+- **Kazanç:** Rev 3'te reviewer sayesinde deploy-fail önlendi
+
+### 8. Subquery yerleşim sırası kritik (YENİ — Oturum 5)
+- `hizli_uygulama_geri_al` audit INSERT'i L9338'den SONRA yerleştirilseydi → `SELECT ... FROM uygulama_log` subquery boş dönerdi → ana_hayvan_id NULL
+- **Kural:** DELETE'den sonra subquery ile aynı kayda erişmeye çalışma. Önceden record'a alınmış değişkenleri kullan (`v_uyg.hayvan_id` gibi)
+- **Pratik kalıp:** INSERT'i "kayıt silinmeden hemen önce" yerleştir, ardından DELETE gelir
 
 ---
 
@@ -188,14 +200,15 @@
 ## 🔑 Son Commit'ler (main)
 
 ```
+6d16040 docs: BUG-064 spec Rev 6 — line referans duzeltmeleri
+42aea2f docs: BUG-064 spec Rev 5 — subagent review + cift islem vaka calismasi
+edd1e6d docs: BUG-064 spec Rev 4 — hizli_uygulama_geri_al subquery + 3 kalıntı duzeltme
+8260a3a docs: BUG-064 spec Rev 3 — islem_log kolon adları + snapshot NOT NULL duzeltme
 e0e6a52 docs: BUG-060v2 spec FINAL — Yaklaşım 2 (2 fix, 1 migration, audit trail)
 aa0f593 docs: BUG-060v2 spec — review sonrası revize
 104ba35 docs: handoff + bugs.md — Faz A.1 + BUG-061 + BUG-064 (v2) tamamlandı
-dd5b6b8 docs: AGENTS.md — write aracı büyük dosya kısıtlaması notu eklendi
-f45cbad docs: BUG-060 spec — protokol uygulama stok/gorev uyumsuzluk
-349d8aa docs: handoff güncelleme — Faz A.1 + BUG-061 tamamlandı
 ```
 
 ---
 
-**Handoff durumu:** ✅ Güncel, 4 oturum kapsıyor (Faz A.1 + BUG-061 + BUG-064 2 revizyon)
+**Handoff durumu:** ✅ Güncel, 5 oturum kapsıyor (Faz A.1 + BUG-061 + BUG-064 6 revizyon)
