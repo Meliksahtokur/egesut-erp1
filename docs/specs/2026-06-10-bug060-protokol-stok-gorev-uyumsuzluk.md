@@ -53,6 +53,26 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 
 **Tasarım felsefesi:** "İki kapı, aynı yer" — trigger mimarisini koru, sadece beslenecek veriyi düzelt + audit boşluğunu kapat. JS'i bu döngüye sokma.
 
+### Revizyon 3 (2026-06-10 review sonrası — SQL kolon adları düzeltme)
+**Reviewer tespiti:** "§3.2 islem_log INSERT bloğundaki kolon adları tamamen yanlış — deploy'da NOT NULL constraint (snapshot) ve bilinmeyen kolon hatasıyla migration fail eder."
+
+**Gerçek `islem_log` tablo yapısı (ground_truth L334-347):**
+
+| Spec'teki kolon (yanlış) | Gerçek kolon (doğru) |
+|---|---|
+| `hayvan_id` | `ana_hayvan_id` |
+| `islem_tipi` | `tip` |
+| `aciklama` | `kullanici_notu` |
+| `referans_id` | `ref_id` + `ref_tablo` (iki ayrı kolon) |
+| (eksik) | `snapshot` (jsonb **NOT NULL**) |
+| (eksik) | `id` (text, explicit `gen_random_uuid()::text`) |
+
+**Düzeltme:** Fix #2 ve §4.3'teki tüm `islem_log` INSERT'leri `gorev_tamamla` L6596'daki referans pattern'e göre yeniden yazıldı. Snapshot jsonb objesi (`olusturulan`/`guncellenen`/`silinen` array'leri) eklendi. `ref_id` + `ref_tablo` iki ayrı kolon olarak set ediliyor.
+
+**Önceki hali deploy etseydi:** `column "islem_tipi" of relation "islem_log" does not exist` + `null value in column "snapshot" violates not-null constraint` → migration fail.
+
+**Onaylanan (reviewer) kısımlar:** Fix #1 kolon adları doğru, trigger mimarisi doğru, "İki kapı aynı yer" felsefesi doğru, 5 test senaryosu kapsamlı, risk tablosu gerçekçi, revizyon geçmişi şeffaf.
+
 ---
 
 ## 1. Sorunun Doğrulanması (Kanıt)
@@ -222,22 +242,53 @@ THEN RETURN 'E_VIT'; END IF;
 
 **Sorun:** `gorev_tamamla` her durumda `islem_log` yazıyor, ama `hizli_uygulama` yazmıyor → hızlı uygulamalar audit trail'siz kalıyor → takip boşluğu.
 
-**Çözüm:** `gorev_tamamla`'daki `islem_log` pattern'ini kopyala. RPC'de `uygulama_log` INSERT'inden sonra, `stok_hareket` INSERT'inden önce ekle.
+**Çözüm:** `gorev_tamamla` L6596'daki `islem_log` INSERT pattern'ini kopyala. RPC'de `uygulama_log` INSERT'inden sonra, `stok_hareket` INSERT'inden önce ekle.
 
-**Eklenecek blok (yeni):**
+**⚠️ KRİTİK:** `islem_log` tablosunun gerçek kolon yapısı (ground_truth L334-347):
+- `id` (text PK, DEFAULT `gen_random_uuid()::text`)
+- `tip` (text NOT NULL) — kolon adı `islem_tipi` DEĞİL
+- `ana_hayvan_id` (text) — kolon adı `hayvan_id` DEĞİL
+- `kullanici_notu` (text) — kolon adı `aciklama` DEĞİL
+- `ref_id` + `ref_tablo` (iki ayrı text kolon) — `referans_id` tek başına YETMEZ
+- `snapshot` (jsonb **NOT NULL**) — audit trail'in kalbi, atlanırsa constraint fail
+- `tarih`, `durum`, `geri_alma_tarihi` (opsiyonel)
+
+**Eklenecek blok (gerçek kolon adlarıyla, deploy-safe):**
 ```sql
 -- Audit trail: hizli_uygulama da gorev_tamamla gibi islem_log yazmali
-INSERT INTO public.islem_log (hayvan_id, islem_tipi, aciklama, referans_id)
-VALUES (p_hayvan_id, 'HIZLI_UYGULAMA',
-        COALESCE(v_stok.urun_adi, '?') || ' — ' || p_doz::text || ' ' || COALESCE(p_birim, ''),
-        v_id);
+INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+VALUES (
+  'HIZLI_UYGULAMA',
+  p_hayvan_id,
+  v_id::text,
+  'uygulama_log',
+  jsonb_build_object(
+    'olusturulan', jsonb_build_array(
+      jsonb_build_object('tablo','uygulama_log','id',v_id::text)
+    ),
+    'guncellenen', '[]'::jsonb,
+    'silinen', '[]'::jsonb
+  ),
+  format('Hızlı Uygulama — %s — %s %s %s',
+    v_hayvan.kupe_no,
+    COALESCE(v_stok.urun_adi, '?'),
+    p_doz::text,
+    COALESCE(p_birim, ''))
+);
 ```
 
-**`islem_tipi` değeri:** `'HIZLI_UYGULAMA'` — `gorev_tamamla`'nın `'GOREV_TAMAMLA'` değeriyle simetrik.
+**`tip` değeri:** `'HIZLI_UYGULAMA'` — mevcut enum listesinde (`DOGUM_KAYDI | TOHUMLAMA | HASTALIK | OLUM | SATIS | SUTEN_KESME | ABORT | GOREV_TAMAMLA | STOK_HAREKET`) olmamasına rağmen `tip` kolonu `text` (enum DEĞİL, CHECK constraint YOK) → herhangi bir string kabul edilir. İleride enum'a eklenebilir (Gelecek İyileştirmeler §8'de).
 
-**Neden `v_id` (uygulama_log.id) `referans_id` olarak:**
-- `islem_log` tablosu `referans_id` kolonu zaten var (gorev_tamamla'da `gorev_log.id` kullanılıyor)
-- `uygulama_log.id` ile bağ kurulur → audit'ten uygulamaya geri izleme yapılabilir
+**Snapshot semantiği (`gorev_tamamla` L6571-6587 pattern'iyle bire bir uyumlu):**
+- `olusturulan`: `uygulama_log` tablosuna yeni eklenen kayıt
+- `guncellenen`: boş (gorev_log trigger tarafından güncelleniyor, islem_log audit'i yapan transaction'a dahil değil)
+- `silinen`: boş
+
+**`ref_id` + `ref_tablo` neden:**
+- `uygulama_log.id` (UUID) ile bağ kurulur → audit'ten uygulamaya geri izleme yapılabilir
+- `ref_tablo='uygulama_log'` sayesinde generic sorgular mümkün (`WHERE ref_tablo='uygulama_log'`)
+
+**`kullanici_notu` formatı:** `"Hızlı Uygulama — <kupe_no> — <urun_adi> <doz> <birim>"` — `gorev_tamamla`'nın "Görev tamamlandı (stok: ...)" pattern'iyle tutarlı.
 
 ### 3.3 Yapılmayacaklar (net)
 
@@ -270,7 +321,7 @@ Kullanıcı: "Hizli uygulama" butonu → CAROFERTIN-E → Kaydet
 
 ---
 
-## 4. Uygulama Planı (8 adım, ~20 dk)
+## 4. Uygulama Planı (11 adım, ~20 dk)
 
 | # | Adım | Araç | Süre |
 |---|------|------|------|
@@ -309,11 +360,41 @@ Migration + ground truth **aynı commit'te**, atomik. Farklı commit'lerde olurs
 
 ### 4.3 `hizli_uygulama_geri_al` simetri sorunu
 
-`hizli_uygulama_geri_al` (L9320-9355) audit log geri alma **yapmıyor**. Spec kapsamı: audit trail'in tutarlılığı için `islem_log` kaydı da geri alınmalı VEYA audit kaydında `referans_id` üzerinden ilişki kurulup geri alma durumunda "iptal" işaretlenmeli.
+`hizli_uygulama_geri_al` (L9320-9355) audit log geri alma **yapmıyor**. Spec kapsamı: audit trail'in tutarlılığı için `islem_log` kaydı da geri alınmalı.
 
-**Karar:** Spec kapsamında sadece ileri yönde audit ekle. Geri alma simetrisi **BUG-065** olarak ayrı bug'a bırakılabilir (scope kontrolü için). Veya bu PR'da `hizli_uygulama_geri_al`'a da `islem_log` ters kaydı eklenir (1 satır ek).
+**Karar:** Bu PR'da çöz — `hizli_uygulama_geri_al`'a `islem_log` INSERT ekle (`tip='HIZLI_UYGULAMA_GERI_AL'`, `ref_id=v_uygulama_id::text`, `ref_tablo='uygulama_log'`). Aynı kolon adları + snapshot semantiği (Fix #2 ile simetrik).
 
-**Önerim:** Bu PR'da çöz — `hizli_uygulama_geri_al`'a `islem_log` INSERT ekle (`islem_tipi='HIZLI_UYGULAMA_GERI_AL'`, `referans_id=v_uygulama_id`). 2 satır ek, simetri tamamlanır.
+**Eklenecek blok (mevcut geri alma kodundan sonra, RETURN'den önce):**
+```sql
+-- Audit trail simetrisi: geri alma da islem_log yazmali
+INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+VALUES (
+  'HIZLI_UYGULAMA_GERI_AL',
+  (SELECT hayvan_id FROM public.uygulama_log WHERE id = p_uygulama_id),
+  p_uygulama_id::text,
+  'uygulama_log',
+  jsonb_build_object(
+    'olusturulan', '[]'::jsonb,
+    'guncellenen', '[]'::jsonb,
+    'silinen', jsonb_build_array(
+      jsonb_build_object('tablo','uygulama_log','id',p_uygulama_id::text)
+    )
+  ),
+  format('Hızlı Uygulama Geri Alındı — uygulama_log id: %s', p_uygulama_id::text)
+);
+```
+
+**Snapshot semantiği (Fix #2'nin tersi):**
+- `olusturulan`: boş
+- `guncellenen`: boş
+- `silinen`: geri alınan `uygulama_log` kaydı (`hizli_uygulama_geri_al` L9336'da `DELETE FROM public.uygulama_log` yapıyor)
+
+**Not:** `ana_hayvan_id` için subquery gerekli — `hizli_uygulama_geri_al` mevcut implementasyonunda `v_hayvan` record'u zaten L9301'de SELECT ediliyor, onu doğrudan kullanmak daha temiz:
+```sql
+ana_hayvan_id => v_hayvan.id  -- zaten L9301'de SELECT edildi
+```
+
+**Audit geri alma (ileride):** Bu kayıtların da geri alınması gerekebilir → `islem_log.durum='geri_alindi'` kolonu kullanılabilir. Bu PR kapsamı dışı.
 
 ---
 
@@ -411,7 +492,8 @@ Migration + ground truth **aynı commit'te**, atomik. Farklı commit'lerde olurs
 - [ ] Ground truth'taki `_etken_kod_bul` L9210 güncellendi (aynı commit)
 - [ ] Ground truth'taki `hizli_uygulama` RPC'ye `islem_log` INSERT eklendi (aynı commit)
 - [ ] Ground truth'taki `hizli_uygulama_geri_al` RPC'ye `'HIZLI_UYGULAMA_GERI_AL'` audit simetrisi eklendi (aynı commit, opsiyonel ama önerilir)
-- [ ] `supabase_migrate` ile canlı DB'ye deploy edildi
+- [ ] `supabase_migrate` ile canlı DB'ye deploy edildi (constraint fail yok)
+- [ ] Deploy sonrası `islem_log` tablosuna `'HIZLI_UYGULAMA'` tipi ile kayıt yazılabildiği doğrulandı (snapshot NOT NULL constraint geçti)
 - [ ] `_etken_kod_bul('99e2349b-...')` → `'E_VIT'` dönüyor
 - [ ] Senaryo A başarılı: 135 için `uygulama_log.etken_kod='E_VIT'` + `gorev_log.tamamlandi=true` + `islem_log` kaydı var
 - [ ] Senaryo B başarılı: geri alma simetrisi çalışıyor (islem_log da geri alınıyor)
