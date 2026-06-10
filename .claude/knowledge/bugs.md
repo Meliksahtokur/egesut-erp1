@@ -39,20 +39,21 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: kullanıcı (canlı test)
 - Modül: supabase (`_etken_kod_bul` RPC — `drug_classes` sınıf eşleşmesi)
 - Önem: yüksek
-- Durum: spec yazıldı, fix uygulanmadı
+- Durum: spec + plan yazıldı, fix uygulanmadı (sırada)
 - Açıklama: 135 numaralı hayvana CAROFERTIN-E uygulandığında `uygulama_log.etken_kod=NULL` kaydediliyor. `_etken_kod_bul` `drug_classes.class_name='Yağda Eriyen Vitaminler'` için `ILIKE '%E Vit%'` eşleşmesi başarısız (E'den sonra " " değil "riyen " geliyor). NULL etken_kod → `fn_dinle_uygulama` trigger `IF NEW.etken_kod IS NOT NULL` koşulunda FALSE → `_gorev_dinle` çağrılmıyor → `gorev_log.tamamlandi=false` kalıyor. Stok yine düşüyor (stok_hareket INSERT bağımsız çalışıyor).
 - **İSİM ÇAKIŞMASI:** Kullanıcı "60" numarası verdi, eski BUG-060 (UUID cast, e0f563d) farklı bug. Bu BUG-064 ID'si ile kayıt altına alındı.
 - **Bulgu:** `fn_dinle_uygulama` trigger'ı (L9463-9470) + `_gorev_dinle` helper'ı (L9224-9251) zaten doğru kurulmuş. Asıl fix `_etken_kod_bul` E_VIT bloğu.
-- **Önerilen fix (YAKLAŞIM 2 — 2 SQL fix, 1 migration):**
-  - **Fix #1:** `_etken_kod_bul` L9210 → `v_class_name ILIKE '%E Vit%'` korunsun, **öncesine** `v_active_ing ILIKE '%E Vitamini%'` eklensin (en spesifik, öncelikli)
-  - **Fix #2:** `hizli_uygulama` L9256-9298 → `uygulama_log` INSERT'ten sonra, `stok_hareket`'ten önce `islem_log` INSERT (audit trail): `islem_tipi='HIZLI_UYGULAMA'`, `referans_id=v_id`
-  - **Bonus:** `hizli_uygulama_geri_al` L9320-9355 → audit simetrisi (`islem_tipi='HIZLI_UYGULAMA_GERI_AL'`)
+- **Önerilen fix (YAKLAŞIM 2 — 2 SQL fix, 1 migration, satır referansları Rev 6'da düzeltildi):**
+  - **Fix #1:** `_etken_kod_bul` L9213 → `v_class_name ILIKE '%E Vit%'` korunsun, **öncesine** `v_active_ing ILIKE '%E Vitamini%'` eklensin (en spesifik, öncelikli)
+  - **Fix #2:** `hizli_uygulama` L9256-9306 → `uygulama_log` INSERT'ten sonra, `stok_hareket`'ten önce `islem_log` INSERT (audit trail). Kolonlar: `tip`, `ana_hayvan_id`, `ref_id`, `ref_tablo`, `snapshot jsonb NOT NULL`, `kullanici_notu` — `gorev_tamamla` L6596 referans pattern'i
+  - **Bonus:** `hizli_uygulama_geri_al` L9309-9342 → audit simetrisi (`tip='HIZLI_UYGULAMA_GERI_AL'`). ⚠️ INSERT L9336-L9338 arasına (DELETE'den ÖNCE), `v_uyg.hayvan_id` kullan (L9317'de record'a alınmış)
   - NULL etken_kod fallback'i yapılmayacak (yanlış görev kapatma riski)
   - JS handler redirect (görev bul → gorev_tamamla) YAPILMAYACAK (yanlış mimari — race condition, mimari bozulma)
-- **Mimari felsefe:** "İki kapı, aynı yer" — trigger mimarisi (`fn_dinle_uygulama` + `_gorev_dinle`) DB transaction içinde atomik. JS'i bu döngüye sokma.
-- **Test senaryoları:** A) 135 normal akış, B) geri alma simetrisi, C) gorev_tamamla regression, D) NULL etken_kod edge case, E) yanlış eşleşme (C vitamini → E_VIT açık kalır)
-- **İlgili spec:** `docs/specs/2026-06-10-bug060-protokol-stok-gorev-uyumsuzluk.md` (470 satır, 2 revizyon geçmişi, Yaklaşım 2)
-- **İlgili commit:** spec `e0e6a52` (push edildi, main)
+- **Mimari felsefe:** "İki kapı, aynı yer" — trigger mimarisi (`fn_dinle_uygulama` L9463-9473 + `_gorev_dinle` L9224-9251) DB transaction içinde atomik. JS'i bu döngüye sokma.
+- **Test senaryoları:** A) 135 normal akış, B) geri alma simetrisi, C) gorev_tamamla regression, D) NULL etken_kod edge case, E) C vitamini NULL kalır (yanlış eşleşme önleme)
+- **İlgili spec:** `docs/specs/2026-06-10-bug060-protokol-stok-gorev-uyumsuzluk.md` (665 satır, 6 revizyon geçmişi, Yaklaşım 2, subagent APPROVED)
+- **İlgili plan:** `.claude/plans/2026-06-10-bug064-impl.md` (210 satır, 5 faz: Doğrulama → Yazım → Ground Truth → Deploy → Test → Commit, ~42 dk)
+- **İlgili commit'ler:** spec Rev 6 `6d16040`, plan + memory `1498903` (push edildi, main, senkron)
 
 ## [2026-06-08] BUG-054 Doğum sonrası laktasyon padok geçişi
 - Kaynak: kullanıcı

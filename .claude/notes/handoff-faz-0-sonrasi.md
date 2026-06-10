@@ -40,23 +40,24 @@
 
 ---
 
-## 📊 Mevcut Durum (2026-06-10 akşam — 5. oturum güncellemesi)
+## 📊 Mevcut Durum (2026-06-10 18:12 — 6. oturum güncellemesi)
 
 | Öğe | Durum |
 |---|---|
 | Aktif bug | **0** (BUG-064 spec FINAL, fix uygulanmadı) |
 | BUG-064 spec | ✅ **665 satır, 6 revizyon geçmişi, subagent tarafından onaylandı** |
-| BUG-064 fix | ⏳ Uygulanmadı, sırada (~20 dk, 2 SQL fix + 1 bonus) |
+| BUG-064 plan | ✅ **210 satır, `.claude/plans/2026-06-10-bug064-impl.md`, 5 faz (Doğrulama → Yazım → Ground Truth → Deploy → Test → Commit)** |
+| BUG-064 fix | ⏳ Uygulanmadı, sırada (~42 dk, 5 senaryo dahil) |
 | Faz A.1 | ✅ Tamamlandı |
 | Faz A.1b backlog | 9 satır `toISOString()` refactor (low risk) |
 | Faz A.2+ | Planlanmadı |
 | ReFactorRoadmap.md | Okunmadı |
-| Son commit | `6d16040` (main, push edildi, senkron doğrulandı) |
-| Bu oturumda yapılan | Spec Rev 3-4-5-6 (kolon düzeltme, subquery, subagent review, line referans) |
+| Son commit | `1498903` (main, push edildi, senkron doğrulandı) |
+| Bu oturumda yapılan | İmplementasyon planı yazımı (Faz 0-5, hibrit araç seti, risk tablosu, kabul kriterleri) |
 
 ---
 
-## 🧠 Bu Oturumlarda Öğrendiklerimiz (8 kritik pattern)
+## 🧠 Bu Oturumlarda Öğrendiklerimiz (9 kritik pattern)
 
 ### 1. Spec doğrulama — "phantom bug" tespiti
 - BUG-061: Spec yazarı eski kodu görmüş, fix zaten 302d6e1'de uygulanmış
@@ -97,6 +98,13 @@
 - `hizli_uygulama_geri_al` audit INSERT'i L9338'den SONRA yerleştirilseydi → `SELECT ... FROM uygulama_log` subquery boş dönerdi → ana_hayvan_id NULL
 - **Kural:** DELETE'den sonra subquery ile aynı kayda erişmeye çalışma. Önceden record'a alınmış değişkenleri kullan (`v_uyg.hayvan_id` gibi)
 - **Pratik kalıp:** INSERT'i "kayıt silinmeden hemen önce" yerleştir, ardından DELETE gelir
+
+### 9. İmplementasyon planı yazarken Faz 0 = Doğrulama (YENİ — Oturum 6)
+- Spec yazıldı, satır referansları 6 revizyonda düzeltildi — ama hâlâ canlı DB'den doğrulanmadı
+- **Kural:** Migration yazmadan önce mutlaka `pg_proc` + `pg_get_functiondef` ile canlı imzaları çek, spec L referanslarıyla karşılaştır
+- **Kazanım:** 5 dakika doğrulama, potansiyel "yanlış satıra uyguladım" hatasını sıfırlar (6 revizyonda düzeltilen line referansları tekrar kayarsa tüm test senaryoları geçersiz olur)
+- **Plan dosyası kalıbı:** `.claude/plans/<tarih>-<bug>-impl.md` (210 satır, 5 faz + riskler + kabul kriterleri)
+- **Referans:** `.claude/plans/2026-06-10-bug064-impl.md`
 
 ---
 
@@ -150,18 +158,15 @@
 ## 📋 Açılışta Yapılacaklar (Sıralı)
 
 ### Seçenek A — BUG-064 fix'i uygula (önerilen)
-- **Süre:** ~20 dakika
+- **Süre:** ~42 dakika (önceden 20 dk tahmin edilmişti, plan detaylandırınca 5 senaryo dahil ~42 dk)
+- **Plan:** `.claude/plans/2026-06-10-bug064-impl.md` (210 satır, 5 faz + riskler + kabul kriterleri)
 - **Adımlar:**
-  1. Migration dosyasını yaz: `supabase/migrations/20260610000001_bug064_etken_kod_vitamin_audit.sql`
-  2. Ground truth'taki `_etken_kod_bul` L9210 güncelle
-  3. Ground truth'taki `hizli_uygulama` RPC'ye `islem_log` INSERT ekle
-  4. Ground truth'taki `hizli_uygulama_geri_al` RPC'ye audit simetrisi ekle
-  5. Atomik commit (migration + ground truth)
-  6. `supabase_migrate` ile deploy et
-  7. 5 test senaryosu çalıştır
-  8. Spec'i "ÇÖZÜLDÜ" işaretle
-  9. `bugs.md`'deki BUG-064'ü "çözüldü" yap
-  10. Commit + push
+  0. **Faz 0 (5 dk):** `pg_proc` + `pg_get_functiondef` ile canlı DB'den 5 fonksiyonun imzasını çek, spec L referanslarıyla karşılaştır
+  1. **Faz 1 (10 dk):** Migration yaz + SQL syntax dry-run
+  2. **Faz 2 (5 dk):** Ground truth senkron + `git diff` kontrol
+  3. **Faz 3 (2 dk):** `supabase_migrate` ile deploy
+  4. **Faz 4 (15 dk):** 5 test senaryosu (A: 135 + E vit, B: geri al simetri, C: regression, D: NULL edge, E: C vit NULL)
+  5. **Faz 5 (5 dk):** Commit + push + memory + handoff + bugs.md güncelle
 
 ### Seçenek B — Faz A.2+ planlaması
 - **Süre:** ~1 saat
@@ -181,7 +186,8 @@
 | Dosya | İçerik | Satır |
 |-------|--------|-------|
 | `docs/specs/2026-06-09-bug061-gecmis-onclick-fix.md` | BUG-061 ✅ ÇÖZÜLDÜ | 180+ |
-| `docs/specs/2026-06-10-bug060-protokol-stok-gorev-uyumsuzluk.md` | BUG-064 spec FINAL (2 fix, Yaklaşım 2) | 470 |
+| `docs/specs/2026-06-10-bug060-protokol-stok-gorev-uyumsuzluk.md` | BUG-064 spec FINAL (2 fix, Yaklaşım 2) | 665 |
+| `.claude/plans/2026-06-10-bug064-impl.md` | BUG-064 implementasyon planı (5 faz, hibrit araç seti) | 210 |
 | `.claude/notes/faz-a1-envanter-raporu.md` | Faz A.1 utils analiz | 163 |
 | `.claude/plans/faz-a1-utils-envanter-ve-refactor.md` | Faz A.1 plan | 445 |
 | `.claude/knowledge/bugs.md` | Aktif + çözülmüş bug listesi (BUG-064 entry var) | 110+ |
