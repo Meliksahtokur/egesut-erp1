@@ -307,15 +307,62 @@
 ## 🔑 Son Commit'ler (main)
 
 ```
-6d16040 docs: BUG-064 spec Rev 6 — line referans duzeltmeleri
-42aea2f docs: BUG-064 spec Rev 5 — subagent review + cift islem vaka calismasi
-edd1e6d docs: BUG-064 spec Rev 4 — hizli_uygulama_geri_al subquery + 3 kalıntı duzeltme
-8260a3a docs: BUG-064 spec Rev 3 — islem_log kolon adları + snapshot NOT NULL duzeltme
-e0e6a52 docs: BUG-060v2 spec FINAL — Yaklaşım 2 (2 fix, 1 migration, audit trail)
-aa0f593 docs: BUG-060v2 spec — review sonrası revize
-104ba35 docs: handoff + bugs.md — Faz A.1 + BUG-061 + BUG-064 (v2) tamamlandı
+13a6b77 chore: GitNexus index güncelleme (6099→6262 sembol, 8969→9161 ilişki)
+b4b8b53 docs(archive): BUG-064 öğrenme arşivleri — v1 WRONG-11param + genişletilmiş imza fikri
+9f037ae docs(session): BUG-064 deploy tamamlandı kayıtları + Pattern 10-11
+dfa1178 docs: BUG-064 spec Rev 8 + plan düzeltme — gerçek hizli_uygulama imzası
+4be01af fix(db): BUG-064 migration v2 — gerçek 6-param hizli_uygulama imzası + islem_log audit
+fff12c2 feat(db): BUG-064 migration — E_VIT eşleşmesi + islem_log audit trail
+e6e662e docs(session): handoff Pattern 10-11 + bugs.md Rev 7 + Faz 0 doğrulama notları
+8c42ccd docs: BUG-064 spec Rev 7 + plan düzeltme — Faz 0 canlı DB doğrulaması
+8eddf65 docs: BUG-064 plan — 3 reviewer notu düzeltme (supabase_migrate, v_hayvan guard, canli ID çekme)
+3718863 docs: BUG-064 impl plani (5 faz, 42dk) + handoff Pattern 9 + bugs.md guncellendi
 ```
 
 ---
 
 **Handoff durumu:** ✅ Güncel, 5 oturum kapsıyor (Faz A.1 + BUG-061 + BUG-064 6 revizyon)
+
+---
+
+## ✅ BUG-064 — FIX KABUL EDİLDİ, KAPATILDI (2026-06-10 oturum sonu)
+
+**Kullanıcı kararı:** Test senaryoları koşulmadan fixed kabul edildi. Sorun olursa Faz 4'e dönülecek.
+
+**Post-deploy doğrulama (bu oturum):**
+- `pg_get_functiondef` ile canlıda 3 fonksiyon kontrol edildi
+- `_etken_kod_bul`: yeni `"%E Vitamini%"` pattern VAR, eski kırık `"%E Vit%"` YOK ✅
+- `hizli_uygulama`: `islem_log` audit + `SET search_path` VAR ✅
+- `hizli_uygulama_geri_al`: `islem_log` audit + `SET search_path` VAR ✅
+
+**5 commit push edildi (hepsi `origin/main`'e gitti):**
+- `4be01af` fix(db): BUG-064 migration v2 — gerçek 6-param `hizli_uygulama` imzası + `islem_log` audit
+- `dfa1178` docs: BUG-064 spec Rev 8 + plan düzeltme
+- `9f037ae` docs(session): BUG-064 deploy tamamlandı kayıtları + Pattern 10-11
+- `b4b8b53` docs(archive): v1 WRONG-11param + genişletilmiş imza fikri
+- `13a6b77` chore: GitNexus index güncelleme (6099→6262 sembol)
+
+**Faz 4 test senaryoları — ertelendi:**
+- Senaryo A (135 + E vit): Koşulabilirdi ama kullanıcı kabul etti
+- Senaryo B (Geri alma simetrisi): Koşulabilirdi ama kullanıcı kabul etti
+- Senaryo C (Regression — `gorev_tamamla`): Koşulabilirdi ama kullanıcı kabul etti
+- Senaryo D (NULL etken_kod, A vit): **Stokta A vit ürünü yok** — koşulamaz
+- Senaryo E (C vit NULL kontrolü): **Stokta C vit ürünü yok** — koşulamaz
+
+**Şema drift keşfi (bu oturum):**
+- Plan/spec'te yazan `stok.ad` → gerçekte `stok.urun_adi`
+- Plan/spec'te yazan `stok.mevcut_miktar` → gerçekte yok (stok miktar bilgisi farklı yerde)
+- Plan/spec'te yazan `hayvanlar.ad` → gerçekte yok (hayvan adı kupe_no alanında birleşik)
+- Mevcut açık E_VIT görevinin hayvanı: `a0731c92-6fe9-4878-87a8-255b9f8735b3` (kupe_no=`Test inek cabbar`, durum=`Satıldı`, iptal=true) → orphaned test verisi
+- CAROFERTIN-E stok ID: `99e2349b-4df7-4930-b79e-8172bc2e7dc0` (orijinal BUG-064 ürünü)
+
+**Telsiz/Blackboard durumu:**
+- Aktif task (bana atanmış): yok
+- Telsiz kapalı (port 8744 ECONNREFUSED)
+- Mevcut `in_progress` task: `task-2026-05-19-6e5363a2` (gebelik-protokol-birlestirme, claude'a atanmış, claimed_by=null)
+
+**Bir dahaki oturum için:**
+1. CLAUDE.md güncelleme (yetki verildi tek seferlik — bir dahakine geri al)
+2. Schema drift düzeltmesi: spec/plan/CLAUDE.md'deki `stok.ad` → `stok.urun_adi` düzeltmesi
+3. Eğer BUG-064 sahada sorun çıkarsa: Faz 4 Senaryo A/B/C koş
+4. `gebelik-protokol-birlestirme` task'ı (task-2026-05-19-6e5363a2) — Claude'a atanmış ama bana delege edilebilir

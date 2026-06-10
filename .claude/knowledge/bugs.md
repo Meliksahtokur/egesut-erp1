@@ -39,7 +39,7 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
 - Kaynak: kullanıcı (canlı test)
 - Modül: supabase (`_etken_kod_bul` RPC — `drug_classes` sınıf eşleşmesi)
 - Önem: yüksek
-- Durum: ✅ **DEPLOY TAMAMLANDI** (2026-06-10) — canlıda 3 fonksiyon güncellendi (Faz 0/1/2/3 geçti, 4 düzeltme uygulandı, subagent review APPROVED 10/10). Sırada: Faz 4 (5 test senaryosu) + Faz 5 (commit + push)
+- Durum: ✅ **FIX KABUL EDİLDİ** (2026-06-10) — canlıda 3 fonksiyon güncellendi (Faz 0/1/2/3 geçti, 4 düzeltme uygulandı, subagent review APPROVED 10/10, `pg_get_functiondef` ile post-deploy doğrulama yapıldı). **Kullanıcı kararı: test edilmeden fixed kabul edildi**, sorun olursa yeniden bakılacak. Faz 4 (5 test senaryosu) ertelendi — Senaryo D/E stokta A/C vit ürünü olmadığı için zaten koşulamazdı.
 - Açıklama: 135 numaralı hayvana CAROFERTIN-E uygulandığında `uygulama_log.etken_kod=NULL` kaydediliyor. `_etken_kod_bul` `drug_classes.class_name='Yağda Eriyen Vitaminler'` için `ILIKE '%E Vit%'` eşleşmesi başarısız (E'den sonra " " değil "riyen " geliyor). NULL etken_kod → `fn_dinle_uygulama` trigger `IF NEW.etken_kod IS NOT NULL` koşulunda FALSE → `_gorev_dinle` çağrılmıyor → `gorev_log.tamamlandi=false` kalıyor. Stok yine düşüyor (stok_hareket INSERT bağımsız çalışıyor).
 - **İSİM ÇAKIŞMASI:** Kullanıcı "60" numarası verdi, eski BUG-060 (UUID cast, e0f563d) farklı bug. Bu BUG-064 ID'si ile kayıt altına alındı.
 - **Bulgu:** `fn_dinle_uygulama` trigger'ı (L9463-9470) + `_gorev_dinle` helper'ı (L9224-9251) zaten doğru kurulmuş. Asıl fix `_etken_kod_bul` E_VIT bloğu.
