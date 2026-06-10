@@ -35,6 +35,19 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
   - Görev detay modal'ı eklenirse o açılabilir (BUG-059 ile ilişkili)
 - İlgili commit: 302d6e1
 
+## [2026-06-10] BUG-064 Protokol uygulama — E vitamini görevi stok düşer ama kapanmıyor (BUG-060v2)
+- Kaynak: kullanıcı (canlı test)
+- Modül: supabase (`_etken_kod_bul` RPC — `drug_classes` sınıf eşleşmesi)
+- Önem: yüksek
+- Durum: spec yazıldı, fix uygulanmadı
+- Açıklama: 135 numaralı hayvana CAROFERTIN-E uygulandığında `uygulama_log.etken_kod=NULL` kaydediliyor. `_etken_kod_bul` `drug_classes.class_name='Yağda Eriyen Vitaminler'` için `ILIKE '%E Vit%'` eşleşmesi başarısız (E'den sonra " " değil "riyen " geliyor). NULL etken_kod → `fn_dinle_uygulama` trigger `IF NEW.etken_kod IS NOT NULL` koşulunda FALSE → `_gorev_dinle` çağrılmıyor → `gorev_log.tamamlandi=false` kalıyor. Stok yine düşüyor (stok_hareket INSERT bağımsız çalışıyor).
+- **İSİM ÇAKIŞMASI:** Kullanıcı "60" numarası verdi, eski BUG-060 (UUID cast, e0f563d) farklı bug. Bu BUG-064 ID'si ile kayıt altına alındı.
+- **Bulgu:** `fn_dinle_uygulama` trigger'ı (L9463-9470) + `_gorev_dinle` helper'ı (L9224-9251) zaten doğru kurulmuş. Asıl fix `_etken_kod_bul` E_VIT bloğu.
+- **Önerilen fix:** L9210'da `v_class_name ILIKE '%E Vit%'` korunsun, **öncesine** `v_active_ing ILIKE '%E Vitamini%'` eklensin. NULL etken_kod fallback'i yapılmayacak (yanlış görev kapatma riski). Migration: `20260610000001_bug064_etken_kod_vitamin.sql`
+- **Test senaryoları:** A) 135 ile normal akış, B) geri alma simetrisi, C) gorev_tamamla regression, D) NULL etken_kod edge case
+- **İlgili spec:** `docs/specs/2026-06-10-bug060-protokol-stok-gorev-uyumsuzluk.md` (338 satır, review sonrası revize)
+- **İlgili commit:** spec `aa0f593` (push edildi)
+
 ## [2026-06-08] BUG-054 Doğum sonrası laktasyon padok geçişi
 - Kaynak: kullanıcı
 - Modül: supabase (dogum_kaydet)
