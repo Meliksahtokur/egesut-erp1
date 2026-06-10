@@ -79,7 +79,92 @@
 
 ### 5. Spec review → ground truth doğrulama
 - İlk yazılan spec 3 kritik hata içeriyordu
-- **Kural:** Spec yazdıktan sonra mutlaka "ground truth'ta bu pattern var mı?" kontrolü yap
+- **Kural:** Spec yazdıktıran sonra mutlaka "ground truth'ta bu pattern var mı?" kontrolü yap
+
+---
+
+## ✅ BUG-064 — DEPLOY TAMAMLANDI (2026-06-10)
+
+**Faz 0 → Faz 3 başarıyla tamamlandı.** Canlıda 3 fonksiyon güncellendi.
+
+### Deploy Edilen SQL (3 fonksiyon, 1 migration)
+
+| # | Fonksiyon | L (ground truth) | Değişiklik | Doğrulama |
+|---|---|---|---|---|
+| 1 | `_etken_kod_bul` | L9169-9224 | +1 satır: `v_active_ing ILIKE '%E Vitamini%' → E_VIT` | ✅ `pg_get_functiondef` |
+| 2 | `hizli_uygulama` | L9256-9306 | +14 satır: islem_log audit (uygulama_log INSERT sonrası, stok_hareket öncesi) | ✅ `pg_get_functiondef` |
+| 3 | `hizli_uygulama_geri_al` | L9309-9342 | +24 satır: islem_log audit (UPDATE öncesi, DELETE sonrası) | ✅ `pg_get_functiondef` |
+
+### Subagent Review #2 — APPROVED (10/10 ✅)
+
+- **Blocker:** 0
+- **Critical:** 0
+- **Major:** 0
+- **Minor:** 2 (post-deploy iyileştirme, deploy'u bloke etmiyor)
+
+**Minor #1:** Satır 218 `v_hayvan.kupe_no` NULL riski → `COALESCE(v_hayvan.kupe_no, v_uyg.hayvan_id)` önerisi (audit kalitesi)
+
+**Minor #2:** Audit snapshot "ne vardı" semantiği (UPDATE öncesi `eski=true`) — doğru audit pattern
+
+### v1 WRONG-11param Backup (öğrenme arşivi)
+
+- **Yol:** `supabase/migrations/backup/20260610000001_bug064_etken_kod_vitamin_audit.WRONG-11param-v1.sql`
+- **Neden yanlış:** Spec Rev 7'de 11 parametreli varsayımsal API uydurulmuş, gerçek 6 parametreli imzadan tamamen farklı
+- **Korunma nedeni:** Gelecekte "spec'te API yazarken ground truth'a bak" dersinin somut kanıtı
+
+### 11-Parametreli Genişletilmiş İmza Fikri (İleride)
+
+- **Yol:** `docs/ideas/2026-06-10-hizli-uygulama-genisletilmis-imza.md` (107 satır)
+- **Fikir:** `uygulama_tipi, uygulayan, protokol_id, gun_no, padok_hedef, kullanici_notu` ek parametreleri
+- **Kullanım:** Tedavi planı entegrasyonu, audit trail, personel atama — refactor yol haritasında değerlendirilebilir
+
+### `uygulama_log` Şema Doğrulaması (Subagent Review #1)
+
+- **Kolonlar (8):** id, hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar, tarih
+- **Tip:** uuid PK + 9 text + 4 numeric/timestamptz
+- **KRİTİK:** `gorev_id` kolonu YOK — `v_uyg.gorev_id` her zaman NULL
+- **Ters yönlü arama:** `gorev_log WHERE kapatan_ref = 'uygulama_log:' || id` (mevcut pattern)
+- **Ders:** `information_schema.columns` her zaman doğrula, ground truth CREATE TABLE'a güvenme
+
+### Reviewer Recipe Standardı
+
+- **Source adı:** `reviewer` (canonical)
+- **Tip:** type-aware task verifier (research/code/docs) + self-repair + auto-retry
+- **Telsiz/Blackboard mode:** var
+- **Subagent çalıştırma:** `delegate(source="reviewer", async=true)` → `load(source=task_id)` ile bekle
+- **BUG-064'te 2 tur:** Review #1 (kritik: `gorev_id` subquery + `SET search_path`), Review #2 (APPROVED 10/10)
+
+### 4 Düzeltme Süreci (deploy öncesi)
+
+| # | Düzeltme | Neden | Kaynak |
+|---|---|---|---|
+| 1 | Fonksiyon 3'te UPDATE + DELETE + `v_uyg.gorev_id` eksikti | v1 backup'tan kopyalarken mevcut yapıyı atlamışım | Subagent review |
+| 2 | 3 fonksiyona `SET search_path = public, pg_temp` | SECURITY DEFINER + schema hijacking koruması | Subagent review |
+| 3 | `v_uyg.gorev_id` → subquery (Bonus) | `uygulama_log` tablosunda `gorev_id` kolonu YOK | Subagent review |
+| 4 | Fonksiyon 3'te `guncellenen` subquery (UPDATE öncesi semantik) | ters yönlü arama (`kapatan_ref = 'uygulama_log:'||id`) | Subagent review |
+
+### Sonraki Adım: Faz 4 — 5 Test Senaryosu
+
+- 4.0 Canlı veri ID çekme (hayvan 135, E/A/C vit stokları, açık E vit görevi)
+- 4.A 135 numaralı hayvan + E Vitamini (ana test)
+- 4.B Geri alma (Bonus simetri)
+- 4.C gorev_tamamla regression
+- 4.D NULL etken_kod edge case
+- 4.E C vitamini NULL kontrolü
+
+**Kural:** Spec yazdıktıran sonra mutlaka "ground truth'ta bu pattern var mı?" kontrolü yap
+
+**Pattern 10 (YENİ - 2026-06-10):** Faz 0 doğrulaması her zaman ÖNCE yapılmalı
+- `pg_get_functiondef` ile **canlı DB'den** fonksiyon imzalarını çek (PostgREST `pg_proc`'a erişemez, `supabase_migrate` ile)
+- `ground_truth.sql` L referansları + imzalar + return type + DECLARE bölümleri + kolon varlıkları teyit et
+- `information_schema.columns` ile tablo şeması (ALTER TABLE eklenen kolonlar CREATE TABLE'da görünmez!)
+- **Kural:** Migration yazmadan önce 5-10 dakika bu doğrulamaya harca. 6 revizyon geçmişimiz var, 1 Faz 0 ile hepsi önlenebilirdi
+
+**Pattern 11 (YENİ - 2026-06-10):** Fonksiyon imza çakışması — ground truth'tan birebir kopyala
+- Spec'te "olması gereken API" yazmak YANLIŞ — gerçek imzayı yaz
+- 6 parametreli mi 11 parametreli mi: `pg_get_functiondef` çıktısı kesindir
+- JS caller sayısı (grep ile) → gerçekte kaç yerde kullanılıyor → ground truth karşılığı
+- v1 WRONG-11param migration backup'ı repoda tutuluyor (`supabase/migrations/backup/`) — gelecekte referans
 
 ### 6. "İki kapı, aynı yer" — Mimari felsefe (YENİ — Oturum 4)
 - Görevler, protokol, hızlı uygulama → hepsi `uygulama_log`'a yazar → trigger otomatik `gorev_log` kapatır
