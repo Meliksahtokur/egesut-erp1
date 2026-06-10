@@ -136,6 +136,43 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 
 **Onaylanan (subagent reviewer #2) kısımlar:** Deploy-safe SQL, NULL handling, trigger mimarisi, vaka çalışması — tüm değişiklikler implementasyona hazır.
 
+### Revizyon 7 (2026-06-10 Faz 0 doğrulama sonrası — canlı DB imzaları + kolon doğrulaması)
+
+**Faz 0 kapsamı:** `supabase_migrate({sql: "SELECT pg_get_functiondef(...)"})` ile 5 fonksiyonun canlı body'si çekildi, spec L referansları + DECLARE bölümleri + kolon varlıkları doğrulandı.
+
+**Doğrulanan (canlı DB'den):**
+
+| Fonksiyon | L (spec) | L (canlı `pg_get_functiondef`) | Uyuşuyor |
+|-----------|----------|--------------------------------|----------|
+| `_etken_kod_bul` | L9169-9224, E_VIT: L9213 | UYUŞUYOR | ✅ |
+| `hizli_uygulama` | L9256-9306 | UYUŞUYOR | ✅ |
+| `hizli_uygulama_geri_al` | L9309-9342 | UYUŞUYOR | ✅ |
+| `fn_dinle_uygulama` | L9463-9473 | UYUŞUYOR | ✅ |
+| `gorev_tamamla` | L6571-6587 + L6596 | UYUŞUYOR | ✅ |
+
+**3 kritik bulgu — Spec'te düzeltme:**
+
+1. **`v_uyg.aktif_ing` kolonu YOK** (spec §3.3 Bonus SQL'de kullanılmıştı):
+   - `v_uyg` record kolonları: `stok_id, doz, birim, rota, notlar, hayvan_id, ...` (Faz 0 doğrulaması)
+   - **Düzeltme:** `format('Hızlı Uygulama Geri Al — %s — uygulama_id=%s', v_hayvan.kupe_no, p_uygulama_id)` (sade, audit yeterli)
+
+2. **`v_hayvan` DECLARE kontrolü — Bonus SQL için**:
+   - `hizli_uygulama_geri_al` L8: `v_hayvan hayvanlar%ROWTYPE;` ✅ DECLARE mevcut
+   - `v_hayvan.kupe_no` kullanımı **güvenli**, runtime error riski YOK
+   - Spec'te zaten DECLARE kontrolü not edilmemişti — şimdi kesin
+
+3. **`fn_dinle_uygulama` ref formatı kesinleşti**:
+   - `PERFORM public._gorev_dinle(NEW.hayvan_id, NEW.etken_kod, 'uygulama_log:' || NEW.id::text);`
+   - Spec §2.1'de bu doğru yazılmıştı — sadece Faz 0 doğrulaması eklendi
+
+**Faz 1'e yansıyan değişiklikler:**
+
+- §3.2 Fix #2 `kullanici_notu` format'ı: spec §3.2 zaten `v_hayvan.kupe_no` + `v_stok.urun_adi` kullanıyordu — DOĞRU, değişiklik yok
+- §3.3 Bonus `kullanici_notu` format'ı: `format('Hızlı Uygulama Geri Al — %s — uygulama_id=%s', v_hayvan.kupe_no, p_uygulama_id)` (v_uyg.aktif_ing kaldırıldı)
+- §3.3 Bonus yerleşim yeri: L9309-9342 arası, **UPDATE gorev_log (L25-28) ile DELETE uygulama_log (L30) arası** (spec L9336-L9338 notu zaten doğruydu, Faz 0 satır numarası kesinleşti)
+
+**Spec durumu:** ✅ Rev 7 ile **deploy-ready** (tüm canlı doğrulamalar tamamlandı, kolon hatası giderildi)
+
 ---
 
 ## 1. Sorunun Doğrulanması (Kanıt)
