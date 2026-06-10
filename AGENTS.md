@@ -116,6 +116,19 @@ SQL taslağı: [sql]"
 - Raw SQL string birleştirme — YASAK (SQL injection)
 - `npx playwright test` local çalıştırma — YASAK (PRoot'ta CPU krizi yapar, CI'da otomatik çalışır)
 
+## `write` Aracı — Büyük Dosya Kısıtlaması
+
+Goose 1.31.1'de `write` aracı büyük içerik yazarken `-32602: Could not parse tool arguments` hatası verebilir.
+
+**Tetikleyici kombinasyon:** SQL `$$` dollar-quote blokları + Markdown code fence (` ``` `) + Türkçe unicode tek dosyada bir arada → JSON payload parse edilemiyor.
+
+**Çözüm — dosyayı parçalara böl:**
+1. Önce başlık + metin bölümleri (SQL kodu olmadan)
+2. Sonra SQL bloklarını ayrı `write` çağrısıyla ekle (`str_replace` veya `append` ile)
+3. Gerekirse 3. parça: test/DoD bölümleri
+
+**Alternatif:** SQL içeren spec/migration dosyalarını Claude Code'a bırak — Claude bu hatayı almaz.
+
 ## Tools-Bank MCP (51+ tool)
 
 `/root/tools-bank/mcp_server/server.py` üzerinden sunulur (FastMCP, `--stdio` modu).
@@ -187,7 +200,7 @@ Memory güncelleme: `load_skill("memory-update")` — oturum sonu kayıt workflo
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **egesut-erp1** (6099 symbols, 8969 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **egesut-erp1** (6262 symbols, 9161 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
