@@ -73,6 +73,23 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 
 **Onaylanan (reviewer) kısımlar:** Fix #1 kolon adları doğru, trigger mimarisi doğru, "İki kapı aynı yer" felsefesi doğru, 5 test senaryosu kapsamlı, risk tablosu gerçekçi, revizyon geçmişi şeffaf.
 
+### Revizyon 4 (2026-06-10 review #2 sonrası — subquery + kalıntı düzeltme)
+**Reviewer tespiti:** "§4.3 hizli_uygulama_geri_al audit INSERT — DELETE'den sonra subquery patlar" + 3 eski kolon adı kalıntısı.
+
+**Kritik düzeltme (deploy'da runtime error verirdi):**
+- `ana_hayvan_id` için `(SELECT hayvan_id FROM uygulama_log WHERE id = p_uygulama_id)` subquery'si → `v_uyg.hayvan_id` (L9317'de record'a alınmış, DELETE'den ÖNCE kullanılabilir)
+- INSERT yerleşimi: L9338 DELETE'den sonra → L9336-L9338 arası (gorev_log UPDATE'ten sonra, uygulama_log DELETE'den ÖNCE)
+- L392'deki yanlış line referansı "L9301'de SELECT ediliyor" → L9317 olarak düzeltildi
+
+**Kozmetik düzeltme (kopyala-yapıştır güvenliği):**
+- L417 §5.1: `islem_tipi='HIZLI_UYGULAMA'`, `referans_id=<...>` → `tip='HIZLI_UYGULAMA'`, `ref_id=<...>::text`, `ref_tablo='uygulama_log'`
+- L519 §7: `islem_tipi='HIZLI_UYGULAMA_GERI_AL'` → `tip='HIZLI_UYGULAMA_GERI_AL'` + yerleşim uyarısı
+- L529 §8: `islem_tipi enum'u` → `islem_log.tip` kolonu için CHECK constraint veya enum standardizasyonu
+
+**Deploy etki:** Kritik düzeltme olmadan `hizli_uygulama_geri_al` çağrısı NULL `ana_hayvan_id` ile audit kaydı oluştururdu (hayvan ilişkisi kopuk). Kozmetik düzeltmeler doküman tutarlılığı için.
+
+**Onaylanan (reviewer #2) kısımlar:** Fix #1 + Fix #2 SQL'leri deploy-ready, trigger mimarisi doğru, felsefe sağlam, test senaryoları kapsamlı, §4 başlık "11 adım" doğru.
+
 ---
 
 ## 1. Sorunun Doğrulanması (Kanıt)
@@ -360,17 +377,30 @@ Migration + ground truth **aynı commit'te**, atomik. Farklı commit'lerde olurs
 
 ### 4.3 `hizli_uygulama_geri_al` simetri sorunu
 
-`hizli_uygulama_geri_al` (L9320-9355) audit log geri alma **yapmıyor**. Spec kapsamı: audit trail'in tutarlılığı için `islem_log` kaydı da geri alınmalı.
+`hizli_uygulama_geri_al` (ground_truth L9308-9342) audit log geri alma **yapmıyor**. Spec kapsamı: audit trail'in tutarlılığı için `islem_log` kaydı da geri alınmalı.
 
-**Karar:** Bu PR'da çöz — `hizli_uygulama_geri_al`'a `islem_log` INSERT ekle (`tip='HIZLI_UYGULAMA_GERI_AL'`, `ref_id=v_uygulama_id::text`, `ref_tablo='uygulama_log'`). Aynı kolon adları + snapshot semantiği (Fix #2 ile simetrik).
+**Karar:** Bu PR'da çöz — `hizli_uygulama_geri_al`'a `islem_log` INSERT ekle (`tip='HIZLI_UYGULAMA_GERI_AL'`, `ref_id=p_uygulama_id::text`, `ref_tablo='uygulama_log'`).
 
-**Eklenecek blok (mevcut geri alma kodundan sonra, RETURN'den önce):**
+**⚠️ YERLEŞİM SIRASI (kritik):** `hizli_uygulama_geri_al` çalışma sırası (ground_truth L9308-9342):
+1. L9317: `SELECT * INTO v_uyg FROM public.uygulama_log` ← **record okundu, `v_uyg.hayvan_id` burada mevcut**
+2. L9322: `SELECT * INTO v_hayvan FROM public.hayvanlar`
+3. L9325: `stok_hareket` INSERT (iade)
+4. L9332: `gorev_log` UPDATE (tekrar aç)
+5. L9338: `DELETE FROM public.uygulama_log WHERE id = p_uygulama_id` ← **kayıt silindi**
+6. L9340: `RETURN`
+
+**Subquery YASAK:** Eğer INSERT bloğu L9338'den sonra yerleştirilir ve `(SELECT hayvan_id FROM uygulama_log WHERE id = p_uygulama_id)` kullanılırsa subquery boş döner → `ana_hayvan_id` NULL olur → audit kaydı hayvanla ilişkilendirilemez.
+
+**Çözüm:** `v_uyg.hayvan_id` (L9317'de zaten record'a alınmış) kullan. INSERT bloğunu L9336 ile L9338 arasına yerleştir (DELETE'den **ÖNCE**).
+
+**Eklenecek blok (doğru yer, doğru kaynak):**
 ```sql
 -- Audit trail simetrisi: geri alma da islem_log yazmali
+-- (DELETE'den ÖNCE, v_uyg.hayvan_id hala mevcut)
 INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
 VALUES (
   'HIZLI_UYGULAMA_GERI_AL',
-  (SELECT hayvan_id FROM public.uygulama_log WHERE id = p_uygulama_id),
+  v_uyg.hayvan_id,           -- L9317'de okunan record (DELETE'den ÖNCE)
   p_uygulama_id::text,
   'uygulama_log',
   jsonb_build_object(
@@ -384,15 +414,12 @@ VALUES (
 );
 ```
 
+**Yerleşim:** `hizli_uygulama_geri_al` içinde L9336 ile L9338 arasına (gorev_log UPDATE'ten sonra, uygulama_log DELETE'den önce).
+
 **Snapshot semantiği (Fix #2'nin tersi):**
 - `olusturulan`: boş
 - `guncellenen`: boş
-- `silinen`: geri alınan `uygulama_log` kaydı (`hizli_uygulama_geri_al` L9336'da `DELETE FROM public.uygulama_log` yapıyor)
-
-**Not:** `ana_hayvan_id` için subquery gerekli — `hizli_uygulama_geri_al` mevcut implementasyonunda `v_hayvan` record'u zaten L9301'de SELECT ediliyor, onu doğrudan kullanmak daha temiz:
-```sql
-ana_hayvan_id => v_hayvan.id  -- zaten L9301'de SELECT edildi
-```
+- `silinen`: geri alınan `uygulama_log` kaydı (L9338 DELETE)
 
 **Audit geri alma (ileride):** Bu kayıtların da geri alınması gerekebilir → `islem_log.durum='geri_alindi'` kolonu kullanılabilir. Bu PR kapsamı dışı.
 
@@ -414,7 +441,7 @@ ana_hayvan_id => v_hayvan.id  -- zaten L9301'de SELECT edildi
 **Beklenen sonuç:**
 - `uygulama_log`'a yeni kayıt, `etken_kod='E_VIT'` (artık NULL değil) ✅
 - `fn_dinle_uygulama` trigger otomatik çalışır → `_gorev_dinle` → `gorev_log` UPDATE → `tamamlandi=true`, `kapatan_ref='uygulama_log:<yeni_id>'` ✅
-- `islem_log`'a yeni kayıt, `islem_tipi='HIZLI_UYGULAMA'`, `referans_id=<uygulama_log_id>` ✅
+- `islem_log`'a yeni kayıt, `tip='HIZLI_UYGULAMA'`, `ref_id=<uygulama_log_id>::text`, `ref_tablo='uygulama_log'` ✅
 - `stok_hareket`'e yeni kayıt ✅
 - UI "tamamlandı" gösterir (hem görevler sekmesi hem detaylı geçmiş) ✅
 - `protokol_eksik_tara` artık 135 için E vitamini "eksik" göstermez ✅
@@ -516,7 +543,7 @@ ana_hayvan_id => v_hayvan.id  -- zaten L9301'de SELECT edildi
 | 135 için geçmiş orphan kayıtlar (etken_kod NULL) | Kesin | Düşük | Yeni uygulama bunları etkilemez, orphan kalır — ayrı temizlik task'ı |
 | D vitamini preparatı girilirse yanlış eşleşme | Düşük | Orta | `v_class_name ILIKE '%Yağda Eriyen%` EKLENMEDİ (review feedback) |
 | NULL etken_kod'da görev kapatılmıyor (yanlış görev kapatma riski alınmadı) | Kesin | Düşük | Kasıtlı — Senaryo D testi, güvenli tarafta kalmak |
-| `hizli_uygulama_geri_al` audit simetrisi unutulursa log tutarsızlığı | Orta | Düşük | Bu PR'da 1 satır ekle (`islem_tipi='HIZLI_UYGULAMA_GERI_AL'`) |
+| `hizli_uygulama_geri_al` audit simetrisi unutulursa log tutarsızlığı | Orta | Düşük | Bu PR'da 1 satır ekle (`tip='HIZLI_UYGULAMA_GERI_AL'`, `v_uyg.hayvan_id` kullan, DELETE'den önce) |
 | JS tarafında race condition (kullanıcı çift tıklama) | Düşük | Düşük | `_gorev_dinle` `ORDER BY hedef_tarih LIMIT 1` ile atomik, çift tetikleme görevi tekrar kapatmaya çalışır ama `tamamlandi=true` zaten |
 
 ---
@@ -526,7 +553,7 @@ ana_hayvan_id => v_hayvan.id  -- zaten L9301'de SELECT edildi
 1. **`gorev_log` oluşturulurken `etken_kod` her zaman set edilsin** — şu an NULL olarak oluşabiliyor, bu da fix'in tam faydasını sınırlıyor (135'in tüm görevlerinde `etken_kod` NULL)
 2. **Orphan `uygulama_log` kayıtları için temizlik scripti** — 135'teki 04:30 ve 04:50 kayıtları gibi etken_kod NULL olan kayıtlar raporlanmalı
 3. **`_etken_kod_bul` fonksiyonu diğer vitaminler için de genişletilebilir** — D vitamini, A vitamini, K vitamini preparatları için
-4. **Tüm uygulama kapıları (hizli, drug_admin, vaccination) için audit trail standardizasyonu** — `islem_tipi` enum'u + UI'da audit log görüntüleme
+4. **Tüm uygulama kapıları (hizli, drug_admin, vaccination) için audit trail standardizasyonu** — `islem_log.tip` kolonu için CHECK constraint veya enum standardizasyonu + UI'da audit log görüntüleme
 5. **"İki kapı, aynı yer" görselleştirmesi** — UI'da hangi uygulama hangi trigger'dan geçti, hangi görevi neden kapattı — debug için
 
 ---
