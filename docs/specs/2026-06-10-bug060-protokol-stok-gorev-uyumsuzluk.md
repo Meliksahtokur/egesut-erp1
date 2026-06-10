@@ -115,6 +115,27 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 
 **Onaylanan (subagent reviewer) kısımlar:** Fix #1 + Fix #2 + bonus Fix SQL'leri deploy-ready, "İki kapı aynı yer" felsefesi sağlam, 5 test senaryosu kapsamlı, geri alma simetrisi Rev 4'te düzeltildi.
 
+### Revizyon 6 (2026-06-10 subagent reviewer #2 sonrası — line referans düzeltmeleri)
+
+**Subagent reviewer #2 sonucu:** APPROVED — tek minor not: spec boyunca line referansları 2-3 satır kayık.
+
+**Ground truth'tan doğrulanan gerçek satır numaraları:**
+
+| Referans | Eski (yanlış) | Yeni (doğru) |
+|----------|---------------|--------------|
+| `_etken_kod_bul` E_VIT satırı | L9210 | **L9213** |
+| `_etken_kod_bul` fonksiyon tanımı | (yok) | **L9169-9224** |
+| `hizli_uygulama` fonksiyon | L9256-9298 | **L9256-9306** |
+| `hizli_uygulama_geri_al` | L9308-9342 / L9320-9355 (3 farklı) | **L9309-9342** (tutarlı) |
+| `fn_dinle_uygulama` trigger | L9463-9470 | **L9463-9473** |
+| `gorev_tamamla` snapshot pattern'i | L6596 | **L6571-6587** (daha spesifik) |
+
+**Düzeltilen yerler:** §0 (5 adet), §1 kanıt (2), §2 kök neden (3), §3 çözüm (4), §4 uygulama planı (1), §4.3 geri alma (5), §5 senaryolar (0 — fonksiyon adı yeterli), §6 kabul kriterleri (1), §9 referanslar (3).
+
+**Kontrol yöntemi:** `grep -nE "L[0-9]{4}" supabase/migrations/99999999999999_ground_truth.sql` ile ground truth'tan her referans teyit edildi.
+
+**Onaylanan (subagent reviewer #2) kısımlar:** Deploy-safe SQL, NULL handling, trigger mimarisi, vaka çalışması — tüm değişiklikler implementasyona hazır.
+
 ---
 
 ## 1. Sorunun Doğrulanması (Kanıt)
@@ -137,7 +158,7 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 - İkisi de aynı RPC'yi çağırır: `rpc('hizli_uygulama', {...})`
 - RPC (`ground_truth.sql:9256-9298`):
   1. `uygulama_log` INSERT
-  2. **`fn_dinle_uygulama` trigger tetiklenir** (L9463-9470) — ama `IF NEW.etken_kod IS NOT NULL` koşulu var
+  2. **`fn_dinle_uygulama` trigger tetiklenir** (L9463-9473) — ama `IF NEW.etken_kod IS NOT NULL` koşulu var
   3. `stok_hareket` INSERT (stok düşer) ✅
   4. Stok kalan hesapla, return OK
 
@@ -168,7 +189,7 @@ Bu bug **farklı** — kullanıcı aynı "60" numarasını kendi sayacıyla verd
 **Dosya:** `supabase/migrations/99999999999999_ground_truth.sql`
 **Satır:** 9169-9224
 
-**Mevcut kod (L9210):**
+**Mevcut kod (L9213):**
 ```sql
 IF v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%' THEN RETURN 'E_VIT';
 ```
@@ -186,7 +207,7 @@ IF v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE
 
 **İlk yazılan spec'te hatalı varsayım:** "`hizli_uygulama` `gorev_log`'a hiç dokunmuyor"
 
-**Gerçek mimari (ground truth'tan doğrulandı, L9463-9470):**
+**Gerçek mimari (ground truth'tan doğrulandı, L9463-9473):**
 ```sql
 CREATE OR REPLACE FUNCTION public.fn_dinle_uygulama()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -213,7 +234,7 @@ CREATE TRIGGER trg_dinle_uygulama AFTER INSERT ON public.uygulama_log FOR EACH R
 
 ### 2.3 `_gorev_dinle` simetri kontrolü (doğrulandı)
 
-`hizli_uygulama_geri_al` (ground truth L9320-9355) zaten `kapatan_ref` üzerinden görevi geri açıyor:
+`hizli_uygulama_geri_al` (ground truth L9309-9342) zaten `kapatan_ref` üzerinden görevi geri açıyor:
 ```sql
 UPDATE public.gorev_log SET tamamlandi = false, tamamlanma_tarihi = NULL, kapatan_ref = NULL
 WHERE kapatan_ref = 'uygulama_log:' || p_uygulama_id::text;
@@ -253,10 +274,10 @@ Kim `uygulama_log`'a yazarsa yazsın (görevler sekmesi, hızlı uygulama, tedav
 
 ### 3.1 Fix #1: `_etken_kod_bul` — E_VIT eşleşmesi
 
-**Dosya:** `supabase/migrations/99999999999999_ground_truth.sql` L9210
+**Dosya:** `supabase/migrations/99999999999999_ground_truth.sql` L9169-9224 (fonksiyon tanımı), E_VIT satırı L9213
 **Migration:** `supabase/migrations/20260610000001_bug064_etken_kod_vitamin_audit.sql` (TEK DOSYA, 2 fix birleşik)
 
-**ESKİ (L9210):**
+**ESKİ (L9213):**
 ```sql
 IF v_class_name ILIKE '%E Vit%' OR v_stok_ad ILIKE '%yeldif%' OR v_stok_ad ILIKE '%e vit%' THEN RETURN 'E_VIT';
 ```
@@ -280,7 +301,7 @@ THEN RETURN 'E_VIT'; END IF;
 
 ### 3.2 Fix #2: `hizli_uygulama` RPC'ye `islem_log` INSERT (audit trail)
 
-**Dosya:** `supabase/migrations/99999999999999_ground_truth.sql` L9256-9298
+**Dosya:** `supabase/migrations/99999999999999_ground_truth.sql` L9256-9306 (fonksiyon tanımı)
 
 **Sorun:** `gorev_tamamla` her durumda `islem_log` yazıyor, ama `hizli_uygulama` yazmıyor → hızlı uygulamalar audit trail'siz kalıyor → takip boşluğu.
 
@@ -368,7 +389,7 @@ Kullanıcı: "Hizli uygulama" butonu → CAROFERTIN-E → Kaydet
 | # | Adım | Araç | Süre |
 |---|------|------|------|
 | 1 | Migration dosyasını yaz (`20260610000001_bug064_etken_kod_vitamin_audit.sql`) — 2 fix birleşik | `write` (parçalı) | 3 dk |
-| 2 | Ground truth'taki `_etken_kod_bul` L9210 güncelle | `edit` + git | 2 dk |
+| 2 | Ground truth'taki `_etken_kod_bul` L9213 güncelle | `edit` + git | 2 dk |
 | 3 | Ground truth'taki `hizli_uygulama` RPC'ye `islem_log` INSERT ekle (stok_hareket'ten önce) | `edit` + git | 2 dk |
 | 4 | Tek atomik commit (migration + ground truth) | `git add` + `commit` | 1 dk |
 | 5 | `supabase_migrate` ile canlı DB'ye deploy et | MCP | 1 dk |
@@ -402,11 +423,11 @@ Migration + ground truth **aynı commit'te**, atomik. Farklı commit'lerde olurs
 
 ### 4.3 `hizli_uygulama_geri_al` simetri sorunu
 
-`hizli_uygulama_geri_al` (ground_truth L9308-9342) audit log geri alma **yapmıyor**. Spec kapsamı: audit trail'in tutarlılığı için `islem_log` kaydı da geri alınmalı.
+`hizli_uygulama_geri_al` (ground_truth L9309-9342) audit log geri alma **yapmıyor**. Spec kapsamı: audit trail'in tutarlılığı için `islem_log` kaydı da geri alınmalı.
 
 **Karar:** Bu PR'da çöz — `hizli_uygulama_geri_al`'a `islem_log` INSERT ekle (`tip='HIZLI_UYGULAMA_GERI_AL'`, `ref_id=p_uygulama_id::text`, `ref_tablo='uygulama_log'`).
 
-**⚠️ YERLEŞİM SIRASI (kritik):** `hizli_uygulama_geri_al` çalışma sırası (ground_truth L9308-9342):
+**⚠️ YERLEŞİM SIRASI (kritik):** `hizli_uygulama_geri_al` çalışma sırası (ground_truth L9309-9342):
 1. L9317: `SELECT * INTO v_uyg FROM public.uygulama_log` ← **record okundu, `v_uyg.hayvan_id` burada mevcut**
 2. L9322: `SELECT * INTO v_hayvan FROM public.hayvanlar`
 3. L9325: `stok_hareket` INSERT (iade)
@@ -542,7 +563,7 @@ VALUES (
 ## 6. Kabul Kriterleri
 
 - [ ] Migration dosyası `supabase/migrations/20260610000001_bug064_etken_kod_vitamin_audit.sql` yazıldı
-- [ ] Ground truth'taki `_etken_kod_bul` L9210 güncellendi (aynı commit)
+- [ ] Ground truth'taki `_etken_kod_bul` L9213 güncellendi (aynı commit)
 - [ ] Ground truth'taki `hizli_uygulama` RPC'ye `islem_log` INSERT eklendi (aynı commit)
 - [ ] Ground truth'taki `hizli_uygulama_geri_al` RPC'ye `'HIZLI_UYGULAMA_GERI_AL'` audit simetrisi eklendi (aynı commit, opsiyonel ama önerilir)
 - [ ] `supabase_migrate` ile canlı DB'ye deploy edildi (constraint fail yok)
