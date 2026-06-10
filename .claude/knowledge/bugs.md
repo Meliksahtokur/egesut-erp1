@@ -51,9 +51,10 @@ Orkestratör oturum açılışında bu dosyayı okur ve briefing'e dahil eder.
   - JS handler redirect (görev bul → gorev_tamamla) YAPILMAYACAK (yanlış mimari — race condition, mimari bozulma)
 - **Mimari felsefe:** "İki kapı, aynı yer" — trigger mimarisi (`fn_dinle_uygulama` L9463-9473 + `_gorev_dinle` L9224-9251) DB transaction içinde atomik. JS'i bu döngüye sokma.
 - **Test senaryoları:** A) 135 normal akış, B) geri alma simetrisi, C) gorev_tamamla regression, D) NULL etken_kod edge case, E) C vitamini NULL kalır (yanlış eşleşme önleme)
-- **İlgili spec:** `docs/specs/2026-06-10-bug060-protokol-stok-gorev-uyumsuzluk.md` (665 satır, 6 revizyon geçmişi, Yaklaşım 2, subagent APPROVED)
-- **İlgili plan:** `.claude/plans/2026-06-10-bug064-impl.md` (210 satır, 5 faz: Doğrulama → Yazım → Ground Truth → Deploy → Test → Commit, ~42 dk)
-- **İlgili commit'ler:** spec Rev 6 `6d16040`, plan + memory `1498903` (push edildi, main, senkron)
+- **İlgili spec:** `docs/specs/2026-06-10-bug060-protokol-stok-gorev-uyumsuzluk.md` (705 satır, **7 revizyon geçmişi**: Rev 6 line referans + Rev 7 Faz 0 doğrulama + v_uyg.aktif_ing fix, Yaklaşım 2, subagent + Faz 0 APPROVED)
+- **İlgili plan:** `.claude/plans/2026-06-10-bug064-impl.md` (213 satır, Rev 7 düzeltmesi dahil, 5 faz: Doğrulama → Yazım → Ground Truth → Deploy → Test → Commit, ~37 dk kaldı Faz 0 sonrası)
+- **Faz 0 bulguları:** 5 fonksiyon `pg_get_functiondef` ile canlıdan çekildi (PostgREST `pg_proc`'a erişemez → `supabase_migrate` Management API). `v_hayvan` L8'de DECLARE mevcut, `v_uyg.aktif_ing` kolonu YOK, 5/5 L referansı uyuşuyor
+- **İlgili commit'ler:** spec Rev 7 `8c42ccd` (push edildi, main, senkron)
 
 ## [2026-06-08] BUG-054 Doğum sonrası laktasyon padok geçişi
 - Kaynak: kullanıcı

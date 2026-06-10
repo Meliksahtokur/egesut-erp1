@@ -40,20 +40,21 @@
 
 ---
 
-## 📊 Mevcut Durum (2026-06-10 18:12 — 6. oturum güncellemesi)
+## 📊 Mevcut Durum (2026-06-10 18:30 — 7. oturum güncellemesi)
 
 | Öğe | Durum |
 |---|---|
-| Aktif bug | **0** (BUG-064 spec FINAL, fix uygulanmadı) |
-| BUG-064 spec | ✅ **665 satır, 6 revizyon geçmişi, subagent tarafından onaylandı** |
-| BUG-064 plan | ✅ **210 satır, `.claude/plans/2026-06-10-bug064-impl.md`, 5 faz (Doğrulama → Yazım → Ground Truth → Deploy → Test → Commit)** |
-| BUG-064 fix | ⏳ Uygulanmadı, sırada (~42 dk, 5 senaryo dahil) |
+| Aktif bug | **0** (BUG-064 spec FINAL Rev 7, fix uygulanmadı) |
+| BUG-064 spec | ✅ **705 satır, 7 revizyon geçmişi, subagent + Faz 0 doğrulaması onaylandı** |
+| BUG-064 plan | ✅ **213 satır, Rev 7 düzeltmesi (v_uyg.aktif_ing kaldırıldı, v_hayvan güvenli)** |
+| BUG-064 Faz 0 | ✅ **Doğrulama tamamlandı** — 5 fonksiyon `pg_get_functiondef` ile çekildi, 5/5 L uyuşuyor, kolon varlıkları doğrulandı |
+| BUG-064 fix | ⏳ Uygulanmadı, Faz 1 sırada (migration yazımı, ~10 dk) |
 | Faz A.1 | ✅ Tamamlandı |
 | Faz A.1b backlog | 9 satır `toISOString()` refactor (low risk) |
 | Faz A.2+ | Planlanmadı |
 | ReFactorRoadmap.md | Okunmadı |
-| Son commit | `1498903` (main, push edildi, senkron doğrulandı) |
-| Bu oturumda yapılan | İmplementasyon planı yazımı (Faz 0-5, hibrit araç seti, risk tablosu, kabul kriterleri) |
+| Son commit | `8c42ccd` (main, push edildi, senkron doğrulandı) |
+| Bu oturumda yapılan | Reviewer 3 notu düzeltme (3 eleştiri → 1 Rev 7) + Faz 0 doğrulama (5 fonksiyon) + plan dosyası v_uyg.aktif_ing fix |
 
 ---
 
@@ -105,6 +106,18 @@
 - **Kazanım:** 5 dakika doğrulama, potansiyel "yanlış satıra uyguladım" hatasını sıfırlar (6 revizyonda düzeltilen line referansları tekrar kayarsa tüm test senaryoları geçersiz olur)
 - **Plan dosyası kalıbı:** `.claude/plans/<tarih>-<bug>-impl.md` (210 satır, 5 faz + riskler + kabul kriterleri)
 - **Referans:** `.claude/plans/2026-06-10-bug064-impl.md`
+
+### 10. `pg_get_functiondef` PostgREST kısıtı (YENİ — Oturum 7, Faz 0 doğrulaması)
+- `supabase_query` `pg_proc`, `pg_get_functiondef` gibi sistem kataloglarına **erişemez** (PostgREST sadece public schema)
+- **Doğru araç:** `supabase_migrate({sql: "SELECT pg_get_functiondef('func'::regproc)"})` (Management API, DDL yetkisi var)
+- **Kazanım:** Faz 0'da `v_hayvan` DECLARE kontrolü + `v_uyg.aktif_ing` kolon varlığı + trigger ref format doğrulandı
+- **Bulgu:** Spec'te `v_uyg.aktif_ing` hiç yoktu (zaten doğruydu), ama **plan dosyamda** vardı — Rev 7 ile düzeltildi
+
+### 11. Kolon varlığı doğrulama — subagent uyarısı (YENİ — Oturum 7)
+- Kullanıcı plan review'inde 3 sorun buldu: (1) `pg_proc` PostgREST erişemez, (2) `v_hayvan` DECLARE kontrolü, (3) test UUID'leri placeholder
+- **Kural:** Spec/plan yazarken `format(...)` içinde kullanılan her kolon için `pg_get_functiondef` ile DECLARE + record kolon listesi doğrula
+- **Pratik kalıp:** Subagent veya kullanıcı review'i → **3 eleştiri = 1 spec revizyonu** (Rev 7 standardı)
+- **Araç:** Plan dosyasında `⚠️ Rev 7 düzeltme` notu ile inline gerekçe bırak
 
 ---
 
@@ -158,14 +171,17 @@
 ## 📋 Açılışta Yapılacaklar (Sıralı)
 
 ### Seçenek A — BUG-064 fix'i uygula (önerilen)
-- **Süre:** ~42 dakika (önceden 20 dk tahmin edilmişti, plan detaylandırınca 5 senaryo dahil ~42 dk)
-- **Plan:** `.claude/plans/2026-06-10-bug064-impl.md` (210 satır, 5 faz + riskler + kabul kriterleri)
-- **Adımlar:**
-  0. **Faz 0 (5 dk):** `pg_proc` + `pg_get_functiondef` ile canlı DB'den 5 fonksiyonun imzasını çek, spec L referanslarıyla karşılaştır
+- **Süre:** ~37 dakika kaldı (Faz 0 = 5 dk tamamlandı, kalan: Faz 1-5 = ~32 dk)
+- **Plan:** `.claude/plans/2026-06-10-bug064-impl.md` (213 satır, Rev 7 düzeltmesi dahil)
+- **Faz 0 tamamlandı:** 5 fonksiyon `pg_get_functiondef` ile çekildi (PostgREST `pg_proc`'a erişemez, Management API ile çalışıyor). Bulgular:
+  - 5/5 L referansı uyuşuyor ✅
+  - `v_hayvan` DECLARE L8'de mevcut (`hizli_uygulama_geri_al`) ✅
+  - `v_uyg.aktif_ing` kolonu YOK → plan dosyası Rev 7 ile düzeltildi ✅
+- **Kalan adımlar:**
   1. **Faz 1 (10 dk):** Migration yaz + SQL syntax dry-run
   2. **Faz 2 (5 dk):** Ground truth senkron + `git diff` kontrol
   3. **Faz 3 (2 dk):** `supabase_migrate` ile deploy
-  4. **Faz 4 (15 dk):** 5 test senaryosu (A: 135 + E vit, B: geri al simetri, C: regression, D: NULL edge, E: C vit NULL)
+  4. **Faz 4 (15 dk):** 5 test senaryosu (A: 135 + E vit, B: geri al simetri, C: regression, D: NULL edge, E: C vit NULL) + Adım 4.0 canlı ID çekme
   5. **Faz 5 (5 dk):** Commit + push + memory + handoff + bugs.md güncelle
 
 ### Seçenek B — Faz A.2+ planlaması
