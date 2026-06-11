@@ -180,138 +180,22 @@ Spec dogrulandi, migration'a geciyorum. Onay?"
 
 ## Faz 1: Schema Migration (DDL)
 
-> **Hedef:** 1 yeni tablo + 3 ALTER kolonu + 5 partial index. Migration idempotent (IF NOT EXISTS / IF EXISTS).
+> **Detay:** [`docs/superpowers/plans/2026-06-11-faz-1-schema-migration.md`](2026-06-11-faz-1-schema-migration.md) (210 satır — review düzeltmeleri uygulanmış, `faz-1-schema-migration.md` planı kullanılacak).
+> 
+> **Hedef:** 1 yeni tablo (`treatment_day_uygulamalar`) + 4 ALTER kolonu + 5 partial index. Migration idempotent (IF NOT EXISTS her yerde).
+> 
+> **Stratejik kararlar (Faz 0 + Faz 1 review):**
+> - `sira_no` ve `stok_hareket_ref` **YOK** — saat bazlı + mevcut `referans_tipi` pattern'i
+> - UNIQUE: `(treatment_day_id, planned_time, stok_id)` — aynı saatte farklı ilaç olabilir
+> - `seans_sayisi` NULL izni VAR — eski tek-seans günler geriye uyumlu
+> - `BEGIN/COMMIT` YOK — `supabase_migrate` zaten transaction sarıyor
+> - Kolon hiyerarşisi: `treatment_days.planned_time` (gün) ↔ `treatment_day_uygulamalar.planned_time` (seans) — detay plan'da
 
-- [ ] **Step 1.1: Migration dosyasini olustur**
+- [ ] **Step 1.1: Migration dosyasi hazir**
 
-```bash
-touch supabase/migrations/20260611000001_bug059_treatment_sessions.sql
-```
+`supabase/migrations/20260611000001_bug059_treatment_sessions.sql` (160 satir) — yazildi, deploy yok.
 
-- [ ] **Step 1.2: SQL'i dosyaya yaz (Parcali — write araci buyuk dosyada parse hatasi verir)**
-
-**Parca 1: Header + CREATE TABLE + CREATE INDEX (~80 satir)**
-
-```sql
--- 2026-06-11: BUG-059 — Saat bazli tedavi seans destegi
--- Yeni tablo: treatment_day_uygulamalar (seans bazli detay)
--- Eski tablolar: kolon ekleme (geriye uyumlu)
--- Spec: docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md
-
-BEGIN;
-
--- 1. YENI TABLO: treatment_day_uygulamalar
-CREATE TABLE IF NOT EXISTS public.treatment_day_uygulamalar (
-  id                          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  treatment_day_id            uuid NOT NULL REFERENCES public.treatment_days(id) ON DELETE CASCADE,
-  case_id                     uuid NOT NULL REFERENCES public.cases(id) ON DELETE CASCADE,
-
-  -- SEANS BILGISI
-  sira_no                     smallint NOT NULL CHECK (sira_no > 0),
-  planned_time                time NOT NULL,
-  planned_date                date NOT NULL,
-
-  -- ILAC
-  stok_id                     text REFERENCES public.stok(id),
-  drug_product_id             uuid REFERENCES public.drug_products(id),
-  dose                        numeric NOT NULL CHECK (dose > 0),
-  unit                        text NOT NULL,
-  route                       text CHECK (route IS NULL OR route IN ('IM','IV','SC','PO','Topikal','Intrauterin')),
-
-  -- DONE STATE
-  uygulama_tamamlandi_at      timestamptz,
-  uygulayan                   text,
-  uygulama_notu               text,
-  uygulanmadi                 boolean DEFAULT false,
-  iptal_nedeni                text,
-
-  -- STOK LEDGER REFERANSI (iptalde kullanilacak) — K1: text FK
-  stok_hareket_ref            text REFERENCES public.stok_hareket(id) ON DELETE SET NULL,
-
-  -- AUDIT
-  created_at                  timestamptz DEFAULT now(),
-  updated_at                  timestamptz DEFAULT now(),
-
-  UNIQUE(treatment_day_id, sira_no),
-  -- O-v3-1: 1 seans = 1 ilac, farkli ilaclar icin 5dk aralik ile saat girilir
-  UNIQUE(treatment_day_id, planned_time)
-);
-
-CREATE INDEX IF NOT EXISTS tdu_day_id_idx    ON public.treatment_day_uygulamalar(treatment_day_id);
-CREATE INDEX IF NOT EXISTS tdu_case_date_idx ON public.treatment_day_uygulamalar(case_id, planned_date);
-CREATE INDEX IF NOT EXISTS tdu_open_idx      ON public.treatment_day_uygulamalar(case_id)
-  WHERE uygulama_tamamlandi_at IS NULL AND uygulanmadi = false;
-CREATE INDEX IF NOT EXISTS tdu_late_idx      ON public.treatment_day_uygulamalar(planned_date, planned_time)
-  WHERE uygulama_tamamlandi_at IS NULL AND uygulanmadi = false;
-
-COMMENT ON TABLE public.treatment_day_uygulamalar
-  IS 'Tedavi gunu alt seanslari. Saat + ilac + doz + yol, gercek zamanli zincir mimarisi. NULL seans = eski tek-seans davranis.';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.sira_no
-  IS 'Gun icinde 1, 2, 3... sirasi';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.planned_time
-  IS '08:00, 16:00, 24:00 gibi gercek saat';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulama_tamamlandi_at
-  IS 'NULL = henuz yapilmadi, now() = yapildi';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulanmadi
-  IS 'true = "yapilmadi, stok iade"';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.stok_hareket_ref
-  IS 'K1: stok_hareket.id text, FK text';
-```
-
-**Parca 2: ALTER kolonlari (~35 satir)**
-
-```sql
--- 2. MEVCUT treatment_days EK KOLON
-ALTER TABLE public.treatment_days
-  ADD COLUMN IF NOT EXISTS seans_sayisi smallint DEFAULT 1;
-COMMENT ON COLUMN public.treatment_days.seans_sayisi
-  IS 'Bu gündeki planlanan seans sayisi (1 = eski davranis, N = yeni cok seans)';
-
--- 3. MEVCUT gorev_log EK KOLONLAR
-ALTER TABLE public.gorev_log
-  ADD COLUMN IF NOT EXISTS seans_admin_id uuid
-    REFERENCES public.treatment_day_uygulamalar(id) ON DELETE SET NULL;
-COMMENT ON COLUMN public.gorev_log.seans_admin_id
-  IS 'Bu gorevi hangi seans tetikledi? NULL = gun seviyesi (eski davranis)';
-
-ALTER TABLE public.gorev_log
-  ADD COLUMN IF NOT EXISTS hedef_saat time;
-COMMENT ON COLUMN public.gorev_log.hedef_saat
-  IS 'Seansin planlanan saati (sadece TEDAVI_SEANS icin)';
-
--- 4. K5: drug_administrations'a seans baglantisi
-ALTER TABLE public.drug_administrations
-  ADD COLUMN IF NOT EXISTS seans_admin_id uuid
-    REFERENCES public.treatment_day_uygulamalar(id) ON DELETE SET NULL;
-COMMENT ON COLUMN public.drug_administrations.seans_admin_id
-  IS 'Bu ilac hangi seansa ait? NULL = eski tek-seans akis (geriye uyumlu)';
-
-CREATE INDEX IF NOT EXISTS da_seans_admin_id_idx
-  ON public.drug_administrations(seans_admin_id) WHERE seans_admin_id IS NOT NULL;
-
-COMMIT;
-```
-
-**Yazim prosedurü** (Opus #16 fix: write araci dosya boyutundan bagimsiz calisir, bu uyari gereksiz):
-
-```bash
-# Tek seferde write ile yaz (~150 satir migration sinir altinda)
-# FK + index cok satir kapliyor ama write parse etmez
-# Eger olurda hata gelirse edit ile str_replace yap
-```
-
-- [ ] **Step 1.3: Dosya butunlugunu dogrula**
-
-```bash
-wc -l supabase/migrations/20260611000001_bug059_treatment_sessions.sql
-head -5 supabase/migrations/20260611000001_bug059_treatment_sessions.sql
-tail -3 supabase/migrations/20260611000001_bug059_treatment_sessions.sql
-grep -c "COMMIT;" supabase/migrations/20260611000001_bug059_treatment_sessions.sql
-```
-
-Beklenen: ~120-150 satir, basta tarihli yorum, sonda `COMMIT;` (1 adet).
-
-- [ ] **Step 1.4: Migration'i canlida calistir**
+- [ ] **Step 1.2: Migration'i canlida calistir** (DEPLOY — kullanici onayi sonrasi)
 
 Arac: `supabase_migrate` (DDL icin tek yetkili yol — anon key yapamaz)
 
@@ -324,24 +208,22 @@ Beklenen: Basari mesaji, hata yok. Hata varsa:
 - "column already exists" -> ADD COLUMN IF NOT EXISTS zaten var, sorun yok
 - "permission denied" -> Management API token suresi dolmus, yenile
 
-- [ ] **Step 1.5: Semayi dogrula (live DB drift kontrolu)**
-
-Arac: `supabase_query`
+- [ ] **Step 1.3: Semayi dogrula (live DB drift kontrolu)**
 
 ```sql
 SELECT table_name, column_name, data_type
 FROM information_schema.columns
 WHERE table_schema = 'public' AND (
-  (table_name = 'treatment_day_uygulamalar' AND column_name IN ('id', 'sira_no', 'planned_time', 'stok_hareket_ref'))
+  (table_name = 'treatment_day_uygulamalar' AND column_name IN ('id', 'planned_time', 'gerceklesme_saati', 'stok_id'))
   OR (table_name = 'treatment_days' AND column_name = 'seans_sayisi')
   OR (table_name = 'gorev_log' AND column_name IN ('seans_admin_id', 'hedef_saat'))
   OR (table_name = 'drug_administrations' AND column_name = 'seans_admin_id')
 ) ORDER BY table_name, column_name;
 ```
 
-Beklenen: 8 satir (1 yeni tablo icin 4 kolon, 4 ALTER kolonu).
+Beklenen: 8 satir (1 yeni tablo icin 4 kolon, 4 ALTER kolonu). `sira_no` ve `stok_hareket_ref` **OLMAMALI** (yeni karar).
 
-- [ ] **Step 1.6: Index kontrolu**
+- [ ] **Step 1.4: Index kontrolu**
 
 ```sql
 SELECT indexname FROM pg_indexes
@@ -354,31 +236,43 @@ WHERE schemaname = 'public' AND tablename IN (
 
 Beklenen: 5 satir.
 
-- [ ] **Step 1.7: UNIQUE constraint kontrolu (1 seans = 1 ilac)**
+- [ ] **Step 1.5: UNIQUE constraint kontrolu (stok_id dahil)**
 
 ```sql
-SELECT conname, contype FROM pg_constraint
+SELECT conname, pg_get_constraintdef(oid) AS def
+FROM pg_constraint
 WHERE conrelid = 'public.treatment_day_uygulamalar'::regclass
   AND contype = 'u'
 ORDER BY conname;
 ```
 
-Beklenen: 2 satir (`treatment_day_uygulamalar_treatment_day_id_sira_no_key`, `treatment_day_uygulamalar_treatment_day_id_planned_time_key`).
+Beklenen: 1 satir — `UNIQUE (treatment_day_id, planned_time, stok_id)`.
 
-- [ ] **Step 1.8: Geriye uyumluluk SELECT kontrolu (smoke test yok — kullanici canlida test edecek)**
+- [ ] **Step 1.6: seans_sayisi NULL izni kontrolu**
 
 ```sql
--- Mevcut 5 vakayi oku, seans_sayisi default 1 olmali
+SELECT pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conrelid = 'public.treatment_days'::regclass
+  AND conname = 'treatment_days_seans_sayisi_check';
+```
+
+Beklenen: `CHECK ((seans_sayisi IS NULL) OR (seans_sayisi > 0))` — NULL izni VAR.
+
+- [ ] **Step 1.7: Geriye uyumluluk SELECT kontrolu (smoke test)**
+
+```sql
+-- Mevcut tedavi gunlerini oku, seans_sayisi default YOK (eski satirlar NULL = geriye uyumluluk)
 SELECT id, seans_sayisi, planned_time
 FROM public.treatment_days
 ORDER BY id LIMIT 5;
 ```
 
-Beklenen: Tum satirlar `seans_sayisi=1` (default migration ile doldu). Sadece SELECT — migration'i bozabilecek bir islem YAPMA.
+Beklenen: Tum satirlar `seans_sayisi=NULL` (eski gunler, default YOK — geriye uyumluluk). Sadece SELECT — migration'i bozabilecek bir islem YAPMA.
 
-- [ ] **Step 1.9: Commit (YAPMA — D1 fix)**
+- [ ] **Step 1.8: Commit + Push** (Faz 1 + Faz 2 birlikte tek commit — D1 fix)
 
-> **D1 fix:** DDL ve RPC'ler AYNI migration dosyasinda (Faz 1 + Faz 2 birlikte yazildi). Cift commit YAPMA, sadece Faz 2 sonunda TEK commit at. Step 2.12'ye bak. (D-v3-1 fix)
+> **D1 fix:** DDL ve RPC'ler tek commit'te gidecek (migration dosyasi tamamlandiginda). Erken commit YAPMA. Step 2.12'ye bak.
 
 ---
 
@@ -1075,7 +969,7 @@ SELECT column_name, data_type FROM information_schema.columns
 WHERE table_name = 'treatment_day_uygulamalar'
 ORDER BY ordinal_position;
 ```
-Beklenen: id, treatment_day_id, case_id, sira_no, planned_time, planned_date, stok_id, drug_product_id, dose, unit, route, uygulama_tamamlandi_at, uygulama_notu, uygulanmadi, stok_hareket_ref, created_at, updated_at (18 kolon).
+Beklenen: id, treatment_day_id, case_id, planned_time, planned_date, stok_id, drug_product_id, dose, unit, route, uygulama_tamamlandi_at, uygulayan, uygulama_notu, gerceklesme_saati, uygulanmadi, iptal_nedeni, created_at, updated_at (18 kolon — `sira_no` ve `stok_hareket_ref` YOK, `uygulayan` + `gerceklesme_saati` + `iptal_nedeni` VAR).
 
 ### 6.1 — RPC Basari Olcutu (5 RPC `rpc` ile cagirilir)
 
