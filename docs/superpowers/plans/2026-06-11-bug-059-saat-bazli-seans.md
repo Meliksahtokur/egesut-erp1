@@ -53,14 +53,12 @@ Bu plan her Fazda hangi aracın neden kullanılacağını gösterir. Mühendis a
 ### Yeni Dosyalar (Create)
 - `supabase/migrations/20260611000001_bug059_treatment_sessions.sql` — Schema + 4 yeni RPC + 1 güncelleme
 
-### Değişen Dosyalar (Modify)
+### Değişen Dosyalar (Modify) (D-v3-2 fix: tek başlık)
 - `supabase/migrations/99999999999999_ground_truth.sql` — Canonical referans güncelle (O-v2-3 fix: 2. SQL dosyası oluşturulmuyor, ground truth doğrudan düzenleniyor)
-
-### Değişen Dosyalar (Modify)
-- (Zaten satir 57'de listelendi, tekrar YOK — O-v2-3 fix)
 - `js/api.js` — `seans_tamamla`, `recete_guncelle`, `close_case_with_remaining` RPC helper'ları + `add_treatment_day_with_sessions`
 - `js/ui.js` — Tedavi modal accordion + renderTask saat rozeti + vaka modal plan accordion
 - `docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md` — Implement edildi notu (opsiyonel)
+- (D-v3-5 fix) `js/state.js` — Implementation sırasında `pullTables` tablo listesi kontrolü: eğer state.js'te sabit liste varsa `treatment_day_uygulamalar` ekle, yoksa (dynamic) sorun yok.
 
 ### Silinen/Dokunulmayan Dosyalar
 - `js/forms.js` — Sadece yeni RPC çağrıları eklenecek, mevcut mantık korunur
@@ -379,7 +377,7 @@ Beklenen: Tum satirlar `seans_sayisi=1` (default migration ile doldu).
 
 - [ ] **Step 1.9: Commit (YAPMA — D1 fix)**
 
-> **D1 fix:** DDL ve RPC'ler AYNI migration dosyasinda (Faz 1 + Faz 2 birlikte yazildi). Cift commit YAPMA, sadece Faz 2 sonunda TEK commit at. Step 2.13'e bak.
+> **D1 fix:** DDL ve RPC'ler AYNI migration dosyasinda (Faz 1 + Faz 2 birlikte yazildi). Cift commit YAPMA, sadece Faz 2 sonunda TEK commit at. Step 2.12'ye bak. (D-v3-1 fix)
 
 ---
 
@@ -1123,7 +1121,7 @@ Spec L990. RPC 1 ile 5 gun × 3 seans ac. 1. gun done. 2. gun henuz acilmamis du
 
 Beklenen:
 - Gun 1 etkilenmez
-- Gun 2: 2 seans silindi + 3 yeni seans + stok iade (eski 2) + stok dus (yeni 3)
+- Gun 2: 3 seans silindi + 2 yeni seans (D-v3-3 fix: "3 -> 2, ilac X silinir, ilac Y eklenir") + stok iade (eski 3) + stok dus (yeni 2)
 - Gun 3-5 etkilenmez
 
 - [ ] **Step 6.4: Senaryo D — Vaka erken kapatma**
@@ -1215,25 +1213,28 @@ Hepsi ☐ ise Faz 7'ye gec. Biri FAIL ise hata analizi yap, spec/RPC'de fix, sen
 ```sql
 -- O1 fix: uuid tipinde LIKE calismaz, = 'uuid'::uuid veya IN kullan
 -- Tum test senaryolari 2026-07-01 - 2026-07-15 araliginda calistirilir
--- O2 fix: tarih filtresi ile izole (LIKE + created_at guvenilmez)
+-- D-v3-4 fix: once stok iade (drug_admins henuz var), sonra DELETE CASCADE
 
--- Test vakalarini kapat (tarih araligindaki vakalar)
+-- 1) Test vakalarini kapat (tarih araligindaki vakalar)
 UPDATE public.cases SET status = 'closed', closed_at = now()
 WHERE id IN (
   SELECT DISTINCT case_id FROM public.treatment_days
   WHERE treatment_date BETWEEN '2026-07-01' AND '2026-07-15'
 );
 
--- Test gunlerini sil (CASCADE seanslari + drug_admins + gorev_log siler)
+-- 2) ONCE: stok iade — JOIN ile treatment_date filtresi (created_at = RPC anidir, treatment_date degil)
+UPDATE public.stok_hareket sh SET iptal = true
+FROM public.drug_administrations da
+JOIN public.treatment_days td ON td.id = da.treatment_day_id
+WHERE sh.notlar = 'drug_admin:' || da.id::text
+  AND td.treatment_date BETWEEN '2026-07-01' AND '2026-07-15'
+  AND sh.iptal = false;
+
+-- 3) SONRA: test gunlerini sil (CASCADE seanslari + drug_admins + gorev_log siler)
 DELETE FROM public.treatment_days
 WHERE treatment_date BETWEEN '2026-07-01' AND '2026-07-15';
 
--- Stok hareketini iade et (O2 fix: tarih filtresi)
-UPDATE public.stok_hareket SET iptal = true
-WHERE created_at::date BETWEEN '2026-07-01' AND '2026-07-15'
-  AND notlar LIKE 'drug_admin:%' AND iptal = false;
-
--- islem_log temizligi (opsiyonel, audit trail kalabilir)
+-- 4) islem_log temizligi (opsiyonel, audit trail kalabilir)
 ```
 
 - [ ] **Step 6.13: Commit (test sonuclari)**
