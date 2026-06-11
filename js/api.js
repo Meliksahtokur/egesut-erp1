@@ -10,7 +10,7 @@ const DB_VER  = 21;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
-                  'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days','stok_kategorileri',
+                  'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
                   'uygulama_log','protokol_instance'];
 const APP_VERSION = '2026-03-12-cln03';
 
@@ -371,6 +371,7 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
     if (successMsg) toast(successMsg);
     // Arka planda sadece ilgili tabloları çek, UI'ı bloklamaz
     const tables = RPC_TABLES[name] || [];
+    // Opus #11 fix: seans_tamamla treatment_days tamamlandi=true yapar, mapping'e ekle
     if (tables.length) pullTables(tables).then(renderSafe).catch(console.warn);
     if (onSuccess) onSuccess(data);
     return data;
@@ -456,7 +457,7 @@ function stopBackgroundSync() {
 // ── REALTIME SUBSCRIPTIONS ──────────────────
 // supabase_realtime publication aktif → WebSocket kanalları
 
-const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs'];
+const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs','treatment_days','treatment_day_uygulamalar'];
 let _realtimeChannel = null;
 
 function initRealtime() {
