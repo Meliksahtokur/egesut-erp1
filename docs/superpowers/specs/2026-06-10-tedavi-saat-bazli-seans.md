@@ -164,6 +164,9 @@ INSERT islem_log (CASE_CLOSED_EARLY)
 | Çok eski reçete (1. gün done, 2. gün açılmamış, 3-5. gün açılmamış) recete_guncelle | Orta | Düşük | 1. gün done ise sadece gün 2-5 güncellenebilir; gün 2 henüz açılmamışsa güncelle |
 | Offline senkron (telefon çevrimdışı) | Düşük | Orta | IDB outbox + rpcOptimistic deseni korunur; seans_admin_id idempotent |
 | Tetik zincirinde bug → sonsuz döngü | Çok düşük | Kritik | `tamamlandi=true` guard, parent_id ayrı, seans_admin_id farklı; döngü imkansız |
+| DST (yaz saati uygulaması) → saat çakışması veya atlanmış saat | Orta | Düşük | `time` tipi DST'den etkilenmez; UI sadece saat:dakika gösterir; grace period saat farkı olmaz |
+| Network yarım kalma (seans done isteği gitti, response gelmedi, retry) | Orta | Düşük | `seans_tamamla` SELECT FOR UPDATE + WHERE guard ile idempotent; ikinci çağrı `race=true` döner, UI tekrar denemez |
+| Çoklu eczacı aynı anda recete_guncelle çalıştırır | Düşük | Orta | RPC transaction içinde; aynı case_id için 2 paralel çağrı → 2. çağrı `kısmi_acık` kontrolünde tutarsız seans sayısı görebilir, sonuç en son commit edileni yansıtır (last-write-wins, sonraki oturumda düzeltilebilir) |
 
 ## ✅ Definition of Done
 
@@ -185,6 +188,12 @@ INSERT islem_log (CASE_CLOSED_EARLY)
 - [ ] Senaryo B: 1 gün × 3 seans + hepsi done — yeşil
 - [ ] Senaryo C: 5 gün × 3 seans + reçete ortasında değişim — yeşil
 - [ ] Senaryo D: Vaka erken kapatma + kalan seanslar — yeşil
+- [ ] Senaryo E: Uygulanmadi seans + stok iade — yeşil
+- [ ] Senaryo F: Mevcut 4 vakaya dokunulmamasi (geriye uyumluluk) — yeşil
+- [ ] Senaryo G: Race condition — ayni seansa 2 paralel done — yeşil
+- [ ] Senaryo H: Recete degisikligi — kismen acilmis gun korunmali — yeşil
+- [ ] Senaryo I: Recete tamamen yeni plana gecis — yeşil
+- [ ] Senaryo J: Vaka erken kapatma + 1 seans acik — yeşil
 
 ## 📚 İlgili Dökümanlar
 
@@ -234,7 +243,7 @@ CREATE TABLE IF NOT EXISTS public.treatment_day_uygulamalar (
   iptal_nedeni                text,
 
   -- STOK LEDGER REFERANSI (iptalde kullanilacak)
-  stok_hareket_ref            uuid,
+  stok_hareket_ref            uuid REFERENCES public.stok_hareket(id) ON DELETE SET NULL,
 
   -- AUDIT
   created_at                  timestamptz DEFAULT now(),
@@ -474,19 +483,24 @@ DECLARE
   v_skip       int;
   v_tip        text;
 BEGIN
-  SELECT * INTO v_seans FROM public.treatment_day_uygulamalar WHERE id = p_seans_admin_id;
+  -- RACE CONDITION GUARD: SELECT FOR UPDATE ile satir kilitle
+  SELECT * INTO v_seans FROM public.treatment_day_uygulamalar
+  WHERE id = p_seans_admin_id
+  FOR UPDATE;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Seans bulunamadi');
   END IF;
   IF v_seans.uygulama_tamamlandi_at IS NOT NULL OR v_seans.uygulanmadi THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu seans zaten kapatilmis');
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu seans zaten kapatilmis', 'race', true);
   END IF;
 
-  -- DONE veya UYGULANMADI
+  -- DONE veya UYGULANMADI (guard ile: sadece aciksa update et)
   IF p_uygulanmadi THEN
     UPDATE public.treatment_day_uygulamalar
     SET uygulanmadi = true, iptal_nedeni = p_not, updated_at = now()
-    WHERE id = p_seans_admin_id;
+    WHERE id = p_seans_admin_id
+      AND uygulama_tamamlandi_at IS NULL
+      AND uygulanmadi = false;
     -- Stok iade
     IF v_seans.stok_hareket_ref IS NOT NULL THEN
       UPDATE public.stok_hareket SET iptal = true WHERE id = v_seans.stok_hareket_ref;
@@ -495,7 +509,13 @@ BEGIN
   ELSE
     UPDATE public.treatment_day_uygulamalar
     SET uygulama_tamamlandi_at = now(), uygulama_notu = p_not, updated_at = now()
-    WHERE id = p_seans_admin_id;
+    WHERE id = p_seans_admin_id
+      AND uygulama_tamamlandi_at IS NULL
+      AND uygulanmadi = false;
+    -- GET DIAGNOSTICS ile gercek update sayisini kontrol et
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu seans baska biri tarafindan kapatilmis', 'race', true);
+    END IF;
     v_tip := 'TEDAVI_SEANS_TAMAM';
   END IF;
 
@@ -566,6 +586,8 @@ DECLARE
   v_first_time    time;
   v_total_seans   int := 0;
   v_affected      jsonb := '[]'::jsonb;
+  v_tamam         boolean;
+  v_kismen_acik   boolean;
 BEGIN
   -- Case kontrol
   IF NOT EXISTS (SELECT 1 FROM public.cases WHERE id = p_case_id AND status = 'active') THEN
@@ -577,51 +599,102 @@ BEGIN
     v_day_no := (v_day_plan->>'day_no')::int;
     v_sira_no := 0;
 
-    -- Bu gun tamamlanmis mi?
-    SELECT id INTO v_day_id FROM public.treatment_days
+    -- Bu gun var mi?
+    SELECT id, tamamlandi INTO v_day_id, v_tamam
+    FROM public.treatment_days
     WHERE case_id = p_case_id AND day_no = v_day_no;
+
+    -- KISMEN ACILMIS GUN DOKUNULMAZ (Soru 4-C + Guclendirme 4)
+    -- Eger gun var ve EN AZ 1 seansi done ise, degistirilemez.
+    IF v_day_id IS NOT NULL AND v_tamam = false THEN
+      SELECT EXISTS(
+        SELECT 1 FROM public.treatment_day_uygulamalar
+        WHERE treatment_day_id = v_day_id
+          AND (uygulama_tamamlandi_at IS NOT NULL OR uygulanmadi = true)
+      ) INTO v_kismen_acik;
+
+      IF v_kismen_acik THEN
+        -- Atla, bu gun kilitli
+        CONTINUE;
+      END IF;
+    END IF;
 
     IF v_day_id IS NULL THEN
       -- YENI GUN EKLE (henuz yoksa)
       PERFORM public.add_treatment_day_with_sessions(
         p_case_id,
-        CURRENT_DATE + (v_day_no - 1),  -- basit offset, gercek tarih v2
+        CURRENT_DATE + (v_day_no - 1),
         v_day_plan->'sessions'
       );
       v_total_seans := v_total_seans + jsonb_array_length(v_day_plan->'sessions');
-    ELSE
-      -- MEVCUT GUN — sadece tamamlanmamissa guncelle
-      IF EXISTS (SELECT 1 FROM public.treatment_days WHERE id = v_day_id AND tamamlandi = false) THEN
-        -- Eski seanslari temizle
-        DELETE FROM public.treatment_day_uygulamalar WHERE treatment_day_id = v_day_id;
+    ELSIF v_tamam = false THEN
+      -- TAMAMLANMAMIS + HENUZ HICBIR SEANS YAPILMAMIS GUN
+      -- 1. Eski seanslari temizle
+      DELETE FROM public.treatment_day_uygulamalar WHERE treatment_day_id = v_day_id;
+      -- 2. Eski gorev_log TEDAVI_SEANS satirlarini temizle
+      DELETE FROM public.gorev_log
+      WHERE gorev_tipi = 'TEDAVI_SEANS'
+        AND (aciklama::jsonb->>'day_id')::uuid = v_day_id;
 
-        -- Yeni seanslari ekle
-        v_first_time := NULL;
-        FOR v_session IN SELECT * FROM jsonb_array_elements(v_day_plan->'sessions')
-        LOOP
-          v_sira_no := v_sira_no + 1;
-          IF v_first_time IS NULL THEN
-            v_first_time := (v_session->>'planned_time')::time;
-          END IF;
+      -- 3. Yeni seanslari ekle + gorev'leri olustur
+      v_first_time := NULL;
+      FOR v_session IN SELECT * FROM jsonb_array_elements(v_day_plan->'sessions')
+      LOOP
+        v_sira_no := v_sira_no + 1;
+        IF v_first_time IS NULL THEN
+          v_first_time := (v_session->>'planned_time')::time;
+        END IF;
 
-          INSERT INTO public.treatment_day_uygulamalar(...)
-          VALUES (...);
-          v_total_seans := v_total_seans + 1;
-        END LOOP;
+        -- treatment_day_uygulamalar INSERT
+        INSERT INTO public.treatment_day_uygulamalar(
+          treatment_day_id, case_id, sira_no, planned_time, planned_date,
+          stok_id, drug_product_id, dose, unit, route
+        )
+        VALUES (
+          v_day_id, p_case_id, v_sira_no,
+          (v_session->>'planned_time')::time,
+          CURRENT_DATE + (v_day_no - 1),
+          v_session->>'stok_id',
+          (v_session->>'drug_product_id')::uuid,
+          (v_session->>'dose')::numeric,
+          v_session->>'unit',
+          v_session->>'route'
+        )
+        RETURNING id INTO v_admin_id;
 
-        -- treatment_days guncelle
-        UPDATE public.treatment_days
-        SET seans_sayisi = v_sira_no, planned_time = v_first_time
-        WHERE id = v_day_id;
+        v_total_seans := v_total_seans + 1;
 
-        -- gorev_log TEDAVI_SEANS'leri guncelle
-        -- (mevcut olanlari sil, yenilerini olustur)
-        DELETE FROM public.gorev_log
-        WHERE gorev_tipi = 'TEDAVI_SEANS'
-          AND (aciklama::jsonb->>'day_id')::uuid = v_day_id;
+        -- gorev_log TEDAVI_SEANS INSERT (eczaci dashboard'da yeni saati gor)
+        INSERT INTO public.gorev_log(
+          id, gorev_tipi, hayvan_id, hedef_tarih, hedef_saat,
+          aciklama, tamamlandi, parent_id, seans_admin_id
+        )
+        SELECT
+          gen_random_uuid(),
+          'TEDAVI_SEANS',
+          c.animal_id,
+          CURRENT_DATE + (v_day_no - 1),
+          (v_session->>'planned_time')::time,
+          jsonb_build_object(
+            'day_id',       v_day_id::text,
+            'seans_no',     v_sira_no,
+            'planned_time', v_session->>'planned_time',
+            'label',        'Gun ' || v_day_no || ' - Seans ' || v_sira_no || ' (' || (v_session->>'planned_time') || ')',
+            'admin_id',     v_admin_id::text
+          )::text,
+          false,
+          (SELECT id FROM public.gorev_log
+           WHERE gorev_tipi = 'TEDAVI_GUN'
+             AND (aciklama::jsonb->>'day_id')::uuid = v_day_id
+           LIMIT 1),
+          v_admin_id
+        FROM public.cases c WHERE c.id = p_case_id;
+      END LOOP;
 
-        -- yeniden olustur (yukaridaki INSERT OR REPLACE mantigi)
-      END IF;
+      -- 4. treatment_days update (seans_sayisi, planned_time)
+      UPDATE public.treatment_days
+      SET seans_sayisi = v_sira_no, planned_time = v_first_time
+      WHERE id = v_day_id;
     END IF;
   END LOOP;
 
@@ -707,7 +780,10 @@ DECLARE
 BEGIN
   SELECT * INTO v_day FROM public.treatment_days WHERE id = p_day_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Tedavi gunu bulunamadi: %', p_day_id; END IF;
-  IF v_day.tamamlandi THEN RAISE EXCEPTION 'Bu tedavi gunu zaten tamamlandi'; END IF;
+  -- IDEMPOTENT: seans_tamamla ile gunden bagimsiz done edilmis olabilir
+  IF v_day.tamamlandi THEN
+    RETURN jsonb_build_object('ok', true, 'day_id', p_day_id, 'mesaj', 'Zaten tamamlanmis (idempotent)');
+  END IF;
 
   -- Onceki gun tamamlanmali
   SELECT EXISTS(
@@ -836,6 +912,10 @@ Vaka modalindaki "📅 Tedavi Plani" accordion'da "✏️ Receteyi Duzenle" buto
 | **D: Vaka erken kapatma** | 1. gun × 3 seans, 2'si done, 1'i acik → "Tedaviyi durdur" tiklanir | Kalan 1 seans done isaretlenir, gun done, gorev done, vaka kapali, audit log |
 | **E: 1 gun × 3 seans + uygulanmadi** | 1. seans done, 2. seans uygulanmadi isaretle (stok iade), 3. seans done | Uygulanmadi seans icin stok_hareket.iptal=true, diger 2 seans tamamlandi, gun done |
 | **F: Mevcut 4 vakaya dokunulmamasi** | Mevcut 140, 5, 7, 9 vakalari acilir, "Tedavi Plani" accordion goruntulenir | Eski tek-seans davranisi (geriye uyumlu), `treatment_day_uygulamalar` bos, sadece `treatment_days` mevcut |
+| **G: Race condition — ayni seansa 2 paralel done** | Tab acilir, 2 sekme ayni anda `seans_tamamla(admin_id, false)` cagirir | 1. cagri `ok=true`, 2. cagri `ok=false, race=true`. Sadece 1 satir done, stok 1 kez dusulmus |
+| **H: Recete degisikligi — kismen acilmis gun** | 5 gun × 3 seans planlanir → 2. gun ilk seansi done edilir → recete_guncelle ile 2. gun plana yeni seans eklenmeye calisilir | 2. gun `kismen_acik=true` oldugu icin ATLANIR. 1, 3, 4, 5. gun guncellenir; 2. gun eski haliyle kalir |
+| **I: Recete tamamen yeni plana gecis** | 5 gun × 3 seans planlanir → 1. gun done, 2. gun tamamen acilmis (3 seans acik, 0 done) → recete_guncelle ile 2. gun plana 4 seans eklenir | 2. gun eski 3 seans silinir, 4 yeni seans + 4 yeni gorev. Gun 1 etkilenmez, 3-5 degismez |
+| **J: Vaka erken kapatma + 1 seans acik** | Vaka 5 gun × 3 seans, gun 1-2 done, gun 3 ilk seans done, 2. seans acik, 3. seans acik → "Tedaviyi durdur" tiklanir | Gun 3-5 kalan 5 acik seans done isaretlenir (stok iade YOK, cunku henuz cekilmemis), gun 3-5 tedavi_days tamamlandi, vaka kapali, audit log "5 seans erken kapatildi" |
 
 ## 🔄 Migration Plani
 
