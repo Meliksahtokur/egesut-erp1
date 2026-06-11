@@ -50,8 +50,13 @@ treatment_days (1 satır/gün, seans_sayisi=1..N)
 - Mevcut 5 vaka (eb10376a, a09f0d0b, 1db49a4e, 57bfc92c, c4ff42d9) → hiçbiri etkilenmez
   - **Opus #17 notu:** eb10376a aktif vaka ama 0 tedavi gunu var → geriye uyumluluk testi trivial pass (kirilacak veri yok). Test senaryolarinda "0 gun, kapsam disi" olarak isaretlenecek.
 
-> **⚠️ Faz 0 Drift Notu (R6, R8, R9):**
-> - `treatment_days.planned_time` ground truth L2933'te var ama canlıda **tüm 13 günde NULL** (hiç set edilmemiş). Bu kolon gün seviyesinde; seans seviyesinde `treatment_day_uygulamalar.planned_time` YENİ olacak.
+> **⚠️ Faz 0 Drift Notu (R6, R8, R9, R12):**
+> - `treatment_days.planned_time` 2026-05-28 (migration 037) eklendi, canlıda **tüm 13 günde NULL** (hiç set edilmemiş). Bu kolon **gün seviyesi planlanan saat**'tir; seans seviyesinde `treatment_day_uygulamalar.planned_time` YENİ olacak.
+> - `treatment_days.treatment_time` 2026-03-25 (migration 025) eklendi, canlıda `c4ff42d9` Gün 1-3'te dolu (`07:00:00`). Bu kolon **gün seviyesi gerçekleşen saat**'tir (uygulayıcı sahada tamamlayınca set edilir); seans seviyesinde `treatment_day_uygulamalar.gerceklesme_saati` YENİ olacak.
+> - **Saat-bazlı kolon ayrımı (kullanıcı kararı Faz 0):**
+>   - `planned_time` = veteriner/sahibin **PLANLADIĞI** saat (örn: "sabah 08:00, akşam 16:00, gece 24:00")
+>   - `treatment_time` = uygulayıcının sahada **GERÇEKLEŞTİRDİĞİ** saat (görev tamamlanınca set)
+>   - Bu iki kolon **birbirini tamamlar**: planlanan = beklenti, gerçekleşen = fiiliyet. Pratikte 5-30dk sapma normaldir (geciken seans uyarısı).
 > - `cases.animal_id` canlıda **UUID + text karışık** (örn: `1433f5f2-b60a-...` + `H000142`). BUG-059 spec'te animal_id kullanmıyoruz ama `gorev_log.hayvan_id` insert ederken `cases.animal_id`'yi kopyalıyoruz — yeni RPC'lerde bu pattern korunmalı, UUID/text karışıklığına dikkat.
 > - `islem_log` audit: ground truth'ta sadece `add_treatment_day` yazıyor (L3240). Yeni RPC'ler (`seans_tamamla`, `recete_guncelle`, `close_case_with_remaining`) islem_log'a audit kaydı yazmalı.
 > - Mevcut ek RPC'ler: `treatment_day_not_guncelle` (ground truth L3376) ve `case_plan_notu_guncelle` (L3396) mevcut — `recete_guncelle` ile çakışmaz, ayrı bırakılır.
@@ -253,6 +258,7 @@ CREATE TABLE IF NOT EXISTS public.treatment_day_uygulamalar (
   uygulama_tamamlandi_at      timestamptz,
   uygulayan                   text,
   uygulama_notu               text,
+  gerceklesme_saati           time,  -- Faz 0 fix: uygulayicinin sahada gerceklestirdigi saat (08:30 gibi, planned_time'dan farkli olabilir)
 
   -- UYARLILIK: yapilmadi olarak isaretlendi mi? (mevcut pattern)
   uygulanmadi                 boolean DEFAULT false,
@@ -285,7 +291,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.treatment_day_uygulamalar TO anon
 
 COMMENT ON TABLE public.treatment_day_uygulamalar IS 'Tedavi gunu alt seanslari. Saat + ilac + doz + yol, gercek zamanli zincir mimarisi';
 COMMENT ON COLUMN public.treatment_day_uygulamalar.sira_no IS 'Gun icinde 1, 2, 3... sirasi';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.planned_time IS '08:00, 16:00, 24:00 gibi gercek saat';
+COMMENT ON COLUMN public.treatment_day_uygulamalar.planned_time IS 'PLANLANAN saat (08:00, 16:00, 24:00). Sahada gerceklesen saat = gerceklesme_saati';
 COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulama_tamamlandi_at IS 'NULL = henuz yapilmadi, now() = yapildi';
 COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulanmadi IS 'true = "yapilmadi, stok iade"';
 
@@ -638,8 +644,12 @@ BEGIN
     END IF;
     v_tip := 'TEDAVI_SEANS_IPTAL';
   ELSE
+    -- Faz 0 fix: gerceklesme_saati = uygulayicinin sahada tamamladigi saat (NOW()::time)
     UPDATE public.treatment_day_uygulamalar
-    SET uygulama_tamamlandi_at = now(), uygulama_notu = p_not, updated_at = now()
+    SET uygulama_tamamlandi_at = now(),
+        uygulama_notu = p_not,
+        gerceklesme_saati = NOW()::time,  -- uygulayici sahada tamamladigi saat
+        updated_at = now()
     WHERE id = p_seans_admin_id
       AND uygulama_tamamlandi_at IS NULL
       AND uygulanmadi = false;
@@ -666,8 +676,11 @@ BEGIN
   v_all_done := (v_total = v_done);
 
   IF v_all_done THEN
+    -- Faz 0 fix: treatment_days.treatment_time (gun seviyesi gerceklesen saat) = NOW()::time
     UPDATE public.treatment_days
-    SET tamamlandi = true, tamamlanma_tarihi = now()
+    SET tamamlandi = true,
+        tamamlanma_tarihi = now(),
+        treatment_time = NOW()::time  -- uygulayicinin son seansi tamamladigi saat (gun seviyesi)
     WHERE id = v_seans.treatment_day_id AND tamamlandi = false;
 
     UPDATE public.gorev_log

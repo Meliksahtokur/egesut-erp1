@@ -1146,10 +1146,20 @@ Kullaniciya sonucu raporla:
 
 Bu bölüm 2026-06-11'de Faz 0 Pato 12 drift analizi sonucu eklendi. Spec'te yazılan ile canlı DB arasındaki farklar (21 bulgu) tespit edildi, bunlardan 7'si plan'a uygulandı. Detay: `docs/superpowers/specs/2026-06-11-faz-0-bulgulari.md`.
 
-### P1 — `treatment_day_uygulamalar.planned_time` (seans bazlı, gün bazlı DEĞİL)
-- `treatment_days.planned_time` ground truth L2933'te var ama canlıda 14 günün hepsinde NULL (hiç set edilmemiş)
-- BUG-059 için seans bazlı `treatment_day_uygulamalar.planned_time` YENİ olacak
-- İki farklı kolon, farklı anlam (gün seviyesi vs seans seviyesi) — çakışma yok
+### P1 — Saat kolonları ayrımı: `planned_time` (planlanan) vs `treatment_time` / `gerceklesme_saati` (gerçekleşen)
+- **Kullanıcı kararı (Faz 0):** iki ayrı kolon, farklı anlamlar
+  - `planned_time` = veteriner/sahibin PLANLADIĞI saat (gün + seans seviyesinde)
+  - `treatment_time` = uygulayıcının sahada GERÇEKLEŞTİRDİĞİ saat (gün seviyesi, treatment_days)
+  - `gerceklesme_saati` = uygulayıcının sahada GERÇEKLEŞTİRDİĞİ saat (seans seviyesi, treatment_day_uygulamalar)
+- **Mevcut durum (canlı):**
+  - `treatment_days.planned_time` (migration 037, 2026-05-28) — 14 günün hepsinde NULL
+  - `treatment_days.treatment_time` (migration 025, 2026-03-25) — `c4ff42d9` Gün 1-3'te `07:00:00` dolu
+  - `treatment_day_uygulamalar.planned_time` YENİ (seans bazlı, 08:00, 16:00, 24:00)
+  - `treatment_day_uygulamalar.gerceklesme_saati` YENİ (seans bazlı, sahada tamamlanınca NOW()::time)
+- **Pratik:** 5-30dk sapma normaldir (geciken seans uyarısı: `planned_time + 3h grace < now`)
+- **RPC'ler:**
+  - `seans_tamamla` → set `gerceklesme_saati = NOW()::time` (seans), `treatment_days.treatment_time = NOW()::time` (gün, son seans tamamlanınca)
+  - `add_treatment_day_with_sessions` → set `planned_time` (gün + seans), `treatment_time` NULL (henüz gerçekleşmedi)
 
 ### P2 — Stok INSERT `add_drug_administration`da zaten var
 - Ground truth L3271-3278: `add_drug_administration` zaten `INSERT INTO stok_hareket` yapıyor (`notlar='drug_admin:' || v_id::text`)
