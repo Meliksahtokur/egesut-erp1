@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** EgeSüt ERP tedavi modülünü "1 günde N seans (saat+ilaç+doz+yol)" modeline geçirmek, reçete değişikliklerini reaktif yansıtmak ve mevcut 4 aktif vakayı etkilemeden geriye uyumlu çalışmak.
+**Goal:** EgeSüt ERP tedavi modülünü "1 günde N seans (saat+ilaç+doz+yol)" modeline geçirmek, reçete değişikliklerini reaktif yansıtmak ve mevcut 5 aktif vakayı etkilemeden geriye uyumlu çalışmak.
+
+> **⚠️ P5 (Faz 0 drift):** 2026-06-11 canlı DB snapshot'ında 5 aktif vaka tespit edildi (`1db49a4e, 57bfc92c, eb10376a, a09f0d0b, c4ff42d9` — hepsi `status=active, closed_at=NULL`). Plan başlangıcında yazılı "4 aktif vaka" güncel değil — **12 tedavi günü, 10 tamamlanmış, 2 devam eden** ile geriye uyumluluk testi yapılacak. (Not: eb10376a 0 günlük vaka — trivial pass; gerçek veri 4 vakada.)
 
 **Architecture:**
 - Yeni tablo: `treatment_day_uygulamalar` (her seans = 1 satır)
@@ -58,7 +60,7 @@ Bu plan her Fazda hangi aracın neden kullanılacağını gösterir. Mühendis a
 - `js/api.js` — `seans_tamamla`, `recete_guncelle`, `close_case_with_remaining` RPC helper'ları + `add_treatment_day_with_sessions`
 - `js/ui.js` — Tedavi modal accordion + renderTask saat rozeti + vaka modal plan accordion
 - `docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md` — Implement edildi notu (opsiyonel)
-- (D-v3-5 fix) `js/state.js` — Implementation sırasında `pullTables` tablo listesi kontrolü: eğer state.js'te sabit liste varsa `treatment_day_uygulamalar` ekle, yoksa (dynamic) sorun yok.
+- (D-v3-5 fix) `js/api.js` (L253-256) — `pullTables` mapping'e `treatment_day_tamamla` **eklenecek** (P4 fix, B17): mevcut 4 mapping + 1 eksik (treatment_day_tamamla). Yeni 4 RPC + 1 güncelleme için de ayrı satırlar. `js/state.js` — Implementation sırasında `pullTables` tablo listesi kontrolü: eğer state.js'te sabit liste varsa `treatment_day_uygulamalar` ekle, yoksa (dynamic) sorun yok.
 
 ### Silinen/Dokunulmayan Dosyalar
 - `js/forms.js` — Sadece yeni RPC çağrıları eklenecek, mevcut mantık korunur
@@ -131,7 +133,7 @@ memory_search("BUG-059 K1 K2 K3 schema drift", category="critical_rules", limit=
 
 Hedef: K1, K2, K3 tarzi hatalari gecmiste de yaptik mi?
 
-- [ ] **Step 0.4: Mevcut 4 vakayi say (geriye uyumluluk hedefi)**
+- [ ] **Step 0.4: Mevcut 5 vakayi say (geriye uyumluluk hedefi — P5 fix)**
 
 ```sql
 SELECT c.id, c.animal_id, c.status, COUNT(td.id) AS day_count
@@ -142,7 +144,7 @@ GROUP BY c.id, c.animal_id, c.status
 ORDER BY c.id;
 ```
 
-Beklenen: 4 satir (vaka 140, 5, 7, 9). Bunlar degismemeli.
+Beklenen: 5 satir (vaka 1db49a4e, 57bfc92c, eb10376a, a09f0d0b, c4ff42d9). Bunlar degismemeli. (K3 fix: P5, canlı DB snapshot)
 
 - [ ] **Step 0.5: tools-bank memory'den RPC notlarini cek**
 
@@ -290,13 +292,12 @@ CREATE INDEX IF NOT EXISTS da_seans_admin_id_idx
 COMMIT;
 ```
 
-**Yazim prosedurü** (write araci buyuk dosyada parse hatasi):
+**Yazim prosedurü** (Opus #16 fix: write araci dosya boyutundan bagimsiz calisir, bu uyari gereksiz):
 
 ```bash
-# Parca 1 (~80 satir) -> write ile tek seferde
-# Parca 2 (~35 satir) -> shell append ile ekle veya ayri write
-# Toplam ~150 satir, sinirin altinda ama FK + index cok satir kapliyor
-# Eger yine parse hatasi gelirse 3 parcaya bol
+# Tek seferde write ile yaz (~150 satir migration sinir altinda)
+# FK + index cok satir kapliyor ama write parse etmez
+# Eger olurda hata gelirse edit ile str_replace yap
 ```
 
 - [ ] **Step 1.3: Dosya butunlugunu dogrula**
@@ -364,16 +365,16 @@ ORDER BY conname;
 
 Beklenen: 2 satir (`treatment_day_uygulamalar_treatment_day_id_sira_no_key`, `treatment_day_uygulamalar_treatment_day_id_planned_time_key`).
 
-- [ ] **Step 1.8: Geriye uyumluluk smoke test**
+- [ ] **Step 1.8: Geriye uyumluluk SELECT kontrolu (smoke test yok — kullanici canlida test edecek)**
 
 ```sql
--- Mevcut 4 vakayi oku, seans_sayisi default 1 olmali
+-- Mevcut 5 vakayi oku, seans_sayisi default 1 olmali
 SELECT id, seans_sayisi, planned_time
 FROM public.treatment_days
 ORDER BY id LIMIT 5;
 ```
 
-Beklenen: Tum satirlar `seans_sayisi=1` (default migration ile doldu).
+Beklenen: Tum satirlar `seans_sayisi=1` (default migration ile doldu). Sadece SELECT — migration'i bozabilecek bir islem YAPMA.
 
 - [ ] **Step 1.9: Commit (YAPMA — D1 fix)**
 
@@ -396,7 +397,7 @@ gitnexus_impact(target="add_treatment_day", direction="upstream", depth=2)
 
 Hedef: Eski `add_treatment_day` cagrilan frontend yerleri. Yeni RPC yan yana (karar 4-C), mevcut yerler bozulmamali.
 
-- [ ] **Step 2.1: RPC 1 — `add_treatment_day_with_sessions` (YENI)**
+- [ ] **Step 2.1: RPC 1 — `add_treatment_day_with_sessions` (SARMALAYICI — atomik + seans planned_time)**
 
 Spec L300-575. Ayni migration dosyasina ekle, `COMMIT;` oncesine.
 
@@ -548,7 +549,7 @@ Beklenen:
 > test_result = supabase_rpc(
 >   function_name="add_treatment_day_with_sessions",
 >   params=json.dumps({
->     "p_case_id": "00000000-0000-0000-0000-000000000140",
+>     "p_case_id": "c4ff42d9-5921-430f-8ad9-ae2133036c67",
 >     "p_date": "2026-06-15",
 >     "p_sessions": [
 >       {"planned_time":"08:00:00","stok_id":real_stok_id,"dose":20,"unit":"ml","route":"IM"},
@@ -575,25 +576,16 @@ Veya daha guvenli: test vakasi ac, sonra kapat. Detay icin bkz. Faz 6.
 - [ ] **Step 2.12: Commit (DDL + RPC — D1 fix, TEK commit)**
 
 ```bash
+# Opus #12 fix: 21 review bulgusu listesi kaldirildi (commit history'de anlamsiz)
 git add supabase/migrations/20260611000001_bug059_treatment_sessions.sql
 git commit -m "feat(db): BUG-059 1 yeni tablo + 4 ALTER + 4 yeni RPC + 1 guncelleme
 
-Schema:
-- Yeni tablo: treatment_day_uygulamalar (saat+ilac+doz+yol, 1 seans = 1 ilac)
-- treatment_days.seans_sayisi (geriye uyumlu, default=1)
-- gorev_log.seans_admin_id + hedef_saat (seans bazli gorev)
-- drug_administrations.seans_admin_id FK (K5 baglantisi)
-- 5 partial index (open/late seanslar icin)
-
-RPC'ler:
-- add_treatment_day_with_sessions: yeni gun + N seans + N gorev + stok (atomik)
-- seans_tamamla: tek seans done/iptal + zincirleme gun done (race guard)
-- recete_guncelle: henuz acilmamis gunleri toplu guncelle (DRY delegasyon)
-- close_case_with_remaining: vaka erken kapatma + stok iade
-- treatment_day_tamamla: seans_sayisi>1 icin 'tum seanslar done' kontrolu (idempotent)
+Schema: treatment_day_uygulamalar + 4 ALTER kolon + 5 partial index.
+RPC: add_treatment_day_with_sessions, seans_tamamla (race guard),
+recete_guncelle, close_case_with_remaining, treatment_day_tamamla (idempotent).
 
 Spec: docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md
-21 review bulgusu giderildi (K1-5, Y1-4, O1-3, K-NEW-1, Y-NEW-1, Y-NEW-2, D1, Y-v3-1, O-v3-1, D-v3-1, D-v3-2, D-v3-3)"
+Plan: docs/superpowers/plans/2026-06-11-bug-059-saat-bazli-seans.md"
 ```
 
 ---
@@ -705,10 +697,10 @@ git status
 
 Beklenen: 2 commit (DDL+RPC birlikte Faz 2.12'de, ground truth sync Faz 3.7'de), working tree clean. (O-v2-2 fix)
 
-- [ ] **Step 4.1: Snapshot al (mevcut 4 vaka + aktif tedavi gunleri)**
+- [ ] **Step 4.1: Snapshot al (mevcut 5 vaka + aktif tedavi gunleri — P5 fix)**
 
 ```sql
--- Mevcut 4 vakanin durumu (geriye uyumluluk referansi)
+-- Mevcut 5 vakanin durumu (geriye uyumluluk referansi)
 SELECT c.id, c.animal_id, c.status,
   COUNT(DISTINCT td.id) AS day_count,
   COUNT(DISTINCT da.id) AS drug_admin_count,
@@ -722,12 +714,12 @@ GROUP BY c.id, c.animal_id, c.status
 ORDER BY c.id;
 ```
 
-Sonuclari not et (Faz 4.9'da karsilastirma icin). Beklenen: 4 vaka, day_count degisken.
+Sonuclari not et (Faz 4.9'da karsilastirma icin). Beklenen: 5 vaka, day_count degisken.
 
-- [ ] **Step 4.2: Mevcut 4 vakada seans tablosu bos mu?**
+- [ ] **Step 4.2: Mevcut 5 vakada seans tablosu bos mu?**
 
 ```sql
--- Yeni tablo geriye uyumlu: mevcut 4 vakada HIC seans olmamali
+-- Yeni tablo geriye uyumlu: mevcut 5 vakada HIC seans olmamali
 SELECT COUNT(*) AS eski_vakalardaki_seans_sayisi
 FROM public.treatment_day_uygulamalar tdu
 WHERE tdu.case_id IN (SELECT id FROM public.cases WHERE status = 'active');
@@ -735,11 +727,11 @@ WHERE tdu.case_id IN (SELECT id FROM public.cases WHERE status = 'active');
 
 Beklenen: 0 (eski vakalarda yeni seans tablosu bos, cunku migration geriye uyumlu).
 
-- [ ] **Step 4.3: Mevcut 4 vakayi dashboard'da ac (canli test)**
+- [ ] **Step 4.3: Mevcut 5 vakayi dashboard'da ac (canli test)**
 
 Arac: Manuel (kullanici) veya `edge_stat` ile ozet kontrol.
 
-Kullaniciya sor: "Mevcut 4 vakayi (140, 5, 7, 9) dashboard'da ac, gorunum bozulmamis mi?"
+Kullaniciya sor: "Mevcut 5 vakayi (1db49a4e, 57bfc92c, eb10376a, a09f0d0b, c4ff42d9) dashboard'da ac, gorunum bozulmamis mi?"
 
 - [ ] **Step 4.4: Tedavi modalini eski usul ac (tek seans)**
 
@@ -753,7 +745,7 @@ Senaryo A (eski davranis):
 ```python
 result = supabase_rpc(
   function_name="add_treatment_day",
-  params='{"p_case_id": "00000000-0000-0000-0000-000000000140", "p_date": "2026-07-01", "p_planned_time": "08:00:00"}'
+  params='{"p_case_id": "c4ff42d9-5921-430f-8ad9-ae2133036c67", "p_date": "2026-07-01", "p_planned_time": "08:00:00"}'
 )
 ```
 
@@ -909,9 +901,12 @@ Yeni entry'ler:
 
 ```javascript
 add_treatment_day_with_sessions: ['cases', 'treatment_days', 'treatment_day_uygulamalar', 'gorev_log'],
-seans_tamamla:                   ['gorev_log', 'treatment_day_uygulamalar', 'stok_hareket'],
-recete_guncelle:                 ['cases', 'treatment_days', 'gorev_log'],
+// Opus #11 fix: seans_tamamla treatment_days.tamamlandi=true yapar, mapping'e ekle
+seans_tamamla:                   ['gorev_log', 'treatment_day_uygulamalar', 'stok_hareket', 'treatment_days'],
+recete_guncelle:                 ['cases', 'treatment_days', 'treatment_day_uygulamalar', 'gorev_log'],
 close_case_with_remaining:       ['cases', 'treatment_days', 'gorev_log', 'stok_hareket'],
+// Opus #14 fix: mevcut treatment_day_tamamla mapping'i (eski bug yok) — implementation sirasinda ekle
+treatment_day_tamamla:           ['treatment_days','gorev_log','drug_administrations','stok_hareket','stok'],
 ```
 
 - [ ] **Step 5.2: js/forms.js'e yeni RPC cagrisi wrapper'lari ekle (opsiyonel)**
@@ -1005,13 +1000,13 @@ async function caseKapat() {
   } catch(e) { toast(e.message, true); }
 }
 
+// Y3 fix: Bu fonksiyon max(seans_sayisi) cekmeli (herhangi bir gun > 1 ise yeni davranis)
 async function getSeansSayisi(caseId) {
-  const { data } = await db.from('treatment_days')
+  const { data } = await supabase_client
+    .from('treatment_days')
     .select('seans_sayisi')
-    .eq('case_id', caseId)
-    .order('seans_sayisi', { ascending: false })
-    .limit(1);
-  return data?.[0]?.seans_sayisi || 1;
+    .eq('case_id', caseId);
+  return (data && data.length) ? Math.max(...data.map(d => d.seans_sayisi || 1)) : 1;
 }
 ```
 
@@ -1040,7 +1035,7 @@ Yeni modal: "Receteyi Duzenle"
 
 - [ ] **Step 5.8: Frontend smoke test (manuel)**
 
-Kullaniciya sor: "Mevcut 4 vakayi (140, 5, 7, 9) dashboard'da ac, yeni seans accordion'u gorunuyor mu? Tek seansli vakalar eski usul mu calisiyor?"
+Kullaniciya sor: "Mevcut 5 vakayi (1db49a4e, 57bfc92c, eb10376a, a09f0d0b, c4ff42d9) dashboard'da ac, yeni seans accordion'u gorunuyor mu? Tek seansli vakalar eski usul mu calisiyor?"
 
 - [ ] **Step 5.9: GitNexus impact (UI degisikligi sonrasi)**
 
@@ -1063,192 +1058,43 @@ git commit -m "feat(ui): BUG-059 saat bazli seans UI
 - Dashboard: late/soon/near rozetler (mevcut pattern korundu)
 
 Spec: docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md
-Mevcut 4 vakaya dokunulmadi (geriye uyumlu)"
+Mevcut 5 vakaya dokunulmadi (geriye uyumlu)"
 ```
 
 ---
 
-## Faz 6: Test Senaryolari (A-J, 10 adim)
+## Faz 6: Canli Dogrulama (Test Senaryolari YOK — Kullanici canlida test eder)
 
-> **Hedef:** Spec'teki 10 senaryonun hepsi canli DB'de end-to-end PASS.
+> **Karar (P6):** 10 test senaryosu A-J spec'te tanimli (senaryo referansi), ama plan smoke test adimlari YOK. Kullanici implementasyon sonrasi canli DB'de elle test edecek (5 vaka uzerinde, P7). Sadece **migration + RPC basari olcutleri** SELECT ile kontrol edilir.
 
-> **Onemli:** Her senaryo sonunda TEST VERISI TEMIZLENMELI. Aksi halde 4 mevcut vakaya karisabilir.
-
-- [ ] **Step 6.0: Test vakasi olustur (her senaryo icin izole)**
+### 6.0 — Migration Basari Olcutu (SELECT)
 
 ```sql
--- Her senaryo icin yeni bir test vakasi ac (mevcut vakalara dokunma)
-INSERT INTO public.cases (id, animal_id, status, ...)
-VALUES ('11111111-1111-1111-1111-000000000001', 'TEST-ANIMAL-1', 'active', ...);
+-- treatment_day_uygulamalar tablosu var, kolonlar tam
+SELECT column_name, data_type FROM information_schema.columns
+WHERE table_name = 'treatment_day_uygulamalar'
+ORDER BY ordinal_position;
 ```
+Beklenen: id, treatment_day_id, case_id, sira_no, planned_time, planned_date, stok_id, drug_product_id, dose, unit, route, uygulama_tamamlandi_at, uygulama_notu, uygulanmadi, stok_hareket_ref, created_at, updated_at (18 kolon).
 
-Veya daha basit: Mevcut 4 vakadan birini (140) kullan, tedavi gunlerini `treatment_date >= '2026-07-01'` ile izole et.
-
-- [ ] **Step 6.1: Senaryo A — 1 gun × 1 seans (eski davranis)**
-
-Spec L988. RPC: `add_treatment_day(p_case_id, '2026-07-10', '08:00:00')`.
-
-Beklenen:
-- `treatment_days` 1 satir, `seans_sayisi=1` (default)
-- `treatment_day_uygulamalar` BOS
-- `drug_administrations` BOS (eski akis, ayri cagriliyor)
-- `gorev_log` 1 satir (TEDAVI_GUN)
-- `stok_hareket` BOS (drug_admin yok)
-
-Dogrulama SQL:
-```sql
-SELECT
-  (SELECT seans_sayisi FROM public.treatment_days WHERE treatment_date='2026-07-10' AND case_id='11111111-1111-1111-1111-000000000001') AS seans_sayisi,
-  (SELECT COUNT(*) FROM public.treatment_day_uygulamalar tdu JOIN public.treatment_days td ON td.id=tdu.treatment_day_id WHERE td.treatment_date='2026-07-10') AS seans_count;
-```
-
-Beklenen: 1, 0.
-
-- [ ] **Step 6.2: Senaryo B — 1 gun × 3 seans + hepsi done**
-
-Spec L989. RPC 1: 3 seans ekle, ardindan 3 kez `seans_tamamla` cagir.
-
-Beklenen:
-- 3 `treatment_day_uygulamalar`, hepsi `uygulama_tamamlandi_at` dolu
-- 3 `drug_administrations` (seans_admin_id dolu)
-- 4 `gorev_log` (1 ana + 3 seans, hepsi done)
-- 1 `treatment_days` tamamlandi (zincirleme)
-- Stok 3 kez dusmus (1 ilac 2 kez + 1 ilac 1 kez)
-
-- [ ] **Step 6.3: Senaryo C — 5 gun × 3 seans + recete ortasinda degisim**
-
-Spec L990. RPC 1 ile 5 gun × 3 seans ac. 1. gun done. 2. gun henuz acilmamis durumdayken RPC 3 ile 2. gun planini degistir (3 -> 2 seans, ilac X silinir, ilac Y eklenir — D-v2-2 fix: "2 -> 3" mantiksiz, 3 seansla basladi, degisim farkli ilac listesine).
-
-Beklenen:
-- Gun 1 etkilenmez
-- Gun 2: 3 seans silindi + 2 yeni seans (D-v3-3 fix: "3 -> 2, ilac X silinir, ilac Y eklenir") + stok iade (eski 3) + stok dus (yeni 2)
-- Gun 3-5 etkilenmez
-
-- [ ] **Step 6.4: Senaryo D — Vaka erken kapatma**
-
-Spec L991. 1 gun × 3 seans, 2 done, 1 acik -> `close_case_with_remaining(case_id, 'tedavi yarida kaldı')`.
-
-Beklenen (D1 fix - Y3 tutarli):
-- Kalan 1 seans `uygulanmadi=true` (DONE degil)
-- `drug_admins.uygulanmadi=true` (K5 FK uzerinden)
-- `stok_hareket.iptal=true` (stok iade)
-- Gun done, gorev done, vaka kapali, audit log
-
-- [ ] **Step 6.5: Senaryo E — 1 gun × 3 seans + uygulanmadi**
-
-Spec L992. 1. seans done, 2. seans `seans_tamamla(admin_id, true, 'stok iade')`, 3. seans done.
-
-Beklenen:
-- Seans 2: `uygulanmadi=true` + `drug_admin.uygulanmadi=true` + `stok_hareket.iptal=true`
-- Seans 1+3: `uygulama_tamamlandi_at` dolu, stok dusmus
-- Gun done, audit log
-
-- [ ] **Step 6.6: Senaryo F — Mevcut 4 vakaya dokunulmamasi**
-
-Spec L993. Mevcut 140, 5, 7, 9 vakalari ac, "Tedavi Plani" accordion goruntule.
-
-Beklenen:
-- Eski tek-seans davranisi (geriye uyumlu)
-- `treatment_day_uygulamalar` bu 4 vaka icin BOS
-- Sadece `treatment_days` mevcut
-- Mevcut `drug_administrations` (NULL seans_admin_id) etkilenmemis
-
-- [ ] **Step 6.7: Senaryo G — Race condition**
-
-Spec L994. Tab acilir, 2 sekme ayni anda `seans_tamamla(admin_id, false)` cagirir.
-
-Beklenen:
-- 1. cagri `ok=true`
-- 2. cagri `ok=false, race=true` (SELECT FOR UPDATE guard)
-- Sadece 1 satir done
-- Stok 1 kez dusulmus (2. cagri noop)
-
-- [ ] **Step 6.8: Senaryo H — Recete degisikligi — kismen acilmis gun**
-
-Spec L995. 5 gun × 3 seans planlanir -> 2. gun ilk seansi done -> `recete_guncelle` ile 2. gun plana yeni seans eklenmeye calisilir.
-
-Beklenen:
-- 2. gun `kismen_acik=true` (en az 1 seansi done), ATLANIR
-- 1, 3, 4, 5. gun guncellenir (ama 1 done, 3-5 acilmamis — sadece 2 etkilenir)
-- 2. gun eski haliyle kalir (3 seans, 1 done, 2 acik)
-
-- [ ] **Step 6.9: Senaryo I — Recete tamamen yeni plana gecis**
-
-Spec L996. 5 gun × 3 seans planlanir -> 1. gun done, 2. gun tamamen acilmis (3 seans acik, 0 done) -> `recete_guncelle` ile 2. gun plana 4 seans eklenir.
-
-Beklenen:
-- 2. gun: 3 eski seans silindi (stok iade) + 4 yeni seans + 4 yeni gorev
-- Gun 1 etkilenmez
-- Gun 3-5 degismez
-
-- [ ] **Step 6.10: Senaryo J — Vaka erken kapatma + 1 seans acik**
-
-Spec L997. 5 gun × 3 seans, gun 1-2 done, gun 3 ilk seans done + 2 acik, gun 4-5 tamamen acik -> `close_case_with_remaining(case_id, 'iptal')`.
-
-Beklenen:
-- Gun 3-5 kalan 5 acik seans `uygulanmadi=true`
-- `drug_admins.uygulanmadi=true` (O2 fix)
-- `stok_hareket.iptal=true` (stok iade, drug_admins INSERT aninda dusmustu)
-- Gun 3-5 done, vaka kapali, audit log "5 seans erken kapatildi, stok iade edildi"
-
-- [ ] **Step 6.11: Tum senaryolar PASS mi?**
-
-| Senaryo | Sonuc |
-|---|---|
-| A: 1×1 eski | ☐ |
-| B: 1×3 done | ☐ |
-| C: 5×3 recete ortasinda | ☐ |
-| D: vaka erken kapatma | ☐ |
-| E: 1×3 uygulanmadi | ☐ |
-| F: 4 mevcut vaka | ☐ |
-| G: race condition | ☐ |
-| H: kismen acilmis | ☐ |
-| I: yeni plana gecis | ☐ |
-| J: vaka kapatma + acik seans | ☐ |
-
-Hepsi ☐ ise Faz 7'ye gec. Biri FAIL ise hata analizi yap, spec/RPC'de fix, senaryoyu tekrar calistir.
-
-- [ ] **Step 6.12: Test verilerini temizle (her senaryo sonrasi)**
+### 6.1 — RPC Basari Olcutu (5 RPC `rpc` ile cagirilir)
 
 ```sql
--- O1 fix: uuid tipinde LIKE calismaz, = 'uuid'::uuid veya IN kullan
--- Tum test senaryolari 2026-07-01 - 2026-07-15 araliginda calistirilir
--- D-v3-4 fix: once stok iade (drug_admins henuz var), sonra DELETE CASCADE
-
--- 1) Test vakalarini kapat (tarih araligindaki vakalar)
-UPDATE public.cases SET status = 'closed', closed_at = now()
-WHERE id IN (
-  SELECT DISTINCT case_id FROM public.treatment_days
-  WHERE treatment_date BETWEEN '2026-07-01' AND '2026-07-15'
-);
-
--- 2) ONCE: stok iade — JOIN ile treatment_date filtresi (created_at = RPC anidir, treatment_date degil)
-UPDATE public.stok_hareket sh SET iptal = true
-FROM public.drug_administrations da
-JOIN public.treatment_days td ON td.id = da.treatment_day_id
-WHERE sh.notlar = 'drug_admin:' || da.id::text
-  AND td.treatment_date BETWEEN '2026-07-01' AND '2026-07-15'
-  AND sh.iptal = false;
-
--- 3) SONRA: test gunlerini sil (CASCADE seanslari + drug_admins + gorev_log siler)
-DELETE FROM public.treatment_days
-WHERE treatment_date BETWEEN '2026-07-01' AND '2026-07-15';
-
--- 4) islem_log temizligi (opsiyonel, audit trail kalabilir)
+-- Supabase REST: POST /rest/v1/rpc/add_treatment_day_with_sessions
+-- Body: {p_case_id: "1db49a4e-...", p_date: "2026-07-15"}
+-- Beklenen: 200 OK + {ok: true, day_id: "..."}
 ```
 
-- [ ] **Step 6.13: Commit (test sonuclari)**
-
-Test verisi SQL degisikligi yok, commit YAPMA. Ancak test sonuclarini docs'a ekle:
-
-```bash
-# docs/superpowers/plans/2026-06-11-test-sonuclari.md
-# Senaryo A-J tablosu, hepsi PASS
-git add docs/superpowers/plans/2026-06-11-test-sonuclari.md
-git commit -m "test: BUG-059 10 senaryo PASS (A-J)"
-```
+5 RPC icin de 200 OK beklenir:
+- add_treatment_day_with_sessions
+- seans_tamamla
+- recete_guncelle
+- close_case_with_remaining
+- treatment_day_tamamla (idempotent, 2. cagrida 200 + "zaten tamamlandi")
 
 ---
+
+## Faz 7: Session Update + Handoff
 
 ## Faz 7: Session Update + Handoff
 
@@ -1258,7 +1104,7 @@ git commit -m "test: BUG-059 10 senaryo PASS (A-J)"
 
 ```python
 memory_add(
-  content="BUG-059 saat bazli seans IMPLEMENT EDILDI (2026-06-11): 1 yeni tablo treatment_day_uygulamalar + 4 ALTER kolon + 4 yeni RPC + 1 guncelleme. K1 fix: stok_hareket.id text FK. K2/K3 fix: stok INSERT atomik drug_admins ile. K5 FK: drug_admins.seans_admin_id. K-NEW-1 C cozumu: recete_guncelle -> add_treatment_day_with_sessions (p_existing_day_id ile delegasyon, DRY). Idempotent: treatment_day_tamamla zaten-tamamlanmış noop. 4 vakaya dokunulmadi (geriye uyumlu). Spec: docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md. Plan: docs/superpowers/plans/2026-06-11-bug-059-saat-bazli-seans.md.",
+  content="BUG-059 saat bazli seans IMPLEMENT EDILDI (2026-06-11): 1 yeni tablo treatment_day_uygulamalar + 4 ALTER kolon + 4 yeni RPC + 1 guncelleme. K1 fix: stok_hareket.id text FK. K2/K3 fix: stok INSERT atomik drug_admins ile. K5 FK: drug_admins.seans_admin_id. K-NEW-1 C cozumu: recete_guncelle -> add_treatment_day_with_sessions (p_existing_day_id ile delegasyon, DRY). Idempotent: treatment_day_tamamla zaten-tamamlanmış noop. 5 vakaya dokunulmadi (geriye uyumlu). Spec: docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md. Plan: docs/superpowers/plans/2026-06-11-bug-059-saat-bazli-seans.md.",
   category="code_change",
   priority="high",
   tags="BUG-059,seans,tedavi,RPC,ground-truth"
@@ -1293,5 +1139,44 @@ Kullaniciya sonucu raporla:
 - Hangi dosyalar degisti
 - Tum senaryolar PASS mi
 - Bilinen sinirlamalar / TODO (varsa)
+
+---
+
+## Faz 0 Revizyon Notu (2026-06-11)
+
+Bu bölüm 2026-06-11'de Faz 0 Pato 12 drift analizi sonucu eklendi. Spec'te yazılan ile canlı DB arasındaki farklar (21 bulgu) tespit edildi, bunlardan 7'si plan'a uygulandı. Detay: `docs/superpowers/specs/2026-06-11-faz-0-bulgulari.md`.
+
+### P1 — `treatment_day_uygulamalar.planned_time` (seans bazlı, gün bazlı DEĞİL)
+- `treatment_days.planned_time` ground truth L2933'te var ama canlıda 14 günün hepsinde NULL (hiç set edilmemiş)
+- BUG-059 için seans bazlı `treatment_day_uygulamalar.planned_time` YENİ olacak
+- İki farklı kolon, farklı anlam (gün seviyesi vs seans seviyesi) — çakışma yok
+
+### P2 — Stok INSERT `add_drug_administration`da zaten var
+- Ground truth L3271-3278: `add_drug_administration` zaten `INSERT INTO stok_hareket` yapıyor (`notlar='drug_admin:' || v_id::text`)
+- RPC 1 (`add_treatment_day_with_sessions`) "yeni atomik stok" yazmaz — mevcut pattern'i sarmalayacak
+- Faz 2'de RPC 1 yazılırken bu notlar pattern olarak kullanılmalı
+
+### P3 — `treatment_day_tamamla` 3 parametreli imzası KORUNACAK
+- Mevcut canlı imza: `(p_day_id uuid, p_not text DEFAULT NULL, p_uygulanmadi_ids uuid[] DEFAULT '{}')`
+- Canlıdaki 2 call site (ui.js:4042 + 4537) değişmeden çalışıyor (default değerler sayesinde)
+- DROP+CREATE yerine `CREATE OR REPLACE` ile idempotent guard EKLE (mevcut RAISE EXCEPTION yerine sessiz RETURN)
+
+### P4 — `js/api.js` pullTables mapping'e `treatment_day_tamamla` eklenecek
+- Mevcut 4 mapping: `add_treatment_day, add_drug_administration, close_case` (L253-256)
+- `treatment_day_tamamla` mapping YOK — BUG-059 ile birlikte EKLENECEK + 4 yeni RPC mapping
+
+### P5 — Snapshot 4 vaka yerine 5 vakaya göre alınacak (Opus #8 fix)
+- 2026-06-11 canlı: 5 aktif vaka (`1db49a4e, 57bfc92c, eb10376a, a09f0d0b, c4ff42d9`)
+- Gerçek veri: 12 tedavi günü, 10 tamamlanmış, 2 devam (Opus #8 doğrulandı)
+- eb10376a 0 günlük vaka (trivial pass — Opus #17)
+- Plan'daki "4 vaka" referansları "5 vaka" olarak güncellendi (L9, L134, L370, L710, L1087)
+
+### P6 — `caseGunEkle` (mevcut handler ismi, "caseGunEkleOnayla" değil)
+- handlers.js:225'te `case-gun-ekle` event handler'ı `caseGunEkle()` fonksiyonunu çağırıyor
+- Plan'da bu isimle devam edilecek (B18 fix)
+
+### P7 — Senaryo A 5 vakaya uygulanacak
+- Mevcut Senaryo A: 1 gün × 1 seans (eski davranış) — 5 vakada çalıştığını doğrula
+- BUG-059 sonrası geriye uyumluluk: hiçbir vakada `seans_sayisi` değişmemeli (default 1)
 
 ---

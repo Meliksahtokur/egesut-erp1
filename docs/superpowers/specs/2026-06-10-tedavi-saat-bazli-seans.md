@@ -47,7 +47,14 @@ treatment_days (1 satır/gün, seans_sayisi=1..N)
 **Uyumluluk katmanı:**
 - `seans_sayisi=1` (eski davranış) → `treatment_day_uygulamalar` boş, eski akış çalışır
 - `seans_sayisi>=2` (yeni davranış) → alt tablo dolu, zincir mantığı devrede
-- Mevcut 4 vaka (140, 5, 7, 9) → hiçbiri etkilenmez
+- Mevcut 5 vaka (eb10376a, a09f0d0b, 1db49a4e, 57bfc92c, c4ff42d9) → hiçbiri etkilenmez
+  - **Opus #17 notu:** eb10376a aktif vaka ama 0 tedavi gunu var → geriye uyumluluk testi trivial pass (kirilacak veri yok). Test senaryolarinda "0 gun, kapsam disi" olarak isaretlenecek.
+
+> **⚠️ Faz 0 Drift Notu (R6, R8, R9):**
+> - `treatment_days.planned_time` ground truth L2933'te var ama canlıda **tüm 13 günde NULL** (hiç set edilmemiş). Bu kolon gün seviyesinde; seans seviyesinde `treatment_day_uygulamalar.planned_time` YENİ olacak.
+> - `cases.animal_id` canlıda **UUID + text karışık** (örn: `1433f5f2-b60a-...` + `H000142`). BUG-059 spec'te animal_id kullanmıyoruz ama `gorev_log.hayvan_id` insert ederken `cases.animal_id`'yi kopyalıyoruz — yeni RPC'lerde bu pattern korunmalı, UUID/text karışıklığına dikkat.
+> - `islem_log` audit: ground truth'ta sadece `add_treatment_day` yazıyor (L3240). Yeni RPC'ler (`seans_tamamla`, `recete_guncelle`, `close_case_with_remaining`) islem_log'a audit kaydı yazmalı.
+> - Mevcut ek RPC'ler: `treatment_day_not_guncelle` (ground truth L3376) ve `case_plan_notu_guncelle` (L3396) mevcut — `recete_guncelle` ile çakışmaz, ayrı bırakılır.
 
 ## 📊 Veri Akışı
 
@@ -118,12 +125,17 @@ INSERT islem_log (CASE_CLOSED_EARLY)
 
 | RPC | Sorumluluk | Yeni mi? |
 |---|---|---|
-| `add_treatment_day_with_sessions(case_id, date, sessions jsonb)` | Yeni gün + N seans + N görev | YENİ (eski add_treatment_day kalır) |
+| `add_treatment_day_with_sessions(case_id, date, sessions jsonb)` | Yeni gün + N seans + N görev | **SARMALAYICI** (eski 2-RPC kalıbına atomiklik + seans planned_time ekler) |
 | `seans_tamamla(seans_admin_id, uygulanan, not)` | Tek seans done/iptal + zincirleme gün done | YENİ |
 | `recete_guncelle(case_id, yeni_plan jsonb)` | Henüz açılmamış günlerin saat/sırasını değiştir | YENİ |
 | `close_case_with_remaining(case_id, not)` | Kalan seansları otomatik tamamla + kapat | YENİ |
 | `treatment_day_tamamla` (güncelleme) | Çok seanslı günlerde "tüm seanslar done" kontrolü | GÜNCELLE (geriye uyumlu) |
 | `add_treatment_day` | Eski tek-seans davranışı (geriye uyumluluk) | KORUNUR |
+
+> **⚠️ Faz 0 Drift Notu (R1, R2, R3):**
+> - `add_treatment_day_with_sessions` (RPC 1) "yeni" değil **sarmalayıcı**: mevcut `add_treatment_day(p_case_id, p_date)` + N×`add_drug_administration(p_day_id, ...)` yerine **tek transaction atomikliği + seans bazlı planned_time** sunuyor. Atomik olması + planned_time'ı seans bazında tek seferde işlemesi mevcut 2-RPC kalıbına göre değer katar.
+> - `treatment_day_tamamla` (RPC 5) güncellemesinde **mevcut `p_uygulanmadi_ids uuid[] DEFAULT '{}'` parametresi korunmalı** (ground truth L3311). Self-review'da bu parametre unutuldu — Y3 senaryosu (seans iptal + stok iade) için kritik.
+> - Idempotent guard: mevcut `RAISE EXCEPTION 'Bu tedavi günü zaten tamamlandı'` (ground truth L3340) **sessiz RETURN'a** çevrilmeli (`RETURN jsonb_build_object('ok', true, 'mesaj', 'Zaten tamamlanmis', 'day_id', p_day_id)`). Bu değişiklik mevcut 3 parametreli imzayı koruyarak yapılır.
 
 ## 🎨 UI Bölümleri
 
@@ -160,7 +172,7 @@ INSERT islem_log (CASE_CLOSED_EARLY)
 
 | Risk | Olasılık | Şiddet | Azaltma |
 |---|---|---|---|
-| Mevcut 4 vakada geriye uyumsuzluk | Düşük | Yüksek | Geriye uyumluluk: seans_sayisi=1 ise eski akış; migration sırasında mevcut veri etkilenmez |
+| Mevcut 5 vakada geriye uyumsuzluk | Düşük | Yüksek | Geriye uyumluluk: seans_sayisi=1 ise eski akış; migration sırasında mevcut veri etkilenmez |
 | Reçete değişikliği ortasında ilaç tutarsızlığı | Orta | Orta | recete_guncelle sadece tamamlanmamış günleri günceller; açılmış günler dokunulmaz |
 | Stok ledger tutarsızlığı (recete_guncelle eski iade + yeni) | Orta | Orta | Eski stok_hareket.iptal=true + yeni INSERT atomik; trigger'lar sıralı çalışır |
 | Çoklu eczacı aynı seansı done ederse | Çok düşük | Düşük | UPDATE WHERE uygulama_tamamlandi_at IS NULL atomic; row lock |
@@ -186,13 +198,14 @@ INSERT islem_log (CASE_CLOSED_EARLY)
 - [ ] Vaka modalı "📅 Tedavi Planı" accordion
 - [ ] Dashboard 🔴 Geciken / ⏳ Bugün / 💊 Yarın seans rozetleri
 - [ ] islem_log audit her RPC'de
-- [ ] Geriye uyumluluk testi: mevcut 4 vaka (140, 5, 7, 9) etkilenmedi
+- [ ] Geriye uyumluluk testi: mevcut 5 vaka (1db49a4e, 57bfc92c, eb10376a, a09f0d0b, c4ff42d9) etkilenmedi
 - [ ] Senaryo A: 1 gün × 1 seans (eski davranış) — yeşil
 - [ ] Senaryo B: 1 gün × 3 seans + hepsi done — yeşil
-- [ ] Senaryo C: 5 gün × 3 seans + reçete ortasında değişim — yeşil
+- [ ] Senaryo C1: 5 gün × 3 seans + henüz gün satırı yokken recete_guncelle — yeşil
+- [ ] Senaryo C2: 5 gün × 3 seans + gün var ama 0 seans done — recete degisikligi — yeşil
 - [ ] Senaryo D: Vaka erken kapatma + kalan seanslar — yeşil
 - [ ] Senaryo E: Uygulanmadi seans + stok iade — yeşil
-- [ ] Senaryo F: Mevcut 4 vakaya dokunulmamasi (geriye uyumluluk) — yeşil
+- [ ] Senaryo F: Mevcut 5 vakaya dokunulmamasi (geriye uyumluluk) — yeşil
 - [ ] Senaryo G: Race condition — ayni seansa 2 paralel done — yeşil
 - [ ] Senaryo H: Recete degisikligi — kismen acilmis gun korunmali — yeşil
 - [ ] Senaryo I: Recete tamamen yeni plana gecis — yeşil
@@ -252,17 +265,23 @@ CREATE TABLE IF NOT EXISTS public.treatment_day_uygulamalar (
   created_at                  timestamptz DEFAULT now(),
   updated_at                  timestamptz DEFAULT now(),
 
-  UNIQUE(treatment_day_id, sira_no),
-  -- O-v3-1 tasarim karari: Ayni saatte 2 farkli ilac PLANLANAMAZ (1 seans = 1 ilac).
-  -- Farkli ilaclar icin pratik kullanim: 08:00 + 08:05 (5dk fark ile) girilir.
-  -- Bu bilinçli karar: UX basitligi icin, hasta sahibi "08:00'da 2 ilac verilecek" bilgisi gorur.
-  UNIQUE(treatment_day_id, planned_time)
+  UNIQUE(treatment_day_id, sira_no)
+  -- Opus #9 fix: UNIQUE(treatment_day_id, planned_time) KALDIRILDI
+  -- Veteriner pratikte ayni anda birden fazla ilac uygulamak yaygin (PenStrep IM + Meloxicam IV 08:00)
+  -- UNIQUE sira_no zaten var, ayni saatte farkli sira_no ile birden fazla ilac girilebilir
 );
 
 CREATE INDEX IF NOT EXISTS tdu_day_id_idx       ON public.treatment_day_uygulamalar(treatment_day_id);
 CREATE INDEX IF NOT EXISTS tdu_case_date_idx    ON public.treatment_day_uygulamalar(case_id, planned_date);
 CREATE INDEX IF NOT EXISTS tdu_open_idx         ON public.treatment_day_uygulamalar(case_id) WHERE uygulama_tamamlandi_at IS NULL AND uygulanmadi = false;
 CREATE INDEX IF NOT EXISTS tdu_late_idx         ON public.treatment_day_uygulamalar(planned_date, planned_time) WHERE uygulama_tamamlandi_at IS NULL AND uygulanmadi = false;
+
+-- Opus #4 fix: RLS policy (treatment_days pattern'i ile tutarlilik)
+ALTER TABLE public.treatment_day_uygulamalar ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS treatment_day_uygulamalar_all ON public.treatment_day_uygulamalar;
+CREATE POLICY treatment_day_uygulamalar_all ON public.treatment_day_uygulamalar
+  FOR ALL USING(true) WITH CHECK(true);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.treatment_day_uygulamalar TO anon, authenticated;
 
 COMMENT ON TABLE public.treatment_day_uygulamalar IS 'Tedavi gunu alt seanslari. Saat + ilac + doz + yol, gercek zamanli zincir mimarisi';
 COMMENT ON COLUMN public.treatment_day_uygulamalar.sira_no IS 'Gun icinde 1, 2, 3... sirasi';
@@ -301,14 +320,19 @@ COMMIT;
 
 ## ⚙️ RPC Tanimlari
 
-### RPC 1: `add_treatment_day_with_sessions` (YENI)
+### RPC 1: `add_treatment_day_with_sessions` (SARMALAYICI — atomik + seans planned_time)
 
 ```sql
--- ESKI: add_treatment_day(p_case_id, p_date, p_planned_time) → 1 gorev
--- YENI: add_treatment_day_with_sessions(p_case_id, p_date, p_sessions jsonb, p_existing_day_id uuid DEFAULT NULL)
---       p_sessions NULL gelirse ESKI davranis (geriye uyumlu)
---       p_existing_day_id NULL degilse: mevcut gunun alt verilerini SIL + yeniden olustur (K-NEW-1 C cozumu)
+-- ESKI: add_treatment_day(p_case_id, p_date, p_planned_time DEFAULT NULL) → 1 gun + 1 TEDAVI_GUN gorev
+--       (canlida sadece 2 parametre cagiriliyor, p_planned_time NULL; ground_truth L3171-3172)
+-- MEVCUT: add_drug_administration(p_day_id, p_stok_id, p_drug_product_id, p_dose, p_unit, p_route)
+--         → otomatik INSERT INTO stok_hareket (notlar='drug_admin:' || v_id) (ground_truth L3271-3278)
+-- YENI (SARMALAYICI): add_treatment_day_with_sessions(p_case_id, p_date, p_sessions jsonb, p_existing_day_id uuid DEFAULT NULL)
+--       - p_sessions NULL gelirse ESKI add_treatment_day davranisi (geriye uyumlu) — atomiklik kazandirir
+--       - p_sessions JSONB dizisi gelirse: tek transaction'da gun + N seans + N ilac + N stok_hareket + N gorev_log + 1 islem_log
+--       - p_existing_day_id NULL degilse: mevcut gunun alt verilerini SIL + yeniden olustur (K-NEW-1 C cozumu)
 --         recete_guncelle tarafindan kullanilir; day_no hesaplanmaz, mevcut gun korunur
+-- NEDEN YENI: atomiklik (mevcut 2-RPC kalibinda kismi hata durumunda yarida kalma riski) + seans bazli planned_time tek seferde islenebilmesi
 
 DROP FUNCTION IF EXISTS public.add_treatment_day_with_sessions(uuid, date, jsonb, uuid);
 CREATE OR REPLACE FUNCTION public.add_treatment_day_with_sessions(
@@ -331,6 +355,10 @@ DECLARE
   v_first_time     time;
   v_sira_no        smallint := 0;
   v_is_update      boolean := false;
+  -- Opus #10 fix: inner DECLARE kaldirildi, degiskenler burada (flat scope)
+  v_drug_admin_id  uuid;
+  v_stok_id        text;
+  v_stok_hareket_id text;
 BEGIN
   v_is_update := p_existing_day_id IS NOT NULL;
 
@@ -478,41 +506,38 @@ BEGIN
       -- K2 + K3 DUZELTME: drug_admins INSERT + STOK INSERT ATOMIK
       -- Mevcut add_drug_administration RPC'sinin yaptigi sey (ground_truth L3271-3274)
       -- Stok trigger KALDIRILDI, stok dusumu RPC icinde yapilmali
-      DECLARE
-        v_drug_admin_id  uuid;
-        v_stok_id        text;
-        v_stok_hareket_id text;
-      BEGIN
-        -- drug_administrations INSERT
-        INSERT INTO public.drug_administrations(
-          treatment_day_id, stok_id, drug_product_id, dose, unit, route,
-          seans_admin_id  -- K5: seans baglantisi
-        )
-        VALUES (
-          v_day_id,
-          v_session->>'stok_id',
-          (v_session->>'drug_product_id')::uuid,
-          (v_session->>'dose')::numeric,
-          v_session->>'unit',
-          v_session->>'route',
-          v_admin_id  -- treatment_day_uygulamalar.id
-        )
-        RETURNING id INTO v_drug_admin_id;
+      -- Opus #10 fix: inner DECLARE kaldirildi, degiskenler ust DECLARE'da
+      -- (nested block bakim zorlugu + variable shadowing riski)
 
-        -- Stok INSERT (drug_admin_id ile birebir izlenebilir)
-        v_stok_id := v_session->>'stok_id';
-        IF v_stok_id IS NOT NULL AND (v_session->>'dose')::numeric > 0 THEN
-          INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar)
-          VALUES (v_stok_id, 'Tedavi', (v_session->>'dose')::numeric,
-                  'drug_admin:' || v_drug_admin_id::text)
-          RETURNING id INTO v_stok_hareket_id;
+      -- drug_administrations INSERT
+      INSERT INTO public.drug_administrations(
+        treatment_day_id, stok_id, drug_product_id, dose, unit, route,
+        seans_admin_id  -- K5: seans baglantisi
+      )
+      VALUES (
+        v_day_id,
+        v_session->>'stok_id',
+        (v_session->>'drug_product_id')::uuid,
+        (v_session->>'dose')::numeric,
+        v_session->>'unit',
+        v_session->>'route',
+        v_admin_id  -- treatment_day_uygulamalar.id
+      )
+      RETURNING id INTO v_drug_admin_id;
 
-          -- Seans tablosuna stok referansini yaz (iptal icin gerekli)
-          UPDATE public.treatment_day_uygulamalar
-          SET stok_hareket_ref = v_stok_hareket_id
-          WHERE id = v_admin_id;
-        END IF;
-      END;
+      -- Stok INSERT (drug_admin_id ile birebir izlenebilir)
+      v_stok_id := v_session->>'stok_id';
+      IF v_stok_id IS NOT NULL AND (v_session->>'dose')::numeric > 0 THEN
+        INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar)
+        VALUES (v_stok_id, 'Tedavi', (v_session->>'dose')::numeric,
+                'drug_admin:' || v_drug_admin_id::text)
+        RETURNING id INTO v_stok_hareket_id;
+
+        -- Seans tablosuna stok referansini yaz (iptal icin gerekli)
+        UPDATE public.treatment_day_uygulamalar
+        SET stok_hareket_ref = v_stok_hareket_id
+        WHERE id = v_admin_id;
+      END IF;
 
       -- Her seans icin ayri TEDAVI_SEANS gorev
       INSERT INTO public.gorev_log(
@@ -725,6 +750,14 @@ BEGIN
 
     IF v_day_id IS NULL THEN
       -- YENI GUN EKLE (henuz yoksa) — K2/K3/Y1: add_treatment_day_with_sessions zaten dogru yapiyor
+      -- Opus #5 fix: recete_guncelle'da day_no bazli tarih atamasi kullanici karari:
+      -- 1. gun done edildikten sonra recete_degisikligi yapilirsa "bugun+offset" mantigiyla
+      -- yeni gunler olusur. Bu BILINCLI bir tasarim karari — orijinal tedavi takvimi
+      -- kayar (kullanici recete_degisikligi yaptigini biliyor). Daha once var olan
+      -- v_day_id IS NULL durumunda CURRENT_DATE + (v_day_no - 1) kullaniliyor — bu,
+      -- vaka henuz hic baslamadiysa dogru (1. gun = bugun). vaka basladiysa mevcut gun
+      -- v_tamam=NULL path'inden gecer (zaten var). Buradaki path SADECE yeni eklenen
+      -- gundur; tarih = bugun + (day_no - 1) dogal. Duzeltme gerekmez.
       PERFORM public.add_treatment_day_with_sessions(
         p_case_id,
         CURRENT_DATE + (v_day_no - 1),
@@ -733,12 +766,11 @@ BEGIN
       v_total_seans := v_total_seans + jsonb_array_length(v_day_plan->'sessions');
     ELSIF v_tamam = false THEN
       -- TAMAMLANMAMIS + HENUZ HICBIR SEANS YAPILMAMIS GUN — RECETE DEGISIKLIGI
-      -- K-NEW-1 (C cozumu): add_treatment_day_with_sessions'a p_existing_day_id ile devret
-      -- RPC 1 mevcut gunu UPDATE eder: stok iade + eski verileri sil + yeni seanslari olustur
-      -- Yeni treatment_days satiri OLUSMAZ, day_no KORUNUR, duplikat guneengel olur
+      -- Opus #5 fix: orijinal treatment_date'i koru (mevcut gun icin)
+      -- Mevcut gunun tarihini oku, recete_degisikliginde kayma olmasin
       PERFORM public.add_treatment_day_with_sessions(
         p_case_id,
-        CURRENT_DATE + (v_day_no - 1),
+        (SELECT treatment_date FROM public.treatment_days WHERE id = v_day_id),  -- Opus #5: orijinal tarih
         v_day_plan->'sessions',
         v_day_id   -- p_existing_day_id: mevcut gunu gunceller, yeni gun OLUSMAZ
       );
@@ -777,6 +809,20 @@ BEGIN
     AND sh.notlar = 'drug_admin:' || da.id::text
     AND sh.iptal = false;
 
+  -- Opus #6 fix: ESKI VAKA FALLBACK (seans_sayisi=1, tdu bos)
+  -- Eski vakalarda treatment_day_uygulamalar tablosu bos, JOIN hiç satir dondurmez
+  -- Bu durumda drug_admins seans_admin_id NULL uzerinden tdu JOIN'i olmadan stok iade et
+  UPDATE public.stok_hareket sh
+  SET iptal = true
+  FROM public.drug_administrations da
+  JOIN public.treatment_days td ON td.id = da.treatment_day_id
+  WHERE td.case_id = p_case_id
+    AND da.seans_admin_id IS NULL  -- eski vaka (seans tablosu kullanilmamis)
+    AND da.uygulama_tamamlandi_at IS NULL
+    AND (da.uygulanmadi IS NULL OR da.uygulanmadi = false)
+    AND sh.notlar = 'drug_admin:' || da.id::text
+    AND sh.iptal = false;
+
   -- 2. treatment_day_uygulamalar: uygulanmadi=true + iptal_nedeni (gercek durum)
   UPDATE public.treatment_day_uygulamalar
   SET uygulanmadi = true,
@@ -796,6 +842,16 @@ BEGIN
   WHERE tdu.id = da.seans_admin_id
     AND tdu.case_id = p_case_id
     AND tdu.uygulanmadi = true  -- adim 2'de zaten true yapildi
+    AND da.uygulanmadi IS DISTINCT FROM true;
+
+  -- Opus #6 fix: ESKI VAKA FALLBACK (seans_admin_id NULL olan drug_admins)
+  UPDATE public.drug_administrations da
+  SET uygulanmadi = true
+  FROM public.treatment_days td
+  WHERE td.id = da.treatment_day_id
+    AND td.case_id = p_case_id
+    AND da.seans_admin_id IS NULL
+    AND da.uygulama_tamamlandi_at IS NULL
     AND da.uygulanmadi IS DISTINCT FROM true;
 
   -- 4. treatment_days tamamlandi isaretle
@@ -836,10 +892,13 @@ $$;
 GRANT EXECUTE ON FUNCTION public.close_case_with_remaining TO anon, authenticated;
 ```
 
-### RPC 5: `treatment_day_tamamla` (GUNCELLEME — geriye uyumlu)
+### RPC 5: `treatment_day_tamamla` (GUNCELLEME — geriye uyumlu, idempotent)
 
 ```sql
--- Mevcut imza korunur, davranis seans_sayisi > 1 ise "tum seanslar done" kontrolu eklenir
+-- Mevcut 3 parametreli imza KORUNUR (ground_truth L3308-3311): (p_day_id, p_not, p_uygulanmadi_ids uuid[])
+-- Davranis: seans_sayisi > 1 ise "tum seanslar done" kontrolu eklenir
+-- Idempotent guard: seans_tamamla ile gunden bagimsiz done edilmis olabilir (self-review fix)
+-- Eski RAISE EXCEPTION yerine sessiz RETURN (geriye yuklu client'lar etkilenmez)
 DROP FUNCTION IF EXISTS public.treatment_day_tamamla(uuid, text, uuid[]);
 CREATE OR REPLACE FUNCTION public.treatment_day_tamamla(
   p_day_id           uuid,
@@ -872,6 +931,9 @@ BEGIN
   IF v_onceki THEN RAISE EXCEPTION 'Onceki tedavi gunleri tamamlanmadan bu gun tamamlanamaz'; END IF;
 
   -- YENI: seans_sayisi > 0 ise "tum seanslar done" kontrolu
+  -- Opus #1 fix: p_uygulanmadi_ids dahil say (uygulanmadi isaretleme oncesi hesapla)
+  -- Aksi halde 2 seans done + 1 seans uygulanmadi isaretlemek istediginde 2+0 < 3 → RAISE
+  -- ve uygulanmadi islemi hic calismaz (RPC patlar)
   SELECT v_day.seans_sayisi INTO v_seans_sayisi;
   IF v_seans_sayisi > 1 THEN
     SELECT
@@ -880,7 +942,8 @@ BEGIN
     INTO v_tamam, v_uygulanmadi
     FROM public.treatment_day_uygulamalar WHERE treatment_day_id = p_day_id;
 
-    IF (v_tamam + v_uygulanmadi) < v_seans_sayisi THEN
+    -- p_uygulanmadi_ids henuz isaretlenmedi, o yuzden simdiki uygulanmadi sayisina + array_length ekle
+    IF (v_tamam + v_uygulanmadi + COALESCE(array_length(p_uygulanmadi_ids, 1), 0)) < v_seans_sayisi THEN
       RAISE EXCEPTION 'Tum seanslar tamamlanmadi (%/% done, % uygulanmadi)', 
         v_tamam, v_seans_sayisi, v_uygulanmadi;
     END IF;
@@ -1044,12 +1107,13 @@ Vaka modalindaki "📅 Tedavi Plani" accordion'da "✏️ Receteyi Duzenle" buto
 |---|---|---|
 | **A: 1 gun × 1 seans (eski davranis)** | Eski modal: 1 seans girilir → kaydet | `add_treatment_day` cagirilir (eski), `seans_sayisi=1`, `treatment_day_uygulamalar` bos, tek gorev |
 | **B: 1 gun × 3 seans + hepsi done** | Yeni modal: 3 seans girilir → kaydet → 3 seans done isaretlenir | 3 `treatment_day_uygulamalar` + 3 TEDAVI_SEANS gorev, hepsi done, gun done, ana gorev done |
-| **C: 5 gun × 3 seans + recete ortasinda degisim** | 5 gun × 3 seans planlanir → 1. gun done → 2. gun henuz acilmamis durumdayken recete_guncelle ile 2. gun plani degistirilir (2 seans → 3 seans) | Eski 2 seans iade + 3 yeni seans, gun 1 etkilenmez, gun 2 yeni planli, gun 3-5 etkilenmez |
+| **C1: 5 gun × 3 seans + recete ortasinda degisim (gun satiri yok)** | 5 gun × 3 seans planlanir → 1. gun done → recete_guncelle ile 2. gun satiri henuz OLUSMAMIS, 2. gun plana 2 seans eklenir | Yeni treatment_days satiri (day_no=2) + 2 tedavi_day_uygulamalar + 2 TEDAVI_SEANS gorev, gun 1 etkilenmez |
+| **C2: 5 gun × 3 seans + recete ortasinda degisim (gun var, 0 seans done)** | 5 gun × 3 seans planlanir → 1. gun done → 2. gun treatment_days var ama 0 seans done → recete_guncelle ile 2. gun plani degistirilir (3 seans → 2 seans) | Mevcut treatment_days (day_no=2) KORUNUR + eski 3 seans silinir + 2 yeni seans, gun 1 etkilenmez, gun 3-5 etkilenmez |
 | **D: Vaka erken kapatma** | 1. gun × 3 seans, 2'si done, 1'i acik → "Tedaviyi durdur" tiklanir | Kalan 1 seans `uygulanmadi=true` isaretlenir + ilgili `drug_admins.uygulanmadi=true` + `stok_hareket.iptal=true` (D1: Y3 ile tutarli), gun done, gorev done, vaka kapali, audit log |
 | **E: 1 gun × 3 seans + uygulanmadi** | 1. seans done, 2. seans uygulanmadi isaretle (stok iade), 3. seans done | Uygulanmadi seans icin stok_hareket.iptal=true, diger 2 seans tamamlandi, gun done |
-| **F: Mevcut 4 vakaya dokunulmamasi** | Mevcut 140, 5, 7, 9 vakalari acilir, "Tedavi Plani" accordion goruntulenir | Eski tek-seans davranisi (geriye uyumlu), `treatment_day_uygulamalar` bos, sadece `treatment_days` mevcut |
+| **F: Mevcut 5 vakaya dokunulmamasi** (Y1 fix: 5 vaka, gercek UUID'ler) | Mevcut 1db49a4e, 57bfc92c, eb10376a, a09f0d0b, c4ff42d9 vakalari acilir, "Tedavi Plani" accordion goruntulenir | Eski tek-seans davranisi (geriye uyumlu), `treatment_day_uygulamalar` bos, sadece `treatment_days` mevcut |
 | **G: Race condition — ayni seansa 2 paralel done** | Tab acilir, 2 sekme ayni anda `seans_tamamla(admin_id, false)` cagirir | 1. cagri `ok=true`, 2. cagri `ok=false, race=true`. Sadece 1 satir done, stok 1 kez dusulmus |
-| **H: Recete degisikligi — kismen acilmis gun** | 5 gun × 3 seans planlanir → 2. gun ilk seansi done edilir → recete_guncelle ile 2. gun plana yeni seans eklenmeye calisilir | 2. gun `kismen_acik=true` oldugu icin ATLANIR. 1, 3, 4, 5. gun guncellenir; 2. gun eski haliyle kalir |
+| **H: Recete degisikligi — kismen acilmis gun** | 5 gun × 3 seans planlanir → 2. gun ilk seansi done edilir → recete_guncelle ile 2. gun plana yeni seans eklenmeye calisilir | 2. gun `kismen_acik=true` (1 seans done + 2 seans henuz acik) oldugu icin ATLANIR (Y2 fix: ne demek netlestirildi). 1, 3, 4, 5. gun guncellenir; 2. gun eski haliyle kalir. RPC 3 (recete_guncelle) uyarisi ile doner: `{ok:true, atlanan_gunler: [2]}` |
 | **I: Recete tamamen yeni plana gecis** | 5 gun × 3 seans planlanir → 1. gun done, 2. gun tamamen acilmis (3 seans acik, 0 done) → recete_guncelle ile 2. gun plana 4 seans eklenir | 2. gun eski 3 seans silinir, 4 yeni seans + 4 yeni gorev. Gun 1 etkilenmez, 3-5 degismez |
 | **J: Vaka erken kapatma + 1 seans acik** | Vaka 5 gun × 3 seans, gun 1-2 done, gun 3 ilk seans done, 2. seans acik, 3. seans acik → "Tedaviyi durdur" tiklanir | Gun 3-5 kalan 5 acik seans `uygulanmadi=true` isaretlenir, ilgili `drug_admins.uygulanmadi=true` + `stok_hareket.iptal=true` (O2: stok drug_admins INSERT aninda dusmustu, geri alinmali), gun 3-5 tedavi_days tamamlandi, vaka kapali, audit log "5 seans erken kapatildi, stok iade edildi" |
 
