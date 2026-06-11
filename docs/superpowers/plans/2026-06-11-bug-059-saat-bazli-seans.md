@@ -52,10 +52,12 @@ Bu plan her Fazda hangi aracın neden kullanılacağını gösterir. Mühendis a
 
 ### Yeni Dosyalar (Create)
 - `supabase/migrations/20260611000001_bug059_treatment_sessions.sql` — Schema + 4 yeni RPC + 1 güncelleme
-- `supabase/migrations/20260611000002_bug059_ground_truth_sync.sql` — Ground truth'a aynı kodu ekle (Pato 12)
 
 ### Değişen Dosyalar (Modify)
-- `supabase/migrations/99999999999999_ground_truth.sql` — Canonical referans güncelle
+- `supabase/migrations/99999999999999_ground_truth.sql` — Canonical referans güncelle (O-v2-3 fix: 2. SQL dosyası oluşturulmuyor, ground truth doğrudan düzenleniyor)
+
+### Değişen Dosyalar (Modify)
+- (Zaten satir 57'de listelendi, tekrar YOK — O-v2-3 fix)
 - `js/api.js` — `seans_tamamla`, `recete_guncelle`, `close_case_with_remaining` RPC helper'ları + `add_treatment_day_with_sessions`
 - `js/ui.js` — Tedavi modal accordion + renderTask saat rozeti + vaka modal plan accordion
 - `docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md` — Implement edildi notu (opsiyonel)
@@ -703,7 +705,7 @@ git log --oneline -5
 git status
 ```
 
-Beklenen: 3 commit (schema, RPC, ground truth), working tree clean.
+Beklenen: 2 commit (DDL+RPC birlikte Faz 2.12'de, ground truth sync Faz 3.7'de), working tree clean. (O-v2-2 fix)
 
 - [ ] **Step 4.1: Snapshot al (mevcut 4 vaka + aktif tedavi gunleri)**
 
@@ -769,10 +771,32 @@ DELETE FROM public.treatment_days WHERE treatment_date = '2026-07-01';
 
 - [ ] **Step 4.7: Senaryo B smoke test (yeni davranis)**
 
+> **Y-v2-1 fix:** Y1 notu — fake `test-stok-1` / `test-stok-2` FK violation yapar. Smoke test zorunlu degil (kullanici canlida test eder). Eger calistirilacaksa:
+
 ```python
+# Once gercek bir stok ID al
+import json
+from tools_bank import supabase_query
+stok_result = supabase_query(
+  table="stok",
+  filters="kategori=eq.Ilac&aktif=eq.true",
+  select="id",
+  limit=1
+)
+real_stok_id = stok_result[0]["id"]  # ornek: "b2c3d4e5-..."
+
+# Sonra RPC cagir
 result = supabase_rpc(
   function_name="add_treatment_day_with_sessions",
-  params='{"p_case_id": "00000000-0000-0000-0000-000000000005", "p_date": "2026-07-02", "p_sessions": [{"planned_time":"08:00:00","stok_id":"test-stok-1","dose":20,"unit":"ml","route":"IM"},{"planned_time":"16:00:00","stok_id":"test-stok-2","dose":5,"unit":"ml","route":"IM"},{"planned_time":"22:00:00","stok_id":"test-stok-1","dose":20,"unit":"ml","route":"IM"}]}'
+  params=json.dumps({
+    "p_case_id": "00000000-0000-0000-0000-000000000005",
+    "p_date": "2026-07-02",
+    "p_sessions": [
+      {"planned_time":"08:00:00","stok_id":real_stok_id,"dose":20,"unit":"ml","route":"IM"},
+      {"planned_time":"16:00:00","stok_id":real_stok_id,"dose":5,"unit":"ml","route":"IM"},
+      {"planned_time":"22:00:00","stok_id":real_stok_id,"dose":20,"unit":"ml","route":"IM"}
+    ]
+  })
 )
 ```
 
@@ -798,11 +822,12 @@ SELECT
   (SELECT COUNT(*) FROM public.gorev_log g
     JOIN public.treatment_days td ON (g.aciklama::jsonb->>'day_id')::uuid = td.id
     WHERE td.treatment_date='2026-07-02') AS gorev_count,
-  -- O2 fix: treatment_date filtresi ile izole (LIKE + created_at guvenilmez)
+  -- O-v2-1 fix: created_at = RPC anidir, treatment_date ile JOIN izole et
   (SELECT COUNT(*) FROM public.stok_hareket sh
-    WHERE sh.created_at::date = '2026-07-02'
-      AND sh.iptal = false
-      AND sh.notlar LIKE 'drug_admin:%') AS stok_hareket_count;
+    JOIN public.drug_administrations da ON sh.notlar = 'drug_admin:' || da.id::text
+    JOIN public.treatment_days td ON td.id = da.treatment_day_id
+    WHERE td.treatment_date = '2026-07-02'
+      AND sh.iptal = false) AS stok_hareket_count;
 ```
 
 Beklenen: day=1, seans=3, drug_admin=3, gorev=4, stok_hareket=3 (sadece test gunu).
@@ -975,7 +1000,9 @@ async function caseKapat() {
       await rpc('close_case', { p_case_id: _curCase.id });
       toast('✅ Vaka kapatildi');
     }
-    await pullTables(['cases', 'diseases', 'kizginlik_log']);
+    // D-v2-1 fix: close_case_with_remaining asagidaki tablolari degistirir
+    // Step 5.1'deki RPC mapping ile uyumlu olmali
+    await pullTables(['cases', 'treatment_days', 'treatment_day_uygulamalar', 'gorev_log', 'stok_hareket']);
     await openCaseDet(_curCase.id);
   } catch(e) { toast(e.message, true); }
 }
@@ -1092,7 +1119,7 @@ Beklenen:
 
 - [ ] **Step 6.3: Senaryo C — 5 gun × 3 seans + recete ortasinda degisim**
 
-Spec L990. RPC 1 ile 5 gun × 3 seans ac. 1. gun done. 2. gun henuz acilmamis durumdayken RPC 3 ile 2. gun planini degistir (2 -> 3 seans).
+Spec L990. RPC 1 ile 5 gun × 3 seans ac. 1. gun done. 2. gun henuz acilmamis durumdayken RPC 3 ile 2. gun planini degistir (3 -> 2 seans, ilac X silinir, ilac Y eklenir — D-v2-2 fix: "2 -> 3" mantiksiz, 3 seansla basladi, degisim farkli ilac listesine).
 
 Beklenen:
 - Gun 1 etkilenmez
