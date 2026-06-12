@@ -98,3 +98,32 @@ const SEMPTOM_KAT = {
   'Buzağı':  ['İshal','Halsizlik','Ateş','Göbek Şişliği','İştahsızlık','Solunum Güçlüğü'],
 };
 const SEMPTOM_GENEL = ['Ateş','Halsizlik','İştahsızlık','Ağrı','Ödem','Titreme','Yememe','Düşkünlük'];
+
+// ══════════════════════════════════════════
+// BUG-059 — Saat Bazlı Tedavi Seans Sistemi
+// ══════════════════════════════════════════
+
+// Uygulama yolları (BUG-059 tedavi seanslarında)
+const UYGULAMA_YOLU = ['IM','IV','SC','PO','Topikal','Intrauterin'];
+
+// Seans durumları (computeSeansState tarafından döner)
+const SEANS_STATE = {
+  scheduled:  { renk: 'gri',     ikon: '○', anim: null,        cssClass: 'med-state-scheduled' },
+  'due-soon': { renk: 'amber',   ikon: '◐', anim: 'med-halo',  cssClass: 'med-state-due-soon' },
+  now:        { renk: 'mavi',    ikon: '●', anim: null,        cssClass: 'med-state-now' },
+  overdue:    { renk: 'kırmızı', ikon: '●', anim: 'med-blink', cssClass: 'med-state-overdue' },
+  done:       { renk: 'yeşil',   ikon: '✓', anim: null,        cssClass: 'med-state-done' },
+  cancelled:  { renk: 'üstü çizili', ikon: '✕', anim: null,    cssClass: 'med-state-cancelled' },
+};
+
+// Done seans için geri al (undo) penceresi — dakika cinsinden
+const SEANS_UNDO_WINDOW_MIN = 5;
+
+// Aynı saatteki pip'ler için offset (px) — max 5 aynı saat
+const PIP_STACK_OFFSETS = [0, 6, -6, 12, -12];
+
+// Hızlı saat şablonları (Tedavi Ekle modal'ında chip olarak)
+const HIZLI_SAATLER = ['08:00', '16:00', '24:00'];
+
+// Tedavi seansı ekleme üst sınırı
+const MAX_SEANS_PER_DAY = 10;

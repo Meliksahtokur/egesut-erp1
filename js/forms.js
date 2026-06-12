@@ -1703,3 +1703,213 @@ function sorunToggle(cb) {
   thumb.style.background = cb.checked ? 'var(--red2)' : 'var(--card3)';
   globalThis._insemSorunVar = cb.checked;
 }
+
+// ══════════════════════════════════════════
+// BUG-059 — Saat Bazlı Tedavi Seans Submit Handler'ları
+// ══════════════════════════════════════════
+
+// Tek seans tamamla/iptal — optimistic update + rollback
+async function seansTamamla(seansId, uygulanmadi, btn) {
+  if (!seansId) { toast('❌ Seans ID eksik', true); return; }
+  const card = btn?.closest('.med-session-card');
+  // Optimistic UI
+  if (card) {
+    card.classList.add(uygulanmadi ? 'med-state-cancelled' : 'med-state-done');
+    card.classList.remove('med-state-scheduled', 'med-state-due-soon', 'med-state-now', 'med-state-overdue');
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  try {
+    const res = await rpcSeansTamamla(seansId, uygulanmadi, null);
+    if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
+    toast(uygulanmadi ? '↩ Stok iade edildi' : '✓ Seans tamamlandı');
+    // Arka plan: tabloları çek, ilgili modal'ı yeniden render et
+    await pullTables(['treatment_day_uygulamalar', 'stok', 'stok_hareket', 'treatment_days']);
+    if (_curTaskDet?.gorev_tipi === 'TEDAVI_GUN') {
+      try {
+        const meta = JSON.parse(_curTaskDet.aciklama || '{}');
+        if (meta.day_id) await renderTedaviGunSeanslar(meta.day_id);
+      } catch (e) { /* sessiz */ }
+    }
+  } catch (e) {
+    // Rollback
+    if (card) {
+      card.classList.remove('med-state-done', 'med-state-cancelled');
+    }
+    toast('❌ ' + (e.message || 'Hata'), true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = uygulanmadi ? '✕ Yapılamadı' : '✓ Uygulandı'; }
+  }
+}
+
+// Tedavi Ekle modal submit — çok seanslı
+async function submitTedaviEkle(btn) {
+  if (!_curTedaviEkle?.caseId) { toast('❌ Vaka seçili değil', true); return; }
+  const tarih = document.getElementById('te-tarih')?.value;
+  if (!tarih) { toast('❌ Tarih girin', true); return; }
+  const seanslar = _curTedaviEkle.seanslar.filter(s => s.planned_time && s.stok_id && s.dose > 0);
+  if (!seanslar.length) { toast('❌ En az 1 geçerli seans girin', true); return; }
+  // p_sessions null ise legacy tek-seans (1 seans) — şimdilik hep yeni yol
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  try {
+    const res = await rpcAddTreatmentDayWithSessions(_curTedaviEkle.caseId, tarih, seanslar, null);
+    if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
+    toast(`✅ ${seanslar.length} seanslı tedavi günü eklendi`);
+    closeM('m-tedavi-ekle');
+    await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'stok', 'stok_hareket', 'gorev_log', 'cases']);
+    // Vaka modal'ı yeniden render et
+    if (typeof renderCaseTimeline === 'function' && _curCase) await renderCaseTimeline(_curCase.id);
+  } catch (e) {
+    toast('❌ ' + (e.message || 'Hata'), true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Tedavi Planını Kaydet'; }
+  }
+}
+
+// Reçete Düzenle submit — full replace
+async function submitReceteDuzenle(btn) {
+  if (!_curReceteDuzenle?.caseId) { toast('❌ Vaka seçili değil', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  try {
+    // Sadece tamamlanmamış günleri gönder
+    const plan = _curReceteDuzenle.gunler
+      .filter(g => !g.tamamlandi)
+      .map(g => ({
+        day_no: g.day_no,
+        tarih: g.tarih,
+        sessions: g.seanslar.filter(s => s.planned_time && s.stok_id && s.dose > 0),
+      }));
+    const res = await rpcReceteGuncelle(_curReceteDuzenle.caseId, plan);
+    if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
+    toast('✅ Reçete güncellendi');
+    closeM('m-recete-duzenle');
+    await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'stok', 'stok_hareket']);
+    if (typeof renderCaseTimeline === 'function' && _curCase) await renderCaseTimeline(_curCase.id);
+  } catch (e) {
+    toast('❌ ' + (e.message || 'Hata'), true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 Reçeteyi Kaydet'; }
+  }
+}
+
+// Vaka Kapat submit — kalan seansları iptal + stok iade
+async function submitVakaKapat(btn) {
+  if (!_curVakaKapat?.caseId) { toast('❌ Vaka seçili değil', true); return; }
+  const not = document.getElementById('vk-not')?.value?.trim() || null;
+  // Onay al
+  openConfirm(
+    'Vakayı Kapat',
+    'Kalan seanslar iptal edilecek ve stok iade edilecek. Emin misiniz?',
+    async () => {
+      if (btn) { btn.disabled = true; btn.textContent = 'Kapatılıyor…'; }
+      try {
+        const res = await rpcCloseCaseWithRemaining(_curVakaKapat.caseId, not);
+        if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
+        const iade = res.iade_edilen_adet || 0;
+        toast(`✅ Vaka kapatıldı${iade ? `, ${iade} ilaç iade edildi` : ''}`);
+        closeM('m-vaka-kapat');
+        closeM('m-case-det');
+        await pullTables(['cases', 'treatment_days', 'treatment_day_uygulamalar', 'stok', 'stok_hareket']);
+        if (typeof renderCaseTimeline === 'function' && _curCase) await renderCaseTimeline(_curCase.id);
+        loadDash();
+      } catch (e) {
+        toast('❌ ' + (e.message || 'Hata'), true);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✕ Kapat ve Stok İade Et'; }
+      }
+    }
+  );
+}
+
+// BUG-059 modal event delegation — tek listener, tüm form input/click
+document.addEventListener('change', e => {
+  const t = e.target;
+  // Tedavi Ekle — seans input
+  if (t.dataset?.teSeansIdx !== undefined) {
+    const idx = +t.dataset.teSeansIdx;
+    const field = t.dataset.teField;
+    if (_curTedaviEkle?.seanslar[idx]) {
+      _curTedaviEkle.seanslar[idx][field] = (field === 'dose') ? (+t.value || 0) : t.value;
+      // Saat değişti → mini ribbon güncelle
+      if (field === 'planned_time') {
+        const miniPips = _curTedaviEkle.seanslar.filter(s => s.planned_time).map(s =>
+          `<div class="med-pip stacked-0 med-state-scheduled" style="left:${(timeToRatio(s.planned_time) * 100).toFixed(2)}%" title="${esc(s.planned_time)}"></div>`
+        ).join('');
+        const pipsEl = document.getElementById('te-mini-pips');
+        if (pipsEl) pipsEl.innerHTML = miniPips;
+      }
+    }
+  }
+  // Reçete Düzenle — seans input
+  if (t.dataset?.rdDay !== undefined) {
+    const gi = +t.dataset.rdDay, si = +t.dataset.rdSeans;
+    const field = t.dataset.rdField;
+    if (_curReceteDuzenle?.gunler[gi]?.seanslar[si]) {
+      _curReceteDuzenle.gunler[gi].seanslar[si][field] = (field === 'dose') ? (+t.value || 0) : t.value;
+    }
+  }
+});
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  // Tedavi Ekle — hızlı saat chip
+  if (action === 'tedavi-seans-ekle') {
+    if (_curTedaviEkle?.seanslar.length >= MAX_SEANS_PER_DAY) {
+      toast(`Maksimum ${MAX_SEANS_PER_DAY} seans eklenebilir`, true);
+      return;
+    }
+    _curTedaviEkle.seanslar.push({ planned_time: '12:00', stok_id: '', dose: 5, unit: 'ml', route: 'IM', notes: '' });
+    renderTedaviEkleForm();
+    return;
+  }
+  if (action === 'submit-tedavi-ekle') { submitTedaviEkle(btn); return; }
+  if (action === 'close-tedavi-ekle') { closeM('m-tedavi-ekle'); return; }
+  if (action === 'submit-recete-duzenle') { submitReceteDuzenle(btn); return; }
+  if (action === 'close-recete-duzenle') { closeM('m-recete-duzenle'); return; }
+  if (action === 'submit-vaka-kapat') { submitVakaKapat(btn); return; }
+  if (action === 'close-vaka-kapat') { closeM('m-vaka-kapat'); return; }
+  // m-case-det butonları
+  if (action === 'open-tedavi-ekle' && _curCase?.id) { openTedaviEkle(_curCase.id); return; }
+  if (action === 'open-recete-duzenle' && _curCase?.id) { openReceteDuzenle(_curCase.id); return; }
+  if (action === 'open-vaka-kapat' && _curCase?.id) { openVakaKapat(_curCase.id); return; }
+  // BUG-059 — seans aksiyonları
+  if (action === 'seans-uygulandi') { seansTamamla(btn.dataset.seansId, false, btn); return; }
+  if (action === 'seans-yapilmadi') { seansTamamla(btn.dataset.seansId, true, btn); return; }
+  // Seans kaldır (Tedavi Ekle)
+  if (btn.dataset.teRemove !== undefined) {
+    const idx = +btn.dataset.teRemove;
+    if (_curTedaviEkle?.seanslar) {
+      _curTedaviEkle.seanslar.splice(idx, 1);
+      renderTedaviEkleForm();
+    }
+    return;
+  }
+  // Hızlı saat chip
+  if (btn.dataset.teQuickHour !== undefined) {
+    const idx = +btn.dataset.teQuickHour;
+    const hour = btn.dataset.teHour;
+    if (_curTedaviEkle?.seanslar[idx]) {
+      _curTedaviEkle.seanslar[idx].planned_time = hour;
+      renderTedaviEkleForm();
+    }
+    return;
+  }
+  // Reçete — seans ekle/sil
+  if (btn.dataset.rdRemoveDay !== undefined) {
+    const gi = +btn.dataset.rdRemoveDay, si = +btn.dataset.rdRemoveSeans;
+    if (_curReceteDuzenle?.gunler[gi]?.seanslar) {
+      _curReceteDuzenle.gunler[gi].seanslar.splice(si, 1);
+      renderReceteDuzenleForm();
+    }
+    return;
+  }
+  if (btn.dataset.rdAddSeans !== undefined) {
+    const gi = +btn.dataset.rdAddSeans;
+    if (_curReceteDuzenle?.gunler[gi]) {
+      _curReceteDuzenle.gunler[gi].seanslar.push({ planned_time: '12:00', stok_id: '', dose: 5, unit: 'ml', route: 'IM', notes: '' });
+      renderReceteDuzenleForm();
+    }
+    return;
+  }
+});

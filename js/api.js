@@ -292,6 +292,11 @@ const RPC_TABLES = {
   disease_ekle:                  ['diseases'],
   disease_guncelle:              ['diseases'],
   disease_sil:                   ['diseases'],
+  // BUG-059 — saat bazlı tedavi seans sistemi (Faz 5 RPC'leri)
+  add_treatment_day_with_sessions: ['cases','treatment_days','treatment_day_uygulamalar','stok','stok_hareket','gorev_log'],
+  seans_tamamla:                 ['treatment_day_uygulamalar','stok','stok_hareket','gorev_log','treatment_days'],
+  recete_guncelle:               ['treatment_days','treatment_day_uygulamalar','stok','stok_hareket'],
+  close_case_with_remaining:     ['cases','treatment_day_uygulamalar','stok','stok_hareket','treatment_days'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────
@@ -488,4 +493,74 @@ function initRealtime() {
 async function getData(table, filterFn) {
   const data = await idbGetAll(table);
   return filterFn ? data.filter(filterFn) : data;
+}
+
+// ══════════════════════════════════════════
+// BUG-059 — Saat Bazlı Tedavi Seans RPC Wrapper'ları
+// ══════════════════════════════════════════
+
+/**
+ * add_treatment_day_with_sessions — çok seanslı tedavi günü ekle
+ * @param {string} caseId - cases.id
+ * @param {string} date - YYYY-MM-DD
+ * @param {Array<{planned_time, stok_id, dose, unit, route, notes?}>} sessions
+ * @param {string|null} not - gün notu (opsiyonel)
+ * @returns {Promise<{ok, day_id, seans_adet, mesaj?}>}
+ */
+async function rpcAddTreatmentDayWithSessions(caseId, date, sessions, not = null) {
+  if (!caseId) throw new Error('caseId zorunlu');
+  if (!date) throw new Error('date zorunlu');
+  if (!Array.isArray(sessions)) throw new Error('sessions array olmalı');
+  if (sessions.length > MAX_SEANS_PER_DAY) throw new Error(`Maksimum ${MAX_SEANS_PER_DAY} seans`);
+  return rpc('add_treatment_day_with_sessions', {
+    p_vaka_id: caseId,
+    p_tarih: date,
+    p_sessions: sessions,
+    p_not: not,
+  });
+}
+
+/**
+ * seans_tamamla — tek seansı tamamla veya iptal et
+ * @param {string} seansAdminId - treatment_day_uygulamalar.id
+ * @param {boolean} uygulanmadi - true=stok iade, false=uygulandı
+ * @param {string|null} not - seans notu (opsiyonel)
+ * @returns {Promise<{ok, seans_done, mesaj?}>}
+ */
+async function rpcSeansTamamla(seansAdminId, uygulanmadi = false, not = null) {
+  if (!seansAdminId) throw new Error('seansAdminId zorunlu');
+  return rpc('seans_tamamla', {
+    p_seans_admin_id: seansAdminId,
+    p_uygulanmadi: !!uygulanmadi,
+    p_not: not,
+  });
+}
+
+/**
+ * recete_guncelle — reçetedeki tüm tedavi günlerini ve seanslarını değiştir (full replace)
+ * @param {string} caseId - cases.id
+ * @param {Array<{day_no, tarih, sessions: [...]}>} yeniPlan
+ * @returns {Promise<{ok, gun_sayisi, seans_adet, mesaj?}>}
+ */
+async function rpcReceteGuncelle(caseId, yeniPlan) {
+  if (!caseId) throw new Error('caseId zorunlu');
+  if (!Array.isArray(yeniPlan)) throw new Error('yeniPlan array olmalı');
+  return rpc('recete_guncelle', {
+    p_vaka_id: caseId,
+    p_yeni_plan: yeniPlan,
+  });
+}
+
+/**
+ * close_case_with_remaining — vakayı kapat, kalan seansları iptal et, stok iade
+ * @param {string} caseId - cases.id
+ * @param {string|null} not - kapatma notu (opsiyonel)
+ * @returns {Promise<{ok, kalan_seans_sayisi, iade_edilen_adet, mesaj?}>}
+ */
+async function rpcCloseCaseWithRemaining(caseId, not = null) {
+  if (!caseId) throw new Error('caseId zorunlu');
+  return rpc('close_case_with_remaining', {
+    p_vaka_id: caseId,
+    p_not: not,
+  });
 }

@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
 <title>Ege Süt</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#111a0a;--bg2:#1a2812;--bg3:#22361a;
@@ -352,6 +352,78 @@ button,input,select,textarea{font-family:inherit}
 .divider{height:1px;background:var(--card2);margin:12px 0}
 .ek-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--card3);background:var(--card);color:var(--ink2);font-size:.7rem;font-weight:600;cursor:pointer;transition:.15s}
 .ek-chip.aktif{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ══════════════════════════════════════════
+   BUG-059 — Klinisyen Monitörü Modal CSS
+   Sadece .med-* class'ları override eder
+   ══════════════════════════════════════════ */
+:root{
+  --med-bg:#0A1014; --med-bg2:#0F1820; --med-bg3:#16222D;
+  --med-grid:rgba(232,240,244,0.06); --med-grid-major:rgba(232,240,244,0.12);
+  --med-ink:#E8F0F4; --med-ink2:#B4C2CC; --med-ink3:#6B7B86;
+  --med-green:#00D084; --med-amber:#FFB627; --med-red:#FF3B5C; --med-blue:#2BA3FF;
+  --med-glow-green:rgba(0,208,132,0.18);
+  --med-glow-red:rgba(255,59,92,0.22);
+  --med-glow-blue:rgba(43,163,255,0.24);
+}
+.med-modal{background:var(--med-bg)!important;color:var(--med-ink);border-radius:12px 12px 0 0!important}
+.med-modal .m-handle{background:var(--med-bg3)}
+.med-modal .m-title{color:var(--med-ink);border-bottom:1px solid var(--med-bg3)}
+.med-modal .m-body{color:var(--med-ink)}
+.med-modal .flbl{color:var(--med-ink3)}
+.med-modal .fi,.med-modal .fsel,.med-modal .fta{background:var(--med-bg2);border:1px solid var(--med-bg3);color:var(--med-ink)}
+.med-modal .fi:focus,.med-modal .fsel:focus,.med-modal .fta:focus{border-color:var(--med-blue)}
+
+/* EKG Ribbon */
+.med-ribbon{position:relative;height:84px;background:var(--med-bg);border:1px solid var(--med-bg3);border-radius:8px;padding:8px 12px;margin-bottom:14px;overflow:hidden}
+.med-ribbon-grid{position:absolute;inset:24px 12px 24px 12px;background-image:repeating-linear-gradient(90deg,var(--med-grid) 0,var(--med-grid) 1px,transparent 1px,transparent 25%),repeating-linear-gradient(90deg,var(--med-grid-major) 0,var(--med-grid-major) 1px,transparent 1px,transparent 150px);background-position:left}
+.med-ribbon-labels{position:absolute;left:12px;right:12px;top:6px;display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--med-ink3);font-weight:500}
+.med-ribbon-cursor{position:absolute;top:20px;bottom:20px;width:1.5px;background:var(--med-blue);box-shadow:0 0 6px var(--med-glow-blue);transition:left 60s linear;pointer-events:none}
+.med-ribbon-cursor::after{content:'▲';position:absolute;top:-14px;left:-3px;color:var(--med-blue);font-size:9px}
+.med-pip{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);transition:all 200ms ease-out;cursor:pointer}
+.med-pip.stacked-0{--pip-off-x:0px}
+.med-pip.stacked-1{--pip-off-x:6px}
+.med-pip.stacked-2{--pip-off-x:-6px}
+.med-pip.stacked-3{--pip-off-x:12px}
+.med-pip.stacked-4{--pip-off-x:-12px}
+.med-pip{transform:translate(calc(-50% + var(--pip-off-x,0px)),-50%)}
+.med-pip.scheduled{background:var(--med-ink3);opacity:.5}
+.med-pip.due-soon,.med-pip.med-state-due-soon{background:var(--med-amber);box-shadow:0 0 12px rgba(255,182,39,0.4);animation:med-halo 2500ms ease-in-out infinite alternate}
+.med-pip.now,.med-pip.med-state-now{background:var(--med-blue);box-shadow:0 0 16px var(--med-glow-blue)}
+.med-pip.overdue,.med-pip.med-state-overdue{background:var(--med-red);animation:med-blink 1200ms ease-in-out infinite alternate}
+.med-pip.done,.med-pip.med-state-done{background:var(--med-green);box-shadow:0 0 10px var(--med-glow-green)}
+.med-pip.done::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#0A1014}
+.med-pip.cancelled,.med-pip.med-state-cancelled{background:transparent;border:1.5px solid var(--med-ink3);opacity:.4}
+.med-pip.cancelled::after{content:'✕';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:var(--med-ink3)}
+@keyframes med-blink{from{box-shadow:0 0 8px var(--med-glow-red);transform:translate(calc(-50% + var(--pip-off-x,0px)),-50%) scale(1)}to{box-shadow:0 0 20px var(--med-glow-red);transform:translate(calc(-50% + var(--pip-off-x,0px)),-50%) scale(1.12)}}
+@keyframes med-halo{from{box-shadow:0 0 8px rgba(255,182,39,0.3)}to{box-shadow:0 0 18px rgba(255,182,39,0.6)}}
+
+/* Mini ribbon (Tedavi Ekle modal'ı) */
+.med-mini-ribbon{position:relative;height:48px;background:var(--med-bg);border:1px solid var(--med-bg3);border-radius:6px;padding:6px 10px;margin:10px 0;overflow:hidden}
+.med-mini-ribbon .med-ribbon-grid{inset:14px 10px 14px 10px}
+
+/* Seans kartı */
+.med-session-card{background:var(--med-bg2);border:1px solid var(--med-bg3);border-radius:8px;padding:10px 12px;margin-bottom:8px;transition:all 200ms ease-out}
+.med-session-card.med-state-done{border-color:var(--med-green);box-shadow:0 0 12px var(--med-glow-green)}
+.med-session-card.med-state-overdue{border-color:var(--med-red);box-shadow:0 0 12px var(--med-glow-red)}
+.med-session-card.med-state-now{border-color:var(--med-blue);box-shadow:0 0 12px var(--med-glow-blue)}
+.med-session-card.med-state-due-soon{border-color:var(--med-amber);box-shadow:0 0 8px rgba(255,182,39,0.3)}
+.med-session-card.med-state-cancelled{opacity:.5}
+.med-session-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.med-session-time{font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;color:var(--med-ink)}
+.med-session-icon{font-size:1.1rem}
+.med-session-drug{font-size:.85rem;font-weight:600;color:var(--med-ink);margin-bottom:2px}
+.med-session-meta{font-size:.7rem;color:var(--med-ink3)}
+.med-session-actions{display:flex;gap:6px;margin-top:8px}
+.med-btn-primary{flex:1;background:var(--med-green);color:#0A1014;border:none;border-radius:6px;padding:8px;font-size:.78rem;font-weight:700;cursor:pointer}
+.med-btn-primary:active{transform:scale(.97)}
+.med-btn-secondary{background:transparent;color:var(--med-ink2);border:1px solid var(--med-bg3);border-radius:6px;padding:8px 12px;font-size:.78rem;font-weight:600;cursor:pointer}
+.med-btn-danger{background:var(--med-red);color:#fff;border:none;border-radius:6px;padding:10px;font-size:.82rem;font-weight:700;cursor:pointer;width:100%}
+.med-btn-danger:active{transform:scale(.97)}
+.med-undo-chip{background:rgba(255,182,39,0.15);border:1px solid var(--med-amber);color:var(--med-amber);border-radius:6px;padding:4px 8px;font-size:.68rem;font-weight:700;cursor:pointer;animation:med-fadein 200ms ease-out}
+@keyframes med-fadein{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:translateY(0)}}
+.med-scan-line{position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--med-blue),transparent);opacity:.4;animation:med-scan 4s linear infinite;pointer-events:none}
+@keyframes med-scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 </style>
 </head>
 <body>
@@ -1431,6 +1503,11 @@ button,input,select,textarea{font-family:inherit}
         <div id="td-gun-notu" style="font-size:.82rem;color:var(--ink2);line-height:1.45;white-space:pre-wrap"></div>
       </div>
       <div id="td-ilac-listesi" style="padding:10px 16px;border-bottom:1px solid var(--card2)"></div>
+      <!-- BUG-059 — EKG Ribbon + Seans Kartları (yeni sistem, tedavi_day_uygulamalar) -->
+      <div id="td-med-wrap" style="display:none;padding:10px 16px;border-bottom:1px solid var(--card2);background:var(--med-bg,#0A1014)">
+        <div id="td-med-ribbon"></div>
+        <div id="td-med-sessions"></div>
+      </div>
       <div style="padding:10px 16px;border-bottom:1px solid var(--card2)">
         <label style="font-size:.62rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:6px">💬 Uygulayıcı Notu</label>
         <textarea id="td-uygulayici-notu" placeholder="Uygulama notu (isteğe bağlı)..." style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.82rem;resize:none;min-height:68px;box-sizing:border-box"></textarea>
@@ -1540,12 +1617,18 @@ button,input,select,textarea{font-family:inherit}
       <div id="cd-gun-bolum">
         <button class="btn" style="background:var(--blue);color:#fff;width:100%;margin-bottom:10px"
           data-action="case-gun-ekle">➕ Bugün Tedavi Günü Ekle</button>
+        <button class="btn" style="background:var(--med-bg2,#0F1820);color:#fff;width:100%;margin-bottom:6px;border:1px solid #16222D"
+          data-action="open-tedavi-ekle">💊 Tedavi Ekle (saat bazlı)</button>
+        <button class="btn" style="background:#16222D;color:#E8F0F4;width:100%;margin-bottom:6px"
+          data-action="open-recete-duzenle">📅 Reçeteyi Düzenle</button>
       </div>
       <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Tedavi Günleri</div>
       <div id="cd-timeline" style="font-size:.82rem"></div>
       <div id="cd-kapat-bolum" style="margin-top:12px">
         <button class="btn" style="background:var(--green);color:#fff;width:100%"
           data-action="case-kapat">✅ Vakayı Kapat (İyileşti)</button>
+        <button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:6px"
+          data-action="open-vaka-kapat">✕ Vakayı Kapat (Stok İade)</button>
       </div>
       <button class="btn btn-o" data-action="close-case-det" style="margin-top:6px;width:100%">Kapat</button>
     </div>
@@ -1671,17 +1754,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781256419"></script>
-    <script src="js/utils/modal.js?v=1781256419"></script>
-    <script src="js/utils/errorHandler.js?v=1781256419"></script>
-    <script src="js/utils/events.js?v=1781256419"></script>
-    <script src="js/config.js?v=1781256419"></script>
-    <script src="js/state.js?v=1781256419"></script>
-    <script src="js/api.js?v=1781256419"></script>
-    <script src="js/ui.js?v=1781256419"></script>
-    <script src="js/forms.js?v=1781256419"></script>
-    <script src="js/app.js?v=1781256419"></script>
-    <script src="js/utils/handlers.js?v=1781256419"></script>
+    <script src="js/utils/helpers.js?v=1781259002"></script>
+    <script src="js/utils/modal.js?v=1781259002"></script>
+    <script src="js/utils/errorHandler.js?v=1781259002"></script>
+    <script src="js/utils/events.js?v=1781259002"></script>
+    <script src="js/config.js?v=1781259002"></script>
+    <script src="js/state.js?v=1781259002"></script>
+    <script src="js/api.js?v=1781259002"></script>
+    <script src="js/ui.js?v=1781259002"></script>
+    <script src="js/forms.js?v=1781259002"></script>
+    <script src="js/app.js?v=1781259002"></script>
+    <script src="js/utils/handlers.js?v=1781259002"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
@@ -1699,6 +1782,60 @@ button,input,select,textarea{font-family:inherit}
       </div>
       <button class="btn btn-g" data-action="submit-gebelik">Kaydet</button>
       <button class="btn btn-o" data-action="close-gebelik">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BUG-059 — TEDAVİ EKLE MODALI (saat bazlı) ═══ -->
+<div id="m-tedavi-ekle" class="mo med-modal" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title">💊 Tedavi Ekle — <span id="te-case-label">—</span></div>
+    <div class="m-body">
+      <div class="fg">
+        <label class="flbl">Tarih *</label>
+        <input id="te-tarih" class="fi" type="date">
+      </div>
+      <div style="font-size:.62rem;font-weight:700;color:var(--med-ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⏰ Seans Planı (<span id="te-seans-count">0</span> seans)</div>
+      <div id="te-seanslar" style="margin-bottom:10px"></div>
+      <div class="med-mini-ribbon"><div class="med-ribbon-grid"></div><div id="te-mini-pips"></div></div>
+      <button class="med-btn-secondary" data-action="tedavi-seans-ekle" style="width:100%;margin-bottom:10px">+ Seans Ekle</button>
+      <button class="med-btn-primary" data-action="submit-tedavi-ekle" style="width:100%;padding:12px;font-size:.88rem">💾 Tedavi Planını Kaydet</button>
+      <button class="med-btn-secondary" data-action="close-tedavi-ekle" style="width:100%;margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BUG-059 — REÇETE DÜZENLE MODALI ═══ -->
+<div id="m-recete-duzenle" class="mo med-modal" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title">📅 Reçete Düzenle — <span id="rd-case-label">—</span></div>
+    <div class="m-body">
+      <div style="background:rgba(255,182,39,0.1);border:1px solid var(--med-amber);border-radius:6px;padding:8px 10px;font-size:.7rem;color:var(--med-amber);margin-bottom:12px">⚠ Sadece henüz tamamlanmamış günler düzenlenebilir.</div>
+      <div id="rd-gunler" style="margin-bottom:12px"></div>
+      <button class="med-btn-primary" data-action="submit-recete-duzenle" style="width:100%;padding:12px;font-size:.88rem">💾 Reçeteyi Kaydet</button>
+      <button class="med-btn-secondary" data-action="close-recete-duzenle" style="width:100%;margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BUG-059 — VAKA KAPAT MODALI ═══ -->
+<div id="m-vaka-kapat" class="mo med-modal" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title">✕ Vakayı Kapat — <span id="vk-case-label">—</span></div>
+    <div class="m-body">
+      <div id="vk-kalan-seanslar" style="font-size:.78rem;color:var(--med-ink2);background:var(--med-bg2);border-radius:8px;padding:10px;margin-bottom:12px"></div>
+      <div style="font-size:.72rem;color:var(--med-ink3);margin-bottom:10px">
+        Kapatınca:<br>
+        • Kalan seanslar "yapılamadı" işaretlenir<br>
+        • Stok iade edilir<br>
+        • Vaka "kapalı" durumuna geçer
+      </div>
+      <div class="fg">
+        <label class="flbl">Kapatma Notu</label>
+        <textarea id="vk-not" class="fta" placeholder="Kapatma nedeni…"></textarea>
+      </div>
+      <button class="med-btn-danger" data-action="submit-vaka-kapat">✕ Kapat ve Stok İade Et</button>
+      <button class="med-btn-secondary" data-action="close-vaka-kapat" style="width:100%;margin-top:6px">İptal</button>
     </div>
   </div>
 </div>

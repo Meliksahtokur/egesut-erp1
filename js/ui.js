@@ -3914,6 +3914,17 @@ async function openTaskDet(id){
   }
 
   openM('m-task-det');
+
+  // BUG-059 — EKG ribbon + seans kartları (sadece TEDAVI_GUN + seans verisi varsa)
+  if (t.gorev_tipi === 'TEDAVI_GUN') {
+    try {
+      let _bugMeta = {};
+      try { _bugMeta = JSON.parse(t.aciklama || '{}'); } catch (e) {}
+      if (_bugMeta.day_id) {
+        await renderTedaviGunSeanslar(_bugMeta.day_id);
+      }
+    } catch (e) { console.warn('BUG-059 ribbon render:', e.message); }
+  }
 }
 async function detayTamamla(){
   if(!_curTaskDet) return;
@@ -6826,4 +6837,300 @@ function taskSrch(){
   if (emptyMsg && visible === 0) {
     emptyMsg.innerHTML = '<div class="empty-ico">🔍</div>Eşleşen görev bulunamadı';
   }
+}
+
+// ══════════════════════════════════════════
+// BUG-059 — Saat Bazlı Tedavi Seans UI
+// ══════════════════════════════════════════
+
+// Pure: planned_time "08:00" → 0-1 arası oran (24h)
+function timeToRatio(timeStr) {
+  if (!timeStr || !/^\d{1,2}:\d{2}$/.test(timeStr)) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return Math.max(0, Math.min(1, (h * 60 + m) / (24 * 60)));
+}
+
+// Pure: seans state hesapla (6 durum)
+function computeSeansState(seans, now = new Date()) {
+  if (seans.uygulama_tamamlandi_at) return 'done';
+  if (seans.uygulanmadi) return 'cancelled';
+  // planned_date + planned_time → Date
+  const dateStr = seans.planned_date || seans.tarih || new Date().toISOString().split('T')[0];
+  const timeStr = seans.planned_time || '00:00';
+  const planned = new Date(`${dateStr}T${timeStr}:00`);
+  if (isNaN(planned.getTime())) return 'scheduled';
+  const diffMin = (now.getTime() - planned.getTime()) / 60000;
+  if (diffMin > 30) return 'overdue';
+  if (diffMin > -30 && diffMin <= 30) return 'now';
+  if (diffMin > -60 && diffMin <= -30) return 'due-soon';
+  return 'scheduled';
+}
+
+// EKG Ribbon render — sessions dizisinden
+function renderSessionsRibbon(sessions, opts = {}) {
+  const mini = opts.mini ? 'med-mini-ribbon' : 'med-ribbon';
+  const labels = !opts.mini ? `<div class="med-ribbon-labels"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>` : '';
+  const cursor = !opts.mini ? '<div class="med-ribbon-cursor"></div>' : '';
+  // Saat grupları: aynı oran için stack index hesapla
+  const groups = new Map();
+  sessions.forEach(s => {
+    const r = timeToRatio(s.planned_time);
+    const k = r.toFixed(3);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(s);
+  });
+  const pips = [];
+  groups.forEach((arr) => {
+    arr.forEach((s, idx) => {
+      const r = timeToRatio(s.planned_time);
+      const left = (r * 100).toFixed(2);
+      const state = computeSeansState(s);
+      const tooltip = `${s.planned_time} ${s.drug_name || s.ilac_adi || ''} ${s.dose || ''}${s.unit || ''}`.trim();
+      pips.push(`<div class="med-pip stacked-${Math.min(idx, 4)} med-state-${state}" data-seans-id="${s.id}" style="left:${left}%" title="${esc(tooltip)}"></div>`);
+    });
+  });
+  return `<div class="${mini}" data-ribbon><div class="med-ribbon-grid"></div>${labels}${pips.join('')}${cursor}</div>`;
+}
+
+// Now cursor güncelle — her dakika
+let _nowCursorInterval = null;
+function updateNowCursor() {
+  const ribbons = document.querySelectorAll('.med-ribbon:not(.med-mini-ribbon)');
+  if (!ribbons.length) return;
+  const now = new Date();
+  const ratio = (now.getHours() * 60 + now.getMinutes()) / 1440;
+  const offsetPx = ratio * 100;
+  ribbons.forEach(r => {
+    const cursor = r.querySelector('.med-ribbon-cursor');
+    if (cursor) cursor.style.left = `${offsetPx}%`;
+  });
+}
+function startNowCursorLoop() {
+  if (_nowCursorInterval) clearInterval(_nowCursorInterval);
+  updateNowCursor();
+  _nowCursorInterval = setInterval(updateNowCursor, 60000);
+}
+
+// Seans kartı render
+function renderSessionCard(s, opts = {}) {
+  const state = computeSeansState(s);
+  const cfg = SEANS_STATE[state] || SEANS_STATE.scheduled;
+  const durumText = {
+    scheduled:  `Bekliyor · ${fmtBeklemeSure(s)}`,
+    'due-soon': `Yaklaşıyor · ${fmtBeklemeSure(s)}`,
+    now:        `⏱ Vakti geldi`,
+    overdue:    `⚠ Gecikme: ${fmtBeklemeSure(s)}`,
+    done:       `✓ Uygulandı ${s.uygulama_tamamlandi_at ? '(' + fmtSaatKisa(s.uygulama_tamamlandi_at) + ')' : ''}`,
+    cancelled:  'Yapılamadı olarak işaretlendi',
+  }[state];
+  const actions = (opts.readOnly || state === 'done' || state === 'cancelled') ? '' :
+    `<div class="med-session-actions">
+       <button class="med-btn-primary" data-action="seans-uygulandi" data-seans-id="${s.id}">✓ Uygulandı</button>
+       <button class="med-btn-secondary" data-action="seans-yapilmadi" data-seans-id="${s.id}">✕ Yapılamadı</button>
+     </div>`;
+  // 5dk undo chip (done state için)
+  const undoChip = (state === 'done' && !opts.readOnly) ?
+    `<span class="med-undo-chip" data-action="seans-undo" data-seans-id="${s.id}" style="margin-left:6px">↩ Geri Al</span>` : '';
+  return `<div class="med-session-card med-state-${state}" data-seans-id="${s.id}">
+    <div class="med-session-header">
+      <span class="med-session-time">${esc(s.planned_time || '—')}</span>
+      <span class="med-session-icon">${cfg.ikon}</span>
+    </div>
+    <div class="med-session-drug">${esc(s.drug_name || s.ilac_adi || 'İlaç')} ${esc(String(s.dose || ''))}${esc(s.unit || 'ml')} ${esc(s.route || '')}</div>
+    <div class="med-session-meta">${durumText}${s.notes ? ' · 📝 ' + esc(s.notes) : ''}${undoChip}</div>
+    ${actions}
+  </div>`;
+}
+
+function fmtBeklemeSure(s) {
+  const dateStr = s.planned_date || s.tarih || new Date().toISOString().split('T')[0];
+  const timeStr = s.planned_time || '00:00';
+  const planned = new Date(`${dateStr}T${timeStr}:00`);
+  if (isNaN(planned.getTime())) return '—';
+  const diffMs = planned.getTime() - Date.now();
+  const diffMin = Math.round(diffMs / 60000);
+  const abs = Math.abs(diffMin);
+  if (abs < 60) return `${abs}dk`;
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  if (h < 24) return `${h}sa ${m}dk`;
+  return `${Math.floor(h / 24)}g ${h % 24}sa`;
+}
+
+function fmtSaatKisa(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// Tedavi günü için tüm seans kartlarını render et (m-task-det için)
+async function renderTedaviGunSeanslar(treatmentDayId) {
+  const all = await idbGetAll('treatment_day_uygulamalar');
+  const sessions = all.filter(s => s.treatment_day_id === treatmentDayId);
+  const wrap = document.getElementById('td-med-wrap');
+  const ribbonEl = document.getElementById('td-med-ribbon');
+  const sessionsEl = document.getElementById('td-med-sessions');
+  if (!wrap || !ribbonEl || !sessionsEl) return;
+  if (!sessions.length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  // Stok isim haritası (drug_name doldurmak için)
+  const [allStok, allDays] = await Promise.all([idbGetAll('stok').catch(() => []), idbGetAll('treatment_days').catch(() => [])]);
+  const stokMap = Object.fromEntries(allStok.map(x => [x.id, x.urun_adi || x.id]));
+  const day = allDays.find(d => d.id === treatmentDayId);
+  const isLocked = day?.tamamlandi === true;
+  // Drug name enrich
+  sessions.forEach(s => { s.drug_name = stokMap[s.stok_id] || 'İlaç'; s.planned_date = s.planned_date || day?.tarih; });
+  // Tarihe göre sırala
+  sessions.sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
+  ribbonEl.innerHTML = renderSessionsRibbon(sessions);
+  sessionsEl.innerHTML = sessions.map(s => renderSessionCard(s, { readOnly: isLocked })).join('');
+  wrap.style.display = 'block';
+  startNowCursorLoop();
+}
+
+// BUG-059 modal açıcılar
+async function openTedaviEkle(caseId) {
+  const m = document.getElementById('m-tedavi-ekle');
+  if (!m) return;
+  _curTedaviEkle = { caseId, seanslar: [] };
+  const allCases = await idbGetAll('cases');
+  const allAnimals = await idbGetAll('hayvanlar');
+  const c = allCases.find(x => x.id === caseId);
+  const a = c ? allAnimals.find(x => x.id === c.animal_id) : null;
+  const label = a?.kupe_no || a?.devlet_kupe || caseId.slice(0, 8);
+  document.getElementById('te-case-label').textContent = label;
+  // Bugün tarih default
+  const today = new Date().toISOString().split('T')[0];
+  const tarihEl = document.getElementById('te-tarih');
+  if (tarihEl) tarihEl.value = today;
+  // İlk seansı ekle
+  _curTedaviEkle.seanslar.push({ planned_time: '08:00', stok_id: '', dose: 5, unit: 'ml', route: 'IM', notes: '' });
+  renderTedaviEkleForm();
+  openM('m-tedavi-ekle');
+}
+
+function renderTedaviEkleForm() {
+  const allStok = getState('stock') || [];
+  const stokOpts = '<option value="">— İlaç seçin —</option>' +
+    allStok.filter(s => s.guncel_stok > 0).map(s =>
+      `<option value="${s.id}">${esc(s.urun_adi || s.id)} (${s.guncel_stok}${s.birim || 'ml'})</option>`
+    ).join('');
+  const yolOpts = UYGULAMA_YOLU.map(y => `<option value="${y}">${y}</option>`).join('');
+  const seanslar = _curTedaviEkle.seanslar;
+  document.getElementById('te-seans-count').textContent = seanslar.length;
+  const container = document.getElementById('te-seanslar');
+  container.innerHTML = seanslar.map((s, i) => `
+    <div style="background:var(--med-bg2);border:1px solid var(--med-bg3);border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="font-size:.65rem;font-weight:700;color:var(--med-ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Seans ${i + 1}</div>
+      <div class="fg"><label class="flbl">Saat *</label>
+        <input class="fi" type="time" data-te-seans-idx="${i}" data-te-field="planned_time" value="${esc(s.planned_time)}">
+        <div style="margin-top:4px;display:flex;gap:4px">${HIZLI_SAATLER.map(h => `<button type="button" class="ek-chip" data-te-quick-hour="${i}" data-te-hour="${h}">${h}</button>`).join('')}</div>
+      </div>
+      <div class="fg"><label class="flbl">İlaç *</label>
+        <select class="fsel" data-te-seans-idx="${i}" data-te-field="stok_id">${stokOpts.replace(`value="${s.stok_id}"`, `value="${s.stok_id}" selected`)}</select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="fg"><label class="flbl">Doz *</label><input class="fi" type="number" step="0.1" data-te-seans-idx="${i}" data-te-field="dose" value="${s.dose}"></div>
+        <div class="fg"><label class="flbl">Yol *</label><select class="fsel" data-te-seans-idx="${i}" data-te-field="route">${yolOpts.replace(`value="${s.route}"`, `value="${s.route}" selected`)}</select></div>
+      </div>
+      <div class="fg"><label class="flbl">Not</label><input class="fi" type="text" data-te-seans-idx="${i}" data-te-field="notes" value="${esc(s.notes || '')}" placeholder="(opsiyonel)"></div>
+      ${seanslar.length > 1 ? `<button class="med-btn-secondary" data-te-remove="${i}" style="width:100%;color:var(--med-red);border-color:var(--med-red)">🗑 Bu seansı sil</button>` : ''}
+    </div>
+  `).join('');
+  // Mini ribbon preview
+  const miniPips = seanslar.filter(s => s.planned_time).map(s =>
+    `<div class="med-pip stacked-0 med-state-scheduled" style="left:${(timeToRatio(s.planned_time) * 100).toFixed(2)}%" title="${esc(s.planned_time)}"></div>`
+  ).join('');
+  document.getElementById('te-mini-pips').innerHTML = miniPips;
+}
+
+async function openReceteDuzenle(caseId) {
+  const m = document.getElementById('m-recete-duzenle');
+  if (!m) return;
+  _curReceteDuzenle = { caseId, gunler: [] };
+  const allCases = await idbGetAll('cases');
+  const allAnimals = await idbGetAll('hayvanlar');
+  const c = allCases.find(x => x.id === caseId);
+  const a = c ? allAnimals.find(x => x.id === c.animal_id) : null;
+  document.getElementById('rd-case-label').textContent = a?.kupe_no || a?.devlet_kupe || caseId.slice(0, 8);
+  // Mevcut tedavi günlerini + seansları çek
+  const [allDays, allApps, allStok] = await Promise.all([
+    idbGetAll('treatment_days'),
+    idbGetAll('treatment_day_uygulamalar'),
+    idbGetAll('stok'),
+  ]);
+  const stokMap = Object.fromEntries(allStok.map(s => [s.id, s.urun_adi || s.id]));
+  const days = allDays.filter(d => d.case_id === caseId).sort((a, b) => (a.day_no || 0) - (b.day_no || 0));
+  _curReceteDuzenle.gunler = days.map(d => {
+    const seanslar = allApps.filter(s => s.treatment_day_id === d.id).map(s => ({
+      id: s.id, planned_time: s.planned_time, stok_id: s.stok_id,
+      dose: s.dose, unit: s.unit, route: s.route, notes: s.notes,
+      drug_name: stokMap[s.stok_id] || 'İlaç',
+    }));
+    return { id: d.id, day_no: d.day_no, tarih: d.tarih, tamamlandi: d.tamamlandi === true, seanslar };
+  });
+  renderReceteDuzenleForm();
+  openM('m-recete-duzenle');
+}
+
+function renderReceteDuzenleForm() {
+  const allStok = getState('stock') || [];
+  const stokOpts = '<option value="">— İlaç seçin —</option>' +
+    allStok.map(s => `<option value="${s.id}">${esc(s.urun_adi || s.id)} (${s.guncel_stok}${s.birim || 'ml'})</option>`).join('');
+  const yolOpts = UYGULAMA_YOLU.map(y => `<option value="${y}">${y}</option>`).join('');
+  document.getElementById('rd-gunler').innerHTML = _curReceteDuzenle.gunler.map((g, gi) => {
+    const locked = g.tamamlandi;
+    const headerColor = locked ? 'var(--med-ink3)' : 'var(--med-ink)';
+    const seansHtml = g.seanslar.map((s, si) => locked ? `
+      <div style="opacity:.6;padding:4px 0;font-size:.75rem">
+        <span style="font-family:'JetBrains Mono',monospace">${esc(s.planned_time)}</span> ${esc(s.drug_name)} ${s.dose}${s.unit} ${esc(s.route)}
+      </div>` : `
+      <div style="background:var(--med-bg2);border:1px solid var(--med-bg3);border-radius:6px;padding:8px;margin-bottom:6px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div><label class="flbl">Saat</label><input class="fi" type="time" data-rd-day="${gi}" data-rd-seans="${si}" data-rd-field="planned_time" value="${esc(s.planned_time)}"></div>
+          <div><label class="flbl">Yol</label><select class="fsel" data-rd-day="${gi}" data-rd-seans="${si}" data-rd-field="route">${yolOpts.replace(`value="${s.route}"`, `value="${s.route}" selected`)}</select></div>
+        </div>
+        <div style="margin-top:4px"><label class="flbl">İlaç</label><select class="fsel" data-rd-day="${gi}" data-rd-seans="${si}" data-rd-field="stok_id">${stokOpts.replace(`value="${s.stok_id}"`, `value="${s.stok_id}" selected`)}</select></div>
+        <div style="margin-top:4px"><label class="flbl">Doz</label><input class="fi" type="number" step="0.1" data-rd-day="${gi}" data-rd-seans="${si}" data-rd-field="dose" value="${s.dose}"></div>
+        <button class="med-btn-secondary" data-rd-remove-day="${gi}" data-rd-remove-seans="${si}" style="width:100%;margin-top:4px;color:var(--med-red);border-color:var(--med-red)">🗑 Sil</button>
+      </div>`).join('');
+    return `<details class="cd-acc" ${locked ? '' : 'open'} style="background:var(--med-bg2);border:1px solid var(--med-bg3);border-radius:8px;margin-bottom:8px">
+      <summary class="cd-acc-hdr" style="color:${headerColor}">
+        <span class="cd-acc-title">Gün ${g.day_no} (${esc(g.tarih || '—')})</span>
+        <span class="cd-acc-right">${locked ? '<span style="color:var(--med-green);font-size:.7rem;font-weight:700">🔒 tamamlandı</span>' : `<span style="color:var(--med-amber);font-size:.7rem;font-weight:700">${g.seanslar.length} seans</span>`}</span>
+      </summary>
+      <div class="cd-acc-body"><div class="cd-acc-body-inner">${seansHtml || '<div style="color:var(--med-ink3);font-size:.75rem;padding:6px 0">Seans yok</div>'}${!locked ? `<button class="med-btn-secondary" data-rd-add-seans="${gi}" style="width:100%;margin-top:4px">+ Seans Ekle</button>` : ''}</div></div>
+    </details>`;
+  }).join('') || '<div style="color:var(--med-ink3);font-size:.8rem;text-align:center;padding:20px">Henüz tedavi günü yok</div>';
+}
+
+async function openVakaKapat(caseId) {
+  const m = document.getElementById('m-vaka-kapat');
+  if (!m) return;
+  _curVakaKapat = { caseId };
+  const allCases = await idbGetAll('cases');
+  const allAnimals = await idbGetAll('hayvanlar');
+  const c = allCases.find(x => x.id === caseId);
+  const a = c ? allAnimals.find(x => x.id === c.animal_id) : null;
+  document.getElementById('vk-case-label').textContent = a?.kupe_no || a?.devlet_kupe || caseId.slice(0, 8);
+  // Kalan seansları say
+  const [allDays, allApps, allStok] = await Promise.all([
+    idbGetAll('treatment_days'), idbGetAll('treatment_day_uygulamalar'), idbGetAll('stok'),
+  ]);
+  const stokMap = Object.fromEntries(allStok.map(s => [s.id, s.urun_adi || s.id]));
+  const days = allDays.filter(d => d.case_id === caseId && !d.tamamlandi);
+  const dayIds = new Set(days.map(d => d.id));
+  const kalan = allApps.filter(s => dayIds.has(s.treatment_day_id) && !s.uygulama_tamamlandi_at && !s.uygulanmadi);
+  const listEl = document.getElementById('vk-kalan-seanslar');
+  if (!kalan.length) {
+    listEl.innerHTML = '<div style="color:var(--med-green);font-weight:700">✓ Tüm seanslar tamamlandı</div>';
+  } else {
+    listEl.innerHTML = `<div style="color:var(--med-amber);font-weight:700;margin-bottom:6px">⚠ ${kalan.length} seans henüz tamamlanmadı:</div>` +
+      kalan.map(s => `<div style="font-size:.7rem;color:var(--med-ink2);padding:2px 0">• ${esc(s.planned_date || '')} ${esc(s.planned_time || '')} — ${esc(stokMap[s.stok_id] || '')} ${s.dose}${s.unit || ''}</div>`).join('');
+  }
+  document.getElementById('vk-not').value = '';
+  openM('m-vaka-kapat');
 }
