@@ -224,6 +224,8 @@ registerActions({
   'gorev-geri-al':      () => gorevGeriAl(),
   'case-gun-ekle':      () => caseGunEkle(),
   'case-kapat':         () => caseKapat(),
+  'erken-kapat-toggle': () => caseErkenKapatToggle(),
+  'erken-kapat-onayla': (el) => caseErkenKapatOnayla(el),
   'toh-sonuc-kaydet':   () => tohSonucKaydet(),
   'toh-sonuc-bekliyor': () => tohSonuc('Bekliyor'),
   'geri-al':            (el) => islemGeriAl(el, g('ga-hid').value),
