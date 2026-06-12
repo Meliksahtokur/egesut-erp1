@@ -242,8 +242,7 @@ CREATE TABLE IF NOT EXISTS public.treatment_day_uygulamalar (
   treatment_day_id            uuid NOT NULL REFERENCES public.treatment_days(id) ON DELETE CASCADE,
   case_id                     uuid NOT NULL REFERENCES public.cases(id) ON DELETE CASCADE,
 
-  -- SEANS BILGISI
-  sira_no                     smallint NOT NULL CHECK (sira_no > 0),
+  -- SEANS BILGISI (sira_no YOK — ORDER BY planned_time ile siralama)
   planned_time                time NOT NULL,
   planned_date                date NOT NULL,
 
@@ -264,17 +263,15 @@ CREATE TABLE IF NOT EXISTS public.treatment_day_uygulamalar (
   uygulanmadi                 boolean DEFAULT false,
   iptal_nedeni                text,
 
-  -- STOK LEDGER REFERANSI (iptalde kullanilacak) — K1: stok_hareket.id text, FK text olmali
-  stok_hareket_ref            text REFERENCES public.stok_hareket(id) ON DELETE SET NULL,
-
   -- AUDIT
   created_at                  timestamptz DEFAULT now(),
   updated_at                  timestamptz DEFAULT now(),
 
-  UNIQUE(treatment_day_id, sira_no)
-  -- Opus #9 fix: UNIQUE(treatment_day_id, planned_time) KALDIRILDI
-  -- Veteriner pratikte ayni anda birden fazla ilac uygulamak yaygin (PenStrep IM + Meloxicam IV 08:00)
-  -- UNIQUE sira_no zaten var, ayni saatte farkli sira_no ile birden fazla ilac girilebilir
+  -- KISITLAR
+  -- Ayni saatte farkli ilaclar olabilir (Antibiyotik + Vitamin 08:00'de),
+  -- ayni saatte ayni ilac 2 kez OLAMAZ (C1 karar)
+  -- 5dk aralik kurali UI/validasyon katmaninda kontrol edilir
+  UNIQUE(treatment_day_id, planned_time, stok_id)
 );
 
 CREATE INDEX IF NOT EXISTS tdu_day_id_idx       ON public.treatment_day_uygulamalar(treatment_day_id);
@@ -289,16 +286,21 @@ CREATE POLICY treatment_day_uygulamalar_all ON public.treatment_day_uygulamalar
   FOR ALL USING(true) WITH CHECK(true);
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.treatment_day_uygulamalar TO anon, authenticated;
 
-COMMENT ON TABLE public.treatment_day_uygulamalar IS 'Tedavi gunu alt seanslari. Saat + ilac + doz + yol, gercek zamanli zincir mimarisi';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.sira_no IS 'Gun icinde 1, 2, 3... sirasi';
+COMMENT ON TABLE public.treatment_day_uygulamalar IS 'Tedavi gunu alt seanslari. Saat + ilac + doz + yol, gercek zamanli zincir mimarisi. NULL seans = eski tek-seans davranis (geriye uyumlu).';
 COMMENT ON COLUMN public.treatment_day_uygulamalar.planned_time IS 'PLANLANAN saat (08:00, 16:00, 24:00). Sahada gerceklesen saat = gerceklesme_saati';
+COMMENT ON COLUMN public.treatment_day_uygulamalar.gerceklesme_saati IS 'Sahada tamamlandigi saat (NOW()::time). planned_time ile karsilastirilip gec uyarisi verilir';
 COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulama_tamamlandi_at IS 'NULL = henuz yapilmadi, now() = yapildi';
-COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulanmadi IS 'true = "yapilmadi, stok iade"';
+COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulayan IS 'Sahada uygulamayi yapan kisi (text — auth entegrasyonu Faz 5)';
+COMMENT ON COLUMN public.treatment_day_uygulamalar.uygulanmadi IS 'true = "yapilmadi, stok iade". Stok_hareket.referans_tipi=tedavi_seans ile eslesir';
+COMMENT ON COLUMN public.treatment_day_uygulamalar.iptal_nedeni IS 'uygulanmadi=true ise neden (recete degisikligi, hayvan olum, vs.)';
 
 -- 2. MEVCUT treatment_days EK KOLON
+-- DEFAULT YOK: eski satirlar NULL = geriye uyumluluk (eski tek-seans davranis)
+-- CHECK NULL'i kabul eder, sadece 0'i bloklar (gozlem gunu yok, 1+ = gercek seans)
 ALTER TABLE public.treatment_days
-  ADD COLUMN IF NOT EXISTS seans_sayisi smallint DEFAULT 1;
-COMMENT ON COLUMN public.treatment_days.seans_sayisi IS 'Bu gündeki planlanan seans sayisi (1 = eski davranis, N = yeni cok seans)';
+  ADD COLUMN IF NOT EXISTS seans_sayisi smallint
+    CHECK (seans_sayisi IS NULL OR seans_sayisi > 0);
+COMMENT ON COLUMN public.treatment_days.seans_sayisi IS 'Bu gunku planlanan seans sayisi. NULL = eski tek-seans (geriye uyumlu, default yok). N >= 1 = yeni coklu-seans';
 
 -- 3. MEVCUT gorev_log EK KOLON
 ALTER TABLE public.gorev_log

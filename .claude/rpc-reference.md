@@ -80,11 +80,20 @@ Frontend'de `api.js` üzerinden çağrılır. Asla doğrudan `db.from().insert/u
 **`create_case(p_animal_id, p_disease_id uuid, p_notes?)`**
 → Kontrollü hastalık listesinden yeni vaka oluşturur.
 
-**`add_treatment_day(p_case_id, p_date, p_planned_time time?)`**
-→ Vakaya tedavi günü ekler (day_no otomatik). planned_time varsa gorev_log JSON'a eklenir.
+**`add_treatment_day(p_case_id, p_date, p_planned_time time?)`** *(LEGACY — korundu)*
+→ Vakaya tedavi günü ekler (day_no otomatik, planned_time opsiyonel). planned_time varsa gorev_log JSON'a eklenir. **Yeni akış için `add_treatment_day_with_sessions` tercih edilir.**
 
-**`treatment_day_tamamla(p_day_id, p_not?, p_uygulanmadi_ids uuid[]?)`**
-→ Tedavi gününü tamamlar (sequential check + tamamlandi). p_uygulanmadi_ids'deki ilaçlar uygulanmadi=true + stok_hareket iptal.
+**`add_treatment_day_with_sessions(p_case_id, p_date, p_sessions jsonb, p_existing_day_id uuid?)`** *(BUG-059 — Faz 2, 2026-06-11)*
+→ Sarmalayıcı RPC. `p_sessions` JSONB array: `[{planned_time, stok_id, drug_product_id?, dose, unit, route}]`. `p_sessions=NULL` ise eski tek-seans davranış (geriye uyumlu). `p_existing_day_id` doluysa günceller (recete revizyonu). `{ ok, day_id, gorev_id, admin_ids, seans_sayisi, mesaj }`
+
+**`seans_tamamla(p_seans_admin_id uuid, p_uygulanmadi boolean?, p_not text?)`** *(BUG-059 — Faz 2)*
+→ Seans bazlı race-safe tamamla/iptal. SELECT FOR UPDATE ile eşzamanlılık koruması. `p_uygulanmandi=true` ise stok_hareket güncellenir, drug_admins senkronize edilir, tedavi günü otomatik tamamlanır. `{ ok, tamamlandi, gun_tamam, mesaj }`
+
+**`recete_guncelle(p_case_id, p_yeni_plan jsonb)`** *(BUG-059 — Faz 2)*
+→ Henüz tamamlanmamış tedavi günlerinin reçetesini günceller (DRY → `add_treatment_day_with_sessions`'a delege eder). `{ ok, guncellenen_gun_sayisi, mesaj }`
+
+**`treatment_day_tamamla(p_day_id, p_not?, p_uygulanmadi_ids uuid[]?)`** *(BUG-059 — Faz 2, idempotent)*
+→ Tedavi gününü tamamlar. **Idempotent** — zaten tamamlandıysa exception fırlatmaz, `{ ok: true }` döner. p_uygulanmadi_ids'deki ilaçlar uygulanmadi=true + stok_hareket iptal. Tüm seanslar tamamsa gun kapatılır, gorev_log güncellenir. `{ ok, day_id }`
 
 **`case_plan_notu_guncelle(p_case_id, p_plan_notu)`**
 → cases.plan_notu güncelle.
@@ -92,8 +101,11 @@ Frontend'de `api.js` üzerinden çağrılır. Asla doğrudan `db.from().insert/u
 **`add_drug_administration(p_day_id uuid, p_drug_id uuid, p_dose, p_unit, p_route?)`**
 → İlaç uygulaması kaydeder + stok düşer.
 
-**`close_case(p_case_id uuid)`**
-→ Vakayı kapatır (status='closed').
+**`close_case(p_case_id uuid)`** *(LEGACY — korundu)*
+→ Vakayı kapatır (status='closed'). **Eksik reçete uyarısı veren akıllı versiyon için `close_case_with_remaining` tercih edilir.**
+
+**`close_case_with_remaining(p_case_id uuid, p_not text?)`** *(BUG-059 — Faz 2)*
+→ Vakayı erken kapatır. Tamamlanmamış tedavi günlerindeki tüm seanslar `uygulanmadi=true` yapılır, stok iade edilir, drug_admins senkronize edilir, açık gorev_log'lar kapatılır. `{ ok, iptal_edilen_seans, iade_edilen_stok, mesaj }`
 
 ---
 
