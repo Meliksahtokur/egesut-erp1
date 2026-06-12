@@ -522,6 +522,57 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
     ${drugHtml}${subHtml}
   </div>`;
 }
+// Görev listesi: hayvan+gün seans grubu ayracı
+function renderSeansGrupAyrac(g){
+  const gun = `Gün ${g.gunNo}${g.totalGun?'/'+g.totalGun:''}`;
+  const dis = g.disease ? ` · 🏥 ${esc(g.disease)}` : '';
+  const prog = g.seansTotal ? ` · ${g.seansDone}/${g.seansTotal} seans` : '';
+  const tarih = g.date ? ` · ${fmtTarih(g.date)}` : '';
+  return `<div class="seans-grup-ayrac">🐄 ${esc(g.animalLabel||'—')} · ${gun}${dis}${prog}${tarih}</div>`;
+}
+// Görev listesi: tek seans kartı (checkbox + ▾ inline iade)
+function renderSeansGorevKart(task, seans, opts={}){
+  const s = { ...seans, planned_date: seans.planned_date || opts.date };
+  const state = computeSeansState(s);
+  const kapali = state==='done' || state==='cancelled';
+  const saat = fmtSeansSaat(s.planned_time) || '—';
+  const drug = esc(opts.drugName || 'İlaç');
+  const meta = [`${s.dose||''}${s.unit||''}`, s.route].filter(Boolean).join(' · ');
+  const durumEk = {
+    'now':       '<span class="sg-now">◀ şimdi</span>',
+    'overdue':   `<span class="sg-late">⚠ ${esc(fmtBeklemeSure(s))} gecikti</span>`,
+    'due-soon':  `<span class="sg-soon">◐ ${esc(fmtBeklemeSure(s))} sonra</span>`,
+  }[state] || '';
+  if(kapali){
+    const dt = state==='done'
+      ? `✓ ${esc(fmtSaatKisa(s.uygulama_tamamlandi_at)||'')}`.trim()
+      : '✕ Yapılamadı';
+    return `<div class="seans-gorev-card s-${state} done-card">
+      <span class="sg-check sg-done">✓</span>
+      <span class="sg-saat">${esc(saat)}</span>
+      <div class="sg-info"><div class="sg-ilac">${drug}</div><div class="sg-meta">${esc(meta)}</div></div>
+      <span class="seans-chip s-${state}">${dt}</span>
+    </div>`;
+  }
+  return `<div class="seans-gorev-card s-${state}" id="sg-${task.id}">
+    <button class="sg-check" onclick="event.stopPropagation();seansTamamla('${seans.id}',false,this)" title="Uygulandı"></button>
+    <span class="sg-saat">${esc(saat)}</span>
+    <div class="sg-info"><div class="sg-ilac">${drug}</div><div class="sg-meta">${esc(meta)}${durumEk?' '+durumEk:''}</div></div>
+    <button class="sg-expand" onclick="event.stopPropagation();toggleSeansAksiyon('${task.id}')" title="Diğer işlemler">▾</button>
+    <div class="sg-actions" id="sga-${task.id}" style="display:none">
+      <button class="sg-act-iade" onclick="event.stopPropagation();seansTamamla('${seans.id}',true,this)">↩ Yapılmadı · stok iade</button>
+    </div>
+  </div>`;
+}
+// Seans kartı ▾ inline aksiyon aç/kapat
+function toggleSeansAksiyon(taskId){
+  const el = document.getElementById('sga-'+taskId);
+  if(!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  const exp = document.querySelector('#sg-'+taskId+' .sg-expand');
+  if(exp) exp.textContent = open ? '▾' : '▴';
+}
 async function toggleSub(subId,parentId,el){
   const subs=await getData('gorev_log',t=>t.id===subId);
   const sub=subs[0]; if(!sub) return;
