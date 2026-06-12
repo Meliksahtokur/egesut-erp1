@@ -212,7 +212,7 @@ BEGIN
           'label', 'Gun ' || v_day_no || ' - Seans (' || (v_session->>'planned_time') || ')',
           'admin_id', v_admin_id
         )::text,
-        false, v_gorev_id::text, v_admin_id
+        false, v_gorev_id, v_admin_id
       );
     END LOOP;
   END IF;
