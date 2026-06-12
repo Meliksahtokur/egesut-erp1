@@ -500,23 +500,25 @@ async function getData(table, filterFn) {
 // ══════════════════════════════════════════
 
 /**
- * add_treatment_day_with_sessions — çok seanslı tedavi günü ekle
+ * add_treatment_day_with_sessions — çok seanslı tedavi günü ekle / mevcut günün seanslarını değiştir
+ * existingDayId verilirse RPC update modunda çalışır: günün tüm drug_admins + seansları
+ * silinir, p_sessions'tan yeniden kurulur (stok hareketleri iptal+yeniden).
  * @param {string} caseId - cases.id
  * @param {string} date - YYYY-MM-DD
- * @param {Array<{planned_time, stok_id, dose, unit, route, notes?}>} sessions
- * @param {string|null} not - gün notu (opsiyonel)
- * @returns {Promise<{ok, day_id, seans_adet, mesaj?}>}
+ * @param {Array<{planned_time, stok_id, dose, unit, route}>} sessions
+ * @param {string|null} existingDayId - treatment_days.id (replace modu)
+ * @returns {Promise<{ok, day_id, day_no, seans_sayisi, mesaj?}>}
  */
-async function rpcAddTreatmentDayWithSessions(caseId, date, sessions, not = null) {
+async function rpcAddTreatmentDayWithSessions(caseId, date, sessions, existingDayId = null) {
   if (!caseId) throw new Error('caseId zorunlu');
   if (!date) throw new Error('date zorunlu');
   if (!Array.isArray(sessions)) throw new Error('sessions array olmalı');
   if (sessions.length > MAX_SEANS_PER_DAY) throw new Error(`Maksimum ${MAX_SEANS_PER_DAY} seans`);
   return rpc('add_treatment_day_with_sessions', {
-    p_vaka_id: caseId,
-    p_tarih: date,
+    p_case_id: caseId,
+    p_date: date,
     p_sessions: sessions,
-    p_not: not,
+    p_existing_day_id: existingDayId,
   });
 }
 
@@ -546,7 +548,7 @@ async function rpcReceteGuncelle(caseId, yeniPlan) {
   if (!caseId) throw new Error('caseId zorunlu');
   if (!Array.isArray(yeniPlan)) throw new Error('yeniPlan array olmalı');
   return rpc('recete_guncelle', {
-    p_vaka_id: caseId,
+    p_case_id: caseId,
     p_yeni_plan: yeniPlan,
   });
 }
@@ -560,7 +562,7 @@ async function rpcReceteGuncelle(caseId, yeniPlan) {
 async function rpcCloseCaseWithRemaining(caseId, not = null) {
   if (!caseId) throw new Error('caseId zorunlu');
   return rpc('close_case_with_remaining', {
-    p_vaka_id: caseId,
+    p_case_id: caseId,
     p_not: not,
   });
 }
