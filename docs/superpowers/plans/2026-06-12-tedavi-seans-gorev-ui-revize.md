@@ -88,8 +88,9 @@ git commit -m "feat(BUG-059): seans görev kartı + ayraç CSS (görev listesi)"
 function renderSeansGrupAyrac(g){
   const gun = `Gün ${g.gunNo}${g.totalGun?'/'+g.totalGun:''}`;
   const dis = g.disease ? ` · 🏥 ${esc(g.disease)}` : '';
+  const prog = g.seansTotal ? ` · ${g.seansDone}/${g.seansTotal} seans` : '';
   const tarih = g.date ? ` · ${fmtTarih(g.date)}` : '';
-  return `<div class="seans-grup-ayrac">🐄 ${esc(g.animalLabel||'—')} · ${gun}${dis}${tarih}</div>`;
+  return `<div class="seans-grup-ayrac">🐄 ${esc(g.animalLabel||'—')} · ${gun}${dis}${prog}${tarih}</div>`;
 }
 
 // Görev listesi: tek seans kartı (checkbox + ▾ inline iade)
@@ -157,12 +158,23 @@ git commit -m "feat(BUG-059): renderSeansGorevKart + ayraç + ▾ toggle fonksiy
 
 ---
 
-## Task 3: loadTasks — filtre fix + dump fix + seans gruplama render (js/ui.js)
+## Task 3: loadTasks — kategori + filtre fix + dump fix + seans gruplama render (js/ui.js)
 
 **Files:**
-- Modify: `js/ui.js` `loadTasks` — filtre satırı (~441), `_dayDrugMap` kurulumu (~459-463), render bloğu (~454-480)
+- Modify: `js/ui.js` `_katTipMap.tedavi` (~52), `loadTasks` — filtre satırı (~441), `_dayDrugMap` kurulumu (~459-463), render bloğu (~454-480)
 
-- [ ] **Step 1: TEDAVI_SEANS'ı üst seviyeye çıkar (filtre fix)**
+- [ ] **Step 1a: Kategori haritasına TEDAVI_SEANS ekle (KRİTİK — review bulgusu #1)**
+
+`js/ui.js:52` satırını:
+```js
+  tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN'],
+```
+şununla değiştir (aksi hâlde "Tedavi" kategorisi seçilince seans kartları kaybolur, "Diğer"de yanlış görünür):
+```js
+  tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
+```
+
+- [ ] **Step 1b: TEDAVI_SEANS'ı üst seviyeye çıkar (filtre fix)**
 
 `js/ui.js:441` satırını:
 ```js
@@ -198,6 +210,9 @@ git commit -m "feat(BUG-059): renderSeansGorevKart + ayraç + ▾ toggle fonksiy
     const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
     const _caseDayCount={};
     _allTDays.forEach(td=>{ _caseDayCount[td.case_id]=(_caseDayCount[td.case_id]||0)+1; });
+    // Gün başına seans ilerlemesi (ayraçta "1/3 seans" — review bulgusu #3)
+    const _seansDayStat={};
+    _allSeans.forEach(s=>{ const d=_seansDayStat[s.treatment_day_id]||(_seansDayStat[s.treatment_day_id]={total:0,done:0}); d.total++; if(s.uygulama_tamamlandi_at||s.uygulanmadi)d.done++; });
 ```
 
 - [ ] **Step 4: Render bloğunu yeniden yaz (gruplama + gizleme)**
@@ -222,7 +237,9 @@ git commit -m "feat(BUG-059): renderSeansGorevKart + ayraç + ▾ toggle fonksiy
           date:t.hedef_tarih||td?.treatment_date||'',
           gunNo:td?.day_no||'?', totalGun:td?_caseDayCount[td.case_id]||0:0,
           animalLabel:animal?(animal.kupe_no||animal.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—'),
-          disease:_dayDiseaseMap[dayId]||'', items:[] };
+          disease:_dayDiseaseMap[dayId]||'',
+          seansTotal:_seansDayStat[dayId]?.total||0, seansDone:_seansDayStat[dayId]?.done||0,
+          items:[] };
       }
       grupMap[key].items.push({ task:t, seans,
         drugName:_prodMap[seans.drug_product_id]?.brand_name||_stokNameMap[seans.stok_id]||'İlaç' });
@@ -299,7 +316,18 @@ git commit -m "fix(BUG-059): loadTasks seans gruplama + saatsiz dump fix + filtr
     const tasks=all.filter(t=>!t.tamamlandi&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||doneIds.has(t.parent_id)));
 ```
 
-- [ ] **Step 2: seansTamamla — görev listesi açıksa tazele**
+- [ ] **Step 2: seansTamamla — yeni kart için disable selector'ı genişlet (review bulgusu #2)**
+
+`js/forms.js:1714`'te çift-dokunma korumasının yeni seans kartını da kapsaması için:
+```js
+  const row = btn?.closest('.seans-row');
+```
+şununla değiştir:
+```js
+  const row = btn?.closest('.seans-row, .seans-gorev-card');
+```
+
+- [ ] **Step 3: seansTamamla — görev listesi açıksa tazele**
 
 `js/forms.js`'de `seansTamamla` içinde, `if (_curTaskDet?.gorev_tipi === 'TEDAVI_GUN') {...}` bloğunun hemen ardından (catch'ten önce, ~1732) ekle:
 
@@ -312,16 +340,16 @@ git commit -m "fix(BUG-059): loadTasks seans gruplama + saatsiz dump fix + filtr
     } catch(e){ /* sessiz */ }
 ```
 
-- [ ] **Step 3: Sözdizimini doğrula**
+- [ ] **Step 4: Sözdizimini doğrula**
 
 Run: `node --check js/ui.js && node --check js/forms.js`
 Expected: çıktı yok (exit 0)
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add js/ui.js js/forms.js
-git commit -m "fix(BUG-059): updateTaskBadge seans + seansTamamla görev listesi tazeleme"
+git commit -m "fix(BUG-059): updateTaskBadge seans + seansTamamla görev listesi tazeleme + çift-dokunma fix"
 ```
 
 ---
@@ -438,4 +466,11 @@ Expected: pre-push hook çalışır, push başarılı.
 - **Spec kapsam:** A1 (filtre)→Task 3.1+4.1; A2 (TEDAVI_GUN gizle)→Task 3.4; A3 (ayraç)→Task 2+3; A4 (seans kartı)→Task 1+2; A5 (dump fix)→Task 3.2; B (modal)→Task 5; C (RPC yok)→teyit, yeni RPC eklenmedi. Tüm spec maddeleri karşılandı.
 - **Bağımlılıklar:** `computeSeansState`/`fmtBeklemeSure`/`fmtSaatKisa`/`fmtSeansSaat` (ui.js'te mevcut), `seansTamamla`/`rpcSeansTamamla` (forms.js/api.js mevcut), `getState`/`esc`/`fmtTarih` (mevcut). Yeni tanımlanan: `renderSeansGorevKart`, `renderSeansGrupAyrac`, `toggleSeansAksiyon` (Task 2) — Task 3'te kullanılmadan önce tanımlı.
 - **İsim tutarlılığı:** `seansTamamla(seansId, uygulanmadi, btn)` imzası her çağrıda korunur; seans kayıt id'si `seans.id` (treatment_day_uygulamalar PK), görev id'si `task.id` — kart id'leri `sg-${task.id}`/`sga-${task.id}` ile eşleşir.
+
+## Review Bulguları (kod-doğrulamalı, plana işlendi)
+
+- **#1 (kritik):** `_katTipMap.tedavi` `TEDAVI_SEANS` içermiyordu → kategori filtresinde seans kartları kaybolur/yanlış kategoriye düşerdi. → Task 3 Step 1a.
+- **#2 (orta):** `seansTamamla` çift-dokunma disable'ı `.seans-row` arıyordu, yeni kart `.seans-gorev-card` → selector genişletildi. → Task 4 Step 2.
+- **#3 (iyileştirme):** Aktif listede tamamlanan seanslar filtrelenir (doğru); grup ilerlemesi ayraçta `done/total seans` rozetiyle gösterilir. → Task 2 + Task 3 Step 3.
+- **#4 (doğrulandı, değişiklik yok):** `seans_tamamla` RPC son seansta hem `TEDAVI_SEANS` hem `TEDAVI_GUN` görevini kapatır (ground_truth:3782-3800) → gün kaybolmaz, tüm seanslar bitince done görünümüne düşer. `done` filtresi `!t.parent_id` ile tekil seansları dışlar (kasıtlı; done listesi gün bazlı kalır).
 ```
