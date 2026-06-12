@@ -86,3 +86,6 @@ session-*.md
 .opencode/
 .claude/CREDENTIALS.md
 AGENTS.local.md
+
+# Git worktrees (izole workspace)
+.worktrees/
