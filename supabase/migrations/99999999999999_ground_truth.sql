@@ -3330,7 +3330,7 @@ BEGIN
     jsonb_build_object(
       'olusturulan', jsonb_build_array(
         jsonb_build_object('tablo', 'treatment_days', 'id', v_day_id::text),
-        jsonb_build_object('tablo', 'gorev_log',      'id', v_gorev_id::text)
+        jsonb_build_object('tablo', 'gorev_log',      'id', v_gorev_id)
       ),
       'guncellenen', '[]'::jsonb
     )
@@ -3675,7 +3675,7 @@ BEGIN
           'label', 'Gun ' || v_day_no || ' - Seans (' || (v_session->>'planned_time') || ')',
           'admin_id', v_admin_id
         )::text,
-        false, v_gorev_id::text, v_admin_id
+        false, v_gorev_id, v_admin_id
       );
     END LOOP;
   END IF;
@@ -3690,7 +3690,7 @@ BEGIN
     jsonb_build_object(
       'olusturulan', jsonb_build_array(
         jsonb_build_object('tablo', 'treatment_days', 'id', v_day_id::text),
-        jsonb_build_object('tablo', 'gorev_log', 'id', v_gorev_id::text)
+        jsonb_build_object('tablo', 'gorev_log', 'id', v_gorev_id)
       ) || COALESCE((
         SELECT jsonb_agg(jsonb_build_object('tablo', 'treatment_day_uygulamalar', 'id', id::text))
         FROM unnest(v_admin_ids) AS id
@@ -3914,7 +3914,7 @@ BEGIN
   JOIN public.treatment_day_uygulamalar tdu
     ON tdu.id = da.seans_admin_id
   WHERE tdu.case_id = p_case_id
-    AND tdu.uygulama_tamamlandi_at IS NULL
+
     AND tdu.uygulanmadi = false
     AND sh.notlar = 'drug_admin:' || da.id::text
     AND sh.iptal = false;
@@ -3926,7 +3926,7 @@ BEGIN
   JOIN public.treatment_days td ON td.id = da.treatment_day_id
   WHERE td.case_id = p_case_id
     AND da.seans_admin_id IS NULL
-    AND da.uygulama_tamamlandi_at IS NULL
+
     AND (da.uygulanmadi IS NULL OR da.uygulanmadi = false)
     AND sh.notlar = 'drug_admin:' || da.id::text
     AND sh.iptal = false;
@@ -3937,7 +3937,7 @@ BEGIN
       iptal_nedeni = 'Vaka erken kapatildi' || COALESCE(': ' || p_not, ''),
       updated_at = now()
   WHERE case_id = p_case_id
-    AND uygulama_tamamlandi_at IS NULL
+
     AND uygulanmadi = false;
 
   GET DIAGNOSTICS v_remaining_count = ROW_COUNT;
@@ -3958,7 +3958,7 @@ BEGIN
   WHERE td.id = da.treatment_day_id
     AND td.case_id = p_case_id
     AND da.seans_admin_id IS NULL
-    AND da.uygulama_tamamlandi_at IS NULL
+
     AND da.uygulanmadi IS DISTINCT FROM true;
 
   -- 4. treatment_days tamamlandi
