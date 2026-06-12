@@ -393,6 +393,28 @@ button,input,select,textarea{font-family:inherit}
 .seans-aksiyon button{border:none;border-radius:7px;padding:7px 10px;font-size:.72rem;font-weight:700;cursor:pointer}
 .seans-btn-ok{background:var(--green);color:#fff}
 .seans-btn-iptal{background:none;border:1px solid var(--card3) !important;color:var(--ink3)}
+/* --- Görev listesi seans kartı (BUG-059 revizyon) --- */
+.seans-grup-ayrac{font-size:.7rem;font-weight:800;color:var(--ink2);padding:10px 4px 4px;display:flex;align-items:center;gap:5px;letter-spacing:.01em;flex-wrap:wrap}
+.seans-grup-wrap{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding-left:6px;border-left:2px solid var(--card3)}
+.seans-gorev-card{background:var(--card);border:1px solid var(--card3);border-left:4px solid var(--green);border-radius:var(--r2);padding:9px 11px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.seans-gorev-card.s-overdue{border-left-color:var(--red)}
+.seans-gorev-card.s-now{border-left-color:var(--blue)}
+.seans-gorev-card.s-due-soon{border-left-color:var(--amber)}
+.seans-gorev-card.done-card{opacity:.5}
+.sg-check{width:24px;height:24px;flex-shrink:0;border:2px solid var(--card3);border-radius:7px;background:none;cursor:pointer;font-size:.9rem;color:#fff;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+.sg-check.sg-done{background:var(--green);border-color:var(--green)}
+.sg-saat{font-weight:800;font-variant-numeric:tabular-nums;font-size:.9rem;color:var(--ink);flex-shrink:0;min-width:46px}
+.sg-info{flex:1;min-width:0}
+.sg-ilac{font-size:.82rem;font-weight:600;color:var(--ink)}
+.sg-meta{font-size:.67rem;color:var(--ink3);margin-top:1px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sg-now{color:var(--blue);font-weight:800}
+.sg-late{color:var(--red);font-weight:800}
+.sg-soon{color:var(--amber);font-weight:700}
+.sg-expand{background:none;border:none;color:var(--ink3);font-size:1rem;cursor:pointer;padding:4px 6px;flex-shrink:0;line-height:1}
+.sg-actions{flex-basis:100%;border-top:1px solid var(--card2);padding-top:7px;margin-top:2px}
+.sg-act-iade{background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 11px;font-size:.74rem;font-weight:600;color:var(--ink2);cursor:pointer;width:100%;text-align:left}
+/* Modal section etiketi */
+.cd-sec-lbl{font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:8px;margin-bottom:2px}
 </style>
 </head>
 <body>
@@ -1729,17 +1751,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781293670"></script>
-    <script src="js/utils/modal.js?v=1781293670"></script>
-    <script src="js/utils/errorHandler.js?v=1781293670"></script>
-    <script src="js/utils/events.js?v=1781293670"></script>
-    <script src="js/config.js?v=1781293670"></script>
-    <script src="js/state.js?v=1781293670"></script>
-    <script src="js/api.js?v=1781293670"></script>
-    <script src="js/ui.js?v=1781293670"></script>
-    <script src="js/forms.js?v=1781293670"></script>
-    <script src="js/app.js?v=1781293670"></script>
-    <script src="js/utils/handlers.js?v=1781293670"></script>
+    <script src="js/utils/helpers.js?v=1781293903"></script>
+    <script src="js/utils/modal.js?v=1781293903"></script>
+    <script src="js/utils/errorHandler.js?v=1781293903"></script>
+    <script src="js/utils/events.js?v=1781293903"></script>
+    <script src="js/config.js?v=1781293903"></script>
+    <script src="js/state.js?v=1781293903"></script>
+    <script src="js/api.js?v=1781293903"></script>
+    <script src="js/ui.js?v=1781293903"></script>
+    <script src="js/forms.js?v=1781293903"></script>
+    <script src="js/app.js?v=1781293903"></script>
+    <script src="js/utils/handlers.js?v=1781293903"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
