@@ -4585,7 +4585,7 @@ async function renderCaseTimeline(caseId) {
 
       // İlaç listesi — sadece saatsiz (eski tip) ilaçlar; seanslılar aşağıda
       const drugHtml = day.drugs.length
-        ? `<div style="margin-top:2px">${day.drugs.map(d => `
+        ? `${sessions.length ? '<div class="cd-sec-lbl">💊 Hızlı ilaçlar (saatsiz)</div>' : ''}<div style="margin-top:2px">${day.drugs.map(d => `
             <div class="cd-drug-row">
               <div><span class="cd-drug-name">${esc(d.drug)}</span> <span class="cd-drug-meta">${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span></div>
               ${aktif && !isDone ? `<div style="display:flex;gap:2px">
@@ -4597,7 +4597,7 @@ async function renderCaseTimeline(caseId) {
 
       // Seans planı bölümü — şerit + satırlar
       const seansHtml = sessions.length ? `
-        <div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:8px">⏰ Seans Planı</div>
+        <div class="cd-sec-lbl">⏰ Seans Planı</div>
         ${renderSeansSerit(sessions, { today: day.date === bugun })}
         <div>${sessions.map(s => renderSeansRow(s, { readOnly: !aktif || isDone || isLocked })).join('')}</div>` : '';
 
@@ -4608,8 +4608,10 @@ async function renderCaseTimeline(caseId) {
           ${!sessions.length ? `<button onclick="caseDrugFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:var(--blue);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">+ İlaç</button>` : ''}
           ${!kilitliSeans ? `<button onclick="caseSeansFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:${sessions.length?'var(--card2)':'none'};color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">⏰ ${sessions.length ? 'Planı Düzenle' : 'Seans Planla'}</button>` : ''}
           <button onclick="caseDayNotAcById('${day.day_id}')" style="flex:1;min-width:64px;background:var(--card2);color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer">📝 Not</button>
-          ${!sessions.length ? `<button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;color:var(--ink3);cursor:pointer" title="Saat ekle">🕐</button>` : ''}
-          <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.06);color:var(--red);border:1px solid rgba(192,50,26,.15);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer" title="Günü sil">🗑</button>
+          <span style="display:flex;gap:2px;margin-left:auto">
+            ${!sessions.length ? `<button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 9px;font-size:.8rem;color:var(--ink3);cursor:pointer" title="Saat ekle">🕐</button>` : ''}
+            <button onclick="caseDaySil('${day.day_id}')" style="background:rgba(192,50,26,.06);color:var(--red);border:1px solid rgba(192,50,26,.15);border-radius:7px;padding:8px 9px;font-size:.8rem;cursor:pointer" title="Günü sil">🗑</button>
+          </span>
         </div>
         ${isLocked ? '<div style="margin-top:4px;font-size:.68rem;color:var(--ink3);padding:0 2px">⏳ Önceki gün tamamlanmadan bu gün tamamlanamaz</div>' : ''}
         ${sessions.length && !isLocked ? '<div style="margin-top:4px;font-size:.68rem;color:var(--ink3);padding:0 2px">Son seans kapatılınca gün otomatik tamamlanır</div>' : ''}` : '';
