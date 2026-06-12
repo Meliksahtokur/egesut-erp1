@@ -181,3 +181,99 @@ Görev: Web'den auth pattern'lerini araştır, sonra implemente et.
 - Quota aşımı → sub-orch reddeder, parent'a rapor eder. Parent yeniden dağıtır.
 - Test gate: her dosya sonrası test. FAIL → `git revert HEAD`, düzelt, tekrar dene.
 - Son çare çakışma çözümü: projeyi klonla, her ekibe ayrı workspace ver, sonra merge.
+
+---
+
+## Oturum 2026-06-12 — BUG-059 Faz 4 (Live Smoke Test + Final Handoff)
+
+### Pattern 1: Cast Hatası Doğrulama Zinciri (KRİTİK)
+
+**Her SQL/RPC yazmadan önce 3 sorgu zorunlu:**
+
+```sql
+-- 1. Tablo var mı?
+SELECT to_regclass('public.tablo_adi');
+-- NULL ise → tablo yok, hata
+
+-- 2. Kolon adı + tipi doğru mu?
+SELECT column_name, data_type, udt_name
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='tablo_adi' AND column_name='kolon';
+
+-- 3. FK tipi (özellikle parent_id, *_id gibi)
+SELECT conname, pg_get_constraintdef(oid)
+FROM pg_constraint
+WHERE conrelid='public.tablo'::regclass AND contype='f';
+```
+
+**Bu 3'ü yapmadan yazılan spec → %60 cast hatası** (T2 + T7'de 4 bug çıktı).
+
+**Yakalanan hatalar (BUG-059):**
+- `gorev_log.parent_id` uuid ama `::text` cast (Bug A)
+- `drug_admins` rename edilmiş → `drug_administrations` (Bug B)
+- `drug_administrations.uygulama_tamamlandi_at` kolonu yok (Bug C)
+- `cases.end_date` kolonu yok → `status, closed_at` kullan (Bug D)
+
+### Pattern 2: Spec Üretim Metodolojisi
+
+**Adımlar (production fix için):**
+1. **Ground truth'tan al** — `99999999999999_ground_truth.sql` canonical referans (10.780 satır, 437KB). Ara migration'lar (revize/fix) şüpheli, **asla referans alma**.
+2. **Satır aralığını belirle** — `grep -n "CREATE OR REPLACE FUNCTION" ground_truth.sql` ile fonksiyon başlangıç satırı bul.
+3. **Sed ile minimal fix** — `sed -i '3333s/old/new/'` gibi. Diff'i `git diff` ile gözden geçir.
+4. **Production deploy** — `supabase_migrate` ile. `-- source:` yorum otomatik eklenir.
+5. **Verify** — `psql -c "SELECT prosrc FROM pg_proc WHERE proname='rpc'"` ile production'dan prosrc çek, ground truth ile birebir diff yap.
+6. **Ground truth sync** — Aynı fix'i ground truth'a uygula, tek commit'te push et.
+
+**Test ortamı:** Canlı Supabase + test case UUID'si + test hayvan UUID'si (production'la aynı DB).
+
+### Pattern 3: Idempotent RPC Pattern (KRİTİK)
+
+**`treatment_day_tamamla` gibi "kapat" RPC'leri idempotent olmalı:**
+- 1. çağrı: `ok=true, step='uygulanmadi_ok'`
+- 2. çağrı (aynı state): `ok=true, step='zaten_tamam'` (HATA DEĞİL)
+- 3. çağrı (farklı state): normal işlem
+
+**Neden:** UI butonuna 2 kez tıklayınca hata almamak için. Frontend'de her RPC sonrası `pullTables()` çağrılır — eğer RPC hata fırlatırsa UI state tutarsız olur.
+
+**Counter sayımı yanıltıcı olabilir:** T7 `iade_edilen_stok=5` dedi ama 6 hareket iptal edildi (T4'ün 1 iadesi + T7'nin 5'i). RPC sadece yeni iptalleri sayıyor. UI'da bu sayıya güvenmeyip `SELECT COUNT(*)` ile doğrula.
+
+### Pattern 4: Stok Hareket İade — String Pattern Matching
+
+**`stok_hareket.notlar` kolonunda string pattern kullanılıyor:**
+```sql
+'notlar', 'drug_admin:' || drug_admins.id::text
+```
+
+**Parse:** `split_part(sh.notlar, ':', 2)::uuid` ile UUID çekilebilir.
+
+**Alternatif düşünülebilirdi:** `drug_admin_id uuid` kolon ekle (Faz 1'de yapılmadı, geriye dönük uyumluluk için pattern korundu).
+
+**UI için:** Stok raporlarında JOIN yaparken `notlar` parse etmek gerekirse yukarıdaki pattern'i kullan.
+
+### Pattern 5: Edit Tool Hata Ayıklama
+
+**Belirti:** `edit` tool "No match found for the specified text" hatası — aslında dosya değişmiş ama tool eşleşmiyor.
+
+**Sebep:** Sondaki `\n` veya boş satır farkı, satır sonu karakteri (LF vs CRLF) farkı, görünmez karakter.
+
+**Çözüm protokolü:**
+1. `tail -3 dosya.md | cat -A` ile gerçek son satırı gör (M-... = multibyte)
+2. Sondaki 1-2 satırı kopyala, **birebir** eşleştir (son satır dahil)
+3. Hâlâ hata → `wc -l` ile satır sayısını doğrula
+4. Son çare: `write` ile dosyayı baştan yaz (ama büyük dosya parse hatası riski var)
+
+**Bu oturumda:** §8-§9 eklendikten sonra §10 eklemesinde 2 deneme hata aldı, 3. denemede `tail -1 | cat -A` ile son satırı görüp eşleştirince başarılı oldu.
+
+### Pattern 6: Çok Büyük Tool Call Hatası
+
+**Belirti:** `A tool call could not be parsed — the response may have been truncated. Try breaking the task into smaller steps or resending your message.`
+
+**Sebep:** Tek seferde yazılan içerik çok büyük (>5KB) + JSON encoding.
+
+**Çözüm:**
+- `write` ile dosya oluştur → büyükse parçalara böl
+- `edit` ile parça parça ekle (her edit <100 satır)
+- `read` ile her edit öncesi son satırı doğrula
+
+**Bu oturumda:** Final handoff 871 satır → `write` ile başlık + `edit` ile 7 parça (her biri <200 satır).
+

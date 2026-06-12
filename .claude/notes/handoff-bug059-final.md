@@ -23,11 +23,6 @@
 13. [Yapılacaklar (Faz 5 / 6 / 7)](#13-yapılacaklar-faz-5--6--7)
 14. [Riskler + Açık Noktalar](#14-riskler--açık-noktalar)
 15. [Referanslar](#15-referanslar)
-11. [Frontend Dosya Haritası](#11-frontend-dosya-haritası)
-12. [Test Verileri (Canlı DB)](#12-test-verileri-canlı-db)
-13. [Yapılacaklar (Faz 5 / 6 / 7)](#13-yapılacaklar-faz-5--6--7)
-14. [Riskler + Açık Noktalar](#14-riskler--açık-noktalar)
-15. [Referanslar](#15-referanslar)
 
 ---
 
