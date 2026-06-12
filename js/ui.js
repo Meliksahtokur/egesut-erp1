@@ -656,7 +656,7 @@ async function updateTaskBadge(){
     const today=new Date().toISOString().split('T')[0];
     const all=await idbGetAll('gorev_log');
     const doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
-    const tasks=all.filter(t=>!t.tamamlandi&&(!t.parent_id||doneIds.has(t.parent_id)));
+    const tasks=all.filter(t=>!t.tamamlandi&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||doneIds.has(t.parent_id)));
     const late=tasks.filter(t=>t.hedef_tarih<today).length;
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=late>99?'99+':late; tb.style.display=late>0?'flex':'none'; }

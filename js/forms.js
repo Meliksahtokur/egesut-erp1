@@ -1711,7 +1711,7 @@ function sorunToggle(cb) {
 
 async function seansTamamla(seansId, uygulanmadi, btn) {
   if (!seansId) { toast('❌ Seans ID eksik', true); return; }
-  const row = btn?.closest('.seans-row');
+  const row = btn?.closest('.seans-row, .seans-gorev-card');
   if (row) row.querySelectorAll('button').forEach(b => { b.disabled = true; });
   if (btn) btn.textContent = '…';
   try {
@@ -1730,6 +1730,12 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
         if (meta.day_id) await renderTedaviGunSeanslar(meta.day_id);
       } catch (e) { /* sessiz */ }
     }
+    // Görev listesi görünürse tazele (seans kartları oradan tamamlanabilir)
+    try {
+      const _tb=document.getElementById('tasks-body');
+      if(_tb && _tb.offsetParent!==null) await loadTasks(_curTaskFilter||'today');
+      if(typeof updateTaskBadge==='function') updateTaskBadge();
+    } catch(e){ /* sessiz */ }
   } catch (e) {
     toast('❌ ' + (e.message || 'Hata'), true);
     if (row) row.querySelectorAll('button').forEach(b => { b.disabled = false; });
