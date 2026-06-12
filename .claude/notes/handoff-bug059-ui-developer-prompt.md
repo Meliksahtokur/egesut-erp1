@@ -208,6 +208,7 @@ const result = await supabase.rpc('add_treatment_day_with_sessions', {
 
 | Dosya | Ne İçin |
 |-------|---------|
+| `docs/superpowers/specs/2026-06-12-bug059-ui-design-klinisyen-monitoru.md` | **UI TASARIM SPESİFİKASYONU** (Klinisyen Monitörü estetiği — renkler, tipografi, EKG ribbon, 4 modal sketch, state matrisi) |
 | `.claude/notes/handoff-bug059-final.md` | **ANA REFERANS** (871 satır, 15 section) |
 | `.claude/notes/handoff-bug059-faz4-sonrasi.md` | Faz 4 özet, test matrisi, bug fix chronology |
 | `.claude/notes/handoff-faz-0-sonrasi.md` | Faz 0 plan, planned_time/treatment_time ayrımı |
@@ -215,7 +216,7 @@ const result = await supabase.rpc('add_treatment_day_with_sessions', {
 | `supabase/migrations/99999999999999_ground_truth.sql` | Canonical DB state (10.780 satır) |
 | `supabase/migrations/20260611000002_bug059_rpcs.sql` | BUG-059 RPC migration (5 RPC) |
 | `.claude/rpc-reference.md` | Tüm RPC imzaları (BUG-059 dahil) |
-| `docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md` | Spec — DB kontratı (T7 doğrulandı) |
+| `docs/superpowers/specs/2026-06-10-tedavi-saat-bazli-seans.md` | DB kontratı (T7 doğrulandı) |
 | `js/forms.js` → mevcut "Tedavi Ekle" formu | UI pattern şablonu |
 | `js/api.js` → `supabaseRpc()` helper | RPC çağrı şablonu |
 
