@@ -49,7 +49,7 @@ const _katTipMap={
   asi:    ['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
   muayene:['MUAYENE','GEBELIK_KONTROL','VETERINER_KONTROL'],
-  tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN'],
+  tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
   bakim:  ['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME','BUZAGI_BAKIM'],
   diger:  null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
@@ -411,7 +411,7 @@ async function loadTasks(f,btn){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const today=new Date().toISOString().split('T')[0];
-    if(navigator.onLine) await pullTables(['gorev_log','treatment_days','cases','diseases']).catch(()=>{});
+    if(navigator.onLine) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
     const all=await idbGetAll('gorev_log');
     if(f==='done'){
       let done=all.filter(t=>t.tamamlandi&&!t.iptal&&!t.parent_id);
@@ -438,7 +438,7 @@ async function loadTasks(f,btn){
     }
     // parent_id olan ama parent'ı tamamlanmış görevler top-level sayılır
     const _doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
-    let data=all.filter(t=>!t.tamamlandi&&!t.iptal&&(!t.parent_id||_doneIds.has(t.parent_id)));
+    let data=all.filter(t=>!t.tamamlandi&&!t.iptal&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||_doneIds.has(t.parent_id)));
     const _d7=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
     if(f==='today') data=data.filter(t=>t.hedef_tarih<=today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
@@ -456,8 +456,11 @@ async function loadTasks(f,btn){
     const _allDrugAdmins=await idbGetAll('drug_administrations').catch(()=>[]);
     const _allStokItems=await idbGetAll('stok').catch(()=>[]);
     const _stokNameMap=Object.fromEntries(_allStokItems.map(s=>[s.id,s.urun_adi||s.id]));
+    const _allDrugProducts=await idbGetAll('drug_products').catch(()=>[]);
+    const _prodMap=Object.fromEntries(_allDrugProducts.map(p=>[p.id,p]));
     const _dayDrugMap={};
     _allDrugAdmins.forEach(da=>{
+      if(da.seans_admin_id) return; // saatli ilaçlar seans kartına gider, güne dump edilmez
       if(!_dayDrugMap[da.treatment_day_id])_dayDrugMap[da.treatment_day_id]=[];
       _dayDrugMap[da.treatment_day_id].push({name:_stokNameMap[da.stok_id]||'İlaç',dose:da.dose,unit:da.unit,route:da.route});
     });
@@ -469,7 +472,58 @@ async function loadTasks(f,btn){
     const _diseaseById=Object.fromEntries(_allTaskDiseases.map(d=>[d.id,d.name||'']));
     const _dayDiseaseMap={};
     _allTDays.forEach(td=>{ const c=_caseById[td.case_id]; if(c?.disease_id)_dayDiseaseMap[td.id]=_diseaseById[c.disease_id]||''; });
-    el.innerHTML=data.slice(0,150).map(t=>{
+    const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
+    const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
+    const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
+    const _caseDayCount={};
+    _allTDays.forEach(td=>{ _caseDayCount[td.case_id]=(_caseDayCount[td.case_id]||0)+1; });
+    // Gün başına seans ilerlemesi (ayraçta "1/3 seans")
+    const _seansDayStat={};
+    _allSeans.forEach(s=>{ const d=_seansDayStat[s.treatment_day_id]||(_seansDayStat[s.treatment_day_id]={total:0,done:0}); d.total++; if(s.uygulama_tamamlandi_at||s.uygulanmadi)d.done++; });
+    // --- Seans görevlerini ayır, gruplara böl ---
+    const seansDayIds=new Set();
+    data.forEach(t=>{ if(t.gorev_tipi==='TEDAVI_SEANS'){ const sd=_seansById[t.seans_admin_id]; if(sd?.treatment_day_id)seansDayIds.add(sd.treatment_day_id); } });
+    const grupMap={};
+    data.forEach(t=>{
+      if(t.gorev_tipi!=='TEDAVI_SEANS')return;
+      const seans=_seansById[t.seans_admin_id]; if(!seans)return;
+      const dayId=seans.treatment_day_id;
+      const key=(t.hayvan_id||'')+'|'+dayId;
+      if(!grupMap[key]){
+        const td=_tdById[dayId];
+        const animal=getState('animals').find(a=>a.id===t.hayvan_id);
+        grupMap[key]={ hayvan_id:t.hayvan_id, day_id:dayId,
+          date:t.hedef_tarih||td?.treatment_date||'',
+          gunNo:td?.day_no||'?', totalGun:td?_caseDayCount[td.case_id]||0:0,
+          animalLabel:animal?(animal.kupe_no||animal.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—'),
+          disease:_dayDiseaseMap[dayId]||'',
+          seansTotal:_seansDayStat[dayId]?.total||0, seansDone:_seansDayStat[dayId]?.done||0,
+          items:[] };
+      }
+      grupMap[key].items.push({ task:t, seans,
+        drugName:_prodMap[seans.drug_product_id]?.brand_name||_stokNameMap[seans.stok_id]||'İlaç' });
+    });
+    // --- Blokları (normal kart + seans grubu) tek listede sırala ---
+    const bloklar=[];
+    data.forEach(t=>{
+      if(t.gorev_tipi==='TEDAVI_SEANS')return;
+      if(t.gorev_tipi==='TEDAVI_GUN'){ try{ if(seansDayIds.has(JSON.parse(t.aciklama||'{}').day_id))return; }catch(e){} }
+      const planTime=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
+      bloklar.push({ sort:(t.hedef_tarih||'')+'|'+(planTime||'~')+'|n', type:'normal', task:t });
+    });
+    Object.values(grupMap).forEach(g=>{
+      g.items.sort((a,b)=>(a.seans.planned_time||'').localeCompare(b.seans.planned_time||''));
+      const ilk=g.items[0]?.seans.planned_time||'';
+      bloklar.push({ sort:(g.date||'')+'|'+(ilk||'~')+'|s', type:'seans', grup:g });
+    });
+    bloklar.sort((a,b)=>a.sort.localeCompare(b.sort));
+    el.innerHTML=bloklar.slice(0,200).map(b=>{
+      if(b.type==='seans'){
+        const g=b.grup;
+        return renderSeansGrupAyrac(g)+'<div class="seans-grup-wrap">'+
+          g.items.map(it=>renderSeansGorevKart(it.task,it.seans,{drugName:it.drugName,date:g.date})).join('')+'</div>';
+      }
+      const t=b.task;
       const _diff=Math.floor((new Date(t.hedef_tarih)-Date.now())/86400000);
       const _clsBase=_diff<=3?'near':'';
       const _clsMid=t.hedef_tarih===today?'soon':_clsBase;
