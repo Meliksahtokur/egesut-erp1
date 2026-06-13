@@ -3884,10 +3884,13 @@ BEGIN
   WHERE case_id = p_case_id AND tamamlandi = false;
 
   -- 5. gorev_log kalan acik gorevler
+  -- NOT: gorev_tipi guard zorunlu — aksi halde gorev_log'daki JSON-olmayan
+  -- (emoji'li duz metin) aciklama'lar g.aciklama::jsonb cast'inde 22P02 verir.
   UPDATE public.gorev_log g
   SET tamamlandi = true, tamamlanma_tarihi = now()
   FROM public.treatment_days td
   WHERE td.case_id = p_case_id
+    AND g.gorev_tipi IN ('TEDAVI_GUN','TEDAVI_SEANS')
     AND (g.aciklama::jsonb->>'day_id')::uuid = td.id
     AND g.tamamlandi = false;
 
