@@ -3914,8 +3914,8 @@ BEGIN
   JOIN public.treatment_day_uygulamalar tdu
     ON tdu.id = da.seans_admin_id
   WHERE tdu.case_id = p_case_id
-
     AND tdu.uygulanmadi = false
+    AND tdu.uygulama_tamamlandi_at IS NULL   -- biten seans iade EDILMEZ
     AND sh.notlar = 'drug_admin:' || da.id::text
     AND sh.iptal = false;
 
@@ -3926,7 +3926,7 @@ BEGIN
   JOIN public.treatment_days td ON td.id = da.treatment_day_id
   WHERE td.case_id = p_case_id
     AND da.seans_admin_id IS NULL
-
+    AND td.tamamlandi = false                 -- tamamlanmis gun iade EDILMEZ
     AND (da.uygulanmadi IS NULL OR da.uygulanmadi = false)
     AND sh.notlar = 'drug_admin:' || da.id::text
     AND sh.iptal = false;
@@ -3937,8 +3937,8 @@ BEGIN
       iptal_nedeni = 'Vaka erken kapatildi' || COALESCE(': ' || p_not, ''),
       updated_at = now()
   WHERE case_id = p_case_id
-
-    AND uygulanmadi = false;
+    AND uygulanmadi = false
+    AND uygulama_tamamlandi_at IS NULL;       -- biten seans "yapilmadi" YAPILMAZ
 
   GET DIAGNOSTICS v_remaining_count = ROW_COUNT;
 
@@ -3958,7 +3958,7 @@ BEGIN
   WHERE td.id = da.treatment_day_id
     AND td.case_id = p_case_id
     AND da.seans_admin_id IS NULL
-
+    AND td.tamamlandi = false                 -- tamamlanmis gun korunur
     AND da.uygulanmadi IS DISTINCT FROM true;
 
   -- 4. treatment_days tamamlandi

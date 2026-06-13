@@ -7149,7 +7149,9 @@ function _seansBosSatir() {
 }
 
 function _seansStokOpts(seciliId) {
-  const stoklar = (getState('stock') || []).filter(s => s.guncel_stok > 0 || s.id === seciliId);
+  // Sadece ilaç kategorileri — Aşı/Sperma/Yem hariç (seçili olan her zaman kalır)
+  const stoklar = (getState('stock') || []).filter(s =>
+    (s.guncel_stok > 0 && s.kategori && !['Aşı','Sperma','Yem'].includes(s.kategori)) || s.id === seciliId);
   return '<option value="">— İlaç seçin —</option>' + stoklar.map(s =>
     `<option value="${s.id}"${s.id === seciliId ? ' selected' : ''}>${esc(s.urun_adi || s.id)} (${s.guncel_stok ?? '?'}${s.birim || ''})</option>`
   ).join('');
