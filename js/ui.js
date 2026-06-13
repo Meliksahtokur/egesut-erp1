@@ -944,6 +944,7 @@ const _ETKEN_INGREDIENT = {
   'ADEMIN':    /ademin|ade\b/i,
   'KALSIYUM':  /kalsiyum|calcium/i,
   'ROTA':      /rota|corona|e\.?\s*coli/i,
+  'ROTA_2DOZ': /rota|corona|e\.?\s*coli/i,  // N3: aynı aşı (2. doz etiketi)
 };
 
 // Legacy regex fallback (drug_product_id olmayan eski stoklar için)
@@ -954,6 +955,7 @@ const _ETKEN_FILTERE_LEGACY = {
   'ADEMIN':    s => /ademin/i.test(s.urun_adi),
   'KALSIYUM':  s => /kalsiyum/i.test(s.urun_adi),
   'ROTA':      s => /rota|corona|e\.?\s*coli/i.test(s.urun_adi),
+  'ROTA_2DOZ': s => /rota|corona|e\.?\s*coli/i.test(s.urun_adi),  // N3
 };
 
 async function _etkenFiltrele(etkenKod, stoklar) {
