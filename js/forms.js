@@ -459,7 +459,7 @@ async function loadDiseasesDropdown() {
   }
 }
 
-function onDiseaseSelect() {
+async function onDiseaseSelect() {
   const sel = g('d-disease-id');
   const catEl = g('d-disease-cat');
   const opt = sel?.selectedOptions[0];
@@ -469,6 +469,35 @@ function onDiseaseSelect() {
   } else {
     catEl.style.display = 'none';
   }
+  await _renderSablonSecim(sel?.value || '');
+}
+
+// #63 — seçili hastalığa bağlı şablonları radio liste olarak göster
+async function _renderSablonSecim(diseaseId){
+  const blok = g('d-sablon-blok'); const list = g('d-sablon-list');
+  globalThis._seciliSablonId = null;
+  if(!blok || !list) return;
+  if(!diseaseId){ blok.style.display='none'; list.innerHTML=''; return; }
+  const eslem = (await idbGetAll('sablon_hastalik_eslem')).filter(e=>e.disease_id===diseaseId);
+  if(!eslem.length){ blok.style.display='none'; list.innerHTML=''; return; }
+  const sablonlar = await idbGetAll('tedavi_sablonu');
+  const kalemler  = await idbGetAll('tedavi_sablonu_kalem');
+  const list2 = eslem.map(e=>sablonlar.find(s=>s.id===e.sablon_id)).filter(Boolean);
+  let html = '';
+  list2.forEach(s=>{
+    const sk = kalemler.filter(k=>k.sablon_id===s.id);
+    const gun = new Set(sk.map(k=>k.gun_no)).size;
+    html += `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.82rem">
+      <input type="radio" name="d-sablon" value="${s.id}"> ${esc(s.ad)}
+      <span style="color:var(--ink2);font-size:.72rem">${gun} gün · ${sk.length} seans</span></label>`;
+  });
+  html += `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.82rem;color:var(--ink2)">
+    <input type="radio" name="d-sablon" value="" checked> Şablonsuz (boş vaka aç)</label>`;
+  list.innerHTML = html;
+  blok.style.display='block';
+  list.querySelectorAll('input[name="d-sablon"]').forEach(r=>{
+    r.onchange = () => { globalThis._seciliSablonId = r.value || null; };
+  });
 }
 
 async function submitCase(btn) {
@@ -492,12 +521,24 @@ async function submitCase(btn) {
       toast('❌ ' + (res?.mesaj || 'Vaka açılamadı'), true);
       return;
     }
-    toast('✅ Vaka açıldı');
+    // #63 — şablon seçildiyse tek tıkla tüm planı uygula
+    const sablonId = globalThis._seciliSablonId;
+    if (sablonId && res?.case_id) {
+      try {
+        const r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId });
+        if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
+        toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)`);
+      } catch(e) { toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true); }
+    } else {
+      toast('✅ Vaka açıldı');
+    }
+    globalThis._seciliSablonId = null;
     closeM('m-disease');
     cl('d-hid'); cl('d-case-notes');
     g('d-disease-id').value = '';
     g('d-disease-cat').style.display = 'none';
-    await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log']);
+    { const sb = g('d-sablon-blok'); if (sb) sb.style.display = 'none'; }
+    await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']);
     _drugsCache = [];
     await loadDrugsCache();
     // Kızgınlık tedavi bağlantısı
