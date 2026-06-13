@@ -4504,7 +4504,12 @@ function fmtGunSaat(ts) {
 async function renderCaseTimeline(caseId) {
   const el = document.getElementById('cd-timeline');
   if (!el) return;
-  el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Yükleniyor…</span>';
+  // Re-render'da açık akordeonları + scroll'u koru (işlem sonrası modal başa dönmesin)
+  const prevOpen = new Set([...el.querySelectorAll('.cd-acc.open')].map(a => a.id.replace('acc-', '')));
+  const _sc = (typeof _findScroller === 'function') ? _findScroller(el) : null;
+  const prevY = _sc ? _sc.scrollTop : 0;
+  // İlk yüklemede "Yükleniyor" göster; re-render'da flash YOK (yoksa scroll başa kayar)
+  if (!prevOpen.size) el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Yükleniyor…</span>';
   try {
     const [allDays, allAdmins, allProducts, allStok, allSeans] = await Promise.all([
       idbGetAll('treatment_days'),
@@ -4602,7 +4607,9 @@ async function renderCaseTimeline(caseId) {
       const isDone   = day.tamamlandi;
       const isLocked = !isDone && day._locked;
       const tlCls    = isDone ? 'tl-done' : isLocked ? 'tl-locked' : 'tl-active';
-      const openAttr = (aktif && !isDone && day === sortedDays.find(d => !d.tamamlandi)) ? 'open' : '';
+      const openAttr = prevOpen.size
+        ? (prevOpen.has(day.day_id) ? 'open' : '')
+        : ((aktif && !isDone && day === sortedDays.find(d => !d.tamamlandi)) ? 'open' : '');
       const nodeIcon = isDone ? '✓' : '';
       const gunNo    = `Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||''}`;
 
@@ -4691,6 +4698,8 @@ async function renderCaseTimeline(caseId) {
           </div>
         </div>`;
     }).join('') + '</div>';
+  // Re-render sonrası scroll konumunu geri yükle (içerik yüksekliği benzer → başa kaymaz)
+  if (_sc && prevY) _sc.scrollTop = prevY;
   // Bugünün şeritlerinde şimdi çizgisini canlı tut
   if (sortedDays.some(d => (d.sessions || []).length && d.date === bugun)) startNowCursorLoop();
   } catch(e) {
@@ -7279,14 +7288,20 @@ function seansAddSaatSec(h, btn) {
 }
 
 async function seansSilTekil(seansId) {
+  const dayId = _seansAddCtx?.dayId;
   openConfirm('Seansı Sil', 'Bu seans silinecek ve ilacı stoğa iade edilecek. Emin misiniz?', async () => {
     try {
       const res = await rpc('remove_treatment_session', { p_seans_id: seansId });
       if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
       toast('✅ Seans silindi, stok iade edildi');
       await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log']);
-      if (_curCase) await renderCaseTimeline(_curCase.id);
-      if (_curCase) _updateKapatBtn(_curCase.id);
+      if (_curCase) {
+        await _keepScroll(document.getElementById('cd-timeline'), async () => {
+          await renderCaseTimeline(_curCase.id);
+          if (dayId) await caseSeansEkleFormAc(dayId); // editör açık kalsın, kullanıcı devam etsin
+        });
+        _updateKapatBtn(_curCase.id);
+      }
     } catch (e) {
       toast('❌ ' + (e.message || 'Hata'), true);
     }
@@ -7320,6 +7335,7 @@ async function seansDuzenleKaydet(seansId, btn) {
   if (!time) { toast('Saat girin', true); return; }
   if (!dose || dose <= 0) { toast('Geçerli doz girin', true); return; }
   if (!unit) { toast('Birim girin', true); return; }
+  const dayId = _seansAddCtx?.dayId;
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
     const res = await rpc('update_treatment_session', {
@@ -7329,8 +7345,13 @@ async function seansDuzenleKaydet(seansId, btn) {
     if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
     toast('✅ Seans güncellendi');
     await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log']);
-    if (_curCase) await renderCaseTimeline(_curCase.id);
-    if (_curCase) _updateKapatBtn(_curCase.id);
+    if (_curCase) {
+      await _keepScroll(document.getElementById('cd-timeline'), async () => {
+        await renderCaseTimeline(_curCase.id);
+        if (dayId) await caseSeansEkleFormAc(dayId); // editör açık kalsın, kullanıcı devam etsin
+      });
+      _updateKapatBtn(_curCase.id);
+    }
   } catch (e) {
     toast('❌ ' + (e.message || 'Hata'), true);
     if (btn) { btn.disabled = false; btn.textContent = '✓'; }
@@ -7362,14 +7383,18 @@ async function caseSeansEkleKaydet(btn) {
   });
   if (hata) return;
   if (!sessions.length) { toast('İlaç seçin', true); return; }
+  const dayId = _seansAddCtx.dayId;
   btn.disabled = true; btn.textContent = 'Ekleniyor…';
   try {
-    const res = await rpc('add_sessions_to_existing_day', { p_day_id: _seansAddCtx.dayId, p_sessions: sessions });
+    const res = await rpc('add_sessions_to_existing_day', { p_day_id: dayId, p_sessions: sessions });
     if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
     toast(`✅ ${sessions.length} seans eklendi (${time})`);
     _seansAddCtx = null;
     await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log']);
-    await renderCaseTimeline(_curCase.id);
+    await _keepScroll(document.getElementById('cd-timeline'), async () => {
+      await renderCaseTimeline(_curCase.id);
+      await caseSeansEkleFormAc(dayId); // editör açık kalsın, başka seans/ilaç eklenebilsin
+    });
     _updateKapatBtn(_curCase.id);
   } catch (e) {
     toast('❌ ' + (e.message || 'Hata'), true);
