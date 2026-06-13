@@ -3426,32 +3426,38 @@ function _sablonDrugName(k){
 
 function _renderSablonBuilder(){
   const s = _sablonEdit;
-  const disOpts = s._diseases
-    .slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','tr'))
-    .map(d=>`<option value="${d.id}" ${s.disease_ids.includes(d.id)?'selected':''}>${esc(d.name)}</option>`).join('');
-  const chips = s.disease_ids.map(id=>{
-    const d = s._diseases.find(x=>x.id===id);
-    return `<span class="chip" style="display:inline-flex;align-items:center;gap:4px">${esc(d?.name||'?')} <a data-action="sablon-dis-cikar" data-id="${id}" style="cursor:pointer;font-weight:700">✕</a></span>`;
+  // Hastalıklar — kategoriye göre gruplu checkbox (çoka-çok, vaka girişiyle aynı dil)
+  const disByCat = {};
+  s._diseases.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','tr')).forEach(d=>{
+    const c = d.category || 'Diğer';
+    (disByCat[c]=disByCat[c]||[]).push(d);
+  });
+  const disHtml = Object.keys(disByCat).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(cat=>{
+    const items = disByCat[cat].map(d=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer">
+      <input type="checkbox" ${s.disease_ids.includes(d.id)?'checked':''} onchange="sablonDisToggle('${d.id}',this.checked)" style="width:17px;height:17px;accent-color:var(--green);flex-shrink:0;cursor:pointer">
+      <span style="font-size:.82rem">${esc(d.name)}</span></label>`).join('');
+    return `<div style="margin-bottom:6px"><div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--card3);padding-bottom:2px;margin-bottom:3px">${esc(cat)}</div>${items}</div>`;
   }).join('');
+  const seciliSayi = s.disease_ids.length;
 
   let gunlerHtml = '';
   s.gunler.forEach((kalemler, gi)=>{
     const seansRows = kalemler.length
       ? kalemler.map((k,ki)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.8rem">
-          <span>⏰ ${esc(k.planned_time)}</span>
-          <span style="flex:1">💊 ${esc(k._drugName)} · ${k.dose} ${esc(k.unit)} · ${esc(k.route||'')}</span>
-          <button data-action="sablon-seans-sil" data-gi="${gi}" data-ki="${ki}" style="background:none;border:none;cursor:pointer">🗑️</button>
+          <span style="font-weight:700;color:var(--ink2);min-width:42px">⏰ ${esc(k.planned_time)}</span>
+          <span style="flex:1">💊 ${esc(k._drugName)} <span style="color:var(--ink3);font-size:.72rem">${k.dose} ${esc(k.unit)}${k.route?' · '+esc(k.route):''}</span></span>
+          <button data-action="sablon-seans-sil" data-gi="${gi}" data-ki="${ki}" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button>
         </div>`).join('')
       : '<div style="font-size:.75rem;color:var(--ink3);padding:4px 0">seans yok</div>';
     gunlerHtml += `<div class="tanimlar-card" style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="sablon-gun-toggle" data-gi="${gi}">
         <strong>Gün ${gi+1}</strong>
         <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length} seans
-          <button data-action="sablon-gun-sil" data-gi="${gi}" style="background:none;border:none;cursor:pointer">🗑️</button></span>
+          <button data-action="sablon-gun-sil" data-gi="${gi}" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button></span>
       </div>
       <div id="sablon-gun-body-${gi}" style="display:${gi===s.gunler.length-1?'block':'none'};margin-top:6px">
         ${seansRows}
-        <button class="btn-sm" data-action="sablon-seans-ac" data-gi="${gi}" style="margin-top:6px;font-size:.75rem;padding:5px 10px;background:var(--card2);border:none;border-radius:6px;cursor:pointer">＋ Bu güne seans/ilaç ekle</button>
+        <button class="btn-sm" data-action="sablon-seans-ac" data-gi="${gi}" style="margin-top:6px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(42,107,181,.1);color:var(--blue);border:1px dashed rgba(42,107,181,.4);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne seans/ilaç ekle</button>
       </div>
     </div>`;
   });
@@ -3459,24 +3465,22 @@ function _renderSablonBuilder(){
   document.getElementById('m-sablon-body').innerHTML = `
     <div class="fg"><label class="flbl">Şablon adı *</label>
       <input id="sb-ad" class="fi" value="${esc(s.ad)}" placeholder="Örn. PRİT Protokolü"></div>
-    <div class="fg"><label class="flbl">Hastalıklar</label>
-      <select id="sb-dis" class="fsel"><option value="">— ekle —</option>${disOpts}</select>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${chips}</div></div>
+    <div class="fg"><label class="flbl">Hastalıklar ${seciliSayi?`<span style="color:var(--green)">(${seciliSayi} seçili)</span>`:''}</label>
+      <div style="max-height:170px;overflow-y:auto;background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px">${disHtml||'<div style="color:var(--ink3);font-size:.78rem">Hastalık tanımı yok</div>'}</div></div>
     <div class="fg"><label class="flbl">Açıklama</label>
       <input id="sb-aciklama" class="fi" value="${esc(s.aciklama)}" placeholder="opsiyonel"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 4px">
       <strong>Plan</strong>
-      <button class="btn-sm" data-action="sablon-gun-ekle" style="padding:5px 10px;background:var(--card2);border:none;border-radius:6px;cursor:pointer">＋ Gün Ekle</button></div>
+      <button class="btn-sm" data-action="sablon-gun-ekle" style="font-weight:700;padding:7px 13px;background:rgba(78,154,42,.12);color:var(--green);border:1px solid rgba(78,154,42,.35);border-radius:7px;cursor:pointer">＋ Gün Ekle</button></div>
     ${gunlerHtml}
     <button class="btn btn-g" data-action="sablon-kaydet" style="margin-top:14px">💾 Kaydet</button>
     <button class="btn btn-o" data-action="sablon-iptal" style="margin-top:6px">İptal</button>`;
+}
 
-  const disSel = document.getElementById('sb-dis');
-  if(disSel) disSel.onchange = () => {
-    const id = disSel.value; if(!id) return;
-    if(!_sablonEdit.disease_ids.includes(id)) _sablonEdit.disease_ids.push(id);
-    _syncSablonAd(); _renderSablonBuilder();
-  };
+function sablonDisToggle(id, checked){
+  _syncSablonAd();
+  if(checked){ if(!_sablonEdit.disease_ids.includes(id)) _sablonEdit.disease_ids.push(id); }
+  else { _sablonEdit.disease_ids = _sablonEdit.disease_ids.filter(x=>x!==id); }
 }
 
 function _syncSablonAd(){
@@ -3496,29 +3500,43 @@ function sablonSeansSil(gi,ki){ _syncSablonAd(); _sablonEdit.gunler[+gi].splice(
 function sablonSeansAc(gi){
   _syncSablonAd();
   if(_sablonSeansForm){ _sablonSeansForm.remove(); _sablonSeansForm=null; }
-  const drugOpts = (_drugsCache||[]).map(d=>`<option value="${d.id}">${esc(d.name)}${d.guncel!=null?` (stok ${d.guncel})`:''}</option>`).join('');
-  const saatChips = HIZLI_SAATLER.map(t=>`<button class="btn-sm" data-action="sablon-saat-chip" data-t="${t}" style="padding:4px 8px;background:var(--card2);border:none;border-radius:6px;cursor:pointer;margin-right:4px">${t}</button>`).join('');
+  // İlaç checkbox grupları — tedavi modalindeki caseSeansEkleFormAc ile birebir aynı dil
+  const cache = _drugsCache || [];
+  const groups = {};
+  [...cache].sort((a,b)=>a.name.localeCompare(b.name,'tr')).forEach(dr=>{ const g=dr.group_name||'Diğer'; (groups[g]=groups[g]||[]).push(dr); });
+  const groupHtml = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(grp=>{
+    const items = groups[grp].map(dr=>{
+      const stokClrPos = dr.guncel<=0?'var(--red)':dr.guncel<=10?'var(--amber)':'var(--green)';
+      const stokClr = dr.guncel===null?'var(--ink3)':stokClrPos;
+      const stokTxt = dr.guncel!==null?dr.guncel.toFixed(1)+' '+dr.birim:'—';
+      const nm = dr.name.replace(/"/g,'&quot;');
+      const rt = (dr.default_route||'IM').split(' ')[0];
+      return '<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">'+
+        '<input type="checkbox" class="cdf-chk" data-id="'+dr.id+'" data-name="'+nm+'" data-unit="'+(dr.default_unit||dr.birim||'ml')+'" data-route="'+rt+'" data-legacy="'+(dr._legacy||false)+'" onchange="cdfChkChange(this)" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600;color:var(--ink)">'+dr.name+'</div>'+
+        (dr.active_ingredient?'<div style="font-size:.65rem;color:var(--ink3)">'+dr.active_ingredient+'</div>':'')+
+        '</div><span style="font-size:.72rem;font-weight:700;color:'+stokClr+';flex-shrink:0">'+stokTxt+'</span></label>';
+    }).join('');
+    return '<div style="margin-bottom:8px"><div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--card3)">'+grp+'</div>'+items+'</div>';
+  }).join('');
+  const saatChips = HIZLI_SAATLER.map(t=>`<button type="button" class="btn-sm" data-action="sablon-saat-chip" data-t="${t}" style="padding:5px 10px;background:rgba(42,107,181,.1);color:var(--blue);border:none;border-radius:6px;cursor:pointer;margin-right:4px;font-weight:700">${t}</button>`).join('');
   const wrap = document.getElementById('sablon-gun-body-'+gi);
   const form = document.createElement('div');
-  form.style.cssText='border:1px dashed var(--card3);border-radius:8px;padding:8px;margin-top:6px';
-  form.innerHTML = `
-    <div style="margin-bottom:4px">${saatChips}
-      <input id="sbs-time" class="fi" type="time" style="width:110px;display:inline-block"></div>
-    <select id="sbs-drug" class="fsel"><option value="">— ilaç —</option>${drugOpts}</select>
-    <div style="display:flex;gap:6px;margin-top:4px">
-      <input id="sbs-dose" class="fi" type="number" step="0.1" placeholder="doz" style="width:80px">
-      <input id="sbs-unit" class="fi" placeholder="birim" style="width:70px">
-      <select id="sbs-route" class="fsel"><option>IM</option><option>IV</option><option>SC</option><option>PO</option><option>Topikal</option><option>Intrauterin</option></select>
-    </div>
-    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
-      <button class="btn-sm" data-action="sablon-seans-vazgec" style="padding:5px 10px;background:var(--card3);border:none;border-radius:6px;cursor:pointer">Vazgeç</button>
-      <button class="btn-sm" data-action="sablon-seans-ekle" data-gi="${gi}" style="padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">Ekle</button></div>`;
+  form.style.cssText='border:1px dashed var(--card3);border-radius:10px;padding:10px;margin-top:6px;background:var(--card2)';
+  form.innerHTML =
+    '<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">⏰ Saat</div>'+
+    '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'+
+    `<input id="sbs-time" class="fi" type="time" value="${HIZLI_SAATLER[0]}" style="margin:0;flex:1;min-width:100px">`+saatChips+'</div>'+
+    '<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>'+
+    '<div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">'+
+    (groupHtml||'<div style="color:var(--ink3);font-size:.78rem;padding:8px">İlaç bulunamadı</div>')+'</div>'+
+    '<div id="cdf-doz-alani" style="display:none">'+
+    '<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Seçili İlaçlar — Doz Gir</div>'+
+    '<div id="cdf-doz-satirlar"></div></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">'+
+    `<button class="btn-sm" data-action="sablon-seans-ekle" data-gi="${gi}" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer">＋ Seansı Ekle</button>`+
+    '<button class="btn-sm" data-action="sablon-seans-vazgec" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">Vazgeç</button></div>';
   wrap.appendChild(form);
-  const drugSel = form.querySelector('#sbs-drug');
-  drugSel.onchange = () => {
-    const d = (_drugsCache||[]).find(x=>x.id===drugSel.value);
-    if(d){ form.querySelector('#sbs-unit').value = d.default_unit||'ml'; form.querySelector('#sbs-route').value = d.default_route||'IM'; }
-  };
   _sablonSeansForm = form;
 }
 
@@ -3526,25 +3544,32 @@ function sablonSaatChip(t){ const i=document.getElementById('sbs-time'); if(i) i
 function sablonSeansVazgec(){ if(_sablonSeansForm){ _sablonSeansForm.remove(); _sablonSeansForm=null; } }
 
 function sablonSeansEkle(gi){
-  const f=_sablonSeansForm; if(!f) return;
-  const time=f.querySelector('#sbs-time').value;
-  const drugId=f.querySelector('#sbs-drug').value;
-  const dose=+f.querySelector('#sbs-dose').value;
-  const unit=f.querySelector('#sbs-unit').value.trim();
-  const route=f.querySelector('#sbs-route').value;
+  if(!_sablonSeansForm) return;
+  const time = document.getElementById('sbs-time')?.value;
   if(!time){ toast('Saat girin', true); return; }
-  if(!drugId){ toast('İlaç seçin', true); return; }
-  if(!dose||dose<=0){ toast('Geçerli doz girin', true); return; }
-  if(!unit){ toast('Birim girin', true); return; }
-  const d=(_drugsCache||[]).find(x=>x.id===drugId);
-  _syncSablonAd();
-  _sablonEdit.gunler[+gi].push({
-    planned_time: time,
-    stok_id: d?.stock_id || null,
-    drug_product_id: d?._legacy ? null : drugId,
-    dose, unit, route,
-    _drugName: d?.name || 'İlaç',
+  const secililer = [];
+  let hata = false;
+  document.querySelectorAll('.cdf-chk:checked').forEach(chk=>{
+    if(hata) return;
+    const id = chk.dataset.id;
+    const dose = Number.parseFloat(document.querySelector('.cdf-dose-inp[data-drug-id="'+id+'"]')?.value);
+    const unit = (document.querySelector('.cdf-unit-inp[data-drug-id="'+id+'"]')?.value||'').trim();
+    const route = document.querySelector('.cdf-route-inp[data-drug-id="'+id+'"]')?.value || null;
+    if(!dose||dose<=0){ toast(chk.dataset.name+': geçerli doz girin', true); hata=true; return; }
+    if(!unit){ toast(chk.dataset.name+': birim girin', true); hata=true; return; }
+    const d = (_drugsCache||[]).find(x=>x.id===id);
+    secililer.push({
+      planned_time: time,
+      stok_id: d?.stock_id || null,
+      drug_product_id: d?._legacy ? null : id,
+      dose, unit, route,
+      _drugName: d?.name || chk.dataset.name,
+    });
   });
+  if(hata) return;
+  if(!secililer.length){ toast('En az bir ilaç seçin', true); return; }
+  _syncSablonAd();
+  secililer.forEach(k=>_sablonEdit.gunler[+gi].push(k));
   _sablonSeansForm=null;
   _renderSablonBuilder();
 }

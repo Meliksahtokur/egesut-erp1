@@ -218,7 +218,6 @@ registerActions({
   'sablon-seans-ekle':   (el) => sablonSeansEkle(el.dataset.gi),
   'sablon-seans-vazgec': () => sablonSeansVazgec(),
   'sablon-saat-chip':    (el) => sablonSaatChip(el.dataset.t),
-  'sablon-dis-cikar':    (el) => { _syncSablonAd(); _sablonEdit.disease_ids = _sablonEdit.disease_ids.filter(x=>x!==el.dataset.id); _renderSablonBuilder(); },
   'sablon-kaydet':       () => sablonKaydet(),
   'sablon-iptal':        () => closeM('m-sablon'),
   'stok-add-open':    () => openStokAdd(),
