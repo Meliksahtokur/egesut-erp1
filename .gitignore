@@ -89,3 +89,6 @@ AGENTS.local.md
 
 # Git worktrees (izole workspace)
 .worktrees/
+
+# Pre-merge yedekleri
+backup/
