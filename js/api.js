@@ -331,6 +331,7 @@ async function pullTables(tables = []) {
       drug_products:() => db.from('drug_products').select('*').order('brand_name'),
       drug_administrations: () => db.from('drug_administrations').select('*'),
       treatment_days: () => db.from('treatment_days').select('*'),
+      treatment_day_uygulamalar: () => db.from('treatment_day_uygulamalar').select('*'),
       tohumlama:    () => db.from('tohumlama').select('*'),
       vaccines:     () => db.from('vaccines').select('*'),
       vaccination_log: () => db.from('vaccination_log').select('*'),
