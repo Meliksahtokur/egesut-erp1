@@ -17,8 +17,9 @@
 | **B1** | `ileri_gebe_asi_tamamla` migration'da `RETURNS json`, canlıda `RETURNS jsonb` | ⛔ **BLOCKER** | `CREATE OR REPLACE` → `cannot change return type of existing function` → **tüm migration rollback** |
 | **B2** | Backfill `AND etken_kod IS NULL` koşulu, tamamlanmış 2. doz kayıtlarını (canlıda `etken_kod='ROTA'`) atlıyor | ⛔ **BLOCKER (mantık)** | Cleanup'ın dayandığı "legit" kayıt `ROTA_2DOZ` olmuyor → **temizlik 0 kayıt iptal ediyor**, küpe 184'ün stray görevi (`16de0128`) **silinmiyor**. Tasarımın "2 iptal" beklentisi yanlış. |
 | **B3** | `gebelik_protokol_kontrol` 261 dedup'una `tamamlandi=false` eklendi; eski kod yoktu | ⚠️ **Yüksek (latent)** | Tamamlanmış 2. doz'u `ROTA` etiketli olan + hâlâ 261+ Düve penceresinde olan hayvana **yeni sahte görev üretir**. Şu an canlıda tetikleyen hayvan yok ama kırılgan. İki fonksiyon arasında tutarsız (`ileri_gebe_gorev_kontrol`'de yok). |
-| N1 | 2. doz → `etken_kod='ROTA_2DOZ'` dinleme trigger'ından (`_etken_kod_bul`→'ROTA') kopuyor | ℹ️ Düşük | Genel aşı modalından uygulanırsa auto-close olmaz. Pratikte 2. doz buton→`ileri_gebe_asi_tamamla` (ID ile kapatır) yoluyla kapanıyor; regresyon değil ama not. |
+| N1 | 2. doz → `etken_kod='ROTA_2DOZ'` dinleme trigger'ından (`_etken_kod_bul`→'ROTA') kopuyor | ℹ️ Düşük | Genel aşı modalından uygulanırsa auto-close olmaz. Pratikte 2. doz buton→`ileri_gebe_asi_tamamla` (ID ile kapatır) yoluyla kapanıyor; **regresyon değil** (önceden de NULL idi). |
 | N2 | `ON CONFLICT (cols) WHERE ... DO NOTHING` partial-index inference | ℹ️ Düşük | Doğru kullanım; INSERT `iptal` set etmiyor ama default=false olduğundan predicate tutuyor. Sorun yok. |
+| **N3** | JS `_katTipMap` (`js/ui.js:946`) `'ROTA'` içeriyor ama `'ROTA_2DOZ'` **yok** | ⚠️ Orta (kırılgan) | `detayTamamla()` (ui.js:4037) `etken_kod && !stok_id` ise `_etkenFiltrele(etken_kod)`'a gider. 2. doz görevi stok_id **taşıdığı** için şu an dal atlanıyor → patlamıyor. Ama Rota aşısının `stock_item_id`'si NULL olursa → "uygun stok bulunamadı" → görev kapatılamaz. **Sigorta:** `_katTipMap`'e `'ROTA_2DOZ': /rota|corona/i` ekle. |
 
 **Net karar:** Fikir (semantic key + UNIQUE partial index) doğru ve geleceğe yönelik sağlam. Ama migration **canlı verinin gerçeğiyle uyuşmuyor** — "2. doz kayıtları `etken_kod IS NULL`" varsayımı **yanlış**. Tamamlanmış kayıtlar `ROTA` taşıyor. Bu yüzden hem teknik (B1) hem mantıksal (B2) olarak başarısız.
 
@@ -136,7 +137,55 @@ WHERE NOT EXISTS (... etken_kod='ROTA_2DOZ' AND iptal=false AND tamamlandi=false
 
 ---
 
-## 5. Açık Sorular (kullanıcıya)
+## 5. İş Mantığı / Work-Logic Uyumu
+
+> Soru: "Var olan sistemi bozmadan iyileştiriyor mu? Work-logic ile ters düşen yeri var mı?"
+> Kısa cevap: **Fonksiyonel olarak bozmuyor; iş değişmezi doğru.** 3 incelik var — 2'si zaten mevcuttu (regresyon değil), 1'i küçük kırılganlık (N3).
+
+### 5.1 Protokol yolu ↔ Event-driven yol KASITLI TAMAMLAYICIDIR (kök borç DEĞİL)
+
+⚠️ İlk taslakta "3 üretici / 2 zamanlama felsefesi = birleştirilmeli mimari borç" dedim — **bu yanlış çerçeve.** Doğrusu (kullanıcı notu):
+
+- **Event-driven yol** (`ileri_gebe_asi_tamamla`, 1. doz+21): normal akış. Kullanıcı 1. doz'u yapınca rapel doğal olarak doğar.
+- **Protokol/scheduler yolu** (`gebelik_protokol_kontrol` / `ileri_gebe_gorev_kontrol`, toh+261): **safety-net.** Maksat = unutulan/atlanan işi yakalamak (örn. 1. doz hiç yapılmadıysa ya da rapel bir şekilde oluşmadıysa, 261. günde yine de görev çıksın).
+
+İkisi **redundancy değil, birbirinin sigortası.** Bu mimari **doğru ve korunmalı.** Asıl sorun hiçbir zaman "iki yol var" değildi — **iki yolun aynı işi farklı dedup anahtarıyla tanımlaması** idi (biri `aciklama='(2. doz)'`, diğeri `'(2. doz — düve)'`). String drift → backup, event-driven'in ürettiğini "görmedi" → duplicate.
+
+➡️ **Bu fix tam da bunu çözüyor:** her iki yol artık ortak semantik anahtar `etken_kod='ROTA_2DOZ'` + UNIQUE index kullanıyor. Yani **safety-net, normal akışın işini artık doğru tanıyor ve tekrar üretmiyor.** Bu bir yama değil — tamamlayıcı tasarımın **çalışması için gereken hizalama.** Doğru iyileştirme.
+
+**Kalan küçük caveat:** Scheduler önce ateşlerse (sayfa 261. günde açıldı, 1. doz henüz yeni tamamlandı), rapel `ON CONFLICT DO NOTHING` ile düşer → 2. doz'un `parent_id` linkajı (hangi 1. doz'a ait) o vakada kaybolabilir. İş açısından zararsız (tek 2. doz uygulanır); sadece izlenebilirlik (audit zinciri) bazen eksik kalır. Kabul edilebilir.
+
+### 5.2 Listener (auto-close) mimarisinden kopma — regresyon DEĞİL (N1)
+
+BUG-064 "iki kapı aynı yere varır": uygulama yapılınca `_gorev_dinle(hayvan, etken_kod)` eşleşen görevi kapatır. `_etken_kod_bul(Rota vaccine)` → `'ROTA'` döner. 2. doz `'ROTA_2DOZ'` olduğundan **genel aşı modalından** uygulanırsa listener onu kapatmaz.
+
+- **Regresyon değil:** Canlıda scheduler 2. doz'ları zaten `etken_kod=NULL` idi → listener `'ROTA'`'yı NULL ile eşleştiremiyordu. Yeni kayıp yok.
+- **Mimari kısıt:** Listener dose-aware olamaz (aşıyı görür, "kaçıncı doz" bilmez). Bu yüzden 2. doz **zaten** dose-aware tek yol olan butonla (`ileri_gebe_asi_tamamla`, ID ile kapatır) kapanmak zorunda. Fix bunu kötüleştirmiyor, kalıcılaştırıyor.
+
+### 5.3 JS stok eşlemesi kırılganlığı (N3)
+
+`js/ui.js:946` `_katTipMap`'te `'ROTA_2DOZ'` yok. 2. doz görevleri `stok_id` taşıdığı için `detayTamamla()` (ui.js:4037) `_etkenFiltrele`'ye gitmiyor → şu an patlamıyor. Ama Rota aşısının `stock_item_id`'si NULL olursa kullanıcı görevi kapatamaz. **Öneri:** `_katTipMap`'e `'ROTA_2DOZ': /rota|corona/i` ekle (2 satır, stok_id'ye bağımlılığı kaldırır).
+
+### 5.4 Cross-pregnancy güvenliği — B3 sorunsuz
+
+B3'te dedup'tan `tamamlandi=false` çıkardım → "tamamlanmış 2. doz bir sonraki gebeliği bloklar mı?" endişesi: **hayır.** Düve, 2. doz'u ilk gebelikte alır; doğunca İnek olur; 261-blok `grup ILIKE '%Düve%'` guard'ı bir daha tetiklenmez ("inekler tek doz"). Aynı gebelik içinde tamamlandıktan sonra tekrar üretimi de doğru biçimde bloklanır. ✓
+
+### 5.5 Özet yargı
+
+| Kriter | Değerlendirme |
+|--------|---------------|
+| İş değişmezi (hayvan başına ≤1 aktif 2. doz, atomik) | ✅ Doğru |
+| Tamamlayıcı (event + safety-net) tasarımı koruyor mu? | ✅ Evet — ortak anahtarla artık **doğru** çalışıyor |
+| Completion yolları bozuluyor mu? | ✅ Hayır (buton ID ile kapatır) |
+| Cross-pregnancy | ✅ Güvenli (Düve guard) |
+| Tarihî temizlik | ✅ Doğru (sadece aktif stray) |
+| Listener kopması | ⚠️ Var ama regresyon değil (önceden NULL) |
+| JS `_katTipMap` | ⚠️ N3 — sigorta için 2 satır eklenmeli |
+| `parent_id` audit linkajı | ⚠️ Scheduler önce ateşlerse bazen kaybolur (kabul edilebilir) |
+
+---
+
+## 6. Açık Sorular (kullanıcıya)
 
 1. **Migration'ı ben düzelteyim mi** (yukarıdaki 6 madde) yoksa sadece bu review yeterli mi?
 2. Tamamlanmış 2. doz kayıtlarının `etken_kod`'unu `ROTA`→`ROTA_2DOZ` olarak **yeniden etiketlemek** uygun mu? (Mantıken doğru: 2. doz'un kendi semantik anahtarı olur. Geçmiş 1. doz `ROTA` kalır.) Bu B2 düzeltmesinin doğal sonucu.
