@@ -4103,6 +4103,196 @@ GRANT EXECUTE ON FUNCTION public.treatment_day_not_guncelle TO anon, authenticat
 GRANT EXECUTE ON FUNCTION public.case_plan_notu_guncelle(uuid, text) TO anon, authenticated;
 
 -- ──────────────────────────────────────────────────────────────
+-- 10b. ŞABLON TEDAVİ PLANLAMA (#63) — tablolar + RLS + GRANT + RPC
+-- ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.tedavi_sablonu (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ad          text UNIQUE NOT NULL,
+  aciklama    text,
+  aktif       boolean DEFAULT true,
+  created_at  timestamptz DEFAULT now(),
+  updated_at  timestamptz DEFAULT now()
+);
+COMMENT ON TABLE public.tedavi_sablonu IS 'Kullanıcı tanımlı tedavi şablonu başlığı (#63)';
+
+CREATE TABLE IF NOT EXISTS public.sablon_hastalik_eslem (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sablon_id   uuid NOT NULL REFERENCES public.tedavi_sablonu(id) ON DELETE CASCADE,
+  disease_id  uuid NOT NULL REFERENCES public.diseases(id)       ON DELETE CASCADE,
+  created_at  timestamptz DEFAULT now(),
+  CONSTRAINT she_uniq UNIQUE (sablon_id, disease_id)
+);
+CREATE INDEX IF NOT EXISTS she_disease_idx ON public.sablon_hastalik_eslem(disease_id);
+CREATE INDEX IF NOT EXISTS she_sablon_idx  ON public.sablon_hastalik_eslem(sablon_id);
+
+CREATE TABLE IF NOT EXISTS public.tedavi_sablonu_kalem (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  sablon_id        uuid     NOT NULL REFERENCES public.tedavi_sablonu(id) ON DELETE CASCADE,
+  gun_no           smallint NOT NULL CHECK (gun_no > 0),
+  planned_time     time     NOT NULL,
+  stok_id          text     REFERENCES public.stok(id),
+  drug_product_id  uuid     REFERENCES public.drug_products(id),
+  dose             numeric  NOT NULL CHECK (dose > 0),
+  unit             text     NOT NULL,
+  route            text     CHECK (route IS NULL OR route IN ('IM','IV','SC','PO','Topikal','Intrauterin')),
+  created_at       timestamptz DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS tsk_sablon_idx ON public.tedavi_sablonu_kalem(sablon_id, gun_no, planned_time);
+
+ALTER TABLE public.tedavi_sablonu        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sablon_hastalik_eslem ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tedavi_sablonu_kalem  ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS anon_all_tedavi_sablonu        ON public.tedavi_sablonu;
+DROP POLICY IF EXISTS anon_all_sablon_hastalik_eslem ON public.sablon_hastalik_eslem;
+DROP POLICY IF EXISTS anon_all_tedavi_sablonu_kalem  ON public.tedavi_sablonu_kalem;
+CREATE POLICY anon_all_tedavi_sablonu        ON public.tedavi_sablonu        FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY anon_all_sablon_hastalik_eslem ON public.sablon_hastalik_eslem FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY anon_all_tedavi_sablonu_kalem  ON public.tedavi_sablonu_kalem  FOR ALL USING (true) WITH CHECK (true);
+GRANT ALL ON public.tedavi_sablonu        TO anon, authenticated;
+GRANT ALL ON public.sablon_hastalik_eslem TO anon, authenticated;
+GRANT ALL ON public.tedavi_sablonu_kalem  TO anon, authenticated;
+
+-- CRUD: kaydet (insert/update + eşlem + kalem, DENSE_RANK ile gün no 1..N)
+DROP FUNCTION IF EXISTS public.tedavi_sablon_kaydet(uuid, text, text, jsonb, jsonb);
+CREATE OR REPLACE FUNCTION public.tedavi_sablon_kaydet(
+  p_id          uuid,
+  p_ad          text,
+  p_aciklama    text,
+  p_disease_ids jsonb,
+  p_kalemler    jsonb
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_id uuid;
+BEGIN
+  IF p_ad IS NULL OR btrim(p_ad) = '' THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon adı zorunlu');
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.tedavi_sablonu
+             WHERE LOWER(ad) = LOWER(p_ad) AND (p_id IS NULL OR id != p_id)) THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu isimde başka bir şablon var');
+  END IF;
+
+  IF p_id IS NULL THEN
+    INSERT INTO public.tedavi_sablonu (ad, aciklama)
+    VALUES (p_ad, NULLIF(btrim(coalesce(p_aciklama,'')),''))
+    RETURNING id INTO v_id;
+  ELSE
+    UPDATE public.tedavi_sablonu
+       SET ad = p_ad, aciklama = NULLIF(btrim(coalesce(p_aciklama,'')),''), updated_at = now()
+     WHERE id = p_id;
+    IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon bulunamadı'); END IF;
+    v_id := p_id;
+    DELETE FROM public.sablon_hastalik_eslem WHERE sablon_id = v_id;
+    DELETE FROM public.tedavi_sablonu_kalem  WHERE sablon_id = v_id;
+  END IF;
+
+  INSERT INTO public.sablon_hastalik_eslem (sablon_id, disease_id)
+  SELECT v_id, t.val::uuid
+  FROM jsonb_array_elements_text(coalesce(p_disease_ids,'[]'::jsonb)) AS t(val)
+  ON CONFLICT (sablon_id, disease_id) DO NOTHING;
+
+  INSERT INTO public.tedavi_sablonu_kalem
+    (sablon_id, gun_no, planned_time, stok_id, drug_product_id, dose, unit, route)
+  SELECT
+    v_id,
+    DENSE_RANK() OVER (ORDER BY (k->>'gun_no')::int)::smallint,
+    (k->>'planned_time')::time,
+    NULLIF(k->>'stok_id','')::text,
+    NULLIF(k->>'drug_product_id','')::uuid,
+    (k->>'dose')::numeric,
+    k->>'unit',
+    NULLIF(k->>'route','')
+  FROM jsonb_array_elements(coalesce(p_kalemler,'[]'::jsonb)) AS k;
+
+  RETURN jsonb_build_object('ok', true, 'sablon_id', v_id);
+END;
+$$;
+
+DROP FUNCTION IF EXISTS public.tedavi_sablon_sil(uuid);
+CREATE OR REPLACE FUNCTION public.tedavi_sablon_sil(p_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  DELETE FROM public.tedavi_sablonu WHERE id = p_id;  -- CASCADE → kalem + eşlem
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon bulunamadı'); END IF;
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
+
+-- Uygula: şablon kalemlerini gun_no'ya göre gruplayıp add_treatment_day_with_sessions motorunu besler
+DROP FUNCTION IF EXISTS public.tedavi_sablon_uygula(uuid, uuid);
+CREATE OR REPLACE FUNCTION public.tedavi_sablon_uygula(
+  p_case_id    uuid,
+  p_sablon_id  uuid
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_case         record;
+  v_gun_no       smallint;
+  v_date         date;
+  v_sessions     jsonb;
+  v_atlanan      jsonb := '[]'::jsonb;
+  v_gun_atlanan  jsonb;
+  v_gun_sayisi   int := 0;
+  v_seans_sayisi int := 0;
+BEGIN
+  SELECT * INTO v_case FROM public.cases WHERE id = p_case_id;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Vaka bulunamadı'); END IF;
+  IF v_case.status = 'closed' THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Kapalı vakaya şablon uygulanamaz');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.tedavi_sablonu WHERE id = p_sablon_id) THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon bulunamadı');
+  END IF;
+
+  FOR v_gun_no IN
+    SELECT DISTINCT gun_no FROM public.tedavi_sablonu_kalem
+    WHERE sablon_id = p_sablon_id ORDER BY gun_no
+  LOOP
+    v_date := v_case.start_date + (v_gun_no - 1);
+
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+             'planned_time',    to_char(k.planned_time,'HH24:MI'),
+             'stok_id',         k.stok_id,
+             'drug_product_id', k.drug_product_id,
+             'dose',            k.dose,
+             'unit',            k.unit,
+             'route',           k.route
+           ) ORDER BY k.planned_time), '[]'::jsonb)
+    INTO v_sessions
+    FROM public.tedavi_sablonu_kalem k
+    WHERE k.sablon_id = p_sablon_id AND k.gun_no = v_gun_no
+      AND (k.drug_product_id IS NULL OR EXISTS (SELECT 1 FROM public.drug_products dp WHERE dp.id = k.drug_product_id))
+      AND (k.stok_id IS NULL OR EXISTS (SELECT 1 FROM public.stok s WHERE s.id = k.stok_id));
+
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+             'gun_no', k.gun_no,
+             'planned_time', to_char(k.planned_time,'HH24:MI'),
+             'neden', 'silinmiş ilaç/stok')), '[]'::jsonb)
+    INTO v_gun_atlanan
+    FROM public.tedavi_sablonu_kalem k
+    WHERE k.sablon_id = p_sablon_id AND k.gun_no = v_gun_no
+      AND ((k.drug_product_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.drug_products dp WHERE dp.id = k.drug_product_id))
+        OR (k.stok_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.stok s WHERE s.id = k.stok_id)));
+    IF jsonb_array_length(v_gun_atlanan) > 0 THEN
+      v_atlanan := v_atlanan || v_gun_atlanan;
+    END IF;
+
+    IF jsonb_array_length(v_sessions) > 0 THEN
+      PERFORM public.add_treatment_day_with_sessions(p_case_id, v_date, v_sessions, NULL);
+      v_gun_sayisi   := v_gun_sayisi + 1;
+      v_seans_sayisi := v_seans_sayisi + jsonb_array_length(v_sessions);
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true,
+    'gun_sayisi', v_gun_sayisi, 'seans_sayisi', v_seans_sayisi, 'atlanan', v_atlanan);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.tedavi_sablon_kaydet(uuid, text, text, jsonb, jsonb) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tedavi_sablon_sil(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.tedavi_sablon_uygula(uuid, uuid) TO anon, authenticated;
+
+-- ──────────────────────────────────────────────────────────────
 -- 11. SEED DATA — Diseases
 -- ──────────────────────────────────────────────────────────────
 INSERT INTO public.diseases (name, category) VALUES
