@@ -1209,8 +1209,48 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
 }
 let _suruStatMode='son';
 
+// ═══ BUG-062 FIX: Grup filtre chipleri DB'den dinamik render ═══
+// Sebep: HTML'de statik grup chipleri yoktu, dynamic render kayboluyordu.
+// Bu fonksiyon her sürü sayfası açılışında DB'den distinct grup değerlerini çeker
+// ve #fc-grup-strip placeholder'ına chip olarak basar. HTML refactor'da
+// placeholder kaybolsa bile, fonksiyon DOM'a yeniden basar (regression-proof).
+let _grupFiltreCache=null;
+async function _renderSuruGrupFiltre(){
+  const strip=document.getElementById('fc-grup-strip');
+  if(!strip) return;
+  // Cache: aynı session'da 1 kez çek
+  if(_grupFiltreCache!==null){
+    _applyGrupFiltreHtml(strip,_grupFiltreCache);
+    return;
+  }
+  try {
+    const{data,error}=await db.from('hayvanlar')
+      .select('grup')
+      .eq('durum','Aktif')
+      .not('grup','is',null);
+    if(error){ console.warn('grup filter load:',error.message); return; }
+    const gruplar=[...new Set((data||[]).map(d=>d.grup))].filter(Boolean).sort((a,b)=>a.localeCompare(b,'tr'));
+    _grupFiltreCache=gruplar;
+    _applyGrupFiltreHtml(strip,gruplar);
+  } catch(e){ console.warn('grup filter load:',e.message); }
+}
+function _applyGrupFiltreHtml(strip,gruplar){
+  if(!gruplar.length){
+    strip.innerHTML='';
+    return;
+  }
+  // Aktif chip state'ini koru
+  const aktifGrup=_fchip.grup;
+  strip.innerHTML=gruplar.map(g=>{
+    const gid='fc-grup-'+g.replace(/[^a-zA-Z0-9]/g,'-');
+    const cls='fchip'+(aktifGrup===g?' on':'');
+    return `<button class="${cls}" id="${gid}" data-action="fchip-grup" data-grup="${esc(g)}">${esc(g)}</button>`;
+  }).join('');
+}
+
 function _renderSuruStat(){
   const el=document.getElementById('suru-stat-card'); if(!el) return;
+  _renderSuruGrupFiltre();
   const padok=document.getElementById('pflt')?.value||'';
   const key=padok+'_'+_suruStatMode;
   if(_suruStatCache[key]){
@@ -1361,11 +1401,12 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#srch')&&!e.target.closest('#ac-srch'))
     { const ac=document.getElementById('ac-srch'); if(ac) ac.style.display='none'; }
 });
-let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null};
+let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null};
 let _detOpenId=null;
 function fchipReset(){
-  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null};
+  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null};
   document.querySelectorAll('[id^="fc-"]').forEach(b=>b.classList.remove('on'));
+  document.getElementById('fc-cinsiyet-hepsi')?.classList.add('on');
 }
 function fchipSec(grup,deger,btn){
   if(_fchip[grup]===deger){ _fchip[grup]=null; btn.classList.remove('on'); }
@@ -1405,6 +1446,7 @@ function filterA(){
     });
     if(_fchip.saglik==='hasta') f=f.filter(a=>getState('hastaIds').has(a.id));
     if(_fchip.kisir==='kisir') f=f.filter(a=>a.kisir);
+    if(_fchip.grup) f=f.filter(a=>a.grup===_fchip.grup);
     if(_fchip.tekrar==='tekrar') {
       f=f.filter(a=>a.repeat_breed_active||a.repeat_breed_past);
       f.sort((a,b)=>{
