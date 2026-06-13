@@ -2932,6 +2932,7 @@ async function loadTanimlarPanel(){
     if(_tanimlarTab==='hastaliklar') await _renderHastaliklar(el);
     else if(_tanimlarTab==='ilaclar') await _renderIlacSiniflari(el);
     else if(_tanimlarTab==='kategoriler') await _renderKategoriler(el);
+    else if(_tanimlarTab==='sablonlar')   await _renderSablonlar(el);
   });
 }
 
@@ -3327,6 +3328,247 @@ async function _renderKategoriler(el){
   html+=`<button onclick="_tanimEditForm('kategori','new')" style="width:100%;padding:13px;background:rgba(78,154,42,.12);border:2px dashed rgba(78,154,42,.4);border-radius:10px;color:var(--green);font-size:.88rem;font-weight:800;cursor:pointer;margin-top:8px">＋ Yeni Kategori Ekle</button>`;
   html+=_tanimVarsayilanBtn('kategoriler');
   el.innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ŞABLON TEDAVİ PLANLAMA — TANIMLAR (#63)
+// ═══════════════════════════════════════════════════════════
+const _KAT_RENK_SABLON = {Meme:'#e91e63',Üreme:'#9c27b0',Metabolik:'#ff9800',Ayak:'#795548',Solunum:'#2196f3',Sindirim:'#4caf50',Buzağı:'#00bcd4',Diğer:'#607d8b'};
+
+async function _renderSablonlar(el){
+  if(navigator.onLine){
+    try{ await pullTables(['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem','diseases']); }catch(e){ console.warn('pull sablon:', e.message); }
+  }
+  const sablonlar = await idbGetAll('tedavi_sablonu');
+  const eslem     = await idbGetAll('sablon_hastalik_eslem');
+  const kalemler  = await idbGetAll('tedavi_sablonu_kalem');
+  const diseases  = await idbGetAll('diseases');
+  const disMap = {}; diseases.forEach(d=>disMap[d.id]=d);
+
+  let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button class="btn btn-g btn-sm" data-action="sablon-yeni" style="width:auto;padding:8px 14px">＋ Yeni Şablon</button></div>`;
+
+  if(!sablonlar.length){
+    html += '<div class="empty"><div class="empty-ico">📋</div>Henüz şablon yok. "＋ Yeni Şablon" ile başlayın.</div>';
+    el.innerHTML = html; return;
+  }
+
+  sablonlar.sort((a,b)=>a.ad.localeCompare(b.ad,'tr',{sensitivity:'base'}));
+  sablonlar.forEach(s=>{
+    const sKalem = kalemler.filter(k=>k.sablon_id===s.id);
+    const gunSayisi  = new Set(sKalem.map(k=>k.gun_no)).size;
+    const seansSayisi= sKalem.length;
+    const disIds = eslem.filter(e=>e.sablon_id===s.id).map(e=>e.disease_id);
+    const disNames = disIds.map(id=>disMap[id]?.name).filter(Boolean);
+    const ilkKat = disIds.map(id=>disMap[id]?.category).find(Boolean) || 'Diğer';
+    const renk = _KAT_RENK_SABLON[ilkKat] || _KAT_RENK_SABLON.Diğer;
+    const etiketler = disNames.length ? disNames.map(esc).join(' · ') : '<span style="color:var(--ink3)">eşlenmemiş</span>';
+    html += `<div class="tanimlar-card" data-search="${esc(s.ad)} ${disNames.map(esc).join(' ')}"
+      style="background:var(--card);border:1px solid var(--card3);border-left:3px solid ${renk};border-radius:10px;padding:11px 13px;margin-bottom:7px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:.88rem">${esc(s.ad)}</div>
+          <div style="font-size:.68rem;color:var(--ink2);margin-top:2px">🏷 ${etiketler}</div>
+        </div>
+        <div style="font-size:.7rem;color:var(--ink2);white-space:nowrap">${gunSayisi} gün · ${seansSayisi} seans</div>
+        <div style="display:flex;gap:6px">
+          <button data-action="sablon-duzenle" data-id="${s.id}" title="Düzenle" style="background:var(--card2);border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.85rem">✏️</button>
+          <button data-action="sablon-sil" data-id="${s.id}" title="Sil" style="background:#ffebee;border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:.85rem">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+async function silSablon(id){
+  const s = (await idbGetAll('tedavi_sablonu')).find(x=>x.id===id);
+  if(!confirm(`"${s?.ad||'Şablon'}" silinsin mi?`)) return;
+  try{
+    await rpc('tedavi_sablon_sil', { p_id: id });
+    await pullTables(['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem']);
+    toast('🗑️ Şablon silindi');
+    loadTanimlarPanel();
+  }catch(e){ toast('❌ '+e.message, true); }
+}
+
+// ── Builder state: { id|null, ad, aciklama, disease_ids:[uuid], gunler:[ [kalem,...] ] } ──
+// kalem = { planned_time, stok_id, drug_product_id, dose, unit, route, _drugName }
+let _sablonEdit = null;
+let _sablonSeansForm = null;
+
+async function openSablonBuilder(id){
+  await loadDrugsCache();
+  const diseases = await idbGetAll('diseases');
+  if(id){
+    const s = (await idbGetAll('tedavi_sablonu')).find(x=>x.id===id);
+    const eslem = (await idbGetAll('sablon_hastalik_eslem')).filter(e=>e.sablon_id===id);
+    const kalemler = (await idbGetAll('tedavi_sablonu_kalem')).filter(k=>k.sablon_id===id);
+    const gunNos = [...new Set(kalemler.map(k=>k.gun_no))].sort((a,b)=>a-b);
+    const gunler = gunNos.map(gn => kalemler.filter(k=>k.gun_no===gn)
+      .sort((a,b)=>(a.planned_time||'').localeCompare(b.planned_time||''))
+      .map(k=>({ planned_time:(k.planned_time||'').slice(0,5), stok_id:k.stok_id, drug_product_id:k.drug_product_id,
+                 dose:k.dose, unit:k.unit, route:k.route, _drugName:_sablonDrugName(k) })));
+    _sablonEdit = { id, ad:s?.ad||'', aciklama:s?.aciklama||'', disease_ids:eslem.map(e=>e.disease_id), gunler:gunler.length?gunler:[[]] };
+  } else {
+    _sablonEdit = { id:null, ad:'', aciklama:'', disease_ids:[], gunler:[[]] };
+  }
+  _sablonEdit._diseases = diseases;
+  document.getElementById('m-sablon-title').textContent = id ? 'Şablonu Düzenle' : 'Yeni Şablon';
+  _renderSablonBuilder();
+  openM('m-sablon');
+}
+
+function _sablonDrugName(k){
+  const d = (_drugsCache||[]).find(x => x.id === (k.drug_product_id || k.stok_id));
+  return d?.name || 'İlaç';
+}
+
+function _renderSablonBuilder(){
+  const s = _sablonEdit;
+  const disOpts = s._diseases
+    .slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','tr'))
+    .map(d=>`<option value="${d.id}" ${s.disease_ids.includes(d.id)?'selected':''}>${esc(d.name)}</option>`).join('');
+  const chips = s.disease_ids.map(id=>{
+    const d = s._diseases.find(x=>x.id===id);
+    return `<span class="chip" style="display:inline-flex;align-items:center;gap:4px">${esc(d?.name||'?')} <a data-action="sablon-dis-cikar" data-id="${id}" style="cursor:pointer;font-weight:700">✕</a></span>`;
+  }).join('');
+
+  let gunlerHtml = '';
+  s.gunler.forEach((kalemler, gi)=>{
+    const seansRows = kalemler.length
+      ? kalemler.map((k,ki)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.8rem">
+          <span>⏰ ${esc(k.planned_time)}</span>
+          <span style="flex:1">💊 ${esc(k._drugName)} · ${k.dose} ${esc(k.unit)} · ${esc(k.route||'')}</span>
+          <button data-action="sablon-seans-sil" data-gi="${gi}" data-ki="${ki}" style="background:none;border:none;cursor:pointer">🗑️</button>
+        </div>`).join('')
+      : '<div style="font-size:.75rem;color:var(--ink3);padding:4px 0">seans yok</div>';
+    gunlerHtml += `<div class="tanimlar-card" style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="sablon-gun-toggle" data-gi="${gi}">
+        <strong>Gün ${gi+1}</strong>
+        <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length} seans
+          <button data-action="sablon-gun-sil" data-gi="${gi}" style="background:none;border:none;cursor:pointer">🗑️</button></span>
+      </div>
+      <div id="sablon-gun-body-${gi}" style="display:${gi===s.gunler.length-1?'block':'none'};margin-top:6px">
+        ${seansRows}
+        <button class="btn-sm" data-action="sablon-seans-ac" data-gi="${gi}" style="margin-top:6px;font-size:.75rem;padding:5px 10px;background:var(--card2);border:none;border-radius:6px;cursor:pointer">＋ Bu güne seans/ilaç ekle</button>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('m-sablon-body').innerHTML = `
+    <div class="fg"><label class="flbl">Şablon adı *</label>
+      <input id="sb-ad" class="fi" value="${esc(s.ad)}" placeholder="Örn. PRİT Protokolü"></div>
+    <div class="fg"><label class="flbl">Hastalıklar</label>
+      <select id="sb-dis" class="fsel"><option value="">— ekle —</option>${disOpts}</select>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${chips}</div></div>
+    <div class="fg"><label class="flbl">Açıklama</label>
+      <input id="sb-aciklama" class="fi" value="${esc(s.aciklama)}" placeholder="opsiyonel"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 4px">
+      <strong>Plan</strong>
+      <button class="btn-sm" data-action="sablon-gun-ekle" style="padding:5px 10px;background:var(--card2);border:none;border-radius:6px;cursor:pointer">＋ Gün Ekle</button></div>
+    ${gunlerHtml}
+    <button class="btn btn-g" data-action="sablon-kaydet" style="margin-top:14px">💾 Kaydet</button>
+    <button class="btn btn-o" data-action="sablon-iptal" style="margin-top:6px">İptal</button>`;
+
+  const disSel = document.getElementById('sb-dis');
+  if(disSel) disSel.onchange = () => {
+    const id = disSel.value; if(!id) return;
+    if(!_sablonEdit.disease_ids.includes(id)) _sablonEdit.disease_ids.push(id);
+    _syncSablonAd(); _renderSablonBuilder();
+  };
+}
+
+function _syncSablonAd(){
+  const ad = document.getElementById('sb-ad'); const ac = document.getElementById('sb-aciklama');
+  if(ad) _sablonEdit.ad = ad.value;
+  if(ac) _sablonEdit.aciklama = ac.value;
+}
+
+function sablonGunEkle(){ _syncSablonAd(); _sablonEdit.gunler.push([]); _renderSablonBuilder(); }
+function sablonGunSil(gi){ _syncSablonAd(); _sablonEdit.gunler.splice(+gi,1); if(!_sablonEdit.gunler.length) _sablonEdit.gunler=[[]]; _renderSablonBuilder(); }
+function sablonGunToggle(gi){
+  const body=document.getElementById('sablon-gun-body-'+gi); if(!body) return;
+  body.style.display = body.style.display==='none' ? 'block' : 'none';
+}
+function sablonSeansSil(gi,ki){ _syncSablonAd(); _sablonEdit.gunler[+gi].splice(+ki,1); _renderSablonBuilder(); }
+
+function sablonSeansAc(gi){
+  _syncSablonAd();
+  if(_sablonSeansForm){ _sablonSeansForm.remove(); _sablonSeansForm=null; }
+  const drugOpts = (_drugsCache||[]).map(d=>`<option value="${d.id}">${esc(d.name)}${d.guncel!=null?` (stok ${d.guncel})`:''}</option>`).join('');
+  const saatChips = HIZLI_SAATLER.map(t=>`<button class="btn-sm" data-action="sablon-saat-chip" data-t="${t}" style="padding:4px 8px;background:var(--card2);border:none;border-radius:6px;cursor:pointer;margin-right:4px">${t}</button>`).join('');
+  const wrap = document.getElementById('sablon-gun-body-'+gi);
+  const form = document.createElement('div');
+  form.style.cssText='border:1px dashed var(--card3);border-radius:8px;padding:8px;margin-top:6px';
+  form.innerHTML = `
+    <div style="margin-bottom:4px">${saatChips}
+      <input id="sbs-time" class="fi" type="time" style="width:110px;display:inline-block"></div>
+    <select id="sbs-drug" class="fsel"><option value="">— ilaç —</option>${drugOpts}</select>
+    <div style="display:flex;gap:6px;margin-top:4px">
+      <input id="sbs-dose" class="fi" type="number" step="0.1" placeholder="doz" style="width:80px">
+      <input id="sbs-unit" class="fi" placeholder="birim" style="width:70px">
+      <select id="sbs-route" class="fsel"><option>IM</option><option>IV</option><option>SC</option><option>PO</option><option>Topikal</option><option>Intrauterin</option></select>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:6px">
+      <button class="btn-sm" data-action="sablon-seans-vazgec" style="padding:5px 10px;background:var(--card3);border:none;border-radius:6px;cursor:pointer">Vazgeç</button>
+      <button class="btn-sm" data-action="sablon-seans-ekle" data-gi="${gi}" style="padding:5px 12px;background:var(--green);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">Ekle</button></div>`;
+  wrap.appendChild(form);
+  const drugSel = form.querySelector('#sbs-drug');
+  drugSel.onchange = () => {
+    const d = (_drugsCache||[]).find(x=>x.id===drugSel.value);
+    if(d){ form.querySelector('#sbs-unit').value = d.default_unit||'ml'; form.querySelector('#sbs-route').value = d.default_route||'IM'; }
+  };
+  _sablonSeansForm = form;
+}
+
+function sablonSaatChip(t){ const i=document.getElementById('sbs-time'); if(i) i.value=t; }
+function sablonSeansVazgec(){ if(_sablonSeansForm){ _sablonSeansForm.remove(); _sablonSeansForm=null; } }
+
+function sablonSeansEkle(gi){
+  const f=_sablonSeansForm; if(!f) return;
+  const time=f.querySelector('#sbs-time').value;
+  const drugId=f.querySelector('#sbs-drug').value;
+  const dose=+f.querySelector('#sbs-dose').value;
+  const unit=f.querySelector('#sbs-unit').value.trim();
+  const route=f.querySelector('#sbs-route').value;
+  if(!time){ toast('Saat girin', true); return; }
+  if(!drugId){ toast('İlaç seçin', true); return; }
+  if(!dose||dose<=0){ toast('Geçerli doz girin', true); return; }
+  if(!unit){ toast('Birim girin', true); return; }
+  const d=(_drugsCache||[]).find(x=>x.id===drugId);
+  _syncSablonAd();
+  _sablonEdit.gunler[+gi].push({
+    planned_time: time,
+    stok_id: d?.stock_id || null,
+    drug_product_id: d?._legacy ? null : drugId,
+    dose, unit, route,
+    _drugName: d?.name || 'İlaç',
+  });
+  _sablonSeansForm=null;
+  _renderSablonBuilder();
+}
+
+async function sablonKaydet(){
+  _syncSablonAd();
+  const s=_sablonEdit;
+  if(!s.ad.trim()){ toast('Şablon adı zorunlu', true); return; }
+  const kalemler=[];
+  s.gunler.forEach((arr,gi)=>arr.forEach(k=>kalemler.push({
+    gun_no: gi+1, planned_time: k.planned_time, stok_id: k.stok_id,
+    drug_product_id: k.drug_product_id, dose: k.dose, unit: k.unit, route: k.route,
+  })));
+  if(!kalemler.length){ toast('En az bir seans ekleyin', true); return; }
+  try{
+    await rpc('tedavi_sablon_kaydet', {
+      p_id: s.id, p_ad: s.ad.trim(), p_aciklama: s.aciklama||null,
+      p_disease_ids: s.disease_ids, p_kalemler: kalemler,
+    });
+    await pullTables(['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem']);
+    closeM('m-sablon');
+    toast('💾 Şablon kaydedildi');
+    loadTanimlarPanel();
+  }catch(e){ toast('❌ '+e.message, true); }
 }
 
 async function _kategoriEditForm(id){

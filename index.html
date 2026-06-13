@@ -709,6 +709,7 @@ button,input,select,textarea{font-family:inherit}
     <button class="kat-btn on" data-action="tanimlar-tab-hastaliklar">🏥 Hastalıklar</button>
     <button class="kat-btn" data-action="tanimlar-tab-ilaclar">💊 İlaç Sınıfları</button>
     <button class="kat-btn" data-action="tanimlar-tab-kategoriler">📂 Kategoriler</button>
+    <button class="kat-btn" data-action="tanimlar-tab-sablonlar">📋 Şablonlar</button>
   </div>
   <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 80px">
     <div id="tanimlar-panel-body"><div class="loader"><div class="spin"></div></div></div>
@@ -927,6 +928,14 @@ button,input,select,textarea{font-family:inherit}
 </div>
 
 <!-- VAKA AÇ (YENİ SİSTEM — migration 022) -->
+
+<!-- ŞABLON BUILDER (#63) -->
+<div id="m-sablon" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div id="m-sablon-title" class="m-title">Yeni Şablon</div>
+    <div class="m-body" id="m-sablon-body"></div>
+  </div>
+</div>
 
 <!-- AŞILAMA -->
 <div id="m-vaccine" class="mo" data-action="mclose-overlay">
@@ -1752,17 +1761,17 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781373856"></script>
-    <script src="js/utils/modal.js?v=1781373856"></script>
-    <script src="js/utils/errorHandler.js?v=1781373856"></script>
-    <script src="js/utils/events.js?v=1781373856"></script>
-    <script src="js/config.js?v=1781373856"></script>
-    <script src="js/state.js?v=1781373856"></script>
-    <script src="js/api.js?v=1781373856"></script>
-    <script src="js/ui.js?v=1781373856"></script>
-    <script src="js/forms.js?v=1781373856"></script>
-    <script src="js/app.js?v=1781373856"></script>
-    <script src="js/utils/handlers.js?v=1781373856"></script>
+    <script src="js/utils/helpers.js?v=1781374683"></script>
+    <script src="js/utils/modal.js?v=1781374683"></script>
+    <script src="js/utils/errorHandler.js?v=1781374683"></script>
+    <script src="js/utils/events.js?v=1781374683"></script>
+    <script src="js/config.js?v=1781374683"></script>
+    <script src="js/state.js?v=1781374683"></script>
+    <script src="js/api.js?v=1781374683"></script>
+    <script src="js/ui.js?v=1781374683"></script>
+    <script src="js/forms.js?v=1781374683"></script>
+    <script src="js/app.js?v=1781374683"></script>
+    <script src="js/utils/handlers.js?v=1781374683"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
