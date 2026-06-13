@@ -186,6 +186,7 @@ route text CHECK('IM','IV','SC','PO','Topikal','Intrauterin')
 | 012 | trigger_fix | _islem_log_yaz CASE fix | ✅ |
 | 013 | ground_truth | Tüm proc'lar yeniden tanım (SQL Editor) | ✅* |
 | 014 | tohumlanabilir_hayvanlar | View (SQL Editor) | ✅* |
+| 9999 | ground_truth_regen | **2026-06-13 regen (commit a2e6d00)** — canlı DB ile 33/138/12 birebir eşleşme. 19 eski default'lu imza silindi, 35 yeni default'suz eklendi, 5 view duplicate + 1 orphan (buzagi_takip) temizlendi. Yöntem: `memory/ground_truth_regen_method.md` | ✅ |
 | 016-018 | ref_id, hastalik RPC'ler | Cast fix, sil fix | ✅ |
 | 019 | tedavi_yeniden_tasarim | tedavi tablosu + RPC'ler | ✅ |
 | 020 | hastalik_guncelle_tarih | p_tarih parametresi | ✅ |
@@ -198,7 +199,7 @@ route text CHECK('IM','IV','SC','PO','Topikal','Intrauterin')
 | 027 | besi_trigger_baba_fixes | Besi padok split, baba trigger | ✅ |
 | 028 | fix_tohumlama_trigger | islem_log trigger düzeltme | ✅ |
 
-*013 ve 014 dosyaları repo'da yok — SQL Editor'dan uygulandı. Drift mevcut.
+*013 ve 014 dosyaları repo'da yok — SQL Editor'dan uygulandı. **2026-06-13'te 99999999999999_ground_truth.sql regen edilerek drift giderildi** (commit a2e6d00). Artık canlı DB ile dosya birebir eşleşiyor.
 
 ### 4.4 Bilinen Teknik Borç
 
@@ -207,8 +208,8 @@ route text CHECK('IM','IV','SC','PO','Topikal','Intrauterin')
 | Tohumlama: 3 write path, 2'si RPC'yi bypass ediyor | 🔴 | Sonraki sprint — `tohumlama_sonuc_gebe/bos`, `tohumlama_abort` RPC'leri |
 | `state.js` benimseme tamamlanmadı, `_appState` paralel yaşıyor | 🟡 | Organik geçiş — yeni kod `setState/getState` kullanır |
 | `hastalik_log.ilac_stok_id` ve `ilac_miktar` orphan kolonlar | 🟢 | **Migration 029'da DROP** → mig-011 + mig-026 |
-| `buzagi_takip` tablosu orphan, hiç kullanılmıyor | 🟢 | **Migration 026'da DROP** → `20260502000003_drop_orphan_objects.sql` |
-| Migration 013-014 repo'da yok | 🟠 | Ground truth sync migration yaz |
+| `buzagi_takip` tablosu orphan, hiç kullanılmıyor | 🟢 | ~~Migration 026'da DROP~~ **2026-06-13 regen'de silindi** (commit a2e6d00) |
+| Migration 013-014 repo'da yok | 🟠 | ~~Ground truth sync migration yaz~~ **ÇÖZÜLDÜ 2026-06-13** — 99999999999999_ground_truth.sql regen edildi |
 | `setInterval(syncNow, 5000)` polling | 🟢 | Realtime'a organik geçiş |
 
 ---

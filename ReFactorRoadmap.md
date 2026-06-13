@@ -103,17 +103,28 @@ Bu aşama, uygulamanın kararlılığını artırır ve hata ayıklamayı kolayl
 
 Bu aşama, veritabanı şemasının kodla tam uyumlu olmasını sağlar.
 
+> **GÜNCEL DURUM (2026-06-13, commit a2e6d00):** `supabase/migrations/99999999999999_ground_truth.sql` canlı DB ile **birebir eşleşiyor** (33 tablo, 138 fonksiyon, 12 view + 1 yeni hayvan_durum_analizi). Aşama 5 TAMAMLANDI.
+
 ### 5.1 Eksik Migration'ların Tamamlanması
-- `ARCHITECTURE.md`'de belirtilen 013 ve 014 numaralı migration'lar (SQL Editor'dan uygulanmış olanlar) dosya sistemine eklenecek.
-- İçerikleri, mevcut canlı veritabanından alınacak (örneğin `supabase db diff --schema public` ile çıkarılacak).
+- ~~`ARCHITECTURE.md`'de belirtilen 013 ve 014 numaralı migration'lar~~ → 99999999999999_ground_truth.sql regen edildi, 013/014 artık bu dosyada.
+- İçerikleri canlı veritabanından alındı (`pg_get_functiondef`, `pg_tables`, `pg_views`).
 
 ### 5.2 Ground Truth Migration'ı
-- Mevcut tüm migration'ların toplamından oluşan bir "ground truth" migration dosyası (örneğin `20260320000000_ground_truth.sql`) oluşturulacak. Bu dosya, her şeyi sıfırdan kurmak için kullanılabilir.
-- Ancak normal geliştirme sürecinde bu dosya çalıştırılmayacak, sadece referans olacak.
+- ~~Mevcut tüm migration'ların toplamından oluşan bir "ground truth" migration dosyası oluşturulacak~~ → TAMAMLANDI: `supabase/migrations/99999999999999_ground_truth.sql` (8865 satır, 33/138/12 birebir)
+- Normal geliştirme sürecinde bu dosya çalıştırılmaz, sadece referans olarak kullanılır.
 
 ### 5.3 Migration'ların İdempotent Hale Getirilmesi
-- Mevcut migration'lar gözden geçirilecek, eksik `IF NOT EXISTS` veya `DROP IF EXISTS` kontrolleri eklenecek.
-- Özellikle `ALTER TABLE ADD COLUMN` işlemleri için `IF NOT EXISTS` kullanılacak.
+- Mevcut migration'lar gözden geçirildi, eksik `IF NOT EXISTS` veya `DROP IF EXISTS` kontrolleri eklendi.
+- Özellikle `ALTER TABLE ADD COLUMN` işlemleri için `IF NOT EXISTS` kullanıldı.
+
+### 5.4 Regen Sonrası (2026-06-13) Yapılanlar
+- **19 eski default'lu fonksiyon imzası silindi** (overload evolution)
+- **35 yeni default'suz fonksiyon eklendi** (canlıda var, dosyada yoktu)
+- **5 view duplicate temizlendi** (4× hayvan_durum_view + 1× treatment_timeline)
+- **1 yeni view eklendi:** `hayvan_durum_analizi` (VetHek gebelik döngüsü analizi)
+- **3 yeni egesut tablo eklendi:** `tedavi`, `hayvan_override`, `vethek_tohumlamalar`
+- **1 orphan tablo silindi:** `buzagi_takip`
+- Yöntem: `memory/ground_truth_regen_method.md`
 
 ---
 
@@ -188,13 +199,13 @@ Bu aşama, projenin gelecekteki geliştirmeler için daha sağlam bir temele otu
 | 2. Veri Yönetimi | ✅ **DONE (review gerekli)** — `insertOffline`/`updateOffline`, IndexedDB index'leri, `rpcOptimistic` (zaten vardı) |
 | 3. UI/Render | ⏸️ **RİSKLİ → BEKLİYOR** (event delegation ~150 handler) |
 | 4. Hata Yönetimi | ✅ **DONE (review gerekli)** — `errorHandler.js`, `withErrorHandling` ile load/online handler sarıldı |
-| 5. Migration | ✅ **DONE (review gerekli)** — Idempotent kontrolü, ground truth (7576 satır) |
+| 5. Migration | ✅ **DONE (regen 2026-06-13)** — Idempotent kontrolü, ground truth (8865 satır, 33/138/12 canlı ile birebir) |
 | 6. Güvenlik/XSS | ⏸️ `esc()` helpers.js'te mevcut, innerHTML sarması **test gerekli** |
 | 7. Performans | ✅ **DONE:** debounce/throttle helpers.js'e eklendi |
 | 8. Test/Kod Kalitesi | ✅ **DONE (review gerekli)** — ESLint/Prettier kurulumu, JSDoc yorumları |
 | 9. Dokümantasyon | ✅ **DONE (review gerekli)** — README güncellendi, ground truth migration |
 
-**Son kontrol:** 2026-05-13
+**Son kontrol:** 2026-06-13 (ground truth regen commit a2e6d00)
 
 ---
 
