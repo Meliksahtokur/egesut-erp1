@@ -98,6 +98,13 @@ function goTo(pg, push = true) {
 }
 
 window.addEventListener('popstate', e => {
+  // Açık modal varsa en üsttekini kapat (Android geri tuşu — tüm modallar)
+  const openModals = document.querySelectorAll('.modal.on');
+  if (openModals.length) {
+    const top = openModals[openModals.length - 1];
+    top.classList.remove('on');
+    return;
+  }
   // Sentinel: history stack'in dibine ulaştık — uygulamadan çıkılacak
   if (e.state?.sentinel) {
     if (confirm('Uygulamadan çıkmak istediğinizden emin misiniz?')) {

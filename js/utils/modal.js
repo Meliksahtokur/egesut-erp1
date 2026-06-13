@@ -4,6 +4,8 @@
 function openM(id) {
   const el = g(id); if (!el) return;
   el.classList.add('on');
+  // Android geri tuşu: modal açılışını history'e ekle (router)
+  history.pushState({modal:id}, '', '');
   // Hayvan modalında doğum tarihi otomatik dolmasın — yaş hesabı bozuluyor
   if (id !== 'm-animal') {
     el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = new Date().toISOString().split('T')[0]; });
@@ -50,6 +52,8 @@ function openM(id) {
 
 function closeM(id) {
   g(id)?.classList.remove('on');
+  // Android geri tuşu: bizim pushState ettiğimiz modalı back ile kapat
+  if (history.state?.modal === id) history.back();
   // Hayvan formunu tam sıfırla — bir sonraki açılışta temiz başlasın
   if (id === 'm-animal') {
     ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
@@ -61,4 +65,10 @@ function closeM(id) {
   }
 }
 
-function mClose(e, el) { if (e.target === el) el.classList.remove('on'); }
+function mClose(e, el) {
+  if (e.target === el) {
+    el.classList.remove('on');
+    // Android geri tuşu: backdrop tıklaması da history'ye yansısın
+    if (history.state?.modal === el.id) history.back();
+  }
+}
