@@ -4650,7 +4650,7 @@ async function renderCaseTimeline(caseId) {
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--card3);align-items:center">
           ${!isLocked && !sessions.length ? `<button onclick="caseDayTamamla('${day.day_id}')" style="flex:1;min-width:80px;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:700">✅ Tamamla</button>` : ''}
           ${!sessions.length ? `<button onclick="caseDrugFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:var(--blue);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">+ İlaç</button>` : ''}
-          ${!isLocked ? `<button onclick="caseSeansEkleFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:${sessions.length?'var(--card2)':'none'};color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">⏰ ${sessions.length ? 'Seans Düzenle' : 'Seans Planla'}</button>` : ''}
+          <button onclick="caseSeansEkleFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:${sessions.length?'var(--card2)':'none'};color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">⏰ ${sessions.length ? 'Seans Düzenle' : 'Seans Planla'}</button>
           <button onclick="caseDayNotAcById('${day.day_id}')" style="flex:1;min-width:64px;background:var(--card2);color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer">📝 Not</button>
           <span style="display:flex;gap:2px;margin-left:auto">
             ${!sessions.length ? `<button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 9px;font-size:.8rem;color:var(--ink3);cursor:pointer" title="Saat ekle">🕐</button>` : ''}
@@ -7210,8 +7210,11 @@ async function caseSeansEkleFormAc(dayId) {
       const ad = s.drug_name || stokMap[s.stok_id] || 'İlaç';
       const sag = kapali
         ? `<span class="seans-chip s-${s.uygulama_tamamlandi_at ? 'done' : 'cancelled'}">${s.uygulama_tamamlandi_at ? '✓' : '✕'}</span>`
-        : `<button onclick="seansSilTekil('${s.id}')" style="background:none;border:none;color:var(--red);font-size:.95rem;cursor:pointer;padding:2px 4px" title="Seansı sil (stok iade)">🗑</button>`;
-      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--card3)">
+        : `<span style="display:flex;gap:2px">
+             <button onclick="seansDuzenleAc('${s.id}')" style="background:none;border:none;color:var(--blue);font-size:.9rem;cursor:pointer;padding:2px 4px" title="Düzenle (doz/saat/yol)">✏️</button>
+             <button onclick="seansSilTekil('${s.id}')" style="background:none;border:none;color:var(--red);font-size:.95rem;cursor:pointer;padding:2px 4px" title="Seansı sil (stok iade)">🗑</button>
+           </span>`;
+      return `<div id="seans-mevcut-${s.id}" style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--card3)">
         <span style="font-weight:700;color:var(--ink2);min-width:42px">${esc(fmtSeansSaat(s.planned_time) || '—')}</span>
         <span style="flex:1;font-size:.8rem;color:var(--ink)">${esc(ad)} <span style="color:var(--ink3);font-size:.72rem">${s.dose || ''}${esc(s.unit || '')}${s.route ? ' · ' + esc(s.route) : ''}</span></span>
         ${sag}
@@ -7288,6 +7291,50 @@ async function seansSilTekil(seansId) {
       toast('❌ ' + (e.message || 'Hata'), true);
     }
   });
+}
+
+// Mevcut not-done seansı yerinde düzenle: satırı inline form'a çevirir
+function seansDuzenleAc(seansId) {
+  const d = _seansAddCtx && _cdDayData[_seansAddCtx.dayId];
+  const s = (d?.sessions || []).find(x => x.id === seansId);
+  const row = document.getElementById('seans-mevcut-' + seansId);
+  if (!s || !row) return;
+  const yolOpts = ['IM', 'IV', 'SC', 'PO', 'Topikal', 'Intrauterin']
+    .map(y => `<option value="${y}"${(s.route || '') === y ? ' selected' : ''}>${y}</option>`).join('');
+  row.innerHTML = `
+    <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;width:100%">
+      <input id="sd-time-${seansId}" class="fi" type="time" value="${esc(fmtSeansSaat(s.planned_time) || '08:00')}" style="margin:0;width:88px">
+      <input id="sd-dose-${seansId}" class="fi" type="number" min="0.01" step="0.01" value="${s.dose ?? ''}" placeholder="Doz" style="margin:0;width:64px">
+      <input id="sd-unit-${seansId}" class="fi" type="text" value="${esc(s.unit || 'ml')}" placeholder="Birim" style="margin:0;width:52px">
+      <select id="sd-route-${seansId}" class="fsel" style="margin:0;flex:1;min-width:64px">${yolOpts}</select>
+      <button onclick="seansDuzenleKaydet('${seansId}',this)" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer" title="Kaydet">✓</button>
+      <button onclick="caseSeansEkleFormAc('${_seansAddCtx.dayId}')" style="background:var(--card3);border:none;border-radius:6px;padding:6px 9px;cursor:pointer" title="İptal">✕</button>
+    </div>`;
+}
+
+async function seansDuzenleKaydet(seansId, btn) {
+  const time = document.getElementById('sd-time-' + seansId)?.value;
+  const dose = Number.parseFloat(document.getElementById('sd-dose-' + seansId)?.value);
+  const unit = (document.getElementById('sd-unit-' + seansId)?.value || '').trim();
+  const route = document.getElementById('sd-route-' + seansId)?.value || null;
+  if (!time) { toast('Saat girin', true); return; }
+  if (!dose || dose <= 0) { toast('Geçerli doz girin', true); return; }
+  if (!unit) { toast('Birim girin', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const res = await rpc('update_treatment_session', {
+      p_seans_id: seansId, p_dose: dose, p_unit: unit,
+      p_route: (route || '').split(' ')[0] || null, p_planned_time: time,
+    });
+    if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
+    toast('✅ Seans güncellendi');
+    await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log']);
+    if (_curCase) await renderCaseTimeline(_curCase.id);
+    if (_curCase) _updateKapatBtn(_curCase.id);
+  } catch (e) {
+    toast('❌ ' + (e.message || 'Hata'), true);
+    if (btn) { btn.disabled = false; btn.textContent = '✓'; }
+  }
 }
 
 async function caseSeansEkleKaydet(btn) {

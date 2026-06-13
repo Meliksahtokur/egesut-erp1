@@ -198,3 +198,74 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.remove_treatment_session(uuid) TO anon, authenticated;
+
+-- ── 3. Gerçekleşmemiş seansı düzenle (doz/birim/yol/saat) + stok farkı ayarla ──
+CREATE OR REPLACE FUNCTION public.update_treatment_session(
+  p_seans_id      uuid,
+  p_dose          numeric,
+  p_unit          text,
+  p_route         text,
+  p_planned_time  text
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_seans   record;
+  v_animal  text;
+  v_time    time := (p_planned_time)::time;
+BEGIN
+  SELECT * INTO v_seans FROM public.treatment_day_uygulamalar WHERE id = p_seans_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Seans bulunamadı');
+  END IF;
+  IF v_seans.uygulama_tamamlandi_at IS NOT NULL OR v_seans.uygulanmadi = true THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Tamamlanmış/iptal seans düzenlenemez');
+  END IF;
+  IF p_dose IS NULL OR p_dose <= 0 THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçerli doz girin');
+  END IF;
+
+  SELECT animal_id INTO v_animal FROM public.cases WHERE id = v_seans.case_id;
+
+  UPDATE public.treatment_day_uygulamalar
+  SET planned_time = v_time, dose = p_dose, unit = p_unit, route = p_route, updated_at = now()
+  WHERE id = p_seans_id;
+
+  -- Eski stok hareketini iptal et, yeni doz ile yeniden yaz
+  UPDATE public.stok_hareket sh
+  SET iptal = true
+  FROM public.drug_administrations da
+  WHERE da.seans_admin_id = p_seans_id
+    AND sh.notlar = 'drug_admin:' || da.id::text
+    AND sh.iptal = false;
+
+  UPDATE public.drug_administrations
+  SET dose = p_dose, unit = p_unit, route = p_route
+  WHERE seans_admin_id = p_seans_id;
+
+  INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar)
+  SELECT da.stok_id, 'Tedavi', p_dose, 'drug_admin:' || da.id::text
+  FROM public.drug_administrations da
+  WHERE da.seans_admin_id = p_seans_id AND da.stok_id IS NOT NULL AND p_dose > 0;
+
+  UPDATE public.gorev_log
+  SET hedef_saat = v_time,
+      aciklama = (aciklama::jsonb || jsonb_build_object('planned_time', p_planned_time))::text
+  WHERE gorev_tipi = 'TEDAVI_SEANS' AND seans_admin_id = p_seans_id;
+
+  UPDATE public.treatment_days
+  SET planned_time = (SELECT min(planned_time) FROM public.treatment_day_uygulamalar WHERE treatment_day_id = v_seans.treatment_day_id)
+  WHERE id = v_seans.treatment_day_id;
+
+  INSERT INTO public.islem_log(id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+  VALUES (
+    gen_random_uuid()::text, 'SEANS_GUNCELLENDI', v_animal,
+    p_seans_id::text, 'treatment_day_uygulamalar',
+    jsonb_build_object('dose', p_dose, 'unit', p_unit, 'route', p_route, 'planned_time', p_planned_time)
+  );
+
+  RETURN jsonb_build_object('ok', true);
+EXCEPTION WHEN unique_violation THEN
+  RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu saatte aynı ilaç zaten ekli — farklı saat seçin');
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.update_treatment_session(uuid, numeric, text, text, text) TO anon, authenticated;
