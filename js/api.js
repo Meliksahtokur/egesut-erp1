@@ -6,12 +6,13 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 21;
+const DB_VER  = 22;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
                   'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
-                  'uygulama_log','protokol_instance'];
+                  'uygulama_log','protokol_instance',
+                  'tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'];
 const APP_VERSION = '2026-03-12-cln03';
 
 // ── SUPABASE SDK ────────────────────────────
@@ -297,6 +298,10 @@ const RPC_TABLES = {
   seans_tamamla:                 ['treatment_day_uygulamalar','stok','stok_hareket','gorev_log','treatment_days'],
   recete_guncelle:               ['treatment_days','treatment_day_uygulamalar','stok','stok_hareket'],
   close_case_with_remaining:     ['cases','treatment_day_uygulamalar','stok','stok_hareket','treatment_days'],
+  // #63 — şablon tedavi planlama
+  tedavi_sablon_kaydet:  ['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'],
+  tedavi_sablon_sil:     ['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'],
+  tedavi_sablon_uygula:  ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────
@@ -346,6 +351,9 @@ async function pullTables(tables = []) {
       hekimler:         () => db.from('hekimler').select('*').eq('aktif', true),
       gebelik_ozet:     () => db.from('gebelik_ozet_view').select('*'),
       stok_kategorileri:() => db.from('stok_kategorileri').select('*').order('sira'),
+      tedavi_sablonu:        () => db.from('tedavi_sablonu').select('*').order('ad'),
+      sablon_hastalik_eslem: () => db.from('sablon_hastalik_eslem').select('*'),
+      tedavi_sablonu_kalem:  () => db.from('tedavi_sablonu_kalem').select('*'),
       // ileri_gebe_view: () => db.from('ileri_gebe_view').select('*'), — dashboard RPC sonucu kullanıyor
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
