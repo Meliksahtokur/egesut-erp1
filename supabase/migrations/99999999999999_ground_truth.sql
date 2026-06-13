@@ -4158,18 +4158,23 @@ ALTER TABLE public.drugs                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cases                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.treatment_days       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.drug_administrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.treatment_day_uygulamalar ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS diseases_select             ON public.diseases;
 DROP POLICY IF EXISTS drugs_select                ON public.drugs;
 DROP POLICY IF EXISTS cases_all                   ON public.cases;
 DROP POLICY IF EXISTS treatment_days_all          ON public.treatment_days;
 DROP POLICY IF EXISTS drug_administrations_all    ON public.drug_administrations;
+DROP POLICY IF EXISTS treatment_day_uygulamalar_all ON public.treatment_day_uygulamalar;
 
 CREATE POLICY diseases_select          ON public.diseases             FOR SELECT USING (true);
 CREATE POLICY drugs_select             ON public.drugs                FOR SELECT USING (true);
 CREATE POLICY cases_all                ON public.cases                FOR ALL    USING (true);
 CREATE POLICY treatment_days_all       ON public.treatment_days       FOR ALL    USING (true);
 CREATE POLICY drug_administrations_all ON public.drug_administrations FOR ALL    USING (true);
+-- BUG-059: seans tablosu RLS policy'si unutulmustu — anon SELECT engelleniyordu,
+-- frontend yarattigi seansi geri okuyamiyordu (modal/gorev bos gorunuyordu)
+CREATE POLICY treatment_day_uygulamalar_all ON public.treatment_day_uygulamalar FOR ALL USING (true);
 
 -- SECURITY DEFINER GRANTS
 GRANT EXECUTE ON FUNCTION public.create_case             TO anon, authenticated;
