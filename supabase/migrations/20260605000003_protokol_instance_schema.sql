@@ -19,16 +19,16 @@ ALTER TABLE public.protokol_instance ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "protokol_instance_all" ON public.protokol_instance;
 CREATE POLICY "protokol_instance_all" ON public.protokol_instance FOR ALL USING (true) WITH CHECK (true);
 
-CREATE INDEX idx_pi_hayvan_durum ON public.protokol_instance(hayvan_id, durum);
-CREATE INDEX idx_pi_tip_alttip   ON public.protokol_instance(tip, alttip);
-CREATE INDEX idx_pi_kaynak_ref   ON public.protokol_instance(kaynak_ref);
+CREATE INDEX IF NOT EXISTS idx_pi_hayvan_durum ON public.protokol_instance(hayvan_id, durum);
+CREATE INDEX IF NOT EXISTS idx_pi_tip_alttip   ON public.protokol_instance(tip, alttip);
+CREATE INDEX IF NOT EXISTS idx_pi_kaynak_ref   ON public.protokol_instance(kaynak_ref);
 
 -- 2. gorev_log FK kolonu ekle
 ALTER TABLE public.gorev_log
   ADD COLUMN IF NOT EXISTS protokol_instance_id uuid
   REFERENCES public.protokol_instance(id) ON DELETE SET NULL;
 
-CREATE INDEX idx_gorev_protokol ON public.gorev_log(protokol_instance_id)
+CREATE INDEX IF NOT EXISTS idx_gorev_protokol ON public.gorev_log(protokol_instance_id)
   WHERE protokol_instance_id IS NOT NULL;
 
 NOTIFY pgrst, 'reload schema';
