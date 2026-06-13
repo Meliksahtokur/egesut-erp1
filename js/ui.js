@@ -4608,7 +4608,7 @@ async function renderCaseTimeline(caseId) {
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--card3);align-items:center">
           ${!isLocked && !sessions.length ? `<button onclick="caseDayTamamla('${day.day_id}')" style="flex:1;min-width:80px;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:700">✅ Tamamla</button>` : ''}
           ${!sessions.length ? `<button onclick="caseDrugFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:var(--blue);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">+ İlaç</button>` : ''}
-          ${!kilitliSeans ? `<button onclick="caseSeansFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:${sessions.length?'var(--card2)':'none'};color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">⏰ ${sessions.length ? 'Planı Düzenle' : 'Seans Planla'}</button>` : ''}
+          ${!isLocked ? `<button onclick="caseSeansEkleFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:${sessions.length?'var(--card2)':'none'};color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">⏰ ${sessions.length ? 'Seans Düzenle' : 'Seans Planla'}</button>` : ''}
           <button onclick="caseDayNotAcById('${day.day_id}')" style="flex:1;min-width:64px;background:var(--card2);color:var(--ink2);border:1px solid var(--card3);border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer">📝 Not</button>
           <span style="display:flex;gap:2px;margin-left:auto">
             ${!sessions.length ? `<button onclick="caseDaySaatAc('${day.day_id}','${day.time||''}')" style="background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 9px;font-size:.8rem;color:var(--ink3);cursor:pointer" title="Saat ekle">🕐</button>` : ''}
@@ -7144,123 +7144,147 @@ async function renderTedaviGunSeanslar(treatmentDayId) {
 // ── Seans planı düzenleyici — gün akordeonu içinde inline form ──
 // renderCaseTimeline her render'da _cdDayData'yı doldurur.
 let _cdDayData = {};
-let _seansEdit = null; // { dayId, tarih, rows, legacyVar }
+let _seansAddCtx = null; // { dayId, tarih } — checkbox seans ekleme bağlamı
 
-function _seansBosSatir() {
-  return { planned_time: HIZLI_SAATLER[0], stok_id: '', dose: '', unit: '', route: 'IM' };
-}
-
-function _seansStokOpts(seciliId) {
-  // Sadece ilaç kategorileri — Aşı/Sperma/Yem hariç (seçili olan her zaman kalır)
-  const stoklar = (getState('stock') || []).filter(s =>
-    (s.guncel_stok > 0 && s.kategori && !['Aşı','Sperma','Yem'].includes(s.kategori)) || s.id === seciliId);
-  return '<option value="">— İlaç seçin —</option>' + stoklar.map(s =>
-    `<option value="${s.id}"${s.id === seciliId ? ' selected' : ''}>${esc(s.urun_adi || s.id)} (${s.guncel_stok ?? '?'}${s.birim || ''})</option>`
-  ).join('');
-}
-
-function caseSeansFormAc(dayId) {
+// Var olan "ilaç ekle" checkbox dilini seansa uyarlar: üstte tek saat seçici,
+// altta gruplu checkbox ilaç listesi (cdfChkChange ile ortak doz satırları).
+// Mevcut seanslar listelenir; gerçekleşmemiş olanlar 🗑 ile silinebilir (incremental).
+async function caseSeansEkleFormAc(dayId) {
   const d = _cdDayData[dayId];
   if (!d || !_curCase) return;
-  if (d.kilitli) { toast('Bu günde kapatılmış seans var — plan değiştirilemez', true); return; }
   document.querySelectorAll('.cd-drug-form, .cd-seans-form').forEach(f => f.remove());
   const container = document.getElementById('drugs-' + dayId);
   if (!container) return;
+  if (!(_drugsCache && _drugsCache.length)) { try { await loadDrugsCache(); } catch (_) {} }
+  _seansAddCtx = { dayId, tarih: d.date };
 
-  const rows = d.sessions.map(s => ({
-    planned_time: fmtSeansSaat(s.planned_time) || '08:00',
-    stok_id: s.stok_id || '', dose: s.dose ?? '', unit: s.unit || '', route: s.route || 'IM',
-  }));
-  // Saatsiz (eski tip) ilaçlar da seansa çevrilir — RPC günü komple yeniden kurar
-  d.legacyDrugs.forEach(dr => rows.push({
-    planned_time: fmtSeansSaat(d.time) || '08:00',
-    stok_id: dr.stok_id || '', dose: dr.dose ?? '', unit: dr.unit || '', route: dr.route || 'IM',
-  }));
-  if (!rows.length) rows.push(_seansBosSatir());
-  _seansEdit = { dayId, tarih: d.date, rows, legacyVar: d.legacyDrugs.length > 0 };
+  // Mevcut seanslar — done/iptal kilitli, gerçekleşmemiş 🗑 silinebilir
+  const sessions = (d.sessions || []).slice().sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
+  const stokMap = Object.fromEntries((getState('stock') || []).map(s => [s.id, s.urun_adi || s.id]));
+  const mevcutHtml = sessions.length ? (
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Mevcut Seanslar</div>' +
+    sessions.map(s => {
+      const kapali = s.uygulama_tamamlandi_at || s.uygulanmadi;
+      const ad = s.drug_name || stokMap[s.stok_id] || 'İlaç';
+      const sag = kapali
+        ? `<span class="seans-chip s-${s.uygulama_tamamlandi_at ? 'done' : 'cancelled'}">${s.uygulama_tamamlandi_at ? '✓' : '✕'}</span>`
+        : `<button onclick="seansSilTekil('${s.id}')" style="background:none;border:none;color:var(--red);font-size:.95rem;cursor:pointer;padding:2px 4px" title="Seansı sil (stok iade)">🗑</button>`;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--card3)">
+        <span style="font-weight:700;color:var(--ink2);min-width:42px">${esc(fmtSeansSaat(s.planned_time) || '—')}</span>
+        <span style="flex:1;font-size:.8rem;color:var(--ink)">${esc(ad)} <span style="color:var(--ink3);font-size:.72rem">${s.dose || ''}${esc(s.unit || '')}${s.route ? ' · ' + esc(s.route) : ''}</span></span>
+        ${sag}
+      </div>`;
+    }).join('')
+  ) : '';
+
+  // Checkbox gruplu ilaç listesi — caseDrugFormAc ile birebir aynı dil
+  const cache = _drugsCache || [];
+  const groups = {};
+  [...cache].sort((a, b) => a.name.localeCompare(b.name, 'tr')).forEach(dr => {
+    const g = dr.group_name || 'Diger';
+    (groups[g] = groups[g] || []).push(dr);
+  });
+  const groupHtml = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'tr', { sensitivity: 'base' })).map(grp => {
+    const items = groups[grp].map(dr => {
+      const stokClrPos = dr.guncel <= 0 ? 'var(--red)' : dr.guncel <= 10 ? 'var(--amber)' : 'var(--green)';
+      const stokClr = dr.guncel === null ? 'var(--ink3)' : stokClrPos;
+      const stokTxt = dr.guncel !== null ? dr.guncel.toFixed(1) + ' ' + dr.birim : 'stok yok';
+      const nm = dr.name.replace(/"/g, '&quot;');
+      const rt = (dr.default_route || 'IM').split(' ')[0];
+      return '<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">' +
+        '<input type="checkbox" class="cdf-chk" data-id="' + dr.id + '" data-name="' + nm + '" data-unit="' + (dr.default_unit || dr.birim || 'ml') + '" data-route="' + rt + '" data-legacy="' + (dr._legacy || false) + '"' +
+        ' onchange="cdfChkChange(this)" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">' +
+        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600;color:var(--ink)">' + dr.name + '</div>' +
+        (dr.active_ingredient ? '<div style="font-size:.65rem;color:var(--ink3)">' + dr.active_ingredient + '</div>' : '') +
+        '</div><span style="font-size:.72rem;font-weight:700;color:' + stokClr + ';flex-shrink:0">' + stokTxt + '</span></label>';
+    }).join('');
+    return '<div style="margin-bottom:8px"><div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding:3px 0;border-bottom:1px solid var(--card3)">' + grp + '</div>' + items + '</div>';
+  }).join('');
+
+  const saatChips = HIZLI_SAATLER.map(h => `<button type="button" class="ek-chip" onclick="seansAddSaatSec('${h}',this)">${h}</button>`).join('');
 
   const form = document.createElement('div');
   form.className = 'cd-seans-form';
   form.style.cssText = 'margin-top:8px;background:var(--card2);border-radius:10px;padding:10px';
   form.innerHTML =
-    '<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⏰ Seans Planı Düzenle</div>' +
-    (_seansEdit.legacyVar ? '<div style="font-size:.68rem;color:var(--amber);background:rgba(201,125,10,.08);border-radius:8px;padding:7px 9px;margin-bottom:8px">Bu günün saatsiz ilaçları da saatli seansa çevrilecek.</div>' : '') +
-    '<div id="cd-seans-satirlar"></div>' +
-    '<button onclick="seansEditSatirEkle()" style="width:100%;background:none;border:1.5px dashed var(--card3);border-radius:8px;padding:9px;font-size:.76rem;font-weight:700;color:var(--ink3);cursor:pointer;margin-top:6px">＋ Seans Satırı</button>' +
+    '<div style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⏰ Seans Planı</div>' +
+    mevcutHtml +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin:8px 0 6px">＋ Yeni Seans — Saat</div>' +
+    '<div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">' +
+    `<input id="seans-add-time" class="fi" type="time" value="${HIZLI_SAATLER[0]}" style="margin:0;flex:1;min-width:90px">` +
+    saatChips + '</div>' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>' +
+    '<div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">' +
+    (groupHtml || '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Stokta ilaç yok</div>') + '</div>' +
+    '<div id="cdf-doz-alani" style="display:none">' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Seçili İlaçlar — Doz Gir</div>' +
+    '<div id="cdf-doz-satirlar"></div></div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">' +
-    '<button onclick="caseSeansKaydet(this)" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer">💾 Kaydet</button>' +
-    '<button onclick="this.closest(\'.cd-seans-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">İptal</button>' +
+    '<button onclick="caseSeansEkleKaydet(this)" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer">＋ Seansı Ekle</button>' +
+    '<button onclick="this.closest(\'.cd-seans-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">Kapat</button>' +
     '</div>';
   container.appendChild(form);
-  renderSeansSatirlar();
 }
 
-function renderSeansSatirlar() {
-  const el = document.getElementById('cd-seans-satirlar');
-  if (!el || !_seansEdit) return;
-  const yolOpts = r => UYGULAMA_YOLU.map(y => `<option value="${y}"${y === r ? ' selected' : ''}>${y}</option>`).join('');
-  el.innerHTML = _seansEdit.rows.map((s, i) => `
-    <div style="background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px;margin-bottom:6px">
-      <div style="display:flex;gap:5px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
-        <input class="fi" type="time" value="${esc(s.planned_time)}" onchange="seansEditAlan(${i},'planned_time',this.value)" style="margin:0;flex:1;min-width:90px">
-        ${HIZLI_SAATLER.map(h => `<button type="button" class="ek-chip${s.planned_time === h ? ' aktif' : ''}" onclick="seansEditAlan(${i},'planned_time','${h}')">${h}</button>`).join('')}
-        <button onclick="seansEditSatirSil(${i})" style="background:none;border:none;color:var(--red);font-size:.95rem;cursor:pointer;padding:2px 4px" title="Satırı sil">🗑</button>
-      </div>
-      <select class="fsel" onchange="seansEditAlan(${i},'stok_id',this.value)" style="margin-bottom:6px">${_seansStokOpts(s.stok_id)}</select>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <input class="fi" type="number" min="0.01" step="0.01" placeholder="Doz" value="${s.dose ?? ''}" onchange="seansEditAlan(${i},'dose',this.value)" style="margin:0">
-        <select class="fsel" onchange="seansEditAlan(${i},'route',this.value)" style="margin:0">${yolOpts(s.route)}</select>
-      </div>
-    </div>`).join('') || '<div style="font-size:.75rem;color:var(--ink3);padding:6px 0">Seans yok — satır ekleyin</div>';
+function seansAddSaatSec(h, btn) {
+  const inp = document.getElementById('seans-add-time');
+  if (inp) inp.value = h;
+  btn?.parentElement?.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
+  btn?.classList.add('aktif');
 }
 
-function seansEditAlan(i, alan, deger) {
-  if (!_seansEdit?.rows[i]) return;
-  _seansEdit.rows[i][alan] = alan === 'dose' ? (parseFloat(deger) || '') : deger;
-  if (alan === 'planned_time' || alan === 'stok_id') renderSeansSatirlar();
+async function seansSilTekil(seansId) {
+  openConfirm('Seansı Sil', 'Bu seans silinecek ve ilacı stoğa iade edilecek. Emin misiniz?', async () => {
+    try {
+      const res = await rpc('remove_treatment_session', { p_seans_id: seansId });
+      if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
+      toast('✅ Seans silindi, stok iade edildi');
+      await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log']);
+      if (_curCase) await renderCaseTimeline(_curCase.id);
+      if (_curCase) _updateKapatBtn(_curCase.id);
+    } catch (e) {
+      toast('❌ ' + (e.message || 'Hata'), true);
+    }
+  });
 }
 
-function seansEditSatirEkle() {
-  if (!_seansEdit) return;
-  if (_seansEdit.rows.length >= MAX_SEANS_PER_DAY) { toast(`En fazla ${MAX_SEANS_PER_DAY} seans eklenebilir`, true); return; }
-  _seansEdit.rows.push(_seansBosSatir());
-  renderSeansSatirlar();
-}
-
-function seansEditSatirSil(i) {
-  if (!_seansEdit) return;
-  _seansEdit.rows.splice(i, 1);
-  renderSeansSatirlar();
-}
-
-async function caseSeansKaydet(btn) {
-  if (!_seansEdit || !_curCase) return;
-  const stokMap = Object.fromEntries((getState('stock') || []).map(s => [s.id, s]));
+async function caseSeansEkleKaydet(btn) {
+  if (!_seansAddCtx || !_curCase) return;
+  const time = document.getElementById('seans-add-time')?.value;
+  if (!time) { toast('Saat seçin', true); return; }
   const sessions = [];
-  for (const r of _seansEdit.rows) {
-    if (!r.planned_time || !r.stok_id || !(r.dose > 0)) { toast('Her satırda saat, ilaç ve doz zorunlu', true); return; }
+  let hata = false;
+  document.querySelectorAll('.cdf-chk:checked').forEach(chk => {
+    if (hata) return;
+    const id = chk.dataset.id;
+    const dose = Number.parseFloat(document.querySelector('.cdf-dose-inp[data-drug-id="' + id + '"]')?.value);
+    const unit = (document.querySelector('.cdf-unit-inp[data-drug-id="' + id + '"]')?.value || '').trim();
+    const route = document.querySelector('.cdf-route-inp[data-drug-id="' + id + '"]')?.value || null;
+    if (!dose || dose <= 0) { toast(chk.dataset.name + ': geçerli doz girin', true); hata = true; return; }
+    if (!unit) { toast(chk.dataset.name + ': birim girin', true); hata = true; return; }
+    const dr = (_drugsCache || []).find(x => x.id === id);
     sessions.push({
-      planned_time: r.planned_time,
-      stok_id: r.stok_id,
-      dose: r.dose,
-      unit: r.unit || stokMap[r.stok_id]?.birim || 'ml',
-      route: r.route || 'IM',
+      planned_time: time,
+      stok_id: dr?.stock_id || null,
+      drug_product_id: dr?._legacy ? null : id,
+      dose, unit,
+      route: (route || '').split(' ')[0] || null,
     });
-  }
-  if (!sessions.length) { toast('En az 1 seans girin', true); return; }
-  sessions.sort((a, b) => a.planned_time.localeCompare(b.planned_time));
-  if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  });
+  if (hata) return;
+  if (!sessions.length) { toast('İlaç seçin', true); return; }
+  btn.disabled = true; btn.textContent = 'Ekleniyor…';
   try {
-    const res = await rpcAddTreatmentDayWithSessions(_curCase.id, _seansEdit.tarih, sessions, _seansEdit.dayId);
+    const res = await rpc('add_sessions_to_existing_day', { p_day_id: _seansAddCtx.dayId, p_sessions: sessions });
     if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
-    toast(`✅ ${sessions.length} seanslı plan kaydedildi`);
-    _seansEdit = null;
+    toast(`✅ ${sessions.length} seans eklendi (${time})`);
+    _seansAddCtx = null;
     await pullTables(['treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log']);
     await renderCaseTimeline(_curCase.id);
     _updateKapatBtn(_curCase.id);
   } catch (e) {
     toast('❌ ' + (e.message || 'Hata'), true);
-    if (btn) { btn.disabled = false; btn.textContent = '💾 Kaydet'; }
+    btn.disabled = false; btn.textContent = '＋ Seansı Ekle';
   }
 }
 
