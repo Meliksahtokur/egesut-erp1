@@ -815,6 +815,21 @@ async function _showSessizList(){
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}
 }
+async function _showBelirsizList(){
+  try{
+    const list=await rpc('hayvan_belirsiz_ureme_listele',{});
+    if(!list||!list.length){toast('Belirsiz hayvan yok');return;}
+    let box=document.getElementById('belirsiz-bs');
+    if(box) box.remove();
+    box=document.createElement('div');
+    box.id='belirsiz-bs';
+    box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+    box.onclick=e=>{if(e.target===box)box.remove();};
+    const rows=list.map(s=>`<div class="arow" onclick="document.getElementById('belirsiz-bs').remove();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.dogum_sayisi} doğum · ${s.tohumlama_sayisi} tohumlama · Son: ${s.son_tohumlama||'—'}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join('');
+    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">⚠️ Belirsiz Üreme Statüsü (${list.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">Karta girip "Üreme Statüsü" alanından Genç Anne / Olgun İnek seç</div>${rows}</div>`;
+    document.body.appendChild(box);
+  }catch(e){toast('Hata: '+e.message);}
+}
 async function _showProtokolEkran(){
   let data = window.__protokolUyarilar;
   if (!data || !data.length) {
@@ -1352,10 +1367,12 @@ function _applySuruStatHtml(el,d,padok){
 
   const sessizCount=h.sessiz||0;
   const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">55+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
+  const belirsizCount=h.belirsiz||0;
+  const belirsizSection=belirsizCount>0?`<div class="stat-section"><div class="stat-section-title">⚠️ Belirsiz Üreme Statüsü (${belirsizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">Düve mi olgun inek mi belirsiz — incelenip işaretlenmeli</div><div class="stat-row"><span onclick="_showBelirsizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
 
   el.innerHTML=`<div class="stat-card${_suruStatOpen?' open':''}" onclick="_toggleSuruStat(event)">
     <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🔬 ${h.tohumlanan||0} tohumlanan · 🤰 ${ho.gebe||0} gebe (${oran})</span><span class="stat-arrow">▼</span></div>
-    <div class="stat-detail"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><span onclick="_toggleStatMode(event)" style="cursor:pointer;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ink1);color:var(--ink4)">${_suruStatMode==='son'?'Son Dönem':'Tüm Zamanlar'} ↻</span></div>${demoHtml}${gebHtml}${verimHtml}${spSection}${sessizSection}${dnSection}</div>
+    <div class="stat-detail"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><span onclick="_toggleStatMode(event)" style="cursor:pointer;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ink1);color:var(--ink4)">${_suruStatMode==='son'?'Son Dönem':'Tüm Zamanlar'} ↻</span></div>${demoHtml}${gebHtml}${verimHtml}${spSection}${sessizSection}${belirsizSection}${dnSection}</div>
   </div>`;
 }
 
@@ -1957,6 +1974,25 @@ async function openAnimalEdit(id){
     }
   }
 
+  // Genç anne / üreme statüsü — sadece belirsiz hayvanlarda göster
+  const gw=document.getElementById('a-genc-anne-wrap');
+  const gs=document.getElementById('a-genc-anne');
+  if(gw&&gs){
+    const dogumlar=await idbGetAll('dogum').catch(()=>[]);
+    const dogumSay=(dogumlar||[]).filter(d=>d.anne_id===a.id).length;
+    const grupDuve=/düve|duve/i.test(a.grup||'');
+    const tohlar=await idbGetAll('tohumlama').catch(()=>[]);
+    const tohVar=(tohlar||[]).some(t=>t.hayvan_id===a.id);
+    const belirsiz=a.cinsiyet==='Dişi' && !a.kisir && !grupDuve && dogumSay<2 && tohVar;
+    if(belirsiz){
+      gw.style.display='block';
+      gs.value=(a.genc_anne===true?'true':a.genc_anne===false?'false':'');
+    } else {
+      gw.style.display='none';
+      gs.value='';
+    }
+  }
+
   // Grup + padok
   await animalFormGuncelle();
   const grupSel=document.getElementById('a-grup');
@@ -1983,6 +2019,11 @@ function closeAnimalEdit(){
   if(kw) kw.style.display='none';
   const kc=document.getElementById('a-kisir');
   if(kc){ kc.checked=false; kc.disabled=false; }
+  // Genç anne select'i gizle
+  const gw2=document.getElementById('a-genc-anne-wrap');
+  if(gw2) gw2.style.display='none';
+  const gs2=document.getElementById('a-genc-anne');
+  if(gs2) gs2.value='';
   const titleEl=document.getElementById('m-animal-title');
   const btnEl=document.getElementById('m-animal-btn');
   if(titleEl) titleEl.textContent='🐄 Hayvan Ekle';

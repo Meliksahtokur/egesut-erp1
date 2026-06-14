@@ -96,6 +96,14 @@ async function submitAnimal(btn) {
         p_ayirici_ozellik: v('a-ozellik') || null,
         p_kisir:          document.getElementById('a-kisir')?.checked === true || (document.getElementById('a-kisir')?.checked === false ? false : null),
       });
+      // Genç anne statüsü — sadece belirsiz hayvanlarda gösterilir (wrap görünürse uygula)
+      const gaEl=document.getElementById('a-genc-anne');
+      const gaWrap=document.getElementById('a-genc-anne-wrap');
+      if (gaWrap && gaWrap.style.display!=='none' && gaEl) {
+        const gv = gaEl.value==='' ? null : (gaEl.value==='true');
+        try { await rpc('hayvan_genc_anne_isaretle', { p_hayvan_id: editId, p_genc_anne: gv }); }
+        catch(e){ console.warn('genc_anne:', e.message); }
+      }
       toast(`✅ ${devlet || kupe} güncellendi`);
       closeAnimalEdit();
       await pullTables(['hayvanlar']);
