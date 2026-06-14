@@ -815,20 +815,71 @@ async function _showSessizList(){
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}
 }
+let _belirsizData=[];
+let _belirsizSel=new Set();
 async function _showBelirsizList(){
   try{
     const list=await rpc('hayvan_belirsiz_ureme_listele',{});
     if(!list||!list.length){toast('Belirsiz hayvan yok');return;}
+    _belirsizData=list;
+    _belirsizSel=new Set();
     let box=document.getElementById('belirsiz-bs');
     if(box) box.remove();
     box=document.createElement('div');
     box.id='belirsiz-bs';
     box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
     box.onclick=e=>{if(e.target===box)box.remove();};
-    const rows=list.map(s=>`<div class="arow" onclick="document.getElementById('belirsiz-bs').remove();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.dogum_sayisi} doğum · ${s.tohumlama_sayisi} tohumlama · Son: ${s.son_tohumlama||'—'}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join('');
-    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">⚠️ Belirsiz Üreme Statüsü (${list.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">Karta girip "Üreme Statüsü" alanından Genç Anne / Olgun İnek seç</div>${rows}</div>`;
     document.body.appendChild(box);
+    _belirsizRender();
   }catch(e){toast('Hata: '+e.message);}
+}
+function _belirsizRender(){
+  const box=document.getElementById('belirsiz-bs'); if(!box) return;
+  const list=_belirsizData, sel=_belirsizSel;
+  const rows=list.map(s=>{
+    const on=sel.has(s.hayvan_id);
+    const hint=s.dogum_sayisi>=1?'<span style="color:var(--green2,#2e7d32)">🐮 genç anne adayı</span>':'<span style="color:var(--blue)">🐄 olgun inek adayı</span>';
+    const chk=`<div style="width:22px;height:22px;border-radius:6px;border:2px solid ${on?'var(--green2,#2e7d32)':'var(--ink2)'};background:${on?'var(--green2,#2e7d32)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">${on?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''}</div>`;
+    return `<div class="arow" onclick="_belirsizToggle('${s.hayvan_id}')" style="${on?'background:rgba(46,125,50,.10);':''}">${chk}<div style="flex:1;min-width:0"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.dogum_sayisi} doğum · ${s.tohumlama_sayisi} toh · ${hint}</div></div></div>`;
+  }).join('');
+  const n=sel.size;
+  box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:84vh;display:flex;flex-direction:column">
+    <div style="padding:18px 16px 8px">
+      <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">⚠️ Belirsiz Üreme Statüsü (${list.length})</div>
+      <div style="font-size:.72rem;color:var(--ink3);margin-bottom:10px">Seç → alttan toplu işaretle. İpucu: <b>1 doğum</b> = genç anne (Düve), <b>0 doğum</b> = olgun inek</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span onclick="event.stopPropagation();_belirsizSelPredik('all')" style="cursor:pointer;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid var(--ink2);background:var(--ink1)">Tümü</span>
+        <span onclick="event.stopPropagation();_belirsizSelPredik('dogum1')" style="cursor:pointer;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid var(--green2,#2e7d32);color:var(--green2,#2e7d32)">🐮 1 doğumlular</span>
+        <span onclick="event.stopPropagation();_belirsizSelPredik('dogum0')" style="cursor:pointer;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid var(--blue);color:var(--blue)">🐄 0 doğumlular</span>
+        <span onclick="event.stopPropagation();_belirsizSelPredik('none')" style="cursor:pointer;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid var(--ink2)">Temizle</span>
+      </div>
+    </div>
+    <div style="flex:1;overflow-y:auto">${rows}</div>
+    <div style="padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--card2);display:flex;gap:8px">
+      <button onclick="_belirsizApply(true)" ${n?'':'disabled'} style="flex:1;padding:11px;border-radius:10px;border:none;font-weight:700;font-size:.8rem;cursor:${n?'pointer':'default'};background:${n?'var(--green2,#2e7d32)':'var(--ink1)'};color:${n?'#fff':'var(--ink3)'}">🐮 Genç Anne (${n})</button>
+      <button onclick="_belirsizApply(false)" ${n?'':'disabled'} style="flex:1;padding:11px;border-radius:10px;border:none;font-weight:700;font-size:.8rem;cursor:${n?'pointer':'default'};background:${n?'var(--blue)':'var(--ink1)'};color:${n?'#fff':'var(--ink3)'}">🐄 Olgun İnek (${n})</button>
+    </div>
+  </div>`;
+}
+function _belirsizToggle(id){ if(_belirsizSel.has(id))_belirsizSel.delete(id); else _belirsizSel.add(id); _belirsizRender(); }
+function _belirsizSelPredik(mode){
+  _belirsizSel=new Set();
+  if(mode==='all') _belirsizData.forEach(s=>_belirsizSel.add(s.hayvan_id));
+  else if(mode==='dogum1') _belirsizData.filter(s=>s.dogum_sayisi>=1).forEach(s=>_belirsizSel.add(s.hayvan_id));
+  else if(mode==='dogum0') _belirsizData.filter(s=>s.dogum_sayisi===0).forEach(s=>_belirsizSel.add(s.hayvan_id));
+  _belirsizRender();
+}
+async function _belirsizApply(val){
+  const ids=[..._belirsizSel]; if(!ids.length) return;
+  try{
+    const r=await rpc('hayvan_genc_anne_isaretle_toplu',{p_ids:ids,p_genc_anne:val});
+    toast(`✅ ${r.adet||ids.length} hayvan ${val?'Genç Anne (Düve)':'Olgun İnek'} işaretlendi`);
+    await pullTables(['hayvanlar']).catch(()=>{});
+    _suruStatCache={}; _renderSuruStat();
+    const list=await rpc('hayvan_belirsiz_ureme_listele',{});
+    if(!list||!list.length){ const b=document.getElementById('belirsiz-bs'); if(b)b.remove(); toast('Tüm belirsizler işaretlendi 🎉'); return; }
+    _belirsizData=list; _belirsizSel=new Set(); _belirsizRender();
+  }catch(e){toast('Hata: '+e.message,true);}
 }
 async function _showProtokolEkran(){
   let data = window.__protokolUyarilar;
