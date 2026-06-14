@@ -1983,7 +1983,7 @@ async function openAnimalEdit(id){
     const grupDuve=/düve|duve/i.test(a.grup||'');
     const tohlar=await idbGetAll('tohumlama').catch(()=>[]);
     const tohVar=(tohlar||[]).some(t=>t.hayvan_id===a.id);
-    const belirsiz=a.cinsiyet==='Dişi' && !a.kisir && !grupDuve && dogumSay<2 && tohVar;
+    const belirsiz=a.cinsiyet!=='Erkek' && !a.kisir && !grupDuve && dogumSay<2 && tohVar;
     if(belirsiz){
       gw.style.display='block';
       gs.value=(a.genc_anne===true?'true':a.genc_anne===false?'false':'');
