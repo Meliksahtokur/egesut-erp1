@@ -611,6 +611,10 @@ document.addEventListener('keydown', e => {
 
 // ── INIT ─────────────────────────────────────
 window.addEventListener('load', withErrorHandling(async () => {
+  // ── AUTH GATE (Faz 1) — oturum yoksa login göster, app init etme ──
+  const _session = await window.authGate();
+  if (!_session) return;
+
   // Sentinel state — stack'in dibini işaretle (çıkış onayı için)
   history.replaceState({sentinel:true}, '', '#');
   history.pushState({pg:'dash'}, '', '#dash');
