@@ -835,6 +835,7 @@ async function _showBelirsizList(){
 }
 function _belirsizRender(){
   const box=document.getElementById('belirsiz-bs'); if(!box) return;
+  const prevScroll=document.getElementById('belirsiz-scroll')?.scrollTop||0;
   const list=_belirsizData, sel=_belirsizSel;
   const rows=list.map(s=>{
     const on=sel.has(s.hayvan_id);
@@ -854,12 +855,14 @@ function _belirsizRender(){
         <span onclick="event.stopPropagation();_belirsizSelPredik('none')" style="cursor:pointer;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:6px;border:1px solid var(--ink2)">Temizle</span>
       </div>
     </div>
-    <div style="flex:1;overflow-y:auto">${rows}</div>
+    <div id="belirsiz-scroll" style="flex:1;overflow-y:auto">${rows}</div>
     <div style="padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--card2);display:flex;gap:8px">
       <button onclick="_belirsizApply(true)" ${n?'':'disabled'} style="flex:1;padding:11px;border-radius:10px;border:none;font-weight:700;font-size:.8rem;cursor:${n?'pointer':'default'};background:${n?'var(--green2,#2e7d32)':'var(--ink1)'};color:${n?'#fff':'var(--ink3)'}">🐮 Genç Anne (${n})</button>
       <button onclick="_belirsizApply(false)" ${n?'':'disabled'} style="flex:1;padding:11px;border-radius:10px;border:none;font-weight:700;font-size:.8rem;cursor:${n?'pointer':'default'};background:${n?'var(--blue)':'var(--ink1)'};color:${n?'#fff':'var(--ink3)'}">🐄 Olgun İnek (${n})</button>
     </div>
   </div>`;
+  const sc=document.getElementById('belirsiz-scroll');
+  if(sc) sc.scrollTop=prevScroll;
 }
 function _belirsizToggle(id){ if(_belirsizSel.has(id))_belirsizSel.delete(id); else _belirsizSel.add(id); _belirsizRender(); }
 function _belirsizSelPredik(mode){
