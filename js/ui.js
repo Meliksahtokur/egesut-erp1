@@ -4168,11 +4168,9 @@ async function openTaskDet(id){
   const tdHayvan=document.getElementById('td-hayvan');
   tdHayvan.textContent=(hayvanLabel?.kupe_no||hayvanLabel?.devlet_kupe)||(t.hayvan_id?.length>20?'Buzağı-'+t.hayvan_id.slice(-6):t.hayvan_id)||'GENEL GÖREV';
   if(t.hayvan_id){
-    tdHayvan.style.cursor='pointer';
-    tdHayvan.onclick=()=>{ closeM('m-task-det'); openDet(t.hayvan_id); };
+    tdHayvan.dataset.hid=t.hayvan_id;
   } else {
-    tdHayvan.style.cursor='';
-    tdHayvan.onclick=null;
+    delete tdHayvan.dataset.hid;
   }
   const _acEl=document.getElementById('td-aciklama');if(_acEl){_acEl.textContent=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'';delete _acEl.dataset.diseaseAppended;}
   const meta=[];
@@ -4713,11 +4711,9 @@ async function openCaseDet(caseId) {
   const cdHayvan=document.getElementById('cd-hayvan');
   cdHayvan.textContent=kupe;
   if(hayvan){
-    cdHayvan.style.cursor='pointer';
-    cdHayvan.onclick=()=>{ closeM('m-case-det'); openDet(hayvan.id); };
+    cdHayvan.dataset.hid=hayvan.id;
   } else {
-    cdHayvan.style.cursor='';
-    cdHayvan.onclick=null;
+    delete cdHayvan.dataset.hid;
   }
   document.getElementById('cd-disease').textContent = '🏥 ' + (disease?.name || '?');
   document.getElementById('cd-notes').textContent   = c.notes || '';
@@ -5487,11 +5483,9 @@ async function openTohDet(id){
   const td2Hayvan=document.getElementById('td2-hayvan');
   td2Hayvan.textContent=hayvanLabel||'?';
   if(hayvanObj){
-    td2Hayvan.style.cursor='pointer';
-    td2Hayvan.onclick=()=>{ closeM('m-toh-det'); openDet(hayvanObj.id); };
+    td2Hayvan.dataset.hid=hayvanObj.id;
   } else {
-    td2Hayvan.style.cursor='';
-    td2Hayvan.onclick=null;
+    delete td2Hayvan.dataset.hid;
   }
   document.getElementById('td2-sperma').textContent=`💉 ${t.sperma||'?'}`;
   const _tohGebe=t.sonuc==='Gebe';
