@@ -1311,23 +1311,32 @@ function _applySuruStatHtml(el,d,padok){
     <div class="stat-row">${katHtml}</div>
   </div>`;
 
-  const cycleHtml=`<div class="stat-section">
-    <div class="stat-section-title">🔄 Cycle Özet</div>
-    <div class="stat-row">${co.toplam_cycle||0} cycle · ${co.basarili||0} başarılı (%${co.oran!=null?co.oran:'—'}) · ${co.basarisiz||0} başarısız${co.devam_eden?` · ⏳ ${co.devam_eden} devam`:''}</div>
-    <div class="stat-row">Ort deneme: ${co.ort_deneme!=null?co.ort_deneme:'—'}</div>
+  const uv=(d.gebelik||{}).ureme_verimlilik||{};
+  const _uvBlock=(label,ico,g)=>{
+    if(!g||!g.ham) return '';
+    const hm=g.ham||{};
+    const _p=v=>v!=null?`%${v}`:'—';
+    return `<div class="stat-row" style="margin-top:2px"><b>${ico} ${label}</b></div>
+      <div class="stat-row">① Gerçek CR: <b>${_p(hm.cr)}</b> <span style="color:var(--ink3);font-size:.7rem">(${hm.gebe||0}/${hm.tohumlama||0} tohumlama)</span></div>
+      <div class="stat-row">② Hayvan ort: <b>${_p(g.hayvan_ort)}</b> <span style="color:var(--ink3);font-size:.7rem">(${g.hayvan_sayisi||0} hayvan)</span></div>
+      <div class="stat-row">③ Cycle ort: <b>${_p(g.cycle_ort)}</b> <span style="color:var(--ink3);font-size:.7rem">(${g.cycle_sayisi||0} cycle · 1/deneme)</span></div>
+      <div class="stat-row" style="color:var(--ink3);font-size:.7rem">⭕ ${hm.bos||0} boş${hm.bekliyor?` · ⏳ ${hm.bekliyor} bekliyor`:''}</div>`;
+  };
+  const verimHtml=`<div class="stat-section">
+    <div class="stat-section-title">📈 Üreme Verimliliği</div>
+    ${_uvBlock('İnek','🐄',uv.inek)||'<div class="stat-row" style="color:var(--ink3)">İnek verisi yok</div>'}
+    ${_uvBlock('Düve','🐮',uv.duve)}
+    <div class="stat-row" style="color:var(--ink3);font-size:.64rem;margin-top:3px">① tohumlama-başına gerçek oran · ② hayvan eşit ağırlık · ③ cycle eşit ağırlık</div>
   </div>`;
 
-  const spAll=d.gebelik?.sperma_all||d.gebelik?.sperma_top5||[];
+  const spAll=d.gebelik?.sperma_pi||[];
   const spFirst=spAll.slice(0,5);
   const spRest=spAll.slice(5);
-  const spFirstHtml=spFirst.map(s=>
-    `<div class="stat-row">${esc(s.ad)} — ${s.cycle_toplam} cycle → <b>%${s.cycle_oran!=null?s.cycle_oran:'—'}</b></div>`
-  ).join('')||'<div class="stat-row" style="color:var(--ink3)">Yeterli veri yok</div>';
-  const spRestHtml=spRest.map(s=>
-    `<div class="stat-row">${esc(s.ad)} — ${s.cycle_toplam} cycle → <b>%${s.cycle_oran!=null?s.cycle_oran:'—'}</b></div>`
-  ).join('');
+  const _spRow=s=>`<div class="stat-row">${esc(s.ad)} — ${s.gebe}/${s.toplam} tohumlama → <b>%${s.oran!=null?s.oran:'—'}</b></div>`;
+  const spFirstHtml=spFirst.map(_spRow).join('')||'<div class="stat-row" style="color:var(--ink3)">Yeterli veri yok</div>';
+  const spRestHtml=spRest.map(_spRow).join('');
   const spRestBtn=spRest.length>0?`<div id="sperma-rest" style="display:${_suruSpermaOpen?'block':'none'}">${spRestHtml}</div><div class="stat-row"><span onclick="_toggleSpermaRest()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">${_suruSpermaOpen?'Daralt':'[+'+spRest.length+' daha]'}</span></div>`:'';
-  const spSection=`<div class="stat-section"><div class="stat-section-title">🏆 Sperma Performansı (≥3 cycle)</div>${spFirstHtml}${spRestBtn}</div>`;
+  const spSection=`<div class="stat-section"><div class="stat-section-title">🏆 Sperma Performansı (≥3 tohumlama)</div>${spFirstHtml}${spRestBtn}</div>`;
 
   const deneme=d.gebelik?.deneme||[];
   const first3=deneme.filter(dn=>dn.no<=3);
@@ -1346,7 +1355,7 @@ function _applySuruStatHtml(el,d,padok){
 
   el.innerHTML=`<div class="stat-card${_suruStatOpen?' open':''}" onclick="_toggleSuruStat(event)">
     <div class="stat-header"><span>${padokLabel}🐄 ${h.toplam||0} hayvan · 🔬 ${h.tohumlanan||0} tohumlanan · 🤰 ${ho.gebe||0} gebe (${oran})</span><span class="stat-arrow">▼</span></div>
-    <div class="stat-detail"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><span onclick="_toggleStatMode(event)" style="cursor:pointer;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ink1);color:var(--ink4)">${_suruStatMode==='son'?'Son Dönem':'Tüm Zamanlar'} ↻</span></div>${demoHtml}${gebHtml}${cycleHtml}${spSection}${sessizSection}${dnSection}</div>
+    <div class="stat-detail"><div style="display:flex;justify-content:flex-end;margin-bottom:4px"><span onclick="_toggleStatMode(event)" style="cursor:pointer;font-size:.68rem;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ink1);color:var(--ink4)">${_suruStatMode==='son'?'Son Dönem':'Tüm Zamanlar'} ↻</span></div>${demoHtml}${gebHtml}${verimHtml}${spSection}${sessizSection}${dnSection}</div>
   </div>`;
 }
 
