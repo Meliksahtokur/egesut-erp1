@@ -27,6 +27,7 @@ WITH numbered AS (
   FROM public.tohumlama t
   JOIN public.hayvanlar h ON h.id = t.hayvan_id
   WHERE h.cinsiyet = 'Dişi'
+    AND h.kisir IS NOT TRUE
 )
 SELECT
   hayvan_id,
