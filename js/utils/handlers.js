@@ -5,7 +5,9 @@ registerActions({
 
   // ═══ NAVİGASYON ═══
   'refresh': (el) => { el.classList.add('spinning'); refreshAll().finally(() => el.classList.remove('spinning')); },
-  'open-ayarlar': () => ayarlarAc(),
+  'open-ayarlar': () => { ayarlarAc(); if (window.authFillAccount) window.authFillAccount(); },
+  'hesap-sifre-degistir': () => { if (window.authChangePassword) window.authChangePassword(); },
+  'hesap-cikis':          () => { if (window.authLogout) window.authLogout(); },
   'show-error-panel': () => { g('error-panel').style.display = 'block'; renderErrorLog(); },
   'go-dash':    () => goTo('dash'),
   'go-suru':    () => goTo('suru'),

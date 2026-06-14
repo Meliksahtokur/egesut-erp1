@@ -8,6 +8,7 @@
   let mode = 'login'; // 'login' | 'signup'
   let cooldownTimer = null;
   let recovering = false;
+  let sessionUser = null;
 
   const AUTH_ERR = {
     'Invalid login credentials': 'E-posta veya şifre hatalı',
@@ -194,23 +195,42 @@
     }
   }
 
-  function mountUserChip(user) {
-    if (document.getElementById('auth-chip')) return;
-    const host = document.getElementById('top-right');
-    if (!host) return;
-    const chip = document.createElement('button');
-    chip.id = 'auth-chip';
-    chip.type = 'button';
-    chip.title = (user && user.email) ? user.email : 'Çıkış';
-    chip.textContent = '⎋';
-    chip.style.cssText = 'background:rgba(192,50,26,.15);border:1px solid #c0321a;color:#e08070;padding:5px 10px;border-radius:20px;font-size:.85rem;cursor:pointer;margin-left:5px';
-    chip.addEventListener('click', async () => {
-      if (!confirm('Çıkış yapılsın mı?')) return;
-      await db.auth.signOut();
-      location.reload();
-    });
-    host.appendChild(chip);
-  }
+  // ── Hesap bölümü (Ayarlar modalı içinde) ──
+  // Çıkış + şifre değiştirme dashboard'ı doldurmasın diye Ayarlar'da.
+
+  // Ayarlar modalı açılınca handlers.js çağırır → e-postayı yaz, alanları temizle.
+  window.authFillAccount = function () {
+    const e = document.getElementById('hesap-email');
+    if (e) e.textContent = (sessionUser && sessionUser.email) ? sessionUser.email : '—';
+    const m = document.getElementById('hesap-msg');
+    if (m) { m.textContent = ''; }
+    const inp = document.getElementById('hesap-yeni-sifre');
+    if (inp) inp.value = '';
+  };
+
+  // Giriş yapmış kullanıcı için şifre değiştir — mail GEREKMEZ, rate limit'e takılmaz.
+  window.authChangePassword = async function () {
+    const inp = document.getElementById('hesap-yeni-sifre');
+    const m = document.getElementById('hesap-msg');
+    const setM = (t, c) => { if (m) { m.textContent = t; m.style.color = c; } };
+    const p = inp ? inp.value : '';
+    if (!p || p.length < 6) { setM('Şifre en az 6 karakter olmalı', '#ff6b5b'); return; }
+    setM('Kaydediliyor…', '#9aa');
+    try {
+      const { error } = await db.auth.updateUser({ password: p });
+      if (error) throw error;
+      if (inp) inp.value = '';
+      setM('Şifre güncellendi ✓', '#4e9a2a');
+    } catch (e) {
+      setM(authErr(e.message), '#ff6b5b');
+    }
+  };
+
+  window.authLogout = async function () {
+    if (!confirm('Çıkış yapılsın mı?')) return;
+    await db.auth.signOut();
+    location.reload();
+  };
 
   // app.js load handler bunu EN BAŞTA await eder.
   // Oturum yoksa null döner → app init etmemeli.
@@ -218,7 +238,7 @@
     if (recovering) { renderResetScreen(); return null; }
     const { data: { session } } = await db.auth.getSession();
     if (!session) { renderAuthScreen(); return null; }
-    mountUserChip(session.user);
+    sessionUser = session.user;
     return session;
   };
 
