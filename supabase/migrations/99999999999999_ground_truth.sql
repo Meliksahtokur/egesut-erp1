@@ -7704,12 +7704,12 @@ WITH numbered AS (
       OVER (PARTITION BY t.hayvan_id ORDER BY t.tarih, t.deneme_no
             ROWS UNBOUNDED PRECEDING) AS cycle_no,
     CASE
-      WHEN h.grup ILIKE '%düve%' OR h.grup ILIKE '%duve%' THEN 'Düve'
-      WHEN EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = h.id) THEN 'İnek'
-      WHEN h.grup ILIKE '%inek%' OR h.grup LIKE '%İnek%'
-           OR h.grup ILIKE '%sağmal%' OR h.grup ILIKE '%sagmal%'
-           OR h.grup ILIKE '%kuru%' THEN 'İnek'
-      ELSE 'Bilinmiyor'
+      WHEN EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = h.id)
+        OR EXISTS (SELECT 1 FROM public.tohumlama t2
+                   WHERE t2.hayvan_id = h.id
+                     AND t2.sonuc IN ('Doğum Yaptı','Abort'))
+        THEN 'İnek'
+      ELSE 'Düve'
     END AS kategori,
     h.padok,
     h.durum
@@ -7746,6 +7746,8 @@ DECLARE
   v_hayvan   jsonb;
   v_gebelik  jsonb;
   v_sessiz   integer;
+  v_verim     jsonb;
+  v_sperma_pi jsonb;
 BEGIN
   SELECT sessiz_hayvanlar_gorev_olustur() INTO v_sessiz;
   SELECT jsonb_build_object(
@@ -7782,9 +7784,68 @@ BEGIN
     'deneme', (SELECT COALESCE(jsonb_agg(row_j ORDER BY (row_j->>'no')::int), '[]'::jsonb) FROM (SELECT jsonb_build_object('no', deneme_sayisi, 'gebe', COUNT(*) FILTER (WHERE sonuc = 'Gebe'), 'toplam', COUNT(*) FILTER (WHERE sonuc != 'Bekliyor'), 'oran', ROUND(100.0 * COUNT(*) FILTER (WHERE sonuc = 'Gebe') / NULLIF(COUNT(*) FILTER (WHERE sonuc != 'Bekliyor'), 0), 1)) AS row_j FROM cycles WHERE sonuc != 'Bekliyor' GROUP BY deneme_sayisi) sub)
   ) INTO v_gebelik
   FROM hayvan_stat;
+
+  -- Üreme verimliliği (Düve/İnek × 3 katman: ham CR / hayvan ort / cycle ort 1/N) — lifetime
+  WITH basari AS (
+    SELECT v.hayvan_id, v.kategori, 1.0 / NULLIF(v.deneme_sayisi, 0) AS skor
+    FROM public.v_ureme_dongusu v
+    WHERE v.durum = 'Aktif' AND v.sonuc = 'Gebe' AND v.deneme_sayisi >= 1
+      AND (p_padok IS NULL OR v.padok = p_padok)
+  ),
+  per_animal AS (SELECT hayvan_id, kategori, AVG(skor) AS animal_skor FROM basari GROUP BY hayvan_id, kategori),
+  ham AS (
+    SELECT
+      CASE WHEN (EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = t.hayvan_id)
+                 OR EXISTS (SELECT 1 FROM public.tohumlama t2 WHERE t2.hayvan_id = t.hayvan_id AND t2.sonuc IN ('Doğum Yaptı','Abort')))
+           THEN 'İnek' ELSE 'Düve' END AS kategori,
+      COUNT(*) FILTER (WHERE t.sonuc <> 'Bekliyor') AS tohumlama,
+      COUNT(*) FILTER (WHERE t.sonuc IN ('Gebe','Doğum Yaptı')) AS gebe,
+      COUNT(*) FILTER (WHERE t.sonuc IN ('Boş','Abort')) AS bos,
+      COUNT(*) FILTER (WHERE t.sonuc = 'Bekliyor') AS bekliyor
+    FROM public.tohumlama t
+    JOIN public.hayvanlar h ON h.id = t.hayvan_id
+    WHERE h.cinsiyet = 'Dişi' AND h.durum = 'Aktif' AND h.kisir IS NOT TRUE
+      AND (p_padok IS NULL OR h.padok = p_padok)
+    GROUP BY 1
+  )
+  SELECT jsonb_object_agg(grp, payload) INTO v_verim
+  FROM (
+    SELECT CASE WHEN ks.k = 'Düve' THEN 'duve' ELSE 'inek' END AS grp,
+      jsonb_build_object(
+        'ham', jsonb_build_object('tohumlama', COALESCE(hm.tohumlama, 0), 'gebe', COALESCE(hm.gebe, 0), 'bos', COALESCE(hm.bos, 0), 'bekliyor', COALESCE(hm.bekliyor, 0), 'cr', ROUND(100.0 * COALESCE(hm.gebe, 0) / NULLIF(hm.tohumlama, 0), 1)),
+        'hayvan_ort', (SELECT ROUND(100.0 * AVG(animal_skor), 1) FROM per_animal pa WHERE pa.kategori = ks.k),
+        'hayvan_sayisi', (SELECT COUNT(*) FROM per_animal pa WHERE pa.kategori = ks.k),
+        'cycle_ort', (SELECT ROUND(100.0 * AVG(skor), 1) FROM basari b WHERE b.kategori = ks.k),
+        'cycle_sayisi', (SELECT COUNT(*) FROM basari b WHERE b.kategori = ks.k)
+      ) AS payload
+    FROM (SELECT unnest(ARRAY['Düve','İnek']) AS k) ks
+    LEFT JOIN ham hm ON hm.kategori = ks.k
+  ) z;
+
+  -- Sperma performansı tohumlama-başına (winning-straw değil): gebe atış / toplam atış
+  SELECT COALESCE(jsonb_agg(row_j ORDER BY (row_j->>'oran')::numeric DESC NULLS LAST), '[]'::jsonb) INTO v_sperma_pi
+  FROM (
+    SELECT jsonb_build_object('ad', sp, 'toplam', toplam, 'gebe', gebe, 'oran', ROUND(100.0 * gebe / NULLIF(toplam, 0), 1)) AS row_j
+    FROM (
+      SELECT LOWER(TRIM(split_part(t.sperma, '|', 1))) AS sp,
+        COUNT(*) FILTER (WHERE t.sonuc <> 'Bekliyor') AS toplam,
+        COUNT(*) FILTER (WHERE t.sonuc IN ('Gebe','Doğum Yaptı')) AS gebe
+      FROM public.tohumlama t
+      JOIN public.hayvanlar h ON h.id = t.hayvan_id
+      WHERE h.cinsiyet = 'Dişi' AND h.durum = 'Aktif' AND h.kisir IS NOT TRUE
+        AND (p_padok IS NULL OR h.padok = p_padok)
+        AND t.sperma IS NOT NULL AND TRIM(t.sperma) <> ''
+      GROUP BY 1
+      HAVING COUNT(*) FILTER (WHERE t.sonuc <> 'Bekliyor') >= 3
+    ) s
+  ) q;
+
+  v_gebelik := COALESCE(v_gebelik, '{"hayvan_ozet":{"toplam":0,"gebe":0,"bos":0,"devam_eden":0,"oran":null},"cycle_ozet":{"toplam_cycle":0,"basarili":0,"basarisiz":0,"devam_eden":0,"oran":null,"ort_deneme":null},"kategori":[],"sperma_all":[],"deneme":[]}'::jsonb)
+    || jsonb_build_object('ureme_verimlilik', COALESCE(v_verim, '{}'::jsonb), 'sperma_pi', COALESCE(v_sperma_pi, '[]'::jsonb));
+
   RETURN jsonb_build_object(
     'hayvan', COALESCE(v_hayvan, '{"toplam":0,"inek":0,"duve":0,"buzagi":0,"erkek":0,"kisir":0,"hasta":0,"tohumlanan":0,"sessiz":0}'::jsonb),
-    'gebelik', COALESCE(v_gebelik, '{"hayvan_ozet":{"toplam":0,"gebe":0,"bos":0,"devam_eden":0,"oran":null},"cycle_ozet":{"toplam_cycle":0,"basarili":0,"basarisiz":0,"devam_eden":0,"oran":null,"ort_deneme":null},"kategori":[],"sperma_all":[],"deneme":[]}'::jsonb)
+    'gebelik', v_gebelik
   );
 END;
 $$;
