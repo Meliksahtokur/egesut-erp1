@@ -335,3 +335,4 @@ Bu kararlar tartışmaya açık değildir, değiştirmek için özel gerekçe ge
 6. **Her migration idempotent** — tekrar çalıştırılabilir, yan etkisiz
 7. **Tohumlama yalnızca RPC ile yazılır** — direkt REST/DB write validation'ı bypass eder; `tohumlama_kaydet` ve gelecekteki geçiş RPC'leri tek geçerli yoldur
 8. **Polling → Realtime geçişi organik** — yeni özellikler Realtime kullanır; `setInterval` kaldırılır, zorlamayla geçiş yapılmaz
+9. **Modal router kullanan modallarda HTML attribute onclick + dataset.x** — DOM property `el.onclick = fn` modal router pushState ile çakışır (BUG-XXX-DETAY-MODAL-KUPE-NO-CLICK, 684534f). Pattern: `<div onclick="if(this.dataset.hid){closeM(...);openDet(this.dataset.hid)}">` + `dataset.hid = id`

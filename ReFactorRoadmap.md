@@ -207,6 +207,11 @@ Bu aşama, projenin gelecekteki geliştirmeler için daha sağlam bir temele otu
 
 **Son kontrol:** 2026-06-13 (ground truth regen commit a2e6d00)
 
+**Son Fix'ler (2026-06-13):**
+- `684534f` — BUG-XXX-DETAY-MODAL-KUPE-NO-CLICK: 3 detay modal'da DOM onclick → HTML attribute onclick (modal router uyumu)
+- `a4a5336` — BUG-XXX-TEDAVI-ORPHAN: Legacy `tedavi` şema orphan cleanup (6 stale görev iptal)
+- `6c4cfbe` — BUG-XXX Modal Router: Android geri tuşu tüm modallarda (kısmi — AKTİF 2 alt bug)
+
 ---
 
 Bu yol haritası, projenin sürdürülebilirliğini ve kalitesini artırmak için atılacak adımları net bir şekilde ortaya koymaktadır. Her aşama, kendi içinde tamamlanabilir ve bir sonraki aşama için temel oluşturur.
