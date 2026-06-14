@@ -6902,6 +6902,71 @@ END;
 $$;
 
 END;
+
+-- genc_anne: nullable boolean üreme statüsü override (belirsiz düve/inek ayrımı)
+-- NULL = incelenmedi (temkinli İnek), true = genç anne (Düve), false = olgun İnek
+ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS genc_anne boolean DEFAULT NULL;
+
+CREATE OR REPLACE FUNCTION public.hayvan_genc_anne_isaretle(
+  p_hayvan_id text,
+  p_genc_anne boolean
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_hayvan record;
+BEGIN
+  SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı');
+  END IF;
+
+  UPDATE public.hayvanlar SET genc_anne = p_genc_anne WHERE id = p_hayvan_id;
+
+  INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+  VALUES (
+    gen_random_uuid()::text,
+    'GENC_ANNE_STATU',
+    p_hayvan_id,
+    p_hayvan_id,
+    'hayvanlar',
+    jsonb_build_object(
+      'olusturulan', '[]'::jsonb,
+      'guncellenen', jsonb_build_array(jsonb_build_object(
+        'tablo', 'hayvanlar', 'id', p_hayvan_id,
+        'degisim', 'genc_anne: ' || COALESCE(v_hayvan.genc_anne::text,'null') || ' → ' || COALESCE(p_genc_anne::text,'null')
+      )),
+      'silinen', '[]'::jsonb
+    )
+  );
+
+  RETURN jsonb_build_object('ok', true, 'genc_anne', p_genc_anne);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.hayvan_genc_anne_isaretle(text, boolean) TO anon, authenticated;
+
+-- Belirsiz üreme statüsü listesi (dashboard triage chip için)
+CREATE OR REPLACE FUNCTION public.hayvan_belirsiz_ureme_listele()
+RETURNS TABLE (
+  hayvan_id text, kupe_no text, grup text, padok text,
+  dogum_sayisi integer, tohumlama_sayisi integer, son_tohumlama date
+)
+LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT h.id, h.kupe_no, h.grup, h.padok,
+    (SELECT COUNT(*) FROM public.dogum d WHERE d.anne_id = h.id)::int,
+    (SELECT COUNT(*) FROM public.tohumlama t WHERE t.hayvan_id = h.id)::int,
+    (SELECT MAX(t.tarih) FROM public.tohumlama t WHERE t.hayvan_id = h.id)
+  FROM public.hayvanlar h
+  WHERE h.cinsiyet = 'Dişi' AND h.durum = 'Aktif' AND h.kisir IS NOT TRUE
+    AND h.genc_anne IS NULL
+    AND NOT (h.grup ILIKE '%düve%' OR h.grup ILIKE '%duve%')
+    AND (SELECT COUNT(*) FROM public.dogum d WHERE d.anne_id = h.id) < 2
+    AND EXISTS (SELECT 1 FROM public.tohumlama t WHERE t.hayvan_id = h.id)
+  ORDER BY (SELECT MAX(t.tarih) FROM public.tohumlama t WHERE t.hayvan_id = h.id) DESC NULLS LAST;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.hayvan_belirsiz_ureme_listele() TO anon, authenticated;
+
 -- Migration: buzagi_sutten_kesme_kontrol RPC
 -- Pattern: ileri_gebe_gorev_kontrol ile aynı yapı
 -- Domain kuralı: 60 günden büyük "Süt İçen Buzağı" → sütten kesme görevi
@@ -7691,6 +7756,8 @@ $$;
 GRANT EXECUTE ON FUNCTION public.stat_gebelik_ozet(date, date, text, text, text) TO anon, authenticated;
 
 -- ── v_ureme_dongusu v3 — cycle detection view + kısır filtresi ═══
+-- per-cycle hibrit kategori: cycle≥2→İnek; cycle1→ genc_anne / grup-düve / dogum_sayisi≥2 / else-İnek(temkinli)
+-- NOT: CREATE OR REPLACE kolon sırasını değiştiremediği için kategori, cycle_no mevcut sırada tutuldu.
 CREATE OR REPLACE VIEW public.v_ureme_dongusu AS
 WITH numbered AS (
   SELECT
@@ -7703,23 +7770,27 @@ WITH numbered AS (
     SUM(CASE WHEN t.deneme_no = 1 THEN 1 ELSE 0 END)
       OVER (PARTITION BY t.hayvan_id ORDER BY t.tarih, t.deneme_no
             ROWS UNBOUNDED PRECEDING) AS cycle_no,
-    CASE
-      WHEN EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = h.id)
-        OR EXISTS (SELECT 1 FROM public.tohumlama t2
-                   WHERE t2.hayvan_id = h.id
-                     AND t2.sonuc IN ('Doğum Yaptı','Abort'))
-        THEN 'İnek'
-      ELSE 'Düve'
-    END AS kategori,
     h.padok,
-    h.durum
+    h.durum,
+    h.genc_anne AS h_genc_anne,
+    h.grup      AS h_grup,
+    (SELECT COUNT(*) FROM public.dogum d2 WHERE d2.anne_id = h.id) AS dogum_sayisi
   FROM public.tohumlama t
   JOIN public.hayvanlar h ON h.id = t.hayvan_id
   WHERE h.cinsiyet = 'Dişi'
     AND h.kisir IS NOT TRUE
 )
 SELECT
-  hayvan_id, padok, durum, kategori, cycle_no,
+  hayvan_id, padok, durum,
+  CASE
+    WHEN cycle_no >= 2 THEN 'İnek'
+    WHEN h_genc_anne = true  THEN 'Düve'
+    WHEN h_genc_anne = false THEN 'İnek'
+    WHEN h_grup ILIKE '%düve%' OR h_grup ILIKE '%duve%' THEN 'Düve'
+    WHEN dogum_sayisi >= 2 THEN 'Düve'
+    ELSE 'İnek'
+  END AS kategori,
+  cycle_no,
   MIN(tarih)           AS baslangic,
   MAX(tarih)           AS bitis,
   MAX(deneme_no)       AS deneme_sayisi,
@@ -7732,7 +7803,7 @@ SELECT
   MAX(CASE WHEN sonuc IN ('Gebe','Doğum Yaptı') THEN sperma_norm END) AS gebe_sperma,
   (ARRAY_AGG(sperma_norm ORDER BY deneme_no DESC))[1] AS son_sperma
 FROM numbered
-GROUP BY hayvan_id, padok, durum, kategori, cycle_no;
+GROUP BY hayvan_id, padok, durum, cycle_no, h_genc_anne, h_grup, dogum_sayisi;
 
 GRANT SELECT ON public.v_ureme_dongusu TO anon, authenticated;
 
@@ -7759,7 +7830,14 @@ BEGIN
     'kisir',  COUNT(*) FILTER (WHERE kisir = true),
     'hasta',  (SELECT COUNT(DISTINCT c.animal_id) FROM public.cases c JOIN public.hayvanlar h2 ON h2.id = c.animal_id WHERE c.status = 'active' AND h2.durum = 'Aktif' AND (p_padok IS NULL OR h2.padok = p_padok)),
     'tohumlanan', (SELECT COUNT(DISTINCT t2.hayvan_id) FROM public.tohumlama t2 JOIN public.hayvanlar h3 ON h3.id = t2.hayvan_id WHERE h3.durum = 'Aktif' AND h3.cinsiyet = 'Dişi' AND (p_padok IS NULL OR h3.padok = p_padok)),
-    'sessiz', (SELECT COUNT(*) FROM public.v_eligible e WHERE (p_padok IS NULL OR e.padok = p_padok) AND COALESCE(e.sessiz_gun, 9999) >= 55)
+    'sessiz', (SELECT COUNT(*) FROM public.v_eligible e WHERE (p_padok IS NULL OR e.padok = p_padok) AND COALESCE(e.sessiz_gun, 9999) >= 55),
+    'belirsiz', (SELECT COUNT(*) FROM public.hayvanlar hb
+                 WHERE hb.cinsiyet = 'Dişi' AND hb.durum = 'Aktif' AND hb.kisir IS NOT TRUE
+                   AND hb.genc_anne IS NULL
+                   AND NOT (hb.grup ILIKE '%düve%' OR hb.grup ILIKE '%duve%')
+                   AND (SELECT COUNT(*) FROM public.dogum d WHERE d.anne_id = hb.id) < 2
+                   AND EXISTS (SELECT 1 FROM public.tohumlama t WHERE t.hayvan_id = hb.id)
+                   AND (p_padok IS NULL OR hb.padok = p_padok))
   ) INTO v_hayvan
   FROM public.hayvanlar h
   WHERE h.durum = 'Aktif' AND (p_padok IS NULL OR h.padok = p_padok);
@@ -7795,17 +7873,29 @@ BEGIN
   per_animal AS (SELECT hayvan_id, kategori, AVG(skor) AS animal_skor FROM basari GROUP BY hayvan_id, kategori),
   ham AS (
     SELECT
-      CASE WHEN (EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = t.hayvan_id)
-                 OR EXISTS (SELECT 1 FROM public.tohumlama t2 WHERE t2.hayvan_id = t.hayvan_id AND t2.sonuc IN ('Doğum Yaptı','Abort')))
-           THEN 'İnek' ELSE 'Düve' END AS kategori,
-      COUNT(*) FILTER (WHERE t.sonuc <> 'Bekliyor') AS tohumlama,
-      COUNT(*) FILTER (WHERE t.sonuc IN ('Gebe','Doğum Yaptı')) AS gebe,
-      COUNT(*) FILTER (WHERE t.sonuc IN ('Boş','Abort')) AS bos,
-      COUNT(*) FILTER (WHERE t.sonuc = 'Bekliyor') AS bekliyor
-    FROM public.tohumlama t
-    JOIN public.hayvanlar h ON h.id = t.hayvan_id
-    WHERE h.cinsiyet = 'Dişi' AND h.durum = 'Aktif' AND h.kisir IS NOT TRUE
-      AND (p_padok IS NULL OR h.padok = p_padok)
+      CASE
+        WHEN ic.cycle_no >= 2 THEN 'İnek'
+        WHEN ic.h_genc_anne = true  THEN 'Düve'
+        WHEN ic.h_genc_anne = false THEN 'İnek'
+        WHEN ic.h_grup ILIKE '%düve%' OR ic.h_grup ILIKE '%duve%' THEN 'Düve'
+        WHEN ic.dogum_sayisi >= 2 THEN 'Düve'
+        ELSE 'İnek'
+      END AS kategori,
+      COUNT(*) FILTER (WHERE ic.sonuc <> 'Bekliyor')             AS tohumlama,
+      COUNT(*) FILTER (WHERE ic.sonuc IN ('Gebe','Doğum Yaptı')) AS gebe,
+      COUNT(*) FILTER (WHERE ic.sonuc IN ('Boş','Abort'))        AS bos,
+      COUNT(*) FILTER (WHERE ic.sonuc = 'Bekliyor')              AS bekliyor
+    FROM (
+      SELECT t.sonuc,
+        SUM(CASE WHEN t.deneme_no = 1 THEN 1 ELSE 0 END)
+          OVER (PARTITION BY t.hayvan_id ORDER BY t.tarih, t.deneme_no ROWS UNBOUNDED PRECEDING) AS cycle_no,
+        h.genc_anne AS h_genc_anne, h.grup AS h_grup,
+        (SELECT COUNT(*) FROM public.dogum d WHERE d.anne_id = h.id) AS dogum_sayisi
+      FROM public.tohumlama t
+      JOIN public.hayvanlar h ON h.id = t.hayvan_id
+      WHERE h.cinsiyet = 'Dişi' AND h.durum = 'Aktif' AND h.kisir IS NOT TRUE
+        AND (p_padok IS NULL OR h.padok = p_padok)
+    ) ic
     GROUP BY 1
   )
   SELECT jsonb_object_agg(grp, payload) INTO v_verim
