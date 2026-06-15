@@ -705,6 +705,21 @@ async function loadAnimals(){
     bosTohs.forEach(t=>{
       if(!globalThis._bosTohMap[t.hayvan_id]||t.tarih>globalThis._bosTohMap[t.hayvan_id]) globalThis._bosTohMap[t.hayvan_id]=t.tarih;
     });
+    // Son doğum (buzağılama) haritası — anne_id başına en son tarih
+    const dogumlar=await getData('dogum');
+    globalThis._sonDogumMap={};
+    dogumlar.forEach(d=>{
+      if(!d.anne_id||!d.tarih) return;
+      if(!globalThis._sonDogumMap[d.anne_id]||d.tarih>globalThis._sonDogumMap[d.anne_id]) globalThis._sonDogumMap[d.anne_id]=d.tarih;
+    });
+    // Son tohumlama haritası — SONUÇ FARK ETMEZ, hayvan_id başına en son tarih
+    // (doğumdan sonra hiç tohumlama yok kontrolü için — _tohMap/_bosTohMap yetersiz)
+    const tumTohs=await getData('tohumlama');
+    globalThis._sonTohMap={};
+    tumTohs.forEach(t=>{
+      if(!t.hayvan_id||!t.tarih) return;
+      if(!globalThis._sonTohMap[t.hayvan_id]||t.tarih>globalThis._sonTohMap[t.hayvan_id]) globalThis._sonTohMap[t.hayvan_id]=t.tarih;
+    });
     const hastaLogs=await getData('cases',c=>c.status==='active');
     setState('hastaIds', new Set(hastaLogs.map(d=>d.animal_id)));
     const sorted=[...animals].sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
