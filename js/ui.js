@@ -401,7 +401,7 @@ async function showGebe(){
 // ──────────────────────────────────────────
 // GÖREVLER
 // ──────────────────────────────────────────
-async function loadTasks(f,btn){
+async function loadTasks(f,btn,opts){
   f=f||_curTaskFilter||'today';   // argümansız çağrı (ör. beslemeGunTamam) aktif filtreye düşsün — yoksa filtresiz tüm görevler (geciken dahil) listelenir
   _curTaskFilter=f;
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
@@ -418,10 +418,12 @@ async function loadTasks(f,btn){
   const srchEl=document.getElementById('task-srch');
   if(srchEl){ srchEl.value=''; }
   await _keepScroll(el,async()=>{
-  el.innerHTML='<div class="loader"><div class="spin"></div></div>';
+  // Sadece cold load'da spinner göster — refresh'te eski liste yerinde kalsın (blink fix)
+  if(!el.querySelector('.task-card')) el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const today=new Date().toISOString().split('T')[0];
-    if(navigator.onLine) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
+    // skipPull: çağıran zaten pullTables yaptıysa içerideki tekrar pull'u atla (çift network fix)
+    if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
     const all=await idbGetAll('gorev_log');
     if(f==='done'){
       // Besleme zincirinde her görev (ilk hariç) parent_id'li → eski filtre hepsini gizliyordu.
@@ -4569,7 +4571,7 @@ async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
       closeM('m-task-det');
       await pullTables(['hayvanlar','gorev_log']).catch(()=>{});
       _islemSonrasiRefresh();
-      loadTasks(_curTaskFilter||'today');
+      loadTasks(_curTaskFilter||'today',null,{skipPull:true});
       loadDash();
     } else {
       toast(res?.mesaj || 'Hata', true);
@@ -4634,7 +4636,7 @@ async function _tedaviGunExecute(uygulanmadiIds){
     toast(msg);
     closeM('m-task-det');
     await pullTables(['treatment_days','gorev_log','drug_administrations','stok_hareket','stok']);
-    loadTasks(_curTaskFilter||'today');
+    loadTasks(_curTaskFilter||'today',null,{skipPull:true});
     loadDash();
     if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
   } catch(e){ toast('❌ ' + e.message, true); }
@@ -4662,7 +4664,7 @@ async function asiUygulaVeTamamla(){
     closeM('m-task-det');
     await pullTables(['gorev_log']).catch(()=>{});
     updateTaskBadge();
-    loadTasks(_curTaskFilter||'today');
+    loadTasks(_curTaskFilter||'today',null,{skipPull:true});
     loadDash();
     const rapelTarih=res.rapel_tarih?fmtTarih(res.rapel_tarih):null;
     toast(rapelTarih?`✅ Aşı kaydedildi · Rapel: ${rapelTarih}`:'✅ Aşı kaydedildi');
@@ -4759,7 +4761,7 @@ function gorevGeriAl(){
       closeM('m-done-det');
       await pullTables(['gorev_log','vaccination_log','stok_hareket']).catch(()=>{});
       updateTaskBadge();
-      loadTasks(_curTaskFilter||'today');
+      loadTasks(_curTaskFilter||'today',null,{skipPull:true});
       loadDash();
       toast(`↩️ Görev geri alındı${res.silinen_rapel?' · Rapel silindi':''}`);
     }catch(e){

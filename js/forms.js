@@ -1782,7 +1782,7 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
     // Görev listesi görünürse tazele (seans kartları oradan tamamlanabilir)
     try {
       const _tb=document.getElementById('tasks-body');
-      if(_tb && _tb.offsetParent!==null) await loadTasks(_curTaskFilter||'today');
+      if(_tb && _tb.offsetParent!==null) await loadTasks(_curTaskFilter||'today',null,{skipPull:true});
       if(typeof updateTaskBadge==='function') updateTaskBadge();
     } catch(e){ /* sessiz */ }
   } catch (e) {
