@@ -728,6 +728,16 @@ async function loadAnimals(){
     if (typeof renderPadokDolulukBar === 'function') renderPadokDolulukBar();
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
+// Doğum yapmış + son doğumdan sonra hiç tohumlanmamış (kısır hariç) → gün sayısı, değilse null
+function _yeniDogumGun(a){
+  if(a.kisir) return null;
+  const dogumTarih=(globalThis._sonDogumMap||{})[a.id];
+  if(!dogumTarih) return null;
+  const sonToh=(globalThis._sonTohMap||{})[a.id];
+  if(sonToh && sonToh>=dogumTarih) return null;   // doğumdan sonra tohumlanmış
+  const gun=Math.floor((Date.now()-new Date(dogumTarih).getTime())/86400000);
+  return gun>0 ? gun : null;
+}
 function _animalTagsHtml(a,gebeSet){
   const isGebe=gebeSet.has(a.id);
   let gebeBadge='';
