@@ -562,27 +562,6 @@ async function loadTasks(f,btn,opts){
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
   });
 }
-// Seri done sırasında liste kaymasını önler: biten kartı YERİNDE işaretle + tıklanamaz yap.
-// Reconcile (gerçek liste yenileme) scheduleTaskReconcile ile 1sn'lik debounce'a alınır.
-function markTaskCardDone(el){
-  if(!el) return;
-  el.classList.add('done');
-  el.style.opacity='.5';
-  el.style.pointerEvents='none';   // tıklanamaz → seri tıklamada yanlış/çift emir önlenir
-  el.style.transition='opacity .2s';
-  const b=el.querySelector('.ck-btn,.sg-check');
-  if(b){ b.disabled=true; b.style.opacity='1'; b.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4e9a2a" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>'; }
-}
-let _taskReconcileTimer=null;
-function scheduleTaskReconcile(opts){
-  clearTimeout(_taskReconcileTimer);
-  const _o=opts||{skipPull:true};
-  _taskReconcileTimer=setTimeout(()=>{
-    _taskReconcileTimer=null;
-    const _tb=document.getElementById('tasks-body');
-    if(_tb && _tb.offsetParent!==null) loadTasks(_curTaskFilter||'today',null,_o);
-  },1000);
-}
 function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
   const planTime=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
@@ -680,12 +659,6 @@ async function toggleSub(subId,parentId,el){
   const sub=subs[0]; if(!sub) return;
   const nowDone=!sub.tamamlandi;
   await write('gorev_log',{...sub,tamamlandi:nowDone,tamamlanma_tarihi:nowDone?new Date().toISOString():null},'PATCH',`id=eq.${subId}`);
-  // Kutucuğu YERİNDE güncelle (reflow yok → seri tıklamada kayma yok)
-  if(el){
-    el.classList.toggle('done',nowDone);
-    el.innerHTML=nowDone?`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>`:'';
-    const lbl=el.parentElement?.querySelector('.st-label'); if(lbl) lbl.classList.toggle('done',nowDone);
-  }
   if(nowDone){
     const allSubs=await getData('gorev_log',t=>t.parent_id===parentId);
     const remaining=allSubs.filter(s=>s.id!==subId&&!s.tamamlandi);
@@ -693,11 +666,10 @@ async function toggleSub(subId,parentId,el){
       const parent=(await getData('gorev_log',t=>t.id===parentId))[0];
       if(parent) await write('gorev_log',{...parent,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString()},'PATCH',`id=eq.${parentId}`);
       toast('✅ Tüm alt görevler tamamlandı, ana görev kapatıldı');
-      markTaskCardDone(document.getElementById('tc-'+parentId));
     }
   }
+  await loadTasks(_curTaskFilter||'today');
   loadDash();
-  scheduleTaskReconcile();
 }
 function openConfirm(title, desc, onConfirm){
   document.getElementById('m-confirm-title').textContent=title;
@@ -729,10 +701,11 @@ async function beslemeGunTamam(id,btn){
       ?'✅ Besleme tamamlandı — hayvan artık gebe değil, zincir kapandı'
       :'✅ Besleme tamamlandı — yarın için görev oluşturuldu';
     toast(msg);
-    markTaskCardDone(document.getElementById('tc-'+id));  // yerinde işaretle, çıkarma (kayma yok)
+    const elT=document.getElementById('tc-'+id);
+    if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
     updateTaskBadge();
     loadDash();
-    scheduleTaskReconcile({skipPull:false});  // zincir görevi sunucudan oluştu → reconcile'da pull şart
+    loadTasks(_curTaskFilter||'today');
   } catch(e){
     btn.disabled=false;
     btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';

@@ -904,12 +904,12 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
   btn.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
   try {
     await rpc('gorev_tamamla', { p_gorev_id: id, p_padok_hedef: padok || null });
-    markTaskCardDone(document.getElementById('tc-' + id));  // yerinde işaretle, çıkarma (kayma yok)
+    const el = document.getElementById('tc-' + id);
+    if (el) { el.classList.add('done'); setTimeout(() => el.remove(), 320); }
     toast('✅ Tamamlandı');
     await pullTables(['gorev_log','hayvanlar']).catch(()=>{});
     if (typeof _islemSonrasiRefresh === 'function') _islemSonrasiRefresh();
     loadDash();
-    scheduleTaskReconcile();  // 1sn duraklayınca listeyi sessizce temizle
   } catch (e) {
     btn.disabled = false;
     btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
@@ -1779,12 +1779,11 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
         if (meta.day_id) await renderTedaviGunSeanslar(meta.day_id);
       } catch (e) { /* sessiz */ }
     }
-    // Görev listesi: biten seans kartını YERİNDE işaretle + 1sn debounce reconcile (seri done kayma fix)
+    // Görev listesi görünürse tazele (seans kartları oradan tamamlanabilir)
     try {
-      markTaskCardDone(row);
-      if(typeof updateTaskBadge==='function') updateTaskBadge();
       const _tb=document.getElementById('tasks-body');
-      if(_tb && _tb.offsetParent!==null) scheduleTaskReconcile();
+      if(_tb && _tb.offsetParent!==null) await loadTasks(_curTaskFilter||'today',null,{skipPull:true});
+      if(typeof updateTaskBadge==='function') updateTaskBadge();
     } catch(e){ /* sessiz */ }
   } catch (e) {
     toast('❌ ' + (e.message || 'Hata'), true);
