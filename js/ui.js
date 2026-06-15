@@ -424,7 +424,14 @@ async function loadTasks(f,btn){
     if(navigator.onLine) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
     const all=await idbGetAll('gorev_log');
     if(f==='done'){
-      let done=all.filter(t=>t.tamamlandi&&!t.iptal&&!t.parent_id);
+      // Besleme zincirinde her görev (ilk hariç) parent_id'li → eski filtre hepsini gizliyordu.
+      // Sadece geri alınabilir ucu göster: çocuğu tamamlanmamış besleme tamamlaması.
+      const _tamamliCocukluParent=new Set(all.filter(x=>x.tamamlandi&&x.parent_id).map(x=>x.parent_id));
+      let done=all.filter(t=>{
+        if(!t.tamamlandi||t.iptal) return false;
+        if(t.gorev_tipi==='BESLEME') return !_tamamliCocukluParent.has(t.id);
+        return !t.parent_id;
+      });
       done.sort((a,b)=>(b.tamamlanma_tarihi||b.hedef_tarih||'').localeCompare(a.tamamlanma_tarihi||a.hedef_tarih||''));
       if(_taskKategori==='diger'){ done=done.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
       else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; done=done.filter(t=>tips.includes(t.gorev_tipi)); }
