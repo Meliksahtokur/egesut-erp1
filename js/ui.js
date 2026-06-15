@@ -404,6 +404,15 @@ async function showGebe(){
 async function loadTasks(f,btn){
   _curTaskFilter=f;
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
+  // Bekleyen pencere chip şeridi — sadece 'all' tab'ında görünür, aktif chip _pendWin'e göre
+  const _pendChips=document.getElementById('task-pend-chips');
+  if(_pendChips){
+    _pendChips.style.display = f==='all' ? 'flex' : 'none';
+    if(f==='all'){
+      const _active=_pendWin||'hepsi';
+      _pendChips.querySelectorAll('.fchip').forEach(c=>c.classList.toggle('on', c.dataset.win===_active));
+    }
+  }
   const el=document.getElementById('tasks-body');
   const srchEl=document.getElementById('task-srch');
   if(srchEl){ srchEl.value=''; }

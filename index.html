@@ -544,6 +544,12 @@ button,input,select,textarea{font-family:inherit}
         <button class="fs-btn" data-action="tasks-all">Bekleyen</button>
         <button class="fs-btn" data-action="tasks-done">Tamamlanan</button>
       </div>
+      <div id="task-pend-chips" style="display:none;gap:6px;padding:0 14px 10px;flex-wrap:wrap">
+        <button class="fchip on" data-win="hepsi" data-action="pend-win-hepsi">Hepsi</button>
+        <button class="fchip" data-win="yarin" data-action="pend-win-yarin">📅 Yarın</button>
+        <button class="fchip" data-win="7" data-action="pend-win-7">📆 7 Gün</button>
+        <button class="fchip" data-win="30" data-action="pend-win-30">🗓️ 30 Gün</button>
+      </div>
       <div id="task-kategori-bar" style="display:flex;gap:6px;padding:0 14px 10px;overflow-x:auto;-webkit-overflow-scrolling:touch">
         <button class="kat-btn on" data-action="task-kat-all">Tümü</button>
         <button class="kat-btn" data-action="task-kat-asi">💉 Aşı</button>
@@ -1786,18 +1792,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781509313"></script>
-    <script src="js/utils/modal.js?v=1781509313"></script>
-    <script src="js/utils/errorHandler.js?v=1781509313"></script>
-    <script src="js/utils/events.js?v=1781509313"></script>
-    <script src="js/config.js?v=1781509313"></script>
-    <script src="js/state.js?v=1781509313"></script>
-    <script src="js/api.js?v=1781509313"></script>
-    <script src="js/auth.js?v=1781509313"></script>
-    <script src="js/ui.js?v=1781509313"></script>
-    <script src="js/forms.js?v=1781509313"></script>
-    <script src="js/app.js?v=1781509313"></script>
-    <script src="js/utils/handlers.js?v=1781509313"></script>
+    <script src="js/utils/helpers.js?v=1781509395"></script>
+    <script src="js/utils/modal.js?v=1781509395"></script>
+    <script src="js/utils/errorHandler.js?v=1781509395"></script>
+    <script src="js/utils/events.js?v=1781509395"></script>
+    <script src="js/config.js?v=1781509395"></script>
+    <script src="js/state.js?v=1781509395"></script>
+    <script src="js/api.js?v=1781509395"></script>
+    <script src="js/auth.js?v=1781509395"></script>
+    <script src="js/ui.js?v=1781509395"></script>
+    <script src="js/forms.js?v=1781509395"></script>
+    <script src="js/app.js?v=1781509395"></script>
+    <script src="js/utils/handlers.js?v=1781509395"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
