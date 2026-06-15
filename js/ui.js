@@ -1509,10 +1509,10 @@ document.addEventListener('click',e=>{
   if(!e.target.closest('#srch')&&!e.target.closest('#ac-srch'))
     { const ac=document.getElementById('ac-srch'); if(ac) ac.style.display='none'; }
 });
-let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null};
+let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null,dogum:null};
 let _detOpenId=null;
 function fchipReset(){
-  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null};
+  _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null,dogum:null};
   document.querySelectorAll('[id^="fc-"]').forEach(b=>b.classList.remove('on'));
   document.getElementById('fc-cinsiyet-hepsi')?.classList.add('on');
 }
@@ -1555,6 +1555,7 @@ function filterA(){
     if(_fchip.saglik==='hasta') f=f.filter(a=>getState('hastaIds').has(a.id));
     if(_fchip.kisir==='kisir') f=f.filter(a=>a.kisir);
     if(_fchip.grup) f=f.filter(a=>a.grup===_fchip.grup);
+    if(_fchip.dogum==='dogurdu') f=f.filter(a=>_yeniDogumGun(a)!=null);
     if(_fchip.tekrar==='tekrar') {
       f=f.filter(a=>a.repeat_breed_active||a.repeat_breed_past);
       f.sort((a,b)=>{
