@@ -402,6 +402,7 @@ async function showGebe(){
 // GÖREVLER
 // ──────────────────────────────────────────
 async function loadTasks(f,btn){
+  f=f||_curTaskFilter||'today';   // argümansız çağrı (ör. beslemeGunTamam) aktif filtreye düşsün — yoksa filtresiz tüm görevler (geciken dahil) listelenir
   _curTaskFilter=f;
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
   // Bekleyen pencere chip şeridi — sadece 'all' tab'ında görünür, aktif chip _pendWin'e göre
@@ -695,7 +696,7 @@ async function beslemeGunTamam(id,btn){
     if(elT){ elT.classList.add('done'); setTimeout(()=>elT.remove(),320); }
     updateTaskBadge();
     loadDash();
-    loadTasks();
+    loadTasks(_curTaskFilter||'today');
   } catch(e){
     btn.disabled=false;
     btn.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';
