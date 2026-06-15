@@ -4,7 +4,7 @@
 
 /* global
   /* global
-   _curTaskFilter, _curUremeTab, _curGecmisFilter, _gecmisTumu, _tanimlarTab,
+   _curTaskFilter, _pendWin, _curUremeTab, _curGecmisFilter, _gecmisTumu, _tanimlarTab,
    _curTaskDet, _curTaskVaccineId, _curToh,
    _customHekimler, _customSperma,
    _ilacCache, _drugsCache, _disFreq,

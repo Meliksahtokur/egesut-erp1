@@ -54,7 +54,7 @@ let _ilacCache      = [];
 // ── GLOBAL STATE ────────────────────────────
 // let _A=[], _S[], _curStk... state'e tasindi (state.js + getState/setState)
 let _suruFilter = 'tumuu', _suruSiralama = 'kupe';
-let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today', _gecmisTumu = false;
+let _curUremeTab = 'kizginlik', _curGecmisFilter = 'hepsi', _curTaskFilter = 'today', _gecmisTumu = false, _pendWin = null;
 let _tanimlarTab = 'hastaliklar';
 let _curTaskDet  = null, _curHst = null, _curToh = null;
 let _curBildirimTab = 'bekliyor';
