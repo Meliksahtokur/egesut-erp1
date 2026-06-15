@@ -440,8 +440,16 @@ async function loadTasks(f,btn){
     const _doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
     let data=all.filter(t=>!t.tamamlandi&&!t.iptal&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||_doneIds.has(t.parent_id)));
     const _d7=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
-    if(f==='today') data=data.filter(t=>t.hedef_tarih<=today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih<=_d7));
+    const _d1=new Date(Date.now()+1*86400000).toISOString().split('T')[0];
+    const _d30=new Date(Date.now()+30*86400000).toISOString().split('T')[0];
+    if(f==='today') data=data.filter(t=>t.hedef_tarih===today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
+    else if(f==='all'){
+      data=data.filter(t=>t.hedef_tarih>today);
+      if(_pendWin==='yarin')   data=data.filter(t=>t.hedef_tarih===_d1);
+      else if(_pendWin==='7')  data=data.filter(t=>t.hedef_tarih<=_d7);
+      else if(_pendWin==='30') data=data.filter(t=>t.hedef_tarih<=_d30);
+    }
     if(_taskKategori==='diger'){ data=data.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
     else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
     data.sort((a,b)=>{
