@@ -763,12 +763,15 @@ function _animalTagsHtml(a,gebeSet){
       if(gun>0) bosTohBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">💉 ${gun} gün önce tohumlandı</span>`;
     }
   }
+  let dogumBadge='';
+  const _dGun=_yeniDogumGun(a);
+  if(_dGun!=null) dogumBadge=`<span class="tag" style="background:rgba(255,160,0,.12);color:var(--amber);font-weight:700">🐣 ${_dGun} gün önce doğum yaptı</span>`;
   const kisirBadge=a.kisir?`<span class="tag" style="background:rgba(255,160,0,.15);color:var(--amber);font-weight:700;font-size:.65rem">💲 Kısır</span>`:'';
   // Repeat breed badge (backend view'dan gelir: repeat_breed_active, repeat_breed_past)
   let repeatBadge='';
   if(a.repeat_breed_active) repeatBadge+=`<span class="repeat-badge active">🔁 Tekrar Aşım</span>`;
   if(a.repeat_breed_past)   repeatBadge+=`<span class="repeat-badge past">↻ Tekrar</span>`;
-  return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${kisirBadge}${repeatBadge}`;
+  return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${dogumBadge}${kisirBadge}${repeatBadge}`;
 }
 function _animalCardHtml(a,gebeSet,idx){
   const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
