@@ -401,9 +401,63 @@ async function showGebe(){
 // ──────────────────────────────────────────
 // GÖREVLER
 // ──────────────────────────────────────────
+// ── ERTELENMİŞ COMMIT (Model A) — bekleyen tamamlamalar ──
+// Inline ✓ tıkları anında RPC göndermez; kuyruğa girer, filtre/sayfa değişiminde flush edilir.
+let _pendingDone = new Map();   // key(gorevId|seansId) → {type,gorevId,params,cardId}
+function _savePending(){
+  try { localStorage.setItem('_pendingDone', JSON.stringify([..._pendingDone.values()])); } catch(e){}
+}
+function _markPending(card, btn){
+  if(card) card.classList.add('pending-done');
+  if(btn){ btn.dataset.pending='1';
+    btn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>'; }
+}
+function _unmarkPending(card, btn, type){
+  if(card) card.classList.remove('pending-done');
+  if(btn){ btn.dataset.pending='';
+    btn.innerHTML = type==='seans' ? '' : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>'; }
+}
+function togglePendingDone(type, gorevId, btn, extra){
+  extra = extra || {};
+  const key = type==='seans' ? extra.seansId : gorevId;
+  if(!key) return;
+  const card = btn ? btn.closest('.task-card, .seans-gorev-card') : null;
+  if(_pendingDone.has(key)){
+    _pendingDone.delete(key);
+    _unmarkPending(card, btn, type);
+  } else {
+    _pendingDone.set(key, {type, gorevId, params:{gorevId, ...extra}, cardId:card?card.id:null});
+    _markPending(card, btn);
+  }
+  _savePending();
+}
+async function flushPendingDone(){
+  if(!_pendingDone.size) return;
+  if(!navigator.onLine){ toast('⚠️ Çevrimiçi olunca uygulanacak'); return; }
+  const items=[..._pendingDone.values()];
+  _pendingDone.clear(); _savePending();
+  for(const it of items){
+    try {
+      if(it.type==='seans') await rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null);
+      else if(it.type==='besleme') await rpc('besleme_tamam', {p_gorev_id:it.params.gorevId});
+      else if(it.type==='gorev') await rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null});
+    } catch(e){ toast('❌ Görev uygulanamadı: '+(e.message||''), true); }
+  }
+  try { await pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']); } catch(e){}
+  if(typeof updateTaskBadge==='function') updateTaskBadge();
+}
+async function recoverPendingDone(){
+  try {
+    const raw=localStorage.getItem('_pendingDone'); if(!raw) return;
+    const arr=JSON.parse(raw)||[]; if(!arr.length) return;
+    arr.forEach(e=>{ const key=e.type==='seans'?e.params.seansId:e.params.gorevId; if(key) _pendingDone.set(key,e); });
+    await flushPendingDone();
+  } catch(e){ /* sessiz */ }
+}
 async function loadTasks(f,btn,opts){
   f=f||_curTaskFilter||'today';   // argümansız çağrı (ör. beslemeGunTamam) aktif filtreye düşsün — yoksa filtresiz tüm görevler (geciken dahil) listelenir
   _curTaskFilter=f;
+  await flushPendingDone();   // filtre/modal kaynaklı render öncesi bekleyenleri commit et
   if(btn){ document.querySelectorAll('.fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
   // Bekleyen pencere chip şeridi — sadece 'all' tab'ında görünür, aktif chip _pendWin'e göre
   const _pendChips=document.getElementById('task-pend-chips');
@@ -593,10 +647,10 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
         <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
         <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
       </div>
-      ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();beslemeGunTamam('${t.id}',this)">
+      ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'?`<button class="ck-btn" onclick="event.stopPropagation();doneTask('${t.id}','${t.hayvan_id||''}','${t.stok_id||''}',${+t.miktar||0},'${t.padok_hedef||''}',this)">
+      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:'${t.padok_hedef||''}'})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -636,12 +690,12 @@ function renderSeansGorevKart(task, seans, opts={}){
     </div>`;
   }
   return `<div class="seans-gorev-card s-${state}" id="sg-${task.id}">
-    <button class="sg-check" onclick="event.stopPropagation();seansTamamla('${seans.id}',false,this)" title="Uygulandı"></button>
+    <button class="sg-check" onclick="event.stopPropagation();togglePendingDone('seans','${task.id}',this,{seansId:'${seans.id}',uygulanmadi:false})" title="Uygulandı"></button>
     <span class="sg-saat">${esc(saat)}</span>
     <div class="sg-info"><div class="sg-ilac">${drug}</div><div class="sg-meta">${esc(meta)}${durumEk?' '+durumEk:''}</div></div>
     <button class="sg-expand" onclick="event.stopPropagation();toggleSeansAksiyon('${task.id}')" title="Diğer işlemler">▾</button>
     <div class="sg-actions" id="sga-${task.id}" style="display:none">
-      <button class="sg-act-iade" onclick="event.stopPropagation();seansTamamla('${seans.id}',true,this)">↩ Yapılmadı · stok iade</button>
+      <button class="sg-act-iade" onclick="event.stopPropagation();togglePendingDone('seans','${task.id}',this,{seansId:'${seans.id}',uygulanmadi:true})">↩ Yapılmadı · stok iade</button>
     </div>
   </div>`;
 }

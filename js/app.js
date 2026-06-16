@@ -77,6 +77,7 @@ function hideSyncBar() { const bar = g('sync-bar'); if (bar) bar.className = '';
 
 // ── ROUTING ─────────────────────────────────
 function goTo(pg, push = true) {
+  if(getState('currentPage')==='tasks' && pg!=='tasks' && typeof flushPendingDone==='function') flushPendingDone();
   setState('currentPage', pg);
   if (push) history.pushState({pg}, '', '#' + pg);
   document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
@@ -148,7 +149,7 @@ async function renderFromLocal() {
   await Promise.all([loadAnimals(), loadStock()]);
   const pg = getState('currentPage') || 'dash';
   if (pg === 'dash')     { await Promise.all([loadDash(), loadStokList()]); }
-  else if (pg === 'tasks')    { await loadTasks(_curTaskFilter || 'today'); await loadDash(); }
+  else if (pg === 'tasks')    { if(typeof _pendingDone!=='undefined' && _pendingDone.size){ await loadDash(); } else { await loadTasks(_curTaskFilter || 'today'); await loadDash(); } }
   else if (pg === 'gecmis')   { await loadGecmis(_curGecmisFilter || 'hepsi'); await loadDash(); }
   else if (pg === 'log')      { await Promise.all([loadBirths(), loadStokList()]); await loadDash(); }
   else if (pg === 'ureme')    { await loadUreme(_curUremeTab || 'kizginlik'); await loadDash(); }
@@ -640,6 +641,7 @@ window.addEventListener('load', withErrorHandling(async () => {
   if (navigator.onLine) {
     try {
       await pullFromSupabase();
+      await recoverPendingDone();   // çökme öncesi bekleyenleri commit et
       await renderFromLocal();
       syncNow();
       // Padok + hekim config yükle (IDB dolu olduktan sonra)

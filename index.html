@@ -130,6 +130,9 @@ button,input,select,textarea{font-family:inherit}
 .pill.DIGER{background:var(--card2);color:var(--ink3)}
 .ck-btn{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:2px solid var(--card3);background:var(--card);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;color:var(--ink3)}
 .ck-btn:active{background:var(--green2);border-color:var(--green2);color:#fff;transform:scale(.88)}
+.pending-done{ border-left:3px solid #f0a020 !important; opacity:.9; position:relative; }
+.pending-done::after{ content:'↺'; position:absolute; right:8px; top:8px; font-size:.8rem; color:#f0a020; opacity:.85; pointer-events:none; }
+.pending-done .ck-btn, .pending-done .sg-check{ background:var(--green); color:#fff; border-color:var(--green); }
 
 /* SUB-TASKS */
 .subtasks{border-top:1px solid var(--card2);padding-top:8px;display:flex;flex-direction:column;gap:5px}
@@ -1792,18 +1795,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781560364"></script>
-    <script src="js/utils/modal.js?v=1781560364"></script>
-    <script src="js/utils/errorHandler.js?v=1781560364"></script>
-    <script src="js/utils/events.js?v=1781560364"></script>
-    <script src="js/config.js?v=1781560364"></script>
-    <script src="js/state.js?v=1781560364"></script>
-    <script src="js/api.js?v=1781560364"></script>
-    <script src="js/auth.js?v=1781560364"></script>
-    <script src="js/ui.js?v=1781560364"></script>
-    <script src="js/forms.js?v=1781560364"></script>
-    <script src="js/app.js?v=1781560364"></script>
-    <script src="js/utils/handlers.js?v=1781560364"></script>
+    <script src="js/utils/helpers.js?v=1781583830"></script>
+    <script src="js/utils/modal.js?v=1781583830"></script>
+    <script src="js/utils/errorHandler.js?v=1781583830"></script>
+    <script src="js/utils/events.js?v=1781583830"></script>
+    <script src="js/config.js?v=1781583830"></script>
+    <script src="js/state.js?v=1781583830"></script>
+    <script src="js/api.js?v=1781583830"></script>
+    <script src="js/auth.js?v=1781583830"></script>
+    <script src="js/ui.js?v=1781583830"></script>
+    <script src="js/forms.js?v=1781583830"></script>
+    <script src="js/app.js?v=1781583830"></script>
+    <script src="js/utils/handlers.js?v=1781583830"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
