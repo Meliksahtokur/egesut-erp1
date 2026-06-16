@@ -5292,6 +5292,15 @@ BEGIN;
     USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+-- BUG-FIX 2026-06-16: authenticated RLS policy eksikti — pullTables
+-- boş dönüyordu, Üreme → Kızgınlık listesi görünmüyordu.
+-- Diğer tablolardaki "allow all" pattern'i ile hizalandı.
+DO $$ BEGIN
+  CREATE POLICY "allow all" ON public.kizginlik_log
+    AS PERMISSIVE FOR ALL TO public
+    USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 -- Migration: tohumlama_sonuc_bekliyor RPC
 -- Reverts tohumlama from 'Boş' to 'Bekliyor' state
 -- Reverts hayvanlar.tohumlama_durumu from islem_log snapshot
