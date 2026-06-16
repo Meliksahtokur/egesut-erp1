@@ -100,6 +100,8 @@ registerActions({
   'open-bulk-ilac':      () => openM('m-bulk-ilac'),
   'open-animal-modal':   () => openM('m-animal'),
   'open-task-add-modal': () => openM('m-task-add'),
+  'commit-pending':      () => loadTasks(),   // argümansız → _curTaskFilter; loadTasks başı flushPendingDone yapar
+  'cancel-pending':      () => cancelPendingDone(),
   'open-stok-panel':     () => openStokPanel(),
   'open-tanimlar-panel':  () => openTanimlarPanel(),
   'close-birth':     () => closeM('m-birth'),

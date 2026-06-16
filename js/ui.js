@@ -407,6 +407,18 @@ let _pendingDone = new Map();   // key(gorevId|seansId) → {type,gorevId,params
 function _savePending(){
   try { localStorage.setItem('_pendingDone', JSON.stringify([..._pendingDone.values()])); } catch(e){}
 }
+function updatePendingFab(){
+  const n=_pendingDone.size;
+  const c=document.getElementById('fab-commit'), x=document.getElementById('fab-cancel');
+  if(c){ c.style.display=n?'flex':'none'; c.title='Bekleyenleri gönder ('+n+')'; }
+  if(x){ x.style.display=n?'flex':'none'; x.title='Hepsini iptal ('+n+')'; }
+}
+// Bekleyenleri iptal et — kuyruğu boşalt + işaretleri kaldır + listeyi tazele
+function cancelPendingDone(){
+  if(!_pendingDone.size) return;
+  _pendingDone.clear(); _savePending(); updatePendingFab();
+  loadTasks(_curTaskFilter||'today');
+}
 function _markPending(card, btn){
   if(card) card.classList.add('pending-done');
   if(btn){ btn.dataset.pending='1';
@@ -430,12 +442,13 @@ function togglePendingDone(type, gorevId, btn, extra){
     _markPending(card, btn);
   }
   _savePending();
+  updatePendingFab();
 }
 async function flushPendingDone(){
   if(!_pendingDone.size) return;
   if(!navigator.onLine){ toast('⚠️ Çevrimiçi olunca uygulanacak'); return; }
   const items=[..._pendingDone.values()];
-  _pendingDone.clear(); _savePending();
+  _pendingDone.clear(); _savePending(); updatePendingFab();
   for(const it of items){
     try {
       if(it.type==='seans') await rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null);

@@ -266,6 +266,8 @@ button,input,select,textarea{font-family:inherit}
 /* FAB */
 .fab{position:fixed;bottom:calc(var(--nav) + var(--safe) + 14px);right:15px;width:52px;height:52px;border-radius:50%;background:var(--green);border:none;color:#fff;box-shadow:0 4px 18px rgba(78,154,42,.5);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:20;transition:transform .12s;font-size:1.5rem}
 .fab:active{transform:scale(.88)}
+.fab-commit{bottom:calc(var(--nav) + var(--safe) + 76px);background:var(--green);box-shadow:0 4px 18px rgba(78,154,42,.55)}
+.fab-cancel{bottom:calc(var(--nav) + var(--safe) + 138px);background:#c0392b;box-shadow:0 4px 18px rgba(192,57,43,.5)}
 
 /* MODALS */
 .mo{position:fixed;inset:0;background:rgba(10,20,5,.8);backdrop-filter:blur(6px);z-index:80;display:none;align-items:flex-end;justify-content:center}
@@ -569,6 +571,9 @@ button,input,select,textarea{font-family:inherit}
     </div>
     <!-- FAB: görev ekle -->
     <button class="fab" data-action="open-task-add-modal" title="Görev Ekle">+</button>
+    <!-- FAB: bekleyen tamamlamalar — sadece kuyruk doluyken görünür -->
+    <button class="fab fab-commit" id="fab-commit" data-action="commit-pending" title="Bekleyenleri gönder" style="display:none">✓</button>
+    <button class="fab fab-cancel" id="fab-cancel" data-action="cancel-pending" title="Hepsini iptal" style="display:none">✕</button>
   </div>
 
 
@@ -1795,18 +1800,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781583926"></script>
-    <script src="js/utils/modal.js?v=1781583926"></script>
-    <script src="js/utils/errorHandler.js?v=1781583926"></script>
-    <script src="js/utils/events.js?v=1781583926"></script>
-    <script src="js/config.js?v=1781583926"></script>
-    <script src="js/state.js?v=1781583926"></script>
-    <script src="js/api.js?v=1781583926"></script>
-    <script src="js/auth.js?v=1781583926"></script>
-    <script src="js/ui.js?v=1781583926"></script>
-    <script src="js/forms.js?v=1781583926"></script>
-    <script src="js/app.js?v=1781583926"></script>
-    <script src="js/utils/handlers.js?v=1781583926"></script>
+    <script src="js/utils/helpers.js?v=1781587258"></script>
+    <script src="js/utils/modal.js?v=1781587258"></script>
+    <script src="js/utils/errorHandler.js?v=1781587258"></script>
+    <script src="js/utils/events.js?v=1781587258"></script>
+    <script src="js/config.js?v=1781587258"></script>
+    <script src="js/state.js?v=1781587258"></script>
+    <script src="js/api.js?v=1781587258"></script>
+    <script src="js/auth.js?v=1781587258"></script>
+    <script src="js/ui.js?v=1781587258"></script>
+    <script src="js/forms.js?v=1781587258"></script>
+    <script src="js/app.js?v=1781587258"></script>
+    <script src="js/utils/handlers.js?v=1781587258"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
