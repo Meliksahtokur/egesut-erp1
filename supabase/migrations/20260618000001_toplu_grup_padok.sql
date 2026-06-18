@@ -174,3 +174,37 @@ $$;
 GRANT EXECUTE ON FUNCTION public.gorev_tamamla(text,text) TO anon, authenticated;
 
 COMMIT;
+
+-- ══════════════════════════════════════════════════════════════
+-- 3. Görev listener — padok_id değişince eşleşen PADOK_DEGISIM görevi kapat
+-- ══════════════════════════════════════════════════════════════
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.fn_padok_transfer_gorev_kapat()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE public.gorev_log
+     SET tamamlandi = true, tamamlanma_tarihi = now()
+   WHERE hayvan_id = NEW.id
+     AND gorev_tipi = 'PADOK_DEGISIM'
+     AND tamamlandi = false
+     AND iptal = false
+     AND padok_hedef = NEW.padok;
+
+  IF FOUND THEN
+    INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, snapshot, kullanici_notu)
+    VALUES ('GOREV_OTOKAPAT', NEW.id, NEW.id, '{}'::jsonb,
+            'Padok değişimi → ' || NEW.padok || ' (transfer görevi otomatik kapatıldı)');
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_padok_transfer_gorev ON public.hayvanlar;
+CREATE TRIGGER trg_padok_transfer_gorev
+  AFTER UPDATE OF padok_id ON public.hayvanlar
+  FOR EACH ROW
+  WHEN (NEW.padok_id IS DISTINCT FROM OLD.padok_id)
+  EXECUTE FUNCTION public.fn_padok_transfer_gorev_kapat();
+
+COMMIT;
