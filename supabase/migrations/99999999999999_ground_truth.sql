@@ -6504,13 +6504,15 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.padok_degistir(text, uuid, text) TO anon, authenticated;
 
--- Drop old overload (without p_etiketler) to avoid ambiguity
+-- Drop old overloads (without p_etiketler / without p_yeni_grup) to avoid ambiguity
 DROP FUNCTION IF EXISTS public.padok_degistir_toplu(text[], uuid);
+DROP FUNCTION IF EXISTS public.padok_degistir_toplu(text[], uuid, text[]);
 
 CREATE OR REPLACE FUNCTION public.padok_degistir_toplu(
   p_hayvan_ids text[],
   p_yeni_padok_id uuid,
-  p_etiketler text[] DEFAULT NULL
+  p_etiketler text[] DEFAULT NULL,
+  p_yeni_grup text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -6521,11 +6523,23 @@ DECLARE
   v_aktif_sayisi integer;
   v_hayvan_id    text;
   v_hayvan       hayvanlar%ROWTYPE;
+  v_eslem_var    boolean;
 BEGIN
   -- Hedef padok var mı?
   SELECT * INTO v_yeni_padok FROM padoklar WHERE id = p_yeni_padok_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Hedef padok bulunamadı');
+  END IF;
+
+  -- Grup-padok uyum guard (UI bypass koruması)
+  IF p_yeni_grup IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM grup_padok_eslem
+      WHERE grup = p_yeni_grup AND padok_id = p_yeni_padok_id
+    ) INTO v_eslem_var;
+    IF NOT v_eslem_var THEN
+      RETURN jsonb_build_object('success', false, 'error', 'grup_padok_uyumsuz');
+    END IF;
   END IF;
 
   -- Kapasite hard block (validasyon, yazma yok)
@@ -6560,12 +6574,14 @@ BEGIN
     UPDATE hayvanlar
        SET padok_id   = p_yeni_padok_id,
            padok      = v_yeni_padok.ad,
+           grup       = COALESCE(p_yeni_grup, grup),
            updated_at = now()
      WHERE id = v_hayvan_id;
 
     INSERT INTO islem_log (tip, ana_hayvan_id, ref_id, snapshot, kullanici_notu)
     VALUES ('padok_degisim', v_hayvan_id, v_hayvan_id, '{}'::jsonb,
-            'Toplu padok değişimi → ' || v_yeni_padok.ad);
+            'Toplu padok değişimi → ' || v_yeni_padok.ad
+            || COALESCE(' (grup: ' || p_yeni_grup || ')', ''));
   END LOOP;
 
   -- Etiket güncelleme (varsa, mevcut etiketlerle birleştir)
@@ -6581,12 +6597,13 @@ BEGIN
     'success',       true,
     'hayvan_sayisi', array_length(p_hayvan_ids, 1),
     'yeni_padok',    v_yeni_padok.ad,
-    'yeni_padok_id', p_yeni_padok_id
+    'yeni_padok_id', p_yeni_padok_id,
+    'yeni_grup',     p_yeni_grup
   );
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.padok_degistir_toplu(text[], uuid, text[]) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.padok_degistir_toplu(text[], uuid, text[], text) TO anon, authenticated;
 
 -- Migration: islem_log trigger'a OLD snapshot desteği
 -- hayvanlar UPDATE ve gorev_log UPDATE için OLD+NEW kaydedilir
