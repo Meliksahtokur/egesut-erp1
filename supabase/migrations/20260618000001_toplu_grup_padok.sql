@@ -208,3 +208,37 @@ CREATE TRIGGER trg_padok_transfer_gorev
   EXECUTE FUNCTION public.fn_padok_transfer_gorev_kapat();
 
 COMMIT;
+
+-- ══════════════════════════════════════════════════════════════
+-- 4. Reconciliation scan — hedefte olup görevi açık kalanları kapat (idempotent)
+-- ══════════════════════════════════════════════════════════════
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.padok_transfer_gorev_uzlastir()
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_kapatilan integer;
+BEGIN
+  WITH kapatilacak AS (
+    SELECT g.id
+    FROM public.gorev_log g
+    JOIN public.hayvanlar h ON h.id = g.hayvan_id
+    WHERE g.gorev_tipi = 'PADOK_DEGISIM'
+      AND g.tamamlandi = false
+      AND g.iptal = false
+      AND g.padok_hedef IS NOT NULL
+      AND g.padok_hedef = h.padok
+  ), upd AS (
+    UPDATE public.gorev_log
+       SET tamamlandi = true, tamamlanma_tarihi = now()
+     WHERE id IN (SELECT id FROM kapatilacak)
+     RETURNING id
+  )
+  SELECT count(*) INTO v_kapatilan FROM upd;
+
+  RETURN jsonb_build_object('ok', true, 'kapatilan', v_kapatilan);
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.padok_transfer_gorev_uzlastir() TO anon, authenticated;
+
+COMMIT;
