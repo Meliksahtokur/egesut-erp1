@@ -1800,18 +1800,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781787698"></script>
-    <script src="js/utils/modal.js?v=1781787698"></script>
-    <script src="js/utils/errorHandler.js?v=1781787698"></script>
-    <script src="js/utils/events.js?v=1781787698"></script>
-    <script src="js/config.js?v=1781787698"></script>
-    <script src="js/state.js?v=1781787698"></script>
-    <script src="js/api.js?v=1781787698"></script>
-    <script src="js/auth.js?v=1781787698"></script>
-    <script src="js/ui.js?v=1781787698"></script>
-    <script src="js/forms.js?v=1781787698"></script>
-    <script src="js/app.js?v=1781787698"></script>
-    <script src="js/utils/handlers.js?v=1781787698"></script>
+    <script src="js/utils/helpers.js?v=1781787764"></script>
+    <script src="js/utils/modal.js?v=1781787764"></script>
+    <script src="js/utils/errorHandler.js?v=1781787764"></script>
+    <script src="js/utils/events.js?v=1781787764"></script>
+    <script src="js/config.js?v=1781787764"></script>
+    <script src="js/state.js?v=1781787764"></script>
+    <script src="js/api.js?v=1781787764"></script>
+    <script src="js/auth.js?v=1781787764"></script>
+    <script src="js/ui.js?v=1781787764"></script>
+    <script src="js/forms.js?v=1781787764"></script>
+    <script src="js/app.js?v=1781787764"></script>
+    <script src="js/utils/handlers.js?v=1781787764"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
@@ -2004,6 +2004,14 @@ function copyErrors() {
         <!-- Seçili hayvanlar -->
         <div style="font-weight:700;font-size:.8rem;margin-bottom:4px">Seçili Hayvanlar (<span id="bt-secili-sayac">0</span>)</div>
         <div id="bt-secili-liste" style="max-height:120px;overflow-y:auto;margin-bottom:6px"></div>
+
+        <!-- Grubu da değiştir (uyumsuz padok seçilince görünür) -->
+        <div id="bt-grup-bolum" style="display:none;margin-bottom:8px;padding:8px;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.15);border-radius:var(--r1)">
+          <div style="font-weight:700;font-size:.78rem;color:var(--blue);margin-bottom:6px">🔀 Grup uyumsuz — yeni grup seç</div>
+          <select id="bt-yeni-grup" class="fi" style="font-size:.78rem" onchange="btYeniGrupDegisti()">
+            <option value="">— Yeni grup seç —</option>
+          </select>
+        </div>
 
         <!-- Hedef padok listesi -->
         <div style="font-weight:700;font-size:.8rem;margin-bottom:4px">Hedef Padok</div>
