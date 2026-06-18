@@ -5949,6 +5949,7 @@ DECLARE
   v_gorev record; v_hayvan record; v_snapshot jsonb;
   v_stok_dusuldu boolean := false; v_padok_guncellendi boolean := false;
   v_olusturulan jsonb := '[]'::jsonb; v_guncellenen jsonb := '[]'::jsonb;
+  v_padok_id uuid;
 BEGIN
   SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id::uuid;
   IF NOT FOUND THEN RAISE EXCEPTION 'Görev bulunamadı: %', p_gorev_id; END IF;
@@ -5972,9 +5973,14 @@ BEGIN
     SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id=v_gorev.hayvan_id;
     IF FOUND THEN
       v_padok_guncellendi := true;
-      UPDATE public.hayvanlar SET padok=p_padok_hedef WHERE id=v_gorev.hayvan_id;
+      -- BUG B fix: padok_id de güncellenir
+      SELECT id INTO v_padok_id FROM public.padoklar WHERE ad=p_padok_hedef;
+      UPDATE public.hayvanlar
+         SET padok=p_padok_hedef, padok_id=COALESCE(v_padok_id, padok_id)
+       WHERE id=v_gorev.hayvan_id;
+      -- BUG A fix: 'Sağmal (Kuru Dönem)' yerine eslem-kanonik 'Sağmal (Kuru)'
       IF v_gorev.gorev_tipi='PADOK_DEGISIM' AND v_gorev.aciklama ILIKE '%Kuru döneme%' THEN
-        UPDATE public.hayvanlar SET grup='Sağmal (Kuru Dönem)' WHERE id=v_gorev.hayvan_id;
+        UPDATE public.hayvanlar SET grup='Sağmal (Kuru)' WHERE id=v_gorev.hayvan_id;
       END IF;
     END IF;
   END IF;
