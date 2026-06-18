@@ -304,6 +304,8 @@ async function loadDash(){
         bb.style.display = aktif.length > 0 ? 'flex' : 'none';
       }
     } catch(e) { console.warn('protokol_eksik_tara:', e.message); }
+    // Transfer görev reconciliation (trigger'dan kaçanları kapat — idempotent)
+    try { await rpc('padok_transfer_gorev_uzlastir', {}); } catch(e) { console.warn('gorev uzlastir:', e.message); }
     updateTaskBadge();
   } catch(e){
     el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadDash()">Tekrar Dene</button></div>`;
