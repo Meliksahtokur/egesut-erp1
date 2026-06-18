@@ -6792,6 +6792,7 @@ let _btSecilenIds = [];        // Cross-padok, filtreden bağımsız korunur
 let _btModalSecilenIds = [];   // Modal içinde onaylanan hayvanlar
 let _btHedefPadokId = null;    // Seçilen hedef padok ID
 let _btEtiketMod = null;       // 'toplu' | 'tektek' | null
+let _btYeniGrup = null;        // Toplu grup değişimi için seçilen yeni grup (null = grup değişmez)
 
 function renderPadokDolulukBar() {
   const el = document.getElementById('padok-doluluk-bar');
@@ -6936,6 +6937,7 @@ function openBulkTransfer() {
   _btModalSecilenIds = [..._btSecilenIds];
   _btHedefPadokId = null;
   _btEtiketMod = null;
+  _btYeniGrup = null;
   const grupSel = document.getElementById('bt-f-grup');
   if (grupSel) {
     const gruplar = Object.keys(GRUP_PADOK);
@@ -6954,6 +6956,8 @@ function openBulkTransfer() {
   if (ozet) ozet.style.display = 'none';
   const etiketBolum = document.getElementById('bt-etiket-bolum');
   if (etiketBolum) etiketBolum.style.display = 'none';
+  const grupBolum = document.getElementById('bt-grup-bolum');
+  if (grupBolum) grupBolum.style.display = 'none';
   const onayBtn = document.getElementById('bt-onay-btn');
   if (onayBtn) onayBtn.disabled = true;
   openM('m-bulk-transfer');
@@ -7053,12 +7057,12 @@ function _btRenderHedefPadoklar() {
     const uygun = _btGrupUygunMu(p, gruplar);
     const besi = _btBesiPadokMu(p);
     if (kaynakPadoklar.size === 1 && kaynakPadoklar.has(p.id)) return '';
-    const disabled = tamDolu || (!uygun && !besi);
+    const disabled = tamDolu;  // uyumsuz padok artık tıklanabilir (grup değişimi ile)
     const renk = yuzde >= 100 ? 'var(--red)' : yuzde >= 80 ? 'var(--amber)' : 'var(--green)';
     const selected = _btHedefPadokId === p.id;
     let badge = '';
     if (tamDolu) badge = '<span style="font-size:.6rem;color:var(--red);font-weight:700">DOLU</span>';
-    else if (!uygun && !besi) badge = '<span style="font-size:.6rem;color:var(--red)">❌ Uyumsuz</span>';
+    else if (!uygun && !besi) badge = '<span style="font-size:.6rem;color:var(--blue)">🔀 Grup değişir</span>';
     else if (!uygun && besi) badge = '<span style="font-size:.6rem;color:var(--amber)">⚠️ Etiket gerekli</span>';
     else if (uyari) badge = '<span style="font-size:.6rem;color:var(--amber)">⚠️ Dolmak üzere</span>';
     else badge = '<span style="font-size:.6rem;color:var(--green3)">✅ Uyumlu</span>';
@@ -7076,8 +7080,34 @@ function _btRenderHedefPadoklar() {
 
 function btHedefSec(padokId) {
   _btHedefPadokId = padokId;
+  _btYeniGrup = null;
+  const hedef = PADOKLAR.find(p => p.id === padokId);
+  const suruData = getState('animals') || [];
+  const secilen = suruData.filter(h => _btModalSecilenIds.includes(h.id));
+  const gruplar = [...new Set(secilen.map(h => h.grup).filter(Boolean))];
+  const grupBolum = document.getElementById('bt-grup-bolum');
+  const grupSel = document.getElementById('bt-yeni-grup');
+  const uygun = hedef ? _btGrupUygunMu(hedef, gruplar) : true;
+  if (grupBolum && grupSel) {
+    if (!uygun && hedef) {
+      // Hedef padoğa izinli grupları doldur (GRUP_PADOK ters eşleme)
+      const izinli = Object.keys(GRUP_PADOK).filter(g => (GRUP_PADOK[g] || []).includes(hedef.ad));
+      grupSel.innerHTML = '<option value="">— Yeni grup seç —</option>' +
+        izinli.map(g => `<option value="${g}">${g}</option>`).join('');
+      grupBolum.style.display = izinli.length ? 'block' : 'none';
+    } else {
+      grupBolum.style.display = 'none';
+      grupSel.value = '';
+    }
+  }
   _btGuncelleOzet();
   _btRenderHedefPadoklar();
+}
+
+function btYeniGrupDegisti() {
+  const grupSel = document.getElementById('bt-yeni-grup');
+  _btYeniGrup = (grupSel && grupSel.value) ? grupSel.value : null;
+  _btGuncelleOzet();
 }
 
 function _btGuncelleOzet() {
@@ -7094,7 +7124,7 @@ function _btGuncelleOzet() {
   const hedef = PADOKLAR.find(p => p.id === _btHedefPadokId);
   if (!hedef) return;
   const secilenHayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
-  const gruplar = [...new Set(secilenHayvanlar.map(h => h.grup).filter(Boolean))];
+  const gruplar = _btYeniGrup ? [_btYeniGrup] : [...new Set(secilenHayvanlar.map(h => h.grup).filter(Boolean))];
   const dolu = suruData.filter(h => h.padok_id === hedef.id && h.durum === 'Aktif').length;
   const kap = hedef.kapasite;
   const uygun = _btGrupUygunMu(hedef, gruplar);
@@ -7121,7 +7151,7 @@ function _btGuncelleOzet() {
   if (etiketGerekli) _btRenderEtiketTekkek();
   const etiketOk = !etiketGerekli || _btEtiketleriKontrolEt();
   if (onayBtn) {
-    onayBtn.disabled = !(kapUygun && (uygun || besi) && etiketOk);
+    onayBtn.disabled = !(kapUygun && (uygun || besi || _btYeniGrup) && etiketOk);
     onayBtn.textContent = `🔀 ${_btModalSecilenIds.length} Hayvanı Taşı`;
   }
 }
@@ -7209,7 +7239,8 @@ async function btTransferOnayla() {
           const hayvanEtiketler = etiketBilgi.map[hayvanId] || [];
           const { data: d, error: e } = await db.rpc('padok_degistir_toplu', {
             p_hayvan_ids: [hayvanId], p_yeni_padok_id: _btHedefPadokId,
-            p_etiketler: hayvanEtiketler.length ? hayvanEtiketler : null
+            p_etiketler: hayvanEtiketler.length ? hayvanEtiketler : null,
+            p_yeni_grup: _btYeniGrup
           });
           if (e) throw e;
           if (!d.success) {
@@ -7223,7 +7254,8 @@ async function btTransferOnayla() {
       } else {
         etiketParam = etiketBilgi.etiketler;
         const { data, error } = await db.rpc('padok_degistir_toplu', {
-          p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: etiketParam
+          p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: etiketParam,
+          p_yeni_grup: _btYeniGrup
         });
         if (error) throw error;
         if (!data.success) {
@@ -7236,7 +7268,8 @@ async function btTransferOnayla() {
       }
     } else {
       const { data, error } = await db.rpc('padok_degistir_toplu', {
-        p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: null
+        p_hayvan_ids: _btModalSecilenIds, p_yeni_padok_id: _btHedefPadokId, p_etiketler: null,
+        p_yeni_grup: _btYeniGrup
       });
       if (error) throw error;
       if (!data.success) {
@@ -7248,7 +7281,7 @@ async function btTransferOnayla() {
       toast(`✅ ${data.hayvan_sayisi} hayvan ${data.yeni_padok}'a taşındı`);
     }
     closeM('m-bulk-transfer');
-    await pullTables(['hayvanlar']);
+    await pullTables(['hayvanlar', 'gorev_log', 'islem_log']);
     if (typeof loadAnimals === 'function') await loadAnimals();
     if (typeof renderPadokDolulukBar === 'function') renderPadokDolulukBar();
   } catch (err) {
