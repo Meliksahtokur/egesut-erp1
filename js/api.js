@@ -10,7 +10,7 @@ const DB_VER  = 22;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
-                  'vaccination_log','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
+                  'vaccination_log','vaccine_diseases','vaccine_protocol_steps','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
                   'uygulama_log','protokol_instance',
                   'tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'];
 const APP_VERSION = '2026-03-12-cln03';
@@ -256,6 +256,9 @@ const RPC_TABLES = {
   remove_drug_administration:['stok','stok_hareket','drug_administrations'],
   close_case:                ['cases'],
   add_vaccination:           ['vaccination_log','gorev_log','stok_hareket'],
+  asi_ekle:                  ['vaccines','stok','vaccine_protocol_steps','vaccine_diseases','islem_log','stok_hareket'],
+  asi_guncelle:              ['vaccines','vaccine_protocol_steps','vaccine_diseases','stok','islem_log'],
+  asi_sil:                   ['vaccines','vaccine_protocol_steps','vaccine_diseases','stok','islem_log'],
   bulk_vaccination:          ['vaccination_log','gorev_log','stok_hareket'],
   bulk_ilac:                  ['islem_log','stok','stok_hareket'],
   ileri_gebe_asi_tamamla:    ['vaccination_log','gorev_log','stok_hareket'],
@@ -340,6 +343,8 @@ async function pullTables(tables = []) {
       treatment_day_uygulamalar: () => db.from('treatment_day_uygulamalar').select('*'),
       tohumlama:    () => db.from('tohumlama').select('*'),
       vaccines:     () => db.from('vaccines').select('*'),
+      vaccine_diseases: () => db.from('vaccine_diseases').select('*'),
+      vaccine_protocol_steps: () => db.from('vaccine_protocol_steps').select('*'),
       vaccination_log: () => db.from('vaccination_log').select('*'),
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
