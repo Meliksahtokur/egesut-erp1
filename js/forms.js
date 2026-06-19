@@ -1271,30 +1271,33 @@ async function submitStokAdd(btn) {
       stokId = mevcut.id;
       const r = await rpc('stok_ekleme', { p_stok_id: stokId, p_miktar: bslg, p_notlar: `Stok güncellendi: ${urun}` });
       toast(`✅ ${urun} stoku güncellendi (+${bslg} ${birim})`);
+    } else if (isIlac) {
+      // YENİ İLAÇ — katalog (etken madde) ZORUNLU. Stok oluşturmadan ÖNCE doğrula.
+      // İlaç kataloglanmadan eklenemez (tasarım kuralı); stok+drug_product atomik yazılır.
+      if (!navigator.onLine) { toast('İlaç eklemek için internet gerekli (katalog kaydı)', true); return; }
+      const etkenId = g('sa-etken')?.value || null;
+      if (!etkenId) { toast('Etken madde zorunlu — ilaç kataloglanmadan eklenemez', true); return; }
+      const konst = g('sa-konst')?.value?.trim() || null;
+      const route = g('sa-route')?.value || 'IM';
+      const r = await rpc('ilac_ekle', {
+        p_urun_adi:           urun,
+        p_kategori:           kat,
+        p_birim:              birim,
+        p_baslangic_miktar:   bslg,
+        p_esik:               esik,
+        p_drug_class_id:      etkenId,
+        p_concentration:      konst ? Number.parseFloat(konst) : null,
+        p_concentration_unit: konst || null,
+        p_default_route:      route
+      });
+      if (r && r.ok === false) throw new Error(r.mesaj || 'İlaç eklenemedi');
+      stokId = r?.stok_id;
+      _drugsCache = [];
+      toast(`✅ ${urun} eklendi (kataloglu)`);
     } else {
-      // Yeni kayıt (RPC — atomik)
+      // Yeni kayıt — ilaç olmayan stok kalemi
       const r = await rpc('stok_ekle', { p_urun_adi: urun, p_kategori: kat, p_birim: birim, p_baslangic_miktar: bslg, p_esik: esik });
       stokId = r?.id;
-      // İlaç ise drug_products'a da ekle (etken madde zorunlu)
-      if (isIlac && navigator.onLine) {
-        const etkenId = g('sa-etken')?.value || null;
-        if (!etkenId) { toast('Etken madde seçilmedi', true); return; }
-        const konst = g('sa-konst')?.value?.trim() || null;
-        const route = g('sa-route')?.value || 'IM';
-        // RPC ile drug_product ekle (stok bağlantısı atomik)
-        const { data: dp, error: dpErr } = await db.rpc('drug_product_ekle', {
-          p_drug_class_id:      etkenId,
-          p_brand_name:         urun,
-          p_concentration:      konst ? Number.parseFloat(konst) : null,
-          p_concentration_unit: konst || null,
-          p_default_route:      route,
-          p_default_unit:       birim,
-          p_stok_id:            stokId || null
-        });
-        if (dpErr) throw new Error(dpErr.message);
-        if (!dp) throw new Error('İlaç kaydı oluşturulamadı');
-        _drugsCache = [];
-      }
       toast(`✅ ${urun} eklendi`);
     }
     closeM('m-stok-add');

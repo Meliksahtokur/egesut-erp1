@@ -272,6 +272,7 @@ const RPC_TABLES = {
   gorev_guncelle:              ['gorev_log'],
   stok_hareket_ekle:           ['stok_hareket'],
   stok_ekle:                   ['stok'],
+  ilac_ekle:                   ['stok','drug_products','islem_log'],
   stok_ekleme:                 ['stok_hareket'],
   gebelik_kaydet_manual:       ['tohumlama', 'islem_log'],
   // Faz 3 — db.from() REST → RPC
