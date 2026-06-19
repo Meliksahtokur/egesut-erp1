@@ -3916,9 +3916,6 @@ async function loadStokPanel(){
       })),
       {ad:'🔧 Sarf & Ekipman', filtre:s=>['Ekipman','Sarf','Diğer'].includes(s.kategori)},
     ]},
-    {baslik:'💉 Aşılar',alt:[
-      {ad:'💉 Aşı Ürünleri', filtre:s=>s.isVaccine||s.kategori==='Aşı'},
-    ]},
     {baslik:'🐂 Tohumlama',alt:[
       {ad:'🐂 Tohumlama Ürünleri', filtre:s=>s.kategori==='Tohumlama'},
     ]},
@@ -3970,22 +3967,44 @@ async function loadStokPanel(){
       }).join('');
     });
   });
-// Vaccines section
-  const vaxList=await getData('vaccines');
-  if(vaxList&&vaxList.length){
-    html+=`<div class="stok-group" style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px">💉 Aşı</div>`;
-    html+=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);margin:8px 0 4px;padding-left:4px">💉 Kayıtlı Aşılar (${vaxList.length})</div>`;
-    html+=vaxList.map(v=>{
-      const interval=v.repeat_interval_days?(v.repeat_interval_days===365?'Yıllık':v.repeat_interval_days===180?'6 Aylık':v.repeat_interval_days+' günde bir'):'Tek Doz';
-      const mandatory=v.is_mandatory?'🔴 Zorunlu':'🔵 Opsiyonel';
+  // Vaccines section — birleşik kart (katalog + stok + hastalık + protokol)
+  const vaxList = await getData('vaccines') || [];
+  if(vaxList.length){
+    const allStok = getState('stock') || [];
+    const vDis = await getData('vaccine_diseases') || [];
+    const allDis = await getData('diseases') || [];
+    const vSteps = await getData('vaccine_protocol_steps') || [];
+    const disName = id => (allDis.find(d=>d.id===id)||{}).name || '';
+    html += `<div class="stok-group" style="font-size:.72rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
+      <span>💉 Aşı</span>
+      <button onclick="openAsiEkle()" style="font-size:.72rem;font-weight:700;padding:6px 11px;background:var(--blue);color:#fff;border:none;border-radius:7px;cursor:pointer">＋ Yeni Aşı Ekle</button></div>`;
+    html += vaxList.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','tr')).map(v=>{
+      const stk = v.stock_item_id ? allStok.find(s=>s.id===v.stock_item_id) : null;
+      const guncel = stk ? +(stk.guncel ?? stk.guncel_stok ?? stk.baslangic_miktar ?? 0) : null;
+      const esik = stk ? +(stk.esik||0) : 0;
+      const chips = vDis.filter(x=>x.vaccine_id===v.id).map(x=>disName(x.disease_id)).filter(Boolean)
+        .map(n=>`<span style="background:var(--card2);color:var(--ink2);font-size:.6rem;padding:1px 6px;border-radius:6px;margin:0 3px 3px 0;display:inline-block">${esc(n)}</span>`).join('') || `<span style="font-size:.62rem;color:var(--ink3)">${esc(v.disease_target||'—')}</span>`;
+      const steps = vSteps.filter(s=>s.vaccine_id===v.id).sort((a,b)=>a.adim_no-b.adim_no);
+      const protOzet = steps.length>1 ? `${steps.length} doz · ${steps[1].offset_gun}g ara` : 'Tek doz';
+      const repeatTxt = v.repeat_interval_days ? ` · tekrar ${v.repeat_interval_days}g` : '';
+      const stokBlok = v.stock_item_id
+        ? `<div style="font-weight:700;font-size:1rem;color:${guncel<=esik?'var(--red)':'var(--ink)'}">${(guncel||0).toFixed(1)} ${esc(v.unit||'ml')}</div>
+           <div style="display:flex;gap:6px;margin-top:6px">
+             <button onclick="openStk('${v.stock_item_id}')" style="flex:1;padding:6px;background:var(--green);color:#fff;border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">+ Miktar Ekle</button>
+             <button onclick="stokHareketGor('${v.stock_item_id}')" style="padding:6px 10px;background:var(--card2);color:var(--ink3);border:none;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer">Hareketler</button>
+           </div>`
+        : `<div style="display:flex;align-items:center;gap:8px"><span style="font-size:.72rem;color:var(--ink3)">Stok yok</span>
+             <button onclick="openAsiEkle('${v.id}')" style="padding:5px 10px;background:rgba(42,107,181,.1);color:var(--blue);border:1px dashed rgba(42,107,181,.4);border-radius:7px;font-size:.7rem;font-weight:700;cursor:pointer">+ Stok Ekle</button></div>`;
       return `<div class="stok-item" data-ad="${esc(v.name)}" style="background:var(--card);border:1px solid var(--card3);border-left:3px solid var(--blue);border-radius:10px;padding:11px 13px;margin-bottom:7px">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div style="flex:1">
-            <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${v.name}</div>
-            <div style="font-size:.62rem;color:var(--ink3);margin-top:2px">${v.disease_target||'—'} · ${interval} · ${mandatory}</div>
-            ${v.dosage_ml?`<div style="font-size:.62rem;color:var(--ink3)">Standart doz: ${v.dosage_ml} ml</div>`:''}
+            <div style="font-weight:700;font-size:.88rem;color:var(--ink)">${esc(v.name)}${v.marka?` <span style="font-weight:400;font-size:.7rem;color:var(--ink3)">${esc(v.marka)}</span>`:''}${v.is_mandatory?' <span style="color:var(--red);font-size:.6rem">🔴</span>':''}</div>
+            <div style="margin-top:4px">${chips}</div>
+            <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${protOzet}${repeatTxt}</div>
           </div>
+          <button onclick="openAsiEkle('${v.id}')" style="background:var(--card2);color:var(--ink3);border:none;border-radius:7px;padding:5px 9px;font-size:.7rem;font-weight:700;cursor:pointer">Düzenle</button>
         </div>
+        <div style="margin-top:8px">${stokBlok}</div>
       </div>`;
     }).join('');
   }
