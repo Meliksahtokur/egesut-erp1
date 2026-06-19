@@ -1527,10 +1527,11 @@ SELECT
     WHEN s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) <= s.esik
     THEN 'kritik'
     ELSE 'normal'
-  END AS stok_durum
+  END AS stok_durum,
+  s.drug_product_id
 FROM public.stok s
 LEFT JOIN public.stok_hareket sh ON sh.stok_id = s.id
-GROUP BY s.id, s.urun_adi, s.kategori, s.birim, s.baslangic_miktar, s.esik;
+GROUP BY s.id, s.urun_adi, s.kategori, s.birim, s.baslangic_miktar, s.esik, s.drug_product_id;
 
 -- ──────────────────────────────────────────
 -- 9. DUPLICATE KONTROL FONKSİYONU

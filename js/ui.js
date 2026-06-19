@@ -558,7 +558,7 @@ async function loadTasks(f,btn,opts){
     _allDrugAdmins.forEach(da=>{
       if(da.seans_admin_id) return; // saatli ilaçlar seans kartına gider, güne dump edilmez
       if(!_dayDrugMap[da.treatment_day_id])_dayDrugMap[da.treatment_day_id]=[];
-      _dayDrugMap[da.treatment_day_id].push({name:_stokNameMap[da.stok_id]||'İlaç',dose:da.dose,unit:da.unit,route:da.route});
+      _dayDrugMap[da.treatment_day_id].push({name:_prodMap[da.drug_product_id]?.brand_name||_stokNameMap[da.stok_id]||'İlaç',dose:da.dose,unit:da.unit,route:da.route});
     });
     // TEDAVI_GUN için teshis adı: treatment_days → cases → diseases
     const _allTDays=await idbGetAll('treatment_days').catch(()=>[]);
@@ -1761,11 +1761,12 @@ async function _detRenderGecmis(id,el){
       const _dis=await idbGetAll('diseases').catch(()=>[]);
       const _hStok=await idbGetAll('stok').catch(()=>[]);
       const _hStokById=Object.fromEntries(_hStok.map(s=>[s.id,s.urun_adi||'']));
+      const _hProdById=Object.fromEntries((await idbGetAll('drug_products').catch(()=>[])).map(p=>[p.id,p.brand_name||'']));
       const _hTdays=await idbGetAll('treatment_days').catch(()=>[]);
       const _hDadm=await idbGetAll('drug_administrations').catch(()=>[]);
       const _hDrugsByCase={};
       const _hDayCase=Object.fromEntries(_hTdays.map(td=>[td.id,td.case_id]));
-      _hDadm.forEach(da=>{const cid=_hDayCase[da.treatment_day_id];if(!cid)return;const name=_hStokById[da.stok_id]||'';if(!name)return;if(!_hDrugsByCase[cid])_hDrugsByCase[cid]=new Set();_hDrugsByCase[cid].add(name);});
+      _hDadm.forEach(da=>{const cid=_hDayCase[da.treatment_day_id];if(!cid)return;const name=_hProdById[da.drug_product_id]||_hStokById[da.stok_id]||'';if(!name)return;if(!_hDrugsByCase[cid])_hDrugsByCase[cid]=new Set();_hDrugsByCase[cid].add(name);});
       (await idbGetAll('cases').catch(()=>[])).filter(r=>r.animal_id===id).forEach(r=>{
         const _d=_dis.find(d=>d.id===r.disease_id);
         const _drugNames=[...(_hDrugsByCase[r.id]||[])];
@@ -1779,8 +1780,9 @@ async function _detRenderGecmis(id,el){
       const _allDrugs=await idbGetAll('drug_administrations').catch(()=>[]);
       const _allStok=await idbGetAll('stok').catch(()=>[]);
       const _stokById=Object.fromEntries(_allStok.map(s=>[s.id,s.urun_adi||'']));
+      const _prodById=Object.fromEntries((await idbGetAll('drug_products').catch(()=>[])).map(p=>[p.id,p.brand_name||'']));
       const _drugsByDay={};
-      _allDrugs.forEach(da=>{if(!da.treatment_day_id)return;const name=_stokById[da.stok_id]||'';if(name)(_drugsByDay[da.treatment_day_id]=_drugsByDay[da.treatment_day_id]||[]).push(name);});
+      _allDrugs.forEach(da=>{if(!da.treatment_day_id)return;const name=_prodById[da.drug_product_id]||_stokById[da.stok_id]||'';if(name)(_drugsByDay[da.treatment_day_id]=_drugsByDay[da.treatment_day_id]||[]).push(name);});
       const _tDays=await idbGetAll('treatment_days').catch(()=>[]);
       const _tDayById=Object.fromEntries(_tDays.map(td=>[td.id,td]));
       const _caseArr=await idbGetAll('cases').catch(()=>[]);
@@ -2936,12 +2938,13 @@ async function loadGecmis(f,btn){
       const _hDadm=await idbGetAll('drug_administrations').catch(()=>[]);
       const _hStok=await idbGetAll('stok').catch(()=>[]);
       const _hStokById=Object.fromEntries(_hStok.map(s=>[s.id,s.urun_adi||'']));
+      const _hProdById=Object.fromEntries((await idbGetAll('drug_products').catch(()=>[])).map(p=>[p.id,p.brand_name||'']));
       const _hDrugsByCase={};
       const _hDayCase=Object.fromEntries(_hTdays.map(td=>[td.id,td.case_id]));
       _hDadm.forEach(da=>{
         const cid=_hDayCase[da.treatment_day_id];
         if(!cid)return;
-        const name=_hStokById[da.stok_id]||'';
+        const name=_hProdById[da.drug_product_id]||_hStokById[da.stok_id]||'';
         if(name){
           if(!_hDrugsByCase[cid])_hDrugsByCase[cid]=new Set();
           _hDrugsByCase[cid].add(name);
@@ -2957,10 +2960,11 @@ async function loadGecmis(f,btn){
       const _allDrugs=await idbGetAll('drug_administrations').catch(()=>[]);
       const _allStok=await idbGetAll('stok').catch(()=>[]);
       const _stokById=Object.fromEntries(_allStok.map(s=>[s.id,s.urun_adi||'']));
+      const _prodById=Object.fromEntries((await idbGetAll('drug_products').catch(()=>[])).map(p=>[p.id,p.brand_name||'']));
       const _drugsByDay={};
       _allDrugs.forEach(da=>{
         if(!da.treatment_day_id)return;
-        const name=_stokById[da.stok_id]||'';
+        const name=_prodById[da.drug_product_id]||_stokById[da.stok_id]||'';
         if(name)(_drugsByDay[da.treatment_day_id]=_drugsByDay[da.treatment_day_id]||[]).push(name);
       });
       const _tDays=await idbGetAll('treatment_days').catch(()=>[]);
@@ -4471,15 +4475,17 @@ async function openTaskDet(id){
       try{ meta=JSON.parse(t.aciklama||'{}'); }catch(e){}
       const dayId=meta.day_id;
       if(dayId){
-        await pullTables(['drug_administrations','treatment_days','cases','stok','diseases']);
-        const [allAdmins,allDays,allCases,allStok,allDiseases]=await Promise.all([
+        await pullTables(['drug_administrations','treatment_days','cases','stok','diseases','drug_products']);
+        const [allAdmins,allDays,allCases,allStok,allDiseases,allProducts]=await Promise.all([
           idbGetAll('drug_administrations'),
           idbGetAll('treatment_days'),
           idbGetAll('cases'),
           idbGetAll('stok'),
           idbGetAll('diseases'),
+          idbGetAll('drug_products').catch(()=>[]),
         ]);
         const stokMap=Object.fromEntries(allStok.map(s=>[s.id,s.urun_adi||s.id]));
+        const prodMap=Object.fromEntries(allProducts.map(p=>[p.id,p.brand_name||'']));
         const dayDrugs=allAdmins.filter(da=>da.treatment_day_id===dayId);
         const day=allDays.find(d=>d.id===dayId);
         const theCase=day?allCases.find(c=>c.id===day.case_id):null;
@@ -4509,7 +4515,7 @@ async function openTaskDet(id){
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
                 </div>
                 <div style="flex:1;min-width:0">
-                  <div style="font-size:.88rem;font-weight:600;color:var(--ink);line-height:1.2">${esc(stokMap[da.stok_id]||'İlaç')}</div>
+                  <div style="font-size:.88rem;font-weight:600;color:var(--ink);line-height:1.2">${esc(prodMap[da.drug_product_id]||stokMap[da.stok_id]||'İlaç')}</div>
                   <div style="font-size:.7rem;color:var(--ink3);margin-top:1px">${da.dose}${da.unit}${da.route?' · <b>'+da.route+'</b>':''}</div>
                   ${da.notes?`<div style="font-size:.68rem;color:var(--ink3);margin-top:3px;font-style:italic;opacity:.8">📝 ${esc(da.notes)}</div>`:''}
                 </div>
@@ -4886,7 +4892,7 @@ async function loadDrugsCache() {
       const unlinkedStok = stok.filter(s =>
         !s.drug_product_id &&
         !linkedStokIds.has(s.id) &&
-        ['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diger Ilac','Ilac'].includes(s.kategori)
+        ['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','İlaç','Diger Ilac','Ilac','Metabolik'].includes(s.kategori)
       );
       unlinkedStok.forEach(s => {
         const guncel = +(s.guncel_stok ?? s.baslangic_miktar ?? 0);
@@ -7702,11 +7708,12 @@ async function renderTedaviGunSeanslar(treatmentDayId) {
     wrap.style.display = 'none';
     return;
   }
-  const [allStok, allDays] = await Promise.all([idbGetAll('stok').catch(() => []), idbGetAll('treatment_days').catch(() => [])]);
+  const [allStok, allDays, allProducts] = await Promise.all([idbGetAll('stok').catch(() => []), idbGetAll('treatment_days').catch(() => []), idbGetAll('drug_products').catch(() => [])]);
   const stokMap = Object.fromEntries(allStok.map(x => [x.id, x.urun_adi || x.id]));
+  const prodMap = Object.fromEntries(allProducts.map(p => [p.id, p.brand_name || '']));
   const day = allDays.find(d => d.id === treatmentDayId);
   const isLocked = day?.tamamlandi === true;
-  sessions.forEach(s => { s.drug_name = stokMap[s.stok_id] || 'İlaç'; s.planned_date = s.planned_date || day?.treatment_date; });
+  sessions.forEach(s => { s.drug_name = prodMap[s.drug_product_id] || stokMap[s.stok_id] || 'İlaç'; s.planned_date = s.planned_date || day?.treatment_date; });
   sessions.sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
   const bugun = new Date().toISOString().split('T')[0];
   ribbonEl.innerHTML = renderSeansSerit(sessions, { today: sessions.some(s => s.planned_date === bugun) });
@@ -7937,12 +7944,14 @@ async function caseErkenKapatToggle() {
     return;
   }
   if (!_curCase) return;
-  const [allDays, allApps, allStok] = await Promise.all([
+  const [allDays, allApps, allStok, allProducts] = await Promise.all([
     idbGetAll('treatment_days'),
     idbGetAll('treatment_day_uygulamalar').catch(() => []),
     idbGetAll('stok').catch(() => []),
+    idbGetAll('drug_products').catch(() => []),
   ]);
   const stokMap = Object.fromEntries(allStok.map(s => [s.id, s.urun_adi || s.id]));
+  const prodMap = Object.fromEntries(allProducts.map(p => [p.id, p.brand_name || '']));
   const acikGunler = allDays.filter(d => d.case_id === _curCase.id && !d.tamamlandi);
   const dayIds = new Set(acikGunler.map(d => d.id));
   const kalan = allApps.filter(s => dayIds.has(s.treatment_day_id) && !s.uygulama_tamamlandi_at && !s.uygulanmadi);
@@ -7950,7 +7959,7 @@ async function caseErkenKapatToggle() {
   if (ozetEl) {
     ozetEl.innerHTML = kalan.length
       ? `<b style="color:var(--red)">⚠ ${kalan.length} seans henüz uygulanmadı:</b><br>` +
-        kalan.map(s => `• ${esc(fmtTarih(s.planned_date) || '')} ${esc(fmtSeansSaat(s.planned_time))} — ${esc(stokMap[s.stok_id] || '')} ${s.dose || ''}${s.unit || ''}`).join('<br>')
+        kalan.map(s => `• ${esc(fmtTarih(s.planned_date) || '')} ${esc(fmtSeansSaat(s.planned_time))} — ${esc(prodMap[s.drug_product_id] || stokMap[s.stok_id] || '')} ${s.dose || ''}${s.unit || ''}`).join('<br>')
       : `<b style="color:var(--red)">⚠ ${acikGunler.length} tedavi günü hâlâ açık.</b> Açık günler kapatılacak.`;
   }
   const notEl = document.getElementById('cd-erken-not');
