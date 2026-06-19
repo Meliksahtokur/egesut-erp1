@@ -7763,6 +7763,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.stok_kategorileri WHERE ad = p_kategori) THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz kategori: ' || p_kategori);
   END IF;
+  -- Katalog zorunlu: ilaç kategorisinde stok yalnızca ilac_ekle ile eklenir.
+  IF EXISTS (SELECT 1 FROM public.stok_kategorileri WHERE ad = p_kategori AND tip = 'ilac') THEN
+    RAISE EXCEPTION 'İlaç kategorisinde stok kataloglanmadan eklenemez — ilac_ekle kullanın (etken madde zorunlu)';
+  END IF;
   v_id := gen_random_uuid()::text;
   INSERT INTO public.stok (id, urun_adi, kategori, birim, baslangic_miktar, esik)
   VALUES (v_id, p_urun_adi, p_kategori, p_birim, p_baslangic_miktar, p_esik);
