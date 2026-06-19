@@ -7987,3 +7987,119 @@ function caseErkenKapatOnayla(btn) {
     }
   });
 }
+
+// ══════════════════════════════════════════════════════════════
+// AŞI EKLE/DÜZENLE — içerik-odaklı (hastalık arama+checkbox + protokol)
+// ══════════════════════════════════════════════════════════════
+let _asiEdit = null;
+let _asiDisSearch = '';
+
+async function openAsiEkle(vaccineId){
+  const diseases = await getData('diseases') || [];
+  if(vaccineId){
+    const vaccines = await getData('vaccines') || [];
+    const v = vaccines.find(x=>x.id===vaccineId);
+    if(!v){ toast('Aşı bulunamadı',true); return; }
+    const steps = (await getData('vaccine_protocol_steps')||[]).filter(s=>s.vaccine_id===vaccineId).sort((a,b)=>a.adim_no-b.adim_no);
+    const vd    = (await getData('vaccine_diseases')||[]).filter(x=>x.vaccine_id===vaccineId);
+    _asiEdit = {
+      id:v.id, name:v.name||'', marka:v.marka||'', etken_madde:v.etken_madde||'',
+      dose:v.dose||'', unit:v.unit||'ml', route:v.route||'SC',
+      is_mandatory:!!v.is_mandatory, repeat:v.repeat_interval_days||'',
+      protokol_tipi:v.protokol_tipi||'tek_doz',
+      ikinci_doz_gun:(steps.find(s=>s.adim_no===2)?.offset_gun)||28,
+      disease_ids:vd.map(x=>x.disease_id), baslangic_stok:'', esik:'',
+      _hasStock:!!v.stock_item_id
+    };
+  } else {
+    _asiEdit = { id:null, name:'', marka:'', etken_madde:'', dose:'', unit:'ml', route:'SC',
+      is_mandatory:false, repeat:'', protokol_tipi:'tek_doz', ikinci_doz_gun:28,
+      disease_ids:[], baslangic_stok:'', esik:'', _hasStock:false };
+  }
+  _asiEdit._diseases = diseases;
+  _asiDisSearch = '';
+  document.getElementById('m-asi-title').textContent = vaccineId ? 'Aşıyı Düzenle' : 'Yeni Aşı';
+  _renderAsiForm();
+  openM('m-asi-ekle');
+}
+
+function _renderAsiDiseasePicker(){
+  const s = _asiEdit;
+  const q = trLower(_asiDisSearch||'');
+  const list = s._diseases.filter(d=> !q || trLower(d.name||'').includes(q));
+  const byCat = {};
+  list.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','tr')).forEach(d=>{
+    const c = d.category || 'Diğer'; (byCat[c]=byCat[c]||[]).push(d);
+  });
+  const inner = Object.keys(byCat).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(cat=>{
+    const items = byCat[cat].map(d=>`<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer">
+      <input type="checkbox" ${s.disease_ids.includes(d.id)?'checked':''} onchange="asiDisToggle('${d.id}',this.checked)" style="width:17px;height:17px;accent-color:var(--green);flex-shrink:0">
+      <span style="font-size:.82rem">${esc(d.name)}</span></label>`).join('');
+    return `<div style="margin-bottom:6px"><div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;border-bottom:1px solid var(--card3);padding-bottom:2px;margin-bottom:3px">${esc(cat)}</div>${items}</div>`;
+  }).join('') || '<div style="color:var(--ink3);font-size:.78rem">Hastalık bulunamadı</div>';
+  return inner;
+}
+
+function _renderAsiForm(){
+  const s = _asiEdit;
+  const sec = s.disease_ids.length;
+  const isPrimer = s.protokol_tipi==='primer_seri';
+  document.getElementById('m-asi-body').innerHTML = `
+    <div class="fg"><label class="flbl">Preparat adı (ürün) *</label>
+      <input id="asi-name" class="fi" value="${esc(s.name)}" placeholder="Örn. Coglavax"></div>
+    <div class="fg"><label class="flbl">Marka (firma)</label>
+      <input id="asi-marka" class="fi" value="${esc(s.marka)}" placeholder="Örn. Ceva"></div>
+    <div class="fg"><label class="flbl">Etken madde</label>
+      <input id="asi-etken" class="fi" value="${esc(s.etken_madde)}" placeholder="opsiyonel"></div>
+    <div style="display:flex;gap:8px">
+      <div class="fg" style="flex:1"><label class="flbl">Doz</label>
+        <input id="asi-dose" class="fi" type="number" step="0.1" value="${esc(String(s.dose))}" placeholder="2"></div>
+      <div class="fg" style="flex:1"><label class="flbl">Birim</label>
+        <input id="asi-unit" class="fi" value="${esc(s.unit)}" placeholder="ml"></div>
+      <div class="fg" style="flex:1"><label class="flbl">Yol</label>
+        <select id="asi-route" class="fi">
+          ${['SC','IM','PO','IV'].map(r=>`<option value="${r}" ${s.route===r?'selected':''}>${r}</option>`).join('')}
+        </select></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer">
+      <input type="checkbox" id="asi-mand" ${s.is_mandatory?'checked':''} style="width:17px;height:17px;accent-color:var(--red)">
+      <span style="font-size:.85rem">Zorunlu aşı</span></label>
+    <div class="fg"><label class="flbl">Hastalıklar ${sec?`<span style="color:var(--green)">(${sec} seçili)</span>`:''}</label>
+      <input id="asi-dis-search" class="fi" placeholder="🔍 Hastalık ara…" value="${esc(_asiDisSearch)}" oninput="asiDisSearchInput(this.value)" style="margin-bottom:6px">
+      <div id="asi-dis-list" style="max-height:160px;overflow-y:auto;background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px">${_renderAsiDiseasePicker()}</div></div>
+    <div class="fg"><label class="flbl">Brand protokolü</label>
+      <div style="display:flex;gap:14px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="asi-prot" value="tek_doz" ${!isPrimer?'checked':''} onchange="asiProtToggle(this.value)"> Tek doz</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="asi-prot" value="primer_seri" ${isPrimer?'checked':''} onchange="asiProtToggle(this.value)"> Primer seri</label>
+      </div>
+      <div id="asi-primer-box" style="display:${isPrimer?'block':'none'};margin-top:6px;font-size:.82rem">
+        2. doz aralığı: <input id="asi-ikinci-gun" type="number" value="${esc(String(s.ikinci_doz_gun))}" style="width:64px;padding:4px 6px;border:1px solid var(--card3);border-radius:6px"> gün
+      </div></div>
+    <div class="fg"><label class="flbl">Yıllık tekrar (gün, ops.)</label>
+      <input id="asi-repeat" class="fi" type="number" value="${esc(String(s.repeat))}" placeholder="365"></div>
+    ${(!s.id || !s._hasStock) ? `<div style="display:flex;gap:8px">
+      <div class="fg" style="flex:1"><label class="flbl">${s.id?'Stok ekle (ops.)':'Başlangıç stok (ops.)'}</label>
+        <input id="asi-stok" class="fi" type="number" step="0.1" value="${esc(String(s.baslangic_stok))}" placeholder="boş=stoksuz"></div>
+      <div class="fg" style="flex:1"><label class="flbl">Eşik (ops.)</label>
+        <input id="asi-esik" class="fi" type="number" step="0.1" value="${esc(String(s.esik))}" placeholder="0"></div>
+    </div>` : ''}
+    <button class="btn btn-g" onclick="submitAsiEkle(this)" style="margin-top:12px">💾 Kaydet</button>`;
+}
+
+function asiDisToggle(did, checked){
+  if(checked){ if(!_asiEdit.disease_ids.includes(did)) _asiEdit.disease_ids.push(did); }
+  else { _asiEdit.disease_ids = _asiEdit.disease_ids.filter(x=>x!==did); }
+}
+function asiProtToggle(val){ _syncAsiForm(); _asiEdit.protokol_tipi = val; _renderAsiForm(); }
+function asiDisSearchInput(val){ _asiDisSearch = val; _syncAsiForm(); document.getElementById('asi-dis-list').innerHTML = _renderAsiDiseasePicker(); }
+
+function _syncAsiForm(){
+  const g2 = id => document.getElementById(id);
+  if(!g2('asi-name')) return;
+  const s=_asiEdit;
+  s.name=g2('asi-name').value; s.marka=g2('asi-marka').value; s.etken_madde=g2('asi-etken').value;
+  s.dose=g2('asi-dose').value; s.unit=g2('asi-unit').value; s.route=g2('asi-route').value;
+  s.is_mandatory=g2('asi-mand').checked; s.repeat=g2('asi-repeat').value;
+  if(g2('asi-ikinci-gun')) s.ikinci_doz_gun=g2('asi-ikinci-gun').value;
+  if(g2('asi-stok')){ s.baslangic_stok=g2('asi-stok').value; s.esik=g2('asi-esik').value; }
+}

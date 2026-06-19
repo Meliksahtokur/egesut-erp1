@@ -1794,3 +1794,40 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
     if (btn) btn.textContent = uygulanmadi ? '✕' : '✓ Uygulandı';
   }
 }
+
+// ── Aşı ekle/düzenle submit (içerik-odaklı) ──
+async function submitAsiEkle(btn){
+  if(typeof _syncAsiForm==='function') _syncAsiForm();
+  const s = _asiEdit;
+  if(!s.name || !s.name.trim()){ toast('Preparat adı zorunlu',true); return; }
+  if(!navigator.onLine){ toast('Aşı eklemek için internet gerekli',true); return; }
+  const adimlar = [{adim_no:1, offset_gun:0, label:'1. doz'}];
+  if(s.protokol_tipi==='primer_seri'){
+    adimlar.push({adim_no:2, offset_gun:parseInt(s.ikinci_doz_gun)||28, label:'2. doz (primer)'});
+  }
+  const params = {
+    p_name:s.name.trim(), p_marka:s.marka?.trim()||null, p_etken_madde:s.etken_madde?.trim()||null,
+    p_dose:s.dose?parseFloat(s.dose):null, p_unit:s.unit||'ml', p_route:s.route||'SC',
+    p_is_mandatory:!!s.is_mandatory, p_disease_ids:s.disease_ids||[],
+    p_protokol_tipi:s.protokol_tipi||'tek_doz', p_protokol_adimlar:adimlar,
+    p_repeat_interval_days:s.repeat?parseInt(s.repeat):null
+  };
+  if(btn){ btn.disabled=true; btn.textContent='Kaydediliyor…'; }
+  try{
+    let r;
+    // baslangic_stok/esik hem ekleme hem (stoksuz aşıya sonradan stok bağlama — Ö1) düzenlemede geçer
+    params.p_baslangic_stok = s.baslangic_stok ? parseFloat(s.baslangic_stok) : null;
+    params.p_esik = s.esik ? parseFloat(s.esik) : 0;
+    if(s.id){
+      r = await rpc('asi_guncelle', { p_vaccine_id:s.id, ...params });
+    } else {
+      r = await rpc('asi_ekle', params);
+    }
+    if(r && r.ok===false) throw new Error(r.mesaj||'Kaydedilemedi');
+    toast(`✅ ${s.name} kaydedildi`);
+    closeM('m-asi-ekle');
+    await pullTables(['vaccines','vaccine_diseases','vaccine_protocol_steps','stok','stok_hareket']).catch(()=>{});
+    if(typeof loadStokPanel==='function') loadStokPanel();
+  }catch(e){ toast('❌ '+getUserMessage(e),true); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='💾 Kaydet'; } }
+}
