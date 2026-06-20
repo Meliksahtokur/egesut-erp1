@@ -169,7 +169,6 @@ registerActions({
   // ═══ AŞI ═══
   'vaccine-focus':  (el) => acHayvan('v-hid', 'ac-vhid'),
   'vaccine-keydown':(opts) => acNav(opts.event, 'ac-vhid'),
-  'vaccine-select': () => onVaccineSelect(),
   'submit-vaccine': (el) => submitVaccination(el),
 
   // ═══ DOĞUM ═══

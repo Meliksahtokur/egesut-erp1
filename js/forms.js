@@ -803,153 +803,106 @@ function selectedVaccineRows(prefix){
   return out;
 }
 
-// ── AŞI DROPDOWN ─────────────────────────────
+// ── AŞI MODAL (çoklu picker) ─────────────────
 async function loadVaccinesDropdown() {
-  const vaccines = await getData('vaccines');
-  const sel = document.getElementById('v-vaccine-id');
-  if (!sel) return;
-
-  if (!vaccines || !vaccines.length) {
-    sel.innerHTML = '<option value="" disabled>Aşı listesi yüklenemedi</option>';
-    const btn = document.querySelector('#m-vaccine .btn-g');
-    if (btn) btn.disabled = true;
-    return;
-  }
-
-  const mandatory = vaccines.filter(v => v.is_mandatory);
-  const optional = vaccines.filter(v => !v.is_mandatory);
-
-  let html = '';
-  if (mandatory.length) {
-    html += '<optgroup label="Zorunlu Aşılar">';
-    mandatory.forEach(v => { html += `<option value="${v.id}">${v.name} — ${v.disease_target || ''}</option>`; });
-    html += '</optgroup>';
-  }
-  if (optional.length) {
-    html += '<optgroup label="Diğer Aşılar">';
-    optional.forEach(v => { html += `<option value="${v.id}">${v.name} — ${v.disease_target || ''}</option>`; });
-    html += '</optgroup>';
-  }
-  sel.innerHTML = '<option value="">— Aşı seçin —</option>' + html;
-
-  const today = new Date().toISOString().split('T')[0];
-  const dateEl = document.getElementById('v-date');
-  if (dateEl) dateEl.value = today;
+  // Ö4: naive hesabı için cache garanti (vaccination_log + vaccine_diseases + protocol_steps)
+  await pullTables(['vaccination_log','vaccine_diseases','vaccine_protocol_steps']).catch(()=>{});
+  await renderVaccinePicker('v-vaccine-picker','v');
+  const _d=document.getElementById('v-date');
+  if(_d && !_d.value) _d.value=new Date().toISOString().split('T')[0];
+  // Ö5: hayvan değişince seçili satır hint'lerini yenile
+  const _vh=document.getElementById('v-hid');
+  if(_vh && !_vh._refreshBound){ _vh.addEventListener('change', _vRefreshRows); _vh._refreshBound=true; }
 }
 
-let _onDoseInput; // dose override visual feedback handler
-async function onVaccineSelect() {
-  const sel = document.getElementById('v-vaccine-id');
-  const info = document.getElementById('v-vaccine-info');
-  const hint = document.getElementById('v-protocol-hint');
-  const unit = document.getElementById('v-dose-unit');
-  const doseOverride = document.getElementById('v-dose-override');
-  if (!sel) return;
-
-  const val = sel.value;
-  if (!val) {
-    if (info) info.style.display = 'none';
-    if (hint) { hint.style.display = 'none'; hint.innerHTML = ''; }
-    if (unit) unit.textContent = '';
-    return;
+// muadil naive: hayvanın bu aşıyı kapsayan hastalık geçmişi var mı?
+function _vaccineNaive(animalId, vaccineId){
+  const logs=(getState('vaccination_log')||[]).filter(l=>l.animal_id===animalId);
+  if(!logs.length) return true;
+  const vd=getState('vaccine_diseases')||[];
+  const myDis=new Set(vd.filter(x=>x.vaccine_id===vaccineId).map(x=>x.disease_id));
+  for(const l of logs){
+    if(l.vaccine_id===vaccineId) return false;
+    const od=vd.filter(x=>x.vaccine_id===l.vaccine_id).map(x=>x.disease_id);
+    if(od.some(d=>myDis.has(d))) return false;
   }
-
-  const vaccines = await getData('vaccines') || [];
-  const vax = vaccines.find(v => v.id === val);
-  if (!vax) return;
-
-  if (info) {
-    info.style.display = 'block';
-    let infoText = `Standart doz: ${vax.dose || '?'} ${vax.unit || 'ml'} · Uygulama: ${vax.route || '?'}`;
-    if (vax.repeat_interval_days) infoText += ` · Her ${vax.repeat_interval_days} günde bir`;
-    info.textContent = infoText;
-  }
-
-  if (unit) unit.textContent = vax.unit || 'ml';
-  if (doseOverride) {
-    doseOverride.placeholder = vax.dose || '';
-    doseOverride.dataset.stdDose = vax.dose || '';
-    // Kaldir eski listener'i (varsa)
-    doseOverride.removeEventListener('input', _onDoseInput);
-    _onDoseInput = function(){
-      const std = doseOverride.dataset.stdDose;
-      const val = doseOverride.value;
-      if (info) {
-        let base = `Standart doz: ${std || '?'} ${vax.unit || 'ml'} · Uygulama: ${vax.route || '?'}`;
-        if (vax.repeat_interval_days) base += ` · Her ${vax.repeat_interval_days} günde bir`;
-        if (val && val !== std) {
-          base += `<br><span style="color:var(--orange);font-weight:600">→ Uygulanacak: ${val} ${vax.unit || 'ml'}</span>`;
-        }
-        info.innerHTML = base;
-      }
-    };
-    doseOverride.addEventListener('input', _onDoseInput);
-  }
-
-  if (hint) {
-    hint.style.display = 'block';
-    if (vax.repeat_interval_days) {
-      hint.innerHTML = `⏰ Bu aşı uygulandıktan <b>${vax.repeat_interval_days}</b> gün sonra otomatik hatırlatma görevi oluşturulur.`;
-      hint.style.background = 'rgba(78,154,42,.12)';
-      hint.style.borderColor = 'rgba(78,154,42,.25)';
-    } else {
-      hint.innerHTML = '💉 Tek doz aşı — hatırlatma görevi oluşmaz.';
-      hint.style.background = 'rgba(42,107,181,.1)';
-      hint.style.borderColor = 'rgba(42,107,181,.2)';
-    }
-  }
+  return true;
+}
+function _vStep2(vaccineId){
+  const s=(getState('vaccine_protocol_steps')||[]).find(x=>x.vaccine_id===vaccineId && x.adim_no===2);
+  return s? s.offset_gun : null;
+}
+function vChkChange(chk){
+  const id=chk.dataset.id, rows=document.getElementById('v-rows');
+  if(!rows) return;
+  if(chk.checked){
+    const hid=v('v-hid');
+    const hayvan=getState('animals').find(a=>a.kupe_no===hid||a.id===hid||a.devlet_kupe===hid);
+    const naive=hayvan? _vaccineNaive(hayvan.id,id):true;
+    const step2=_vStep2(id);
+    const rid=chk.dataset.rid!==''?parseInt(chk.dataset.rid,10):null;
+    let defOff=null, hint='';
+    if(naive && step2!=null){ defOff=step2; hint='2. doz: +'+step2+'g'; }
+    else if(rid!=null){ defOff=rid; hint='yıllık: +'+rid+'g'; }
+    else hint='tekrar yok';
+    const row=document.createElement('div');
+    row.id='v-row-'+id;
+    row.style.cssText='background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:8px;padding:8px;margin-bottom:6px';
+    row.innerHTML='<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-bottom:5px">'+chk.dataset.name+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+      '<input type="number" step="0.1" class="fi vp-dose" placeholder="Doz" value="'+(chk.dataset.dose||'')+'" style="margin:0">'+
+      '<input type="number" class="fi vp-off" placeholder="Offset (g)" '+(defOff!=null?'value="'+defOff+'"':'')+' data-def="'+(defOff!=null?defOff:'')+'" style="margin:0">'+
+      '</div>'+
+      '<div style="font-size:.65rem;color:var(--ink3);margin-top:4px">⏰ '+hint+'</div>';
+    rows.appendChild(row);
+  } else { document.getElementById('v-row-'+id)?.remove(); }
+}
+// Hayvan değişince seçili satırların naive hint'lerini yeniden hesapla
+function _vRefreshRows(){
+  document.querySelectorAll('.v-chk:checked').forEach(chk=>{ document.getElementById('v-row-'+chk.dataset.id)?.remove(); vChkChange(chk); });
 }
 
-// ── AŞI UYGULA ──────────────────────────────
+// ── AŞI UYGULA (tek hayvan, çoklu aşı) ───────
 async function submitVaccination(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-
   const hid = v('v-hid');
-  const vaccineId = v('v-vaccine-id');
   const date = v('v-date');
-  const doseOverride = v('v-dose-override');
   const notes = v('v-notes');
-
+  const secili = selectedVaccineRows('v');
   if (!hid) { toast('⚠️ Hayvan seçin', true); return; }
-  if (!vaccineId) { toast('⚠️ Aşı seçin', true); return; }
+  if (!secili.length) { toast('⚠️ En az bir aşı seçin', true); return; }
   if (!date) { toast('⚠️ Tarih girin', true); return; }
   if (date > new Date().toISOString().split('T')[0]) { toast('İleri tarih girilemez', true); return; }
-
   const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
+  let ok=0, fail=0, lastDue=null;
   try {
-    const res = await rpc('add_vaccination', {
-      p_animal_id: hayvan.id,
-      p_vaccine_id: vaccineId,
-      p_date: date,
-      p_dose_override: doseOverride ? parseFloat(doseOverride) : null,
-      p_notes: notes || null,
-    });
-
-    toast('💉 Aşı kaydedildi');
+    for (const s of secili) {
+      try {
+        const res = await rpc('add_vaccination', {
+          p_animal_id: hayvan.id, p_vaccine_id: s.id, p_date: date,
+          p_dose_override: (s.dose!=null && s.dose!==s.stdDose) ? s.dose : null,
+          p_notes: notes || null,
+          p_next_offset_days: (s.offset!=null && s.offset!==s.defOffset) ? s.offset : null,
+        });
+        ok++; if (res && res.next_due) lastDue=res.next_due;
+      } catch(e){ fail++; }
+    }
+    toast(`💉 ${ok} aşı kaydedildi${fail?` · ${fail} hata`:''}${(ok===1&&lastDue)?` · Sonraki: ${fmtTarih(lastDue)}`:''}`, fail>0);
     closeM('m-vaccine');
     resetVaccineForm();
-    if (res && res.next_due) toast(`⏰ Sonraki aşı: ${fmtTarih(res.next_due)}`, false);
-    await pullTables(['vaccination_log', 'gorev_log', 'hayvanlar']);
+    await pullTables(['vaccination_log', 'gorev_log', 'hayvanlar', 'stok_hareket']);
     renderSafe();
-  } catch (e) {
-    toast('❌ Aşı kaydedilemedi: ' + getUserMessage(e), true);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '💉 Aşı Uygula'; }
   }
 }
 
 function resetVaccineForm() {
-  const ids = ['v-hid','v-vaccine-id','v-date','v-dose-override','v-notes'];
-  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  const info = document.getElementById('v-vaccine-info');
-  const hint = document.getElementById('v-protocol-hint');
-  if (info) info.style.display = 'none';
-  if (hint) { hint.style.display = 'none'; hint.innerHTML = ''; }
-  const unit = document.getElementById('v-dose-unit');
-  if (unit) unit.textContent = '';
+  ['v-hid','v-date','v-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  if (typeof renderVaccinePicker === 'function') renderVaccinePicker('v-vaccine-picker','v');
 }
 
 // ── GÖREV TAMAMLA ────────────────────────────
