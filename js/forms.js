@@ -749,6 +749,60 @@ function openTohumErtele(hayvanId, kupe) {
   openM('m-tohum-ertele');
 }
 
+// ── ORTAK AŞI PICKER (checkbox + arama) ────────────
+// m-vaccine (prefix 'v') ve m-bulk-vaccine (prefix 'bv') paylaşır
+async function renderVaccinePicker(containerId, prefix){
+  const vaccines = (await getData('vaccines')) || [];
+  const c = document.getElementById(containerId);
+  if(!c) return;
+  const groups = { 'Zorunlu Aşılar':[], 'Diğer Aşılar':[] };
+  vaccines.forEach(vx => (vx.is_mandatory?groups['Zorunlu Aşılar']:groups['Diğer Aşılar']).push(vx));
+  const groupHtml = Object.keys(groups).filter(g=>groups[g].length).map(g=>{
+    const items = groups[g].map(vx=>{
+      const esc=(vx.name||'').replace(/"/g,'&quot;');
+      const dt=(vx.disease_target||'').replace(/"/g,'&quot;');
+      return '<label class="vp-item" data-name="'+esc.toLowerCase()+' '+dt.toLowerCase()+'" '+
+        'style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">'+
+        '<input type="checkbox" class="'+prefix+'-chk" data-id="'+vx.id+'" data-name="'+esc+'" '+
+        'data-dose="'+(vx.dose||'')+'" data-unit="'+(vx.unit||'ml')+'" data-rid="'+(vx.repeat_interval_days||'')+'" '+
+        'onchange="'+prefix+'ChkChange(this)" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600;color:var(--ink)">'+vx.name+'</div>'+
+        (dt?'<div style="font-size:.65rem;color:var(--ink3)">'+vx.disease_target+'</div>':'')+'</div></label>';
+    }).join('');
+    return '<div style="margin-bottom:8px"><div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding:3px 0;border-bottom:1px solid var(--card3)">'+g+'</div>'+items+'</div>';
+  }).join('');
+  c.innerHTML =
+    '<input class="fi" placeholder="Aşı ara…" oninput="vaccinePickerSearch(\''+prefix+'\',this.value)" style="margin-bottom:6px">'+
+    '<div id="'+prefix+'-list" style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;border:1px solid var(--card3)">'+
+    (groupHtml||'<div style="color:var(--ink3);font-size:.78rem;padding:8px">Aşı yok</div>')+'</div>'+
+    '<div id="'+prefix+'-rows" style="margin-top:8px"></div>';
+}
+
+function vaccinePickerSearch(prefix, term){
+  const t=(term||'').toLowerCase().trim();
+  document.querySelectorAll('#'+prefix+'-list .vp-item').forEach(el=>{
+    el.style.display = (!t || (el.dataset.name||'').includes(t)) ? 'flex' : 'none';
+  });
+}
+
+// Seçili aşı satırlarını topla: [{id,name,dose,stdDose,offset,defOffset}]
+function selectedVaccineRows(prefix){
+  const out=[];
+  document.querySelectorAll('.'+prefix+'-chk:checked').forEach(chk=>{
+    const id=chk.dataset.id;
+    const doseInp=document.querySelector('#'+prefix+'-row-'+id+' .vp-dose');
+    const offInp =document.querySelector('#'+prefix+'-row-'+id+' .vp-off');
+    out.push({
+      id, name:chk.dataset.name,
+      dose: doseInp && doseInp.value!=='' ? parseFloat(doseInp.value) : null,
+      stdDose: chk.dataset.dose!=='' ? parseFloat(chk.dataset.dose) : null,
+      offset: offInp && offInp.value!=='' ? parseInt(offInp.value,10) : null,
+      defOffset: offInp && offInp.dataset.def!=='' ? parseInt(offInp.dataset.def,10) : null
+    });
+  });
+  return out;
+}
+
 // ── AŞI DROPDOWN ─────────────────────────────
 async function loadVaccinesDropdown() {
   const vaccines = await getData('vaccines');
