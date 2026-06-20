@@ -1490,70 +1490,54 @@ async function loadBulkVaccineHayvanlar() {
 }
 
 async function loadBulkVaccineVaccines() {
-  const vaccines = await getData('vaccines');
-  const sel = document.getElementById('bv-vaccine-sel');
-  if (!sel) return;
-
-  if (!vaccines || !vaccines.length) {
-    sel.innerHTML = '<option value="" disabled>Aşı listesi yüklenemedi</option>';
-    return;
-  }
-
-  const mandatory = vaccines.filter(v => v.is_mandatory);
-  const optional = vaccines.filter(v => !v.is_mandatory);
-
-  let html = '';
-  if (mandatory.length) {
-    html += '<optgroup label="Zorunlu Aşılar">';
-    mandatory.forEach(v => { html += `<option value="${v.id}">${v.name} — ${v.disease_target || ''}</option>`; });
-    html += '</optgroup>';
-  }
-  if (optional.length) {
-    html += '<optgroup label="Diğer Aşılar">';
-    optional.forEach(v => { html += `<option value="${v.id}">${v.name} — ${v.disease_target || ''}</option>`; });
-    html += '</optgroup>';
-  }
-  sel.innerHTML = '<option value="">— Aşı seçin —</option>' + html;
-
-  // Set default date
-  const today = new Date().toISOString().split('T')[0];
+  // Ö4: muadil/protokol cache (bulk'ta naive hint yok ama tutarlilik icin)
+  await pullTables(['vaccine_diseases','vaccine_protocol_steps']).catch(()=>{});
+  await renderVaccinePicker('bv-vaccine-picker','bv');
   const dateEl = document.getElementById('bv-tarih');
-  if (dateEl) dateEl.value = today;
+  if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+  const r=document.getElementById('bv-result'); if(r) r.innerHTML=''; // Ö8: eski sonucu temizle
+}
+
+// Bulk'ta naive hint YOK (çok hayvan) — sadece doz satırı, .vp-off yok
+function bvChkChange(chk){
+  const id=chk.dataset.id, rows=document.getElementById('bv-rows');
+  if(!rows) return;
+  if(chk.checked){
+    const row=document.createElement('div');
+    row.id='bv-row-'+id;
+    row.style.cssText='background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:8px;padding:8px;margin-bottom:6px';
+    row.innerHTML='<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-bottom:5px">'+chk.dataset.name+'</div>'+
+      '<input type="number" step="0.1" class="fi vp-dose" placeholder="Doz (boş=standart '+(chk.dataset.dose||'?')+')" value="'+(chk.dataset.dose||'')+'" style="margin:0">';
+    rows.appendChild(row);
+  } else { document.getElementById('bv-row-'+id)?.remove(); }
 }
 
 async function submitBulkVaccination() {
   const animalIds = window._bvAnimalIds || [];
-  if (!animalIds.length) { toast('Önce padok seçip hayvanları getirin'); return; }
-  const vaccineId = document.getElementById('bv-vaccine-sel')?.value;
-  if (!vaccineId) { toast('Aşı seçin'); return; }
+  if (!animalIds.length) { toast('Önce hayvanları getirin'); return; }
+  const secili = selectedVaccineRows('bv');
+  if (!secili.length) { toast('En az bir aşı seçin'); return; }
   const tarih = document.getElementById('bv-tarih')?.value;
   if (!tarih) { toast('Tarih girin'); return; }
-  const doz = parseFloat(document.getElementById('bv-doz')?.value) || null;
   const notes = document.getElementById('bv-notes')?.value || null;
 
-  const submitBtn = document.querySelector('[onclick="submitBulkVaccination()"]');
+  const submitBtn = document.querySelector('[data-action="submit-bv"]');
   if (submitBtn) submitBtn.disabled = true;
+  let totOk=0, totErr=0;
   try {
-    const result = await rpc('bulk_vaccination', {
-      p_animal_ids: animalIds,
-      p_vaccine_id: vaccineId,
-      p_date: tarih,
-      p_dose_ml: doz,
-      p_notes: notes
-    });
-
-    const div = document.getElementById('bv-result');
-    if (div) {
-      const errors = result.errors || [];
-      div.innerHTML = `<div style="margin-top:8px;font-size:.8rem">
-        ✅ ${result.success}/${result.total} başarılı
-        ${errors.length ? `<br>⚠️ ${errors.length} hata: ${errors.map(e=>e.error).join(', ')}` : ''}
-      </div>`;
+    for (const s of secili) {
+      try {
+        const r = await rpc('bulk_vaccination', {
+          p_animal_ids: animalIds, p_vaccine_id: s.id, p_date: tarih,
+          p_dose_ml: (s.dose!=null && s.dose!==s.stdDose) ? s.dose : null, p_notes: notes });
+        totOk += (r.success||0); totErr += ((r.errors||[]).length);
+      } catch(e){ totErr += animalIds.length; }
     }
-    if (result.success > 0) {
-      toast(`✅ ${result.success} hayvan aşılandı`);
-      // Refresh data
-      pullTables(['vaccination_log','gorev_log','stok_hareket']).catch(console.warn);
+    const div = document.getElementById('bv-result');
+    if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem">✅ ${totOk} uygulama${totErr?` · ⚠️ ${totErr} hata`:''}</div>`;
+    if (totOk>0) {
+      toast(`✅ ${animalIds.length} hayvan × ${secili.length} aşı`);
+      pullTables(['vaccination_log','gorev_log','stok_hareket','islem_log']).catch(()=>{});
     }
   } catch(e) {
     toast('❌ ' + getUserMessage(e), true);
