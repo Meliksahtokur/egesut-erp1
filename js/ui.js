@@ -6277,6 +6277,14 @@ function ayarlarAc(){
   renderAyarlarPadokList();
   renderGrupPadokEslem();
   dataTrafficYenile();
+  // Protokol ayarları — taze çek + state + render
+  (async () => {
+    try {
+      await pullTables(['protokol_ayar']);
+      if (typeof setState === 'function') setState('protokol_ayar', await getData('protokol_ayar'));
+    } catch (e) { /* offline → mevcut state/IDB kullanılır */ }
+    if (typeof protokolAyarYukle === 'function') protokolAyarYukle();
+  })();
   // tema butonlarını senkronize et
   const cur = localStorage.getItem('ege_theme') || 'dark';
   const btnSaha = document.getElementById('btn-saha-mod');

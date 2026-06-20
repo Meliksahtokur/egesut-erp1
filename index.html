@@ -1505,6 +1505,29 @@ button,input,select,textarea{font-family:inherit}
       <div class="sh"><span class="sh-title">💉 Aşı Kataloğu</span></div>
       <div id="ay-vaksiyon-list" style="margin-bottom:12px"></div>
       <div class="divider"></div>
+      <div class="sh"><span class="sh-title">⚙️ Protokol Ayarları</span></div>
+      <div style="margin-bottom:12px">
+        <button class="btn btn-g" data-action="pa-toggle" data-sec="pa-sutten" style="width:100%;text-align:left">🍼 Sütten Kesme</button>
+        <div id="pa-sutten" style="display:none;padding:8px 4px">
+          <div class="flbl">Kesme günü</div>
+          <div id="pa-chips-sutten_kesme_gun" style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0"></div>
+          <input class="fi" type="number" data-ayar="sutten_kesme_gun" placeholder="özel gün">
+          <div class="flbl" style="margin-top:8px">Gecikme eşiği (gün)</div>
+          <input class="fi" type="number" data-ayar="sutten_kesme_gecikme_gun">
+          <div class="flbl" style="margin-top:8px">Sert alt sınır (gün)</div>
+          <input class="fi" type="number" data-ayar="sutten_kesme_erken_uyari">
+        </div>
+        <button class="btn btn-g" data-action="pa-toggle" data-sec="pa-diger" style="width:100%;text-align:left;margin-top:6px">🥛 Diğer Protokoller</button>
+        <div id="pa-diger" style="display:none;padding:8px 4px">
+          <div class="flbl">Anyonik besleme (gebelik günü)</div><input class="fi" type="number" data-ayar="besleme_baslangic_gun">
+          <div class="flbl" style="margin-top:8px">Kuru dönem (gebelik günü)</div><input class="fi" type="number" data-ayar="kuru_donem_gun">
+          <div class="flbl" style="margin-top:8px">İleri gebe aşı 1 / 2</div>
+          <input class="fi" type="number" data-ayar="ileri_gebe_asi1_gun"><input class="fi" type="number" data-ayar="ileri_gebe_asi2_gun" style="margin-top:4px">
+          <div class="flbl" style="margin-top:8px">Ademin / E-Vit</div>
+          <input class="fi" type="number" data-ayar="ileri_gebe_ademin_gun"><input class="fi" type="number" data-ayar="ileri_gebe_evit_gun" style="margin-top:4px">
+        </div>
+      </div>
+      <div class="divider"></div>
       <div class="sh"><span class="sh-title">📡 Data Traffic</span><button class="sh-link" data-action="data-traffic-yenile">Yenile</button></div>
       <div id="dt-summary" style="font-size:.72rem;color:var(--ink3);margin-bottom:8px">Yükleniyor…</div>
       <div id="dt-list" style="max-height:220px;overflow-y:auto;margin-bottom:10px"></div>
@@ -1816,18 +1839,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781981009"></script>
-    <script src="js/utils/modal.js?v=1781981009"></script>
-    <script src="js/utils/errorHandler.js?v=1781981009"></script>
-    <script src="js/utils/events.js?v=1781981009"></script>
-    <script src="js/config.js?v=1781981009"></script>
-    <script src="js/state.js?v=1781981009"></script>
-    <script src="js/api.js?v=1781981009"></script>
-    <script src="js/auth.js?v=1781981009"></script>
-    <script src="js/ui.js?v=1781981009"></script>
-    <script src="js/forms.js?v=1781981009"></script>
-    <script src="js/app.js?v=1781981009"></script>
-    <script src="js/utils/handlers.js?v=1781981009"></script>
+    <script src="js/utils/helpers.js?v=1781981180"></script>
+    <script src="js/utils/modal.js?v=1781981180"></script>
+    <script src="js/utils/errorHandler.js?v=1781981180"></script>
+    <script src="js/utils/events.js?v=1781981180"></script>
+    <script src="js/config.js?v=1781981180"></script>
+    <script src="js/state.js?v=1781981180"></script>
+    <script src="js/api.js?v=1781981180"></script>
+    <script src="js/auth.js?v=1781981180"></script>
+    <script src="js/ui.js?v=1781981180"></script>
+    <script src="js/forms.js?v=1781981180"></script>
+    <script src="js/app.js?v=1781981180"></script>
+    <script src="js/utils/handlers.js?v=1781981180"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

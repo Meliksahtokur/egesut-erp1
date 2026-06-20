@@ -742,6 +742,33 @@ window.skHepsiniSec = skHepsiniSec;
 window.skOnayla = skOnayla;
 window.suttenKesTekil = suttenKesTekil;
 
+// ── PROTOKOL AYARLARI (Ayarlar paneli) ───────
+function protokolAyarYukle() {
+  const rows = getState('protokol_ayar') || [];
+  const val = k => rows.find(r => r.anahtar === k)?.deger;
+  document.querySelectorAll('#m-ayarlar [data-ayar]').forEach(inp => {
+    const v = val(inp.dataset.ayar); if (v != null) inp.value = v;
+    inp.onchange = () => protokolAyarKaydet(inp.dataset.ayar, inp.value);
+  });
+  const wrap = document.getElementById('pa-chips-sutten_kesme_gun');
+  if (wrap) {
+    const cur = val('sutten_kesme_gun');
+    wrap.innerHTML = [45,60,75,90,105,120].map(g =>
+      `<button class="btn ${+cur===g?'':'btn-g'}" data-action="pa-chip" data-anahtar="sutten_kesme_gun" data-deger="${g}" style="font-size:.72rem;padding:3px 8px">${g}</button>`).join('');
+  }
+}
+async function protokolAyarKaydet(anahtar, deger) {
+  try {
+    await rpc('protokol_ayar_guncelle', { p_anahtar: anahtar, p_deger: +deger });
+    toast(`✅ ${anahtar} = ${deger}`);
+    await pullTables(['protokol_ayar']);
+    if (typeof setState === 'function') { try { setState('protokol_ayar', await getData('protokol_ayar')); } catch(e){} }
+    protokolAyarYukle();
+  } catch (e) { toast(getUserMessage(e), true); }
+}
+window.protokolAyarYukle = protokolAyarYukle;
+window.protokolAyarKaydet = protokolAyarKaydet;
+
 // ── TOHUMLANABILIR ONAY ──────────────────────
 async function submitTohumOnayla(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
