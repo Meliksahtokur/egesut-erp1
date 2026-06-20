@@ -1538,6 +1538,8 @@ async function submitBulkVaccination() {
     if (totOk>0) {
       toast(`✅ ${animalIds.length} hayvan × ${secili.length} aşı`);
       pullTables(['vaccination_log','gorev_log','stok_hareket','islem_log']).catch(()=>{});
+    } else {
+      toast(`⚠️ Hiçbir aşı uygulanamadı${totErr?` · ${totErr} hata`:''}`, true);
     }
   } catch(e) {
     toast('❌ ' + getUserMessage(e), true);
