@@ -978,25 +978,14 @@ button,input,select,textarea{font-family:inherit}
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div>
       </div>
 
-      <!-- AŞI SEÇİM — DB'den controlled dropdown -->
-      <div class="fg"><label class="flbl">Aşı *</label>
-        <select id="v-vaccine-id" class="fsel" data-change="vaccine-select">
-          <option value="">— Aşı seçin —</option>
-        </select>
-        <div id="v-vaccine-info" style="font-size:.75rem;color:var(--ink3);margin-top:6px;display:none"></div>
-        <div id="v-protocol-hint" style="display:none;margin-top:4px;padding:6px 10px;border-radius:8px;background:rgba(78,154,42,.12);border:1px solid rgba(78,154,42,.25);font-size:.72rem;color:var(--ink2);line-height:1.5"></div>
+      <!-- AŞI SEÇİM — çoklu checkbox+arama -->
+      <div class="fg"><label class="flbl">Aşılar *</label>
+        <div id="v-vaccine-picker"></div>
       </div>
 
       <!-- TARİH -->
       <div class="fg"><label class="flbl">Uygulama Tarihi *</label>
         <input id="v-date" class="fi" type="date">
-      </div>
-
-      <!-- DOZ OVERRIDE (OPSIYONEL) -->
-      <div class="fg"><label class="flbl">Doz (opsiyonel)</label>
-        <input id="v-dose-override" class="fi" type="number" step="0.1" placeholder="Boş bırakılırsa standart doz kullanılır">
-        <span id="v-dose-unit" style="font-size:.68rem;color:var(--ink3);margin-left:6px"></span>
-        <div class="fhint" style="font-size:.62rem;color:var(--ink3);margin-top:3px">Sadece standart dozdan farklı ise girin</div>
       </div>
 
       <!-- NOTLAR -->
@@ -1068,22 +1057,14 @@ button,input,select,textarea{font-family:inherit}
       <div id="bv-hayvan-list" style="max-height:120px;overflow-y:auto;margin-bottom:12px;display:none;border:1px solid var(--card3);border-radius:var(--r1);padding:8px;background:var(--card2)">
       </div>
 
-      <!-- Aşı Seç -->
-      <div class="fg"><label class="flbl">Aşı *</label>
-        <select id="bv-vaccine-sel" class="fsel">
-          <option value="">— Aşı seçin —</option>
-        </select>
-        <div id="bv-vaccine-info" style="font-size:.75rem;color:var(--ink3);margin-top:6px;display:none"></div>
+      <!-- Aşı Seç — çoklu checkbox+arama -->
+      <div class="fg"><label class="flbl">Aşılar *</label>
+        <div id="bv-vaccine-picker"></div>
       </div>
 
       <!-- Tarih -->
       <div class="fg"><label class="flbl">Uygulama Tarihi *</label>
         <input id="bv-tarih" class="fi" type="date">
-      </div>
-
-      <!-- Doz (ml) -->
-      <div class="fg"><label class="flbl">Doz (ml, opsiyonel)</label>
-        <input id="bv-doz" class="fi" type="number" step="0.1" placeholder="Boş bırakılırsa standart doz">
       </div>
 
       <!-- Notlar -->
@@ -1808,18 +1789,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781937059"></script>
-    <script src="js/utils/modal.js?v=1781937059"></script>
-    <script src="js/utils/errorHandler.js?v=1781937059"></script>
-    <script src="js/utils/events.js?v=1781937059"></script>
-    <script src="js/config.js?v=1781937059"></script>
-    <script src="js/state.js?v=1781937059"></script>
-    <script src="js/api.js?v=1781937059"></script>
-    <script src="js/auth.js?v=1781937059"></script>
-    <script src="js/ui.js?v=1781937059"></script>
-    <script src="js/forms.js?v=1781937059"></script>
-    <script src="js/app.js?v=1781937059"></script>
-    <script src="js/utils/handlers.js?v=1781937059"></script>
+    <script src="js/utils/helpers.js?v=1781937208"></script>
+    <script src="js/utils/modal.js?v=1781937208"></script>
+    <script src="js/utils/errorHandler.js?v=1781937208"></script>
+    <script src="js/utils/events.js?v=1781937208"></script>
+    <script src="js/config.js?v=1781937208"></script>
+    <script src="js/state.js?v=1781937208"></script>
+    <script src="js/api.js?v=1781937208"></script>
+    <script src="js/auth.js?v=1781937208"></script>
+    <script src="js/ui.js?v=1781937208"></script>
+    <script src="js/forms.js?v=1781937208"></script>
+    <script src="js/app.js?v=1781937208"></script>
+    <script src="js/utils/handlers.js?v=1781937208"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
