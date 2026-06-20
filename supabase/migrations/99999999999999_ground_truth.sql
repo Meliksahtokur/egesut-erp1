@@ -9854,8 +9854,22 @@ END; $$;
 
 CREATE OR REPLACE FUNCTION public.buzagi_sutten_kesme_geri_al(p_hayvan_id text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_log record; v_onceki jsonb;
+DECLARE v_log record; v_onceki jsonb; v_h record;
 BEGIN
+  -- geri alma koşulları (FE ile birebir): buzağı grubu + ≤15 gün + (dogum yok VEYA yaş≤180) + tohumlama yok
+  SELECT * INTO v_h FROM public.hayvanlar WHERE id = p_hayvan_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Hayvan bulunamadı: %', p_hayvan_id; END IF;
+  IF v_h.suttten_kesme_tarihi IS NULL THEN
+    RAISE EXCEPTION 'Hayvan sütten kesilmemiş'; END IF;
+  IF v_h.grup IS NULL OR v_h.grup NOT ILIKE '%Buzağı%' THEN
+    RAISE EXCEPTION 'Sadece buzağı grubunda geri alınabilir (grup: %)', v_h.grup; END IF;
+  IF (CURRENT_DATE - v_h.suttten_kesme_tarihi) > 15 THEN
+    RAISE EXCEPTION 'Kesimden 15 günden fazla geçti (% gün) — geri alınamaz', (CURRENT_DATE - v_h.suttten_kesme_tarihi); END IF;
+  IF v_h.dogum_tarihi IS NOT NULL AND (CURRENT_DATE - v_h.dogum_tarihi) > 180 THEN
+    RAISE EXCEPTION '6 aylıktan büyük (% gün) — geri alınamaz', (CURRENT_DATE - v_h.dogum_tarihi); END IF;
+  IF EXISTS (SELECT 1 FROM public.tohumlama WHERE hayvan_id = p_hayvan_id) THEN
+    RAISE EXCEPTION 'Tohumlama kaydı olan hayvanda geri alınamaz'; END IF;
+
   SELECT * INTO v_log FROM public.islem_log
    WHERE tip='SUTEN_KESME' AND ana_hayvan_id=p_hayvan_id AND durum='aktif'
    ORDER BY tarih DESC LIMIT 1;

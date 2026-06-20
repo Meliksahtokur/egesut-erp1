@@ -1698,7 +1698,14 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     </div>
     ${extra}
     ${(!a.suttten_kesme_tarihi && a.grup && a.grup.includes('Buzağı')) ? `<button class="btn" data-action="sutten-kes-tekil" data-hid="${a.id}" style="margin-top:4px;padding:9px;background:rgba(78,154,42,.12);color:var(--green3);border:1px solid rgba(78,154,42,.35);font-weight:700">🍼 Sütten Kes</button>` : ''}
-    ${(a.suttten_kesme_tarihi && a.grup && a.grup.includes('Buzağı')) ? `<button class="btn" data-action="sutten-kes-geri-al" data-hid="${a.id}" style="margin-top:4px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2);font-weight:700">↩️ Sütten Kesmeyi Geri Al</button>` : ''}
+    ${(() => {
+      if (!a.suttten_kesme_tarihi || !a.grup || !a.grup.includes('Buzağı')) return '';
+      const _kg = Math.floor((Date.now() - new Date(a.suttten_kesme_tarihi)) / 86400000);
+      if (_kg > 15) return '';                                  // kesimden >15 gün → gizle
+      if (yasRaw !== null && yasRaw > 180) return '';           // 6 aydan büyük → gizle
+      if (globalThis._sonTohMap && globalThis._sonTohMap[a.id]) return ''; // tohumlama kaydı → gizle
+      return `<button class="btn" data-action="sutten-kes-geri-al" data-hid="${a.id}" style="margin-top:4px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2);font-weight:700">↩️ Sütten Kesmeyi Geri Al</button>`;
+    })()}
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı Uygulama</button>
