@@ -736,11 +736,26 @@ async function suttenKesTekil(hayvanId, btn) {
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
+async function suttenKesGeriAl(hayvanId, btn) {
+  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  const h = (getState('animals') || []).find(a => a.id === hayvanId);
+  if (!confirm(`${h ? getDisplayKupe(h) : 'Bu hayvan'} için sütten kesme geri alınacak. Onaylıyor musunuz?`)) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Geri alınıyor…'; }
+  try {
+    await rpc('buzagi_sutten_kesme_geri_al', { p_hayvan_id: hayvanId });
+    toast('↩️ Sütten kesme geri alındı');
+    if (typeof closeDet === 'function') closeDet();
+    await pullTables(['hayvanlar','gorev_log','protokol_instance','islem_log']).catch(()=>{});
+    renderSafe();
+  } catch (e) { toast(getUserMessage(e), true); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '↩️ Sütten Kesmeyi Geri Al'; } }
+}
 window.openSuttenKesModal = openSuttenKesModal;
 window.renderBuzagiPicker = renderBuzagiPicker;
 window.skHepsiniSec = skHepsiniSec;
 window.skOnayla = skOnayla;
 window.suttenKesTekil = suttenKesTekil;
+window.suttenKesGeriAl = suttenKesGeriAl;
 
 // ── PROTOKOL AYARLARI (Ayarlar paneli) ───────
 function protokolAyarYukle() {
@@ -972,6 +987,8 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
     await pullTables(['gorev_log','hayvanlar']).catch(()=>{});
     if (typeof _islemSonrasiRefresh === 'function') _islemSonrasiRefresh();
     loadDash();
+    // Sürü/padok listesini de tazele (grup/padok değiştiren görevler için — sütten kesme, padok değişim)
+    if (typeof loadAnimals === 'function') loadAnimals().catch(()=>{});
   } catch (e) {
     btn.disabled = false;
     btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>';

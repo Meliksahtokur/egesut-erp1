@@ -104,6 +104,7 @@ registerActions({
   'sk-hicbiri':          () => skHepsiniSec(false),
   'sk-onayla':           (el) => skOnayla(el),
   'sutten-kes-tekil':    (el) => suttenKesTekil(el.dataset.hid, el),
+  'sutten-kes-geri-al':  (el) => suttenKesGeriAl(el.dataset.hid, el),
   'pa-toggle':           (el) => { const s = document.getElementById(el.dataset.sec); if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none'; },
   'pa-chip':             (el) => protokolAyarKaydet(el.dataset.anahtar, el.dataset.deger),
   'open-animal-modal':   () => openM('m-animal'),
