@@ -6,12 +6,12 @@
 // ── CONFIG ─────────────────────────────────
 const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
 const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
-const DB_VER  = 22;
+const DB_VER  = 23;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
                   'vaccination_log','vaccine_diseases','vaccine_protocol_steps','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
-                  'uygulama_log','protokol_instance',
+                  'uygulama_log','protokol_instance','protokol_ayar',
                   'tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'];
 const APP_VERSION = '2026-03-12-cln03';
 
@@ -67,7 +67,7 @@ async function openDB() {
     const req = indexedDB.open('egesut_v12', DB_VER);
     req.onupgradeneeded = e => {
       const d = e.target.result;
-      TABLES.forEach(t => { if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: 'id' }); });
+      TABLES.forEach(t => { if (!d.objectStoreNames.contains(t)) d.createObjectStore(t, { keyPath: t === 'protokol_ayar' ? 'anahtar' : 'id' }); });
       if (!d.objectStoreNames.contains('_queue')) d.createObjectStore('_queue', { keyPath: '_qid', autoIncrement: true });
       // Index'ler: gorev_log, tohumlama, dogum
       ['gorev_log','tohumlama','dogum'].forEach(t => {
@@ -265,7 +265,10 @@ const RPC_TABLES = {
   delete_treatment_day:      ['cases','treatment_days','drug_administrations','stok','stok_hareket'],
   update_treatment_time:     ['treatment_days'],
   // Faz 1 — RPC bypass fix
-  buzagi_sutten_kesme_onayla:  ['hayvanlar'],
+  buzagi_sutten_kesme_onayla:  ['hayvanlar','gorev_log','protokol_instance'],
+  buzagi_sutten_kesme_toplu:   ['hayvanlar','gorev_log','protokol_instance'],
+  buzagi_sutten_kesme_geri_al: ['hayvanlar','gorev_log','protokol_instance'],
+  protokol_ayar_guncelle:      ['protokol_ayar'],
   hayvan_tohumlanabilir_onayla:['hayvanlar'],
   gebelik_protokol_kontrol:   ['gorev_log'],
   besleme_tamam:              ['gorev_log'],
@@ -360,6 +363,7 @@ async function pullTables(tables = []) {
       tedavi_sablonu:        () => db.from('tedavi_sablonu').select('*').order('ad'),
       sablon_hastalik_eslem: () => db.from('sablon_hastalik_eslem').select('*'),
       tedavi_sablonu_kalem:  () => db.from('tedavi_sablonu_kalem').select('*'),
+      protokol_ayar:    () => db.from('protokol_ayar').select('*'),
       // ileri_gebe_view: () => db.from('ileri_gebe_view').select('*'), — dashboard RPC sonucu kullanıyor
     };
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
@@ -477,7 +481,7 @@ function stopBackgroundSync() {
 // ── REALTIME SUBSCRIPTIONS ──────────────────
 // supabase_realtime publication aktif → WebSocket kanalları
 
-const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs','treatment_days','treatment_day_uygulamalar'];
+const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs','treatment_days','treatment_day_uygulamalar','protokol_ayar'];
 let _realtimeChannel = null;
 
 function initRealtime() {
@@ -494,6 +498,7 @@ function initRealtime() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'kizginlik_log' }, () => pullTables(['kizginlik_log']).then(renderSafe))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'islem_log' },    () => pullTables(['islem_log']))
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  () => {})
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'protokol_ayar' }, () => pullTables(['protokol_ayar']))
     .subscribe(status => {
       if (status === 'SUBSCRIBED') {
         
