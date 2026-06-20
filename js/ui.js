@@ -790,6 +790,7 @@ async function loadAnimals(){
   try {
     const animals=await getData('hayvanlar',a=>a.durum==='Aktif');
     if(typeof setState==='function') setState('animals',animals);
+    if(typeof setState==='function'){ try{ setState('protokol_ayar', await getData('protokol_ayar')); }catch(e){/* config yoksa fallback default kullanılır */} }
     const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
     setState('gebeIds', [...new Set(gebeTohs.map(t=>t.hayvan_id))]);
     // Tohumlama tarihi haritası (gebe badge'de gün hesabı için)
@@ -1696,6 +1697,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
       ${infoFields.map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
     </div>
     ${extra}
+    ${(!a.suttten_kesme_tarihi && a.grup && a.grup.includes('Buzağı')) ? `<button class="btn" data-action="sutten-kes-tekil" data-hid="${a.id}" style="margin-top:4px;padding:9px;background:rgba(78,154,42,.12);color:var(--green3);border:1px solid rgba(78,154,42,.35);font-weight:700">🍼 Sütten Kes</button>` : ''}
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı Uygulama</button>

@@ -630,6 +630,11 @@ button,input,select,textarea{font-family:inherit}
         <div class="log-text"><div class="log-title">Toplu İlaç</div><div class="log-sub">Padok bazlı toplu ilaç uygulaması</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
+      <div data-action="open-sutten-kes" class="log-btn">
+        <div class="log-ico" style="background:rgba(78,154,42,.2)">🍼</div>
+        <div class="log-text"><div class="log-title">Toplu Sütten Kes</div><div class="log-sub">Süt içen buzağıları toplu sütten kes</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
       <div data-action="open-animal-modal" class="log-btn">
         <div class="log-ico a">➕</div>
         <div class="log-text"><div class="log-title">Yeni Hayvan</div><div class="log-sub">Sürüye hayvan ekle</div></div>
@@ -1162,6 +1167,28 @@ button,input,select,textarea{font-family:inherit}
 
       <!-- Sonuç -->
       <div id="bi-result" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SÜTTEN KESME (TOPLU) -->
+<div id="m-sutten-kes" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title">🍼 Sütten Kes</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Kesim Tarihi</label>
+        <input id="sk-tarih" class="fi" type="date"></div>
+      <input id="sk-ara" class="fi" placeholder="🔍 Küpe ara…" autocomplete="off" style="margin-bottom:8px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-g" data-action="sk-hepsi" style="font-size:.72rem;padding:4px 10px">Tümünü Seç</button>
+        <button class="btn btn-g" data-action="sk-hicbiri" style="font-size:.72rem;padding:4px 10px">Temizle</button>
+      </div>
+      <div id="sk-liste" style="max-height:42vh;overflow-y:auto"></div>
+      <div id="sk-hatalar" style="margin-top:6px"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn" data-action="sk-onayla" style="flex:1">🍼 Sütten Kes</button>
+        <button class="btn btn-o" data-action="close-sutten-kes">İptal</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1789,18 +1816,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1781979921"></script>
-    <script src="js/utils/modal.js?v=1781979921"></script>
-    <script src="js/utils/errorHandler.js?v=1781979921"></script>
-    <script src="js/utils/events.js?v=1781979921"></script>
-    <script src="js/config.js?v=1781979921"></script>
-    <script src="js/state.js?v=1781979921"></script>
-    <script src="js/api.js?v=1781979921"></script>
-    <script src="js/auth.js?v=1781979921"></script>
-    <script src="js/ui.js?v=1781979921"></script>
-    <script src="js/forms.js?v=1781979921"></script>
-    <script src="js/app.js?v=1781979921"></script>
-    <script src="js/utils/handlers.js?v=1781979921"></script>
+    <script src="js/utils/helpers.js?v=1781981009"></script>
+    <script src="js/utils/modal.js?v=1781981009"></script>
+    <script src="js/utils/errorHandler.js?v=1781981009"></script>
+    <script src="js/utils/events.js?v=1781981009"></script>
+    <script src="js/config.js?v=1781981009"></script>
+    <script src="js/state.js?v=1781981009"></script>
+    <script src="js/api.js?v=1781981009"></script>
+    <script src="js/auth.js?v=1781981009"></script>
+    <script src="js/ui.js?v=1781981009"></script>
+    <script src="js/forms.js?v=1781981009"></script>
+    <script src="js/app.js?v=1781981009"></script>
+    <script src="js/utils/handlers.js?v=1781981009"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

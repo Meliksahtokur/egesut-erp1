@@ -658,18 +658,35 @@ async function submitCikis(btn) {
 }
 
 // ── SÜTTEN KESME ─────────────────────────────
+// Süt içen buzağı seti: aktif + kesilmemiş + (grup 'Buzağı' içerir VEYA yaş ≤ 180g)
+function _sutIcenBuzagilar() {
+  return (getState('animals') || []).filter(a => {
+    if (a.durum !== 'Aktif' || a.suttten_kesme_tarihi) return false;
+    const yas = a.dogum_tarihi ? Math.floor((Date.now() - new Date(a.dogum_tarihi)) / 86400000) : null;
+    return (a.grup && a.grup.includes('Buzağı')) || (yas !== null && yas <= 180);
+  });
+}
+function renderBuzagiPicker(filter) {
+  const liste = document.getElementById('sk-liste');
+  if (!liste) return;
+  const q = (filter || '').toLowerCase();
+  const rows = _sutIcenBuzagilar().filter(a => !q || (getDisplayKupe(a) || '').toLowerCase().includes(q));
+  if (!rows.length) { liste.innerHTML = '<div style="color:var(--ink3);padding:8px">Süt içen buzağı yok</div>'; return; }
+  liste.innerHTML = rows.map(a => {
+    const yas = yasHesapla(a.dogum_tarihi) || 'Yaş?';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--card2);cursor:pointer">
+      <input type="checkbox" data-id="${a.id}" checked style="width:18px;height:18px">
+      <div><div style="font-weight:700;font-size:.85rem">${getDisplayKupe(a)}</div>
+      <div style="font-size:.72rem;color:var(--ink3)">${a.irk || '—'} · ${yas}</div></div></label>`;
+  }).join('');
+}
 function openSuttenKesModal() {
-  const sutIcenler = getState('animals').filter(a => a.hesap_kategori === 'sut_icen');
-  if (!sutIcenler.length) { toast('Süt içen buzağı yok'); return; }
-  const liste = g('sk-liste');
-  liste.innerHTML = sutIcenler.map(a => `
-    <label style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--card2);cursor:pointer">
-      <input type="checkbox" data-id="${a.id}" checked style="width:18px;height:18px;cursor:pointer">
-      <div>
-        <div style="font-weight:700;font-size:.85rem">${getDisplayKupe(a)}</div>
-        <div style="font-size:.72rem;color:var(--ink3)">${a.irk || '—'} · ${yasHesapla(a.dogum_tarihi) || 'Yaş?'}</div>
-      </div>
-    </label>`).join('');
+  if (!_sutIcenBuzagilar().length) { toast('Süt içen buzağı yok'); return; }
+  const t = document.getElementById('sk-tarih'); if (t) t.value = new Date().toISOString().split('T')[0];
+  const h = document.getElementById('sk-hatalar'); if (h) h.innerHTML = '';
+  renderBuzagiPicker('');
+  const ara = document.getElementById('sk-ara');
+  if (ara) { ara.value = ''; ara.oninput = () => renderBuzagiPicker(ara.value); }
   openM('m-sutten-kes');
 }
 function skHepsiniSec(durum) {
@@ -682,37 +699,48 @@ async function skOnayla(btn) {
 async function submitSuttenKes(hayvanIdList, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!hayvanIdList || !hayvanIdList.length) { toast('Hayvan seçilmedi', true); return; }
-  if (!confirm(`${hayvanIdList.length} buzağı sütten kesilecek. Onaylıyor musunuz?`)) return;
+  const tarih = (document.getElementById('sk-tarih')?.value) || new Date().toISOString().split('T')[0];
+  if (!confirm(`${hayvanIdList.length} buzağı ${tarih} tarihinde sütten kesilecek. Onaylıyor musunuz?`)) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
-  let basari = 0;
   try {
-    for (const id of hayvanIdList) {
-      const h = getState('animals').find(a => a.id === id);
-      if (!h || h.hesap_kategori !== 'sut_icen') continue;
-      await rpc('buzagi_sutten_kesme_onayla', { p_hayvan_id: id });
-      basari++;
+    const res = await rpc('buzagi_sutten_kesme_toplu', { p_hayvan_idler: hayvanIdList, p_tarih: tarih });
+    if (res.ok && res.hata_sayisi === 0) {
+      toast(`✅ ${res.basari} buzağı sütten kesildi`);
+      closeM('m-sutten-kes');
+    } else if (res.ok && res.hata_sayisi > 0) {
+      toast(`⚠️ ${res.basari} başarılı, ${res.hata_sayisi} hatalı`, true);
+      const hd = document.getElementById('sk-hatalar');
+      if (hd) hd.innerHTML = res.hatalar.map(h => `<div style="color:var(--err);font-size:.72rem">• ${h.hata}</div>`).join('');
+    } else {
+      toast(res.hata || 'Bilinmeyen hata', true);
     }
-    toast(`✅ ${basari} buzağı sütten kesildi`);
-    closeM('m-sutten-kes');
-    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
+    pullTables(['hayvanlar','gorev_log','protokol_instance']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
 async function suttenKesTekil(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const h = getState('animals').find(a => a.id === hayvanId);
+  const h = (getState('animals') || []).find(a => a.id === hayvanId);
   if (!h) { toast('Hayvan bulunamadı', true); return; }
-  if (h.hesap_kategori !== 'sut_icen') { toast('Bu hayvan süt içen kategorisinde değil', true); return; }
+  if (h.suttten_kesme_tarihi) { toast('Zaten sütten kesilmiş', true); return; }
+  const yas = h.dogum_tarihi ? Math.floor((Date.now() - new Date(h.dogum_tarihi)) / 86400000) : null;
+  const min = +(getState('protokol_ayar')?.find(x => x.anahtar === 'sutten_kesme_erken_uyari')?.deger ?? 40);
+  if (yas !== null && yas < min && !confirm(`Buzağı ${yas} günlük (min ${min}). Çok erken — yine de kesilsin mi?`)) return;
   if (!confirm(`${getDisplayKupe(h)} sütten kesilecek. Onaylıyor musunuz?`)) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
     await rpc('buzagi_sutten_kesme_onayla', { p_hayvan_id: hayvanId });
     toast(`✅ ${getDisplayKupe(h)} sütten kesildi`);
-    closeDet();
-    pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
+    if (typeof closeDet === 'function') closeDet();
+    pullTables(['hayvanlar','gorev_log','protokol_instance']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
+window.openSuttenKesModal = openSuttenKesModal;
+window.renderBuzagiPicker = renderBuzagiPicker;
+window.skHepsiniSec = skHepsiniSec;
+window.skOnayla = skOnayla;
+window.suttenKesTekil = suttenKesTekil;
 
 // ── TOHUMLANABILIR ONAY ──────────────────────
 async function submitTohumOnayla(hayvanId, btn) {

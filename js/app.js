@@ -317,10 +317,8 @@ async function animalFormGuncelle() {
     } else if (tohumlanmis) {
       // Tohumlanmış ama henüz doğum/abort yok → düve veya gebe düve veya inek
       gruplar = ['Gebe Düve', 'Sağmal (Laktasyonda)', 'Sağmal (Kuru)', 'Düve (Büyük)', 'Düve (Küçük)'];
-    } else if (yasGun !== null && yasGun <= 75) {
-      gruplar = ['Süt İçen Buzağı'];
-    } else if (yasGun !== null && yasGun > 75 && yasGun <= 180) {
-      gruplar = ['Sütten Kesilmiş Buzağı'];
+    } else if (yasGun !== null && yasGun <= 180) {
+      gruplar = ['Süt İçen Buzağı', 'Sütten Kesilmiş Buzağı'];
     } else if (yasGun !== null && yasGun > 180 && yasGun <= 365) {
       gruplar = ['Düve (Küçük)'];
     } else if (yasGun !== null && yasGun > 365 && yasGun <= 730) {
@@ -329,10 +327,8 @@ async function animalFormGuncelle() {
       // 730+ gün veya yaş bilinmiyor → yetişkin dişi, buzağı grubu yok
       gruplar = ['Sağmal (Laktasyonda)', 'Sağmal (Kuru)', 'Gebe Düve', 'Düve (Büyük)', 'Düve (Küçük)'];
     }
-  } else if (yasGun !== null && yasGun <= 75) { // Erkek
-    gruplar = ['Süt İçen Buzağı'];
-  } else if (yasGun !== null && yasGun > 75 && yasGun <= 180) {
-    gruplar = ['Sütten Kesilmiş Buzağı'];
+  } else if (yasGun !== null && yasGun <= 180) { // Erkek buzağı
+    gruplar = ['Süt İçen Buzağı', 'Sütten Kesilmiş Buzağı'];
   } else if (yasGun !== null && yasGun > 180) {
     gruplar = ['Besi'];
   } else {
