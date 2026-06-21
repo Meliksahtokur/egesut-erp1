@@ -88,6 +88,7 @@ Deno.serve(async (req) => {
     system: SYSTEM_PROMPT,
     messages,
     tools: buildTools(db, audit),
+    temperature: 0.2,        // tutarlılık: düşük sıcaklık → daha az savrulma
     stopWhen: stepCountIs(6),
     onFinish: async ({ text }) => {
       const sonSql = auditKayit.filter((a) => a.tool === "sql_sorgula").pop() as

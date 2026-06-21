@@ -7,7 +7,7 @@ export function buildTools(db: SupabaseClient, audit: (t: string, a: unknown) =>
   return {
     sql_sorgula: tool({
       description:
-        "Veritabanına salt-okuma SQL SELECT sorgusu çalıştırır. Hayvan, aşı, tedavi, tohumlama, görev, stok verileri için kullan. Sadece SELECT. Sonuçları yorumlamadan önce ham veriyi al.",
+        "Veritabanına salt-okuma SQL SELECT çalıştırır (hayvan, aşı, tedavi, tohumlama, görev, stok). Veri gerektiren HER soruda bunu kullan — tahminle cevaplama. Sayım/oran için COUNT/GROUP BY ile AGGREGATE sorgula, ham satırları çekip kendin sayma. Sadece SELECT.",
       inputSchema: z.object({
         sql: z.string().describe("Çalıştırılacak SELECT sorgusu (tek statement)"),
       }),
