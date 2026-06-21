@@ -109,6 +109,61 @@ function asistanInit() {
   if (inp) setTimeout(() => inp.focus(), 100);
 }
 
+async function asistanGecmisAc() {
+  const list = document.getElementById('asistan-thread-list');
+  list.innerHTML = 'Yükleniyor...';
+  document.getElementById('asistan-drawer').style.display = 'flex';
+  const { data } = await window.db.from('agent_threads')
+    .select('id, baslik, updated_at').order('updated_at', { ascending: false }).limit(100);
+  if (!data || !data.length) { list.innerHTML = '<div style="color:var(--ink3)">Henüz konuşma yok.</div>'; return; }
+  list.innerHTML = '';
+  data.forEach(t => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border-radius:8px;background:var(--card)';
+    row.innerHTML = `<span style="flex:1;cursor:pointer;font-size:.82rem;color:var(--ink)" data-action="asistan-thread-ac" data-tid="${t.id}">💬 ${_asistanEsc(t.baslik)}</span>
+      <button class="btn" data-action="asistan-thread-sil" data-tid="${t.id}" style="padding:3px 8px;width:auto;color:var(--red);background:none">🗑</button>`;
+    list.appendChild(row);
+  });
+}
+
+function asistanDrawerKapat() {
+  document.getElementById('asistan-drawer').style.display = 'none';
+}
+
+async function asistanThreadAc(tid) {
+  _asistanThreadId = tid;
+  asistanDrawerKapat();
+  const box = document.getElementById('asistan-mesajlar');
+  box.innerHTML = '';
+  const bos = document.getElementById('asistan-bos');
+  if (bos) bos.style.display = 'none';
+  const { data } = await window.db.from('agent_messages')
+    .select('rol, icerik, metadata').eq('thread_id', tid).order('created_at', { ascending: true });
+  (data || []).forEach(m => {
+    const html = m.rol === 'assistant' ? _asistanCevapHtml(m.icerik, m.metadata?.sql) : _asistanEsc(m.icerik);
+    box.appendChild(_asistanBalon(m.rol, html));
+  });
+}
+
+async function asistanThreadSil(tid) {
+  await window.db.from('agent_threads').delete().eq('id', tid);
+  if (_asistanThreadId === tid) asistanYeniSohbet();
+  asistanGecmisAc();
+}
+
+async function asistanTumunuSil() {
+  if (!confirm('Tüm sohbet geçmişi silinecek. Emin misiniz?')) return;
+  const { data } = await window.db.from('agent_threads').select('id');
+  for (const t of (data || [])) await window.db.from('agent_threads').delete().eq('id', t.id);
+  asistanYeniSohbet();
+  asistanDrawerKapat();
+}
+
 window.asistanGonder = asistanGonder;
 window.asistanYeniSohbet = asistanYeniSohbet;
 window.asistanInit = asistanInit;
+window.asistanGecmisAc = asistanGecmisAc;
+window.asistanDrawerKapat = asistanDrawerKapat;
+window.asistanThreadAc = asistanThreadAc;
+window.asistanThreadSil = asistanThreadSil;
+window.asistanTumunuSil = asistanTumunuSil;
