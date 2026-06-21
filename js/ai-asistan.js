@@ -14,8 +14,9 @@ function _asistanEsc(s) {
 
 // MiniMax-M3 <think> bloklarını canlı akışta gizle (tamamlanmış + açık kalmış)
 function _asistanStripThink(s) {
-  let t = (s || '').replace(/<think>[\s\S]*?<\/think>/g, '');
-  t = t.replace(/<think>[\s\S]*$/, ''); // kapanmamış blok → sonuna kadar gizle
+  let t = (s || '').replace(/<think>[\s\S]*?<\/think>/g, ''); // eşli blok
+  t = t.replace(/<think>[\s\S]*$/, '');                       // kapanmamış blok → sonuna kadar gizle
+  t = t.replace(/<\/?think>/g, '');                           // öksüz açılış/kapanış etiketi
   return t.trim();
 }
 

@@ -13,9 +13,12 @@ const corsHeaders = {
   "Access-Control-Expose-Headers": "X-Thread-Id",
 };
 
-// MiniMax-M3 düşünce bloklarını nihai metinden temizle
+// MiniMax-M3 düşünce bloklarını nihai metinden temizle (eşli + öksüz etiketler)
 function thinkTemizle(s: string): string {
-  return (s ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  return (s ?? "")
+    .replace(/<think>[\s\S]*?<\/think>/g, "")
+    .replace(/<\/?think>/g, "")
+    .trim();
 }
 
 Deno.serve(async (req) => {
