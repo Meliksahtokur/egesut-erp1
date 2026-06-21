@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "ai": "npm:ai@^6.0.0",
+    "@ai-sdk/openai-compatible": "npm:@ai-sdk/openai-compatible@^1.0.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "zod": "npm:zod@^3.23.0"
+  }
+}
