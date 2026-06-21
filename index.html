@@ -433,6 +433,7 @@ button,input,select,textarea{font-family:inherit}
   <div id="top-right">
     <div id="dot"></div>
     <button id="refbtn" data-action="refresh">↻</button>
+    <button id="asistanbtn" data-action="open-asistan" style="position:relative;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.85rem;cursor:pointer">🤖<span id="asistanbadge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--red2);color:#fff;font-size:.55rem;font-weight:800;min-width:16px;height:16px;border-radius:8px;align-items:center;justify-content:center;padding:0 4px">0</span></button>
     <button id="bellbtn" onclick="_showProtokolEkran()" style="position:relative;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.85rem;cursor:pointer">🔔<span id="bellbadge" style="display:none;position:absolute;top:-4px;right:-4px;background:var(--red2);color:#fff;font-size:.55rem;font-weight:800;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px">0</span></button>
 <button id="ayarlarbtn" data-action="open-ayarlar" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:var(--ink3);padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer">⚙️</button>
     <button id="errorbtn" data-action="show-error-panel" style="background:rgba(78,154,42,.15);border:1px solid #4e9a2a;color:#4e9a2a;padding:5px 10px;border-radius:20px;font-size:.75rem;cursor:pointer;margin-left:5px;">✅ All is well</button>
@@ -656,7 +657,48 @@ button,input,select,textarea{font-family:inherit}
     </div>
   </div>
 
+<div id="pg-asistan" class="pg">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bg3)">
+    <div>
+      <div style="font-weight:800">🤖 Asistan</div>
+      <div style="font-size:.7rem;color:var(--ink3)">⚡ MiniMax-M3</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn" data-action="asistan-gecmis" style="padding:5px 10px">≡</button>
+      <button class="btn" data-action="asistan-yeni" style="padding:5px 10px">+ Yeni</button>
+    </div>
+  </div>
+
+  <div id="asistan-mesajlar" style="padding:14px 12px;display:flex;flex-direction:column;gap:12px"></div>
+
+  <div id="asistan-bos" style="padding:20px 16px;color:var(--ink3)">
+    <div style="margin-bottom:10px">Örnek sorular:</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button class="btn" data-action="asistan-ornek" data-soru="Bugün hangi görevler var?" style="padding:6px 12px">Bugünkü görevler</button>
+      <button class="btn" data-action="asistan-ornek" data-soru="Kaç gebe inek var?" style="padding:6px 12px">Gebe inekler</button>
+      <button class="btn" data-action="asistan-ornek" data-soru="Hangi ürünler kritik stok eşiğinin altında?" style="padding:6px 12px">Düşük stok</button>
+    </div>
+  </div>
+
+  <div style="position:sticky;bottom:0;background:var(--bg);padding:10px 12px;border-top:1px solid var(--bg3);display:flex;gap:8px">
+    <input id="asistan-input" data-keydown="asistan-enter" placeholder="Soru yaz..." style="flex:1;padding:10px 14px;border-radius:20px;border:1px solid var(--bg3);background:var(--card);color:var(--ink)">
+    <button class="btn" data-action="asistan-gonder" style="padding:10px 16px;background:var(--green);color:#fff">➤</button>
+  </div>
+</div>
+
 </div><!-- /pages -->
+
+<!-- Asistan geçmiş çekmecesi -->
+<div id="asistan-drawer" class="modal-overlay" style="display:none">
+  <div class="modal" style="max-width:420px;max-height:80dvh;overflow-y:auto">
+    <div class="modal-hdr"><span>Geçmiş Konuşmalar</span><button class="mcls" data-action="asistan-drawer-kapat">✕</button></div>
+    <div style="padding:14px">
+      <div id="asistan-thread-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      <button class="btn" data-action="asistan-tumunu-sil" style="margin-top:12px;background:rgba(192,57,43,.12);color:var(--red)">🧹 Tümünü temizle</button>
+      <div style="font-size:.65rem;color:var(--ink3);margin-top:6px">90 günden eski konuşmalar otomatik silinir.</div>
+    </div>
+  </div>
+</div>
 
 <nav id="nav">
   <button class="nb on" id="nb-dash" data-action="go-dash">
@@ -1839,18 +1881,18 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1782047241"></script>
-    <script src="js/utils/modal.js?v=1782047241"></script>
-    <script src="js/utils/errorHandler.js?v=1782047241"></script>
-    <script src="js/utils/events.js?v=1782047241"></script>
-    <script src="js/config.js?v=1782047241"></script>
-    <script src="js/state.js?v=1782047241"></script>
-    <script src="js/api.js?v=1782047241"></script>
-    <script src="js/auth.js?v=1782047241"></script>
-    <script src="js/ui.js?v=1782047241"></script>
-    <script src="js/forms.js?v=1782047241"></script>
-    <script src="js/app.js?v=1782047241"></script>
-    <script src="js/utils/handlers.js?v=1782047241"></script>
+    <script src="js/utils/helpers.js?v=1782047559"></script>
+    <script src="js/utils/modal.js?v=1782047559"></script>
+    <script src="js/utils/errorHandler.js?v=1782047559"></script>
+    <script src="js/utils/events.js?v=1782047559"></script>
+    <script src="js/config.js?v=1782047559"></script>
+    <script src="js/state.js?v=1782047559"></script>
+    <script src="js/api.js?v=1782047559"></script>
+    <script src="js/auth.js?v=1782047559"></script>
+    <script src="js/ui.js?v=1782047559"></script>
+    <script src="js/forms.js?v=1782047559"></script>
+    <script src="js/app.js?v=1782047559"></script>
+    <script src="js/utils/handlers.js?v=1782047559"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
