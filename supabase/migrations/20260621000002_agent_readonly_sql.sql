@@ -34,8 +34,10 @@ BEGIN
   SET LOCAL transaction_read_only = on;
   SET LOCAL statement_timeout = '5s';
 
+  -- Kullanıcı sorgusunu türetilmiş tablo olarak sarıp 500 ile kaplıyoruz.
+  -- (Doğrudan "%s LIMIT 500" sorguda zaten LIMIT varsa "LIMIT .. LIMIT" sözdizimi hatası verir.)
   EXECUTE format(
-    'SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (%s LIMIT 500) t',
+    'SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (SELECT * FROM (%s) sub LIMIT 500) t',
     rtrim(v_clean, ';')
   ) INTO v_result;
 
