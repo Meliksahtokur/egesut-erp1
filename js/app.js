@@ -95,6 +95,7 @@ function goTo(pg, push = true) {
   else if (pg === 'ureme')    { loadUreme(_curUremeTab || 'kizginlik'); loadDash(); }
   else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
+  else if (pg === 'asistan')  { if (typeof asistanInit === 'function') asistanInit(); }
   if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
 }
 

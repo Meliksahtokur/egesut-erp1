@@ -15,6 +15,18 @@ registerActions({
   'go-ureme':   () => goTo('ureme'),
   'go-gecmis':  () => goTo('gecmis'),
   'go-log':     () => goTo('log'),
+
+  // ═══ AI ASİSTAN ═══
+  'open-asistan':         () => { if (typeof goTo === 'function') goTo('asistan'); },
+  'asistan-gonder':       () => window.asistanGonder(),
+  'asistan-yeni':         () => window.asistanYeniSohbet(),
+  'asistan-gecmis':       () => window.asistanGecmisAc(),
+  'asistan-drawer-kapat': () => window.asistanDrawerKapat(),
+  'asistan-tumunu-sil':   () => window.asistanTumunuSil(),
+  'asistan-thread-ac':    (el) => window.asistanThreadAc(el.dataset.tid),
+  'asistan-thread-sil':   (el) => window.asistanThreadSil(el.dataset.tid),
+  'asistan-ornek':        (el) => window.asistanGonder(el.dataset.soru),
+  'asistan-enter':        (p) => { if (p.key === 'Enter') window.asistanGonder(); },
   'go-back': () => {
     if (window._prevTaskId) {
       const tid = window._prevTaskId;
