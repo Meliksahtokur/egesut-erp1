@@ -26,7 +26,7 @@ registerActions({
   'asistan-thread-ac':    (el) => window.asistanThreadAc(el.dataset.tid),
   'asistan-thread-sil':   (el) => window.asistanThreadSil(el.dataset.tid),
   'asistan-ornek':        (el) => window.asistanGonder(el.dataset.soru),
-  'asistan-enter':        (p) => { if (p.key === 'Enter') window.asistanGonder(); },
+  'asistan-enter':        (p) => { if (p.key === 'Enter' && !p.event.shiftKey) { p.event.preventDefault(); window.asistanGonder(); } },
   'go-back': () => {
     if (window._prevTaskId) {
       const tid = window._prevTaskId;

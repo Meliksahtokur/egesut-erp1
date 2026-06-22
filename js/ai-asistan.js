@@ -2,6 +2,26 @@
 const ASISTAN_FN_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co/functions/v1/ai-agent';
 let _asistanThreadId = null;
 let _asistanBekliyor = false;
+let _asistanAbort = null;
+
+// Gönder butonunu yazma sırasında ⏹ Durdur'a çevir
+function _asistanBtnDurum(yaziyor) {
+  const btn = document.getElementById('asistan-gonder-btn');
+  if (!btn) return;
+  btn.textContent = yaziyor ? '⏹' : '➤';
+  btn.style.background = yaziyor ? 'var(--red)' : 'var(--green)';
+  btn.title = yaziyor ? 'Durdur' : 'Gönder';
+}
+
+// Textarea içerikle birlikte büyüsün (max 140px)
+function _asistanAutoGrow(inp) {
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(inp.scrollHeight, 140) + 'px';
+}
+function _asistanInputReset() {
+  const inp = document.getElementById('asistan-input');
+  if (inp) { inp.value = ''; inp.style.height = 'auto'; }
+}
 
 async function _asistanToken() {
   const { data } = await window.db.auth.getSession();
@@ -39,11 +59,12 @@ function _asistanBalon(rol, html) {
 }
 
 async function asistanGonder(soru) {
-  if (_asistanBekliyor) return;
+  // Yazma sürerken butona tekrar basmak = DURDUR
+  if (_asistanBekliyor) { if (_asistanAbort) _asistanAbort.abort(); return; }
   const inp = document.getElementById('asistan-input');
   const mesaj = (soru || (inp ? inp.value : '') || '').trim();
   if (!mesaj) return;
-  if (inp) inp.value = '';
+  _asistanInputReset();
   const bos = document.getElementById('asistan-bos');
   if (bos) bos.style.display = 'none';
 
@@ -57,11 +78,15 @@ async function asistanGonder(soru) {
   if (!token) { cevapDiv.innerHTML = 'Oturum gerekli — lütfen tekrar giriş yapın.'; return; }
 
   _asistanBekliyor = true;
+  _asistanAbort = new AbortController();
+  _asistanBtnDurum(true);
+  let acc = '';
   try {
     const resp = await fetch(ASISTAN_FN_URL, {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ mesaj, thread_id: _asistanThreadId }),
+      signal: _asistanAbort.signal,
     });
     const tid = resp.headers.get('X-Thread-Id');
     if (tid) _asistanThreadId = tid;
@@ -69,7 +94,6 @@ async function asistanGonder(soru) {
 
     const reader = resp.body.getReader();
     const dec = new TextDecoder();
-    let acc = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -83,9 +107,18 @@ async function asistanGonder(soru) {
     // Stream bitti — SQL metadata'sını DB'den çek ve katlanır panel ekle
     cevapDiv.innerHTML = _asistanCevapHtml(acc, await _asistanSonSql());
   } catch (e) {
-    cevapDiv.innerHTML = 'Bağlantı hatası: ' + _asistanEsc(String(e));
+    if (e && e.name === 'AbortError') {
+      // Kullanıcı durdurdu — o ana kadarki kısmî cevabı koru
+      const kismi = _asistanStripThink(acc);
+      cevapDiv.innerHTML = (kismi ? _asistanEsc(kismi).replace(/\n/g, '<br>') : '')
+        + '<div style="margin-top:6px;font-size:.7rem;color:var(--ink3)">⏹ durduruldu</div>';
+    } else {
+      cevapDiv.innerHTML = 'Bağlantı hatası: ' + _asistanEsc(String(e));
+    }
   } finally {
     _asistanBekliyor = false;
+    _asistanAbort = null;
+    _asistanBtnDurum(false);
   }
 }
 
@@ -107,7 +140,10 @@ function asistanYeniSohbet() {
 function asistanInit() {
   if (!_asistanThreadId) asistanYeniSohbet();
   const inp = document.getElementById('asistan-input');
-  if (inp) setTimeout(() => inp.focus(), 100);
+  if (inp) {
+    if (!inp._growBound) { inp.addEventListener('input', () => _asistanAutoGrow(inp)); inp._growBound = true; }
+    setTimeout(() => inp.focus(), 100);
+  }
 }
 
 async function asistanGecmisAc() {

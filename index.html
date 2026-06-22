@@ -680,9 +680,9 @@ button,input,select,textarea{font-family:inherit}
     </div>
   </div>
 
-  <div style="position:sticky;bottom:0;background:var(--bg);padding:10px 12px;border-top:1px solid var(--bg3);display:flex;gap:8px">
-    <input id="asistan-input" data-keydown="asistan-enter" placeholder="Soru yaz..." style="flex:1;padding:10px 14px;border-radius:20px;border:1px solid var(--bg3);background:var(--card);color:var(--ink)">
-    <button class="btn" data-action="asistan-gonder" style="padding:10px 16px;background:var(--green);color:#fff">➤</button>
+  <div style="position:sticky;bottom:0;background:var(--bg);padding:10px 12px;border-top:1px solid var(--bg3);display:flex;gap:8px;align-items:flex-end">
+    <textarea id="asistan-input" data-keydown="asistan-enter" rows="1" placeholder="Soru yaz...  (Enter gönderir, Shift+Enter alt satır)" style="flex:1;padding:11px 16px;border-radius:18px;border:1px solid var(--bg3);background:var(--card);color:var(--ink);font-size:.9rem;font-family:inherit;line-height:1.4;resize:none;max-height:140px;overflow-y:auto"></textarea>
+    <button id="asistan-gonder-btn" class="btn" data-action="asistan-gonder" title="Gönder" style="flex:none;width:42px;height:42px;padding:0;border-radius:50%;background:var(--green);color:#fff;font-size:1.05rem;display:flex;align-items:center;justify-content:center">➤</button>
   </div>
 </div>
 
@@ -1881,19 +1881,19 @@ button,input,select,textarea{font-family:inherit}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
     <!-- EgeSüt JS modülleri -->
-    <script src="js/utils/helpers.js?v=1782069516"></script>
-    <script src="js/utils/modal.js?v=1782069516"></script>
-    <script src="js/utils/errorHandler.js?v=1782069516"></script>
-    <script src="js/utils/events.js?v=1782069516"></script>
-    <script src="js/config.js?v=1782069516"></script>
-    <script src="js/state.js?v=1782069516"></script>
-    <script src="js/api.js?v=1782069516"></script>
-    <script src="js/auth.js?v=1782069516"></script>
-    <script src="js/ui.js?v=1782069516"></script>
-    <script src="js/forms.js?v=1782069516"></script>
-    <script src="js/ai-asistan.js?v=1782069516"></script>
-    <script src="js/app.js?v=1782069516"></script>
-    <script src="js/utils/handlers.js?v=1782069516"></script>
+    <script src="js/utils/helpers.js?v=1782111364"></script>
+    <script src="js/utils/modal.js?v=1782111364"></script>
+    <script src="js/utils/errorHandler.js?v=1782111364"></script>
+    <script src="js/utils/events.js?v=1782111364"></script>
+    <script src="js/config.js?v=1782111364"></script>
+    <script src="js/state.js?v=1782111364"></script>
+    <script src="js/api.js?v=1782111364"></script>
+    <script src="js/auth.js?v=1782111364"></script>
+    <script src="js/ui.js?v=1782111364"></script>
+    <script src="js/forms.js?v=1782111364"></script>
+    <script src="js/ai-asistan.js?v=1782111364"></script>
+    <script src="js/app.js?v=1782111364"></script>
+    <script src="js/utils/handlers.js?v=1782111364"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">
