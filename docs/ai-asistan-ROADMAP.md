@@ -22,7 +22,7 @@ Uygulamaya gömülü AI asistan: çiftçi/operatör doğal dille (Türkçe) veri
 | **0** | Asistan Runtime (Edge loop + provider + auth + streaming + sayfa + tool/audit iskeleti) | — | ✅ **BİTTİ** (2026-06-21) |
 | **1** | Salt-okuma Soru-Cevap (sql_sorgula + hayvan_detay) | 0 | ✅ **BİTTİ** (2026-06-21) |
 | **1.5** | Cila: tutarlılık (prompt) + DUR butonu + input/buton UX | 1 | ✅ **BİTTİ** (2026-06-22, kullanıcı onaylı) |
-| **2** | Yazma + HITL (onaylı aksiyonlar) | 1 | ⬜ Sıradaki — ayrı brainstorming→spec→plan |
+| **2** | Yazma + HITL (onaylı aksiyonlar) | 1 | ✅ **BİTTİ** (2026-06-22) — plan motoru + 7 step + diff kartı |
 | **3** | Toplu import (Excel amiral) | 2 | ⬜ Bekliyor |
 | **4** | Dosya tabanı + hafıza (Storage + pgvector RAG) | 0 | ⬜ Bekliyor |
 | **5** | Web search (provider-native) | 0 | ⬜ Bekliyor |
@@ -34,8 +34,9 @@ Uygulamaya gömülü AI asistan: çiftçi/operatör doğal dille (Türkçe) veri
 1. ✅ `sql_sorgula` — salt-okuma SQL (her okuma sorusu)
 2. ✅ `hayvan_detay` — tek hayvan 360° özeti
 
-**Aksiyon tool'ları (Faz 2 — yazma + HITL, RPC'den geçer; SQL read-only kalır):**
-3. ⬜ `hizli_uygulama` · 4. ⬜ `tohumlama_kaydet` (state machine) · 5. ⬜ `gorev_tamamla` / `gorev_olustur` · 6. ⬜ `padok_degistir` (tekli/toplu)
+**Aksiyon tool'ları (Faz 2 — yazma + HITL, RPC'den geçer; SQL read-only kalır):** ✅ BİTTİ
+Mimari: 2 generic tool (`aksiyon_plani` plan oluştur · `plani_uygula` onaylı uygula) + DB step registry.
+7 step tipi: ✅ `gorev_kapat` · ✅ `hizli_uygulama` · ✅ `vaka_ac` (+`tedavi_gun_ekle`, $ref) · ✅ `tohumlama_kaydet` (state machine + VWP) · ✅ `padok_toplu` · ✅ `dogum_kaydet` (kalın RPC).
 
 **Faz 3:** 7. ⬜ `hayvan_ekle_toplu` (Excel)
 
@@ -51,6 +52,16 @@ Uygulamaya gömülü AI asistan: çiftçi/operatör doğal dille (Türkçe) veri
 - MVP (Faz 0+1): `fab8969`
 - Cila tutarlılık (prompt yetkilendirme, temp 0.5, stepCount 8): `ee6ff55`
 - Cila DUR butonu + textarea + küçük buton: `478cfa2`
+- Faz 2 (Yazma + HITL): `888dd25` agent_plans · `5369695` motor/$ref · `5369695` tool+rehber · `6c0bf01` diff kartı · hizli_uygulama · vaka/tedavi · ureme/padok/dogum step'leri (migration'lar `20260622000001..05`)
+
+## Faz 2 mimari notları (ezber)
+- **2 generic tool + DB step registry:** `aksiyon_plani`→`asistan_plan_olustur` (valide+pending, YAZMAZ), `plani_uygula`→`asistan_plan_uygula` (atomik, $ref çözer). Yeni aksiyon = `_asistan_step_dogrula` + `_asistan_step_calistir`'a 2 CASE dalı + rehber satırı.
+- **Atomiklik:** `asistan_plan_uygula` adımları `EXCEPTION WHEN OTHERS` subtransaction'da sarar → herhangi step RAISE ederse hepsi geri sarılır, plan `failed`.
+- **$ref bağımlılık:** bağımlı adım önceki çıktıya `"$N.anahtar"` ile başvurur (`_asistan_ref_coz`). Örn vaka_ac→tedavi_gun_ekle: `case_id:"$1.case_id"`.
+- **HITL:** olustur pending bırakır; frontend diff kartı (Onayla/Vazgeç) → onay mesajı → LLM `plani_uygula` çağırır. Onaysız asla uygulanmaz (kanıtlandı).
+- **RPC dönüş tuzağı:** `padok_degistir_toplu` `{success,error}` döner (ok değil) — runner success kontrol eder. `tohumlama_kaydet` 2 overload → named notation + `p_vwp_override` ile disambiguate.
+- **Güvenlik duvarı:** DDL/migration/pg_cron/tanım düzenleme YASAK — agent reddedip uygulamada nereye gidileceğini söyler (test edildi).
+- **Tablo:** `agent_plans` (pending/applied/cancelled/failed/expired) + RLS + 15dk prune cron (30dk bayat→expired).
 
 ## Kritik teknik notlar (Faz 2+ için ezber)
 - **SECURITY DEFINER içinde `SET ROLE` YASAK** (PG 42501) → `SET LOCAL transaction_read_only=on` kullan.
