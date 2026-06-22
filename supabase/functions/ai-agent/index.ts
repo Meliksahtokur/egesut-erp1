@@ -93,11 +93,17 @@ Deno.serve(async (req) => {
     onFinish: async ({ text }) => {
       const sonSql = auditKayit.filter((a) => a.tool === "sql_sorgula").pop() as
         { args?: { sql?: string } } | undefined;
+      const sonPlan = auditKayit.filter((a) => a.tool === "aksiyon_plani").pop() as
+        { args?: { sonuc?: { ok?: boolean; plan_id?: string; onizleme?: string[] } } } | undefined;
       await db.from("agent_messages").insert({
         thread_id: threadId,
         rol: "assistant",
         icerik: thinkTemizle(text),
-        metadata: { model: DEFAULT_MODEL, sql: sonSql?.args?.sql ?? null },
+        metadata: {
+          model: DEFAULT_MODEL,
+          sql: sonSql?.args?.sql ?? null,
+          plan: sonPlan?.args?.sonuc ?? null,
+        },
       });
       await db.from("agent_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
     },

@@ -36,5 +36,42 @@ export function buildTools(db: SupabaseClient, audit: (t: string, a: unknown) =>
         return data;
       },
     }),
+
+    aksiyon_plani: tool({
+      description:
+        "Yazma işlemi için ONAY PLANI oluşturur — HİÇBİR ŞEY YAZMAZ, sadece önizleme döner. " +
+        "Veriyi/ID'leri önce sql_sorgula ile çöz, sonra tipli adımları buraya ver. " +
+        "Kullanıcıya tek konsolide önizleme gösterilir; onaylarsa ayrı adımda uygulanır. " +
+        "adimlar: [{tip, parametreler}]. Bağımlı adımda önceki çıktıya '$N.anahtar' ile başvur (N=1'den).",
+      inputSchema: z.object({
+        adimlar: z.array(z.object({
+          tip: z.string(),
+          parametreler: z.record(z.any()),
+        })).describe("Tipli adım listesi"),
+      }),
+      execute: async ({ adimlar }) => {
+        const { data, error } = await db.rpc("asistan_plan_olustur", {
+          p_thread_id: null, p_adimlar: adimlar,
+        });
+        const sonuc = error ? { hata: error.message } : data;
+        audit("aksiyon_plani", { adimlar, sonuc });
+        return sonuc;
+      },
+    }),
+
+    plani_uygula: tool({
+      description:
+        "SADECE kullanıcı önizlemeyi onayladığını AÇIKÇA söylediğinde çağır. Verilen plan_id'yi atomik uygular. " +
+        "Kullanıcı onaylamadıysa ASLA çağırma.",
+      inputSchema: z.object({
+        plan_id: z.string().describe("aksiyon_plani'nin döndürdüğü plan_id"),
+      }),
+      execute: async ({ plan_id }) => {
+        audit("plani_uygula", { plan_id });
+        const { data, error } = await db.rpc("asistan_plan_uygula", { p_plan_id: plan_id });
+        if (error) return { hata: error.message };
+        return data;
+      },
+    }),
   };
 }
