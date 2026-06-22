@@ -107,9 +107,14 @@ async function asistanGonder(soru) {
     // Stream bitti — SQL metadata'sını DB'den çek ve katlanır panel ekle
     cevapDiv.innerHTML = _asistanCevapHtml(acc, await _asistanSonSql());
     // Onay bekleyen plan varsa diff kartını göster
-    const plan = await _asistanSonPlan();
+    const meta = await _asistanSonMeta();
+    const plan = meta?.plan;
     if (plan && plan.ok && plan.plan_id && Array.isArray(plan.onizleme)) {
       _asistanPlanKarti(box, plan);
+    }
+    // Uygulanmış plan varsa "Geri Al" kartını göster
+    if (meta?.applied?.plan_id) {
+      _asistanUndoKarti(box, meta.applied.plan_id);
     }
   } catch (e) {
     if (e && e.name === 'AbortError') {
@@ -135,38 +140,79 @@ async function _asistanSonSql() {
   return data?.[0]?.metadata?.sql || null;
 }
 
-async function _asistanSonPlan() {
+async function _asistanSonMeta() {
   if (!_asistanThreadId) return null;
   const { data } = await window.db.from('agent_messages')
     .select('metadata').eq('thread_id', _asistanThreadId).eq('rol', 'assistant')
     .order('created_at', { ascending: false }).limit(1);
-  return data?.[0]?.metadata?.plan || null;
+  return data?.[0]?.metadata || null;
 }
 
-// Onay bekleyen plan için diff kartı (Onayla / Vazgeç)
+// Onay bekleyen plan için diff kartı (numaralı + güvence + Onayla/Vazgeç)
 function _asistanPlanKarti(box, plan) {
   const div = document.createElement('div');
-  div.style.cssText = 'align-self:flex-start;max-width:90%;background:var(--card);border:1px solid var(--green);border-radius:14px;padding:12px 14px;font-size:.82rem';
-  const satirlar = plan.onizleme.map(s => '• ' + _asistanEsc(s)).join('<br>');
-  div.innerHTML = `<div style="font-weight:700;margin-bottom:6px">📋 Onayla: uygulanacak işlemler</div>
-    <div style="color:var(--ink);line-height:1.5">${satirlar}</div>
+  div.className = 'asistan-plan-karti';
+  div.style.cssText = 'align-self:flex-start;max-width:92%;background:var(--card);border:1px solid var(--green);border-radius:14px;padding:13px 15px;font-size:.83rem';
+  const satirlar = plan.onizleme.map((s, i) =>
+    `<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid var(--line,rgba(128,128,128,.15))">
+       <span style="color:var(--green);font-weight:700;min-width:18px">${i + 1}.</span>
+       <span style="flex:1">${_asistanEsc(s)}</span></div>`).join('');
+  div.innerHTML = `<div style="font-weight:700;margin-bottom:8px">📋 Onayına sunulan işlemler</div>
+    <div style="color:var(--ink);line-height:1.45">${satirlar}</div>
+    <div style="color:var(--ink3);font-size:.72rem;margin-top:8px">🔒 Onaylamadan hiçbir şey kaydedilmez. Uyguladıktan sonra geri alabilirsin.</div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn" data-action="asistan-plan-onayla" data-pid="${plan.plan_id}"
-        style="background:var(--green);color:#fff;padding:7px 14px;width:auto">✓ Onayla</button>
+        style="background:var(--green);color:#fff;padding:8px 16px;width:auto">✓ Onayla ve Uygula</button>
       <button class="btn" data-action="asistan-plan-vazgec" data-pid="${plan.plan_id}"
-        style="background:none;color:var(--red);padding:7px 14px;width:auto">✗ Vazgeç</button>
+        style="background:none;color:var(--red);padding:8px 16px;width:auto">✗ Vazgeç</button>
     </div>`;
   box.appendChild(div);
   div.scrollIntoView({ behavior: 'smooth' });
 }
 
+// Uygulanmış plan için "Geri Al" kartı
+function _asistanUndoKarti(box, planId) {
+  const div = document.createElement('div');
+  div.className = 'asistan-undo-karti';
+  div.style.cssText = 'align-self:flex-start;max-width:92%;background:var(--card);border:1px dashed var(--ink3);border-radius:14px;padding:10px 14px;font-size:.8rem;display:flex;align-items:center;gap:10px';
+  div.innerHTML = `<span style="flex:1;color:var(--ink3)">✅ Uygulandı. Yanlış olduysa geri alabilirsin.</span>
+    <button class="btn" data-action="asistan-plan-geri-al" data-pid="${planId}"
+      style="background:none;color:var(--red);border:1px solid var(--red);padding:6px 12px;width:auto">↩ Geri Al</button>`;
+  box.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth' });
+}
+
 function asistanPlanOnayla(pid, el) {
-  if (el) el.closest('div').parentElement.querySelectorAll('button').forEach(b => b.disabled = true);
+  if (el) el.closest('.asistan-plan-karti')?.querySelectorAll('button').forEach(b => b.disabled = true);
   window.asistanGonder('Onaylıyorum, planı uygula. (plan_id: ' + pid + ')');
 }
 function asistanPlanVazgec(pid, el) {
-  if (el) el.closest('div').parentElement.remove();
+  if (el) el.closest('.asistan-plan-karti')?.remove();
   window.asistanGonder('Vazgeçtim, bu planı uygulama.');
+}
+
+// Geri al — LLM'e gitmeden doğrudan RPC (hızlı + güvenli)
+async function asistanPlanGeriAl(pid, el) {
+  const kart = el ? el.closest('.asistan-undo-karti') : null;
+  if (el) { el.disabled = true; el.textContent = '↩ Geri alınıyor…'; }
+  try {
+    const { data, error } = await window.db.rpc('asistan_plan_geri_al', { p_plan_id: pid });
+    const box = document.getElementById('asistan-mesajlar');
+    let mesaj;
+    if (error || !data?.ok) {
+      mesaj = '⚠️ Geri alınamadı: ' + _asistanEsc(error?.message || data?.mesaj || 'bilinmeyen hata');
+    } else if (data.kismi) {
+      mesaj = `↩ ${data.geri_alinan} işlem geri alındı. Geri alınamayanlar: ${_asistanEsc((data.atlanan || []).join(', '))}. Bunları uygulamadan manuel düzeltmen gerekebilir.`;
+    } else {
+      mesaj = `↩ Tüm işlemler geri alındı (${data.geri_alinan}).`;
+    }
+    if (kart) kart.remove();
+    box.appendChild(_asistanBalon('assistant', mesaj));
+    box.lastChild.scrollIntoView({ behavior: 'smooth' });
+  } catch (e) {
+    if (el) { el.disabled = false; el.textContent = '↩ Geri Al'; }
+    alert('Geri alma hatası: ' + e);
+  }
 }
 
 function asistanYeniSohbet() {
@@ -238,6 +284,7 @@ async function asistanTumunuSil() {
 window.asistanGonder = asistanGonder;
 window.asistanPlanOnayla = asistanPlanOnayla;
 window.asistanPlanVazgec = asistanPlanVazgec;
+window.asistanPlanGeriAl = asistanPlanGeriAl;
 window.asistanYeniSohbet = asistanYeniSohbet;
 window.asistanInit = asistanInit;
 window.asistanGecmisAc = asistanGecmisAc;

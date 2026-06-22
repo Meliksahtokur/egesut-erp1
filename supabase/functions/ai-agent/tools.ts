@@ -67,10 +67,10 @@ export function buildTools(db: SupabaseClient, audit: (t: string, a: unknown) =>
         plan_id: z.string().describe("aksiyon_plani'nin döndürdüğü plan_id"),
       }),
       execute: async ({ plan_id }) => {
-        audit("plani_uygula", { plan_id });
         const { data, error } = await db.rpc("asistan_plan_uygula", { p_plan_id: plan_id });
-        if (error) return { hata: error.message };
-        return data;
+        const sonuc = error ? { hata: error.message } : data;
+        audit("plani_uygula", { plan_id, sonuc });
+        return sonuc;
       },
     }),
   };

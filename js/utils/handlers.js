@@ -28,6 +28,7 @@ registerActions({
   'asistan-ornek':        (el) => window.asistanGonder(el.dataset.soru),
   'asistan-plan-onayla':  (el) => window.asistanPlanOnayla(el.dataset.pid, el),
   'asistan-plan-vazgec':  (el) => window.asistanPlanVazgec(el.dataset.pid, el),
+  'asistan-plan-geri-al': (el) => window.asistanPlanGeriAl(el.dataset.pid, el),
   'asistan-enter':        (p) => { if (p.key === 'Enter' && !p.event.shiftKey) { p.event.preventDefault(); window.asistanGonder(); } },
   'go-back': () => {
     if (window._prevTaskId) {

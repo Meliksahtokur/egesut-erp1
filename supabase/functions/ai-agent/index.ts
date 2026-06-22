@@ -95,6 +95,12 @@ Deno.serve(async (req) => {
         { args?: { sql?: string } } | undefined;
       const sonPlan = auditKayit.filter((a) => a.tool === "aksiyon_plani").pop() as
         { args?: { sonuc?: { ok?: boolean; plan_id?: string; onizleme?: string[] } } } | undefined;
+      const sonUygula = auditKayit.filter((a) => a.tool === "plani_uygula").pop() as
+        { args?: { sonuc?: { ok?: boolean; plan_id?: string } } } | undefined;
+      // Uygulanan plan onaylanmış demektir → bekleyen plan kartını gösterme (applied göster)
+      const planMeta = sonUygula?.args?.sonuc?.ok
+        ? null
+        : (sonPlan?.args?.sonuc ?? null);
       await db.from("agent_messages").insert({
         thread_id: threadId,
         rol: "assistant",
@@ -102,7 +108,8 @@ Deno.serve(async (req) => {
         metadata: {
           model: DEFAULT_MODEL,
           sql: sonSql?.args?.sql ?? null,
-          plan: sonPlan?.args?.sonuc ?? null,
+          plan: planMeta,
+          applied: sonUygula?.args?.sonuc?.ok ? { plan_id: sonUygula.args.sonuc.plan_id } : null,
         },
       });
       await db.from("agent_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
