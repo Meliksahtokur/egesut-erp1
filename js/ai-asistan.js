@@ -106,6 +106,11 @@ async function asistanGonder(soru) {
     }
     // Stream bitti — SQL metadata'sını DB'den çek ve katlanır panel ekle
     cevapDiv.innerHTML = _asistanCevapHtml(acc, await _asistanSonSql());
+    // Onay bekleyen plan varsa diff kartını göster
+    const plan = await _asistanSonPlan();
+    if (plan && plan.ok && plan.plan_id && Array.isArray(plan.onizleme)) {
+      _asistanPlanKarti(box, plan);
+    }
   } catch (e) {
     if (e && e.name === 'AbortError') {
       // Kullanıcı durdurdu — o ana kadarki kısmî cevabı koru
@@ -128,6 +133,40 @@ async function _asistanSonSql() {
     .select('metadata').eq('thread_id', _asistanThreadId).eq('rol', 'assistant')
     .order('created_at', { ascending: false }).limit(1);
   return data?.[0]?.metadata?.sql || null;
+}
+
+async function _asistanSonPlan() {
+  if (!_asistanThreadId) return null;
+  const { data } = await window.db.from('agent_messages')
+    .select('metadata').eq('thread_id', _asistanThreadId).eq('rol', 'assistant')
+    .order('created_at', { ascending: false }).limit(1);
+  return data?.[0]?.metadata?.plan || null;
+}
+
+// Onay bekleyen plan için diff kartı (Onayla / Vazgeç)
+function _asistanPlanKarti(box, plan) {
+  const div = document.createElement('div');
+  div.style.cssText = 'align-self:flex-start;max-width:90%;background:var(--card);border:1px solid var(--green);border-radius:14px;padding:12px 14px;font-size:.82rem';
+  const satirlar = plan.onizleme.map(s => '• ' + _asistanEsc(s)).join('<br>');
+  div.innerHTML = `<div style="font-weight:700;margin-bottom:6px">📋 Onayla: uygulanacak işlemler</div>
+    <div style="color:var(--ink);line-height:1.5">${satirlar}</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn" data-action="asistan-plan-onayla" data-pid="${plan.plan_id}"
+        style="background:var(--green);color:#fff;padding:7px 14px;width:auto">✓ Onayla</button>
+      <button class="btn" data-action="asistan-plan-vazgec" data-pid="${plan.plan_id}"
+        style="background:none;color:var(--red);padding:7px 14px;width:auto">✗ Vazgeç</button>
+    </div>`;
+  box.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth' });
+}
+
+function asistanPlanOnayla(pid, el) {
+  if (el) el.closest('div').parentElement.querySelectorAll('button').forEach(b => b.disabled = true);
+  window.asistanGonder('Onaylıyorum, planı uygula. (plan_id: ' + pid + ')');
+}
+function asistanPlanVazgec(pid, el) {
+  if (el) el.closest('div').parentElement.remove();
+  window.asistanGonder('Vazgeçtim, bu planı uygulama.');
 }
 
 function asistanYeniSohbet() {
@@ -197,6 +236,8 @@ async function asistanTumunuSil() {
 }
 
 window.asistanGonder = asistanGonder;
+window.asistanPlanOnayla = asistanPlanOnayla;
+window.asistanPlanVazgec = asistanPlanVazgec;
 window.asistanYeniSohbet = asistanYeniSohbet;
 window.asistanInit = asistanInit;
 window.asistanGecmisAc = asistanGecmisAc;
