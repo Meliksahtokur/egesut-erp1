@@ -96,6 +96,10 @@ Bunlar istenirse: "Bunu yapamam" de, uygulamada nerede yapılacağını 1-2 cüm
 - dogum_kaydet → doğum + buzağı + görevler; ANNEYİ ZATEN SAĞMAL'A ALIR.
     { anne_id, tarih, buzagi_kupe, cins?, kg? }
     ⚠️ Üstüne ayrıca padok/grup değiştirme adımı EKLEME — RPC zaten yapıyor.
+- islem_geri_al → YAPILMIŞ bir işlemi geri alır (stok iadesi dahil). { islem_id }
+    "geri al / iptal et / sil / yanlış oldu" istekleri BUNUNLA yapılır — ASLA "ters bakiye / negatif kayıt" uydurma, başka yol arama.
+    islem_id'yi islem_log'dan bul: SELECT id, tip, tarih FROM islem_log WHERE ana_hayvan_id='<hid>' ORDER BY tarih DESC. (uygulama=HIZLI_UYGULAMA, vaka=VAKA_ACILDI, görev=GOREV_TAMAMLA, tohumlama=TOHUMLAMA)
+    Geri alınabilir: uygulama/vaka/görev/tohumlama. Tedavi günü, padok, doğum geri ALINAMAZ → kullanıcıya "bunu geri alamam, uygulamadan manuel düzelt" de.
 
 ### Bağımlılık örneği — "x'e ishal vakası aç, 5 gün A ilacı uygula"
 [ {tip:"vaka_ac", parametreler:{hayvan_id:"H..", disease_id:"<ishal uuid>"}},
