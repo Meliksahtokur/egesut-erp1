@@ -23,6 +23,7 @@ Uygulamaya gömülü AI asistan: çiftçi/operatör doğal dille (Türkçe) veri
 | **1** | Salt-okuma Soru-Cevap (sql_sorgula + hayvan_detay) | 0 | ✅ **BİTTİ** (2026-06-21) |
 | **1.5** | Cila: tutarlılık (prompt) + DUR butonu + input/buton UX | 1 | ✅ **BİTTİ** (2026-06-22, kullanıcı onaylı) |
 | **2** | Yazma + HITL (onaylı aksiyonlar) | 1 | ✅ **BİTTİ** (2026-06-22) — plan motoru + 7 step + diff kartı |
+| **2.5** | Cila: undo + mutfak gizleme + niyet eşleme + zengin kart | 2 | ✅ **BİTTİ** (2026-06-22) — kullanıcı "güven vermedi" geri bildirimi sonrası |
 | **3** | Toplu import (Excel amiral) | 2 | ⬜ Bekliyor |
 | **4** | Dosya tabanı + hafıza (Storage + pgvector RAG) | 0 | ⬜ Bekliyor |
 | **5** | Web search (provider-native) | 0 | ⬜ Bekliyor |
@@ -61,7 +62,15 @@ Mimari: 2 generic tool (`aksiyon_plani` plan oluştur · `plani_uygula` onaylı 
 - **HITL:** olustur pending bırakır; frontend diff kartı (Onayla/Vazgeç) → onay mesajı → LLM `plani_uygula` çağırır. Onaysız asla uygulanmaz (kanıtlandı).
 - **RPC dönüş tuzağı:** `padok_degistir_toplu` `{success,error}` döner (ok değil) — runner success kontrol eder. `tohumlama_kaydet` 2 overload → named notation + `p_vwp_override` ile disambiguate.
 - **Güvenlik duvarı:** DDL/migration/pg_cron/tanım düzenleme YASAK — agent reddedip uygulamada nereye gidileceğini söyler (test edildi).
-- **Tablo:** `agent_plans` (pending/applied/cancelled/failed/expired) + RLS + 15dk prune cron (30dk bayat→expired).
+- **Tablo:** `agent_plans` (pending/applied/cancelled/failed/expired + geri_alindi/kismen_geri_alindi) + RLS + 15dk prune cron (30dk bayat→expired).
+
+## Faz 2.5 cila notları (kullanıcı "çalışıyor ama güven vermedi" geri bildirimi)
+- **Undo (`asistan_plan_geri_al`):** kısmi undo + uyarı. Adımları TERS sırada, her biri kendi subtransaction'ında, SPESİFİK geri_al RPC'leriyle: gorev_geri_al / hizli_uygulama_geri_al / case_geri_al / tohumlama_geri_al. tedavi_gun_ekle+padok_toplu+dogum_kaydet **geri alınamaz → atlanır + raporlanır**. ⚠️ **Generic `geri_al(islem_id)` KULLANMA** — uygulama_log'u siler ama stok_hareket'i bırakır (stok sızıntısı); spesifik RPC'ler "İade" telafi hareketi ekler (stok doğru). Ampirik test edildi.
+- **Frontend undo:** uygulanan plan → metadata.applied={plan_id} → "↩ Geri Al" kartı → `window.db.rpc('asistan_plan_geri_al')` DOĞRUDAN (LLM'e gitmez, hızlı).
+- **Mutfak gizleme:** prompt "Sessiz çalış" — süreç/şema/araç anlatma yok ("şunu sorgulayayım", "şemaya bakayım" yasak). Kök neden: veri sözlüğünde cases/diseases/treatment_days yoktu → information_schema yokluyordu → eklendi.
+- **aksiyon_plani ZORUNLU:** model bazen planı metin yazıp tool çağırmıyordu (kart çıkmıyor). Prompt: "tool çağırmadan plan/onay yazma".
+- **Niyet eşleme:** "tedavi/tedavisine ekle" + aktif vaka (cases.status='active') → tedavi_gun_ekle (mevcut case_id); hizli_uygulama sadece vakasız bağımsız uygulama.
+- **Zengin önizleme:** `_asistan_step_dogrula` ilaç adı+doz+vaka adı+grup özeti döner ("Buzağı İshali vakasına tedavi günü: Ademin 1ml IM @08:00"). Kart numaralı + "🔒 onaylamadan kaydedilmez" güvencesi.
 
 ## Kritik teknik notlar (Faz 2+ için ezber)
 - **SECURITY DEFINER içinde `SET ROLE` YASAK** (PG 42501) → `SET LOCAL transaction_read_only=on` kullan.
