@@ -24,6 +24,7 @@ Uygulamaya gömülü AI asistan: çiftçi/operatör doğal dille (Türkçe) veri
 | **1.5** | Cila: tutarlılık (prompt) + DUR butonu + input/buton UX | 1 | ✅ **BİTTİ** (2026-06-22, kullanıcı onaylı) |
 | **2** | Yazma + HITL (onaylı aksiyonlar) | 1 | ✅ **BİTTİ** (2026-06-22) — plan motoru + 7 step + diff kartı |
 | **2.5** | Cila: undo + mutfak gizleme + niyet eşleme + zengin kart | 2 | ✅ **BİTTİ** (2026-06-22) — kullanıcı "güven vermedi" geri bildirimi sonrası |
+| **2.6** | stok_durum tool + güncel stok fix + UI (son promtu düzenle/iptal · işlem sayacı · tek tık kopyala) | 2.5 | ✅ **BİTTİ** (2026-06-23, commit 46a50d2) — agent baslangic_miktar'ı mevcut stok sanıyordu (Sefanel 0 dedi, gerçek 939); stok_tuketim_view.guncel_stok + stok_durum tool ile düzeltildi |
 | **3** | Toplu import (Excel amiral) | 2 | ⬜ Bekliyor |
 | **4** | Dosya tabanı + hafıza (Storage + pgvector RAG) | 0 | ⬜ Bekliyor |
 | **5** | Web search (provider-native) | 0 | ⬜ Bekliyor |
