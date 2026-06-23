@@ -37,6 +37,36 @@ export function buildTools(db: SupabaseClient, audit: (t: string, a: unknown) =>
       },
     }),
 
+    stok_durum: tool({
+      description:
+        "Tüm stok kalemlerinin GÜNCEL durumunu döndürür: guncel_stok (tüketim düşülmüş gerçek miktar), esik ve durum (sıfır/kritik/yeterli). " +
+        "'Stok ne durumda / kritik mi / hangi ürün az / anomali var mı' gibi stok sorularında sql_sorgula yerine BUNU kullan — baslangic_miktar yanılgısına düşmez. " +
+        "sadece_kritik=true verilirse yalnızca eşik altı + sıfır kalemleri döner.",
+      inputSchema: z.object({
+        sadece_kritik: z.boolean().optional().describe("true → yalnız kritik/sıfır kalemler"),
+      }),
+      execute: async ({ sadece_kritik }) => {
+        audit("stok_durum", { sadece_kritik });
+        const sql =
+          "SELECT urun_adi, kategori, birim, guncel_stok, esik " +
+          "FROM stok_tuketim_view ORDER BY urun_adi";
+        const { data, error } = await db.rpc("asistan_sql_calistir", { p_sql: sql });
+        if (error) return { hata: error.message };
+        const rows = (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => {
+          const g = Number(r.guncel_stok);
+          const e = r.esik == null ? null : Number(r.esik);
+          const durum = g <= 0 ? "sıfır" : (e != null && g <= e ? "kritik" : "yeterli");
+          return { ...r, durum };
+        });
+        const sonuc = sadece_kritik ? rows.filter((r) => r.durum !== "yeterli") : rows;
+        return {
+          satirlar: sonuc,
+          toplam: rows.length,
+          kritik_sayisi: rows.filter((r) => r.durum !== "yeterli").length,
+        };
+      },
+    }),
+
     aksiyon_plani: tool({
       description:
         "Yazma işlemi için ONAY PLANI oluşturur — HİÇBİR ŞEY YAZMAZ, sadece önizleme döner. " +

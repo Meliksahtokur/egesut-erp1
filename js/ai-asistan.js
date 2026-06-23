@@ -58,6 +58,32 @@ function _asistanBalon(rol, html) {
   return div;
 }
 
+// Kullanıcı balonu — "düzenle" (son promtu iptal/düzenle) butonlu
+function _asistanUserBalon(text) {
+  const div = _asistanBalon('user', _asistanEsc(text));
+  div.dataset.role = 'user';
+  div.dataset.text = encodeURIComponent(text || '');
+  const btn = document.createElement('button');
+  btn.setAttribute('data-action', 'asistan-mesaj-duzenle');
+  btn.title = 'Bu mesajı düzenle';
+  btn.textContent = '✏️';
+  btn.style.cssText = 'display:block;margin:4px 0 0 auto;background:none;border:none;color:#fff;opacity:.55;cursor:pointer;font-size:.72rem;padding:0';
+  div.appendChild(btn);
+  return div;
+}
+
+// Asistan balonuna tek-tık kopyala butonu ekle (temiz metni panoya)
+function _asistanKopyaEkle(div, cleanText) {
+  if (!cleanText) return;
+  div.dataset.copy = encodeURIComponent(cleanText);
+  const btn = document.createElement('button');
+  btn.setAttribute('data-action', 'asistan-mesaj-kopyala');
+  btn.title = 'Cevabı kopyala';
+  btn.textContent = '📋 Kopyala';
+  btn.style.cssText = 'display:inline-block;margin-top:8px;background:none;border:none;color:var(--ink3);cursor:pointer;font-size:.72rem;padding:0';
+  div.appendChild(btn);
+}
+
 async function asistanGonder(soru) {
   // Yazma sürerken butona tekrar basmak = DURDUR
   if (_asistanBekliyor) { if (_asistanAbort) _asistanAbort.abort(); return; }
@@ -69,7 +95,7 @@ async function asistanGonder(soru) {
   if (bos) bos.style.display = 'none';
 
   const box = document.getElementById('asistan-mesajlar');
-  box.appendChild(_asistanBalon('user', _asistanEsc(mesaj)));
+  box.appendChild(_asistanUserBalon(mesaj));
   const cevapDiv = _asistanBalon('assistant', '<span style="color:var(--ink3)">···</span>');
   box.appendChild(cevapDiv);
   cevapDiv.scrollIntoView({ behavior: 'smooth' });
@@ -81,6 +107,13 @@ async function asistanGonder(soru) {
   _asistanAbort = new AbortController();
   _asistanBtnDurum(true);
   let acc = '';
+  // İşlem sayacı — ilk görünür metne kadar "düşünüyor… Nsn" göster (boşuna iptali önler)
+  const _t0 = Date.now();
+  const _sayacId = setInterval(() => {
+    if (_asistanStripThink(acc)) return; // metin akmaya başladı → sayaca dokunma
+    const sn = Math.floor((Date.now() - _t0) / 1000);
+    cevapDiv.innerHTML = `<span style="color:var(--ink3)">🤔 düşünüyor… ${sn}sn</span>`;
+  }, 1000);
   try {
     const resp = await fetch(ASISTAN_FN_URL, {
       method: 'POST',
@@ -99,13 +132,13 @@ async function asistanGonder(soru) {
       if (done) break;
       acc += dec.decode(value, { stream: true });
       const goster = _asistanStripThink(acc);
-      cevapDiv.innerHTML = goster
-        ? _asistanEsc(goster).replace(/\n/g, '<br>')
-        : '<span style="color:var(--ink3)">🤔 düşünüyor…</span>';
+      // Görünür metin varsa yaz; yoksa sayaç placeholder'ı korur
+      if (goster) cevapDiv.innerHTML = _asistanEsc(goster).replace(/\n/g, '<br>');
       cevapDiv.scrollIntoView({ behavior: 'smooth' });
     }
     // Stream bitti — SQL metadata'sını DB'den çek ve katlanır panel ekle
     cevapDiv.innerHTML = _asistanCevapHtml(acc, await _asistanSonSql());
+    _asistanKopyaEkle(cevapDiv, _asistanStripThink(acc));
     // Onay bekleyen plan varsa diff kartını göster
     const meta = await _asistanSonMeta();
     const plan = meta?.plan;
@@ -126,9 +159,60 @@ async function asistanGonder(soru) {
       cevapDiv.innerHTML = 'Bağlantı hatası: ' + _asistanEsc(String(e));
     }
   } finally {
+    clearInterval(_sayacId);
     _asistanBekliyor = false;
     _asistanAbort = null;
     _asistanBtnDurum(false);
+  }
+}
+
+// Son promtu (veya herhangi bir kullanıcı mesajını) düzenle:
+// o mesaj + sonrasını DB'den ve DOM'dan sil, metni input'a geri yükle
+async function asistanMesajDuzenle(el) {
+  if (_asistanBekliyor) return;
+  const bubble = el.closest('[data-role="user"]');
+  if (!bubble) return;
+  const text = decodeURIComponent(bubble.dataset.text || '');
+  const box = document.getElementById('asistan-mesajlar');
+  // Kalıcı: bu mesaj ve sonrasını agent_messages'tan sil (model eski turu görmesin)
+  if (_asistanThreadId) {
+    try {
+      const { data } = await window.db.from('agent_messages')
+        .select('created_at').eq('thread_id', _asistanThreadId)
+        .eq('rol', 'user').eq('icerik', text)
+        .order('created_at', { ascending: false }).limit(1);
+      const ts = data?.[0]?.created_at;
+      if (ts) await window.db.from('agent_messages')
+        .delete().eq('thread_id', _asistanThreadId).gte('created_at', ts);
+    } catch (e) { /* sessiz — en azından DOM temizlenir */ }
+  }
+  // DOM: bu balon + sonrasındaki her şeyi (cevap, plan/undo kartları) kaldır
+  while (bubble.nextSibling) box.removeChild(bubble.nextSibling);
+  box.removeChild(bubble);
+  // Metni input'a geri ver
+  const inp = document.getElementById('asistan-input');
+  if (inp) { inp.value = text; _asistanAutoGrow(inp); inp.focus(); }
+  if (!box.children.length) {
+    const bos = document.getElementById('asistan-bos');
+    if (bos) bos.style.display = '';
+  }
+}
+
+// Asistan cevabını tek tıkla panoya kopyala
+async function asistanMesajKopyala(el) {
+  const bubble = el.closest('[data-copy]');
+  const txt = bubble ? decodeURIComponent(bubble.dataset.copy || '') : '';
+  if (!txt) return;
+  const ok = () => { const o = el.textContent; el.textContent = '✓ Kopyalandı'; setTimeout(() => { el.textContent = o; }, 1500); };
+  try {
+    await navigator.clipboard.writeText(txt);
+    ok();
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); ok(); } catch (_) {}
+    document.body.removeChild(ta);
   }
 }
 
@@ -262,8 +346,13 @@ async function asistanThreadAc(tid) {
   const { data } = await window.db.from('agent_messages')
     .select('rol, icerik, metadata').eq('thread_id', tid).order('created_at', { ascending: true });
   (data || []).forEach(m => {
-    const html = m.rol === 'assistant' ? _asistanCevapHtml(m.icerik, m.metadata?.sql) : _asistanEsc(m.icerik);
-    box.appendChild(_asistanBalon(m.rol, html));
+    if (m.rol === 'user') {
+      box.appendChild(_asistanUserBalon(m.icerik));
+    } else {
+      const div = _asistanBalon('assistant', _asistanCevapHtml(m.icerik, m.metadata?.sql));
+      _asistanKopyaEkle(div, _asistanStripThink(m.icerik));
+      box.appendChild(div);
+    }
   });
 }
 
@@ -282,6 +371,8 @@ async function asistanTumunuSil() {
 }
 
 window.asistanGonder = asistanGonder;
+window.asistanMesajDuzenle = asistanMesajDuzenle;
+window.asistanMesajKopyala = asistanMesajKopyala;
 window.asistanPlanOnayla = asistanPlanOnayla;
 window.asistanPlanVazgec = asistanPlanVazgec;
 window.asistanPlanGeriAl = asistanPlanGeriAl;

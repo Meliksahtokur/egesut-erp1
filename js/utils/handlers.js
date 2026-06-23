@@ -26,6 +26,8 @@ registerActions({
   'asistan-thread-ac':    (el) => window.asistanThreadAc(el.dataset.tid),
   'asistan-thread-sil':   (el) => window.asistanThreadSil(el.dataset.tid),
   'asistan-ornek':        (el) => window.asistanGonder(el.dataset.soru),
+  'asistan-mesaj-duzenle': (el) => window.asistanMesajDuzenle(el),
+  'asistan-mesaj-kopyala': (el) => window.asistanMesajKopyala(el),
   'asistan-plan-onayla':  (el) => window.asistanPlanOnayla(el.dataset.pid, el),
   'asistan-plan-vazgec':  (el) => window.asistanPlanVazgec(el.dataset.pid, el),
   'asistan-plan-geri-al': (el) => window.asistanPlanGeriAl(el.dataset.pid, el),

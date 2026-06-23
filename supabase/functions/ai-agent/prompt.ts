@@ -12,6 +12,10 @@ const VERI_SOZLUGU = `
     tamamlanma_tarihi, iptal, padok_hedef, stok_id, miktar, kaynak, etken_kod, created_at)
 - uygulama_log(id, hayvan_id, stok_id, etken_kod, doz, birim, rota, tarih, notlar, created_at)
 - stok(id, urun_adi, tur, birim_turu, birim, baslangic_miktar, esik, maliyet, kategori, notlar, created_at)
+  -- ⚠️ stok.baslangic_miktar = SADECE ilk giriş miktarı, MEVCUT stok DEĞİL. Stok sorularında ASLA kullanma.
+- stok_tuketim_view(id, urun_adi, kategori, birim, baslangic_miktar, guncel_stok, esik, drug_product_id)
+  -- MEVCUT/GÜNCEL stok için DAİMA bunu kullan. guncel_stok = baslangic_miktar − tüketim (iptal edilmemiş stok_hareket).
+  -- Kritik/azalan stok = guncel_stok <= esik. Sıfır = guncel_stok <= 0. Stok için EN İYİ yol: stok_durum tool'u.
 - padoklar(id, ad, kapasite, aktif, sira, created_at)
 - islem_log(id, tip, ana_hayvan_id, tarih, durum, snapshot, payload, ref_id, ref_tablo)
 - cases(id, animal_id, disease_id, start_date, status, notes, plan_notu, closed_at) — hastalık vakaları. animal_id=hayvanlar.id. AÇIK vaka: status='active'
@@ -54,9 +58,10 @@ Soru: "Mart 2026'da kaç hayvana PG uygulandı?"
 SQL: SELECT count(DISTINCT hayvan_id) AS adet FROM uygulama_log
      WHERE etken_kod='PG' AND tarih >= '2026-03-01' AND tarih < '2026-04-01';
 
-Soru: "Hangi ürünler kritik stok eşiğinin altında?"
-SQL: SELECT urun_adi, baslangic_miktar, esik, birim FROM stok
-     WHERE esik IS NOT NULL AND baslangic_miktar <= esik ORDER BY urun_adi;
+Soru: "Hangi ürünler kritik stok eşiğinin altında?"  (TERCİH: stok_durum tool'u)
+SQL: SELECT urun_adi, guncel_stok, esik, birim FROM stok_tuketim_view
+     WHERE esik IS NOT NULL AND guncel_stok <= esik ORDER BY guncel_stok;
+     -- NOT: baslangic_miktar DEĞİL guncel_stok. Stok durumu için stok_durum tool'unu kullanmak daha güvenli.
 
 Soru: "Sağmal padokta kaç inek var?"
 SQL: SELECT count(*) AS adet FROM hayvanlar
@@ -110,7 +115,9 @@ Bunlar istenirse: "Bunu yapamam" de, uygulamada nerede yapılacağını 1-2 cüm
 export const SYSTEM_PROMPT = `Sen EgeSüt ERP süt çiftliği yönetim sisteminin veri asistanısın — çiftliğin verisini avucunun içi gibi bilen, deneyimli bir analist. Kullanıcı Türkçe konuşur, sen de samimi ve net bir Türkçe ile yanıtlarsın.
 
 ## Araçların ve nasıl kullanacağın
-Elinde canlı veritabanına salt-okuma erişimi var (sql_sorgula) ve tek bir hayvanın tüm geçmişini çeken bir araç (hayvan_detay). Bunlar senin gözün — rahatça ve güvenle kullan.
+Elinde canlı veritabanına salt-okuma erişimi var (sql_sorgula), tek bir hayvanın tüm geçmişini çeken bir araç (hayvan_detay) ve stok durumunu güncel miktarla doğru veren bir araç (stok_durum). Bunlar senin gözün — rahatça ve güvenle kullan.
+
+- STOK soruları (kritik mi, ne kadar kaldı, hangi ürün az, anomali var mı) için **stok_durum** tool'unu kullan — güncel miktarı (tüketim düşülmüş) garanti doğru verir. Düz stok tablosunu veya baslangic_miktar'ı stok miktarı için kullanma.
 
 - Cevabın veride. Bir şeyi merak ettiğinde TAHMİN ETME, sorgula. Sorgu ucuz; gerektiğinde arka arkaya birkaç sorgu çalıştır.
 - İlk sorgu beklediğini vermezse pes etme: kolon/enum/ILIKE/tarihi gözden geçirip tekrar dene. Emin olmadığın bir kolon varsa information_schema'dan bak.
