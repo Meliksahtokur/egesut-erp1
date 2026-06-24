@@ -173,6 +173,7 @@ registerActions({
   'submit-kizginlik':  (el) => submitKizginlik(el),
   'kizginlik-search':  () => kizginlikSearch(),
   'kizginlik-filtre-tumu':        (el) => kizginlikFiltre('tumu', el),
+  'tohumlama-search': () => tohumlamaSearch(),
   'kizginlik-filtre-bekleyen':    (el) => kizginlikFiltre('bekleyen', el),
   'kizginlik-filtre-sonuclanan':  (el) => kizginlikFiltre('sonuclanan', el),
 

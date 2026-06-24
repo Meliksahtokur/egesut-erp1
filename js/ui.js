@@ -2785,7 +2785,7 @@ async function _uremeTohumlama(el){
       const _bekliyor=!_gebe&&!_kotu;
       const _sonucBadge=_kotu?`<span style="background:rgba(192,50,26,.15);color:var(--red);font-size:.72rem;padding:2px 6px;border-radius:8px;font-weight:700;margin-left:4px">${t.sonuc}</span>`:'';
       return `<div class="hist-row" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="openTohDet('${t.id}')">
-        <div class="hist-dot" style="background:${dot};flex-shrink:0"></div>
+        <div class="hist-dot" style="background:${dot};flex-shrink:0" role="img" aria-label="${t.sonuc||'Bekliyor'}"></div>
         <div class="hist-main" style="flex:1;min-width:0">
           <div class="hist-title" style="color:var(--ink2);display:flex;align-items:center;gap:6px;min-width:0">
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${kupe} — ${t.sperma||'?'}</span>
@@ -2830,6 +2830,12 @@ async function loadUreme(tab='kizginlik'){
   const ttb=document.getElementById('tohumlama-toolbar');
   if(tb&&tab!=='kizginlik') tb.style.display='none';
   if(ttb) ttb.style.display = (tab==='tohumlama') ? 'block' : 'none';
+  // Tab değişiminde search state temizle (I1 fix)
+  if(tab!=='tohumlama'){
+    globalThis._tohSearch='';
+    const inp=document.getElementById('tohumlama-srch');
+    if(inp) inp.value='';
+  }
   await _keepScroll(el,async()=>{
     el.innerHTML='<div class="loader"><div class="spin"></div></div>';
     try {
