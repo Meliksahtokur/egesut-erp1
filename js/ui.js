@@ -2596,6 +2596,17 @@ function kizginlikSearch(){
     if(typeof loadUreme==='function') loadUreme('kizginlik');
   },250);
 }
+
+// Tohumlama arama — 200ms debounce, multi-field (küpe + sperma + sonuç + hayvan adı)
+let _tohumlamaSearchTimer=null;
+function tohumlamaSearch(){
+  clearTimeout(_tohumlamaSearchTimer);
+  _tohumlamaSearchTimer=setTimeout(()=>{
+    const inp=document.getElementById('tohumlama-srch');
+    globalThis._tohSearch = (inp?.value || '').toLowerCase().trim();
+    if(typeof loadUreme==='function') loadUreme('tohumlama');
+  },200);
+}
 function kizginlikFiltre(deger,btn){
   const onceki=globalThis._kizginlikFilter||'tumu';
   globalThis._kizginlikFilter=onceki===deger?null:deger;
@@ -2741,8 +2752,26 @@ async function _uremeDogum(el){
 }
 
 async function _uremeTohumlama(el){
-  const list=await idbGetAll('tohumlama');
+  let list=await idbGetAll('tohumlama');
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+
+  // Searchbar filtresi (multi-field: küpe + sperma + sonuç + hayvan adı)
+  const _q=(globalThis._tohSearch||'').toLowerCase().trim();
+  if(_q){
+    const _terms=_q.split(/\s+/).filter(Boolean);
+    const _hayvanlar=getState('animals')||[];
+    list=list.filter(t=>{
+      const h=_hayvanlar.find(a=>a.id===t.hayvan_id);
+      const kupe=(h?.kupe_no||h?.devlet_kupe||'').toLowerCase();
+      const isim=(h?.isim||'').toLowerCase();
+      const sperma=(t.sperma||'').toLowerCase();
+      const sonuc=(t.sonuc||'').toLowerCase();
+      const tarih=(t.tarih||'').toLowerCase();
+      const haystack=[kupe,isim,sperma,sonuc,tarih].join(' ');
+      return _terms.every(term=>haystack.includes(term));
+    });
+  }
+
   el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" data-action="open-insem-modal">💉 Tohumlama Ekle</button></div>`+
     (list.length?list.map(t=>{
       const h=getState('animals').find(a=>a.id===t.hayvan_id);
@@ -2754,24 +2783,28 @@ async function _uremeTohumlama(el){
       const _scMid=_kotu?'var(--red)':'var(--amber)';
       const sc=_gebe?'var(--green)':_scMid;
       const _bekliyor=!_gebe&&!_kotu;
+      const _sonucBadge=_kotu?`<span style="background:rgba(192,50,26,.15);color:var(--red);font-size:.72rem;padding:2px 6px;border-radius:8px;font-weight:700;margin-left:4px">${t.sonuc}</span>`:'';
       return `<div class="hist-row" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="openTohDet('${t.id}')">
         <div class="hist-dot" style="background:${dot};flex-shrink:0"></div>
         <div class="hist-main" style="flex:1;min-width:0">
-          <div class="hist-title" style="color:var(--ink2)">${kupe} — ${t.sperma||'?'} <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span></div>
-          <div class="hist-sub">${t.tarih} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b></div>
+          <div class="hist-title" style="color:var(--ink2);display:flex;align-items:center;gap:6px;min-width:0">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${kupe} — ${t.sperma||'?'}</span>
+            <span style="flex-shrink:0;background:rgba(176,120,0,.18);color:#7a4f00;font-size:.78rem;padding:2px 6px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span>
+          </div>
+          <div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b>${_sonucBadge}</div>
         </div>
         ${_bekliyor && t.tarih
           ? (()=>{
               const _uretGun=Math.floor((Date.now()-new Date(t.tarih))/86400000);
               return _uretGun>=0&&_uretGun<=15
-                ? `<button onclick="event.stopPropagation();openTekrarAsim('${t.hayvan_id}','${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">🔁 Tekrar Aşım</button>`
-                : '<span style="flex-shrink:0;font-size:.65rem;color:var(--ink3)">' + _uretGun + ' gün</span>';
+                ? `<button onclick="event.stopPropagation();openTekrarAsim('${t.hayvan_id}','${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;font-weight:700;cursor:pointer">🔁 Tekrar Aşım</button>`
+                : '<span style="flex-shrink:0;font-size:.75rem;color:var(--ink3)">' + _uretGun + ' gün</span>';
             })()
           : (_bekliyor
-            ? `<button onclick="event.stopPropagation();tekrarTohumla('${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--green);color:#fff;border:none;border-radius:8px;padding:6px 10px;font-size:.68rem;font-weight:700;cursor:pointer">💉 Tohumla</button>`
+            ? `<button onclick="event.stopPropagation();tekrarTohumla('${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;font-weight:700;cursor:pointer">💉 Tohumla</button>`
             : '')}
       </div>`;
-    }).join(''):'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
+    }).join(''):'<div class="empty"><div class="empty-ico">💉</div>'+(_q?'Arama sonucu yok':'Tohumlama kaydı yok')+'</div>');
 }
 
 async function _uremeAbort(el){
@@ -2784,7 +2817,7 @@ async function _uremeAbort(el){
       <div class="hist-dot" style="background:var(--red2)"></div>
       <div class="hist-main">
         <div class="hist-title" style="color:var(--red)">⚠️ ${kupe} — Abort</div>
-        <div class="hist-sub">${t.tarih} ${t.abort_notlar?'· '+t.abort_notlar:''}</div>
+        <div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} ${t.abort_notlar?'· '+t.abort_notlar:''}</div>
       </div>
     </div>`;
   }).join(''):'<div class="empty"><div class="empty-ico">⚠️</div>Abort kaydı yok</div>');
@@ -2794,7 +2827,9 @@ async function loadUreme(tab='kizginlik'){
   _curUremeTab=tab;
   const el=document.getElementById('ureme-body');
   const tb=document.getElementById('kizginlik-toolbar');
+  const ttb=document.getElementById('tohumlama-toolbar');
   if(tb&&tab!=='kizginlik') tb.style.display='none';
+  if(ttb) ttb.style.display = (tab==='tohumlama') ? 'block' : 'none';
   await _keepScroll(el,async()=>{
     el.innerHTML='<div class="loader"><div class="spin"></div></div>';
     try {
