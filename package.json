@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "fast-check": "^4.8.0",
     "supabase": "^2.76.16"
   },
   "name": "egesut-erp1",
@@ -13,7 +14,8 @@
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "test:report": "playwright show-report tests/report"
+    "test:report": "playwright show-report tests/report",
+    "test:unit": "node --test tests/unit/"
   },
   "repository": {
     "type": "git",

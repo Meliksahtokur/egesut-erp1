@@ -96,3 +96,8 @@ function throttle(fn, limit = 1000) {
   let last = 0;
   return (...args) => { const now = Date.now(); if (now - last >= limit) { last = now; fn(...args); } };
 }
+
+// Test için dual-mode export (tarayıcıda module undefined, etkisiz)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Object.assign(module.exports || {}, { trLower, dAgo, dFwd, fmtTarih, fmtTarihSaat });
+}
