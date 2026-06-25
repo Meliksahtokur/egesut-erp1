@@ -129,59 +129,113 @@ ALTER TABLE public.tohumlama
 ALTER TABLE public.tohumlama
   ADD COLUMN IF NOT EXISTS case_id uuid REFERENCES public.cases(id) ON DELETE SET NULL;
 
+
+-- ════════════════════════════════════════════════════════════════
+-- GÖREV B FAZ 2 — ground_truth onarımı (2026-06-25)
+-- Eski satır 132-224 (dogum gövdesiz + yutulmuş tablolar) silindi,
+-- yerine canlı Management API'den yeniden üretildi.
+-- Kapsam: EgeSüt kanonik (tools-bank 9 tablo HARİÇ, set_deneme_no atlandı).
+-- ════════════════════════════════════════════════════════════════
+
+-- ════════════════════════════════════════════════════════════════
+-- DOGUM (Faz 2 — canlı Management API)
+-- ════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.dogum (
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  anne_id text,
+  tarih date,
+  yavru_cins text,
+  yavru_kupe text,
+  yavru_irk text,
+  dogum_tipi text DEFAULT 'Normal'::text,
+  created_at timestamp with time zone DEFAULT now(),
+  hekim_id text,
+  dogum_kg numeric,
+  baba_bilgi text,
+  CONSTRAINT dogum_pkey PRIMARY KEY (id),
+  CONSTRAINT dogum_fk_anne_id FOREIGN KEY (anne_id) REFERENCES hayvanlar(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS dogum_pkey ON public.dogum USING btree (id);
+CREATE INDEX IF NOT EXISTS idx_dogum_anne_tarih ON public.dogum USING btree (anne_id, tarih);
+
+ALTER TABLE public.dogum ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "allow all" ON public.dogum;
+CREATE POLICY "allow all" ON public.dogum FOR ALL TO public USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS anon_all ON public.dogum;
+CREATE POLICY anon_all ON public.dogum FOR ALL TO public USING (true) WITH CHECK (true);
+
+GRANT SELECT ON public.dogum TO agent_readonly;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.dogum TO authenticated;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.dogum TO postgres;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.dogum TO service_role;
 
 -- ════════════════════════════════════════════════════════════════
--- YENİ EGESUT TABLOLARI (canlı DB diff — REGEN 2026-06-13)
+-- TEDAVI (Faz 2 — canlı Management API)
 -- ════════════════════════════════════════════════════════════════
-
 CREATE TABLE IF NOT EXISTS public.tedavi (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
   hayvan_id text,
   tarih date,
   tani text,
   ilac_stok_id text,
   miktar numeric,
   sut_yasagi_bitis date,
-  aktif boolean,
+  aktif boolean DEFAULT true,
   vaka_id text,
-  created_at timestamptz DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
   uygulama_yolu text,
   hekim_id text,
   bekleme_suresi_gun integer,
   notlar text,
-  CONSTRAINT tedavi_pkey PRIMARY KEY (id)
+  CONSTRAINT tedavi_pkey PRIMARY KEY (id),
+  CONSTRAINT tedavi_fk_hayvan_id FOREIGN KEY (hayvan_id) REFERENCES hayvanlar(id)
 );
-CREATE INDEX IF NOT EXISTS idx_tedavi_hayvan ON public.tedavi (hayvan_id);
-CREATE INDEX IF NOT EXISTS idx_tedavi_vaka ON public.tedavi (vaka_id);
-CREATE INDEX IF NOT EXISTS idx_tedavi_ilac ON public.tedavi (ilac_stok_id);
-GRANT ALL ON public.tedavi TO anon, authenticated;
-ALTER TABLE public.tedavi ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS tedavi_select ON public.tedavi;
-DROP POLICY IF EXISTS tedavi_insert ON public.tedavi;
-DROP POLICY IF EXISTS tedavi_update ON public.tedavi;
-DROP POLICY IF EXISTS tedavi_delete ON public.tedavi;
-CREATE POLICY tedavi_select ON public.tedavi FOR SELECT TO public USING (true);
-CREATE POLICY tedavi_insert ON public.tedavi FOR INSERT TO public WITH CHECK (true);
-CREATE POLICY tedavi_update ON public.tedavi FOR UPDATE TO public USING (true) WITH CHECK (true);
-CREATE POLICY tedavi_delete ON public.tedavi FOR DELETE TO public USING (true);
 
+CREATE UNIQUE INDEX IF NOT EXISTS tedavi_pkey ON public.tedavi USING btree (id);
+
+ALTER TABLE public.tedavi ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "allow all" ON public.tedavi;
+CREATE POLICY "allow all" ON public.tedavi FOR ALL TO public USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS tedavi_delete ON public.tedavi;
+CREATE POLICY tedavi_delete ON public.tedavi FOR DELETE TO public USING (true);
+DROP POLICY IF EXISTS tedavi_insert ON public.tedavi;
+CREATE POLICY tedavi_insert ON public.tedavi FOR INSERT TO public WITH CHECK (true);
+DROP POLICY IF EXISTS tedavi_select ON public.tedavi;
+CREATE POLICY tedavi_select ON public.tedavi FOR SELECT TO public USING (true);
+DROP POLICY IF EXISTS tedavi_update ON public.tedavi;
+CREATE POLICY tedavi_update ON public.tedavi FOR UPDATE TO public USING (true) WITH CHECK (true);
+
+GRANT SELECT ON public.tedavi TO agent_readonly;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.tedavi TO authenticated;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.tedavi TO postgres;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.tedavi TO service_role;
+
+-- ════════════════════════════════════════════════════════════════
+-- HAYVAN_OVERRIDE (Faz 2 — canlı Management API)
+-- ════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.hayvan_override (
   kupe_no text NOT NULL,
-  pasif_mi boolean,
+  pasif_mi boolean DEFAULT false,
   notlar text,
-  guncelleme_tarihi date,
+  guncelleme_tarihi date DEFAULT CURRENT_DATE,
   CONSTRAINT hayvan_override_pkey PRIMARY KEY (kupe_no)
 );
-GRANT ALL ON public.hayvan_override TO anon, authenticated;
-ALTER TABLE public.hayvan_override ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS hayvan_override_select ON public.hayvan_override;
-DROP POLICY IF EXISTS hayvan_override_all ON public.hayvan_override;
-CREATE POLICY hayvan_override_select ON public.hayvan_override FOR SELECT TO public USING (true);
-CREATE POLICY hayvan_override_all ON public.hayvan_override FOR ALL TO public USING (true) WITH CHECK (true);
 
+CREATE UNIQUE INDEX IF NOT EXISTS hayvan_override_pkey ON public.hayvan_override USING btree (kupe_no);
+
+ALTER TABLE public.hayvan_override ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT ON public.hayvan_override TO agent_readonly;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.hayvan_override TO authenticated;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.hayvan_override TO postgres;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.hayvan_override TO service_role;
+
+-- ════════════════════════════════════════════════════════════════
+-- VETHEK_TOHUMLAMALAR (Faz 2 — canlı Management API)
+-- ════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.vethek_tohumlamalar (
-  id bigint NOT NULL DEFAULT nextval('public.vethek_tohumlamalar_id_seq'::regclass),
+  id bigint DEFAULT nextval('vethek_tohumlamalar_id_seq'::regclass) NOT NULL,
   hayvan_id integer NOT NULL,
   sperma text,
   belge_no text,
@@ -192,36 +246,625 @@ CREATE TABLE IF NOT EXISTS public.vethek_tohumlamalar (
   gebe boolean,
   scrape_tarihi date NOT NULL,
   kaynak_url text,
-  olusturulma_zamani timestamptz DEFAULT now(),
+  olusturulma_zamani timestamp with time zone DEFAULT now(),
   CONSTRAINT vethek_tohumlamalar_pkey PRIMARY KEY (id)
 );
-CREATE INDEX IF NOT EXISTS idx_vethek_kupe_no ON public.vethek_tohumlamalar (kupe_no);
-CREATE INDEX IF NOT EXISTS idx_vethek_tarih ON public.vethek_tohumlamalar (tohumlama_tar);
-CREATE INDEX IF NOT EXISTS idx_vethek_hayvan ON public.vethek_tohumlamalar (hayvan_id);
-GRANT ALL ON public.vethek_tohumlamalar TO anon, authenticated;
+
+CREATE UNIQUE INDEX IF NOT EXISTS vethek_tohumlamalar_pkey ON public.vethek_tohumlamalar USING btree (id);
+CREATE INDEX IF NOT EXISTS idx_vethek_kupe ON public.vethek_tohumlamalar USING btree (kupe_no);
+CREATE INDEX IF NOT EXISTS idx_vethek_tarih ON public.vethek_tohumlamalar USING btree (tohumlama_tar);
+
 ALTER TABLE public.vethek_tohumlamalar ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS vethek_select ON public.vethek_tohumlamalar;
-DROP POLICY IF EXISTS vethek_all ON public.vethek_tohumlamalar;
-CREATE POLICY vethek_select ON public.vethek_tohumlamalar FOR SELECT TO public USING (true);
-CREATE POLICY vethek_all ON public.vethek_tohumlamalar FOR ALL TO public USING (true) WITH CHECK (true);
 
-  id text PRIMARY KEY,
-  anne_id text,
-  tarih date,
-  yavru_cins text,
-  yavru_kupe text,
-  dogum_tipi text,
-  dogum_kg numeric,
-  baba_bilgi text,
-  hekim_id text
+GRANT SELECT ON public.vethek_tohumlamalar TO agent_readonly;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.vethek_tohumlamalar TO authenticated;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.vethek_tohumlamalar TO postgres;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.vethek_tohumlamalar TO service_role;
+
+-- ════════════════════════════════════════════════════════════════
+-- AGENT_PLANS (Faz 2 — canlı Management API)
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.agent_plans (
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  thread_id uuid,
+  kullanici_id uuid DEFAULT auth.uid() NOT NULL,
+  durum text DEFAULT 'pending'::text NOT NULL,
+  adimlar jsonb NOT NULL,
+  onizleme jsonb,
+  sonuc jsonb,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  applied_at timestamp with time zone,
+  CONSTRAINT agent_plans_pkey PRIMARY KEY (id),
+  CONSTRAINT agent_plans_fk_thread_id FOREIGN KEY (thread_id) REFERENCES agent_threads(id) ON DELETE CASCADE
 );
 
-  id text PRIMARY KEY,
-  kupe_no text,
-  cinsiyet text,
-  dogum_tarihi date,
-  anne_id text
+CREATE UNIQUE INDEX IF NOT EXISTS agent_plans_pkey ON public.agent_plans USING btree (id);
+CREATE INDEX IF NOT EXISTS idx_agent_plans_thread ON public.agent_plans USING btree (thread_id);
+CREATE INDEX IF NOT EXISTS idx_agent_plans_durum ON public.agent_plans USING btree (kullanici_id, durum);
+
+ALTER TABLE public.agent_plans ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS agent_plans_insert ON public.agent_plans;
+CREATE POLICY agent_plans_insert ON public.agent_plans FOR INSERT TO public WITH CHECK ((kullanici_id = auth.uid()));
+DROP POLICY IF EXISTS agent_plans_select ON public.agent_plans;
+CREATE POLICY agent_plans_select ON public.agent_plans FOR SELECT TO public USING ((kullanici_id = auth.uid()));
+DROP POLICY IF EXISTS agent_plans_update ON public.agent_plans;
+CREATE POLICY agent_plans_update ON public.agent_plans FOR UPDATE TO public USING ((kullanici_id = auth.uid())) WITH CHECK (true);
+
+GRANT SELECT ON public.agent_plans TO agent_readonly;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.agent_plans TO authenticated;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.agent_plans TO postgres;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.agent_plans TO service_role;
+
+-- ════════════════════════════════════════════════════════════════
+-- UI_LOGS (Faz 2 — canlı Management API)
+-- ════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.ui_logs (
+  id bigint DEFAULT nextval('ui_logs_id_seq'::regclass) NOT NULL,
+  level text NOT NULL,
+  message text NOT NULL,
+  source text,
+  payload jsonb,
+  session_id text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT ui_logs_pkey PRIMARY KEY (id)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS ui_logs_pkey ON public.ui_logs USING btree (id);
+CREATE INDEX IF NOT EXISTS idx_ui_logs_session ON public.ui_logs USING btree (session_id, created_at DESC);
+
+ALTER TABLE public.ui_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon insert" ON public.ui_logs;
+CREATE POLICY "anon insert" ON public.ui_logs FOR INSERT TO public WITH CHECK (true);
+DROP POLICY IF EXISTS "anon select" ON public.ui_logs;
+CREATE POLICY "anon select" ON public.ui_logs FOR SELECT TO public USING (true);
+
+GRANT SELECT ON public.ui_logs TO agent_readonly;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.ui_logs TO authenticated;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.ui_logs TO postgres;
+GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.ui_logs TO service_role;
+
+-- ════════════════════════════════════════════════════════════════
+-- COZULMEMIS_KIZGINLIK_VIEW (Faz 2 — canlı Management API)
+-- ════════════════════════════════════════════════════════════════
+CREATE OR REPLACE VIEW public.cozulmemis_kizginlik_view AS
+SELECT DISTINCT ON (kl.hayvan_id) kl.id AS kizginlik_id,
+    kl.hayvan_id,
+    h.kupe_no,
+    h.padok,
+    h.grup,
+    kl.tarih AS kizginlik_tarihi,
+    kl.olusturma AS kizginlik_zamani,
+    kl.belirti,
+    (EXTRACT(epoch FROM (now() - kl.olusturma)) / (3600)::numeric) AS gecen_saat,
+        CASE
+            WHEN (kl.cozuldu = true) THEN 'cozuldu'::text
+            WHEN (EXISTS ( SELECT 1
+               FROM tohumlama t
+              WHERE ((t.hayvan_id = kl.hayvan_id) AND (COALESCE(t.created_at, (t.tarih)::timestamp with time zone) >= kl.olusturma) AND (COALESCE(t.created_at, (t.tarih)::timestamp with time zone) < (kl.olusturma + '12:00:00'::interval))))) THEN 'cozuldu'::text
+            WHEN ((EXTRACT(epoch FROM (now() - kl.olusturma)) / (3600)::numeric) > (24)::numeric) THEN 'bekleniyor'::text
+            WHEN ((EXTRACT(epoch FROM (now() - kl.olusturma)) / (3600)::numeric) > (12)::numeric) THEN 'uyari'::text
+            ELSE 'izleniyor'::text
+        END AS durum
+   FROM (kizginlik_log kl
+     JOIN hayvanlar h ON (((h.id = kl.hayvan_id) AND (h.durum = 'Aktif'::text))))
+  WHERE (kl.olusturma >= (now() - '3 days'::interval))
+  ORDER BY kl.hayvan_id, kl.olusturma DESC;;
+
+-- ════════════════════════════════════════════════════════════════
+-- EKSİK EGESÜT FONKSİYONLAR (10 adet, Faz 2)
+-- ════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public._asistan_ref_coz(p_param jsonb, p_ctx jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ IMMUTABLE
+AS $function$
+DECLARE
+  k text; v jsonb; m text[];
+  v_out jsonb := p_param;
+BEGIN
+  FOR k, v IN SELECT * FROM jsonb_each(p_param) LOOP
+    IF jsonb_typeof(v) = 'string' AND left(v #>> '{}', 1) = '$' THEN
+      m := regexp_match(v #>> '{}', '^\$([0-9]+)\.(.+)$');
+      IF m IS NOT NULL THEN
+        v_out := jsonb_set(v_out, ARRAY[k],
+          COALESCE(p_ctx -> m[1] -> m[2], 'null'::jsonb));
+      END IF;
+    END IF;
+  END LOOP;
+  RETURN v_out;
+END;
+$function$
+;
+CREATE OR REPLACE FUNCTION public._asistan_step_calistir(p_tip text, p_param jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+  g text; r jsonb; v_rt text; v_rid text;
+BEGIN
+  CASE p_tip
+  WHEN 'gorev_kapat' THEN
+    FOR g IN SELECT jsonb_array_elements_text(p_param->'gorev_idler') LOOP
+      r := public.gorev_tamamla(g, NULL);
+      IF (r->>'ok') = 'false' THEN
+        RAISE EXCEPTION 'gorev_tamamla(%) başarısız: %', g, r->>'mesaj';
+      END IF;
+    END LOOP;
+    RETURN jsonb_build_object('kapatilan', jsonb_array_length(p_param->'gorev_idler'));
+  WHEN 'hizli_uygulama' THEN
+    r := public.hizli_uygulama(
+      p_param->>'hayvan_id', p_param->>'stok_id',
+      (p_param->>'doz')::numeric, COALESCE(p_param->>'birim','ml'),
+      COALESCE(p_param->>'rota','IM'), COALESCE(p_param->>'notlar','AI Asistan'));
+    IF (r->>'ok')='false' THEN RAISE EXCEPTION 'hizli_uygulama: %', r->>'mesaj'; END IF;
+    RETURN r;
+  WHEN 'vaka_ac' THEN
+    r := public.create_case(p_param->>'hayvan_id', (p_param->>'disease_id')::uuid, p_param->>'not');
+    IF (r->>'ok')='false' THEN RAISE EXCEPTION 'create_case: %', r->>'mesaj'; END IF;
+    RETURN r;
+  WHEN 'tedavi_gun_ekle' THEN
+    r := public.add_treatment_day_with_sessions(
+      (p_param->>'case_id')::uuid, (p_param->>'tarih')::date, p_param->'sessions', NULL);
+    IF (r->>'ok')='false' THEN RAISE EXCEPTION 'add_treatment_day: %', r->>'mesaj'; END IF;
+    RETURN r;
+  WHEN 'tohumlama_kaydet' THEN
+    r := public.tohumlama_kaydet(
+      p_hayvan_id   := p_param->>'hayvan_id',
+      p_tarih       := (p_param->>'tarih')::date,
+      p_sperma      := p_param->>'sperma',
+      p_hekim_id    := NULLIF(p_param->>'hekim_id',''),
+      p_irk_bilgisi := NULLIF(p_param->>'irk_bilgisi',''),
+      p_vwp_override := false);
+    IF (r->>'ok')='false' THEN RAISE EXCEPTION 'tohumlama_kaydet: %', r->>'mesaj'; END IF;
+    RETURN r;
+  WHEN 'padok_toplu' THEN
+    r := public.padok_degistir_toplu(
+      ARRAY(SELECT jsonb_array_elements_text(p_param->'hayvan_idler')),
+      (p_param->>'yeni_padok_id')::uuid, NULL, NULLIF(p_param->>'yeni_grup',''));
+    IF (r->>'success')='false' THEN RAISE EXCEPTION 'padok_degistir_toplu: %', r->>'error'; END IF;
+    RETURN r;
+  WHEN 'dogum_kaydet' THEN
+    r := public.dogum_kaydet(p_param->>'anne_id', (p_param->>'tarih')::date, p_param->>'buzagi_kupe',
+      COALESCE(p_param->>'cins','Dişi'), COALESCE(p_param->>'tip','Normal'),
+      NULLIF(p_param->>'kg','')::numeric, NULLIF(p_param->>'baba',''), NULLIF(p_param->>'hekim_id',''));
+    IF (r->>'ok')='false' THEN RAISE EXCEPTION 'dogum_kaydet: %', r->>'mesaj'; END IF;
+    RETURN r;
+  WHEN 'islem_geri_al' THEN
+    SELECT ref_tablo, ref_id INTO v_rt, v_rid FROM public.islem_log WHERE id = p_param->>'islem_id';
+    IF v_rt IS NULL THEN RAISE EXCEPTION 'İşlem bulunamadı: %', p_param->>'islem_id'; END IF;
+    IF    v_rt='uygulama_log' THEN r := public.hizli_uygulama_geri_al(v_rid::uuid);
+    ELSIF v_rt='cases'        THEN r := public.case_geri_al(v_rid::uuid);
+    ELSIF v_rt='tohumlama'    THEN r := public.tohumlama_geri_al(v_rid);
+    ELSIF v_rt='gorev_log'    THEN r := public.gorev_geri_al(v_rid);
+    ELSE  RAISE EXCEPTION 'Geri alınamaz işlem tipi: %', v_rt; END IF;
+    IF (r->>'ok')='false' THEN RAISE EXCEPTION 'geri alma başarısız: %', COALESCE(r->>'mesaj',r->>'hata'); END IF;
+    RETURN jsonb_build_object('geri_alindi', v_rt, 'ref_id', v_rid);
+  ELSE
+    RAISE EXCEPTION 'Bilinmeyen adım tipi: %', p_tip;
+  END CASE;
+END;
+$function$
+;
+CREATE OR REPLACE FUNCTION public._asistan_step_dogrula(p_tip text, p_param jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE
+AS $function$
+DECLARE
+  v_n int; v_seans text; v_vaka text;
+  v_rt text; v_rtip text; v_rdurum text;
+BEGIN
+  CASE p_tip
+  WHEN 'gorev_kapat' THEN
+    v_n := jsonb_array_length(COALESCE(p_param->'gorev_idler','[]'::jsonb));
+    IF v_n = 0 THEN RETURN jsonb_build_object('ok',false,'hata','gorev_idler boş'); END IF;
+    IF EXISTS (
+      SELECT 1 FROM jsonb_array_elements_text(p_param->'gorev_idler') g(id)
+      LEFT JOIN public.gorev_log gl ON gl.id::text = g.id
+      WHERE gl.id IS NULL OR gl.tamamlandi = true OR gl.iptal = true
+    ) THEN
+      RETURN jsonb_build_object('ok',false,'hata','Bazı görevler bulunamadı veya zaten kapalı');
+    END IF;
+    RETURN jsonb_build_object('ok',true,'onizleme', v_n || ' görev kapatılacak');
+  WHEN 'hizli_uygulama' THEN
+    IF NOT (p_param ? 'hayvan_id' AND p_param ? 'stok_id' AND p_param ? 'doz') THEN
+      RETURN jsonb_build_object('ok',false,'hata','hizli_uygulama: hayvan_id/stok_id/doz gerekli');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.hayvanlar WHERE id = p_param->>'hayvan_id' AND durum='Aktif') THEN
+      RETURN jsonb_build_object('ok',false,'hata','Hayvan aktif değil: '||(p_param->>'hayvan_id'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.stok WHERE id = p_param->>'stok_id') THEN
+      RETURN jsonb_build_object('ok',false,'hata','Stok yok: '||(p_param->>'stok_id'));
+    END IF;
+    RETURN jsonb_build_object('ok',true,'onizleme',
+      (SELECT kupe_no || COALESCE(' ('||grup||')','') FROM public.hayvanlar WHERE id=p_param->>'hayvan_id')||
+      ' → bağımsız uygulama: '||
+      (SELECT urun_adi FROM public.stok WHERE id=p_param->>'stok_id')||' '||
+      (p_param->>'doz')||COALESCE(p_param->>'birim','')||' '||COALESCE(p_param->>'rota',''));
+  WHEN 'vaka_ac' THEN
+    IF NOT (p_param ? 'hayvan_id' AND p_param ? 'disease_id') THEN
+      RETURN jsonb_build_object('ok',false,'hata','vaka_ac: hayvan_id/disease_id gerekli'); END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.diseases WHERE id=(p_param->>'disease_id')::uuid) THEN
+      RETURN jsonb_build_object('ok',false,'hata','Hastalık bulunamadı'); END IF;
+    RETURN jsonb_build_object('ok',true,'onizleme',
+      (SELECT kupe_no || COALESCE(' ('||grup||')','') FROM public.hayvanlar WHERE id=p_param->>'hayvan_id')||
+      ' → yeni vaka aç: '||
+      (SELECT name FROM public.diseases WHERE id=(p_param->>'disease_id')::uuid));
+  WHEN 'tedavi_gun_ekle' THEN
+    IF NOT (p_param ? 'case_id' AND p_param ? 'tarih' AND p_param ? 'sessions') THEN
+      RETURN jsonb_build_object('ok',false,'hata','tedavi_gun_ekle: case_id/tarih/sessions gerekli'); END IF;
+    SELECT string_agg(
+      COALESCE((SELECT urun_adi FROM public.stok WHERE id = s->>'stok_id'), s->>'stok_id')||' '||
+      (s->>'dose')||COALESCE(s->>'unit','')||' '||COALESCE(s->>'route','')||
+      COALESCE(' @'||(s->>'planned_time'),''), ', ')
+    INTO v_seans FROM jsonb_array_elements(p_param->'sessions') s;
+    v_vaka := CASE
+      WHEN left(p_param->>'case_id',1) = '$' THEN 'yeni açılan vakaya'
+      ELSE COALESCE((SELECT d.name FROM public.cases c JOIN public.diseases d ON d.id=c.disease_id
+                     WHERE c.id=(p_param->>'case_id')::uuid),'vakaya')||' vakasına'
+    END;
+    RETURN jsonb_build_object('ok',true,'onizleme',
+      v_vaka||' tedavi günü ('||(p_param->>'tarih')||'): '||COALESCE(v_seans,'seans yok'));
+  WHEN 'tohumlama_kaydet' THEN
+    IF NOT (p_param ? 'hayvan_id' AND p_param ? 'tarih' AND p_param ? 'sperma') THEN
+      RETURN jsonb_build_object('ok',false,'hata','tohumlama_kaydet: hayvan_id/tarih/sperma gerekli'); END IF;
+    IF EXISTS (SELECT 1 FROM public.hayvanlar WHERE id=p_param->>'hayvan_id'
+               AND (tohumlama_durumu ILIKE 'gebe' OR grup ILIKE 'Sağmal (Kuru)')) THEN
+      RETURN jsonb_build_object('ok',false,'hata','Hayvan gebe veya kuru — tohumlanamaz'); END IF;
+    RETURN jsonb_build_object('ok',true,'onizleme',
+      (SELECT kupe_no FROM public.hayvanlar WHERE id=p_param->>'hayvan_id')||' → tohumlama: '||
+      (p_param->>'sperma')||' ('||(p_param->>'tarih')||')');
+  WHEN 'padok_toplu' THEN
+    IF NOT (p_param ? 'hayvan_idler' AND p_param ? 'yeni_padok_id') THEN
+      RETURN jsonb_build_object('ok',false,'hata','padok_toplu: hayvan_idler/yeni_padok_id gerekli'); END IF;
+    RETURN jsonb_build_object('ok',true,'onizleme',
+      jsonb_array_length(p_param->'hayvan_idler')||' hayvan → '||
+      (SELECT ad FROM public.padoklar WHERE id=(p_param->>'yeni_padok_id')::uuid)||' padok'||
+      COALESCE(' / grup: '||(p_param->>'yeni_grup'),''));
+  WHEN 'dogum_kaydet' THEN
+    IF NOT (p_param ? 'anne_id' AND p_param ? 'tarih' AND p_param ? 'buzagi_kupe') THEN
+      RETURN jsonb_build_object('ok',false,'hata','dogum_kaydet: anne_id/tarih/buzagi_kupe gerekli'); END IF;
+    RETURN jsonb_build_object('ok',true,'onizleme',
+      (SELECT kupe_no FROM public.hayvanlar WHERE id=p_param->>'anne_id')||' doğum → buzağı '||
+      (p_param->>'buzagi_kupe')||COALESCE(' ('||(p_param->>'cins')||')','')||
+      ' · anne otomatik Sağmal''a alınır + görevler açılır');
+  WHEN 'islem_geri_al' THEN
+    IF NOT (p_param ? 'islem_id') THEN
+      RETURN jsonb_build_object('ok',false,'hata','islem_geri_al: islem_id gerekli (islem_log.id)'); END IF;
+    SELECT ref_tablo, tip, durum INTO v_rt, v_rtip, v_rdurum
+    FROM public.islem_log WHERE id = p_param->>'islem_id';
+    IF v_rtip IS NULL THEN RETURN jsonb_build_object('ok',false,'hata','İşlem bulunamadı'); END IF;
+    IF v_rdurum = 'geri_alindi' THEN RETURN jsonb_build_object('ok',false,'hata','Bu işlem zaten geri alınmış'); END IF;
+    IF v_rt NOT IN ('uygulama_log','cases','tohumlama','gorev_log') THEN
+      RETURN jsonb_build_object('ok',false,'hata','Bu işlem tipi geri alınamaz ('||COALESCE(v_rt,'?')||') — manuel düzeltme gerekir');
+    END IF;
+    RETURN jsonb_build_object('ok',true,'onizleme','GERİ AL: '||v_rtip||' ('||v_rt||') işlemi geri alınacak');
+  ELSE
+    RETURN jsonb_build_object('ok',false,'hata','Bilinmeyen adım tipi: '||p_tip);
+  END CASE;
+END;
+$function$
+;
+CREATE OR REPLACE FUNCTION public.asistan_hayvan_detay(p_kupe text DEFAULT NULL::text, p_id text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_h record;
+  v_out jsonb;
+BEGIN
+  SELECT * INTO v_h FROM hayvanlar
+   WHERE (p_id IS NOT NULL AND id = p_id)
+      OR (p_kupe IS NOT NULL AND kupe_no = p_kupe)
+   LIMIT 1;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('bulundu', false);
+  END IF;
+
+  v_out := jsonb_build_object(
+    'bulundu', true,
+    'hayvan', to_jsonb(v_h),
+    'tohumlama', (SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY t.tarih DESC), '[]'::jsonb)
+                  FROM tohumlama t WHERE t.hayvan_id = v_h.id),
+    'gorevler', (SELECT coalesce(jsonb_agg(to_jsonb(g) ORDER BY g.created_at DESC), '[]'::jsonb)
+                 FROM gorev_log g WHERE g.hayvan_id = v_h.id),
+    'uygulamalar', (SELECT coalesce(jsonb_agg(to_jsonb(u) ORDER BY u.created_at DESC), '[]'::jsonb)
+                    FROM uygulama_log u WHERE u.hayvan_id = v_h.id),
+    'islem_log', (SELECT coalesce(jsonb_agg(to_jsonb(i) ORDER BY i.tarih DESC), '[]'::jsonb)
+                  FROM islem_log i WHERE i.ana_hayvan_id = v_h.id)
+  );
+  RETURN v_out;
+END $function$
+;
+CREATE OR REPLACE FUNCTION public.asistan_plan_geri_al(p_plan_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_plan record; v_adim jsonb; v_step_out jsonb;
+  v_tip text; v_i int; v_n int; v_geri int := 0;
+  v_atlanan jsonb := '[]'::jsonb; g text;
+BEGIN
+  SELECT * INTO v_plan FROM public.agent_plans
+  WHERE id = p_plan_id AND kullanici_id = auth.uid();
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'mesaj','Plan bulunamadı'); END IF;
+  IF v_plan.durum <> 'applied' THEN
+    RETURN jsonb_build_object('ok',false,'mesaj','Sadece uygulanmış plan geri alınır (durum: '||v_plan.durum||')');
+  END IF;
+
+  v_n := jsonb_array_length(v_plan.adimlar);
+  FOR v_i IN REVERSE v_n..1 LOOP
+    v_adim     := v_plan.adimlar->(v_i-1);
+    v_tip      := v_adim->>'tip';
+    v_step_out := v_plan.sonuc->(v_i::text);
+    BEGIN
+      CASE v_tip
+      WHEN 'gorev_kapat' THEN
+        FOR g IN SELECT jsonb_array_elements_text(v_adim->'parametreler'->'gorev_idler') LOOP
+          PERFORM public.gorev_geri_al(g);
+        END LOOP;
+        v_geri := v_geri + 1;
+      WHEN 'hizli_uygulama' THEN
+        PERFORM public.hizli_uygulama_geri_al((v_step_out->>'id')::uuid);
+        v_geri := v_geri + 1;
+      WHEN 'vaka_ac' THEN
+        PERFORM public.case_geri_al((v_step_out->>'case_id')::uuid);
+        v_geri := v_geri + 1;
+      WHEN 'tohumlama_kaydet' THEN
+        PERFORM public.tohumlama_geri_al(v_step_out->>'tohumlama_id');
+        v_geri := v_geri + 1;
+      ELSE
+        v_atlanan := v_atlanan || jsonb_build_array(v_tip||' (geri alınamaz)');
+      END CASE;
+    EXCEPTION WHEN OTHERS THEN
+      v_atlanan := v_atlanan || jsonb_build_array(v_tip||' (hata: '||SQLERRM||')');
+    END;
+  END LOOP;
+
+  UPDATE public.agent_plans
+  SET durum = CASE WHEN jsonb_array_length(v_atlanan)=0 THEN 'geri_alindi' ELSE 'kismen_geri_alindi' END,
+      sonuc = COALESCE(sonuc,'{}'::jsonb) || jsonb_build_object('geri_al',
+                jsonb_build_object('geri_alinan', v_geri, 'atlanan', v_atlanan))
+  WHERE id = p_plan_id;
+
+  RETURN jsonb_build_object('ok',true,'geri_alinan',v_geri,'atlanan',v_atlanan,
+    'kismi', (jsonb_array_length(v_atlanan) > 0));
+END;
+$function$
+;
+CREATE OR REPLACE FUNCTION public.asistan_plan_olustur(p_thread_id uuid, p_adimlar jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_adim jsonb; v_d jsonb; v_satirlar jsonb := '[]'::jsonb;
+  v_plan_id uuid; v_n int;
+BEGIN
+  v_n := jsonb_array_length(COALESCE(p_adimlar,'[]'::jsonb));
+  IF v_n = 0 THEN RETURN jsonb_build_object('ok',false,'mesaj','Boş plan'); END IF;
+  IF v_n > 50 THEN RETURN jsonb_build_object('ok',false,'mesaj','Plan çok büyük (max 50 adım)'); END IF;
+
+  FOR v_adim IN SELECT jsonb_array_elements(p_adimlar) LOOP
+    v_d := public._asistan_step_dogrula(v_adim->>'tip', COALESCE(v_adim->'parametreler','{}'::jsonb));
+    IF (v_d->>'ok') = 'false' THEN
+      RETURN jsonb_build_object('ok',false,'mesaj', v_d->>'hata');
+    END IF;
+    v_satirlar := v_satirlar || jsonb_build_array(v_d->>'onizleme');
+  END LOOP;
+
+  INSERT INTO public.agent_plans (thread_id, adimlar, onizleme, durum)
+  VALUES (p_thread_id, p_adimlar, jsonb_build_object('satirlar', v_satirlar), 'pending')
+  RETURNING id INTO v_plan_id;
+
+  RETURN jsonb_build_object('ok',true,'plan_id',v_plan_id,'onizleme',v_satirlar);
+END;
+$function$
+;
+CREATE OR REPLACE FUNCTION public.asistan_plan_uygula(p_plan_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_plan record; v_adim jsonb; v_ctx jsonb := '{}'::jsonb;
+  v_param jsonb; v_out jsonb; v_i int := 0;
+BEGIN
+  SELECT * INTO v_plan FROM public.agent_plans
+  WHERE id = p_plan_id AND kullanici_id = auth.uid();
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'mesaj','Plan bulunamadı'); END IF;
+  IF v_plan.durum <> 'pending' THEN
+    RETURN jsonb_build_object('ok',false,'mesaj','Plan zaten '||v_plan.durum);
+  END IF;
+
+  BEGIN
+    FOR v_adim IN SELECT jsonb_array_elements(v_plan.adimlar) LOOP
+      v_i := v_i + 1;
+      v_param := public._asistan_ref_coz(COALESCE(v_adim->'parametreler','{}'::jsonb), v_ctx);
+      v_out := public._asistan_step_calistir(v_adim->>'tip', v_param);
+      v_ctx := jsonb_set(v_ctx, ARRAY[v_i::text], COALESCE(v_out,'{}'::jsonb));
+    END LOOP;
+  EXCEPTION WHEN OTHERS THEN
+    UPDATE public.agent_plans
+    SET durum='failed', sonuc=jsonb_build_object('hata',SQLERRM,'adim',v_i)
+    WHERE id = p_plan_id;
+    RETURN jsonb_build_object('ok',false,'mesaj','Adım '||v_i||' başarısız: '||SQLERRM);
+  END;
+
+  UPDATE public.agent_plans
+  SET durum='applied', applied_at=now(), sonuc=v_ctx
+  WHERE id = p_plan_id;
+  RETURN jsonb_build_object('ok',true,'plan_id',p_plan_id,'sonuc',v_ctx);
+END;
+$function$
+;
+CREATE OR REPLACE FUNCTION public.asistan_sql_calistir(p_sql text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_clean text := btrim(p_sql);
+  v_low   text := lower(v_clean);
+  v_result jsonb;
+BEGIN
+  IF v_low !~ '^(select|with)\s' THEN
+    RAISE EXCEPTION 'Sadece SELECT sorgusu çalıştırılabilir';
+  END IF;
+  IF position(';' in btrim(v_clean, ';')) > 0 THEN
+    RAISE EXCEPTION 'Çoklu statement yasak';
+  END IF;
+  IF v_low ~ '\m(insert|update|delete|drop|alter|create|truncate|grant|revoke|copy|call|do)\M' THEN
+    RAISE EXCEPTION 'Yazma/DDL anahtar kelimesi yasak';
+  END IF;
+
+  SET LOCAL transaction_read_only = on;
+  SET LOCAL statement_timeout = '5s';
+
+  EXECUTE format(
+    'SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (SELECT * FROM (%s) sub LIMIT 500) t',
+    rtrim(v_clean, ';')
+  ) INTO v_result;
+
+  RETURN v_result;
+END $function$
+;
+CREATE OR REPLACE FUNCTION public.tohumlama_duplicate_bekliyor_temizle()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_iptal_t  integer := 0;
+  v_hayvan   record;
+  v_eski_id  uuid;
+BEGIN
+  -- Her hayvan için birden fazla Bekliyor olan grupları bul
+  FOR v_hayvan IN
+    SELECT hayvan_id, COUNT(*) as adet, array_agg(id ORDER BY tarih ASC, created_at ASC) as id_list
+    FROM public.tohumlama
+    WHERE sonuc = 'Bekliyor'
+    GROUP BY hayvan_id
+    HAVING COUNT(*) > 1
+  LOOP
+    -- En eski kaydı koru (ilk Bekliyor gerçekten muayene bekliyor olabilir)
+    -- Diğerlerini Boş yap
+    FOREACH v_eski_id IN ARRAY v_hayvan.id_list[2:]
+    LOOP
+      UPDATE public.tohumlama SET sonuc = 'Boş' WHERE id = v_eski_id;
+      v_iptal_t := v_iptal_t + 1;
+
+      -- islem_log audit
+      INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+      VALUES (
+        gen_random_uuid()::text,
+        'TOHUMLAMA_DUPLICATE_TEMIZLE',
+        v_hayvan.hayvan_id,
+        v_eski_id::text,
+        'tohumlama',
+        jsonb_build_object(
+          'sebep', 'Aynı hayvanda birden fazla Bekliyor — en eski korundu',
+          'korunan_id', v_hayvan.id_list[1]::text,
+          'iptal_edilen_id', v_eski_id::text,
+          'hayvandaki_bekliyor_sayisi', v_hayvan.adet
+        )
+      );
+    END LOOP;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'iptal_edilen_tohumlama', v_iptal_t,
+    'etkilenen_hayvan_sayisi', (SELECT COUNT(*) FROM (SELECT hayvan_id FROM tohumlama WHERE sonuc = 'Bekliyor' GROUP BY hayvan_id HAVING COUNT(*) > 1) x),
+    'zaman', now()
+  );
+END;
+$function$
+;
+CREATE OR REPLACE FUNCTION public.tohumlama_orphan_gorev_temizle()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_iptal_gorev1 integer;
+  v_iptal_gorev2 integer;
+  v_iptal_gorev3 integer;
+  v_iptal_gorev  integer;
+  v_iptal_inst   integer;
+BEGIN
+  -- 1) ref_tohumlama_id ile bağlı (eski sistem)
+  UPDATE public.gorev_log g
+    SET iptal = true
+    WHERE g.tamamlandi = false
+      AND g.iptal = false
+      AND g.gorev_tipi IN ('GEBELIK_KONTROL', 'VETERINER_KONTROL', 'KIZGINLIK_TAKIP')
+      AND g.ref_tohumlama_id IS NOT NULL
+      AND EXISTS (
+        SELECT 1 FROM public.tohumlama t
+        WHERE t.id::text = g.ref_tohumlama_id
+          AND t.sonuc IN ('Boş', 'Abort')
+      );
+  GET DIAGNOSTICS v_iptal_gorev1 = ROW_COUNT;
+
+  -- 2) kaynak ile bağlı (yeni sistem)
+  UPDATE public.gorev_log g
+    SET iptal = true
+    WHERE g.tamamlandi = false
+      AND g.iptal = false
+      AND g.kaynak LIKE 'TOH-%'
+      AND EXISTS (
+        SELECT 1 FROM public.tohumlama t
+        WHERE 'TOH-' || t.id::text = g.kaynak
+          AND t.sonuc IN ('Boş', 'Abort')
+      );
+  GET DIAGNOSTICS v_iptal_gorev2 = ROW_COUNT;
+
+  -- 3) NULL kaynak + NULL ref — orphan, bağlı tohumlama Boş/Abort (yeni eklenen)
+  UPDATE public.gorev_log g
+    SET iptal = true
+    WHERE g.tamamlandi = false
+      AND g.iptal = false
+      AND g.kaynak IS NULL
+      AND g.ref_tohumlama_id IS NULL
+      AND g.gorev_tipi IN ('GEBELIK_KONTROL', 'VETERINER_KONTROL', 'KIZGINLIK_TAKIP')
+      AND EXISTS (
+        SELECT 1 FROM public.tohumlama t
+        WHERE t.hayvan_id = g.hayvan_id
+          AND t.sonuc IN ('Boş', 'Abort')
+          AND t.tarih < g.hedef_tarih  -- orphan görev önce gelmiş
+      );
+  GET DIAGNOSTICS v_iptal_gorev3 = ROW_COUNT;
+
+  v_iptal_gorev := v_iptal_gorev1 + v_iptal_gorev2 + v_iptal_gorev3;
+
+  -- 4) protokol_instance — kaynak_ref bazlı
+  UPDATE public.protokol_instance pi
+    SET durum = 'iptal'
+    WHERE pi.durum = 'aktif'
+      AND pi.kaynak_ref LIKE 'TOH-%'
+      AND EXISTS (
+        SELECT 1 FROM public.tohumlama t
+        WHERE 'TOH-' || t.id::text = pi.kaynak_ref
+          AND t.sonuc IN ('Boş', 'Abort')
+      );
+  GET DIAGNOSTICS v_iptal_inst = ROW_COUNT;
+
+  RETURN jsonb_build_object(
+    'iptal_gorev',  v_iptal_gorev,
+    'iptal_gorev_ref_tohumlama', v_iptal_gorev1,
+    'iptal_gorev_kaynak',        v_iptal_gorev2,
+    'iptal_gorev_null_orphan',   v_iptal_gorev3,
+    'iptal_inst',   v_iptal_inst,
+    'zaman',        now()
+  );
+END;
+$function$
+;
+
 
 
 
