@@ -15,7 +15,7 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report tests/report",
-    "test:unit": "node --test tests/unit/"
+    "test:unit": "node --test tests/unit/*.test.js"
   },
   "repository": {
     "type": "git",
