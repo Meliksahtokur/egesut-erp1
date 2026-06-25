@@ -92,3 +92,7 @@ AGENTS.local.md
 
 # Pre-merge yedekleri
 backup/
+
+# LSP/credential — ASLA commit etme
+.env
+.env.*
