@@ -579,6 +579,8 @@ async function loadTasks(f,btn,opts){
     // --- Seans görevlerini ayır, gruplara böl ---
     const seansDayIds=new Set();
     data.forEach(t=>{ if(t.gorev_tipi==='TEDAVI_SEANS'){ const sd=_seansById[t.seans_admin_id]; if(sd?.treatment_day_id)seansDayIds.add(sd.treatment_day_id); } });
+    // TEDAVI_GUN gorev aciklamasi JSON {day_id, planned_time, label, ...} — try/catch fallback
+    const _gorevAciklama=t=>{ try{ return JSON.parse(t.aciklama||'{}'); }catch(e){ return {}; } };
     const grupMap={};
     data.forEach(t=>{
       if(t.gorev_tipi!=='TEDAVI_SEANS')return;
@@ -603,8 +605,8 @@ async function loadTasks(f,btn,opts){
     const bloklar=[];
     data.forEach(t=>{
       if(t.gorev_tipi==='TEDAVI_SEANS')return;
-      if(t.gorev_tipi==='TEDAVI_GUN'){ try{ if(seansDayIds.has(JSON.parse(t.aciklama||'{}').day_id))return; }catch(e){} }
-      const planTime=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
+      if(t.gorev_tipi==='TEDAVI_GUN'){ if(seansDayIds.has(_gorevAciklama(t).day_id))return; }
+      const planTime=t.gorev_tipi==='TEDAVI_GUN'?(_gorevAciklama(t).planned_time||''):'';
       bloklar.push({ sort:(t.hedef_tarih||'')+'|'+(planTime||'~')+'|n', type:'normal', task:t });
     });
     Object.values(grupMap).forEach(g=>{
