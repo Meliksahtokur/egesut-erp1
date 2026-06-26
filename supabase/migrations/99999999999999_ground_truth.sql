@@ -8937,20 +8937,18 @@ GROUP BY hayvan_id, padok, durum, cycle_no, h_genc_anne, h_grup, dogum_sayisi;
 
 GRANT SELECT ON public.v_ureme_dongusu TO anon, authenticated;
 
--- ── stat_suru_ozet v4 — 42-gün + sperma_all + sessiz + görev tetikleme ═══
+-- ── stat_suru_ozet v5 — 42-gün + sperma_all + sessiz (salt-okuma) ═══
 CREATE OR REPLACE FUNCTION public.stat_suru_ozet(
   p_padok     text    DEFAULT NULL,
   p_son_donem boolean DEFAULT true
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_hayvan   jsonb;
-  v_gebelik  jsonb;
-  v_sessiz   integer;
+  v_hayvan    jsonb;
+  v_gebelik   jsonb;
   v_verim     jsonb;
   v_sperma_pi jsonb;
 BEGIN
-  SELECT sessiz_hayvanlar_gorev_olustur() INTO v_sessiz;
   SELECT jsonb_build_object(
     'toplam', COUNT(*),
     'inek',   COUNT(*) FILTER (WHERE grup ILIKE '%inek%' OR grup LIKE '%İnek%' OR grup ILIKE '%sağmal%' OR grup ILIKE '%sagmal%' OR grup ILIKE '%kuru%' OR EXISTS (SELECT 1 FROM public.dogum d WHERE d.anne_id = h.id)),
@@ -8960,7 +8958,7 @@ BEGIN
     'kisir',  COUNT(*) FILTER (WHERE kisir = true),
     'hasta',  (SELECT COUNT(DISTINCT c.animal_id) FROM public.cases c JOIN public.hayvanlar h2 ON h2.id = c.animal_id WHERE c.status = 'active' AND h2.durum = 'Aktif' AND (p_padok IS NULL OR h2.padok = p_padok)),
     'tohumlanan', (SELECT COUNT(DISTINCT t2.hayvan_id) FROM public.tohumlama t2 JOIN public.hayvanlar h3 ON h3.id = t2.hayvan_id WHERE h3.durum = 'Aktif' AND h3.cinsiyet = 'Dişi' AND (p_padok IS NULL OR h3.padok = p_padok)),
-    'sessiz', (SELECT COUNT(*) FROM public.v_eligible e WHERE (p_padok IS NULL OR e.padok = p_padok) AND COALESCE(e.sessiz_gun, 9999) >= 55),
+    'sessiz', (SELECT COUNT(*) FROM public.v_eligible e WHERE (p_padok IS NULL OR e.padok = p_padok) AND e.sessiz_gun >= 55),
     'belirsiz', (SELECT COUNT(*) FROM public.hayvanlar hb
                  WHERE hb.cinsiyet = 'Dişi' AND hb.durum = 'Aktif' AND hb.kisir IS NOT TRUE
                    AND hb.genc_anne IS NULL
@@ -9077,39 +9075,45 @@ GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenti
 -- ═══════════════════════════════════════════════════════════════
 
 -- ── v_eligible — tohumlama için uygun hayvanlar (buzağı hariç, 13+ ay) ──
+-- v2 (2026-06-25): sessiz_gun sinyal sıralaması — son_aktivite → son_dogum → dogum_tarihi → NULL.
+--                  Hiç sinyal yoksa NULL (9999 hilesi kalkar). Row-set aynı.
 CREATE OR REPLACE VIEW public.v_eligible AS
-SELECT
-  h.id, h.kupe_no, h.grup, h.padok,
-  son_dogum.tarih                    AS son_dogum_tarihi,
-  CURRENT_DATE - son_dogum.tarih     AS dogum_gun,
-  son_aktivite.tarih                 AS son_aktivite_tarihi,
-  CASE
-    WHEN son_aktivite.tarih IS NOT NULL THEN CURRENT_DATE - son_aktivite.tarih
-    ELSE CASE
-      WHEN h.dogum_tarihi IS NOT NULL THEN CURRENT_DATE - h.dogum_tarihi
-      ELSE NULL
-    END
-  END                                AS sessiz_gun
-FROM public.hayvanlar h
-LEFT JOIN LATERAL (
-  SELECT MAX(d.tarih) AS tarih FROM public.dogum d WHERE d.anne_id = h.id
-) son_dogum ON true
-LEFT JOIN LATERAL (
-  SELECT MAX(tarih) AS tarih FROM (
-    SELECT tarih FROM public.tohumlama WHERE hayvan_id = h.id
-    UNION ALL
-    SELECT tarih FROM public.kizginlik_log WHERE hayvan_id = h.id
-  ) aktivite
-) son_aktivite ON true
-WHERE h.cinsiyet = 'Dişi'
-  AND h.durum = 'Aktif'
-  AND h.kisir IS NOT TRUE
-  AND h.grup NOT ILIKE '%buzağı%' AND h.grup NOT ILIKE '%buzagi%'
-  AND h.grup NOT ILIKE '%Küçük%' AND h.grup NOT ILIKE '%Kucuk%'
-  AND (h.dogum_tarihi IS NULL OR h.dogum_tarihi <= CURRENT_DATE - INTERVAL '13 months')
-  AND NOT EXISTS (SELECT 1 FROM public.tohumlama t WHERE t.hayvan_id = h.id AND t.sonuc = 'Gebe')
-  AND NOT EXISTS (SELECT 1 FROM public.cases c WHERE c.animal_id = h.id AND c.status = 'active')
-  AND (son_dogum.tarih IS NULL OR son_dogum.tarih < CURRENT_DATE - 55);
+ SELECT h.id,
+    h.kupe_no,
+    h.grup,
+    h.padok,
+    son_dogum.tarih AS son_dogum_tarihi,
+    CURRENT_DATE - son_dogum.tarih AS dogum_gun,
+    son_aktivite.tarih AS son_aktivite_tarihi,
+    CASE
+        WHEN son_aktivite.tarih IS NOT NULL THEN CURRENT_DATE - son_aktivite.tarih
+        WHEN son_dogum.tarih   IS NOT NULL THEN CURRENT_DATE - son_dogum.tarih
+        WHEN h.dogum_tarihi    IS NOT NULL THEN CURRENT_DATE - h.dogum_tarihi
+        ELSE NULL::integer
+    END AS sessiz_gun
+   FROM hayvanlar h
+     LEFT JOIN LATERAL ( SELECT max(d.tarih) AS tarih
+           FROM dogum d
+          WHERE d.anne_id = h.id) son_dogum ON true
+     LEFT JOIN LATERAL ( SELECT max(aktivite.tarih) AS tarih
+           FROM ( SELECT tohumlama.tarih
+                   FROM tohumlama
+                  WHERE tohumlama.hayvan_id = h.id
+                UNION ALL
+                 SELECT kizginlik_log.tarih
+                   FROM kizginlik_log
+                  WHERE kizginlik_log.hayvan_id = h.id) aktivite) son_aktivite ON true
+  WHERE h.cinsiyet = 'Dişi'::text
+    AND h.durum = 'Aktif'::text
+    AND h.kisir IS NOT TRUE
+    AND h.grup !~~* '%buzağı%'::text
+    AND h.grup !~~* '%buzagi%'::text
+    AND h.grup !~~* '%Küçük%'::text
+    AND h.grup !~~* '%Kucuk%'::text
+    AND (h.dogum_tarihi IS NULL OR h.dogum_tarihi <= (CURRENT_DATE - '1 year 1 mon'::interval))
+    AND NOT (EXISTS ( SELECT 1 FROM tohumlama t WHERE t.hayvan_id = h.id AND t.sonuc = 'Gebe'::text))
+    AND NOT (EXISTS ( SELECT 1 FROM cases c WHERE c.animal_id = h.id AND c.status = 'active'::text))
+    AND (son_dogum.tarih IS NULL OR son_dogum.tarih < (CURRENT_DATE - 55));
 GRANT SELECT ON public.v_eligible TO anon, authenticated;
 
 -- ── sessiz_hayvanlar_listele ──
@@ -9128,37 +9132,77 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.sessiz_hayvanlar_listele(text, integer) TO anon, authenticated;
 
--- ── sessiz_hayvanlar_gorev_olustur ──
-CREATE OR REPLACE FUNCTION public.sessiz_hayvanlar_gorev_olustur()
-RETURNS integer LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_count integer := 0; v_rec record;
+-- ── sessiz_hayvanlar_reconcile (TEK OTORİTE) + eski jeneratör → wrapper ──
+-- v2 (2026-06-25): kararlı kaynak='SESSIZ-<id>', 30g cooldown (yalnız kullanıcı tamamlaması).
+-- Günlük cron: sessiz-reconcile-daily 05:00.
+CREATE OR REPLACE FUNCTION public.sessiz_hayvanlar_reconcile()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE
+  v_uretilen  integer := 0;
+  v_kapatilan integer := 0;
+  v_rec       record;
 BEGIN
   FOR v_rec IN
-    SELECT e.id, e.kupe_no, e.sessiz_gun FROM public.v_eligible e
-    WHERE COALESCE(e.sessiz_gun, 9999) >= 55
+    SELECT e.id, e.kupe_no, e.sessiz_gun
+    FROM public.v_eligible e
+    WHERE e.sessiz_gun >= 55
       AND NOT EXISTS (
         SELECT 1 FROM public.gorev_log g
         WHERE g.hayvan_id = e.id
-          AND g.gorev_tipi = 'VETERINER_KONTROL'
-          AND g.tamamlandi = false
-          AND g.iptal = false
+          AND g.kaynak = 'SESSIZ-' || e.id
+          AND g.tamamlandi = false AND g.iptal = false
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM public.gorev_log g
+        WHERE g.hayvan_id = e.id
+          AND g.kaynak = 'SESSIZ-' || e.id
+          AND g.tamamlandi = true
+          AND g.tamamlanma_tarihi >= (CURRENT_DATE - 30)
       )
   LOOP
-    INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal)
+    INSERT INTO public.gorev_log
+      (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal, kaynak)
     VALUES (
       gen_random_uuid(), v_rec.id, 'VETERINER_KONTROL',
-      CASE
-        WHEN v_rec.sessiz_gun IS NULL
-          THEN format('Sessiz hayvan: hiç üreme kaydı yok (%s)', v_rec.kupe_no)
-        ELSE format('Sessiz hayvan: %s gündür üreme aktivitesi yok (%s)', v_rec.sessiz_gun, v_rec.kupe_no)
-      END,
-      CURRENT_DATE, false, false
+      format('Sessiz hayvan: %s gündür üreme aktivitesi yok (%s)', v_rec.sessiz_gun, v_rec.kupe_no),
+      CURRENT_DATE, false, false, 'SESSIZ-' || v_rec.id
     );
-    v_count := v_count + 1;
+    v_uretilen := v_uretilen + 1;
   END LOOP;
-  RETURN v_count;
+
+  UPDATE public.gorev_log g
+  SET iptal = true, kapatan_ref = 'sessiz-noteligible'
+  WHERE g.gorev_tipi = 'VETERINER_KONTROL'
+    AND g.kaynak LIKE 'SESSIZ-%'
+    AND g.tamamlandi = false AND g.iptal = false
+    AND NOT EXISTS (
+      SELECT 1 FROM public.v_eligible e
+      WHERE e.id = g.hayvan_id AND e.sessiz_gun >= 55
+    );
+  GET DIAGNOSTICS v_kapatilan = ROW_COUNT;
+
+  RETURN jsonb_build_object('uretilen', v_uretilen, 'kapatilan', v_kapatilan, 'zaman', now());
 END;
-$$;
+$function$
+;
+GRANT EXECUTE ON FUNCTION public.sessiz_hayvanlar_reconcile() TO anon, authenticated;
+
+-- Eski jeneratör → ince wrapper (kalıntı çağıranlar güvenli; tek otorite reconcile)
+CREATE OR REPLACE FUNCTION public.sessiz_hayvanlar_gorev_olustur()
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+DECLARE v_res jsonb;
+BEGIN
+  v_res := public.sessiz_hayvanlar_reconcile();
+  RETURN COALESCE((v_res->>'uretilen')::int, 0);
+END;
+$function$
+;
 GRANT EXECUTE ON FUNCTION public.sessiz_hayvanlar_gorev_olustur() TO anon, authenticated;
 
 -- ── _sessiz_gorev_iptal helper ──
