@@ -333,7 +333,7 @@ async function pullTables(tables = []) {
   try {
     const FETCHERS = {
       hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
-      gorev_log:    () => db.from('gorev_log').select('*'),
+      gorev_log:    () => db.from('v_gorev_log_sync').select('*'),
       stok:         () => db.from('stok_tuketim_view').select('*'),
       stok_hareket: () => db.from('stok_hareket').select('*'),
       cases:        () => db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
