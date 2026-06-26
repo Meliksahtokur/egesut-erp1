@@ -10599,3 +10599,187 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES    FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM PUBLIC;
+-- ── gorev_log yaşam döngüsü (2026-06-26) — append ──
+
+-- VIEW: v_gorev_log_sync
+CREATE OR REPLACE VIEW public.v_gorev_log_sync AS
+ SELECT gorev_log.id,
+    gorev_log.hayvan_id,
+    gorev_log.gorev_tipi,
+    gorev_log.aciklama,
+    gorev_log.hedef_tarih,
+    gorev_log.tamamlandi,
+    gorev_log.tamamlanma_tarihi,
+    gorev_log.padok_hedef,
+    gorev_log.stok_id,
+    gorev_log.miktar,
+    gorev_log.stok_dusuldu,
+    gorev_log.kaynak,
+    gorev_log.created_at,
+    gorev_log.parent_id,
+    gorev_log.iptal,
+    gorev_log.hekim_id,
+    gorev_log.ref_tohumlama_id,
+    gorev_log.etken_kod,
+    gorev_log.kapatan_ref,
+    gorev_log.protokol_instance_id,
+    gorev_log.seans_admin_id,
+    gorev_log.hedef_saat
+   FROM gorev_log
+  WHERE NOT gorev_log.tamamlandi AND NOT gorev_log.iptal
+UNION ALL
+ SELECT kapali.id,
+    kapali.hayvan_id,
+    kapali.gorev_tipi,
+    kapali.aciklama,
+    kapali.hedef_tarih,
+    kapali.tamamlandi,
+    kapali.tamamlanma_tarihi,
+    kapali.padok_hedef,
+    kapali.stok_id,
+    kapali.miktar,
+    kapali.stok_dusuldu,
+    kapali.kaynak,
+    kapali.created_at,
+    kapali.parent_id,
+    kapali.iptal,
+    kapali.hekim_id,
+    kapali.ref_tohumlama_id,
+    kapali.etken_kod,
+    kapali.kapatan_ref,
+    kapali.protokol_instance_id,
+    kapali.seans_admin_id,
+    kapali.hedef_saat
+   FROM ( SELECT gorev_log.id,
+            gorev_log.hayvan_id,
+            gorev_log.gorev_tipi,
+            gorev_log.aciklama,
+            gorev_log.hedef_tarih,
+            gorev_log.tamamlandi,
+            gorev_log.tamamlanma_tarihi,
+            gorev_log.padok_hedef,
+            gorev_log.stok_id,
+            gorev_log.miktar,
+            gorev_log.stok_dusuldu,
+            gorev_log.kaynak,
+            gorev_log.created_at,
+            gorev_log.parent_id,
+            gorev_log.iptal,
+            gorev_log.hekim_id,
+            gorev_log.ref_tohumlama_id,
+            gorev_log.etken_kod,
+            gorev_log.kapatan_ref,
+            gorev_log.protokol_instance_id,
+            gorev_log.seans_admin_id,
+            gorev_log.hedef_saat
+           FROM gorev_log
+          WHERE gorev_log.tamamlandi OR gorev_log.iptal
+          ORDER BY gorev_log.created_at DESC NULLS LAST
+         LIMIT 300) kapali;
+;
+
+-- VIEW: v_orphan_gorev
+CREATE OR REPLACE VIEW public.v_orphan_gorev AS
+ SELECT id,
+    hayvan_id,
+    gorev_tipi,
+    aciklama,
+    hedef_tarih,
+    tamamlandi,
+    tamamlanma_tarihi,
+    padok_hedef,
+    stok_id,
+    miktar,
+    stok_dusuldu,
+    kaynak,
+    created_at,
+    parent_id,
+    iptal,
+    hekim_id,
+    ref_tohumlama_id,
+    etken_kod,
+    kapatan_ref,
+    protokol_instance_id,
+    seans_admin_id,
+    hedef_saat
+   FROM gorev_log g
+  WHERE NOT tamamlandi AND NOT iptal AND (NOT (EXISTS ( SELECT 1
+           FROM hayvanlar h
+          WHERE h.id = g.hayvan_id AND h.durum = 'Aktif'::text)) OR parent_id IS NOT NULL AND (gorev_tipi <> ALL (ARRAY['BESLEME'::text, 'BUZAGI_BAKIM'::text, 'TEDAVI_GUN'::text, 'ILERI_GEBE_ASI'::text])) AND NOT (EXISTS ( SELECT 1
+           FROM gorev_log p
+          WHERE p.id = g.parent_id)) OR parent_id IS NOT NULL AND (EXISTS ( SELECT 1
+           FROM gorev_log p
+          WHERE p.id = g.parent_id AND (p.tamamlandi OR p.iptal) AND p.gorev_tipi <> g.gorev_tipi)));
+;
+
+-- FUNCTION: _trg_gorev_parent_kapandi
+CREATE OR REPLACE FUNCTION public._trg_gorev_parent_kapandi()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    UPDATE public.gorev_log
+       SET iptal = true, kapatan_ref = 'parent-silindi'
+     WHERE parent_id = OLD.id AND NOT tamamlandi AND NOT iptal
+       AND gorev_tipi NOT IN ('BESLEME','BUZAGI_BAKIM','TEDAVI_GUN','ILERI_GEBE_ASI');
+    RETURN OLD;
+  END IF;
+  IF (NEW.tamamlandi OR NEW.iptal) AND NOT (OLD.tamamlandi OR OLD.iptal) THEN
+    UPDATE public.gorev_log c
+       SET iptal = true, kapatan_ref = 'parent-kapandi'
+     WHERE c.parent_id = NEW.id AND NOT c.tamamlandi AND NOT c.iptal
+       AND c.gorev_tipi <> NEW.gorev_tipi;
+  END IF;
+  RETURN NEW;
+END;
+$function$
+;
+
+-- FUNCTION: _trg_hayvan_cikis_gorev_iptal
+CREATE OR REPLACE FUNCTION public._trg_hayvan_cikis_gorev_iptal()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF NEW.durum <> 'Aktif' AND OLD.durum = 'Aktif' THEN
+    UPDATE public.gorev_log
+       SET iptal = true, kapatan_ref = 'hayvan-cikis'
+     WHERE hayvan_id = NEW.id
+       AND NOT tamamlandi AND NOT iptal;
+  END IF;
+  RETURN NEW;
+END;
+$function$
+;
+
+-- FUNCTION: gorev_orphan_temizle
+CREATE OR REPLACE FUNCTION public.gorev_orphan_temizle()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE v_temizlenen int;
+BEGIN
+  UPDATE public.gorev_log g
+     SET iptal = true, kapatan_ref = 'orphan-temizle'
+   WHERE g.id IN (SELECT id FROM public.v_orphan_gorev);
+  GET DIAGNOSTICS v_temizlenen = ROW_COUNT;
+
+  IF v_temizlenen > 0 THEN
+    INSERT INTO public.bildirim_log (tip, mesaj)
+    VALUES ('ORPHAN_GOREV',
+            format('%s orphan görev temizlendi (trigger kaçağı?)', v_temizlenen));
+  END IF;
+
+  RETURN jsonb_build_object('temizlenen', v_temizlenen, 'zaman', now());
+END;
+$function$
+;
+
+-- TRIGGER: trg_gorev_parent_kapandi (gorev_log)
+CREATE TRIGGER trg_gorev_parent_kapandi AFTER DELETE OR UPDATE OF tamamlandi, iptal ON public.gorev_log FOR EACH ROW EXECUTE FUNCTION _trg_gorev_parent_kapandi();
+
+-- TRIGGER: trg_hayvan_cikis_gorev_iptal (hayvanlar)
+CREATE TRIGGER trg_hayvan_cikis_gorev_iptal AFTER UPDATE OF durum ON public.hayvanlar FOR EACH ROW EXECUTE FUNCTION _trg_hayvan_cikis_gorev_iptal();
+
