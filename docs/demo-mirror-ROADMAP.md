@@ -3,7 +3,29 @@
 > **Seçilen mimari: Seçenek D** — ayrı Supabase projesi + FDW köprüsü + tek-tık/saatlik klon.
 > Araştırma: `research/2026-07-01-demo-hesap-mirror-arastirma/rapor.md` (+ `rapor-L-rpc-drift-audit.md`)
 > İlgili disiplin: `.claude/farm-id-discipline.md` (D, aynı zamanda Faz 2 staging'i olarak ikiye katlanır)
-> Durum: **PLAN — implementasyon başlamadı** (2026-07-02). Ön-koşul olan farm_id ileri-disiplini ✅ BİTTİ (commit `0e421f3`).
+> Durum: **D0 sürüyor** (2026-07-02). Demo projesi kuruldu, şema kaynağı = **günlük backup dump'ı** (aşağıda). Ön-koşul farm_id disiplini ✅ (commit `0e421f3`).
+
+## Altyapı / Bağlantılar (2026-07-02)
+
+**Demo Supabase projesi** — ref `vtzqjmazsvurxdeondmi` · region `eu-west-1` (prod ile AYNI) · PG 17.6.
+- Sırlar `.env`'de (gitignored): `SUPABASE_DEMO_REF`, `SUPABASE_DEMO_PAT`, `SUPABASE_DEMO_DB_PASSWORD`, `SUPABASE_DEMO_POOLER`.
+- psql: `postgresql://postgres.$SUPABASE_DEMO_REF@$SUPABASE_DEMO_POOLER:5432/postgres?sslmode=require`
+- MCP (proje seviyesi, `.mcp.json` → `supabase-demo`): `@supabase/mcp-server-supabase@0.8.2`, project-ref demo'ya kilitli, features `database,development,debugging`. Token env `SUPABASE_DEMO_PAT`. **Restart sonrası** `mcp__supabase-demo__*` görünür.
+
+**Prod** — ref `zqnexqbdfvbhlxzelzju` · region `eu-west-1`. Doğrudan DB şifresi lokalde YOK (GitHub secret `SUPABASE_DB_PASSWORD`).
+
+**ŞEMA + VERİ KAYNAĞI = günlük backup** (`.github/workflows/db-backup.yml`): her gün 03:00 TSİ, Docker `pg_dump --format=custom --no-owner --no-acl` (extensions/graphql/net/realtime vb. şemalar hariç; **public + auth dahil**), openssl `aes-256-cbc -pbkdf2` ile şifreli GitHub artifact (90 gün). Not: `--no-acl` → **GRANT'lar dump'ta YOK, restore sonrası yeniden verilmeli** (anon/authenticated PostgREST erişimi için).
+
+**Backup indir + çöz (recipe):**
+```bash
+export GH_TOKEN=$(git remote get-url origin | sed -E 's|https://([^@]+)@.*|\1|')   # PAT git remote'da gömülü
+RID=$(gh run list --workflow=db-backup.yml -L1 --json databaseId -q '.[0].databaseId')
+gh run download "$RID" -D /tmp/bk
+openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$BACKUP_PASSWORD" \
+  -in /tmp/bk/*/egesut_*.pg.enc -out /tmp/bk/dump.pg     # BACKUP_PASSWORD = GitHub secret
+# demo'ya sadece public: pg_restore --schema=public --no-owner -d "<demo psql url>" /tmp/bk/dump.pg
+```
+**Eksik tek anahtar:** `BACKUP_PASSWORD` (dump'ı çözmek için). Prod'a hiç dokunmaz.
 
 ## Amaç
 
