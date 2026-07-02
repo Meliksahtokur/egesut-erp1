@@ -48,7 +48,7 @@ Demo tarafında (demo Management API `/database/query` ile) çalıştırıldı:
 
 ### D2 GERÇEKLEŞEN yöntem (2026-07-02) — demo_klonla() RPC kuruldu + canlı test geçti
 SQL repoda: `demo/02_demo_klonla.sql` (+ `demo/01_fdw_bridge.sql`, `demo/README.md`). **Demo-only, prod migration DEĞİL.**
-- 44 tablo (agent_* + demo_klon_log + 3 vector-infra hariç), topolojik FK sırası (ebeveyn→çocuk), generated/identity kolon YOK → düz `INSERT..SELECT`.
+- **DİNAMİK** (2026-07-02 yükseltme): tablo listesi + FK sırası + kolonlar + sequence'ler runtime demo katalogundan (`pg_class`/`pg_constraint` recursive CTE topo-sort + `information_schema`). Gömülü ad yok → demo'ya tablo/kolon eklenince klon otomatik kapsar, regen gerekmez. 44 tablo (agent_* + demo_klon_log + 3 vector-infra hariç, sadece prod_fdw'de olanlar). Kolon listesi = demo ∩ prod_fdw (iki yönlü drift-güvenli).
 - **Superuser tuzağı:** Supabase `postgres` superuser değil → `DISABLE TRIGGER ALL` (FK constraint trigger) yasak. Çözüm: `DISABLE TRIGGER USER` (app trigger'ları sustur, sahiplik yeter) + topolojik sıra (FK açık ama sağlanır).
 - **pending trigger events tuzağı:** gorev_log'un bir FK'sı DEFERRABLE INITIALLY DEFERRED → INSERT'ten sonra `ALTER TABLE ENABLE TRIGGER` "pending trigger events" ile patlar. Çözüm: re-enable öncesi `SET CONSTRAINTS ALL IMMEDIATE`.
 - Kolon listesi çalışma anında **demo** katalogundan üretilir (prod kolon eklese bile demo'nunkiyle sınırlı → drift'e kısmen dayanıklı).
@@ -82,8 +82,9 @@ KULLANICI ──┬─ gerçek giriş ──▶ PROD PROJESİ (canlı, read-only
 | **D0** | Demo projesi + şema+veri (prod'dan pg_dump via `demo_reader`, BYPASSRLS) | ½ gün | ✅ **2026-07-02** |
 | **D1** | FDW köprüsü: `CREATE SERVER`/`USER MAPPING`/`IMPORT FOREIGN SCHEMA` + read testi | ½ gün | ✅ **2026-07-02** |
 | **D2** | `demo_klonla()` RPC: FK-ters TRUNCATE + FK-düz INSERT..SELECT + `setval` — tek transaction + `demo_klon_log` | 1 gün | ✅ **2026-07-02** |
-| **D3** | pg_cron saatlik + **şema-senkron adımı** (prod migration'ı demo'ya replay) | ½ gün | ⬜ |
-| **D4** | UI: `config.js` `IS_DEMO` host-tespiti + demo client + login butonu + demo bandı + "↻ Klonla" | 1 gün | ⬜ |
+| ~~D3~~ | ~~pg_cron saatlik~~ **İPTAL (2026-07-02)** — prod yavaş değişir, buton yeter. Yerine: girişte popup-hatırlatma (D4) + şema-senkron prod-migration adımı + on-demand şema-diff | — | ❌ iptal |
+| **D4** | UI: `config.js` `IS_DEMO` host-tespiti + demo client + login butonu + demo bandı + "↻ Klonla" + giriş-popup ("bir daha gösterme") | 1 gün | ⬜ |
+| **D-şema** | Şema-senkron = prod migration'ı demo'ya da uygula + FDW yenile (cron değil, workflow adımı); + on-demand şema-diff uyarısı | ¼ gün | ⬜ |
 | **D5** | Sağlamlaştırma: yazma-geçicilik teyidi, service_role client'ta yok kontrolü, klon sırası UI kilidi, deploy | ½ gün | ⬜ |
 
 **Toplam: ~4 gün efor (≈1 hafta takvim).** Faz 2 multi-tenant (~3-4 hafta) DEĞİL — D bilinçli olarak hafif tutuldu.
