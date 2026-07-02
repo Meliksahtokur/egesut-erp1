@@ -35,6 +35,17 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$BACKUP_PASSWORD" \
 Sonuç: 47 tablo + tam veri (hayvanlar 153, gorev_log 1246, drug_products 25) + 172 fn + 14 view + 68 policy + 26 trigger + grant'lar. Eksik = sadece vector-infra (farm app'i kullanmaz).
 **AÇIK:** `demo_reader` prod'da duruyor (D2 klon için gerekli; bitince `DROP ROLE demo_reader`).
 
+### D1 GERÇEKLEŞEN yöntem (2026-07-02) — postgres_fdw köprüsü kuruldu
+Demo tarafında (demo Management API `/database/query` ile) çalıştırıldı:
+1. `CREATE EXTENSION postgres_fdw;`
+2. `CREATE SERVER prod_srv` → host `aws-1-eu-west-1.pooler.supabase.com`, **port 5432 (session mode; transaction-mode 6543 FDW için uygun değil)**, dbname `postgres`, `sslmode 'require'`.
+3. `CREATE USER MAPPING FOR postgres` → user `demo_reader.zqnexqbdfvbhlxzelzju` (pooler `.ref` sonekli), password (`demo_reader` prod rolü, SELECT-only + BYPASSRLS). Mapping **postgres** için: D2 klon RPC SECURITY DEFINER + pg_cron postgres olarak koşar.
+4. `IMPORT FOREIGN SCHEMA public EXCEPT (code_embeddings, entity_graph, memory_notes) FROM SERVER prod_srv INTO prod_fdw;` → **prod_fdw** şemasına 61 foreign relation (prod'un tüm tablo+view'ları; 3 AI-infra `vector` tablo hariç, demo'da tip yok).
+5. Read testi: `SELECT count(*) FROM prod_fdw.hayvanlar` → 153, `gorev_log` → **1251** (D0 dump'ında 1246'ydı → köprünün **canlı** prod okuduğunun kanıtı). Eksik base tablo = 0 (demo'daki her tablo köprüde karşılanıyor → D2 klonu hepsini doldurabilir).
+
+**TUZAK:** Demo Management API'ye Python `urllib` ile POST → **Cloudflare error 1010** (client-signature ban). **`curl` kullan** (veya browser UA header). MCP `mcp__supabase-demo__*` (restart sonrası) bu sorunu yaşamaz.
+**AÇIK:** `demo_reader` prod'da SELECT-only + BYPASSRLS olarak duruyor — köprü buna bağlı, artık D2/kalıcı klon için gerekli (DROP etme).
+
 ## Amaç
 
 Login ekranında "🧪 Demo Girişi" butonu → ayrı Supabase projesinde gerçek verinin **kopyası**. Demo'daki yazmalar **geçici**: prod → demo klon her tetiklendiğinde üzerine yazılır. Tetik iki yoldan: **pg_cron (saatlik)** + **UI "↻ Prod'dan Klonla" butonu**.
@@ -60,7 +71,7 @@ KULLANICI ──┬─ gerçek giriş ──▶ PROD PROJESİ (canlı, read-only
 | Faz | İş | Efor | Durum |
 |---|---|---|---|
 | **D0** | Demo projesi + şema+veri (prod'dan pg_dump via `demo_reader`, BYPASSRLS) | ½ gün | ✅ **2026-07-02** |
-| **D1** | FDW köprüsü: `CREATE SERVER`/`USER MAPPING`/`IMPORT FOREIGN SCHEMA` + read testi | ½ gün | ⬜ |
+| **D1** | FDW köprüsü: `CREATE SERVER`/`USER MAPPING`/`IMPORT FOREIGN SCHEMA` + read testi | ½ gün | ✅ **2026-07-02** |
 | **D2** | `demo_klonla()` RPC: FK-ters TRUNCATE + FK-düz INSERT..SELECT + `setval` — tek transaction + `demo_klon_log` | 1 gün | ⬜ |
 | **D3** | pg_cron saatlik + **şema-senkron adımı** (prod migration'ı demo'ya replay) | ½ gün | ⬜ |
 | **D4** | UI: `config.js` `IS_DEMO` host-tespiti + demo client + login butonu + demo bandı + "↻ Klonla" | 1 gün | ⬜ |
