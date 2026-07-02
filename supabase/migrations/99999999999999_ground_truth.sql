@@ -10783,3 +10783,18 @@ CREATE TRIGGER trg_gorev_parent_kapandi AFTER DELETE OR UPDATE OF tamamlandi, ip
 -- TRIGGER: trg_hayvan_cikis_gorev_iptal (hayvanlar)
 CREATE TRIGGER trg_hayvan_cikis_gorev_iptal AFTER UPDATE OF durum ON public.hayvanlar FOR EACH ROW EXECUTE FUNCTION _trg_hayvan_cikis_gorev_iptal();
 
+-- ════════════════════════════════════════════════════════════════════════════
+-- farm_id İleri-Disiplini — Temel (2026-07-01, Faz 2 hazırlığı)
+-- Kapsam: SADECE public.current_farm_id() helper'ı. Mevcut tablo/RLS'e dokunmaz.
+-- Lockdown bloğu (yukarıda) zaten GRANT EXECUTE ON ALL FUNCTIONS ... TO
+-- authenticated yapıyor → current_farm_id authenticated-only olur.
+-- Kaynak: .claude/farm-id-discipline.md (kanonik kural).
+-- ════════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.current_farm_id() RETURNS uuid
+LANGUAGE sql STABLE SET search_path = pg_catalog, public AS $$
+  SELECT '400b9107-a85e-4126-af2c-fd7fe73fb68e'::uuid;
+$$;
+
+COMMENT ON FUNCTION public.current_farm_id() IS
+  'farm_id ileri-disiplini: şimdilik REAL_FARM_ID sabiti. Faz 2 multi-tenant''te JWT/profiles''tan okunacak. Detay: .claude/farm-id-discipline.md';
+

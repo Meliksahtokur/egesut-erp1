@@ -207,6 +207,15 @@ Bu aşama, projenin gelecekteki geliştirmeler için daha sağlam bir temele otu
 
 **Son kontrol:** 2026-06-13 (ground truth regen commit a2e6d00)
 
+## Faz 2 — Multi-Tenant (farm_id) — planlı
+
+- **Durum:** Planlı, henüz başlanmadı. Bugün itibarıyla **ileri-disiplin aktif** (2026-07-01):
+  yeni yazılan tenant-scoped tablo ve yazma RPC'si `farm_id` alır; RLS `USING(true)` kalır.
+  Mevcut 41 tablo + ~170 fonksiyon Faz 2 retrofit kapsamında.
+- **Hazırlık:** `public.current_farm_id()` helper'ı eklendi (STABLE, REAL_FARM_ID sabiti).
+- **Kaynak:** `.claude/farm-id-discipline.md` (kanonik kural); spec `docs/superpowers/specs/2026-06-14-login-auth-gate-design.md` §İzolasyon.
+- **Yapılacak (Faz 2):** `farms` + `profiles` tabloları, JWT entegrasyonu, RLS flip, donmuş eski setin tek backfill'i.
+
 **Son Fix'ler (2026-06-13):**
 - `684534f` — BUG-XXX-DETAY-MODAL-KUPE-NO-CLICK: 3 detay modal'da DOM onclick → HTML attribute onclick (modal router uyumu)
 - `a4a5336` — BUG-XXX-TEDAVI-ORPHAN: Legacy `tedavi` şema orphan cleanup (6 stale görev iptal)

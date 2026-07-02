@@ -212,6 +212,10 @@ route text CHECK('IM','IV','SC','PO','Topikal','Intrauterin')
 | Migration 013-014 repo'da yok | 🟠 | ~~Ground truth sync migration yaz~~ **ÇÖZÜLDÜ 2026-06-13** — 99999999999999_ground_truth.sql regen edildi |
 | `setInterval(syncNow, 5000)` polling | 🟢 | Realtime'a organik geçiş |
 
+### 4.5 Multi-Tenancy ve farm_id (Faz 2 planlı, ileri-disiplin aktif)
+
+Şu an **tek-tenant** (RLS `USING(true)`), multi-tenant Faz 2'ye planlı; demo hesabı Faz 2'de "demo çiftlik" olacak (`docs/superpowers/specs/2026-06-14-login-auth-gate-design.md`). Sabit: `REAL_FARM_ID = 400b9107-a85e-4126-af2c-fd7fe73fb68e`. Helper: `public.current_farm_id()` (STABLE). **YENİ** tablo / yazma RPC'si bu disipline uyar; mevcut 41 tablo Faz 2 retrofit'inde güncellenecek. Detay: `.claude/farm-id-discipline.md`.
+
 ---
 
 ## 5. İŞ AKIŞLARI
