@@ -46,6 +46,15 @@ Demo tarafında (demo Management API `/database/query` ile) çalıştırıldı:
 **TUZAK:** Demo Management API'ye Python `urllib` ile POST → **Cloudflare error 1010** (client-signature ban). **`curl` kullan** (veya browser UA header). MCP `mcp__supabase-demo__*` (restart sonrası) bu sorunu yaşamaz.
 **AÇIK:** `demo_reader` prod'da SELECT-only + BYPASSRLS olarak duruyor — köprü buna bağlı, artık D2/kalıcı klon için gerekli (DROP etme).
 
+### D2 GERÇEKLEŞEN yöntem (2026-07-02) — demo_klonla() RPC kuruldu + canlı test geçti
+SQL repoda: `demo/02_demo_klonla.sql` (+ `demo/01_fdw_bridge.sql`, `demo/README.md`). **Demo-only, prod migration DEĞİL.**
+- 44 tablo (agent_* + demo_klon_log + 3 vector-infra hariç), topolojik FK sırası (ebeveyn→çocuk), generated/identity kolon YOK → düz `INSERT..SELECT`.
+- **Superuser tuzağı:** Supabase `postgres` superuser değil → `DISABLE TRIGGER ALL` (FK constraint trigger) yasak. Çözüm: `DISABLE TRIGGER USER` (app trigger'ları sustur, sahiplik yeter) + topolojik sıra (FK açık ama sağlanır).
+- **pending trigger events tuzağı:** gorev_log'un bir FK'sı DEFERRABLE INITIALLY DEFERRED → INSERT'ten sonra `ALTER TABLE ENABLE TRIGGER` "pending trigger events" ile patlar. Çözüm: re-enable öncesi `SET CONSTRAINTS ALL IMMEDIATE`.
+- Kolon listesi çalışma anında **demo** katalogundan üretilir (prod kolon eklese bile demo'nunkiyle sınırlı → drift'e kısmen dayanıklı).
+- Tek transaction (atomik, yarım-klon yok). `demo_klon_log` audit (farm_id disiplinli). `GRANT EXECUTE TO authenticated`.
+- **CANLI TEST:** `SELECT demo_klonla()` → 44 tablo / 6715 satır / **957ms**. Doğrulama: 8/8 kritik tablo demo == prod_fdw (canlı) birebir (hayvanlar 153, gorev_log 1251, tohumlama 258, cases 27, stok 39, drug_products 25, treatment_days 81, padoklar 9).
+
 ## Amaç
 
 Login ekranında "🧪 Demo Girişi" butonu → ayrı Supabase projesinde gerçek verinin **kopyası**. Demo'daki yazmalar **geçici**: prod → demo klon her tetiklendiğinde üzerine yazılır. Tetik iki yoldan: **pg_cron (saatlik)** + **UI "↻ Prod'dan Klonla" butonu**.
@@ -72,7 +81,7 @@ KULLANICI ──┬─ gerçek giriş ──▶ PROD PROJESİ (canlı, read-only
 |---|---|---|---|
 | **D0** | Demo projesi + şema+veri (prod'dan pg_dump via `demo_reader`, BYPASSRLS) | ½ gün | ✅ **2026-07-02** |
 | **D1** | FDW köprüsü: `CREATE SERVER`/`USER MAPPING`/`IMPORT FOREIGN SCHEMA` + read testi | ½ gün | ✅ **2026-07-02** |
-| **D2** | `demo_klonla()` RPC: FK-ters TRUNCATE + FK-düz INSERT..SELECT + `setval` — tek transaction + `demo_klon_log` | 1 gün | ⬜ |
+| **D2** | `demo_klonla()` RPC: FK-ters TRUNCATE + FK-düz INSERT..SELECT + `setval` — tek transaction + `demo_klon_log` | 1 gün | ✅ **2026-07-02** |
 | **D3** | pg_cron saatlik + **şema-senkron adımı** (prod migration'ı demo'ya replay) | ½ gün | ⬜ |
 | **D4** | UI: `config.js` `IS_DEMO` host-tespiti + demo client + login butonu + demo bandı + "↻ Klonla" | 1 gün | ⬜ |
 | **D5** | Sağlamlaştırma: yazma-geçicilik teyidi, service_role client'ta yok kontrolü, klon sırası UI kilidi, deploy | ½ gün | ⬜ |
