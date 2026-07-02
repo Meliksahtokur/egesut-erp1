@@ -11,8 +11,12 @@ Tam yol haritası: `../docs/demo-mirror-ROADMAP.md`. Mimari: Seçenek D (ayrı p
 | Dosya | Ne yapar | Faz |
 |---|---|---|
 | (D0) | Demo şema+veri ilk doldurma — prod'dan `pg_dump via demo_reader` (BYPASSRLS). Detay ROADMAP D0. | D0 ✅ |
+| `00_grants.sql` | authenticated CRUD grant'ları (D0 pg_dump ACL taşımadı → 42501 fix) + ALTER DEFAULT PRIVILEGES | D0+ ✅ |
 | `01_fdw_bridge.sql` | `postgres_fdw` + `prod_srv` + `USER MAPPING` + `IMPORT FOREIGN SCHEMA` → `prod_fdw` canlı prod aynası | D1 ✅ |
-| `02_demo_klonla.sql` | `demo_klon_log` tablosu + `demo_klonla()` RPC (atomik birebir klon) | D2 ✅ |
+| `02_demo_klonla.sql` | `demo_klon_log` + `demo_klonla()` RPC (atomik birebir klon, dinamik, `statement_timeout=300s`) | D2 ✅ |
+| `03_sema_diff.sql` | `demo_sema_diff()` — prod↔demo şema drift uyarısı (salt-okuma) | D-şema ✅ |
+
+**UI (frontend):** `js/api.js` IS_DEMO + demo client · `js/auth.js` "🧪 Demo Girişi" + oto-login · `js/demo.js` bant + klon butonu + popup + drift uyarısı. **Demo giriş:** login ekranı "🧪 Demo Girişi" veya URL `?demo`. **Gömülü kullanıcı:** `demo@egesut.web` / `demo2026`.
 
 ## `demo_klonla()` — nasıl çalışır (DİNAMİK)
 

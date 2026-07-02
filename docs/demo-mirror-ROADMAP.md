@@ -55,6 +55,12 @@ SQL repoda: `demo/02_demo_klonla.sql` (+ `demo/01_fdw_bridge.sql`, `demo/README.
 - Tek transaction (atomik, yarım-klon yok). `demo_klon_log` audit (farm_id disiplinli). `GRANT EXECUTE TO authenticated`.
 - **CANLI TEST:** `SELECT demo_klonla()` → 44 tablo / 6715 satır / **957ms**. Doğrulama: 8/8 kritik tablo demo == prod_fdw (canlı) birebir (hayvanlar 153, gorev_log 1251, tohumlama 258, cases 27, stok 39, drug_products 25, treatment_days 81, padoklar 9).
 
+### D4 GERÇEKLEŞEN (2026-07-02) — UI + demo giriş + klon butonu
+Frontend: `js/api.js` (IS_DEMO=?demo→localStorage kilit; demo ise DEMO_URL/DEMO_KEY, değilse PROD; `?prod` çıkış), `js/auth.js` ("🧪 Demo Girişi" butonu → flag+reload → `authGate` gömülü kullanıcıyla oto-login `demo@egesut.web`/`demo2026`, döngü-guard sessionStorage; `authLogout` demo bayrağını temizler=prod'a dön), `js/demo.js` (YENİ: turuncu demo bandı + "↻ Prod'dan Klonla" + giriş-popup "bir daha gösterme" + AI-asistanı gizle [edge fn demo'da yok] + `demo_sema_diff` drift uyarısı), `index.html` demo.js script.
+Backend demo: `demo/00_grants.sql` (YENİ) + `demo/03_sema_diff.sql` (YENİ) + `demo_klonla` `SET statement_timeout='300s'`.
+**İKİ TUZAK (uçtan uca testte yakalandı):** (1) `demo_klonla` PostgREST'te **57014 statement timeout** — authenticated rolü ~8s, FDW ağ-okuması aşıyor → fonksiyona `SET statement_timeout='300s'` (SECURITY DEFINER tek başına yetmez, timeout çağıran rolün). (2) authenticated **42501 permission denied** — D0 pg_dump ACL taşımadı → `GRANT ... TO authenticated` + ALTER DEFAULT PRIVILEGES (grant klon'dan bağımsız, kalıcı). Test: demo login→klon(6715/2026ms)→okuma→sema_diff hepsi authenticated ile ✓.
+**Gömülü demo kullanıcı:** `demo@egesut.web` / `demo2026` (demo projede, email_confirm). Giriş: normal login ekranında "🧪 Demo Girişi" ya da URL `?demo`.
+
 ## Amaç
 
 Login ekranında "🧪 Demo Girişi" butonu → ayrı Supabase projesinde gerçek verinin **kopyası**. Demo'daki yazmalar **geçici**: prod → demo klon her tetiklendiğinde üzerine yazılır. Tetik iki yoldan: **pg_cron (saatlik)** + **UI "↻ Prod'dan Klonla" butonu**.
@@ -83,8 +89,8 @@ KULLANICI ──┬─ gerçek giriş ──▶ PROD PROJESİ (canlı, read-only
 | **D1** | FDW köprüsü: `CREATE SERVER`/`USER MAPPING`/`IMPORT FOREIGN SCHEMA` + read testi | ½ gün | ✅ **2026-07-02** |
 | **D2** | `demo_klonla()` RPC: FK-ters TRUNCATE + FK-düz INSERT..SELECT + `setval` — tek transaction + `demo_klon_log` | 1 gün | ✅ **2026-07-02** |
 | ~~D3~~ | ~~pg_cron saatlik~~ **İPTAL (2026-07-02)** — prod yavaş değişir, buton yeter. Yerine: girişte popup-hatırlatma (D4) + şema-senkron prod-migration adımı + on-demand şema-diff | — | ❌ iptal |
-| **D4** | UI: `config.js` `IS_DEMO` host-tespiti + demo client + login butonu + demo bandı + "↻ Klonla" + giriş-popup ("bir daha gösterme") | 1 gün | ⬜ |
-| **D-şema** | Şema-senkron = prod migration'ı demo'ya da uygula + FDW yenile (cron değil, workflow adımı); + on-demand şema-diff uyarısı | ¼ gün | ⬜ |
+| **D4** | UI: `IS_DEMO` (?demo+localStorage) + demo client + login butonu + demo bandı + "↻ Klonla" + giriş-popup ("bir daha gösterme") | 1 gün | ✅ **2026-07-02** |
+| **D-şema** | on-demand `demo_sema_diff()` uyarısı ✅. Şema-senkron (prod migration'ı demo'ya uygula + FDW yenile) = workflow adımı, cron değil | ¼ gün | ✅ diff / ⬜ sync-adımı |
 | **D5** | Sağlamlaştırma: yazma-geçicilik teyidi, service_role client'ta yok kontrolü, klon sırası UI kilidi, deploy | ½ gün | ⬜ |
 
 **Toplam: ~4 gün efor (≈1 hafta takvim).** Faz 2 multi-tenant (~3-4 hafta) DEĞİL — D bilinçli olarak hafif tutuldu.

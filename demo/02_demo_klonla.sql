@@ -18,7 +18,9 @@ GRANT SELECT ON public.demo_klon_log TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.demo_klonla()
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, pg_temp AS $fn$
+SET search_path = public, pg_temp
+SET statement_timeout TO '300s'   -- authenticated rolünün ~8s limiti FDW ağ-okumasında yetmez
+AS $fn$
 DECLARE
   ins_order text[];   -- topolojik FK sırası (ebeveyn -> çocuk), runtime hesaplanır
   trunc_list text;

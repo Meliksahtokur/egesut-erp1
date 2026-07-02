@@ -3,9 +3,27 @@
 // Tüm veri katmanı: Supabase SDK + IndexedDB
 // ══════════════════════════════════════════
 
+// ── DEMO MODU ──────────────────────────────
+// ?demo → localStorage kilit (reload'da kalır). ?prod → çıkış. Demo ayrı Supabase projesine bağlanır.
+// Demo yazmaları geçici; demo_klonla() prod'dan üzerine yazar. service_role ASLA client'ta yok (demo de anon+RLS).
+(function () {
+  const p = new URLSearchParams(location.search);
+  if (p.has('demo')) localStorage.setItem('EGESUT_DEMO', '1');
+  if (p.has('prod')) localStorage.removeItem('EGESUT_DEMO');
+})();
+const IS_DEMO = localStorage.getItem('EGESUT_DEMO') === '1';
+window.IS_DEMO = IS_DEMO;
+// Gömülü demo kullanıcı (gizli değil — demo herkese açık, çöpe-atılır)
+const DEMO_LOGIN = { email: 'demo@egesut.web', password: 'demo2026' };
+window.DEMO_LOGIN = DEMO_LOGIN;
+
 // ── CONFIG ─────────────────────────────────
-const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
-const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
+const PROD_URL = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
+const DEMO_URL = 'https://vtzqjmazsvurxdeondmi.supabase.co';
+const DEMO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0enFqbWF6c3Z1cnhkZW9uZG1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NDc0OTcsImV4cCI6MjA5ODUyMzQ5N30.t9Bq7jZhV316SYt0HH5tih78dCckxHuUjdHUA9GeAs8';
+const SB_URL  = IS_DEMO ? DEMO_URL : PROD_URL;
+const PROD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
+const SB_KEY  = IS_DEMO ? DEMO_KEY : PROD_KEY;
 const DB_VER  = 23;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',

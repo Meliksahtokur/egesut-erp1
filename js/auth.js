@@ -148,6 +148,9 @@
         '<button id="auth-forgot" type="button" style="display:block;width:100%;margin-top:10px;background:transparent;border:0;color:#8a978c;font-size:.78rem;cursor:pointer;text-decoration:underline">Şifremi unuttum</button>' +
         '<button id="auth-resend" type="button" style="display:none;width:100%;margin-top:8px;background:transparent;border:1px solid #2a352b;border-radius:9px;padding:9px;color:#9aa;font-size:.78rem;cursor:pointer">Tekrar gönder</button>' +
         '<div id="auth-msg" style="margin-top:14px;font-size:.78rem;text-align:center;min-height:18px;line-height:1.4"></div>' +
+        '<div style="margin:16px 0 4px;border-top:1px solid #2a352b"></div>' +
+        '<button id="auth-demo" type="button" style="width:100%;margin-top:12px;padding:12px;background:transparent;border:1px dashed #b07a2a;border-radius:9px;color:#e0a94a;font-size:.85rem;font-weight:700;cursor:pointer">🧪 Demo Girişi</button>' +
+        '<div style="margin-top:6px;font-size:.68rem;color:#8a978c;text-align:center;line-height:1.35">Gerçek verinin kopyası · yazdıkların geçici</div>' +
       '</div>';
     document.body.appendChild(el);
 
@@ -156,6 +159,13 @@
     document.getElementById('auth-submit').addEventListener('click', submit);
     document.getElementById('auth-forgot').addEventListener('click', forgotPassword);
     document.getElementById('auth-pass').addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    document.getElementById('auth-demo').addEventListener('click', () => {
+      localStorage.setItem('EGESUT_DEMO', '1');
+      sessionStorage.removeItem('demo_autologin_tried');
+      msg('Demoya giriliyor…');
+      location.reload();
+    });
+    if (window.IS_DEMO) msg('Demo girişi başarısız — tekrar "🧪 Demo Girişi" dene veya normal giriş yap.', 'err');
   }
 
   // Şifre sıfırlama linkine tıklanınca (PASSWORD_RECOVERY) "yeni şifre belirle" ekranı.
@@ -229,6 +239,7 @@
   window.authLogout = async function () {
     if (!confirm('Çıkış yapılsın mı?')) return;
     await db.auth.signOut();
+    if (window.IS_DEMO) localStorage.removeItem('EGESUT_DEMO'); // demo → prod girişine dön
     location.reload();
   };
 
@@ -237,9 +248,15 @@
   window.authGate = async function () {
     if (recovering) { renderResetScreen(); return null; }
     const { data: { session } } = await db.auth.getSession();
-    if (!session) { renderAuthScreen(); return null; }
-    sessionUser = session.user;
-    return session;
+    if (session) { sessionUser = session.user; return session; }
+    // Demo modu: gömülü kullanıcıyla otomatik giriş (bir kez dene — döngü guard)
+    if (window.IS_DEMO && window.DEMO_LOGIN && !sessionStorage.getItem('demo_autologin_tried')) {
+      sessionStorage.setItem('demo_autologin_tried', '1');
+      const { error } = await db.auth.signInWithPassword(window.DEMO_LOGIN);
+      if (!error) { location.reload(); return null; }
+    }
+    renderAuthScreen();
+    return null;
   };
 
   // Auth durum değişiklikleri
