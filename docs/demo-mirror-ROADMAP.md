@@ -25,7 +25,15 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$BACKUP_PASSWORD" \
   -in /tmp/bk/*/egesut_*.pg.enc -out /tmp/bk/dump.pg     # BACKUP_PASSWORD = GitHub secret
 # demo'ya sadece public: pg_restore --schema=public --no-owner -d "<demo psql url>" /tmp/bk/dump.pg
 ```
-**Eksik tek anahtar:** `BACKUP_PASSWORD` (dump'ı çözmek için). Prod'a hiç dokunmaz.
+**Not:** `BACKUP_PASSWORD` yok (şifreli artifact çözülemiyor). Onun yerine D0'da **doğrudan prod'dan** çekildi (aşağı bkz).
+
+### D0 GERÇEKLEŞEN yöntem (2026-07-02) — pg_dump via demo_reader
+`BACKUP_PASSWORD` olmadığı için şifreli artifact yerine prod'dan doğrudan çekildi:
+1. Prod'da `demo_reader` rolü (Management API/SB_MGMT_TOKEN ile, LOGIN + SELECT-only + **BYPASSRLS**). BYPASSRLS şart: policy'si `TO authenticated` olan tablolar (ör. drug_products) aksi halde 0 satır döner.
+2. `pg_dump --schema=public --no-owner` prod (aws-1-eu-west-1 pooler, user `demo_reader.<prodref>`), **hariç:** `code_embeddings/entity_graph/memory_notes` (AI-infra, vector) tabloları + `agent_threads/messages/plans` **verisi** (gerçek kullanıcı sohbeti sızmasın; yapı kalır). Dump ~1.8MB (prod'un 207MB'ı embeddings+chat'ten; farm verisi minik → **D3 egress endişesi yok**).
+3. `pg_restore --no-owner` demo'ya.
+Sonuç: 47 tablo + tam veri (hayvanlar 153, gorev_log 1246, drug_products 25) + 172 fn + 14 view + 68 policy + 26 trigger + grant'lar. Eksik = sadece vector-infra (farm app'i kullanmaz).
+**AÇIK:** `demo_reader` prod'da duruyor (D2 klon için gerekli; bitince `DROP ROLE demo_reader`).
 
 ## Amaç
 
@@ -51,7 +59,7 @@ KULLANICI ──┬─ gerçek giriş ──▶ PROD PROJESİ (canlı, read-only
 
 | Faz | İş | Efor | Durum |
 |---|---|---|---|
-| **D0** | Yeni Supabase projesi + şema taşı (`ground_truth.sql`) + demo@ kullanıcısı + uzantı doğrula | ½ gün | ⬜ |
+| **D0** | Demo projesi + şema+veri (prod'dan pg_dump via `demo_reader`, BYPASSRLS) | ½ gün | ✅ **2026-07-02** |
 | **D1** | FDW köprüsü: `CREATE SERVER`/`USER MAPPING`/`IMPORT FOREIGN SCHEMA` + read testi | ½ gün | ⬜ |
 | **D2** | `demo_klonla()` RPC: FK-ters TRUNCATE + FK-düz INSERT..SELECT + `setval` — tek transaction + `demo_klon_log` | 1 gün | ⬜ |
 | **D3** | pg_cron saatlik + **şema-senkron adımı** (prod migration'ı demo'ya replay) | ½ gün | ⬜ |
