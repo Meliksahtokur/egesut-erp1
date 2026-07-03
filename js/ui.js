@@ -349,9 +349,11 @@ async function kizginlikSil(kayitId) {
 // ── KIZGINLIK BAR ALERT ──────────────────────
 async function updateKizginlikAlert() {
   try {
-    const { data } = await db.from('cozulmemis_kizginlik_view')
-      .select('hayvan_id,durum')
+    const { data: _raw } = await db.from('cozulmemis_kizginlik_view')
+      .select('hayvan_id,durum,gecen_saat')
       .neq('durum', 'cozuldu');
+    // Aksiyon penceresi 48 saat — geçmiş kızgınlıklar uyarı üretmez (Geçti/Kaçırıldı)
+    const data = (_raw || []).filter(d => d.gecen_saat == null || d.gecen_saat <= 48);
     const bar = document.getElementById('kizginlik-bar');
     const txt = document.getElementById('kizginlik-bar-txt');
     const badge = document.getElementById('ubadge');
@@ -1742,7 +1744,14 @@ function _detUremeHtml(a,tohs,kizgs){
   h+='</div>';
   if(gebeBilgi) h+=`<div style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:.8rem;color:var(--ink2)"><b style="color:var(--green)">🤰 Gebe</b> — ${gebeBilgi}</div>`;
   h+=(tohs.length
-    ?tohs.map(t=>`<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${t.sonuc==='Gebe'?'var(--green2)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)'}"></div><div class="hist-main"><div class="hist-title">${esc(t.sperma||'—')} <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span></div><div class="hist-sub">${esc(t.tarih||'')} · <b>${esc(t.sonuc||'Bekliyor')}</b></div></div></div>`).join('')
+    ?tohs.map(t=>{
+      const _ab=t.sonuc==='Abort';
+      const _dot=t.sonuc==='Gebe'?'var(--green2)':_ab?'var(--red)':t.sonuc==='Boş'?'var(--red2)':'var(--amber)';
+      const _sonucHtml=_ab
+        ? `<b style="color:var(--red)">⚠️ Abort</b>${t.abort_notlar?` · <span style="color:var(--ink3)">${esc(t.abort_notlar)}</span>`:''}`
+        : `<b>${esc(t.sonuc||'Bekliyor')}</b>`;
+      return `<div class="hist-row" onclick="openTohDet('${t.id}')" style="cursor:pointer"><div class="hist-dot" style="background:${_dot}"></div><div class="hist-main"><div class="hist-title"${_ab?' style="color:var(--red)"':''}>${esc(t.sperma||'—')} <span style="background:var(--amber);color:#fff;font-size:.65rem;padding:1px 5px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span></div><div class="hist-sub">${esc(t.tarih||'')} · ${_sonucHtml}</div></div></div>`;
+    }).join('')
     :'<div class="empty"><div class="empty-ico">💉</div>Tohumlama kaydı yok</div>');
   if(kizgs&&kizgs.length){
     h+='<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:.72rem;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Kızgınlık Geçmişi</div>';
@@ -2434,52 +2443,68 @@ async function _uremeKizginlik(el){
     });
   }
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
-  // Durum filtresi
-  let aktif=list.filter(k=>!k.cozuldu);
-  let cozulmus=list.filter(k=>k.cozuldu);
-  if(flt==='bekleyen') cozulmus=[];
-  else if(flt==='sonuclanan') aktif=[];
-  const card=(k,cozulduMi)=>{
+  // ── Gruplama: aksiyon penceresi 48 saat ──────────────────────────
+  // ≤48h + aksiyon alınmamış → Bekleyen; postpartum → Gözlem;
+  // >48h aksiyon alınmamış → Geçti/Kaçırıldı; cozuldu → Sonuçlanan.
+  const KIZGINLIK_AKTIF_SAAT=48;
+  const _ageH=k=>(Date.now()-new Date(k.olusturma||k.tarih))/3600000;
+  const _isGozlem=k=>k.sonuc==='POSTPARTUM_GOZLEM';
+  let bekleyen=[], gozlem=[], gecti=[], sonuclanan=[];
+  list.forEach(k=>{
+    if(k.cozuldu){ sonuclanan.push(k); return; }
+    if(_isGozlem(k)){ gozlem.push(k); return; }
+    if(_ageH(k)>KIZGINLIK_AKTIF_SAAT){ gecti.push(k); return; }
+    bekleyen.push(k);
+  });
+  // Durum filtresi: 'bekleyen' → açık olanlar (bekleyen+gözlem); 'sonuclanan' → geçmiş (geçti+sonuçlanan)
+  if(flt==='bekleyen'){ gecti=[]; sonuclanan=[]; }
+  else if(flt==='sonuclanan'){ bekleyen=[]; gozlem=[]; }
+  const card=(k,mode)=>{
     const h=getState('animals').find(a=>a.id===k.hayvan_id);
     const kupe=h?.kupe_no||h?.devlet_kupe||k.hayvan_id;
-    const badge=cozulduMi
-      ? k.tedavi_case_id
-        ? `<span style="font-size:.6rem;color:var(--red2);background:rgba(192,50,26,.1);border-radius:4px;padding:1px 5px;margin-left:4px">🏥 Tedavi</span>`
-        : `<span style="font-size:.6rem;color:var(--blue);background:rgba(52,152,219,.1);border-radius:4px;padding:1px 5px;margin-left:4px">💉 Tohumlandı</span>`
-      : k.sonuc === 'POSTPARTUM_GOZLEM'
+    const badge = mode==='sonuclanan'
+      ? (k.tedavi_case_id
+          ? `<span style="font-size:.6rem;color:var(--red2);background:rgba(192,50,26,.1);border-radius:4px;padding:1px 5px;margin-left:4px">🏥 Tedavi</span>`
+          : `<span style="font-size:.6rem;color:var(--blue);background:rgba(52,152,219,.1);border-radius:4px;padding:1px 5px;margin-left:4px">💉 Tohumlandı</span>`)
+      : mode==='gozlem'
         ? `<span style="font-size:.6rem;color:var(--ink3);background:var(--card2);border-radius:4px;padding:1px 5px;margin-left:4px">👁 Gözlem</span>`
+      : mode==='gecti'
+        ? `<span style="font-size:.6rem;color:#8a6a1e;background:rgba(176,134,46,.12);border-radius:4px;padding:1px 5px;margin-left:4px">⌛ Geçti</span>`
       : '';
-    const caseBadge = k.tedavi_case_id && !cozulduMi
+    const caseBadge = k.tedavi_case_id && mode!=='sonuclanan'
       ? `<span style="font-size:.6rem;color:var(--blue);background:rgba(42,107,181,.1);border-radius:4px;padding:1px 5px;margin-left:4px;cursor:pointer" onclick="event.stopPropagation();toast('🏥 Vaka açıldı — Tedavi sekmesinden görüntüleyin')">🔗 Vaka</span>`
       : '';
+    const dot = mode==='gecti'?'#b0862e':mode==='gozlem'?'var(--ink3)':'#e74c3c';
+    const ico = mode==='gecti'?'⌛':mode==='gozlem'?'👁':'🔴';
+    const showAct = mode==='bekleyen';
     return `<div class="hist-row">
-      <div class="hist-dot" style="background:#e74c3c;cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
+      <div class="hist-dot" style="background:${dot};cursor:pointer" onclick="openDet('${k.hayvan_id}')"></div>
       <div class="hist-main" style="cursor:pointer" onclick="openDet('${k.hayvan_id}')">
-        <div class="hist-title">🔴 ${esc(kupe)} — ${esc(k.belirti||'Kızgınlık')} ${badge}</div>
+        <div class="hist-title">${ico} ${esc(kupe)} — ${esc(k.belirti||'Kızgınlık')} ${badge}</div>
         <div class="hist-sub">${esc(k.tarih)} ${k.notlar?'· '+esc(k.notlar):''} ${caseBadge}</div>
       </div>
       <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
-        ${cozulduMi?'':`
+        ${showAct?`
           <button style="background:var(--blue);color:#fff;padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700"
             onclick="event.stopPropagation();globalThis._insemKizginlikId='${k.id}';openInsemSafe('${kupe}')">💉 Tohumla</button>
           <button style="background:rgba(42,107,181,.15);color:var(--blue);padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;white-space:nowrap"
             onclick="event.stopPropagation();kizginlikTedaviAc('${k.id}','${kupe}')">🏥 Tedavi</button>
-        `}
+        `:''}
         <button style="background:rgba(192,50,26,.1);color:var(--red2);padding:2px 5px;font-size:.6rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;line-height:1"
           onclick="event.stopPropagation();kizginlikSil('${k.id}')">🗑️</button>
       </div>
     </div>`;
   };
-  const aktifHtml=aktif.length
-    ? `<div style="margin-bottom:8px;font-size:.72rem;font-weight:700;color:var(--red2);text-transform:uppercase;letter-spacing:.06em;padding:4px 0">🔴 Bekleyen Kızgınlıklar (${aktif.length})</div>`
-      +aktif.map(k=>card(k,false)).join('')
+  const sec=(arr,mode,title,color,topBorder)=>arr.length
+    ? `<div style="${topBorder?'margin-top:12px;border-top:1px solid var(--card3);padding-top:8px;':'margin-bottom:8px;'}font-size:.72rem;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:.06em;padding:4px 0">${title} (${arr.length})</div>`
+      +arr.map(k=>card(k,mode)).join('')
     : '';
-  const cozulmusHtml=cozulmus.length
-    ? `<div style="margin-top:12px;border-top:1px solid var(--card3);padding-top:8px;font-size:.72rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;padding-bottom:4px">✅ Sonuçlanan (${cozulmus.length})</div>`
-      +cozulmus.map(k=>card(k,true)).join('')
-    : '';
+  const bekleyenHtml=sec(bekleyen,'bekleyen','🔴 Bekleyen Kızgınlıklar','var(--red2)',false);
+  const gozlemHtml=sec(gozlem,'gozlem','👁 Gözlem (Postpartum)','var(--ink3)',bekleyen.length>0);
+  const gectiHtml=sec(gecti,'gecti','⌛ Geçti / Kaçırıldı','#b0862e',bekleyen.length+gozlem.length>0);
+  const sonucHtml=sec(sonuclanan,'sonuclanan','✅ Sonuçlanan','var(--green)',bekleyen.length+gozlem.length+gecti.length>0);
   el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`
-    +(list.length?aktifHtml+cozulmusHtml:'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
+    +(list.length?bekleyenHtml+gozlemHtml+gectiHtml+sonucHtml:'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
 }
 
 // ── İN-FLOW VAKA AÇMA (Plan-E) ─────────────
