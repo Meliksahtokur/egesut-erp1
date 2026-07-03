@@ -1,0 +1,56 @@
+name: Deploy static site to Pages
+
+# Yalnızca uygulama dosyalarını (index.html + js/ + assets) yayınlar.
+# Repo kökünü OLDUĞU GİBİ tarayan legacy "Deploy from branch" işi,
+# .claude/.openclaude/.skills altındaki yerel-mutlak symlink'lerde
+# "tar: Cannot stat: Permission denied" ile exit 2 veriyordu (2026-07 sessiz red).
+# Ayrıca docs/research/.claude gibi geliştirici klasörlerinin publike
+# sızmasını da keser.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble site (whitelist)
+        run: |
+          set -e
+          mkdir -p _site
+          # Kök seviye statik dosyalar
+          cp index.html manifest.json sw.js _site/
+          cp icon-192.svg icon-512.svg _site/ 2>/dev/null || true
+          # Uygulama JS ağacı
+          cp -r js _site/js
+          # Jekyll'i tamamen devre dışı bırak
+          touch _site/.nojekyll
+          echo "== _site içeriği =="
+          find _site -type f | sort
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
