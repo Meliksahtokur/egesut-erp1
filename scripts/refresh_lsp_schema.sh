@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# refresh_lsp_schema.sh — Canlı Supabase şemasını çekip Neon'a yükler (Management API).
+# refresh_lsp_schema.sh — Canlı Supabase şemasını çekip yerel Postgres'e (bu makine) yükler (Management API).
 # ŞİFRE YOK: SB_MGMT_TOKEN (anon olmayan, sadece tools-bank/.env'den okunur).
 # Kullanım: bash scripts/refresh_lsp_schema.sh
 #
@@ -9,7 +9,7 @@
 #   3) Tabloları constraint-free olarak çek.
 #   4) Fonksiyonları pg_get_functiondef ile çek (2 geçiş: ilki aggregate 100KB+ sınırı için).
 #   5) View'ları CREATE OR REPLACE VIEW olarak çek.
-#   6) Neon'da public schema'yı yeniden kur + roller.
+#   6) Yerel Postgres'te public schema'yı yeniden kur + roller.
 #   7) Sıralı yükle: tipler → tablolar → fonksiyonlar (2 geçiş) → view'lar.
 #   8) Sayım karşılaştırması + eksik raporu.
 #
@@ -28,7 +28,7 @@ fi
 
 : "${SB_MGMT_TOKEN:?SB_MGMT_TOKEN missing — .env'i kontrol et}"
 : "${SB_PROJECT_REF:=zqnexqbdfvbhlxzelzju}"
-: "${NEON_LSP_URL:?NEON_LSP_URL missing — .env'i kontrol et}"
+: "${LOCAL_LSP_URL:?LOCAL_LSP_URL missing — .env'i kontrol et}"
 
 OUT_DIR="/tmp/refresh_lsp"
 mkdir -p "$OUT_DIR"
@@ -142,15 +142,15 @@ echo "$VIEWS_DDL" > "$OUT_DIR/views.sql"
 VIEWS_GEN=$(grep -c '^CREATE OR REPLACE VIEW' "$OUT_DIR/views.sql" || echo 0)
 echo "  views.sql: $(wc -c <"$OUT_DIR/views.sql") byte, $VIEWS_GEN view"
 
-# ── 6) NEON: RESET public + ROLLER ────────────────────────────────────
-say "6/7 Neon 'public' şeması sıfırlanıyor + roller…"
-psql "$NEON_LSP_URL" -v ON_ERROR_STOP=0 <<'SQL' >/dev/null 2>&1 || true
+# ── 6) YEREL: RESET public + ROLLER ────────────────────────────────────
+say "6/7 Yerel 'public' şeması sıfırlanıyor + roller…"
+psql "$LOCAL_LSP_URL" -v ON_ERROR_STOP=0 <<'SQL' >/dev/null 2>&1 || true
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO public;
 
 -- RLS'i kapatan yardımcı roller (anon/authenticated/service_role/postgres)
-DO $ BEGIN
+DO $$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='anon') THEN
     CREATE ROLE anon NOLOGIN;
   END IF;
@@ -164,24 +164,29 @@ DO $ BEGIN
     CREATE ROLE postgres NOLOGIN BYPASSRLS;
   END IF;
 EXCEPTION WHEN duplicate_object THEN NULL;
-END $;
+END $$;
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role;
 
--- vector extension (code_embeddings/entity_graph/memory_notes tabloları için)
-CREATE EXTENSION IF NOT EXISTS vector;
+-- vector extension: prod'da 'extensions' şemasında yaşıyor (public'te DEĞİL) —
+-- aynısını burada da yapmazsak pg_proc(public) sayımı ~118 fazladan vector
+-- fonksiyonuyla şişer ve canlı sayımla eşleşmez.
+CREATE SCHEMA IF NOT EXISTS extensions;
+GRANT USAGE ON SCHEMA extensions TO public, anon, authenticated, service_role;
+CREATE EXTENSION IF NOT EXISTS vector SCHEMA extensions;
+ALTER DATABASE egesut_lsp SET search_path TO public, extensions;
 SQL
-say "  Neon public + vector extension hazır."
+say "  Yerel public + vector extension hazır."
 
 # ── 7) YÜKLE (sıralı, ON_ERROR_STOP=0) ────────────────────────────────
-say "7/7 Neon'a yükleniyor (sıralı, hata toplama modu)…"
+say "7/7 Yerel Postgres'e yükleniyor (sıralı, hata toplama modu)…"
 LOAD_ERRORS=0
 load_sql() {
   local f="$1" label="$2"
   if [[ -s "$f" ]]; then
-    if ! psql "$NEON_LSP_URL" -v ON_ERROR_STOP=0 -f "$f" >"$OUT_DIR/${label}.out" 2>"$OUT_DIR/${label}.err"; then
+    if ! psql "$LOCAL_LSP_URL" -v ON_ERROR_STOP=0 -f "$f" >"$OUT_DIR/${label}.out" 2>"$OUT_DIR/${label}.err"; then
       LOAD_ERRORS=$((LOAD_ERRORS+1))
     fi
     local err_lines
@@ -203,12 +208,12 @@ done
 load_sql "$OUT_DIR/views.sql"   views
 
 # ── 8) SAYIM + RAPOR ──────────────────────────────────────────────────
-say "Neon sayımı…"
-N_T=$(psql "$NEON_LSP_URL" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")
-N_F=$(psql "$NEON_LSP_URL" -tAc "SELECT COUNT(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'")
-N_V=$(psql "$NEON_LSP_URL" -tAc "SELECT COUNT(*) FROM information_schema.views WHERE table_schema='public'")
+say "Yerel sayım…"
+N_T=$(psql "$LOCAL_LSP_URL" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE'")
+N_F=$(psql "$LOCAL_LSP_URL" -tAc "SELECT COUNT(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public'")
+N_V=$(psql "$LOCAL_LSP_URL" -tAc "SELECT COUNT(*) FROM information_schema.views WHERE table_schema='public'")
 echo "  Canlı:   T=$LIVE_T F=$LIVE_F V=$LIVE_V"
-echo "  Neon:    T=$N_T F=$N_F V=$N_V"
+echo "  Yerel:   T=$N_T F=$N_F V=$N_V"
 if [[ "$N_T" == "$LIVE_T" && "$N_F" == "$LIVE_F" && "$N_V" == "$LIVE_V" ]]; then
   echo -e "\033[1;32m✓ Birebir eşleşti.\033[0m"
 else

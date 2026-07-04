@@ -1,7 +1,7 @@
 #!/bin/bash
-# SQL LSP launcher — Neon şema host için postgrestools stdio proxy
+# SQL LSP launcher — yerel Postgres (bu makine) şema host için postgrestools stdio proxy
 #
-# .env'den NEON_LSP_URL parse eder, PGPASSWORD env'e inject eder,
+# .env'den LOCAL_LSP_URL parse eder, PGPASSWORD env'e inject eder,
 # postgrestools lsp-proxy'yi başlatır (stdio). openclaude/Claude Code
 # custom plugin bu script'i çağırır.
 #
@@ -12,7 +12,7 @@
 #   bash scripts/sql-lsp.sh env      # export edilen env'i göster (debug)
 
 set -u
-REPO="/root/egesut-erp1"
+REPO="/home/melik/egesut-erp1"
 ENV_FILE="$REPO/.env"
 LOG="/tmp/sql-lsp.log"
 PID_FILE="/tmp/sql-lsp.pid"
@@ -26,7 +26,7 @@ command -v postgrestools >/dev/null || { echo "❌ postgrestools yok — npm i -
 
 # .env → PGPASSWORD
 if [ "$ACTION" = "env" ]; then
-  URL=$(grep -E "^NEON_LSP_URL=" "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")
+  URL=$(grep -E "^LOCAL_LSP_URL=" "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")
   PGPASSWORD=$(python3 -c "import urllib.parse as u; p=u.urlparse('$URL'); print(p.password or '')")
   echo "PGHOST=$(python3 -c "import urllib.parse as u; p=u.urlparse('$URL'); print(p.hostname)")"
   echo "PGPORT=$(python3 -c "import urllib.parse as u; p=u.urlparse('$URL'); print(p.port or 5432)")"
@@ -36,7 +36,7 @@ if [ "$ACTION" = "env" ]; then
   exit 0
 fi
 
-URL=$(grep -E "^NEON_LSP_URL=" "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")
+URL=$(grep -E "^LOCAL_LSP_URL=" "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr -d "'")
 PGHOST=$(python3 -c "import urllib.parse as u; p=u.urlparse('$URL'); print(p.hostname)")
 PGPORT=$(python3 -c "import urllib.parse as u; p=u.urlparse('$URL'); print(p.port or 5432)")
 PGUSER=$(python3 -c "import urllib.parse as u; p=u.urlparse('$URL'); print(p.username)")
@@ -55,50 +55,44 @@ case "$ACTION" in
       --log-path=/tmp/pg-logs
     ;;
   start)
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat $PID_FILE)" 2>/dev/null; then
-      echo "→ SQL LSP zaten çalışıyor (PID $(cat $PID_FILE))"
+    # NOT (2026-07-04, doğrulandı): `postgrestools lsp-proxy` internal olarak
+    # --stop-on-disconnect ile bir daemon spawn eder — proxy client kopunca
+    # daemon da kendini kapatır, bu yüzden asla kalıcı olamıyordu. Gerçek
+    # kalıcı daemon komutu `postgrestools start`dır; `lsp-proxy` (stdio
+    # action) zaten çalışan bu daemon'a bağlanır, kopsa da daemon ayakta kalır.
+    if pgrep -f "postgrestools __run_server" >/dev/null 2>&1; then
+      echo "→ SQL LSP daemon zaten çalışıyor (PID $(pgrep -f 'postgrestools __run_server' | paste -sd, -))"
       exit 0
     fi
-    # postgrestools read .env PGPASSWORD'ı zaten okuyamaz — postgrestools
-    # config'deki password satırı boş, PGT_PG_PASSWORD veya PGPASSWORD env
-    # üzerinden override edilir. tokio-postgres PGPASSWORD kullanır.
-    # postgrestools internal logs ayrı klasöre (PGT_LOG_PATH zorunlu)
     mkdir -p /tmp/pg-logs
     export PGT_LOG_PATH=/tmp/pg-logs
-    nohup postgrestools lsp-proxy --config-path="$REPO/postgres-language-server.jsonc" \
+    nohup postgrestools start --config-path="$REPO/postgres-language-server.jsonc" \
       --log-path=/tmp/pg-logs \
       > "$LOG" 2>&1 &
-    echo $! > "$PID_FILE"
+    disown
     sleep 1
-    if kill -0 "$(cat $PID_FILE)" 2>/dev/null; then
-      echo "✓ SQL LSP başlatıldı (PID $(cat $PID_FILE), log: $LOG)"
+    if pgrep -f "postgrestools __run_server" >/dev/null 2>&1; then
+      echo "✓ SQL LSP daemon başlatıldı (PID $(pgrep -f 'postgrestools __run_server' | paste -sd, -), log: $LOG)"
     else
-      echo "❌ SQL LSP başlatılamadı — log:"
+      echo "❌ SQL LSP daemon başlatılamadı — log:"
       tail -20 "$LOG"
       exit 1
     fi
     ;;
   status)
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat $PID_FILE)" 2>/dev/null; then
-      PID=$(cat $PID_FILE)
+    if pgrep -f "postgrestools __run_server" >/dev/null 2>&1; then
+      PID=$(pgrep -f "postgrestools __run_server" | head -1)
       RSS=$(ps -o rss= -p "$PID" 2>/dev/null | tr -d ' ')
-      echo "→ SQL LSP çalışıyor (PID $PID, RAM ${RSS}KB)"
-      psql "$(grep -E '^NEON_LSP_URL=' $ENV_FILE | cut -d= -f2- | tr -d '"' | tr -d "'")" \
-        -tA -c "SELECT 'Neon OK ('||count(*)||' public tables)' FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>&1 | sed 's/^/  /'
+      echo "→ SQL LSP daemon çalışıyor (PID $PID, RAM ${RSS}KB)"
+      psql "$(grep -E '^LOCAL_LSP_URL=' $ENV_FILE | cut -d= -f2- | tr -d '"' | tr -d "'")" \
+        -tA -c "SELECT 'Yerel Postgres OK ('||count(*)||' public tables)' FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>&1 | sed 's/^/  /'
     else
-      echo "→ SQL LSP çalışmıyor. Başlat: bash scripts/sql-lsp.sh start"
+      echo "→ SQL LSP daemon çalışmıyor. Başlat: bash scripts/sql-lsp.sh start"
     fi
     ;;
   stop)
-    if [ -f "$PID_FILE" ]; then
-      PID=$(cat $PID_FILE)
-      kill "$PID" 2>/dev/null && echo "✓ SQL LSP durduruldu (PID $PID)" || echo "  zaten durmuş"
-      rm -f "$PID_FILE"
-    else
-      echo "→ PID dosyası yok — çalışmıyor"
-    fi
-    # postgrestools internal daemon da çalışıyor olabilir
-    pkill -f "postgrestools lsp-proxy" 2>/dev/null
+    postgrestools stop 2>/dev/null && echo "✓ SQL LSP daemon durduruldu" || echo "  zaten durmuş"
+    rm -f "$PID_FILE"
     ;;
   *)
     echo "Kullanım: $0 {start|status|stop|env}"

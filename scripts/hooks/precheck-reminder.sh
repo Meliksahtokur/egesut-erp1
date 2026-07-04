@@ -9,10 +9,10 @@ except Exception: print('')" 2>/dev/null)
 
 case "$fp" in
   *js/*.js)
-    echo "🔍 code-change-precheck (JS): değiştirmeden önce blast radius'a bak — gitnexus_impact({target,direction:'upstream'}) + LSP findReferences. HIGH/CRITICAL ise kullanıcıya bildir. İş bitince: scripts/lsp-ctl.sh stop-openclaude"
+    echo "🔍 code-change-precheck (JS): değiştirmeden önce blast radius'a bak — gitnexus_impact({target,direction:'upstream'}) + LSP findReferences. HIGH/CRITICAL ise kullanıcıya bildir."
     ;;
   *supabase/migrations/*)
-    echo "🔍 code-change-precheck (SQL): migration yazmadan önce → scripts/refresh_lsp_schema.sh (ayna taze mi) + postgrestools check / .sql LSP ile kolon-tablo doğrula. Referans canlı şema, ground_truth DEĞİL. İş bitince: scripts/sql-lsp.sh stop"
+    echo "🔍 code-change-precheck (SQL): migration yazmadan önce → scripts/refresh_lsp_schema.sh (ayna taze mi) + postgrestools check / .sql LSP ile kolon-tablo doğrula. Referans canlı şema, ground_truth DEĞİL."
     ;;
 esac
 exit 0
