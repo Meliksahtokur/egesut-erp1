@@ -146,7 +146,7 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
     display.map(v=>`<div class="arow" style="display:flex;align-items:center;gap:6px">
       <div style="flex:1;cursor:pointer" onclick="openDet('${v.animal_id}')">
         <div class="arow-left">
-          <div class="arow-main">${v.vaxName}</div>
+          <div class="arow-main">${esc(v.vaxName)}</div>
           <div class="arow-sub">${v.days<0?'⚠️ '+Math.abs(v.days)+' gün gecikti':'⏰ '+v.days+' gün kaldı'}</div>
         </div>
         <div class="arow-right">${fmtTarih(v.next_due_date)}</div>
@@ -214,7 +214,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
     h+=band('red',sTitle,
       sessizList.slice(0,5).map(s=>{
         const gunTxt=s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz';
-        return `<div class="arow" onclick="openDet('${s.hayvan_id}')"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${gunTxt} · Son: ${s.son_aktivite||'—'}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+        return `<div class="arow" onclick="openDet('${s.hayvan_id}')"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${gunTxt} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if(nearBirth.length){
@@ -939,7 +939,7 @@ async function _showSessizList(){
     box.id='sessiz-bs';
     box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
     box.onclick=e=>{if(e.target===box)box.remove();};
-    const rows=list.map(s=>`<div class="arow" onclick="document.getElementById('sessiz-bs').remove();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz'} · Son: ${s.son_aktivite||'—'}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join('');
+    const rows=list.map(s=>`<div class="arow" onclick="document.getElementById('sessiz-bs').remove();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz'} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join('');
     box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${list.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">55+ gündür kızgınlık/tohumlama kaydı yok</div>${rows}</div>`;
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}
@@ -2273,7 +2273,7 @@ async function loadBirths(){
       return `<div style="background:var(--card2);border:1px solid var(--card3);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;align-items:center;gap:10px">
     <div style="width:34px;height:34px;border-radius:9px;background:rgba(78,154,42,.12);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">🐄</div>
     <div style="flex:1;min-width:0">
-      <div style="font-weight:700;font-size:.85rem;color:var(--ink2)">${anneKupe} → <b>${b.yavru_kupe||'?'}</b> <span style="color:var(--ink3);font-weight:400">(${b.yavru_cins||'?'})</span></div>
+      <div style="font-weight:700;font-size:.85rem;color:var(--ink2)">${esc(anneKupe)} → <b>${esc(b.yavru_kupe||'?')}</b> <span style="color:var(--ink3);font-weight:400">(${esc(b.yavru_cins||'?')})</span></div>
       <div style="font-size:.7rem;color:var(--ink3);margin-top:2px">${fmtTarih(b.tarih)} · <span style="background:${tipBg};color:${tipClr};border-radius:4px;padding:1px 6px;font-weight:700">${tip}</span>${b.dogum_kg?' · '+b.dogum_kg+' kg':''}</div>
     </div>
   </div>`;
@@ -2672,7 +2672,7 @@ async function _uremeGebelik(el){
         return `<div class="hist-row" style="align-items:center;gap:8px">
           <div class="hist-dot" style="background:var(--amber);flex-shrink:0"></div>
           <div class="hist-main" style="flex:1;min-width:0;cursor:pointer" onclick="openDetByKupe('${kupe}')">
-            <div class="hist-title" style="color:var(--amber)">${kupe}</div>
+            <div class="hist-title" style="color:var(--amber)">${esc(kupe)}</div>
             <div class="hist-sub">${t.sperma||'?'} · ${fmtTarih(t.tarih)} · ${gun} gün</div>
           </div>
           <button style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:2px 5px;font-size:.62rem;min-width:auto;line-height:1.1;border-radius:4px;border:none;cursor:pointer;font-weight:700"
@@ -2698,7 +2698,7 @@ async function _uremeGebelik(el){
     return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${t.hayvan_id}')">
       <div class="hist-dot" style="background:${kalanGun<0?'var(--red2)':'var(--green2)'}"></div>
       <div class="hist-main">
-        <div class="hist-title" style="color:${kalanGun<0?'var(--red)':'var(--green)'}">🤰 ${kupe}</div>
+        <div class="hist-title" style="color:${kalanGun<0?'var(--red)':'var(--green)'}">🤰 ${esc(kupe)}</div>
         <div class="hist-sub">${gunBilgi}</div>
         <div class="hist-sub">${kalanBilgi}</div>
       </div>
@@ -2749,7 +2749,7 @@ async function _uremeDogum(el){
       return `<div class="hist-row" onclick="openDet('${t.hayvan_id}')" style="cursor:pointer">
         <div class="hist-dot" style="background:${renk}"></div>
         <div class="hist-main">
-          <div class="hist-title">${kupe} · ${t.sperma||'?'}${beslemeUyari}</div>
+          <div class="hist-title">${esc(kupe)} · ${esc(t.sperma||'?')}${beslemeUyari}</div>
           <div class="hist-sub">🐮 ${fmtTarih(t.tarih)} → Tahmini doğum: <b>${fmtTarih(dogumTahmin)}</b> · <span style="background:${bg};color:${renk};border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem">⏳ ${kalan} gun kaldi</span></div>
         </div>
       </div>`;
@@ -2768,8 +2768,8 @@ async function _uremeDogum(el){
         <div class="hist-dot" style="background:var(--green2)"></div>
         <div class="hist-main">
           <div class="hist-title" style="color:var(--ink2)">
-            <span onclick="openDet('${b.anne_id}')" style="cursor:pointer">🐄 ${anneKupe}</span>
-            → <b onclick="openDetByKupe('${b.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${b.yavru_kupe}</b> (${b.yavru_cins||'?'})
+            <span onclick="openDet('${b.anne_id}')" style="cursor:pointer">🐄 ${esc(anneKupe)}</span>
+            → <b onclick="openDetByKupe('${b.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${esc(b.yavru_kupe)}</b> (${esc(b.yavru_cins||'?')})
           </div>
           <div class="hist-sub">${fmtTarih(b.tarih)} · <span style="background:${tipBg};color:${tipRenk};border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem">${tip}</span></div>
         </div>
@@ -2815,7 +2815,7 @@ async function _uremeTohumlama(el){
         <div class="hist-dot" style="background:${dot};flex-shrink:0" role="img" aria-label="${t.sonuc||'Bekliyor'}"></div>
         <div class="hist-main" style="flex:1;min-width:0">
           <div class="hist-title" style="color:var(--ink2);display:flex;align-items:center;gap:6px;min-width:0">
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${kupe} — ${t.sperma||'?'}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${esc(kupe)} — ${esc(t.sperma||'?')}</span>
             <span style="flex-shrink:0;background:rgba(176,120,0,.18);color:#7a4f00;font-size:.78rem;padding:2px 6px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span>
           </div>
           <div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b>${_sonucBadge}</div>
@@ -2843,8 +2843,8 @@ async function _uremeAbort(el){
     return `<div class="hist-row" style="cursor:pointer" onclick="openDet('${t.hayvan_id}')">
       <div class="hist-dot" style="background:var(--red2)"></div>
       <div class="hist-main">
-        <div class="hist-title" style="color:var(--red)">⚠️ ${kupe} — Abort</div>
-        <div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} ${t.abort_notlar?'· '+t.abort_notlar:''}</div>
+        <div class="hist-title" style="color:var(--red)">⚠️ ${esc(kupe)} — Abort</div>
+        <div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} ${t.abort_notlar?'· '+esc(t.abort_notlar):''}</div>
       </div>
     </div>`;
   }).join(''):'<div class="empty"><div class="empty-ico">⚠️</div>Abort kaydı yok</div>');
@@ -2900,15 +2900,15 @@ function _gecmisEntryHtml(e, overrideOc){
   if(type==='dogum'){
     const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id);
     const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
-    title=`<span onclick="openDet('${data.anne_id}')" style="cursor:pointer">${anneLabel||'?'}</span> → <b onclick="openDetByKupe('${data.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${data.yavru_kupe||'?'}</b> (${data.yavru_cins||'?'})`;
+    title=`<span onclick="openDet('${data.anne_id}')" style="cursor:pointer">${esc(anneLabel)||'?'}</span> → <b onclick="openDetByKupe('${data.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${esc(data.yavru_kupe)||'?'}</b> (${esc(data.yavru_cins||'?')})`;
     sub=`${data.dogum_tipi||'Normal'}${hkName}`;
   } else if(type==='tohumlama'){
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
-    title=`${hayvanLabel||'?'} — ${data.sperma||'?'}`;
+    title=`${esc(hayvanLabel||'?')} — ${esc(data.sperma||'?')}`;
     sub=`${data.deneme_no||1}. Tohumlama · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`;
   } else if(type==='hastalik'){
     const sc=data.status==='active'?'var(--red)':'var(--green)';
-    title=`${hayvanLabel||'?'} — ${data.disease_name||data.tani||'?'}`;
+    title=`${esc(hayvanLabel||'?')} — ${esc(data.disease_name||data.tani||'?')}`;
     sub=`<b style="color:${sc}">${data.status==='active'?'Aktif':'Kapalı'}</b>${hkName}`;
   } else if(type==='gorev'){
     const gHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
@@ -2917,21 +2917,21 @@ function _gecmisEntryHtml(e, overrideOc){
     const _pill=_done?'<span style="font-size:.6rem;padding:1px 6px;border-radius:8px;background:var(--card3);color:var(--ink3)">Tamamlandı</span>':'<span style="font-size:.6rem;padding:1px 6px;border-radius:8px;background:rgba(42,107,181,.15);color:var(--blue)">Bekliyor</span>';
     if(data.gorev_tipi==='TEDAVI_GUN'){
       const lbl=data._lbl||('Gün '+(data._gunNo||'?')+' tedavisi');
-      title=`${gLabel||'?'} — ${lbl}`;
-      const drugLine=(data._drugNames||[]).length?`<div style="font-size:.66rem;color:var(--ink2);margin-top:1px">💊 ${data._drugNames.join(', ')}</div>`:'';
-      const disLine=data._disName?`<span style="font-size:.62rem;color:var(--ink3)">🏥 ${data._disName}</span> · `:'';
+      title=`${esc(gLabel||'?')} — ${lbl}`;
+      const drugLine=(data._drugNames||[]).length?`<div style="font-size:.66rem;color:var(--ink2);margin-top:1px">💊 ${esc(data._drugNames.join(', '))}</div>`:'';
+      const disLine=data._disName?`<span style="font-size:.62rem;color:var(--ink3)">🏥 ${esc(data._disName)}</span> · `:'';
       sub=`${drugLine}<div style="margin-top:1px">${disLine}${_pill}</div>`;
       if(data._caseId) oc=`onclick="openCaseDet('${data._caseId}')" style="cursor:pointer"`;
     } else {
       let _aLbl='';try{const _p=typeof data.aciklama==='string'?JSON.parse(data.aciklama):data.aciklama;_aLbl=_p?.label||data.aciklama||'';}catch(e){_aLbl=data.aciklama||'';}
-      title=`${gLabel||'GENEL'} — ${_aLbl}`;
+      title=`${esc(gLabel||'GENEL')} — ${esc(_aLbl)}`;
       sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span> · ${_pill}${hkName}`;
       if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
     }
   } else if(type==='uygulama'){
     const uHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
     const uLabel=uHayvan?(uHayvan.kupe_no||uHayvan.devlet_kupe):data.hayvan_id;
-    title=`${uLabel||'?'} — ${esc(data._stokAdi||'?')}`;
+    title=`${esc(uLabel||'?')} — ${esc(data._stokAdi||'?')}`;
     sub=`${data.doz||'?'} ${data.birim||'ml'} · ${data.rota||'IM'}${data.notlar?' · '+esc(data.notlar):''}`;
     if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
   } else if(type==='islem'){
@@ -2939,11 +2939,11 @@ function _gecmisEntryHtml(e, overrideOc){
     const hayvanObj2=getState('animals').find(a=>a.id===data.ana_hayvan_id);
     const _exitedCache=JSON.parse(localStorage.getItem('ege_exited_kupe')||'{}');
     const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_exitedCache[data.ana_hayvan_id]||data.ana_hayvan_id||'?';
-    title=`${kupe} — ${_ISLEM_ETK[data.tip]||data.tip}`;
-    if(data.tip==='ASI_KAYDI') sub=snap.vaccine_name||'';
-    else if(data.tip==='ASI_ERTELEME') sub=snap.erteleme_notu||snap.vaccine_name||'';
-    else if(data.tip==='TOPLU_ILAC') sub=snap.ilac_adi||'';
-    else sub=snap.irk||snap.grup||'';
+    title=`${esc(kupe)} — ${_ISLEM_ETK[data.tip]||data.tip}`;
+    if(data.tip==='ASI_KAYDI') sub=esc(snap.vaccine_name||'');
+    else if(data.tip==='ASI_ERTELEME') sub=esc(snap.erteleme_notu||snap.vaccine_name||'');
+    else if(data.tip==='TOPLU_ILAC') sub=esc(snap.ilac_adi||'');
+    else sub=esc(snap.irk||snap.grup||'');
     if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
   }
   if(overrideOc!==undefined) oc=overrideOc;

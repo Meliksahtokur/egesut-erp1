@@ -710,7 +710,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
     } else if (res.ok && res.hata_sayisi > 0) {
       toast(`⚠️ ${res.basari} başarılı, ${res.hata_sayisi} hatalı`, true);
       const hd = document.getElementById('sk-hatalar');
-      if (hd) hd.innerHTML = res.hatalar.map(h => `<div style="color:var(--err);font-size:.72rem">• ${h.hata}</div>`).join('');
+      if (hd) hd.innerHTML = res.hatalar.map(h => `<div style="color:var(--err);font-size:.72rem">• ${esc(h.hata)}</div>`).join('');
     } else {
       toast(res.hata || 'Bilinmeyen hata', true);
     }
@@ -1616,7 +1616,7 @@ async function submitBulkVaccination() {
   } catch(e) {
     toast('❌ ' + getUserMessage(e), true);
     const div = document.getElementById('bv-result');
-    if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
+    if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${esc(e.message)}</div>`;
   } finally {
     if (submitBtn) submitBtn.disabled = false;
   }
@@ -1705,7 +1705,7 @@ async function submitBulkIlac() {
   } catch(e) {
     toast('❌ ' + getUserMessage(e), true);
     const div = document.getElementById('bi-result');
-    if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${e.message}</div>`;
+    if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${esc(e.message)}</div>`;
   }
 }
 
