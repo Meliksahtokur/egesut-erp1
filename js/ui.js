@@ -1393,7 +1393,7 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
 
   try {
     const res = await rpc('hizli_uygulama', {
-      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: not_ || ''
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: ''
     });
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
@@ -4435,10 +4435,10 @@ async function loadRaporlar(){
       h+=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">📦 Stok Durumu</div>
         ${negStk.map(s=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.8rem">
-          <span>🆘 ${esc(s.urun_adi)}</span><span style="font-weight:700;color:var(--red)">${stkNet[s.id].toFixed(1)} ${s.birim||''}</span>
+          <span>🆘 ${esc(s.urun_adi)}</span><span style="font-weight:700;color:var(--red)">${(s.guncel_stok ?? 0).toFixed(1)} ${s.birim||''}</span>
         </div>`).join('')}
         ${kritikStok.map(s=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.8rem">
-          <span>⚠️ ${esc(s.urun_adi)}</span><span style="font-weight:700;color:var(--amber)">${stkNet[s.id].toFixed(1)} ${s.birim||''}</span>
+          <span>⚠️ ${esc(s.urun_adi)}</span><span style="font-weight:700;color:var(--amber)">${(s.guncel_stok ?? 0).toFixed(1)} ${s.birim||''}</span>
         </div>`).join('')}
       </div>`;
     }
