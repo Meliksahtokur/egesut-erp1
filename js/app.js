@@ -189,26 +189,10 @@ function renderAyarlarSpermaList() {
     ${_customSperma.includes(s) ? `<button onclick="customSpermaSil('${s.replace(/'/g,"\\'")}') " style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">Sil</button>` : ''}
   </div>`).join('');
 }
-function ayarlarHekimEkle()  { g('ay-hekim-form').style.display = 'block'; }
-function ayarlarHekimKaydet() {
-  const ad = (g('ay-hekim-ad')?.value || '').trim(); if (!ad) return;
-  const id = 'CH' + Date.now();
-  _customHekimler.push({ id, ad });
-  g('ay-hekim-form').style.display = 'none';
-  if (g('ay-hekim-ad')) g('ay-hekim-ad').value = '';
-  renderAyarlarHekimList();
-  populateHekimSelects();
-  // DB'ye de yaz (online ise)
-  if (navigator.onLine) {
-    db.rpc('hekim_ekle', { p_id: id, p_ad: ad }).catch(e => console.warn('Hekim DB yazılamadı:', e.message));
-  }
-  toast('Hekim eklendi');
-}
-function customHekimSil(id) {
-  _customHekimler = _customHekimler.filter(h => h.id !== id);
-  renderAyarlarHekimList();
-  populateHekimSelects();
-}
+// ayarlarHekimEkle / ayarlarHekimKaydet — ui.js'deki DB-backed (Supabase) versiyonlar kullanılır.
+// Buradaki eski yerel-_customHekimler kopyaları kaldırıldı: app.js en son yüklendiği için
+// ui.js'in doğru versiyonlarını eziyordu + yanlış input id ('ay-hekim-ad') okuyordu → hekim ekleme çalışmıyordu.
+// customHekimSil de öksüzdü (hiç çağrılmıyordu), silindi. (_customHekimler boş fallback olarak kalıyor.)
 function ayarlarSpermaEkle()  { g('ay-sperma-form').style.display = 'block'; }
 function ayarlarSpermaKaydet() {
   const kod = (g('ay-sperma-kod')?.value || '').trim(); if (!kod) return;
