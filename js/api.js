@@ -292,7 +292,7 @@ const RPC_TABLES = {
   besleme_tamam:              ['gorev_log'],
   hayvan_tohumlama_ertele:     ['hayvanlar'],
   gorev_tamamla:               ['gorev_log', 'stok_hareket', 'hayvanlar', 'uygulama_log'],
-  hizli_uygulama:              ['uygulama_log', 'stok_hareket'],
+  hizli_uygulama:              ['uygulama_log', 'stok_hareket', 'gorev_log'],
   gorev_guncelle:              ['gorev_log'],
   stok_hareket_ekle:           ['stok_hareket'],
   stok_ekle:                   ['stok'],
