@@ -4412,7 +4412,7 @@ async function loadRaporlar(){
           const pct=aktif.length?Math.round(sayi/aktif.length*100):0;
           return `<div style="margin-bottom:8px">
             <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:3px">
-              <span style="font-weight:600">${irk}</span><span style="color:var(--ink3)">${sayi} (${pct}%)</span>
+              <span style="font-weight:600">${esc(irk)}</span><span style="color:var(--ink3)">${sayi} (${pct}%)</span>
             </div>
             <div style="height:6px;background:var(--card2);border-radius:3px;overflow:hidden">
               <div style="height:100%;width:${pct}%;background:var(--green);border-radius:3px"></div>
@@ -4426,7 +4426,7 @@ async function loadRaporlar(){
       h+=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:14px;margin-bottom:10px">
         <div style="font-weight:700;font-size:.85rem;margin-bottom:10px">🏥 Hastalık Kategorileri</div>
         ${katSorted.map(([kat,sayi])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2);font-size:.8rem">
-          <span>${kat}</span><span style="font-weight:700;color:var(--red)">${sayi}</span>
+          <span>${esc(kat)}</span><span style="font-weight:700;color:var(--red)">${sayi}</span>
         </div>`).join('')}
       </div>`;
     }
@@ -4469,15 +4469,15 @@ async function loadCikanlar(){
       return `<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:11px 13px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-weight:700;font-size:.88rem">${kupe}</div>
-            <div style="font-size:.7rem;color:var(--ink3);margin-top:2px">${a.irk||'—'} · ${a.grup||'—'}</div>
+            <div style="font-weight:700;font-size:.88rem">${esc(kupe)}</div>
+            <div style="font-size:.7rem;color:var(--ink3);margin-top:2px">${esc(a.irk||'—')} · ${esc(a.grup||'—')}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:.75rem;font-weight:700;color:${clr}">${a.durum}</div>
+            <div style="font-size:.75rem;font-weight:700;color:${clr}">${esc(a.durum)}</div>
             <div style="font-size:.65rem;color:var(--ink3)">${fmtTarih(a.cikis_tarihi)||'—'}</div>
           </div>
         </div>
-        ${a.cikis_sebebi?`<div style="font-size:.7rem;color:var(--ink3);margin-top:5px;padding-top:5px;border-top:1px solid var(--card2)">${a.cikis_sebebi}${a.satis_fiyati?' · '+a.satis_fiyati+' ₺':''}</div>`:''}
+        ${a.cikis_sebebi?`<div style="font-size:.7rem;color:var(--ink3);margin-top:5px;padding-top:5px;border-top:1px solid var(--card2)">${esc(a.cikis_sebebi)}${a.satis_fiyati?' · '+a.satis_fiyati+' ₺':''}</div>`:''}
       </div>`;
     }).join('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
@@ -4505,7 +4505,7 @@ async function openTaskDet(id){
   const _acEl=document.getElementById('td-aciklama');if(_acEl){_acEl.textContent=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'';delete _acEl.dataset.diseaseAppended;}
   const meta=[];
   meta.push(`📅 ${fmtTarih(t.hedef_tarih)}${isLate?' ⚠️ Gecikmiş':''}`);
-  if(hekim) meta.push(`👨‍⚕️ ${hekim.ad}`);
+  if(hekim) meta.push(`👨‍⚕️ ${esc(hekim.ad)}`);
   if(t.stok_id) meta.push(`💊 ${t.stok_id}`);
   meta.push(`🏷 ${(t.gorev_tipi||'DIGER').replace(/_/g,' ')}`);
   document.getElementById('td-meta').innerHTML=meta.map(m=>`<span style="background:var(--card2);padding:3px 8px;border-radius:10px">${m}</span>`).join('');
@@ -5019,9 +5019,9 @@ async function renderCasesForAnimal(animalId) {
     return `<div class="hist-row" onclick="openCaseDet('${c.id}')" style="cursor:pointer">
       <div class="hist-dot" style="background:${isActive ? 'var(--red2)' : 'var(--green2)'}"></div>
       <div class="hist-main">
-        <div class="hist-title">${dis?.name || '?'}</div>
+        <div class="hist-title">${esc(dis?.name || '?')}</div>
         <div class="hist-sub">${fmtTarih(c.start_date)} · <b style="color:${isActive ? 'var(--red)' : 'var(--green)'}">${isActive ? 'Aktif' : 'Kapalı'}</b></div>
-        ${c.notes ? `<div class="hist-sub" style="margin-top:2px">${c.notes}</div>` : ''}
+        ${c.notes ? `<div class="hist-sub" style="margin-top:2px">${esc(c.notes)}</div>` : ''}
       </div>
     </div>`;
   }).join('');
