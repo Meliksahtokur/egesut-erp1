@@ -626,8 +626,10 @@ async function submitCikis(btn) {
   const tarih     = g('cx-tarih').value;
   const sebep     = g('cx-sebep').value.trim();
   const fiyat     = Number.parseFloat(g('cx-fiyat').value) || null;
-  // cikis_yap RPC sadece 'olum' | 'satis' kabul eder
-  const rpcTip    = cxTip === 'Satıldı' ? 'satis' : 'olum';
+  // M-11 fix: cikis_yap RPC artık 4 ayrı tip kabul ediyor (eskiden Kesildi/Öldü/Kayıp
+  // hepsi 'olum'a sıkıştırılıyordu, rapor/audit'te ayrım kayboluyordu).
+  const RPC_TIP_MAP = { 'Satıldı': 'satis', 'Kesildi': 'kesim', 'Öldü': 'olum', 'Kayıp': 'kayip' };
+  const rpcTip    = RPC_TIP_MAP[cxTip] || 'olum';
   if (!tarih) { toast('Tarih zorunlu', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {

@@ -270,9 +270,24 @@ function asistanPlanOnayla(pid, el) {
   if (el) el.closest('.asistan-plan-karti')?.querySelectorAll('button').forEach(b => b.disabled = true);
   window.asistanGonder('Onaylıyorum, planı uygula. (plan_id: ' + pid + ')');
 }
-function asistanPlanVazgec(pid, el) {
-  if (el) el.closest('.asistan-plan-karti')?.remove();
-  window.asistanGonder('Vazgeçtim, bu planı uygulama.');
+// M-19 fix: eskiden sadece DOM'dan kaldırıp LLM'e "vazgeçtim" mesajı gönderiyordu —
+// DB'deki agent_plans.durum='pending' kaydı hiç kapanmıyordu. Artık asistan_plan_geri_al
+// ile aynı desende doğrudan RPC (LLM'e gitmeden).
+async function asistanPlanVazgec(pid, el) {
+  const kart = el ? el.closest('.asistan-plan-karti') : null;
+  if (kart) kart.querySelectorAll('button').forEach(b => b.disabled = true);
+  try {
+    const { data, error } = await window.db.rpc('asistan_plan_iptal', { p_plan_id: pid });
+    if (error || !data?.ok) {
+      alert('Plan iptal edilemedi: ' + (error?.message || data?.mesaj || 'bilinmeyen hata'));
+      if (kart) kart.querySelectorAll('button').forEach(b => b.disabled = false);
+      return;
+    }
+    if (kart) kart.remove();
+  } catch (e) {
+    alert('Plan iptal hatası: ' + e);
+    if (kart) kart.querySelectorAll('button').forEach(b => b.disabled = false);
+  }
 }
 
 // Geri al — LLM'e gitmeden doğrudan RPC (hızlı + güvenli)
@@ -362,10 +377,13 @@ async function asistanThreadSil(tid) {
   asistanGecmisAc();
 }
 
+// M-20 fix: eskiden client'a select('id') ile çekip tek tek delete ediyordu —
+// supabase-js default 1000 satır limiti yüzünden 1000+ thread'i olan kullanıcıda
+// kalanlar sessizce siliniyordu, ayrıca N+1 istek. Artık tek RPC, tek DELETE.
 async function asistanTumunuSil() {
   if (!confirm('Tüm sohbet geçmişi silinecek. Emin misiniz?')) return;
-  const { data } = await window.db.from('agent_threads').select('id');
-  for (const t of (data || [])) await window.db.from('agent_threads').delete().eq('id', t.id);
+  const { error } = await window.db.rpc('asistan_tumunu_sil');
+  if (error) { alert('Silme başarısız: ' + error.message); return; }
   asistanYeniSohbet();
   asistanDrawerKapat();
 }
