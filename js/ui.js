@@ -872,7 +872,7 @@ function _animalTagsHtml(a,gebeSet){
   let repeatBadge='';
   if(a.repeat_breed_active) repeatBadge+=`<span class="repeat-badge active">🔁 Tekrar Aşım</span>`;
   if(a.repeat_breed_past)   repeatBadge+=`<span class="repeat-badge past">↻ Tekrar</span>`;
-  return `<span class="tag tb">${a.padok||'?'}</span><span class="tag tk">${a.grup||''}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${dogumBadge}${kisirBadge}${repeatBadge}`;
+  return `<span class="tag tb">${esc(a.padok||'?')}</span><span class="tag tk">${esc(a.grup||'')}</span>${gebeBadge}${hastaBadge}${abortBadge}${bosTohBadge}${dogumBadge}${kisirBadge}${repeatBadge}`;
 }
 function _animalCardHtml(a,gebeSet,idx){
   const mainId=a.kupe_no||a.devlet_kupe||a.id||'?';
@@ -888,7 +888,7 @@ function _animalCardHtml(a,gebeSet,idx){
     ${seqHtml}<div class="avt">${init}</div>
     <div class="ainfo">
       <div class="a-id">${mainId}${subId}</div>
-      <div class="a-sub">${a.irk||'—'}${yas?' · '+yas:''}</div>
+      <div class="a-sub">${esc(a.irk||'—')}${yas?' · '+yas:''}</div>
       <div class="a-tags">${_animalTagsHtml(a,gebeSet)}</div>
     </div>
     <svg class="a-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
@@ -2359,10 +2359,11 @@ function gebeFiltrele(){
     const overdue=g.kalanGun<0, urgent=g.kalanGun<=7&&!overdue;
     const _colorMidF=urgent?'#b84c00':'#1a5c1a';
     const color=overdue?'#c0321a':_colorMidF;
-    return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
+    return `<div data-hid="${escAttr(g.hayvan.id)}" data-kupe="${escAttr(kupe)}" data-dt="${escAttr(g.dogumTahmini)}" data-sperma="${escAttr(g.toh.sperma||'')}"
+      onclick="anneSeç(this.dataset.hid,this.dataset.kupe,this.dataset.dt,this.dataset.sperma)"
       style="padding:12px 14px;border-bottom:1px solid var(--card3);cursor:pointer">
-      <div style="font-weight:700;font-size:.88rem;color:${color}">${kupe} — ${overdue?'GECİKTİ '+Math.abs(g.kalanGun)+' gün':g.kalanGun+' gün kaldı'}</div>
-      <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${g.hayvan?.irk||'—'} · ${g.toh.sperma||'?'} · Tahmini: ${fmtTarih(g.dogumTahmini)}</div>
+      <div style="font-weight:700;font-size:.88rem;color:${color}">${esc(kupe)} — ${overdue?'GECİKTİ '+Math.abs(g.kalanGun)+' gün':g.kalanGun+' gün kaldı'}</div>
+      <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${esc(g.hayvan?.irk||'—')} · ${esc(g.toh.sperma||'?')} · Tahmini: ${fmtTarih(g.dogumTahmini)}</div>
     </div>`;
   }).join('')||'<div style="padding:20px;text-align:center;color:#999">Eşleşen hayvan yok</div>';
 }
@@ -2824,11 +2825,11 @@ async function _uremeTohumlama(el){
           ? (()=>{
               const _uretGun=Math.floor((Date.now()-new Date(t.tarih))/86400000);
               return _uretGun>=0&&_uretGun<=15
-                ? `<button onclick="event.stopPropagation();openTekrarAsim('${t.hayvan_id}','${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;font-weight:700;cursor:pointer">🔁 Tekrar Aşım</button>`
+                ? `<button data-hid="${escAttr(t.hayvan_id)}" data-kupe="${escAttr(kupe)}" onclick="event.stopPropagation();openTekrarAsim(this.dataset.hid,this.dataset.kupe)" style="flex-shrink:0;background:var(--purple);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;font-weight:700;cursor:pointer">🔁 Tekrar Aşım</button>`
                 : '<span style="flex-shrink:0;font-size:.75rem;color:var(--ink3)">' + _uretGun + ' gün</span>';
             })()
           : (_bekliyor
-            ? `<button onclick="event.stopPropagation();tekrarTohumla('${kupe.replace(/'/g,"\\'")}')" style="flex-shrink:0;background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;font-weight:700;cursor:pointer">💉 Tohumla</button>`
+            ? `<button data-kupe="${escAttr(kupe)}" onclick="event.stopPropagation();tekrarTohumla(this.dataset.kupe)" style="flex-shrink:0;background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:.78rem;font-weight:700;cursor:pointer">💉 Tohumla</button>`
             : '')}
       </div>`;
     }).join(''):'<div class="empty"><div class="empty-ico">💉</div>'+(_q?'Arama sonucu yok':'Tohumlama kaydı yok')+'</div>');
@@ -5787,9 +5788,9 @@ async function acHdiStok(inp){
     const {data}=await db.from('stok').select('*').eq('kategori','İlaç');
     _hdiIlacCache=data||[];
   }
-  const filtered=q?_hdiIlacCache.filter(s=>s.urun_adi.toLowerCase().includes(q)):_hdiIlacCache.slice(0,12);
+  const filtered=q?_hdiIlacCache.filter(s=>(s.urun_adi||'').toLowerCase().includes(q)):_hdiIlacCache.slice(0,12);
   if(!filtered.length){ ac.style.display='none'; return; }
-  ac.innerHTML=filtered.map(s=>`<div onclick="hdiStokSec('${s.id}','${s.urun_adi.replace(/'/g,"\'")}','${s.birim||''}')"
+  ac.innerHTML=filtered.map(s=>`<div data-id="${escAttr(s.id)}" data-ad="${escAttr(s.urun_adi||'')}" data-birim="${escAttr(s.birim||'')}" onclick="hdiStokSec(this.dataset.id,this.dataset.ad,this.dataset.birim)"
     style="padding:8px 12px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card2)"
     onmouseover="this.style.background='var(--card2)'" onmouseout="this.style.background=''">${esc(s.urun_adi)} <span style="color:var(--ink3)">${s.birim||''}</span></div>`).join('');
   ac.style.display='block';

@@ -26,6 +26,11 @@ function esc(str) {
   div.textContent = str || '';
   return div.innerHTML;
 }
+// HTML attribute / JS string literal context için escape — esc() tek/çift tırnak kaçırmaz,
+// bu yüzden onclick="fn('${değer}')" kalıbında KULLANILAMAZ. escAttr() hem ' hem " hem &<> kaçırır.
+function escAttr(str) {
+  return String(str ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 function trLower(s) { return s.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase(); }
 
 /**
@@ -78,6 +83,7 @@ function setupAutocomplete(inputId, opts) {
     if (e.key === 'ArrowDown') { e.preventDefault(); if (idx < items.length - 1) idx++; }
     else if (e.key === 'ArrowUp') { e.preventDefault(); if (idx > 0) idx--; }
     else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); select(idx); return; }
+
     else if (e.key === 'Escape') { ul.style.display = 'none'; return; }
     items.forEach((li, i) => li.classList.toggle('active', i === idx));
   });
