@@ -2670,14 +2670,14 @@ async function _uremeGebelik(el){
         const h=hayvanlar.find(h2=>h2.id===t.hayvan_id||h2.kupe_no===t.hayvan_id);
         const kupe=h?.kupe_no||h?.devlet_kupe||t.hayvan_id;
         const gun=t.tarih?Math.floor((Date.now()-new Date(t.tarih))/86400000):'?';
-        return `<div class="hist-row" style="align-items:center;gap:8px">
+        return `<div class="hist-row" style="align-items:center;gap:8px" data-kupe="${escAttr(kupe)}" data-tid="${escAttr(t.id)}">
           <div class="hist-dot" style="background:var(--amber);flex-shrink:0"></div>
-          <div class="hist-main" style="flex:1;min-width:0;cursor:pointer" onclick="openDetByKupe('${kupe}')">
+          <div class="hist-main" style="flex:1;min-width:0;cursor:pointer" onclick="openDetByKupe(this.closest('[data-kupe]').dataset.kupe)">
             <div class="hist-title" style="color:var(--amber)">${esc(kupe)}</div>
-            <div class="hist-sub">${t.sperma||'?'} · ${fmtTarih(t.tarih)} · ${gun} gün</div>
+            <div class="hist-sub">${esc(t.sperma||'?')} · ${fmtTarih(t.tarih)} · ${gun} gün</div>
           </div>
           <button style="background:var(--green);color:#fff;white-space:nowrap;flex-shrink:0;padding:2px 5px;font-size:.62rem;min-width:auto;line-height:1.1;border-radius:4px;border:none;cursor:pointer;font-weight:700"
-            onclick="gebeAta('${t.id}','${kupe}')">Gebe Ata</button>
+            onclick="gebeAta(this.closest('[data-kupe]').dataset.tid,this.closest('[data-kupe]').dataset.kupe)">Gebe Ata</button>
         </div>`;
       }).join('')+
       `</div>`;
@@ -5949,8 +5949,8 @@ async function acSperma(){
     const adet=stokMap[s];
     const warn=adet!==undefined&&adet<=5;
     const adetTxt=adet!==undefined?`<span style="color:${warn?'var(--red)':'var(--green)'};font-weight:700">${adet} doz</span>`:'';
-    return `<div onclick="selSperma('${s.replace(/'/g,"\\'")}');event.stopPropagation()" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center">
-      <span>${s}${warn?' ⚠️':''}</span>${adetTxt}
+    return `<div data-s="${escAttr(s)}" onclick="selSperma(this.dataset.s);event.stopPropagation()" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center">
+      <span>${esc(s)}${warn?' ⚠️':''}</span>${adetTxt}
     </div>`;
   }).join('');
   ac.style.display='block';
@@ -6102,7 +6102,7 @@ async function acIlac(){
     const warn=s.guncel<=0;
     const _stokColorMid=s.guncel<=5?'var(--amber)':'var(--green)';
     const _stokColor=warn?'var(--red)':_stokColorMid;
-    return `<div onclick="selIlac('${s.id}','${s.urun_adi.replace(/"/g,'&quot;').replace(/'/g,"\\'")}','${s.birim||'ml'}',${s.guncel});event.stopPropagation()"
+    return `<div data-id="${escAttr(s.id)}" data-ad="${escAttr(s.urun_adi||'')}" data-birim="${escAttr(s.birim||'ml')}" onclick="selIlac(this.dataset.id,this.dataset.ad,this.dataset.birim,${s.guncel});event.stopPropagation()"
       style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center;${warn?'opacity:.5':''}">
       <div><div style="font-weight:600">${esc(s.urun_adi)}</div><div style="font-size:.65rem;color:var(--ink3)">${s.kategori||''}</div></div>
       <span style="color:${_stokColor};font-weight:700;font-size:.78rem">${s.guncel.toFixed(s.birim==='adet'?0:1)} ${s.birim||''}</span>
@@ -6139,7 +6139,7 @@ async function acDilacSatir(inp){
   const stoklar=getState('stock').filter(s=>s.kategori!=='Sperma'&&!(s.urun_adi||'').toLowerCase().includes('sperma'));
   const filtered=q?stoklar.filter(s=>trLower(s.urun_adi||'').includes(trLower(q))):stoklar.slice(0,8);
   if(!filtered.length){ac.style.display='none';return;}
-  ac.innerHTML=filtered.map(s=>`<div onclick="selDilacSatir(this,'${s.id}','${s.urun_adi.replace(/"/g,'&quot;').replace(/'/g,"\\'")}','${s.birim||''}')" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">${esc(s.urun_adi)} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
+  ac.innerHTML=filtered.map(s=>`<div data-id="${escAttr(s.id)}" data-ad="${escAttr(s.urun_adi||'')}" data-birim="${escAttr(s.birim||'')}" onclick="selDilacSatir(this,this.dataset.id,this.dataset.ad,this.dataset.birim)" style="padding:8px 10px;cursor:pointer;font-size:.82rem;border-bottom:1px solid var(--card3)">${esc(s.urun_adi)} <span style="color:#aaa;font-size:.65rem">${s.guncel||0} ${s.birim||''}</span></div>`).join('');
   ac.style.display='block';
 }
 function selDilacSatir(el,id,ad,birim){
@@ -6211,9 +6211,9 @@ function acHayvan(inputId,listId){
   }
   ac.innerHTML=filtered.map(a=>{
     const kupe=a.kupe_no||a.devlet_kupe||a.id;
-    return `<div onclick="selHayvan('${inputId}','${listId}','${kupe}')" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between">
-      <span style="font-weight:600">${kupe}</span>
-      <span style="color:var(--ink3);font-size:.7rem">${a.irk||''} · ${a.padok||''}</span>
+    return `<div data-kupe="${escAttr(kupe)}" onclick="selHayvan('${inputId}','${listId}',this.dataset.kupe)" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between">
+      <span style="font-weight:600">${esc(kupe)}</span>
+      <span style="color:var(--ink3);font-size:.7rem">${esc(a.irk||'')} · ${esc(a.padok||'')}</span>
     </div>`;
   }).join('');
   ac.style.display='block';
