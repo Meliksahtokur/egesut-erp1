@@ -46,8 +46,8 @@ async function openApp(page) {
   });
   page.on('pageerror', err => criticalErrors.push(err.message));
 
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.stat-row', { timeout: 30000 });
+  await page.goto('./', { waitUntil: 'domcontentloaded' }); // '/' baseURL alt-dizinini düşürüp GH Pages kök 404'üne gider
+  await page.waitForSelector('#pg-dash .sv', { timeout: 30000 });
 
   return criticalErrors;
 }
@@ -68,7 +68,7 @@ test.describe('1 — Stabilite', () => {
   test('1.01 sayfa hatasız yüklenir, dashboard görünür', async ({ page }) => {
     const errors = await openApp(page);
     await expect(page.locator('#pg-dash')).toBeVisible();
-    await expect(page.locator('.stat-row')).toBeVisible();
+    await expect(page.locator('#pg-dash .sv')).toBeVisible();
     await expect(page.locator('#nav')).toBeVisible();
     expect(errors, `Kritik JS hataları: ${errors.join(' | ')}`).toHaveLength(0);
   });
@@ -93,7 +93,7 @@ test.describe('1 — Stabilite', () => {
     await openApp(page);
     await page.click('#refbtn');
     await page.waitForTimeout(300);
-    await page.waitForSelector('.stat-row', { timeout: 20000 });
+    await page.waitForSelector('#pg-dash .sv', { timeout: 20000 });
   });
 
   test('1.04 alt nav butonları erişilebilir', async ({ page }) => {
@@ -422,8 +422,9 @@ test.describe('5 — Edge Cases', () => {
   test('5.04 FAB modal açar', async ({ page }) => {
     await openApp(page);
     await navTo(page, '#nb-tasks');
-    await page.waitForSelector('.fab', { timeout: 10000 });
-    await page.click('.fab');
+    // .fab 3 buton eşleştirir (görev-ekle + gizli commit/cancel FAB'ları) — spesifik hedefle
+    await page.waitForSelector('[data-action="open-task-add-modal"]', { timeout: 10000 });
+    await page.click('[data-action="open-task-add-modal"]');
     await page.waitForTimeout(800);
     const anyModal = page.locator('.mo.on, .modal');
     await expect(anyModal.first()).toBeVisible({ timeout: 5000 });
@@ -495,8 +496,8 @@ test.describe('6 — Performans', () => {
 
   test('6.01 dashboard 8 saniyede yüklenir', async ({ page }) => {
     const start = Date.now();
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('.stat-row', { timeout: 30000 });
+    await page.goto('./', { waitUntil: 'domcontentloaded' }); // '/' baseURL alt-dizinini düşürüp GH Pages kök 404'üne gider
+    await page.waitForSelector('#pg-dash .sv', { timeout: 30000 });
     const duration = Date.now() - start;
     expect(duration, `Dashboard ${duration}ms`).toBeLessThan(8000);
   });
@@ -543,7 +544,7 @@ test.describe('6 — Performans', () => {
 test.describe('7 — Shell', () => {
 
   test('7.01 shell olmadan crash olmaz', async ({ page }) => {
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('./', { waitUntil: 'domcontentloaded' }); // '/' baseURL alt-dizinini düşürüp GH Pages kök 404'üne gider
     await expect(page.locator('#shell')).toBeVisible();
     await expect(page.locator('#nav')).toBeVisible();
   });
@@ -554,7 +555,7 @@ test.describe('7 — Shell', () => {
       if (msg.text().toLowerCase().includes('idb') && msg.type() === 'error')
         idbErrors.push(msg.text());
     });
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.goto('./', { waitUntil: 'domcontentloaded' }); // '/' baseURL alt-dizinini düşürüp GH Pages kök 404'üne gider
     await page.waitForTimeout(3000);
     await expect(page.locator('#shell')).toBeVisible();
   });

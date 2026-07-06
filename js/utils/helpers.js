@@ -99,5 +99,5 @@ function throttle(fn, limit = 1000) {
 
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, dAgo, dFwd, fmtTarih, fmtTarihSaat });
+  module.exports = Object.assign(module.exports || {}, { trLower, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe });
 }

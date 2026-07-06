@@ -26,9 +26,9 @@ async function openApp(page) {
   });
   page.on('pageerror', err => criticalErrors.push(err.message));
 
-  await page.goto('/');
+  await page.goto('./'); // '/' baseURL'in alt-dizinini (egesut-erp1/) düşürüp GH Pages kök 404'üne gider
   // Dashboard istatistik satırı görünene kadar bekle (veri yüklendi sinyali)
-  await page.waitForSelector('.stat-row', { timeout: 20000 });
+  await page.waitForSelector('#pg-dash .sv', { timeout: 20000 });
 
   return criticalErrors;
 }
@@ -122,7 +122,8 @@ test('sürü sayfasında FAB tıklanınca modal açılır', async ({ page }) => 
   await openApp(page);
   await page.click('#nb-suru');
   await page.locator('.animal-card').first().waitFor({ timeout: 10000 });
-  await page.locator('.fab').click();
+  // .fab 3 buton eşleştirir (görev-ekle + gizli commit/cancel FAB'ları) — spesifik hedefle
+  await page.locator('[data-action="open-task-add-modal"]').click();
   // Herhangi bir modal açılmış olmalı
   await expect(page.locator('.modal').first()).toBeVisible({ timeout: 5000 });
 });

@@ -5,8 +5,8 @@
 import { test, expect } from '@playwright/test';
 
 async function openApp(page) {
-  await page.goto('/');
-  await page.waitForSelector('.stat-row', { timeout: 20000 });
+  await page.goto('./'); // '/' baseURL'in alt-dizinini düşürüp GH Pages kök 404'üne gider
+  await page.waitForSelector('#pg-dash .sv', { timeout: 20000 });
 }
 
 test('Tanımlar Şablonlar sekmesi açılır ve builder render olur', async ({ page }) => {

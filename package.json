@@ -15,7 +15,12 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report tests/report",
-    "test:unit": "node --test tests/unit/*.test.js"
+    "test:unit": "node --test tests/unit/*.test.js",
+    "serve:local": "python3 -m http.server 8080",
+    "test:local": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080/ playwright test",
+    "test:demo": "PLAYWRIGHT_DEMO_MODE=1 playwright test",
+    "test:docker": "docker run --rm -v \"$PWD\":/work -w /work mcr.microsoft.com/playwright:v1.58.2-noble npx playwright test",
+    "test:docker:demo": "docker run --rm -e PLAYWRIGHT_DEMO_MODE=1 -v \"$PWD\":/work -w /work mcr.microsoft.com/playwright:v1.58.2-noble npx playwright test"
   },
   "repository": {
     "type": "git",
