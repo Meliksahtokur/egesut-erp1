@@ -152,7 +152,8 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
         <div class="arow-right">${fmtTarih(v.next_due_date)}</div>
       </div>
       <button style="font-size:.7rem;font-weight:700;color:var(--ink3);background:var(--card2);border:1px solid var(--card3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap;flex-shrink:0"
-        onclick="event.stopPropagation();asiDismiss('${v.id}','${v.vaxName}')">✕</button>
+        data-vlid="${escAttr(v.id)}" data-vaxname="${escAttr(v.vaxName)}"
+        onclick="event.stopPropagation();asiDismiss(this.dataset.vlid,this.dataset.vaxname)">✕</button>
     </div>`).join('')+(more>0?`<div class="arow" style="opacity:.5;font-size:.68rem;text-align:center">+${more} daha</div>`:''));
 }
 
@@ -4858,7 +4859,7 @@ async function rapelTarihiKaydet(){
   const yeniTarih=tarihEl?.value;
   if(!yeniTarih){ toast('Tarih seçin',true); return; }
   try{
-    await write('gorev_log',{hedef_tarih:yeniTarih},'PATCH',`id=eq.${_curTaskDet.id}`);
+    await rpc('gorev_guncelle',{p_id:_curTaskDet.id,p_hedef_tarih:yeniTarih});
     toast('📅 Rapel tarihi güncellendi');
     loadTasks(_curTaskFilter||'today');
   }catch(e){
