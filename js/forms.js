@@ -1056,15 +1056,6 @@ async function kaydetTaskEdit(btn, t, degisen) {
       p_hedef_tarih: degisen.hedef_tarih ?? null,
       p_gorev_tipi: degisen.gorev_tipi ?? null
     });
-    await write('islem_log', {
-      id: crypto.randomUUID(),
-      ana_hayvan_id: t.hayvan_id || null,
-      islem_tipi: 'gorev_duzenle',
-      islem_detay: JSON.stringify({ gorev_id: t.id, ...degisen }),
-      tarih: new Date().toISOString(),
-      kullanici: null,
-      kaynak: 'MANUEL'
-    }).catch(() => {});
     toast('✅ Görev güncellendi');
     closeM('m-task-edit');
     await loadTasks(_curTaskFilter||'today');
