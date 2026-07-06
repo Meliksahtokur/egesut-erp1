@@ -181,32 +181,14 @@ function populateHekimSelects() {
 
 // Hekim/sperma ayarları
 // renderAyarlarHekimList — defined in ui.js (Supabase-backed, with hekim card)
-function renderAyarlarSpermaList() {
-  const el = g('ay-sperma-list'); if (!el) return;
-  const all = [...new Set([...SPERMA_LISTESI, ..._customSperma])];
-  el.innerHTML = all.map(s => `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--card2)">
-    <span style="font-size:.84rem">${s}</span>
-    ${_customSperma.includes(s) ? `<button onclick="customSpermaSil('${s.replace(/'/g,"\\'")}') " style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.8rem">Sil</button>` : ''}
-  </div>`).join('');
-}
 // ayarlarHekimEkle / ayarlarHekimKaydet — ui.js'deki DB-backed (Supabase) versiyonlar kullanılır.
 // Buradaki eski yerel-_customHekimler kopyaları kaldırıldı: app.js en son yüklendiği için
 // ui.js'in doğru versiyonlarını eziyordu + yanlış input id ('ay-hekim-ad') okuyordu → hekim ekleme çalışmıyordu.
 // customHekimSil de öksüzdü (hiç çağrılmıyordu), silindi. (_customHekimler boş fallback olarak kalıyor.)
-function ayarlarSpermaEkle()  { g('ay-sperma-form').style.display = 'block'; }
-function ayarlarSpermaKaydet() {
-  const kod = (g('ay-sperma-kod')?.value || '').trim(); if (!kod) return;
-  if (!_customSperma.includes(kod)) _customSperma.push(kod);
-  g('ay-sperma-form').style.display = 'none';
-  if (g('ay-sperma-kod')) g('ay-sperma-kod').value = '';
-  renderAyarlarSpermaList();
-  buildSpermaList();
-  toast('Sperma eklendi');
-}
-function customSpermaSil(kod) {
-  _customSperma = _customSperma.filter(s => s !== kod);
-  renderAyarlarSpermaList();
-}
+// renderAyarlarSpermaList / ayarlarSpermaEkle / ayarlarSpermaKaydet / customSpermaSil —
+// ölü kod olarak arşivlendi (js/_archive/ayarlarSperma.bak.js): index.html'de giriş
+// noktası (ay-sperma-list/-form/-kod elementleri) hiç yok, sperma zaten Stok sekmesinden
+// (kategori='Sperma') yönetiliyor.
 
 // ── IRK DROPDOWN ─────────────────────────────
 // Backend'den irk listesi çek, dropdown'ı doldur

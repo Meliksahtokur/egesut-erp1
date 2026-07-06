@@ -6649,14 +6649,8 @@ async function vaccineRapelGuncelle(vaccineId,val){
   await pullTables(['vaccines']);
   toast('Rapel süresi güncellendi');
 }
-function renderAyarlarSpermaList(){
-  const el=document.getElementById('ay-sperma-list'); if(!el) return;
-  const all=[...SPERMA_LISTESI,...(_customSperma||[])];
-  el.innerHTML=all.map((s,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
-    <span style="font-size:.8rem;color:var(--ink)">${s}</span>
-    ${i>=SPERMA_LISTESI.length?`<button onclick="customSpermaSil('${s}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>`:'<span style="font-size:.6rem;color:var(--ink3)">Sabit</span>'}
-  </div>`).join('');
-}
+// renderAyarlarSpermaList (eski local-array versiyonu) ölü kod olarak arşivlendi
+// (js/_archive/ayarlarSperma.bak.js) — index.html'de giriş noktası yok.
 function ayarlarHekimEkle(){ document.getElementById('ay-hekim-form').style.display='block'; }
 async function ayarlarHekimKaydet(){
   const ad=v('ay-hek-ad').trim(); if(!ad) return;
@@ -6802,37 +6796,9 @@ async function hekimDetSil() {
   toast('Hekim silindi');
 }
 
-function ayarlarSpermaEkle(){ document.getElementById('ay-sperma-form').style.display='block'; }
-async function ayarlarSpermaKaydet(){
-  const kod=v('ay-sp-kod').trim(); if(!kod) return;
-  // Stok tablosuna Sperma kategorisinde ekle (RPC)
-  const{error}=await rpc('stok_ekle',{p_urun_adi:kod,p_kategori:'Sperma',p_birim:'doz',p_baslangic_miktar:0,p_esik:0});
-  if(error){ toast('Hata: '+error.message,true); return; }
-  await pullTables(['stok']);
-  cl('ay-sp-kod');
-  document.getElementById('ay-sperma-form').style.display='none';
-  renderAyarlarSpermaList();
-  buildSpermaList();
-  toast(`✅ ${kod} eklendi`);
-}
-async function renderAyarlarSpermaList(){
-  const el=document.getElementById('ay-sperma-list'); if(!el) return;
-  const stoklar=await getData('stok');
-  const spermalar=stoklar.filter(s=>s.kategori==='Sperma');
-  if(!spermalar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Henüz sperma eklenmedi</div>'; return; }
-  el.innerHTML=spermalar.map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
-    <span style="font-size:.8rem;color:var(--ink)">${esc(s.urun_adi)}</span>
-    <button onclick="spermaSil('${s.id}')" style="background:none;border:none;color:var(--red);font-size:.75rem;cursor:pointer">Sil</button>
-  </div>`).join('');
-}
-async function spermaSil(stokId){
-  const res=await rpc('sperma_sil',{p_stok_id:stokId});
-  if(!res.ok){ toast(res.mesaj||'Silinemedi',true); return; }
-  await pullTables(['stok','stok_hareket']);
-  renderAyarlarSpermaList();
-  buildSpermaList();
-  toast('Sperma silindi');
-}
+// ayarlarSpermaEkle / ayarlarSpermaKaydet / renderAyarlarSpermaList (DB-backed) /
+// spermaSil — ölü kod olarak arşivlendi (js/_archive/ayarlarSperma.bak.js):
+// index.html'de giriş noktası (ay-sperma-list/-form/-kod elementleri) hiç yok.
 
 // ── PADOK CRUD ──────────────────────────────
 async function renderAyarlarPadokList(){
