@@ -245,9 +245,9 @@ function _asistanPlanKarti(box, plan) {
     <div style="color:var(--ink);line-height:1.45">${satirlar}</div>
     <div style="color:var(--ink3);font-size:.72rem;margin-top:8px">🔒 Onaylamadan hiçbir şey kaydedilmez. Uyguladıktan sonra geri alabilirsin.</div>
     <div style="display:flex;gap:8px;margin-top:10px">
-      <button class="btn" data-action="asistan-plan-onayla" data-pid="${plan.plan_id}"
+      <button class="btn" data-action="asistan-plan-onayla" data-pid="${escAttr(plan.plan_id)}"
         style="background:var(--green);color:#fff;padding:8px 16px;width:auto">✓ Onayla ve Uygula</button>
-      <button class="btn" data-action="asistan-plan-vazgec" data-pid="${plan.plan_id}"
+      <button class="btn" data-action="asistan-plan-vazgec" data-pid="${escAttr(plan.plan_id)}"
         style="background:none;color:var(--red);padding:8px 16px;width:auto">✗ Vazgeç</button>
     </div>`;
   box.appendChild(div);
@@ -260,7 +260,7 @@ function _asistanUndoKarti(box, planId) {
   div.className = 'asistan-undo-karti';
   div.style.cssText = 'align-self:flex-start;max-width:92%;background:var(--card);border:1px dashed var(--ink3);border-radius:14px;padding:10px 14px;font-size:.8rem;display:flex;align-items:center;gap:10px';
   div.innerHTML = `<span style="flex:1;color:var(--ink3)">✅ Uygulandı. Yanlış olduysa geri alabilirsin.</span>
-    <button class="btn" data-action="asistan-plan-geri-al" data-pid="${planId}"
+    <button class="btn" data-action="asistan-plan-geri-al" data-pid="${escAttr(planId)}"
       style="background:none;color:var(--red);border:1px solid var(--red);padding:6px 12px;width:auto">↩ Geri Al</button>`;
   box.appendChild(div);
   div.scrollIntoView({ behavior: 'smooth' });

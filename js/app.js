@@ -76,7 +76,7 @@ function setSyncBar(type, txt) {
 function hideSyncBar() { const bar = g('sync-bar'); if (bar) bar.className = ''; }
 
 // ── ROUTING ─────────────────────────────────
-function goTo(pg, push = true) {
+async function goTo(pg, push = true) {
   if(getState('currentPage')==='tasks' && pg!=='tasks' && typeof flushPendingDone==='function') flushPendingDone();
   setState('currentPage', pg);
   if (push) history.pushState({pg}, '', '#' + pg);
@@ -88,10 +88,10 @@ function goTo(pg, push = true) {
   if (nbEl) nbEl.classList.add('on');
 
   if (pg === 'suru')     { if (typeof fchipReset === 'function') fchipReset(); filterA(); }
-  else if (pg === 'dash')     { Promise.all([loadDash(), loadStokList()]); }
+  else if (pg === 'dash')     { await Promise.all([loadDash(), loadStokList()]); }
   else if (pg === 'tasks')    { loadTasks(_curTaskFilter || 'today'); loadDash(); }
   else if (pg === 'gecmis')   { loadGecmis(_curGecmisFilter || 'hepsi'); loadDash(); }
-  else if (pg === 'log')      { Promise.all([loadBirths(), loadStokList()]); loadDash(); }
+  else if (pg === 'log')      { await Promise.all([loadBirths(), loadStokList()]); loadDash(); }
   else if (pg === 'ureme')    { loadUreme(_curUremeTab || 'kizginlik'); loadDash(); }
   else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
@@ -678,9 +678,14 @@ function pwaInstall() {
   }
 }
 
-if ('serviceWorker' in navigator) {
+// M-10 fix: eskiden her sayfa yüklemesinde TÜM service worker + cache'leri siliyordu.
+// Uygulamanın hiçbir yerinde serviceWorker.register() çağrısı yok (grep ile doğrulandı) —
+// bu blok sadece eski bir deploy'dan kalmış olabilecek SW/cache'i temizlemek için var.
+// Her yüklemede tekrarlamaya gerek yok, bir kere yeter.
+if ('serviceWorker' in navigator && !localStorage.getItem('ege_sw_temizlendi')) {
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(r => r.unregister());
   });
   caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  try { localStorage.setItem('ege_sw_temizlendi', '1'); } catch(_) {}
 }

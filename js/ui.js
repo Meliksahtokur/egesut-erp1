@@ -2448,13 +2448,18 @@ async function _uremeKizginlik(el){
   // ≤48h + aksiyon alınmamış → Bekleyen; postpartum → Gözlem;
   // >48h aksiyon alınmamış → Geçti/Kaçırıldı; cozuldu → Sonuçlanan.
   const KIZGINLIK_AKTIF_SAAT=48;
-  const _ageH=k=>(Date.now()-new Date(k.olusturma||k.tarih))/3600000;
+  // M-18 fix: k.olusturma ve k.tarih ikisi de yoksa null dön — eskiden new Date(undefined)
+  // NaN üretip yanlışlıkla "bekleyen"e düşüyordu (null.olusturma/tarih durumunda ise
+  // new Date(null)=epoch 1970 → yanlışlıkla "Geçti/Kaçırıldı"ya düşüyordu). İkisi de yanlıştı.
+  const _ageH=k=>(k.olusturma||k.tarih)?(Date.now()-new Date(k.olusturma||k.tarih))/3600000:null;
   const _isGozlem=k=>k.sonuc==='POSTPARTUM_GOZLEM';
   let bekleyen=[], gozlem=[], gecti=[], sonuclanan=[];
   list.forEach(k=>{
     if(k.cozuldu){ sonuclanan.push(k); return; }
     if(_isGozlem(k)){ gozlem.push(k); return; }
-    if(_ageH(k)>KIZGINLIK_AKTIF_SAAT){ gecti.push(k); return; }
+    const yas=_ageH(k);
+    if(yas===null){ bekleyen.push(k); return; } // tarih bilinmiyor — güvenli taraf: aksiyon bekleyen say
+    if(yas>KIZGINLIK_AKTIF_SAAT){ gecti.push(k); return; }
     bekleyen.push(k);
   });
   // Durum filtresi: 'bekleyen' → açık olanlar (bekleyen+gözlem); 'sonuclanan' → geçmiş (geçti+sonuçlanan)
@@ -5233,11 +5238,11 @@ async function renderCaseTimeline(caseId) {
       // İlaç listesi — sadece saatsiz (eski tip) ilaçlar; seanslılar aşağıda
       const drugHtml = day.drugs.length
         ? `${sessions.length ? '<div class="cd-sec-lbl">💊 Hızlı ilaçlar (saatsiz)</div>' : ''}<div style="margin-top:2px">${day.drugs.map(d => `
-            <div class="cd-drug-row">
-              <div><span class="cd-drug-name">${esc(d.drug)}</span> <span class="cd-drug-meta">${d.dose} ${d.unit}${d.route?' · '+d.route:''}</span></div>
+            <div class="cd-drug-row" data-admin-id="${escAttr(d.administration_id)}">
+              <div><span class="cd-drug-name">${esc(d.drug)}</span> <span class="cd-drug-meta">${esc(d.dose)} ${esc(d.unit)}${d.route?' · '+esc(d.route):''}</span></div>
               ${aktif && !isDone ? `<div style="display:flex;gap:2px">
-                <button onclick="caseDrugDuzenle('${d.administration_id}','${d.dose}','${d.unit}','${d.route||''}')" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.85rem;padding:2px">✏️</button>
-                <button onclick="caseDrugSil('${d.administration_id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.85rem;padding:2px">🗑</button>
+                <button data-dose="${escAttr(d.dose)}" data-unit="${escAttr(d.unit)}" data-route="${escAttr(d.route||'')}" onclick="caseDrugDuzenle(this)" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:.85rem;padding:2px">✏️</button>
+                <button data-admin-id="${escAttr(d.administration_id)}" onclick="caseDrugSil(this.dataset.adminId)" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.85rem;padding:2px">🗑</button>
               </div>` : ''}
             </div>`).join('')}</div>`
         : (sessions.length ? '' : `<span style="color:var(--ink3);font-size:.75rem;display:block;padding:4px 0">İlaç eklenmemiş</span>`);
@@ -5559,7 +5564,7 @@ function caseDrugFormAc(dayId) {
     '<div id="cdf-doz-satirlar"></div></div>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">'+
     '<button onclick="caseDrugKaydet(this)" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer">Kaydet</button>'+
-    '<button onclick="this.closest(\'.cd-drug-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">Iptal</button>'+
+    '<button onclick="_activeDayId=null;this.closest(\'.cd-drug-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">Iptal</button>'+
     '</div>';
   container.appendChild(form);
 }
@@ -5663,6 +5668,7 @@ async function caseDrugKaydet(btn) {
     toast('✅ ' + secililar.length + ' ilac eklendi');
     await pullTables(['stok','stok_hareket','drug_administrations','treatment_days']);
     btn.closest('.cd-drug-form').remove();
+    _activeDayId = null; // M-17 fix: form kapanınca modül-düzey state sızmasın
     _drugsCache = [];
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
@@ -5697,22 +5703,27 @@ async function caseDaySil(dayId) {
   } catch(e) { toast(e.message, true); }
 }
 
-function caseDrugDuzenle(adminId, dose, unit, route) {
-  // Inline edit — satiri bul ve form ac
-  const satirlar = document.querySelectorAll('[data-admin-id]');
+function caseDrugDuzenle(btn) {
+  // M-16 fix: eskiden brittle substring selector (`button[onclick*="${adminId}"]`)
+  // kullanıyordu — birden fazla satırda aynı adminId parça-eşleşirse yanlış satır
+  // düzenlenebiliyordu. Artık btn zaten doğru satırın kendi elemanı (event'ten geliyor),
+  // closest('.cd-drug-row') ile güvenilir + dose/unit/route dataset'ten okunuyor (raw
+  // string interpolation yok, injection riski yok).
   document.querySelectorAll('.drug-edit-form').forEach(f => f.remove());
-  // Admin satırının parent div'ini bul
-  const btn = document.querySelector(`button[onclick*="${adminId}"][onclick*="caseDrugDuzenle"]`);
-  if (!btn) return;
-  const row = btn.closest('div[style*="border-bottom"]');
+  const row = btn.closest('.cd-drug-row');
   if (!row) return;
+  const adminId = row.dataset.adminId;
+  const dose = btn.dataset.dose;
+  const unit = btn.dataset.unit;
+  const route = btn.dataset.route;
   const form = document.createElement('div');
   form.className = 'drug-edit-form';
+  form.dataset.adminId = adminId;
   form.style.cssText = 'background:rgba(42,107,181,.06);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:8px;margin-top:4px';
   form.innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">' +
-    '<input id="ded-dose" type="number" min="0.01" step="0.01" value="'+dose+'" class="fi" style="margin:0" placeholder="Doz">' +
-    '<input id="ded-unit" type="text" value="'+unit+'" class="fi" style="margin:0" placeholder="Birim">' +
+    '<input id="ded-dose" type="number" min="0.01" step="0.01" value="'+escAttr(dose)+'" class="fi" style="margin:0" placeholder="Doz">' +
+    '<input id="ded-unit" type="text" value="'+escAttr(unit)+'" class="fi" style="margin:0" placeholder="Birim">' +
     '</div>' +
     '<select id="ded-route" class="fsel" style="margin-bottom:6px">' +
     '<option value="">Uygulama yolu</option>' +
@@ -5724,7 +5735,7 @@ function caseDrugDuzenle(adminId, dose, unit, route) {
     '<option '+(route==='Intrauterin'?'selected':'')+' value="Intrauterin">Intrauterin</option>' +
     '</select>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
-    '<button onclick="caseDrugDuzenleKaydet(\''+adminId+'\')" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:7px;font-weight:700;cursor:pointer">Kaydet</button>' +
+    '<button onclick="caseDrugDuzenleKaydet(this.closest(\'.drug-edit-form\').dataset.adminId)" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:7px;font-weight:700;cursor:pointer">Kaydet</button>' +
     '<button onclick="this.closest(\'.drug-edit-form\').remove()" style="background:var(--card3);border:none;border-radius:7px;padding:7px;cursor:pointer">Iptal</button>' +
     '</div>';
   row.insertAdjacentElement('afterend', form);
@@ -6487,10 +6498,14 @@ async function dataTrafficTekGonder(qid){
     const rpcName = op.method === 'POST' ? rpcInfo.POST : rpcInfo.PATCH;
     if(!rpcName) throw new Error(`${op.method} için RPC tanımlı değil`);
     
-    // Veriyi temizle (null/undefined/boş string'leri çıkar)
+    // M-15 fix: eskiden boş string alanları da tamamen siliyordu (NOT NULL RPC
+    // parametreleri için tehlikeli — p_unit gibi alanlar '' yerine hiç gönderilmeyince
+    // RPC'nin kendi DEFAULT'u devreye giriyordu, bazen NULL). Artık sadece undefined
+    // çıkarılıyor; null ve '' olduğu gibi RPC'ye gidiyor, buildRpcParams kendi
+    // per-alan fallback'lerine (|| null vb.) karar veriyor.
     const clean = op.method === 'POST'
-      ? op.data.map(item => Object.fromEntries(Object.entries(item).filter(([k,v]) => v !== null && v !== undefined && v !== '')))
-      : Object.fromEntries(Object.entries(op.data[0]).filter(([k,v]) => v !== null && v !== undefined && v !== ''));
+      ? op.data.map(item => Object.fromEntries(Object.entries(item).filter(([k,v]) => v !== undefined)))
+      : Object.fromEntries(Object.entries(op.data[0]).filter(([k,v]) => v !== undefined));
     
     // RPC parametrelerini hazırla
     const rpcParams = buildRpcParams(rpcName, clean, op);
@@ -6579,9 +6594,12 @@ function buildRpcParams(rpcName, data, op) {
         p_tarih: data.tarih
       };
     case 'add_drug_administration':
+      // M-14 fix: p_stok_id eksikti — offline queue replay'de RPC'ye NULL gidiyordu,
+      // online branch (caseDrugKaydet) zaten p_stok_id gönderiyor (ui.js:5631).
       return {
         p_day_id: data.day_id,
         p_drug_product_id: data.drug_product_id,
+        p_stok_id: data.stok_id ?? null,
         p_dose: data.dose,
         p_unit: data.unit,
         p_route: data.route,
@@ -7564,7 +7582,8 @@ async function bildirimKontrol(){
   const bugun=now.toISOString().split('T')[0];
   const yarin=dFwd(bugun,1);
   const gorevler=await getData('gorev_log',g=>!g.tamamlandi&&!g.parent_id&&(g.hedef_tarih===bugun||g.hedef_tarih===yarin));
-  const gosterilen=JSON.parse(localStorage.getItem('bildirim_gosterilen')||'{}');
+  // M-26 fix: localStorage bozuk/eski formatta JSON içerebilir — try/catch yoktu, crash riski.
+  let gosterilen; try { gosterilen=JSON.parse(localStorage.getItem('bildirim_gosterilen')||'{}'); } catch(_){ gosterilen={}; }
   const simdi=Date.now();
   for(const g2 of gorevler){
     const hedef=new Date(g2.hedef_tarih+'T08:00:00');

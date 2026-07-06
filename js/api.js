@@ -62,8 +62,16 @@ function _trErr(msg) {
  * @returns {Promise<any>} RPC sonucu
  */
 async function rpc(name, params = {}) {
-  if (!navigator.onLine) throw new Error('İnternet bağlantısı gerekli');
-  const { data, error } = await db.rpc(name, params);
+  // M-25 fix: navigator.onLine captive-portal/VPN'de yanlış değer dönebilir (MDN:
+  // "unreliable"). Artık ön-kontrol yapmıyoruz — RPC'yi gerçekten deniyoruz, ancak
+  // gerçek bir ağ hatası (fetch/TypeError, db.rpc'nin kendi error objesi değil) alırsak
+  // offline kabul ediyoruz.
+  let data, error;
+  try {
+    ({ data, error } = await db.rpc(name, params));
+  } catch (networkErr) {
+    throw new Error('İnternet bağlantısı gerekli');
+  }
   if (error) throw new Error(_trErr(error.message));
   if (data && data.ok === false) throw new Error(data.mesaj || 'İşlem başarısız');
   return data;
@@ -73,8 +81,11 @@ async function rpc(name, params = {}) {
 let _idb;
 
 async function clearAndReloadIDB() {
+  // M-23 fix: eskiden 'egesut_v9' siliyordu ama openDB() 'egesut_v12' açıyordu —
+  // v9 zaten hiç açılmadığı için deleteDatabase no-op'tu, fonksiyon aslında bir işe
+  // yaramıyordu.
   return new Promise((res, rej) => {
-    const req = indexedDB.deleteDatabase('egesut_v9');
+    const req = indexedDB.deleteDatabase('egesut_v12');
     req.onsuccess = () => { location.reload(); };
     req.onerror = () => rej('IDB silinemedi');
   });
@@ -101,6 +112,9 @@ async function openDB() {
     };
     req.onsuccess = e => { _idb = e.target.result; _dbReady = true; res(_idb); };
     req.onerror   = e => rej(e.target.error);
+    // M-24 fix: eski versiyon başka sekmede açıkken upgrade bloklanıyordu, kullanıcıya
+    // hiçbir bilgi verilmiyordu — sayfa askıda kalmış gibi görünüyordu.
+    req.onblocked = () => { if (typeof toast === 'function') toast('Veritabanı güncellemesi bloklandı — diğer sekmeleri kapatıp tekrar deneyin', true); };
   });
 }
 
