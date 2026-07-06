@@ -4890,10 +4890,10 @@ async function openDoneTaskDet(id){
   ddHayvan.textContent=(hayvan?.kupe_no||hayvan?.devlet_kupe)||t.hayvan_id||'GENEL';
   if(t.hayvan_id){
     ddHayvan.style.cursor='pointer';
-    ddHayvan.onclick=()=>{ closeM('m-done-det'); openDet(t.hayvan_id); };
+    ddHayvan.dataset.hid=t.hayvan_id;
   } else {
     ddHayvan.style.cursor='';
-    ddHayvan.onclick=null;
+    delete ddHayvan.dataset.hid;
   }
   document.getElementById('dd-aciklama').textContent=t.aciklama||'';
   const meta=[];

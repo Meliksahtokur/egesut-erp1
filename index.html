@@ -1712,7 +1712,7 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-done-det" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">✅ Tamamlanan Görev</div>
     <div class="m-body">
-      <div id="dd-hayvan" style="font-size:1.1rem;font-weight:800;color:var(--blue);margin-bottom:6px;cursor:pointer"></div>
+      <div id="dd-hayvan" onclick="if(this.dataset.hid){closeM('m-done-det');openDet(this.dataset.hid)}" style="font-size:1.1rem;font-weight:800;color:var(--blue);margin-bottom:6px;cursor:pointer"></div>
       <div id="dd-aciklama" style="font-size:.85rem;color:var(--ink);margin-bottom:10px"></div>
       <div id="dd-meta" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;font-size:.72rem"></div>
       <div id="dd-rapel" style="display:none;background:rgba(42,107,181,.08);border:1px solid rgba(42,107,181,.2);border-radius:8px;padding:10px;margin-bottom:12px;font-size:.8rem"></div>
