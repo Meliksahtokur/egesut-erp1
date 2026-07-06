@@ -9,8 +9,17 @@ import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 
 // ─── Sabitler ────────────────────────────────────────────────────────────────
-const SB_URL  = 'https://zqnexqbdfvbhlxzelzju.supabase.co';
-const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
+// Guvenlik: dbCount/dbGetFirst her zaman ayni ortama (demo/prod) baglanmali ki
+// PLAYWRIGHT_DEMO_MODE ile UI'nin konustugu proje ile assertion'larin okudugu
+// proje ayni olsun. Bu bayrak olmadan bu dosya HER ZAMAN canli prod'u okuyordu
+// (playwright.config.js'deki storageState demo bayragindan bagimsiz calisiyordu).
+const IS_DEMO = !!process.env.PLAYWRIGHT_DEMO_MODE;
+const SB_URL  = IS_DEMO
+  ? 'https://vtzqjmazsvurxdeondmi.supabase.co'
+  : 'https://zqnexqbdfvbhlxzelzju.supabase.co';
+const SB_KEY  = IS_DEMO
+  ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0enFqbWF6c3Z1cnhkZW9uZG1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NDc0OTcsImV4cCI6MjA5ODUyMzQ5N30.t9Bq7jZhV316SYt0HH5tih78dCckxHuUjdHUA9GeAs8'
+  : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
 const supabase = createClient(SB_URL, SB_KEY);
 
 // ─── Bilinen/zararsız uyarılar ──────────────────────────────────────────────
