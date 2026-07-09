@@ -27,6 +27,7 @@ calendar_events.py
 
 # MCP config (token içeriyor)
 .mcp.json
+opencode.json
 
 # Claude Code ayarları (lokal)
 .claude/settings.json
