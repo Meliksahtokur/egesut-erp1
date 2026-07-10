@@ -1,148 +1,154 @@
 # EgeSüt ERP
 
-130+ hayvanlık süt çiftliği için offline-first web tabanlı yönetim sistemi.
+> Web-based management system for a 130+ head dairy farm — herd, reproduction, clinic, inventory, and automated task workflows in one offline-first app.
 
-**Live:** https://meliksahtokur.github.io/egesut-erp1/
-**Backend:** Supabase (PostgreSQL)
-**Repo:** github.com/Meliksahtokur/egesut-erp1
+[![Live Demo](https://img.shields.io/badge/demo-live-4e9a2a?style=flat-square&logo=github&logoColor=white)](https://meliksahtokur.github.io/egesut-erp1/)
+[![GitHub stars](https://img.shields.io/github/stars/Meliksahtokur/egesut-erp1?style=flat-square&logo=github)](https://github.com/Meliksahtokur/egesut-erp1/stargazers)
+[![License](https://img.shields.io/badge/license-ISC-blue?style=flat-square)](LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/Meliksahtokur/egesut-erp1?style=flat-square&logo=git)](https://github.com/Meliksahtokur/egesut-erp1/commits/main)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33?style=flat-square&logo=playwright&logoColor=white)](https://playwright.dev)
 
----
+**Live app:** https://meliksahtokur.github.io/egesut-erp1/
 
-## Teknik Stack
-
-| Katman | Teknoloji |
-|--------|-----------|
-| Frontend | Vanilla JS, tek `index.html`, framework yok |
-| Backend | Supabase (PostgreSQL + RPC) |
-| Offline Cache | IndexedDB (`egesut_v9`) |
-| Deploy | GitHub Pages (her push otomatik) |
-| DB Migration | GitHub Actions → Supabase CLI |
+EgeSüt ERP runs a real working dairy farm. It is built as a single-page, installable Progressive Web App with vanilla JavaScript on the front and a PostgreSQL database (Supabase) on the back. Every write goes through a versioned server-side function; the business logic lives in the database, not the browser. Field staff use it on phones in the barn, offline, and sync when connectivity returns.
 
 ---
 
-## Modüller ve Durum
+## Features
 
-| Modül | Durum | Açıklama |
-|-------|-------|----------|
-| **Sürü** | ✅ Tamamlandı | Hayvan kartı, grup/padok, 🐣 Doğurdu chip (#66), kızgınlık bar, search+filter |
-| **Görev** | ✅ Tamamlandı | Otomatik üretim, cascade/orphan zincir-guard, hayvan çıkışında iptal, ertelenmiş commit |
-| **Stok** | ✅ Tamamlandı | İlaç katalog + ledger (immutable), kritik eşik, atomik RPC |
-| **Üreme** | ✅ Tamamlandı | Tohumlama → gebelik → doğum, per-cycle state machine, genç anne, polish devam ediyor |
-| **Klinik / Vaka** | ✅ Tamamlandı | Tedavi seans (BUG-059) + şablon, Klinisyen Monitörü (Faz 5), undo, atomik RPC'ler |
-| **Aşı** | ✅ Tamamlandı | İçerik-odaklı yönetim (vaccines + hastalıklar + protocol_steps), primer/muadil, çoklu uygulama |
-| **İstatistik** | ✅ Tamamlandı | stat_suru_ozet + v_ureme_dongusu, üreme verimliliği (Düve/İnek ×3), sperma/PI |
-| **AI Asistan** | ✅ Tamamlandı | Supabase Edge Function + MiniMax, agent loop, plan+undo (Faz 0–2.6), salt-okuma SQL + HITL yazma |
-| **Demo-Mirror** | ✅ Tamamlandı | postgres_fdw → demo atomik klon (D0–D4), günlük backup, demo login → canlı klon |
+### Herd Management
+Individual animal records, identity cards, physical-location tracking (paddock and group assignments), and herd-wide filtering across 130+ animals. Each animal carries a full historical timeline.
 
----
+### Reproduction
+A complete breeding state machine: heat detection → insemination → pregnancy tracking → calving → calf registration. Status transitions are guarded by database triggers, so an invalid progression (for example, marking a non-pregnant animal as calved) is rejected at the data layer.
 
-## Mimari Prensipler
+### Clinical Cases
+A structured veterinary workflow: open a case, add daily treatment sessions, prescribe medication from a controlled catalog, and close the case. Treatment templates and an undo path are supported. Backed by a disease catalog grouped by body system (mammary, reproductive, metabolic, foot, respiratory, digestive, calf) and a veterinarian registry.
 
-- **İş mantığı DB'de** — frontend sadece render ve input toplar, **hesap yapmaz, state machine işletmez, validasyon yapmaz**. Frontend ERP'de güvenilmezdir (DevTools override, çoklu cihaz versiyon farkı, offline güncellik sorunu). Tüm iş mantığı PostgreSQL'de (RPC + trigger + view).
-- **Sadece RPC ile yaz** — direkt REST INSERT/UPDATE/DELETE yasak; tüm yazma işlemleri Supabase RPC üzerinden geçer. `write()` fonksiyonu geçici offline queue çözümüdür, yeni kodda RPC tercih edilir.
-- **Controlled entities** — hastalık, ilaç, hayvan asla free-text; FK + dropdown zorunlu
-- **Stok ledger immutable** — `stok_hareket` asla silinmez; düzeltme yeni kayıt olarak girilir
-- **Offline-first** — tüm okumalar IndexedDB'den, yazma Supabase'e kuyruğa alınır
-- **Migration idempotent** — her migration `DROP IF EXISTS + CREATE OR REPLACE` ile yazılır
+### Inventory and Pharmacy
+Drug and material entry, automatic stock deduction on administration, and critical-stock threshold alerts. Vaccines and semen stock are tracked alongside consumables, with an immutable ledger so corrections are entered as new movements rather than edits.
 
----
+### Automated Tasks
+The database generates recurring and event-driven tasks — vaccinations, follow-ups, protocol steps — automatically. Tasks carry a color-coded status and are completed in one tap, with an immutable operation log for auditability.
 
-## Kaynak Dosyalar
+### Vaccination Protocols
+Content-driven protocol management linking vaccines, target diseases, and protocol steps (primer and booster schedules), with support for equivalent products and multi-dose administration.
 
-```
-index.html                    — HTML + CSS + tüm modaller (2246 satır)
-js/
-  config.js                   — GRUP_PADOK + sabitler (129 satır)
-  state.js                    — AppState (92 satır)
-  api.js                      — Supabase client, IDB sync, RPC wrapper (606 satır)
-  app.js                      — Uygulama init + routing (719 satır)
-  ui.js                       — Tüm render (8210 satır)
-  forms.js                    — Form submit + validasyon (1898 satır)
-  auth.js                     — Login gate, kayıt, şifre sıfırlama (267 satır)
-  ai-asistan.js               — AI Asistan frontend (385 satır)
-  demo.js                     — Demo-Mirror UI (87 satır)
-  utils/
-    helpers.js                — DOM, toast, autocomplete, debounce (103 satır)
-    modal.js                  — openM/closeM/mClose (74 satır)
-    errorHandler.js           — withErrorHandling (54 satır)
-    handlers.js               — Global event handler'lar (354 satır)
-    events.js                 — Event emitter (49 satır)
-supabase/migrations/             — 214 migration dosyası (PostgreSQL)
-scripts/                       — LSP, ground-truth-audit, sql-lsp daemon, vb.
-lsp.json                       — OMP için SQL LSP kaydı (lsp-proxy)
-plugins/                       — OMP/Claude Code için LSP plugin manifestleri (sql-lsp, ts-lsp)
-```
+### Notifications
+A unified inbox of pending alerts — upcoming tasks, low stock, open cases — so nothing falls through the cracks.
 
-## Veritabanı Özeti
+### Reports and History
+Operational dashboards and reports (herd summary, reproductive efficiency by parity, semen and pregnancy indices) plus per-animal and per-event historical timelines for traceability.
 
-**50 public base tablo** (canlı, 2026-07-04 LSP teyitli — ground_truth 41 + bugünden eklenenler; psql view ile 64 görünür çünkü extension nesneleri ve view'lar dahil).
+### AI Assistant
+An in-app assistant that drafts plans and runs read-only queries against the live schema to help operators reason about the herd, with human-in-the-loop confirmation for any write action.
 
-```
-hayvanlar (çekirdek)
-  ├── tohumlama          — üreme olayları (per-cycle state machine)
-  ├── dogum              — doğum kayıtları
-  ├── kizginlik_log      — kızgınlık takibi (tedavi-silme entegre)
-  ├── gorev_log          — görev sistemi (id text+uuid; cascade/orphan guard)
-  └── cases              — klinik vakalar
-        ├── treatment_days → drug_administrations → drugs → stok
-        ├── tedavi_sablon_*, tedavi_sablon_uygulama — şablon motoru (#63)
-        └── tedavi (legacy) — BUG-XXX-TEDAVI-ORPHAN temizlendi
-
-stok
-  └── stok_hareket       — ledger (immutable)
-
-vaccines + vaccine_diseases + protocol_steps  — aşı yönetimi (içerik-odaklı)
-agent_threads + agent_messages + agent_plans — AI Asistan hafıza + plan motoru
-prod_fdw                                     — Demo-Mirror FDW köprüsü (postgres_fdw → demo atomik klon)
-diseases / drugs                             — controlled listeler
-```
-
-Canlı DB şeması: [`db_schema_snapshot.md`](db_schema_snapshot.md)
-Mimari kararlar: [`ARCHITECTURE.md`](ARCHITECTURE.md)
-`ground_truth` referans: [`supabase/migrations/99999999999999_ground_truth.sql`](supabase/migrations/99999999999999_ground_truth.sql) (canlıyla regen tamamlandı 2026-06-25)
+### Offline-first PWA
+Installable on iOS and Android home screens, runs offline through a service worker and an IndexedDB cache, and shows a live connectivity indicator so the user always knows whether they are reading cached data or live.
 
 ---
 
-## Aktif Teknik Borç
+## Tech Stack
 
-| Sorun | Önem |
-|-------|------|
-| ui.js monolitik (8210 satır) — Aşama 3 event delegation + render motoru | 🟠 Orta |
-| **BUG-XXX Modal Router** (6c4cfbe kısmi) — 2 alt bug stabil değil | 🟡 Yüksek |
-| Tools-bank arama edge case'leri (TB-001/002/003): kod araması try/except yutuyor, semantic RPC ~10s JWT gecikmesi, Cloudflare bge-m3 intermittent degrade | 🟠 Orta |
-| ground_truth kalıntıları (GT-B2): bazı fn header + $$/quote bozuk; workflow bozmuyor, LSP canlıdan beslenir | 🟢 Düşük |
-| ReFactorRoadmap kalan — 1.1 (13 global app.js:81), 1.4 (acHayvan/acDisease), 3.x (render motoru + event delegation), 6.x (XSS `esc()` test gerekli) | 🟠 Orta |
-| Multi-tenant retrofit (Faz 2) — `farm_id` ileri-disiplin aktif (YENİ nesneler), mevcut 41 tablo henüz retrofit edilmedi (kaynak: `.claude/farm-id-discipline.md`) | 🟡 Yüksek |
+| Layer | Technology |
+|------|-----------|
+| Frontend | Vanilla JavaScript, single `index.html` — no framework, no bundler, no build step |
+| Backend | Supabase (PostgreSQL) — RPC + REST |
+| Data model | 50 tables, 170+ server-side functions, triggers, RLS policies |
+| Offline cache | IndexedDB (`egesut_v9`) |
+| Hosting | GitHub Pages (static frontend), Supabase (database) |
+| Migrations | 222 versioned SQL files, CI-deployed via Supabase CLI |
+| Testing | Playwright E2E (sharded across 3 runners), `node:test` unit tests |
+| Quality | SonarCloud static analysis |
 
-**Düzeltilen (2026-05-16 → 2026-07-04):**
-- ✅ BUG-059 Tedavi seans → görev UI + Klinisyen Monitörü (Faz 5, 4c732a6)
-- ✅ Tedavi şablon motoru (#63, 8086256 + 49f62bc + 636bd5f)
-- ✅ ground_truth regen (a2e6d00) → `99999999999999_ground_truth.sql` canlıyla birebir
-- ✅ Auth gate + anon kilidi (b3e777e, e0fd1e6)
-- ✅ Sütten-kesme atomik RPC + UI + undo (54e95dd, a20ee28, f503537)
-- ✅ BUG-064 hizli_uygulama 6-param imza + islem_log audit (4be01af)
-- ✅ Detay-modal kupe no: DOM onclick → HTML attribute (684534f, modal router uyumu)
-- ✅ Tedavi orphan cleanup (a4a5336)
-- ✅ Aşı içerik-odaklı yönetim — vaccines + hastalıklar + protocol_steps M:N (3f90565, 8b48f82)
-- ✅ Üreme per-cycle state machine + genç anne hibrit kategori (dc7581c, fb62104, 4cb146f)
-- ✅ Kızgınlık ↔ tedavi çift yönlü entegrasyon + belirsiz liste (edf84a2, 14b35a7)
-- ✅ GitNexus code intelligence + LSP precheck + DB blast radius (1499d42, 7cf732b, 64d217f)
+---
 
-## Geliştirme Notları
+## Architecture Highlights
+
+- **RPC-only writes.** The browser never issues `INSERT`/`UPDATE`/`DELETE` against a table directly. Every mutation calls a PostgreSQL function, so validation, authorization, and side effects are enforced server-side in one place.
+- **Business logic in the database.** State machines (reproduction, clinical cases, task generation), stock deduction, and protocol enforcement are implemented as triggers and functions. The frontend is a thin presentation layer — the same logic holds regardless of which client connects.
+- **Controlled entities.** Diseases, drugs, and animals are never free-text; foreign keys and dropdowns are enforced, keeping the dataset clean and reportable.
+- **Immutable stock ledger.** Stock movements are append-only; corrections are entered as new ledger entries, preserving a complete audit trail.
+- **Offline-first.** Reads are served from IndexedDB and reconciled with the server when online; a service worker keeps the shell available with no connection. Designed for use in a barn with spotty signal.
+- **Versioned schema, CI-deployed.** Migrations live in `supabase/migrations/` and are pushed to production by a GitHub Actions workflow on every merge to `main`. The canonical schema is captured in `supabase/migrations/99999999999999_ground_truth.sql`.
+- **Multi-tenant foundations.** A `farm_id` discipline and tenant-scoped policies are in place for future multi-farm expansion.
+- **Demo environment.** A read-only demo mirror with a live-data clone (`demo_klonla()` RPC over `postgres_fdw`) lets prospective users explore the real schema without touching production.
+- **Zero build step.** No transpiler, no bundler, no dependency resolution at deploy time — the static assets ship as written, keeping the surface area small and the deploy pipeline trivial.
+
+---
+
+## Getting Started
+
+### Prerequisites
+- A Supabase project (or any PostgreSQL 14+ instance with the Supabase runtime)
+- Node.js 18+ for running the test suite
+- Python 3 for the optional local static server
+
+### Run the app locally
+The frontend is plain static files — serve the repository root with any static server:
 
 ```bash
-# Bağımlılıkları kur (geliştirme/test bağımlılıkları; runtime vanilla JS)
-npm install
-
-# Supabase CLI ile migration uygula (GitHub Actions otomatik çalıştırır)
-npx supabase db push
-
-# JS syntax kontrolü
-node --check js/ui.js
-node --check js/forms.js
-
-# Değişiklik öncesi ZORUNLU precheck:
-#   SQL/RPC: bash scripts/refresh_lsp_schema.sh && postgrestools check <sql>
-#   JS:     mcp__gitnexus_impact({target: "<symbol>", direction: "upstream"})
-# (skill: .claude/skills/code-change-precheck)
+python3 -m http.server 8080
+# open http://127.0.0.1:8080/
 ```
+
+Point `js/config.js` at your Supabase project URL and anon key to connect to your own database.
+
+### Apply the database schema
+The canonical schema and all migrations live under `supabase/migrations/`. With the Supabase CLI:
+
+```bash
+supabase link --project-ref <your-project-ref>
+supabase db push --include-all
+```
+
+### Run the tests
+```bash
+npm install
+npm test                 # Playwright E2E
+npm run test:unit        # node:test unit tests
+npm run test:docker      # E2E in the official Playwright Docker image
+```
+
+---
+
+## CI/CD
+
+| Workflow | Purpose |
+|---------|---------|
+| `test.yml` | Playwright E2E across 3 shards on every push and pull request |
+| `deploy.yml` | Pushes pending migrations to Supabase on merge to `main` |
+| `pages.yml` | Publishes the static frontend to GitHub Pages |
+| `sonarcloud.yml` | Static analysis and code-quality gates |
+| `db-backup.yml` | Scheduled database backups |
+| `test-migration-ready.yml` | Validates migrations before they ship |
+
+[![E2E Tests](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/test.yml)
+[![Deploy to Supabase](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/deploy.yml)
+[![GitHub Pages](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/pages.yml/badge.svg?branch=main)](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/pages.yml)
+[![SonarCloud](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/sonarcloud.yml/badge.svg?branch=main)](https://github.com/Meliksahtokur/egesut-erp1/actions/workflows/sonarcloud.yml)
+
+---
+
+## Screenshots
+
+> Add screenshots under `docs/screenshots/` and reference them here — dashboard, animal card, reproduction timeline, clinical case, inventory alerts.
+
+---
+
+## License
+
+Distributed under the ISC license. See `package.json` for details. The database schema, migrations, and application source in this repository are provided as-is.
+
+---
+
+## Contact
+
+**Melik Şah Tokur** — freelance full-stack developer
+
+- GitHub: [@Meliksahtokur](https://github.com/Meliksahtokur)
+- Repository: [egesut-erp1](https://github.com/Meliksahtokur/egesut-erp1)
+- Live demo: https://meliksahtokur.github.io/egesut-erp1/
+
+Available for freelance and contract work on internal tools, line-of-business applications, and data-driven web apps. This repository is a working example — a production system running a real operation, not a demo project.
