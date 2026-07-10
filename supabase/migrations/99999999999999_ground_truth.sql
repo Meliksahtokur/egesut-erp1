@@ -3358,6 +3358,7 @@ CREATE TABLE IF NOT EXISTS public.drug_classes (
   group_name        text NOT NULL,
   class_name        text,
   active_ingredient text,
+  etken_kod         text,  -- otorite (OKSITOSIN/PG/E_VIT/ADEMIN/KALSIYUM/ROTA); _etken_kod_bul önce bunu okur
   kategori_id       uuid REFERENCES public.stok_kategorileri(id),
   created_at        timestamptz DEFAULT now(),
   CONSTRAINT uq_drug_classes_combo UNIQUE (group_name, class_name, active_ingredient)
@@ -9417,11 +9418,12 @@ CREATE OR REPLACE FUNCTION public._etken_kod_bul(
 ) RETURNS text
 LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_class_name text;
-  v_group_name text;
-  v_active_ing text;
-  v_stok_ad text;
+  v_class_name   text;
+  v_group_name   text;
+  v_active_ing   text;
+  v_stok_ad      text;
   v_vaccine_name text;
+  v_etken_kod    text;  -- otorite (drug_classes.etken_kod)
 BEGIN
   -- Aşı yolu
   IF p_vaccine_id IS NOT NULL THEN
@@ -9434,25 +9436,32 @@ BEGIN
   IF p_stok_id IS NOT NULL THEN
     SELECT s.urun_adi INTO v_stok_ad FROM public.stok s WHERE s.id = p_stok_id;
 
-    -- Önce stok.drug_product_id FK kullan (en doğru yol)
-    SELECT dc.group_name, dc.class_name, dc.active_ingredient
-    INTO v_group_name, v_class_name, v_active_ing
+    -- Aşı (stok yolu): FK zinciri aşılarda boş — isimden yakala
+    IF v_stok_ad ILIKE '%Rota%' THEN RETURN 'ROTA'; END IF;
+
+    -- Önce stok.drug_product_id FK zinciri (en doğru yol) — etken_kod dahil 4 alan
+    SELECT dc.etken_kod, dc.group_name, dc.class_name, dc.active_ingredient
+    INTO v_etken_kod, v_group_name, v_class_name, v_active_ing
     FROM public.drug_products dp
     JOIN public.drug_classes dc ON dc.id = dp.drug_class_id
     WHERE dp.id = (SELECT drug_product_id FROM public.stok WHERE id = p_stok_id)
     LIMIT 1;
 
-    -- Fallback: brand_name eşleşmesi
+    -- Otorite: drug_classes.etken_kod set ise kesin dönüş (ILIKE'ı atla)
+    IF v_etken_kod IS NOT NULL THEN RETURN v_etken_kod; END IF;
+
+    -- Fallback: brand_name eşleşmesi (FK boşsa) — etken_kod'u da çek
     IF v_class_name IS NULL THEN
-      SELECT dc.group_name, dc.class_name, dc.active_ingredient
-      INTO v_group_name, v_class_name, v_active_ing
+      SELECT dc.etken_kod, dc.group_name, dc.class_name, dc.active_ingredient
+      INTO v_etken_kod, v_group_name, v_class_name, v_active_ing
       FROM public.drug_products dp
       JOIN public.drug_classes dc ON dc.id = dp.drug_class_id
       WHERE dp.brand_name ILIKE '%' || COALESCE(v_stok_ad,'') || '%'
       LIMIT 1;
+      IF v_etken_kod IS NOT NULL THEN RETURN v_etken_kod; END IF;
     END IF;
 
-    -- Sınıf bazlı eşleşme
+    -- Legacy ILIKE güvenlik ağı: etken_kod kolonu boşsa text-guesser dener
     IF v_class_name ILIKE '%oksitosin%' OR v_active_ing ILIKE '%oxytocin%' THEN RETURN 'OKSITOSIN'; END IF;
     IF v_class_name ILIKE '%prostaglandin%' OR v_group_name ILIKE '%PG%' OR v_active_ing ILIKE '%dinoprost%' OR v_active_ing ILIKE '%cloprostenol%' THEN RETURN 'PG'; END IF;
     IF v_active_ing ILIKE '%E Vitamini%' THEN RETURN 'E_VIT'; END IF;

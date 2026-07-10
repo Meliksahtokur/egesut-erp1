@@ -97,3 +97,34 @@ backup/
 # LSP/credential — ASLA commit etme
 .env
 .env.*
+
+# === AI/Agent geliştirme araçları (repoda yeri yok) ===
+.skillopt-sleep/
+.openclaude/
+.agents/
+.skills/
+.pi/
+.superpowers/
+.claude-plugin/
+.goosehints
+.aiderignore
+.greptileignore
+.review-status.json
+.githooks/
+.semgrep/
+.idx/
+.devcontainer/
+.vscode/
+
+# === Geçici araştırma/analiz dizinleri ===
+research/
+findings/
+reports/
+big-analiz/
+analysis/
+review/
+graphify-out/
+tools-bank/
+memory/
+results/
+plugins/
