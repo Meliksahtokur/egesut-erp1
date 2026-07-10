@@ -128,3 +128,45 @@ tools-bank/
 memory/
 results/
 plugins/
+
+# === AI agent / kişisel yapılandırma ===
+AGENTS.md
+CLAUDE.md
+.qwen/
+.agents/
+.skills/
+.pi/
+.superpowers/
+.openclaude/
+.claude-plugin/
+.goosehints
+.aiderignore
+.greptileignore
+.review-status.json
+.githooks/
+.semgrep/
+.idx/
+.devcontainer/
+.vscode/
+.skillopt-sleep/
+
+# === Kişisel dokümanlar (public değil) ===
+docs/superpowers/
+docs/plans/
+docs/handoff/
+docs/ideas/
+docs/analysis/
+docs/research/
+docs/specs/
+docs/architecture-violations.md
+docs/feature-status-2026-05-13.md
+
+# === Dev araçları / artifact'ler ===
+patch.py
+skills-lock.json
+lsp.json
+recipe.yaml
+repomix.config.js
+postgres-language-server.jsonc
+"$WATCHDOG_PID_FILE"
+--include-idle-unload
