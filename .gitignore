@@ -171,3 +171,4 @@ postgres-language-server.jsonc
 "$WATCHDOG_PID_FILE"
 --include-idle-unload
 *.sh
+*.py
