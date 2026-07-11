@@ -425,6 +425,53 @@ button,input,select,textarea{font-family:inherit}
    MASAÜSTÜ RESPONSIVE (Kademe 2) — sadece ≥900px. Mobil dokunulmaz.
    ============================================================ */
 @media (min-width:900px){
+  /* ---- 1. SHELL → sidebar grid ---- */
+  #shell{
+    display:grid;
+    grid-template-columns:220px minmax(0,1fr);
+    grid-template-rows:auto auto auto minmax(0,1fr);
+    grid-template-areas:
+      "nav topbar"
+      "nav sync"
+      "nav kizginlik"
+      "nav pages";
+  }
+  #topbar      {grid-area:topbar}
+  #sync-bar    {grid-area:sync}
+  #kizginlik-bar{grid-area:kizginlik}
+  #pages       {grid-area:pages}
+  #nav         {grid-area:nav}
+
+  /* nav: alt bar → dikey sol ray */
+  #nav{
+    height:auto;
+    flex-direction:column;
+    align-items:stretch;
+    gap:4px;
+    padding:16px 10px;
+    border-top:none;
+    border-right:1px solid var(--bg3);
+  }
+  .nb{
+    flex:0 0 auto;
+    flex-direction:row;
+    justify-content:flex-start;
+    gap:12px;
+    padding:11px 14px;
+    border-radius:10px;
+  }
+  .nb .nb-lbl{font-size:.8rem;text-transform:none;letter-spacing:0}
+  .nb.on{background:rgba(106,191,61,.12)}
+  /* alt çizgi vurgusu → sol kenar rayı */
+  .nb.on::after{
+    top:18%;bottom:18%;left:0;right:auto;
+    width:3px;height:auto;border-radius:0 4px 4px 0;
+  }
+  /* rozet: satır düzeninde ikonun sağ-üstü */
+  .nbadge{top:6px;left:28px;right:auto}
+
+  /* .pg: alt nav kalktı → alt boşluğu sıfırla */
+  .pg{padding-bottom:12px}
 }
 </style>
 </head>
