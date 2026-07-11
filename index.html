@@ -508,6 +508,30 @@ button,input,select,textarea{font-family:inherit}
   /* ---- 5. Arketip ③ Form/okuma — dar tut ---- */
   #pg-log .pg-inner{max-width:720px}
   #pg-asistan .pg-inner{max-width:760px}
+
+  /* ---- V2: Canlı UI — sadece gerçek imleçte (hover:hover) ---- */
+  @media (hover:hover){
+    .animal-card{transition:background .12s,border-color .12s,transform .12s,box-shadow .12s}
+    .animal-card:hover{background:var(--card2);border-color:var(--ink3);transform:translateY(-1px);box-shadow:0 2px 12px rgba(0,0,0,.10)}
+    .arow{transition:background .12s}
+    .arow:hover{background:var(--card2)}
+    .task-card{transition:transform .12s,box-shadow .12s}
+    .task-card:hover{transform:translateY(-1px);box-shadow:0 2px 12px rgba(0,0,0,.10)}
+    .sc{transition:transform .12s,box-shadow .12s}
+    .sc:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.12)}
+    .log-btn{transition:background .12s}
+    .log-btn:hover{background:var(--card2)}
+    .fchip{transition:border-color .12s,background .12s}
+    .fchip:hover{border-color:var(--ink3)}
+    .btn{transition:filter .12s,transform .12s}
+    .btn:hover{filter:brightness(1.08)}
+    .ck-btn{transition:border-color .12s,color .12s}
+    .ck-btn:hover{border-color:var(--green2);color:var(--green2)}
+    .nb{transition:background .12s,color .12s}
+    .nb:hover{background:rgba(106,191,61,.08);color:var(--green2)}
+    #refbtn{transition:background .12s}
+    #refbtn:hover{background:rgba(106,191,61,.2)}
+  }
 }
 </style>
 </head>
