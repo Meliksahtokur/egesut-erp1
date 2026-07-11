@@ -429,16 +429,18 @@ button,input,select,textarea{font-family:inherit}
   #shell{
     display:grid;
     grid-template-columns:220px minmax(0,1fr);
-    grid-template-rows:auto auto auto minmax(0,1fr);
+    grid-template-rows:auto auto auto auto minmax(0,1fr);
     grid-template-areas:
       "nav topbar"
       "nav sync"
       "nav kizginlik"
+      "nav sperma"
       "nav pages";
   }
   #topbar      {grid-area:topbar}
   #sync-bar    {grid-area:sync}
   #kizginlik-bar{grid-area:kizginlik}
+  #sperma-warn-band{grid-area:sperma}
   #pages       {grid-area:pages}
   #nav         {grid-area:nav}
 
