@@ -485,6 +485,18 @@ button,input,select,textarea{font-family:inherit}
   #pg-dash .dash-row{
     grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
   }
+
+  /* ---- 4. Arketip ② Sürü kart ızgarası ---- */
+  #pg-suru .pg-inner{max-width:1280px}
+  #suru-body{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:8px;
+  }
+  #suru-body .animal-card{margin-bottom:0}
+  /* boş/yükleniyor durumları tüm satırı kaplasın */
+  #suru-body .empty,
+  #suru-body .loader{grid-column:1/-1}
 }
 </style>
 </head>
