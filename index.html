@@ -420,6 +420,90 @@ button,input,select,textarea{font-family:inherit}
 .sg-act-iade{background:none;border:1px solid var(--card3);border-radius:7px;padding:8px 11px;font-size:.74rem;font-weight:600;color:var(--ink2);cursor:pointer;width:100%;text-align:left}
 /* Modal section etiketi */
 .cd-sec-lbl{font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:8px;margin-bottom:2px}
+
+/* ============================================================
+   MASAÜSTÜ RESPONSIVE (Kademe 2) — sadece ≥900px. Mobil dokunulmaz.
+   ============================================================ */
+@media (min-width:900px){
+  /* ---- 1. SHELL → sidebar grid ---- */
+  #shell{
+    display:grid;
+    grid-template-columns:220px minmax(0,1fr);
+    grid-template-rows:auto auto auto auto minmax(0,1fr);
+    grid-template-areas:
+      "nav topbar"
+      "nav sync"
+      "nav kizginlik"
+      "nav sperma"
+      "nav pages";
+  }
+  #topbar      {grid-area:topbar}
+  #sync-bar    {grid-area:sync}
+  #kizginlik-bar{grid-area:kizginlik}
+  #sperma-warn-band{grid-area:sperma}
+  #pages       {grid-area:pages}
+  #nav         {grid-area:nav}
+
+  /* nav: alt bar → dikey sol ray */
+  #nav{
+    height:auto;
+    flex-direction:column;
+    align-items:stretch;
+    gap:4px;
+    padding:16px 10px;
+    border-top:none;
+    border-right:1px solid var(--bg3);
+  }
+  .nb{
+    flex:0 0 auto;
+    flex-direction:row;
+    justify-content:flex-start;
+    gap:12px;
+    padding:11px 14px;
+    border-radius:10px;
+  }
+  .nb .nb-lbl{font-size:.8rem;text-transform:none;letter-spacing:0}
+  .nb.on{background:rgba(106,191,61,.12)}
+  /* alt çizgi vurgusu → sol kenar rayı */
+  .nb.on::after{
+    top:18%;bottom:18%;left:0;right:auto;
+    width:3px;height:auto;border-radius:0 4px 4px 0;
+  }
+  /* rozet: satır düzeninde ikonun sağ-üstü */
+  .nbadge{top:6px;left:28px;right:auto}
+
+  /* .pg: alt nav kalktı → alt boşluğu sıfırla */
+  .pg{padding-bottom:12px}
+
+  /* ---- 2. Evrensel içerik cap'i (yatay esnemeyi keser) ---- */
+  .pg-inner{
+    max-width:1080px;
+    margin-inline:auto;
+    padding:20px 24px;
+  }
+
+  /* ---- 3. Arketip ① PANO ---- */
+  #pg-dash .pg-inner{max-width:1200px}
+  #pg-dash .dash-row{
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  }
+
+  /* ---- 4. Arketip ② Sürü kart ızgarası ---- */
+  #pg-suru .pg-inner{max-width:1280px}
+  #suru-body{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:8px;
+  }
+  #suru-body .animal-card{margin-bottom:0}
+  /* boş/yükleniyor durumları tüm satırı kaplasın */
+  #suru-body .empty,
+  #suru-body .loader{grid-column:1/-1}
+
+  /* ---- 5. Arketip ③ Form/okuma — dar tut ---- */
+  #pg-log .pg-inner{max-width:720px}
+  #pg-asistan .pg-inner{max-width:760px}
+}
 </style>
 </head>
 <body>
