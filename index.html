@@ -477,19 +477,19 @@ button,input,select,textarea{font-family:inherit}
 
   /* ---- 2. Evrensel içerik cap'i (yatay esnemeyi keser) ---- */
   .pg-inner{
-    max-width:1440px;
+    max-width:1080px;
     margin-inline:auto;
-    padding:24px 32px;
+    padding:20px 24px;
   }
 
   /* ---- 3. Arketip ① PANO ---- */
-  #pg-dash .pg-inner{max-width:1680px}
+  #pg-dash .pg-inner{max-width:1200px}
   #pg-dash .dash-row{
     grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
   }
 
   /* ---- 4. Arketip ② Sürü kart ızgarası ---- */
-  #pg-suru .pg-inner{max-width:1680px}
+  #pg-suru .pg-inner{max-width:1280px}
   #suru-body{
     display:grid;
     grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
@@ -509,28 +509,30 @@ button,input,select,textarea{font-family:inherit}
   #pg-log .pg-inner{max-width:720px}
   #pg-asistan .pg-inner{max-width:760px}
 
-  /* ---- V2: Canlı UI — sadece gerçek imleçte (hover:hover) ---- */
+  /* ---- V3: Canlı UI — yaylı sıçrama + yeşil parıltı (sadece hover:hover) ---- */
   @media (hover:hover){
-    .animal-card{transition:background .12s,border-color .12s,transform .12s,box-shadow .12s}
-    .animal-card:hover{background:var(--card2);border-color:var(--ink3);transform:translateY(-1px);box-shadow:0 2px 12px rgba(0,0,0,.10)}
-    .arow{transition:background .12s}
-    .arow:hover{background:var(--card2)}
-    .task-card{transition:transform .12s,box-shadow .12s}
-    .task-card:hover{transform:translateY(-1px);box-shadow:0 2px 12px rgba(0,0,0,.10)}
-    .sc{transition:transform .12s,box-shadow .12s}
-    .sc:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(0,0,0,.12)}
-    .log-btn{transition:background .12s}
-    .log-btn:hover{background:var(--card2)}
-    .fchip{transition:border-color .12s,background .12s}
-    .fchip:hover{border-color:var(--ink3)}
-    .btn{transition:filter .12s,transform .12s}
-    .btn:hover{filter:brightness(1.08)}
-    .ck-btn{transition:border-color .12s,color .12s}
-    .ck-btn:hover{border-color:var(--green2);color:var(--green2)}
-    .nb{transition:background .12s,color .12s}
-    .nb:hover{background:rgba(106,191,61,.08);color:var(--green2)}
-    #refbtn{transition:background .12s}
-    #refbtn:hover{background:rgba(106,191,61,.2)}
+    /* springy easing = overshoot; yeşil glow = ışıldama */
+    .animal-card{transition:background .14s,border-color .18s,transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s}
+    .animal-card:hover{background:var(--card2);border-color:var(--green);transform:translateY(-3px);box-shadow:0 7px 20px rgba(78,154,42,.24)}
+    .arow{transition:background .14s,transform .18s cubic-bezier(.34,1.56,.64,1)}
+    .arow:hover{background:var(--card2);transform:translateX(3px)}
+    .task-card{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s,border-color .18s}
+    .task-card:hover{transform:translateY(-3px);box-shadow:0 7px 20px rgba(78,154,42,.22);border-color:var(--green)}
+    .sc{transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s}
+    .sc:hover{transform:translateY(-4px);box-shadow:0 9px 24px rgba(78,154,42,.28)}
+    .log-btn{transition:background .14s,transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s}
+    .log-btn:hover{background:var(--card2);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.13)}
+    .fchip{transition:border-color .14s,background .14s,transform .16s cubic-bezier(.34,1.56,.64,1)}
+    .fchip:hover{border-color:var(--green);background:var(--card2);transform:translateY(-1px)}
+    /* butonlar: belirgin sıçrama + güçlü gölge + parlaklık */
+    .btn{transition:filter .14s,transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s}
+    .btn:hover{filter:brightness(1.12);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.24)}
+    .ck-btn{transition:border-color .14s,color .14s,background .14s,transform .16s cubic-bezier(.34,1.56,.64,1)}
+    .ck-btn:hover{border-color:var(--green2);color:var(--green2);background:rgba(106,191,61,.12);transform:translateY(-1px)}
+    .nb{transition:background .14s,color .14s,transform .15s}
+    .nb:hover{background:rgba(106,191,61,.10);color:var(--green2)}
+    #refbtn{transition:background .14s,transform .16s cubic-bezier(.34,1.56,.64,1),box-shadow .18s}
+    #refbtn:hover{background:rgba(106,191,61,.28);transform:translateY(-1px);box-shadow:0 4px 14px rgba(106,191,61,.3)}
   }
 }
 </style>
