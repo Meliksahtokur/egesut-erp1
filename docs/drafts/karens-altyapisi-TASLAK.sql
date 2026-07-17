@@ -1,38 +1,37 @@
 -- ============================================================================
--- ⚠️  TASLAK — DEPLOY EDİLEMEZ. BİLİNEN HATA VAR (aşağıda). ⚠️
+-- ⚠️  TASLAK — HENÜZ DEPLOY EDİLMEZ (karens değerleri + numune görevi eksik). ⚠️
 --
 --   Bu dosya bilerek supabase/migrations/ DIŞINDA tutuluyor: oradaki her dosya
 --   main'e merge'te deploy.yml tarafından canlıya uygulanır. Tamamlanınca
 --   20260716000001_karens_altyapisi.sql adıyla oraya taşınacak.
 --
---   DURUM (2026-07-16): şema + türetme mantığı canlı şemaya karşı ROLLBACK'li
---   test edildi, çalışıyor. Sonuçlar: 137 aktif hayvan, 536 karens üreten
---   uygulama (ASI=378 TEDAVI=89 UYGULAMA=69), 46 hayvan BILINMIYOR, 91 TEMIZ.
+--   DURUM (2026-07-17): şema + türetme mantığı canlı şemaya karşı ROLLBACK'li
+--   test edildi, çalışıyor. Sonuçlar: 605 karens üreten uygulama
+--   (ASI=378 TEDAVI=154 UYGULAMA=73), 51 hayvan BILINMIYOR, 85 TEMIZ.
+--   Karens değerleri henüz girilmediği için 605 uygulamanın hepsi karensi
+--   NULL — fail-safe gereği pencere (90 gün) içindekiler BILINMIYOR üretiyor,
+--   dışındakiler TEMIZ. Hiçbir hayvan yanlışlıkla TEMIZ değil.
 --
---   🐞 AÇIK HATA — fail-safe deliniyor, düzeltilmeden deploy EDİLMEMELİ:
---      hayvan_karens_uygulama_view'daki CROSS JOIN LATERAL _karens_bul(...),
---      drug_product_id NULL olan satırlarda sıfır satır döndürüyor ve uygulamayı
---      view'dan SESSİZCE DÜŞÜRÜYOR. Canlıda drug_administrations'ın 158 satırının
---      62'sinde drug_product_id NULL → bu uygulamalar karens hesabına hiç girmiyor
---      → hayvan yanlışlıkla TEMIZ görünebilir. Aynı hata (b) yolunda elle yazılmış:
---      WHERE s.drug_product_id IS NOT NULL o satırları filtreliyor (73→69).
+--   ✅ DÜZELTİLDİ (2026-07-17) — fail-safe deliği kapatıldı:
+--      hayvan_karens_uygulama_view artık CROSS değil LEFT JOIN LATERAL ... ON true
+--      kullanıyor; ürün bağlantısı olmayan uygulama view'dan DÜŞMÜYOR, sut/et
+--      karensi NULL ile gelip BILINMIYOR üretiyor. (b) yolundaki elle yazılmış
+--      WHERE drug_product_id IS NOT NULL filtresi kaldırıldı. Tedavi yolunda ürün
+--      stok üzerinden kurtarılıyor: COALESCE(da.drug_product_id, s.drug_product_id).
+--      Doğrulama: TEDAVI 154 = tüm not-uygulanmadı drug_admin (çift sayım yok,
+--      stok.id benzersiz), UYGULAMA 73 = tüm uygulama_log (filtre kalktı, 69→73).
 --
---      DÜZELTME YÖNÜ: CROSS JOIN LATERAL → LEFT JOIN LATERAL ... ON true, ve
---      NULL filtreleri kaldır. Ürün bağlantısı bilinmeyen uygulama KAYBOLMAMALI,
---      sut_saat/et_gun NULL ile gelip BILINMIYOR üretmeli. Ayrıca ürünü
---      stok üzerinden kurtar: COALESCE(da.drug_product_id, s.drug_product_id)
---      (mevcut _etken_kod_bul aynı fallback desenini kullanıyor).
+--   TASARIM KARARI: karens hem drug_classes (etken madde varsayılanı) hem
+--      drug_products (ürün ezmesi) seviyesinde; ürün NULL → sınıftan miras
+--      (_karens_bul COALESCE). Aynı etken maddenin LA/IMM formülasyonları farklı
+--      karens verdiği için ürün ezmesi korunuyor.
 --
---   AÇIK TASARIM SORUSU: karens etken maddede mi (drug_classes) ürün seviyesinde
---      mi (drug_products) otorite olmalı? Taslak ikisini de destekliyor (ürün
---      NULL → sınıftan miras). Aynı etken maddenin LA/IMM formülasyonları farklı
---      karens verdiği için ürün ezmesi korunmalı.
---
---   YAPILMADI: numune görevi üretimi (süt arınması + 1 günde NUMUNE gorev_log
---      kaydı), hayvan kartı sağlık bölümü UI, kiloya göre dozaj.
---
---   KARENS DEĞERLERİ BİLEREK BOŞ: prospektüsten girilecek (karens_guncelle RPC).
---      Değer uydurmak gıda güvenliği riskidir.
+--   DEPLOY ÖNCESİ KALAN İŞLER (ayrı oturum):
+--     1. Karens DEĞERLERİ girilecek — prospektüsten, karens_guncelle RPC ile.
+--        Değer uydurmak gıda güvenliği riskidir; o yüzden şema boş geliyor.
+--     2. Numune görevi üretimi: süt arınması + 1 günde NUMUNE gorev_log kaydı.
+--     3. Hayvan kartı sağlık bölümü UI (karens rozeti / durum).
+--     4. Kiloya göre dozaj (drug_products.concentration altyapısı hazır).
 -- ============================================================================
 
 -- ============================================================================
@@ -154,8 +153,15 @@ GRANT EXECUTE ON FUNCTION public._karens_bul(uuid, uuid) TO anon, authenticated;
 --    uygulanmadi=true kayıtlar hariç (uygulanmamış ilaç karens yaratmaz).
 -- ============================================================================
 
+-- LEFT JOIN LATERAL (CROSS değil) — bilerek. CROSS JOIN LATERAL, _karens_bul
+-- sıfır satır döndürdüğünde (ürün bağlantısı yok) uygulamayı view'dan SESSİZCE
+-- düşürür ve hayvan yanlışlıkla TEMIZ görünür. Bilinmeyen uygulama kaybolmamalı,
+-- sut_saat/et_gun NULL ile gelip BILINMIYOR üretmeli. Aynı sebeple hiçbir yolda
+-- drug_product_id IS NOT NULL filtresi YOK.
 CREATE OR REPLACE VIEW public.hayvan_karens_uygulama_view AS
 -- (a) Tedavi seansı yolu
+--     Ürün: önce da.drug_product_id, yoksa stok üzerinden kurtar
+--     (_etken_kod_bul aynı fallback desenini kullanıyor).
 SELECT
   c.animal_id                                   AS hayvan_id,
   'TEDAVI'::text                                AS kaynak,
@@ -166,7 +172,9 @@ SELECT
 FROM public.drug_administrations da
 JOIN public.treatment_days td ON td.id = da.treatment_day_id
 JOIN public.cases c           ON c.id  = td.case_id
-CROSS JOIN LATERAL public._karens_bul(da.drug_product_id, NULL) k
+LEFT JOIN public.stok s       ON s.id  = da.stok_id
+LEFT JOIN LATERAL public._karens_bul(
+  COALESCE(da.drug_product_id, s.drug_product_id), NULL) k ON true
 WHERE COALESCE(da.uygulanmadi, false) = false
 
 UNION ALL
@@ -180,9 +188,8 @@ SELECT
   u.tarih,
   k.sut_saat, k.et_gun
 FROM public.uygulama_log u
-JOIN public.stok s ON s.id = u.stok_id
-CROSS JOIN LATERAL public._karens_bul(s.drug_product_id, NULL) k
-WHERE s.drug_product_id IS NOT NULL
+LEFT JOIN public.stok s ON s.id = u.stok_id
+LEFT JOIN LATERAL public._karens_bul(s.drug_product_id, NULL) k ON true
 
 UNION ALL
 
@@ -195,7 +202,7 @@ SELECT
   vl.vaccination_date,
   k.sut_saat, k.et_gun
 FROM public.vaccination_log vl
-CROSS JOIN LATERAL public._karens_bul(NULL, vl.vaccine_id) k;
+LEFT JOIN LATERAL public._karens_bul(NULL, vl.vaccine_id) k ON true;
 
 COMMENT ON VIEW public.hayvan_karens_uygulama_view IS
   'Karens üreten her uygulama (tedavi + tekil + aşı), tek akışta. hayvan_karens_view bunun üstünde toplar.';
