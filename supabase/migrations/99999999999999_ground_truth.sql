@@ -232,36 +232,6 @@ GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.hayvan_o
 GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.hayvan_override TO service_role;
 
 -- ════════════════════════════════════════════════════════════════
--- VETHEK_TOHUMLAMALAR (Faz 2 — canlı Management API)
--- ════════════════════════════════════════════════════════════════
-CREATE TABLE IF NOT EXISTS public.vethek_tohumlamalar (
-  id bigint DEFAULT nextval('vethek_tohumlamalar_id_seq'::regclass) NOT NULL,
-  hayvan_id integer NOT NULL,
-  sperma text,
-  belge_no text,
-  kupe_no text,
-  irk text,
-  not_ text,
-  tohumlama_tar date,
-  gebe boolean,
-  scrape_tarihi date NOT NULL,
-  kaynak_url text,
-  olusturulma_zamani timestamp with time zone DEFAULT now(),
-  CONSTRAINT vethek_tohumlamalar_pkey PRIMARY KEY (id)
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS vethek_tohumlamalar_pkey ON public.vethek_tohumlamalar USING btree (id);
-CREATE INDEX IF NOT EXISTS idx_vethek_kupe ON public.vethek_tohumlamalar USING btree (kupe_no);
-CREATE INDEX IF NOT EXISTS idx_vethek_tarih ON public.vethek_tohumlamalar USING btree (tohumlama_tar);
-
-ALTER TABLE public.vethek_tohumlamalar ENABLE ROW LEVEL SECURITY;
-
-GRANT SELECT ON public.vethek_tohumlamalar TO agent_readonly;
-GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.vethek_tohumlamalar TO authenticated;
-GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.vethek_tohumlamalar TO postgres;
-GRANT DELETE,INSERT,REFERENCES,SELECT,TRIGGER,TRUNCATE,UPDATE ON public.vethek_tohumlamalar TO service_role;
-
--- ════════════════════════════════════════════════════════════════
 -- AGENT_PLANS (Faz 2 — canlı Management API)
 -- ════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.agent_plans (
@@ -2080,57 +2050,6 @@ CREATE INDEX IF NOT EXISTS idx_cop_geri       ON public.cop_kutusu(geri_yuklendi
 -- 7. HAYVAN DURUM VIEW
 -- Frontend bu view'ı okur — badge ve kategori hesabı burada
 -- ──────────────────────────────────────────
-
--- ════════════════════════════════════════════════════════════════
--- 6.6 HAYVAN_DURUM_ANALIZI VIEW (canlı DB diff — REGEN 2026-06-13)
--- ════════════════════════════════════════════════════════════════
-
-DROP VIEW IF EXISTS public.hayvan_durum_analizi CASCADE;
-CREATE OR REPLACE VIEW public.hayvan_durum_analizi AS
- WITH gebelik_donem AS (
-         SELECT vethek_tohumlamalar.kupe_no,
-            vethek_tohumlamalar.tohumlama_tar,
-            vethek_tohumlamalar.gebe,
-            vethek_tohumlamalar.sperma,
-            vethek_tohumlamalar.not_,
-            sum(
-                CASE WHEN vethek_tohumlamalar.gebe THEN 1 ELSE 0 END
-            ) OVER (PARTITION BY vethek_tohumlamalar.kupe_no ORDER BY vethek_tohumlamalar.tohumlama_tar ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS donem_no
-           FROM vethek_tohumlamalar
-        ), tohumlama_no AS (
-         SELECT gebelik_donem.kupe_no,
-            gebelik_donem.tohumlama_tar,
-            row_number() OVER (PARTITION BY gebelik_donem.kupe_no, gebelik_donem.donem_no ORDER BY gebelik_donem.tohumlama_tar) AS t_no
-           FROM gebelik_donem
-        ), son_kayitlar AS (
-         SELECT DISTINCT ON (vethek_tohumlamalar.kupe_no) vethek_tohumlamalar.kupe_no,
-            vethek_tohumlamalar.tohumlama_tar,
-            vethek_tohumlamalar.gebe,
-            vethek_tohumlamalar.sperma,
-            vethek_tohumlamalar.not_
-           FROM vethek_tohumlamalar
-          ORDER BY vethek_tohumlamalar.kupe_no, vethek_tohumlamalar.tohumlama_tar DESC
-        ), son_gebelikler AS (
-         SELECT vethek_tohumlamalar.kupe_no,
-            max(vethek_tohumlamalar.tohumlama_tar) AS son_gebe_tarihi
-           FROM vethek_tohumlamalar
-          WHERE (vethek_tohumlamalar.gebe = true)
-          GROUP BY vethek_tohumlamalar.kupe_no
-        )
- SELECT kupe_no,
-    tohumlama_tar AS son_islem_tarihi,
-    gebe AS gebe_mi,
-    sperma,
-    not_::text AS not_,
-    (CURRENT_DATE - tohumlama_tar) AS gecen_gun,
-    (CURRENT_DATE - tohumlama_tar) > 360 AS pasif_mi,
-    son_gebelikler.son_gebe_tarihi,
-    (son_gebelikler.son_gebe_tarihi + interval '285 days')::date AS tahmini_dogum,
-    tohumlama_no.t_no
-   FROM son_kayitlar
-     LEFT JOIN son_gebelikler USING (kupe_no)
-     LEFT JOIN tohumlama_no USING (kupe_no, tohumlama_tar);
-GRANT ALL ON public.hayvan_durum_analizi TO anon, authenticated;
 
 DROP VIEW IF EXISTS public.hayvan_durum_view CASCADE;
 -- ──────────────────────────────────────────
@@ -11064,3 +10983,427 @@ CREATE TRIGGER trg_hayvan_grup_padok_sync BEFORE INSERT OR UPDATE OF grup, padok
 -- TRIGGER: trg_padok_transfer_gorev
 DROP TRIGGER IF EXISTS trg_padok_transfer_gorev ON public.hayvanlar;
 CREATE TRIGGER trg_padok_transfer_gorev AFTER UPDATE ON public.hayvanlar FOR EACH ROW WHEN ((new.padok_id IS DISTINCT FROM old.padok_id)) EXECUTE FUNCTION fn_padok_transfer_gorev_kapat();
+
+-- ── canonical drift reconciliation (2026-07-18) — live-derived append ──
+
+-- FUNCTION: _islem_log_immutable_guard()
+CREATE OR REPLACE FUNCTION public._islem_log_immutable_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'islem_log kayıtları silinemez (immutable audit trail)';
+  END IF;
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.tip IS DISTINCT FROM OLD.tip
+       OR NEW.ana_hayvan_id IS DISTINCT FROM OLD.ana_hayvan_id
+       OR NEW.ref_id IS DISTINCT FROM OLD.ref_id
+       OR NEW.ref_tablo IS DISTINCT FROM OLD.ref_tablo
+       OR NEW.snapshot IS DISTINCT FROM OLD.snapshot
+       OR NEW.tarih IS DISTINCT FROM OLD.tarih
+       OR NEW.kullanici_notu IS DISTINCT FROM OLD.kullanici_notu
+       OR NEW.payload IS DISTINCT FROM OLD.payload THEN
+      RAISE EXCEPTION 'islem_log kayıtları değiştirilemez — sadece durum=geri_alindi geçişine izin verilir';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$function$
+;
+
+-- FUNCTION: add_treatment_day(p_case_id uuid, p_date date, p_planned_time time without time zone)
+CREATE OR REPLACE FUNCTION public.add_treatment_day(p_case_id uuid, p_date date, p_planned_time time without time zone DEFAULT NULL::time without time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_day_id        uuid;
+  v_gorev_id      uuid;
+  v_prev_gorev_id uuid := NULL;
+  v_day_no        int;
+  v_case          record;
+  v_gecmis        boolean;
+BEGIN
+  SELECT COALESCE(MAX(day_no), 0) + 1 INTO v_day_no
+  FROM public.treatment_days
+  WHERE case_id = p_case_id;
+
+  SELECT * INTO v_case FROM public.cases WHERE id = p_case_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Vaka bulunamadı');
+  END IF;
+
+  IF v_case.status = 'closed' THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Kapalı vakaya gün eklenemez');
+  END IF;
+
+  v_gecmis := p_date < CURRENT_DATE;
+
+  -- Zincir: önceki günün gorev_log ID'sini bul
+  IF v_day_no > 1 THEN
+    SELECT g.id INTO v_prev_gorev_id
+    FROM public.gorev_log g
+    JOIN public.treatment_days td ON (g.aciklama::jsonb->>'day_id')::uuid = td.id
+    WHERE td.case_id = p_case_id
+      AND td.day_no  = v_day_no - 1
+      AND g.gorev_tipi = 'TEDAVI_GUN'
+    LIMIT 1;
+  END IF;
+
+  INSERT INTO public.treatment_days(id, case_id, day_no, treatment_date, tamamlandi, tamamlanma_tarihi, planned_time)
+  VALUES (
+    gen_random_uuid(), p_case_id, v_day_no, p_date,
+    v_gecmis,
+    CASE WHEN v_gecmis THEN p_date::timestamptz ELSE NULL END,
+    p_planned_time
+  )
+  RETURNING id INTO v_day_id;
+
+  INSERT INTO public.gorev_log(
+    id, gorev_tipi, hayvan_id, hedef_tarih, aciklama,
+    tamamlandi, tamamlanma_tarihi, parent_id
+  )
+  VALUES (
+    gen_random_uuid(),
+    'TEDAVI_GUN',
+    v_case.animal_id,
+    p_date,
+    jsonb_build_object(
+      'day_id',       v_day_id,
+      'gun_no',       v_day_no,
+      'label',        'Gün ' || v_day_no || ' tedavisi — ' || to_char(p_date, 'DD.MM.YYYY'),
+      'planned_time', COALESCE(p_planned_time::text, '')
+    )::text,
+    v_gecmis,
+    CASE WHEN v_gecmis THEN p_date::timestamptz ELSE NULL END,
+    v_prev_gorev_id
+  )
+  RETURNING id INTO v_gorev_id;
+
+  INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+  VALUES (
+    gen_random_uuid()::text,
+    'TEDAVI_GUN_EKLENDI',
+    v_case.animal_id,
+    v_day_id::text,
+    'treatment_days',
+    jsonb_build_object(
+      'olusturulan', jsonb_build_array(
+        jsonb_build_object('tablo', 'treatment_days', 'id', v_day_id::text),
+        jsonb_build_object('tablo', 'gorev_log',      'id', v_gorev_id::text)
+      ),
+      'guncellenen', '[]'::jsonb
+    )
+  );
+
+  RETURN jsonb_build_object('ok', true, 'day_id', v_day_id, 'day_no', v_day_no, 'gecmis', v_gecmis);
+END;
+$function$
+;
+
+-- FUNCTION: asistan_plan_iptal(p_plan_id uuid)
+CREATE OR REPLACE FUNCTION public.asistan_plan_iptal(p_plan_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_plan record;
+BEGIN
+  SELECT * INTO v_plan FROM public.agent_plans
+  WHERE id = p_plan_id AND kullanici_id = auth.uid();
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Plan bulunamadı');
+  END IF;
+  IF v_plan.durum <> 'pending' THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Plan zaten ' || v_plan.durum);
+  END IF;
+
+  UPDATE public.agent_plans
+  SET durum = 'iptal'
+  WHERE id = p_plan_id;
+
+  RETURN jsonb_build_object('ok', true, 'plan_id', p_plan_id);
+END;
+$function$
+;
+
+-- FUNCTION: asistan_tumunu_sil()
+CREATE OR REPLACE FUNCTION public.asistan_tumunu_sil()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_sayi integer;
+BEGIN
+  DELETE FROM public.agent_threads WHERE kullanici_id = auth.uid();
+  GET DIAGNOSTICS v_sayi = ROW_COUNT;
+  -- agent_messages, agent_plans → thread_id FK ON DELETE CASCADE (otomatik silinir)
+  RETURN jsonb_build_object('ok', true, 'silinen_thread', v_sayi);
+END;
+$function$
+;
+
+-- FUNCTION: protokol_gorev_bol(p_dry_run boolean)
+CREATE OR REPLACE FUNCTION public.protokol_gorev_bol(p_dry_run boolean DEFAULT true)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_tipA   int := 0;  v_tipA_new int := 0;
+  v_tipB   int := 0;  v_tipB_new int := 0;
+  v_tipC   int := 0;
+  v_g      record;
+  v_rc     int;
+  v_samples jsonb := '[]'::jsonb;
+BEGIN
+  -- ── Tip A: day-0 birleşik → 3 ayrı ──
+  FOR v_g IN
+    SELECT id, hayvan_id, hedef_tarih, tamamlandi, tamamlanma_tarihi, kapatan_ref, kaynak
+    FROM public.gorev_log
+    WHERE etken_kod IS NULL
+      AND iptal = false
+      AND aciklama ILIKE 'Doğum günü: Oksitosin + Ademin + Kalsiyum'
+    ORDER BY hedef_tarih DESC
+  LOOP
+    v_tipA := v_tipA + 1;
+    IF v_tipA <= 5 THEN
+      v_samples := v_samples || jsonb_build_object('tip','A','gorev_id',v_g.id,'hayvan_id',v_g.hayvan_id,'hedef',v_g.hedef_tarih);
+    END IF;
+
+    IF p_dry_run THEN CONTINUE; END IF;
+
+    -- 3 ayrı etken_kod'lu görev yarat (durum birleşikten kopya)
+    INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, tamamlanma_tarihi, kapatan_ref, kaynak, etken_kod)
+    VALUES
+      (gen_random_uuid(), v_g.hayvan_id, 'ILAC', 'Doğum günü: Oksitosin', v_g.hedef_tarih, v_g.tamamlandi, v_g.tamamlanma_tarihi, v_g.kapatan_ref, v_g.kaynak, 'OKSITOSIN'),
+      (gen_random_uuid(), v_g.hayvan_id, 'ILAC', 'Doğum günü: Ademin',    v_g.hedef_tarih, v_g.tamamlandi, v_g.tamamlanma_tarihi, v_g.kapatan_ref, v_g.kaynak, 'ADEMIN'),
+      (gen_random_uuid(), v_g.hayvan_id, 'ILAC', 'Doğum günü: Kalsiyum',  v_g.hedef_tarih, v_g.tamamlandi, v_g.tamamlanma_tarihi, v_g.kapatan_ref, v_g.kaynak, 'KALSIYUM');
+    GET DIAGNOSTICS v_rc = ROW_COUNT;
+    v_tipA_new := v_tipA_new + v_rc;
+
+    -- Birleşik görevi iptal et (scanner görmesin)
+    UPDATE public.gorev_log SET iptal = true
+    WHERE id = v_g.id AND iptal = false;
+  END LOOP;
+
+  -- ── Tip B: d53 birleşik → 2 ayrı (ADEMIN + E_VIT) ──
+  FOR v_g IN
+    SELECT id, hayvan_id, hedef_tarih, tamamlandi, tamamlanma_tarihi, kapatan_ref, kaynak
+    FROM public.gorev_log
+    WHERE etken_kod IS NULL
+      AND iptal = false
+      AND aciklama ILIKE '53. Gün: Ademin + Yeldif'
+    ORDER BY hedef_tarih DESC
+  LOOP
+    v_tipB := v_tipB + 1;
+    IF v_tipB <= 5 THEN
+      v_samples := v_samples || jsonb_build_object('tip','B','gorev_id',v_g.id,'hayvan_id',v_g.hayvan_id,'hedef',v_g.hedef_tarih);
+    END IF;
+
+    IF p_dry_run THEN CONTINUE; END IF;
+
+    -- Önce bu hayvanda mevcut "54. Gün: Yeldif" etken_kod=NULL ayrı görevi var mı?
+    -- Varsa: Tip B yalnızca "53. Gün: Ademin" yaratır; mevcut 54. Yeldif görevini
+    --   etken_kod='E_VIT' set eder (duplicate yaratma). Yoksa: 2 ayrı yarat (ADEMIN+E_VIT).
+    SELECT 1 INTO v_rc FROM public.gorev_log
+      WHERE hayvan_id = v_g.hayvan_id AND etken_kod IS NULL AND iptal = false
+        AND aciklama ILIKE '54. Gün: Yeldif' LIMIT 1;
+
+    IF v_rc = 1 THEN
+      -- Mevcut 54. Yeldif var → sadece 53. Ademin yarat + mevcut Yeldif'i E_VIT set
+      INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, tamamlanma_tarihi, kapatan_ref, kaynak, etken_kod)
+      VALUES (gen_random_uuid(), v_g.hayvan_id, 'ILAC', '53. Gün: Ademin', v_g.hedef_tarih, v_g.tamamlandi, v_g.tamamlanma_tarihi, v_g.kapatan_ref, v_g.kaynak, 'ADEMIN');
+      GET DIAGNOSTICS v_rc = ROW_COUNT; v_tipB_new := v_tipB_new + v_rc;
+      UPDATE public.gorev_log SET etken_kod = 'E_VIT'
+        WHERE hayvan_id = v_g.hayvan_id AND etken_kod IS NULL AND iptal = false
+          AND aciklama ILIKE '54. Gün: Yeldif';
+    ELSE
+      -- Mevcut 54. Yeldif yok → 2 ayrı yarat
+      INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, tamamlanma_tarihi, kapatan_ref, kaynak, etken_kod)
+      VALUES
+        (gen_random_uuid(), v_g.hayvan_id, 'ILAC', '53. Gün: Ademin', v_g.hedef_tarih, v_g.tamamlandi, v_g.tamamlanma_tarihi, v_g.kapatan_ref, v_g.kaynak, 'ADEMIN'),
+        (gen_random_uuid(), v_g.hayvan_id, 'ILAC', '54. Gün: Yeldif', v_g.hedef_tarih, v_g.tamamlandi, v_g.tamamlanma_tarihi, v_g.kapatan_ref, v_g.kaynak, 'E_VIT');
+      GET DIAGNOSTICS v_rc = ROW_COUNT; v_tipB_new := v_tipB_new + v_rc;
+    END IF;
+
+    -- Birleşik 53. görevi iptal et
+    UPDATE public.gorev_log SET iptal = true
+    WHERE id = v_g.id AND iptal = false;
+  END LOOP;
+
+  -- ── Tip C: kapatıldı — Tip B artık mevcut 54. Yeldif NULL'ları set eder
+  --   (duplicate yaratma). Aşağıdaki blok pasif; v_tipC=0 raporlanır. ──
+  v_tipC := 0;
+
+  RETURN jsonb_build_object(
+    'dry_run', p_dry_run,
+    'tipA_day0_birlesik', v_tipA, 'tipA_new_gorev', v_tipA_new,
+    'tipB_d53_birlesik', v_tipB, 'tipB_new_gorev', v_tipB_new,
+    'tipC_d54_set', v_tipC,
+    'samples', v_samples
+  );
+END;
+$function$
+;
+
+-- FUNCTION: protokol_orphan_audit()
+CREATE OR REPLACE FUNCTION public.protokol_orphan_audit()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_orphan_uyg        int;
+  v_riskli_classes    int;
+  v_etken_dagilim     jsonb;
+BEGIN
+  -- Mevcut orphan uygulama_log (false-warning kaynağı)
+  SELECT count(*) INTO v_orphan_uyg
+  FROM public.uygulama_log u
+  WHERE u.etken_kod IS NULL
+    AND u.stok_id IS NOT NULL
+    AND public._etken_kod_bul(u.stok_id, NULL) IS NOT NULL;
+
+  -- Riskli drug_classes: protokol-relevant stoğa bağlı ama etken_kod NULL
+  -- (gelecekte orphan üretebilir — proaktif sinyal)
+  SELECT count(DISTINCT dc.id) INTO v_riskli_classes
+  FROM public.drug_classes dc
+  JOIN public.drug_products dp ON dp.drug_class_id = dc.id
+  JOIN public.stok s ON s.drug_product_id = dp.id
+  WHERE dc.etken_kod IS NULL;
+
+  -- Etkan dağılımı (etken_kod set edilen drug_classes sayıları)
+  SELECT jsonb_object_agg(etken_kod, cnt) INTO v_etken_dagilim
+  FROM (
+    SELECT coalesce(etken_kod, 'NULL') AS etken_kod, count(*) AS cnt
+    FROM public.drug_classes
+    GROUP BY etken_kod
+  ) t;
+
+  RETURN jsonb_build_object(
+    'orphan_uygulama_log', v_orphan_uyg,
+    'riskli_drug_classes', v_riskli_classes,
+    'drug_classes_etken_dagilim', v_etken_dagilim
+  );
+END;
+$function$
+;
+
+-- FUNCTION: protokol_orphan_temizle(p_dry_run boolean)
+CREATE OR REPLACE FUNCTION public.protokol_orphan_temizle(p_dry_run boolean DEFAULT true)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_orphan       int := 0;
+  v_fixed        int := 0;
+  v_gorev_closed int := 0;
+  v_rc           int;
+  v_rec          record;
+  v_ek           text;
+  v_samples      jsonb := '[]'::jsonb;
+BEGIN
+  FOR v_rec IN
+    SELECT u.id AS uyg_id, u.hayvan_id, u.stok_id, u.tarih, u.notlar,
+           h.kupe_no
+    FROM public.uygulama_log u
+    LEFT JOIN public.hayvanlar h ON h.id = u.hayvan_id
+    WHERE u.etken_kod IS NULL
+      AND u.stok_id IS NOT NULL
+      AND public._etken_kod_bul(u.stok_id, NULL) IS NOT NULL
+    ORDER BY u.tarih DESC
+  LOOP
+    v_orphan := v_orphan + 1;
+
+    IF v_orphan <= 10 THEN
+      v_samples := v_samples || jsonb_build_object(
+        'uyg_id', v_rec.uyg_id,
+        'hayvan_id', v_rec.hayvan_id,
+        'kupe_no', v_rec.kupe_no,
+        'stok_id', v_rec.stok_id,
+        'tarih', v_rec.tarih,
+        'etken_kod', public._etken_kod_bul(v_rec.stok_id, NULL));
+    END IF;
+
+    IF p_dry_run THEN
+      CONTINUE;
+    END IF;
+
+    v_ek := public._etken_kod_bul(v_rec.stok_id, NULL);
+
+    -- (a) uygulama_log.etken_kod backfill
+    UPDATE public.uygulama_log
+    SET etken_kod = v_ek
+    WHERE id = v_rec.uyg_id;
+    v_fixed := v_fixed + 1;
+
+    -- (b) eşleşen bekleyen gorev_log'u kapat (uygulama tarihi ±3 gün içindeki hedef)
+    UPDATE public.gorev_log
+    SET tamamlandi = true,
+        tamamlanma_tarihi = now(),
+        kapatan_ref = 'orphan_temizle:uygulama_log:' || v_rec.uyg_id::text
+    WHERE hayvan_id = v_rec.hayvan_id
+      AND etken_kod = v_ek
+      AND tamamlandi = false
+      AND iptal = false
+      AND hedef_tarih BETWEEN v_rec.tarih - 3 AND v_rec.tarih + 3;
+    GET DIAGNOSTICS v_rc = ROW_COUNT;
+    v_gorev_closed := v_gorev_closed + v_rc;
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'dry_run', p_dry_run,
+    'orphan_count', v_orphan,
+    'fixed_uygulama_log', v_fixed,
+    'closed_gorev_log', v_gorev_closed,
+    'samples', v_samples
+  );
+END;
+$function$
+;
+
+-- FUNCTION: update_treatment_time(p_day_id uuid, p_treatment_time time without time zone)
+CREATE OR REPLACE FUNCTION public.update_treatment_time(p_day_id uuid, p_treatment_time time without time zone)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  UPDATE public.treatment_days
+  SET treatment_time = p_treatment_time
+  WHERE id = p_day_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Tedavi günü bulunamadı');
+  END IF;
+
+  RETURN jsonb_build_object('ok', true);
+END;
+$function$
+;
+
+-- TRIGGER: gorev_log_cycle_guard_trigger
+DROP TRIGGER IF EXISTS gorev_log_cycle_guard_trigger ON public.gorev_log;
+CREATE TRIGGER gorev_log_cycle_guard_trigger BEFORE INSERT ON public.gorev_log FOR EACH ROW EXECUTE FUNCTION gorev_log_cycle_guard();
+
+-- TRIGGER: tohumlama_cycle_iptal_trigger
+DROP TRIGGER IF EXISTS tohumlama_cycle_iptal_trigger ON public.tohumlama;
+CREATE TRIGGER tohumlama_cycle_iptal_trigger AFTER INSERT OR UPDATE OF sonuc ON public.tohumlama FOR EACH ROW EXECUTE FUNCTION tohumlama_cycle_gorevcil_iptal();
+
+-- TRIGGER: trg_islem_log_immutable
+DROP TRIGGER IF EXISTS trg_islem_log_immutable ON public.islem_log;
+CREATE TRIGGER trg_islem_log_immutable BEFORE DELETE OR UPDATE ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_immutable_guard();
+
+-- TRIGGER: trg_kizginlik_case_close
+DROP TRIGGER IF EXISTS trg_kizginlik_case_close ON public.cases;
+CREATE TRIGGER trg_kizginlik_case_close AFTER UPDATE OF status ON public.cases FOR EACH ROW WHEN (((new.status = 'closed'::text) AND (old.status = 'active'::text))) EXECUTE FUNCTION _kizginlik_case_close();
+
+-- TRIGGER: trg_tohumlama_kizginlik
+DROP TRIGGER IF EXISTS trg_tohumlama_kizginlik ON public.tohumlama;
+CREATE TRIGGER trg_tohumlama_kizginlik AFTER INSERT ON public.tohumlama FOR EACH ROW EXECUTE FUNCTION _tohumlama_kizginlik_kapat();
