@@ -9207,26 +9207,26 @@ DECLARE
 BEGIN
   SELECT * INTO v_toh FROM public.tohumlama WHERE id::text = p_tohumlama_id;
   IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'Tohumlama bulunamadı');
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Tohumlama bulunamadı');
   END IF;
 
   IF v_toh.sonuc != 'Bekliyor' THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'Sadece Bekliyor durumundaki tohumlama gebe ilanı alabilir');
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Sadece Bekliyor durumundaki tohumlama gebe ilanı alabilir');
   END IF;
 
   SELECT id::text INTO v_son_toh_id
   FROM public.tohumlama
   WHERE hayvan_id = v_toh.hayvan_id
-  ORDER BY deneme_no DESC LIMIT 1 FOR UPDATE;
+  ORDER BY tarih DESC, created_at DESC, id::text DESC LIMIT 1 FOR UPDATE;
 
   IF v_son_toh_id != p_tohumlama_id THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'Sadece son tohumlama gebe ilanı alabilir');
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Sadece son tohumlama gebe ilanı alabilir');
   END IF;
 
   SELECT tohumlama_durumu INTO v_onceki_durum
   FROM public.hayvanlar WHERE id = v_toh.hayvan_id AND durum = 'Aktif';
   IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'error', 'Hayvan aktif değil');
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan aktif değil');
   END IF;
 
   UPDATE public.tohumlama SET sonuc = 'Gebe' WHERE id::text = p_tohumlama_id;
@@ -10151,7 +10151,7 @@ BEGIN
   WHERE hayvan_id = p_hayvan_id
     AND sonuc = 'Bekliyor'
     AND tarih >= CURRENT_DATE - INTERVAL '15 days'
-  ORDER BY tarih DESC
+  ORDER BY tarih DESC, created_at DESC, id::text DESC
   LIMIT 1;
 
   IF NOT FOUND THEN
