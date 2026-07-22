@@ -247,6 +247,7 @@ registerActions({
   'sablon-sil':          (el) => silSablon(el.dataset.id),
   'sablon-gun-ekle':     () => sablonGunEkle(),
   'sablon-gun-sil':      (el) => sablonGunSil(el.dataset.gi),
+  'sablon-gun-ofset':    (el) => sablonGunOfsetGuncelle(el.dataset.gi, el.value),
   'sablon-gun-toggle':   (el) => sablonGunToggle(el.dataset.gi),
   'sablon-seans-ac':     (el) => sablonSeansAc(el.dataset.gi),
   'sablon-seans-sil':    (el) => sablonSeansSil(el.dataset.gi, el.dataset.ki),

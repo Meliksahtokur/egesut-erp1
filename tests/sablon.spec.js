@@ -25,9 +25,15 @@ test('Tanımlar Şablonlar sekmesi açılır ve builder render olur', async ({ p
   await expect(page.locator('#m-sablon')).toBeVisible();
   await expect(page.locator('#sb-ad')).toBeVisible();
 
-  // Gün ekle → Gün 2 başlığı görünür
+  // Yeni şablon başlangıç gününü Gün 0 olarak gösterir.
+  await expect(page.locator('#m-sablon-body')).toContainText('Gün 0');
+
+  // İkinci günün ofseti düzenlenebilir ve korunur.
   await page.click('[data-action="sablon-gun-ekle"]');
-  await expect(page.locator('#m-sablon-body')).toContainText('Gün 2');
+  const offsets = page.locator('[data-change="sablon-gun-ofset"]');
+  await offsets.nth(1).fill('7');
+  await offsets.nth(1).press('Tab');
+  await expect(page.locator('#m-sablon-body')).toContainText('Gün 7');
 
   // İptal ile kapat (veri yazılmadı)
   await page.click('[data-action="sablon-iptal"]');

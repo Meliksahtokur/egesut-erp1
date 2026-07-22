@@ -3710,7 +3710,8 @@ async function silSablon(id){
   }catch(e){ toast('❌ '+e.message, true); }
 }
 
-// ── Builder state: { id|null, ad, aciklama, disease_ids:[uuid], gunler:[ [kalem,...] ] } ──
+// ── Builder state: { id|null, ad, aciklama, disease_ids:[uuid], gunler:[{offset,kalemler}] } ──
+// offset başlangıç gününe göredir: 0 = vaka açılış günü.
 // kalem = { planned_time, stok_id, drug_product_id, dose, unit, route, _drugName }
 let _sablonEdit = null;
 let _sablonSeansForm = null;
@@ -3723,13 +3724,13 @@ async function openSablonBuilder(id){
     const eslem = (await idbGetAll('sablon_hastalik_eslem')).filter(e=>e.sablon_id===id);
     const kalemler = (await idbGetAll('tedavi_sablonu_kalem')).filter(k=>k.sablon_id===id);
     const gunNos = [...new Set(kalemler.map(k=>k.gun_no))].sort((a,b)=>a-b);
-    const gunler = gunNos.map(gn => kalemler.filter(k=>k.gun_no===gn)
+    const gunler = gunNos.map(gn => ({ offset:gn-1, kalemler:kalemler.filter(k=>k.gun_no===gn)
       .sort((a,b)=>(a.planned_time||'').localeCompare(b.planned_time||''))
       .map(k=>({ planned_time:(k.planned_time||'').slice(0,5), stok_id:k.stok_id, drug_product_id:k.drug_product_id,
-                 dose:k.dose, unit:k.unit, route:k.route, _drugName:_sablonDrugName(k) })));
-    _sablonEdit = { id, ad:s?.ad||'', aciklama:s?.aciklama||'', disease_ids:eslem.map(e=>e.disease_id), gunler:gunler.length?gunler:[[]] };
+                 dose:k.dose, unit:k.unit, route:k.route, _drugName:_sablonDrugName(k) })) }));
+    _sablonEdit = { id, ad:s?.ad||'', aciklama:s?.aciklama||'', disease_ids:eslem.map(e=>e.disease_id), gunler:gunler.length?gunler:[{offset:0,kalemler:[]}] };
   } else {
-    _sablonEdit = { id:null, ad:'', aciklama:'', disease_ids:[], gunler:[[]] };
+    _sablonEdit = { id:null, ad:'', aciklama:'', disease_ids:[], gunler:[{offset:0,kalemler:[]}] };
   }
   _sablonEdit._diseases = diseases;
   document.getElementById('m-sablon-title').textContent = id ? 'Şablonu Düzenle' : 'Yeni Şablon';
@@ -3759,7 +3760,8 @@ function _renderSablonBuilder(){
   const seciliSayi = s.disease_ids.length;
 
   let gunlerHtml = '';
-  s.gunler.forEach((kalemler, gi)=>{
+  s.gunler.forEach((gun, gi)=>{
+    const kalemler = gun.kalemler;
     const seansRows = kalemler.length
       ? kalemler.map((k,ki)=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.8rem">
           <span style="font-weight:700;color:var(--ink2);min-width:42px">⏰ ${esc(k.planned_time)}</span>
@@ -3769,11 +3771,13 @@ function _renderSablonBuilder(){
       : '<div style="font-size:.75rem;color:var(--ink3);padding:4px 0">seans yok</div>';
     gunlerHtml += `<div class="tanimlar-card" style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="sablon-gun-toggle" data-gi="${gi}">
-        <strong>Gün ${gi+1}</strong>
+        <strong>Gün ${gun.offset}</strong>
         <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length} seans
           <button data-action="sablon-gun-sil" data-gi="${gi}" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button></span>
       </div>
       <div id="sablon-gun-body-${gi}" style="display:${gi===s.gunler.length-1?'block':'none'};margin-top:6px">
+        <label style="display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--ink2);margin:4px 0 7px">Başlangıçtan gün
+          <input class="fi" type="number" min="0" step="1" value="${gun.offset}" data-change="sablon-gun-ofset" data-gi="${gi}" style="width:75px;margin:0;padding:5px 7px"></label>
         ${seansRows}
         <button class="btn-sm" data-action="sablon-seans-ac" data-gi="${gi}" style="margin-top:6px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(42,107,181,.1);color:var(--blue);border:1px dashed rgba(42,107,181,.4);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne seans/ilaç ekle</button>
       </div>
@@ -3807,13 +3811,29 @@ function _syncSablonAd(){
   if(ac) _sablonEdit.aciklama = ac.value;
 }
 
-function sablonGunEkle(){ _syncSablonAd(); _sablonEdit.gunler.push([]); _renderSablonBuilder(); }
-function sablonGunSil(gi){ _syncSablonAd(); _sablonEdit.gunler.splice(+gi,1); if(!_sablonEdit.gunler.length) _sablonEdit.gunler=[[]]; _renderSablonBuilder(); }
+function sablonGunEkle(){
+  _syncSablonAd();
+  const sonOfset = _sablonEdit.gunler.reduce((max, gun) => Math.max(max, gun.offset), -1);
+  _sablonEdit.gunler.push({ offset:sonOfset+1, kalemler:[] });
+  _renderSablonBuilder();
+}
+function sablonGunSil(gi){ _syncSablonAd(); _sablonEdit.gunler.splice(+gi,1); if(!_sablonEdit.gunler.length) _sablonEdit.gunler=[{offset:0,kalemler:[]}]; _renderSablonBuilder(); }
+function sablonGunOfsetGuncelle(gi, value){
+  const offset = Number(value);
+  if(!Number.isInteger(offset) || offset < 0){ toast('Gün ofseti 0 veya daha büyük tam sayı olmalı', true); _renderSablonBuilder(); return; }
+  if(_sablonEdit.gunler.some((gun, i) => i !== +gi && gun.offset === offset)){
+    toast('Aynı gün zaten var; seansları o günün altında toplayın', true); _renderSablonBuilder(); return;
+  }
+  _syncSablonAd();
+  _sablonEdit.gunler[+gi].offset = offset;
+  _sablonEdit.gunler.sort((a,b) => a.offset-b.offset);
+  _renderSablonBuilder();
+}
 function sablonGunToggle(gi){
   const body=document.getElementById('sablon-gun-body-'+gi); if(!body) return;
   body.style.display = body.style.display==='none' ? 'block' : 'none';
 }
-function sablonSeansSil(gi,ki){ _syncSablonAd(); _sablonEdit.gunler[+gi].splice(+ki,1); _renderSablonBuilder(); }
+function sablonSeansSil(gi,ki){ _syncSablonAd(); _sablonEdit.gunler[+gi].kalemler.splice(+ki,1); _renderSablonBuilder(); }
 
 function sablonSeansAc(gi){
   _syncSablonAd();
@@ -3887,7 +3907,7 @@ function sablonSeansEkle(gi){
   if(hata) return;
   if(!secililer.length){ toast('En az bir ilaç seçin', true); return; }
   _syncSablonAd();
-  secililer.forEach(k=>_sablonEdit.gunler[+gi].push(k));
+  secililer.forEach(k=>_sablonEdit.gunler[+gi].kalemler.push(k));
   _sablonSeansForm=null;
   _renderSablonBuilder();
 }
@@ -3897,8 +3917,8 @@ async function sablonKaydet(){
   const s=_sablonEdit;
   if(!s.ad.trim()){ toast('Şablon adı zorunlu', true); return; }
   const kalemler=[];
-  s.gunler.forEach((arr,gi)=>arr.forEach(k=>kalemler.push({
-    gun_no: gi+1, planned_time: k.planned_time, stok_id: k.stok_id,
+  s.gunler.forEach(gun=>gun.kalemler.forEach(k=>kalemler.push({
+    gun_no: gun.offset+1, planned_time: k.planned_time, stok_id: k.stok_id,
     drug_product_id: k.drug_product_id, dose: k.dose, unit: k.unit, route: k.route,
   })));
   if(!kalemler.length){ toast('En az bir seans ekleyin', true); return; }
