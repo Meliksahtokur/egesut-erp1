@@ -3674,8 +3674,9 @@ async function _renderSablonlar(el){
   sablonlar.sort((a,b)=>a.ad.localeCompare(b.ad,'tr',{sensitivity:'base'}));
   sablonlar.forEach(s=>{
     const sKalem = kalemler.filter(k=>k.sablon_id===s.id);
-    const gunSayisi  = new Set(sKalem.map(k=>k.gun_no)).size;
-    const seansSayisi= sKalem.length;
+    const tohumlamaGunNo = Number.isInteger(s.tohumlama_plani?.gun_ofset) ? s.tohumlama_plani.gun_ofset + 1 : null;
+    const gunSayisi  = new Set([...sKalem.map(k=>k.gun_no), ...(tohumlamaGunNo===null?[]:[tohumlamaGunNo])]).size;
+    const seansSayisi= sKalem.length + (s.tohumlama_plani ? 1 : 0);
     const disIds = eslem.filter(e=>e.sablon_id===s.id).map(e=>e.disease_id);
     const disNames = disIds.map(id=>disMap[id]?.name).filter(Boolean);
     const ilkKat = disIds.map(id=>disMap[id]?.category).find(Boolean) || 'Diğer';
@@ -3771,11 +3772,11 @@ function _renderSablonBuilder(){
           <span style="flex:1">💊 ${esc(k._drugName)} <span style="color:var(--ink3);font-size:.72rem">${k.dose} ${esc(k.unit)}${k.route?' · '+esc(k.route):''}</span></span>
           <button data-action="sablon-seans-sil" data-gi="${gi}" data-ki="${ki}" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button>
         </div>`).join('')
-      : '<div style="font-size:.75rem;color:var(--ink3);padding:4px 0">seans yok</div>';
+      : '';
     gunlerHtml += `<div class="tanimlar-card" style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="sablon-gun-toggle" data-gi="${gi}">
         <strong>Gün ${gun.offset}</strong>
-        <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length} ilaç seansı${tohumlama?' · 1 tohumlama':''}
+        <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length+(tohumlama?1:0)} seans
           <button data-action="sablon-gun-sil" data-gi="${gi}" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button></span>
       </div>
       <div id="sablon-gun-body-${gi}" style="display:${gi===s.gunler.length-1?'block':'none'};margin-top:6px">
