@@ -186,6 +186,7 @@ registerActions({
   'sperma-select':(el) => onSpermaSelect(el),
   'sperma-input': (el) => { g('i-sperma').value = el.value; },
   'submit-insem': (el) => submitInsem(el),
+  'planli-insem-iptal': () => { globalThis._planliTohumlamaGorevId=null; closeM('m-insem'); },
 
   // ═══ HASTALIK ═══
   'disease-focus':  (el) => acHayvan('d-hid', 'ac-dhid'),
@@ -254,6 +255,9 @@ registerActions({
   'sablon-seans-ekle':   (el) => sablonSeansEkle(el.dataset.gi),
   'sablon-seans-vazgec': () => sablonSeansVazgec(),
   'sablon-saat-chip':    (el) => sablonSaatChip(el.dataset.t),
+  'sablon-tohumlama-toggle': (el) => sablonTohumlamaToggle(el.checked),
+  'sablon-tohumlama-ofset':  (el) => sablonTohumlamaOfset(el.value),
+  'sablon-tohumlama-saat':   (el) => sablonTohumlamaSaat(el.value),
   'sablon-kaydet':       () => sablonKaydet(),
   'sablon-iptal':        () => closeM('m-sablon'),
   'stok-add-open':    () => openStokAdd(),

@@ -3728,9 +3728,9 @@ async function openSablonBuilder(id){
       .sort((a,b)=>(a.planned_time||'').localeCompare(b.planned_time||''))
       .map(k=>({ planned_time:(k.planned_time||'').slice(0,5), stok_id:k.stok_id, drug_product_id:k.drug_product_id,
                  dose:k.dose, unit:k.unit, route:k.route, _drugName:_sablonDrugName(k) })) }));
-    _sablonEdit = { id, ad:s?.ad||'', aciklama:s?.aciklama||'', disease_ids:eslem.map(e=>e.disease_id), gunler:gunler.length?gunler:[{offset:0,kalemler:[]}] };
+    _sablonEdit = { id, ad:s?.ad||'', aciklama:s?.aciklama||'', disease_ids:eslem.map(e=>e.disease_id), gunler:gunler.length?gunler:[{offset:0,kalemler:[]}], tohumlama_plani:s?.tohumlama_plani||null };
   } else {
-    _sablonEdit = { id:null, ad:'', aciklama:'', disease_ids:[], gunler:[{offset:0,kalemler:[]}] };
+    _sablonEdit = { id:null, ad:'', aciklama:'', disease_ids:[], gunler:[{offset:0,kalemler:[]}], tohumlama_plani:null };
   }
   _sablonEdit._diseases = diseases;
   document.getElementById('m-sablon-title').textContent = id ? 'Şablonu Düzenle' : 'Yeni Şablon';
@@ -3795,6 +3795,10 @@ function _renderSablonBuilder(){
       <strong>Plan</strong>
       <button class="btn-sm" data-action="sablon-gun-ekle" style="font-weight:700;padding:7px 13px;background:rgba(78,154,42,.12);color:var(--green);border:1px solid rgba(78,154,42,.35);border-radius:7px;cursor:pointer">＋ Gün Ekle</button></div>
     ${gunlerHtml}
+    <div class="tanimlar-card" style="margin:10px 0;padding:10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
+      <label style="display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer"><input type="checkbox" data-change="sablon-tohumlama-toggle" ${s.tohumlama_plani?'checked':''}> 🐄 Planlı tohumlama ekle</label>
+      ${s.tohumlama_plani?`<div style="display:flex;gap:8px;margin-top:8px"><label style="flex:1;font-size:.75rem">Başlangıçtan gün<input class="fi" type="number" min="0" value="${s.tohumlama_plani.gun_ofset}" data-change="sablon-tohumlama-ofset"></label><label style="flex:1;font-size:.75rem">Saat<input class="fi" type="time" value="${s.tohumlama_plani.planned_time}" data-change="sablon-tohumlama-saat"></label></div><div style="font-size:.68rem;color:var(--ink3);margin-top:5px">Sperma görev açıldığında seçilir; gerçekleşme zamanı kayda yazılır.</div>`:''}
+    </div>
     <button class="btn btn-g" data-action="sablon-kaydet" style="margin-top:14px">💾 Kaydet</button>
     <button class="btn btn-o" data-action="sablon-iptal" style="margin-top:6px">İptal</button>`;
 }
@@ -3879,6 +3883,9 @@ function sablonSeansAc(gi){
 }
 
 function sablonSaatChip(t){ const i=document.getElementById('sbs-time'); if(i) i.value=t; }
+function sablonTohumlamaToggle(checked){ _syncSablonAd(); _sablonEdit.tohumlama_plani=checked?{gun_ofset:0,planned_time:'08:00'}:null; _renderSablonBuilder(); }
+function sablonTohumlamaOfset(value){ const n=Number(value); if(!Number.isInteger(n)||n<0){toast('Tohumlama gün ofseti 0 veya daha büyük tam sayı olmalı',true);_renderSablonBuilder();return;} _sablonEdit.tohumlama_plani={..._sablonEdit.tohumlama_plani,gun_ofset:n}; }
+function sablonTohumlamaSaat(value){ if(value) _sablonEdit.tohumlama_plani={..._sablonEdit.tohumlama_plani,planned_time:value}; }
 function sablonSeansVazgec(){ if(_sablonSeansForm){ _sablonSeansForm.remove(); _sablonSeansForm=null; } }
 
 function sablonSeansEkle(gi){
@@ -3925,7 +3932,7 @@ async function sablonKaydet(){
   try{
     await rpc('tedavi_sablon_kaydet', {
       p_id: s.id, p_ad: s.ad.trim(), p_aciklama: s.aciklama||null,
-      p_disease_ids: s.disease_ids, p_kalemler: kalemler,
+      p_disease_ids: s.disease_ids, p_kalemler: { kalemler, tohumlama_plani:s.tohumlama_plani },
     });
     await pullTables(['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem']);
     closeM('m-sablon');
@@ -4701,6 +4708,7 @@ async function openTaskDet(id){
 }
 async function detayTamamla(){
   if(!_curTaskDet) return;
+  if(_curTaskDet.gorev_tipi==='TOHUMLAMA_PLANLI') return openPlanliTohumlama(_curTaskDet);
   // §3: etken_kod varsa ama stok_id yoksa → önce stok seçtir
   if (_curTaskDet.etken_kod && !_curTaskDet.stok_id) {
     return _gorevStokSecVeTamamla(_curTaskDet);
@@ -6326,6 +6334,15 @@ async function openInsemSafe(kupeNo){
     if(gun>=0&&gun<=15){ _openInsemIntercept(hayvan,bekliyor); return; }
   }
   openMWithHayvan('m-insem','i-hid',kupeNo);
+}
+
+function openPlanliTohumlama(gorev){
+  const hayvan=(getState('animals')||[]).find(a=>a.id===gorev.hayvan_id);
+  if(!hayvan){ toast('Görevin hayvanı bulunamadı',true); return; }
+  globalThis._planliTohumlamaGorevId=gorev.id;
+  closeM('m-task-det');
+  openMWithHayvan('m-insem','i-hid',hayvan.kupe_no||hayvan.devlet_kupe||hayvan.id);
+  setTimeout(()=>{ const tarih=document.getElementById('i-tarih'); if(tarih) tarih.value=new Date().toISOString().slice(0,10); },180);
 }
 
 function _openInsemIntercept(hayvan,bekliyor){

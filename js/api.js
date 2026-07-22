@@ -270,6 +270,7 @@ const RPC_TABLES = {
   hayvan_ekle:               ['hayvanlar'],
   dogum_kaydet:              ['hayvanlar','dogum','gorev_log','tohumlama'],
   tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket','hayvanlar'],
+  planli_tohumlama_kaydet:   ['tohumlama','gorev_log','stok','stok_hareket','hayvanlar','islem_log'],
   tohumlama_tekrar_kaydet:   ['tohumlama','gorev_log','stok_hareket'],
   tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
   tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log'],
@@ -341,6 +342,7 @@ const RPC_TABLES = {
   tedavi_sablon_kaydet:  ['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'],
   tedavi_sablon_sil:     ['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'],
   tedavi_sablon_uygula:  ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
+  tedavi_sablon_tohumlama_gorev_ekle: ['gorev_log'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────

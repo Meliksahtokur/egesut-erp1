@@ -279,7 +279,9 @@ async function submitInsem(btn) {
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
-    const result = await rpc('tohumlama_kaydet', {
+    const planliGorevId=globalThis._planliTohumlamaGorevId||null;
+    const result = await rpc(planliGorevId?'planli_tohumlama_kaydet':'tohumlama_kaydet', {
+      ...(planliGorevId?{p_gorev_id:planliGorevId}:{}),
       p_hayvan_id:      hayvan.id,
       p_tarih:          tarih,
       p_sperma:         sperma,
@@ -288,6 +290,7 @@ async function submitInsem(btn) {
       p_vwp_override:   globalThis._vwpOverride || false,
     });
     globalThis._vwpOverride = false;
+    globalThis._planliTohumlamaGorevId = null;
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
 
@@ -534,8 +537,9 @@ async function submitCase(btn) {
     if (sablonId && res?.case_id) {
       try {
         const r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId });
+        const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res.case_id, p_sablon_id: sablonId });
         if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
-        toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)`);
+        toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
       } catch(e) { toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true); }
     } else {
       toast('✅ Vaka açıldı');
