@@ -3723,7 +3723,9 @@ async function openSablonBuilder(id){
     const s = (await idbGetAll('tedavi_sablonu')).find(x=>x.id===id);
     const eslem = (await idbGetAll('sablon_hastalik_eslem')).filter(e=>e.sablon_id===id);
     const kalemler = (await idbGetAll('tedavi_sablonu_kalem')).filter(k=>k.sablon_id===id);
-    const gunNos = [...new Set(kalemler.map(k=>k.gun_no))].sort((a,b)=>a-b);
+    // Tohumlama tek başına bir günün etkinliği olabilir; ilaç kalemi yok diye o günü düşürme.
+    const tohumlamaGunNo = Number.isInteger(s?.tohumlama_plani?.gun_ofset) ? s.tohumlama_plani.gun_ofset + 1 : null;
+    const gunNos = [...new Set([...kalemler.map(k=>k.gun_no), ...(tohumlamaGunNo===null?[]:[tohumlamaGunNo])])].sort((a,b)=>a-b);
     const gunler = gunNos.map(gn => ({ offset:gn-1, kalemler:kalemler.filter(k=>k.gun_no===gn)
       .sort((a,b)=>(a.planned_time||'').localeCompare(b.planned_time||''))
       .map(k=>({ planned_time:(k.planned_time||'').slice(0,5), stok_id:k.stok_id, drug_product_id:k.drug_product_id,
