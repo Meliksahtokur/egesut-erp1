@@ -637,7 +637,9 @@ async function loadTasks(f,btn,opts){
   });
 }
 function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
-  const planTime=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
+  const planTime=t.gorev_tipi==='TOHUMLAMA_PLANLI'
+    ? (t.hedef_saat||'').slice(0,5)
+    : t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').planned_time||'';}catch(e){return '';}})():'';
   const doneSubs=subs.filter(s=>s.tamamlandi).length;
   const allDone=subs.length>0&&doneSubs===subs.length;
   const subHtml=subs.length?`<div class="subtasks">
@@ -670,7 +672,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:'${t.padok_hedef||''}'})">
+      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:'${t.padok_hedef||''}'})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -3776,7 +3778,7 @@ function _renderSablonBuilder(){
     gunlerHtml += `<div class="tanimlar-card" style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="sablon-gun-toggle" data-gi="${gi}">
         <strong>Gün ${gun.offset}</strong>
-        <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length+(tohumlama?1:0)} seans
+        <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length} ilaç seansı${tohumlama?' · 1 tohumlama':''}
           <button data-action="sablon-gun-sil" data-gi="${gi}" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button></span>
       </div>
       <div id="sablon-gun-body-${gi}" style="display:${gi===s.gunler.length-1?'block':'none'};margin-top:6px">
@@ -4528,6 +4530,9 @@ async function openTaskDet(id){
   const all=await idbGetAll('gorev_log');
   const t=all.find(x=>x.id===id); if(!t) return;
   if(t.tamamlandi){ openDoneTaskDet(id); return; }
+  // Planlı tohumlama hatırlatıcı değil, kayıtla kapanan bir görevdir.
+  // Karttan doğrudan tohumlama formuna gidilir; kayıt RPC'si görevi atomik kapatır.
+  if(t.gorev_tipi==='TOHUMLAMA_PLANLI') return openPlanliTohumlama(t);
   _curTaskDet=t;
   const today=new Date().toISOString().split('T')[0];
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
