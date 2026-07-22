@@ -3775,7 +3775,7 @@ function _renderSablonBuilder(){
     gunlerHtml += `<div class="tanimlar-card" style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
       <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="sablon-gun-toggle" data-gi="${gi}">
         <strong>Gün ${gun.offset}</strong>
-        <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length} seans
+        <span style="font-size:.72rem;color:var(--ink2)">${kalemler.length} ilaç seansı${tohumlama?' · 1 tohumlama':''}
           <button data-action="sablon-gun-sil" data-gi="${gi}" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button></span>
       </div>
       <div id="sablon-gun-body-${gi}" style="display:${gi===s.gunler.length-1?'block':'none'};margin-top:6px">
