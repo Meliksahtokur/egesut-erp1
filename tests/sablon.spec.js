@@ -27,8 +27,8 @@ test('Tanımlar Şablonlar sekmesi açılır ve builder render olur', async ({ p
 
   // Yeni şablon başlangıç gününü Gün 0 olarak gösterir.
   await expect(page.locator('#m-sablon-body')).toContainText('Gün 0');
-  await page.check('[data-change="sablon-tohumlama-toggle"]');
-  await expect(page.locator('#m-sablon-body')).toContainText('Planlı tohumlama ekle');
+  await page.click('[data-action="sablon-tohumlama-gun-ekle"]');
+  await expect(page.locator('#m-sablon-body')).toContainText('Planlı tohumlama');
 
   // İkinci günün ofseti düzenlenebilir ve korunur.
   await page.click('[data-action="sablon-gun-ekle"]');
