@@ -343,6 +343,7 @@ const RPC_TABLES = {
   tedavi_sablon_sil:     ['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'],
   tedavi_sablon_uygula:  ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
   tedavi_sablon_tohumlama_gorev_ekle: ['gorev_log'],
+  vaka_tohumlama_ekle:   ['gorev_log','islem_log'],
 };
 
 // ── RENDER DEBOUNCE ─────────────────────────

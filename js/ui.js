@@ -5162,13 +5162,23 @@ async function renderCaseTimeline(caseId) {
   // İlk yüklemede "Yükleniyor" göster; re-render'da flash YOK (yoksa scroll başa kayar)
   if (!prevOpen.size) el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Yükleniyor…</span>';
   try {
-    const [allDays, allAdmins, allProducts, allStok, allSeans] = await Promise.all([
+    const [allDays, allAdmins, allProducts, allStok, allSeans, allGorev] = await Promise.all([
       idbGetAll('treatment_days'),
       idbGetAll('drug_administrations'),
       idbGetAll('drug_products'),
       idbGetAll('stok'),
-      idbGetAll('treatment_day_uygulamalar').catch(() => [])
+      idbGetAll('treatment_day_uygulamalar').catch(() => []),
+      idbGetAll('gorev_log').catch(() => [])
     ]);
+    // Planlı tohumlamanın kendi treatment_days satırı YOKTUR: ilaç günleri şablon
+    // kalemlerinden doğar, tohumlama ise ayrı bir ofsette bağımsız bir gorev_log
+    // satırıdır (canlıda 8/8 vakada ilaçsız bir güne düşüyor). Bu yüzden timeline'a
+    // SANAL gün olarak enjekte edilir — durumun tek kaynağı görev satırının
+    // kendisi kalır, ikinci bir kayıt üretilmez.
+    const _tohPrefix = 'TEDAVI_SABLON_TOHUMLAMA:' + caseId + ':';
+    const tohGorevler = allGorev
+      .filter(g => g.gorev_tipi === 'TOHUMLAMA_PLANLI' && (g.kaynak || '').startsWith(_tohPrefix) && !g.iptal)
+      .sort((a, b) => (a.hedef_tarih || '').localeCompare(b.hedef_tarih || ''));
     const days = allDays.filter(d => d.case_id === caseId).sort((a,b) => (a.treatment_date||'').localeCompare(b.treatment_date||''));
     const prodMap = {}; allProducts.forEach(p => { prodMap[p.id] = p; });
     const stokMap = {}; allStok.forEach(s => { stokMap[s.id] = s; });
@@ -5198,7 +5208,7 @@ async function renderCaseTimeline(caseId) {
         });
       }
     });
-    if (!data.length) {
+    if (!data.length && !tohGorevler.length) {
       el.innerHTML = '<span style="color:var(--ink3);font-size:.78rem">Henüz tedavi günü yok</span>';
       return;
     }
@@ -5206,6 +5216,21 @@ async function renderCaseTimeline(caseId) {
     data.forEach(r => {
       if (!byDay[r.day_id]) byDay[r.day_id] = { day_no: r.day_no, date: r.treatment_date, day_id: r.day_id, time: r.treatment_time || '', drugs: [], sessions: r.sessions || [], tamamlandi: r.tamamlandi, tamamlanma_tarihi: r.tamamlanma_tarihi, tamamlanma_notu: r.tamamlanma_notu, notes: r.notes };
       if (r.administration_id) byDay[r.day_id].drugs.push(r);
+    });
+    // Sanal tohumlama günlerini enjekte et. day_no, aynı/önceki tarihli gerçek
+    // günlerin en büyüğünün 0.5 fazlası — mevcut `sort((a,b)=>a.day_no-b.day_no)`
+    // sıralamasını bozmadan tohumlamayı doğru yere oturtur.
+    tohGorevler.forEach(g => {
+      const vid = 'toh-' + g.id;
+      const oncekiMax = Object.values(byDay)
+        .filter(d => !d._toh && (d.date || '') <= (g.hedef_tarih || ''))
+        .reduce((m, d) => Math.max(m, d.day_no || 0), 0);
+      byDay[vid] = {
+        day_no: oncekiMax + 0.5, date: g.hedef_tarih, day_id: vid,
+        time: (g.hedef_saat || '').slice(0, 5), drugs: [], sessions: [],
+        tamamlandi: !!g.tamamlandi, tamamlanma_tarihi: g.tamamlanma_tarihi,
+        tamamlanma_notu: null, notes: null, _toh: g,
+      };
     });
   // Tarih gruplama: benzersiz tarihler sıralı grup numarası alır, aynı tarihtekiler A/B/C
   const SUFFIKLER = ['A','B','C','D','E','F','G'];
@@ -5265,13 +5290,18 @@ async function renderCaseTimeline(caseId) {
       const gunNo    = `Gün ${tarihGunNo[day.day_id]||day.day_no}${tarihSuffix[day.day_id]||''}`;
 
       // Seans planı durumu
+      const toh          = day._toh || null;
       const sessions     = day.sessions || [];
       const seansKapali  = sessions.filter(s => s.uygulama_tamamlandi_at || s.uygulanmadi).length;
       const kilitliSeans = seansKapali > 0; // kapatılmış seans varsa plan değiştirilemez (RPC kuralı)
-      _cdDayData[day.day_id] = { date: day.date, time: day.time, sessions, legacyDrugs: day.drugs, kilitli: kilitliSeans };
+      // Sanal tohumlama günü _cdDayData'ya YAZILMAZ — seans/ilaç formları onu
+      // gerçek bir gün sanıp üzerine yazmaya çalışmasın.
+      if (!toh) _cdDayData[day.day_id] = { date: day.date, time: day.time, sessions, legacyDrugs: day.drugs, kilitli: kilitliSeans };
 
       // Başlık sağ taraf
-      const seansBadge = sessions.length && !isDone
+      const seansBadge = toh
+        ? `<span style="background:rgba(78,154,42,.1);color:var(--green);padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700">🐄 Tohumlama</span>`
+        : sessions.length && !isDone
         ? `<span style="background:rgba(42,107,181,.1);color:var(--blue);padding:2px 8px;border-radius:6px;font-size:.68rem;font-weight:700">⏰ ${seansKapali}/${sessions.length}</span>`
         : '';
       const badge = isDone
@@ -5295,16 +5325,41 @@ async function renderCaseTimeline(caseId) {
                 <button data-admin-id="${escAttr(d.administration_id)}" onclick="caseDrugSil(this.dataset.adminId)" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:.85rem;padding:2px">🗑</button>
               </div>` : ''}
             </div>`).join('')}</div>`
-        : (sessions.length ? '' : `<span style="color:var(--ink3);font-size:.75rem;display:block;padding:4px 0">İlaç eklenmemiş</span>`);
+        : ((sessions.length || toh) ? '' : `<span style="color:var(--ink3);font-size:.75rem;display:block;padding:4px 0">İlaç eklenmemiş</span>`);
 
       // Seans planı bölümü — şerit + satırlar
-      const seansHtml = sessions.length ? `
+      const seansHtml = (!toh && sessions.length) ? `
         <div class="cd-sec-lbl">⏰ Seans Planı</div>
         ${renderSeansSerit(sessions, { today: day.date === bugun })}
         <div>${sessions.map(s => renderSeansRow(s, { readOnly: !aktif || isDone || isLocked })).join('')}</div>` : '';
 
+      // Tohumlama kalemi — ilaç seansıyla aynı satır dilinde
+      const tohState = toh
+        ? (isDone ? 'done' : (day.date < bugun ? 'overdue' : (day.date === bugun ? 'now' : 'scheduled')))
+        : '';
+      const tohDurum = { done: '✓ Kaydedildi', overdue: '⚠ Gecikti', now: '⏱ Vakti geldi', scheduled: '⏳ Planlandı' }[tohState] || '';
+      const tohHtml = toh ? `
+        <div class="cd-sec-lbl">🐄 Üreme</div>
+        <div class="seans-row s-${tohState}" data-gorev-id="${escAttr(toh.id)}">
+          <span class="seans-saat">${esc(day.time || '—')}</span>
+          <div class="seans-info">
+            <div class="seans-ilac">🐄 Tohumlama</div>
+            <div class="seans-meta">${esc(isDone ? tohDurum : 'Sperma kayıt sırasında seçilir · ' + tohDurum)}</div>
+          </div>
+          <span class="seans-chip s-${tohState}">${esc(tohDurum)}</span>
+        </div>` : '';
+
+      // Tohumlama günü kendi eylemlerini taşır: gün tamamla/sil/seans planla YOK.
+      // Kayıt bugün düzelttiğimiz planlı tohumlama akışına gider, iptal tek tık.
+      const tohActionsHtml = (toh && aktif && !isDone) ? `
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--card3);align-items:center">
+          ${!isLocked ? `<button onclick="caseTohumlamaKaydet('${escAttr(toh.id)}')" style="flex:1;min-width:120px;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:700">🐄 Tohumlamayı Kaydet</button>` : ''}
+          <button onclick="caseTohumlamaIptal('${escAttr(toh.id)}')" style="background:rgba(192,50,26,.06);color:var(--red);border:1px solid rgba(192,50,26,.15);border-radius:7px;padding:8px 9px;font-size:.8rem;cursor:pointer" title="Planlı tohumlamayı iptal et">🗑</button>
+        </div>
+        ${isLocked ? '<div style="margin-top:4px;font-size:.68rem;color:var(--ink3);padding:0 2px">⏳ Önceki gün tamamlanmadan tohumlama yapılamaz</div>' : ''}` : '';
+
       // Eylem çubuğu — seanslı günlerde gün "✅ Tamamla" yok (son seansla otomatik kapanır)
-      const actionsHtml = aktif && !isDone ? `
+      const actionsHtml = !toh && aktif && !isDone ? `
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid var(--card3);align-items:center">
           ${!isLocked && !sessions.length ? `<button onclick="caseDayTamamla('${day.day_id}')" style="flex:1;min-width:80px;background:var(--green);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:700">✅ Tamamla</button>` : ''}
           ${!sessions.length ? `<button onclick="caseDrugFormAc('${day.day_id}')" style="flex:1;min-width:72px;background:var(--blue);color:#fff;border:none;border-radius:7px;padding:8px 10px;font-size:.74rem;cursor:pointer;font-weight:600">+ İlaç</button>` : ''}
@@ -5342,7 +5397,9 @@ async function renderCaseTimeline(caseId) {
                   ${notHtml}
                   ${drugHtml}
                   ${seansHtml}
+                  ${tohHtml}
                   ${actionsHtml}
+                  ${tohActionsHtml}
                 </div>
               </div>
             </div>
@@ -5567,7 +5624,69 @@ async function caseGunEkleOnayla() {
   } catch(e) { toast(e.message, true); }
 }
 
+// ── VAKAYA PLANLI TOHUMLAMA ────────────────────────────────────────────────
+// Tohumlama ilaç gibi vakanın bir kalemi; ama kaydı tohumlama_kaydet zinciri
+// üzerinden gitmek zorunda (sperma, VWP, gebelik kontrol görevleri). Bu yüzden
+// kart yalnızca planı taşır, kayıt planlı tohumlama formuna devreder.
+function caseTohumlamaEkleAc() {
+  if (!_curCase) return;
+  document.getElementById('cd-toh-form')?.remove();
+  const bugun = new Date().toISOString().split('T')[0];
+  const div = document.createElement('div');
+  div.id = 'cd-toh-form';
+  div.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:12px;margin-bottom:10px';
+  div.innerHTML =
+    '<div style="font-size:.74rem;font-weight:700;color:var(--ink2);margin-bottom:8px">🐄 Planlı Tohumlama Ekle</div>' +
+    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+      '<label style="flex:2;font-size:.7rem;color:var(--ink3)">Tarih<input id="cdt-tarih" class="fi" type="date" value="' + bugun + '" style="margin-top:3px"></label>' +
+      '<label style="flex:1;font-size:.7rem;color:var(--ink3)">Saat<input id="cdt-saat" class="fi" type="time" value="08:00" style="margin-top:3px"></label>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px">' +
+      '<button onclick="caseTohumlamaEkleOnayla(this)" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:9px;font-size:.76rem;font-weight:700;cursor:pointer">Ekle</button>' +
+      '<button onclick="document.getElementById(\'cd-toh-form\').remove()" style="flex:1;background:var(--card2);color:var(--ink2);border:1px solid var(--card3);border-radius:8px;padding:9px;font-size:.76rem;cursor:pointer">Vazgeç</button>' +
+    '</div>';
+  document.getElementById('cd-gun-bolum')?.appendChild(div);
+}
 
+async function caseTohumlamaEkleOnayla(btn) {
+  if (!_curCase) return;
+  const tarih = document.getElementById('cdt-tarih')?.value;
+  const saat  = document.getElementById('cdt-saat')?.value || '08:00';
+  if (!tarih) { toast('Tarih seçin', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
+  try {
+    await rpc('vaka_tohumlama_ekle', { p_case_id: _curCase.id, p_tarih: tarih, p_saat: saat });
+    document.getElementById('cd-toh-form')?.remove();
+    toast('🐄 Planlı tohumlama eklendi');
+    await pullTables(['gorev_log']);
+    await renderCaseTimeline(_curCase.id);
+    updateTaskBadge();
+  } catch(e) {
+    toast('❌ ' + e.message, true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Ekle'; }
+  }
+}
+
+async function caseTohumlamaKaydet(gorevId) {
+  const g = (await idbGetAll('gorev_log')).find(x => x.id === gorevId);
+  if (!g) { toast('Planlı tohumlama görevi bulunamadı', true); return; }
+  closeM('m-case-det');
+  openPlanliTohumlama(g);
+}
+
+async function caseTohumlamaIptal(gorevId) {
+  const g = (await idbGetAll('gorev_log')).find(x => x.id === gorevId);
+  if (!g) { toast('Planlı tohumlama görevi bulunamadı', true); return; }
+  openConfirm('Tohumlamayı İptal Et', 'Bu planlı tohumlama iptal edilsin mi?', async () => {
+    try {
+      await write('gorev_log', { ...g, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString(), iptal: true }, 'PATCH', `id=eq.${g.id}`);
+      toast('🗑 Planlı tohumlama iptal edildi');
+      await renderCaseTimeline(_curCase.id);
+      updateTaskBadge();
+      loadDash();
+    } catch(e) { toast('❌ ' + e.message, true); }
+  });
+}
 
 let _activeDayId = null;
 function caseDrugFormAc(dayId) {

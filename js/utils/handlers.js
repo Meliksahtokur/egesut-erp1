@@ -279,6 +279,7 @@ registerActions({
   'detay-iptal':        () => detayIptal(),
   'gorev-geri-al':      () => gorevGeriAl(),
   'case-gun-ekle':      () => caseGunEkle(),
+  'case-tohumlama-ekle':() => caseTohumlamaEkleAc(),
   'case-kapat':         () => caseKapat(),
   'erken-kapat-toggle': () => caseErkenKapatToggle(),
   'erken-kapat-onayla': (el) => caseErkenKapatOnayla(el),
