@@ -3934,11 +3934,18 @@ async function sablonKaydet(){
     gun_no: gun.offset+1, planned_time: k.planned_time, stok_id: k.stok_id,
     drug_product_id: k.drug_product_id, dose: k.dose, unit: k.unit, route: k.route,
   })));
-  if(!kalemler.length){ toast('En az bir seans ekleyin', true); return; }
+  // Sadece tohumlamadan oluşan şablon da geçerlidir (senkronizasyon sonu tohumlama).
+  if(!kalemler.length && !s.tohumlama_plani){ toast('En az bir seans ekleyin', true); return; }
   try{
+    // tohumlama_plani anahtarını SADECE plan varsa gönder. `null` gönderilirse
+    // Postgres tarafında `p_kalemler->'tohumlama_plani'` SQL NULL değil jsonb 'null'
+    // döner ve doğrulama "tohumlama zorunlu" gibi davranır (DB tarafı da düzeltildi,
+    // bu ikinci emniyet). Anahtarın yokluğu = "bu şablonda tohumlama yok".
+    const payload = { kalemler };
+    if(s.tohumlama_plani) payload.tohumlama_plani = s.tohumlama_plani;
     await rpc('tedavi_sablon_kaydet', {
       p_id: s.id, p_ad: s.ad.trim(), p_aciklama: s.aciklama||null,
-      p_disease_ids: s.disease_ids, p_kalemler: { kalemler, tohumlama_plani:s.tohumlama_plani },
+      p_disease_ids: s.disease_ids, p_kalemler: payload,
     });
     await pullTables(['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem']);
     closeM('m-sablon');
@@ -4530,9 +4537,10 @@ async function openTaskDet(id){
   const all=await idbGetAll('gorev_log');
   const t=all.find(x=>x.id===id); if(!t) return;
   if(t.tamamlandi){ openDoneTaskDet(id); return; }
-  // Planlı tohumlama hatırlatıcı değil, kayıtla kapanan bir görevdir.
-  // Karttan doğrudan tohumlama formuna gidilir; kayıt RPC'si görevi atomik kapatır.
-  if(t.gorev_tipi==='TOHUMLAMA_PLANLI') return openPlanliTohumlama(t);
+  // NOT: TOHUMLAMA_PLANLI eskiden burada erken return ile doğrudan tohumlama
+  // formuna gidiyordu — detay modalı hiç açılmadığı için "🗑 Görevi İptal Et"
+  // butonuna ULAŞILAMIYORDU ve görevin tek çıkışı gerçekten tohumlamaktı.
+  // Artık modal normal açılıyor; tamamla butonu aşağıda forma yönlendiriliyor.
   _curTaskDet=t;
   const today=new Date().toISOString().split('T')[0];
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
@@ -4569,10 +4577,14 @@ async function openTaskDet(id){
   const asiAcBtn=document.getElementById('td-asi-ac-btn');
   const asiForm =document.getElementById('td-asi-form');
   // rapelForm removed — merged into td-asi-form
-  if(tamamBtn)  tamamBtn.style.display='block';
+  if(tamamBtn){ tamamBtn.style.display='block'; tamamBtn.textContent='✅ Tamamlandı Olarak İşaretle'; }
   if(asiAcBtn)  asiAcBtn.style.display='none';
   if(asiForm)   asiForm.style.display='none';
   _curTaskVaccineId=null;
+
+  // TOHUMLAMA_PLANLI: tek tıkla "tamamlandı" olmaz — gerçek tohumlama kaydı gerekir.
+  // Buton etiketi bunu söylesin; detayTamamla() forma yönlendiriyor.
+  if(t.gorev_tipi==='TOHUMLAMA_PLANLI'&&tamamBtn) tamamBtn.textContent='🐄 Tohumlamayı Kaydet';
 
   // ILERI_GEBE_ASI: standart tamamla gizle, aşı butonu göster
   if(t.gorev_tipi==='ILERI_GEBE_ASI'){

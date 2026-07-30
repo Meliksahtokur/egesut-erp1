@@ -539,6 +539,9 @@ async function submitCase(btn) {
         const r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId });
         const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res.case_id, p_sablon_id: sablonId });
         if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
+        // Şablonda tohumlama var ama hayvan uygun değilse (erkek/12 aydan küçük/gebe)
+        // görev sessizce atlanır — kullanıcı nedenini görsün.
+        if (planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
         toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
       } catch(e) { toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true); }
     } else {

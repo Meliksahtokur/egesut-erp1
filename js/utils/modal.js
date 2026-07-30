@@ -54,6 +54,10 @@ function closeM(id) {
   g(id)?.classList.remove('on');
   // Android geri tuşu: bizim pushState ettiğimiz modalı back ile kapat
   if (history.state?.modal === id) history.back();
+  // Planlı tohumlama bayrağını HER kapanış yolunda bırak (overlay, X, ESC, geri tuşu).
+  // Aksi halde bayrak takılı kalır ve bir sonraki NORMAL tohumlama, kapanmış bir
+  // planlı göreve yazılmaya çalışılır.
+  if (id === 'm-insem') globalThis._planliTohumlamaGorevId = null;
   // Hayvan formunu tam sıfırla — bir sonraki açılışta temiz başlasın
   if (id === 'm-animal') {
     ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
