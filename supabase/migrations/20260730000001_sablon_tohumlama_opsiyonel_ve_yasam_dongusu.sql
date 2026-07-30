@@ -115,8 +115,11 @@ BEGIN
   IF v_hayvan.dogum_tarihi IS NOT NULL AND (v_date - v_hayvan.dogum_tarihi) < 365 THEN
     RETURN jsonb_build_object('ok', true, 'olustu', false, 'sebep', 'Hayvan hedef tarihte 12 aydan küçük');
   END IF;
-  IF lower(coalesce(v_hayvan.tohumlama_durumu, '')) = 'gebe'
-     OR EXISTS (SELECT 1 FROM public.tohumlama WHERE hayvan_id = v_case.animal_id AND sonuc = 'Gebe') THEN
+  -- Gebelik sinyali SADECE tohumlama tablosundan okunur — tohumlama_kaydet'in
+  -- gercek kapisi da budur. hayvanlar.tohumlama_durumu KULLANILMAZ: bayat
+  -- (dogum yapan inekte 'gebe' kaliyor) ve 4 farkli yazimi var
+  -- ('gebe'/'Gebe'/'Boş'/'bos'). O alana bakmak mesru Ovsynch gorevlerini engeller.
+  IF EXISTS (SELECT 1 FROM public.tohumlama WHERE hayvan_id = v_case.animal_id AND sonuc = 'Gebe') THEN
     RETURN jsonb_build_object('ok', true, 'olustu', false, 'sebep', 'Hayvan gebe');
   END IF;
 
