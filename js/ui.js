@@ -6041,6 +6041,7 @@ async function openTohDet(id){
   // islem_log'dan bu kaydın id'sini bul (geri alma için)
   const islemLog=await idbGetAll('islem_log');
   const islemKayit=islemLog.find(l=>l.tip==='TOHUMLAMA'&&l.ref_id===id);
+  const abortKayit=islemLog.find(l=>l.tip==='ABORT_KAYDI'&&l.ref_id===id);
 
   // Son tohumlama kontrolü (event stack kuralı)
   const tumTohlar=await idbGetAll('tohumlama');
@@ -6051,7 +6052,14 @@ async function openTohDet(id){
 
   const td2GeriAlBtn=document.getElementById('td2-geri-al-btn');
   if(td2GeriAlBtn){
-    if(isSonToh&&islemKayit){
+    if(abortKayit){
+      // Abort'u geri al — kaydı silmez; geri_al RPC'si ABORT_KAYDI snapshot'ından
+      // sonuc='Gebe' + tohumlama_durumu'nu restore eder. Abort kaydın son eylemi
+      // olduğu için son-tohumlama şartı aranmaz.
+      td2GeriAlBtn.style.display='block';
+      td2GeriAlBtn.textContent='↩ Abort İşlemini Geri Al';
+      td2GeriAlBtn.onclick=()=>openGeriAl(abortKayit.id,`${hayvanLabel} — abort geri alınacak (kayıt tekrar Gebe olur)`);
+    } else if(isSonToh&&islemKayit){
       td2GeriAlBtn.style.display='block';
       td2GeriAlBtn.textContent='🔄 Bu Kaydı Geri Al';
       td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`);
