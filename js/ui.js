@@ -212,8 +212,9 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   }
   if((sessizList||[]).length){
     const sTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">❗ Sessiz Hayvanlar (${sessizList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
+    const sessizTop=[...(sessizList||[])].sort((a,b)=>((a.sessiz_gun>=9999?Infinity:a.sessiz_gun)-(b.sessiz_gun>=9999?Infinity:b.sessiz_gun)));
     h+=band('red',sTitle,
-      sessizList.slice(0,5).map(s=>{
+      sessizTop.slice(0,8).map(s=>{
         const gunTxt=s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz';
         return `<div class="arow" onclick="openDet('${s.hayvan_id}')"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${gunTxt} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
