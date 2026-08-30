@@ -2075,7 +2075,8 @@ function openIslemDetay(idx){
   const l=(globalThis._detGecmisLogs||[])[idx];
   if(!l) return;
   // ref_tablo varsa doğrudan ilgili detay modalını aç
-  if(l.ref_tablo==='tohumlama' && l.ref_id){ openTohDet(l.ref_id); return; }
+  // ABORT_KAYDI hariç: abort kaydının Geri Al butonu bu panelde — toh det'e yönlendirme
+  if(l.ref_tablo==='tohumlama' && l.ref_id && l.tip!=='ABORT_KAYDI'){ openTohDet(l.ref_id); return; }
   // TOHUMLAMA tipinde snapshot id varsa direkt aç
   const snapId=l.snapshot?.id;
   if(l.tip==='TOHUMLAMA' && snapId){ openTohDet(snapId); return; }

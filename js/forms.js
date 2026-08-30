@@ -1254,7 +1254,9 @@ async function tohSonuc(sonuc, btn) {
     }
     await renderFromLocal();
   } catch (e) {
-    toast('❌ Sonuç kaydedilemedi: ' + getUserMessage(e), true);
+    // rpc() iş kuralı mesajlarını (data.mesaj / RAISE) zaten Türkçe fırlatır —
+    // generic "tekrar deneyin"e çevirme, spesifik mesajı göster.
+    toast('❌ Sonuç kaydedilemedi: ' + (e?.message || getUserMessage(e)), true);
   }
 }
 
