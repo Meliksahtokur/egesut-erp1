@@ -212,7 +212,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   }
   if((sessizList||[]).length){
     const sTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">❗ Sessiz Hayvanlar (${sessizList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
-    const sessizTop=[...(sessizList||[])].sort((a,b)=>((a.sessiz_gun>=9999?Infinity:a.sessiz_gun)-(b.sessiz_gun>=9999?Infinity:b.sessiz_gun)));
+    const sessizTop=[...(sessizList||[])].sort((a,b)=>{const af=a.sessiz_gun>=9999?1:0,bf=b.sessiz_gun>=9999?1:0;return af-bf||b.sessiz_gun-a.sessiz_gun;});
     h+=band('red',sTitle,
       sessizTop.slice(0,8).map(s=>{
         const gunTxt=s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz';
@@ -6052,10 +6052,11 @@ async function openTohDet(id){
 
   const td2GeriAlBtn=document.getElementById('td2-geri-al-btn');
   if(td2GeriAlBtn){
-    if(abortKayit){
+    if(abortKayit&&isSonToh&&abortKayit.durum!=='geri_alindi'){
       // Abort'u geri al — kaydı silmez; geri_al RPC'si ABORT_KAYDI snapshot'ından
-      // sonuc='Gebe' + tohumlama_durumu'nu restore eder. Abort kaydın son eylemi
-      // olduğu için son-tohumlama şartı aranmaz.
+      // sonuc='Gebe' + tohumlama_durumu'nu restore eder.
+      // GUARD (review #6): yalnızca abort hayvanın SON üreme olayıysa — eski bir
+      // abort geri alınırsa sonraki açık cycle üzerinde hayalet gebelik oluşur.
       td2GeriAlBtn.style.display='block';
       td2GeriAlBtn.textContent='↩ Abort İşlemini Geri Al';
       td2GeriAlBtn.onclick=()=>openGeriAl(abortKayit.id,`${hayvanLabel} — abort geri alınacak (kayıt tekrar Gebe olur)`);

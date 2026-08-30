@@ -318,10 +318,12 @@ async function submitInsem(btn) {
       }
     }).catch(console.warn);
   } catch (e) {
+    // REVIEW #12: bayat override flag'i sonraki hayvanın submit'ini sessizce geçmesin
+    globalThis._vwpOverride = false;
     const msg = e?.message || e?.toString() || '';
     // NOT: ABORT_VWP_VIOLATION alt dize olarak VWP_VIOLATION içerir; abort dalı
     // ÖNCE test edilmezse abort hatası doğum-bazlı dala düşer.
-    const abortMatch = msg.match(/ABORT_VWP_VIOLATION:(\d+):(\d+)/);
+    const abortMatch = msg.match(/ABORT_VWP_VIOLATION:(-?\d+):(\d+)/);
     if (abortMatch) {
       const gun = abortMatch[1];
       const limit = abortMatch[2];
@@ -333,7 +335,7 @@ async function submitInsem(btn) {
       }
       return;
     }
-    const vwpMatch = msg.match(/VWP_VIOLATION:(\d+):(\d+)/);
+    const vwpMatch = msg.match(/VWP_VIOLATION:(-?\d+):(\d+)/);
     if (vwpMatch) {
       const gun = vwpMatch[1];
       const limit = vwpMatch[2];
@@ -618,7 +620,7 @@ async function abortKaydet(hayvanId, tohId) {
     await pullTables(['tohumlama','hayvanlar','islem_log']);
     renderSafe();
     openDet(hayvanId);
-  } catch (e) { toast('❌ Abort kaydedilemedi: ' + getUserMessage(e), true); }
+  } catch (e) { toast('❌ Abort kaydedilemedi: ' + (e?.message || getUserMessage(e)), true); }
 }
 
 // ── HAYVAN NOTU EKLE ─────────────────────────
