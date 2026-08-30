@@ -319,6 +319,20 @@ async function submitInsem(btn) {
     }).catch(console.warn);
   } catch (e) {
     const msg = e?.message || e?.toString() || '';
+    // NOT: ABORT_VWP_VIOLATION alt dize olarak VWP_VIOLATION içerir; abort dalı
+    // ÖNCE test edilmezse abort hatası doğum-bazlı dala düşer.
+    const abortMatch = msg.match(/ABORT_VWP_VIOLATION:(\d+):(\d+)/);
+    if (abortMatch) {
+      const gun = abortMatch[1];
+      const limit = abortMatch[2];
+      if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; }
+      const ok = confirm(`❗ Abort sonrası VWP dolmadı: ${gun}/${limit} gün.\n\nBu hayvan abort yaptı — yeterli süre geçmemiş.\nYine de kaydetmek istiyor musunuz?`);
+      if (ok) {
+        globalThis._vwpOverride = true;
+        return submitInsem();
+      }
+      return;
+    }
     const vwpMatch = msg.match(/VWP_VIOLATION:(\d+):(\d+)/);
     if (vwpMatch) {
       const gun = vwpMatch[1];
@@ -583,12 +597,21 @@ async function submitCase(btn) {
 async function abortKaydet(hayvanId, tohId) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!confirm('Bu hayvanda abort / erken doğum mu oldu? Gebelik kaydı kapatılacak.')) return;
+  const bugun = new Date().toISOString().split('T')[0];
+  const tarihGirdi = (prompt('Abort tarihi (YYYY-AA-GG, boş=bugün):', bugun) || '').trim();
+  let abortTarihi = bugun;
+  if (tarihGirdi && !/^\d{4}-\d{2}-\d{2}$/.test(tarihGirdi)) {
+    toast('⚠️ Abort tarihi formatı hatalı (YYYY-AA-GG)', true);
+    return;
+  }
+  if (tarihGirdi) abortTarihi = tarihGirdi;
   const notlar = prompt('Abort detayı (opsiyonel):') || '';
   try {
     // Yeni tohumlama_abort RPC kullan (islem_log kaydı oluşturur)
     const result = await rpc('tohumlama_abort', {
-      p_tohumlama_id: tohId,
-      p_notlar:       notlar || null,
+      p_tohumlama_id:  tohId,
+      p_notlar:        notlar || null,
+      p_abort_tarihi:  abortTarihi,
     });
     if (result?.ok === false) { toast('❌ ' + (result.error || result.mesaj), true); return; }
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
