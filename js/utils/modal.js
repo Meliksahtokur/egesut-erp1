@@ -12,10 +12,10 @@ function openM(id) {
   history.pushState({modal:id}, '', '');
   // Hayvan modalında doğum tarihi otomatik dolmasın — yaş hesabı bozuluyor
   if (id !== 'm-animal') {
-    el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = new Date().toISOString().split('T')[0]; });
+    el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = bugun(); });
   }
   if (id === 'm-animal') {
-    const today = new Date().toISOString().split('T')[0];
+    const today = bugun();
     const dtInput = g('a-dt');
     if (dtInput) dtInput.max = today;
     loadIrkDropdown();

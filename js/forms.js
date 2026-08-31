@@ -152,7 +152,7 @@ async function submitBirth(btn) {
   const baba   = v('b-baba') || v('b-baba-text') || null;
   if (!anneId) { toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir', true); return; }
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
-  if (tarih > new Date().toISOString().split('T')[0]) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
+  if (tarih > bugun()) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
 
   const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
@@ -269,7 +269,7 @@ async function submitInsem(btn) {
   const tarih  = v('i-tarih');
   const sperma = v('i-sperma');
   if (!hid || !tarih || !sperma) { toast('Küpe, Tarih ve Sperma zorunlu', true); return; }
-  if (tarih > new Date().toISOString().split('T')[0]) { toast('Tohumlama tarihi ileri tarih olamaz', true); return; }
+  if (tarih > bugun()) { toast('Tohumlama tarihi ileri tarih olamaz', true); return; }
 
   const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
@@ -358,7 +358,7 @@ async function submitTekrarAsim(btn) {
   const tarih  = document.getElementById('tr-tarih').value;
   const sperma = document.getElementById('tr-sperma').value;
   if (!hid || !tarih || !sperma) { toast('Tarih ve Sperma zorunlu', true); return; }
-  if (tarih > new Date().toISOString().split('T')[0]) { toast('Tarih ileri olamaz', true); return; }
+  if (tarih > bugun()) { toast('Tarih ileri olamaz', true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
@@ -386,7 +386,7 @@ async function submitTekrarAsim(btn) {
 function openTekrarAsim(hayvanId, kupeNo) {
   document.getElementById('tr-hid').value = hayvanId;
   document.getElementById('tr-kupe-label').textContent = kupeNo;
-  document.getElementById('tr-tarih').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tr-tarih').value = bugun();
   document.getElementById('tr-sperma').value = '';
   document.getElementById('tr-sperma-select').value = '';
   // Hekim: önce i-hekim'den kopyala, boşsa populateHekimSelects ile doldur
@@ -599,9 +599,9 @@ async function submitCase(btn) {
 async function abortKaydet(hayvanId, tohId) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!confirm('Bu hayvanda abort / erken doğum mu oldu? Gebelik kaydı kapatılacak.')) return;
-  const bugun = new Date().toISOString().split('T')[0];
-  const tarihGirdi = (prompt('Abort tarihi (YYYY-AA-GG, boş=bugün):', bugun) || '').trim();
-  let abortTarihi = bugun;
+  const bugunTr = bugun();
+  const tarihGirdi = (prompt('Abort tarihi (YYYY-AA-GG, boş=bugün):', bugunTr) || '').trim();
+  let abortTarihi = bugunTr;
   if (tarihGirdi && !/^\d{4}-\d{2}-\d{2}$/.test(tarihGirdi)) {
     toast('⚠️ Abort tarihi formatı hatalı (YYYY-AA-GG)', true);
     return;
@@ -716,7 +716,7 @@ function renderBuzagiPicker(filter) {
 }
 function openSuttenKesModal() {
   if (!_sutIcenBuzagilar().length) { toast('Süt içen buzağı yok'); return; }
-  const t = document.getElementById('sk-tarih'); if (t) t.value = new Date().toISOString().split('T')[0];
+  const t = document.getElementById('sk-tarih'); if (t) t.value = bugun();
   const h = document.getElementById('sk-hatalar'); if (h) h.innerHTML = '';
   renderBuzagiPicker('');
   const ara = document.getElementById('sk-ara');
@@ -733,7 +733,7 @@ async function skOnayla(btn) {
 async function submitSuttenKes(hayvanIdList, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!hayvanIdList || !hayvanIdList.length) { toast('Hayvan seçilmedi', true); return; }
-  const tarih = (document.getElementById('sk-tarih')?.value) || new Date().toISOString().split('T')[0];
+  const tarih = (document.getElementById('sk-tarih')?.value) || bugun();
   if (!confirm(`${hayvanIdList.length} buzağı ${tarih} tarihinde sütten kesilecek. Onaylıyor musunuz?`)) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
@@ -913,7 +913,7 @@ async function loadVaccinesDropdown() {
   await pullTables(['vaccination_log','vaccine_diseases','vaccine_protocol_steps']).catch(()=>{});
   await renderVaccinePicker('v-vaccine-picker','v');
   const _d=document.getElementById('v-date');
-  if(_d && !_d.value) _d.value=new Date().toISOString().split('T')[0];
+  if(_d && !_d.value) _d.value=bugun();
   // Ö5: hayvan değişince seçili satır hint'lerini yenile
   const _vh=document.getElementById('v-hid');
   if(_vh && !_vh._refreshBound){ _vh.addEventListener('change', _vRefreshRows); _vh._refreshBound=true; }
@@ -976,7 +976,7 @@ async function submitVaccination(btn) {
   if (!hid) { toast('⚠️ Hayvan seçin', true); return; }
   if (!secili.length) { toast('⚠️ En az bir aşı seçin', true); return; }
   if (!date) { toast('⚠️ Tarih girin', true); return; }
-  if (date > new Date().toISOString().split('T')[0]) { toast('İleri tarih girilemez', true); return; }
+  if (date > bugun()) { toast('İleri tarih girilemez', true); return; }
   const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
@@ -1424,8 +1424,8 @@ async function submitGebelikEkle(btn) {
   if (!hayvanId) { toast('Hayvan seçilmedi', true); return; }
   const tarih = g('geb-tarih')?.value;
   if (!tarih) { toast('Tarih zorunlu', true); return; }
-  const bugun = new Date().toISOString().split('T')[0];
-  if (tarih > bugun) { toast('İleri tarih girilemez', true); return; }
+  const bugunTr = bugun();
+  if (tarih > bugunTr) { toast('İleri tarih girilemez', true); return; }
   const sperma = (g('geb-sperma')?.value||'').trim();
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
@@ -1450,7 +1450,7 @@ async function bildirimGoruldu(bildirimId) {
 async function bildirimKontrol() {
   try {
     const tasks = await getData('gorev_log', t => !t.tamamlandi);
-    const today = new Date().toISOString().split('T')[0];
+    const today = bugun();
     const geciken = tasks.filter(t => t.hedef_tarih < today);
     if (!geciken.length) return;
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -1593,7 +1593,7 @@ async function loadBulkVaccineVaccines() {
   await pullTables(['vaccine_diseases','vaccine_protocol_steps']).catch(()=>{});
   await renderVaccinePicker('bv-vaccine-picker','bv');
   const dateEl = document.getElementById('bv-tarih');
-  if (dateEl && !dateEl.value) dateEl.value = new Date().toISOString().split('T')[0];
+  if (dateEl && !dateEl.value) dateEl.value = bugun();
   const r=document.getElementById('bv-result'); if(r) r.innerHTML=''; // Ö8: eski sonucu temizle
 }
 

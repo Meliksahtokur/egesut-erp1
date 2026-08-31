@@ -5,8 +5,16 @@ function g(id)   { return document.getElementById(id); }
 function v(id)   { return g(id)?.value || ''; }
 function cl(id)  { const el = g(id); if (el) el.value = ''; }
 
-function dAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
-function dFwd(base, n) { const d = base ? new Date(base) : new Date(); d.setDate(d.getDate() + n); return d.toISOString().split('T')[0]; }
+// Yerel Y-M-D biçimlendirici. toISOString() UTC'dir — yerel 00:00-02:59 arasında
+// bir gün ÖNCEKİ tarihi basar (B4: gece doğumları yanlış güne kaydırıyordu).
+// "Bugün" gereken HER yerde bugun() kullan; toISOString().split('T') ile bugün üretme.
+function _ymd(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), g = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${g}`;
+}
+function bugun() { return _ymd(new Date()); }
+function dAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return _ymd(d); }
+function dFwd(base, n) { const d = base ? new Date(base + 'T00:00:00') : new Date(); d.setDate(d.getDate() + n); return _ymd(d); }
 function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso; }
 function fmtTarihSaat(iso) { if (!iso) return '—'; try { const d = new Date(iso); return d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch(e) { return fmtTarih(iso); } }
 function getDisplayKupe(h, fallback) { if (!h) return fallback || '—'; return h.kupe_no || h.devlet_kupe || h.id || fallback || '—'; }
@@ -105,5 +113,5 @@ function throttle(fn, limit = 1000) {
 
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe });
+  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe });
 }

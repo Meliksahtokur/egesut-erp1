@@ -587,7 +587,7 @@ window.addEventListener('load', withErrorHandling(async () => {
   history.pushState({pg:'dash'}, '', '#dash');
   try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
 
-  const t = new Date().toISOString().split('T')[0];
+  const t = bugun();
   ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { const el = g(id); if (el) el.value = t; });
 
   await loadHekimler();  // DB'den + fallback

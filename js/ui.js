@@ -238,7 +238,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
 async function loadDash(){
   const el=document.getElementById('dash-body');
   try {
-    const today=new Date().toISOString().split('T')[0];
+    const today=bugun();
     const [animals,diseases,tasks,stock,births60,gebeTohs,vaxLogs,vaccines,allKizginlik,allTohum]=await Promise.all([
       getData('hayvanlar',a=>a.durum==='Aktif'),
       getData('cases',c=>c.status==='active'),
@@ -258,8 +258,8 @@ async function loadDash(){
     const _isTop=t=>!t.parent_id||!_activePids.has(t.parent_id);
     const late=tasks.filter(t=>t.hedef_tarih<today&&_isTop(t));
     const todayT=tasks.filter(t=>t.hedef_tarih===today&&_isTop(t));
-    const d7str=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
-    const d1str=new Date(Date.now()+86400000).toISOString().split('T')[0];
+    const d7str=dFwd(null,7);
+    const d1str=dFwd(null,1);
     const yakAsi=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE_ASI'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
     const yakTakviye=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d1str);
     const badge=late.length;
@@ -494,7 +494,7 @@ async function loadTasks(f,btn,opts){
   // Sadece cold load'da spinner göster — refresh'te eski liste yerinde kalsın (blink fix)
   if(!el.querySelector('.task-card')) el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
-    const today=new Date().toISOString().split('T')[0];
+    const today=bugun();
     // skipPull: çağıran zaten pullTables yaptıysa içerideki tekrar pull'u atla (çift network fix)
     if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
     const all=await idbGetAll('gorev_log');
@@ -531,9 +531,9 @@ async function loadTasks(f,btn,opts){
     // parent_id olan ama parent'ı tamamlanmış görevler top-level sayılır
     const _doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
     let data=all.filter(t=>!t.tamamlandi&&!t.iptal&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||_doneIds.has(t.parent_id)));
-    const _d7=new Date(Date.now()+7*86400000).toISOString().split('T')[0];
-    const _d1=new Date(Date.now()+1*86400000).toISOString().split('T')[0];
-    const _d30=new Date(Date.now()+30*86400000).toISOString().split('T')[0];
+    const _d7=dFwd(null,7);
+    const _d1=dFwd(null,1);
+    const _d30=dFwd(null,30);
     if(f==='today') data=data.filter(t=>t.hedef_tarih===today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     else if(f==='all'){
@@ -765,7 +765,7 @@ function _confirmOk(){
 }
 async function updateTaskBadge(){
   try{
-    const today=new Date().toISOString().split('T')[0];
+    const today=bugun();
     const all=await idbGetAll('gorev_log');
     const doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
     const tasks=all.filter(t=>!t.tamamlandi&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||doneIds.has(t.parent_id)));
@@ -2053,7 +2053,7 @@ async function openDet(id, keepTab){
     const _yasGunBase=yasRaw<0||yasRaw>36500?'Geçersiz tarih':yasHesapla(a.dogum_tarihi);
     const yasGun=yasRaw===null?'—':_yasGunBase;
     const aktifHst=diseases.filter(c=>c.status==='active').length;
-    const today=new Date().toISOString().split('T')[0];
+    const today=bugun();
     const displayId=a.devlet_kupe||a.kupe_no||a.id;
     document.getElementById('det-name').textContent=displayId;
     document.getElementById('det-meta').textContent=`${a.irk||'—'} · ${a.padok||'?'}`;
@@ -2273,7 +2273,7 @@ function openCikisModal(hayvanId,kupe){
   const b=Math.floor(Math.random()*9)+1;
   document.getElementById('cx-hid').value=hayvanId;
   document.getElementById('cx-title').textContent='🚪 '+kupe+' — Çıkış';
-  document.getElementById('cx-tarih').value=new Date().toISOString().split('T')[0];
+  document.getElementById('cx-tarih').value=bugun();
   document.getElementById('cx-math-label').textContent=`${a} + ${b}`;
   document.getElementById('cx-math-ans').value='';
   document.getElementById('cx-math-ok').value=String(a+b);
@@ -2327,7 +2327,7 @@ async function gebeledenSec(){
     const dogumTahmini=new Date(toh.getTime()+280*86400000);
     const kalanGun=Math.floor((dogumTahmini-today2)/86400000);
     const hayvan=getState('animals').find(a=>a.id===t.hayvan_id||a.kupe_no===t.hayvan_id);
-    return {toh:t,hayvan,kalanGun,dogumTahmini:dogumTahmini.toISOString().split('T')[0]};
+    return {toh:t,hayvan,kalanGun,dogumTahmini:_ymd(dogumTahmini)};
   }).filter(g=>g.hayvan);
   const gebeList=[...listFromToh];
   gebeList.sort((a,b)=>a.kalanGun-b.kalanGun);
@@ -2446,7 +2446,7 @@ function dogumYaptiAc(hayvanId,kupe,tohTarih,sperma){
   const dogumTahmini=dFwd(tohTarih,280);
   anneSeç(hayvanId,kupe,dogumTahmini,sperma);
   const tarihEl=document.getElementById('b-tarih');
-  if(tarihEl) tarihEl.value=new Date().toISOString().split('T')[0];
+  if(tarihEl) tarihEl.value=bugun();
   openM('m-birth');
 }
 
@@ -4573,7 +4573,7 @@ async function openTaskDet(id){
   // butonuna ULAŞILAMIYORDU ve görevin tek çıkışı gerçekten tohumlamaktı.
   // Artık modal normal açılıyor; tamamla butonu aşağıda forma yönlendiriliyor.
   _curTaskDet=t;
-  const today=new Date().toISOString().split('T')[0];
+  const today=bugun();
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
   const isLate=t.hedef_tarih<today;
   const hayvanLabel=getState('animals').find(a=>a.id===t.hayvan_id);
@@ -4639,7 +4639,7 @@ async function openTaskDet(id){
       }
     }catch(e){ console.warn('vaccine lookup:',e.message); }
     const tarihEl=document.getElementById('td-asi-tarih');
-    const todayStr=new Date().toISOString().split('T')[0];
+    const todayStr=bugun();
     if(tarihEl){tarihEl.value=todayStr;tarihEl.max=todayStr;}
   }
 
@@ -4723,7 +4723,7 @@ async function openTaskDet(id){
         const pd=new Date(parent.tamamlanma_tarihi);
         const minD=new Date(pd); minD.setDate(minD.getDate()+14);
         const maxD=new Date(pd); maxD.setDate(maxD.getDate()+21);
-        const fmt=d=>d.toISOString().split('T')[0];
+        const fmt=_ymd;
         const rapelTarihEl=document.getElementById('td-rapel-tarih');
         if(rapelTarihEl){
           rapelTarihEl.min=fmt(minD);
@@ -4910,7 +4910,7 @@ async function asiUygulaVeTamamla(){
   const btn=document.getElementById('td-asi-uygula-btn');
   if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
   try{
-    const tarih=document.getElementById('td-asi-tarih').value||new Date().toISOString().split('T')[0];
+    const tarih=document.getElementById('td-asi-tarih').value||bugun();
     const dozRaw=document.getElementById('td-asi-doz').value;
     const doz=dozRaw?parseFloat(dozRaw):null;
     const res=await rpc('ileri_gebe_asi_tamamla',{
@@ -5303,7 +5303,7 @@ async function renderCaseTimeline(caseId) {
     </div>` : '';
 
   const aktif = _curCase?.status === 'active';
-  const bugun = new Date().toISOString().split('T')[0];
+  const bugun = bugun();
 
   // Seans formu için gün verisini sakla (caseSeansFormAc okur)
   _cdDayData = {};
@@ -5592,7 +5592,7 @@ function caseGunModalRender() {
   const bosluk = (ilkGun + 6) % 7;
   const sonGun = new Date(yil, ay + 1, 0).getDate();
   const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', {month:'long', year:'numeric'});
-  const bugun = new Date().toISOString().split('T')[0];
+  const bugun = bugun();
 
   let kareler = '';
   for (let i = 0; i < bosluk; i++) kareler += '<div></div>';
@@ -5662,7 +5662,7 @@ async function caseGunEkleOnayla() {
 function caseTohumlamaEkleAc() {
   if (!_curCase) return;
   document.getElementById('cd-toh-form')?.remove();
-  const bugun = new Date().toISOString().split('T')[0];
+  const bugun = bugun();
   const div = document.createElement('div');
   div.id = 'cd-toh-form';
   div.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:12px;margin-bottom:10px';
@@ -6513,7 +6513,7 @@ async function openInsemSafe(kupeNo){
   const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvan.id);
   const bekliyor=tohs.find(t=>t.sonuc==='Bekliyor');
   if(bekliyor){
-    const today=new Date().toISOString().split('T')[0];
+    const today=bugun();
     const gun=Math.floor((new Date(today)-new Date(bekliyor.tarih))/86400000);
     if(gun>=0&&gun<=15){ _openInsemIntercept(hayvan,bekliyor); return; }
   }
@@ -6530,7 +6530,7 @@ function openPlanliTohumlama(gorev){
 }
 
 function _openInsemIntercept(hayvan,bekliyor){
-  const today=new Date().toISOString().split('T')[0];
+  const today=bugun();
   const gun=Math.floor((new Date(today)-new Date(bekliyor.tarih))/86400000);
   const hid=hayvan.kupe_no||hayvan.devlet_kupe||hayvan.id;
   const infoEl=document.getElementById('insem-intercept-info');
@@ -6944,7 +6944,7 @@ async function renderHekimStats() {
   ]);
 
   // Period filter
-  const cutoff = _hekimPeriodDays === 'all' ? null : new Date(Date.now() - _hekimPeriodDays * 86400000).toISOString().split('T')[0];
+  const cutoff = _hekimPeriodDays === 'all' ? null : dAgo(_hekimPeriodDays);
   const hToh = tohumlar.filter(t => t.hekim_id === hid && (!cutoff || t.tarih >= cutoff));
   const hDog = dogumlar.filter(d => d.hekim_id === hid && (!cutoff || d.tarih >= cutoff));
 
@@ -7801,9 +7801,9 @@ async function bildirimIzniAl(){
 async function bildirimKontrol(){
   if(!('Notification' in window)||Notification.permission!=='granted') return;
   const now=new Date();
-  const bugun=now.toISOString().split('T')[0];
-  const yarin=dFwd(bugun,1);
-  const gorevler=await getData('gorev_log',g=>!g.tamamlandi&&!g.parent_id&&(g.hedef_tarih===bugun||g.hedef_tarih===yarin));
+  const bugunStr=bugun();
+  const yarin=dFwd(bugunStr,1);
+  const gorevler=await getData('gorev_log',g=>!g.tamamlandi&&!g.parent_id&&(g.hedef_tarih===bugunStr||g.hedef_tarih===yarin));
   // M-26 fix: localStorage bozuk/eski formatta JSON içerebilir — try/catch yoktu, crash riski.
   let gosterilen; try { gosterilen=JSON.parse(localStorage.getItem('bildirim_gosterilen')||'{}'); } catch(_){ gosterilen={}; }
   const simdi=Date.now();
@@ -7906,7 +7906,7 @@ function timeToRatio(timeStr) {
 function computeSeansState(seans, now = new Date()) {
   if (seans.uygulama_tamamlandi_at) return 'done';
   if (seans.uygulanmadi) return 'cancelled';
-  const dateStr = seans.planned_date || new Date().toISOString().split('T')[0];
+  const dateStr = seans.planned_date || bugun();
   const timeStr = fmtSeansSaat(seans.planned_time) || '00:00';
   const planned = new Date(`${dateStr}T${timeStr}:00`);
   if (isNaN(planned.getTime())) return 'scheduled';
@@ -7959,7 +7959,7 @@ function startNowCursorLoop() {
 }
 
 function fmtBeklemeSure(s) {
-  const dateStr = s.planned_date || new Date().toISOString().split('T')[0];
+  const dateStr = s.planned_date || bugun();
   const planned = new Date(`${dateStr}T${fmtSeansSaat(s.planned_time) || '00:00'}:00`);
   if (isNaN(planned.getTime())) return '—';
   const diffMin = Math.round((planned.getTime() - Date.now()) / 60000);
@@ -8028,7 +8028,7 @@ async function renderTedaviGunSeanslar(treatmentDayId) {
   const isLocked = day?.tamamlandi === true;
   sessions.forEach(s => { s.drug_name = prodMap[s.drug_product_id] || stokMap[s.stok_id] || 'İlaç'; s.planned_date = s.planned_date || day?.treatment_date; });
   sessions.sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
-  const bugun = new Date().toISOString().split('T')[0];
+  const bugun = bugun();
   ribbonEl.innerHTML = renderSeansSerit(sessions, { today: sessions.some(s => s.planned_date === bugun) });
   sessionsEl.innerHTML = sessions.map(s => renderSeansRow(s, { readOnly: isLocked })).join('');
   wrap.style.display = 'block';
