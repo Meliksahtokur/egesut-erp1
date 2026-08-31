@@ -160,38 +160,31 @@ test('withErrorHandling: debugMode kapalıyken showDebug dalı çalışmaz (pane
   assert.strictEqual(mod.toastCalls.length, 1, 'toast yine atılmalı');
 });
 
-test('withErrorHandling: debugMode açık + panel + esc stub → panele debug girdisi eklenir', async () => {
+test('withErrorHandling: debugMode açık + panel → panele debug girdisi eklenir (modül kendi escape’i)', async () => {
+  // WP-9 fix: showDebug artık global esc stub'ına değil kendi _dbgEsc'ine
+  // güveniyor — ham <>& kaçırılır
   const panel = makeElement('div');
-  const escCalls = [];
   const mod = yukle(
-    {
-      g: (id) => (id === 'debugPanel' ? panel : null),
-      esc: (s) => { escCalls.push(s); return `[${s}]`; },
-    },
+    { g: (id) => (id === 'debugPanel' ? panel : null) },
     makeStorage({ debug: 'true' })
   );
-  const res = await mod.sandbox.withErrorHandling(() => { throw new Error('boom-hata'); }, 'testCtx')();
+  const res = await mod.sandbox.withErrorHandling(() => { throw new Error('<boom> & "x"'); }, 'testCtx')();
   assert.strictEqual(res, null);
   assert.strictEqual(panel.children.length, 1, 'panele 1 girdi eklenmeli');
   assert.strictEqual(panel.children[0].className, 'debug-entry');
-  assert.match(panel.children[0].innerHTML, /\[testCtx\]/);
-  assert.match(panel.children[0].innerHTML, /boom-hata/);
-  assert.deepStrictEqual(escCalls, ['boom-hata']);
+  assert.match(panel.children[0].innerHTML, /testCtx/);
+  assert.match(panel.children[0].innerHTML, /&lt;boom&gt;/);
+  assert.ok(!/<boom>/.test(panel.children[0].innerHTML), 'ham HTML girmemeli');
 });
 
-test('withErrorHandling: debugMode açık + panel VAR ama esc tanımsız → ReferenceError ile REJECT olur', async () => {
-  // ŞÜPHELİ DAVRANIŞ: showDebug içindeki esc() bu modülde tanımlı değil (bare global,
-  // başka scriptten yüklenmesi bekleniyor). esc yoksa ve debug paneli DOM'da varsa
-  // catch bloğu içinde ReferenceError fırlar — "hata yakalanır, null döner" sözleşmesi
-  // de bozulur: promise null yerine reject olur. Mevcut davranış oldugu gibi test edildi.
+test('withErrorHandling: esc tanımsız ortamda bile REJECT olmaz (WP-9 — self-contained)', async () => {
+  // DÜZELTİLDİ: eskiden showDebug bare global esc'e takılıp ReferenceError ile
+  // reject ediyordu ("hata yakalanır, null döner" sözleşmesi bozuluyordu).
   const panel = makeElement('div');
   const mod = yukle({ g: () => panel }, makeStorage({ debug: 'true' })); // esc bilinçli verilmiyor
-  const p = mod.sandbox.withErrorHandling(() => { throw new Error('x'); }, 'c')();
-  // vm gerçekminden geldiği için host ReferenceError prototype'inden farklı —
-  // isim + mesaj üzerinden doğrula (cross-realm farkı testi kırmasın):
-  await assert.rejects(p, (err) =>
-    err.name === 'ReferenceError' && /esc is not defined/.test(err.message));
-  // toast, showDebug çağrısından ÖNCE çalıştığı için yine atıldı:
+  const res = await mod.sandbox.withErrorHandling(() => { throw new Error('x'); }, 'c')();
+  assert.strictEqual(res, null);
+  assert.strictEqual(panel.children.length, 1);
   assert.strictEqual(mod.toastCalls.length, 1);
 });
 

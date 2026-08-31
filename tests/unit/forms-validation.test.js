@@ -214,13 +214,24 @@ describe('_kupeKontrolEt (küpe çakışma blur kontrolü)', () => {
     assert.strictEqual('p_hayvan_id' in ctx.calls.db[0].params, false);
   });
 
-  it('db.rpc hata fırlatırsa catch yutar → promise reject olmaz, uyarı temizlenir', async () => {
+  it('db.rpc hata fırlatırsa → reject olmaz, ÖNCEKİ uyarı korunur (fail-aware, WP-9)', async () => {
+    // DÜZELTİLDİ: eskiden catch uyarıyı temizleyip sessizce 'müsait' sayıyordu
+    // (fail-open). Artık önceki gerçek uyarı korunur.
     const ctx = kupeSetup({
       db: { rpc: async () => { throw new Error('db erişilemez'); } },
     });
     ctx.warn.textContent = '⚠️ Bu küpe zaten kayıtlı';
     await assert.doesNotReject(() => ctx.sandbox._kupeKontrolEt(ctx.alan));
-    assert.strictEqual(ctx.warn.textContent, '');
+    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu küpe zaten kayıtlı');
+  });
+
+  it('db.rpc hatası + uyarı boşsa → soft not düşer, dataset.soft=1 (submit engellemez)', async () => {
+    const ctx = kupeSetup({
+      db: { rpc: async () => { throw new Error('db erişilemez'); } },
+    });
+    await assert.doesNotReject(() => ctx.sandbox._kupeKontrolEt(ctx.alan));
+    assert.match(ctx.warn.textContent, /Küpe kontrolü yapılamadı/);
+    assert.strictEqual(ctx.warn.dataset.soft, '1');
   });
 
   it('res.data null (db hata nesnesi) → uyarı temizlenir — hata "müsait" sayılır', async () => {
