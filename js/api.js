@@ -73,7 +73,12 @@ async function rpc(name, params = {}) {
     throw new Error('İnternet bağlantısı gerekli');
   }
   if (error) throw new Error(_trErr(error.message));
-  if (data && data.ok === false) throw new Error(data.mesaj || 'İşlem başarısız');
+  // ok:false gövdesini (oneri, detay vb.) hataya taşır — çağıranlar e.data ile okur
+  if (data && data.ok === false) {
+    const err = new Error(data.mesaj || 'İşlem başarısız');
+    err.data = data;
+    throw err;
+  }
   return data;
 }
 

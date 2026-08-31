@@ -149,6 +149,7 @@ async function submitBirth(btn) {
   const cins   = v('b-cins');
   const tip    = v('b-tip');
   const kg     = Number.parseFloat(g('b-dogum-kg')?.value || '') || null;
+  if (kg !== null && kg < 0) { toast('⚠️ Doğum ağırlığı negatif olamaz', true); return; }
   const baba   = v('b-baba') || v('b-baba-text') || null;
   if (!anneId) { toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir', true); return; }
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
@@ -331,7 +332,9 @@ async function submitInsem(btn) {
       const ok = confirm(`❗ Abort sonrası VWP dolmadı: ${gun}/${limit} gün.\n\nBu hayvan abort yaptı — yeterli süre geçmemiş.\nYine de kaydetmek istiyor musunuz?`);
       if (ok) {
         globalThis._vwpOverride = true;
-        return submitInsem();
+        // btn'i aktar — argümansız çağrı tüm if(btn) guard'larını atlıyordu:
+        // override RPC'si uçarken buton aktif kalıyor, çift tık = çift kayıt (B13)
+        return submitInsem(btn);
       }
       return;
     }
@@ -343,7 +346,7 @@ async function submitInsem(btn) {
       const ok = confirm(`❗ VWP dolmadı: ${gun}/${limit} gün.\n\nDoğumdan sonra yeterli süre geçmemiş.\nYine de kaydetmek istiyor musunuz?`);
       if (ok) {
         globalThis._vwpOverride = true;
-        return submitInsem();
+        return submitInsem(btn);
       }
       return;
     }
@@ -408,6 +411,7 @@ async function submitKizginlik(btn) {
   const hid   = v('k-hid');
   const tarih = v('k-tarih');
   if (!hid || !tarih) { toast('Küpe ve Tarih zorunlu', true); return; }
+  if (tarih > bugun()) { toast('Kızgınlık tarihi ileri tarih olamaz', true); return; }
 
   const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
@@ -421,12 +425,7 @@ async function submitKizginlik(btn) {
       p_notlar:    v('k-notlar') || null,
     });
 
-    // Hayvan 12 aydan küçükse backend red döner ama öneri verir
-    if (result && result.oneri) {
-      toast(`⚠️ ${result.mesaj} — ${result.oneri}`, true);
-      return;
-    }
-
+    // 12 aydan küçük red dönerse rpc() fırlatır; öneri gövdesi e.data'da taşınır
     toast('✅ Kızgınlık kaydedildi');
     closeM('m-kizginlik');
     ['k-hid','k-notlar'].forEach(cl);
@@ -434,10 +433,13 @@ async function submitKizginlik(btn) {
       renderSafe();
       if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
     }).catch(console.warn);
-  } catch (e) { toast(getUserMessage(e), true); }
+  } catch (e) {
+    // Backend'in öneri içeren redleri (ör. 12 aydan küçük kızgınlık) öneriyle göster
+    if (e?.data?.oneri) { toast(`⚠️ ${e.message} — ${e.data.oneri}`, true); return; }
+    toast(getUserMessage(e), true);
+  }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Kaydet'; } }
 }
-
 
 // ── VAKA AÇ (CLN-02) ────────────────────────
 // diseases dropdown'u DB'den doldur
@@ -599,14 +601,26 @@ async function submitCase(btn) {
 async function abortKaydet(hayvanId, tohId) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!confirm('Bu hayvanda abort / erken doğum mu oldu? Gebelik kaydı kapatılacak.')) return;
+  // B14: Cancel (null) ile boş-OK ayrıtılır — Cancel akışı tamamen iptal eder.
+  // Eskiden Cancel yine de bugün tarihiyle abort kaydediyordu.
   const bugunTr = bugun();
-  const tarihGirdi = (prompt('Abort tarihi (YYYY-AA-GG, boş=bugün):', bugunTr) || '').trim();
+  const rawTarih = prompt('Abort tarihi (YYYY-AA-GG, boş=bugün):', bugunTr);
+  if (rawTarih === null) return;
+  const tarihGirdi = rawTarih.trim();
   let abortTarihi = bugunTr;
   if (tarihGirdi && !/^\d{4}-\d{2}-\d{2}$/.test(tarihGirdi)) {
     toast('⚠️ Abort tarihi formatı hatalı (YYYY-AA-GG)', true);
     return;
   }
   if (tarihGirdi) abortTarihi = tarihGirdi;
+  // B14: ileri tarih ve tohumlamadan önce tarih reddi — bozuk VWP/sessiz ankrajı
+  // önler (2027 yazımı "-354 gün" gibi anlamsız uyarılar üretiyordu)
+  if (abortTarihi > bugunTr) { toast('⚠️ Abort tarihi ileri tarih olamaz', true); return; }
+  const tohKayit = (await getData('tohumlama', t => t.id === tohId))[0];
+  if (tohKayit?.tarih && abortTarihi < tohKayit.tarih) {
+    toast(`⚠️ Abort tarihi tohumlama tarihinden önce olamaz (${fmtTarih(tohKayit.tarih)})`, true);
+    return;
+  }
   const notlar = prompt('Abort detayı (opsiyonel):') || '';
   try {
     // Yeni tohumlama_abort RPC kullan (islem_log kaydı oluşturur)
@@ -658,6 +672,7 @@ async function submitCikis(btn) {
   const tarih     = g('cx-tarih').value;
   const sebep     = g('cx-sebep').value.trim();
   const fiyat     = Number.parseFloat(g('cx-fiyat').value) || null;
+  if (fiyat !== null && fiyat < 0) { toast('⚠️ Satış fiyatı negatif olamaz', true); return; }
   // M-11 fix: cikis_yap RPC artık 4 ayrı tip kabul ediyor (eskiden Kesildi/Öldü/Kayıp
   // hepsi 'olum'a sıkıştırılıyordu, rapor/audit'te ayrım kayboluyordu).
   const RPC_TIP_MAP = { 'Satıldı': 'satis', 'Kesildi': 'kesim', 'Öldü': 'olum', 'Kayıp': 'kayip' };
@@ -746,7 +761,11 @@ async function submitSuttenKes(hayvanIdList, btn) {
       const hd = document.getElementById('sk-hatalar');
       if (hd) hd.innerHTML = res.hatalar.map(h => `<div style="color:var(--err);font-size:.72rem">• ${esc(h.hata)}</div>`).join('');
     } else {
-      toast(res.hata || 'Bilinmeyen hata', true);
+      // RPC hata durumunda 'hata' değil 'hatalar' dizisi döner (B33)
+      const hMsj = (res.hatalar && res.hatalar.length)
+        ? res.hatalar.map(h => h.hata || h).join('; ')
+        : (res.mesaj || res.hata || 'Bilinmeyen hata');
+      toast(hMsj, true);
     }
     pullTables(['hayvanlar','gorev_log','protokol_instance']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(getUserMessage(e), true); }
@@ -1041,9 +1060,13 @@ async function submitTaskAdd(btn) {
   if (btn) { btn.disabled = true; btn.textContent = 'Oluşturuluyor…'; }
   try {
     const hid    = v('ta-hid').trim();
-    const hayvan = hid ? (getState('animals').find(a => a.kupe_no === hid || a.id === hid)) : null;
+    // B15: devlet_kupe de denenir; serbest metin hayvana bağlanamıyorsa görev
+    // yaratılmaz — eskiden yazılan string gorev_log.hayvan_id'ye giriyor, gece
+    // cron'u (gorev_orphan_temizle) görevi sessizce siliyordu
+    const hayvan = hid ? (getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid)) : null;
+    if (hid && !hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil — hayvan alanını boş bırakırsanız genel görev oluşur`, true); return; }
     await write('gorev_log', {
-      id: crypto.randomUUID(), hayvan_id: hayvan?.id || hid || null,
+      id: crypto.randomUUID(), hayvan_id: hayvan?.id || null,
       gorev_tipi: v('ta-tip'), aciklama: desc, hedef_tarih: tarih,
       tamamlandi: false, kaynak: 'MANUEL'
     });
@@ -1383,8 +1406,15 @@ async function submitStokAdd(btn) {
       if (!navigator.onLine) { toast('İlaç eklemek için internet gerekli (katalog kaydı)', true); return; }
       const etkenId = g('sa-etken')?.value || null;
       if (!etkenId) { toast('Etken madde zorunlu — ilaç kataloglanmadan eklenemez', true); return; }
-      const konst = g('sa-konst')?.value?.trim() || null;
+      // "100mg/ml" gibi tek alandan değer+birim ayrıştırılır — eskiden değerin
+      // kendisi p_concentration_unit'a gidiyordu (B29: birim alanına çöp veri)
       const route = g('sa-route')?.value || 'IM';
+      const konstRaw = g('sa-konst')?.value?.trim() || null;
+      let konstVal = null, konstUnit = null;
+      if (konstRaw) {
+        const km = konstRaw.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Zµμ][a-zA-Zµμ\/]*)?$/);
+        if (km) { konstVal = parseFloat(km[1].replace(',', '.')); konstUnit = km[2] || null; }
+      }
       const r = await rpc('ilac_ekle', {
         p_urun_adi:           urun,
         p_kategori:           kat,
@@ -1392,8 +1422,8 @@ async function submitStokAdd(btn) {
         p_baslangic_miktar:   bslg,
         p_esik:               esik,
         p_drug_class_id:      etkenId,
-        p_concentration:      konst ? Number.parseFloat(konst) : null,
-        p_concentration_unit: konst || null,
+        p_concentration:      konstVal,
+        p_concentration_unit: konstUnit,
         p_default_route:      route
       });
       if (r && r.ok === false) throw new Error(r.mesaj || 'İlaç eklenemedi');
@@ -1702,7 +1732,8 @@ async function submitBulkIlac() {
   const ilacId = document.getElementById('bi-ilac-sel')?.value;
   if (!ilacId) { toast('İlaç seçin'); return; }
   const miktar = parseFloat(document.getElementById('bi-miktar')?.value);
-  if (!miktar) { toast('Miktar girin'); return; }
+  if (!miktar || isNaN(miktar)) { toast('Miktar girin'); return; }
+  if (miktar <= 0) { toast('Miktar sıfırdan büyük olmalı'); return; }
   const notes = document.getElementById('bi-notes')?.value || null;
 
   try {

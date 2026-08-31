@@ -24,6 +24,10 @@ function openM(id) {
   if (id === 'm-insem') {
     clearTimeout(globalThis._insemKupeTid);
     cl('i-hid');
+    // B12: önceki oturumdan taşan ek uygulama listesi yeni hayvana yazılmasın
+    _ekUygulamalar = [];
+    _ekSeciliTur = null;
+    if (typeof _ekListeGoster === 'function') _ekListeGoster();
     const acIhid = g('ac-ihid'); if (acIhid) acIhid.style.display = 'none';
     db.from('tohumlanabilir_hayvanlar').select('*').then(({data}) => {
       globalThis._TH = data || [];
@@ -64,7 +68,15 @@ function closeM(id) {
   // Planlı tohumlama bayrağını HER kapanış yolunda bırak (overlay, X, ESC, geri tuşu).
   // Aksi halde bayrak takılı kalır ve bir sonraki NORMAL tohumlama, kapanmış bir
   // planlı göreve yazılmaya çalışılır.
-  if (id === 'm-insem') globalThis._planliTohumlamaGorevId = null;
+  if (id === 'm-insem') {
+    globalThis._planliTohumlamaGorevId = null;
+    // B12: ek uygulamalar yalnızca başarılı submit'te sıfırlandı — terk edilen
+    // modal (X/backdrop/geri tuşu) listeyi taşıyordu ve sonraki HAYVANIN
+    // tohumlamasına p_ek_uygulamalar olarak stok düşümüyle yazılıyordu
+    _ekUygulamalar = [];
+    _ekSeciliTur = null;
+    if (typeof _ekListeGoster === 'function') _ekListeGoster();
+  }
   // Hayvan formunu tam sıfırla — bir sonraki açılışta temiz başlasın
   if (id === 'm-animal') {
     ['a-devlet','a-kupe','a-irk-txt','a-dt','a-dkg','a-agirlik','a-boy','a-renk','a-ozellik'].forEach(cl);
