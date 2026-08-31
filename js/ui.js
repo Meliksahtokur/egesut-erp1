@@ -6716,8 +6716,10 @@ async function dataTrafficTekGonder(qid){
   try {
     const rpcInfo = RPC_MAP[op.table];
     if(!rpcInfo) throw new Error(`Tablo "${op.table}" için RPC tanımlı değil`);
-    
-    const rpcName = op.method === 'POST' ? rpcInfo.POST : rpcInfo.PATCH;
+
+    // B25: yalnız POST/PATCH okunuyordu — RPC_MAP'te tanımlı DELETE dalı
+    // (kizginlik_sil) hiç seçilemiyordu, "RPC tanımlı değil" yanılgısı üretiyordu
+    const rpcName = rpcInfo[op.method];
     if(!rpcName) throw new Error(`${op.method} için RPC tanımlı değil`);
     
     // M-15 fix: eskiden boş string alanları da tamamen siliyordu (NOT NULL RPC
@@ -6729,8 +6731,9 @@ async function dataTrafficTekGonder(qid){
       ? op.data.map(item => Object.fromEntries(Object.entries(item).filter(([k,v]) => v !== undefined)))
       : Object.fromEntries(Object.entries(op.data[0]).filter(([k,v]) => v !== undefined));
     
-    // RPC parametrelerini hazırla
-    const rpcParams = buildRpcParams(rpcName, clean, op);
+    // RPC parametrelerini hazırla — B6: POST'ta clean DİZİ, PATCH'te obje;
+    // dizi buildRpcParams'e data.x okutunca tüm alanlar undefined oluyordu
+    const rpcParams = buildRpcParams(rpcName, Array.isArray(clean) ? clean[0] : clean, op);
     
     // RPC çağrısı — REST bypass yerine backend validasyon + trigger'lar çalışır
     await rpc(rpcName, rpcParams);
@@ -6750,32 +6753,73 @@ async function dataTrafficTekGonder(qid){
   updateSyncBar();
 }
 
-// RPC parametre builder — her RPC için doğru parametre yapısını oluştur
+// RPC parametre builder — her RPC için doğru parametre yapısını oluştur.
+// İmzalar 2026-08-31 canlı pg_get_functiondef ile doğrulandı (B6):
+// yanlış adlı anahtarları supabase-js sessizce yutar → Postgres DEFAULT/NULL.
 function buildRpcParams(rpcName, data, op) {
   switch(rpcName) {
     case 'hayvan_ekle':
+      // canlı: (p_kupe_no, p_devlet_kupe, p_irk, p_cinsiyet, p_dogum_tarihi,
+      // p_grup, p_padok, p_dogum_kg, p_anne_id, p_baba_bilgi, p_canli_agirlik,
+      // p_boy, p_renk, p_ayirci_ozellik[, p_padok_id])
+      // eski kod p_grup_id/p_irk_id gönderiyordu — ikisi de yok
       return {
-        p_kupe_no: data.kupe_no,
-        p_grup_id: data.grup_id,
-        p_dogum_tarihi: data.dogum_tarihi,
-        p_cinsiyet: data.cinsiyet,
-        p_irk_id: data.irk_id
+        p_kupe_no: data.kupe_no ?? null,
+        p_devlet_kupe: data.devlet_kupe ?? null,
+        p_irk: data.irk ?? null,
+        p_cinsiyet: data.cinsiyet ?? null,
+        p_dogum_tarihi: data.dogum_tarihi ?? null,
+        p_grup: data.grup ?? null,
+        p_padok: data.padok ?? null,
+        p_dogum_kg: data.dogum_kg ?? null,
+        p_anne_id: data.anne_id ?? null,
+        p_baba_bilgi: data.baba_bilgi ?? null,
+        p_canli_agirlik: data.canli_agirlik ?? null,
+        p_boy: data.boy ?? null,
+        p_renk: data.renk ?? null,
+        p_ayirici_ozellik: data.ayirici_ozellik ?? null,
+        ...(data.padok_id ? { p_padok_id: data.padok_id } : {})
       };
     case 'hayvan_guncelle': {
-      // PATCH için: hangi alan güncellenecek?
-      const [col, val] = op.filter.split('=eq.');
+      // canlı: tam-satır update — (p_id, p_kupe_no, p_devlet_kupe, p_irk,
+      // p_cinsiyet, p_dogum_tarihi, p_grup, p_padok, p_dogum_kg, p_canli_agirlik,
+      // p_boy, p_renk, p_ayirici_ozellik[, p_baba_bilgi, p_notlar, p_anne_id,
+      // p_padok_id][, p_kisir]). Eski kod p_alan/p_deger gönderiyordu — yok;
+      // COALESCE no-op + 'ok' ile kuyruktaki düzenleme başarı sansıyordu.
+      const idMatch = (op.filter || '').match(/id=eq\.([^&]+)/);
       return {
-        p_id: data[col] || val,
-        p_alan: Object.keys(data)[0],
-        p_deger: Object.values(data)[0]
+        p_id: idMatch ? idMatch[1] : (data.id ?? null),
+        p_kupe_no: data.kupe_no ?? null,
+        p_devlet_kupe: data.devlet_kupe ?? null,
+        p_irk: data.irk ?? null,
+        p_cinsiyet: data.cinsiyet ?? null,
+        p_dogum_tarihi: data.dogum_tarihi ?? null,
+        p_grup: data.grup ?? null,
+        p_padok: data.padok ?? null,
+        p_dogum_kg: data.dogum_kg ?? null,
+        p_canli_agirlik: data.canli_agirlik ?? null,
+        p_boy: data.boy ?? null,
+        p_renk: data.renk ?? null,
+        p_ayirci_ozellik: data.ayirici_ozellik ?? null,
+        ...(data.baba_bilgi !== undefined ? { p_baba_bilgi: data.baba_bilgi } : {}),
+        ...(data.notlar !== undefined ? { p_notlar: data.notlar } : {}),
+        ...(data.anne_id !== undefined ? { p_anne_id: data.anne_id } : {}),
+        ...(data.padok_id ? { p_padok_id: data.padok_id } : {}),
+        ...(data.kisir !== undefined ? { p_kisir: data.kisir } : {})
       };
     }
     case 'tohumlama_kaydet':
+      // canlı: (p_hayvan_id, p_tarih, p_sperma[, p_hekim_id, p_irk_bilgisi,
+      // p_ek_uygulamalar, p_vwp_override]) — eski kod p_sperma_kodu/p_teknisyen
+      // (yok) gönderiyordu → p_sperma zorunlu eksik → PGRST hatası
       return {
         p_hayvan_id: data.hayvan_id,
         p_tarih: data.tarih,
-        p_sperma_kodu: data.sperma_kodu,
-        p_teknisyen: data.teknisyen
+        p_sperma: data.sperma,
+        p_hekim_id: data.hekim_id ?? null,
+        p_irk_bilgisi: data.irk_bilgisi ?? null,
+        p_ek_uygulamalar: data.ek_uygulamalar ?? [],
+        p_vwp_override: data.vwp_override ?? false
       };
     case 'tohumlama_tekrar_kaydet':
       return {
@@ -6783,13 +6827,20 @@ function buildRpcParams(rpcName, data, op) {
         p_tarih:     data.tarih,
         p_sperma:    data.sperma,
         p_hekim_id:  data.hekim_id || null,
+        p_irk_bilgisi: data.irk_bilgisi || null
       };
     case 'dogum_kaydet':
+      // canlı: (p_anne_id, p_tarih, p_kupe, p_cins, p_tip, p_kg, p_baba,
+      // p_hekim_id) — eski kod p_buzagi_cinsiyet/p_buzagi_kupe (yok) gönderiyordu
       return {
         p_anne_id: data.anne_id,
         p_tarih: data.tarih,
-        p_buzagi_cinsiyet: data.buzagi_cinsiyet,
-        p_buzagi_kupe: data.buzagi_kupe
+        p_kupe: data.kupe ?? data.buzagi_kupe ?? null,
+        p_cins: data.cins ?? data.buzagi_cinsiyet ?? null,
+        p_tip: data.tip ?? null,
+        p_kg: data.kg ?? null,
+        p_baba: data.baba ?? null,
+        p_hekim_id: data.hekim_id ?? null
       };
     case 'stok_hareket_ekle':
       return {
@@ -6810,22 +6861,24 @@ function buildRpcParams(rpcName, data, op) {
         p_kayit_id: data.id || op.filter?.replace('id=eq.', '')
       };
     case 'create_case':
+      // canlı: (p_animal_id, p_disease_id, p_notes) — eski kod p_hayvan_id/
+      // p_tanis/p_tarih (hiçbiri yok) gönderiyordu
       return {
-        p_hayvan_id: data.hayvan_id,
-        p_tanis: data.tanis,
-        p_tarih: data.tarih
+        p_animal_id: data.animal_id ?? data.hayvan_id ?? null,
+        p_disease_id: data.disease_id ?? null,
+        p_notes: data.notes ?? data.tanis ?? null
       };
     case 'add_drug_administration':
-      // M-14 fix: p_stok_id eksikti — offline queue replay'de RPC'ye NULL gidiyordu,
-      // online branch (caseDrugKaydet) zaten p_stok_id gönderiyor (ui.js:5631).
+      // canlı: (p_day_id, p_drug_product_id, p_stok_id, p_dose, p_unit, p_route)
+      // — p_time parametresi YOK (uygulama saati RPC üzerinden aktarılamaz,
+      // M-14: p_stok_id eksikti, eklendi)
       return {
-        p_day_id: data.day_id,
+        p_day_id: data.day_id ?? data.treatment_day_id ?? null,
         p_drug_product_id: data.drug_product_id,
         p_stok_id: data.stok_id ?? null,
         p_dose: data.dose,
         p_unit: data.unit,
-        p_route: data.route,
-        p_time: data.time
+        p_route: data.route
       };
     case 'update_drug_administration':
       return {
@@ -6837,7 +6890,13 @@ function buildRpcParams(rpcName, data, op) {
     case 'gorev_tamamla':
       return { p_gorev_id: data.id, p_padok_hedef: data.padok || null };
     case 'gorev_guncelle':
-      return { p_gorev_id: data.id, p_padok_hedef: data.padok || null };
+      // canlı: (p_id, p_aciklama, p_hedef_tarih, p_gorev_tipi)
+      return {
+        p_id: data.id,
+        p_aciklama: data.aciklama ?? null,
+        p_hedef_tarih: data.hedef_tarih ?? null,
+        p_gorev_tipi: data.gorev_tipi ?? null
+      };
     default:
       // Fallback — doğrudan veriyi geç
       return data;
