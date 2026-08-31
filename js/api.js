@@ -13,7 +13,9 @@
 })();
 const IS_DEMO = localStorage.getItem('EGESUT_DEMO') === '1';
 window.IS_DEMO = IS_DEMO;
-// Gömülü demo kullanıcı (gizli değil — demo herkese açık, çöpe-atılır)
+// Gömülü demo kullanıcı — PUBLIC-BY-DESIGN (kullanıcı kararı 2026-08-31): demo,
+// izole klon bir Supabase projesine bağlanan herkese açık canlı-test/inceleme
+// alanıdır. Prod tablolarına demo yolundan yazılamaz. B1 bulgusu bu kararla kapatıldı.
 const DEMO_LOGIN = { email: 'demo@egesut.web', password: 'demo2026' };
 window.DEMO_LOGIN = DEMO_LOGIN;
 
