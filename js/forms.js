@@ -1477,17 +1477,9 @@ async function bildirimGoruldu(bildirimId) {
   } catch (e) { toast(getUserMessage(e), true); }
 }
 
-async function bildirimKontrol() {
-  try {
-    const tasks = await getData('gorev_log', t => !t.tamamlandi);
-    const today = bugun();
-    const geciken = tasks.filter(t => t.hedef_tarih < today);
-    if (!geciken.length) return;
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const ozet = geciken.length === 1 ? geciken[0].aciklama : `${geciken.length} geciken görev var`;
-    new Notification('🐄 EgeSüt — Görev Hatırlatması', { body: ozet });
-  } catch (e) { console.warn('bildirimKontrol:', e.message); }
-}
+// bildirimKontrol: ui.js'teki M-26 düzeltmeli (dedup + tag + 3-saat-öncesi
+// hatırlatma) sürüm kullanılır — buradaki eskisi (B11) yükleme sırası
+// gereği kazanıp saatlik tekrarlayan bildirim spam'i üretiyordu. Silindi.
 
 async function bildirimIzniAl() {
   if (!('Notification' in window)) { toast('Tarayıcınız bildirimleri desteklemiyor', true); return false; }

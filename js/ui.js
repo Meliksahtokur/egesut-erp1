@@ -140,7 +140,8 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
 
   const total=categorized.length;
   const display=rows.slice(0,5);
-  const more=total-5;
+  // B24: gösterilen 5'ten azken 'more' yanlış (negatif/aşırı) olabiliyordu
+  const more=Math.max(0,total-display.length);
 
   return band(priority,`💉 Yaklaşan Aşılar (${total})`,
     display.map(v=>`<div class="arow" style="display:flex;align-items:center;gap:6px">
@@ -399,9 +400,14 @@ async function asiDismiss(vacLogId, vaxName) {
 
 async function showGebe(){
   goTo('suru');
-  const gebeTohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
-  const gebeIds=new Set(gebeTohs.map(t=>t.hayvan_id));
-  renderAnimals(getState('animals').filter(a=>gebeIds.has(a.id)||gebeIds.has(a.kupe_no)));
+  // B20: doğrudan renderAnimals çağırıp 250ms sonra debounce'lu filterA'ya
+  // eziliyordu (goTo'nun fchipReset+filterA'ı chip'leri sıfırlıyordu). Chip
+  // state'ini programatik seç, render'ı filterA'a bırak — sondaki filterA
+  // çağrısı önceki zamanlayıcıyı clearTimeout ile iptal eder.
+  _fchip.gebelik='gebe';
+  document.querySelectorAll('[id^="fc-gebelik-"]').forEach(b=>b.classList.remove('on'));
+  document.getElementById('fc-gebelik-gebe')?.classList.add('on');
+  filterA();
 }
 
 // ──────────────────────────────────────────
@@ -637,6 +643,12 @@ async function loadTasks(f,btn,opts){
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
   });
 }
+// B34: görev çipinde ham stok UUID'si yerine ürün adı (bulunamazsa kısaltılmış id)
+function _stokAdi(stokId){
+  if(!stokId) return '';
+  const s=(getState('stock')||[]).find(x=>x.id===stokId);
+  return s?.urun_adi || (stokId.length>8 ? stokId.slice(0,8)+'…' : stokId);
+}
 function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
   const planTime=t.gorev_tipi==='TOHUMLAMA_PLANLI'
     ? (t.hedef_saat||'').slice(0,5)
@@ -668,7 +680,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
           ${diseaseName?`<span class="pill" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2)">🏥 ${esc(diseaseName)}</span>`:''}
         </div>
         <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
-        <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${t.stok_id?`<span>💊 ${t.stok_id}</span>`:''}</div>
+        <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${t.stok_id?`<span>💊 ${esc(_stokAdi(t.stok_id))}</span>`:''}</div>
       </div>
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
@@ -3150,9 +3162,18 @@ function openStk(id){
 async function stokDrugBagla(stokId, sel) {
   const drugId = sel.value || null;
   try {
+    // B30: bağlantı KALDIRMA (drugId=null) eskiden p_drug_id:null gönderiyordu —
+    // RPC'de WHERE id IS NULL → her zaman 'İlaç bulunamadı'. Kaldırma, bu
+    // stoka bağlı ilacın id'siyle yapılır (drugs.stock_item_id üzerinden).
+    let hedefDrugId = drugId;
+    if (!hedefDrugId) {
+      const drugs = await getData('drugs');
+      hedefDrugId = drugs.find(d => d.stock_item_id === stokId)?.id || null;
+      if (!hedefDrugId) { toast('Bu stoka bağlı ilaç bulunamadı — kaldırılacak bağlantı yok', true); return; }
+    }
     // RPC: link_drug_to_stock artık drugs tablosunu düzgün güncelliyor
     // Ek batch update'e gerek yok, çünkü RPC içinde tek bir UPDATE yapılıyor
-    await rpc('link_drug_to_stock', { p_drug_id: drugId, p_stock_item_id: drugId ? stokId : null });
+    await rpc('link_drug_to_stock', { p_drug_id: hedefDrugId, p_stock_item_id: drugId ? stokId : null });
     toast('✅ Bağlantı kaydedildi');
     _drugsCache = [];
     await loadDrugsCache();
@@ -4438,10 +4459,11 @@ async function loadRaporlar(){
   await _keepScroll(el,async()=>{
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
-    const [animals,tohs,diseases,births,stock]=await Promise.all([
+    const [animals,tohs,cases,diseaseRows,births,stock]=await Promise.all([
       idbGetAll('hayvanlar'),
       idbGetAll('tohumlama'),
       idbGetAll('cases'),
+      idbGetAll('diseases'),
       idbGetAll('dogum'),
       idbGetAll('stok'),
     ]);
@@ -4459,9 +4481,14 @@ async function loadRaporlar(){
     aktif.forEach(a=>{ const irk=a.irk||'Bilinmiyor'; irkMap[irk]=(irkMap[irk]||0)+1; });
     const irkSorted=Object.entries(irkMap).sort((a,b)=>b[1]-a[1]);
 
-    // Hastalık kategorileri
+    // B5: kategori grafik ve aktif vaka cases+diseases join'ından — eskiden
+    // cases satırları 'diseases' değişkenine bağlanıyordu; cases'te kategori/
+    // durum yok → grafik hep 'Diğer', 'Aktif Vaka' hep 0 (yeşil) gösteriyordu
+    const disById={};
+    diseaseRows.forEach(d=>{ disById[d.id]=d; });
+    const aktifVaka=cases.filter(c=>c.status==='active');
     const katMap={};
-    diseases.forEach(d=>{ const k=d.kategori||'Diğer'; katMap[k]=(katMap[k]||0)+1; });
+    cases.forEach(c=>{ const k=disById[c.disease_id]?.category||'Diğer'; katMap[k]=(katMap[k]||0)+1; });
     const katSorted=Object.entries(katMap).sort((a,b)=>b[1]-a[1]);
 
     // Stok durumu (stok_tuketim_view'dan hazır gelir)
@@ -4479,7 +4506,7 @@ async function loadRaporlar(){
       ${statKart('Gebe',gebe.length,`%${gebeOran} oran`,'var(--green)')}
       ${statKart('Gebelik Oranı','%'+gebelikOran,`${tohGebe}/${tohToplam} tohumlama`,gebelikOran>=60?'var(--green)':'var(--amber)')}
       ${statKart('Abort',abortlar,'toplam kayıt',abortlar>0?'var(--red)':'var(--ink3)')}
-      ${statKart('Aktif Vaka',diseases.filter(d=>d.durum==='Aktif').length,'hastalık',diseases.filter(d=>d.durum==='Aktif').length>0?'var(--red)':'var(--green)')}
+      ${statKart('Aktif Vaka',aktifVaka.length,'hastalık',aktifVaka.length>0?'var(--red)':'var(--green)')}
       ${statKart('Toplam Doğum',births.length,'')}
     </div>`;
 
@@ -4588,7 +4615,7 @@ async function openTaskDet(id){
   const meta=[];
   meta.push(`📅 ${fmtTarih(t.hedef_tarih)}${isLate?' ⚠️ Gecikmiş':''}`);
   if(hekim) meta.push(`👨‍⚕️ ${esc(hekim.ad)}`);
-  if(t.stok_id) meta.push(`💊 ${t.stok_id}`);
+  if(t.stok_id) meta.push(`💊 ${esc(_stokAdi(t.stok_id))}`);
   meta.push(`🏷 ${(t.gorev_tipi||'DIGER').replace(/_/g,' ')}`);
   document.getElementById('td-meta').innerHTML=meta.map(m=>`<span style="background:var(--card2);padding:3px 8px;border-radius:10px">${m}</span>`).join('');
   const subs=all.filter(s=>s.parent_id===id&&!s.tamamlandi);
