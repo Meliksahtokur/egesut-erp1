@@ -4,6 +4,10 @@
 function openM(id) {
   const el = g(id); if (!el) return;
   el.classList.add('on');
+  // Router stack: popstate en üstteki açık modalı kapatır (B2 — DOM sırasına
+  // güvenilmez, yığılmış modallarda en son açılan kapanmalı)
+  globalThis._modalStack = (globalThis._modalStack || []).filter(x => x !== id);
+  globalThis._modalStack.push(id);
   // Android geri tuşu: modal açılışını history'e ekle (router)
   history.pushState({modal:id}, '', '');
   // Hayvan modalında doğum tarihi otomatik dolmasın — yaş hesabı bozuluyor
@@ -52,8 +56,11 @@ function openM(id) {
 
 function closeM(id) {
   g(id)?.classList.remove('on');
-  // Android geri tuşu: bizim pushState ettiğimiz modalı back ile kapat
-  if (history.state?.modal === id) history.back();
+  globalThis._modalStack = (globalThis._modalStack || []).filter(x => x !== id);
+  // Android geri tuşu: bizim pushState ettiğimiz modalı back ile kapat.
+  // _modalBackGuard: bu back'in ürettiği popstate, popstate handler'da
+  // tüketilir — altındaki modalı/sayfayı yanlışlıkla kapatmasın diye.
+  if (history.state?.modal === id) { globalThis._modalBackGuard = true; history.back(); }
   // Planlı tohumlama bayrağını HER kapanış yolunda bırak (overlay, X, ESC, geri tuşu).
   // Aksi halde bayrak takılı kalır ve bir sonraki NORMAL tohumlama, kapanmış bir
   // planlı göreve yazılmaya çalışılır.
@@ -70,9 +77,6 @@ function closeM(id) {
 }
 
 function mClose(e, el) {
-  if (e.target === el) {
-    el.classList.remove('on');
-    // Android geri tuşu: backdrop tıklaması da history'ye yansısın
-    if (history.state?.modal === el.id) history.back();
-  }
+  // Backdrop kapatma da closeM'den geçsin — cleanup + history tek noktadan (B3)
+  if (e.target === el) closeM(el.id);
 }

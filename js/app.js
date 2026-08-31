@@ -100,13 +100,13 @@ async function goTo(pg, push = true) {
 }
 
 window.addEventListener('popstate', e => {
-  // Açık modal varsa en üsttekini kapat (Android geri tuşu — tüm modallar)
-  const openModals = document.querySelectorAll('.modal.on');
-  if (openModals.length) {
-    const top = openModals[openModals.length - 1];
-    top.classList.remove('on');
-    return;
-  }
+  // Kod kaynaklı back (closeM / sheet kapatma) — tüket, altındaki şeyi yakma
+  if (globalThis._modalBackGuard) { globalThis._modalBackGuard = null; return; }
+  // Açık router-modal varsa en üsttekini kapat (Android geri tuşu — tüm modallar).
+  // closeM: cleanup (_planliTohumlamaGorevId, form sıfırlama) + stack/history dahil.
+  // NOT: 'det' bu stack'te değil — kendi dalı aşağıda (sheet yeniden gösterimi yapar).
+  const _mstack = globalThis._modalStack || [];
+  if (_mstack.length) { closeM(_mstack[_mstack.length - 1]); return; }
   // Sentinel: history stack'in dibine ulaştık — uygulamadan çıkılacak
   if (e.state?.sentinel) {
     if (confirm('Uygulamadan çıkmak istediğinizden emin misiniz?')) {
@@ -141,6 +141,9 @@ window.addEventListener('popstate', e => {
     }
     return;
   }
+  // Modal/sheet state'leri sayfa taşımaz — dash'e atlamayı önle (B21: sheet
+  // girdisiyle karşılaşan back, ekranda sheet varken uygulamayı dash'a götürüyordu)
+  if (e.state?.protokol || e.state?.proto_detay || e.state?.modal) return;
   // Sayfalar arası geri — history.back() ile geldiğimizde push etme
   goTo(e.state?.pg || 'dash', false);
 });

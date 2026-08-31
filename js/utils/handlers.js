@@ -109,7 +109,9 @@ registerActions({
 
   // ═══ MODAL AÇ/KAPAT ═══
   'open-modal': (el) => openM(el.dataset.modal),
-  'mclose-overlay': (el, e) => { if (e.target === el) el.classList.remove('on'); },
+  // Backdrop kapatma closeM'den geçmeli — direkt classList.remove cleanup'ı
+  // atlıyordu (_planliTohumlamaGorevId sızıntısı → B3) ve history.back yapmıyordu
+  'mclose-overlay': (el, e) => { if (e.target === el) closeM(el.id); },
   'open-birth-modal':    () => openM('m-birth'),
   'open-insem-modal':    () => openM('m-insem'),
   'open-disease-modal':  () => openM('m-disease'),

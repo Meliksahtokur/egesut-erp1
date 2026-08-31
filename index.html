@@ -1906,8 +1906,8 @@ button,input,select,textarea{font-family:inherit}
       <div id="td2-info-msg" style="display:none;font-size:.8rem;color:var(--ink3);background:var(--card2);border-radius:8px;padding:9px 12px;margin-bottom:8px"></div>
       <div id="td2-denemeler" style="margin-top:8px"></div>
       <button id="td2-bos-fixed" class="btn" data-action="toh-sonuc-bekliyor" style="display:none;background:var(--amber);color:#fff;margin-bottom:8px">⏳ Hatalı Kayıt — Bekliyor'a Al</button>
-      <button id="td2-tekrar-btn" class="btn btn-g" style="margin-top:4px;display:none">💉 Tekrar Tohumla</button>
-      <button id="td2-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:4px;display:none">🔄 Bu Kaydı Geri Al</button>
+      <button id="td2-tekrar-btn" class="btn btn-g" style="margin-top:4px;display:none" onclick="tekrarTohumla(this.dataset.kupe)">💉 Tekrar Tohumla</button>
+      <button id="td2-geri-al-btn" class="btn" style="background:rgba(192,50,26,.12);color:var(--red);margin-top:4px;display:none" onclick="openGeriAl(this.dataset.ref,this.dataset.label)">🔄 Bu Kaydı Geri Al</button>
       <button class="btn btn-o" data-action="close-toh-det" style="margin-top:2px">Kapat</button>
     </div>
   </div>
@@ -2137,7 +2137,7 @@ function copyErrors() {
     </div>
     <div style="display:flex;gap:8px;padding:16px 20px 20px;margin-top:8px">
       <button class="btn btn-o" style="flex:1;padding:11px" data-action="close-confirm">İptal</button>
-      <button id="m-confirm-ok" class="btn btn-g" style="flex:1;padding:11px">Onayla</button>
+      <button id="m-confirm-ok" class="btn btn-g" style="flex:1;padding:11px" onclick="_confirmOk()">Onayla</button>
     </div>
   </div>
 </div>

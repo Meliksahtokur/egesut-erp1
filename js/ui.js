@@ -748,12 +748,20 @@ async function toggleSub(subId,parentId,el){
   await loadTasks(_curTaskFilter||'today');
   loadDash();
 }
+// onConfirm module değişkenine alınır; OK butonu index.html'de attribute onclick
+// ile bağlanır (DOM property onclick modal router closeM→history.back yarışına
+// girer — AGENTS.md kuralı, td-hayvan/684534f deseni)
+let _confirmAction = null;
 function openConfirm(title, desc, onConfirm){
   document.getElementById('m-confirm-title').textContent=title;
   document.getElementById('m-confirm-desc').textContent=desc;
-  const ok=document.getElementById('m-confirm-ok');
-  ok.onclick=()=>{ closeM('m-confirm'); onConfirm(); };
+  _confirmAction = onConfirm;
   openM('m-confirm');
+}
+function _confirmOk(){
+  closeM('m-confirm');
+  const fn = _confirmAction; _confirmAction = null;
+  if (typeof fn === 'function') fn();
 }
 async function updateTaskBadge(){
   try{
@@ -1018,6 +1026,22 @@ async function _belirsizApply(val){
     _belirsizData=list; _belirsizSel=new Set(); _belirsizRender();
   }catch(e){toast('Hata: '+e.message,true);}
 }
+// ── Protokol sheet'leri tek noktadan kapat (B21) ──
+// DOM remove + (state eşleşiyorsa) history.back. Back'in popstate'ı
+// _modalBackGuard ile tüketilir → liste sheet'i ekranda kalır, dash'e atlanmaz.
+function _closeProtokolListe(){
+  const box = document.getElementById('protokol-bs');
+  if (!box) return;
+  box.remove();
+  if (history.state?.protokol) { globalThis._modalBackGuard = true; history.back(); }
+}
+function _closeProtokolDetay(){
+  const box = document.getElementById('proto-detay-bs');
+  if (!box) return;
+  box.remove();
+  if (history.state?.proto_detay) { globalThis._modalBackGuard = true; history.back(); }
+}
+
 async function _showProtokolEkran(){
   let data = window.__protokolUyarilar;
   if (!data || !data.length) {
@@ -1030,7 +1054,7 @@ async function _showProtokolEkran(){
   box = document.createElement('div');
   box.id = 'protokol-bs';
   box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
-  box.onclick = e => { if (e.target === box) box.remove(); };
+  box.onclick = e => { if (e.target === box) _closeProtokolListe(); };
 
   const eksik = data.filter(u => u.durum === 'eksik');
   const yaklasan = data.filter(u => u.durum === 'yaklasan');
@@ -1074,6 +1098,9 @@ function _showProtokolDetay(hayvanId, protokol, activeIdx){
   if (!items.length) return;
 
   const d0 = items[0];
+  // Sheet zaten açıksa (uygulama sonrası tazeleme) yeniden pushState YOK —
+  // her tazelemede öksüz {proto_detay} girdisi birikiyordu (B21)
+  const existedBefore = !!document.getElementById('proto-detay-bs');
   const _renk = d => d.durum === 'eksik' ? 'var(--red2)' : d.durum === 'yaklasan' ? '#b8860b' : '#2e7d32';
   const _ikon = d => d.durum === 'eksik' ? '🔴' : d.durum === 'yaklasan' ? '🟡' : '✅';
 
@@ -1082,7 +1109,7 @@ function _showProtokolDetay(hayvanId, protokol, activeIdx){
   box = document.createElement('div');
   box.id = 'proto-detay-bs';
   box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:350;display:flex;align-items:flex-end';
-  box.onclick = e => { if (e.target === box) { box.remove(); history.back(); } };
+  box.onclick = e => { if (e.target === box) _closeProtokolDetay(); };
 
   const _adimHtml = items.map((d, i) => {
     const globalIdx = data.indexOf(d);
@@ -1122,12 +1149,12 @@ function _showProtokolDetay(hayvanId, protokol, activeIdx){
         </div>
         <div style="font-size:.72rem;color:var(--ink3);margin-top:2px">${protokolLabel}</div>
       </div>
-      <button onclick="document.getElementById('proto-detay-bs')?.remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--ink3)">✕</button>
+      <button onclick="_closeProtokolDetay()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--ink3)">✕</button>
     </div>
     ${_adimHtml}
   </div>`;
 
-  history.pushState({proto_detay:true}, '', '');
+  if (!existedBefore) history.pushState({proto_detay:true}, '', '');
   document.body.appendChild(box);
 }
 
@@ -1265,9 +1292,10 @@ async function _protokolUygulaKaydet(hayvanId, idx){
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
       await _islemSonrasiRefresh();
-      const detayBs = document.getElementById('proto-detay-bs');
-      if (detayBs) {
-        detayBs.remove();
+      // Detay sheet'i yerinde tazele — remove+pushState öksüz history bırakıyordu.
+      // _showProtokolDetay kendi remove'unu yapar; existedBefore kontrolü
+      // pushState'i atlar.
+      if (document.getElementById('proto-detay-bs')) {
         const d = window.__protokolUyarilar[idx];
         if (d) _showProtokolDetay(d.hayvan_id, d.protokol, idx);
       }
@@ -6060,16 +6088,19 @@ async function openTohDet(id){
       // abort geri alınırsa sonraki açık cycle üzerinde hayalet gebelik oluşur.
       td2GeriAlBtn.style.display='block';
       td2GeriAlBtn.textContent='↩ Abort İşlemini Geri Al';
-      td2GeriAlBtn.onclick=()=>openGeriAl(abortKayit.id,`${hayvanLabel} — abort geri alınacak (kayıt tekrar Gebe olur)`);
+      td2GeriAlBtn.dataset.ref=abortKayit.id;
+      td2GeriAlBtn.dataset.label=`${hayvanLabel} — abort geri alınacak (kayıt tekrar Gebe olur)`;
     } else if(isSonToh&&islemKayit){
       td2GeriAlBtn.style.display='block';
       td2GeriAlBtn.textContent='🔄 Bu Kaydı Geri Al';
-      td2GeriAlBtn.onclick=()=>openGeriAl(islemKayit.id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`);
+      td2GeriAlBtn.dataset.ref=islemKayit.id;
+      td2GeriAlBtn.dataset.label=`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)})`;
     } else if(isSonToh&&!islemKayit&&t.sonuc==='Bekliyor'){
       // Agent/manuel kayıt — islem_log yok, doğrudan sil
       td2GeriAlBtn.style.display='block';
       td2GeriAlBtn.textContent='⚠️ Hatalı Kaydı Sil';
-      td2GeriAlBtn.onclick=()=>openGeriAl('toh:'+id,`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)}) [islem_log yok]`);
+      td2GeriAlBtn.dataset.ref='toh:'+id;
+      td2GeriAlBtn.dataset.label=`${hayvanLabel} — ${t.sperma||'?'} (${fmtTarih(t.tarih)}) [islem_log yok]`;
     } else {
       td2GeriAlBtn.style.display='none';
     }
@@ -6093,7 +6124,8 @@ async function openTohDet(id){
   }
   const td2TekrarBtn=document.getElementById('td2-tekrar-btn');
   if(td2TekrarBtn){
-    if(t.sonuc!=='Gebe'&&t.sonuc!=='Doğum Yaptı'){ td2TekrarBtn.style.display='block'; td2TekrarBtn.onclick=()=>tekrarTohumla(hayvanLabel||t.hayvan_id); }
+    // dataset.kupe + index.html attribute onclick (router-modal DOM onclick yasağı)
+    if(t.sonuc!=='Gebe'&&t.sonuc!=='Doğum Yaptı'){ td2TekrarBtn.style.display='block'; td2TekrarBtn.dataset.kupe=hayvanLabel||t.hayvan_id; }
     else { td2TekrarBtn.style.display='none'; }
   }
 
