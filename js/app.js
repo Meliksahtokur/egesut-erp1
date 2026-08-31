@@ -639,8 +639,10 @@ window.addEventListener('load', withErrorHandling(async () => {
 window.addEventListener('online', withErrorHandling(async () => {
   g('dot')?.classList.remove('off', 'warn');
   toast('🌐 Bağlantı geldi');
-  // Background sync yeniden başlat
-  startBackgroundSync(30000);
+  // Background sync yeniden başlat — ama yalnız realtime bağlı DEĞİLSE (B35:
+  // SUBSCRIBED iken restart polling+realtime çift çalıştırıyordu). Offline
+  // sırasında kaçan veri aşağıdaki pullFromSupabase ile toplanır.
+  if (!globalThis._realtimeSubscribed) startBackgroundSync(30000);
   await syncNow();
   await pullFromSupabase();
   renderFromLocal();

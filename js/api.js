@@ -70,7 +70,14 @@ async function rpc(name, params = {}) {
   try {
     ({ data, error } = await db.rpc(name, params));
   } catch (networkErr) {
-    throw new Error('İnternet bağlantısı gerekli');
+    // B23: yalnız gerçek iletim hataları "internet" olarak etiketlenir —
+    // TypeError/auth yenileme gibi başka istisnalar yanlış teşhisle
+    // "İnternet bağlantısı gerekli" diye yeniden adlandırılıyordu
+    if (networkErr instanceof TypeError || networkErr?.name === 'AbortError' ||
+        /failed to fetch|networkerror|load failed/i.test(networkErr?.message || '')) {
+      throw new Error('İnternet bağlantısı gerekli');
+    }
+    throw networkErr;
   }
   if (error) throw new Error(_trErr(error.message));
   // ok:false gövdesini (oneri, detay vb.) hataya taşır — çağıranlar e.data ile okur
@@ -192,9 +199,20 @@ async function removeFromQueue(qid) {
 
 // ── SDK YARDIMCILARI ────────────────────────
 async function dbUpdate(table, id, changes) {
-  const clean = Object.fromEntries(Object.entries(changes).filter(([k, v]) => k !== 'id' && v !== null && v !== undefined && v !== ''));
-  const { error } = await db.from(table).update(clean).eq('id', id);
+  // B16: null/'' SUNUCUYA GİDER — eskiden filtrelendikleri için hiçbir alan
+  // sunucuda temizlenemiyordu (toggleSub geri-alında tamamlanma_tarihi hayaleti).
+  // (dbInsert'teki filtre bilinçli olarak aynı bırakıldı: INSERT'te null atmak
+  // DB default'larına bırakır; UPDATE'te null göndermek alan temizlemektir.)
+  const clean = Object.fromEntries(Object.entries(changes).filter(([k, v]) => k !== 'id' && v !== undefined));
+  const { data, error } = await db.from(table).update(clean).eq('id', id).select('id');
   if (error) throw new Error(_trErr(error.message));
+  // B17: hedef satır sunucuda silinmişse update 0 satır etkiler, hata vermezdi —
+  // değişiklik iz bırakmadan yutuluyordu. dead-target olarak işaretle
+  if (!data || data.length === 0) {
+    const e = new Error(`Hedef kayıt sunucuda yok (silinmiş olabilir): ${table}/${id}`);
+    e.deadTarget = true;
+    throw e;
+  }
 }
 
 async function dbInsert(table, rows) {
@@ -211,8 +229,10 @@ async function dbInsert(table, rows) {
 // Karmaşık işlemler → rpc() kullanır, bu fonksiyon değil
 async function _writePatch(table, filter, arr) {
   const idMatch = filter.match(/id=eq\.([^&]+)/);
-  const targetId = idMatch ? idMatch[1] : null;
-  if (!targetId) return null;
+  // B28: id=eq. dışı filtreyle PATCH eskiden null dönüp _writePost'a düşüyordu —
+  // parça satır INSERT'i üretiyordu. Artık net hata.
+  if (!idMatch) throw new Error(`PATCH için id=eq. filtresi gerekli (tablo: ${table}, filtre: ${filter || 'yok'})`);
+  const targetId = idMatch[1];
   const existing = await idbGetAll(table);
   const base = existing.find(r => r.id === targetId) || { id: targetId };
   const merged = { ...base, ...arr[0], id: targetId };
@@ -261,10 +281,7 @@ async function _writePost(table, arr, method, filter) {
 
 async function write(table, data, method = 'POST', filter = '') {
   const arr = Array.isArray(data) ? data : [data];
-  if (method === 'PATCH') {
-    const result = await _writePatch(table, filter, arr);
-    if (result) return result;
-  }
+  if (method === 'PATCH') return _writePatch(table, filter, arr);
   return _writePost(table, arr, method, filter);
 }
 
@@ -360,16 +377,21 @@ function renderSafe() {
 }
 
 // ── PULL LOCK ───────────────────────────────
-// Devam eden pull varsa yeni çağrılar onu bekler, drop edilmez
-let _pullingPromise = null;
+// B18: gerçek sıralı kuyruk — eskiden bekleyenler ilk pull çözülünce HEPsi
+// aynı anda salınıyor, erken biten finally kilidi boşaltıp geç fetch'in bayat
+// snapshot'ıyla yeniyi ezebiliyordu. Her çağrı zincirin sonuna eklenir.
+let _pullChain = Promise.resolve();
 
 // Sadece belirtilen tabloları Supabase'den çek
-async function pullTables(tables = []) {
-  _suruStatCache={};
-  if (!tables.length) return;
-  if (_pullingPromise) await _pullingPromise;
-  let resolve;
-  _pullingPromise = new Promise(r => { resolve = r; });
+function pullTables(tables = []) {
+  _suruStatCache = {};
+  if (!tables.length) return Promise.resolve();
+  const run = _pullChain.then(() => _pullTablesNow(tables), () => _pullTablesNow(tables));
+  _pullChain = run.catch(() => {});
+  return run;
+}
+
+async function _pullTablesNow(tables = []) {
   try {
     const FETCHERS = {
       hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
@@ -394,31 +416,38 @@ async function pullTables(tables = []) {
       islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
       uygulama_log: () => db.from('uygulama_log').select('*').order('created_at', { ascending: false }).limit(500),
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
-      tohumlanabilir_hayvanlar: () => db.from('tohumlanabilir_hayvanlar').select('*'),
       padoklar:         () => db.from('padoklar').select('*').eq('aktif', true).order('sira'),
       grup_padok_eslem: () => db.from('grup_padok_eslem').select('*'),
       hekimler:         () => db.from('hekimler').select('*').eq('aktif', true),
-      gebelik_ozet:     () => db.from('gebelik_ozet_view').select('*'),
       stok_kategorileri:() => db.from('stok_kategorileri').select('*').order('sira'),
       tedavi_sablonu:        () => db.from('tedavi_sablonu').select('*').order('ad'),
       sablon_hastalik_eslem: () => db.from('sablon_hastalik_eslem').select('*'),
       tedavi_sablonu_kalem:  () => db.from('tedavi_sablonu_kalem').select('*'),
       protokol_ayar:    () => db.from('protokol_ayar').select('*'),
+      // B27: TABLES'ta olup fetcher'ı olmayanlar sessiz no-op'tu — eklendi
+      protokol_instance: () => db.from('protokol_instance').select('*'),
+      cop_kutusu:        () => db.from('cop_kutusu').select('*'),
       // ileri_gebe_view: () => db.from('ileri_gebe_view').select('*'), — dashboard RPC sonucu kullanıyor
     };
+    // B27: tohumlanabilir_hayvanlar/gebelik_ozet fetcher'ları kaldırıldı — IDB
+    // store'ları yoktu (TABLES dışı), ilk pullTables çağrısında NotFoundError
+    // patlatırlardı; çağıranları yok (m-insem doğrudan db.from kullanıyor)
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
     const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
+    let hataSayisi = 0;
     await Promise.all(uniq.map((t, i) => {
       if (results[i].error) {
+        hataSayisi++;
         console.warn(`⚠️ pullTables ${t}: ${results[i].error.message}`);
         return Promise.resolve();
       }
       return idbClearAndPut(t, results[i].data || []);
     }));
-    if (uniq.includes('tohumlanabilir_hayvanlar')) globalThis._TH = results[uniq.indexOf('tohumlanabilir_hayvanlar')].data || [];
+    // B19: tablo bazlı pull hataları yutulup nokta yeşil kalıyordu — bayat
+    // veri "senkron" görünüyordu. warn sınıfı mevcut dot stili.
+    if (hataSayisi > 0) document.getElementById('dot')?.classList.add('warn');
   } finally {
-    _pullingPromise = null;
-    resolve();
+    // zincir _pullChain'de yönetiliyor; burada kilitleyecek bir şey yok
   }
 }
 
@@ -459,6 +488,9 @@ async function pullFromSupabase() {
 
 // ── AUTO SYNC ENGINE ────────────────────────
 let _syncing = false;
+// B17: op başına ardışık hata sayacı — 5'ten sonra dead-letter (otomatik atla,
+// Veri Trafik panelinden manuel 'Gönder' hâlâ mümkün)
+const _syncFailCount = {};
 
 async function syncNow() {
   if (_syncing || !navigator.onLine) return;
@@ -466,6 +498,7 @@ async function syncNow() {
   try {
     const q = await getQueue();
     for (const op of q) {
+      if ((_syncFailCount[op._qid] || 0) >= 5) continue;
       try {
         if (op.method === 'PATCH') {
           const idMatch = (op.filter || '').match(/id=eq\.([^&]+)/);
@@ -474,9 +507,18 @@ async function syncNow() {
           await dbInsert(op.table, op.data);
         }
         await removeFromQueue(op._qid);
+        delete _syncFailCount[op._qid];
       } catch (e) {
+        // B17: ilk kalıcı hata tüm drain'i kesiyordu — zehirli kayıttan sonraki
+        // TÜM offline yazmalar sonsuza dek yerel kalıyordu. Atla-devam; hatalı
+        // op kuyrukta kalır, sonraki sync'te tekrar denenir.
         console.warn('sync item failed:', e.message);
-        break;
+        _syncFailCount[op._qid] = (_syncFailCount[op._qid] || 0) + 1;
+        if (e.deadTarget) {
+          // Hedef satır sunucuda silinmiş — yeniden denemenin anlamı yok, düşür
+          await removeFromQueue(op._qid).catch(console.warn);
+          delete _syncFailCount[op._qid];
+        }
       }
     }
     const remaining = await getQueue();
@@ -486,9 +528,10 @@ async function syncNow() {
   }
 }
 
-// ── AUTO SYNC ───────────────────────────────
-// Online event'te syncNow tetiklenir (polling kaldırıldı — organik realtime geçişi)
-window.addEventListener('online', syncNow);
+// ── AUTO SYNC ──────────────────────────────
+// B37: bu dinleyici kaldırıldı — app.js'in online handler'ı zaten syncNow +
+// pullFromSupabase yapıyor; çift dinleyici çift syncNow çağırıyordu (_syncing
+// guard'ı no-op'a indirgediği içinsessizdi, ama bilgi kirliliğiydi).
 
 // ── REALTIME SUBSCRIPTIONS (Organik geçiş — yeni özellikler kullanır) ─────
 // Sprint 5 — Realtime kanalları:
@@ -540,8 +583,10 @@ function initRealtime() {
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ui_logs' },  () => {})
     .on('postgres_changes', { event: '*', schema: 'public', table: 'protokol_ayar' }, () => pullTables(['protokol_ayar']))
     .subscribe(status => {
+      // B35: online handler'ın polling restart'ı realtime durumunu bilsin
+      globalThis._realtimeSubscribed = (status === 'SUBSCRIBED');
       if (status === 'SUBSCRIBED') {
-        
+
         stopBackgroundSync(); // polling artık gereksiz
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         console.warn('⚠️ Realtime bağlantı hatası, polling devam ediyor');
