@@ -4214,12 +4214,13 @@ async function stokDetKaydet(){
     p_esik:parseFloat(v('sd-esik'))||0
   };
   if(!updates.p_urun_adi){ toast('Ürün adı boş olamaz',true); return; }
-  const{error}=await rpc('stok_guncelle',{p_stok_id:_curStokDet.id,...updates});
-  if(error){ toast('Hata: '+error.message,true); return; }
-  await pullTables(['stok']);
-  closeM('m-stok-det');
-  loadStokPanel();
-  toast('Ürün güncellendi');
+  try {
+    await rpc('stok_guncelle',{p_stok_id:_curStokDet.id,...updates});
+    await pullTables(['stok']);
+    closeM('m-stok-det');
+    loadStokPanel();
+    toast('Ürün güncellendi');
+  } catch(e){ toast('Hata: '+e.message,true); return; }
 }
 
 async function stokDetArsivle(){
@@ -4230,12 +4231,13 @@ async function stokDetArsivle(){
     ?`Bu üründe ${count} hareket kaydı var. Arşivlenecek (silinmeyecek). Devam?`
     :'Bu ürünü arşivlemek istediğinizden emin misiniz?';
   openConfirm('Ürün Arşivle',msg,async()=>{
-    const{error}=await rpc('stok_arsivle',{p_stok_id:_curStokDet.id});
-    if(error){ toast('Hata: '+error.message,true); return; }
-    await pullTables(['stok']);
-    closeM('m-stok-det');
-    loadStokPanel();
-    toast('Ürün arşivlendi');
+    try {
+      await rpc('stok_arsivle',{p_stok_id:_curStokDet.id});
+      await pullTables(['stok']);
+      closeM('m-stok-det');
+      loadStokPanel();
+      toast('Ürün arşivlendi');
+    } catch(e){ toast('Hata: '+e.message,true); }
   });
 }
 
@@ -6574,7 +6576,8 @@ async function openGebelikEkle(hayvanId){
   const sure=confirm('Son tohumlama ('+fmtTarih(son.tarih)+' · '+(son.sperma||'—')+') Gebe olarak işaretlensin mi?');
   if(!sure) return;
   try{
-    const { error } = await rpc('tohumlama_sonuc_gebe', { p_tohumlama_id: son.id }); if (error) throw error; toast('✅ Gebe işaretlendi');
+    await rpc('tohumlama_sonuc_gebe', { p_tohumlama_id: son.id });
+    toast('✅ Gebe işaretlendi');
     openDet(hayvanId);
   }catch(e){ toast(e.message,true); }
 }
@@ -6971,10 +6974,11 @@ async function renderAyarlarVaccineList(){
 
 async function vaccineRapelGuncelle(vaccineId,val){
   const days=val===''?null:parseInt(val);
-  const{error}=await rpc('vaccine_rapel_guncelle',{p_vaccine_id:vaccineId,p_repeat_days:days});
-  if(error){toast('Hata: '+error.message,true);return;}
-  await pullTables(['vaccines']);
-  toast('Rapel süresi güncellendi');
+  try {
+    await rpc('vaccine_rapel_guncelle',{p_vaccine_id:vaccineId,p_repeat_days:days});
+    await pullTables(['vaccines']);
+    toast('Rapel süresi güncellendi');
+  } catch(e){ toast('Hata: '+e.message,true); }
 }
 // renderAyarlarSpermaList (eski local-array versiyonu) ölü kod olarak arşivlendi
 // (js/_archive/ayarlarSperma.bak.js) — index.html'de giriş noktası yok.
@@ -6982,15 +6986,16 @@ function ayarlarHekimEkle(){ document.getElementById('ay-hekim-form').style.disp
 async function ayarlarHekimKaydet(){
   const ad=v('ay-hek-ad').trim(); if(!ad) return;
   const tel=v('ay-hek-tel')||null;
-  const{error}=await rpc('hekim_ekle',{p_ad:ad,p_telefon:tel});
-  if(error){ toast('Hata: '+error.message,true); return; }
-  await pullTables(['hekimler']);
-  await loadHekimlerFromDB();
-  populateHekimSelects();
-  cl('ay-hek-ad');
-  document.getElementById('ay-hekim-form').style.display='none';
-  renderAyarlarHekimList();
-  toast(`✅ ${ad} eklendi`);
+  try {
+    await rpc('hekim_ekle',{p_ad:ad,p_telefon:tel});
+    await pullTables(['hekimler']);
+    await loadHekimlerFromDB();
+    populateHekimSelects();
+    cl('ay-hek-ad');
+    document.getElementById('ay-hekim-form').style.display='none';
+    renderAyarlarHekimList();
+    toast(`✅ ${ad} eklendi`);
+  } catch(e){ toast('Hata: '+e.message,true); return; }
 }
 
 let _curHekimDet = null;
@@ -7097,14 +7102,15 @@ async function hekimDetKaydet() {
   const ad = v('hk-ad').trim();
   if (!ad) { toast('Hekim adı boş olamaz', true); return; }
   const tel=v('hk-tel')||null;
-  const { error } = await rpc('hekim_guncelle',{p_hekim_id:_curHekimDet.id,p_ad:ad,p_telefon:tel});
-  if (error) { toast('Hata: ' + error.message, true); return; }
-  await pullTables(['hekimler']);
-  await loadHekimlerFromDB();
-  populateHekimSelects();
-  closeM('m-hekim-det');
-  renderAyarlarHekimList();
-  toast('Hekim güncellendi');
+  try {
+    await rpc('hekim_guncelle',{p_hekim_id:_curHekimDet.id,p_ad:ad,p_telefon:tel});
+    await pullTables(['hekimler']);
+    await loadHekimlerFromDB();
+    populateHekimSelects();
+    closeM('m-hekim-det');
+    renderAyarlarHekimList();
+    toast('Hekim güncellendi');
+  } catch(e){ toast('Hata: '+e.message,true); return; }
 }
 
 async function hekimDetSil() {
@@ -7158,14 +7164,15 @@ async function padokDuzenleKaydet(){
   const ad=document.getElementById('pd-ad').value.trim();
   if(!ad){ toast('Padok adı boş olamaz',true); return; }
   const kap=parseInt(document.getElementById('pd-kap').value)||null;
-  const{error}=await rpc('padok_guncelle',{p_padok_id:_curPadokDet.id,p_ad:ad,p_kapasite:kap,p_sira:null});
-  if(error){ toast('Hata: '+error.message,true); return; }
-  await pullTables(['padoklar']);
-  await loadPadokConfig();
-  closeM('m-padok-det');
-  renderAyarlarPadokList();
-  renderGrupPadokEslem();
-  toast('Padok güncellendi');
+  try {
+    await rpc('padok_guncelle',{p_padok_id:_curPadokDet.id,p_ad:ad,p_kapasite:kap,p_sira:null});
+    await pullTables(['padoklar']);
+    await loadPadokConfig();
+    closeM('m-padok-det');
+    renderAyarlarPadokList();
+    renderGrupPadokEslem();
+    toast('Padok güncellendi');
+  } catch(e){ toast('Hata: '+e.message,true); return; }
 }
 
 async function padokSilOnay(){
@@ -7175,14 +7182,15 @@ async function padokSilOnay(){
   const count=hayvanlar.filter(h=>h.padok_id===id&&h.durum==='Aktif').length;
   if(count>0){ toast(`Bu padokta ${count} aktif hayvan var — önce hayvanları başka padoğa taşıyın`,true); return; }
   openConfirm('Padok Sil',`"${_curPadokDet.ad}" silinecek. Emin misiniz?`,async()=>{
-    const{error}=await rpc('padok_sil',{p_padok_id:id});
-    if(error){ toast('Hata: '+error.message,true); return; }
-    await pullTables(['padoklar','grup_padok_eslem']);
-    await loadPadokConfig();
-    closeM('m-padok-det');
-    renderAyarlarPadokList();
-    renderGrupPadokEslem();
-    toast('Padok silindi');
+    try {
+      await rpc('padok_sil',{p_padok_id:id});
+      await pullTables(['padoklar','grup_padok_eslem']);
+      await loadPadokConfig();
+      closeM('m-padok-det');
+      renderAyarlarPadokList();
+      renderGrupPadokEslem();
+      toast('Padok silindi');
+    } catch(e){ toast('Hata: '+e.message,true); }
   });
 }
 
@@ -7861,14 +7869,15 @@ function ayarlarPadokEkle(){ document.getElementById('ay-padok-form').style.disp
 async function ayarlarPadokKaydet(){
   const ad=v('ay-padok-ad').trim(); if(!ad){ toast('Padok adı boş olamaz',true); return; }
   const kap=parseInt(v('ay-padok-kap'))||null;
-  const{error}=await rpc('padok_ekle',{p_ad:ad,p_kapasite:kap,p_sira:0});
-  if(error){ toast('Hata: '+error.message,true); return; }
-  await pullTables(['padoklar']);
-  await loadPadokConfig();
-  cl('ay-padok-ad'); cl('ay-padok-kap');
-  document.getElementById('ay-padok-form').style.display='none';
-  renderAyarlarPadokList();
-  toast('✅ Padok eklendi');
+  try {
+    await rpc('padok_ekle',{p_ad:ad,p_kapasite:kap,p_sira:0});
+    await pullTables(['padoklar']);
+    await loadPadokConfig();
+    cl('ay-padok-ad'); cl('ay-padok-kap');
+    document.getElementById('ay-padok-form').style.display='none';
+    renderAyarlarPadokList();
+    toast('✅ Padok eklendi');
+  } catch(e){ toast('Hata: '+e.message,true); return; }
 }
 
 
