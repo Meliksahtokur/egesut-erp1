@@ -42,6 +42,10 @@ class AppState {
     this.emit('*', key, value, old);
   }
 
+  // SÖZLEŞME (test-rapor #3 — davranış bilinçli korunuyor, state.test.js kilitli):
+  // set():     key event → (value, old)  ·  '*' event → (key, value, old)
+  // setBatch(): key event → (value)      ·  '*' event → tek seferde [{key, value}]
+  // '*' dinleyicileri iki biçimi ayrı işlemek zorundadır.
   setBatch(updates) {
     const changed = [];
     for (const [key, value] of Object.entries(updates)) {

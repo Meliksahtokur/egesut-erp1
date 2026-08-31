@@ -28,7 +28,7 @@ async function _kupeKontrolEt(alan) {
   const warnId = alan + '-warn';
   const warnEl = g(warnId);
   if (!warnEl) return;
-  if (!deger) { warnEl.textContent = ''; return; }
+  if (!deger) { warnEl.textContent = ''; delete warnEl.dataset.soft; return; }
 
   const modal  = g('m-animal');
   const editId = modal?.dataset.editId || null;
@@ -41,18 +41,29 @@ async function _kupeKontrolEt(alan) {
     const res = await db.rpc('kupe_musait_mi', params);
     if (res.data && res.data.musait === false) {
       warnEl.textContent = '⚠️ Bu küpe zaten kayıtlı';
+      delete warnEl.dataset.soft;
     } else {
       warnEl.textContent = '';
+      delete warnEl.dataset.soft;
     }
-  } catch (_) { warnEl.textContent = ''; }
+  } catch (_) {
+    // Fail-aware (test-rapor #1): kontrol hatası sessizce 'müsait' SAYILMAZ.
+    // Önceki gerçek uyarı korunur; boşsa yumuşak not (soft) düşülür — submit'i
+    // engellemez, kullanıcı durumu GÖRÜR; gerekirse alanı düzenleyip tekrar tetikler.
+    if (!warnEl.textContent) {
+      warnEl.textContent = '⏳ Küpe kontrolü yapılamadı — kayıtta teyit edilir';
+      warnEl.dataset.soft = '1';
+    }
+  }
 }
 
 // ── YENİ HAYVAN ─────────────────────────────
 async function submitAnimal(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
 
-  // Küpe çakışma uyarısı varsa durdur
-  if (g('a-devlet-warn')?.textContent || g('a-kupe-warn')?.textContent) {
+  // Küpe çakışma uyarısı varsa durdur (soft not hariç — kontrol hatası engel değil)
+  const _kupeUyarisi = el => el?.textContent && el.dataset.soft !== '1';
+  if (_kupeUyarisi(g('a-devlet-warn')) || _kupeUyarisi(g('a-kupe-warn'))) {
     toast('⚠️ Küpe çakışması var — formu kontrol edin', true); return;
   }
 

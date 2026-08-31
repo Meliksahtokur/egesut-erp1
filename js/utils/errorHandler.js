@@ -32,12 +32,18 @@ function withErrorHandling(fn, context) {
   };
 }
 
+// Modül self-contained olmalı: global esc helpers.js'ten önce yüklenebilir /
+// yüklenmeyebilir (script hataları window.onerror'a erken düşer) — test-rapor #4
+function _dbgEsc(x) {
+  return String(x ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function showDebug(err, context) {
   const panel = g('debugPanel');
   if (!panel) return;
   const entry = document.createElement('div');
   entry.className = 'debug-entry';
-  entry.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> [${context||'?'}] ${esc(err.message || String(err))}`;
+  entry.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> [${_dbgEsc(context||'?')}] ${_dbgEsc(err?.message || String(err))}`;
   panel.prepend(entry);
   if (panel.children.length > 50) panel.lastChild?.remove();
 }
