@@ -194,7 +194,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   }
   if(births60.length){
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
-      births60.map(b=>`<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${b.anne_id}')"><div class="arow-left"><div class="arow-id">${b.anne_id}</div><div class="arow-sub">${b.tarih} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button style="font-size:.65rem;font-weight:700;color:var(--red2);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap" onclick="event.stopPropagation();kizginlikYoktu('${b.anne_id}','${b.id||''}')">✕</button></div>`).join(''));
+      births60.map(b=>`<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${escAttr(b.anne_id)}')"><div class="arow-left"><div class="arow-id">${esc(b.anne_id)}</div><div class="arow-sub">${esc(b.tarih)} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button style="font-size:.65rem;font-weight:700;color:var(--red2);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap" onclick="event.stopPropagation();kizginlikYoktu('${escAttr(b.anne_id)}','${escAttr(b.id||'')}')">✕</button></div>`).join(''));
   }
   if((ileriGebeler||[]).length){
     const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
@@ -227,7 +227,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
         const a=aMap&&aMap[b.hayvan_id];
         const kid=a?.kupe_no||a?.devlet_kupe||b.hayvan_id;
         const gun=Math.floor((Date.now()-new Date(b.tarih))/86400000);
-        return `<div class="arow" onclick="openDet('${b.hayvan_id}')"><div class="arow-left"><div class="arow-id">${kid}</div><div class="arow-sub">${gun}. gün · ${Math.floor((new Date(b.tarih).getTime()+280*86400000-Date.now())/86400000)} gün kaldı</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+        return `<div class="arow" onclick="openDet('${escAttr(b.hayvan_id)}')"><div class="arow-left"><div class="arow-id">${esc(kid)}</div><div class="arow-sub">${gun}. gün · ${Math.floor((new Date(b.tarih).getTime()+280*86400000-Date.now())/86400000)} gün kaldı</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if(critStk>0){
@@ -1624,14 +1624,14 @@ function _toggleDenemeRest(){
 }
 let _filterTimer=null;
 function srchDropdown(){
-  const q=(document.getElementById('srch')?.value||'').toLowerCase().trim();
+  const q=trLower(document.getElementById('srch')?.value||'').trim();
   const ac=document.getElementById('ac-srch');
   if(!ac) return;
   if(!q){ ac.style.display='none'; return; }
   const gebeSet=new Set(getState('gebeIds')||[]);
   const matches=getState('animals').filter(a=>{
-    const k=(a.kupe_no||'').toLowerCase(), d=(a.devlet_kupe||'').toLowerCase();
-    return k.includes(q)||d.includes(q)||(a.irk||'').toLowerCase().includes(q);
+    const k=trLower(a.kupe_no||''), d=trLower(a.devlet_kupe||'');
+    return k.includes(q)||d.includes(q)||trLower(a.irk||'').includes(q);
   }).slice(0,8);
   if(!matches.length){ ac.style.display='none'; return; }
   ac.innerHTML=matches.map(a=>{
@@ -1673,11 +1673,11 @@ function fchipSec(grup,deger,btn){
 function filterA(){
   clearTimeout(_filterTimer);
   _filterTimer=setTimeout(()=>{
-    const q=document.getElementById('srch')?.value.toLowerCase()||'';
+    const q=trLower(document.getElementById('srch')?.value||'');
     const p=document.getElementById('pflt')?.value||'';
     const gebeSet=new Set(getState('gebeIds')||[]);
     let f=getState('animals');
-    if(q) f=f.filter(a=>(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).toLowerCase().includes(q));
+    if(q) f=f.filter(a=>trLower(a.id+(a.kupe_no||'')+(a.devlet_kupe||'')+(a.irk||'')).includes(q));
     if(p) {
       f=f.filter(a=>a.padok===p);
       if(p==='Buzağı Padok (Süt İçenler)'){
@@ -1901,12 +1901,12 @@ async function _detRenderGecmis(id,el){
       else if(e.type==='gorev') parts.push(d._lbl||'',d.gorev_tipi||'',d._disName||'',d.tamamlandi?'tamamlandı':'bekliyor',...(d._drugNames||[]));
       else if(e.type==='uygulama') parts.push(d._stokAdi||'',d.etken_kod||'',d.rota||'','uygulama','ilaç');
       else if(e.type==='islem'){const sn=d.snapshot||{};parts.push(d.tip||'',sn.vaccine_name||'',sn.ilac_adi||'','işlem');}
-      e._s=parts.join(' ').toLowerCase();
+      e._s=trLower(parts.join(' '));
     });
     globalThis._detGecmisEntries=entries;
 
     function _renderDetGecmisList(q){
-      const list=q?entries.filter(e=>q.trim().toLowerCase().split(/\s+/).every(t=>e._s.includes(t))):entries;
+      const list=q?entries.filter(e=>trLower(q.trim()).split(/\s+/).every(t=>e._s.includes(t))):entries;
       const bodyEl=document.getElementById('det-gecmis-body');
       if(!bodyEl) return;
       if(!list.length){bodyEl.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>';return;}
@@ -1941,8 +1941,8 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
     :'';
   const _caseListHtml=await renderCasesForAnimal(a.id);
   const vaxButton = `<div style="padding:6px 0 6px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">🏥 Vaka Aç</button>
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${esc(a.kupe_no||a.devlet_kupe||a.id)}')">💉 Aşı Uygula</button>
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${escAttr(a.kupe_no||a.devlet_kupe||a.id)}')">🏥 Vaka Aç</button>
+    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${escAttr(a.kupe_no||a.devlet_kupe||a.id)}')">💉 Aşı Uygula</button>
     <button class="btn btn-o" style="padding:9px;grid-column:1/-1" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı İlaç/Vitamin Uygula</button>
   </div>`;
 
@@ -2392,12 +2392,12 @@ async function gebeledenSec(){
   setTimeout(()=>document.getElementById('gebe-srch')?.focus(),100);
 }
 function gebeFiltrele(){
-  const q=(document.getElementById('gebe-srch')?.value||'').toLowerCase();
+  const q=trLower(document.getElementById('gebe-srch')?.value||'');
   const box=document.getElementById('gebe-sec-modal');
   if(!box||!box._gebeList) return;
   const listEl=document.getElementById('gebe-list');
   const filtered=q?box._gebeList.filter(g=>{
-    const kupe=(g.hayvan?.kupe_no||g.hayvan?.devlet_kupe||g.toh.hayvan_id||'').toLowerCase();
+    const kupe=trLower(g.hayvan?.kupe_no||g.hayvan?.devlet_kupe||g.toh.hayvan_id||'');
     return kupe.includes(q);
   }):box._gebeList;
   listEl.innerHTML=filtered.map(g=>{
@@ -2477,7 +2477,7 @@ async function _uremeKizginlik(el){
   const tb=document.getElementById('kizginlik-toolbar');
   if(tb) tb.style.display='block';
   // Filtre + search oku
-  const q=(document.getElementById('kizginlik-srch')?.value||'').toLowerCase().trim();
+  const q=trLower(document.getElementById('kizginlik-srch')?.value||'').trim();
   const flt=globalThis._kizginlikFilter||'tumu';
   let list=await idbGetAll('kizginlik_log');
   const animals=getState('animals')||[];
@@ -2485,8 +2485,8 @@ async function _uremeKizginlik(el){
   if(q){
     list=list.filter(k=>{
       const h=animals.find(a=>a.id===k.hayvan_id);
-      const kupe=(h?.kupe_no||h?.devlet_kupe||'').toLowerCase();
-      return kupe.includes(q)||k.hayvan_id.toLowerCase().includes(q);
+      const kupe=trLower(h?.kupe_no||h?.devlet_kupe||'');
+      return kupe.includes(q)||trLower(k.hayvan_id).includes(q);
     });
   }
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
@@ -2682,7 +2682,7 @@ function tohumlamaSearch(){
   clearTimeout(_tohumlamaSearchTimer);
   _tohumlamaSearchTimer=setTimeout(()=>{
     const inp=document.getElementById('tohumlama-srch');
-    globalThis._tohSearch = (inp?.value || '').toLowerCase().trim();
+    globalThis._tohSearch = trLower(inp?.value || '').trim();
     if(typeof loadUreme==='function') loadUreme('tohumlama');
   },200);
 }
@@ -2835,17 +2835,17 @@ async function _uremeTohumlama(el){
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
 
   // Searchbar filtresi (multi-field: küpe + sperma + sonuç + hayvan adı)
-  const _q=(globalThis._tohSearch||'').toLowerCase().trim();
+  const _q=trLower(globalThis._tohSearch||'').trim();
   if(_q){
     const _terms=_q.split(/\s+/).filter(Boolean);
     const _hayvanlar=getState('animals')||[];
     list=list.filter(t=>{
       const h=_hayvanlar.find(a=>a.id===t.hayvan_id);
-      const kupe=(h?.kupe_no||h?.devlet_kupe||'').toLowerCase();
-      const isim=(h?.isim||'').toLowerCase();
-      const sperma=(t.sperma||'').toLowerCase();
-      const sonuc=(t.sonuc||'').toLowerCase();
-      const tarih=(t.tarih||'').toLowerCase();
+      const kupe=trLower(h?.kupe_no||h?.devlet_kupe||'');
+      const isim=trLower(h?.isim||'');
+      const sperma=trLower(t.sperma||'');
+      const sonuc=trLower(t.sonuc||'');
+      const tarih=trLower(t.tarih||'');
       const haystack=[kupe,isim,sperma,sonuc,tarih].join(' ');
       return _terms.every(term=>haystack.includes(term));
     });
@@ -3034,7 +3034,7 @@ function _gecmisSearchText(e){
   }
   const hk=HEKIMLER.find(h=>h.id===d.hekim_id);
   if(hk)parts.push(hk.ad);
-  return parts.join(' ').toLowerCase().replace(/\s+/g,' ');
+  return trLower(parts.join(' ')).replace(/\s+/g,' ');
 }
 
 let _gecmisAllEntries=[];
