@@ -8997,6 +8997,10 @@ GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenti
 -- ── v_eligible — tohumlama için uygun hayvanlar (buzağı hariç, 13+ ay) ──
 -- v2 (2026-06-25): sessiz_gun sinyal sıralaması — son_aktivite → son_dogum → dogum_tarihi → NULL.
 --                  Hiç sinyal yoksa NULL (9999 hilesi kalkar). Row-set aynı.
+-- v3 (2026-08-31): sessiz ankrajı — son_event = max(kızgınlık, tohumlama, abort_tarihi,
+--                  dogum_tarihi(tohumlama), dogum tablosu). Doğum/abort yapan inek eski
+--                  tohumlamadan sayılmaz; son event < 55 gün ise listeye girmez.
+--                  (vaka filtresi 20260830000020 ile canlıdan kalkmıştı, drift giderildi.)
 CREATE OR REPLACE VIEW public.v_eligible AS
  SELECT h.id,
     h.kupe_no,
@@ -9004,9 +9008,9 @@ CREATE OR REPLACE VIEW public.v_eligible AS
     h.padok,
     son_dogum.tarih AS son_dogum_tarihi,
     CURRENT_DATE - son_dogum.tarih AS dogum_gun,
-    son_aktivite.tarih AS son_aktivite_tarihi,
+    son_event.tarih AS son_aktivite_tarihi,
     CASE
-        WHEN son_aktivite.tarih IS NOT NULL THEN CURRENT_DATE - son_aktivite.tarih
+        WHEN son_event.tarih IS NOT NULL THEN CURRENT_DATE - son_event.tarih
         WHEN son_dogum.tarih   IS NOT NULL THEN CURRENT_DATE - son_dogum.tarih
         WHEN h.dogum_tarihi    IS NOT NULL THEN CURRENT_DATE - h.dogum_tarihi
         ELSE NULL::integer
@@ -9015,14 +9019,26 @@ CREATE OR REPLACE VIEW public.v_eligible AS
      LEFT JOIN LATERAL ( SELECT max(d.tarih) AS tarih
            FROM dogum d
           WHERE d.anne_id = h.id) son_dogum ON true
-     LEFT JOIN LATERAL ( SELECT max(aktivite.tarih) AS tarih
-           FROM ( SELECT tohumlama.tarih
-                   FROM tohumlama
-                  WHERE tohumlama.hayvan_id = h.id
+     LEFT JOIN LATERAL ( SELECT max(ev.tarih) AS tarih
+           FROM ( SELECT t.tarih
+                   FROM tohumlama t
+                  WHERE t.hayvan_id = h.id
                 UNION ALL
-                 SELECT kizginlik_log.tarih
-                   FROM kizginlik_log
-                  WHERE kizginlik_log.hayvan_id = h.id) aktivite) son_aktivite ON true
+                 SELECT k.tarih
+                   FROM kizginlik_log k
+                  WHERE k.hayvan_id = h.id
+                UNION ALL
+                 SELECT t.abort_tarihi
+                   FROM tohumlama t
+                  WHERE t.hayvan_id = h.id AND t.abort_tarihi IS NOT NULL
+                UNION ALL
+                 SELECT t.dogum_tarihi
+                   FROM tohumlama t
+                  WHERE t.hayvan_id = h.id AND t.dogum_tarihi IS NOT NULL
+                UNION ALL
+                 SELECT d.tarih
+                   FROM dogum d
+                  WHERE d.anne_id = h.id) ev) son_event ON true
   WHERE h.cinsiyet = 'Dişi'::text
     AND h.durum = 'Aktif'::text
     AND h.kisir IS NOT TRUE
@@ -9032,8 +9048,7 @@ CREATE OR REPLACE VIEW public.v_eligible AS
     AND h.grup !~~* '%Kucuk%'::text
     AND (h.dogum_tarihi IS NULL OR h.dogum_tarihi <= (CURRENT_DATE - '1 year 1 mon'::interval))
     AND NOT (EXISTS ( SELECT 1 FROM tohumlama t WHERE t.hayvan_id = h.id AND t.sonuc = 'Gebe'::text))
-    AND NOT (EXISTS ( SELECT 1 FROM cases c WHERE c.animal_id = h.id AND c.status = 'active'::text))
-    AND (son_dogum.tarih IS NULL OR son_dogum.tarih < (CURRENT_DATE - 55));
+    AND (son_event.tarih IS NULL OR son_event.tarih < (CURRENT_DATE - 55));
 GRANT SELECT ON public.v_eligible TO anon, authenticated;
 
 -- ── sessiz_hayvanlar_listele ──
