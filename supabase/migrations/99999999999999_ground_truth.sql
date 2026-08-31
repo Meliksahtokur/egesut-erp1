@@ -9001,6 +9001,8 @@ GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenti
 --                  dogum_tarihi(tohumlama), dogum tablosu). Doğum/abort yapan inek eski
 --                  tohumlamadan sayılmaz; son event < 55 gün ise listeye girmez.
 --                  (vaka filtresi 20260830000020 ile canlıdan kalkmıştı, drift giderildi.)
+-- v4 (2026-08-31): düve (event'siz) sessiz_gun ham yaş yerine 13 aylık uygunluk noktasından
+--                  sayılır; RPC p_min_gun=55 ile düve listeye 13 ay + 55 günde girer.
 CREATE OR REPLACE VIEW public.v_eligible AS
  SELECT h.id,
     h.kupe_no,
@@ -9012,7 +9014,7 @@ CREATE OR REPLACE VIEW public.v_eligible AS
     CASE
         WHEN son_event.tarih IS NOT NULL THEN CURRENT_DATE - son_event.tarih
         WHEN son_dogum.tarih   IS NOT NULL THEN CURRENT_DATE - son_dogum.tarih
-        WHEN h.dogum_tarihi    IS NOT NULL THEN CURRENT_DATE - h.dogum_tarihi
+        WHEN h.dogum_tarihi    IS NOT NULL THEN GREATEST(0, CURRENT_DATE - ((h.dogum_tarihi + INTERVAL '1 year 1 mon')::date))
         ELSE NULL::integer
     END AS sessiz_gun
    FROM hayvanlar h
