@@ -38,7 +38,7 @@ BEGIN
       SELECT id, durum INTO v_gecmis_id, v_gecmis_durum FROM public.hayvanlar
        WHERE kupe_no = p_kupe_no AND durum IS DISTINCT FROM 'Aktif'
          AND (p_hayvan_id IS NULL OR id <> p_hayvan_id)
-       ORDER BY cikis_tarihi DESC NULLS LAST LIMIT 1;
+       ORDER BY cikis_tarihi DESC NULLS LAST, id DESC LIMIT 1;
     END IF;
   END IF;
   IF p_devlet_kupe IS NOT NULL AND p_devlet_kupe <> '' THEN
@@ -84,7 +84,7 @@ BEGIN
   END IF;
 
   IF p_cins = 'Erkek' AND p_kupe ~ '^[0-9]+$'
-     AND (p_kupe::int < 500 OR p_kupe::int > 599) THEN
+     AND (p_kupe::numeric < 500 OR p_kupe::numeric > 599) THEN
     RETURN jsonb_build_object('ok', false, 'mesaj',
       'Erkek buzağı küpesi 500-599 aralığında olmalı (girilen: ' || p_kupe || ')');
   END IF;

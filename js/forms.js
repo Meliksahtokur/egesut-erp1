@@ -40,6 +40,11 @@ async function _kupeKontrolEt(alan) {
 
   const modal  = g('m-animal');
   const editId = modal?.dataset.editId || null;
+  // Devlet küpesi GLOBAL teklik (TURKVET, K2) → mesajı ayrı; işletme küpesi
+  // (a-kupe/b-kupe) aktif-filtreli → mesajda "aktif hayvan" nitelendirmesi
+  const cayismaMesaji = alan === 'a-devlet'
+    ? '⚠️ Bu devlet küpesi zaten kayıtlı'
+    : '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)';
   try {
     const params = {
       // b-kupe (doğum formu yavru küpesi) da İŞLETME küpesidir
@@ -48,8 +53,11 @@ async function _kupeKontrolEt(alan) {
     };
     if (editId) params.p_hayvan_id = editId;
     const res = await db.rpc('kupe_musait_mi', params);
+    // Stale-response guard (openDet'in _detOpenId idiomu): await sırasında alan
+    // değiştiyse bu sonucu YAZMA — yeni blur kontrolü zaten yolda
+    if (v(alan).trim() !== deger) return;
     if (res.data && res.data.musait === false) {
-      warnEl.textContent = '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)';
+      warnEl.textContent = cayismaMesaji;
       delete warnEl.dataset.soft;
     } else if (res.data && res.data.kupe_gecmis_id) {
       warnEl.textContent = `ℹ️ Bu numara geçmişte kullanılmış (${res.data.kupe_gecmis_durum || 'çıkmış'}) — yeniden kullanılabilir`;
@@ -62,7 +70,7 @@ async function _kupeKontrolEt(alan) {
     // Fail-aware (test-rapor #1): kontrol hatası sessizce 'müsait' SAYILMAZ.
     // Önceki gerçek uyarı korunur; boşsa yumuşak not (soft) düşülür — submit'i
     // engellemez, kullanıcı durumu GÖRÜR; gerekirse alanı düzenleyip tekrar tetikler.
-    if (!warnEl.textContent) {
+    if (v(alan).trim() === deger && !warnEl.textContent) {
       warnEl.textContent = '⏳ Küpe kontrolü yapılamadı — kayıtta teyit edilir';
       warnEl.dataset.soft = '1';
     }
@@ -176,7 +184,7 @@ async function submitBirth(btn) {
   }
   const anneId = v('b-anne');
   const tarih  = v('b-tarih');
-  const kupe   = v('b-kupe');
+  const kupe   = v('b-kupe').trim();
   const cins   = v('b-cins');
   const tip    = v('b-tip');
   const kg     = Number.parseFloat(g('b-dogum-kg')?.value || '') || null;
@@ -220,6 +228,9 @@ async function submitBirth(btn) {
     ['b-kupe','b-dogum-kg','b-baba','b-baba-text'].forEach(id => { const el = g(id); if (el) el.value = ''; });
     const babaAuto = g('b-baba-auto'); if (babaAuto) babaAuto.style.display = 'none';
     const babaText = g('b-baba-text'); if (babaText) babaText.style.display = 'none';
+    // Küpe kalıntısı: blur uyarısı + soft bayrak + öneri chip listesi (closeM de yapar — belt & braces)
+    const kupeWarn = g('b-kupe-warn'); if (kupeWarn) { kupeWarn.textContent = ''; delete kupeWarn.dataset.soft; }
+    const kupeOner = g('b-kupe-oner-list'); if (kupeOner) kupeOner.style.display = 'none';
 
     if (window.__ileriGebeListesi) {
       window.__ileriGebeListesi = window.__ileriGebeListesi.filter(h => h.hayvan_id !== anne.id);

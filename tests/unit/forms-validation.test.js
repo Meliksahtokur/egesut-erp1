@@ -214,6 +214,43 @@ describe('_kupeKontrolEt (küpe çakışma blur kontrolü)', () => {
     });
   });
 
+  it('alan="a-devlet" + musait:false → "⚠️ Bu devlet küpesi zaten kayıtlı" (GLOBAL kontrol, K2)', async () => {
+    const ctx = kupeSetup({ alan: 'a-devlet', deger: 'TR-999',
+      dbResult: { data: { musait: false, devlet_cakisma_id: 'H-3' }, error: null } });
+    await ctx.sandbox._kupeKontrolEt('a-devlet');
+    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu devlet küpesi zaten kayıtlı');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('stale-response guard: await sırasında alan değeri değişirse sonuç YAZILMAZ (openDet _detOpenId idiomu)', async () => {
+    const ctx = kupeSetup({ dbResult: { data: { musait: false }, error: null } });
+    const input = ctx.document.getElementById('a-kupe');
+    const p = ctx.sandbox._kupeKontrolEt('a-kupe');
+    input.value = 'TR-DIGER'; // kontrol uçuştayken kullanıcı alanı değiştirdi
+    await p;
+    assert.strictEqual(ctx.warn.textContent, '', 'eski (stale) sonucun uyarısı yazılmamalı');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('stale-response guard: gecmis bilgisi de stale ise yazılmaz', async () => {
+    const ctx = kupeSetup({ dbResult: { data: { musait: true, kupe_gecmis_id: 'H-7', kupe_gecmis_durum: 'Satıldı' }, error: null } });
+    const input = ctx.document.getElementById('a-kupe');
+    const p = ctx.sandbox._kupeKontrolEt('a-kupe');
+    input.value = '501';
+    await p;
+    assert.strictEqual(ctx.warn.textContent, '');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('stale-response guard (catch): db hatası + alan değiştiyse soft not da yazılmaz', async () => {
+    const ctx = kupeSetup({ db: { rpc: async () => { throw new Error('db erişilemez'); } } });
+    const input = ctx.document.getElementById('a-kupe');
+    const p = ctx.sandbox._kupeKontrolEt('a-kupe');
+    input.value = 'TR-DIGER';
+    await assert.doesNotReject(() => p);
+    assert.strictEqual(ctx.warn.textContent, '', 'stale istek için soft not düşülmemeli');
+  });
+
   it('db musait:true dönerse → uyarı temizlenir', async () => {
     const ctx = kupeSetup({ dbResult: { data: { musait: true }, error: null } });
     ctx.warn.textContent = '⚠️ Bu küpe zaten kayıtlı';
@@ -812,6 +849,20 @@ describe('submitBirth (küpe revizyonu guardları)', () => {
       warn: '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)' });
     await ctx.sandbox.submitBirth(null);
     assert.ok(ctx.calls.toast.some(t => t.msg === '⚠️ Küpe çakışması var — formu kontrol edin' && t.err));
+    assert.deepStrictEqual(rpcAdlari(ctx), []);
+  });
+
+  it('b-kupe boşluk-dolu (" 501 ") → trim edilir: 5xx kuralı geçer, rpc p_kupe trimmed gider', async () => {
+    const ctx = dogumSetup({ kupe: ' 501 ', cins: 'Erkek' });
+    await ctx.sandbox.submitBirth(null);
+    assert.deepStrictEqual(rpcAdlari(ctx), ['dogum_kaydet']);
+    assert.strictEqual(ctx.calls.rpc[0].params.p_kupe, '501', "küpe trim edilerek iletilmeli (' 501 ' saklanmaz)");
+  });
+
+  it('b-kupe " 123 " + Erkek → trim sonrası 5xx dışı → SERT engel (boşluk dolgusu kuralı atlatamaz)', async () => {
+    const ctx = dogumSetup({ kupe: ' 123 ', cins: 'Erkek' });
+    await ctx.sandbox.submitBirth(null);
+    assert.ok(ctx.calls.toast.some(t => t.msg === '⚠️ Erkek buzağı küpesi 500-599 aralığında olmalı' && t.err));
     assert.deepStrictEqual(rpcAdlari(ctx), []);
   });
 
