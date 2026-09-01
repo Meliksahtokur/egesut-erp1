@@ -32,7 +32,7 @@
 **`hayvan_ekle(…14 aynı alan…, p_padok_id uuid?)`** → jsonb *(overload 2 — C1 düzeltmesi)*
 → Padok ID ile ekleme. Çağrı: forms.js:123-128 `p_padok_id` iletir; GT:7124.
 → **2026-09-01 küpe revizyonu:** gövde başında `kupe_musait_mi(p_kupe_no, p_devlet_kupe)` kontrolü var
-(migration 20260901000001) — aktif çakışma/devlet çakışması → `ok:false`.
+(migration 20260901000002) — aktif çakışma/devlet çakışması → `ok:false`.
 
 **`hayvan_guncelle(p_id, p_kupe_no?, p_devlet_kupe?, p_irk?, p_cinsiyet?, p_dogum_tarihi?, p_grup?, p_padok?, p_dogum_kg?, p_canli_agirlik?, p_boy?, p_renk?, p_ayirici_ozellik?)`** → jsonb
 → Temel güncelleme (14 param).
@@ -43,7 +43,7 @@
 **`hayvan_guncelle(…18 aynı… + p_kisir boolean?)`** → jsonb *(overload 3 — C2)*
 → Kısırlık işareti dahil geniş güncelleme; forms.js:99 `p_kisir` iletir.
 → **2026-09-01 küpe revizyonu:** küpe/devlet değişiyorsa `kupe_musait_mi(p_kupe_no, p_devlet_kupe, p_id)`
-kontrolü (kendi kaydı hariç, migration 20260901000001).
+kontrolü (kendi kaydı hariç, migration 20260901000002).
 
 **`hayvan_kisir_isaretle(p_hayvan_id, p_kisir)`** → jsonb
 → Kısırlık bayrağı. Çağrı: js'te yok — `hayvan_guncelle` overload 3 üzerinden kullanılıyor (RPC olarak kullanılmıyor, DB'de duruyor).
@@ -66,7 +66,7 @@ kontrolü (kendi kaydı hariç, migration 20260901000001).
 
 **`kupe_musait_mi(p_kupe_no?, p_devlet_kupe?, p_hayvan_id?)`** → jsonb
 → Küpe çakışma kontrolü. Çağrı: forms.js `_kupeKontrolEt` (a-kupe/a-devlet **ve b-kupe** blur).
-→ **2026-09-01 küpe revizyonu (migration 20260901000001):** işletme küpesi kontrolü yalnız
+→ **2026-09-01 küpe revizyonu (migration 20260901000002):** işletme küpesi kontrolü yalnız
 `durum='Aktif'` hayvanlarda (recycle K1); devlet küpesi GLOBAL (TURKVET, K2). Dönüşe yeni alanlar:
 `kupe_gecmis_id` + `kupe_gecmis_durum` (numara çıkmış hayvanda kullanılmışsa bilgi amaçlı — engel değil).
 DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanlar(kupe_no) WHERE durum='Aktif' AND kupe_no IS NOT NULL AND kupe_no <> ''` — string-bazlı, "002"≠"02").
@@ -146,7 +146,7 @@ DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanla
 **`dogum_kaydet(p_anne_id, p_tarih, p_kupe, p_cins?, p_tip?, p_kg?, p_baba?, p_hekim_id?)`** → jsonb
 → Doğum + buzağı kaydı + **16 görev** (anne protokol 10 + buzağı 6; d2·d25·d39 Presynch, d53 Ademin+E Vitamini — domain-rules §5).
 → İleri tarih kontrolü frontend'de (forms.js:155); **backend'de yok** (2026-08-31 guard'ı `hayvanlar`/`tohumlama` tablolarında, `dogum_kaydet` RPC'sinde değil — rapor notu).
-→ **2026-09-01 küpe revizyonu (migration 20260901000001):** (1) dup check işletme küpesinde yalnız
+→ **2026-09-01 küpe revizyonu (migration 20260901000002):** (1) dup check işletme küpesinde yalnız
 `durum='Aktif'` filtreli (recycle K1; devlet küpesi GLOBAL kalır), (2) erkek buzağı + sayısal küpe
 500-599 dışı → `ok:false` red (K5 sunucu kuralı; JS tarafı `submitBirth` de sert engeller).
 → Çağrı: forms.js:177; replay: ui.js:6738, 6862.
