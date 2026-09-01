@@ -5332,7 +5332,7 @@ async function renderCaseTimeline(caseId) {
     </div>` : '';
 
   const aktif = _curCase?.status === 'active';
-  const bugun = bugun();
+  const bugunTr = bugun();
 
   // Seans formu için gün verisini sakla (caseSeansFormAc okur)
   _cdDayData = {};
@@ -5390,12 +5390,12 @@ async function renderCaseTimeline(caseId) {
       // Seans planı bölümü — şerit + satırlar
       const seansHtml = (!toh && sessions.length) ? `
         <div class="cd-sec-lbl">⏰ Seans Planı</div>
-        ${renderSeansSerit(sessions, { today: day.date === bugun })}
+        ${renderSeansSerit(sessions, { today: day.date === bugunTr })}
         <div>${sessions.map(s => renderSeansRow(s, { readOnly: !aktif || isDone || isLocked })).join('')}</div>` : '';
 
       // Tohumlama kalemi — ilaç seansıyla aynı satır dilinde
       const tohState = toh
-        ? (isDone ? 'done' : (day.date < bugun ? 'overdue' : (day.date === bugun ? 'now' : 'scheduled')))
+        ? (isDone ? 'done' : (day.date < bugunTr ? 'overdue' : (day.date === bugunTr ? 'now' : 'scheduled')))
         : '';
       const tohDurum = { done: '✓ Kaydedildi', overdue: '⚠ Gecikti', now: '⏱ Vakti geldi', scheduled: '⏳ Planlandı' }[tohState] || '';
       const tohHtml = toh ? `
@@ -5621,14 +5621,14 @@ function caseGunModalRender() {
   const bosluk = (ilkGun + 6) % 7;
   const sonGun = new Date(yil, ay + 1, 0).getDate();
   const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', {month:'long', year:'numeric'});
-  const bugun = bugun();
+  const bugunTr = bugun();
 
   let kareler = '';
   for (let i = 0; i < bosluk; i++) kareler += '<div></div>';
   for (let g = 1; g <= sonGun; g++) {
     const iso = yil + '-' + String(ay+1).padStart(2,'0') + '-' + String(g).padStart(2,'0');
     const secili = _gunSecimSecili.has(iso);
-    const bugunMu = iso === bugun;
+    const bugunMu = iso === bugunTr;
     kareler += '<div onclick="caseGunToggle(&#39;' + iso + '&#39;)" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;' +
       (secili ? 'background:var(--green);color:#fff;' : bugunMu ? 'background:rgba(78,154,42,.15);color:var(--green);border:1.5px solid var(--green);' : 'color:var(--ink);') +
       '">' + g + '</div>';
@@ -5691,14 +5691,14 @@ async function caseGunEkleOnayla() {
 function caseTohumlamaEkleAc() {
   if (!_curCase) return;
   document.getElementById('cd-toh-form')?.remove();
-  const bugun = bugun();
+  const bugunTr = bugun();
   const div = document.createElement('div');
   div.id = 'cd-toh-form';
   div.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:12px;margin-bottom:10px';
   div.innerHTML =
     '<div style="font-size:.74rem;font-weight:700;color:var(--ink2);margin-bottom:8px">🐄 Planlı Tohumlama Ekle</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:10px">' +
-      '<label style="flex:2;font-size:.7rem;color:var(--ink3)">Tarih<input id="cdt-tarih" class="fi" type="date" value="' + bugun + '" style="margin-top:3px"></label>' +
+      '<label style="flex:2;font-size:.7rem;color:var(--ink3)">Tarih<input id="cdt-tarih" class="fi" type="date" value="' + bugunTr + '" style="margin-top:3px"></label>' +
       '<label style="flex:1;font-size:.7rem;color:var(--ink3)">Saat<input id="cdt-saat" class="fi" type="time" value="08:00" style="margin-top:3px"></label>' +
     '</div>' +
     '<div style="display:flex;gap:6px">' +
@@ -8123,8 +8123,8 @@ async function renderTedaviGunSeanslar(treatmentDayId) {
   const isLocked = day?.tamamlandi === true;
   sessions.forEach(s => { s.drug_name = prodMap[s.drug_product_id] || stokMap[s.stok_id] || 'İlaç'; s.planned_date = s.planned_date || day?.treatment_date; });
   sessions.sort((a, b) => (a.planned_time || '').localeCompare(b.planned_time || ''));
-  const bugun = bugun();
-  ribbonEl.innerHTML = renderSeansSerit(sessions, { today: sessions.some(s => s.planned_date === bugun) });
+  const bugunTr = bugun();
+  ribbonEl.innerHTML = renderSeansSerit(sessions, { today: sessions.some(s => s.planned_date === bugunTr) });
   sessionsEl.innerHTML = sessions.map(s => renderSeansRow(s, { readOnly: isLocked })).join('');
   wrap.style.display = 'block';
   startNowCursorLoop();
