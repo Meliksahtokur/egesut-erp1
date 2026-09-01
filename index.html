@@ -2108,9 +2108,9 @@ function renderErrorLog() {
   list.innerHTML = window.errorLog.map((e, i) => `
     <div style="border-bottom:1px solid #333;padding:10px;margin-bottom:5px">
       <div style="color:#ff8888;font-weight:bold;font-size:11px">#${i+1} · ${e.t}</div>
-      <div style="color:#ffcc44;margin-top:4px">${e.msg}</div>
-      ${e.src ? `<div style="color:#88ff88;margin-top:3px;font-size:10px">📍 ${e.src}${e.line ? ':'+e.line : ''}</div>` : ''}
-      ${e.stack ? `<div style="color:#999;margin-top:4px;font-size:10px;white-space:pre-wrap">${e.stack}</div>` : ''}
+      <div style="color:#ffcc44;margin-top:4px">${esc(e.msg)}</div>
+      ${e.src ? `<div style="color:#88ff88;margin-top:3px;font-size:10px">📍 ${esc(e.src)}${e.line ? ':'+e.line : ''}</div>` : ''}
+      ${e.stack ? `<div style="color:#999;margin-top:4px;font-size:10px;white-space:pre-wrap">${esc(e.stack)}</div>` : ''}
     </div>`).join('');
   list.scrollTop = list.scrollHeight;
 }

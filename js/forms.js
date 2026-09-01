@@ -596,10 +596,7 @@ async function submitCase(btn) {
       p_disease_id: diseaseId,
       p_notes:      v('d-case-notes') || null,
     });
-    if (!res?.ok) {
-      toast('❌ ' + (res?.mesaj || 'Vaka açılamadı'), true);
-      return;
-    }
+    // rpc() hata ve ok:false'te throw eder — create_case başarıda ok:true döner
     // #63 — şablon seçildiyse tek tıkla tüm planı uygula
     const sablonId = globalThis._seciliSablonId;
     if (sablonId && res?.case_id) {
@@ -679,7 +676,6 @@ async function abortKaydet(hayvanId, tohId) {
       p_notlar:        notlar || null,
       p_abort_tarihi:  abortTarihi,
     });
-    if (result?.ok === false) { toast('❌ ' + (result.error || result.mesaj), true); return; }
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
     await pullTables(['tohumlama','hayvanlar','islem_log']);
     renderSafe();
@@ -775,8 +771,8 @@ function renderBuzagiPicker(filter) {
     const yas = yasHesapla(a.dogum_tarihi) || 'Yaş?';
     return `<label style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--card2);cursor:pointer">
       <input type="checkbox" data-id="${a.id}" checked style="width:18px;height:18px">
-      <div><div style="font-weight:700;font-size:.85rem">${getDisplayKupe(a)}</div>
-      <div style="font-size:.72rem;color:var(--ink3)">${a.irk || '—'} · ${yas}</div></div></label>`;
+      <div><div style="font-weight:700;font-size:.85rem">${esc(getDisplayKupe(a))}</div>
+      <div style="font-size:.72rem;color:var(--ink3)">${esc(a.irk || '—')} · ${yas}</div></div></label>`;
   }).join('');
 }
 function openSuttenKesModal() {
@@ -1176,7 +1172,6 @@ async function hstKapat() {
   if (!_curHst) return;
   try {
     const res = await rpc('hastalik_kapat', { p_id: _curHst.id });
-    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ Hastalık kaydı kapatıldı');
     closeM('m-hst-det');
     await pullTables(['cases']); renderSafe();
@@ -1236,7 +1231,7 @@ function hstDuzenleAc() {
     const chips = g('sempt-chips'); if (!chips) return;
     const chip = document.createElement('span');
     chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
-    chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="semptomKaldir('${val}',this.parentElement)">✕</span>`;
+    chip.innerHTML = `${esc(val)} <span style="font-size:.9rem;opacity:.7" data-val="${escAttr(val)}" onclick="semptomKaldir(this.dataset.val,this.parentElement)">✕</span>`;
     chips.appendChild(chip);
     if (g('d-sempt')) g('d-sempt').value = _semptomSecili.join(', ');
   });
@@ -1265,7 +1260,6 @@ async function hstGuncelle(btn) {
       p_lokasyon:   v('d-lokasyon') || null,
       p_hekim_id:   v('d-hekim')    || null,
     });
-    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ Güncellendi');
     closeDisease();
     await pullTables(['cases']);
@@ -1280,7 +1274,6 @@ async function hstSilOnay() {
   if (!onay) return;
   try {
     const res = await rpc('hastalik_sil', { p_id: _curHst.id });
-    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('🗑 Kayıt silindi');
     closeM('m-hst-det');
     await pullTables(['cases']); renderSafe();
@@ -1360,7 +1353,6 @@ async function islemGeriAl(btn, islemLogId) {
     if (String(islemLogId).startsWith('toh:')) {
       const tohId = islemLogId.slice(4);
       const res = await rpc('tohumlama_geri_al', { p_tohumlama_id: tohId });
-      if (!res?.ok) throw new Error(res?.hata || 'Geri alma başarısız');
       toast('✅ Kayıt silindi');
       closeM('m-geri-al'); closeM('m-toh-det');
       await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','islem_log']);
@@ -1390,8 +1382,6 @@ async function islemGeriAl(btn, islemLogId) {
     }
 
     const res = await rpc(rpcName, rpcParams);
-    if (!res?.ok) throw new Error(res?.hata || 'Geri alma başarısız');
-
     toast('✅ İşlem geri alındı');
     closeM('m-geri-al');
     closeM('m-toh-det');
@@ -1448,7 +1438,7 @@ async function submitStokAdd(btn) {
     if (mevcut) {
       // Miktarı güncelle (RPC — stok_hareket ile immutable)
       stokId = mevcut.id;
-      const r = await rpc('stok_ekleme', { p_stok_id: stokId, p_miktar: bslg, p_notlar: `Stok güncellendi: ${urun}` });
+      await rpc('stok_ekleme', { p_stok_id: stokId, p_miktar: bslg, p_notlar: `Stok güncellendi: ${urun}` });
       toast(`✅ ${urun} stoku güncellendi (+${bslg} ${birim})`);
     } else if (isIlac) {
       // YENİ İLAÇ — katalog (etken madde) ZORUNLU. Stok oluşturmadan ÖNCE doğrula.
@@ -1476,7 +1466,6 @@ async function submitStokAdd(btn) {
         p_concentration_unit: konstUnit,
         p_default_route:      route
       });
-      if (r && r.ok === false) throw new Error(r.mesaj || 'İlaç eklenemedi');
       stokId = r?.stok_id;
       _drugsCache = [];
       toast(`✅ ${urun} eklendi (kataloglu)`);
@@ -1587,7 +1576,6 @@ async function hstIlacEkle(btn) {
       p_bekleme_gun:   bekleme,
       p_hekim_id:      null,
     });
-    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ İlaç kaydedildi');
     hstIlacFormToggle();
     await renderHstIlaclar(_curHst.id);
@@ -1601,7 +1589,6 @@ async function hstIlacSil(tedaviId) {
   if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
   try {
     const res = await rpc('tedavi_sil', { p_tedavi_id: tedaviId });
-    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast('✅ İlaç silindi');
     await renderHstIlaclar(_curHst.id);
     pullTables(['tedavi','stok','stok_hareket']).then(renderSafe).catch(console.warn);
@@ -1617,7 +1604,6 @@ async function submitDrugStokLink(drugId, stockItemId) {
       p_drug_id:       drugId,
       p_stock_item_id: stockId,
     });
-    if (res?.ok === false) { toast('❌ ' + res.mesaj, true); return; }
     toast(stockId ? '✅ Stok bağlantısı kaydedildi' : '✅ Bağlantı kaldırıldı');
     // drugs cache'ini güncelle (IDB + _drugsCache)
     _drugsCache = [];
@@ -1651,7 +1637,7 @@ async function loadBulkVaccineHayvanlar() {
       list.style.display = 'block';
       list.innerHTML = animals.map(a =>
         `<span style="font-size:.72rem;background:var(--card2);padding:2px 6px;border-radius:4px;margin:2px;display:inline-block">
-          ${a.kupe_no || a.devlet_kupe || a.id}
+          ${esc(a.kupe_no || a.devlet_kupe || a.id)}
         </span>`
       ).join('');
     }
@@ -1750,7 +1736,7 @@ async function loadBulkIlacHayvanlar() {
       list.style.display = 'block';
       list.innerHTML = animals.map(a =>
         `<span style="font-size:.72rem;background:var(--card2);padding:2px 6px;border-radius:4px;margin:2px;display:inline-block">
-          ${a.kupe_no || a.devlet_kupe || a.id}
+          ${esc(a.kupe_no || a.devlet_kupe || a.id)}
         </span>`
       ).join('');
     }
@@ -1790,11 +1776,8 @@ async function submitBulkIlac() {
     if (div) {
       const errors = result.errors || [];
       div.innerHTML = `<div style="margin-top:8px;font-size:.8rem">
-        ${result.ok === false
-          ? `⚠️ ${result.mesaj}`
-          : `✅ ${result.success}/${result.total} hayvana uygulandı
-             ${errors.length ? '<br>⚠️ ' + errors.map(e=>e.error).join(', ') : ''}`
-        }
+        ✅ ${result.success}/${result.total} hayvana uygulandı
+        ${errors.length ? '<br>⚠️ ' + errors.map(e=>esc(e.error)).join(', ') : ''}
       </div>`;
     }
     if (result.success > 0) {
@@ -1933,7 +1916,6 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
   if (btn) btn.textContent = '…';
   try {
     const res = await rpcSeansTamamla(seansId, uygulanmadi, null);
-    if (res?.ok === false) throw new Error(res.mesaj || 'Hata');
     toast(uygulanmadi ? '↩ Yapılamadı işaretlendi, stok iade edildi' : '✓ Seans tamamlandı');
     await pullTables(['treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'treatment_days', 'gorev_log', 'cases']);
     // Açık görünümleri tazele
@@ -1979,16 +1961,14 @@ async function submitAsiEkle(btn){
   };
   if(btn){ btn.disabled=true; btn.textContent='Kaydediliyor…'; }
   try{
-    let r;
     // baslangic_stok/esik hem ekleme hem (stoksuz aşıya sonradan stok bağlama — Ö1) düzenlemede geçer
     params.p_baslangic_stok = s.baslangic_stok ? parseFloat(s.baslangic_stok) : null;
     params.p_esik = s.esik ? parseFloat(s.esik) : 0;
     if(s.id){
-      r = await rpc('asi_guncelle', { p_vaccine_id:s.id, ...params });
+      await rpc('asi_guncelle', { p_vaccine_id:s.id, ...params });
     } else {
-      r = await rpc('asi_ekle', params);
+      await rpc('asi_ekle', params);
     }
-    if(r && r.ok===false) throw new Error(r.mesaj||'Kaydedilemedi');
     toast(`✅ ${s.name} kaydedildi`);
     closeM('m-asi-ekle');
     await pullTables(['vaccines','vaccine_diseases','vaccine_protocol_steps','stok','stok_hareket']).catch(()=>{});
