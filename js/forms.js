@@ -20,7 +20,7 @@
    loadDrugsCache, loadStock, loadDash, loadTasks, loadUreme, loadGecmis,
    loadBildirimler, loadStokPanel, openDet, closeDet, openStokPanel,
    openAnimalEdit, closeAnimalEdit, getDisplayKupe, yasHesapla, loadIrkDropdown,
-   erkekKupeUygunMu
+   erkekKupeUygunMu, hayvanByKupeRef
 */
 
 // ── KÜPE ÇAKIŞMA KONTROLÜ (blur) ────────────
@@ -190,7 +190,7 @@ async function submitBirth(btn) {
     toast('⚠️ Erkek buzağı küpesi 500-599 aralığında olmalı', true); return;
   }
 
-  const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
+  const anne = hayvanByKupeRef(anneId); // K7: küpe eşleşmesinde aktif önce
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
 
   // UI Telemetry: doğum submit
@@ -307,7 +307,7 @@ async function submitInsem(btn) {
   if (!hid || !tarih || !sperma) { toast('Küpe, Tarih ve Sperma zorunlu', true); return; }
   if (tarih > bugun()) { toast('Tohumlama tarihi ileri tarih olamaz', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   // UI Telemetry: tohumlama submit
@@ -448,7 +448,7 @@ async function submitKizginlik(btn) {
   if (!hid || !tarih) { toast('Küpe ve Tarih zorunlu', true); return; }
   if (tarih > bugun()) { toast('Kızgınlık tarihi ileri tarih olamaz', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -571,7 +571,7 @@ async function submitCase(btn) {
   if (!hid)       { toast('Hayvan seçilmedi', true); return; }
   if (!diseaseId) { toast('Hastalık seçilmedi', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
@@ -995,7 +995,7 @@ function vChkChange(chk){
   if(!rows) return;
   if(chk.checked){
     const hid=v('v-hid');
-    const hayvan=getState('animals').find(a=>a.kupe_no===hid||a.id===hid||a.devlet_kupe===hid);
+    const hayvan=hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
     const naive=hayvan? _vaccineNaive(hayvan.id,id):true;
     const step2=_vStep2(id);
     const rid=chk.dataset.rid!==''?parseInt(chk.dataset.rid,10):null;
@@ -1031,7 +1031,7 @@ async function submitVaccination(btn) {
   if (!secili.length) { toast('⚠️ En az bir aşı seçin', true); return; }
   if (!date) { toast('⚠️ Tarih girin', true); return; }
   if (date > bugun()) { toast('İleri tarih girilemez', true); return; }
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -1098,7 +1098,7 @@ async function submitTaskAdd(btn) {
     // B15: devlet_kupe de denenir; serbest metin hayvana bağlanamıyorsa görev
     // yaratılmaz — eskiden yazılan string gorev_log.hayvan_id'ye giriyor, gece
     // cron'u (gorev_orphan_temizle) görevi sessizce siliyordu
-    const hayvan = hid ? (getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid)) : null;
+    const hayvan = hid ? hayvanByKupeRef(hid) : null; // K7: küpe eşleşmesinde aktif önce
     if (hid && !hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil — hayvan alanını boş bırakırsanız genel görev oluşur`, true); return; }
     await write('gorev_log', {
       id: crypto.randomUUID(), hayvan_id: hayvan?.id || null,

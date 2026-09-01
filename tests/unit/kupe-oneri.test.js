@@ -183,3 +183,82 @@ test('property: erkekKupeUygunMu ↔ bosKupeOner erkek havuzu tutarlı', () => {
     assert.strictEqual(erkekKupeUygunMu(k, 'Dişi'), true);
   }), { numRuns: 300 });
 });
+
+// ── ui.js hayvanByKupeRef (K7 aktif-öncelik resolver) ────────────
+// Cerrahi extraction: ui.js'in tamamı yüklenmeden sadece bu fonksiyon test edilir.
+// Fonksiyon gövdesi global getState kullanır — kaynak metni getState stub'lı
+// taze vm context'inde değerlendirip hayvan listesini enjekte ediyoruz.
+test('hayvanByKupeRef: aktif-öncelik + id/küpe/devlet eşleşmesi (K7)', () => {
+  const { extractFunctionSource } = require('./support/loadModule.js');
+  const vm = require('node:vm');
+  const src = extractFunctionSource('js/ui.js', 'hayvanByKupeRef');
+  const mk = (list) => vm.runInContext(`(${src})`, vm.createContext({ getState: () => list }));
+
+  const aktif = { id: 'h-yeni', kupe_no: '7', devlet_kupe: 'TR-7', durum: 'Aktif' };
+  const cikan = { id: 'h-eski', kupe_no: '7', devlet_kupe: 'TR-9', durum: 'Öldü' };
+
+  const fKarishik = mk([cikan, aktif]);
+  assert.strictEqual(fKarishik('7'), aktif, 'küpe eşleşmesinde aktif önce (sıra ne olursa olsun)');
+  assert.strictEqual(fKarishik('h-eski'), cikan, 'id eşleşmesi aynen çalışır');
+  assert.strictEqual(fKarishik('TR-7'), aktif, 'devlet küpesi eşleşmesi aynen çalışır');
+  assert.strictEqual(fKarishik('TR-9'), cikan, 'çıkışlı hayvanın devlet küpesi hâlâ bulunur');
+
+  const fSadeceCikan = mk([cikan]);
+  assert.strictEqual(fSadeceCikan('7'), cikan, 'aktif yoksa çıkışlı bulunur (geriye uyumlu)');
+
+  assert.strictEqual(mk([])('7'), undefined, 'boş listede undefined');
+  assert.strictEqual(mk([aktif])(null), undefined, 'null referans → undefined');
+  assert.strictEqual(mk([null, aktif])('7'), aktif, 'bozuk (null) kayıt patlatmaz');
+});
+
+// ── ui.js kupeOnerGoster/kupeOnerSec (K6 öneri butonu akışı) ────
+// Her iki handler da cerrahi extraction ile alınır; document/getState/bosKupeOner
+// stub+gerçek karışımı tek vm context'ine bağlanır. Chip'ler HTML attribute
+// onclick ile render edilmeli (modal router kuralı — DOM property YASAK).
+test('kupeOnerGoster/Sec: cinsiyete göre chip render, inline onclick, seçim inputa yazılır', () => {
+  const { extractFunctionSource, makeDomStub, makeElement } = require('./support/loadModule.js');
+  const vm = require('node:vm');
+  const srcG = extractFunctionSource('js/ui.js', 'kupeOnerGoster');
+  const srcS = extractFunctionSource('js/ui.js', 'kupeOnerSec');
+
+  const doc = makeDomStub();
+  const bInput = doc.__setEl('b-kupe', Object.assign(makeElement('input'), { value: '' }));
+  doc.__setEl('b-cins', Object.assign(makeElement('select'), { value: 'Erkek' }));
+  const bListe = doc.__setEl('b-kupe-oner-list', makeElement('div'));
+  const aInput = doc.__setEl('a-kupe', Object.assign(makeElement('input'), { value: '' }));
+  doc.__setEl('a-cinsiyet', Object.assign(makeElement('select'), { value: '' })); // cinsiyet BOŞ
+  const aListe = doc.__setEl('a-kupe-oner-list', makeElement('div'));
+
+  let kontrolTetiklenen = null;
+  const ctx = vm.createContext({
+    document: doc,
+    getState: () => [{ id: 'h1', kupe_no: '500', durum: 'Aktif' }], // erkek 500 dolu
+    bosKupeOner, // gerçek config.js fonksiyonu (drift olmasın)
+    _kupeKontrolEt: (alan) => { kontrolTetiklenen = alan; },
+  });
+  const fns = vm.runInContext(`({ goster: ${srcG}, sec: ${srcS} })`, ctx);
+
+  // Erkek havuzu: 500 dolu → ilk öneri 501; chip inline onclick attribute'lu
+  fns.goster('b-kupe');
+  assert.strictEqual(bListe.style.display, 'flex');
+  assert.ok(bListe.innerHTML.includes('ek-chip'), 'mevcut chip sınıfı kullanılmalı');
+  assert.ok(bListe.innerHTML.includes("kupeOnerSec('b-kupe','501')"),
+    'chip HTML attribute onclick ile inline bağlanmalı (modal router kuralı)');
+  assert.ok(!bListe.innerHTML.includes("'500'"), 'aktif hayvanın numarası önerilmez');
+
+  // Tekrar tık → kapanır (toggle)
+  fns.goster('b-kupe');
+  assert.strictEqual(bListe.style.display, 'none');
+
+  // Manuel form + cinsiyet boş → dişi havuzu + açıklayıcı not
+  fns.goster('a-kupe');
+  assert.strictEqual(aListe.style.display, 'flex');
+  assert.ok(aListe.innerHTML.includes('Cinsiyet seçili değil'), 'dişi havuzu notu gösterilmeli');
+  assert.ok(aListe.innerHTML.includes("kupeOnerSec('a-kupe','1')"), 'dişi havuzu 1 ile başlar');
+
+  // Seçim → inputa yaz + liste kapanır + blur ön kontrolü tetiklenir
+  fns.sec('b-kupe', '501');
+  assert.strictEqual(bInput.value, '501');
+  assert.strictEqual(bListe.style.display, 'none');
+  assert.strictEqual(kontrolTetiklenen, 'b-kupe', 'seçim sonrası _kupeKontrolEt tetiklenmeli');
+});

@@ -745,11 +745,14 @@ describe('ek uygulama akışı (ekChipSec → ekUygulamaEkle → ekUygulama_sil)
 // ══════════════════════════════════════════════════════════════════════
 describe('submitBirth (küpe revizyonu guardları)', () => {
   function dogumSetup({ cins = 'Erkek', kupe = '123', warn, warnSoft } = {}) {
+    const animals = [{ id: 'anne-1', kupe_no: 'A-1', durum: 'Aktif' }];
     const ctx = setupForms({
-      state: { animals: [{ id: 'anne-1', kupe_no: 'A-1', durum: 'Aktif' }] },
+      state: { animals },
       extra: {
         navigator: { onLine: true },
         erkekKupeUygunMu,
+        // ui.js'te tanımlı resolver'ın davranış aynası (id/küpe/devlet eşleşmesi)
+        hayvanByKupeRef: (ref) => animals.find(a => a.id === ref || a.kupe_no === ref || a.devlet_kupe === ref),
         bugun,
         uiLog: () => {},
         closeM: () => {},
