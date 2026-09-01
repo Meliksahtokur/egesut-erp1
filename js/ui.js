@@ -7913,7 +7913,7 @@ async function bildirimKontrol(){
       gosterilen[key]=simdi;
     }
     const sabahKey=`${g2.id}_sabah`;
-    if(g2.hedef_tarih===bugun&&fark>=-0.5&&fark<=0.5&&!gosterilen[sabahKey]){
+    if(g2.hedef_tarih===bugunStr&&fark>=-0.5&&fark<=0.5&&!gosterilen[sabahKey]){
       const hayvan=getState('animals').find(a=>a.id===g2.hayvan_id);
       const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe):'Genel';
       new Notification(`📋 Bugün: ${kupe}`,{body:g2.aciklama||'',tag:sabahKey});
