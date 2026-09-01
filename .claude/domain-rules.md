@@ -154,7 +154,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 ## 5. Doğum Kaydı
 
-### `dogum_kaydet` RPC'nin Yaptıkları (16 görev üretir)
+### `dogum_kaydet` RPC'nin Yaptıkları (ilk yavru: 17 görev — 10 anne + 7 buzağı; 2.+ yavru: yalnız 7 buzağı görevi)
 
 1. `dogum` tablosuna kayıt ekler
 2. Buzağıyı `hayvanlar` tablosuna ekler (grup: Süt İçen Buzağı, padok: **Buzağı Padok (Süt İçenler)**)
@@ -175,6 +175,16 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
    - Ademin (1. gün)
    - Maya (1. gün)
    - Probiyotik (1. gün)
+
+### İkiz / Çoklu Doğum (2026-09-01, migration 20260901000001 — spec: docs/2026-09-01-ikiz-dogum-modeli-spec.md)
+
+- `dogum.olay_id uuid`: 1 doğum olayı = 1 olay_id; her buzağı ayrı `dogum` satırı (1 satır = 1 buzağı)
+- **Olay penceresi 10 gün:** aynı annede pencere içinde yeni doğum girilirse aynı olaya bağlanır → dönüş `coklu_dogum: true, yavru_sirasi`; yalnız 7 buzağı görevi açılır
+- **Anne görev guard'ı 60 gün:** yakın doğum varsa 10 anne görevi + tohumlama kapatma + grup/padok + protokol + BESLEME iptali ASLA tekrarlanmaz (kullanıcı kuralı: "birinci yavrunun hiçbir anne görevi tekrarlanmaz")
+- Aynı (anne_id, yavru_kupe) ikinci kez gönderilemez — RPC reddeder (typo → yanlış ikiz engeli)
+- Kardeş tanımı (frontend, `_kardeslerBul`): aynı `anne_id` + aynı `dogum_tarihi` → hayvan kartında `Anne:` bloğu altında kardeş satırı
+- UI: doğumdan sonraki 10 günde anne kartında "➕ Bu doğuma yavru ekle" butonu (anne/tarih/baba prefilled modal; `ikinciYavruAc`)
+- `dogum_sayisi` = `COUNT(DISTINCT olay_id)` (`hayvan_belirsiz_ureme_listele` + `v_ureme_dongusu`); buzağı sayısı = satır sayısı
 
 ### Doğum Kuralları
 

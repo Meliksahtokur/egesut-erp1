@@ -144,7 +144,7 @@ DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanla
 ## Doğum
 
 **`dogum_kaydet(p_anne_id, p_tarih, p_kupe, p_cins?, p_tip?, p_kg?, p_baba?, p_hekim_id?)`** → jsonb
-→ Doğum + buzağı kaydı + **ikiz olay modeli** (olay_id, 10g pencere, 60g anne guard; 2026-09-01 ikiz deploy). Görev sayısı: anne yan-etki 9 + buzağı 7 (yakın doğum varsa anne ayağı atlanır).
+→ Doğum + buzağı kaydı + **ikiz olay modeli** (olay_id, 10g pencere, 60g anne guard; 2026-09-01 ikiz deploy). Görev sayısı: anne yan-etki 10 + buzağı 7 = 17 (yakın doğum varsa anne ayağı atlanır → 7).
 → İleri tarih kontrolü frontend'de (forms.js:155); **backend'de yok** (2026-08-31 guard'ı `hayvanlar`/`tohumlama` tablolarında, `dogum_kaydet` RPC'sinde değil — rapor notu).
 → **2026-09-01 küpe revizyonu (migration 20260901000002):** (1) dup check işletme küpesinde yalnız
 `durum='Aktif'` filtreli (recycle K1; devlet küpesi GLOBAL kalır), (2) erkek buzağı + sayısal küpe
