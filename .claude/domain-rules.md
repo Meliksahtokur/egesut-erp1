@@ -30,6 +30,8 @@ Yeni özellik geliştirirken veya mevcut kodu değiştirirken bu kurallara uyulm
 | **Mevcut erkekler (K12)** | Kural yalnız **yeni** kayıtlar; mevcut aktif Erkek 5xx dışı küpelere DOKUNULMAZ. Sürüden çıkınca numaraları havuza döner. |
 | **Aktif-öncelik arama (K7)** | Aynı küpe string'i geçmişte çıkmışta + bugün aktifte varsa arama/detay/asistan **aktif** hayvanı bulur (`hayvanByKupeRef` js/ui.js; `asistan_hayvan_detay` ORDER BY aktif DESC). |
 
+**Deploy durumu:** canlıda aktif (2026-09-01, Management API deploy). Bağlam: `.claude/specs/2026-09-01-buzagi-kupe-revizyon-kararlar.md`; RPC özetleri `rpc-reference.md`.
+
 ---
 
 ## 2. Hayvan Grupları ve Padok Eşlemeleri

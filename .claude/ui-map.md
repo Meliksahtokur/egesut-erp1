@@ -126,3 +126,14 @@
 **Offline/sync değişikliği:**
 - Agent A: api.js 97–547 (IDB + kuyruk + syncNow)
 - Agent B: ui.js 6677–6941 (data traffic + buildRpcParams)
+
+## 2026-09-01 Deltası — Küpe Revizyonu (satır aralıkları ~+40 kaymış olabilir)
+
+| Yer | Yeni | Not |
+|---|---|---|
+| index.html (m-birth) | `b-kupe-warn` warn elementi, `b-kupe-oner` 💡 butonu, `onblur="_kupeKontrolEt('b-kupe')"` | doğum formu küpe ön kontrolü + öneri |
+| index.html (m-animal) | `a-kupe-oner` 💡 butonu | manuel hayvan ekleme önerisi |
+| js/config.js | `bosKupeOner()`, `erkekKupeUygunMu()`, `KUPE_ERKEK_MIN/MAX` | saf fonksiyonlar (K5/K10/K11) |
+| js/ui.js (~2460-2490) | `hayvanByKupeRef()`, `kupeOnerGoster()`, `kupeOnerSec()` | aktif-öncelik lookup + popover (chip list `ek-chip`, HTML attribute onclick — modal router uyumlu) |
+| js/forms.js | `submitBirth` (trim + b-kupe-warn gate + erkek sert engel), `submitAnimal` (erkek uyarı), `_kupeKontrolEt` (üç durumlu + stale-guard) | |
+| js/utils/modal.js | `_kupeFormKalintiTemizle()` | closeM'de b/a warn + öneri listesi temizliği |
