@@ -16,7 +16,24 @@ export const STUB = !!process.env.PLAYWRIGHT_STUB_BACKEND;
 
 const DEMO_URL = 'https://vtzqjmazsvurxdeondmi.supabase.co';
 const DEMO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0enFqbWF6c3Z1cnhkZW9uZG1pIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI5NDc0OTcsImV4cCI6MjA5ODUyMzQ5N30.t9Bq7jZhV316SYt0HH5tih78dCckxHuUjdHUA9GeAs8';
+// js/api.js DEMO_LOGIN ile aynı — demo projesinde anon rolün tablo okuma
+// yetkisi yok (2026-09 restore sonrası GRANT kaybı, REST 42501); UI demo
+// autologin ile authenticated çektiği için DB doğrulamaları da aynı yoldan
+// okur (bkz. rapor: demo anon-yetki bulgusu).
+const DEMO_LOGIN = { email: 'demo@egesut.web', password: 'demo2026' };
 const supabase = STUB ? null : createClient(DEMO_URL, DEMO_KEY);
+
+// Oturum isteklerini tek seferlik önbelleğe alır (worker başına 1 login).
+let sessionPromise = null;
+function demoSession() {
+  if (!sessionPromise) {
+    sessionPromise = supabase.auth.signInWithPassword(DEMO_LOGIN).then(res => {
+      if (res.error) throw res.error;
+      return res.data;
+    });
+  }
+  return sessionPromise;
+}
 
 export async function openApp(page) {
   if (STUB) await installStubBackend(page);
@@ -72,6 +89,7 @@ export async function gorevByMarker(marker) {
   if (STUB) {
     return store.gorev_log.find(r => (r.aciklama || '').includes(marker)) || null;
   }
+  await demoSession();
   const { data } = await supabase.from('gorev_log').select('id,tamamlandi').eq('aciklama', marker);
   return data?.[0] ?? null;
 }
@@ -79,6 +97,7 @@ export async function gorevByMarker(marker) {
 // gorev_log'a marker'lı satırın DB/endpoint'e ulaşmış olması
 export async function gorevReachedBackend(marker) {
   if (STUB) return insertLog.some(e => e.table === 'gorev_log' && e.rows.some(r => (r.aciklama || '').includes(marker)));
+  await demoSession();
   const { data } = await supabase.from('gorev_log').select('id').eq('aciklama', marker);
   return (data?.length || 0) > 0;
 }
