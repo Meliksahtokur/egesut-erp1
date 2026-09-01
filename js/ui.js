@@ -5469,7 +5469,7 @@ async function renderCaseTimeline(caseId) {
   // Re-render sonrası scroll konumunu geri yükle (içerik yüksekliği benzer → başa kaymaz)
   if (_sc && prevY) _sc.scrollTop = prevY;
   // Bugünün şeritlerinde şimdi çizgisini canlı tut
-  if (sortedDays.some(d => (d.sessions || []).length && d.date === bugun)) startNowCursorLoop();
+  if (sortedDays.some(d => (d.sessions || []).length && d.date === bugunTr)) startNowCursorLoop();
   } catch(e) {
     el.innerHTML = `<span style="color:var(--red);font-size:.78rem">Yüklenemedi: ${esc(e.message)}</span>`;
   }
