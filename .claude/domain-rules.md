@@ -161,13 +161,12 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 3. Buzağıya anne ırkı atanır
 4. Buzağıya baba bilgisi (`p_baba`) yazılır
 5. Annenin açık tohumlama kaydını `sonuc = 'Doğum Yaptı'` olarak kapatır
-6. Anneye doğum sonrası ilaç protokolü görevleri oluşturur (10 görev, Presynch-14 şeması):
+6. Anneye doğum sonrası ilaç protokolü görevleri oluşturur (10 görev):
    - Doğum günü: Oksitosin + Ademin + Kalsiyum (3 ayrı görev)
-   - 2. Gün: PG
-   - 25. Gün: PG
-   - 39. Gün: PG
-   - 53. Gün: Ademin + **E Vitamini** (etken_kod `E_VIT`; "Yeldif" bir ürün adı değil E vit sınıfıdır)
-   - 58–63. Gün: Kızgınlık takibi
+   - 2. Gün: PG · 11. Gün: PG · 25. Gün: PG
+   - 53. Gün: Ademin + E Vitamini (Yeldif)
+   - 54. Gün: E Vitamini (Yeldif)
+   - 58-63. gün: kızgınlık takibi
 7. Buzağıya ilk gün bakım görevleri oluşturur (6 alt görev):
    - Kolostrum (ilk 2 saat)
    - Göbek kordonu dezenfeksiyonu (iyot)

@@ -24,7 +24,7 @@
 
 ## 2. Uygulama paketi sırası
 
-1. **Migration** `supabase/migrations/20260901000001_kupe_revizyon.sql` (tek transaction): `kupe_musait_mi` aktif-filtre + `kupe_gecmis_id/durum` dönüş alanları · `dogum_kaydet` kontrol ayrımı (işletme=aktif, devlet=global) + erkek 5xx sunucu kuralı · partial unique index `hayvanlar_kupe_no_key` · h11 `hayvan_ekle`/`hayvan_guncelle` overload'larına `kupe_musait_mi` çağrısı · `asistan_hayvan_detay` aktif-öncelik ORDER BY · `NOTIFY pgrst`. Deploy öncesi aktif-küpe dublikasyon taraması (beklenen: 0).
+1. **Migration** `supabase/migrations/20260901000002_kupe_revizyon.sql` (tek transaction): `kupe_musait_mi` aktif-filtre + `kupe_gecmis_id/durum` dönüş alanları · `dogum_kaydet` kontrol ayrımı (işletme=aktif, devlet=global) + erkek 5xx sunucu kuralı · partial unique index `hayvanlar_kupe_no_key` · h11 `hayvan_ekle`/`hayvan_guncelle` overload'larına `kupe_musait_mi` çağrısı · `asistan_hayvan_detay` aktif-öncelik ORDER BY · `NOTIFY pgrst`. Deploy öncesi aktif-küpe dublikasyon taraması (beklenen: 0).
 2. **JS doğrulama:** `_kupeKontrolEt` üç durumlu (aktif çakışma=engel / geçmiş kullanım=bilgi / temiz) + `b-kupe` blur ön kontrolü; `submitBirth` erkek sert engel; `submitAnimal` erkek uyarısı.
 3. **JS öneri:** `js/config.js` sabitler + saf hesap fonksiyonları (`bosKupeOner`, `erkekKupeUygunMu`); formlarda "Boş küpeler" butonu (HTML attribute onclick — modal router kuralı).
 4. **JS aktif-öncelik sweep (K7).**

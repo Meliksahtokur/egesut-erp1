@@ -201,7 +201,7 @@ BEGIN
 
   RETURN jsonb_build_object(
     'ok', true, 'buzagi_id', v_buzagi_id, 'dogum_id', v_dogum_id,
-    'gorev_sayisi', (CASE WHEN v_anne_yan_etki THEN 9 ELSE 0 END) + 7,
+    'gorev_sayisi', (CASE WHEN v_anne_yan_etki THEN 10 ELSE 0 END) + 7,
     'anne_inst_id', v_anne_inst_id,
     'buzagi_inst_id', v_buzagi_inst_id, 'tohumlama_kapatildi', v_sayac,
     'coklu_dogum', v_ikinci, 'olay_id', v_olay_id, 'yavru_sirasi', v_yavru_sirasi
