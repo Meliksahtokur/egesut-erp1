@@ -67,6 +67,11 @@ END; $func$ LANGUAGE plpgsql;
 --    Yalnızca 2 değişiklik:
 --    a) Dup check: işletme küpesi yalnız AKTİFlerde çakışır (K1); devlet GLOBAL (K2)
 --    b) Erkek + sayısal küpe + 500-599 dışı → red (K5, ::numeric — int4 overflow koruması)
+--    NOT (merge 2026-09-01): canlı dump'taki `buzazi_kupe` yazımı, main'e merge edilip canlıya
+--    deploy edilmiş DOĞRULANMIŞ ikiz gövdesiyle (20260901000001: `buzagi_kupe`, GT:1927 kolonu,
+--    20260730000002 gövdesi) uyumlu olması için `buzagi_kupe` olarak düzeltildi — dump satırı
+--    transkripsiyon artefaktı kabul edildi. Deploy öncesi teyit: pg_get_functiondef'de
+--    'buzagi_kupe' görünmeli.
 -- ----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.dogum_kaydet(p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text)
  RETURNS jsonb
@@ -167,7 +172,7 @@ BEGIN
       (gen_random_uuid(), p_anne_id, 'DIGER','⚡ 58-63. gün kızgınlık takibi', p_tarih + 58, false, 'DOGUM-' || p_anne_id, NULL, v_anne_inst_id);
 
     UPDATE public.tohumlama
-    SET sonuc = 'Doğum Yaptı', dogum_tarihi = p_tarih, buzazi_kupe = p_kupe
+    SET sonuc = 'Doğum Yaptı', dogum_tarihi = p_tarih, buzagi_kupe = p_kupe
     WHERE hayvan_id = p_anne_id AND sonuc = 'Gebe';
     GET DIAGNOSTICS v_sayac = ROW_COUNT;
 

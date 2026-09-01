@@ -217,7 +217,11 @@ async function submitBirth(btn) {
       p_hekim_id: v('b-hekim') || null,
     });
 
-    toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${data?.gorev_sayisi ?? 0} görev oluşturuldu`);
+    if (data?.coklu_dogum) {
+      toast(`✅ İkiz kaydedildi — ${kupe} bu doğuma ${data.yavru_sirasi}. yavru olarak eklendi (${data.gorev_sayisi ?? 0} görev)`);
+    } else {
+      toast(`✅ Doğum kaydedildi — ${kupe} sürüye eklendi, ${data?.gorev_sayisi ?? 0} görev oluşturuldu`);
+    }
     closeM('m-birth');
 
     // Formu sıfırla
