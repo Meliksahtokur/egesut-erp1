@@ -784,6 +784,96 @@ async function toggleSub(subId,parentId,el){
   await loadTasks(_curTaskFilter||'today');
   loadDash();
 }
+// ── Görev detay modalı: alt görev paneli + grup tamamlama (bölünme fix'i, 2026-09-01) ──
+// Özel tipli alt görevler asla düz PATCH ile kapatılmaz: kendi RPC'leri (aşı kaydı,
+// besleme zinciri, tedavi seansı, sütten kesme) bypass edilirdi. Bunlar modalda
+// statik bilgi satırıdır ('⚙ form ile kapatılır'); tıklanabilir checkbox yalnız
+// plain alt görevlerde. Ana görev, hiçbir tipte açık çocuk kalmadığında kapanır —
+// aksi hâlde kapanan parent'ın açık çocukları top-level karta bölünür (analiz §2).
+const OZEL_ALT_TIPLER=['ILERI_GEBE_ASI','BESLEME','TEDAVI_GUN','TEDAVI_SEANS','TOHUMLAMA_PLANLI','SUTTEN_KESME'];
+function detayAltTiklanabilir(sub){ return !OZEL_ALT_TIPLER.includes(sub.gorev_tipi||''); }
+// Tamamla butonu etiketi: açık plain alt yoksa mevcut etiket, varsa grup sayacı.
+function detayBtnEtiketi(acikSafSayi){
+  if(!acikSafSayi||acikSafSayi<=0) return '✅ Tamamlandı Olarak İşaretle';
+  return `✅ ${acikSafSayi} alt görevle birlikte tamamla`;
+}
+// td-subs içeriği: bugünkü görsel dil korunur (yuvarlak st-check + üstü çizili done
+// etiketi). Plain satırlar toggleSubDet'e HTML attribute onclick ile bağlanır —
+// DOM property onclick modal router ile yarışır (AGENTS.md kuralı, 684534f deseni).
+function renderTaskDetSubs(subsDone,subsAcik,parentId){
+  const head=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Alt Görevler (${subsDone.length}/${subsDone.length+subsAcik.length})</div>`;
+  const rows=[...subsDone,...subsAcik].map(s=>{
+    const label=(()=>{try{const p=JSON.parse(s.aciklama||'{}');return esc(p.label||s.aciklama);}catch(e){return esc(s.aciklama);}})();
+    const tik=detayAltTiklanabilir(s);
+    const check=`<div class="st-check ${s.tamamlandi?'done':''}"${tik?` onclick="toggleSubDet('${s.id}','${parentId}',this)"`:''} style="width:18px;height:18px;background:${s.tamamlandi?'var(--green)':'var(--card2)'};border:2px solid ${s.tamamlandi?'var(--green)':'var(--card3)'};${tik?'cursor:pointer':'cursor:default'}">${s.tamamlandi?'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>':''}</div>`;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
+      ${check}
+      <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${label}${tik?'':'<span style="font-size:.62rem;color:var(--ink3);margin-left:6px">⚙ form ile kapatılır</span>'}</span>
+    </div>`;
+  }).join('');
+  return head+rows;
+}
+// td-subs panelini + tamamla butonu etiketini IDB'den taze okuyup yeniden çizer
+// (toggleSubDet ve grupTamamla ortak çıktısı — modal içi sayaç/etiket senkronu, K1).
+async function _detaySubsVeEtiket(parentId){
+  const all=await idbGetAll('gorev_log');
+  const subsDone=all.filter(s=>s.parent_id===parentId&&s.tamamlandi);
+  const subsAcik=all.filter(s=>s.parent_id===parentId&&!s.tamamlandi);
+  const subsEl=document.getElementById('td-subs');
+  if(subsEl){
+    if(subsDone.length+subsAcik.length>0){
+      subsEl.style.display='block';
+      subsEl.innerHTML=renderTaskDetSubs(subsDone,subsAcik,parentId);
+    } else { subsEl.style.display='none'; }
+  }
+  const btn=document.getElementById('td-tamam-btn');
+  // Etiketi yalnız standart tamamla butonuna yaz — TOHUMLAMA_PLANLI override'ını ve
+  // gizli butonlu özel tipleri (ILERI_GEBE_ASI/TEDAVI_GUN) ezme.
+  if(btn&&_curTaskDet&&_curTaskDet.id===parentId&&btn.style.display!=='none'&&_curTaskDet.gorev_tipi!=='TOHUMLAMA_PLANLI'){
+    btn.textContent=detayBtnEtiketi(subsAcik.filter(s=>detayAltTiklanabilir(s)).length);
+  }
+}
+// Modal içi alt görev toggle — toggleSub semantiği (REST PATCH, tarih set/clear).
+// Parent burada KAPANMAZ: tek aksiyon noktası "tamamla" butonudur (grupTamamla).
+async function toggleSubDet(subId,parentId,el){
+  const subs=await getData('gorev_log',t=>t.id===subId);
+  const sub=subs[0]; if(!sub) return;
+  if(!detayAltTiklanabilir(sub)) return; // savunma: özel tipler form ile kapanır
+  const nowDone=!sub.tamamlandi;
+  await write('gorev_log',{...sub,tamamlandi:nowDone,tamamlanma_tarihi:nowDone?new Date().toISOString():null},'PATCH',`id=eq.${subId}`);
+  await _detaySubsVeEtiket(parentId);
+  await loadTasks(_curTaskFilter||'today');
+  loadDash();
+}
+// Grup tamamlama: açık plain altlar sıralı PATCH ile kapanır (hata → dur + toast,
+// parent'a dokunulmaz — bölünme yok). Sonra hâlâ açık çocuk (özel tip) varsa parent
+// AÇIK kalır; yoksa mevcut doneTask yolu → gorev_tamamla RPC (islem_log izi, K3).
+async function grupTamamla(parent,acikSafAltlar){
+  const btn=document.getElementById('td-tamam-btn');
+  if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
+  try{
+    for(const s of acikSafAltlar){
+      await write('gorev_log',{...s,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString()},'PATCH',`id=eq.${s.id}`);
+    }
+  }catch(e){
+    toast(e.message,true);
+    await _detaySubsVeEtiket(parent.id); // kapananlar tasarıya yansısın, etiket doğru kalsın
+    if(btn) btn.disabled=false;
+    return;
+  }
+  const cocuklar=(await idbGetAll('gorev_log')).filter(s=>s.parent_id===parent.id);
+  const acik=cocuklar.filter(s=>!s.tamamlandi);
+  if(acik.length){
+    await _detaySubsVeEtiket(parent.id);
+    if(btn) btn.disabled=false;
+    toast(`✅ ${acikSafAltlar.length} alt görev tamamlandı, özel görevler açık`);
+    return;
+  }
+  await doneTask(parent.id,parent.hayvan_id||'',parent.stok_id||'',+parent.miktar||0,parent.padok_hedef||'',{disabled:false,innerHTML:''});
+  toast(`✅ ${acikSafAltlar.length} alt görev ve ana görev tamamlandı`);
+  closeM('m-task-det');
+  await loadTasks(_curTaskFilter||'today');
+}
 // onConfirm module değişkenine alınır; OK butonu index.html'de attribute onclick
 // ile bağlanır (DOM property onclick modal router closeM→history.back yarışına
 // girer — AGENTS.md kuralı, td-hayvan/684534f deseni)
@@ -4695,11 +4785,7 @@ async function openTaskDet(id){
   const subsEl=document.getElementById('td-subs');
   if(subs.length+subsDone.length>0){
     subsEl.style.display='block';
-    subsEl.innerHTML=`<div style="font-size:.65rem;font-weight:700;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Alt Görevler (${subsDone.length}/${subs.length+subsDone.length})</div>`
-      +[...subsDone,...subs].map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
-        <div style="width:18px;height:18px;border-radius:50%;background:${s.tamamlandi?'var(--green)':'var(--card2)'};border:2px solid ${s.tamamlandi?'var(--green)':'var(--card3)'};flex-shrink:0"></div>
-        <span style="font-size:.8rem;color:var(--ink);${s.tamamlandi?'text-decoration:line-through;opacity:.6':''}">${(()=>{try{const p=JSON.parse(s.aciklama||'{}');return esc(p.label||s.aciklama);}catch(e){return esc(s.aciklama);}})()}</span>
-      </div>`).join('');
+    subsEl.innerHTML=renderTaskDetSubs(subsDone,subs,id);
   } else { subsEl.style.display='none'; }
 
   // Butonları reset et
@@ -4707,7 +4793,12 @@ async function openTaskDet(id){
   const asiAcBtn=document.getElementById('td-asi-ac-btn');
   const asiForm =document.getElementById('td-asi-form');
   // rapelForm removed — merged into td-asi-form
-  if(tamamBtn){ tamamBtn.style.display='block'; tamamBtn.textContent='✅ Tamamlandı Olarak İşaretle'; }
+  if(tamamBtn){
+    tamamBtn.style.display='block'; tamamBtn.textContent='✅ Tamamlandı Olarak İşaretle';
+    // Alt görevli grup: etiket toplu kapanışı anlatsın (yalnız açık PLAIN altlar sayılır —
+    // özel tipler form ile kapanır). Alt görevsiz görevde mevcut etiket kalır (K4).
+    if(subs.length+subsDone.length>0) tamamBtn.textContent=detayBtnEtiketi(subs.filter(s=>detayAltTiklanabilir(s)).length);
+  }
   if(asiAcBtn)  asiAcBtn.style.display='none';
   if(asiForm)   asiForm.style.display='none';
   _curTaskVaccineId=null;
@@ -4864,6 +4955,11 @@ async function detayTamamla(){
   if (_curTaskDet.etken_kod && !_curTaskDet.stok_id) {
     return _gorevStokSecVeTamamla(_curTaskDet);
   }
+  // Bölünme fix'i: açık PLAIN alt görev varsa grup tamamlama — ana görev tek başına
+  // kapatılamaz (kalan çocuklar top-level karta bölünürdü, analiz §2). Özel tipli
+  // altlar açıkken parent-only yol çalışır: onlar form ile kapanır, RPC bypass edilmez.
+  const acikSafAltlar=(await idbGetAll('gorev_log')).filter(s=>s.parent_id===_curTaskDet.id&&!s.tamamlandi&&!s.iptal&&detayAltTiklanabilir(s));
+  if(acikSafAltlar.length) return grupTamamla(_curTaskDet,acikSafAltlar);
   const btn=document.getElementById('td-tamam-btn');
   if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
   try {

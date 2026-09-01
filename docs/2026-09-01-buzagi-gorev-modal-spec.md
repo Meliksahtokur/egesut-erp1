@@ -34,7 +34,7 @@ Görev detay modal'ını açan kullanıcı:
 | K2 | `detayTamamla`, hedef görevin **açık alt görevi** varsa artık tek satır kapatmaz: önce tüm açık altlar, sonra ana görev kapanır (sıralı yazım; alt hata alırsa dur, toast ile bildir). |
 | K3 | Ana görev kapanışı **daima** `gorev_tamamla` RPC'si ile olur (islem_log GOREV_TAMAMLA izi korunsun — mevcut `doneTask` yolu). Alt görev kapanışı REST PATCH kalabilir (stok/padok yan etkisi yok — analiz §3). |
 | K4 | Alt görevi olmayan görevlerde modal **birebir bugünkü gibi** çalışır (etiket dahil). |
-| K5 | Tip-agnostik: davranış `parent_id` varlığına bağlıdır, `BUZAGI_BAKIM` string'i koda yazılmaz — BESLEME/rapel gibi diğer gruplar da aynı iyileştirmeyi alır, davranışları değişmez (onlarda da bugün aynı bölünme potansiyeli var). |
+| K5 | Özel tipli alt görevler asla düz PATCH ile kapatılmaz: `OZEL_ALT_TIPLER = ['ILERI_GEBE_ASI','BESLEME','TEDAVI_GUN','TEDAVI_SEANS','TOHUMLAMA_PLANLI','SUTTEN_KESME']`. Gerekçe: düz PATCH bu altların kendi RPC'lerini bypass eder (aşı kaydı, besleme zinciri, tedavi seansı, sütten kesme). Bu tipler modalda statik bilgi satırıdır ('⚙ form ile kapatılır' ipucu), tıklanabilir checkbox yalnız **plain** alt görevlerde. Toplu tamamlama yalnız açık **plain** altları sayar ve kapatır; ana görev, döngü sonrası **hiçbir tipte** açık çocuk kalmadığında kapanır — özel tip açık kaldıysa parent açık kalır (`✅ N alt görev tamamlandı, özel görevler açık`). Davranış `parent_id` varlığına bağlıdır, `BUZAGI_BAKIM` string'i koda yazılmaz — diğer gruplar aynı iyileştirmeyi alır. |
 | K6 | Modal router uyumu: üretilen HTML'de **HTML attribute onclick + dataset** (AGENTS.md kuralı — DOM property onclick yasak). |
 
 ## 4. Kapsam dışı (açık liste)
@@ -46,10 +46,11 @@ Görev detay modal'ını açan kullanıcı:
 
 ## 5. Kabul kriterleri
 
-1. Modal'da 6 satır tıklanabilir; işaretli satır `st-check done` görselli + üstü çizili; sayaç `N/6`.
-2. "Tamamla" → açık tüm altlar + ana görev kapanır; toast `✅ N alt görev ve ana görev tamamlandı`;
-   listede grup kartı yok, tek tek kart yok; `updateTaskBadge` şişmez.
-3. Kısmi işaretleme senaryosu: 2/6 işaretli + tamamla → yalnız kalan 4 + ana kapanır.
+1. Modal'da 6 satır görünür; **plain** satırlar tıklanabilir — işaretli satır `st-check done` görselli + üstü çizili; sayaç `N/6`.
+2. "Tamamla" → açık tüm **plain** altlar + ana görev kapanır; toast `✅ N alt görev ve ana görev tamamlandı`;
+   listede grup kartı yok, tek tek kart yok; `updateTaskBadge` şişmez. (Yalnız özel tipli
+   açık alt kaldıysa parent açık kalır: `✅ N alt görev tamamlandı, özel görevler açık`.)
+3. Kısmi işaretleme senaryosu: 2/6 **plain** alt işaretli + tamamla → yalnız kalan 4 plain + ana kapanır.
 4. Alt görevsiz görev modalı değişmez (regresyon).
 5. `gorev_tamamla`'ya hâlâ sadece ana görev girer; altlar PATCH — islem_log'da 1 GOREV_TAMAMLA.
 6. `npm run test:unit` → 344+ yeni testlerle geçer; yeni saf fonksiyonlar testli.
