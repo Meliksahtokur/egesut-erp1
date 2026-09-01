@@ -24,16 +24,10 @@ async function uiLog(level, message, extra = {}) {
 // HEKIMLER config.js'den geliyor (const), burada tanımlanmaz
 // VARSAYILAN_HEKIM config.js'den geliyor
 
-// DB'den hekimleri yükle
+// DB'den hekimleri yükle (IDB 'hekimler' üzerinden — canlıda hekim_listesi RPC'si yok,
+// o dal her açılışta hataya düşüp config fallback'ine kalıyordu)
 async function loadHekimler() {
-  try {
-    const { data, error } = await db.rpc('hekim_listesi');
-    if (!error && data && data.length > 0) {
-      HEKIMLER = data.map(h => ({ id: h.id, ad: h.ad, telefon: h.telefon }));
-    }
-  } catch (e) {
-    console.warn('Hekimler DB\'den yüklenemedi, fallback kullanılıyor:', e.message);
-  }
+  await loadHekimlerFromDB();
   populateHekimSelects();
 }
 
@@ -370,7 +364,7 @@ async function spermaModStok() {
   } else {
     sel.innerHTML =
       '<option value="">— Seçin —</option>' +
-      stoklar.map(s => `<option value="${s.urun_adi}" data-stok="${s.guncel ?? 0}">${s.urun_adi} (${s.guncel ?? 0} doz)</option>`).join('');
+      stoklar.map(s => `<option value="${escAttr(s.urun_adi)}" data-stok="${s.guncel ?? 0}">${esc(s.urun_adi)} (${s.guncel ?? 0} doz)</option>`).join('');
     g('sperma-hint').textContent = '';
   }
 
@@ -470,7 +464,7 @@ function semptomEkle(sel) {
   const chips = g('sempt-chips'); if (!chips) return;
   const chip = document.createElement('span');
   chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
-  chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="semptomKaldir('${val}',this.parentElement)">✕</span>`;
+  chip.innerHTML = `${esc(val)} <span style="font-size:.9rem;opacity:.7" data-val="${escAttr(val)}" onclick="semptomKaldir(this.dataset.val,this.parentElement)">✕</span>`;
   chips.appendChild(chip);
   if (g('d-sempt')) g('d-sempt').value = _semptomSecili.join(', ');
   const kat = g('d-kat')?.value || '';
@@ -505,7 +499,7 @@ function hdeSmptomEkle(sel) {
   const chips = g('hde-sempt-chips'); if (!chips) return;
   const chip = document.createElement('span');
   chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(42,107,181,.12);border:1px solid rgba(42,107,181,.25);border-radius:20px;font-size:.72rem;font-weight:700;color:var(--blue);cursor:pointer';
-  chip.innerHTML = `${val} <span style="font-size:.9rem;opacity:.7" onclick="hdeSmptomKaldir('${val}',this.parentElement)">✕</span>`;
+  chip.innerHTML = `${esc(val)} <span style="font-size:.9rem;opacity:.7" data-val="${escAttr(val)}" onclick="hdeSmptomKaldir(this.dataset.val,this.parentElement)">✕</span>`;
   chips.appendChild(chip);
   if (g('hde-semptomlar')) g('hde-semptomlar').value = _hdeSmptSecili.join(', ');
   hdeUpdateSmptDropdown(g('hde-tani')?.dataset?.kat || '');
@@ -623,8 +617,9 @@ window.addEventListener('load', withErrorHandling(async () => {
   } else {
     g('dot')?.classList.add('warn');
     toast('Çevrimdışı — yerel veri gösteriliyor');
-    // Çevrimdışı: IDB'den yükle
-    Promise.all([loadPadokConfig(), loadHekimlerFromDB()]).then(() => populateHekimSelects()).catch(console.warn);
+    // Çevrimdışı: IDB'den yükle — hekimleri loadHekimler (IDB aynı) zaten doldurup
+    // populate etti; burada yalnız padok config'i gerekir
+    loadPadokConfig().catch(console.warn);
   }
 
   buildSpermaList();

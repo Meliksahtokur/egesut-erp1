@@ -364,7 +364,6 @@ async function kizginlikSil(kayitId) {
   if (!confirm('Bu kızgınlık kaydını silmek istediğinize emin misiniz?')) return;
   try {
     const res = await rpc('kizginlik_sil', { p_kayit_id: kayitId });
-    if (!res?.ok) throw new Error(res?.hata || 'Silme başarısız');
     toast('🗑️ Kızgınlık kaydı silindi');
     await pullTables(['kizginlik_log']);
     if (typeof loadUreme === 'function') loadUreme('kizginlik');
@@ -1100,7 +1099,7 @@ async function _showProtokolEkran(){
   const _ikon = d => d.durum === 'eksik' ? '🔴' : d.durum === 'yaklasan' ? '🟡' : '✅';
   const _gun = d => d.durum === 'eksik' ? d.gecikme_gun + ' gün gecikmiş' : d.durum === 'yaklasan' ? Math.abs(d.gecikme_gun || 0) + ' gün kaldı' : '';
 
-  const _satirHtml = (d, i) => `<div class="arow" style="border-left:3px solid ${_renk(d)};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_showProtokolDetay('${d.hayvan_id}','${esc(d.protokol)}',${i})">
+  const _satirHtml = (d, i) => `<div class="arow" data-p="${escAttr(d.protokol)}" style="border-left:3px solid ${_renk(d)};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_showProtokolDetay('${d.hayvan_id}',this.dataset.p,${i})">
     <div style="flex:1">
       <div style="font-weight:700;font-size:.8rem">${_ikon(d)} ${esc(d.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(d.grup||'')}</span></div>
       <div style="font-size:.7rem;color:var(--ink3)">${esc(d.adim)} · ${_gun(d)}</div>
@@ -1109,7 +1108,7 @@ async function _showProtokolEkran(){
     <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
       ${d.durum !== 'tamamlandi' && d.etken_kod ? `<button onclick="_protokolUygula(${i})" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.1);color:var(--blue);cursor:pointer">💉 Uygula</button>` : ''}
       ${d.durum !== 'tamamlandi' ? `<button onclick="_protokolDismiss(${i})" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>` : ''}
-      ${d.durum === 'tamamlandi' && d.kapatan_ref ? `<button onclick="_protokolGeriAl('${esc(d.kapatan_ref)}')" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩ Geri Al</button>` : ''}
+      ${d.durum === 'tamamlandi' && d.kapatan_ref ? `<button data-ref="${escAttr(d.kapatan_ref)}" onclick="_protokolGeriAl(this.dataset.ref)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩ Geri Al</button>` : ''}
     </div>
   </div>`;
 
@@ -1159,7 +1158,7 @@ function _showProtokolDetay(hayvanId, protokol, activeIdx){
       : d.durum !== 'tamamlandi'
       ? `<button onclick="_protokolDismiss(${globalIdx})" style="font-size:.6rem;padding:3px 6px;border-radius:6px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`
       : d.kapatan_ref
-      ? `<button onclick="_protokolGeriAl('${esc(d.kapatan_ref)}')" style="font-size:.6rem;padding:3px 8px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩</button>`
+      ? `<button data-ref="${escAttr(d.kapatan_ref)}" onclick="_protokolGeriAl(this.dataset.ref)" style="font-size:.6rem;padding:3px 8px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩</button>`
       : '';
 
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--card2)">
@@ -1660,12 +1659,12 @@ function srchDropdown(){
   if(!matches.length){ ac.style.display='none'; return; }
   ac.innerHTML=matches.map(a=>{
     const main=a.kupe_no||a.devlet_kupe||a.id;
-    const sub=a.kupe_no&&a.devlet_kupe?` · <span style="color:#aaa">${a.devlet_kupe}</span>`:'';
+    const sub=a.kupe_no&&a.devlet_kupe?` · <span style="color:#aaa">${esc(a.devlet_kupe)}</span>`:'';
     const isGebe=gebeSet.has(a.id);
     const badge=isGebe?'<span style="background:rgba(78,154,42,.15);color:var(--green);border-radius:5px;padding:1px 5px;font-size:.62rem;font-weight:700;margin-left:4px">🤰</span>':'';
-    return `<div onclick="srchSec('${a.id}','${main}')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
-      <div><span style="font-weight:700;font-size:.85rem">${main}</span>${sub}${badge}</div>
-      <span style="font-size:.68rem;color:#aaa">${a.padok||''}</span>
+    return `<div data-sid="${escAttr(a.id)}" data-main="${escAttr(main)}" onclick="srchSec(this.dataset.sid,this.dataset.main)" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
+      <div><span style="font-weight:700;font-size:.85rem">${esc(main)}</span>${sub}${badge}</div>
+      <span style="font-size:.68rem;color:#aaa">${esc(a.padok||'')}</span>
     </div>`;
   }).join('');
   ac.style.display='block';
@@ -2326,7 +2325,7 @@ function openCikisModal(hayvanId,kupe){
   const infoEl=document.getElementById('cx-info');
   if(infoEl&&hayvan){
     const yas=hayvan.dogum_tarihi?Math.floor((Date.now()-new Date(hayvan.dogum_tarihi))/86400000)+' gün':'—';
-    infoEl.innerHTML=`<b>${kupe}</b> · ${hayvan.irk||'—'} · ${hayvan.hesap_kategori||hayvan.grup||'—'}<br>Yaş: ${yas}`;
+    infoEl.innerHTML=`<b>${esc(kupe)}</b> · ${esc(hayvan.irk||'—')} · ${esc(hayvan.hesap_kategori||hayvan.grup||'—')}<br>Yaş: ${yas}`;
     infoEl.style.display='block';
   }
   openM('m-cikis');
@@ -2397,11 +2396,11 @@ async function gebeledenSec(){
         const _badgeNormal=`<span style="background:rgba(78,154,42,.15);color:#1a5c1a;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">${g.kalanGun} gün kaldı</span>`;
         const _badgeMid=urgent?_badgeUrgent:_badgeNormal;
         const badge=overdue?`<span style="background:#c0321a;color:#fff;border-radius:8px;padding:2px 7px;font-size:.62rem;font-weight:700">GECİKTİ ${Math.abs(g.kalanGun)} GÜN</span>`:_badgeMid;
-        return `<div onclick="anneSeç('${g.hayvan.id}','${kupe}','${g.dogumTahmini}','${g.toh.sperma||''}')" 
+        return `<div data-hid="${escAttr(g.hayvan.id)}" data-kupe="${escAttr(kupe)}" data-dt="${escAttr(g.dogumTahmini)}" data-sperma="${escAttr(g.toh.sperma||'')}" onclick="anneSeç(this.dataset.hid,this.dataset.kupe,this.dataset.dt,this.dataset.sperma)"
           style="padding:12px 14px;border-bottom:1px solid var(--card3);cursor:pointer;background:${bg};display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-weight:700;font-size:.88rem;color:${color}">${kupe}</div>
-            <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${g.hayvan?.irk||'—'} · ${g.toh.tarih} · ${g.toh.sperma||'?'}</div>
+            <div style="font-weight:700;font-size:.88rem;color:${color}">${esc(kupe)}</div>
+            <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${esc(g.hayvan?.irk||'—')} · ${esc(g.toh.tarih)} · ${esc(g.toh.sperma||'?')}</div>
             <div style="font-size:.65rem;color:#888;margin-top:1px">Tahmini doğum: ${fmtTarih(g.dogumTahmini)}</div>
           </div>${badge}
         </div>`;
@@ -2654,7 +2653,7 @@ function sorunBottomSheet(tohId, kizId) {
       <div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">Tohumlama kaydedildi — şimdi vaka açılıyor</div>
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px">
         ${sorunlar.map(s => `
-          <button type="button" onclick="sorunSec('${s.id}','${esc(s.tani||'')}',event)"
+          <button type="button" data-sid="${escAttr(s.id)}" data-tani="${escAttr(s.tani||'')}" onclick="sorunSec(this.dataset.sid,this.dataset.tani,event)"
             style="padding:7px 13px;border-radius:20px;border:1.5px solid var(--card3);background:var(--card);color:var(--ink2);font-size:.78rem;font-weight:600;cursor:pointer">
             ${s.label}
           </button>`).join('')}
@@ -3489,16 +3488,14 @@ async function _diseaseSave(id){
   if(!name){toast('Hastalık adı zorunlu','warn');return;}
   if(!cat){toast('Kategori seçin','warn');return;}
   const isNew=id==='new';
-  const res=await rpcOptimistic(isNew?'disease_ekle':'disease_guncelle',
+  await rpcOptimistic(isNew?'disease_ekle':'disease_guncelle',
     isNew?{p_name:name,p_category:cat}:{p_id:id,p_name:name,p_category:cat});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   loadTanimlarPanel();
 }
 
 async function _diseaseDelete(id){
   if(!confirm('Bu hastalığı silmek istediğinize emin misiniz?')) return;
-  const res=await rpcOptimistic('disease_sil',{p_id:id});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  await rpcOptimistic('disease_sil',{p_id:id});
   toast('Hastalık silindi');
   loadTanimlarPanel();
 }
@@ -3510,7 +3507,6 @@ async function _tanimVarsayilan(tip){
     const ans=prompt(`Varsayılan sistem düzenine dönülecek. Eksik varsayılanlar eklenecektir.\n\nDevam etmek için ${a} + ${b} = ? yazın:`);
     if(parseInt(ans)!==(a+b)){toast('Yanlış cevap — işlem iptal','warn');return;}
     const res=await rpcOptimistic('drug_class_varsayilan_yukle',{});
-    if(res&&res.ok===false){toast(res.mesaj,'error');return;}
     toast(`${res.eklenen||0} yeni ilaç sınıfı eklendi`);
     loadTanimlarPanel();
     return;
@@ -3518,7 +3514,6 @@ async function _tanimVarsayilan(tip){
   const labels={diseases:'hastalık',drugs:'ilaç',kategoriler:'kategori'};
   if(!confirm(`Standart ${labels[tip]||tip} tanımları geri yüklenecek. Mevcut özel tanımlarınız silinmez. Devam?`)) return;
   const res=await rpcOptimistic('seed_defaults',{p_tip:tip});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   toast(`${res.eklenen||0} yeni ${labels[tip]} eklendi`);
   loadTanimlarPanel();
 }
@@ -3570,8 +3565,8 @@ async function _renderIlacSiniflari(el){
         <span style="width:4px;height:22px;border-radius:2px;background:${renk};flex-shrink:0"></span>
         <span style="font-weight:800;font-size:.82rem;color:${renk};flex:1">${esc(grp)}</span>
         <span class="tanim-grup-count" style="background:var(--card3);color:var(--ink3);padding:1px 7px;border-radius:10px;font-size:.65rem;font-weight:700">${toplamMadde}</span>
-        <button onclick="event.stopPropagation();_dcEditInline('group','${esc(grp)}',null)" style="padding:2px 6px;background:none;border:none;cursor:pointer;font-size:.7rem" title="Düzenle">✏️</button>
-        <button onclick="event.stopPropagation();_dcDeleteGroup('${esc(grp)}')" style="padding:2px 6px;background:none;border:none;cursor:pointer;font-size:.7rem" title="Sil">🗑</button>
+        <button data-grp="${escAttr(grp)}" onclick="event.stopPropagation();_dcEditInline('group',this.dataset.grp,null)" style="padding:2px 6px;background:none;border:none;cursor:pointer;font-size:.7rem" title="Düzenle">✏️</button>
+        <button data-grp="${escAttr(grp)}" onclick="event.stopPropagation();_dcDeleteGroup(this.dataset.grp)" style="padding:2px 6px;background:none;border:none;cursor:pointer;font-size:.7rem" title="Sil">🗑</button>
         <svg class="tanim-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${renk}" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
       </div>
       <div style="display:none;padding:4px 0 0 0">`;
@@ -3583,8 +3578,8 @@ async function _renderIlacSiniflari(el){
           <span style="width:3px;height:16px;border-radius:2px;background:${renk}60;flex-shrink:0"></span>
           <span style="font-weight:700;font-size:.78rem;color:var(--ink);flex:1">${esc(cls)}</span>
           <span style="font-size:.6rem;color:var(--ink3)">${maddeler.length}</span>
-          <button onclick="event.stopPropagation();_dcEditInline('class','${esc(grp)}','${esc(cls)}')" style="padding:2px 4px;background:none;border:none;cursor:pointer;font-size:.65rem" title="Düzenle">✏️</button>
-          <button onclick="event.stopPropagation();_dcDeleteClass('${esc(grp)}','${esc(cls)}')" style="padding:2px 4px;background:none;border:none;cursor:pointer;font-size:.65rem" title="Sil">🗑</button>
+          <button data-grp="${escAttr(grp)}" data-cls="${escAttr(cls)}" onclick="event.stopPropagation();_dcEditInline('class',this.dataset.grp,this.dataset.cls)" style="padding:2px 4px;background:none;border:none;cursor:pointer;font-size:.65rem" title="Düzenle">✏️</button>
+          <button data-grp="${escAttr(grp)}" data-cls="${escAttr(cls)}" onclick="event.stopPropagation();_dcDeleteClass(this.dataset.grp,this.dataset.cls)" style="padding:2px 4px;background:none;border:none;cursor:pointer;font-size:.65rem" title="Sil">🗑</button>
           <svg class="tanim-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="2.5" style="transition:transform .2s;flex-shrink:0"><path d="M6 9l6 6 6-6"/></svg>
         </div>
         <div style="display:none;padding:2px 0 0 0">`;
@@ -3605,11 +3600,11 @@ async function _renderIlacSiniflari(el){
         </div>`;
       });
 
-      html+=`<button onclick="_dcAddIngredient('${esc(grp)}','${esc(cls)}')" style="display:block;width:calc(100% - 20px);margin:3px 0 0 20px;padding:6px;background:none;border:1px dashed var(--card3);border-radius:5px;color:var(--ink3);font-size:.7rem;cursor:pointer;text-align:left">＋ Etken Madde Ekle</button>`;
+      html+=`<button data-grp="${escAttr(grp)}" data-cls="${escAttr(cls)}" onclick="_dcAddIngredient(this.dataset.grp,this.dataset.cls)" style="display:block;width:calc(100% - 20px);margin:3px 0 0 20px;padding:6px;background:none;border:1px dashed var(--card3);border-radius:5px;color:var(--ink3);font-size:.7rem;cursor:pointer;text-align:left">＋ Etken Madde Ekle</button>`;
       html+=`</div></div>`;
     });
 
-    html+=`<button onclick="_dcAddClass('${esc(grp)}')" style="display:block;width:calc(100% - 12px);margin:4px 0 0 12px;padding:6px;background:none;border:1px dashed var(--card3);border-radius:5px;color:var(--ink3);font-size:.7rem;cursor:pointer;text-align:left">＋ Alt Grup Ekle</button>`;
+    html+=`<button data-grp="${escAttr(grp)}" onclick="_dcAddClass(this.dataset.grp)" style="display:block;width:calc(100% - 12px);margin:4px 0 0 12px;padding:6px;background:none;border:1px dashed var(--card3);border-radius:5px;color:var(--ink3);font-size:.7rem;cursor:pointer;text-align:left">＋ Alt Grup Ekle</button>`;
     html+=`</div></div>`;
   });
 
@@ -3623,8 +3618,7 @@ async function _renderIlacSiniflari(el){
 async function _dcAddGroup(){
   const name=prompt('Yeni grup adı:');
   if(!name||!name.trim()) return;
-  const res=await rpcOptimistic('drug_class_ekle',{p_group_name:name.trim(),p_class_name:'Genel',p_active_ingredient:'(tanımsız)'});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  await rpcOptimistic('drug_class_ekle',{p_group_name:name.trim(),p_class_name:'Genel',p_active_ingredient:'(tanımsız)'});
   toast('Grup eklendi');
   loadTanimlarPanel();
 }
@@ -3632,8 +3626,7 @@ async function _dcAddGroup(){
 async function _dcAddClass(grp){
   const name=prompt('Yeni alt grup adı:');
   if(!name||!name.trim()) return;
-  const res=await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:name.trim(),p_active_ingredient:'(tanımsız)'});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:name.trim(),p_active_ingredient:'(tanımsız)'});
   toast('Alt grup eklendi');
   loadTanimlarPanel();
 }
@@ -3644,8 +3637,7 @@ async function _dcAddIngredient(grp,cls){
   const allDC=await idbGetAll('drug_classes');
   const sameGrp=allDC.find(dc=>dc.group_name===grp);
   const katId=sameGrp?sameGrp.kategori_id:null;
-  const res=await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:cls,p_active_ingredient:name.trim(),p_kategori_id:katId});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:cls,p_active_ingredient:name.trim(),p_kategori_id:katId});
   const placeholder=allDC.find(dc=>dc.group_name===grp&&dc.class_name===cls&&dc.active_ingredient==='(tanımsız)');
   if(placeholder) await rpcOptimistic('drug_class_sil',{p_id:placeholder.id});
   toast('Etken madde eklendi');
@@ -3682,8 +3674,7 @@ async function _dcEditIngredient(id){
   if(!dc) return;
   const newName=prompt('Etken madde adını düzenle:',dc.active_ingredient);
   if(!newName||!newName.trim()||newName.trim()===dc.active_ingredient) return;
-  const res=await rpcOptimistic('drug_class_guncelle',{p_id:id,p_active_ingredient:newName.trim()});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  await rpcOptimistic('drug_class_guncelle',{p_id:id,p_active_ingredient:newName.trim()});
   toast('Güncellendi');
   loadTanimlarPanel();
 }
@@ -3731,8 +3722,7 @@ async function _dcDeleteIngredient(id){
     return;
   }
   if(!confirm('Bu etken maddeyi silmek istediğinize emin misiniz?')) return;
-  const res=await rpcOptimistic('drug_class_sil',{p_id:id});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  await rpcOptimistic('drug_class_sil',{p_id:id});
   toast('Silindi');
   loadTanimlarPanel();
 }
@@ -4109,16 +4099,14 @@ async function _kategoriSave(id){
   const tip=document.getElementById('tef-kat-tip')?.value||'genel';
   if(!ad){toast('Kategori adı zorunlu','warn');return;}
   const isNew=id==='new';
-  const res=await rpcOptimistic(isNew?'kategori_ekle':'kategori_guncelle',
+  await rpcOptimistic(isNew?'kategori_ekle':'kategori_guncelle',
     isNew?{p_ad:ad,p_tip:tip}:{p_id:id,p_new_ad:ad,p_tip:tip});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
   loadTanimlarPanel();
 }
 
 async function _kategoriDelete(id){
   if(!confirm('Bu kategoriyi silmek istediğinize emin misiniz?')) return;
-  const res=await rpcOptimistic('kategori_sil',{p_id:id});
-  if(res&&res.ok===false){toast(res.mesaj,'error');return;}
+  await rpcOptimistic('kategori_sil',{p_id:id});
   toast('Kategori silindi');
   loadTanimlarPanel();
 }
@@ -4365,14 +4353,14 @@ async function tumStokHareketleriniGoster(){
         const turIsaret=m.tur==='Giriş'||m.tur==='İade'||m.tur==='Düzeltme'||m.tur==='Ekleme'?'+':'−';
         html+=`<div style="background:var(--card);border:1px solid var(--card2);border-radius:8px;padding:10px;margin-bottom:6px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div style="font-weight:700;font-size:.85rem;color:var(--ink)">${urunAd}</div>
-            <div style="font-size:.85rem;font-weight:800;color:${turRenk}">${turIsaret}${(m.miktar||0).toFixed(dec)} ${birim}</div>
+            <div style="font-weight:700;font-size:.85rem;color:var(--ink)">${esc(urunAd)}</div>
+            <div style="font-size:.85rem;font-weight:800;color:${turRenk}">${turIsaret}${(m.miktar||0).toFixed(dec)} ${esc(birim)}</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.68rem;color:var(--ink3)">
             <div>📅 ${tarihFmt}</div>
-            <div>📝 ${m.tur||'—'}</div>
+            <div>📝 ${esc(m.tur||'—')}</div>
           </div>
-          ${m.notlar?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${m.notlar}</div>`:''}
+          ${m.notlar?`<div style="font-size:.68rem;color:var(--ink3);margin-top:4px;padding-top:4px;border-top:1px dashed var(--card2)">${esc(m.notlar)}</div>`:''}
         </div>`;
       }
     });
@@ -4515,8 +4503,8 @@ async function stokHareketGor(stokId){
         }
         if(m.iptal) return '';
         return `<div style="padding:8px 0;border-bottom:1px solid var(--card3);font-size:.8rem;display:flex;justify-content:space-between">
-        <div><div style="font-weight:600">${m.tur||'Kullanım'}</div><div style="color:#999;font-size:.7rem">${m.notlar||''}</div><div style="color:#888;font-size:.7rem;font-weight:600">${_tarih}</div></div>
-        <div style="text-align:right"><div style="font-weight:700;color:${m.miktar<0?'var(--green)':'#c0321a'}">${m.miktar<0?'+':'-'}${Math.abs(m.miktar)} ${s.birim||''}</div></div>
+        <div><div style="font-weight:600">${esc(m.tur||'Kullanım')}</div><div style="color:#999;font-size:.7rem">${esc(m.notlar||'')}</div><div style="color:#888;font-size:.7rem;font-weight:600">${_tarih}</div></div>
+        <div style="text-align:right"><div style="font-weight:700;color:${m.miktar<0?'var(--green)':'#c0321a'}">${m.miktar<0?'+':'-'}${Math.abs(m.miktar)} ${esc(s.birim||'')}</div></div>
       </div>`;}).join('')}
     <button onclick="document.getElementById('stok-hrkt-modal').remove()" style="width:100%;margin-top:12px;padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">Kapat</button>
   </div>`;
@@ -4903,7 +4891,7 @@ async function _gorevStokSecVeTamamla(gorev){
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
-    <button onclick="_gorevStokTamamlaSubmit('${gorev.id}','${gorev.hayvan_id||''}','${gorev.padok_hedef||''}')" class="btn" style="width:100%;padding:10px;font-weight:700">Tamamla</button>
+    <button data-padok="${escAttr(gorev.padok_hedef||'')}" onclick="_gorevStokTamamlaSubmit('${gorev.id}','${gorev.hayvan_id||''}',this.dataset.padok)" class="btn" style="width:100%;padding:10px;font-weight:700">Tamamla</button>
   </div>`;
   document.body.appendChild(mini);
   if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
@@ -6138,7 +6126,7 @@ async function openTohDet(id){
     `<span style="background:rgba(0,0,0,.06);padding:3px 9px;border-radius:10px;font-size:.7rem;font-weight:700;color:${sc}">${t.sonuc||'Bekliyor'}</span>`,
     `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">${t.deneme_no||1}. deneme</span>`,
     `<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">📅 ${fmtTarih(t.tarih)}</span>`,
-    hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${hk.ad}</span>`:'',
+    hk?`<span style="background:var(--card2);padding:3px 9px;border-radius:10px;font-size:.7rem">👨‍⚕️ ${esc(hk.ad)}</span>`:'',
   ];
   document.getElementById('td2-meta').innerHTML=chips.filter(Boolean).join('');
 
@@ -6238,7 +6226,7 @@ async function openTohDet(id){
           <div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:.78rem">
             <span style="background:var(--card2);border-radius:6px;padding:1px 6px;font-weight:700">${d.no}.</span>
             <span>${d.tarih||'?'}</span>
-            <span style="color:var(--ink3)">· ${d.sperma||'?'}</span>
+            <span style="color:var(--ink3)">· ${esc(d.sperma||'?')}</span>
           </div>`).join('')}
       </div>`;
     } else {
@@ -6633,7 +6621,7 @@ function _openInsemIntercept(hayvan,bekliyor){
   const gun=Math.floor((new Date(today)-new Date(bekliyor.tarih))/86400000);
   const hid=hayvan.kupe_no||hayvan.devlet_kupe||hayvan.id;
   const infoEl=document.getElementById('insem-intercept-info');
-  if(infoEl) infoEl.innerHTML=`<b>${hid}</b> — ${bekliyor.sperma||'?'} · <b>${gun}. gün</b> (${(bekliyor.tarih||'').slice(0,10)})`;
+  if(infoEl) infoEl.innerHTML=`<b>${esc(hid)}</b> — ${esc(bekliyor.sperma||'?')} · <b>${gun}. gün</b> (${(bekliyor.tarih||'').slice(0,10)})`;
   globalThis._insemInterceptHayvan={id:hayvan.id,kupeNo:hid,tohId:bekliyor.id};
   openM('m-insem-intercept');
 }
@@ -6725,7 +6713,7 @@ async function renderDrugStokList() {
       .map(d => {
         const linked = d.stock_item_id || '';
         return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <div style="flex:1;font-size:.78rem;font-weight:600;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${d.name}">${d.name}</div>
+          <div style="flex:1;font-size:.78rem;font-weight:600;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escAttr(d.name)}">${esc(d.name)}</div>
           <select
             data-drug-id="${d.id}"
             onchange="submitDrugStokLink('${d.id}', this.value)"
@@ -7034,8 +7022,8 @@ async function renderAyarlarVaccineList(){
     const opts=intervals.map(i=>`<option value="${i.val}"${cur===i.val?' selected':''}>${i.lbl}</option>`).join('');
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--card2)">
       <div style="flex:1">
-        <div style="font-size:.8rem;color:var(--ink)">${vac.name}${vac.is_mandatory?' <span style="font-size:.6rem;color:var(--red)">Zorunlu</span>':''}</div>
-        <div style="font-size:.65rem;color:var(--ink3)">${vac.disease_target||'—'} · ${vac.dose||'?'} ${vac.unit||''}</div>
+        <div style="font-size:.8rem;color:var(--ink)">${esc(vac.name)}${vac.is_mandatory?' <span style="font-size:.6rem;color:var(--red)">Zorunlu</span>':''}</div>
+        <div style="font-size:.65rem;color:var(--ink3)">${esc(vac.disease_target||'—')} · ${vac.dose||'?'} ${vac.unit||''}</div>
       </div>
       <select onchange="vaccineRapelGuncelle('${vac.id}',this.value)" style="padding:3px 5px;border:1px solid var(--brd);border-radius:6px;font-size:.7rem;min-width:80px">${opts}</select>
     </div>`;
@@ -7209,7 +7197,7 @@ async function renderAyarlarPadokList(){
   const padoklar=await getData('padoklar');
   if(!padoklar.length){ el.innerHTML='<div style="font-size:.75rem;color:var(--ink3)">Henüz padok tanımlı değil</div>'; return; }
   el.innerHTML=padoklar.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card2)">
-    <span style="font-size:.82rem;color:var(--ink)">${p.ad}${p.kapasite?' <span style="font-size:.65rem;color:var(--ink3)">(${p.kapasite} baş)</span>':''}</span>
+    <span style="font-size:.82rem;color:var(--ink)">${esc(p.ad)}${p.kapasite?' <span style="font-size:.65rem;color:var(--ink3)">(${p.kapasite} baş)</span>':''}</span>
     <div style="display:flex;gap:4px">
       <button onclick="padokDetayAc('${p.id}')" style="background:none;border:none;color:var(--blue);font-size:.72rem;cursor:pointer;padding:4px 6px">📋</button>
       <button onclick="padokDuzenleAc('${p.id}')" style="background:none;border:none;color:var(--ink3);font-size:.75rem;cursor:pointer;padding:4px 8px">✏️</button>
@@ -7431,7 +7419,7 @@ function openBulkTransfer() {
   const kaynakSel = document.getElementById('bt-kaynak-padok-sel');
   if (kaynakSel) {
     kaynakSel.innerHTML = '<option value="">— Padok Seç —</option>' +
-      PADOKLAR.map(p => `<option value="${p.id}">${p.ad}</option>`).join('');
+      PADOKLAR.map(p => `<option value="${p.id}">${esc(p.ad)}</option>`).join('');
   }
   _btRenderSerbestListe();
   _btRenderSeciliHayvanlar();
@@ -7461,8 +7449,8 @@ function _btRenderSeciliHayvanlar() {
   }
   liste.innerHTML = hayvanlar.map(h => `
     <div class="bt-hayvan-satir">
-      <span style="font-weight:600;font-size:.8rem">${h.kupe_no || h.id}</span>
-      <span style="font-size:.68rem;color:var(--ink3);flex:1;margin:0 6px">${h.grup || ''} · ${h.padok || ''}</span>
+      <span style="font-weight:600;font-size:.8rem">${esc(h.kupe_no || h.id)}</span>
+      <span style="font-size:.68rem;color:var(--ink3);flex:1;margin:0 6px">${esc(h.grup || '')} · ${esc(h.padok || '')}</span>
       <button onclick="btSecilidenKaldir('${h.id}')" style="background:none;border:none;color:var(--ink3);cursor:pointer;font-size:1rem;padding:2px 4px;line-height:1" title="Çıkar">×</button>
     </div>
   `).join('');
@@ -7552,7 +7540,7 @@ function _btRenderHedefPadoklar() {
     else badge = '<span style="font-size:.6rem;color:var(--green3)">✅ Uyumlu</span>';
     return `<div class="bt-padok-opt ${disabled?'disabled':''} ${selected?'selected':''}"
                  onclick="${disabled?'':'btHedefSec(\''+p.id+'\')'}">
-      <span class="bpo-ad">${p.ad}</span>
+      <span class="bpo-ad">${esc(p.ad)}</span>
       ${badge}
       ${kap ? `<div>
         <div class="bpo-bar-wrap"><div class="bpo-bar-fill" style="width:${Math.min(yuzde,100)}%;background:${renk}"></div></div>
@@ -7647,8 +7635,8 @@ function _btRenderEtiketTekkek() {
   const hayvanlar = suruData.filter(h => _btModalSecilenIds.includes(h.id));
   el.innerHTML = hayvanlar.map(h => `
     <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:.78rem;border-bottom:1px solid var(--card2)">
-      <span style="font-weight:600;min-width:60px">${h.kupe_no||h.id}</span>
-      <span style="font-size:.68rem;color:var(--ink3);flex:1">${h.grup||''}</span>
+      <span style="font-weight:600;min-width:60px">${esc(h.kupe_no||h.id)}</span>
+      <span style="font-size:.68rem;color:var(--ink3);flex:1">${esc(h.grup||'')}</span>
       <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer">
         <input type="checkbox" data-hayvan="${h.id}" data-etiket="kisir" onchange="btEtiketTekkekDegisti()" style="accent-color:var(--blue)"> Kısır
       </label>
@@ -7820,9 +7808,9 @@ async function renderPadokHayvanlar(padokId) {
       const secili = _pdHayvanIds.includes(h.id);
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--card3)">
         <input type="checkbox" ${secili ? 'checked' : ''} onchange="pdToggleHayvan('${h.id}',this.checked)" style="width:16px;height:16px;cursor:pointer">
-        <span style="flex:1;font-weight:600;color:var(--ink);font-size:.8rem">${h.kupe_no || h.devlet_kupe || h.id}</span>
-        <span style="font-size:.7rem;color:var(--ink3)">${h.grup || '—'} · ${h.cinsiyet || '—'} · ${yas}</span>
-        <button class="btn" style="padding:3px 8px;font-size:.7rem;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokTekliTasi('${h.id}','${esc(h.kupe_no || h.devlet_kupe || h.id)}')">➡️</button>
+        <span style="flex:1;font-weight:600;color:var(--ink);font-size:.8rem">${esc(h.kupe_no || h.devlet_kupe || h.id)}</span>
+        <span style="font-size:.7rem;color:var(--ink3)">${esc(h.grup || '—')} · ${esc(h.cinsiyet || '—')} · ${yas}</span>
+        <button class="btn" data-kupe="${escAttr(h.kupe_no || h.devlet_kupe || h.id)}" style="padding:3px 8px;font-size:.7rem;background:rgba(42,107,181,.1);color:var(--blue);border:1px solid rgba(42,107,181,.2)" onclick="padokTekliTasi('${h.id}',this.dataset.kupe)">➡️</button>
       </div>`;
     }).join('');
   } catch (e) {
@@ -7916,11 +7904,11 @@ async function renderGrupPadokEslem(){
     const secili=eslemMap[g]||new Set();
     const boxes=padoklar.map(p=>`
       <label style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:var(--ink);padding:2px 0;cursor:pointer">
-        <input type="checkbox" value="${p.id}" ${secili.has(p.id)?'checked':''} onchange="grupPadokCheckbox('${g}',this)">
-        ${p.ad}
+        <input type="checkbox" value="${p.id}" ${secili.has(p.id)?'checked':''} data-grup="${escAttr(g)}" onchange="grupPadokCheckbox(this.dataset.grup,this)">
+        ${esc(p.ad)}
       </label>`).join('');
     return `<div style="padding:6px 0;border-bottom:1px solid var(--card2)">
-      <div style="font-size:.75rem;font-weight:700;color:var(--ink);margin-bottom:4px">${g}</div>
+      <div style="font-size:.75rem;font-weight:700;color:var(--ink);margin-bottom:4px">${esc(g)}</div>
       <div style="padding-left:8px">${boxes}</div>
     </div>`;
   }).join('');
