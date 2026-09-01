@@ -19,10 +19,18 @@
    idbGetAll, getData, write,
    loadDrugsCache, loadStock, loadDash, loadTasks, loadUreme, loadGecmis,
    loadBildirimler, loadStokPanel, openDet, closeDet, openStokPanel,
-   openAnimalEdit, closeAnimalEdit, getDisplayKupe, yasHesapla, loadIrkDropdown
+   openAnimalEdit, closeAnimalEdit, getDisplayKupe, yasHesapla, loadIrkDropdown,
+   erkekKupeUygunMu
 */
 
 // ── KÜPE ÇAKIŞMA KONTROLÜ (blur) ────────────
+// Küpe uyarıları üç durumlu (spec 2026-09-01 K1/K2):
+//   1) aktif çakışma  → ⚠️ engel (submit durdurur, soft YOK)
+//   2) geçmiş kullanım → ℹ️ bilgi (dataset.soft=1 — engel değil, recycle mümkün)
+//   3) temiz          → uyarı temizlenir
+// Uyarı elementinde kalan metin + soft bayrağı submit'lerde _kupeUyarisi ile okunur.
+const _kupeUyarisi = el => el?.textContent && el.dataset.soft !== '1';
+
 async function _kupeKontrolEt(alan) {
   const deger = v(alan).trim();
   const warnId = alan + '-warn';
@@ -34,14 +42,18 @@ async function _kupeKontrolEt(alan) {
   const editId = modal?.dataset.editId || null;
   try {
     const params = {
-      p_kupe_no:     alan === 'a-kupe'    ? deger : null,
+      // b-kupe (doğum formu yavru küpesi) da İŞLETME küpesidir
+      p_kupe_no:     (alan === 'a-kupe' || alan === 'b-kupe') ? deger : null,
       p_devlet_kupe: alan === 'a-devlet'  ? deger : null,
     };
     if (editId) params.p_hayvan_id = editId;
     const res = await db.rpc('kupe_musait_mi', params);
     if (res.data && res.data.musait === false) {
-      warnEl.textContent = '⚠️ Bu küpe zaten kayıtlı';
+      warnEl.textContent = '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)';
       delete warnEl.dataset.soft;
+    } else if (res.data && res.data.kupe_gecmis_id) {
+      warnEl.textContent = `ℹ️ Bu numara geçmişte kullanılmış (${res.data.kupe_gecmis_durum || 'çıkmış'}) — yeniden kullanılabilir`;
+      warnEl.dataset.soft = '1';
     } else {
       warnEl.textContent = '';
       delete warnEl.dataset.soft;
@@ -61,8 +73,7 @@ async function _kupeKontrolEt(alan) {
 async function submitAnimal(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
 
-  // Küpe çakışma uyarısı varsa durdur (soft not hariç — kontrol hatası engel değil)
-  const _kupeUyarisi = el => el?.textContent && el.dataset.soft !== '1';
+  // Küpe çakışma uyarısı varsa durdur (soft not hariç — kontrol hatası/geçmiş kullanım engel değil)
   if (_kupeUyarisi(g('a-devlet-warn')) || _kupeUyarisi(g('a-kupe-warn'))) {
     toast('⚠️ Küpe çakışması var — formu kontrol edin', true); return;
   }
@@ -85,6 +96,10 @@ async function submitAnimal(btn) {
     if ((_grup === 'Süt İçen Buzağı' || _grup === 'Sütten Kesilmiş Buzağı') && _yasGun > 365) {
       toast('⚠️ 12 aylıktan büyük hayvan buzağı grubuna eklenemez', true); return;
     }
+  }
+  // K5 (manuel kayıt): erkek + sayısal + 500-599 dışı → UYARI (engel değil, doğum formundaki sert engel gibi DEĞİL)
+  if (!erkekKupeUygunMu(kupe, v('a-cinsiyet'))) {
+    toast('⚠️ Erkek hayvan küpesi için 500-599 aralığı önerilir');
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
 
@@ -154,6 +169,11 @@ async function submitAnimal(btn) {
 // ── DOĞUM ────────────────────────────────────
 async function submitBirth(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+
+  // Küpe çakışma uyarısı varsa durdur (soft not hariç — b-kupe blur ön kontrolü)
+  if (_kupeUyarisi(g('b-kupe-warn'))) {
+    toast('⚠️ Küpe çakışması var — formu kontrol edin', true); return;
+  }
   const anneId = v('b-anne');
   const tarih  = v('b-tarih');
   const kupe   = v('b-kupe');
@@ -165,6 +185,10 @@ async function submitBirth(btn) {
   if (!anneId) { toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir', true); return; }
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
   if (tarih > bugun()) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
+  // K5: erkek buzağı sayısal küpesi 500-599 aralığında olmalı (dogum_kaydet RPC de zorlar)
+  if (!erkekKupeUygunMu(kupe, cins)) {
+    toast('⚠️ Erkek buzağı küpesi 500-599 aralığında olmalı', true); return;
+  }
 
   const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
