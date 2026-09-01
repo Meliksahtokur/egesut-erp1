@@ -15,9 +15,10 @@
   ölü koddur. `rpcOptimistic` (api.js:457) aynı kontrat + toast/pull sarmalayıcıdır.
 - **D1 — yazma yolları:** online yazma RPC iledir; **offline kuyruk replay**'i ikiye ayrılır:
   otomatik `syncNow` (api.js:497) `db.from` PATCH/POST kullanır (`dbUpdate` api.js:203 / `dbInsert`
-  api.js:220), manuel "Gönder" replay'i (ui.js:6789 `buildRpcParams`) RPC kullanır — replay imzaları
-  bilinçli bug adayıdır (docs-tutarlilik §1.6: `hayvan_ekle p_grup_id`, `create_case p_hayvan_id`
-  gibi canlıda olmayan paramlar).
+  api.js:220), manuel "Gönder" replay'i (ui.js:6789 `buildRpcParams`) RPC kullanır.
+  NOT (review düzeltmesi 2026-09-01): docs-tutarlilik §1.6'daki replay imza sapmaları (`p_grup_id`,
+  `p_hayvan_id` vb.) commit `202df1f` ile DÜZELTİLDİ — buildRpcParams artık canlı imzalarla yazıldı
+  ve tests/unit/buildRpcParams.test.js ile kilitli; bu sapmalar artık bug değil, tarihsel kayıttır.
 - `?` işareti parametrenin DEFAULT'lu/opsiyonel olduğunu gösterir (snapshot imza düzeyi DEFAULT
   değeri göstermez; DEFAULT için migrations/GT'e bak).
 
