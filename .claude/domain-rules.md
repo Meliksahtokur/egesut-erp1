@@ -15,6 +15,21 @@ Yeni özellik geliştirirken veya mevcut kodu değiştirirken bu kurallara uyulm
 - Tohumlama ve doğum kayıtlarında `hayvan_id` alanı bazen `id` (UUID), bazen `kupe_no` değeri olarak saklanmış olabilir. Arama yaparken her ikisini de kontrol et: `a.id === x || a.kupe_no === x`.
 - Buzağı doğduğunda küpesi (`yavru_kupe`) anında sisteme girilir; küpeleme ayrıca görev olarak da takip edilir.
 
+### Küpe Numara Planı (2026-09-01 — spec `.claude/specs/2026-09-01-buzagi-kupe-revizyon-kararlar.md`)
+
+| Kural | İçerik |
+|---|---|
+| **Erkek yeni doğum** | Sayısal küpe **500-599 zorunlu** (JS sert engel `submitBirth` + RPC `dogum_kaydet` — çift katman). Sayısal OLMAYAN küpe (ör. `BZ-001`) serbest. |
+| **Manuel erkek kaydı** | 500-599 dışı sayısal küpe → **uyarı** (engel değil, K5'in yumuşak ayağı). |
+| **Dişi** | **1-999 içinde 5xx hariç her numara serbest.** Öneri listesi küçükten büyüğe (sıra disiplini teşviki, K10). |
+| **Öneri havuzu (K6)** | Erkek → yalnız 500-599; dişi → 1-999 \ 500-599. Doluluk **sayısal uzayda**: `"02"` ve `"002"` aynı 2'yi işgal eder sayılır. Yalnız **Aktif**lerin numaraları dolu. UI: `bosKupeOner()` (js/config.js), 💡 butonu `b-kupe`/`a-kupe` yanında. |
+| **Recycle (K1)** | Çıkmış (Ölü/Satıldı/Kesildi/Kayıp) hayvanın **işletme küpesi** çıkıştan hemen sonra yeniden kullanılabilir — loglar `id` ile bağlı olduğundan geçmiş kayıtlar bozulmaz. |
+| **Devlet küpesi (K2)** | TURKVET: hayvana ömür boyu — kontrol **GLOBAL** kalır, çıkmışta dahi çakışırsa red. |
+| **Çift katman (K3)** | DB: partial unique index `hayvanlar_kupe_no_key` (`WHERE durum='Aktif' AND kupe_no IS NOT NULL AND kupe_no <> ''`) + `kupe_musait_mi` aktif-filtre + h11 `hayvan_ekle`/`hayvan_guncelle` overload'larında kontrol. |
+| **Sıfır-trick (K9)** | `"002" ≠ "02"` string farkı **bilinçli özellik** — normalizasyon YASAK, mevcut stringlere dokunulmaz. |
+| **Mevcut erkekler (K12)** | Kural yalnız **yeni** kayıtlar; mevcut aktif Erkek 5xx dışı küpelere DOKUNULMAZ. Sürüden çıkınca numaraları havuza döner. |
+| **Aktif-öncelik arama (K7)** | Aynı küpe string'i geçmişte çıkmışta + bugün aktifte varsa arama/detay/asistan **aktif** hayvanı bulur (`hayvanByKupeRef` js/ui.js; `asistan_hayvan_detay` ORDER BY aktif DESC). |
+
 ---
 
 ## 2. Hayvan Grupları ve Padok Eşlemeleri

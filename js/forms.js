@@ -19,10 +19,18 @@
    idbGetAll, getData, write,
    loadDrugsCache, loadStock, loadDash, loadTasks, loadUreme, loadGecmis,
    loadBildirimler, loadStokPanel, openDet, closeDet, openStokPanel,
-   openAnimalEdit, closeAnimalEdit, getDisplayKupe, yasHesapla, loadIrkDropdown
+   openAnimalEdit, closeAnimalEdit, getDisplayKupe, yasHesapla, loadIrkDropdown,
+   erkekKupeUygunMu, hayvanByKupeRef
 */
 
 // ── KÜPE ÇAKIŞMA KONTROLÜ (blur) ────────────
+// Küpe uyarıları üç durumlu (spec 2026-09-01 K1/K2):
+//   1) aktif çakışma  → ⚠️ engel (submit durdurur, soft YOK)
+//   2) geçmiş kullanım → ℹ️ bilgi (dataset.soft=1 — engel değil, recycle mümkün)
+//   3) temiz          → uyarı temizlenir
+// Uyarı elementinde kalan metin + soft bayrağı submit'lerde _kupeUyarisi ile okunur.
+const _kupeUyarisi = el => el?.textContent && el.dataset.soft !== '1';
+
 async function _kupeKontrolEt(alan) {
   const deger = v(alan).trim();
   const warnId = alan + '-warn';
@@ -32,16 +40,28 @@ async function _kupeKontrolEt(alan) {
 
   const modal  = g('m-animal');
   const editId = modal?.dataset.editId || null;
+  // Devlet küpesi GLOBAL teklik (TURKVET, K2) → mesajı ayrı; işletme küpesi
+  // (a-kupe/b-kupe) aktif-filtreli → mesajda "aktif hayvan" nitelendirmesi
+  const cayismaMesaji = alan === 'a-devlet'
+    ? '⚠️ Bu devlet küpesi zaten kayıtlı'
+    : '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)';
   try {
     const params = {
-      p_kupe_no:     alan === 'a-kupe'    ? deger : null,
+      // b-kupe (doğum formu yavru küpesi) da İŞLETME küpesidir
+      p_kupe_no:     (alan === 'a-kupe' || alan === 'b-kupe') ? deger : null,
       p_devlet_kupe: alan === 'a-devlet'  ? deger : null,
     };
     if (editId) params.p_hayvan_id = editId;
     const res = await db.rpc('kupe_musait_mi', params);
+    // Stale-response guard (openDet'in _detOpenId idiomu): await sırasında alan
+    // değiştiyse bu sonucu YAZMA — yeni blur kontrolü zaten yolda
+    if (v(alan).trim() !== deger) return;
     if (res.data && res.data.musait === false) {
-      warnEl.textContent = '⚠️ Bu küpe zaten kayıtlı';
+      warnEl.textContent = cayismaMesaji;
       delete warnEl.dataset.soft;
+    } else if (res.data && res.data.kupe_gecmis_id) {
+      warnEl.textContent = `ℹ️ Bu numara geçmişte kullanılmış (${res.data.kupe_gecmis_durum || 'çıkmış'}) — yeniden kullanılabilir`;
+      warnEl.dataset.soft = '1';
     } else {
       warnEl.textContent = '';
       delete warnEl.dataset.soft;
@@ -50,7 +70,7 @@ async function _kupeKontrolEt(alan) {
     // Fail-aware (test-rapor #1): kontrol hatası sessizce 'müsait' SAYILMAZ.
     // Önceki gerçek uyarı korunur; boşsa yumuşak not (soft) düşülür — submit'i
     // engellemez, kullanıcı durumu GÖRÜR; gerekirse alanı düzenleyip tekrar tetikler.
-    if (!warnEl.textContent) {
+    if (v(alan).trim() === deger && !warnEl.textContent) {
       warnEl.textContent = '⏳ Küpe kontrolü yapılamadı — kayıtta teyit edilir';
       warnEl.dataset.soft = '1';
     }
@@ -61,8 +81,7 @@ async function _kupeKontrolEt(alan) {
 async function submitAnimal(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
 
-  // Küpe çakışma uyarısı varsa durdur (soft not hariç — kontrol hatası engel değil)
-  const _kupeUyarisi = el => el?.textContent && el.dataset.soft !== '1';
+  // Küpe çakışma uyarısı varsa durdur (soft not hariç — kontrol hatası/geçmiş kullanım engel değil)
   if (_kupeUyarisi(g('a-devlet-warn')) || _kupeUyarisi(g('a-kupe-warn'))) {
     toast('⚠️ Küpe çakışması var — formu kontrol edin', true); return;
   }
@@ -85,6 +104,10 @@ async function submitAnimal(btn) {
     if ((_grup === 'Süt İçen Buzağı' || _grup === 'Sütten Kesilmiş Buzağı') && _yasGun > 365) {
       toast('⚠️ 12 aylıktan büyük hayvan buzağı grubuna eklenemez', true); return;
     }
+  }
+  // K5 (manuel kayıt): erkek + sayısal + 500-599 dışı → UYARI (engel değil, doğum formundaki sert engel gibi DEĞİL)
+  if (!erkekKupeUygunMu(kupe, v('a-cinsiyet'))) {
+    toast('⚠️ Erkek hayvan küpesi için 500-599 aralığı önerilir');
   }
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
 
@@ -154,9 +177,14 @@ async function submitAnimal(btn) {
 // ── DOĞUM ────────────────────────────────────
 async function submitBirth(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+
+  // Küpe çakışma uyarısı varsa durdur (soft not hariç — b-kupe blur ön kontrolü)
+  if (_kupeUyarisi(g('b-kupe-warn'))) {
+    toast('⚠️ Küpe çakışması var — formu kontrol edin', true); return;
+  }
   const anneId = v('b-anne');
   const tarih  = v('b-tarih');
-  const kupe   = v('b-kupe');
+  const kupe   = v('b-kupe').trim();
   const cins   = v('b-cins');
   const tip    = v('b-tip');
   const kg     = Number.parseFloat(g('b-dogum-kg')?.value || '') || null;
@@ -165,8 +193,12 @@ async function submitBirth(btn) {
   if (!anneId) { toast('Anne seçilmedi — Gebelerden Seç veya Manuel Gir', true); return; }
   if (!tarih || !kupe) { toast('Doğum Tarihi ve Yavru Küpe zorunlu', true); return; }
   if (tarih > bugun()) { toast('Doğum tarihi ileri tarih olamaz', true); return; }
+  // K5: erkek buzağı sayısal küpesi 500-599 aralığında olmalı (dogum_kaydet RPC de zorlar)
+  if (!erkekKupeUygunMu(kupe, cins)) {
+    toast('⚠️ Erkek buzağı küpesi 500-599 aralığında olmalı', true); return;
+  }
 
-  const anne = getState('animals').find(a => a.id === anneId || a.kupe_no === anneId || a.devlet_kupe === anneId);
+  const anne = hayvanByKupeRef(anneId); // K7: küpe eşleşmesinde aktif önce
   if (!anne) { toast(`⚠️ Anne "${anneId}" sürüde bulunamadı`, true); return; }
 
   // UI Telemetry: doğum submit
@@ -200,6 +232,9 @@ async function submitBirth(btn) {
     ['b-kupe','b-dogum-kg','b-baba','b-baba-text'].forEach(id => { const el = g(id); if (el) el.value = ''; });
     const babaAuto = g('b-baba-auto'); if (babaAuto) babaAuto.style.display = 'none';
     const babaText = g('b-baba-text'); if (babaText) babaText.style.display = 'none';
+    // Küpe kalıntısı: blur uyarısı + soft bayrak + öneri chip listesi (closeM de yapar — belt & braces)
+    const kupeWarn = g('b-kupe-warn'); if (kupeWarn) { kupeWarn.textContent = ''; delete kupeWarn.dataset.soft; }
+    const kupeOner = g('b-kupe-oner-list'); if (kupeOner) kupeOner.style.display = 'none';
 
     if (window.__ileriGebeListesi) {
       window.__ileriGebeListesi = window.__ileriGebeListesi.filter(h => h.hayvan_id !== anne.id);
@@ -287,7 +322,7 @@ async function submitInsem(btn) {
   if (!hid || !tarih || !sperma) { toast('Küpe, Tarih ve Sperma zorunlu', true); return; }
   if (tarih > bugun()) { toast('Tohumlama tarihi ileri tarih olamaz', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   // UI Telemetry: tohumlama submit
@@ -428,7 +463,7 @@ async function submitKizginlik(btn) {
   if (!hid || !tarih) { toast('Küpe ve Tarih zorunlu', true); return; }
   if (tarih > bugun()) { toast('Kızgınlık tarihi ileri tarih olamaz', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -551,7 +586,7 @@ async function submitCase(btn) {
   if (!hid)       { toast('Hayvan seçilmedi', true); return; }
   if (!diseaseId) { toast('Hastalık seçilmedi', true); return; }
 
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
@@ -975,7 +1010,7 @@ function vChkChange(chk){
   if(!rows) return;
   if(chk.checked){
     const hid=v('v-hid');
-    const hayvan=getState('animals').find(a=>a.kupe_no===hid||a.id===hid||a.devlet_kupe===hid);
+    const hayvan=hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
     const naive=hayvan? _vaccineNaive(hayvan.id,id):true;
     const step2=_vStep2(id);
     const rid=chk.dataset.rid!==''?parseInt(chk.dataset.rid,10):null;
@@ -1011,7 +1046,7 @@ async function submitVaccination(btn) {
   if (!secili.length) { toast('⚠️ En az bir aşı seçin', true); return; }
   if (!date) { toast('⚠️ Tarih girin', true); return; }
   if (date > bugun()) { toast('İleri tarih girilemez', true); return; }
-  const hayvan = getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid);
+  const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -1078,7 +1113,7 @@ async function submitTaskAdd(btn) {
     // B15: devlet_kupe de denenir; serbest metin hayvana bağlanamıyorsa görev
     // yaratılmaz — eskiden yazılan string gorev_log.hayvan_id'ye giriyor, gece
     // cron'u (gorev_orphan_temizle) görevi sessizce siliyordu
-    const hayvan = hid ? (getState('animals').find(a => a.kupe_no === hid || a.id === hid || a.devlet_kupe === hid)) : null;
+    const hayvan = hid ? hayvanByKupeRef(hid) : null; // K7: küpe eşleşmesinde aktif önce
     if (hid && !hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil — hayvan alanını boş bırakırsanız genel görev oluşur`, true); return; }
     await write('gorev_log', {
       id: crypto.randomUUID(), hayvan_id: hayvan?.id || null,

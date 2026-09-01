@@ -11,6 +11,7 @@
    HEKIMLER, VARSAYILAN_HEKIM,
    HASTALIK_LISTESI, HASTALIK_KAT, LOKASYON_KAT, SEMPTOM_KAT, SEMPTOM_GENEL,
    SPERMA_LISTESI, GRUP_PADOK, PADOKLAR,
+   bosKupeOner,
    getState, setState,
    g, v, cl, dAgo, dFwd, fmtTarih, fmtTarihSaat, toast, openM, closeM, mClose,
    db, rpc, rpcOptimistic, pullTables, renderSafe, renderFromLocal,
@@ -2087,7 +2088,8 @@ async function openDet(id, keepTab){
       getData('uygulama_log',u=>u.hayvan_id===id),
     ]);
     if(_detOpenId!==id) return;
-    const a=aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
+    // K7: id/küpe referansıyla eşleşen birden çok kayıt varsa AKTİF olan önce
+    const a=aArr.find(x=>x.durum==='Aktif')||aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tohs.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
     tasks.sort((x,y)=>(x.hedef_tarih||'').localeCompare(y.hedef_tarih||''));
@@ -2481,9 +2483,40 @@ function anneSecimSifirla(){
 }
 function openDetByKupe(kupe){
   if(!kupe) return;
-  const a=getState('animals').find(x=>x.kupe_no===kupe||x.devlet_kupe===kupe);
+  const a=hayvanByKupeRef(kupe);
   if(a) openDet(a.id);
   else toast('Hayvan bulunamadı: '+kupe);
+}
+// K7 (spec 2026-09-01): küpe/id referansından hayvan bulma — AKTİF öncelikli.
+// Aynı küpe string'i geçmişte çıkmışta + bugün aktifte varsa aktif bulunur.
+function hayvanByKupeRef(ref){
+  if(!ref) return undefined;
+  const L=getState('animals')||[];
+  const hit=a=>a&&(a.kupe_no===ref||a.devlet_kupe===ref||a.id===ref);
+  return L.find(a=>hit(a)&&a.durum==='Aktif')||L.find(hit);
+}
+// K6: "Boş küpeler" öneri butonu — b-kupe (doğum) / a-kupe (manuel) yanındaki 💡.
+// Cinsiyete göre havuz: erkek=500-599, dişi=1-999 (5xx hariç), küçükten büyüğe.
+function kupeOnerGoster(alan){
+  const liste=document.getElementById(alan+'-oner-list');
+  if(!liste) return;
+  if(liste.style.display==='flex'){ liste.style.display='none'; return; } // toggle
+  const cinsSel=document.getElementById(alan==='b-kupe'?'b-cins':'a-cinsiyet');
+  const cins=cinsSel?.value||'';
+  const havuzCins=cins||'Dişi'; // manuel formda cinsiyet boşsa dişi havuzu göster
+  const oneri=bosKupeOner(getState('animals'),havuzCins,10);
+  const not=(!cins&&alan==='a-kupe')
+    ?'<div style="font-size:.62rem;color:var(--ink3);width:100%">Cinsiyet seçili değil — dişi havuzu (1-999, 5xx hariç) gösteriliyor</div>'
+    :'';
+  liste.innerHTML=not+oneri.map(k=>'<button type="button" class="ek-chip" onclick="kupeOnerSec(\''+alan+'\',\''+k+'\')">'+k+'</button>').join('');
+  liste.style.display='flex';
+}
+function kupeOnerSec(alan,kupe){
+  const input=document.getElementById(alan);
+  if(input) input.value=kupe;
+  const liste=document.getElementById(alan+'-oner-list');
+  if(liste) liste.style.display='none';
+  if(typeof _kupeKontrolEt==='function') _kupeKontrolEt(alan); // blur ön kontrolünü tetikle
 }
 function dogumYaptiAc(hayvanId,kupe,tohTarih,sperma){
   const dogumTahmini=dFwd(tohTarih,280);

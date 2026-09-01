@@ -127,3 +127,33 @@ const HIZLI_SAATLER = ['08:00', '16:00', '20:00'];
 
 // Tedavi seansı ekleme üst sınırı
 const MAX_SEANS_PER_DAY = 10;
+
+// ══════════════════════════════════════════
+// Küpe Numara Planı (spec 2026-09-01, K5/K10/K11)
+// Erkek yeni kayıt: sayısal küpe 500-599 zorunlu.
+// Dişi: 1-999 içinde 5xx hariç her numara serbest.
+// Havuz: yalnız AKTİFlerin numaraları dolu (çıkmışınki geri döner — K1).
+// Doluluk SAYISAL uzayda hesaplanır ("02" ve "002" aynı 2'yi işgal eder — K9).
+// Öneri listesi her iki cinsiyette küçükten büyüğe (K10).
+// ══════════════════════════════════════════
+const KUPE_ERKEK_MIN = 500, KUPE_ERKEK_MAX = 599;
+
+function erkekKupeUygunMu(kupe, cinsiyet) {
+  if (cinsiyet !== 'Erkek' || !/^\d+$/.test(String(kupe || ''))) return true;
+  const n = parseInt(kupe, 10);
+  return n >= KUPE_ERKEK_MIN && n <= KUPE_ERKEK_MAX;
+}
+
+function bosKupeOner(hayvanlar, cinsiyet, adet = 10) {
+  const dolu = new Set((hayvanlar || [])
+    .filter(a => a && a.durum === 'Aktif' && a.kupe_no && /^\d+$/.test(String(a.kupe_no)))
+    .map(a => parseInt(a.kupe_no, 10)));
+  const erkek = cinsiyet === 'Erkek';
+  const out = [];
+  for (let n = erkek ? KUPE_ERKEK_MIN : 1; n <= (erkek ? KUPE_ERKEK_MAX : 999) && out.length < adet; n++) {
+    if (!erkek && n >= KUPE_ERKEK_MIN && n <= KUPE_ERKEK_MAX) continue;
+    if (!dolu.has(n)) out.push(String(n));
+  }
+  return out;
+}
+

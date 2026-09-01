@@ -85,7 +85,20 @@ function closeM(id) {
     const grup = g('a-grup'); if (grup) grup.innerHTML = '<option value="">Önce cinsiyet seçin</option>';
     const padok = g('a-padok'); if (padok) padok.innerHTML = '<option value="">Önce grup seçin</option>';
     const hint = g('a-grup-hint'); if (hint) hint.style.display = 'none';
+    // Küpe revizyonu (2026-09-01): blur uyarısı + öneri chip listesi kalıntısı
+    _kupeFormKalintiTemizle(['a-devlet-warn','a-kupe-warn'], ['a-kupe-oner-list']);
   }
+  // Doğum formu: yavru küpe uyarısı + öneri chip listesi kalıntısı
+  if (id === 'm-birth') {
+    _kupeFormKalintiTemizle(['b-kupe-warn'], ['b-kupe-oner-list']);
+  }
+}
+
+// Küpe alanı kalıntı temizliği (blur uyarı metinleri + soft bayrak + öneri listeleri).
+// closeM'den HER kapanış yolunda (X, overlay, ESC, geri tuşu) çağrılır.
+function _kupeFormKalintiTemizle(warnIdler, onerListeIdler){
+  (warnIdler||[]).forEach(id=>{ const el=g(id); if(el){ el.textContent=''; delete el.dataset.soft; } });
+  (onerListeIdler||[]).forEach(id=>{ const el=g(id); if(el) el.style.display='none'; });
 }
 
 function mClose(e, el) {

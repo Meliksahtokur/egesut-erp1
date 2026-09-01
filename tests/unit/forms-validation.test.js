@@ -14,7 +14,11 @@ const {
   makeDomStub,
   makeElement,
 } = require('./support/loadModule.js');
-const { getDisplayKupe } = require('../../js/utils/helpers.js');
+const { getDisplayKupe, bugun } = require('../../js/utils/helpers.js');
+// Gerçek config.js fonksiyonu — erkek 5xx kuralı testi sahte implementation ile değil
+// kanonik kod ile doğrulanır (drift olmasın)
+const { sandbox: _cfgSandbox } = loadBrowserModule('js/config.js', {});
+const erkekKupeUygunMu = _cfgSandbox.erkekKupeUygunMu;
 
 // ── Sorgulanabilir DOM ────────────────────────────────────────────────
 // Loader'ın document stub'ı querySelectorAll'u hep [] döner. forms.js'in
@@ -150,7 +154,7 @@ describe('_kupeKontrolEt (küpe çakışma blur kontrolü)', () => {
   it('boş veya boşluk-dolu girdi → uyarı temizlenir, db hiç çağrılmaz', async () => {
     for (const bos of ['', '   ']) {
       const ctx = kupeSetup({ deger: bos });
-      ctx.warn.textContent = '⚠️ Bu küpe zaten kayıtlı'; // kirli başlangıç
+      ctx.warn.textContent = '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)'; // kirli başlangıç
       await ctx.sandbox._kupeKontrolEt(ctx.alan);
       assert.strictEqual(ctx.warn.textContent, '');
       assert.strictEqual(ctx.calls.db.length, 0, 'db.rpc çağrılmamalı');
@@ -165,12 +169,86 @@ describe('_kupeKontrolEt (küpe çakışma blur kontrolü)', () => {
     assert.strictEqual(ctx.calls.db.length, 0);
   });
 
-  it('db musait:false dönerse → "⚠️ Bu küpe zaten kayıtlı" uyarısı yazılır', async () => {
+  it('db musait:false dönerse → "⚠️ Bu küpe zaten kayıtlı (aktif hayvan)" uyarısı yazılır', async () => {
     const ctx = kupeSetup({ dbResult: { data: { musait: false }, error: null } });
     await ctx.sandbox._kupeKontrolEt(ctx.alan);
-    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu küpe zaten kayıtlı');
+    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined, 'aktif çakışma soft DEĞİL — engel');
     assert.strictEqual(ctx.calls.db.length, 1);
     assert.strictEqual(ctx.calls.db[0].name, 'kupe_musait_mi');
+  });
+
+  it('kupe_gecmis_id doluysa → ℹ️ bilgi mesajı + dataset.soft=1 (engel değil, recycle K1)', async () => {
+    const ctx = kupeSetup({
+      dbResult: { data: { musait: true, kupe_gecmis_id: 'H-7', kupe_gecmis_durum: 'Satıldı' }, error: null },
+    });
+    await ctx.sandbox._kupeKontrolEt(ctx.alan);
+    assert.strictEqual(ctx.warn.textContent, 'ℹ️ Bu numara geçmişte kullanılmış (Satıldı) — yeniden kullanılabilir');
+    assert.strictEqual(ctx.warn.dataset.soft, '1', 'geçmiş kullanım bilgisi submit Engellemeyez');
+  });
+
+  it('aktif çakışma + geçmiş kayıt birlikte dönerse → aktif çakışma (musait:false) kazanır', async () => {
+    const ctx = kupeSetup({
+      dbResult: { data: { musait: false, kupe_cakisma_id: 'H-9', kupe_gecmis_id: 'H-7', kupe_gecmis_durum: 'Öldü' }, error: null },
+    });
+    await ctx.sandbox._kupeKontrolEt(ctx.alan);
+    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('musait true + gecmis YOK → uyarı temizlenir (temiz numara)', async () => {
+    const ctx = kupeSetup({ dbResult: { data: { musait: true }, error: null } });
+    ctx.warn.textContent = 'ℹ️ Bu numara geçmişte kullanılmış (Satıldı) — yeniden kullanılabilir';
+    ctx.warn.dataset.soft = '1';
+    await ctx.sandbox._kupeKontrolEt(ctx.alan);
+    assert.strictEqual(ctx.warn.textContent, '');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('alan="b-kupe" (doğum formu yavru küpesi) → değer p_kupe_no alanına gider (işletme küpesi)', async () => {
+    const ctx = kupeSetup({ alan: 'b-kupe', deger: '321' });
+    await ctx.sandbox._kupeKontrolEt('b-kupe');
+    assert.deepStrictEqual(host(ctx.calls.db[0].params), {
+      p_kupe_no: '321',
+      p_devlet_kupe: null,
+    });
+  });
+
+  it('alan="a-devlet" + musait:false → "⚠️ Bu devlet küpesi zaten kayıtlı" (GLOBAL kontrol, K2)', async () => {
+    const ctx = kupeSetup({ alan: 'a-devlet', deger: 'TR-999',
+      dbResult: { data: { musait: false, devlet_cakisma_id: 'H-3' }, error: null } });
+    await ctx.sandbox._kupeKontrolEt('a-devlet');
+    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu devlet küpesi zaten kayıtlı');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('stale-response guard: await sırasında alan değeri değişirse sonuç YAZILMAZ (openDet _detOpenId idiomu)', async () => {
+    const ctx = kupeSetup({ dbResult: { data: { musait: false }, error: null } });
+    const input = ctx.document.getElementById('a-kupe');
+    const p = ctx.sandbox._kupeKontrolEt('a-kupe');
+    input.value = 'TR-DIGER'; // kontrol uçuştayken kullanıcı alanı değiştirdi
+    await p;
+    assert.strictEqual(ctx.warn.textContent, '', 'eski (stale) sonucun uyarısı yazılmamalı');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('stale-response guard: gecmis bilgisi de stale ise yazılmaz', async () => {
+    const ctx = kupeSetup({ dbResult: { data: { musait: true, kupe_gecmis_id: 'H-7', kupe_gecmis_durum: 'Satıldı' }, error: null } });
+    const input = ctx.document.getElementById('a-kupe');
+    const p = ctx.sandbox._kupeKontrolEt('a-kupe');
+    input.value = '501';
+    await p;
+    assert.strictEqual(ctx.warn.textContent, '');
+    assert.strictEqual(ctx.warn.dataset.soft, undefined);
+  });
+
+  it('stale-response guard (catch): db hatası + alan değiştiyse soft not da yazılmaz', async () => {
+    const ctx = kupeSetup({ db: { rpc: async () => { throw new Error('db erişilemez'); } } });
+    const input = ctx.document.getElementById('a-kupe');
+    const p = ctx.sandbox._kupeKontrolEt('a-kupe');
+    input.value = 'TR-DIGER';
+    await assert.doesNotReject(() => p);
+    assert.strictEqual(ctx.warn.textContent, '', 'stale istek için soft not düşülmemeli');
   });
 
   it('db musait:true dönerse → uyarı temizlenir', async () => {
@@ -220,9 +298,9 @@ describe('_kupeKontrolEt (küpe çakışma blur kontrolü)', () => {
     const ctx = kupeSetup({
       db: { rpc: async () => { throw new Error('db erişilemez'); } },
     });
-    ctx.warn.textContent = '⚠️ Bu küpe zaten kayıtlı';
+    ctx.warn.textContent = '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)';
     await assert.doesNotReject(() => ctx.sandbox._kupeKontrolEt(ctx.alan));
-    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu küpe zaten kayıtlı');
+    assert.strictEqual(ctx.warn.textContent, '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)');
   });
 
   it('db.rpc hatası + uyarı boşsa → soft not düşer, dataset.soft=1 (submit engellemez)', async () => {
@@ -692,5 +770,106 @@ describe('ek uygulama akışı (ekChipSec → ekUygulamaEkle → ekUygulama_sil)
     assert.ok(html.includes('A&amp;B &lt;b&gt;x&lt;/b&gt;'), 'tür escape edilmiş görünmeli');
     assert.ok(html.includes('&lt;script&gt;zmnr&lt;/script&gt;'), 'stok adı escape edilmiş görünmeli');
     assert.ok(!html.includes('<b>x</b>'), 'ham HTML sızmamalı');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// submitBirth — küpe revizyonu guard'ları (spec 2026-09-01 K1/K5)
+//   1) b-kupe-warn hard uyarısı (aktif çakışma) → submit durur
+//   2) b-kupe-warn soft (geçmiş kullanım / kontrol hatası) → submit devam
+//   3) Erkek + sayısal 500-599 dışı → SERT engel (RPC çift katmanının JS ayağı)
+//   4) Sayısal olmayan erkek küpesi serbest (kural yalnız sayısal uzayda)
+// ══════════════════════════════════════════════════════════════════════
+describe('submitBirth (küpe revizyonu guardları)', () => {
+  function dogumSetup({ cins = 'Erkek', kupe = '123', warn, warnSoft } = {}) {
+    const animals = [{ id: 'anne-1', kupe_no: 'A-1', durum: 'Aktif' }];
+    const ctx = setupForms({
+      state: { animals },
+      extra: {
+        navigator: { onLine: true },
+        erkekKupeUygunMu,
+        // ui.js'te tanımlı resolver'ın davranış aynası (id/küpe/devlet eşleşmesi)
+        hayvanByKupeRef: (ref) => animals.find(a => a.id === ref || a.kupe_no === ref || a.devlet_kupe === ref),
+        bugun,
+        uiLog: () => {},
+        closeM: () => {},
+        getUserMessage: (e) => String(e?.message || e),
+        pullTables: async () => {},
+        renderSafe: () => {},
+      },
+    });
+    ctx.document.__setEl('b-anne', Object.assign(makeElement('input'), { value: 'anne-1' }));
+    ctx.document.__setEl('b-tarih', Object.assign(makeElement('input'), { value: '2020-01-01' }));
+    ctx.document.__setEl('b-kupe', Object.assign(makeElement('input'), { value: kupe }));
+    ctx.document.__setEl('b-cins', Object.assign(makeElement('select'), { value: cins }));
+    ctx.document.__setEl('b-tip', Object.assign(makeElement('select'), { value: 'Normal' }));
+    ctx.document.__setEl('b-dogum-kg', Object.assign(makeElement('input'), { value: '35' }));
+    if (warn !== undefined) {
+      const w = ctx.document.__setEl('b-kupe-warn', makeElement('div'));
+      w.textContent = warn;
+      if (warnSoft) w.dataset.soft = '1';
+    }
+    return ctx;
+  }
+  const rpcAdlari = (ctx) => ctx.calls.rpc.map(c => c.name);
+
+  it('Erkek + sayısal küpe 500-599 dışı → sert engel, dogum_kaydet ÇAĞRILMAZ', async () => {
+    for (const kotu of ['123', '499', '600', '999']) {
+      const ctx = dogumSetup({ kupe: kotu, cins: 'Erkek' });
+      await ctx.sandbox.submitBirth(null);
+      assert.ok(ctx.calls.toast.some(t => t.msg === '⚠️ Erkek buzağı küpesi 500-599 aralığında olmalı' && t.err),
+        `kupe=${kotu}: erkek 5xx engel toast'ı beklenir`);
+      assert.deepStrictEqual(rpcAdlari(ctx), [], `kupe=${kotu}: rpc çağrılmamalı`);
+    }
+  });
+
+  it('Erkek + 500-599 → engel yok, dogum_kaydet çağrılır', async () => {
+    for (const iyi of ['500', '550', '599']) {
+      const ctx = dogumSetup({ kupe: iyi, cins: 'Erkek' });
+      await ctx.sandbox.submitBirth(null);
+      assert.deepStrictEqual(rpcAdlari(ctx), ['dogum_kaydet'], `kupe=${iyi}`);
+      assert.strictEqual(ctx.calls.rpc[0].params.p_kupe, iyi);
+    }
+  });
+
+  it('Dişi + 500-599 dışı sayısal küpe serbest (kural erkeğe özgü, K10)', async () => {
+    const ctx = dogumSetup({ kupe: '123', cins: 'Dişi' });
+    await ctx.sandbox.submitBirth(null);
+    assert.deepStrictEqual(rpcAdlari(ctx), ['dogum_kaydet']);
+  });
+
+  it('Sayısal OLMAYAN erkek küpesi (ör. BZ-001) serbest — kural yalnız sayısal uzayda', async () => {
+    const ctx = dogumSetup({ kupe: 'BZ-001', cins: 'Erkek' });
+    await ctx.sandbox.submitBirth(null);
+    assert.deepStrictEqual(rpcAdlari(ctx), ['dogum_kaydet']);
+  });
+
+  it('b-kupe-warn dolu + soft DEĞİL (aktif çakışma) → submit durur', async () => {
+    const ctx = dogumSetup({ kupe: '550', cins: 'Erkek',
+      warn: '⚠️ Bu küpe zaten kayıtlı (aktif hayvan)' });
+    await ctx.sandbox.submitBirth(null);
+    assert.ok(ctx.calls.toast.some(t => t.msg === '⚠️ Küpe çakışması var — formu kontrol edin' && t.err));
+    assert.deepStrictEqual(rpcAdlari(ctx), []);
+  });
+
+  it('b-kupe boşluk-dolu (" 501 ") → trim edilir: 5xx kuralı geçer, rpc p_kupe trimmed gider', async () => {
+    const ctx = dogumSetup({ kupe: ' 501 ', cins: 'Erkek' });
+    await ctx.sandbox.submitBirth(null);
+    assert.deepStrictEqual(rpcAdlari(ctx), ['dogum_kaydet']);
+    assert.strictEqual(ctx.calls.rpc[0].params.p_kupe, '501', "küpe trim edilerek iletilmeli (' 501 ' saklanmaz)");
+  });
+
+  it('b-kupe " 123 " + Erkek → trim sonrası 5xx dışı → SERT engel (boşluk dolgusu kuralı atlatamaz)', async () => {
+    const ctx = dogumSetup({ kupe: ' 123 ', cins: 'Erkek' });
+    await ctx.sandbox.submitBirth(null);
+    assert.ok(ctx.calls.toast.some(t => t.msg === '⚠️ Erkek buzağı küpesi 500-599 aralığında olmalı' && t.err));
+    assert.deepStrictEqual(rpcAdlari(ctx), []);
+  });
+
+  it('b-kupe-warn dolu + soft=1 (geçmiş kullanım bilgisi) → submit DEVAM eder (recycle K1)', async () => {
+    const ctx = dogumSetup({ kupe: '550', cins: 'Erkek',
+      warn: 'ℹ️ Bu numara geçmişte kullanılmış (Satıldı) — yeniden kullanılabilir', warnSoft: true });
+    await ctx.sandbox.submitBirth(null);
+    assert.deepStrictEqual(rpcAdlari(ctx), ['dogum_kaydet']);
   });
 });

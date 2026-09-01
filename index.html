@@ -1379,7 +1379,10 @@ button,input,select,textarea{font-family:inherit}
       <div class="fg"><label class="flbl">Doğum Tarihi *</label><input id="b-tarih" class="fi" type="date"></div>
       <div class="r2">
         <div class="fg"><label class="flbl">Yavru Cinsiyeti *</label><select id="b-cins" class="fsel"><option>Dişi</option><option>Erkek</option></select></div>
-        <div class="fg"><label class="flbl">Yavru Küpe *</label><input id="b-kupe" class="fi" placeholder="BZ-001" autocomplete="off"></div>
+        <div class="fg"><label class="flbl">Yavru Küpe *</label>
+          <div style="display:flex;gap:5px"><input id="b-kupe" class="fi" placeholder="BZ-001" autocomplete="off" onblur="_kupeKontrolEt('b-kupe')" style="margin:0;flex:1;min-width:0"><button type="button" id="b-kupe-oner" onclick="kupeOnerGoster('b-kupe')" title="Boş küpe numaralarını göster" style="padding:8px 10px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);cursor:pointer;font-size:.8rem">💡</button></div>
+          <div id="b-kupe-oner-list" style="display:none;flex-wrap:wrap;gap:5px;margin-top:5px"></div>
+          <div id="b-kupe-warn" style="font-size:.62rem;color:var(--red);min-height:.9em;margin-top:2px"></div></div>
       </div>
       <div class="fg-row">
         <div class="fg"><label class="flbl">Doğum Ağırlığı (kg) *</label><input id="b-dogum-kg" type="number" step="0.1" min="0" max="100" class="fi" placeholder="Örn: 38.5"></div>
@@ -1415,7 +1418,11 @@ button,input,select,textarea{font-family:inherit}
         </div>
         <div class="fg">
           <label class="flbl">İşletme Küpe No</label>
-          <input id="a-kupe" class="fi" placeholder="001" autocomplete="off" onblur="_kupeKontrolEt('a-kupe')">
+          <div style="display:flex;gap:5px">
+            <input id="a-kupe" class="fi" placeholder="001" autocomplete="off" onblur="_kupeKontrolEt('a-kupe')" style="margin:0;flex:1;min-width:0">
+            <button type="button" id="a-kupe-oner" onclick="kupeOnerGoster('a-kupe')" title="Boş küpe numaralarını göster" style="padding:8px 10px;background:var(--card2);border:1px solid var(--card3);border-radius:var(--r1);cursor:pointer;font-size:.8rem">💡</button>
+          </div>
+          <div id="a-kupe-oner-list" style="display:none;flex-wrap:wrap;gap:5px;margin-top:5px"></div>
           <div id="a-kupe-warn" style="font-size:.62rem;color:var(--red);min-height:.9em;margin-top:2px"></div>
         </div>
       </div>
