@@ -113,6 +113,7 @@ registerActions({
   // atlıyordu (_planliTohumlamaGorevId sızıntısı → B3) ve history.back yapmıyordu
   'mclose-overlay': (el, e) => { if (e.target === el) closeM(el.id); },
   'open-birth-modal':    () => openM('m-birth'),
+  'ikinci-yavru-ekle':   (el) => ikinciYavruAc(el.dataset.hid, el.dataset.kupe, el.dataset.dt, el.dataset.sperma),
   'open-insem-modal':    () => openM('m-insem'),
   'open-disease-modal':  () => openM('m-disease'),
   'open-bulk-vaccine':   () => openM('m-bulk-vaccine'),

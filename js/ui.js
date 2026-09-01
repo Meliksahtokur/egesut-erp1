@@ -93,6 +93,28 @@ function showTab2(name,btn){
 // ──────────────────────────────────────────
 // DASHBOARD
 // ──────────────────────────────────────────
+// ── İkiz/çoklu doğum yardımcıları (saf — tests/unit/ikiz-dogum.test.js) ──
+// Kardeş = aynı anne_id + aynı dogum_tarihi (olay_id'siz, migration-bağımsız kural)
+function _kardeslerBul(animals,a){
+  if(!a || !a.anne_id || !a.dogum_tarihi) return [];
+  return (animals||[]).filter(x => x && x.id !== a.id && x.anne_id === a.anne_id && x.dogum_tarihi === a.dogum_tarihi);
+}
+// births = bu hayvanın kendi dogum satırları; son PENCERE gün içinde doğum varsa o satırı döner
+function _ikinciYavruDogumu(births,bugunStr,pencereGun){
+  if(!Array.isArray(births) || !births.length) return null;
+  const enSon = births.reduce((m,d)=> (!m || (d.tarih||'') > (m.tarih||'')) ? d : m, null);
+  if(!enSon || !enSon.tarih) return null;
+  const sinir = new Date(bugunStr + 'T00:00:00');
+  sinir.setDate(sinir.getDate() - (pencereGun || 10));
+  const s = `${sinir.getFullYear()}-${String(sinir.getMonth()+1).padStart(2,'0')}-${String(sinir.getDate()).padStart(2,'0')}`;
+  return enSon.tarih >= s ? enSon : null;
+}
+// Dashboard bandı için: anne başına tek dogum satırı (ikizde anne 1 kez görünür)
+function _dogumAnneBazliTekillestir(births){
+  const m = new Map();
+  for(const b of (births||[])){ if(b && b.anne_id && !m.has(b.anne_id)) m.set(b.anne_id, b); }
+  return [...m.values()];
+}
 function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
   const _taskCls=tasks.length>0?'warn':'ok';
   const sutBuzagiSayisi=animals.filter(a=>a.grup&&a.grup.includes('Süt İçen Buzağı')&&a.dogum_tarihi&&Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000)>=60).length;
@@ -275,6 +297,7 @@ async function loadDash(){
       const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
       return !hasK&&!hasT;
     });
+    const births60D=_dogumAnneBazliTekillestir(births60F);   // ikizde anne 1 kez
     // Buzağı sütten kesme otomatik kontrolü
     try {
       const resBuz=await rpc('buzagi_sutten_kesme_kontrol');
@@ -294,7 +317,7 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
@@ -1727,10 +1750,18 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     <span style="color:var(--ink3)">Anne: </span>
     <span onclick="openDet('${a.anne_id}')" style="font-weight:700;color:var(--blue);cursor:pointer">📌 ${anneKupe}</span>
   </div>`;
+  const kardesler=_kardeslerBul(getState('animals'),a);
+  if(kardesler.length) extra+=`<div data-kardes-row style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.35);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span style="color:var(--ink3)">Kardeş${kardesler.length>1?'ler':''} ${kardesler.length===1?'(ikiz)':'('+(kardesler.length+1)+'\'lü)'}: </span>
+    ${kardesler.map(k=>`<span onclick="openDet('${k.id}')" style="background:rgba(78,154,42,.12);border:1px solid rgba(78,154,42,.4);border-radius:7px;padding:3px 8px;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--green3)">🐄 ${esc(k.kupe_no||k.devlet_kupe||k.id)}</span>`).join(' ')}
+    <span onclick="this.closest('[data-kardes-row]').remove()" title="Satırı kapat" style="margin-left:auto;color:var(--ink3);cursor:pointer;padding:0 4px">✕</span>
+  </div>`;
   if(yavrular.length) extra+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
     <div style="color:var(--ink3);margin-bottom:4px">Yavrular (${yavrular.length}):</div>
     <div style="display:flex;flex-wrap:wrap;gap:5px">${yavrular.map(y=>`<span onclick="openDet('${y.id}')" style="background:var(--card);border:1px solid var(--card3);border-radius:7px;padding:3px 8px;font-size:.75rem;font-weight:700;cursor:pointer;color:var(--ink)">🐄 ${esc(y.kupe_no||y.devlet_kupe||y.id)}</span>`).join('')}</div>
   </div>`;
+  const _ikizDog=_ikinciYavruDogumu(births,bugun(),10);
+  if(_ikizDog) extra+=`<button class="btn" data-action="ikinci-yavru-ekle" data-hid="${a.id}" data-kupe="${escAttr(a.kupe_no||a.devlet_kupe||a.id)}" data-dt="${_ikizDog.tarih}" data-sperma="${escAttr(_ikizDog.baba_bilgi||'')}" style="margin-bottom:8px;padding:8px 10px;font-size:.78rem;background:rgba(78,154,42,.12);color:var(--green3);border:1px solid rgba(78,154,42,.45);font-weight:700">➕ Bu doğuma yavru ekle</button>`;
   if(a.notlar) extra+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
     <div style="color:var(--ink3);margin-bottom:4px">📝 Notlar:</div>
     <div style="color:var(--ink)">${esc(a.notlar)}</div>
@@ -2459,6 +2490,12 @@ function dogumYaptiAc(hayvanId,kupe,tohTarih,sperma){
   anneSeç(hayvanId,kupe,dogumTahmini,sperma);
   const tarihEl=document.getElementById('b-tarih');
   if(tarihEl) tarihEl.value=bugun();
+  openM('m-birth');
+}
+function ikinciYavruAc(hayvanId,kupe,dogumTarihi,sperma){
+  anneSeç(hayvanId,kupe,dogumTarihi,sperma||'');
+  const t=document.getElementById('b-tarih'); if(t) t.value=dogumTarihi;
+  const k=document.getElementById('b-kupe'); if(k) k.value='';
   openM('m-birth');
 }
 
