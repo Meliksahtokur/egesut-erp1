@@ -93,6 +93,28 @@ function showTab2(name,btn){
 // ──────────────────────────────────────────
 // DASHBOARD
 // ──────────────────────────────────────────
+// ── İkiz/çoklu doğum yardımcıları (saf — tests/unit/ikiz-dogum.test.js) ──
+// Kardeş = aynı anne_id + aynı dogum_tarihi (olay_id'siz, migration-bağımsız kural)
+function _kardeslerBul(animals,a){
+  if(!a || !a.anne_id || !a.dogum_tarihi) return [];
+  return (animals||[]).filter(x => x && x.id !== a.id && x.anne_id === a.anne_id && x.dogum_tarihi === a.dogum_tarihi);
+}
+// births = bu hayvanın kendi dogum satırları; son PENCERE gün içinde doğum varsa o satırı döner
+function _ikinciYavruDogumu(births,bugunStr,pencereGun){
+  if(!Array.isArray(births) || !births.length) return null;
+  const enSon = births.reduce((m,d)=> (!m || (d.tarih||'') > (m.tarih||'')) ? d : m, null);
+  if(!enSon || !enSon.tarih) return null;
+  const sinir = new Date(bugunStr + 'T00:00:00');
+  sinir.setDate(sinir.getDate() - (pencereGun || 10));
+  const s = `${sinir.getFullYear()}-${String(sinir.getMonth()+1).padStart(2,'0')}-${String(sinir.getDate()).padStart(2,'0')}`;
+  return enSon.tarih >= s ? enSon : null;
+}
+// Dashboard bandı için: anne başına tek dogum satırı (ikizde anne 1 kez görünür)
+function _dogumAnneBazliTekillestir(births){
+  const m = new Map();
+  for(const b of (births||[])){ if(b && b.anne_id && !m.has(b.anne_id)) m.set(b.anne_id, b); }
+  return [...m.values()];
+}
 function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
   const _taskCls=tasks.length>0?'warn':'ok';
   const sutBuzagiSayisi=animals.filter(a=>a.grup&&a.grup.includes('Süt İçen Buzağı')&&a.dogum_tarihi&&Math.floor((Date.now()-new Date(a.dogum_tarihi))/86400000)>=60).length;
