@@ -673,6 +673,44 @@ function _stokAdi(stokId){
   const s=(getState('stock')||[]).find(x=>x.id===stokId);
   return s?.urun_adi || (stokId.length>8 ? stokId.slice(0,8)+'…' : stokId);
 }
+// Aşı görevinden aşıyı çözümle: (1) stok_id→vaccines.stock_item_id, (2) aciklama ad-öneki.
+// Ad-öneki adımı şart: Coglavax/Vac-Sules kataloğunda stock_item_id NULL (2026-06-19 seed
+// stok yaratmadı) ve add_vaccination'ın ürettiği ASI_RAPEL görevleri bu aşılarla stok_id'siz doğar.
+function _asiVaccineCoz(t,vaccines){
+  if(!t) return null;
+  const vaxList=vaccines||[];
+  if(t.stok_id){
+    const s=vaxList.find(v=>v.stock_item_id===t.stok_id);
+    if(s) return s;
+  }
+  const ad=(t.aciklama||'').replace(/^\s*💉\s*/,'').trim().toLowerCase();
+  if(!ad) return null;
+  const adaylar=vaxList.filter(v=>v.name&&ad.startsWith(String(v.name).toLowerCase()));
+  if(!adaylar.length) return null;
+  return adaylar.sort((a,b)=>b.name.length-a.name.length)[0]; // en uzun ad öncelik
+}
+// Detaydaki aşı formu alanlarını (ad + doz) verilen aşıya kurar; vax null ise sıfırlar.
+function _asiFormVaxKur(vax){
+  const adiEl=document.getElementById('td-asi-adi');
+  const dozEl=document.getElementById('td-asi-doz');
+  const dozInfo=document.getElementById('td-asi-doz-info');
+  const dozUnit=document.getElementById('td-asi-doz-unit');
+  if(adiEl) adiEl.textContent=vax?(vax.name||'—'):'—';
+  if(dozEl){ dozEl.value=vax?.dose??''; dozEl.placeholder=vax?.dose??''; }
+  if(dozInfo) dozInfo.textContent='St: '+((vax?.dose)??'?')+' '+(vax?.unit||'ml');
+  if(dozUnit) dozUnit.textContent='('+(vax?.unit||'ml')+')';
+}
+// td-asi-vax select'i değişince uygulanacak aşıyı ve doz bilgisini güncelle
+// (index.html'deki onchange attribute'u çağırır — modal router uyumu için DOM property yok)
+async function tdAsiVaxSec(vId){
+  _curTaskVaccineId=vId||null;
+  if(!vId){ _asiFormVaxKur(null); return; }
+  try{
+    const vaccines=await getData('vaccines');
+    _asiFormVaxKur((vaccines||[]).find(v=>v.id===vId)||null);
+  }catch(e){ console.warn('vaccine lookup:',e.message); }
+}
+
 function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
   const planTime=t.gorev_tipi==='TOHUMLAMA_PLANLI'
     ? (t.hedef_saat||'').slice(0,5)
@@ -4807,25 +4845,31 @@ async function openTaskDet(id){
   // Buton etiketi bunu söylesin; detayTamamla() forma yönlendiriyor.
   if(t.gorev_tipi==='TOHUMLAMA_PLANLI'&&tamamBtn) tamamBtn.textContent='🐄 Tohumlamayı Kaydet';
 
-  // ILERI_GEBE_ASI: standart tamamla gizle, aşı butonu göster
-  if(t.gorev_tipi==='ILERI_GEBE_ASI'){
+  // ILERI_GEBE_ASI / ASI_RAPEL / ASI_HATIRLATMA: standart tamamla gizle, aşı butonu göster.
+  // ASI_RAPEL özel olarak işlenmeli — generic 'Tamamlandı' görevi kayıtsız kapatıyordu
+  // (vaccination_log'a kayıt düşmüyordu; kullanıcının tüm Coglavax rapelleri bu yoldaydı).
+  const vaxSelWrap=document.getElementById('td-asi-vax-wrap');
+  const vaxSel=document.getElementById('td-asi-vax');
+  if(vaxSelWrap) vaxSelWrap.style.display='none';
+  if(vaxSel) vaxSel.value='';
+  _asiFormVaxKur(null); // önceki görevden kalan ad/doz'u temizle (stale name fix)
+  if(t.gorev_tipi==='ILERI_GEBE_ASI'||t.gorev_tipi==='ASI_RAPEL'||t.gorev_tipi==='ASI_HATIRLATMA'){
     if(tamamBtn) tamamBtn.style.display='none';
     if(asiAcBtn) asiAcBtn.style.display='block';
     try{
       const vaccines=await getData('vaccines');
-      const vax=vaccines.find(v=>v.stock_item_id===t.stok_id);
+      const vax=_asiVaccineCoz(t,vaccines);
       if(vax){
         _curTaskVaccineId=vax.id;
-        document.getElementById('td-asi-adi').textContent=vax.name||'Rota-Corona';
-        const dozEl=document.getElementById('td-asi-doz');
-        if(dozEl){
-          if(vax.dose) dozEl.value=vax.dose;
-          dozEl.placeholder=vax.dose||'';
+        _asiFormVaxKur(vax);
+      } else {
+        // Aşı çözümlenemedi (manuel görev vb.) — formda seçim listesi aç, ölü nokta yok
+        _curTaskVaccineId=null;
+        if(vaxSelWrap&&vaxSel){
+          vaxSel.innerHTML='<option value="">— Aşı seçin —</option>'
+            +(vaccines||[]).map(v=>`<option value="${escAttr(v.id)}">${esc(v.name||v.id)}</option>`).join('');
+          vaxSelWrap.style.display='block';
         }
-        const dozInfo=document.getElementById('td-asi-doz-info');
-        if(dozInfo) dozInfo.textContent='St: '+(vax.dose||'?')+' '+(vax.unit||'ml');
-        const dozUnit=document.getElementById('td-asi-doz-unit');
-        if(dozUnit) dozUnit.textContent='('+(vax.unit||'ml')+')';
       }
     }catch(e){ console.warn('vaccine lookup:',e.message); }
     const tarihEl=document.getElementById('td-asi-tarih');
@@ -5101,27 +5145,49 @@ function asiFormAc(){
   document.getElementById('td-asi-ac-btn').style.display='none';
 }
 async function asiUygulaVeTamamla(){
-  if(!_curTaskDet||!_curTaskVaccineId){ toast('Aşı bilgisi eksik',true); return; }
+  if(!_curTaskDet){ toast('Görev bulunamadı',true); return; }
+  // Aşı id: çözümlenmiş (_curTaskVaccineId) ya da formdaki seçim listesinden
+  const vaxSel=document.getElementById('td-asi-vax');
+  const secilenId=(vaxSel&&vaxSel.value)?vaxSel.value:_curTaskVaccineId;
+  if(!secilenId){ toast('Aşı seçin',true); return; }
   const btn=document.getElementById('td-asi-uygula-btn');
   if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
   try{
     const tarih=document.getElementById('td-asi-tarih').value||bugun();
     const dozRaw=document.getElementById('td-asi-doz').value;
     const doz=dozRaw?parseFloat(dozRaw):null;
-    const res=await rpc('ileri_gebe_asi_tamamla',{
-      p_gorev_id:  _curTaskDet.id,
-      p_vaccine_id:_curTaskVaccineId,
-      p_tarih:     tarih,
-      p_doz:       doz,
-    });
-    if(!res.ok){ toast(_trErr(res.mesaj||'Hata'),true); return; }
+    let rapelTarih=null;
+    if(_curTaskDet.gorev_tipi==='ILERI_GEBE_ASI'){
+      const res=await rpc('ileri_gebe_asi_tamamla',{
+        p_gorev_id:  _curTaskDet.id,
+        p_vaccine_id:secilenId,
+        p_tarih:     tarih,
+        p_doz:       doz,
+      });
+      if(!res.ok){ toast(_trErr(res.mesaj||'Hata'),true); return; }
+      rapelTarih=res.rapel_tarih||null;
+    } else {
+      // ASI_RAPEL / ASI_HATIRLATMA: uygulama kaydı + görevi kapat.
+      // notes 'GorevID:' ile başlamalı DEĞİL — add_vaccination böylece sonraki
+      // rapel görevini kendisi üretir (yıllık döngünün mevcut konvansiyonu).
+      const res=await rpc('add_vaccination',{
+        p_animal_id: _curTaskDet.hayvan_id,
+        p_vaccine_id:secilenId,
+        p_date:      tarih,
+        p_dose_override:doz,
+        p_notes:     null,
+      });
+      if(!res||res.ok===false){ toast(_trErr(res?.mesaj||'Hata'),true); return; }
+      await rpc('gorev_tamamla',{p_gorev_id:_curTaskDet.id});
+      rapelTarih=res.next_due||null;
+    }
     closeM('m-task-det');
-    await pullTables(['gorev_log']).catch(()=>{});
+    await pullTables(['gorev_log','vaccination_log']).catch(()=>{});
     updateTaskBadge();
     loadTasks(_curTaskFilter||'today',null,{skipPull:true});
     loadDash();
-    const rapelTarih=res.rapel_tarih?fmtTarih(res.rapel_tarih):null;
-    toast(rapelTarih?`✅ Aşı kaydedildi · Rapel: ${rapelTarih}`:'✅ Aşı kaydedildi');
+    const rapelStr=rapelTarih?fmtTarih(rapelTarih):null;
+    toast(rapelStr?`✅ Aşı kaydedildi · Sonraki: ${rapelStr}`:'✅ Aşı kaydedildi');
   }catch(e){
     toast(_trErr(e.message),true);
   }finally{

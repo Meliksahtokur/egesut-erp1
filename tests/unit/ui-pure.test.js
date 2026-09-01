@@ -29,7 +29,7 @@ const { sandbox } = loadBrowserModule('js/ui.js', {
 });
 const {
   yasHesapla, band, _dashVacAlerts, _yeniDogumGun,
-  _durumClr, _durumTxt, renderSeansGrupAyrac,
+  _durumClr, _durumTxt, renderSeansGrupAyrac, _asiVaccineCoz,
 } = sandbox;
 
 // ── Tarih yardımcıları (yerel takvim; yasHesapla new Date() ile yerel çalışır) ──
@@ -415,4 +415,64 @@ test('renderSeansGrupAyrac: falsy segmentler (hastalık/seans/tarih) hiç render
   assert.ok(!/\d+\/\d+ seans/.test(out), 'seans sayacı segmenti olmamalı');
   assert.ok(!out.includes('20.08'));
   assert.ok(out.includes('Gün 1'));
+});
+
+// ═══════════════════════════════════════════════════════════════
+// _asiVaccineCoz (js/ui.js) — aşı görevinden aşı çözümleme zinciri
+// Gerçek arka plan: Coglavax/Vac-Sules'un stock_item_id'si NULL ve
+// add_vaccination'ın ürettiği ASI_RAPEL görevleri stok_id'siz doğar;
+// eski kod yalnız stok_id eşleşmesi aradığı için bu görevlere aşı
+// uygulanamıyordu ('Aşı bilgisi eksik').
+// ═══════════════════════════════════════════════════════════════
+const VAX_ORNEK = [
+  { id: 'v-sarbon',  name: 'Şarbon Aşısı',  stock_item_id: 'STOK-AŞI-v-sarbon',  dose: 2, unit: 'ml' },
+  { id: 'v-cogla',   name: 'Coglavax',      stock_item_id: null,                 dose: 4, unit: 'ml' },
+  { id: 'v-sules',   name: 'Vac-Sules Feedlot', stock_item_id: null,             dose: 5, unit: 'ml' },
+  { id: 'v-rota',    name: 'Rotavirus Aşısı', stock_item_id: 'STOK-AŞI-v-rota',  dose: 2, unit: 'ml' },
+];
+
+test('_asiVaccineCoz: stok_id → vaccines.stock_item_id eşleşmesi (eski davranış korunur)', () => {
+  const t = { stok_id: 'STOK-AŞI-v-rota', aciklama: '💉 Rota-Corona Aşısı (1. doz)' };
+  assert.equal(_asiVaccineCoz(t, VAX_ORNEK).id, 'v-rota');
+});
+
+test('_asiVaccineCoz: stok_id bulunamazsa aciklama ad-öneki fallback (Coglavax rapeli)', () => {
+  const t = { stok_id: null, aciklama: 'Coglavax (rapel)' };
+  const v = _asiVaccineCoz(t, VAX_ORNEK);
+  assert.ok(v, 'Coglavax (rapel) bir aşıya çözümlenmeli');
+  assert.equal(v.id, 'v-cogla');
+});
+
+test('_asiVaccineCoz: 💉 emoji öneki temizlenir', () => {
+  const t = { stok_id: null, aciklama: '💉 Şarbon Aşısı (rapel)' };
+  assert.equal(_asiVaccineCoz(t, VAX_ORNEK).id, 'v-sarbon');
+});
+
+test('_asiVaccineCoz: en uzun ad öncelik alır', () => {
+  const vaxlar = [
+    { id: 'kisa',  name: 'Vac-Sules',        stock_item_id: null },
+    { id: 'uzun',  name: 'Vac-Sules Feedlot', stock_item_id: null },
+  ];
+  assert.equal(_asiVaccineCoz({ aciklama: 'Vac-Sules Feedlot (rapel)' }, vaxlar).id, 'uzun');
+  assert.equal(_asiVaccineCoz({ aciklama: 'Vac-Sules (rapel)' }, vaxlar).id, 'kisa');
+});
+
+test('_asiVaccineCoz: eşleşmeyen açıklama → null (formda seçim listesi açılacak)', () => {
+  // Gerçek vaka: kullanıcının manuel oluşturduğu 'rota' görevi
+  assert.equal(_asiVaccineCoz({ stok_id: null, aciklama: 'rota' }, VAX_ORNEK), null);
+  // Rota-Corona metni Rotavirus Aşısı ile başlamadığından YANLIŞ eşleşmez
+  assert.equal(_asiVaccineCoz({ stok_id: null, aciklama: 'Rota-Corona Aşısı (1. doz)' }, VAX_ORNEK), null);
+});
+
+test('_asiVaccineCoz: stok_id hiçbir aşıyla eşleşmezse ad-öneki denenir', () => {
+  const t = { stok_id: 'STOK-AŞI-SILINMIS', aciklama: 'Coglavax (rapel)' };
+  assert.equal(_asiVaccineCoz(t, VAX_ORNEK).id, 'v-cogla');
+});
+
+test('_asiVaccineCoz: boş/eksik girişler → null', () => {
+  assert.equal(_asiVaccineCoz(null, VAX_ORNEK), null);
+  assert.equal(_asiVaccineCoz({ stok_id: null, aciklama: null }, VAX_ORNEK), null);
+  assert.equal(_asiVaccineCoz({ stok_id: null, aciklama: '   ' }, VAX_ORNEK), null);
+  assert.equal(_asiVaccineCoz({ aciklama: 'Coglavax (rapel)' }, []), null);
+  assert.equal(_asiVaccineCoz({ aciklama: 'Coglavax (rapel)' }, undefined), null);
 });
