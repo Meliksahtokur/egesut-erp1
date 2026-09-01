@@ -1348,8 +1348,8 @@ button,input,select,textarea{font-family:inherit}
       <div id="sk-liste" style="max-height:42vh;overflow-y:auto"></div>
       <div id="sk-hatalar" style="margin-top:6px"></div>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn" data-action="sk-onayla" style="flex:1">🍼 Sütten Kes</button>
-        <button class="btn btn-o" data-action="close-sutten-kes">İptal</button>
+        <button class="btn" data-action="sk-onayla" style="flex:1;width:auto">🍼 Sütten Kes</button>
+        <button class="btn btn-o" style="flex:0 0 auto;width:auto;background:var(--card2)" data-action="close-sutten-kes">İptal</button>
       </div>
     </div>
   </div>
@@ -1797,16 +1797,18 @@ button,input,select,textarea{font-family:inherit}
           </div>
         </div>
         <div style="display:flex;gap:8px">
-          <button id="td-asi-uygula-btn" class="btn btn-g" style="flex:1" data-action="asi-uygula-tamamla">💉 Uygula ve Tamamla</button>
-          <button class="btn btn-o" style="flex:0 0 auto" data-action="asi-form-gizle">İptal</button>
+          <button id="td-asi-uygula-btn" class="btn btn-g" style="flex:1;width:auto" data-action="asi-uygula-tamamla">💉 Uygula ve Tamamla</button>
+          <button class="btn btn-o" style="flex:0 0 auto;width:auto;background:var(--card2)" data-action="asi-form-gizle">İptal</button>
         </div>
       </div>
       <button id="td-tamam-btn" class="btn btn-g" data-action="detay-tamamla">✅ Tamamlandı Olarak İşaretle</button>
       <button id="td-tedavi-gun-btn" class="btn btn-g" style="display:none" data-action="tedavi-gun-tamamla">✅ Tedavi Gününü Tamamla</button>
       <button id="td-asi-ac-btn" class="btn btn-g" style="display:none" data-action="asi-form-ac">💉 Aşıyı Uygula</button>
-      <button class="btn btn-sm btn-o" style="margin-top:6px" data-action="detay-duzenle">✏️ Görevi Düzenle</button>
-      <button class="btn btn-sm btn-r" style="margin-top:6px" data-action="detay-iptal">🗑 Görevi İptal Et</button>
-      <button class="btn btn-o" data-action="close-task-det" style="margin-top:6px">Kapat</button>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn btn-sm" style="flex:1;width:auto;background:rgba(42,107,181,.12);color:var(--blue);border:1px solid rgba(42,107,181,.25)" data-action="detay-duzenle">✏️ Görevi Düzenle</button>
+        <button class="btn btn-sm btn-r" style="flex:1;width:auto" data-action="detay-iptal">🗑 Görevi İptal Et</button>
+      </div>
+      <button class="btn btn-o" data-action="close-task-det" style="margin-top:6px;background:var(--card2)">Kapat</button>
     </div>
   </div>
 </div>
