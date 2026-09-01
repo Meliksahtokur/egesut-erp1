@@ -9,7 +9,7 @@ ALTER TABLE public.dogum ADD COLUMN IF NOT EXISTS olay_id uuid DEFAULT gen_rando
 -- ═══ 2. BACKFILL: aynı (anne_id, tarih) çoklu satır → ortak olay_id ═══
 -- (canlıda tek vaka: anne 901, buzağı 77+78, 2026-04-08)
 UPDATE public.dogum d SET olay_id = ilk.olay_id
-FROM (SELECT DISTINCT ON (anne_id, tarih) anne_id, tarih, olay_id FROM public.dogum) ilk
+FROM (SELECT DISTINCT ON (anne_id, tarih) anne_id, tarih, olay_id FROM public.dogum ORDER BY anne_id, tarih) ilk
 WHERE d.anne_id = ilk.anne_id AND d.tarih = ilk.tarih
   AND d.olay_id IS DISTINCT FROM ilk.olay_id;
 
