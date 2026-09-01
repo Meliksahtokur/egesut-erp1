@@ -1772,6 +1772,11 @@ button,input,select,textarea{font-family:inherit}
             <span id="td-asi-doz-info" style="font-size:.68rem;color:var(--ink3);padding:2px 6px;background:var(--card2);border-radius:6px">St: —</span>
           </div>
         </div>
+        <!-- Aşı çözümlenemediğinde (manuel görev vb.) seçim listesi -->
+        <div id="td-asi-vax-wrap" style="display:none;margin-bottom:8px">
+          <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Aşı Seç</label>
+          <select id="td-asi-vax" class="fsel" onchange="tdAsiVaxSec(this.value)" style="width:100%"></select>
+        </div>
         <div style="margin-bottom:8px">
           <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Uygulama Tarihi</label>
           <input type="date" id="td-asi-tarih" style="width:100%;padding:6px 8px;border-radius:8px;border:1px solid var(--card3);background:var(--bg);color:var(--ink);font-size:.85rem">
