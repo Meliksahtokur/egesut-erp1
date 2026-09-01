@@ -297,6 +297,7 @@ async function loadDash(){
       const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
       return !hasK&&!hasT;
     });
+    const births60D=_dogumAnneBazliTekillestir(births60F);   // ikizde anne 1 kez
     // Buzağı sütten kesme otomatik kontrolü
     try {
       const resBuz=await rpc('buzagi_sutten_kesme_kontrol');
@@ -316,7 +317,7 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60F,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
+    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
