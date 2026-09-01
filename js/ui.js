@@ -1749,10 +1749,18 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     <span style="color:var(--ink3)">Anne: </span>
     <span onclick="openDet('${a.anne_id}')" style="font-weight:700;color:var(--blue);cursor:pointer">📌 ${anneKupe}</span>
   </div>`;
+  const kardesler=_kardeslerBul(getState('animals'),a);
+  if(kardesler.length) extra+=`<div data-kardes-row style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.35);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <span style="color:var(--ink3)">Kardeş${kardesler.length>1?'ler':''} ${kardesler.length===1?'(ikiz)':'('+(kardesler.length+1)+'\'lü)'}: </span>
+    ${kardesler.map(k=>`<span onclick="openDet('${k.id}')" style="background:rgba(78,154,42,.12);border:1px solid rgba(78,154,42,.4);border-radius:7px;padding:3px 8px;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--green3)">🐄 ${esc(k.kupe_no||k.devlet_kupe||k.id)}</span>`).join(' ')}
+    <span onclick="this.closest('[data-kardes-row]').remove()" title="Satırı kapat" style="margin-left:auto;color:var(--ink3);cursor:pointer;padding:0 4px">✕</span>
+  </div>`;
   if(yavrular.length) extra+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
     <div style="color:var(--ink3);margin-bottom:4px">Yavrular (${yavrular.length}):</div>
     <div style="display:flex;flex-wrap:wrap;gap:5px">${yavrular.map(y=>`<span onclick="openDet('${y.id}')" style="background:var(--card);border:1px solid var(--card3);border-radius:7px;padding:3px 8px;font-size:.75rem;font-weight:700;cursor:pointer;color:var(--ink)">🐄 ${esc(y.kupe_no||y.devlet_kupe||y.id)}</span>`).join('')}</div>
   </div>`;
+  const _ikizDog=_ikinciYavruDogumu(births,bugun(),10);
+  if(_ikizDog) extra+=`<button class="btn" data-action="ikinci-yavru-ekle" data-hid="${a.id}" data-kupe="${escAttr(a.kupe_no||a.devlet_kupe||a.id)}" data-dt="${_ikizDog.tarih}" data-sperma="${escAttr(_ikizDog.baba_bilgi||'')}" style="margin-bottom:8px;padding:8px 10px;font-size:.78rem;background:rgba(78,154,42,.12);color:var(--green3);border:1px solid rgba(78,154,42,.45);font-weight:700">➕ Bu doğuma yavru ekle</button>`;
   if(a.notlar) extra+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
     <div style="color:var(--ink3);margin-bottom:4px">📝 Notlar:</div>
     <div style="color:var(--ink)">${esc(a.notlar)}</div>
@@ -2481,6 +2489,12 @@ function dogumYaptiAc(hayvanId,kupe,tohTarih,sperma){
   anneSeç(hayvanId,kupe,dogumTahmini,sperma);
   const tarihEl=document.getElementById('b-tarih');
   if(tarihEl) tarihEl.value=bugun();
+  openM('m-birth');
+}
+function ikinciYavruAc(hayvanId,kupe,dogumTarihi,sperma){
+  anneSeç(hayvanId,kupe,dogumTarihi,sperma||'');
+  const t=document.getElementById('b-tarih'); if(t) t.value=dogumTarihi;
+  const k=document.getElementById('b-kupe'); if(k) k.value='';
   openM('m-birth');
 }
 
