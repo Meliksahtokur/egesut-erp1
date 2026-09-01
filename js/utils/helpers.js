@@ -19,12 +19,65 @@ function fmtTarih(iso) { if (!iso) return '—'; const p = iso.slice(0, 10).spli
 function fmtTarihSaat(iso) { if (!iso) return '—'; try { const d = new Date(iso); return d.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch(e) { return fmtTarih(iso); } }
 function getDisplayKupe(h, fallback) { if (!h) return fallback || '—'; return h.kupe_no || h.devlet_kupe || h.id || fallback || '—'; }
 
+// ── TOAST KUYRUĞU (ReFactorRoadmap Aşama 3.4) ────────────────────────
+// SÖZLEŞME (testle kilitli: tests/unit/toast.test.js):
+// 1. toast(msg, err) imzası DEĞİŞMEZ; renkler mevcut 'err' bayrağıyla aynı
+//    ('on' / 'on err', gizliyken '').
+// 2. Aynı anda TEK bildirim görünür. Yeni çağrı görünür mesajı EZMEZ —
+//    FIFO kuyruğa girer; sırası gelince gösterilir (ardışık işlemlerin her
+//    birinden kullanıcı haberdar olur, son mesaj öncekileri gölgelemez).
+// 3. Her mesaj TOAST_MS görünür; sonraki mesaja geçmeden önce #toast'un
+//    .28s CSS fade-out'ı tamamlansın diye TOAST_GAP_MS boşluk bırakılır.
+// 4. Kuyruk tavanı TOAST_MAX_QUEUE bekleyendir; taşmada EN ESKİ bekleyen
+//    düşürülür (toast fırtınasında kuyruk sonsuz uzayıp dakikalarca süren
+//    bildirim şeridine dönüşmez; en yeni mesaj, kullanıcının az önceki
+//    eylemi hakkında olduğu için önceliklidir).
+// 5. Birebir aynı (msg, err) görünür mesajla YA DA kuyruğun sonundakiyle
+//    aynıysa yutulır — aynı hata üst üste 5 kez kuyruğu doldurup farklı
+//    mesajları dışarıda bırakmaz. (Aynı mesajın araya başka mesaj girmeden
+//    tekrarı zaten bilgi taşımaz.)
+// 6. #toast elementi yoksa eski davranış korunur: sessiz no-op, kuyruk da
+//    birikmez.
+const TOAST_MS = 3200;
+const TOAST_GAP_MS = 300;   // index.html #toast transition:all .28s
+const TOAST_MAX_QUEUE = 3;
+
+const _toastQ = [];         // bekleyen {msg, err}
+let _toastCur = null;       // görünür/gösterilmiş son mesaj (dedupe karşılaştırması için)
+let _toastBusy = false;     // gösterim döngüsü (gösterim+gap) çalışıyor mu
+
+function _toastHide() {
+  const el = g('toast');
+  if (el) { clearTimeout(el._tid); el._tid = 0; el.className = ''; }
+}
+
+// Kuyruğun başını göster; süre dolunca gizle, gap bekle, sıradakine geç
+function _toastPump() {
+  const el = g('toast');
+  const next = _toastQ.shift();
+  if (!el || !next) {                       // kuyruk bitti ya da element gitti: dur
+    _toastCur = null; _toastBusy = false; _toastHide();
+    return;
+  }
+  _toastCur = next;
+  el.textContent = next.msg;
+  el.className = 'on' + (next.err ? ' err' : '');
+  clearTimeout(el._tid);
+  el._tid = setTimeout(() => {
+    _toastHide();
+    el._tid = setTimeout(_toastPump, TOAST_GAP_MS);
+  }, TOAST_MS);
+}
+
 function toast(msg, err = false) {
   const el = g('toast'); if (!el) return;
-  el.textContent = msg;
-  el.className = 'on' + (err ? ' err' : '');
-  clearTimeout(el._tid);
-  el._tid = setTimeout(() => el.className = '', 3200);
+  err = !!err;
+  // dedupe (sözleşme madde 5): görünür mesaj ya da kuyruk tail'i ile birebir aynı
+  const tail = _toastQ.length ? _toastQ[_toastQ.length - 1] : _toastCur;
+  if (tail && tail.msg === msg && tail.err === err) return;
+  if (!_toastBusy) { _toastBusy = true; _toastQ.push({ msg, err }); _toastPump(); return; }
+  _toastQ.push({ msg, err });
+  if (_toastQ.length > TOAST_MAX_QUEUE) _toastQ.shift();   // en eski bekleyeni düşür (madde 4)
 }
 
 function showDebug(msg) { console.warn('[debug]', msg); }
