@@ -167,7 +167,53 @@ function throttle(fn, limit = 1000) {
   return (...args) => { const now = Date.now(); if (now - last >= limit) { last = now; fn(...args); } };
 }
 
+// ── KÜPE ARAMA — ALAKA SIRALAMASI + EŞLEŞME VURGUSU (srchDropdown) ──
+// SÖZLEŞME (testle kilitli: tests/unit/srch-siralama.test.js):
+// 1. srchAdaySirala katmanları (küçük tier daha alakalı):
+//    0 kupe_no birebir · 1 devlet_kupe birebir · 2 kupe_no önek ·
+//    3 devlet_kupe önek · 4 kupe_no içerir · 5 devlet_kupe içerir · 6 ırk içerir.
+//    "01" yazınca 01'in birebir eşleşmesi, TR…'nin ortasındaki "01"den önce gelir.
+// 2. Aynı katmanda kısa gösterim önce (daha spesifik), sonra 'tr' localeCompare —
+//    deterministik, dizi sırasına bağımlı değil.
+// 3. q boşsa [] döner; en fazla limit (varsayılan 8) aday döner.
+// 4. vurguHtml esc() semantiğiyle (& < >) kaçırır, İLK eşleşmeyi
+//    <span class="ac-vurgu"> ile sarar; eşleşme yoksa düz kaçırılmış metin.
+//    Büyüklük duyarsızlığı trLower ile (İ/i, I/ı).
+function srchAdaySirala(hayvanlar, q, limit = 8) {
+  const ql = trLower(String(q ?? '')).trim();
+  if (!ql) return [];
+  const disp = h => String(h.kupe_no || h.devlet_kupe || h.id || '');
+  const gec = h => {
+    const k = trLower(h.kupe_no || ''), d = trLower(h.devlet_kupe || ''), i = trLower(h.irk || '');
+    if (k === ql) return 0;
+    if (d === ql) return 1;
+    if (k.startsWith(ql)) return 2;
+    if (d.startsWith(ql)) return 3;
+    if (k.includes(ql)) return 4;
+    if (d.includes(ql)) return 5;
+    if (i.includes(ql)) return 6;
+    return -1;
+  };
+  return hayvanlar
+    .map(h => ({ h, tier: gec(h) }))
+    .filter(x => x.tier >= 0)
+    .sort((x, y) => x.tier - y.tier
+      || disp(x.h).length - disp(y.h).length
+      || disp(x.h).localeCompare(disp(y.h), 'tr'))
+    .slice(0, limit);
+}
+
+function vurguHtml(metin, q) {
+  const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const s = String(metin ?? '');
+  const ql = trLower(String(q ?? '')).trim();
+  if (!s || !ql) return esc(s);
+  const i = trLower(s).indexOf(ql);
+  if (i < 0) return esc(s);
+  return esc(s.slice(0, i)) + '<span class="ac-vurgu">' + esc(s.slice(i, i + ql.length)) + '</span>' + esc(s.slice(i + ql.length));
+}
+
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe });
+  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml });
 }
