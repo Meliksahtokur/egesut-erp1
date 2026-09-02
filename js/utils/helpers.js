@@ -258,7 +258,7 @@ function suttenKesimeHazirSec(animals, esik = 60) {
 }
 function suttenKesListeSirala(animals, esik = 60) {
   return sutIcenBuzagiSec(animals)
-    .map((a, i) => ({ a, i, h: (_sutGunYasi(a) !== null && _sutGunYasi(a) >= esik) ? 0 : 1 }))
+    .map((a, i) => ({ a, i, h: (() => { const y = _sutGunYasi(a); return y !== null && y >= esik ? 0 : 1; })() }))
     .sort((x, y) => x.h - y.h || x.i - y.i)
     .map(x => x.a);
 }

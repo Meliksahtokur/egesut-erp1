@@ -12,11 +12,12 @@ const assert = require('node:assert');
 const { loadBrowserModule } = require('./support/loadModule.js');
 const { sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala } = require('../../js/utils/helpers.js');
 
-// ── Tarih yardımcıları (yerel takvim) ──
-function toLocalIso(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-function daysAgoIso(n) { const d = new Date(); d.setDate(d.getDate() - n); return toLocalIso(d); }
+// ── Tarih yardımcıları ──
+// n*24h önceki an (tam ISO) — _sutGunYasi'nın ms matematiğiyle BİREBİR:
+// yaş = n*24h + (ölçüm-üretim arası mikrosaniyeler) → floor her zaman n.
+// Yerel takvim kullanırsan (UTC+3 gece 00:00-03:00) UTC-geceyarısı parse'ı
+// sınırda titreme yapar — bu yüzden ms tabanlı (forms-validation gunOnce deseni).
+function daysAgoIso(n) { return new Date(Date.now() - n * 86400000).toISOString(); }
 
 const buzagi = (over = {}) => Object.assign({
   id: 'h1', durum: 'Aktif', grup: 'Süt İçen Buzağı', dogum_tarihi: daysAgoIso(10),

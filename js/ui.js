@@ -381,7 +381,7 @@ async function loadDash(){
     // 🍼 Süt içen buzağılar bandı (aşı takvimi api.js pull ile senkron: vaccination_schedule)
     let schRows=[];
     try{ schRows=await getData('vaccination_schedule')||[]; }catch(e){ /* eski IDB sürümü — bantsız devam */ }
-    const kesimEsik=+(getState('protokol_ayar')||[]).find(x=>x.anahtar==='sutten_kesme_gun')?.deger||60;
+    const kesimEsik=suttenKesmeEsigi();   // tek kaynak (forms.js; protokol_ayar yoksa 60)
     const sutBuzagiBandi=_dashSutBuzagiBandi(animals,vaccines,vaxLogs,aktifTasks,schRows,kesimEsik,today);
     // Buzağı sütten kesme otomatik kontrolü
     try {
