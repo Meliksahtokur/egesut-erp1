@@ -1138,14 +1138,16 @@ function _animalCardHtml(a,gebeSet,idx){
     <svg class="a-arr" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
   </div>`;
 }
-function renderAnimals(list){
+function renderAnimals(list,opts){
   const el=document.getElementById('suru-body');
   if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-ico">🐄</div>Hayvan bulunamadı</div>'; return; }
   const gebeSet=new Set(getState('gebeIds')||[]);
   const tohMap=globalThis._tohMap||{};
-  // Gebe → gebelik günü; Bekliyor tohumlama → tarih DESC; diğer → küpe no
+  // Gebe → gebelik günü; Bekliyor tohumlama → tarih DESC; diğer → küpe no.
+  // opts.verilenSira: çağıran kendi sıralamasını verdi (hasta modu — vaka açılışı);
+  // buradaki gebe/kupe sıralaması onu ezmesin.
   const bosTohMap=globalThis._bosTohMap||{};
-  const sorted=[...list].sort((a,b)=>{
+  const sorted=(opts&&opts.verilenSira)?[...list]:[...list].sort((a,b)=>{
     const aT=gebeSet.has(a.id)||gebeSet.has(a.kupe_no)?tohMap[a.id]:null;
     const bT=gebeSet.has(b.id)||gebeSet.has(b.kupe_no)?tohMap[b.id]:null;
     if(aT&&bT) return aT.localeCompare(bT);
@@ -2075,7 +2077,7 @@ function filterA(){
         return (b.repeat_breed_count||0)-(a.repeat_breed_count||0);
       });
     }
-    renderAnimals(f);
+    renderAnimals(f,_fchip.saglik==='hasta'?{verilenSira:true}:undefined);
     _renderSuruStat();
   },250);
 }

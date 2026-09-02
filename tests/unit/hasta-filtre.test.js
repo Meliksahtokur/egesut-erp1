@@ -19,10 +19,10 @@ const escAttrMirror = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
   .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const { sandbox } = loadBrowserModule('js/ui.js', {
-  extra: { esc: escMirror, escAttr: escAttrMirror },
+const { sandbox, document: docStub } = loadBrowserModule('js/ui.js', {
+  extra: { esc: escMirror, escAttr: escAttrMirror, getState: k => k === 'gebeIds' ? new Set() : undefined },
 });
-const { _hastaHastalikSecenekleri, _aktifVakaAcilisMap, _hastaModuUygula, _dashStatRow } = sandbox;
+const { _hastaHastalikSecenekleri, _aktifVakaAcilisMap, _hastaModuUygula, _dashStatRow, renderAnimals } = sandbox;
 
 // ── Test verisi ──
 const DISEASES = [
@@ -154,4 +154,26 @@ test('dashboard kartı showHasta() çağırır — gecmis/hastalik sekmesine git
   const html = _dashStatRow([], [], [{ id: 'c1' }], [], 0);
   assert.ok(html.includes('onclick="showHasta()"'), 'kart showHasta() olmalı');
   assert.ok(!html.includes("loadGecmis('hastalik')"), 'eski gecmis yönlendirmesi kalmamalı');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// renderAnimals — opts.verilenSira sıralama ezilmesini engeller
+// (hata raporu: hasta modunda renderAnimals'ın gebe/kupe sıralaması
+//  filterA'nın vaka-açılış sıralamasını eziyordu → "random" görünüm)
+// ═══════════════════════════════════════════════════════════════
+test('renderAnimals: verilenSira ile çağıranın sırası korunur (ezilmez)', () => {
+  const el = require('./support/loadModule.js').makeElement('div');
+  docStub.__setEl('suru-body', el);
+  // Bileşik sırada ver: küpe sırasının TERSİ
+  renderAnimals([{ id: 'B', kupe_no: '902' }, { id: 'A', kupe_no: '901' }], { verilenSira: true });
+  assert.ok(el.innerHTML.indexOf('902') < el.innerHTML.indexOf('901'),
+    'verilenSira=true iken liste verildiği sırayla basılmalı');
+});
+
+test('renderAnimals: opts olmadan gebe/kupe sıralaması aynen korunur', () => {
+  const el = require('./support/loadModule.js').makeElement('div');
+  docStub.__setEl('suru-body', el);
+  renderAnimals([{ id: 'B', kupe_no: '902' }, { id: 'A', kupe_no: '901' }]);
+  assert.ok(el.innerHTML.indexOf('901') < el.innerHTML.indexOf('902'),
+    'varsayılan davranış (kupe sırası) değişmemeli');
 });
