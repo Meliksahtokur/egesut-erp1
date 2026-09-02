@@ -1919,7 +1919,7 @@ let _detOpenId=null;
 // 🏥 Hasta tag'ine bağlı dinamik hastalık filtresi (T2):
 // seçenekler aktif vakalardan (cases status='active' + diseases) türetilir,
 // kontrol yalnız hasta tag aktifken görünür.
-let _hastaHastalikSecim=new Set();  // seçili disease_id'ler
+let _hastaHastalikSecim=new Set();  // seçili disease_id'ler — tag kapat/aç'ta korunur (arama metni gibi), sayfa değişiminde fchipReset temizler
 let _hastaHastalikAcik=false;       // dropdown paneli açık mı
 let _hastaHastalikSig=null;         // seçenek imzası — değişmediyse DOM yeniden kurulmaz
 function fchipReset(){
@@ -2016,8 +2016,9 @@ function _hastaHastalikFiltreHtml(secenekler){
 function _hastaHastalikFiltreGuncelle(){
   const box=document.getElementById('hasta-hastalik-filtre');
   if(!box) return;
-  if(_fchip.saglik!=='hasta'){ box.style.display='none'; box.innerHTML=''; _hastaHastalikSig=null; return; }
+  if(_fchip.saglik!=='hasta'){ box.style.display='none'; box.innerHTML=''; _hastaHastalikSig=null; _hastaHastalikAcik=false; return; }
   const secenekler=_hastaHastalikSecenekleri(getState('aktifVakalar'),getState('diseases'));
+  if(!secenekler.length){ box.style.display='none'; box.innerHTML=''; _hastaHastalikSig=null; return; } // filtrelenecek hastalık yok → kontrolü hiç gösterme
   const sig=secenekler.map(s=>s.id+'|'+s.sayi).join(';');
   if(sig!==_hastaHastalikSig){
     _hastaHastalikSig=sig;
