@@ -14,7 +14,7 @@
 // klondur; yazmalar kullanıcı tarafından ONAYLI (IDLE-GOREV.md). Marker'lar
 // E2E- öneklidir.
 
-import { test, expect, openApp, navTo, toastText, gorevByMarker, IS_DEMO, STUB } from './support/app.js';
+import { test, expect, openApp, navTo, toastText, gorevByMarker, IS_DEMO } from './support/app.js';
 
 test.skip(!IS_DEMO, 'demo-mode savunma hattı: yalnız PLAYWRIGHT_DEMO_MODE=1 ile koşar');
 
@@ -50,12 +50,9 @@ async function ilkBekliyoruGebeYap(page) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('tohumlama sonucu Gebe işaretlenir → gebelik listesine düşer', async ({ page }) => {
-  // Gerçek demo projesindeki tohumlama_sonuc_gebe eski sürüm (şema drift:
-  // prod'a 3 tablo eklendi, demo migration'ı uygulanmadı) — gerçek kayıtla
-  // ok:false + mesajsız gövde döndürüyor, UI "İşlem başarısız" toast'ı
-  // üretiyor (2026-09-02 ölçümü, e2e-gercek raporu). Demo migration
-  // uygulanınca bu skip kaldırılmalı. Stub modunda RPC simülasyonu sağlıklı.
-  test.skip(!STUB, 'demo DB tohumlama_sonuc_* RPC\'leri eski sürüm — şema drift, migration sonrası aç');
+  // 2026-09-02 demo-sync: demo'ya eksik migration'lar uygulandı (20260706..20260902),
+  // tohumlama_sonuc_gebe artık gerçek kayıtla ok:true, sahte UUID ile mesajlı
+  // ok:false döndürüyor → e2e-gercek raporundaki gerekçeli skip kaldırıldı.
   await openApp(page);
   const kupe = await ilkBekliyoruGebeYap(page);
   test.skip(!kupe, 'veride Bekliyor tohumlama kaydı yok (veri-agnostic skip)');
@@ -72,10 +69,7 @@ test('tohumlama sonucu Gebe işaretlenir → gebelik listesine düşer', async (
 // ═════════════════════════════════════════════════════════════════════════════
 
 test('B20: "Gebe ›" kartı → gebe chip ve filtresi debounce sonrası da korunur', async ({ page }) => {
-  // Önkoşul dalı ilkBekliyoruGebeYap'a dayanır → demo RPC eski sürüm (üstteki
-  // skip gerekçesi). Demo'da gebeIds da boş (FDW/eski şema): akış her koşulda
-  // bozuk RPC'ye düşer. Migration sonrası kaldırılmalı.
-  test.skip(!STUB, 'demo DB tohumlama_sonuc_* RPC\'leri eski sürüm — şema drift, migration sonrası aç');
+  // 2026-09-02 demo-sync: demo RPC'leri güncel (üstteki testin notu) → skip kaldırıldı.
   await openApp(page);
 
   // Önkoşul: en az bir gebe hayvan (yoksa UI üzerinden bir tane işaretle)
@@ -86,6 +80,10 @@ test('B20: "Gebe ›" kartı → gebe chip ve filtresi debounce sonrası da koru
     await expect
       .poll(async () => (await page.evaluate(() => (new Set(getState('gebeIds') || [])).size)), { timeout: 15000 })
       .toBeGreaterThan(0);
+    // ilkBekliyoruGebeYap üreme sayfasında bırakır — dashboard stat kartına
+    // tıklamadan önce dashboard'a dön (2026-09-02 demo-sync: bu dal ilk kez
+    // koştu; gebeIds RPC dolana kadar 0 kaldığından giriş buraya düştü).
+    await navTo(page, '#nb-dash');
   }
 
   // Dashboard "Gebe ›" kartına tıkla (.sc.ok'lerin İLKİ "Aktif Hayvan" —
