@@ -1099,40 +1099,97 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
 // openTaskDet, detayTamamla, detayIptal → ui.js'te tanımlı (daha tam versiyon)
 
 // Manuel görev ekle
-// ── Planlı aşı görevi: tür seçimi + aşı/doz planlayıcı ──
-// m-task-add'te tür='ASI_PLANLI' seçilince açılır (index.html onchange attr — modal router uyumu)
+// ── Planlı aşı görevi: tür seçimi + checkbox'lı aşı planlayıcı ──
+// Tedavi plan modalindeki gruplu checkbox dilinin aşıya uyarlanması: birden çok aşı
+// seçilebilir; her seçim için doz satırı açılır (standart doz dolu gelir).
+let _taVaxCache = [];
 async function taskAddTipDegisti(val){
   const alani=document.getElementById('ta-asi-alani');
   if(!alani) return;
   if(val!=='ASI_PLANLI'){ alani.style.display='none'; return; }
   alani.style.display='block';
-  const dozEl=document.getElementById('ta-doz'); if(dozEl) dozEl.value=''; // önceki açılışın dozu taşınmaz
+  const dozSatirlari=document.getElementById('ta-doz-satirlari'); if(dozSatirlari) dozSatirlari.innerHTML='';
   try{
     let vaccines=(await getData('vaccines'))||[];
     if(!vaccines.length){ await pullTables(['vaccines']).catch(()=>{}); vaccines=(await getData('vaccines'))||[]; }
-    const [stockRows,hmvs]=await Promise.all([getData('stok'),getData('stok_hareket')]); // IDB store adı 'stok' (state anahtarı 'stock' değil)
+    const [stockRows,hmvs]=await Promise.all([getData('stok'),getData('stok_hareket')]);
     const kalalar=_asiStokKalanlar(vaccines,stockRows,hmvs);
-    const sel=document.getElementById('ta-vax');
-    if(sel) sel.innerHTML='<option value="">— Aşı seçin —</option>'
-      +vaccines.map(vx=>{
+    _taVaxCache=vaccines;
+    const liste=document.getElementById('ta-vax-liste');
+    if(!liste) return;
+    const zorunlu=vaccines.filter(v=>v.is_mandatory), diger=vaccines.filter(v=>!v.is_mandatory);
+    const gruplar={}; if(zorunlu.length) gruplar['Zorunlu Aşılar']=zorunlu; if(diger.length) gruplar['Diğer Aşılar']=diger;
+    let html='';
+    for(const [g,liste2] of Object.entries(gruplar)){
+      html+=`<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin:4px 0 2px">${g}</div>`;
+      for(const vx of liste2){
         const kalan=kalalar[vx.id];
-        const kalanLbl=kalan==null?'':(kalan<=0?` · ⚠ kalan ${kalan} ${vx.unit||'ml'}`:` · kalan ${kalan} ${vx.unit||'ml'}`);
-        return `<option value="${escAttr(vx.id)}" data-doz="${escAttr(vx.dose||'')}">${esc(vx.name||vx.id)}${vx.dose?` · standart ${vx.dose} ${vx.unit||'ml'}`:''}${kalanLbl}</option>`;
-      }).join('');
+        const kalanClr=kalan==null?'var(--ink3)':(kalan<=0?'var(--red2)':(kalan<=10?'var(--amber)':'var(--green)'));
+        const kalanTxt=kalan==null?'stok yok':`kalan ${kalan} ${vx.unit||'ml'}`;
+        html+=`<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer;border-bottom:1px solid var(--card2)">
+          <input type="checkbox" class="ta-vaxchk" data-id="${escAttr(vx.id)}" onchange="taskAddVaxChkChange(this)" style="width:17px;height:17px;accent-color:var(--green);cursor:pointer;flex-shrink:0">
+          <span style="flex:1;min-width:0"><span style="font-size:.8rem;font-weight:600;color:var(--ink)">${esc(vx.name||vx.id)}</span>
+          ${vx.dose?`<span style="font-size:.65rem;color:var(--ink3);margin-left:4px">standart ${vx.dose} ${vx.unit||'ml'}</span>`:''}</span>
+          <span style="font-size:.66rem;font-weight:700;color:${kalanClr};flex-shrink:0">${kalanTxt}</span></label>`;
+      }
+    }
+    liste.innerHTML=html||'<div style="color:var(--ink3);font-size:.78rem;padding:8px">Aşı yok</div>';
   }catch(e){ toast('Aşı listesi yüklenemedi', true); }
 }
-// Aşı seçilince planlanan doza standart dozu yazar
-function taskAddVaxDegisti(sel){
-  const o=sel?.selectedOptions?.[0];
-  const d=document.getElementById('ta-doz');
-  if(d&&o&&o.dataset.doz) d.value=o.dataset.doz;
+// Checkbox işaretlenince doz satırı aç/kapat (standart doz dolu gelir)
+function taskAddVaxChkChange(chk){
+  const satirlari=document.getElementById('ta-doz-satirlari'); if(!satirlari) return;
+  const vax=_taVaxCache.find(v=>v.id===chk.dataset.id);
+  const stdDoz=vax?.dose??'';
+  const unit=vax?.unit||'ml';
+  if(chk.checked){
+    const row=document.createElement('div');
+    row.id='ta-dozrow-'+chk.dataset.id;
+    row.style.cssText='display:flex;align-items:center;gap:6px;background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:8px;padding:6px 8px;margin-bottom:5px';
+    row.innerHTML=`<span style="font-size:.72rem;font-weight:700;color:var(--green);min-width:70px">${esc(chk.dataset.name||'')}</span>
+      <input type="number" step="0.5" min="0.5" class="fi ta-doz-giris" data-vax="${escAttr(chk.dataset.id)}" value="${escAttr(stdDoz)}" placeholder="doz" style="width:80px;margin:0;padding:5px 8px">
+      <span style="font-size:.68rem;color:var(--ink3)">${unit}</span>`;
+    satirlari.appendChild(row);
+  } else {
+    document.getElementById('ta-dozrow-'+chk.dataset.id)?.remove();
+  }
+}
+// İşaretli aşıları topla → [{vaccine_id,doz,name,unit}] (doz girilmemişse standart)
+function taskAddSeciliAsilar(){
+  const out=[];
+  document.querySelectorAll('.ta-vaxchk:checked').forEach(chk=>{
+    const row=document.getElementById('ta-dozrow-'+chk.dataset.id);
+    const inp=row?.querySelector('.ta-doz-giris');
+    const vax=_taVaxCache.find(v=>v.id===chk.dataset.id);
+    const doz=inp&&inp.value!==''?parseFloat(inp.value):(vax?.dose??null);
+    out.push({ vaccine_id:chk.dataset.id, doz, name:vax?.name||chk.dataset.name, unit:vax?.unit||'ml' });
+  });
+  return out;
 }
 // Manuel görev formunu her açılışta sıfırla (bayat tip/doz/aşı taşınmaz)
 function taskAddFormSifirla(){
   const tt=document.getElementById('ta-tip'); if(tt) tt.value='MANUEL';
-  ['ta-hid','ta-desc','ta-doz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  const tv=document.getElementById('ta-vax'); if(tv) tv.value='';
+  ['ta-hid','ta-desc'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.querySelectorAll('.ta-vaxchk:checked').forEach(c=>{ c.checked=false; });
+  const ds=document.getElementById('ta-doz-satirlari'); if(ds) ds.innerHTML='';
   taskAddTipDegisti('');
+}
+// Hayvanın 1 yıl içinde aynı hastalığı kapsayan aşısı var mı? (marka bağımsız; _vaccineNaive'in 1 yıllık hali)
+function _asiTekrarUyariBilgisi(hayvanId, vaccineId){
+  const sinir=new Date(); sinir.setDate(sinir.getDate()-365);
+  const isoSinir=sinir.toISOString().slice(0,10);
+  const logs=(getState('vaccination_log')||[]).filter(l=>l.animal_id===hayvanId&&l.vaccination_date&&l.vaccination_date>=isoSinir);
+  if(!logs.length) return null;
+  const vd=getState('vaccine_diseases')||[];
+  const myDis=new Set(vd.filter(x=>x.vaccine_id===vaccineId).map(x=>x.disease_id));
+  const vaxlar=getState('vaccines')||[];
+  for(const l of logs.sort((a,b)=>(b.vaccination_date||'').localeCompare(a.vaccination_date||''))){
+    const ad=(vaxlar.find(v=>v.id===l.vaccine_id)||{}).name||'aşı';
+    if(l.vaccine_id===vaccineId) return { tarih:l.vaccination_date, ad };
+    const od=vd.filter(x=>x.vaccine_id===l.vaccine_id).map(x=>x.disease_id);
+    if(od.some(d=>myDis.has(d))) return { tarih:l.vaccination_date, ad };
+  }
+  return null;
 }
 
 async function submitTaskAdd(btn) {
@@ -1150,23 +1207,47 @@ async function submitTaskAdd(btn) {
     const hayvan = hid ? hayvanByKupeRef(hid) : null; // K7: küpe eşleşmesinde aktif önce
     if (hid && !hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil — hayvan alanını boş bırakırsanız genel görev oluşur`, true); return; }
     if (planli) {
-      // Planlı aşı: aşı+doz planla, stok anında rezerve edilir (atomik RPC — ilaç modeli).
-      // Rezervasyon iptalde trigger ile iade edilir; offline kuyruğa girmez.
+      // Planlı aşı: checkbox'lı çoklu seçim → tek kart (+ alt görevler), stok plan anında rezerve.
       if (!navigator.onLine) { toast('⚠️ Planlı aşı için internet gerekli (stok rezervasyonu)', true); return; }
-      const vaxId = v('ta-vax');
-      const dozRaw = v('ta-doz');
-      const doz = dozRaw ? parseFloat(dozRaw) : null;
-      if (!vaxId) { toast('Aşı seçin', true); return; }
-      if (!doz || doz <= 0) { toast('Geçerli doz girin (ml)', true); return; }
+      const items = taskAddSeciliAsilar();
+      if (!items.length) { toast('En az bir aşı seçin', true); return; }
+      if (items.some(it => !it.doz || it.doz <= 0)) { toast('Seçili tüm aşılar için geçerli doz girin (ml)', true); return; }
       if (!hayvan) { toast('Planlı aşı görevi için küpe zorunlu', true); return; }
-      const res = await rpc('asi_gorev_planla', {
-        p_hayvan_id: hayvan.id, p_vaccine_id: vaxId, p_doz: doz,
-        p_tarih: tarih, p_aciklama: desc || null,
-      });
-      if (!res || res.ok === false) { toast(getUserMessage(res?.mesaj || 'Hata'), true); return; }
-      // rezervasyon stok kartına anında yansısın (plan anında düşme görünürlüğü)
-      await pullTables(['stok','stok_hareket']).catch(()=>{});
-      toast('✅ Planlı aşı görevi oluşturuldu — stok rezerve edildi');
+      // Mükerrer plan: aynı hayvan + aynı aşı + aynı gün için açık görev varsa engel
+      const acikPlanlilar = (await getData('gorev_log', g => g.gorev_tipi==='ASI_PLANLI' && !g.tamamlandi && !g.iptal && g.hedef_tarih===tarih)) || [];
+      const cakisan = [];
+      for (const it of items) {
+        const v = _taVaxCache.find(vv => vv.id === it.vaccine_id);
+        if (v?.stock_item_id && acikPlanlilar.some(g => g.stok_id === v.stock_item_id && g.hayvan_id === hayvan.id)) cakisan.push(v.name);
+      }
+      if (cakisan.length) { toast('⚠️ Bu tarih için zaten planlı: ' + cakisan.join(', '), true); return; }
+      // Tekrar uyarısı: 1 yıl içinde aynı hastalığı kapsayan aşı (marka bağımsız) — engel değil
+      await pullTables(['vaccination_log','vaccine_diseases']).catch(()=>{});
+      const uyariSatirlari = items.map(it => {
+        const u = _asiTekrarUyariBilgisi(hayvan.id, it.vaccine_id);
+        return u ? `• ${it.name}: bu hayvan ${fmtTarih(u.tarih)} tarihinde "${u.ad}" olmuş` : null;
+      }).filter(Boolean);
+      const olustur = async () => {
+        let res;
+        if (items.length === 1) {
+          res = await rpc('asi_gorev_planla', { p_hayvan_id: hayvan.id, p_vaccine_id: items[0].vaccine_id, p_doz: items[0].doz, p_tarih: tarih, p_aciklama: desc || null });
+        } else {
+          res = await rpc('asi_toplu_planla', { p_hayvan_id: hayvan.id, p_tarih: tarih, p_items: items.map(it => ({ vaccine_id: it.vaccine_id, doz: it.doz })), p_aciklama: desc || null }); // jsonb param → dizi (string scalar OLMAZ)
+        }
+        if (!res || res.ok === false) { toast(getUserMessage(res?.mesaj || 'Hata'), true); return; }
+        await pullTables(['stok','stok_hareket']).catch(()=>{});
+        toast(items.length > 1 ? `✅ Toplu aşı görevi (${items.length} aşı) — stok rezerve edildi` : '✅ Planlı aşı görevi oluşturuldu — stok rezerve edildi');
+        closeM('m-task-add');
+        taskAddFormSifirla();
+        await loadTasks(_curTaskFilter || 'today');
+        loadDash();
+      };
+      if (uyariSatirlari.length) {
+        openConfirm('⚠️ Tekrar aşı uyarısı', uyariSatirlari.join('\n') + '\n\nYine de kaydetmek istiyor musunuz?', olustur);
+        return;
+      }
+      await olustur();
+      return;
     } else {
       await write('gorev_log', {
         id: crypto.randomUUID(), hayvan_id: hayvan?.id || null,
@@ -1174,14 +1255,11 @@ async function submitTaskAdd(btn) {
         tamamlandi: false, kaynak: 'MANUEL'
       });
       toast('✅ Görev oluşturuldu');
+      closeM('m-task-add');
+      taskAddFormSifirla();
+      await loadTasks(_curTaskFilter || 'today');
+      loadDash();
     }
-    closeM('m-task-add');
-    ['ta-hid','ta-desc','ta-doz'].forEach(cl);
-    const tv=document.getElementById('ta-vax'); if(tv) tv.value='';
-    const tt=document.getElementById('ta-tip'); if(tt) tt.value='MANUEL'; // tekrar açılışta bayat seçim
-    taskAddTipDegisti('');
-    await loadTasks(_curTaskFilter || 'today');
-    loadDash();
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Görev Oluştur'; } }
 }

@@ -5,7 +5,7 @@
 /* global
   /* global
    _curTaskFilter, _pendWin, _curUremeTab, _curGecmisFilter, _gecmisTumu, _tanimlarTab,
-   _curTaskDet, _curTaskVaccineId, _curToh,
+   _curTaskDet, _curTaskVaccineId, _curTaskTopluChildren, _curToh,
    _customHekimler, _customSperma,
    _ilacCache, _drugsCache, _disFreq,
    HEKIMLER, VARSAYILAN_HEKIM,
@@ -718,6 +718,41 @@ function _asiFormVaxKur(vax){
   if(dozEl){ dozEl.value=vax?.dose??''; dozEl.placeholder=vax?.dose??''; }
   if(dozInfo) dozInfo.textContent='St: '+((vax?.dose)??'?')+' '+(vax?.unit||'ml');
   if(dozUnit) dozUnit.textContent='('+(vax?.unit||'ml')+')';
+}
+// Toplu görev: tek alt görevi uygula (detaydaki tarih ile)
+async function topluTekUygula(childId){
+  try{
+    const tarih=document.getElementById('td-asi-tarih')?.value||bugun();
+    const res=await rpc('asi_planli_tamamla',{p_gorev_id:childId,p_tarih:tarih});
+    if(!res||res.ok===false){ toast(_trErr(res?.mesaj||'Hata'),true); return; }
+    toast('✅ Uygulandı');
+    await pullTables(['gorev_log','vaccination_log','stok','stok_hareket']).catch(()=>{});
+    if(_curTaskDet) openTaskDet(_curTaskDet.id);
+  }catch(e){ toast(_trErr(e.message),true); }
+}
+// Toplu görev: açık tüm alt görevleri sırayla uygula
+async function topluHepsiniUygula(){
+  const tarih=document.getElementById('td-asi-tarih')?.value||bugun();
+  const children=_curTaskTopluChildren||[];
+  if(!children.length){ toast('Uygulanacak aşı yok',true); return; }
+  let ok=0,hata=0;
+  for(const c of children){
+    try{
+      const res=await rpc('asi_planli_tamamla',{p_gorev_id:c.id,p_tarih:tarih});
+      if(res&&res.ok) ok++; else hata++;
+    }catch(e){ hata++; }
+  }
+  if(ok>0){
+    try{ await rpc('gorev_tamamla',{p_gorev_id:_curTaskDet.id}); }catch(e){}
+    await pullTables(['gorev_log','vaccination_log','stok','stok_hareket']).catch(()=>{});
+    toast(`✅ ${ok} aşı uygulandı${hata?` · ${hata} hata`:''}`);
+    closeM('m-task-det');
+    updateTaskBadge();
+    loadTasks(_curTaskFilter||'today',null,{skipPull:true});
+    loadDash();
+  } else {
+    toast('Hiçbir aşı uygulanamadı',true);
+  }
 }
 // td-asi-vax select'i değişince uygulanacak aşıyı ve doz bilgisini güncelle
 // (index.html'deki onchange attribute'u çağırır — modal router uyumu için DOM property yok)
@@ -4923,8 +4958,46 @@ async function openTaskDet(id){
   const vaxSel=document.getElementById('td-asi-vax');
   if(vaxSelWrap) vaxSelWrap.style.display='none';
   if(vaxSel) vaxSel.value='';
+  const topluAlan=document.getElementById('td-toplu-alani');
+  if(topluAlan){ topluAlan.style.display='none'; topluAlan.innerHTML=''; }
   _asiFormVaxKur(null); // önceki görevden kalan ad/doz'u temizle (stale name fix)
-  if(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI'||t.gorev_tipi==='ASI_RAPEL'||t.gorev_tipi==='ASI_HATIRLATMA'){
+  // Toplu görev (parent): aşı listesi + hepsini uygula
+  if(t.gorev_tipi==='ASI_PLANLI' && !t.stok_id && topluAlan){
+    if(tamamBtn) tamamBtn.style.display='none';
+    if(asiAcBtn) asiAcBtn.style.display='block';
+    const adiEl=document.getElementById('td-asi-adi');
+    if(adiEl) adiEl.textContent='Toplu aşı görevi';
+    try{
+      const children=((await getData('gorev_log',c=>c.parent_id===t.id&&!c.tamamlandi&&!c.iptal))||[]);
+      const doneChildren=((await getData('gorev_log',c=>c.parent_id===t.id&&c.tamamlandi))||[]);
+      const stockRows=(await getData('stok'))||[];
+      const hmvs=(await getData('stok_hareket'))||[];
+      _curTaskTopluChildren=children;
+      const tarihEl=document.getElementById('td-asi-tarih');
+      const todayStr=bugun();
+      if(tarihEl){tarihEl.value=todayStr;tarihEl.max=todayStr;}
+      if(!children.length){
+        topluAlan.innerHTML='<div style="font-size:.75rem;color:var(--green)">✅ Tüm aşılar uygulandı</div>';
+        topluAlan.style.display='block';
+        if(asiAcBtn) asiAcBtn.style.display='none';
+      } else {
+        const kalanlar=_asiStokKalanlar(children.map(c=>({id:c.stok_id,stock_item_id:c.stok_id})),stockRows,hmvs);
+        topluAlan.innerHTML='<div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:4px">Aşılar ('+children.length+' kaldı'+(doneChildren.length?', '+doneChildren.length+' uygulandı':'')+')</div>'
+          +children.map(c=>{
+            const kalan=kalanlar[c.stok_id];
+            const kalanClr=kalan==null?'var(--ink3)':(kalan<=0?'var(--red2)':'var(--green)');
+            const kalanTxt=kalan==null?'':`<span style="color:${kalanClr};font-weight:700;margin-left:6px">kalan ${kalan} ml</span>`;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--bg);border-radius:8px;margin-bottom:5px">
+              <span style="flex:1;min-width:0;font-size:.78rem;font-weight:600;color:var(--ink)">${esc(c.aciklama||'Aşı')}</span>${kalanTxt}
+              <button class="btn btn-g" style="width:auto;padding:5px 10px;font-size:.7rem" onclick="topluTekUygula('${escAttr(c.id)}')">Uygula</button></div>`;
+          }).join('')
+          +`<button class="btn btn-g" style="margin-top:4px" onclick="topluHepsiniUygula()">💉 Hepsini Uygula (${children.length})</button>`;
+        topluAlan.style.display='block';
+      }
+    }catch(e){ console.warn('toplu görev:',e.message); }
+    const tarihEl2=document.getElementById('td-asi-tarih');
+    if(tarihEl2){tarihEl2.value=bugun();tarihEl2.max=bugun();}
+  } else if(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI'||t.gorev_tipi==='ASI_RAPEL'||t.gorev_tipi==='ASI_HATIRLATMA'){
     if(tamamBtn) tamamBtn.style.display='none';
     if(asiAcBtn) asiAcBtn.style.display='block';
     try{
