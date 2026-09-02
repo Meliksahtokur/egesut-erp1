@@ -1838,19 +1838,20 @@ function srchDropdown(){
   if(!ac) return;
   if(!q){ ac.style.display='none'; return; }
   const gebeSet=new Set(getState('gebeIds')||[]);
-  const matches=getState('animals').filter(a=>{
-    const k=trLower(a.kupe_no||''), d=trLower(a.devlet_kupe||'');
-    return k.includes(q)||d.includes(q)||trLower(a.irk||'').includes(q);
-  }).slice(0,8);
+  const matches=srchAdaySirala(getState('animals'), q);
   if(!matches.length){ ac.style.display='none'; return; }
-  ac.innerHTML=matches.map(a=>{
+  ac.innerHTML=matches.map(({h:a,tier})=>{
     const main=a.kupe_no||a.devlet_kupe||a.id;
-    const sub=a.kupe_no&&a.devlet_kupe?` · <span style="color:#aaa">${esc(a.devlet_kupe)}</span>`:'';
+    // Irktan eşleşen satırda main eşleşme içermez (olsa tier≤5 olurdu) — vurgu yanıltır
+    const mainHtml=tier===6?esc(main):vurguHtml(main,q);
+    let sub=a.kupe_no&&a.devlet_kupe?` · <span style="color:var(--ink3)">${vurguHtml(a.devlet_kupe,q)}</span>`:'';
+    // Irktan eşleşen satırda neden listelendiği görünmez — ırkı vurgulu göster
+    if(tier===6&&a.irk) sub+=' · <span style="color:var(--ink3)">'+vurguHtml(a.irk,q)+'</span>';
     const isGebe=gebeSet.has(a.id);
     const badge=isGebe?'<span style="background:rgba(78,154,42,.15);color:var(--green);border-radius:5px;padding:1px 5px;font-size:.62rem;font-weight:700;margin-left:4px">🤰</span>':'';
-    return `<div data-sid="${escAttr(a.id)}" data-main="${escAttr(main)}" onclick="srchSec(this.dataset.sid,this.dataset.main)" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
-      <div><span style="font-weight:700;font-size:.85rem">${esc(main)}</span>${sub}${badge}</div>
-      <span style="font-size:.68rem;color:#aaa">${esc(a.padok||'')}</span>
+    return `<div data-sid="${escAttr(a.id)}" data-main="${escAttr(main)}" onclick="srchSec(this.dataset.sid,this.dataset.main)" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--card2);display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div style="min-width:0"><span style="font-weight:700;font-size:.85rem">${mainHtml}</span>${sub}${badge}</div>
+      <span style="font-size:.68rem;color:var(--ink3);flex-shrink:0">${esc(a.padok||'')}</span>
     </div>`;
   }).join('');
   ac.style.display='block';
