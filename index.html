@@ -1551,12 +1551,11 @@ body.dark .ac-vurgu{color:#8ec6ff}
           <option value="DIGER">📂 Diğer</option>
         </select>
       </div>
-      <!-- Planlı aşı: aşı + doz planlaması (stok plan anında rezerve edilir, ilaç modeli) -->
+      <!-- Planlı aşı: checkbox listesi (tedavi plan dili) — çoklu seçim tek kart + alt görevler -->
       <div class="fg" id="ta-asi-alani" style="display:none">
-        <label class="flbl">Aşı *</label>
-        <select id="ta-vax" class="fsel" style="margin-bottom:6px" onchange="taskAddVaxDegisti(this)"></select>
-        <label class="flbl" style="margin-top:4px">Planlanan Doz (ml) *</label>
-        <input id="ta-doz" class="fi" type="number" step="0.5" min="0.5" placeholder="Aşı seçilince standart doz gelir">
+        <label class="flbl">Aşılar * <span style="font-weight:400">— birden fazla seçebilirsiniz</span></label>
+        <div id="ta-vax-liste" style="max-height:210px;overflow-y:auto;background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px;margin-bottom:6px"></div>
+        <div id="ta-doz-satirlari"></div>
         <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Stok görev oluşturulurken rezerve edilir; görev iptal edilirse iade edilir</div>
       </div>
       <button class="btn btn-g" data-action="submit-task-add">Görev Oluştur</button>
@@ -1790,6 +1789,8 @@ body.dark .ac-vurgu{color:#8ec6ff}
             <span id="td-asi-doz-info" style="font-size:.68rem;color:var(--ink3);padding:2px 6px;background:var(--card2);border-radius:6px">St: —</span>
           </div>
         </div>
+        <!-- Toplu görev: alt görev satırları + hepsini uygula -->
+        <div id="td-toplu-alani" style="display:none;margin-bottom:8px"></div>
         <!-- Aşı çözümlenemediğinde (manuel görev vb.) seçim listesi -->
         <div id="td-asi-vax-wrap" style="display:none;margin-bottom:8px">
           <label style="font-size:.7rem;color:var(--ink3);display:block;margin-bottom:3px">Aşı Seç</label>
