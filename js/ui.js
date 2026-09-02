@@ -688,6 +688,26 @@ function _asiVaccineCoz(t,vaccines){
   if(!adaylar.length) return null;
   return adaylar.sort((a,b)=>b.name.length-a.name.length)[0]; // en uzun ad öncelik
 }
+// Aşı→stok entegrasyonu: her aşının kalan stoğu (vaccines.stock_item_id → stok).
+// Ev formülü: baslangic_miktar − Σ(iptal olmayan hareket) [stokHareketGor ile aynı].
+// Saf tutuldu (okuma çağıranda) — unit test edilebilir.
+function _asiStokKalanlar(vaccines,stockRows,hareketRows){
+  const used={};
+  (hareketRows||[]).forEach(m=>{ if(m.iptal||!m.stok_id) return; used[m.stok_id]=(used[m.stok_id]||0)+(+m.miktar||0); });
+  const out={};
+  (vaccines||[]).forEach(vx=>{
+    if(!vx.stock_item_id){ out[vx.id]=null; return; }
+    const s=(stockRows||[]).find(x=>x.id===vx.stock_item_id);
+    out[vx.id]= s ? (+s.baslangic_miktar||0)-(used[vx.stock_item_id]||0) : null;
+  });
+  return out;
+}
+// Tek aşı için kalan (detay modalı kullanır)
+async function _asiStokKalan(vax){
+  if(!vax||!vax.stock_item_id) return null;
+  const [stockRows,hmvs]=await Promise.all([getData('stok'),getData('stok_hareket')]); // IDB store adı 'stok'
+  return _asiStokKalanlar([vax],stockRows,hmvs)[vax.id];
+}
 // Detaydaki aşı formu alanlarını (ad + doz) verilen aşıya kurar; vax null ise sıfırlar.
 function _asiFormVaxKur(vax){
   const adiEl=document.getElementById('td-asi-adi');
@@ -4915,6 +4935,15 @@ async function openTaskDet(id){
         _asiFormVaxKur(vax);
         // Planlı görevde planlanan doz, katalog standart dozunu ezer
         if(t.gorev_tipi==='ASI_PLANLI'&&t.miktar){ const pd=document.getElementById('td-asi-doz'); if(pd) pd.value=t.miktar; }
+        // Gerçek stok entegrasyonu: görevin çekileceği stoktaki kalan miktar
+        try{
+          const kalan=await _asiStokKalan(vax);
+          const di=document.getElementById('td-asi-doz-info');
+          if(di&&kalan!=null){
+            di.textContent='Kalan: '+kalan+' '+(vax.unit||'ml');
+            di.style.color=kalan<=0?'var(--red2)':'var(--green)';
+          }
+        }catch(e2){ console.warn('stok kalan:',e2.message); }
       } else {
         // Aşı çözümlenemedi (manuel görev vb.) — formda seçim listesi aç, ölü nokta yok
         _curTaskVaccineId=null;
