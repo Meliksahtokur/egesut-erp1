@@ -29,7 +29,7 @@ const { sandbox } = loadBrowserModule('js/ui.js', {
 });
 const {
   yasHesapla, band, _dashVacAlerts, _yeniDogumGun,
-  _durumClr, _durumTxt, renderSeansGrupAyrac, _asiVaccineCoz,
+  _durumClr, _durumTxt, renderSeansGrupAyrac, _asiVaccineCoz, _sessizGrupla,
 } = sandbox;
 
 // ── Tarih yardımcıları (yerel takvim; yasHesapla new Date() ile yerel çalışır) ──
@@ -475,4 +475,74 @@ test('_asiVaccineCoz: boş/eksik girişler → null', () => {
   assert.equal(_asiVaccineCoz({ stok_id: null, aciklama: '   ' }, VAX_ORNEK), null);
   assert.equal(_asiVaccineCoz({ aciklama: 'Coglavax (rapel)' }, []), null);
   assert.equal(_asiVaccineCoz({ aciklama: 'Coglavax (rapel)' }, undefined), null);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// _sessizGrupla (js/ui.js — REV-5 idle/sessiz-ui)
+// Sessiz listesinin gruplu bölümlemesi: grup sırası en yüksek sessiz_gun'a
+// göre; grup içi sessiz_gun DESC; 'Hiç kayıt yok' (sessiz_gun>=9999) her
+// zaman EN ALTta ayrı bölüm (sentinel-son kuralı, bb4ea92). Saf fonksiyon —
+// grup adları HAM döner, esc() render'da uygulanır (helpers.js sözleşmesi).
+// ═══════════════════════════════════════════════════════════════
+const SG = (id, gun, grup) => ({ hayvan_id: id, sessiz_gun: gun, grup, kupe_no: id, son_aktivite: null });
+
+test('_sessizGrupla: boş/null liste → boş dizi', () => {
+  assert.deepEqual(_sessizGrupla([]), []);
+  assert.deepEqual(_sessizGrupla(null), []);
+  assert.deepEqual(_sessizGrupla(undefined), []);
+});
+
+test('_sessizGrupla: tek grup, grup içi sessiz_gun DESC', () => {
+  const r = _sessizGrupla([SG('a', 60, 'Sağmal'), SG('b', 90, 'Sağmal'), SG('c', 75, 'Sağmal')]);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].grup, 'Sağmal');
+  assert.deepEqual(r[0].items.map(s => s.hayvan_id), ['b', 'c', 'a']);
+});
+
+test('_sessizGrupla: en yüksek sessiz_gun\'u içeren grup önce', () => {
+  const r = _sessizGrupla([
+    SG('a', 58, 'Düve'),     // Düve'un en yükseği 58
+    SG('b', 120, 'Sağmal'),  // Sağmal'ın en yükseği 120 → Sağmal önce
+    SG('c', 61, 'Düve'),
+    SG('d', 70, 'Kuru Dönem'), // Kuru Dönem'in en yükseği 70 → ikinci
+  ]);
+  assert.deepEqual(r.map(g => g.grup), ['Sağmal', 'Kuru Dönem', 'Düve']);
+  assert.deepEqual(r[2].items.map(s => s.hayvan_id), ['c', 'a']); // grup içi DESC
+});
+
+test('_sessizGrupla: sessiz_gun>=9999 her zaman EN ALTta ayrı bölüm', () => {
+  const r = _sessizGrupla([
+    SG('k1', 9999, 'Düve'),
+    SG('a', 100, 'Sağmal'),
+    SG('k2', 12000, 'Sağmal'),
+    SG('b', 65, 'Düve'),
+  ]);
+  assert.deepEqual(r.map(g => g.grup), ['Sağmal', 'Düve', 'Hiç kayıt yok']);
+  // Kayıtsız bölüm grubundan bağımsız toplanır, içinde DESC
+  assert.deepEqual(r[2].items.map(s => s.hayvan_id), ['k2', 'k1']);
+  // Satırda grubun kendi etiketi görünür kalsın — item HAM grup değerini taşır
+  assert.equal(r[2].items[0].grup, 'Sağmal');
+  assert.equal(r[2].items[1].grup, 'Düve');
+});
+
+test('_sessizGrupla: grupsuz hayvanlar "Grupsuz" bölümünde toplanır', () => {
+  const r = _sessizGrupla([
+    SG('a', 70, 'Sağmal'),
+    SG('x', 80, ''),
+    SG('y', 60, null),
+  ]);
+  // Grupsuz'un en yükseği (80) > Sağmal'ın en yükseği (70) → Grupsuz önce
+  assert.deepEqual(r.map(g => g.grup), ['Grupsuz', 'Sağmal']);
+  assert.deepEqual(r[0].items.map(s => s.hayvan_id), ['x', 'y']);
+});
+
+test('_sessizGrupla: Türkçe grup adları HAM korunur (escape render\'da)', () => {
+  const ad = 'İnek<Script> & "Düve"';
+  const r = _sessizGrupla([SG('a', 70, ad)]);
+  assert.equal(r[0].grup, ad); // saf fonksiyon kaçırmaz — render esc()'ler
+});
+
+test('_sessizGrupla: sentinel-son kuralı yalnız kayıtsız varken bölüm ekler', () => {
+  const r = _sessizGrupla([SG('a', 70, 'Sağmal'), SG('b', 90, 'Sağmal')]);
+  assert.deepEqual(r.map(g => g.grup), ['Sağmal']); // 9999 yoksa kayıtsız bölümü YOK
 });

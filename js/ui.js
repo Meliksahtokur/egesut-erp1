@@ -1104,19 +1104,57 @@ function _toggleSpermaRest(){
   const parent=el?.parentElement;
   if(parent){const btn=parent.querySelector('[onclick*="toggleSpermaRest"]');if(btn)btn.textContent=_suruSpermaOpen?'Daralt':'[+'+(document.querySelectorAll('#sperma-rest .stat-row').length)+' daha]';}
 }
+// ── Sessiz sheet yardımcıları (REV-5 idle/sessiz-ui) ──
+// Satır tıklanınca sheet remove EDİLMEZ — yalnız gizlenir; closeDet() geri
+// gösterir (DOM korunduğu için scroll dahil). _sessizReturn: "det'ten çıkınca
+// sheet'i geri aç" işareti; goTo ve popstate temizlik noktaları sıfırlar.
+function _sessizSheetGizle(){
+  const box=document.getElementById('sessiz-bs');
+  if(box) box.style.display='none';
+  globalThis._sessizReturn=true;
+}
+// Tam kapatma (backdrop tap) — pushState girdisi varsa tüket (protokol deseni)
+function _sessizSheetKapat(){
+  const box=document.getElementById('sessiz-bs');
+  if(!box) return;
+  box.remove();
+  globalThis._sessizReturn=false;
+  if(history.state?.sessiz_bs){ globalThis._modalBackGuard=true; history.back(); }
+}
+// Gruplu bölümleme — SAF fonksiyon (DOM yok, unit test: tests/unit/ui-pure.test.js).
+// Grup sırası: en yüksek sessiz_gun'u içeren grup önce; grup içi sessiz_gun DESC.
+// 'Hiç kayıt yok' (sessiz_gun>=9999) her zaman EN ALTta ayrı bölüm toplanır
+// (sentinel-son kuralı, bb4ea92); satırda grubun kendi etiketi görünür kalır.
+function _sessizGrupla(list){
+  if(!list||!list.length) return [];
+  const kayitsiz=list.filter(s=>s.sessiz_gun>=9999).sort((a,b)=>b.sessiz_gun-a.sessiz_gun);
+  const diger=list.filter(s=>s.sessiz_gun<9999).sort((a,b)=>b.sessiz_gun-a.sessiz_gun);
+  const groups=[];
+  const byName=new Map();
+  for(const s of diger){
+    const gAd=s.grup||'Grupsuz';
+    if(!byName.has(gAd)){ const sec={grup:gAd,items:[]}; byName.set(gAd,sec); groups.push(sec); }
+    byName.get(gAd).items.push(s);
+  }
+  if(kayitsiz.length) groups.push({grup:'Hiç kayıt yok',items:kayitsiz});
+  return groups;
+}
 async function _showSessizList(){
   try{
     const list=await rpc('sessiz_hayvanlar_listele',{});
     if(!list||!list.length){toast('Sessiz hayvan yok');return;}
-    const sessizTop=[...list].sort((a,b)=>{const af=a.sessiz_gun>=9999?1:0,bf=b.sessiz_gun>=9999?1:0;return af-bf||b.sessiz_gun-a.sessiz_gun;});
+    globalThis._sessizReturn=false; // taze açılış eski dönüş işaretini ezer
+    const existedBefore=!!document.getElementById('sessiz-bs'); // öksüz history girdisi birikmesin (proto-detay deseni)
     let box=document.getElementById('sessiz-bs');
     if(box) box.remove();
     box=document.createElement('div');
     box.id='sessiz-bs';
     box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
-    box.onclick=e=>{if(e.target===box)box.remove();};
-    const rows=sessizTop.map(s=>`<div class="arow" onclick="document.getElementById('sessiz-bs').remove();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz'} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join('');
+    box.onclick=e=>{if(e.target===box)_sessizSheetKapat();};
+    const row=s=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz'} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const rows=_sessizGrupla(list).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
     box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${list.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">55+ gündür kızgınlık/tohumlama kaydı yok</div>${rows}</div>`;
+    if(!existedBefore) history.pushState({sessiz_bs:1}, '', '');
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}
 }
@@ -2250,7 +2288,16 @@ async function openDet(id, keepTab){
 
   } catch(e){ document.getElementById('det-name').textContent='Hata: '+e.message; }
 }
-function closeDet(){ document.getElementById('det').classList.remove('on'); }
+function closeDet(){
+  document.getElementById('det').classList.remove('on');
+  // REV-5: sessiz sheet'inden gelindiyse sheet'i geri göster (scroll korunur);
+  // hem ✕/geri butonu hem Android geri (app.js popstate det dalı) bu noktadan döner.
+  if(globalThis._sessizReturn){
+    globalThis._sessizReturn=false;
+    const sb=document.getElementById('sessiz-bs');
+    if(sb) sb.style.display='flex';
+  }
+}
 function fromTaskOpenDet(hayvanId, taskId) {
   window._prevTaskId = taskId;
   closeM('m-task-det');

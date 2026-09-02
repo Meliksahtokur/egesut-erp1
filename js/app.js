@@ -71,6 +71,13 @@ function hideSyncBar() { const bar = g('sync-bar'); if (bar) bar.className = '';
 
 // ── ROUTING ─────────────────────────────────
 async function goTo(pg, push = true) {
+  // REV-5: sayfa değişince gizli sessiz sheet'ini ve dönüş işaretini temizle —
+  // det'tan çıkıp başka sayfaya geçilirse öksüz sheet kalmasın
+  if (globalThis._sessizReturn) {
+    globalThis._sessizReturn = false;
+    const sessizBsGo = document.getElementById('sessiz-bs');
+    if (sessizBsGo) sessizBsGo.remove();
+  }
   if(getState('currentPage')==='tasks' && pg!=='tasks' && typeof flushPendingDone==='function') flushPendingDone();
   setState('currentPage', pg);
   if (push) history.pushState({pg}, '', '#' + pg);
@@ -96,6 +103,14 @@ async function goTo(pg, push = true) {
 window.addEventListener('popstate', e => {
   // Kod kaynaklı back (closeM / sheet kapatma) — tüket, altındaki şeyi yakma
   if (globalThis._modalBackGuard) { globalThis._modalBackGuard = null; return; }
+  // Sessiz sheet'i router modalı DEĞİL (REV-5) — Android geri yalnız sheet'i
+  // kapatsın; sentinel confirm'e ve modal yığınına düşmesin.
+  const sessizBsPop = document.getElementById('sessiz-bs');
+  if (sessizBsPop && sessizBsPop.style.display !== 'none') {
+    sessizBsPop.remove();
+    globalThis._sessizReturn = false;
+    return;
+  }
   // Açık router-modal varsa en üsttekini kapat (Android geri tuşu — tüm modallar).
   // closeM: cleanup (_planliTohumlamaGorevId, form sıfırlama) + stack/history dahil.
   // NOT: 'det' bu stack'te değil — kendi dalı aşağıda (sheet yeniden gösterimi yapar).
