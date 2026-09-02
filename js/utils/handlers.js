@@ -64,6 +64,8 @@ registerActions({
   'fchip-tekrar':          (el) => fchipSec('tekrar', 'tekrar', el),
   'fchip-dogum':           (el) => fchipSec('dogum', 'dogurdu', el),
   'fchip-grup':            (el) => fchipSec('grup', el.dataset.grup, el),
+  'hasta-hastalik-drop':    () => _hastaHastalikAcKapa(!_hastaHastalikAcik),
+  'hasta-hastalik-temizle': () => { _hastaHastalikSecim.clear(); _hastaHastalikSig=null; filterA(); },
 
   // ═══ ÜREME SEKMELERİ ═══
   'ureme-kizginlik': (el) => uremeTab('kizginlik', el),

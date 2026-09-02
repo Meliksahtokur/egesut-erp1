@@ -19,6 +19,8 @@ class AppState {
       currentNotificationTab: 'bekliyor', // _curBildirimTab (zaten var)
       gebeIds: [],               // _gebeIds — ARRAY (new Set() sarilarak kullanilir)
       hastaIds: new Set(),       // _hastaIds — SET (direkt .has() ile)
+      aktifVakalar: [],          // cases status='active' satırları — hastalık filtresi seçenekleri + açılış sıralaması
+      diseases: [],              // diseases tablosu — filtre seçeneklerinde hastalık adı eşlemesi
       // BUG-059 — saat bazlı tedavi seans sistemi
       tedaviPlan: [],            // treatment_day_uygulamalar (seans listesi) — case_id'ye göre filtrelenir
       aktifSeansUndo: new Map(),  // seansId → {undoUntil: Date, prevState: 'done'|'cancelled'}
