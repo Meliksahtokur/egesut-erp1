@@ -6766,7 +6766,7 @@ function _activeAnimalsOnly(){
 
 function acHayvan(inputId,listId){
   const inp=document.getElementById(inputId);
-  const q=(inp?.value||'').toLowerCase().trim();
+  const q=(inp?.value||'').trim();
   const ac=document.getElementById(listId); if(!ac) return;
   // DB view öncelikli, yoksa UI fallback (hybrid approach)
   let src;
@@ -6779,18 +6779,32 @@ function acHayvan(inputId,listId){
   } else {
     src = getState('animals').length ? getState('animals') : [];
   }
-  const filtered=q
-    ?src.filter(a=>(a.kupe_no||'').toLowerCase().includes(q)||(a.devlet_kupe||'').toLowerCase().includes(q)||(a.id||'').toLowerCase().includes(q)).slice(0,12)
-    :src.slice(0,10);
-  if(!filtered.length){
+  // uuid id içinde aramak alakasız satır üretir — yalnız küpe/devlet/ırk aranır.
+  // Sıralama+vurgu srchDropdown ile aynı sözleşme: srchAdaySirala/vurguHtml (helpers.js)
+  let rows;
+  if(!q){
+    const disp=a=>String(a.kupe_no||a.devlet_kupe||a.id||'');
+    rows=[...src].sort((a,b)=>disp(a).localeCompare(disp(b),'tr',{numeric:true})).slice(0,10).map(a=>({a,tier:-1}));
+  }else{
+    rows=srchAdaySirala(src,q,12).map(x=>({a:x.h,tier:x.tier}));
+  }
+  if(!rows.length){
     ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--red)">⚠️ Sürüde eşleşen hayvan bulunamadı</div>';
     ac.style.display='block'; return;
   }
-  ac.innerHTML=filtered.map(a=>{
+  ac.innerHTML=rows.map(({a,tier})=>{
     const kupe=a.kupe_no||a.devlet_kupe||a.id;
-    return `<div data-kupe="${escAttr(kupe)}" onclick="selHayvan('${inputId}','${listId}',this.dataset.kupe)" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between">
-      <span style="font-weight:600">${esc(kupe)}</span>
-      <span style="color:var(--ink3);font-size:.7rem">${esc(a.irk||'')} · ${esc(a.padok||'')}</span>
+    // Irktan eşleşen satırda küpe eşleşme içermez — vurgu yanıltır
+    const kupeHtml=tier===6?esc(kupe):vurguHtml(kupe,q);
+    // Eşleşme görünmez olmasın: devlet küpesinden eşleştiyse vurgulu devlet, ırksa vurgulu ırk göster
+    const sagParcalar=[];
+    if(a.kupe_no&&a.devlet_kupe&&a.devlet_kupe!==a.kupe_no&&(tier===1||tier===3||tier===5)) sagParcalar.push(vurguHtml(a.devlet_kupe,q));
+    if(tier===6&&a.irk) sagParcalar.push(vurguHtml(a.irk,q));
+    else if(a.irk) sagParcalar.push(esc(a.irk));
+    if(a.padok) sagParcalar.push(esc(a.padok));
+    return `<div data-kupe="${escAttr(kupe)}" onclick="selHayvan('${inputId}','${listId}',this.dataset.kupe)" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;gap:8px">
+      <span style="font-weight:600">${kupeHtml}</span>
+      <span style="color:var(--ink3);font-size:.7rem;text-align:right">${sagParcalar.join(' · ')}</span>
     </div>`;
   }).join('');
   ac.style.display='block';
