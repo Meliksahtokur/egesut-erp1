@@ -229,7 +229,41 @@ function aktifHayvanSatirlari(rows, idKey, aktifIdler) {
   return rows.filter(r => !r || !r[idKey] || set.has(r[idKey]));
 }
 
+// ── SÜTTEN KESME — BUZAĞI SETİ + KESİM VAKTİ (dashboard kartı ↔ m-sutten-kes) ──
+// SÖZLEŞME (testle kilitli: tests/unit/sutten-kes-secim.test.js):
+// 1. sutIcenBuzagiSec SAF'tır — animals'ı parametre alır, state'e dokunmaz.
+//    Kanonik tanım (forms.js _sutIcenBuzagilar'ın birebir aynası): aktif +
+//    kesilmemiş + (grup 'Buzağı' içerir VEYA yaş ≤ 180g). forms.js bu saf
+//    katmanı getState('animals') ile çağırır — tek kaynak burası.
+// 2. Gün yaşı Math.floor((now - dogum_tarihi)/86400000) (forms.js'teki birebir hesap).
+// 3. suttenKesimeHazirSec: set içinden yaş ≥ eşik olanlar = "kesim vakti gelenler".
+//    Dashboard kartının sayacı BU sayıdır; modal listesinde 'Kesim vakti' rozetli
+//    satırlar bu kümedir — sayaç ↔ rozet sayısı birebir tutarlı.
+// 4. suttenKesListeSirala: kesim vakti gelenler önce; grup içi mevcut sıra korunur.
+function _sutGunYasi(a) {
+  return a && a.dogum_tarihi ? Math.floor((Date.now() - new Date(a.dogum_tarihi)) / 86400000) : null;
+}
+function sutIcenBuzagiSec(animals) {
+  return (animals || []).filter(a => {
+    if (!a || a.durum !== 'Aktif' || a.suttten_kesme_tarihi) return false;
+    const yas = _sutGunYasi(a);
+    return (a.grup && a.grup.includes('Buzağı')) || (yas !== null && yas <= 180);
+  });
+}
+function suttenKesimeHazirSec(animals, esik = 60) {
+  return sutIcenBuzagiSec(animals).filter(a => {
+    const yas = _sutGunYasi(a);
+    return yas !== null && yas >= esik;
+  });
+}
+function suttenKesListeSirala(animals, esik = 60) {
+  return sutIcenBuzagiSec(animals)
+    .map((a, i) => ({ a, i, h: (_sutGunYasi(a) !== null && _sutGunYasi(a) >= esik) ? 0 : 1 }))
+    .sort((x, y) => x.h - y.h || x.i - y.i)
+    .map(x => x.a);
+}
+
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari });
+  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala });
 }

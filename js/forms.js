@@ -754,24 +754,36 @@ async function submitCikis(btn) {
 
 // ── SÜTTEN KESME ─────────────────────────────
 // Süt içen buzağı seti: aktif + kesilmemiş + (grup 'Buzağı' içerir VEYA yaş ≤ 180g)
+// Saf katman helpers.js'te (sutIcenBuzagiSec) — dashboard kartı sayacıyla tek kaynak.
 function _sutIcenBuzagilar() {
-  return (getState('animals') || []).filter(a => {
-    if (a.durum !== 'Aktif' || a.suttten_kesme_tarihi) return false;
-    const yas = a.dogum_tarihi ? Math.floor((Date.now() - new Date(a.dogum_tarihi)) / 86400000) : null;
-    return (a.grup && a.grup.includes('Buzağı')) || (yas !== null && yas <= 180);
-  });
+  return sutIcenBuzagiSec(getState('animals'));
+}
+// Kesim eşiği: protokol_ayar 'sutten_kesme_gun' (varsayılan 60)
+function suttenKesmeEsigi() {
+  return +(getState('protokol_ayar')?.find(x => x.anahtar === 'sutten_kesme_gun')?.deger ?? 60);
 }
 function renderBuzagiPicker(filter) {
   const liste = document.getElementById('sk-liste');
   if (!liste) return;
   const q = (filter || '').toLowerCase();
-  const rows = _sutIcenBuzagilar().filter(a => !q || (getDisplayKupe(a) || '').toLowerCase().includes(q));
+  const esik = suttenKesmeEsigi();
+  const tum = _sutIcenBuzagilar();
+  const hazir = suttenKesimeHazirSec(tum, esik);
+  const ozet = document.getElementById('sk-ozet');
+  if (ozet) ozet.innerHTML = hazir.length
+    ? `<span style="color:var(--green3);font-weight:700">${hazir.length} buzağı kesim vakti</span> <span style="color:var(--ink3)">(≥ ${esik} gün) · toplam ${tum.length} süt içen</span>`
+    : `<span style="color:var(--ink3)">Kesim vakti gelen yok (eşik ≥ ${esik} gün) · toplam ${tum.length} süt içen</span>`;
+  const havuz = q ? tum.filter(a => (getDisplayKupe(a) || '').toLowerCase().includes(q)) : tum;
+  const rows = suttenKesListeSirala(havuz, esik);
   if (!rows.length) { liste.innerHTML = '<div style="color:var(--ink3);padding:8px">Süt içen buzağı yok</div>'; return; }
+  const hazirId = new Set(hazir.map(a => a.id));
   liste.innerHTML = rows.map(a => {
     const yas = yasHesapla(a.dogum_tarihi) || 'Yaş?';
-    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--card2);cursor:pointer">
+    const vakti = hazirId.has(a.id);
+    const rozet = vakti ? ' <span style="font-size:.66rem;font-weight:700;color:var(--green3);background:rgba(78,154,42,.14);border:1px solid rgba(78,154,42,.35);border-radius:999px;padding:1px 7px;margin-left:4px;white-space:nowrap">🍼 Kesim vakti</span>' : '';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--card2);cursor:pointer;${vakti ? 'background:rgba(78,154,42,.07);' : ''}">
       <input type="checkbox" data-id="${a.id}" checked style="width:18px;height:18px">
-      <div><div style="font-weight:700;font-size:.85rem">${esc(getDisplayKupe(a))}</div>
+      <div><div style="font-weight:700;font-size:.85rem">${esc(getDisplayKupe(a))}${rozet}</div>
       <div style="font-size:.72rem;color:var(--ink3)">${esc(a.irk || '—')} · ${yas}</div></div></label>`;
   }).join('');
 }
@@ -851,6 +863,7 @@ async function suttenKesGeriAl(hayvanId, btn) {
 }
 window.openSuttenKesModal = openSuttenKesModal;
 window.renderBuzagiPicker = renderBuzagiPicker;
+window.suttenKesmeEsigi = suttenKesmeEsigi;
 window.skHepsiniSec = skHepsiniSec;
 window.skOnayla = skOnayla;
 window.suttenKesTekil = suttenKesTekil;

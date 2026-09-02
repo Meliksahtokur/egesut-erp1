@@ -14,7 +14,7 @@ const {
   makeDomStub,
   makeElement,
 } = require('./support/loadModule.js');
-const { getDisplayKupe, bugun } = require('../../js/utils/helpers.js');
+const { getDisplayKupe, bugun, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala } = require('../../js/utils/helpers.js');
 // Gerçek config.js fonksiyonu — erkek 5xx kuralı testi sahte implementation ile değil
 // kanonik kod ile doğrulanır (drift olmasın)
 const { sandbox: _cfgSandbox } = loadBrowserModule('js/config.js', {});
@@ -117,6 +117,9 @@ function setupForms(opts = {}) {
       toast: (msg, err) => { calls.toast.push({ msg, err: !!err }); },
       rpc: async (name, params) => { calls.rpc.push({ name, params }); return {}; },
       getDisplayKupe,
+      sutIcenBuzagiSec,
+      suttenKesimeHazirSec,
+      suttenKesListeSirala,
       yasHesapla: yasHesaplaMirror,
       idbGetAll: async () => [],
       getData: async () => [],
