@@ -294,9 +294,10 @@ test('RPC_TABLES: her değer dolu dizi ve tüm tablolar TABLES içinde (yoksa pu
 test('RPC_TABLES: js/ kaynaklarında rpcOptimistic("...") ile çağrılan HER RPC mapte (sessiz senkron boşluğu kilidi)', () => {
   const { exposed } = loadApi();
   const { RPC_TABLES } = exposed;
-  // Bilinçli muafiyet: bu RPC'lerin çağrı yerlerini loadTanimlarPanel() izler —
-  // kendisi pullTables(['stok_kategorileri']) ile telafi eder (js/forms.js:1391)
-  const EXEMPT = new Set(['kategori_ekle', 'kategori_guncelle', 'kategori_sil', 'seed_defaults']);
+  // Bilinçli muafiyet: kategori üçlüsünün çağrı yerlerini loadTanimlarPanel() izler —
+  // _renderKategoriler pullTables(['stok_kategorileri','stok']) ile telafi eder (js/ui.js).
+  // seed_defaults artık muaf DEĞİL: RPC_TABLES'ta mapli (diseases/drugs/stok_kategorileri).
+  const EXEMPT = new Set(['kategori_ekle', 'kategori_guncelle', 'kategori_sil']);
   const jsDir = path.join(REPO_ROOT, 'js');
   const files = fs.readdirSync(jsDir).filter(f => f.endsWith('.js'));
   const called = new Set();

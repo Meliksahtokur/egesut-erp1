@@ -357,6 +357,10 @@ const RPC_TABLES = {
   disease_ekle:                  ['diseases'],
   disease_guncelle:              ['diseases'],
   disease_sil:                   ['diseases'],
+  // seed_defaults(p_tip) canlı gövdeden (pg_get_functiondef, oid 109988): diseases/drugs/stok_kategorileri
+  // yazar — drug_classes YAZMAZ (onu drug_class_varsayilan_yukle yazar, yukarıda mapli). Tip'e göre
+  // koşullu çekilemediğinden üçü de listelenir; küçük tablolar, over-pull maliyeti ihmal edilebilir.
+  seed_defaults:                 ['diseases','drugs','stok_kategorileri'],
   // BUG-059 — saat bazlı tedavi seans sistemi (Faz 5 RPC'leri)
   add_treatment_day_with_sessions: ['cases','treatment_days','treatment_day_uygulamalar','stok','stok_hareket','gorev_log'],
   seans_tamamla:                 ['treatment_day_uygulamalar','stok','stok_hareket','gorev_log','treatment_days'],

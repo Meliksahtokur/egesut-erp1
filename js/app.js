@@ -328,7 +328,7 @@ function animalGrupDegisti() {
   // PADOKLAR dizisinden UUID'leri bul (DB yüklüyse), yoksa ad kullan
   const opts = padokAdlari.map(ad => {
     const p = PADOKLAR.find(x => x.ad === ad);
-    return p ? `<option value="${p.id}">${p.ad}</option>` : `<option value="">${ad}</option>`;
+    return p ? `<option value="${p.id}">${esc(p.ad)}</option>` : `<option value="">${esc(ad)}</option>`;
   });
   padokSel.innerHTML = opts.join('');
   // Besi grubunda cinsiyet bazlı varsayılan padok
