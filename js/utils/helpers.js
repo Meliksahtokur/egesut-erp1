@@ -199,7 +199,7 @@ function srchAdaySirala(hayvanlar, q, limit = 8) {
     .filter(x => x.tier >= 0)
     .sort((x, y) => x.tier - y.tier
       || disp(x.h).length - disp(y.h).length
-      || disp(x.h).localeCompare(disp(y.h), 'tr'))
+      || disp(x.h).localeCompare(disp(y.h), 'tr', { numeric: true }))
     .slice(0, limit);
 }
 
