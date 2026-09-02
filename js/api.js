@@ -26,11 +26,11 @@ const DEMO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const SB_URL  = IS_DEMO ? DEMO_URL : PROD_URL;
 const PROD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpxbmV4cWJkZnZiaGx4emVsemp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMDE4OTksImV4cCI6MjA4Nzg3Nzg5OX0.VggKv3KsmXm7C1LqBxCJaMj2yLQh10iRwSXMtuC4cmc';
 const SB_KEY  = IS_DEMO ? DEMO_KEY : PROD_KEY;
-const DB_VER  = 23;
+const DB_VER  = 24;
 const TABLES  = ['hayvanlar','tohumlama','dogum','stok','stok_hareket',
                   'gorev_log','kizginlik_log','bildirim_log','islem_log','cop_kutusu','vaccines',
                   'cases','diseases','drugs','drug_classes','drug_products','drug_administrations',
-                  'vaccination_log','vaccine_diseases','vaccine_protocol_steps','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
+                  'vaccination_log','vaccine_diseases','vaccine_protocol_steps','vaccination_schedule','padoklar','grup_padok_eslem','hekimler','treatment_days','treatment_day_uygulamalar','stok_kategorileri',
                   'uygulama_log','protokol_instance','protokol_ayar',
                   'tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem'];
 const APP_VERSION = '2026-03-12-cln03';
@@ -416,6 +416,7 @@ async function _pullTablesNow(tables = []) {
       vaccines:     () => db.from('vaccines').select('*'),
       vaccine_diseases: () => db.from('vaccine_diseases').select('*'),
       vaccine_protocol_steps: () => db.from('vaccine_protocol_steps').select('*'),
+      vaccination_schedule: () => db.from('vaccination_schedule').select('*'),
       vaccination_log: () => db.from('vaccination_log').select('*'),
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
