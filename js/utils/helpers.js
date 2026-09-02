@@ -167,14 +167,14 @@ function throttle(fn, limit = 1000) {
   return (...args) => { const now = Date.now(); if (now - last >= limit) { last = now; fn(...args); } };
 }
 
-// ── KÜPE ARAMA — ALAKA SIRALAMASI + EŞLEŞME VURGUSU (srchDropdown) ──
+// ── KÜPE ARAMA — ALAKA SIRALAMASI + EŞLEŞME VURGUSU (srchDropdown + acHayvan) ──
 // SÖZLEŞME (testle kilitli: tests/unit/srch-siralama.test.js):
 // 1. srchAdaySirala katmanları (küçük tier daha alakalı):
 //    0 kupe_no birebir · 1 devlet_kupe birebir · 2 kupe_no önek ·
 //    3 devlet_kupe önek · 4 kupe_no içerir · 5 devlet_kupe içerir · 6 ırk içerir.
 //    "01" yazınca 01'in birebir eşleşmesi, TR…'nin ortasındaki "01"den önce gelir.
-// 2. Aynı katmanda kısa gösterim önce (daha spesifik), sonra 'tr' localeCompare —
-//    deterministik, dizi sırasına bağımlı değil.
+// 2. Aynı katmanda kısa gösterim önce (daha spesifik), sonra 'tr' localeCompare
+//    ({numeric:true} — "02" < "10" doğal sayı sırası); deterministik, dizi sırasına bağımlı değil.
 // 3. q boşsa [] döner; en fazla limit (varsayılan 8) aday döner.
 // 4. vurguHtml esc() semantiğiyle (& < >) kaçırır, İLK eşleşmeyi
 //    <span class="ac-vurgu"> ile sarar; eşleşme yoksa düz kaçırılmış metin.

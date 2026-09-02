@@ -1,8 +1,12 @@
-# UI & Kod Bölüm Haritası (2026-09-01 yeniden üretim)
+# UI & Kod Bölüm Haritası (2026-09-01 yeniden üretim · 2026-09-02 kısmi doğrulama)
 
 > **Yöntem:** `idle/docs-hatti` worktree kodundan grep ile üretildi (`^(async )?function` + `const X = (` taraması,
 > Python; satır numaraları 2026-09-01 kod durumudur). Eski haritadaki ~2.8k satırlık dönem aralıkları GEÇERSİZDİ —
 > bu sürüm günceldir. Yine de büyük refactor sonrası doğrulamak istersen: `grep -n "function <ad>" js/ui.js`.
+>
+> **2026-09-02:** `srchDropdown`/`acHayvan` bölgeleri (25, 44-46. satırlar) doğrulanıp güncellendi
+> (ui.js **8851** satır); 2026-09-02 kupe-autocomplete merge'leri (3efe71a, 973f5ee) sonrası. Diğer
+> aralıklar 2026-09-01 bazlıdır ve o tarihten sonraki merge'lerle ~birkaç on satır kaymış olabilir.
 >
 > Dosya boyutları: ui.js **8513** · forms.js **1959** · api.js **675** · app.js **695** · ai-asistan.js 403 ·
 > demo.js 87 · auth.js 267 · config.js 129 · state.js 96 · utils/ (5 dosya).
@@ -22,8 +26,8 @@
 | 1044–1390 | Protokol ekranı (etken madde) | `_showProtokolEkran()`, `_showProtokolDetay()`, `_etkenFiltrele()`, `_sonDozGetir()`, `_puDozPrefill()`, `_protokolUygula()`, `_protokolUygulaKaydet()`, `_protokolDismiss()`, `_protokolGeriAl()`, `_islemSonrasiRefresh()` |
 | 1391–1460 | Hayvan hızlı uygulama | `_hayvanHizliUygulama()`, `_hayvanHizliUygulaKaydet()` |
 | 1461–1625 | Sürü istatistik paneli | `_renderSuruGrupFiltre()`, `_renderSuruStat()`, `_fetchSuruStat()`, `_applySuruStatHtml()`, `_toggleSuruStat()` |
-| 1626–1720 | Arama/filtre çipleri | `srchDropdown()`, `srchSec()`, `fchipReset()`, `fchipSec()`, `filterA()` |
-| 1721–2114 | Hayvan detay modal + geçmiş | `_detOzetHtml()`, `_detUremeHtml()`, `_detRenderGecmis()`, `_detSaglikRender()`, `_detGorevHtml()`, `openDet()`, `closeDet()`, `fromTaskOpenDet()`, `islemGeriAl()`, `openIslemDetay()` |
+| 1835–1930 | Arama/filtre çipleri | `srchDropdown()` (**1835**), `srchSec()`, `fchipReset()`, `fchipSec()`, `filterA()` |
+| 1931–2131 | Hayvan detay modal + geçmiş | `_detOzetHtml()`, `_detUremeHtml()`, `_detRenderGecmis()`, `_detSaglikRender()`, `_detGorevHtml()`, `openDet()`, `closeDet()`, `fromTaskOpenDet()`, `islemGeriAl()`, `openIslemDetay()` |
 | 2115–2304 | Hayvan düzenleme + çıkış modal | `openAnimalEdit()`, `closeAnimalEdit()`, `openCikisModal()` |
 | 2305–2467 | Doğumlar | `loadBirths()`, `gebeledenSec()`, `gebeFiltrele()`, `anneSe()`, `anneSecimSifirla()`, `openDetByKupe()`, `dogumYaptiAc()` |
 | 2468–2937 | Üreme sekmesi + sorun bottom-sheet | `uremeTab()`, `_uremeKizginlik()`, `sorunBottomSheet()`, `sorunVakaAc()`, `kizginlikSearch()`, `tohumlamaSearch()`, `_uremeGebelik()`, `gebeAta()`, `_uremeDogum()`, `_uremeTohumlama()`, `_uremeAbort()`, `loadUreme()` |
@@ -41,10 +45,10 @@
 | 6048–6189 | Tohumlama detay modal | `openTohDet()`, `tekrarTohumla()` |
 | 6190–6338 | Sperma autocomplete + stok modu | `acSperma()`, `selSperma()`, `getSpermaStok()`, `dusSpermaStok()`, `checkSpermaUyari()`, `trSpermaModStok()`, `onTrSpermaSelect()`, `spermaModStok/Elle()` |
 | 6339–6420 | İlaç autocomplete | `refreshIlacCache()`, `acIlac()`, `selIlac()`, `ilacSatirEkle()`, `acDilacSatir()`, `selDilacSatir()` |
-| 6421–6538 | Hayvan autocomplete + uygunluk | `_eligibleHayvanlar()`, `_activeAnimalsOnly()`, `acHayvan()`, `selHayvan()`, `acNav()` |
-| 6503–6598 | Tohumlama/gebelik form modalları | `openMWithHayvan()`, `openInsemSafe()`, `openPlanliTohumlama()`, `_openInsemIntercept()`, `openGebelikEkle()` |
-| 6599–6676 | Tema & ayarlar + drug-stok listesi | `setTheme()`, `ayarlarAc()`, `renderDrugStokList()` |
-| 6677–6941 | Data yönetimi (kuyruk/replay) | `kuyrukTemizle()`, `stokHareketiTemizle()`, `dataTrafficYenile()`, `dataTrafficGonder()`, `dataTrafficTekGonder()`, `buildRpcParams()` (**6789** — offline replay param setleri, bilinçli bug adayı), `dataTrafficSil()` |
+| 6745–6840 | Hayvan autocomplete + uygunluk | `_eligibleHayvanlar()` (**6745**), `_activeAnimalsOnly()`, `acHayvan()` (**6767**), `selHayvan()`, `acNav()` |
+| 6841–6936 | Tohumlama/gebelik form modalları | `openMWithHayvan()`, `openInsemSafe()`, `openPlanliTohumlama()`, `_openInsemIntercept()`, `openGebelikEkle()` |
+| 6937–7095 | Tema & ayarlar + drug-stok listesi | `setTheme()`, `ayarlarAc()`, `renderDrugStokList()` |
+| 6677–6941 | Data yönetimi (kuyruk/replay) | `kuyrukTemizle()`, `stokHareketiTemizle()`, `dataTrafficYenile()`, `dataTrafficGonder()`, `dataTrafficTekGonder()`, `buildRpcParams()` (**7127** — offline replay param setleri, bilinçli bug adayı), `dataTrafficSil()` |
 | 6942–7136 | Ayarlar: hekimler + aşı rapel | `renderAyarlarHekimList()`, `renderAyarlarVaccineList()`, `vaccineRapelGuncelle()`, `ayarlarHekimEkle/Kaydet()`, `hekimDetAc()`, `renderHekimStats()`, `hekimDetKaydet()`, `hekimDetSil()` |
 | 7137–7248 | Ayarlar: padoklar | `renderAyarlarPadokList()`, `padokDuzenleAc/Kaydet()`, `padokSilOnay()`, `renderPadokDolulukBar()` |
 | 7249–7707 | Bulk transfer (toplu padok taşıma) | `setPadokFiltreBt()`, `enterBtSecimModu()`, `_btRenderSuru()`, `openBulkTransfer()`, `btSecilidenKaldir()`, `btSerbestYukle()`, `_btGrupUygunMu()`, `_btRenderHedefPadoklar()`, `btHedefSec()`, `_btGuncelleOzet()`, `_btEtiketleriBir()`, `btTransferOnayla()` |

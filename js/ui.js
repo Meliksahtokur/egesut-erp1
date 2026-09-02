@@ -1849,7 +1849,7 @@ function srchDropdown(){
     if(tier===6&&a.irk) sub+=' · <span style="color:var(--ink3)">'+vurguHtml(a.irk,q)+'</span>';
     const isGebe=gebeSet.has(a.id);
     const badge=isGebe?'<span style="background:rgba(78,154,42,.15);color:var(--green);border-radius:5px;padding:1px 5px;font-size:.62rem;font-weight:700;margin-left:4px">🤰</span>':'';
-    return `<div data-sid="${escAttr(a.id)}" data-main="${escAttr(main)}" onclick="srchSec(this.dataset.sid,this.dataset.main)" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--card2);display:flex;justify-content:space-between;align-items:center;gap:8px">
+    return `<div data-sid="${escAttr(a.id)}" data-main="${escAttr(main)}" onclick="srchSec(this.dataset.sid,this.dataset.main)" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;align-items:center;gap:8px">
       <div style="min-width:0"><span style="font-weight:700;font-size:.85rem">${mainHtml}</span>${sub}${badge}</div>
       <span style="font-size:.68rem;color:var(--ink3);flex-shrink:0">${esc(a.padok||'')}</span>
     </div>`;
