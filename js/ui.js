@@ -122,7 +122,7 @@ function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
   return `<div class="dash-row">
     <div class="sc ok" onclick="goTo('suru')"><div class="sv">${animals.length}</div><div class="sl">Aktif Hayvan ›</div></div>
     <div class="sc ok" onclick="showGebe()"><div class="sv">${gebeTohs.length}</div><div class="sl">Gebe ›</div></div>
-    <div class="sc ${diseases.length>0?'alert':'ok'}" onclick="goTo('gecmis');loadGecmis('hastalik')"><div class="sv">${diseases.length}</div><div class="sl">Aktif Hastalık ›</div></div>
+    <div class="sc ${diseases.length>0?'alert':'ok'}" onclick="showHasta()"><div class="sv">${diseases.length}</div><div class="sl">Aktif Hastalık ›</div></div>
     <div class="sc ${sutBuzagiSayisi>0?'warn':'ok'}" onclick="goTo('suru');filterA()"><div class="sv">${sutBuzagiSayisi}</div><div class="sl">🍼 Sütten Kes ›</div></div>
     <div class="sc ${badge>0?'alert':_taskCls}" onclick="goTo('tasks')"><div class="sv">${tasks.length}</div><div class="sl">Bekleyen Görev ›</div></div>
   </div>`;
@@ -430,6 +430,17 @@ async function showGebe(){
   _fchip.gebelik='gebe';
   document.querySelectorAll('[id^="fc-gebelik-"]').forEach(b=>b.classList.remove('on'));
   document.getElementById('fc-gebelik-gebe')?.classList.add('on');
+  filterA();
+}
+
+function showHasta(){
+  // Dashboard "Aktif Hastalık" kartı — showGebe ile aynı B20 deseni:
+  // goTo('suru') fchipReset+filterA ile chip'leri sıfırladığından chip state'i
+  // programatik seçilir, render'ı sondaki filterA bırakır.
+  goTo('suru');
+  _fchip.saglik='hasta';
+  document.querySelectorAll('[id^="fc-saglik-"]').forEach(b=>b.classList.remove('on'));
+  document.getElementById('fc-saglik-hasta')?.classList.add('on');
   filterA();
 }
 
@@ -1053,6 +1064,9 @@ async function loadAnimals(){
     });
     const hastaLogs=await getData('cases',c=>c.status==='active');
     setState('hastaIds', new Set(hastaLogs.map(d=>d.animal_id)));
+    // Hastalık filtresi seçenekleri + vaka açılış sıralaması için aktif vaka satırları
+    setState('aktifVakalar', hastaLogs);
+    try{ setState('diseases', await getData('diseases')); }catch(e){/* diseases okunamazsa seçenek adı '?' düşer */}
     const sorted=[...animals].sort((a,b)=>(a.kupe_no||a.id||'').localeCompare(b.kupe_no||b.id||''));
     renderAnimals(sorted);
     _renderSuruStat();
@@ -1902,8 +1916,15 @@ document.addEventListener('click',e=>{
 });
 let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null,dogum:null};
 let _detOpenId=null;
+// 🏥 Hasta tag'ine bağlı dinamik hastalık filtresi (T2):
+// seçenekler aktif vakalardan (cases status='active' + diseases) türetilir,
+// kontrol yalnız hasta tag aktifken görünür.
+let _hastaHastalikSecim=new Set();  // seçili disease_id'ler
+let _hastaHastalikAcik=false;       // dropdown paneli açık mı
+let _hastaHastalikSig=null;         // seçenek imzası — değişmediyse DOM yeniden kurulmaz
 function fchipReset(){
   _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null,dogum:null};
+  _hastaHastalikSecim=new Set(); _hastaHastalikAcik=false; _hastaHastalikSig=null;
   document.querySelectorAll('[id^="fc-"]').forEach(b=>b.classList.remove('on'));
   document.getElementById('fc-cinsiyet-hepsi')?.classList.add('on');
 }
@@ -1915,7 +1936,102 @@ function fchipSec(grup,deger,btn){
   }
   filterA();
 }
+
+// ── Hasta modu saf çekirdeği (unit test kapsamı) ──
+// Aktif vakalardan hastalık seçenekleri: [{id,name,sayi}] — isme göre tr-alfabetik.
+// Yalnız vakalarda gerçekten görünen hastalıklar çıkar (hastalar arasında metrit
+// yoksa metrit seçeneği de çıkmaz).
+function _hastaHastalikSecenekleri(vakalar,diseases){
+  const dMap=new Map((diseases||[]).map(d=>[d.id,d?.name||'?']));
+  const m=new Map();
+  (vakalar||[]).forEach(v=>{
+    if(!v||!v.disease_id) return;
+    const cur=m.get(v.disease_id)||{id:v.disease_id,name:dMap.get(v.disease_id)||'?',sayi:0};
+    cur.sayi+=1;
+    m.set(v.disease_id,cur);
+  });
+  return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name,'tr'));
+}
+// hayvan_id → en yeni aktif vaka açılış tarihi (start_date yoksa created_at)
+function _aktifVakaAcilisMap(vakalar){
+  const m=new Map();
+  (vakalar||[]).forEach(v=>{
+    if(!v||!v.animal_id) return;
+    const t=v.start_date||v.created_at||'';
+    if(!t) return;
+    const cur=m.get(v.animal_id);
+    if(!cur||t>cur) m.set(v.animal_id,t);
+  });
+  return m;
+}
+// Hasta modu filtre+sıralama: seçim kümesi boşsa yalnız sıralar (en yeni açılan
+// vaka üstte), doluysa seçili hastalıklardan en az biri olan hayvanlara indirger.
+function _hastaModuUygula(list,vakalar,secim){
+  let f=list;
+  if(secim&&secim.size){
+    const byHayvan=new Map();
+    (vakalar||[]).forEach(v=>{
+      if(!v||!v.animal_id||!v.disease_id) return;
+      let s=byHayvan.get(v.animal_id);
+      if(!s){ s=new Set(); byHayvan.set(v.animal_id,s); }
+      s.add(v.disease_id);
+    });
+    f=f.filter(a=>{
+      const ids=byHayvan.get(a.id);
+      if(!ids) return false;
+      for(const d of secim) if(ids.has(d)) return true;
+      return false;
+    });
+  }
+  const acilis=_aktifVakaAcilisMap(vakalar);
+  return [...f].sort((a,b)=>(acilis.get(b.id)||'').localeCompare(acilis.get(a.id)||''));
+}
+
+// ── Hasta hastalık filtresi UI (checkbox'lı dropdown; yalnız hasta tag aktifken) ──
+function _hastaHastalikAcKapa(acik){
+  _hastaHastalikAcik=acik;
+  const p=document.getElementById('hh-drop-panel');
+  if(p) p.style.display=acik?'block':'none';
+}
+function _hastaHastalikToggle(diseaseId,checked){
+  if(checked) _hastaHastalikSecim.add(diseaseId); else _hastaHastalikSecim.delete(diseaseId);
+  _hastaHastalikSig=null;   // buton etiketi (seçim sayısı) değişti → yeniden kur
+  filterA();
+}
+function _hastaHastalikFiltreHtml(secenekler){
+  const n=_hastaHastalikSecim.size;
+  const satirlar=secenekler.map(s=>`
+    <label style="display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:.8rem;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--card2)">
+      <input type="checkbox" ${_hastaHastalikSecim.has(s.id)?'checked':''} data-hdid="${escAttr(s.id)}" onchange="_hastaHastalikToggle(this.dataset.hdid,this.checked)" style="width:17px;height:17px;accent-color:var(--red);flex-shrink:0;cursor:pointer">
+      <span style="flex:1">${esc(s.name)}</span>
+      <span style="color:var(--ink3);font-size:.72rem;font-weight:700">${s.sayi}</span>
+    </label>`).join('');
+  return `
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <button class="fchip${n?' on':''}" id="hh-drop-btn" data-action="hasta-hastalik-drop">🦠 Hastalık${n?': '+n:''} ▾</button>
+      ${n?`<button class="fchip" data-action="hasta-hastalik-temizle">✕ Temizle</button>`:''}
+    </div>
+    <div id="hh-drop-panel" style="display:${_hastaHastalikAcik?'block':'none'};background:var(--card);border:1px solid var(--card3);border-radius:10px;margin-top:4px;max-height:240px;overflow-y:auto;box-shadow:0 4px 14px rgba(0,0,0,.12)">${satirlar}</div>`;
+}
+function _hastaHastalikFiltreGuncelle(){
+  const box=document.getElementById('hasta-hastalik-filtre');
+  if(!box) return;
+  if(_fchip.saglik!=='hasta'){ box.style.display='none'; box.innerHTML=''; _hastaHastalikSig=null; return; }
+  const secenekler=_hastaHastalikSecenekleri(getState('aktifVakalar'),getState('diseases'));
+  const sig=secenekler.map(s=>s.id+'|'+s.sayi).join(';');
+  if(sig!==_hastaHastalikSig){
+    _hastaHastalikSig=sig;
+    box.innerHTML=_hastaHastalikFiltreHtml(secenekler);
+  }
+  box.style.display='block';
+}
+// Panel dışına tıklayınca dropdown kapansın (srch autocomplete ile aynı desen)
+document.addEventListener('click',e=>{
+  if(_hastaHastalikAcik&&e.target&&typeof e.target.closest==='function'&&!e.target.closest('#hasta-hastalik-filtre'))
+    _hastaHastalikAcKapa(false);
+});
 function filterA(){
+  _hastaHastalikFiltreGuncelle();   // kontrol görünürlüğü — debounce beklemeden
   clearTimeout(_filterTimer);
   _filterTimer=setTimeout(()=>{
     const q=trLower(document.getElementById('srch')?.value||'');
@@ -1943,7 +2059,10 @@ function filterA(){
       // dogum_tarihi yoksa yetiskin grubunda mi kontrol et
       return ['Sağmal (Laktasyonda)','Sağmal (Kuru)','Gebe İnek','Gebe Düve','Düve (Büyük)'].includes(a.grup);
     });
-    if(_fchip.saglik==='hasta') f=f.filter(a=>getState('hastaIds').has(a.id));
+    if(_fchip.saglik==='hasta'){
+      f=f.filter(a=>getState('hastaIds').has(a.id));
+      f=_hastaModuUygula(f,getState('aktifVakalar'),_hastaHastalikSecim);
+    }
     if(_fchip.kisir==='kisir') f=f.filter(a=>a.kisir);
     if(_fchip.grup) f=f.filter(a=>a.grup===_fchip.grup);
     if(_fchip.dogum==='dogurdu') f=f.filter(a=>_yeniDogumGun(a)!=null);
