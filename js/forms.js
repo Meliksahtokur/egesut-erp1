@@ -1164,6 +1164,8 @@ async function submitTaskAdd(btn) {
         p_tarih: tarih, p_aciklama: desc || null,
       });
       if (!res || res.ok === false) { toast(getUserMessage(res?.mesaj || 'Hata'), true); return; }
+      // rezervasyon stok kartına anında yansısın (plan anında düşme görünürlüğü)
+      await pullTables(['stok','stok_hareket']).catch(()=>{});
       toast('✅ Planlı aşı görevi oluşturuldu — stok rezerve edildi');
     } else {
       await write('gorev_log', {

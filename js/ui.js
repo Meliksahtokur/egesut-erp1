@@ -5274,7 +5274,8 @@ async function asiUygulaVeTamamla(){
       rapelTarih=res.next_due||null;
     }
     closeM('m-task-det');
-    await pullTables(['gorev_log','vaccination_log']).catch(()=>{});
+    // stok+stok_hareket: rezervasyon flip'i ve gerçek kullanım stok kartına anında yansısın
+    await pullTables(['gorev_log','vaccination_log','stok','stok_hareket']).catch(()=>{});
     updateTaskBadge();
     loadTasks(_curTaskFilter||'today',null,{skipPull:true});
     loadDash();
@@ -5317,6 +5318,8 @@ async function detayIptal(){
     closeM('m-task-det');
     toast('🗑 Görev iptal edildi');
     updateTaskBadge();
+    // planlı aşı rezervasyonunun iadesi stok kartına anında yansısın
+    await pullTables(['gorev_log','stok','stok_hareket']).catch(()=>{});
     loadTasks(_curTaskFilter||'today');
     loadDash();
   });
