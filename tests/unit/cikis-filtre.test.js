@@ -53,6 +53,13 @@ test('aktifHayvanSatirlari: aktifIdler null/undefined ise hiçbir satır düşme
   assert.equal(aktifHayvanSatirlari(rows, 'hayvan_id', undefined).length, 2);
 });
 
+test('aktifHayvanSatirlari: boş Set = tüm hayvan-bağlı satırlar düşer (çağıran boş liste yerine null geçmeli)', () => {
+  // Review bulgusu 1: hayvan pull'u başarısızsa çağıran boş küme ÜRETMEMELİ,
+  // null geçmeli (fail-safe). Bu test keskin ayrımı sabitler.
+  const rows = [{ hayvan_id: 'A1' }, { hayvan_id: 'A2' }, { id: 'genel' }];
+  assert.deepEqual(aktifHayvanSatirlari(rows, 'hayvan_id', new Set()), [{ id: 'genel' }]);
+});
+
 test('aktifHayvanSatirlari: dizi olmayan girişte boş dizi', () => {
   assert.deepEqual(aktifHayvanSatirlari(null, 'hayvan_id', new Set()), []);
   assert.deepEqual(aktifHayvanSatirlari(undefined, 'hayvan_id', new Set()), []);

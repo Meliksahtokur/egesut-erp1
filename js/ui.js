@@ -284,7 +284,8 @@ async function loadDash(){
     const _isTop=t=>!t.parent_id||!_activePids.has(t.parent_id);
     // T3: sürüden çıkan (durum≠Aktif / cop_kutusu) hayvan hiçbir bantta görünmesin.
     // Çıkışta trigger görevleri iptal eder; bu satırlar IDB gecikmesine karşı güvenlik ağı.
-    const aktifIdler=new Set(animals.map(a=>a.id));
+    // animals boşsa (pull hatası) null → filtre devre dışı (eski davranış, tümünü gizleme)
+    const aktifIdler=animals.length?new Set(animals.map(a=>a.id)):null;
     const aktifTasks=aktifHayvanSatirlari(tasks,'hayvan_id',aktifIdler);
     const late=aktifTasks.filter(t=>t.hedef_tarih<today&&_isTop(t));
     const todayT=aktifTasks.filter(t=>t.hedef_tarih===today&&_isTop(t));
@@ -570,8 +571,10 @@ async function loadTasks(f,btn,opts){
     const _doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
     let data=all.filter(t=>!t.tamamlandi&&!t.iptal&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||_doneIds.has(t.parent_id)));
     // T3: sürüden çıkan hayvanın görevleri listede görünmesin (çıkış trigger'ı
-    // iptal eder; IDB gecikmesine karşı client güvenlik ağı)
-    const _aktifIdler=new Set((getState('animals')||[]).filter(a=>a.durum==='Aktif').map(a=>a.id));
+    // iptal eder; IDB gecikmesine karşı client güvenlik ağı). Hayvan listesi
+    // boşsa (pull hatası) null → filtre kapalı, liste yanlışça boşalmasın.
+    const _aktifHay=(getState('animals')||[]).filter(a=>a.durum==='Aktif');
+    const _aktifIdler=_aktifHay.length?new Set(_aktifHay.map(a=>a.id)):null;
     data=aktifHayvanSatirlari(data,'hayvan_id',_aktifIdler);
     const _d7=dFwd(null,7);
     const _d1=dFwd(null,1);
@@ -593,7 +596,7 @@ async function loadTasks(f,btn,opts){
       return getTime(a).localeCompare(getTime(b))||(a.aciklama||'').localeCompare(b.aciklama||'');
     });
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
-    const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
+    const allSubs=aktifHayvanSatirlari(all.filter(t=>!!t.parent_id&&!t.tamamlandi),'hayvan_id',_aktifIdler);
     // TEDAVI_GUN için ilaç listesi: drug_administrations + stok isim haritası
     const _allDrugAdmins=await idbGetAll('drug_administrations').catch(()=>[]);
     const _allStokItems=await idbGetAll('stok').catch(()=>[]);
