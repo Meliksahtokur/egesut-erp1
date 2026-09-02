@@ -195,7 +195,74 @@ async function ileriGebeKontrol(){
     }
   } catch(e){ toast('❌ '+e.message,true); }
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList){
+// 🍼 Süt İçen Buzağılar bandı (İleri Gebeler bandının altına eklenir) — saf, tests/unit/sut-buzagi-band.test.js
+// Aşı takibi üç kaynaktan: vaccination_schedule ('buzağı' hedefli yaş dozları — api.js pull),
+// vaccination_log (son kayıt + next_due_date yıllık rapeli), açık ASI_PLANLI görevleri (📅 planlı).
+// Kesim eşiği protokol_ayar 'sutten_kesme_gun' ile beslenir (varsayılan 60).
+function _dashSutBuzagiBandi(animals,vaccines,vaxLogs,tasks,schRows,kesimEsik,today){
+  const esik=+kesimEsik||60;
+  const _gun=(d1,d2)=>Math.floor((new Date(d1+'T00:00:00')-new Date(d2+'T00:00:00'))/86400000);
+  const _tarihEkle=(iso,g)=>{const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+g);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+  const liste=(animals||[]).map(a=>({...a,yas:a.dogum_tarihi?_gun(today,a.dogum_tarihi):null}))
+    .filter(a=>a.yas!==null&&!a.suttten_kesme_tarihi&&!(a.grup||'').includes('Sütten Kesilmiş')&&((a.grup||'').includes('Buzağı')||a.yas<=180))
+    .sort((x,y)=>y.yas-x.yas);
+  if(!liste.length) return '';
+  const vaxMap={};(vaccines||[]).forEach(v=>vaxMap[v.id]=v);
+  const sonLog=(aid,vid)=>{let b=null;(vaxLogs||[]).forEach(v=>{if(v.animal_id===aid&&v.vaccine_id===vid&&!v.ertelendi&&(!b||(v.vaccination_date||'')>(b.vaccination_date||'')))b=v;});return b;};
+  const _chip=(t,r)=>`<span style="background:${r.bg};color:${r.fg};border-radius:4px;padding:1px 5px;font-weight:700;font-size:.62rem;white-space:nowrap">${t}</span>`;
+  const OK={bg:'rgba(34,150,80,.12)',fg:'#2a9e50'},UYARI={bg:'rgba(255,160,0,.12)',fg:'#b07800'},GECIK={bg:'rgba(192,50,26,.1)',fg:'var(--red2)'},PLAN={bg:'rgba(59,130,246,.12)',fg:'#3b82f6'};
+  const schVax={};(schRows||[]).forEach(s=>{if(s.target_type==='buzağı'&&s.timing_type==='yas')(schVax[s.vaccine_id]=schVax[s.vaccine_id]||[]).push(s);});
+  Object.values(schVax).forEach(d=>d.sort((a,b)=>a.timing_days-b.timing_days));
+  let gecikVar=false;
+  const rows=liste.map((a,i)=>{
+    const chips=[],kullanilan=new Set();
+    // 1) Yaş takvimi dozları — karşılanmayan İLK doz üstünden durum (14 gün önceden görünür)
+    //    Chip üretilmeyen (uzak doz) aşı, 2. adımdaki gözlemlenen rapel takibine açık kalsın.
+    Object.entries(schVax).forEach(([vid,dose])=>{
+      const ad=String((vaxMap[vid]||{}).name||'?').replace(/ Aşısı$/,'');
+      const lg=sonLog(a.id,vid);
+      const sonraki=dose.find(s=>!(lg&&(lg.vaccination_date||'')>=_tarihEkle(a.dogum_tarihi,s.timing_days-14)));
+      let uretildi=false;
+      if(sonraki){
+        const kalan=_gun(_tarihEkle(a.dogum_tarihi,sonraki.timing_days),today);
+        if(kalan<0){gecikVar=true;chips.push(_chip(`⚠️ ${esc(ad)} ${-kalan}g gecikti`,GECIK));uretildi=true;}
+        else if(kalan<=14){chips.push(_chip(`⏰ ${esc(ad)} ${kalan}g`,UYARI));uretildi=true;}
+      }else if(lg&&lg.next_due_date){
+        const k=_gun(lg.next_due_date,today);
+        if(k<0){gecikVar=true;chips.push(_chip(`⚠️ ${esc(ad)} rapel ${-k}g gecikti`,GECIK));}
+        else if(k<=7)chips.push(_chip(`⏰ ${esc(ad)} rapel ${k}g`,UYARI));
+        else chips.push(_chip(`✓ ${esc(ad)}`,OK));
+        uretildi=true;
+      }else{chips.push(_chip(`✓ ${esc(ad)}`,OK));uretildi=true;}
+      if(uretildi)kullanilan.add(vid);
+    });
+    // 2) Zorunlu aşılar — takvimde olmayanlar yalnız kaydı varsa görünür (UI kirletmez)
+    (vaccines||[]).forEach(v=>{
+      if(!v.is_mandatory||kullanilan.has(v.id))return;
+      const lg=sonLog(a.id,v.id);if(!lg)return;
+      kullanilan.add(v.id);
+      const n=String(v.name||'?').replace(/ Aşısı$/,'');
+      if(lg.next_due_date){const k=_gun(lg.next_due_date,today);
+        if(k<0){gecikVar=true;chips.push(_chip(`⚠️ ${esc(n)} rapel ${-k}g gecikti`,GECIK));}
+        else if(k<=7)chips.push(_chip(`⏰ ${esc(n)} rapel ${k}g`,UYARI));
+        else chips.push(_chip(`✓ ${esc(n)}`,OK));
+      }else chips.push(_chip(`✓ ${esc(n)}`,OK));
+    });
+    // 3) Açık planlı aşı görevleri — kaydı olmayan aşı için 📅 planlı
+    (tasks||[]).forEach(t=>{
+      if(!t||t.tamamlandi||t.iptal||t.gorev_tipi!=='ASI_PLANLI'||t.hayvan_id!==a.id)return;
+      const v=_asiVaccineCoz(t,vaccines);if(!v||kullanilan.has(v.id))return;
+      kullanilan.add(v.id);chips.push(_chip(`📅 ${esc(v.name||'Aşı')}`,PLAN));
+    });
+    const kid=a.kupe_no||a.devlet_kupe||a.id;
+    const kesimChip=a.yas>=esik?`<span style="background:rgba(192,50,26,.1);color:var(--red2);border-radius:4px;padding:1px 5px;font-weight:700;font-size:.62rem;margin-left:4px">🍼 kesim vakti</span>`:'';
+    return `<div class="arow" onclick="openDet('${escAttr(a.id)}')"><div class="arow-left"><div class="arow-id"><span style="color:var(--ink3);font-size:.65rem;margin-right:3px">${i+1})</span>${esc(kid)}${kesimChip}</div><div class="arow-sub">${a.yas}. gün · ${esc(a.grup||'')}${a.padok?' · '+esc(a.padok):''}</div></div>${chips.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;align-items:center;flex-shrink:0;max-width:55%">${chips.join('')}</div>`:''}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+  });
+  const kesimBtn=`<button onclick="openSuttenKesModal()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🍼 Toplu Kes →</button>`;
+  const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🍼 Süt İçen Buzağılar (${liste.length}) ${kesimBtn}</span>`;
+  return band((gecikVar||liste.some(a=>a.yas>=esik))?'red':'amber',title,rows.join(''));
+}
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml){
   const _dd=ddMap||{};
   const _getDis=t=>{if(t.gorev_tipi!=='TEDAVI_GUN')return '';try{return _dd[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}};
   const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
@@ -236,6 +303,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
         return `<div class="arow" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span style="color:var(--ink3);font-size:.65rem;margin-right:3px">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
+  if(sutBuzagiHtml) h+=sutBuzagiHtml;   // 🍼 Süt İçen Buzağılar — ileri gebelerin hemen altı
   if((sessizList||[]).length){
     const sTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">❗ Sessiz Hayvanlar (${sessizList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
     const sessizTop=[...(sessizList||[])].sort((a,b)=>{const af=a.sessiz_gun>=9999?1:0,bf=b.sessiz_gun>=9999?1:0;return af-bf||b.sessiz_gun-a.sessiz_gun;});
@@ -309,6 +377,11 @@ async function loadDash(){
       return !hasK&&!hasT;
     });
     const births60D=_dogumAnneBazliTekillestir(births60F);   // ikizde anne 1 kez
+    // 🍼 Süt içen buzağılar bandı (aşı takvimi api.js pull ile senkron: vaccination_schedule)
+    let schRows=[];
+    try{ schRows=await getData('vaccination_schedule')||[]; }catch(e){ /* eski IDB sürümü — bantsız devam */ }
+    const kesimEsik=+(getState('protokol_ayar')||[]).find(x=>x.anahtar==='sutten_kesme_gun')?.deger||60;
+    const sutBuzagiBandi=_dashSutBuzagiBandi(animals,vaccines,vaxLogs,aktifTasks,schRows,kesimEsik,today);
     // Buzağı sütten kesme otomatik kontrolü
     try {
       const resBuz=await rpc('buzagi_sutten_kesme_kontrol');
@@ -328,7 +401,9 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
-    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
+    // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
+    // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
