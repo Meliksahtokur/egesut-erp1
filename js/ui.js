@@ -47,7 +47,7 @@ async function _keepScroll(contentEl,fn){
 }
 
 const _katTipMap={
-  asi:    ['ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
+  asi:    ['ASI_PLANLI','ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
   muayene:['MUAYENE','GEBELIK_KONTROL','VETERINER_KONTROL'],
   tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
@@ -284,7 +284,7 @@ async function loadDash(){
     const todayT=tasks.filter(t=>t.hedef_tarih===today&&_isTop(t));
     const d7str=dFwd(null,7);
     const d1str=dFwd(null,1);
-    const yakAsi=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE_ASI'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
+    const yakAsi=tasks.filter(t=>(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI')&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
     const yakTakviye=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d1str);
     const badge=late.length;
     const tb=document.getElementById('tbadge');
@@ -563,7 +563,7 @@ async function loadTasks(f,btn,opts){
     const _d7=dFwd(null,7);
     const _d1=dFwd(null,1);
     const _d30=dFwd(null,30);
-    if(f==='today') data=data.filter(t=>t.hedef_tarih===today||(t.gorev_tipi==='ILERI_GEBE_ASI'&&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
+    if(f==='today') data=data.filter(t=>t.hedef_tarih===today||((t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI')&&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     else if(f==='all'){
       data=data.filter(t=>t.hedef_tarih>today);
@@ -737,7 +737,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       <div class="tc-main">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
-          <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
+          <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           ${diseaseName?`<span class="pill" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2)">🏥 ${esc(diseaseName)}</span>`:''}
         </div>
         <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
@@ -746,7 +746,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:'${t.padok_hedef||''}'})">
+      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:'${t.padok_hedef||''}'})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -827,7 +827,7 @@ async function toggleSub(subId,parentId,el){
 // statik bilgi satırıdır ('⚙ form ile kapatılır'); tıklanabilir checkbox yalnız
 // plain alt görevlerde. Ana görev, hiçbir tipte açık çocuk kalmadığında kapanır —
 // aksi hâlde kapanan parent'ın açık çocukları top-level karta bölünür (analiz §2).
-const OZEL_ALT_TIPLER=['ILERI_GEBE_ASI','BESLEME','TEDAVI_GUN','TEDAVI_SEANS','TOHUMLAMA_PLANLI','SUTTEN_KESME'];
+const OZEL_ALT_TIPLER=['ASI_PLANLI','ILERI_GEBE_ASI','BESLEME','TEDAVI_GUN','TEDAVI_SEANS','TOHUMLAMA_PLANLI','SUTTEN_KESME'];
 function detayAltTiklanabilir(sub){ return !OZEL_ALT_TIPLER.includes(sub.gorev_tipi||''); }
 // Tamamla butonu etiketi: açık plain alt yoksa mevcut etiket, varsa grup sayacı.
 function detayBtnEtiketi(acikSafSayi){
@@ -4841,7 +4841,7 @@ async function openTaskDet(id){
   if(vaxSelWrap) vaxSelWrap.style.display='none';
   if(vaxSel) vaxSel.value='';
   _asiFormVaxKur(null); // önceki görevden kalan ad/doz'u temizle (stale name fix)
-  if(t.gorev_tipi==='ILERI_GEBE_ASI'||t.gorev_tipi==='ASI_RAPEL'||t.gorev_tipi==='ASI_HATIRLATMA'){
+  if(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI'||t.gorev_tipi==='ASI_RAPEL'||t.gorev_tipi==='ASI_HATIRLATMA'){
     if(tamamBtn) tamamBtn.style.display='none';
     if(asiAcBtn) asiAcBtn.style.display='block';
     try{
@@ -4850,6 +4850,8 @@ async function openTaskDet(id){
       if(vax){
         _curTaskVaccineId=vax.id;
         _asiFormVaxKur(vax);
+        // Planlı görevde planlanan doz, katalog standart dozunu ezer
+        if(t.gorev_tipi==='ASI_PLANLI'&&t.miktar){ const pd=document.getElementById('td-asi-doz'); if(pd) pd.value=t.miktar; }
       } else {
         // Aşı çözümlenemedi (manuel görev vb.) — formda seçim listesi aç, ölü nokta yok
         _curTaskVaccineId=null;
@@ -5145,7 +5147,17 @@ async function asiUygulaVeTamamla(){
     const dozRaw=document.getElementById('td-asi-doz').value;
     const doz=dozRaw?parseFloat(dozRaw):null;
     let rapelTarih=null;
-    if(_curTaskDet.gorev_tipi==='ILERI_GEBE_ASI'){
+    if(_curTaskDet.gorev_tipi==='ASI_PLANLI'){
+      // Planlı aşı: plan rezervasyonu kapatılır + gerçek uygulama yazılır (tek düşüm, atomik)
+      const res=await rpc('asi_planli_tamamla',{
+        p_gorev_id:  _curTaskDet.id,
+        p_tarih:     tarih,
+        p_doz:       doz,
+        p_vaccine_id:secilenId,
+      });
+      if(!res||res.ok===false){ toast(_trErr(res?.mesaj||'Hata'),true); return; }
+      rapelTarih=res.next_due||null;
+    } else if(_curTaskDet.gorev_tipi==='ILERI_GEBE_ASI'){
       const res=await rpc('ileri_gebe_asi_tamamla',{
         p_gorev_id:  _curTaskDet.id,
         p_vaccine_id:secilenId,

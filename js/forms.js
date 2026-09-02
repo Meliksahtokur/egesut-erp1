@@ -1099,10 +1099,34 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
 // openTaskDet, detayTamamla, detayIptal → ui.js'te tanımlı (daha tam versiyon)
 
 // Manuel görev ekle
+// ── Planlı aşı görevi: tür seçimi + aşı/doz planlayıcı ──
+// m-task-add'te tür='ASI_PLANLI' seçilince açılır (index.html onchange attr — modal router uyumu)
+async function taskAddTipDegisti(val){
+  const alani=document.getElementById('ta-asi-alani');
+  if(!alani) return;
+  if(val!=='ASI_PLANLI'){ alani.style.display='none'; return; }
+  alani.style.display='block';
+  try{
+    let vaccines=(await getData('vaccines'))||[];
+    if(!vaccines.length){ await pullTables(['vaccines']).catch(()=>{}); vaccines=(await getData('vaccines'))||[]; }
+    const sel=document.getElementById('ta-vax');
+    if(sel) sel.innerHTML='<option value="">— Aşı seçin —</option>'
+      +vaccines.map(vx=>`<option value="${escAttr(vx.id)}" data-doz="${escAttr(vx.dose||'')}">${esc(vx.name||vx.id)}${vx.dose?` · standart ${vx.dose} ${vx.unit||'ml'}`:''}</option>`).join('');
+  }catch(e){ toast('Aşı listesi yüklenemedi', true); }
+}
+// Aşı seçilince planlanan doza standart dozu yazar
+function taskAddVaxDegisti(sel){
+  const o=sel?.selectedOptions?.[0];
+  const d=document.getElementById('ta-doz');
+  if(d&&o&&o.dataset.doz) d.value=o.dataset.doz;
+}
+
 async function submitTaskAdd(btn) {
   const desc  = v('ta-desc');
   const tarih = v('ta-tarih');
-  if (!desc || !tarih) { toast('Açıklama ve Tarih zorunlu', true); return; }
+  const tip   = v('ta-tip');
+  const planli = tip==='ASI_PLANLI';
+  if (planli ? !tarih : (!desc || !tarih)) { toast(planli?'Tarih zorunlu':'Açıklama ve Tarih zorunlu', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'Oluşturuluyor…'; }
   try {
     const hid    = v('ta-hid').trim();
@@ -1111,14 +1135,35 @@ async function submitTaskAdd(btn) {
     // cron'u (gorev_orphan_temizle) görevi sessizce siliyordu
     const hayvan = hid ? hayvanByKupeRef(hid) : null; // K7: küpe eşleşmesinde aktif önce
     if (hid && !hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil — hayvan alanını boş bırakırsanız genel görev oluşur`, true); return; }
-    await write('gorev_log', {
-      id: crypto.randomUUID(), hayvan_id: hayvan?.id || null,
-      gorev_tipi: v('ta-tip'), aciklama: desc, hedef_tarih: tarih,
-      tamamlandi: false, kaynak: 'MANUEL'
-    });
-    toast('✅ Görev oluşturuldu');
+    if (planli) {
+      // Planlı aşı: aşı+doz planla, stok anında rezerve edilir (atomik RPC — ilaç modeli).
+      // Rezervasyon iptalde trigger ile iade edilir; offline kuyruğa girmez.
+      if (!navigator.onLine) { toast('⚠️ Planlı aşı için internet gerekli (stok rezervasyonu)', true); return; }
+      const vaxId = v('ta-vax');
+      const dozRaw = v('ta-doz');
+      const doz = dozRaw ? parseFloat(dozRaw) : null;
+      if (!vaxId) { toast('Aşı seçin', true); return; }
+      if (!doz || doz <= 0) { toast('Geçerli doz girin (ml)', true); return; }
+      if (!hayvan) { toast('Planlı aşı görevi için küpe zorunlu', true); return; }
+      const res = await rpc('asi_gorev_planla', {
+        p_hayvan_id: hayvan.id, p_vaccine_id: vaxId, p_doz: doz,
+        p_tarih: tarih, p_aciklama: desc || null,
+      });
+      if (!res || res.ok === false) { toast(getUserMessage(res?.mesaj || 'Hata'), true); return; }
+      toast('✅ Planlı aşı görevi oluşturuldu — stok rezerve edildi');
+    } else {
+      await write('gorev_log', {
+        id: crypto.randomUUID(), hayvan_id: hayvan?.id || null,
+        gorev_tipi: tip, aciklama: desc, hedef_tarih: tarih,
+        tamamlandi: false, kaynak: 'MANUEL'
+      });
+      toast('✅ Görev oluşturuldu');
+    }
     closeM('m-task-add');
-    ['ta-hid','ta-desc'].forEach(cl);
+    ['ta-hid','ta-desc','ta-doz'].forEach(cl);
+    const tv=document.getElementById('ta-vax'); if(tv) tv.value='';
+    const tt=document.getElementById('ta-tip'); if(tt) tt.value='MANUEL'; // tekrar açılışta bayat seçim
+    taskAddTipDegisti('');
     await loadTasks(_curTaskFilter || 'today');
     loadDash();
   } catch (e) { toast(getUserMessage(e), true); }
@@ -1132,6 +1177,10 @@ async function submitTaskEdit(btn) {
   if (!desc || !tarih) { toast('Açıklama ve Tarih zorunlu', true); return; }
   const t=_curTaskDet;
   const tip=v('te-tip');
+  // Planlı aşı görevinin türü değiştirilemez — aktif stok rezervasyonu boşa düşer.
+  if(t.gorev_tipi==='ASI_PLANLI' && tip!=='ASI_PLANLI'){
+    toast('⚠️ Planlı aşı görevinin türü değiştirilemez — iptal edip yeniden oluşturun (stok iade edilir)', true); return;
+  }
   const degisen={};
   if(t.aciklama!==desc) degisen.aciklama=desc;
   if(t.hedef_tarih!==tarih) degisen.hedef_tarih=tarih;
@@ -1140,7 +1189,7 @@ async function submitTaskEdit(btn) {
     toast('Hiçbir değişiklik yapılmadı'); return;
   }
   // Diff mesajı oluştur
-  const tipEtiket={MANUEL:'📋 Genel',TEDAVI:'🚑 Tedavi',ILAC_UYGULAMA:'💊 İlaç',PADOK_DEGISIM:'🐄 Padok',MUAYENE:'🩺 Muayene',ILERI_GEBE_ASI:'💉 Aşı',ILERI_GEBE:'💊 Takviye',SUTTEN_KESME:'🍼 Sütten',DIGER:'📂 Diğer'};
+  const tipEtiket={MANUEL:'📋 Genel',TEDAVI:'🚑 Tedavi',ILAC_UYGULAMA:'💊 İlaç',PADOK_DEGISIM:'🐄 Padok',MUAYENE:'🩺 Muayene',ASI_PLANLI:'💉 Aşı (Planlı)',ILERI_GEBE_ASI:'💉 Aşı (İleri Gebe)',ILERI_GEBE:'💊 Takviye',SUTTEN_KESME:'🍼 Sütten',DIGER:'📂 Diğer'};
   const diffSatirlari=[];
   if('aciklama' in degisen) diffSatirlari.push('📝 Açıklama: "'+(t.aciklama||'')+'" → "'+desc+'"');
   if('hedef_tarih' in degisen) diffSatirlari.push('📅 Tarih: '+(t.hedef_tarih||'')+' → '+tarih);

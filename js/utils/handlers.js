@@ -129,6 +129,9 @@ registerActions({
   'pa-chip':             (el) => protokolAyarKaydet(el.dataset.anahtar, el.dataset.deger),
   'open-animal-modal':   () => openM('m-animal'),
   'open-task-add-modal': () => openM('m-task-add'),
+  // m-task-add küpe autocomplete (m-vaccine'deki acHayvan deseninin aynısı)
+  'taskadd-focus':   (el) => acHayvan('ta-hid', 'ac-tahid'),
+  'taskadd-keydown': (opts) => acNav(opts.event, 'ac-tahid'),
   'commit-pending':      () => loadTasks(),   // argümansız → _curTaskFilter; loadTasks başı flushPendingDone yapar
   'cancel-pending':      () => cancelPendingDone(),
   'open-stok-panel':     () => openStokPanel(),
