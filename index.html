@@ -1525,21 +1525,32 @@ button,input,select,textarea{font-family:inherit}
 <div id="m-task-add" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div><div class="m-title">📋 Manuel Görev Ekle</div>
     <div class="m-body">
-      <div class="fg"><label class="flbl">Hayvan Küpesi</label><input id="ta-hid" class="fi" placeholder="Küpe no (opsiyonel)" autocomplete="off"></div>
+      <div class="fg"><label class="flbl">Hayvan Küpesi</label><input id="ta-hid" class="fi" placeholder="Küpe no (opsiyonel)" autocomplete="off"
+        data-input="taskadd-focus" data-focus="taskadd-focus" data-keydown="taskadd-keydown" data-action="taskadd-focus">
+        <div id="ac-tahid" class="ac-box" style="display:none"></div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir</div></div>
       <div class="fg"><label class="flbl">Görev Açıklaması *</label><textarea id="ta-desc" class="fta" placeholder="Yapılacak iş…"></textarea></div>
       <div class="fg"><label class="flbl">Hedef Tarih *</label><input id="ta-tarih" class="fi" type="date"></div>
       <div class="fg"><label class="flbl">Görev Türü</label>
-        <select id="ta-tip" class="fsel">
+        <select id="ta-tip" class="fsel" onchange="taskAddTipDegisti(this.value)">
           <option value="MANUEL">📋 Genel Görev</option>
           <option value="TEDAVI">🚑 Tedavi</option>
           <option value="ILAC_UYGULAMA">💊 İlaç Uygulama</option>
           <option value="PADOK_DEGISIM">🐄 Padok Geçişi</option>
           <option value="MUAYENE">🩺 Muayene</option>
-          <option value="ILERI_GEBE_ASI">💉 Aşı</option>
+          <option value="ASI_PLANLI">💉 Aşı (Planlı)</option>
           <option value="ILERI_GEBE">💊 Takviye</option>
           <option value="SUTTEN_KESME">🍼 Sütten Kesme</option>
           <option value="DIGER">📂 Diğer</option>
         </select>
+      </div>
+      <!-- Planlı aşı: aşı + doz planlaması (stok plan anında rezerve edilir, ilaç modeli) -->
+      <div class="fg" id="ta-asi-alani" style="display:none">
+        <label class="flbl">Aşı *</label>
+        <select id="ta-vax" class="fsel" style="margin-bottom:6px" onchange="taskAddVaxDegisti(this)"></select>
+        <label class="flbl" style="margin-top:4px">Planlanan Doz (ml) *</label>
+        <input id="ta-doz" class="fi" type="number" step="0.5" min="0.5" placeholder="Aşı seçilince standart doz gelir">
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Stok görev oluşturulurken rezerve edilir; görev iptal edilirse iade edilir</div>
       </div>
       <button class="btn btn-g" data-action="submit-task-add">Görev Oluştur</button>
       <button class="btn btn-o" data-action="close-task-add">İptal</button>
@@ -1826,7 +1837,8 @@ button,input,select,textarea{font-family:inherit}
           <option value="ILAC_UYGULAMA">💊 İlaç Uygulama</option>
           <option value="PADOK_DEGISIM">🐄 Padok Geçişi</option>
           <option value="MUAYENE">🩺 Muayene</option>
-          <option value="ILERI_GEBE_ASI">💉 Aşı</option>
+          <option value="ASI_PLANLI">💉 Aşı (Planlı)</option>
+          <option value="ILERI_GEBE_ASI">💉 Aşı (İleri Gebe)</option>
           <option value="ILERI_GEBE">💊 Takviye</option>
           <option value="SUTTEN_KESME">🍼 Sütten Kesme</option>
           <option value="DIGER">📂 Diğer</option>

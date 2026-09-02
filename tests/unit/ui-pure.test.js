@@ -24,8 +24,9 @@ const escAttrMirror = (s) => String(s ?? '')
   .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // Tam modülü BİR KEZ yükle (8k satır derleme maliyeti), sandbox'ı testlerde yeniden kullan.
-const { sandbox } = loadBrowserModule('js/ui.js', {
+const { sandbox, exposed } = loadBrowserModule('js/ui.js', {
   extra: { esc: escMirror, escAttr: escAttrMirror, fmtTarih },
+  expose: ['_katTipMap', 'OZEL_ALT_TIPLER'],
 });
 const {
   yasHesapla, band, _dashVacAlerts, _yeniDogumGun,
@@ -475,4 +476,16 @@ test('_asiVaccineCoz: boş/eksik girişler → null', () => {
   assert.equal(_asiVaccineCoz({ stok_id: null, aciklama: '   ' }, VAX_ORNEK), null);
   assert.equal(_asiVaccineCoz({ aciklama: 'Coglavax (rapel)' }, []), null);
   assert.equal(_asiVaccineCoz({ aciklama: 'Coglavax (rapel)' }, undefined), null);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// ASI_PLANLI tip entegrasyonu (planlı aşı görevi, 2026-09-02)
+// Bu iki liste; filtre görünürlüğü ve 'düz PATCH ile kapanamaz'
+// korumasının tek savunma hattı — unutulursa rezervasyon atlanır.
+// ═══════════════════════════════════════════════════════════════
+test('_katTipMap.asi ASI_PLANLI içerir (görev filtresi)', () => {
+  assert.ok(exposed._katTipMap.asi.includes('ASI_PLANLI'));
+});
+test('OZEL_ALT_TIPLER ASI_PLANLI içerir (düz PATCH koruması)', () => {
+  assert.ok(exposed.OZEL_ALT_TIPLER.includes('ASI_PLANLI'));
 });
