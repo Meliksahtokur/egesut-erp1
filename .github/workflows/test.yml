@@ -150,6 +150,103 @@ jobs:
           path: .playwright/
           retention-days: 7
 
+  # 2026-09-02 idle/ci-saglamlastirma: demo-pause dayanıklılığı.
+  # 2026-09-01'de demo Supabase projesi free-tier pause'a girdi (DNS NXDOMAIN) → demo-mode
+  # koşumları açılışta asılı kaldı. Bu job: health check (HTTP kodu) ile demo gerçek backend
+  # (workers=1, TEK job — free-tier paralel yük kaldırmıyor: paralel=23 fail, serial=64/0/3)
+  # ya da pause durumunda stub-backend fallback (PLAYWRIGHT_STUB_BACKEND=1; DB-bağımlı
+  # e2e.spec testleri 2.01/2.03/3.02 stub'da kendiliğinden skip) arasında seçim yapar.
+  # Not: DEMO_ANON_KEY secret'ı repoda tanımlı değilse key'siz kontrol yapılır — HTTP 401
+  # dahi projenin ayakta (pause değil) olduğunu kanıtlar; 000/NXDOMAIN → stub fallback.
+  # Kullanıcının secret ekleme notu: .claude/idle-reports/2026-09-02-ci-saglamlastirma.md
+  demo-e2e:
+    name: E2E Demo (health-gated, stub fallback)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Demo health check
+        id: demo
+        env:
+          DEMO_ANON_KEY: ${{ secrets.DEMO_ANON_KEY }}
+        run: |
+          # status: ok = 2xx (key ile doğrulanmış) · alive = başka HTTP yanıtı
+          # (key'siz 401 dahil — DNS+gateway ayakta, pause değil) · down = 000 (pause/NXDOMAIN)
+          code=000
+          for attempt in 1 2 3; do
+            if [ -n "$DEMO_ANON_KEY" ]; then
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+                -H "apikey: $DEMO_ANON_KEY" \
+                https://vtzqjmazsvurxdeondmi.supabase.co/rest/v1/ || true)
+            else
+              echo "::warning::DEMO_ANON_KEY secret tanımlı değil — key'siz health check (HTTP 401 dahi 'ayakta' sayılır). Repo secret'larına DEMO_ANON_KEY eklenmesi önerilir."
+              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+                https://vtzqjmazsvurxdeondmi.supabase.co/rest/v1/ || true)
+            fi
+            [ "$code" != "000" ] && break
+            [ "$attempt" != "3" ] && sleep 5
+          done
+          case "$code" in
+            000) status=down ;;
+            2*)  status=ok ;;
+            *)   status=alive ;;
+          esac
+          echo "Demo health: HTTP $code -> $status"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Run E2E (demo gerçek backend)
+        if: steps.demo.outputs.status != 'down'
+        env:
+          PLAYWRIGHT_DEMO_MODE: '1'
+        run: |
+          npx playwright test \
+            --reporter=list \
+            --workers=1 \
+            --timeout=30000
+
+      - name: Run E2E (stub fallback — demo paused/NXDOMAIN)
+        if: steps.demo.outputs.status == 'down'
+        env:
+          PLAYWRIGHT_DEMO_MODE: '1'
+          PLAYWRIGHT_STUB_BACKEND: '1'
+        run: |
+          npx playwright test \
+            --reporter=list \
+            --workers=1 \
+            --timeout=30000
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-e2e-demo
+          path: tests/report/
+          retention-days: 7
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace-e2e-demo
+          path: .playwright/
+          retention-days: 7
+
   smoke-test:
     name: Smoke Test (9 critical checks)
     runs-on: ubuntu-latest
