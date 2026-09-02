@@ -746,7 +746,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:'${t.padok_hedef||''}'})">
+      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -1876,7 +1876,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
   let extra='';
   if(anneKupe) extra+=`<div style="background:var(--card2);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem">
     <span style="color:var(--ink3)">Anne: </span>
-    <span onclick="openDet('${a.anne_id}')" style="font-weight:700;color:var(--blue);cursor:pointer">📌 ${anneKupe}</span>
+    <span onclick="openDet('${a.anne_id}')" style="font-weight:700;color:var(--blue);cursor:pointer">📌 ${esc(anneKupe)}</span>
   </div>`;
   const kardesler=_kardeslerBul(getState('animals'),a);
   if(kardesler.length) extra+=`<div data-kardes-row style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.35);border-radius:10px;padding:9px 12px;margin-bottom:8px;font-size:.8rem;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -1902,7 +1902,7 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
       <div class="ss-item"><div class="ss-val">${tasks.length+subs.length}</div><div class="ss-lbl">Bekl. Görev</div></div>
     </div>
     <div class="info-grid">
-      ${infoFields.map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${i.v}</div></div>`).join('')}
+      ${infoFields.map(i=>`<div class="ig-item"><div class="ig-lbl">${i.l}</div><div class="ig-val">${esc(i.v)}</div></div>`).join('')}
     </div>
     ${extra}
     ${(!a.suttten_kesme_tarihi && a.grup && a.grup.includes('Buzağı')) ? `<button class="btn" data-action="sutten-kes-tekil" data-hid="${a.id}" style="margin-top:4px;padding:9px;background:rgba(78,154,42,.12);color:var(--green3);border:1px solid rgba(78,154,42,.35);font-weight:700">🍼 Sütten Kes</button>` : ''}
@@ -1933,17 +1933,17 @@ function _detUremeHtml(a,tohs,kizgs){
   let h=`<div style="padding:10px 0 6px;display:flex;gap:6px;flex-wrap:wrap">`;
   if(gebeTohumlama){
     h+=`<button class="btn" style="flex:1;padding:9px;background:rgba(192,50,26,.1);color:var(--red);font-weight:700" onclick="abortKaydet('${a.id}','${gebeTohumlama.id}')">⚠️ Abort / Erken Doğum</button>`;
-    h+=`<button class="btn btn-g" style="flex:1;padding:9px;font-weight:700" onclick="dogumYaptiAc('${a.id}','${hid}','${gebeTohumlama.tarih}','${gebeTohumlama.sperma||''}')">🐄 Doğum Yaptı</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px;font-weight:700" data-hid="${escAttr(hid)}" data-sperma="${escAttr(gebeTohumlama.sperma||'')}" onclick="dogumYaptiAc('${a.id}',this.dataset.hid,'${gebeTohumlama.tarih}',this.dataset.sperma)">🐄 Doğum Yaptı</button>`;
   } else if(bekleyenToh){
     const _tohGun=Math.floor((Date.now()-new Date(bekleyenToh.tarih))/86400000);
-    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Tohumlama Ekle</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px" data-hid="${escAttr(hid)}" onclick="openInsemSafe(this.dataset.hid)">💉 Tohumlama Ekle</button>`;
     if(_tohGun>=0&&_tohGun<=15){
-      h+=`<button class="btn" style="flex:1;padding:9px;font-weight:700;background:var(--purple);color:#fff;border:none" onclick="openTekrarAsim('${a.id}','${hid}')">🔁 Tekrar Aşım</button>`;
+      h+=`<button class="btn" style="flex:1;padding:9px;font-weight:700;background:var(--purple);color:#fff;border:none" data-hid="${escAttr(hid)}" onclick="openTekrarAsim('${a.id}',this.dataset.hid)">🔁 Tekrar Aşım</button>`;
     }
   } else if(dogumYaptiToh){
-    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Yeni Tohumlama Ekle</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px" data-hid="${escAttr(hid)}" onclick="openInsemSafe(this.dataset.hid)">💉 Yeni Tohumlama Ekle</button>`;
   } else {
-    h+=`<button class="btn btn-g" style="flex:1;padding:9px" onclick="openInsemSafe('${hid}')">💉 Tohumlama Ekle</button>`;
+    h+=`<button class="btn btn-g" style="flex:1;padding:9px" data-hid="${escAttr(hid)}" onclick="openInsemSafe(this.dataset.hid)">💉 Tohumlama Ekle</button>`;
   }
   h+='</div>';
   if(gebeBilgi) h+=`<div style="background:rgba(78,154,42,.08);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:.8rem;color:var(--ink2)"><b style="color:var(--green)">🤰 Gebe</b> — ${gebeBilgi}</div>`;
@@ -2095,13 +2095,13 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
   const activeCaseChips=activeCases.length
     ?`<div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px">`+activeCases.map(c=>{
         const dis=allDiseasesList.find(d=>d.id===c.disease_id);
-        return `<div onclick="openCaseDet('${c.id}')" style="cursor:pointer;background:rgba(192,50,26,.1);border:1.5px solid var(--red);border-radius:10px;padding:6px 10px;font-size:.78rem;font-weight:700;color:var(--red)">🏥 ${dis?.name||'?'}</div>`;
+        return `<div onclick="openCaseDet('${c.id}')" style="cursor:pointer;background:rgba(192,50,26,.1);border:1.5px solid var(--red);border-radius:10px;padding:6px 10px;font-size:.78rem;font-weight:700;color:var(--red)">🏥 ${esc(dis?.name||'?')}</div>`;
       }).join('')+`</div>`
     :'';
   const _caseListHtml=await renderCasesForAnimal(a.id);
   const vaxButton = `<div style="padding:6px 0 6px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-disease','d-hid','${escAttr(a.kupe_no||a.devlet_kupe||a.id)}')">🏥 Vaka Aç</button>
-    <button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-vaccine','v-hid','${escAttr(a.kupe_no||a.devlet_kupe||a.id)}')">💉 Aşı Uygula</button>
+    <button class="btn btn-g" style="padding:9px" data-kupe="${escAttr(a.kupe_no||a.devlet_kupe||a.id)}" onclick="openMWithHayvan('m-disease','d-hid',this.dataset.kupe)">🏥 Vaka Aç</button>
+    <button class="btn btn-g" style="padding:9px" data-kupe="${escAttr(a.kupe_no||a.devlet_kupe||a.id)}" onclick="openMWithHayvan('m-vaccine','v-hid',this.dataset.kupe)">💉 Aşı Uygula</button>
     <button class="btn btn-o" style="padding:9px;grid-column:1/-1" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı İlaç/Vitamin Uygula</button>
   </div>`;
 
@@ -2177,7 +2177,7 @@ function _detGorevHtml(a,tasks,subs,today){
   const liste=allTop.length
     ?allTop.map(t=>{ const ts=subs.filter(s=>s.parent_id===t.id); const _stateMid=t.hedef_tarih===today?'soon':''; const state=t.hedef_tarih<today?'late':_stateMid; return renderTask(t,state,ts); }).join('')
     :'<div class="empty"><div class="empty-ico">✅</div>Bekleyen görev yok</div>';
-  return `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openMWithHayvan('m-task-add','ta-hid','${kupe}')">➕ Görev Ekle</button></div>`+liste;
+  return `<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" data-kupe="${escAttr(kupe)}" onclick="openMWithHayvan('m-task-add','ta-hid',this.dataset.kupe)">➕ Görev Ekle</button></div>`+liste;
 }
 async function openDet(id, keepTab){
   _detOpenId=id;
@@ -2735,9 +2735,9 @@ async function _uremeKizginlik(el){
       <div style="display:flex;gap:3px;flex-shrink:0;align-items:center">
         ${showAct?`
           <button style="background:var(--blue);color:#fff;padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700"
-            onclick="event.stopPropagation();globalThis._insemKizginlikId='${k.id}';openInsemSafe('${kupe}')">💉 Tohumla</button>
+            data-kupe="${escAttr(kupe)}" onclick="event.stopPropagation();globalThis._insemKizginlikId='${k.id}';openInsemSafe(this.dataset.kupe)">💉 Tohumla</button>
           <button style="background:rgba(42,107,181,.15);color:var(--blue);padding:2px 5px;font-size:.62rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;white-space:nowrap"
-            onclick="event.stopPropagation();kizginlikTedaviAc('${k.id}','${kupe}')">🏥 Tedavi</button>
+            data-kupe="${escAttr(kupe)}" onclick="event.stopPropagation();kizginlikTedaviAc('${k.id}',this.dataset.kupe)">🏥 Tedavi</button>
         `:''}
         <button style="background:rgba(192,50,26,.1);color:var(--red2);padding:2px 5px;font-size:.6rem;border-radius:4px;border:none;cursor:pointer;font-weight:700;line-height:1"
           onclick="event.stopPropagation();kizginlikSil('${k.id}')">🗑️</button>
@@ -3746,30 +3746,36 @@ async function _renderIlacSiniflari(el){
 async function _dcAddGroup(){
   const name=prompt('Yeni grup adı:');
   if(!name||!name.trim()) return;
-  await rpcOptimistic('drug_class_ekle',{p_group_name:name.trim(),p_class_name:'Genel',p_active_ingredient:'(tanımsız)'});
-  toast('Grup eklendi');
-  loadTanimlarPanel();
+  try{
+    await rpcOptimistic('drug_class_ekle',{p_group_name:name.trim(),p_class_name:'Genel',p_active_ingredient:'(tanımsız)'});
+    toast('Grup eklendi');
+    loadTanimlarPanel();
+  }catch(e){/* rpcOptimistic toast bastı — sessiz geç */}
 }
 
 async function _dcAddClass(grp){
   const name=prompt('Yeni alt grup adı:');
   if(!name||!name.trim()) return;
-  await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:name.trim(),p_active_ingredient:'(tanımsız)'});
-  toast('Alt grup eklendi');
-  loadTanimlarPanel();
+  try{
+    await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:name.trim(),p_active_ingredient:'(tanımsız)'});
+    toast('Alt grup eklendi');
+    loadTanimlarPanel();
+  }catch(e){/* rpcOptimistic toast bastı — sessiz geç */}
 }
 
 async function _dcAddIngredient(grp,cls){
   const name=prompt('Yeni etken madde adı:');
   if(!name||!name.trim()) return;
-  const allDC=await idbGetAll('drug_classes');
-  const sameGrp=allDC.find(dc=>dc.group_name===grp);
-  const katId=sameGrp?sameGrp.kategori_id:null;
-  await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:cls,p_active_ingredient:name.trim(),p_kategori_id:katId});
-  const placeholder=allDC.find(dc=>dc.group_name===grp&&dc.class_name===cls&&dc.active_ingredient==='(tanımsız)');
-  if(placeholder) await rpcOptimistic('drug_class_sil',{p_id:placeholder.id});
-  toast('Etken madde eklendi');
-  loadTanimlarPanel();
+  try{
+    const allDC=await idbGetAll('drug_classes');
+    const sameGrp=allDC.find(dc=>dc.group_name===grp);
+    const katId=sameGrp?sameGrp.kategori_id:null;
+    await rpcOptimistic('drug_class_ekle',{p_group_name:grp,p_class_name:cls,p_active_ingredient:name.trim(),p_kategori_id:katId});
+    const placeholder=allDC.find(dc=>dc.group_name===grp&&dc.class_name===cls&&dc.active_ingredient==='(tanımsız)');
+    if(placeholder) await rpcOptimistic('drug_class_sil',{p_id:placeholder.id});
+    toast('Etken madde eklendi');
+    loadTanimlarPanel();
+  }catch(e){/* rpcOptimistic toast bastı — sessiz geç */}
 }
 
 async function _dcEditInline(level,grp,cls){
@@ -3802,9 +3808,12 @@ async function _dcEditIngredient(id){
   if(!dc) return;
   const newName=prompt('Etken madde adını düzenle:',dc.active_ingredient);
   if(!newName||!newName.trim()||newName.trim()===dc.active_ingredient) return;
-  await rpcOptimistic('drug_class_guncelle',{p_id:id,p_active_ingredient:newName.trim()});
-  toast('Güncellendi');
-  loadTanimlarPanel();
+  try{
+    await rpcOptimistic('drug_class_guncelle',{p_id:id,p_active_ingredient:newName.trim()});
+    toast('Güncellendi');
+    loadTanimlarPanel();
+  }catch(e){/* rpcOptimistic toast bastı — sessiz geç */
+  }
 }
 
 async function _dcDeleteGroup(grp){
@@ -3850,9 +3859,11 @@ async function _dcDeleteIngredient(id){
     return;
   }
   if(!confirm('Bu etken maddeyi silmek istediğinize emin misiniz?')) return;
-  await rpcOptimistic('drug_class_sil',{p_id:id});
-  toast('Silindi');
-  loadTanimlarPanel();
+  try{
+    await rpcOptimistic('drug_class_sil',{p_id:id});
+    toast('Silindi');
+    loadTanimlarPanel();
+  }catch(e){/* rpcOptimistic toast bastı — sessiz geç */}
 }
 
 async function _renderKategoriler(el){
@@ -4227,16 +4238,20 @@ async function _kategoriSave(id){
   const tip=document.getElementById('tef-kat-tip')?.value||'genel';
   if(!ad){toast('Kategori adı zorunlu','warn');return;}
   const isNew=id==='new';
-  await rpcOptimistic(isNew?'kategori_ekle':'kategori_guncelle',
-    isNew?{p_ad:ad,p_tip:tip}:{p_id:id,p_new_ad:ad,p_tip:tip});
-  loadTanimlarPanel();
+  try{
+    await rpcOptimistic(isNew?'kategori_ekle':'kategori_guncelle',
+      isNew?{p_ad:ad,p_tip:tip}:{p_id:id,p_new_ad:ad,p_tip:tip});
+    loadTanimlarPanel();
+  }catch(e){/* rpcOptimistic toast bastı — sessiz geç */}
 }
 
 async function _kategoriDelete(id){
   if(!confirm('Bu kategoriyi silmek istediğinize emin misiniz?')) return;
-  await rpcOptimistic('kategori_sil',{p_id:id});
-  toast('Kategori silindi');
-  loadTanimlarPanel();
+  try{
+    await rpcOptimistic('kategori_sil',{p_id:id});
+    toast('Kategori silindi');
+    loadTanimlarPanel();
+  }catch(e){/* rpcOptimistic toast bastı — sessiz geç */}
 }
 
 let _ilacKatAdlari=null;
@@ -7463,15 +7478,15 @@ function renderPadokDolulukBar() {
     const kap = p.kapasite;
     const padokAdi = (p.ad || '').replace(' Padok', '');
     if (!kap) {
-      return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${esc(p.ad)}')" title="${p.ad}: ${dolu} hayvan">
-        <span class="pdoluluk-ad">${padokAdi}</span>
+      return `<div class="pdoluluk-chip" data-ad="${escAttr(p.ad)}" onclick="setPadokFiltreBt('${p.id}',this.dataset.ad)" title="${escAttr(p.ad)}: ${dolu} hayvan">
+        <span class="pdoluluk-ad">${esc(padokAdi)}</span>
         <span class="pdoluluk-sayi">${dolu}</span>
       </div>`;
     }
     const yuzde = Math.round((dolu / kap) * 100);
     const renk = yuzde >= 100 ? 'var(--red)' : yuzde >= 80 ? 'var(--amber)' : 'var(--green)';
-    return `<div class="pdoluluk-chip" onclick="setPadokFiltreBt('${p.id}','${esc(p.ad)}')" title="${p.ad}: ${dolu}/${kap}">
-      <span class="pdoluluk-ad">${padokAdi}</span>
+    return `<div class="pdoluluk-chip" data-ad="${escAttr(p.ad)}" onclick="setPadokFiltreBt('${p.id}',this.dataset.ad)" title="${escAttr(p.ad)}: ${dolu}/${kap}">
+      <span class="pdoluluk-ad">${esc(padokAdi)}</span>
       <div class="pdoluluk-bar-wrap"><div class="pdoluluk-fill" style="width:${Math.min(yuzde,100)}%;background:${renk}"></div></div>
       <span class="pdoluluk-sayi" style="color:${renk}">${dolu}/${kap}</span>
     </div>`;

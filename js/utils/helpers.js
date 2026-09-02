@@ -87,8 +87,11 @@ function esc(str) {
   div.textContent = str || '';
   return div.innerHTML;
 }
-// HTML attribute / JS string literal context için escape — esc() tek/çift tırnak kaçırmaz,
-// bu yüzden onclick="fn('${değer}')" kalıbında KULLANILAMAZ. escAttr() hem ' hem " hem &<> kaçırır.
+// Yalnız HTML attribute bağlamı için escape (data-x="…" title="…" value="…" vb.).
+// esc() tırnak kaçırmaz; ama escAttr DA onclick="fn('${escAttr(v)}')" kalıbında ÇALIŞMAZ:
+// HTML parser attribute değerini entity-decode edip JS motoruna verir, &#39; → ' string'i kırar
+// (ampirik kanıt: 2026-09-02 kod-temizlik raporu §0). Metin değerli onclick argümanları için
+// data-x="${escAttr(v)}" + this.dataset.x deseni kullan (AGENTS.md modal-router kuralı).
 function escAttr(str) {
   return String(str ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
