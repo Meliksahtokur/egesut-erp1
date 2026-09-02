@@ -127,8 +127,10 @@ function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
     <div class="sc ${badge>0?'alert':_taskCls}" onclick="goTo('tasks')"><div class="sv">${tasks.length}</div><div class="sl">Bekleyen Görev ›</div></div>
   </div>`;
 }
-function _dashVacAlerts(today,vaxLogs,vaccines){
+function _dashVacAlerts(today,vaxLogs,vaccines,aktifIdler){
   if(!vaxLogs||!vaxLogs.length) return '';
+  // T3: hayvanı sürüden çıkmış aşı hatırlatmalarını düşür (param verilmişse)
+  const _aktif=aktifIdler?new Set(aktifIdler):null;
   // Keep only latest non-dismissed entry per (animal_id, vaccine_id)
   const latestMap = {};
   vaxLogs
@@ -138,7 +140,7 @@ function _dashVacAlerts(today,vaxLogs,vaccines){
       const key = v.animal_id + '|' + v.vaccine_id;
       if (!latestMap[key]) latestMap[key] = v;
     });
-  const withDue = Object.values(latestMap).filter(v => v.next_due_date);
+  const withDue = Object.values(latestMap).filter(v => v.next_due_date&&(!_aktif||_aktif.has(v.animal_id)));
   if(!withDue.length) return '';
 
   const vaxMap={};
@@ -284,7 +286,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   }
   if(births60.length){
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
-      births60.map(b=>`<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${escAttr(b.anne_id)}')"><div class="arow-left"><div class="arow-id">${esc(b.anne_id)}</div><div class="arow-sub">${esc(b.tarih)} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button style="font-size:.65rem;font-weight:700;color:var(--red2);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap" onclick="event.stopPropagation();kizginlikYoktu('${escAttr(b.anne_id)}','${escAttr(b.id||'')}')">✕</button></div>`).join(''));
+      births60.map(b=>{const _an=aMap&&aMap[b.anne_id];const _kid=(_an&&(_an.kupe_no||_an.devlet_kupe))||b.anne_id;return `<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${escAttr(b.anne_id)}')"><div class="arow-left"><div class="arow-id">${esc(_kid)}</div><div class="arow-sub">${esc(b.tarih)} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button style="font-size:.65rem;font-weight:700;color:var(--red2);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap" onclick="event.stopPropagation();kizginlikYoktu('${escAttr(b.anne_id)}','${escAttr(b.id||'')}')">✕</button></div>`;}).join(''));
   }
   if((ileriGebeler||[]).length){
     const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
@@ -348,20 +350,28 @@ async function loadDash(){
     // parent_id olan ama parent'ı tamamlanmış görevler de top-level sayılır
     const _activePids=new Set(tasks.map(t=>t.id));
     const _isTop=t=>!t.parent_id||!_activePids.has(t.parent_id);
-    const late=tasks.filter(t=>t.hedef_tarih<today&&_isTop(t));
-    const todayT=tasks.filter(t=>t.hedef_tarih===today&&_isTop(t));
+    // T3: sürüden çıkan (durum≠Aktif / cop_kutusu) hayvan hiçbir bantta görünmesin.
+    // Çıkışta trigger görevleri iptal eder; bu satırlar IDB gecikmesine karşı güvenlik ağı.
+    // animals boşsa (pull hatası) null → filtre devre dışı (eski davranış, tümünü gizleme)
+    const aktifIdler=animals.length?new Set(animals.map(a=>a.id)):null;
+    const aktifTasks=aktifHayvanSatirlari(tasks,'hayvan_id',aktifIdler);
+    const late=aktifTasks.filter(t=>t.hedef_tarih<today&&_isTop(t));
+    const todayT=aktifTasks.filter(t=>t.hedef_tarih===today&&_isTop(t));
     const d7str=dFwd(null,7);
     const d1str=dFwd(null,1);
-    const yakAsi=tasks.filter(t=>(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI')&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
-    const yakTakviye=tasks.filter(t=>t.gorev_tipi==='ILERI_GEBE'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d1str);
+    const yakAsi=aktifTasks.filter(t=>(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI')&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d7str);
+    const yakTakviye=aktifTasks.filter(t=>t.gorev_tipi==='ILERI_GEBE'&&_isTop(t)&&t.hedef_tarih>today&&t.hedef_tarih<=d1str);
     const badge=late.length;
     const tb=document.getElementById('tbadge');
     if(tb){ tb.textContent=badge>99?'99+':badge; tb.style.display=badge>0?'flex':'none'; }
     const aMap={}; animals.forEach(a=>aMap[a.id]=a);
-    const nearBirth=gebeTohs.filter(t=>{ if(!t.tarih)return false; const d=Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000); return d>=0&&d<=7; });
+    // T3: Gebe sayacı + Yaklaşan Doğumlar bandı yalnız aktif annelerden
+    const gebeTohsA=aktifHayvanSatirlari(gebeTohs,'hayvan_id',aktifIdler);
+    const nearBirth=gebeTohsA.filter(t=>{ if(!t.tarih)return false; const d=Math.floor((new Date(t.tarih).getTime()+280*86400000-Date.now())/86400000); return d>=0&&d<=7; });
     const ileriGebeler=window.__ileriGebeListesi||[];
-    // Filter births60: hide if kizginlik or tohumlama recorded after birth
-    const births60F=births60.filter(b=>{
+    // Filter births60: annesi sürüden çıkmışsa gösterme; kizginlik/tohumlama
+    // kaydı doğumdan sonraysa gösterme
+    const births60F=aktifHayvanSatirlari(births60,'anne_id',aktifIdler).filter(b=>{
       const hasK=allKizginlik.some(k=>k.hayvan_id===b.anne_id&&k.tarih>=b.tarih);
       const hasT=allTohum.some(t=>t.hayvan_id===b.anne_id&&t.tarih>=b.tarih);
       return !hasK&&!hasT;
@@ -371,7 +381,7 @@ async function loadDash(){
     let schRows=[];
     try{ schRows=await getData('vaccination_schedule')||[]; }catch(e){ /* eski IDB sürümü — bantsız devam */ }
     const kesimEsik=+(getState('protokol_ayar')||[]).find(x=>x.anahtar==='sutten_kesme_gun')?.deger||60;
-    const sutBuzagiBandi=_dashSutBuzagiBandi(animals,vaccines,vaxLogs,tasks,schRows,kesimEsik,today);
+    const sutBuzagiBandi=_dashSutBuzagiBandi(animals,vaccines,vaxLogs,aktifTasks,schRows,kesimEsik,today);
     // Buzağı sütten kesme otomatik kontrolü
     try {
       const resBuz=await rpc('buzagi_sutten_kesme_kontrol');
@@ -391,7 +401,9 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
-    const h=_dashStatRow(animals,gebeTohs,diseases,tasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi)+_dashVacAlerts(today,vaxLogs,vaccines);
+    // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
+    // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
@@ -633,6 +645,12 @@ async function loadTasks(f,btn,opts){
     // parent_id olan ama parent'ı tamamlanmış görevler top-level sayılır
     const _doneIds=new Set(all.filter(t=>t.tamamlandi).map(t=>t.id));
     let data=all.filter(t=>!t.tamamlandi&&!t.iptal&&(t.gorev_tipi==='TEDAVI_SEANS'||!t.parent_id||_doneIds.has(t.parent_id)));
+    // T3: sürüden çıkan hayvanın görevleri listede görünmesin (çıkış trigger'ı
+    // iptal eder; IDB gecikmesine karşı client güvenlik ağı). Hayvan listesi
+    // boşsa (pull hatası) null → filtre kapalı, liste yanlışça boşalmasın.
+    const _aktifHay=(getState('animals')||[]).filter(a=>a.durum==='Aktif');
+    const _aktifIdler=_aktifHay.length?new Set(_aktifHay.map(a=>a.id)):null;
+    data=aktifHayvanSatirlari(data,'hayvan_id',_aktifIdler);
     const _d7=dFwd(null,7);
     const _d1=dFwd(null,1);
     const _d30=dFwd(null,30);
@@ -653,7 +671,7 @@ async function loadTasks(f,btn,opts){
       return getTime(a).localeCompare(getTime(b))||(a.aciklama||'').localeCompare(b.aciklama||'');
     });
     if(!data.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>'; return; }
-    const allSubs=all.filter(t=>!!t.parent_id&&!t.tamamlandi);
+    const allSubs=aktifHayvanSatirlari(all.filter(t=>!!t.parent_id&&!t.tamamlandi),'hayvan_id',_aktifIdler);
     // TEDAVI_GUN için ilaç listesi: drug_administrations + stok isim haritası
     const _allDrugAdmins=await idbGetAll('drug_administrations').catch(()=>[]);
     const _allStokItems=await idbGetAll('stok').catch(()=>[]);

@@ -213,7 +213,23 @@ function vurguHtml(metin, q) {
   return esc(s.slice(0, i)) + '<span class="ac-vurgu">' + esc(s.slice(i, i + ql.length)) + '</span>' + esc(s.slice(i + ql.length));
 }
 
+// ── SÜRDEN ÇIKAN HAYVAN FİLTRESİ (dashboard bantları + görev listesi güvenlik ağı) ──
+// SÖZLEŞME (testle kilitli: tests/unit/cikis-filtre.test.js):
+// 1. rows içinden idKey kolonu aktifIdler kümesinde OLMAYAN satırları düşürür
+//    (durumu 'Aktif' olmayan: Satıldı/Ölü/Kesildi + cop_kutusu'dan silinenler —
+//    ikisi de aktif kümesinde yer almaz).
+// 2. idKey'siz satırlar (genel görev vb.) filtrelenmeden kalır.
+// 3. aktifIdler Set YA DA dizi kabul eder; null/undefined ise hiçbir satır
+//    düşürülmez (hayvan verisi yüklenememişse liste boşaltılmaz).
+// 4. Saf: girişleri değiştirmez, yeni dizi döner.
+function aktifHayvanSatirlari(rows, idKey, aktifIdler) {
+  if (!Array.isArray(rows)) return [];
+  if (aktifIdler == null) return rows.slice();
+  const set = aktifIdler instanceof Set ? aktifIdler : new Set(aktifIdler);
+  return rows.filter(r => !r || !r[idKey] || set.has(r[idKey]));
+}
+
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml });
+  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari });
 }
