@@ -130,6 +130,19 @@ DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanla
 **`ileri_gebe_asi_tamamla(p_gorev_id, p_vaccine_id uuid, p_tarih, p_doz?)`** → jsonb
 → İleri gebe aşısı görev tamamla. Çağrı: ui.js:4945.
 
+**`asi_gorev_planla(p_hayvan_id, p_vaccine_id uuid, p_doz numeric, p_tarih, p_aciklama?)`** → jsonb
+→ Planlı aşı görevi yaratır (ASI_PLANLI, stok_id+miktar dolu) ve stok rezerve eder
+  (stok_hareket, referans_tipi='asi_plan'). 20260902000003. Çağrı: forms.js submitTaskAdd.
+
+**`asi_planli_tamamla(p_gorev_id, p_tarih, p_doz?, p_vaccine_id?)`** → jsonb
+→ Planlı görevi tamamlar: add_vaccination (sonra GorevID notu yazılır — gorev_geri_al uyumu,
+  rapel kararı etkilenmez) → rezervasyon flip (iptal=true) → görev kapanır. Tek net düşüm.
+  Çağrı: ui.js asiUygulaVeTamamla (ASI_PLANLI dalı).
+
+**`fn_gorev_asip_iade()`** — trigger fn (trg_gorev_asip_iade, gorev_log.iptal TRUE geçişi)
+→ Planlı görev iptalinde 'asi_plan' rezervasyonunu iade eder (iptal=true flip). 20260902000003.
+Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çift düşüm kilidi.
+
 **`vaka_tohumlama_ekle(p_case_id uuid, p_tarih, p_saat time?)`** → jsonb
 → Vakaya planlı tohumlama günü ekle. Çağrı: ui.js:5718. **GT'de YOK** (audit).
 

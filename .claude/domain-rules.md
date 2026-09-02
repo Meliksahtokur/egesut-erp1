@@ -135,7 +135,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 - **Event'siz düveler** (20260831000002): sayaç ham yaş değil, **13 aylık tohumlama uygunluk noktasından** sayılır; RPC `p_min_gun=55` ile düve listeye **13 ay + 55 gün**de girer. 13 aydan önce tohumlama yapılmadığı için genç düve listede görünmez.
 - **"Hiç kayıt yok" (9999):** ne event'i ne doğum bilgisi olan hayvanlarda `sessiz_gun` NULL'dur; RPC `COALESCE(...,9999)` ile 9999 döner. UI'da (dashboard bandı + modal) **en altta** sıralanır (bb4ea92) — sentinel-son sıralama her iki yüzeyde de client-side yapılır.
 - `v_eligible` SADECE sessiz akışlarını besler (listele/reconcile/stat); tohumlama form uygunluk listesi client-side `_eligibleHayvanlar()`'dır — view'dan bağımsız.
-- Bilinen tutarsızlık: `stat_suru_ozet` sessiz sayacı `sessiz_gun >= 55` (NULL hariç), liste ise 9999'ları içerir → istatistik, listeden "hiç kayıt yok" kadar düşük görünür (henüz kapatılmadı).
+- Bilinen tutarsızlık: `stat_suru_ozet` sessiz sayacı `sessiz_gun >= 55` (NULL hariç), liste ise 9999'ları içerir → istatistik, listeden "hiç kayıt yok" kadar düşük görünür. **Kök neden canlıda doğrulandı (2026-09-02):** `20260625000030_stat_suru_ozet_readonly.sql` gövdesine yazılırken v3'teki COALESCE düşmüş. Taslak hazır: `.claude/draft-migrations/20260902000000_stat_suru_ozet_sessiz_coalesce.sql` (tek satır restore; otomatik-deploy emniyeti için migrations/ DIŞINDA — deploy emrinde supabase/migrations/'a taşınır). Analiz: `.claude/idle-reports/2026-09-02-sessiz-9999-analiz.md`. Not: `sessiz_hayvanlar_reconcile` da bilinçli COALESCE'siz — NULL hayvanlara vet-kontrol görevi üretilmez (veri eksiği olan hayvanlara görev spam'i olmasın).
 
 ### Gebelik Süresi
 
@@ -289,7 +289,7 @@ Her kritik işlem `islem_log` tablosına yazılır. Tip değerleri (kodda üreti
 ## 12. Görev Sistemi (gorev_log)
 
 - `gorev_tipi` değerleri (CHECK kısıtı **yok** — serbest metin; kodda üretilenler):
-  `ILAC`, `BUZAGI_BAKIM`, `GEBELIK_KONTROL` (eski `TOHUMLAMA_HAZIRLIK`'ın yerini aldı, 20260830000010),
+  `ILAC`, `ASI_PLANLI` (planlı aşı — stok rezervasyonlu, 20260902000003), `BUZAGI_BAKIM`, `GEBELIK_KONTROL` (eski `TOHUMLAMA_HAZIRLIK`'ın yerini aldı, 20260830000010),
   `ILERI_GEBE`, `ILERI_GEBE_ASI`, `BESLEME`, `SUTTEN_KESME`, `PADOK_DEGISIM`, `TOHUMLAMA_PLANLI`,
   `TEDAVI_GUN`, `TEDAVI_SEANS`, `VETERINER_KONTROL`, `KIZGINLIK_TAKIP`, `DIGER`
 - Ana görev (`parent_id = NULL`) + alt görevler (`parent_id` dolu); parent kapanınca çocuklar `trg_gorev_parent_kapandi` ile iptal olur
@@ -297,6 +297,8 @@ Her kritik işlem `islem_log` tablosına yazılır. Tip değerleri (kodda üreti
 - `hedef_tarih` geçmişte kalan ve tamamlanmamış görevler gecikmiş sayılır
 - Görevler RPC'ler tarafından otomatik oluşturulur; elle silinmemelidir
 - Zincir tipler (BESLEME, BUZAGI_BAKIM, TEDAVI_GUN, ILERI_GEBE_ASI) orphan temizlikten muaf
+- **ASI_PLANLI bilinçli olarak muafiyet DIŞINDA:** orphan/parent iptali olursa `trg_gorev_asip_iade`
+  rezervasyonu iade eder — bu istenen davranış (hedefi geçersiz planın stoğu kilitli kalmaz)
 
 ---
 
@@ -362,3 +364,16 @@ Kaynak: `.claude/idle-reports/2026-08-31-docs-tutarlilik.md` §2.2 (çelişki) +
 | ⚠️6 | §11 | TOHUMLAMA_GUNCELLENDI üretilir; ABORT_KAYDI trigger'dan | UPDATE kolu sessiz (20260830000030); ABORT_KAYDI üreticisi `tohumlama_abort` RPC'si | Kod — 20260830000030:29-37; 20260830000034:46 |
 | ⚠️7 | §12 | `ILAC, BUZAGI_BAKIM, TOHUMLAMA_HAZIRLIK, DIGER` | 14 değerlik gerçek liste; TOHUMLAMA_HAZIRLIK→GEBELIK_KONTROL; CHECK kısıtı yok | Kod — 20260830000010:185 + GT:51 |
 | ⚠️8 | §5/§13 K4 | "ileri doğum tarihi backend'de yok (kod eksiği adayı)" | `_guard_dogum_ileri_tarih` tablo trigger'ı eklendi (2026-08-31); RPC gövdesinde hâlâ yok | Kod — 20260831000003:63-68; denetimden sonra canlıya deploy edildi |
+
+## 15. Aşı Stoku (2026-09-02 güncel)
+
+- 12/12 katalog aşısının `stock_item_id` bağlı (20260902000001 backfill); Coglavax/Vac-Sules başlangıç stoku 0 — Stok Girişi ile elle girilir.
+- **Serbest düşüm (20260902000002):** `vaccination_stok_dusum` trigger'ının 'Yetersiz stok' kilidi kullanıcı kararıyla kaldırıldı — aşı stoku ilaç/seans/tohumlama gibi eksiye düşebilir, uygulama asla stok yüzünden engellenmez. Ledger (stok_hareket, pozitif=kullanım) aynen yazılır.
+- Guard'lı `drug_administration_stok_dusum` fonksiyonu ÖLÜ KOD (trigger'sız, çağrısız) — güvenle silinebilir.
+- `ileri_gebe_gorev_kontrol` sabit Rota protokolü (gebe d240) bilinçli; görev 'Uygula ve Tamamla' ile kapanır, GorevID notlu kayıt rapel üretmez, düvede +21g 2. doz açılır.
+- Görev aşı akışı: `_asiVaccineCoz` (stok_id → aciklama ad-öneki → null) + çözümlenemeyen görevde form içi aşı seçim listesi (td-asi-vax).
+- **Planlı aşı görevi (2026-09-02, ilaç modeli):** m-task-add'te '💉 Aşı (Planlı)' → `asi_gorev_planla`
+  aşı+doz ile görev yaratır ve stok REZERVE eder; iptal/geri-al yolları `trg_gorev_asip_iade` ile
+  iade eder; tamamlama `asi_planli_tamamla` (add_vaccination → GorevID notu → rezervasyon flip).
+  `gorev_tamamla` ASI_PLANLI'da stok yazmaz (muafiyet). Planlı görevler online-only'dir (rezervasyon
+  atomikliği); küpe alanı autocomplete'lidir (taskadd-focus/taskadd-keydown).

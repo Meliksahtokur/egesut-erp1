@@ -104,3 +104,18 @@ kapatılacaktır. **Bu görev için durum: UNVERIFIED (DB erişim guardrail'i ne
 3. **rpc-reference:** çağrı yeri/durum notları için; imza otoritesi DEĞİL.
 4. 20260901000001/000002 sonrası canlıda imza değişen fn'ler (§B'deki 4 ESKİ-GT gövdesi) için
    snapshot değil migration imzası esastır; regen zaten canlıdan çekerek bunu aşar.
+
+## §E — 2026-09-02 REV-1 demo-sync drift bulguları (regen oturumuna girdi)
+
+REV-1 (demo şema senkronu) sırasında canlı↔repo karşılaştırması şunları ortaya çıkardı —
+regen oturumunda işlenmeli:
+
+1. **prod `gorev_tamamla` dosyasız hotfix:** canlı gövdede `ASI_PLANLI` muafiyeti var
+   (planlı aşı görevi düz PATCH ile kapanamaz), repoda HİÇBİR migration'da yok → migration
+   olarak repo'ya işlenmeli ya da gövde belgelenmeli. (Detay: `.claude/idle-reports/2026-09-02-demo-sync.md`)
+2. **2 kozmetik gövde farkı** (canlı vs migration son-kazanan) — raporun tablosunda.
+3. **demo'da prod'da olmayan 3 legacy fonksiyon** — demo temizliği veya dokümantasyon kararı.
+4. **20260730000002 versiyon çakışması:** 2 migration dosyası aynı öneki paylaşıyor —
+   sıralama belirsizliği; regen öncesi düzeltilmeli.
+5. `demo_sema_diff`'in "3 tablo drift" uyarısının kaynağı: prod'dan silinmiş hayalet view'lar
+   (diff RPC'si artık boş) — gerçek drift değildi.
