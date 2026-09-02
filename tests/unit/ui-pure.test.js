@@ -30,7 +30,7 @@ const { sandbox, exposed } = loadBrowserModule('js/ui.js', {
 });
 const {
   yasHesapla, band, _dashVacAlerts, _yeniDogumGun,
-  _durumClr, _durumTxt, renderSeansGrupAyrac, _asiVaccineCoz, _sessizGrupla,
+  _durumClr, _durumTxt, renderSeansGrupAyrac, _asiVaccineCoz, _sessizGrupla, _asiStokKalanlar,
 } = sandbox;
 
 // ── Tarih yardımcıları (yerel takvim; yasHesapla new Date() ile yerel çalışır) ──
@@ -557,4 +557,29 @@ test('_sessizGrupla: Türkçe grup adları HAM korunur (escape render\'da)', () 
 test('_sessizGrupla: sentinel-son kuralı yalnız kayıtsız varken bölüm ekler', () => {
   const r = _sessizGrupla([SG('a', 70, 'Sağmal'), SG('b', 90, 'Sağmal')]);
   assert.deepEqual(r.map(g => g.grup), ['Sağmal']); // 9999 yoksa kayıtsız bölümü YOK
+});
+
+// ── _asiStokKalanlar — aşı→stok entegrasyonu (kalan hesabı) ──
+const STOK_ORNEK=[
+  { id:'STOK-AŞI-v-cogla', baslangic_miktar:20 },
+  { id:'STOK-AŞI-v-rota',  baslangic_miktar:15 },
+];
+const HAREKET_ORNEK=[
+  { stok_id:'STOK-AŞI-v-cogla', miktar:4,  iptal:false },  // uygulama
+  { stok_id:'STOK-AŞI-v-cogla', miktar:4,  iptal:true  },  // iade edilen rezervasyon — sayılmaz
+  { stok_id:'STOK-AŞI-v-rota',  miktar:2,  iptal:false },
+  { stok_id:'STOK-AŞI-v-rota',  miktar:-10, iptal:false },  // stok girişi (negatif)
+];
+test('_asiStokKalanlar: net kalan = baslangıç − Σ(iptal olmayan)', () => {
+  const k=_asiStokKalanlar([{id:'v-cogla',stock_item_id:'STOK-AŞI-v-cogla'}],STOK_ORNEK,HAREKET_ORNEK);
+  assert.equal(k['v-cogla'], 16); // 20 − 4 (iptal olan 4 hariç)
+});
+test('_asiStokKalanlar: negatif hareket (stok girişi) kalanı artırır', () => {
+  const k=_asiStokKalanlar([{id:'v-rota',stock_item_id:'STOK-AŞI-v-rota'}],STOK_ORNEK,HAREKET_ORNEK);
+  assert.equal(k['v-rota'], 23); // 15 − 2 − (−10)
+});
+test('_asiStokKalanlar: stok satırı yoksa null (bağlantısız aşı)', () => {
+  const k=_asiStokKalanlar([{id:'v-x',stock_item_id:'STOK-AŞI-v-x'},{id:'v-y',stock_item_id:null}],STOK_ORNEK,[]);
+  assert.equal(k['v-x'], null);
+  assert.equal(k['v-y'], null);
 });

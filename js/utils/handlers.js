@@ -128,7 +128,7 @@ registerActions({
   'pa-toggle':           (el) => { const s = document.getElementById(el.dataset.sec); if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none'; },
   'pa-chip':             (el) => protokolAyarKaydet(el.dataset.anahtar, el.dataset.deger),
   'open-animal-modal':   () => openM('m-animal'),
-  'open-task-add-modal': () => openM('m-task-add'),
+  'open-task-add-modal': () => { taskAddFormSifirla(); openM('m-task-add'); },
   // m-task-add küpe autocomplete (m-vaccine'deki acHayvan deseninin aynısı)
   'taskadd-focus':   (el) => acHayvan('ta-hid', 'ac-tahid'),
   'taskadd-keydown': (opts) => acNav(opts.event, 'ac-tahid'),

@@ -1106,12 +1106,19 @@ async function taskAddTipDegisti(val){
   if(!alani) return;
   if(val!=='ASI_PLANLI'){ alani.style.display='none'; return; }
   alani.style.display='block';
+  const dozEl=document.getElementById('ta-doz'); if(dozEl) dozEl.value=''; // önceki açılışın dozu taşınmaz
   try{
     let vaccines=(await getData('vaccines'))||[];
     if(!vaccines.length){ await pullTables(['vaccines']).catch(()=>{}); vaccines=(await getData('vaccines'))||[]; }
+    const [stockRows,hmvs]=await Promise.all([getData('stok'),getData('stok_hareket')]); // IDB store adı 'stok' (state anahtarı 'stock' değil)
+    const kalalar=_asiStokKalanlar(vaccines,stockRows,hmvs);
     const sel=document.getElementById('ta-vax');
     if(sel) sel.innerHTML='<option value="">— Aşı seçin —</option>'
-      +vaccines.map(vx=>`<option value="${escAttr(vx.id)}" data-doz="${escAttr(vx.dose||'')}">${esc(vx.name||vx.id)}${vx.dose?` · standart ${vx.dose} ${vx.unit||'ml'}`:''}</option>`).join('');
+      +vaccines.map(vx=>{
+        const kalan=kalalar[vx.id];
+        const kalanLbl=kalan==null?'':(kalan<=0?` · ⚠ kalan ${kalan} ${vx.unit||'ml'}`:` · kalan ${kalan} ${vx.unit||'ml'}`);
+        return `<option value="${escAttr(vx.id)}" data-doz="${escAttr(vx.dose||'')}">${esc(vx.name||vx.id)}${vx.dose?` · standart ${vx.dose} ${vx.unit||'ml'}`:''}${kalanLbl}</option>`;
+      }).join('');
   }catch(e){ toast('Aşı listesi yüklenemedi', true); }
 }
 // Aşı seçilince planlanan doza standart dozu yazar
@@ -1119,6 +1126,13 @@ function taskAddVaxDegisti(sel){
   const o=sel?.selectedOptions?.[0];
   const d=document.getElementById('ta-doz');
   if(d&&o&&o.dataset.doz) d.value=o.dataset.doz;
+}
+// Manuel görev formunu her açılışta sıfırla (bayat tip/doz/aşı taşınmaz)
+function taskAddFormSifirla(){
+  const tt=document.getElementById('ta-tip'); if(tt) tt.value='MANUEL';
+  ['ta-hid','ta-desc','ta-doz'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const tv=document.getElementById('ta-vax'); if(tv) tv.value='';
+  taskAddTipDegisti('');
 }
 
 async function submitTaskAdd(btn) {
