@@ -1,8 +1,9 @@
 # T3 — Süruden Çıkan Hayvan Filtresi: Tarama Raporu
 
 **Branch:** `idle/suruden-cikan-filtre` · **Worktree:** `/home/melik/egesut-wt/suruden-cikan-filtre`
-**Commit'ler:** `ec65148` (ana fix) + `6b1412e` (review minorları) · **Temel:** e8cd620 (main)
-**Test:** 404/404 unit yeşil · **Review:** subagent APPROVE (2 minor uygulandı)
+**Commit'ler:** `ec65148` (ana fix) + `6b1412e` (review minorları) + `9c6d71e` (rapor) + `fa43970` (main d1de3e8/T4 merge — loadDash çağrı satırı çakışması çözüldü, _dashSutBuzagiBandi'ye aktifTasks verildi)
+**Temel:** e8cd620 → main d1de3e8 ile senkron (T4 sonrası merge çatışması kalmaz)
+**Test:** 413/413 unit yeşil (T4'ün 9 testi dahil) · **Review:** subagent APPROVE (2 minor uygulandı)
 
 ## 1. Rapor edilen sızıntı — kök neden ve canlı simülasyon (2026-09-02)
 
