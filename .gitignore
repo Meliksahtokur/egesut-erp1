@@ -120,6 +120,8 @@ backup/
 research/
 findings/
 reports/
+!/.harness/reports/
+!/.harness/reports/**
 big-analiz/
 analysis/
 review/
@@ -130,8 +132,6 @@ results/
 plugins/
 
 # === AI agent / kişisel yapılandırma ===
-AGENTS.md
-CLAUDE.md
 .qwen/
 .agents/
 .skills/
@@ -149,6 +149,7 @@ CLAUDE.md
 .devcontainer/
 .vscode/
 .skillopt-sleep/
+/.harness/cache/
 
 # === Kişisel dokümanlar (public değil) ===
 docs/superpowers/
@@ -172,3 +173,12 @@ postgres-language-server.jsonc
 --include-idle-unload
 *.sh
 *.py
+
+# === Portable unified-harness Python entrypoints ===
+!/.zcode/hooks/session_contract.py
+!/.zcode/hooks/commit_guard.py
+!/.zcode/hooks/js_edit_guard.py
+!/tests/harness/
+!/tests/harness/**/*.py
+!/.harness/bin/
+!/.harness/bin/*.py
