@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "enabled": true,
+    "timeoutMs": 5000,
+    "events": {
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python3 ${ZCODE_PROJECT_DIR}/.zcode/hooks/session_contract.py",
+              "timeout": 5,
+              "statusMessage": "EgeSut shared contract is being loaded"
+            }
+          ]
+        }
+      ],
+      "PreToolUse": [
+        {
+          "matcher": "Edit|Write",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python3 ${ZCODE_PROJECT_DIR}/.zcode/hooks/js_edit_guard.py",
+              "timeout": 5,
+              "statusMessage": "EgeSut JS pre-check reminder"
+            }
+          ]
+        },
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python3 ${ZCODE_PROJECT_DIR}/.zcode/hooks/commit_guard.py",
+              "timeout": 5,
+              "statusMessage": "EgeSut commit-boundary reminder"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
