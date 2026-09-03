@@ -18,7 +18,32 @@ Read in this order:
 Canonical records are tracked. Generated boards, indexes, schema summaries,
 receipts, and runtime state belong in ignored `.harness/cache/` or stdout.
 
-The current implementation is Phase 1. Goal/report schemas, the query CLI,
-docs-update automation, pattern catalogs, and legacy retirement arrive only in
-their later reviewed phases. Their absence must not be papered over with
-runtime-specific policy copies.
+Phase 2 adds standard-library goal/report/decision validation and the
+`.harness/bin/harness.py` query surface. Run `harness.py --help` for commands;
+generated board, handoff, and goal-index views remain stdout/ignored-cache
+projections. Docs-update automation, pattern catalogs, and legacy retirement
+arrive only in their later reviewed phases. Their absence must not be papered
+over with runtime-specific policy copies.
+
+## Phase 2 query surface
+
+Invoke commands with `python3 .harness/bin/harness.py`:
+
+```text
+validate                  validate canonical records and active worktrees
+goals                     list goal metadata
+show G-...                show one goal
+search QUERY              search goals, reports, and decisions
+history                   reconstruct basic commit history from Git
+worktrees                 combine Git existence with recorded goal intent
+stale                     report active goal/worktree/checkpoint discrepancies
+lineage G-...             show parent and direct children
+render board              generate the goal board to stdout
+render handoff            generate active-goal handoff to stdout
+render goal-index         generate deterministic JSON to stdout
+```
+
+Add `--json` to query commands that support structured output. `render ...
+--cache` writes only to ignored `.harness/cache/`; cached projections never
+become authority. `history` always reports commit subject, paths, author, and
+date. Goal, flow, and mode remain `null` when no truthful trailer exists.

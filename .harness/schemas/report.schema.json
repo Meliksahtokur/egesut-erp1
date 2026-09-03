@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://egesut.invalid/harness/report.schema.json",
+  "title": "EgeSut Harness Report Header",
+  "type": "object",
+  "required": ["goal", "date", "flow", "root_verdict"],
+  "properties": {
+    "goal": {"type": "string", "pattern": "^G-[0-9]{8}-[A-Z0-9][A-Z0-9-]*$"},
+    "date": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "flow": {"type": "string", "minLength": 1},
+    "root_verdict": {"enum": ["IN_PROGRESS", "PASS", "PARTIAL", "FAIL", "INCONCLUSIVE"]}
+  },
+  "additionalProperties": false
+}
