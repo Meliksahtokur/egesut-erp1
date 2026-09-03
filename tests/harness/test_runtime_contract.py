@@ -133,13 +133,22 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn(".agents/", entrypoints)
         self.assertNotIn(".claude/farm-id-discipline.md", entrypoints)
 
-    def test_transitional_product_references_exist_in_worktree(self) -> None:
+    def test_canonical_product_references_exist_in_worktree(self) -> None:
         references = [
+            ".harness/references/domain-rules.md",
+            ".harness/references/rpc-reference.md",
+            ".harness/references/ui-map.md",
+        ]
+        self.assertEqual([], [path for path in references if not (ROOT / path).is_file()])
+        retired = [
             ".claude/domain-rules.md",
             ".claude/rpc-reference.md",
             ".claude/ui-map.md",
         ]
-        self.assertEqual([], [path for path in references if not (ROOT / path).is_file()])
+        self.assertEqual(
+            [], [path for path in retired if (ROOT / path).exists()],
+            "transitional copies must stay retired (D-20260904-PHASE6-LEGACY-RETIREMENT)",
+        )
 
     def test_zcode_config_references_all_existing_hooks(self) -> None:
         config = json.loads(ZCODE_CONFIG.read_text(encoding="utf-8"))

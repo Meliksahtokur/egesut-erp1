@@ -43,15 +43,17 @@ Important current source areas:
 | Any repository change | `.harness/contract.md`, `.harness/acceptance.md` |
 | Full goal/worktree task | active `.harness/goals/YYYY/G-*.md` |
 | JS symbol or DB/RPC change | `.harness/contract.md` pre-check rules plus the runtime-provided `code-change-precheck` skill when available |
-| Domain or state-machine work | `.claude/domain-rules.md` |
-| RPC work | `.claude/rpc-reference.md` plus separately authorized live schema |
-| UI/modal work | `.claude/ui-map.md` and current production/test example |
+| Domain or state-machine work | `.harness/references/domain-rules.md` |
+| RPC work | `.harness/references/rpc-reference.md` plus separately authorized live schema |
+| UI/modal work | `.harness/references/ui-map.md` and current production/test example |
 | New tenant-scoped DB object | `.harness/contract.md` plus separately verified live schema |
 | GitNexus CLI/index work | `.harness/contract.md`; use `--index-only` for non-injecting refresh |
 
-The tracked `.claude` references above are transitional until Phase 4. They are useful
-contracts or maps, not live database authority. Do not modify the currently
-user-owned dirty copies unless the active manifest explicitly allows it.
+The transitional `.claude` reference copies were retired on 2026-09-04
+(decision `D-20260904-PHASE6-LEGACY-RETIREMENT`); the curated
+`.harness/references/` documents above are canonical, live schema remains
+the only DB authority, and `.claude/` stays the owner's local working
+surface for reports, plans, and archives.
 
 ## Runtime selection
 

@@ -53,7 +53,8 @@ class DomainRulesTests(unittest.TestCase):
         body = flat("domain-rules.md")
         self.assertIn("Provenance", body)
         self.assertIn(".claude/domain-rules.md", body)
-        self.assertIn("Phase 6", body)
+        self.assertIn("retired on 2026-09-04", body)
+        self.assertIn("D-20260904-PHASE6-LEGACY-RETIREMENT", body)
         self.assertIn("not a schema mirror", body)
 
     def test_carries_curated_domain_knowledge(self) -> None:

@@ -40,3 +40,16 @@ after the owner approves a separate cleanup manifest built from this table.
 No bulk deletion, no bulk `git add`, no credential probing; the owner's
 dirty main state stays untouched. Archives remain until replacement
 acceptance. This proposal itself writes only this report file.
+
+## Execution record (2026-09-04)
+
+The owner approved the full cleanup manifest. Executed in one Fast-mode
+gated commit: the three tracked transitional references retired (`git rm`,
+recoverable from history; their content — including the owner's pending
+2026-09-02 additions — lives in `.harness/references/`), the four design
+process artifacts tracked, `AGENTS.md` and the contract re-routed to the
+canonical references, the qwen runtime surfaces archived (moved, not
+deleted, to `.claude/archive/qwen-retirement-2026-09-04/`), and the two
+decision records `D-20260904-HARNESS-ROLLOUT` and
+`D-20260904-PHASE6-LEGACY-RETIREMENT` added. No product code, live DB,
+hook, or deployment was touched.

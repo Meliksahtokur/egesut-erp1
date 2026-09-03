@@ -116,11 +116,13 @@ or explicit owner choice. See `task-modes.md`.
 - Demo credentials and public demo access are intentionally public-by-design
   for the isolated demo project. Do not report that accepted design as a bug.
 
-Transitional product references, pending Phase 4 migration:
+Curated product references live under `.harness/references/` (migrated
+from the retired `.claude` copies on 2026-09-04, decision
+`D-20260904-PHASE6-LEGACY-RETIREMENT`):
 
-- `.claude/domain-rules.md`
-- `.claude/rpc-reference.md`
-- `.claude/ui-map.md`
+- `.harness/references/domain-rules.md`
+- `.harness/references/rpc-reference.md`
+- `.harness/references/ui-map.md`
 
 The references above do not override live schema or current source code.
 

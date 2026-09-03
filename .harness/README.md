@@ -25,9 +25,10 @@ pattern catalog under `patterns/`, the curated references under `references/`
 (symbol-keyed UI map plus RPC/domain contracts; live schema stays the only DB
 authority), product-diff routing for `js/state.js`, `js/config.js`, and
 `supabase/functions/**`, and pattern_ref enforcement for product-code goals.
-Run `harness.py --help` for commands. Git lifecycle gates and legacy
-retirement arrive only in their later reviewed phases; their absence must not
-be papered over with runtime-specific policy copies.
+Run `harness.py --help` for commands. Git lifecycle gates shipped in
+Phase 5 and the legacy `.claude` reference retirement in Phase 6 (decisions
+`D-20260904-*`); the harness is the standing governance surface per the
+rollout decision.
 
 ## Phase 2 query surface
 

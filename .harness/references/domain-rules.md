@@ -3,7 +3,7 @@
 > **Provenance:** curated 2026-09-03 for the harness from
 > `.claude/domain-rules.md` (2026-09-01 revision) including its pending
 > 2026-09-02 working-copy additions (toplu aşı). The transitional `.claude`
-> copy remains owner-owned until Phase 6. Live schema and current source code
+> copy was retired on 2026-09-04 (decision `D-20260904-PHASE6-LEGACY-RETIREMENT`). Live schema and current source code
 > remain the only authorities; this file is a product contract, not a schema
 > mirror. RPC signatures: see `rpc-reference.md` in this directory.
 

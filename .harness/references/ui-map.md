@@ -11,7 +11,7 @@ reference); code anchors resolve to definitions.
 
 Provenance: regenerated 2026-09-03 from the current `main` sources
 (read-only inventory at 9f34fe1); supersedes the line-numbered
-`.claude/ui-map.md` map, which remains the transitional copy until Phase 6.
+`.claude/ui-map.md` map, retired on 2026-09-04 (decision `D-20260904-PHASE6-LEGACY-RETIREMENT`).
 
 ## Router surface (history-tracked modals)
 
