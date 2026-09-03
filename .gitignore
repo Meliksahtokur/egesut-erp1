@@ -182,3 +182,5 @@ postgres-language-server.jsonc
 !/tests/harness/**/*.py
 !/.harness/bin/
 !/.harness/bin/*.py
+!/.harness/memory/
+!/.harness/memory/**/*.md
