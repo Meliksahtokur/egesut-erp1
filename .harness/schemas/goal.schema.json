@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://egesut.invalid/harness/goal.schema.json",
+  "title": "EgeSut Harness Goal",
+  "type": "object",
+  "required": [
+    "id", "status", "owner", "flow", "created", "base_sha", "launch_sha",
+    "branch", "worktree", "write_manifest", "docs_authority", "acceptance",
+    "stop_conditions", "report", "checkpoint"
+  ],
+  "properties": {
+    "id": {"type": "string", "pattern": "^G-[0-9]{8}-[A-Z0-9][A-Z0-9-]*$"},
+    "status": {
+      "enum": ["draft", "active", "review", "done", "partial", "blocked", "cancelled", "superseded"]
+    },
+    "owner": {"type": "string", "minLength": 1},
+    "parent": {"type": ["string", "null"]},
+    "superseded_by": {"type": ["string", "null"]},
+    "flow": {"type": "string", "minLength": 1},
+    "created": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "base_sha": {"$ref": "#/$defs/sha"},
+    "launch_sha": {"$ref": "#/$defs/sha"},
+    "branch": {"type": ["string", "null"]},
+    "worktree": {"type": ["string", "null"]},
+    "write_manifest": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "docs_authority": {
+      "type": "object",
+      "required": ["tracked_paths", "local_paths", "db", "propose_only"],
+      "properties": {
+        "tracked_paths": {"$ref": "#/$defs/pathAuthority"},
+        "local_paths": {"$ref": "#/$defs/pathAuthority"},
+        "db": {"enum": ["none", "read", "write"]},
+        "propose_only": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "pattern_refs": {"type": "array", "items": {"type": "string"}},
+    "acceptance": {"type": "array", "items": {"type": "string"}},
+    "stop_conditions": {"type": "array", "items": {"type": "string"}},
+    "report": {"type": "string", "minLength": 1},
+    "checkpoint": {
+      "type": "object",
+      "required": ["sequence", "kind", "head", "docs_verdict"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 0},
+        "kind": {"type": ["string", "null"]},
+        "head": {"$ref": "#/$defs/nullableSha"},
+        "docs_verdict": {"enum": [null, "PASS", "PARTIAL", "FAIL"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "sha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$"},
+    "nullableSha": {"type": ["string", "null"], "pattern": "^[0-9a-f]{7,40}$"},
+    "pathAuthority": {
+      "type": "object",
+      "required": ["write", "append"],
+      "properties": {
+        "write": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "append": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
