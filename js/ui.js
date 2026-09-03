@@ -3069,7 +3069,7 @@ async function _uremeKizginlik(el){
   const gozlemHtml=sec(gozlem,'gozlem','👁 Gözlem (Postpartum)','var(--ink3)',bekleyen.length>0);
   const gectiHtml=sec(gecti,'gecti','⌛ Geçti / Kaçırıldı','#b0862e',bekleyen.length+gozlem.length>0);
   const sonucHtml=sec(sonuclanan,'sonuclanan','✅ Sonuçlanan','var(--green)',bekleyen.length+gozlem.length+gecti.length>0);
-  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-kizginlik')">🔴 Kızgınlık Ekle</button></div>`
+  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" data-action="open-kizginlik-modal">🔴 Kızgınlık Ekle</button></div>`
     +(list.length?bekleyenHtml+gozlemHtml+gectiHtml+sonucHtml:'<div class="empty"><div class="empty-ico">🔴</div>Kızgınlık kaydı yok</div>');
 }
 
@@ -3272,7 +3272,7 @@ async function _uremeGebelik(el){
   })].join('')
   :'<div class="empty"><div class="empty-ico">🤰</div>Gebe hayvan yok</div>');
 
-  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" onclick="openM('m-insem')">💉 Yeni Tohumlama</button></div>`+
+  el.innerHTML=`<div style="padding:10px 0 6px"><button class="btn btn-g" style="padding:9px" data-action="open-insem-modal">💉 Yeni Tohumlama</button></div>`+
     bekleyenHtml+gebeHtml;
 }
 
@@ -4891,7 +4891,7 @@ async function loadStokList(){
   try {
     await loadStock();
     if(!getState('stock').length){
-      el.innerHTML='<div style="text-align:center;padding:12px;color:var(--ink3);font-size:.78rem">📦 Henüz stok ürünü eklenmemiş<br><button class="sh-link" onclick="openM(\'m-stok-add\')" style="margin-top:6px;display:block;margin:6px auto 0">İlk ürünü ekle →</button></div>';
+      el.innerHTML='<div style="text-align:center;padding:12px;color:var(--ink3);font-size:.78rem">📦 Henüz stok ürünü eklenmemiş<br><button class="sh-link" data-action="stok-add-open" style="margin-top:6px;display:block;margin:6px auto 0">İlk ürünü ekle →</button></div>';
       return;
     }
     const gruplar={
