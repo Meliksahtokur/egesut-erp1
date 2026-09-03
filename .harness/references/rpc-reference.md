@@ -619,3 +619,22 @@ ankraj = MAX(kızgınlık, tohumlama, abort_tarihi, dogum_tarihi, dogum). Aktif 
   `js/ai-asistan.js` (streaming HTTP); `supabase/functions/stat-hesapla` has
   no frontend caller (the `stat_suru_ozet` RPC serves that data) — classified
   superseded from the frontend's point of view.
+
+## Live-schema audit (demo probe, 2026-09-03)
+
+Read-only `pg_proc` signature probe against the connected demo project
+(vtzqjmazsvurxdeondmi) — not PROD; demo parity rests on the 2026-09-02
+migration sync. Sample: 20 functions / 23 signatures (overloads included),
+spanning the oldest and newest write paths — `hayvan_ekle` (both overloads),
+`hayvan_guncelle` (all three overloads incl. `p_kisir`), `dogum_kaydet`,
+`tohumlama_kaydet` / `planli_tohumlama_kaydet` (incl. `p_irk_bilgisi`),
+`gorev_tamamla`, `asi_ekle` / `asi_guncelle` / `asi_gorev_planla` /
+`asi_planli_tamamla` / `asi_toplu_planla`, `bulk_vaccination`, `bulk_ilac`,
+`buzagi_sutten_kesme_toplu`, `cikis_yap`, `stok_ekleme`, `ilac_ekle`,
+`kupe_musait_mi`, `stat_suru_ozet`. Result: every function present;
+parameter names and `jsonb` result types match this reference — zero
+mismatches in the sample, including the newest `asi_toplu_planla`
+(20260902000004). This is dated evidence about the reference's accuracy in
+one environment; the tracked reference remains a contract, not live-schema
+authority, and PROD signatures are verifiable only through their own
+separately authorized probe.
