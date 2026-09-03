@@ -156,6 +156,30 @@ Each relevant surface is `UPDATED`, `NO_CHANGE_REQUIRED`, `PROPOSED`, or
 Evaluation is mandatory, but editing every document is not. Progress and
 ordinary test/fix loops are not checkpoints.
 
+## Git lifecycle gates
+
+`commit-gate` and `push-gate` are verification-only checks; they read Git and
+receipt state and never mutate it.
+
+- Fast flow (no goal): change → tests → `docs-update pre-commit --scope
+  staged --write-receipt` → `commit-gate` (optional `--message-file` trailer
+  check) → commit → `docs-update final --publishing --write-receipt` →
+  `push-gate --receipt .harness/cache/DOCS-RECEIPT.json` → push.
+- Full flow (goal-bound): lead worktree commit through `commit-gate --goal`
+  (staged paths must fit the goal manifest) → root pre-review → integration
+  with `--no-commit --no-ff` and goal/report reconciliation → goal `done` at
+  `final(publishing=true)` → `push-gate --goal` → push.
+- A commit message without `Harness-*` or verdict trailers is valid and stays
+  queryable through subject, paths, author, and date. A `Docs-Update`
+  trailer is legal only when it matches a current staged receipt; a `Tests`
+  verdict trailer has no receipt kind yet and is refused.
+- `push-gate` requires finalized acceptance (goal checkpoint
+  `final(publishing=true)` with `PASS`, or a current final receipt), a
+  fast-forward remote range with no locally modified paths inside it, and it
+  never asserts deployment or DB state.
+- The existing `.git/hooks/pre-commit` stays reachable and unchanged;
+  `core.hooksPath` stays unset. Setting it is a gate finding.
+
 ## Documentation authority
 
 Root reconciles documentation within owner-approved scope. A lead may write
