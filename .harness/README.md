@@ -48,6 +48,8 @@ render goal-index         generate deterministic JSON to stdout
 render memory-index       generate curated-memory navigation to stdout
 docs-update CHECKPOINT    evaluate routed documentation surfaces and authority
 receipt-check             reject missing, stale, or dishonest docs receipts
+commit-gate               verify staged receipt, goal manifest, hook state, trailers
+push-gate                 verify finalized acceptance and the fast-forward publish range
 ```
 
 Add `--json` to query commands that support structured output. `render ...
@@ -56,5 +58,6 @@ become authority. `history` always reports commit subject, paths, author, and
 date. Goal, flow, and mode remain `null` when no truthful trailer exists.
 
 See `docs-update.md` for checkpoint outcomes, receipt semantics, and CLI
-examples. Receipts and all four rendered aggregate views remain ignored derived
-state.
+examples, and `contract.md` for the Fast and Full Git flows behind
+`commit-gate`/`push-gate`. Receipts and all four rendered aggregate views
+remain ignored derived state; gates verify, they never mutate Git.

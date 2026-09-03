@@ -47,10 +47,23 @@ docs evaluation. It does not authorize merge or push.
 Root reviews the manifest, diff, tests, documentation authority, and evidence.
 Integration strategy is explicit and must preserve unrelated dirty state.
 
+### Commit gate
+
+`commit-gate` refuses a commit whose staged input has no current staged-scope
+`PASS` receipt, whose message carries a `Docs-Update` trailer that no current
+receipt backs (including a `PARTIAL` trailer over a `PASS` receipt), whose
+`Tests` trailer has no receipt kind, whose staged paths escape the goal
+manifest, or whose repository sets `core.hooksPath`. A missing pre-commit
+hook is a warning; an unenriched message is valid.
+
 ### Push
 
 Push requires separate owner authority, accepted integration, a current final
 checkpoint with `publishing=true`, and the exact remote-bound range.
+`push-gate` verifies the finalized acceptance (goal checkpoint or current
+final receipt), prints the exact fast-forward range, refuses locally modified
+paths inside that range, and states that push is not deploy and not a DB
+mutation. A migration commit inside the range is not evidence of deployment.
 
 ### Deploy and DB
 

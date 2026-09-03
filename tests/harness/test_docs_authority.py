@@ -69,6 +69,8 @@ class DocsAuthorityTests(unittest.TestCase):
             {"tests": "NO_CHANGE_REQUIRED"},
             goal=goal,
             changed_paths=["docs/unbounded.md"],
+
+            actor_role="root",
         )
         self.assertIn("MANIFEST_VIOLATION", {item["code"] for item in result["findings"]})
 
@@ -177,6 +179,8 @@ class DocsAuthorityTests(unittest.TestCase):
             {"tests": "NO_CHANGE_REQUIRED"},
             changed_paths=[],
             db_observation="VERIFIED",
+
+            actor_role="root",
         )
         self.assertEqual("FAIL", result["verdict"])
         self.assertIn("UNOBSERVABLE_DB_VERIFICATION", {item["code"] for item in result["findings"]})
@@ -192,6 +196,8 @@ class DocsAuthorityTests(unittest.TestCase):
                 goal=goal_for(root),
                 changed_paths=[],
                 db_observation="ATTESTED",
+
+                actor_role="root",
             )
             self.assertIn(
                 "DB_AUTHORITY_VIOLATION", {item["code"] for item in result["findings"]}

@@ -63,6 +63,8 @@ class DocsUpdateTests(unittest.TestCase):
             "pre-commit",
             {"tests": "NO_CHANGE_REQUIRED"},
             changed_paths=["js/ui.js"],
+
+            actor_role="root",
         )
         self.assertEqual("FAIL", result["verdict"])
         self.assertIn("MISSING_SURFACE_EVALUATION", {item["code"] for item in result["findings"]})
@@ -72,6 +74,8 @@ class DocsUpdateTests(unittest.TestCase):
         evaluations["ui_map"] = {"outcome": "NO_CHANGE_REQUIRED", "fresh": False}
         result = HARNESS.evaluate_docs_update(
             ROOT, "pre-commit", evaluations, changed_paths=["js/ui.js"]
+,
+            actor_role="root",
         )
         self.assertEqual("FAIL", result["verdict"])
         self.assertIn("STALE_DOCUMENTATION_SURFACE", {item["code"] for item in result["findings"]})
@@ -102,6 +106,8 @@ class DocsUpdateTests(unittest.TestCase):
                 goal=goal,
                 changed_paths=[],
                 publishing=checkpoint == "final",
+
+                actor_role="root",
             )
             if checkpoint == "final":
                 self.assertIn("MISSING_FINAL_REPORT", {item["code"] for item in result["findings"]})
@@ -116,6 +122,8 @@ class DocsUpdateTests(unittest.TestCase):
             evaluations = self._passing_evaluations("pre-commit", ["README.md"])
             result = HARNESS.evaluate_docs_update(
                 root, "pre-commit", evaluations, changed_paths=["README.md"]
+,
+                actor_role="root",
             )
             self.assertEqual("PASS", result["verdict"])
             receipt_path = HARNESS.write_docs_receipt(root, result["receipt"])
@@ -134,6 +142,8 @@ class DocsUpdateTests(unittest.TestCase):
             evaluations = self._passing_evaluations("pre-commit", ["README.md"])
             result = HARNESS.evaluate_docs_update(
                 root, "pre-commit", evaluations, changed_paths=["README.md"]
+,
+                actor_role="root",
             )
             receipt_path = HARNESS.write_docs_receipt(root, result["receipt"])
             (root / "README.md").chmod(0o755)
@@ -194,6 +204,8 @@ class DocsUpdateTests(unittest.TestCase):
             "pre-commit",
             {"tests": "NO_CHANGE_REQUIRED"},
             changed_paths=["js/config.js"],
+
+            actor_role="root",
         )
         self.assertEqual("FAIL", result["verdict"])
         self.assertIn("MISSING_SURFACE_EVALUATION", {item["code"] for item in result["findings"]})
@@ -206,6 +218,65 @@ class DocsUpdateTests(unittest.TestCase):
         )
         self.assertTrue({"domain_rules", "deploy_boundary", "tests"}.issubset(required))
         self.assertNotIn("live_schema", required)
+
+    def test_pre_commit_with_goal_requires_goal_report(self) -> None:
+        goal = HARNESS.minimal_goal_for_test()
+        result = HARNESS.evaluate_docs_update(
+            ROOT,
+            "pre-commit",
+            {"tests": "NO_CHANGE_REQUIRED"},
+            goal=goal,
+            actor_role="root",
+            changed_paths=["example.txt"],
+        )
+        missing = {item["path"] for item in result["findings"] if item["code"] == "MISSING_SURFACE_EVALUATION"}
+        self.assertTrue(any("goal_report" in path for path in missing), missing)
+
+    def test_actor_role_must_be_explicit(self) -> None:
+        result = HARNESS.evaluate_docs_update(
+            ROOT,
+            "pre-commit",
+            {"tests": "NO_CHANGE_REQUIRED"},
+            changed_paths=["README.md"],
+        )
+        self.assertIn("INVALID_DOCS_ACTOR", {item["code"] for item in result["findings"]})
+
+    def test_unbound_active_goal_worktree_warns(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            init_repo(root)
+            head = git(root, "rev-parse", "HEAD")
+            goal_dir = root / ".harness" / "goals" / "2026"
+            report_dir = root / ".harness" / "reports" / "2026"
+            goal_dir.mkdir(parents=True)
+            report_dir.mkdir(parents=True)
+            report_dir.joinpath("G-20990101-TEST.md").write_text(
+                "# r\n\nGoal: `G-20990101-TEST`\n\nDate: 2099-01-01\n\nFlow: `inline`\n\nRoot verdict: `IN_PROGRESS`\n",
+                encoding="utf-8",
+            )
+            frontmatter = (
+                "---\nid: G-20990101-TEST\nstatus: active\nowner: root\nflow: inline\n"
+                "created: 2099-01-01\nbase_sha: " + head + "\nlaunch_sha: " + head + "\n"
+                "branch: main\nworktree: " + str(root) + "\nwrite_manifest:\n  - README.md\n"
+                "docs_authority:\n  tracked_paths:\n    write:\n      - README.md\n    append: []\n"
+                "  local_paths:\n    write: []\n    append: []\n  db: none\npattern_refs: []\n"
+                "acceptance:\n  - a\nstop_conditions:\n  - s\n"
+                "report: .harness/reports/2026/G-20990101-TEST.md\n"
+                "checkpoint:\n  sequence: 0\n  kind: null\n  head: null\n  docs_verdict: null\n---\n\n# goal\n"
+            )
+            goal_dir.joinpath("G-20990101-TEST.md").write_text(frontmatter, encoding="utf-8")
+            (root / "README.md").write_text("changed\n", encoding="utf-8")
+            result = HARNESS.evaluate_docs_update(
+                root,
+                "pre-commit",
+                {"tests": "NO_CHANGE_REQUIRED"},
+                actor_role="root",
+                changed_paths=["README.md"],
+            )
+            warning = [item for item in result["findings"] if item["code"] == "ACTIVE_GOAL_UNBOUND"]
+            self.assertEqual(1, len(warning))
+            self.assertEqual("WARNING", warning[0]["level"])
+            self.assertEqual("PASS", result["verdict"])
 
 
 if __name__ == "__main__":

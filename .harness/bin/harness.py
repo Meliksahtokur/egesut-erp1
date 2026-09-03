@@ -328,7 +328,7 @@ def required_docs_surfaces(
         "final": {"memory"},
     }[checkpoint]
     required = set(base)
-    if goal is not None and checkpoint in {"pre-review", "handoff", "post-merge", "final"}:
+    if goal is not None and checkpoint in {"pre-commit", "pre-review", "handoff", "post-merge", "final"}:
         required.add("goal_report")
     if checkpoint == "final" and publishing:
         required.add("remote_range")
@@ -492,7 +492,7 @@ def evaluate_docs_update(
     evaluations: dict[str, Any],
     *,
     goal: dict[str, Any] | None = None,
-    actor_role: str = "root",
+    actor_role: str | None = None,
     changed_paths: Iterable[str] | None = None,
     local_paths: Iterable[str] = (),
     db_observation: str = "NONE",
@@ -508,6 +508,19 @@ def evaluate_docs_update(
     )
     goal_records, _ = load_goal_records(root)
     findings.extend(rendered_cache_findings(root, goal_records))
+    if goal is None:
+        for record in goal_records:
+            meta = record.get("meta", {})
+            if (
+                meta.get("status") in ACTIVE_GOAL_STATUSES
+                and str(meta.get("worktree")) == str(root)
+            ):
+                findings.append(
+                    finding(
+                        "ACTIVE_GOAL_UNBOUND", "WARNING", str(meta.get("id")),
+                        "evaluation ran without --goal while an active goal records this worktree",
+                    )
+                )
     normalized: dict[str, dict[str, Any]] = {}
     partial = False
     for surface, raw in sorted(evaluations.items()):
@@ -1329,6 +1342,181 @@ def parse_surface_arguments(values: Iterable[str]) -> dict[str, str]:
     return result
 
 
+TRAILER_RE = re.compile(r"^(Docs-Update|Tests):\s*(PASS|PARTIAL|FAIL)\s*$", re.MULTILINE)
+
+
+def commit_gate(
+    root: Path,
+    *,
+    goal: dict[str, Any] | None = None,
+    message_file: Path | None = None,
+) -> dict[str, Any]:
+    root = root.resolve()
+    findings: list[dict[str, Any]] = []
+    hooks_path = run_git(root, "config", "core.hooksPath", check=False).stdout.strip()
+    if hooks_path:
+        findings.append(
+            finding("HOOKS_PATH_SET", "ERROR", ".git/config", f"core.hooksPath is set: {hooks_path}")
+        )
+    common_dir = run_git(root, "rev-parse", "--git-common-dir").stdout.strip()
+    common_path = Path(common_dir) if common_dir else root / ".git"
+    if not common_path.is_absolute():
+        common_path = root / common_path
+    hook_file = common_path / "hooks" / "pre-commit"
+    hook_state = "present" if hook_file.is_file() else "missing"
+    if hook_state == "missing":
+        findings.append(
+            finding(
+                "NO_PRE_COMMIT_HOOK", "WARNING", str(hook_file),
+                "no pre-commit hook present; the contract keeps the existing hook reachable",
+            )
+        )
+    receipt_path = root / ".harness" / "cache" / DOCS_RECEIPT_NAME
+    checked = check_docs_receipt(root, receipt_path, expected_verdict="PASS")
+    findings.extend(checked["findings"])
+    receipt = checked.get("receipt") or {}
+    if checked.get("ok") and receipt.get("scope") != "staged":
+        findings.append(
+            finding(
+                "WRONG_RECEIPT_SCOPE", "ERROR", str(receipt_path),
+                f"commit gate requires a staged-scope receipt, found scope {receipt.get('scope')}",
+            )
+        )
+    staged = current_changed_paths(root, "staged")
+    if goal is not None:
+        manifest = goal.get("write_manifest") if isinstance(goal.get("write_manifest"), list) else []
+        for path in staged:
+            if path not in manifest:
+                findings.append(
+                    finding("MANIFEST_VIOLATION", "ERROR", path, "staged path is outside the goal write manifest")
+                )
+        receipt_goal = receipt.get("goal_id") if isinstance(receipt, dict) else None
+        if not receipt or receipt_goal != goal.get("id"):
+            findings.append(
+                finding(
+                    "RECEIPT_GOAL_MISMATCH", "ERROR", str(receipt_path),
+                    f"the staged receipt must record the gate goal {goal.get('id')}",
+                )
+            )
+    message = ""
+    if message_file is not None:
+        try:
+            message = Path(message_file).read_text(encoding="utf-8")
+        except OSError as exc:
+            findings.append(finding("INVALID_MESSAGE_FILE", "ERROR", str(message_file), str(exc)))
+    for match in TRAILER_RE.finditer(message):
+        kind, verdict = match.group(1), match.group(2)
+        if kind == "Tests":
+            findings.append(
+                finding(
+                    "UNSUPPORTED_TESTS_TRAILER", "ERROR", str(message_file),
+                    "Tests trailers require a test-receipt kind that does not exist; remove the trailer",
+                )
+            )
+        elif not checked.get("ok") or receipt.get("verdict") != verdict:
+            findings.append(
+                finding(
+                    "FABRICATED_DOCS_TRAILER", "ERROR", str(message_file),
+                    f"Docs-Update: {verdict} is not backed by a current matching staged receipt",
+                )
+            )
+    findings = _aggregate_findings(findings)
+    return {
+        "ok": not any(item["level"] == "ERROR" for item in findings),
+        "findings": findings,
+        "receipt_path": str(receipt_path),
+        "pre_commit_hook": hook_state,
+        "staged_paths": staged,
+    }
+
+
+def push_gate(
+    root: Path,
+    *,
+    goal: dict[str, Any] | None = None,
+    receipt: Path | None = None,
+    remote: str = "origin/main",
+    branch: str = "main",
+) -> dict[str, Any]:
+    root = root.resolve()
+    findings: list[dict[str, Any]] = []
+    if goal is None and receipt is None:
+        findings.append(
+            finding(
+                "NO_ACCEPTANCE_EVIDENCE", "ERROR", str(root),
+                "push gate requires a finalized goal or a current final receipt",
+            )
+        )
+    if goal is not None:
+        checkpoint = goal.get("checkpoint") if isinstance(goal.get("checkpoint"), dict) else {}
+        if checkpoint.get("kind") != "final(publishing=true)" or checkpoint.get("docs_verdict") != "PASS":
+            findings.append(
+                finding(
+                    "NOT_FINALIZED", "ERROR", str(goal.get("id", "goal")),
+                    "goal checkpoint must be final(publishing=true) with docs_verdict PASS",
+                )
+            )
+    if receipt is not None:
+        checked = check_docs_receipt(root, Path(receipt), expected_verdict="PASS")
+        findings.extend(checked["findings"])
+        gate_receipt = checked.get("receipt") or {}
+        if gate_receipt and (
+            gate_receipt.get("checkpoint") != "final" or not gate_receipt.get("publishing")
+        ):
+            findings.append(
+                finding(
+                    "NOT_FINAL_RECEIPT", "ERROR", str(receipt),
+                    "push-gate receipt must be a final(publishing=true) evaluation",
+                )
+            )
+    local = run_git(root, "rev-parse", branch).stdout.strip()
+    remote_result = None
+    if not remote.startswith("refs/"):
+        remote_result = run_git(root, "rev-parse", "--verify", f"refs/remotes/{remote}", check=False)
+    if remote_result is None or remote_result.returncode != 0:
+        remote_result = run_git(root, "rev-parse", "--verify", remote, check=False)
+    remote_sha = remote_result.stdout.strip() if remote_result.returncode == 0 else None
+    if remote_sha is None:
+        findings.append(
+            finding("UNKNOWN_REMOTE_REF", "ERROR", remote, f"remote ref not found: {remote}")
+        )
+    else:
+        if not git_is_ancestor(root, remote_sha, local):
+            findings.append(
+                finding(
+                    "NOT_FAST_FORWARD", "ERROR", remote,
+                    f"{remote} is not an ancestor of {branch}; refusing a non-fast-forward publish",
+                )
+            )
+        else:
+            changed = [
+                line for line in run_git(root, "diff", "--name-only", remote_sha, local).stdout.splitlines()
+                if line
+            ]
+            status_lines = run_git(root, "status", "--porcelain=v1").stdout.splitlines()
+            tracked_dirty = {
+                line[3:].split(" -> ")[-1]
+                for line in status_lines
+                if line and not line.startswith("??") and any(c in "MDCTR" for c in line[:2])
+            }
+            overlap = sorted(set(changed) & tracked_dirty)
+            if overlap:
+                findings.append(
+                    finding(
+                        "DIRTY_RANGE_PATHS", "ERROR", ", ".join(overlap),
+                        "locally modified paths inside the publish range must be clean",
+                    )
+                )
+    findings = _aggregate_findings(findings)
+    return {
+        "ok": not any(item["level"] == "ERROR" for item in findings),
+        "findings": findings,
+        "remote_range": f"{remote_sha}..{local}" if remote_sha else None,
+        "local_head": local,
+        "deploy_boundary": "push is not deploy; deploy, live DB, and destructive actions remain separate gates",
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="EgeSut unified harness")
     parser.add_argument("--root", type=Path, help="repository root; defaults to Git discovery")
@@ -1366,6 +1554,16 @@ def build_parser() -> argparse.ArgumentParser:
     receipt.add_argument("--path", type=Path)
     receipt.add_argument("--expect", choices=("PASS", "PARTIAL", "FAIL"))
     receipt.add_argument("--json", action="store_true")
+    commit = sub.add_parser("commit-gate")
+    commit.add_argument("--goal")
+    commit.add_argument("--message-file", type=Path)
+    commit.add_argument("--json", action="store_true")
+    push = sub.add_parser("push-gate")
+    push.add_argument("--goal")
+    push.add_argument("--receipt", type=Path)
+    push.add_argument("--remote", default="origin/main")
+    push.add_argument("--branch", default="main")
+    push.add_argument("--json", action="store_true")
     render = sub.add_parser("render")
     render.add_argument("view", choices=("board", "handoff", "goal-index", "memory-index"))
     render.add_argument("--cache", action="store_true")
@@ -1433,6 +1631,21 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if payload["verdict"] == "PASS" else 1
     elif command == "receipt-check":
         payload = check_docs_receipt(root, args.path, expected_verdict=args.expect)
+        print_payload(payload, args.json)
+        return 0 if payload["ok"] else 1
+    elif command in {"commit-gate", "push-gate"}:
+        goal = None
+        if args.goal:
+            record = next((item for item in goals if item["meta"].get("id") == args.goal), None)
+            if record is None:
+                raise HarnessError(f"unknown goal: {args.goal}")
+            goal = record["meta"]
+        if command == "commit-gate":
+            payload = commit_gate(root, goal=goal, message_file=args.message_file)
+        else:
+            payload = push_gate(
+                root, goal=goal, receipt=args.receipt, remote=args.remote, branch=args.branch
+            )
         print_payload(payload, args.json)
         return 0 if payload["ok"] else 1
     elif command == "render":
