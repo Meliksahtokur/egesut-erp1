@@ -99,6 +99,33 @@ staged commit input. `--local-path` declares an observed ignored/local write;
 it does not grant authority. `--db-observation ATTESTED` records an external
 claim without upgrading it to locally verified fact.
 
+## Surface names
+
+Required-surface names map to the document or evidence that owns them:
+
+| Surface | Owning document or evidence |
+|---|---|
+| `manifest` | the active goal's `write_manifest` |
+| `acceptance` | `.harness/acceptance.md` and per-criterion verdicts |
+| `docs_authority` | the goal's `docs_authority` block |
+| `tests` | the test-run evidence recorded in the goal report |
+| `ui_map` | `.harness/references/ui-map.md` |
+| `ui_patterns` | `.harness/patterns/modal.md` and `.harness/patterns/forms.md` |
+| `live_schema` | a separately authorized live-schema probe (never a tracked mirror) |
+| `rpc_reference` | `.harness/references/rpc-reference.md` |
+| `domain_rules` | `.harness/references/domain-rules.md` |
+| `deploy_boundary` | the report's deploy record; push is not deploy |
+| `decisions` | `.harness/decisions/` records |
+| `harness_contract` | `.harness/contract.md` and this document |
+| `harness_tests` | `tests/harness/` |
+| `goal_report` | the active goal and its linked report |
+| `generated_views` | the ignored `.harness/cache/` views |
+| `blockers_risks`, `next_action` | the handoff section of the report |
+| `memory` | curated notes under `.harness/memory/` |
+| `remote_range` | the exact push range recorded at `final --publishing` |
+| `testing_patterns` | `.harness/patterns/testing.md` |
+| `producer_provenance` | fixture provenance notes in the report |
+
 ## Generated views
 
 BOARD, HANDOFF, GOAL-INDEX, MEMORY-INDEX, and receipts belong to ignored cache

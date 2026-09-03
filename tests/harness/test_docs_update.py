@@ -180,6 +180,33 @@ class DocsUpdateTests(unittest.TestCase):
                 "INVALID_RECEIPT_ROLE", {item["code"] for item in checked["findings"]}
             )
 
+    def test_state_and_config_changes_require_ui_map_evaluation(self) -> None:
+        required = HARNESS.required_docs_surfaces(
+            "pre-commit", ["js/state.js"], goal=None, publishing=False
+        )
+        self.assertTrue({"ui_map", "ui_patterns", "tests"}.issubset(required))
+        config_required = HARNESS.required_docs_surfaces(
+            "pre-commit", ["js/config.js"], goal=None, publishing=False
+        )
+        self.assertTrue("ui_map" in config_required)
+        result = HARNESS.evaluate_docs_update(
+            ROOT,
+            "pre-commit",
+            {"tests": "NO_CHANGE_REQUIRED"},
+            changed_paths=["js/config.js"],
+        )
+        self.assertEqual("FAIL", result["verdict"])
+        self.assertIn("MISSING_SURFACE_EVALUATION", {item["code"] for item in result["findings"]})
+        missing = {item["path"] for item in result["findings"] if item["code"] == "MISSING_SURFACE_EVALUATION"}
+        self.assertTrue(any("ui_map" in path for path in missing), missing)
+
+    def test_edge_function_change_requires_domain_and_deploy_evaluation(self) -> None:
+        required = HARNESS.required_docs_surfaces(
+            "pre-commit", ["supabase/functions/stat-hesapla/index.ts"], goal=None, publishing=False
+        )
+        self.assertTrue({"domain_rules", "deploy_boundary", "tests"}.issubset(required))
+        self.assertNotIn("live_schema", required)
+
 
 if __name__ == "__main__":
     unittest.main()

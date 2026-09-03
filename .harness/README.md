@@ -20,10 +20,14 @@ receipts, and runtime state belong in ignored `.harness/cache/` or stdout.
 
 Phase 2 adds standard-library goal/report/decision validation and deterministic
 queries. Phase 3 adds checkpoint docs evaluation, authority checks,
-HEAD/diff-bound ignored receipts, and memory-index rendering. Run
-`harness.py --help` for commands. Pattern catalogs, product references, and
-legacy retirement arrive only in their later reviewed phases; their absence
-must not be papered over with runtime-specific policy copies.
+HEAD/diff-bound ignored receipts, and memory-index rendering. Phase 4 adds the
+pattern catalog under `patterns/`, the curated references under `references/`
+(symbol-keyed UI map plus RPC/domain contracts; live schema stays the only DB
+authority), product-diff routing for `js/state.js`, `js/config.js`, and
+`supabase/functions/**`, and pattern_ref enforcement for product-code goals.
+Run `harness.py --help` for commands. Git lifecycle gates and legacy
+retirement arrive only in their later reviewed phases; their absence must not
+be papered over with runtime-specific policy copies.
 
 ## Phase 2 query surface
 

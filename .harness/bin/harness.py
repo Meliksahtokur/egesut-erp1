@@ -39,6 +39,7 @@ DOC_SURFACE_OUTCOMES = {
     "UPDATED", "NO_CHANGE_REQUIRED", "PROPOSED", "OUT_OF_SCOPE"
 }
 DOCS_RECEIPT_NAME = "DOCS-RECEIPT.json"
+PATTERN_ID_RE = re.compile(r"^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*-[0-9]{2}$")
 
 
 class HarnessError(RuntimeError):
@@ -334,8 +335,12 @@ def required_docs_surfaces(
 
     for raw_path in changed_paths:
         path = str(raw_path).replace("\\", "/")
-        if path == "index.html" or path in {"js/ui.js", "js/forms.js", "js/app.js"}:
+        if path == "index.html" or path in {
+            "js/ui.js", "js/forms.js", "js/app.js", "js/state.js", "js/config.js",
+        }:
             required.update({"ui_map", "ui_patterns", "tests"})
+        if path.startswith("supabase/functions/"):
+            required.update({"domain_rules", "deploy_boundary", "tests"})
         if path == "js/api.js" or path.startswith("supabase/migrations/"):
             required.update(
                 {"live_schema", "rpc_reference", "domain_rules", "deploy_boundary", "tests"}
@@ -657,7 +662,33 @@ def check_docs_receipt(
     return {"ok": not findings, "receipt": receipt, "findings": findings}
 
 
-def validate_goal_meta(meta: dict[str, Any], path: Path) -> list[dict[str, str]]:
+def load_pattern_ids(root: Path) -> tuple[set[str], list[dict[str, str]]]:
+    index_path = root / ".harness" / "patterns" / "index.yaml"
+    if not index_path.is_file():
+        return set(), []
+    try:
+        parsed = parse_yaml_subset(index_path.read_text(encoding="utf-8"))
+    except (OSError, HarnessError) as exc:
+        return set(), [finding("INVALID_PATTERN_INDEX", "ERROR", index_path, str(exc))]
+    if not isinstance(parsed, dict) or not parsed:
+        return set(), [
+            finding("INVALID_PATTERN_INDEX", "ERROR", index_path, "pattern index must be a non-empty mapping")
+        ]
+    return set(parsed), []
+
+
+def product_manifest_paths(manifest: list[Any]) -> list[str]:
+    return [
+        str(item)
+        for item in manifest
+        if isinstance(item, str)
+        and (item == "index.html" or item.startswith(("js/", "supabase/")))
+    ]
+
+
+def validate_goal_meta(
+    meta: dict[str, Any], path: Path, pattern_ids: set[str] | None = None
+) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     required = {
         "id", "status", "owner", "flow", "created", "base_sha", "launch_sha", "branch",
@@ -759,6 +790,41 @@ def validate_goal_meta(meta: dict[str, Any], path: Path) -> list[dict[str, str]]
             findings.append(finding("INVALID_CHECKPOINT_HEAD", "ERROR", path, f"invalid checkpoint head: {head}"))
         if checkpoint.get("docs_verdict") not in DOCS_VERDICTS:
             findings.append(finding("INVALID_DOCS_VERDICT", "ERROR", path, f"invalid docs verdict: {checkpoint.get('docs_verdict')}"))
+    pattern_refs = meta.get("pattern_refs", [])
+    if pattern_refs is None:
+        pattern_refs = []
+    if not isinstance(pattern_refs, list):
+        findings.append(finding("INVALID_PATTERN_REFS", "ERROR", path, "pattern_refs must be a list"))
+    else:
+        malformed = [
+            str(item) for item in pattern_refs
+            if not isinstance(item, str) or not PATTERN_ID_RE.fullmatch(item)
+        ]
+        if malformed:
+            findings.append(
+                finding(
+                    "INVALID_PATTERN_REF", "ERROR", path,
+                    "pattern ids must look like MODAL-ROUTER-01: " + ", ".join(malformed),
+                )
+            )
+        if pattern_ids is not None:
+            unknown = [str(item) for item in pattern_refs if isinstance(item, str) and item not in pattern_ids]
+            if unknown:
+                findings.append(
+                    finding(
+                        "UNKNOWN_PATTERN_REF", "ERROR", path,
+                        "pattern id is not in .harness/patterns/index.yaml: " + ", ".join(unknown),
+                    )
+                )
+        exceptions = meta.get("pattern_exceptions", [])
+        if isinstance(manifest, list) and product_manifest_paths(manifest):
+            if not pattern_refs and not (isinstance(exceptions, list) and exceptions):
+                findings.append(
+                    finding(
+                        "MISSING_PATTERN_REF", "ERROR", path,
+                        "goals writing product code require pattern_refs or recorded pattern_exceptions",
+                    )
+                )
     return findings
 
 
@@ -865,12 +931,14 @@ def validate_repository(root: Path) -> dict[str, Any]:
     goals, findings = load_goal_records(root)
     decisions, decision_load_findings = load_decision_records(root)
     findings.extend(decision_load_findings)
+    pattern_ids, pattern_findings = load_pattern_ids(root)
+    findings.extend(pattern_findings)
     findings.extend(validate_unique_ids(goals, "goal"))
     findings.extend(validate_unique_ids(decisions, "decision"))
     goal_ids = {record.get("meta", {}).get("id") for record in goals}
     for record in goals:
         meta, path = record["meta"], Path(record["path"])
-        findings.extend(validate_goal_meta(meta, path))
+        findings.extend(validate_goal_meta(meta, path, pattern_ids=pattern_ids))
         linked = validate_report_link(root, meta, path)
         if linked:
             findings.append(linked)
@@ -885,6 +953,7 @@ def validate_repository(root: Path) -> dict[str, Any]:
         "ok": not any(item["level"] == "ERROR" for item in findings),
         "goal_count": len(goals),
         "decision_count": len(decisions),
+        "pattern_count": len(pattern_ids),
         "findings": findings,
     }
 

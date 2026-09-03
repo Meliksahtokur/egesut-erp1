@@ -135,6 +135,12 @@ Before inventing a modal, form, RPC, offline-sync path, fixture, or test helper:
 
 Line numbers are hints. Prefer stable symbols and behavior-backed tests.
 
+Goals whose write manifest touches product code (`js/`, `index.html`,
+`supabase/`) must declare `pattern_refs` naming catalog patterns from
+`.harness/patterns/index.yaml`, or record `pattern_exceptions` with the
+reason. Pattern references and exceptions are attestations reviewed at
+pre-review, not mechanically verified product compliance.
+
 ## Documentation checkpoints
 
 Root and lead evaluate documentation at:
