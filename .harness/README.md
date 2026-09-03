@@ -18,12 +18,12 @@ Read in this order:
 Canonical records are tracked. Generated boards, indexes, schema summaries,
 receipts, and runtime state belong in ignored `.harness/cache/` or stdout.
 
-Phase 2 adds standard-library goal/report/decision validation and the
-`.harness/bin/harness.py` query surface. Run `harness.py --help` for commands;
-generated board, handoff, and goal-index views remain stdout/ignored-cache
-projections. Docs-update automation, pattern catalogs, and legacy retirement
-arrive only in their later reviewed phases. Their absence must not be papered
-over with runtime-specific policy copies.
+Phase 2 adds standard-library goal/report/decision validation and deterministic
+queries. Phase 3 adds checkpoint docs evaluation, authority checks,
+HEAD/diff-bound ignored receipts, and memory-index rendering. Run
+`harness.py --help` for commands. Pattern catalogs, product references, and
+legacy retirement arrive only in their later reviewed phases; their absence
+must not be papered over with runtime-specific policy copies.
 
 ## Phase 2 query surface
 
@@ -41,9 +41,16 @@ lineage G-...             show parent and direct children
 render board              generate the goal board to stdout
 render handoff            generate active-goal handoff to stdout
 render goal-index         generate deterministic JSON to stdout
+render memory-index       generate curated-memory navigation to stdout
+docs-update CHECKPOINT    evaluate routed documentation surfaces and authority
+receipt-check             reject missing, stale, or dishonest docs receipts
 ```
 
 Add `--json` to query commands that support structured output. `render ...
 --cache` writes only to ignored `.harness/cache/`; cached projections never
 become authority. `history` always reports commit subject, paths, author, and
 date. Goal, flow, and mode remain `null` when no truthful trailer exists.
+
+See `docs-update.md` for checkpoint outcomes, receipt semantics, and CLI
+examples. Receipts and all four rendered aggregate views remain ignored derived
+state.

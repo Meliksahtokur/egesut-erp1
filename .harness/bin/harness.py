@@ -9,6 +9,8 @@ for governance intent. It never repairs records or changes Git state.
 from __future__ import annotations
 
 import argparse
+import fnmatch
+import hashlib
 import json
 import re
 import subprocess
@@ -28,7 +30,15 @@ GOAL_ID_RE = re.compile(r"^G-[0-9]{8}-[A-Z0-9][A-Z0-9-]*$")
 DECISION_ID_RE = re.compile(r"^D-[0-9]{8}-[A-Z0-9][A-Z0-9-]*$")
 DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 CANONICAL_TREES = ("goals", "reports", "decisions")
-ALLOWED_CACHE_NAMES = {"BOARD.md", "HANDOFF.md", "GOAL-INDEX.md"}
+ALLOWED_CACHE_NAMES = {"BOARD.md", "HANDOFF.md", "GOAL-INDEX.md", "MEMORY-INDEX.md"}
+CHECKPOINT_KINDS = {"pre-commit", "pre-review", "handoff", "post-merge", "final"}
+GOAL_CHECKPOINT_KINDS = {
+    None, *CHECKPOINT_KINDS, "final(publishing=false)", "final(publishing=true)"
+}
+DOC_SURFACE_OUTCOMES = {
+    "UPDATED", "NO_CHANGE_REQUIRED", "PROPOSED", "OUT_OF_SCOPE"
+}
+DOCS_RECEIPT_NAME = "DOCS-RECEIPT.json"
 
 
 class HarnessError(RuntimeError):
@@ -203,6 +213,450 @@ def valid_repository_path(value: Any) -> bool:
     return not path.is_absolute() and ".." not in path.parts and path != PurePosixPath(".")
 
 
+def current_changed_paths(root: Path, scope: str = "all") -> list[str]:
+    if scope not in {"all", "staged"}:
+        raise HarnessError(f"unsupported diff scope: {scope}")
+    if scope == "staged":
+        raw = subprocess.run(
+            ["git", "diff", "--cached", "--name-only", "-z"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        ).stdout
+        return sorted({item.decode("utf-8", "surrogateescape") for item in raw.split(b"\0") if item})
+
+    raw = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    ).stdout
+    tokens = [item for item in raw.split(b"\0") if item]
+    paths: set[str] = set()
+    index = 0
+    while index < len(tokens):
+        record = tokens[index]
+        if len(record) < 4:
+            index += 1
+            continue
+        status = record[:2].decode("ascii", "replace")
+        paths.add(record[3:].decode("utf-8", "surrogateescape"))
+        if status[0] in {"R", "C"} or status[1] in {"R", "C"}:
+            index += 1
+            if index < len(tokens):
+                paths.add(tokens[index].decode("utf-8", "surrogateescape"))
+        index += 1
+    return sorted(paths)
+
+
+def repository_state(
+    root: Path,
+    paths: Iterable[str],
+    *,
+    scope: str = "all",
+    local_paths: Iterable[str] = (),
+) -> dict[str, Any]:
+    root = root.resolve()
+    head = run_git(root, "rev-parse", "HEAD").stdout.strip()
+    digest = hashlib.sha256()
+    normalized_paths = sorted(set(str(item) for item in paths))
+    normalized_local = sorted(set(str(item) for item in local_paths))
+    digest.update(f"head\0{head}\0scope\0{scope}\0".encode())
+
+    for value in normalized_paths:
+        digest.update(f"repo\0{value}\0".encode("utf-8", "surrogateescape"))
+        if not valid_repository_path(value):
+            digest.update(b"INVALID\0")
+            continue
+        if scope == "staged":
+            staged = subprocess.run(
+                ["git", "show", f":{value}"], cwd=root, check=False, capture_output=True
+            )
+            mode = run_git(root, "ls-files", "-s", "--", value, check=False).stdout
+            digest.update(mode.encode("utf-8", "surrogateescape"))
+            digest.update(staged.stdout if staged.returncode == 0 else b"DELETED\0")
+            continue
+        path = root / value
+        if path.exists() or path.is_symlink():
+            digest.update(f"MODE\0{path.lstat().st_mode:o}\0".encode())
+        if path.is_symlink():
+            digest.update(b"SYMLINK\0" + str(path.readlink()).encode("utf-8", "surrogateescape"))
+        elif path.is_file():
+            digest.update(b"FILE\0" + path.read_bytes())
+        elif path.is_dir():
+            digest.update(b"DIRECTORY\0")
+        else:
+            digest.update(b"MISSING\0")
+
+    for value in normalized_local:
+        digest.update(f"local\0{value}\0".encode("utf-8", "surrogateescape"))
+        path = Path(value) if Path(value).is_absolute() else root / value
+        if path.exists() or path.is_symlink():
+            digest.update(f"MODE\0{path.lstat().st_mode:o}\0".encode())
+        if path.is_symlink():
+            digest.update(b"SYMLINK\0" + str(path.readlink()).encode("utf-8", "surrogateescape"))
+        elif path.is_file():
+            digest.update(b"FILE\0" + path.read_bytes())
+        elif path.is_dir():
+            digest.update(b"DIRECTORY\0")
+        else:
+            digest.update(b"MISSING\0")
+    return {
+        "head": head,
+        "diff_hash": digest.hexdigest(),
+        "paths": normalized_paths,
+        "local_paths": normalized_local,
+        "scope": scope,
+    }
+
+
+def required_docs_surfaces(
+    checkpoint: str,
+    changed_paths: Iterable[str],
+    *,
+    goal: dict[str, Any] | None = None,
+    publishing: bool = False,
+) -> set[str]:
+    if checkpoint not in CHECKPOINT_KINDS:
+        raise HarnessError(f"unsupported docs checkpoint: {checkpoint}")
+    base = {
+        "pre-commit": {"tests"},
+        "pre-review": {"manifest", "acceptance", "docs_authority"},
+        "handoff": {"blockers_risks", "next_action"},
+        "post-merge": {"memory"},
+        "final": {"memory"},
+    }[checkpoint]
+    required = set(base)
+    if goal is not None and checkpoint in {"pre-review", "handoff", "post-merge", "final"}:
+        required.add("goal_report")
+    if checkpoint == "final" and publishing:
+        required.add("remote_range")
+
+    for raw_path in changed_paths:
+        path = str(raw_path).replace("\\", "/")
+        if path == "index.html" or path in {"js/ui.js", "js/forms.js", "js/app.js"}:
+            required.update({"ui_map", "ui_patterns", "tests"})
+        if path == "js/api.js" or path.startswith("supabase/migrations/"):
+            required.update(
+                {"live_schema", "rpc_reference", "domain_rules", "deploy_boundary", "tests"}
+            )
+        if "domain-rules" in path or path.startswith(".harness/decisions/"):
+            required.update({"domain_rules", "decisions"})
+        if path.startswith(".harness/") or path.startswith("tests/harness/"):
+            required.update({"harness_contract", "harness_tests"})
+        if path.startswith(".harness/goals/") or path.startswith(".harness/reports/"):
+            required.update({"goal_report", "generated_views"})
+        if path.startswith("tests/") and "fixture" in path.casefold():
+            required.update({"testing_patterns", "producer_provenance"})
+    return required
+
+
+def _path_allowed(path: str, declarations: Iterable[str]) -> bool:
+    normalized = path.replace("\\", "/")
+    for declaration in declarations:
+        pattern = str(declaration).replace("\\", "/")
+        if normalized == pattern or fnmatch.fnmatchcase(normalized, pattern):
+            return True
+        if pattern.endswith("/**") and normalized.startswith(pattern[:-3].rstrip("/") + "/"):
+            return True
+    return False
+
+
+def is_documentation_path(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    if normalized in {"AGENTS.md", "CLAUDE.md"} or normalized.startswith("docs/"):
+        return True
+    if normalized.endswith((".md", ".mdx")):
+        return True
+    if normalized.startswith((".claude/", ".agents/", ".zcode/", ".qwen/", ".openclaude/")):
+        return normalized.endswith((".md", ".json", ".yaml", ".yml"))
+    if normalized.startswith(".harness/") and not normalized.startswith(".harness/bin/"):
+        return normalized.endswith((".md", ".json", ".yaml", ".yml"))
+    return False
+
+
+def _aggregate_findings(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for item in items:
+        key = (str(item["code"]), str(item["level"]), str(item["message"]))
+        if key not in grouped:
+            grouped[key] = {**item, "count": int(item.get("count", 1)), "paths": [str(item["path"])]}
+        else:
+            grouped[key]["count"] += int(item.get("count", 1))
+            grouped[key]["paths"].append(str(item["path"]))
+    result: list[dict[str, Any]] = []
+    for value in grouped.values():
+        value["paths"] = sorted(set(value["paths"]))
+        value["path"] = ", ".join(value["paths"])
+        result.append(value)
+    return sorted(result, key=lambda item: (item["level"], item["code"], item["path"]))
+
+
+def documentation_authority_findings(
+    goal: dict[str, Any] | None,
+    actor_role: str,
+    changed_paths: Iterable[str],
+    local_paths: Iterable[str],
+    db_observation: str,
+) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    changed = sorted(set(str(item) for item in changed_paths))
+    local = sorted(set(str(item) for item in local_paths))
+    if actor_role not in {"root", "lead"}:
+        findings.append(finding("INVALID_DOCS_ACTOR", "ERROR", actor_role, "docs-update actor must be root or lead"))
+    if actor_role == "lead" and goal is None:
+        for path in [item for item in changed if is_documentation_path(item)] + local:
+            findings.append(
+                finding(
+                    "LEAD_DOCS_GOAL_REQUIRED", "ERROR", path,
+                    "lead documentation writes require a goal with declared docs authority",
+                )
+            )
+    if goal is not None:
+        manifest = goal.get("write_manifest") if isinstance(goal.get("write_manifest"), list) else []
+        authority = goal.get("docs_authority") if isinstance(goal.get("docs_authority"), dict) else {}
+        local_authority = authority.get("local_paths") if isinstance(authority.get("local_paths"), dict) else {}
+        local_allowed = [*local_authority.get("write", []), *local_authority.get("append", [])]
+        outside_manifest = [path for path in changed if path not in manifest]
+        for path in outside_manifest:
+            findings.append(finding("MANIFEST_VIOLATION", "ERROR", path, "changed path is outside the goal write manifest"))
+        if actor_role == "lead":
+            tracked = authority.get("tracked_paths") if isinstance(authority.get("tracked_paths"), dict) else {}
+            tracked_allowed = [*tracked.get("write", []), *tracked.get("append", [])]
+            for path in changed:
+                if is_documentation_path(path) and not _path_allowed(path, tracked_allowed):
+                    findings.append(
+                        finding(
+                            "UNAUTHORIZED_TRACKED_DOC", "ERROR", path,
+                            "lead changed tracked documentation outside declared docs authority",
+                        )
+                    )
+            for path in local:
+                if not _path_allowed(path, local_allowed):
+                    findings.append(
+                        finding(
+                            "UNAUTHORIZED_LOCAL_DOC", "ERROR", path,
+                            "lead changed local or ignored documentation outside declared local authority",
+                        )
+                    )
+        for path in local:
+            if not _path_allowed(path, local_allowed):
+                findings.append(
+                    finding(
+                        "LOCAL_SCOPE_VIOLATION", "ERROR", path,
+                        "local or ignored write is outside the Full goal local authority",
+                    )
+                )
+        if db_observation != "NONE" and authority.get("db", "none") == "none":
+            findings.append(
+                finding(
+                    "DB_AUTHORITY_VIOLATION", "ERROR", "db",
+                    "DB observation was declared while the goal grants db: none",
+                )
+            )
+    elif db_observation != "NONE":
+        findings.append(
+            finding(
+                "DB_AUTHORITY_VIOLATION", "ERROR", "db",
+                "DB observations require a Full goal with explicit DB authority",
+            )
+        )
+    if db_observation == "VERIFIED":
+        findings.append(
+            finding(
+                "UNOBSERVABLE_DB_VERIFICATION", "ERROR", "db",
+                "local docs-update cannot independently label a DB effect VERIFIED; use ATTESTED",
+            )
+        )
+    elif db_observation not in {"NONE", "ATTESTED"}:
+        findings.append(finding("INVALID_DB_OBSERVATION", "ERROR", "db", f"invalid DB observation: {db_observation}"))
+    return _aggregate_findings(findings)
+
+
+def _normalize_surface(value: Any) -> tuple[str | None, bool]:
+    if isinstance(value, str):
+        return value, True
+    if isinstance(value, dict):
+        return value.get("outcome"), value.get("fresh", True) is not False
+    return None, True
+
+
+def evaluate_docs_update(
+    root: Path,
+    checkpoint: str,
+    evaluations: dict[str, Any],
+    *,
+    goal: dict[str, Any] | None = None,
+    actor_role: str = "root",
+    changed_paths: Iterable[str] | None = None,
+    local_paths: Iterable[str] = (),
+    db_observation: str = "NONE",
+    publishing: bool = False,
+    scope: str = "all",
+) -> dict[str, Any]:
+    root = root.resolve()
+    changed = current_changed_paths(root, scope) if changed_paths is None else sorted(set(changed_paths))
+    local = sorted(set(str(item) for item in local_paths))
+    required = required_docs_surfaces(checkpoint, changed, goal=goal, publishing=publishing)
+    findings: list[dict[str, Any]] = documentation_authority_findings(
+        goal, actor_role, changed, local, db_observation.upper()
+    )
+    goal_records, _ = load_goal_records(root)
+    findings.extend(rendered_cache_findings(root, goal_records))
+    normalized: dict[str, dict[str, Any]] = {}
+    partial = False
+    for surface, raw in sorted(evaluations.items()):
+        outcome, fresh = _normalize_surface(raw)
+        normalized[surface] = {"outcome": outcome, "fresh": fresh}
+        if outcome not in DOC_SURFACE_OUTCOMES:
+            findings.append(finding("INVALID_SURFACE_OUTCOME", "ERROR", surface, f"invalid outcome: {outcome}"))
+        if not fresh:
+            findings.append(
+                finding(
+                    "STALE_DOCUMENTATION_SURFACE", "ERROR", surface,
+                    "surface was evaluated from stale evidence",
+                )
+            )
+        if outcome in {"PROPOSED", "OUT_OF_SCOPE"}:
+            partial = True
+    for surface in sorted(required - set(normalized)):
+        findings.append(
+            finding(
+                "MISSING_SURFACE_EVALUATION", "ERROR", surface,
+                "required documentation surface was not evaluated",
+            )
+        )
+    if checkpoint == "final" and goal is not None:
+        report = goal.get("report")
+        if not isinstance(report, str) or not valid_repository_path(report) or not (root / report).is_file():
+            findings.append(
+                finding("MISSING_FINAL_REPORT", "ERROR", str(report), "final checkpoint requires its linked report")
+            )
+    findings = _aggregate_findings(findings)
+    verdict = "FAIL" if any(item["level"] == "ERROR" for item in findings) else "PARTIAL" if partial else "PASS"
+    state = repository_state(root, changed, scope=scope, local_paths=local)
+    receipt = {
+        "version": 1,
+        "checkpoint": checkpoint,
+        "publishing": publishing,
+        "goal_id": goal.get("id") if goal else None,
+        "actor_role": actor_role,
+        "db_observation": db_observation.upper(),
+        "head": state["head"],
+        "scope": scope,
+        "diff_hash": state["diff_hash"],
+        "paths": state["paths"],
+        "local_paths": state["local_paths"],
+        "required_surfaces": sorted(required),
+        "evaluations": normalized,
+        "verdict": verdict,
+    }
+    return {
+        "verdict": verdict,
+        "checkpoint": checkpoint,
+        "required_surfaces": sorted(required),
+        "findings": findings,
+        "receipt": receipt,
+    }
+
+
+def write_docs_receipt(root: Path, receipt: dict[str, Any]) -> Path:
+    path = root.resolve() / ".harness" / "cache" / DOCS_RECEIPT_NAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def _goal_by_id(root: Path, goal_id: str | None) -> dict[str, Any] | None:
+    if goal_id is None:
+        return None
+    goals, _ = load_goal_records(root)
+    record = next((item for item in goals if item["meta"].get("id") == goal_id), None)
+    return record["meta"] if record else None
+
+
+def check_docs_receipt(
+    root: Path,
+    path: Path | None = None,
+    *,
+    expected_verdict: str | None = None,
+) -> dict[str, Any]:
+    root = root.resolve()
+    receipt_path = path or root / ".harness" / "cache" / DOCS_RECEIPT_NAME
+    if not receipt_path.is_file():
+        item = finding("MISSING_DOCS_RECEIPT", "ERROR", receipt_path, "docs-update receipt is missing")
+        return {"ok": False, "findings": _aggregate_findings([item])}
+    try:
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        item = finding("INVALID_DOCS_RECEIPT", "ERROR", receipt_path, str(exc))
+        return {"ok": False, "findings": _aggregate_findings([item])}
+    findings: list[dict[str, Any]] = []
+    if receipt.get("version") != 1:
+        findings.append(finding("INVALID_RECEIPT_VERSION", "ERROR", receipt_path, "unsupported receipt version"))
+    scope = receipt.get("scope", "all")
+    actual_paths = current_changed_paths(root, scope)
+    recorded_paths = sorted(set(receipt.get("paths", [])))
+    if actual_paths != recorded_paths:
+        findings.append(
+            finding(
+                "STALE_RECEIPT_PATHS", "ERROR", receipt_path,
+                "receipt paths do not match the current Git change set",
+            )
+        )
+    state = repository_state(
+        root, actual_paths, scope=scope, local_paths=receipt.get("local_paths", [])
+    )
+    if receipt.get("head") != state["head"]:
+        findings.append(finding("STALE_RECEIPT_HEAD", "ERROR", receipt_path, "receipt HEAD is stale"))
+    if receipt.get("diff_hash") != state["diff_hash"]:
+        findings.append(finding("STALE_RECEIPT_DIFF", "ERROR", receipt_path, "receipt diff hash is stale"))
+    goal = _goal_by_id(root, receipt.get("goal_id"))
+    if receipt.get("goal_id") and goal is None:
+        findings.append(finding("UNKNOWN_RECEIPT_GOAL", "ERROR", receipt_path, "receipt goal does not exist"))
+    actor_role = receipt.get("actor_role")
+    if actor_role not in {"root", "lead"}:
+        findings.append(
+            finding(
+                "INVALID_RECEIPT_ROLE", "ERROR", receipt_path,
+                "receipt must record an explicit root or lead actor-role attestation",
+            )
+        )
+    recomputed = None
+    if actor_role in {"root", "lead"}:
+        try:
+            recomputed = evaluate_docs_update(
+                root,
+                receipt.get("checkpoint"),
+                receipt.get("evaluations", {}),
+                goal=goal,
+                actor_role=actor_role,
+                changed_paths=actual_paths,
+                local_paths=receipt.get("local_paths", []),
+                db_observation=receipt.get("db_observation", "NONE"),
+                publishing=bool(receipt.get("publishing", False)),
+                scope=scope,
+            )
+        except (HarnessError, TypeError, ValueError) as exc:
+            findings.append(finding("INVALID_DOCS_RECEIPT", "ERROR", receipt_path, str(exc)))
+    if recomputed and receipt.get("verdict") != recomputed["verdict"]:
+        findings.append(
+            finding(
+                "RECEIPT_VERDICT_MISMATCH", "ERROR", receipt_path,
+                "receipt verdict does not match a current deterministic evaluation",
+            )
+        )
+    if expected_verdict is not None and receipt.get("verdict") != expected_verdict:
+        findings.append(
+            finding(
+                "RECEIPT_EXPECTED_VERDICT_MISMATCH", "ERROR", receipt_path,
+                f"expected {expected_verdict}, receipt records {receipt.get('verdict')}",
+            )
+        )
+    findings = _aggregate_findings(findings)
+    return {"ok": not findings, "receipt": receipt, "findings": findings}
+
+
 def validate_goal_meta(meta: dict[str, Any], path: Path) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     required = {
@@ -242,6 +696,21 @@ def validate_goal_meta(meta: dict[str, Any], path: Path) -> list[dict[str, str]]
                     + ", ".join(invalid_paths),
                 )
             )
+        wildcard_paths = [
+            str(item)
+            for item in manifest
+            if isinstance(item, str) and any(marker in item for marker in ("*", "?", "[", "]"))
+        ]
+        if wildcard_paths:
+            findings.append(
+                finding(
+                    "WILDCARD_MANIFEST_PATH",
+                    "ERROR",
+                    path,
+                    "write_manifest requires exact paths, not patterns: "
+                    + ", ".join(wildcard_paths),
+                )
+            )
     for key in ("acceptance", "stop_conditions"):
         findings.extend(_require_list(meta, key, path))
     authority = meta.get("docs_authority")
@@ -278,6 +747,13 @@ def validate_goal_meta(meta: dict[str, Any], path: Path) -> list[dict[str, str]]
     else:
         if not isinstance(checkpoint.get("sequence"), int) or checkpoint.get("sequence", -1) < 0:
             findings.append(finding("INVALID_CHECKPOINT_SEQUENCE", "ERROR", path, "checkpoint sequence must be non-negative"))
+        if checkpoint.get("kind") not in GOAL_CHECKPOINT_KINDS:
+            findings.append(
+                finding(
+                    "INVALID_CHECKPOINT_KIND", "ERROR", path,
+                    f"invalid checkpoint kind: {checkpoint.get('kind')}",
+                )
+            )
         head = checkpoint.get("head")
         if head is not None and (not isinstance(head, str) or not SHA_RE.fullmatch(head)):
             findings.append(finding("INVALID_CHECKPOINT_HEAD", "ERROR", path, f"invalid checkpoint head: {head}"))
@@ -683,6 +1159,46 @@ def render_goal_index(goals: list[dict[str, Any]]) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
 
 
+def render_memory_index(root: Path) -> str:
+    directory = root / ".harness" / "memory"
+    rows: list[tuple[str, str]] = []
+    if directory.exists():
+        for path in sorted(directory.rglob("*.md")):
+            if path.name.casefold() == "readme.md":
+                continue
+            lines = path.read_text(encoding="utf-8").splitlines()
+            title = next(
+                (line[2:].strip() for line in lines if line.startswith("# ")),
+                path.stem,
+            )
+            rows.append((str(path.relative_to(root)), title.replace("|", "\\|")))
+    lines = ["# Generated Memory Index", "", "| Path | Subject |", "|---|---|"]
+    lines.extend(f"| {path} | {title} |" for path, title in rows)
+    return "\n".join(lines) + "\n"
+
+
+def rendered_cache_findings(
+    root: Path, goals: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    expected = {
+        "BOARD.md": render_board(goals),
+        "HANDOFF.md": render_handoff(goals),
+        "GOAL-INDEX.md": render_goal_index(goals),
+        "MEMORY-INDEX.md": render_memory_index(root),
+    }
+    findings: list[dict[str, Any]] = []
+    for name, content in expected.items():
+        path = root / ".harness" / "cache" / name
+        if path.is_file() and path.read_text(encoding="utf-8") != content:
+            findings.append(
+                finding(
+                    "STALE_RENDERED_VIEW", "WARNING", path,
+                    "cached generated view differs from canonical inputs",
+                )
+            )
+    return _aggregate_findings(findings)
+
+
 def write_cache(root: Path, name: str, content: str) -> Path:
     if name not in ALLOWED_CACHE_NAMES:
         raise HarnessError(f"unsupported generated cache name: {name}")
@@ -732,6 +1248,18 @@ def print_payload(payload: Any, as_json: bool) -> None:
         print(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
 
 
+def parse_surface_arguments(values: Iterable[str]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for value in values:
+        name, separator, outcome = value.partition("=")
+        if not separator or not name or not outcome:
+            raise HarnessError(f"surface evaluation must be NAME=OUTCOME: {value}")
+        if name in result:
+            raise HarnessError(f"duplicate surface evaluation: {name}")
+        result[name] = outcome
+    return result
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="EgeSut unified harness")
     parser.add_argument("--root", type=Path, help="repository root; defaults to Git discovery")
@@ -754,8 +1282,23 @@ def build_parser() -> argparse.ArgumentParser:
     tree = sub.add_parser("lineage")
     tree.add_argument("goal_id")
     tree.add_argument("--json", action="store_true")
+    docs = sub.add_parser("docs-update")
+    docs.add_argument("checkpoint", choices=sorted(CHECKPOINT_KINDS))
+    docs.add_argument("--goal")
+    docs.add_argument("--role", choices=("root", "lead"), required=True)
+    docs.add_argument("--surface", action="append", default=[])
+    docs.add_argument("--local-path", action="append", default=[])
+    docs.add_argument("--db-observation", choices=("NONE", "ATTESTED", "VERIFIED"), default="NONE")
+    docs.add_argument("--publishing", action="store_true")
+    docs.add_argument("--scope", choices=("all", "staged"), default="all")
+    docs.add_argument("--write-receipt", action="store_true")
+    docs.add_argument("--json", action="store_true")
+    receipt = sub.add_parser("receipt-check")
+    receipt.add_argument("--path", type=Path)
+    receipt.add_argument("--expect", choices=("PASS", "PARTIAL", "FAIL"))
+    receipt.add_argument("--json", action="store_true")
     render = sub.add_parser("render")
-    render.add_argument("view", choices=("board", "handoff", "goal-index"))
+    render.add_argument("view", choices=("board", "handoff", "goal-index", "memory-index"))
     render.add_argument("--cache", action="store_true")
     return parser
 
@@ -797,10 +1340,46 @@ def main(argv: list[str] | None = None) -> int:
         print_payload(stale_goals(root, goals), args.json)
     elif command == "lineage":
         print_payload(lineage(goals, args.goal_id), args.json)
+    elif command == "docs-update":
+        goal = None
+        if args.goal:
+            record = next((item for item in goals if item["meta"].get("id") == args.goal), None)
+            if record is None:
+                raise HarnessError(f"unknown goal: {args.goal}")
+            goal = record["meta"]
+        payload = evaluate_docs_update(
+            root,
+            args.checkpoint,
+            parse_surface_arguments(args.surface),
+            goal=goal,
+            actor_role=args.role,
+            local_paths=args.local_path,
+            db_observation=args.db_observation,
+            publishing=args.publishing,
+            scope=args.scope,
+        )
+        if args.write_receipt:
+            payload["receipt_path"] = str(write_docs_receipt(root, payload["receipt"]))
+        print_payload(payload, args.json)
+        return 0 if payload["verdict"] == "PASS" else 1
+    elif command == "receipt-check":
+        payload = check_docs_receipt(root, args.path, expected_verdict=args.expect)
+        print_payload(payload, args.json)
+        return 0 if payload["ok"] else 1
     elif command == "render":
-        renderers = {"board": render_board, "handoff": render_handoff, "goal-index": render_goal_index}
-        names = {"board": "BOARD.md", "handoff": "HANDOFF.md", "goal-index": "GOAL-INDEX.md"}
-        content = renderers[args.view](goals)
+        renderers = {
+            "board": lambda: render_board(goals),
+            "handoff": lambda: render_handoff(goals),
+            "goal-index": lambda: render_goal_index(goals),
+            "memory-index": lambda: render_memory_index(root),
+        }
+        names = {
+            "board": "BOARD.md",
+            "handoff": "HANDOFF.md",
+            "goal-index": "GOAL-INDEX.md",
+            "memory-index": "MEMORY-INDEX.md",
+        }
+        content = renderers[args.view]()
         if args.cache:
             print(write_cache(root, names[args.view], content))
         else:
