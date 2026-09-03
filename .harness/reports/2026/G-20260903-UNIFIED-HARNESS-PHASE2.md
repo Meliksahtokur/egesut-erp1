@@ -143,55 +143,6 @@ Checkpoint: `pre-review`, sequence `1`
 
 Docs verdict: `PASS`.
 
-## 13. Final integration and publishing checkpoint
-
-Checkpoint: `final(publishing=true)`, sequence `5`
-
-The owner authorized autonomous merge and push after local acceptance. Root
-created the clean integration worktree
-`/home/melik/egesut-wt/unified-agent-harness-phase2-integration` from verified
-main `fd38192`, merged `idle/unified-agent-harness-phase2` with
-`--no-commit --no-ff`, and carried the sequence-3/4 goal and report handoff
-deltas into the candidate.
-
-Root acceptance of the complete candidate:
-
-```text
-candidate parents: fd38192 and 05f268d
-manifest vs candidate paths: PASS, exactly 12/12
-harness suite: 41/41 PASS
-product unit suite: 440/440 PASS
-harness validate: PASS, two goals, zero decisions, zero findings
-GitNexus candidate scope: low risk, 12 files, 0 affected product symbols or flows
-git diff checks: PASS
-generated cache/Python residue: none
-main and origin/main before integration: fd38192
-main status fingerprint before integration: 6249c018b06ccf9ad31fb7107b6ab0f40a7323024b1142eff32de125f4d2230f
-protected main files, existing pre-commit hook, and core.hooksPath: unchanged
-```
-
-The known GitHub E2E timeout is explicitly excluded from this harness goal and
-was not run, waited for, cancelled, or used as acceptance evidence. Product,
-DB, deploy, legacy-agent cleanup, and hook replacement remain out of scope.
-
-Final docs evaluation:
-
-| Surface | Outcome |
-|---|---|
-| Phase 2 goal and report | `UPDATED` |
-| Harness README, schemas, CLI, and tests | `NO_CHANGE_REQUIRED` |
-| Shared contract, acceptance, and runtime adapters | `NO_CHANGE_REQUIRED` |
-| Product/domain references | `NO_CHANGE_REQUIRED` |
-| Design SPEC/PLAN stale status headers | `OUT_OF_SCOPE` — untracked main design artifacts outside the exact Phase 2 manifest; reconcile in the next root docs phase |
-| Memory promotion | `NO_CHANGE_REQUIRED` |
-
-Final docs verdict: `PASS`.
-
-The goal is accepted as `done`. The integration commit, detached
-post-commit reconstruction, safe main fast-forward, GitNexus refresh, and
-remote push are the remaining mechanical publication steps; each must preserve
-the accepted candidate and the protected main state.
-
 Commit, merge, and push remain unauthorized.
 
 ## 10. Pre-commit checkpoint
@@ -340,3 +291,52 @@ Compaction docs evaluation:
 | Memory promotion | `NO_CHANGE_REQUIRED` |
 
 Docs verdict: `PASS`.
+
+## 13. Final integration and publishing checkpoint
+
+Checkpoint: `final(publishing=true)`, sequence `5`
+
+The owner authorized autonomous merge and push after local acceptance. Root
+created the clean integration worktree
+`/home/melik/egesut-wt/unified-agent-harness-phase2-integration` from verified
+main `fd38192`, merged `idle/unified-agent-harness-phase2` with
+`--no-commit --no-ff`, and carried the sequence-3/4 goal and report handoff
+deltas into the candidate.
+
+Root acceptance of the complete candidate:
+
+```text
+candidate parents: fd38192 and 05f268d
+manifest vs candidate paths: PASS, exactly 12/12
+harness suite: 41/41 PASS
+product unit suite: 440/440 PASS
+harness validate: PASS, two goals, zero decisions, zero findings
+GitNexus candidate scope: low risk, 12 files, 0 affected product symbols or flows
+git diff checks: PASS
+generated cache/Python residue: none
+main and origin/main before integration: fd38192
+main status fingerprint before integration: 6249c018b06ccf9ad31fb7107b6ab0f40a7323024b1142eff32de125f4d2230f
+protected main files, existing pre-commit hook, and core.hooksPath: unchanged
+```
+
+The known GitHub E2E timeout is explicitly excluded from this harness goal and
+was not run, waited for, cancelled, or used as acceptance evidence. Product,
+DB, deploy, legacy-agent cleanup, and hook replacement remain out of scope.
+
+Final docs evaluation:
+
+| Surface | Outcome |
+|---|---|
+| Phase 2 goal and report | `UPDATED` |
+| Harness README, schemas, CLI, and tests | `NO_CHANGE_REQUIRED` |
+| Shared contract, acceptance, and runtime adapters | `NO_CHANGE_REQUIRED` |
+| Product/domain references | `NO_CHANGE_REQUIRED` |
+| Design SPEC/PLAN stale status headers | `OUT_OF_SCOPE` — untracked main design artifacts outside the exact Phase 2 manifest; reconcile in the next root docs phase |
+| Memory promotion | `NO_CHANGE_REQUIRED` |
+
+Final docs verdict: `PASS`.
+
+The goal is accepted as `done`. The integration commit, detached
+post-commit reconstruction, safe main fast-forward, GitNexus refresh, and
+remote push were completed while preserving the accepted candidate and the
+protected main state.
