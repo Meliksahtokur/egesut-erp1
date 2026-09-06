@@ -1,11 +1,11 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: active
+status: review
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
 base_sha: 434c14236b95a1121339322c548df34c06b9e9e2
-launch_sha: 434c14236b95a1121339322c548df34c06b9e9e2
+launch_sha: eaa0640e65d576c403cbd7aee0fefa66dc81a6f9
 branch: idle/toplu-vaka
 worktree: /home/melik/egesut-wt/toplu-vaka
 write_manifest:
@@ -56,13 +56,20 @@ stop_conditions:
   - A required write falls outside the exact manifest above.
 report: .harness/reports/2026/G-20260906-TOPLU-VAKA.md
 checkpoint:
-  sequence: 0
-  kind: pre-commit
-  head: 434c14236b95a1121339322c548df34c06b9e9e2
+  sequence: 1
+  kind: pre-review
+  head: 1139798057cf27250fe91c8eb87ca969325d2cbc
   docs_verdict: PASS
 ---
 
 # Toplu Vaka Aç — Bulk Case Creation (Full goal)
+
+> Rebase note (2026-09-06): the branch was rebased conflict-free from the
+> original base 434c142 onto eaa0640 (main advanced mid-task with the
+> protokol-dismiss hotfix + reference alignment); `base_sha` is kept as the
+> original 434c142 and `launch_sha` records the post-rebase launch point
+> eaa0640. Pre-rebase implementation shas (dfc5643/777bc7b/799c912/1b2bfff)
+> are superseded by 0036fa5/c45fd72/9a89e15/1139798.
 
 ## Objective
 
