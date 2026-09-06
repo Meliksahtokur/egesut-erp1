@@ -19,6 +19,7 @@ write_manifest:
   - js/utils/helpers.js
   - js/api.js
   - supabase/migrations/20260906120000_vaka_toplu_ac.sql
+  - supabase/migrations/99999999999999_ground_truth.sql
   - tests/unit/vaka-toplu-ac.test.js
 docs_authority:
   tracked_paths:

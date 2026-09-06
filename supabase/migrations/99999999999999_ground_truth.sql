@@ -3566,10 +3566,11 @@ DROP VIEW IF EXISTS public.treatment_timeline CASCADE;
 -- 9. RPC FONKSİYONLARI
 -- ──────────────────────────────────────────────────────────────
 
--- 9a. create_case
+-- 9a. vaka açma: _vaka_ac_tek helper + create_case wrapper + vaka_toplu_ac
+-- (create_case gövdesi helper'a taşındı; imza/davranış değişmedi)
 DROP FUNCTION IF EXISTS public.create_case(text, uuid, text);
-CREATE OR REPLACE FUNCTION public.create_case(
-  p_animal_id   text,
+CREATE OR REPLACE FUNCTION public._vaka_ac_tek(
+  p_hayvan_id   text,
   p_disease_id  uuid,
   p_notes       text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -3578,7 +3579,7 @@ DECLARE
   v_animal  record;
   v_disease record;
 BEGIN
-  SELECT * INTO v_animal FROM public.hayvanlar WHERE id = p_animal_id AND durum = 'Aktif';
+  SELECT * INTO v_animal FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı veya aktif değil');
   END IF;
@@ -3591,7 +3592,7 @@ BEGIN
   -- Aynı hayvanda aynı hastalıkta zaten aktif vaka var mı?
   IF EXISTS (
     SELECT 1 FROM public.cases
-    WHERE animal_id = p_animal_id
+    WHERE animal_id = p_hayvan_id
       AND disease_id = p_disease_id
       AND status = 'active'
   ) THEN
@@ -3599,7 +3600,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.cases (animal_id, disease_id, notes)
-  VALUES (p_animal_id, p_disease_id, p_notes)
+  VALUES (p_hayvan_id, p_disease_id, p_notes)
   RETURNING id INTO v_new_id;
 
   -- islem_log: geri alma icin snapshot
@@ -3607,7 +3608,7 @@ BEGIN
   VALUES (
     gen_random_uuid()::text,
     'VAKA_ACILDI',
-    p_animal_id,
+    p_hayvan_id,
     v_new_id::text,
     'cases',
     jsonb_build_object(
@@ -3621,6 +3622,132 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'case_id', v_new_id);
 END;
 $$;
+
+-- create_case = ince wrapper (imza/değer değişmedi)
+CREATE OR REPLACE FUNCTION public.create_case(
+  p_animal_id   text,
+  p_disease_id  uuid,
+  p_notes       text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  RETURN public._vaka_ac_tek(p_animal_id, p_disease_id, p_notes);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.vaka_toplu_ac(
+  p_animal_ids  text[],
+  p_disease_id  uuid,
+  p_sablon_id   uuid DEFAULT NULL,
+  p_notes       text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_list          text[] := ARRAY[]::text[];
+  v_seen          text[] := ARRAY[]::text[];
+  v_id            text;
+  v_toplam        int;
+  v_basari        int := 0;
+  v_acilan        jsonb := '[]'::jsonb;
+  v_atlanan       jsonb := '[]'::jsonb;
+  v_hatalar       jsonb := '[]'::jsonb;
+  v_kupe          text;
+  v_res           jsonb;
+  v_case_id       uuid;
+  v_sab           jsonb;
+  v_sab_obj       jsonb;
+  v_top           jsonb;
+  v_ok            boolean;
+  v_tohumlama_var boolean;
+BEGIN
+  IF p_animal_ids IS NULL OR array_length(p_animal_ids, 1) IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan listesi boş');
+  END IF;
+  IF array_length(p_animal_ids, 1) > 200 THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'En fazla 200 hayvan');
+  END IF;
+
+  -- Dedupe: girdi sırası korunur
+  FOREACH v_id IN ARRAY p_animal_ids LOOP
+    IF v_id IS NOT NULL AND NOT (v_id = ANY (v_seen)) THEN
+      v_seen := v_seen || v_id;
+      v_list := v_list || v_id;
+    END IF;
+  END LOOP;
+  v_toplam := array_length(v_list, 1);
+  IF v_toplam IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan listesi boş');
+  END IF;
+
+  -- GT'de olmayan opsiyonel helper canlıdaysa uygula (pg_proc guard — bir kez,
+  -- döngü dışında; helper yoksa RPC güvenli düşer)
+  SELECT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE proname = 'tedavi_sablon_tohumlama_gorev_ekle'
+      AND pronamespace = 'public'::regnamespace
+  ) INTO v_tohumlama_var;
+
+  FOREACH v_id IN ARRAY v_list LOOP
+    SELECT kupe_no INTO v_kupe FROM public.hayvanlar WHERE id = v_id;
+    v_ok      := true;
+    v_case_id := NULL;
+    v_sab_obj := NULL;
+    BEGIN
+      v_res := public._vaka_ac_tek(v_id, p_disease_id, p_notes);
+      IF (v_res->>'ok') <> 'true' THEN
+        v_ok := false;
+        v_atlanan := v_atlanan || jsonb_build_array(jsonb_build_object(
+          'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', v_res->>'mesaj'));
+      ELSE
+        v_case_id := (v_res->>'case_id')::uuid;
+        IF p_sablon_id IS NOT NULL THEN
+          BEGIN
+            v_sab := public.tedavi_sablon_uygula(p_case_id := v_case_id, p_sablon_id := p_sablon_id);
+            v_sab_obj := jsonb_build_object(
+              'gun_sayisi',   v_sab->'gun_sayisi',
+              'seans_sayisi', v_sab->'seans_sayisi',
+              'atlanan',      v_sab->'atlanan');
+            IF v_tohumlama_var THEN
+              v_top := public.tedavi_sablon_tohumlama_gorev_ekle(p_case_id := v_case_id, p_sablon_id := p_sablon_id);
+              v_sab_obj := v_sab_obj || jsonb_build_object(
+                'toplanti_uygulandi', COALESCE((v_top->>'olustu') = 'true', false),
+                'toplanti_sebep',     v_top->'sebep');
+            ELSE
+              v_sab_obj := v_sab_obj || jsonb_build_object('toplanti_uygulandi', false);
+            END IF;
+          EXCEPTION WHEN OTHERS THEN
+            -- Şablon hatası tek hayvanı hatalar'a düşürür; vaka açık kalır.
+            v_ok := false;
+            v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
+              'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM, 'case_id', v_case_id));
+          END;
+        END IF;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      v_ok := false;
+      v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
+        'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM));
+    END;
+
+    IF v_ok THEN
+      v_basari := v_basari + 1;
+      v_acilan := v_acilan || jsonb_build_array(jsonb_build_object(
+        'hayvan_id', v_id, 'kupe', v_kupe, 'case_id', v_case_id, 'sablon', v_sab_obj));
+    END IF;
+  END LOOP;
+
+  IF v_tohumlama_var THEN
+    RETURN jsonb_build_object('ok', true, 'toplam', v_toplam, 'basari', v_basari,
+      'atlanan', v_atlanan, 'hatalar', v_hatalar, 'acilan', v_acilan,
+      'sablon', p_sablon_id IS NOT NULL);
+  END IF;
+
+  -- Tohumlama helper'ı canlıda yok: güvenli düşüm işareti
+  RETURN jsonb_build_object('ok', true, 'toplam', v_toplam, 'basari', v_basari,
+    'atlanan', v_atlanan, 'hatalar', v_hatalar, 'acilan', v_acilan,
+    'sablon', p_sablon_id IS NOT NULL, 'toplanti_uygulandi', false);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.vaka_toplu_ac(text[], uuid, uuid, text) TO anon, authenticated;
 
 -- Kızgınlık bağlamından vaka açma RPC (Plan-B)
 CREATE OR REPLACE FUNCTION public.kizginlik_vaka_ac(
