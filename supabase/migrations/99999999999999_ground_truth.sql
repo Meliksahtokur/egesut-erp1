@@ -3570,12 +3570,21 @@ DROP VIEW IF EXISTS public.treatment_timeline CASCADE;
 -- (create_case gövdesi helper'a taşındı; imza/davranış değişmedi)
 -- V1.1 (2026-09-06): vaka_toplu_ac imzasına p_items jsonb eklendi (üçüncü
 -- parametre; manuel ilaç listesi — gün 1 uygulaması bug059 motoruyla).
+-- V1.2 (2026-09-06): p_tarih (planlı başlangıç → cases.start_date'e yazılır;
+-- şablon günleri start_date+(n-1), manuel gün-1 p_tarih'te) + p_tohumlama
+-- (vaka başına vaka_tohumlama_ekle yeniden kullanımı; offset 0-365, saat
+-- default '08:00'; sonuç acilan[i].tohumlama — yumuşak, hatalara sayılmaz).
 -- Eski imzalar DROP edilir; ayrıntı 20260906120000_vaka_toplu_ac.sql başlığında.
-DROP FUNCTION IF EXISTS public.create_case(text, uuid, text);
+-- NOT: vaka_tohumlama_ekle / _tohumlama_gorev_uygunluk GT'de YOKTUR (GT drift;
+-- canlıda mevcut — 20260730000002_vaka_tohumlama_ekle.sql) → buraya
+-- kopyalanmaz; vaka_toplu_ac bağımlılığı canlı şemada pg_proc guard ile
+-- yoklanır, RPC yoksa yumuşak düşer ({olustu:false, sebep:'Tohumlama RPC yok'}).
+DROP FUNCTION IF EXISTS public._vaka_ac_tek(text, uuid, text);
 CREATE OR REPLACE FUNCTION public._vaka_ac_tek(
   p_hayvan_id   text,
   p_disease_id  uuid,
-  p_notes       text DEFAULT NULL
+  p_notes       text DEFAULT NULL,
+  p_tarih       date DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_new_id  uuid;
@@ -3602,8 +3611,8 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu hayvan için zaten aktif bir ' || v_disease.name || ' vakası mevcut');
   END IF;
 
-  INSERT INTO public.cases (animal_id, disease_id, notes)
-  VALUES (p_hayvan_id, p_disease_id, p_notes)
+  INSERT INTO public.cases (animal_id, disease_id, notes, start_date)
+  VALUES (p_hayvan_id, p_disease_id, p_notes, COALESCE(p_tarih, CURRENT_DATE))
   RETURNING id INTO v_new_id;
 
   -- islem_log: geri alma icin snapshot
@@ -3626,27 +3635,33 @@ BEGIN
 END;
 $$;
 
--- create_case = ince wrapper (imza/değer değişmedi)
+-- create_case = ince wrapper (imza/değer değişmedi; p_tarih NULL geçer)
 CREATE OR REPLACE FUNCTION public.create_case(
   p_animal_id   text,
   p_disease_id  uuid,
   p_notes       text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  RETURN public._vaka_ac_tek(p_animal_id, p_disease_id, p_notes);
+  RETURN public._vaka_ac_tek(p_animal_id, p_disease_id, p_notes, NULL);
 END;
 $$;
 
--- V1.1 imza: p_items üçüncü parametre; eski 4-arg (ve olası 3-arg) gövdeler
--- DROP edilir — CREATE OR REPLACE yeni imzada overload üretirdi.
+-- V1.2 imza: 9 parametre (p_items/p_sablon_id/p_notes/p_tarih/p_tohumlama/
+-- offset/saat); eski 3/4/5-arg gövdeler DROP edilir — CREATE OR REPLACE yeni
+-- imzada overload üretirdi.
 DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, uuid);
 DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, uuid, text);
+DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text);
 CREATE OR REPLACE FUNCTION public.vaka_toplu_ac(
-  p_animal_ids  text[],
-  p_disease_id  uuid,
-  p_items       jsonb DEFAULT NULL,
-  p_sablon_id   uuid DEFAULT NULL,
-  p_notes       text DEFAULT NULL
+  p_animal_ids           text[],
+  p_disease_id           uuid,
+  p_items                jsonb DEFAULT NULL,
+  p_sablon_id            uuid DEFAULT NULL,
+  p_notes                text DEFAULT NULL,
+  p_tarih                date DEFAULT NULL,
+  p_tohumlama            boolean DEFAULT false,
+  p_tohumlama_gun_offset int DEFAULT 0,
+  p_tohumlama_saat       text DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_list          text[] := ARRAY[]::text[];
@@ -3667,6 +3682,11 @@ DECLARE
   v_top           jsonb;
   v_ok            boolean;
   v_tohumlama_var boolean;
+  v_tohu_ekle_var boolean;
+  v_start_date    date;
+  v_tohu_tarih    date;
+  v_tohu_res      jsonb;
+  v_tohu_obj      jsonb;
   v_sess          jsonb;
   v_item          jsonb;
   v_idx           int;
@@ -3682,6 +3702,23 @@ BEGIN
   IF p_items IS NOT NULL AND p_sablon_id IS NOT NULL THEN
     RETURN jsonb_build_object('ok', false, 'mesaj',
       'Şablon ve manuel ilaç listesi aynı anda verilemez');
+  END IF;
+
+  -- V1.2: p_tarih = planlanan başlangıç. NULL → bugün; geçmiş reddedilir
+  -- (fail-fast — hiç vaka açılmadan).
+  IF p_tarih IS NOT NULL AND p_tarih < CURRENT_DATE THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçmiş tarih planlanamaz');
+  END IF;
+
+  -- V1.2: tohumlama parametreleri (fail-fast)
+  IF p_tohumlama_gun_offset IS NULL
+     OR p_tohumlama_gun_offset < 0 OR p_tohumlama_gun_offset > 365 THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj',
+      'Tohumlama gün ofseti 0-365 aralığında olmalı');
+  END IF;
+  IF p_tohumlama_saat IS NOT NULL
+     AND p_tohumlama_saat !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz saat');
   END IF;
 
   -- V1.1: p_items doğrulama + motor biçimine normalize (fail-fast — henüz
@@ -3753,13 +3790,18 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan listesi boş');
   END IF;
 
-  -- GT'de olmayan opsiyonel helper canlıdaysa uygula (pg_proc guard — bir kez,
-  -- döngü dışında; helper yoksa RPC güvenli düşer)
+  -- GT'de olmayan opsiyonel helper'lar canlıdaysa uygula (pg_proc guard — bir
+  -- kez, döngü dışında; helper yoksa ilgili yol güvenli düşer)
   SELECT EXISTS (
     SELECT 1 FROM pg_proc
     WHERE proname = 'tedavi_sablon_tohumlama_gorev_ekle'
       AND pronamespace = 'public'::regnamespace
   ) INTO v_tohumlama_var;
+  SELECT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE proname = 'vaka_tohumlama_ekle'
+      AND pronamespace = 'public'::regnamespace
+  ) INTO v_tohu_ekle_var;
 
   FOREACH v_id IN ARRAY v_list LOOP
     SELECT kupe_no INTO v_kupe FROM public.hayvanlar WHERE id = v_id;
@@ -3767,14 +3809,19 @@ BEGIN
     v_case_id    := NULL;
     v_sab_obj    := NULL;
     v_manuel_obj := NULL;
+    v_start_date := NULL;
+    v_tohu_obj   := NULL;
     BEGIN
-      v_res := public._vaka_ac_tek(v_id, p_disease_id, p_notes);
+      v_res := public._vaka_ac_tek(v_id, p_disease_id, p_notes, p_tarih);
       IF (v_res->>'ok') <> 'true' THEN
         v_ok := false;
         v_atlanan := v_atlanan || jsonb_build_array(jsonb_build_object(
           'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', v_res->>'mesaj'));
       ELSE
         v_case_id := (v_res->>'case_id')::uuid;
+        -- V1.2: vakanın GERÇEK start_date'i (p_tarih ya da bugün) — tohumlama
+        -- hedefi ve acilan[i].tarih buna çapar
+        SELECT start_date INTO v_start_date FROM public.cases WHERE id = v_case_id;
         IF p_sablon_id IS NOT NULL THEN
           BEGIN
             v_sab := public.tedavi_sablon_uygula(p_case_id := v_case_id, p_sablon_id := p_sablon_id);
@@ -3798,12 +3845,13 @@ BEGIN
           END;
         ELSIF p_items IS NOT NULL THEN
           -- V1.1: gün 1 manuel tedavi — bug059 motoru (şablon yolunun da
-          -- altındaki aynı motor). Motor hatası tek hayvanı hatalar'a
+          -- altındaki aynı motor). V1.2: gün-1 tarihi p_tarih'e çapar
+          -- (planlı başlangıç). Motor hatası tek hayvanı hatalar'a
           -- düşürür; vaka açık kalır (şablon deseni ile aynı).
           BEGIN
             v_r := public.add_treatment_day_with_sessions(
               p_case_id         := v_case_id,
-              p_date            := CURRENT_DATE,
+              p_date            := COALESCE(p_tarih, CURRENT_DATE),
               p_sessions        := v_sess,
               p_existing_day_id := NULL);
             IF (v_r->>'ok') <> 'true' THEN
@@ -3823,6 +3871,36 @@ BEGIN
               'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM, 'case_id', v_case_id));
           END;
         END IF;
+
+        -- V1.2: planlı tohumlama — HER başarılı açılan vaka için, şablon/
+        -- manuel'den SONRA, yalnız p_tohumlama iken. Yumuşak: sonuç asla
+        -- hatalar'a sayılmaz, vaka açık kalır; sebep acilan[i].tohumlama'ya
+        -- yazılır (uygunluk reddi / RPC yok / beklenmeyen hata).
+        IF p_tohumlama THEN
+          BEGIN
+            IF v_tohu_ekle_var THEN
+              v_tohu_tarih := v_start_date + p_tohumlama_gun_offset;
+              v_tohu_res := public.vaka_tohumlama_ekle(
+                p_case_id := v_case_id,
+                p_tarih   := v_tohu_tarih,
+                p_saat    := COALESCE(p_tohumlama_saat, '08:00')::time);
+              IF (v_tohu_res->>'ok') = 'true' THEN
+                v_tohu_obj := jsonb_build_object(
+                  'olustu', true, 'gorev_id', v_tohu_res->'gorev_id');
+              ELSE
+                v_tohu_obj := jsonb_build_object(
+                  'olustu', false,
+                  'sebep', COALESCE(v_tohu_res->>'mesaj', 'Bilinmeyen sebep'));
+              END IF;
+            ELSE
+              -- vaka_tohumlama_ekle canlıda yok (GT drift): güvenli düşüm
+              v_tohu_obj := jsonb_build_object(
+                'olustu', false, 'sebep', 'Tohumlama RPC yok');
+            END IF;
+          EXCEPTION WHEN OTHERS THEN
+            v_tohu_obj := jsonb_build_object('olustu', false, 'sebep', SQLERRM);
+          END;
+        END IF;
       END IF;
     EXCEPTION WHEN OTHERS THEN
       v_ok := false;
@@ -3834,25 +3912,28 @@ BEGIN
       v_basari := v_basari + 1;
       v_acilan := v_acilan || jsonb_build_array(jsonb_build_object(
         'hayvan_id', v_id, 'kupe', v_kupe, 'case_id', v_case_id,
-        'sablon', v_sab_obj, 'manuel', v_manuel_obj));
+        'tarih', v_start_date,
+        'sablon', v_sab_obj, 'manuel', v_manuel_obj,
+        'tohumlama', v_tohu_obj));
     END IF;
   END LOOP;
 
   IF v_tohumlama_var THEN
     RETURN jsonb_build_object('ok', true, 'toplam', v_toplam, 'basari', v_basari,
       'atlanan', v_atlanan, 'hatalar', v_hatalar, 'acilan', v_acilan,
-      'sablon', p_sablon_id IS NOT NULL, 'manuel', p_items IS NOT NULL);
+      'sablon', p_sablon_id IS NOT NULL, 'manuel', p_items IS NOT NULL,
+      'tohumlama', p_tohumlama);
   END IF;
 
-  -- Tohumlama helper'ı canlıda yok: güvenli düşüm işareti
+  -- Tohumlama (şablon) helper'ı canlıda yok: güvenli düşüm işareti
   RETURN jsonb_build_object('ok', true, 'toplam', v_toplam, 'basari', v_basari,
     'atlanan', v_atlanan, 'hatalar', v_hatalar, 'acilan', v_acilan,
     'sablon', p_sablon_id IS NOT NULL, 'manuel', p_items IS NOT NULL,
-    'toplanti_uygulandi', false);
+    'toplanti_uygulandi', false, 'tohumlama', p_tohumlama);
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text) TO anon, authenticated;
 
 -- Kızgınlık bağlamından vaka açma RPC (Plan-B)
 CREATE OR REPLACE FUNCTION public.kizginlik_vaka_ac(

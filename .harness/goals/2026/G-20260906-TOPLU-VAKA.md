@@ -1,6 +1,6 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: review
+status: active
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
@@ -48,6 +48,7 @@ acceptance:
   - Read-only live-schema probe recorded in the report verifying create_case guards, tedavi_sablon_uygula engine outputs, and the _tohumlama_gorev_uygunluk / add_drug_administration signatures before RPC reliance.
   - `python3 .harness/bin/harness.py validate --json` reports zero findings for this goal and its linked report.
   - Manual drug path E2E: bulk case + day-1 drug_administrations per animal verified in demo.
+  - V1.2 E2E: future-dated bulk case (şablon or manuel) anchors days+tohumlama to planned date; male/young animals' tohumlama skipped with exact reasons in demo.
   - Root reviews the diff; merge and push happen only after owner approval; PROD migration happens only after separate owner approval.
 stop_conditions:
   - Live schema materially contradicts ground-truth assumptions before implementation (create_case, tedavi_sablon_uygula, or _tohumlama_gorev_uygunluk drift).
@@ -94,6 +95,39 @@ New signature:
 (the old 4-arg body is DROPped first to avoid an overload). Per-animal engine
 results are captured as `acilan[i].manuel = {day_no, seans_sayisi}` and the
 top-level result gains `'manuel' boolean`.
+
+**V1.2 amendment (2026-09-06, owner feedback):** date planning + planlı
+tohumlama. ROOT DECISION: `p_tarih date` is the planned START date and is
+WRITTEN to `cases.start_date` — the first-ever non-default start_date write in
+the modern case system; everything anchors to it coherently (şablon günleri
+`start_date+(n-1)` automatic via `tedavi_sablon_uygula` which reads
+`v_case.start_date`; manuel gün-1 at `p_tarih`; tohumlama hedefi
+`start_date+offset`). NULL → CURRENT_DATE (today's behavior unchanged);
+`p_tarih < CURRENT_DATE` → `{ok:false, mesaj:'Geçmiş tarih planlanamaz'}`
+fail-fast before any case. `_vaka_ac_tek` gains `p_tarih date DEFAULT NULL`
+(last param) and the INSERT sets `start_date = COALESCE(p_tarih,
+CURRENT_DATE)` explicitly; the `create_case` wrapper signature is UNCHANGED
+(passes NULL → single-animal flow still defaults to today). The manual engine
+call becomes `add_treatment_day_with_sessions(case, COALESCE(p_tarih,
+CURRENT_DATE), items, NULL)`. Tohumlama option: when `p_tohumlama` is true,
+EVERY successfully opened case (after şablon/manuel) reuses the EXISTING
+`public.vaka_tohumlama_ekle(case, start_date + p_tohumlama_gun_offset,
+COALESCE(p_tohumlama_saat,'08:00')::time)` — per-case SOFT skip, never
+counted in `hatalar`: `ok:true → acilan[i].tohumlama = {olustu:true,
+gorev_id}`; `ok:false → {olustu:false, sebep:<server mesaj>}` with the exact
+eligibility reasons ('Erkek hayvana tohumlama görevi açılmaz', 'Hayvan hedef
+tarihte 12 aydan küçük', 'Hayvan gebe') plus 'Bu vakada zaten açık bir planlı
+tohumlama var' when the şablon path already opened one; RPC absent
+(GT-drift, probed live via pg_proc guard like the şablon tohumlama helper) →
+`{olustu:false, sebep:'Tohumlama RPC yok'}`; EXCEPTION → same soft shape,
+case stays open. Bounds (fail-fast): `p_tohumlama_gun_offset` integer 0..365
+else `{ok:false, mesaj:'Tohumlama gün ofseti 0-365 aralığında olmalı'}`;
+`p_tohumlama_saat` NULL → '08:00', else must match `^([01][0-9]|2[0-3]):[0-5][0-9]$`
+else `{ok:false, mesaj:'Geçersiz saat'}`. New signature (old 5-arg body
+DROPped first):
+`vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid, p_items jsonb DEFAULT NULL, p_sablon_id uuid DEFAULT NULL, p_notes text DEFAULT NULL, p_tarih date DEFAULT NULL, p_tohumlama boolean DEFAULT false, p_tohumlama_gun_offset int DEFAULT 0, p_tohumlama_saat text DEFAULT NULL)`.
+`acilan[i]` gains `'tarih'` (the case's actual start_date ISO); the top-level
+result gains `'tohumlama' boolean`. All V1/V1.1 behavior retained.
 
 ## Objective
 
