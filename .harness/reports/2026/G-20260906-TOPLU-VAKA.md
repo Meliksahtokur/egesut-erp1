@@ -215,10 +215,19 @@ implementation commits (post-rebase):
           (gün 1 uygulama, add_treatment_day_with_sessions motoru)
   5e463d9 feat(ui): toplu vaka manuel ilaç listesi — cdf-chk dili,
           şablon/mutual exclusion, dinamik buton + testler
-  (7 commits on branch idle/toplu-vaka; branch tip 5e463d9)
+  8ada4b5 docs(harness): G-20260906-TOPLU-VAKA V1.1 rapor + criterion 9
+          PASS, status review
+  197fbce feat(ui): toplu vaka tarih planlama + tohumlama bölümü —
+          birleşik uyarı, erkek/yaş ön-kontrolü + testler
+  6d2a285 feat(db): vaka_toplu_ac V1.2 — p_tarih planlama (start_date
+          çapası) + tohumlama görevi (vaka_tohumlama_ekle yeniden
+          kullanımı)
+  (11 commits on branch idle/toplu-vaka incl. this V1.2 docs amendment;
+  pre-amendment tip 6d2a285; sequence 0036fa5…6d2a285)
 docs checkpoints:
   pre-review @ 1139798 — docs_verdict PASS (V1 docs commit)
   pre-review @ 5e463d9 — docs_verdict PASS (V1.1 amendment docs commit)
+  pre-review @ 6d2a285 — docs_verdict PASS (V1.2 amendment docs commit)
   handoff/final: not recorded — root close + owner merge approval pending
 residual risks: see §6
 temporary mutations and artifacts restored:
@@ -351,3 +360,153 @@ Meloksikam 10 ml):
 2. W6 left a disposable GitNexus probe index `wt-toplu-vaka-w6-probe`
    registered — cleanup at goal close.
 3. The worktree `node_modules` is symlinked to the main repo (gitignored).
+
+## V1.2 Amendment (2026-09-06, owner feedback)
+
+V1.1 (criterion 9 PASS above, status review) was extended the same day after
+further owner feedback: bulk case opening must support DATE PLANNING and a
+PLANNED-INSEMINATION option. W7 added the RPC layer (v3), W8 the UI layer;
+W7 re-opened the goal (status→active) and added acceptance criterion 10.
+Root has since verified V1.2 end-to-end (below); the goal returns to
+`review` with criterion 10 `PASS`. All V1/V1.1 content above stays intact;
+only the §5 commit/checkpoint lists were extended (11 commits on branch).
+
+### V1.2 commits
+
+- `6d2a285` feat(db): vaka_toplu_ac V1.2 — p_tarih planlama (start_date
+  çapası) + tohumlama görevi (vaka_tohumlama_ekle yeniden kullanımı)
+- `197fbce` feat(ui): toplu vaka tarih planlama + tohumlama bölümü —
+  birleşik uyarı, erkek/yaş ön-kontrolü + testler
+
+Branch tip at amendment: `6d2a285` (this docs amendment lands on top).
+Full branch sequence — 11 commits, 0036fa5…6d2a285 plus this V1.2 docs
+amendment:
+0036fa5 → c45fd72 → 9a89e15 → 1139798 → ad40561 → dcd8128 → 5e463d9 →
+8ada4b5 → 197fbce → 6d2a285 → (this docs amendment).
+
+### RPC v3 contract
+
+```text
+vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid,
+              p_items jsonb DEFAULT NULL, p_sablon_id uuid DEFAULT NULL,
+              p_notes text DEFAULT NULL, p_tarih date DEFAULT NULL,
+              p_tohumlama boolean DEFAULT false,
+              p_tohumlama_gun_offset int DEFAULT 0,
+              p_tohumlama_saat text DEFAULT NULL) → jsonb
+```
+
+- ROOT DECISION — start_date anchor: `p_tarih` is the planned START date
+  and is WRITTEN to `cases.start_date` — the first-ever non-default
+  start_date write in the modern case system. Rationale: one coherent
+  anchor for everything — şablon günleri land at `start_date+(n-1)`
+  automatically (the `tedavi_sablon_uygula` engine reads
+  `v_case.start_date`), manuel day-1 lands at `p_tarih`, and the tohumlama
+  target is `start_date + p_tohumlama_gun_offset` — instead of drifting
+  per-table dates. `NULL p_tarih` → CURRENT_DATE (today's behavior
+  unchanged); `p_tarih < CURRENT_DATE` →
+  `{ok:false, mesaj:'Geçmiş tarih planlanamaz'}` fail-fast before any case
+  is created.
+- `_vaka_ac_tek` gains `p_tarih date DEFAULT NULL` (last param) and the
+  INSERT sets `start_date = COALESCE(p_tarih, CURRENT_DATE)` explicitly.
+  The `create_case` wrapper signature is UNCHANGED (passes NULL — the
+  single-animal flow still defaults to today). The manual engine call
+  becomes `add_treatment_day_with_sessions(case, COALESCE(p_tarih,
+  CURRENT_DATE), items, NULL)`.
+- Tohumlama option (`p_tohumlama` true): every successfully opened case
+  (after şablon/manuel) reuses the EXISTING
+  `public.vaka_tohumlama_ekle(case, start_date + p_tohumlama_gun_offset,
+  COALESCE(p_tohumlama_saat,'08:00')::time)` behind a per-case SOFT
+  pg_proc guard (GT-drift safe, same pattern as the şablon tohumlama
+  helper). Soft skip is never counted in `hatalar`:
+  `ok:true → acilan[i].tohumlama = {olustu:true, gorev_id}`;
+  `ok:false / EXCEPTION → {olustu:false, sebep:<server mesaj>}` with the
+  exact eligibility reasons ('Erkek hayvana tohumlama görevi açılmaz',
+  'Hayvan hedef tarihte 12 aydan küçük', 'Hayvan gebe') plus 'Bu vakada
+  zaten açık bir planlı tohumlama var' when the şablon path already opened
+  one; RPC absent (GT drift) → `sebep:'Tohumlama RPC yok'`. The case stays
+  open in every soft path.
+- Bounds (fail-fast): `p_tohumlama_gun_offset` integer 0..365 else
+  `{ok:false, mesaj:'Tohumlama gün ofseti 0-365 aralığında olmalı'}`;
+  `p_tohumlama_saat` NULL → '08:00', else must match
+  `^([01][0-9]|2[0-3]):[0-5][0-9]$` else `{ok:false, mesaj:'Geçersiz
+  saat'}`.
+- `acilan[i]` gains `tarih` (the case's actual start_date ISO); the
+  top-level result gains `tohumlama` boolean. The old 5-arg variant is
+  DROPped first (overload avoidance).
+
+### Scratch-cluster behavioral tests + demo catalog (all PASS)
+
+Throwaway PostgreSQL scratch cluster (deleted after): past-date block
+('Geçmiş tarih planlanamaz'), offset bounds (0..365), saat regex (incl.
+'Geçersiz saat'), future anchor (+30d `p_tarih`, +14:30 saat), eligibility
+reasons exact (Erkek / young / gebe / şablon-collision), RPC-absent soft
+skip ('Tohumlama RPC yok'), `create_case` wrapper default (NULL → today).
+
+Demo catalog after apply: 9-param `vaka_toplu_ac` live, the 5-arg variant
+gone (overload-drop verified), `_vaka_ac_tek` 4-arg with `p_tarih`.
+
+### UI (date planning + tohumlama block in m-bulk-case)
+
+- `bc-tarih` date input with `min=today` and a dynamic hint
+  ("Vaka ve tüm tedavi günleri <date> gününe planlanacak").
+- 🐄 tohumlama block: gün-ofset input + saat input (default 08:00,
+  HIZLI_SAATLER quick-pick chips). Visibility rule: hidden while no
+  animals are selected or the selection is all-Erkek.
+- Combined single `openConfirm`: one confirm lists BOTH mükerrer warnings
+  and tohumlama-uygunsuz warnings. The client mirrors the server rules for
+  the pre-check (durum Aktif, cinsiyet Erkek, <365 days AT THE TARGET date
+  via Date.UTC); pregnancy is deliberately NOT approximated client-side
+  (server-only).
+- Result rows gain suffixes: `· 🐄 tohumlama HH:MM` on success,
+  `· ⏭ tohumlama: <sebep>` on per-case soft skip.
+
+### Root E2E (demo, browser) — criterion 10: PASS
+
+Worktree serve :8097, `?demo` auto-login, browser, 2026-09-06. Paste
+`002\n008\n39` (2 Dişi + 1 Erkek) → 3 chips. `bc-tarih` set to +2 days →
+hint "Vaka ve tüm tedavi günleri 2026-09-08 gününe planlanacak". Tohumlama
+block visible (≥1 Dişi), checkbox on, offset 0, saat 08:00. Disease
+Enterit (şablonsuz default, no drugs). Submit → single combined confirm
+"⚠️ Uyarılar": "• 39 — Erkek hayvana tohumlama görevi açılmaz —
+tohumlaması atlanacak / Devam edilsin mi?" → Onayla → result
+"Toplam 3 · Açılan 3 · Atlanan 0 · Hata 0"; rows: 002/008
+"✅ — vaka açıldı · 🐄 tohumlama 08:00", 39 "✅ — vaka açıldı · ⏭
+tohumlama: Erkek hayvana tohumlama görevi açılmaz".
+
+DB verification (demo): 3 Enterit cases with `start_date=2026-09-08` —
+the first future-dated cases ever written by this system;
+TOHUMLAMA_PLANLI görev rows ONLY for 002/008 (hedef_tarih 2026-09-08,
+hedef_saat 08:00, kaynak 'TEDAVI_SABLON_TOHUMLAMA:<case>:MANUEL', open) —
+39 has none.
+
+Acceptance criterion 10 ("V1.2 E2E: future-dated bulk case (şablon or
+manuel) anchors days+tohumlama to planned date; male/young animals'
+tohumlama skipped with exact reasons in demo"): `PASS`.
+
+### Tests (V1.2)
+
+```text
+V1.1 final: 481/481 pass, 0 fail
+V1.2 final: 497/497 pass, 0 fail
+delta: +16 in tests/unit/vaka-toplu-ac.test.js (RED→GREEN):
+       bcTohumUygunOlmayanlar ×8 (incl. the target-date-not-today age
+       case), bcGecmisPlanTarihiMi ×4, bcSonucSatirlari V1.2 ×4
+RED: W8 captured 14 RED failures verbatim against unmodified sources
+     before implementing the UI layer
+```
+
+### Demo rows created by V1.2 E2E (owner data, not deleted)
+
+3 future-dated Enterit cases (start_date 2026-09-08; küpeler 002/008/39) +
+2 TOHUMLAMA_PLANLI görev rows (002/008).
+
+### V1.2 residual notes
+
+1. Pregnancy (gebe) eligibility is server-only by design; the client
+   deliberately ships NO gebe approximation — its pre-check covers
+   durum/cinsiyet/age-at-target-date only.
+2. HIZLI_SAATLER chips are a UI convenience over the same 08:00 RPC
+   default — no contract surface of their own.
+3. rpc-reference.md rows for the v3 signature and the live-schema sync
+   remain propose_only, deferred to the post-merge docs commit (same as
+   the V1/V1.1 items in §6).
