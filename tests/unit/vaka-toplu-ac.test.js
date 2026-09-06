@@ -54,6 +54,12 @@
 //      (inline _bcTkAy-- wrap matematiği KALDIRILDI); seçim Set'i ay
 //      değişimlerinde DOKUNULMAZ.
 //
+//   9. V2.2.1 (W14) — sahibe onaylı ikili: P1 çoklu hedef gün kopyalama
+//      (bcGunKopyalaCoklu — degisti[]/olusturuldu[] listeleri; W11
+//      bcGunKopyala boolean sözleşmesi korunarak çoklu çekirdeğe delege),
+//      P2 sonuç satırı → hayvan kartı (bcSonucSatirlari hayvanId + 
+//      bcSonucBantlari data-action="bc-sonuc-hayvan" satır affordance'ı).
+//
 //   V2→V2.1 ADAPTASYONLAR (bilinçli, iç şekil değişimi — her biri belgelendi):
 //     a. bcGunlardenItems: state şekli secili→seanslar [{saat, ilaclar}].
 //        Gün-düzlemi 'saat' alanı KALDIRILDI; kalem.saat ARTIK HER ZAMAN
@@ -1441,5 +1447,197 @@ describe('bc-gun-takvim DOM davranışı (V2.2 — ay geçişi + seçim kalıcı
     const onclicklar = [...kutu.innerHTML.matchAll(/bcTakvimToggle\(&#39;([\d-]+)&#39;\)/g)].map(m => m[1]);
     assert.ok(onclicklar.length === 31, '31 tıklanabilir Ekim hücresi');
     assert.ok(onclicklar.every(iso => iso.startsWith('2026-10-')), 'hepsi Ekim: ' + onclicklar[0] + '..' + onclicklar[onclicklar.length - 1]);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 9. V2.2.1 (W14) — SAHİBE ONAYLI İKİLİ (2026-09-06):
+//    P1 = gün kopyalama ÇOKLU hedef (tek tek useless) — bcGunKopyalaCoklu
+//    saf özü: var olan hedef DEĞİŞİR (degisti[]), olmayan OLUŞTURULUR
+//    (olusturuldu[]); kaynak kendisi hedef olamaz, hedefler unique + 1..31
+//    (bcGunNoKontrol aralığı). W11 bcGunKopyala sözleşmesi KORUNUR — çoklu
+//    çekirdeğe TEK-ELEMANLI delege olur (bilinçli adaptasyon: iç şekil
+//    {gunler, degisti, olusturuldu} → dış boolean {gunler, olusturuldu}).
+//    P2 = sonuç satırı → hayvan kartı: bcSonucSatirlari satırları hayvanId
+//    taşır (acilan[i].hayvan_id + atlanan[i].hayvan_id — RPC sözleşmesi
+//    20260906120000_vaka_toplu_ac.sql; hata satırları KASTEN haritalanmaz =
+//    inert); bcSonucBantlari hayvanId'lı satırı data-action + data-hayvan-id
+//    + cursor:pointer + '›' ucuyla basar (events.js data-action delege dili).
+// ══════════════════════════════════════════════════════════════════════
+describe('bcGunKopyalaCoklu (V2.2.1 saf — çoklu hedef gün kopyalama)', () => {
+  const kaynak = [
+    { gun: 1, seanslar: [seans('08:00', { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) })] },
+    { gun: 3, seanslar: [seans('20:00', { L1: kalem({ name: 'Eski', dose: '1', unit: 'adet', route: 'PO' }) })] },
+    { gun: 5, seanslar: [] },
+  ];
+
+  it('karışık: var olan hedef DEĞİŞİR (degisti), olmayan OLUŞTURULUR (olusturuldu); ASC plan', () => {
+    const r = sb.bcGunKopyalaCoklu(kaynak, 1, [2, 3]);
+    assert.deepStrictEqual(host(r.degisti), [3]);
+    assert.deepStrictEqual(host(r.olusturuldu), [2]);
+    assert.deepStrictEqual(host(r.gunler.map(g => g.gun)), [1, 2, 3, 5]);
+    const h2 = r.gunler.find(g => g.gun === 2);
+    const h3 = r.gunler.find(g => g.gun === 3);
+    assert.deepStrictEqual(host(h2.seanslar), host(kaynak[0].seanslar), 'yeni gün kaynak seanslarını taşır');
+    assert.deepStrictEqual(host(h3.seanslar), host(kaynak[0].seanslar), 'eski gün 3 seansları KAYNAKLA değişmeli');
+    assert.deepStrictEqual(host(r.gunler.find(g => g.gun === 5).seanslar), [], 'dokunulmamış gün aynı kalır');
+  });
+
+  it('üç hedef karışık sırayla → sonuç ASC, her hedefe AYRI deep-copy', () => {
+    const r = sb.bcGunKopyalaCoklu(kaynak, 1, [7, 3, 2]);
+    assert.deepStrictEqual(host(r.gunler.map(g => g.gun)), [1, 2, 3, 5, 7]);
+    assert.deepStrictEqual(host(r.degisti), [3]);
+    assert.deepStrictEqual(host(r.olusturuldu.slice().sort((a, b) => a - b)), [2, 7]);
+    const h2 = r.gunler.find(g => g.gun === 2);
+    const h7 = r.gunler.find(g => g.gun === 7);
+    assert.notStrictEqual(h2.seanslar, h7.seanslar, 'hedefler arasında paylaşımlı dizi olmamalı');
+    h2.seanslar[0].saat = '23:59';
+    assert.strictEqual(h7.seanslar[0].saat, '08:00', 'h2 mutasyonu h7\'ye sıçramamalı');
+  });
+
+  it('kaynak kendisi hedefler arasında → null (tek başına da, karışıkta da)', () => {
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, [1]), null);
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, [2, 1]), null);
+  });
+
+  it('hedefler TEKRARLI → null (unique zorunlu)', () => {
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, [2, 2]), null);
+  });
+
+  it('hedef 1..31 dışı / ondalık → null (bcGunNoKontrol aralık kuralı)', () => {
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, [0]), null);
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, [32]), null);
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, [2.5]), null);
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, [2, 32]), null);
+  });
+
+  it('kaynak gün yok → null', () => {
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 9, [2]), null);
+  });
+
+  it('boş hedef listesi → null', () => {
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, []), null);
+    assert.strictEqual(sb.bcGunKopyalaCoklu(kaynak, 1, null), null);
+  });
+
+  it('girdi dizi MUTASYONLANMAZ + kaynak seansları deep-copy korunur', () => {
+    const once = JSON.stringify(kaynak);
+    const r = sb.bcGunKopyalaCoklu(kaynak, 1, [2]);
+    assert.strictEqual(JSON.stringify(kaynak), once, 'kaynak plan dokunulmaz');
+    r.gunler.find(g => g.gun === 2).seanslar[0].saat = '23:59';
+    assert.strictEqual(kaynak[0].seanslar[0].saat, '08:00', 'sonuçtan mutasyon kaynağa sıçramaz');
+  });
+
+  it('null girdi → null (patlamaz)', () => {
+    assert.strictEqual(sb.bcGunKopyalaCoklu(null, 1, [2]), null);
+  });
+
+  it('bcGunKopyala (W11) eski sözleşme KORUNUR — çoklu çekirdeğe delege', () => {
+    const r = sb.bcGunKopyala(kaynak, 1, 2);
+    assert.strictEqual(r.olusturuldu, true, 'eski boolean sözleşme');
+    assert.deepStrictEqual(host(r.gunler.map(g => g.gun)), [1, 2, 3, 5]);
+    const r2 = sb.bcGunKopyala(kaynak, 1, 3);
+    assert.strictEqual(r2.olusturuldu, false, 'değiştirmede false kalır');
+  });
+});
+
+// ── P2: bcSonucSatirlari hayvanId uzantısı ────────────────────────────
+describe('bcSonucSatirlari V2.2.1 uzantısı (hayvanId → hayvan kartı)', () => {
+  it('acilan[i].hayvan_id → ok satırına hayvanId taşınır (additive)', () => {
+    const rows = sb.bcSonucSatirlari({ ok: true, acilan: [{ hayvan_id: 'H-1', kupe: 'TR-1', case_id: 'c1' }] });
+    assert.strictEqual(rows[0].hayvanId, 'H-1');
+    assert.strictEqual(rows[0].tip, 'ok');
+  });
+
+  it('atlanan[i].hayvan_id → atlanan satırına hayvanId taşınır (RPC sözleşmesi)', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      atlanan: [{ hayvan_id: 'H-2', kupe: 'TR-2', mesaj: 'zaten aktif' }],
+    });
+    assert.strictEqual(rows[0].hayvanId, 'H-2');
+    assert.strictEqual(rows[0].tip, 'atlanan');
+  });
+
+  it('hayvan_id YOKSA hayvanId anahtarı hiç eklenmez (eski sözleşme korunur)', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      acilan: [{ kupe: 'TR-1', case_id: 'c1' }],
+      atlanan: [{ kupe: 'TR-2', mesaj: 'x' }],
+      hatalar: [{ kupe: 'TR-3', mesaj: 'y' }],
+    });
+    assert.deepStrictEqual(host(rows), [
+      { tip: 'ok', kupe: 'TR-1' },
+      { tip: 'atlanan', kupe: 'TR-2', mesaj: 'x' },
+      { tip: 'hata', kupe: 'TR-3', mesaj: 'y' },
+    ]);
+  });
+
+  it('hata satırı KASTEN inert: RPC hayvan_id taşısa bile hayvanId haritalanmaz', () => {
+    const rows = sb.bcSonucSatirlari({ ok: true, hatalar: [{ hayvan_id: 'H-9', kupe: 'TR-9', mesaj: 'stok' }] });
+    assert.ok(!('hayvanId' in rows[0]), 'hata satırı hayvan kartına gitmez');
+  });
+});
+
+// ── P2: bcSonucBantlari tap affordance + gün kartı DOM çapraz kontrolü ─
+describe('bcSonucBantlari V2.2.1 (satır → hayvan kartı affordance)', () => {
+  it('hayvanId\'lı satır tıklanabilir: data-action + data-hayvan-id + cursor:pointer + › ucu', () => {
+    const html = sb.bcSonucBantlari(
+      [
+        { tip: 'ok', kupe: 'TR-1', hayvanId: 'H-1' },
+        { tip: 'atlanan', kupe: 'TR-2', mesaj: 'zaten aktif', hayvanId: 'H-2' },
+      ],
+      { acilan: [] }
+    );
+    assert.match(html, /data-action="bc-sonuc-hayvan"/);
+    assert.match(html, /data-hayvan-id="H-1"/);
+    assert.match(html, /data-hayvan-id="H-2"/);
+    assert.match(html, /cursor:pointer/);
+    assert.ok(html.includes('›'), 'satır ucunda › ipucu olmalı');
+  });
+
+  it('hayvanId\'siz satır inert: data-action/data-hayvan-id YOK', () => {
+    const html = sb.bcSonucBantlari(
+      [
+        { tip: 'ok', kupe: 'TR-1' },
+        { tip: 'hata', kupe: 'TR-3', mesaj: 'stok' },
+      ],
+      { acilan: [] }
+    );
+    assert.ok(!html.includes('data-action'), 'inert satır data-action taşımamalı');
+    assert.ok(!html.includes('data-hayvan-id'), 'inert satır data-hayvan-id taşımamalı');
+  });
+});
+
+describe('_bcGunKartiHtml V2.2.1 (çoklu kopyalama alanı — DOM çapraz kontrol)', () => {
+  function kartHtml() {
+    sb._bcGunler = [
+      { gun: 1, seanslar: [seans('08:00', {})] },
+      { gun: 2, seanslar: [] },
+      { gun: 5, seanslar: [] },
+    ];
+    sb._bcAktifGunCard = 1;
+    sb._bcKopyaAcikGun = 1;
+    return sb._bcGunKartiHtml(sb._bcGunler[0], '2026-09-06');
+  }
+
+  it('yeni id\'ler birer kez: bc-gkopya-alan-1 + bc-gkopya-chips-1 + bc-gkopya-no-1', () => {
+    const html = kartHtml();
+    assert.strictEqual((html.match(/id="bc-gkopya-alan-1"/g) || []).length, 1);
+    assert.strictEqual((html.match(/id="bc-gkopya-chips-1"/g) || []).length, 1);
+    assert.strictEqual((html.match(/id="bc-gkopya-no-1"/g) || []).length, 1);
+  });
+
+  it('diğer HER gün için çip (Gün 2, Gün 5); kaynak gün 1 için çip YOK', () => {
+    const html = kartHtml();
+    assert.match(html, /data-action="bc-gun-kopya-chip"[^>]*data-hedef="2"[^>]*>Gün 2</);
+    assert.match(html, /data-action="bc-gun-kopya-chip"[^>]*data-hedef="5"[^>]*>Gün 5</);
+    assert.ok(!html.includes('data-hedef="1"'), 'kaynak gün kendisi çip olmamalı');
+  });
+
+  it('+№ ekle girişi + ✅ Uygula + alan aç/kapa toggle action\'ları', () => {
+    const html = kartHtml();
+    assert.match(html, /data-action="bc-gun-kopya-ekle"/);
+    assert.match(html, /data-action="bc-gun-kopyala"/);
+    assert.match(html, /data-action="bc-gun-kopya-toggle"/);
   });
 });

@@ -221,7 +221,18 @@ registerActions({
   'bc-gun-toggle':    (el) => bcGunToggle(Number(el.dataset.gun)),             // gün kartı aç/kapa
   'bc-gun-sil':       (el) => bcGunSil(Number(el.dataset.gun)),                // günü sil (diğer № korunur)
   'bc-gun-no':        (el) => bcGunNoDegisti(el),                              // Başlangıçtan gün № (doğrula+sırala)
-  'bc-gun-kopyala':   (el) => bcGunKopyalaUygula(Number(el.dataset.gun)),      // 📋 Günü Kopyala → Uygula
+  // V2.2.1 (W14) — ÇOKLU hedef gün kopyalama alanı
+  'bc-gun-kopya-toggle': (el) => bcGunKopyaToggle(Number(el.dataset.gun)),    // 📋 alan aç/kapa (▸/▾)
+  'bc-gun-kopya-chip':   (el) => el.classList.toggle('aktif'),                // hedef gün çipi işaretle (.ek-chip dili)
+  'bc-gun-kopya-ekle':   (el) => bcGunKopyaNoEkle(Number(el.dataset.gun)),    // +№ yeni hedef çipi (gün Uygula'da tembel doğar)
+  'bc-gun-kopyala':      (el) => bcGunKopyalaUygula(Number(el.dataset.gun)),  // ✅ Uygula (çoklu hedef)
+  // V2.2.1 (W14) — sonuç satırı → hayvan kartı (fromTaskOpenDet dili: closeM + openDet)
+  'bc-sonuc-hayvan':  (el) => {
+    const hid = el.dataset.hayvanId;
+    if (!hid) return;
+    closeM('m-bulk-case');
+    openDet(hid);
+  },
   'bc-seans-form-ac': (el) => bcSeansFormAc(Number(el.dataset.gun)),           // ＋ Bu güne seans ekle (katlı form)
   'bc-seans-ekle':    (el) => bcSeansEkle(Number(el.dataset.gun)),             // [Seansı Ekle] (form açık kalır)
   'bc-seans-vazgec':  () => bcSeansVazgec(),

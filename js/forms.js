@@ -972,24 +972,40 @@ function bcGunNoKontrol(gunler, gi, yeniGun){
   return { ok: true, mesaj: null };
 }
 
-// Gün kopyalama saf özü: kaynak günün seanslarını hedefe kopyalar. Hedef
-// VARSa seanslarını DEĞİŞTİRİR (olusturuldu:false), YOKSA oluşturur
-// (true). Sonuç ASC sıralı YENİ dizidir — girdi MUTASYONLANMAZ, seanslar
-// deep-copy'dir. Geçersiz girdi (kaynak yok / hedef===kaynak / hedef
-// 1..31 dışı) → null. Boş seanslı kaynak da kopyalanır (saf semantiği
-// total; boş-kaynak UI politikası bcGunKopyalaUygula'da).
-function bcGunKopyala(gunler, kaynakGun, hedefGun){
+// Gün kopyalama saf özü — V2.2.1 (W14) ÇOKLU hedef çekirdeği (sahibe onayı
+// 'tek tek useless'): kaynak günün seansları HER hedefe kopyalanır. Var olan
+// hedef günün seansları DEĞİŞİR (№ degisti[]'ye), olmayan gün OLUŞTURULUR
+// (№ olusturuldu[]'ya). Sonuç ASC sıralı YENİ dizidir — girdi MUTASYONLANMAZ;
+// her hedefe AYRI deep-copy (hedefler arası paylaşımlı dizi yok). Geçersiz
+// girdi → null: kaynak yok, hedefler boş/null, hedef===kaynak, hedefler
+// tekrarlı, herhangi hedef 1..31 dışı veya ondalık (bcGunNoKontrol aralığı).
+// Boş seanslı kaynak da kopyalanır (saf semantiği total; boş-kaynak UI
+// politikası bcGunKopyalaUygula'da).
+function bcGunKopyalaCoklu(gunler, kaynakGun, hedefler){
   const liste = gunler || [];
   const src = liste.find(g => g.gun === kaynakGun);
-  const hedef = Number(hedefGun);
-  if(!src || !Number.isInteger(hedef) || hedef < 1 || hedef > 31 || hedef === kaynakGun) return null;
-  const seanslar = JSON.parse(JSON.stringify(src.seanslar || []));
-  const olusturuldu = !liste.some(g => g.gun === hedef);
+  const hedefDizi = Array.isArray(hedefler) ? hedefler.map(Number) : null;
+  if(!src || !hedefDizi || !hedefDizi.length) return null;
+  const aralikta = hedefDizi.every(h => Number.isInteger(h) && h >= 1 && h <= 31 && h !== kaynakGun);
+  const unique = new Set(hedefDizi).size === hedefDizi.length;
+  if(!aralikta || !unique) return null;
+  const degisti = hedefDizi.filter(h => liste.some(g => g.gun === h));
+  const olusturuldu = hedefDizi.filter(h => !liste.some(g => g.gun === h));
   const yeni = liste
-    .filter(g => g.gun !== hedef)
-    .concat([{ gun: hedef, seanslar }])
+    .filter(g => !hedefDizi.includes(g.gun))
+    .concat(hedefDizi.map(h => ({ gun: h, seanslar: JSON.parse(JSON.stringify(src.seanslar || [])) })))
     .sort((a, b) => a.gun - b.gun);
-  return { gunler: yeni, olusturuldu };
+  return { gunler: yeni, degisti, olusturuldu };
+}
+
+// W11 TEK-hedef kopyalama — sözleşme KORUNUR ({gunler, olusturuldu:boolean}),
+// artık bcGunKopyalaCoklu çekirdeğine TEK-ELEMANLI delege olur (bilinçli
+// V2.2.1 adaptasyonu: iç şekil {gunler, degisti, olusturuldu} → dış boolean;
+// '📋 Önceki günden' menü yolu dahil tüm kopyalamalar tek çekirdekte).
+function bcGunKopyala(gunler, kaynakGun, hedefGun){
+  const r = bcGunKopyalaCoklu(gunler, kaynakGun, [hedefGun]);
+  if(!r) return null;
+  return { gunler: r.gunler, olusturuldu: r.olusturuldu.length > 0 };
 }
 
 // Takvimden gün ekleme saf özü: ISO tarih listesini başlangıç tarihine
@@ -1032,12 +1048,15 @@ function bcPlanRender(){
 // Tek gün kartı html'i — başlık '▾/▸ Gün N · GG Ay' + seans sayacı + 🗑
 // (silme diğer gün № KORUR); gövdede 'Başlangıçtan gün' № girişi
 // (bc-gno-<gun>, 1..31), seans blokları (⏰ Seans · SS:DD + kalem satırları),
-// katlı '＋ Bu güne seans ekle' formu ve '📋 Günü Kopyala → Gün №' şeridi.
+// katlı '＋ Bu güne seans ekle' formu ve V2.2.1 ÇOKLU kopyalama alanı
+// (bc-gkopya-toggle başlığı → bc-gkopya-alan-<gun>: diğer günlere
+// .ek-chip işaret çipleri + '+№ ekle' + ✅ Uygula).
 function _bcGunKartiHtml(gn, tarihStr){
   const gun = gn.gun;
   const seanslar = gn.seanslar || [];
   const ilacSayi = seanslar.reduce((n, s) => n + Object.keys(s.ilaclar || {}).length, 0);
   const acik = globalThis._bcAktifGunCard === gun;
+  const kopyaAcik = globalThis._bcKopyaAcikGun === gun;
   return `
   <div style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
     <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="bc-gun-toggle" data-gun="${gun}">
@@ -1053,13 +1072,33 @@ function _bcGunKartiHtml(gn, tarihStr){
       <div id="bc-gseanslar-${gun}">${_bcSeansHtml(gn)}</div>
       <button type="button" class="btn-sm" data-action="bc-seans-form-ac" data-gun="${gun}" style="margin-top:4px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(42,107,181,.1);color:var(--blue);border:1px dashed rgba(42,107,181,.4);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne seans ekle</button>
       <div id="bc-gseansform-${gun}">${globalThis._bcSeansFormGun === gun ? _bcSeansFormHtml(gun) : ''}</div>
-      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:7px;border-top:1px solid var(--card3);font-size:.74rem;color:var(--ink2);flex-wrap:wrap">
-        📋 Günü Kopyala → Gün №
-        <input id="bc-gkopya-${gun}" class="fi" type="number" min="1" max="31" placeholder="örn. ${gun + 1}" style="width:74px;margin:0;padding:4px 7px">
-        <button type="button" class="btn-sm" data-action="bc-gun-kopyala" data-gun="${gun}" style="font-weight:700;padding:6px 11px;background:rgba(78,154,42,.12);color:var(--green);border:1px solid rgba(78,154,42,.35);border-radius:7px;cursor:pointer">Uygula</button>
+      <div style="margin-top:8px;padding-top:7px;border-top:1px solid var(--card3);font-size:.74rem;color:var(--ink2)">
+        <div data-action="bc-gun-kopya-toggle" data-gun="${gun}" style="display:flex;align-items:center;gap:5px;cursor:pointer">
+          <span>📋 Bu günü şu günlere kopyala ${kopyaAcik ? '▾' : '▸'}</span>
+        </div>
+        <div id="bc-gkopya-alan-${gun}" style="display:${kopyaAcik ? 'block' : 'none'};margin-top:6px">
+          <div id="bc-gkopya-chips-${gun}" style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">${_bcKopyaChipsHtml(gun)}</div>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:6px;flex-wrap:wrap">
+            <span style="white-space:nowrap">+№</span>
+            <input id="bc-gkopya-no-${gun}" class="fi" type="number" min="1" max="31" placeholder="örn. ${gun + 1}" style="width:64px;margin:0;padding:4px 7px">
+            <button type="button" class="ek-chip" data-action="bc-gun-kopya-ekle" data-gun="${gun}" style="font-weight:700">ekle</button>
+            <span style="flex:1"></span>
+            <button type="button" class="btn-sm" data-action="bc-gun-kopyala" data-gun="${gun}" style="font-weight:700;padding:6px 11px;background:rgba(78,154,42,.12);color:var(--green);border:1px solid rgba(78,154,42,.35);border-radius:7px;cursor:pointer">✅ Uygula</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>`;
+}
+
+// V2.2.1 — çoklu kopyalama hedef çipleri: KAYNAK DIŞI her mevcut gün için
+// bir .ek-chip (HIZLI_SAATLER çip dili; işaret = .aktif, bc-gun-kopya-chip
+// delege toggle'ı). '+№ ekle' yeni çipleri bu kapsayıcıya ekler.
+function _bcKopyaChipsHtml(gun){
+  return (globalThis._bcGunler || [])
+    .filter(g => g.gun !== gun)
+    .map(g => `<button type="button" class="ek-chip" data-action="bc-gun-kopya-chip" data-gun="${gun}" data-hedef="${g.gun}">Gün ${g.gun}</button>`)
+    .join('');
 }
 
 // Bir günün seans blokları — '⏰ Seans · SS:DD' başlığı + 🗑 seans; kalem
@@ -1174,7 +1213,8 @@ function bcGunEkleBos(){
 }
 
 // 📋 Önceki günden: açık kartın (yoksa en büyük №'lu günün) seanslarını
-// taşıyan yeni gün — bcGunKopyala saf özü üzerinden.
+// taşıyan yeni gün — V2.2.1'de bcGunKopyalaCoklu çekirdeğine TEK hedefle
+// delege (sıradaki yeni ordinal = maks+1).
 function bcGunEkleOncekiGunden(){
   const gunler = globalThis._bcGunler || (globalThis._bcGunler = []);
   if(gunler.length >= 31){ toast('⚠️ En fazla 31 gün', true); return; }
@@ -1182,12 +1222,13 @@ function bcGunEkleOncekiGunden(){
   const kaynakGun = (globalThis._bcAktifGunCard && gunler.some(g => g.gun === globalThis._bcAktifGunCard))
     ? globalThis._bcAktifGunCard : maks;
   const hedef = maks + 1;
-  const r = bcGunKopyala(gunler, kaynakGun, hedef);
+  if(hedef > 31){ toast('⚠️ En fazla 31 gün', true); return; } // seyrek № taşması (boş gün 32 doğurmaz)
+  const r = bcGunKopyalaCoklu(gunler, kaynakGun, [hedef]);
   if(!r){ bcGunEkleBos(); return; }
   globalThis._bcGunler = r.gunler;
   globalThis._bcAktifGunCard = hedef;
   bcPlanRender();
-  toast('📋 Gün ' + kaynakGun + ' → Gün ' + hedef + ' kopyalandı (oluşturuldu)');
+  toast('📋 Gün ' + kaynakGun + ' → Gün ' + hedef + ' (' + r.degisti.length + ' değişti, ' + r.olusturuldu.length + ' oluşturuldu)');
 }
 
 // ═══ V2.1 GÜN KARTI İŞLEMLERİ ═══
@@ -1230,22 +1271,57 @@ function bcGunNoDegisti(el){
   bcPlanRender();
 }
 
-// Kart altı '📋 Günü Kopyala → Gün № [Uygula]': hedef yoksa OLUŞTURULUR,
-// varsa seansları DEĞİŞTİRİLİR (bcGunKopyala). Boş kaynak gün
-// kopyalanamaz (hedefi boşaltma veri kaybı).
+// V2.2.1 — kopyalama alanı aç/kapa ('📋 Bu günü şu günlere kopyala ▸/▾';
+// kart başlığı ▾/▸ dili — tek alan açık, Uygula sonrası kapanır).
+function bcGunKopyaToggle(gun){
+  globalThis._bcKopyaAcikGun = globalThis._bcKopyaAcikGun === gun ? null : gun;
+  bcPlanRender();
+}
+
+// V2.2.1 — '+№ ekle': girilen №'yu hedef çipi olarak seçime EKLER (mevcut
+// çip varsa yalnız işaretlenir). Gün burada OLUŞTURULMAZ — Uygula'da tembel
+// doğar (plan state dokunulmaz); doğrulama bcGunNoKontrol aralık dili.
+function bcGunKopyaNoEkle(kaynakGun){
+  const input = g('bc-gkopya-no-' + kaynakGun);
+  const konteyner = g('bc-gkopya-chips-' + kaynakGun);
+  if(!konteyner) return;
+  const n = Number.parseInt(input && input.value, 10);
+  if(!Number.isInteger(n) || n < 1 || n > 31){ toast('⚠️ Gün 1-31 aralığında bir tam sayı olmalı', true); return; }
+  if(n === kaynakGun){ toast('⚠️ Hedef gün kaynakla aynı olamaz', true); return; }
+  let chip = konteyner.querySelector('[data-hedef="' + n + '"]');
+  if(chip){ chip.classList.add('aktif'); }
+  else {
+    chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'ek-chip aktif';
+    chip.dataset.action = 'bc-gun-kopya-chip';
+    chip.dataset.gun = String(kaynakGun);
+    chip.dataset.hedef = String(n);
+    chip.textContent = 'Gün ' + n;
+    konteyner.appendChild(chip);
+  }
+  if(input) input.value = '';
+}
+
+// Kart altı çoklu kopyalama '✅ Uygula': işaretli .ek-chip'ler hedef kümesi
+// olur (bcGunKopyalaCoklu). Boş kaynak gün kopyalanamaz (hedefi boşaltma
+// veri kaybı — V2.1 politikası). Başarıda plan yeniden çizilir + kopyalama
+// alanı KAPANIR; toast '📋 Gün K → Gün a, b (X değişti, Y oluşturuldu)'.
 function bcGunKopyalaUygula(kaynakGun){
   const gunler = globalThis._bcGunler || [];
   const src = gunler.find(g => g.gun === kaynakGun);
   if(!src || !(src.seanslar || []).length){ toast('⚠️ Kaynak günde kopyalanacak seans yok', true); return; }
-  const hedef = Number.parseInt(g('bc-gkopya-' + kaynakGun)?.value, 10);
-  if(!Number.isInteger(hedef) || hedef < 1 || hedef > 31){ toast('⚠️ Hedef gün numarası girin (1-31)', true); return; }
-  if(hedef === kaynakGun){ toast('⚠️ Hedef gün kaynakla aynı olamaz', true); return; }
-  const r = bcGunKopyala(gunler, kaynakGun, hedef);
-  if(!r){ toast('⚠️ Gün kopyalanamadı', true); return; }
+  const hedefler = [...(g('bc-gkopya-chips-' + kaynakGun)?.querySelectorAll('.ek-chip.aktif') || [])]
+    .map(el => Number.parseInt(el.dataset.hedef, 10))
+    .filter(n => Number.isInteger(n));
+  if(!hedefler.length){ toast('⚠️ En az bir hedef gün seçin', true); return; }
+  const r = bcGunKopyalaCoklu(gunler, kaynakGun, hedefler);
+  if(!r){ toast('⚠️ Gün kopyalanamadı (hedefleri kontrol edin)', true); return; }
   globalThis._bcGunler = r.gunler;
-  globalThis._bcAktifGunCard = hedef;
+  globalThis._bcKopyaAcikGun = null;
   bcPlanRender();
-  toast('📋 Gün ' + kaynakGun + ' → Gün ' + hedef + ' kopyalandı (' + (r.olusturuldu ? 'oluşturuldu' : 'değiştirildi') + ')');
+  toast('📋 Gün ' + kaynakGun + ' → Gün ' + hedefler.slice().sort((a, b) => a - b).join(', ') +
+    ' (' + r.degisti.length + ' değişti, ' + r.olusturuldu.length + ' oluşturuldu)');
 }
 
 // ═══ V2.1 TAKVİMDEN GÜN EKLEME (bc-gun-takvim — gun-tarih-modal
@@ -1737,6 +1813,9 @@ function bcTarihKisa(iso){
 // olarak taşınır (yoksa anahtar hiç eklenmez — eski sözleşme korunur).
 // V1.2: acilan[i].tohumlama → ok satırına tohumlamaOlustu:true YA DA
 // tohumlamaSebep:<sebep> olarak taşınır (additive — tohumlama yoksa anahtar yok).
+// V2.2.1 (W14): acilan[i].hayvan_id + atlanan[i].hayvan_id → hayvanId
+// (additive; yoksa anahtar yok — satır hayvan kartına yönlendirilir).
+// hata satırları KASTEN haritalanmaz (inert): hata durumunda kart açılmaz.
 // Saf, DOM'suz.
 function bcSonucSatirlari(result){
   const r = result || {};
@@ -1751,9 +1830,15 @@ function bcSonucSatirlari(result){
     const th = a.tohumlama;
     if(th && th.olustu === true) satir.tohumlamaOlustu = true;
     else if(th && th.olustu === false && th.sebep) satir.tohumlamaSebep = th.sebep;
+    if(a.hayvan_id != null) satir.hayvanId = a.hayvan_id;
     satirlar.push(satir);
   });
-  (r.atlanan || []).forEach(a => satirlar.push({ tip: 'atlanan', kupe: a.kupe, mesaj: a.mesaj }));
+  (r.atlanan || []).forEach(a => {
+    const satir = { tip: 'atlanan', kupe: a.kupe, mesaj: a.mesaj };
+    if(a.hayvan_id != null) satir.hayvanId = a.hayvan_id; // V2.2.1 additive
+    satirlar.push(satir);
+  });
+  // hata satırı hayvanId TAŞIMAZ (V2.2.1 — kasıtlı inert)
   (r.hatalar || []).forEach(h => satirlar.push({ tip: 'hata',    kupe: h.kupe, mesaj: h.mesaj }));
   return satirlar;
 }
@@ -1783,6 +1868,8 @@ function bcManuelSatirEki(manuel){
 // tohumIste, tohumSaat } — şablon gün sayısı satırlarda taşınmadığından
 // acilan[i] hizalaması burada yapılır (eski ai sayaç aynası). band()
 // global'i js/ui.js:68'den gelir (ui.js forms.js'ten önce yüklenir).
+// V2.2.1: hayvanId'lı satır data-action="bc-sonuc-hayvan" taşır — dokunuş
+// m-bulk-case'i kapatıp hayvan kartını açar (handlers.js).
 // Saf, DOM'suz.
 function bcSonucBantlari(satirlar, opts){
   const o = opts || {};
@@ -1815,11 +1902,19 @@ function bcSonucBantlari(satirlar, opts){
     } else {
       idHtml = `❌ ${esc(s.mesaj || 'hata')}`;
     }
+    // V2.2.1 (W14) — hayvanId'lı satır hayvan kartına gider: data-action
+    // delege dili (events.js) + data-hayvan-id (escAttr disiplini) +
+    // cursor:pointer + satır ucu '›' ipucu. hayvanId'siz satır inert kalır.
+    const tiklanabilir = !!s.hayvanId;
+    const rowAttrs = tiklanabilir
+      ? ` style="cursor:pointer" data-action="bc-sonuc-hayvan" data-hayvan-id="${escAttr(s.hayvanId)}"`
+      : ' style="cursor:default"';
+    const ucHtml = tiklanabilir ? '<span style="color:var(--ink3);font-size:.9rem;flex-shrink:0;line-height:1">›</span>' : '';
     grup.rows.push(
-      `<div class="arow" style="cursor:default"><div class="arow-left">` +
+      `<div class="arow"${rowAttrs}><div class="arow-left">` +
       `<div class="arow-id" style="font-size:.8rem">${idHtml}</div>` +
       (subHtml ? `<div class="arow-sub" style="font-size:.72rem">${subHtml}</div>` : '') +
-      `</div></div>`
+      `</div>${ucHtml}</div>`
     );
   });
   return gruplar
@@ -1910,14 +2005,18 @@ async function submitBulkCase(btn){
       // satırları renkli grup bantlarına bağlanır (Açılan green → Atlanan
       // amber → Hata red); sayaçlar bant başlıklarında — eski tek-satır
       // özet ('Toplam X · Açılan Y · …') kaldırıldı. Başarı toast'ı aynı.
+      // V2.2.1 — tıklanabilir satır varsa band altına dokunma ipucu.
       const satirlar = bcSonucSatirlari(res);
       const sonuc = g('bc-sonuc');
       if (sonuc) {
+        const dokunIpucu = satirlar.some(s => s.hayvanId)
+          ? '<div style="margin-top:6px;font-size:.72rem;color:var(--ink3);text-align:center">👆 Hayvana gitmek için satıra dokun</div>'
+          : '';
         sonuc.innerHTML = bcSonucBantlari(satirlar, {
           acilan: res.acilan || [],
           tohumIste,
           tohumSaat,
-        });
+        }) + dokunIpucu;
         sonuc.style.display = 'block';
       }
 
