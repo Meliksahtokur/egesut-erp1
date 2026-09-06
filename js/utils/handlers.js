@@ -212,6 +212,8 @@ registerActions({
   'bc-yapistir-coz':  () => bcYapistirCoz(),
   'bc-chip-sil':      (el) => bcChipCikar(el.dataset.id),
   'bc-ilac-ara':      () => bcIlacAraFiltre(), // V1.1 — manuel ilaç arama filtresi
+  'bc-tarih-degisti': () => bcTarihIpucuGuncelle(), // V1.2 — plan tarihi ipucu
+  'bc-tohum-saat-chip': (el) => { const i = g('bc-tohum-saat'); if (i) i.value = el.dataset.t; }, // V1.2 — hızlı saat çipi
   'submit-bulk-case': (el) => submitBulkCase(el),
 
   // ═══ AŞI ═══

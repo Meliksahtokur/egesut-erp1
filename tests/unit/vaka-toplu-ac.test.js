@@ -442,3 +442,143 @@ describe('bcSonucSatirlari V1.1 uzantısı (manuel → ilacSayisi)', () => {
     assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'ilacSayisi'), false);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// V1.2 (W8) — TARİH PLANLAMA + TOHUMLAMA BÖLÜMÜ
+//
+// bcTohumUygunOlmayanlar(hayvanlar, hedefTarihStr): sunucu _tohumlama_
+// gorev_uygunluk kurallarının istemci aynası — gebe istisna (sunucu teyitli).
+// Tarih aritmetiği Date.UTC ile (TZ-safe); hedef tarih parametreden gelir,
+// bugun() KULLANMAZ.
+// ══════════════════════════════════════════════════════════════════════
+describe('bcTohumUygunOlmayanlar (V1.2 — tohumlama uygunluk ön-kontrolü)', () => {
+  const H = (over) => Object.assign({
+    id: 'H1', kupe: 'TR-1', cinsiyet: 'Dişi', dogum_tarihi: '2022-01-01', durum: 'Aktif',
+  }, over);
+
+  it('erkek hayvan → sunucu cümlesi BİREBİR: "Erkek hayvana tohumlama görevi açılmaz"', () => {
+    const r = sb.bcTohumUygunOlmayanlar([H({ cinsiyet: 'Erkek' })], '2027-01-01');
+    assert.deepStrictEqual(host(r), [
+      { id: 'H1', kupe: 'TR-1', sebep: 'Erkek hayvana tohumlama görevi açılmaz' },
+    ]);
+  });
+
+  it('hedef tarihte yaş < 365 gün → "Hayvan hedef tarihte 12 aydan küçük"', () => {
+    // 2026-01-01 doğumlu, hedef 2026-12-31 → 364 gün (< 365)
+    const r = sb.bcTohumUygunOlmayanlar([H({ dogum_tarihi: '2026-01-01' })], '2026-12-31');
+    assert.deepStrictEqual(host(r), [
+      { id: 'H1', kupe: 'TR-1', sebep: 'Hayvan hedef tarihte 12 aydan küçük' },
+    ]);
+  });
+
+  it('hedef tarihte yaş tam 365 gün → GEÇER (sınır: "12 aydan küçük" değil)', () => {
+    // 2026-01-01 → 2027-01-01 = 365 gün (2026 artık yıl değil)
+    const r = sb.bcTohumUygunOlmayanlar([H({ dogum_tarihi: '2026-01-01' })], '2027-01-01');
+    assert.deepStrictEqual(host(r), []);
+  });
+
+  it('dogum_tarihi NULL → geçer (sunucu paritesi; yaş kontrolü atlanır)', () => {
+    const r = sb.bcTohumUygunOlmayanlar([H({ dogum_tarihi: null })], '2026-12-31');
+    assert.deepStrictEqual(host(r), []);
+  });
+
+  it('durum !== "Aktif" → "Hayvan aktif değil" (kural sırası: aktiflik önce)', () => {
+    const r = sb.bcTohumUygunOlmayanlar(
+      [H({ durum: 'Satıldı', cinsiyet: 'Erkek' })],
+      '2027-01-01'
+    );
+    assert.deepStrictEqual(host(r), [
+      { id: 'H1', kupe: 'TR-1', sebep: 'Hayvan aktif değil' },
+    ]);
+  });
+
+  it('hedef tarih KULLANILIR, bugün kullanılmaz — aynı hayvan hedefe göre sonuç değişir', () => {
+    const h = [H({ dogum_tarihi: '2026-01-01' })];
+    const hedefteKucuk = sb.bcTohumUygunOlmayanlar(h, '2026-12-31'); // 364 gün → fail
+    const hedefteYeterli = sb.bcTohumUygunOlmayanlar(h, '2027-01-01'); // 365 gün → pass
+    assert.deepStrictEqual(host(hedefteKucuk.length), 1);
+    assert.deepStrictEqual(host(hedefteYeterli), []);
+  });
+
+  it('karışık sürü — yalnız uygunsuzlar döner, girdi sırası korunur', () => {
+    const suru = [
+      H({ id: 'H1', kupe: 'TR-1' }),                                    // geçerli dişi
+      H({ id: 'H2', kupe: 'TR-2', cinsiyet: 'Erkek' }),                 // erkek
+      H({ id: 'H3', kupe: 'TR-3', dogum_tarihi: '2026-03-01' }),        // hedefte küçük
+    ];
+    const r = sb.bcTohumUygunOlmayanlar(suru, '2026-12-31');
+    assert.deepStrictEqual(host(r), [
+      { id: 'H2', kupe: 'TR-2', sebep: 'Erkek hayvana tohumlama görevi açılmaz' },
+      { id: 'H3', kupe: 'TR-3', sebep: 'Hayvan hedef tarihte 12 aydan küçük' },
+    ]);
+  });
+
+  it('boş liste / tümü geçerli → []', () => {
+    assert.deepStrictEqual(host(sb.bcTohumUygunOlmayanlar([], '2027-01-01')), []);
+    assert.deepStrictEqual(host(sb.bcTohumUygunOlmayanlar(null, '2027-01-01')), []);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// bcGecmisPlanTarihiMi (V1.2) — p_tarih geçmiş plan reddinin saf özü.
+// YYYY-MM-DD string karşılaştırması; boş/null → false (NULL = bugün, sunucu).
+// ══════════════════════════════════════════════════════════════════════
+describe('bcGecmisPlanTarihiMi (V1.2 — geçmiş tarih erkenden reddi)', () => {
+  it('dün → true', () => {
+    assert.strictEqual(sb.bcGecmisPlanTarihiMi('2026-09-05', '2026-09-06'), true);
+  });
+
+  it('bugün → false (aynı gün planlanabilir)', () => {
+    assert.strictEqual(sb.bcGecmisPlanTarihiMi('2026-09-06', '2026-09-06'), false);
+  });
+
+  it('yarın → false', () => {
+    assert.strictEqual(sb.bcGecmisPlanTarihiMi('2026-09-07', '2026-09-06'), false);
+  });
+
+  it('boş/null → false (doğrulama yok — NULL=bugün sunucuda)', () => {
+    assert.strictEqual(sb.bcGecmisPlanTarihiMi('', '2026-09-06'), false);
+    assert.strictEqual(sb.bcGecmisPlanTarihiMi(null, '2026-09-06'), false);
+    assert.strictEqual(sb.bcGecmisPlanTarihiMi(undefined, '2026-09-06'), false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// bcSonucSatirlari V1.2 uzantısı — acilan[i].tohumlama → satıra ek anahtarlar
+// (ADDITIVE: eski sözleşme satırlarında anahtar HİÇ görünmez)
+// ══════════════════════════════════════════════════════════════════════
+describe('bcSonucSatirlari V1.2 uzantısı (tohumlama alanları)', () => {
+  it('tohumlama.olustu=true → satıra tohumlamaOlustu:true taşınır', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      acilan: [{ kupe: 'TR-1', case_id: 'c1', tohumlama: { olustu: true, gorev_id: 'g1' } }],
+    });
+    assert.deepStrictEqual(host(rows), [
+      { tip: 'ok', kupe: 'TR-1', tohumlamaOlustu: true },
+    ]);
+  });
+
+  it('tohumlama.olustu=false → satıra tohumlamaSebep taşınır', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      acilan: [{ kupe: 'TR-2', case_id: 'c2', tohumlama: { olustu: false, sebep: 'Hayvan gebe' } }],
+    });
+    assert.deepStrictEqual(host(rows), [
+      { tip: 'ok', kupe: 'TR-2', tohumlamaSebep: 'Hayvan gebe' },
+    ]);
+  });
+
+  it('tohumlama yoksa anahtarlar HİÇ eklenmez (eski sözleşme korunur)', () => {
+    const rows = sb.bcSonucSatirlari({ ok: true, acilan: [{ kupe: 'TR-3', case_id: 'c3' }] });
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'tohumlamaOlustu'), false);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'tohumlamaSebep'), false);
+  });
+
+  it('olustu=false ama sebep eksik → tohumlamaSebep eklenmez (fallback)', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      acilan: [{ kupe: 'TR-4', case_id: 'c4', tohumlama: { olustu: false } }],
+    });
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'tohumlamaSebep'), false);
+  });
+});

@@ -685,6 +685,15 @@ async function loadBulkCaseForm(){
   const ara = g('bc-ilac-ara'); if(ara) ara.value = '';
   const dozSatirlar = g('bc-ilac-doz-satirlar'); if(dozSatirlar) dozSatirlar.innerHTML = '';
   const dozAlan = g('bc-ilac-doz-alani'); if(dozAlan) dozAlan.style.display = 'none';
+  // V1.2 — tarih + tohumlama sıfırlama: tarih bugün (min bugün — geçmiş seçilemez),
+  // saat 08:00, gün 0, kutu kapalı; blok görünürlüğü bcChipsRender'da kurulur.
+  const tEl = g('bc-tarih');
+  if(tEl){ tEl.value = bugun(); tEl.min = bugun(); }
+  const tohumSaatEl = g('bc-tohum-saat'); if(tohumSaatEl) tohumSaatEl.value = '08:00';
+  const tohumGunEl = g('bc-tohum-gun'); if(tohumGunEl) tohumGunEl.value = '0';
+  const tohumChkEl = g('bc-tohum'); if(tohumChkEl) tohumChkEl.checked = false;
+  bcTohumSaatChipsRender();
+  bcTarihIpucuGuncelle();
   await bcIlacListesiRender();
   bcChipsRender();
   bcButonEtiketi();
@@ -727,11 +736,19 @@ async function bcDiseaseSelect() {
 }
 
 // Chip mekaniği — _bcHayvanlar id bazlı dedupe'lu, sıra korunur
+// V1.2: cinsiyet/dogum_tarihi/durum da taşınır — tohumlama uygunluk ön-kontrolü
+// (bcTohumUygunOlmayanlar) ve blok görünürlüğü bu alanlardan okur.
 function bcChipEkle(hayvan){
   if(!hayvan?.id) return false;
   globalThis._bcHayvanlar = globalThis._bcHayvanlar || [];
   if(globalThis._bcHayvanlar.some(x=>x.id===hayvan.id)) return false;
-  globalThis._bcHayvanlar.push({ id: hayvan.id, kupe: _bcKupeGoster(hayvan) });
+  globalThis._bcHayvanlar.push({
+    id: hayvan.id,
+    kupe: _bcKupeGoster(hayvan),
+    cinsiyet: hayvan.cinsiyet ?? null,
+    dogum_tarihi: hayvan.dogum_tarihi ?? null,
+    durum: hayvan.durum ?? null,
+  });
   bcChipsRender();
   return true;
 }
@@ -751,6 +768,18 @@ function bcChipsRender(){
     ).join('');
   }
   if(sayac) sayac.textContent = liste.length + ' hayvan';
+  // V1.2 — tohumlama bloğu görünürlüğü: liste boşken gizli; en az bir
+  // cinsiyet!=='Erkek' hayvan seçiliyken görünür. Gizlenirken işaretli kutu
+  // sessizce kapatılır (toast yok — görsel durum temizliği).
+  const tohumBlok = g('bc-tohum-blok');
+  if(tohumBlok){
+    const gorunur = liste.length > 0 && liste.some(h => h.cinsiyet !== 'Erkek');
+    tohumBlok.style.display = gorunur ? '' : 'none';
+    if(!gorunur){
+      const chk = g('bc-tohum');
+      if(chk && chk.checked) chk.checked = false;
+    }
+  }
   // V1.1 — chip değişimi buton etiketini de tazeler (manuel↔şablon modu)
   bcButonEtiketi();
 }
@@ -789,6 +818,81 @@ function bcYapistirCoz(){
     if(kutu) kutu.value = '';
     toast(`✅ ${eklenen} hayvan eklendi`);
   }
+}
+
+// ── TOPLU VAKA TARİH + TOHUMLAMA (V1.2) ──────────────────────────────
+// RPC v3 sözleşmesi (W7): vaka_toplu_ac(..., p_tarih, p_tohumlama,
+// p_tohumlama_gun_offset, p_tohumlama_saat). p_tarih planlanan başlangıç —
+// şablon/manuel günler ve tohumlama anchor'u ona oturur; NULL = bugün.
+// p_tohumlama HER AÇILAN vaka için işlenir; sonucu acilan[i].tohumlama =
+// {olustu:true, gorev_id} | {olustu:false, sebep}. Sunucu sebep cümleleri
+// birebir: 'Erkek hayvana tohumlama görevi açılmaz',
+// 'Hayvan hedef tarihte 12 aydan küçük', 'Hayvan gebe',
+// 'Bu vakada zaten açık bir planlı tohumlama var'.
+
+// YYYY-MM-DD → Date.UTC gün sayısı (TZ-safe; new Date(string) KULLANMA —
+// yerel saat dilimi kaydırması 365 gün sınırını 1 güne kaydırabilir).
+function _bcUtcGun(t){
+  const p = String(t || '').split('-').map(Number);
+  if(p.length !== 3 || p.some(x => !Number.isFinite(x))) return null;
+  return Date.UTC(p[0], p[1] - 1, p[2]) / 86400000;
+}
+
+// Geçmiş plan tarihi mi? YYYY-MM-DD string karşılaştırması yeterli (sıralı biçim).
+// Boş/null → false: doğrulama yok, NULL=bugün kararı sunucunun.
+function bcGecmisPlanTarihiMi(tarihStr, bugunStr){
+  if(!tarihStr) return false;
+  return String(tarihStr) < String(bugunStr);
+}
+
+// Tohumlama uygunluk ön-kontrolü — sunucu kural aynası (bcTohumUygunOlmayanlar):
+//   durum!=='Aktif'                 → 'Hayvan aktif değil'
+//   cinsiyet==='Erkek'              → 'Erkek hayvana tohumlama görevi açılmaz'
+//   hedefte yaş < 365 gün           → 'Hayvan hedef tarihte 12 aydan küçük'
+// Gebe istisnası İSTEMCİDE YOK (sunucu teyitli — onay metninde belirtilir).
+// dogum_tarihi null ise yaş kuralı atlanır (sunucu paritesi). Saf, DOM'suz.
+function bcTohumUygunOlmayanlar(hayvanlar, hedefTarihStr){
+  const hedefGun = _bcUtcGun(hedefTarihStr);
+  return (hayvanlar || []).filter(h => {
+    if(!h?.id) return false;
+    if(h.durum !== 'Aktif') return true;
+    if(h.cinsiyet === 'Erkek') return true;
+    const dGun = _bcUtcGun(h.dogum_tarihi);
+    if(dGun !== null && hedefGun !== null && (hedefGun - dGun) < 365) return true;
+    return false;
+  }).map(h => ({
+    id: h.id,
+    kupe: h.kupe,
+    sebep: h.durum !== 'Aktif' ? 'Hayvan aktif değil'
+      : h.cinsiyet === 'Erkek' ? 'Erkek hayvana tohumlama görevi açılmaz'
+      : 'Hayvan hedef tarihte 12 aydan küçük',
+  }));
+}
+
+// Tohumlama hedef tarihi: p_tarih (+ gün ofseti); p_tarih null → bugün.
+// Yalnız submit/uyarı yolunda kullanılır (dFwd/bugun runtime global'leri).
+function bcTohumHedefTarih(tarihStr, gun){
+  return dFwd(tarihStr || bugun(), Math.max(0, Number(gun) || 0));
+}
+
+// bc-tarih ipucu: ileri tarih seçildiyse planlama cümlesi, aksi halde varsayılan.
+function bcTarihIpucuGuncelle(){
+  const ipucu = g('bc-tarih-ipucu');
+  if(!ipucu) return;
+  const t = (v('bc-tarih') || '').trim();
+  ipucu.textContent = t
+    ? `Vaka ve tüm tedavi günleri ${t} gününe planlanacak`
+    : 'Tarih boş bırakılırsa vakalar bugün açılır.';
+}
+
+// HIZLI_SAATLER çipleri (config.js) — ek-chip deseni, bc-tohum-saat'i doldurur.
+function bcTohumSaatChipsRender(){
+  const kutu = g('bc-tohum-saat-chips');
+  if(!kutu) return;
+  const saatler = (typeof HIZLI_SAATLER !== 'undefined' && HIZLI_SAATLER) || ['08:00', '16:00', '20:00'];
+  kutu.innerHTML = saatler.map(t =>
+    `<button type="button" class="ek-chip" data-action="bc-tohum-saat-chip" data-t="${t}">${t}</button>`
+  ).join('');
 }
 
 // ── TOPLU VAKA MANUEL İLAÇ (V1.1) ───────────────────────────────────
@@ -979,6 +1083,8 @@ function bcMukerrerBul(hayvanlar, cases, diseaseId){
 // hatalar→{tip:'hata',kupe,mesaj}. Sabit sıra: acilan → atlanan → hatalar.
 // V1.1: manuel yol acilan[i].manuel.seans_sayisi → ok satırına ilacSayisi
 // olarak taşınır (yoksa anahtar hiç eklenmez — eski sözleşme korunur).
+// V1.2: acilan[i].tohumlama → ok satırına tohumlamaOlustu:true YA DA
+// tohumlamaSebep:<sebep> olarak taşınır (additive — tohumlama yoksa anahtar yok).
 // Saf, DOM'suz.
 function bcSonucSatirlari(result){
   const r = result || {};
@@ -987,6 +1093,9 @@ function bcSonucSatirlari(result){
     const satir = { tip: 'ok', kupe: a.kupe };
     const n = a.manuel?.seans_sayisi;
     if(typeof n === 'number') satir.ilacSayisi = n;
+    const th = a.tohumlama;
+    if(th && th.olustu === true) satir.tohumlamaOlustu = true;
+    else if(th && th.olustu === false && th.sebep) satir.tohumlamaSebep = th.sebep;
     satirlar.push(satir);
   });
   (r.atlanan || []).forEach(a => satirlar.push({ tip: 'atlanan', kupe: a.kupe, mesaj: a.mesaj }));
@@ -1014,27 +1123,53 @@ async function submitBulkCase(btn){
   if (sec.hatalar.length) { toast('⚠️ ' + sec.hatalar[0], true); return; }
   const manuelVar = sec.items.length > 0;
 
+  // V1.2 — planlanan tedavi tarihi (boş → null = bugün); geçmiş tarih erken red
+  // (sunucu da reddeder: 'Geçmiş tarih planlanamaz' — istemci aynası).
+  const tarih = (v('bc-tarih') || '').trim() || null;
+  if (tarih && bcGecmisPlanTarihiMi(tarih, bugun())) {
+    toast('⚠️ Geçmiş tarih planlanamaz', true);
+    return;
+  }
+
+  // V1.2 — tohumlama isteği: bölüm görünür + kutu işaretli. Görünmez bölümden
+  // değer OKUNMAZ (erkek/boş listede istek sessizce yok sayılır).
+  const tohumBlok = g('bc-tohum-blok');
+  const tohumGorunur = !!(tohumBlok && tohumBlok.style.display !== 'none');
+  const tohumChkEl = g('bc-tohum');
+  const tohumIste = !!(tohumGorunur && tohumChkEl && tohumChkEl.checked);
+  const tohumGun = tohumIste
+    ? Math.max(0, Math.min(365, Number.parseInt(v('bc-tohum-gun'), 10) || 0))
+    : 0;
+  const tohumSaat = tohumIste ? ((v('bc-tohum-saat') || '').trim() || '08:00') : '08:00';
+
   // Mükerrer ön-kontrol: seçili hayvanlar × disease × status='active' (IndexedDB)
   let cases = [];
   try { cases = await idbGetAll('cases'); } catch { cases = []; }
   const dups = bcMukerrerBul(liste, cases, diseaseId);
+
+  // V1.2 — tohumlama uygunluk ön-kontrolü (hedef = p_tarih + gün ofseti;
+  // gebe kontrolü istemcide YOK — sunucu teyitli, onay metninde belirtilir).
+  const uygunsuz = tohumIste
+    ? bcTohumUygunOlmayanlar(liste, bcTohumHedefTarih(tarih, tohumGun))
+    : [];
 
   const gonder = async () => {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Gönderiliyor…'; }
     try {
       // rpc() hata ve ok:false'ta throw eder (e.data gövdeyi taşır) —
       // buraya gelen res her zaman ok:true gövdesidir; if (!res.ok) ÖLÜ KOD.
-      const res = await rpc('vaka_toplu_ac', manuelVar ? {
+      // V1.2 — named args: p_tarih + tohumlama üçlüsü her yolda gönderilir.
+      const res = await rpc('vaka_toplu_ac', {
         p_animal_ids: liste.map(h => h.id),
         p_disease_id: diseaseId,
-        p_items:      sec.items,
-        p_sablon_id:  null,
         p_notes:      v('bc-notes') || null,
-      } : {
-        p_animal_ids: liste.map(h => h.id),
-        p_disease_id: diseaseId,
-        p_sablon_id:  globalThis._bcSeciliSablonId || null,
-        p_notes:      v('bc-notes') || null,
+        ...(manuelVar
+          ? { p_items: sec.items, p_sablon_id: null }
+          : { p_sablon_id: globalThis._bcSeciliSablonId || null }),
+        p_tarih:                tarih,
+        p_tohumlama:            tohumIste,
+        p_tohumlama_gun_offset: tohumGun,
+        p_tohumlama_saat:       tohumSaat,
       });
 
       // Sonuç listesi (bcSonucSatirlari sırası: acilan → atlanan → hatalar)
@@ -1050,7 +1185,11 @@ async function submitBulkCase(btn){
           // (seans_sayisi RPC'den gelmezse ek yok — eski metin korunur)
           const ilacEk = (typeof s.ilacSayisi === 'number') ? ` + ${s.ilacSayisi} ilaç` : '';
           const sablonEk = ilacEk ? '' : (gun ? ` + ${gun} gün şablon` : '');
-          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.ok}">✅ ${escAttr(s.kupe)} — vaka açıldı${ilacEk}${sablonEk}</div>`;
+          // V1.2 tohumlama eki: olustu → saat; olustu=false + istek var → sebep
+          const tohumEk = (s.tohumlamaOlustu === true)
+            ? ` · 🐄 tohumlama ${tohumSaat}`
+            : (s.tohumlamaSebep && tohumIste ? ` · ⏭ tohumlama: ${s.tohumlamaSebep}` : '');
+          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.ok}">✅ ${escAttr(s.kupe)} — vaka açıldı${ilacEk}${sablonEk}${tohumEk}</div>`;
         }
         if (s.tip === 'atlanan') {
           return `<div style="font-size:.78rem;padding:2px 0;color:${renk.atlanan}">⏭ ${escAttr(s.kupe)} — ${esc(s.mesaj || 'atlandı')}</div>`;
@@ -1083,12 +1222,17 @@ async function submitBulkCase(btn){
     }
   };
 
-  if (dups.length) {
+  // V1.2 — BİRLEŞİK uyarı onayı: mükerrer aktif vaka + tohumlama uygunsuzleri
+  // TEK openConfirm'de; her iki uyarı da "atlanacak" — onay akışı sürer.
+  const uyariSatirlari = [
+    ...dups.map(d => `• ${d.kupe} — zaten aktif vaka — atlanacak`),
+    ...uygunsuz.map(u => `• ${u.kupe} — ${u.sebep} — tohumlaması atlanacak`),
+  ];
+  if (uyariSatirlari.length) {
     // Planlı aşı tekrar uyarısı (forms.js:1400) openConfirm deseni —
     // desc textContent ile basılır, HTML kaçış gerektirmez
-    openConfirm('⚠️ Aktif vaka mükerrer',
-      dups.map(d => '• ' + d.kupe).join('\n') +
-      '\n\nBu hayvanlar atlanacak. Devam edilsin mi?',
+    openConfirm('⚠️ Uyarılar',
+      uyariSatirlari.join('\n') + '\n\nDevam edilsin mi?',
       gonder);
     return;
   }

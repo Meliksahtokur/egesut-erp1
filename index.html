@@ -1158,6 +1158,13 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <div id="bc-disease-cat" style="font-size:.68rem;color:var(--ink3);margin-top:3px;display:none"></div>
       </div>
 
+      <!-- TEDAVİ TARİHİ (V1.2) — planlanan başlangıç; şablon/manuel günleri ve
+           tohumlama anchor'unu taşır. Boş = bugün (RPC p_tarih NULL). -->
+      <div class="fg"><label class="flbl">📅 Tedavi Tarihi</label>
+        <input id="bc-tarih" class="fi" type="date" data-change="bc-tarih-degisti">
+        <div id="bc-tarih-ipucu" class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">Tarih boş bırakılırsa vakalar bugün açılır.</div>
+      </div>
+
       <!-- ŞABLON — seçili hastalığa bağlı şablonlar (m-disease ile aynı render) -->
       <div id="bc-sablon-blok" class="fg" style="display:none;padding:8px;border:1px solid var(--card3);border-radius:8px">
         <label class="flbl" style="font-size:.72rem">📋 Tedavi Şablonu (opsiyonel)</label>
@@ -1176,6 +1183,26 @@ body.dark .ac-vurgu{color:#8ec6ff}
           <div id="bc-ilac-doz-satirlar"></div>
         </div>
         <div id="bc-ilac-ipucu" style="font-size:.65rem;color:var(--ink3);margin-top:6px">Manuel ilaç seçilirse şablon uygulanmaz; bugünün tedavi günü olarak işlenir.</div>
+      </div>
+
+      <!-- TOHUMLAMA (V1.2) — en az bir dişi seçiliyken görünür (bcChipsRender);
+           seçim temizlenince kutu sessizce kapanır. Gebe kontrolü sunucuda. -->
+      <div id="bc-tohum-blok" class="fg" style="display:none;padding:8px;border:1px solid var(--card3);border-radius:8px">
+        <label class="flbl" style="font-size:.72rem">🐄 Tohumlama</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
+          <input type="checkbox" id="bc-tohum" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">
+          <span style="font-size:.82rem;font-weight:600;color:var(--ink)">Tohumlama görevi planla</span>
+        </label>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;margin-top:4px">
+          <label for="bc-tohum-gun" style="font-size:.72rem;color:var(--ink3);font-weight:700">Kaç gün sonra</label>
+          <input id="bc-tohum-gun" class="fi" type="number" min="0" max="365" value="0" style="margin:0;max-width:110px">
+          <label for="bc-tohum-saat" style="font-size:.72rem;color:var(--ink3);font-weight:700">Saat</label>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <input id="bc-tohum-saat" class="fi" type="time" value="08:00" style="margin:0;width:110px">
+            <span id="bc-tohum-saat-chips" style="display:flex;gap:4px;flex-wrap:wrap"></span>
+          </div>
+        </div>
+        <div id="bc-tohum-ipucu" class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:6px">Erkek, 12 aydan küçük ve gebe hayvanlara tohumlama açılmaz — bunlar sebebiyle listede atlanır. Şablonun kendi tohumlama planı varsa o geçerli olur.</div>
       </div>
 
       <!-- NOTLAR — tek not tüm hayvanlara uygulanır -->
