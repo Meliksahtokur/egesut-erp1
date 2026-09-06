@@ -776,13 +776,113 @@ function bcYapistirCoz(){
   }
 }
 
-// GEÇİCİ STUB — W3 submitBulkCase (FORM-SUBMIT-01 zinciri) ile değiştirilecek.
-// Yalnız seçim doğrulaması yapar; RPC çağrısı YOK.
-function submitBulkCaseStub(){
+// ── TOPLU GÖNDERİM (FORM-SUBMIT-01 zinciri) ──
+// Sunucu guard aynası: aynı hayvan + aynı hastalık + status='active' vaka varsa
+// hayvan atlanacak demektir (cases.animal_id/disease_id/status alanlarıyla
+// birebir). Saf, DOM'suz — IndexedDB ucuz ön-kontrol; sunucu guard'a
+// dokunulmaz (çifte emniyet).
+function bcMukerrerBul(hayvanlar, cases, diseaseId){
+  if(!diseaseId) return [];
+  return (hayvanlar || []).filter(h =>
+    h?.id && (cases || []).some(c =>
+      c.animal_id === h.id && c.disease_id === diseaseId && c.status === 'active'
+    )
+  ).map(h => ({ id: h.id, kupe: h.kupe }));
+}
+
+// vaka_toplu_ac jsonb sonucunu render satırlarına çevirir:
+// acilan→{tip:'ok',kupe}, atlanan→{tip:'atlanan',kupe,mesaj},
+// hatalar→{tip:'hata',kupe,mesaj}. Sabit sıra: acilan → atlanan → hatalar.
+// Saf, DOM'suz.
+function bcSonucSatirlari(result){
+  const r = result || {};
+  const satirlar = [];
+  (r.acilan  || []).forEach(a => satirlar.push({ tip: 'ok',      kupe: a.kupe }));
+  (r.atlanan || []).forEach(a => satirlar.push({ tip: 'atlanan', kupe: a.kupe, mesaj: a.mesaj }));
+  (r.hatalar || []).forEach(h => satirlar.push({ tip: 'hata',    kupe: h.kupe, mesaj: h.mesaj }));
+  return satirlar;
+}
+
+// Toplu vaka gönderimi — submitCase:590 zincirinin N-hayvan aynası:
+// online-only guard → seçim/hastalık doğrulaması → IndexedDB mükerrer
+// ön-kontrol (openConfirm) → tek rpc('vaka_toplu_ac') → bc-sonuc satır
+// render → pullTables(submitCase seti). Modal KAPANMAZ — kullanıcı sonuç
+// listesini gözden geçirir; form sıfırlanmaz (chips kalır).
+async function submitBulkCase(btn){
+  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const liste = globalThis._bcHayvanlar || [];
-  if(!liste.length){ toast('Hayvan seçilmedi', true); return; }
-  if(!v('bc-disease-id')){ toast('Hastalık seçilmedi', true); return; }
-  toast('⚠️ Gönderim akışı hazırlanıyor (W3)');
+  if (!liste.length) { toast('⚠️ En az bir hayvan seçin', true); return; }
+  if (liste.length > 200) { toast('⚠️ En fazla 200 hayvan', true); return; }
+  const diseaseId = v('bc-disease-id');
+  if (!diseaseId) { toast('⚠️ Hastalık seçin', true); return; }
+
+  // Mükerrer ön-kontrol: seçili hayvanlar × disease × status='active' (IndexedDB)
+  let cases = [];
+  try { cases = await idbGetAll('cases'); } catch { cases = []; }
+  const dups = bcMukerrerBul(liste, cases, diseaseId);
+
+  const gonder = async () => {
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Gönderiliyor…'; }
+    try {
+      // rpc() hata ve ok:false'ta throw eder (e.data gövdeyi taşır) —
+      // buraya gelen res her zaman ok:true gövdesidir; if (!res.ok) ÖLÜ KOD.
+      const res = await rpc('vaka_toplu_ac', {
+        p_animal_ids: liste.map(h => h.id),
+        p_disease_id: diseaseId,
+        p_sablon_id:  globalThis._bcSeciliSablonId || null,
+        p_notes:      v('bc-notes') || null,
+      });
+
+      // Sonuç listesi (bcSonucSatirlari sırası: acilan → atlanan → hatalar)
+      const satirlar = bcSonucSatirlari(res);
+      const acilanlar = res.acilan || [];
+      const renk = { ok: 'var(--green)', atlanan: 'var(--amber)', hata: 'var(--red)' };
+      let ai = 0;
+      const html = satirlar.map(s => {
+        if (s.tip === 'ok') {
+          const gun = acilanlar[ai++]?.sablon?.gun_sayisi;
+          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.ok}">✅ ${escAttr(s.kupe)} — vaka açıldı${gun ? ` + ${gun} gün şablon` : ''}</div>`;
+        }
+        if (s.tip === 'atlanan') {
+          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.atlanan}">⏭ ${escAttr(s.kupe)} — ${esc(s.mesaj || 'atlandı')}</div>`;
+        }
+        return `<div style="font-size:.78rem;padding:2px 0;color:${renk.hata}">❌ ${esc(s.mesaj || 'hata')}</div>`;
+      }).join('');
+      const ozet = `Toplam ${res.toplam ?? liste.length} · Açılan ${res.basari ?? 0} · Atlanan ${(res.atlanan || []).length} · Hata ${(res.hatalar || []).length}`;
+      const sonuc = g('bc-sonuc');
+      if (sonuc) {
+        sonuc.innerHTML =
+          `<div style="font-size:.78rem;font-weight:700;padding:4px 0">${esc(ozet)}</div>` + html;
+        sonuc.style.display = 'block';
+      }
+
+      const basari = res.basari || 0;
+      if (basari > 0) toast(`✅ ${basari} vaka açıldı`);
+      else toast('⚠️ Hiç vaka açılamadı — listeye bakın', true);
+
+      // submitCase:629 pull setinin aynısı (RPC-WRITE-01); pull/cache hatası
+      // başarıyı maskelemesin — uyarı sadece console'a
+      await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(console.warn);
+      _drugsCache = [];
+      await loadDrugsCache().catch(console.warn);
+      renderSafe();
+    } catch (e) {
+      toast(getUserMessage(e), true);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🩺 Vakaları Aç'; }
+    }
+  };
+
+  if (dups.length) {
+    // Planlı aşı tekrar uyarısı (forms.js:1400) openConfirm deseni —
+    // desc textContent ile basılır, HTML kaçış gerektirmez
+    openConfirm('⚠️ Aktif vaka mükerrer',
+      dups.map(d => '• ' + d.kupe).join('\n') +
+      '\n\nBu hayvanlar atlanacak. Devam edilsin mi?',
+      gonder);
+    return;
+  }
+  await gonder();
 }
 
 // ── ABORT ────────────────────────────────────

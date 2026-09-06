@@ -308,6 +308,10 @@ const RPC_TABLES = {
   cikis_yap:                 ['hayvanlar'],
   geri_al:                   ['hayvanlar','tohumlama','dogum','gorev_log','islem_log','cases','treatment_days'],
   create_case:               ['cases'],
+  // G-20260906-TOPLU-VAKA — toplu vaka; pull seti submitCase'in (forms.js:629)
+  // birebir aynısı. NOT: offline-replay RPC_MAP'e (ui.js dataTrafficTekGonder)
+  // EKLENMEZ — online-only RPC.
+  vaka_toplu_ac:             ['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log'],
   add_treatment_day:         ['cases','treatment_days'],
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
   remove_drug_administration:['stok','stok_hareket','drug_administrations'],
