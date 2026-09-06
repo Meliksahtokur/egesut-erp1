@@ -1683,6 +1683,32 @@ async function _protokolDismiss(idx){
     }, { onConflict: 'hayvan_id,etken_kod,protokol' });
     if (insErr) { toast('Hata: ' + (insErr.message || insErr.details || 'Dismiss başarısız'), true); return; }
     toast('Uyarı geçersiz kılındı');
+    // Dismiss uyarıyı bastırır ama gorev_log'daki açık görevi kapatmıyordu —
+    // protokol_eksik_tara dismiss'u görünce uyarıyı bırakıyor, lakin loadTasks
+    // dismiss kaydına hiç bakmadığı için görev Görevler ekranında kalıyordu.
+    // detayIptal deseniyle (tamamlandi+iptal PATCH, alt görevler parent_id ile)
+    // eşleşen açık görevleri kapat. etken_kod boşsa (MANUAL dismiss) görev
+    // eşleştirilmez — yalnız dismiss kaydı yazılır.
+    if (d.etken_kod) {
+      try {
+        const { data: acikGorevler, error: gErr } = await db.from('gorev_log')
+          .select('id,hayvan_id,parent_id,gorev_tipi,aciklama,hedef_tarih,tamamlanma_tarihi,kaynak,etken_kod,tamamlandi,iptal')
+          .eq('hayvan_id', d.hayvan_id)
+          .eq('etken_kod', d.etken_kod)
+          .eq('tamamlandi', false)
+          .eq('iptal', false);
+        if (gErr) throw new Error(gErr.message || 'gorev_log sorgusu başarısız');
+        for (const t of (acikGorevler || [])) {
+          await write('gorev_log', { ...t, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString(), iptal: true }, 'PATCH', `id=eq.${t.id}`);
+          const subs = await getData('gorev_log', s => s.parent_id === t.id && !s.tamamlandi);
+          for (const s of subs) await write('gorev_log', { ...s, tamamlandi: true, iptal: true }, 'PATCH', `id=eq.${s.id}`);
+        }
+      } catch(e) { console.warn('dismiss görev kapatma:', e.message); }
+      // Görev verisini tazele — kapatılan görev listeden ve badge'den düşsün
+      try { await pullTables(['gorev_log']); } catch(e) {}
+      try { if (document.getElementById('tasks-body')) await loadTasks(_curTaskFilter||'today'); } catch(e) {}
+      try { await loadDash(); } catch(e) {}
+    }
     await _islemSonrasiRefresh();
     const detayBs = document.getElementById('proto-detay-bs');
     if (detayBs) {
