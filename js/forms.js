@@ -14,7 +14,7 @@
    HEKIMLER, VARSAYILAN_HEKIM,
    HASTALIK_LISTESI, HASTALIK_KAT, LOKASYON_KAT, SEMPTOM_KAT, SEMPTOM_GENEL,
    getState, setState,
-   g, v, cl, dAgo, dFwd, fmtTarih, toast, openM, closeM,
+   g, v, cl, dAgo, dFwd, fmtTarih, toast, openM, closeM, trLower,
    db, rpc, pullTables, renderSafe, renderFromLocal,
    idbGetAll, getData, write,
    loadDrugsCache, loadStock, loadDash, loadTasks, loadUreme, loadGecmis,
@@ -581,7 +581,14 @@ async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix
   blok.style.display='block';
   list.querySelectorAll(`input[name="${radyoAd}"]`).forEach(r=>{
     r.onchange = () => {
-      if(prefix==='bc') globalThis._bcSeciliSablonId = r.value || null;
+      if(prefix==='bc'){
+        globalThis._bcSeciliSablonId = r.value || null;
+        // V1.1 karşılıklı dışlama (şablon→ilaç): gerçek bir şablon seçildiyse
+        // manuel ilaç seçimi tamamen temizlenir. d-prefix (m-disease) davranışı
+        // DOKUNULMAZ — bu dal yalnız bc konteynerine dokunur.
+        if(r.value) bcSablonIlacTemizle();
+        bcButonEtiketi();
+      }
       else globalThis._seciliSablonId = r.value || null;
     };
   });
@@ -674,7 +681,13 @@ async function loadBulkCaseForm(){
   const sl = g('bc-sablon-list'); if(sl) sl.innerHTML='';
   const hn = g('bc-bulunamayan'); if(hn){ hn.textContent=''; hn.style.display='none'; }
   const sonuc = g('bc-sonuc'); if(sonuc){ sonuc.innerHTML=''; sonuc.style.display='none'; }
+  // V1.1 manuel ilaç sıfırlama: arama + doz satırları + seçimler temiz, liste taze
+  const ara = g('bc-ilac-ara'); if(ara) ara.value = '';
+  const dozSatirlar = g('bc-ilac-doz-satirlar'); if(dozSatirlar) dozSatirlar.innerHTML = '';
+  const dozAlan = g('bc-ilac-doz-alani'); if(dozAlan) dozAlan.style.display = 'none';
+  await bcIlacListesiRender();
   bcChipsRender();
+  bcButonEtiketi();
   const sel = g('bc-disease-id');
   if(!sel) return;
   const list = await idbGetAll('diseases');
@@ -738,6 +751,8 @@ function bcChipsRender(){
     ).join('');
   }
   if(sayac) sayac.textContent = liste.length + ' hayvan';
+  // V1.1 — chip değişimi buton etiketini de tazeler (manuel↔şablon modu)
+  bcButonEtiketi();
 }
 
 // Yapıştırma kutusu → token listesi (satır/virgül/noktalı virgül, trim, boş at, dedupe)
@@ -776,6 +791,175 @@ function bcYapistirCoz(){
   }
 }
 
+// ── TOPLU VAKA MANUEL İLAÇ (V1.1) ───────────────────────────────────
+// Vaka detayındaki KANITLANMIŞ cdf-chk dili (caseDrugFormAc/cdfChkChange,
+// ui.js) toplu modal'a kopyalanır: gruplu checkbox ilaç listesi + ilaç başına
+// doz satırı. Seçilen ilaç/doz TEK GİRİŞTE tüm seçili hayvanlara uygulanır
+// (RPC v2 p_items). Şablonla KARŞILIKLI DIŞLAYICI: ilaç seçilince şablon
+// Şablonsuz'a döner, şablon seçilince ilaç seçimi temizlenir.
+//
+// RPC v2 sözleşmesi (W5): vaka_toplu_ac(p_animal_ids, p_disease_id, p_items,
+// p_sablon_id, p_notes) — p_items: [{drug_product_id, stok_id, dose>0, unit,
+// route|null}]; p_items ile p_sablon_id birbirini dışlar (sunucu da korur).
+// Sonuçta acilan[i].manuel = {day_no, seans_sayisi} + üstte manuel:true.
+
+// Gruplu ilaç listesini bc-ilac-liste'ye çizer — caseDrugFormAc ui.js:6398-6421
+// ile birebir aynı dil (grup başlığı, checkbox + ad + etken madde + stok renkli
+// kalan). _drugsCache boşsa loadDrugsCache ile doldurulur (seans formu önceli).
+async function bcIlacListesiRender(){
+  const liste = g('bc-ilac-liste');
+  if(!liste) return;
+  if(!(_drugsCache && _drugsCache.length)){ try { await loadDrugsCache(); } catch(_) {} }
+  const cache = _drugsCache || [];
+  const groups = {};
+  [...cache].sort((a,b) => a.name.localeCompare(b.name,'tr')).forEach(d => {
+    const grp = d.group_name || 'Diger';
+    if(!groups[grp]) groups[grp] = [];
+    groups[grp].push(d);
+  });
+  const groupHtml = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(grp => {
+    const items = groups[grp].map(d => {
+      const stokClrPos = d.guncel <= 0 ? 'var(--red)' : d.guncel <= 10 ? 'var(--amber)' : 'var(--green)';
+      const stokClr = d.guncel === null ? 'var(--ink3)' : stokClrPos;
+      const stokTxt = d.guncel !== null ? d.guncel.toFixed(1)+' '+d.birim : 'stok yok';
+      const nm = d.name.replace(/"/g,'&quot;');
+      const rt = (d.default_route||'IM').split(' ')[0];
+      return '<label class="bc-ilac-satir" style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">'+
+        '<input type="checkbox" class="bc-ichk" data-id="'+d.id+'" data-name="'+nm+'" data-unit="'+(d.default_unit||d.birim||'ml')+'" data-route="'+rt+'" data-legacy="'+(d._legacy||false)+'"'+
+        ' onchange="bcIlacChkChange(this)" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600;color:var(--ink)">'+d.name+'</div>'+
+        (d.active_ingredient ? '<div style="font-size:.65rem;color:var(--ink3)">'+d.active_ingredient+'</div>' : '')+
+        '</div><span style="font-size:.72rem;font-weight:700;color:'+stokClr+';flex-shrink:0">'+stokTxt+'</span></label>';
+    }).join('');
+    return '<div class="bc-ilac-grup" style="margin-bottom:8px"><div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding:3px 0;border-bottom:1px solid var(--card3)">'+grp+'</div>'+items+'</div>';
+  }).join('');
+  liste.innerHTML = groupHtml || '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Stokta ilaç yok</div>';
+  bcIlacAraFiltre();
+}
+
+// bc-ilac-ara arama filtresi — trLower includes; eşleşmeyen satır gizlenir,
+// tamamen boşalan grup başlığı da gizlenir.
+function bcIlacAraFiltre(){
+  const liste = g('bc-ilac-liste'); if(!liste) return;
+  const q = trLower((v('bc-ilac-ara')||'').trim());
+  liste.querySelectorAll('.bc-ilac-satir').forEach(lbl => {
+    const m = !q || trLower(lbl.textContent||'').includes(q);
+    lbl.style.display = m ? 'flex' : 'none';
+  });
+  [...liste.children].forEach(grp => {
+    if(!grp.querySelector || !grp.querySelector('.bc-ilac-satir')) return;
+    const anyVisible = [...grp.querySelectorAll('.bc-ilac-satir')].some(l => l.style.display !== 'none');
+    grp.style.display = anyVisible ? '' : 'none';
+  });
+}
+
+// İlaç checkbox değişimi — cdfChkChange ui.js:6441 aynası: işaretlenince
+// #bc-irow-<id> doz satırı (birim/yol data-attrs'tan ön-dolulular, doz BOŞ —
+// cdf'te varsayılan doz yok), kaldırılınca satır silinir. İşaretleme anında
+// şablon Şablonsuz'a döner (karşılıklı dışlama).
+function bcIlacChkChange(chk){
+  const id = chk.dataset.id;
+  const name = chk.dataset.name;
+  const unit = chk.dataset.unit || 'ml';
+  const route = chk.dataset.route || 'IM';
+  const satirlar = g('bc-ilac-doz-satirlar');
+  const alan = g('bc-ilac-doz-alani');
+  if(!satirlar || !alan) return;
+  if(chk.checked){
+    bcSablonaDonustur();
+    const row = document.createElement('div');
+    row.id = 'bc-irow-' + id;
+    row.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:8px;padding:8px;margin-bottom:6px';
+    row.innerHTML =
+      '<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-bottom:5px">'+name+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
+      '<input type="number" id="bc-idoz-'+id+'" min="0.01" step="0.01" placeholder="Doz" class="fi" style="margin:0">'+
+      '<input type="text" id="bc-iunit-'+id+'" placeholder="Birim" value="'+unit+'" class="fi" style="margin:0">'+
+      '</div>'+
+      '<select id="bc-irot-'+id+'" class="fsel" style="margin-top:5px">'+
+      '<option value="">Uygulama yolu</option>'+
+      '<option '+(route==='IM'?'selected':'')+' value="IM">IM — Kas ici</option>'+
+      '<option '+(route==='IV'?'selected':'')+' value="IV">IV — Damar ici</option>'+
+      '<option '+(route==='SC'?'selected':'')+' value="SC">SC — Deri alti</option>'+
+      '<option '+(route==='PO'?'selected':'')+' value="PO">PO — Agizdan</option>'+
+      '<option value="Topikal">Topikal</option>'+
+      '<option value="Intrauterin">Intrauterin</option>'+
+      '</select>';
+    satirlar.appendChild(row);
+  } else {
+    const row = g('bc-irow-' + id); if(row) row.remove();
+  }
+  const checked = document.querySelectorAll('.bc-ichk:checked').length;
+  alan.style.display = checked > 0 ? 'block' : 'none';
+  bcButonEtiketi();
+}
+
+// Karşılıklı dışlama (ilaç→şablon): radyoyu "Şablonsuz"a çeker, state'i
+// temizler. Zaten Şablonsuz ise (state null + default işaretli/rendesiz)
+// no-op — false döner; değişiklik olduysa true.
+function bcSablonaDonustur(){
+  const dflt = document.querySelector('input[name="bc-sablon"][value=""]');
+  if(globalThis._bcSeciliSablonId == null && (!dflt || dflt.checked)) return false;
+  globalThis._bcSeciliSablonId = null;
+  document.querySelectorAll('input[name="bc-sablon"]').forEach(r => { r.checked = (r.value === ''); });
+  return true;
+}
+
+// Karşılıklı dışlama (şablon→ilaç): gerçek bir şablon seçildiyse manuel ilaç
+// seçimini tamamen temizler (kutular + doz satırları + doz alanı). Arama
+// metnine dokunmaz.
+function bcSablonIlacTemizle(){
+  document.querySelectorAll('.bc-ichk:checked').forEach(chk => { chk.checked = false; });
+  const satirlar = g('bc-ilac-doz-satirlar'); if(satirlar) satirlar.innerHTML = '';
+  const alan = g('bc-ilac-doz-alani'); if(alan) alan.style.display = 'none';
+}
+
+// Dinamik buton etiketi: manuel ilaç varsa "💊 Tedaviyi Uygula", yoksa
+// "🩺 Vakaları Aç". bcChipsRender / bcIlacChkChange / şablon onchange'den
+// çağrılır; submitBulkCase finally de AKTİF etikete döner (sabit değil).
+function bcButonMetni(){
+  const manuel = document.querySelectorAll('.bc-ichk:checked').length > 0;
+  return manuel ? '💊 Tedaviyi Uygula' : '🩺 Vakaları Aç';
+}
+function bcButonEtiketi(){
+  const btn = g('bc-submit');
+  if(btn) btn.textContent = bcButonMetni();
+}
+
+// Seçili bc ilaç kutuları + doz satırlarını RPC v2 p_items sözleşmesine
+// toplar: {hatalar:[strings], items:[{drug_product_id, stok_id, dose:Number,
+// unit, route|null}]}. Satır bazlı hatalar "<İlaç adı>: doz girin" /
+// "<İlaç adı>: birim girin"; hatalı satırın öğesi TOPLANMAZ. drug_product_id/
+// stok_id çözümü caseDrugKaydet ile aynı: legacy stok kaleminde
+// drug_product_id null, stok_id cache'ten. DOM'dan okur, DOM'a yazmaz.
+function bcIlacSecilenler(){
+  const hatalar = [];
+  const items = [];
+  document.querySelectorAll('.bc-ichk:checked').forEach(chk => {
+    const id = chk.dataset.id;
+    const ad = chk.dataset.name || id;
+    const doseInp = g('bc-idoz-' + id);
+    const unitInp = g('bc-iunit-' + id);
+    const rotInp  = g('bc-irot-' + id);
+    const dose = Number.parseFloat(doseInp?.value);
+    const unit = (unitInp?.value || '').trim();
+    const route = (rotInp?.value || '').trim();
+    let satirHatali = false;
+    if(!Number.isFinite(dose) || dose <= 0){ hatalar.push(ad + ': doz girin'); satirHatali = true; }
+    if(!unit){ hatalar.push(ad + ': birim girin'); satirHatali = true; }
+    if(satirHatali) return;
+    const d = (_drugsCache||[]).find(x => x.id === id);
+    items.push({
+      drug_product_id: d?._legacy ? null : id,
+      stok_id: d?.stock_id || null,
+      dose: dose,
+      unit: unit,
+      route: route || null,
+    });
+  });
+  return { hatalar, items };
+}
+
 // ── TOPLU GÖNDERİM (FORM-SUBMIT-01 zinciri) ──
 // Sunucu guard aynası: aynı hayvan + aynı hastalık + status='active' vaka varsa
 // hayvan atlanacak demektir (cases.animal_id/disease_id/status alanlarıyla
@@ -793,11 +977,18 @@ function bcMukerrerBul(hayvanlar, cases, diseaseId){
 // vaka_toplu_ac jsonb sonucunu render satırlarına çevirir:
 // acilan→{tip:'ok',kupe}, atlanan→{tip:'atlanan',kupe,mesaj},
 // hatalar→{tip:'hata',kupe,mesaj}. Sabit sıra: acilan → atlanan → hatalar.
+// V1.1: manuel yol acilan[i].manuel.seans_sayisi → ok satırına ilacSayisi
+// olarak taşınır (yoksa anahtar hiç eklenmez — eski sözleşme korunur).
 // Saf, DOM'suz.
 function bcSonucSatirlari(result){
   const r = result || {};
   const satirlar = [];
-  (r.acilan  || []).forEach(a => satirlar.push({ tip: 'ok',      kupe: a.kupe }));
+  (r.acilan  || []).forEach(a => {
+    const satir = { tip: 'ok', kupe: a.kupe };
+    const n = a.manuel?.seans_sayisi;
+    if(typeof n === 'number') satir.ilacSayisi = n;
+    satirlar.push(satir);
+  });
   (r.atlanan || []).forEach(a => satirlar.push({ tip: 'atlanan', kupe: a.kupe, mesaj: a.mesaj }));
   (r.hatalar || []).forEach(h => satirlar.push({ tip: 'hata',    kupe: h.kupe, mesaj: h.mesaj }));
   return satirlar;
@@ -816,6 +1007,13 @@ async function submitBulkCase(btn){
   const diseaseId = v('bc-disease-id');
   if (!diseaseId) { toast('⚠️ Hastalık seçin', true); return; }
 
+  // V1.1 manuel ilaç yolu — toplayıcı hatalıysa ilk hata toast'lanır ve
+  // akış durur; manuel öğe varsa p_items yolu açılır (p_sablon_id null —
+  // RPC v2 karşılıklı dışlama; seçim sırasında UI zaten Şablonsuz'a çeker).
+  const sec = bcIlacSecilenler();
+  if (sec.hatalar.length) { toast('⚠️ ' + sec.hatalar[0], true); return; }
+  const manuelVar = sec.items.length > 0;
+
   // Mükerrer ön-kontrol: seçili hayvanlar × disease × status='active' (IndexedDB)
   let cases = [];
   try { cases = await idbGetAll('cases'); } catch { cases = []; }
@@ -826,7 +1024,13 @@ async function submitBulkCase(btn){
     try {
       // rpc() hata ve ok:false'ta throw eder (e.data gövdeyi taşır) —
       // buraya gelen res her zaman ok:true gövdesidir; if (!res.ok) ÖLÜ KOD.
-      const res = await rpc('vaka_toplu_ac', {
+      const res = await rpc('vaka_toplu_ac', manuelVar ? {
+        p_animal_ids: liste.map(h => h.id),
+        p_disease_id: diseaseId,
+        p_items:      sec.items,
+        p_sablon_id:  null,
+        p_notes:      v('bc-notes') || null,
+      } : {
         p_animal_ids: liste.map(h => h.id),
         p_disease_id: diseaseId,
         p_sablon_id:  globalThis._bcSeciliSablonId || null,
@@ -840,8 +1044,13 @@ async function submitBulkCase(btn){
       let ai = 0;
       const html = satirlar.map(s => {
         if (s.tip === 'ok') {
-          const gun = acilanlar[ai++]?.sablon?.gun_sayisi;
-          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.ok}">✅ ${escAttr(s.kupe)} — vaka açıldı${gun ? ` + ${gun} gün şablon` : ''}</div>`;
+          const a = acilanlar[ai++];
+          const gun = a?.sablon?.gun_sayisi;
+          // V1.1 manuel satır: "✅ <kupe> — vaka açıldı + N ilaç"
+          // (seans_sayisi RPC'den gelmezse ek yok — eski metin korunur)
+          const ilacEk = (typeof s.ilacSayisi === 'number') ? ` + ${s.ilacSayisi} ilaç` : '';
+          const sablonEk = ilacEk ? '' : (gun ? ` + ${gun} gün şablon` : '');
+          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.ok}">✅ ${escAttr(s.kupe)} — vaka açıldı${ilacEk}${sablonEk}</div>`;
         }
         if (s.tip === 'atlanan') {
           return `<div style="font-size:.78rem;padding:2px 0;color:${renk.atlanan}">⏭ ${escAttr(s.kupe)} — ${esc(s.mesaj || 'atlandı')}</div>`;
@@ -869,7 +1078,8 @@ async function submitBulkCase(btn){
     } catch (e) {
       toast(getUserMessage(e), true);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = '🩺 Vakaları Aç'; }
+      // V1.1 — sabit etiket değil AKTİF dinamik etikete dön (manuel/şablon modu)
+      if (btn) { btn.disabled = false; btn.textContent = bcButonMetni(); }
     }
   };
 

@@ -211,6 +211,7 @@ registerActions({
   'bc-disease-select':() => bcDiseaseSelect(),
   'bc-yapistir-coz':  () => bcYapistirCoz(),
   'bc-chip-sil':      (el) => bcChipCikar(el.dataset.id),
+  'bc-ilac-ara':      () => bcIlacAraFiltre(), // V1.1 — manuel ilaç arama filtresi
   'submit-bulk-case': (el) => submitBulkCase(el),
 
   // ═══ AŞI ═══

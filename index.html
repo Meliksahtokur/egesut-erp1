@@ -1164,6 +1164,20 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <div id="bc-sablon-list"></div>
       </div>
 
+      <!-- İLAÇLAR — manuel tedavi (V1.1): cdf-chk dili; şablonla karşılıklı dışlayıcı.
+           Seçilen ilaç + doz tek girişte TÜM seçili hayvanlara uygulanır (RPC v2 p_items). -->
+      <div id="bc-ilac-blok" class="fg" style="padding:8px;border:1px solid var(--card3);border-radius:8px">
+        <label class="flbl" style="font-size:.72rem">💊 İlaçlar (manuel tedavi)</label>
+        <input id="bc-ilac-ara" class="fi" placeholder="İlaç ara — isim veya etken madde" autocomplete="off"
+          data-input="bc-ilac-ara" style="margin-bottom:6px">
+        <div id="bc-ilac-liste" style="max-height:220px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;border:1px solid var(--card3)"></div>
+        <div id="bc-ilac-doz-alani" style="display:none;margin-top:8px">
+          <div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Seçili İlaçlar — Doz Gir (tüm hayvanlara uygulanır)</div>
+          <div id="bc-ilac-doz-satirlar"></div>
+        </div>
+        <div id="bc-ilac-ipucu" style="font-size:.65rem;color:var(--ink3);margin-top:6px">Manuel ilaç seçilirse şablon uygulanmaz; bugünün tedavi günü olarak işlenir.</div>
+      </div>
+
       <!-- NOTLAR — tek not tüm hayvanlara uygulanır -->
       <div class="fg"><label class="flbl">Notlar</label>
         <textarea id="bc-notes" class="fi" rows="2" placeholder="Tüm vakalara yazılacak not — semptomlar, gözlemler…" style="resize:vertical"></textarea>
@@ -1172,7 +1186,7 @@ body.dark .ac-vurgu{color:#8ec6ff}
       <!-- SONUÇ — submit sonrası W3 doldurur (submitBulkCase) -->
       <div id="bc-sonuc" style="display:none"></div>
 
-      <button class="btn btn-g" data-action="submit-bulk-case">🩺 Vakaları Aç</button>
+      <button id="bc-submit" class="btn btn-g" data-action="submit-bulk-case">🩺 Vakaları Aç</button>
       <button class="btn btn-o" data-action="close-bulk-case" style="margin-top:6px">İptal</button>
     </div>
   </div>
