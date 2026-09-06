@@ -34,6 +34,13 @@
 //      renumber YOK), bcButonMetni (seans state'i), bcSablonIlacTemizle
 //      (TÜM günlerin seanslarını temizler).
 //
+//   7. V2.1 (W12) — sonuç/uyarı düzeni: bcSonucBantlari (renkli grup
+//      bantları — 'Açılan (N)' green → 'Atlanan (N)' amber → 'Hata (N)'
+//      red; boş grup → bant yok; .arow/.arow-id/.arow-sub satır dili,
+//      ok-satır ekleri V1.1/V1.2/V2 davranışını korur), bcTohumCakismaBul
+//      (açık planlı tohumlama çakışma ön-kontrolü — UI-only, non-blocking;
+//      cross-case tespit) ve bcTarihKisa (DD.AA).
+//
 //   V2→V2.1 ADAPTASYONLAR (bilinçli, iç şekil değişimi — her biri belgelendi):
 //     a. bcGunlardenItems: state şekli secili→seanslar [{saat, ilaclar}].
 //        Gün-düzlemi 'saat' alanı KALDIRILDI; kalem.saat ARTIK HER ZAMAN
@@ -79,6 +86,11 @@ function setupForms() {
       rpc: async () => ({}),
       idbGetAll: async () => [],
       getData: async () => [],
+      // js/ui.js:68 band() şablonunun BİREBİR aynası — forms.js bunu global
+      // olarak kullanır (ui.js forms.js'ten ÖNCE yüklenir); W12
+      // bcSonucBantlari bant dilini buradan alır.
+      band: (cls, title, content) =>
+        `<div class="aband"><div class="aband-hdr ${cls}">${title}</div><div class="aband-body">${content}</div></div>`,
     },
   });
   return sandbox;
@@ -968,5 +980,178 @@ describe('bcManuelSatirEki (V2 — manuel ok-satırı metin kurucusu)', () => {
     assert.strictEqual(sb.bcManuelSatirEki(null), '');
     assert.strictEqual(sb.bcManuelSatirEki({}), '');
     assert.strictEqual(sb.bcManuelSatirEki({ gun_sayisi: 3 }), '');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// V2.1 (W12) — bcSonucBantlari: renkli grup bantları (owner-approved
+// 'bantlı sonuç düzeni'). bcSonucSatirlari çıktısı üç banda ayrılır:
+// 'Açılan (N)' → green, 'Atlanan (N)' → amber, 'Hata (N)' → red; sabit
+// sıra; boş grup → bant YOK; eski tek-satır özet ('Toplam X · Açılan Y')
+// kaldırıldı — sayaçlar bant başlıklarında. Satır dili dashboard aband
+// gövdesiyle aynı (.arow / .arow-id bold + .arow-sub gri detay).
+// ══════════════════════════════════════════════════════════════════════
+describe('bcSonucBantlari (V2.1 — bantlı sonuç düzeni)', () => {
+  const karisik = [
+    { tip: 'ok', kupe: 'TR-1', tohumlamaOlustu: true },
+    { tip: 'ok', kupe: 'TR-4', ilacSayisi: 5, gunSayisi: 3 },
+    { tip: 'atlanan', kupe: 'TR-2', mesaj: 'zaten aktif vaka' },
+    { tip: 'hata', kupe: 'TR-3', mesaj: 'şablon hatası' },
+  ];
+
+  it('bant başlıklarında sayaç var: Açılan (2) / Atlanan (1) / Hata (1)', () => {
+    const html = sb.bcSonucBantlari(karisik, { acilan: [], tohumIste: false, tohumSaat: '08:00' });
+    assert.match(html, /Açılan \(2\)/);
+    assert.match(html, /Atlanan \(1\)/);
+    assert.match(html, /Hata \(1\)/);
+  });
+
+  it('bant sırası sabit: Açılan (green) → Atlanan (amber) → Hata (red)', () => {
+    const html = sb.bcSonucBantlari(karisik, { acilan: [] });
+    const iA = html.indexOf('Açılan (2)');
+    const iAt = html.indexOf('Atlanan (1)');
+    const iH = html.indexOf('Hata (1)');
+    assert.ok(iA !== -1 && iAt !== -1 && iH !== -1, 'üç bant da basılmalı');
+    assert.ok(iA < iAt && iAt < iH, 'sıra Açılan → Atlanan → Hata olmalı');
+    assert.match(html, /aband-hdr green/);
+    assert.match(html, /aband-hdr amber/);
+    assert.match(html, /aband-hdr red/);
+  });
+
+  it('boş grup → bant YOK', () => {
+    const html = sb.bcSonucBantlari([{ tip: 'ok', kupe: 'TR-1' }], { acilan: [] });
+    assert.match(html, /Açılan \(1\)/);
+    assert.ok(!html.includes('Atlanan'), 'Atlanan bantı olmamalı');
+    assert.ok(!html.includes('Hata ('), 'Hata bantı olmamalı');
+  });
+
+  it('hepsi boş → boş string', () => {
+    assert.strictEqual(sb.bcSonucBantlari([], { acilan: [] }), '');
+    assert.strictEqual(sb.bcSonucBantlari(undefined, null), '');
+  });
+
+  it('ok satırı: kupe .arow-id + detay .arow-sub (vaka açıldı + manuel/tohum ekleri)', () => {
+    const html = sb.bcSonucBantlari(
+      [{ tip: 'ok', kupe: 'TR-9', ilacSayisi: 5, gunSayisi: 3, tohumlamaOlustu: true }],
+      { acilan: [{ kupe: 'TR-9', manuel: { gun_sayisi: 3, seans_sayisi: 5 } }], tohumIste: true, tohumSaat: '09:30' }
+    );
+    assert.match(html, /arow-id[^>]*>✅ TR-9</);
+    assert.match(html, /arow-sub[^>]*>vaka açıldı \+ 3 gün · 5 ilaç/);
+    assert.match(html, /🐄 tohumlama 09:30/);
+  });
+
+  it('ok satırı şablon yolu: "+ N gün şablon" eki korunur', () => {
+    const html = sb.bcSonucBantlari(
+      [{ tip: 'ok', kupe: 'TR-7' }],
+      { acilan: [{ kupe: 'TR-7', sablon: { gun_sayisi: 2 } }] }
+    );
+    assert.match(html, /vaka açıldı \+ 2 gün şablon/);
+  });
+
+  it('ok satırı tohumlama olmadı + istek vardı → sebep eki (⏭)', () => {
+    const html = sb.bcSonucBantlari(
+      [{ tip: 'ok', kupe: 'TR-5', tohumlamaSebep: 'Hayvan gebe' }],
+      { acilan: [], tohumIste: true, tohumSaat: '08:00' }
+    );
+    assert.match(html, /⏭ tohumlama: Hayvan gebe/);
+  });
+
+  it('atlanan satırı: ⏭ kupe (.arow-id) + mesaj (.arow-sub); hata satırı: ❌ mesaj', () => {
+    const html = sb.bcSonucBantlari(
+      [
+        { tip: 'atlanan', kupe: 'TR-2', mesaj: 'zaten aktif vaka' },
+        { tip: 'hata', kupe: 'TR-3', mesaj: 'STOK_YETERSIZ' },
+      ],
+      { acilan: [] }
+    );
+    assert.match(html, /arow-id[^>]*>⏭ TR-2</);
+    assert.match(html, /arow-sub[^>]*>zaten aktif vaka</);
+    assert.match(html, /arow-id[^>]*>❌ STOK_YETERSIZ</);
+  });
+
+  it('uzun liste: bant gövdesi kaydırma kutusu (max-height:220px + overflow-y:auto)', () => {
+    const cok = Array.from({ length: 30 }, (_, i) => ({ tip: 'ok', kupe: 'TR-' + i }));
+    const html = sb.bcSonucBantlari(cok, { acilan: [] });
+    assert.match(html, /max-height:220px;overflow-y:auto/);
+  });
+
+  it('eski tek-satır özet dili YOK (sayaçlar yalnız bant başlığında)', () => {
+    const html = sb.bcSonucBantlari(karisik, { acilan: [] });
+    assert.ok(!html.includes('Toplam '), 'eski özet satırı dönmemeli');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// V2.1 (W12) — bcTohumCakismaBul: açık planlı tohumlama çakışma
+// ön-kontrolü (UI-only, non-blocking — owner kararı). Seçili hayvandan
+// OPEN gorev_log kaydı olanlar: gorev_tipi='TOHUMLAMA_PLANLI' (harf
+// duyarsız — A1 denetim bulgusu), tamamlandi falsy + iptal falsy
+// (kodbase konvansiyonu: forms.js:2372 '!tamamlandi && !iptal').
+// Sunucu per-case soft-skip semantiği DEĞİŞMEZ; uyarı yalnız satır ekler.
+// ══════════════════════════════════════════════════════════════════════
+describe('bcTohumCakismaBul (V2.1 — açık planlı tohumlama çakışması)', () => {
+  const hayvanlar = [
+    { id: 'H1', kupe: 'TR-001' },
+    { id: 'H2', kupe: 'TR-002' },
+    { id: 'H3', kupe: 'TR-003' },
+  ];
+  const gorevler = [
+    { hayvan_id: 'H1', gorev_tipi: 'TOHUMLAMA_PLANLI', tamamlandi: false, iptal: false, hedef_tarih: '2026-09-10' },
+    { hayvan_id: 'H2', gorev_tipi: 'TOHUMLAMA_PLANLI', tamamlandi: true, iptal: false, hedef_tarih: '2026-09-10' },
+    { hayvan_id: 'H3', gorev_tipi: 'ASI_PLANLI', tamamlandi: false, iptal: false, hedef_tarih: '2026-09-10' },
+  ];
+
+  it('açık (tamamlandi=false, iptal=false) TOHUMLAMA_PLANLI → {id, kupe, tarih}', () => {
+    const cakisan = sb.bcTohumCakismaBul(hayvanlar, gorevler);
+    assert.deepStrictEqual(host(cakisan), [{ id: 'H1', kupe: 'TR-001', tarih: '2026-09-10' }]);
+  });
+
+  it('tamamlandı / iptal görevleri çakışma sayılmaz', () => {
+    const cakisan = sb.bcTohumCakismaBul(hayvanlar, [
+      { hayvan_id: 'H1', gorev_tipi: 'TOHUMLAMA_PLANLI', tamamlandi: true, iptal: false, hedef_tarih: '2026-09-10' },
+      { hayvan_id: 'H2', gorev_tipi: 'TOHUMLAMA_PLANLI', tamamlandi: false, iptal: true, hedef_tarih: '2026-09-11' },
+    ]);
+    assert.deepStrictEqual(host(cakisan), []);
+  });
+
+  it('cross-case tespiti: gorev_tipi büyük/küçük harf duyarsız', () => {
+    const cakisan = sb.bcTohumCakismaBul(hayvanlar, [
+      { hayvan_id: 'H2', gorev_tipi: 'tohumlama_planli', tamamlandi: false, iptal: false, hedef_tarih: '2026-09-12' },
+    ]);
+    assert.deepStrictEqual(host(cakisan), [{ id: 'H2', kupe: 'TR-002', tarih: '2026-09-12' }]);
+  });
+
+  it('başka görev tipi (ASI_PLANLI) çakışma sayılmaz', () => {
+    const cakisan = sb.bcTohumCakismaBul(hayvanlar, [
+      { hayvan_id: 'H3', gorev_tipi: 'ASI_PLANLI', tamamlandi: false, iptal: false, hedef_tarih: '2026-09-10' },
+    ]);
+    assert.deepStrictEqual(host(cakisan), []);
+  });
+
+  it('hedef_tarih yok → tarih null taşınır (satır yine üretilir)', () => {
+    const cakisan = sb.bcTohumCakismaBul(hayvanlar, [
+      { hayvan_id: 'H1', gorev_tipi: 'TOHUMLAMA_PLANLI', tamamlandi: false, iptal: false },
+    ]);
+    assert.deepStrictEqual(host(cakisan), [{ id: 'H1', kupe: 'TR-001', tarih: null }]);
+  });
+
+  it('görev yok / boş argümanlar → []', () => {
+    assert.deepStrictEqual(host(sb.bcTohumCakismaBul(hayvanlar, [])), []);
+    assert.deepStrictEqual(host(sb.bcTohumCakismaBul([], gorevler)), []);
+    assert.deepStrictEqual(host(sb.bcTohumCakismaBul(null, null)), []);
+  });
+});
+
+// V2.1 (W12) — bcTarihKisa: 'YYYY-MM-DD' → 'DD.AA' (uyarı satırı tarihi);
+// boş / geçersiz → '—'.
+describe('bcTarihKisa (V2.1 — DD.AA kısa tarih)', () => {
+  it("'2026-09-10' → '10.09'", () => {
+    assert.strictEqual(sb.bcTarihKisa('2026-09-10'), '10.09');
+  });
+
+  it('boş / geçersiz → —', () => {
+    assert.strictEqual(sb.bcTarihKisa(''), '—');
+    assert.strictEqual(sb.bcTarihKisa(null), '—');
+    assert.strictEqual(sb.bcTarihKisa('10/09/2026'), '—');
   });
 });

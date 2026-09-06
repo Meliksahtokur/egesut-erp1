@@ -51,6 +51,7 @@ acceptance:
   - V1.2 E2E: future-dated bulk case (şablon or manuel) anchors days+tohumlama to planned date; male/young animals' tohumlama skipped with exact reasons in demo.
   - V2 E2E: multi-day bulk plan anchors each day to start_date+(n-1) with per-day/per-kalem times verified in demo.
   - V2.1 E2E: gapped multi-day plan (e.g. gün 1+5) with two sessions on one day and a day-copy, verified in demo.
+  - V2.1 E2E: sonuçlar bantlı bölümlerde + uyarı diyaloğu satır satır + tohumlama çakışması uyarıda listeleniyor (demo).
   - Root reviews the diff; merge and push happen only after owner approval; PROD migration happens only after separate owner approval.
 stop_conditions:
   - Live schema materially contradicts ground-truth assumptions before implementation (create_case, tedavi_sablon_uygula, or _tohumlama_gorev_uygunluk drift).
@@ -342,3 +343,28 @@ BİRDEN" decisions):
    exclusion now snaps/clears across ALL days' sessions. W10 unit tests
    adapted deliberately (documented in tests/unit/vaka-toplu-ac.test.js
    header: seans-state toplama, gün № koruma, buton etiketi).
+
+**V2.1 result/warning amendment (2026-09-06, owner-approved — W12):**
+1. Bantlı sonuç düzeni: the bc-sonuc in-modal result list is REBUILT in
+   the dashboard alarm-band language (`band()` js/ui.js + `.aband` /
+   `.aband-hdr.green|.amber|.red` / `.aband-body` / `.arow` markup) via
+   the pure `bcSonucBantlari(satirlar, opts)` on top of the UNCHANGED
+   `bcSonucSatirlari` — bands 'Açılan (N)' green → 'Atlanan (N)' amber →
+   'Hata (N)' red in fixed order, empty group → no band, counts live in
+   band headers, the old single-line 'Toplam X · Açılan Y · …' summary is
+   REMOVED, ok-row suffixes (manuel/şablon/tohumlama eki) preserved
+   verbatim, each band body gets a max-height:220px scroll box, success
+   toast unchanged.
+2. `m-confirm-desc` gains `white-space:pre-line` — joined('\n') warning
+   lists render line-by-line (also improves planlı aşı tekrarı + görev
+   düzenleme diff); CSS only, no behavior change.
+3. Tohumlama çakışma uyarısı (UI-only, NON-BLOCKING): pure
+   `bcTohumCakismaBul(hayvanlar, gorevler)` finds selected animals with an
+   OPEN gorev_log row (tamamlandi falsy, iptal falsy,
+   gorev_tipi='TOHUMLAMA_PLANLI' case-insensitive per the A1 audit
+   finding), surfaced in the combined openConfirm warning list as
+   '• <kupe> — açık planlı tohumlaması var (<DD.AA>) — yenisi de
+   açılacak' when tohumlama is requested; confirm proceeds, server
+   per-case soft-skip semantics unchanged.
+4. sk-hatalar color fix: `var(--err)` (undefined variable, 0 index.html
+   hits) → `var(--red)` in submitSuttenKes error list.

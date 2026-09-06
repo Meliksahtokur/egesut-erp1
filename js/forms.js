@@ -1608,6 +1608,38 @@ function bcMukerrerBul(hayvanlar, cases, diseaseId){
   ).map(h => ({ id: h.id, kupe: h.kupe }));
 }
 
+// V2.1 — tohumlama çakışma uyarısı (owner kararı: UI-only, NON-BLOCKING).
+// Seçili hayvanlardan OPEN gorev_log kaydı olanları bulur: gorev_tipi=
+// 'TOHUMLAMA_PLANLI' (harf duyarsız — A1 denetim bulgusu: kaynak/path
+// çeşitliliği) + tamamlandi falsy + iptal falsy (kodbase konvansiyonu,
+// forms.js:2372 '!tamamlandi && !iptal' aynası). Uyarı yalnız openConfirm
+// listesine satır ekler — onay akışı sürer; sunucu per-case soft-skip
+// (yalnız 'Bu vakada zaten açık bir planlı tohumlama var' duplikelerini
+// atlar) semantiği DEĞİŞMEZ. Saf, DOM'suz.
+function bcTohumCakismaBul(hayvanlar, gorevler){
+  return (hayvanlar || []).filter(h =>
+    h?.id && (gorevler || []).some(gt =>
+      gt?.hayvan_id === h.id &&
+      !gt.tamamlandi && !gt.iptal &&
+      String(gt.gorev_tipi || '').toUpperCase() === 'TOHUMLAMA_PLANLI'
+    )
+  ).map(h => {
+    const gt = (gorevler || []).find(gt =>
+      gt?.hayvan_id === h.id &&
+      !gt.tamamlandi && !gt.iptal &&
+      String(gt.gorev_tipi || '').toUpperCase() === 'TOHUMLAMA_PLANLI'
+    );
+    return { id: h.id, kupe: h.kupe, tarih: gt?.hedef_tarih ?? null };
+  });
+}
+
+// V2.1 — uyarı satırı kısa tarih: 'YYYY-MM-DD' → 'DD.AA'; boş/geçersiz → '—'.
+// Saf, DOM'suz.
+function bcTarihKisa(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  return m ? `${m[3]}.${m[2]}` : '—';
+}
+
 // vaka_toplu_ac jsonb sonucunu render satırlarına çevirir:
 // acilan→{tip:'ok',kupe}, atlanan→{tip:'atlanan',kupe,mesaj},
 // hatalar→{tip:'hata',kupe,mesaj}. Sabit sıra: acilan → atlanan → hatalar.
@@ -1648,9 +1680,68 @@ function bcManuelSatirEki(manuel){
   return '';
 }
 
+// V2.1 — bantlı sonuç düzeni (owner-approved 'renkli grup bantları').
+// bcSonucSatirlari satırlarını üç banda gruplar: 'Açılan (N)' → green,
+// 'Atlanan (N)' → amber, 'Hata (N)' → red; sabit sıra; boş grup → bant
+// YOK (eski tek-satır 'Toplam X · Açılan Y · …' özeti KALDIRILDI —
+// sayaçlar bant başlıklarında). Satır dili dashboard aband gövdesiyle
+// aynı: .arow > .arow-left > .arow-id (bold küpe/mesaj) + .arow-sub
+// (gri detay — js/ui.js:329 kritik stok bandı dili). Uzun listeler için
+// gövde içi kaydırma kutusu (max-height:220px + overflow-y:auto —
+// index.html bc-ilac-blok / ac-box konvansiyonu). Ok-satır ekleri
+// V1.1/V1.2/V2 davranışını birebir korur; opts = { acilan: res.acilan,
+// tohumIste, tohumSaat } — şablon gün sayısı satırlarda taşınmadığından
+// acilan[i] hizalaması burada yapılır (eski ai sayaç aynası). band()
+// global'i js/ui.js:68'den gelir (ui.js forms.js'ten önce yüklenir).
+// Saf, DOM'suz.
+function bcSonucBantlari(satirlar, opts){
+  const o = opts || {};
+  const acilanlar = o.acilan || [];
+  const tohumIste = !!o.tohumIste;
+  const tohumSaat = o.tohumSaat || '08:00';
+  const gruplar = [
+    { tip: 'ok',      cls: 'green', baslik: 'Açılan',  rows: [] },
+    { tip: 'atlanan', cls: 'amber', baslik: 'Atlanan', rows: [] },
+    { tip: 'hata',    cls: 'red',   baslik: 'Hata',    rows: [] },
+  ];
+  let ai = 0;
+  (satirlar || []).forEach(s => {
+    const grup = gruplar.find(x => x.tip === s.tip);
+    if (!grup) return;
+    let idHtml = '', subHtml = '';
+    if (s.tip === 'ok') {
+      const a = acilanlar[ai++];
+      const gun = a?.sablon?.gun_sayisi;
+      const manuelEk = bcManuelSatirEki(a?.manuel);
+      const sablonEk = manuelEk ? '' : (gun ? ` + ${gun} gün şablon` : '');
+      const tohumEk = (s.tohumlamaOlustu === true)
+        ? ` · 🐄 tohumlama ${tohumSaat}`
+        : (s.tohumlamaSebep && tohumIste ? ` · ⏭ tohumlama: ${s.tohumlamaSebep}` : '');
+      idHtml = `✅ ${escAttr(s.kupe)}`;
+      subHtml = `vaka açıldı${manuelEk}${sablonEk}${tohumEk}`;
+    } else if (s.tip === 'atlanan') {
+      idHtml = `⏭ ${escAttr(s.kupe)}`;
+      subHtml = esc(s.mesaj || 'atlandı');
+    } else {
+      idHtml = `❌ ${esc(s.mesaj || 'hata')}`;
+    }
+    grup.rows.push(
+      `<div class="arow" style="cursor:default"><div class="arow-left">` +
+      `<div class="arow-id" style="font-size:.8rem">${idHtml}</div>` +
+      (subHtml ? `<div class="arow-sub" style="font-size:.72rem">${subHtml}</div>` : '') +
+      `</div></div>`
+    );
+  });
+  return gruplar
+    .filter(x => x.rows.length)
+    .map(x => band(x.cls, `${x.baslik} (${x.rows.length})`,
+      `<div style="max-height:220px;overflow-y:auto">${x.rows.join('')}</div>`))
+    .join('');
+}
+
 // Toplu vaka gönderimi — submitCase:590 zincirinin N-hayvan aynası:
 // online-only guard → seçim/hastalık doğrulaması → IndexedDB mükerrer
-// ön-kontrol (openConfirm) → tek rpc('vaka_toplu_ac') → bc-sonuc satır
+// ön-kontrol (openConfirm) → tek rpc('vaka_toplu_ac') → bc-sonuc bant
 // render → pullTables(submitCase seti). Modal KAPANMAZ — kullanıcı sonuç
 // listesini gözden geçirir; form sıfırlanmaz (chips kalır).
 async function submitBulkCase(btn){
@@ -1700,6 +1791,12 @@ async function submitBulkCase(btn){
     ? bcTohumUygunOlmayanlar(liste, bcTohumHedefTarih(tarih, tohumGun))
     : [];
 
+  // V2.1 — tohumlama çakışma ön-kontrolü (UI-only, non-blocking): seçili
+  // hayvanlarda OPEN planlı tohumlama görevi var mı (IndexedDB gorev_log)?
+  let gorevler = [];
+  try { gorevler = await idbGetAll('gorev_log'); } catch { gorevler = []; }
+  const tohumCakisan = tohumIste ? bcTohumCakismaBul(liste, gorevler) : [];
+
   const gonder = async () => {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Gönderiliyor…'; }
     try {
@@ -1719,35 +1816,18 @@ async function submitBulkCase(btn){
         p_tohumlama_saat:       tohumSaat,
       });
 
-      // Sonuç listesi (bcSonucSatirlari sırası: acilan → atlanan → hatalar)
+      // V2.1 — bantlı sonuç düzeni (owner-approved): bcSonucSatirlari
+      // satırları renkli grup bantlarına bağlanır (Açılan green → Atlanan
+      // amber → Hata red); sayaçlar bant başlıklarında — eski tek-satır
+      // özet ('Toplam X · Açılan Y · …') kaldırıldı. Başarı toast'ı aynı.
       const satirlar = bcSonucSatirlari(res);
-      const acilanlar = res.acilan || [];
-      const renk = { ok: 'var(--green)', atlanan: 'var(--amber)', hata: 'var(--red)' };
-      let ai = 0;
-      const html = satirlar.map(s => {
-        if (s.tip === 'ok') {
-          const a = acilanlar[ai++];
-          const gun = a?.sablon?.gun_sayisi;
-          // V2 manuel satır: "✅ <kupe> — vaka açıldı + N gün · M ilaç"
-          // (gün alanı yoksa eski "+ M ilaç" fallback; hiçbiri yoksa ek yok)
-          const manuelEk = bcManuelSatirEki(a?.manuel);
-          const sablonEk = manuelEk ? '' : (gun ? ` + ${gun} gün şablon` : '');
-          // V1.2 tohumlama eki: olustu → saat; olustu=false + istek var → sebep
-          const tohumEk = (s.tohumlamaOlustu === true)
-            ? ` · 🐄 tohumlama ${tohumSaat}`
-            : (s.tohumlamaSebep && tohumIste ? ` · ⏭ tohumlama: ${s.tohumlamaSebep}` : '');
-          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.ok}">✅ ${escAttr(s.kupe)} — vaka açıldı${manuelEk}${sablonEk}${tohumEk}</div>`;
-        }
-        if (s.tip === 'atlanan') {
-          return `<div style="font-size:.78rem;padding:2px 0;color:${renk.atlanan}">⏭ ${escAttr(s.kupe)} — ${esc(s.mesaj || 'atlandı')}</div>`;
-        }
-        return `<div style="font-size:.78rem;padding:2px 0;color:${renk.hata}">❌ ${esc(s.mesaj || 'hata')}</div>`;
-      }).join('');
-      const ozet = `Toplam ${res.toplam ?? liste.length} · Açılan ${res.basari ?? 0} · Atlanan ${(res.atlanan || []).length} · Hata ${(res.hatalar || []).length}`;
       const sonuc = g('bc-sonuc');
       if (sonuc) {
-        sonuc.innerHTML =
-          `<div style="font-size:.78rem;font-weight:700;padding:4px 0">${esc(ozet)}</div>` + html;
+        sonuc.innerHTML = bcSonucBantlari(satirlar, {
+          acilan: res.acilan || [],
+          tohumIste,
+          tohumSaat,
+        });
         sonuc.style.display = 'block';
       }
 
@@ -1769,10 +1849,13 @@ async function submitBulkCase(btn){
     }
   };
 
-  // V1.2 — BİRLEŞİK uyarı onayı: mükerrer aktif vaka + tohumlama uygunsuzleri
-  // TEK openConfirm'de; her iki uyarı da "atlanacak" — onay akışı sürer.
+  // V1.2 — BİRLEŞİK uyarı onayı: mükerrer aktif vaka + tohumlama çakışması
+  // (V2.1) + tohumlama uygunsuzleri TEK openConfirm'de. Çakışma NON-BLOCKING:
+  // 'yenisi de açılacak' — onay akışı sürer; sunucu yalnız aynı-vaka
+  // duplikelerini atlar.
   const uyariSatirlari = [
     ...dups.map(d => `• ${d.kupe} — zaten aktif vaka — atlanacak`),
+    ...tohumCakisan.map(t => `• ${t.kupe} — açık planlı tohumlaması var (${bcTarihKisa(t.tarih)}) — yenisi de açılacak`),
     ...uygunsuz.map(u => `• ${u.kupe} — ${u.sebep} — tohumlaması atlanacak`),
   ];
   if (uyariSatirlari.length) {
@@ -1959,7 +2042,7 @@ async function submitSuttenKes(hayvanIdList, btn) {
     } else if (res.ok && res.hata_sayisi > 0) {
       toast(`⚠️ ${res.basari} başarılı, ${res.hata_sayisi} hatalı`, true);
       const hd = document.getElementById('sk-hatalar');
-      if (hd) hd.innerHTML = res.hatalar.map(h => `<div style="color:var(--err);font-size:.72rem">• ${esc(h.hata)}</div>`).join('');
+      if (hd) hd.innerHTML = res.hatalar.map(h => `<div style="color:var(--red);font-size:.72rem">• ${esc(h.hata)}</div>`).join('');
     } else {
       // RPC hata durumunda 'hata' değil 'hatalar' dizisi döner (B33)
       const hMsj = (res.hatalar && res.hatalar.length)

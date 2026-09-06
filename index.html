@@ -1229,7 +1229,8 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <textarea id="bc-notes" class="fi" rows="2" placeholder="Tüm vakalara yazılacak not — semptomlar, gözlemler…" style="resize:vertical"></textarea>
       </div>
 
-      <!-- SONUÇ — submit sonrası W3 doldurur (submitBulkCase) -->
+      <!-- SONUÇ — submit sonrası bantlı düzen (W12: bcSonucBantlari —
+           Açılan/Atlanan/Hata renkli grup bantları, aband dili) -->
       <div id="bc-sonuc" style="display:none"></div>
 
       <button id="bc-submit" class="btn btn-g" data-action="submit-bulk-case">🩺 Vakaları Aç</button>
@@ -2284,7 +2285,9 @@ function copyErrors() {
   <div class="modal" style="max-width:340px;border-radius:18px;padding:0">
     <div style="padding:20px 20px 0">
       <div id="m-confirm-title" style="font-size:1rem;font-weight:700;color:var(--ink);margin-bottom:8px"></div>
-      <div id="m-confirm-desc" style="font-size:.85rem;color:var(--ink2);line-height:1.4"></div>
+      <!-- white-space:pre-line — joined('\n') uyarı listeleri satır satır
+           basılır (toplu vaka uyarıları, planlı aşı tekrarı, görev diff) -->
+      <div id="m-confirm-desc" style="font-size:.85rem;color:var(--ink2);line-height:1.4;white-space:pre-line"></div>
     </div>
     <div style="display:flex;gap:8px;padding:16px 20px 20px;margin-top:8px">
       <button class="btn btn-o" style="flex:1;padding:11px" data-action="close-confirm">İptal</button>
