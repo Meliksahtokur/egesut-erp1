@@ -134,7 +134,47 @@
 --   * Diğer her şey AYNEN: karşılıklı dışlama (p_items ↔ p_sablon_id),
 --     p_tarih çapası (geçmiş yasak), tohumlama kolu (vaka_tohumlama_ekle
 --     yeniden kullanımı + yumuşak guard), 200 sınırı, dedupe, atlanan,
---     hatalar, şablon pg_proc guard'ı, NOTIFY pgrst, GRANT'lar.
+--     hatalar, şablon pg_proc guard'ı, NOTIFY, GRANT'lar.
+-- ----------------------------------------------------------------------------
+-- V2.2 (2026-09-06, owner kararı): TOHUMLAMA ÇAKIŞMA MODU.
+--   Yeni imza (10 parametre; eski 9-arg gövde DROP edilip yeniden yaratılıyor):
+--     vaka_toplu_ac(..., p_tohumlama_saat text DEFAULT NULL,
+--                   p_tohumlama_cakisma text DEFAULT 'ekle') → jsonb
+--   * p_tohumlama_cakisma ∈ {'ekle','uzerine_yaz','atla'}; aksi (veya NULL)
+--     → {ok:false, mesaj:'Geçersiz çakışma modu'} (fail-fast — hiç vaka
+--     açılmadan). p_tohumlama=false iken mod etki etmez.
+--   * ÇAKIŞMA TARAMASI (yalnız p_tohumlama_cakisma <> 'ekle' iken, her
+--     başarıyla açılan vaka için, ekle çağrısından ÖNCE): hayvanın AÇIK
+--     (tamamlandi=false AND iptal=false) TOHUMLAMA_PLANLI gorev_log
+--     satırları — HER VAKADAN (kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%'),
+--     YENİ açılan vakanın kendi satırları HARİÇ (şablon yolu aynı RPC
+--     çağrısında az önce görev açtıysa o "eski" değildir; aynı-vaka
+--     tekrarı vaka_tohumlama_ekle'nin mevcut guard'ında kalır:
+--     'Bu vakada zaten açık bir planlı tohumlama var'). Sahip kararı
+--     bağlamında çakışma = ESKİ görev. Tarama sonucu hedef_tarih ASC
+--     (en eski önce) sıralanır.
+--   * 'ekle': mevcut davranış AYNEN (hayvan-vaka çakışmasına bakılmaksızın
+--     vaka_tohumlama_ekle; per-case guard mesajı yumuşak düşer).
+--   * 'atla': çakışma VARSA ekle HİÇ çağrılmaz;
+--     acilan[i].tohumlama := {olustu:false, sebep:'Açık planlı tohumlama
+--     vardı — atlandı (eski plan: <DD.MM>)'} (<DD.MM> = en eski açık
+--     görevin hedef_tarih'i). Çakışma yoksa 'ekle' gibi devam eder.
+--   * 'uzerine_yaz': çakışma VARSA her eski görev için YUMUŞAK İPTAL —
+--     mevcut kapanış konvansiyonunun aynası (close_case_with_remaining
+--     5b adımı + trg_gorev_parent_kapandi kapatan_ref'i):
+--       UPDATE gorev_log SET iptal=true, tamamlandi=true,
+--         tamamlanma_tarihi=now(), kapatan_ref='toplu-vaka-uzerine-yaz'
+--     ve HER iptal edilen görev için bir islem_log denetim satırı:
+--       tip='TOHUMLAMA_PLANLI_IPTAL', ana_hayvan_id=<hayvan>, ref_id=<görev
+--       id>, ref_tablo='gorev_log', snapshot={'sebep':'toplu vaka üzerine
+--       yazma'} (GOREV_IPTAL önceli yok — grep doğrulandı; benzer ip'ler
+--       GOREV_EKLENDI/GOREV_TAMAMLA/GOREV_OTOKAPAT). Ardından ekle
+--       çağrılır; ok:true → acilan[i].tohumlama := {olustu:true, gorev_id,
+--       uzerine_yazildi:['<DD.MM>', ...]} (eski→yeni sırayla; iptal
+--       olmadıysa anahtar konmaz); ok:false → bugünkü yumuşak hata şekli.
+--   * Tohumlama RPC'si canlıda yoksa (pg_proc guard) mod kolu da devreye
+--     girmez — güvenli düşüm {olustu:false, sebep:'Tohumlama RPC yok'}.
+--   * V1/V1.1/V1.2/V2 davranışı AYNEN korunur.
 -- ============================================================================
 
 BEGIN;
@@ -225,10 +265,13 @@ GRANT EXECUTE ON FUNCTION public.create_case(text, uuid, text) TO anon, authenti
 --    V1.2: imza 9 parametreye çıktı (p_tarih, p_tohumlama, offset, saat) →
 --    eski gövdeler (3/4/5-arg) DROP edilmeli; aksi halde CREATE OR REPLACE
 --    overload üretirdi.
+--    V2.2: imza 10 parametre (son parametre p_tohumlama_cakisma) → 9-arg
+--    gövde de DROP edilir (demo'da canlı; PROD'a hiç gitmedi).
 -- ----------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, uuid);
 DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, uuid, text);
 DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text);
+DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text);
 CREATE OR REPLACE FUNCTION public.vaka_toplu_ac(
   p_animal_ids           text[],
   p_disease_id           uuid,
@@ -238,7 +281,8 @@ CREATE OR REPLACE FUNCTION public.vaka_toplu_ac(
   p_tarih                date DEFAULT NULL,
   p_tohumlama            boolean DEFAULT false,
   p_tohumlama_gun_offset int DEFAULT 0,
-  p_tohumlama_saat       text DEFAULT NULL
+  p_tohumlama_saat       text DEFAULT NULL,
+  p_tohumlama_cakisma    text DEFAULT 'ekle'
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_list          text[] := ARRAY[]::text[];
@@ -273,6 +317,9 @@ DECLARE
   v_gun_sayisi    int;
   v_seans_toplam  int;
   v_err_gun       int;
+  v_cakisma       jsonb;
+  v_uzerine       jsonb;
+  v_c             record;
 BEGIN
   IF p_animal_ids IS NULL OR array_length(p_animal_ids, 1) IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan listesi boş');
@@ -302,6 +349,13 @@ BEGIN
   IF p_tohumlama_saat IS NOT NULL
      AND p_tohumlama_saat !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz saat');
+  END IF;
+
+  -- V2.2: çakışma modu (fail-fast — hiç vaka açılmadan). DEFAULT 'ekle'
+  -- mevcut davranışı korur; mod p_tohumlama=false iken etki etmez.
+  IF p_tohumlama_cakisma IS NULL OR
+     p_tohumlama_cakisma NOT IN ('ekle', 'uzerine_yaz', 'atla') THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz çakışma modu');
   END IF;
 
   -- V2: p_items doğrulama + motor biçimine normalize (fail-fast — henüz
@@ -550,21 +604,106 @@ BEGIN
         -- manuel'den SONRA, yalnız p_tohumlama iken. Yumuşak: sonuç asla
         -- hatalar'a sayılmaz, vaka açık kalır; sebep acilan[i].tohumlama'ya
         -- yazılır (uygunluk reddi / RPC yok / beklenmeyen hata).
+        -- V2.2: p_tohumlama_cakisma modu — 'ekle' (default, davranış
+        -- değişmez) | 'atla' (eski açık görev varsa YENİSİ AÇILMAZ) |
+        -- 'uzerine_yaz' (eski açık görevler YUMUŞAK İPTAL + görev başına
+        -- islem_log denetimi, sonra yeni görev açılır).
         IF p_tohumlama THEN
           BEGIN
             IF v_tohu_ekle_var THEN
-              v_tohu_tarih := v_start_date + p_tohumlama_gun_offset;
-              v_tohu_res := public.vaka_tohumlama_ekle(
-                p_case_id := v_case_id,
-                p_tarih   := v_tohu_tarih,
-                p_saat    := COALESCE(p_tohumlama_saat, '08:00')::time);
-              IF (v_tohu_res->>'ok') = 'true' THEN
-                v_tohu_obj := jsonb_build_object(
-                  'olustu', true, 'gorev_id', v_tohu_res->'gorev_id');
-              ELSE
-                v_tohu_obj := jsonb_build_object(
-                  'olustu', false,
-                  'sebep', COALESCE(v_tohu_res->>'mesaj', 'Bilinmeyen sebep'));
+              -- Çakışma taraması (yalnız mod <> 'ekle'; ekle hiç taramaz —
+              -- regresyon birebir): hayvanın AÇIK TOHUMLAMA_PLANLI görevleri
+              -- HER VAKADAN (kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%'), YENİ
+              -- açılan vakanın kendi satırları HARİÇ — şablon yolu aynı RPC
+              -- çağrısında az önce görev açtıysa o "eski" değildir; aynı-vaka
+              -- tekrarı vaka_tohumlama_ekle'nin mevcut guard'ında kalır.
+              -- Sıra hedef_tarih ASC (en eski önce; NULL en son).
+              v_uzerine := NULL;
+              v_tohu_obj := NULL;
+              IF p_tohumlama_cakisma <> 'ekle' THEN
+                SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                                  'id', g.id::text, 'hedef_tarih', g.hedef_tarih)
+                                ORDER BY g.hedef_tarih ASC, g.id ASC),
+                               '[]'::jsonb)
+                  INTO v_cakisma
+                  FROM public.gorev_log g
+                 WHERE g.hayvan_id = v_id
+                   AND g.gorev_tipi = 'TOHUMLAMA_PLANLI'
+                   AND g.kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%'
+                   AND g.kaynak NOT LIKE
+                       'TEDAVI_SABLON_TOHUMLAMA:' || v_case_id::text || ':%'
+                   AND g.tamamlandi = false
+                   AND g.iptal = false;
+
+                IF p_tohumlama_cakisma = 'atla' AND v_cakisma <> '[]'::jsonb THEN
+                  -- Sahip kararı: 'Atla' = yenisi AÇILMAZ; eski planın hedef
+                  -- tarihi (en eski açık görev) sebebe yazılır.
+                  v_tohu_obj := jsonb_build_object(
+                    'olustu', false,
+                    'sebep', 'Açık planlı tohumlama vardı — atlandı (eski plan: '
+                             || COALESCE(to_char(
+                                  (v_cakisma->0->>'hedef_tarih')::date, 'DD.MM'),
+                                  '?')
+                             || ')');
+                ELSIF p_tohumlama_cakisma = 'uzerine_yaz'
+                      AND v_cakisma <> '[]'::jsonb THEN
+                  -- Sahip kararı: 'Üzerine yaz' = eski görev YUMUŞAK İPTAL.
+                  -- Kapanış şekli close_case_with_remaining 5b adımının
+                  -- (TOHUMLAMA_PLANLI iptali: iptal+tamamlandi+tarih)
+                  -- aynası; kapatan_ref trg_gorev_parent_kapandi
+                  -- konvansiyonuyla. Görev başına islem_log denetimi
+                  -- (GOREV_IPTAL önceli yok — ip'ler GOREV_EKLENDI/
+                  -- GOREV_TAMAMLA/GOREV_OTOKAPAT).
+                  v_uzerine := '[]'::jsonb;
+                  FOR v_c IN
+                    SELECT x.id, x.hedef_tarih
+                    FROM jsonb_to_recordset(v_cakisma)
+                         AS x(id text, hedef_tarih date)
+                  LOOP
+                    UPDATE public.gorev_log
+                       SET iptal = true,
+                           tamamlandi = true,
+                           tamamlanma_tarihi = now(),
+                           kapatan_ref = 'toplu-vaka-uzerine-yaz'
+                     WHERE id::text = v_c.id
+                       AND tamamlandi = false
+                       AND iptal = false;
+                    IF FOUND THEN
+                      INSERT INTO public.islem_log
+                        (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+                      VALUES
+                        (gen_random_uuid()::text,
+                         'TOHUMLAMA_PLANLI_IPTAL',
+                         v_id, v_c.id, 'gorev_log',
+                         jsonb_build_object(
+                           'sebep', 'toplu vaka üzerine yazma'));
+                      v_uzerine := v_uzerine || to_jsonb(
+                        COALESCE(to_char(v_c.hedef_tarih, 'DD.MM'), '?'));
+                    END IF;
+                  END LOOP;
+                END IF;
+              END IF;
+
+              IF v_tohu_obj IS NULL THEN
+                v_tohu_tarih := v_start_date + p_tohumlama_gun_offset;
+                v_tohu_res := public.vaka_tohumlama_ekle(
+                  p_case_id := v_case_id,
+                  p_tarih   := v_tohu_tarih,
+                  p_saat    := COALESCE(p_tohumlama_saat, '08:00')::time);
+                IF (v_tohu_res->>'ok') = 'true' THEN
+                  v_tohu_obj := jsonb_build_object(
+                    'olustu', true, 'gorev_id', v_tohu_res->'gorev_id');
+                  -- V2.2: üzerine yazıldıysa iptal edilen eski planların
+                  -- tarihleri (eski→yeni) sonuca eklenir.
+                  IF v_uzerine IS NOT NULL AND v_uzerine <> '[]'::jsonb THEN
+                    v_tohu_obj := v_tohu_obj || jsonb_build_object(
+                      'uzerine_yazildi', v_uzerine);
+                  END IF;
+                ELSE
+                  v_tohu_obj := jsonb_build_object(
+                    'olustu', false,
+                    'sebep', COALESCE(v_tohu_res->>'mesaj', 'Bilinmeyen sebep'));
+                END IF;
               END IF;
             ELSE
               -- vaka_tohumlama_ekle canlıda yok (GT drift): güvenli düşüm
@@ -607,7 +746,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text) TO anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
 

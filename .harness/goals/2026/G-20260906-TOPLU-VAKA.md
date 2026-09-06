@@ -1,6 +1,6 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: review
+status: active
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
@@ -52,6 +52,8 @@ acceptance:
   - V2 E2E: multi-day bulk plan anchors each day to start_date+(n-1) with per-day/per-kalem times verified in demo.
   - V2.1 E2E: gapped multi-day plan (e.g. gün 1+5) with two sessions on one day and a day-copy, verified in demo.
   - V2.1 E2E: sonuçlar bantlı bölümlerde + uyarı diyaloğu satır satır + tohumlama çakışması uyarıda listeleniyor (demo).
+  - V2.2 criterion 14: şablon boşluk round-trip — boşluklu şablon (ör. gün 1+5) kaydedilir, kalemler gun_no 1 ve 5 olarak saklanır (1,2 SIKIŞTIRILMAZ), vakaya uygulandığında tedavi günleri start_date+0 ve start_date+4'e kurulur; gapless şablon davranışı değişmez (scratch-cluster kanıtı; canlı gövde 20260722000001+'den beri zaten boşluksuz saklıyordu — GT canlı gövdeyle hizalandı).
+  - V2.2 criterion 15: tohumlama çakışma modları — `vaka_toplu_ac` 10-parametreli imza (p_tohumlama_cakisma DEFAULT 'ekle'); 'atla' eski açık planlı tohumlaması olan hayvana yeni görev AÇMAZ (sebep 'Açık planlı tohumlama vardı — atlandı (eski plan: <DD.MM>)'); 'uzerine_yaz' eski açık görevleri YUMUŞAK iptal eder (iptal+tamamlandi+kapatan_ref='toplu-vaka-uzerine-yaz') ve görev başına islem_log tip='TOHUMLAMA_PLANLI_IPTAL' denetimi yazar, sonra yeni görevi açar (acilan[i].tohumlama.uzerine_yazildi listesi); 'ekle' bugünkü davranışın aynısı; geçersiz mod fail-fast 'Geçersiz çakışma modu' (scratch-cluster kanıtı + demo katalog doğrulaması).
   - Root reviews the diff; merge and push happen only after owner approval; PROD migration happens only after separate owner approval.
 stop_conditions:
   - Live schema materially contradicts ground-truth assumptions before implementation (create_case, tedavi_sablon_uygula, or _tohumlama_gorev_uygunluk drift).
@@ -368,3 +370,53 @@ BİRDEN" decisions):
    per-case soft-skip semantics unchanged.
 4. sk-hatalar color fix: `var(--err)` (undefined variable, 0 index.html
    hits) → `var(--red)` in submitSuttenKes error list.
+
+**V2.2 amendment (owner decisions, 2026-09-06 — W15-RPC):** two DB-side
+owner decisions, both landing in this goal.
+
+1. Şablon boşluk koruması (criterion 14): `tedavi_sablon_kaydet` must
+   PRESERVE gapped day numbers — no DENSE_RANK compression. REPO
+   CONVENTION VERIFIED: deployed functions change through NEW migration
+   files (20260613000008 → 20260722000001 → 20260730000001 chain);
+   defining migrations are never edited in place. KEY DISCOVERY: the
+   live body ALREADY stores gun_no as-given (20260722000001 removed
+   DENSE_RANK + added the `gun_no ≥ 1` validation; 20260730000001 added
+   tohumlama_plani normalize). NO new migration written; GT only was
+   stale — its kaydet body was replaced with the live
+   pg_get_functiondef output and GT's `tedavi_sablonu` DDL gained
+   `tohumlama_plani jsonb`. `tedavi_sablon_uygula` needs NO change
+   (verified: `SELECT DISTINCT gun_no … ORDER BY gun_no` +
+   `start_date + (gun_no − 1)` is sparse-safe).
+
+2. Tohumlama çakışma modu (criterion 15): `vaka_toplu_ac` evolves
+   IN PLACE in its own undeployed-to-PROD migration
+   20260906120000_vaka_toplu_ac.sql to a 10-parameter signature ending
+   `p_tohumlama_cakisma text DEFAULT 'ekle'`
+   (`'ekle' | 'uzerine_yaz' | 'atla'`; anything else → fail-fast
+   `{ok:false, mesaj:'Geçersiz çakışma modu'}`; the 9-arg body is
+   DROPped). Semantics when p_tohumlama is on, per successfully opened
+   case: the conflict scan looks for OPEN (`tamamlandi=false AND
+   iptal=false`) `TOHUMLAMA_PLANLI` gorev_log rows of the ANIMAL from
+   ANY case with `kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%'`, EXCLUDING
+   the just-opened case's own rows (a görev the şablon path created
+   seconds earlier in the same RPC call is not "eski"; the same-case
+   duplicate stays handled by `vaka_tohumlama_ekle`'s existing guard).
+   'ekle' = today's behavior verbatim (regression-tested). 'atla' =
+   when such rows exist, `vaka_tohumlama_ekle` is NOT called;
+   `acilan[i].tohumlama := {olustu:false, sebep:'Açık planlı tohumlama
+   vardı — atlandı (eski plan: <DD.MM>)'}` (oldest open hedef_tarih).
+   'uzerine_yaz' = each such old görev is soft-cancelled mirroring the
+   existing cancel conventions (`close_case_with_remaining` step 5b
+   flag shape `iptal=true, tamamlandi=true, tamamlanma_tarihi=now()`
+   plus `kapatan_ref='toplu-vaka-uzerine-yaz'` per
+   trg_gorev_parent_kapandi) with one islem_log audit row per cancelled
+   görev: `tip='TOHUMLAMA_PLANLI_IPTAL', ref_tablo='gorev_log',
+   ref_id=<görev>, snapshot={'sebep':'toplu vaka üzerine yazma'}`
+   (no GOREV_IPTAL precedent exists — grep-verified; existing ips are
+   GOREV_EKLENDI/GOREV_GUNCELLENDI/GOREV_TAMAMLA/GOREV_OTOKAPAT) — then
+   the new görev is created;
+   `acilan[i].tohumlama := {olustu:true, gorev_id, uzerine_yazildi:
+   ['<DD.MM>', …]}` oldest-first (key omitted when nothing was
+   cancelled; `ekle` failure keeps today's soft shape). The 9-arg
+   positional call remains valid (new param defaults 'ekle'). GT's
+   vaka_toplu_ac section carries the 10-arg body same-commit.

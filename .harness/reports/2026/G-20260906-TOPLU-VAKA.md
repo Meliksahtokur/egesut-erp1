@@ -922,3 +922,79 @@ after; live verbatim engines):
   olmalı'}` (message verbatim).
 - Update path re-save with {1,5,9} → gaps preserved (`gun_no {1,5,9}`).
 - GT body ↔ live body diff: identical (modulo statement-terminating `;`).
+
+### TASK B — vaka_toplu_ac p_tohumlama_cakisma (V2.2, in-place migration evolve)
+
+Migration 20260906120000_vaka_toplu_ac.sql evolved IN PLACE (undeployed
+to PROD; demo had the 9-arg version — dropped & recreated). New
+signature: `vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date,
+boolean, int, text, p_tohumlama_cakisma text DEFAULT 'ekle')`; invalid
+or NULL mode → fail-fast `{ok:false, mesaj:'Geçersiz çakışma modu'}`
+before any case. Conflict scan (mode ≠ 'ekle', per opened case, before
+ekle): OPEN (`tamamlandi=false AND iptal=false`) TOHUMLAMA_PLANLI
+gorev_log rows of the ANIMAL from any case with
+`kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%'`, excluding the just-opened
+case's own rows; ordered hedef_tarih ASC. 'ekle' = unchanged; 'atla' =
+ekle not called, `{olustu:false, sebep:'Açık planlı tohumlama vardı —
+atlandı (eski plan: <DD.MM>)'}`; 'uzerine_yaz' = per old görev soft
+cancel (`iptal=true, tamamlandi=true, tamamlanma_tarihi=now(),
+kapatan_ref='toplu-vaka-uzerine-yaz'` — close_case_with_remaining 5b +
+kapatan_ref convention mirror) + islem_log
+`tip='TOHUMLAMA_PLANLI_IPTAL', ref_tablo='gorev_log',
+snapshot={'sebep':'toplu vaka üzerine yazma'}` per cancelled görev,
+then ekle; `{olustu:true, gorev_id, uzerine_yazildi:['<DD.MM>'…]}`
+(oldest first; key omitted when nothing cancelled; ekle failure keeps
+today's soft shape). 9-arg positional call stays valid.
+
+Audit-tip precedent check: NO `GOREV_IPTAL` tip exists in migrations
+(grep); existing ips GOREV_EKLENDI ×8, GOREV_GUNCELLENDI ×10,
+GOREV_TAMAMLA ×13, GOREV_OTOKAPAT ×2 → `TOHUMLAMA_PLANLI_IPTAL` chosen
+per task spec.
+
+Scratch-cluster behavioral evidence (PG fresh build per run; verbatim
+live engines + verbatim migration; fixtures: closed old cases so the
+conflict görevler persist — normal close does NOT cancel
+TOHUMLAMA_PLANLI, only close_case_with_remaining does):
+
+- T7 'ekle' regression (9-arg positional call, cross-case conflict):
+  `tohumlama = {olustu:true, gorev_id:…}`; new görev created (count 1);
+  old open görev untouched (count 1) — today's behavior byte-identical.
+- T8 'atla' with conflict: `{olustu:false, sebep:'Açık planlı
+  tohumlama vardı — atlandı (eski plan: 01.08)'}`; new görev count 0.
+- T9 'uzerine_yaz' with TWO open old görevler (2026-07-15, 2026-08-01):
+  `tohumlama = {olustu:true, gorev_id:…, uzerine_yazildi:["15.07",
+  "01.08"]}`; both old rows iptal=true + tamamlandi=true +
+  kapatan_ref='toplu-vaka-uzerine-yaz'; islem_log TOHUMLAMA_PLANLI_IPTAL
+  audit rows = 2 with exact snapshot sebep.
+- T10 invalid mode 'sil': `{ok:false, mesaj:'Geçersiz çakışma modu'}`;
+  cases opened for that animal = 0 (fail-fast).
+- T11a/b clean animals under 'atla'/'uzerine_yaz': behave as 'ekle'
+  (`{olustu:true, gorev_id:…}`, no uzerine_yazildi key).
+- T12 şablon path + 'uzerine_yaz': the görev the şablon helper created
+  moments earlier for the SAME new case is NOT cancelled (current-case
+  exclusion); ekle soft-skips with its own guard message 'Bu vakada
+  zaten açık bir planlı tohumlama var'; fresh görev remains open.
+- GT body equivalence proof: GT's transplanted vaka_toplu_ac body
+  extracted and CREATE OR REPLACE'd over the migration-installed
+  function on a fresh scratch DB → ALL TASK B tests pass identically.
+
+### TASK C — demo apply + catalog verification (2026-09-06)
+
+Management API apply (project vtzqjmazsvurxdeondmi): migration file
+posted byte-exact → `[]` (success). Catalog verify (pg_proc +
+pg_get_functiondef):
+
+- `vaka_toplu_ac` catalog rows: EXACTLY ONE —
+  `p_animal_ids text[], p_disease_id uuid, p_items jsonb, p_sablon_id
+  uuid, p_notes text, p_tarih date, p_tohumlama boolean,
+  p_tohumlama_gun_offset integer, p_tohumlama_saat text,
+  p_tohumlama_cakisma text` (9-arg GONE).
+- `create_case(text,uuid,text)` wrapper + `_vaka_ac_tek(text,uuid,text,date)`
+  intact; EXECUTE granted to anon+authenticated.
+- `tedavi_sablon_kaydet` live body: `dense_rank` position 0 (absent).
+- New body markers present: `p_tohumlama_cakisma` +
+  `TOHUMLAMA_PLANLI_IPTAL`.
+
+Demo rows: none created by the apply (DDL only); the çakışma modları
+E2E on demo (criterion 15 browser path) remains root's E2E step, the
+RPC contract is scratch-proven above. NOT applied to PROD (owner-gated).
