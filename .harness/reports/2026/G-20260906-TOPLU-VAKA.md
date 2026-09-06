@@ -878,3 +878,47 @@ when a stray reset emptied the select, with no partial RPC sent.
    commit (§6 item 3 carry-forward).
 3. W6 GitNexus probe index + node_modules symlink cleanup at goal close
    (V1.1 notes 2-3 carry-forward).
+
+## V2.2 Amendment (2026-09-06, owner decisions — W15-RPC)
+
+Owner decisions (2026-09-06): (1) şablon kaydı boşluklu günleri KORUSUN
+(DENSE_RANK compression removed); (2) tohumlama çakışmasında
+'Üzerine yaz' = eski görevi İPTAL et (soft), 'Atla' = yenisi açılmasın.
+
+### TASK A — şablon boşluk koruması: discovery + GT alignment
+
+REPO CONVENTION (verified): deployed functions are changed through NEW
+migration files via CREATE OR REPLACE; defining migrations are never
+edited in place — `tedavi_sablon_kaydet` chain 20260613000008 (original,
+DENSE_RANK) → 20260722000001 (DENSE_RANK removed, gun_no stored AS GIVEN
++ `gun_no ≥ 1` validation) → 20260730000001 (pg_get_functiondef-verbatim
+rewrite adding tohumlama_plani normalize). `tedavi_sablon_uygula`
+(20260613000009) iterates `SELECT DISTINCT gun_no … ORDER BY gun_no` and
+dates at `start_date + (gun_no − 1)` — sparse-safe, needs NO change.
+
+KEY DISCOVERY: the owner's decision (1) is ALREADY the live behavior —
+the 2026-07-22 migration removed DENSE_RANK. Only GT was stale (it still
+carried the original DENSE_RANK body). NO new migration was written:
+a third identical rewrite would contradict the convention and add no
+behavior. Demo live probe (read-only pg_get_functiondef, project
+vtzqjmazsvurxdeondmi): `dense_rank` position 0 in the live body — body
+matches 20260730000001 verbatim.
+
+Changes (this commit):
+- GT `tedavi_sablon_kaydet` body replaced with the live
+  pg_get_functiondef output (no DENSE_RANK; gun_no as-given; validation
+  message 'Şablon gün ofseti 0 veya daha büyük olmalı'); GT
+  `tedavi_sablonu` DDL gains `tohumlama_plani jsonb` (body dependency,
+  live column since 20260722000002).
+
+Scratch-cluster behavioral evidence (throwaway PostgreSQL, deleted
+after; live verbatim engines):
+
+- Gapped şablon {gun 1, gun 5} → kalemler stored `gun_no {1,5}` (NOT
+  {1,2}); `tedavi_sablon_uygula` on a case with start_date 2026-09-10
+  created treatment days at {2026-09-10, 2026-09-14} = start+0 / start+4.
+- Gapless regression {1,2,3} → gun_no {1,2,3}; dates +0,+1,+2 unchanged.
+- gun_no 0 → `{ok:false, mesaj:'Şablon gün ofseti 0 veya daha büyük
+  olmalı'}` (message verbatim).
+- Update path re-save with {1,5,9} → gaps preserved (`gun_no {1,5,9}`).
+- GT body ↔ live body diff: identical (modulo statement-terminating `;`).

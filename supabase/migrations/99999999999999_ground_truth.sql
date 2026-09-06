@@ -5108,6 +5108,7 @@ CREATE TABLE IF NOT EXISTS public.tedavi_sablonu (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ad          text UNIQUE NOT NULL,
   aciklama    text,
+  tohumlama_plani jsonb,
   aktif       boolean DEFAULT true,
   created_at  timestamptz DEFAULT now(),
   updated_at  timestamptz DEFAULT now()
@@ -5151,61 +5152,54 @@ GRANT ALL ON public.tedavi_sablonu        TO anon, authenticated;
 GRANT ALL ON public.sablon_hastalik_eslem TO anon, authenticated;
 GRANT ALL ON public.tedavi_sablonu_kalem  TO anon, authenticated;
 
--- CRUD: kaydet (insert/update + eşlem + kalem, DENSE_RANK ile gün no 1..N)
+-- CRUD: kaydet (insert/update + eşlem + kalem)
+-- V2.2 (2026-09-06, owner: şablon boşluklu günleri KORUSUN): gövde canlı
+-- pg_get_functiondef çıktısıyla hizalandı (20260730000001 sürümü). DENSE_RANK
+-- sıkıştırması YOKTUR — gun_no VERİLDİĞİ GİBİ yazılır (20260722000001'den beri
+-- canlı davranış; boşluklu şablon {1,5} → kalem gun_no 1 ve 5). Doğrulama:
+-- her kalem gun_no ≥ 1 ('Şablon gün ofseti 0 veya daha büyük olmalı').
+-- (sablon_id, gun_no) tekliği doğrulamayla korunur. geçmiş: DENSE_RANK
+-- sıkıştırması 20260613000008'deydi, 20260722000001 kaldırdı,
+-- 20260730000001 tohumlama_plani normalize'ı ekledi.
 DROP FUNCTION IF EXISTS public.tedavi_sablon_kaydet(uuid, text, text, jsonb, jsonb);
-CREATE OR REPLACE FUNCTION public.tedavi_sablon_kaydet(
-  p_id          uuid,
-  p_ad          text,
-  p_aciklama    text,
-  p_disease_ids jsonb,
-  p_kalemler    jsonb
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION public.tedavi_sablon_kaydet(p_id uuid, p_ad text, p_aciklama text, p_disease_ids jsonb, p_kalemler jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 DECLARE
   v_id uuid;
+  v_kalemler jsonb := CASE WHEN jsonb_typeof(p_kalemler)='object' THEN coalesce(p_kalemler->'kalemler','[]'::jsonb) ELSE coalesce(p_kalemler,'[]'::jsonb) END;
+  v_tohumlama jsonb := CASE WHEN jsonb_typeof(p_kalemler)='object' THEN nullif(p_kalemler->'tohumlama_plani','null'::jsonb) ELSE NULL END;
 BEGIN
-  IF p_ad IS NULL OR btrim(p_ad) = '' THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon adı zorunlu');
+  IF p_ad IS NULL OR btrim(p_ad) = '' THEN RETURN jsonb_build_object('ok',false,'mesaj','Şablon adı zorunlu'); END IF;
+  IF EXISTS (SELECT 1 FROM public.tedavi_sablonu WHERE lower(ad)=lower(p_ad) AND (p_id IS NULL OR id<>p_id)) THEN
+    RETURN jsonb_build_object('ok',false,'mesaj','Bu isimde başka bir şablon var');
   END IF;
-  IF EXISTS (SELECT 1 FROM public.tedavi_sablonu
-             WHERE LOWER(ad) = LOWER(p_ad) AND (p_id IS NULL OR id != p_id)) THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu isimde başka bir şablon var');
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_kalemler) k WHERE coalesce((k->>'gun_no')::smallint,0)<1) THEN
+    RETURN jsonb_build_object('ok',false,'mesaj','Şablon gün ofseti 0 veya daha büyük olmalı');
   END IF;
-
+  IF v_tohumlama IS NOT NULL AND (
+    coalesce((v_tohumlama->>'gun_ofset')::integer,-1)<0 OR nullif(v_tohumlama->>'planned_time','') IS NULL
+  ) THEN RETURN jsonb_build_object('ok',false,'mesaj','Planlı tohumlama gün ve saat bilgisi zorunlu'); END IF;
   IF p_id IS NULL THEN
-    INSERT INTO public.tedavi_sablonu (ad, aciklama)
-    VALUES (p_ad, NULLIF(btrim(coalesce(p_aciklama,'')),''))
-    RETURNING id INTO v_id;
+    INSERT INTO public.tedavi_sablonu(ad,aciklama,tohumlama_plani)
+    VALUES(p_ad,NULLIF(btrim(coalesce(p_aciklama,'')),''),v_tohumlama) RETURNING id INTO v_id;
   ELSE
-    UPDATE public.tedavi_sablonu
-       SET ad = p_ad, aciklama = NULLIF(btrim(coalesce(p_aciklama,'')),''), updated_at = now()
-     WHERE id = p_id;
-    IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon bulunamadı'); END IF;
-    v_id := p_id;
-    DELETE FROM public.sablon_hastalik_eslem WHERE sablon_id = v_id;
-    DELETE FROM public.tedavi_sablonu_kalem  WHERE sablon_id = v_id;
+    UPDATE public.tedavi_sablonu SET ad=p_ad,aciklama=NULLIF(btrim(coalesce(p_aciklama,'')),''),tohumlama_plani=v_tohumlama,updated_at=now() WHERE id=p_id;
+    IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'mesaj','Şablon bulunamadı'); END IF;
+    v_id:=p_id;
+    DELETE FROM public.sablon_hastalik_eslem WHERE sablon_id=v_id;
+    DELETE FROM public.tedavi_sablonu_kalem WHERE sablon_id=v_id;
   END IF;
-
-  INSERT INTO public.sablon_hastalik_eslem (sablon_id, disease_id)
-  SELECT v_id, t.val::uuid
-  FROM jsonb_array_elements_text(coalesce(p_disease_ids,'[]'::jsonb)) AS t(val)
-  ON CONFLICT (sablon_id, disease_id) DO NOTHING;
-
-  INSERT INTO public.tedavi_sablonu_kalem
-    (sablon_id, gun_no, planned_time, stok_id, drug_product_id, dose, unit, route)
-  SELECT
-    v_id,
-    DENSE_RANK() OVER (ORDER BY (k->>'gun_no')::int)::smallint,
-    (k->>'planned_time')::time,
-    NULLIF(k->>'stok_id','')::text,
-    NULLIF(k->>'drug_product_id','')::uuid,
-    (k->>'dose')::numeric,
-    k->>'unit',
-    NULLIF(k->>'route','')
-  FROM jsonb_array_elements(coalesce(p_kalemler,'[]'::jsonb)) AS k;
-
-  RETURN jsonb_build_object('ok', true, 'sablon_id', v_id);
-END;
-$$;
+  INSERT INTO public.sablon_hastalik_eslem(sablon_id,disease_id)
+  SELECT v_id,t.val::uuid FROM jsonb_array_elements_text(coalesce(p_disease_ids,'[]'::jsonb)) t(val)
+  ON CONFLICT(sablon_id,disease_id) DO NOTHING;
+  INSERT INTO public.tedavi_sablonu_kalem(sablon_id,gun_no,planned_time,stok_id,drug_product_id,dose,unit,route)
+  SELECT v_id,(k->>'gun_no')::smallint,(k->>'planned_time')::time,NULLIF(k->>'stok_id',''),NULLIF(k->>'drug_product_id','')::uuid,(k->>'dose')::numeric,k->>'unit',NULLIF(k->>'route','')
+  FROM jsonb_array_elements(v_kalemler) k;
+  RETURN jsonb_build_object('ok',true,'sablon_id',v_id);
+END; $function$;
 
 DROP FUNCTION IF EXISTS public.tedavi_sablon_sil(uuid);
 CREATE OR REPLACE FUNCTION public.tedavi_sablon_sil(p_id uuid)
