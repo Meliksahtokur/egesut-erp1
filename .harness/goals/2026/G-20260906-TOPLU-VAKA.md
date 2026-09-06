@@ -1,6 +1,6 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: active
+status: review
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
@@ -57,9 +57,9 @@ stop_conditions:
   - A required write falls outside the exact manifest above.
 report: .harness/reports/2026/G-20260906-TOPLU-VAKA.md
 checkpoint:
-  sequence: 1
+  sequence: 2
   kind: pre-review
-  head: 1139798057cf27250fe91c8eb87ca969325d2cbc
+  head: 5e463d97986937a972d55daad8e6f7138861ca1a
   docs_verdict: PASS
 ---
 

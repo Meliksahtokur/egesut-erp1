@@ -209,8 +209,16 @@ implementation commits (post-rebase):
           refactor + GT sync
   1139798 feat(ui): toplu vaka gönderim akışı — mükerrer uyarısı,
           vaka_toplu_ac çağrısı, sonuç listesi + testler
+  ad40561 docs(harness): G-20260906-TOPLU-VAKA rapor doldurma + rebase
+          sonrası launch hizalama
+  dcd8128 feat(db): vaka_toplu_ac V1.1 — p_items manuel ilaç listesi
+          (gün 1 uygulama, add_treatment_day_with_sessions motoru)
+  5e463d9 feat(ui): toplu vaka manuel ilaç listesi — cdf-chk dili,
+          şablon/mutual exclusion, dinamik buton + testler
+  (7 commits on branch idle/toplu-vaka; branch tip 5e463d9)
 docs checkpoints:
-  pre-review @ 1139798 — docs_verdict PASS (this goal's docs commit)
+  pre-review @ 1139798 — docs_verdict PASS (V1 docs commit)
+  pre-review @ 5e463d9 — docs_verdict PASS (V1.1 amendment docs commit)
   handoff/final: not recorded — root close + owner merge approval pending
 residual risks: see §6
 temporary mutations and artifacts restored:
@@ -243,3 +251,103 @@ toplu vaka testi — 5 hayvan, Enrolen mastit şablonu (otomatik test)") and
 their dependents: 15 treatment_days, 30 drug_administrations, 30
 TEDAVI_GUN/TEDAVI_SEANS görev rows, 30 stok_hareket ledger rows, 20
 islem_log rows.
+
+## V1.1 Amendment (2026-09-06, owner feedback)
+
+V1 (8×PASS above, status review) was extended the same day after owner
+feedback: the modal must not end at opening cases — an entered treatment
+must APPLY to all animals. W5 added the RPC layer (p_items), W6 the manual
+drug-list UI; W5 re-opened the goal (status→active) and added acceptance
+criterion 9. Root has since verified V1.1 end-to-end (below); the goal
+returns to `review` with criterion 9 `PASS`. All V1 content above stays
+intact; only the §5 commit/checkpoint lists were extended (7 commits on
+branch).
+
+### V1.1 commits
+
+- `dcd8128` feat(db): vaka_toplu_ac V1.1 — p_items manuel ilaç listesi
+  (gün 1 uygulama, add_treatment_day_with_sessions motoru)
+- `5e463d9` feat(ui): toplu vaka manuel ilaç listesi — cdf-chk dili,
+  şablon/mutual exclusion, dinamik buton + testler
+
+Branch tip: `5e463d9`. Full branch sequence (7 commits):
+0036fa5 → c45fd72 → 9a89e15 → 1139798 → ad40561 → dcd8128 → 5e463d9.
+
+### RPC v2 contract
+
+```text
+vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid,
+              p_items jsonb DEFAULT NULL, p_sablon_id uuid DEFAULT NULL,
+              p_notes text DEFAULT NULL) → jsonb
+```
+
+- `p_items` ↔ `p_sablon_id` mutual exclusion: both supplied →
+  `{ok:false}`; UI mirrors the same exclusion in both directions.
+- Per-item fail-fast validation: any invalid kalem returns
+  `{ok:false, mesaj:'Geçersiz ilaç kalemi: <index>: <sebep>'}` before any
+  case is created.
+- Per-animal day-1 application runs the verbatim
+  `add_treatment_day_with_sessions` engine (bug059, migration
+  20260611000002) — treatment_days + treatment_day_uygulamalar +
+  drug_administrations + stok_hareket + TEDAVI_GUN/TEDAVI_SEANS görevleri —
+  the same engine the şablon path already feeds; şablon path unchanged.
+- planned_time discovery: the engine requires NOT NULL
+  (`treatment_day_uygulamalar.planned_time` is `time NOT NULL` per
+  migration 20260611000001; the NOT NULL violation was proven on the
+  scratch cluster) → manual items missing/empty `planned_time` are coerced
+  to `'09:00'`; the şablon path is unaffected (it supplies its own times).
+- Engine results are captured per animal as `acilan[i].manuel =
+  {day_no, seans_sayisi}`.
+- The old 4-arg variant is DROPped first (overload avoidance);
+  catalog-verified gone from demo.
+
+### UI (manual drug list in m-bulk-case)
+
+- cdf-chk drug-picker language copied into `m-bulk-case`: `bc-ilac-*` ids,
+  32 drugs rendered, search filter, dose rows prefilled with unit/route.
+- Mutual exclusion both directions: picking a şablon disables/clears drug
+  rows and vice versa.
+- Dynamic submit label: "💊 Tedaviyi Uygula" when drug items are entered,
+  "🩺 Vakaları Aç" otherwise.
+- Result rows: "✅ <kupe> — vaka açıldı + N ilaç".
+
+### Tests (V1.1)
+
+```text
+V1 final:  465/465 pass, 0 fail
+V1.1 final: 481/481 pass, 0 fail  (+16, RED→GREEN)
+RED: W6 captured 14 RED TypeErrors against unmodified sources before
+     implementing the UI layer
+engine finding: planned_time NOT-NULL requirement documented under the
+     RPC contract above (scratch-cluster proof)
+```
+
+### Root E2E (demo, browser) — criterion 9: PASS
+
+3 animals (002/008/01) + Pnömoni + 2 manual drugs (Enrolen 10 ml IM +
+Meloksikam 10 ml):
+
+- Result: "Toplam 3 · Açılan 3 · Atlanan 0 · Hata 0", each row
+  "vaka açıldı + 2 ilaç".
+- Mutual exclusion observed live: şablon selected → a drug was checked →
+  the radio snapped back to "Şablonsuz", `_bcSeciliSablonId` null, submit
+  button flipped to "💊 Tedaviyi Uygula".
+- DB verification (demo): 3 active Pnömoni cases (start_date =
+  CURRENT_DATE); drug_administrations ×6; treatment_day_uygulamalar ×6 all
+  planned_time='09:00'; stok_hareket tur='Tedavi' ×6 positive (timestamps
+  after 08:30Z).
+- Acceptance criterion 9 ("Manual drug path E2E: bulk case + day-1
+  drug_administrations per animal verified in demo"): `PASS`.
+
+### Demo rows created by V1.1 E2E (owner data, not deleted)
+
+3 Pnömoni cases (küpeler 002/008/01) + 6 drug_administrations + 6 sessions
+(treatment_day_uygulamalar) + 6 stok_hareket ledger rows.
+
+### V1.1 residual notes
+
+1. `planned_time` is hardcoded to the `'09:00'` default for manual items —
+   the UI has no time input (YAGNI); per-dose time only if the owner asks.
+2. W6 left a disposable GitNexus probe index `wt-toplu-vaka-w6-probe`
+   registered — cleanup at goal close.
+3. The worktree `node_modules` is symlinked to the main repo (gitignored).
