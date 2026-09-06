@@ -171,7 +171,7 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 ## Doğum
 
 **`dogum_kaydet(p_anne_id, p_tarih, p_kupe, p_cins?, p_tip?, p_kg?, p_baba?, p_hekim_id?)`** → jsonb
-→ Doğum + buzağı kaydı + **ikiz olay modeli** (olay_id, 10g pencere, 60g anne guard; 2026-09-01 ikiz deploy). Görev sayısı: anne yan-etki 10 + buzağı 7 = 17 (yakın doğum varsa anne ayağı atlanır → 7).
+→ Doğum + buzağı kaydı + **ikiz olay modeli** (olay_id, 10g pencere, 60g anne guard; 2026-09-01 ikiz deploy). Görev sayısı: anne yan-etki 8 + buzağı 7 = 15 (yakın doğum varsa anne ayağı atlanır → 7). **20260906000001 ile** d53'te tek `'53. Gün: E Vitamini'` (E_VIT) görevi üretilir (d53 Ademin + d54 Yeldif kaldırıldı) — migration yazıldı, **canlıya deploy bekliyor (2026-09-06)**.
 → İleri tarih kontrolü frontend'de (forms.js:155); **backend'de yok** (2026-08-31 guard'ı `hayvanlar`/`tohumlama` tablolarında, `dogum_kaydet` RPC'sinde değil — rapor notu).
 → **2026-09-01 küpe revizyonu (migration 20260901000002):** (1) dup check işletme küpesinde yalnız
 `durum='Aktif'` filtreli (recycle K1; devlet küpesi GLOBAL kalır), (2) erkek buzağı + sayısal küpe

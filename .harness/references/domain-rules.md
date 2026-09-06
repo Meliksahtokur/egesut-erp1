@@ -160,18 +160,18 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 ## 5. Doğum Kaydı
 
-### `dogum_kaydet` RPC'nin Yaptıkları (ilk yavru: 17 görev — 10 anne + 7 buzağı; 2.+ yavru: yalnız 7 buzağı görevi)
+### `dogum_kaydet` RPC'nin Yaptıkları (ilk yavru: 15 görev — 8 anne + 7 buzağı; 2.+ yavru: yalnız 7 buzağı görevi)
 
 1. `dogum` tablosuna kayıt ekler
 2. Buzağıyı `hayvanlar` tablosuna ekler (grup: Süt İçen Buzağı, padok: **Buzağı Padok (Süt İçenler)**)
 3. Buzağıya anne ırkı atanır
 4. Buzağıya baba bilgisi (`p_baba`) yazılır
 5. Annenin açık tohumlama kaydını `sonuc = 'Doğum Yaptı'` olarak kapatır
-6. Anneye doğum sonrası ilaç protokolü görevleri oluşturur (10 görev):
+6. Anneye doğum sonrası ilaç protokolü görevleri oluşturur (8 görev):
    - Doğum günü: Oksitosin + Ademin + Kalsiyum (3 ayrı görev)
    - 2. Gün: PG · 11. Gün: PG · 25. Gün: PG
-   - 53. Gün: Ademin + E Vitamini (Yeldif)
-   - 54. Gün: E Vitamini (Yeldif)
+   - 53. Gün: E Vitamini — TEK görev (etken_kod `E_VIT`; d53 Ademin ve d54 Yeldif görevi
+     20260906000001 ile kaldırıldı; migration yazıldı, canlıya deploy bekliyor — 2026-09-06)
    - 58-63. gün: kızgınlık takibi
 7. Buzağıya ilk gün bakım görevleri oluşturur (6 alt görev):
    - Kolostrum (ilk 2 saat)
@@ -185,7 +185,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 - `dogum.olay_id uuid`: 1 doğum olayı = 1 olay_id; her buzağı ayrı `dogum` satırı (1 satır = 1 buzağı)
 - **Olay penceresi 10 gün:** aynı annede pencere içinde yeni doğum girilirse aynı olaya bağlanır → dönüş `coklu_dogum: true, yavru_sirasi`; yalnız 7 buzağı görevi açılır
-- **Anne görev guard'ı 60 gün:** yakın doğum varsa 10 anne görevi + tohumlama kapatma + grup/padok + protokol + BESLEME iptali ASLA tekrarlanmaz (kullanıcı kuralı: "birinci yavrunun hiçbir anne görevi tekrarlanmaz")
+- **Anne görev guard'ı 60 gün:** yakın doğum varsa 8 anne görevi + tohumlama kapatma + grup/padok + protokol + BESLEME iptali ASLA tekrarlanmaz (kullanıcı kuralı: "birinci yavrunun hiçbir anne görevi tekrarlanmaz")
 - Aynı (anne_id, yavru_kupe) ikinci kez gönderilemez — RPC reddeder (typo → yanlış ikiz engeli)
 - Kardeş tanımı (frontend, `_kardeslerBul`): aynı `anne_id` + aynı `dogum_tarihi` → hayvan kartında `Anne:` bloğu altında kardeş satırı
 - UI: doğumdan sonraki 10 günde anne kartında "➕ Bu doğuma yavru ekle" butonu (anne/tarih/baba prefilled modal; `ikinciYavruAc`)
@@ -356,7 +356,7 @@ Kaynak: `.claude/idle-reports/2026-08-31-docs-tutarlilik.md` §2.2 (çelişki) +
 |---|---|---|---|---|
 | ❌1 | §5 | 14 görev | 16 görev | Kod — 20260730000002:407-417 `"gorev_sayisi",16`; Oksitosin/Ademin/Kalsiyum 3 ayrı görev |
 | ❌2 | §5 | PG d11 | d2·d25·d39 (Presynch-14) | Kod — 20260730000002:412-414; d11 20260628000001 ile kaldırıldı |
-| ❌3 | §5 | d53 "Ademin+Yeldif", d54 "Yeldif" | d53 Ademin + E Vitamini; d54 görevi yok | Kod — 20260730000002:415-416,358-359, etken_kod E_VIT (commit 978e018); Yeldif ürün değil sınıf |
+| ❌3 | §5 | d53 "Ademin+Yeldif", d54 "Yeldif" | d53 tek "E Vitamini" (E_VIT); d53 Ademin + d54 görevi yok | **Migration 20260906000001 yazıldı, canlıya DEPLOY BEKLİYOR (2026-09-06)** — canlı (20260901000002) hâlâ d53 Ademin + d53 Yeldif + d54 Yeldif üretir; Yeldif ürün değil sınıf |
 | ❌4 | §5 | Buzağı Ahırı | Buzağı Padok (Süt İçenler) | Kod — 20260730000002:401; 20260326000026:7 |
 | ❌5 | §9 | sütten kesme `tohumlama_durumu='tohumlanabilir'` yazar | yalnız `suttten_kesme_tarihi` yazar | Kod — 20260620000003:47 (commit 6e41b94); flag yaklaşımı terk edildi |
 | ❌6 | §10 | `durum='Pasif'` | Ölü/Satıldı/Kesildi/Kayıp değerleri | Kod — 20260706000003:191-201; 'Pasif' 0 grep; davranışsal sonuç (listelerde görünmez) değişmedi |
