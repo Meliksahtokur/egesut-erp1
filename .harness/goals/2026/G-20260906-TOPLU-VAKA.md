@@ -255,3 +255,28 @@ DB authority boundary
   `stok_hareket` while `stok_tuketim_view` counts both).
 - No PROD DB mutation, no deploy, no push within this goal without separate
   owner approval.
+
+## V2 Direction (owner clarification, 2026-09-06)
+
+Owner tested V1.2 and clarified the long-term design intent: the reference UI
+for "tedavi planı" is the multi-day plan-editor language of the şablon
+builder (modal `m-sablon`; `openSablonBuilder` / `sablonSeansAc`,
+js/ui.js) — gün-gün ilaç kalemleri + seans saatleri + tohumlama ofseti
+(`tohumlama_plani.gun_ofset`) — not a single anchor date. V1-V1.2
+deliberately shipped: single-date anchor + day-1 manual drugs OR pre-built
+şablon + tohumlama offset option.
+
+V2 (owner: "üzerine eklenmeye devam edilebilir"): embed the ad-hoc multi-day
+plan editor into the bulk modal — generalize `p_items` to a day-keyed
+structure `[{gun_no, planned_time?, kalemler:[...]}]` and loop
+`add_treatment_day_with_sessions` per day server-side (the engine already
+supports per-day invocation; the şablon path already chains days from
+`start_date`). Nothing in V1-V1.2 needs rework:
+şablon/manuel/tohumlama/date layers all compose.
+
+Constraint carried forward: past dates stay blocked; per-day saat must
+satisfy the engine's `planned_time NOT NULL` (default `'09:00'` convention
+or per-kalem saat input like the şablon builder).
+
+This section records direction only — implementation scope stays closed for
+this goal (status: review; no new acceptance criteria).
