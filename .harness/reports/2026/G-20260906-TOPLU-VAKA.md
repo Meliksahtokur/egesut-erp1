@@ -222,12 +222,22 @@ implementation commits (post-rebase):
   6d2a285 feat(db): vaka_toplu_ac V1.2 — p_tarih planlama (start_date
           çapası) + tohumlama görevi (vaka_tohumlama_ekle yeniden
           kullanımı)
-  (11 commits on branch idle/toplu-vaka incl. this V1.2 docs amendment;
-  pre-amendment tip 6d2a285; sequence 0036fa5…6d2a285)
+  afe8791 docs(harness): G-20260906-TOPLU-VAKA V1.2 rapor + criterion 10
+          PASS, status review
+  02ee51b docs(harness): G-20260906-TOPLU-VAKA V2 direction — çoklu gün
+          plan editörü (owner netleştirmesi)
+  79ac4e0 feat(db): vaka_toplu_ac V2 — gün-anahtarlı p_items (çoklu
+          tarihli plan, saat önceliği kalem>gün>09:00)
+  39468f5 feat(ui): toplu vaka çoklu gün plan editörü — gün sekmeleri,
+          gün/kalem saati, tohumlama bloğu keşfedilebilirliği + testler
+  (14 commits on branch idle/toplu-vaka since launch eaa0640 through tip
+  39468f5 — rev-list verified; 15 incl. this V2 docs amendment;
+  sequence 0036fa5…39468f5)
 docs checkpoints:
   pre-review @ 1139798 — docs_verdict PASS (V1 docs commit)
   pre-review @ 5e463d9 — docs_verdict PASS (V1.1 amendment docs commit)
   pre-review @ 6d2a285 — docs_verdict PASS (V1.2 amendment docs commit)
+  pre-review @ 39468f5 — docs_verdict PASS (V2 delivery docs commit)
   handoff/final: not recorded — root close + owner merge approval pending
 residual risks: see §6
 temporary mutations and artifacts restored:
@@ -596,3 +606,130 @@ ADAPTATIONS (deliberate, internal shape change):
   modal↔action wiring (open/submit/close) unchanged; reference-doc rows
   for the V2 controls follow the goal's established propose_only deferral
   to the post-merge docs commit (§6 / V1.2 item 3).
+
+## V2 Delivery (2026-09-06)
+
+W9 (RPC v4) and W10 (UI multi-day plan editor — section above) landed the
+V2 direction; root has since verified V2 end-to-end (below). All
+V1/V1.1/V1.2 content above stays intact; only the §5 commit/checkpoint
+lists were extended (14 commits on branch). The goal returns to `review`
+with acceptance criterion 11 `PASS`.
+
+### V2 commits
+
+- `79ac4e0` feat(db): vaka_toplu_ac V2 — gün-anahtarlı p_items (çoklu
+  tarihli plan, saat önceliği kalem>gün>09:00)
+- `39468f5` feat(ui): toplu vaka çoklu gün plan editörü — gün sekmeleri,
+  gün/kalem saati, tohumlama bloğu keşfedilebilirliği + testler
+
+(preceded by `02ee51b`, the V2 direction docs commit). Branch tip at
+delivery: `39468f5` — this docs amendment lands on top. Verified branch
+count: `git rev-list --count eaa0640..39468f5` = **14** commits since
+launch (15 including this V2 docs amendment); sequence
+0036fa5 → … → 39468f5.
+
+### RPC v4 contract (day-keyed p_items)
+
+The signature is UNCHANGED — the same 9 params as v3; only the `p_items`
+shape evolved:
+
+```text
+[{"gun": <int 1..31, unique>, "saat"?: "<HH:MM>",
+  "kalemler": [{"drug_product_id", "stok_id", "dose">0, "unit",
+                "route"?, "saat"?}]}]
+```
+
+- planned_time precedence per kalem: `kalem.saat > gün.saat > '09:00'`.
+- Day N anchors at `start_date + (N - 1)`; each day executes through the
+  verbatim `add_treatment_day_with_sessions` engine.
+- KISMİ GÜN SEMANTİĞİ (partial-days-on-error): PER-DAY BEGIN/EXCEPTION
+  sub-block — an engine `ok:false` or EXCEPTION on day N pushes
+  `hatalar[{gun: N, case_id}]`, the case STAYS OPEN with all earlier
+  days' rows intact, the remaining days are not attempted, and the loop
+  continues with the next animal (such an animal never enters `acilan`).
+  W9's scratch test caught the initial whole-loop-rollback bug (a day-2
+  failure also destroyed day-1 rows) and fixed it per-day.
+- `acilan[i].manuel = {gun_sayisi, seans_sayisi}`.
+- The flat V1.1 array shape is REJECTED → day-validation fail-fast
+  ('Geçersiz plan: gün 1..31'); the only caller is this goal's UI, never
+  deployed to PROD.
+- Everything else unchanged: mutual exclusion, `p_tarih` anchor (past
+  blocked), tohumlama branch, cap 200, dedupe, GRANTs, NOTIFY pgrst.
+
+### Scratch-cluster behavioral evidence (PG 18.6, verbatim engines, deleted after)
+
+- Two-day plan anchored +10d start: dates exact (day 1 → +10d, day 2 →
+  +11d); planned_times 09:00/14:00/16:00 prove the kalem > gün > default
+  precedence end-to-end.
+- 12 fail-fast cases, all exact messages with 0 cases created: gun 0 /
+  gun 32 / gun 1.5 / duplicate gun; flat V1.1 array; empty kalemler; bad
+  day saat; bad kalem saat; bad uuid; mutual exclusion (items + şablon).
+- Day-2 engine EXCEPTION → `hatalar[{gun: 2, case_id}]`, day-1 rows
+  intact, case still active — partial-days semantics proven live.
+- Tohumlama alongside items: eligible Dişi got the görev at +21d 08:00;
+  Erkek soft-skipped with the exact string ('Erkek hayvana tohumlama
+  görevi açılmaz').
+
+### Demo catalog
+
+`vaka_toplu_ac` pronargs=9; `pg_get_functiondef` body contains the
+kalemler handling; migration applied HTTP 201.
+
+### Root E2E (demo, browser) — criterion 11: PASS
+
+Worktree serve, `?demo` auto-login, browser, 2026-09-06:
+
+- Tohumlama block visible-but-disabled (opacity .5, hint 'Hayvan seçince
+  aktifleşir') before animals → active after paste (015, 02) — the W10
+  discoverability fix verified; no silent uncheck.
+- Disease Mastit selected; Gün 1: Enrolen dose 10 + gün saati 10:00.
+- `＋ Gün` added Gün 2: Meloksikam dose 10 + per-kalem saat 14:00
+  (`bc-isaat-<id>-g<gun>` input).
+- `bcGunlardenItems` collected `{gun1: saat 10:00, kalemSaat null},
+  {gun2: kalemSaat 14:00}`; dynamic button "💊 Tedaviyi Uygula".
+- Submit → "Toplam 2 · Açılan 2 · Atlanan 0 · Hata 0"; rows
+  "✅ 015/02 — vaka açıldı + 2 gün · 2 ilaç".
+- DB verification (demo): 2 new Mastit cases (distinct from the older
+  Klinik Mastit set); treatment_days per animal: day_no 1 →
+  2026-09-06 10:00:00, day_no 2 → 2026-09-07 14:00:00 — day anchoring
+  (start_date + (n-1)) AND time precedence (kalem.saat > gün.saat)
+  proven live.
+
+Acceptance criterion 11 ("V2 E2E: multi-day bulk plan anchors each day
+to start_date+(n-1) with per-day/per-kalem times verified in demo"):
+`PASS`.
+
+### Tests (V2 delivery)
+
+```text
+V1.2 final: 497/497 pass, 0 fail
+V2 final:   516/516 pass, 0 fail  (+19, RED→GREEN)
+```
+
+RED (26 captured verbatim) and the 3 deliberate adaptations are
+documented in the W10 section above ("Tests (V2)") — not duplicated
+here.
+
+### Demo rows created by V2 E2E (owner data, not deleted)
+
+2 Mastit cases (015, 02) + 2×2 treatment_days + 2×2
+drug_administrations + stok_hareket ledger rows.
+
+### Root test-harness note (not a product issue)
+
+A false-positive 'dialog open' check in root's E2E driver (a closed
+modal carries an empty inline `style.display`, which the script misread
+as open) auto-clicked a hidden never-opened confirm button — a harmless
+no-op: the product took the no-warning direct path. Product logic
+verified correct by code read (only the mükerrer/tohumlama warning lines
+open the confirm dialog).
+
+### V2 residual notes
+
+1. rpc-reference.md rows for the v4 day-keyed shape + live-schema sync
+   remain propose_only, deferred to the post-merge docs commit (§6 item
+   3 / V1.2 item 3).
+2. Gebelik (pregnancy) eligibility stays server-only (V1.2 note 1
+   carried forward).
+3. W6 GitNexus probe index + node_modules symlink cleanup at goal close
+   (V1.1 notes 2-3 carried forward).
