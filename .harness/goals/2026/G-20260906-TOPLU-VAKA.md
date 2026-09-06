@@ -1,6 +1,6 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: review
+status: active
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
@@ -47,6 +47,7 @@ acceptance:
   - GitNexus impact pre-check run on every touched JS symbol before edits; output referenced in the report, HIGH/CRITICAL findings escalated before proceeding.
   - Read-only live-schema probe recorded in the report verifying create_case guards, tedavi_sablon_uygula engine outputs, and the _tohumlama_gorev_uygunluk / add_drug_administration signatures before RPC reliance.
   - `python3 .harness/bin/harness.py validate --json` reports zero findings for this goal and its linked report.
+  - Manual drug path E2E: bulk case + day-1 drug_administrations per animal verified in demo.
   - Root reviews the diff; merge and push happen only after owner approval; PROD migration happens only after separate owner approval.
 stop_conditions:
   - Live schema materially contradicts ground-truth assumptions before implementation (create_case, tedavi_sablon_uygula, or _tohumlama_gorev_uygunluk drift).
@@ -70,6 +71,29 @@ checkpoint:
 > original 434c142 and `launch_sha` records the post-rebase launch point
 > eaa0640. Pre-rebase implementation shas (dfc5643/777bc7b/799c912/1b2bfff)
 > are superseded by 0036fa5/c45fd72/9a89e15/1139798.
+
+**V1.1 amendment (2026-09-06, owner feedback):** the bulk modal must APPLY a
+manually-entered treatment, not just open cases. The manual drug list layer
+(`p_items jsonb`) is the primary treatment path: for each animal the day-1
+treatment (treatment_days + treatment_day_uygulamalar + drug_administrations
++ stok_hareket + TEDAVI_GUN/TEDAVI_SEANS görevleri) is created immediately
+after case creation through the existing `add_treatment_day_with_sessions`
+engine (bug059, migration 20260611000002) — the same engine the şablon path
+already feeds. The şablon path is retained unchanged; `p_items` and
+`p_sablon_id` are mutually exclusive (enforced in the RPC and mirrored by
+the UI). Engine compatibility: the engine reads the exact keys
+`drug_product_id/stok_id/dose/unit/route` and REQUIRES a non-NULL
+`planned_time` (`treatment_day_uygulamalar.planned_time` is `time NOT NULL`
+per migration 20260611000001; `gorev_log.hedef_saat` is nullable but the
+uygulamalar INSERT fails first), so `vaka_toplu_ac` validates and normalizes
+`p_items` before any case is created — items missing `planned_time` are
+coerced to `'09:00'`; violations return
+`{ok:false, mesaj:'Geçersiz ilaç kalemi: <index>: <sebep>'}` fail-fast.
+New signature:
+`vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid, p_items jsonb DEFAULT NULL, p_sablon_id uuid DEFAULT NULL, p_notes text DEFAULT NULL)`
+(the old 4-arg body is DROPped first to avoid an overload). Per-animal engine
+results are captured as `acilan[i].manuel = {day_no, seans_sayisi}` and the
+top-level result gains `'manuel' boolean`.
 
 ## Objective
 
