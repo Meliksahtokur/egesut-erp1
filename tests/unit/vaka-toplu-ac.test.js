@@ -1641,3 +1641,355 @@ describe('_bcGunKartiHtml V2.2.1 (çoklu kopyalama alanı — DOM çapraz kontro
     assert.match(html, /data-action="bc-gun-kopya-toggle"/);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// 10. V2.2.2 (W16) — SAHİBE ONAYLI İKİLİ (2026-09-06):
+//     P3 = 💾 planı tedavi şablonu olarak kaydet (submit akışı SÜRER —
+//     bellek; şablon kayıt akışı sablonKaydet ui.js:4522 örnek):
+//       - bcSablonKalemleriOlustur(gunler): gün planı state'ini
+//         tedavi_sablon_kaydet p_kalemler.kalemler sözleşmesine düzleştirir —
+//         gun_no AS-IS (boşluklu plan korunur — W15 RPC sözleşmesi),
+//         planned_time = seans saati, dose Number, route boş→null,
+//         legacy/stok_id çözümü bcGunlardenItems aynası.
+//       - bcSablonOzetMetni(gunler): mini-form canlı özeti
+//         'İçerik: N gün · M seans (gün 1,2,5)' — şablon listesi
+//         _renderSablonSecim 'N gün · M seans' dilinin aynısı (M = kalem).
+//     P4 = tohumlama çakışma radyosu (W15 p_tohumlama_cakisma sözleşmesi):
+//       - bcCakismaRadyosu(tohumIste, cakisanlar): openConfirm opts.radyolar
+//         yapılandırması — varsayılan 'atla' (muhafazakâr), aksi halde null.
+//       - bcCakismaPayloadDegeri(radyoVar, secim): radyo + geçerli seçim →
+//         seçim; aksi her durumda 'ekle' (eski davranış birebir).
+//       - bcSonucSatirlari V2.2 uzantısı: acilan[i].tohumlama.uzerine_yazildi
+//         → satıra uzerineYazildi (ADDITIVE — anahtar yoksa hiç eklenmez).
+//       - bcSonucBantlari ok-satırı eki: ' (üzerine yazıldı: eski DD.MM, …)'.
+// ══════════════════════════════════════════════════════════════════════
+describe('bcSablonKalemleriOlustur (V2.2.2 W16 — plan state → şablon kalem dizisi)', () => {
+  it('çoklu gün + boşluk: gun_no AS-IS korunur (1 ve 5 — renumber YOK), ASC sıralı', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [
+      { gun: 5, seanslar: [seans('16:00', { D1: kalem({ dose: '5', unit: 'ml', route: 'SC' }) })] },
+      { gun: 1, seanslar: [seans('09:00', { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) })] },
+    ]);
+    const kalemler = sandbox.bcSablonKalemleriOlustur(sandbox.globalThis._bcGunler);
+    assert.deepStrictEqual(host(kalemler.map(k => k.gun_no)), [1, 5]);
+  });
+
+  it('kalem sözleşmesi: planned_time = seans saati; dose Number; route boş→null', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [{ gun: 1, seanslar: [seans('09:00', { D1: kalem({ dose: '12.5', unit: ' ml ', route: '' }) })] }]);
+    const kalemler = sandbox.bcSablonKalemleriOlustur(sandbox.globalThis._bcGunler);
+    assert.deepStrictEqual(host(kalemler), [
+      { gun_no: 1, planned_time: '09:00', drug_product_id: 'D1', stok_id: 'S1', dose: 12.5, unit: 'ml', route: null },
+    ]);
+  });
+
+  it('aynı ilaç iki seansta → iki kalem, her biri kendi planned_time ile', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [{ gun: 2, seanslar: [
+      seans('08:00', { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) }),
+      seans('20:00', { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) }),
+    ] }]);
+    const kalemler = sandbox.bcSablonKalemleriOlustur(sandbox.globalThis._bcGunler);
+    assert.deepStrictEqual(host(kalemler.map(k => k.planned_time)), ['08:00', '20:00']);
+    assert.deepStrictEqual(host(kalemler.map(k => k.gun_no)), [2, 2]);
+  });
+
+  it('legacy ilaç → drug_product_id:null, stok_id cache fallback (SL1 — bcGunlardenItems aynası)', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [{ gun: 1, seanslar: [seans('07:15', { L1: kalem({ name: 'Eski', dose: '5', unit: 'ml', route: '' }) })] }]);
+    const kalemler = sandbox.bcSablonKalemleriOlustur(sandbox.globalThis._bcGunler);
+    assert.deepStrictEqual(host(kalemler), [
+      { gun_no: 1, planned_time: '07:15', drug_product_id: null, stok_id: 'SL1', dose: 5, unit: 'ml', route: null },
+    ]);
+  });
+
+  it('boş / null plan → [] (patlamaz)', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [{ gun: 1, seanslar: [] }]);
+    assert.deepStrictEqual(host(sandbox.bcSablonKalemleriOlustur(sandbox.globalThis._bcGunler)), []);
+    assert.deepStrictEqual(host(sandbox.bcSablonKalemleriOlustur(null)), []);
+    assert.deepStrictEqual(host(sandbox.bcSablonKalemleriOlustur(undefined)), []);
+  });
+
+  it('girdi dizi MUTASYONLANMAZ (saf)', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [{ gun: 1, seanslar: [seans('08:00', { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) })] }]);
+    const once = JSON.stringify(sandbox.globalThis._bcGunler);
+    sandbox.bcSablonKalemleriOlustur(sandbox.globalThis._bcGunler);
+    assert.strictEqual(JSON.stringify(sandbox.globalThis._bcGunler), once);
+  });
+});
+
+describe('bcSablonOzetMetni (V2.2.2 W16 — şablon kaydet mini-formu canlı özeti)', () => {
+  it('gün 1,2,5 + 5 kalem → "İçerik: 3 gün · 5 seans (gün 1,2,5)" (şablon listesi dili)', () => {
+    const { sandbox } = setupFormsPlan();
+    const D = (doz) => kalem({ dose: doz, unit: 'ml', route: 'IM' });
+    gunle(sandbox, [
+      { gun: 1, seanslar: [seans('08:00', { D1: D('10') }), seans('20:00', { D1: D('10') })] },
+      { gun: 2, seanslar: [seans('08:00', { D1: D('10') })] },
+      { gun: 3, seanslar: [] }, // seanssız gün şablona kalem üretmez
+      { gun: 5, seanslar: [seans('16:00', { D1: D('10') }), seans('16:00', { L1: D('2') })] },
+    ]);
+    assert.strictEqual(sandbox.bcSablonOzetMetni(sandbox.globalThis._bcGunler), 'İçerik: 3 gün · 5 seans (gün 1,2,5)');
+  });
+
+  it('doz boş (taslak) kalem özete SAYILMAZ — geçerli kalem sayısı düşer', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [{ gun: 1, seanslar: [
+      seans('08:00', { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) }),
+      seans('20:00', { D1: kalem({ dose: '', unit: '', route: '' }) }),
+    ] }]);
+    assert.strictEqual(sandbox.bcSablonOzetMetni(sandbox.globalThis._bcGunler), 'İçerik: 1 gün · 1 seans (gün 1)');
+  });
+
+  it('boş / null plan → "İçerik: boş plan" (patlamaz)', () => {
+    const { sandbox } = setupFormsPlan();
+    gunle(sandbox, [{ gun: 1, seanslar: [] }]);
+    assert.strictEqual(sandbox.bcSablonOzetMetni(sandbox.globalThis._bcGunler), 'İçerik: boş plan');
+    assert.strictEqual(sandbox.bcSablonOzetMetni(null), 'İçerik: boş plan');
+  });
+});
+
+describe('bcCakismaRadyosu (V2.2.2 W16 — çakışma radyosu kararı, saf)', () => {
+  it('tohumlama + çakışan var → {isim:"cakisma", varsayilan:"atla", 2 seçenek}', () => {
+    const r = sb.bcCakismaRadyosu(true, [{ id: 'H1', kupe: 'TR-1', tarih: '2026-09-10' }]);
+    assert.deepStrictEqual(host(r), {
+      isim: 'cakisma',
+      varsayilan: 'atla',
+      secenekler: [
+        { deger: 'uzerine_yaz', etiket: 'Üzerine yaz — eski plan iptal, yenisi planlanır' },
+        { deger: 'atla', etiket: 'Atla — eski plan kalır, yenisi açılmaz' },
+      ],
+    });
+  });
+
+  it('tohumlama yok → null (radyo gösterilmez)', () => {
+    assert.strictEqual(sb.bcCakismaRadyosu(false, [{ id: 'H1' }]), null);
+  });
+
+  it('çakışan yok → null (radyo gösterilmez)', () => {
+    assert.strictEqual(sb.bcCakismaRadyosu(true, []), null);
+    assert.strictEqual(sb.bcCakismaRadyosu(true, null), null);
+  });
+
+  it('varsayılan MUHAFAZAKÂR: atla — eski plan korunur (sahip kararı)', () => {
+    const r = sb.bcCakismaRadyosu(true, [{ id: 'H1' }]);
+    assert.strictEqual(r.varsayilan, 'atla');
+  });
+});
+
+describe('bcCakismaPayloadDegeri (V2.2.2 W16 — p_tohumlama_cakisma payload değeri, saf)', () => {
+  it('radyo gösterildi + seçim → seçim birebir (uzerine_yaz/atla)', () => {
+    assert.strictEqual(sb.bcCakismaPayloadDegeri(true, 'uzerine_yaz'), 'uzerine_yaz');
+    assert.strictEqual(sb.bcCakismaPayloadDegeri(true, 'atla'), 'atla');
+  });
+
+  it('radyo yok → "ekle" (eski davranış birebir)', () => {
+    assert.strictEqual(sb.bcCakismaPayloadDegeri(false, 'atla'), 'ekle');
+    assert.strictEqual(sb.bcCakismaPayloadDegeri(false, undefined), 'ekle');
+  });
+
+  it('radyo var ama seçim geçersiz/eksik → "ekle" (RPC default güvencesi)', () => {
+    assert.strictEqual(sb.bcCakismaPayloadDegeri(true, undefined), 'ekle');
+    assert.strictEqual(sb.bcCakismaPayloadDegeri(true, ''), 'ekle');
+    assert.strictEqual(sb.bcCakismaPayloadDegeri(true, 'sil_bunu'), 'ekle');
+  });
+});
+
+describe('bcSonucSatirlari V2.2.2 uzantısı (uzerine_yazildi — W15 RPC sözleşmesi)', () => {
+  it('tohumlama.olustu=true + uzerine_yazildi → satıra uzerineYazildi taşınır (additive)', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      acilan: [{ kupe: 'TR-1', case_id: 'c1', tohumlama: { olustu: true, gorev_id: 'g1', uzerine_yazildi: ['10.09', '12.09'] } }],
+    });
+    assert.deepStrictEqual(host(rows), [
+      { tip: 'ok', kupe: 'TR-1', tohumlamaOlustu: true, uzerineYazildi: ['10.09', '12.09'] },
+    ]);
+  });
+
+  it('uzerine_yazildi YOKSA anahtar HİÇ eklenmez (eski sözleşme korunur)', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      acilan: [{ kupe: 'TR-2', case_id: 'c2', tohumlama: { olustu: true, gorev_id: 'g2' } }],
+    });
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'uzerineYazildi'), false);
+  });
+
+  it('boş uzerine_yazildi dizisi → anahtar eklenmez (üzerine yazma gerçekleşmedi)', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true,
+      acilan: [{ kupe: 'TR-3', case_id: 'c3', tohumlama: { olustu: true, uzerine_yazildi: [] } }],
+    });
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'uzerineYazildi'), false);
+  });
+});
+
+describe('bcSonucBantlari V2.2.2 (üzerine yazıldı eki)', () => {
+  it('ok satırı uzerineYazildi → tohum ekine " (üzerine yazıldı: eski 10.09, 12.09)" eklenir', () => {
+    const html = sb.bcSonucBantlari(
+      [{ tip: 'ok', kupe: 'TR-1', tohumlamaOlustu: true, uzerineYazildi: ['10.09', '12.09'] }],
+      { acilan: [], tohumIste: true, tohumSaat: '08:00' }
+    );
+    assert.match(html, /🐄 tohumlama 08:00 \(üzerine yazıldı: eski 10\.09, 12\.09\)/);
+  });
+
+  it('uzerineYazildi yoksa eki YOK — eski "· 🐄 tohumlama SS:DD" dili birebir', () => {
+    const html = sb.bcSonucBantlari(
+      [{ tip: 'ok', kupe: 'TR-2', tohumlamaOlustu: true }],
+      { acilan: [], tohumIste: true, tohumSaat: '09:30' }
+    );
+    assert.match(html, /· 🐄 tohumlama 09:30</);
+    assert.ok(!html.includes('üzerine yazıldı'), 'eki olmamalı');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// 11. V2.2.2 (W16) — openConfirm radyo grubu (P4 devamı): onay diyaloğuna
+//     OPSİYONEL opts.radyolar — {isim, varsayilan, secenekler:[{deger,
+//     etiket}]} — desc ile butonlar arası radio grubu; Onayla callback'i
+//     seçilen değeri ek argümanla alır. opts'suz yol BİREBİR eski davranış
+//     (radyo kutusu boş+gizli, callback args'sız — 12 mevcut çağıranın
+//     hepsi sıfır-argüman callback; GitNexus d=1: 12 kanıtı).
+//     ui.js testleri bu dosyada: goal write_manifest yalnız
+//     tests/unit/vaka-toplu-ac.test.js'i listeler (ui-pure.test.js DEĞİL).
+//     Saf yüz: _confirmRadyolarHtml(radyolar) → HTML | '' (radio dili
+//     _renderSablonSecim forms.js aynası).
+// ══════════════════════════════════════════════════════════════════════
+
+// helpers.js esc/escAttr tarayıcı aynaları (ui.js bunları global'den alır)
+const escUi = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escAttrUi = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// m-confirm elemanları stub'lanmış ayrı ui.js sandbox'ı (openM/closeM
+// js/utils/modal.js'ten gelir — vm'de yok; testte gözlemlenebilir stub).
+function setupConfirm() {
+  const document = makeDomStub();
+  const acilan = [], kapanan = [];
+  const { sandbox } = loadBrowserModule('js/ui.js', {
+    dom: document,
+    extra: {
+      esc: escUi, escAttr: escAttrUi,
+      openM: (id) => acilan.push(id),
+      closeM: (id) => kapanan.push(id),
+    },
+  });
+  return { sandbox, document, acilan, kapanan };
+}
+
+const CAKISMA_RADYO = {
+  isim: 'cakisma',
+  varsayilan: 'atla',
+  secenekler: [
+    { deger: 'uzerine_yaz', etiket: 'Üzerine yaz — eski plan iptal, yenisi planlanır' },
+    { deger: 'atla', etiket: 'Atla — eski plan kalır, yenisi açılmaz' },
+  ],
+};
+
+describe('openConfirm radyo grubu (V2.2.2 W16 — _confirmRadyolarHtml saf yüzü)', () => {
+  it('radio dili _renderSablonSecim aynası — name/value/etiket', () => {
+    const { sandbox } = setupConfirm();
+    const html = sandbox._confirmRadyolarHtml(CAKISMA_RADYO);
+    assert.match(html, /<label[^>]*>/);
+    assert.match(html, /<input type="radio" name="cakisma" value="uzerine_yaz">/);
+    assert.match(html, /<input type="radio" name="cakisma" value="atla" checked>/);
+    assert.ok(html.includes('Üzerine yaz — eski plan iptal, yenisi planlanır'));
+    assert.ok(html.includes('Atla — eski plan kalır, yenisi açılmaz'));
+  });
+
+  it('varsayılan işaretli (checked) — diğer işaretsiz', () => {
+    const { sandbox } = setupConfirm();
+    const html = sandbox._confirmRadyolarHtml(CAKISMA_RADYO);
+    assert.match(html, /<input type="radio" name="cakisma" value="atla" checked>/);
+    assert.ok(!html.includes('value="uzerine_yaz" checked'), 'varsayılan dışı işaretlenmez');
+  });
+
+  it('boş/eksik/hatalı girdi → "" (grup basılmaz)', () => {
+    const { sandbox } = setupConfirm();
+    assert.strictEqual(sandbox._confirmRadyolarHtml(null), '');
+    assert.strictEqual(sandbox._confirmRadyolarHtml(undefined), '');
+    assert.strictEqual(sandbox._confirmRadyolarHtml({}), '');
+    assert.strictEqual(sandbox._confirmRadyolarHtml({ isim: 'x', secenekler: [] }), '');
+    assert.strictEqual(sandbox._confirmRadyolarHtml({ isim: 'x', secenekler: 'dizi-degil' }), '');
+  });
+
+  it('etiket HTML kaçırılır (esc)', () => {
+    const { sandbox } = setupConfirm();
+    const html = sandbox._confirmRadyolarHtml({
+      isim: 'r', varsayilan: '', secenekler: [{ deger: 'a', etiket: '<b>kalin</b>' }],
+    });
+    assert.ok(html.includes('&lt;b&gt;kalin&lt;/b&gt;'));
+    assert.ok(!html.includes('<b>kalin</b>'));
+  });
+});
+
+describe('openConfirm + _confirmOk DOM davranışı (V2.2.2 W16 — m-confirm stub)', () => {
+  it('radyolar: desc ile butonlar arasında grup basılır, default checked, modal açılır', () => {
+    const { sandbox, document, acilan } = setupConfirm();
+    const title = document.__setEl('m-confirm-title', makeElement('div'));
+    const desc = document.__setEl('m-confirm-desc', makeElement('div'));
+    const radyoKutu = document.__setEl('m-confirm-radyolar', makeElement('div'));
+    const fn = () => {};
+    sandbox.openConfirm('⚠️ Uyarılar', 'satır1\nsatır2', fn, { radyolar: CAKISMA_RADYO });
+    assert.strictEqual(title.textContent, '⚠️ Uyarılar');
+    assert.strictEqual(desc.textContent, 'satır1\nsatır2');
+    assert.match(radyoKutu.innerHTML, /name="cakisma" value="atla" checked>/);
+    assert.strictEqual(radyoKutu.style.display, 'block');
+    assert.ok(acilan.includes('m-confirm'), 'modal açılır');
+  });
+
+  it('opts\'suz: radyo kutusu TEMİZLENİR + gizlenir (önceki onayın radyosu sızmaz)', () => {
+    const { sandbox, document } = setupConfirm();
+    document.__setEl('m-confirm-title', makeElement('div'));
+    document.__setEl('m-confirm-desc', makeElement('div'));
+    const radyoKutu = document.__setEl('m-confirm-radyolar', makeElement('div'));
+    radyoKutu.innerHTML = '<input type="radio" name="eski">';
+    radyoKutu.style.display = 'block';
+    sandbox.openConfirm('Onay', 'Açıklama', () => {});
+    assert.strictEqual(radyoKutu.innerHTML, '');
+    assert.strictEqual(radyoKutu.style.display, 'none');
+  });
+
+  it('_confirmOk + radyo: callback seçilen değeri ek argümanla alır + modal kapanır', () => {
+    const { sandbox, document, kapanan } = setupConfirm();
+    document.__setEl('m-confirm-title', makeElement('div'));
+    document.__setEl('m-confirm-desc', makeElement('div'));
+    document.__setEl('m-confirm-radyolar', makeElement('div'));
+    const secili = makeElement('input');
+    secili.type = 'radio'; secili.name = 'cakisma'; secili.value = 'uzerine_yaz'; secili.checked = true;
+    document.querySelector = (sel) =>
+      (sel === '#m-confirm-radyolar input[type="radio"]' || sel === 'input[name="cakisma"]:checked')
+        ? secili : null;
+    let alinan = { args: null, cagrildi: false };
+    sandbox.openConfirm('T', 'D', (...args) => { alinan = { args, cagrildi: true }; }, { radyolar: CAKISMA_RADYO });
+    sandbox._confirmOk();
+    assert.strictEqual(alinan.cagrildi, true);
+    assert.deepStrictEqual([...alinan.args], ['uzerine_yaz'], 'callback seçilen değeri alır');
+    assert.ok(kapanan.includes('m-confirm'), 'modal kapanır');
+  });
+
+  it('_confirmOk opts\'suz yol: callback ARGÜMANSIZ çağrılır (mevcut çağıranlar birebir)', () => {
+    const { sandbox, document } = setupConfirm();
+    document.__setEl('m-confirm-title', makeElement('div'));
+    document.__setEl('m-confirm-desc', makeElement('div'));
+    document.__setEl('m-confirm-radyolar', makeElement('div'));
+    let argSayisi = null, cagrildi = false;
+    sandbox.openConfirm('T', 'D', (...args) => { argSayisi = args.length; cagrildi = true; });
+    sandbox._confirmOk();
+    assert.strictEqual(cagrildi, true);
+    assert.strictEqual(argSayisi, 0, 'radyo yoksa eski fn() imzası korunur');
+  });
+
+  it('_confirmOk tek-atım: ikinci OK çağrısı fn çalıştırmaz (eski davranış korunur)', () => {
+    const { sandbox, document } = setupConfirm();
+    document.__setEl('m-confirm-title', makeElement('div'));
+    document.__setEl('m-confirm-desc', makeElement('div'));
+    document.__setEl('m-confirm-radyolar', makeElement('div'));
+    let sayac = 0;
+    sandbox.openConfirm('T', 'D', () => { sayac++; });
+    sandbox._confirmOk();
+    sandbox._confirmOk();
+    assert.strictEqual(sayac, 1, '_confirmAction tek-atımlı — eski davranış korunur');
+  });
+});

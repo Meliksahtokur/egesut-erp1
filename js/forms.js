@@ -1043,6 +1043,7 @@ function bcPlanRender(){
   const tarihStr = (v('bc-tarih') || '').trim() || bugun();
   kutu.innerHTML = gunler.map(gn => _bcGunKartiHtml(gn, tarihStr)).join('');
   bcButonEtiketi();
+  bcSablonKaydetOzetGuncelle(); // V2.2.2 — şablon mini-formu özeti canlı
 }
 
 // Tek gün kartı html'i — başlık '▾/▸ Gün N · GG Ay' + seans sayacı + 🗑
@@ -1199,6 +1200,85 @@ function bcGunEkleMenuToggle(){
 function bcGunEkleMenuKapat(){
   const menu = g('bc-gun-ekle-menu');
   if(menu) menu.style.display = 'none';
+}
+
+// ═══ V2.2.2 (W16) 💾 PLANI ŞABLON OLARAK KAYDET ═══
+// Plan başlığındaki '💾 Şablon Kaydet' (bc-sablon-kaydet-toggle) W14 kopya
+// alanı deseninde satır-içi katlanır mini-form açar. Kayıt, şablon
+// builder'ının (sablonKaydet ui.js:4522) RPC sözleşmesini kullanır
+// (tedavi_sablon_kaydet); modal + plan AÇIK KALIR — devam düzenleme
+// (sahip kararı P3). Tohumlama ayarları şablona DAHİL EDİLMEZ.
+
+function bcSablonKaydetToggle(){
+  const alan = g('bc-sablon-kaydet-alan');
+  if(!alan) return;
+  const aciliyor = alan.style.display !== 'block';
+  alan.style.display = aciliyor ? 'block' : 'none';
+  if(aciliyor) bcSablonKaydetHazirla();
+}
+function bcSablonKaydetKapat(){
+  const alan = g('bc-sablon-kaydet-alan');
+  if(alan) alan.style.display = 'none';
+}
+
+// Form açılışında placeholder + özet: placeholder '<HastalıkAdı> — N gün'
+// (hastalık seçiliyken); özet satırı bcSablonOzetMetni canlı değeri.
+function bcSablonKaydetHazirla(){
+  const adEl = g('bc-sablon-kaydet-ad');
+  if(adEl){
+    const sel = g('bc-disease-id');
+    const opt = (sel && sel.selectedOptions) ? sel.selectedOptions[0] : null;
+    const hastalik = ((opt && opt.textContent) || '').trim();
+    adEl.placeholder = hastalik
+      ? hastalik + ' — ' + (globalThis._bcGunler || []).length + ' gün'
+      : 'Şablon adı';
+  }
+  bcSablonKaydetOzetGuncelle();
+}
+
+// Özet satırı tazeleme — plan her değiştiğinde (bcPlanRender) form açıksa
+// canlı kalır.
+function bcSablonKaydetOzetGuncelle(){
+  const alan = g('bc-sablon-kaydet-alan');
+  if(!alan || alan.style.display !== 'block') return;
+  const ozet = g('bc-sablon-kaydet-ozet');
+  if(ozet) ozet.textContent = bcSablonOzetMetni(globalThis._bcGunler || []);
+}
+
+async function bcSablonKaydet(){
+  const diseaseId = v('bc-disease-id');
+  if(!diseaseId){ toast('⚠️ Önce hastalık seçin', true); return; }
+  const ad = (g('bc-sablon-kaydet-ad')?.value || '').trim();
+  if(!ad){ toast('⚠️ Şablon adı girin', true); return; }
+  // Plan toplayıcı hataları (doz/birim/seanssız gün) önce raporlanır —
+  // geçersiz kalem şablona YAZILMAZ (bcGunlardenItems dilinin aynısı).
+  const sec = bcGunlardenItems();
+  if(sec.hatalar.length){ toast('⚠️ ' + sec.hatalar[0], true); return; }
+  if(!sec.items.length){ toast('⚠️ En az bir seans ekleyin', true); return; }
+  const kalemler = bcSablonKalemleriOlustur(globalThis._bcGunler || []);
+  if(!kalemler.length){ toast('⚠️ En az bir seans ekleyin', true); return; }
+  try{
+    // sablonKaydet (ui.js:4522) payload biçimi birebir; p_id null = yeni
+    // şablon. gun_no plan № AS-IS (boşluk korunur — W15 RPC sözleşmesi);
+    // tohumlama_plani anahtarı GÖNDERİLMEZ (şablona dahil değil).
+    await rpc('tedavi_sablon_kaydet', {
+      p_id: null,
+      p_ad: ad,
+      p_aciklama: 'Toplu vaka planından kaydedildi',
+      p_disease_ids: [diseaseId],
+      p_kalemler: { kalemler },
+    });
+    // Şablon pull seti sablonKaydet ile aynı (RPC-WRITE-01 konvansiyonu);
+    // pull hatası kaydı maskelemesin — kayıt başarılı, akış sürer.
+    await pullTables(['tedavi_sablonu','sablon_hastalik_eslem','tedavi_sablonu_kalem']).catch(console.warn);
+    bcSablonKaydetKapat();
+    toast('💾 Şablon kaydedildi: ' + ad);
+    // Şablon radio listesi tazelenir — yeni şablon seçilebilir olur
+    // (modal + plan açık kalır; _renderSablonSecim seçim state'ini sıfırlar).
+    await _renderSablonSecim(diseaseId, 'bc-sablon-list', 'bc');
+  }catch(e){
+    toast('❌ ' + (e?.message || 'Şablon kaydedilemedi'), true);
+  }
 }
 
 // ＋ Boş gün: sıradaki ardışık № (maks+1 — builder sablonGunEkle dili).
@@ -1760,6 +1840,49 @@ function bcGunlardenItems(){
   return { hatalar, items };
 }
 
+// V2.2.2 (W16) — gün planı state'ini tedavi_sablon_kaydet p_kalemler.kalemler
+// sözleşmesine düzleştirir (sablonKaydet ui.js:4527 kalem biçiminin aynası):
+// [{gun_no, planned_time, stok_id, drug_product_id, dose, unit, route}].
+// gun_no AS-IS (boşluklu plan korunur — W15 RPC sözleşmesi), planned_time =
+// seans saati, dose Number, route boş→null; legacy/stok_id çözümü
+// bcGunlardenItems aynası. Doğrulama YAPMAZ — çağıran (bcSablonKaydet)
+// bcGunlardenItems hatalarını önce raporlar. Saf (girdi mutasyonlanmaz).
+function bcSablonKalemleriOlustur(gunler){
+  const kalemler = [];
+  (gunler || []).slice().sort((a, b) => a.gun - b.gun).forEach(gn => {
+    (gn.seanslar || []).forEach(seans => {
+      Object.keys(seans.ilaclar || {}).forEach(id => {
+        const k = seans.ilaclar[id] || {};
+        const d = (_drugsCache||[]).find(x => x.id === id);
+        const legacy = k.legacy !== undefined ? !!k.legacy : !!(d && d._legacy);
+        const stockId = k.stock_id !== undefined ? (k.stock_id || null) : (d?.stock_id || null);
+        kalemler.push({
+          gun_no: gn.gun,
+          planned_time: (seans.saat || '').trim(),
+          stok_id: stockId,
+          drug_product_id: legacy ? null : id,
+          dose: Number.parseFloat(k.dose),
+          unit: (k.unit || '').trim(),
+          route: (k.route || '').trim() || null,
+        });
+      });
+    });
+  });
+  return kalemler;
+}
+
+// V2.2.2 (W16) — şablon kaydet mini-formunun canlı özeti (saf):
+// 'İçerik: N gün · M seans (gün 1,2,5)' — _renderSablonSecim şablon satırı
+// 'N gün · M seans' dilinin aynısı (N = kalem taşıyan gün sayısı,
+// M = kalem sayısı). Taslak/geçersiz kalemler (doz/birim boş) SAYILMAZ;
+// geçerli kalem yoksa 'İçerik: boş plan'.
+function bcSablonOzetMetni(gunler){
+  const gecerli = bcSablonKalemleriOlustur(gunler).filter(k => Number.isFinite(k.dose) && k.unit);
+  if(!gecerli.length) return 'İçerik: boş plan';
+  const gunNos = [...new Set(gecerli.map(k => k.gun_no))].sort((a, b) => a - b);
+  return 'İçerik: ' + gunNos.length + ' gün · ' + gecerli.length + ' seans (gün ' + gunNos.join(',') + ')';
+}
+
 // ── TOPLU GÖNDERİM (FORM-SUBMIT-01 zinciri) ──
 // Sunucu guard aynası: aynı hayvan + aynı hastalık + status='active' vaka varsa
 // hayvan atlanacak demektir (cases.animal_id/disease_id/status alanlarıyla
@@ -1806,6 +1929,29 @@ function bcTarihKisa(iso){
   return m ? `${m[3]}.${m[2]}` : '—';
 }
 
+// V2.2.2 (W16) — çakışma radyosu kararı (saf): tohumlama İSTENİYOR ve en az
+// bir çakışan hayvan varsa openConfirm opts.radyolar yapılandırması; aksi
+// halde null (radyo gösterilmez). Varsayılan 'atla' — MUHAFAZAKÂR (eski plan
+// korunur; sahip kararı 2026-09-06). Değer kümesi W15 RPC sözleşmesi:
+// p_tohumlama_cakisma ∈ {'ekle','uzerine_yaz','atla'}.
+function bcCakismaRadyosu(tohumIste, cakisanlar){
+  if(!tohumIste || !(cakisanlar || []).length) return null;
+  return {
+    isim: 'cakisma',
+    varsayilan: 'atla',
+    secenekler: [
+      { deger: 'uzerine_yaz', etiket: 'Üzerine yaz — eski plan iptal, yenisi planlanır' },
+      { deger: 'atla',        etiket: 'Atla — eski plan kalır, yenisi açılmaz' },
+    ],
+  };
+}
+
+// V2.2.2 (W16) — radyo sonucu → payload değeri (saf). Radyo gösterilmediyse
+// veya seçim RPC değer kümesinden değilse 'ekle' — eski davranış birebir.
+function bcCakismaPayloadDegeri(radyoVar, secim){
+  return (radyoVar && (secim === 'uzerine_yaz' || secim === 'atla')) ? secim : 'ekle';
+}
+
 // vaka_toplu_ac jsonb sonucunu render satırlarına çevirir:
 // acilan→{tip:'ok',kupe}, atlanan→{tip:'atlanan',kupe,mesaj},
 // hatalar→{tip:'hata',kupe,mesaj}. Sabit sıra: acilan → atlanan → hatalar.
@@ -1815,6 +1961,8 @@ function bcTarihKisa(iso){
 // tohumlamaSebep:<sebep> olarak taşınır (additive — tohumlama yoksa anahtar yok).
 // V2.2.1 (W14): acilan[i].hayvan_id + atlanan[i].hayvan_id → hayvanId
 // (additive; yoksa anahtar yok — satır hayvan kartına yönlendirilir).
+// V2.2.2 (W16): acilan[i].tohumlama.uzerine_yazildi → uzerineYazildi
+// (additive — üzerine yazma yoksa anahtar yok; W15 RPC sözleşmesi).
 // hata satırları KASTEN haritalanmaz (inert): hata durumunda kart açılmaz.
 // Saf, DOM'suz.
 function bcSonucSatirlari(result){
@@ -1830,6 +1978,11 @@ function bcSonucSatirlari(result){
     const th = a.tohumlama;
     if(th && th.olustu === true) satir.tohumlamaOlustu = true;
     else if(th && th.olustu === false && th.sebep) satir.tohumlamaSebep = th.sebep;
+    // V2.2.2 (W16): üzerine yazılan eski planlar (W15 RPC uzerine_yazildi
+    // tarih dizisi) — ADDITIVE: dizi yoksa/boşsa anahtar hiç eklenmez.
+    if(th && th.olustu === true && Array.isArray(th.uzerine_yazildi) && th.uzerine_yazildi.length){
+      satir.uzerineYazildi = th.uzerine_yazildi;
+    }
     if(a.hayvan_id != null) satir.hayvanId = a.hayvan_id;
     satirlar.push(satir);
   });
@@ -1891,8 +2044,12 @@ function bcSonucBantlari(satirlar, opts){
       const gun = a?.sablon?.gun_sayisi;
       const manuelEk = bcManuelSatirEki(a?.manuel);
       const sablonEk = manuelEk ? '' : (gun ? ` + ${gun} gün şablon` : '');
+      // V2.2.2 (W16) — üzerine yazma gerçekleştiyse eski plan tarihleri eki
+      // (' (üzerine yazıldı: eski DD.MM[, DD.MM])'); yoksa ek YOK (eski dil).
+      const uzerineEk = (s.tohumlamaOlustu === true && Array.isArray(s.uzerineYazildi) && s.uzerineYazildi.length)
+        ? ` (üzerine yazıldı: eski ${s.uzerineYazildi.join(', ')})` : '';
       const tohumEk = (s.tohumlamaOlustu === true)
-        ? ` · 🐄 tohumlama ${tohumSaat}`
+        ? ` · 🐄 tohumlama ${tohumSaat}${uzerineEk}`
         : (s.tohumlamaSebep && tohumIste ? ` · ⏭ tohumlama: ${s.tohumlamaSebep}` : '');
       idHtml = `✅ ${escAttr(s.kupe)}`;
       subHtml = `vaka açıldı${manuelEk}${sablonEk}${tohumEk}`;
@@ -1982,6 +2139,13 @@ async function submitBulkCase(btn){
   try { gorevler = await idbGetAll('gorev_log'); } catch { gorevler = []; }
   const tohumCakisan = tohumIste ? bcTohumCakismaBul(liste, gorevler) : [];
 
+  // V2.2.2 (W16) — çakışma radyosu: yalnız tohumlama isteniyor VE çakışan
+  // hayvan varken onay diyaloğunda 'üzerine yaz / atla' seçimi sunulur.
+  // Varsayılan 'atla' (muhafazakâr). Seçim onay callback'inde yakalanır ve
+  // rpc payload'ına p_tohumlama_cakisma olarak yazılır (radyosuz yol 'ekle').
+  const cakismaRadyosu = bcCakismaRadyosu(tohumIste, tohumCakisan);
+  let cakismaSecim = null; // 'uzerine_yaz' | 'atla' — onay radyosundan
+
   const gonder = async () => {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Gönderiliyor…'; }
     try {
@@ -1999,6 +2163,9 @@ async function submitBulkCase(btn){
         p_tohumlama:            tohumIste,
         p_tohumlama_gun_offset: tohumGun,
         p_tohumlama_saat:       tohumSaat,
+        // V2.2.2 (W16) — çakışma modu: radyo seçimi ('uzerine_yaz'|'atla')
+        // ya da eski davranış ('ekle' — W15 RPC default güvencesi).
+        p_tohumlama_cakisma:    bcCakismaPayloadDegeri(!!cakismaRadyosu, cakismaSecim),
       });
 
       // V2.1 — bantlı sonuç düzeni (owner-approved): bcSonucSatirlari
@@ -2042,6 +2209,9 @@ async function submitBulkCase(btn){
   // (V2.1) + tohumlama uygunsuzleri TEK openConfirm'de. Çakışma NON-BLOCKING:
   // 'yenisi de açılacak' — onay akışı sürer; sunucu yalnız aynı-vaka
   // duplikelerini atlar.
+  // V2.2.2 — çakışan hayvanlar varsa uyarı satırları KALIR (per-hayvan durumu
+  // açıklar) ve diyaloğa çakışma radyosu eklenir ('Üzerine yaz' = eski İPTAL /
+  // 'Atla' = eski kalır); Onayla callback'i seçilen değeri yakalar.
   const uyariSatirlari = [
     ...dups.map(d => `• ${d.kupe} — zaten aktif vaka — atlanacak`),
     ...tohumCakisan.map(t => `• ${t.kupe} — açık planlı tohumlaması var (${bcTarihKisa(t.tarih)}) — yenisi de açılacak`),
@@ -2052,7 +2222,8 @@ async function submitBulkCase(btn){
     // desc textContent ile basılır, HTML kaçış gerektirmez
     openConfirm('⚠️ Uyarılar',
       uyariSatirlari.join('\n') + '\n\nDevam edilsin mi?',
-      gonder);
+      (secim) => { cakismaSecim = secim; return gonder(); },
+      cakismaRadyosu ? { radyolar: cakismaRadyosu } : undefined);
     return;
   }
   await gonder();

@@ -239,6 +239,11 @@ registerActions({
   'bc-seans-sil':     (el) => bcSeansSil(Number(el.dataset.gun), Number(el.dataset.si)),
   'bc-kalem-sil':     (el) => bcKalemSil(Number(el.dataset.gun), Number(el.dataset.si), el.dataset.id),
   'bc-saat-chip':     (el) => bcSeansSaatChip(el.dataset.t, el),               // HIZLI_SAATLER çipi (seans formu)
+  // V2.2.2 (W16) — 💾 planı şablon olarak kaydet (satır-içi mini-form;
+  // kayıt sonrası modal + plan açık kalır — devam düzenleme)
+  'bc-sablon-kaydet-toggle': () => bcSablonKaydetToggle(),
+  'bc-sablon-kaydet':        () => bcSablonKaydet(),
+  'bc-sablon-kaydet-vazgec': () => bcSablonKaydetKapat(),
   'submit-bulk-case': (el) => submitBulkCase(el),
 
   // ═══ AŞI ═══

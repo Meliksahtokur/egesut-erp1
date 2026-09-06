@@ -1073,16 +1073,49 @@ async function grupTamamla(parent,acikSafAltlar){
 // ile bağlanır (DOM property onclick modal router closeM→history.back yarışına
 // girer — AGENTS.md kuralı, td-hayvan/684534f deseni)
 let _confirmAction = null;
-function openConfirm(title, desc, onConfirm){
+// V2.2.2 (W16) — onay diyaloğuna OPSİYONEL radio grubu (tohumlama çakışma
+// seçimi: üzerine yaz / atla). radyolar = {isim, varsayilan,
+// secenekler:[{deger, etiket}]}; HTML dili _renderSablonSecim
+// (forms.js:574) radio dili aynası — label + input[type=radio]. Yapılandırma
+// yok/eksikse '' — grup hiç basılmaz (eski davranış birebir).
+function _confirmRadyolarHtml(radyolar){
+  if(!radyolar || !radyolar.isim || !Array.isArray(radyolar.secenekler)) return '';
+  return radyolar.secenekler.map(s =>
+    `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.82rem">
+      <input type="radio" name="${escAttr(radyolar.isim)}" value="${escAttr(s.deger)}"${s.deger === radyolar.varsayilan ? ' checked' : ''}> ${esc(s.etiket)}</label>`
+  ).join('');
+}
+// İşaretli radyonun değeri (yoksa null) — _confirmOk'un callback'ine ek
+// argüman olarak taşınır.
+function _confirmRadyoDegeri(isim){
+  const el = document.querySelector('input[name="' + isim + '"]:checked');
+  return el ? el.value : null;
+}
+function openConfirm(title, desc, onConfirm, opts){
   document.getElementById('m-confirm-title').textContent=title;
   document.getElementById('m-confirm-desc').textContent=desc;
   _confirmAction = onConfirm;
+  // V2.2.2 — opts.radyolar varsa desc ile butonlar arasındaki konteynere
+  // basılır; opts'suz çağrıda kutu TEMİZLENİR + gizlenir (önceki onayın
+  // radyosu sızmaz; eski davranış birebir).
+  const rk = document.getElementById('m-confirm-radyolar');
+  if(rk){
+    const html = (opts && opts.radyolar) ? _confirmRadyolarHtml(opts.radyolar) : '';
+    rk.innerHTML = html;
+    rk.style.display = html ? 'block' : 'none';
+  }
   openM('m-confirm');
 }
 function _confirmOk(){
   closeM('m-confirm');
   const fn = _confirmAction; _confirmAction = null;
-  if (typeof fn === 'function') fn();
+  if (typeof fn === 'function'){
+    // V2.2.2 — radyolu onayda seçilen değer ek argümanla taşınır
+    // (fn(chosen)); radyosuz yol args'sız fn() — mevcut çağıranlar birebir.
+    const radyo = document.querySelector('#m-confirm-radyolar input[type="radio"]');
+    if(radyo) fn(_confirmRadyoDegeri(radyo.name));
+    else fn();
+  }
 }
 async function updateTaskBadge(){
   try{

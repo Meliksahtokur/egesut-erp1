@@ -1185,6 +1185,8 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <label class="flbl" style="font-size:.72rem;margin:0">💊 Tedavi Planı</label>
           <div style="position:relative;display:flex;align-items:center">
+            <button type="button" class="ek-chip" data-action="bc-sablon-kaydet-toggle"
+              style="font-weight:800;color:var(--blue);border-color:rgba(42,107,181,.4);margin-right:5px">💾 Şablon Kaydet</button>
             <button type="button" class="ek-chip" id="bc-gun-ekle-btn" data-action="bc-gun-ekle-menu"
               style="font-weight:800;color:var(--green);border-color:rgba(78,154,42,.4)">＋ Gün ▾</button>
             <div id="bc-gun-ekle-menu" style="display:none;position:absolute;right:0;top:28px;background:var(--card);border:1px solid var(--card3);border-radius:9px;box-shadow:0 6px 18px rgba(0,0,0,.18);z-index:30;min-width:178px;padding:4px">
@@ -1195,6 +1197,19 @@ body.dark .ac-vurgu{color:#8ec6ff}
               <button type="button" data-action="bc-gun-ekle-takvim"
                 style="display:block;width:100%;text-align:left;padding:8px 10px;background:none;border:none;font-size:.78rem;font-weight:600;color:var(--ink);cursor:pointer;border-radius:6px">📅 Takvimden</button>
             </div>
+          </div>
+        </div>
+        <!-- V2.2.2 (W16) — 💾 şablon kaydet mini-formu (W14 kopyalama alanı
+             deseni: toggle aç/kapa; kayıt sonrası kapanır, modal + plan AÇIK
+             kalır — devam düzenleme). Tohumlama ayarı şablona dahil edilmez. -->
+        <div id="bc-sablon-kaydet-alan" style="display:none;margin:2px 0 6px;padding:8px;border:1px dashed var(--card3);border-radius:8px;background:var(--card2)">
+          <label style="display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--ink2)">Şablon adı
+            <input id="bc-sablon-kaydet-ad" class="fi" placeholder="Şablon adı" style="flex:1;margin:0;padding:5px 7px"></label>
+          <div id="bc-sablon-kaydet-ozet" style="font-size:.72rem;color:var(--ink2);margin:6px 0 2px">İçerik: boş plan</div>
+          <div style="font-size:.65rem;color:var(--ink3);margin-bottom:7px">ℹ️ Tohumlama ayarı şablona kaydedilmez</div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn-sm" data-action="bc-sablon-kaydet" style="flex:1;font-weight:700;padding:8px;background:rgba(78,154,42,.12);color:var(--green);border:1px solid rgba(78,154,42,.35);border-radius:7px;cursor:pointer">Kaydet</button>
+            <button type="button" class="btn-sm" data-action="bc-sablon-kaydet-vazgec" style="flex:1;padding:8px;background:var(--card3);border:none;border-radius:7px;cursor:pointer">Vazgeç</button>
           </div>
         </div>
         <div id="bc-plan-gunler"></div>
@@ -2288,6 +2303,10 @@ function copyErrors() {
       <!-- white-space:pre-line — joined('\n') uyarı listeleri satır satır
            basılır (toplu vaka uyarıları, planlı aşı tekrarı, görev diff) -->
       <div id="m-confirm-desc" style="font-size:.85rem;color:var(--ink2);line-height:1.4;white-space:pre-line"></div>
+      <!-- V2.2.2 (W16) — opsiyonel radyo grubu (openConfirm opts.radyolar;
+           tohumlama çakışma seçimi: üzerine yaz / atla). Radyosuz onayda
+           boş + gizli — eski davranış birebir korunur. -->
+      <div id="m-confirm-radyolar" style="display:none;margin-top:10px"></div>
     </div>
     <div style="display:flex;gap:8px;padding:16px 20px 20px;margin-top:8px">
       <button class="btn btn-o" style="flex:1;padding:11px" data-action="close-confirm">İptal</button>
