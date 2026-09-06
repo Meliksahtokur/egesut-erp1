@@ -41,6 +41,19 @@
 //      (açık planlı tohumlama çakışma ön-kontrolü — UI-only, non-blocking;
 //      cross-case tespit) ve bcTarihKisa (DD.AA).
 //
+//   8. V2.2 (W13) — takvim ay-geçiş/gün-seçim düzeltmesi (sahibe hata
+//      bildirimi: "takvimden seçimde sıkıntı — gün tıklanınca ay
+//      değişiyor; ay değişince gün…"). Saf ay durum makinesi:
+//      bcTakvimAyKaydir (yıl rollover'lı ay kaydırma), bcTakvimAyGosterim
+//      (ayOffset → hücre matrisi; komşu-ay hücresi ÜRETİLMEZ), 
+//      bcTakvimSecimEkle (toggle + min=başlangıç + maks=gün 31 = 
+//      başlangıç+30 sınırları — SİNIRSIZ gün>31 seçimi HATASI burada
+//      kilitlenir), bcTakvimBaslikTarihi (DD.MM.YYYY) ve 
+//      bcTakvimChipEtiketi (DD.MM). DOM katmanı: ay ‹/› BC takvim
+//      butonları artık bcTakvimAyDegistir üzerinden saf kaydırma kullanır
+//      (inline _bcTkAy-- wrap matematiği KALDIRILDI); seçim Set'i ay
+//      değişimlerinde DOKUNULMAZ.
+//
 //   V2→V2.1 ADAPTASYONLAR (bilinçli, iç şekil değişimi — her biri belgelendi):
 //     a. bcGunlardenItems: state şekli secili→seanslar [{saat, ilaclar}].
 //        Gün-düzlemi 'saat' alanı KALDIRILDI; kalem.saat ARTIK HER ZAMAN
@@ -66,23 +79,35 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { loadBrowserModule, makeDomStub } = require('./support/loadModule.js');
+const vm = require('node:vm');
+const { loadBrowserModule, makeDomStub, makeElement } = require('./support/loadModule.js');
 
 // ── forms.js yükleme (saf helper'lar için minimal stub seti) ──────────
 function setupForms() {
   const document = makeDomStub();
+  const toasts = [];
   const { sandbox } = loadBrowserModule('js/forms.js', {
     dom: document,
     extra: {
       db: { rpc: async () => ({ data: null, error: null }), from: () => { throw new Error('test stub'); } },
+      // js/utils/helpers.js:15-17 birebir — takvim yolları bugun()/dFwd kullanır
+      bugun: () => {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      },
+      dFwd: (base, n) => {
+        const d = base ? new Date(base + 'T00:00:00') : new Date();
+        d.setDate(d.getDate() + n);
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      },
       g: (id) => document.getElementById(id),
       v: (id) => { const el = document.getElementById(id); return (el && el.value) || ''; },
+      toast: (m, isErr) => toasts.push({ m: String(m), isErr: !!isErr }),
       cl: () => {},
       esc: (s) => String(s || ''),
       escAttr: (s) => String(s || ''),
       getState: () => null,
       setState: () => {},
-      toast: () => {},
       rpc: async () => ({}),
       idbGetAll: async () => [],
       getData: async () => [],
@@ -93,6 +118,7 @@ function setupForms() {
         `<div class="aband"><div class="aband-hdr ${cls}">${title}</div><div class="aband-body">${content}</div></div>`,
     },
   });
+  sandbox.__toasts = toasts; // W13: takvim toast iddiaları için canlı yakalama
   return sandbox;
 }
 
@@ -1153,5 +1179,267 @@ describe('bcTarihKisa (V2.1 — DD.AA kısa tarih)', () => {
     assert.strictEqual(sb.bcTarihKisa(''), '—');
     assert.strictEqual(sb.bcTarihKisa(null), '—');
     assert.strictEqual(sb.bcTarihKisa('10/09/2026'), '—');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// V2.2 (W13) — bc-gun-takvim ay-geçiş/gün-seçim durumu
+// Sahibe hata bildirimi: "takvimden seçimde sıkıntı — gün tıklanınca ay
+// değişiyor; ay değişince gün…". RED-ÖNCE: aşağıdaki testler düzeltmeden
+// ÖNCE yazıldı ve mevcut kodda KIRMIZI çıktı (ay durum matematiği inline
+// onclick string'lerinde gömülü + gün>31 üst sınırı YOK).
+//
+// Saf yüzey (js/forms.js):
+//   bcTakvimAyKaydir(yil, ayIdx, delta)     → { yil, ay }   yıl rollover'lı
+//   bcTakvimAyGosterim(baslangic, ayOffset) → { yil, ay, etiket, bosluk,
+//        hucreler:[{gunNo, tarihISO, disiMi}] }  — komşu-ay hücresi üretilmez
+//   bcTakvimSecimEkle(secimler, iso, bas)   → { ok, eklendi, secimler, mesaj }
+//   bcTakvimBaslikTarihi(str)               → 'DD.MM.YYYY'
+//   bcTakvimChipEtiketi(iso)                → 'DD.MM'
+// ══════════════════════════════════════════════════════════════════════
+
+// Takvim modül state'ine CANLI erişim (vm üst-seviye let — snapshot değil).
+// Ay durumu TEK skalerdir: _bcTkOffset (0 = başlangıç ayı; ‹/› ±1) —
+// görüntülenen yıl/ay SAF bcTakvimAyGosterim'den türetilir (kilit: rollover
+// matematiği DOM'da DEĞİL).
+function tkDurum(baslangic) {
+  const ham = vm.runInContext('({ offset: _bcTkOffset, secili: [..._bcTkSecili] })', sb);
+  const gost = host(sb.bcTakvimAyGosterim(baslangic, ham.offset));
+  return { ...ham, ay: gost.ay, yil: gost.yil, etiket: gost.etiket };
+}
+
+// bcTakvimAc'yı bc-tarih input'u ile aç ve modal kutusunu döndür.
+// Gerçek tarayıcıda getElementById appendChild'la eklenen elemanları bulur;
+// makeDomStub yalnız __setEl ile kaydedilenleri bulur — tarayıcıya sadık
+// köprü (yoksa her render yeni kutu yaratır ve referans bayatlar).
+function takvimAc(tarih) {
+  const el = makeElement('input');
+  el.value = tarih;
+  sb.document.__setEl('bc-tarih', el);
+  if(!sb.document.__getByIdKoprulu){
+    const origGet = sb.document.getElementById.bind(sb.document);
+    sb.document.getElementById = (id) => origGet(id) || sb.document.body.children.find(c => c.id === id) || null;
+    sb.document.__getByIdKoprulu = true;
+  }
+  sb.bcTakvimAc();
+  const kutu = sb.document.getElementById('bc-gun-takvim');
+  assert.strictEqual(kutu.id, 'bc-gun-takvim');
+  return kutu;
+}
+
+describe('bcTakvimAyKaydir (V2.2 saf — yıl rollover\'lı ay kaydırma)', () => {
+  it('ay içi kaydırma: Ağustos 2026 +1 → Eylül 2026', () => {
+    assert.deepStrictEqual(host(sb.bcTakvimAyKaydir(2026, 7, 1)), { yil: 2026, ay: 8 });
+  });
+
+  it('yıl sınırı İLERİ: Aralık 2026 +1 → Ocak 2027', () => {
+    assert.deepStrictEqual(host(sb.bcTakvimAyKaydir(2026, 11, 1)), { yil: 2027, ay: 0 });
+  });
+
+  it('yıl sınırı GERİ: Ocak 2027 -1 → Aralık 2026', () => {
+    assert.deepStrictEqual(host(sb.bcTakvimAyKaydir(2027, 0, -1)), { yil: 2026, ay: 11 });
+  });
+
+  it('çok adımlı ileri: Eylül 2026 +16 → Ocak 2028', () => {
+    assert.deepStrictEqual(host(sb.bcTakvimAyKaydir(2026, 8, 16)), { yil: 2028, ay: 0 });
+  });
+
+  it('çok adımlı geri: Eylül 2026 -20 → Ocak 2025', () => {
+    assert.deepStrictEqual(host(sb.bcTakvimAyKaydir(2026, 8, -20)), { yil: 2025, ay: 0 });
+  });
+});
+
+describe('bcTakvimAyGosterim (V2.2 saf — ayOffset → hücre matrisi)', () => {
+  it('offset 0: başlangıç ayı — 30 hücre, Eylül 2026, Pazartesi-bazlı 1 boşluk (1 Eylül Salı)', () => {
+    const g = host(sb.bcTakvimAyGosterim('2026-09-06', 0));
+    assert.strictEqual(g.yil, 2026);
+    assert.strictEqual(g.ay, 8);
+    assert.strictEqual(g.etiket, 'Eylül 2026');
+    assert.strictEqual(g.bosluk, 1);
+    assert.strictEqual(g.hucreler.length, 30);
+    assert.deepStrictEqual(g.hucreler[0], { gunNo: 1, tarihISO: '2026-09-01', disiMi: false });
+    assert.deepStrictEqual(g.hucreler[29], { gunNo: 30, tarihISO: '2026-09-30', disiMi: false });
+  });
+
+  it('komşu-ay hücresi ÜRETİLMEZ: tüm tarihISO görüntülenen aydan (gün tıkının yanlış aya düşmesi kilitlenir)', () => {
+    for (const off of [-1, 0, 1, 2]) {
+      const g = host(sb.bcTakvimAyGosterim('2026-09-06', off));
+      const onEk = g.yil + '-' + String(g.ay + 1).padStart(2, '0') + '-';
+      for (const h of g.hucreler) {
+        assert.ok(h.tarihISO.startsWith(onEk), 'offset ' + off + ' hücre taşması: ' + h.tarihISO);
+        assert.strictEqual(h.disiMi, false);
+      }
+    }
+  });
+
+  it('offset +1: Ekim 2026 — 31 hücre, 3 boşluk (1 Ekim Perşembe)', () => {
+    const g = host(sb.bcTakvimAyGosterim('2026-09-06', 1));
+    assert.strictEqual(g.etiket, 'Ekim 2026');
+    assert.strictEqual(g.bosluk, 3);
+    assert.strictEqual(g.hucreler.length, 31);
+    assert.strictEqual(g.hucreler[0].tarihISO, '2026-10-01');
+  });
+
+  it('offset yıl atlar: 2026-12-15 başlangıç, +1 → Ocak 2027 (etiket + yıl doğru)', () => {
+    const g = host(sb.bcTakvimAyGosterim('2026-12-15', 1));
+    assert.strictEqual(g.yil, 2027);
+    assert.strictEqual(g.ay, 0);
+    assert.strictEqual(g.etiket, 'Ocak 2027');
+    assert.strictEqual(g.hucreler[0].tarihISO, '2027-01-01');
+  });
+
+  it('negatif offset yıl atlar: 2026-12-15 başlangıç, -1 → Kasım 2026; 2027-01-10, -1 → Aralık 2026', () => {
+    const g1 = host(sb.bcTakvimAyGosterim('2026-12-15', -1));
+    assert.strictEqual(g1.etiket, 'Kasım 2026');
+    const g2 = host(sb.bcTakvimAyGosterim('2027-01-10', -1));
+    assert.strictEqual(g2.yil, 2026);
+    assert.strictEqual(g2.ay, 11);
+    assert.strictEqual(g2.etiket, 'Aralık 2026');
+  });
+
+  it('12 ay etiketinin tamamı Türkçe + yıl taşımalı', () => {
+    const beklenen = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    for (let i = 0; i < 12; i++) {
+      const g = host(sb.bcTakvimAyGosterim('2026-01-01', i));
+      assert.ok(g.etiket.startsWith(beklenen[i]), i + ' → ' + g.etiket);
+      assert.ok(g.etiket.endsWith('2026'), i + ' → ' + g.etiket);
+    }
+  });
+
+  it('geçersiz başlangıç → bugün ayına düşer (patlamaz)', () => {
+    const g = host(sb.bcTakvimAyGosterim('', 0));
+    assert.strictEqual(g.hucreler.length >= 28 && g.hucreler.length <= 31, true);
+    assert.strictEqual(g.bosluk >= 0 && g.bosluk <= 6, true);
+  });
+});
+
+describe('bcTakvimSecimEkle (V2.2 saf — toggle + min/maks doğrulama)', () => {
+  const BAS = '2026-09-06';
+
+  it('geçerli gün eklenir → ASC dizide birebir aynı ISO (başka ay görünümündeki gün YANLIŞ aya düşmez; 2026-10-05 = Gün 30 ≤ 31)', () => {
+    const r = host(sb.bcTakvimSecimEkle(['2026-09-15'], '2026-10-05', BAS));
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.eklendi, true);
+    assert.deepStrictEqual(r.secimler, ['2026-09-15', '2026-10-05']);
+  });
+
+  it('mevcut seçim toggle → çıkarılır (eklendi:false)', () => {
+    const r = host(sb.bcTakvimSecimEkle(['2026-09-15', '2026-09-20'], '2026-09-15', BAS));
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.eklendi, false);
+    assert.deepStrictEqual(r.secimler, ['2026-09-20']);
+  });
+
+  it('başlangıçtan ÖNCEKİ gün reddedilir + mesaj + seçimler değişmez', () => {
+    const mevcut = ['2026-09-10'];
+    const r = host(sb.bcTakvimSecimEkle(mevcut, '2026-09-01', BAS));
+    assert.strictEqual(r.ok, false);
+    assert.ok(r.mesaj && r.mesaj.length > 0);
+    assert.deepStrictEqual(r.secimler, ['2026-09-10']);
+  });
+
+  it('gün 31 SINIRI (başlangıç+30): 2026-10-06 → ok', () => {
+    const r = host(sb.bcTakvimSecimEkle([], '2026-10-06', BAS));
+    assert.strictEqual(r.ok, true);
+    assert.deepStrictEqual(r.secimler, ['2026-10-06']);
+  });
+
+  it('gün 32 (başlangıç+31) REDDEDİLİR — sınırsız gün>31 seçimi HATASI kilitlenir', () => {
+    const r = host(sb.bcTakvimSecimEkle([], '2026-10-07', BAS));
+    assert.strictEqual(r.ok, false);
+    assert.ok(/31/.test(r.mesaj), 'mesaj sınırı açıklar: ' + r.mesaj);
+    assert.deepStrictEqual(r.secimler, []);
+  });
+
+  it('çok ileri tarih (gün 40 = 2026-10-15) reddedilir', () => {
+    const r = host(sb.bcTakvimSecimEkle([], '2026-10-15', BAS));
+    assert.strictEqual(r.ok, false);
+  });
+
+  it('yıl sınırında sınır kontrolü: 2026-12-20 başlangıç → 2027-01-19 gün 31 ok, 2027-01-20 gün 32 red', () => {
+    assert.strictEqual(host(sb.bcTakvimSecimEkle([], '2027-01-19', '2026-12-20')).ok, true);
+    assert.strictEqual(host(sb.bcTakvimSecimEkle([], '2027-01-20', '2026-12-20')).ok, false);
+  });
+
+  it('geçersiz başlangıç → red (mesajlı), seçim eklenmez', () => {
+    const r = host(sb.bcTakvimSecimEkle([], '2026-10-07', ''));
+    assert.strictEqual(r.ok, false);
+    assert.deepStrictEqual(r.secimler, []);
+  });
+});
+
+describe('bcTakvimBaslikTarihi + bcTakvimChipEtiketi (V2.2 saf — TR tarih biçimi)', () => {
+  it("bcTakvimBaslikTarihi('2026-09-06') → '06.09.2026' (YYYY-MM-DD değil)", () => {
+    assert.strictEqual(sb.bcTakvimBaslikTarihi('2026-09-06'), '06.09.2026');
+  });
+
+  it("bcTakvimBaslikTarihi('') ve geçersiz → bugün DD.MM.YYYY biçiminde", () => {
+    assert.match(sb.bcTakvimBaslikTarihi(''), /^\d{2}\.\d{2}\.\d{4}$/);
+    assert.match(sb.bcTakvimBaslikTarihi('10/09/2026'), /^\d{2}\.\d{2}\.\d{4}$/);
+    assert.match(sb.bcTakvimBaslikTarihi(null), /^\d{2}\.\d{2}\.\d{4}$/);
+  });
+
+  it("bcTakvimChipEtiketi('2026-10-15') → '15.10' (GÜN.AY — eski '10.15' ters okuma kilitlenir)", () => {
+    assert.strictEqual(sb.bcTakvimChipEtiketi('2026-10-15'), '15.10');
+    assert.strictEqual(sb.bcTakvimChipEtiketi('2026-09-06'), '06.09');
+  });
+});
+
+describe('bc-gun-takvim DOM davranışı (V2.2 — ay geçişi + seçim kalıcılığı + toast)', () => {
+  it('gün tıklanınca GÖRÜNTÜLENEN AY KORUNUR (sahibe "gün tıklayınca ay değişiyor" kilidi)', () => {
+    takvimAc('2026-09-06');
+    sb.bcTakvimToggle('2026-09-15');
+    const d = tkDurum('2026-09-06');
+    assert.strictEqual(d.ay, 8);
+    assert.strictEqual(d.yil, 2026);
+    assert.deepStrictEqual(host(d.secili), ['2026-09-15']);
+  });
+
+  it('‹ sonra › : ay etiketi geri döner, seçim ÇİP ve Set\'te kalıcı', () => {
+    const kutu = takvimAc('2026-09-06');
+    sb.bcTakvimToggle('2026-09-15');
+    sb.bcTakvimAyDegistir(-1);
+    assert.ok(kutu.innerHTML.includes('Ağustos 2026'), '‹ sonrası Ağustos');
+    sb.bcTakvimAyDegistir(1);
+    assert.ok(kutu.innerHTML.includes('Eylül 2026'), '› sonrası Eylül');
+    assert.deepStrictEqual(host(tkDurum('2026-09-06').secili), ['2026-09-15']);
+    assert.ok(kutu.innerHTML.includes('15.09'), 'çip DD.MM kalır: ' + (kutu.innerHTML.match(/Seçili Günler[\s\S]{0,400}/) || [''])[0]);
+  });
+
+  it('› ile sonraki ayda gün tıklama: ay EKİM kalır, seçim 2026-10-05 birebir (yanlış aya düşmez)', () => {
+    const kutu = takvimAc('2026-09-06');
+    sb.bcTakvimAyDegistir(1);
+    assert.ok(kutu.innerHTML.includes('Ekim 2026'));
+    sb.bcTakvimToggle('2026-10-05'); // Gün 30 — sınır içi
+    const d = tkDurum('2026-09-06');
+    assert.strictEqual(d.ay, 9, 'ay Ekim (9) korunmalı');
+    assert.strictEqual(d.yil, 2026);
+    assert.deepStrictEqual(host(d.secili), ['2026-10-05']);
+    assert.ok(kutu.innerHTML.includes('05.10'));
+  });
+
+  it('başlangıç+31 ötesi gün: toast + seçim REDDİ (sahibin 31-gün taarruzu zarif düşer)', () => {
+    takvimAc('2026-09-06');
+    sb.__toasts.length = 0;
+    sb.bcTakvimToggle('2026-10-10'); // gün 35
+    assert.deepStrictEqual(host(tkDurum('2026-09-06').secili), [], 'gün>31 seçime girmez');
+    assert.strictEqual(sb.__toasts.length, 1, 'tek uyarı toast');
+    assert.strictEqual(sb.__toasts[0].isErr, true);
+    assert.ok(/31/.test(sb.__toasts[0].m), 'toast sınırı açıklar: ' + sb.__toasts[0].m);
+  });
+
+  it('başlık tarihi DD.MM.YYYY: modal başlığında 06.09.2026 (2026-09-06 değil)', () => {
+    const kutu = takvimAc('2026-09-06');
+    assert.ok(kutu.innerHTML.includes('06.09.2026'), 'DD.MM.YYYY başlık');
+    assert.ok(!kutu.innerHTML.includes('başlangıç: 2026-09-06'), 'ISO biçimi kalmaz');
+  });
+
+  it('hücre onclick ISO\'ları görüntülenen aya ait (› sonrası Ekim ISO\'ları)', () => {
+    const kutu = takvimAc('2026-09-06');
+    sb.bcTakvimAyDegistir(1);
+    const onclicklar = [...kutu.innerHTML.matchAll(/bcTakvimToggle\(&#39;([\d-]+)&#39;\)/g)].map(m => m[1]);
+    assert.ok(onclicklar.length === 31, '31 tıklanabilir Ekim hücresi');
+    assert.ok(onclicklar.every(iso => iso.startsWith('2026-10-')), 'hepsi Ekim: ' + onclicklar[0] + '..' + onclicklar[onclicklar.length - 1]);
   });
 });

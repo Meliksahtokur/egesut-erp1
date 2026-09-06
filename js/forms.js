@@ -1252,19 +1252,113 @@ function bcGunKopyalaUygula(kaynakGun){
 // dilinin bc uyarlaması: ay takvimi, dokun-işaretle, seçili çipler,
 // Onayla). Yalnız bc-tarih ve SONRASI seçilebilir; mevcut gün tarihleri
 // mavi vurgulu (dokunuş no-op). ═══
+//
+// ═══ V2.2 AY-GEÇİŞ/GÜN-SEÇİM DÜZELTMESİ (sahibe hata bildirimi, 2026-09-06:
+// "takvimden seçimde sıkıntı — gün tıklanınca ay değişiyor; ay değişince
+// gün…"). Kök nedenler: (1) ay durum matematiği (_bcTkAy--/_bcTkYil--)
+// inline onclick STRING'lerinde gömülüydü — test edilemez, kırılgan;
+// (2) seçimde ÜST SINIR yoktu — başlangıç+31 ötesi tarihler Gün 35/40
+// kartları olarak sessizce doğuyordu (bcGunNoKontrol 1..31 aralığını
+// zorluyor ama takvim ayağı bunu atlıyordu); (3) başlık/çip tarihleri
+// ISO/MM.AY biçimindeydi. Durum artık saf fonksiyonlarda
+// (bcTakvimAyKaydir/bcTakvimAyGosterim/bcTakvimSecimEkle), render yalnız
+// tüketir; ay durumu TEK skaler offset (0 = başlangıç ayı), seçim Set'i
+// ay değişimlerinde DOKUNULMAZ. ═══
 
-let _bcTkAy = 0, _bcTkYil = 0;
+let _bcTkOffset = 0; // 0 = başlangıç ayı; ‹/› ±1 — yıl rollover saf katmanda
 let _bcTkSecili = new Set();
+
+// ── V2.2 SAF AY/SEÇİM KATMANI (DOM'suz — vaka-toplu-ac.test.js V2.2 RED-
+// ÖNCE kilidi; _bcUtcGun UTC aritmetiği, new Date(string) YOK) ──
+
+// Ay kaydırma: (yil, ayIdx 0..11) + delta tam sayı → normalize {yil, ay}.
+// Yıl sınırı her iki yönde doğru taşar (Aralık 2026 +1 → Ocak 2027).
+function bcTakvimAyKaydir(yil, ayIdx, delta){
+  const toplam = Math.trunc(Number(yil) || 0) * 12 + Math.trunc(Number(ayIdx) || 0) + Math.trunc(Number(delta) || 0);
+  return { yil: Math.floor(toplam / 12), ay: ((toplam % 12) + 12) % 12 };
+}
+
+// Ay gösterimi: başlangıç tarihinin ayinden ayOffset ay ilerideki ayın
+// hücre matrisi. Döner: { yil, ay(0..11), etiket('Eylül 2026'),
+// bosluk(Pazartesi-bazlı baştaki boş hücre sayısı),
+// hucreler:[{gunNo, tarihISO, disiMi}] }. Komşu-ay hücresi ÜRETİLMEZ
+// (disiMi daima false) — bir gün tıklaması asla başka ayın tarihine
+// düşemez. Etiket Türkçe, UTC çapalı (TZ'den bağımsız). Başlangıç
+// geçersizse bugün'ün ayine düşer (patlamaz; _bcTkBaslangic zaten bugün
+// fallback'li).
+function bcTakvimAyGosterim(baslangicDateStr, ayOffset){
+  const p = String(baslangicDateStr || '').split('-').map(Number);
+  const gecerli = p.length === 3 && p.every(x => Number.isFinite(x));
+  const bugunP = bugun().split('-').map(Number);
+  const y0 = gecerli ? p[0] : bugunP[0];
+  const m0 = gecerli ? p[1] : bugunP[1];
+  const yer = bcTakvimAyKaydir(y0, m0 - 1, ayOffset);
+  const yil = yer.yil, ay = yer.ay;
+  const etiket = new Date(Date.UTC(yil, ay, 1)).toLocaleString('tr-TR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const bosluk = (new Date(yil, ay, 1).getDay() + 6) % 7;
+  const sonGun = new Date(yil, ay + 1, 0).getDate();
+  const onEk = yil + '-' + String(ay + 1).padStart(2, '0') + '-';
+  const hucreler = [];
+  for(let gn = 1; gn <= sonGun; gn++){
+    hucreler.push({ gunNo: gn, tarihISO: onEk + String(gn).padStart(2, '0'), disiMi: false });
+  }
+  return { yil, ay, etiket, bosluk, hucreler };
+}
+
+// Seçim toggle + sınırlar — SAF: girdi dizisi MUTASYONLANMAZ, yeni dizi
+// döner. Sıra: toggle-çıkarma (mevcut seçim hep geçerliyse çıkar) →
+// min: başlangıç (dahil) → maks: Gün 31 = başlangıç+30 (RPC v4 p_items
+// gun 1..31 alanıyla parite — bcGunNoKontrol aralığının takvim ayağı).
+// Red: { ok:false, secimler: dokunulmamış kopya, mesaj } — UI toast'lar.
+function bcTakvimSecimEkle(secimler, tarihISO, baslangicDateStr){
+  const liste = [...new Set(secimler || [])].sort();
+  if(liste.includes(tarihISO)){
+    return { ok: true, eklendi: false, secimler: liste.filter(d => d !== tarihISO), mesaj: null };
+  }
+  const basGun = _bcUtcGun(baslangicDateStr);
+  const isoGun = _bcUtcGun(tarihISO);
+  if(basGun === null) return { ok: false, eklendi: false, secimler: liste, mesaj: '⚠️ Başlangıç tarihi geçersiz' };
+  if(isoGun === null) return { ok: false, eklendi: false, secimler: liste, mesaj: '⚠️ Geçersiz tarih' };
+  if(isoGun < basGun) return { ok: false, eklendi: false, secimler: liste, mesaj: '⚠️ Başlangıç tarihinden önceki gün seçilemez' };
+  if(isoGun - basGun > 30){
+    const sonISO = new Date((basGun + 30) * 86400000).toISOString().slice(0, 10);
+    return { ok: false, eklendi: false, secimler: liste, mesaj: '⚠️ Başlangıçtan itibaren en fazla 31 gün seçilebilir (son gün: ' + bcTakvimBaslikTarihi(sonISO) + ')' };
+  }
+  return { ok: true, eklendi: true, secimler: [...liste, tarihISO].sort(), mesaj: null };
+}
+
+// Başlık tarihi 'YYYY-MM-DD' → 'DD.MM.YYYY' (TR); geçersiz → bugün.
+function bcTakvimBaslikTarihi(tarihStr){
+  const p = String(tarihStr || '').split('-').map(Number);
+  const t = (p.length === 3 && p.every(x => Number.isFinite(x))) ? p : bugun().split('-').map(Number);
+  return String(t[2]).padStart(2, '0') + '.' + String(t[1]).padStart(2, '0') + '.' + String(t[0]).padStart(4, '0');
+}
+
+// Seçim çipi 'YYYY-MM-DD' → 'DD.AA' (eski MM.AA '09.15' ters-okuması
+// kilitlenir); biçim dışı → ''.
+function bcTakvimChipEtiketi(iso){
+  const s = String(iso || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(8, 10) + '.' + s.slice(5, 7) : '';
+}
+
+// ── V2.2 DOM KATMANI (ince — yalnız saf katmanı tüketir) ──
 
 function _bcTkBaslangic(){
   return (v('bc-tarih') || '').trim() || bugun();
 }
 
 function bcTakvimAc(){
-  const p = _bcTkBaslangic().split('-').map(Number);
-  _bcTkAy = (p[1] || 1) - 1;
-  _bcTkYil = p[0] || new Date().getFullYear();
+  _bcTkOffset = 0;
   _bcTkSecili = new Set();
+  bcTakvimRender();
+}
+
+// ‹/› — tek saf giriş noktası. Eski inline `_bcTkAy--;if(_bcTkAy<0)…`
+// wrap matematiği KALDIRILDI (ay durumu tek skaler offset; yıl rollover
+// bcTakvimAyGosterim içinde). Seçim Set'i DOKUNULMAZ — ay değişince
+// seçimler kalıcı.
+function bcTakvimAyDegistir(delta){
+  _bcTkOffset += Math.trunc(Number(delta) || 0);
   bcTakvimRender();
 }
 
@@ -1277,8 +1371,8 @@ function bcTakvimRender(){
     box.onclick = e => { if (e.target === box) box.remove(); };
     document.body.appendChild(box);
   }
-  const ay = _bcTkAy, yil = _bcTkYil;
   const baslangic = _bcTkBaslangic();
+  const gosterim = bcTakvimAyGosterim(baslangic, _bcTkOffset);
   const basGun = _bcUtcGun(baslangic);
   // mevcut günlerin tarihleri mavi vurgulanır (Gün № = tarih + N−1)
   const tarihdenGun = {};
@@ -1286,15 +1380,11 @@ function bcTakvimRender(){
     const iso = dFwd(baslangic, (Number(gn.gun) || 1) - 1);
     if(iso) tarihdenGun[iso] = gn.gun;
   });
-  const ilkGun = new Date(yil, ay, 1).getDay();
-  const bosluk = (ilkGun + 6) % 7;
-  const sonGun = new Date(yil, ay + 1, 0).getDate();
-  const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
 
   let kareler = '';
-  for(let i = 0; i < bosluk; i++) kareler += '<div></div>';
-  for(let g2 = 1; g2 <= sonGun; g2++){
-    const iso = yil + '-' + String(ay + 1).padStart(2, '0') + '-' + String(g2).padStart(2, '0');
+  for(let i = 0; i < gosterim.bosluk; i++) kareler += '<div></div>';
+  for(const h of gosterim.hucreler){
+    const iso = h.tarihISO;
     const isoGun = _bcUtcGun(iso);
     const onceMi = basGun !== null && isoGun !== null && isoGun < basGun;
     const mevcutNo = tarihdenGun[iso] || null;
@@ -1304,23 +1394,23 @@ function bcTakvimRender(){
     else if(secili) stil = 'background:var(--green);color:#fff;';
     const tik = (onceMi || mevcutNo) ? '' : ' onclick="bcTakvimToggle(&#39;' + iso + '&#39;)"';
     kareler += '<div' + tik + (mevcutNo ? ' title="Gün ' + mevcutNo + ' planlı"' : '') +
-      ' style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:' + (onceMi ? 'not-allowed;opacity:.35;' : 'pointer;') + stil + '">' + g2 + '</div>';
+      ' style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:' + (onceMi ? 'not-allowed;opacity:.35;' : 'pointer;') + stil + '">' + h.gunNo + '</div>';
   }
 
   const seciliList = [..._bcTkSecili].sort();
   const seciliHtml = seciliList.length
     ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">' +
-      seciliList.map(d => '<span style="background:rgba(78,154,42,.12);border:1px solid var(--green);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;color:var(--green)">' + d.slice(5).replaceAll('-', '.') + '</span>').join('') +
+      seciliList.map(d => '<span style="background:rgba(78,154,42,.12);border:1px solid var(--green);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;color:var(--green)">' + bcTakvimChipEtiketi(d) + '</span>').join('') +
       '</div>'
     : '<div style="font-size:.75rem;color:var(--ink3);margin-bottom:10px">Tarih seçin</div>';
 
   box.innerHTML =
     '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
-    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📅 Tedavi Günleri — Takvimden Seç (başlangıç: ' + baslangic + ')</div>' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📅 Tedavi Günleri — Takvimden Seç (başlangıç: ' + bcTakvimBaslikTarihi(baslangic) + ')</div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-    '<button onclick="_bcTkAy--;if(_bcTkAy<0){_bcTkAy=11;_bcTkYil--;}bcTakvimRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
-    '<span style="font-weight:800;font-size:.9rem">' + ayAdi + '</span>' +
-    '<button onclick="_bcTkAy++;if(_bcTkAy>11){_bcTkAy=0;_bcTkYil++;}bcTakvimRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
+    '<button onclick="bcTakvimAyDegistir(-1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
+    '<span style="font-weight:800;font-size:.9rem">' + gosterim.etiket + '</span>' +
+    '<button onclick="bcTakvimAyDegistir(1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
     ['Pt', 'Sa', 'Ca', 'Pe', 'Cu', 'Ct', 'Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
@@ -1335,12 +1425,12 @@ function bcTakvimRender(){
   box.style.display = 'flex';
 }
 
+// Gün hücresi: doğrulama SAF bcTakvimSecimEkle'de (min başlangıç, maks
+// Gün 31); red → zarif toast, Set değişmez.
 function bcTakvimToggle(iso){
-  const basGun = _bcUtcGun(_bcTkBaslangic());
-  const isoGun = _bcUtcGun(iso);
-  if(basGun !== null && isoGun !== null && isoGun < basGun){ toast('⚠️ Başlangıç tarihinden önceki gün seçilemez', true); return; }
-  if(_bcTkSecili.has(iso)) _bcTkSecili.delete(iso);
-  else _bcTkSecili.add(iso);
+  const r = bcTakvimSecimEkle([..._bcTkSecili], iso, _bcTkBaslangic());
+  if(!r.ok){ toast(r.mesaj, true); return; }
+  _bcTkSecili = new Set(r.secimler);
   bcTakvimRender();
 }
 
