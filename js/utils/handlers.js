@@ -211,13 +211,23 @@ registerActions({
   'bc-disease-select':() => bcDiseaseSelect(),
   'bc-yapistir-coz':  () => bcYapistirCoz(),
   'bc-chip-sil':      (el) => bcChipCikar(el.dataset.id),
-  'bc-ilac-ara':      () => bcIlacAraFiltre(), // V1.1 — manuel ilaç arama filtresi
-  'bc-tarih-degisti': () => bcTarihIpucuGuncelle(), // V1.2 — plan tarihi ipucu
+  'bc-tarih-degisti': () => { bcTarihIpucuGuncelle(); bcPlanRender(); }, // V1.2 ipucu + V2.1 başlık tarihleri (Gün N = tarih+N−1)
   'bc-tohum-saat-chip': (el) => { const i = g('bc-tohum-saat'); if (i) i.value = el.dataset.t; }, // V1.2 — hızlı saat çipi
-  'bc-gun-ekle':      () => bcGunEkle(),                          // V2 — gün planına gün ekle
-  'bc-gun-sil':       () => bcGunSil(),                           // V2 — aktif günü sil (ordinal renumber)
-  'bc-gun-sec':       (el) => bcGunSec(Number(el.dataset.gun)),   // V2 — gün sekmesi seç (data-gun)
-  'bc-gun-saat':      (el) => bcGunSaatDegisti(el),               // V2 — aktif günün varsayılan saati
+  // V2.1 — gün kartları + seans-grup dili
+  'bc-gun-ekle-menu': () => bcGunEkleMenuToggle(),                             // [+ Gün ▾] menüsü
+  'bc-gun-ekle-bos':  () => { bcGunEkleMenuKapat(); bcGunEkleBos(); },         // ＋ Boş gün (sıradaki №)
+  'bc-gun-ekle-kopya':() => { bcGunEkleMenuKapat(); bcGunEkleOncekiGunden(); },// 📋 Önceki günden
+  'bc-gun-ekle-takvim':() => { bcGunEkleMenuKapat(); bcTakvimAc(); },          // 📅 Takvimden (bc-gun-takvim)
+  'bc-gun-toggle':    (el) => bcGunToggle(Number(el.dataset.gun)),             // gün kartı aç/kapa
+  'bc-gun-sil':       (el) => bcGunSil(Number(el.dataset.gun)),                // günü sil (diğer № korunur)
+  'bc-gun-no':        (el) => bcGunNoDegisti(el),                              // Başlangıçtan gün № (doğrula+sırala)
+  'bc-gun-kopyala':   (el) => bcGunKopyalaUygula(Number(el.dataset.gun)),      // 📋 Günü Kopyala → Uygula
+  'bc-seans-form-ac': (el) => bcSeansFormAc(Number(el.dataset.gun)),           // ＋ Bu güne seans ekle (katlı form)
+  'bc-seans-ekle':    (el) => bcSeansEkle(Number(el.dataset.gun)),             // [Seansı Ekle] (form açık kalır)
+  'bc-seans-vazgec':  () => bcSeansVazgec(),
+  'bc-seans-sil':     (el) => bcSeansSil(Number(el.dataset.gun), Number(el.dataset.si)),
+  'bc-kalem-sil':     (el) => bcKalemSil(Number(el.dataset.gun), Number(el.dataset.si), el.dataset.id),
+  'bc-saat-chip':     (el) => bcSeansSaatChip(el.dataset.t, el),               // HIZLI_SAATLER çipi (seans formu)
   'submit-bulk-case': (el) => submitBulkCase(el),
 
   // ═══ AŞI ═══

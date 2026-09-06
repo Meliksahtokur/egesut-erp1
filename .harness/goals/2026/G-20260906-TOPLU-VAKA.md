@@ -1,6 +1,6 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: review
+status: active
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
@@ -50,6 +50,7 @@ acceptance:
   - Manual drug path E2E: bulk case + day-1 drug_administrations per animal verified in demo.
   - V1.2 E2E: future-dated bulk case (şablon or manuel) anchors days+tohumlama to planned date; male/young animals' tohumlama skipped with exact reasons in demo.
   - V2 E2E: multi-day bulk plan anchors each day to start_date+(n-1) with per-day/per-kalem times verified in demo.
+  - V2.1 E2E: gapped multi-day plan (e.g. gün 1+5) with two sessions on one day and a day-copy, verified in demo.
   - Root reviews the diff; merge and push happen only after owner approval; PROD migration happens only after separate owner approval.
 stop_conditions:
   - Live schema materially contradicts ground-truth assumptions before implementation (create_case, tedavi_sablon_uygula, or _tohumlama_gorev_uygunluk drift).
@@ -298,3 +299,46 @@ array shape is no longer accepted and fails day validation fail-fast
 deployed to PROD). Everything else unchanged: mutual exclusion, `p_tarih`
 anchor (past blocked), tohumlama branch, cap 200, dedupe, atlanan/hatalar,
 şablon pg_proc guard, NOTIFY pgrst, GRANTs. UI half: parallel worker W10.
+
+**V2.1 amendment (owner brainstorm 2026-09-06):** the bulk plan editor
+(W10's sequential day-tabs + day-saat + flat per-day drug list) is REBUILT
+into the m-sablon builder + seans planner language — UI only, engine and
+RPC untouched (V2 `p_items` day-keyed contract is consumed as-is; day-level
+`saat` is simply no longer sent and each kalem ALWAYS carries
+`saat = <seans saati>`, which the existing kalem-level precedence already
+supports — zero migration in V2.1). Owner-approved design (three "İKİSİ
+BİRDEN" decisions):
+1. Gün girişi = SAYI inputu + TAKVİM ikisi birden: each day card carries a
+   "Başlangıçtan gün" number input (1..31, user-chosen — GAPPED plans like
+   gün 1+5 are valid; unique-check toast 'Aynı gün zaten var; seansları o
+   günün altında toplayın' + revert; ASC re-sort; delete PRESERVES other
+   day numbers) plus a `[+ Gün ▾]` menu with `📅 Takvimden` (bc-gun-takvim,
+   a variant of the case-detail gun-tarih-modal: only dates ≥ bc-tarih
+   selectable → 'Başlangıçtan tarihinden önceki gün seçilemez'; existing
+   day dates pre-highlighted; Onayla adds days with the seans form open).
+   Card headers show the computed date `Gün N · <DD Ay>` (bc-tarih + N−1),
+   re-rendered on any gün/tarih change.
+2. Seans = SAAT-GRUP dili: per day, MULTIPLE sessions each with its own
+   saat ('⏰ Seans · SS:DD'); the inline `＋ Bu güne seans ekle` form
+   (collapsed by default) copies sablonSeansAc/caseSeansEkleFormAc: saat
+   input (default 09:00) + HIZLI_SAATLER chips + grouped drug checkbox
+   list (stock coloring) + dose rows + [Seansı Ekle]; validates saat and
+   doz/birim per checked drug, appends the session, resets saat, STAYS
+   OPEN (the exact 'seans A + seans B' interaction; same drug in multiple
+   sessions is allowed). Old day-level `bc-gun-saat` input REMOVED.
+3. Gün kopyalama = BUTON + EKLERKEN-KOPYALA ikisi birden: card footer
+   `📋 Günü Kopyala → Gün № [<input>] [Uygula]` (creates the target day if
+   missing, REPLACES its sessions otherwise; toast 'Gün N → Gün M
+   kopyalandı (oluşturuldu / değiştirildi)') AND `[+ Gün ▾] → 📋 Önceki
+   günden` (new next day seeded from the open/last day). Pure core:
+   bcGunKopyala. State: `window._bcGunler = [{gun, seanslar: [{saat,
+   ilaclar: {drugId: {name, dose, unit, route, legacy, stock_id}}}]}]`,
+   `window._bcAktifGunCard` (collapse), `_bcSeansFormGun` (open form);
+   validation in bcGunlardenItems v2: per-session saat regex, kalem errors
+   prefixed 'Gün N (<saat>): ', zero-session day (>1st, when any kalem
+   exists) → 'Gün N: en az bir seans ekleyin ya da günü silin', ALL days
+   empty → items:[] (drug-free case unchanged); submitBulkCase flow and
+   the 'N gün · M ilaç' result text unchanged; şablon↔kalem mutual
+   exclusion now snaps/clears across ALL days' sessions. W10 unit tests
+   adapted deliberately (documented in tests/unit/vaka-toplu-ac.test.js
+   header: seans-state toplama, gün № koruma, buton etiketi).

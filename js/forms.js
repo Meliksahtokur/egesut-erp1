@@ -667,15 +667,14 @@ async function submitCase(btn) {
 //   globalThis._bcHayvanlar     → [{id, kupe}] — chip listesi (id dedupe'lu)
 //   globalThis._bcSeciliSablonId→ string|null  — bc-sablon-list radio seçimi
 //
-// V2 çoklu gün plan editörü state'i:
-//   globalThis._bcGunler  → [{gun, saat, secili}] — gün planı. 'gun' = ordinal
-//     1..N (kullanıcı seçimi DEĞİL; ekleme sona, silme sonrası yeniden
-//     numaralama — RPC v4 p_items 'gun' alanı = ordinal). 'saat' = gün
-//     varsayılan saati (boşsa sunucu 09:00). 'secili' = drugId →
-//     {name, dose, unit, route, saat, legacy, stock_id}.
-//   globalThis._bcAktifGun → number — aktif gün ordinal'ı (sekme vurgusu;
-//     DOM checkbox/doz satırları yalnız AKTİF günü taşır, sekme değişiminde
-//     _bcHarvestAktifGun() ile state'e yazılır).
+// V2.1 çoklu gün plan editörü state'i (gün kartları + seans-grup dili):
+//   globalThis._bcGunler → [{gun, seanslar}] — 'gun' KULLANICI SEÇİMİDİR
+//     (boşluklu plan 1,5 geçerli; 1..31; silme diğer № KORUR). Dizi ASC
+//     sıralı. seanslar: [{saat:'HH:MM', ilaclar:{<drugId>:{name, dose,
+//     unit, route, legacy, stock_id}}}] — kalem [Seansı Ekle] onayıyla
+//     yazılır (draft değil). Detay: plan bölümü başındaki sözleşme.
+//   globalThis._bcAktifGunCard → number|null (açık gün kartı)
+//   globalThis._bcSeansFormGun → number|null (açık '＋ seans ekle' formu)
 function _bcKupeGoster(h){ return h.kupe_no || h.devlet_kupe || h.id; }
 
 // m-bulk-case açılış yükleyicisi — openM hook'u ve 'open-bulk-case' aksiyonu çağırır.
@@ -684,9 +683,12 @@ function _bcKupeGoster(h){ return h.kupe_no || h.devlet_kupe || h.id; }
 async function loadBulkCaseForm(){
   globalThis._bcHayvanlar = [];
   globalThis._bcSeciliSablonId = null;
-  // V2 — gün plan editörü sıfırlama: tek gün, gün saati boş, seçimler temiz
-  globalThis._bcGunler = [{ gun: 1, saat: '', secili: {} }];
-  globalThis._bcAktifGun = 1;
+  // V2.1 — gün kartları sıfırlama: TEK gün (№ 1, seanssız); gün 1'in
+  // '＋ Bu güne seans ekle' formu AÇIK gelir. Gün № kullanıcı seçimidir;
+  // başlık tarihleri bc-tarih'ten hesaplanır (bcPlanRender).
+  globalThis._bcGunler = [{ gun: 1, seanslar: [] }];
+  globalThis._bcAktifGunCard = 1;
+  globalThis._bcSeansFormGun = 1;
   cl('bc-hid'); cl('bc-yapistir'); cl('bc-notes');
   const ac = g('ac-bchid'); if(ac) ac.style.display='none';
   const catEl = g('bc-disease-cat'); if(catEl){ catEl.textContent=''; catEl.style.display='none'; }
@@ -694,11 +696,7 @@ async function loadBulkCaseForm(){
   const sl = g('bc-sablon-list'); if(sl) sl.innerHTML='';
   const hn = g('bc-bulunamayan'); if(hn){ hn.textContent=''; hn.style.display='none'; }
   const sonuc = g('bc-sonuc'); if(sonuc){ sonuc.innerHTML=''; sonuc.style.display='none'; }
-  // V1.1/V2 manuel ilaç sıfırlama: arama + doz satırları + gün saati temiz;
-  // doz alanı (gün sekmeleri) V2'den beri daima görünür.
-  const ara = g('bc-ilac-ara'); if(ara) ara.value = '';
-  const dozSatirlar = g('bc-ilac-doz-satirlar'); if(dozSatirlar) dozSatirlar.innerHTML = '';
-  const gunSaatInp = g('bc-gun-saat'); if(gunSaatInp) gunSaatInp.value = '';
+  const menu = g('bc-gun-ekle-menu'); if(menu) menu.style.display = 'none';
   // V1.2 — tarih + tohumlama sıfırlama: tarih bugün (min bugün — geçmiş seçilemez),
   // saat 08:00, gün 0, kutu kapalı; blok DURUMU (disabled/aktif) bcChipsRender'da kurulur.
   const tEl = g('bc-tarih');
@@ -708,8 +706,8 @@ async function loadBulkCaseForm(){
   const tohumChkEl = g('bc-tohum'); if(tohumChkEl) tohumChkEl.checked = false;
   bcTohumSaatChipsRender();
   bcTarihIpucuGuncelle();
-  await bcIlacListesiRender();
-  bcGunSekmeRender();
+  if(!(_drugsCache && _drugsCache.length)){ try { await loadDrugsCache(); } catch(_) {} }
+  bcPlanRender(); // gün kartları + açık seans formu (ilaç listesi dahil)
   bcChipsRender();
   bcButonEtiketi();
   const sel = g('bc-disease-id');
@@ -931,245 +929,576 @@ function bcTohumSaatChipsRender(){
   ).join('');
 }
 
-// ── TOPLU VAKA MANUEL İLAÇ (V1.1 → V2 çoklu gün plan editörü) ────────
-// Vaka detayındaki KANITLANMIŞ cdf-chk dili (caseDrugFormAc/cdfChkChange,
-// ui.js) toplu modal'a kopyalanır: gruplu checkbox ilaç listesi + ilaç başına
-// doz satırı — artık GÜN BAŞINA (m-sablon builder dili: gün sekmeleri + gün
-// saati + per-kalem saat). Şablonla KARŞILIKLI DIŞLAYICI: herhangi bir günde
-// ilaç seçilince şablon Şablonsuz'a döner, şablon seçilince TÜM günlerin
-// seçimi temizlenir.
+// ── TOPLU VAKA MANUEL TEDAVİ PLANI (V1.1 → V2.1 GÜN KARTLARI) ─────────
+// V2.1 (sahibe beyin fırtınası, 2026-09-06): plan editörü m-sablon builder
+// + seans planlayıcı diline taşındı — ÜST ÜSTE KATLANABİLİR GÜN KARTLARI
+// (boşluklu "Başlangıçtan gün" № girişi + takvimden gün ekleme) ve SEANS
+// GRUP DİLİ (bir günde çoklu seans; her seansın kendi saati; aynı ilaç
+// farklı seanslarda geçerli). Eski gün sekmeleri + gün saati + düz ilaç
+// listesi KALDIRILDI; ilaç seçimi artık her gün kartının içindeki
+// "＋ Bu güne seans ekle" formunda (caseSeansEkleFormAc/sablonSeansAc
+// dili: saat girişi + HIZLI_SAATLER çipleri + gruplu cdf-chk listesi +
+// doz satırları + [Seansı Ekle]; form AÇIK kalır — seans A/B akışı).
+// Gün kopyalama İKİSİ BİRDEN: [+ Gün ▾] → 'Önceki günden' menü öğesi ve
+// kart altı '📋 Günü Kopyala → Gün № [Uygula]'.
 //
-// RPC v4 sözleşmesi (W9): vaka_toplu_ac(p_animal_ids, p_disease_id, p_items,
-// p_sablon_id, p_notes, p_tarih, p_tohumlama, p_tohumlama_gun_offset,
-// p_tohumlama_saat) — p_items GÜN-KEYED: [{gun: 1..31, saat?: "HH:MM",
-// kalemler: [{drug_product_id, stok_id, dose>0, unit, route?, saat?}]}].
-// planned_time önceliği sunucuda: kalem.saat > gün.saat > '09:00'. Gün N,
-// start_date+(N-1) çapasına oturur; engine gün gün çalışır (kısmi başarı:
-// hatalı gün önceki günleri bozmaz). p_items ile p_sablon_id birbirini dışlar
-// (sunucu da korur). acilan[i].manuel = {gun_sayisi, seans_sayisi}.
+// Plan state:
+//   globalThis._bcGunler → [{gun: <int 1..31>, seanslar: [{saat:'HH:MM',
+//     ilaclar: {<drugId>: {name, dose, unit, route, legacy, stock_id}}}]}]
+//   — 'gun' ARTIK KULLANICI SEÇİMİDİR (boşluklu plan 1,5 geçerli —
+//   m-sablon builder offset dilinin bc uyarlaması; silme DİĞER
+//   numaraları KORUR, renumber yok). Dizi ASC sıralı tutulur; kalem
+//   [Seansı Ekle] onayıyla state'e yazılır (draft değil).
+//   globalThis._bcAktifGunCard → number|null (açık gün kartı)
+//   globalThis._bcSeansFormGun → number|null (açık "＋ seans ekle" formu)
+//
+// RPC v4 sözleşmesi DEVAM (gün-keyed p_items) ama saat düzlemi değişti:
+//   [{gun: 1..31, kalemler: [{drug_product_id, stok_id, dose>0, unit,
+//   route?, saat}]}] — kalem.saat HER ZAMAN seans saatidir (aynı ilacın
+//   A/B seansları sunucuda ayrı planned_time'lı uygulamalara düşer);
+//   gün-düzlemi 'saat' alanı GÖNDERİLMEZ. p_items ile p_sablon_id
+//   birbirini dışlar (karşılıklı dışlama UI'da birebir korunur).
+// acilan[i].manuel = {gun_sayisi, seans_sayisi} — submit akışı değişmedi.
 
-// Gruplu ilaç listesini bc-ilac-liste'ye çizer — caseDrugFormAc ui.js:6398-6421
-// ile birebir aynı dil (grup başlığı, checkbox + ad + etken madde + stok renkli
-// kalan). _drugsCache boşsa loadDrugsCache ile doldurulur (seans formu önceli).
-async function bcIlacListesiRender(){
-  const liste = g('bc-ilac-liste');
-  if(!liste) return;
-  if(!(_drugsCache && _drugsCache.length)){ try { await loadDrugsCache(); } catch(_) {} }
-  const cache = _drugsCache || [];
-  const groups = {};
-  [...cache].sort((a,b) => a.name.localeCompare(b.name,'tr')).forEach(d => {
-    const grp = d.group_name || 'Diger';
-    if(!groups[grp]) groups[grp] = [];
-    groups[grp].push(d);
-  });
-  const groupHtml = Object.keys(groups).sort((a,b)=>a.localeCompare(b,'tr',{sensitivity:'base'})).map(grp => {
-    const items = groups[grp].map(d => {
-      const stokClrPos = d.guncel <= 0 ? 'var(--red)' : d.guncel <= 10 ? 'var(--amber)' : 'var(--green)';
-      const stokClr = d.guncel === null ? 'var(--ink3)' : stokClrPos;
-      const stokTxt = d.guncel !== null ? d.guncel.toFixed(1)+' '+d.birim : 'stok yok';
-      const nm = d.name.replace(/"/g,'&quot;');
-      const rt = (d.default_route||'IM').split(' ')[0];
-      // V2 — işaret durumu AKTİF günün secili state'inden okunur (sekme
-      // değişiminde liste yeniden kurulur)
-      const gun = _bcAktifGunObj();
-      const checkedAttr = (gun && gun.secili && gun.secili[d.id]) ? ' checked' : '';
-      return '<label class="bc-ilac-satir" style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">'+
-        '<input type="checkbox" class="bc-ichk" data-id="'+d.id+'" data-name="'+nm+'" data-unit="'+(d.default_unit||d.birim||'ml')+'" data-route="'+rt+'" data-legacy="'+(d._legacy||false)+'"'+checkedAttr+
-        ' onchange="bcIlacChkChange(this)" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">'+
-        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600;color:var(--ink)">'+d.name+'</div>'+
-        (d.active_ingredient ? '<div style="font-size:.65rem;color:var(--ink3)">'+d.active_ingredient+'</div>' : '')+
-        '</div><span style="font-size:.72rem;font-weight:700;color:'+stokClr+';flex-shrink:0">'+stokTxt+'</span></label>';
-    }).join('');
-    return '<div class="bc-ilac-grup" style="margin-bottom:8px"><div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding:3px 0;border-bottom:1px solid var(--card3)">'+grp+'</div>'+items+'</div>';
-  }).join('');
-  liste.innerHTML = groupHtml || '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Stokta ilaç yok</div>';
-  bcIlacAraFiltre();
+// ═══ V2.1 SAF BİRİMLER (DOM'suz — vaka-toplu-ac.test.js yeşil kilidi) ═══
+
+// Gün № düzenleme doğrulaması: tam sayı 1..31 + mevcut başka günle
+// çakışmama (gi = düzenlenen günün index'i — kendisiyle çakışma sayılmaz).
+// Başarısızlık mesajları builder diliyle birebir: aralık + teklik.
+function bcGunNoKontrol(gunler, gi, yeniGun){
+  const n = Number(yeniGun);
+  if(!Number.isInteger(n) || n < 1 || n > 31) return { ok: false, mesaj: 'Gün 1-31 aralığında bir tam sayı olmalı' };
+  if((gunler || []).some((g, i) => i !== gi && g.gun === n)) return { ok: false, mesaj: 'Aynı gün zaten var; seansları o günün altında toplayın' };
+  return { ok: true, mesaj: null };
 }
 
-// bc-ilac-ara arama filtresi — trLower includes; eşleşmeyen satır gizlenir,
-// tamamen boşalan grup başlığı da gizlenir.
-function bcIlacAraFiltre(){
-  const liste = g('bc-ilac-liste'); if(!liste) return;
-  const q = trLower((v('bc-ilac-ara')||'').trim());
-  liste.querySelectorAll('.bc-ilac-satir').forEach(lbl => {
-    const m = !q || trLower(lbl.textContent||'').includes(q);
-    lbl.style.display = m ? 'flex' : 'none';
-  });
-  [...liste.children].forEach(grp => {
-    if(!grp.querySelector || !grp.querySelector('.bc-ilac-satir')) return;
-    const anyVisible = [...grp.querySelectorAll('.bc-ilac-satir')].some(l => l.style.display !== 'none');
-    grp.style.display = anyVisible ? '' : 'none';
-  });
+// Gün kopyalama saf özü: kaynak günün seanslarını hedefe kopyalar. Hedef
+// VARSa seanslarını DEĞİŞTİRİR (olusturuldu:false), YOKSA oluşturur
+// (true). Sonuç ASC sıralı YENİ dizidir — girdi MUTASYONLANMAZ, seanslar
+// deep-copy'dir. Geçersiz girdi (kaynak yok / hedef===kaynak / hedef
+// 1..31 dışı) → null. Boş seanslı kaynak da kopyalanır (saf semantiği
+// total; boş-kaynak UI politikası bcGunKopyalaUygula'da).
+function bcGunKopyala(gunler, kaynakGun, hedefGun){
+  const liste = gunler || [];
+  const src = liste.find(g => g.gun === kaynakGun);
+  const hedef = Number(hedefGun);
+  if(!src || !Number.isInteger(hedef) || hedef < 1 || hedef > 31 || hedef === kaynakGun) return null;
+  const seanslar = JSON.parse(JSON.stringify(src.seanslar || []));
+  const olusturuldu = !liste.some(g => g.gun === hedef);
+  const yeni = liste
+    .filter(g => g.gun !== hedef)
+    .concat([{ gun: hedef, seanslar }])
+    .sort((a, b) => a.gun - b.gun);
+  return { gunler: yeni, olusturuldu };
 }
 
-// ── V2 GÜN SEKMELERİ — m-sablon builder dili (sablonGunEkle/Sil/Toggle aynası).
-// Gün numaraları ordinal: ekleme sona ekler, silme sonrası 1..N yeniden
-// numaralanır; RPC v4 p_items 'gun' alanı bu ordinal'ı taşır (Gün N =
-// start_date+(N-1) çapası sunucuda).
-
-// Aktif gün state objesi — _bcGunler içinden _bcAktifGun ordinal'ıyla bulunur.
-function _bcAktifGunObj(){
-  return (globalThis._bcGunler || []).find(gn => gn.gun === globalThis._bcAktifGun) || null;
+// Takvimden gün ekleme saf özü: ISO tarih listesini başlangıç tarihine
+// göre gün numaralarına çevirir. Başlangıçtan ÖNCEKİ tarihler
+// filtrelenir; dedupe + ASC; gün = UTC gün farkı + 1. Başlangıç
+// geçersizse [] (TZ-safe aritmetik — _bcUtcGun ile, new Date(string) yok).
+function bcTakvimdenGunler(dates, startDateStr){
+  const bas = _bcUtcGun(startDateStr);
+  if(bas === null) return [];
+  return [...new Set(dates || [])]
+    .map(d => ({ d, g: _bcUtcGun(d) }))
+    .filter(x => x.g !== null && x.g >= bas)
+    .sort((a, b) => a.g - b.g)
+    .map(x => x.g - bas + 1);
 }
 
-// Aktif günün DOM doz satırlarını state'e yazar (sekme değişimi/collect öncesi
-// hasat — doz/birim/yol/saat girişleri statik input'tur, anlık senkron yok;
-// bc-irow girişlerinin V1.1'den beri izlediği deseni sürdürür).
-function _bcHarvestAktifGun(){
-  const gun = _bcAktifGunObj();
-  if(!gun) return;
-  gun.secili = gun.secili || {};
-  document.querySelectorAll('.bc-ichk:checked').forEach(chk => {
-    const id = chk.dataset.id;
-    const s = gun.secili[id];
-    if(!s) return;
-    const dozInp  = g('bc-idoz-' + id);
-    const unitInp = g('bc-iunit-' + id);
-    const rotInp  = g('bc-irot-' + id);
-    const saatInp = g('bc-isaat-' + id + '-g' + gun.gun);
-    if(dozInp)  s.dose  = dozInp.value;
-    if(unitInp) s.unit  = unitInp.value;
-    if(rotInp)  s.route = rotInp.value;
-    if(saatInp) s.saat  = saatInp.value;
-  });
+// Gün kartı başlık tarihi: bc-tarih + (gun-1) → 'GG AyUzun'. bc-tarih
+// boşsa bugün (NULL=bugün sunucu kararıyla paralel). UTC aritmetik.
+function _bcGunTarihEtiketi(gun, tarihStr){
+  const p = String(tarihStr || '').split('-').map(Number);
+  const bas = (p.length === 3 && p.every(x => Number.isFinite(x))) ? p : bugun().split('-').map(Number);
+  const d = new Date(Date.UTC(bas[0], bas[1] - 1, bas[2] + (Number(gun) || 1) - 1));
+  return String(d.getUTCDate()).padStart(2, '0') + ' ' + d.toLocaleString('tr-TR', { month: 'long', timeZone: 'UTC' });
 }
 
-// Gün sekmesi çipleri (bc-gun-sekme): .ek-chip/.aktif dili, aktif gün vurgulu;
-// günde kaç ilaç seçili olduğu rozetlenir. − Gün düğmesi yalnız >1 günde
-// görünür (tek gün silinemez).
-function bcGunSekmeRender(){
-  const kutu = g('bc-gun-sekme');
+// ═══ V2.1 GÜN KARTLARI — RENDER (m-sablon builder _renderSablonBuilder
+// dili: üst üste katlanabilir kartlar, son kart açık) ═══
+
+// Planı bc-plan-gunler'e çizer. Başlık tarihleri bc-tarih'ten HESAPLANIR
+// (Gün N = tarih + N−1) — tarih veya gün № her değiştiğinde yeniden çizilir.
+function bcPlanRender(){
+  const kutu = g('bc-plan-gunler');
   if(!kutu) return;
   const gunler = globalThis._bcGunler || [];
-  kutu.innerHTML = gunler.map((gn, i) => {
-    const n = i + 1;
-    const sayi = Object.keys(gn.secili || {}).length;
-    const aktifMi = n === globalThis._bcAktifGun;
-    return '<button type="button" class="ek-chip' + (aktifMi ? ' aktif' : '') + '"' +
-      ' data-action="bc-gun-sec" data-gun="' + n + '">Gün ' + n +
-      (sayi ? ' · ' + sayi : '') + '</button>';
-  }).join('');
-  const sil = g('bc-gun-sil');
-  if(sil) sil.style.display = gunler.length > 1 ? '' : 'none';
-}
-
-// Sekme seçimi: mevcut gün hasat edilir, aktif ordinal değişir, liste + doz
-// satırları + sekme çipleri + gün saati girişi aktif güne göre yeniden kurulur.
-function bcGunSec(gunNo){
-  const gunler = globalThis._bcGunler || [];
-  const n = Number(gunNo);
-  if(!gunler.some((_, i) => i + 1 === n)) return;
-  _bcHarvestAktifGun();
-  globalThis._bcAktifGun = n;
-  const gun = gunler[n - 1];
-  const saatInp = g('bc-gun-saat');
-  if(saatInp) saatInp.value = gun.saat || '';
-  bcIlacListesiRender();
-  bcDozSatirlariRender();
-  bcGunSekmeRender();
+  const tarihStr = (v('bc-tarih') || '').trim() || bugun();
+  kutu.innerHTML = gunler.map(gn => _bcGunKartiHtml(gn, tarihStr)).join('');
   bcButonEtiketi();
 }
 
-// ＋ Gün: sona yeni boş gün (ordinal). 31 gün üst sınırı (RPC 1..31 aralığı).
-function bcGunEkle(){
+// Tek gün kartı html'i — başlık '▾/▸ Gün N · GG Ay' + seans sayacı + 🗑
+// (silme diğer gün № KORUR); gövdede 'Başlangıçtan gün' № girişi
+// (bc-gno-<gun>, 1..31), seans blokları (⏰ Seans · SS:DD + kalem satırları),
+// katlı '＋ Bu güne seans ekle' formu ve '📋 Günü Kopyala → Gün №' şeridi.
+function _bcGunKartiHtml(gn, tarihStr){
+  const gun = gn.gun;
+  const seanslar = gn.seanslar || [];
+  const ilacSayi = seanslar.reduce((n, s) => n + Object.keys(s.ilaclar || {}).length, 0);
+  const acik = globalThis._bcAktifGunCard === gun;
+  return `
+  <div style="margin:6px 0;padding:8px 10px;background:var(--card);border:1px solid var(--card3);border-radius:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-action="bc-gun-toggle" data-gun="${gun}">
+      <strong style="font-size:.82rem">${acik ? '▾' : '▸'} Gün ${gun} · ${escAttr(_bcGunTarihEtiketi(gun, tarihStr))}</strong>
+      <span style="font-size:.72rem;color:var(--ink2);display:flex;align-items:center;gap:2px">
+        <span id="bc-gsayac-${gun}">${seanslar.length} seans · ${ilacSayi} ilaç</span>
+        <button type="button" data-action="bc-gun-sil" data-gun="${gun}" title="Günü sil (diğer gün numaraları korunur)" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button>
+      </span>
+    </div>
+    <div id="bc-ggovde-${gun}" style="display:${acik ? 'block' : 'none'};margin-top:6px">
+      <label style="display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--ink2);margin:4px 0 7px">Başlangıçtan gün
+        <input id="bc-gno-${gun}" class="fi" type="number" min="1" max="31" step="1" value="${gun}" data-change="bc-gun-no" data-gun="${gun}" style="width:75px;margin:0;padding:5px 7px"></label>
+      <div id="bc-gseanslar-${gun}">${_bcSeansHtml(gn)}</div>
+      <button type="button" class="btn-sm" data-action="bc-seans-form-ac" data-gun="${gun}" style="margin-top:4px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(42,107,181,.1);color:var(--blue);border:1px dashed rgba(42,107,181,.4);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne seans ekle</button>
+      <div id="bc-gseansform-${gun}">${globalThis._bcSeansFormGun === gun ? _bcSeansFormHtml(gun) : ''}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:7px;border-top:1px solid var(--card3);font-size:.74rem;color:var(--ink2);flex-wrap:wrap">
+        📋 Günü Kopyala → Gün №
+        <input id="bc-gkopya-${gun}" class="fi" type="number" min="1" max="31" placeholder="örn. ${gun + 1}" style="width:74px;margin:0;padding:4px 7px">
+        <button type="button" class="btn-sm" data-action="bc-gun-kopyala" data-gun="${gun}" style="font-weight:700;padding:6px 11px;background:rgba(78,154,42,.12);color:var(--green);border:1px solid rgba(78,154,42,.35);border-radius:7px;cursor:pointer">Uygula</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Bir günün seans blokları — '⏰ Seans · SS:DD' başlığı + 🗑 seans; kalem
+// satırları '💊 <ad> <doz> <birim> · <yol> 🗑'. Aynı ilaç farklı seanslarda
+// (farklı saat) GEÇERLİ — saat-grup dilinin özü.
+function _bcSeansHtml(gn){
+  const gun = gn.gun;
+  return (gn.seanslar || []).map((s, si) => `
+    <div style="border:1px solid var(--card3);border-radius:8px;padding:6px 8px;margin-bottom:5px;background:var(--card2)">
+      <div style="display:flex;align-items:center;gap:8px">
+        <strong style="font-size:.78rem;color:var(--ink2)">⏰ Seans · ${escAttr(s.saat)}</strong>
+        <button type="button" data-action="bc-seans-sil" data-gun="${gun}" data-si="${si}" title="Seansı sil" style="margin-left:auto;background:none;border:none;color:var(--red);cursor:pointer">🗑️</button>
+      </div>
+      ${(s.ilaclar && Object.keys(s.ilaclar).length) ? Object.keys(s.ilaclar).map(id => {
+        const k = s.ilaclar[id] || {};
+        return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 6px;font-size:.78rem">
+          <span style="flex:1">💊 ${escAttr(k.name || id)} <span style="color:var(--ink3);font-size:.7rem">${escAttr(k.dose)} ${escAttr(k.unit)}${k.route ? ' · ' + escAttr(k.route) : ''}</span></span>
+          <button type="button" data-action="bc-kalem-sil" data-gun="${gun}" data-si="${si}" data-id="${escAttr(id)}" title="Kalemi çıkar" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button>
+        </div>`;
+      }).join('') : '<div style="font-size:.72rem;color:var(--ink3);padding:2px 0 2px 6px">Bu seansta ilaç yok</div>'}
+    </div>`).join('');
+}
+
+// Cerrahi tazeleme: [Seansı Ekle] sonrası KARTI baştan kurmadan seans
+// listesini + başlık sayacını günceller — açık seans formunun draft'ı
+// (işaretli kutular + doz girişleri) KORUNUR, yalnız saat sıfırlanır
+// (seans A → saat değiştir → seans B akışı).
+function _bcSeanslariCiz(gun){
+  const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
+  const kutu = g('bc-gseanslar-' + gun);
+  if(!gunObj || !kutu) return;
+  kutu.innerHTML = _bcSeansHtml(gunObj);
+  const seanslar = gunObj.seanslar || [];
+  const ilacSayi = seanslar.reduce((n, s) => n + Object.keys(s.ilaclar || {}).length, 0);
+  const sayac = g('bc-gsayac-' + gun);
+  if(sayac) sayac.textContent = seanslar.length + ' seans · ' + ilacSayi + ' ilaç';
+}
+
+// Katlı '＋ seans ekle' formu — sablonSeansAc/caseSeansEkleFormAc dili:
+// saat girişi (varsayılan 09:00) + HIZLI_SAATLER çipleri + gruplu ilaç
+// checkbox listesi + doz satırları + [Seansı Ekle]/Vazgeç.
+function _bcSeansFormHtml(gun){
+  const saatler = (typeof HIZLI_SAATLER !== 'undefined' && HIZLI_SAATLER) || ['08:00', '16:00', '20:00'];
+  const chips = saatler.map(t => `<button type="button" class="ek-chip" data-action="bc-saat-chip" data-t="${t}">${t}</button>`).join('');
+  return `
+  <div style="border:1px dashed var(--card3);border-radius:10px;padding:10px;margin-top:6px;background:var(--card2)">
+    <div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">⏰ Yeni Seans — Saat</div>
+    <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <input id="bc-gsaat" class="fi" type="time" value="09:00" style="margin:0;flex:1;min-width:100px">${chips}
+    </div>
+    <div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">İlaç Seç (çoklu — bu saatte uygulanacak)</div>
+    <div style="max-height:200px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;margin-bottom:8px;border:1px solid var(--card3)">${_bcSeansDrugGruplariHtml()}</div>
+    <div id="bc-sdoz-alani" style="display:none">
+      <div style="font-size:.62rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Seçili İlaçlar — Doz Gir</div>
+      <div id="bc-sdoz-satirlar"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+      <button type="button" class="btn-sm" data-action="bc-seans-ekle" data-gun="${gun}" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:9px;font-weight:700;cursor:pointer">＋ Seansı Ekle</button>
+      <button type="button" class="btn-sm" data-action="bc-seans-vazgec" style="background:var(--card3);border:none;border-radius:7px;padding:9px;cursor:pointer">Vazgeç</button>
+    </div>
+  </div>`;
+}
+
+// Seans formunun gruplu ilaç listesi — bcIlacListesiRender dilinin
+// (caseDrugFormAc aynası) seans formu uyarlaması: bc-schk checkbox'ları,
+// stok renkli kalan, etken madde satırı.
+function _bcSeansDrugGruplariHtml(){
+  const cache = _drugsCache || [];
+  const groups = {};
+  [...cache].sort((a, b) => a.name.localeCompare(b.name, 'tr')).forEach(d => {
+    const grp = d.group_name || 'Diger';
+    (groups[grp] = groups[grp] || []).push(d);
+  });
+  return Object.keys(groups).sort((a, b) => a.localeCompare(b, 'tr', { sensitivity: 'base' })).map(grp => {
+    const items = groups[grp].map(d => {
+      const stokClrPos = d.guncel <= 0 ? 'var(--red)' : d.guncel <= 10 ? 'var(--amber)' : 'var(--green)';
+      const stokClr = d.guncel === null ? 'var(--ink3)' : stokClrPos;
+      const stokTxt = d.guncel !== null ? d.guncel.toFixed(1) + ' ' + d.birim : 'stok yok';
+      const nm = d.name.replace(/"/g, '&quot;');
+      const rt = (d.default_route || 'IM').split(' ')[0];
+      return '<label class="bc-ilac-satir" style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer">' +
+        '<input type="checkbox" class="bc-schk" data-id="' + d.id + '" data-name="' + nm + '" data-unit="' + (d.default_unit || d.birim || 'ml') + '" data-route="' + rt + '" data-legacy="' + (d._legacy || false) + '"' +
+        ' onchange="bcSeansChkChange(this)" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">' +
+        '<div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:600;color:var(--ink)">' + d.name + '</div>' +
+        (d.active_ingredient ? '<div style="font-size:.65rem;color:var(--ink3)">' + d.active_ingredient + '</div>' : '') +
+        '</div><span style="font-size:.72rem;font-weight:700;color:' + stokClr + ';flex-shrink:0">' + stokTxt + '</span></label>';
+    }).join('');
+    return '<div class="bc-ilac-grup" style="margin-bottom:8px"><div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;padding:3px 0;border-bottom:1px solid var(--card3)">' + grp + '</div>' + items + '</div>';
+  }).join('') || '<div style="color:var(--ink3);font-size:.78rem;padding:8px">Stokta ilaç yok</div>';
+}
+
+// ═══ V2.1 [+ Gün ▾] MENÜSÜ ═══
+
+function bcGunEkleMenuToggle(){
+  const menu = g('bc-gun-ekle-menu');
+  if(menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+function bcGunEkleMenuKapat(){
+  const menu = g('bc-gun-ekle-menu');
+  if(menu) menu.style.display = 'none';
+}
+
+// ＋ Boş gün: sıradaki ardışık № (maks+1 — builder sablonGunEkle dili).
+function bcGunEkleBos(){
   const gunler = globalThis._bcGunler || (globalThis._bcGunler = []);
   if(gunler.length >= 31){ toast('⚠️ En fazla 31 gün', true); return; }
-  _bcHarvestAktifGun();
-  gunler.push({ gun: gunler.length + 1, saat: '', secili: {} });
-  bcGunSec(gunler.length);
+  const yeni = gunler.reduce((m, g) => Math.max(m, g.gun), 0) + 1;
+  gunler.push({ gun: yeni, seanslar: [] });
+  gunler.sort((a, b) => a.gun - b.gun);
+  globalThis._bcAktifGunCard = yeni;
+  bcPlanRender();
 }
 
-// − Gün: AKTİF gün silinir (yalnız planlanmış satırlar silinir — onaysız direkt
-// silme tasarım kararı; vaka verisi etkilenmez). Kalan günler 1..N yeniden
-// numaralanır, aktif ordinal clamp edilir. Tek gün silinemez (no-op).
-function bcGunSil(){
+// 📋 Önceki günden: açık kartın (yoksa en büyük №'lu günün) seanslarını
+// taşıyan yeni gün — bcGunKopyala saf özü üzerinden.
+function bcGunEkleOncekiGunden(){
+  const gunler = globalThis._bcGunler || (globalThis._bcGunler = []);
+  if(gunler.length >= 31){ toast('⚠️ En fazla 31 gün', true); return; }
+  const maks = gunler.reduce((m, g) => Math.max(m, g.gun), 0);
+  const kaynakGun = (globalThis._bcAktifGunCard && gunler.some(g => g.gun === globalThis._bcAktifGunCard))
+    ? globalThis._bcAktifGunCard : maks;
+  const hedef = maks + 1;
+  const r = bcGunKopyala(gunler, kaynakGun, hedef);
+  if(!r){ bcGunEkleBos(); return; }
+  globalThis._bcGunler = r.gunler;
+  globalThis._bcAktifGunCard = hedef;
+  bcPlanRender();
+  toast('📋 Gün ' + kaynakGun + ' → Gün ' + hedef + ' kopyalandı (oluşturuldu)');
+}
+
+// ═══ V2.1 GÜN KARTI İŞLEMLERİ ═══
+
+// Kart başlığı: tek kart açılır (builder gibi); açık karta tekrar dokunuş kapatır.
+function bcGunToggle(gun){
+  globalThis._bcAktifGunCard = globalThis._bcAktifGunCard === gun ? null : gun;
+  bcPlanRender();
+}
+
+// 🗑: gün kartını siler — DİĞER gün numaraları KORUNUR (boşluklu plan
+// geçerlidir; renumber YOK). Son gün silinirse editör tek boş gün 1 ile
+// devam eder. Silinen gün açıksa kart/form durumu temizlenir.
+function bcGunSil(gun){
   const gunler = globalThis._bcGunler || [];
-  if(gunler.length <= 1) return;
-  const idx = gunler.findIndex(gn => gn.gun === globalThis._bcAktifGun);
-  if(idx >= 0) gunler.splice(idx, 1);
-  gunler.forEach((gn, i) => { gn.gun = i + 1; });
-  globalThis._bcAktifGun = Math.max(1, Math.min(globalThis._bcAktifGun || 1, gunler.length));
-  bcGunSec(globalThis._bcAktifGun);
+  const idx = gunler.findIndex(g => g.gun === gun);
+  if(idx < 0) return;
+  gunler.splice(idx, 1);
+  if(!gunler.length) gunler.push({ gun: 1, seanslar: [] });
+  if(globalThis._bcAktifGunCard === gun) globalThis._bcAktifGunCard = null;
+  if(globalThis._bcSeansFormGun === gun) globalThis._bcSeansFormGun = null;
+  bcPlanRender();
 }
 
-// Gün saati girişi (bc-gun-saat, data-change) → aktif günün varsayılan saati.
-// Boş bırakılırsa sunucu 09:00 varsayılanını kullanır (kalem saati > gün
-// saati > 09:00 önceliği RPC v4'te).
-function bcGunSaatDegisti(el){
-  const gun = _bcAktifGunObj();
-  if(gun) gun.saat = (el && el.value) || '';
+// 'Başlangıçtan gün' № değişimi (bc-gno-<gun>): doğrula (1..31 + teklik —
+// değilse builder mesajı + revert), ASC yeniden sırala; başlık tarihleri
+// yeni № ile yeniden hesaplanır (bcPlanRender).
+function bcGunNoDegisti(el){
+  const eskiGun = Number(el && el.dataset ? el.dataset.gun : NaN);
+  const gunler = globalThis._bcGunler || [];
+  const gi = gunler.findIndex(g => g.gun === eskiGun);
+  if(gi < 0){ bcPlanRender(); return; }
+  const kontrol = bcGunNoKontrol(gunler, gi, el.value);
+  if(!kontrol.ok){ toast('⚠️ ' + kontrol.mesaj, true); bcPlanRender(); return; }
+  const yeni = Number(el.value);
+  gunler[gi].gun = yeni;
+  gunler.sort((a, b) => a.gun - b.gun);
+  if(globalThis._bcAktifGunCard === eskiGun) globalThis._bcAktifGunCard = yeni;
+  if(globalThis._bcSeansFormGun === eskiGun) globalThis._bcSeansFormGun = yeni;
+  bcPlanRender();
 }
 
-// Aktif günün doz satırlarını secili state'ten yeniden kurar (sekme değişimi).
-function bcDozSatirlariRender(){
-  const satirlar = g('bc-ilac-doz-satirlar');
+// Kart altı '📋 Günü Kopyala → Gün № [Uygula]': hedef yoksa OLUŞTURULUR,
+// varsa seansları DEĞİŞTİRİLİR (bcGunKopyala). Boş kaynak gün
+// kopyalanamaz (hedefi boşaltma veri kaybı).
+function bcGunKopyalaUygula(kaynakGun){
+  const gunler = globalThis._bcGunler || [];
+  const src = gunler.find(g => g.gun === kaynakGun);
+  if(!src || !(src.seanslar || []).length){ toast('⚠️ Kaynak günde kopyalanacak seans yok', true); return; }
+  const hedef = Number.parseInt(g('bc-gkopya-' + kaynakGun)?.value, 10);
+  if(!Number.isInteger(hedef) || hedef < 1 || hedef > 31){ toast('⚠️ Hedef gün numarası girin (1-31)', true); return; }
+  if(hedef === kaynakGun){ toast('⚠️ Hedef gün kaynakla aynı olamaz', true); return; }
+  const r = bcGunKopyala(gunler, kaynakGun, hedef);
+  if(!r){ toast('⚠️ Gün kopyalanamadı', true); return; }
+  globalThis._bcGunler = r.gunler;
+  globalThis._bcAktifGunCard = hedef;
+  bcPlanRender();
+  toast('📋 Gün ' + kaynakGun + ' → Gün ' + hedef + ' kopyalandı (' + (r.olusturuldu ? 'oluşturuldu' : 'değiştirildi') + ')');
+}
+
+// ═══ V2.1 TAKVİMDEN GÜN EKLEME (bc-gun-takvim — gun-tarih-modal
+// dilinin bc uyarlaması: ay takvimi, dokun-işaretle, seçili çipler,
+// Onayla). Yalnız bc-tarih ve SONRASI seçilebilir; mevcut gün tarihleri
+// mavi vurgulu (dokunuş no-op). ═══
+
+let _bcTkAy = 0, _bcTkYil = 0;
+let _bcTkSecili = new Set();
+
+function _bcTkBaslangic(){
+  return (v('bc-tarih') || '').trim() || bugun();
+}
+
+function bcTakvimAc(){
+  const p = _bcTkBaslangic().split('-').map(Number);
+  _bcTkAy = (p[1] || 1) - 1;
+  _bcTkYil = p[0] || new Date().getFullYear();
+  _bcTkSecili = new Set();
+  bcTakvimRender();
+}
+
+function bcTakvimRender(){
+  let box = document.getElementById('bc-gun-takvim');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'bc-gun-takvim';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end';
+    box.onclick = e => { if (e.target === box) box.remove(); };
+    document.body.appendChild(box);
+  }
+  const ay = _bcTkAy, yil = _bcTkYil;
+  const baslangic = _bcTkBaslangic();
+  const basGun = _bcUtcGun(baslangic);
+  // mevcut günlerin tarihleri mavi vurgulanır (Gün № = tarih + N−1)
+  const tarihdenGun = {};
+  (globalThis._bcGunler || []).forEach(gn => {
+    const iso = dFwd(baslangic, (Number(gn.gun) || 1) - 1);
+    if(iso) tarihdenGun[iso] = gn.gun;
+  });
+  const ilkGun = new Date(yil, ay, 1).getDay();
+  const bosluk = (ilkGun + 6) % 7;
+  const sonGun = new Date(yil, ay + 1, 0).getDate();
+  const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', { month: 'long', year: 'numeric' });
+
+  let kareler = '';
+  for(let i = 0; i < bosluk; i++) kareler += '<div></div>';
+  for(let g2 = 1; g2 <= sonGun; g2++){
+    const iso = yil + '-' + String(ay + 1).padStart(2, '0') + '-' + String(g2).padStart(2, '0');
+    const isoGun = _bcUtcGun(iso);
+    const onceMi = basGun !== null && isoGun !== null && isoGun < basGun;
+    const mevcutNo = tarihdenGun[iso] || null;
+    const secili = _bcTkSecili.has(iso);
+    let stil = 'color:var(--ink);';
+    if(mevcutNo) stil = 'background:rgba(42,107,181,.15);color:var(--blue);border:1.5px solid var(--blue);';
+    else if(secili) stil = 'background:var(--green);color:#fff;';
+    const tik = (onceMi || mevcutNo) ? '' : ' onclick="bcTakvimToggle(&#39;' + iso + '&#39;)"';
+    kareler += '<div' + tik + (mevcutNo ? ' title="Gün ' + mevcutNo + ' planlı"' : '') +
+      ' style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:' + (onceMi ? 'not-allowed;opacity:.35;' : 'pointer;') + stil + '">' + g2 + '</div>';
+  }
+
+  const seciliList = [..._bcTkSecili].sort();
+  const seciliHtml = seciliList.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">' +
+      seciliList.map(d => '<span style="background:rgba(78,154,42,.12);border:1px solid var(--green);border-radius:6px;padding:2px 8px;font-size:.72rem;font-weight:700;color:var(--green)">' + d.slice(5).replaceAll('-', '.') + '</span>').join('') +
+      '</div>'
+    : '<div style="font-size:.75rem;color:var(--ink3);margin-bottom:10px">Tarih seçin</div>';
+
+  box.innerHTML =
+    '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📅 Tedavi Günleri — Takvimden Seç (başlangıç: ' + baslangic + ')</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<button onclick="_bcTkAy--;if(_bcTkAy<0){_bcTkAy=11;_bcTkYil--;}bcTakvimRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
+    '<span style="font-weight:800;font-size:.9rem">' + ayAdi + '</span>' +
+    '<button onclick="_bcTkAy++;if(_bcTkAy>11){_bcTkAy=0;_bcTkYil++;}bcTakvimRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
+    ['Pt', 'Sa', 'Ca', 'Pe', 'Cu', 'Ct', 'Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">' + kareler + '</div>' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Seçili Günler (' + seciliList.length + ')</div>' +
+    seciliHtml +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<button onclick="bcTakvimOnayla()" style="padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Ekle</button>' +
+    '<button onclick="bcTakvimKapat()" style="padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">İptal</button>' +
+    '</div></div>';
+  box.style.display = 'flex';
+}
+
+function bcTakvimToggle(iso){
+  const basGun = _bcUtcGun(_bcTkBaslangic());
+  const isoGun = _bcUtcGun(iso);
+  if(basGun !== null && isoGun !== null && isoGun < basGun){ toast('⚠️ Başlangıç tarihinden önceki gün seçilemez', true); return; }
+  if(_bcTkSecili.has(iso)) _bcTkSecili.delete(iso);
+  else _bcTkSecili.add(iso);
+  bcTakvimRender();
+}
+
+// Onayla: yeni tarihler boş gün olarak eklenir (bir günün seansı olmak
+// zorunda — ilk yeni günün '＋ seans ekle' formu AÇIK gelir); mevcut
+// günler birleştirilir (dokunulmaz). Üst sınır 31.
+function bcTakvimOnayla(){
+  const gunNolar = bcTakvimdenGunler([..._bcTkSecili], _bcTkBaslangic());
+  const gunler = globalThis._bcGunler || (globalThis._bcGunler = []);
+  const mevcut = new Set(gunler.map(g => g.gun));
+  const yeniler = gunNolar.filter(n => !mevcut.has(n));
+  if(!yeniler.length){ bcTakvimKapat(); toast('⚠️ Yeni eklenecek tarih seçilmedi (mevcut günler mavi)', true); return; }
+  let ilk = null, eklendi = 0;
+  for(const n of yeniler){
+    if(gunler.length >= 31){ toast('⚠️ En fazla 31 gün', true); break; }
+    gunler.push({ gun: n, seanslar: [] });
+    if(ilk === null) ilk = n;
+    eklendi++;
+  }
+  gunler.sort((a, b) => a.gun - b.gun);
+  bcTakvimKapat();
+  toast('📅 ' + eklendi + ' gün eklendi — seans ekleyin');
+  bcSeansFormAc(ilk); // boş gün tek başına kalamaz: seans formu açık gelir
+}
+
+function bcTakvimKapat(){
+  const box = document.getElementById('bc-gun-takvim');
+  if(box) box.remove();
+}
+
+// ═══ V2.1 SEANS FORMU ('＋ Bu güne seans ekle') ═══
+
+async function bcSeansFormAc(gun){
+  if(!(_drugsCache && _drugsCache.length)){ try { await loadDrugsCache(); } catch(_) {} }
+  globalThis._bcSeansFormGun = gun;
+  globalThis._bcAktifGunCard = gun;
+  bcPlanRender();
+}
+function bcSeansVazgec(){
+  globalThis._bcSeansFormGun = null;
+  bcPlanRender();
+}
+
+// İlaç checkbox'ı → doz satırı (#bc-srow-<id>: doz/birim/yol ön-dolular,
+// doz BOŞ). Değerler [Seansı Ekle] onayında okunur — anlık state sync yok
+// (bc-irow deseninin seans formu uyarlaması).
+function bcSeansChkChange(chk){
+  const satirlar = g('bc-sdoz-satirlar');
   if(!satirlar) return;
-  satirlar.innerHTML = '';
-  const gun = _bcAktifGunObj();
-  if(!gun) return;
-  Object.keys(gun.secili || {}).forEach(id => satirlar.appendChild(_bcDozSatiri(id, gun)));
+  const alan = g('bc-sdoz-alani');
+  if(chk.checked){
+    if(alan) alan.style.display = 'block';
+    satirlar.appendChild(_bcSeansDozSatiri(chk.dataset));
+  } else {
+    const row = g('bc-srow-' + chk.dataset.id);
+    if(row) row.remove();
+    if(alan && !satirlar.children.length) alan.style.display = 'none';
+  }
 }
 
-// Doz satırı kurucu — V1.1 bcIlacChkChange satır dili + V2 per-kalem saat
-// girişi (bc-isaat-<drugId>-g<gunNo>, placeholder 'gün saati'; statik input,
-// değer hasat/collect anında okunur — bc-idoz ile aynı bağlantı deseni).
-function _bcDozSatiri(id, gun){
-  const k = (gun && gun.secili && gun.secili[id]) || {};
-  const gunNo = gun ? gun.gun : 1;
-  const name = String(k.name || id).replace(/"/g,'&quot;');
-  const route = k.route || 'IM';
+function _bcSeansDozSatiri(ds){
+  const id = ds.id;
+  const name = String(ds.name || id).replace(/"/g, '&quot;');
+  const route = ds.route || 'IM';
   const row = document.createElement('div');
-  row.id = 'bc-irow-' + id;
+  row.id = 'bc-srow-' + id;
   row.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:8px;padding:8px;margin-bottom:6px';
   row.innerHTML =
-    '<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-bottom:5px">'+name+'</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">'+
-    '<input type="number" id="bc-idoz-'+id+'" min="0.01" step="0.01" placeholder="Doz" class="fi" value="'+escAttr(k.dose||'')+'" style="margin:0">'+
-    '<input type="text" id="bc-iunit-'+id+'" placeholder="Birim" value="'+escAttr(k.unit||'')+'" class="fi" style="margin:0">'+
-    '<input type="time" id="bc-isaat-'+id+'-g'+gunNo+'" class="fi" value="'+escAttr(k.saat||'')+'" placeholder="gün saati" style="margin:0">'+
-    '</div>'+
-    '<select id="bc-irot-'+id+'" class="fsel" style="margin-top:5px">'+
-    '<option value="">Uygulama yolu</option>'+
-    '<option '+(route==='IM'?'selected':'')+' value="IM">IM — Kas ici</option>'+
-    '<option '+(route==='IV'?'selected':'')+' value="IV">IV — Damar ici</option>'+
-    '<option '+(route==='SC'?'selected':'')+' value="SC">SC — Deri alti</option>'+
-    '<option '+(route==='PO'?'selected':'')+' value="PO">PO — Agizdan</option>'+
-    '<option value="Topikal">Topikal</option>'+
-    '<option value="Intrauterin">Intrauterin</option>'+
+    '<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-bottom:5px">' + name + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
+    '<input type="number" id="bc-sdoz-' + id + '" min="0.01" step="0.01" placeholder="Doz" class="fi" style="margin:0">' +
+    '<input type="text" id="bc-sunit-' + id + '" placeholder="Birim" value="' + escAttr(ds.unit || 'ml') + '" class="fi" style="margin:0">' +
+    '</div>' +
+    '<select id="bc-srot-' + id + '" class="fsel" style="margin-top:5px">' +
+    '<option value="">Uygulama yolu</option>' +
+    '<option ' + (route === 'IM' ? 'selected' : '') + ' value="IM">IM — Kas ici</option>' +
+    '<option ' + (route === 'IV' ? 'selected' : '') + ' value="IV">IV — Damar ici</option>' +
+    '<option ' + (route === 'SC' ? 'selected' : '') + ' value="SC">SC — Deri alti</option>' +
+    '<option ' + (route === 'PO' ? 'selected' : '') + ' value="PO">PO — Agizdan</option>' +
+    '<option value="Topikal">Topikal</option>' +
+    '<option value="Intrauterin">Intrauterin</option>' +
     '</select>';
   return row;
 }
 
-// İlaç checkbox değişimi — cdfChkChange ui.js:6441 aynasının V2 uyarlaması:
-// işaretlenince AKTİF günün secili state'ine yazılır + #bc-irow-<id> doz
-// satırı (birim/yol data-attrs'tan ön-dolulular, doz BOŞ; per-kalem saat
-// dahil), kaldırılınca state'ten ve DOM'dan silinir. İşaretleme anında
-// şablon Şablonsuz'a döner (karşılıklı dışlama — her gün için geçerli).
-function bcIlacChkChange(chk){
-  const id = chk.dataset.id;
-  const gun = _bcAktifGunObj();
-  if(!gun) return;
-  gun.secili = gun.secili || {};
-  const satirlar = g('bc-ilac-doz-satirlar');
-  if(chk.checked){
-    bcSablonaDonustur();
-    const d = (_drugsCache||[]).find(x => x.id === id);
-    gun.secili[id] = {
-      name: chk.dataset.name || id,
-      unit: chk.dataset.unit || 'ml',
-      route: chk.dataset.route || 'IM',
-      dose: '',
-      saat: '',
+function bcSeansSaatChip(t, btn){
+  const i = g('bc-gsaat');
+  if(i) i.value = t;
+  if(btn && btn.parentElement) btn.parentElement.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
+  if(btn) btn.classList.add('aktif');
+}
+
+// [Seansı Ekle]: saat + işaretli ilaçların doz/birim'ini doğrular
+// (sablonSeansEkle aynası), kalem state'e YAZAR, seansı saate göre ASC
+// ekler, seans listesini cerrahi çizer; form AÇIK kalır, yalnız saat
+// sıfırlanır (seans A → 20:00 → seans B akışı). Kalem state'e girmeden
+// şablon Şablonsuz'a döner (karşılıklı dışlama).
+function bcSeansEkle(gun){
+  const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
+  if(!gunObj) return;
+  const saat = (g('bc-gsaat')?.value || '').trim();
+  if(!saat){ toast('⚠️ Seans saati girin', true); return; }
+  if(!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(saat)){ toast('⚠️ Geçerli saat girin (SS:DD)', true); return; }
+  const secililer = [];
+  let hata = false;
+  document.querySelectorAll('.bc-schk:checked').forEach(chk => {
+    if(hata) return;
+    const id = chk.dataset.id;
+    const dose = Number.parseFloat(g('bc-sdoz-' + id)?.value);
+    const unit = (g('bc-sunit-' + id)?.value || '').trim();
+    const route = g('bc-srot-' + id)?.value || null;
+    if(!dose || dose <= 0){ toast(chk.dataset.name + ': geçerli doz girin', true); hata = true; return; }
+    if(!unit){ toast(chk.dataset.name + ': birim girin', true); hata = true; return; }
+    const d = (_drugsCache || []).find(x => x.id === id);
+    secililer.push({
+      id,
+      name: d?.name || chk.dataset.name || id,
+      dose, unit, route,
       legacy: d ? !!d._legacy : chk.dataset.legacy === 'true',
       stock_id: d ? (d.stock_id || null) : null,
-    };
-    if(satirlar) satirlar.appendChild(_bcDozSatiri(id, gun));
-  } else {
-    delete gun.secili[id];
-    const row = g('bc-irow-' + id); if(row) row.remove();
+    });
+  });
+  if(hata) return;
+  if(!secililer.length){ toast('⚠️ En az bir ilaç seçin', true); return; }
+  bcSablonaDonustur();
+  const ilaclar = {};
+  secililer.forEach(k => {
+    ilaclar[k.id] = { name: k.name, dose: k.dose, unit: k.unit, route: k.route, legacy: k.legacy, stock_id: k.stock_id };
+  });
+  gunObj.seanslar = gunObj.seanslar || [];
+  gunObj.seanslar.push({ saat, ilaclar });
+  gunObj.seanslar.sort((a, b) => (a.saat || '').localeCompare(b.saat || ''));
+  _bcSeanslariCiz(gun);
+  const saatInp = g('bc-gsaat');
+  if(saatInp){
+    saatInp.value = '09:00';
+    if(saatInp.parentElement) saatInp.parentElement.querySelectorAll('.ek-chip').forEach(c => c.classList.remove('aktif'));
   }
-  bcGunSekmeRender();
   bcButonEtiketi();
+}
+
+function bcSeansSil(gun, si){
+  const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
+  if(!gunObj || !gunObj.seanslar || gunObj.seanslar[si] === undefined) return;
+  gunObj.seanslar.splice(si, 1);
+  bcPlanRender();
+}
+
+function bcKalemSil(gun, si, drugId){
+  const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
+  const seans = gunObj && gunObj.seanslar ? gunObj.seanslar[si] : null;
+  if(!seans || !seans.ilaclar) return;
+  delete seans.ilaclar[drugId];
+  if(!Object.keys(seans.ilaclar).length){
+    // son kalemi çıkarılan seans boş kalır — seanssız gün hatasına düşmesin
+    gunObj.seanslar.splice(si, 1);
+  }
+  bcPlanRender();
 }
 
 // Karşılıklı dışlama (ilaç→şablon): radyoyu "Şablonsuz"a çeker, state'i
@@ -1183,85 +1512,84 @@ function bcSablonaDonustur(){
   return true;
 }
 
-// Karşılıklı dışlama (şablon→ilaç): gerçek bir şablon seçildiyse manuel ilaç
-// seçimini TÜM GÜNLERDE temizler (kutular + doz satırları + her günün secili
-// state'i). Arama metnine ve gün saatlerine dokunmaz.
+// Karşılıklı dışlama (şablon→kalem): gerçek bir şablon seçildiyse TÜM
+// günlerin seansları temizlenir + açık seans formu kapanır (V2.1'de kalem
+// state'i seansların içindedir — eski 'secili state' düzlemi kalktı).
 function bcSablonIlacTemizle(){
-  document.querySelectorAll('.bc-ichk:checked').forEach(chk => { chk.checked = false; });
-  const satirlar = g('bc-ilac-doz-satirlar'); if(satirlar) satirlar.innerHTML = '';
-  (globalThis._bcGunler || []).forEach(gn => { gn.secili = {}; });
-  bcGunSekmeRender();
+  document.querySelectorAll('.bc-schk:checked').forEach(chk => { chk.checked = false; });
+  (globalThis._bcGunler || []).forEach(gn => { gn.seanslar = []; });
+  globalThis._bcSeansFormGun = null;
+  bcPlanRender();
   bcButonEtiketi();
 }
 
-// Dinamik buton etiketi: HERHANGİ bir günde manuel ilaç varsa "💊 Tedaviyi
-// Uygula", yoksa "🩺 Vakaları Aç". V2: aktif günün DOM'u TEK kaynak değil —
-// diğer günlerin secili state'i de sorgulanır. bcChipsRender / bcIlacChkChange /
-// bcGunSec / şablon onchange'den çağrılır; submitBulkCase finally de AKTİF
-// etikete döner (sabit değil).
+// Dinamik buton etiketi (V2.1): HERHANGİ bir günün herhangi bir seansında
+// ilaç varsa "💊 Tedaviyi Uygula", yoksa "🩺 Vakaları Aç". Yalnız seans
+// state'i sorgulanır — kalem [Seansı Ekle] onayıyla state'e yazıldığından
+// DOM sorgusuna gerek kalmadı (V2'deki aktif-gün DOM kontrolü kalktı).
 function bcButonMetni(){
-  const gunlerdeVar = (globalThis._bcGunler || []).some(gn => Object.keys(gn.secili || {}).length > 0);
-  let domVar = false;
-  try { domVar = document.querySelectorAll('.bc-ichk:checked').length > 0; } catch(_) { domVar = false; }
-  return (gunlerdeVar || domVar) ? '💊 Tedaviyi Uygula' : '🩺 Vakaları Aç';
+  const varMi = (globalThis._bcGunler || []).some(gn => (gn.seanslar || []).some(s => Object.keys(s.ilaclar || {}).length > 0));
+  return varMi ? '💊 Tedaviyi Uygula' : '🩺 Vakaları Aç';
 }
 function bcButonEtiketi(){
   const btn = g('bc-submit');
   if(btn) btn.textContent = bcButonMetni();
 }
 
-// Gün planını RPC v4 p_items sözleşmesine toplar (V1.1 bcIlacSecilenler'in
-// halefi): {hatalar:[strings], items:[{gun, saat?, kalemler:[...]}]}.
-//   - Aktif günün DOM girişleri önce state'e hasat edilir (_bcHarvestAktifGun).
+// Gün planını RPC v4 p_items sözleşmesine toplar (V2.1: seans-saat
+// eşlemeli) — {hatalar:[strings], items:[{gun, kalemler:[...]}]}.
+//   - STATE-TABANLI: kalem [Seansı Ekle] anında state'te — DOM harvest yok.
 //   - TÜM günler boşsa {hatalar:[], items:[]} — eski akış (vaka ilaçsız veya
 //     şablon yolu) korunur.
-//   - Herhangi bir günde kalem varsa: kalem sıfır gün hata alır ('Gün N: en az
-//     bir ilaç seçin' — editördeki her gün niyetlidir; sunucu da gün başına
-//     fail-fast eder), satır hataları gün önekli: 'Gün N: <ad>: doz girin' /
-//     'Gün N: <ad>: birim girin'; hatalı satırın öğesi TOPLANMAZ.
-//   - saat önceliği SUNUCUDA (kalem.saat > gün.saat > '09:00'); istemci yalnız
-//     DOLU alanları taşır — boş saat anahtarı hiç eklenmez.
-//   - drug_product_id/stok_id: secili'de check anında çözülür; eksikse
-//     _drugsCache fallback (legacy stok kaleminde drug_product_id null).
+//   - Herhangi bir günde kalem varsa: seanssız gün hata alır ('Gün N: en az
+//     bir seans ekleyin ya da günü silin'); seans saati SS:DD regex'ten
+//     geçer; satır hataları gün+saat önekli: 'Gün N (<saat>): <ad>: doz
+//     girin' / '... birim girin'; hatalı satırın öğesi TOPLANMAZ.
+//   - kalem.saat HER ZAMAN seans saatini taşır; gün-düzlemi 'saat' alanı
+//     GÖNDERİLMEZ (replace-old-day-saat semantiği — aynı ilacın A/B
+//     seansları sunucuda ayrı planned_time'lı uygulamalara düşer).
+//   - drug_product_id/stok_id: kalem state'inde check anında çözülür;
+//     eksikse _drugsCache fallback (legacy stok kaleminde drug_product_id null).
 function bcGunlardenItems(){
-  _bcHarvestAktifGun();
   const gunler = globalThis._bcGunler || [];
-  const herhangiKalem = gunler.some(gn => Object.keys(gn.secili || {}).length > 0);
+  const herhangiKalem = gunler.some(gn => (gn.seanslar || []).some(s => Object.keys(s.ilaclar || {}).length > 0));
   if(!herhangiKalem) return { hatalar: [], items: [] };
   const hatalar = [];
   const items = [];
-  gunler.forEach((gn, idx) => {
-    const gunNo = idx + 1; // ordinal — silme sonrası yeniden numaralanmış
-    const ids = Object.keys(gn.secili || {});
-    if(!ids.length){ hatalar.push('Gün ' + gunNo + ': en az bir ilaç seçin'); return; }
+  gunler.slice().sort((a, b) => a.gun - b.gun).forEach(gn => {
+    const gunNo = gn.gun;
+    const seanslar = gn.seanslar || [];
+    if(!seanslar.length){ hatalar.push('Gün ' + gunNo + ': en az bir seans ekleyin ya da günü silin'); return; }
     const kalemler = [];
-    ids.forEach(id => {
-      const k = gn.secili[id] || {};
-      const d = (_drugsCache||[]).find(x => x.id === id);
-      const legacy = k.legacy !== undefined ? !!k.legacy : !!(d && d._legacy);
-      const stockId = k.stock_id !== undefined ? (k.stock_id || null) : (d?.stock_id || null);
-      const dose = Number.parseFloat(k.dose);
-      const unit = (k.unit || '').trim();
-      let satirHatali = false;
-      if(!Number.isFinite(dose) || dose <= 0){ hatalar.push('Gün ' + gunNo + ': ' + (k.name || id) + ': doz girin'); satirHatali = true; }
-      if(!unit){ hatalar.push('Gün ' + gunNo + ': ' + (k.name || id) + ': birim girin'); satirHatali = true; }
-      if(satirHatali) return;
-      const kalem = {
-        drug_product_id: legacy ? null : id,
-        stok_id: stockId,
-        dose: dose,
-        unit: unit,
-        route: (k.route || '').trim() || null,
-      };
-      const kalemSaat = (k.saat || '').trim();
-      if(kalemSaat) kalem.saat = kalemSaat;
-      kalemler.push(kalem);
+    seanslar.forEach(seans => {
+      const saat = (seans.saat || '').trim();
+      if(!saat){ hatalar.push('Gün ' + gunNo + ': seans saati girin'); return; }
+      if(!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(saat)){ hatalar.push('Gün ' + gunNo + ': geçersiz seans saati (' + saat + ')'); return; }
+      const ids = Object.keys(seans.ilaclar || {});
+      if(!ids.length) return; // boş seans — sessiz atlanır (yarıda kalan draft)
+      ids.forEach(id => {
+        const k = seans.ilaclar[id] || {};
+        const d = (_drugsCache||[]).find(x => x.id === id);
+        const legacy = k.legacy !== undefined ? !!k.legacy : !!(d && d._legacy);
+        const stockId = k.stock_id !== undefined ? (k.stock_id || null) : (d?.stock_id || null);
+        const dose = Number.parseFloat(k.dose);
+        const unit = (k.unit || '').trim();
+        let satirHatali = false;
+        if(!Number.isFinite(dose) || dose <= 0){ hatalar.push('Gün ' + gunNo + ' (' + saat + '): ' + (k.name || id) + ': doz girin'); satirHatali = true; }
+        if(!unit){ hatalar.push('Gün ' + gunNo + ' (' + saat + '): ' + (k.name || id) + ': birim girin'); satirHatali = true; }
+        if(satirHatali) return;
+        kalemler.push({
+          drug_product_id: legacy ? null : id,
+          stok_id: stockId,
+          dose: dose,
+          unit: unit,
+          route: (k.route || '').trim() || null,
+          saat: saat,
+        });
+      });
     });
-    if(!kalemler.length) return; // tüm satırları hatalı gün — hatalar zaten toplandı
-    const day = { gun: gunNo, kalemler };
-    const gunSaat = (gn.saat || '').trim();
-    if(gunSaat) day.saat = gunSaat;
-    items.push(day);
+    if(!kalemler.length) return; // tüm seansları hatalı gün — hatalar zaten toplandı
+    items.push({ gun: gunNo, kalemler });
   });
   return { hatalar, items };
 }
@@ -1335,8 +1663,9 @@ async function submitBulkCase(btn){
 
   // V1.1/V2 manuel çoklu gün yolu — toplayıcı hatalıysa ilk hata toast'lanır
   // ve akış durur; kalem varsa p_items yolu açılır (p_sablon_id null —
-  // karşılıklı dışlama; seçim sırasında UI zaten Şablonsuz'a çeker).
-  // p_items Gün-KEYED (RPC v4): [{gun, saat?, kalemler:[...]}].
+  // karşılıklı dışlama; kalem state'e girerken UI zaten Şablonsuz'a çeker).
+  // p_items Gün-KEYED (RPC v4, V2.1): [{gun, kalemler:[{..., saat}]}] —
+  // kalem.saat HER ZAMAN seans saatini taşır (gün-düzlemi saat gönderilmez).
   const sec = bcGunlardenItems();
   if (sec.hatalar.length) { toast('⚠️ ' + sec.hatalar[0], true); return; }
   const manuelVar = sec.items.length > 0;
