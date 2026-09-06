@@ -20,7 +20,10 @@ def main() -> int:
     message = (
         "EgeSut commit boundary: read .harness/acceptance.md and the active "
         "goal before continuing. This runtime hook is warning-only; it does "
-        "not replace repository acceptance checks or grant commit authority."
+        "not replace repository acceptance checks or grant commit authority.\n"
+        "Before committing: run gitnexus detect_changes on the staged work, "
+        "npm run test:unit, and produce the docs-update pre-commit receipt "
+        "(commit-gate verifies it)."
     )
     print(json.dumps({"additionalContext": message}, ensure_ascii=False))
     return 0

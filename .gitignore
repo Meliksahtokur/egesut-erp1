@@ -178,6 +178,10 @@ postgres-language-server.jsonc
 !/.zcode/hooks/session_contract.py
 !/.zcode/hooks/commit_guard.py
 !/.zcode/hooks/js_edit_guard.py
+!/.zcode/hooks/rpc_write_guard.py
+!/.zcode/hooks/sql_migration_guard.py
+!/.zcode/hooks/ddl_refresh_guard.py
+!/.zcode/hooks/smoke_test.sh
 !/tests/harness/
 !/tests/harness/**/*.py
 !/.harness/bin/

@@ -37,6 +37,41 @@
               "statusMessage": "EgeSut commit-boundary reminder"
             }
           ]
+        },
+        {
+          "matcher": "Edit|Write",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python3 ${ZCODE_PROJECT_DIR}/.zcode/hooks/rpc_write_guard.py",
+              "timeout": 5,
+              "statusMessage": "EgeSut RPC-bypass write guard"
+            }
+          ]
+        },
+        {
+          "matcher": "Edit|Write",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python3 ${ZCODE_PROJECT_DIR}/.zcode/hooks/sql_migration_guard.py",
+              "timeoutMs": 25000,
+              "statusMessage": "EgeSut SQL LSP migration guard"
+            }
+          ]
+        }
+      ],
+      "PostToolUse": [
+        {
+          "matcher": "mcp__tools-bank__supabase_migrate",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "python3 ${ZCODE_PROJECT_DIR}/.zcode/hooks/ddl_refresh_guard.py",
+              "timeoutMs": 15000,
+              "statusMessage": "EgeSut schema-mirror auto-refresh"
+            }
+          ]
         }
       ]
     }

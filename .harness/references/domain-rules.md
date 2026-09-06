@@ -171,7 +171,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
    - Doğum günü: Oksitosin + Ademin + Kalsiyum (3 ayrı görev)
    - 2. Gün: PG · 11. Gün: PG · 25. Gün: PG
    - 53. Gün: E Vitamini — TEK görev (etken_kod `E_VIT`; d53 Ademin ve d54 Yeldif görevi
-     20260906000001 ile kaldırıldı; migration yazıldı, canlıya deploy bekliyor — 2026-09-06)
+     20260906000001 ile kaldırıldı; canlıda — deploy 2026-09-06)
    - 58-63. gün: kızgınlık takibi
 7. Buzağıya ilk gün bakım görevleri oluşturur (6 alt görev):
    - Kolostrum (ilk 2 saat)
@@ -356,7 +356,7 @@ Kaynak: `.claude/idle-reports/2026-08-31-docs-tutarlilik.md` §2.2 (çelişki) +
 |---|---|---|---|---|
 | ❌1 | §5 | 14 görev | 16 görev | Kod — 20260730000002:407-417 `"gorev_sayisi",16`; Oksitosin/Ademin/Kalsiyum 3 ayrı görev |
 | ❌2 | §5 | PG d11 | d2·d25·d39 (Presynch-14) | Kod — 20260730000002:412-414; d11 20260628000001 ile kaldırıldı |
-| ❌3 | §5 | d53 "Ademin+Yeldif", d54 "Yeldif" | d53 tek "E Vitamini" (E_VIT); d53 Ademin + d54 görevi yok | **Migration 20260906000001 yazıldı, canlıya DEPLOY BEKLİYOR (2026-09-06)** — canlı (20260901000002) hâlâ d53 Ademin + d53 Yeldif + d54 Yeldif üretir; Yeldif ürün değil sınıf |
+| ✅3 | §5 | d53 "Ademin+Yeldif", d54 "Yeldif" | d53 tek "E Vitamini" (E_VIT); d53 Ademin + d54 görevi yok | **KAPANDI (2026-09-06)** — migration 20260906000001 canlıya deploy edildi (commit 434c142); canlı doğrulama: pg_proc gövdelerinde eski satırlar yok, 9 hayvanın her birinde tam 1 açık E Vitamini görevi (mükerrer 0), 11 açık eski görev taşındı (1 yeniden adlandırma + 10 iptal), hedef_tarih sapması 0; Yeldif ürün değil sınıf |
 | ❌4 | §5 | Buzağı Ahırı | Buzağı Padok (Süt İçenler) | Kod — 20260730000002:401; 20260326000026:7 |
 | ❌5 | §9 | sütten kesme `tohumlama_durumu='tohumlanabilir'` yazar | yalnız `suttten_kesme_tarihi` yazar | Kod — 20260620000003:47 (commit 6e41b94); flag yaklaşımı terk edildi |
 | ❌6 | §10 | `durum='Pasif'` | Ölü/Satıldı/Kesildi/Kayıp değerleri | Kod — 20260706000003:191-201; 'Pasif' 0 grep; davranışsal sonuç (listelerde görünmez) değişmedi |
