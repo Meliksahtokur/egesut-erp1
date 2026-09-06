@@ -230,14 +230,21 @@ implementation commits (post-rebase):
           tarihli plan, saat önceliği kalem>gün>09:00)
   39468f5 feat(ui): toplu vaka çoklu gün plan editörü — gün sekmeleri,
           gün/kalem saati, tohumlama bloğu keşfedilebilirliği + testler
-  (14 commits on branch idle/toplu-vaka since launch eaa0640 through tip
-  39468f5 — rev-list verified; 15 incl. this V2 docs amendment;
-  sequence 0036fa5…39468f5)
+  3f701a9 docs(harness): G-20260906-TOPLU-VAKA V2 rapor + criterion 11
+          PASS, status review
+  e7d96fb feat(ui): plan editörü v2.1 — gün kartları (boşluklu gün
+          №+takvim), seans A/B saat-grup dili, gün kopyalama
+  b32fb65 feat(ui): bantlı sonuç/uyarı düzeni + pre-line satır düzeltmesi +
+          tohumlama çakışma uyarısı
+  (17 commits on branch idle/toplu-vaka since launch eaa0640 through tip
+  b32fb65 — rev-list verified; 18 incl. this V2.1 docs amendment;
+  sequence 0036fa5…b32fb65)
 docs checkpoints:
   pre-review @ 1139798 — docs_verdict PASS (V1 docs commit)
   pre-review @ 5e463d9 — docs_verdict PASS (V1.1 amendment docs commit)
   pre-review @ 6d2a285 — docs_verdict PASS (V1.2 amendment docs commit)
   pre-review @ 39468f5 — docs_verdict PASS (V2 delivery docs commit)
+  pre-review @ b32fb65 — docs_verdict PASS (V2.1 delivery docs commit)
   handoff/final: not recorded — root close + owner merge approval pending
 residual risks: see §6
 temporary mutations and artifacts restored:
@@ -733,3 +740,141 @@ open the confirm dialog).
    carried forward).
 3. W6 GitNexus probe index + node_modules symlink cleanup at goal close
    (V1.1 notes 2-3 carried forward).
+
+## V2.1 Delivery (2026-09-06, owner brainstorm)
+
+W11 (plan editor v2.1, commit `e7d96fb`) and W12 (banded results/warnings,
+commit `b32fb65`) landed the V2.1 amendment after an owner brainstorm:
+3 parallel research agents (A1/A2/A3) + an ASCII UI draft + 4 owner
+decisions. All V1/V1.1/V1.2/V2 content above stays intact; only the §5
+commit/checkpoint lists were extended (17 commits on branch through tip
+`b32fb65`, rev-list verified). The goal returns to `review` with
+acceptance criteria 12 AND 13 `PASS` (root E2E below; unit suite re-run
+by this docs amendment: 557/557 pass, 0 fail).
+
+### Research round (one-liners)
+
+- A1 — structural audit of live bulk-created data (25 cases / 45
+  treatment_days / 80 sessions / 4 tohumlama rows): ALL PASS structurally
+  (independent audit evidence for the V2 engine contract); findings:
+  cross-case open-planlı-tohumlama coexistence is possible (→ owner chose
+  the non-blocking warning, W12), empty plan producing no tasks is
+  conscious behavior, the TOHUMLAMA card lacks case context (noted,
+  not in scope).
+- A2 — interaction-language research over the m-sablon builder + seans
+  planner (`openSablonBuilder`/`sablonSeansAc`) → fed the ASCII draft and
+  the W11 gün-kartı + saat-grup seans design.
+- A3 — warning/result presentation research → dashboard alarm-band
+  language (`band()`, `.aband*`/`.arow`) and the `m-confirm-desc`
+  pre-line precedent → fed the W12 banded-results + combined-warning
+  design.
+
+### Owner decisions (4, brainstorm output)
+
+1. Gün girişi = SAYI + TAKVİM ikisi birden (gapped plans valid; calendar
+   only offers dates ≥ bc-tarih).
+2. Bantlı sonuç düzeni approved (alarm-band language, counts in band
+   headers, old summary line removed).
+3. Gün kopyalama = BUTON + EKLERKEN-KOPYALA ikisi birden.
+4. Tohumlama çakışması = NON-BLOCKING uyarı (per-animal line in the
+   combined confirm; server soft-skip semantics unchanged).
+
+### V2.1 commits
+
+- `e7d96fb` feat(ui): plan editörü v2.1 — gün kartları (boşluklu gün
+  №+takvim), seans A/B saat-grup dili, gün kopyalama (W11)
+- `b32fb65` feat(ui): bantlı sonuç/uyarı düzeni + pre-line satır
+  düzeltmesi + tohumlama çakışma uyarısı (W12)
+
+Branch tip at delivery: `b32fb65` — this docs amendment lands on top.
+Verified branch count: `git rev-list --count eaa0640..b32fb65` = **17**
+commits since launch (18 including this V2.1 docs amendment); sequence
+0036fa5 → … → b32fb65. Engine and RPC untouched — the V2 day-keyed
+`p_items` contract is consumed as-is (day-level `saat` no longer sent;
+every kalem carries `saat = <seans saati>`, already supported by the
+kalem-level precedence).
+
+### Tests (V2.1)
+
+```text
+V2 final:    516/516 pass, 0 fail
+W11 final:   539/539 pass, 0 fail  (+23, RED→GREEN)
+W12 final:   557/557 pass, 0 fail  (+18, RED→GREEN)
+RED (W11): 37 failures captured verbatim against unmodified sources,
+     incl. TypeError for bcGunKopyala / bcTakvimdenGunler / bcGunNoKontrol
+RED (W12): 18 failures captured verbatim: TypeError for
+     bcSonucBantlari / bcTohumCakismaBul / bcTarihKisa
+re-run at V2.1 docs amendment (this commit):
+     NODE_PATH=/home/melik/egesut-erp1/node_modules npm run test:unit
+     → 557 pass, 0 fail, exit 0 (verified live)
+```
+
+### Root E2E (demo, browser) — criteria 12 AND 13: PASS
+
+Worktree serve :8097, `?demo` auto-login, browser, 2026-09-06. Animals
+002 + 01, disease Mastit.
+
+Plan editor (criterion 12 surface):
+
+- Gün 1 got Seans A 09:00 (Enrolen 10ml) AND Seans B 20:00 (Enrolen 10ml)
+  — the SAME drug twice at different times; session-group language works.
+- `+ Gün ▾ → 📅 Takvimden` → picked 10.09 → Gün 5 card created (gapped
+  plan), Meloksikam 14:00 added.
+- Card footer `📋 Günü Kopyala → № 2 Uygula` → Gün 2 created as a copy
+  (toast `📋 Gün 1 → Gün 2 kopyalandı (oluşturuldu)`).
+- Tohumlama checked.
+
+Submit → combined confirm dialog OPEN (`m-confirm` class `mo on`) showing
+`• 002 — açık planlı tohumlaması var (13.09) — yenisi de açılacak`
+(002 already had one open planned insemination; per-animal line) with
+`white-space:pre-line` applied (computed style verified, ~4 visual
+lines) — criterion 13 warning part PASS.
+
+Onayla → banded result: band `AÇILAN (2)` (green `.aband-hdr`) with
+`.arow` rows:
+
+- `✅ 002 — vaka açıldı + 3 gün · 5 ilaç · 🐄 tohumlama 08:00`
+- `✅ 01 — vaka açıldı + 3 gün · 5 ilaç · ⏭ tohumlama: Hayvan gebe`
+
+The server-side pregnancy check caught 01 — the client deliberately has
+no pregnancy check (layered design demonstrated). Old text summary line
+gone; counts live in band headers — criterion 13 banded-results part
+PASS.
+
+DB verification (demo, Management API): both animals got day_no 1 →
+2026-09-06 with planned 09:00 AND 20:00 (same-day two sessions;
+UNIQUE(treatment_day_id, planned_time, stok_id) respected), day_no 2 →
+2026-09-07 (09:00 + 20:00, the copy), day_no 3 → 2026-09-10 14:00
+(gün 5 → start + (5−1) = 10.09 — the GAP; engine untouched, the sparse
+gün contract works end-to-end). New TOHUMLAMA_PLANLI görev ONLY for 002
+(hedef 2026-09-06 08:00, kaynak `TEDAVI_SABLON_TOHUMLAMA:<case>:MANUEL`);
+01 has none.
+
+Acceptance criterion 12 ("V2.1 E2E: gapped multi-day plan (e.g. gün 1+5)
+with two sessions on one day and a day-copy, verified in demo"): `PASS`.
+Acceptance criterion 13 ("V2.1 E2E: sonuçlar bantlı bölümlerde + uyarı
+diyaloğu satır satır + tohumlama çakışması uyarıda listeleniyor"):
+`PASS`.
+
+### Root test-harness notes (V2.1 — not product bugs)
+
+Earlier selector mistakes in root's E2E driver: a `bc-dose` DIV prefix
+match, and the `m-confirm` open-class is `on` (not `acik`). Product
+guards all behaved correctly — `⚠️ Hastalık seçin` early-return fired
+when a stray reset emptied the select, with no partial RPC sent.
+
+### Demo rows created by V2.1 E2E (owner data, not deleted)
+
+2 Mastit cases (küpeler 002, 01) + 3 treatment_days each (plan gün
+1/2/5 → day_no 1/2/3, dates 06/07/10.09) + 5 drug_administrations each +
+1 TOHUMLAMA_PLANLI görev (002 only).
+
+### V2.1 residual notes
+
+1. A1 open questions not acted on — tohumlama card case-context and
+   per-case result grouping recorded as future candidates (owner
+   brainstorm backlog), not scope of this goal.
+2. rpc-reference.md + ui-map sync remain propose_only, post-merge docs
+   commit (§6 item 3 carry-forward).
+3. W6 GitNexus probe index + node_modules symlink cleanup at goal close
+   (V1.1 notes 2-3 carry-forward).
