@@ -1171,23 +1171,40 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <div id="bc-sablon-list"></div>
       </div>
 
-      <!-- İLAÇLAR — manuel tedavi (V1.1): cdf-chk dili; şablonla karşılıklı dışlayıcı.
-           Seçilen ilaç + doz tek girişte TÜM seçili hayvanlara uygulanır (RPC v2 p_items). -->
+      <!-- İLAÇLAR — manuel ÇOKLU GÜN plan editörü (V2): m-sablon builder dili
+           (gün sekmeleri + gün/kalem saati) × bc ilaç listesi dili (cdf-chk
+           satırları + doz satırları). Şablonla karşılıklı dışlayıcı. Gün N,
+           seçilen tarihe göre tarih+(N-1) gününe planlanır (RPC v4 p_items:
+           [{gun, saat?, kalemler:[...]}]). -->
       <div id="bc-ilac-blok" class="fg" style="padding:8px;border:1px solid var(--card3);border-radius:8px">
-        <label class="flbl" style="font-size:.72rem">💊 İlaçlar (manuel tedavi)</label>
+        <label class="flbl" style="font-size:.72rem">💊 İlaçlar (manuel tedavi planı)</label>
         <input id="bc-ilac-ara" class="fi" placeholder="İlaç ara — isim veya etken madde" autocomplete="off"
           data-input="bc-ilac-ara" style="margin-bottom:6px">
         <div id="bc-ilac-liste" style="max-height:220px;overflow-y:auto;background:var(--card);border-radius:8px;padding:8px;border:1px solid var(--card3)"></div>
-        <div id="bc-ilac-doz-alani" style="display:none;margin-top:8px">
-          <div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Seçili İlaçlar — Doz Gir (tüm hayvanlara uygulanır)</div>
+        <div id="bc-ilac-doz-alani" style="margin-top:8px">
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px">
+            <div id="bc-gun-sekme" style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex:1;min-width:0"></div>
+            <button type="button" class="ek-chip" data-action="bc-gun-ekle"
+              style="font-weight:800;color:var(--green);border-color:rgba(78,154,42,.4)">＋ Gün</button>
+            <button type="button" class="ek-chip" id="bc-gun-sil" data-action="bc-gun-sil"
+              style="display:none;font-weight:800;color:var(--red);border-color:rgba(200,60,60,.45)">− Gün</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px">
+            <label for="bc-gun-saat" style="font-size:.68rem;color:var(--ink3);font-weight:700">Gün saati (boşsa 09:00)</label>
+            <input id="bc-gun-saat" class="fi" type="time" data-change="bc-gun-saat" style="margin:0;width:110px">
+          </div>
+          <div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Seçili İlaçlar — Doz Gir (aktif güne uygulanır)</div>
           <div id="bc-ilac-doz-satirlar"></div>
         </div>
-        <div id="bc-ilac-ipucu" style="font-size:.65rem;color:var(--ink3);margin-top:6px">Manuel ilaç seçilirse şablon uygulanmaz; bugünün tedavi günü olarak işlenir.</div>
+        <div id="bc-ilac-ipucu" style="font-size:.65rem;color:var(--ink3);margin-top:6px">Manuel ilaç seçilirse şablon uygulanmaz; günler seçilen tarihe göre planlanır (Gün N = tarih + N−1). Her güne ve kaleme kendi saati verilebilir.</div>
       </div>
 
-      <!-- TOHUMLAMA (V1.2) — en az bir dişi seçiliyken görünür (bcChipsRender);
-           seçim temizlenince kutu sessizce kapanır. Gebe kontrolü sunucuda. -->
-      <div id="bc-tohum-blok" class="fg" style="display:none;padding:8px;border:1px solid var(--card3);border-radius:8px">
+      <!-- TOHUMLAMA (V2 keşfedilebilirlik) — blok HER ZAMAN görünür; seçim
+           durumuna göre disabled (opacity .5 + pointer-events:none): boş seçim
+           → 'Hayvan seçince aktifleşir', tümü Erkek → kırmızı uyarı. Durum
+           bcTohumBlokDurumu() ile bcChipsRender'da kurulur; işaret durumu
+           korunur (eski silent-uncheck kaldırıldı). Gebe kontrolü sunucuda. -->
+      <div id="bc-tohum-blok" class="fg" style="padding:8px;border:1px solid var(--card3);border-radius:8px;opacity:.5;pointer-events:none">
         <label class="flbl" style="font-size:.72rem">🐄 Tohumlama</label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0">
           <input type="checkbox" id="bc-tohum" style="width:18px;height:18px;accent-color:var(--green);flex-shrink:0;cursor:pointer">
@@ -1202,7 +1219,7 @@ body.dark .ac-vurgu{color:#8ec6ff}
             <span id="bc-tohum-saat-chips" style="display:flex;gap:4px;flex-wrap:wrap"></span>
           </div>
         </div>
-        <div id="bc-tohum-ipucu" class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:6px">Erkek, 12 aydan küçük ve gebe hayvanlara tohumlama açılmaz — bunlar sebebiyle listede atlanır. Şablonun kendi tohumlama planı varsa o geçerli olur.</div>
+        <div id="bc-tohum-ipucu" class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:6px">Hayvan seçince aktifleşir</div>
       </div>
 
       <!-- NOTLAR — tek not tüm hayvanlara uygulanır -->

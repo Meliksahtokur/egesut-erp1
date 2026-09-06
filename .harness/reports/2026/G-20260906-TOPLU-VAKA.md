@@ -510,3 +510,89 @@ RED: W8 captured 14 RED failures verbatim against unmodified sources
 3. rpc-reference.md rows for the v3 signature and the live-schema sync
    remain propose_only, deferred to the post-merge docs commit (same as
    the V1/V1.1 items in §6).
+
+## V2 Amendment — UI multi-day plan editor (W10, 2026-09-06)
+
+Scope (worker W10, files: `index.html`, `js/forms.js`, `js/utils/handlers.js`,
+`tests/unit/vaka-toplu-ac.test.js`): the single 💊 ilaç listesi became a
+MULTI-DAY plan editor copying the m-sablon builder language
+(`openSablonBuilder`/`sablonSeansAc`, js/ui.js) while keeping the existing
+bc ilaç list renderer language (cdf-chk rows + dose rows). FROZEN RPC
+CONTRACT v4 (`p_items` day-keyed) is implemented by W9 in parallel; this
+commit contains ONLY the UI layer + tests.
+
+### UI surface
+
+- Day tabs (`#bc-gun-sekme`, `.ek-chip`/`.aktif` language): per-day chips
+  with selected-drug count badge; `＋ Gün` (`bc-gun-ekle`) appends a day;
+  `− Gün` (`bc-gun-sil`) deletes the ACTIVE day (no confirm — planned rows
+  only). Max 31 days → toast '⚠️ En fazla 31 gün'. Day numbers are
+  ORDINALS: after add/remove the array renumbers 1..N; RPC `gun` = ordinal.
+- Day-level saat input `#bc-gun-saat` (label "Gün saati (boşsa 09:00)"),
+  `data-change="bc-gun-saat"` → active day's default saat.
+- Dose rows gain per-kalem saat input `bc-isaat-<drugId>-g<gunNo>`
+  (placeholder "gün saati"), read at harvest/collect time (same static
+  wiring as `bc-idoz-*`).
+- TOHUMLAMA discoverability fix: `#bc-tohum-blok` is ALWAYS visible; state
+  comes from pure `bcTohumBlokDurumu(hayvanlar)` →
+  `{mod:'disabled-bos'|'disabled-erkek'|'aktif', ipucu}`; disabled =
+  opacity .5 + pointer-events:none (no silent uncheck — checkbox state is
+  kept and simply not read while disabled; submit reads it only when
+  mod==='aktif').
+- State: `globalThis._bcGunler = [{gun, saat, secili:{drugId→{name,dose,
+  unit,route,saat,legacy,stock_id}}}]`, `globalThis._bcAktifGun`; tab
+  switch harvests the active day's DOM inputs into state
+  (`_bcHarvestAktifGun`) then re-renders list/rows/tabs.
+- Mutual exclusion generalized: a checked drug on ANY day snaps şablon to
+  Şablonsuz (`bcIlacChkChange → bcSablonaDonustur`); a şablon pick clears
+  ALL days' selections (`bcSablonIlacTemizle`).
+- `bcGunlardenItems()` replaces `bcIlacSecilenler()` (V2 collector): all
+  days empty → `{hatalar:[], items:[]}` (old şablon/no-drug flow); any
+  kalem anywhere → per-day collection with 'Gün N: ' prefixed errors and
+  'Gün N: en az bir ilaç seçin' for empty days; saat fields sent ONLY when
+  filled (precedence kalem>gün>'09:00' is server-side per contract v4).
+- Result rows: `acilan[i].manuel = {gun_sayisi, seans_sayisi}` →
+  '✅ <kupe> — vaka açıldı + N gün · M ilaç' via pure `bcManuelSatirEki`
+  (falls back to '+ M ilaç' / no suffix when fields missing).
+
+### Tests (V2)
+
+```text
+V2 final: 516/516 pass, 0 fail (npm run test:unit)
+delta: +19 net vs V1.2's 497 baseline
+RED: 26 failing tests captured against unmodified sources, verbatim:
+     TypeError: sb.bcGunlardenItems is not a function /
+     sb.bcTohumBlokDurumu is not a function /
+     sb.bcGunEkle / sb.bcGunSil / sb.bcManuelSatirEki is not a function
+ADAPTATIONS (deliberate, internal shape change):
+  a. bcIlacSecilenler (7 V1.1 tests) → bcGunlardenItems suite: same
+     scenarios re-expressed day-keyed with 'Gün N: ' prefixed error
+     strings and state setup (dose/unit/legacy/çoklu-sıra/hep-boş).
+  b. bcSablonIlacTemizle: 'doz alanı display=none' assertion REPLACED by
+     all-days secili-clear assertion (doz alanı is always visible in V2).
+  c. bcButonMetni: +1 state-based test (drug only on day 2, DOM empty).
+```
+
+### Verify (V2)
+
+- `node --check js/forms.js js/utils/handlers.js` → OK
+- DOM cross-check: `bc-gun-sekme`/`bc-gun-ekle`/`bc-gun-sil`/`bc-gun-saat`
+  each present exactly once in index.html; `data-change="bc-gun-saat"`
+  wired; 4 new actions registered in `js/utils/handlers.js`; per-kalem
+  `bc-isaat-<id>-g<gun>` emitted by `_bcDozSatiri`.
+- Serve check: python3 http.server :8098 on the worktree; curl markers for
+  all new ids → 200/1; server killed, `ss -tln` confirms :8098 released.
+- GitNexus impact pre-check: submitBulkCase LOW (1 direct caller, the
+  handler registration); all touched bc* symbols are internal to the
+  bulk-case flow (forms.js internal + handlers.js registrations +
+  modal.js onOpen hook); no HIGH/CRITICAL.
+- NOTE: E2E against the frozen v4 RPC (day-keyed engine, per-day saat,
+  partial-day failure semantics) is deferred to root after W9's migration
+  lands in demo; this commit is UI-only and its unit suite is the gate.
+
+### Docs (V2)
+
+- ui_map / ui_patterns: NO_CHANGE_REQUIRED at their granularity —
+  modal↔action wiring (open/submit/close) unchanged; reference-doc rows
+  for the V2 controls follow the goal's established propose_only deferral
+  to the post-merge docs commit (§6 / V1.2 item 3).

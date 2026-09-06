@@ -11,10 +11,27 @@
 //   3. bcKupeParse(metin) — W2 helper'ının yeşil kilidi (satır/virgül/noktalı
 //      virgül ayrımı, trim, boş at, dedupe — ilk geçiş sırası korunur).
 //
-//   4. V1.1 manuel ilaç yolu (W6): bcIlacSecilenler (p_items toplayıcısı),
-//      bcSablonaDonustur + bcSablonIlacTemizle (şablon↔ilaç karşılıklı
-//      dışlama), bcButonMetni (dinamik buton etiketi) ve bcSonucSatirlari
-//      manuel uzantısı (acilan[i].manuel.seans_sayisi → ilacSayisi).
+//   4. V1.1 manuel ilaç yolu (W6): bcSablonaDonustur + bcSablonIlacTemizle
+//      (şablon↔ilaç karşılıklı dışlama), bcButonMetni (dinamik buton
+//      etiketi) ve bcSonucSatirlari manuel uzantısı (acilan[i].manuel.
+//      seans_sayisi → ilacSayisi).
+//
+//   5. V2 çoklu gün plan editörü (W10): bcGunlardenItems (gün-keyed p_items
+//      toplayıcısı; saat önceliği kalem>gün>09:00 sunucuda, istemci yalnız
+//      dolu alanları taşır), bcGunEkle/bcGunSil (ordinal 1..N renumbering),
+//      bcTohumBlokDurumu (keşfedilebilirlik durumu), bcManuelSatirEki
+//      (' + N gün · M ilaç' metin kurucusu) ve bcButonMetni çoklu gün
+//      uzantısı.
+//
+//   V1.1→V2 ADAPTASYONLAR (bilinçli, iç şekil değişimi — her biri belgelendi):
+//     a. bcIlacSecilenler KALDIRILDI → bcGunlardenItems. Eski 8 testin
+//        senaryoları gün-önekli hata dizeleriyle ('Gün N: ...') ve state
+//        kurulumuyla yeniden yazıldı: geçerli seçim, legacy cache fallback,
+//        doz/birim eksik (artık 'Gün N: ' önekli), hiç seçim (TÜM günler
+//        boş → {hatalar:[], items:[]}), çoklu seçim sırası.
+//     b. bcSablonIlacTemizle: 'alan.style.display=none' assertion'ı KALDIRILDI
+//        (V2'de doz alanı hep görünür — gün plan editörü); yerine TÜM
+//        günlerin secili state temizliği assertion'ı GEÇTİ.
 //
 // Loader pattern: forms-validation.test.js ile birebir — forms.js vm'de yüklenir,
 // db/rpc erişimi stub (gerçek Supabase çağrısı YOK, DOM submit YOK).
@@ -276,73 +293,207 @@ function makeRowInputs(document, id, { dose = '', unit = '', route = '' } = {}) 
   return { doz: mk('doz', dose), unit: mk('unit', unit), rot: mk('rot', route) };
 }
 
-describe('bcIlacSecilenler (V1.1 — p_items toplayıcısı)', () => {
-  it('geçerli seçim → sözleşme tam öğe: {drug_product_id, stok_id, dose:Number, unit, route}', () => {
+// state kurulum yardımcı — _bcGunler/_bcAktifGun doğrudan sandbox'a yazılır
+function gunle(sandbox, gunler, aktif = 1) {
+  sandbox.globalThis._bcGunler = gunler;
+  sandbox.globalThis._bcAktifGun = aktif;
+}
+
+// kalem state fabrikası — secili drugId → girdi (dose/birim henüz girilmemiş
+// alanlar boş string; DOM satırı harvest'ı bcGunlardenItems içinde)
+function kalem(over = {}) {
+  return Object.assign(
+    { name: 'Baytril 10%', dose: '', unit: '', route: '', saat: '' },
+    over
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// V2 (W10) — bcGunlardenItems: çoklu gün plan toplayıcısı.
+// RPC v4 sözleşmesi: p_items GÜN-KEYED —
+//   [{gun: 1..31, saat?: "HH:MM", kalemler: [{drug_product_id, stok_id,
+//     dose>0, unit, route?, saat?}]}]
+// planned_time önceliği SUNUCUDA: kalem.saat > gün.saat > '09:00'. İstemci
+// yalnız DOLU alanları taşır (boş saat anahtarı hiç eklenmez).
+// Tüm günler boş → {hatalar:[], items:[]} (eski akış: vaka ilaçsız / şablon).
+// ══════════════════════════════════════════════════════════════════════
+describe('bcGunlardenItems (V2 — çoklu gün plan toplayıcısı)', () => {
+  it('tek gün, saat yok → {gun:1, kalemler:[...]} — day.saat/kalem.saat anahtarı HİÇ eklenmez (sunucu 09:00 varsayılanı)', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '', secili: { D1: kalem({ dose: '12.5', unit: 'ml', route: 'IM' }) } }]);
+    const sec = sandbox.bcGunlardenItems();
+    assert.deepStrictEqual(host(sec), {
+      hatalar: [],
+      items: [{ gun: 1, kalemler: [{ drug_product_id: 'D1', stok_id: 'S1', dose: 12.5, unit: 'ml', route: 'IM' }] }],
+    });
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(sec.items[0], 'saat'), false);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(sec.items[0].kalemler[0], 'saat'), false);
+  });
+
+  it('saat önceliği taşınır: kalem saati dolu → kalem.saat korunur, gün saati de ayrı gönderilir (öncelik sunucuda)', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '08:30', secili: { D1: kalem({ dose: '10', unit: 'ml', route: 'IM', saat: '07:15' }) } }]);
+    const sec = sandbox.bcGunlardenItems();
+    assert.strictEqual(sec.items[0].saat, '08:30');
+    assert.strictEqual(sec.items[0].kalemler[0].saat, '07:15');
+  });
+
+  it('gün saati dolu, kalem saati boş → kalemde saat anahtarı YOK (gün saati o günün varsayılanı)', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '20:00', secili: { D1: kalem({ dose: '10', unit: 'ml', route: 'IM', saat: '' }) } }]);
+    const sec = sandbox.bcGunlardenItems();
+    assert.strictEqual(sec.items[0].saat, '20:00');
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(sec.items[0].kalemler[0], 'saat'), false);
+  });
+
+  it('çoklu gün — gun sıralı ordinals 1..N; gün saati yalnız dolu günde', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [
+      { gun: 1, saat: '', secili: { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) } },
+      { gun: 2, saat: '16:00', secili: { D1: kalem({ dose: '5', unit: 'ml', route: 'SC', saat: '09:30' }) } },
+    ]);
+    const sec = sandbox.bcGunlardenItems();
+    assert.deepStrictEqual(host(sec.hatalar), []);
+    assert.deepStrictEqual(host(sec.items.map(g => g.gun)), [1, 2]);
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(sec.items[0], 'saat'), false);
+    assert.strictEqual(sec.items[1].saat, '16:00');
+    assert.strictEqual(sec.items[1].kalemler[0].saat, '09:30');
+  });
+
+  it('aktif günün DOM satırı harvest edilir: doz + per-kalem saat (bc-isaat-<id>-g<gun>) state\'e yazılır', () => {
     const { sandbox, document, qsMap } = setupFormsIlac();
+    gunle(sandbox, [
+      { gun: 1, saat: '', secili: { D1: kalem() } },
+      { gun: 2, saat: '', secili: {} },
+    ], 1);
     makeChk(document, qsMap, { id: 'D1', name: 'Baytril 10%' });
     makeRowInputs(document, 'D1', { dose: '12.5', unit: 'ml', route: 'IM' });
-    const sec = sandbox.bcIlacSecilenler();
-    assert.deepStrictEqual(host(sec), {
-      hatalar: [],
-      items: [{ drug_product_id: 'D1', stok_id: 'S1', dose: 12.5, unit: 'ml', route: 'IM' }],
+    const saatInp = document.createElement('input');
+    saatInp.value = '06:30';
+    document.__setEl('bc-isaat-D1-g1', saatInp);
+    const sec = sandbox.bcGunlardenItems();
+    assert.deepStrictEqual(host(sec.hatalar), ['Gün 2: en az bir ilaç seçin']);
+    assert.deepStrictEqual(host(sec.items[0].kalemler[0]), {
+      drug_product_id: 'D1', stok_id: 'S1', dose: 12.5, unit: 'ml', route: 'IM', saat: '06:30',
     });
   });
 
-  it('legacy ilaç → drug_product_id:null, stok_id stoktan çözülür', () => {
-    const { sandbox, document, qsMap } = setupFormsIlac();
-    makeChk(document, qsMap, { id: 'L1', name: 'Eski Stok İlacı', legacy: true });
-    makeRowInputs(document, 'L1', { dose: '5', unit: 'ml', route: '' });
-    const sec = sandbox.bcIlacSecilenler();
+  it('gün 2 boş (gün 1 dolu) → hata "Gün 2: en az bir ilaç seçin"; dolu gün yine toplanır', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [
+      { gun: 1, saat: '', secili: { D1: kalem({ dose: '10', unit: 'ml', route: 'IM' }) } },
+      { gun: 2, saat: '', secili: {} },
+    ]);
+    const sec = sandbox.bcGunlardenItems();
+    assert.deepStrictEqual(host(sec.hatalar), ['Gün 2: en az bir ilaç seçin']);
+    assert.deepStrictEqual(host(sec.items.length), 1);
+    assert.deepStrictEqual(host(sec.items[0].gun), 1);
+  });
+
+  it('TÜM günler boş → {hatalar:[], items:[]} (eski akış korunur: vaka ilaçsız / şablon yolu)', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [
+      { gun: 1, saat: '', secili: {} },
+      { gun: 2, saat: '08:00', secili: {} },
+    ]);
+    assert.deepStrictEqual(host(sandbox.bcGunlardenItems()), { hatalar: [], items: [] });
+  });
+
+  it('doz eksik → "Gün N: <ad>: doz girin" (gün önekli), öğe toplanmaz', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '', secili: { D1: kalem({ dose: '', unit: 'ml', route: 'IM' }) } }]);
+    const sec = sandbox.bcGunlardenItems();
+    assert.deepStrictEqual(host(sec.hatalar), ['Gün 1: Baytril 10%: doz girin']);
+    assert.deepStrictEqual(host(sec.items), []);
+  });
+
+  it('doz ≤ 0 / sayı olmayan → gün önekli doz hatası sayılır', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '', secili: { D1: kalem({ dose: '-2', unit: 'ml', route: 'IM' }) } }]);
+    assert.deepStrictEqual(host(sandbox.bcGunlardenItems().hatalar), ['Gün 1: Baytril 10%: doz girin']);
+  });
+
+  it('birim eksik → "Gün N: <ad>: birim girin"', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '', secili: { D1: kalem({ dose: '10', unit: '  ', route: 'IM' }) } }]);
+    const sec = sandbox.bcGunlardenItems();
+    assert.deepStrictEqual(host(sec.hatalar), ['Gün 1: Baytril 10%: birim girin']);
+    assert.deepStrictEqual(host(sec.items), []);
+  });
+
+  it('legacy ilaç → drug_product_id:null, stok_id cache\'ten çözülür (state legacy/stock tanımsızsa cache fallback)', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '', secili: { L1: kalem({ name: 'Eski Stok İlacı', dose: '5', unit: 'ml', route: '' }) } }]);
+    const sec = sandbox.bcGunlardenItems();
     assert.deepStrictEqual(host(sec), {
       hatalar: [],
-      items: [{ drug_product_id: null, stok_id: 'SL1', dose: 5, unit: 'ml', route: null }],
+      items: [{ gun: 1, kalemler: [{ drug_product_id: null, stok_id: 'SL1', dose: 5, unit: 'ml', route: null }] }],
     });
   });
 
-  it('doz eksik → "İlaç adı: doz girin" hatası, öğe toplanmaz', () => {
-    const { sandbox, document, qsMap } = setupFormsIlac();
-    makeChk(document, qsMap, { id: 'D1', name: 'Baytril 10%' });
-    makeRowInputs(document, 'D1', { dose: '', unit: 'ml', route: 'IM' });
-    const sec = sandbox.bcIlacSecilenler();
-    assert.deepStrictEqual(host(sec.hatalar), ['Baytril 10%: doz girin']);
-    assert.deepStrictEqual(host(sec.items), []);
-  });
-
-  it('doz ≤ 0 / sayı olmayan → doz hatası sayılır', () => {
-    const { sandbox, document, qsMap } = setupFormsIlac();
-    makeChk(document, qsMap, { id: 'D1', name: 'Baytril 10%' });
-    makeRowInputs(document, 'D1', { dose: '-2', unit: 'ml', route: 'IM' });
-    assert.deepStrictEqual(host(sandbox.bcIlacSecilenler().hatalar), ['Baytril 10%: doz girin']);
-  });
-
-  it('birim eksik → "İlaç adı: birim girin" hatası', () => {
-    const { sandbox, document, qsMap } = setupFormsIlac();
-    makeChk(document, qsMap, { id: 'D1', name: 'Baytril 10%' });
-    makeRowInputs(document, 'D1', { dose: '10', unit: '  ', route: 'IM' });
-    const sec = sandbox.bcIlacSecilenler();
-    assert.deepStrictEqual(host(sec.hatalar), ['Baytril 10%: birim girin']);
-    assert.deepStrictEqual(host(sec.items), []);
-  });
-
-  it('hiç seçim yok → {hatalar:[], items:[]} (şablon yolu bozulmaz)', () => {
-    const { sandbox, document, qsMap } = setupFormsIlac();
-    const sec = sandbox.bcIlacSecilenler();
-    assert.deepStrictEqual(host(sec), { hatalar: [], items: [] });
-  });
-
-  it('çoklu seçim — sıra korunur, satır hataları toplanır', () => {
-    const { sandbox, document, qsMap } = setupFormsIlac();
-    makeChk(document, qsMap, { id: 'D1', name: 'Baytril 10%' });
-    makeRowInputs(document, 'D1', { dose: '10', unit: 'ml', route: 'IV' });
-    makeChk(document, qsMap, { id: 'L1', name: 'Eski Stok İlacı', legacy: true });
-    makeRowInputs(document, 'L1', { dose: '', unit: '', route: '' });
-    const sec = sandbox.bcIlacSecilenler();
+  it('çoklu kalem — sıra korunur, satır hataları toplanır (V1.1 çoklu seçim senaryosunun V2 aynası)', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '', secili: {
+      D1: kalem({ dose: '10', unit: 'ml', route: 'IV' }),
+      L1: kalem({ name: 'Eski Stok İlacı', dose: '', unit: '', route: '' }),
+    } }]);
+    const sec = sandbox.bcGunlardenItems();
     assert.deepStrictEqual(host(sec.hatalar), [
-      'Eski Stok İlacı: doz girin',
-      'Eski Stok İlacı: birim girin',
+      'Gün 1: Eski Stok İlacı: doz girin',
+      'Gün 1: Eski Stok İlacı: birim girin',
     ]);
     assert.deepStrictEqual(host(sec.items.length), 1);
-    assert.deepStrictEqual(host(sec.items[0].route), 'IV');
+    assert.deepStrictEqual(host(sec.items[0].kalemler.length), 1);
+    assert.deepStrictEqual(host(sec.items[0].kalemler[0].route), 'IV');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// V2 (W10) — bcGunEkle/bcGunSil: gün sekmesi mekaniği. Gün numaraları
+// KULLANICI SEÇİMİ DEĞİL ordinal: ekleme sonuna ekler, silme sonrası 1..N
+// yeniden numaralanır (RPC 'gun' alanı = ordinal). Maksimum 31 gün.
+// ══════════════════════════════════════════════════════════════════════
+describe('bcGunEkle/bcGunSil (V2 — gün ekleme/silme, ordinal renumbering)', () => {
+  it('gün ekleme → sona ordinal gün ekler, aktif gün yeni güne geçer', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '', secili: {} }]);
+    sandbox.bcGunEkle();
+    assert.strictEqual(sandbox.globalThis._bcGunler.length, 2);
+    assert.strictEqual(sandbox.globalThis._bcAktifGun, 2);
+    assert.strictEqual(sandbox.globalThis._bcGunler[1].gun, 2);
+    assert.deepStrictEqual(host(sandbox.globalThis._bcGunler[1].secili), {});
+  });
+
+  it('31 gün dolu → eklenmez, "⚠️ En fazla 31 gün" toastı', () => {
+    const { sandbox } = setupFormsIlac();
+    const toasts = [];
+    sandbox.toast = (m) => { toasts.push(m); };
+    gunle(sandbox, Array.from({ length: 31 }, (_, i) => ({ gun: i + 1, saat: '', secili: {} })));
+    sandbox.bcGunEkle();
+    assert.strictEqual(sandbox.globalThis._bcGunler.length, 31);
+    assert.deepStrictEqual(host(toasts), ['⚠️ En fazla 31 gün']);
+  });
+
+  it('aktif gün silinir → kalan günler 1..N yeniden numaralanır (RPC gun = ordinal), aktif clamp edilir', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [
+      { gun: 1, saat: '', secili: {} },
+      { gun: 2, saat: '16:00', secili: { D1: kalem({ dose: '5', unit: 'ml', route: 'IM' }) } },
+      { gun: 3, saat: '20:00', secili: {} },
+    ], 2);
+    sandbox.bcGunSil();
+    const gunler = sandbox.globalThis._bcGunler;
+    assert.deepStrictEqual(host(gunler.map(g => g.gun)), [1, 2]);
+    assert.strictEqual(gunler[1].saat, '20:00'); // eski gün 3 → yeni gün 2
+    assert.strictEqual(sandbox.globalThis._bcAktifGun, 2); // min(2, yeniN)
+  });
+
+  it('tek gün silinemez — no-op', () => {
+    const { sandbox } = setupFormsIlac();
+    gunle(sandbox, [{ gun: 1, saat: '08:00', secili: {} }]);
+    sandbox.bcGunSil();
+    assert.strictEqual(sandbox.globalThis._bcGunler.length, 1);
+    assert.strictEqual(sandbox.globalThis._bcGunler[0].saat, '08:00');
   });
 });
 
@@ -389,33 +540,51 @@ describe('bcSablonaDonustur (V1.1 — ilaç→şablon karşılıklı dışlama)'
   });
 });
 
-describe('bcSablonIlacTemizle (V1.1 — şablon→ilaç karşılıklı dışlama)', () => {
-  it('işaretli ilaç kutularını kapatır, doz alanını sıfırlar', () => {
+describe('bcSablonIlacTemizle (V1.1 → V2 — şablon→ilaç karşılıklı dışlama)', () => {
+  // V2 ADAPTASYON: V1.1 testi 'alan.style.display===none' assertion'ı içeriyordu;
+  // V2'de doz alanı hep görünür (gün plan editörü) — assertion yerine TÜM
+  // günlerin secili state temizliği kontrol edilir.
+  it('işaretli kutuları kapatır, doz satırlarını sıfırlar, TÜM günlerin secili state\'ini temizler', () => {
     const { sandbox, document, qsMap } = setupFormsIlac();
     const chk = makeChk(document, qsMap, { id: 'D1', name: 'Baytril 10%' });
     const satirlar = document.createElement('div');
     satirlar.innerHTML = '<div id="bc-irow-D1"></div>';
     document.__setEl('bc-ilac-doz-satirlar', satirlar);
-    const alan = document.createElement('div');
-    alan.style.display = 'block';
-    document.__setEl('bc-ilac-doz-alani', alan);
+    gunle(sandbox, [
+      { gun: 1, saat: '', secili: { D1: kalem({ dose: '5' }) } },
+      { gun: 2, saat: '16:00', secili: { L1: kalem({ name: 'Eski', dose: '2' }) } },
+    ], 1);
     sandbox.bcSablonIlacTemizle();
     assert.strictEqual(chk.checked, false);
     assert.strictEqual(satirlar.innerHTML, '');
-    assert.strictEqual(alan.style.display, 'none');
+    assert.deepStrictEqual(
+      host(sandbox.globalThis._bcGunler.map(g => Object.keys(g.secili).length)),
+      [0, 0]
+    );
+    assert.strictEqual(sandbox.globalThis._bcGunler[1].saat, '16:00'); // gün saati korunur
   });
 });
 
-describe('bcButonMetni (V1.1 — dinamik buton etiketi)', () => {
+describe('bcButonMetni (V1.1 → V2 — dinamik buton etiketi)', () => {
   it('manuel ilaç yok → "🩺 Vakaları Aç"', () => {
     const { sandbox, document, qsMap } = setupFormsIlac();
     qsMap.set('.bc-ichk:checked', []);
     assert.strictEqual(sandbox.bcButonMetni(), '🩺 Vakaları Aç');
   });
 
-  it('manuel ilaç var → "💊 Tedaviyi Uygula"', () => {
+  it('manuel ilaç var (aktif gün DOM) → "💊 Tedaviyi Uygula"', () => {
     const { sandbox, document, qsMap } = setupFormsIlac();
     makeChk(document, qsMap, { id: 'D1', name: 'Baytril 10%' });
+    assert.strictEqual(sandbox.bcButonMetni(), '💊 Tedaviyi Uygula');
+  });
+
+  it('V2 — ilaç yalnız BAŞKA bir günde (DOM boş) → "💊 Tedaviyi Uygula"', () => {
+    const { sandbox, document, qsMap } = setupFormsIlac();
+    qsMap.set('.bc-ichk:checked', []);
+    gunle(sandbox, [
+      { gun: 1, saat: '', secili: {} },
+      { gun: 2, saat: '', secili: { D1: kalem({ dose: '5' }) } },
+    ], 1);
     assert.strictEqual(sandbox.bcButonMetni(), '💊 Tedaviyi Uygula');
   });
 });
@@ -580,5 +749,91 @@ describe('bcSonucSatirlari V1.2 uzantısı (tohumlama alanları)', () => {
       acilan: [{ kupe: 'TR-4', case_id: 'c4', tohumlama: { olustu: false } }],
     });
     assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'tohumlamaSebep'), false);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// V2 (W10) — bcTohumBlokDurumu: tohumlama bloğu keşfedilebilirlik durumu.
+// Blok HER ZAMAN görünür; yalnız duruma göre disabled olur (eski
+// display:none + silent-uncheck davranışı kaldırıldı — sahibi bulamıyordu).
+//    disabled-bos   → seçim yok: 'Hayvan seçince aktifleşir'
+//    disabled-erkek → tümü Erkek: kırmızı uyarı, hâlâ disabled
+//    aktif          → orijinal uygunluk ipucu, tam opaklık
+// Saf, DOM'suz.
+// ══════════════════════════════════════════════════════════════════════
+describe('bcTohumBlokDurumu (V2 — tohumlama bloğu keşfedilebilirliği)', () => {
+  it('boş liste → {mod:"disabled-bos", ipucu:"Hayvan seçince aktifleşir"}', () => {
+    assert.deepStrictEqual(host(sb.bcTohumBlokDurumu([])), {
+      mod: 'disabled-bos',
+      ipucu: 'Hayvan seçince aktifleşir',
+    });
+  });
+
+  it('null/undefined → disabled-bos (patlamaz)', () => {
+    assert.strictEqual(sb.bcTohumBlokDurumu(null).mod, 'disabled-bos');
+    assert.strictEqual(sb.bcTohumBlokDurumu(undefined).mod, 'disabled-bos');
+  });
+
+  it('tümü Erkek → {mod:"disabled-erkek", ipucu:"Seçili hayvanların tümü erkek — tohumlama uygulanamaz"}', () => {
+    const r = sb.bcTohumBlokDurumu([
+      { id: 'H1', kupe: 'TR-1', cinsiyet: 'Erkek' },
+      { id: 'H2', kupe: 'TR-2', cinsiyet: 'Erkek' },
+    ]);
+    assert.deepStrictEqual(host(r), {
+      mod: 'disabled-erkek',
+      ipucu: 'Seçili hayvanların tümü erkek — tohumlama uygulanamaz',
+    });
+  });
+
+  it('en az bir dişi → {mod:"aktif", ipucu: orijinal uygunluk ipucu}', () => {
+    const r = sb.bcTohumBlokDurumu([
+      { id: 'H1', kupe: 'TR-1', cinsiyet: 'Erkek' },
+      { id: 'H2', kupe: 'TR-2', cinsiyet: 'Dişi' },
+    ]);
+    assert.strictEqual(r.mod, 'aktif');
+    assert.match(r.ipucu, /Erkek, 12 aydan küçük ve gebe/);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// V2 (W10) — bcSonucSatirlari çoklu gün uzantısı + bcManuelSatirEki.
+// RPC v4: acilan[i].manuel = {gun_sayisi, seans_sayisi}. Ok satırı metni:
+// '✅ <kupe> — vaka açıldı + N gün · M ilaç' (gün yoksa eski '+ M ilaç'
+// fallback; hiçbiri yoksa ek yok).
+// ══════════════════════════════════════════════════════════════════════
+describe('bcSonucSatirlari V2 uzantısı (çoklu gün — gunSayisi)', () => {
+  it('manuel {gun_sayisi, seans_sayisi} → satıra gunSayisi + ilacSayisi taşınır', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true, manuel: true,
+      acilan: [{ kupe: 'TR-9', case_id: 'c9', manuel: { gun_sayisi: 3, seans_sayisi: 5 } }],
+    });
+    assert.deepStrictEqual(host(rows), [
+      { tip: 'ok', kupe: 'TR-9', ilacSayisi: 5, gunSayisi: 3 },
+    ]);
+  });
+
+  it('gun_sayisi eksik → gunSayisi anahtarı HİÇ eklenmez (fallback)', () => {
+    const rows = sb.bcSonucSatirlari({
+      ok: true, manuel: true,
+      acilan: [{ kupe: 'TR-2', case_id: 'c2', manuel: { seans_sayisi: 2 } }],
+    });
+    assert.strictEqual(Object.prototype.hasOwnProperty.call(rows[0], 'gunSayisi'), false);
+  });
+});
+
+describe('bcManuelSatirEki (V2 — manuel ok-satırı metin kurucusu)', () => {
+  it('gun + seans → " + 3 gün · 5 ilaç"', () => {
+    assert.strictEqual(sb.bcManuelSatirEki({ gun_sayisi: 3, seans_sayisi: 5 }), ' + 3 gün · 5 ilaç');
+  });
+
+  it('yalnız seans → eski " + 5 ilaç" fallback', () => {
+    assert.strictEqual(sb.bcManuelSatirEki({ seans_sayisi: 5 }), ' + 5 ilaç');
+  });
+
+  it('manuel yok / alanlar eksik → "" (ek yok)', () => {
+    assert.strictEqual(sb.bcManuelSatirEki(undefined), '');
+    assert.strictEqual(sb.bcManuelSatirEki(null), '');
+    assert.strictEqual(sb.bcManuelSatirEki({}), '');
+    assert.strictEqual(sb.bcManuelSatirEki({ gun_sayisi: 3 }), '');
   });
 });

@@ -214,6 +214,10 @@ registerActions({
   'bc-ilac-ara':      () => bcIlacAraFiltre(), // V1.1 — manuel ilaç arama filtresi
   'bc-tarih-degisti': () => bcTarihIpucuGuncelle(), // V1.2 — plan tarihi ipucu
   'bc-tohum-saat-chip': (el) => { const i = g('bc-tohum-saat'); if (i) i.value = el.dataset.t; }, // V1.2 — hızlı saat çipi
+  'bc-gun-ekle':      () => bcGunEkle(),                          // V2 — gün planına gün ekle
+  'bc-gun-sil':       () => bcGunSil(),                           // V2 — aktif günü sil (ordinal renumber)
+  'bc-gun-sec':       (el) => bcGunSec(Number(el.dataset.gun)),   // V2 — gün sekmesi seç (data-gun)
+  'bc-gun-saat':      (el) => bcGunSaatDegisti(el),               // V2 — aktif günün varsayılan saati
   'submit-bulk-case': (el) => submitBulkCase(el),
 
   // ═══ AŞI ═══
