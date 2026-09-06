@@ -1,6 +1,6 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: review
+status: active
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
@@ -49,6 +49,7 @@ acceptance:
   - `python3 .harness/bin/harness.py validate --json` reports zero findings for this goal and its linked report.
   - Manual drug path E2E: bulk case + day-1 drug_administrations per animal verified in demo.
   - V1.2 E2E: future-dated bulk case (şablon or manuel) anchors days+tohumlama to planned date; male/young animals' tohumlama skipped with exact reasons in demo.
+  - V2 E2E: multi-day bulk plan anchors each day to start_date+(n-1) with per-day/per-kalem times verified in demo.
   - Root reviews the diff; merge and push happen only after owner approval; PROD migration happens only after separate owner approval.
 stop_conditions:
   - Live schema materially contradicts ground-truth assumptions before implementation (create_case, tedavi_sablon_uygula, or _tohumlama_gorev_uygunluk drift).
@@ -278,5 +279,22 @@ Constraint carried forward: past dates stay blocked; per-day saat must
 satisfy the engine's `planned_time NOT NULL` (default `'09:00'` convention
 or per-kalem saat input like the şablon builder).
 
-This section records direction only — implementation scope stays closed for
-this goal (status: review; no new acceptance criteria).
+**V2 implementation (2026-09-06, owner: devam):** the RPC half of the V2
+direction is now implemented in this goal (status review → active). The
+`vaka_toplu_ac` signature is UNCHANGED (9 params); only the `p_items` SHAPE
+evolves to a day-keyed array
+`[{"gun": <int 1..31>, "saat"?: "<HH:MM>", "kalemler": [...]}]` where each
+kalem keeps the V1.1 keys plus an optional per-kalem `saat`. Saat precedence
+per kalem is `COALESCE(kalem.saat, gün.saat, '09:00')`; days sort by `gun`
+ASC and each day executes through `add_treatment_day_with_sessions` anchored
+at `start_date + (gun - 1)`. PARTIAL-DAYS-ON-ERROR semantics: an engine
+`ok:false` or EXCEPTION on any day pushes the per-animal error into
+`hatalar` WITH `case_id` + `gun`, the case STAYS OPEN with all earlier
+days' rows remaining, the remaining days are not attempted, and the loop
+continues with the next animal (such an animal never enters `acilan`).
+`acilan[i].manuel` becomes `{gun_sayisi, seans_sayisi}`. The flat V1.1
+array shape is no longer accepted and fails day validation fail-fast
+(`'Geçersiz plan: gün 1..31'`; the only caller is this goal's UI, never
+deployed to PROD). Everything else unchanged: mutual exclusion, `p_tarih`
+anchor (past blocked), tohumlama branch, cap 200, dedupe, atlanan/hatalar,
+şablon pg_proc guard, NOTIFY pgrst, GRANTs. UI half: parallel worker W10.

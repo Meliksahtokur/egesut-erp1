@@ -91,6 +91,50 @@
 --   * V1/V1.1 davranışı aynen korunur (karşılıklı dışlama, kalem doğrulama,
 --     200 sınırı, dedupe, atlanan/hatalar, pg_proc şablon guard'ı, NOTIFY,
 --     GRANT'lar).
+-- ----------------------------------------------------------------------------
+-- V2 (2026-09-06, owner: devam): ÇOKLU GÜNLÜ TEDAVİ PLANI — gün-anahtarlı
+--   p_items. İmza DEĞİŞMEDİ (9 parametre); yalnız p_items ŞEKLİ evrilir:
+--     p_items: GÜN objeleri dizisi:
+--       [{"gun": <int 1..31>,
+--         "saat": "<HH:MM>" (opsiyonel — günün varsayılan seans saati),
+--         "kalemler": [{"drug_product_id": uuid-metni, "stok_id": metin,
+--                       "dose": sayı > 0, "unit": boş olmayan metin,
+--                       "route": opsiyonel metin,
+--                       "saat": "<HH:MM>" opsiyonel (kalem başına)}]}]
+--   * Doğrulama fail-fast'tir — hiç vaka açılmadan döner (V1.1 üslubu):
+--     - p_items boş olmayan bir dizi;
+--     - her gün: 'gun' tam sayı 1..31 (aksi halde
+--       'Geçersiz plan: gün 1..31'), günler dizide tekil (aksi halde
+--       'Geçersiz plan: gün <n> tekrar ediyor'), 'kalemler' boş olmayan
+--       dizi (aksi halde 'Geçersiz plan: Gün <n> kalemleri boş');
+--     - gün.saat ve kalem.saat verildiyse V1.2'deki HH:MM regex'i
+--       (aksi halde 'Geçersiz plan: <yer>: saat'; <yer> = 'gün <n>' ya da
+--       'gün <n> kalem <k>');
+--     - her kalem V1.1 kalem kontrollerinden geçer (mesajlar aynen; index
+--       biçimi '<gün>.<kalem>', kalem 1 tabanlı).
+--     DÜZ (V1.1) dizi şekli ARTIK KABUL EDİLMEZ: 'gun' anahtarı olmayan ilk
+--     eleman 'Geçersiz plan: gün 1..31' ile düşer (tek çağıran bu goal'ın
+--     UI'ı; PROD'a hiç gitmedi).
+--   * Yürütme (V1.1 tek-gün manuel kolunun YERİNE): günler gun ASC; her gün
+--     için seans dizisi kurulur — kalem başına planned_time :=
+--     COALESCE(kalem.saat, gün.saat, '09:00') — ve her gün motor bug059
+--     add_treatment_day_with_sessions(case, start_date + (gun - 1), sess,
+--     NULL) ile işlenir (start_date = p_tarih ya da bugün — V1.2 çapası).
+--     KISMİ GÜN SEMANTİĞİ: HER GÜN kendi BEGIN/EXCEPTION alt bloğunda
+--     işlenir; motor ok:false dönerse ya da bir gün EXCEPTION yükseltirse
+--     hata, case_id + gün bilgisiyle hatalar'a yazılır ve yalnız O günün
+--     satırları geri alınır; vaka AÇIK kalır ve ÖNCEKİ günlerin satırları
+--     (treatment_days, uygulamalar, ilaç kayıtları, stok hareketleri,
+--     görevler) DURAR; kalan günler denenmez, sıradaki hayvana geçilir
+--     (V1.1 tek-gün deseninin çoklu-gün genelleştirmesi). Böyle bir hayvan
+--     acilan'a GİRMEZ.
+--   * acilan[i].manuel := {gun_sayisi: <başarıyla işlenen gün sayısı>,
+--     seans_sayisi: <günler boyunca yaratılan toplam seans>}. Üst seviye
+--     alanlar DEĞİŞMEDİ ('manuel' boolean dahil).
+--   * Diğer her şey AYNEN: karşılıklı dışlama (p_items ↔ p_sablon_id),
+--     p_tarih çapası (geçmiş yasak), tohumlama kolu (vaka_tohumlama_ekle
+--     yeniden kullanımı + yumuşak guard), 200 sınırı, dedupe, atlanan,
+--     hatalar, şablon pg_proc guard'ı, NOTIFY pgrst, GRANT'lar.
 -- ============================================================================
 
 BEGIN;
@@ -223,6 +267,12 @@ DECLARE
   v_sess          jsonb;
   v_item          jsonb;
   v_idx           int;
+  v_day           jsonb;
+  v_days_sorted   jsonb;
+  v_dup_gun       int;
+  v_gun_sayisi    int;
+  v_seans_toplam  int;
+  v_err_gun       int;
 BEGIN
   IF p_animal_ids IS NULL OR array_length(p_animal_ids, 1) IS NULL THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan listesi boş');
@@ -254,60 +304,130 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz saat');
   END IF;
 
-  -- V1.1: p_items doğrulama + motor biçimine normalize (fail-fast — henüz
-  -- hiç vaka açılmadan döner). Motor kalemleri birebir aynı anahtarlarla
-  -- okur (20260611000002_bug059_rpcs.sql); planned_time motor için zorunlu
-  -- olduğundan (treatment_day_uygulamalar.planned_time NOT NULL,
-  -- 20260611000001) verilmeyen kaleme '09:00' default'u yazılır.
+  -- V2: p_items doğrulama + motor biçimine normalize (fail-fast — henüz
+  -- hiç vaka açılmadan döner). p_items artık GÜN objeleri dizisidir:
+  -- [{gun, saat?, kalemler:[...]}]. Her kalem V1.1 kalem kontrollerinden
+  -- geçer (mesajlar aynen, index '<gün>.<kalem>'); kalem saati motor için
+  -- zorunlu planned_time'a COALESCE(kalem.saat, gün.saat, '09:00') ile
+  -- çevrilir (treatment_day_uygulamalar.planned_time NOT NULL,
+  -- 20260611000001). DÜZ (V1.1) dizi şekli kabul edilmez: gun anahtarı
+  -- olmayan ilk eleman 'Geçersiz plan: gün 1..31' ile düşer.
   IF p_items IS NOT NULL THEN
     IF jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) < 1 THEN
       RETURN jsonb_build_object('ok', false, 'mesaj',
-        'Geçersiz ilaç kalemi: 0: boş olmayan bir jsonb dizisi bekleniyor');
+        'Geçersiz plan: boş olmayan bir jsonb dizisi bekleniyor');
     END IF;
-    v_sess := '[]'::jsonb;
-    FOR v_item, v_idx IN
+    FOR v_day, v_idx IN
       SELECT value, ord - 1
       FROM jsonb_array_elements(p_items) WITH ORDINALITY AS t(value, ord)
     LOOP
-      IF jsonb_typeof(v_item) IS DISTINCT FROM 'object' THEN
+      IF jsonb_typeof(v_day) IS DISTINCT FROM 'object' THEN
         RETURN jsonb_build_object('ok', false, 'mesaj',
-          'Geçersiz ilaç kalemi: ' || v_idx || ': dizi elemanı obje olmalı');
+          'Geçersiz plan: ' || v_idx || ': gün elemanı obje olmalı');
       END IF;
-      IF COALESCE(v_item->>'drug_product_id', '') = '' THEN
+      -- gun: JSON sayısı ve tam sayı yazımı, 1..31 (düz V1.1 kalemleri burada
+      -- düşer — gun anahtarı yok)
+      IF COALESCE(jsonb_typeof(v_day->'gun'), '') <> 'number'
+         OR (v_day->>'gun') !~ '^[0-9]+$'
+         OR (v_day->>'gun')::numeric < 1
+         OR (v_day->>'gun')::numeric > 31 THEN
+        RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz plan: gün 1..31');
+      END IF;
+      IF v_day->>'saat' IS NOT NULL
+         AND (v_day->>'saat') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
         RETURN jsonb_build_object('ok', false, 'mesaj',
-          'Geçersiz ilaç kalemi: ' || v_idx || ': drug_product_id zorunlu (uuid)');
+          'Geçersiz plan: gün ' || (v_day->>'gun') || ': saat');
       END IF;
-      IF (v_item->>'drug_product_id') !~*
-          '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+      IF COALESCE(jsonb_typeof(v_day->'kalemler'), '') <> 'array'
+         OR jsonb_array_length(v_day->'kalemler') < 1 THEN
         RETURN jsonb_build_object('ok', false, 'mesaj',
-          'Geçersiz ilaç kalemi: ' || v_idx || ': drug_product_id geçerli bir uuid değil');
+          'Geçersiz plan: Gün ' || (v_day->>'gun') || ' kalemleri boş');
       END IF;
-      IF COALESCE(v_item->>'stok_id', '') = '' THEN
-        RETURN jsonb_build_object('ok', false, 'mesaj',
-          'Geçersiz ilaç kalemi: ' || v_idx || ': stok_id zorunlu');
-      END IF;
-      IF v_item->>'dose' IS NULL
-         OR (v_item->>'dose') !~ '^[0-9]+([.][0-9]+)?$'
-         OR (v_item->>'dose')::numeric <= 0 THEN
-        RETURN jsonb_build_object('ok', false, 'mesaj',
-          'Geçersiz ilaç kalemi: ' || v_idx || ': dose pozitif sayısal olmalı (dose > 0)');
-      END IF;
-      IF COALESCE(v_item->>'unit', '') = '' THEN
-        RETURN jsonb_build_object('ok', false, 'mesaj',
-          'Geçersiz ilaç kalemi: ' || v_idx || ': unit zorunlu');
-      END IF;
-      IF v_item->>'planned_time' IS NOT NULL
-         AND (v_item->>'planned_time') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
-        RETURN jsonb_build_object('ok', false, 'mesaj',
-          'Geçersiz ilaç kalemi: ' || v_idx || ': planned_time HH:MM biçiminde olmalı');
-      END IF;
-      v_sess := v_sess || jsonb_build_array(jsonb_build_object(
-        'drug_product_id', v_item->>'drug_product_id',
-        'stok_id',         v_item->>'stok_id',
-        'dose',            v_item->>'dose',
-        'unit',            v_item->>'unit',
-        'route',           NULLIF(v_item->>'route', ''),
-        'planned_time',    COALESCE(NULLIF(v_item->>'planned_time', ''), '09:00')));
+      -- V1.1 kalem kontrolleri — mesajlar aynen, index '<gün>.<kalem>'
+      -- (kalem 1 tabanlı); kalem saati V2 üslubuyla denetlenir
+      FOR v_item, v_idx IN
+        SELECT value, ord
+        FROM jsonb_array_elements(v_day->'kalemler') WITH ORDINALITY AS t(value, ord)
+      LOOP
+        IF jsonb_typeof(v_item) IS DISTINCT FROM 'object' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': dizi elemanı obje olmalı');
+        END IF;
+        IF COALESCE(v_item->>'drug_product_id', '') = '' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': drug_product_id zorunlu (uuid)');
+        END IF;
+        IF (v_item->>'drug_product_id') !~*
+            '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': drug_product_id geçerli bir uuid değil');
+        END IF;
+        IF COALESCE(v_item->>'stok_id', '') = '' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': stok_id zorunlu');
+        END IF;
+        IF v_item->>'dose' IS NULL
+           OR (v_item->>'dose') !~ '^[0-9]+([.][0-9]+)?$'
+           OR (v_item->>'dose')::numeric <= 0 THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': dose pozitif sayısal olmalı (dose > 0)');
+        END IF;
+        IF COALESCE(v_item->>'unit', '') = '' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': unit zorunlu');
+        END IF;
+        IF v_item->>'saat' IS NOT NULL
+           AND (v_item->>'saat') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz plan: gün ' || (v_day->>'gun') || ' kalem ' || v_idx || ': saat');
+        END IF;
+      END LOOP;
+    END LOOP;
+    -- Günler dizide tekil olmalı (buraya gelindiğinde tüm gun değerleri
+    -- 1..31 aralığında geçerli tam sayılar)
+    SELECT min(g)
+      INTO v_dup_gun
+      FROM (
+        SELECT (d->>'gun')::int AS g
+        FROM jsonb_array_elements(p_items) d
+        GROUP BY 1
+        HAVING count(*) > 1
+      ) t;
+    IF v_dup_gun IS NOT NULL THEN
+      RETURN jsonb_build_object('ok', false, 'mesaj',
+        'Geçersiz plan: gün ' || v_dup_gun || ' tekrar ediyor');
+    END IF;
+    -- Yürütme planı (bir kez, döngü dışında): günler gun ASC sıralanır,
+    -- her günün seans dizisi kurulur — kalem başına planned_time :=
+    -- COALESCE(kalem.saat, gün.saat, '09:00'). Motor kalemleri birebir aynı
+    -- anahtarlarla okur (20260611000002_bug059_rpcs.sql).
+    v_days_sorted := '[]'::jsonb;
+    FOR v_day IN
+      SELECT value
+      FROM jsonb_array_elements(p_items)
+      ORDER BY (value->>'gun')::int
+    LOOP
+      v_sess := '[]'::jsonb;
+      FOR v_item IN SELECT * FROM jsonb_array_elements(v_day->'kalemler')
+      LOOP
+        v_sess := v_sess || jsonb_build_array(jsonb_build_object(
+          'drug_product_id', v_item->>'drug_product_id',
+          'stok_id',         v_item->>'stok_id',
+          'dose',            v_item->>'dose',
+          'unit',            v_item->>'unit',
+          'route',           NULLIF(v_item->>'route', ''),
+          'planned_time',    COALESCE(NULLIF(v_item->>'saat', ''),
+                                    NULLIF(v_day->>'saat', ''), '09:00')));
+      END LOOP;
+      v_days_sorted := v_days_sorted || jsonb_build_array(jsonb_build_object(
+        'gun',  (v_day->>'gun')::int,
+        'sess', v_sess));
     END LOOP;
   END IF;
 
@@ -377,32 +497,53 @@ BEGIN
               'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM, 'case_id', v_case_id));
           END;
         ELSIF p_items IS NOT NULL THEN
-          -- V1.1: gün 1 manuel tedavi — bug059 motoru (şablon yolunun da
-          -- altındaki aynı motor). V1.2: gün-1 tarihi p_tarih'e çapar
-          -- (planlı başlangıç). Motor hatası tek hayvanı hatalar'a
-          -- düşürür; vaka açık kalır (şablon deseni ile aynı).
-          BEGIN
-            v_r := public.add_treatment_day_with_sessions(
-              p_case_id         := v_case_id,
-              p_date            := COALESCE(p_tarih, CURRENT_DATE),
-              p_sessions        := v_sess,
-              p_existing_day_id := NULL);
-            IF (v_r->>'ok') <> 'true' THEN
+          -- V2: çoklu gün manuel plan — günler gun ASC (v_days_sorted), her
+          -- gün bug059 motoruyla vakanın start_date + (gun - 1) tarihine
+          -- işlenir (start_date = p_tarih ya da bugün — V1.2 çapası).
+          -- KISMİ GÜN SEMANTİĞİ: HER GÜN kendi BEGIN/EXCEPTION alt bloğunda
+          -- işlenir — bir günde motor ok:false ya da EXCEPTION → hayvan
+          -- hatalar'a düşer (case_id + gün bilgisiyle), vaka AÇIK kalır ve
+          -- ÖNCEKİ günlerin satırları (treatment_days, uygulamalar, ilaç
+          -- kayıtları, stok hareketleri, görevler) DURAR (gün alt bloğu
+          -- yalnız kendi gününü geri alır); kalan günler denenmez,
+          -- sıradaki hayvana geçilir. Böyle bir hayvan acilan'a girmez
+          -- (V1.1 tek-gün deseninin çoklu-gün genelleştirmesi).
+          v_gun_sayisi   := 0;
+          v_seans_toplam := 0;
+          v_err_gun      := NULL;
+          FOR v_day IN SELECT * FROM jsonb_array_elements(v_days_sorted)
+          LOOP
+            EXIT WHEN NOT v_ok;
+            v_err_gun := (v_day->>'gun')::int;
+            BEGIN
+              v_r := public.add_treatment_day_with_sessions(
+                p_case_id         := v_case_id,
+                p_date            := v_start_date + (v_err_gun - 1),
+                p_sessions        := v_day->'sess',
+                p_existing_day_id := NULL);
+              IF (v_r->>'ok') <> 'true' THEN
+                v_ok := false;
+                v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
+                  'hayvan_id', v_id, 'kupe', v_kupe,
+                  'mesaj', COALESCE(v_r->>'mesaj', 'Tedavi günü eklenemedi'),
+                  'case_id', v_case_id, 'gun', v_err_gun));
+              ELSE
+                v_gun_sayisi   := v_gun_sayisi + 1;
+                v_seans_toplam := v_seans_toplam
+                                  + COALESCE((v_r->>'seans_sayisi')::int, 0);
+              END IF;
+            EXCEPTION WHEN OTHERS THEN
               v_ok := false;
               v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
-                'hayvan_id', v_id, 'kupe', v_kupe,
-                'mesaj', COALESCE(v_r->>'mesaj', 'Tedavi günü eklenemedi'),
-                'case_id', v_case_id));
-            ELSE
-              v_manuel_obj := jsonb_build_object(
-                'day_no',       v_r->'day_no',
-                'seans_sayisi', v_r->'seans_sayisi');
-            END IF;
-          EXCEPTION WHEN OTHERS THEN
-            v_ok := false;
-            v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
-              'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM, 'case_id', v_case_id));
-          END;
+                'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM,
+                'case_id', v_case_id, 'gun', v_err_gun));
+            END;
+          END LOOP;
+          IF v_ok THEN
+            v_manuel_obj := jsonb_build_object(
+              'gun_sayisi',   v_gun_sayisi,
+              'seans_sayisi', v_seans_toplam);
+          END IF;
         END IF;
 
         -- V1.2: planlı tohumlama — HER başarılı açılan vaka için, şablon/
