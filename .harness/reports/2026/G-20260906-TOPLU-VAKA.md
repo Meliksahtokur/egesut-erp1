@@ -236,15 +236,26 @@ implementation commits (post-rebase):
           №+takvim), seans A/B saat-grup dili, gün kopyalama
   b32fb65 feat(ui): bantlı sonuç/uyarı düzeni + pre-line satır düzeltmesi +
           tohumlama çakışma uyarısı
-  (17 commits on branch idle/toplu-vaka since launch eaa0640 through tip
-  b32fb65 — rev-list verified; 18 incl. this V2.1 docs amendment;
-  sequence 0036fa5…b32fb65)
+  1b62258 feat(db): tedavi_sablon_kaydet boşluk koruması — DENSE_RANK
+          kaldırıldı (+GT)
+  32f73b9 feat(db): vaka_toplu_ac p_tohumlama_cakisma —
+          uzerine_yaz=iptal / atla modları (+GT, goal V2.2)
+  57ffd15 fix(ui): takvim ay-geçiş/gün-seçim bug'ı — saf durum
+          fonksiyonları + RED-önce testler + TR tarih başlığı
+  aaa79ca feat(ui): çoklu hedef gün kopyalama + sonuç satırından hayvan
+          kartına geçiş
+  a247bec feat(ui): planı şablon olarak kaydet (devam edit) + tohumlama
+          çakışma radyosu (üzerine yaz/atla)
+  (23 commits on branch idle/toplu-vaka since launch eaa0640 through tip
+  a247bec — rev-list verified; 24 incl. this V2.2 docs amendment;
+  sequence 0036fa5…a247bec)
 docs checkpoints:
   pre-review @ 1139798 — docs_verdict PASS (V1 docs commit)
   pre-review @ 5e463d9 — docs_verdict PASS (V1.1 amendment docs commit)
   pre-review @ 6d2a285 — docs_verdict PASS (V1.2 amendment docs commit)
   pre-review @ 39468f5 — docs_verdict PASS (V2 delivery docs commit)
   pre-review @ b32fb65 — docs_verdict PASS (V2.1 delivery docs commit)
+  pre-review @ a247bec — docs_verdict PASS (V2.2 delivery docs commit)
   handoff/final: not recorded — root close + owner merge approval pending
 residual risks: see §6
 temporary mutations and artifacts restored:
@@ -998,3 +1009,116 @@ pg_get_functiondef):
 Demo rows: none created by the apply (DDL only); the çakışma modları
 E2E on demo (criterion 15 browser path) remains root's E2E step, the
 RPC contract is scratch-proven above. NOT applied to PROD (owner-gated).
+
+## V2.2 Delivery (2026-09-06, superset-10x operasyon planı)
+
+Management model: owner-approved superset-10x operasyon planı — research
+round → frozen contracts → parallel workers on two disjoint file-lanes
+(W13 calendar fix on js/ui.js ‖ W15-RPC `p_tohumlama_cakisma` on the
+migration + GT), then sequential W14 (multi-copy + animal-card link) and
+W16 (şablon kaydet + çakışma radyosu) on the shared UI lane; W15-RPC
+re-opened the goal (status→active, criteria 14/15 per the amendment
+above) and root E2E below verifies both — the goal returns to `review`
+with criteria 14 AND 15 `PASS`. Unit suite re-run by this docs amendment:
+635/635 pass, 0 fail, exit 0 (verified live). All earlier content stays
+intact; only the §5 commit/checkpoint lists were extended (23 commits on
+branch through tip `a247bec`, rev-list verified).
+
+### Owner decisions (2, V2.2 — implemented, then E2E-verified here)
+
+1. Şablon boşluk koruması — a şablon's gapped day numbers are PRESERVED
+   (no DENSE_RANK compression). Discovery: the live body has behaved
+   this way since 20260722000001; only GT was stale (commit `1b62258`
+   aligned GT, no new migration — see the V2.2 Amendment TASK A above).
+2. Üzerine yaz = soft-cancel — 'uzerine_yaz' YUMUŞAK iptal eder the old
+   open TOHUMLAMA_PLANLI görevler (iptal+tamamlandi+kapatan_ref +
+   per-görev islem_log audit), never a hard delete; 'atla' opens
+   nothing (commit `32f73b9`, 10-arg signature).
+
+### V2.2 commits (5)
+
+- `1b62258` feat(db): tedavi_sablon_kaydet boşluk koruması — DENSE_RANK
+  kaldırıldı (+GT)
+- `32f73b9` feat(db): vaka_toplu_ac p_tohumlama_cakisma —
+  uzerine_yaz=iptal / atla modları (+GT, goal V2.2)
+- `57ffd15` fix(ui): takvim ay-geçiş/gün-seçim bug'ı — saf durum
+  fonksiyonları + RED-önce testler + TR tarih başlığı (W13)
+- `aaa79ca` feat(ui): çoklu hedef gün kopyalama + sonuç satırından
+  hayvan kartına geçiş (W14)
+- `a247bec` feat(ui): planı şablon olarak kaydet (devam edit) +
+  tohumlama çakışma radyosu (üzerine yaz/atla) (W16)
+
+Branch tip at delivery: `a247bec` — this docs amendment lands on top.
+Verified branch count: `git rev-list --count eaa0640..a247bec` = **23**
+commits since launch; **24** including this V2.2 docs amendment
+(post-commit rev-list verified); sequence 0036fa5 → … → a247bec.
+
+### Root E2E (demo, browser) — criteria 14 AND 15: PASS
+
+Test-env lesson first (not a product bug): the first E2E pass on the
+long-lived local-serve tab :8097 showed a stale `ui.js` browser-cache
+artifact; diagnosed as staleness, then re-run clean on a fresh-origin
+serve :8099 (demo mode, 2026-09-06). Cache-busting `?v=` on script tags
+noted as a future candidate — out of scope here.
+
+1. Calendar (bug fix, W13): title 'BAŞLANGIÇ: 06.09.2026' (TR format);
+   month labels Turkish ('Eylül 2026', 'Ekim 2026'); day beyond bound
+   (15 Ekim = start+39) → toast '⚠️ Başlangıçtan itibaren en fazla 31
+   gün seçilebilir (son gün: 06.10.2026)' + NOT selected (the REAL bug
+   W13 found: no upper bound → gün 35/40 cards silently); 20.09
+   selected → chip '20.09' → Ekle → gün 15 derived correctly. 29
+   RED-first tests (bcTakvimAyKaydir/AyGosterim/SecimEkle/BaslikTarihi),
+   586/586 after W13.
+2. Multi-target day copy (W14): source Gün 1 → chips {existing Gün 15 +
+   new №3} → single Uygula → günler [1,3,15] all with copied seans;
+   toast '📋 Gün 1 → Gün 3, 15 (2 değişti, 0 oluşturuldu)'. Empty day
+   deletion also verified.
+3. Şablon kaydet (criterion 14, W16): plan gün {1,3,15} saved as
+   'E2E Test Kürüsü — boşluklu' → toast '💾 Şablon kaydedildi'; şablon
+   appears in the modal's radio list immediately; plan + modal stay
+   open (continue-editing). DB: `tedavi_sablonu_kalem` gun_no = {1,3,15}
+   EXACTLY (gap round-trip preserved; DENSE_RANK era over).
+4. Çakışma radyosu + Üzerine yaz (criterion 15, W16): submit with
+   tohumlama → confirm dialog shows the 002 conflict line AND the radio
+   group ('Üzerine yaz — eski plan iptal, yenisi planlanır' / 'Atla —
+   eski plan kalır, yenisi açılmaz', default 'atla'); chose Üzerine yaz
+   → Onayla → result band 'AÇILAN (1)' row: '✅ 002 — vaka açıldı +
+   1 gün · 1 ilaç · 🐄 tohumlama 08:00 (üzerine yazıldı: eski 06.09,
+   08.09, 13.09, 18.10)'. DB: 002's 4 old open TOHUMLAMA_PLANLI rows
+   now iptal=true/tamamlandi=true; 1 new open row (06.09 08:00); 4
+   islem_log TOHUMLAMA_PLANLI_IPTAL audit rows.
+5. Sonuç satırı → hayvan kartı (W14): row carries `data-hayvan-id` +
+   '›' + hint '👆 Hayvana gitmek için satıra dokun'; tap → m-bulk-case
+   closes + animal detail opens ('002 · Sağmal Padok · 🚨 7 aktif vaka ·
+   ÖZET/SAĞLIK/ÜREME').
+6. Tests final: 635/635 (557 → 586 W13 +29 → 605 W14 +19 → 635 W16
+   +30; every round RED-verbatim captured).
+7. W16 `openConfirm` impact: GitNexus CRITICAL-by-caller-count (12
+   direct) but all 11 existing call sites are zero-arg → the default
+   path is byte-identical, locked by 3 dedicated tests (root reviewed
+   + accepted).
+
+Acceptance criterion 14 ("V2.2: şablon boşluk round-trip — boşluklu
+şablon kaydedilir, kalemler gun_no 1 ve 5 olarak saklanır
+(SIKIŞTIRILMAZ)…"): `PASS` (scratch-cluster proof in the V2.2 Amendment
+TASK A above + demo round-trip here, gun_no {1,3,15} EXACTLY).
+Acceptance criterion 15 ("V2.2: tohumlama çakışma modları — 10-parametreli
+imza… 'uzerine_yaz' eski açık görevleri YUMUŞAK iptal eder… görev
+başına islem_log tip='TOHUMLAMA_PLANLI_IPTAL' denetimi yazar…"):
+`PASS` (scratch-cluster T7-T12 above + demo browser path here).
+
+### Demo rows created by V2.2 E2E (owner data, not deleted)
+
+1 Tırnak Yarası case (002, 1 gün / 1 ilaç) + 1 şablon 'E2E Test Kürüsü —
+boşluklu' (gun 1,3,15) + 1 new tohumlama görev + 4 cancelled tohumlama
+görevler + 4 islem_log TOHUMLAMA_PLANLI_IPTAL audit rows.
+
+### V2.2 residual notes
+
+1. Browser-cache staleness on long-lived local-serve tabs (test-env;
+   future cache-busting '?v=' candidate — noted, not scope).
+2. rpc-reference.md + ui-map sync remain propose_only, post-merge docs
+   commit (§6 item 3 carry-forward).
+3. Probe index + node_modules symlink cleanup at goal close (V1.1/V2.1
+   carry-forward).
+4. A1's open candidates still parked (owner brainstorm backlog).
