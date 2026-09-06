@@ -203,6 +203,17 @@ registerActions({
   'disease-select': () => onDiseaseSelect(),
   'submit-case':    (el) => submitCase(el),
 
+  // ═══ TOPLU VAKA (G-20260906-TOPLU-VAKA) ═══
+  // submit-bulk-case GEÇİCİ stub'tur — W3 aynı dalda submitBulkCase ile değiştirir.
+  'open-bulk-case':   () => { loadBulkCaseForm(); openM('m-bulk-case'); },
+  'close-bulk-case':  () => closeM('m-bulk-case'),
+  'bc-focus':         () => acHayvanMulti('bc-hid', 'ac-bchid', (h) => bcChipEkle(h)),
+  'bc-keydown':       (opts) => acNav(opts.event, 'ac-bchid'),
+  'bc-disease-select':() => bcDiseaseSelect(),
+  'bc-yapistir-coz':  () => bcYapistirCoz(),
+  'bc-chip-sil':      (el) => bcChipCikar(el.dataset.id),
+  'submit-bulk-case': () => submitBulkCaseStub(),
+
   // ═══ AŞI ═══
   'vaccine-focus':  (el) => acHayvan('v-hid', 'ac-vhid'),
   'vaccine-keydown':(opts) => acNav(opts.event, 'ac-vhid'),

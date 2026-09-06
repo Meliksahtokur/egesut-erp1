@@ -552,9 +552,13 @@ async function onDiseaseSelect() {
 }
 
 // #63 — seçili hastalığa bağlı şablonları radio liste olarak göster
-async function _renderSablonSecim(diseaseId){
-  const blok = g('d-sablon-blok'); const list = g('d-sablon-list');
-  globalThis._seciliSablonId = null;
+// G-20260906-TOPLU-VAKA: container-parametrize edildi — varsayılan argümanlar
+// m-disease çağrısını birebir korur (blok: <prefix>-sablon-blok, radio adı:
+// <prefix>-sablon, seçim hedefi: d→_seciliSablonId / bc→_bcSeciliSablonId).
+async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix='d'){
+  const blok = g(prefix+'-sablon-blok'); const list = g(containerId);
+  if(prefix==='bc') globalThis._bcSeciliSablonId = null;
+  else globalThis._seciliSablonId = null;
   if(!blok || !list) return;
   if(!diseaseId){ blok.style.display='none'; list.innerHTML=''; return; }
   const eslem = (await idbGetAll('sablon_hastalik_eslem')).filter(e=>e.disease_id===diseaseId);
@@ -562,20 +566,24 @@ async function _renderSablonSecim(diseaseId){
   const sablonlar = await idbGetAll('tedavi_sablonu');
   const kalemler  = await idbGetAll('tedavi_sablonu_kalem');
   const list2 = eslem.map(e=>sablonlar.find(s=>s.id===e.sablon_id)).filter(Boolean);
+  const radyoAd = prefix+'-sablon';
   let html = '';
   list2.forEach(s=>{
     const sk = kalemler.filter(k=>k.sablon_id===s.id);
     const gun = new Set(sk.map(k=>k.gun_no)).size;
     html += `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.82rem">
-      <input type="radio" name="d-sablon" value="${s.id}"> ${esc(s.ad)}
+      <input type="radio" name="${radyoAd}" value="${s.id}"> ${esc(s.ad)}
       <span style="color:var(--ink2);font-size:.72rem">${gun} gün · ${sk.length} seans</span></label>`;
   });
   html += `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.82rem;color:var(--ink2)">
-    <input type="radio" name="d-sablon" value="" checked> Şablonsuz (boş vaka aç)</label>`;
+    <input type="radio" name="${radyoAd}" value="" checked> Şablonsuz (boş vaka aç)</label>`;
   list.innerHTML = html;
   blok.style.display='block';
-  list.querySelectorAll('input[name="d-sablon"]').forEach(r=>{
-    r.onchange = () => { globalThis._seciliSablonId = r.value || null; };
+  list.querySelectorAll(`input[name="${radyoAd}"]`).forEach(r=>{
+    r.onchange = () => {
+      if(prefix==='bc') globalThis._bcSeciliSablonId = r.value || null;
+      else globalThis._seciliSablonId = r.value || null;
+    };
   });
 }
 
@@ -642,6 +650,139 @@ async function submitCase(btn) {
     }
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
+}
+
+// ── TOPLU VAKA (m-bulk-case) — G-20260906-TOPLU-VAKA ──
+// Tek küpe yerine çoklu küpe: autocomplete chip + toplu yapıştır.
+// Submit akışı W3'te (submitBulkCase); burada form kabuğu + seçim mekaniği.
+//
+// State sözleşmesi (W3 için):
+//   globalThis._bcHayvanlar     → [{id, kupe}] — chip listesi (id dedupe'lu)
+//   globalThis._bcSeciliSablonId→ string|null  — bc-sablon-list radio seçimi
+function _bcKupeGoster(h){ return h.kupe_no || h.devlet_kupe || h.id; }
+
+// m-bulk-case açılış yükleyicisi — openM hook'u ve 'open-bulk-case' aksiyonu çağırır.
+// Hastalık dropdown'u loadDiseasesDropdown ile aynı kaynaktan gruplanır; kızgınlık
+// üreme-filtresi (globalThis._kizginlikTedaviId) TOPLU akışa sızdırılmaz.
+async function loadBulkCaseForm(){
+  globalThis._bcHayvanlar = [];
+  globalThis._bcSeciliSablonId = null;
+  cl('bc-hid'); cl('bc-yapistir'); cl('bc-notes');
+  const ac = g('ac-bchid'); if(ac) ac.style.display='none';
+  const catEl = g('bc-disease-cat'); if(catEl){ catEl.textContent=''; catEl.style.display='none'; }
+  const sb = g('bc-sablon-blok'); if(sb) sb.style.display='none';
+  const sl = g('bc-sablon-list'); if(sl) sl.innerHTML='';
+  const hn = g('bc-bulunamayan'); if(hn){ hn.textContent=''; hn.style.display='none'; }
+  const sonuc = g('bc-sonuc'); if(sonuc){ sonuc.innerHTML=''; sonuc.style.display='none'; }
+  bcChipsRender();
+  const sel = g('bc-disease-id');
+  if(!sel) return;
+  const list = await idbGetAll('diseases');
+  const grouped = {};
+  list.forEach(d => {
+    const kategori = d.category || 'Diğer';
+    if (!grouped[kategori]) grouped[kategori] = [];
+    grouped[kategori].push(d);
+  });
+  sel.innerHTML = '<option value="">— Hastalık seçin —</option>';
+  Object.keys(grouped).sort((a,b) => a.localeCompare(b, 'tr', {sensitivity:'base'})).forEach(kategori => {
+    const og = document.createElement('optgroup');
+    og.label = kategori;
+    grouped[kategori].forEach(d => {
+      const o = document.createElement('option');
+      o.value = d.id;
+      o.textContent = d.name;
+      o.dataset.category = d.category || '';
+      og.appendChild(o);
+    });
+    sel.appendChild(og);
+  });
+}
+
+// m-bulk-case hastalık seçimi — onDiseaseSelect aynası (bc konteynerleri, bc şablon state'i)
+async function bcDiseaseSelect() {
+  const sel = g('bc-disease-id');
+  const catEl = g('bc-disease-cat');
+  const opt = sel?.selectedOptions[0];
+  if (opt?.dataset.category) {
+    catEl.textContent = '📂 ' + opt.dataset.category;
+    catEl.style.display = 'block';
+  } else {
+    catEl.style.display = 'none';
+  }
+  await _renderSablonSecim(sel?.value || '', 'bc-sablon-list', 'bc');
+}
+
+// Chip mekaniği — _bcHayvanlar id bazlı dedupe'lu, sıra korunur
+function bcChipEkle(hayvan){
+  if(!hayvan?.id) return false;
+  globalThis._bcHayvanlar = globalThis._bcHayvanlar || [];
+  if(globalThis._bcHayvanlar.some(x=>x.id===hayvan.id)) return false;
+  globalThis._bcHayvanlar.push({ id: hayvan.id, kupe: _bcKupeGoster(hayvan) });
+  bcChipsRender();
+  return true;
+}
+function bcChipCikar(id){
+  globalThis._bcHayvanlar = (globalThis._bcHayvanlar||[]).filter(x=>x.id!==id);
+  bcChipsRender();
+}
+function bcChipsRender(){
+  const kutu = g('bc-chips');
+  const sayac = g('bc-sayac');
+  const liste = globalThis._bcHayvanlar || [];
+  if(kutu){
+    kutu.innerHTML = liste.map(h =>
+      `<span class="chip chip-g" style="gap:6px">${escAttr(h.kupe)}` +
+      `<button type="button" data-action="bc-chip-sil" data-id="${escAttr(h.id)}" aria-label="Çıkar"` +
+      ` style="background:none;border:none;color:inherit;font:inherit;font-weight:700;cursor:pointer;padding:0;line-height:1">✕</button></span>`
+    ).join('');
+  }
+  if(sayac) sayac.textContent = liste.length + ' hayvan';
+}
+
+// Yapıştırma kutusu → token listesi (satır/virgül/noktalı virgül, trim, boş at, dedupe)
+function bcKupeParse(metin){
+  return [...new Set(String(metin||'').split(/[\n,;]+/).map(t=>t.trim()).filter(Boolean))];
+}
+// Toplu çözümleme: her token hayvanByKupeRef ile çözülür (K7: aktif öncelikli),
+// bulunan chip'e düşer, bulunamayan kırmızı listede. Tümü çözülürse kutu temizlenir.
+function bcYapistirCoz(){
+  const kutu = g('bc-yapistir');
+  const hataKutu = g('bc-bulunamayan');
+  const tokenler = bcKupeParse(kutu?.value);
+  if(!tokenler.length){ toast('⚠️ Yapıştırma kutusu boş', true); return; }
+  const once = (globalThis._bcHayvanlar||[]).length;
+  const bulunamayan = [];
+  tokenler.forEach(tok=>{
+    const h = hayvanByKupeRef(tok);
+    if(h) bcChipEkle(h);
+    else bulunamayan.push(tok);
+  });
+  const eklenen = (globalThis._bcHayvanlar||[]).length - once;
+  if(hataKutu){
+    if(bulunamayan.length){
+      hataKutu.textContent = 'Bulunamadı: ' + bulunamayan.join(', ');
+      hataKutu.style.display = 'block';
+    } else {
+      hataKutu.textContent = '';
+      hataKutu.style.display = 'none';
+    }
+  }
+  if(bulunamayan.length){
+    toast(`⚠️ ${eklenen} hayvan eklendi, ${bulunamayan.length} bulunamadı`, true);
+  } else {
+    if(kutu) kutu.value = '';
+    toast(`✅ ${eklenen} hayvan eklendi`);
+  }
+}
+
+// GEÇİCİ STUB — W3 submitBulkCase (FORM-SUBMIT-01 zinciri) ile değiştirilecek.
+// Yalnız seçim doğrulaması yapar; RPC çağrısı YOK.
+function submitBulkCaseStub(){
+  const liste = globalThis._bcHayvanlar || [];
+  if(!liste.length){ toast('Hayvan seçilmedi', true); return; }
+  if(!v('bc-disease-id')){ toast('Hastalık seçilmedi', true); return; }
+  toast('⚠️ Gönderim akışı hazırlanıyor (W3)');
 }
 
 // ── ABORT ────────────────────────────────────

@@ -56,6 +56,10 @@ function openM(id) {
     if(typeof loadBulkIlacPadoklar==='function') loadBulkIlacPadoklar();
     if(typeof loadBulkIlacDropdown==='function') loadBulkIlacDropdown();
   }
+  // Toplu vaka: her açılışta temiz form (chip/paste/şablon/sonuç sıfır + dropdown)
+  if (id === 'm-bulk-case') {
+    if(typeof loadBulkCaseForm==='function') loadBulkCaseForm();
+  }
 }
 
 function closeM(id) {

@@ -749,6 +749,11 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <div class="log-text"><div class="log-title">Vaka Aç</div><div class="log-sub">Tanı, günlük tedavi, ilaç — stok otomatik düşer</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
+      <div data-action="open-bulk-case" class="log-btn">
+        <div class="log-ico" style="background:rgba(220,53,69,.15)">🩺🩺</div>
+        <div class="log-text"><div class="log-title">Toplu Vaka</div><div class="log-sub">Çoklu küpe seç — aynı tanı ve şablon tüm sürüye</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
       <div data-action="open-bulk-vaccine" class="log-btn">
         <div class="log-ico" style="background:rgba(78,154,42,.2)">💉💉</div>
         <div class="log-text"><div class="log-title">Toplu Aşılama</div><div class="log-sub">Padok bazlı toplu aşı uygulaması</div></div>
@@ -1119,6 +1124,56 @@ body.dark .ac-vurgu{color:#8ec6ff}
       <div class="fg"><label class="flbl">Hekim</label><select id="d-hekim" class="fsel"></select></div>
       <button class="btn btn-g" data-action="submit-case">🏥 Vakayı Aç</button>
       <button class="btn btn-o" data-action="close-disease" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOPLU VAKA (G-20260906-TOPLU-VAKA) — m-disease kopyası, tek küpe yerine çoklu seçim -->
+<div id="m-bulk-case" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div><div id="m-bulk-case-title" class="m-title">🩺 Toplu Vaka Aç</div>
+    <div class="m-body">
+      <!-- ÇOKLU KÜPE — autocomplete + chip listesi -->
+      <div class="fg"><label class="flbl">Hayvanlar *</label>
+        <input id="bc-hid" class="fi" placeholder="Küpe yazın — seçim chip olarak eklenir" autocomplete="off"
+          data-input="bc-focus" data-focus="bc-focus" data-keydown="bc-keydown"
+          data-action="bc-focus">
+        <div id="ac-bchid" class="ac-box" style="display:none"></div>
+        <div class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px">💡 Küpe no yazın — aktif hayvanlar listelenir, seçtikçe chip eklenir</div>
+        <div id="bc-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+        <div style="margin-top:6px"><span id="bc-sayac" class="chip chip-g">0 hayvan</span></div>
+      </div>
+
+      <!-- TOPLU YAPIŞTIR — satır/virgül/noktalı virgül ile küpe listesi -->
+      <div class="fg"><label class="flbl">📋 Küpe Listesi Yapıştır</label>
+        <textarea id="bc-yapistir" class="fta" rows="3" placeholder="Küpe listesi — satır, virgül veya noktalı virgül ile ayırın" style="resize:vertical"></textarea>
+        <button class="btn btn-o" data-action="bc-yapistir-coz" style="margin-top:6px">🔎 Küpeleri Çöz ve Ekle</button>
+        <div id="bc-bulunamayan" style="display:none;font-size:.72rem;color:var(--red);margin-top:4px"></div>
+      </div>
+
+      <!-- TANI — DB'den controlled dropdown (m-disease ile aynı kaynak) -->
+      <div class="fg"><label class="flbl">Hastalık / Tanı *</label>
+        <select id="bc-disease-id" class="fsel" data-change="bc-disease-select">
+          <option value="">— Hastalık seçin —</option>
+        </select>
+        <div id="bc-disease-cat" style="font-size:.68rem;color:var(--ink3);margin-top:3px;display:none"></div>
+      </div>
+
+      <!-- ŞABLON — seçili hastalığa bağlı şablonlar (m-disease ile aynı render) -->
+      <div id="bc-sablon-blok" class="fg" style="display:none;padding:8px;border:1px solid var(--card3);border-radius:8px">
+        <label class="flbl" style="font-size:.72rem">📋 Tedavi Şablonu (opsiyonel)</label>
+        <div id="bc-sablon-list"></div>
+      </div>
+
+      <!-- NOTLAR — tek not tüm hayvanlara uygulanır -->
+      <div class="fg"><label class="flbl">Notlar</label>
+        <textarea id="bc-notes" class="fi" rows="2" placeholder="Tüm vakalara yazılacak not — semptomlar, gözlemler…" style="resize:vertical"></textarea>
+      </div>
+
+      <!-- SONUÇ — submit sonrası W3 doldurur (submitBulkCase) -->
+      <div id="bc-sonuc" style="display:none"></div>
+
+      <button class="btn btn-g" data-action="submit-bulk-case">🩺 Vakaları Aç</button>
+      <button class="btn btn-o" data-action="close-bulk-case" style="margin-top:6px">İptal</button>
     </div>
   </div>
 </div>
