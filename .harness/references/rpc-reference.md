@@ -252,7 +252,29 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 ## Vaka / Tedavi (cases)
 
 **`create_case(p_animal_id, p_disease_id uuid, p_notes?)`** → jsonb
-→ Kontrollü hastalık listesinden vaka. Çağrı: forms.js:555; replay: ui.js:6789.
+→ Kontrollü hastalık listesinden vaka. **20260906120000'den beri ince wrapper** — gövde `_vaka_ac_tek`
+  helper'ına taşındı (imza ve davranış değişmedi; `p_tarih` NULL geçer → start_date bugün).
+  Çağrı: forms.js:555; replay: ui.js:6789.
+
+**`vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid, p_items jsonb?, p_sablon_id uuid?, p_notes text?, p_tarih date?, p_tohumlama boolean?, p_tohumlama_gun_offset int?, p_tohumlama_saat text?, p_tohumlama_cakisma text? DEFAULT 'ekle')`** → jsonb *(10 param — 20260906120000; **DEPLOY-PENDING: PROD'a uygulanmadı**, ayrı owner onayı bekliyor)*
+→ Toplu vaka aç (G-20260906-TOPLU-VAKA): N hayvana tek RPC; per-hayvan guard (dup aktif vaka →
+  `atlanan`, beklenmeyen EXCEPTION → `hatalar`), 200 sınırı, kısmi başarı `{ok, toplam, basari, atlanan, hatalar}`
+  (buzagi_sutten_kesme_toplu aynası). `p_items` ↔ `p_sablon_id` karşılıklı dışlama (fail-fast).
+  `p_tarih` = planlanan başlangıç → `cases.start_date`'e YAZILIR (ilk varsayılan-dışı yazım; NULL → bugün,
+  geçmiş → fail-fast 'Geçmiş tarih planlanamaz'). `p_items` GÜN-ANAHTARLI:
+  `[{gun 1..31, saat?, kalemler:[{drug_product_id, stok_id, dose>0, unit, route?, saat?}]}]`;
+  kalem saati `COALESCE(kalem.saat, gün.saat, '09:00')`; her gün bug059 motoruna
+  `add_treatment_day_with_sessions(case, start_date+(gun-1), …)` ile. **Kısmi-gün semantiği:** HER GÜN
+  kendi BEGIN/EXCEPTION alt bloğunda — motor hatası/EXCEPTION yalnız O günü geri alır; vaka AÇIK kalır,
+  önceki günlerin satırları durur, kalan günler denenmez, sıradaki hayvana geçilir (hayvan `acilan`'a girmez,
+  `hatalar`'a `case_id`+`gun` ile yazılır). `p_tohumlama=true` → her açılan vakaya mevcut
+  `vaka_tohumlama_ekle(start_date+offset, saat||'08:00')` (RPC yoksa pg_proc guard'lı yumuşak düşüş);
+  sonuç `acilan[i].tohumlama` soft — uygunluk redleri: erkek / hedef tarihte 12 aydan küçük / gebe /
+  aynı vakada açık planlı tohumlama (asla `hatalar`'a sayılmaz). `p_tohumlama_cakisma` (V2.2):
+  'ekle' (default) | 'atla' (eski açık TOHUMLAMA_PLANLI görev varsa yeni görev AÇILMAZ) |
+  'uzerine_yaz' (eski görevler yumuşak iptal `kapatan_ref='toplu-vaka-uzerine-yaz'` + görev başına
+  islem_log `TOHUMLAMA_PLANLI_IPTAL`, sonra yeni görev); geçersiz mod fail-fast 'Geçersiz çakışma modu'.
+  Çağrı: forms.js `submitBulkCase` (ONLINE-ONLY — `RPC_TABLES`'ta, offline-replay `RPC_MAP`'te değil).
 
 **`close_case(p_case_id uuid)`** → jsonb *(LEGACY — korundu)*
 → Basit kapatma; akıllı versiyon `close_case_with_remaining`. Çağrı: ui.js:5995.
@@ -311,7 +333,10 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 → Tamamlanmamış günlerin reçetesi → `add_treatment_day_with_sessions`'a delege. Çağrı: api.js:657.
 
 **`tedavi_sablon_kaydet(p_id uuid?, p_ad, p_aciklama?, p_disease_ids jsonb?, p_kalemler jsonb?)`** → jsonb
-→ ui.js:3998 (şablon builder).
+→ ui.js:3998 (şablon builder); toplu-vaka şablon kaydı: forms.js `bcSablonKaydet`.
+→ **tohumlama_plani (20260730000001):** p_kalemler objesi `tohumlama_plani jsonb {gun_ofset ≥0, planned_time 'HH:MM'}`
+  taşıyabilir; toplu-vaka UI'ı yalnız 🐄 checkbox işaretliyken ekler, işaretsizse anahtar OLMAZ (jsonb 'null' geçersiz).
+  Gün no verildiği gibi saklanır — boşluklu plan SIKIŞTIRILMAZ (20260722000001, V2.2 criterion 14).
 
 **`tedavi_sablon_sil(p_id uuid)`** → jsonb
 → ui.js:3761.
@@ -576,9 +601,13 @@ ankraj = MAX(kızgınlık, tohumlama, abort_tarihi, dogum_tarihi, dogum). Aktif 
 ## Internal Helper'lar (SQL içi — RPC olarak çağrılmaz)
 
 `_ayar(p_anahtar, p_varsayilan)` → numeric (protokol_ayar okuma; STABLE) ·
+`_vaka_ac_tek(p_hayvan_id, p_disease_id, p_notes, p_tarih date?)` → jsonb (create_case gövdesi burada;
+  20260906120000 — create_case ince wrapper, p_tarih NULL geçer; **GT'de YOK**, PROD deploy-pending) ·
 `_protokol_kapat(p_kaynak_ref, p_sebep)` → void · `_sessiz_gorev_iptal(p_hayvan_id)` → void ·
 `_gorev_dinle(p_hayvan_id, p_etken_kod, p_ref, p_tarih)` → void (**canlıda 4 param — GT'de 3, audit**) ·
-`_tohumlama_gorev_uygunluk(p_hayvan_id, p_tarih)` → text (**GT'de YOK**) ·
+`_tohumlama_gorev_uygunluk(p_hayvan_id, p_tarih)` → text (**GT'de YOK; 2026-09-06 pg_get_functiondef
+  probe: canlıda MEVCUT**; red metinleri — vaka_tohumlama_ekle bunları `acilan[i].tohumlama.sebep`'e taşır:
+  'Erkek hayvana tohumlama görevi açılmaz', 'Hayvan hedef tarihte 12 aydan küçük', 'Hayvan gebe') ·
 `_etken_kod_bul(p_stok_id, p_vaccine_id uuid)` → text ·
 `_asistan_ref_coz(p_param, p_ctx)` / `_asistan_step_calistir(p_tip, p_param)` / `_asistan_step_dogrula(p_tip, p_param)` → jsonb (asistan plan motoru)
 

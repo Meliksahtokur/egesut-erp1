@@ -1,11 +1,13 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: review
+status: done
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
 base_sha: 434c14236b95a1121339322c548df34c06b9e9e2
 launch_sha: eaa0640e65d576c403cbd7aee0fefa66dc81a6f9
+merge_sha: 1030725
+merge_date: 2026-09-07
 branch: idle/toplu-vaka
 worktree: /home/melik/egesut-wt/toplu-vaka
 write_manifest:

@@ -32,6 +32,7 @@ Router core: `js/utils/events.js:ACTIONS` registry filled by
 | `index.html:m-vaccine` | `js/ui.js:openMWithHayvan` | Aşı uygula |
 | `index.html:m-bulk-vaccine` | action `open-bulk-vaccine` | Toplu aşılama |
 | `index.html:m-bulk-ilac` | action `open-bulk-ilac` | Toplu ilaç |
+| `index.html:m-bulk-case` | action `open-bulk-case` | Toplu vaka aç |
 | `index.html:m-sutten-kes` | `js/forms.js:openSuttenKesModal` | Sütten kes |
 | `index.html:m-birth` | `js/ui.js:dogumYaptiAc`, `js/ui.js:ikinciYavruAc` | Doğum kaydı |
 | `index.html:m-animal` | `js/ui.js:openAnimalEdit` | Yeni hayvan / düzenleme |
@@ -65,6 +66,18 @@ Non-router overlays (direct DOM removal, no history): silent sheet
 problem bottom-sheet (`js/ui.js:sorunBottomSheet`), slide panels
 (`js/ui.js:openTanimlarPanel`), animal detail page-panel
 (`js/ui.js:openDet` / `js/ui.js:closeDet`).
+
+Toplu vaka (`index.html:m-bulk-case`, G-20260906-TOPLU-VAKA) sub-elements:
+`index.html:bc-yapistir` küpe yapıştırma (`js/forms.js:bcYapistirCoz`),
+`index.html:bc-disease-id` + `index.html:bc-sablon-list` (şablon radyo),
+`index.html:bc-tarih` BUTTON + `index.html:bc-tarih-takvim` tek-seçim takvim
+(`js/forms.js:bcTarihYaz`, `js/forms.js:bcTarihDeger`, `js/forms.js:bcTarihTakvimAc`),
+`index.html:bc-plan-gunler` gün kartları + `index.html:bc-gun-ekle-menu`
+(`js/forms.js:bcPlanRender`, `js/forms.js:bcGunKopyala`), şablon kaydet/yükle
+`index.html:bc-sablon-kaydet-alan` / `index.html:bc-sablon-yukle-alan`
+(`js/forms.js:bcSablonKaydet`, `js/forms.js:bcSablonYukle`), `index.html:bc-sonuc`
+bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCase`
+(ONLINE-ONLY → `vaka_toplu_ac`; plan derleme `js/forms.js:bcGunlardenItems`).
 
 ## js/ui.js — rendering and interaction
 
