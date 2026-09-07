@@ -246,9 +246,13 @@ implementation commits (post-rebase):
           kartına geçiş
   a247bec feat(ui): planı şablon olarak kaydet (devam edit) + tohumlama
           çakışma radyosu (üzerine yaz/atla)
-  (23 commits on branch idle/toplu-vaka since launch eaa0640 through tip
-  a247bec — rev-list verified; 24 incl. this V2.2 docs amendment;
-  sequence 0036fa5…a247bec)
+  46e1e94 feat(ui): ?v= sürüm damgası + şablona tohumlama kaydı + 📂
+          Şablon Yükle (geri çağırma-düzenleme)
+  ec2ec9b fix(ui): şablon tohumlama kaydı yalnız checkbox'a bakar —
+          blok-aktiflik kapısı kalktı + ?v= bump
+  (26 commits on branch idle/toplu-vaka since launch eaa0640 through tip
+  ec2ec9b — rev-list verified; 27 incl. this V2.3 docs amendment;
+  sequence 0036fa5…ec2ec9b)
 docs checkpoints:
   pre-review @ 1139798 — docs_verdict PASS (V1 docs commit)
   pre-review @ 5e463d9 — docs_verdict PASS (V1.1 amendment docs commit)
@@ -256,6 +260,7 @@ docs checkpoints:
   pre-review @ 39468f5 — docs_verdict PASS (V2 delivery docs commit)
   pre-review @ b32fb65 — docs_verdict PASS (V2.1 delivery docs commit)
   pre-review @ a247bec — docs_verdict PASS (V2.2 delivery docs commit)
+  pre-review @ ec2ec9b — docs_verdict PASS (V2.3 delivery docs commit)
   handoff/final: not recorded — root close + owner merge approval pending
 residual risks: see §6
 temporary mutations and artifacts restored:
@@ -1225,3 +1230,110 @@ local scripts + local link). Browser E2E (yükle → düzenle → uygula on
    "planned_time":"HH:MM"}; uncheck → NULL.
 3. Long-lived tabs: hard-reload no longer needed after JS edits IF the
    stamp is bumped (convention noted in index.html).
+
+## V2.3 Delivery (2026-09-07, owner feedback)
+
+Management model: W18 landed the three UI-lane owner decisions (commit
+`46e1e94`), root then ran the E2E pass — diagnosing first ANOTHER
+stale-cache chain on the reused serve origins (cached index.html → old
+script chain) on fresh origins :8101/:8102 — which surfaced the W19 gate
+bug, fixed by `ec2ec9b`; this docs amendment closes the round. The goal
+returns to `review` with criterion 16 `PASS`. Unit suite re-run by this
+docs amendment: **651/651 pass, 0 fail, exit 0** (npm run test:unit,
+verified live). All earlier content stays intact; only the §5
+commit/checkpoint lists were extended (26 commits on branch through tip
+`ec2ec9b`, rev-list verified).
+
+### V2.3 commits (2)
+
+- `46e1e94` feat(ui): ?v= sürüm damgası + şablona tohumlama kaydı + 📂
+  Şablon Yükle (geri çağırma-düzenleme) (W18)
+- `ec2ec9b` fix(ui): şablon tohumlama kaydı yalnız checkbox'a bakar —
+  blok-aktiflik kapısı kalktı + ?v= bump (W19)
+
+Branch tip at delivery: `ec2ec9b` — this docs amendment lands on top.
+Verified branch count: `git rev-list --count eaa0640..ec2ec9b` = **26**
+commits since launch; **27** including this V2.3 docs amendment
+(post-commit rev-list verified); sequence 0036fa5 → … → ec2ec9b.
+
+### Cache-busting stamp — convention + evidence
+
+Every local `<script src="js/…">` (14) and the local `<link
+rel="manifest">` in index.html carries a single date stamp
+`?v=20260907`, bumped to `?v=20260907-2` by W19 (marker comment next to
+the first script tag: 'her js/css değişikliğinde GÜNCELLE'). Root
+verified on the served HTML of both fresh origins: 14/14 scripts + the
+manifest link carry `?v=20260907(-2)`. Bypass audit clean (no dynamic
+`import('js/…')`, no `new Worker`, no `serviceWorker.register` — only
+the M-10 legacy-SW unregister), regression-locked by unit test.
+
+**CONVENTION (binding for every future JS/CSS-touching commit): bump ALL
+stamps together in index.html.** Recorded in the goal's V2.3 amendment;
+root enforces at review.
+
+### Root E2E (demo, fresh origins :8101/:8102)
+
+1. Owner-reported 'visual bug' (card-bar month change on day edit) is
+   ABSENT on the fresh origin — boundary matrix all correct: start
+   30.09 → Gün 1 '30 Eylül', Gün 2 '01 Ekim'; takvim 05 Ekim pick →
+   'Gün 6 · 05 Ekim'; gün 30 from 07.09 → '06 Ekim'. Conclusion
+   recorded: stale-cache artifact, not a math bug (the V2.2 W13 fix
+   holds). The criterion-16 note ':8098' predates this session; the E2E
+   moved to fresh ports :8101/:8102 after diagnosing the reused-origin
+   staleness.
+2. 📂 Şablon Yükle: list shows the SELECTED disease's şablonlar
+   (owner's real '3x30 sefanel + nsaid — 3 gün · 6 seans' + 'E2E Test
+   Kürüsü — boşluklu — 3 gün · 3 seans'); Yükle → editor rebuilt
+   günler [1,3,15] with a 09:00 seans each, cards dated 07/09/21
+   Eylül, toast '📂 … yüklendi — düzenleyip uygulayabilirsin'.
+
+### W19 — şablon tohumlama gate fix (root E2E bulgusu)
+
+Root's first tohumlama-save E2E produced `tohumlama_plani = NULL` in
+`tedavi_sablonu`: W18 gated the payload on the tohumlama BLOCK being
+aktif, but the block is disabled when the animal list is empty — and a
+şablon is a PROTOCOL DEFINITION, animal-independent. W19 (`ec2ec9b`)
+reduced the gate to the 🐄 checkbox only (RED 1 verbatim captured:
+payload test failed against unmodified forms.js, then green; stamp
+bumped to 20260907-2 in the same commit). Regression E2E: save with 🐄
+checked (gün 2, saat 16:00) and ZERO animals → 'E2E Tur 2 — tohumlamalı
+(hayvansız)' saved; DB `tedavi_sablonu.tohumlama_plani` =
+`{"gun_ofset":2,"planned_time":"16:00"}`; Yükle of that şablon → tohum
+fields RESTORED (checked, 2, 16:00).
+
+Acceptance criterion 16 ("V2.3: şablon with tohumlama round-trips
+through 📂 Şablon Yükle into the editor and submits (kalemler p_items +
+tohumlama restored from şablon; radio 'Şablonsuz'a çeker); ?v=20260907
+stamps present on every local script src and the local manifest link
+(unit-checked); RED-first pure-fn tests (bcSablonTohumPayload,
+bcSablondenPlan) recorded in the report"): `PASS` (W18 RED verbatim in
+the V2.3 Amendment above + served-HTML stamp audit + Yükle round-trip +
+W19 save/restore E2E here).
+
+### Tests
+
+635 → **649** (W18: +11 RED pure-fn +3 manifest text/DENETIM) →
+**651/651** (W19: +2, RED verbatim). Every round captured RED-first;
+re-run by this docs amendment: 651/651, 0 fail, exit 0.
+
+### Demo rows created by V2.3 E2E (owner data, not deleted)
+
+Şablonlar: 'E2E Yükle Turu — tohumlamalı' (`tohumlama_plani` NULL — the
+pre-W19 bug artifact, kept as evidence) and 'E2E Tur 2 — tohumlamalı
+(hayvansız)' (`{"gun_ofset":2,"planned_time":"16:00"}`).
+
+### V2.3 residual notes
+
+1. Stamp bump convention: index.html comment + goal note; must be
+   followed by EVERY future JS-touching commit (root enforces at
+   review; worker habit).
+2. Owner's old :8097 tab needs ONE manual hard refresh AFTER this stamp
+   lands — the last manual bump needed.
+3. rpc-reference.md + ui-map sync remain propose_only, post-merge docs
+   commit (§6 item 3 carry-forward).
+4. Probe index + node_modules symlink cleanup at goal close (carry-
+   forward).
+5. Test-env lesson (recorded): a FRESH PORT (new origin) is the
+   reliable E2E pattern while python http.server sends no cache
+   headers — reused origins accumulated an index.html-cached → old
+   script chain; the stamp makes future JS updates deterministic.
