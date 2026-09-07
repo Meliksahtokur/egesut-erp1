@@ -212,6 +212,7 @@ registerActions({
   'bc-yapistir-coz':  () => bcYapistirCoz(),
   'bc-chip-sil':      (el) => bcChipCikar(el.dataset.id),
   'bc-tarih-degisti': () => { bcTarihIpucuGuncelle(); bcPlanRender(); }, // V1.2 ipucu + V2.1 başlık tarihleri (Gün N = tarih+N−1)
+  'bc-tarih-takvim':  () => bcTarihTakvimAc(), // V2.3-W20 — 📅 tek-seçim takvim (readonly TR alanının picker'ı)
   'bc-tohum-saat-chip': (el) => { const i = g('bc-tohum-saat'); if (i) i.value = el.dataset.t; }, // V1.2 — hızlı saat çipi
   // V2.1 — gün kartları + seans-grup dili
   'bc-gun-ekle-menu': () => bcGunEkleMenuToggle(),                             // [+ Gün ▾] menüsü

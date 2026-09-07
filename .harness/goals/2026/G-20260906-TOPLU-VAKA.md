@@ -182,6 +182,36 @@ decisions from owner testing; engine and RPC UNTOUCHED.
    bağımsız (blok-disabled kaydı engelliyor, tohumlama_plani NULL
    kalıyordu); stamp ?v=20260907-2.
 
+   W20 (root screenshot diagnosis, 2026-09-07): the native `#bc-tarih`
+   type=date input RENDERED its displayed string in the BROWSER LOCALE —
+   the in-app browser runs en-US → showed '09/26/2026' (MM/DD/YYYY) while
+   the hint's ISO and all math were correct; owner read it as day/month
+   swapping. Fixed locale-independently: the field is now a READONLY text
+   input displaying Turkish 'DD.MM.YYYY' (pure bcIsoTrGoster/bcTrGosterIso
+   pair; canonical ISO lives in globalThis._bcTarihIso — write via
+   bcTarihYaz, read via bcTarihDeger; every former v('bc-tarih') consumer
+   — hint, bcPlanRender, _bcTkBaslangic, submitBulkCase — switched) plus a
+   📅 button (bc-tarih-takvim action) opening a SINGLE-SELECT calendar
+   (bc-gun-takvim renderer language; pure bcTarihSecimEkle — min=today,
+   max=today+365, message 'Geçmiş tarih seçilemez'; header shows 'Seçilen:
+   DD.MM.YYYY'; Onayla writes through bcTarihYaz and refreshes hint + day
+   cards). Hint fix: 'Vaka ve tüm tedavi günleri 26.09.2026 gününe
+   planlanacak' with guaranteed spaces (the rendered
+   'günleri2026-09-09gününe' transcription) + overflow-wrap/word-break on
+   the hint element for narrow-screen clipping. Sweep: bc-tohum-saat
+   type=time is locale-stable (left); other type=date inputs (k-tarih,
+   i-tarih, tr-tarih, v-date, bv-tarih, sk-tarih, b-tarih, a-dt, ta-tarih,
+   td-asi-tarih, td-rapel-tarih, te-tarih, cx-tarih, geb-tarih) are
+   OUTSIDE m-bulk-case — reported, not in scope. Stamp ?v=20260907-3.
+   Test evidence (2026-09-07, worker W20): RED-first — 25 new unit tests
+   failed verbatim before the fix (tests 228 / pass 203 / fail 25 in
+   vaka-toplu-ac.test.js), GREEN after: full unit suite
+   `node --test tests/unit/*.test.js` → 676 pass / 0 fail (651 baseline
+   + 25 new, takvimAc + stamp expectations adapted deliberately);
+   `node --check` clean on forms.js + handlers.js; smoke serve :8100 curl
+   markers: 15 × ?v=20260907-3, readonly #bc-tarih markup, 2 ×
+   bc-tarih-takvim action, forms.js 200.
+
 ## Objective
 
 Apply the same case/treatment to multiple animals at once, exactly mirroring

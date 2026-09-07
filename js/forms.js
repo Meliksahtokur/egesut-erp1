@@ -699,10 +699,11 @@ async function loadBulkCaseForm(){
   const menu = g('bc-gun-ekle-menu'); if(menu) menu.style.display = 'none';
   // V2.3 (W18) — 📂 şablon yükle alanı modal açılışında kapalı başlar.
   const yukleAlan = g('bc-sablon-yukle-alan'); if(yukleAlan) yukleAlan.style.display = 'none';
-  // V1.2 — tarih + tohumlama sıfırlama: tarih bugün (min bugün — geçmiş seçilemez),
-  // saat 08:00, gün 0, kutu kapalı; blok DURUMU (disabled/aktif) bcChipsRender'da kurulur.
-  const tEl = g('bc-tarih');
-  if(tEl){ tEl.value = bugun(); tEl.min = bugun(); }
+  // V1.2 — tarih + tohumlama sıfırlama: tarih bugün (takvimde min bugün —
+  // geçmiş seçilemez), saat 08:00, gün 0, kutu kapalı; blok DURUMU
+  // (disabled/aktif) bcChipsRender'da kurulur. V2.3-W20: yazma TEK kapı
+  // bcTarihYaz — görüntü DD.MM.YYYY + kanonik ISO birlikte kurulur.
+  bcTarihYaz(bugun());
   const tohumSaatEl = g('bc-tohum-saat'); if(tohumSaatEl) tohumSaatEl.value = '08:00';
   const tohumGunEl = g('bc-tohum-gun'); if(tohumGunEl) tohumGunEl.value = '0';
   const tohumChkEl = g('bc-tohum'); if(tohumChkEl) tohumChkEl.checked = false;
@@ -912,13 +913,85 @@ function bcTohumBlokDurumu(hayvanlar){
 }
 
 // bc-tarih ipucu: ileri tarih seçildiyse planlama cümlesi, aksi halde varsayılan.
+// V2.3-W20: tarih bcTarihDeger()'den (kanonik ISO) okunur ve bcIsoTrGoster ile
+// TR (DD.MM.YYYY) gösterilir — tarih çevresindeki boşluklar cümlenin parçasıdır
+// (sahibe ekranındaki 'günleri2026-09-09gününe' bitişikliği kilitlenir).
 function bcTarihIpucuGuncelle(){
   const ipucu = g('bc-tarih-ipucu');
   if(!ipucu) return;
-  const t = (v('bc-tarih') || '').trim();
+  const t = bcTarihDeger();
   ipucu.textContent = t
-    ? `Vaka ve tüm tedavi günleri ${t} gününe planlanacak`
+    ? 'Vaka ve tüm tedavi günleri ' + bcIsoTrGoster(t) + ' gününe planlanacak'
     : 'Tarih boş bırakılırsa vakalar bugün açılır.';
+}
+
+// ═══ V2.3-W20 — TEDAVİ TARİHİ GÖSTERİM/DEĞER AYRIMI ═══
+// Kök teşhis (sahibe ekran görüntüleri, 2026-09-07): #bc-tarih type=date idi;
+// GÖRÜNEN string tarayıcı yereline göre çiziliyordu (in-app en-US →
+// '09/26/2026' MM/DD/YYYY) — hesap ve hint ISO'su doğruydu ama sahibe alanı
+// ters okudu ('gün değiştiriyorum ay değişiyor'). Alan ARTIK readonly metin:
+// görünen 'DD.MM.YYYY' (locale BAĞIMSIZ), kanonik ISO globalThis._bcTarihIso'da.
+// Görüntü ve değer ASLA ayrışmaz: yazma TEK kapı bcTarihYaz, okuma TEK kapı
+// bcTarihDeger — bu alanda v('bc-tarih') okuması YASAK.
+
+// 'YYYY-MM-DD' → 'DD.MM.YYYY' (SAF — toLocaleString/new Date YOK; yerelden
+// bağımsız string dilimleme). Biçim dışı / ay 01-12 veya gün 01-31 dışı → ''
+// (bugün fallback YOK — boş alan placeholder gösterir).
+function bcIsoTrGoster(iso){
+  const s = String(iso || '');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+  const p = s.split('-');
+  const ay = Number(p[1]), gun = Number(p[2]);
+  if(ay < 1 || ay > 12 || gun < 1 || gun > 31) return '';
+  return p[2] + '.' + p[1] + '.' + p[0];
+}
+
+// 'DD.MM.YYYY' → 'YYYY-MM-DD' (SAF — bcIsoTrGoster'in yuvarlama çifti).
+// Biçim dışı / aralık dışı → ''.
+function bcTrGosterIso(tr){
+  const s = String(tr || '').trim();
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if(!m) return '';
+  const gun = Number(m[1]), ay = Number(m[2]);
+  if(ay < 1 || ay > 12 || gun < 1 || gun > 31) return '';
+  return m[3] + '-' + m[2] + '-' + m[1];
+}
+
+// Kanonik ISO okuma — m-bulk-case tarih tüketicilerinin TEK kaynağı:
+// bcTarihIpucuGuncelle / bcPlanRender / _bcTkBaslangic / submitBulkCase.
+function bcTarihDeger(){
+  const iso = globalThis._bcTarihIso;
+  return (typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)) ? iso : '';
+}
+
+// Kanonik yazma — görüntü ('DD.MM.YYYY') ve kanonik ISO AYNI ANDA yazılır;
+// geçersiz ISO ikisini birden boşaltır (yarım durum imkânsız). İpucu/plan
+// tazeleme çağıranın işi (tek sorumluluk).
+function bcTarihYaz(iso){
+  const gosterim = bcIsoTrGoster(iso);
+  globalThis._bcTarihIso = gosterim ? String(iso) : '';
+  const tEl = g('bc-tarih');
+  if(tEl){
+    tEl.value = gosterim;
+    tEl.dataset.iso = globalThis._bcTarihIso;
+  }
+}
+
+// Tek-seçim takvim seçimi — SAF (bcTakvimSecimEkle kardeşi; seçim DEĞİŞTİRİR,
+// toggle YOK). Sınırlar: min = bugun, maks = bugun+365 (başlangıç bir yıldan
+// ileri planlanamaz). Red: { ok:false, secim: dokunulmamış, mesaj } — UI toast.
+// UTC aritmetik (_bcUtcGun) — yerel saat dilimi sınırı 1 güne kaydıramaz.
+function bcTarihSecimEkle(secim, tarihISO, bugunStr){
+  const bugunGun = _bcUtcGun(bugunStr);
+  const isoGun = _bcUtcGun(tarihISO);
+  if(bugunGun === null) return { ok: false, secim: secim || null, mesaj: '⚠️ Bugün tarihi hesaplanamadı' };
+  if(isoGun === null) return { ok: false, secim: secim || null, mesaj: '⚠️ Geçersiz tarih' };
+  if(isoGun < bugunGun) return { ok: false, secim: secim || null, mesaj: 'Geçmiş tarih seçilemez' };
+  if(isoGun - bugunGun > 365){
+    const sonISO = new Date((bugunGun + 365) * 86400000).toISOString().slice(0, 10);
+    return { ok: false, secim: secim || null, mesaj: '⚠️ En fazla 365 gün ileri seçilebilir (son gün: ' + bcIsoTrGoster(sonISO) + ')' };
+  }
+  return { ok: true, secim: String(tarihISO), mesaj: null };
 }
 
 // HIZLI_SAATLER çipleri (config.js) — ek-chip deseni, bc-tohum-saat'i doldurur.
@@ -1042,7 +1115,7 @@ function bcPlanRender(){
   const kutu = g('bc-plan-gunler');
   if(!kutu) return;
   const gunler = globalThis._bcGunler || [];
-  const tarihStr = (v('bc-tarih') || '').trim() || bugun();
+  const tarihStr = bcTarihDeger() || bugun();
   kutu.innerHTML = gunler.map(gn => _bcGunKartiHtml(gn, tarihStr)).join('');
   bcButonEtiketi();
   bcSablonKaydetOzetGuncelle(); // V2.2.2 — şablon mini-formu özeti canlı
@@ -1606,7 +1679,8 @@ function bcTakvimChipEtiketi(iso){
 // ── V2.2 DOM KATMANI (ince — yalnız saf katmanı tüketir) ──
 
 function _bcTkBaslangic(){
-  return (v('bc-tarih') || '').trim() || bugun();
+  // V2.3-W20: kanonik ISO tek kapıdan (input.value artık DD.MM.YYYY görünüm)
+  return bcTarihDeger() || bugun();
 }
 
 function bcTakvimAc(){
@@ -1721,6 +1795,99 @@ function bcTakvimOnayla(){
 function bcTakvimKapat(){
   const box = document.getElementById('bc-gun-takvim');
   if(box) box.remove();
+}
+
+// ═══ V2.3-W20 — TEDAVİ TARİHİ TEK-SEÇİM TAKVİMİ (bc-gun-takvim renderer
+//     dili; fark: hücre tıkı seçimi DEĞİŞTİRİR — toggle yok; min=bugun,
+//     maks=bugun+365; mevcut gün vurgusu YOK. Onayla bcTarihYaz ile kanonik
+//     ISO'yu yazar + ipucu/planı tazeler — görüntü ve değer tek kapıdan.) ═══
+
+let _bcTsOffset = 0;    // 0 = bugünün ayi; ‹/› ±1 — rollover bcTakvimAyKaydir'da
+let _bcTsSecili = null; // ISO | null — başlık 'Seçilen:' bunu TR gösterir
+
+function bcTarihTakvimAc(){
+  _bcTsOffset = 0;
+  _bcTsSecili = bcTarihDeger() || bugun();
+  bcTarihTakvimRender();
+}
+
+function bcTarihTakvimKapat(){
+  const box = document.getElementById('bc-tarih-takvim');
+  if(box) box.remove();
+}
+
+// ‹/› — bcTakvimAyDegistir aynası: ay durumu tek skaler offset (saf katman).
+function bcTarihTakvimAyDegistir(delta){
+  _bcTsOffset += Math.trunc(Number(delta) || 0);
+  bcTarihTakvimRender();
+}
+
+// Hücre tıkı: doğrulama SAF bcTarihSecimEkle'de (min bugun, maks +365);
+// red → zarif toast, seçim değişmez.
+function bcTarihTakvimSec(iso){
+  const r = bcTarihSecimEkle(_bcTsSecili, iso, bugun());
+  if(!r.ok){ toast(r.mesaj, true); return; }
+  _bcTsSecili = r.secim;
+  bcTarihTakvimRender();
+}
+
+// Onayla: kanonik yazım TEK kapıdan (bcTarihYaz — görüntü TR + ISO birlikte),
+// sonra ipucu + gün kartı başlıkları (Gün N = tarih+N−1) tazelenir.
+function bcTarihTakvimOnayla(){
+  const secim = _bcTsSecili || bcTarihDeger() || bugun();
+  bcTarihYaz(secim);
+  bcTarihTakvimKapat();
+  bcTarihIpucuGuncelle();
+  bcPlanRender();
+}
+
+function bcTarihTakvimRender(){
+  let box = document.getElementById('bc-tarih-takvim');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'bc-tarih-takvim';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end';
+    box.onclick = e => { if (e.target === box) box.remove(); };
+    document.body.appendChild(box);
+  }
+  const bugunStr = bugun();
+  const bugunGun = _bcUtcGun(bugunStr);
+  const maksGun = bugunGun === null ? null : bugunGun + 365;
+  const gosterim = bcTakvimAyGosterim(bugunStr, _bcTsOffset);
+
+  let kareler = '';
+  for(let i = 0; i < gosterim.bosluk; i++) kareler += '<div></div>';
+  for(const h of gosterim.hucreler){
+    const isoGun = _bcUtcGun(h.tarihISO);
+    const onceMi = bugunGun !== null && isoGun !== null && isoGun < bugunGun;
+    const sonrasiMi = maksGun !== null && isoGun !== null && isoGun > maksGun;
+    const secili = _bcTsSecili === h.tarihISO;
+    let stil = 'color:var(--ink);';
+    if(secili) stil = 'background:var(--green);color:#fff;';
+    const kapali = onceMi || sonrasiMi;
+    const tik = kapali ? '' : ' onclick="bcTarihTakvimSec(&#39;' + h.tarihISO + '&#39;)"';
+    kareler += '<div' + tik +
+      ' style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:' + (kapali ? 'not-allowed;opacity:.35;' : 'pointer;') + stil + '">' + h.gunNo + '</div>';
+  }
+
+  box.innerHTML =
+    '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📅 Tedavi Tarihi — Takvimden Seç</div>' +
+    '<div style="font-weight:800;font-size:.95rem;margin-bottom:12px">Seçilen: ' + (bcIsoTrGoster(_bcTsSecili) || '—') + '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<button onclick="bcTarihTakvimAyDegistir(-1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
+    '<span style="font-weight:800;font-size:.9rem">' + gosterim.etiket + '</span>' +
+    '<button onclick="bcTarihTakvimAyDegistir(1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
+    ['Pt', 'Sa', 'Ca', 'Pe', 'Cu', 'Ct', 'Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">' + kareler + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<button onclick="bcTarihTakvimOnayla()" style="padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Onayla</button>' +
+    '<button onclick="bcTarihTakvimKapat()" style="padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">İptal</button>' +
+    '</div></div>';
+  box.style.display = 'flex';
 }
 
 // ═══ V2.1 SEANS FORMU ('＋ Bu güne seans ekle') ═══
@@ -2284,7 +2451,7 @@ async function submitBulkCase(btn){
 
   // V1.2 — planlanan tedavi tarihi (boş → null = bugün); geçmiş tarih erken red
   // (sunucu da reddeder: 'Geçmiş tarih planlanamaz' — istemci aynası).
-  const tarih = (v('bc-tarih') || '').trim() || null;
+  const tarih = bcTarihDeger() || null; // V2.3-W20: kanonik ISO (görüntü TR — asla gönderilmez)
   if (tarih && bcGecmisPlanTarihiMi(tarih, bugun())) {
     toast('⚠️ Geçmiş tarih planlanamaz', true);
     return;

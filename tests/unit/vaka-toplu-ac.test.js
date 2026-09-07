@@ -1218,10 +1218,13 @@ function tkDurum(baslangic) {
 // Gerçek tarayıcıda getElementById appendChild'la eklenen elemanları bulur;
 // makeDomStub yalnız __setEl ile kaydedilenleri bulur — tarayıcıya sadık
 // köprü (yoksa her render yeni kutu yaratır ve referans bayatlar).
+// V2.3-W20: başlangıç artık TEK kapıdan yazılır (bcTarihYaz — görüntü TR +
+// kanonik ISO); eski el.value = tarih ataması v('bc-tarih') okumasıyla
+// birlikte kalktı.
 function takvimAc(tarih) {
   const el = makeElement('input');
-  el.value = tarih;
   sb.document.__setEl('bc-tarih', el);
+  sb.bcTarihYaz(tarih);
   if(!sb.document.__getByIdKoprulu){
     const origGet = sb.document.getElementById.bind(sb.document);
     sb.document.getElementById = (id) => origGet(id) || sb.document.body.children.find(c => c.id === id) || null;
@@ -2168,11 +2171,11 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     assert.strictEqual((html.match(/id="bc-sablon-yukle-alan"/g) || []).length, 1);
     assert.strictEqual((html.match(/id="bc-sablon-yukle-list"/g) || []).length, 1);
     // Cache-busting (owner feedback 2026-09-07): her YEREL script src'si damgalı
-    // W19: stamp 20260907-2 (bcSablonKaydet checkbox kapısı değişikliği)
+    // W20: stamp 20260907-3 (bc-tarih readonly TR + tek-seçim takvim değişikliği)
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
-    const damgasiz = yerel.filter(s => !/\?v=20260907-2$/.test(s));
+    const damgasiz = yerel.filter(s => !/\?v=20260907-3$/.test(s));
     assert.deepStrictEqual(host(damgasiz), [], 'damgasız yerel script kalmamalı');
     assert.ok(/<!-- \?v= damgası: her js\/css değişikliğinde GÜNCELLE \(cache-busting\) -->/.test(html),
       'damga bakım notu ilk script etiketinin yanında');
@@ -2191,5 +2194,295 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
       if (/serviceWorker\.register\s*\(/.test(kod)) ihlal.push(f + ' (SW register)');
     });
     assert.deepStrictEqual(ihlal, [], 'dinamik ?v= bypass kaynağı kalmamalı');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// V2.3 (W20) — TEDAVİ TARİHİ: yerel-input MM/DD gösteriminden kurtarma
+// Sahibe kök teşhis (ekran görüntüleri, 2026-09-07): #bc-tarih type=date
+// idi; GÖRÜNEN string tarayıcı yereline göre çiziliyor (in-app en-US →
+// '09/26/2026' MM/DD/YYYY) — hesap ve hint ISO'su doğruydu ama sahibe alanı
+// ters okudu ('gün değiştiriyorum ay değişiyor'). Ayrıca hint boşluksuz ve
+// soldan taşan render oldu ('tedavi günleri2026-09-09gününe'). Çözüm
+// (vanilla, yerelden bağımsız): alan readonly metin (görünen 'DD.MM.YYYY')
+// + 📅 tek-seçim takvim butonu; kanonik ISO globalThis._bcTarihIso'da —
+// görüntü ve değer ASLA ayrışmaz (tek yazma kapısı bcTarihYaz, tek okuma
+// kapısı bcTarihDeger). Saf yüzey:
+//   bcIsoTrGoster(iso)              → 'DD.MM.YYYY' | ''  (saf, locale'siz)
+//   bcTrGosterIso(tr)               → 'YYYY-MM-DD' | ''  (yuvarlama çifti)
+//   bcTarihSecimEkle(sec,iso,bugun) → { ok, secim, mesaj }  tek seçim;
+//        min=bugun, maks=bugun+365 — seçim DEĞİŞTİRİR (toggle yok)
+// Tüketiciler (bcTarihIpucuGuncelle/bcPlanRender/_bcTkBaslangic/
+// submitBulkCase) artık v('bc-tarih') DEĞİL bcTarihDeger() okur.
+// ══════════════════════════════════════════════════════════════════════
+
+describe('bcIsoTrGoster (V2.3-W20 saf — ISO → TR DD.MM.YYYY, locale bağımsız)', () => {
+  it("'2026-09-26' → '26.09.2026' (MM/DD ters-okuma kilitlenir)", () => {
+    assert.strictEqual(sb.bcIsoTrGoster('2026-09-26'), '26.09.2026');
+  });
+
+  it('tek haneli gün/ay padStart: 2026-09-09 → 09.09.2026', () => {
+    assert.strictEqual(sb.bcIsoTrGoster('2026-09-09'), '09.09.2026');
+    assert.strictEqual(sb.bcIsoTrGoster('2027-01-05'), '05.01.2027');
+  });
+
+  it('boş / null / biçim dışı → boş string (bugün fallback YOK — alan placeholder gösterir)', () => {
+    assert.strictEqual(sb.bcIsoTrGoster(''), '');
+    assert.strictEqual(sb.bcIsoTrGoster(null), '');
+    assert.strictEqual(sb.bcIsoTrGoster(undefined), '');
+    assert.strictEqual(sb.bcIsoTrGoster('26.09.2026'), '', 'zaten TR biçimli girdi yutulmaz');
+    assert.strictEqual(sb.bcIsoTrGoster('09/26/2026'), '');
+    assert.strictEqual(sb.bcIsoTrGoster('2026-13-40'), '', 'ay 01-12 dışı reddedilir');
+  });
+});
+
+describe('bcTrGosterIso (V2.3-W20 saf — TR DD.MM.YYYY → ISO; yuvarlama çifti)', () => {
+  it("'26.09.2026' → '2026-09-26'", () => {
+    assert.strictEqual(sb.bcTrGosterIso('26.09.2026'), '2026-09-26');
+    assert.strictEqual(sb.bcTrGosterIso('05.01.2027'), '2027-01-05');
+  });
+
+  it('boş / null / biçim dışı → boş string', () => {
+    assert.strictEqual(sb.bcTrGosterIso(''), '');
+    assert.strictEqual(sb.bcTrGosterIso(null), '');
+    assert.strictEqual(sb.bcTrGosterIso('2026-09-26'), '');
+    assert.strictEqual(sb.bcTrGosterIso('26.09.26'), '');
+    assert.strictEqual(sb.bcTrGosterIso('32.13.2026'), '', 'gün/ay aralık dışı reddedilir');
+  });
+
+  it('yuvarlama: bcTrGosterIso(bcIsoTrGoster(iso)) === iso ve tersi', () => {
+    for (const iso of ['2026-09-26', '2026-09-09', '2027-01-01', '2026-12-31']) {
+      assert.strictEqual(sb.bcTrGosterIso(sb.bcIsoTrGoster(iso)), iso, 'ISO→TR→ISO: ' + iso);
+      const tr = sb.bcIsoTrGoster(iso);
+      assert.strictEqual(sb.bcIsoTrGoster(sb.bcTrGosterIso(tr)), tr, 'TR→ISO→TR: ' + tr);
+    }
+  });
+});
+
+describe('bcTarihSecimEkle (V2.3-W20 saf — tek-seçim takvim durumu; min=bugun, maks=+365)', () => {
+  const BUGUN = '2026-09-07';
+
+  it('seçim DEĞİŞTİRİR: mevcut 2026-09-10 iken 2026-09-26 tıkı → secim 2026-09-26 (toggle yok)', () => {
+    const r = host(sb.bcTarihSecimEkle('2026-09-10', '2026-09-26', BUGUN));
+    assert.deepStrictEqual(r, { ok: true, secim: '2026-09-26', mesaj: null });
+  });
+
+  it('aynı güne tık idempotent: seçim korunur, ok', () => {
+    const r = host(sb.bcTarihSecimEkle('2026-09-26', '2026-09-26', BUGUN));
+    assert.deepStrictEqual(r, { ok: true, secim: '2026-09-26', mesaj: null });
+  });
+
+  it('geçmiş gün RED: mesaj tam "Geçmiş tarih seçilemez", mevcut seçim DOKUNULMAZ', () => {
+    const r = host(sb.bcTarihSecimEkle('2026-09-10', '2026-09-06', BUGUN));
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.mesaj, 'Geçmiş tarih seçilemez');
+    assert.strictEqual(r.secim, '2026-09-10');
+  });
+
+  it('sınır min: bugünün kendisi seçilebilir (2026-09-07)', () => {
+    const r = host(sb.bcTarihSecimEkle(null, BUGUN, BUGUN));
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.secim, BUGUN);
+  });
+
+  it('sınır maks: bugün+365 seçilebilir; bugün+366 RED (mesaj 365 açıklar)', () => {
+    const sinir = host(sb.bcTarihSecimEkle(null, '2027-09-07', BUGUN));
+    assert.strictEqual(sinir.ok, true, 'bugün+365 ok');
+    const tasma = host(sb.bcTarihSecimEkle('2026-09-10', '2027-09-08', BUGUN));
+    assert.strictEqual(tasma.ok, false, 'bugün+366 red');
+    assert.strictEqual(tasma.secim, '2026-09-10', 'mevcut seçim korunur');
+    assert.ok(/365/.test(tasma.mesaj), 'mesaj sınırı açıklar: ' + tasma.mesaj);
+    assert.ok(tasma.mesaj.includes('07.09.2027'), 'son gün (bugün+365) TR gösterilir: ' + tasma.mesaj);
+  });
+
+  it('geçersiz ISO RED: "⚠️ Geçersiz tarih" (bcTakvimSecimEkle kardeş dili)', () => {
+    const r = host(sb.bcTarihSecimEkle(null, 'garbage', BUGUN));
+    assert.strictEqual(r.ok, false);
+    assert.strictEqual(r.mesaj, '⚠️ Geçersiz tarih');
+  });
+});
+
+// ── V2.3-W20 DOM katmanı — bcTarihYaz/bcTarihDeger tek kapı + ipucu ──
+
+function bcTarihElSifirla() {
+  const el = makeElement('input');
+  sb.document.__setEl('bc-tarih', el);
+  sb.bcTarihYaz('');
+  return el;
+}
+
+describe('bcTarihYaz/bcTarihDeger (V2.3-W20 — görüntü DD.MM.YYYY, kanonik ISO; ayrışmaz)', () => {
+  it('yaz: input.value TR görünüm, bcTarihDeger() ISO döner', () => {
+    const el = bcTarihElSifirla();
+    sb.bcTarihYaz('2026-09-26');
+    assert.strictEqual(el.value, '26.09.2026', 'görünen DD.MM.YYYY (tarayıcı yereli DEVRE DIŞI)');
+    assert.strictEqual(sb.bcTarihDeger(), '2026-09-26', 'kanonik ISO');
+  });
+
+  it('okuma v() DEĞİL: input.value elle bozulsa bile kanonik ISO dönmez-diverge olmaz', () => {
+    const el = bcTarihElSifirla();
+    sb.bcTarihYaz('2026-09-26');
+    el.value = '09/26/2026'; // hayali tarayıcı yereli müdahalesi
+    assert.strictEqual(sb.bcTarihDeger(), '2026-09-26');
+  });
+
+  it('boş yazım: görüntü ve kanonik birlikte boşalır (placeholder devreye girer)', () => {
+    const el = bcTarihElSifirla();
+    sb.bcTarihYaz('2026-09-26');
+    sb.bcTarihYaz('');
+    assert.strictEqual(el.value, '');
+    assert.strictEqual(sb.bcTarihDeger(), '');
+  });
+
+  it('geçersiz ISO yazımı yutulur (görüntü+kanonik boş — asla yarım durum yok)', () => {
+    const el = bcTarihElSifirla();
+    sb.bcTarihYaz('09/26/2026');
+    assert.strictEqual(el.value, '');
+    assert.strictEqual(sb.bcTarihDeger(), '');
+  });
+});
+
+describe('bcTarihIpucuGuncelle (V2.3-W20 — hint BOŞLUKLU + TR tarih)', () => {
+  function ipucuEl() {
+    const el = makeElement('div');
+    sb.document.__setEl('bc-tarih-ipucu', el);
+    return el;
+  }
+
+  it('ileri tarih: "Vaka ve tüm tedavi günleri 26.09.2026 gününe planlanacak" — tarih çevresinde boşluk ZORUNLU', () => {
+    bcTarihElSifirla();
+    sb.bcTarihYaz('2026-09-26');
+    const el = ipucuEl();
+    sb.bcTarihIpucuGuncelle();
+    assert.strictEqual(el.textContent, 'Vaka ve tüm tedavi günleri 26.09.2026 gününe planlanacak');
+    assert.ok(el.textContent.includes(' 26.09.2026 '), 'tarih öncesi+sonrası boşluk');
+    assert.ok(!el.textContent.includes('günleri2026'), 'sahibe ekranındaki bitişik hata kilitlenir');
+  });
+
+  it('boş tarih: varsayılan cümle aynen korunur', () => {
+    bcTarihElSifirla();
+    const el = ipucuEl();
+    sb.bcTarihIpucuGuncelle();
+    assert.strictEqual(el.textContent, 'Tarih boş bırakılırsa vakalar bugün açılır.');
+  });
+});
+
+describe('bc-tarih takvim (V2.3-W20 DOM — tek-seçim picker; açılış/seçim/onay)', () => {
+  // Gerçek bugün (vm bugun() stub'u ile aynı saat) — DOM yol testleri göreli tarih kurar.
+  const BUGUN_ISO = (() => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  })();
+  const isoKaydir = (base, n) => {
+    const d = new Date(base + 'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+
+  // bc-gun-takvim testköprüsüyle aynı desen: appendChild'lanan kutuyu
+  // getElementById köprüsüyle bul (yoksa her render yeni kutu yaratır).
+  function takvimKoprusuKur() {
+    if (!sb.document.__getByIdKoprulu) {
+      const origGet = sb.document.getElementById.bind(sb.document);
+      sb.document.getElementById = (id) => origGet(id) || sb.document.body.children.find(c => c.id === id) || null;
+      sb.document.__getByIdKoprulu = true;
+    }
+  }
+
+  it('açılış: kutu çizilir, başlıkta mevcut tarih TR (Seçilen: DD.MM.YYYY), Onayla/İptal var', () => {
+    bcTarihElSifirla();
+    sb.bcTarihYaz('2026-09-26');
+    takvimKoprusuKur();
+    sb.bcTarihTakvimAc();
+    const kutu = sb.document.getElementById('bc-tarih-takvim');
+    assert.ok(kutu, 'takvim kutusu açılır');
+    assert.ok(kutu.innerHTML.includes('26.09.2026'), 'başlık TR tarih: ' + kutu.innerHTML.slice(0, 200));
+    assert.ok(kutu.innerHTML.includes('bcTarihTakvimOnayla()'), 'Onayla butonu');
+    sb.bcTarihTakvimKapat();
+    assert.strictEqual(sb.document.getElementById('bc-tarih-takvim'), null, 'kapatma kutuyu kaldırır');
+  });
+
+  it('geçmiş güne tık: toast "Geçmiş tarih seçilemez", seçim değişmez', () => {
+    bcTarihElSifirla();
+    sb.bcTarihYaz(BUGUN_ISO);
+    takvimKoprusuKur();
+    sb.bcTarihTakvimAc();
+    sb.__toasts.length = 0;
+    sb.bcTarihTakvimSec(isoKaydir(BUGUN_ISO, -1));
+    assert.strictEqual(sb.__toasts.length, 1);
+    assert.strictEqual(sb.__toasts[0].isErr, true);
+    assert.strictEqual(sb.__toasts[0].m, 'Geçmiş tarih seçilemez');
+    sb.bcTarihTakvimKapat();
+  });
+
+  it('gelecek güne tık: başlık güncellenir; Onayla → input TR + bcTarihDeger ISO + ipucu boşluklu + kutu kapanır', () => {
+    const el = bcTarihElSifirla();
+    sb.bcTarihYaz(BUGUN_ISO);
+    const ipucu = makeElement('div');
+    sb.document.__setEl('bc-tarih-ipucu', ipucu);
+    takvimKoprusuKur();
+    sb.bcTarihTakvimAc();
+    const hedef = isoKaydir(BUGUN_ISO, 10);
+    sb.bcTarihTakvimSec(hedef);
+    const kutu = sb.document.getElementById('bc-tarih-takvim');
+    const trBeklenen = sb.bcIsoTrGoster(hedef);
+    assert.ok(kutu.innerHTML.includes(trBeklenen), 'başlık yeni seçimi gösterir: ' + trBeklenen);
+    sb.bcTarihTakvimOnayla();
+    assert.strictEqual(el.value, trBeklenen, 'input DD.MM.YYYY');
+    assert.strictEqual(sb.bcTarihDeger(), hedef, 'kanonik ISO');
+    assert.strictEqual(ipucu.textContent, 'Vaka ve tüm tedavi günleri ' + trBeklenen + ' gününe planlanacak');
+    assert.strictEqual(sb.document.getElementById('bc-tarih-takvim'), null, 'onay kutuyu kapatır');
+  });
+
+  it('ay ‹/› : bcTakvimAyKaydir dili — etiket değişir, seçim korunur', () => {
+    bcTarihElSifirla();
+    sb.bcTarihYaz('2026-09-26');
+    takvimKoprusuKur();
+    sb.bcTarihTakvimAc();
+    sb.bcTarihTakvimSec('2026-09-26');
+    sb.bcTarihTakvimAyDegistir(3);
+    const kutu = sb.document.getElementById('bc-tarih-takvim');
+    assert.ok(kutu.innerHTML.includes('Aralık 2026'), 'Eylül+3 → Aralık: ' + kutu.innerHTML.slice(0, 300));
+    assert.ok(kutu.innerHTML.includes('26.09.2026'), 'seçim başlıkta kalır');
+    sb.bcTarihTakvimAyDegistir(-3);
+    assert.ok(sb.document.getElementById('bc-tarih-takvim').innerHTML.includes('Eylül 2026'), 'geri dönüş');
+    sb.bcTarihTakvimKapat();
+  });
+});
+
+describe('V2.3 (W20) — m-bulk-case tarih alanı yapısı + takvim aksiyonu + manifest damgası', () => {
+  const fs = require('node:fs');
+
+  function mBulkCaseBolumu() {
+    const html = fs.readFileSync('index.html', 'utf8');
+    const bas = html.indexOf('<div id="m-bulk-case"');
+    const son = html.indexOf('<div id="m-sablon"');
+    assert.ok(bas !== -1 && son > bas, 'm-bulk-case bölümü bulunamadı');
+    return html.slice(bas, son);
+  }
+
+  it('handlers.js bc-tarih-takvim aksiyonunu kaydeder (takvim açılır)', () => {
+    const src = fs.readFileSync('js/utils/handlers.js', 'utf8');
+    assert.ok(/'bc-tarih-takvim':\s*\(\)\s*=>\s*bcTarihTakvimAc\(\)/.test(src));
+  });
+
+  it('index.html: #bc-tarih readonly text + 📅 picker butonu + hint sarma stili; m-bulk-case içinde type=date YOK', () => {
+    const bolum = mBulkCaseBolumu();
+    assert.ok(/<input id="bc-tarih"[^>]*type="text"/.test(bolum), 'alan type=text');
+    assert.ok(/<input id="bc-tarih"[^>]*readonly/.test(bolum), 'alan readonly — yerel date UI yok');
+    assert.ok(/<input id="bc-tarih"[^>]*inputmode="none"/.test(bolum), 'klavye açılmaz');
+    assert.ok(/placeholder="Başlangıç tarihi"/.test(bolum), 'placeholder');
+    assert.strictEqual((bolum.match(/data-action="bc-tarih-takvim"/g) || []).length, 2,
+      'input + 📅 butonu aynı aksiyonu taşır');
+    assert.ok(/📅<\/button>/.test(bolum), 'takvim butonu etiketi');
+    assert.ok(!/type="date"/.test(bolum), 'm-bulk-case içinde native date input KALMAZ');
+    const ipucu = bolum.match(/<div id="bc-tarih-ipucu"[^>]*>/);
+    assert.ok(ipucu && /overflow-wrap:\s*anywhere/.test(ipucu[0]), 'hint sarma stili (taşma kilidi)');
+  });
+
+  it('manifest link de damgalı: manifest.json?v=20260907-3', () => {
+    const html = fs.readFileSync('index.html', 'utf8');
+    assert.ok(html.includes('manifest.json?v=20260907-3'), 'manifest damgası -3');
+    assert.ok(!html.includes('?v=20260907-2'), 'eski -2 damgası kalmaz');
   });
 });
