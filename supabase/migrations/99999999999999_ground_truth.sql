@@ -3566,19 +3566,53 @@ DROP VIEW IF EXISTS public.treatment_timeline CASCADE;
 -- 9. RPC FONKSİYONLARI
 -- ──────────────────────────────────────────────────────────────
 
--- 9a. create_case
-DROP FUNCTION IF EXISTS public.create_case(text, uuid, text);
-CREATE OR REPLACE FUNCTION public.create_case(
-  p_animal_id   text,
+-- 9a. vaka açma: _vaka_ac_tek helper + create_case wrapper + vaka_toplu_ac
+-- (create_case gövdesi helper'a taşındı; imza/davranış değişmedi)
+-- V1.1 (2026-09-06): vaka_toplu_ac imzasına p_items jsonb eklendi (üçüncü
+-- parametre; manuel ilaç listesi — gün 1 uygulaması bug059 motoruyla).
+-- V1.2 (2026-09-06): p_tarih (planlı başlangıç → cases.start_date'e yazılır;
+-- şablon günleri start_date+(n-1), manuel gün-1 p_tarih'te) + p_tohumlama
+-- (vaka başına vaka_tohumlama_ekle yeniden kullanımı; offset 0-365, saat
+-- default '08:00'; sonuç acilan[i].tohumlama — yumuşak, hatalara sayılmaz).
+-- V2 (2026-09-06): p_items GÜN-anahtarlı şekle evrilir (imza aynı — 9
+-- parametre): [{gun 1..31, saat?, kalemler:[{drug_product_id, stok_id, dose,
+-- unit, route?, saat?}]}]. Günler gun ASC, her gün bug059 motoruyla
+-- start_date+(gun-1)'e işlenir; saat önceliği kalem>gün>'09:00'. Bir günün
+-- motor hatası hayvanı hatalar'a düşürür (case_id+gun), vaka açık kalır,
+-- önceki günler durur (kısmi gün semantiği). acilan[i].manuel =
+-- {gun_sayisi, seans_sayisi}. Düz (V1.1) dizi şekli kabul edilmez
+-- ('Geçersiz plan: gün 1..31').
+-- V2.2 (2026-09-06, sahip kararı): p_tohumlama_cakisma text DEFAULT 'ekle'
+-- (10 parametre; 9-arg gövde DROP edilir). 'ekle' = bugünkü davranış;
+-- 'atla' = hayvanın ESKİ açık planlı tohumlama görevi varsa (her vakadan,
+-- kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%', yeni vakanın kendisi hariç)
+-- yeni görev AÇILMAZ: acilan[i].tohumlama = {olustu:false, sebep:'Açık
+-- planlı tohumlama vardı — atlandı (eski plan: <DD.MM>)'};
+-- 'uzerine_yaz' = eski açık görevler YUMUŞAK İPTAL (iptal+tamamlandi+
+-- tamamlanma_tarihi, kapatan_ref='toplu-vaka-uzerine-yaz') + görev başına
+-- islem_log tip='TOHUMLAMA_PLANLI_IPTAL' (ref_tablo='gorev_log',
+-- snapshot {'sebep':'toplu vaka üzerine yazma'}), sonra yeni görev;
+-- acilan[i].tohumlama = {olustu:true, gorev_id, uzerine_yazildi:['<DD.MM>',…]}
+-- (iptal olmadıysa anahtar konmaz; ekle ok:false → bugünkü yumuşak şekil).
+-- Geçersiz/NULL mod → {ok:false, mesaj:'Geçersiz çakışma modu'} (fail-fast).
+-- Eski imzalar DROP edilir; ayrıntı 20260906120000_vaka_toplu_ac.sql başlığında.
+-- NOT: vaka_tohumlama_ekle / _tohumlama_gorev_uygunluk GT'de YOKTUR (GT drift;
+-- canlıda mevcut — 20260730000002_vaka_tohumlama_ekle.sql) → buraya
+-- kopyalanmaz; vaka_toplu_ac bağımlılığı canlı şemada pg_proc guard ile
+-- yoklanır, RPC yoksa yumuşak düşer ({olustu:false, sebep:'Tohumlama RPC yok'}).
+DROP FUNCTION IF EXISTS public._vaka_ac_tek(text, uuid, text);
+CREATE OR REPLACE FUNCTION public._vaka_ac_tek(
+  p_hayvan_id   text,
   p_disease_id  uuid,
-  p_notes       text DEFAULT NULL
+  p_notes       text DEFAULT NULL,
+  p_tarih       date DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_new_id  uuid;
   v_animal  record;
   v_disease record;
 BEGIN
-  SELECT * INTO v_animal FROM public.hayvanlar WHERE id = p_animal_id AND durum = 'Aktif';
+  SELECT * INTO v_animal FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı veya aktif değil');
   END IF;
@@ -3591,15 +3625,15 @@ BEGIN
   -- Aynı hayvanda aynı hastalıkta zaten aktif vaka var mı?
   IF EXISTS (
     SELECT 1 FROM public.cases
-    WHERE animal_id = p_animal_id
+    WHERE animal_id = p_hayvan_id
       AND disease_id = p_disease_id
       AND status = 'active'
   ) THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu hayvan için zaten aktif bir ' || v_disease.name || ' vakası mevcut');
   END IF;
 
-  INSERT INTO public.cases (animal_id, disease_id, notes)
-  VALUES (p_animal_id, p_disease_id, p_notes)
+  INSERT INTO public.cases (animal_id, disease_id, notes, start_date)
+  VALUES (p_hayvan_id, p_disease_id, p_notes, COALESCE(p_tarih, CURRENT_DATE))
   RETURNING id INTO v_new_id;
 
   -- islem_log: geri alma icin snapshot
@@ -3607,7 +3641,7 @@ BEGIN
   VALUES (
     gen_random_uuid()::text,
     'VAKA_ACILDI',
-    p_animal_id,
+    p_hayvan_id,
     v_new_id::text,
     'cases',
     jsonb_build_object(
@@ -3621,6 +3655,501 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'case_id', v_new_id);
 END;
 $$;
+
+-- create_case = ince wrapper (imza/değer değişmedi; p_tarih NULL geçer)
+CREATE OR REPLACE FUNCTION public.create_case(
+  p_animal_id   text,
+  p_disease_id  uuid,
+  p_notes       text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  RETURN public._vaka_ac_tek(p_animal_id, p_disease_id, p_notes, NULL);
+END;
+$$;
+
+-- V1.2 imza: 9 parametre (p_items/p_sablon_id/p_notes/p_tarih/p_tohumlama/
+-- offset/saat); V2'de imza DEĞİŞMEDİ (yalnız p_items şekli gün-anahtarlı
+-- oldu). Eski 3/4/5-arg gövdeler DROP edilir — CREATE OR REPLACE yeni
+-- imzada overload üretirdi.
+DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, uuid);
+DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, uuid, text);
+DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text);
+DROP FUNCTION IF EXISTS public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text);
+CREATE OR REPLACE FUNCTION public.vaka_toplu_ac(
+  p_animal_ids           text[],
+  p_disease_id           uuid,
+  p_items                jsonb DEFAULT NULL,
+  p_sablon_id            uuid DEFAULT NULL,
+  p_notes                text DEFAULT NULL,
+  p_tarih                date DEFAULT NULL,
+  p_tohumlama            boolean DEFAULT false,
+  p_tohumlama_gun_offset int DEFAULT 0,
+  p_tohumlama_saat       text DEFAULT NULL,
+  p_tohumlama_cakisma    text DEFAULT 'ekle'
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_list          text[] := ARRAY[]::text[];
+  v_seen          text[] := ARRAY[]::text[];
+  v_id            text;
+  v_toplam        int;
+  v_basari        int := 0;
+  v_acilan        jsonb := '[]'::jsonb;
+  v_atlanan       jsonb := '[]'::jsonb;
+  v_hatalar       jsonb := '[]'::jsonb;
+  v_kupe          text;
+  v_res           jsonb;
+  v_r             jsonb;
+  v_case_id       uuid;
+  v_sab           jsonb;
+  v_sab_obj       jsonb;
+  v_manuel_obj    jsonb;
+  v_top           jsonb;
+  v_ok            boolean;
+  v_tohumlama_var boolean;
+  v_tohu_ekle_var boolean;
+  v_start_date    date;
+  v_tohu_tarih    date;
+  v_tohu_res      jsonb;
+  v_tohu_obj      jsonb;
+  v_sess          jsonb;
+  v_item          jsonb;
+  v_idx           int;
+  v_day           jsonb;
+  v_days_sorted   jsonb;
+  v_dup_gun       int;
+  v_gun_sayisi    int;
+  v_seans_toplam  int;
+  v_err_gun       int;
+  v_cakisma       jsonb;
+  v_uzerine       jsonb;
+  v_c             record;
+BEGIN
+  IF p_animal_ids IS NULL OR array_length(p_animal_ids, 1) IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan listesi boş');
+  END IF;
+  IF array_length(p_animal_ids, 1) > 200 THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'En fazla 200 hayvan');
+  END IF;
+
+  -- V1.1: şablon ile manuel ilaç listesi karşılıklı dışlanır
+  IF p_items IS NOT NULL AND p_sablon_id IS NOT NULL THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj',
+      'Şablon ve manuel ilaç listesi aynı anda verilemez');
+  END IF;
+
+  -- V1.2: p_tarih = planlanan başlangıç. NULL → bugün; geçmiş reddedilir
+  -- (fail-fast — hiç vaka açılmadan).
+  IF p_tarih IS NOT NULL AND p_tarih < CURRENT_DATE THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçmiş tarih planlanamaz');
+  END IF;
+
+  -- V1.2: tohumlama parametreleri (fail-fast)
+  IF p_tohumlama_gun_offset IS NULL
+     OR p_tohumlama_gun_offset < 0 OR p_tohumlama_gun_offset > 365 THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj',
+      'Tohumlama gün ofseti 0-365 aralığında olmalı');
+  END IF;
+  IF p_tohumlama_saat IS NOT NULL
+     AND p_tohumlama_saat !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz saat');
+  END IF;
+
+  -- V2.2: çakışma modu (fail-fast — hiç vaka açılmadan). DEFAULT 'ekle'
+  -- mevcut davranışı korur; mod p_tohumlama=false iken etki etmez.
+  IF p_tohumlama_cakisma IS NULL OR
+     p_tohumlama_cakisma NOT IN ('ekle', 'uzerine_yaz', 'atla') THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz çakışma modu');
+  END IF;
+
+  -- V2: p_items doğrulama + motor biçimine normalize (fail-fast — henüz
+  -- hiç vaka açılmadan döner). p_items artık GÜN objeleri dizisidir:
+  -- [{gun, saat?, kalemler:[...]}]. Her kalem V1.1 kalem kontrollerinden
+  -- geçer (mesajlar aynen, index '<gün>.<kalem>'); kalem saati motor için
+  -- zorunlu planned_time'a COALESCE(kalem.saat, gün.saat, '09:00') ile
+  -- çevrilir (treatment_day_uygulamalar.planned_time NOT NULL,
+  -- 20260611000001). DÜZ (V1.1) dizi şekli kabul edilmez: gun anahtarı
+  -- olmayan ilk eleman 'Geçersiz plan: gün 1..31' ile düşer.
+  IF p_items IS NOT NULL THEN
+    IF jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) < 1 THEN
+      RETURN jsonb_build_object('ok', false, 'mesaj',
+        'Geçersiz plan: boş olmayan bir jsonb dizisi bekleniyor');
+    END IF;
+    FOR v_day, v_idx IN
+      SELECT value, ord - 1
+      FROM jsonb_array_elements(p_items) WITH ORDINALITY AS t(value, ord)
+    LOOP
+      IF jsonb_typeof(v_day) IS DISTINCT FROM 'object' THEN
+        RETURN jsonb_build_object('ok', false, 'mesaj',
+          'Geçersiz plan: ' || v_idx || ': gün elemanı obje olmalı');
+      END IF;
+      -- gun: JSON sayısı ve tam sayı yazımı, 1..31 (düz V1.1 kalemleri burada
+      -- düşer — gun anahtarı yok)
+      IF COALESCE(jsonb_typeof(v_day->'gun'), '') <> 'number'
+         OR (v_day->>'gun') !~ '^[0-9]+$'
+         OR (v_day->>'gun')::numeric < 1
+         OR (v_day->>'gun')::numeric > 31 THEN
+        RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz plan: gün 1..31');
+      END IF;
+      IF v_day->>'saat' IS NOT NULL
+         AND (v_day->>'saat') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
+        RETURN jsonb_build_object('ok', false, 'mesaj',
+          'Geçersiz plan: gün ' || (v_day->>'gun') || ': saat');
+      END IF;
+      IF COALESCE(jsonb_typeof(v_day->'kalemler'), '') <> 'array'
+         OR jsonb_array_length(v_day->'kalemler') < 1 THEN
+        RETURN jsonb_build_object('ok', false, 'mesaj',
+          'Geçersiz plan: Gün ' || (v_day->>'gun') || ' kalemleri boş');
+      END IF;
+      -- V1.1 kalem kontrolleri — mesajlar aynen, index '<gün>.<kalem>'
+      -- (kalem 1 tabanlı); kalem saati V2 üslubuyla denetlenir
+      FOR v_item, v_idx IN
+        SELECT value, ord
+        FROM jsonb_array_elements(v_day->'kalemler') WITH ORDINALITY AS t(value, ord)
+      LOOP
+        IF jsonb_typeof(v_item) IS DISTINCT FROM 'object' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': dizi elemanı obje olmalı');
+        END IF;
+        IF COALESCE(v_item->>'drug_product_id', '') = '' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': drug_product_id zorunlu (uuid)');
+        END IF;
+        IF (v_item->>'drug_product_id') !~*
+            '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': drug_product_id geçerli bir uuid değil');
+        END IF;
+        IF COALESCE(v_item->>'stok_id', '') = '' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': stok_id zorunlu');
+        END IF;
+        IF v_item->>'dose' IS NULL
+           OR (v_item->>'dose') !~ '^[0-9]+([.][0-9]+)?$'
+           OR (v_item->>'dose')::numeric <= 0 THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': dose pozitif sayısal olmalı (dose > 0)');
+        END IF;
+        IF COALESCE(v_item->>'unit', '') = '' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz ilaç kalemi: ' || (v_day->>'gun') || '.' || v_idx ||
+            ': unit zorunlu');
+        END IF;
+        IF v_item->>'saat' IS NOT NULL
+           AND (v_item->>'saat') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' THEN
+          RETURN jsonb_build_object('ok', false, 'mesaj',
+            'Geçersiz plan: gün ' || (v_day->>'gun') || ' kalem ' || v_idx || ': saat');
+        END IF;
+      END LOOP;
+    END LOOP;
+    -- Günler dizide tekil olmalı (buraya gelindiğinde tüm gun değerleri
+    -- 1..31 aralığında geçerli tam sayılar)
+    SELECT min(g)
+      INTO v_dup_gun
+      FROM (
+        SELECT (d->>'gun')::int AS g
+        FROM jsonb_array_elements(p_items) d
+        GROUP BY 1
+        HAVING count(*) > 1
+      ) t;
+    IF v_dup_gun IS NOT NULL THEN
+      RETURN jsonb_build_object('ok', false, 'mesaj',
+        'Geçersiz plan: gün ' || v_dup_gun || ' tekrar ediyor');
+    END IF;
+    -- Yürütme planı (bir kez, döngü dışında): günler gun ASC sıralanır,
+    -- her günün seans dizisi kurulur — kalem başına planned_time :=
+    -- COALESCE(kalem.saat, gün.saat, '09:00'). Motor kalemleri birebir aynı
+    -- anahtarlarla okur (20260611000002_bug059_rpcs.sql).
+    v_days_sorted := '[]'::jsonb;
+    FOR v_day IN
+      SELECT value
+      FROM jsonb_array_elements(p_items)
+      ORDER BY (value->>'gun')::int
+    LOOP
+      v_sess := '[]'::jsonb;
+      FOR v_item IN SELECT * FROM jsonb_array_elements(v_day->'kalemler')
+      LOOP
+        v_sess := v_sess || jsonb_build_array(jsonb_build_object(
+          'drug_product_id', v_item->>'drug_product_id',
+          'stok_id',         v_item->>'stok_id',
+          'dose',            v_item->>'dose',
+          'unit',            v_item->>'unit',
+          'route',           NULLIF(v_item->>'route', ''),
+          'planned_time',    COALESCE(NULLIF(v_item->>'saat', ''),
+                                    NULLIF(v_day->>'saat', ''), '09:00')));
+      END LOOP;
+      v_days_sorted := v_days_sorted || jsonb_build_array(jsonb_build_object(
+        'gun',  (v_day->>'gun')::int,
+        'sess', v_sess));
+    END LOOP;
+  END IF;
+
+  -- Dedupe: girdi sırası korunur
+  FOREACH v_id IN ARRAY p_animal_ids LOOP
+    IF v_id IS NOT NULL AND NOT (v_id = ANY (v_seen)) THEN
+      v_seen := v_seen || v_id;
+      v_list := v_list || v_id;
+    END IF;
+  END LOOP;
+  v_toplam := array_length(v_list, 1);
+  IF v_toplam IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan listesi boş');
+  END IF;
+
+  -- GT'de olmayan opsiyonel helper'lar canlıdaysa uygula (pg_proc guard — bir
+  -- kez, döngü dışında; helper yoksa ilgili yol güvenli düşer)
+  SELECT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE proname = 'tedavi_sablon_tohumlama_gorev_ekle'
+      AND pronamespace = 'public'::regnamespace
+  ) INTO v_tohumlama_var;
+  SELECT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE proname = 'vaka_tohumlama_ekle'
+      AND pronamespace = 'public'::regnamespace
+  ) INTO v_tohu_ekle_var;
+
+  FOREACH v_id IN ARRAY v_list LOOP
+    SELECT kupe_no INTO v_kupe FROM public.hayvanlar WHERE id = v_id;
+    v_ok         := true;
+    v_case_id    := NULL;
+    v_sab_obj    := NULL;
+    v_manuel_obj := NULL;
+    v_start_date := NULL;
+    v_tohu_obj   := NULL;
+    BEGIN
+      v_res := public._vaka_ac_tek(v_id, p_disease_id, p_notes, p_tarih);
+      IF (v_res->>'ok') <> 'true' THEN
+        v_ok := false;
+        v_atlanan := v_atlanan || jsonb_build_array(jsonb_build_object(
+          'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', v_res->>'mesaj'));
+      ELSE
+        v_case_id := (v_res->>'case_id')::uuid;
+        -- V1.2: vakanın GERÇEK start_date'i (p_tarih ya da bugün) — tohumlama
+        -- hedefi ve acilan[i].tarih buna çapar
+        SELECT start_date INTO v_start_date FROM public.cases WHERE id = v_case_id;
+        IF p_sablon_id IS NOT NULL THEN
+          BEGIN
+            v_sab := public.tedavi_sablon_uygula(p_case_id := v_case_id, p_sablon_id := p_sablon_id);
+            v_sab_obj := jsonb_build_object(
+              'gun_sayisi',   v_sab->'gun_sayisi',
+              'seans_sayisi', v_sab->'seans_sayisi',
+              'atlanan',      v_sab->'atlanan');
+            IF v_tohumlama_var THEN
+              v_top := public.tedavi_sablon_tohumlama_gorev_ekle(p_case_id := v_case_id, p_sablon_id := p_sablon_id);
+              v_sab_obj := v_sab_obj || jsonb_build_object(
+                'toplanti_uygulandi', COALESCE((v_top->>'olustu') = 'true', false),
+                'toplanti_sebep',     v_top->'sebep');
+            ELSE
+              v_sab_obj := v_sab_obj || jsonb_build_object('toplanti_uygulandi', false);
+            END IF;
+          EXCEPTION WHEN OTHERS THEN
+            -- Şablon hatası tek hayvanı hatalar'a düşürür; vaka açık kalır.
+            v_ok := false;
+            v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
+              'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM, 'case_id', v_case_id));
+          END;
+        ELSIF p_items IS NOT NULL THEN
+          -- V2: çoklu gün manuel plan — günler gun ASC (v_days_sorted), her
+          -- gün bug059 motoruyla vakanın start_date + (gun - 1) tarihine
+          -- işlenir (start_date = p_tarih ya da bugün — V1.2 çapası).
+          -- KISMİ GÜN SEMANTİĞİ: HER GÜN kendi BEGIN/EXCEPTION alt bloğunda
+          -- işlenir — bir günde motor ok:false ya da EXCEPTION → hayvan
+          -- hatalar'a düşer (case_id + gün bilgisiyle), vaka AÇIK kalır ve
+          -- ÖNCEKİ günlerin satırları (treatment_days, uygulamalar, ilaç
+          -- kayıtları, stok hareketleri, görevler) DURAR (gün alt bloğu
+          -- yalnız kendi gününü geri alır); kalan günler denenmez,
+          -- sıradaki hayvana geçilir. Böyle bir hayvan acilan'a girmez
+          -- (V1.1 tek-gün deseninin çoklu-gün genelleştirmesi).
+          v_gun_sayisi   := 0;
+          v_seans_toplam := 0;
+          v_err_gun      := NULL;
+          FOR v_day IN SELECT * FROM jsonb_array_elements(v_days_sorted)
+          LOOP
+            EXIT WHEN NOT v_ok;
+            v_err_gun := (v_day->>'gun')::int;
+            BEGIN
+              v_r := public.add_treatment_day_with_sessions(
+                p_case_id         := v_case_id,
+                p_date            := v_start_date + (v_err_gun - 1),
+                p_sessions        := v_day->'sess',
+                p_existing_day_id := NULL);
+              IF (v_r->>'ok') <> 'true' THEN
+                v_ok := false;
+                v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
+                  'hayvan_id', v_id, 'kupe', v_kupe,
+                  'mesaj', COALESCE(v_r->>'mesaj', 'Tedavi günü eklenemedi'),
+                  'case_id', v_case_id, 'gun', v_err_gun));
+              ELSE
+                v_gun_sayisi   := v_gun_sayisi + 1;
+                v_seans_toplam := v_seans_toplam
+                                  + COALESCE((v_r->>'seans_sayisi')::int, 0);
+              END IF;
+            EXCEPTION WHEN OTHERS THEN
+              v_ok := false;
+              v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
+                'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM,
+                'case_id', v_case_id, 'gun', v_err_gun));
+            END;
+          END LOOP;
+          IF v_ok THEN
+            v_manuel_obj := jsonb_build_object(
+              'gun_sayisi',   v_gun_sayisi,
+              'seans_sayisi', v_seans_toplam);
+          END IF;
+        END IF;
+
+        -- V1.2: planlı tohumlama — HER başarılı açılan vaka için, şablon/
+        -- manuel'den SONRA, yalnız p_tohumlama iken. Yumuşak: sonuç asla
+        -- hatalar'a sayılmaz, vaka açık kalır; sebep acilan[i].tohumlama'ya
+        -- yazılır (uygunluk reddi / RPC yok / beklenmeyen hata).
+        -- V2.2: p_tohumlama_cakisma modu — 'ekle' (default, davranış
+        -- değişmez) | 'atla' (eski açık görev varsa YENİSİ AÇILMAZ) |
+        -- 'uzerine_yaz' (eski açık görevler YUMUŞAK İPTAL + görev başına
+        -- islem_log denetimi, sonra yeni görev açılır).
+        IF p_tohumlama THEN
+          BEGIN
+            IF v_tohu_ekle_var THEN
+              -- Çakışma taraması (yalnız mod <> 'ekle'; ekle hiç taramaz —
+              -- regresyon birebir): hayvanın AÇIK TOHUMLAMA_PLANLI görevleri
+              -- HER VAKADAN (kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%'), YENİ
+              -- açılan vakanın kendi satırları HARİÇ — şablon yolu aynı RPC
+              -- çağrısında az önce görev açtıysa o "eski" değildir; aynı-vaka
+              -- tekrarı vaka_tohumlama_ekle'nin mevcut guard'ında kalır.
+              -- Sıra hedef_tarih ASC (en eski önce; NULL en son).
+              v_uzerine := NULL;
+              v_tohu_obj := NULL;
+              IF p_tohumlama_cakisma <> 'ekle' THEN
+                SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                                  'id', g.id::text, 'hedef_tarih', g.hedef_tarih)
+                                ORDER BY g.hedef_tarih ASC, g.id ASC),
+                               '[]'::jsonb)
+                  INTO v_cakisma
+                  FROM public.gorev_log g
+                 WHERE g.hayvan_id = v_id
+                   AND g.gorev_tipi = 'TOHUMLAMA_PLANLI'
+                   AND g.kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%'
+                   AND g.kaynak NOT LIKE
+                       'TEDAVI_SABLON_TOHUMLAMA:' || v_case_id::text || ':%'
+                   AND g.tamamlandi = false
+                   AND g.iptal = false;
+
+                IF p_tohumlama_cakisma = 'atla' AND v_cakisma <> '[]'::jsonb THEN
+                  -- Sahip kararı: 'Atla' = yenisi AÇILMAZ; eski planın hedef
+                  -- tarihi (en eski açık görev) sebebe yazılır.
+                  v_tohu_obj := jsonb_build_object(
+                    'olustu', false,
+                    'sebep', 'Açık planlı tohumlama vardı — atlandı (eski plan: '
+                             || COALESCE(to_char(
+                                  (v_cakisma->0->>'hedef_tarih')::date, 'DD.MM'),
+                                  '?')
+                             || ')');
+                ELSIF p_tohumlama_cakisma = 'uzerine_yaz'
+                      AND v_cakisma <> '[]'::jsonb THEN
+                  -- Sahip kararı: 'Üzerine yaz' = eski görev YUMUŞAK İPTAL.
+                  -- Kapanış şekli close_case_with_remaining 5b adımının
+                  -- (TOHUMLAMA_PLANLI iptali: iptal+tamamlandi+tarih)
+                  -- aynası; kapatan_ref trg_gorev_parent_kapandi
+                  -- konvansiyonuyla. Görev başına islem_log denetimi
+                  -- (GOREV_IPTAL önceli yok — ip'ler GOREV_EKLENDI/
+                  -- GOREV_TAMAMLA/GOREV_OTOKAPAT).
+                  v_uzerine := '[]'::jsonb;
+                  FOR v_c IN
+                    SELECT x.id, x.hedef_tarih
+                    FROM jsonb_to_recordset(v_cakisma)
+                         AS x(id text, hedef_tarih date)
+                  LOOP
+                    UPDATE public.gorev_log
+                       SET iptal = true,
+                           tamamlandi = true,
+                           tamamlanma_tarihi = now(),
+                           kapatan_ref = 'toplu-vaka-uzerine-yaz'
+                     WHERE id::text = v_c.id
+                       AND tamamlandi = false
+                       AND iptal = false;
+                    IF FOUND THEN
+                      INSERT INTO public.islem_log
+                        (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
+                      VALUES
+                        (gen_random_uuid()::text,
+                         'TOHUMLAMA_PLANLI_IPTAL',
+                         v_id, v_c.id, 'gorev_log',
+                         jsonb_build_object(
+                           'sebep', 'toplu vaka üzerine yazma'));
+                      v_uzerine := v_uzerine || to_jsonb(
+                        COALESCE(to_char(v_c.hedef_tarih, 'DD.MM'), '?'));
+                    END IF;
+                  END LOOP;
+                END IF;
+              END IF;
+
+              IF v_tohu_obj IS NULL THEN
+                v_tohu_tarih := v_start_date + p_tohumlama_gun_offset;
+                v_tohu_res := public.vaka_tohumlama_ekle(
+                  p_case_id := v_case_id,
+                  p_tarih   := v_tohu_tarih,
+                  p_saat    := COALESCE(p_tohumlama_saat, '08:00')::time);
+                IF (v_tohu_res->>'ok') = 'true' THEN
+                  v_tohu_obj := jsonb_build_object(
+                    'olustu', true, 'gorev_id', v_tohu_res->'gorev_id');
+                  -- V2.2: üzerine yazıldıysa iptal edilen eski planların
+                  -- tarihleri (eski→yeni) sonuca eklenir.
+                  IF v_uzerine IS NOT NULL AND v_uzerine <> '[]'::jsonb THEN
+                    v_tohu_obj := v_tohu_obj || jsonb_build_object(
+                      'uzerine_yazildi', v_uzerine);
+                  END IF;
+                ELSE
+                  v_tohu_obj := jsonb_build_object(
+                    'olustu', false,
+                    'sebep', COALESCE(v_tohu_res->>'mesaj', 'Bilinmeyen sebep'));
+                END IF;
+              END IF;
+            ELSE
+              -- vaka_tohumlama_ekle canlıda yok (GT drift): güvenli düşüm
+              v_tohu_obj := jsonb_build_object(
+                'olustu', false, 'sebep', 'Tohumlama RPC yok');
+            END IF;
+          EXCEPTION WHEN OTHERS THEN
+            v_tohu_obj := jsonb_build_object('olustu', false, 'sebep', SQLERRM);
+          END;
+        END IF;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      v_ok := false;
+      v_hatalar := v_hatalar || jsonb_build_array(jsonb_build_object(
+        'hayvan_id', v_id, 'kupe', v_kupe, 'mesaj', SQLERRM));
+    END;
+
+    IF v_ok THEN
+      v_basari := v_basari + 1;
+      v_acilan := v_acilan || jsonb_build_array(jsonb_build_object(
+        'hayvan_id', v_id, 'kupe', v_kupe, 'case_id', v_case_id,
+        'tarih', v_start_date,
+        'sablon', v_sab_obj, 'manuel', v_manuel_obj,
+        'tohumlama', v_tohu_obj));
+    END IF;
+  END LOOP;
+
+  IF v_tohumlama_var THEN
+    RETURN jsonb_build_object('ok', true, 'toplam', v_toplam, 'basari', v_basari,
+      'atlanan', v_atlanan, 'hatalar', v_hatalar, 'acilan', v_acilan,
+      'sablon', p_sablon_id IS NOT NULL, 'manuel', p_items IS NOT NULL,
+      'tohumlama', p_tohumlama);
+  END IF;
+
+  -- Tohumlama (şablon) helper'ı canlıda yok: güvenli düşüm işareti
+  RETURN jsonb_build_object('ok', true, 'toplam', v_toplam, 'basari', v_basari,
+    'atlanan', v_atlanan, 'hatalar', v_hatalar, 'acilan', v_acilan,
+    'sablon', p_sablon_id IS NOT NULL, 'manuel', p_items IS NOT NULL,
+    'toplanti_uygulandi', false, 'tohumlama', p_tohumlama);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text) TO anon, authenticated;
 
 -- Kızgınlık bağlamından vaka açma RPC (Plan-B)
 CREATE OR REPLACE FUNCTION public.kizginlik_vaka_ac(
@@ -4689,6 +5218,7 @@ CREATE TABLE IF NOT EXISTS public.tedavi_sablonu (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ad          text UNIQUE NOT NULL,
   aciklama    text,
+  tohumlama_plani jsonb,
   aktif       boolean DEFAULT true,
   created_at  timestamptz DEFAULT now(),
   updated_at  timestamptz DEFAULT now()
@@ -4732,61 +5262,54 @@ GRANT ALL ON public.tedavi_sablonu        TO anon, authenticated;
 GRANT ALL ON public.sablon_hastalik_eslem TO anon, authenticated;
 GRANT ALL ON public.tedavi_sablonu_kalem  TO anon, authenticated;
 
--- CRUD: kaydet (insert/update + eşlem + kalem, DENSE_RANK ile gün no 1..N)
+-- CRUD: kaydet (insert/update + eşlem + kalem)
+-- V2.2 (2026-09-06, owner: şablon boşluklu günleri KORUSUN): gövde canlı
+-- pg_get_functiondef çıktısıyla hizalandı (20260730000001 sürümü). DENSE_RANK
+-- sıkıştırması YOKTUR — gun_no VERİLDİĞİ GİBİ yazılır (20260722000001'den beri
+-- canlı davranış; boşluklu şablon {1,5} → kalem gun_no 1 ve 5). Doğrulama:
+-- her kalem gun_no ≥ 1 ('Şablon gün ofseti 0 veya daha büyük olmalı').
+-- (sablon_id, gun_no) tekliği doğrulamayla korunur. geçmiş: DENSE_RANK
+-- sıkıştırması 20260613000008'deydi, 20260722000001 kaldırdı,
+-- 20260730000001 tohumlama_plani normalize'ı ekledi.
 DROP FUNCTION IF EXISTS public.tedavi_sablon_kaydet(uuid, text, text, jsonb, jsonb);
-CREATE OR REPLACE FUNCTION public.tedavi_sablon_kaydet(
-  p_id          uuid,
-  p_ad          text,
-  p_aciklama    text,
-  p_disease_ids jsonb,
-  p_kalemler    jsonb
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+CREATE OR REPLACE FUNCTION public.tedavi_sablon_kaydet(p_id uuid, p_ad text, p_aciklama text, p_disease_ids jsonb, p_kalemler jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 DECLARE
   v_id uuid;
+  v_kalemler jsonb := CASE WHEN jsonb_typeof(p_kalemler)='object' THEN coalesce(p_kalemler->'kalemler','[]'::jsonb) ELSE coalesce(p_kalemler,'[]'::jsonb) END;
+  v_tohumlama jsonb := CASE WHEN jsonb_typeof(p_kalemler)='object' THEN nullif(p_kalemler->'tohumlama_plani','null'::jsonb) ELSE NULL END;
 BEGIN
-  IF p_ad IS NULL OR btrim(p_ad) = '' THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon adı zorunlu');
+  IF p_ad IS NULL OR btrim(p_ad) = '' THEN RETURN jsonb_build_object('ok',false,'mesaj','Şablon adı zorunlu'); END IF;
+  IF EXISTS (SELECT 1 FROM public.tedavi_sablonu WHERE lower(ad)=lower(p_ad) AND (p_id IS NULL OR id<>p_id)) THEN
+    RETURN jsonb_build_object('ok',false,'mesaj','Bu isimde başka bir şablon var');
   END IF;
-  IF EXISTS (SELECT 1 FROM public.tedavi_sablonu
-             WHERE LOWER(ad) = LOWER(p_ad) AND (p_id IS NULL OR id != p_id)) THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu isimde başka bir şablon var');
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_kalemler) k WHERE coalesce((k->>'gun_no')::smallint,0)<1) THEN
+    RETURN jsonb_build_object('ok',false,'mesaj','Şablon gün ofseti 0 veya daha büyük olmalı');
   END IF;
-
+  IF v_tohumlama IS NOT NULL AND (
+    coalesce((v_tohumlama->>'gun_ofset')::integer,-1)<0 OR nullif(v_tohumlama->>'planned_time','') IS NULL
+  ) THEN RETURN jsonb_build_object('ok',false,'mesaj','Planlı tohumlama gün ve saat bilgisi zorunlu'); END IF;
   IF p_id IS NULL THEN
-    INSERT INTO public.tedavi_sablonu (ad, aciklama)
-    VALUES (p_ad, NULLIF(btrim(coalesce(p_aciklama,'')),''))
-    RETURNING id INTO v_id;
+    INSERT INTO public.tedavi_sablonu(ad,aciklama,tohumlama_plani)
+    VALUES(p_ad,NULLIF(btrim(coalesce(p_aciklama,'')),''),v_tohumlama) RETURNING id INTO v_id;
   ELSE
-    UPDATE public.tedavi_sablonu
-       SET ad = p_ad, aciklama = NULLIF(btrim(coalesce(p_aciklama,'')),''), updated_at = now()
-     WHERE id = p_id;
-    IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Şablon bulunamadı'); END IF;
-    v_id := p_id;
-    DELETE FROM public.sablon_hastalik_eslem WHERE sablon_id = v_id;
-    DELETE FROM public.tedavi_sablonu_kalem  WHERE sablon_id = v_id;
+    UPDATE public.tedavi_sablonu SET ad=p_ad,aciklama=NULLIF(btrim(coalesce(p_aciklama,'')),''),tohumlama_plani=v_tohumlama,updated_at=now() WHERE id=p_id;
+    IF NOT FOUND THEN RETURN jsonb_build_object('ok',false,'mesaj','Şablon bulunamadı'); END IF;
+    v_id:=p_id;
+    DELETE FROM public.sablon_hastalik_eslem WHERE sablon_id=v_id;
+    DELETE FROM public.tedavi_sablonu_kalem WHERE sablon_id=v_id;
   END IF;
-
-  INSERT INTO public.sablon_hastalik_eslem (sablon_id, disease_id)
-  SELECT v_id, t.val::uuid
-  FROM jsonb_array_elements_text(coalesce(p_disease_ids,'[]'::jsonb)) AS t(val)
-  ON CONFLICT (sablon_id, disease_id) DO NOTHING;
-
-  INSERT INTO public.tedavi_sablonu_kalem
-    (sablon_id, gun_no, planned_time, stok_id, drug_product_id, dose, unit, route)
-  SELECT
-    v_id,
-    DENSE_RANK() OVER (ORDER BY (k->>'gun_no')::int)::smallint,
-    (k->>'planned_time')::time,
-    NULLIF(k->>'stok_id','')::text,
-    NULLIF(k->>'drug_product_id','')::uuid,
-    (k->>'dose')::numeric,
-    k->>'unit',
-    NULLIF(k->>'route','')
-  FROM jsonb_array_elements(coalesce(p_kalemler,'[]'::jsonb)) AS k;
-
-  RETURN jsonb_build_object('ok', true, 'sablon_id', v_id);
-END;
-$$;
+  INSERT INTO public.sablon_hastalik_eslem(sablon_id,disease_id)
+  SELECT v_id,t.val::uuid FROM jsonb_array_elements_text(coalesce(p_disease_ids,'[]'::jsonb)) t(val)
+  ON CONFLICT(sablon_id,disease_id) DO NOTHING;
+  INSERT INTO public.tedavi_sablonu_kalem(sablon_id,gun_no,planned_time,stok_id,drug_product_id,dose,unit,route)
+  SELECT v_id,(k->>'gun_no')::smallint,(k->>'planned_time')::time,NULLIF(k->>'stok_id',''),NULLIF(k->>'drug_product_id','')::uuid,(k->>'dose')::numeric,k->>'unit',NULLIF(k->>'route','')
+  FROM jsonb_array_elements(v_kalemler) k;
+  RETURN jsonb_build_object('ok',true,'sablon_id',v_id);
+END; $function$;
 
 DROP FUNCTION IF EXISTS public.tedavi_sablon_sil(uuid);
 CREATE OR REPLACE FUNCTION public.tedavi_sablon_sil(p_id uuid)

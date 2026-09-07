@@ -1073,16 +1073,49 @@ async function grupTamamla(parent,acikSafAltlar){
 // ile bağlanır (DOM property onclick modal router closeM→history.back yarışına
 // girer — AGENTS.md kuralı, td-hayvan/684534f deseni)
 let _confirmAction = null;
-function openConfirm(title, desc, onConfirm){
+// V2.2.2 (W16) — onay diyaloğuna OPSİYONEL radio grubu (tohumlama çakışma
+// seçimi: üzerine yaz / atla). radyolar = {isim, varsayilan,
+// secenekler:[{deger, etiket}]}; HTML dili _renderSablonSecim
+// (forms.js:574) radio dili aynası — label + input[type=radio]. Yapılandırma
+// yok/eksikse '' — grup hiç basılmaz (eski davranış birebir).
+function _confirmRadyolarHtml(radyolar){
+  if(!radyolar || !radyolar.isim || !Array.isArray(radyolar.secenekler)) return '';
+  return radyolar.secenekler.map(s =>
+    `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.82rem">
+      <input type="radio" name="${escAttr(radyolar.isim)}" value="${escAttr(s.deger)}"${s.deger === radyolar.varsayilan ? ' checked' : ''}> ${esc(s.etiket)}</label>`
+  ).join('');
+}
+// İşaretli radyonun değeri (yoksa null) — _confirmOk'un callback'ine ek
+// argüman olarak taşınır.
+function _confirmRadyoDegeri(isim){
+  const el = document.querySelector('input[name="' + isim + '"]:checked');
+  return el ? el.value : null;
+}
+function openConfirm(title, desc, onConfirm, opts){
   document.getElementById('m-confirm-title').textContent=title;
   document.getElementById('m-confirm-desc').textContent=desc;
   _confirmAction = onConfirm;
+  // V2.2.2 — opts.radyolar varsa desc ile butonlar arasındaki konteynere
+  // basılır; opts'suz çağrıda kutu TEMİZLENİR + gizlenir (önceki onayın
+  // radyosu sızmaz; eski davranış birebir).
+  const rk = document.getElementById('m-confirm-radyolar');
+  if(rk){
+    const html = (opts && opts.radyolar) ? _confirmRadyolarHtml(opts.radyolar) : '';
+    rk.innerHTML = html;
+    rk.style.display = html ? 'block' : 'none';
+  }
   openM('m-confirm');
 }
 function _confirmOk(){
   closeM('m-confirm');
   const fn = _confirmAction; _confirmAction = null;
-  if (typeof fn === 'function') fn();
+  if (typeof fn === 'function'){
+    // V2.2.2 — radyolu onayda seçilen değer ek argümanla taşınır
+    // (fn(chosen)); radyosuz yol args'sız fn() — mevcut çağıranlar birebir.
+    const radyo = document.querySelector('#m-confirm-radyolar input[type="radio"]');
+    if(radyo) fn(_confirmRadyoDegeri(radyo.name));
+    else fn();
+  }
 }
 async function updateTaskBadge(){
   try{
@@ -7131,8 +7164,57 @@ function selHayvan(inputId,listId,val){
   const el=document.getElementById(inputId); if(el) el.value=val;
   const ac=document.getElementById(listId); if(ac) ac.style.display='none';
 }
+// G-20260906-TOPLU-VAKA — m-bulk-case çoklu küpe autocomplete.
+// acHayvan klonu (tek-select akışı %100 korunur): satır seçimi inputa YAZMAZ,
+// onPick(hayvan)'ı çağırır, inputu temizler, odağı korur ve listeyi kapatır.
+// Kaynak sözleşmesi ac-dhid dalı ile aynı: yalnız aktif hayvanlar.
+// Satırlar statik onclick="bcAcSatirSec(this)" + data-kupe (escAttr) —
+// interpole onclick yok; acNav div[onclick] seçicisi böylece çalışmaya devam eder.
+function acHayvanMulti(inputId,listId,onPick){
+  globalThis._bcAcCtx={inputId,listId,onPick};
+  const inp=document.getElementById(inputId);
+  const q=(inp?.value||'').trim();
+  const ac=document.getElementById(listId); if(!ac) return;
+  const src=_activeAnimalsOnly();
+  let rows;
+  if(!q){
+    const disp=a=>String(a.kupe_no||a.devlet_kupe||a.id||'');
+    rows=[...src].sort((a,b)=>disp(a).localeCompare(disp(b),'tr',{numeric:true})).slice(0,10).map(a=>({a,tier:-1}));
+  }else{
+    rows=srchAdaySirala(src,q,12).map(x=>({a:x.h,tier:x.tier}));
+  }
+  if(!rows.length){
+    ac.innerHTML='<div style="padding:9px 12px;font-size:.78rem;color:var(--red)">⚠️ Sürüde eşleşen hayvan bulunamadı</div>';
+    ac.style.display='block'; return;
+  }
+  ac.innerHTML=rows.map(({a,tier})=>{
+    const kupe=a.kupe_no||a.devlet_kupe||a.id;
+    const kupeHtml=tier===6?esc(kupe):vurguHtml(kupe,q);
+    const sagParcalar=[];
+    if(a.kupe_no&&a.devlet_kupe&&a.devlet_kupe!==a.kupe_no&&(tier===1||tier===3||tier===5)) sagParcalar.push(vurguHtml(a.devlet_kupe,q));
+    if(tier===6&&a.irk) sagParcalar.push(vurguHtml(a.irk,q));
+    else if(a.irk) sagParcalar.push(esc(a.irk));
+    if(a.padok) sagParcalar.push(esc(a.padok));
+    return `<div data-kupe="${escAttr(kupe)}" onclick="bcAcSatirSec(this)" style="padding:9px 12px;font-size:.84rem;cursor:pointer;border-bottom:1px solid var(--card3);display:flex;justify-content:space-between;gap:8px">
+      <span style="font-weight:600">${kupeHtml}</span>
+      <span style="color:var(--ink3);font-size:.7rem;text-align:right">${sagParcalar.join(' · ')}</span>
+    </div>`;
+  }).join('');
+  ac.style.display='block';
+  if(inp && document.activeElement!==inp){ inp.focus(); }
+}
+// acHayvanMulti satır seçimi — dataset.kupe'den hayvanı çözer (K7 aktif öncelikli),
+// inputu temizler, odağı korur, listeyi kapatır, onPick(hayvan)'ı tetikler.
+function bcAcSatirSec(el){
+  const ctx=globalThis._bcAcCtx||{};
+  const ac=el?.closest('.ac-box'); if(ac) ac.style.display='none';
+  const inp=ctx.inputId?document.getElementById(ctx.inputId):null;
+  const h=hayvanByKupeRef(el?.dataset.kupe);
+  if(inp){ inp.value=''; inp.focus(); }
+  if(h&&typeof ctx.onPick==='function') ctx.onPick(h);
+}
 document.addEventListener('click',e=>{
-  ['ac-ihid','ac-dhid','ac-banne','ac-sperma'].forEach(id=>{
+  ['ac-ihid','ac-dhid','ac-banne','ac-sperma','ac-bchid'].forEach(id=>{
     const ac=document.getElementById(id);
     if(ac&&!e.target.closest('#'+id)) ac.style.display='none';
   });
