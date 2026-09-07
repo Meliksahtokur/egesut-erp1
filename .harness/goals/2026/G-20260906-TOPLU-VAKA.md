@@ -177,6 +177,11 @@ decisions from owner testing; engine and RPC UNTOUCHED.
    hints now disambiguate: 'Şablon seç → gönderimde olduğu gibi uygulanır'
    vs Yükle area 'Plana YÜKLE → düzenle → uygula'.
 
+   W19 (root E2E bulgusu, 2026-09-07): tohumlama şablon kaydı kapısı
+   yalnız checkbox — şablon kaydı bir protokol tanımıdır, hayvan-seçimi
+   bağımsız (blok-disabled kaydı engelliyor, tohumlama_plani NULL
+   kalıyordu); stamp ?v=20260907-2.
+
 ## Objective
 
 Apply the same case/treatment to multiple animals at once, exactly mirroring

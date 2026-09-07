@@ -2034,6 +2034,52 @@ describe('bcSablonTohumPayload (şablona tohumlama payload haritası)', () => {
   });
 });
 
+// W19 (2026-09-07) — bcSablonKaydet tohumlama kaydı KAPISI: şablon kaydı bir
+// PROTOKOL tanımıdır — hayvan seçiminden bağımsız. Kapı YALNIZ bc-tohum
+// checkbox'ına bakar; 🐄 bloğunun disabled görünümü YALNIZ submit yolunu
+// ilgilendirir (root E2E bulgusu: hayvan seçimi boşken işaretli kutuya
+// rağmen şablon tohumlama_plani NULL kaydediliyordu — demo DB kanıtı
+// 'E2E Yükle Turu — tohumlamalı', gün 2, saat 16:00).
+describe('bcSablonKaydet tohumlama kapısı (W19 — yalnız checkbox)', () => {
+  // bcSablonKaydet'i RPC yakalayarak sürer: _drugsCache'li taze sandbox
+  // (setupFormsPlan) + mini-form DOM'u + geçerli tek-günlük plan state'i.
+  async function kaydetVeYakala({ checked, hayvanlar }) {
+    const { sandbox, document } = setupFormsPlan();
+    document.__setEl('bc-disease-id', makeElement('input')).value = 'dis-1';
+    document.__setEl('bc-sablon-kaydet-ad', makeElement('input')).value = 'E2E Yükle Turu — tohumlamalı';
+    const chk = document.__setEl('bc-tohum', makeElement('input'));
+    chk.type = 'checkbox';
+    chk.checked = !!checked;
+    document.__setEl('bc-tohum-gun', makeElement('input')).value = '2';
+    document.__setEl('bc-tohum-saat', makeElement('input')).value = '16:00';
+    sandbox.globalThis._bcHayvanlar = hayvanlar; // [] → blok disabled-bos; kapı burada OLMAMALI
+    sandbox.globalThis._bcGunler = [{ gun: 1, seanslar: [seans('08:00', {
+      D1: { name: 'Baytril 10%', dose: '5', unit: 'ml', route: '' },
+    })] }];
+    const cagrilar = [];
+    sandbox.rpc = async (name, params) => { cagrilar.push({ name, params }); return {}; };
+    await sandbox.bcSablonKaydet();
+    return cagrilar;
+  }
+
+  it('checkbox İŞARETLİ + hayvan listesi BOŞ → tohumlama_plani payload\'a DAHİL (gün 2, 16:00)', async () => {
+    const cagrilar = await kaydetVeYakala({ checked: true, hayvanlar: [] });
+    const cagri = cagrilar.find(c => c.name === 'tedavi_sablon_kaydet');
+    assert.ok(cagri, 'tedavi_sablon_kaydet çağrıldı — plan doğrulaması geçildi');
+    assert.deepStrictEqual(
+      host(cagri.params.p_kalemler.tohumlama_plani),
+      { gun_ofset: 2, planned_time: '16:00' },
+      'blok-disabled (hayvan boş) kaydı engellememeli — kapı yalnız checkbox');
+  });
+
+  it('checkbox işaretsiz → tohumlama_plani anahtarı GÖNDERİLMEZ (mevcut doğrulama korunur)', async () => {
+    const cagrilar = await kaydetVeYakala({ checked: false, hayvanlar: [{ id: 'h1', cinsiyet: 'Dişi' }] });
+    const cagri = cagrilar.find(c => c.name === 'tedavi_sablon_kaydet');
+    assert.ok(cagri, 'tedavi_sablon_kaydet çağrıldı');
+    assert.ok(!('tohumlama_plani' in cagri.params.p_kalemler), 'kapalı kutu anahtar göndermez');
+  });
+});
+
 describe('bcSablondenPlan (şablon → plan editörü geri çağırma)', () => {
   const K = (gun_no, planned_time, over) => Object.assign({
     gun_no, planned_time, stok_id: 'stk-' + gun_no + planned_time,
@@ -2116,16 +2162,17 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     assert.ok(/'bc-sablon-yukle-kapat':\s*\(\)\s*=>\s*bcSablonYukleKapat\(\)/.test(src));
   });
 
-  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260907 damgalı', () => {
+  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260907-2 damgalı', () => {
     const html = fs.readFileSync('index.html', 'utf8');
     assert.strictEqual((html.match(/data-action="bc-sablon-yukle-toggle"/g) || []).length, 1);
     assert.strictEqual((html.match(/id="bc-sablon-yukle-alan"/g) || []).length, 1);
     assert.strictEqual((html.match(/id="bc-sablon-yukle-list"/g) || []).length, 1);
     // Cache-busting (owner feedback 2026-09-07): her YEREL script src'si damgalı
+    // W19: stamp 20260907-2 (bcSablonKaydet checkbox kapısı değişikliği)
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
-    const damgasiz = yerel.filter(s => !/\?v=20260907$/.test(s));
+    const damgasiz = yerel.filter(s => !/\?v=20260907-2$/.test(s));
     assert.deepStrictEqual(host(damgasiz), [], 'damgasız yerel script kalmamalı');
     assert.ok(/<!-- \?v= damgası: her js\/css değişikliğinde GÜNCELLE \(cache-busting\) -->/.test(html),
       'damga bakım notu ilk script etiketinin yanında');

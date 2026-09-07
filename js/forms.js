@@ -1260,13 +1260,15 @@ async function bcSablonKaydet(){
   if(!sec.items.length){ toast('⚠️ En az bir seans ekleyin', true); return; }
   const kalemler = bcSablonKalemleriOlustur(globalThis._bcGunler || []);
   if(!kalemler.length){ toast('⚠️ En az bir seans ekleyin', true); return; }
-  // V2.3 (W18) — şablona tohumlama: kutu işaretli VE blok aktifken (en az
-  // bir dişi seçili — disabled moddan değer OKUNMAZ, submitBulkCase paritesi)
-  // tohumlama_plani {gun_ofset, planned_time} payload'a EKLENİR; kapalıysa
-  // anahtar GÖNDERİLMEZ (sablonKaydet ui.js konvansiyonu — jsonb 'null'
-  // normalize dili). Şablon semantiği: plan tarihi = vaka start_date +
-  // gun_ofset — 'Kaç gün sonra' ile aynı dil.
-  const tohumIste = bcTohumBlokDurumu(globalThis._bcHayvanlar || []).mod === 'aktif' && !!g('bc-tohum')?.checked;
+  // V2.3 (W18) — şablona tohumlama: kutu işaretliyse tohumlama_plani
+  // {gun_ofset, planned_time} payload'a EKLENİR. W19 (root E2E): kapı YALNIZ
+  // checkbox'a bakar — şablon kaydı bir protokol tanımıdır, hayvan
+  // seçiminden bağımsız; 🐄 bloğunun disabled görünümü YALNIZ submit yolunu
+  // ilgilendirir (eski blok-aktif kapısı hayvan boşken kaydı NULL'a
+  // düşürüyordu). Kapalıysa anahtar GÖNDERİLMEZ (sablonKaydet ui.js
+  // konvansiyonu — jsonb 'null' normalize dili). Şablon semantiği: plan
+  // tarihi = vaka start_date + gun_ofset — 'Kaç gün sonra' ile aynı dil.
+  const tohumIste = !!g('bc-tohum')?.checked;
   const tohumPayload = bcSablonTohumPayload(tohumIste, v('bc-tohum-gun'), v('bc-tohum-saat'));
   const kayitPayload = { kalemler };
   if(tohumPayload) kayitPayload.tohumlama_plani = tohumPayload;
