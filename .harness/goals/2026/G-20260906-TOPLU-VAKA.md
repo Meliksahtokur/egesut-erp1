@@ -511,3 +511,15 @@ owner decisions, both landing in this goal.
    cancelled; `ekle` failure keeps today's soft shape). The 9-arg
    positional call remains valid (new param defaults 'ekle'). GT's
    vaka_toplu_ac section carries the 10-arg body same-commit.
+
+## Post-merge deployment (2026-09-07)
+
+Owner ordered live deploy ("canlıya gönder"). Migration 20260906120000
+applied to PROD (zqnexq…) via Management API query endpoint (HTTP 201).
+Pre-deploy read-only probes: `create_case` live body matched `_vaka_ac_tek`
+line-by-line; `cases.start_date` DEFAULT CURRENT_DATE proves the explicit
+COALESCE write is behavior-identical; `vaka_toplu_ac` absent pre-deploy
+(clean install). Post-deploy read-only verification: 10-arg signature,
+V2.2 body markers, EXECUTE grants (anon/authenticated), `_vaka_ac_tek`
+without grants (schema hardening covers). No PROD test-data writes.
+rpc-reference.md DEPLOY-PENDING marker flipped to deployed same-commit.

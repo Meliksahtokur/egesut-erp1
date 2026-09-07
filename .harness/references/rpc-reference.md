@@ -256,7 +256,7 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
   helper'ına taşındı (imza ve davranış değişmedi; `p_tarih` NULL geçer → start_date bugün).
   Çağrı: forms.js:555; replay: ui.js:6789.
 
-**`vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid, p_items jsonb?, p_sablon_id uuid?, p_notes text?, p_tarih date?, p_tohumlama boolean?, p_tohumlama_gun_offset int?, p_tohumlama_saat text?, p_tohumlama_cakisma text? DEFAULT 'ekle')`** → jsonb *(10 param — 20260906120000; **DEPLOY-PENDING: PROD'a uygulanmadı**, ayrı owner onayı bekliyor)*
+**`vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid, p_items jsonb?, p_sablon_id uuid?, p_notes text?, p_tarih date?, p_tohumlama boolean?, p_tohumlama_gun_offset int?, p_tohumlama_saat text?, p_tohumlama_cakisma text? DEFAULT 'ekle')`** → jsonb *(10 param — 20260906120000; **PROD'a deploy edildi 2026-09-07**, owner emri; post-deploy salt-okunur doğrulama: imza+gövde işaretleri+GRANT anon/authenticated teyitli, `create_case` canlı gövdesi deploy öncesi satır-satır eşleşti, `cases.start_date` DEFAULT CURRENT_DATE davranış-eşdeğerliği kanıtlı)*
 → Toplu vaka aç (G-20260906-TOPLU-VAKA): N hayvana tek RPC; per-hayvan guard (dup aktif vaka →
   `atlanan`, beklenmeyen EXCEPTION → `hatalar`), 200 sınırı, kısmi başarı `{ok, toplam, basari, atlanan, hatalar}`
   (buzagi_sutten_kesme_toplu aynası). `p_items` ↔ `p_sablon_id` karşılıklı dışlama (fail-fast).
