@@ -925,14 +925,17 @@ function bcTarihIpucuGuncelle(){
     : 'Tarih boş bırakılırsa vakalar bugün açılır.';
 }
 
-// ═══ V2.3-W20 — TEDAVİ TARİHİ GÖSTERİM/DEĞER AYRIMI ═══
+// ═══ V2.3-W20/W21 — TEDAVİ TARİHİ GÖSTERİM/DEĞER AYRIMI ═══
 // Kök teşhis (sahibe ekran görüntüleri, 2026-09-07): #bc-tarih type=date idi;
 // GÖRÜNEN string tarayıcı yereline göre çiziliyordu (in-app en-US →
 // '09/26/2026' MM/DD/YYYY) — hesap ve hint ISO'su doğruydu ama sahibe alanı
-// ters okudu ('gün değiştiriyorum ay değişiyor'). Alan ARTIK readonly metin:
-// görünen 'DD.MM.YYYY' (locale BAĞIMSIZ), kanonik ISO globalThis._bcTarihIso'da.
-// Görüntü ve değer ASLA ayrışmaz: yazma TEK kapı bcTarihYaz, okuma TEK kapı
-// bcTarihDeger — bu alanda v('bc-tarih') okuması YASAK.
+// ters okudu ('gün değiştiriyorum ay değişiyor'). W20'de readonly metin input
+// + 📅 butonu geldi; W21'de sahibe 'iki buton da acayip duruyo ve ikisinin
+// de aynı işlevi var' dedi → İKİSİ TEK BUTONA indirildi: #bc-tarih artık
+// BUTTON, görünen '📅 DD.MM.YYYY' (locale BAĞIMSIZ), kanonik ISO
+// globalThis._bcTarihIso'da. Görüntü ve değer ASLA ayrışmaz: yazma TEK kapı
+// bcTarihYaz, okuma TEK kapı bcTarihDeger — bu alanda v('bc-tarih') okuması
+// YASAK (buton .value'suz; değer asla input.value'dan OKUNMAZ).
 
 // 'YYYY-MM-DD' → 'DD.MM.YYYY' (SAF — toLocaleString/new Date YOK; yerelden
 // bağımsız string dilimleme). Biçim dışı / ay 01-12 veya gün 01-31 dışı → ''
@@ -964,15 +967,16 @@ function bcTarihDeger(){
   return (typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)) ? iso : '';
 }
 
-// Kanonik yazma — görüntü ('DD.MM.YYYY') ve kanonik ISO AYNI ANDA yazılır;
-// geçersiz ISO ikisini birden boşaltır (yarım durum imkânsız). İpucu/plan
-// tazeleme çağıranın işi (tek sorumluluk).
+// Kanonik yazma — butun GÖRÜNENİ ('📅 DD.MM.YYYY'; W21: alan TEK BUTON) ve
+// kanonik ISO AYNI ANDA yazılır; geçersiz/boş ISO → etiket '📅 Tarih seç' +
+// kanonik boş (yarım durum imkânsız). İpucu/plan tazeleme çağıranın işi
+// (tek sorumluluk).
 function bcTarihYaz(iso){
   const gosterim = bcIsoTrGoster(iso);
   globalThis._bcTarihIso = gosterim ? String(iso) : '';
   const tEl = g('bc-tarih');
   if(tEl){
-    tEl.value = gosterim;
+    tEl.textContent = gosterim ? '📅 ' + gosterim : '📅 Tarih seç';
     tEl.dataset.iso = globalThis._bcTarihIso;
   }
 }

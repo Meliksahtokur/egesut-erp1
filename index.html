@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20260907-3">
+<link rel="manifest" href="manifest.json?v=20260907-4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -1158,18 +1158,17 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <div id="bc-disease-cat" style="font-size:.68rem;color:var(--ink3);margin-top:3px;display:none"></div>
       </div>
 
-      <!-- TEDAVİ TARİHİ (V1.2 → V2.3-W20) — planlanan başlangıç; şablon/manuel
+      <!-- TEDAVİ TARİHİ (V1.2 → V2.3-W21) — planlanan başlangıç; şablon/manuel
            günleri ve tohumlama anchor'unu taşır. type=date KALDIRILDI (kök
            teşhis 2026-09-07: görünen string tarayıcı yereline göre çiziliyor,
-           in-app en-US → MM/DD/YYYY). Alan readonly metin: görünen 'DD.MM.YYYY'
-           (bcIsoTrGoster — locale bağımsız); kanonik ISO globalThis._bcTarihIso
-           (bcTarihYaz yazar, bcTarihDeger okur). 📅 butonu tek-seçim takvimi
-           açar (min bugün, maks +365). Boş = bugün (RPC p_tarih NULL). -->
+           in-app en-US → MM/DD/YYYY). W21 (sahibe: 'iki buton da acayip
+           duruyo ve ikisinin de aynı işlevi var'): W20'nin readonly input +
+           📅 butonu çifti TEK BUTONA indirildi — #bc-tarih BUTTON, görünen
+           '📅 DD.MM.YYYY' (bcTarihYaz yazar — locale bağımsız); kanonik ISO
+           globalThis._bcTarihIso'da (bcTarihDeger okur). Buton tek-seçim
+           takvimi açar (min bugün, maks +365). Boş = bugün (RPC p_tarih NULL). -->
       <div class="fg"><label class="flbl">📅 Tedavi Tarihi</label>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="bc-tarih" class="fi" type="text" inputmode="none" readonly autocomplete="off" placeholder="Başlangıç tarihi" data-change="bc-tarih-degisti" data-action="bc-tarih-takvim" style="flex:1;min-width:0;cursor:pointer">
-          <button type="button" class="btn btn-o" data-action="bc-tarih-takvim" style="margin:0;padding:8px 12px;flex-shrink:0">📅</button>
-        </div>
+        <button type="button" id="bc-tarih" class="btn btn-o" data-action="bc-tarih-takvim" style="width:100%;font-weight:600;justify-content:center">📅 Tarih seç</button>
         <div id="bc-tarih-ipucu" class="fhint" style="font-size:.65rem;color:var(--ink3);margin-top:4px;overflow-wrap:anywhere;word-break:break-word">Tarih boş bırakılırsa vakalar bugün açılır.</div>
       </div>
 
@@ -2198,20 +2197,20 @@ body.dark .ac-vurgu{color:#8ec6ff}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20260907-3"></script>
-    <script src="js/utils/modal.js?v=20260907-3"></script>
-    <script src="js/utils/errorHandler.js?v=20260907-3"></script>
-    <script src="js/utils/events.js?v=20260907-3"></script>
-    <script src="js/config.js?v=20260907-3"></script>
-    <script src="js/state.js?v=20260907-3"></script>
-    <script src="js/api.js?v=20260907-3"></script>
-    <script src="js/auth.js?v=20260907-3"></script>
-    <script src="js/ui.js?v=20260907-3"></script>
-    <script src="js/forms.js?v=20260907-3"></script>
-    <script src="js/ai-asistan.js?v=20260907-3"></script>
-    <script src="js/demo.js?v=20260907-3"></script>
-    <script src="js/app.js?v=20260907-3"></script>
-    <script src="js/utils/handlers.js?v=20260907-3"></script>
+    <script src="js/utils/helpers.js?v=20260907-4"></script>
+    <script src="js/utils/modal.js?v=20260907-4"></script>
+    <script src="js/utils/errorHandler.js?v=20260907-4"></script>
+    <script src="js/utils/events.js?v=20260907-4"></script>
+    <script src="js/config.js?v=20260907-4"></script>
+    <script src="js/state.js?v=20260907-4"></script>
+    <script src="js/api.js?v=20260907-4"></script>
+    <script src="js/auth.js?v=20260907-4"></script>
+    <script src="js/ui.js?v=20260907-4"></script>
+    <script src="js/forms.js?v=20260907-4"></script>
+    <script src="js/ai-asistan.js?v=20260907-4"></script>
+    <script src="js/demo.js?v=20260907-4"></script>
+    <script src="js/app.js?v=20260907-4"></script>
+    <script src="js/utils/handlers.js?v=20260907-4"></script>
 
     <!-- GEBELİK EKLE MODAL -->
 <div id="m-gebelik" class="mo" data-action="mclose-overlay">

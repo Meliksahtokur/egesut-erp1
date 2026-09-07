@@ -212,6 +212,17 @@ decisions from owner testing; engine and RPC UNTOUCHED.
    markers: 15 × ?v=20260907-3, readonly #bc-tarih markup, 2 ×
    bc-tarih-takvim action, forms.js 200.
 
+   W21 (owner screenshot, 2026-09-07 — 'buradaki iki buton da acayip
+   duruyo ve ikisinin de aynı işlevi var'): W20's readonly input + separate
+   📅 button rendered as two odd controls with duplicate function →
+   collapsed into ONE full-width button: `#bc-tarih` is now a BUTTON
+   ('📅 Tarih seç' / '📅 DD.MM.YYYY' via bcTarihYaz textContent; data-change
+   dropped; bcTarihDeger unchanged), exactly one `data-action="bc-tarih-takvim"`
+   in m-bulk-case (duplicate-guarded in tests). RED-first: 7 adapted tests
+   failed verbatim (228/221/7), GREEN → full unit suite 676/676;
+   `node --check` clean; smoke :8100 curl: 15 × ?v=20260907-4, single
+   control, 0 type=date in m-bulk-case, forms.js 200. Stamp ?v=20260907-4.
+
 ## Objective
 
 Apply the same case/treatment to multiple animals at once, exactly mirroring
