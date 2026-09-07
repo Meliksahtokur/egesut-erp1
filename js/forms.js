@@ -697,6 +697,8 @@ async function loadBulkCaseForm(){
   const hn = g('bc-bulunamayan'); if(hn){ hn.textContent=''; hn.style.display='none'; }
   const sonuc = g('bc-sonuc'); if(sonuc){ sonuc.innerHTML=''; sonuc.style.display='none'; }
   const menu = g('bc-gun-ekle-menu'); if(menu) menu.style.display = 'none';
+  // V2.3 (W18) — 📂 şablon yükle alanı modal açılışında kapalı başlar.
+  const yukleAlan = g('bc-sablon-yukle-alan'); if(yukleAlan) yukleAlan.style.display = 'none';
   // V1.2 — tarih + tohumlama sıfırlama: tarih bugün (min bugün — geçmiş seçilemez),
   // saat 08:00, gün 0, kutu kapalı; blok DURUMU (disabled/aktif) bcChipsRender'da kurulur.
   const tEl = g('bc-tarih');
@@ -1207,7 +1209,8 @@ function bcGunEkleMenuKapat(){
 // alanı deseninde satır-içi katlanır mini-form açar. Kayıt, şablon
 // builder'ının (sablonKaydet ui.js:4522) RPC sözleşmesini kullanır
 // (tedavi_sablon_kaydet); modal + plan AÇIK KALIR — devam düzenleme
-// (sahip kararı P3). Tohumlama ayarları şablona DAHİL EDİLMEZ.
+// (sahip kararı P3). V2.3 (W18): tohumlama kutusu işaretliyse tohumlama
+// planı da ŞABLONA kaydedilir (bcSablonTohumPayload).
 
 function bcSablonKaydetToggle(){
   const alan = g('bc-sablon-kaydet-alan');
@@ -1257,16 +1260,25 @@ async function bcSablonKaydet(){
   if(!sec.items.length){ toast('⚠️ En az bir seans ekleyin', true); return; }
   const kalemler = bcSablonKalemleriOlustur(globalThis._bcGunler || []);
   if(!kalemler.length){ toast('⚠️ En az bir seans ekleyin', true); return; }
+  // V2.3 (W18) — şablona tohumlama: kutu işaretli VE blok aktifken (en az
+  // bir dişi seçili — disabled moddan değer OKUNMAZ, submitBulkCase paritesi)
+  // tohumlama_plani {gun_ofset, planned_time} payload'a EKLENİR; kapalıysa
+  // anahtar GÖNDERİLMEZ (sablonKaydet ui.js konvansiyonu — jsonb 'null'
+  // normalize dili). Şablon semantiği: plan tarihi = vaka start_date +
+  // gun_ofset — 'Kaç gün sonra' ile aynı dil.
+  const tohumIste = bcTohumBlokDurumu(globalThis._bcHayvanlar || []).mod === 'aktif' && !!g('bc-tohum')?.checked;
+  const tohumPayload = bcSablonTohumPayload(tohumIste, v('bc-tohum-gun'), v('bc-tohum-saat'));
+  const kayitPayload = { kalemler };
+  if(tohumPayload) kayitPayload.tohumlama_plani = tohumPayload;
   try{
     // sablonKaydet (ui.js:4522) payload biçimi birebir; p_id null = yeni
-    // şablon. gun_no plan № AS-IS (boşluk korunur — W15 RPC sözleşmesi);
-    // tohumlama_plani anahtarı GÖNDERİLMEZ (şablona dahil değil).
+    // şablon. gun_no plan № AS-IS (boşluk korunur — W15 RPC sözleşmesi).
     await rpc('tedavi_sablon_kaydet', {
       p_id: null,
       p_ad: ad,
       p_aciklama: 'Toplu vaka planından kaydedildi',
       p_disease_ids: [diseaseId],
-      p_kalemler: { kalemler },
+      p_kalemler: kayitPayload,
     });
     // Şablon pull seti sablonKaydet ile aynı (RPC-WRITE-01 konvansiyonu);
     // pull hatası kaydı maskelemesin — kayıt başarılı, akış sürer.
@@ -1279,6 +1291,98 @@ async function bcSablonKaydet(){
   }catch(e){
     toast('❌ ' + (e?.message || 'Şablon kaydedilemedi'), true);
   }
+}
+
+// ═══ V2.3 (W18) — 📂 ŞABLON YÜKLE (geri çağırma-düzenleme) ═══
+// Kayıtlı şablonu plan editörüne YÜKLER: _bcGunler + tohumlama alanları
+// şablondan kurulur, kullanıcı düzenleyip gönderir (gönderimde manuel plan
+// yolu — p_items; şablon radyosu 'Şablonsuz'a çekilir). Şablon RADIO listesi
+// (hızlı uygulama) DOKUNULMAZ kalır; bu alan AYRI bir geri çağırma yolu —
+// sahibin 'şablon geri çağırma akışı' geri bildirimine cevap.
+
+function bcSablonYukleToggle(){
+  const alan = g('bc-sablon-yukle-alan');
+  if(!alan) return;
+  const aciliyor = alan.style.display !== 'block';
+  alan.style.display = aciliyor ? 'block' : 'none';
+  if(aciliyor) bcSablonYukleListeRender();
+}
+function bcSablonYukleKapat(){
+  const alan = g('bc-sablon-yukle-alan');
+  if(alan) alan.style.display = 'none';
+}
+
+// Seçili hastalığa bağlı şablonları listeler — _renderSablonSecim veri
+// kaynağının aynısı (sablon_hastalik_eslem + tedavi_sablonu +
+// tedavi_sablonu_kalem, IndexedDB); satır: ad + 'N gün · M seans' + [Yükle].
+async function bcSablonYukleListeRender(){
+  const list = g('bc-sablon-yukle-list');
+  if(!list) return;
+  const diseaseId = v('bc-disease-id');
+  if(!diseaseId){
+    list.innerHTML = '<div style="font-size:.74rem;color:var(--ink3);padding:4px 0">Önce hastalık seçin — bu hastalığa bağlı şablonlar burada listelenir.</div>';
+    return;
+  }
+  const eslem = (await idbGetAll('sablon_hastalik_eslem')).filter(e => e.disease_id === diseaseId);
+  const sablonlar = await idbGetAll('tedavi_sablonu');
+  const kalemler = await idbGetAll('tedavi_sablonu_kalem');
+  const eslesen = eslem.map(e => sablonlar.find(s => s.id === e.sablon_id)).filter(Boolean);
+  if(!eslesen.length){
+    list.innerHTML = '<div style="font-size:.74rem;color:var(--ink3);padding:4px 0">Bu hastalık için kayıtlı şablon yok.</div>';
+    return;
+  }
+  list.innerHTML = eslesen.map(s => {
+    const sk = kalemler.filter(k => k.sablon_id === s.id);
+    const gun = new Set(sk.map(k => k.gun_no)).size;
+    const tp = s.tohumlama_plani;
+    const tohumVar = (tp && typeof tp === 'object' && tp.gun_ofset != null && tp.planned_time) ? ' · 🐄 tohumlama' : '';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.8rem;border-bottom:1px solid var(--card3)">' +
+      '<span style="flex:1;min-width:0;font-weight:600;color:var(--ink)">' + esc(s.ad) +
+      '<span style="color:var(--ink2);font-size:.72rem;font-weight:400"> — ' + gun + ' gün · ' + sk.length + ' seans' + tohumVar + '</span></span>' +
+      '<button type="button" class="ek-chip" data-action="bc-sablon-yukle" data-sablon-id="' + escAttr(s.id) + '" style="font-weight:700;color:var(--blue);border-color:rgba(42,107,181,.4)">Yükle</button></div>';
+  }).join('');
+}
+
+// [Yükle]: editörde kalem varsa ÖNCE onay (openConfirm, radyosuz — mevcut
+// planın üzerine yazma uyarısı), sonra uygula; kalem yoksa doğrudan.
+async function bcSablonYukle(sablonId){
+  if(!sablonId) return;
+  const sablon = (await idbGetAll('tedavi_sablonu')).find(s => s.id === sablonId);
+  if(!sablon){ toast('⚠️ Şablon bulunamadı', true); return; }
+  const kalemler = (await idbGetAll('tedavi_sablonu_kalem')).filter(k => k.sablon_id === sablonId);
+  const kalemVar = (globalThis._bcGunler || []).some(gn => (gn.seanslar || []).some(se => Object.keys(se.ilaclar || {}).length > 0));
+  const uygula = () => bcSablonYukleUygula(sablon, kalemler);
+  if(kalemVar){
+    openConfirm('⚠️ Mevcut plan değiştirilecek',
+      '"' + sablon.ad + '" şablonu yüklendiğinde editördeki mevcut planın üzerine yazılır. Devam edilsin mi?',
+      uygula);
+    return;
+  }
+  await uygula();
+}
+
+// Uygulama: bcSablondenPlan saf çıktısıyla editör state'ini kur; tohum
+// alanlarını şablondan ayarla; şablon radyosunu 'Şablonsuz'a çek (gönderim
+// p_items yolu — karşılıklı dışlama); planı yeniden çiz. Boş şablon
+// (yalnız tohumlama / kalemsiz) tek boş gün-1 kartıyla açılır.
+async function bcSablonYukleUygula(sablon, kalemler){
+  const plan = bcSablondenPlan(Object.assign({}, sablon, { kalemler }), _drugsCache || []);
+  globalThis._bcGunler = plan.gunler.length ? plan.gunler : [{ gun: 1, seanslar: [] }];
+  globalThis._bcAktifGunCard = globalThis._bcGunler[0].gun;
+  globalThis._bcSeansFormGun = null;
+  globalThis._bcKopyaAcikGun = null;
+  const tohumChkEl = g('bc-tohum');
+  const tohumGunEl = g('bc-tohum-gun');
+  const tohumSaatEl = g('bc-tohum-saat');
+  if(tohumChkEl) tohumChkEl.checked = !!plan.tohumlama;
+  if(plan.tohumlama){
+    if(tohumGunEl) tohumGunEl.value = String(plan.tohumlama.gun_ofset);
+    if(tohumSaatEl) tohumSaatEl.value = plan.tohumlama.planned_time;
+  }
+  bcSablonaDonustur(); // şablon radyosu → 'Şablonsuz' (gönderim p_items yolu)
+  bcPlanRender();
+  bcSablonYukleKapat();
+  toast('📂 ' + sablon.ad + ' yüklendi — düzenleyip uygulayabilirsin');
 }
 
 // ＋ Boş gün: sıradaki ardışık № (maks+1 — builder sablonGunEkle dili).
@@ -1881,6 +1985,79 @@ function bcSablonOzetMetni(gunler){
   if(!gecerli.length) return 'İçerik: boş plan';
   const gunNos = [...new Set(gecerli.map(k => k.gun_no))].sort((a, b) => a - b);
   return 'İçerik: ' + gunNos.length + ' gün · ' + gecerli.length + ' seans (gün ' + gunNos.join(',') + ')';
+}
+
+// ═══ V2.3 (W18, 2026-09-07) — ŞABLONA TOHUMLAMA + 📂 ŞABLON YÜKLE ═══
+
+// bc-tohum üçlüsünü tedavi_sablon_kaydet p_kalemler.tohumlama_plani
+// sözleşmesine (W15 GT + 20260730000001: {gun_ofset integer ≥0,
+// planned_time 'HH:MM'}) haritalar. İstek YOKSA null döner — çağıran
+// (bcSablonKaydet) anahtarı GÖNDERMEZ (sablonKaydet ui.js konvansiyonu:
+// jsonb 'null' gönderimi doğrulamayı bozar; anahtarın yokluğu = tohumlama
+// yok). gun 0..365 kelepir (submitBulkCase paritesi + RPC guard), geçersiz/
+// boş saat '08:00' varsayılanına düşer. Saf, DOM'suz.
+function bcSablonTohumPayload(istenen, gunStr, saatStr){
+  if(!istenen) return null;
+  const n = Number.parseInt(gunStr, 10);
+  const gun_ofset = Number.isInteger(n) ? Math.max(0, Math.min(365, n)) : 0;
+  const s = String(saatStr || '').trim();
+  const planned_time = /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(s) ? s : '08:00';
+  return { gun_ofset, planned_time };
+}
+
+// Şablon geri çağırma saf özü: IDB tedavi_sablonu satırı (+ sablon_id'ye
+// göre filtrelenmiş tedavi_sablonu_kalem satırları) → bc plan editörü
+// state'i {gunler, tohumlama}.
+//   gunler: [{gun: <gun_no ASC>, seanslar: [{saat, ilaclar: {<drugId>:
+//   {name, dose, unit, route, legacy, stock_id}}}]}] — kalemler
+//   (gun_no, planned_time) düzleminde seanslara gruplanır (criterion 14:
+//   boşluklu gun_no AS-IS korunur), seans saatleri ASC, planned_time
+//   'HH:MM' dilimlenir (Postgres time '::00' soneki).
+//   ilaç anahtarı drug_product_id; legacy (drug_product_id null) kalemde
+//   stok_id — builder _sablonDrugName anahtar dili. name drugs cache'ten
+//   (ikinci argüman, opsiyonel) çözülür; yoksa kalem>_drugsCache fallback.
+//   tohumlama: {gun_ofset, planned_time} | null — 20260730000001 normalize
+//   dili: geçersiz/eksik alan → null.
+// Saf (girdi mutasyonlanmaz) — uygulayıcı bcSablonYukleUygula.
+function bcSablondenPlan(sablon, drugs){
+  // _drugsCache ui.js'te bildirilen script-ler-arası lexical global'dir —
+  // typeof guard'ı (vm test sandbox'ında bağlantı yok; UI çağıranı açık
+  // argüman gönderir, bu dal yalnız güvenlik ağı).
+  const cache = drugs !== undefined ? drugs
+    : (typeof _drugsCache !== 'undefined' ? _drugsCache : []) || [];
+  const seansMap = new Map(); // gun_no → Map(saat → ilaclar)
+  (sablon?.kalemler || []).forEach(k => {
+    const gunNo = Number(k.gun_no);
+    if(!Number.isInteger(gunNo) || gunNo < 1) return;
+    const saat = String(k.planned_time || '').slice(0, 5);
+    const drugId = k.drug_product_id || k.stok_id;
+    if(!drugId) return;
+    if(!seansMap.has(gunNo)) seansMap.set(gunNo, new Map());
+    const saatMap = seansMap.get(gunNo);
+    if(!saatMap.has(saat)) saatMap.set(saat, {});
+    const d = (cache || []).find(x => x.id === drugId);
+    saatMap.get(saat)[drugId] = {
+      name: d?.name || 'İlaç',
+      dose: Number(k.dose),
+      unit: k.unit || '',
+      route: k.route || null,
+      legacy: !k.drug_product_id,
+      stock_id: k.stok_id || null,
+    };
+  });
+  const gunler = [...seansMap.keys()].sort((a, b) => a - b).map(gunNo => ({
+    gun: gunNo,
+    seanslar: [...seansMap.get(gunNo).keys()].sort((a, b) => a.localeCompare(b))
+      .map(saat => ({ saat, ilaclar: seansMap.get(gunNo).get(saat) })),
+  }));
+  let tohumlama = null;
+  const tp = sablon?.tohumlama_plani;
+  if(tp && typeof tp === 'object' &&
+     Number.isInteger(Number(tp.gun_ofset)) && Number(tp.gun_ofset) >= 0 &&
+     /^([01][0-9]|2[0-3]):[0-5][0-9]/.test(String(tp.planned_time || ''))){
+    tohumlama = { gun_ofset: Number(tp.gun_ofset), planned_time: String(tp.planned_time).slice(0, 5) };
+  }
+  return { gunler, tohumlama };
 }
 
 // ── TOPLU GÖNDERİM (FORM-SUBMIT-01 zinciri) ──

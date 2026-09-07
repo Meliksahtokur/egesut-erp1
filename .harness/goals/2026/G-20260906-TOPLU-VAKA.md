@@ -1,6 +1,6 @@
 ---
 id: G-20260906-TOPLU-VAKA
-status: review
+status: active
 owner: root
 flow: zcode_builtin
 created: 2026-09-06
@@ -54,6 +54,12 @@ acceptance:
   - V2.1 E2E: sonuçlar bantlı bölümlerde + uyarı diyaloğu satır satır + tohumlama çakışması uyarıda listeleniyor (demo).
   - V2.2 criterion 14: şablon boşluk round-trip — boşluklu şablon (ör. gün 1+5) kaydedilir, kalemler gun_no 1 ve 5 olarak saklanır (1,2 SIKIŞTIRILMAZ), vakaya uygulandığında tedavi günleri start_date+0 ve start_date+4'e kurulur; gapless şablon davranışı değişmez (scratch-cluster kanıtı; canlı gövde 20260722000001+'den beri zaten boşluksuz saklıyordu — GT canlı gövdeyle hizalandı).
   - V2.2 criterion 15: tohumlama çakışma modları — `vaka_toplu_ac` 10-parametreli imza (p_tohumlama_cakisma DEFAULT 'ekle'); 'atla' eski açık planlı tohumlaması olan hayvana yeni görev AÇMAZ (sebep 'Açık planlı tohumlama vardı — atlandı (eski plan: <DD.MM>)'); 'uzerine_yaz' eski açık görevleri YUMUŞAK iptal eder (iptal+tamamlandi+kapatan_ref='toplu-vaka-uzerine-yaz') ve görev başına islem_log tip='TOHUMLAMA_PLANLI_IPTAL' denetimi yazar, sonra yeni görevi açar (acilan[i].tohumlama.uzerine_yazildi listesi); 'ekle' bugünkü davranışın aynısı; geçersiz mod fail-fast 'Geçersiz çakışma modu' (scratch-cluster kanıtı + demo katalog doğrulaması).
+  - V2.3 criterion 16: şablon with tohumlama round-trips through 📂 Şablon
+    Yükle into the editor and submits (kalemler p_items + tohumlama
+    restored from şablon; radio 'Şablonsuz'a çeker); ?v=20260907 stamps
+    present on every local script src and the local manifest link
+    (unit-checked); RED-first pure-fn tests (bcSablonTohumPayload,
+    bcSablondenPlan) recorded in the report; root E2E on :8098.
   - Root reviews the diff; merge and push happen only after owner approval; PROD migration happens only after separate owner approval.
 stop_conditions:
   - Live schema materially contradicts ground-truth assumptions before implementation (create_case, tedavi_sablon_uygula, or _tohumlama_gorev_uygunluk drift).
@@ -133,6 +139,43 @@ DROPped first):
 `vaka_toplu_ac(p_animal_ids text[], p_disease_id uuid, p_items jsonb DEFAULT NULL, p_sablon_id uuid DEFAULT NULL, p_notes text DEFAULT NULL, p_tarih date DEFAULT NULL, p_tohumlama boolean DEFAULT false, p_tohumlama_gun_offset int DEFAULT 0, p_tohumlama_saat text DEFAULT NULL)`.
 `acilan[i]` gains `'tarih'` (the case's actual start_date ISO); the top-level
 result gains `'tohumlama' boolean`. All V1/V1.1 behavior retained.
+
+**V2.3 amendment (owner feedback, 2026-09-07 — W18-UI):** three UI-lane
+decisions from owner testing; engine and RPC UNTOUCHED.
+
+1. Cache-busting (?v= sürüm damgası): long-lived tabs served stale JS
+   (python http.server + browser heuristic caching) — the reported plan
+   'visual bug' was stale cache, root verified date math correct on fresh
+   origin. EVERY local `<script src>` and the local `<link rel=manifest>`
+   in index.html carries a single date-based stamp `?v=20260907` with the
+   maintenance marker comment `<!-- ?v= damgası: her js/css değişikliğinde
+   GÜNCELLE (cache-busting) -->` next to the first script tag. Convention:
+   any future JS/CSS change bumps ALL stamps together. Dynamic-loader
+   bypass audited: no `import('js/…')`, no `new Worker`, no
+   `serviceWorker.register` call in js/ (only the M-10 legacy-SW cleanup
+   unregister block) — stamp is effective.
+2. Şablona tohumlama kaydı: `tedavi_sablon_kaydet` already supports it —
+   p_kalemler jsonb object key `tohumlama_plani`
+   {gun_ofset integer ≥0, planned_time 'HH:MM'} (GT + migration
+   20260730000001 normalize; NO migration needed). `bcSablonKaydet` now
+   includes it when the 🐄 checkbox is checked AND the tohumlama block is
+   aktif (bcSablonTohumPayload pure fn: 0..365 clamp, invalid/empty saat →
+   '08:00'); unchecked → key OMITTED (ui.js sablonKaydet convention —
+   jsonb 'null' breaks validation). Şablon semantics identical to the
+   builder: plan date = case start_date + gun_ofset. Hint text updated.
+3. 📂 Şablon Yükle (recall into editor, addresses 'şablon kaydetme/geri
+   çağırma mantığı anlaşılmıyor'): new chip next to 💾 Şablon Kaydet opens
+   a collapsible list of the SELECTED disease's şablonlar (same IDB
+   source as the radio list: sablon_hastalik_eslem + tedavi_sablonu +
+   tedavi_sablonu_kalem); each row shows ad + 'N gün · M seans'
+   (+ tohumlama marker) + [Yükle]. Yükle rebuilds the editor via pure
+   `bcSablondenPlan` (kalem grouping by (gun_no, planned_time), sparse
+   gun_no preserved, drug keys drug_product_id / legacy stok_id, tohum
+   fields restored); existing kalem → openConfirm 'Mevcut plan
+   değiştirilecek' first; then şablon radio snaps to 'Şablonsuz' (submit
+   goes the p_items path). Radio list UNCHANGED (quick apply) — section
+   hints now disambiguate: 'Şablon seç → gönderimde olduğu gibi uygulanır'
+   vs Yükle area 'Plana YÜKLE → düzenle → uygula'.
 
 ## Objective
 

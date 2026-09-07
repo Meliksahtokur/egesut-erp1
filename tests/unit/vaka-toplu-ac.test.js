@@ -1993,3 +1993,156 @@ describe('openConfirm + _confirmOk DOM davranışı (V2.2.2 W16 — m-confirm st
     assert.strictEqual(sayac, 1, '_confirmAction tek-atımlı — eski davranış korunur');
   });
 });
+
+// ══════════════════════════════════════════════════════════════════════
+// V2.3 (W18, 2026-09-07) — şablona tohumlama kaydı + 📂 Şablon Yükle
+// (geri çağırma-düzenleme). Saf birimler:
+//   bcSablonTohumPayload(istenen, gunStr, saatStr) — bc-tohum üçlüsünü
+//     tedavi_sablon_kaydet p_kalemler.tohumlama_plani sözleşmesine (W15 GT:
+//     {gun_ofset int ≥0, planned_time 'HH:MM'}) map eder; istek yoksa NULL
+//     döner (anahtar GÖNDERİLMEZ — sablonKaydet ui.js konvansiyonu).
+//   bcSablondenPlan(sablon, drugs) — IDB şablon satırı + tedavi_sablonu_kalem
+//     satırlarını bc plan editörü state'ine ({gunler, tohumlama}) çevirir:
+//     (gun_no, planned_time) seans-gruplama, boşluklu gün № korunur, kalem
+//     ilaç anahtarı drug_product_id (legacy'de stok_id), planned_time
+//     'HH:MM' dilimlenir.
+// ══════════════════════════════════════════════════════════════════════
+
+describe('bcSablonTohumPayload (şablona tohumlama payload haritası)', () => {
+  it('istek yoksa null döner — tohumlama_plani anahtarı GÖNDERİLMEZ (ui.js konvansiyonu)', () => {
+    assert.strictEqual(sb.bcSablonTohumPayload(false, '21', '14:00'), null);
+  });
+
+  it('istek varsa {gun_ofset, planned_time} üretir', () => {
+    assert.deepStrictEqual(
+      host(sb.bcSablonTohumPayload(true, '21', '14:00')),
+      { gun_ofset: 21, planned_time: '14:00' });
+  });
+
+  it('gun_ofset 0..365 aralığına kelepirlenir (RPC sözleşmesi)', () => {
+    assert.strictEqual(sb.bcSablonTohumPayload(true, '400', '08:00').gun_ofset, 365);
+    assert.strictEqual(sb.bcSablonTohumPayload(true, '-3', '08:00').gun_ofset, 0);
+    assert.strictEqual(sb.bcSablonTohumPayload(true, 'abc', '08:00').gun_ofset, 0);
+    assert.strictEqual(sb.bcSablonTohumPayload(true, '', '08:00').gun_ofset, 0);
+  });
+
+  it('geçersiz/boş saat varsayılana düşer (08:00 — submitBulkCase paritesi)', () => {
+    assert.strictEqual(sb.bcSablonTohumPayload(true, '5', '25:99').planned_time, '08:00');
+    assert.strictEqual(sb.bcSablonTohumPayload(true, '5', '').planned_time, '08:00');
+    assert.strictEqual(sb.bcSablonTohumPayload(true, '5', null).planned_time, '08:00');
+    assert.strictEqual(sb.bcSablonTohumPayload(true, '5', '06:30').planned_time, '06:30');
+  });
+});
+
+describe('bcSablondenPlan (şablon → plan editörü geri çağırma)', () => {
+  const K = (gun_no, planned_time, over) => Object.assign({
+    gun_no, planned_time, stok_id: 'stk-' + gun_no + planned_time,
+    drug_product_id: 'drug-' + gun_no + planned_time, dose: 10, unit: 'ml', route: 'IM',
+  }, over || {});
+
+  it('kalemler (gun_no, planned_time) düzleminde seanslara gruplanır, saatler ASC', () => {
+    const r = sb.bcSablondenPlan({
+      tohumlama_plani: null,
+      kalemler: [K(1, '16:00'), K(1, '09:00'), K(1, '09:00', { drug_product_id: 'drug-b', stok_id: 'stk-b' })],
+    });
+    assert.strictEqual(r.gunler.length, 1);
+    assert.strictEqual(r.gunler[0].gun, 1);
+    assert.deepStrictEqual(host(r.gunler[0].seanslar.map(s => s.saat)), ['09:00', '16:00'], 'seans saatleri ASC');
+    assert.strictEqual(Object.keys(r.gunler[0].seanslar[0].ilaclar).length, 2, 'aynı seans iki ilaç taşır');
+    assert.strictEqual(Object.keys(r.gunler[0].seanslar[1].ilaclar).length, 1);
+  });
+
+  it('boşluklu gün № korunur (gün 1 ve 5 — 2,3,4 SIKIŞTIRILMAZ; criterion 14 dili)', () => {
+    const r = sb.bcSablondenPlan({ tohumlama_plani: null, kalemler: [K(5, '09:00'), K(1, '09:00')] });
+    assert.deepStrictEqual(host(r.gunler.map(g => g.gun)), [1, 5]);
+  });
+
+  it('tohumlama_plani {gun_ofset, planned_time} olarak taşınır', () => {
+    const r = sb.bcSablondenPlan({
+      tohumlama_plani: { gun_ofset: 10, planned_time: '08:30' },
+      kalemler: [K(1, '09:00')],
+    });
+    assert.deepStrictEqual(host(r.tohumlama), { gun_ofset: 10, planned_time: '08:30' });
+  });
+
+  it('tohumlama_plani eksik/geçersizse tohumlama null (jsonb null normalize)', () => {
+    assert.strictEqual(sb.bcSablondenPlan({ tohumlama_plani: null, kalemler: [K(1, '09:00')] }).tohumlama, null);
+    assert.strictEqual(sb.bcSablondenPlan({ kalemler: [] }).tohumlama, null);
+    assert.strictEqual(
+      sb.bcSablondenPlan({ tohumlama_plani: { gun_ofset: 10 }, kalemler: [] }).tohumlama, null,
+      'planned_time eksik — sunucu "gün ve saat bilgisi zorunlu" sözleşmesi');
+  });
+
+  it('kalem ilaç anahtarı drug_product_id; legacy (null) kalemin anahtarı stok_id', () => {
+    const r = sb.bcSablondenPlan({
+      tohumlama_plani: null,
+      kalemler: [K(1, '09:00'), K(2, '10:00', { drug_product_id: null, stok_id: 'stk-legacy' })],
+    });
+    const gun1 = r.gunler.find(g => g.gun === 1).seanslar[0].ilaclar;
+    const gun2 = r.gunler.find(g => g.gun === 2).seanslar[0].ilaclar;
+    assert.ok('drug-109:00' in gun1, 'drug_product_id anahtar');
+    assert.strictEqual(gun1['drug-109:00'].legacy, false);
+    assert.ok('stk-legacy' in gun2, 'legacy kalem stok_id anahtarı');
+    assert.strictEqual(gun2['stk-legacy'].legacy, true);
+  });
+
+  it('kalem doz sayı, stock_id stok_id\'den, planned_time HH:MM dilimlenir', () => {
+    const drugs = [{ id: 'dp-1', name: 'Penisilin', stock_id: 'stk-farkli' }];
+    const r = sb.bcSablondenPlan({
+      tohumlama_plani: null,
+      kalemler: [K(1, '09:00:00', { drug_product_id: 'dp-1', stok_id: 'stk-gercek', dose: 12.5 })],
+    }, drugs);
+    const ilac = r.gunler[0].seanslar[0].ilaclar['dp-1'];
+    assert.strictEqual(ilac.dose, 12.5);
+    assert.strictEqual(r.gunler[0].seanslar[0].saat, '09:00', ':ss soneki dilimlenir (seans düzleminde — bc state sözleşmesi)');
+    assert.strictEqual(ilac.name, 'Penisilin', 'ad drugs cache\'ten çözülür');
+    assert.strictEqual(ilac.stock_id, 'stk-gercek', 'stock_id kalem stok_id\'sinden');
+  });
+
+  it('boş şablon: gunler [] (çağıran editörü gün-1 boş planla açar), tohumlama null', () => {
+    const r = sb.bcSablondenPlan({ tohumlama_plani: null, kalemler: [] });
+    assert.deepStrictEqual(host(r.gunler), []);
+    assert.strictEqual(r.tohumlama, null);
+  });
+});
+
+describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manifest-içi metin denetimi)', () => {
+  const fs = require('node:fs');
+
+  it('handlers.js yeni bc-sablon-yukle aksiyonlarını kaydeder', () => {
+    const src = fs.readFileSync('js/utils/handlers.js', 'utf8');
+    assert.ok(/'bc-sablon-yukle-toggle':\s*\(\)\s*=>\s*bcSablonYukleToggle\(\)/.test(src));
+    assert.ok(/'bc-sablon-yukle':\s*\(el\)\s*=>\s*bcSablonYukle\(el\.dataset\.sablonId\)/.test(src));
+    assert.ok(/'bc-sablon-yukle-kapat':\s*\(\)\s*=>\s*bcSablonYukleKapat\(\)/.test(src));
+  });
+
+  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260907 damgalı', () => {
+    const html = fs.readFileSync('index.html', 'utf8');
+    assert.strictEqual((html.match(/data-action="bc-sablon-yukle-toggle"/g) || []).length, 1);
+    assert.strictEqual((html.match(/id="bc-sablon-yukle-alan"/g) || []).length, 1);
+    assert.strictEqual((html.match(/id="bc-sablon-yukle-list"/g) || []).length, 1);
+    // Cache-busting (owner feedback 2026-09-07): her YEREL script src'si damgalı
+    const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
+    const yerel = srcs.filter(s => !s.startsWith('http'));
+    assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
+    const damgasiz = yerel.filter(s => !/\?v=20260907$/.test(s));
+    assert.deepStrictEqual(host(damgasiz), [], 'damgasız yerel script kalmamalı');
+    assert.ok(/<!-- \?v= damgası: her js\/css değişikliğinde GÜNCELLE \(cache-busting\) -->/.test(html),
+      'damga bakım notu ilk script etiketinin yanında');
+  });
+
+  it('dinamik yükleyici bypass yok: js/ içinde js/*.js bare-path yükleyici tanımı yok', () => {
+    const fs2 = require('node:fs');
+    const taranacak = ['js/app.js', 'js/ui.js', 'js/forms.js', 'js/api.js', 'js/auth.js', 'js/demo.js',
+      'js/config.js', 'js/state.js', 'js/ai-asistan.js'];
+    const ihlal = [];
+    taranacak.forEach(f => {
+      const src = fs2.readFileSync(f, 'utf8');
+      if (/import\s*\(\s*['"`]js\//.test(src) || /new\s+Worker\(/.test(src)) ihlal.push(f);
+      // satır-içi yorumdaki bahsi sayma (app.js M-10 bloğu 'çağrısı yok' açıklaması taşır)
+      const kod = src.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n');
+      if (/serviceWorker\.register\s*\(/.test(kod)) ihlal.push(f + ' (SW register)');
+    });
+    assert.deepStrictEqual(ihlal, [], 'dinamik ?v= bypass kaynağı kalmamalı');
+  });
+});

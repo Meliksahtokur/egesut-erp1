@@ -1122,3 +1122,106 @@ görevler + 4 islem_log TOHUMLAMA_PLANLI_IPTAL audit rows.
 3. Probe index + node_modules symlink cleanup at goal close (V1.1/V2.1
    carry-forward).
 4. A1's open candidates still parked (owner brainstorm backlog).
+
+## V2.3 Amendment — W18-UI (owner feedback 2026-09-07, 2026-09-07)
+
+Scope: UI lane only (index.html, js/forms.js, js/utils/handlers.js,
+tests/unit/vaka-toplu-ac.test.js — all inside write_manifest). Engine and
+RPC untouched; supabase/ untouched.
+
+### STEP 0 research finding (tohumlama RPC support — no db worker needed)
+
+`tedavi_sablon_kaydet(p_id uuid, p_ad text, p_aciklama text,
+p_disease_ids jsonb, p_kalemler jsonb)` (migration 20260730000001 +
+GT) ACCEPTS tohumlama inside the p_kalemler jsonb OBJECT: key
+`tohumlama_plani`, shape `{gun_ofset: integer ≥0, planned_time: 'HH:MM'}`;
+normalize `nullif(p_kalemler->'tohumlama_plani','null'::jsonb)` guards the
+jsonb-'null' trap, and the builder (sablonKaydet, js/ui.js:4555) sends the
+key ONLY when a plan exists — omission = "no tohumlama". Param shape
+confirmed read-only; NO migration written.
+
+### TASK D — TDD RED verbatim (captured before any forms.js edit)
+
+`node --test tests/unit/vaka-toplu-ac.test.js` → 11 new tests failing:
+
+```
+✖ bcSablonTohumPayload (şablona tohumlama payload haritası) — 4/4 fail
+  TypeError: sb.bcSablonTohumPayload is not a function
+✖ bcSablondenPlan (şablon → plan editörü geri çağırma) — 7/7 fail
+  TypeError: sb.bcSablondenPlan is not a function
+ℹ tests 198
+ℹ pass 187
+ℹ fail 11
+```
+
+GREEN after implementation: same file 198/198, then full suite
+635 → **649/649** (npm run test:unit, 0 fail; +11 pure-fn tests +
++3 manifest-içi text/DENETIM tests: handlers routes, index.html chip/ids/
+?v= stamps, dynamic-loader bypass audit). node --check on js/forms.js +
+js/utils/handlers.js OK. New pure fns: `bcSablonTohumPayload`,
+`bcSablondenPlan` (DOM-less, cross-realm `host()` discipline kept).
+
+### TASK A — cache-busting
+
+All 14 local `<script src="js/…">` + `<link rel="manifest">` stamped
+`?v=20260907` (single date stamp; remote Supabase CDN correctly
+unstamped); marker comment `<!-- ?v= damgası: her js/css değişikliğinde
+GÜNCELLE (cache-busting) -->` next to the first script tag. Bypass audit:
+NO dynamic `import('js/…')`, NO `new Worker`, NO
+`serviceWorker.register` call in js/ (only app.js M-10 legacy-SW
+UNregister cleanup) — stamp effective; regression-locked by unit test.
+Smoke: python http.server :8100 → index 200, 15 stamp hits, forms.js?v=
+and utils/handlers.js?v= both 200; server killed, `ss` shows only root's
+:8098 (E2E) still listening.
+
+### TASK B — şablona tohumlama
+
+`bcSablonKaydet` (js/forms.js) sends `p_kalemler:
+{kalemler, tohumlama_plani?}` — tohumlama_plani included only when 🐄
+checkbox checked AND block aktif (disabled-mod values never read,
+submitBulkCase parity); `bcSablonTohumPayload` clamps gun 0..365 and
+falls back saat → '08:00'. Unchecked → key omitted (builder convention).
+Hint: 'ℹ️ İşaretliyse 🐄 tohumlama planı da şablona kaydedilir'.
+GitNexus pre-change impact on `bcSablonKaydet`: LOW (1 direct caller,
+epistemic exact; probe index wt-toplu-vaka-w6-probe refreshed
+`--index-only` first — it predated W16). Post-change detect_changes flags
+'critical' only by dense-section line-hunk attribution (vaccine-* rows in
+handlers.js are hunk noise; git diff --stat shows the 4 manifest files).
+
+### TASK C — 📂 Şablon Yükle (recall)
+
+`bc-sablon-yukle-toggle` chip next to 💾 Şablon Kaydet →
+`#bc-sablon-yukle-alan` (hint 'Plana YÜKLE → düzenle → uygula') listing
+the SELECTED disease's şablonlar from the SAME IDB source as the radio
+list (_renderSablonSecim triple: sablon_hastalik_eslem + tedavi_sablonu +
+tedavi_sablonu_kalem), rows 'ad — N gün · M seans (· 🐄 tohumlama)'
++ [Yükle data-action=bc-sablon-yukle data-sablon-id]. `bcSablonYukle`:
+existing kalem → openConfirm '⚠️ Mevcut plan değiştirilecek' (radyosuz),
+then `bcSablonYukleUygula` → pure `bcSablondenPlan` rebuild of
+`_bcGunler` (per-(gun_no, planned_time) seans grouping, sparse gun_no
+preserved, drug keys drug_product_id / legacy stok_id, planned_time
+HH:MM slice), tohum fields restored (checkbox/gün/saat), şablon radio
+snaps 'Şablonsuz' (submit = p_items path), toast '📂 <ad> yüklendi —
+düzenleyip uygulayabilirsin'. Radio list unchanged (quick apply); hints
+disambiguate the two paths. Reset: area closed on loadBulkCaseForm.
+
+### Criterion 16 status
+
+`V2.3 E2E: şablon with tohumlama round-trips through Yükle into the
+editor and submits; ?v= stamps present` — unit layers PASS (bcSablondenPlan
+tohumlama mapping + grouping + gap preservation; stamps asserted on all
+local scripts + local link). Browser E2E (yükle → düzenle → uygula on
+:8098) left to ROOT's standard demo pass (root keeps the E2E server).
+
+### V2.3 demo notes for root
+
+1. Yükle round-trip: pick a disease with a şablon that has tohumlama →
+   📂 Şablon Yükle → row should show '· 🐄 tohumlama' → Yükle → editor
+   gün kartları + tohum kutusu (işaretli, gün/saat şablondan) → send with
+   a fresh animal: cases should open with p_items plan + per-case
+   tohumlama görev at start_date + gun_ofset.
+2. Kaydet path: check 🐄 + gir gun/saat → 💾 Şablon Kaydet → new şablon's
+   tedavi_sablonu.tohumlama_plani should be {"gun_ofset":N,
+   "planned_time":"HH:MM"}; uncheck → NULL.
+3. Long-lived tabs: hard-reload no longer needed after JS edits IF the
+   stamp is bumped (convention noted in index.html).

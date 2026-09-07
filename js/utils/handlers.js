@@ -244,6 +244,11 @@ registerActions({
   'bc-sablon-kaydet-toggle': () => bcSablonKaydetToggle(),
   'bc-sablon-kaydet':        () => bcSablonKaydet(),
   'bc-sablon-kaydet-vazgec': () => bcSablonKaydetKapat(),
+  // V2.3 (W18) — 📂 şablon yükle (geri çağırma-düzenleme): şablon listesi
+  // aç/kapa + [Yükle] şablonu plan editörüne geri çağırır
+  'bc-sablon-yukle-toggle': () => bcSablonYukleToggle(),
+  'bc-sablon-yukle':        (el) => bcSablonYukle(el.dataset.sablonId),
+  'bc-sablon-yukle-kapat':  () => bcSablonYukleKapat(),
   'submit-bulk-case': (el) => submitBulkCase(el),
 
   // ═══ AŞI ═══
