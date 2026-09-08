@@ -104,7 +104,7 @@ const SEMPTOM_GENEL = ['Ateş','Halsizlik','İştahsızlık','Ağrı','Ödem','T
 // ══════════════════════════════════════════
 
 // Uygulama yolları (BUG-059 tedavi seanslarında)
-const UYGULAMA_YOLU = ['IM','IV','SC','PO','Topikal','Intrauterin'];
+const UYGULAMA_YOLU = ['IM','IV','SC','PO','Topikal','Intrauterin','Meme içi'];
 
 // Seans durumları (computeSeansState tarafından döner)
 const SEANS_STATE = {

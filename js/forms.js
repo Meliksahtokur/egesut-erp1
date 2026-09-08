@@ -1945,6 +1945,7 @@ function _bcSeansDozSatiri(ds){
     '<option ' + (route === 'PO' ? 'selected' : '') + ' value="PO">PO — Agizdan</option>' +
     '<option value="Topikal">Topikal</option>' +
     '<option value="Intrauterin">Intrauterin</option>' +
+    '<option ' + (route === 'Meme içi' ? 'selected' : '') + ' value="Meme içi">Meme içi</option>' +
     '</select>';
   return row;
 }

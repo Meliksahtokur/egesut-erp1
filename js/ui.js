@@ -1647,7 +1647,7 @@ async function _protokolUygula(idx){
   mini.onclick = e => { if (e.target === mini) mini.remove(); };
 
   const stokOpts = ilaclar.map(s => `<option value="${s.id}" data-birim="${esc(s.birim||'ml')}">${esc(s.urun_adi)}</option>`).join('');
-  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin','Meme içi'].map(r => `<option value="${r}">${r}</option>`).join('');
   const ilkBirim = ilaclar[0]?.birim || 'ml';
 
   mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
@@ -1812,7 +1812,7 @@ async function _hayvanHizliUygulama(hayvanId){
   mini.onclick = e => { if (e.target === mini) mini.remove(); };
 
   const stokOpts = ilaclar.map(s => `<option value="${s.id}" data-birim="${esc(s.birim||'ml')}">${esc(s.urun_adi)}</option>`).join('');
-  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin','Meme içi'].map(r => `<option value="${r}">${r}</option>`).join('');
   const ilkBirim2 = ilaclar[0]?.birim || 'ml';
   const hayvanKupe = getState('animals')?.find(a=>a.id===hayvanId)?.kupe_no || hayvanId;
 
@@ -5458,7 +5458,7 @@ async function _gorevStokSecVeTamamla(gorev){
   mini.onclick = e => { if (e.target === mini) mini.remove(); };
 
   const stokOpts = ilaclar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
-  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin'].map(r => `<option value="${r}">${r}</option>`).join('');
+  const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin','Meme içi'].map(r => `<option value="${r}">${r}</option>`).join('');
 
   mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💊 Görev Tamamlama — Stok Seç</div>
@@ -6497,6 +6497,7 @@ function cdfChkChange(chk) {
       '<option '+(route==='PO'?'selected':'')+' value="PO">PO — Agizdan</option>'+
       '<option value="Topikal">Topikal</option>'+
       '<option value="Intrauterin">Intrauterin</option>'+
+      '<option value="Meme içi">Meme içi</option>'+
       '</select>';
     satirlar.appendChild(row);
   } else {
@@ -6635,6 +6636,7 @@ function caseDrugDuzenle(btn) {
     '<option '+(route==='PO'?'selected':'')+' value="PO">PO — Agizdan</option>' +
     '<option '+(route==='Topikal'?'selected':'')+' value="Topikal">Topikal</option>' +
     '<option '+(route==='Intrauterin'?'selected':'')+' value="Intrauterin">Intrauterin</option>' +
+    '<option '+(route==='Meme içi'?'selected':'')+' value="Meme içi">Meme içi</option>' +
     '</select>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
     '<button onclick="caseDrugDuzenleKaydet(this.closest(\'.drug-edit-form\').dataset.adminId)" style="background:var(--green);color:#fff;border:none;border-radius:7px;padding:7px;font-weight:700;cursor:pointer">Kaydet</button>' +
@@ -8988,7 +8990,7 @@ function seansDuzenleAc(seansId) {
   const s = (d?.sessions || []).find(x => x.id === seansId);
   const row = document.getElementById('seans-mevcut-' + seansId);
   if (!s || !row) return;
-  const yolOpts = ['IM', 'IV', 'SC', 'PO', 'Topikal', 'Intrauterin']
+  const yolOpts = ['IM', 'IV', 'SC', 'PO', 'Topikal', 'Intrauterin', 'Meme içi']
     .map(y => `<option value="${y}"${(s.route || '') === y ? ' selected' : ''}>${y}</option>`).join('');
   row.innerHTML = `
     <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;width:100%">
