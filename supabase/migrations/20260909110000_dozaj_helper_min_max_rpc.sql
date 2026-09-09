@@ -99,3 +99,32 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.ilac_dozaj_guncelle(uuid, jsonb) TO anon, authenticated;
+
+-- ──────────────────────────────────────────────────────────────
+-- hayvan_kilo_guncelle — helper sheet'in kilo yazımı için tek amaçlı RPC.
+-- Neden: hayvan_guncelle'nin 3 overload'u var (küpe/boy/kısırlık sürümleri);
+-- minimal parametreyle PostgREST "Could not choose the best candidate"
+-- hatası veriyor (2026-09-09 demo e2e bulgusu). Ağırlık yazımı tek alandır —
+-- ayrı RPC belirsizliği kökten çözer.
+-- ──────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.hayvan_kilo_guncelle(
+  p_id            text,
+  p_canli_agirlik numeric
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF p_id IS NULL THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'hayvan_id gerekli');
+  END IF;
+  IF p_canli_agirlik IS NULL OR p_canli_agirlik <= 0 THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'canlı ağırlık > 0 olmalı');
+  END IF;
+  UPDATE public.hayvanlar SET canli_agirlik = p_canli_agirlik WHERE id = p_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı');
+  END IF;
+  RETURN jsonb_build_object('ok', true, 'id', p_id, 'canli_agirlik', p_canli_agirlik);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.hayvan_kilo_guncelle(text, numeric) TO anon, authenticated;

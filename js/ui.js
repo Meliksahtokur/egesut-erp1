@@ -1859,13 +1859,15 @@ async function _dozSheetUygula(btn, mini, kart, ids, cip) {
   _kaydetKilit();
   try {
     if (kgYaz) {
-      const res = await rpc('hayvan_guncelle', { p_id: ids[0], p_canli_agirlik: kgYaz });
+      // hayvan_guncelle 3 overload'lu — minimal çağrıda PostgREST belirsizlik
+      // veriyor; kilo yazımı tek amaçlı RPC'den geçer (20260909110000).
+      const res = await rpc('hayvan_kilo_guncelle', { p_id: ids[0], p_canli_agirlik: kgYaz });
       if (res?.ok === false) throw new Error(res.mesaj || 'Kilo kaydı başarısız');
       const yeni = (getState('animals') || []).map(a => a.id === ids[0] ? { ...a, canli_agirlik: kgYaz } : a);
       if (yeni.length) setState('animals', yeni);
     }
     if (Object.keys(guncellemeler).length) {
-      const res = await rpc('ilac_dozaj_guncelle', { p_id: kart.id, p_guncellemeler });
+      const res = await rpc('ilac_dozaj_guncelle', { p_id: kart.id, p_guncellemeler: guncellemeler });
       if (res?.ok === false) throw new Error(res.mesaj || 'İlaç kartı yazımı başarısız');
       Object.assign(kart, guncellemeler); // cache'i yerinde güncelle
     }
