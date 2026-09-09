@@ -1757,11 +1757,15 @@ function _dozSheetAc(btn, kart, ids) {
   const _f = x => (x === null || x === undefined || x === '' ? '' : x);
   const isSabit = unit === 'ml/hayvan';
 
+  // Repo modal deseni (.mo + .modal): dar ekranda alt-sheet, geniş ekranda
+  // ortalanmış compact kart (max-width 560 — tedavi modalıyla aynı davranış).
+  // z-index 600: vaka detay (.mo z-80) ve pu mini modalların (z-500) üstünde.
   const mini = document.createElement('div');
   mini.id = 'doz-sheet';
-  mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:flex;align-items:flex-end';
-  mini.onclick = e => { if (e.target === mini) mini.remove(); };
-  mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:18px 16px;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))">
+  mini.className = 'mo';
+  mini.style.zIndex = '600';
+  mini.setAttribute('data-action', 'mclose-overlay');
+  mini.innerHTML = `<div class="modal"><div class="m-handle"></div><div style="padding:4px 16px 18px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
       <div style="font-weight:800;font-size:.92rem">💡 Dozaj Helperı</div>
       <button id="doz-sheet-kapat" style="background:none;border:none;font-size:1.15rem;cursor:pointer;color:var(--ink3)">✕</button>
@@ -1796,15 +1800,23 @@ function _dozSheetAc(btn, kart, ids) {
       <button id="doz-sheet-iptal" style="flex:0 0 auto;background:var(--card3);border:none;border-radius:8px;padding:10px 14px;cursor:pointer">İptal</button>
     </div>
     <div style="font-size:.62rem;color:var(--ink3);margin-top:6px">Çipe tıkla = kaydet + doz kutusuna yaz. Sadece kaydetmek istersen "💾 Kartlara yaz". Yazmadan ✕ ile çıkabilirsin.</div>
-  </div>`;
+  </div></div>`;
   document.body.appendChild(mini);
-  document.getElementById('doz-sheet-kapat').onclick = () => mini.remove();
-  document.getElementById('doz-sheet-iptal').onclick = () => mini.remove();
+  openM('doz-sheet');
+  document.getElementById('doz-sheet-kapat').onclick = _dozSheetKapat;
+  document.getElementById('doz-sheet-iptal').onclick = _dozSheetKapat;
   ['doz-sheet-kg','doz-sheet-pratik','doz-sheet-pro','doz-sheet-conc','doz-sheet-min','doz-sheet-max'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => _dozSheetCiplerCiz(kart, btn, ids));
   });
   document.getElementById('doz-sheet-kaydet').onclick = () => _dozSheetUygula(btn, mini, kart, ids, null);
   _dozSheetCiplerCiz(kart, btn, ids);
+}
+
+function _dozSheetKapat() {
+  const s = document.getElementById('doz-sheet');
+  if (!s) return;
+  closeM('doz-sheet');
+  s.remove();
 }
 
 // Hesap çiplerini canlı çiz — her çip tek tıkla: kartlara yaz + doz kutusuna aktar + kapat.
@@ -1873,7 +1885,7 @@ async function _dozSheetUygula(btn, mini, kart, ids, cip) {
     }
     pullTables(['hayvanlar', 'drug_products']).catch(() => {});
     if (cip && dozInp) dozInp.value = cip.doz;
-    mini?.remove();
+    _dozSheetKapat();
     toast('💡 ' + (cip ? cip.aciklama : 'Kartlar güncellendi'));
   } catch (e) {
     toast('❌ ' + (e.message || e), true);
