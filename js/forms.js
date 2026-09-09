@@ -3446,7 +3446,7 @@ async function islemGeriAl(btn, islemLogId) {
       const tohId = islemLogId.slice(4);
       const res = await rpc('tohumlama_geri_al', { p_tohumlama_id: tohId });
       toast('✅ Kayıt silindi');
-      closeM('m-geri-al'); closeM('m-toh-det');
+      closeM('m-geri-al'); closeM('m-toh-det'); closeM('m-det');
       await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','islem_log']);
       renderSafe();
       return;
@@ -3478,6 +3478,9 @@ async function islemGeriAl(btn, islemLogId) {
     closeM('m-geri-al');
     closeM('m-toh-det');
     closeM('m-case-det');
+    // Hayvan kartı geçmişi de geri alma kaynağıdır — kart açık kalırsa bayat liste
+    // gösterir; renderSafe yalnız mevcut sayfayı yeniler (spec E: iki yüzey de taze)
+    closeM('m-det');
     await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','cases','treatment_days','stok_hareket','islem_log','drug_administrations']);
     renderSafe();
   } catch (e) {
