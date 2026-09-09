@@ -1729,7 +1729,10 @@ function _dozSheetOku() {
   const sayi = id => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) && v > 0 ? v : null; };
   return {
     kg: sayi('doz-sheet-kg'),
-    pratik: sayi('doz-sheet-pratik'),
+    // Pratik doz = "X kg'a Y ml" çifti (saha dili): oran = Y ÷ X (ml/kg).
+    pratik: (() => { const kg = sayi('doz-sheet-pratik-kg'), ml = sayi('doz-sheet-pratik-ml');
+      return (kg && ml) ? ml / kg : null; })(),
+    pratikKg: sayi('doz-sheet-pratik-kg'),
     pro: sayi('doz-sheet-pro'),
     conc: sayi('doz-sheet-conc'),
     min: sayi('doz-sheet-min'),
@@ -1784,7 +1787,11 @@ function _dozSheetAc(btn, kart, ids) {
         ? `<div style="font-size:.78rem;margin-top:6px">Sabit doz tipi (ml/hayvan) — kart: <b>${_f(kart.std_dose)} ml</b>${kart.std_dose_min ? ' · aralık ' + _f(kart.std_dose_min) + '–' + _f(kart.std_dose_max) : ''}</div>
            <input type="hidden" id="doz-sheet-sabit" value="${_f(kart.std_dose)}">`
         : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
-        <div><label style="font-size:.64rem;color:var(--ink3)">ml/kg oranı</label><input id="doz-sheet-pratik" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 0,04" value="${unit === 'ml/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div style="grid-column:1 / -1"><label style="font-size:.64rem;color:var(--ink3)">Pratik doz — kaç kg'a kaç ml? <span title="Örn: 50 kg'a 2 ml → 500 kg hayvana 20 ml">ⓘ</span></label><div style="display:grid;grid-template-columns:1fr 14px 1fr;gap:4px;align-items:center">
+        <input id="doz-sheet-pratik-kg" type="number" step="1" min="1" inputmode="decimal" placeholder="kg" value="${unit === 'ml/kg' && +kart.std_dose > 0 ? '50' : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0;text-align:center">
+        <span style="text-align:center;color:var(--ink3);font-size:.7rem">kg'a</span>
+        <input id="doz-sheet-pratik-ml" type="number" step="0.1" min="0" inputmode="decimal" placeholder="ml" value="${unit === 'ml/kg' && +kart.std_dose > 0 ? String(Math.round(+kart.std_dose * 50 * 100) / 100) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0;text-align:center">
+        </div></div>
         <div><label style="font-size:.64rem;color:var(--ink3)">mg/kg oranı (pro)</label><input id="doz-sheet-pro" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 2" value="${unit === 'mg/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
         <div><label style="font-size:.64rem;color:var(--ink3)">Konsantrasyon (mg/ml) — 1 ml ilaçtaki etken</label><input id="doz-sheet-conc" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 50" value="${_f(kart.concentration)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -1805,7 +1812,7 @@ function _dozSheetAc(btn, kart, ids) {
   openM('doz-sheet');
   document.getElementById('doz-sheet-kapat').onclick = _dozSheetKapat;
   document.getElementById('doz-sheet-iptal').onclick = _dozSheetKapat;
-  ['doz-sheet-kg','doz-sheet-pratik','doz-sheet-pro','doz-sheet-conc','doz-sheet-min','doz-sheet-max'].forEach(id => {
+  ['doz-sheet-kg','doz-sheet-pratik-kg','doz-sheet-pratik-ml','doz-sheet-pro','doz-sheet-conc','doz-sheet-min','doz-sheet-max'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => _dozSheetCiplerCiz(kart, btn, ids));
   });
   document.getElementById('doz-sheet-kaydet').onclick = () => _dozSheetUygula(btn, mini, kart, ids, null);
