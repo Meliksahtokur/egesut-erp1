@@ -6378,6 +6378,70 @@ function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
   });
 }
 
+function caseSablonToggle(){
+  const alan = document.getElementById('cd-sablon-alan');
+  if(!alan) return;
+  const aciliyor = alan.style.display !== 'block';
+  alan.style.display = aciliyor ? 'block' : 'none';
+  if(aciliyor){
+    const tarihEl = document.getElementById('cd-sablon-tarih');
+    if(tarihEl && !tarihEl.value) tarihEl.value = bugun();
+    caseSablonListeRender();
+  }
+}
+
+async function caseSablonListeRender(){
+  const list = document.getElementById('cd-sablon-list');
+  if(!list || !_curCase) return;
+  // Yalnız VAKANIN hastalığına bağlı şablonlar — açılış listesiyle aynı
+  // kaynak (sablon_hastalik_eslem; bcSablonYukleListeRender deseni).
+  const [eslem, sablonlar, kalemler] = await Promise.all([
+    idbGetAll('sablon_hastalik_eslem'), idbGetAll('tedavi_sablonu'), idbGetAll('tedavi_sablonu_kalem')
+  ]);
+  const liste = cdSablonListeBul(eslem, sablonlar, kalemler, _curCase.disease_id);
+  if(!liste.length){
+    list.innerHTML = '<div style="font-size:.74rem;color:var(--ink3);padding:4px 0">Bu hastalık için kayıtlı şablon yok.</div>';
+    return;
+  }
+  list.innerHTML = liste.map(s =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.8rem;border-bottom:1px solid var(--card3)">' +
+    '<span style="flex:1;min-width:0;font-weight:600;color:var(--ink)">' + esc(s.ad) +
+    '<span style="color:var(--ink2);font-size:.72rem;font-weight:400"> — ' + s.gun + ' gün · ' + s.seans + ' seans' +
+    (s.tohumVar ? ' · 🐄 tohumlama' : '') + '</span></span>' +
+    '<button type="button" class="ek-chip" data-action="cd-sablon-uygula" data-sablon-id="' + escAttr(s.id) +
+    '" style="font-weight:700;color:var(--blue);border-color:rgba(42,107,181,.4)">Uygula</button></div>'
+  ).join('');
+}
+
+async function caseSablonUygula(sablonId){
+  if(!sablonId || !_curCase) return;
+  if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  const tarih = v('cd-sablon-tarih');
+  if(!tarih){ toast('Şablonun ilk gününü seçin', true); return; }
+  try {
+    const r = await rpc('tedavi_sablon_uygula',
+      { p_case_id: _curCase.id, p_sablon_id: sablonId, p_baslangic_tarihi: tarih });
+    let tohumMsg = '';
+    // submitCase (forms.js:620-624) toast dili birebir; ikinci RPC ayrı
+    // try'da — günler zaten eklendi, tazeleme atlanmamalı.
+    try {
+      const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle',
+        { p_case_id: _curCase.id, p_sablon_id: sablonId, p_baslangic_tarihi: tarih });
+      if(planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
+      if(planli?.olustu) tohumMsg = ' + tohumlama';
+    } catch(e) { toast('Şablon günleri eklendi ama planlı tohumlama açılamadı: ' + e.message, true); }
+    if(r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
+    toast(`✅ Şablon uygulandı (${r?.gun_sayisi||0} gün)${tohumMsg}`);
+    const alan = document.getElementById('cd-sablon-alan');
+    if(alan) alan.style.display = 'none';
+    await pullTables(['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log','islem_log']);
+    _drugsCache = [];
+    await loadDrugsCache();
+    await renderCaseTimeline(_curCase.id);
+    _updateKapatBtn(_curCase.id);
+  } catch(e) { toast(getUserMessage(e), true); }
+}
+
 // ── VAKAYA PLANLI TOHUMLAMA ────────────────────────────────────────────────
 // Tohumlama ilaç gibi vakanın bir kalemi; ama kaydı tohumlama_kaydet zinciri
 // üzerinden gitmek zorunda (sperma, VWP, gebelik kontrol görevleri). Bu yüzden
