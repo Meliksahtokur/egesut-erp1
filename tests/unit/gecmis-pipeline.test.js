@@ -398,3 +398,41 @@ test('dateKey + CSV saati Europe/Istanbul kuralı (impl-review 5/7): UTC akşam�
   assert.strictEqual(_gmCsvTarih('2026-09-08T21:30:00+03:00'), '08.09.2026');
   assert.strictEqual(_gmCsvSaat('2026-09-08T21:30:00+03:00'), '21:30');
 });
+
+// ── D15: Klasik görünüm modu (eski düz-liste davranışı) ──────────
+
+test('klasik mod: bekleyen tohumlama ve aktif vaka görünür, defter politikası bypass edilir', () => {
+  const { _gmEntriesFromSources } = sandbox;
+  const sources = {
+    tohumlama: [{ id: 'T1', sonuc: 'Bekliyor', created_at: '2026-09-08T10:00:00Z', hayvan_id: 'A1' }],
+    cases: [{ id: 'C1', status: 'active', start_date: '2026-09-08', created_at: '2026-09-08T08:00:00Z' }],
+    gorev_log: [{ id: 'G1', tamamlandi: false, hedef_tarih: '2099-01-01' }],
+  };
+  // defter (default): hiçbiri geçmez
+  assert.strictEqual(_gmEntriesFromSources(sources).length, 0);
+  // klasik: tohumlama (Bekliyor) ve aktif vaka girer; pending gorev tumu=false'da girmez
+  const k = _gmEntriesFromSources(sources, null, { mode: 'klasik', tumu: false });
+  assert.strictEqual(k.map(e => e.type + ':' + e.data.id).sort().join(','), 'hastalik:C1,tohumlama:T1');
+});
+
+test('klasik mod gorev: tumu=false → tamamlandı+parentsız; tumu=true → pending ve alt görev dahil, iptal yine hariç', () => {
+  const { _gmEntriesFromSources } = sandbox;
+  const sources = { gorev_log: [
+    { id: 'DONE', tamamlandi: true, tamamlanma_tarihi: '2026-09-08T09:00:00Z' },
+    { id: 'PEND', tamamlandi: false, hedef_tarih: '2026-09-10' },
+    { id: 'CHILD', tamamlandi: true, tamamlanma_tarihi: '2026-09-08T07:00:00Z', parent_id: 'ana' },
+    { id: 'IPTAL', tamamlandi: true, tamamlanma_tarihi: '2026-09-08T06:00:00Z', iptal: true },
+  ]};
+  const kapali = _gmEntriesFromSources(sources, null, { mode: 'klasik', tumu: false }).map(e => e.data.id).join(',');
+  assert.strictEqual(kapali, 'DONE', 'eski default: tamamlandı ve parentsız');
+  const acik = _gmEntriesFromSources(sources, null, { mode: 'klasik', tumu: true }).map(e => e.data.id).sort().join(',');
+  assert.strictEqual(acik, 'CHILD,DONE,PEND', 'tümü açık: pending + alt görev girer, iptal girmez');
+});
+
+test('klasik mod eventAt: eski fallback zincirleri (gorev tamamlanma→created_at→hedef; vaka created_at→start_date)', () => {
+  const { _gmEntriesFromSources } = sandbox;
+  const g = _gmEntriesFromSources({ gorev_log: [{ id: 'G1', tamamlandi: false, created_at: '2026-09-07T12:00:00Z', hedef_tarih: '2026-09-10' }] }, null, { mode: 'klasik', tumu: true });
+  assert.strictEqual(g[0].eventAt, '2026-09-07T12:00:00Z', 'pending görevde created_at esas');
+  const c = _gmEntriesFromSources({ cases: [{ id: 'C1', status: 'active', start_date: '2026-09-05', created_at: '2026-09-05T09:00:00Z' }] }, null, { mode: 'klasik' });
+  assert.strictEqual(c[0].eventAt, '2026-09-05T09:00:00Z');
+});

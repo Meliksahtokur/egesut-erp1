@@ -51,6 +51,16 @@ function _gmPolicyRow(sourceKey, row) {
   }
 }
 
+// Klasik görünüm politikası (eski düz-liste davranışı): gorev dışında her şey
+// kabul; gorev filtresi (tamamlandi/parent_id) çağıran tarafta _gecmisTumu'ye
+// göre satır satır uygulanır. islem yine 5 tip.
+function _gmPolicyRowKlasik(sourceKey, row) {
+  if (!row) return false;
+  if (sourceKey === 'islem_log' || sourceKey === 'islem')
+    return _GM_ISLEM_TIPLERI.includes(row.tip);
+  return true;
+}
+
 // ── Olay zamanı (spec B eventAt sütunu) ──────────────────
 function _gmEventAt(sourceKey, row) {
   switch (sourceKey) {
@@ -86,6 +96,25 @@ function _gmDateKey(eventAt) {
   return s.slice(0, 10);
 }
 
+// Klasik modda eski eventAt kuralları (tarih=fallback'li, bekleyen dahil)
+function _gmEventAtKlasik(sourceKey, row) {
+  switch (sourceKey) {
+    case 'gorev_log': case 'gorev':
+      return row.tamamlanma_tarihi || row.created_at || row.hedef_tarih || '';
+    case 'tohumlama':
+      return row.created_at || row.tarih || '';
+    case 'cases': case 'hastalik':
+      return row.created_at || row.start_date || '';
+    case 'dogum':
+    case 'uygulama_log': case 'uygulama':
+      return row.created_at || row.tarih || '';
+    case 'islem_log': case 'islem':
+      return row.tarih || row.created_at || '';
+    default:
+      return '';
+  }
+}
+
 // ── Geri alma bağlamı (openTohDet muhafazası, spec E) ─────
 // Ham (politika öncesi) kaynaklardan türetilir: TOHUMLAMA islem_log referansları,
 // ABORT_KAYDI muhafazaları ve hayvan başına SON tohumlama id'si.
@@ -108,12 +137,15 @@ function _gmUndoCtx(sources) {
 }
 
 // ── Entry üretimi (normalize + politika) ─────────────────
-// sources: {gorev_log:[], tohumlama:[], cases:[], dogum:[], uygulama_log:[], islem_log:[]}
+// sources: {gorev_log:[],tohumlama:[],cases:[],dogum:[],uygulama_log:[],islem_log:[]}
 // scope:   {animalId?} — hayvan kartı geçmişi için kaynak bazında mevcut eşleşme kuralları
+// opts:    {mode:'defter'|'klasik', tumu:boolean} — klasik mod eski davranışı geri getirir
 // Çıktı: eventAt desc sıralı entry listesi; eventAt'i boş kalan satır entry üretmez.
-function _gmEntriesFromSources(sources, scope) {
+function _gmEntriesFromSources(sources, scope, opts) {
   sources = sources || {};
   scope = scope || {};
+  opts = opts || {};
+  const klasik = opts.mode === 'klasik';
   const id = scope.animalId;
   const ctx = _gmUndoCtx(sources);
   const out = [];
@@ -121,8 +153,16 @@ function _gmEntriesFromSources(sources, scope) {
     (rows || []).forEach(row => {
       if (!row) return;
       if (id && !(match && match(row))) return; // kapsam filtresi (yalnız hayvan kartı)
-      if (!_gmPolicyRow(sourceKey, row)) return;
-      const eventAt = _gmEventAt(sourceKey, row);
+      if (klasik) {
+        if (sourceKey === 'gorev_log' || sourceKey === 'gorev') {
+          // iptal edilen iş hiçbir görünümde listelenmez
+          if (row.iptal) return;
+          // eski default: tamamlandı VE parent'sız; "Tümü" açıkken ikisi de kalkar
+          if (!opts.tumu && !(row.tamamlandi === true && !row.parent_id)) return;
+        }
+        if (!_gmPolicyRowKlasik(sourceKey, row)) return;
+      } else if (!_gmPolicyRow(sourceKey, row)) return;
+      const eventAt = klasik ? _gmEventAtKlasik(sourceKey, row) : _gmEventAt(sourceKey, row);
       if (!eventAt) return;
       out.push({
         type: entryType,

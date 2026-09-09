@@ -4,7 +4,7 @@
 
 /* global
   /* global
-   _curTaskFilter, _pendWin, _curUremeTab, _curGecmisFilter, _tanimlarTab,
+   _curTaskFilter, _pendWin, _curUremeTab, _curGecmisFilter, _gecmisTumu, _tanimlarTab,
    _curTaskDet, _curTaskVaccineId, _curTaskTopluChildren, _curToh,
    _customHekimler, _customSperma,
    _ilacCache, _drugsCache, _disFreq,
@@ -3577,6 +3577,21 @@ async function _gecmisCollectSources(){
   return { gorev_log:gorevEnr, tohumlama:tohArr, cases:casesEnr, dogum:dogumArr, uygulama_log:uyEnr, islem_log:islemArr };
 }
 
+// Görünüm tercihi: Defter (gün gruplu, saf-bitmiş) ↔ Klasik (eski düz liste,
+// "Tümü" toggle'ı ile birlikte). localStorage'da kalıcı (D15).
+function _gecmisKlasik(){ try{ return localStorage.getItem('ege_gecmis_klasik')==='1'; }catch(e){ return false; } }
+function _gecmisSetKlasik(v){
+  try{ v?localStorage.setItem('ege_gecmis_klasik','1'):localStorage.removeItem('ege_gecmis_klasik'); }catch(e){}
+  // "Tümü" toggle'ı yalnız klasik görünümde anlamlı
+  const tum = document.getElementById('gecmis-tumu-wrap');
+  if(tum) tum.style.display = v?'flex':'none';
+  const sw = document.getElementById('gecmis-gorunum-toggle');
+  if(sw){
+    sw.style.background = v?'var(--green)':'var(--card3)';
+    if(sw.firstElementChild) sw.firstElementChild.style.left = v?'16px':'2px';
+  }
+}
+
 function _gecmisRender(q){
   const el=document.getElementById('gecmis-body');
   if(!el)return;
@@ -3600,6 +3615,11 @@ function _gecmisRender(q){
   const hint=total>visible.length
     ?`<div style="font-size:.65rem;color:var(--ink3);margin-bottom:6px;padding:0 2px">İlk ${visible.length} / ${total} kayıt</div>`
     :(q.trim()&&total<filtreliSayi?`<div style="font-size:.65rem;color:var(--ink3);margin-bottom:6px;padding:0 2px">${total} / ${filtreliSayi} sonuç</div>`:'');
+  // Klasik görünüm (D15): gün gruplamasız eski düz liste
+  if(_gecmisKlasik()){
+    el.innerHTML=hint+visible.map(e=>_gecmisEntryHtml(e)).join('');
+    return;
+  }
   // arama aktifken tüm gün grupları açık zorunlu (spec C)
   const gruplar=_gmGroup(visible)
     .map(g=>_gmGroupHtml(g,_gecmisEntryHtml,{open:!!q.trim(),todayKey:_gmTodayKey()}))
@@ -3682,17 +3702,19 @@ function gmUndoClick(kind,id){
   openGeriAl(kind==='toh'?'toh:'+id:id,ozet);
 }
 
-async function loadGecmis(f,btn){
+async function loadGecmis(f,btn,opts){
   _curGecmisFilter=f||_curGecmisFilter||'hepsi';
   if(btn){ document.querySelectorAll('#pg-gecmis .fs-btn').forEach(b=>b.classList.remove('on')); btn.classList.add('on'); }
+  _gecmisSetKlasik(_gecmisKlasik());
   const el=document.getElementById('gecmis-body');
   await _keepScroll(el,async()=>{
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     // D14: sekme girişinde çevrimiçiyken taze veri çek; offline IDB önbelleği
-    if(navigator.onLine) await pullTables(['gorev_log','tohumlama','cases','dogum','treatment_days','drug_administrations','drug_products','stok','islem_log','uygulama_log','diseases']).catch(()=>{});
+    // (görünüm/tümü toggle'ı skipPull ile — ağ bağlantısız anında geçiş)
+    if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','tohumlama','cases','dogum','treatment_days','drug_administrations','drug_products','stok','islem_log','uygulama_log','diseases']).catch(()=>{});
     const sources=await _gecmisCollectSources();
-    const entries=_gmEntriesFromSources(sources);
+    const entries=_gmEntriesFromSources(sources,null,{mode:_gecmisKlasik()?'klasik':'defter',tumu:_gecmisTumu});
     entries.forEach(e=>{ e.searchText=_gecmisSearchText(e); });
     _gecmisAllEntries=entries;
     _gecmisChipCounts();
