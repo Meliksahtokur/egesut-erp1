@@ -1751,7 +1751,8 @@ function _dozSheetAc(btn, kart, ids) {
   const _ilk = ids.map(id => animals.find(a => a.id === id)).filter(Boolean);
   const tekHayvan = ids.length === 1;
   const kupe = _ilk.length ? (_ilk[0].kupe_no || _ilk[0].devlet_kupe || '') : '';
-  const kgNow = _ilk.length ? Math.max(0, ..._ilk.map(a => +a.canli_agirlik || 0)) : '';
+  const _kgler = _ilk.map(a => +a.canli_agirlik || 0).filter(x => x > 0);
+  const kgNow = _kgler.length ? Math.max(..._kgler) : '';
   const unit = kart.std_dose_unit || 'ml/kg';
   const _f = x => (x === null || x === undefined || x === '' ? '' : x);
   const isSabit = unit === 'ml/hayvan';
