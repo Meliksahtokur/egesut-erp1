@@ -339,6 +339,7 @@ registerActions({
   'case-gun-ekle':      () => caseGunEkle(),
   'case-tohumlama-ekle':() => caseTohumlamaEkleAc(),
   'cd-sablon-toggle':      () => caseSablonToggle(),
+  'cd-sablon-takvim-ac':   () => cdSablonTarihTakvimAc(),
   'cd-sablon-uygula':      (el) => caseSablonUygula(el.dataset.sablonId),
   'case-kapat':         () => caseKapat(),
   'erken-kapat-toggle': () => caseErkenKapatToggle(),

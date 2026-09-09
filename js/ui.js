@@ -6359,9 +6359,9 @@ async function caseGunEkleOnayla() {
 
 // ═══ AKTİF VAKAYA ŞABLON UYGULAMA (2026-09-09) ═══
 // Desen: bc-sablon-yukle (forms.js:1382) katlanır alanı + submitCase
-// (forms.js:616-629) çift-RPC akışı. Çapa: cd-sablon-tarih = şablonun
-// 1. günü (RPC'de tarih = çapa + (gun_no − 1)); p_baslangic_tarihi NULL
-// ⇔ açılıştaki start_date çapası.
+// (forms.js:616-629) çift-RPC akışı. Çapa: _cdSablonTarih (tek-seçim takvim
+// modalı, aşağıda) = şablonun 1. günü (RPC'de tarih = çapa + (gun_no − 1));
+// p_baslangic_tarihi NULL ⇔ açılıştaki start_date çapası.
 
 // Saf çekirdek — tests/unit/tedavi-sablon-aktif.test.js yeşil kilidi.
 // bcSablonYukleListeRender (forms.js:1413-1421) satır hesabının DOM'suz aynası.
@@ -6378,14 +6378,91 @@ function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
   });
 }
 
+// ── Şablon ilk-gün takvimi — TEK SEÇİM (2026-09-09, sahibe direktifi: yeni
+// yüzeylerde yerel <input type="date"> KULLANILMAZ; mevcut takvim modalı dili
+// kullanılır). Görsel dil: gun-tarih-modal (caseGunModalRender); seçim kuralı:
+// bc-tarih-takvim W20 (forms.js:1804) — hücre tıkı seçimi DEĞİŞTİRİR, toggle
+// yok. Aralık sınırsız: geriye dönük kayıt serbest (spec D5).
+let _cdSablonTakvimAy = 0, _cdSablonTakvimYil = 0;
+let _cdSablonTarih = null; // ISO — şablon çapa tarihinin TEK kaynağı
+
+function cdSablonTarihTakvimAc(){
+  const simdi = new Date();
+  _cdSablonTakvimAy  = simdi.getMonth();
+  _cdSablonTakvimYil = simdi.getFullYear();
+  if(!_cdSablonTarih) _cdSablonTarih = bugun();
+  cdSablonTarihTakvimRender();
+}
+function cdSablonTarihTakvimKapat(){
+  const box = document.getElementById('cd-sablon-takvim');
+  if(box) box.remove();
+}
+function cdSablonTarihTakvimSec(iso){
+  _cdSablonTarih = iso;
+  cdSablonTarihTakvimRender();
+}
+function cdSablonTarihTakvimOnayla(){
+  cdSablonTarihEtiketGuncelle();
+  cdSablonTarihTakvimKapat();
+}
+function cdSablonTarihEtiketGuncelle(){
+  const btn = document.getElementById('cd-sablon-tarih-btn');
+  if(btn) btn.textContent = '📅 Şablonun ilk günü: ' + fmtTarih(_cdSablonTarih);
+}
+function cdSablonTarihTakvimRender(){
+  let box = document.getElementById('cd-sablon-takvim');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'cd-sablon-takvim';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end';
+    box.onclick = e => { if(e.target === box) box.remove(); };
+    document.body.appendChild(box);
+  }
+  const ay = _cdSablonTakvimAy, yil = _cdSablonTakvimYil;
+  const bosluk = (new Date(yil, ay, 1).getDay() + 6) % 7;
+  const sonGun = new Date(yil, ay + 1, 0).getDate();
+  const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', {month:'long', year:'numeric'});
+  let kareler = '';
+  for(let i = 0; i < bosluk; i++) kareler += '<div></div>';
+  for(let g = 1; g <= sonGun; g++){
+    const iso = yil + '-' + String(ay+1).padStart(2,'0') + '-' + String(g).padStart(2,'0');
+    kareler += '<div onclick="cdSablonTarihTakvimSec(&#39;' + iso + '&#39;)" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;' +
+      (iso === _cdSablonTarih ? 'background:var(--green);color:#fff;' : 'color:var(--ink);') + '">' + g + '</div>';
+  }
+  box.innerHTML =
+    '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📅 Şablonun İlk Günü — Takvimden Seç</div>' +
+    '<div style="font-weight:800;font-size:.95rem;margin-bottom:12px">Seçilen: ' + fmtTarih(_cdSablonTarih) + '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<button onclick="cdSablonTarihTakvimAyDegistir(-1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
+    '<span style="font-weight:800;font-size:.9rem">' + ayAdi + '</span>' +
+    '<button onclick="cdSablonTarihTakvimAyDegistir(1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
+    ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">' + kareler + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<button onclick="cdSablonTarihTakvimOnayla()" style="padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Onayla</button>' +
+    '<button onclick="cdSablonTarihTakvimKapat()" style="padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">İptal</button>' +
+    '</div></div>';
+  box.style.display = 'flex';
+}
+function cdSablonTarihTakvimAyDegistir(delta){
+  _cdSablonTakvimAy += Math.trunc(Number(delta) || 0);
+  if(_cdSablonTakvimAy < 0){ _cdSablonTakvimAy = 11; _cdSablonTakvimYil--; }
+  if(_cdSablonTakvimAy > 11){ _cdSablonTakvimAy = 0; _cdSablonTakvimYil++; }
+  cdSablonTarihTakvimRender();
+}
+
 function caseSablonToggle(){
   const alan = document.getElementById('cd-sablon-alan');
   if(!alan) return;
   const aciliyor = alan.style.display !== 'block';
   alan.style.display = aciliyor ? 'block' : 'none';
   if(aciliyor){
-    const tarihEl = document.getElementById('cd-sablon-tarih');
-    if(tarihEl && !tarihEl.value) tarihEl.value = bugun();
+    if(!_cdSablonTarih) _cdSablonTarih = bugun();
+    cdSablonTarihEtiketGuncelle();
     caseSablonListeRender();
   }
 }
@@ -6416,7 +6493,7 @@ async function caseSablonListeRender(){
 async function caseSablonUygula(sablonId){
   if(!sablonId || !_curCase) return;
   if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const tarih = v('cd-sablon-tarih');
+  const tarih = _cdSablonTarih;
   if(!tarih){ toast('Şablonun ilk gününü seçin', true); return; }
   try {
     const r = await rpc('tedavi_sablon_uygula',
