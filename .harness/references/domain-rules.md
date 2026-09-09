@@ -322,6 +322,7 @@ Her kritik işlem `islem_log` tablosına yazılır. Tip değerleri (kodda üreti
 8. **Tohumlama verisi yalnızca RPC üzerinden yazılmalı; direkt REST PATCH, RPC validation'ı bypass eder.**
    *(Nüans, 2026-08-31: erkek/yaş kuralları tablo trigger'ı ile REST'te de yakalanır; VWP ve aktif gebelik
    kontrolleri yalnız `tohumlama_kaydet` RPC gövdesindedir — RPC'siz INSERT bu iki kontrolü atlar.)*
+9. **Tedavi şablonu uygulaması EKLEMELİDİR: mevcut `treatment_days` satırları asla değiştirilmez; şablon günleri yeni satır olarak düşer.** Tarih çapası: vaka açılışında `cases.start_date` (2-arg çağrı, `p_baslangic_tarihi` DEFAULT NULL), aktif vakada kullanıcının seçtiği tarih = şablonun 1. günü (`p_baslangic_tarihi`, mig. 20260909000001; `tarih = çapa + (gun_no − 1)`). Kapalı vakaya şablon uygulanamaz (RPC guard).
 
 ---
 
