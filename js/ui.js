@@ -1722,7 +1722,7 @@ async function dozOneriUygula(btn) {
 }
 
 // ── Helper sheet ──
-const _DOZ_TIP_ETIKET = { pratik: 'Pratik', pro: 'Pro', sabit: 'Sabit' };
+const _DOZ_TIP_ETIKET = { pratik: 'ml/kg yolu', pro: 'mg/kg yolu', sabit: 'Sabit doz' };
 const _DOZ_SEVIYE_ETIKET = { min: 'Min', tip: 'Varsayılan', max: 'Max' };
 
 function _dozSheetOku() {
@@ -1779,22 +1779,22 @@ function _dozSheetAc(btn, kart, ids) {
         ? `<div style="font-size:.78rem;margin-top:6px">Sabit doz tipi (ml/hayvan) — kart: <b>${_f(kart.std_dose)} ml</b>${kart.std_dose_min ? ' · aralık ' + _f(kart.std_dose_min) + '–' + _f(kart.std_dose_max) : ''}</div>
            <input type="hidden" id="doz-sheet-sabit" value="${_f(kart.std_dose)}">`
         : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
-        <div><label style="font-size:.64rem;color:var(--ink3)">Pratik doz (ml/kg)</label><input id="doz-sheet-pratik" type="number" step="0.01" min="0" inputmode="decimal" placeholder="ml/kg" value="${unit === 'ml/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
-        <div><label style="font-size:.64rem;color:var(--ink3)">Pro doz (mg/kg)</label><input id="doz-sheet-pro" type="number" step="0.01" min="0" inputmode="decimal" placeholder="mg/kg" value="${unit === 'mg/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
-        <div><label style="font-size:.64rem;color:var(--ink3)">Konsantrasyon (mg/ml)</label><input id="doz-sheet-conc" type="number" step="0.01" min="0" inputmode="decimal" placeholder="mg/ml" value="${_f(kart.concentration)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div><label style="font-size:.64rem;color:var(--ink3)">ml/kg oranı</label><input id="doz-sheet-pratik" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 0,04" value="${unit === 'ml/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div><label style="font-size:.64rem;color:var(--ink3)">mg/kg oranı (pro)</label><input id="doz-sheet-pro" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 2" value="${unit === 'mg/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div><label style="font-size:.64rem;color:var(--ink3)">Konsantrasyon (mg/ml) — 1 ml ilaçtaki etken</label><input id="doz-sheet-conc" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 50" value="${_f(kart.concentration)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
           <div><label style="font-size:.64rem;color:var(--ink3)">Min</label><input id="doz-sheet-min" type="number" step="0.01" min="0" inputmode="decimal" placeholder="min" value="${_f(kart.std_dose_min)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
           <div><label style="font-size:.64rem;color:var(--ink3)">Max</label><input id="doz-sheet-max" type="number" step="0.01" min="0" inputmode="decimal" placeholder="max" value="${_f(kart.std_dose_max)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
         </div>
       </div>
-      <div style="font-size:.62rem;color:var(--ink3);margin-top:4px">İkisi de girilirse pro (mg/kg) karta yazılır; pratik = pro ÷ konsantrasyon hesaplanır.</div>`}
+      <div style="font-size:.62rem;color:var(--ink3);margin-top:4px">ml/kg ve mg/kg aynı dozun iki yazılışıdır — konsantrasyon ikisini birbirine çevirir. <b>Pratik doz = hayvana verilecek ml</b>; aşağıda ağırlıkla hesaplanır.</div>`}
     </div>
     <div id="doz-sheet-cipler" style="margin-bottom:8px"></div>
     <div style="display:flex;gap:8px">
       <button id="doz-sheet-kaydet" class="btn" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer">💾 Kartlara yaz</button>
       <button id="doz-sheet-iptal" style="flex:0 0 auto;background:var(--card3);border:none;border-radius:8px;padding:10px 14px;cursor:pointer">İptal</button>
     </div>
-    <div style="font-size:.62rem;color:var(--ink3);margin-top:6px">Hesap çipine tıklamak: kilo ve dozajlama kartlara yazılır + seçilen doz kutuya aktarılır. "Kartlara yaz" yalnız kaydeder.</div>
+    <div style="font-size:.62rem;color:var(--ink3);margin-top:6px">Çipe tıkla = kaydet + doz kutusuna yaz. Sadece kaydetmek istersen "💾 Kartlara yaz". Yazmadan ✕ ile çıkabilirsin.</div>
   </div>`;
   document.body.appendChild(mini);
   document.getElementById('doz-sheet-kapat').onclick = () => mini.remove();
@@ -1813,13 +1813,13 @@ function _dozSheetCiplerCiz(kart, btn, ids) {
   const okunan = _dozSheetOku();
   const taban = _dozSheetTaban(okunan, kart);
   const cipler = dozCipleri(okunan.kg, taban);
-  if (!ciplen.length) {
+  if (!cipler.length) {
     bolum.innerHTML = '<div style="font-size:.72rem;color:var(--ink3);padding:6px 2px">' +
-      (okunan.kg ? 'Hesap için pratik veya pro doz girin.' : 'Hesap için canlı ağırlık girin (ve gerekirse dozajlama).') + '</div>';
+      (okunan.kg ? 'Hesap için ml/kg veya mg/kg oranını girin.' : 'Önce canlı ağırlığı girin — hayvana verilecek doz burada hesaplanır.') + '</div>';
     return;
   }
   const _renk = { pratik: 'var(--green)', pro: 'var(--blue)', sabit: 'var(--ink3)' };
-  bolum.innerHTML = '<div style="font-size:.66rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px">Hesaplanmış dozajlar — tıkla: kartlara yaz + aktar</div>' +
+  bolum.innerHTML = '<div style="font-size:.66rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px">Hayvana verilecek doz — çipe tıkla: kartlara yazılır + doz kutusuna aktarılır</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
     cipler.map((c, i) => `<button type="button" data-cip="${i}" style="background:${_renk[c.tip] || 'var(--card3)'};color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:.74rem;font-weight:700;cursor:pointer;text-align:left">` +
       `${_DOZ_TIP_ETIKET[c.tip]} · ${_DOZ_SEVIYE_ETIKET[c.seviye]}: <b>${esc(String(c.doz).replace('.', ','))} ${esc(c.birim)}</b><br>` +
