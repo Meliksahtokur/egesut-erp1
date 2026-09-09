@@ -388,3 +388,19 @@ Kaynak: `.claude/idle-reports/2026-08-31-docs-tutarlilik.md` §2.2 (çelişki) +
   iade eder; tamamlama `asi_planli_tamamla` (add_vaccination → GorevID notu → rezervasyon flip).
   `gorev_tamamla` ASI_PLANLI'da stok yazmaz (muafiyet). Planlı görevler online-only'dir (rezervasyon
   atomikliği); küpe alanı autocomplete'lidir (taskadd-focus/taskadd-keydown).
+
+## 16. Geçmiş Sekmesi Görünürlüğü (2026-09-09, D15)
+
+- **Saf-bitmiş kuralı (Defter görünümü):** geçmişe yalnızca `tamamlandi && tamamlanma_tarihi dolu && !iptal`
+  görevler, terminal sonuçlu (`Gebe|Boş|Doğum Yaptı|Abort`) tohumlamalar, `status='closed' && closed_at`
+  vakalar ile dogum/uygulama/islem kayıtları (`durum!='geri_alindi'`) girer. Bekleyen/sonuçlanmamış/aktif
+  vaka satırı girmez; tamamlanan `TEDAVI_GUN` alt görevleri GİRER (bitiş tarihinde). `iptal` hiçbir
+  görünümde listelenmez. Kanıt: js/gecmis.js `_gmPolicyRow` (canlı teyitler: `gorev_log.iptal` kolonu
+  var, `cases.closed_at` 58/58 dolu, `tohumlama.sonuc` non-terminal yalnız `Bekliyor`).
+- **Klasik görünüm (owner kararı, D15):** switch ile eski düz liste döner — `Tümü` toggle'ı yalnız
+  burada meşru (bekleyen+alt görev girer; iptal yine hariç), localStorage `ege_gecmis_klasik`.
+- **Tek veri hattı:** ana sekme + hayvan kartı geçmişi aynı pipeline'ı paylaşır
+  (`_gmEntriesFromSources`; scope=animalId). Tarih/saat `Europe/Istanbul` kuralıyla (kart fmtTarihSaat
+  ile aynı; Z VE offset'li ISO çevrilir, timezone'suz aynen).
+- **Geri-al butonu:** önceden hesaplanmış `undoRef` (islem ref > yalnız Bekliyor-son toh:; ABORT_KAYDI
+  generic route); değerler dataset'te taşınır (helpers escAttr-inline yasağı).
