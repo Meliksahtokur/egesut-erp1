@@ -160,11 +160,14 @@ pre-check), `js/forms.js:islemGeriAl`.
 New surfaces MUST NOT introduce native `<input type="date">` pickers or
 invent new calendar widgets. Reuse the established calendar-modal language:
 
-- Single date: bottom-sheet single-select calendar — visual language of
-  `js/ui.js:caseGunModalRender` (`gun-tarih-modal`), selection rule of
-  `js/forms.js:bcTarihTakvimRender` (W20 `bc-tarih-takvim`: tap REPLACES the
-  selection). Current users: `js/forms.js:bcTarihTakvimRender` (bulk-case
-  treatment date), `js/ui.js:cdSablonTarihTakvimRender` (template anchor date
-  on the active case).
+- Single date: canonical component `js/ui.js:tekTarihTakvimAc`
+  ({baslik, deger, onSec}) — bottom-sheet single-select calendar; visual
+  language of `js/ui.js:caseGunModalRender` (`gun-tarih-modal`), selection
+  rule of `js/forms.js:bcTarihTakvimRender` (W20 `bc-tarih-takvim`: tap
+  REPLACES the selection). Current users: template anchor date
+  (`js/ui.js:cdSablonTarihTakvimAc`) and planned-insemination date
+  (`js/ui.js:cdtTakvimAc`) on the active case. Bulk-case treatment date keeps
+  its W20 twin (`js/forms.js:bcTarihTakvimRender`) until that surface adopts
+  the shared component.
 - Multiple dates: `js/ui.js:caseGunModalRender` (`gun-tarih-modal`, toggle
   selection + "Secili Gunler" chips).

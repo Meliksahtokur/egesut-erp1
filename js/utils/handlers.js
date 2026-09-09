@@ -341,6 +341,7 @@ registerActions({
   'cd-sablon-toggle':      () => caseSablonToggle(),
   'cd-sablon-takvim-ac':   () => cdSablonTarihTakvimAc(),
   'cd-sablon-uygula':      (el) => caseSablonUygula(el.dataset.sablonId),
+  'cdt-takvim-ac':         () => cdtTakvimAc(),
   'case-kapat':         () => caseKapat(),
   'erken-kapat-toggle': () => caseErkenKapatToggle(),
   'erken-kapat-onayla': (el) => caseErkenKapatOnayla(el),
