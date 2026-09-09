@@ -1,146 +1,174 @@
-# History Tab Redesign — "Daily Ledger" (2026-09-09)
+# History Tab Redesign — "Daily Ledger" — FINAL SPEC (rev 2)
 
 Branch: `idle/gecmis-refactor` · Worktree: `/home/melik/egesut-wt/gecmis-sekmesi`
-Status: design approved direction (owner picked hybrid: ledger view + structured
-CSV + undo button restore); final CSV format and undo scope questions were left
-unanswered — resolved by recommendation and flagged below.
+Rev 2 (2026-09-09): incorporates the Codex luna-max worker review
+(`egesut-gecmis-design-review`, APPROVE-WITH-CHANGES, session `eeff947c`) and
+live-schema probes. Rev 1 sections that the review confirmed are kept; changes
+are marked **[R]**.
 
-## Problem (evidence)
+## Problem (confirmed by review)
 
-The history tab (`#pg-gecmis`) renders every record kind in one flat
-chronological list. Three concrete defects:
+1. Pending-work leak: `js/ui.js:3679` — `_gecmisTumu` disables both filters;
+   pending tasks use future `hedef_tarih` as date (`js/ui.js:3687`).
+2. Completed treatments invisible: `TEDAVI_GUN` rows have `parent_id`, and
+   `!t.parent_id` excludes them unconditionally.
+3. Undo unreachable from history: `_gecmisEntryHtml` has no undo affordance,
+   though `openGeriAl`/`islemGeriAl` + RPCs work.
+4. Leaked in-progress state: "Bekliyor" tohumlama rows and active cases.
 
-1. **Pending-work leak.** `js/ui.js:3679` — the "Tümü" toggle sets
-   `_gecmisTumu=true`, which disables *both* filters
-   `(_gecmisTumu||t.tamamlandi) && (_gecmisTumu||!t.parent_id)`. Pending tasks
-   and child tasks flood the history. Worse, `js/ui.js:3687` falls back to
-   `hedef_tarih` (a *future* date) when `tamamlanma_tarihi` is empty, so future
-   dates enter and re-order the "history".
-2. **Completed treatments invisible.** `TEDAVI_GUN` tasks are born as child
-   rows (`parent_id` set, see `supabase/migrations/99999999999999_ground_truth.sql`
-   gorev_log constraint). The `!t.parent_id` condition excludes them *always* —
-   toggle on or off. "Yesterday's treatments missing" is this filter, not data
-   loss.
-3. **Undo unreachable from history.** `openGeriAl`/`islemGeriAl`
-   (`js/forms.js:3425-3489`) and the `geri_al` / `tohumlama_geri_al` RPCs work,
-   but `_gecmisEntryHtml` (`js/ui.js:3511`) has no undo button — the function
-   used by BOTH the main history tab and the animal-card history tab.
+## Verified live-schema facts (probed 2026-09-09, read-only)
 
-Adjacent defects accepted into scope: "Bekliyor" tohumlama rows and "Aktif"
-case rows also leak into history (owner: "saf bitmişler girmeli; aktif vakalar
-sürü listesi üzerinden takip ediliyor").
+- `cases` columns include `status text` and `closed_at timestamptz`.
+  58/58 closed cases have `closed_at` filled. **No fallback needed**: rule is
+  `status='closed' AND closed_at IS NOT NULL`; a closed case without
+  `closed_at` simply does not enter history (data-quality signal).
+- `tohumlama.sonuc` value set: `Boş`, `Doğum Yaptı`, `Gebe`, `Bekliyor`,
+  `Abort`. Non-terminal value is exactly `Bekliyor`.
 
 ## Decision set
 
-| # | Decision | Source |
-|---|---|---|
-| D1 | History = completed work only ("saf bitmiş") | owner, explicit |
-| D2 | `parent_id` exclusion REMOVED — completed TEDAVI_GUN days become first-class rows at their completion date | follows from D1 + defect 2 |
-| D3 | "Tümü" toggle removed entirely | follows from D1 |
-| D4 | Day-grouped reverse-chronology ledger with per-day type counters and counted filter chips (proposal B) | owner picked hybrid |
-| D5 | Structured CSV export, client-side only (Blob download), no backend, no PDF this round | owner constraint: GitHub Pages = vanilla JS only |
-| D6 | Undo: restore the ↩ button on history entries wired to the EXISTING `openGeriAl`/RPC path; central undo architecture is a SEPARATE design round | owner: "sağlam mimari… belki ayrıca ele alınabilir" |
-| D7 | CSV = WYSIWYG: exports exactly the currently filtered+searched list (unanswered question resolved by recommendation) | best judgment, flagged |
-| D8 | CSV format: `;`-separated, one row per event, full date+category columns (no day separator rows — keeps spreadsheet filtering intact); UTF-8 BOM for Turkish chars in Excel | owner: "csv sistematik olmalı, düz liste olmaz" |
+| # | Decision |
+|---|---|
+| D1 | History = completed work only (owner, explicit) |
+| D2 | `parent_id` exclusion removed; completed TEDAVI_GUN days are first-class rows at completion date |
+| D3 | "Tümü" toggle removed entirely |
+| D4 | Day-grouped reverse-chronology ledger with per-day counters and counted chips |
+| D5 | Structured CSV, client-side only |
+| D6 | Undo: entry-level ↩ wired to existing RPC path; central undo architecture stays a separate round |
+| D7 | **[R]** CSV = WYSIWYG over the **capped visible list** (300), not the uncapped search result — less surprising |
+| D8 | CSV: `;` separator, BOM, one row per event, full date+category columns |
+| D9 | **[R]** ONE shared pipeline (normalize → policy-filter → search → cap → group) feeds the main history, the animal-card history, chips, day counters, and CSV. Animal-card parity is mandatory. |
+| D10 | **[R]** Entries carry a precomputed `undoRef` derived from existing guard logic; rows without a valid undoRef get NO button |
+| D11 | **[R]** Reverted records (`durum='geri_alindi'` / cancelled) are excluded from history: a reverted event is no longer "done work" |
+| D12 | **[R]** Day groups use native `<details>` elements; counters computed from the visible capped slice |
+| D13 | **[R]** Undo button hidden when offline (`js/forms.js:3440` rejects offline undo) |
+| D14 | **[R]** History tab pulls fresh data on entry (online only), same pattern as `loadTasks` |
 
 ## Design
 
-### Data rules (loadGecmis)
+### A. Shared pipeline [R]
 
-- `gorev_log`: keep `t.tamamlandi === true` AND require non-empty
-  `tamamlanma_tarihi`. Drop the `!t.parent_id` condition. `date`/`sortKey` =
-  `tamamlanma_tarihi` only — no `hedef_tarih` fallback.
-- `tohumlama`: only rows with non-empty `sonuc` (Gebe/Boş). Pending
-  ("Bekliyor") rows are excluded; they surface via reproduction tab once a
-  result exists.
-- `cases`: only closed cases (`status !== 'active'`). ⚠ Verify the real
-  close-date column in the live schema during implementation (contract: live
-  schema is the only DB authority); if a close timestamp exists, use it for
-  date/sortKey instead of `start_date`.
-- `dogum`, `uygulama_log`, `islem_log`: unchanged (already completed facts).
-- `_gecmisTumu` state, toggle UI, and `gecmis-tumu-toggle` handler are deleted.
+New pure module-level functions in `js/ui.js` (kept inline to match the file
+conventions; no new files unless size forces it):
 
-### Rendering (day-grouped ledger)
+```
+_gmNormalize(sources, scope)  -> entries[]
+_gmApplyPolicy(entries)       -> entries[]   (per-source rules below)
+_gmSearch(entries, q)         -> entries[]   (reuse _gecmisSearchText logic)
+_gmCap(entries, n=300)        -> {visible, total}
+_gmGroup(visible)             -> [{dateKey, label, entries, counters}]
+```
 
-- Keep the existing entry card (`_gecmisEntryHtml`) and search
-  (`_gecmisSearchText`) infrastructure.
-- `_gecmisRender` groups the sorted list by `date` (YYYY-MM-DD) into collapsible
-  day sections: `BUGÜN` / `DÜN` / `d MMMM, weekday`. Each header carries that
-  day's per-type counters (🐄 💉 🏥 ✅ 🐮).
-- Filter chips show counts (total on "Hepsi", per-type on category chips).
-- The existing 300-entry cap is kept (slice first, then group).
+Entry contract: `{ type, category, eventAt, dateKey, data, searchText, undoRef }`
+where `eventAt` is the authoritative ISO timestamp, `dateKey` its local
+`YYYY-MM-DD`, `category` ∈ {dogum, tohumlama, hastalik, gorev, uygulama,
+islem} (chip mapping below). Entries with empty `eventAt` are NOT accepted.
 
-### CSV export
+`scope` parameter: `{animalId?: id}` — the animal-card history
+(`_detRenderGecmis`) calls the same pipeline with the animal scope instead of
+its own loading logic (replaces `js/ui.js:2340-2384` ad-hoc loads).
 
-- Button next to the chip row: `↧ CSV`. Exports the currently visible
-  (filtered + searched) list — WYSIWYG (D7).
-- Columns: `Tarih;Saat;Kategori;Küpe;Detay;Ek Bilgi;Hekim;Tip` — `Tip` is the
-  internal record type for unambiguous re-import/analysis.
-- Dates `DD.MM.YYYY`, times `HH:MM` when a timestamp exists.
-- `\uFEFF` BOM + `;` separator (TR Excel locale). Filename:
-  `egesut-gecmis-YYYY-MM-DD.csv`.
-- Pure client: `Blob` + `URL.createObjectURL` + `a[download]`. Works offline
-  (all sources are already in IndexedDB). No Supabase, no local-machine
-  backend, no CDN library (PDF explicitly out).
+### B. Data rules (policy filter)
 
-### Undo button restore (thin layer, D6)
+| Source | Accept rule | eventAt |
+|---|---|---|
+| `gorev_log` | `tamamlandi===true` AND non-empty `tamamlanma_tarihi` AND not reverted | `tamamlanma_tarihi` (no `hedef_tarih` fallback) |
+| `tohumlama` | `sonuc` ∈ {`Gebe`,`Boş`,`Doğum Yaptı`,`Abort`} (allowlist) AND not reverted | `created_at` (row keeps its result timestamp semantics; if `created_at` empty → `tarih` at 00:00) |
+| `cases` | `status='closed'` AND `closed_at` non-empty | `closed_at` |
+| `dogum` | all (unchanged) | `created_at` || `tarih` |
+| `uygulama_log` | all (unchanged) | `created_at` || `tarih` |
+| `islem_log` (5 types as today) | `durum` ≠ `geri_alindi` | `tarih` || `created_at` |
 
-- In `_gecmisEntryHtml`, add a small `↩` affordance on rows whose type has an
-  existing undo path:
-  - `type:'islem'` → `openGeriAl(data.id, …)` (islem_log id; `islemGeriAl`
-    already routes TOHUMLAMA/HASTALIK_KAYDI/VAKA_ACILDI/TEDAVI_GUN_EKLENDI).
-  - `type:'tohumlama'` → `openGeriAl('toh:'+data.id, …)` (existing direct
-    path).
-  - `type:'gorev'`, `type:'hastalik'` (cases): only if a live-schema probe
-    confirms an RPC path; otherwise no button (do not invent RPCs).
-- Button must `stopPropagation()` so the row's own onclick (detail modal) does
-  not fire — this is the pattern break that likely killed the original undo
-  button; verify against the current production example (m-case-det
-  `td2-geri-al-btn`, `index.html:2104`).
-- Confirmation stays the existing math-check modal `m-geri-al`.
-- The same button automatically appears in the animal-card history tab
-  (`_detRenderGecmis` reuses `_gecmisEntryHtml` with `overrideOc`) — wire the
-  undo button OUTSIDE the `overrideOc` replacement path so it survives there.
+TEDAVI_GUN rows of a still-active case DO appear once completed (the drug was
+administered — that is done work); the case-level card follows the case rule
+above. [R explicit]
 
-### Central undo architecture — separate round (out of scope)
+### C. Rendering
 
-Recorded inventory for that future round (5 disconnected surfaces):
-`openGeriAl/islemGeriAl` (generic RPC), `_protokolGeriAl` (ui.js:1473/1756),
-sütten kesme geri al (forms.js:2789), asistan undo (ai-asistan.js + RPC),
-done-session undo window (state.js:26, backend RPC pending). Goals for that
-round: single undo router, write RPCs returning undo refs, cascade rules
-(stok_hareket, süt yasağı), rate/window policy.
+- `_gecmisRender` builds native `<details open>` day sections: header
+  `BUGÜN` / `DÜN` / `d MMMM weekday` + counters (🐄 💉 🏥 ✅ 💊 🐮).
+- Counters computed from the visible slice only; when capped, show
+  `İlk 300 / {total} kayıt` hint. [R]
+- Chip mapping unchanged: `uygulama` counts under the ✅ Görev chip, `islem`
+  under the 🐮 Hayvan chip (current behavior, now explicit). [R]
+- Search keeps `_gecmisSearchText` semantics; active search forces all day
+  groups open.
+- Keep `_keepScroll`; keep the 200ms debounced search handler.
+
+### D. CSV export [R hardened]
+
+- Button `↧ CSV` in the header row; exports the **capped visible list** (D7).
+- Built from normalized entries (never from DOM).
+- Columns: `Tarih;Saat;Kategori;Küpe;Detay;Ek Bilgi;Hekim;Tip`.
+- Escaping: field wrapped in `"` if it contains `;`, `"`, newline; inner `"`
+  doubled; line endings CRLF; prefix `\uFEFF` BOM; MIME `text/csv;charset=utf-8`;
+  `URL.revokeObjectURL` after download.
+- Formula-injection guard: fields starting with `=`, `+`, `-`, `@` get a
+  leading `'`. Applies to all text fields.
+- Dates `DD.MM.YYYY`, times `HH:MM` from `eventAt`.
+- Filename `egesut-gecmis-YYYY-MM-DD.csv`.
+
+### E. Undo button restore [R hardened]
+
+`undoRef` derivation (precomputed during normalize; NO blanket paths):
+
+| type | rule |
+|---|---|
+| `islem` | button only if `data.tip` ∈ the existing geri-alınabilir set intersected with what `islemGeriAl` routes (`TOHUMLAMA`, `TOHUMLAMA_GUNCELLENDI`, `HASTALIK_KAYDI`, `VAKA_ACILDI`, `TEDAVI_GUN_EKLENDI` + others present at `js/ui.js:2664`); ref = `data.id` |
+| `tohumlama` | reuse `openTohDet`'s guard logic (`js/ui.js:6774-6807`): if the row has an `islem_log` ref → that id; else only if it is the animal's LATEST tohumlama and not abort-guarded → `toh:`+id; older/guarded rows → `undoRef=null` (no button) |
+| others | `undoRef=null` |
+
+- Button is a **sibling button inside the card content** (correct existing
+  pattern at `js/ui.js:3452`, `3456`), NOT the outer onclick; unaffected by
+  `overrideOc` so it also lives in the animal-card history. `stopPropagation`.
+- Offline (`!navigator.onLine`): button hidden.
+- Confirm stays `m-geri-al` (math check). After undo, re-run pipeline and
+  re-render BOTH surfaces if open.
+
+### F. Data freshness [R]
+
+`loadGecmis` on tab entry, when online, pulls before reading IDB
+(`pullTables` list mirrors `loadTasks`: `gorev_log`, `tohumlama`, `cases`,
+`treatment_days`, `drug_administrations`, `drug_products`, `stok`, `islem_log`,
+`uygulama_log`) with `.catch(()=>{})` — offline falls back to cached IDB.
+
+### G. Cleanup
+
+Delete: `_gecmisTumu` state (`js/app.js:51` + import list `js/ui.js:7`), toggle
+markup (`index.html:714-719`), `gecmis-tumu-toggle` handler
+(`js/utils/handlers.js:102-110`). Add `gecmis-csv` handler. If `index.html`
+bumps asset `?v=` stamps, bump the SINGLE shared value once for all local
+assets (repo invariant: one shared stamp).
 
 ## Files touched
 
-- `js/ui.js` — loadGecmis rules; _gecmisRender grouping+counters; CSV builder
-  (new pure helper, e.g. `_gecmisCsvLine`); _gecmisEntryHtml undo button.
-- `index.html` — remove toggle row; add CSV button; day-section markup is
-  JS-generated.
-- `js/utils/handlers.js` — remove `gecmis-tumu-toggle`; add `gecmis-csv`.
-- `js/app.js` — remove `_gecmisTumu` declaration + import in ui.js deps list.
-- `tests/unit/` — new unit tests (below).
-
-Pattern reuse: entry card, `_keepScroll`, debounce search, `openM/closeM`
-modal plumbing, math-check confirm — all reused as-is.
+`js/ui.js` (pipeline + render + CSV + undo), `index.html` (toggle out, CSV
+button), `js/utils/handlers.js`, `js/app.js`, `tests/unit/*` (new).
 
 ## Testing
 
-- Unit (pure functions): filter rules (pending/child/undated exclusion,
-  tohumlama sonuc, case status), day-group keys+counters, CSV line building
-  (escaping `;` in text, BOM, date/time formats).
-- Manual: worktree serve + demo mode; verify (a) no pending rows under any
-  filter, (b) completed treatment days visible at completion date, (c) CSV
-  opens correctly in a TR-locale spreadsheet, (d) undo button opens confirm
-  and returns to a refreshed list.
-- No CI/demo-DB writes; no prod deploy without owner approval (standing rule).
+- Unit: policy filter per source (incl. reverted exclusion, allowlist tohumlama,
+  closed_at requirement, TEDAVI_GUN-of-active-case accepted); dateKey/eventAt
+  normalization; cap+counter math ("İlk 300/N"); CSV escaping matrix (`;`,
+  `"`, newline, formula prefixes, BOM/CRLF presence); undoRef derivation
+  (islem tip matrix; tohumlama latest-vs-older; guarded rows → null);
+  searchText parity for animal-card scope.
+- Manual (demo mode, worktree server): no pending rows under any filter;
+  completed treatment days visible at completion date; day groups + counters;
+  CSV opens in TR-locale spreadsheet; undo button appears only on eligible
+  rows, opens math-check modal, refreshes both surfaces; offline button hidden.
+- No CI/demo-DB writes; no prod deploy without owner approval.
 
-## Risks / open questions
+## Out of scope (separate rounds)
 
-- Case close-date column name must come from a live-schema probe, not
-  migrations (D-note above).
-- A gorev/case undo RPC may not exist → those rows simply get no ↩ button
-  this round (documented in code comment).
-- Mobile perf: day headers must stay cheap (single div, no nested layouts).
-- Owner did not answer D7/D8 — first implementation review should re-confirm
-  CSV scope (WYSIWYG vs fixed period) before polish.
+- Central undo architecture (5-surface inventory recorded in rev 1).
+- PDF export; period summary cards (proposal C leftovers).
+- Dashboard/other tabs.
+
+## Review provenance
+
+Worker `egesut-gecmis-design-review` (Codex gpt-5.6-luna max, 9m): verdict
+APPROVE-WITH-CHANGES; all four required revisions are folded in above as
+[D9]-[D14] + sections A/E hardening. Live-schema facts probed directly by the
+coordinator (read-only SQL): `cases.closed_at` exists and 58/58 closed rows
+filled; `tohumlama.sonuc` enumerated.
