@@ -6357,6 +6357,182 @@ async function caseGunEkleOnayla() {
   } catch(e) { toast(e.message, true); }
 }
 
+// ═══ AKTİF VAKAYA ŞABLON UYGULAMA (2026-09-09) ═══
+// Desen: bc-sablon-yukle (forms.js:1382) katlanır alanı + submitCase
+// (forms.js:616-629) çift-RPC akışı. Çapa: _cdSablonTarih (tek-seçim takvim
+// modalı, aşağıda) = şablonun 1. günü (RPC'de tarih = çapa + (gun_no − 1));
+// p_baslangic_tarihi NULL ⇔ açılıştaki start_date çapası.
+
+// Saf çekirdek — tests/unit/tedavi-sablon-aktif.test.js yeşil kilidi.
+// bcSablonYukleListeRender (forms.js:1413-1421) satır hesabının DOM'suz aynası.
+function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
+  const list = (eslem || []).filter(e => e.disease_id === diseaseId)
+    .map(e => (sablonlar || []).find(s => s.id === e.sablon_id)).filter(Boolean);
+  return list.map(s => {
+    const sk = (kalemler || []).filter(k => k.sablon_id === s.id);
+    const tp = s.tohumlama_plani;
+    return { id: s.id, ad: s.ad,
+             gun: new Set(sk.map(k => k.gun_no)).size,
+             seans: sk.length,
+             tohumVar: !!(tp && typeof tp === 'object' && tp.gun_ofset != null && tp.planned_time) };
+  });
+}
+
+// ── TEK-TARİH TAKVİM MODALI — KANONİK bileşen (ui-map "Canonical date
+// selection"; sahibe direktifi 2026-09-09: yeni yüzeylerde yerel
+// <input type="date"> KULLANILMAZ). Görsel dil: gun-tarih-modal
+// (caseGunModalRender); seçim kuralı: bc-tarih-takvim W20 (forms.js:1804) —
+// hücre tıkı seçimi DEĞİŞTİRİR, toggle yok; aralık sınırsız (geriye dönük
+// kayıt serbest). Çağıran kendi durumunu getirir:
+//   tekTarihTakvimAc({ baslik, deger, onSec })  — onSec(iso) Onayla'da.
+let _tekTarihAy = 0, _tekTarihYil = 0, _tekTarihSecili = null;
+let _tekTarihBaslik = '📅 Takvimden Seç', _tekTarihOnSec = null;
+
+function tekTarihTakvimAc(opts){
+  const simdi = new Date();
+  _tekTarihAy  = simdi.getMonth();
+  _tekTarihYil = simdi.getFullYear();
+  _tekTarihSecili = opts?.deger || bugun();
+  _tekTarihBaslik = opts?.baslik || '📅 Takvimden Seç';
+  _tekTarihOnSec  = opts?.onSec  || null;
+  tekTarihTakvimRender();
+}
+function tekTarihTakvimKapat(){
+  const box = document.getElementById('tek-tarih-takvim');
+  if(box) box.remove();
+}
+function tekTarihTakvimSec(iso){
+  _tekTarihSecili = iso;
+  tekTarihTakvimRender();
+}
+function tekTarihTakvimOnayla(){
+  if(_tekTarihOnSec) _tekTarihOnSec(_tekTarihSecili);
+  tekTarihTakvimKapat();
+}
+function tekTarihTakvimRender(){
+  let box = document.getElementById('tek-tarih-takvim');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'tek-tarih-takvim';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:flex-end';
+    box.onclick = e => { if(e.target === box) box.remove(); };
+    document.body.appendChild(box);
+  }
+  const ay = _tekTarihAy, yil = _tekTarihYil;
+  const bosluk = (new Date(yil, ay, 1).getDay() + 6) % 7;
+  const sonGun = new Date(yil, ay + 1, 0).getDate();
+  const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', {month:'long', year:'numeric'});
+  let kareler = '';
+  for(let i = 0; i < bosluk; i++) kareler += '<div></div>';
+  for(let g = 1; g <= sonGun; g++){
+    const iso = yil + '-' + String(ay+1).padStart(2,'0') + '-' + String(g).padStart(2,'0');
+    kareler += '<div onclick="tekTarihTakvimSec(&#39;' + iso + '&#39;)" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;' +
+      (iso === _tekTarihSecili ? 'background:var(--green);color:#fff;' : 'color:var(--ink);') + '">' + g + '</div>';
+  }
+  box.innerHTML =
+    '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
+    '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">' + esc(_tekTarihBaslik) + '</div>' +
+    '<div style="font-weight:800;font-size:.95rem;margin-bottom:12px">Seçilen: ' + fmtTarih(_tekTarihSecili) + '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<button onclick="tekTarihTakvimAyDegistir(-1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
+    '<span style="font-weight:800;font-size:.9rem">' + ayAdi + '</span>' +
+    '<button onclick="tekTarihTakvimAyDegistir(1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
+    ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">' + kareler + '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<button onclick="tekTarihTakvimOnayla()" style="padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Onayla</button>' +
+    '<button onclick="tekTarihTakvimKapat()" style="padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">İptal</button>' +
+    '</div></div>';
+  box.style.display = 'flex';
+}
+function tekTarihTakvimAyDegistir(delta){
+  _tekTarihAy += Math.trunc(Number(delta) || 0);
+  if(_tekTarihAy < 0){ _tekTarihAy = 11; _tekTarihYil--; }
+  if(_tekTarihAy > 11){ _tekTarihAy = 0; _tekTarihYil++; }
+  tekTarihTakvimRender();
+}
+
+// Şablon ilk-gün adapteri — çapa tarihi _cdSablonTarih'te kalır.
+let _cdSablonTarih = null; // ISO — şablon çapa tarihinin TEK kaynağı
+function cdSablonTarihTakvimAc(){
+  tekTarihTakvimAc({
+    baslik: '📅 Şablonun İlk Günü — Takvimden Seç',
+    deger: _cdSablonTarih,
+    onSec: iso => { _cdSablonTarih = iso; cdSablonTarihEtiketGuncelle(); }
+  });
+}
+function cdSablonTarihEtiketGuncelle(){
+  const btn = document.getElementById('cd-sablon-tarih-btn');
+  if(btn) btn.textContent = '📅 Şablonun ilk günü: ' + fmtTarih(_cdSablonTarih);
+}
+
+function caseSablonToggle(){
+  const alan = document.getElementById('cd-sablon-alan');
+  if(!alan) return;
+  const aciliyor = alan.style.display !== 'block';
+  alan.style.display = aciliyor ? 'block' : 'none';
+  if(aciliyor){
+    if(!_cdSablonTarih) _cdSablonTarih = bugun();
+    cdSablonTarihEtiketGuncelle();
+    caseSablonListeRender();
+  }
+}
+
+async function caseSablonListeRender(){
+  const list = document.getElementById('cd-sablon-list');
+  if(!list || !_curCase) return;
+  // Yalnız VAKANIN hastalığına bağlı şablonlar — açılış listesiyle aynı
+  // kaynak (sablon_hastalik_eslem; bcSablonYukleListeRender deseni).
+  const [eslem, sablonlar, kalemler] = await Promise.all([
+    idbGetAll('sablon_hastalik_eslem'), idbGetAll('tedavi_sablonu'), idbGetAll('tedavi_sablonu_kalem')
+  ]);
+  const liste = cdSablonListeBul(eslem, sablonlar, kalemler, _curCase.disease_id);
+  if(!liste.length){
+    list.innerHTML = '<div style="font-size:.74rem;color:var(--ink3);padding:4px 0">Bu hastalık için kayıtlı şablon yok.</div>';
+    return;
+  }
+  list.innerHTML = liste.map(s =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.8rem;border-bottom:1px solid var(--card3)">' +
+    '<span style="flex:1;min-width:0;font-weight:600;color:var(--ink)">' + esc(s.ad) +
+    '<span style="color:var(--ink2);font-size:.72rem;font-weight:400"> — ' + s.gun + ' gün · ' + s.seans + ' seans' +
+    (s.tohumVar ? ' · 🐄 tohumlama' : '') + '</span></span>' +
+    '<button type="button" class="ek-chip" data-action="cd-sablon-uygula" data-sablon-id="' + escAttr(s.id) +
+    '" style="font-weight:700;color:var(--blue);border-color:rgba(42,107,181,.4)">Uygula</button></div>'
+  ).join('');
+}
+
+async function caseSablonUygula(sablonId){
+  if(!sablonId || !_curCase) return;
+  if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  const tarih = _cdSablonTarih;
+  if(!tarih){ toast('Şablonun ilk gününü seçin', true); return; }
+  try {
+    const r = await rpc('tedavi_sablon_uygula',
+      { p_case_id: _curCase.id, p_sablon_id: sablonId, p_baslangic_tarihi: tarih });
+    let tohumMsg = '';
+    // submitCase (forms.js:620-624) toast dili birebir; ikinci RPC ayrı
+    // try'da — günler zaten eklendi, tazeleme atlanmamalı.
+    try {
+      const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle',
+        { p_case_id: _curCase.id, p_sablon_id: sablonId, p_baslangic_tarihi: tarih });
+      if(planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
+      if(planli?.olustu) tohumMsg = ' + tohumlama';
+    } catch(e) { toast('Şablon günleri eklendi ama planlı tohumlama açılamadı: ' + e.message, true); }
+    if(r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
+    toast(`✅ Şablon uygulandı (${r?.gun_sayisi||0} gün)${tohumMsg}`);
+    const alan = document.getElementById('cd-sablon-alan');
+    if(alan) alan.style.display = 'none';
+    await pullTables(['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log','islem_log']);
+    _drugsCache = [];
+    await loadDrugsCache();
+    await renderCaseTimeline(_curCase.id);
+    _updateKapatBtn(_curCase.id);
+  } catch(e) { toast(getUserMessage(e), true); }
+}
+
 // ── VAKAYA PLANLI TOHUMLAMA ────────────────────────────────────────────────
 // Tohumlama ilaç gibi vakanın bir kalemi; ama kaydı tohumlama_kaydet zinciri
 // üzerinden gitmek zorunda (sperma, VWP, gebelik kontrol görevleri). Bu yüzden
@@ -6371,7 +6547,9 @@ function caseTohumlamaEkleAc() {
   div.innerHTML =
     '<div style="font-size:.74rem;font-weight:700;color:var(--ink2);margin-bottom:8px">🐄 Planlı Tohumlama Ekle</div>' +
     '<div style="display:flex;gap:8px;margin-bottom:10px">' +
-      '<label style="flex:2;font-size:.7rem;color:var(--ink3)">Tarih<input id="cdt-tarih" class="fi" type="date" value="' + bugunTr + '" style="margin-top:3px"></label>' +
+      '<label style="flex:2;font-size:.7rem;color:var(--ink3)">Tarih' +
+      '<input type="hidden" id="cdt-tarih" value="' + bugunTr + '">' +
+      '<button type="button" id="cdt-tarih-btn" data-action="cdt-takvim-ac" style="width:100%;margin-top:3px;background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:var(--ink);cursor:pointer;text-align:left">📅 ' + fmtTarih(bugunTr) + '</button></label>' +
       '<label style="flex:1;font-size:.7rem;color:var(--ink3)">Saat<input id="cdt-saat" class="fi" type="time" value="08:00" style="margin-top:3px"></label>' +
     '</div>' +
     '<div style="display:flex;gap:6px">' +
@@ -6381,12 +6559,25 @@ function caseTohumlamaEkleAc() {
   document.getElementById('cd-gun-bolum')?.appendChild(div);
 }
 
+// Tohumlama tarihi — kanonik tek-tarih takvimi (cdt-tarih hidden input'a yazar).
+function cdtTakvimAc(){
+  tekTarihTakvimAc({
+    baslik: '📅 Tohumlama Tarihi — Takvimden Seç',
+    deger: document.getElementById('cdt-tarih')?.value || bugun(),
+    onSec: iso => {
+      const inp = document.getElementById('cdt-tarih');
+      if(inp) inp.value = iso;
+      const btn = document.getElementById('cdt-tarih-btn');
+      if(btn) btn.textContent = '📅 ' + fmtTarih(iso);
+    }
+  });
+}
+
 async function caseTohumlamaEkleOnayla(btn) {
   if (!_curCase) return;
   const tarih = document.getElementById('cdt-tarih')?.value;
   const saat  = document.getElementById('cdt-saat')?.value || '08:00';
-  if (!tarih) { toast('Tarih seçin', true); return; }
-  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
+  if (!tarih) { toast('Tarih seçin', true); return; }  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   try {
     await rpc('vaka_tohumlama_ekle', { p_case_id: _curCase.id, p_tarih: tarih, p_saat: saat });
     document.getElementById('cd-toh-form')?.remove();

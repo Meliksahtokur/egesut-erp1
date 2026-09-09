@@ -341,11 +341,11 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 **`tedavi_sablon_sil(p_id uuid)`** → jsonb
 → ui.js:3761.
 
-**`tedavi_sablon_uygula(p_case_id uuid, p_sablon_id uuid)`** → jsonb
-→ forms.js:568.
+**`tedavi_sablon_uygula(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
+→ Açılışta forms.js:568 (2-arg, çapa=start_date); aktif vakada `ui.js:caseSablonUygula` (3-arg; seçilen tarih şablonun 1. günü, mig. 20260909000001). NULL çapa ⇔ eski start_date davranışı.
 
-**`tedavi_sablon_tohumlama_gorev_ekle(p_case_id uuid, p_sablon_id uuid)`** → jsonb
-→ forms.js:569. **GT'de YOK** (audit).
+**`tedavi_sablon_tohumlama_gorev_ekle(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL)`** → jsonb
+→ forms.js:569 + `ui.js:caseSablonUygula` (aynı çapa semantiği). **GT'de YOK** (audit).
 
 **`disease_ekle(p_name, p_category)`** / **`disease_guncelle(p_id uuid, p_name, p_category)`** / **`disease_sil(p_id uuid)`** → jsonb
 → Tanım yönetimi (hastalık kataloğu). Çağrı: ui.js:3422 (ternary ekle/güncelle), 3430 (sil).
