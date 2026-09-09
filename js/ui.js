@@ -6581,7 +6581,7 @@ function cdfChkChange(chk) {
   // Hayvan bağlamı yalnız vaka detay modalı AÇIKKEN geçerli — bayat _curCase
   // şablon builder'a sızmasın (orada hayvan yok, buton da üretilmez).
   const _vakaHayvanId = document.getElementById('m-case-det')?.classList.contains('on')
-    ? (globalThis._curCase?.animal_id || '') : '';
+    ? (_curCase?.animal_id || '') : '';
   if (chk.checked) {
     const row = document.createElement('div');
     row.id = 'cdf-row-' + id;
@@ -9094,7 +9094,7 @@ function seansDuzenleAc(seansId) {
     <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;width:100%">
       <input id="sd-time-${seansId}" class="fi" type="time" value="${esc(fmtSeansSaat(s.planned_time) || '08:00')}" style="margin:0;width:88px">
       <input id="sd-dose-${seansId}" class="fi" type="number" min="0.01" step="0.01" value="${s.dose ?? ''}" placeholder="Doz" style="margin:0;width:64px">
-      ${_dozHintBtnHtml('sd-dose-' + seansId, s.drug_product_id || '', document.getElementById('m-case-det')?.classList.contains('on') ? (globalThis._curCase?.animal_id || '') : '')}
+      ${_dozHintBtnHtml('sd-dose-' + seansId, s.drug_product_id || '', document.getElementById('m-case-det')?.classList.contains('on') ? (_curCase?.animal_id || '') : '')}
       <input id="sd-unit-${seansId}" class="fi" type="text" value="${esc(s.unit || 'ml')}" placeholder="Birim" style="margin:0;width:52px">
       <select id="sd-route-${seansId}" class="fsel" style="margin:0;flex:1;min-width:64px">${yolOpts}</select>
       <button onclick="seansDuzenleKaydet('${seansId}',this)" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer" title="Kaydet">✓</button>
