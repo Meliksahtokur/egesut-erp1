@@ -455,6 +455,13 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 **`ilac_ekle(p_urun_adi, p_kategori?, p_birim?, p_baslangic_miktar?, p_esik?, p_drug_class_id uuid?, p_concentration?, p_concentration_unit?, p_default_route?)`** → jsonb
 → forms.js:1429.
 
+**`ilac_dozaj_guncelle(p_id uuid, p_guncellemeler jsonb)`** → jsonb
+→ ui.js (dozaj helper sheet "Uygula"): yalnız gönderilen anahtarlar set edilir —
+std_dose, std_dose_unit ('ml/kg'|'mg/kg'|'ml/hayvan'), std_dose_min/max,
+concentration(+unit). Doğrulama: std_dose>0, min≤max, concentration>0.
+Migration: 20260909110000. Hayvan kartı kilosu ayrı yoldan `hayvan_guncelle`
+ile yazılır (helper sheet "Uygula" aynı anda ikisini çağırır).
+
 **`link_drug_to_stock(p_drug_id uuid, p_stock_item_id)`** → jsonb
 → forms.js:1577; ui.js:3176.
 

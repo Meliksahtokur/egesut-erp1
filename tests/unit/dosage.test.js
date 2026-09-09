@@ -85,3 +85,62 @@ test('dozOner: std_dose_unit eksikse varsayım ml/kg', () => {
   assert.equal(r.ok, true);
   assert.equal(r.doz, 100);
 });
+
+// ── seviye desteği + sheet çip hesabı + eksik ağırlık listesi (2026-09-09 revizyon) ──
+const { dozCipleri, agirlikEksikHayvanlar } = require('../../js/utils/helpers.js');
+
+test('dozOner: seviye min/tip/max — kart aralığından hesaplar', () => {
+  const kart = { std_dose: 2, std_dose_min: 1, std_dose_max: 4, std_dose_unit: 'ml/kg', default_unit: 'ml' };
+  assert.equal(dozOner(550, kart, 'min').doz, 550);
+  assert.equal(dozOner(550, kart, 'tip').doz, 1100);
+  assert.equal(dozOner(550, kart, 'max').doz, 2200);
+});
+
+test('dozOner: seviye değeri kartta yoksa ok:false', () => {
+  const kart = { std_dose: 2, std_dose_unit: 'ml/kg' };
+  assert.equal(dozOner(550, kart, 'max').ok, false);
+  assert.match(dozOner(550, kart, 'max').neden, /maksimum/);
+});
+
+test('dozCipleri: mg/kg+conc kartta pratik çipleri conc üzerinden de gelir (6 çip)', () => {
+  const kart = { std_dose: 2, std_dose_min: 1, std_dose_max: 4, std_dose_unit: 'mg/kg', concentration: 100, default_unit: 'ml' };
+  const c = dozCipleri(650, kart);
+  const bul = (tip, seviye) => c.find(x => x.tip === tip && x.seviye === seviye);
+  assert.equal(c.length, 6);
+  assert.equal(bul('pro', 'tip').doz, 13);          // 650×2÷100
+  assert.equal(bul('pratik', 'tip').doz, 13);       // 0,02 ml/kg = 2/100 → 650×0,02
+  assert.equal(bul('pro', 'max').doz, 26);          // 650×4÷100
+  assert.equal(bul('pratik', 'min').birim, 'ml');
+});
+
+test('dozCipleri: conc yoksa yalnız kart tipinin çipleri', () => {
+  const kart = { std_dose: 2, std_dose_min: 1, std_dose_max: 4, std_dose_unit: 'ml/kg', default_unit: 'ml' };
+  const c = dozCipleri(100, kart);
+  assert.equal(c.length, 3);
+  assert.ok(c.every(x => x.tip === 'pratik'));
+});
+
+test('dozCipleri: ml/hayvan — sabit çipler, ağırlıksız', () => {
+  const kart = { std_dose: 2, std_dose_min: 1, std_dose_max: 4, std_dose_unit: 'ml/hayvan', default_unit: 'ml' };
+  const c = dozCipleri(null, kart);
+  assert.equal(c.length, 3);
+  assert.ok(c.every(x => x.tip === 'sabit'));
+  assert.equal(c.find(x => x.seviye === 'max').doz, 4);
+});
+
+test('dozCipleri: kg yoksa ağırlık-uzun tipler çip üretmez; sabit üretir', () => {
+  const a = dozCipleri(null, { std_dose: 2, std_dose_unit: 'ml/kg' });
+  assert.equal(a.length, 0);
+});
+
+test('agirlikEksikHayvanlar: eksik/0/negatif ağırlıklıları sırayla döndürür', () => {
+  const animals = [
+    { id: 'a', canli_agirlik: 500 },
+    { id: 'b', canli_agirlik: 0 },
+    { id: 'c', canli_agirlik: null },
+    { id: 'd', canli_agirlik: -3 },
+    { id: 'e' },
+  ];
+  assert.deepEqual(agirlikEksikHayvanlar(['a', 'b', 'c', 'd', 'e'], animals), ['b', 'c', 'd', 'e']);
+  assert.deepEqual(agirlikEksikHayvanlar(['a'], animals), []);
+});

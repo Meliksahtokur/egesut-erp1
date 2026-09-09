@@ -272,28 +272,74 @@ function suttenKesListeSirala(animals, esik = 60) {
 // tıklamasıyla doldurulur (dozOneriUygula, ui.js).
 function _trNum(n) { return String(n).replace('.', ','); }
 
-function dozOner(canliAgirlik, kart) {
-  if (!kart || !(+kart.std_dose > 0)) return { ok: false, neden: 'Kartta standart doz yok' };
+function dozOner(canliAgirlik, kart, seviye) {
+  if (!kart) return { ok: false, neden: 'Kartta standart doz yok' };
+  seviye = seviye || 'tip';
+  const oranKaynak = seviye === 'min' ? +kart.std_dose_min
+    : seviye === 'max' ? +kart.std_dose_max
+    : +kart.std_dose;
+  if (!(oranKaynak > 0)) {
+    return { ok: false, neden: seviye === 'tip' ? 'Kartta standart doz yok'
+      : 'Kartta ' + (seviye === 'min' ? 'minimum' : 'maksimum') + ' doz girilmemiş' };
+  }
   const unit = kart.std_dose_unit || 'ml/kg';
   const birim = kart.default_unit || kart.birim || 'ml';
   const _yuvarla = x => Math.round(x * 10) / 10;
   if (unit === 'ml/hayvan') {
-    const doz = _yuvarla(+kart.std_dose);
+    const doz = _yuvarla(oranKaynak);
     if (!(doz > 0)) return { ok: false, neden: 'Karttaki standart doz geçersiz' };
     return { ok: true, doz, birim, aciklama: 'sabit doz: ' + _trNum(doz) + ' ' + birim };
   }
   const kg = +canliAgirlik;
   if (!kg || kg <= 0) return { ok: false, neden: 'Hayvanın canlı ağırlığı girilmemiş' };
   if (unit === 'ml/kg') {
-    const doz = _yuvarla(kg * +kart.std_dose);
+    const doz = _yuvarla(kg * oranKaynak);
     if (!(doz > 0)) return { ok: false, neden: 'Hesaplanan doz sıfır' };
-    return { ok: true, doz, birim, aciklama: _trNum(kg) + ' kg × ' + _trNum(+kart.std_dose) + ' ml/kg = ' + _trNum(doz) + ' ' + birim };
+    return { ok: true, doz, birim, aciklama: _trNum(kg) + ' kg × ' + _trNum(oranKaynak) + ' ml/kg = ' + _trNum(doz) + ' ' + birim };
   }
   const conc = +kart.concentration;
   if (!conc || conc <= 0) return { ok: false, neden: 'Kartta konsantrasyon (mg/ml) girilmemiş' };
-  const doz = _yuvarla(kg * +kart.std_dose / conc);
+  const doz = _yuvarla(kg * oranKaynak / conc);
   if (!(doz > 0)) return { ok: false, neden: 'Hesaplanan doz sıfır' };
-  return { ok: true, doz, birim: 'ml', aciklama: _trNum(kg) + ' kg × ' + _trNum(+kart.std_dose) + ' mg/kg ÷ ' + _trNum(conc) + ' mg/ml = ' + _trNum(doz) + ' ml' };
+  return { ok: true, doz, birim: 'ml', aciklama: _trNum(kg) + ' kg × ' + _trNum(oranKaynak) + ' mg/kg ÷ ' + _trNum(conc) + ' mg/ml = ' + _trNum(doz) + ' ml' };
+}
+
+// ── 💡 SHEET ÇİP HESABI (kullanıcı revizyonu 2026-09-09) ──
+// Helper sheet'inin "hesaplanmış dozajlar" bölgesi: pratik + pro (konsantrasyon
+// varsa birbirine çevrilir) × min/varsayılan/max. Dönen her çip
+// {tip:'pratik'|'pro'|'sabit', seviye:'min'|'tip'|'max', doz, birim, aciklama}.
+// dozOner'in üzerine saf katman — DOM'a dokunmaz.
+function dozCipleri(canliAgirlik, kart) {
+  const cikti = [];
+  if (!kart) return cikti;
+  const unit = kart.std_dose_unit || 'ml/kg';
+  const conc = +kart.concentration > 0 ? +kart.concentration : null;
+  const birim = kart.default_unit || kart.birim || 'ml';
+  const _tipeGore = (tipEtiket, oranlar, birimTip) => {
+    [['min', oranlar.min], ['tip', oranlar.tip], ['max', oranlar.max]].forEach(([seviye, d]) => {
+      if (!(+d > 0)) return;
+      const r = dozOner(canliAgirlik, birimTip === 'mg/kg'
+        ? { std_dose: d, std_dose_unit: 'mg/kg', concentration: conc, default_unit: birim }
+        : { std_dose: d, std_dose_unit: birimTip, default_unit: birim });
+      if (r.ok) cikti.push({ tip: tipEtiket, seviye, ...r });
+    });
+  };
+  if (unit === 'ml/hayvan') {
+    _tipeGore('sabit', { min: kart.std_dose_min, tip: kart.std_dose, max: kart.std_dose_max }, 'ml/hayvan');
+    return cikti;
+  }
+  // kartın kendi tipi
+  const kendiTip = unit === 'mg/kg' ? 'pro' : 'pratik';
+  _tipeGore(kendiTip, { min: kart.std_dose_min, tip: kart.std_dose, max: kart.std_dose_max }, unit);
+  // karşı tip — yalnız konsantrasyon varken (pro ÷ conc = pratik; pratik × conc = pro)
+  if (conc) {
+    const _cevir = d => (+d > 0 ? (unit === 'ml/kg' ? +d * conc : +d / conc) : null);
+    const karsiTip = unit === 'mg/kg' ? 'pratik' : 'pro';
+    _tipeGore(karsiTip, {
+      min: _cevir(kart.std_dose_min), tip: _cevir(kart.std_dose), max: _cevir(kart.std_dose_max),
+    }, unit === 'mg/kg' ? 'ml/kg' : 'mg/kg');
+  }
+  return cikti;
 }
 
 // ── KÜPE DOĞAL SIRASI (spec §4.1) ──
@@ -331,7 +377,19 @@ function gorevSaatAnahtari(t) {
   return '';
 }
 
+// ── 💡 AKIŞI: AĞIRLIĞI EKSİK HAYVANLAR ──
+// dozOneriUygula'nın "soru-sor → kart'a kaydet → kaldığı yerden devam" dalında
+// eksik (canli_agirlik ≤ 0 / boş) hayvanları verilen sırayla döndürür — sıra
+// korunur ki çoklu seçimde zincir soru deterministik olsun.
+function agirlikEksikHayvanlar(ids, animals) {
+  const liste = Array.isArray(animals) ? animals : [];
+  return (ids || []).filter(id => {
+    const a = liste.find(x => x && x.id === id);
+    return !(+a?.canli_agirlik > 0);
+  });
+}
+
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala, dozOner, kuceDogalBlok, kuceDogalKarsilastir, gorevSaatAnahtari });
+  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala, dozOner, dozCipleri, kuceDogalBlok, kuceDogalKarsilastir, gorevSaatAnahtari, agirlikEksikHayvanlar });
 }

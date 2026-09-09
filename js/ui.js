@@ -1691,8 +1691,18 @@ function _dozHintBtnHtml(inpId, drugId, hayvanIds, stokInpId) {
     ` style="flex-shrink:0;width:34px;min-height:34px;align-self:stretch;border:none;border-radius:7px;background:rgba(42,107,181,.12);color:var(--blue);cursor:pointer;font-size:.95rem;line-height:1">💡</button>`;
 }
 
-// Buton tıklaması: kart + hayvan(lar)ın MAX canlı ağırlığı → dozOner → input'a yaz.
-// Toplu vakada referans en ağır hayvandır (tek doz/kalem sözleşmesi; spec §3.3).
+// Buton tıklaması: artık doğrudan değer yazmaz — DOZAJ HELPER SHEET'ini açar.
+// Sheet: hayvan kg + ilaç pratik/pro dozajları (kartlardan öndolum; boşsa
+// buradan girilir) + canlı hesap çipleri (pratik/pro × min/varsayılan/max).
+// Tek tıkla uygula → kilo HAYVAN kartına, dozaj oranları İLAÇ kartına yazılır
+// (RPC) ve seçilen değer doz kutusuna aktarılır; sheet kapanır. Arka plandaki
+// planlama formu ASLA kapatılmaz/sıfırlanmaz (kullanıcı kuralı, 2026-09-09).
+function _dozInpBul(btn) {
+  return btn.dataset.dozInp
+    ? document.getElementById(btn.dataset.dozInp)
+    : (btn.parentElement && btn.parentElement.querySelector('input.cdf-dose-inp')) || null;
+}
+
 async function dozOneriUygula(btn) {
   try {
     let drugId = btn.dataset.drug || '';
@@ -1705,18 +1715,166 @@ async function dozOneriUygula(btn) {
     const kart = (_drugsCache || []).find(d => d.id === drugId);
     if (!kart) { toast('💡 İlaç kartı bulunamadı', true); return; }
     const ids = (btn.dataset.hayvan || '').split(',').filter(Boolean);
-    const animals = getState('animals') || [];
-    const agirlik = Math.max(0, ...ids.map(id => +(animals.find(a => a.id === id)?.canli_agirlik) || 0));
-    const r = dozOner(agirlik || null, kart);
-    if (!r.ok) { toast('💡 ' + r.neden, true); return; }
-    const dozInp = btn.dataset.dozInp
-      ? document.getElementById(btn.dataset.dozInp)
-      : (btn.parentElement && btn.parentElement.querySelector('input.cdf-dose-inp')) || null;
-    if (!dozInp) { toast('💡 Doz kutusu bulunamadı', true); return; }
-    dozInp.value = r.doz;
-    toast('💡 ' + r.aciklama);
+    _dozSheetAc(btn, kart, ids);
   } catch (e) {
     toast('💡 Hata: ' + (e.message || e), true);
+  }
+}
+
+// ── Helper sheet ──
+const _DOZ_TIP_ETIKET = { pratik: 'Pratik', pro: 'Pro', sabit: 'Sabit' };
+const _DOZ_SEVIYE_ETIKET = { min: 'Min', tip: 'Varsayılan', max: 'Max' };
+
+function _dozSheetOku() {
+  const sayi = id => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) && v > 0 ? v : null; };
+  return {
+    kg: sayi('doz-sheet-kg'),
+    pratik: sayi('doz-sheet-pratik'),
+    pro: sayi('doz-sheet-pro'),
+    conc: sayi('doz-sheet-conc'),
+    min: sayi('doz-sheet-min'),
+    max: sayi('doz-sheet-max'),
+  };
+}
+
+// Girdilere göre hesap tabanını kur: pro doluysa pro-bazlı (pratik çipleri
+// conc'tan), değilse pratik-bazlı; ikisi de boşsa kartın kendi değerleri.
+function _dozSheetTaban(okunan, kart) {
+  if (okunan.pro) return { std_dose: okunan.pro, std_dose_unit: 'mg/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, concentration: okunan.conc, default_unit: kart.default_unit || kart.birim || 'ml' };
+  if (okunan.pratik) return { std_dose: okunan.pratik, std_dose_unit: 'ml/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, default_unit: kart.default_unit || kart.birim || 'ml' };
+  return kart;
+}
+
+function _dozSheetAc(btn, kart, ids) {
+  document.getElementById('doz-sheet')?.remove();
+  const animals = getState('animals') || [];
+  const _ilk = ids.map(id => animals.find(a => a.id === id)).filter(Boolean);
+  const tekHayvan = ids.length === 1;
+  const kupe = _ilk.length ? (_ilk[0].kupe_no || _ilk[0].devlet_kupe || '') : '';
+  const kgNow = _ilk.length ? Math.max(0, ..._ilk.map(a => +a.canli_agirlik || 0)) : '';
+  const unit = kart.std_dose_unit || 'ml/kg';
+  const _f = x => (x === null || x === undefined || x === '' ? '' : x);
+  const isSabit = unit === 'ml/hayvan';
+
+  const mini = document.createElement('div');
+  mini.id = 'doz-sheet';
+  mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;display:flex;align-items:flex-end';
+  mini.onclick = e => { if (e.target === mini) mini.remove(); };
+  mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:18px 16px;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+      <div style="font-weight:800;font-size:.92rem">💡 Dozaj Helperı</div>
+      <button id="doz-sheet-kapat" style="background:none;border:none;font-size:1.15rem;cursor:pointer;color:var(--ink3)">✕</button>
+    </div>
+    <div style="font-size:.73rem;color:var(--ink3);margin-bottom:12px">${_ilk.length ? '🐄 ' + esc(kupe) + (tekHayvan ? ' · kilo kaydedilir' : ' · çoklu seçim — kilo kaydedilmez, yalnız hesap') : '🐄 hayvan bağlamı yok — yalnız ilaç kartı'}</div>
+    <div style="background:var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
+      <label style="font-size:.68rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em">🐄 Hayvan</label>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <input id="doz-sheet-kg" type="number" step="0.5" min="1" inputmode="decimal" placeholder="Canlı ağırlık (kg)" value="${_f(kgNow)}" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);font-size:.85rem;min-width:0">
+        ${tekHayvan ? '' : '<span style="font-size:.66rem;color:var(--ink3);flex-shrink:0">referans: en ağır</span>'}
+      </div>
+    </div>
+    <div style="background:var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
+      <label style="font-size:.68rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em">💊 ${esc(kart.name || 'İlaç kartı')} — dozajlama</label>
+      ${isSabit
+        ? `<div style="font-size:.78rem;margin-top:6px">Sabit doz tipi (ml/hayvan) — kart: <b>${_f(kart.std_dose)} ml</b>${kart.std_dose_min ? ' · aralık ' + _f(kart.std_dose_min) + '–' + _f(kart.std_dose_max) : ''}</div>
+           <input type="hidden" id="doz-sheet-sabit" value="${_f(kart.std_dose)}">`
+        : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+        <div><label style="font-size:.64rem;color:var(--ink3)">Pratik doz (ml/kg)</label><input id="doz-sheet-pratik" type="number" step="0.01" min="0" inputmode="decimal" placeholder="ml/kg" value="${unit === 'ml/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div><label style="font-size:.64rem;color:var(--ink3)">Pro doz (mg/kg)</label><input id="doz-sheet-pro" type="number" step="0.01" min="0" inputmode="decimal" placeholder="mg/kg" value="${unit === 'mg/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div><label style="font-size:.64rem;color:var(--ink3)">Konsantrasyon (mg/ml)</label><input id="doz-sheet-conc" type="number" step="0.01" min="0" inputmode="decimal" placeholder="mg/ml" value="${_f(kart.concentration)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div><label style="font-size:.64rem;color:var(--ink3)">Min</label><input id="doz-sheet-min" type="number" step="0.01" min="0" inputmode="decimal" placeholder="min" value="${_f(kart.std_dose_min)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+          <div><label style="font-size:.64rem;color:var(--ink3)">Max</label><input id="doz-sheet-max" type="number" step="0.01" min="0" inputmode="decimal" placeholder="max" value="${_f(kart.std_dose_max)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        </div>
+      </div>
+      <div style="font-size:.62rem;color:var(--ink3);margin-top:4px">İkisi de girilirse pro (mg/kg) karta yazılır; pratik = pro ÷ konsantrasyon hesaplanır.</div>`}
+    </div>
+    <div id="doz-sheet-cipler" style="margin-bottom:8px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="doz-sheet-kaydet" class="btn" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer">💾 Kartlara yaz</button>
+      <button id="doz-sheet-iptal" style="flex:0 0 auto;background:var(--card3);border:none;border-radius:8px;padding:10px 14px;cursor:pointer">İptal</button>
+    </div>
+    <div style="font-size:.62rem;color:var(--ink3);margin-top:6px">Hesap çipine tıklamak: kilo ve dozajlama kartlara yazılır + seçilen doz kutuya aktarılır. "Kartlara yaz" yalnız kaydeder.</div>
+  </div>`;
+  document.body.appendChild(mini);
+  document.getElementById('doz-sheet-kapat').onclick = () => mini.remove();
+  document.getElementById('doz-sheet-iptal').onclick = () => mini.remove();
+  ['doz-sheet-kg','doz-sheet-pratik','doz-sheet-pro','doz-sheet-conc','doz-sheet-min','doz-sheet-max'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => _dozSheetCiplerCiz(kart, btn, ids));
+  });
+  document.getElementById('doz-sheet-kaydet').onclick = () => _dozSheetUygula(btn, mini, kart, ids, null);
+  _dozSheetCiplerCiz(kart, btn, ids);
+}
+
+// Hesap çiplerini canlı çiz — her çip tek tıkla: kartlara yaz + doz kutusuna aktar + kapat.
+function _dozSheetCiplerCiz(kart, btn, ids) {
+  const bolum = document.getElementById('doz-sheet-cipler');
+  if (!bolum) return;
+  const okunan = _dozSheetOku();
+  const taban = _dozSheetTaban(okunan, kart);
+  const cipler = dozCipleri(okunan.kg, taban);
+  if (!ciplen.length) {
+    bolum.innerHTML = '<div style="font-size:.72rem;color:var(--ink3);padding:6px 2px">' +
+      (okunan.kg ? 'Hesap için pratik veya pro doz girin.' : 'Hesap için canlı ağırlık girin (ve gerekirse dozajlama).') + '</div>';
+    return;
+  }
+  const _renk = { pratik: 'var(--green)', pro: 'var(--blue)', sabit: 'var(--ink3)' };
+  bolum.innerHTML = '<div style="font-size:.66rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px">Hesaplanmış dozajlar — tıkla: kartlara yaz + aktar</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+    cipler.map((c, i) => `<button type="button" data-cip="${i}" style="background:${_renk[c.tip] || 'var(--card3)'};color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:.74rem;font-weight:700;cursor:pointer;text-align:left">` +
+      `${_DOZ_TIP_ETIKET[c.tip]} · ${_DOZ_SEVIYE_ETIKET[c.seviye]}: <b>${esc(String(c.doz).replace('.', ','))} ${esc(c.birim)}</b><br>` +
+      `<span style="font-weight:500;font-size:.64rem;opacity:.85">${esc(c.aciklama)}</span></button>`).join('') +
+    '</div>';
+  bolum.querySelectorAll('[data-cip]').forEach(el => {
+    el.onclick = () => _dozSheetUygula(btn, document.getElementById('doz-sheet'), kart, ids, cipler[+el.dataset.cip]);
+  });
+}
+
+async function _dozSheetUygula(btn, mini, kart, ids, cip) {
+  const okunan = _dozSheetOku();
+  const dozInp = _dozInpBul(btn);
+  const kaydetBtn = document.getElementById('doz-sheet-kaydet');
+  const _kaydetKilit = () => { if (kaydetBtn) { kaydetBtn.disabled = true; kaydetBtn.textContent = 'Yazılıyor…'; } };
+  const _kaydetAc = () => { if (kaydetBtn) { kaydetBtn.disabled = false; kaydetBtn.textContent = '💾 Kartlara yaz'; } };
+  const taban = _dozSheetTaban(okunan, kart);
+  const guncellemeler = {};
+  if (taban !== kart) {
+    if (taban.std_dose_unit === 'mg/kg') {
+      guncellemeler.std_dose = taban.std_dose;
+      guncellemeler.std_dose_unit = 'mg/kg';
+      if (okunan.conc) { guncellemeler.concentration = okunan.conc; guncellemeler.concentration_unit = 'mg/ml'; }
+    } else {
+      guncellemeler.std_dose = taban.std_dose;
+      guncellemeler.std_dose_unit = 'ml/kg';
+    }
+    if (okunan.min) guncellemeler.std_dose_min = okunan.min;
+    if (okunan.max) guncellemeler.std_dose_max = okunan.max;
+  }
+  const kgYaz = okunan.kg && ids.length === 1 ? okunan.kg : null;
+  if (!guncellemeler.std_dose && !kgYaz && !cip) {
+    toast('💡 Kaydedilecek değer yok — kilo ve dozajlama girin', true);
+    return;
+  }
+  _kaydetKilit();
+  try {
+    if (kgYaz) {
+      const res = await rpc('hayvan_guncelle', { p_id: ids[0], p_canli_agirlik: kgYaz });
+      if (res?.ok === false) throw new Error(res.mesaj || 'Kilo kaydı başarısız');
+      const yeni = (getState('animals') || []).map(a => a.id === ids[0] ? { ...a, canli_agirlik: kgYaz } : a);
+      if (yeni.length) setState('animals', yeni);
+    }
+    if (Object.keys(guncellemeler).length) {
+      const res = await rpc('ilac_dozaj_guncelle', { p_id: kart.id, p_guncellemeler });
+      if (res?.ok === false) throw new Error(res.mesaj || 'İlaç kartı yazımı başarısız');
+      Object.assign(kart, guncellemeler); // cache'i yerinde güncelle
+    }
+    pullTables(['hayvanlar', 'drug_products']).catch(() => {});
+    if (cip && dozInp) dozInp.value = cip.doz;
+    mini?.remove();
+    toast('💡 ' + (cip ? cip.aciklama : 'Kartlar güncellendi'));
+  } catch (e) {
+    toast('❌ ' + (e.message || e), true);
+    _kaydetAc();
   }
 }
 
