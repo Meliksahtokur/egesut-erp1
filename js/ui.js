@@ -1742,9 +1742,19 @@ function _dozSheetOku() {
 
 // Girdilere göre hesap tabanını kur: pro doluysa pro-bazlı (pratik çipleri
 // conc'tan), değilse pratik-bazlı; ikisi de boşsa kartın kendi değerleri.
+// KULLANICI NEYİ DEĞİŞTİRDİYSE O KAZANIR (2026-09-09: pro öndolumu hep
+// öncelikliydi, pratik girişi görmezden geliniyordu — "aynı değerler geri
+// geliyor" şikayetinin kökü):
+//  - pro (mg/kg) kart değerinden farklı girildiyse ya da kart mg/kg değilken
+//    elle doldurulduysa → pro-bazlı
+//  - değilse pratik çifti (kg→ml) doluysa → pratik-bazlı (ml/kg)
+//  - değilse kartın kendi değerleri.
 function _dozSheetTaban(okunan, kart) {
+  const kartMgKg = kart.std_dose_unit === 'mg/kg';
+  const proDegisti = okunan.pro && ((kartMgKg && okunan.pro !== +kart.std_dose) || (!kartMgKg && !okunan.pratik));
+  if (okunan.pro && proDegisti) return { std_dose: okunan.pro, std_dose_unit: 'mg/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, concentration: okunan.conc, default_unit: kart.default_unit || kart.birim || 'ml' };
+  if (okunan.pratik) return { std_dose: okunan.pratik, std_dose_unit: 'ml/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, concentration: okunan.conc, default_unit: kart.default_unit || kart.birim || 'ml' };
   if (okunan.pro) return { std_dose: okunan.pro, std_dose_unit: 'mg/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, concentration: okunan.conc, default_unit: kart.default_unit || kart.birim || 'ml' };
-  if (okunan.pratik) return { std_dose: okunan.pratik, std_dose_unit: 'ml/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, default_unit: kart.default_unit || kart.birim || 'ml' };
   return kart;
 }
 
@@ -1794,10 +1804,13 @@ function _dozSheetAc(btn, kart, ids) {
         </div></div>
         <div><label style="font-size:.64rem;color:var(--ink3)">mg/kg oranı (pro)</label><input id="doz-sheet-pro" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 2" value="${unit === 'mg/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
         <div><label style="font-size:.64rem;color:var(--ink3)">Konsantrasyon (mg/ml) — 1 ml ilaçtaki etken</label><input id="doz-sheet-conc" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 50" value="${_f(kart.concentration)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div><label style="font-size:.64rem;color:var(--ink3)">Min</label><input id="doz-sheet-min" type="number" step="0.01" min="0" inputmode="decimal" placeholder="min" value="${_f(kart.std_dose_min)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
-          <div><label style="font-size:.64rem;color:var(--ink3)">Max</label><input id="doz-sheet-max" type="number" step="0.01" min="0" inputmode="decimal" placeholder="max" value="${_f(kart.std_dose_max)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr auto;gap:4px;align-items:end">
+          <div><label style="font-size:.64rem;color:var(--ink3)">Min dozaj (<span id="doz-sheet-mm-birim">${unit === 'mg/kg' ? 'mg/kg' : 'ml/kg'}</span>)</label><input id="doz-sheet-min" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 0,02" value="${_f(kart.std_dose_min)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+          <button type="button" id="doz-sheet-min-btn" title="Min dozu (alt sınır) tedaviye yaz" style="height:37px;padding:0 8px;border:none;border-radius:8px;background:rgba(42,107,181,.12);color:var(--blue);font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 —</button>
+          <div><label style="font-size:.64rem;color:var(--ink3)">Max dozaj (<span id="doz-sheet-mm-birim-max">${unit === 'mg/kg' ? 'mg/kg' : 'ml/kg'}</span>)</label><input id="doz-sheet-max" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 0,06" value="${_f(kart.std_dose_max)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+          <button type="button" id="doz-sheet-max-btn" title="Max dozu (üst sınır) tedaviye yaz" style="height:37px;padding:0 8px;border:none;border-radius:8px;background:rgba(190,66,50,.12);color:var(--red);font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 —</button>
         </div>
+        <div style="font-size:.62rem;color:var(--ink3);margin-top:4px">Min/Max = prospektüs aralığının alt/üst dozu (aynı oranda). 📥 butonu o dozu kilo ile hesaplayıp tedaviye yazar — hayvan kilosu ve oranlar değiştikçe canlı güncellenir.</div>
       </div>
       <div style="font-size:.62rem;color:var(--ink3);margin-top:4px">ml/kg ve mg/kg aynı dozun iki yazılışıdır — konsantrasyon ikisini birbirine çevirir. <b>Pratik doz = hayvana verilecek ml</b>; aşağıda ağırlıkla hesaplanır.</div>`}
     </div>
@@ -1815,6 +1828,12 @@ function _dozSheetAc(btn, kart, ids) {
   ['doz-sheet-kg','doz-sheet-pratik-kg','doz-sheet-pratik-ml','doz-sheet-pro','doz-sheet-conc','doz-sheet-min','doz-sheet-max'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', () => _dozSheetCiplerCiz(kart, btn, ids));
   });
+  ['min','max'].forEach(sv => document.getElementById('doz-sheet-' + sv + '-btn')?.addEventListener('click', () => {
+    const b = document.getElementById('doz-sheet-' + sv + '-btn');
+    if (!b || b.disabled || !b.dataset.doz) return;
+    _dozSheetUygula(btn, document.getElementById('doz-sheet'), kart, ids,
+      { doz: +b.dataset.doz, birim: b.dataset.birim || 'ml', aciklama: b.dataset.aciklama || '' });
+  }));
   document.getElementById('doz-sheet-kaydet').onclick = () => _dozSheetUygula(btn, mini, kart, ids, null);
   _dozSheetCiplerCiz(kart, btn, ids);
 }
@@ -1848,6 +1867,22 @@ function _dozSheetCiplerCiz(kart, btn, ids) {
   bolum.querySelectorAll('[data-cip]').forEach(el => {
     el.onclick = () => _dozSheetUygula(btn, document.getElementById('doz-sheet'), kart, ids, cipler[+el.dataset.cip]);
   });
+  // Min/Max 📥 butonları — hayvan kg'ı ve oranlarla CANLI hesaplanır; tıklayınca
+  // kartlara yazılır + o doz tedaviye yazılır (kullanıcı istekleri, 2026-09-09).
+  const _mmBtn = seviye => {
+    const btnEl = document.getElementById('doz-sheet-' + seviye + '-btn');
+    if (!btnEl) return;
+    const oran = seviye === 'min' ? okunan.min : okunan.max;
+    if (!oran || !okunan.kg) { btnEl.disabled = true; btnEl.textContent = '📥 —'; return; }
+    const r = dozOner(okunan.kg, { ...taban, std_dose: oran });
+    if (!r.ok) { btnEl.disabled = true; btnEl.textContent = '📥 —'; return; }
+    btnEl.disabled = false;
+    btnEl.textContent = '📥 ' + String(r.doz).replace('.', ',') + ' ' + r.birim;
+    btnEl.dataset.doz = String(r.doz);
+    btnEl.dataset.birim = r.birim;
+    btnEl.dataset.aciklama = r.aciklama;
+  };
+  _mmBtn('min'); _mmBtn('max');
 }
 
 async function _dozSheetUygula(btn, mini, kart, ids, cip) {
@@ -1891,9 +1926,16 @@ async function _dozSheetUygula(btn, mini, kart, ids, cip) {
       Object.assign(kart, guncellemeler); // cache'i yerinde güncelle
     }
     pullTables(['hayvanlar', 'drug_products']).catch(() => {});
+    if (!cip) _dozSheetCiplerCiz(kart, btn, ids); // kartlara-yaz sonrası çipler tazelensin
     if (cip && dozInp) dozInp.value = cip.doz;
-    _dozSheetKapat();
-    toast('💡 ' + (cip ? cip.aciklama : 'Kartlar güncellendi'));
+    if (cip) {
+      _dozSheetKapat(); // çip: kaydet + aktar + kapat — kaldığın yerden devam
+      toast('💡 ' + cip.aciklama);
+    } else {
+      // 💾 Kartlara yaz: yalnız kaydet — sheet AÇIK kalır, planlamaya devam
+      toast('💾 Kartlara yazıldı — sheet açık, devam edebilirsin');
+      _kaydetAc();
+    }
   } catch (e) {
     toast('❌ ' + (e.message || e), true);
     _kaydetAc();

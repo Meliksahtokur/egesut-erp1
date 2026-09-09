@@ -295,13 +295,13 @@ function dozOner(canliAgirlik, kart, seviye) {
   if (unit === 'ml/kg') {
     const doz = _yuvarla(kg * oranKaynak);
     if (!(doz > 0)) return { ok: false, neden: 'Hesaplanan doz sıfır' };
-    return { ok: true, doz, birim, aciklama: _trNum(kg) + ' kg × ' + _trNum(oranKaynak) + ' ml/kg = ' + _trNum(doz) + ' ' + birim };
+    return { ok: true, doz, birim, aciklama: _trNum(kg) + ' kg × ' + _trNum(Math.round(oranKaynak * 1e4) / 1e4) + ' ml/kg = ' + _trNum(doz) + ' ' + birim };
   }
   const conc = +kart.concentration;
   if (!conc || conc <= 0) return { ok: false, neden: 'Kartta konsantrasyon (mg/ml) girilmemiş' };
   const doz = _yuvarla(kg * oranKaynak / conc);
   if (!(doz > 0)) return { ok: false, neden: 'Hesaplanan doz sıfır' };
-  return { ok: true, doz, birim: 'ml', aciklama: _trNum(kg) + ' kg × ' + _trNum(oranKaynak) + ' mg/kg ÷ ' + _trNum(conc) + ' mg/ml = ' + _trNum(doz) + ' ml' };
+  return { ok: true, doz, birim: 'ml', aciklama: _trNum(kg) + ' kg × ' + _trNum(Math.round(oranKaynak * 1e4) / 1e4) + ' mg/kg ÷ ' + _trNum(conc) + ' mg/ml = ' + _trNum(doz) + ' ml' };
 }
 
 // ── 💡 SHEET ÇİP HESABI (kullanıcı revizyonu 2026-09-09) ──
@@ -333,7 +333,7 @@ function dozCipleri(canliAgirlik, kart) {
   _tipeGore(kendiTip, { min: kart.std_dose_min, tip: kart.std_dose, max: kart.std_dose_max }, unit);
   // karşı tip — yalnız konsantrasyon varken (pro ÷ conc = pratik; pratik × conc = pro)
   if (conc) {
-    const _cevir = d => (+d > 0 ? (unit === 'ml/kg' ? +d * conc : +d / conc) : null);
+    const _cevir = d => (+d > 0 ? Math.round((unit === 'ml/kg' ? +d * conc : +d / conc) * 1e6) / 1e6 : null);
     const karsiTip = unit === 'mg/kg' ? 'pratik' : 'pro';
     _tipeGore(karsiTip, {
       min: _cevir(kart.std_dose_min), tip: _cevir(kart.std_dose), max: _cevir(kart.std_dose_max),
