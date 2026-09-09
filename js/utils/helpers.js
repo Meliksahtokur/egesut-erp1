@@ -263,7 +263,75 @@ function suttenKesListeSirala(animals, esik = 60) {
     .map(x => x.a);
 }
 
+// ── DOZAJ HELPERI (spec: .claude/plans/2026-09-09-tedavi-doz-gorev-design.md §3.2) ──
+// Saf hesap motoru: DOM'a dokunmaz. kart = _drugsCache item'ı
+// (std_dose / std_dose_unit / concentration alanları loadDrugsCache'ten gelir).
+// Birim tipleri: 'ml/kg' (ağırlık × oran) | 'mg/kg' (÷ concentration → ml) |
+// 'ml/hayvan' (sabit — ağırlık gerekmez). RPC sözleşmesi değişmez: yalnız form
+// ön-dolumu. Kullanıcı kuralı: doz kutusuna asla otomatik yazılmaz; buton
+// tıklamasıyla doldurulur (dozOneriUygula, ui.js).
+function _trNum(n) { return String(n).replace('.', ','); }
+
+function dozOner(canliAgirlik, kart) {
+  if (!kart || !(+kart.std_dose > 0)) return { ok: false, neden: 'Kartta standart doz yok' };
+  const unit = kart.std_dose_unit || 'ml/kg';
+  const birim = kart.default_unit || kart.birim || 'ml';
+  const _yuvarla = x => Math.round(x * 10) / 10;
+  if (unit === 'ml/hayvan') {
+    const doz = _yuvarla(+kart.std_dose);
+    if (!(doz > 0)) return { ok: false, neden: 'Karttaki standart doz geçersiz' };
+    return { ok: true, doz, birim, aciklama: 'sabit doz: ' + _trNum(doz) + ' ' + birim };
+  }
+  const kg = +canliAgirlik;
+  if (!kg || kg <= 0) return { ok: false, neden: 'Hayvanın canlı ağırlığı girilmemiş' };
+  if (unit === 'ml/kg') {
+    const doz = _yuvarla(kg * +kart.std_dose);
+    if (!(doz > 0)) return { ok: false, neden: 'Hesaplanan doz sıfır' };
+    return { ok: true, doz, birim, aciklama: _trNum(kg) + ' kg × ' + _trNum(+kart.std_dose) + ' ml/kg = ' + _trNum(doz) + ' ' + birim };
+  }
+  const conc = +kart.concentration;
+  if (!conc || conc <= 0) return { ok: false, neden: 'Kartta konsantrasyon (mg/ml) girilmemiş' };
+  const doz = _yuvarla(kg * +kart.std_dose / conc);
+  if (!(doz > 0)) return { ok: false, neden: 'Hesaplanan doz sıfır' };
+  return { ok: true, doz, birim: 'ml', aciklama: _trNum(kg) + ' kg × ' + _trNum(+kart.std_dose) + ' mg/kg ÷ ' + _trNum(conc) + ' mg/ml = ' + _trNum(doz) + ' ml' };
+}
+
+// ── KÜPE DOĞAL SIRASI (spec §4.1) ──
+// "002" → 2, "19" → 19, "2044" → 2044 (alfabetik sıralama "19" < "2044" < "002"
+// yanlış verirdi). Sayısal bloklar değerle, eşitlikte metinle karşılaştırılır;
+// sayı blokları metin bloklarından önce. Kirli küpeler ("Test buzağı", "xx")
+// sayısal bloklardan SONRA alfabetik — listede sonda.
+function kuceDogalBlok(s) {
+  return String(s ?? '').split(/(\d+)/).map(p => /^\d+$/.test(p) ? { n: +p, s: p } : p).filter(p => p !== '');
+}
+function kuceDogalKarsilastir(a, b) {
+  const A = kuceDogalBlok(a), B = kuceDogalBlok(b);
+  for (let i = 0; i < Math.max(A.length, B.length); i++) {
+    const x = A[i], y = B[i];
+    if (x === undefined) return -1;
+    if (y === undefined) return 1;
+    const xn = typeof x === 'object', yn = typeof y === 'object';
+    if (xn && yn) { if (x.n !== y.n) return x.n - y.n; if (x.s !== y.s) return x.s < y.s ? -1 : 1; }
+    else if (!xn && !yn) { if (x !== y) return x < y ? -1 : 1; }
+    else return xn ? -1 : 1;
+  }
+  return 0;
+}
+
+// ── GÖREV SAAT ANAHTARI (spec §4.1) ──
+// Gruplamanın 1. katmanı: hedef_saat → TEDAVI_GUN açıklama JSON planned_time.
+// "08:00:00" (PostgREST time) → "08:00" kırpılır. Saatsiz '' döner (çağıran en
+// sona koyar).
+function gorevSaatAnahtari(t) {
+  if (!t) return '';
+  if (t.hedef_saat) return String(t.hedef_saat).slice(0, 5);
+  if (t.gorev_tipi === 'TEDAVI_GUN') {
+    try { return JSON.parse(t.aciklama || '{}').planned_time || ''; } catch (e) { return ''; }
+  }
+  return '';
+}
+
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala });
+  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala, dozOner, kuceDogalBlok, kuceDogalKarsilastir, gorevSaatAnahtari });
 }

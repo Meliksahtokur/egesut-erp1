@@ -157,3 +157,18 @@ function bosKupeOner(hayvanlar, cinsiyet, adet = 10) {
   return out;
 }
 
+
+// ══════════════════════════════════════════
+// Görev listesi — hayvan grubu katmanı (spec: .claude/plans/2026-09-09-tedavi-doz-gorev-design.md §4.1)
+// Saat → grup → küpe katmanlamasının 2. katmanı. Değerler hayvanlar.grup
+// sütununun canlı sözlüğüyle birebir; sıra işletmenin çalışma düzenine göre
+// (buzağıdan ineğe). Burada olmayan bir grup değeri "Diğer" bloğuna düşer.
+const GOREV_GRUP_SIRA = [
+  'Süt İçen Buzağı',
+  'Sütten Kesilmiş Buzağı',
+  'Düve (Küçük)',
+  'Düve (Büyük)',
+  'Besi',
+  'Sağmal (Laktasyonda)',
+  'Sağmal (Kuru)',
+];

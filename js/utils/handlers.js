@@ -91,6 +91,9 @@ registerActions({
   'task-kat-bakim':   (el) => setTaskKat('bakim', el),
   'task-kat-diger':   (el) => setTaskKat('diger', el),
 
+  // ═══ DOZAJ HELPERİ ═══
+  'doz-oneri': (el) => dozOneriUygula(el),
+
   // ═══ GEÇMİŞ FİLTRELERİ ═══
   'gecmis-hepsi':     (el) => loadGecmis('hepsi', el),
   'gecmis-dogum':     (el) => loadGecmis('dogum', el),
