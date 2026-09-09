@@ -6357,6 +6357,27 @@ async function caseGunEkleOnayla() {
   } catch(e) { toast(e.message, true); }
 }
 
+// ═══ AKTİF VAKAYA ŞABLON UYGULAMA (2026-09-09) ═══
+// Desen: bc-sablon-yukle (forms.js:1382) katlanır alanı + submitCase
+// (forms.js:616-629) çift-RPC akışı. Çapa: cd-sablon-tarih = şablonun
+// 1. günü (RPC'de tarih = çapa + (gun_no − 1)); p_baslangic_tarihi NULL
+// ⇔ açılıştaki start_date çapası.
+
+// Saf çekirdek — tests/unit/tedavi-sablon-aktif.test.js yeşil kilidi.
+// bcSablonYukleListeRender (forms.js:1413-1421) satır hesabının DOM'suz aynası.
+function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
+  const list = (eslem || []).filter(e => e.disease_id === diseaseId)
+    .map(e => (sablonlar || []).find(s => s.id === e.sablon_id)).filter(Boolean);
+  return list.map(s => {
+    const sk = (kalemler || []).filter(k => k.sablon_id === s.id);
+    const tp = s.tohumlama_plani;
+    return { id: s.id, ad: s.ad,
+             gun: new Set(sk.map(k => k.gun_no)).size,
+             seans: sk.length,
+             tohumVar: !!(tp && typeof tp === 'object' && tp.gun_ofset != null && tp.planned_time) };
+  });
+}
+
 // ── VAKAYA PLANLI TOHUMLAMA ────────────────────────────────────────────────
 // Tohumlama ilaç gibi vakanın bir kalemi; ama kaydı tohumlama_kaydet zinciri
 // üzerinden gitmek zorunda (sperma, VWP, gebelik kontrol görevleri). Bu yüzden
