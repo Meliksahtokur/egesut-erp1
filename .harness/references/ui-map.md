@@ -87,6 +87,7 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
 | `js/ui.js:_dashStatRow`, `js/ui.js:_dashVacAlerts`, `js/ui.js:ileriGebeKontrol` | Dashboard stats and alerts |
 | `js/ui.js:loadTasks`, `js/ui.js:renderAnimals`, `js/ui.js:flushPendingDone` | Task list, animal list, pending-done recovery |
 | `js/ui.js:loadBirths`, `js/ui.js:loadUreme`, `js/ui.js:loadGecmis` | Births, reproduction tab, history |
+| `js/gecmis.js` (`_gmEntriesFromSources`, `_gmGroupHtml`, `_gmCsv`, `_gmUndoRef`) | Shared history pipeline (main tab + animal-card, day groups, CSV, guarded undo) feeding `loadGecmis`/`_detRenderGecmis`; D15 view switch Defter↔Klasik (`_gecmisKlasik`/`_gecmisSetKlasik`, localStorage `ege_gecmis_klasik`) |
 | `js/ui.js:loadStock`, `js/ui.js:loadStokPanel`, `js/ui.js:loadRaporlar`, `js/ui.js:loadCikanlar` | Stock, stock panel, reports, exits |
 | `js/ui.js:srchDropdown`, `js/ui.js:acHayvan`, `js/ui.js:acIlac`, `js/ui.js:acSperma` | Search and autocompletes |
 | `js/ui.js:_showSessizList`, `js/ui.js:_showBelirsizList` | Silent / ambiguous reproduction lists |

@@ -99,6 +99,14 @@ registerActions({
   'gecmis-gorev':     (el) => loadGecmis('gorev', el),
   'gecmis-hayvan':    (el) => loadGecmis('hayvan', el),
   'gecmis-search':    (() => { let _t; return (el) => { clearTimeout(_t); _t = setTimeout(() => _gecmisRender(el.value), 200); }; })(),
+  'gecmis-csv':       () => _gmDownloadCsv(),
+  // D15 görünüm switch'i: Defter (gün gruplu saf-bitmiş) ↔ Klasik (eski düz liste).
+  // skipPull ile ağ çekmeden anında geçiş; tercih localStorage'da kalıcı.
+  'gecmis-gorunum-toggle': () => {
+    _gecmisSetKlasik(!_gecmisKlasik());
+    loadGecmis(null, null, { skipPull: true });
+  },
+  // "Tümü" — yalnız klasik görünümde görünür/meşru (eski davranışın parçası)
   'gecmis-tumu-toggle': () => {
     _gecmisTumu = !_gecmisTumu;
     const tog = document.getElementById('gecmis-toggle');
@@ -106,7 +114,7 @@ registerActions({
       tog.style.background = _gecmisTumu ? 'var(--green)' : 'var(--card3)';
       tog.firstElementChild.style.left = _gecmisTumu ? '16px' : '2px';
     }
-    loadGecmis(_curGecmisFilter);
+    loadGecmis(null, null, { skipPull: true });
   },
 
   // ═══ MODAL AÇ/KAPAT ═══
