@@ -2165,7 +2165,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     assert.ok(/'bc-sablon-yukle-kapat':\s*\(\)\s*=>\s*bcSablonYukleKapat\(\)/.test(src));
   });
 
-  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260909-4 damgalı', () => {
+  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260909-12 damgalı', () => {
     const html = fs.readFileSync('index.html', 'utf8');
     assert.strictEqual((html.match(/data-action="bc-sablon-yukle-toggle"/g) || []).length, 1);
     assert.strictEqual((html.match(/id="bc-sablon-yukle-alan"/g) || []).length, 1);
@@ -2173,10 +2173,11 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // Cache-busting (owner feedback 2026-09-07): her YEREL script src'si damgalı
     // W21: stamp 20260907-4 (bc-tarih tek buton); 20260908-1: meme içi uygulama yolu
     // 20260909-1: şablon uygulama; -2: gecmis defter/klasik + ilk-gün takvim; -3: kanonik tek-tarih takvimi; -4: merge (gecmis main'e)
+    // 20260909-11: dozaj helper sheet + görev saat-grup-kupe; -12: merge (dozaj main'e)
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
-    const damgasiz = yerel.filter(s => !/\?v=20260909-4$/.test(s));
+    const damgasiz = yerel.filter(s => !/\?v=20260909-12$/.test(s));
     assert.deepStrictEqual(host(damgasiz), [], 'damgasız yerel script kalmamalı');
     assert.ok(/<!-- \?v= damgası: her js\/css değişikliğinde GÜNCELLE \(cache-busting\) -->/.test(html),
       'damga bakım notu ilk script etiketinin yanında');
@@ -2482,13 +2483,13 @@ describe('V2.3 (W21) — m-bulk-case tarih alanı yapısı + takvim aksiyonu + m
     assert.ok(ipucu && /overflow-wrap:\s*anywhere/.test(ipucu[0]), 'hint sarma stili (taşma kilidi)');
   });
 
-  it('manifest link de damgalı: manifest.json?v=20260909-4', () => {
+  it('manifest link de damgalı: manifest.json?v=20260909-12', () => {
     const html = fs.readFileSync('index.html', 'utf8');
-    assert.ok(html.includes('manifest.json?v=20260909-4'), 'manifest damgası 20260909-4');
-    assert.ok(!html.includes('?v=20260909-3'), 'eski 20260909-3 damgası kalmaz');
-    assert.ok(!html.includes('?v=20260909-2'), 'eski 20260909-2 damgası kalmaz');
-    assert.ok(!html.includes('?v=20260909-1'), 'eski 20260909-1 damgası kalmaz');
-    assert.ok(!html.includes('?v=20260908-1'), 'eski 20260908-1 damgası kalmaz');
+    assert.ok(html.includes('manifest.json?v=20260909-12'), 'manifest damgası 20260909-12');
+    for (const eski of ['20260909-11','20260909-10','20260909-9','20260909-8','20260909-7','20260909-6','20260909-5','20260909-4','20260909-3','20260909-2','20260909-1','20260908-1','20260907-4']) {
+      // substring tuzağı: '?v=20260909-1' '?v=20260909-12'i de yakalar → rakam-sonrası sınır şart
+      assert.ok(!new RegExp('\\?v=' + eski + '(?![0-9])').test(html), 'eski ' + eski + ' damgası kalmaz');
+    }
     assert.ok(!html.includes('?v=20260907-4'), 'eski 20260907-4 damgası kalmaz');
     assert.ok(!html.includes('?v=20260907-3'), 'eski -3 damgası kalmaz');
     assert.ok(!html.includes('?v=20260907-2'), 'eski -2 damgası kalmaz');

@@ -1928,13 +1928,19 @@ function _bcSeansDozSatiri(ds){
   const id = ds.id;
   const name = String(ds.name || id).replace(/"/g, '&quot;');
   const route = ds.route || 'IM';
+  // 💡 öneri referansı: satırın üretim anındaki seçili hayvanlar (chip listesi);
+  // handler en ağır canlı ağırlığı alır (tek doz/kalem sözleşmesi, spec §3.3).
+  const hayvanIds = (globalThis._bcHayvanlar || []).map(h => h.id).join(',');
   const row = document.createElement('div');
   row.id = 'bc-srow-' + id;
   row.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:8px;padding:8px;margin-bottom:6px';
   row.innerHTML =
     '<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-bottom:5px">' + name + '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
-    '<input type="number" id="bc-sdoz-' + id + '" min="0.01" step="0.01" placeholder="Doz" class="fi" style="margin:0">' +
+    '<div style="display:flex;gap:4px">' +
+    '<input type="number" id="bc-sdoz-' + id + '" min="0.01" step="0.01" placeholder="Doz" class="fi" style="margin:0;flex:1;min-width:0">' +
+    _dozHintBtnHtml('bc-sdoz-' + id, id, hayvanIds) +
+    '</div>' +
     '<input type="text" id="bc-sunit-' + id + '" placeholder="Birim" value="' + escAttr(ds.unit || 'ml') + '" class="fi" style="margin:0">' +
     '</div>' +
     '<select id="bc-srot-' + id + '" class="fsel" style="margin-top:5px">' +

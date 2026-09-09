@@ -85,7 +85,8 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
 |---|---|
 | `js/ui.js:loadDash` | Dashboard assembly |
 | `js/ui.js:_dashStatRow`, `js/ui.js:_dashVacAlerts`, `js/ui.js:ileriGebeKontrol` | Dashboard stats and alerts |
-| `js/ui.js:loadTasks`, `js/ui.js:renderAnimals`, `js/ui.js:flushPendingDone` | Task list, animal list, pending-done recovery |
+| `js/ui.js:loadTasks` (saat→grup→küpe katmanlı; arama veri-katmanı filtresi), `js/ui.js:renderAnimals`, `js/ui.js:flushPendingDone` | Task list (hour→herd-group→ear-tag natural order; `#task-srch` searches kupe/tip/açıklama/ilâç/teşhis, survives tab switches), animal list, pending-done recovery |
+| `js/ui.js:dozOneriUygula`, `js/ui.js:_dozHintBtnHtml`, `js/utils/helpers.js:dozOner` | 💡 dosage hint button (click-to-fill only, never auto-write; 4 entry points: bc-sdoz, cdf-dose, sd-dose, pu-doz; bulk-case uses max live weight of selected animals) |
 | `js/ui.js:loadBirths`, `js/ui.js:loadUreme`, `js/ui.js:loadGecmis` | Births, reproduction tab, history |
 | `js/gecmis.js` (`_gmEntriesFromSources`, `_gmGroupHtml`, `_gmCsv`, `_gmUndoRef`) | Shared history pipeline (main tab + animal-card, day groups, CSV, guarded undo) feeding `loadGecmis`/`_detRenderGecmis`; D15 view switch Defter↔Klasik (`_gecmisKlasik`/`_gecmisSetKlasik`, localStorage `ege_gecmis_klasik`) |
 | `js/ui.js:loadStock`, `js/ui.js:loadStokPanel`, `js/ui.js:loadRaporlar`, `js/ui.js:loadCikanlar` | Stock, stock panel, reports, exits |

@@ -617,7 +617,8 @@ async function loadTasks(f,btn,opts){
   }
   const el=document.getElementById('tasks-body');
   const srchEl=document.getElementById('task-srch');
-  if(srchEl){ srchEl.value=''; }
+  // F4: arama sekme/filtre geçişlerinde korunur — loadTasks temizlemez (eskiden
+  // burada srchEl.value='' vardı); yalnız ✕/elle temizlenir.
   await _keepScroll(el,async()=>{
   // Sadece cold load'da spinner göster — refresh'te eski liste yerinde kalsın (blink fix)
   if(!el.querySelector('.task-card')) el.innerHTML='<div class="loader"><div class="spin"></div></div>';
@@ -732,6 +733,7 @@ async function loadTasks(f,btn,opts){
           date:t.hedef_tarih||td?.treatment_date||'',
           gunNo:td?.day_no||'?', totalGun:td?_caseDayCount[td.case_id]||0:0,
           animalLabel:animal?(animal.kupe_no||animal.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—'),
+          grupAd:animal?.grup||(t.hayvan_id?'':'GENEL'),
           disease:_dayDiseaseMap[dayId]||'',
           seansTotal:_seansDayStat[dayId]?.total||0, seansDone:_seansDayStat[dayId]?.done||0,
           items:[] };
@@ -739,35 +741,84 @@ async function loadTasks(f,btn,opts){
       grupMap[key].items.push({ task:t, seans,
         drugName:_prodMap[seans.drug_product_id]?.brand_name||_stokNameMap[seans.stok_id]||'İlaç' });
     });
-    // --- Blokları (normal kart + seans grubu) tek listede sırala ---
+    // --- Blokları (normal kart + seans grubu) topla; her bloğa F3/F4 meta'sı ---
+    // F3 katmanları: tarih → saat → hayvan grubu → küpe (doğal sıra).
+    // F4 arama: blok.arama = kupe + tip + açıklama + ilaç adları + teşhis.
     const bloklar=[];
+    const _grupSira=grupAd=>{
+      if(grupAd==='GENEL') return 100;
+      const i=(typeof GOREV_GRUP_SIRA!=='undefined'?GOREV_GRUP_SIRA:[]).indexOf(grupAd||'');
+      return i>=0 ? i : 90; // tanımsız grup değeri → "Diğer" bloğu
+    };
     data.forEach(t=>{
       if(t.gorev_tipi==='TEDAVI_SEANS')return;
       if(t.gorev_tipi==='TEDAVI_GUN'){ if(seansDayIds.has(_gorevAciklama(t).day_id))return; }
-      const planTime=t.gorev_tipi==='TEDAVI_GUN'?(_gorevAciklama(t).planned_time||''):'';
-      bloklar.push({ sort:(t.hedef_tarih||'')+'|'+(planTime||'~')+'|n', type:'normal', task:t });
+      const _acik=t.gorev_tipi==='TEDAVI_GUN'?_gorevAciklama(t):{};
+      const h=t.hayvan_id?(getState('animals').find(a=>a.id===t.hayvan_id)):null;
+      const kupe=h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):(t.hayvan_id||'GENEL'));
+      const _drugs=t.gorev_tipi==='TEDAVI_GUN'?(_dayDrugMap[_acik.day_id||'']||[]):[];
+      const _teshis=t.gorev_tipi==='TEDAVI_GUN'?(_dayDiseaseMap[_acik.day_id||'']||''):'';
+      const _acikMetin=(_acik.label||t.aciklama||'');
+      bloklar.push({ type:'normal', task:t, tarih:t.hedef_tarih||'', saat:gorevSaatAnahtari(t),
+        hayvanGrup:h?.grup||(t.hayvan_id?'':'GENEL'), kupe, drugs:_drugs, teshis:_teshis,
+        arama:[kupe,h?.grup||'',t.gorev_tipi,_acikMetin,_teshis,_drugs.map(d=>d.name).join(' ')].join(' ').toLowerCase() });
     });
     Object.values(grupMap).forEach(g=>{
       g.items.sort((a,b)=>(a.seans.planned_time||'').localeCompare(b.seans.planned_time||''));
-      const ilk=g.items[0]?.seans.planned_time||'';
-      bloklar.push({ sort:(g.date||'')+'|'+(ilk||'~')+'|s', type:'seans', grup:g });
+      bloklar.push({ type:'seans', grup:g, tarih:g.date||'', saat:(g.items[0]?.seans.planned_time||'').slice(0,5),
+        hayvanGrup:g.grupAd||'', kupe:g.animalLabel,
+        arama:[g.animalLabel,g.grupAd||'','TEDAVI_SEANS',g.disease||'',g.items.map(it=>it.drugName).join(' ')].join(' ').toLowerCase() });
     });
-    bloklar.sort((a,b)=>a.sort.localeCompare(b.sort));
-    el.innerHTML=bloklar.slice(0,200).map(b=>{
+    const _saatK=s=>s||'\uffff'; // saatsizler en sonda (spec §4.1)
+    bloklar.sort((a,b)=>
+      a.tarih.localeCompare(b.tarih) ||
+      _saatK(a.saat).localeCompare(_saatK(b.saat)) ||
+      _grupSira(a.hayvanGrup)-_grupSira(b.hayvanGrup) ||
+      kuceDogalKarsilastir(a.kupe,b.kupe));
+    // F4: arama aktifken limit kalkar (IDB'de tüm gorev_log zaten var)
+    const _arama=(srchEl?.value||'').trim().toLowerCase();
+    const _secili=_arama?bloklar.filter(b=>b.arama.includes(_arama)):bloklar;
+    if(!_secili.length){
+      el.innerHTML=_arama
+        ?'<div class="empty"><div class="empty-ico">🔍</div>Eşleşen görev bulunamadı</div>'
+        :'<div class="empty"><div class="empty-ico">✅</div>Bu filtrede görev yok</div>';
+      return;
+    }
+    const _limitSecili=_arama?_secili:_secili.slice(0,200);
+    let _html=''; let _curSaat=null; let _curGrupKey='';
+    _limitSecili.forEach(b=>{
+      const saatKey=b.saat||'';
+      if(saatKey!==_curSaat){
+        _curSaat=saatKey; _curGrupKey='';
+        const _n=_secili.filter(x=>(x.saat||'')===saatKey).length;
+        _html+='<div style="display:flex;align-items:center;gap:8px;margin:'+(saatKey===_limitSecili[0].saat?'2px':'12px')+' 2px 4px;font-size:.74rem;font-weight:800">'+
+          '<span style="color:var(--blue)">'+(saatKey?'⏰ '+esc(saatKey):'⏰ Saatsiz')+'</span>'+
+          '<span style="flex:1;height:1px;background:var(--card3)"></span>'+
+          '<span style="color:var(--ink3);font-weight:700">'+_n+' görev</span></div>';
+      }
+      const grupEtiket=b.hayvanGrup||'Diğer';
+      const gKey=saatKey+'|'+b.tarih+'|'+grupEtiket;
+      if(gKey!==_curGrupKey){
+        _curGrupKey=gKey;
+        const _n=_secili.filter(x=>(x.saat||'')===saatKey&&(x.hayvanGrup||'')===grupEtiket).length;
+        _html+='<div style="margin:4px 2px 2px;font-size:.76rem;font-weight:800;color:'+(grupEtiket==='GENEL'?'var(--ink3)':'var(--green)')+'">'+
+          (grupEtiket==='GENEL'?'📋':'🐄')+' '+esc(grupEtiket)+
+          ' <span style="color:var(--ink3);font-weight:600;font-size:.68rem">'+_n+'</span></div>';
+      }
       if(b.type==='seans'){
         const g=b.grup;
-        return renderSeansGrupAyrac(g)+'<div class="seans-grup-wrap">'+
-          g.items.map(it=>renderSeansGorevKart(it.task,it.seans,{drugName:it.drugName,date:g.date})).join('')+'</div>';
+        _html+='<div style="margin-left:8px">'+renderSeansGrupAyrac(g)+'<div class="seans-grup-wrap">'+
+          g.items.map(it=>renderSeansGorevKart(it.task,it.seans,{drugName:it.drugName,date:g.date})).join('')+'</div></div>';
+        return;
       }
       const t=b.task;
       const _diff=Math.floor((new Date(t.hedef_tarih)-Date.now())/86400000);
       const _clsBase=_diff<=3?'near':'';
       const _clsMid=t.hedef_tarih===today?'soon':_clsBase;
       const cls=t.hedef_tarih<today?'late':_clsMid;
-      const _tDrugs=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return _dayDrugMap[JSON.parse(t.aciklama||'{}').day_id]||[];}catch(e){return [];}})():[];
-      const _tDisease=t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return _dayDiseaseMap[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}})():'';
-      return renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id),_tDrugs,_tDisease);
-    }).join('');
+      _html+='<div style="margin-left:8px">'+renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id),b.drugs,b.teshis)+'</div>';
+    });
+    el.innerHTML=_html;
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
   });
 }
@@ -1630,6 +1681,269 @@ function _puDozPrefill(stokId) {
   });
 }
 
+// ═══ DOZAJ HELPERİ — 💡 tıkla-doldur (spec §3.3; asla otomatik yazma) ═══
+// _dozHintBtnHtml: doz input'unun yanına ufak buton. drugId boş ve stokInpId
+// verildiyse (pu modalları) ilaç, seçili stok option'ının data-dp'sinden çözülür.
+// hayvanIds boşsa (hayvan bağlamı yok — örn. şablon builder) buton hiç üretilmez.
+function _dozHintBtnHtml(inpId, drugId, hayvanIds, stokInpId) {
+  if (!hayvanIds || (!drugId && !stokInpId)) return '';
+  const dAttr = drugId ? ` data-drug="${drugId}"` : ` data-stok-inp="${stokInpId}"`;
+  return `<button type="button" title="Dozaj önerisi: kart dozu × canlı ağırlık — tıkla, dozu doldur"` +
+    ` data-action="doz-oneri"${dAttr} data-doz-inp="${inpId}" data-hayvan="${hayvanIds}"` +
+    ` style="flex-shrink:0;width:34px;min-height:34px;align-self:stretch;border:none;border-radius:7px;background:rgba(42,107,181,.12);color:var(--blue);cursor:pointer;font-size:.95rem;line-height:1">💡</button>`;
+}
+
+// Buton tıklaması: artık doğrudan değer yazmaz — DOZAJ HELPER SHEET'ini açar.
+// Sheet: hayvan kg + ilaç pratik/pro dozajları (kartlardan öndolum; boşsa
+// buradan girilir) + canlı hesap çipleri (pratik/pro × min/varsayılan/max).
+// Tek tıkla uygula → kilo HAYVAN kartına, dozaj oranları İLAÇ kartına yazılır
+// (RPC) ve seçilen değer doz kutusuna aktarılır; sheet kapanır. Arka plandaki
+// planlama formu ASLA kapatılmaz/sıfırlanmaz (kullanıcı kuralı, 2026-09-09).
+function _dozInpBul(btn) {
+  return btn.dataset.dozInp
+    ? document.getElementById(btn.dataset.dozInp)
+    : (btn.parentElement && btn.parentElement.querySelector('input.cdf-dose-inp')) || null;
+}
+
+async function dozOneriUygula(btn) {
+  try {
+    let drugId = btn.dataset.drug || '';
+    if (!drugId && btn.dataset.stokInp) {
+      const sel = document.getElementById(btn.dataset.stokInp);
+      drugId = sel?.selectedOptions?.[0]?.dataset?.dp || '';
+    }
+    if (!drugId) { toast('💡 Bu kayıtta ilaç kartı (drug_product) yok — öneri yapılamaz', true); return; }
+    if (!(_drugsCache && _drugsCache.length)) { try { await loadDrugsCache(); } catch (e) {} }
+    const kart = (_drugsCache || []).find(d => d.id === drugId);
+    if (!kart) { toast('💡 İlaç kartı bulunamadı', true); return; }
+    const ids = (btn.dataset.hayvan || '').split(',').filter(Boolean);
+    _dozSheetAc(btn, kart, ids);
+  } catch (e) {
+    toast('💡 Hata: ' + (e.message || e), true);
+  }
+}
+
+// ── Helper sheet ──
+const _DOZ_TIP_ETIKET = { pratik: 'ml/kg yolu', pro: 'mg/kg yolu', sabit: 'Sabit doz' };
+const _DOZ_SEVIYE_ETIKET = { min: 'Min', tip: 'Varsayılan', max: 'Max' };
+
+function _dozSheetOku() {
+  const sayi = id => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) && v > 0 ? v : null; };
+  return {
+    kg: sayi('doz-sheet-kg'),
+    // Pratik doz = "X kg'a Y ml" çifti (saha dili): oran = Y ÷ X (ml/kg).
+    pratik: (() => { const kg = sayi('doz-sheet-pratik-kg'), ml = sayi('doz-sheet-pratik-ml');
+      return (kg && ml) ? ml / kg : null; })(),
+    pratikKg: sayi('doz-sheet-pratik-kg'),
+    pro: sayi('doz-sheet-pro'),
+    conc: sayi('doz-sheet-conc'),
+    min: sayi('doz-sheet-min'),
+    max: sayi('doz-sheet-max'),
+  };
+}
+
+// Girdilere göre hesap tabanını kur: pro doluysa pro-bazlı (pratik çipleri
+// conc'tan), değilse pratik-bazlı; ikisi de boşsa kartın kendi değerleri.
+// KULLANICI NEYİ DEĞİŞTİRDİYSE O KAZANIR (2026-09-09: pro öndolumu hep
+// öncelikliydi, pratik girişi görmezden geliniyordu — "aynı değerler geri
+// geliyor" şikayetinin kökü):
+//  - pro (mg/kg) kart değerinden farklı girildiyse ya da kart mg/kg değilken
+//    elle doldurulduysa → pro-bazlı
+//  - değilse pratik çifti (kg→ml) doluysa → pratik-bazlı (ml/kg)
+//  - değilse kartın kendi değerleri.
+function _dozSheetTaban(okunan, kart) {
+  const kartMgKg = kart.std_dose_unit === 'mg/kg';
+  const proDegisti = okunan.pro && ((kartMgKg && okunan.pro !== +kart.std_dose) || (!kartMgKg && !okunan.pratik));
+  if (okunan.pro && proDegisti) return { std_dose: okunan.pro, std_dose_unit: 'mg/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, concentration: okunan.conc, default_unit: kart.default_unit || kart.birim || 'ml' };
+  if (okunan.pratik) return { std_dose: okunan.pratik, std_dose_unit: 'ml/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, concentration: okunan.conc, default_unit: kart.default_unit || kart.birim || 'ml' };
+  if (okunan.pro) return { std_dose: okunan.pro, std_dose_unit: 'mg/kg', std_dose_min: okunan.min, std_dose_max: okunan.max, concentration: okunan.conc, default_unit: kart.default_unit || kart.birim || 'ml' };
+  return kart;
+}
+
+function _dozSheetAc(btn, kart, ids) {
+  document.getElementById('doz-sheet')?.remove();
+  const animals = getState('animals') || [];
+  const _ilk = ids.map(id => animals.find(a => a.id === id)).filter(Boolean);
+  const tekHayvan = ids.length === 1;
+  const kupe = _ilk.length ? (_ilk[0].kupe_no || _ilk[0].devlet_kupe || '') : '';
+  const _kgler = _ilk.map(a => +a.canli_agirlik || 0).filter(x => x > 0);
+  const kgNow = _kgler.length ? Math.max(..._kgler) : '';
+  const unit = kart.std_dose_unit || 'ml/kg';
+  const _f = x => (x === null || x === undefined || x === '' ? '' : x);
+  const isSabit = unit === 'ml/hayvan';
+
+  // Repo modal deseni (.mo + .modal): dar ekranda alt-sheet, geniş ekranda
+  // ortalanmış compact kart (max-width 560 — tedavi modalıyla aynı davranış).
+  // z-index 600: vaka detay (.mo z-80) ve pu mini modalların (z-500) üstünde.
+  const mini = document.createElement('div');
+  mini.id = 'doz-sheet';
+  mini.className = 'mo';
+  mini.style.zIndex = '600';
+  mini.setAttribute('data-action', 'mclose-overlay');
+  mini.innerHTML = `<div class="modal"><div class="m-handle"></div><div style="padding:4px 16px 18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+      <div style="font-weight:800;font-size:.92rem">💡 Dozaj Helperı</div>
+      <button id="doz-sheet-kapat" style="background:none;border:none;font-size:1.15rem;cursor:pointer;color:var(--ink3)">✕</button>
+    </div>
+    <div style="font-size:.73rem;color:var(--ink3);margin-bottom:12px">${_ilk.length ? '🐄 ' + esc(kupe) + (tekHayvan ? ' · kilo kaydedilir' : ' · çoklu seçim — kilo kaydedilmez, yalnız hesap') : '🐄 hayvan bağlamı yok — yalnız ilaç kartı'}</div>
+    <div style="background:var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
+      <label style="font-size:.68rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em">🐄 Hayvan</label>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+        <input id="doz-sheet-kg" type="number" step="0.5" min="1" inputmode="decimal" placeholder="Canlı ağırlık (kg)" value="${_f(kgNow)}" style="flex:1;padding:9px;border-radius:8px;border:1px solid var(--border);font-size:.85rem;min-width:0">
+        ${tekHayvan ? '' : '<span style="font-size:.66rem;color:var(--ink3);flex-shrink:0">referans: en ağır</span>'}
+      </div>
+    </div>
+    <div style="background:var(--card2);border-radius:10px;padding:10px;margin-bottom:8px">
+      <label style="font-size:.68rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em">💊 ${esc(kart.name || 'İlaç kartı')} — dozajlama</label>
+      ${isSabit
+        ? `<div style="font-size:.78rem;margin-top:6px">Sabit doz tipi (ml/hayvan) — kart: <b>${_f(kart.std_dose)} ml</b>${kart.std_dose_min ? ' · aralık ' + _f(kart.std_dose_min) + '–' + _f(kart.std_dose_max) : ''}</div>
+           <input type="hidden" id="doz-sheet-sabit" value="${_f(kart.std_dose)}">`
+        : `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+        <div style="grid-column:1 / -1"><label style="font-size:.64rem;color:var(--ink3)">Pratik doz — kaç kg'a kaç ml? <span title="Örn: 50 kg'a 2 ml → 500 kg hayvana 20 ml">ⓘ</span></label><div style="display:grid;grid-template-columns:1fr 14px 1fr;gap:4px;align-items:center">
+        <input id="doz-sheet-pratik-kg" type="number" step="1" min="1" inputmode="decimal" placeholder="kg" value="${unit === 'ml/kg' && +kart.std_dose > 0 ? '50' : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0;text-align:center">
+        <span style="text-align:center;color:var(--ink3);font-size:.7rem">kg'a</span>
+        <input id="doz-sheet-pratik-ml" type="number" step="0.1" min="0" inputmode="decimal" placeholder="ml" value="${unit === 'ml/kg' && +kart.std_dose > 0 ? String(Math.round(+kart.std_dose * 50 * 100) / 100) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0;text-align:center">
+        </div></div>
+        <div><label style="font-size:.64rem;color:var(--ink3)">mg/kg oranı (pro)</label><input id="doz-sheet-pro" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 2" value="${unit === 'mg/kg' ? _f(kart.std_dose) : ''}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div><label style="font-size:.64rem;color:var(--ink3)">Konsantrasyon (mg/ml) — 1 ml ilaçtaki etken</label><input id="doz-sheet-conc" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 50" value="${_f(kart.concentration)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr auto;gap:4px;align-items:end">
+          <div><label style="font-size:.64rem;color:var(--ink3)">Min dozaj (<span id="doz-sheet-mm-birim">${unit === 'mg/kg' ? 'mg/kg' : 'ml/kg'}</span>)</label><input id="doz-sheet-min" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 0,02" value="${_f(kart.std_dose_min)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+          <button type="button" id="doz-sheet-min-btn" title="Min dozu (alt sınır) tedaviye yaz" style="height:37px;padding:0 8px;border:none;border-radius:8px;background:rgba(42,107,181,.12);color:var(--blue);font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 —</button>
+          <div><label style="font-size:.64rem;color:var(--ink3)">Max dozaj (<span id="doz-sheet-mm-birim-max">${unit === 'mg/kg' ? 'mg/kg' : 'ml/kg'}</span>)</label><input id="doz-sheet-max" type="number" step="0.01" min="0" inputmode="decimal" placeholder="örn: 0,06" value="${_f(kart.std_dose_max)}" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;min-width:0"></div>
+          <button type="button" id="doz-sheet-max-btn" title="Max dozu (üst sınır) tedaviye yaz" style="height:37px;padding:0 8px;border:none;border-radius:8px;background:rgba(190,66,50,.12);color:var(--red);font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">📥 —</button>
+        </div>
+        <div style="font-size:.62rem;color:var(--ink3);margin-top:4px">Min/Max = prospektüs aralığının alt/üst dozu (aynı oranda). 📥 butonu o dozu kilo ile hesaplayıp tedaviye yazar — hayvan kilosu ve oranlar değiştikçe canlı güncellenir.</div>
+      </div>
+      <div style="font-size:.62rem;color:var(--ink3);margin-top:4px">ml/kg ve mg/kg aynı dozun iki yazılışıdır — konsantrasyon ikisini birbirine çevirir. <b>Pratik doz = hayvana verilecek ml</b>; aşağıda ağırlıkla hesaplanır.</div>`}
+    </div>
+    <div id="doz-sheet-cipler" style="margin-bottom:8px"></div>
+    <div style="display:flex;gap:8px">
+      <button id="doz-sheet-kaydet" class="btn" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:10px;font-weight:700;cursor:pointer">💾 Kartlara yaz</button>
+      <button id="doz-sheet-iptal" style="flex:0 0 auto;background:var(--card3);border:none;border-radius:8px;padding:10px 14px;cursor:pointer">İptal</button>
+    </div>
+    <div style="font-size:.62rem;color:var(--ink3);margin-top:6px">Çipe tıkla = kaydet + doz kutusuna yaz. Sadece kaydetmek istersen "💾 Kartlara yaz". Yazmadan ✕ ile çıkabilirsin.</div>
+  </div></div>`;
+  document.body.appendChild(mini);
+  openM('doz-sheet');
+  document.getElementById('doz-sheet-kapat').onclick = _dozSheetKapat;
+  document.getElementById('doz-sheet-iptal').onclick = _dozSheetKapat;
+  ['doz-sheet-kg','doz-sheet-pratik-kg','doz-sheet-pratik-ml','doz-sheet-pro','doz-sheet-conc','doz-sheet-min','doz-sheet-max'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => _dozSheetCiplerCiz(kart, btn, ids));
+  });
+  ['min','max'].forEach(sv => document.getElementById('doz-sheet-' + sv + '-btn')?.addEventListener('click', () => {
+    const b = document.getElementById('doz-sheet-' + sv + '-btn');
+    if (!b || b.disabled || !b.dataset.doz) return;
+    _dozSheetUygula(btn, document.getElementById('doz-sheet'), kart, ids,
+      { doz: +b.dataset.doz, birim: b.dataset.birim || 'ml', aciklama: b.dataset.aciklama || '' });
+  }));
+  document.getElementById('doz-sheet-kaydet').onclick = () => _dozSheetUygula(btn, mini, kart, ids, null);
+  _dozSheetCiplerCiz(kart, btn, ids);
+}
+
+function _dozSheetKapat() {
+  const s = document.getElementById('doz-sheet');
+  if (!s) return;
+  closeM('doz-sheet');
+  s.remove();
+}
+
+// Hesap çiplerini canlı çiz — her çip tek tıkla: kartlara yaz + doz kutusuna aktar + kapat.
+function _dozSheetCiplerCiz(kart, btn, ids) {
+  const bolum = document.getElementById('doz-sheet-cipler');
+  if (!bolum) return;
+  const okunan = _dozSheetOku();
+  const taban = _dozSheetTaban(okunan, kart);
+  const cipler = dozCipleri(okunan.kg, taban);
+  if (!cipler.length) {
+    bolum.innerHTML = '<div style="font-size:.72rem;color:var(--ink3);padding:6px 2px">' +
+      (okunan.kg ? 'Hesap için ml/kg veya mg/kg oranını girin.' : 'Önce canlı ağırlığı girin — hayvana verilecek doz burada hesaplanır.') + '</div>';
+    return;
+  }
+  const _renk = { pratik: 'var(--green)', pro: 'var(--blue)', sabit: 'var(--ink3)' };
+  bolum.innerHTML = '<div style="font-size:.66rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.05em;margin:2px 0 6px">Hayvana verilecek doz — çipe tıkla: kartlara yazılır + doz kutusuna aktarılır</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px">' +
+    cipler.map((c, i) => `<button type="button" data-cip="${i}" style="background:${_renk[c.tip] || 'var(--card3)'};color:#fff;border:none;border-radius:8px;padding:8px 10px;font-size:.74rem;font-weight:700;cursor:pointer;text-align:left">` +
+      `${_DOZ_TIP_ETIKET[c.tip]} · ${_DOZ_SEVIYE_ETIKET[c.seviye]}: <b>${esc(String(c.doz).replace('.', ','))} ${esc(c.birim)}</b><br>` +
+      `<span style="font-weight:500;font-size:.64rem;opacity:.85">${esc(c.aciklama)}</span></button>`).join('') +
+    '</div>';
+  bolum.querySelectorAll('[data-cip]').forEach(el => {
+    el.onclick = () => _dozSheetUygula(btn, document.getElementById('doz-sheet'), kart, ids, cipler[+el.dataset.cip]);
+  });
+  // Min/Max 📥 butonları — hayvan kg'ı ve oranlarla CANLI hesaplanır; tıklayınca
+  // kartlara yazılır + o doz tedaviye yazılır (kullanıcı istekleri, 2026-09-09).
+  const _mmBtn = seviye => {
+    const btnEl = document.getElementById('doz-sheet-' + seviye + '-btn');
+    if (!btnEl) return;
+    const oran = seviye === 'min' ? okunan.min : okunan.max;
+    if (!oran || !okunan.kg) { btnEl.disabled = true; btnEl.textContent = '📥 —'; return; }
+    const r = dozOner(okunan.kg, { ...taban, std_dose: oran });
+    if (!r.ok) { btnEl.disabled = true; btnEl.textContent = '📥 —'; return; }
+    btnEl.disabled = false;
+    btnEl.textContent = '📥 ' + String(r.doz).replace('.', ',') + ' ' + r.birim;
+    btnEl.dataset.doz = String(r.doz);
+    btnEl.dataset.birim = r.birim;
+    btnEl.dataset.aciklama = r.aciklama;
+  };
+  _mmBtn('min'); _mmBtn('max');
+}
+
+async function _dozSheetUygula(btn, mini, kart, ids, cip) {
+  const okunan = _dozSheetOku();
+  const dozInp = _dozInpBul(btn);
+  const kaydetBtn = document.getElementById('doz-sheet-kaydet');
+  const _kaydetKilit = () => { if (kaydetBtn) { kaydetBtn.disabled = true; kaydetBtn.textContent = 'Yazılıyor…'; } };
+  const _kaydetAc = () => { if (kaydetBtn) { kaydetBtn.disabled = false; kaydetBtn.textContent = '💾 Kartlara yaz'; } };
+  const taban = _dozSheetTaban(okunan, kart);
+  const guncellemeler = {};
+  if (taban !== kart) {
+    if (taban.std_dose_unit === 'mg/kg') {
+      guncellemeler.std_dose = taban.std_dose;
+      guncellemeler.std_dose_unit = 'mg/kg';
+      if (okunan.conc) { guncellemeler.concentration = okunan.conc; guncellemeler.concentration_unit = 'mg/ml'; }
+    } else {
+      guncellemeler.std_dose = taban.std_dose;
+      guncellemeler.std_dose_unit = 'ml/kg';
+    }
+    if (okunan.min) guncellemeler.std_dose_min = okunan.min;
+    if (okunan.max) guncellemeler.std_dose_max = okunan.max;
+  }
+  const kgYaz = okunan.kg && ids.length === 1 ? okunan.kg : null;
+  if (!guncellemeler.std_dose && !kgYaz && !cip) {
+    toast('💡 Kaydedilecek değer yok — kilo ve dozajlama girin', true);
+    return;
+  }
+  _kaydetKilit();
+  try {
+    if (kgYaz) {
+      // hayvan_guncelle 3 overload'lu — minimal çağrıda PostgREST belirsizlik
+      // veriyor; kilo yazımı tek amaçlı RPC'den geçer (20260909110000).
+      const res = await rpc('hayvan_kilo_guncelle', { p_id: ids[0], p_canli_agirlik: kgYaz });
+      if (res?.ok === false) throw new Error(res.mesaj || 'Kilo kaydı başarısız');
+      const yeni = (getState('animals') || []).map(a => a.id === ids[0] ? { ...a, canli_agirlik: kgYaz } : a);
+      if (yeni.length) setState('animals', yeni);
+    }
+    if (Object.keys(guncellemeler).length) {
+      const res = await rpc('ilac_dozaj_guncelle', { p_id: kart.id, p_guncellemeler: guncellemeler });
+      if (res?.ok === false) throw new Error(res.mesaj || 'İlaç kartı yazımı başarısız');
+      Object.assign(kart, guncellemeler); // cache'i yerinde güncelle
+    }
+    pullTables(['hayvanlar', 'drug_products']).catch(() => {});
+    if (!cip) _dozSheetCiplerCiz(kart, btn, ids); // kartlara-yaz sonrası çipler tazelensin
+    if (cip && dozInp) dozInp.value = cip.doz;
+    if (cip) {
+      _dozSheetKapat(); // çip: kaydet + aktar + kapat — kaldığın yerden devam
+      toast('💡 ' + cip.aciklama);
+    } else {
+      // 💾 Kartlara yaz: yalnız kaydet — sheet AÇIK kalır, planlamaya devam
+      toast('💾 Kartlara yazıldı — sheet açık, devam edebilirsin');
+      _kaydetAc();
+    }
+  } catch (e) {
+    toast('❌ ' + (e.message || e), true);
+    _kaydetAc();
+  }
+}
+
 async function _protokolUygula(idx){
   const d = window.__protokolUyarilar[idx];
   if (!d) return;
@@ -1648,9 +1962,10 @@ async function _protokolUygula(idx){
   mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:flex-end';
   mini.onclick = e => { if (e.target === mini) mini.remove(); };
 
-  const stokOpts = ilaclar.map(s => `<option value="${s.id}" data-birim="${esc(s.birim||'ml')}">${esc(s.urun_adi)}</option>`).join('');
+  const stokOpts = ilaclar.map(s => `<option value="${s.id}" data-birim="${esc(s.birim||'ml')}" data-dp="${s.drug_product_id||''}">${esc(s.urun_adi)}</option>`).join('');
   const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin','Meme içi'].map(r => `<option value="${r}">${r}</option>`).join('');
   const ilkBirim = ilaclar[0]?.birim || 'ml';
+  const _dozBtn = _dozHintBtnHtml('pu-doz', '', d.hayvan_id, 'pu-stok');
 
   mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💉 Protokol Uygula</div>
@@ -1658,7 +1973,7 @@ async function _protokolUygula(idx){
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Stok</label>
     <select id="pu-stok" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${stokOpts}</select>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <div style="flex:2"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" min="0.1" value="1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:2"><label style="font-size:.7rem;font-weight:600">Doz</label><div style="display:flex;gap:4px"><input id="pu-doz" type="number" step="0.1" min="0.1" value="1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem;flex:1;min-width:0">${_dozBtn}</div></div>
       <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="${ilkBirim}" readonly style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem;background:var(--card2);color:var(--ink3)"></div>
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
@@ -5472,8 +5787,9 @@ async function _gorevStokSecVeTamamla(gorev){
   mini.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;display:flex;align-items:flex-end';
   mini.onclick = e => { if (e.target === mini) mini.remove(); };
 
-  const stokOpts = ilaclar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
+  const stokOpts = ilaclar.map(s => `<option value="${s.id}" data-dp="${s.drug_product_id||''}">${esc(s.urun_adi)} (${s.birim||''})</option>`).join('');
   const rotaOpts = ['IM','IV','SC','PO','Topikal','Intrauterin','Meme içi'].map(r => `<option value="${r}">${r}</option>`).join('');
+  const _dozBtn = _dozHintBtnHtml('pu-doz', '', gorev.hayvan_id || '', 'pu-stok');
 
   mini.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:.9rem;margin-bottom:4px">💊 Görev Tamamlama — Stok Seç</div>
@@ -5481,7 +5797,7 @@ async function _gorevStokSecVeTamamla(gorev){
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Stok</label>
     <select id="pu-stok" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:8px;font-size:.8rem">${stokOpts}</select>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Doz</label><input id="pu-doz" type="number" step="0.1" value="10" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Doz</label><div style="display:flex;gap:4px"><input id="pu-doz" type="number" step="0.1" value="10" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem;flex:1;min-width:0">${_dozBtn}</div></div>
       <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="ml" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem"></div>
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
@@ -5786,6 +6102,11 @@ async function loadDrugsCache() {
         stock_id:         s?.id || null,
         guncel,
         birim:            s?.birim || dp.default_unit || 'ml',
+        // Dozaj helperi (20260909100000 migration): standart doz + konsantrasyon
+        std_dose:         dp.std_dose ?? null,
+        std_dose_unit:    dp.std_dose_unit || null,
+        concentration:    dp.concentration ?? null,
+        concentration_unit: dp.concentration_unit || null,
       };
     });
       // Fallback: drug_product_id olmayan eski stok kalemleri de ekle
@@ -6685,6 +7006,10 @@ function cdfChkChange(chk) {
   const satirlar = document.getElementById('cdf-doz-satirlar');
   const alan = document.getElementById('cdf-doz-alani');
   if (!satirlar || !alan) return;
+  // Hayvan bağlamı yalnız vaka detay modalı AÇIKKEN geçerli — bayat _curCase
+  // şablon builder'a sızmasın (orada hayvan yok, buton da üretilmez).
+  const _vakaHayvanId = document.getElementById('m-case-det')?.classList.contains('on')
+    ? (_curCase?.animal_id || '') : '';
   if (chk.checked) {
     const row = document.createElement('div');
     row.id = 'cdf-row-' + id;
@@ -6692,9 +7017,11 @@ function cdfChkChange(chk) {
     row.innerHTML =
       '<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-bottom:5px">'+name+'</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+
-      '<input type="number" min="0.01" step="0.01" placeholder="Doz" class="fi cdf-dose-inp" data-drug-id="'+id+'" style="margin:0">'+
-      '<input type="text" placeholder="Birim" value="'+unit+'" class="fi cdf-unit-inp" data-drug-id="'+id+'" style="margin:0">'+
+      '<div style="display:flex;gap:4px">'+
+      '<input type="number" min="0.01" step="0.01" placeholder="Doz" class="fi cdf-dose-inp" data-drug-id="'+id+'" style="margin:0;flex:1;min-width:0">'+
+      _dozHintBtnHtml('', id, _vakaHayvanId)+
       '</div>'+
+      '<input type="text" placeholder="Birim" value="'+unit+'" class="fi cdf-unit-inp" data-drug-id="'+id+'" style="margin:0">'+
       '<select class="fsel cdf-route-inp" data-drug-id="'+id+'" style="margin-top:5px">'+
       '<option value="">Uygulama yolu</option>'+
       '<option '+(route==='IM'?'selected':'')+' value="IM">IM — Kas ici</option>'+
@@ -8903,23 +9230,16 @@ function stokFiltrele(q){
   if (sonuc) sonuc.textContent = q ? visible+' sonuç' : '';
 }
 
-// ═══ GÖREV KÜPE ARAMA ═══
+// ═══ GÖREV İÇERİK ARAMASI (F4 — veri katmanı) ═══
+// Eski taskSrch client-side DOM gizleme'ydi: yalnız o an render edilmiş ≤200
+// kartın .tc-id metninde arıyor, seans/alt görev kartları kapsam dışıydı ve
+// her loadTasks'ta input temizleniyordu. Artık burada yalnız debounce var;
+// filtre loadTasks içinde blok verisi üzerinden uygulanır (kupe, tip,
+// açıklama, ilaç adları, teşhis), limit arama aktifken kalkar ve arama
+// sekme/filtre geçişlerinde korunur.
 function taskSrch(){
-  const q = (document.getElementById('task-srch')?.value||'').toLowerCase().trim();
-  const cards = document.querySelectorAll('#tasks-body .task-card');
-  let visible = 0;
-  cards.forEach(card => {
-    const idSpan = card.querySelector('.tc-id');
-    const text = (idSpan?.textContent||'').toLowerCase();
-    if (!q || text.includes(q)) { card.style.display = ''; visible++; }
-    else { card.style.display = 'none'; }
-  });
-  // Boş sonuç mesajını güncelle
-  const body = document.getElementById('tasks-body');
-  const emptyMsg = body?.querySelector('.empty:only-child');
-  if (emptyMsg && visible === 0) {
-    emptyMsg.innerHTML = '<div class="empty-ico">🔍</div>Eşleşen görev bulunamadı';
-  }
+  clearTimeout(taskSrch._t);
+  taskSrch._t=setTimeout(()=>{ loadTasks(_curTaskFilter||'today',null,{skipPull:true}); },220);
 }
 
 // ══════════════════════════════════════════
@@ -9202,6 +9522,7 @@ function seansDuzenleAc(seansId) {
     <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;width:100%">
       <input id="sd-time-${seansId}" class="fi" type="time" value="${esc(fmtSeansSaat(s.planned_time) || '08:00')}" style="margin:0;width:88px">
       <input id="sd-dose-${seansId}" class="fi" type="number" min="0.01" step="0.01" value="${s.dose ?? ''}" placeholder="Doz" style="margin:0;width:64px">
+      ${_dozHintBtnHtml('sd-dose-' + seansId, s.drug_product_id || '', document.getElementById('m-case-det')?.classList.contains('on') ? (_curCase?.animal_id || '') : '')}
       <input id="sd-unit-${seansId}" class="fi" type="text" value="${esc(s.unit || 'ml')}" placeholder="Birim" style="margin:0;width:52px">
       <select id="sd-route-${seansId}" class="fsel" style="margin:0;flex:1;min-width:64px">${yolOpts}</select>
       <button onclick="seansDuzenleKaydet('${seansId}',this)" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:6px 10px;font-weight:700;cursor:pointer" title="Kaydet">✓</button>
