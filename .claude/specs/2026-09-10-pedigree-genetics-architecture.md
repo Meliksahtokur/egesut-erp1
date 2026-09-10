@@ -49,7 +49,7 @@ Temel kararlar:
 6. Sperma bir metin değil, kontrollü entity olur: `semen_catalog`. Bir semen kaydı bir `pedigree_node` boğasına bağlanır; isterse mevcut `stok` satırına bağlanır.
 7. Tohumlama gerçekleştiğinde pedigree edge oluşmaz. Yalnız seçilen semen entity'si kaydedilir. Yavru doğduğunda `dogum_kaydet` transaction'ı yavru node'unu ve dam/sire edge'lerini oluşturur.
 8. Akrabalık, inbreeding, founder contribution ve mating risk **PostgreSQL/RPC katmanında** hesaplanır. Frontend yalnız projection/render yapar; bu mevcut “frontend hesap yapmaz” invariant'ıyla uyumludur.
-9. Görselleştirme: **Cytoscape.js**. Hiyerarşik yerleşim: **ELK / cytoscape-elk**. Tree-sitter, Graphology, Neo4j veya ayrı graph DB MVP için kullanılmaz.
+9. Görselleştirme: **Cytoscape.js**. Focal tree yerleşimi gömülü `breadthfirst`; ELK yalnız mating overlay'de lazy-load (Revizyon 2). Tree-sitter, Graphology, Neo4j veya ayrı graph DB MVP için kullanılmaz.
 10. İlk fazda “genetik değer” tek bir uydurma 0–100 puanı olmayacak. Pedigree metrikleri, yayınlanmış EBV/PTA vb. değerlendirmeler ve ileride çiftliğin fenotip verisinden üretilecek internal breeding index birbirinden ayrı tutulur.
 
 ---
@@ -197,6 +197,10 @@ CREATE TABLE public.pedigree_nodes (
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now(),
 
+  -- node_kind ↔ farm_animal_id invariant'i DDL'de (r3-F8):
+  CHECK ((node_kind = 'farm_animal'     AND farm_animal_id IS NOT NULL)
+      OR (node_kind = 'external_animal' AND farm_animal_id IS NULL)),
+
   UNIQUE (farm_id, id),              -- composite FK hedefi (cross-farm enforcement, §4.2)
   UNIQUE (farm_id, farm_animal_id)
 );
@@ -228,6 +232,7 @@ CREATE TABLE public.pedigree_parentage (
 
   source_type       text NOT NULL CHECK (source_type IN ('birth','manual','import','reconcile')),
   source_ref        text NULL,
+  evidence          jsonb NOT NULL DEFAULT '{}'::jsonb,   -- r3-F2: doğum edge'i {"tohumlama_id","semen_id"} taşır; rebuild/audit iddiasının sorgulanabilir kontratı
   confidence        numeric NOT NULL DEFAULT 1.0 CHECK (confidence >= 0 AND confidence <= 1),
   created_at        timestamptz NOT NULL DEFAULT now(),
 
@@ -270,8 +275,12 @@ Mevcut `stok` ile biyolojik sire kimliği arasındaki kontrollü köprü.
 CREATE TABLE public.semen_catalog (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   farm_id           uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
-  bull_node_id      uuid NOT NULL REFERENCES public.pedigree_nodes(id),
+  bull_farm_id      uuid NOT NULL,                    -- r3-N3: farm-scope ilişkisel kilit
+  bull_node_id      uuid NOT NULL,
   stock_id          text NULL REFERENCES public.stok(id) ON DELETE SET NULL,
+
+  FOREIGN KEY (bull_farm_id, bull_node_id)
+    REFERENCES public.pedigree_nodes(farm_id, id),
 
   code              text NULL,
   display_name      text NOT NULL,
@@ -296,7 +305,10 @@ kontrolü yapılır — geçerli FK bile anlamsız bağ kuramaz.
 
 ```sql
 ALTER TABLE public.tohumlama
-  ADD COLUMN semen_id uuid NULL REFERENCES public.semen_catalog(id);
+  ADD COLUMN semen_id uuid NULL REFERENCES public.semen_catalog(id),
+  ADD COLUMN semen_id_onceki uuid NULL REFERENCES public.semen_catalog(id);
+  -- semen_id_onceki (r3-N17): tekrar aşım p_force_semen ile kimlik değişince
+  -- eski kanonik değer buraya taşınır (tek adım zincir; tam deneme tarihi v2).
 ```
 
 `tohumlama.sperma` hemen kaldırılmaz.
@@ -888,7 +900,7 @@ Genetik:
 - pedigree completeness
 - inbreeding F
 - founder/breed contribution
-- available published evaluations
+- available published evaluations — **(v2: dış değerlendirme katmanı)**
 
 #### Sperma kartı
 
@@ -898,7 +910,7 @@ Armada semen entity'si açıldığında:
 - supplier/code
 - stok miktarı
 - sire ancestry tree
-- published evaluations
+- published evaluations — **(v2)**
 - “Bu hayvanla eşleştir” aksiyonu
 
 #### Tohumlama modalı
@@ -1426,7 +1438,7 @@ Self-review sonunda mimariyi bloke eden bir çelişki bulunmadı. En büyük mig
                                                   ▼
                                       ┌──────────────────────┐
                                       │ Vanilla JS frontend  │
-                                      │ Cytoscape bf + ELK*  │
+                                      │ Cytoscape (bf)       │
                                       └──────────────────────┘
 ```
 

@@ -77,14 +77,14 @@ yeni RPC birine eklenip diğerine eklenmezse offline kuyruk sessizce legacy
 yola düşer. Pedigree planı Task 10'da zorunlu madde olmalı; genel tutarlılık
 testi (`api.test.js`) araştırılabilir.
 
-### SMELL-003 — Ground truth ↔ canlı `tohumlama_kaydet` gövde ayrışması
+### SMELL-003 — Ground truth ↔ canlı ayrışmaları (2 örnek)
 
-Tracked GT (`99999999999999_ground_truth.sql`, tohumlama_kaydet tanımı
-satır 10858–10924, 66 satır) gövdesinde stok düşümü **yok**; canlıda **var**
-(gorev_log + stok düşümü + ek uygulama döngüsü içeren daha uzun gövde).
-GT rehberdir, canlı otoritedir; bugfix deploy'undan sonra GT yeniden
-üretilmelidir (root kapısı). Bugünkü pedrigree planı (Task 0.2) "yeni drift"
-arıyor — mevcut drift örneği olarak bu kayıt referans alınmalı.
+Örnek 1: tracked GT'de `tohumlama_kaydet` tanımı (satır 10858–10924, 66 satır)
+stok düşümü **içermiyor**; canlıda **var** (gorev_log + stok düşümü + ek
+uygulama döngüsü). Örnek 2 (2026-09-10 kanıt S4): GT `tohumlama.id`'yi text
+gösteriyor (GT:116), canlı **uuid**; `created_at` GT tablo tanımında yok,
+canlıda mevcut. GT rehberdir, canlı otoritedir; bugfix + pedigree
+deploy'larından sonra GT yeniden üretilmelidir (root kapısı).
 
 ### SMELL-004 — `tests/sql` koşumu manuel
 
@@ -96,14 +96,15 @@ otomasyon kararı ayrı iş.
 
 ## Pedigree doküman düzeltmeleri (İndirilenler'deki spec/plana yansıtılacak)
 
-**Durum (2026-09-10, Revizyon 2): KARŞILANDI** — DOC-001..006, repo içindeki
-revize kopyalara işlendi (`.claude/specs/2026-09-10-pedigree-genetics-architecture.md`,
-`.claude/plans/2026-09-10-pedigree-genetics-impl.md`). Kalıntılar: DOC-005
-kapsam nüansı ve DOC-006'nın tracked-kapı eksiği aşağıda notludur; luna max
-review turu (r1 FAIL → r2) bulgularıyla birlikte kapatıldı.
+**Durum (2026-09-10, Revizyon 2 + review turları): KARŞILANDI** — DOC-001..006
+repo içindeki revize kopyalara işlendi; luna max turları (r1, r2, r3 FAIL)
+bulgularıyla iteratif kapatıldı. **Açık borç (bilinçli):** DOC-006'nın tracked
+dry-run kapısı Task 1.7 maddesidir (P1'de kapanır).
 
-DOC-001: ~~`tohumlama.id` beklentisi düzeltilmeli~~ → **İŞLENDİ**: plan Task 0.2
-artık beklenti yazmaz, canlıdan okur; bugünkü bilinen değer (text) kayıtlı.
+DOC-001: ~~`tohumlama.id` beklentisi düzeltilmeli~~ → **İŞLENDİ + canlı düzeltmesi**:
+plan Task 0.2 beklenti yazmaz, canlıdan okur. Canlı ölçüm (kanıt S4):
+`tohumlama.id` **uuid**, `created_at` timestamptz mevcut — GT'nin text/eksik
+gösterimi drift örneği #2'dir (SMELL-003).
 
 DOC-002: ~~stok düşümü okuması hizalanmalı~~ → **İŞLENDİ**: spec §6.3 + plan
 D4/Task 10 "düzeltilmiş kuralı semen_catalog.stock_id'ye taşı" olarak yazıldı.

@@ -64,11 +64,57 @@ Tracked `supabase/migrations/99999999999999_ground_truth.sql` içinde
 stok düşümü + gorev_log + ek uygulama döngüsünü içerir. Yani GT o anki canlı
 gövdeyi yansıtmıyor; canlı otorite kabul edildi.
 
+## S4 — Kolon tipleri (r3-review turu, 2026-09-10, information_schema)
+
+```sql
+SELECT table_name, column_name, data_type FROM information_schema.columns
+WHERE table_schema='public' AND (
+  (table_name='tohumlama'   AND column_name IN ('id','sperma','created_at','tarih','hayvan_id','sonuc'))
+  OR (table_name='hayvanlar' AND column_name IN ('id','anne_id','baba_bilgi','dogum_tarihi','cinsiyet'))
+  OR (table_name='dogum'     AND column_name IN ('id','olay_id','anne_id','baba_bilgi','dogum_tarihi'))
+  OR (table_name='stok'      AND column_name IN ('id','kategori','urun_adi')))
+ORDER BY table_name, column_name;
+```
+
+Özet çıktı: `tohumlama.id` **uuid**, `tohumlama.created_at` **timestamptz
+(MEV CUT)**, `tohumlama.sperma/hayvan_id/sonuc` text, `tarih` date;
+`hayvanlar.id/anne_id/baba_bilgi/cinsiyet` text, `dogum_tarihi` date;
+`dogum.id/olay_id` uuid, `dogum.anne_id/baba_bilgi` text; `stok.id/kategori/
+urun_adi` text. **Drift örneği #2:** tracked GT `tohumlama.id`'yi text
+gösteriyor (GT:116); canlı uuid — canlı otorite. `created_at` da GT tablo
+tanımında görünmüyor, canlıda mevcut (cutoff tasarımı bu kolona dayanabilir).
+
+## S5 — RPC dönüş tipleri (legacy dönüş kontratı, r3 turu)
+
+```sql
+SELECT p.proname, pg_get_function_result(p.oid) FROM pg_proc p
+JOIN pg_namespace n ON n.oid=p.pronamespace
+WHERE n.nspname='public' AND p.proname IN ('tohumlama_kaydet',
+ 'tohumlama_tekrar_kaydet','planli_tohumlama_kaydet','gebelik_kaydet_manual',
+ 'hayvan_ekle','dogum_kaydet');
+```
+
+Çıktı: altısının dönüş tipi de **jsonb** (`hayvan_ekle`'nin iki overload'ı
+dahil). `_semen` varyantlarının dönüş eşdeğerlik hedefi = jsonb, aynı shape.
+
+## S6 — Maternal spot-check (r3 turu, salt-okunur, gerçek sürü)
+
+```sql
+SELECT count(*) FILTER (WHERE h.anne_id IS NOT NULL) AS anne_id_dolu,
+       count(*) FILTER (WHERE h.anne_id IS NOT NULL AND EXISTS
+         (SELECT 1 FROM dogum d WHERE d.anne_id = h.anne_id)) AS dam_dogum_kaydi_var
+FROM hayvanlar h;
+```
+
+Çıktı: **anne_id_dolu = 61, dam_dogum_kaydi_var = 61** — anne_id'si dolu her
+hayvanın dam'ı için doğum kaydı mevcut; maternal backfill için çelişki
+sayısı 0. (207, tohumlama satır sayısıdır; maternal kontrolün evreni 61'dir.)
+
 ## Kapsam notu
 
 - `gebelik_kaydet_manual`'ın PROD çağrıda SQL 42804 verdiği (BUG-003) bu
   dosyanın ölçümü DEĞİLDİR; bilinen PROD hata raporuna dayanır ve demo DB'de
   kırmızı-önce reproduce ile doğrulanacaktır (goal
   `G-20260910-UREME-STOK-BUGFIX`).
-- 207 tohumlamalık vethek seti maternal spot-check'i P1 Task 0.3 koşusunda
-  üretilir; bu dosyaya eklenir.
+- ET kullanım kararı owner'a aittir; tarihli owner kararı planın D-bölümüne
+  işlenmeden Faz 7 zarfı yazılamaz (açık maddedir, ölçümle kapanmaz).
