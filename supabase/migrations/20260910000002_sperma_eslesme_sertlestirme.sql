@@ -1,22 +1,27 @@
 -- 20260910000002_sperma_eslesme_sertlestirme.sql
--- G-20260910-UREME-STOK-BUGFIX / W2 (BUG-002) — matcher sertleştirme + ortak kural.
+-- G-20260910-UREME-STOK-BUGFIX / W2+W2b (BUG-002) — iki legacy tohumlama
+-- yolunun paylaşılan matcher'a bağlanması (SAF REWIRING).
 --
--- Ne yapar:
---   1. `fn_sperma_stok_dus` helper'ı OPSİYONEL `p_notlar` parametresiyle
---      yeniden kurulur (DROP + CREATE; DEFAULT NULL → M1 davranışı aynen
---      korunur: 'Tohumlama — ' || p_sperma).
---      Gerekçe: canlı `tohumlama_kaydet` gövdesi notlar'a hayvanın kupe_no'sunu,
---      `tohumlama_tekrar_kaydet` ise deneme sayısını yazıyor; M1'in sabit
---      notlar'ına körü körüne bağlanmak denetim izi bilgisini kaybederdi.
---      Bu, M1 başlığındaki sözleşme (d) "INSERT şekli canlı gövdeyle aynı"
---      maddesinin notlar için de uygulanmasıdır (W2 gate bulgusu).
---      DROP gerekçesi: (text,text DEFAULT) imzasını (text) overload'ının
---      yanına koymak tek-bilinmeyen-tipli çağrılarda "could not choose best
---      candidate" belirsizliği üretir (yerel ölçüm, 2026-09-10).
---   2. `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet` gövdelerindeki inline
---      `INSERT INTO stok_hareket ... ILIKE '%'||p_sperma||'%'` blokları
---      helper çağrısıyla değiştirilir; gövdenin KALANI dump'tan birebir
---      korunur (pg_get_functiondef, 2026-09-10 ölçümü).
+-- Ne yapar (W2b sonrası): YALNIZ iki `CREATE OR REPLACE FUNCTION` —
+-- `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet` gövdelerindeki inline
+-- `INSERT INTO stok_hareket ... ILIKE '%'||p_sperma||'%'` blokları
+-- `PERFORM public.fn_sperma_stok_dus(...)` çağrısıyla değiştirilir; gövdenin
+-- KALANI dump'tan birebir korunur (pg_get_functiondef, 2026-09-10 ölçümü).
+-- Helper'ın kendisi M1'de (20260910000001) final imzasıyla kurulur; bu dosyada
+-- helper CREATE/DROP'ı YOKTUR. W2b (review düzeltme turu) yapı kararı:
+--   * DROP yok (review B2/B3): (text) overload'ı asla doğmaz → 42725 belirsizliği
+--     ve DROP kaynaklı ACL/owner kaybı imkânsızlaşır; zincir M1'den replay
+--     edilse bile helper tek imzada kalır.
+--   * Oturum-düzeyi mesaj SET satırı yok (review B4): session-artığı sızdırmaz;
+--     kaldırılma nedeni olan "does not exist, skipping" NOTICE'i de artık yoktur.
+--   * BEGIN/COMMIT sargısı (review B5): dosya kendi içinde atomiktir —
+--     `psql -f` dış transaction açmadığından tek CREATE'in geçip ikisinin
+--     kalması imkânsızdır (Postgres'te fonksiyon DDL'i transactioneldir).
+--
+-- Notlar (çağıran taraf): M1'in sabit notlar'ına bağlanmak denetim izi
+-- kaybettireceği için (canlıda tohumlama_kaydet kupe_no, tekrar yolu deneme
+-- sayısı yazar) iki yol, notları canlı metinleriyle helper'a verir; bu,
+-- M1 sözleşmesi (d) maddesinin notlar için uygulanmasıdır (W2 gate bulgusu).
 --
 -- Böylece üç tohumlama yolu tek eşleşme kuralına bağlanır:
 --   - tohumlama_kaydet          → doğrudan helper
@@ -24,69 +29,13 @@
 --   - planli_tohumlama_kaydet   → delege (koşulsuz tohumlama_kaydet çağırır;
 --     gövdesinde stok düşümü yoktur — W1 kanıtı, karar 398ff5c7) → miras alır
 --
--- Eşleşme kuralı (helper'da yaşar): boş/whitespace/NULL ad HİÇ düşmez;
+-- Eşleşme kuralı (helper'da yaşar, M1'de): boş/whitespace/NULL ad HİÇ düşmez;
 -- exact `urun_adi` önce; exact yoksa substring ILIKE; kategori='Sperma';
 -- eşleşme yok sessiz geçer; stok eksiye düşebilir (emsal 20260902000002).
 --
--- Notlar:
---   - CREATE OR REPLACE — GRANT'ları ve sahipliği değiştirmez.
---   - Helper INVOKER rights kalır; üretimdeki tek çağıranlar SECURITY DEFINER
---     olduğundan ledger yazımı canlıdaki hak bağlamında çalışır.
---   - Calistirma: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f <bu dosya>
+-- Calistirma: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f <bu dosya>
 
--- IF EXISTS düşürmenin "does not exist, skipping" NOTICE'si db-dry-run.sh'in
--- hata-kodu sınıflandırıcısını yanıltır (bilinçli idempotent atlama); NOTICE
--- düzeyi kapatılır — ERROR/WARNING akar.
-SET client_min_messages = WARNING;
-
--- (1) Helper: opsiyonel p_notlar (DEFAULT NULL → M1 davranışı aynen).
--- DROP + CREATE: (text, text DEFAULT) imzasını (text) overloading'inin
--- YANINA CREATE OR REPLACE ile eklemek, tek-bilinmeyen-tipli tek argümanlı
--- çağrılarda "could not choose best candidate" belirsizliği üretir (ölçüldü).
--- Tek implementasyon kalması için eski (text) imzası düşürülür.
-DROP FUNCTION IF EXISTS public.fn_sperma_stok_dus(text);
-
-CREATE OR REPLACE FUNCTION public.fn_sperma_stok_dus(p_sperma text, p_notlar text DEFAULT NULL::text)
- RETURNS void
- LANGUAGE plpgsql
-AS $function$
-DECLARE
-  v_stok_id text;
-BEGIN
-  -- (a) Boş/boşluk ad asla düşüm üretmez ('' → ILIKE '%%' rastgele satır
-  -- kusurunun kapanışı).
-  IF p_sperma IS NULL OR btrim(p_sperma) = '' THEN
-    RETURN;
-  END IF;
-
-  -- (b) Exact eşleşme önceliklidir.
-  SELECT s.id INTO v_stok_id
-    FROM public.stok s
-   WHERE s.kategori = 'Sperma'
-     AND s.urun_adi = p_sperma
-   LIMIT 1;
-
-  -- (c) Exact yoksa substring ILIKE (canlı davranışla aynı eşleşme ailesi).
-  IF v_stok_id IS NULL THEN
-    SELECT s.id INTO v_stok_id
-      FROM public.stok s
-     WHERE s.kategori = 'Sperma'
-       AND s.urun_adi ILIKE '%' || p_sperma || '%'
-     LIMIT 1;
-  END IF;
-
-  IF v_stok_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  -- (d) Ledger: pozitif miktar = kullanım; canlı INSERT şekliyle aynı kolonlar.
-  -- M2: notlar çağıranın verdiği metinle yazılabilir (kupe_no/deneme bilgisi);
-  -- verilmezse M1'deki gibi 'Tohumlama — ' || p_sperma.
-  INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar, iptal)
-  VALUES (v_stok_id, 'Tohumlama', 1,
-          COALESCE(p_notlar, 'Tohumlama — ' || p_sperma), false);
-END;
-$function$;
+BEGIN;
 
 CREATE OR REPLACE FUNCTION public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false)
  RETURNS jsonb
@@ -327,3 +276,5 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'tohumlama_id', v_toh.id, 'deneme_sayisi', v_toh.deneme_sayisi + 1);
 END;
 $function$;
+
+COMMIT;
