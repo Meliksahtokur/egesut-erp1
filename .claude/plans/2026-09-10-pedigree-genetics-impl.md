@@ -405,6 +405,7 @@ Sonraki fazların migration’larına girenler (fonksiyon orada yaratılır — 
 ```sql
 -- Task 2 (integrity): o migration’da:
 GRANT EXECUTE ON FUNCTION public.pedigree_integrity_report() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_accept_finding(text,text,text) TO authenticated;  -- r7-F37
 -- Task 3 (projection): o migration’da:
 GRANT EXECUTE ON FUNCTION public.pedigree_subgraph(uuid,integer,integer) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pedigree_subgraph_for_animal(text,integer,integer) TO anon, authenticated;
@@ -648,12 +649,23 @@ warning: farm_animal_node_eksik, unresolved_anne_id, child_without_dam,
 info:    unresolved_baba_bilgi, child_without_sire
 ```
 
-**Kabul kaydı (r6-F33):** warning/info bulgusu G2'de "kabul edildi" saymak
-için `pedigree_meta`'da `integrity_accepted:<code>:<key>` = `accepted` satırı
-gerekir (owner kararı; değer/ tarih notu value'ya JSON olarak yazılır) ve
-rapor item'ı `"disposition": "accepted"` döner — kabul kayıtsız item
-`open`'dır. G2 = rapor koştu + blocker=0 + warning/info'nin tamamı
-`disposition=accepted`.
+**Kabul kaydı (r6-F33, r7-F37 ile mekanik):** kabul yalnızca RPC ile yazılır —
+`pedigree_accept_finding(p_code text, p_key text, p_note text)` (SECURITY
+DEFINER, Task 2 migration'ında; `GRANT EXECUTE ... TO authenticated`; v1 tek
+kullanıcı — owner). Yazdığı kayıt: `pedigree_meta` key
+`integrity_accepted:<code>:<key>`, value = `{"accepted_at": ISO, "note": text,
+"finding_hash": h}`; **h = md5(code || ':' || key || ':' || detail)** — rapor
+her item için aynı hash'i hesarlar; `disposition=accepted` YALNIZ meta'daki
+`finding_hash` birebir eşitse döner, eşit değilse item `open`'dır ve raporda
+`stale_disposition: true` işaretlenir (evidence değişince kabul bayatlar —
+tazelik mekanik). SQL fixture: (a) kabul yaz → accepted; (b) detail değiştir →
+tekrar open + stale. G2 = rapor koştu + blocker=0 + warning/info tamamen
+`accepted` (stale kabul open sayılır).
+
+**Cutoff durumunun G2 bağlamı (r7-F36):** `cutoff:"tanimsiz"` (Task 10 öncesi
+meşru erken durum) → `post_cutoff_null_semen` kontrolü `not_applicable`'dır ve
+G2 için ölçüm engeli DEĞİLDİR; `cutoff:"gecersiz"` (bozuk sahipli veri) →
+**blocker**; geçerli cutoff → kontrol ölçülür ve blocker kuralı işler.
 
 ### 2.4 Idempotency testi
 
@@ -815,11 +827,22 @@ pedigreeApi.integrityReport()
 Davranış:
 
 1. network RPC denenir
-2. başarılıysa cache overwrite edilir
+2. başarılıysa cache overwrite edilir — **generation guard’lı (r7-F38):**
+   istek başlarken `pedigreeSessionGen` (modül-seviye sayaç) okunur; yazma
+   öncesi sayaç değiştiyse (arada clear olduysa) sonuç DISKARDE edilir —
+   logout sonrası gelen eski yanıt yeni oturumun cache’ine yazamaz
 3. network yok/iletim hatası varsa matching cached payload döner
 4. cache de yoksa açık “çevrimdışı ve önbellek yok” durumu döner
 
 Domain hesabı client’a taşınmaz.
+
+**`clearPedigreeCacheStore()` hata politikası (r7-F39):** fonksiyon kendi
+içinde try/catch’tir (fail-open; IDB yok/reddi/txn hatası konsola loglanır,
+fırlatılmaz) ve `pedigreeSessionGen++` HER durumda çalışır. Auth çağrı
+kesimleri de `try { await clear... } finally { signOut()/reload() }`
+yaparlar — cache temizliği hiçbir koşulda çıkışı BLOKLA MAZ. Test: IDB
+reddi simülasyonunda logout/reload yine tamamlanır; clear sonrası gelen
+pending yanıt store’a yazılmaz (final store boş kalır).
 
 ### 4.4 Cache invalidation
 

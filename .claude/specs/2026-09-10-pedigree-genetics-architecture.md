@@ -1136,20 +1136,14 @@ Graph hesaplarının değeri veri kalitesine bağlıdır. Bu nedenle ilk-class r
 pedigree_integrity_report()
 ```
 
-Kontroller:
-
-- farm hayvanı olup pedigree node'u olmayanlar
-- `hayvanlar.anne_id` ile graph dam uyuşmazlığı
-- `dogum.anne_id` ile graph dam uyuşmazlığı
-- known semen text ama `semen_id IS NULL`
-- aynı registry code ile duplicate external nodes
-- role/sex mismatch
-- cycle attempt / existing cycle
-- sire bilinmeyen calf'ler
-- parent doğum tarihi child'dan sonra görünen anomaliler
-- suspiciously young parent
-
-Son iki madde warning olmalı; hard DB constraint olmak zorunda değildir.
+**Kontrol evreni tek otoritede (r7-F35):** grup kodları, severity matrisi,
+JSON yanıt şekli ve kabul-kayıtı mekanizması implementasyon planı **Task
+2.3'te** tanımlıdır; spec ayrı bir kontrol listesi YÜRÜTMEZ — oradaki liste
+bağlayıcıdır ve iki doküman aynı kontrol evrenini üretir (bilinmeyen semen
+eşlemesi, node eksikleri, dam/sire boşlukları, role-sex çelişkileri, döngü,
+tarih anomalileri, post-cutoff semen sayacı vb. — kod seviyesinde plan
+matrisi). Spec'in önceki serbest liste denemesi bu atıfla yürürlükten
+kalkmıştır.
 
 **Yanıt kontratı:** raporun JSON şekli (grup `code` + `severity` + `items`
 listesi; cutoff `tanimsiz`/`gecersiz` durumları dahil) implementasyon planı
