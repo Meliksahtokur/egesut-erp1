@@ -14,7 +14,7 @@
 -- Gereksinim: public.fn_sperma_stok_dus kurulu (M1+M2 sonrası).
 -- Canlı/demo DB'de güvenlidir: tüm test verisi transaction sonunda ROLLBACK
 -- edilir.
--- Calistirma: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/tohumlama_sperma_matcher_test.sql
+-- Calistirma: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/sperma_eslesme_test.sql
 
 BEGIN;
 
@@ -34,7 +34,10 @@ DECLARE
   v_notlar        text;
 BEGIN
   -- Seed: üç hayvan (Dişi, Aktif; dogum_tarihi NULL → yaş/VWP kapısı atlanır),
-  -- exact ad + superstring + substring hedef + aynı adla İlaç satırı,
+  -- superstring + substring hedef satırlar exact'ten ÖNCE (B8: exact'i önce
+  -- seed etmek, precedence'ini kaybetmiş LIMIT 1 mutantını gizleyebilirdi),
+  -- testedilen adlarla çakışmayan TEKİL adlı İlaç satırı (B8: aynı adlı ikiz
+  -- iki kategori seed'ini kafa karıştırıyordu),
   -- tekrar yolu için Bekliyor tohumlama, planlı yolu için 2 açık görev.
   INSERT INTO public.hayvanlar (id, kupe_no, grup, durum, cinsiyet)
   VALUES
@@ -44,10 +47,10 @@ BEGIN
 
   INSERT INTO public.stok (id, urun_adi, kategori, baslangic_miktar)
   VALUES
-    (v_stok_exact_id, 'TEST-SPERM-W2', 'Sperma', 5),
     (v_stok_super_id, 'TEST-SPERM-W2 PRO (üst yumuşatıcı)', 'Sperma', 5),
     (v_stok_sub_id,   'TEST-SPERM-W2 SUBSTR Ürün', 'Sperma', 5),
-    (v_stok_ilac_id,  'TEST-SPERM-W2', 'İlaç', 5);
+    (v_stok_ilac_id,  'TEST-ILAC-W2', 'İlaç', 5),
+    (v_stok_exact_id, 'TEST-SPERM-W2', 'Sperma', 5);
 
   INSERT INTO public.tohumlama
     (id, hayvan_id, tarih, sperma, sonuc, deneme_no, deneme_sayisi, denemeler)
