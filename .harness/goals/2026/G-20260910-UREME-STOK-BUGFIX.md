@@ -19,7 +19,7 @@ implement_lane: glmf_workers
 
 - **Status:** ACTIVE
 - **Date:** 2026-09-10
-- **Base SHA:** a3d8bc2 (main at dispatch time)
+- **Base SHA:** 38c3b07 (main ucu dispatch anında; front-matter ile tek — F6/B9 kapandı)
 - **Owner directive (2026-09-10):** fix the bugs recorded in `BUGS.md` via the
   ss-org network — Lead (GLM) coordinates, Worker (GLMF) sessions implement.
   Root verifies the lead branch, then merges to main or sends back for
