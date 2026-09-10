@@ -673,7 +673,8 @@ bulunur.
   ],
   "relationship": 0.0625,
   "offspring_inbreeding_f": 0.03125,
-  "pedigree_completeness": 0.87,
+  "completeness": {"cow": 0.91, "bull": 0.84, "combined": 0.87},
+  "effective_depth": 6,
   "warnings": []
 }
 ```

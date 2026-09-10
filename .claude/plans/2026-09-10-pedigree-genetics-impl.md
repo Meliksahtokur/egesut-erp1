@@ -103,10 +103,17 @@ Bunlar yalnız projection/profile RPC sonucu olarak `pedigree_cache` içinde on-
 - **Migration numaraları:** bugfix migration'ları `20260910*` aralığını
   kullanacak; bu planın migration timestamp'leri implementasyon anında
   next-free kuralıyla yeniden seçilir (aşağıdaki sıra konsept sırasıdır).
-- **Canlı ölçüm gerçeği (2026-09-10):** `tohumlama_kaydet` ve
-  `tohumlama_tekrar_kaydet` ILIKE desenle düşürüyor, `planli_tohumlama_kaydet`
-  hiç düşürmüyor. GT dosyasında bu gövde ayrışmış durumda (SMELL-003) —
-  GT rehber, canlı otorite.
+- **Canlı ölçüm gerçeği (2026-09-10, r10-F56 düzeltmesiyle):**
+  `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet` ILIKE desenle düşürüyor;
+  `planli_tohumlama_kaydet` koşulsuz `tohumlama_kaydet`'e DELEGE eder ve düşüm
+  delegasyonla gerçekleşir (**BUG-001 refuted** — G-UREME-STOK-BUGFIX teslimi:
+  davranışsal probe + tracked `20260730000001:477-496` teyidi; ilk lexical
+  probe'un "dokunmuyor" sonucu literal-arama sınırlamasıydı, kanıt dosyası
+  S1'e düzeltme notu işlendi). Sonuç: Task 10 planli yoluna AYRI düşüm
+  EKLEMEZ (çift düşüm olur); üç yol tek kuralı yalnız iki gövde rewiring'i +
+  delegasyon mirasıyla sağlar. GT dosyası gövdelerden ayrışmış (SMELL-003) —
+  GT rehber, canlı otorite; Task 10 öncesi davranışsal yeniden ölçüm
+  (planli → 1 düşüm) preflight şartıdır.
 
 ### D5 — v1 kapsamı ve teslim paketleri (overridable)
 
@@ -391,8 +398,9 @@ CREATE POLICY allow_all ON public.pedigree_nodes     FOR ALL USING (true) WITH C
 CREATE POLICY allow_all ON public.pedigree_parentage FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY allow_all ON public.semen_catalog      FOR ALL USING (true) WITH CHECK (true);
 
--- IDB sync gerekir (D3):
-GRANT SELECT ON public.semen_catalog TO anon, authenticated;
+-- IDB sync gerekir (D3); r10-F51: tracked auth-lockdown anon'a HİÇBİR şey
+-- vermiyor + app login gate'i var → tüm grant'lar yalnız authenticated:
+GRANT SELECT ON public.semen_catalog TO authenticated;
 
 -- Foundation’da yaratılan RPC’ler (Task 1.4) — tam argüman tipleriyle (r3-N1, r4-F13 sıraları):
 GRANT EXECUTE ON FUNCTION public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO authenticated;
@@ -407,20 +415,20 @@ Sonraki fazların migration’larına girenler (fonksiyon orada yaratılır — 
 GRANT EXECUTE ON FUNCTION public.pedigree_integrity_report() TO authenticated;
 -- pedigree_finding_hash IMMUTABLE helper: client grant gerektirmez (yalnız SQL içi kullanım + owner şablonu)
 -- Task 3 (projection): o migration’da:
-GRANT EXECUTE ON FUNCTION public.pedigree_subgraph(uuid,integer,integer) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.pedigree_subgraph_for_animal(text,integer,integer) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_subgraph(uuid,integer,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_subgraph_for_animal(text,integer,integer) TO authenticated;
 -- Task 10 (controlled writes): o migration’da (r4-F12):
 GRANT EXECUTE ON FUNCTION public.tohumlama_kaydet_semen(text,date,uuid,text,text,jsonb,boolean) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.planli_tohumlama_kaydet_semen(uuid,text,date,uuid,text,text,jsonb,boolean) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.tohumlama_tekrar_kaydet_semen(text,date,uuid,text,text,boolean) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.gebelik_kaydet_manual_semen(text,date,uuid) TO authenticated;
 -- Task 17/P4 (profile+mating+kinship): o migration’da (r4-F20):
-GRANT EXECUTE ON FUNCTION public.pedigree_profile(text,integer) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.mating_analyze(text,uuid,integer) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_profile(text,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.mating_analyze(text,uuid,integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.pedigree_kinship(uuid,uuid,integer) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.pedigree_inbreeding(uuid,integer) TO authenticated;
 -- v2 (Task 22): genetic_evaluations tablosu + okuma RPC’si birlikte:
-GRANT EXECUTE ON FUNCTION public.genetic_evaluations_for_node(uuid) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.genetic_evaluations_for_node(uuid) TO authenticated;
 ```
 
 **SECURITY DEFINER kontratı:** yeni RPC’lerin tamamı `SECURITY DEFINER` +
@@ -428,6 +436,16 @@ GRANT EXECUTE ON FUNCTION public.genetic_evaluations_for_node(uuid) TO anon, aut
 client grant’i olmadığından RPC’ler kendi yetkisiyle okur/yazar); farm stamp
 `public.current_farm_id()`’den gelir, client parametresinden değil. Graph DML
 istemciye hiçbir tabloda açılmaz; Task 26 denetimi bunu doğrular, ikame etmez.
+
+**Operatör guard’ı (r10-F58):** mutasyon RPC’leri (`pedigree_parent_set`,
+`pedigree_external_upsert`, `semen_catalog_upsert`) gövde başında
+`public.assert_is_operator()` çağırır: `auth.uid()::text` = `pedigree_meta`
+`op_owner_uid` değerine eşit olmalı; değilse exception. `op_owner_uid`
+değeri migration YAZMAZ — **deploy bootstrap adımı** olarak owner tek INSERT
+ile yazar (deploy talimat satırı; service-key/psql ile). Signup açık olsa
+bile kayıt olan herhangi bir hesap kanonik soy değiştiremez. SQL fixture:
+`set_config` ile jwt claim mock’lanıp non-owner reddi + owner geçişi test
+edilir. UI’daki "admin-level" etiketi yetki DEĞİLDİR; yetki bu RPC guard’ıdır.
 
 ### 1.4 Helper’lar
 
@@ -468,6 +486,14 @@ semen_catalog_upsert(                        -- Task 11 "Elle Gir"/tanımla akı
 değilse reddeder; (b) bull node yarattırıyorsa `sex='male'` yazar, mevcut node
 `female` ise reddeder; (c) tüm node/stock bağlantıları farm-scope composite FK
 ile aynı farm'a kilitlidir. Geçerli FK + anlamsız bağ kombinasyonu kapalıdır.
+
+**Tarihsel kimlik değişmezliği (r10-F57):** `p_id` ile güncellemede, satır
+tarihsel bir `tohumlama.semen_id` tarafından referans ediliyorsa
+(`EXISTS tohumlama WHERE semen_id = p_id`) `bull_node_id` DEĞİŞTİRİLEMEZ —
+RPC hata döner. Farklı boğa gerekiyorsa yeni catalog satırı yaratılır, eski
+satır `active=false` olur (replacement modeli; edge'ler eski node'a bağlı
+kalır, split-brain imkânsız). Silme v1'de yok; `stock_id` tek silme otoritesi
+`ON DELETE SET NULL`'dir (spec §4.3 ile aynı).
 
 oluştur.
 
@@ -603,18 +629,21 @@ döner (İngilizce harflerle — JSON enum'da tek gösterim; yanındaki insan-a�
 ayrı bir `detail` alanındadır, değerle karışmaz) ve NULL-sayaç bölümü atlanır;
 hata vermez.
 
-**Create read-only RPC** ve şu grupları JSON döndür:
+**Create read-only RPC** — döndürdüğü grup evreni **tek gösterim**: aşağıdaki
+severity matrisindeki kod listesinin ta kendisidir (r10-F52; ayrı liste
+YOKTUR). Matris: `farm_animal_node_eksik, unresolved_anne_id,
+unresolved_baba_bilgi, child_without_dam, child_without_sire,
+role_sex_contradiction, duplicate_registry, legacy_semen_no_mapping,
+cycle_count, parent_born_after_child, maternal_tarihsel_uyumsuz,
+maternal_tarih_bilinmiyor, legacy_anne_graph_dam_celiskisi,
+dogum_anne_graph_dam_celiskisi, suspiciously_young_parent,
+post_cutoff_null_semen, cutoff_invalid` — 17 kod.
 
-- farm animal node eksikleri
-- unresolved `anne_id`
-- unresolved `baba_bilgi`
-- child without dam
-- child without sire
-- role/sex contradiction
-- duplicate registry identities
-- legacy semen strings without catalog mapping
-- cycle count (normalde 0)
-- parent born after child gibi tarih anomalileri
+**Emisyon kuralları (r10-F53):** (a) bulgusu olmayan grup HİÇ emit edilmez
+(yokluk = sıfır); (b) sayım anlamlı gruplarda (`post_cutoff_null_semen`) her
+ihlal SATIRI bir item'tır (`key = tohumlama.id`, `detail = "created_at > cutoff,
+sperma=<t>"`) — `{count:0}` item'i YOKTUR; (c) `cutoff_invalid` tek item:
+`key="cutoff"`, `detail=<ham value>`.
 - post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = `pedigree_meta` tablosundaki `semen_controlled_cutoff` değeri — r3-F6; tablo bu migration'da yaratılır, r4-F11)
 
 **Yanıt kontratı (r5-F28):** rapor tek JSON döner:
@@ -673,10 +702,19 @@ dogum_anne_graph_dam_celiskisi:
 
 suspiciously_young_parent:
   child doğum tarihi VE parent node doğum tarihi biliniyorsa VE
-  (child_tarih - parent_tarih) < 548 gün (18 ay) ise bulgu.
+  0 <= (child_tarih - parent_tarih) < 548 gün (18 ay) ise bulgu —
+  r10-F61: negatif fark (child'tan SONRA doğan parent) bu kontrole girMEZ;
+  o durum yalnızca parent_born_after_child grubunun konusudur.
   key = "<child_hayvan_id>:<parent_role>"; detail = "parent <node> yaşı <gün> gün".
-  Tarihlerden herhangi biri NULL → bulgu YOK (tarih yokluğu
-  maternal_tarih_bilinmiyor benzeri bilinmezlik sınıfıdır, gençlik iddiası değil).
+  Tarihlerden herhangi biri NULL → bulgu YOK.
+
+dogum_anne_graph_dam_celiskisi (join ifadesi — r10-F48):
+  dogum satırının buzağı node'u: pedigree_nodes.farm_animal_id =
+    (SELECT id FROM hayvanlar WHERE kupe_no = dogum.yavru_kupe);
+  kupe eşleşmesi yoksa bulgu YOK (graph'a henüz girmemiş doğum).
+  Karşılaştırma: dogum.anne_id → dam node vs buzağı node'unun graph dam edge'i.
+  Parent tarih kaynağı (tek ifade): farm node → hayvanlar.dogum_tarihi,
+  external node → pedigree_nodes.birth_date; COALESCE(h.dogum_tarihi, pn.birth_date).
 ```
 
 **Makine-okunur durum kuralları (r8-F40):** rapor item şeması
@@ -903,6 +941,13 @@ vakası). Bu yüzden sayaç **`globalThis.__pedigreeSessionGen`** üzerinde yaş
 HER durumda `globalThis.__pedigreeSessionGen =
 (globalThis.__pedigreeSessionGen ?? 0) + 1` çalıştırır. Modül-seviye `let`
 sayaç YASAKTIR (bağlantısız ikinci sayaç riski).
+
+**Sıra kontratı (r10-F54):** `clearPedigreeCacheStore()` gövdesi İLK İKİ
+adımı SENKRON ve IDB temizliği BAŞLAMADAN yapar: (1) globalThis sayaç++,
+(2) localStorage epoch üret — ancak sonra `await idbClearStore(...)`
+başlar (try/catch fail-open). Böylece clear-in-flight penceresinde pending
+yanıt ESKİ sayacı göremez ve fiziksel kalan eski satır epoch karantinasına
+takılır. Kabul testi bu sırayı doğrular.
 
 **Okuma karantinası (r8-F42 — fail-open kalıntısı):** epoch
 `localStorage[‘pedigree_cache_epoch’]` içinde yaşar (app init’te yoksa
@@ -1548,6 +1593,12 @@ Parentage mutation sonrası affected subject/descendant metrics stale olur. İlk
   full sib/half sib/first cousins + inbred ancestor) bu kontratın deterministik
   çıktısını ölçer.
 
+**Depth sınırı (r10-F59 — tüm analiz RPC'lerinde tek kural):** `p_depth`
+NULL → default (6); `< 0` → exception; `> 8` → **8'e clamp** + yanıtta
+`effective_depth` döner. `pedigree_profile`, `pedigree_kinship`,
+`pedigree_inbreeding`, `mating_analyze` için eşit geçerli; projection
+RPC'lerindeki mevcut negatif-red/max-8 kuralı zaten uyumludur.
+
 API ayrımı:
 
 ```text
@@ -1601,7 +1652,7 @@ Unknown parent branch sessizce unrelated sayılmaz.
 
 ## Task 17 — `mating_analyze`
 
-**Create/update:** metrics migration veya ayrı `20260910000008_mating_analyze.sql` — **bu migration `pedigree_profile(p_hayvan_id text, p_depth integer default 6)` fonksiyonunu DA yaratır** (spec §7.2b kontratı; Task 21'in veri kaynağı — r2-N7) **ve Task 15'in `pedigree_kinship(uuid,uuid,integer)` + `pedigree_inbreeding(uuid,integer)` fonksiyonlarını yaratır** (r4-F20 — bunların ayrı migration'u yoktur); dördünün `GRANT EXECUTE` cümlesi bu migration'dadır (Task 1.3 envanteri)
+**Create:** `20260910000008_mating_analyze.sql` — **tek v1 migration'dır** (r10-F55: metrics foundation v2'dir, v1 RPC oraya ASLA konmaz) ve `pedigree_profile(p_hayvan_id text, p_depth integer default 6)` (spec §7.2b; Task 21'in veri kaynağı — r2-N7) **+ `pedigree_kinship(uuid,uuid,integer)` + `pedigree_inbreeding(uuid,integer)`** fonksiyonlarını yaratır (r4-F20); `GRANT EXECUTE` cümleleri bu migration'dadır (Task 1.3 envanteri)
 
 ```text
 mating_analyze(
@@ -1621,7 +1672,7 @@ Dönüş:
 - relationship
 - kinship/coancestry
 - expected calf F
-- completeness cow/bull/combined
+- completeness cow/bull/combined — **alan adlarıyla: `"completeness": {"cow": r, "bull": r, "combined": r}` + `"effective_depth": n` (r10-F60; spec §7.2 örneğiyle tek şekil)**
 - warnings
 - algorithm_version
 
@@ -1769,7 +1820,7 @@ Pedigree-derived değerlerle external evaluation aynı tablo/alan adı altında 
 
 **Okuma yolu (r2-N8 + r3-F9):** tablo D3 gereği full-sync'e girmez ve SELECT
 grant'i yoktur; aynı v2 migration `genetic_evaluations_for_node(p_node_id uuid) -> jsonb`
-read RPC'sini yaratır + `GRANT EXECUTE ... TO anon, authenticated` (Task 1.3
+read RPC'sini yaratır + `GRANT EXECUTE ... TO authenticated` (Task 1.3
 v2 bloğu). **Yanıt kontratı:**
 `{"node_id": "...", "evaluations": [{"source","source_registry","evaluation_date","trait_code","trait_name","value","unit","reliability","metadata"}...]}`,
 `evaluation_date DESC, trait_code` sıralı. **Same-farm guard:** node

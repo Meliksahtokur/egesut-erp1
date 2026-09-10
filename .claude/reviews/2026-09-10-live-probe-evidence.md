@@ -30,6 +30,14 @@ ORDER BY p.proname;
 Sonuç: `planli_tohumlama_kaydet` gövdesi stok_hareket'e hiç dokunmuyor
 (BUG-001); diğer ikisi dokunuyor.
 
+> **DÜZELTME (2026-09-10, G-UREME-STOK-BUGFIX teslimi + r10-F56):** yukarıdaki
+> sonuç LEXICAL ölçümdür (gövdede literal arama) ve yanıltıcıdır —
+> `planli_tohumlama_kaydet` koşulsuz `public.tohumlama_kaydet(...)`'e delege
+> eder (tracked `20260730000001:477-496` + lead bağımsız canlı gövde okuması)
+> ve düşüm DELEGASYONLA gerçekleşir (davranışsal probe: planli çağrısı 1
+> stok_hareket satırı üretti). **BUG-001 refuted** — S1'in "dokunmuyor"
+> cümlesi yalnızca literal-geçmeme gözlemi olarak okunmalıdır.
+
 ## S2 — `tohumlama_kaydet` gövdesindeki stok düşümü bloğu (ilk geçen yer çevresi)
 
 ```sql
