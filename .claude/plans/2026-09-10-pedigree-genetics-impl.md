@@ -562,11 +562,23 @@ oluştur.
 
 `anne_id` değeri gerçek `hayvanlar.id` ile resolve olmayan satırları otomatik node’a dönüştürme; integrity report’a bırak.
 
-**Dışlama kuralı (r5-F23):** "güvenli" predicate yalnız `anne_id` resolve
-olması DEĞİLDİR; dam’in en geç doğum kaydı `dogum.tarih > child.dogum_tarihi`
-ise (S8’deki ölçülmüş anomali sınıfı) edge YARATILMAZ — satır integrity
-raporunun `maternal_tarihsel_uyumsuz` grubuna `severity=blocker` olarak düşer.
-confidence=1 yalnız çelişkisiz satırlarda geçerlidir.
+**Dışlama kuralı (r5-F23, r6-F31 ile kesin predicate):** "güvenli" koşul tam
+SQL ile budur — edge yalnız şu koşulda yaratılır:
+
+```sql
+c.anne_id IS NOT NULL
+AND EXISTS (SELECT 1 FROM hayvanlar p WHERE p.id = c.anne_id)          -- dam mevcut
+AND c.dogum_tarihi IS NOT NULL                                          -- tarih kanıtı zorunlu
+AND EXISTS (SELECT 1 FROM dogum d
+             WHERE d.anne_id = c.anne_id
+               AND d.tarih <= c.dogum_tarihi)                           -- S8’in ölçtüğü predicate
+```
+
+Bu S8’in `NOT EXISTS` ölçümüyle birebir aynı sınıflandırmadır (dam’in geç bir
+kayıtı, daha erken geçerli bir kaydı geçersiz KILMAZ). İki dışlama sınıfı:
+`maternal_tarihsel_uyumsuz` (dam var, tarihli, ama erken kayıt yok → blocker)
+ve `maternal_tarih_bilinmiyor` (child.dogum_tarihi NULL → warning; edge
+yaratılmaz, otomatik güvenilmez). "En geç kayıt" yorumu YOKTUR.
 
 ### 2.3 `pedigree_integrity_report()`
 
@@ -610,16 +622,38 @@ writes devrede değil` döner ve NULL-sayaç bölümünü atlar; hata vermez.
   "cutoff": "ISO | 'tanimsiz' | 'gecersiz'",
   "groups": [
     {"code": "maternal_tarihsel_uyumsuz", "severity": "blocker|warning|info",
-     "items": [{"key": "hayvan-id", "detail": "tek satır açıklama"}]}
+     "items": [{"key": "hayvan-id", "detail": "tek satır açıklama",
+                "disposition": "open|accepted"}]}
   ]
 }
 ```
 
 Grup `code` listesi bu bölümdeki kontrollerle birebir; her bulgu satırı
-`key` ile kimliklenir. **Yazma kuralı:** `pedigree_meta` cutoff değeri
-ISO-8601 timestamp metnidir; okuma `value::timestamptz` cast'iyle yapılır;
-cast hatası veya anahtar yokluğu raporda `cutoff: "gecersiz"|"tanimsiz"`
-olarak döner ve NULL-sayaç bölümü atlanır — sessiz varsayılan yok (r5-I6/F6).
+`key` ile kimliklenir. **Yazma kuralı (r5-I6/F6 + r6-F34 exception-güvenli):**
+`pedigree_meta` cutoff değeri ISO-8601 timestamp metnidir; okuma aynı
+migration'da tanımlanan `pedigree_try_timestamptz(p_value text)` helper'ıyla
+yapılır (PL/pgSQL `BEGIN ... EXCEPTION WHEN others THEN RETURN NULL` bloğu —
+bilinear cast istisnası raporu ÇALIŞTIRAMAZ). Anahtar yok → `cutoff:"tanimsiz"`,
+helper NULL döner → `cutoff:"gecersiz"`; her ikisinde NULL-sayaç bölümü atlanır.
+SQL fixture: bozuk değerle (`'1900-13-45'`) raporun istisna değil
+`gecersiz` döndüğü doğrulanır.
+
+**Group→severity matrisi (r6-F33):**
+
+```text
+blocker: maternal_tarihsel_uyumsuz, duplicate_registry, cycle_count, post_cutoff_null_semen
+warning: farm_animal_node_eksik, unresolved_anne_id, child_without_dam,
+         role_sex_contradiction, legacy_semen_no_mapping, parent_born_after_child,
+         maternal_tarih_bilinmiyor
+info:    unresolved_baba_bilgi, child_without_sire
+```
+
+**Kabul kaydı (r6-F33):** warning/info bulgusu G2'de "kabul edildi" saymak
+için `pedigree_meta`'da `integrity_accepted:<code>:<key>` = `accepted` satırı
+gerekir (owner kararı; değer/ tarih notu value'ya JSON olarak yazılır) ve
+rapor item'ı `"disposition": "accepted"` döner — kabul kayıtsız item
+`open`'dır. G2 = rapor koştu + blocker=0 + warning/info'nin tamamı
+`disposition=accepted`.
 
 ### 2.4 Idempotency testi
 
@@ -757,12 +791,16 @@ tamamen temizlenir** — başka farm/bağlamın grafiği yanlış bağlamda rend
 edilemez. **Farm bağlamının istemci kaynağı (r3-F3):** `js/config.js`'e
 `PEDIGREE_FARM_ID` sabiti eklenir (DB farm_id varsayanıyla hizalı; bugün tek
 farm — değer network'süz okunur, offline arama çalışır; multi-farm fazında RPC
-değerine taşınır). **Temizliğin yüzeyi (r4-F17/F18 — buildless gerçeklere
-bağlı):** `js/api.js`'e top-level global fonksiyon `clearPedigreeCacheStore()`
+değerine taşınır). **Temizliğin yüzeyi (r4-F17/F18 + r6-F32 — buildless gerçeklere bağlı):**
+`js/api.js`'e top-level global fonksiyon `clearPedigreeCacheStore()`
 eklenir (mevcut global desen; `api.` namespace'i YOKTUR). `js/auth.js`'te
-sıra şudur: `await clearPedigreeCacheStore()` **ÖNCE**, sonra
-`await db.auth.signOut()` — böylece `SIGNED_OUT` listener reload'ı ne zaman
-tetiklenirse tetiklensin cache zaten temizdir (reload yarışı kapanır).
+**her iki çıkış yolu da** kapanır: (a) açık logout: `await
+clearPedigreeCacheStore()` ÖNCE, sonra `await db.auth.signOut()`;
+(b) `SIGNED_OUT` listener'ı (session expiry / başka sekme logout'ı):
+reload'dan ÖNCE `await clearPedigreeCacheStore()` — listener bloğu
+`location.reload()` çağrısından önce clear'ı bekler. Kabul testi iki yolu
+da içerir: açık logout + listener üzerinden external sign-out (test,
+listener'ın clear çağırdığını mock/spy ile kanıtlar).
 
 ### 4.3 Cache policy
 
