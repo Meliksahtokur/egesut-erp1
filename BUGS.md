@@ -2,7 +2,8 @@
 
 Kaynak: 2026-09-10 pedigree doküman review (dump HEAD `a3d8bc2`) + canlı PROD
 salt-okunur imza/gövde ölçümü (root). Canlı şema otoritedir; tracked ground
-truth rehberdir (bkz. SMELL-003).
+truth rehberdir (bkz. SMELL-003). Canlı ölçüm kanıtları:
+`.claude/reviews/2026-09-10-live-probe-evidence.md` (sorgular + ham çıktılar).
 
 Durum değerleri: `open` → `fixed-pending-deploy` (migration hazır, PROD'da
 değil) → `verified` (canlıda ölçüldü).
@@ -95,6 +96,12 @@ otomasyon kararı ayrı iş.
 
 ## Pedigree doküman düzeltmeleri (İndirilenler'deki spec/plana yansıtılacak)
 
+**Durum (2026-09-10, Revizyon 2): KARŞILANDI** — DOC-001..006, repo içindeki
+revize kopyalara işlendi (`.claude/specs/2026-09-10-pedigree-genetics-architecture.md`,
+`.claude/plans/2026-09-10-pedigree-genetics-impl.md`). Kalıntılar: DOC-005
+kapsam nüansı ve DOC-006'nın tracked-kapı eksiği aşağıda notludur; luna max
+review turu (r1 FAIL → r2) bulgularıyla birlikte kapatıldı.
+
 DOC-001: `tohumlama.id` **text** (GT:116), uuid değil — plan Task 0.2 beklenti
 değeri düzeltilmeli (ya da beklenti yazılmayıp canlıdan okunmalı).
 
@@ -111,13 +118,18 @@ stok seçicileri ui.js'te. Plan Task 11 yüzey envanteri üç kaynağı +
 DOC-004: Offline replay `RPC_MAP`'e yeni `*_semen` RPC'leri eklenmelidir —
 opsiyonel değil (tohumlama zaten kuyrukta).
 
-DOC-005: farm_id kolonlu tablo repoda henüz **sıfır**; pedigree tabloları ilk
-uygulayıcı olacak. Plan "mevcut geçiş politikası" değil "contract kuralının
-ilk uygulaması" demeli; farm_id ile başlayan index checklist maddesi.
+DOC-005: farm_id kolonlu ürün tablosu repoda henüz **sıfır** (`demo/02_demo_klonla.sql`'deki
+demo-yardımcı `demo_klon_log` hariç — kapsam: canlı üretim şeması); pedigree
+tabloları ilk uygulayıcı olacak. Plan "mevcut geçiş politikası" değil "contract
+kuralının ilk uygulaması" demeli; farm_id ile başlayan index checklist maddesi.
+→ *Karşılandı (plan Task 27) + kapsam nüansı eklendi.*
 
 DOC-006: SQL test koşum ortamı plana bağlanmalı: `psql "$DATABASE_URL"`
-(tests/sql deseni) + `scripts/db-dry-run.sh` (Neon ayna). Lokal Postgres yok;
+(tests/sql deseni, tracked). Dikkat: `scripts/db-dry-run.sh` **tracked değil**
+(owner-local; sabit `/tmp` log yazar) — P1 tooling maddesiyle tracked + TMPDIR
+uyumlu hale getirilene kadar migration kabulü psql fixture'larıyladır.
 CI otomasyonu kapsam dışı (repo test stratejisi: lokal yeter).
+→ *Kısmen karşılandı (plan Task 27); tracked kapı P1 borcu.*
 
 ---
 

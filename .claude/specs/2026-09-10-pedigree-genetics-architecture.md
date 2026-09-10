@@ -25,6 +25,10 @@
 > 6. **GT↔canlı drift kayıtlı** (`BUGS.md` SMELL-003): tracked ground truth
 >    rehberdir, canlı şema otoritedir; GT regen deploy sonrası ayrı adımdır.
 >
+> 7. **Canlı ölçüm iddialarının kanıt dosyası:**
+>    `.claude/reviews/2026-09-10-live-probe-evidence.md` (root, salt-okunur
+>    pg katalog ölçümü; nokta-zamanlıdır, teyit gerektiğinde sorgu yeniden koşulur).
+>
 > 1, 2 ve 4 numaralı kararlar owner onayıyla üzerine yazılabilir (overridable
 > defaults); dayanakları İndirilenler'deki Revizyon 1 metniyle karşılaştırmalı
 > review'dur.
@@ -203,7 +207,7 @@ Kurallar:
 - Farm animal'ın ad/ırk/cinsiyetinin authoritative kaynağı `hayvanlar`; node'daki external alanlar kullanılmaz.
 - `external_animal` Armada veya onun ataları için kullanılır.
 - Registry code biliniyorsa aynı dış hayvanın ikinci kez yaratılması engellenir. Bunun için `(farm_id, registry_system, registry_code)` üzerinde partial unique index önerilir.
-- `farm_id` zorunlu: bu graph çiftliğin operasyonel/genetik knowledge alanıdır ve `.claude/farm-id-discipline.md` kapsamına girer.
+- `farm_id` zorunlu: bu graph çiftliğin operasyonel/genetik knowledge alanıdır ve `.harness/contract.md`'deki farm_id kuralının kapsamına girer (owner-local `.claude/farm-id-discipline.md` kopyası tracked değildir; otorite contract'tır).
 
 ### 4.2 `pedigree_parentage`
 
@@ -226,6 +230,16 @@ CREATE TABLE public.pedigree_parentage (
   UNIQUE (farm_id, child_node_id, parent_role)
 );
 ```
+
+**Cross-farm enforcement (Revizyon 2, yapısal):** farm-scope yalnız RPC
+proseunde değil DDL'de taşınır — `pedigree_nodes` üzerinde `UNIQUE (farm_id, id)`
+bulunur; `pedigree_parentage` kolonları `(parent_farm_id, parent_node_id)` /
+`(child_farm_id, child_node_id)` çiftleri olarak tanımlanır ve
+`FOREIGN KEY (parent_farm_id, parent_node_id) REFERENCES pedigree_nodes(farm_id, id)`
+(aynısı child için) ile bağlanır. Böylece cross-farm edge DB seviyesinde
+imkânsızdır; RPC'deki same-farm check ikinci savunma katmanıdır. Ayrıca graph
+tablolarına (`pedigree_nodes`, `pedigree_parentage`) doğrudan client GRANT'i
+verilmez — erişim yalnız RPC'dir (bkz. implementasyon planı Task 1.3).
 
 MVP'de bir child için en fazla bir confirmed dam ve bir confirmed sire vardır.
 
@@ -283,7 +297,11 @@ Geçiş döneminde legacy kayıtların `semen_id` değeri NULL olabilir.
 
 Yeni tohumlamada UI artık serbest `sperma` text'i değil `semen_id` gönderir. Stokta olmayan yeni semen gerekiyorsa önce `semen_catalog` entity'si oluşturulur; böylece yeni legacy free-text üretilmez.
 
-### 4.5 `genetic_evaluations`
+### 4.5 `genetic_evaluations` (v2'ye ertelendi — Revizyon 2)
+
+> Dış EBV/PTA katmanı v2 kapsamındadır (D5). Şema, implementasyon planı
+> Task 22 ile tek biçime indirildi: JSON blob yerine **long-form trait
+> satırları** — yeni trait eklemek migration gerektirmez.
 
 Armada gibi dış boğaların yayımlanmış genetik değerlerini pedigree metriklerinden ayırmak için.
 
@@ -294,29 +312,30 @@ CREATE TABLE public.genetic_evaluations (
   node_id           uuid NOT NULL REFERENCES public.pedigree_nodes(id) ON DELETE CASCADE,
 
   source             text NOT NULL,
+  source_registry    text NULL,
   evaluation_date    date NULL,
-  scheme             text NULL,
-  metrics            jsonb NOT NULL DEFAULT '{}'::jsonb,
-  reliability        jsonb NOT NULL DEFAULT '{}'::jsonb,
-  raw_metadata       jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at         timestamptz NOT NULL DEFAULT now()
+  trait_code         text NOT NULL,
+  trait_name         text NULL,
+  value              numeric NOT NULL,
+  unit               text NULL,
+  reliability        numeric NULL,
+  metadata           jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+
+  UNIQUE (farm_id, node_id, source, evaluation_date, trait_code)
 );
 ```
 
-Örnek `metrics`:
+Örnek satırlar:
 
-```json
-{
-  "milk": 780,
-  "fat": 42,
-  "protein": 31,
-  "fertility": 104,
-  "longevity": 108,
-  "calving_ease": 106
-}
+```text
+Armada | CDC | 2026-08 | milk_pta  | Milk PTA |  +780 | kg | 0.82
+Armada | CDC | 2026-08 | fat_pta   | Fat PTA  |   +42 | kg | 0.79
+Armada | CDC | 2026-08 | calf_ease | Calving Ease | 106 | idx | 0.71
 ```
 
-Bu JSON anahtarları kaynağa göre değişebilir. İlk sürümde bütün uluslararası/genetik indeks şemalarını normalize etmeye çalışmak gereksizdir. Kaynak + scheme korunur; UI sadece bildiği metric'leri anlamlandırır.
+Kaynak + değerlendirme tarihi + trait bazlı satır korunur; UI yalnız bildiği
+trait kodlarını anlamlandırır, bilinmeyenleri etiketiyle listeler.
 
 ### 4.6 `pedigree_node_metrics` — derived cache (v2'ye ertelendi)
 
@@ -366,11 +385,15 @@ CREATE TABLE public.pedigree_founder_contributions (
 );
 ```
 
+> **Revizyon 2 (D6):** v1'de kalıcı satır/staleness YOKTUR — hesap her istekte
+> tazedir, parentage değişimi bir sonraki sorguya otomatik yansır. Aşağıdaki
+> cümleler yalnız v2 cache tasarımı içindir.
+
 Parentage değişince ilgili descendant metrikleri ve founder contribution satırları stale kabul edilir ve yeniden hesaplanır. MVP sürü boyutunda eager rebuild bile ucuz olacaktır; daha sonra dirty-descendant queue eklenebilir.
 
 ### 4.8 Tenant/RLS ve write sınırı
 
-Yeni operational/genetic tablolar `.claude/farm-id-discipline.md` ile aynı disiplini izler:
+Yeni operational/genetic tablolar `.harness/contract.md`'deki farm_id disiplinini izler (owner-local `.claude` kopyası tracked değildir):
 
 - `farm_id UUID NOT NULL DEFAULT current/real farm id`
 - mevcut geçiş politikasına uygun RLS açılır; bugün proje `USING (true)` yaklaşımını kullanıyorsa yeni tablolar farklı bir güvenlik modeli icat etmez
@@ -496,7 +519,7 @@ mevcut stok düşümü semen_catalog.stock_id üzerinden
 rastgele satırdan düşebiliyor (`BUGS.md` BUG-001/BUG-002 — fix işi
 `G-20260910-UREME-STOK-BUGFIX` goal'unda ayrı yürüyor). Pedigree burada
 davranış icat ETMEZ: semen-aware yollar, bugfix'lerle düzeltilmiş kuralı
-(boş sperma düşmez + exact-first + üç yol ortak) `semen_catalog.stock_id`
+(boş/whitespace sperma düşmez — `btrim(p_sperma) <> ''` guard; exact-first; üç yol ortak kural) `semen_catalog.stock_id`
 üzerinden taşır. Bugfix merge edilmeden bu fazın write kontratı dondurulmaz.
 
 **Tohumlama parentage edge üretmez.** Henüz doğmuş child yoktur.
@@ -613,6 +636,39 @@ bulunur.
   "warnings": []
 }
 ```
+
+### 7.2b `pedigree_profile` — v1 "Genetik" sekmesinin tek veri kaynağı (Revizyon 2 ile eklendi)
+
+```text
+pedigree_profile(
+  p_hayvan_id text,
+  p_depth     integer default 6
+) -> jsonb
+```
+
+Dönüş kontratı:
+
+```json
+{
+  "focus": "H0136",
+  "node_id": "uuid",
+  "inbreeding_f": 0.031,
+  "completeness": {"target_depth": 6, "known_slots": 83, "total_slots": 126, "ratio": 0.659},
+  "founder_contributions": [
+    {"founder_node_id": "uuid", "label": "Armada", "contribution": 0.25}
+  ],
+  "breed_composition": [
+    {"breed": "Holstein", "share": 0.625},
+    {"breed": "Brown Swiss", "share": 0.25},
+    {"unknown_share": 0.125}
+  ],
+  "algorithm_version": "pedigree-v1"
+}
+```
+
+Hesap **istek anında** yapılır (D6: kalıcı cache yok). Founder katkıları ve
+breed composition bu yanıtın parçasıdır; ayrı tablo/RPC yoktur. Implementasyon
+planı Task 21 bu kontratı okur.
 
 ### 7.3 Founder contribution
 
@@ -939,7 +995,7 @@ CREATE INDEX ... ON pedigree_parentage (farm_id, parent_node_id);
 CREATE INDEX ... ON pedigree_nodes (farm_id, farm_animal_id);
 CREATE INDEX ... ON semen_catalog (farm_id, bull_node_id);
 CREATE INDEX ... ON genetic_evaluations (farm_id, node_id, evaluation_date DESC);
-CREATE INDEX ... ON pedigree_founder_contributions (farm_id, founder_node_id, contribution DESC);
+CREATE INDEX ... ON pedigree_founder_contributions (farm_id, founder_node_id, contribution DESC);  -- v2 (D6): tablo v1'de yok
 ```
 
 Recursive ancestor sorgularında `child_node_id`; descendant sorgularında `parent_node_id` kritik index'tir.
@@ -1059,7 +1115,7 @@ Yeni `tests/sql/pedigree_graph_test.sql`:
 - sire unknown → yalnız dam edge
 - twin birth → iki child, aynı dam/sire, aynı `olay_id`
 - semen stock link resolve
-- parentage correction invalidates metrics
+- parentage düzeltmesi sonraki profil/kinship sorgularına yansır (v1: istek-başı hesap; kalıcı cache invalidation v2'de anlamlıdır)
 
 ### 14.2 Unit tests
 
@@ -1095,7 +1151,7 @@ Projede `fast-check` zaten var. Graph için değerlidir:
 
 - rastgele DAG üret
 - parent edge ekleme cycle yaratmıyor
-- founder contribution toplamı ≈ 1 ve satır-bazlı cache ile recursive hesap aynı sonucu verir
+- founder contribution toplamı ≈ 1 (v1: istek-bazlı hesap; satır-bazlı cache eşdeğerlik özelliği v2'de eklenir)
 - offspring F simetrik parent order'dan etkilenmiyor
 - ancestor projection depth limit'i aşmıyor
 
@@ -1145,7 +1201,7 @@ Projede `fast-check` zaten var. Graph için değerlidir:
 - offspring F
 - completeness
 - mating precheck
-- metric cache
+- metric cache (v2 — D6: v1'de istek başına hesap)
 
 **Acceptance:** test pedigree fixtures üzerinde known coefficients ile doğrulama.
 
@@ -1281,7 +1337,7 @@ Feature “pedigree foundation tamam” sayılabilmesi için:
 10. Cow × semen query shared ancestor graph üretir.
 11. Inbreeding sonucu completeness metriği olmadan gösterilmez.
 12. Frontend hiçbir kinship/inbreeding/founder hesabı yapmaz.
-13. Parentage değişimi derived metrics'i invalidate eder.
+13. Parentage değişimi sonraki tüm metrik sorgularına yansır (v1'de istek-başı hesap bunu kendiliğinden sağlar; kalıcı cache invalidation v2 maddesidir).
 14. Pedigree tabloları `farm_id` ileri-disiplinine uyar.
 15. Full app sync graph büyüklüğüyle lineer şişmez; pedigree read'leri on-demand kalır.
 
