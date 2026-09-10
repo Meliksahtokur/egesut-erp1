@@ -34,10 +34,15 @@
 -- eşleşme yok sessiz geçer; stok eksiye düşebilir (emsal 20260902000002).
 --
 -- Calistirma: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f <bu dosya>
+--
+-- Atomiklik (review B5): iki CREATE tek DO blogunda (tek statement) — hem tek
+-- basina calistirildiginda atomik, hem db-dry-run.sh'in BEGIN/ROLLBACK
+-- sarmasiyla uyumlu. Dosya ici BEGIN/COMMIT sarmasi dry-run sarmasiyla ic ice
+-- dusup 25001/25P01 uretiyordu (lead olcumu, M2b kapisi).
 
-BEGIN;
-
-CREATE OR REPLACE FUNCTION public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false)
+DO $do$
+BEGIN
+  CREATE OR REPLACE FUNCTION public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -276,5 +281,5 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'tohumlama_id', v_toh.id, 'deneme_sayisi', v_toh.deneme_sayisi + 1);
 END;
 $function$;
-
-COMMIT;
+END
+$do$;

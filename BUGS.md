@@ -11,7 +11,16 @@ değil) → `verified` (canlıda ölçüldü).
 
 ## Bugs
 
-### BUG-001 — `planli_tohumlama_kaydet` sperma stok düşümü yapmıyor [HIGH] [open]
+### BUG-001 — `planli_tohumlama_kaydet` sperma stok düşümü yapmıyor [HIGH] [refuted — yanlış alarm, 2026-09-10]
+
+- **Düzeltme kaydı (lead + W1, çift bağımsız kanıt):** canlı gövde koşulsuz
+  `public.tohumlama_kaydet(...)`'e delege ediyor — düşüm delegasyonla
+  gerçekleşiyor. İlk leksik ölçüm ("gövdede stok_hareket geçmiyor")
+  delegasyonu göremedi. Kanıt: demo davranışsal probe (planli çağrı → 1
+  `stok_hareket` satırı) + canlı gövde satırı. Fix gerekmez; çift düşümü
+  önlemek için planli'ye düşüm EKLENMEDİ — sertleşmiş kuralı delegasyonla
+  miras alır (M2, `20260910000002`). Rapor:
+  `.claude/idle-reports/2026-09-10-ureme-bugfix.md`.
 
 - **Kanıt (canlı, 2026-09-10):** `pg_get_functiondef` gövdesinde `stok_hareket`
   geçmiyor. Aynı ölçümde `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet`
@@ -24,7 +33,15 @@ değil) → `verified` (canlıda ölçüldü).
 - **Fix yönü:** planli yoluna, diğer iki yolun (BUG-002 ile düzeltilmiş)
   eşleşme/düşüm kuralını uygula; üç yol tek kuralı kullansın.
 
-### BUG-002 — sperma stok düşümü string eşleşmesi kırılgan [MEDIUM-HIGH] [open]
+### BUG-002 — sperma stok düşümü string eşleşmesi kırılgan [MEDIUM-HIGH] [fixed-pending-deploy]
+
+- **Fix:** `20260910000002_sperma_eslesme_sertlestirme.sql` (helper
+  `fn_sperma_stok_dus` M1'de final biçimiyle, boş/whitespace ad hiç düşürmez
+  `^\s*$`, exact önce, substring fallback, kategori='Sperma', notlar içeriği
+  canlıyla birebir; üç yol tek kural — planli delegasyonla). Testler:
+  `tests/sql/sperma_stok_dus_test.sql` + `tests/sql/sperma_eslesme_test.sql`.
+  Bağımsız review düzeltmeleri (B2..B8) işlendi. Rapor:
+  `.claude/idle-reports/2026-09-10-ureme-bugfix.md`.
 
 - **Kanıt (canlı):** `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet`
   gövdelerinde:
@@ -48,7 +65,14 @@ değil) → `verified` (canlıda ölçüldü).
   yaşar. Stok eksiye düşebilir (serbest düşürme politikası, emsal
   `20260902000002`).
 
-### BUG-003 — `gebelik_kaydet_manual` canlıda 42804 ile kırık [HIGH] [open]
+### BUG-003 — `gebelik_kaydet_manual` canlıda 42804 ile kırık [HIGH] [fixed-pending-deploy]
+
+- **Fix:** `20260910000003_gebelik_kaydet_manual_42804_fix.sql` — gövdede
+  `v_tohumlama_id text` ↔ `tohumlama.id uuid` uyuşmazlığı; 3 noktalık minimal
+  tür düzeltmesi (canlı gövde ölçümüne dayalı). Red-first leadce bağımsız
+  yeniden üretildi (SQLSTATE 42804). Test:
+  `tests/sql/gebelik_kaydet_manual_test.sql`. Rapor:
+  `.claude/idle-reports/2026-09-10-ureme-bugfix.md`.
 
 - **Kanıt:** canlı imza `(p_hayvan_id text, p_tarih date, p_sperma text)`; PROD
   çağrıda SQL 42804 (text id → uuid kolon uyuşmazlığı, gövde içi). 🤰 Gebelik
