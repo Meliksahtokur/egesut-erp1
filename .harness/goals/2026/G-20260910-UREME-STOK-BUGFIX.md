@@ -102,6 +102,15 @@ The LEAD opens ONE Codex (luna max) review session over the final diff of
 summary). Findings go back to the same worker once; verification of the fix
 is the mechanical gate, not a second review round.
 
+**Owner standing rule (2026-09-10) — supersedes the single-round limit at the
+ROOT merge gate:** before ROOT merges this branch into main, ROOT sends the
+full deliverable to a separate independent Codex (luna max) review session.
+The revision loop (findings → lead/worker fix → root re-verify → review again)
+continues until that reviewer's own verdict is PASS. Anti-manipulation: the
+review envelope carries neutral material and criteria only — no author
+summaries presented as facts, no coaching, no pre-negotiated verdict; findings
+are relayed verbatim.
+
 ## Acceptance (mechanical — root will re-run)
 
 1. Demo DB: planli tohumlama with a known sperma reduces that stock row by 1
