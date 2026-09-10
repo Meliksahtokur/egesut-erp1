@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["run", "items", "compatibility", "total_try", "budget_fit"],
+  "properties": {
+    "run": {
+      "type": "object",
+      "required": ["date", "budget_try", "region", "domain"],
+      "properties": {
+        "date": {"type": "string"},
+        "budget_try": {"type": "number"},
+        "region": {"type": "string"},
+        "domain": {"type": "string"}
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "name", "chosen_price_try", "seller",
+                     "source_url", "last_updated", "stock_status", "confidence", "evidence"],
+        "properties": {
+          "category": {"type": "string"},
+          "name": {"type": "string"},
+          "chosen_price_try": {"type": "number"},
+          "seller": {"type": "string"},
+          "source_url": {"type": "string", "pattern": "^https?://"},
+          "last_updated": {"type": "string"},
+          "stock_status": {"enum": ["in_stock", "out_of_stock", "unknown"]},
+          "confidence": {"enum": ["VERIFIED", "UNVERIFIED"]},
+          "evidence": {"type": "string"},
+          "alternatives": {"type": "array"}
+        }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["verdict", "notes"],
+      "properties": {
+        "verdict": {"enum": ["PASS", "WARN", "FAIL", "N/A"]},
+        "notes": {"type": "array"}
+      }
+    },
+    "total_try": {"type": "number"},
+    "budget_fit": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "run": {"date": "2026-06-26", "budget_try": 100000, "region": "TR", "domain": "pc-build"},
+  "items": [{
+    "category": "cpu", "name": "AMD Ryzen 7 7700", "chosen_price_try": 9660,
+    "seller": "DFS Bilgisayar", "source_url": "https://www.akakce.com/islemci/x.html",
+    "last_updated": "29 dakika önce", "stock_status": "maybe",
+    "confidence": "VERIFIED"
+  }],
+  "compatibility": {"verdict": "PASS", "notes": []},
+  "total_try": 9660, "budget_fit": true
+}
