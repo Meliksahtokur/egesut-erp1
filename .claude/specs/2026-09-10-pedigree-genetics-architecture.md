@@ -281,6 +281,7 @@ CREATE TABLE public.semen_catalog (
 
   FOREIGN KEY (bull_farm_id, bull_node_id)
     REFERENCES public.pedigree_nodes(farm_id, id),
+  CHECK (farm_id = bull_farm_id),                     -- r4-F14: satır kendi farm'ına kilitli
 
   code              text NULL,
   display_name      text NOT NULL,
@@ -336,7 +337,8 @@ Armada gibi dış boğaların yayımlanmış genetik değerlerini pedigree metri
 CREATE TABLE public.genetic_evaluations (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   farm_id           uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
-  node_id           uuid NOT NULL REFERENCES public.pedigree_nodes(id) ON DELETE CASCADE,
+  node_farm_id      uuid NOT NULL,                    -- r4-F15: tenant kilidi composite FK ile
+  node_id           uuid NOT NULL,
 
   source             text NOT NULL,
   source_registry    text NULL,
@@ -348,6 +350,10 @@ CREATE TABLE public.genetic_evaluations (
   reliability        numeric NULL,
   metadata           jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at         timestamptz NOT NULL DEFAULT now(),
+
+  FOREIGN KEY (node_farm_id, node_id)
+    REFERENCES public.pedigree_nodes(farm_id, id) ON DELETE CASCADE,
+  CHECK (farm_id = node_farm_id),
 
   UNIQUE (farm_id, node_id, source, evaluation_date, trait_code)
 );
@@ -692,14 +698,19 @@ Dönüş kontratı:
   "founder_contributions": [
     {"founder_node_id": "uuid", "label": "Armada", "contribution": 0.25}
   ],
+  "unknown_share": 0.125,
   "breed_composition": [
     {"breed": "Holstein", "share": 0.625},
-    {"breed": "Brown Swiss", "share": 0.25},
-    {"unknown_share": 0.125}
+    {"breed": "Brown Swiss", "share": 0.25}
   ],
   "algorithm_version": "pedigree-v1"
 }
 ```
+
+**Invariant (r4-F22):** `Σ(founder_contributions.contribution) + unknown_share = 1`.
+Bilinmeyen atalar uydurulmuş founder olarak listelenmez; kütleleri yalnız
+`unknown_share`'de yaşar. Bilinmeyen parent slotu completeness'te BİLİNMEMİŞ
+sayılır (r4-F19) — hesapta founder sınırı gibi davranır ama known-slot şişirmez.
 
 Hesap **istek anında** yapılır (D6: kalıcı cache yok). Founder katkıları ve
 breed composition bu yanıtın parçasıdır; ayrı tablo/RPC yoktur. Implementasyon

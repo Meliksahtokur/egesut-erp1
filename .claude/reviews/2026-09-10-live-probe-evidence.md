@@ -110,6 +110,36 @@ FROM hayvanlar h;
 hayvanın dam'ı için doğum kaydı mevcut; maternal backfill için çelişki
 sayısı 0. (207, tohumlama satır sayısıdır; maternal kontrolün evreni 61'dir.)
 
+## S7 — Kalan RPC imzaları (r4 turu)
+
+`hayvan_ekle` (2 overload): `(p_kupe_no text, p_devlet_kupe text, p_irk text,
+p_cinsiyet text, p_dogum_tarihi date, p_grup text, p_padok text, p_dogum_kg
+numeric, p_anne_id text, p_baba_bilgi text, p_canli_agirlik numeric, p_boy
+numeric, p_renk text, p_ayirici_ozellik text[, p_padok_id uuid])`.
+`dogum_kaydet`: `(p_anne_id text, p_tarih date, p_kupe text, p_cins text,
+p_tip text, p_kg numeric, p_baba text, p_hekim_id text)`.
+`geri_al`: `(p_islem_id text)`.
+
+## S8 — Tarihe-bağlı maternal kontrol (r4 turu; plan Task 0.3 sorgusunun düzeltilmiş hali)
+
+**Kolon düzeltmesi:** `dogum` tablosunda `dogum_tarihi` YOKTUR — tarih kolonu
+adı **`tarih`** (canlı kolon listesi: id, anne_id, tarih, yavru_cins,
+yavru_kupe, yavru_irk, dogum_tipi, created_at, hekim_id, dogum_kg, baba_bilgi,
+olay_id). Plan Task 0.3'teki örnek sorgu bu nedenle `d.tarih` olarak düzeltildi.
+
+```sql
+SELECT count(*) FILTER (WHERE h.anne_id IS NOT NULL) AS anne_dolu,
+       count(*) FILTER (WHERE h.anne_id IS NOT NULL AND NOT EXISTS
+         (SELECT 1 FROM dogum d WHERE d.anne_id = h.anne_id
+            AND d.tarih <= h.dogum_tarihi)) AS tarihsel_uyumsuz
+FROM hayvanlar h;
+```
+
+Çıktı: **anne_dolu = 61, tarihsel_uyumsuz = 1** — bir hayvanın dam'ının doğum
+kaydı, yavrunun kendi doğum tarihinden SONRA tarihli (veri anomalisi;
+integrity raporunun ilk gerçek bulgusu, backfill'de otomatik override edilmez,
+rapora düşer).
+
 ## Kapsam notu
 
 - `gebelik_kaydet_manual`'ın PROD çağrıda SQL 42804 verdiği (BUG-003) bu

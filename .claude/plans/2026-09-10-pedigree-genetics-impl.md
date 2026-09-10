@@ -249,11 +249,16 @@ doğrulaması eklenir; sorgu ve ham çıktı `live-probe-evidence.md`’ye yazı
 
 ```sql
 -- anne_id’si dolu hayvanların dam hattı dogum ile uyumlu mu?
+-- (r4 düzeltmesi: dogum tablosunda tarih kolonunun adı ‘tarih’tir — dogum_tarihi DEĞİL; kanıt S8)
 SELECT c.id, c.anne_id,
        (SELECT count(*) FROM dogum d WHERE d.anne_id = c.anne_id
-          AND d.dogum_tarihi <= c.dogum_tarihi) AS dogum_kaydi_var
+          AND d.tarih <= c.dogum_tarihi) AS dogum_kaydi_var
 FROM hayvanlar c WHERE c.anne_id IS NOT NULL;
 ```
+
+Kök ölçümü (kanıt S8, 2026-09-10): 61 anne-id’li hayvandan **1** tanesi
+tarihsel olarak uyumsuz (dam’ın doğum kaydı yavrunun doğumundan sonra
+tarihli) — integrity raporunun ilk gerçek bulgusu.
 
 Çelişkiler (anne_id’si hiçbir dogum ile doğrulanamayan hayvanlar) integrity
 raporunun ilk girdisidir. Fixture uydurma veriyle geçer, gerçek sürü geçmeyebilir.
@@ -263,6 +268,13 @@ raporunun ilk girdisidir. Fixture uydurma veriyle geçer, gerçek sürü geçmey
 Canlı tarihçede embriyo transferi kullanıldıysa bu planın `dam = dogum.anne_id` varsayımı durdurulur ve önce `genetic_dam` / `recipient_dam` genişletmesi yapılır.
 
 **Gate:** ET yok/ihmal edilebilir diye **owner** domain kararı netleşmeden doğum parentage write açılmaz — bu planın ölçeğinde **Faz 7**'dir (doğum entegrasyonu; spec'in ölçeğinde Phase 2). Karar, planın D-bölümüne tarihli owner kararı satırı olarak işlenir; işlenmemiş Faz 7 zarfı yazılamaz.
+
+**Preflight açık girdileri (r4-A4/I7 çerçevesi):** ET owner kararı, semen
+mapping dosyasının üretilmesi, PROD 42804 reproduce ve legacy return-shape
+yakalama, **implementasyon öncesi** üretilen girdilerdir — bu plandaki
+eksiklikleri doküman kusuru değil, **beklenen açık girdi** durumudur. Her biri
+kanıt dosyasına veya D-bölümüne tarihli işlenmeden ilgili fazın zarfı
+yazılamaz; produce edilen her girdi kanıt zincirine girer.
 
 ---
 
@@ -382,21 +394,30 @@ CREATE POLICY allow_all ON public.semen_catalog      FOR ALL USING (true) WITH C
 -- IDB sync gerekir (D3):
 GRANT SELECT ON public.semen_catalog TO anon, authenticated;
 
--- Foundation’da yaratılan RPC’ler (Task 1.4) — tam argüman tipleriyle (r3-N1):
-GRANT EXECUTE ON FUNCTION public.pedigree_parent_set(uuid,text,uuid,text,text,boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pedigree_external_upsert(uuid,text,text,text,date,text,text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.semen_catalog_upsert(uuid,text,uuid,text,text,text,text,text,text,boolean) TO authenticated;
+-- Foundation’da yaratılan RPC’ler (Task 1.4) — tam argüman tipleriyle (r3-N1, r4-F13 sıraları):
+GRANT EXECUTE ON FUNCTION public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_external_upsert(text,uuid,text,text,date,text,text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean) TO authenticated;
 ```
 
-Sonraki fazların migration’larına girenler (fonksiyon orada yaratılır):
+Sonraki fazların migration’larına girenler (fonksiyon orada yaratılır — eksiksiz envanter, r4-F12/F20/F21):
 
 ```sql
+-- Task 2 (integrity): o migration’da:
+GRANT EXECUTE ON FUNCTION public.pedigree_integrity_report() TO authenticated;
 -- Task 3 (projection): o migration’da:
 GRANT EXECUTE ON FUNCTION public.pedigree_subgraph(uuid,integer,integer) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pedigree_subgraph_for_animal(text,integer,integer) TO anon, authenticated;
--- Task 17/P4 (profile+mating): o migration’da:
+-- Task 10 (controlled writes): o migration’da (r4-F12):
+GRANT EXECUTE ON FUNCTION public.tohumlama_kaydet_semen(text,date,uuid,text,text,jsonb,boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.planli_tohumlama_kaydet_semen(uuid,text,date,uuid,text,text,jsonb,boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.tohumlama_tekrar_kaydet_semen(text,date,uuid,text,text,boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.gebelik_kaydet_manual_semen(text,date,uuid) TO authenticated;
+-- Task 17/P4 (profile+mating+kinship): o migration’da (r4-F20):
 GRANT EXECUTE ON FUNCTION public.pedigree_profile(text,integer) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.mating_analyze(text,uuid,integer) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_kinship(uuid,uuid,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_inbreeding(uuid,integer) TO authenticated;
 -- v2 (Task 22): genetic_evaluations tablosu + okuma RPC’si birlikte:
 GRANT EXECUTE ON FUNCTION public.genetic_evaluations_for_node(uuid) TO anon, authenticated;
 ```
@@ -419,17 +440,18 @@ pedigree_parent_set(
   p_parent_node_id uuid,
   p_source_type text default 'manual',      -- birth|manual|import|reconcile
   p_source_ref text default null,
-  p_replace boolean default false           -- farklı parent'a değişim için açık onay
+  p_replace boolean default false,          -- farklı parent'a değişim için açık onay
+  p_evidence jsonb default null             -- r4-F10: doğum edge'i {"tohumlama_id","semen_id"} yazar
 ) -> uuid
-pedigree_external_upsert(
-  p_node_id uuid default null,
-  p_display_name text, p_sex text default null, p_breed text default null,
+pedigree_external_upsert(                   -- r4-F13: zorunlu parametreler ÖNCE (PG default kuralı)
+  p_display_name text,
+  p_node_id uuid default null, p_sex text default null, p_breed text default null,
   p_birth_date date default null,
   p_registry_system text default null, p_registry_code text default null
 ) -> uuid
-semen_catalog_upsert(                        -- Task 11 "Elle Gir"/tanımla akışının tek yolu
-  p_id uuid default null,
+semen_catalog_upsert(                        -- Task 11 "Elle Gir"/tanımla akışının tek yolu; r4-F13 sıralı
   p_display_name text,
+  p_id uuid default null,
   p_bull_node_id uuid default null,          -- verilmezse external bull node yaratılır
   p_registry_system text default null, p_registry_code text default null,
   p_stock_id text default null,
@@ -539,6 +561,24 @@ oluştur.
 
 ### 2.3 `pedigree_integrity_report()`
 
+Bu migration **`public.pedigree_meta` tablosunu da yaratır** (r4-F11 — Task
+6'da değil, burada; Task 10 yalnızca değer INSERT eder):
+
+```sql
+CREATE TABLE public.pedigree_meta (
+  farm_id uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
+  key     text NOT NULL,
+  value   text NOT NULL,          -- örn. cutoff: ISO timestamp metni
+  PRIMARY KEY (farm_id, key)
+);
+ALTER TABLE public.pedigree_meta ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all ON public.pedigree_meta FOR ALL USING (true) WITH CHECK (true);
+```
+
+Rapor cutoff okumasını NULL-güvenli yapar: `semen_controlled_cutoff` anahtarı
+yoksa (Task 10 henüz deploy edilmemişse) rapor `cutoff: tanımsız — controlled
+writes devrede değil` döner ve NULL-sayaç bölümünü atlar; hata vermez.
+
 **Create read-only RPC** ve şu grupları JSON döndür:
 
 - farm animal node eksikleri
@@ -551,7 +591,7 @@ oluştur.
 - legacy semen strings without catalog mapping
 - cycle count (normalde 0)
 - parent born after child gibi tarih anomalileri
-- post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = `pedigree_meta` tablosundaki `semen_controlled_cutoff` değeri — r3-F6)
+- post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = `pedigree_meta` tablosundaki `semen_controlled_cutoff` değeri — r3-F6; tablo bu migration'da yaratılır, r4-F11)
 
 ### 2.4 Idempotency testi
 
@@ -689,9 +729,12 @@ tamamen temizlenir** — başka farm/bağlamın grafiği yanlış bağlamda rend
 edilemez. **Farm bağlamının istemci kaynağı (r3-F3):** `js/config.js`'e
 `PEDIGREE_FARM_ID` sabiti eklenir (DB farm_id varsayanıyla hizalı; bugün tek
 farm — değer network'süz okunur, offline arama çalışır; multi-farm fazında RPC
-değerine taşınır). **Temizliğin yüzeyi (r3-F4):** çıkış akışı `js/auth.js`'te
-`api.clearPedigreeCache()` çağırır — `js/auth.js` final değişiklik
-haritasındadır.
+değerine taşınır). **Temizliğin yüzeyi (r4-F17/F18 — buildless gerçeklere
+bağlı):** `js/api.js`'e top-level global fonksiyon `clearPedigreeCacheStore()`
+eklenir (mevcut global desen; `api.` namespace'i YOKTUR). `js/auth.js`'te
+sıra şudur: `await clearPedigreeCacheStore()` **ÖNCE**, sonra
+`await db.auth.signOut()` — böylece `SIGNED_OUT` listener reload'ı ne zaman
+tetiklenirse tetiklensin cache zaten temizdir (reload yarışı kapanır).
 
 ### 4.3 Cache policy
 
@@ -1169,8 +1212,11 @@ migration'ı `public.pedigree_meta(farm_id, key, value)` tablosunu yaratır ve
 adı değişse bile sorgu otoritesi bozulmaz; `tohumlama.created_at` canlıda
 mevcuttur (kanıt S4). Integrity sorgusu pedigree_meta'dan okur. Kabul:
 
-1. UI E2E: controlled selector’dan giden her tohumlama/tekrar/gebelik kaydı
-   `semen_id` taşır (frontend yolundan NULL üreten yol kalmadığının testi).
+1. UI E2E: controlled selector’dan giden her **tohumlama/tekrar** kaydı
+   `semen_id` taşır (bu iki formda NULL üreten yol kalmadığının testi);
+   **gebelik formu ayrıdır** (r4-F16): ya `semen_id` ya bilinçli NULL
+   (unknown-sire) — iki yol da ayrı test senaryosuyla doğrulanır, NULL
+   "kalan yol" sayılmaz.
 2. `pedigree_integrity_report()` sorgusu: `created_at > cutoff AND semen_id IS NULL`
    satır sayısını raporlar — 0 hedefi DB sorgusuyla izlenir.
 3. Veritabanı-geneli sert garanti (NOT NULL + legacy RPC kapatma) **v2**
@@ -1327,8 +1373,12 @@ Parentage mutation sonrası affected subject/descendant metrics stale olur. İlk
   (i<j topolojik sırada); köşegen `a_ii = 1 + 0.5*a_sire(i),dam(i)`;
   inbreeding `F_i = a_sire(i),dam(i)`; kinship `f_ij = 0.5*a_ij`.
 - Founder: bilinen parent'ı olmayan node; `F=0`, satırı birim köşegenli.
-- **Bilinmeyen parent:** founder gibi davranır (F=0, a=0) ve completeness
-  slotunu bilinmiş olarak işler — sessiz akraba sayma YOK.
+- **Bilinmeyen parent (r4-F19):** hesapta founder sınırı gibi davranır (F=0,
+  a=0) ANCAK (a) completeness slotu BİLİNMEMİŞ sayılır — known-slot şişirmez;
+  (b) katkısı uydurulmuş founder'a değil `unknown_share` kovasına yazılır.
+  Sessiz known-founder YOK. Fixture: focus'un bir parent'ı bilinmiyorsa
+  `completeness = {known_slots: 1, total_slots: 2, ratio: 0.5}` ve
+  `unknown_share = 0.5` beklenir (sayısal beklenen değer).
 - **Derinlik kesme:** depth limit ötesi yollar yok sayılır; kesilen her dal
   completeness payını düşürür. Inbred ancestor `(1+F)` etkisi korunur.
 - Node'lar topolojik sırayla işlenir (ancestor closure içinde); aynı founder
@@ -1387,7 +1437,7 @@ Unknown parent branch sessizce unrelated sayılmaz.
 
 ## Task 17 — `mating_analyze`
 
-**Create/update:** metrics migration veya ayrı `20260910000008_mating_analyze.sql` — **bu migration `pedigree_profile(p_hayvan_id text, p_depth integer default 6)` fonksiyonunu DA yaratır** (spec §7.2b kontratı; Task 21'in veri kaynağı — r2-N7) ve `GRANT EXECUTE` cümlesini içerir (Task 1.3 sonraki-fazlar bloğu)
+**Create/update:** metrics migration veya ayrı `20260910000008_mating_analyze.sql` — **bu migration `pedigree_profile(p_hayvan_id text, p_depth integer default 6)` fonksiyonunu DA yaratır** (spec §7.2b kontratı; Task 21'in veri kaynağı — r2-N7) **ve Task 15'in `pedigree_kinship(uuid,uuid,integer)` + `pedigree_inbreeding(uuid,integer)` fonksiyonlarını yaratır** (r4-F20 — bunların ayrı migration'u yoktur); dördünün `GRANT EXECUTE` cümlesi bu migration'dadır (Task 1.3 envanteri)
 
 ```text
 mating_analyze(
@@ -1528,7 +1578,10 @@ Table minimum:
 ```text
 id
 farm_id
-node_id            -- composite FK: (node_farm_id, node_id) → pedigree_nodes(farm_id, id) (r3-G3 kalıntısı)
+node_farm_id       -- uuid NOT NULL kolonu (r4-F15; spec §4.5 ile aynı)
+node_id
+  -- CONSTRAINT: FOREIGN KEY (node_farm_id, node_id) → pedigree_nodes(farm_id, id)
+  --             + CHECK (farm_id = node_farm_id)
 source
 source_registry
 evaluation_date    -- date NOT NULL (spec §4.5; NULL unique-key deler — kaynak periyodu girilir)

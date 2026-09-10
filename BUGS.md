@@ -97,9 +97,10 @@ otomasyon kararı ayrı iş.
 ## Pedigree doküman düzeltmeleri (İndirilenler'deki spec/plana yansıtılacak)
 
 **Durum (2026-09-10, Revizyon 2 + review turları): KARŞILANDI** — DOC-001..006
-repo içindeki revize kopyalara işlendi; luna max turları (r1, r2, r3 FAIL)
-bulgularıyla iteratif kapatıldı. **Açık borç (bilinçli):** DOC-006'nın tracked
-dry-run kapısı Task 1.7 maddesidir (P1'de kapanır).
+repo içindeki revize kopyalara işlendi; luna max turları (r1-r4) bulgularıyla
+iteratif kapatıldı. Tek zamanlanmış teslim: DOC-006'nın tracked dry-run kapısı
+**Task 1.7'de P1 ile teslim edilir** (plan maddesi olarak taahhüt edildi —
+açık eksiklik değil, planlı iş).
 
 DOC-001: ~~`tohumlama.id` beklentisi düzeltilmeli~~ → **İŞLENDİ + canlı düzeltmesi**:
 plan Task 0.2 beklenti yazmaz, canlıdan okur. Canlı ölçüm (kanıt S4):
