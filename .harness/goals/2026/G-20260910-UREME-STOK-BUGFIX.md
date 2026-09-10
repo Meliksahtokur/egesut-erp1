@@ -1,8 +1,25 @@
+---
+id: G-20260910-UREME-STOK-BUGFIX
+status: active
+owner: root
+flow: ss_org
+created: 2026-09-10
+base_sha: 38c3b07
+branch: idle/ureme-stok-bugfix
+write_manifest:
+  - BUGS.md
+  - supabase/migrations/
+  - tests/sql/
+  - .claude/idle-reports/2026-09-10-ureme-bugfix.md
+review_lane: codex_luna_max
+implement_lane: glmf_workers
+---
+
 # G-20260910-UREME-STOK-BUGFIX — Reproduction-path stock/RPC bug fixes
 
 - **Status:** ACTIVE
 - **Date:** 2026-09-10
-- **Base SHA:** a3d8bc2 (main at dispatch time)
+- **Base SHA:** 38c3b07 (main ucu dispatch anında; front-matter ile tek — F6/B9 kapandı)
 - **Owner directive (2026-09-10):** fix the bugs recorded in `BUGS.md` via the
   ss-org network — Lead (GLM) coordinates, Worker (GLMF) sessions implement.
   Root verifies the lead branch, then merges to main or sends back for
@@ -84,6 +101,15 @@ The LEAD opens ONE Codex (luna max) review session over the final diff of
 `idle/ureme-stok-bugfix` (input: envelope + `git diff`, not the author's
 summary). Findings go back to the same worker once; verification of the fix
 is the mechanical gate, not a second review round.
+
+**Owner standing rule (2026-09-10) — supersedes the single-round limit at the
+ROOT merge gate:** before ROOT merges this branch into main, ROOT sends the
+full deliverable to a separate independent Codex (luna max) review session.
+The revision loop (findings → lead/worker fix → root re-verify → review again)
+continues until that reviewer's own verdict is PASS. Anti-manipulation: the
+review envelope carries neutral material and criteria only — no author
+summaries presented as facts, no coaching, no pre-negotiated verdict; findings
+are relayed verbatim.
 
 ## Acceptance (mechanical — root will re-run)
 

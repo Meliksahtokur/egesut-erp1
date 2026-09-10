@@ -2,7 +2,8 @@
 
 Kaynak: 2026-09-10 pedigree doküman review (dump HEAD `a3d8bc2`) + canlı PROD
 salt-okunur imza/gövde ölçümü (root). Canlı şema otoritedir; tracked ground
-truth rehberdir (bkz. SMELL-003).
+truth rehberdir (bkz. SMELL-003). Canlı ölçüm kanıtları:
+`.claude/reviews/2026-09-10-live-probe-evidence.md` (sorgular + ham çıktılar).
 
 Durum değerleri: `open` → `fixed-pending-deploy` (migration hazır, PROD'da
 değil) → `verified` (canlıda ölçüldü).
@@ -11,37 +12,19 @@ değil) → `verified` (canlıda ölçüldü).
 
 ## Bugs
 
-### BUG-001 — `planli_tohumlama_kaydet` sperma stok düşümü yapmıyor [HIGH] [refuted — yanlış alarm, 2026-09-10]
+### BUG-001 — `planli_tohumlama_kaydet` sperma stok düşümü yapmıyor [REFUTED — yanlış alarm]
 
-- **Düzeltme kaydı (lead + W1, çift bağımsız kanıt):** canlı gövde koşulsuz
-  `public.tohumlama_kaydet(...)`'e delege ediyor — düşüm delegasyonla
-  gerçekleşiyor. İlk leksik ölçüm ("gövdede stok_hareket geçmiyor")
-  delegasyonu göremedi. Kanıt: demo davranışsal probe (planli çağrı → 1
-  `stok_hareket` satırı) + canlı gövde satırı. Fix gerekmez; çift düşümü
-  önlemek için planli'ye düşüm EKLENMEDİ — sertleşmiş kuralı delegasyonla
-  miras alır (M2, `20260910000002`). Rapor:
-  `.claude/idle-reports/2026-09-10-ureme-bugfix.md`.
+- **Düzeltme (2026-09-10, üç bağımsız kanıt):** ilk teşhis kötüldü. (1) Canlı
+  `planli_tohumlama_kaydet` gövdesi koşulsuz `tohumlama_kaydet`'e delege eder —
+  düşüm delegasyonla gerçekleşir (G-UREME-STOK-BUGFIX teslimi: davranışsal
+  probe, planli çağrısı 1 stok_hareket satırı üretti); (2) tracked
+  `20260730000001:477-496` delegasyon satırını içerir; (3) ilk canlı
+  lexical probu (gövdede `stok_hareket` aramak) delegasyonu göremedi —
+  ölçüm sınırlamasıydı (kanıt S1 düzeltme notu).
+- **Sonuç:** planli yoluna ayrı düşüm EKLENMEZ (çift düşüm olur); sertleşmiş
+  kuralı (BUG-002 fix'i) delegasyonla miras alır.
 
-- **Kanıt (canlı, 2026-09-10):** `pg_get_functiondef` gövdesinde `stok_hareket`
-  geçmiyor. Aynı ölçümde `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet`
-  düşürüyor. Canlı imzalar:
-  - `tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb, p_vwp_override boolean)` — düşüyor
-  - `tohumlama_tekrar_kaydet(text, date, text, text, text)` — düşüyor
-  - `planli_tohumlama_kaydet(p_gorev_id uuid, ...)` — **düşmüyor**
-- **Etki:** planlı tohumlama yoluyla yapılan aşımınlarda sperma stoğu düşmez;
-  stok fiili miktarla sessizce ayrışır.
-- **Fix yönü:** planli yoluna, diğer iki yolun (BUG-002 ile düzeltilmiş)
-  eşleşme/düşüm kuralını uygula; üç yol tek kuralı kullansın.
-
-### BUG-002 — sperma stok düşümü string eşleşmesi kırılgan [MEDIUM-HIGH] [fixed-pending-deploy]
-
-- **Fix:** `20260910000002_sperma_eslesme_sertlestirme.sql` (helper
-  `fn_sperma_stok_dus` M1'de final biçimiyle, boş/whitespace ad hiç düşürmez
-  `^\s*$`, exact önce, substring fallback, kategori='Sperma', notlar içeriği
-  canlıyla birebir; üç yol tek kural — planli delegasyonla). Testler:
-  `tests/sql/sperma_stok_dus_test.sql` + `tests/sql/sperma_eslesme_test.sql`.
-  Bağımsız review düzeltmeleri (B2..B8) işlendi. Rapor:
-  `.claude/idle-reports/2026-09-10-ureme-bugfix.md`.
+### BUG-002 — sperma stok düşümü string eşleşmesi kırılgan [MEDIUM-HIGH] [fixed-pending-deploy — idle/ureme-stok-bugfix dalında, merge/deploy bekliyor]
 
 - **Kanıt (canlı):** `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet`
   gövdelerinde:
@@ -65,14 +48,7 @@ değil) → `verified` (canlıda ölçüldü).
   yaşar. Stok eksiye düşebilir (serbest düşürme politikası, emsal
   `20260902000002`).
 
-### BUG-003 — `gebelik_kaydet_manual` canlıda 42804 ile kırık [HIGH] [fixed-pending-deploy]
-
-- **Fix:** `20260910000003_gebelik_kaydet_manual_42804_fix.sql` — gövdede
-  `v_tohumlama_id text` ↔ `tohumlama.id uuid` uyuşmazlığı; 3 noktalık minimal
-  tür düzeltmesi (canlı gövde ölçümüne dayalı). Red-first leadce bağımsız
-  yeniden üretildi (SQLSTATE 42804). Test:
-  `tests/sql/gebelik_kaydet_manual_test.sql`. Rapor:
-  `.claude/idle-reports/2026-09-10-ureme-bugfix.md`.
+### BUG-003 — `gebelik_kaydet_manual` canlıda 42804 ile kırık [HIGH] [fixed-pending-deploy — idle/ureme-stok-bugfix dalında (3 noktalık uuid fix + kırmızı-önce kanıt), merge/deploy bekliyor]
 
 - **Kanıt:** canlı imza `(p_hayvan_id text, p_tarih date, p_sperma text)`; PROD
   çağrıda SQL 42804 (text id → uuid kolon uyuşmazlığı, gövde içi). 🤰 Gebelik
@@ -100,14 +76,14 @@ yeni RPC birine eklenip diğerine eklenmezse offline kuyruk sessizce legacy
 yola düşer. Pedigree planı Task 10'da zorunlu madde olmalı; genel tutarlılık
 testi (`api.test.js`) araştırılabilir.
 
-### SMELL-003 — Ground truth ↔ canlı `tohumlama_kaydet` gövde ayrışması
+### SMELL-003 — Ground truth ↔ canlı ayrışmaları (2 örnek)
 
-Tracked GT (`99999999999999_ground_truth.sql`, tohumlama_kaydet tanımı
-satır 10858–10924, 66 satır) gövdesinde stok düşümü **yok**; canlıda **var**
-(gorev_log + stok düşümü + ek uygulama döngüsü içeren daha uzun gövde).
-GT rehberdir, canlı otoritedir; bugfix deploy'undan sonra GT yeniden
-üretilmelidir (root kapısı). Bugünkü pedrigree planı (Task 0.2) "yeni drift"
-arıyor — mevcut drift örneği olarak bu kayıt referans alınmalı.
+Örnek 1: tracked GT'de `tohumlama_kaydet` tanımı (satır 10858–10924, 66 satır)
+stok düşümü **içermiyor**; canlıda **var** (gorev_log + stok düşümü + ek
+uygulama döngüsü). Örnek 2 (2026-09-10 kanıt S4): GT `tohumlama.id`'yi text
+gösteriyor (GT:116), canlı **uuid**; `created_at` GT tablo tanımında yok,
+canlıda mevcut. GT rehberdir, canlı otoritedir; bugfix + pedigree
+deploy'larından sonra GT yeniden üretilmelidir (root kapısı).
 
 ### SMELL-004 — `tests/sql` koşumu manuel
 
@@ -119,29 +95,44 @@ otomasyon kararı ayrı iş.
 
 ## Pedigree doküman düzeltmeleri (İndirilenler'deki spec/plana yansıtılacak)
 
-DOC-001: `tohumlama.id` **text** (GT:116), uuid değil — plan Task 0.2 beklenti
-değeri düzeltilmeli (ya da beklenti yazılmayıp canlıdan okunmalı).
+**Durum (2026-09-10, Revizyon 2 + review turları): KARŞILANDI** — DOC-001..006
+repo içindeki revize kopyalara işlendi; luna max turları (r1-r4) bulgularıyla
+iteratif kapatıldı. Tek zamanlanmış teslim: DOC-006'nın tracked dry-run kapısı
+**Task 1.7'de P1 ile teslim edilir** (plan maddesi olarak taahhüt edildi —
+açık eksiklik değil, planlı iş).
 
-DOC-002: Stok düşümü okuması revize: canlıda `tohumlama_kaydet` **düşürüyor**
-(ILIKE desenli), `planli_tohumlama_kaydet` düşürmüyor (BUG-001). Spec §6.3
-"mevcut stok düşümü" ifadesi ve plan Task 10 madde 5, BUG-001/002
-fix'leriyle hizalanmalı ("korumak" değil "düzeltipi semen_catalog.stock_id'ye
-taşımak").
+DOC-001: ~~`tohumlama.id` beklentisi düzeltilmeli~~ → **İŞLENDİ + canlı düzeltmesi**:
+plan Task 0.2 beklenti yazmaz, canlıdan okur. Canlı ölçüm (kanıt S4):
+`tohumlama.id` **uuid**, `created_at` timestamptz mevcut — GT'nin text/eksik
+gösterimi drift örneği #2'dir (SMELL-003).
 
-DOC-003: `buildSpermaList` (app.js:399) stok değil geçmiş+config datalist'i;
-stok seçicileri ui.js'te. Plan Task 11 yüzey envanteri üç kaynağı +
-`geb-sperma`'yı kapsamalı.
+DOC-002: ~~stok düşümü okuması hizalanmalı~~ → **İŞLENDİ**: spec §6.3 + plan
+D4/Task 10 "düzeltilmiş kuralı semen_catalog.stock_id'ye taşı" olarak yazıldı.
+*(r2 düzeltmesi: offline "kuyrukta zaten queueable" iddiası yanlıştı — formlar
+offline'da kuyruğa girmeden reddediyor; v1 *_semen online-only, RPC_MAP'e
+ekleme YOK.)*
 
-DOC-004: Offline replay `RPC_MAP`'e yeni `*_semen` RPC'leri eklenmelidir —
-opsiyonel değil (tohumlama zaten kuyrukta).
+DOC-003: ~~yüzey envanteri genişletilmeli~~ → **İŞLENDİ**: plan Task 11 üç
+kaynağı (config/datalist/stok-select) + `geb-sperma`'yı kapsıyor; geb formunda
+semen seçimi opsiyonel (mevcut davranış).
 
-DOC-005: farm_id kolonlu tablo repoda henüz **sıfır**; pedigree tabloları ilk
-uygulayıcı olacak. Plan "mevcut geçiş politikası" değil "contract kuralının
-ilk uygulaması" demeli; farm_id ile başlayan index checklist maddesi.
+DOC-004: ~~RPC_MAP'e eklenmeli~~ → **DÜZELTİLDİ (tersine)**: ölçüm (r2) formların
+offline'da kuyruk oluşturmadığını gösterdi; ekleme yapılmaz, v1 semen-aware
+yollar online-only; RPC_TABLES↔RPC_MAP tutarlılık testi izleme aracı olarak kalır.
+
+DOC-005: farm_id kolonlu ürün tablosu repoda henüz **sıfır** (`demo/02_demo_klonla.sql`'deki
+demo-yardımcı `demo_klon_log` hariç — kapsam: canlı üretim şeması); pedigree
+tabloları ilk uygulayıcı olacak. Plan "mevcut geçiş politikası" değil "contract
+kuralının ilk uygulaması" demeli; farm_id ile başlayan index checklist maddesi.
+→ *Karşılandı (plan Task 27) + kapsam nüansı eklendi.*
 
 DOC-006: SQL test koşum ortamı plana bağlanmalı: `psql "$DATABASE_URL"`
-(tests/sql deseni) + `scripts/db-dry-run.sh` (Neon ayna). Lokal Postgres yok;
+(tests/sql deseni, tracked). Dikkat: `scripts/db-dry-run.sh` **tracked değil**
+(owner-local; sabit `/tmp` log yazar) — P1 tooling maddesiyle tracked + TMPDIR
+uyumlu hale getirilene kadar migration kabulü psql fixture'larıyladır.
 CI otomasyonu kapsam dışı (repo test stratejisi: lokal yeter).
+→ *İŞLENDİ — tracked kapı plan maddesi Task 1.7 olarak P1 ile teslim edilir
+(zamanlanmış iş; açık eksiklik değil).*
 
 ---
 

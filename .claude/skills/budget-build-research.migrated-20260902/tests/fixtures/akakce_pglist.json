@@ -1,0 +1,1011 @@
+{
+ "r": 0,
+ "result": {
+  "isEnabledSellers": true,
+  "pgList": [
+   {
+    "pgCode": 1613002800,
+    "price": 47991.45,
+    "pgName": "Apple İphone 15 128 Gb Siyah (Apple Türkiye Garantili)",
+    "vdCode": 11281,
+    "vdName": "Pttavm",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=1&v=11281&p=282674948&c=15850&g=1613002800&f=%2fr%2f%3fpr%3d282674948%26vd%3d11281%26pg%3d1613002800",
+    "badgePrice": 0,
+    "pgNick": "TK SANAL MARKET",
+    "sloganText": "Pttavm 'yi Takip Et Yaza Özel İndirim Fırsatlarını Kaçırma",
+    "stock": 4,
+    "badgeId": 1,
+    "badge": "Kargo Dahil En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:01:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 2 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 2 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1614454493,
+    "price": 48048,
+    "pgName": "Apple iPhone 15 128 GB (Apple Türkiye Garantili) Siyah",
+    "vdCode": 5717,
+    "vdName": "Adilpazar",
+    "hasLogo": false,
+    "shipPrice": 0,
+    "url": "#/111/?s=2&v=5717&p=282674948&c=24093&g=1614454493&f=%2fr%2f%3fpr%3d282674948%26vd%3d5717%26pg%3d1614454493",
+    "badgePrice": 0,
+    "sloganText": "Alışveriş Kredisi ile Kolay Alışverişin Adresi",
+    "lastUpdateTime": "06/29/2026 14:01:00"
+   },
+   {
+    "pgCode": 1519157375,
+    "price": 48249,
+    "pgName": "Apple iPhone 15 128 GB (Apple Türkiye Garantili) siyah",
+    "vdCode": 11070,
+    "vdName": "n11",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=3&v=11070&p=282674948&c=15663&g=1519157375&f=%2fr%2f%3fpr%3d282674948%26vd%3d11070%26pg%3d1519157375",
+    "badgePrice": 0,
+    "pgNick": "n11",
+    "sloganText": "Kaçırılmayacak fırsatlar n11'de seni bekliyor.",
+    "stock": 75,
+    "lastUpdateTime": "06/29/2026 15:07:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 8,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1453604884,
+    "price": 48357.65,
+    "pgName": "Apple iPhone 15 128 GB (Apple Türkiye Garantili) siyah",
+    "vdCode": 11070,
+    "vdName": "n11",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=4&v=11070&p=282674948&c=15663&g=1453604884&f=%2fr%2f%3fpr%3d282674948%26vd%3d11070%26pg%3d1453604884",
+    "badgePrice": 0,
+    "pgNick": "cephaneteknoloji",
+    "sloganText": "Kaçırılmayacak fırsatlar n11'de seni bekliyor.",
+    "stock": 6,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:07:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 8,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1623153580,
+    "price": 48450,
+    "pgName": "Apple iPhone 15 128 GB Siyah - (Apple Türkiye Garantili)",
+    "vdCode": 12088,
+    "vdName": "Hepsiburada",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=5&v=12088&p=282674948&c=17384&g=1623153580&f=%2fr%2f%3fpr%3d282674948%26vd%3d12088%26pg%3d1623153580",
+    "badgePrice": 0,
+    "pgNick": "Karsu Teknoloji Ürünleri",
+    "sloganText": "Haziran Ayı Fırsatlarıyla Aradığınız Her Şey Hepsiburada'da",
+    "stock": 10,
+    "badgeId": 3,
+    "badge": "Bugün Kargo En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Bugün kargoda",
+    "deliveryHour": "18:00",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1623812999,
+    "price": 48459,
+    "pgName": "Apple iPhone 15 128 GB Siyah - (Apple Türkiye Garantili)",
+    "vdCode": 12088,
+    "vdName": "Hepsiburada",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=6&v=12088&p=282674948&c=17384&g=1623812999&f=%2fr%2f%3fpr%3d282674948%26vd%3d12088%26pg%3d1623812999",
+    "badgePrice": 0,
+    "pgNick": "İzi Teknoloji",
+    "sloganText": "Haziran Ayı Fırsatlarıyla Aradığınız Her Şey Hepsiburada'da",
+    "stock": 10,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Bugün kargoda",
+    "deliveryHour": "18:00",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1620141712,
+    "price": 48499,
+    "pgName": "Apple iPhone 15 128 GB Siyah - (Apple Türkiye Garantili)",
+    "vdCode": 12088,
+    "vdName": "Hepsiburada",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=7&v=12088&p=282674948&c=17384&g=1620141712&f=%2fr%2f%3fpr%3d282674948%26vd%3d12088%26pg%3d1620141712",
+    "badgePrice": 0,
+    "pgNick": "Enuyguna",
+    "sloganText": "Haziran Ayı Fırsatlarıyla Aradığınız Her Şey Hepsiburada'da",
+    "stock": 10,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Bugün kargoda",
+    "deliveryHour": "18:00",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1624482741,
+    "price": 48586.84,
+    "pgName": "Apple iPhone 15 128 GB (Apple Türkiye Garantili) siyah",
+    "vdCode": 11070,
+    "vdName": "n11",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=8&v=11070&p=282674948&c=15663&g=1624482741&f=%2fr%2f%3fpr%3d282674948%26vd%3d11070%26pg%3d1624482741",
+    "badgePrice": 0,
+    "pgNick": "enhizlibizde",
+    "sloganText": "Kaçırılmayacak fırsatlar n11'de seni bekliyor.",
+    "stock": 1,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:07:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 8,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1464604675,
+    "price": 48899,
+    "pgName": "Apple iPhone 15 128 GB Siyah",
+    "vdCode": 11707,
+    "vdName": "Trendyol",
+    "hasLogo": true,
+    "shipPrice": 44.99,
+    "url": "#/111/?s=9&v=11707&p=282674948&c=20155&g=1464604675&f=%2fr%2f%3fpr%3d282674948%26vd%3d11707%26pg%3d1464604675",
+    "badgePrice": 0,
+    "pgNick": "Trendyol",
+    "sloganText": "Aradığın ne varsa Trendyol'da",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda"
+   },
+   {
+    "pgCode": 1575438164,
+    "price": 48907.7,
+    "pgName": "Apple iPhone 15 128 GB (Apple Türkiye Garantili) siyah",
+    "vdCode": 11070,
+    "vdName": "n11",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=10&v=11070&p=282674948&c=15663&g=1575438164&f=%2fr%2f%3fpr%3d282674948%26vd%3d11070%26pg%3d1575438164",
+    "badgePrice": 0,
+    "pgNick": "aksarayiletisim",
+    "sloganText": "Kaçırılmayacak fırsatlar n11'de seni bekliyor.",
+    "stock": 26,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:07:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 8,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1605473040,
+    "price": 48984.2,
+    "pgName": "Apple iPhone 15 128 Gb Siyah (Apple Türkiye Garantili)",
+    "vdCode": 13275,
+    "vdName": "idefix",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=11&v=13275&p=282674948&c=23112&g=1605473040&f=%2fr%2f%3fpr%3d282674948%26vd%3d13275%26pg%3d1605473040",
+    "badgePrice": 0,
+    "pgNick": "3E İletişim",
+    "sloganText": "Troy Kartlara Özel, Her 1.000 TL Alışverişe 200 TL İndirim",
+    "stock": 1,
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 5 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1628371206,
+    "price": 48999.95,
+    "pgName": "Apple iPhone 15 128 GB Siyah Cep Telefonu",
+    "vdCode": 5214,
+    "vdName": "Migros Sanal Market Ekstra",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=12&v=5214&p=282674948&c=23610&g=1628371206&f=%2fr%2f%3fpr%3d282674948%26vd%3d5214%26pg%3d1628371206",
+    "badgePrice": 0,
+    "lastUpdateTime": "06/29/2026 14:20:00"
+   },
+   {
+    "pgCode": 1459871438,
+    "price": 49078.55,
+    "pgName": "Apple İphone 15 128 Gb Siyah (Apple Türkiye Garantili)",
+    "vdCode": 13275,
+    "vdName": "idefix",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=13&v=13275&p=282674948&c=23112&g=1459871438&f=%2fr%2f%3fpr%3d282674948%26vd%3d13275%26pg%3d1459871438",
+    "badgePrice": 0,
+    "pgNick": "BSZ ELEKTRONİK",
+    "sloganText": "Troy Kartlara Özel, Her 1.000 TL Alışverişe 200 TL İndirim",
+    "stock": 3,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 5 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1459871436,
+    "price": 49079.5,
+    "pgName": "Apple İphone 15 128 Gb Siyah (Apple Türkiye Garantili)",
+    "vdCode": 13275,
+    "vdName": "idefix",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=14&v=13275&p=282674948&c=23112&g=1459871436&f=%2fr%2f%3fpr%3d282674948%26vd%3d13275%26pg%3d1459871436",
+    "badgePrice": 0,
+    "pgNick": "Kurumsal Elektronik",
+    "sloganText": "Troy Kartlara Özel, Her 1.000 TL Alışverişe 200 TL İndirim",
+    "stock": 1,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "2 iş günü",
+    "campaigns": [
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 5 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1603299548,
+    "price": 49079.5,
+    "pgName": "Apple iPhone 15 128 Gb Siyah (Apple Türkiye Garantili)",
+    "vdCode": 13275,
+    "vdName": "idefix",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=15&v=13275&p=282674948&c=23112&g=1603299548&f=%2fr%2f%3fpr%3d282674948%26vd%3d13275%26pg%3d1603299548",
+    "badgePrice": 0,
+    "pgNick": "Tekyıldız",
+    "sloganText": "Troy Kartlara Özel, Her 1.000 TL Alışverişe 200 TL İndirim",
+    "stock": 5,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "2 iş günü",
+    "campaigns": [
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 5 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1612571388,
+    "price": 49099.18,
+    "pgName": "Apple İphone 15 128 Gb Siyah (Apple Türkiye Garantili)",
+    "vdCode": 11281,
+    "vdName": "Pttavm",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=16&v=11281&p=282674948&c=15850&g=1612571388&f=%2fr%2f%3fpr%3d282674948%26vd%3d11281%26pg%3d1612571388",
+    "badgePrice": 0,
+    "pgNick": "ÇARŞI MOBİLE",
+    "sloganText": "Pttavm 'yi Takip Et Yaza Özel İndirim Fırsatlarını Kaçırma",
+    "stock": 6,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:01:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 2 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 2 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1479674422,
+    "price": 49119.22,
+    "pgName": "Apple İphone 15 128 Gb Siyah (Apple Türkiye Garantili)",
+    "vdCode": 11281,
+    "vdName": "Pttavm",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=17&v=11281&p=282674948&c=15850&g=1479674422&f=%2fr%2f%3fpr%3d282674948%26vd%3d11281%26pg%3d1479674422",
+    "badgePrice": 0,
+    "pgNick": "BSZ Elektronik",
+    "sloganText": "Pttavm 'yi Takip Et Yaza Özel İndirim Fırsatlarını Kaçırma",
+    "stock": 2,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:01:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 2 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 2 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1453609563,
+    "price": 49309.24,
+    "pgName": "Apple İphone 15 128 6 Gb Ram 5G (Apple Türkiye Garantili) Siyah",
+    "vdCode": 11281,
+    "vdName": "Pttavm",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=18&v=11281&p=282674948&c=15850&g=1453609563&f=%2fr%2f%3fpr%3d282674948%26vd%3d11281%26pg%3d1453609563",
+    "badgePrice": 0,
+    "pgNick": "CepHane Teknoloji",
+    "sloganText": "Pttavm 'yi Takip Et Yaza Özel İndirim Fırsatlarını Kaçırma",
+    "stock": 6,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:01:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 2 taksit"
+     },
+     {
+      "cardId": 9,
+      "text": "Peşin fiyatına 2 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1459734196,
+    "price": 49449,
+    "pgName": "Apple iPhone 15 128 GB Siyah - (Apple Türkiye Garantili)",
+    "vdCode": 12088,
+    "vdName": "Hepsiburada",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=19&v=12088&p=282674948&c=17384&g=1459734196&f=%2fr%2f%3fpr%3d282674948%26vd%3d12088%26pg%3d1459734196",
+    "badgePrice": 0,
+    "sloganText": "Haziran Ayı Fırsatlarıyla Aradığınız Her Şey Hepsiburada'da",
+    "stock": 10,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Bugün kargoda",
+    "deliveryHour": "18:00",
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 9 taksit"
+     },
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1421784361,
+    "price": 49499,
+    "pgName": "APPLE iPhone 15 128GB Siyah Cep Telefonu MTP03TU/A (Apple TÜRKİYE Garantili)",
+    "vdCode": 5547,
+    "vdName": "exbilisim.com",
+    "hasLogo": false,
+    "shipPrice": 0,
+    "url": "#/111/?s=20&v=5547&p=282674948&c=23934&g=1421784361&f=%2fr%2f%3fpr%3d282674948%26vd%3d5547%26pg%3d1421784361",
+    "badgePrice": 0,
+    "sloganText": "Güçlü Stok, Hızlı Çözüm, Güvenli Alışveriş İşinize Değer Katar",
+    "lastUpdateTime": "06/29/2026 14:31:00"
+   },
+   {
+    "pgCode": 1347883315,
+    "price": 49783.02,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 10694,
+    "vdName": "Pazarama",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=21&v=10694&p=282674948&c=21533&g=1347883315&f=%2fr%2f%3fpr%3d282674948%26vd%3d10694%26pg%3d1347883315",
+    "badgePrice": 0,
+    "pgNick": "Gürgençler Apple",
+    "sloganText": "Maximum ile 2.000 TL ve Üzeri Alışverişe 250 TL Pazaramapuan",
+    "stock": 3,
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "2 iş günü",
+    "campaigns": [
+     {
+      "cardId": 5,
+      "text": "Peşin fiyatına 7 taksit"
+     },
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1601962766,
+    "price": 49799,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 11222,
+    "vdName": "Turkcell",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=22&v=11222&p=282674948&c=20753&g=1601962766&f=%2fr%2f%3fpr%3d282674948%26vd%3d11222%26pg%3d1601962766",
+    "badgePrice": 0,
+    "pgNick": "Turkcell Satış A.Ş.",
+    "sloganText": "Pasaj350 Koduyla İlk Alışverişe Özel 350 TL İndirim",
+    "stock": 37,
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda"
+   },
+   {
+    "pgCode": 1464321866,
+    "price": 49850.05,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 10694,
+    "vdName": "Pazarama",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=23&v=10694&p=282674948&c=21533&g=1464321866&f=%2fr%2f%3fpr%3d282674948%26vd%3d10694%26pg%3d1464321866",
+    "badgePrice": 0,
+    "pgNick": "CepHane Teknoloji",
+    "sloganText": "Maximum ile 2.000 TL ve Üzeri Alışverişe 250 TL Pazaramapuan",
+    "stock": 10,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 5,
+      "text": "Peşin fiyatına 7 taksit"
+     },
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1023145493,
+    "price": 49920,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 10694,
+    "vdName": "Pazarama",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=24&v=10694&p=282674948&c=21533&g=1023145493&f=%2fr%2f%3fpr%3d282674948%26vd%3d10694%26pg%3d1023145493",
+    "badgePrice": 0,
+    "pgNick": "TURKCELL EMRE İLETİŞİM",
+    "sloganText": "Maximum ile 2.000 TL ve Üzeri Alışverişe 250 TL Pazaramapuan",
+    "stock": 2,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "2 iş günü",
+    "campaigns": [
+     {
+      "cardId": 5,
+      "text": "Peşin fiyatına 7 taksit"
+     },
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1025492925,
+    "price": 49999,
+    "pgName": "iPhone 15 128 GB Siyah - MTP03TU/A",
+    "vdCode": 3508,
+    "vdName": "gurgencler.com.tr",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=25&v=3508&p=282674948&c=19884&g=1025492925&f=%2fr%2f%3fpr%3d282674948%26vd%3d3508%26pg%3d1025492925",
+    "badgePrice": 0,
+    "sloganText": "Çok Sevdiğiniz Apple Ürünleri, Apple Gürgençler'de.",
+    "stock": 1,
+    "badgeId": 5,
+    "badge": "Yetkili Satıcı En Ucuz",
+    "lastUpdateTime": "06/29/2026 14:47:00",
+    "deliveryText": "Yarın kargoda",
+    "vdRating": "8,3",
+    "vdRatingCount": 36,
+    "isAVP": true,
+    "campaigns": [
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 5,
+      "text": "1.000 TL MaxiPuan"
+     }
+    ]
+   },
+   {
+    "pgCode": 1157856148,
+    "price": 49999,
+    "pgName": "Apple iPhone 15 128 GB Cep Telefonu Siyah",
+    "vdCode": 3192,
+    "vdName": "A101",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=26&v=3192&p=282674948&c=18790&g=1157856148&f=%2fr%2f%3fpr%3d282674948%26vd%3d3192%26pg%3d1157856148",
+    "badgePrice": 0,
+    "sloganText": "2.000 TL ve üzeri siparişinize ücretsiz kargo",
+    "lastUpdateTime": "06/29/2026 14:17:00",
+    "deliveryText": "2 iş günü",
+    "vdRating": "7,2",
+    "vdRatingCount": 87,
+    "campaigns": [
+     {
+      "cardId": 5,
+      "text": "700 TL MaxiPuan"
+     }
+    ]
+   },
+   {
+    "pgCode": 1340510958,
+    "price": 50394.4,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 10694,
+    "vdName": "Pazarama",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=27&v=10694&p=282674948&c=21533&g=1340510958&f=%2fr%2f%3fpr%3d282674948%26vd%3d10694%26pg%3d1340510958",
+    "badgePrice": 0,
+    "pgNick": "Aksaray İletişim",
+    "sloganText": "Maximum ile 2.000 TL ve Üzeri Alışverişe 250 TL Pazaramapuan",
+    "stock": 4,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 5,
+      "text": "Peşin fiyatına 7 taksit"
+     },
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1029932278,
+    "price": 50489,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 11222,
+    "vdName": "Turkcell",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=28&v=11222&p=282674948&c=20753&g=1029932278&f=%2fr%2f%3fpr%3d282674948%26vd%3d11222%26pg%3d1029932278",
+    "badgePrice": 0,
+    "pgNick": "AKTEL GSM - Turkcell Mağa",
+    "sloganText": "Pasaj350 Koduyla İlk Alışverişe Özel 350 TL İndirim",
+    "stock": 1,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda"
+   },
+   {
+    "pgCode": 726764689,
+    "price": 50499,
+    "pgName": "Apple iPhone 15 128 GB Akıllı Telefon Siyah Mtp03Tu/A",
+    "vdCode": 1494,
+    "vdName": "MediaMarkt",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=29&v=1494&p=282674948&c=15743&g=726764689&f=%2fr%2f%3fpr%3d282674948%26vd%3d1494%26pg%3d726764689",
+    "badgePrice": 0,
+    "lastUpdateTime": "06/29/2026 14:45:00",
+    "deliveryText": "Yarın kargoda",
+    "vdRating": "8,8",
+    "vdRatingCount": 696,
+    "campaigns": [
+     {
+      "cardId": 5,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1595382684,
+    "price": 50499,
+    "pgName": "iPhone 15 128GB Siyah Akıllı Telefon",
+    "vdCode": 3177,
+    "vdName": "Gizerler.com",
+    "hasLogo": false,
+    "shipPrice": 0,
+    "url": "#/111/?s=30&v=3177&p=282674948&c=18742&g=1595382684&f=%2fr%2f%3fpr%3d282674948%26vd%3d3177%26pg%3d1595382684",
+    "badgePrice": 0,
+    "sloganText": "70 Yılı Aşkın Yetkili Satıcı Güvencesiyle",
+    "stock": 7,
+    "lastUpdateTime": "06/29/2026 14:47:00",
+    "deliveryText": "3 iş günü",
+    "vdRating": "8,5",
+    "vdRatingCount": 17,
+    "campaigns": [
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 4 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1595476479,
+    "price": 50499,
+    "pgName": "iPhone 15 128GB Siyah Telefon",
+    "vdCode": 3177,
+    "vdName": "Gizerler.com",
+    "hasLogo": false,
+    "shipPrice": 0,
+    "url": "#/111/?s=31&v=3177&p=282674948&c=18742&g=1595476479&f=%2fr%2f%3fpr%3d282674948%26vd%3d3177%26pg%3d1595476479",
+    "badgePrice": 0,
+    "sloganText": "70 Yılı Aşkın Yetkili Satıcı Güvencesiyle",
+    "stock": 1,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 14:47:00",
+    "deliveryText": "3 iş günü",
+    "vdRating": "8,5",
+    "vdRatingCount": 17,
+    "campaigns": [
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 6 taksit"
+     },
+     {
+      "cardId": 2,
+      "text": "Peşin fiyatına 4 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1147276827,
+    "price": 50499,
+    "pgName": "Apple iPhone 15 128GB Siyah Akıllı Telefon",
+    "vdCode": 10402,
+    "vdName": "Teknosa",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=32&v=10402&p=282674948&c=21681&g=1147276827&f=%2fr%2f%3fpr%3d282674948%26vd%3d10402%26pg%3d1147276827",
+    "badgePrice": 0,
+    "pgNick": "teknosa",
+    "sloganText": "Aradığın Teknoloji Teknosa'da",
+    "stock": 160,
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "2 iş günü",
+    "campaigns": [
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 3 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1478935524,
+    "price": 50499,
+    "pgName": "Apple iPhone 15 128 GB Siyah",
+    "vdCode": 11707,
+    "vdName": "Trendyol",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=33&v=11707&p=282674948&c=20155&g=1478935524&f=%2fr%2f%3fpr%3d282674948%26vd%3d11707%26pg%3d1478935524",
+    "badgePrice": 0,
+    "pgNick": "Gürgençler Apple Yetkili ",
+    "sloganText": "Aradığın ne varsa Trendyol'da",
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda"
+   },
+   {
+    "pgCode": 1453667352,
+    "price": 50549,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 11222,
+    "vdName": "Turkcell",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=34&v=11222&p=282674948&c=20753&g=1453667352&f=%2fr%2f%3fpr%3d282674948%26vd%3d11222%26pg%3d1453667352",
+    "badgePrice": 0,
+    "pgNick": "CepHane Teknoloji",
+    "sloganText": "Pasaj350 Koduyla İlk Alışverişe Özel 350 TL İndirim",
+    "stock": 5,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda"
+   },
+   {
+    "pgCode": 1314095835,
+    "price": 50999,
+    "pgName": "iPhone 15 128 GB Siyah",
+    "vdCode": 11222,
+    "vdName": "Turkcell",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=35&v=11222&p=282674948&c=20753&g=1314095835&f=%2fr%2f%3fpr%3d282674948%26vd%3d11222%26pg%3d1314095835",
+    "badgePrice": 0,
+    "pgNick": "Life",
+    "sloganText": "Pasaj350 Koduyla İlk Alışverişe Özel 350 TL İndirim",
+    "stock": 25,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda"
+   },
+   {
+    "pgCode": 1628314489,
+    "price": 51099,
+    "pgName": "Apple iPhone 15 128 6 GB RAM 5G (Apple Türkiye Garantili) Siyah",
+    "vdCode": 292,
+    "vdName": "Trendruum.com",
+    "hasLogo": false,
+    "shipPrice": 0,
+    "url": "#/111/?s=36&v=292&p=282674948&c=23200&g=1628314489&f=%2fr%2f%3fpr%3d282674948%26vd%3d292%26pg%3d1628314489",
+    "badgePrice": 0,
+    "sloganText": "Türkiye'nin Uygun Online Alışveriş Sitesi",
+    "stock": 5,
+    "lastUpdateTime": "06/29/2026 14:17:00",
+    "deliveryText": "2 iş günü"
+   },
+   {
+    "pgCode": 1472354606,
+    "price": 51999,
+    "pgName": "Apple iPhone 15 128GB Siyah Akıllı Telefon",
+    "vdCode": 10402,
+    "vdName": "Teknosa",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=37&v=10402&p=282674948&c=21681&g=1472354606&f=%2fr%2f%3fpr%3d282674948%26vd%3d10402%26pg%3d1472354606",
+    "badgePrice": 0,
+    "pgNick": "TAHA İLETİŞİM",
+    "sloganText": "Aradığın Teknoloji Teknosa'da",
+    "stock": 23,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 3 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1608636841,
+    "price": 52599,
+    "pgName": "Apple iPhone 15 128GB Siyah Akıllı Telefon",
+    "vdCode": 10402,
+    "vdName": "Teknosa",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=38&v=10402&p=282674948&c=21681&g=1608636841&f=%2fr%2f%3fpr%3d282674948%26vd%3d10402%26pg%3d1608636841",
+    "badgePrice": 0,
+    "pgNick": "EFETÜRK",
+    "sloganText": "Aradığın Teknoloji Teknosa'da",
+    "stock": 1,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 3 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1472354615,
+    "price": 52999,
+    "pgName": "Apple iPhone 15 128GB Siyah Akıllı Telefon",
+    "vdCode": 10402,
+    "vdName": "Teknosa",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=39&v=10402&p=282674948&c=21681&g=1472354615&f=%2fr%2f%3fpr%3d282674948%26vd%3d10402%26pg%3d1472354615",
+    "badgePrice": 0,
+    "pgNick": "Reeder",
+    "sloganText": "Aradığın Teknoloji Teknosa'da",
+    "stock": 50,
+    "badge": "En Ucuz",
+    "lastUpdateTime": "06/29/2026 15:06:00",
+    "deliveryText": "Yarın kargoda",
+    "campaigns": [
+     {
+      "cardId": 3,
+      "text": "Peşin fiyatına 3 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1267956291,
+    "price": 56650,
+    "pgName": "Apple iPhone 15 128GB Siyah",
+    "vdCode": 2489,
+    "vdName": "Arçelik",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?z=146&s=40&v=2489&p=282674948&c=19996&g=1267956291&f=%2fr%2f%3fpr%3d282674948%26vd%3d2489%26pg%3d1267956291",
+    "badgePrice": 0,
+    "sloganText": "Ücretsiz ve Hızlı Teslimat ile Arçelik Kapında",
+    "stock": 6,
+    "lastUpdateTime": "06/29/2026 14:17:00",
+    "isAVP": true,
+    "campaigns": [
+     {
+      "cardId": 6,
+      "text": "Peşin fiyatına 7 taksit"
+     },
+     {
+      "cardId": 5,
+      "text": "Peşin fiyatına 5 taksit"
+     },
+     {
+      "text": "3.000 TL Hediye Çeki~~~"
+     }
+    ]
+   },
+   {
+    "pgCode": 1264716226,
+    "price": 56650,
+    "pgName": "Apple iPhone 15 128GB Siyah",
+    "vdCode": 2494,
+    "vdName": "Beko",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?z=146&s=41&v=2494&p=282674948&c=19997&g=1264716226&f=%2fr%2f%3fpr%3d282674948%26vd%3d2494%26pg%3d1264716226",
+    "badgePrice": 0,
+    "sloganText": "Ücretsiz ve Hızlı Teslimat ile Beko Kapında",
+    "stock": 7,
+    "lastUpdateTime": "06/29/2026 14:44:00",
+    "isAVP": true,
+    "campaigns": [
+     {
+      "text": "3.000 TL Hediye Çeki~~~"
+     }
+    ]
+   },
+   {
+    "pgCode": 1561594130,
+    "price": 58999,
+    "pgName": "iPhone 15 128GB Siyah MTP03TU/A",
+    "vdCode": 3600,
+    "vdName": "Aynetteknoloji.com",
+    "hasLogo": false,
+    "shipPrice": 0,
+    "url": "#/111/?s=42&v=3600&p=282674948&c=20117&g=1561594130&f=%2fr%2f%3fpr%3d282674948%26vd%3d3600%26pg%3d1561594130",
+    "badgePrice": 0,
+    "sloganText": "Apple Yetkili Satıcı,  Apple Yetkili Servis Sağlayıcısı",
+    "lastUpdateTime": "06/29/2026 14:10:00",
+    "vdRatingCount": 1,
+    "isAVP": true,
+    "campaigns": [
+     {
+      "cardId": 8,
+      "text": "Peşin fiyatına 6 taksit"
+     }
+    ]
+   },
+   {
+    "pgCode": 1033540540,
+    "price": 63844.39,
+    "pgName": "Apple iPhone 15 128 GB - Siyah",
+    "vdCode": 1418,
+    "vdName": "Ofix",
+    "hasLogo": true,
+    "shipPrice": 0,
+    "url": "#/111/?s=43&v=1418&p=282674948&c=16055&g=1033540540&f=%2fr%2f%3fpr%3d282674948%26vd%3d1418%26pg%3d1033540540",
+    "badgePrice": 0,
+    "sloganText": "500 TL Üzerine Ücretsiz Kargo Avantajı Ofix'te",
+    "badgeId": 2,
+    "badge": "Yüksek Puanlı Satıcı En Ucuz",
+    "lastUpdateTime": "06/29/2026 14:44:00",
+    "deliveryText": "5 iş günü",
+    "vdRating": "9,1",
+    "vdRatingCount": 49
+   }
+  ]
+ }
+}

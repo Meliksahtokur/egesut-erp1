@@ -188,3 +188,7 @@ postgres-language-server.jsonc
 !/.harness/bin/*.py
 !/.harness/memory/
 !/.harness/memory/**/*.md
+
+# 2026-09-10: probe log + sır içeren lokal doküman
+.crumbs/
+.claude/security-report.md

@@ -1,0 +1,1 @@
+/root/tools-bank/docs/agent-telsiz-mimarisi.md
