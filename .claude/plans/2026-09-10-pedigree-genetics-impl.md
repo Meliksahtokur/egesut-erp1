@@ -109,7 +109,11 @@ Bunlar yalnız projection/profile RPC sonucu olarak `pedigree_cache` içinde on-
   delegasyonla gerçekleşir (**BUG-001 refuted** — G-UREME-STOK-BUGFIX teslimi:
   davranışsal probe + tracked `20260730000001:477-496` teyidi; ilk lexical
   probe'un "dokunmuyor" sonucu literal-arama sınırlamasıydı, kanıt dosyası
-  S1'e düzeltme notu işlendi). Sonuç: Task 10 planli yoluna AYRI düşüm
+  S1'e düzeltme notu işlendi; davranışsal probe'un komut/çıktı kanıtı
+  `.claude/idle-reports/2026-09-10-ureme-bugfix.md` teslim raporundadır —
+  bugfix dalı main'e merge edilince repoda kalıcı olur; BUGS.md otorite
+  durumu da refuted/fixed-pending-deploy ile senkronlanmıştır [r11-F65]).
+  Sonuç: Task 10 planli yoluna AYRI düşüm
   EKLEMEZ (çift düşüm olur); üç yol tek kuralı yalnız iki gövde rewiring'i +
   delegasyon mirasıyla sağlar. GT dosyası gövdelerden ayrışmış (SMELL-003) —
   GT rehber, canlı otorite; Task 10 öncesi davranışsal yeniden ölçüm
@@ -437,15 +441,20 @@ client grant’i olmadığından RPC’ler kendi yetkisiyle okur/yazar); farm st
 `public.current_farm_id()`’den gelir, client parametresinden değil. Graph DML
 istemciye hiçbir tabloda açılmaz; Task 26 denetimi bunu doğrular, ikame etmez.
 
-**Operatör guard’ı (r10-F58):** mutasyon RPC’leri (`pedigree_parent_set`,
-`pedigree_external_upsert`, `semen_catalog_upsert`) gövde başında
-`public.assert_is_operator()` çağırır: `auth.uid()::text` = `pedigree_meta`
-`op_owner_uid` değerine eşit olmalı; değilse exception. `op_owner_uid`
-değeri migration YAZMAZ — **deploy bootstrap adımı** olarak owner tek INSERT
-ile yazar (deploy talimat satırı; service-key/psql ile). Signup açık olsa
-bile kayıt olan herhangi bir hesap kanonik soy değiştiremez. SQL fixture:
-`set_config` ile jwt claim mock’lanıp non-owner reddi + owner geçişi test
-edilir. UI’daki "admin-level" etiketi yetki DEĞİLDİR; yetki bu RPC guard’ıdır.
+**Operatör guard’ı (r10-F58, r11-F62/F63 ile uygulanabilir):**
+`pedigree_meta` tablosu + `public.assert_is_operator()` fonksiyonu **Task 1
+foundation’da yaratılır** (Task 2’de değil): guard, `pedigree_meta`’da
+`op_owner_uid` anahtarı varsa `auth.uid()::text` ile eşitlik ister; **anahtar
+YOKSA fail-closed — kimse geçemez**; owner deploy sonrası bootstrap INSERT’i
+ile kendini açar (deploy talimat satırı). Guard yalnız PUBLIC mutasyon
+RPC’lerinde: `pedigree_parent_set` (manuel düzeltme), `pedigree_external_upsert`,
+`semen_catalog_upsert`. **Doğum yolu muafiyeti (r11-F62):** bu RPC’lerin
+paylaştığı iş mantığı `_pedigree_parent_set_core` gibi INTERNAL (grantsız,
+yalnız SQL-içi çağrılabilir) fonksiyonlardadır; `dogum_kaydet` core’u doğrudan
+çağırır — normal doğum her authenticated kullanıcıda çalışır, guard yalnızca
+manuel soy düzeltmesini owner’a kilitler. SQL fixture: set_config claim
+mock’u ile non-owner manuel reddi + owner geçişi + doğum yolunun guardsız
+akışı üçü ayrı test edilir. UI etiketi yetki değildir; yetki bu kontrattır.
 
 ### 1.4 Helper’lar
 
@@ -487,13 +496,15 @@ değilse reddeder; (b) bull node yarattırıyorsa `sex='male'` yazar, mevcut nod
 `female` ise reddeder; (c) tüm node/stock bağlantıları farm-scope composite FK
 ile aynı farm'a kilitlidir. Geçerli FK + anlamsız bağ kombinasyonu kapalıdır.
 
-**Tarihsel kimlik değişmezliği (r10-F57):** `p_id` ile güncellemede, satır
-tarihsel bir `tohumlama.semen_id` tarafından referans ediliyorsa
-(`EXISTS tohumlama WHERE semen_id = p_id`) `bull_node_id` DEĞİŞTİRİLEMEZ —
-RPC hata döner. Farklı boğa gerekiyorsa yeni catalog satırı yaratılır, eski
-satır `active=false` olur (replacement modeli; edge'ler eski node'a bağlı
-kalır, split-brain imkânsız). Silme v1'de yok; `stock_id` tek silme otoritesi
-`ON DELETE SET NULL`'dir (spec §4.3 ile aynı).
+**Tarihsel kimlik değişmezliği (r10-F57, r11-F57 tam kapsam):** `p_id` ile
+güncellemede, satır `tohumlama.semen_id` **VEYA** `tohumlama.semen_id_onceki`
+tarafından referans ediliyorsa `bull_node_id` DEĞİŞTİRİLEMEZ — RPC hata döner.
+Farklı boğa gerekiyorsa yeni catalog satırı yaratılır, eski satır `active=false`
+olur (replacement modeli; edge'ler eski node'a bağlı kalır). Silme v1'de yok:
+`tohumlama.semen_id`/`semen_id_onceki` FK'ları **default (NO ACTION)** ile
+tanımlanır — spec §4.4 ile tek otorite (`SET NULL` DEĞİL; catalog satırı
+tarihsel referanslar dururken silinemez). `semen_catalog.stock_id` ayrı
+kolondur ve `ON DELETE SET NULL` kalır.
 
 oluştur.
 
@@ -609,19 +620,9 @@ yaratılmaz, otomatik güvenilmez). "En geç kayıt" yorumu YOKTUR.
 
 ### 2.3 `pedigree_integrity_report()`
 
-Bu migration **`public.pedigree_meta` tablosunu da yaratır** (r4-F11 — Task
-6'da değil, burada; Task 10 yalnızca değer INSERT eder):
-
-```sql
-CREATE TABLE public.pedigree_meta (
-  farm_id uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
-  key     text NOT NULL,
-  value   text NOT NULL,          -- örn. cutoff: ISO timestamp metni
-  PRIMARY KEY (farm_id, key)
-);
-ALTER TABLE public.pedigree_meta ENABLE ROW LEVEL SECURITY;
-CREATE POLICY allow_all ON public.pedigree_meta FOR ALL USING (true) WITH CHECK (true);
-```
+> `pedigree_meta` tablosu **Task 1 foundation'da yaratılır** (r11-F63; guard +
+> op_owner_uid orada); bu migration yalnızca cutoff anahtarını YAZAR/OKUR
+> (Task 10 INSERT eder).
 
 Rapor cutoff okumasını NULL-güvenli yapar: `semen_controlled_cutoff` anahtarı
 yoksa (Task 10 henüz deploy edilmemişse) rapor **makine değeri `"tanimsiz"`**
@@ -708,10 +709,19 @@ suspiciously_young_parent:
   key = "<child_hayvan_id>:<parent_role>"; detail = "parent <node> yaşı <gün> gün".
   Tarihlerden herhangi biri NULL → bulgu YOK.
 
-dogum_anne_graph_dam_celiskisi (join ifadesi — r10-F48):
-  dogum satırının buzağı node'u: pedigree_nodes.farm_animal_id =
-    (SELECT id FROM hayvanlar WHERE kupe_no = dogum.yavru_kupe);
-  kupe eşleşmesi yoksa bulgu YOK (graph'a henüz girmemiş doğum).
+dogum_anne_graph_dam_celiskisi (join ifadesi — r10-F48, r11-F48 deterministik):
+  dogum satırının buzağı node'u — kupe recycle (domain kuralı: benzersizlik
+  yalnız aktif+dolu küpede) nedeniyle SKALER alt sorgu DETERMİNİSTİK
+  sıralanmalıdır:
+    pedigree_nodes.farm_animal_id = (
+      SELECT h.id FROM hayvanlar h
+      WHERE h.kupe_no = dogum.yavru_kupe
+      ORDER BY (h.dogum_tarihi = dogum.tarih) DESC,   -- bu doğumun buzağısı önce
+               (h.durum = 'Aktif') DESC,              -- sonra aktif kayıt
+               h.dogum_tarihi DESC, h.id              -- son kırbaç: deterministik
+      LIMIT 1)
+  kupe eşleşmesi hiç yoksa bulgu YOK. (v2 notu: dogum.buzagi_id kolonu bu
+  heuristiği tamamen kaldırır — bilinçli borç.)
   Karşılaştırma: dogum.anne_id → dam node vs buzağı node'unun graph dam edge'i.
   Parent tarih kaynağı (tek ifade): farm node → hayvanlar.dogum_tarihi,
   external node → pedigree_nodes.birth_date; COALESCE(h.dogum_tarihi, pn.birth_date).
@@ -942,12 +952,17 @@ HER durumda `globalThis.__pedigreeSessionGen =
 (globalThis.__pedigreeSessionGen ?? 0) + 1` çalıştırır. Modül-seviye `let`
 sayaç YASAKTIR (bağlantısız ikinci sayaç riski).
 
-**Sıra kontratı (r10-F54):** `clearPedigreeCacheStore()` gövdesi İLK İKİ
-adımı SENKRON ve IDB temizliği BAŞLAMADAN yapar: (1) globalThis sayaç++,
-(2) localStorage epoch üret — ancak sonra `await idbClearStore(...)`
-başlar (try/catch fail-open). Böylece clear-in-flight penceresinde pending
-yanıt ESKİ sayacı göremez ve fiziksel kalan eski satır epoch karantinasına
-takılır. Kabul testi bu sırayı doğrular.
+**Sıra kontratı (r10-F54) + yazma askısı (r11-F64):** `clearPedigreeCacheStore()`
+gövdesi İLK ÜÇ adımı SENKRON ve IDB temizliği BAŞLAMADAN yapar: (1) globalThis
+sayaç++, (2) localStorage epoch üret, (3) `globalThis.__pedigreeWritesSuspended
+= true` — ancak sonra `await idbClearStore(...)` başlar (try/catch fail-open).
+**Askı bayrağı reload'a kadar kalır:** fence→reload arası başlayan HER yeni
+istek network sonucunu döner ama cache'e YAZMAZ (yeni-epoch satırı üretilemez).
+Böylece IDB silme başarısız olsa bile: eski satırlar epoch karantinasında,
+yeni satırlar askı ile — izolasyon iki mekanizmayla birlikte tamdır. Kabul
+testi: (a) fence öncesi pending yanıt yazılmaz; (b) fence SONRASI başlayan
+istek de yazmaz (askı); (c) IDB reddi simülasyonunda okuma eski payload
+döndüremez.
 
 **Okuma karantinası (r8-F42 — fail-open kalıntısı):** epoch
 `localStorage[‘pedigree_cache_epoch’]` içinde yaşar (app init’te yoksa
@@ -1174,7 +1189,7 @@ Additive column:
 
 ```sql
 ALTER TABLE public.tohumlama
-ADD COLUMN semen_id uuid NULL REFERENCES public.semen_catalog(id) ON DELETE SET NULL;
+  ADD COLUMN semen_id uuid NULL REFERENCES public.semen_catalog(id);  -- default NO ACTION (r11-F57: SET NULL değil — tarihsel referans satırı korur; silme v1'de yok)
 ```
 
 Index:

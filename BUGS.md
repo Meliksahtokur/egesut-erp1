@@ -12,20 +12,19 @@ değil) → `verified` (canlıda ölçüldü).
 
 ## Bugs
 
-### BUG-001 — `planli_tohumlama_kaydet` sperma stok düşümü yapmıyor [HIGH] [open]
+### BUG-001 — `planli_tohumlama_kaydet` sperma stok düşümü yapmıyor [REFUTED — yanlış alarm]
 
-- **Kanıt (canlı, 2026-09-10):** `pg_get_functiondef` gövdesinde `stok_hareket`
-  geçmiyor. Aynı ölçümde `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet`
-  düşürüyor. Canlı imzalar:
-  - `tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb, p_vwp_override boolean)` — düşüyor
-  - `tohumlama_tekrar_kaydet(text, date, text, text, text)` — düşüyor
-  - `planli_tohumlama_kaydet(p_gorev_id uuid, ...)` — **düşmüyor**
-- **Etki:** planlı tohumlama yoluyla yapılan aşımınlarda sperma stoğu düşmez;
-  stok fiili miktarla sessizce ayrışır.
-- **Fix yönü:** planli yoluna, diğer iki yolun (BUG-002 ile düzeltilmiş)
-  eşleşme/düşüm kuralını uygula; üç yol tek kuralı kullansın.
+- **Düzeltme (2026-09-10, üç bağımsız kanıt):** ilk teşhis kötüldü. (1) Canlı
+  `planli_tohumlama_kaydet` gövdesi koşulsuz `tohumlama_kaydet`'e delege eder —
+  düşüm delegasyonla gerçekleşir (G-UREME-STOK-BUGFIX teslimi: davranışsal
+  probe, planli çağrısı 1 stok_hareket satırı üretti); (2) tracked
+  `20260730000001:477-496` delegasyon satırını içerir; (3) ilk canlı
+  lexical probu (gövdede `stok_hareket` aramak) delegasyonu göremedi —
+  ölçüm sınırlamasıydı (kanıt S1 düzeltme notu).
+- **Sonuç:** planli yoluna ayrı düşüm EKLENMEZ (çift düşüm olur); sertleşmiş
+  kuralı (BUG-002 fix'i) delegasyonla miras alır.
 
-### BUG-002 — sperma stok düşümü string eşleşmesi kırılgan [MEDIUM-HIGH] [open]
+### BUG-002 — sperma stok düşümü string eşleşmesi kırılgan [MEDIUM-HIGH] [fixed-pending-deploy — idle/ureme-stok-bugfix dalında, merge/deploy bekliyor]
 
 - **Kanıt (canlı):** `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet`
   gövdelerinde:
@@ -49,7 +48,7 @@ değil) → `verified` (canlıda ölçüldü).
   yaşar. Stok eksiye düşebilir (serbest düşürme politikası, emsal
   `20260902000002`).
 
-### BUG-003 — `gebelik_kaydet_manual` canlıda 42804 ile kırık [HIGH] [open]
+### BUG-003 — `gebelik_kaydet_manual` canlıda 42804 ile kırık [HIGH] [fixed-pending-deploy — idle/ureme-stok-bugfix dalında (3 noktalık uuid fix + kırmızı-önce kanıt), merge/deploy bekliyor]
 
 - **Kanıt:** canlı imza `(p_hayvan_id text, p_tarih date, p_sperma text)`; PROD
   çağrıda SQL 42804 (text id → uuid kolon uyuşmazlığı, gövde içi). 🤰 Gebelik
