@@ -18,6 +18,14 @@
 >
 > **NON-NEGOTIABLE:** Frontend pedigree/genetik hesabı yapmaz. Cytoscape/ELK yalnız render/layout yapar. Kinship, F, founder contribution, completeness ve mating sonucu PostgreSQL/RPC otoritesindedir.
 >
+> **ROOT KABUL KARARI (2026-09-10):** Bu plan 12 bağımsız luna max review turundan
+> geçti (170+ bulgu kapatıldı; tur raporları `.claude/reviews/2026-09-10-pedigree-rev2*.md`
+> zincirinde). Tur-13 teslimsiz kesildi; root bu belgeyi **implementasyon otoritesi
+> olarak kabul etti**. Kalan PARTIAL/kalıntı maddeler (tur-12 raporunda listeli:
+> calf-join kupe-recycle sezgeli [v2 buzagi_id borcu], kanıt-provenans notları,
+> N17 tek-adım semen tarihi bilinçli v1 sınırı) P1 implementasyon fazında ve
+> implementasyon review'larında ele alınır — doküman turu kapanmıştır.
+
 > **REVİZYON 2 (2026-09-10):** Repo + canlı DB doğrulaması ve owner review turu
 > sonrası revize edildi. Kapsayıcı değişiklikler: (1) D4 — üreme stok/RPC
 > bugfix'leriyle hizalama (BUGS.md BUG-001..003, goal `G-20260910-UREME-STOK-BUGFIX`);
