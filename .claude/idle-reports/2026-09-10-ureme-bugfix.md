@@ -27,7 +27,7 @@ worker (W1/W2/W3) + 1× Codex review (gpt-5.6-luna max)
 
 | Dosya | Yazar | İçerik |
 |---|---|---|
-| `supabase/migrations/20260910000001_planli_tohumlama_sperma_dus.sql` | W1 + W2b | `fn_sperma_stok_dus(p_sperma, p_notlar DEFAULT NULL)` helper FİNAL biçimi: boş/whitespace (`^\s*$`) hiç düşürmez, exact önce, substring fallback, notlar içeriği canlıyla birebir; DROP yok, CREATE OR REPLACE |
+| `supabase/migrations/20260910000001_planli_tohumlama_sperma_dus.sql` | W1 + W2b + lead | `fn_sperma_stok_dus(p_sperma, p_notlar DEFAULT NULL)` helper FİNAL biçimi: boş/whitespace (`^\s*$`) hiç düşürmez, exact önce, substring fallback, notlar içeriği canlıyla birebir; DROP yok, CREATE OR REPLACE + **REVOKE bloğu (root-gate F1)**: PUBLIC/anon/authenticated EXECUTE kapalı, yalnız owner |
 | `supabase/migrations/20260910000002_sperma_eslesme_sertlestirme.sql` | W2 + W2b + lead | iki CREATE tek `DO` bloğunda (atomik, dry-run uyumlu): `tohumlama_kaydet` + `tohumlama_tekrar_kaydet` inline INSERT → `PERFORM fn_sperma_stok_dus(...)` (notlar birebir); DROP yok, SET yok |
 | `supabase/migrations/20260910000003_gebelik_kaydet_manual_42804_fix.sql` | W3 | gebelik gövdesi text→uuid düzeltmesi (3 nokta) |
 | `tests/sql/sperma_stok_dus_test.sql` | W1 + W2b | helper davranışı K1-K5 + tab/newline/CR vakaları |
@@ -61,9 +61,9 @@ kalktı, M2 kendi içinde BEGIN/COMMIT ile atomik.
    - Yeşil: `psql "$DATABASE_URL" -f tests/sql/gebelik_kaydet_manual_test.sql`
      → PASS×3 (çağrı + tohumlama/islem_log satırları + guard reddi), ROLLBACK, exit 0.
 5. **Dry-run (Neon aynası)** — `bash /home/melik/egesut-erp1/scripts/db-dry-run.sh
-   <migration>` final dosyalarla: M1 exit 0 (`M1b.dryrun.log`), M2 exit 0
-   (`M2c.dryrun.log`), M3 exit 0 (`M3.dryrun.log`). (Script ana checkout'ta
-   untracked — bkz. açık kalemler.)
+   <migration>` final dosyalarla: M1 (REVOKE'lu revize) exit 0
+   (`M1d.dryrun.log`), M2 exit 0 (`M2c.dryrun.log`), M3 exit 0
+   (`M3.dryrun.log`). (Script ana checkout'ta untracked — bkz. açık kalemler.)
 6. **Unit** — `npm run test:unit` → 736 pass / 1 fail; tek kırmızı
    `tests/unit/gecmis-pipeline.test.js` (_gmGroupHtml 'DÜN' assert) **main'de
    de aynı şekilde kırmızı** (base 38c3b07'de leadçe ölçüldü) — bu görevden
@@ -141,6 +141,38 @@ hem tek başına atomik (B5 korunur) hem dry-run sarmasıyla uyumlu
 (`M2c.dryrun.log` exit 0). Düzeltme sonrası demo yeniden uygulandı + fixture
 yeniden koşuldu (exit 0).
 
+## Root-gate revizyon turu (FAIL → düzeltme, 2026-09-10)
+
+Root-gate (`git show idle/ureme-bugfix-rootgate:.claude/reviews/2026-09-10-ureme-bugfix-rootgate.md`)
+FAIL verdi; bulgu bazında çözümler ve kanıtlar:
+
+| # | Sınıf | Bulgu | Çözüm | Kanıt |
+|---|---|---|---|---|
+| F1 | security (HIGH) | helper PUBLIC/anon/authenticated EXECUTE taşıyor — doğrudan client çağrısı denetimsiz ledger satırı üretebilir | M1'e REVOKE bloğu (PUBLIC+anon+authenticated); helper yalnız SECURITY DEFINER RPC'ler içinden PERFORM ile çağrılır | demo ACL probu: `authenticated=f, anon=f, postgres=t`; üç fixture exit 0 (RPC düşüm yolları REVOKE sonrası da çalışıyor — regression kanıtı) |
+| F2 | scope-violation | BUGS.md'ye manifeste aykırı 27 açıklama satırı eklenmiş | `git merge main` (63071be): BUGS.md **tamamen main versiyonu** — lead'in ek düz yazısı yok; diff'te yalnız root'un zaten main'e işlediği etiketler | `git diff main...HEAD -- BUGS.md` → boş |
+| F3 | fake-arm | boş-girdi fixture'ları yalnız 4 seed-ID sayıyor; mutant MEVCUT Sperma satırına yazarsa yakalanamıyor | iki fixture'da boş-girdi çağrıları **toplam stok_hareket delta=0** global assert'iyle sarıldı (K1 + K3 + K5a; helper fixture'da tek blok) | fixture'lar demo'da exit 0 (yeni assert'lerle) |
+| F4 | doc-drift | BUG-001'in eski "düşmüyor/Kanıt/Etki/Fix yönü" bloğu duruyordu | main'in BUG-001 yeniden yazımı (üç bağımsız kanıt + "düzeltme kaydı") merge ile alındı | BUGS.md:15-24 (main versiyonu) |
+| F5 | fake-arm | iddia edilen CR vakası fixture'da yoktu (yalnız tab/newline) | `E'\r'` + `E'\r\n'` vakaları eklendi | sperma_stok_dus_test.sql K1 bloğu; fixture exit 0 |
+| F6/B9 | doc-drift | goal base SHA frontmatter/body ayrışması | root main'de kapattı (`c2631d1`); merge ile dalda | goal dosyası dalda = main hali |
+
+Revizyon sonrası kabul koşuları (hepsi leadce yeniden koşuldu):
+
+- Dry-run: **M1 revize (REVOKE'lu) `M1d.dryrun.log` exit 0**; M2 (`M2c`) ve
+  M3 (`M3.dryrun.log`) değişmedi — exit 0.
+- Demo: M1 revize uygulandı → ACL probu (F1 kanıtı) → replay → pg_proc
+  sayısı 1 → üç fixture exit 0 (F3/F5 assert'leriyle, REVOKE sonrası RPC
+  yolları dahil).
+- Unit: 736/737 — tek kırmızı `gecmis-pipeline.test.js`, base'te (main'de)
+  aynı; bu görevden yeni kırmızı yok. Goal'in literal "green" ölçütü
+  main'in mevcut kırmızısı nedeniyle literal karşılanamaz — root-gate'in
+  tespitiyle aynı; kabul yargısı root'undur.
+- BUGS.md: main ile birebir (F2) — BUG-001 `[REFUTED — yanlış alarm]`
+  (root'un üç kanıtlı yeniden yazımı), BUG-002/003
+  `[fixed-pending-deploy — idle/ureme-stok-bugfix dalında ...]` (root
+  etiketleri). Acceptance-7'nin "üçü birden fixed-pending-deploy" literal
+  ölçütü BUG-001 refutasyonuyla birlikte root tarafından yorumlanmış durumda
+  (main'deki etiketler root'un tercihi); dal bu haliyle uyumlu.
+
 ## Açık kalemler (root)
 
 1. `scripts/db-dry-run.sh` (+ `refresh_lsp_schema.sh`) repoya commit edilmemiş
@@ -155,8 +187,8 @@ yeniden koşuldu (exit 0).
 5. GT (`99999999999999_ground_truth.sql`) yeniden üretimi root'un post-deploy
    kapısı (goal gereği kapsam dışı); yeni drift örnekleri: `tohumlama.id`
    uuid≠text, gebelik gövdesi, tohumlama gövdeleri (stok düşümlü).
-   5b. Goal dosyasının `base_sha: a3d8bc2` alanı gerçek tabanla (38c3b07,
-   ff ile alınan main ucu) senkronlanmalı (review B9).
+   5b. ~~Goal base SHA ayrışması~~ → **KAPANDI**: root main'de tekilleştirdi
+   (`c2631d1`), dal merge ile aldı (F6/B9).
 6. İlk review workspace'i (b288c384) host kaydına düşmedi ve silindi —
    Superset host'unda create-race araştırması root'a ait (ikinci deneme
    sağlıklı çalıştı).

@@ -31,6 +31,8 @@ DECLARE
   v_g2            uuid := gen_random_uuid();
   v_sonuc         jsonb;
   v_n             integer;
+  v_toplam_once  integer;
+  v_toplam_sonra integer;
   v_notlar        text;
 BEGIN
   -- Seed: üç hayvan (Dişi, Aktif; dogum_tarihi NULL → yaş/VWP kapısı atlanır),
@@ -65,9 +67,14 @@ BEGIN
   -- görev "Görev kapalı" ile reddedilirdi (canlı davranış, test verisi değil).
 
   -- K1: tohumlama_kaydet + '' → hiçbir stok_hareket satırı.
+  SELECT count(*) INTO v_toplam_once FROM public.stok_hareket;  -- F3 global
   v_sonuc := public.tohumlama_kaydet(v_h1, CURRENT_DATE, '', NULL, NULL, '[]'::jsonb, false);
   IF COALESCE(v_sonuc->>'ok', '') <> 'true' THEN
     RAISE EXCEPTION 'K1: kaydet bos adla başarısız: %', v_sonuc;
+  END IF;
+  SELECT count(*) INTO v_toplam_sonra FROM public.stok_hareket;
+  IF v_toplam_sonra <> v_toplam_once THEN
+    RAISE EXCEPTION 'F3(K1): bos-girdi TOPLAM stok_hareket delta % <> 0 (mutant seed-disi satira yazmis olabilir)', v_toplam_sonra - v_toplam_once;
   END IF;
   SELECT count(*) INTO v_n FROM public.stok_hareket
    WHERE stok_id IN (v_stok_exact_id, v_stok_super_id, v_stok_sub_id, v_stok_ilac_id);
@@ -100,9 +107,14 @@ BEGIN
   END IF;
 
   -- K3: tekrar yolu + '' → hiçbir satır yok (canlıda rastgele düşen kusur).
+  SELECT count(*) INTO v_toplam_once FROM public.stok_hareket;  -- F3 global
   v_sonuc := public.tohumlama_tekrar_kaydet(v_h2, CURRENT_DATE, '');
   IF COALESCE(v_sonuc->>'ok', '') <> 'true' THEN
     RAISE EXCEPTION 'K3: tekrar bos adla başarısız: %', v_sonuc;
+  END IF;
+  SELECT count(*) INTO v_toplam_sonra FROM public.stok_hareket;
+  IF v_toplam_sonra <> v_toplam_once THEN
+    RAISE EXCEPTION 'F3(K3): bos-girdi TOPLAM stok_hareket delta % <> 0 (mutant seed-disi satira yazmis olabilir)', v_toplam_sonra - v_toplam_once;
   END IF;
   SELECT count(*) INTO v_n FROM public.stok_hareket
    WHERE stok_id IN (v_stok_exact_id, v_stok_super_id, v_stok_sub_id, v_stok_ilac_id);
@@ -133,9 +145,14 @@ BEGIN
   END IF;
 
   -- K5a: planlı yol (delegasyon) + '' → görev tamamlanır ama düşüm YOK.
+  SELECT count(*) INTO v_toplam_once FROM public.stok_hareket;  -- F3 global
   v_sonuc := public.planli_tohumlama_kaydet(v_g1, v_h3, CURRENT_DATE, '', NULL, NULL, '[]'::jsonb, false);
   IF COALESCE(v_sonuc->>'ok', '') <> 'true' THEN
     RAISE EXCEPTION 'K5a: planli bos adla başarısız: %', v_sonuc;
+  END IF;
+  SELECT count(*) INTO v_toplam_sonra FROM public.stok_hareket;
+  IF v_toplam_sonra <> v_toplam_once THEN
+    RAISE EXCEPTION 'F3(K5a): bos-girdi TOPLAM stok_hareket delta % <> 0 (mutant seed-disi satira yazmis olabilir)', v_toplam_sonra - v_toplam_once;
   END IF;
   SELECT count(*) INTO v_n FROM public.stok_hareket
    WHERE stok_id IN (v_stok_exact_id, v_stok_super_id, v_stok_sub_id, v_stok_ilac_id);

@@ -85,3 +85,13 @@ BEGIN
           COALESCE(p_notlar, 'Tohumlama — ' || p_sperma), false);
 END;
 $function$;
+
+-- ACL (root-gate F1): helper yalnız gövde-içi PERFORM ile çağrılır —
+-- SECURITY DEFINER RPC'lerin (tohumlama_kaydet, tohumlama_tekrar_kaydet)
+-- içinden, owner hak bağlamında. İstemci rollerinin (anon/authenticated,
+-- PUBLIC dahil) doğrudan EXECUTE yetkisi gereksiz ve risklidir: doğrudan
+-- çağrı, hayvan/tohumlama doğrulaması ve denetim izi olmayan stok_hareket
+-- satırı üretebilir. Kapatılır; yalnız owner (migration runner) kalır.
+REVOKE ALL ON FUNCTION public.fn_sperma_stok_dus(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.fn_sperma_stok_dus(text, text) FROM anon;
+REVOKE ALL ON FUNCTION public.fn_sperma_stok_dus(text, text) FROM authenticated;

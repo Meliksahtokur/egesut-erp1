@@ -26,7 +26,9 @@ DECLARE
   v_stok_super_id   text := '__TEST_W1_STOK_SUPER__';
   v_stok_sub_id     text := '__TEST_W1_STOK_SUB__';
   v_stok_ilac_id    text := '__TEST_W1_STOK_ILAC__';
-  v_n integer;
+  v_n             integer;
+  v_toplam_once  integer;
+  v_toplam_sonra integer;
 BEGIN
   -- Seed (B8 sırası): superstring + substring-hedef satırlar exact'ten ÖNCE;
   -- İlaç satırı tekil adlı (testedilen sperma adlarının hiçbiriyle
@@ -58,21 +60,31 @@ BEGIN
     RAISE EXCEPTION 'K2 ledger satir sekli yanlis (tur/miktar/iptal)';
   END IF;
 
-  -- K1: boş string / boşluk / NULL / tab / newline → hiçbir satır yok
-  -- ('' → ILIKE '%%' kusuru; tab/newline → btrim'in kaçırdığı whitespace
-  -- sınıfı, B6 guard'ının fixture karşılığı).
+  -- K1: boş string / boşluk / NULL / tab / newline / CR / CRLF → hiçbir satır yok
+  -- ('' → ILIKE '%%' kusuru; tab/newline/CR/CRLF → btrim'in kaçırdığı
+  -- whitespace sınıfı, B6 guard'ının fixture karşılığı; CR/CRLF root-gate F5).
+  -- F3 (root-gate): GLOBAL invariant — toplam stok_hareket sayısı değişmez.
+  -- Seed-ID sayımı mutantın MEVCUT (seed-dışı) Sperma satırına yazmasını
+  -- göremez; toplam delta=0 bunu bağımsız kanıtlar.
+  SELECT count(*) INTO v_toplam_once FROM public.stok_hareket;
   PERFORM public.fn_sperma_stok_dus('');
   PERFORM public.fn_sperma_stok_dus('   ');
   PERFORM public.fn_sperma_stok_dus(NULL);
   PERFORM public.fn_sperma_stok_dus(E'\t');
   PERFORM public.fn_sperma_stok_dus(E'\n  ');
+  PERFORM public.fn_sperma_stok_dus(E'\r');
+  PERFORM public.fn_sperma_stok_dus(E'\r\n');
+  SELECT count(*) INTO v_toplam_sonra FROM public.stok_hareket;
+  IF v_toplam_sonra <> v_toplam_once THEN
+    RAISE EXCEPTION 'F3: bos-girdi TOPLAM stok_hareket delta % <> 0 (mutant seed-disi satira yazmis olabilir)', v_toplam_sonra - v_toplam_once;
+  END IF;
 
   SELECT count(*) INTO v_n
     FROM public.stok_hareket
    WHERE stok_id IN (v_stok_exact_id, v_stok_super_id, v_stok_sub_id, v_stok_ilac_id)
      AND notlar <> 'Tohumlama — TEST-SPERM-W1';
   IF v_n <> 0 THEN
-    RAISE EXCEPTION 'K1 bos/bosluk/NULL/tab/newline ad % satir üretti', v_n;
+    RAISE EXCEPTION 'K1 bos/bosluk/NULL/tab/newline/CR ad % satir üretti', v_n;
   END IF;
 
   -- K3: exact eşleşme yok → substring ILIKE fallback tek satıra düşer.
