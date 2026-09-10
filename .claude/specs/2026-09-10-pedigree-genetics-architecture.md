@@ -182,7 +182,7 @@ CREATE TABLE public.pedigree_nodes (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   farm_id           uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
 
-  farm_animal_id    text NULL REFERENCES public.hayvanlar(id) ON DELETE SET NULL,
+  farm_animal_id    text NULL REFERENCES public.hayvanlar(id) ON DELETE CASCADE,  -- D1: geri_al DELETE orphan node bırakmasın (plan D1 ile tek otorite)
   node_kind         text NOT NULL CHECK (node_kind IN ('farm_animal','external_animal')),
 
   display_name      text NULL,
@@ -197,6 +197,7 @@ CREATE TABLE public.pedigree_nodes (
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now(),
 
+  UNIQUE (farm_id, id),              -- composite FK hedefi (cross-farm enforcement, §4.2)
   UNIQUE (farm_id, farm_animal_id)
 );
 ```
@@ -217,8 +218,12 @@ Kanonik biyolojik parentage edge tablosu.
 CREATE TABLE public.pedigree_parentage (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   farm_id           uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
-  parent_node_id    uuid NOT NULL REFERENCES public.pedigree_nodes(id),
-  child_node_id     uuid NOT NULL REFERENCES public.pedigree_nodes(id),
+
+  -- composite FK çiftleri: cross-farm edge DDL seviyesinde imkânsız (Revizyon 2)
+  parent_farm_id    uuid NOT NULL,
+  parent_node_id    uuid NOT NULL,
+  child_farm_id     uuid NOT NULL,
+  child_node_id     uuid NOT NULL,
   parent_role       text NOT NULL CHECK (parent_role IN ('dam','sire')),
 
   source_type       text NOT NULL CHECK (source_type IN ('birth','manual','import','reconcile')),
@@ -226,7 +231,12 @@ CREATE TABLE public.pedigree_parentage (
   confidence        numeric NOT NULL DEFAULT 1.0 CHECK (confidence >= 0 AND confidence <= 1),
   created_at        timestamptz NOT NULL DEFAULT now(),
 
+  FOREIGN KEY (parent_farm_id, parent_node_id)
+    REFERENCES public.pedigree_nodes(farm_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (child_farm_id, child_node_id)
+    REFERENCES public.pedigree_nodes(farm_id, id) ON DELETE CASCADE,
   CHECK (parent_node_id <> child_node_id),
+  CHECK (farm_id = parent_farm_id AND farm_id = child_farm_id),
   UNIQUE (farm_id, child_node_id, parent_role)
 );
 ```
@@ -277,6 +287,11 @@ CREATE TABLE public.semen_catalog (
 
 MVP varsayımı: mevcut bir `stok` sperma satırı tek semen catalog kaydına bağlanır. İleride batch/lot takibi gerekirse `semen_batches` ayrı tablo olarak eklenebilir; ilk fazda gereksizdir.
 
+**Guard'lar (r2-review):** `bull_node_id` bağlantısı composite FK ile farm-scope taşır
+(`(bull_farm_id, bull_node_id) → pedigree_nodes(farm_id, id)`) ve `semen_catalog_upsert`
+RPC'sinde bull node `sex='male'` zorunluluğu ile `stock_id` varsa `stok.kategori='Sperma'`
+kontrolü yapılır — geçerli FK bile anlamsız bağ kuramaz.
+
 ### 4.4 `tohumlama` genişletmesi
 
 ```sql
@@ -313,7 +328,7 @@ CREATE TABLE public.genetic_evaluations (
 
   source             text NOT NULL,
   source_registry    text NULL,
-  evaluation_date    date NULL,
+  evaluation_date    date NOT NULL,   -- NULL unique-key'te tekilleştirmez (r2-N15); tarih bilinmiyorsa kaynak periyodu girilir
   trait_code         text NOT NULL,
   trait_name         text NULL,
   value              numeric NOT NULL,
@@ -522,6 +537,14 @@ davranış icat ETMEZ: semen-aware yollar, bugfix'lerle düzeltilmiş kuralı
 (boş/whitespace sperma düşmez — `btrim(p_sperma) <> ''` guard; exact-first; üç yol ortak kural) `semen_catalog.stock_id`
 üzerinden taşır. Bugfix merge edilmeden bu fazın write kontratı dondurulmaz.
 
+**Tekrar aşım kimlik kuralı (r2-N17):** mevcut `tohumlama_tekrar_kaydet` aynı
+tohumlama satırını günceller — önceki denemenin metni snapshot'ta kalır ama
+kanonik kimlik yalnız tek kolonda yaşayacağı için ezilir. Kural: tekrar
+varyantı, satırda farklı ve NULL-olmayan bir `semen_id` varsa sessiz ezmez;
+açık `p_force_semen boolean default false` ister. Ezilen denemenin kimliği
+`islem_log` snapshot'ında ve `sperma` metninde korunur. Deneme-başı tam kimlik
+tarihi (per-attempt table) bilinçli olarak v2'dir.
+
 **Tohumlama parentage edge üretmez.** Henüz doğmuş child yoktur.
 
 ### 6.4 Doğum
@@ -619,7 +642,7 @@ Dönüşte:
 - beklenen offspring inbreeding F
 - pedigree completeness
 - uyarılar
-- varsa bull genetic evaluation özeti
+- varsa bull genetic evaluation özeti — **(v2: dış değerlendirme katmanı; v1 mating yanıtında yoktur)**
 
 bulunur.
 
@@ -921,9 +944,10 @@ cow ancestors ---- shared ancestor ---- bull ancestors
 
 > **Revizyon 2 (offline gerçekçiliği):** app shell cold-start offline DEĞİLDİR
 > (service worker stub, README). Bu yüzden "internet yokken app açılır"
-> senaryosu yoktur; cache'in kabul senaryosu **sekme açıkken ağ kesilmesi** ve
-> ikinci açılışta son projection'ın yerel sunulmasıdır. Asıl değeri RPC trafiği
-> ve veri hacmi korumasıdır.
+> senaryosu yoktur; cache'in kabul senaryosu **sekme açıkken ağ kesilmesi**dir.
+> Çevrimiçi ikinci açılışta shell yüklendikten sonra son projection RPC'siz
+> sunulabilir (cache hit); **tam çevrimdışı ikinci açılış kabul senaryosu
+> değildir** (r2-N14). Asıl değer RPC trafiği ve veri hacmi korumasıdır.
 
 Mevcut `pullFromSupabase()` `TABLES` listesindeki her şeyi full-pull yaptığı için external pedigree graph büyüdüğünde bütün graph'ı her sync'te çekmek yanlış olur.
 
@@ -944,11 +968,11 @@ veya daha basit tek:
 pedigree_cache
 ```
 
-key örneği:
+key örneği (farm-scope önekli — r2-N4; çıkış/farm değişiminde store temizlenir):
 
 ```text
-subgraph:<focusNode>:up4:down1:v3
-mating:<cow>:<semen>:depth6:v3
+farm:<farm_id>:subgraph:<focusNode>:up4:down1:v3
+farm:<farm_id>:mating:<cow>:<semen>:depth6:v3
 ```
 
 `DB_VER` implementasyon anında bir sonraki boş değere artırılır (dump'ta 24).
@@ -1015,9 +1039,9 @@ Tek seferde string kolonları kaldırmak yasak. Geçiş dört aşamalı olmalı.
 - `pedigree_nodes`
 - `pedigree_parentage`
 - `semen_catalog`
-- `genetic_evaluations`
-- `pedigree_node_metrics`
-- `pedigree_founder_contributions`
+- `genetic_evaluations` — **(v2)**
+- `pedigree_node_metrics` — **(v2, D6)**
+- `pedigree_founder_contributions` — **(v2, D6)**
 - `tohumlama.semen_id`
 - gerekli RPC'ler
 
@@ -1178,7 +1202,7 @@ Projede `fast-check` zaten var. Graph için değerlidir:
 
 - external animal CRUD/import
 - parentage CRUD RPC
-- Cytoscape + ELK
+- Cytoscape (gömülü `breadthfirst`; ELK DEĞİL — ELK yalnız P4 mating overlay'de lazy)
 - animal card Soy Ağacı
 - Armada gibi semen sire tree
 
@@ -1228,7 +1252,7 @@ Projede `fast-check` zaten var. Graph için değerlidir:
 | Kinship/inbreeding | versioned server-side algorithm | yeni |
 | Frontend | mevcut Vanilla JS | korunur |
 | Graph render | Cytoscape.js | ekle |
-| Hierarchical layout | ELK layered, Cytoscape adapter üzerinden | ekle |
+| Hierarchical layout | focal: Cytoscape `breadthfirst`; mating overlay: ELK layered (lazy-load, P4) | ekle |
 | Local cache | mevcut IndexedDB, on-demand pedigree cache | genişlet |
 | Test | mevcut Node + Playwright + fast-check + SQL fixtures | genişlet |
 | Graphology | yok | gerekmez |
@@ -1402,11 +1426,12 @@ Self-review sonunda mimariyi bloke eden bir çelişki bulunmadı. En büyük mig
                                                   ▼
                                       ┌──────────────────────┐
                                       │ Vanilla JS frontend  │
-                                      │ Cytoscape + ELK      │
+                                      │ Cytoscape bf + ELK*  │
                                       └──────────────────────┘
 ```
 
 Ana fikir: **DB'de tek global pedigree DAG, ekranda seçilen hayvana göre tree; çiftleşme analizinde iki tree'nin ortak node'larda birleştiği graph.**
+(*ELK yalnız mating overlay'de lazy-load; focal tree `breadthfirst` — Revizyon 2.)
 
 
 ---
@@ -1414,6 +1439,10 @@ Ana fikir: **DB'de tek global pedigree DAG, ekranda seçilen hayvana göre tree;
 ## 22. Implementasyon öncesi ek bilgi ihtiyacı
 
 **Bu mimari spec'i için ek doküman gerekmiyor.** Mevcut dump yeterliydi.
+*(İstisna, r2-N6: iki commit'li uygulama artefaktı bu planın parçasıdır —
+`.claude/specs/2026-09-10-pedigree-semen-mapping.md` (owner onaylı kimlik
+eşlemesi) ve `.claude/reviews/2026-09-10-live-probe-evidence.md` (canlı ölçüm
+kanıtları). "Ek doküman yok" ifadesi tasarım dokümanı içindir.)*
 
 Kodlamaya/backfill'e geçerken ise dokümandan ziyade canlı DB envanteri gerekir:
 

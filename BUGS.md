@@ -102,21 +102,22 @@ revize kopyalara işlendi (`.claude/specs/2026-09-10-pedigree-genetics-architect
 kapsam nüansı ve DOC-006'nın tracked-kapı eksiği aşağıda notludur; luna max
 review turu (r1 FAIL → r2) bulgularıyla birlikte kapatıldı.
 
-DOC-001: `tohumlama.id` **text** (GT:116), uuid değil — plan Task 0.2 beklenti
-değeri düzeltilmeli (ya da beklenti yazılmayıp canlıdan okunmalı).
+DOC-001: ~~`tohumlama.id` beklentisi düzeltilmeli~~ → **İŞLENDİ**: plan Task 0.2
+artık beklenti yazmaz, canlıdan okur; bugünkü bilinen değer (text) kayıtlı.
 
-DOC-002: Stok düşümü okuması revize: canlıda `tohumlama_kaydet` **düşürüyor**
-(ILIKE desenli), `planli_tohumlama_kaydet` düşürmüyor (BUG-001). Spec §6.3
-"mevcut stok düşümü" ifadesi ve plan Task 10 madde 5, BUG-001/002
-fix'leriyle hizalanmalı ("korumak" değil "düzeltipi semen_catalog.stock_id'ye
-taşımak").
+DOC-002: ~~stok düşümü okuması hizalanmalı~~ → **İŞLENDİ**: spec §6.3 + plan
+D4/Task 10 "düzeltilmiş kuralı semen_catalog.stock_id'ye taşı" olarak yazıldı.
+*(r2 düzeltmesi: offline "kuyrukta zaten queueable" iddiası yanlıştı — formlar
+offline'da kuyruğa girmeden reddediyor; v1 *_semen online-only, RPC_MAP'e
+ekleme YOK.)*
 
-DOC-003: `buildSpermaList` (app.js:399) stok değil geçmiş+config datalist'i;
-stok seçicileri ui.js'te. Plan Task 11 yüzey envanteri üç kaynağı +
-`geb-sperma`'yı kapsamalı.
+DOC-003: ~~yüzey envanteri genişletilmeli~~ → **İŞLENDİ**: plan Task 11 üç
+kaynağı (config/datalist/stok-select) + `geb-sperma`'yı kapsıyor; geb formunda
+semen seçimi opsiyonel (mevcut davranış).
 
-DOC-004: Offline replay `RPC_MAP`'e yeni `*_semen` RPC'leri eklenmelidir —
-opsiyonel değil (tohumlama zaten kuyrukta).
+DOC-004: ~~RPC_MAP'e eklenmeli~~ → **DÜZELTİLDİ (tersine)**: ölçüm (r2) formların
+offline'da kuyruk oluşturmadığını gösterdi; ekleme yapılmaz, v1 semen-aware
+yollar online-only; RPC_TABLES↔RPC_MAP tutarlılık testi izleme aracı olarak kalır.
 
 DOC-005: farm_id kolonlu ürün tablosu repoda henüz **sıfır** (`demo/02_demo_klonla.sql`'deki
 demo-yardımcı `demo_klon_log` hariç — kapsam: canlı üretim şeması); pedigree

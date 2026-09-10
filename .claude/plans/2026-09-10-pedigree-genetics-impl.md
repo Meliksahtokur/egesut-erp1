@@ -241,11 +241,20 @@ versiyon = commit SHA’sı; sahibi owner (onayı satır satır baştadır). Tas
 dosyayı okur ve migration içine dosya versiyonunu not düşer; dosyasız/versiyonsuz
 mapping’ten backfill koşulamaz.
 
-**Revizyon 2 — gerçek veri spot-check:** envanter çıktısı yanına, vethek’ten
-işlenen gerçek sürü verisiyle (207 tohumlamalı set) salt-okunur maternal hat
-doğrulaması eklenir: `hayvanlar.anne_id` ↔ `dogum` kayıtları çapraz kontrol;
-çelişkiler integrity raporunun ilk girdisidir. Fixture uydurma veriyle geçer,
-gerçek sürü geçmeyebilir.
+**Revizyon 2 — gerçek veri spot-check (r2-I7 ile somutlaşıldı):** envanter
+çıktısı yanına, vethek’ten işlenen gerçek sürüyle salt-okunur maternal hat
+doğrulaması eklenir; sorgu ve ham çıktı `live-probe-evidence.md`’ye yazılır:
+
+```sql
+-- anne_id’si dolu hayvanların dam hattı dogum ile uyumlu mu?
+SELECT c.id, c.anne_id,
+       (SELECT count(*) FROM dogum d WHERE d.anne_id = c.anne_id
+          AND d.dogum_tarihi <= c.dogum_tarihi) AS dogum_kaydi_var
+FROM hayvanlar c WHERE c.anne_id IS NOT NULL;
+```
+
+Çelişkiler (anne_id’si hiçbir dogum ile doğrulanamayan hayvanlar) integrity
+raporunun ilk girdisidir. Fixture uydurma veriyle geçer, gerçek sürü geçmeyebilir.
 
 ## Task 0.4 — Embriyo transferi gate’i
 
@@ -319,7 +328,7 @@ Unique/index:
 
 #### `pedigree_parentage`
 
-- `parent_node_id` / `child_node_id` FK `ON DELETE CASCADE`
+- `parent_farm_id` + `parent_node_id` ve `child_farm_id` + `child_node_id` **composite FK çiftleri** → `pedigree_nodes(farm_id, id)` `ON DELETE CASCADE` (cross-farm edge DDL'de imkânsız — r2-G3; `pedigree_nodes` tarafında `UNIQUE (farm_id, id)` zorunlu)
 - `parent_role IN ('dam','sire')`
 - `source_type IN ('birth','manual','import','reconcile')`
 - `source_ref text`
@@ -349,29 +358,52 @@ savunmadır).
 - `code`, `display_name`, `supplier`, `semen_type`, `active`, `metadata`
 - `(farm_id, stock_id)` partial/normal unique when stock_id non-null
 
-### 1.3 RLS / grants (Revizyon 2: açık cümleler)
+### 1.3 RLS / grants (r2 sonrası yürütülebilir hale getirildi)
 
 Yeni tablolar RLS-enabled olur; repo politikası gereği `USING(true)` kalır.
-Yetki sınırı grant cümleleriyle netleşir (tracked auth-lockdown referansı
-PUBLIC’i geri aldığı için yeni nesnelere grant yazılmazsa istemci erişemez):
+Yetki sınırı **çalışan DDL cümleleriyle** netleşir (tracked auth-lockdown
+PUBLIC’i geri aldığı için yeni nesnelere grant yazılmazsa istemci erişemez).
+**Kural: her grant, ilgili nesneyi yaratan MIGRATION’ın kendi içinde durur** —
+foundation migration’ı henüz var olmayan fonksiyona grant yazamaz (r2-N1).
+
+Foundation migration’ına girenler:
 
 ```sql
+-- RLS (her yeni tablo için, tablo CREATE’inden hemen sonra):
+ALTER TABLE public.pedigree_nodes       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pedigree_parentage   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.semen_catalog        ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all ON public.pedigree_nodes     FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.pedigree_parentage FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY allow_all ON public.semen_catalog      FOR ALL USING (true) WITH CHECK (true);
+
 -- IDB sync gerekir (D3):
 GRANT SELECT ON public.semen_catalog TO anon, authenticated;
 
--- Graph tabloları: DOĞRUDAN tablo grant’i YOK — erişim yalnız RPC:
---   (pedigree_nodes, pedigree_parentage için anon/authenticated’a SELECT verilmez)
-GRANT EXECUTE ON FUNCTION public.pedigree_subgraph(jsonb) TO anon, authenticated;  -- imza Task 3’te
-GRANT EXECUTE ON FUNCTION public.pedigree_subgraph_for_animal(text,integer,integer) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.pedigree_profile(text,integer) TO anon, authenticated;
+-- Foundation’da yaratılan RPC’ler (Task 1.4) — tanımlandıkları yerde:
 GRANT EXECUTE ON FUNCTION public.pedigree_parent_set(uuid,text,uuid,text,boolean) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pedigree_external_upsert(...) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.semen_catalog_upsert(...) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_external_upsert(...) TO authenticated;   -- imza Task 1.4 listesinden
+GRANT EXECUTE ON FUNCTION public.semen_catalog_upsert(...) TO authenticated;       -- imza Task 1.4 listesinden
 ```
 
-Kural: graph DML (INSERT/UPDATE/DELETE) istemciye hiçbir tabloda açılmaz;
-yazma yalnız SECURITY DEFINER RPC’lerden. Her yeni RPC’nin grant cümlesi aynı
-migration’da yazılır — "RPC_TABLES güncellenir" tek başına yetki vermez.
+Sonraki fazların migration’larına girenler (fonksiyon orada yaratılır):
+
+```sql
+-- Task 3 (projection): o migration’da:
+GRANT EXECUTE ON FUNCTION public.pedigree_subgraph(uuid,integer,integer) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pedigree_subgraph_for_animal(text,integer,integer) TO anon, authenticated;
+-- Task 17/P4 (profile+mating): o migration’da:
+GRANT EXECUTE ON FUNCTION public.pedigree_profile(text,integer) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.mating_analyze(text,uuid,integer) TO anon, authenticated;
+-- v2 (Task 22): genetic_evaluations tablosu + okuma RPC’si birlikte:
+GRANT EXECUTE ON FUNCTION public.genetic_evaluations_for_node(uuid) TO anon, authenticated;
+```
+
+**SECURITY DEFINER kontratı:** yeni RPC’lerin tamamı `SECURITY DEFINER` +
+`SET search_path = public, pg_temp` ile yazılır (graph tablolarına doğrudan
+client grant’i olmadığından RPC’ler kendi yetkisiyle okur/yazar); farm stamp
+`public.current_farm_id()`’den gelir, client parametresinden değil. Graph DML
+istemciye hiçbir tabloda açılmaz; Task 26 denetimi bunu doğrular, ikame etmez.
 
 ### 1.4 Helper’lar
 
@@ -403,6 +435,11 @@ semen_catalog_upsert(                        -- Task 11 "Elle Gir"/tanımla akı
   p_semen_type text default null, p_active boolean default true
 ) -> uuid
 ```
+
+**Guard'lar (r2-N3):** upsert (a) `p_stock_id` verildiyse `stok.kategori='Sperma'`
+değilse reddeder; (b) bull node yarattırıyorsa `sex='male'` yazar, mevcut node
+`female` ise reddeder; (c) tüm node/stock bağlantıları farm-scope composite FK
+ile aynı farm'a kilitlidir. Geçerli FK + anlamsız bağ kombinasyonu kapalıdır.
 
 oluştur.
 
@@ -437,9 +474,22 @@ Trigger function `farm_id` değerini client’tan almaz.
 
 ### 1.6 Test
 
-Migration local/test DB’ye uygulanıp `tests/sql/pedigree_graph_test.sql` çalıştırılır.
+Migration demo DB’ye uygulanır; `tests/sql/pedigree_graph_test.sql` **`BEGIN` …
+`ROLLBACK`** bloğu içinde koşar (tracked desen:
+`tests/sql/hayvan_grup_padok_sync_test.sql:1-5`) — fixture kalıcı satır bırakamaz
+(r2-N11). Koşum öncesi hedef doğrulaması zorunludur: `$DATABASE_URL`’nin demo
+proje olduğunu gösteren çıktı rapora eklenir; PROD hedefine koşum YASAK.
 
 **Phase 1 acceptance:** mevcut frontend hiç değişmeden çalışır; yeni tablolar additive’dir; yeni/geri alınan hayvan node lifecycle testi geçer.
+
+### 1.7 Tooling (r2-A1): tracked dry-run kapısı
+
+Owner-local `scripts/db-dry-run.sh` **commit edilir** (TMPDIR uyumlu uyarlamayla:
+sabit `/tmp/dry-run-refresh.log` → `${TMPDIR:-/tmp}` altına `mktemp`; bağımlı
+`refresh_lsp_schema.sh` de tracked edilir ya da betik içine katlanır). Kabul:
+`scripts/` altında commit’li + README’de tek satır çağrım talimatı; bu maddeden
+sonra "migration dry-run kapısı" tekrar üretilebilirdir. Bu maddeye kadar
+migration kabulü Task 1.6’daki psql fixture + demo uygulamasıyla verilir.
 
 ---
 
@@ -499,6 +549,7 @@ oluştur.
 - legacy semen strings without catalog mapping
 - cycle count (normalde 0)
 - parent born after child gibi tarih anomalileri
+- post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = semen_controlled_writes migration timestamp'i — r2-I6)
 
 ### 2.4 Idempotency testi
 
@@ -614,7 +665,7 @@ row shape:
 
 ```json
 {
-  "key": "subgraph:animal:H123:up4:down1:v1",
+  "key": "farm:<farm_id>:subgraph:animal:H123:up4:down1:v1",
   "payload": {},
   "cached_at": "ISO",
   "schema_version": 1
@@ -630,7 +681,10 @@ idbGetByKey(store, key)
 idbClearStore(store)
 ```
 
-ekle. `pedigree_cache` global `TABLES` listesine eklenmez.
+ekle. `pedigree_cache` global `TABLES` listesine eklenmez. Key'ler farm-scope öneki
+taşır (r2-N4) ve **çıkış/farm bağlamı değişiminde `pedigree_cache` store
+tamamen temizlenir** — başka farm/bağlamın grafiği yanlış bağlamda render
+edilemez.
 
 ### 4.3 Cache policy
 
@@ -949,19 +1003,23 @@ planli_tohumlama_kaydet_semen(
 ) -> legacy ile AYNI
 tohumlama_tekrar_kaydet_semen(
   p_hayvan_id text, p_tarih date, p_semen_id uuid,
-  p_hekim_id text, p_irk_bilgisi text
+  p_hekim_id text, p_irk_bilgisi text,
+  p_force_semen boolean DEFAULT FALSE   -- satırda FARKLI non-null semen_id varsa sessiz ezme yok (r2-N17; spec §6.3 kuralı)
 ) -> legacy ile AYNI
 gebelik_kaydet_manual_semen(
-  p_hayvan_id text, p_tarih date, p_semen_id uuid
-) -> legacy ile AYNI
+  p_hayvan_id text, p_tarih date, p_semen_id uuid DEFAULT NULL
+) -> legacy ile AYNI   -- NULL geçerli: mevcut modal sperma bilinmiyor'a izin veriyor (index.html:2241-2244); yeni RPC de bilinmeyen-sperma gebeliğini kabul eder (r2-N9)
 ```
 
 **Kontrat kuralı:** her `_semen` varyantı, legacy eşiyle aynı parametre sırası
 (p_sperma → p_semen_id dönüşümü dışında), aynı dönüş değeri ve aynı hata
 davranışına sahiptir; etkilenen tablo seti legacy eşinininki + `tohumlama.semen_id`
 yazımıdır. Return shape değişikliği YASAK — frontend iki yolu da aynı şekilde
-çağırabilmelidir. SQL testleri bu eşdeğerliği (aynı girdi → aynı sonuç + semen_id
-dolu) doğrular.
+çağırabilmelidir. **Legacy dönüş/hata kontratı ezberden yazılmaz:** Task 0.2
+ölçümünde her legacy RPC'nin dönüş tipi + temel hata durumları kanıt dosyasına
+(`live-probe-evidence.md`) kaydedilir; eşdeğerlik fixture'ı o çıktıya karşı
+doğrulanır (r2-I3). SQL testleri eşdeğerliği (aynı girdi → aynı sonuç + semen_id
+dolu) ölçer.
 
 Yeni RPC’ler:
 
@@ -996,12 +1054,16 @@ Eski RPC’ler bir release boyunca çalışmaya devam eder. Legacy string yolund
 
 `js/api.js:RPC_TABLES` yeni RPC’lerle güncellenir.
 
-**Revizyon 2 (ölçüldü — DOC-004):** `tohumlama`/`dogum` offline kuyrukta ZATEN
-queueable (`js/ui.js` `RPC_MAP`). `*_semen` RPC’lerinin `RPC_MAP`’e eklenmesi
-**zorunludur** — eklenmezse offline tohumlama girişleri sessizce legacy text
-yoluna düşer ve "%100 semen_id" acceptance’ı offline’da kırılır. Aynı
-migration’da `tests/unit/api.test.js`’ye RPC_TABLES ↔ RPC_MAP tutarlılık testi
-eklenir (BUGS.md SMELL-002 kalıcı kapanır).
+**Revizyon 3 (r2-N5 — önceki iddia ölçümle düzeltildi):** önceki metin
+"tohumlama offline kuyrukta ZATEN queueable" diyordu; **yanlıştı**.
+`submitInsem`/`submitTekrarAsim` offline’da kuyruk öğesi yaratmadan reddediyor
+(`js/forms.js:317-322`, `407-423`); `RPC_MAP`’teki `tohumlama → tohumlama_kaydet`
+girdisi bu formlardan gelmiyor. Sonuç: **v1’de `*_semen` çağrıları
+online-only’dir** ve `RPC_MAP`’e yeni ad EKLENMEZ (payload ayrımı olmayan tek
+POST hedefi rota belirleyemez). Offline tohumlama kuyruğunu açmak ayrı bir
+iştidir ve bu planın kapsamı dışındadır. Kalan madde: `tests/unit/api.test.js`’ye
+RPC_TABLES ↔ RPC_MAP tutarlılık testi (SMELL-002’nin izleme aracı) — queueability
+iddiası içermez.
 
 ## Task 11 — Tohumlama ve tekrar aşım UI controlled selector
 
@@ -1078,10 +1140,10 @@ Kullanıcı geçmişteki unresolved string’i seçmek isterse bunu önce catalo
 - selector ID gönderir, label değil
 - stock row mapping doğru
 - manual create sonrası created id seçili
-- no selected semen id → submit block
+- no selected semen id → submit block — **yalnız i-sperma/tr-sperma formlarında**; `geb-sperma` formunda seçim OPSİYONELDİR (mevcut modal davranışı, r2-N9) ve NULL `p_semen_id` geçerli kabul edilir
 - legacy existing record render hâlâ `t.sperma` ile çalışır
 
-**Phase 6 acceptance (ölçülebilir — Revizyon 2):** "yeni" kayıt = `created_at > P3 deploy cutoff` (cutoff tarihi migration notunda). Kabul:
+**Phase 6 acceptance (ölçülebilir — Revizyon 2/3):** "yeni" kayıt = `created_at > cutoff`; **cutoff'un saklı otoritesi = `20260910000005_semen_controlled_writes.sql` dosya adındaki timestamp** (repo'da deterministik, tartışmasız; ayrı not gerekmez — r2-I6). Kabul:
 
 1. UI E2E: controlled selector’dan giden her tohumlama/tekrar/gebelik kaydı
    `semen_id` taşır (frontend yolundan NULL üreten yol kalmadığının testi).
@@ -1287,7 +1349,7 @@ Unknown parent branch sessizce unrelated sayılmaz.
 
 ## Task 17 — `mating_analyze`
 
-**Create/update:** metrics migration veya ayrı `20260910000008_mating_analyze.sql`
+**Create/update:** metrics migration veya ayrı `20260910000008_mating_analyze.sql` — **bu migration `pedigree_profile(p_hayvan_id text, p_depth integer default 6)` fonksiyonunu DA yaratır** (spec §7.2b kontratı; Task 21'in veri kaynağı — r2-N7) ve `GRANT EXECUTE` cümlesini içerir (Task 1.3 sonraki-fazlar bloğu)
 
 ```text
 mating_analyze(
@@ -1449,6 +1511,11 @@ Unique key source + evaluation date + node + trait bazlı tasarlanır.
 
 Pedigree-derived değerlerle external evaluation aynı tablo/alan adı altında karıştırılmaz.
 
+**Okuma yolu (r2-N8):** tablo D3 gereği full-sync'e girmez ve SELECT grant'i
+yoktur; aynı v2 migration `genetic_evaluations_for_node(p_node_id uuid) -> jsonb`
+read RPC'sini yaratır + `GRANT EXECUTE ... TO anon, authenticated` (Task 1.3
+v2 bloğu). Task 23 UI'sı yalnız bu RPC'den okur.
+
 ## Task 23 — External bull detail/genetic UI
 
 Armada node detail:
@@ -1505,6 +1572,13 @@ Playwright scenarios:
 
 Prod E2E write YOK.
 
+**Stub disiplini (r2-N12 — sahte-yeşil riski):** mevcut
+`tests/support/stub-backend.js` bilinmeyen RPC'lere `{ok:true}`, bilinmeyen
+tablolara boş dizi döndürüyor. Pedigree E2E senaryoları koşulmadan önce her
+pedigree RPC'si için **gerçekçi stub handler** eklenir ve senaryo, handler'ın
+fiilen çağrıldığını doğrular (çağrı sayacı) — stub'un sessiz ok:true'si ile
+yeşil senaryo KABUL SAYILMAZ.
+
 ## Task 25 — Performance / safety checks
 
 Target farm ölçeği için:
@@ -1516,13 +1590,16 @@ Target farm ölçeği için:
 
 ölçülür.
 
-Acceptance guideline:
+Acceptance guideline (r2-N13 — sayısal kapılar; veri seti: gerçek sürü +
+sentetik 6-kuşak dış soy fixture’ı; ölçüm = sorgu + süre tablosu raporda):
 
-- normal focal query kullanıcıya anlık hissedilmeli
-- no unbounded recursive query
-- max-depth enforced server-side
-- no full pedigree table pull at app startup
-- no graph object global `state.animals` benzeri dev array’e kopyalanmamalı
+- 4-kuşak focal `pedigree_subgraph`: p50 < 300 ms, p95 < 1 sn (RPC süresi)
+- 6-kuşak `mating_analyze`: p95 < 2 sn
+- 8-kuşak izin verilen en derin sorgu: p95 < 4 sn
+- Cytoscape render (temsili dış soy boyutuyla): < 1 sn ilk layout
+- max-depth sunucu tarafında zorunlu; app startup’ta tam pedigree pull yok;
+  graph nesnesi `state.animals` benzeri global diziye kopyalanmaz (bunlar
+  yapısal şartlardır, ölçümle birlikte raporlanır)
 
 ## Task 26 — Security / mutation audit
 
@@ -1665,6 +1742,10 @@ supabase/migrations/
 .harness/references/rpc-reference.md    ← Task 27; root/lead şeridi (worker zarflarına girmez)
 ARCHITECTURE.md                         ← Task 27; root/lead şeridi
 README.md / README.tr.md                ← Task 27; yalnız kullanıcı-facing anlatım gerekirse
+
+.claude/specs/2026-09-10-pedigree-semen-mapping.md   ← Task 0.3 preflight artefaktı (owner onaylı; Task 8 girdisi — r2-N6)
+.claude/reviews/2026-09-10-live-probe-evidence.md    ← Task 0.2/0.3 ölçüm kanıtı (yaşayan dosya)
+scripts/db-dry-run.sh + refresh_lsp_schema.sh        ← Task 1.7 tooling (tracked + TMPDIR-uyumlu)
 
 tests/unit/
   + pedigree-api.test.js
