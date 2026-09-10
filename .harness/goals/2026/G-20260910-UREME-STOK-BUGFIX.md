@@ -1,3 +1,20 @@
+---
+id: G-20260910-UREME-STOK-BUGFIX
+status: active
+owner: root
+flow: ss_org
+created: 2026-09-10
+base_sha: 38c3b07
+branch: idle/ureme-stok-bugfix
+write_manifest:
+  - BUGS.md
+  - supabase/migrations/
+  - tests/sql/
+  - .claude/idle-reports/2026-09-10-ureme-bugfix.md
+review_lane: codex_luna_max
+implement_lane: glmf_workers
+---
+
 # G-20260910-UREME-STOK-BUGFIX — Reproduction-path stock/RPC bug fixes
 
 - **Status:** ACTIVE
