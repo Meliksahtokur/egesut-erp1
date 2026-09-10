@@ -598,8 +598,10 @@ CREATE POLICY allow_all ON public.pedigree_meta FOR ALL USING (true) WITH CHECK 
 ```
 
 Rapor cutoff okumasını NULL-güvenli yapar: `semen_controlled_cutoff` anahtarı
-yoksa (Task 10 henüz deploy edilmemişse) rapor `cutoff: tanımsız — controlled
-writes devrede değil` döner ve NULL-sayaç bölümünü atlar; hata vermez.
+yoksa (Task 10 henüz deploy edilmemişse) rapor **makine değeri `"tanimsiz"`**
+döner (İngilizce harflerle — JSON enum'da tek gösterim; yanındaki insan-açıklaması
+ayrı bir `detail` alanındadır, değerle karışmaz) ve NULL-sayaç bölümü atlanır;
+hata vermez.
 
 **Create read-only RPC** ve şu grupları JSON döndür:
 
@@ -653,6 +655,30 @@ warning: farm_animal_node_eksik, unresolved_anne_id, child_without_dam,
 info:    unresolved_baba_bilgi, child_without_sire
 ```
 
+**Yeni üç kontrolün predikat kontratı (r9-F48):**
+
+```text
+legacy_anne_graph_dam_celiskisi:
+  hayvanlar.anne_id NULL değil VE graph'ta tam bir dam edge'i var VE
+  anne_id → dam node resolve edilebiliyorsa; iki node farklıysa bulgu.
+  key = hayvan_id; detail = "anne_id=<id> graph=<node-uuid kısa>".
+  anne_id NULL / edge yok / resolve edilemiyor → bulgu YOK (bu durumlar
+  unresolved_anne_id / child_without_dam gruplarına aittir).
+
+dogum_anne_graph_dam_celiskisi:
+  dogum satırının buzağı node'u graph'ta dam edge'i taşıyorsa VE
+  dogum.anne_id → dam node resolve edilebiliyorsa; farklıysa bulgu.
+  key = dogum.id; detail = "dogum.anne_id=<id> graph=<node>"; resolve
+  edilemiyorsa bulgu YOK (başka grup sahiplenir).
+
+suspiciously_young_parent:
+  child doğum tarihi VE parent node doğum tarihi biliniyorsa VE
+  (child_tarih - parent_tarih) < 548 gün (18 ay) ise bulgu.
+  key = "<child_hayvan_id>:<parent_role>"; detail = "parent <node> yaşı <gün> gün".
+  Tarihlerden herhangi biri NULL → bulgu YOK (tarih yokluğu
+  maternal_tarih_bilinmiyor benzeri bilinmezlik sınıfıdır, gençlik iddiası değil).
+```
+
 **Makine-okunur durum kuralları (r8-F40):** rapor item şeması
 `{"key","detail","disposition":"open|accepted","stale_disposition":true|false}`
 taşır (stale → kabul geçersiz, item open işlem görür). Cutoff durumları:
@@ -674,9 +700,12 @@ dokümante şablonu koşar:
 INSERT INTO public.pedigree_meta (farm_id, key, value) VALUES (
   public.current_farm_id(),
   'integrity_accepted:<code>:<key>',
-  jsonb_build_object('accepted_at', now(), 'note', '<not>',
-    'finding_hash', public.pedigree_finding_hash('<code>','<key>','<detail>'))
-)::text)
+  jsonb_build_object(
+    'accepted_at', now(),
+    'note', '<not>',
+    'finding_hash', public.pedigree_finding_hash('<code>','<key>','<detail>')
+  )::text
+)
 ON CONFLICT (farm_id, key) DO UPDATE SET value = excluded.value;
 ```
 
@@ -807,7 +836,8 @@ row shape:
   "key": "farm:<farm_id>:subgraph:animal:H123:up4:down1:v1",
   "payload": {},
   "cached_at": "ISO",
-  "schema_version": 1
+  "schema_version": 1,
+  "epoch": "<localStorage pedigree_cache_epoch değeri — r8-F42 karantina alanı>"
 }
 ```
 
@@ -850,10 +880,11 @@ pedigreeApi.integrityReport()
 Davranış:
 
 1. network RPC denenir
-2. başarılıysa cache overwrite edilir — **generation guard’lı (r7-F38):**
-   istek başlarken `pedigreeSessionGen` (modül-seviye sayaç) okunur; yazma
-   öncesi sayaç değiştiyse (arada clear olduysa) sonuç DISKARDE edilir —
-   logout sonrası gelen eski yanıt yeni oturumun cache’ine yazamaz
+2. başarılıysa cache overwrite edilir — **generation guard’lı (r7-F38; sayaç
+   = `globalThis.__pedigreeSessionGen`, r8-F41 tek gösterim):** istek
+   başlarken sayaç okunur; yazma öncesi sayaç değiştiyse (arada clear olduysa)
+   sonuç DISKARDE edilir — logout sonrası gelen eski yanıt yeni oturumun
+   cache’ine yazamaz
 3. network yok/iletim hatası varsa matching cached payload döner
 4. cache de yoksa açık “çevrimdışı ve önbellek yok” durumu döner
 
@@ -2002,7 +2033,7 @@ tests/
 |---|---|---|
 | G0 | baseline + live inventory | migration başlat |
 | G1 | graph schema invariant tests green | farm backfill |
-| G2 | integrity report koştu + her bulgu sınıflandı (blocker=0; warning/info kabul kayıtlı — r5-F24: "clean" = bloklayıcı sıfır, tüm bulgular durumlu; "sıfır bulgu" DEĞİL) | read projection |
+| G2 | Task 2.3 makine kuralının birebir kendisi: emit edilen tüm gruplarda blocker item=0 VE her warning/info item `disposition=accepted AND stale_disposition=false` (stale kabul=open işlem görür) — r9-F49: tek gösterim, rollout satırı ayrı yorum taşıMAZ | read projection |
 | G3 | subgraph RPC + offline cache green | Soy UI |
 | G4 | external bull/semen mapping reviewed | paternal backfill |
 | G5 | controlled selector + semen-aware writes green | new writes canonical |
