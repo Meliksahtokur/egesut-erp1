@@ -405,7 +405,7 @@ Sonraki fazların migration’larına girenler (fonksiyon orada yaratılır — 
 ```sql
 -- Task 2 (integrity): o migration’da:
 GRANT EXECUTE ON FUNCTION public.pedigree_integrity_report() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pedigree_accept_finding(text,text,text) TO authenticated;  -- r7-F37
+-- pedigree_finding_hash IMMUTABLE helper: client grant gerektirmez (yalnız SQL içi kullanım + owner şablonu)
 -- Task 3 (projection): o migration’da:
 GRANT EXECUTE ON FUNCTION public.pedigree_subgraph(uuid,integer,integer) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pedigree_subgraph_for_animal(text,integer,integer) TO anon, authenticated;
@@ -624,7 +624,7 @@ writes devrede değil` döner ve NULL-sayaç bölümünü atlar; hata vermez.
   "groups": [
     {"code": "maternal_tarihsel_uyumsuz", "severity": "blocker|warning|info",
      "items": [{"key": "hayvan-id", "detail": "tek satır açıklama",
-                "disposition": "open|accepted"}]}
+                "disposition": "open|accepted", "stale_disposition": false}]}
   ]
 }
 ```
@@ -642,30 +642,53 @@ SQL fixture: bozuk değerle (`'1900-13-45'`) raporun istisna değil
 **Group→severity matrisi (r6-F33):**
 
 ```text
-blocker: maternal_tarihsel_uyumsuz, duplicate_registry, cycle_count, post_cutoff_null_semen
+blocker: maternal_tarihsel_uyumsuz, duplicate_registry, cycle_count,
+         post_cutoff_null_semen, cutoff_invalid
 warning: farm_animal_node_eksik, unresolved_anne_id, child_without_dam,
          role_sex_contradiction, legacy_semen_no_mapping, parent_born_after_child,
-         maternal_tarih_bilinmiyor
+         maternal_tarih_bilinmiyor,
+         legacy_anne_graph_dam_celiskisi,   -- r8-F44: hayvanlar.anne_id dam'i ile graph dam edge'i farklı
+         dogum_anne_graph_dam_celiskisi,    -- r8-F44: dogum.anne_id ile graph dam farklı
+         suspiciously_young_parent          -- r8-F44: child doğumunda parent yaşı < 18 ay (548 gün)
 info:    unresolved_baba_bilgi, child_without_sire
 ```
 
-**Kabul kaydı (r6-F33, r7-F37 ile mekanik):** kabul yalnızca RPC ile yazılır —
-`pedigree_accept_finding(p_code text, p_key text, p_note text)` (SECURITY
-DEFINER, Task 2 migration'ında; `GRANT EXECUTE ... TO authenticated`; v1 tek
-kullanıcı — owner). Yazdığı kayıt: `pedigree_meta` key
-`integrity_accepted:<code>:<key>`, value = `{"accepted_at": ISO, "note": text,
-"finding_hash": h}`; **h = md5(code || ':' || key || ':' || detail)** — rapor
-her item için aynı hash'i hesarlar; `disposition=accepted` YALNIZ meta'daki
-`finding_hash` birebir eşitse döner, eşit değilse item `open`'dır ve raporda
-`stale_disposition: true` işaretlenir (evidence değişince kabul bayatlar —
-tazelik mekanik). SQL fixture: (a) kabul yaz → accepted; (b) detail değiştir →
-tekrar open + stale. G2 = rapor koştu + blocker=0 + warning/info tamamen
-`accepted` (stale kabul open sayılır).
+**Makine-okunur durum kuralları (r8-F40):** rapor item şeması
+`{"key","detail","disposition":"open|accepted","stale_disposition":true|false}`
+taşır (stale → kabul geçersiz, item open işlem görür). Cutoff durumları:
+`cutoff:"tanimsiz"` → `post_cutoff_null_semen` grubu HİÇ emit edilmez
+(yokluğu = not_applicable); `cutoff:"gecersiz"` → `cutoff_invalid` grubu
+(blocker, tek item) emit edilir. **G2 (tek yorum):** rapor emit ettiği tüm
+gruplarda blocker item sayısı = 0 VE tüm warning/info item'larında
+`disposition=accepted AND stale_disposition=false`.
 
-**Cutoff durumunun G2 bağlamı (r7-F36):** `cutoff:"tanimsiz"` (Task 10 öncesi
-meşru erken durum) → `post_cutoff_null_semen` kontrolü `not_applicable`'dır ve
-G2 için ölçüm engeli DEĞİLDİR; `cutoff:"gecersiz"` (bozuk sahipli veri) →
-**blocker**; geçerli cutoff → kontrol ölçülür ve blocker kuralı işler.
+**Kabul kaydı (r6-F33, r7-F37; r8-F43 ile owner-SQL):** kabul CLIENT RPC'si
+değildir — demo/PROD signup açıktır, `authenticated` grant'ı her kayıt olana
+kabul yazdırırdı. Kabul **owner'ın SQL ile yazdığı** karardır: Task 2
+migration'ı `IMMUTABLE` helper `pedigree_finding_hash(p_code text, p_key text,
+p_detail text) returns text` (md5(code||':'||key||':'||detail)) tanımlar; rapor
+her item için aynı helper'ı çağırır. Owner, rapor JSON'undaki item için
+dokümante şablonu koşar:
+
+```sql
+INSERT INTO public.pedigree_meta (farm_id, key, value) VALUES (
+  public.current_farm_id(),
+  'integrity_accepted:<code>:<key>',
+  jsonb_build_object('accepted_at', now(), 'note', '<not>',
+    'finding_hash', public.pedigree_finding_hash('<code>','<key>','<detail>'))
+)::text)
+ON CONFLICT (farm_id, key) DO UPDATE SET value = excluded.value;
+```
+
+`disposition=accepted` YALNIZ meta `finding_hash`'i birebir eşitse; eşit
+değilse item `open` + `stale_disposition:true` (kanıt değişince kabul bayatlar
+— tazelik mekanik). `pedigree_accept_finding` RPC'si ve grant'ı YOKTUR (v2'de
+owner-auth tasarımıyla değerlendirilir). SQL fixture: (a) şablonla kabul →
+accepted; (b) detail değişimi → tekrar open + stale.
+
+**Cutoff durumunun G2 bağlamı (r7-F36, r8-F40 makine-okunur):** yukarıdaki
+emit kuralları — `tanimsiz` → grup yok (not_applicable), `gecersiz` →
+`cutoff_invalid` blocker, geçerli → ölçülür.
 
 ### 2.4 Idempotency testi
 
@@ -836,13 +859,29 @@ Davranış:
 
 Domain hesabı client’a taşınmaz.
 
-**`clearPedigreeCacheStore()` hata politikası (r7-F39):** fonksiyon kendi
-içinde try/catch’tir (fail-open; IDB yok/reddi/txn hatası konsola loglanır,
-fırlatılmaz) ve `pedigreeSessionGen++` HER durumda çalışır. Auth çağrı
-kesimleri de `try { await clear... } finally { signOut()/reload() }`
-yaparlar — cache temizliği hiçbir koşulda çıkışı BLOKLA MAZ. Test: IDB
-reddi simülasyonunda logout/reload yine tamamlanır; clear sonrası gelen
-pending yanıt store’a yazılmaz (final store boş kalır).
+**`clearPedigreeCacheStore()` hata politikası (r7-F39 + r8-F41/F42):**
+fonksiyon kendi içinde try/catch’tir (fail-open; IDB hatası loglanır,
+fırlatılmaz) ve çıkış asla bloklanmaz — auth kesimleri
+`try { await clear... } finally { signOut()/reload() }` yazar.
+
+**Paylaşılan sayaç (r8-F41 — buildless gerçek):** repo dersi: classic
+script’lerde top-level `let/const` globalThis’a ÇIKMAZ, script’ler arasında
+paylaşılmaz (`tests/unit/support/loadModule.js:10-12`; 2026-09-09 💡-buton
+vakası). Bu yüzden sayaç **`globalThis.__pedigreeSessionGen`** üzerinde yaşar:
+`pedigree-api.js` yazma öncesi okur, `clearPedigreeCacheStore()` (api.js)
+HER durumda `globalThis.__pedigreeSessionGen =
+(globalThis.__pedigreeSessionGen ?? 0) + 1` çalıştırır. Modül-seviye `let`
+sayaç YASAKTIR (bağlantısız ikinci sayaç riski).
+
+**Okuma karantinası (r8-F42 — fail-open kalıntısı):** epoch
+`localStorage[‘pedigree_cache_epoch’]` içinde yaşar (app init’te yoksa
+üretilir; clear HER durumda yeni epoch üretir — IDB temizliği başarısız olsa
+bile). Cache yazımı satıra `epoch` yazar; okuma (network fallback dahil)
+YALNIZ satır epoch’u === güncel epoch olan satırları sunar. Böylece clear
+sonrası fiziksel olarak kalmış eski satır görünmezdir — fail-open, garantiyi
+bozmaz. Test: IDB clear reddi simülasyonu → logout tamamlanır VE sonraki
+okuma eski payload’u DÖNÜREMEZ (epoch karantinası); pending yanıt store’a
+yazılamaz (generation guard) — final durum: store okumada boş.
 
 ### 4.4 Cache invalidation
 
