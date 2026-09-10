@@ -443,6 +443,9 @@ pedigree_parent_set(
   p_replace boolean default false,          -- farklı parent'a değişim için açık onay
   p_evidence jsonb default null             -- r4-F10: doğum edge'i {"tohumlama_id","semen_id"} yazar
 ) -> uuid
+-- r5-F29 kontratı: gövde COALESCE(p_evidence, '{}'::jsonb) yazar — NOT NULL
+-- kolon hiçbir çağrı yolunda ihlal edilmez; manual/import/reconcile çağrıları
+-- evidence='{}' ile sonuçlanır ve bu davranış SQL fixture'da test edilir.
 pedigree_external_upsert(                   -- r4-F13: zorunlu parametreler ÖNCE (PG default kuralı)
   p_display_name text,
   p_node_id uuid default null, p_sex text default null, p_breed text default null,
@@ -559,6 +562,12 @@ oluştur.
 
 `anne_id` değeri gerçek `hayvanlar.id` ile resolve olmayan satırları otomatik node’a dönüştürme; integrity report’a bırak.
 
+**Dışlama kuralı (r5-F23):** "güvenli" predicate yalnız `anne_id` resolve
+olması DEĞİLDİR; dam’in en geç doğum kaydı `dogum.tarih > child.dogum_tarihi`
+ise (S8’deki ölçülmüş anomali sınıfı) edge YARATILMAZ — satır integrity
+raporunun `maternal_tarihsel_uyumsuz` grubuna `severity=blocker` olarak düşer.
+confidence=1 yalnız çelişkisiz satırlarda geçerlidir.
+
 ### 2.3 `pedigree_integrity_report()`
 
 Bu migration **`public.pedigree_meta` tablosunu da yaratır** (r4-F11 — Task
@@ -592,6 +601,25 @@ writes devrede değil` döner ve NULL-sayaç bölümünü atlar; hata vermez.
 - cycle count (normalde 0)
 - parent born after child gibi tarih anomalileri
 - post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = `pedigree_meta` tablosundaki `semen_controlled_cutoff` değeri — r3-F6; tablo bu migration'da yaratılır, r4-F11)
+
+**Yanıt kontratı (r5-F28):** rapor tek JSON döner:
+
+```json
+{
+  "generated_at": "ISO",
+  "cutoff": "ISO | 'tanimsiz' | 'gecersiz'",
+  "groups": [
+    {"code": "maternal_tarihsel_uyumsuz", "severity": "blocker|warning|info",
+     "items": [{"key": "hayvan-id", "detail": "tek satır açıklama"}]}
+  ]
+}
+```
+
+Grup `code` listesi bu bölümdeki kontrollerle birebir; her bulgu satırı
+`key` ile kimliklenir. **Yazma kuralı:** `pedigree_meta` cutoff değeri
+ISO-8601 timestamp metnidir; okuma `value::timestamptz` cast'iyle yapılır;
+cast hatası veya anahtar yokluğu raporda `cutoff: "gecersiz"|"tanimsiz"`
+olarak döner ve NULL-sayaç bölümü atlanır — sessiz varsayılan yok (r5-I6/F6).
 
 ### 2.4 Idempotency testi
 
@@ -1375,8 +1403,10 @@ Parentage mutation sonrası affected subject/descendant metrics stale olur. İlk
 - Founder: bilinen parent'ı olmayan node; `F=0`, satırı birim köşegenli.
 - **Bilinmeyen parent (r4-F19):** hesapta founder sınırı gibi davranır (F=0,
   a=0) ANCAK (a) completeness slotu BİLİNMEMİŞ sayılır — known-slot şişirmez;
-  (b) katkısı uydurulmuş founder'a değil `unknown_share` kovasına yazılır.
-  Sessiz known-founder YOK. Fixture: focus'un bir parent'ı bilinmiyorsa
+  (b) katkısı uydurulmuş founder'a değil `unknown_share` kovasına yazılır;
+  (c) unknown dalın depth-limit'e kadar tüm alt slotları unknown sayılır
+  (r5-F26/F27 — kayıtlı-founder vs unknown-slot ayrımı spec §7.3'te).
+  Fixture (r5-F27 — çağrı `p_depth=1` ile): focus'un bir parent'ı bilinmiyorsa
   `completeness = {known_slots: 1, total_slots: 2, ratio: 0.5}` ve
   `unknown_share = 0.5` beklenir (sayısal beklenen değer).
 - **Derinlik kesme:** depth limit ötesi yollar yok sayılır; kesilen her dal
@@ -1418,7 +1448,10 @@ SQL fixture minimum:
 | half siblings | 0.25 | 0.125 |
 | first cousins | 0.125 | 0.0625 |
 
-Ayrıca inbred ancestor case eklenir; `(1 + F_ancestor)` etkisi doğrulanır.
+Ayrıca inbred ancestor case eklenir — **sayısal beklenen değer (r5-F7):** A
+boğası F_A=0.25 (inbred), B unrelated founder, X=A×B → F_X=0 (kinship(A,B)=0);
+`pedigree_kinship(X, A) = 0.3125` (F_A=0 olsaydı 0.25 olurdu — `(1+F_A)`
+etkisi bu farkla kanıtlanır).
 
 **Gate:** yukarıdaki fixture değerleri tolerans içinde geçmeden mating UI açılmaz.
 
@@ -1498,14 +1531,15 @@ Akrabalık analizi yapılamadı — tohumlama kaydı yine yapılabilir
 > SQL sorgulaması için) v2 kararıdır. Algoritma, normalization kuralı ve
 > fixture'lar aynen geçerli.
 
-Server-side propagation:
+Server-side propagation (r5-F26 sınıflandırması — spec §7.3 ile tek):
 
 - ancestry geriye traverse
-- gerçek parent bulunmayan node founder boundary
+- **kayıtlı founder** (var olan parent-edge’siz node) → katkı node’a;
+  **bilinmeyen slot** (edge yok) + **derinlik sınırı ötesi** → `unknown_share`
 - her parent branch contribution ×0.5
 - aynı founder’a farklı path’lerden gelen değerler toplanır
-- unknown ancestry ayrı tutulur
-- total known + unknown ≈ 1
+- unknown ancestry ayrı tutulur; unknown dalın alt slotları unknown sayılır
+- invariant: Σ(founder) + unknown_share = 1
 
 Derived rows:
 
@@ -1841,7 +1875,7 @@ README.md / README.tr.md                ← Task 27; yalnız kullanıcı-facing 
 .claude/specs/2026-09-10-pedigree-semen-mapping.md   ← Task 0.3 preflight artefaktı (owner onaylı; Task 8 girdisi — r2-N6)
 .claude/reviews/2026-09-10-live-probe-evidence.md    ← Task 0.2/0.3 ölçüm kanıtı (yaşayan dosya)
 scripts/db-dry-run.sh + refresh_lsp_schema.sh        ← Task 1.7 tooling (tracked + TMPDIR-uyumlu)
-js/auth.js                                           ← r3-F4: çıkışta clearPedigreeCache() hook (tek satır katılım)
+js/auth.js                                           ← r3-F4/r5-F25: çıkışta clearPedigreeCacheStore() çağrısı (ad Task 4.4 ile tek)
 js/config.js                                         ← r3-F3: PEDIGREE_FARM_ID sabiti (cache key kaynağı)
 tests/support/stub-backend.js                        ← r3-F5: Task 24 pedigree RPC stub handler'ları + çağrı sayaçları
 
@@ -1868,7 +1902,7 @@ tests/
 |---|---|---|
 | G0 | baseline + live inventory | migration başlat |
 | G1 | graph schema invariant tests green | farm backfill |
-| G2 | integrity report + maternal backfill clean | read projection |
+| G2 | integrity report koştu + her bulgu sınıflandı (blocker=0; warning/info kabul kayıtlı — r5-F24: "clean" = bloklayıcı sıfır, tüm bulgular durumlu; "sıfır bulgu" DEĞİL) | read projection |
 | G3 | subgraph RPC + offline cache green | Soy UI |
 | G4 | external bull/semen mapping reviewed | paternal backfill |
 | G5 | controlled selector + semen-aware writes green | new writes canonical |

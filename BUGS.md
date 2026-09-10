@@ -132,7 +132,8 @@ DOC-006: SQL test koşum ortamı plana bağlanmalı: `psql "$DATABASE_URL"`
 (owner-local; sabit `/tmp` log yazar) — P1 tooling maddesiyle tracked + TMPDIR
 uyumlu hale getirilene kadar migration kabulü psql fixture'larıyladır.
 CI otomasyonu kapsam dışı (repo test stratejisi: lokal yeter).
-→ *Kısmen karşılandı (plan Task 27); tracked kapı P1 borcu.*
+→ *İŞLENDİ — tracked kapı plan maddesi Task 1.7 olarak P1 ile teslim edilir
+(zamanlanmış iş; açık eksiklik değil).*
 
 ---
 

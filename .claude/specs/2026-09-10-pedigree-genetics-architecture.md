@@ -720,13 +720,18 @@ planı Task 21 bu kontratı okur.
 
 “Genetik havuz” için MVP'deki doğru kavram **expected founder contribution** olmalıdır.
 
-Algoritma:
+Algoritma — üç durumlu sınıflandırma kontratı ile (r5-F26):
 
 - Bilinen ancestry üzerinde geriye git.
-- Parent bilgisi olmayan/derinlik sınırında kalan node founder boundary olur.
-- Her parent branch'e 0.5 aktar.
-- Aynı founder'a farklı yollardan gelen katkıları topla.
-- Sonuç normalize edildiğinde contribution toplamı 1 olmalı.
+- **Kayıtlı founder:** graph'ta VAR olan (kimliği işlenmiş, parent-edge'siz) node
+  — katkısı o node'a yazılır (known founder).
+- **Bilinmeyen slot:** parent edge'i OLMAYAN boş slot — katkısı `unknown_share`
+  kovasına gider; o dalın depth-limit'e kadar TÜM alt slotları unknown sayılır.
+- **Derinlik sınırı:** limit ötesi kalan kütleye ulaşılamaz — `unknown_share`'e
+  eklenir (beyond-depth bilinmiyor).
+- Her bilinen parent branch'e 0.5 aktar; aynı founder'a farklı yollardan gelen
+  katkıları topla.
+- Invariant: `Σ(founder_contributions) + unknown_share = 1`.
 
 Bu, “nine %25” gibi basit kuşak gösteriminden daha doğrudur; tekrarlanan ortak ataları tek founder üzerinde birleştirir.
 
@@ -1146,6 +1151,10 @@ Kontroller:
 
 Son iki madde warning olmalı; hard DB constraint olmak zorunda değildir.
 
+**Yanıt kontratı:** raporun JSON şekli (grup `code` + `severity` + `items`
+listesi; cutoff `tanimsiz`/`gecersiz` durumları dahil) implementasyon planı
+Task 2.3'te tek otorite olarak tanımlıdır; spec bu kontrata atıf yapar (r5-F28).
+
 ---
 
 ## 14. Test stratejisi
@@ -1363,6 +1372,7 @@ tests/
 - graph üstünden doğrudan drag-drop parent değiştirme
 - bütün pedigree graph'ı her app sync'te download etme
 - tek “genetik kalite 0–100” puanı
+- deneme-başı tam semen kimlik tarihi (v1: tek adım `semen_id_onceki` zinciri; tam geçmiş bilinçli olarak v2 — r5-N17)
 
 Bunlar core modelin önünü kapatmadan sonradan eklenebilir.
 
@@ -1399,7 +1409,7 @@ Spec teslim edilmeden önce mevcut repo invariant'ları ve önerilen model bir k
 3. **`hayvanlar` içine sahte boğa basma reddedildi.** External animal identity ayrı `pedigree_nodes` katmanında tutulur; operasyonel hayvan kartı kirletilmez.
 4. **Free-text sperm source-of-truth reddedildi.** Mevcut `tohumlama.sperma`/`baba_bilgi` transition snapshot olur; yeni write'lar controlled `semen_id` üzerinden akar.
 5. **Full-sync reddedildi.** Dump'taki `pullFromSupabase()` TABLES davranışı nedeniyle pedigree graph global sync listesine eklenmez; projection bazlı on-demand cache kullanılır.
-6. **Founder contribution JSON blob'u küçültüldü.** Genetik havuzun gerçekten sorgulanabilmesi için founder dağılımı `pedigree_founder_contributions` tablosuna ayrıldı.
+6. **Founder contribution JSON blob'u küçültüldü.** Genetik havuzun gerçekten sorgulanabilmesi için founder dağılımı `pedigree_founder_contributions` tablosuna ayrıldı — **(v2 — D6, r5-F30: v1'de founder kütlesi `pedigree_profile` yanıtında on-demand döner; tablo v1'de yoktur.)**
 7. **Parentage provenance netleştirildi.** Semen bir parentage olayı değildir; doğan calf edge'inin provenance'ı `dogum.id`, evidence'i `tohumlama/semen` olur.
 8. **Embriyo transferi riski açıklandı.** Mevcut model doğuran annenin genetik dam olduğu varsayımıyla çalışır. Gerçek veride ET varsa Phase 2 öncesi model genişletilmelidir.
 9. **Library version drift kapatıldı.** Buildless projede unpinned CDN yerine test edilmiş Cytoscape/ELK adapter sürüm seti vendor edilir.
