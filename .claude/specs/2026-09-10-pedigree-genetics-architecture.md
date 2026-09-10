@@ -12,10 +12,12 @@
 > 2. **Metrik cache tabloları v1'den çıkarıldı** (§4.6/§4.7): kinship, F,
 >    founder katkısı, completeness **on-demand RPC** hesabıdır; kalıcı cache
 >    ancak ölçümle gerekçelenirse v2'de eklenir.
-> 3. **Stok düşümü okuması canlı ölçümle düzeltildi**: canlıda
->    `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet` ILIKE desenle düşürüyor,
->    `planli_tohumlama_kaydet` hiç düşürmüyor; eşleşmede boş-string joker riski
->    var (`BUGS.md` BUG-001/BUG-002). `gebelik_kaydet_manual` canlıda 42804 ile
+> 3. **Stok düşümü okuması canlı ölçümle düzeltildi + BUG-001 refuted (r12-F79):**
+>    canlıda `tohumlama_kaydet` ve `tohumlama_tekrar_kaydet` ILIKE desenle
+>    düşürüyor; `planli_tohumlama_kaydet` koşulsuz `tohumlama_kaydet`'e delege
+>    eder ve düşüm delegasyonla gerçekleşir (davranışsal probe + tracked
+>    migration teyidi — BUGS.md BUG-001 REFUTED). Eşleşmede boş-string joker
+>    riski real (BUG-002). `gebelik_kaydet_manual` canlıda 42804 ile
 >    kırık (BUG-003) — üreme write entegrasyon fazının ön koşulu.
 > 4. **Layout kararı**: v1 focal tree Cytoscape yerleşik `breadthfirst`
 >    yerleşimiyle açılır (0 ek byte); ELK yalnız mating overlay için lazy-load
@@ -546,9 +548,11 @@ tohumlama INSERT
 mevcut stok düşümü semen_catalog.stock_id üzerinden
 ```
 
-**Stok düşümü (Revizyon 2):** canlıda `tohumlama_kaydet` ve
-`tohumlama_tekrar_kaydet` ILIKE string eşleşmesiyle düşürüyor,
-`planli_tohumlama_kaydet` hiç düşürmüyor; boş `p_sperma` joker gibi davranıp
+**Stok düşümü (Revizyon 2 + r12-F79 düzeltmesi):** canlıda `tohumlama_kaydet` ve
+`tohumlama_tekrar_kaydet` ILIKE string eşleşmesiyle düşürüyor;
+`planli_tohumlama_kaydet` `tohumlama_kaydet`'e DELEGE eder — düşüm delegasyonla
+zaten gerçekleşir (BUG-001 refuted; planli'ye ayrı düşüm eklemek ÇİFT düşüm
+üretirdiğinden YASAK). Boş `p_sperma` joker gibi davranıp
 rastgele satırdan düşebiliyor (`BUGS.md` BUG-001/BUG-002 — fix işi
 `G-20260910-UREME-STOK-BUGFIX` goal'unda ayrı yürüyor). Pedigree burada
 davranış icat ETMEZ: semen-aware yollar, bugfix'lerle düzeltilmiş kuralı
@@ -704,7 +708,8 @@ Dönüş kontratı:
     {"breed": "Holstein", "share": 0.625},
     {"breed": "Brown Swiss", "share": 0.25}
   ],
-  "algorithm_version": "pedigree-v1"
+  "algorithm_version": "pedigree-v1",
+  "effective_depth": 6
 }
 ```
 

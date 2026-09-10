@@ -383,6 +383,36 @@ savunmadır).
 - `code`, `display_name`, `supplier`, `semen_type`, `active`, `metadata`
 - `(farm_id, stock_id)` partial/normal unique when stock_id non-null
 
+### 1.2b `pedigree_meta` + operatör guard DDL'si (r12-F63 — Task 1'de, somut)
+
+```sql
+CREATE TABLE public.pedigree_meta (
+  farm_id uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
+  key     text NOT NULL,
+  value   text NOT NULL,
+  PRIMARY KEY (farm_id, key)
+);
+ALTER TABLE public.pedigree_meta ENABLE ROW LEVEL SECURITY;
+CREATE POLICY allow_all ON public.pedigree_meta FOR ALL USING (true) WITH CHECK (true);
+
+CREATE FUNCTION public.assert_is_operator() RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_owner text;
+BEGIN
+  SELECT value INTO v_owner FROM public.pedigree_meta
+   WHERE farm_id = public.current_farm_id() AND key = 'op_owner_uid';
+  IF v_owner IS NULL THEN
+    RAISE EXCEPTION 'op_owner_uid tanimli degil — sistem kapali (fail-closed)';
+  END IF;
+  IF coalesce(current_setting('request.jwt.claim.sub', true), '') <> v_owner THEN
+    RAISE EXCEPTION 'operator degil';
+  END IF;
+END $$;
+-- op_owner_uid satırını migration YAZMAZ; owner deploy sonrası bootstrap
+-- INSERT ile yazar (deploy talimatı). Foundation'ın tablo listesi: pedigree_nodes,
+-- pedigree_parentage, semen_catalog, pedigree_meta (bu blok).
+```
+
 ### 1.3 RLS / grants (r2 sonrası yürütülebilir hale getirildi)
 
 Yeni tablolar RLS-enabled olur; repo politikası gereği `USING(true)` kalır.
@@ -463,6 +493,9 @@ Foundation ile:
 ```text
 pedigree_ensure_farm_node(p_hayvan_id text) -> uuid
 pedigree_is_ancestor(p_ancestor uuid, p_descendant uuid) -> boolean
+_pedigree_parent_set_core(...)  -- INTERNAL: pedigree_parent_set ile AYNI parametreler, GRANTSIZ
+                                -- (EXECUTE grant'i kimseye verilmez; yalnız SQL-içi çağrı: dogum_kaydet
+                                --  ve public pedigree_parent_set [guard + core] — r12-F62)
 pedigree_parent_set(
   p_child_node_id uuid, p_role text,        -- 'dam' | 'sire'
   p_parent_node_id uuid,
@@ -496,9 +529,13 @@ değilse reddeder; (b) bull node yarattırıyorsa `sex='male'` yazar, mevcut nod
 `female` ise reddeder; (c) tüm node/stock bağlantıları farm-scope composite FK
 ile aynı farm'a kilitlidir. Geçerli FK + anlamsız bağ kombinasyonu kapalıdır.
 
-**Tarihsel kimlik değişmezliği (r10-F57, r11-F57 tam kapsam):** `p_id` ile
+**Tarihsel kimlik değişmezliği (r10-F57, r11-F57, r12-F78 kilit):** `p_id` ile
 güncellemede, satır `tohumlama.semen_id` **VEYA** `tohumlama.semen_id_onceki`
 tarafından referans ediliyorsa `bull_node_id` DEĞİŞTİRİLEMEZ — RPC hata döner.
+**Kilit:** `semen_catalog_upsert`, gövde başında
+`pg_advisory_xact_lock(hashtext('pedigree_semen_catalog'))` alır; `dogum_kaydet`
+sire çözümünden önce AYNI kilidi alır — check-then-use penceresi kapanır
+(güncelleme ya historical-use'tan önce commit eder [reddedilir] ya sonra).
 Farklı boğa gerekiyorsa yeni catalog satırı yaratılır, eski satır `active=false`
 olur (replacement modeli; edge'ler eski node'a bağlı kalır). Silme v1'de yok:
 `tohumlama.semen_id`/`semen_id_onceki` FK'ları **default (NO ACTION)** ile
@@ -609,14 +646,19 @@ AND EXISTS (SELECT 1 FROM hayvanlar p WHERE p.id = c.anne_id)          -- dam me
 AND c.dogum_tarihi IS NOT NULL                                          -- tarih kanıtı zorunlu
 AND EXISTS (SELECT 1 FROM dogum d
              WHERE d.anne_id = c.anne_id
-               AND d.tarih <= c.dogum_tarihi)                           -- S8’in ölçtüğü predicate
+               AND d.yavru_kupe = c.kupe_no                             -- r12-F66: child’in KENDİ doğum olayı
+               AND d.tarih <= c.dogum_tarihi)                           -- S8’in ölçtüğü temporal koşul
 ```
 
 Bu S8’in `NOT EXISTS` ölçümüyle birebir aynı sınıflandırmadır (dam’in geç bir
-kayıtı, daha erken geçerli bir kaydı geçersiz KILMAZ). İki dışlama sınıfı:
-`maternal_tarihsel_uyumsuz` (dam var, tarihli, ama erken kayıt yok → blocker)
-ve `maternal_tarih_bilinmiyor` (child.dogum_tarihi NULL → warning; edge
-yaratılmaz, otomatik güvenilmez). "En geç kayıt" yorumu YOKTUR.
+kayıtı, daha erken geçerli bir kaydı geçersiz KILMAZ). İkinci EXISTS
+**child’in KENDİ doğum olayına bağlanır** (r12-F66): `d.yavru_kupe = c.kupe_no`
+koşulu eklenmiştir — çocuğun kimliğiyle eşleşmeyen, dam’in herhangi eski bir
+doğumu "güvenli" edge ÜRETEMEZ. İki dışlama sınıfı:
+`maternal_tarihsel_uyumsuz` (dam var, tarihli, ama çocuğun kendi doğum kaydı
+erken-değil/hiç yok → blocker) ve `maternal_tarih_bilinmiyor`
+(child.dogum_tarihi NULL → warning; edge yaratılmaz). "En geç kayıt" yorumu
+YOKTUR; edge yalnız çocuk-kimlikli doğum kaydıyla kurulur.
 
 ### 2.3 `pedigree_integrity_report()`
 
@@ -645,7 +687,34 @@ post_cutoff_null_semen, cutoff_invalid` — 17 kod.
 ihlal SATIRI bir item'tır (`key = tohumlama.id`, `detail = "created_at > cutoff,
 sperma=<t>"`) — `{count:0}` item'i YOKTUR; (c) `cutoff_invalid` tek item:
 `key="cutoff"`, `detail=<ham value>`.
-- post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = `pedigree_meta` tablosundaki `semen_controlled_cutoff` değeri — r3-F6; tablo bu migration'da yaratılır, r4-F11)
+
+**`post_cutoff_null_semen` ayrım kuralı (r12-F68):** yalnız
+`sperma IS NOT NULL AND btrim(sperma) <> '' AND semen_id IS NULL` satırları
+ihlaldir (bir sperm ADI var ama katalog bağlanmamış). `sperma` NULL/boş olan
+satırlar bilinçli unknown-sire gebeliğidir (gebelik `_semen` RPC'si p_semen_id
+NULL'da sperma'yı da NULL yazar) — ihlal DEĞİL, emit edilmez.
+
+**17 kodun tam predikat tablosu (r12-F69 — hepsi tek yerde, key = kimlik):**
+
+```text
+farm_animal_node_eksik      hayvanlar.id'si için pedigree_nodes(farm_animal) yok; key=hayvan_id
+unresolved_anne_id          anne_id IS NOT NULL AND hayvanlar'da karşılığı yok; key=hayvan_id
+unresolved_baba_bilgi       baba_bilgi dolu AND exact katalog eşlemesi yok (mapping dosyasına göre); key=hayvan_id
+child_without_dam           node'un dam edge'i yok (farm animal, 1 yaş üstü); key=hayvan_id
+child_without_sire          node'un sire edge'i yok; key=hayvan_id (info)
+role_sex_contradiction      edge role'ü node.sex ile çelişiyor (dam=female); key=edge-id
+duplicate_registry          (farm_id,registry_system,registry_code) birden çok node; key=registry_code
+legacy_semen_no_mapping     DISTINCT tohumlama.sperma (dolu) mapping dosyasında yok; key=sperma-metni
+cycle_count                 parentage'da döngü (recursive CTE, path uuid[] guard'lı); key=döngüdeki ilk node-id; her döngü 1 item
+parent_born_after_child     parent doğum > child doğum (tarihler dolu); key="<child>:<role>"
+maternal_tarihsel_uyumsuz   yukarıdaki blocker sınıf; key=hayvan_id
+maternal_tarih_bilinmiyor   child.dogum_tarihi NULL + anne_id dolu; key=hayvan_id
+legacy_anne_graph_dam_celiskisi / dogum_anne_graph_dam_celiskisi / suspiciously_young_parent
+                            yukarıdaki predikat blokları (r10-F48 + r12-F66/F67 düzeltmeleriyle)
+post_cutoff_null_semen      yukarıdaki ayrım kuralıyla; key=tohumlama.id
+cutoff_invalid              pedigree_meta cutoff cast NULL (helper); key="cutoff"
+```
+- post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = `pedigree_meta` tablosundaki `semen_controlled_cutoff` değeri — tablo Task 1'de yaratılır, bu migration yalnızca okur)
 
 **Yanıt kontratı (r5-F28):** rapor tek JSON döner:
 
@@ -716,9 +785,10 @@ dogum_anne_graph_dam_celiskisi (join ifadesi — r10-F48, r11-F48 deterministik)
     pedigree_nodes.farm_animal_id = (
       SELECT h.id FROM hayvanlar h
       WHERE h.kupe_no = dogum.yavru_kupe
-      ORDER BY (h.dogum_tarihi = dogum.tarih) DESC,   -- bu doğumun buzağısı önce
-               (h.durum = 'Aktif') DESC,              -- sonra aktif kayıt
-               h.dogum_tarihi DESC, h.id              -- son kırbaç: deterministik
+      ORDER BY (h.dogum_tarihi = dogum.tarih) DESC NULLS LAST,  -- r12-F67: NULL'lar HİÇ öne geçmesin
+               (h.durum = 'Aktif') DESC,
+               h.dogum_tarihi DESC NULLS LAST,
+               h.id                                       -- son kırbaç: deterministik
       LIMIT 1)
   kupe eşleşmesi hiç yoksa bulgu YOK. (v2 notu: dogum.buzagi_id kolonu bu
   heuristiği tamamen kaldırır — bilinçli borç.)
@@ -952,17 +1022,34 @@ HER durumda `globalThis.__pedigreeSessionGen =
 (globalThis.__pedigreeSessionGen ?? 0) + 1` çalıştırır. Modül-seviye `let`
 sayaç YASAKTIR (bağlantısız ikinci sayaç riski).
 
-**Sıra kontratı (r10-F54) + yazma askısı (r11-F64):** `clearPedigreeCacheStore()`
-gövdesi İLK ÜÇ adımı SENKRON ve IDB temizliği BAŞLAMADAN yapar: (1) globalThis
-sayaç++, (2) localStorage epoch üret, (3) `globalThis.__pedigreeWritesSuspended
-= true` — ancak sonra `await idbClearStore(...)` başlar (try/catch fail-open).
-**Askı bayrağı reload'a kadar kalır:** fence→reload arası başlayan HER yeni
-istek network sonucunu döner ama cache'e YAZMAZ (yeni-epoch satırı üretilemez).
-Böylece IDB silme başarısız olsa bile: eski satırlar epoch karantinasında,
-yeni satırlar askı ile — izolasyon iki mekanizmayla birlikte tamdır. Kabul
-testi: (a) fence öncesi pending yanıt yazılmaz; (b) fence SONRASI başlayan
-istek de yazmaz (askı); (c) IDB reddi simülasyonunda okuma eski payload
-döndüremez.
+**Sıra kontratı (r10-F54) + yazma askısı (r11/r12-F64/F70/F71 — paylaşımlı
+kapılar):** İKİ ayrı işlem vardır:
+
+1. **`clearPedigreeCacheStore()` — yalnız ÇIKIŞ fence'i.** SENKRON sırayla:
+   (1) `globalThis.__pedigreeSessionGen++`, (2) localStorage epoch üret,
+   (3) **localStorage'a `pedigree_writes_suspended = <yeni epoch>` yaz**
+   (paylaşımlı depoda — tüm sekmeler bir sonraki okumada görür, propagation
+   gerekmez), sonra `await idbClearStore(...)` (fail-open). Askı, bir sonraki
+   başarılı oturum init'ine kadar kalır: auth oturumu kurulduğunda app init
+   `suspended` bayrağını siler VE yeni epoch üretir (fresh session).
+2. **`invalidatePedigreeCache()` — mutasyon invalidation'ı (askısız).**
+   globalThis sayaç++ VE localStorage epoch üret (eski satırlar karantinaya
+   düşer) AMA suspended YAZMAZ; IDB clear fail-open. `dogum_kaydet` /
+   `pedigree_parent_set` / `semen_catalog_upsert` sonrası çağrılan budur —
+   cache yazımı devam eder (F70).
+
+**Yazma/okuma kapıları (paylaşımlı otorite localStorage — r12-F71):** yazma
+öncesi kontrol: `localStorage.suspended` YOK (veya != güncel epoch) VE istek
+başındaki epoch == güncel epoch VE globalThis sayaç değişmemiş. Okuma: satır
+epoch'u == güncel localStorage epoch VE suspended yok (suspended varken
+cache'ten servis yok — network/diskarte). globalThis sayaç yalnız tab-içi
+pending-yazım guard'ıdır; sekmeler-arası otorite localStorage'dır.
+
+Kabul testleri: (a) fence öncesi pending yanıt yazılmaz; (b) fence SONRASI
+başlayan istek yazmaz (askı); (c) IDB reddi simülasyonunda okuma eski payload
+döndüremez; (d) **başka sekme**: sekme A fence atınca sekme B'nin başlayan
+isteği de yazamaz (paylaşımlı suspended kapısı); (e) mutasyon invalidation'ı
+sonrası cache yazımı DEVAM eder (askı yok — F70).
 
 **Okuma karantinası (r8-F42 — fail-open kalıntısı):** epoch
 `localStorage[‘pedigree_cache_epoch’]` içinde yaşar (app init’te yoksa
@@ -1153,6 +1240,13 @@ supabase/migrations/20260910000004_semen_identity_backfill.sql
 
 Phase 0’daki human-reviewed mapping bu migration’ın veri girdisidir — girdi **commit’li dosyadır**: `.claude/specs/2026-09-10-pedigree-semen-mapping.md` (format Task 0.3’te; versiyon = commit SHA’sı; migration bu versiyonu not düşer).
 
+**Kanıt zinciri notu (r12-F65):** bugfix teslim raporu
+(`.claude/idle-reports/2026-09-10-ureme-bugfix.md`) bugfix dalındadır ve merge
+ile main'e girer; D4'ün davranışsal kanıt atfı bu merge sonrası repoda
+kalıcıdır. Goal'un Context bölümündeki eski "planli düşmüyor" önkabulü teslim
+sırasında çürütülmüş, BUGS.md'de REFUTED işlenmiştir — goal metni tarihî ön
+kabuldür; otorite BUGS.md + kanıt dosyasıdır.
+
 ### 8.1 External bull nodes
 
 Her confirmed canonical bull için bir node:
@@ -1342,7 +1436,7 @@ iddiası içermez.
 
 ## Task 11 — Tohumlama ve tekrar aşım UI controlled selector
 
-**Modify:** `index.html`, `js/app.js`, `js/forms.js`, `js/utils/handlers.js`, tests
+**Modify:** `index.html`, `js/app.js`, `js/forms.js`, `js/utils/handlers.js`, **`js/ui.js` (r12-F74: tekrar-aşım seçicileri `trSpermaModStok`/`getSpermaStok` burada — yazma sahibi bu task)**, tests
 
 **Gebelik formu kuralı (r3-F1):** `geb-sperma` serbest metni KALKAR; form ya
 **controlled semen seçimi** ya **"bilinmiyor" (NULL)** kabul eder. Boş olmayan
@@ -1455,6 +1549,18 @@ supabase/migrations/20260910000006_dogum_pedigree_integration.sql
 
 Mevcut live `dogum_kaydet` gövdesi esas alınır; eski GT body kopyalanmaz.
 
+**Eşzamanlılık + ACL (r12-F72/F73):** (a) transaction, 10 günlük olay
+penceresi OKUMADAN ÖNCE `pg_advisory_xact_lock(hashtext('dogum:' || p_anne_id))`
+alır — aynı annede eşzamanlı iki doğum ayrı `olay_id` üretemez (ikiz kabulunun
+ön koşulu); (b) bu migration `REVOKE EXECUTE ON FUNCTION public.dogum_kaydet(...)
+FROM anon;` içerir — mevcut ACL `CREATE OR REPLACE` ile korunur, anon açık
+kalmışsa graph yan etkili doğum yoluna anon erişim kapanır (auth-lockdown
+ilkesiyle hizalı). (c) `geri_al` entegrasyonu (r12-F77): dogum_kaydet'in
+islem_log snapshot'ı `olusturulan: [{tablo:'dogum',id},{tablo:'hayvanlar',id:calf}]`
+envelope'ı yazar (mevcut raw-NEW değil) ve `20260830000033` undo whitelist'ine
+`dogum` + `hayvanlar` eklenir; undo kabul testi gerçek `geri_al` çağrısıyla
+kanıtlanır (cascade node temizliğini dahil eder; silent-ok YOK).
+
 ### Yeni transaction sırası
 
 Mevcut logic korunarak ilgili noktaya:
@@ -1469,8 +1575,8 @@ Mevcut logic korunarak ilgili noktaya:
    └─ AFTER INSERT trigger farm pedigree node'u garanti eder
 7 calf node resolve
 8 dam node resolve
-9 pedigree_parent_set(dam -> calf, source_type=birth, source_ref=dogum.id, evidence={"tohumlama_id":...})
-10 sire biliniyorsa pedigree_parent_set(sire -> calf, source_type=birth, source_ref=dogum.id, evidence={"tohumlama_id":...,"semen_id":...})  -- r3-F2: edge hangi denemeden geldiğini sorgulanabilir taşır
+9 _pedigree_parent_set_core(dam -> calf, source_type=birth, source_ref=dogum.id, evidence={"tohumlama_id":...})  -- INTERNAL çağrı: guard yok (r12-F62; doğum her authenticated kullanıcıda çalışır)
+10 sire biliniyorsa _pedigree_parent_set_core(sire -> calf, ...)  -- r3-F2: edge hangi denemeden geldiğini sorgulanabilir taşır
 11 legacy baba_bilgi snapshot
 12 mevcut görev/protokol/tohumlama yan etkileri
 ```
@@ -1629,9 +1735,15 @@ UI’ye tek belirsiz “akrabalık %” dönme. JSON açık isimlerle:
   "kinship": 0.25,
   "expected_offspring_inbreeding_f": 0.25,
   "algorithm_version": "pedigree-v1",
-  "completeness": 1.0
+  "completeness": 1.0,
+  "effective_depth": 6
 }
 ```
+
+**Girdi guard'ı (r12-F76):** `pedigree_kinship`/`pedigree_inbreeding`/
+`mating_analyze` tüm girdi node/semen/hayvan kimliklerini farm-scope çözer
+(`current_farm_id()` + composite FK); yabancı-farm kimliği → exception. Bu,
+projection RPC'lerindeki same-farm kuralının birebir uygulamasıdır.
 
 ### Known-coefficient fixture gate
 
@@ -1691,7 +1803,7 @@ Dönüş:
 - warnings
 - algorithm_version
 
-Max depth guard örn. 8.
+Max depth guard: `p_depth` 0-8 clamp + yanıtta `effective_depth` (Task 15 kuralının birebir uygulaması — "örn." yok).
 
 ## Task 18 — Tohumlama modalı mating precheck
 
