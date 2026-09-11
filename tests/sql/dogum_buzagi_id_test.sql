@@ -1,8 +1,9 @@
 -- 20260911000001_dogum_buzagi_id_foundation.sql davranis testi (Task 0.5, gate G0b).
 -- Canli/yerel DB'de guvenlidir: tum test verisi transaction sonunda ROLLBACK edilir.
 -- Calistirma: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f tests/sql/dogum_buzagi_id_test.sql
--- Kapsam: unique ihlali reddi / SET NULL davranisi / konservatif backfill 4 sinifi /
---         dogum_kaydet ayni-transaction yazimi.
+-- Kapsam: unique ihlali reddi / SET NULL davranisi / konservatif backfill 4 sinifi
+--         (migration'in GERCEK _dogum_buzagi_backfill() fonksiyonu uzerinden) /
+--         dogum_kaydet ayni-transaction yazimi / D53 postpartum regresyonu (8+7).
 
 BEGIN;
 
@@ -14,6 +15,7 @@ DECLARE
   v_dogum_id  uuid;
   v_tmp       text;
   v_cnt       integer;
+  v_sayac_json jsonb;
 BEGIN
   ------------------------------------------------------------------
   -- FIXTURE'lar (__W1T_ ad-uzayi — gercek veriyle cakisma yok)
@@ -103,43 +105,16 @@ BEGIN
   INSERT INTO public.dogum (anne_id, tarih, yavru_kupe)
   VALUES ('__W1T_ANNE', DATE '2024-09-01', '__W1T_BF4');
 
-  -- migration 20260911000001 backfill blogunun birebir kopyasi
-  DO $bf$
-  DECLARE
-    r        record;
-    v_aday   integer;
-    v_bf_calf text;
-  BEGIN
-    FOR r IN
-      SELECT d.id, d.yavru_kupe, d.tarih
-      FROM public.dogum d
-      WHERE d.buzagi_id IS NULL
-    LOOP
-      SELECT count(*) INTO v_aday
-      FROM public.hayvanlar h
-      WHERE h.kupe_no = r.yavru_kupe;
-
-      IF v_aday = 0 THEN CONTINUE; END IF;
-      IF v_aday > 1 THEN CONTINUE; END IF;
-
-      SELECT h.id INTO v_bf_calf
-      FROM public.hayvanlar h
-      WHERE h.kupe_no = r.yavru_kupe
-        AND h.dogum_tarihi = r.tarih;
-
-      IF v_bf_calf IS NULL THEN CONTINUE; END IF;
-
-      IF EXISTS (
-        SELECT 1 FROM public.dogum d2
-        WHERE d2.buzagi_id = v_bf_calf AND d2.id <> r.id
-      ) THEN
-        CONTINUE;
-      END IF;
-
-      UPDATE public.dogum SET buzagi_id = v_bf_calf WHERE id = r.id;
-    END LOOP;
-  END
-  $bf$;
+  -- root-gate F3 duzeltmesi: artik KOPYA yok — migration'in GERCEK ic fonksiyonu
+  -- (_dogum_buzagi_backfill, 20260911000001 ile gelen) cagiriliyor
+  v_sayac_json := public._dogum_buzagi_backfill();
+  IF v_sayac_json IS NULL OR v_sayac_json ? 'auto' IS NOT TRUE
+     OR v_sayac_json ? 'cok-aday' IS NOT TRUE THEN
+    RAISE NOTICE 'FAIL T4pre: _dogum_buzagi_backfill sayac jsonb donmedi: %', v_sayac_json;
+    v_fail := v_fail + 1;
+  ELSE
+    RAISE NOTICE 'T4 OK-ust: gercek backfill fonksiyonu cagrildi, sayaclar: %', v_sayac_json;
+  END IF;
 
   -- auto-aday ciftinden TAM BIRI yazilmali (loop sirasi belirsiz; ikisi de ayni calf'i hedefler)
   SELECT count(*) INTO v_cnt FROM public.dogum d
@@ -179,6 +154,55 @@ BEGIN
     v_fail := v_fail + 1;
   ELSE
     RAISE NOTICE 'T4e OK: aday-yok NULL kaldi';
+  END IF;
+
+  ------------------------------------------------------------------
+  -- TEST 5 (root-gate F2 regresyonu): dogum_kaydet D53 postpartum davranisi
+  -- — 8+7 gorev_sayisi, '53. Gun: E Vitamini' VAR, eski Ademin/Yeldif d53/d54 YOK
+  ------------------------------------------------------------------
+  INSERT INTO public.hayvanlar (id, kupe_no, irk, cinsiyet, grup, padok, durum, dogum_tarihi)
+  VALUES ('__W1T_ANNE2', '__W1T_ANNE2_KUPE', 'Hint', 'Dişi', 'Test Grup', 'Test Padok', 'Aktif', DATE '2023-01-01');
+
+  v_res := public.dogum_kaydet('__W1T_ANNE2', DATE '2025-01-10', '__W1T_K5', 'Dişi', 'Normal', 36, '__W1T_BABA2', NULL);
+  IF v_res->>'ok' IS DISTINCT FROM 'true' THEN
+    RAISE NOTICE 'FAIL T5a: dogum_kaydet ok!=true: %', v_res;
+    v_fail := v_fail + 1;
+  ELSE
+    IF v_res->>'gorev_sayisi' IS DISTINCT FROM '15' THEN
+      RAISE NOTICE 'FAIL T5b: gorev_sayisi 8+7=15 olmali (eski 10+7 govde isareti), gelen: %', v_res->>'gorev_sayisi';
+      v_fail := v_fail + 1;
+    ELSE
+      RAISE NOTICE 'T5b OK: gorev_sayisi=15 (anne 8 + buzagi 7)';
+    END IF;
+
+    SELECT count(*) INTO v_cnt FROM public.gorev_log
+     WHERE hayvan_id = '__W1T_ANNE2' AND aciklama = '53. Gün: E Vitamini'
+       AND gorev_tipi = 'ILAC' AND etken_kod = 'E_VIT';
+    IF v_cnt <> 1 THEN
+      RAISE NOTICE 'FAIL T5c: tek adet 53. Gun E Vitamini (E_VIT) beklenirdi, gelen: %', v_cnt;
+      v_fail := v_fail + 1;
+    ELSE
+      RAISE NOTICE 'T5c OK: 53. Gun E Vitamini gorevi var (tek adet, E_VIT)';
+    END IF;
+
+    SELECT count(*) INTO v_cnt FROM public.gorev_log
+     WHERE hayvan_id = '__W1T_ANNE2' AND kaynak = 'DOGUM-__W1T_ANNE2'
+       AND aciklama IN ('53. Gün: Ademin', '53. Gün: Yeldif', '54. Gün: Yeldif');
+    IF v_cnt <> 0 THEN
+      RAISE NOTICE 'FAIL T5d: kaldirilan eski d53/d54 gorevleri geri geldi (% adet)', v_cnt;
+      v_fail := v_fail + 1;
+    ELSE
+      RAISE NOTICE 'T5d OK: eski 53.Ademin / 53.Yeldif / 54.Yeldif gorevleri YOK';
+    END IF;
+
+    SELECT count(*) INTO v_cnt FROM public.gorev_log
+     WHERE hayvan_id = '__W1T_ANNE2' AND kaynak = 'DOGUM-__W1T_ANNE2';
+    IF v_cnt <> 8 THEN
+      RAISE NOTICE 'FAIL T5e: anne gorev sayisi 8 olmali, gelen: %', v_cnt;
+      v_fail := v_fail + 1;
+    ELSE
+      RAISE NOTICE 'T5e OK: anne gorev listesi 8 satir (D53 listesi)';
+    END IF;
   END IF;
 
   ------------------------------------------------------------------
