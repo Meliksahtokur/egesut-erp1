@@ -35,6 +35,20 @@ if [[ ! -f "$SQL_FILE" ]]; then
   exit 2
 fi
 
+# ── F6 (tur-1): kendi transaction kontrolünü içeren dosyayı reddet ───────
+# Sarmalayıcı tek BEGIN…ROLLBACK açar; dosya içinden COMMIT/ROLLBACK/BEGIN
+# sarmalayıcıyı kırar → kapanış ROLLBACK'i transaction DIŞINDA koşar ve DDL/
+# backfill geri alınamaz. Guard statik greptir, fail-closed.
+# Sınır: SQL `END;` (COMMIT eşanlamlısı) plpgsql `END;`'ten statik olarak
+# ayırt edilemez → taranmaz; satır-başı transaction fiilleri taranır.
+TX_HITS=$(grep -inE '^[[:space:]]*(BEGIN([[:space:]]+(WORK|TRANSACTION))?|START[[:space:]]+TRANSACTION|COMMIT([[:space:]]+(WORK|TRANSACTION|PREPARED))?|ROLLBACK([[:space:]]+(WORK|TRANSACTION|PREPARED))?)[[:space:]]*;' "$SQL_FILE" || true)
+if [[ -n "$TX_HITS" ]]; then
+  echo "❌ Migration dosyası kendi transaction kontrolünü içeriyor — dry-run sarmalayıcısı kırılır:" >&2
+  echo "$TX_HITS" | sed 's/^/    satır /' >&2
+  echo "   İç transaction deyimlerini kaldır (Supabase runner dosyayı zaten tek transaction'da koşar)." >&2
+  exit 65
+fi
+
 # ── ENV ────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/../.env"
@@ -74,11 +88,15 @@ echo
 # TMPDIR uyumu (Task 1.7): sabit /tmp/dry-run-refresh.log yerine
 # ${TMPDIR:-/tmp} altında mktemp — makinenin tmpfs bütçesini şişirmez.
 REFRESH_LOG=$(mktemp "${TMPDIR:-/tmp}/dry-run-refresh.XXXXXX.log")
+trap 'rm -f "${REFRESH_LOG:-}" "${OUT_TMP:-}" "${ERR_TMP:-}"' EXIT
 say "1/2 Neon aynası tazeleniyor (bayat ayna yanlış-pozitif verir)…"
 if bash "${SCRIPT_DIR}/refresh_lsp_schema.sh" >"$REFRESH_LOG" 2>&1; then
   ok "Ayna tazelendi."
 else
-  warn "Ayna tazeleme hatası (log: $REFRESH_LOG). Mevcut ayna ile devam ediliyor."
+  # F5 (tur-1): bayat/KISMİ ayna ile dry-run kabul edilmez — fail-closed.
+  err "Ayna tazeleme BAŞARISIZ — dry-run durduruldu (fail-closed)."
+  echo "   Ayna tazeleme logu: $REFRESH_LOG" >&2
+  exit 66
 fi
 
 # ── 2) DRY-RUN (BEGIN; … ROLLBACK;) ───────────────────────────────────
@@ -87,7 +105,6 @@ say "2/2 Migration Neon'da çalıştırılıyor (transaction içinde, rollback)�
 # Geçici dosyalar
 OUT_TMP=$(mktemp)
 ERR_TMP=$(mktemp)
-trap 'rm -f "$OUT_TMP" "$ERR_TMP" "${REFRESH_LOG:-}"' EXIT
 
 # BEGIN/ROLLBACK tek psql çağrısıyla sar:
 #   -c "BEGIN;" -f migration.sql -c "ROLLBACK;"

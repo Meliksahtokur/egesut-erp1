@@ -4,7 +4,8 @@
 --
 -- Kapsam (goal G1 + plan Task 1.1):
 --   1.1 invarianlari (1-10) + sex normalization + operator guard uclusu
---   (fail-closed / owner gecisi / dogum yolu guardsiz) + grants authenticated-only
+--   (fail-closed / owner gecisi / INTERNAL core guardsız çağrısı — mekanizma
+--   kanıtı, üretim bağlantısı Faz 7) + grants authenticated-only
 --   + evidence COALESCE (r5-F29) + semen catalog guard'lari.
 
 BEGIN;
@@ -44,7 +45,10 @@ BEGIN
     RAISE EXCEPTION 'A1 fail-closed: op_owner_uid yokken manual red gelmedi: %', coalesce(v_hata, 'hic hata yok');
   END IF;
 
-  -- ═══ A2) Dogum yolu: INTERNAL core guardsiz calisir (dogum_kaydet'in yolu) ═
+  -- ═══ A2) INTERNAL core guard'sız çağrılabilir — MEKANİZMA kanıtı (review ══
+  -- F4 düzeltmesi: P1'de dogum_kaydet→core üretim bağlantısı YOK; "doğum yolu"
+  -- write'ı Faz 7'de bağlanır. Bu blok yalnız core'un guardsız çalışabildiğini
+  -- kanıtlar; dogum_kaydet akışı iddiası TAŞIMAZ.)
   INSERT INTO public.pedigree_nodes (node_kind, display_name, sex)
   VALUES ('external_animal', '__TEST_PED_CORE_ANNE__', 'female')
   RETURNING id INTO v_ey;
@@ -116,6 +120,15 @@ BEGIN
   END;
   IF v_hata IS NULL OR v_hata NOT LIKE '%p_replace%' THEN
     RAISE EXCEPTION 'C5/inv5: farkli parent sessizce overwrite edilmedi mi? gelen: %', coalesce(v_hata, 'hic hata yok');
+  END IF;
+  -- F3 (tur-1): p_replace=NULL da açık onay DEĞİLDİR (üç-değerli tuzak, fail-closed)
+  v_hata := NULL;
+  BEGIN
+    PERFORM public.pedigree_parent_set(v_node_h3, 'dam', v_anne, 'manual', NULL, NULL);
+  EXCEPTION WHEN OTHERS THEN v_hata := SQLERRM;
+  END;
+  IF v_hata IS NULL OR v_hata NOT LIKE '%p_replace%' THEN
+    RAISE EXCEPTION 'C5/F3: p_replace=NULL overwrite''i engellemeliydi: %', coalesce(v_hata, 'hic hata yok');
   END IF;
   v_edge_tmp := public.pedigree_parent_set(v_node_h3, 'dam', v_anne, 'manual', NULL, true);
   SELECT parent_node_id INTO STRICT v_id FROM public.pedigree_parentage WHERE id = v_edge_tmp;
@@ -334,7 +347,68 @@ BEGIN
     RAISE EXCEPTION 'C17: INTERNAL core''a EXECUTE sizmıs';
   END IF;
 
-  RAISE NOTICE 'TESTDONE:pedigree_graph_test tamam — 17 blok yeşil';
+  -- ═══ C18) F1: authenticated'in semen_catalog DML'i kapalı, SELECT açık ═══
+  IF has_table_privilege('authenticated', 'public.semen_catalog', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.semen_catalog', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.semen_catalog', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.pedigree_nodes', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.pedigree_parentage', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.pedigree_meta', 'INSERT') THEN
+    RAISE EXCEPTION 'C18/F1: authenticated graph/katalog tablolarında DML yetkisi var (default ACL sizintisi)';
+  END IF;
+
+  -- F1: authenticated olarak doğrudan catalog INSERT → red
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  v_hata := NULL;
+  BEGIN
+    INSERT INTO public.semen_catalog (bull_node_id, display_name)
+    VALUES (gen_random_uuid(), '__TEST_PED_F1_DOGRUDAN_YAZ__');
+  EXCEPTION WHEN OTHERS THEN v_hata := SQLERRM;
+  END;
+  EXECUTE 'RESET ROLE';
+  IF v_hata IS NULL OR (v_hata NOT LIKE '%permission denied%' AND v_hata NOT LIKE '%yetki%') THEN
+    RAISE EXCEPTION 'C18/F1: authenticated dogrudan catalog INSERT reddi gelmedi: %', coalesce(v_hata, 'hic hata yok');
+  END IF;
+
+  -- ═══ C19) F2: helper'lar istemciye kapali; trigger yolu calisir ═══════════
+  -- (a) anon dogrudan ensure_farm_node / is_ancestor → red
+  EXECUTE 'SET LOCAL ROLE anon';
+  v_hata := NULL;
+  BEGIN
+    PERFORM public.pedigree_ensure_farm_node(v_h_erkek);
+  EXCEPTION WHEN OTHERS THEN v_hata := SQLERRM;
+  END;
+  IF v_hata IS NULL OR (v_hata NOT LIKE '%permission denied%' AND v_hata NOT LIKE '%yetki%') THEN
+    RAISE EXCEPTION 'C19/F2: anon ensure_farm_node reddi gelmedi: %', coalesce(v_hata, 'hic hata yok');
+  END IF;
+  v_hata := NULL;
+  BEGIN
+    PERFORM public.pedigree_is_ancestor(v_node_h1, v_node_h3);
+  EXCEPTION WHEN OTHERS THEN v_hata := SQLERRM;
+  END;
+  EXECUTE 'RESET ROLE';
+  IF v_hata IS NULL OR (v_hata NOT LIKE '%permission denied%' AND v_hata NOT LIKE '%yetki%') THEN
+    RAISE EXCEPTION 'C19/F2: anon is_ancestor reddi gelmedi: %', coalesce(v_hata, 'hic hata yok');
+  END IF;
+
+  -- (b) trigger yolu KIRILMAMALI: authenticated dogrudan hayvanlar INSERT →
+  --     node yaratilir (wrapper SECURITY DEFINER; trigger cagrisinda EXECUTE
+  --     denetlenmez — review F2 kanit talebi)
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  v_hata := NULL;
+  BEGIN
+    INSERT INTO public.hayvanlar (id, kupe_no, grup, cinsiyet, durum)
+    VALUES ('__TEST_PED_H5__', '__TEST_PED_H5__', 'Süt İçen Buzağı', 'Erkek', 'Aktif');
+  EXCEPTION WHEN OTHERS THEN v_hata := SQLERRM;
+  END;
+  EXECUTE 'RESET ROLE';
+  IF v_hata IS NOT NULL THEN
+    RAISE EXCEPTION 'C19/F2: authenticated hayvan INSERT trigger yolunu kırdı: %', v_hata;
+  END IF;
+  SELECT count(*) INTO v_n FROM public.pedigree_nodes WHERE farm_animal_id = '__TEST_PED_H5__';
+  IF v_n <> 1 THEN RAISE EXCEPTION 'C19/F2: authenticated INSERT sonrasi node yaratilmadi (% node)', v_n; END IF;
+
+  RAISE NOTICE 'TESTDONE:pedigree_graph_test tamam — 19 blok yeşil';
 END;
 $test$;
 
