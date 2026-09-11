@@ -192,7 +192,11 @@ aynı transaction'da yazması bedava. **Canlı `dogum_kaydet` RPC'sine
 dokunduğu için kararı owner verir** (teklif dosyasında etki analizi +
 ret durumunda fallback). Ret edilirse plan aynen sezgeliyle yürür; kabul
 edilirse Task 2.3/9'daki join'ler `buzagi_id`'ye iner ve teklif kendi
-migration task'ı olarak P1'in ilk maddesi olur.
+migration task'ı olarak P1'in ilk maddesi olur. **Kontrat detayı teklif
+dosyasındadır (Rev 2):** `ON DELETE SET NULL` + partial unique index
+`(buzagi_id) WHERE NOT NULL` + konservatif backfill (yalnız exact+unique
+eşleşme yazılır, gerisi NULL+warning — sezgeli ranking en fazla
+`suggested_candidate`).
 
 ---
 
