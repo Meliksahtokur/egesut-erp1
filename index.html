@@ -243,6 +243,11 @@ body.dark .ac-vurgu{color:#8ec6ff}
 .tab.on{color:var(--green);border-bottom-color:var(--green)}
 .tab-pane{display:none;padding:14px}
 .tab-pane.on{display:block}
+/* Pedigree sub-tab'ları (Soy pane içi [Soy Ağacı][Genetik]) — .tab2 idiomu */
+.tab2{padding:6px 12px;font-size:.66rem;font-weight:700;border:1px solid var(--card3);background:var(--card2);color:var(--ink3);border-radius:8px;cursor:pointer;transition:all .15s}
+.tab2.on{color:#fff;background:var(--green);border-color:var(--green)}
+.tab2-pane{display:none}
+.tab2-pane.on{display:block}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--card2);border-radius:var(--r2);overflow:hidden;margin-bottom:12px}
 .ig-item{background:var(--card);padding:11px 13px}
 .ig-lbl{font-size:.6rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.07em}
@@ -934,12 +939,14 @@ body.dark .ac-vurgu{color:#8ec6ff}
       <button class="tab on" data-action="tab-ozet">Özet</button>
       <button class="tab" data-action="tab-saglik">Sağlık</button>
       <button class="tab" data-action="tab-ureme">Üreme</button>
+      <button class="tab" data-action="tab-pedigree">Soy</button>
       <button class="tab" data-action="tab-gorev">Görevler</button>
       <button class="tab" data-action="tab-gecmis">Geçmiş</button>
     </div>
     <div id="tab-ozet" class="tab-pane on"></div>
     <div id="tab-saglik" class="tab-pane"></div>
     <div id="tab-ureme" class="tab-pane"></div>
+    <div id="tab-pedigree" class="tab-pane"></div>
     <div id="tab-gorev" class="tab-pane"></div>
     <div id="tab-gecmis" class="tab-pane"></div>
   </div>
@@ -2224,6 +2231,12 @@ body.dark .ac-vurgu{color:#8ec6ff}
     <script src="js/forms.js?v=20260909-12"></script>
     <script src="js/ai-asistan.js?v=20260909-12"></script>
     <script src="js/demo.js?v=20260909-12"></script>
+    <script src="vendor/cytoscape.min.js?v=20260909-12"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20260909-12"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20260909-12"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20260909-12"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20260909-12"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20260909-12"></script>
     <script src="js/app.js?v=20260909-12"></script>
     <script src="js/utils/handlers.js?v=20260909-12"></script>
 

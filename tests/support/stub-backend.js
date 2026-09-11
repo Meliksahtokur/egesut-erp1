@@ -32,6 +32,73 @@ const H_ERKEK = '33333333-3333-4333-8333-333333333333'; // erkek — filtre ayr�
 const T_GEBE = 'aaaaaaa1-0000-4000-8000-000000000001';
 const T_BEKLIYOR = 'aaaaaaa2-0000-4000-8000-000000000002';
 
+// ─── Pedigree projection fixture'ı (G-20260911-PEDIGREE-P2, W3) ─────────────
+// 4 ata kuşağı (focus + 4 = 5 kuşak soy) dam hattı zinciri; her kuşakta external
+// sire. farm_animal_id H_GEBE/H_BEKLIYOR'a bağlanır → demo akışında hayvan
+// kartından karta geçiş test edilir. Düğüm/kenar sayıları meta'nın EFEKTİF
+// değerleriyle tutarlı (ancestor_depth: 4 gerçek; focus'un yavrusu yok → 0).
+const PED_F = '99999999-1111-4111-8111-000000000001';
+const PED_D = '99999999-1111-4111-8111-000000000002';
+const PED_S = '99999999-1111-4111-8111-000000000003';
+const PED_GD = '99999999-1111-4111-8111-000000000004';
+const PED_GS = '99999999-1111-4111-8111-000000000005';
+const PED_GGD = '99999999-1111-4111-8111-000000000006';
+const PED_GGS = '99999999-1111-4111-8111-000000000007';
+const PED_GGGD = '99999999-1111-4111-8111-000000000008';
+
+// W1 RPC kontratı (Task 3.2): {focus, nodes[], edges[], meta} — meta clamp'lenmiş
+// EFEKTİF değerler. Stub canlı RPC'nin yerine geçmez; yalnız UI 4-kuşak akışını sürer.
+function pedigreeGraphFixture() {
+  const node = (id, kind, farmId, label, sex) =>
+    ({ id, kind, farm_animal_id: farmId, label, sex, breed: 'Simental', birth_date: null });
+  return {
+    focus: PED_F,
+    nodes: [
+      node(PED_F, 'farm_animal', H_GEBE, 'E2E1', 'Dişi'),            // focus
+      node(PED_D, 'farm_animal', H_BEKLIYOR, 'E2E2', 'Dişi'),        // 1. kuşak anne
+      node(PED_S, 'external_animal', null, 'EXT-BOGA-1', 'Erkek'),   // 1. kuşak baba
+      node(PED_GD, 'farm_animal', null, 'BUYUKANNE', 'Dişi'),        // 2. kuşak
+      node(PED_GS, 'external_animal', null, 'EXT-BOGA-2', 'Erkek'),
+      node(PED_GGD, 'farm_animal', null, 'DEV-BUYUKANNE', 'Dişi'),   // 3. kuşak
+      node(PED_GGS, 'external_animal', null, 'EXT-BOGA-3', 'Erkek'),
+      node(PED_GGGD, 'external_animal', null, 'EXT-DIS-ATA', 'Dişi'), // 4. kuşak
+    ],
+    edges: [
+      { id: 'ped-e-1', source: PED_D, target: PED_F, role: 'dam', source_type: 'birth' },
+      { id: 'ped-e-2', source: PED_S, target: PED_F, role: 'sire', source_type: 'birth' },
+      { id: 'ped-e-3', source: PED_GD, target: PED_D, role: 'dam', source_type: 'birth' },
+      { id: 'ped-e-4', source: PED_GS, target: PED_D, role: 'sire', source_type: 'birth' },
+      { id: 'ped-e-5', source: PED_GGD, target: PED_GD, role: 'dam', source_type: 'birth' },
+      { id: 'ped-e-6', source: PED_GGS, target: PED_GD, role: 'sire', source_type: 'birth' },
+      { id: 'ped-e-7', source: PED_GGGD, target: PED_GGD, role: 'dam', source_type: 'birth' },
+    ],
+    meta: { ancestor_depth: 4, descendant_depth: 0, truncated: false },
+  };
+}
+
+function pedigreeFixtureForNode(pFocusNodeId) {
+  const g = pedigreeGraphFixture();
+  if ([PED_F, PED_D, PED_S, PED_GD, PED_GS, PED_GGD, PED_GGS, PED_GGGD].includes(pFocusNodeId)) {
+    g.focus = pFocusNodeId;
+  }
+  return g;
+}
+
+function pedigreeFixtureForAnimal(pHayvanId) {
+  const g = pedigreeGraphFixture();
+  if (pHayvanId === H_BEKLIYOR) g.focus = PED_D;
+  return g; // varsayılan/unknown hayvan → F focus
+}
+
+// RPC çağrı sayaçları — E2E'de 4-kuşak focal akışının gerçekten RPC attığını
+// kanıtlar (fake-arm karşıtı): test `pedigreeRpcCounts.pedigree_subgraph_for_animal`
+// üzerinden istek sayısını doğrular; resetStore ile tazelenir.
+export const pedigreeRpcCounts = {
+  pedigree_subgraph: 0,
+  pedigree_subgraph_for_animal: 0,
+  pedigree_integrity_report: 0,
+};
+
 function freshStore() {
   return {
     hayvanlar: [
@@ -70,6 +137,7 @@ export function resetStore() {
   Object.assign(store, freshStore());
   insertLog.length = 0;
   rpcLog.length = 0;
+  Object.keys(pedigreeRpcCounts).forEach(k => { pedigreeRpcCounts[k] = 0; });
 }
 
 function json(route, status, body) {
@@ -103,6 +171,19 @@ const RPCS = {
     return { ok: true };
   },
   protokol_eksik_tara: () => [],
+  // ── Pedigree (Task 3 kontratı; G-20260911-PEDIGREE-P2) ──
+  pedigree_subgraph: (p) => {
+    pedigreeRpcCounts.pedigree_subgraph++;
+    return pedigreeFixtureForNode(p && p.p_focus_node_id);
+  },
+  pedigree_subgraph_for_animal: (p) => {
+    pedigreeRpcCounts.pedigree_subgraph_for_animal++;
+    return pedigreeFixtureForAnimal(p && p.p_hayvan_id);
+  },
+  pedigree_integrity_report: () => {
+    pedigreeRpcCounts.pedigree_integrity_report++;
+    return { ok: true, issues: [] };
+  },
 };
 
 function stubSession() {

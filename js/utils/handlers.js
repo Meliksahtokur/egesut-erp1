@@ -185,6 +185,8 @@ registerActions({
   'tab-ureme':  (el) => showTab('ureme', el),
   'tab-gorev':  (el) => showTab('gorev', el),
   'tab-gecmis': (el) => showTab('gecmis', el),
+  // Soy sekmesi (Task 7): göster + lazy-load tetik (ilk aktivasyonda RPC)
+  'tab-pedigree': (el) => { showTab('pedigree', el); if (typeof pedigreeTabActivated === 'function') pedigreeTabActivated(); },
 
   // ═══ KIZGINLIK ═══
   'kizginlik-ac': (el) => { acHayvan('k-hid', 'ac-khid'); el.focus(); },
