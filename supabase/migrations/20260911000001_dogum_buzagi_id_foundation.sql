@@ -14,7 +14,6 @@
 -- Replay-safe: her adim idempotent (column/constraint guard, IF NOT EXISTS index, OR REPLACE fn,
 -- backfill yalniz buzagi_id IS NULL satirlara yazar).
 
-BEGIN;
 
 -- (1) kolon + FK — SET NULL (Rev 2 duzeltme 1): calf silinirse dogum kaydi KALIR, bag NULL olur
 DO $mig$
@@ -242,4 +241,3 @@ BEGIN
 END
 $mig$;
 
-COMMIT;
