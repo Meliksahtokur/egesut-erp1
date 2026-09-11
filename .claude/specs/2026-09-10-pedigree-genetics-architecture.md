@@ -1,9 +1,32 @@
 # EgeSüt ERP — Pedigree, Soy Graph ve Genetik Katman Mimari Spec
 
-**Durum:** Tasarım / implementasyon öncesi spec — **REVİZYON 2**  
+**Durum:** Tasarım / implementasyon öncesi spec — **REVİZYON 3**  
 **İncelenen dump:** `egesut-dump.zip`, HEAD `a3d8bc2` (2026-09-09)  
 **Hedef:** Mevcut EgeSüt ERP üreme akışına, çiftlik hayvanları ile dış boğa/sperma soylarını aynı biyolojik graph üzerinde birleştiren; focal tree, ortak ata, akrabalık, inbreeding, founder/breed katkısı ve ileride genetik değerlendirme/çiftleşme skoru üretebilen bir katman eklemek.
 
+> **REVİZYON 3 (2026-09-11) — bağımsız dış review üzerinden küçültme + doğruluk:**
+>
+> 1. **FK sadeleştirme:** `pedigree_parentage`'den `parent_farm_id`/`child_farm_id`,
+>    `semen_catalog`'tan `bull_farm_id`, `genetic_evaluations`'dan `node_farm_id`
+>    kaldırıldı — her iki composite FK da tek `farm_id` üzerinden bağlanır; cross-farm
+>    kilidi birebir aynı, kolon tekrarı yok (§4.2-4.5).
+> 2. **Founder bildirimli:** `pedigree_nodes.founder_status`
+>    (`explicit_founder`/`ordinary`) eklendi; parent-edge'siz node otomatik founder
+>    DEĞİLDİR — "soy burada başlıyor" ile "atasını henüz bilmiyoruz" ayrıştı (§7.3).
+> 3. **v1'de IDB cache YOK:** Revizyon 2'nin IDB projection cache'i ve koruma
+>    protokolü (epoch/sekmeler-arası/logout fence'leri) tamamen çıkarıldı; v1
+>    yalnız oturumluk memory cache kullanır (§10). IDB cache ölçümle
+>    gerekçelenirse v2 tasarımıdır.
+> 4. **semen_id_onceki kaldırıldı:** boğa değişmezliği katalog tarafına taşındı —
+>    referans edilmiş `semen_catalog` satırının `bull_node_id`'si değişmez;
+>    geçmiş deneme kimlikleri `islem_log` snapshot'ında yaşar (§4.3-4.4).
+> 5. **Integrity kabul bürokrasisi sadeleşti:** G2 = blockers==0; warning/info
+>    bulguları read-only ağacı bloke etmez, per-finding owner-SQL kabul akışı
+>    v1'de yoktur (bkz. implementasyon planı Task 2.3).
+> 6. **Küçük doğruluk onarımları:** UI iki sekmeyle hizalandı (Akrabalık sekmesi
+>    yok), `sex` alanı için Erkek/Dişi ↔ male/female normalize kontratı eklendi (§4.1),
+>    `pedigree_meta` "domain şeması değil, operational metadata" olarak beyan edildi.
+>
 > **REVİZYON 2 (2026-09-10) — repo + canlı DB doğrulaması sonrası:**
 >
 > 1. **v1 kapsamı = Faz 0-10 karşılığı** (foundation → soy ağacı UI → semen/doğum
@@ -23,7 +46,8 @@
 >    yerleşimiyle açılır (0 ek byte); ELK yalnız mating overlay için lazy-load
 >    edilir (§9.2-9.3).
 > 5. **Offline kabulü gerçekçileştirildi**: app shell cold-start offline
->    değildir (SW stub); cache senaryosu "sekme açıkken ağ kesilmesi"dir (§10).
+>    değildir (SW stub); pedigree v1'de çevrimdışında yeni görünüm açılmaz
+>    (§10 — Revizyon 3 ile IDB cache de kalktı).
 > 6. **GT↔canlı drift kayıtlı** (`BUGS.md` SMELL-003): tracked ground truth
 >    rehberdir, canlı şema otoritedir; GT regen deploy sonrası ayrı adımdır.
 >
@@ -195,6 +219,11 @@ CREATE TABLE public.pedigree_nodes (
   birth_date        date NULL,
   country_code      text NULL,
 
+  founder_status    text NOT NULL DEFAULT 'ordinary'
+                    CHECK (founder_status IN ('explicit_founder','ordinary')),
+                    -- Revizyon 3: founder BİLDİRİMİDİR, çıkarım değil (§7.3) —
+                    -- parent-edge'siz her node otomatik founder DEĞİLDİR.
+
   metadata          jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now(),
@@ -212,7 +241,15 @@ Kurallar:
 
 - `node_kind='farm_animal'` ise `farm_animal_id` zorunlu.
 - Farm animal'ın ad/ırk/cinsiyetinin authoritative kaynağı `hayvanlar`; node'daki external alanlar kullanılmaz.
+- **`sex` canonical kontratı (Revizyon 3):** pedigree katmanı dahilinde
+  `sex='male'|'female'`; farm node'larda `hayvanlar` değerleri
+  (`Erkek`/`Dişi`) RPC tarafında normalize edilir (`Erkek→male`,
+  `Dişi→female`; bilinmeyen/boş `NULL` kalır). Sire/dam role-validasyonu
+  normalize edilmiş değer üzerinden yapılır — aksi hâlde farm hayvanlarında
+  sessizce çalışmaz.
 - `external_animal` Armada veya onun ataları için kullanılır.
+- `founder_status='explicit_founder'` node'a parent edge eklenemez (RPC
+  reddeder — §7.3); atası sonradan öğrenilirse önce `ordinary` yapılır.
 - Registry code biliniyorsa aynı dış hayvanın ikinci kez yaratılması engellenir. Bunun için `(farm_id, registry_system, registry_code)` üzerinde partial unique index önerilir.
 - `farm_id` zorunlu: bu graph çiftliğin operasyonel/genetik knowledge alanıdır ve `.harness/contract.md`'deki farm_id kuralının kapsamına girer (owner-local `.claude/farm-id-discipline.md` kopyası tracked değildir; otorite contract'tır).
 
@@ -225,10 +262,8 @@ CREATE TABLE public.pedigree_parentage (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   farm_id           uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
 
-  -- composite FK çiftleri: cross-farm edge DDL seviyesinde imkânsız (Revizyon 2)
-  parent_farm_id    uuid NOT NULL,
+  -- composite FK'ler tek farm_id üzerinden: cross-farm edge DDL seviyesinde imkânsız
   parent_node_id    uuid NOT NULL,
-  child_farm_id     uuid NOT NULL,
   child_node_id     uuid NOT NULL,
   parent_role       text NOT NULL CHECK (parent_role IN ('dam','sire')),
 
@@ -238,23 +273,24 @@ CREATE TABLE public.pedigree_parentage (
   confidence        numeric NOT NULL DEFAULT 1.0 CHECK (confidence >= 0 AND confidence <= 1),
   created_at        timestamptz NOT NULL DEFAULT now(),
 
-  FOREIGN KEY (parent_farm_id, parent_node_id)
+  FOREIGN KEY (farm_id, parent_node_id)
     REFERENCES public.pedigree_nodes(farm_id, id) ON DELETE CASCADE,
-  FOREIGN KEY (child_farm_id, child_node_id)
+  FOREIGN KEY (farm_id, child_node_id)
     REFERENCES public.pedigree_nodes(farm_id, id) ON DELETE CASCADE,
   CHECK (parent_node_id <> child_node_id),
-  CHECK (farm_id = parent_farm_id AND farm_id = child_farm_id),
   UNIQUE (farm_id, child_node_id, parent_role)
 );
 ```
 
-**Cross-farm enforcement (Revizyon 2, yapısal):** farm-scope yalnız RPC
-proseunde değil DDL'de taşınır — `pedigree_nodes` üzerinde `UNIQUE (farm_id, id)`
-bulunur; `pedigree_parentage` kolonları `(parent_farm_id, parent_node_id)` /
-`(child_farm_id, child_node_id)` çiftleri olarak tanımlanır ve
-`FOREIGN KEY (parent_farm_id, parent_node_id) REFERENCES pedigree_nodes(farm_id, id)`
-(aynısı child için) ile bağlanır. Böylece cross-farm edge DB seviyesinde
-imkânsızdır; RPC'deki same-farm check ikinci savunma katmanıdır. Ayrıca graph
+**Cross-farm enforcement (yapısal):** farm-scope yalnız RPC proseunde değil
+DDL'de taşınır — `pedigree_nodes` üzerinde `UNIQUE (farm_id, id)` bulunur;
+`pedigree_parentage`'in her iki FK'sı da `(farm_id, node_id)` çiftiyle
+`pedigree_nodes(farm_id, id)`'ye bağlanır. İki FK aynı `farm_id` değerini
+paylaştığı için cross-farm edge DB seviyesinde imkânsızdır; RPC'deki same-farm
+check ikinci savunma katmanıdır. **(Revizyon 3 sadeleştirmesi:** eski tasarım
+`parent_farm_id`/`child_farm_id` + eşitlik CHECK'i taşıyordu — aynı garantiyi
+satırda farm bilgisini üç kez tekrarlayarak veriyordu; tek `farm_id` + iki
+composite FK birebir aynı kilidi daha az kolonla sağlar.**)** Ayrıca graph
 tablolarına (`pedigree_nodes`, `pedigree_parentage`) doğrudan client GRANT'i
 verilmez — erişim yalnız RPC'dir (bkz. implementasyon planı Task 1.3).
 
@@ -277,13 +313,11 @@ Mevcut `stok` ile biyolojik sire kimliği arasındaki kontrollü köprü.
 CREATE TABLE public.semen_catalog (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   farm_id           uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
-  bull_farm_id      uuid NOT NULL,                    -- r3-N3: farm-scope ilişkisel kilit
-  bull_node_id      uuid NOT NULL,
+  bull_node_id      uuid NOT NULL,                    -- composite FK ile farm-scope kilitli (Revizyon 3: tek farm_id)
   stock_id          text NULL REFERENCES public.stok(id) ON DELETE SET NULL,
 
-  FOREIGN KEY (bull_farm_id, bull_node_id)
+  FOREIGN KEY (farm_id, bull_node_id)
     REFERENCES public.pedigree_nodes(farm_id, id),
-  CHECK (farm_id = bull_farm_id),                     -- r4-F14: satır kendi farm'ına kilitli
 
   code              text NULL,
   display_name      text NOT NULL,
@@ -299,19 +333,27 @@ CREATE TABLE public.semen_catalog (
 
 MVP varsayımı: mevcut bir `stok` sperma satırı tek semen catalog kaydına bağlanır. İleride batch/lot takibi gerekirse `semen_batches` ayrı tablo olarak eklenebilir; ilk fazda gereksizdir.
 
-**Guard'lar (r2-review):** `bull_node_id` bağlantısı composite FK ile farm-scope taşır
-(`(bull_farm_id, bull_node_id) → pedigree_nodes(farm_id, id)`) ve `semen_catalog_upsert`
+**Guard'lar:** `bull_node_id` bağlantısı composite FK ile farm-scope taşır
+(`(farm_id, bull_node_id) → pedigree_nodes(farm_id, id)`) ve `semen_catalog_upsert`
 RPC'sinde bull node `sex='male'` zorunluluğu ile `stock_id` varsa `stok.kategori='Sperma'`
 kontrolü yapılır — geçerli FK bile anlamsız bağ kuramaz.
+
+**Tarihsel değişmezlik (Revizyon 3, katalog tarafı):** bir `semen_catalog`
+satırı herhangi bir `tohumlama.semen_id` tarafından referans edildiyse
+`bull_node_id`'si **değişmez** (upsert reddeder; düzeltme gerekiyorsa yeni
+satır açılır, eski `active=false` yapılır). Geçmiş aşım denemelerinin semen
+kimliği `islem_log` snapshot'ında yaşar — `tohumlama` tablosunda `semen_id_onceki`
+gibi geçmiş kolonu taşınmaz (tek adımlık geçmiş DB modeline ara-state sokuyordu;
+tam deneme tarihi zaten bilinçli v2 kapsamı).
 
 ### 4.4 `tohumlama` genişletmesi
 
 ```sql
 ALTER TABLE public.tohumlama
-  ADD COLUMN semen_id uuid NULL REFERENCES public.semen_catalog(id),
-  ADD COLUMN semen_id_onceki uuid NULL REFERENCES public.semen_catalog(id);
-  -- semen_id_onceki (r3-N17): tekrar aşım p_force_semen ile kimlik değişince
-  -- eski kanonik değer buraya taşınır (tek adım zincir; tam deneme tarihi v2).
+  ADD COLUMN semen_id uuid NULL REFERENCES public.semen_catalog(id);
+  -- Revizyon 3: semen_id_onceki kolonu YOK — tekrar aşımda eski kimlik
+  -- islem_log snapshot'ında kalır; boğa değişmezliği katalog tarafında
+  -- (referans edilmiş satırın bull_node_id'si değişmez, §4.3) korunur.
 ```
 
 `tohumlama.sperma` hemen kaldırılmaz.
@@ -339,8 +381,7 @@ Armada gibi dış boğaların yayımlanmış genetik değerlerini pedigree metri
 CREATE TABLE public.genetic_evaluations (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   farm_id           uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e',
-  node_farm_id      uuid NOT NULL,                    -- r4-F15: tenant kilidi composite FK ile
-  node_id           uuid NOT NULL,
+  node_id           uuid NOT NULL,    -- composite FK ile tenant kilidi (Revizyon 3: tek farm_id)
 
   source             text NOT NULL,
   source_registry    text NULL,
@@ -353,9 +394,8 @@ CREATE TABLE public.genetic_evaluations (
   metadata           jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at         timestamptz NOT NULL DEFAULT now(),
 
-  FOREIGN KEY (node_farm_id, node_id)
+  FOREIGN KEY (farm_id, node_id)
     REFERENCES public.pedigree_nodes(farm_id, id) ON DELETE CASCADE,
-  CHECK (farm_id = node_farm_id),
 
   UNIQUE (farm_id, node_id, source, evaluation_date, trait_code)
 );
@@ -437,6 +477,14 @@ Yeni operational/genetic tablolar `.harness/contract.md`'deki farm_id disiplinin
 - grants/migration idempotency mevcut migration standartlarına uyar
 
 Bu spec multi-tenant ürünleştirme yapmıyor; fakat bugün yaratılan graph tablolarının yarın tenant migration'ını engellememesini garanti ediyor.
+
+### 4.9 `pedigree_meta` — operational metadata (domain şeması DEĞİL)
+
+Implementasyon planı Task 1.2b'nin yarattığı `pedigree_meta` (anahtar-değer:
+`semen_controlled_cutoff`, `op_owner_uid` vb.) **domain şeması değildir** —
+rollout kontrolü ve operatör bootstrap'ı için operational metadata'dır
+(Revizyon 3 beyanı). Soy grafının biyolojik modelinde yeri yoktur; DDL,
+RLS ve guard ayrıntıları plan Task 1.2b'nin otoritesindedir.
 
 ---
 
@@ -726,13 +774,18 @@ planı Task 21 bu kontratı okur.
 
 “Genetik havuz” için MVP'deki doğru kavram **expected founder contribution** olmalıdır.
 
-Algoritma — üç durumlu sınıflandırma kontratı ile (r5-F26):
+Algoritma — üç durumlu sınıflandırma kontratı ile (Revizyon 3: founder bildirimli):
 
 - Bilinen ancestry üzerinde geriye git.
-- **Kayıtlı founder:** graph'ta VAR olan (kimliği işlenmiş, parent-edge'siz) node
-  — katkısı o node'a yazılır (known founder).
-- **Bilinmeyen slot:** parent edge'i OLMAYAN boş slot — katkısı `unknown_share`
-  kovasına gider; o dalın depth-limit'e kadar TÜM alt slotları unknown sayılır.
+- **Bildirilmiş founder:** `founder_status='explicit_founder'` node — soy
+  burada **bilinerek** başlar; katkısı o node'a yazılır (known founder).
+  Explicit founder'a parent edge eklenemez (RPC reddeder; atası sonradan
+  öğrenilirse önce `founder_status='ordinary'` yapılır, sonra edge girilir).
+- **Ordinary + eksik parent slotu:** `founder_status='ordinary'` (varsayılan)
+  olan ve parent edge'i bulunmayan slot — o dalın kütlesi `unknown_share`
+  kovasına gider; traversal o node'da biter, alt slotlar üretilmez/şişirilmez.
+  "Atasını henüz bilmiyoruz" ile "soy burada başlıyor" böyle ayrışır: dış
+  boğa atası girilmemiş diye otomatik founder ilan edilmez.
 - **Derinlik sınırı:** limit ötesi kalan kütleye ulaşılamaz — `unknown_share`'e
   eklenir (beyond-depth bilinmiyor).
 - Her bilinen parent branch'e 0.5 aktar; aynı founder'a farklı yollardan gelen
@@ -905,8 +958,12 @@ vendor/cytoscape-elk.js
 #### Hayvan kartı → “Soy & Genetik”
 
 ```text
-[ Soy Ağacı ] [ Genetik ] [ Akrabalık ]
+[ Soy Ağacı ] [ Genetik ]
 ```
+
+(Akrabalık ayrı sekme DEĞİLDİR — Revizyon 3 hizalaması: akrabalık/F
+bilgisi tohumlama modalının mating precheck'inde ve Genetik sekmesinde
+yaşar; implementasyon planındaki iki-sekme düzenü esas alınır.)
 
 Soy Ağacı:
 
@@ -974,44 +1031,36 @@ cow ancestors ---- shared ancestor ---- bull ancestors
 
 ---
 
-## 10. IndexedDB / state / sync entegrasyonu
+## 10. State / sync entegrasyonu (Revizyon 3: v1'de IDB cache YOK)
 
-> **Revizyon 2 (offline gerçekçiliği):** app shell cold-start offline DEĞİLDİR
-> (service worker stub, README). Bu yüzden "internet yokken app açılır"
-> senaryosu yoktur; cache'in kabul senaryosu **sekme açıkken ağ kesilmesi**dir.
-> Çevrimiçi ikinci açılışta shell yüklendikten sonra son projection RPC'siz
-> sunulabilir (cache hit); **tam çevrimdışı ikinci açılış kabul senaryosu
-> değildir** (r2-N14). Asıl değer RPC trafiği ve veri hacmi korumasıdır.
+> **Revizyon 3 (cache küçültme):** v1'de pedigree için kalıcı/IDB önbellek
+> **yoktur**. Revizyon 2'nin IDB projection cache'i ve onu koruyan protokol
+> (globalThis generation + localStorage epoch + sekmeler-arası kapı + logout
+> fence + epoch karantinası) korumaya çalıştığı veriden daha karmaşık hâle
+> gelmişti; hepsi bu sürümde çıkarıldı. IDB projection cache ölçüm
+> gerektiriyorsa v2 tasarımıdır.
 
 Mevcut `pullFromSupabase()` `TABLES` listesindeki her şeyi full-pull yaptığı için external pedigree graph büyüdüğünde bütün graph'ı her sync'te çekmek yanlış olur.
 
-Bu feature **on-demand read model** kullanmalı.
-
-### 10.1 IDB
-
-Yeni dedicated stores:
+Bu feature **on-demand read model** kullanır:
 
 ```text
-pedigree_query_cache
-pedigree_entity_cache
+sekme açılırken RPC → render
+oturum-içi tekrarlar: feature-scope JS memory cache
 ```
 
-veya daha basit tek:
+### 10.1 Memory cache (oturumluk)
 
-```text
-pedigree_cache
-```
-
-key örneği (farm-scope önekli — r2-N4; çıkış/farm değişiminde store temizlenir):
-
-```text
-farm:<farm_id>:subgraph:<focusNode>:up4:down1:v3
-farm:<farm_id>:mating:<cow>:<semen>:depth6:v3
-```
-
-`DB_VER` implementasyon anında bir sonraki boş değere artırılır (dump'ta 24).
-
-Bu cache `TABLES` global full-pull listesine eklenmez.
+- Feature scope'unda tek `Map`; key `farm:<farm_id>:<rpc>:<focus>:<params>:v<algo>`
+  biçiminde. `DB_VER` artışı ve yeni IDB store **gerekmez**.
+- Pedigree-etkilen her write sonrası (dogum_kaydet, parentage düzeltmesi,
+  semen catalog değişimi) map TAMAMEN boşaltılır — hedefli invalidasyon
+  gerekmez; veri küçüktür, yeniden çekmek ucuzdur.
+- Logout / sekme kapanışı: `globalThis` ile birlikte doğal olarak ölür;
+  ek temizlik katmanı, epoch veya sekmeler-arası protokol yoktur.
+- Offline davranış: yeni görünüm isteği hata döner ve sekme bunu açıkça
+  gösterir — mevcut tohumlama RPC'lerinin offline'da reddedilmesiyle aynı
+  desendir. Zaten render edilmiş görünüm bellekte kalmaya devam eder.
 
 ### 10.2 State
 
@@ -1029,17 +1078,9 @@ Graph instance/controller kendi feature scope'unda yaşar.
 
 ### 10.3 RPC_TABLES
 
-Write RPC'leri graph tablolarını etkiliyorsa mapping güncellenir; ancak full table pull yerine pedigree cache invalidation hook'u tercih edilir.
-
-Örnek:
-
-```text
-dogum_kaydet success
-  -> mevcut operational pulls
-  -> invalidatePedigree(calf, dam, sire)
-```
-
-`dogum_kaydet` her doğumdan sonra binlerce graph row'unu çekmemelidir.
+Write RPC'leri graph tablolarını etkiler; full table pull ve IDB store
+yoktur — write sonrası gereken tek şey §10.1 memory cache'in
+boşaltılmasıdır. `dogum_kaydet` her doğumdan sonra graph row'u çekmez.
 
 ---
 
@@ -1182,10 +1223,10 @@ Yeni `tests/sql/pedigree_graph_test.sql`:
 - external/farm node class mapping
 - virtual proposed calf DB entity sanılmaz
 
-`tests/unit/pedigree-cache.test.js`:
+`tests/unit/pedigree-cache.test.js` (memory cache — Revizyon 3 ile IDB yok):
 
 - cache key/version
-- invalidation
+- write sonrası tam boşaltma
 - stale result kullanılmaması
 
 ### 14.3 E2E
@@ -1285,7 +1326,7 @@ Projede `fast-check` zaten var. Graph için değerlidir:
 | Frontend | mevcut Vanilla JS | korunur |
 | Graph render | Cytoscape.js | ekle |
 | Hierarchical layout | focal: Cytoscape `breadthfirst`; mating overlay: ELK layered (lazy-load, P4) | ekle |
-| Local cache | mevcut IndexedDB, on-demand pedigree cache | genişlet |
+| Local cache | oturumluk JS memory cache (Revizyon 3: IDB yok); semen_catalog normal IDB sync | sınırlı |
 | Test | mevcut Node + Playwright + fast-check + SQL fixtures | genişlet |
 | Graphology | yok | gerekmez |
 | Neo4j / AGE | yok | gerekmez |
@@ -1372,7 +1413,9 @@ tests/
 - graph üstünden doğrudan drag-drop parent değiştirme
 - bütün pedigree graph'ı her app sync'te download etme
 - tek “genetik kalite 0–100” puanı
-- deneme-başı tam semen kimlik tarihi (v1: tek adım `semen_id_onceki` zinciri; tam geçmiş bilinçli olarak v2 — r5-N17)
+- deneme-başı tam semen kimlik tarihi (v1: `islem_log` snapshot'ı yeterli;
+  deneme bazlı model `tohumlama_attempts` bilinçli olarak v2 — Revizyon 3,
+  `semen_id_onceki` ara-state'i kaldırıldı)
 
 Bunlar core modelin önünü kapatmadan sonradan eklenebilir.
 
