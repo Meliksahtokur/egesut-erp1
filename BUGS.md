@@ -57,6 +57,28 @@ değil) → `verified` (canlıda ölçüldü).
 - **Fix yönü:** gövdedeki text→uuid uyuşmazlığı düzeltilir; demo DB'de
   kırmızı-önce (reproduce) → fix → yeşil. PROD deploy ayrı kapıdır (owner).
 
+### BUG-004 — `gebelik_protokol_kontrol` Rota 1. doz görevini `etken_kod`'suz yazıyor [MEDIUM-HIGH] [data-fix uygulandı (907 vakası, 2026-09-11); durable migration owner kapısında]
+
+- **Kanıt (canlı gövde, 2026-09-11 root pg_get_functiondef):** ILERI_GEBE_ASI
+  '💉 Rota-Corona Aşısı (1. doz)' INSERT'i kolon listesinde `etken_kod` yok;
+  2. doz (düve) kolonunda `'ROTA_2DOZ'` var. Kapanış tetikleyicisi
+  `_gorev_dinle` `etken_kod = p_etken_kod` eşitliğiyle eşleşir → damgasız
+  görev hiçbir hızlı uygulama/uygulama_log yoluyla kapanamaz. Ademin/E Vit
+  INSERT'leri de damgasız.
+- **Belirti (907 vakası, 2026-09-11):** görev kapandı SANILDI ama açık kaldı
+  (Görevler + protokol uyarısı sinyal verdi); hızlı uygulama çift-tıkla 2 kez
+  yazıldı (15 sn arayla; RPC+UI dedup yoktu). Teşhis:
+  `.claude/idle-reports/2026-09-11-rota-907-tezhis.md`.
+- **Uygulanan PROD veri düzeltimi (root, owner talimatı, 2026-09-11):** Seçenek
+  A — 2× `hizli_uygulama_geri_al` (çift giriş geri alındı, stok iade +10) +
+  `ileri_gebe_asi_tamamla` (görev id ile kapatıldı, vaccination_log'a kanonik
+  5 ml IM kayıt + stok −5; rapel yok — inek). Sonuç: tek kayıt, stok 2→7,
+  scanner 907 uyarısı bitti. UI çift-gönderim guard'ı main'de (3 handler + 6
+  test).
+- **Durable fix (BEKLİYOR — owner):** üretici INSERT'lere `etken_kod`
+  ('ROTA'/'ADEMIN'/'E_VIT') + damgasız açık görevlere backfill (şablon teşhis
+  raporu §5). RPC-side hızlı uygulama dedup ayrı tasarım kararı.
+
 ---
 
 ## Smells (kayıt altında — araştırma/karar bekliyor, fix şimdi değil)
