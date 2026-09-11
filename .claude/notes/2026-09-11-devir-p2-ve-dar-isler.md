@@ -9,9 +9,13 @@
 
 | Koltuk | ws / terminal | Dal | Beklenen çıktı | Bekleyici (bg exec) | Timeout |
 |---|---|---|---|---|---|
-| **Lead GLM — P2 Ağaç** | `bf5382ed` / `3d53c3e8` | `idle/pedigree-p2` | `.claude/idle-reports/2026-09-11-pedigree-p2.md` | `exec_aa75fb4b` | 4 saat |
-| **W-ROTA (glmf) — 907 vakası** | `54af90b7` / `fc898451` | `idle/rota-907` | `.claude/idle-reports/2026-09-11-rota-907-tezhis.md` | `exec_c6df152f` | 3 saat |
-| **W-SAGLIK (glmf) — DB taraması** | `c31f3b35` / `7ddc70ab` | `idle/db-saglik` | `.claude/idle-reports/2026-09-11-db-saglik-taraması.md` | `exec_8e7fce3c` | 3 saat |
+| **Lead GLM — P2 Ağaç** | `bf5382ed` / `3d53c3e8` | `idle/pedigree-p2` | `.claude/idle-reports/2026-09-11-pedigree-p2.md` | `exec_2c2c412b` | 4 saat |
+| **W-ROTA (glmf) — 907 vakası** | `54af90b7` / `fc898451` | `idle/rota-907` | `.claude/idle-reports/2026-09-11-rota-907-tezhis.md` | `exec_3380c2c2` | 3 saat |
+| **W-SAGLIK (glmf) — DB taraması** | `c31f3b35` / `7ddc70ab` | `idle/db-saglik` | `.claude/idle-reports/2026-09-11-db-saglik-taraması.md` | `exec_7f9263a5` | 3 saat |
+
+Not (17:45): compact'ta eski bekleyiciler düştü; yeniden kuruldu. P2 lead
+işi W1/W2/W3'e böldü (dal `idle/pedigree-p2-W1/W2/W3`); W2 ilk teslini
+verdi (7c28a7d: pedigree-api + cytoscape + 18 test). W1/W3 uçuşta.
 
 Bekleyici ölçütü: **report-on-branch** (dosya dalda VAR). Yanlış-uyanma
 sınıfı: ara merge'ler `--base <eski-uc>` ile ateşler → uyanınca raporda
@@ -71,8 +75,9 @@ PROD deploy bu pakette onaylı DEĞİL; demo-only.
   yanlış exit 6). Manuel primitive'ler:
   `superset workspaces create --local --project 1dddb562-abe3-495c-970e-872567945510 --name <ws> --branch <dal> --base-branch main --agent <aid> --prompt "<rol+yol+IKISINI DE OKU>" --json`
   → wsid+tid al → `ss-write-binding …` → `ss-wait --report <repo-göreli yol> <dal>`
-  (arka plan, PATH önekiyle: `PATH="$HOME/.superset/bin:…"` — ss-wait'in
-  dürtmesi PATH'siz düşüyor).
+  (arka plan). **ÇAĞRI FORMU ÖNEMLİ (17:45 ölçümü): bg kabukta `PATH=… ss-wait`
+  öneki YUTULUYOR (exit 127) — çalışmayan form değil, mutlak yol + env kullan:
+  `env PATH="$HOME/.superset/bin:/home/melik/tools-bank/.superset/bin:/usr/local/bin:/usr/bin:/bin" /home/melik/tools-bank/scripts/ss-wait …`**
   Ajanlar: Lead GLM `b42b52e4`, Worker GLMF `8f36f1e5`, Worker Codex `4f0cbc5a`.
   `$HOME/.superset/bin` PATH'te değilse `superset` bulunmaz.
 - **Demo DB:** worktree `.env`'den `SUPABASE_DEMO_POOLER/_DB_PASSWORD/_REF`;
