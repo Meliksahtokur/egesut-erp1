@@ -182,6 +182,9 @@ postgres-language-server.jsonc
 !/.zcode/hooks/sql_migration_guard.py
 !/.zcode/hooks/ddl_refresh_guard.py
 !/.zcode/hooks/smoke_test.sh
+# 2026-09-11: pedigree Task 1.7 — migration dry-run kapısı tracked (plan Task 1.7)
+!scripts/db-dry-run.sh
+!scripts/refresh_lsp_schema.sh
 !/tests/harness/
 !/tests/harness/**/*.py
 !/.harness/bin/

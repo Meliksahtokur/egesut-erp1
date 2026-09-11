@@ -274,6 +274,8 @@ supabase link --project-ref <your-project-ref>
 supabase db push --include-all
 ```
 
+To pre-flight a migration against the local schema mirror without touching any live database: `bash scripts/db-dry-run.sh supabase/migrations/<file>.sql`.
+
 ### Run the tests
 ```bash
 npm install
