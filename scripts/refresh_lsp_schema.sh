@@ -13,7 +13,8 @@
 #   7) Sıralı yükle: tipler → tablolar → fonksiyonlar (2 geçiş) → view'lar.
 #   8) Sayım karşılaştırması + eksik raporu.
 #
-# Çıktı dosyaları (debug): ${TMPDIR:-/tmp}/refresh_lsp/*.sql (TMPDIR-uyumlu)
+# Çıktı dosyaları: tek kullanımlık mktemp -d dizininde yaşar, çıkışta trap ile
+# silinir (Task 1.7 + F8; kök: SS_TMP_ROOT → TMPDIR → hata, fallback yok).
 set -euo pipefail
 
 # ── ENV ────────────────────────────────────────────────────────────────
@@ -30,8 +31,14 @@ fi
 : "${SB_PROJECT_REF:=zqnexqbdfvbhlxzelzju}"
 : "${LOCAL_LSP_URL:?LOCAL_LSP_URL missing — .env'i kontrol et}"
 
-OUT_DIR="${TMPDIR:-/tmp}/refresh_lsp"
-mkdir -p "$OUT_DIR"
+# F8 (root-gate): sabit geçici kök fallback'i YOK — disk-tabanlı kök zorunlu.
+TMP_ROOT="${SS_TMP_ROOT:-${TMPDIR:-}}"
+if [[ -z "$TMP_ROOT" ]]; then
+  echo "❌ TMPDIR ya da SS_TMP_ROOT set değil — disk-tabanlı geçici kök gerekli (F8)." >&2
+  exit 78
+fi
+OUT_DIR=$(mktemp -d "$TMP_ROOT/refresh_lsp.XXXXXXXX")
+trap 'rm -rf "$OUT_DIR"' EXIT
 
 API="https://api.supabase.com/v1/projects/${SB_PROJECT_REF}/database/query"
 mgt_query() {

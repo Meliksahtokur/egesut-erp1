@@ -525,19 +525,21 @@ END;
 $fn$;
 
 -- ── 1.3 Grant'lar (fonksiyonlar — plan 1.3 listesi birebir) ───────────────
+-- F5 (root-gate): authenticated-only kontratı service_role'u da kapsar —
+-- default ACL yeni fonksiyona service_role=X veriyor; açık revoke şart.
 
 REVOKE ALL ON FUNCTION public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)
-  FROM PUBLIC, anon;
+  FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)
   TO authenticated;
 
 REVOKE ALL ON FUNCTION public.pedigree_external_upsert(text,uuid,text,text,date,text,text)
-  FROM PUBLIC, anon;
+  FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.pedigree_external_upsert(text,uuid,text,text,date,text,text)
   TO authenticated;
 
 REVOKE ALL ON FUNCTION public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)
-  FROM PUBLIC, anon;
+  FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)
   TO authenticated;
 

@@ -13,8 +13,9 @@
 # Kullanım:
 #   bash scripts/db-dry-run.sh <migration.sql>
 #
-# TMPDIR-uyumlu: tüm geçici çıktılar ${TMPDIR:-/tmp} altında mktemp ile
-# yaratılır; sabit /tmp yolu yoktur (Task 1.7, r2-A1).
+# TMPDIR uyumu (Task 1.7 + F8): geçici kök SS_TMP_ROOT → TMPDIR sırayla
+# çözülür; hiçbiri yoksa script HATA verir (kök yoksa fallback yoktur).
+# Tüm geçici dosyalar o köke mktemp'lenir, çıkışta trap ile silinir.
 #
 # Akış:
 #   1) refresh_lsp_schema.sh çağır (ayna taze olsun)
@@ -85,9 +86,13 @@ echo "════════════════════════�
 echo
 
 # ── 1) AYNA TAZELE ─────────────────────────────────────────────────────
-# TMPDIR uyumu (Task 1.7): sabit /tmp/dry-run-refresh.log yerine
-# ${TMPDIR:-/tmp} altında mktemp — makinenin tmpfs bütçesini şişirmez.
-REFRESH_LOG=$(mktemp "${TMPDIR:-/tmp}/dry-run-refresh.XXXXXX.log")
+# F8 (root-gate): kök çözümlemesi — SS_TMP_ROOT → TMPDIR → hata (fail-closed).
+TMP_ROOT="${SS_TMP_ROOT:-${TMPDIR:-}}"
+if [[ -z "$TMP_ROOT" ]]; then
+  echo "❌ TMPDIR ya da SS_TMP_ROOT set değil — disk-tabanlı geçici kök gerekli (F8)." >&2
+  exit 78
+fi
+REFRESH_LOG=$(mktemp "$TMP_ROOT/dry-run-refresh.XXXXXX.log")
 trap 'rm -f "${REFRESH_LOG:-}" "${OUT_TMP:-}" "${ERR_TMP:-}"' EXIT
 say "1/2 Neon aynası tazeleniyor (bayat ayna yanlış-pozitif verir)…"
 if bash "${SCRIPT_DIR}/refresh_lsp_schema.sh" >"$REFRESH_LOG" 2>&1; then
@@ -103,8 +108,8 @@ fi
 say "2/2 Migration Neon'da çalıştırılıyor (transaction içinde, rollback)…"
 
 # Geçici dosyalar
-OUT_TMP=$(mktemp)
-ERR_TMP=$(mktemp)
+OUT_TMP=$(mktemp "$TMP_ROOT/dry-run-out.XXXXXX")
+ERR_TMP=$(mktemp "$TMP_ROOT/dry-run-err.XXXXXX")
 
 # BEGIN/ROLLBACK tek psql çağrısıyla sar:
 #   -c "BEGIN;" -f migration.sql -c "ROLLBACK;"

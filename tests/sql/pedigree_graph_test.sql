@@ -340,6 +340,13 @@ BEGIN
   IF has_function_privilege('anon', 'public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)', 'EXECUTE') THEN
     RAISE EXCEPTION 'C17: anon semen_catalog_upsert EXECUTE almis';
   END IF;
+  -- F5 (root-gate): service_role da kapali — authenticated-only kontratı
+  IF has_function_privilege('service_role', 'public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)', 'EXECUTE')
+     OR has_function_privilege('service_role', 'public.pedigree_external_upsert(text,uuid,text,text,date,text,text)', 'EXECUTE')
+     OR has_function_privilege('service_role', 'public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'C17/F5: service_role public RPC EXECUTE almis (authenticated-only ihlali)';
+  END IF;
+
   -- INTERNAL core: kimse cagiramaz
   IF has_function_privilege('anon', 'public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb)', 'EXECUTE')
