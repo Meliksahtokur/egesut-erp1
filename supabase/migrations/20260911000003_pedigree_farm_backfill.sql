@@ -175,7 +175,8 @@ DECLARE
   v_cutoff_state   text;      -- 'ok' | 'tanimsiz' | 'gecersiz'
   v_has_semen_col  boolean;
   v_static_groups  jsonb;
-  v_dyn_group      jsonb;
+  v_pc_count       integer;
+  v_pc_items       jsonb;
   v_groups         jsonb;
   v_ordered        jsonb;
 BEGIN
@@ -439,20 +440,24 @@ BEGIN
   -- post_cutoff_null_semen (blocker; r12-F68 ayırım kuralı): yalnız sperma dolu
   -- + semen_id NULL satırlar ihlaldir. Dinamik SQL: kolon Task 10'da iner; kolon
   -- yoksa grup atlanır (cutoff tanimsizken de atlanır — emisyon kuralı).
+  -- F1 (root-gate tur-1): jsonb_build_object NULL döndürmediği için sıfır ihlalde
+  -- bile grup items:null ile emit ediliyordu → sayım guard'ı: grup YALNIZ >=1
+  -- ihlal satırında oluşturulur/eklenir (absent-group kuralı).
   IF v_cutoff_state = 'ok' AND v_has_semen_col THEN
     EXECUTE $q$
-      SELECT jsonb_build_object('code', 'post_cutoff_null_semen', 'severity', 'blocker',
-        'items', jsonb_agg(jsonb_build_object(
-                    'key', t.id::text,
-                    'detail', 'created_at > cutoff, sperma=' || t.sperma)
-                  ORDER BY t.id::text))
+      SELECT count(*),
+             jsonb_agg(jsonb_build_object(
+                        'key', t.id::text,
+                        'detail', 'created_at > cutoff, sperma=' || t.sperma)
+                      ORDER BY t.id::text)
         FROM public.tohumlama t
        WHERE t.created_at > $1
          AND t.semen_id IS NULL
          AND t.sperma IS NOT NULL AND btrim(t.sperma) <> ''
-    $q$ INTO v_dyn_group USING v_cutoff_ts;
-    IF v_dyn_group IS NOT NULL THEN
-      v_groups := v_groups || jsonb_build_array(v_dyn_group);
+    $q$ INTO v_pc_count, v_pc_items USING v_cutoff_ts;
+    IF v_pc_count > 0 THEN
+      v_groups := v_groups || jsonb_build_array(jsonb_build_object(
+        'code', 'post_cutoff_null_semen', 'severity', 'blocker', 'items', v_pc_items));
     END IF;
   END IF;
 
@@ -473,7 +478,11 @@ END;
 $fn$;
 
 -- Plan 1.3 envanteri: Task 2'nin grant'i BU migration'dadır.
+-- F5 (root-gate tur-1): service_role EXECUTE'i açıkça geri alınır — ölçülmüş
+-- demo default ACL'si fonksiyonlara service_role veriyor (W2 F1/F2 ile aynı
+-- gerçek; PUBLIC revoke'a rağmen service_role'da kalıyor).
 REVOKE ALL ON FUNCTION public.pedigree_integrity_report() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.pedigree_integrity_report() FROM service_role;
 GRANT EXECUTE ON FUNCTION public.pedigree_integrity_report() TO authenticated;
 
 -- ── Migration uygulaması: backfill'i bir kez koştur (idempotent — replay'te ─
