@@ -1,6 +1,7 @@
 # Teklif — `dogum.buzagi_id`: doğum→buzağı kimlik bağının sezgelden kolona alınması
 
-**Durum:** Dış review KABUL (2026-09-11) + 3 düzeltme uygulandı — owner'ın nihai onayı bekliyor  
+**Durum:** **KABUL EDİLDİ — owner onayı 2026-09-11** ("kabul"); P1 Task 0
+olarak uygulanacak (dış review Rev-2 düzeltmeleri işlendi)  
 **Tarih:** 2026-09-11 (Revizyon 3 ile, pedigree implementasyon planı D7; aynı gün Rev 2 düzeltmeleri)  
 **Kaynak:** Bağımsız dış review + root değerlendirmesi  
 **Dokunulan canlı yüzey:** `dogum` tablosu + `dogum_kaydet` RPC + `geri_al` uyumu
@@ -129,7 +130,6 @@ P1 / Task 1 — pedigree foundation
 P1 / Task 2 — konservatif backfill + integrity entegrasyonu
 ```
 
-- [ ] **KABUL** — P1 Task 0 olarak uygula (dış review KABUL etti, 3 Rev-2
-      düzeltmesi işlendi: SET NULL + partial unique + konservatif backfill;
-      nihai onay owner'ın)
+- [x] **KABUL** — owner onayı 2026-09-11; P1 Task 0 olarak uygula
+      (SET NULL + partial unique + konservatif backfill Rev-2 düzeltmeleriyle)
 - [ ] **RET** — v2 bandına bırak, plan değişmez

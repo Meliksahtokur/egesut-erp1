@@ -29,7 +29,9 @@
 >    okur (Task 8, Task 2.3).
 > 8. **`dogum.buzagi_id` teklifi:** P1 öncesi ayrı owner-kapılı teklif olarak
 >    öne alındı (`.claude/specs/2026-09-11-dogum-buzagi-id-teklif.md`) —
->    kabul edilirse calf-join sezgeli Task 4.3/9'dan tamamen düşer.
+>    **owner KABUL etti (2026-09-11)**: Task 0.5 + gate G0b eklendi,
+>    calf-join sezgeli Task 2.3/2.2'den düştü, kod evrenine
+>    `dogum_buzagi_missing` (info) girdi.
 >
 > **ROOT KABUL KARARI (2026-09-10):** Bu plan 12 bağımsız luna max review turundan
 
@@ -162,7 +164,7 @@ Fazlar 4 teslim paketine eşlenir; her paket kendi migration seti + testleri +
 demo gösterimiyle kapanır (owner demo-onaylı merge akışı):
 
 ```text
-P1 Temel   = Faz 0-2   (foundation + backfill + integrity raporu)   — demo: rapor
+P1 Temel   = Faz 0-2 + Task 0.5 (buzagi_id foundation + foundation + backfill + integrity raporu) — demo: rapor
 P2 Ağaç    = Faz 3-4   (projection RPC + cache + Soy tabı UI)       — demo: soy ağacı
 P3 Üreme   = Faz 5-7   (semen identity + kontrollü write + doğum)   — demo: buzağı soyu
 P4 Analiz  = Faz 8-10  (kinship + precheck + founder/breed havuzu)  — demo: precheck
@@ -181,22 +183,17 @@ completeness on-demand RPC hesabıdır (yanıtlar `algorithm_version` taşır).
 dirty-descendant queue ancak ölçümle gerekçelenirse v2'de eklenir. Task 14 ve
 Task 19'un cache kısımları v2 bandına alınmıştır.
 
-### D7 — `dogum.buzagi_id` önerisi: P1 ÖNCESİ owner-kapılı teklif (Revizyon 3)
+### D7 — `dogum.buzagi_id`: **KABUL EDİLDİ** (owner, 2026-09-11)
 
 Revizyon 2 bu kolonu v2 borcuna atmıştı; bağımsız dış review'un haklı
-itirazıyla **ayrı teklif dosyasına** alındı: `.claude/specs/2026-09-11-dogum-buzagi-id-teklif.md`.
-Gerekçe kısa: buzağı kimliğini kupe-recycle sezgelinden (Task 2.3
-`dogum_anne_graph_dam_celiskisi` join'i + Task 9 maternal backfill predikatı)
-kurtaran tek kolon; `dogum_kaydet` zaten buzağı `hayvanlar.id`'yi üretirken
-aynı transaction'da yazması bedava. **Canlı `dogum_kaydet` RPC'sine
-dokunduğu için kararı owner verir** (teklif dosyasında etki analizi +
-ret durumunda fallback). Ret edilirse plan aynen sezgeliyle yürür; kabul
-edilirse Task 2.3/9'daki join'ler `buzagi_id`'ye iner ve teklif kendi
-migration task'ı olarak P1'in ilk maddesi olur. **Kontrat detayı teklif
-dosyasındadır (Rev 2):** `ON DELETE SET NULL` + partial unique index
-`(buzagi_id) WHERE NOT NULL` + konservatif backfill (yalnız exact+unique
-eşleşme yazılır, gerisi NULL+warning — sezgeli ranking en fazla
-`suggested_candidate`).
+itirazıyla **ayrı teklif dosyasına** alındı ve **owner KABUL etti**:
+`.claude/specs/2026-09-11-dogum-buzagi-id-teklif.md` (Rev 2 — SET NULL +
+partial unique + konservatif backfill). Gerekçe: buzağı kimliğini
+kupe-recycle sezgelinden kurtaran tek kolon; `dogum_kaydet` zaten buzağı
+`hayvanlar.id`'yi üretirken aynı transaction'da yazması bedava.
+**Yürürlük:** Task 0.5 (foundation, gate G0b) → Task 1 → Task 2 sırasıyla;
+Task 2.2 maternal backfill ve Task 2.3 integrity join'i `buzagi_id` FK'sından
+okur; kod evrenine `dogum_buzagi_missing` (info) eklendi.
 
 ---
 
@@ -338,6 +335,46 @@ yakalama, **implementasyon öncesi** üretilen girdilerdir — bu plandaki
 eksiklikleri doküman kusuru değil, **beklenen açık girdi** durumudur. Her biri
 kanıt dosyasına veya D-bölümüne tarihli işlenmeden ilgili fazın zarfı
 yazılamaz; produce edilen her girdi kanıt zincirine girer.
+
+## Task 0.5 — `dogum.buzagi_id` foundation (KABUL — owner 2026-09-11)
+
+**Otorite:** `.claude/specs/2026-09-11-dogum-buzagi-id-teklif.md` (Rev 2). Bu
+task teklifin §2/§2b kontratını birebir uygular; pedigree migration'ından
+ÖNCE ayrı migration olarak gider (dış review onaylı sıra: Task 0.5 → Task 1 →
+Task 2).
+
+**Create:**
+
+```text
+supabase/migrations/<next-free>_dogum_buzagi_id_foundation.sql
+tests/sql/dogum_buzagi_id_test.sql
+```
+
+İçerik:
+
+1. `ALTER TABLE public.dogum ADD COLUMN buzagi_id text NULL REFERENCES
+   public.hayvanlar(id) ON DELETE SET NULL` (hayvanlar.id text — canlı S4).
+2. `CREATE UNIQUE INDEX dogum_buzagi_id_uidx ON public.dogum (buzagi_id)
+   WHERE buzagi_id IS NOT NULL` — iki doğum satırı aynı calf'i claim edemez;
+   calf→dogum lookup'ı bu index'ten gelir.
+3. `dogum_kaydet` aynı transaction içinde yazar (mevcut RPC sırası dogum
+   önce ise: `INSERT dogum (buzagi_id NULL) RETURNING id` → `INSERT hayvanlar
+   ... RETURNING id` → `UPDATE dogum SET buzagi_id=...` — atomicity korunur).
+4. **Konservatif backfill** (§2b): yalnız `kupe exact + dogum.tarih ==
+   hayvanlar.dogum_tarihi + TEK aday` → AUTO yaz; çok-aday / tarih-uyumsuz /
+   aday-yok → NULL bırak. Backfill raporu auto/cok-aday/tarih-uyumsuz/aday-yok
+   sayaçlarını yazar (owner'a sunulur). Eski 4 kriterli ranking en fazla
+   `suggested_candidate` önerisidir — FK'ya yazmaz.
+5. `geri_al` uyumu: SET NULL sayesinde calf DELETE'i FK'i kendisi temizler;
+   prosedürel null'lama YOK.
+
+**Test (tests/sql/dogum_buzagi_id_test.sql):** unique ihlali reddi (aynı
+buzagi_id iki satırda), SET NULL davranışı (calf DELETE → dogum kalır +
+buzagi_id NULL), konservatif backfill'in 4 sınıfı, `dogum_kaydet`'in aynı
+transaction yazımı.
+
+**Gate G0b:** bu testler yeşil + backfill raporu owner'da → pedigree
+foundation (Task 1) açılır.
 
 ---
 
@@ -691,24 +728,25 @@ oluştur.
 
 `anne_id` değeri gerçek `hayvanlar.id` ile resolve olmayan satırları otomatik node’a dönüştürme; integrity report’a bırak.
 
-**Dışlama kuralı (r5-F23, r6-F31 ile kesin predicate):** "güvenli" koşul tam
-SQL ile budur — edge yalnız şu koşulda yaratılır:
+**Dışlama kuralı (r5-F23, r6-F31; buzazi_id KABUL'üyle sadeleşti):** "güvenli"
+koşul tam SQL ile budur — edge yalnız şu koşulda yaratılır:
 
 ```sql
 c.anne_id IS NOT NULL
 AND EXISTS (SELECT 1 FROM hayvanlar p WHERE p.id = c.anne_id)          -- dam mevcut
 AND c.dogum_tarihi IS NOT NULL                                          -- tarih kanıtı zorunlu
 AND EXISTS (SELECT 1 FROM dogum d
-             WHERE d.anne_id = c.anne_id
-               AND d.yavru_kupe = c.kupe_no                             -- r12-F66: child’in KENDİ doğum olayı
-               AND d.tarih <= c.dogum_tarihi)                           -- S8’in ölçtüğü temporal koşul
+             WHERE d.buzagi_id = c.id                                    -- child'in KENDİ doğum satırı: FK üzerinden (Task 0.5)
+               AND d.anne_id = c.anne_id                                 -- farm kaydı ile doğum kaydı aynı dam
+               AND d.tarih <= c.dogum_tarihi)                            -- S8'in ölçtüğü temporal koşul
 ```
 
-Bu S8’in `NOT EXISTS` ölçümüyle birebir aynı sınıflandırmadır (dam’in geç bir
+Eski `d.yavru_kupe = c.kupe_no` join'i **kaldırıldı** — çocuk kimliği artık
+`dogum.buzagi_id` FK'sından gelir (kupe recycle bu yolda sorun olmaktan çıktı).
+Bu yine S8'in `NOT EXISTS` ölçümüyle aynı sınıflandırmadır (dam'in geç bir
 kayıtı, daha erken geçerli bir kaydı geçersiz KILMAZ). İkinci EXISTS
-**child’in KENDİ doğum olayına bağlanır** (r12-F66): `d.yavru_kupe = c.kupe_no`
-koşulu eklenmiştir — çocuğun kimliğiyle eşleşmeyen, dam’in herhangi eski bir
-doğumu "güvenli" edge ÜRETEMEZ. İki dışlama sınıfı:
+**child'in KENDİ doğum satırına** bağlanır: çocuğun kimliğiyle eşleşmeyen,
+dam'in herhangi eski bir doğumu "güvenli" edge ÜRETEMEZ. İki dışlama sınıfı:
 `maternal_tarihsel_uyumsuz` (dam var, tarihli, ama çocuğun kendi doğum kaydı
 erken-değil/hiç yok → blocker) ve `maternal_tarih_bilinmiyor`
 (child.dogum_tarihi NULL → warning; edge yaratılmaz). "En geç kayıt" yorumu
@@ -734,7 +772,8 @@ role_sex_contradiction, duplicate_registry, legacy_semen_no_mapping,
 cycle_count, parent_born_after_child, maternal_tarihsel_uyumsuz,
 maternal_tarih_bilinmiyor, legacy_anne_graph_dam_celiskisi,
 dogum_anne_graph_dam_celiskisi, suspiciously_young_parent,
-post_cutoff_null_semen, cutoff_invalid` — 17 kod.
+post_cutoff_null_semen, cutoff_invalid, dogum_buzagi_missing` — 18 kod
+(buzazi_id KABUL'üyle info sınıfı eklendi).
 
 **Emisyon kuralları (r10-F53):** (a) bulgusu olmayan grup HİÇ emit edilmez
 (yokluk = sıfır); (b) sayım anlamlı gruplarda (`post_cutoff_null_semen`) her
@@ -748,7 +787,7 @@ ihlaldir (bir sperm ADI var ama katalog bağlanmamış). `sperma` NULL/boş olan
 satırlar bilinçli unknown-sire gebeliğidir (gebelik `_semen` RPC'si p_semen_id
 NULL'da sperma'yı da NULL yazar) — ihlal DEĞİL, emit edilmez.
 
-**17 kodun tam predikat tablosu (r12-F69 — hepsi tek yerde, key = kimlik):**
+**18 kodun tam predikat tablosu (r12-F69 — hepsi tek yerde, key = kimlik):**
 
 ```text
 farm_animal_node_eksik      hayvanlar.id'si için pedigree_nodes(farm_animal) yok; key=hayvan_id
@@ -767,6 +806,7 @@ legacy_anne_graph_dam_celiskisi / dogum_anne_graph_dam_celiskisi / suspiciously_
                             yukarıdaki predikat blokları (r10-F48 + r12-F66/F67 düzeltmeleriyle)
 post_cutoff_null_semen      yukarıdaki ayrım kuralıyla; key=tohumlama.id
 cutoff_invalid              pedigree_meta cutoff cast NULL (helper); key="cutoff"
+dogum_buzagi_missing        dogum.buzagi_id IS NULL (Task 0.5 konservatif backfill eşleşmemiş legacy satır); key=dogum.id
 ```
 - post-cutoff tohumlama satırlarında `semen_id IS NULL` sayısı (cutoff = `pedigree_meta` tablosundaki `semen_controlled_cutoff` değeri — tablo Task 1'de yaratılır, bu migration yalnızca okur)
 
@@ -804,7 +844,7 @@ warning: farm_animal_node_eksik, unresolved_anne_id, child_without_dam,
          legacy_anne_graph_dam_celiskisi,   -- r8-F44: hayvanlar.anne_id dam'i ile graph dam edge'i farklı
          dogum_anne_graph_dam_celiskisi,    -- r8-F44: dogum.anne_id ile graph dam farklı
          suspiciously_young_parent          -- r8-F44: child doğumunda parent yaşı < 18 ay (548 gün)
-info:    unresolved_baba_bilgi, child_without_sire
+info:    unresolved_baba_bilgi, child_without_sire, dogum_buzagi_missing
 ```
 
 **Yeni üç kontrolün predikat kontratı (r9-F48):**
@@ -831,23 +871,14 @@ suspiciously_young_parent:
   key = "<child_hayvan_id>:<parent_role>"; detail = "parent <node> yaşı <gün> gün".
   Tarihlerden herhangi biri NULL → bulgu YOK.
 
-dogum_anne_graph_dam_celiskisi (join ifadesi — r10-F48, r11-F48 deterministik):
-  dogum satırının buzağı node'u — kupe recycle (domain kuralı: benzersizlik
-  yalnız aktif+dolu küpede) nedeniyle SKALER alt sorgu DETERMİNİSTİK
-  sıralanmalıdır:
-    pedigree_nodes.farm_animal_id = (
-      SELECT h.id FROM hayvanlar h
-      WHERE h.kupe_no = dogum.yavru_kupe
-      ORDER BY (h.dogum_tarihi = dogum.tarih) DESC NULLS LAST,  -- r12-F67: NULL'lar HİÇ öne geçmesin
-               (h.durum = 'Aktif') DESC,
-               h.dogum_tarihi DESC NULLS LAST,
-               h.id                                       -- son kırbaç: deterministik
-      LIMIT 1)
-  kupe eşleşmesi hiç yoksa bulgu YOK. (Revizyon 3 notu: `dogum.buzagi_id`
-  kolonu bu sezgeli tamamen kaldırır — ayrı owner-kapılı teklif:
-  `.claude/specs/2026-09-11-dogum-buzagi-id-teklif.md`; kabul edilirse bu
-  join birebir `dogum.buzagi_id`'ye iner.)
+dogum_anne_graph_dam_celiskisi (join ifadesi — buzagi_id KABUL sonrası):
+  dogum satırının buzağı node'u doğrudan FK'dan çözülür:
+    pedigree_nodes.farm_animal_id = dogum.buzagi_id
   Karşılaştırma: dogum.anne_id → dam node vs buzağı node'unun graph dam edge'i.
+  buzagi_id NULL (Task 0.5 konservatif backfill eşleşmemiş legacy satır) →
+  bu grupta bulgu YOK; satır `dogum_buzagi_missing` (info) altında görünür
+  kalır. Kupe-recycle sıralı skaler alt sorgu KALDIRILDI (Revizyon 3'te
+  teklif kabulüne koşullu duruyordu; owner KABUL 2026-09-11 ile yürürlükte).
   Parent tarih kaynağı (tek ifade): farm node → hayvanlar.dogum_tarihi,
   external node → pedigree_nodes.birth_date; COALESCE(h.dogum_tarihi, pn.birth_date).
 ```
@@ -2166,6 +2197,7 @@ tests/
 | Gate | Açılması için şart | Sonraki kabiliyet |
 |---|---|---|
 | G0 | baseline + live inventory | migration başlat |
+| G0b | Task 0.5 buzazi_id foundation testleri yeşil (SET NULL + unique + konservatif backfill) + backfill raporu owner'da | pedigree foundation (Task 1) |
 | G1 | graph schema invariant tests green | farm backfill |
 | G2 | Task 2.3 makine kuralının birebir kendisi: emit edilen tüm gruplarda blocker item=0 (Revizyon 3: warning/info kabul gerektirmez, ağacı bloke etmez) — tek gösterim, rollout satırı ayrı yorum taşıMAZ | read projection |
 | G3 | subgraph RPC + offline cache green | Soy UI |
