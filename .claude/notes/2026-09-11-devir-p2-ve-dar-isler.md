@@ -5,17 +5,26 @@
 
 ---
 
-## 1. Aktif ağ (3 koltuk + bekleyiciler)
+## 1. Aktif ağ
 
 | Koltuk | ws / terminal | Dal | Beklenen çıktı | Bekleyici (bg exec) | Timeout |
 |---|---|---|---|---|---|
 | **Lead GLM — P2 Ağaç** | `bf5382ed` / `3d53c3e8` | `idle/pedigree-p2` | `.claude/idle-reports/2026-09-11-pedigree-p2.md` | `exec_2c2c412b` | 4 saat |
-| **W-ROTA (glmf) — 907 vakası** | `54af90b7` / `fc898451` | `idle/rota-907` | `.claude/idle-reports/2026-09-11-rota-907-tezhis.md` | `exec_3380c2c2` | 3 saat |
-| **W-SAGLIK (glmf) — DB taraması** | `c31f3b35` / `7ddc70ab` | `idle/db-saglik` | `.claude/idle-reports/2026-09-11-db-saglik-taraması.md` | `exec_7f9263a5` | 3 saat |
 
-Not (17:45): compact'ta eski bekleyiciler düştü; yeniden kuruldu. P2 lead
-işi W1/W2/W3'e böldü (dal `idle/pedigree-p2-W1/W2/W3`); W2 ilk teslini
-verdi (7c28a7d: pedigree-api + cytoscape + 18 test). W1/W3 uçuşta.
+P2 lead işi W1/W2/W3'e böldü (`idle/pedigree-p2-W1/W2/W3`); üç worker da
+ara-teslim verdi (W2: 7c28a7d api+cytoscape; W1: 6e49a22 RPC; W3: 1b4c3cb UI).
+Lead entegrasyon + luna review aşamasında.
+
+**KAPANAN LANELER (2026-09-11 akşam):**
+- **W-SAGLIK:** rapor teslim + root PROD probeleri (P1–P8) rapora eklendi;
+  merge `11cd079`, workspace+dal kapatıldı. Ana bulgular: BF-1 (872 dangling
+  tohumlama audit) PROD'da birebir; PROD açık gecikmiş görev yalnız 8 (demo
+  272 = E2E artığı); E2E sızması 0; 40 zombi protokol; 12 negatif stok.
+- **W-ROTA:** teşhis `f349539` (etken_kod'suz üretici BUG-004), UI çift-gönderim
+  guard'ı merge `c07f54f`; **907 PROD veri düzeltimi ROOT TARAFINDAN
+  UYGULANDI** (Seçenek A: 2×`hizli_uygulama_geri_al` + `ileri_gebe_asi_tamamla`
+  → tek vaccination_log kaydı 93dcb05d, görev kapalı, stok 2→7, scanner temiz,
+  rapel yok). BUGS.md BUG-004 kayıtlı (4c55687).
 
 Bekleyici ölçütü: **report-on-branch** (dosya dalda VAR). Yanlış-uyanma
 sınıfı: ara merge'ler `--base <eski-uc>` ile ateşler → uyanınca raporda
@@ -51,9 +60,16 @@ PROD deploy bu pakette onaylı DEĞİL; demo-only.
 
 1. **PROD deploy — 6 migration** (net emir BEKLİYOR; sıra: `20260910000001-3`
    bugfix → `20260911000001-3` pedigree). Hepsi additive/replay-safe.
-2. **907 PROD veri düzeltimi** — W-ROTA planı gelince uygula (owner talimatı var).
-3. 2 maternal blocker + 13 child_without_dam (P1 veri-kalitesi bulguları) — owner.
-4. tools-bank 2 altyapı bug'ı (ss-dispatch `_repo` yanlış repo ölçüyor;
+2. ~~907 PROD veri düzeltimi~~ **UYGULANDI** (2026-09-11, Seçenek A — bkz. §1).
+3. **BUG-004 durable fix** (YENİ): `gebelik_protokol_kontrol` üreticisine
+   etken_kod damgası ('ROTA'/'ADEMIN'/'E_VIT') + damgasız açık görev backfill
+   (şablon: rota-907-tezhis.md §5). Migration yazımı + deploy owner emriyle.
+   RPC-side hızlı uygulama dedup ayrı tasarım kararı.
+4. 2 maternal blocker + 13 child_without_dam (P1 veri-kalitesi bulguları) — owner.
+5. DB sağlık taraması takip listesi (db-saglik-taraması.md): BF-1 data-fix
+   kararı (872 satır), 40 zombi protokol elle kapatma listesi, negatif stok
+   kalemleri review'ı — hepsi owner.
+6. tools-bank 2 altyapı bug'ı (ss-dispatch `_repo` yanlış repo ölçüyor;
    ss-wait `superset` PATH'siz) — tools-bank şeridi, bizim turda düzeltilmez.
 
 ## 4. Şerit kuralları (owner direktifi 2026-09-11 = plan Rev 3.1, BAĞLAYICI)
