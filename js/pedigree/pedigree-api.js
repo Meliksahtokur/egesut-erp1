@@ -60,9 +60,12 @@ function _pedigreeCacheKey(rpcName, focus, params) {
     JSON.stringify(sorted) + ':v' + PEDIGREE_ALGO_VERSION;
 }
 
-// meta.cached mührü (W2-fix) — yalnız DÖNÜŞ sınırında uygulanır; saklanan
+// meta.cached mührü (W2-fix; kapsam W2-fix2'de daraldı) — yalnız PROJECTION
+// payload'larında (subgraph*) ve yalnız DÖNÜŞ sınırında uygulanır; saklanan
 // snapshot W1 RPC kontratından (ancestor_depth/descendant_depth/truncated)
 // bozulmadan kalır. Ağdan gelenlerde false, cache'ten servis edilenlerde true.
+// integrityReport() mühürsüz — P1 kontratı (cutoff/generated_at/groups)
+// üst-düzey meta eklemeden korunur (luna F5).
 function _sealCached(payload, cached) {
   if (payload && !Array.isArray(payload) && typeof payload === 'object') {
     if (!payload.meta || typeof payload.meta !== 'object') payload.meta = {};
@@ -71,22 +74,31 @@ function _sealCached(payload, cached) {
   return payload;
 }
 
-// Ortak akış (W2-fix, cache-first — lead demo kapısı ölçümü: 3 açılışta 3 RPC
-// atılıyordu; goal G5 "zaten açılmış görünüm memory cache'ten" ONLİNE'da
-// karşılanmalı): sıcak anahtar ağa HİÇ gitmez; ağ yalnız cache miss'te denenir.
-// Miss + ağ hatası → rpc()'nin açık çevrimdışı hatası aynen yükselir
-// ('İnternet bağlantısı gerekli' / _trErr 'Sunucuya ulaşılamıyor').
-// Savunma kopyaları (review bulgusu) korunur: çağıran (W3 adapter — cytoscape
-// element dönüşümü) payload'ı mutate edebilir; cache ve çağıran bağımsız
-// kopyalar alır.
-async function _pedigreeFetchCached(rpcName, focus, params) {
+// Revizyon sayacı (luna F4 fence): invalidateCache TAM boşaltma + sayaç artışı
+// yapar. In-flight bir isteğin geç dönen yanıtı, beklediği sırada invalidation
+// olduysa (sayaç değiştiyse) cache'e YAZILMAZ — bayat yanıt önbelleği
+// dolduramaz, çağırana ağ sonucu olarak döner.
+let PEDIGREE_CACHE_REVISION = 0;
+
+// Ortak akış (cache-first — lead demo kapısı ölçümü; fence luna F4):
+// sıcak anahtar ağa HİÇ gitmez; ağ yalnız cache miss'te denenir.
+// Miss + ağ hatası → rpc()'nin açık çevrimdışı hatası aynen yükselir.
+// sealable: projection çağrıları true (meta.cached mührü), integrityReport
+// false (kontrat şekli). Savunma kopyaları korunur: çağıran (W3 adapter)
+// payload'ı mutate edebilir; cache ve çağıran bağımsız kopyalar alır.
+async function _pedigreeFetchCached(rpcName, focus, params, sealable) {
   const key = _pedigreeCacheKey(rpcName, focus, params);
   if (PEDIGREE_CACHE.has(key)) {
-    return _sealCached(structuredClone(PEDIGREE_CACHE.get(key)), true);
+    const hit = structuredClone(PEDIGREE_CACHE.get(key));
+    return sealable ? _sealCached(hit, true) : hit;
   }
+  const revisionAtStart = PEDIGREE_CACHE_REVISION;
   const data = await rpc(rpcName, params);
-  PEDIGREE_CACHE.set(key, structuredClone(data));
-  return _sealCached(structuredClone(data), false);
+  if (PEDIGREE_CACHE_REVISION === revisionAtStart) {
+    PEDIGREE_CACHE.set(key, structuredClone(data));
+  }
+  const out = structuredClone(data);
+  return sealable ? _sealCached(out, false) : out;
 }
 
 /**
@@ -104,7 +116,7 @@ async function subgraphForAnimal(hayvanId, ancestorDepth = PEDIGREE_DEFAULT_ANCE
     p_ancestor_depth: ancestorDepth,
     p_descendant_depth: descendantDepth,
   };
-  return _pedigreeFetchCached('pedigree_subgraph_for_animal', String(hayvanId), params);
+  return _pedigreeFetchCached('pedigree_subgraph_for_animal', String(hayvanId), params, true);
 }
 
 /**
@@ -122,7 +134,7 @@ async function subgraphForNode(nodeId, ancestorDepth = PEDIGREE_DEFAULT_ANCESTOR
     p_ancestor_depth: ancestorDepth,
     p_descendant_depth: descendantDepth,
   };
-  return _pedigreeFetchCached('pedigree_subgraph', String(nodeId), params);
+  return _pedigreeFetchCached('pedigree_subgraph', String(nodeId), params, true);
 }
 
 /**
@@ -130,7 +142,9 @@ async function subgraphForNode(nodeId, ancestorDepth = PEDIGREE_DEFAULT_ANCESTOR
  * @returns {Promise<object>} pedigree_integrity_report() sonucu
  */
 async function integrityReport() {
-  return _pedigreeFetchCached('pedigree_integrity_report', '-', {});
+  // sealable=false — P1 kontrat şekli (cutoff/generated_at/groups) korunur;
+  // cache'lenmesi kontrat sapması değildir, meta ekleme olurdu (luna F5).
+  return _pedigreeFetchCached('pedigree_integrity_report', '-', {}, false);
 }
 
 /**
@@ -141,6 +155,7 @@ async function integrityReport() {
  */
 function invalidateCache() {
   PEDIGREE_CACHE.clear();
+  PEDIGREE_CACHE_REVISION++; // fence: in-flight geç yazanlar artık yazamaz
 }
 
 const pedigreeApi = {

@@ -107,6 +107,24 @@ test('integrityReport: pedigree_integrity_report, paramsiz; anahtar "-" focus di
   assert.ok(keys[0].includes(':pedigree_integrity_report:-:'), 'focus "-" olmalı: ' + keys[0]);
 });
 
+test('F5 — integrityReport dönüşü P1 kontrat şekli: üst-düzey meta YOK (ağ ve cache)', async () => {
+  const stub = makeRpcStub();
+  stub.on('pedigree_integrity_report', () => ({
+    cutoff: '2026-09-01',
+    generated_at: '2026-09-11T10:00:00Z',
+    groups: [],
+  }));
+  const m = loadApi(stub);
+  const api = m.window.pedigreeApi;
+  const fromNetwork = await api.integrityReport();
+  assert.strictEqual('meta' in fromNetwork, false, 'ağ dönüşüne meta EKLENMEMELİ (luna shape probe: meta 4. alan)');
+  const fromCache = await api.integrityReport(); // cache-first ikinci erişim
+  assert.strictEqual(stub.calls.length, 1);
+  assert.strictEqual('meta' in fromCache, false, 'cache dönüşüne de meta EKLENMEMELİ');
+  assert.ok('cutoff' in fromCache && 'groups' in fromCache && 'generated_at' in fromCache,
+    'P1 kontrat alanları yerinde');
+});
+
 test('boş id → RPC hiç çağrılmadan reddedilir', async () => {
   const stub = makeRpcStub();
   stub.on('pedigree_subgraph_for_animal', () => PAYLOAD);
