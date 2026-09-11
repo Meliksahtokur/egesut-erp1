@@ -169,6 +169,51 @@ test('SENARYO 4 — invalidateCache: Map TAMAMEN boşalır, offline miss artık 
   await assert.rejects(api.subgraphForAnimal('H-1'), { message: 'İnternet bağlantısı gerekli' });
 });
 
+test('F4 fence — in-flight istek sırasındaki invalidate geç yazanı cache\'e ALMAZ (luna senaryosu)', async () => {
+  const stub = makeRpcStub();
+  let resolveLate;
+  stub.on('pedigree_subgraph_for_animal', () => new Promise(res => { resolveLate = res; }));
+  const m = loadApi(stub);
+  const api = m.window.pedigreeApi;
+  const pending = api.subgraphForAnimal('H-1'); // miss → in-flight
+  api.invalidateCache();                         // istek havadayken invalidation
+  resolveLate(payloadFor('H-1'));                // geç yanıt döner
+  const out = await pending;
+  assert.strictEqual(m.exposed.PEDIGREE_CACHE.size, 0,
+    'geç yazan cache\'e GİRMEMELİ (luna ölçümü: sizeAfterLateWriter:1, cached:true idi)');
+  assert.strictEqual(out.meta.cached, false, 'çağıran yanıtı ağ sonucu olarak aldı');
+  // sonraki okuma: miss → yeniden ağa gider (bayat servis edilmedi)
+  stub.on('pedigree_subgraph_for_animal', () => payloadFor('H-1'));
+  await api.subgraphForAnimal('H-1');
+  assert.strictEqual(stub.calls.length, 2, 'sonraki okuma ağa gider');
+});
+
+test('F4 fence — invalidate → taze istek yazdıktan SONRA eski in-flight geç gelirse EZMEZ', async () => {
+  const stub = makeRpcStub();
+  let resolveOld;
+  stub.on('pedigree_subgraph_for_animal', () => new Promise(res => { resolveOld = res; }));
+  const m = loadApi(stub);
+  const api = m.window.pedigreeApi;
+  const oldReq = api.subgraphForAnimal('H-1'); // eski in-flight (rev=0 yakaladı)
+  api.invalidateCache();                        // rev=1, Map temiz
+  // taze istek (rev=1) — hızlı yanıt, cache'e YAZAR
+  stub.on('pedigree_subgraph_for_animal', () => {
+    const p = payloadFor('H-1');
+    p.nodes.push({ id: 'fresh', kind: 'farm_animal', label: 'taze' });
+    return p;
+  });
+  const fresh = await api.subgraphForAnimal('H-1');
+  assert.strictEqual(fresh.nodes.length, 2);
+  // şimdi eski in-flight'ın bayat yanıtı (nodes:1) geç gelir
+  resolveOld(payloadFor('H-1'));
+  await oldReq;
+  const stored = Array.from(m.exposed.PEDIGREE_CACHE.values())[0];
+  assert.strictEqual(stored.nodes.length, 2, 'eski in-flight taze yazıyı EZMEMELİ');
+  const served = await api.subgraphForAnimal('H-1'); // hit-path
+  assert.strictEqual(served.nodes.length, 2, 'cache taze veriyi servis etmeye devam eder');
+  assert.strictEqual(served.meta.cached, true);
+});
+
 test('write-sonrası akış simülasyonu: invalidate sonrası online istek TAZE payload getirir', async () => {
   const stub = makeRpcStub();
   let parentAdded = false;
