@@ -1978,7 +1978,7 @@ async function _protokolUygula(idx){
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
-    <button onclick="_protokolUygulaKaydet('${d.hayvan_id}',${idx})" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
+    <button id="pu-kaydet-btn" onclick="_protokolUygulaKaydet('${d.hayvan_id}',${idx})" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
   document.body.appendChild(mini);
   _puDozPrefill(ilaclar[0]?.id);
@@ -1991,12 +1991,15 @@ async function _protokolUygula(idx){
 }
 
 async function _protokolUygulaKaydet(hayvanId, idx){
+  const kaydetBtn=document.getElementById('pu-kaydet-btn');
+  if(kaydetBtn&&kaydetBtn.disabled) return; // çift-gönderim: rpc uçuşta ikinci tık yok sayılır
   const stok = document.getElementById('pu-stok')?.value;
   const doz = parseFloat(document.getElementById('pu-doz')?.value);
   const birim = document.getElementById('pu-birim')?.value || 'ml';
   const rota = document.getElementById('pu-rota')?.value || 'IM';
   if (!stok) { toast('Stok seçilmedi', true); return; }
   if (!doz || isNaN(doz) || doz <= 0) { toast('Geçerli doz girin', true); return; }
+  if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
     const res = await rpc('hizli_uygulama', {
@@ -2017,6 +2020,10 @@ async function _protokolUygulaKaydet(hayvanId, idx){
       toast(res?.mesaj || 'Hata', true);
     }
   } catch(e) { toast('Hata: '+e.message, true); }
+  finally {
+    // sheet remove edilmişse buton kopuktur; tekrar aktif etmek zararsız
+    if(kaydetBtn){kaydetBtn.disabled=false;kaydetBtn.textContent='Kaydet';}
+  }
 }
 
 async function _protokolDismiss(idx){
@@ -2144,7 +2151,7 @@ async function _hayvanHizliUygulama(hayvanId){
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
-    <button onclick="_hayvanHizliUygulaKaydet('${hayvanId}')" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
+    <button id="pu-kaydet-btn" onclick="_hayvanHizliUygulaKaydet('${hayvanId}')" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
   </div>`;
   document.body.appendChild(mini);
   if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
@@ -2157,12 +2164,15 @@ async function _hayvanHizliUygulama(hayvanId){
 }
 
 async function _hayvanHizliUygulaKaydet(hayvanId){
+  const kaydetBtn=document.getElementById('pu-kaydet-btn');
+  if(kaydetBtn&&kaydetBtn.disabled) return; // çift-gönderim: rpc uçuşta ikinci tık yok sayılır
   const stok = document.getElementById('pu-stok')?.value;
   const doz = parseFloat(document.getElementById('pu-doz')?.value);
   const birim = document.getElementById('pu-birim')?.value || 'ml';
   const rota = document.getElementById('pu-rota')?.value || 'IM';
   if (!stok) { toast('Stok seçilmedi', true); return; }
   if (!doz || isNaN(doz) || doz <= 0) { toast('Geçerli doz girin', true); return; }
+  if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
     const res = await rpc('hizli_uygulama', {
@@ -2177,6 +2187,10 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
       toast(res?.mesaj || 'Hata', true);
     }
   } catch(e) { toast('Hata: '+e.message, true); }
+  finally {
+    // sheet remove edilmişse buton kopuktur; tekrar aktif etmek zararsız
+    if(kaydetBtn){kaydetBtn.disabled=false;kaydetBtn.textContent='Kaydet';}
+  }
 }
 let _suruStatMode='son';
 
@@ -5802,7 +5816,7 @@ async function _gorevStokSecVeTamamla(gorev){
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Rota</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
-    <button data-padok="${escAttr(gorev.padok_hedef||'')}" onclick="_gorevStokTamamlaSubmit('${gorev.id}','${gorev.hayvan_id||''}',this.dataset.padok)" class="btn" style="width:100%;padding:10px;font-weight:700">Tamamla</button>
+    <button id="pu-kaydet-btn" data-padok="${escAttr(gorev.padok_hedef||'')}" onclick="_gorevStokTamamlaSubmit('${gorev.id}','${gorev.hayvan_id||''}',this.dataset.padok)" class="btn" style="width:100%;padding:10px;font-weight:700">Tamamla</button>
   </div>`;
   document.body.appendChild(mini);
   if (ilaclar[0]) _puDozPrefill(ilaclar[0].id);
@@ -5810,11 +5824,14 @@ async function _gorevStokSecVeTamamla(gorev){
 }
 
 async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
+  const kaydetBtn=document.getElementById('pu-kaydet-btn');
+  if(kaydetBtn&&kaydetBtn.disabled) return; // çift-gönderim: rpc uçuşta ikinci tık yok sayılır
   const stok = document.getElementById('pu-stok')?.value;
   const doz = parseFloat(document.getElementById('pu-doz')?.value);
   const birim = document.getElementById('pu-birim')?.value;
   const rota = document.getElementById('pu-rota')?.value;
   if (!stok || !doz || !birim) { toast('Stok ve doz alanlarını doldurun', true); return; }
+  if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
     await rpc('hizli_uygulama', {
@@ -5834,6 +5851,10 @@ async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
       toast(res?.mesaj || 'Hata', true);
     }
   } catch(e) { toast('Hata: '+e.message, true); }
+  finally {
+    // sheet remove edilmişse buton kopuktur; tekrar aktif etmek zararsız
+    if(kaydetBtn){kaydetBtn.disabled=false;kaydetBtn.textContent='Tamamla';}
+  }
 }
 function toggleTedaviIlac(adminId, el){
   const isRed = el.dataset.uygulanmadi === 'true';
