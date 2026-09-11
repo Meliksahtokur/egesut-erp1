@@ -5,13 +5,15 @@
 -- (teslimat kanitinda: demo project ref vtzqjmazsvurxdeondmi pooler uzerinden;
 -- on-kozum: pedigree_nodes=166 / pedigree_parentage=59 — P1 fixture verisi).
 --
--- Kapsam (goal G3 + zarf W1 + plan Task 3.3):
+-- Kapsam (goal G3 + zarf W1 + plan Task 3.3; M-O: zarf W1-fix / luna F3):
 --   A guard'lar (NULL/negatif depth, NULL focus), B depth clamp (99→8/3),
 --   C focus-only, D unknown parent (founder), E 4-nesil zincir + tam graf
 --   truncated=false, F shared ancestor dedup (diamond), G sibling
 --   descendants, H max depth truncate (iki yon), I bozuk dongude termination,
 --   J same-farm reddi, K for_animal birebir parite + bilinmeyen hayvan,
 --   L grants authenticated-only (service_role dahil yok — P1 F5).
+--   M-O GERÇEK veri blokları (sentetikten ÖNCE, salt-okunur): canlı boyut
+--   alt-sınırı + gerçek odak projeksiyonu + gerçek kardeş/ortak-ata tek düğüm.
 --
 -- Test grafigi:
 --   A4→A3→A2→A1→focus (4 nesil ata zinciri, dam)
@@ -22,6 +24,166 @@
 --   FND (kenarsiz founder), YABANCI (farkli farm node)
 
 BEGIN;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- Gerçek-veri blokları M-O (luna F3 / zarf W1-fix): P1'in canlı demo verisi
+-- üzerinde salt-okunur iddialar. Senteitik kurulumdan ÖNCE koşar — filtre
+-- gerektirmez. Veri YAZMAZ; BEGIN/ROLLBACK yine de tüm dosyayı sarar.
+--   M  canlı graf boyutu + sentetik-olmayan id varlığı
+--   N  gerçek odak projeksiyonu (odak sorguyla seçilir — hardcode id YOK)
+--   O  gerçek kardeş çifti + ortak ata tek düğüm (id sayımı)
+-- ══════════════════════════════════════════════════════════════════════════
+DO $real$
+DECLARE
+  v_m integer; v_n integer;
+  v_real_node uuid; v_real_dam uuid;
+  v_dam uuid; v_sib1 uuid; v_sib2 uuid;
+  v_json jsonb;
+BEGIN
+  -- ═══ M) Canlı graf boyutu ═══════════════════════════════════════════════
+  -- EŞİTLİK DEĞİL ALT-SINIR (>=): demo PAYLAŞIMLI — P1 teslimi 166/59 bıraktı,
+  -- başka aktör veri ekleyebilir; eşitlik kırılgan FAIL üretirdi (zarf onayı:
+  -- ">= 166 düğüm ve >= 59 kenar" sağlamlaştırması). Radikal silme ihtimaline
+  -- karşı alt-sınır yine de G3'ün "P1 verisi üzerinden" ölçütünü korur.
+  SELECT count(*) INTO v_m FROM public.pedigree_nodes;
+  SELECT count(*) INTO v_n FROM public.pedigree_parentage;
+  IF v_m < 166 THEN
+    RAISE EXCEPTION 'M1 canlı graf beklenen alt sınırın altında: % node (beklenen >= 166)', v_m;
+  END IF;
+  IF v_n < 59 THEN
+    RAISE EXCEPTION 'M2 canlı kenar sayısı beklenen alt sınırın altında: % (beklenen >= 59)', v_n;
+  END IF;
+  -- Sentetik-olmayan (P1/backfill kökenli) gerçek id varlığı: sayısal kupe_no
+  -- yalnız gerçek demo verisinde var; '__*' test desenleri hariçtir.
+  SELECT n.id INTO v_real_node
+    FROM public.hayvanlar h
+    JOIN public.pedigree_nodes n ON n.farm_animal_id = h.id
+   WHERE h.kupe_no ~ '^[0-9]+$'
+   LIMIT 1;
+  IF v_real_node IS NULL THEN
+    RAISE EXCEPTION 'M3 sentetik olmayan gerçek farm node bulunamadi — P1 verisi kaybolmus';
+  END IF;
+
+  -- ═══ N) Gerçek odak projeksiyonu (odak sorgulanarak seçilir) ════════════
+  -- Odak: sayısal kupe'li gerçek hayvanlar içinde en çok kenarı olan —
+  -- hardcode id YOK (id çürüğüne karşı; kupe_no UNIQUE ama değer de
+  -- değişebilir → tamamen sorgu-ile seçim).
+  SELECT n.id INTO v_real_node
+    FROM public.hayvanlar h
+    JOIN public.pedigree_nodes n ON n.farm_animal_id = h.id
+   WHERE h.kupe_no ~ '^[0-9]+$'
+   ORDER BY (SELECT count(*) FROM public.pedigree_parentage pp
+              WHERE pp.parent_node_id = n.id) DESC,
+            (SELECT count(*) FROM public.pedigree_parentage pp
+              WHERE pp.child_node_id = n.id) DESC,
+            n.id
+   LIMIT 1;
+  IF v_real_node IS NULL THEN
+    RAISE EXCEPTION 'N1 gerçek odak seçilemedi';
+  END IF;
+
+  v_json := public.pedigree_subgraph(v_real_node, 4, 1);
+  -- IS DISTINCT FROM (review notu #1): <> NULL-kördür; focus anahtarı
+  -- düşerse/regrese olursa sessiz yeşil kalmasın.
+  IF v_json->>'focus' IS DISTINCT FROM v_real_node::text THEN
+    RAISE EXCEPTION 'N2 gerçek odakta focus anahtarı odak id''si değil: %', v_json->>'focus';
+  END IF;
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+   WHERE value->>'id' = v_real_node::text;
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'N3 gerçek odak nodes[] içinde tam 1 kez olmalı, eslesen %', v_n;
+  END IF;
+  -- farm düğüm kontratı: gerçek veride her farm_animal node'unun
+  -- farm_animal_id'si dolu (null'suz).
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+   WHERE value->>'kind' = 'farm_animal' AND value->>'farm_animal_id' IS NULL;
+  IF v_n <> 0 THEN
+    RAISE EXCEPTION 'N4 gerçek veride farm_animal_id NULL olan % farm node var', v_n;
+  END IF;
+  -- Kenar kapanışı + kontrat: her kenarın İKİ ucu da nodes[] kümesinde
+  -- (dangling yok), role/source_type enum içinde (yön parent→child
+  -- yapısal: source=parent_node_id, target=child_node_id).
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'edges') AS ed(value)
+   WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+                      WHERE value->>'id' = ed.value->>'source')
+      OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+                      WHERE value->>'id' = ed.value->>'target')
+      OR ed.value->>'role' NOT IN ('dam','sire')
+      OR ed.value->>'source_type' NOT IN ('birth','manual','import','reconcile');
+  IF v_n <> 0 THEN
+    RAISE EXCEPTION 'N5 gerçek veride % kenar kapanış/enum kontratını bozuyor', v_n;
+  END IF;
+  -- Clamp uyumu gerçek veride: aşırı istek → meta efektif 8/3.
+  v_json := public.pedigree_subgraph(v_real_node, 99, 99);
+  IF (v_json->'meta'->>'ancestor_depth')::int <> 8
+     OR (v_json->'meta'->>'descendant_depth')::int <> 3 THEN
+    RAISE EXCEPTION 'N6 gerçek veride clamp meta 8/3 beklenirdi, gelen %/%',
+      v_json->'meta'->>'ancestor_depth', v_json->'meta'->>'descendant_depth';
+  END IF;
+  -- Ata yönü gerçek veride: parent'ı olan (backfill dam-edge'li) gerçek node
+  -- seçilir; (4,0) çağrısı dam'ını nodes[]'ta döndürmeli.
+  SELECT pp.child_node_id, pp.parent_node_id INTO v_real_node, v_real_dam
+    FROM public.pedigree_parentage pp
+    JOIN public.pedigree_nodes n ON n.id = pp.child_node_id
+   WHERE n.farm_animal_id IS NOT NULL
+     AND pp.parent_role = 'dam'                       -- review notu #2: dam-edge kısıtı
+     AND n.farm_id = public.current_farm_id()         -- (multi-farm drift'te doğru hata)
+   ORDER BY pp.child_node_id
+   LIMIT 1;
+  IF v_real_node IS NULL THEN
+    RAISE EXCEPTION 'N7 gerçek dam-edge''li node bulunamadi — backfill verisi kaybolmus';
+  END IF;
+  v_json := public.pedigree_subgraph(v_real_node, 4, 0);
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+   WHERE value->>'id' = v_real_dam::text;
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'N8 gerçek odağın dam''ı ata projeksiyonunda yok, eslesen %', v_n;
+  END IF;
+
+  -- ═══ O) Gerçek kardeş çifti + ortak ata tek düğüm ═══════════════════════
+  -- NOT: gerçek demo verisinde inbred diamond YOKTUR (2026-09-11 ölçümü:
+  -- iki parent'ı ortak parent'lı node sayısı 0) — paylaşılan ata iddiası
+  -- dam-paylaşımlı kardeş formülasyonuyla kurulur: dam D, kardeşler {s1, s2};
+  -- D'nin projeksiyonunda her kardeş tam 1 kez, D→s kenarları ikisi de var.
+  SELECT pp1.parent_node_id, pp1.child_node_id, pp2.child_node_id
+    INTO v_dam, v_sib1, v_sib2
+    FROM public.pedigree_parentage pp1
+    JOIN public.pedigree_parentage pp2
+      ON pp1.parent_node_id = pp2.parent_node_id
+     AND pp1.child_node_id < pp2.child_node_id
+   WHERE pp1.parent_role = 'dam' AND pp2.parent_role = 'dam'
+   ORDER BY pp1.parent_node_id, pp1.child_node_id, pp2.child_node_id  -- review notu #3: tam determinizm
+   LIMIT 1;
+  IF v_dam IS NULL THEN
+    RAISE EXCEPTION 'O1 gerçek kardeş çifti bulunamadı (dam paylaşımlı) — P1 backfill verisi değişmis';
+  END IF;
+  v_json := public.pedigree_subgraph(v_dam, 4, 1);
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+   WHERE value->>'id' = v_sib1::text;
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'O2 gerçek kardeş s1 projeksiyonda tam 1 kez olmalı, eslesen %', v_n;
+  END IF;
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+   WHERE value->>'id' = v_sib2::text;
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'O3 gerçek kardeş s2 projeksiyonda tam 1 kez olmalı, eslesen %', v_n;
+  END IF;
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'nodes') AS nd(value)
+   WHERE value->>'id' = v_dam::text;
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION 'O4 ortak ata (dam) tam 1 kez listelenmeli, eslesen %', v_n;
+  END IF;
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_json->'edges') AS ed(value)
+   WHERE ed.value->>'source' = v_dam::text
+     AND ed.value->>'target' IN (v_sib1::text, v_sib2::text)
+     AND ed.value->>'role' = 'dam';
+  IF v_n <> 2 THEN
+    RAISE EXCEPTION 'O5 dam→kardeş 2 dam kenarı beklenirdi, eslesen %', v_n;
+  END IF;
+
+  RAISE NOTICE 'REALDONE:gerçek-veri blokları M-O yeşil (boyut >=166/>=59, gerçek odak projeksiyonu, kardeş/ortak-ata tek düğüm)';
+END;
+$real$;
 
 DO $test$
 DECLARE
@@ -377,7 +539,7 @@ BEGIN
     RAISE EXCEPTION 'L6 service_role for_animal EXECUTE almis (F5 ihlali)';
   END IF;
 
-  RAISE NOTICE 'TESTDONE:pedigree_projection_rpc_test tamam — 12 blok (A-L) yesil';
+  RAISE NOTICE 'TESTDONE:pedigree_projection_rpc_test tamam — gerçek-veri M-O + sentetik A-L toplam 15 blok yesil';
 END;
 $test$;
 
