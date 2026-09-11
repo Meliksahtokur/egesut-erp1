@@ -37,13 +37,24 @@
 
 > **EXECUTION NOTE:** Bu plan tek seferde “big bang” uygulanmamalı. Her phase kendi migration + test + acceptance gate’ini geçmeden sonraki phase’e başlanmamalı. DB tarafı additive/compatible önce deploy edilir, frontend daha sonra yeni kontrata geçirilir.
 >
-> **REPO FLOW (Revizyon 2 — şeride göre):** Bu program **ss-org şeridinde** yürür
-> (D5 paketleri): worker kendi dalına commit eder, lead kendi dalına merge eder,
-> root main'e merge eder + owner push kapısı. Owner'ın root kapısı kuralı
-> gereği her teslim merge'den önce bağımsız Codex (luna max) review'dan PASS
-> alır (döngü). Eski "implementer commit atmaz" kuralı yalnız inline/coordinator
-> şeridinde geçerlidir; bu planla çelişki durumunda aktif goal zarfının şeridi
-> kazanır.
+> **REPO FLOW (Rev 3.1 — owner şerit kuralları, 2026-09-11):** Bu program
+> **ss-org şeridinde** yürür (D5 paketleri): worker kendi dalına commit eder,
+> lead kendi dalına merge eder, root main'e merge eder + owner push kapısı.
+> Owner'ın root kapısı kuralı gereği her teslim merge'den önce bağımsız
+> Codex (luna max) review'dan PASS alır (sınırlı: tur başına 1 revizyon).
+> **Üç yeni kalıcı kural (owner direktifi, 2026-09-11):**
+> 1. **Worker-katmanı subagent review — ZORUNLU:** her worker, lead'e teslimden
+>    ÖNCE kendi diff'ine builtin subagent review turu koşturur (farklı oturum;
+>    bulgular veya "bulgu yok" notu teslimatın parçasıdır) + mekanik kapıları
+>    kendisi koşar. Subagentsiz kol yoksa lead'e not eder, lead tur-1 kapsar.
+> 2. **Lead-katmanı luna review — ZORUNLU:** lead, worker teslimlerini (düzeltme
+>    turları dahil) aldıktan sonra root'a devretmeden ÖNCE paket geneline
+>    bağımsız Codex (luna max) review açar (sınırlı tek tur; bulgu aynı
+>    worker'a döner, doğrulama mekanik kapıyla).
+> 3. **İş yükü workerlarda:** lead olabildiğince teslim eder — implementasyon,
+>    test yazımı, zarf taslağı worker'lardadır; lead yalnız orkestrasyon,
+>    triage ve küçük dokunuşlar yapar (owner: "kendisi sadece gerekli yerlerde
+>    küçük dokunuşlar yapmalıdır").
 >
 > **NON-NEGOTIABLE:** Frontend pedigree/genetik hesabı yapmaz. Cytoscape/ELK yalnız render/layout yapar. Kinship, F, founder contribution, completeness ve mating sonucu PostgreSQL/RPC otoritesindedir.
 >
