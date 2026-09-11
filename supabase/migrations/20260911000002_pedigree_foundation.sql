@@ -137,6 +137,10 @@ REVOKE ALL ON public.pedigree_nodes     FROM anon, authenticated;
 REVOKE ALL ON public.pedigree_parentage FROM anon, authenticated;
 REVOKE ALL ON public.pedigree_meta      FROM anon, authenticated;
 REVOKE ALL ON public.semen_catalog      FROM anon;
+-- F1 (tur-1): default ACL authenticated=arwd — INSERT/UPDATE/DELETE açıkça
+-- geri alınır; yalnız SELECT kalır (D3 IDB sync okuması). Yazma yolu yalnız
+-- guarded RPC (semen_catalog_upsert).
+REVOKE INSERT, UPDATE, DELETE ON public.semen_catalog FROM authenticated;
 
 GRANT SELECT ON public.semen_catalog TO authenticated;
 
@@ -192,8 +196,12 @@ BEGIN
   RETURN v_node_id;
 END;
 $fn$;
--- Trigger yolu doğrudan authenticated INSERT altında da koşabilir → EXECUTE
--- default (PUBLIC/authenticated) bilinçli olarak geride bırakıldı.
+-- F2 (tur-1): INTERNAL makine fonksiyonu — istemci yüzeyi yok. Trigger yolu
+-- kırılmaz: (a) trigger çağrısında EXECUTE ayrıca denetlenmez, (b) çağrı zinciri
+-- _trg_pedigree_hayvan_insert (SECURITY DEFINER, definer=postgres) içinden
+-- geçer → çalışma-anı EXECUTE denetimi definer olarak yapılır. Kanıt: test C19.
+REVOKE ALL ON FUNCTION public.pedigree_ensure_farm_node(text)
+  FROM PUBLIC, anon, authenticated, service_role;
 
 -- Katı ata sorgusu: p_ancestor, p_descendant'ın atası mı? (kendisi değil)
 CREATE OR REPLACE FUNCTION public.pedigree_is_ancestor(p_ancestor uuid, p_descendant uuid)
@@ -211,10 +219,14 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
   )
   SELECT EXISTS (SELECT 1 FROM up WHERE node_id = p_ancestor);
 $fn$;
+-- F2 (tur-1): okuma helper'ı da içseldir — guardsız graph atası sorgusu istemciye açılmaz.
+REVOKE ALL ON FUNCTION public.pedigree_is_ancestor(uuid,uuid)
+  FROM PUBLIC, anon, authenticated, service_role;
 
 -- INTERNAL çekirdek: pedigree_parent_set ile AYNI parametreler. EXECUTE grant'i
--- kimseye verilmez (aşağıda REVOKE) — yalnız SQL-içi çağrı: dogum_kaydet (doğum
--- yolu, guardsız) ve public.pedigree_parent_set (guard + core). r12-F62.
+-- kimseye verilmez (aşağıda REVOKE) — yalnız SQL-içi çağrı: public.pedigree_parent_set
+-- (guard + core). Doğum yolunun üretim bağlantısı Faz 7'dedir (P1'de YOK —
+-- review F4). r12-F62.
 CREATE OR REPLACE FUNCTION public._pedigree_parent_set_core(
   p_child_node_id uuid,
   p_role          text,
@@ -286,7 +298,8 @@ BEGIN
     IF v_cur_parent = p_parent_node_id THEN
       RETURN v_edge_id;  -- idempotent success
     END IF;
-    IF NOT p_replace THEN
+    -- F3 (tur-1): üç-değerli tuzak — NULL p_replace açık onay DEĞİLDİR (fail-closed)
+    IF p_replace IS NOT TRUE THEN
       RAISE EXCEPTION 'farkli parent — sessiz overwrite yok; p_replace=true gerekli';
     END IF;
     UPDATE public.pedigree_parentage
@@ -544,3 +557,7 @@ DROP TRIGGER IF EXISTS trg_pedigree_hayvan_insert ON public.hayvanlar;
 CREATE TRIGGER trg_pedigree_hayvan_insert
   AFTER INSERT ON public.hayvanlar
   FOR EACH ROW EXECUTE FUNCTION public._trg_pedigree_hayvan_insert();
+
+-- F2 (tur-1): trigger sarmalayıcısı da içseldir — doğrudan istemci çağrısı kapalı.
+REVOKE ALL ON FUNCTION public._trg_pedigree_hayvan_insert()
+  FROM PUBLIC, anon, authenticated, service_role;

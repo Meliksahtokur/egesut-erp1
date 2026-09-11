@@ -144,7 +144,9 @@ echo "  views.sql: $(wc -c <"$OUT_DIR/views.sql") byte, $VIEWS_GEN view"
 
 # ── 6) YEREL: RESET public + ROLLER ────────────────────────────────────
 say "6/7 Yerel 'public' şeması sıfırlanıyor + roller…"
-psql "$LOCAL_LSP_URL" -v ON_ERROR_STOP=0 <<'SQL' >/dev/null 2>&1 || true
+# F5 (tur-1): reset hatası sessiz yutulmaz — ON_ERROR_STOP=1 + nonzero çıkış.
+RESET_FAIL=0
+psql "$LOCAL_LSP_URL" -v ON_ERROR_STOP=1 <<'SQL' >/dev/null 2>&1 || RESET_FAIL=1
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO public;
@@ -178,6 +180,9 @@ GRANT USAGE ON SCHEMA extensions TO public, anon, authenticated, service_role;
 CREATE EXTENSION IF NOT EXISTS vector SCHEMA extensions;
 ALTER DATABASE egesut_lsp SET search_path TO public, extensions;
 SQL
+if [[ "${RESET_FAIL}" -ne 0 ]]; then
+  fail "Yerel public şeması sıfırlanamadı — ayna yüklemesi durduruldu (F5: fail-closed)"
+fi
 say "  Yerel public + vector extension hazır."
 
 # ── 7) YÜKLE (sıralı, ON_ERROR_STOP=0) ────────────────────────────────
@@ -186,7 +191,7 @@ LOAD_ERRORS=0
 load_sql() {
   local f="$1" label="$2"
   if [[ -s "$f" ]]; then
-    if ! psql "$LOCAL_LSP_URL" -v ON_ERROR_STOP=0 -f "$f" >"$OUT_DIR/${label}.out" 2>"$OUT_DIR/${label}.err"; then
+    if ! psql "$LOCAL_LSP_URL" -v ON_ERROR_STOP=1 -f "$f" >"$OUT_DIR/${label}.out" 2>"$OUT_DIR/${label}.err"; then
       LOAD_ERRORS=$((LOAD_ERRORS+1))
     fi
     local err_lines
@@ -214,10 +219,15 @@ N_F=$(psql "$LOCAL_LSP_URL" -tAc "SELECT COUNT(*) FROM pg_proc p JOIN pg_namespa
 N_V=$(psql "$LOCAL_LSP_URL" -tAc "SELECT COUNT(*) FROM information_schema.views WHERE table_schema='public'")
 echo "  Canlı:   T=$LIVE_T F=$LIVE_F V=$LIVE_V"
 echo "  Yerel:   T=$N_T F=$N_F V=$N_V"
+# F5 (tur-1): yükleme hatası veya sayım uyuşmazlığı → NONZERO çıkış.
+# db-dry-run.sh bu çıkışı görmezden gelip bayat aynayla devam edemez.
+if [[ "$LOAD_ERRORS" -gt 0 ]]; then
+  fail "Yükleme hatası: $LOAD_ERRORS dosya hatalı — ayna eksik/bozuk. İncele: $OUT_DIR/*.err"
+fi
 if [[ "$N_T" == "$LIVE_T" && "$N_F" == "$LIVE_F" && "$N_V" == "$LIVE_V" ]]; then
   echo -e "\033[1;32m✓ Birebir eşleşti.\033[0m"
 else
-  warn "Fark var — fn_part2.out ve fn_part1.out incele."
+  fail "Sayım uyuşmazlığı — ayna bayat/kısmi (canlı T=$LIVE_T F=$LIVE_F V=$LIVE_V; yerel T=$N_T F=$N_F V=$N_V)"
 fi
 
 echo
