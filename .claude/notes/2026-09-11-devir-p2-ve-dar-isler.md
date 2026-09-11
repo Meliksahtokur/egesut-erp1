@@ -1,30 +1,25 @@
 # DEVİR BELGESİ — 2026-09-11 (compact öncesi)
 
 **Yazan:** root (ZCode oturumu) · **Amaç:** bağlam sıkışması sonrası kesintisiz devam.
-**main ucu:** `dac87fd` (origin'de) · **P1 kapalı, P2 + 2 dar iş UÇUŞTA.**
+**main ucu:** `a96804f` (origin'de) · **P1 + P2 + 2 dar iş HEPSİ KAPANDI; ağ boş.**
 
 ---
 
-## 1. Aktif ağ
+## 1. Durum: tüm lane'ler kapalı (2026-09-11 gece)
 
-| Koltuk | ws / terminal | Dal | Beklenen çıktı | Bekleyici (bg exec) | Timeout |
-|---|---|---|---|---|---|
-| **Lead GLM — P2 Ağaç** | `bf5382ed` / `3d53c3e8` | `idle/pedigree-p2` | `.claude/idle-reports/2026-09-11-pedigree-p2.md` | `exec_2c2c412b` | 4 saat |
+| Lane | Sonuç | Kanıt zinciri |
+|---|---|---|
+| **P1 Temel** | DONE, merge 31b808d | idle-reports/2026-09-11-pedigree-p1.md + reviews/…-rootgate.md |
+| **P2 Ağaç** | DONE, merge `40d09d2` + goal kapanışı `a96804f` | idle-reports/2026-09-11-pedigree-p2.md + reviews/2026-09-11-pedigree-p2-lead-review.md (luna 5 bulgu, tümü kapalı) |
+| **W-ROTA 907** | DONE, merge `c07f54f`; **PROD veri düzeltimi UYGULANDI** (Seçenek A) | idle-reports/2026-09-11-rota-907-tezhis.md + BUGS.md BUG-004 |
+| **W-SAGLIK** | DONE, merge `11cd079` | idle-reports/2026-09-11-db-saglik-taramasi.md (demo+PROD probe'lı) |
 
-P2 lead işi W1/W2/W3'e böldü (`idle/pedigree-p2-W1/W2/W3`); üç worker da
-ara-teslim verdi (W2: 7c28a7d api+cytoscape; W1: 6e49a22 RPC; W3: 1b4c3cb UI).
-Lead entegrasyon + luna review aşamasında.
-
-**KAPANAN LANELER (2026-09-11 akşam):**
-- **W-SAGLIK:** rapor teslim + root PROD probeleri (P1–P8) rapora eklendi;
-  merge `11cd079`, workspace+dal kapatıldı. Ana bulgular: BF-1 (872 dangling
-  tohumlama audit) PROD'da birebir; PROD açık gecikmiş görev yalnız 8 (demo
-  272 = E2E artığı); E2E sızması 0; 40 zombi protokol; 12 negatif stok.
-- **W-ROTA:** teşhis `f349539` (etken_kod'suz üretici BUG-004), UI çift-gönderim
-  guard'ı merge `c07f54f`; **907 PROD veri düzeltimi ROOT TARAFINDAN
-  UYGULANDI** (Seçenek A: 2×`hizli_uygulama_geri_al` + `ileri_gebe_asi_tamamla`
-  → tek vaccination_log kaydı 93dcb05d, görev kapalı, stok 2→7, scanner temiz,
-  rapel yok). BUGS.md BUG-004 kayıtlı (4c55687).
+P2 root kapısı: mekanik bağımsız yeniden ölçüm (unit 790/789 dal + 795/1
+birleşik; SQL 15/15 demo; api.js dokunulmadı; cytoscape sha doğrulu; damga
+TEK değer 20260911-14'te yeniden birleştirildi — rota-907 çakışması root
+çözümü) + luna 5 bulgunun kodda kapatıldığının teyidi. İkinci tam luna
+AÇILMADI (lead luna + tek revizyon zaten koşuldu — anti-overloop).
+Workspace'ler (6), dallar (7), worktree'ler temiz; kırıntılar `.crumbs/`da.
 
 Bekleyici ölçütü: **report-on-branch** (dosya dalda VAR). Yanlış-uyanma
 sınıfı: ara merge'ler `--base <eski-uc>` ile ateşler → uyanınca raporda
@@ -58,8 +53,9 @@ PROD deploy bu pakette onaylı DEĞİL; demo-only.
 
 ## 3. Owner kapılarında bekleyen kararlar
 
-1. **PROD deploy — 6 migration** (net emir BEKLİYOR; sıra: `20260910000001-3`
-   bugfix → `20260911000001-3` pedigree). Hepsi additive/replay-safe.
+1. **PROD deploy — 7 migration** (net emir BEKLİYOR; sıra: `20260910000001-3`
+   bugfix → `20260911000001-3` pedigree P1 → `20260911000004` P2 projection
+   RPC. Hepsi additive/replay-safe; P1+P2 demo'da canlı testli).
 2. ~~907 PROD veri düzeltimi~~ **UYGULANDI** (2026-09-11, Seçenek A — bkz. §1).
 3. **BUG-004 durable fix** (YENİ): `gebelik_protokol_kontrol` üreticisine
    etken_kod damgası ('ROTA'/'ADEMIN'/'E_VIT') + damgasız açık görev backfill
