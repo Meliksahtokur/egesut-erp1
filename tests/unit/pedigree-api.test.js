@@ -29,11 +29,13 @@ function loadApi(stub) {
   });
 }
 
+// Ağdan dönüş wrapper tarafından mühürlenir (W2-fix): meta.cached=false.
+// (Cache-servisli dönüşlerde true — bakınız pedigree-cache.test.js)
 const PAYLOAD = {
   focus: 'u-1',
   nodes: [{ id: 'u-1', kind: 'farm_animal', label: '136' }],
   edges: [],
-  meta: { ancestor_depth: 4, descendant_depth: 1, truncated: false },
+  meta: { ancestor_depth: 4, descendant_depth: 1, truncated: false, cached: false },
 };
 
 // vm realm: modül içi nesneler farklı prototipte gelir — deepStrictEqual
@@ -115,13 +117,12 @@ test('boş id → RPC hiç çağrılmadan reddedilir', async () => {
   assert.strictEqual(stub.calls.length, 0);
 });
 
-test('domain hatası cache isabetinde bile cache\'ten servis EDİLMEZ (aynen yükselir)', async () => {
+test('domain hatası (miss\'te) aynen yükselir ve cache DOLDURULMAZ', async () => {
   const stub = makeRpcStub();
-  stub.on('pedigree_subgraph_for_animal', () => PAYLOAD);
-  const m = loadApi(stub);
-  await m.window.pedigreeApi.subgraphForAnimal('H-9'); // cache dolsun
   stub.on('pedigree_subgraph_for_animal', () => { throw new Error('Yetkisiz işlem'); });
+  const m = loadApi(stub);
   await assert.rejects(m.window.pedigreeApi.subgraphForAnimal('H-9'), { message: 'Yetkisiz işlem' });
+  assert.strictEqual(m.exposed.PEDIGREE_CACHE.size, 0, 'hatalı yanıt cache\'e yazılmamalı');
 });
 
 test('cache anahtarı farm-scope öneklidir: farm:<farm_id>:...', async () => {

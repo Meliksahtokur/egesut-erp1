@@ -8,11 +8,20 @@
 //   pedigreeApi.integrityReport()
 //   pedigreeApi.invalidateCache()
 //
-// Davranış (plan 4.1): network RPC denenir → başarıda memory cache'e yazılır;
-// network yok/iletim hatasında cache'te varsa aynı payload döner, yoksa açık
-// "çevrimdışı" hatası (js/api.js rpc()'nin 'İnternet bağlantısı gerekli'
-// hatası — mevcut tohumlama RPC'lerinin offline reddiyle aynı desen).
-// Domain hesabı client'a taşınmaz: depth clamp/max guard yalnız RPC'de.
+// Davranış (W2-fix, cache-first — lead demo kapısı ölçümüyle netleşti; goal G5
+// "zaten açılmış görünüm memory cache'ten"): sıcak cache anahtarı ağa hiç
+// gitmeden servis edilir (meta.cached=true); cache miss'te network RPC denenir
+// → başarıda cache'e yazılır (meta.cached=false döner); miss + ağ hatasında
+// açık "çevrimdışı" hatası (js/api.js rpc()'nin hatası — mevcut tohumlama
+// RPC'lerinin offline reddiyle aynı desen). Graph-write sonrası invalidateCache
+// cache'i tamamen boşalttığı için tazelik write noktasında garanti altındadır
+// (kablolar P3'te). Domain hesabı client'a taşınmaz: depth clamp/max guard
+// yalnız RPC'de.
+//
+// BİLİNEN SINIRLAR (bilinçli tasarım — plan 4.2): cache oturumluk ve TEK
+// SEKME ölçeğindedir — başka sekme/cihazdan yapılan parentage değişikliği bu
+// sekmede write tetiklenene (invalidate) ya da sekme kapanana kadar yeniden
+// doğrulanmaz; invalidateCache yalnız kendi sekmesinin Map'ini boşaltır.
 //
 // YASAKLAR (Rev 3 küçültme — geri dönme): js/api.js'e DB_VER/IDB dokunuşu,
 // RPC_TABLES'a pseudo tablo, auth.js, epoch/protokol değişikliği.
@@ -51,38 +60,33 @@ function _pedigreeCacheKey(rpcName, focus, params) {
     JSON.stringify(sorted) + ':v' + PEDIGREE_ALGO_VERSION;
 }
 
-// B23 ile aynı sınıflandırma: yalnız gerçek iletim hataları "offline" sayılır.
-// İki yol tanınır: (1) rpc()'nin iletim istisnalarına verdiği
-// 'İnternet bağlantısı gerekli'; (2) _trErr haritasının (js/api.js) iletim
-// sınıfı error gövdelerine verdiği 'Sunucuya ulaşılamıyor' — review bulgusu,
-// aksi hâlde bu sınıf fallback'i atlar. Domain hataları (ok:false gövdeleri,
-// 'Yetkisiz işlem' vb.) buraya girmez — cache'ten servis EDİLMEZ.
-function _isTransportError(err) {
-  const m = String((err && err.message) || err || '');
-  return m.indexOf('İnternet bağlantısı') !== -1 ||
-    m.indexOf('Sunucuya ulaşılamıyor') !== -1 ||
-    /failed to fetch|networkerror|load failed/i.test(m);
+// meta.cached mührü (W2-fix) — yalnız DÖNÜŞ sınırında uygulanır; saklanan
+// snapshot W1 RPC kontratından (ancestor_depth/descendant_depth/truncated)
+// bozulmadan kalır. Ağdan gelenlerde false, cache'ten servis edilenlerde true.
+function _sealCached(payload, cached) {
+  if (payload && !Array.isArray(payload) && typeof payload === 'object') {
+    if (!payload.meta || typeof payload.meta !== 'object') payload.meta = {};
+    payload.meta.cached = cached;
+  }
+  return payload;
 }
 
-// Ortak akış: dene → yaz; iletim hatası + cache isabeti → aynı payload
-// (değer olarak — aşağıdaki savunma kopyaları yüzünden farklı nesne);
-// aksi hâlde hatayı yükselt.
+// Ortak akış (W2-fix, cache-first — lead demo kapısı ölçümü: 3 açılışta 3 RPC
+// atılıyordu; goal G5 "zaten açılmış görünüm memory cache'ten" ONLİNE'da
+// karşılanmalı): sıcak anahtar ağa HİÇ gitmez; ağ yalnız cache miss'te denenir.
+// Miss + ağ hatası → rpc()'nin açık çevrimdışı hatası aynen yükselir
+// ('İnternet bağlantısı gerekli' / _trErr 'Sunucuya ulaşılamıyor').
+// Savunma kopyaları (review bulgusu) korunur: çağıran (W3 adapter — cytoscape
+// element dönüşümü) payload'ı mutate edebilir; cache ve çağıran bağımsız
+// kopyalar alır.
 async function _pedigreeFetchCached(rpcName, focus, params) {
   const key = _pedigreeCacheKey(rpcName, focus, params);
-  try {
-    const data = await rpc(rpcName, params);
-    // Savunma kopyaları (review bulgusu): çağıran (W3 adapter — cytoscape
-    // element dönüşümü) payload'ı mutate edebilir; cache ve çağıran birbirinden
-    // bağımsız kopyalar alır, "aynı payload" değeri olarak korunur.
-    const snapshot = structuredClone(data);
-    PEDIGREE_CACHE.set(key, snapshot);
-    return structuredClone(snapshot);
-  } catch (err) {
-    if (_isTransportError(err) && PEDIGREE_CACHE.has(key)) {
-      return structuredClone(PEDIGREE_CACHE.get(key));
-    }
-    throw err;
+  if (PEDIGREE_CACHE.has(key)) {
+    return _sealCached(structuredClone(PEDIGREE_CACHE.get(key)), true);
   }
+  const data = await rpc(rpcName, params);
+  PEDIGREE_CACHE.set(key, structuredClone(data));
+  return _sealCached(structuredClone(data), false);
 }
 
 /**
