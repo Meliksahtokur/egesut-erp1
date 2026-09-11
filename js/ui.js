@@ -2797,9 +2797,13 @@ async function openDet(id, keepTab){
   document.getElementById('det-name').textContent=' ';
   document.getElementById('det-meta').textContent=' ';
   const _skelHtml='<div style="padding:16px 0">'+['80%','60%','90%','50%'].map(w=>`<div class="skel" style="height:14px;width:${w};margin-bottom:12px"></div>`).join('')+'</div>';
-  ['det-chips','tab-saglik','tab-ureme','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
+  ['det-chips','tab-saglik','tab-ureme','tab-pedigree','tab-gorev','tab-gecmis'].forEach(i=>{const el=document.getElementById(i);if(el)el.innerHTML='';});
   const _ozetEl=document.getElementById('tab-ozet'); if(_ozetEl) _ozetEl.innerHTML=_skelHtml;
   showTab(activeTab||'ozet',document.querySelector(activeTab?`.tab[data-action="tab-${activeTab}"]`:'.tab'));
+  // Pedigree lazy-load (Task 7): openDet RPC çağırmaz; yalnız focus'u bildirir —
+  // Soy sekmesi aktifse controller yükler, değilse sekme ilk aktive olduğunda yükler.
+  const _pedPane=document.getElementById('tab-pedigree');
+  if (typeof pedigreeSetFocus === 'function') pedigreeSetFocus(id, !!(_pedPane && _pedPane.classList && _pedPane.classList.contains('on')));
   await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
   if(_detOpenId!==id) return;
   try {
