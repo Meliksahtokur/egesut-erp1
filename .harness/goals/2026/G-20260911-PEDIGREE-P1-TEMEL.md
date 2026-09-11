@@ -17,6 +17,8 @@ write_manifest:
   - README.md                        # dry-run kapısı kullanım satırı
   - .gitignore                       # iki script'in negasyonu
   - .claude/tasks/2026-09-11-pedigree-p1-*.md  # ss-org süreç zarfları (kanıt zinciri)
+  - .harness/goals/2026/G-20260911-PEDIGREE-P1-TEMEL.md  # goal yaşam döngüsü root'a ait (durum/manifest/report anahtarı güncellemeleri)
+report: .claude/idle-reports/2026-09-11-pedigree-p1.md
 review_lane: codex_luna_max_bounded
 implement_lane: glmf_workers
 ---
