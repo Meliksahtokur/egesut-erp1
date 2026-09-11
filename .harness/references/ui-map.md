@@ -157,6 +157,23 @@ pre-check), `js/forms.js:islemGeriAl`.
 `js/ai-asistan.js:asistanPlanGeriAl`, `js/ai-asistan.js:asistanTumunuSil`
 (plan management; the streaming endpoint is `supabase/functions/ai-agent`).
 
+## js/pedigree/ — Pedigree ağacı (P2 2026-09-11; see TESTING-01)
+
+- `js/pedigree/pedigree-api.js` — RPC sarmalı + modül-scope memory cache
+  (farm-scope key; cache-first sıcak yol `meta.cached` mührü, yalnız
+  projection'ta; late-writer revizyon-fence luna F4; `invalidateCache()`
+  write sonrası TAM boşaltma). `js/api.js`'e dokunmaz.
+- `js/pedigree/pedigree-adapter.js` — RPC JSON → cytoscape elements
+  dönüşümü (farm/external node ayrımı).
+- `js/pedigree/pedigree-view.js` + `pedigree-style.js` — cytoscape 3.34.3
+  (`vendor/cytoscape.min.js`, pinned) breadthfirst render + stil.
+- `js/pedigree/pedigree-controller.js` — hayvan kartı [Soy Ağacı][Genetik]
+  sekmeleri (`tab-pedigree`), lazy-load (ilk aktivasyonda RPC), "4 kuşak
+  atası · N kuşak yavru" özeti, "Önbellekten" rozeti.
+- Kayıt noktaları: `js/ui.js` (openDet temizlik listesi + `pedigreeSetFocus`
+  kancası) ve `js/utils/handlers.js` (`tab-pedigree` handler) — B3 dar
+  dokunuş, root onaylı.
+
 ## Canonical date selection (owner directive 2026-09-09)
 
 New surfaces MUST NOT introduce native `<input type="date">` pickers or

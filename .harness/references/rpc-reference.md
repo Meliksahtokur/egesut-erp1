@@ -656,7 +656,29 @@ ankraj = MAX(kızgınlık, tohumlama, abort_tarihi, dogum_tarihi, dogum). Aktif 
   no frontend caller (the `stat_suru_ozet` RPC serves that data) — classified
   superseded from the frontend's point of view.
 
+## Pedigree (P1 temel + P2 ağaç; demo'da canlı, PROD deploy bekler)
+
+**`pedigree_integrity_report()`** → jsonb — P1 (migration 20260911000002):
+18 kodlu bütünlük evreni (groups). Çağıran: `js/pedigree/pedigree-api.js`
+(integrityReport — P1 kontratı korunur: cutoff/generated_at/groups; cache
+mührü YALNIZ projection yolunda, luna F5).
+
+**`pedigree_legacy_identity_map()`** → jsonb — P1: açık-kimlik → farm_animal
+materializasyon önerisi.
+
+**`pedigree_subgraph(p_focus_node_id uuid, p_ancestor_depth int, p_descendant_depth int)`**
+→ jsonb — P2 (migration 20260911000004): nod-merkezli projeksiyon; depth
+clamp 0-8, yanıtta `effective_ancestor_depth`/`effective_descendant_depth` +
+`truncated`; grants authenticated-only aynı migration'da. Çağıran:
+`js/pedigree/pedigree-api.js` (subgraphForNode).
+
+**`pedigree_subgraph_for_animal(p_hayvan_id text, p_ancestor_depth int, p_descendant_depth int)`**
+→ jsonb — P2: hayvan-kupe odaklı sarmal (for_animal ↔ subgraph parite
+fixture K bloğunda kilitli). Çağıran: `js/pedigree/pedigree-api.js`
+(subgraphForAnimal — Soy sekmesi).
+
 ## Live-schema audit (demo probe, 2026-09-03)
+
 
 Read-only `pg_proc` signature probe against the connected demo project
 (vtzqjmazsvurxdeondmi) — not PROD; demo parity rests on the 2026-09-02

@@ -1,6 +1,6 @@
 ---
 id: G-20260911-PEDIGREE-P2-AGAC
-status: active
+status: done
 owner: root
 flow: ss_org
 created: 2026-09-11
@@ -14,7 +14,9 @@ write_manifest:
   - tests/support/stub-backend.js   # pedigree RPC stub'ları + çağrı sayaçları
   - js/pedigree/                    # api/adapter/style/view/controller
   - vendor/cytoscape.min.js         # Task 5 P2 bandı (pinned)
-  - index.html                      # Soy & Genetik sekmesi (+?v= damgası TEK ortak değer)
+  - index.html                      # Soy & Genetik sekmesi (+?v= damga TEK ortak değer)
+  - js/ui.js                        # B3 dar dokunuş (root 2026-09-11 onayı): tab-pedigree temizlik + lazy-load kancası
+  - js/utils/handlers.js            # B3 dar dokunuş (root 2026-09-11 onayı): tab-pedigree handler kaydı
   - .claude/idle-reports/2026-09-11-pedigree-p2.md
   - .claude/reviews/2026-09-11-pedigree-p2-lead-review.md
   - .claude/tasks/2026-09-11-pedigree-p2-*.md
@@ -29,7 +31,7 @@ implement_lane: glmf_workers
 
 # G-20260911-PEDIGREE-P2-AGAC — Pedigree P2 "Ağaç" package
 
-- **Status:** ACTIVE
+- **Status:** DONE (2026-09-11 — root merge 40d09d2; lead luna 5/5 kapatıldı, root mekanik 795/1 known-red, SQL 15/15 demo)
 - **Date:** 2026-09-11
 - **Owner directive (2026-09-11):** "planı faaliyete sok" — P2 starts now,
   same lane (Lead GLM, workers GLMF). PROD deploy of the pending 6 migrations
