@@ -1,6 +1,6 @@
 ---
 id: G-20260911-PEDIGREE-P1-TEMEL
-status: active
+status: done
 owner: root
 flow: ss_org
 created: 2026-09-11
@@ -23,8 +23,9 @@ implement_lane: glmf_workers
 
 # G-20260911-PEDIGREE-P1-TEMEL — Pedigree P1 "Temel" package
 
-- **Status:** ACTIVE — revision round 1/1 open (rootgate tur-1 FAIL: F1-F8;
-  report `.claude/reviews/2026-09-11-pedigree-p1-rootgate.md` @ idle/pedigree-p1-rootgate)
+- **Status:** DONE — merged to main 31b808d (2026-09-11). Root-gate tur-1
+  FAIL→revizyon 1/1→8/8 kapandı (report `.claude/reviews/2026-09-11-pedigree-p1-rootgate.md`);
+  root mekanik doğrulama bağımsız koşumlarla yeşil. Push/PROD deploy owner kapısı.
 - **Date:** 2026-09-11
 - **Base SHA:** 0dccaeb (main tip at dispatch; includes this goal's input files)
 - **Owner directive (2026-09-11):** Start pedigree implementation via the
