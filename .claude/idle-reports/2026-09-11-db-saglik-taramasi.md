@@ -82,7 +82,9 @@ bu raporda hiçbir düzenleme yapılmadı.
   ailesi) ya da satırlar eski-sürüm yoldan geldiysa timestamp eksik kalıyor.
 - **Önerilen sınıf:** izle + PROD doğrulama (P2: sayım + canlı fonksiyon gövdesi
   salt-okunur `pg_get_functiondef`). Kod düzeltimi yalnız canlı gövde gerçekten
-  timestamp yazmıyorsa.
+  timestamp yazmıyorsa. **→ PROD sonucu (root): canlı `case_geri_al` gövdesi
+  timestamp YAZIYOR (adım 6) — sınıf "kod" değil, "izle + data-fix adayı" olarak
+  netleşti; 28-29 satır eski-yol kalıntısı.**
 
 ### BF-4 — 45 zombi "aktif" protokol: tüm çocuk görevleri kapalı [MEDIUM]
 
@@ -104,7 +106,10 @@ bu raporda hiçbir düzenleme yapılmadı.
 - **Bağlam:** eksiye düşme politika olarak serbest (BUGS.md BUG-002 notu, emsal
   migration `20260902000002`). Bulgu sınıfı "negatif var" değil, **büyüklük**
   (başlangıcın 3 katı aşım) — BUG-002'deki serbest-metin/rastgele eşleşme ailesinin
-  bir belirtisi olabilir ya da çift düşüm.
+  bir belirtisi olabilir ya da çift düşüm. **→ PROD sapma notu (root): 12 kalem
+  PROD'da da negatif ama demo değerleri şişik — büyük sapmalı kalemler (Klavil
+  demo −945 ↔ PROD −295; Enrolen −918 ↔ −293) demo E2E kalıntılarının stok
+  tüketimiyle açıklandı; referans=PROD. Ayrıntı aşağıdaki PROD bölümünde.**
 - **Önerilen sınıf:** izle + PROD probe (P3); aşım kalemlerinde hareket dökümü review.
 
 ### BF-6 — E2E kalıntı görevleri (demo test-artifact kirliliği) [LOW]
@@ -141,7 +146,11 @@ bu raporda hiçbir düzenleme yapılmadı.
   BF-6), TEDAVI_GUN 60, BESLEME 23 … **>90g = 0** — eski-yarıda takılı kalma yok.
   En eskisi 2026-08-20 (PADOK_DEGISIM, `093d5bca…`).
 - **Yorum:** birikim yeni (≤1 ay) — operasyonel gecikme + demo anlık görüntüsü etkisi
-  karışık; PROD'da gerçek dağılım P7 ile ölçülmeli.
+  karışık; PROD'da gerçek dağılım P7 ile ölçülmeli. **→ PROD sonucu (root): PROD'da
+  açık gecikmiş YALNIZ 8 (k7=5, k30=3, >90g=0) — demo'daki 272 birikimin
+  tamamına yakını demo/E2E artığı; PROD operasyonel olarak temiz. Bu sınıfın
+  "bulgusu" demo-artefakttır; PROD'daki 8'in 1'i 907 hayalet görevinin kendisi
+  (aşağıdaki PROD bölümüne bkz.).**
 - **Önerilen sınıf:** izle.
 
 ### BF-9 (zayıf sinyal, iddia DEĞİL) — vaccination_log ↔ uygulama_log eşleşmezliği
@@ -221,6 +230,49 @@ GROUP BY gorev_tipi ORDER BY 5 DESC;
 SELECT count(*) FROM gorev_log
 WHERE hayvan_id IS NULL AND aciklama LIKE 'E2E-OFLINE-%' AND NOT tamamlandi AND NOT iptal;
 ```
+
+## PROD probe sonuçları (root koşumu)
+
+Root (ZCode) 2026-09-11 ~18:10 TR'de P1–P8'i PROD'da koştu — salt-okunur
+(yalnız SELECT + `pg_get_functiondef`), PROD yazma sıfır. Aşağıdaki sayılar
+root'un bağımsız ölçümüdür (bu worker ölçmedi; alıntı gömme).
+
+### Demo ↔ PROD karşılaştırma tablosu
+
+| Probe | Sınıf | DEMO (klon 2026-09-02) | PROD (2026-09-11) | Sapma / yorum |
+|---|---|---|---|---|
+| P1 | BF-1 tohumlama dangling audit | 873 (872 aktif + 1 geri_alindi), hepsi 2026-05 | **872 aktif + 1 geri_alindi** | **BİREBİR — BF-1 PROD'da doğrulandı.** Kütle silme PROD verisinde duruyor; data-fix kararı owner'da. |
+| P2a | BF-3 geri_alindi tarihsiz | 28 | 29 | +1 — klon sonrası 1 yeni tarihsiz satır; izleme sürer. |
+| P2b | BF-3 canlı gövde | tracked gövde timestamp yazıyor | **canlı gövde de yazıyor** (`SET durum='geri_alindi', geri_alma_tarihi=now()`, adım 6) | BF-3 canlı-kod hatası DEĞİL; sınıf **"kod" → "izle + data-fix adayı"** olarak netleşti (eski-yol kalıntısı). |
+| P3 | BF-5 negatif stok | 12 kalem (Klavil −945, Enrolen −918, Halocur −495) | **12 kalem** (aşağıda tam liste) | Sayı aynı; değerler sapıyor — demo E2E tüketimi şişiriyor, **referans=PROD** (satır-içi not BF-5'te). |
+| P4 | BF-2 çift uygulama | 4 çift | **5 çift** | +907'nin ROTA çifti (`1978c04d`→`895f8c8d`, 14,7 sn, 2026-09-11 — klon sonrası, demo'da olamaz). OKSITOSIN üçlemesi ve PG çifti demo ile aynı id'ler — sınıf PROD'da da yaşıyor. |
+| P5 | BF-4 zombi aktif protokol | 45 | **40** (36 UREME + 4 BAKIM) | −5 = klon sonrası kapanmalar; sınıf PROD'da da var. |
+| P6 | BF-9 vaccination↔uygulama | 379/380 eşleşmez | **379/380** | Birebir; eşleme belirsizliği yorumu aynen geçerli (iddia yok). |
+| P7 | BF-8 açık gecikmiş görev | 272 (>90g=0) | **YALNIZ 8** (k7=5, k30=3, >90g=0) | **KRİTİK sapma:** demo birikiminin tamamına yakını demo/E2E artığı — PROD operasyonel olarak temiz. |
+| P8 | BF-6 E2E kalıntısı | 66 (oynak 46–69) | **0** | Sızma yok — kalıntı demo-only. |
+
+### P3 — PROD negatif stok değerleri (root ölçümü, referans)
+
+Sefanel 0→−700, Halocur 120→−600, Klavil 300→−295, Enrolen 251→−293,
+Makrovil 215→−247, Carofertin-E 200→−135, Ketojezik 0→−135, Marbox 0→−123,
+Florkem 0→−15, Fulimed 0→−5, Gentavilin 0→−5, E. coli Aşısı 0→−2.
+
+Sapma dökümü (demo ↔ PROD): 7 kalemde demo daha negatif (Klavil −945↔−295,
+Enrolen −918↔−293, Sefanel −711↔−700, Ketojezik −248↔−135, Fulimed −38↔−5,
+Florkem −18↔−15, Gentavilin −9↔−5) — E2E kalıntı tüketimiyle uyumlu; 2 kalemde
+eşit (Makrovil −247, E. coli −2); 3 kalemde PROD daha negatif (Halocur −495↔−600,
+Marbox −96↔−123, Carofertin-E −95↔−135) — klon sonrası PROD'da ek kullanım.
+Root'un özeti demo'nun en-büyük sapmalı kalemleri için geçerli (Klavil, Enrolen);
+yön tutarlı değil, bu yüzden referans PROD kabul edildi.
+
+### 907 yakınsama notu (root teyidi)
+
+PROD'daki tek açık gecikmiş ILERI_GEBE_ASI görevi, 907 hayalet görevinin
+kendisidir: `f80eaa6e-654f-4a85-811e-015adab24fc8`, hedef 2026-09-07,
+`etken_kod NULL`. Bu bağımsız tarama, P7 üzerinden ayrı bir yoldan 907 vakasına
+yakınsadı — taramanın etken_kod=NULL varyant probe'ları (zarf C sınıfı bağlamı)
+ile W-ROTA şeridinin teşhisi çakışıyor. Düzeltimi W-ROTA dalında ayrı yürüyor;
+bu rapor kapsamında müdahale yok.
 
 ## Şerit kuralı — subagent review notu
 
