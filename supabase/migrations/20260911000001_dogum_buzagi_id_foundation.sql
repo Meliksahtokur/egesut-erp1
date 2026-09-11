@@ -5,15 +5,14 @@
 --
 -- 1) dogum.buzagi_id text NULL -> hayvanlar(id) ON DELETE SET NULL
 -- 2) partial unique index dogum_buzagi_id_uidx (WHERE buzagi_id IS NOT NULL)
--- 3) dogum_kaydet ayni transaction'da yazar (canli demo govdesi pg_get_functiondef(20705) + tek UPDATE satiri)
--- 4) konservatif backfill (spec 2b): yalniz kupe exact + tarih eslesme + TEK aday -> yazar;
+-- 3) dogum_kaydet ayni transaction'da yazar (D53 tabani 20260906000001 govdesi + tek UPDATE satiri)
+-- 4) konservatif backfill (spec 2b) — _dogum_buzagi_backfill() ic fonksiyonu: yalniz kupe exact + tarih eslesme + TEK aday -> yazar;
 --    cok-aday / tarih-uyumsuz / aday-yok -> NULL kalir, 4 sayac RAISE NOTICE ile raporlanir
 -- 5) geri_al uyumu: prosedurel degisiklik YOK — geri_al whitelist'inde dogum yoktur; calf
 --    DELETE'inde SET NULL FK'i kendisi temizler (canli geri_al govdesi 20725 uzerinde dogrulandi)
 --
 -- Replay-safe: her adim idempotent (column/constraint guard, IF NOT EXISTS index, OR REPLACE fn,
 -- backfill yalniz buzagi_id IS NULL satirlara yazar).
-
 
 -- (1) kolon + FK — SET NULL (Rev 2 duzeltme 1): calf silinirse dogum kaydi KALIR, bag NULL olur
 DO $mig$
@@ -47,8 +46,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS dogum_buzagi_id_uidx
 COMMENT ON COLUMN public.dogum.buzagi_id IS
   'Yavru buzaginin hayvanlar.id baglantisi (Task 0.5, spec Rev 2). ON DELETE SET NULL: dogum tarihsel olaydir, calf silinirse kayit kalir bag NULL olur. Konservatif backfill: yalniz kupe exact + dogum.tarih = hayvanlar.dogum_tarihi + tek aday AUTO yazilir.';
 
--- (3) dogum_kaydet — canli demo DB govdesi (pg_get_functiondef, oid 20705) + tek UPDATE satiri
--- (asagidaki 'buzagi_id baglama' yorumu); geri kalan byte-ayni. CREATE OR REPLACE ACL'leri korur.
+-- (3) dogum_kaydet — D53 tabani: 20260906000001_postpartum_d53_e_vitamin_tek.sql
+--     govdesi AYNEN (8 gorev, gorev_sayisi 8+7) + tek fark: buzagi_id baglama
+--     UPDATE satiri (root-gate F2 duzeltmesi: onceki surum bayat canli demo
+--     govdesini yaziyor ve D53 duzeltmesini eziyordu)
+
 CREATE OR REPLACE FUNCTION public.dogum_kaydet(p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -145,9 +147,7 @@ BEGIN
       (gen_random_uuid(), p_anne_id, 'ILAC', '2. Gün PG',             p_tarih + 2,  false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', '11. Gün PG',            p_tarih + 11, false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', '25. Gün PG',            p_tarih + 25, false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
-      (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Ademin',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'ADEMIN',    v_anne_inst_id),
-      (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Yeldif',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'E_VIT',     v_anne_inst_id),
-      (gen_random_uuid(), p_anne_id, 'ILAC', '54. Gün: Yeldif',       p_tarih + 54, false, 'DOGUM-' || p_anne_id, 'E_VIT',     v_anne_inst_id),
+      (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: E Vitamini',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'E_VIT',     v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'DIGER','⚡ 58-63. gün kızgınlık takibi', p_tarih + 58, false, 'DOGUM-' || p_anne_id, NULL, v_anne_inst_id);
 
     UPDATE public.tohumlama
@@ -180,7 +180,7 @@ BEGIN
 
   RETURN jsonb_build_object(
     'ok', true, 'buzagi_id', v_buzagi_id, 'dogum_id', v_dogum_id,
-    'gorev_sayisi', (CASE WHEN v_anne_yan_etki THEN 10 ELSE 0 END) + 7,
+    'gorev_sayisi', (CASE WHEN v_anne_yan_etki THEN 8 ELSE 0 END) + 7,
     'anne_inst_id', v_anne_inst_id,
     'buzagi_inst_id', v_buzagi_inst_id, 'tohumlama_kapatildi', v_sayac,
     'coklu_dogum', v_ikinci, 'olay_id', v_olay_id, 'yavru_sirasi', v_yavru_sirasi
@@ -188,14 +188,13 @@ BEGIN
 END;
 $function$;
 
--- (3b) Konservatif backfill (spec 2b, Rev 2 duzeltme 3):
---   auto          = kupe_no exact TEK aday AND hayvanlar.dogum_tarihi = dogum.tarih AND calf baska dogum tarafindan claim edilmemis
---   cok-aday      = kupe ile 2+ hayvanlar adayi VEYA calf baska bir dogum tarafindan claim edilmis
---   tarih-uyumsuz = TEK aday var ama dogum_tarihi eslesmiyor (NULL dahil)
---   aday-yok      = kupa ile hic hayvanlar adayi yok
--- Eski 4 kriterli ranking burada KULLANILMAZ (sadece suggested_candidate olabilir).
--- Idempotent: yalniz buzagi_id IS NULL satirlara dokunur; ikinci kosum yazmaz.
-DO $mig$
+-- (3b) Konservatif backfill — cagrilabilir ic fonksiyon (root-gate F3 duzeltmesi:
+-- tek algoritma, tek kaynak; dogum_buzagi_id_test.sql de bu fonksiyonu cagirir).
+-- INTERNAL desen: grant YOK + PUBLIC'den REVOKE (repo precedansi: 20260621000002).
+CREATE OR REPLACE FUNCTION public._dogum_buzagi_backfill()
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $fn$
 DECLARE
   r        record;
   v_aday   integer;
@@ -236,8 +235,20 @@ BEGIN
     v_auto := v_auto + 1;
   END LOOP;
 
+  RETURN jsonb_build_object('auto', v_auto, 'cok-aday', v_cok,
+                            'tarih-uyumsuz', v_tarih, 'aday-yok', v_yok);
+END
+$fn$;
+
+REVOKE ALL ON FUNCTION public._dogum_buzagi_backfill() FROM PUBLIC;
+
+-- (3c) migration cagrisi: dört sayacı NOTICE ile raporlar (degerler teslim notunda)
+DO $mig$
+DECLARE
+  v_sayac jsonb;
+BEGIN
+  v_sayac := public._dogum_buzagi_backfill();
   RAISE NOTICE 'buzagi_id backfill: auto=% cok-aday=% tarih-uyumsuz=% aday-yok=%',
-    v_auto, v_cok, v_tarih, v_yok;
+    v_sayac->>'auto', v_sayac->>'cok-aday', v_sayac->>'tarih-uyumsuz', v_sayac->>'aday-yok';
 END
 $mig$;
-
