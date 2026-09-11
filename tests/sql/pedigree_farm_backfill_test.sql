@@ -107,12 +107,13 @@ BEGIN
   IF v_r->>'generated_at' !~ '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$' THEN
     RAISE EXCEPTION 'F0: generated_at ISO degil: %', v_r->>'generated_at';
   END IF;
-  -- Emisyon kurali (a): bulgusu olmayan grup emit edilmez — her grup en az 1 item
+  -- Emisyon kurali (a): bulgusu olmayan grup emit edilmez — her grubun items'i
+  -- GERCEK dizi olmali (bos dizi VE items:null F1 dersinden ikisi de red)
   SELECT count(*) INTO v_n
     FROM jsonb_array_elements(v_r->'groups') g
-   WHERE jsonb_array_length(g->'items') = 0;
+   WHERE jsonb_typeof(g->'items') <> 'array';
   IF v_n <> 0 THEN
-    RAISE EXCEPTION 'F0: % grup bos items ile emit edilmis (kural a ihlali)', v_n;
+    RAISE EXCEPTION 'F0: % grubun items''i dizi degil (bos/null emit — kural a ihlali)', v_n;
   END IF;
   -- Demo baseline: cutoff anahtari YOK → 'tanimsiz', post_cutoff + cutoff_invalid yok
   IF v_r->>'cutoff' IS DISTINCT FROM 'tanimsiz' THEN
@@ -124,6 +125,18 @@ BEGIN
   END IF;
   v_b0 := pg_temp.bf_blocker_count(v_r);
   RAISE NOTICE 'F0 OK: sekil + tanimsiz-cutoff + bos-grup-yok; baseline blocker sayisi %', v_b0;
+
+  -- ═══ F0b) Grant yuzeyi (F5, root-gate tur-1) ══════════════════════════
+  IF has_function_privilege('service_role', 'public.pedigree_integrity_report()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'F0b: service_role integrity_report EXECUTE aliyor (F5 ihlali)';
+  END IF;
+  IF NOT has_function_privilege('authenticated', 'public.pedigree_integrity_report()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'F0b: authenticated integrity_report EXECUTE verilmemis';
+  END IF;
+  IF has_function_privilege('anon', 'public.pedigree_integrity_report()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'F0b: anon integrity_report EXECUTE aliyor';
+  END IF;
+  RAISE NOTICE 'F0b OK: grantlar — authenticated=t, anon=f, service_role=f';
 
   -- ═══ FAZ A) Temiz fixture: guvenli maternal satir → edge + SIFIR blocker ═
   INSERT INTO public.hayvanlar (id, kupe_no, cinsiyet, durum, dogum_tarihi)
@@ -483,6 +496,27 @@ BEGIN
   END IF;
   DELETE FROM public.pedigree_meta WHERE key = 'semen_controlled_cutoff';
   RAISE NOTICE 'FE OK: cutoff gecersiz→gecersiz+blocker; gecerli→post_cutoff r12-F68 predikati (%+1 item)', v_real_pc;
+
+  -- E3) gecerli cutoff + SIFIR ihlal → grup HIC emit edilmez (F1, root-gate
+  -- tur-1: ne items:null ne bos dizi — absent-group kurali; Goal Rev 1 G2)
+  -- semen_id kolonu E2'de bu tx icinde eklendi; ihlal uretmeyen gelecek cutoff
+  INSERT INTO public.pedigree_meta (key, value) VALUES ('semen_controlled_cutoff', '2999-01-01T00:00:00Z');
+  v_r := public.pedigree_integrity_report();
+  IF v_r->>'cutoff' IS DISTINCT FROM '2999-01-01T00:00:00.000Z' THEN
+    RAISE EXCEPTION 'E3: cutoff ISO beklenirdi, gelen %', v_r->>'cutoff';
+  END IF;
+  IF pg_temp.bf_has_group(v_r, 'post_cutoff_null_semen') THEN
+    RAISE EXCEPTION 'E3/F1: gecerli cutoff + 0 ihlalde post_cutoff emit edildi (items=null/bos)';
+  END IF;
+  -- butun gruplarda items gercek dizi (global olcek — her durumda gecerli)
+  SELECT count(*) INTO v_n
+    FROM jsonb_array_elements(v_r->'groups') g
+   WHERE jsonb_typeof(g->'items') <> 'array';
+  IF v_n <> 0 THEN
+    RAISE EXCEPTION 'E3: % grubun items''i dizi degil (F1 regresyonu)', v_n;
+  END IF;
+  DELETE FROM public.pedigree_meta WHERE key = 'semen_controlled_cutoff';
+  RAISE NOTICE 'E3 OK: gecerli cutoff + 0 ihlal → post_cutoff grup YOK (F1 fix)';
 
   -- ═══ FAZ F) Task 8 gecikmis gruplari: map tablosu YOK → ASLA emit edilmez ═
   INSERT INTO public.tohumlama (id, hayvan_id, tarih, sperma, sonuc, created_at)
