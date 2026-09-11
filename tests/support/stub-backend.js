@@ -29,14 +29,16 @@ const D = (n) => {
 const H_GEBE = '11111111-1111-4111-8111-111111111111'; // dişi — gebe
 const H_BEKLIYOR = '22222222-2222-4222-8222-222222222222'; // dişi — bekliyor tohumlama
 const H_ERKEK = '33333333-3333-4333-8333-333333333333'; // erkek — filtre ayrışımı için
+const H_ANNEANNE = '44444444-4444-4444-8444-444444444444'; // dişi — büyükanne (pedigree farm)
+const H_DEVANNE = '55555555-5555-4555-8555-555555555555'; // dişi — dev büyükanne (pedigree farm)
 const T_GEBE = 'aaaaaaa1-0000-4000-8000-000000000001';
 const T_BEKLIYOR = 'aaaaaaa2-0000-4000-8000-000000000002';
 
-// ─── Pedigree projection fixture'ı (G-20260911-PEDIGREE-P2, W3) ─────────────
-// 4 ata kuşağı (focus + 4 = 5 kuşak soy) dam hattı zinciri; her kuşakta external
-// sire. farm_animal_id H_GEBE/H_BEKLIYOR'a bağlanır → demo akışında hayvan
-// kartından karta geçiş test edilir. Düğüm/kenar sayıları meta'nın EFEKTİF
-// değerleriyle tutarlı (ancestor_depth: 4 gerçek; focus'un yavrusu yok → 0).
+// ─── Pedigree projection fixture'ı (G-20260911-PEDIGREE-P2, W3-fix F2) ──────
+// KONTRAT-ŞEKLİ (foundation chk_pedigree_nodes_kind_invariant birebir):
+// farm_animal → farm_animal_id DOLU (freshStore hayvanlarına bağlı: E2E1/E2E2/
+// E2E4/E2E5), external_animal → farm_animal_id null. 4 ata kuşağı; her kuşakta
+// external sire. W3-fix öncesi GD/GGD farm_animal+null id idi — invariant ihlali.
 const PED_F = '99999999-1111-4111-8111-000000000001';
 const PED_D = '99999999-1111-4111-8111-000000000002';
 const PED_S = '99999999-1111-4111-8111-000000000003';
@@ -46,58 +48,118 @@ const PED_GGD = '99999999-1111-4111-8111-000000000006';
 const PED_GGS = '99999999-1111-4111-8111-000000000007';
 const PED_GGGD = '99999999-1111-4111-8111-000000000008';
 
-// W1 RPC kontratı (Task 3.2): {focus, nodes[], edges[], meta} — meta clamp'lenmiş
-// EFEKTİF değerler. Stub canlı RPC'nin yerine geçmez; yalnız UI 4-kuşak akışını sürer.
-function pedigreeGraphFixture() {
-  const node = (id, kind, farmId, label, sex) =>
-    ({ id, kind, farm_animal_id: farmId, label, sex, breed: 'Simental', birth_date: null });
+const PED_NODES = [
+  { id: PED_F, kind: 'farm_animal', farm_animal_id: H_GEBE, label: 'E2E1', sex: 'Dişi', breed: 'Simental', birth_date: null },
+  { id: PED_D, kind: 'farm_animal', farm_animal_id: H_BEKLIYOR, label: 'E2E2', sex: 'Dişi', breed: 'Simental', birth_date: null },
+  { id: PED_S, kind: 'external_animal', farm_animal_id: null, label: 'EXT-BOGA-1', sex: 'Erkek', breed: 'Simental', birth_date: null },
+  { id: PED_GD, kind: 'farm_animal', farm_animal_id: H_ANNEANNE, label: 'E2E4', sex: 'Dişi', breed: 'Simental', birth_date: null },
+  { id: PED_GS, kind: 'external_animal', farm_animal_id: null, label: 'EXT-BOGA-2', sex: 'Erkek', breed: 'Simental', birth_date: null },
+  { id: PED_GGD, kind: 'farm_animal', farm_animal_id: H_DEVANNE, label: 'E2E5', sex: 'Dişi', breed: 'Simental', birth_date: null },
+  { id: PED_GGS, kind: 'external_animal', farm_animal_id: null, label: 'EXT-BOGA-3', sex: 'Erkek', breed: 'Simental', birth_date: null },
+  { id: PED_GGGD, kind: 'external_animal', farm_animal_id: null, label: 'EXT-DIS-ATA', sex: 'Dişi', breed: 'Holştayn', birth_date: null },
+];
+const PED_EDGES = [
+  { id: 'ped-e-1', source: PED_D, target: PED_F, role: 'dam', source_type: 'birth' },
+  { id: 'ped-e-2', source: PED_S, target: PED_F, role: 'sire', source_type: 'birth' },
+  { id: 'ped-e-3', source: PED_GD, target: PED_D, role: 'dam', source_type: 'birth' },
+  { id: 'ped-e-4', source: PED_GS, target: PED_D, role: 'sire', source_type: 'birth' },
+  { id: 'ped-e-5', source: PED_GGD, target: PED_GD, role: 'dam', source_type: 'birth' },
+  { id: 'ped-e-6', source: PED_GGS, target: PED_GD, role: 'sire', source_type: 'birth' },
+  { id: 'ped-e-7', source: PED_GGGD, target: PED_GGD, role: 'dam', source_type: 'birth' },
+];
+const PED_KNOWN_NODES = new Set(PED_NODES.map(n => n.id));
+const PED_FARM_BY_NODE = new Map([
+  [PED_F, H_GEBE], [PED_D, H_BEKLIYOR], [PED_GD, H_ANNEANNE], [PED_GGD, H_DEVANNE],
+]);
+
+// Yeniden-merkezleme (F2): istenen odak için GERÇEK alt graf — focus + atalar
+// (istenen ancestor_depth'e kadar, kuşak katmanlı) + focus'un doğrudan
+// yavruları (descendant_depth ≥ 1 ise). Odak VE derinlik değişince düğüm/kenar
+// kümesi değişir; meta EFEKTİF değerleri taşır (W1 Task 3.2 sözleşmesi).
+function pedigreeSubgraphFor(pFocusNodeId, pAncDepth, pDescDepth) {
+  const ancLimit = Number.isInteger(pAncDepth) && pAncDepth >= 0 ? pAncDepth : 4;
+  const descDepth = Number.isInteger(pDescDepth) && pDescDepth >= 0 ? pDescDepth : 1;
+  const seviye = new Map([[pFocusNodeId, 0]]);
+  let frontier = [pFocusNodeId];
+  while (frontier.length) {
+    const next = [];
+    for (const id of frontier) {
+      for (const e of PED_EDGES) {
+        if (e.target === id && !seviye.has(e.source) && seviye.get(id) + 1 <= ancLimit) {
+          seviye.set(e.source, seviye.get(id) + 1);
+          next.push(e.source);
+        }
+      }
+    }
+    frontier = next;
+  }
+  const ids = new Set(seviye.keys());
+  let yavruKusak = 0;
+  if (descDepth >= 1) {
+    for (const e of PED_EDGES) {
+      if (e.source === pFocusNodeId) { ids.add(e.target); yavruKusak = 1; }
+    }
+  }
   return {
-    focus: PED_F,
-    nodes: [
-      node(PED_F, 'farm_animal', H_GEBE, 'E2E1', 'Dişi'),            // focus
-      node(PED_D, 'farm_animal', H_BEKLIYOR, 'E2E2', 'Dişi'),        // 1. kuşak anne
-      node(PED_S, 'external_animal', null, 'EXT-BOGA-1', 'Erkek'),   // 1. kuşak baba
-      node(PED_GD, 'farm_animal', null, 'BUYUKANNE', 'Dişi'),        // 2. kuşak
-      node(PED_GS, 'external_animal', null, 'EXT-BOGA-2', 'Erkek'),
-      node(PED_GGD, 'farm_animal', null, 'DEV-BUYUKANNE', 'Dişi'),   // 3. kuşak
-      node(PED_GGS, 'external_animal', null, 'EXT-BOGA-3', 'Erkek'),
-      node(PED_GGGD, 'external_animal', null, 'EXT-DIS-ATA', 'Dişi'), // 4. kuşak
-    ],
-    edges: [
-      { id: 'ped-e-1', source: PED_D, target: PED_F, role: 'dam', source_type: 'birth' },
-      { id: 'ped-e-2', source: PED_S, target: PED_F, role: 'sire', source_type: 'birth' },
-      { id: 'ped-e-3', source: PED_GD, target: PED_D, role: 'dam', source_type: 'birth' },
-      { id: 'ped-e-4', source: PED_GS, target: PED_D, role: 'sire', source_type: 'birth' },
-      { id: 'ped-e-5', source: PED_GGD, target: PED_GD, role: 'dam', source_type: 'birth' },
-      { id: 'ped-e-6', source: PED_GGS, target: PED_GD, role: 'sire', source_type: 'birth' },
-      { id: 'ped-e-7', source: PED_GGGD, target: PED_GGD, role: 'dam', source_type: 'birth' },
-    ],
-    meta: { ancestor_depth: 4, descendant_depth: 0, truncated: false },
+    focus: pFocusNodeId,
+    nodes: PED_NODES.filter(n => ids.has(n.id)),
+    edges: PED_EDGES.filter(e => ids.has(e.source) && ids.has(e.target)),
+    meta: {
+      ancestor_depth: Math.max(0, ...seviye.values()),
+      descendant_depth: yavruKusak,
+      truncated: false,
+    },
   };
 }
 
-function pedigreeFixtureForNode(pFocusNodeId) {
-  const g = pedigreeGraphFixture();
-  if ([PED_F, PED_D, PED_S, PED_GD, PED_GS, PED_GGD, PED_GGS, PED_GGGD].includes(pFocusNodeId)) {
-    g.focus = pFocusNodeId;
+// W1 depth guard'ı (projection_rpc.sql:80,83): NULL/negatif reddedilir —
+// kontrat-sadık 400; yalnız çağrıda hiç verilmemişse (undefined) default uygulanır.
+function pedigreeDerinlik(v, varsayilan, ad) {
+  if (v === undefined) return varsayilan;
+  if (!Number.isInteger(v) || v < 0) {
+    return { __httpStatus: 400, body: { message: `gecersiz ${ad} depth (NULL/negatif reddedilir): ${v}`, code: 'P0001' } };
   }
-  return g;
-}
-
-function pedigreeFixtureForAnimal(pHayvanId) {
-  const g = pedigreeGraphFixture();
-  if (pHayvanId === H_BEKLIYOR) g.focus = PED_D;
-  return g; // varsayılan/unknown hayvan → F focus
+  return v;
 }
 
 // RPC çağrı sayaçları — E2E'de 4-kuşak focal akışının gerçekten RPC attığını
-// kanıtlar (fake-arm karşıtı): test `pedigreeRpcCounts.pedigree_subgraph_for_animal`
-// üzerinden istek sayısını doğrular; resetStore ile tazelenir.
+// kanıtlar (fake-arm karşıtı): tests/unit/pedigree-stub-backend.test.js iddia
+// eder; e2e spec'leri tests/support/app.js re-export'u üzerinden okur;
+// resetStore ile tazelenir.
 export const pedigreeRpcCounts = {
   pedigree_subgraph: 0,
   pedigree_subgraph_for_animal: 0,
   pedigree_integrity_report: 0,
 };
+
+function pedigreeFixtureForNode(pFocusNodeId, pAncDepth, pDescDepth) {
+  if (!PED_KNOWN_NODES.has(pFocusNodeId)) {
+    // W1 kontratı: RAISE EXCEPTION (varsayılan errcode P0001 — projection_rpc.sql
+    // USING ERRCODE kullanmaz; 'P0002' yanlış olurdu, review turunda düzeltildi)
+    return { __httpStatus: 400, body: { message: `focus node bulunamadi ya da farkli farm: ${pFocusNodeId}`, code: 'P0001' } };
+  }
+  const anc = pedigreeDerinlik(pAncDepth, 4, 'ancestor');
+  if (anc && anc.__httpStatus) return anc;
+  const desc = pedigreeDerinlik(pDescDepth, 1, 'descendant');
+  if (desc && desc.__httpStatus) return desc;
+  return pedigreeSubgraphFor(pFocusNodeId, anc, desc);
+}
+
+function pedigreeFixtureForAnimal(pHayvanId, pAncDepth, pDescDepth) {
+  let nodeId = null;
+  for (const [k, hayvanId] of PED_FARM_BY_NODE) {
+    if (hayvanId === pHayvanId) { nodeId = k; break; }
+  }
+  if (!nodeId) {
+    // W1 kontratı: RAISE EXCEPTION (varsayılan errcode P0001)
+    return { __httpStatus: 400, body: { message: `hayvan icin pedigree node bulunamadi ya da farkli farm: ${pHayvanId}`, code: 'P0001' } };
+  }
+  const anc = pedigreeDerinlik(pAncDepth, 4, 'ancestor');
+  if (anc && anc.__httpStatus) return anc;
+  const desc = pedigreeDerinlik(pDescDepth, 1, 'descendant');
+  if (desc && desc.__httpStatus) return desc;
+  return pedigreeSubgraphFor(nodeId, anc, desc);
+}
 
 function freshStore() {
   return {
@@ -105,6 +167,8 @@ function freshStore() {
       { id: H_GEBE, kupe_no: 'E2E1', devlet_kupe: 'TR-E2E-1', cinsiyet: 'Dişi', grup: 'Gebe İnek', padok: '', irk: 'Simental', durum: 'Aktif', kisir: false },
       { id: H_BEKLIYOR, kupe_no: 'E2E2', devlet_kupe: 'TR-E2E-2', cinsiyet: 'Dişi', grup: 'Düve (Büyük)', padok: '', irk: 'Holştayn', durum: 'Aktif', kisir: false },
       { id: H_ERKEK, kupe_no: 'E2E3', devlet_kupe: 'TR-E2E-3', cinsiyet: 'Erkek', grup: 'Boğa', padok: '', irk: 'Simental', durum: 'Aktif', kisir: false },
+      { id: H_ANNEANNE, kupe_no: 'E2E4', devlet_kupe: 'TR-E2E-4', cinsiyet: 'Dişi', grup: 'Gebe İnek', padok: '', irk: 'Simental', durum: 'Aktif', kisir: false },
+      { id: H_DEVANNE, kupe_no: 'E2E5', devlet_kupe: 'TR-E2E-5', cinsiyet: 'Dişi', grup: 'Düve (Büyük)', padok: '', irk: 'Simental', durum: 'Aktif', kisir: false },
     ],
     tohumlama: [
       { id: T_GEBE, hayvan_id: H_GEBE, sperma: 'E2E Sperma A', tarih: D(40), sonuc: 'Gebe', deneme_no: 1 },
@@ -174,11 +238,11 @@ const RPCS = {
   // ── Pedigree (Task 3 kontratı; G-20260911-PEDIGREE-P2) ──
   pedigree_subgraph: (p) => {
     pedigreeRpcCounts.pedigree_subgraph++;
-    return pedigreeFixtureForNode(p && p.p_focus_node_id);
+    return pedigreeFixtureForNode(p && p.p_focus_node_id, p && p.p_ancestor_depth, p && p.p_descendant_depth);
   },
   pedigree_subgraph_for_animal: (p) => {
     pedigreeRpcCounts.pedigree_subgraph_for_animal++;
-    return pedigreeFixtureForAnimal(p && p.p_hayvan_id);
+    return pedigreeFixtureForAnimal(p && p.p_hayvan_id, p && p.p_ancestor_depth, p && p.p_descendant_depth);
   },
   pedigree_integrity_report: () => {
     pedigreeRpcCounts.pedigree_integrity_report++;
@@ -217,7 +281,13 @@ async function handleRest(route, request) {
     rpcLog.push({ fn, params, ts: Date.now() });
     const handler = RPCS[fn];
     if (!handler) return json(route, 200, { ok: true }); // bilinmeyen RPC: iyimser ok
-    return json(route, 200, handler(params));
+    const out = handler(params);
+    if (out && typeof out === 'object' && out.__httpStatus) {
+      // Kontrat-sadık RPC hatası (gerçek RPC RAISE EXCEPTION → PostgREST 4xx +
+      // {message, code}); supabase-js bunu {data: null, error} olarak verir.
+      return json(route, out.__httpStatus, out.body || { message: 'rpc hata' });
+    }
+    return json(route, 200, out);
   }
 
   // ── Auth (demo autologin) — path: /auth/v1/... → parts[0]='auth' ──

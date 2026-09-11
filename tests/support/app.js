@@ -9,7 +9,13 @@
 
 import { test, expect } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import { installStubBackend, store, insertLog } from './stub-backend.js';
+import { installStubBackend, store, insertLog, pedigreeRpcCounts } from './stub-backend.js';
+
+// Pedigree RPC çağrı sayaçları (W3-fix F1) — e2e yüzeyine açılan re-export.
+// Bugün tüketen spec YOK (pedigree e2e henüz yazılmadı); mevcut iddia
+// tests/unit/pedigree-stub-backend.test.js'te (dispatch→sayaç, resetStore→0).
+// P2 demo gate'inde Soy sekmesi akışı spec'lendiğinde bu export kullanılmalı.
+export { pedigreeRpcCounts };
 
 export const IS_DEMO = !!process.env.PLAYWRIGHT_DEMO_MODE;
 export const STUB = !!process.env.PLAYWRIGHT_STUB_BACKEND;
