@@ -11,13 +11,20 @@ write_manifest:
   - tests/sql/
   - .claude/idle-reports/2026-09-11-pedigree-p1.md
   - .claude/reviews/2026-09-11-pedigree-p1-lead-review.md
+  # Rev 1 (rootgate F7) — root authorization 2026-09-11, NOT silent widening:
+  - scripts/db-dry-run.sh            # plan Task 1.7 tooling (tracked + TMPDIR-uyumlu)
+  - scripts/refresh_lsp_schema.sh    # plan Task 1.7 tooling
+  - README.md                        # dry-run kapısı kullanım satırı
+  - .gitignore                       # iki script'in negasyonu
+  - .claude/tasks/2026-09-11-pedigree-p1-*.md  # ss-org süreç zarfları (kanıt zinciri)
 review_lane: codex_luna_max_bounded
 implement_lane: glmf_workers
 ---
 
 # G-20260911-PEDIGREE-P1-TEMEL — Pedigree P1 "Temel" package
 
-- **Status:** ACTIVE
+- **Status:** ACTIVE — revision round 1/1 open (rootgate tur-1 FAIL: F1-F8;
+  report `.claude/reviews/2026-09-11-pedigree-p1-rootgate.md` @ idle/pedigree-p1-rootgate)
 - **Date:** 2026-09-11
 - **Base SHA:** 0dccaeb (main tip at dispatch; includes this goal's input files)
 - **Owner directive (2026-09-11):** Start pedigree implementation via the
@@ -56,12 +63,19 @@ gate for Faz 7 only — record it as an open item, do not wait.
    dam/sire unique, self-parent reject, cycle reject, parent-edge on
    explicit founder rejected, sex normalization (Erkek→male, Dişi→female),
    operator-guard fail-closed without op_owner_uid, grants are
-   authenticated-only, birth-path bypasses guard via INTERNAL core.
-3. **G2:** `pedigree_integrity_report()` on demo DB: blockers==0 with fixture
-   data; 18-code emission rules (absent group not emitted; cutoff
-   `tanimsiz` skips the post-cutoff group); maternal edges follow the
-   buzagi_id FK predicate; backfill is idempotent (second run adds no
-   nodes/edges).
+   authenticated-only. **Birth-path ölçütü (Rev 1 — rootgate F4):** P1'de
+   yalnız INTERNAL `_pedigree_parent_set_core` MEKANİZMASI kanıtlanır;
+   üretim `dogum_kaydet`→core bağlantısı **Faz 7**'dir (ET owner kapısı) —
+   test üretim çağrıcı zinciri iddiası TAŞIMAZ, bunu açıkça yazar.
+3. **G2:** `pedigree_integrity_report()` on demo DB: **fixture-DELTA
+   criterion (Rev 1 — rootgate F6):** temiz fixture eklendiğinde blocker
+   DELTASI 0; bilinçli anomaly fixture'ları beklenen blokerleri üretir;
+   18-kod emisyon kuralları (absent group not emitted — geçerli cutoff +
+   sıfır ihlalde dahi grup YOK; cutoff `tanimsiz` skips the post-cutoff
+   group); demo'da önceden var olan gerçek veri-kalitesi blokerleri (2
+   maternal) ölçütün DIŞINDAdır — teslim raporunda veri kalitesi bulgusu
+   olarak listelenir. Maternal edges follow the buzagi_id FK predicate;
+   backfill is idempotent (second run adds no nodes/edges).
 4. **Suite:** `npm run test:unit` — existing suite must not regress
    (the known-red gecmis-pipeline DÜN test on main pre-dates this goal).
 5. **Migration discipline:** replay-safe (idempotent DO blocks), farm_id
