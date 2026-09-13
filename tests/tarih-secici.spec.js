@@ -77,9 +77,10 @@ test.describe('F2 — kanonik tarih seçici (native date göcü)', () => {
     await page.click('#b-tarih-btn');
     await expect(takvim(page)).toBeVisible();
 
-    // Ay başlığı Türkçe — en-US locale'ine rağmen (locale sızıntı kilidi)
-    const baslik = await page.locator('#tek-tarih-takvim span', { hasText: /\d{4}/ }).first().innerText();
-    expect(TR_AYLAR.some(ay => baslik.startsWith(ay)), `başlık TR ay içermeli: "${baslik}"`).toBe(true);
+    // Ay başlığı Türkçe — en-US locale'ine rağmen (locale sızıntı kilidi).
+    // R1: başlık artık ay/yıl <select> dropdown'ı — seçili opsiyon TR ay adı.
+    const seciliAy = await page.locator('#tek-tarih-ay-sec option:checked').innerText();
+    expect(TR_AYLAR, `seçili ay TR olmalı: "${seciliAy}"`).toContain(seciliAy);
 
     const t = await bugunIso(page);
     await gunHucreTikla(page, t);
@@ -102,9 +103,9 @@ test.describe('F2 — kanonik tarih seçici (native date göcü)', () => {
     await page.fill('#tek-tarih-giris', '15.07.2026');
     await page.click('#tek-tarih-takvim button:has-text("Uygula")');
 
-    // El girişi görünümü Temmuz'a taşıdı — Türkçe ay adıyla
-    const baslik = await page.locator('#tek-tarih-takvim span', { hasText: /2026/ }).first().innerText();
-    expect(baslik).toContain('Temmuz');
+    // El girişi görünümü Temmuz'a taşıdı — R1: başlık dropdown'da okunur
+    await expect(page.locator('#tek-tarih-ay-sec')).toHaveValue('6'); // Temmuz (0-based)
+    await expect(page.locator('#tek-tarih-yil-sec')).toHaveValue('2026');
 
     await page.click('#tek-tarih-takvim button:has-text("Onayla")');
     await expect(takvim(page)).toHaveCount(0);
@@ -158,5 +159,120 @@ test.describe('F2 — kanonik tarih seçici (native date göcü)', () => {
     await expect(hucre, 'gelecek gün seçilemez olmalı (onclick yok)').toHaveCount(0);
     await page.click('#tek-tarih-takvim button:has-text("İptal")');
     await expect(takvim(page)).toHaveCount(0);
+  });
+});
+
+// ═══ R1 — SAHİP TESTİ REVİZYONU (G-20260913-TARIH-SECICI-R1) ═══
+// Bulgu 2: masaüstü (≥900px) modal kartı 400px + ortalı; mobil (412×915)
+// tam-genişlik alt-sheet KORUNUR ("telefonda gayet iyi").
+// Bulgu 1: nav okları ≥40px dokunma hedefi.
+// Bulgu 4: başlıkta ay+yıl dropdown.
+// Bulgu 3: maske — 11122026 → 11.12.2026; ayraç toleransı 13,09,2026.
+
+test.describe('R1 — masaüstü kompakt modal (1920×1080)', () => {
+  test.use({ viewport: { width: 1920, height: 1080 }, hasTouch: false, isMobile: false });
+
+  test('masaüstü: modal kartı 360–440px + ortalı; nav oku ≥40px', async ({ page }) => {
+    await openApp(page);
+    await navTo(page, '#nb-log');
+    await page.click('text=Doğum Kaydı');
+    await expect(page.locator('#m-birth')).toHaveClass(/on/);
+    await page.click('#b-tarih-btn');
+    await expect(takvim(page)).toBeVisible();
+
+    const kart = await page.locator('#tek-tarih-takvim .tarih-modal-kart').boundingBox();
+    expect(kart.width).toBeLessThanOrEqual(440);
+    expect(kart.width).toBeGreaterThanOrEqual(360);
+    expect(kart.x + kart.width / 2).toBeGreaterThan(1920 / 2 - 40); // yatay ortada
+    expect(kart.x + kart.width / 2).toBeLessThan(1920 / 2 + 40);
+    expect(kart.y + kart.height / 2).toBeGreaterThan(1080 / 2 - 80); // dikey ortada
+    expect(kart.y + kart.height / 2).toBeLessThan(1080 / 2 + 80);
+
+    const ok = await page.locator('#tek-tarih-takvim button[aria-label="Önceki ay"]').boundingBox();
+    expect(ok.width).toBeGreaterThanOrEqual(40);
+    expect(ok.height).toBeGreaterThanOrEqual(40);
+  });
+
+  test('dropdown: ay/yıl seçimi görünümü taşır, hücre seçimi değeri yazar', async ({ page }) => {
+    await openApp(page);
+    await navTo(page, '#nb-log');
+    await page.click('text=Doğum Kaydı');
+    await expect(page.locator('#m-birth')).toHaveClass(/on/);
+    await page.click('#b-tarih-btn');
+    await expect(takvim(page)).toBeVisible();
+
+    // Doğum senaryosu (sahip: geçmiş yıllar hâkim) — Ocak 2018'e atla
+    await page.selectOption('#tek-tarih-ay-sec', '0');
+    await page.selectOption('#tek-tarih-yil-sec', '2018');
+    await expect(page.locator('#tek-tarih-ay-sec')).toHaveValue('0');
+    await expect(page.locator('#tek-tarih-yil-sec')).toHaveValue('2018');
+
+    await page.locator('#tek-tarih-takvim div[onclick*="2018-01-15"]').click();
+    await page.click('#tek-tarih-takvim button:has-text("Onayla")');
+    await expect(takvim(page)).toHaveCount(0);
+    await expect(page.locator('#b-tarih')).toHaveValue('2018-01-15');
+    await expect(page.locator('#b-tarih-btn')).toHaveText(/📅 15\.01\.2018/);
+  });
+});
+
+test.describe('R1 — mobil korunur + maske girişi (412×915)', () => {
+  test.use({ viewport: { width: 412, height: 915 }, hasTouch: true, isMobile: true });
+
+  test('maske: 11122026 → 11.12.2026; Uygula Aralığa atlar ve seçer', async ({ page }) => {
+    // Yüzey: ta-tarih (görev hedefi — gelecek serbest); i-tarih max=bugun
+    // olduğu için sahibin gelecek-tarih örneği orada red edilir (kural doğru,
+    // yüzey yanlış olurdu). FAB görevler sayfasındadır.
+    await openApp(page);
+    await navTo(page, '#nb-tasks');
+    await page.click('[data-action="open-task-add-modal"]');
+    await expect(page.locator('#m-task-add')).toHaveClass(/on/);
+    await page.click('#ta-tarih-btn');
+    await expect(takvim(page)).toBeVisible();
+
+    await page.fill('#tek-tarih-giris', '11122026');
+    await expect(page.locator('#tek-tarih-giris')).toHaveValue('11.12.2026');
+    await page.click('#tek-tarih-takvim button:has-text("Uygula")');
+    await expect(page.locator('#tek-tarih-ay-sec')).toHaveValue('11');
+    await expect(page.locator('#tek-tarih-yil-sec')).toHaveValue('2026');
+    await page.locator('#tek-tarih-takvim div[onclick*="2026-12-11"]').click();
+    await page.click('#tek-tarih-takvim button:has-text("Onayla")');
+    await expect(takvim(page)).toHaveCount(0);
+    await expect(page.locator('#ta-tarih')).toHaveValue('2026-12-11');
+  });
+
+  test('ayraç toleransı: 13,09,2026 → 13.09.2026 (sahibin bugünkü hata örneği)', async ({ page }) => {
+    await openApp(page);
+    await navTo(page, '#nb-log');
+    await page.click('[data-action="open-insem-modal"]');
+    await expect(page.locator('#m-insem')).toHaveClass(/on/);
+    await page.click('#i-tarih-btn');
+    await expect(takvim(page)).toBeVisible();
+
+    await page.fill('#tek-tarih-giris', '13,09,2026');
+    await expect(page.locator('#tek-tarih-giris')).toHaveValue('13.09.2026');
+    await page.click('#tek-tarih-takvim button:has-text("Uygula")');
+    await expect(page.locator('#tek-tarih-ay-sec')).toHaveValue('8'); // Eylül
+    await page.click('#tek-tarih-takvim button:has-text("Onayla")');
+    await expect(takvim(page)).toHaveCount(0);
+    await expect(page.locator('#i-tarih')).toHaveValue('2026-09-13');
+  });
+
+  test('mobil: kart tam-genişlik alt-sheet kalır, gün tıkı davranışı aynı', async ({ page }) => {
+    await openApp(page);
+    await navTo(page, '#nb-log');
+    await page.click('text=Doğum Kaydı');
+    await expect(page.locator('#m-birth')).toHaveClass(/on/);
+    await page.click('#b-tarih-btn');
+    await expect(takvim(page)).toBeVisible();
+
+    const kart = await page.locator('#tek-tarih-takvim .tarih-modal-kart').boundingBox();
+    expect(kart.width).toBeGreaterThan(412 * 0.9);          // tam genişlik (alt-sheet)
+    expect(kart.y + kart.height).toBeGreaterThan(915 - 60); // alta yaslı
+
+    const t = await bugunIso(page);
+    await page.locator(`#tek-tarih-takvim div[onclick*="${t}"]`).click();
+    await page.click('#tek-tarih-takvim button:has-text("Onayla")');
+    await expect(takvim(page)).toHaveCount(0);
+    await expect(page.locator('#b-tarih')).toHaveValue(t);
   });
 });

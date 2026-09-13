@@ -5,7 +5,8 @@ const assert = require('node:assert');
 const {
   TARIH_AY_ADLARI, TARIH_GUN_ADLARI,
   tarihArtikYilMi, tarihAyGunSayisi, tarihGecerliMi, tarihIsoTr,
-  tarihParse, tarihAraliktaMi, tarihAyIzgara, tarihYilKaydir
+  tarihParse, tarihAraliktaMi, tarihAyIzgara, tarihYilKaydir,
+  tarihGirisCoz, tarihMaskeUygula, tarihMaskeImlec, tarihYilAraligi
 } = require('../../js/tarih/tarih.js');
 
 // ── VERİ ──
@@ -134,6 +135,125 @@ test('tarihParse: 2 haneli yıl girişinde hayali gün yine red — yıl 2000+yy
   // 29.02.26 → 2026 artık DEĞİL → red; 29.02.24 → 2024 artık → kabul
   assert.strictEqual(tarihParse('29.02.26').ok, false);
   assert.deepStrictEqual(tarihParse('29.02.24'), { ok:true, iso:'2024-02-29' });
+});
+
+// ── R1 (G-20260913-TARIH-SECICI-R1) — MASKE + NORMALİZASYON + YIL ARALIĞI ──
+// Sahip testi bulguları: '13,09,2026' "okunamadı" verdi; maske yoktu; ay/yıl
+// dropdown yoktu. tarihParse sözleşmesi SABİT kalır (yukarıdaki red-pinler);
+// tolerans AYRI saf adımlarda (tarihGirisCoz / tarihMaskeUygula) yaşar.
+
+test('tarihGirisCoz: ayraç toleransı — , / - ve boşluk → nokta (sahip: 13,09,2026)', () => {
+  assert.deepStrictEqual(tarihGirisCoz('13,09,2026'), { ok:true, iso:'2026-09-13' });
+  assert.deepStrictEqual(tarihGirisCoz('13/09/2026'), { ok:true, iso:'2026-09-13' });
+  assert.deepStrictEqual(tarihGirisCoz('13-09-2026'), { ok:true, iso:'2026-09-13' });
+  assert.deepStrictEqual(tarihGirisCoz('13 09 2026'), { ok:true, iso:'2026-09-13' });
+  assert.deepStrictEqual(tarihGirisCoz('13.09.2026'), { ok:true, iso:'2026-09-13' });
+  assert.deepStrictEqual(tarihGirisCoz('05,02,26'), { ok:true, iso:'2026-02-05' });
+});
+
+test('tarihGirisCoz: mm/dd TUZAĞI normalizasyondan sonra da kapalı — 05.02 = 5 Şubat', () => {
+  assert.deepStrictEqual(tarihGirisCoz('05.02.2026'), { ok:true, iso:'2026-02-05' });
+  assert.deepStrictEqual(tarihGirisCoz('5,2,2026'), { ok:true, iso:'2026-02-05' });
+});
+
+test('tarihGirisCoz: hayali tarih normalizasyondan sonra da RED — sessiz düzeltme yok', () => {
+  const r = tarihGirisCoz('31,02,2026');
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, /Şubat 2026 28 gün/);
+  assert.strictEqual(tarihGirisCoz('90,09,2026').ok, false);
+  assert.strictEqual(tarihGirisCoz('abc').ok, false);
+  assert.strictEqual(tarihGirisCoz('').ok, false);
+  assert.strictEqual(tarihGirisCoz(null).ok, false);
+});
+
+test('tarihMaskeUygula: rakam dizisi GG.AA.YYYY segmentlerine dizer — 11122026 → 11.12.2026', () => {
+  assert.strictEqual(tarihMaskeUygula('11122026').metin, '11.12.2026');
+  assert.strictEqual(tarihMaskeUygula('1112202').metin, '11.12.202');
+  assert.strictEqual(tarihMaskeUygula('11122').metin, '11.12.2');
+  assert.strictEqual(tarihMaskeUygula('1112').metin, '11.12');
+  assert.strictEqual(tarihMaskeUygula('111').metin, '11.1');
+  assert.strictEqual(tarihMaskeUygula('11').metin, '11');
+  assert.strictEqual(tarihMaskeUygula('1').metin, '1');
+  assert.strictEqual(tarihMaskeUygula('').metin, '');
+});
+
+test('tarihMaskeUygula: yazılan ayraç noktaya döner — , / - ve boşluk hepsi', () => {
+  assert.strictEqual(tarihMaskeUygula('13,09,2026').metin, '13.09.2026');
+  assert.strictEqual(tarihMaskeUygula('13/09/2026').metin, '13.09.2026');
+  assert.strictEqual(tarihMaskeUygula('13-09-2026').metin, '13.09.2026');
+  assert.strictEqual(tarihMaskeUygula('13 09 2026').metin, '13.09.2026');
+  assert.strictEqual(tarihMaskeUygula('13.09.2026').metin, '13.09.2026');
+});
+
+test('tarihMaskeUygula: segment sınırı taşması ANINDA İŞARETLENİR — hata segmenti adlandırır', () => {
+  // Politika (beyanlı): hane YUTULMAZ — yapıştırılan geçersiz tarih sessizce
+  // başka bir tarihe çevrilemez ("90.09.2026" → "9.09.2026" olurdu); sahip
+  // "yazılamasın YA DA anında işaretlensin" dediği için işaretleme seçildi.
+  const gun = tarihMaskeUygula('39');
+  assert.strictEqual(gun.metin, '39');
+  assert.match(gun.hata, /Gün 1-31/);
+  const ay = tarihMaskeUygula('01.13');
+  assert.strictEqual(ay.metin, '01.13');
+  assert.match(ay.hata, /Ay 1-12/);
+  // meşru sınırda hata YOK: 31 / 12
+  assert.strictEqual(tarihMaskeUygula('31.12.2026').hata, null);
+  assert.strictEqual(tarihMaskeUygula('31.12.2026').metin, '31.12.2026');
+  // yapıştırılan geçersiz tarih BİREBİR korunur + işaretlenir (sessiz düzeltme yok)
+  const yapistirilan = tarihMaskeUygula('90.09.2026');
+  assert.strictEqual(yapistirilan.metin, '90.09.2026');
+  assert.match(yapistirilan.hata, /Gün 1-31/);
+});
+
+test('tarihMaskeUygula: yıl 4 haneyi aşamaz — fazlası yutulur + işaretlenir', () => {
+  const r = tarihMaskeUygula('05.12.20265');
+  assert.strictEqual(r.metin, '05.12.2026');
+  assert.match(r.hata, /Yıl 4 hane/);
+});
+
+test('tarihMaskeUygula: silme doğaldır — kuyruk ayraç korunur, geri alınmaz', () => {
+  // geri tuşuyla '11.12.2026' → '11.12.202' … silme zinciri
+  assert.strictEqual(tarihMaskeUygula('11.12.202').metin, '11.12.202');
+  assert.strictEqual(tarihMaskeUygula('11.12.').metin, '11.12.'); // kuyruk nokta KORUNUR
+  assert.strictEqual(tarihMaskeUygula('11.12').metin, '11.12');
+  assert.strictEqual(tarihMaskeUygula('11.').metin, '11.');       // kuyruk nokta KORUNUR
+  assert.strictEqual(tarihMaskeUygula('11').metin, '11');
+  assert.strictEqual(tarihMaskeUygula('1').metin, '1');
+  assert.strictEqual(tarihMaskeUygula('').metin, '');
+  // yapıştırma (paste) tek input olayıdır — tam dizge aynı yoldan geçer
+  assert.strictEqual(tarihMaskeUygula('11122026').metin, '11.12.2026');
+  // çöp non-digit girdi temizlenir
+  assert.strictEqual(tarihMaskeUygula('ab?!12cd2026').metin, '12.20.26');
+});
+
+test('tarihMaskeImlec: rakam sayısını koruyan imleç konumu — silme/ortada-yazma imleci kaçırmaz', () => {
+  // '11122026' (8 rakam) maskeli '11.12.2026' — 8. rakamdan sonra = sondan 1 önce
+  assert.strictEqual(tarihMaskeImlec('11.12.2026', 8), 10);
+  assert.strictEqual(tarihMaskeImlec('11.12.2026', 0), 0);  // en başa
+  assert.strictEqual(tarihMaskeImlec('11.12.2026', 2), 3);  // ilk noktadan sonra
+  assert.strictEqual(tarihMaskeImlec('11.12.2026', 4), 6);  // ikinci noktadan sonra
+  // rakam sayısı fazlaysa sona kıskanır
+  assert.strictEqual(tarihMaskeImlec('11.12', 9), 5);
+  assert.strictEqual(tarihMaskeImlec('', 0), 0);
+});
+
+test('tarihYilAraligi: min/max veriliyse aralık birebir (kapalı)', () => {
+  assert.deepStrictEqual(tarihYilAraligi('2026-09-01', '2027-09-01', 2026), [2026, 2027]);
+  assert.deepStrictEqual(tarihYilAraligi('2025-05-26', '2026-07-15', 2026), [2025, 2026]);
+});
+
+test('tarihYilAraligi: tek sınır — diğer taraf ±120 yıl (sahip kuralı)', () => {
+  assert.deepStrictEqual(tarihYilAraligi('2026-01-01', null, 2026), [2026, 2146]); // max yok → min+120
+  assert.deepStrictEqual(tarihYilAraligi(null, '2026-09-13', 2026), [1906, 2026]); // min yok → max-120
+});
+
+test('tarihYilAraligi: iki sınır da yok — bugun-120 .. bugun+10 (beyanlı varsayılan)', () => {
+  assert.deepStrictEqual(tarihYilAraligi(null, null, 2026), [1906, 2036]);
+});
+
+test('tarihYilAraligi: kelepır 1..9999 + geçersiz ISO sınırı yok sayılır', () => {
+  assert.deepStrictEqual(tarihYilAraligi('0001-01-01', null, 2026), [1, 121]);
+  assert.deepStrictEqual(tarihYilAraligi(null, '9999-12-31', 2026), [9879, 9999]);
+  assert.deepStrictEqual(tarihYilAraligi('çöp', 'çöp', 2026), [1906, 2036]);
 });
 
 // ── MIN/MAX ARALIK ──
@@ -306,6 +426,9 @@ function tekTakvimSandboxi(kapaliGun, opts = {}) {
       fmtTarih: (iso) => { if (!iso) return '—'; const p = String(iso).slice(0, 10).split('-'); return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : iso; },
       tarihAyIzgara, TARIH_AY_ADLARI, TARIH_GUN_ADLARI,
       tarihGecerliMi, tarihParse, tarihAraliktaMi, tarihIsoTr, tarihYilKaydir,
+      // R1: maske/normalizasyon + yıl-aralığı (render başlığı ve maske bağı
+      // bunları kullanır).
+      tarihGirisCoz, tarihMaskeUygula, tarihMaskeImlec, tarihYilAraligi,
     },
   });
   // appendChild'lanan kutuyu getElementById köprüsüyle bul (W20 testköprüsü deseni).
@@ -415,6 +538,85 @@ test('DOM kapaliGun plumbing: tarihAlaniTakvimAc şemadaki kapaliGun fonksiyonun
   assert.ok(kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-20')), 'fonksiyon olmayan kapaliGun → kapalı hücre yok');
 });
 
+// ═══ R1 — BAŞLIK DROPDOWN + MASKE GİRİŞİ DOM YOLU (G-20260913-TARIH-SECICI-R1) ═══
+
+test('R1 dropdown: ay/yıl seçici başlıkta çizilir, seçim görünümü taşır', () => {
+  const sb = tekTakvimSandboxi(null);
+  sb.__ac();
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('id="tek-tarih-ay-sec"'), 'ay select var');
+  assert.ok(kutu.innerHTML.includes('id="tek-tarih-yil-sec"'), 'yıl select var');
+  assert.ok(kutu.innerHTML.includes('<option value="8" selected>Eylül</option>'), 'açılış ayı Eylül seçili');
+  assert.ok(kutu.innerHTML.includes('<option value="2026" selected>2026</option>'), 'açılış yılı 2026 seçili');
+  sb.tekTarihTakvimAySec('0');
+  sb.tekTarihTakvimYilSec('2034');
+  const kutu2 = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu2.innerHTML.includes('<option value="0" selected>Ocak</option>'), 'Ocak seçildi');
+  assert.ok(kutu2.innerHTML.includes('<option value="2034" selected>2034</option>'), '2034 seçildi');
+});
+
+test('R1 dropdown: aralık dışı yıl sayfalanırsa da listede seçili kalır', () => {
+  const sb = tekTakvimSandboxi(null);
+  sb.__ac();
+  // sınır 1906 (bugun-120) — bir yıl gerisi (1905) aralıkta DEĞİL; sayfa
+  // oklarıyla oraya düşilebilir, dropdown o yılı listeye eklemek zorunda.
+  sb.tekTarihTakvimYilSec('1906');
+  sb.tekTarihTakvimAySec('0');     // Ocak 1906
+  sb.tekTarihTakvimAyDegistir(-1); // Aralık 1905
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('<option value="1905" selected>1905</option>'), 'aralık dışı görünüm yılı listeye eklenir');
+  assert.ok(kutu.innerHTML.includes('<option value="11" selected>Aralık</option>'), 'Aralık seçili');
+});
+
+test('R1 el girişi: 13,09,2026 (virgüllü) Uygula → 13 Eylül seçilir + görünüm atlar', () => {
+  const sb = tekTakvimSandboxi(null);
+  sb.document.__setEl('tek-tarih-giris', makeElement('input'));
+  sb.__ac();
+  const inp = sb.document.getElementById('tek-tarih-giris');
+  inp.value = '13,09,2026';
+  sb.tekTarihTakvimGirisUygula();
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Seçilen: 13.09.2026'), 'seçim güncellendi (ayraç tolere)');
+  assert.ok(kutu.innerHTML.includes('<option value="8" selected>Eylül</option>'), 'görünüm Eylüle atladı');
+  assert.ok(kutu.innerHTML.includes('<option value="2026" selected>2026</option>'), 'yıl 2026');
+  assert.ok(kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-13')), '13 hücresi seçilebilir çizilir');
+});
+
+test('R1 el girişi: 90,09,2026 Uygula → satır içi hata + seçim korunur + yazdığı saklanır', () => {
+  const sb = tekTakvimSandboxi(null);
+  sb.document.__setEl('tek-tarih-giris', makeElement('input'));
+  sb.__ac();
+  const inp = sb.document.getElementById('tek-tarih-giris');
+  inp.value = '90,09,2026';
+  sb.tekTarihTakvimGirisUygula();
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Seçilen: 15.09.2026'), 'seçim değişmedi');
+  assert.ok(kutu.innerHTML.includes('value="90,09,2026"'), 'yazdığı korunur');
+  assert.ok(kutu.innerHTML.includes('Eylül 2026 30 gün — 90.09.2026 yok'), 'hata satır içi ve somut: ' + (kutu.innerHTML.match(/giris-hata[\s\S]{0,160}/) || [''])[0]);
+});
+
+test('R1 maske bağı: input olayında 11122026 → 11.12.2026; taşan segment yuvaya anında yazar', () => {
+  const sb = tekTakvimSandboxi(null);
+  const inp = makeElement('input');
+  const yuva = makeElement('div');
+  sb.document.__setEl('tek-tarih-giris', inp);
+  sb.document.__setEl('tek-tarih-giris-hata', yuva);
+  sb.__ac(); // render, bagla'yı bu elemanlara bağlar
+  inp.value = '11122026';
+  inp.dispatchEvent('input', {});
+  assert.strictEqual(inp.value, '11.12.2026', 'maske noktaları dizer');
+  // silme zinciri doğal: kuyruk nokta korunur
+  inp.value = '11.12.';
+  inp.dispatchEvent('input', {});
+  assert.strictEqual(inp.value, '11.12.', 'kuyruk nokta korunur (geri alma doğal)');
+  // taşan segment: 39 gün
+  inp.value = '39';
+  inp.dispatchEvent('input', {});
+  assert.strictEqual(inp.value, '39', 'hane yutulmaz (sessiz düzeltme yok)');
+  assert.strictEqual(yuva.textContent, '⚠️ Gün 1-31 olmalı', 'uyarı yuvaya anında yazılır');
+  assert.strictEqual(yuva.style.display, 'block', 'yuva görünür');
+});
+
 // ═══ F4 — STANDART KİLİDİ (G-20260913-TARIH-SECICI) ═══
 // Kanonik tarih seçimi artık tek yol: yeni type="date" girişi YASAK, kanonik
 // dışı takvim kopyası YENİDEN DOĞAMAZ, saf katman saflığı block-comment'i de
@@ -489,11 +691,16 @@ test('F4 muhafızı — takvim-semantikli YENİ fonksiyon adı beyaz liste dış
     'bcTakvimAc', 'bcTakvimAyDegistir', 'bcTakvimAyGosterim', 'bcTakvimAyKaydir',
     'bcTakvimBaslikTarihi', 'bcTakvimChipEtiketi', 'bcTakvimdenGunler', 'bcTakvimKapat',
     'bcTakvimOnayla', 'bcTakvimRender', 'bcTakvimSecimEkle', 'bcTakvimToggle',
+    // R1 (G-20260913-TARIH-SECICI-R1): başlık dropdown'ları + el girişi
+    // (review kanıtıyla bilinçli eklendi; tarihSeciciStilEnjekte /
+    // tarihSeciciMaskeBagla adları Takvim/GunSecim deseni taşımadığı için
+    // listeye gerek yoktur).
+    'bcTakvimAySec', 'bcTakvimGirisUygula', 'bcTakvimYilSec',
     'cdSablonTarihTakvimAc', 'cdtTakvimAc', 'tarihAlaniTakvimAc', 'tekTarihTakvimAc',
-    'tekTarihTakvimAyDegistir', 'tekTarihTakvimGirisUygula', 'tekTarihTakvimKapat',
-    'tekTarihTakvimOnayla', 'tekTarihTakvimRender', 'tekTarihTakvimSec',
-    'tekTarihTakvimTemizle', 'tekTarihTakvimYilDegistir', 'caseGunModalRender',
-    'bcTarihSeciciAc',
+    'tekTarihTakvimAyDegistir', 'tekTarihTakvimAySec', 'tekTarihTakvimGirisUygula',
+    'tekTarihTakvimKapat', 'tekTarihTakvimOnayla', 'tekTarihTakvimRender',
+    'tekTarihTakvimSec', 'tekTarihTakvimTemizle', 'tekTarihTakvimYilSec',
+    'caseGunModalRender', 'bcTarihSeciciAc',
   ]);
   const yabancilar = [];
   for (const d of jsDosyalari(fs, path, kok)) {

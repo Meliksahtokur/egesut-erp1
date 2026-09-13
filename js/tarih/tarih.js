@@ -125,12 +125,100 @@ function tarihYilKaydir(yil, delta){
   return Math.min(9999, Math.max(1, (Number(yil) || 0) + adim));
 }
 
+// ═══ EL GİRİŞİ MASKE + NORMALİZASYON + YIL ARALIĞI (R1, G-20260913-
+// TARIH-SECICI-R1 bulgu 3/4 — sahip testi: '13,09,2026' "okunamadı") ═══
+// tarihParse sözleşmesi SABİT kalır (mevcut red-pinler '5 2 2026'/'5,2,2026'
+// girişini RED olarak kilitler); tolerans AYRI saf adımlarda yaşar: bileşen
+// Uygula'yı tarihGirisCoz'dan, canlı yazımı tarihMaskeUygula'dan geçirir.
+
+// GİRİŞ ÇÖZÜMLEYİCİ (Uygula yolu) — ayraç toleransı: ',' '/' '-' ve boşluk
+// '.'a normalize edilir, sonra tarihParse konuşur (mm/dd yorumu YOK, hayali
+// tarih sessizce düzeltilmez). DOM yok.
+function tarihGirisCoz(metin){
+  return tarihParse(String(metin == null ? '' : metin).replace(/[,.\/\-\s]+/g, '.'));
+}
+
+// CANLI MASKE (input olayı yolu) — rakamları GG.AA.YYYY segmentlerine dizer;
+// yazılan ayraçlar (, / - boşluk) '.'a döner; segment dolunca nokta kendiliğinden
+// gelir. Silme doğal kalsın diye değer ayraçla bitiyorsa kuyruk noktası
+// KORUNUR (tam tarih uzunluğuna ulaşıldıysa eklenmez — '13.09.2026.' gibi
+// bozuk kuyruk oluşamaz). Döner { metin, hata }:
+// - hata: taşan segmentin adını taşıyan anlık uyarı ('Gün 1-31 olmalı',
+//   'Ay 1-12 olmalı', 'Yıl 4 hane olmalı') — POLITIKA: hane YUTULMAZ.
+//   Yutma, yapıştırılan geçersiz tarihi sessizce başka bir tarihe çevirirdi
+//   ('90.09.2026' → '9.09.2026' kabulü = sessiz düzeltme); sahip kuralı
+//   "yazılamasın ya da anında işaretlensin" — işaretleme seçildi. Gerçek
+//   ay-gün sayısı denetimi Uygula'da (tarihParse) yapılır.
+function tarihMaskeUygula(ham){
+  const s = String(ham == null ? '' : ham);
+  const rakamlar = s.replace(/\D/g, '');
+  // Segment planı: gün 2 hane / ay 2 hane / yıl 4 hane (değer tavanları ayrı).
+  const uzunluklar = [2, 2, 4];
+  const tavanlar  = [31, 12, null];
+  let metin = '', hata = null, kalan = rakamlar;
+  for(let i = 0; i < 3 && kalan.length; i++){
+    const parca = kalan.slice(0, uzunluklar[i]);
+    kalan = kalan.slice(parca.length);
+    if(i < 2){
+      if(Number(parca) > tavanlar[i]) hata = (i === 0 ? 'Gün 1-31 olmalı' : 'Ay 1-12 olmalı');
+    } else if(parca.length === uzunluklar[i] && kalan.length){
+      hata = 'Yıl 4 hane olmalı'; // 5. yıl hanesi yutulur ama sessiz kalmaz
+    }
+    metin += parca;
+    if(kalan.length && i < 2) metin += '.';
+  }
+  // Kuyruk ayraç koruması: değer ayraçla bittiyse ('11.12.' geri-silme hâli,
+  // ya da kullanıcı ayracı kendisi yazdıysa) nokta yerinde kalır; tam tarih
+  // kurulduysa (10 karakter) kuyruk eklenmez.
+  if(metin && metin.length < 10 && /[,.\/\-\s]$/.test(s)) metin += '.';
+  return { metin: metin, hata: hata };
+}
+
+// MASKE İMLECİ — eski imlecin önündeki rakam sayısını yeni maskeli metinde
+// aynı rakamın ardına taşır; ara ayraçların ÜSTÜNDEN ATLANIR (imleç noktanın
+// soluna düşerse sonraki hane segmente karışır); rakam azalırsa (silme)
+// metin sonuna kıskanır. Bileşen input olayında setSelectionRange ile
+// uygular; saf, test edilebilir.
+function tarihMaskeImlec(yeniMetin, rakamSayisi){
+  const s = String(yeniMetin == null ? '' : yeniMetin);
+  if(!(rakamSayisi > 0)) return 0;
+  let sayilan = 0;
+  for(let i = 0; i < s.length; i++){
+    if(s[i] >= '0' && s[i] <= '9'){
+      sayilan++;
+      if(sayilan === rakamSayisi){
+        while(i + 1 < s.length && !(s[i + 1] >= '0' && s[i + 1] <= '9')) i++;
+        return i + 1;
+      }
+    }
+  }
+  return s.length;
+}
+
+// YIL AÇILIR LİSTE ARALIĞI — alanın min/max'ından türetilir (sahip kuralı:
+// doğum geçmiş yıllara hâkim, görev birkaç gelecek yıl). Tek sınır varsa
+// öbür taraf ±120 yıl; ikisi de yoksa bugunYil-120 .. bugunYil+10 (raporda
+// beyanlı varsayılan). Sonuç 1..9999'a kelepirli; geçersiz ISO sınır yok
+// sayılır (tarihAraliktaMi aynı tavır). DOM yok.
+function tarihYilAraligi(min, max, bugunYil){
+  const simdi = Math.trunc(Number(bugunYil) || 0);
+  const yilOf = v => (tarihGecerliMi(v) ? Number(String(v).slice(0, 4)) : null);
+  const minYil = yilOf(min), maxYil = yilOf(max);
+  let a, b;
+  if(minYil !== null && maxYil !== null){ a = minYil; b = maxYil; }
+  else if(minYil !== null){ a = minYil; b = minYil + 120; }
+  else if(maxYil !== null){ a = maxYil - 120; b = maxYil; }
+  else { a = simdi - 120; b = simdi + 10; }
+  return [Math.max(1, a), Math.min(9999, b)];
+}
+
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz —
 // js/utils/helpers.js kalıbı).
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Object.assign(module.exports || {}, {
     TARIH_AY_ADLARI, TARIH_GUN_ADLARI,
     tarihArtikYilMi, tarihAyGunSayisi, tarihGecerliMi, tarihIsoTr,
-    tarihParse, tarihAraliktaMi, tarihAyIzgara, tarihYilKaydir
+    tarihParse, tarihAraliktaMi, tarihAyIzgara, tarihYilKaydir,
+    tarihGirisCoz, tarihMaskeUygula, tarihMaskeImlec, tarihYilAraligi
   });
 }
