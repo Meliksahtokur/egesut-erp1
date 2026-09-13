@@ -43,11 +43,18 @@ EXCEPTION WHEN others THEN
   RAISE;
 END;
 $do$;
--- LUNA-4: paylaşılan gizli durum koşum başında anlık görüntülenir; temizlik
--- yalnız bu koşumun ürettiği kayıtlara dokunur (önceden var olan bilet,
--- kullanım ve sahip şifresi korunur — S11/S11b).
-CREATE TEMP TABLE k3_biletler_once AS SELECT bilet FROM surum_gizli.geri_alma_bileti;
-CREATE TEMP TABLE k3_sifre_once AS SELECT hash FROM surum_gizli.sahip_sifresi;
+-- LUNA-2/A3 madde-2: aktif paylaşımlı SENTİNEL bilet — S14, temizliğin
+-- ön-varolan satırın TÜM alanlarına dokunmadığını tam-alan düzeyinde kanıtlar.
+-- Sabit uuid (bizim işaretimiz); koşum sonunda S14 doğrulamasından sonra silinir.
+INSERT INTO surum_gizli.geri_alma_bileti (bilet, olusturma, son_gecerlilik, kaynak)
+VALUES ('00000000-0000-4000-8000-0000000000a3', '2026-09-01 00:00:00+00'::timestamptz,
+        now() + interval '1 hour', '{"sentinel":"a3"}'::jsonb)
+ON CONFLICT (bilet) DO NOTHING;
+-- LUNA-4: paylaşılan gizli durum koşum başında TAM SATIR olarak anlık
+-- görüntülenir; temizlik yalnız bu koşumun ürettiği kayıtlara dokunur ve
+-- ön-varolan satırlar (varsa) tam-alan geri yazımla garanti edilir (S14).
+CREATE TEMP TABLE k3_biletler_once AS SELECT * FROM surum_gizli.geri_alma_bileti;
+CREATE TEMP TABLE k3_sifre_once AS SELECT * FROM surum_gizli.sahip_sifresi;
 SELECT EXISTS (SELECT 1 FROM k3_sifre_once) AS sifrevardi \gset
 
 -- ══ S0: password + ticket flow ═════════════════════════════════════════════
@@ -524,12 +531,22 @@ DELETE FROM surum_gizli.geri_alma_bileti
 DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM k3_sifre_once) THEN
-    UPDATE surum_gizli.sahip_sifresi SET hash = (SELECT hash FROM k3_sifre_once);
+    -- LUNA-2/A3: metadata dahil TAM geri yükleme (hash + guncelleme)
+    UPDATE surum_gizli.sahip_sifresi
+       SET hash = (SELECT hash FROM k3_sifre_once),
+           guncelleme = (SELECT guncelleme FROM k3_sifre_once);
   ELSE
     DELETE FROM surum_gizli.sahip_sifresi;
   END IF;
 END;
 $do$;
+-- LUNA-2/A3: ön-varolan bilet satırları TAM alanlarıyla garanti (birebir geri yazım)
+INSERT INTO surum_gizli.geri_alma_bileti (bilet, olusturma, son_gecerlilik, kaynak)
+SELECT bilet, olusturma, son_gecerlilik, kaynak FROM k3_biletler_once
+ON CONFLICT (bilet) DO UPDATE
+  SET olusturma = EXCLUDED.olusturma,
+      son_gecerlilik = EXCLUDED.son_gecerlilik,
+      kaynak = EXCLUDED.kaynak;
 
 SELECT count(*) AS oncekibilet FROM surum_gizli.geri_alma_bileti
  WHERE bilet IN (SELECT bilet FROM k3_biletler_once) \gset
@@ -541,6 +558,26 @@ INSERT INTO k3 SELECT 'S11b LUNA-4: önceden varolan gizli kayıt korundu',
   CASE WHEN :'oncekibilet' = (SELECT count(*)::text FROM k3_biletler_once)
         AND :'oncekisifre' = (SELECT count(*)::text FROM k3_sifre_once)
        THEN 'PASS' ELSE 'FAIL' END, '';
+
+-- ══ S14 (LUNA-2/A3 madde-2): sentinel + tam-alan koruma kanıtı ═════════════
+-- Aktif paylaşımlı sentinel bilet, koşum boyunca TÜM alanlarıyla aynı kalmış
+-- olmalı; sahip şifresi hash+guncelleme metadata'sıyla birebir geri
+-- yüklenmiş olmalı.
+SELECT count(*) AS sb FROM surum_gizli.geri_alma_bileti b
+  JOIN k3_biletler_once s USING (bilet)
+ WHERE b.olusturma IS NOT DISTINCT FROM s.olusturma
+   AND b.son_gecerlilik IS NOT DISTINCT FROM s.son_gecerlilik
+   AND b.kaynak IS NOT DISTINCT FROM s.kaynak \gset
+SELECT count(*) AS sbtoplam FROM k3_biletler_once \gset
+SELECT (SELECT row(hash, guncelleme) FROM surum_gizli.sahip_sifresi)
+    IS NOT DISTINCT FROM (SELECT row(hash, guncelleme) FROM k3_sifre_once) AS sifretam \gset
+INSERT INTO k3 SELECT 'S14 LUNA-2: sentinel + ön-varolan bilet TAM ALAN korundu; şifre metadata birebir',
+  format('tam-alan=%s/%s; sifre-metadata birebir', :'sb', :'sbtoplam'),
+  format('tam-alan=%s/%s sifretam=%s', :'sb', :'sbtoplam', :'sifretam'),
+  CASE WHEN :'sb' = :'sbtoplam' AND :'sifretam' = 't' THEN 'PASS' ELSE 'FAIL' END, '';
+
+-- sentinel temizliği (bizim sabit-uuid işaretimiz; doğrulama bitti)
+DELETE FROM surum_gizli.geri_alma_bileti WHERE bilet = '00000000-0000-4000-8000-0000000000a3';
 
 SELECT count(*) AS logkalan FROM public.degisim_log
  WHERE kaynak ->> 'istemci_etiketi' = 'k3-geri-alma-testi' \gset

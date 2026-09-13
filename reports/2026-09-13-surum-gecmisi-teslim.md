@@ -103,17 +103,16 @@ Hariç 12:
   Ölçüm: `stok_hareket`, 2000 satır, 3 tekrar, trigger açık/kapalı dönüşümlü.
   Sapma paylaşımlı DEMO + pooler dalgalanmasıdır; oran-tablosu her koşumda
   5.5×–9.7× (I/U) bandında. txid gruplaması: 100+100 satır tek tx → 1 txid.
-- **K3 PASS (45/45)** — W1'in 43 vakasına LUNA düzeltme vakaları eklendi:
+- **K3 PASS (46/46)** — W1'in 43 vakasına LUNA düzeltme vakaları eklendi:
   **S13** (LUNA-1: revert sonrası `degisim_log` içinde TAM bilet UUID geçmez;
   maskeli ilk-8+… bulunur), **S11b** (LUNA-4: koşum öncesi varolan gizli
-  kayıt korunur), **S2c** maske beklentisine çevrildi. Kapsam: bilet akışları
-  (SIFRE_AYARLI_DEGİL/SIFRE_HATALI/kalan_sn/BILET_SURESI_DOLMUS + kullanım
-  kaydı/BILET_GECERSİZ/çok kullanımlılık), 3 seviye revert, revert-in-revert
-  ×2, çakışma→CAKISMA (bypass yok), bağımlılık KADEMELİ/ENGEL, composite PK,
-  cascade topolojik EKLE (S12), temizlik. Lead merged-durum + LUNA-fix
-  tekrarları: **45 PASS / 0 FAIL**. Not: koşum penceresinde canlı UI trafiği
-  (gorev_log, 7 satır) log'a düştü — o satırlar KASITLI olarak korunmuştur
-  (LUNA-4 ilkesi: başkasının kaydına dokunulmaz).
+  kayıt korunur), **S14** (yeniden denetim md-2: aktif paylaşımlı SENTİNEL
+  bilet + şifre metadata'sı TAM ALAN korunur — `tam-alan=1/1, sifretam=t`),
+  **S2c** maske beklentisi. Kapsam: bilet akışları, 3 seviye revert,
+  revert-in-revert ×2, çakışma→CAKISMA (bypass yok), bağımlılık
+  KADEMELİ/ENGEL, composite PK, cascade topolojik EKLE (S12), temizlik.
+  Lead merged-durum + iki LUNA turu tekrarları: **46 PASS / 0 FAIL**
+  (sentinel teardown'lı; canlı UI trafiği kasıtlı korunur).
 - **K4 PASS** — taban 796/795/1 (bilinen kırmızı `gecmis-pipeline:283`);
   W2 sonrası 814/813/1; LUNA düzeltmeleriyle **817/816/1** (+3 LUNA-2 testi:
   kapsam-39 harita üyeliği, bulgu alanları, tam-süpürme çiftleri). LUNA'nın
@@ -152,20 +151,23 @@ Hariç 12:
      `_degisim_log_yaz` CREATE OR REPLACE, log'a yalnız `left(bilet,8)||'…'`
      yazılır (tam bilet yalnız `surum_gizli`'de, korelasyon korunur).
      Regression: k3 S13.
-   - **LUNA-2:** etiket haritası 4 eksik tablo (pedigree_meta/nodes/parentage,
-     semen_catalog) + 5 alan ile başlandı; A3 öncesi TAM SÜPÜRME yapıldı:
-     canlı 393 kolon tarandı, İngilizce-adlı ~50 kolon + diyakritik-hassas 7
-     kolon (buzagi_id, gun sonekleri, deger, kupe_no, guncellendi...) haritaya
-     eklendi; kalan fallback'ler Türkçe-adlı kolonlardır (insanlaştırma doğru
-     Türkçe verir). Üç unit testi (üyelik + bulgu alanları + süpürme
-     çiftleri).
+   - **LUNA-2:** etiket haritası 4 eksik tablo + 5 alan ile başlandı; sonra
+     TAM SÜPÜRME: canlı 39 tablo / 393 kolon tarandı, tüm fallback alanları
+     (99 çift / 66 benzersiz ad) açık Türkçe etikete bağlandı — **haritasız
+     kolon: 0**. Regression kilidi: `tests/unit/support/
+     degisiklikler-kapsam-kolonlari.json` (canlı envanter snapshot'ı) + üyelik
+     testi — yeni kolon eklenince fixture + harita güncellenmek zorunda
+     (kırılma noktası). `kapsamHaritalari()` görünümlü fonksiyonu haritaları
+     teste açar.
    - **LUNA-3:** rapor tazelendi — DEMO/PROD ref'leri, canlı kapsam listesi
      (51/39/12, `tasks` gerekçeli), K2 taze koşum eşlemesi, diff hijyeni
      (`.out` trailing-whitespace temizliği; `git diff --check` temiz).
-   - **LUNA-4:** k3 temizliği artık `surum_gizli`'de KOŞUM ÖNCESİ anlık
-     görüntüyle çalışır — yalnız koşumun ürettiği bilet/kullanım satırları
-     silinir; önceden var olan sahip şifresi üzerine yazıldıysa geri
-     yüklenir (S0a paylaşılan-demo uyumlu, S11b koruma vakası).
+   - **LUNA-4 + yeniden denetim md-2:** k3 temizliği `surum_gizli`'de KOŞUM
+     ÖNCESİ TAM SATIR anlık görüntüyle çalışır — yalnız koşumun ürettiği
+     bilet/kullanım satırları silinir; ön-varolan bilet satırları tam-alan
+     geri yazımla garanti edilir; sahip şifresi hash + **guncelleme
+     metadata'sıyla birebir** geri yüklenir. Kanıt: aktif paylaşımlı
+     SENTİNEL bilet vakaası **S14** + S11b.
 7. **W2 kararları:** bilet `sessionStorage`'da, süre client saatinden +
    sunucu her kullanımda yeniden doğrular; UI her satır/alan revert'inde
    `txid` gönderir.

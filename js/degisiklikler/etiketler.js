@@ -117,6 +117,62 @@ const DG_ORTAK_ALANLAR = {
   min_deger: 'Min. değer',
   max_deger: 'Maks. değer',
   guncellendi: 'Güncellendi',
+  // LUNA-2 (A3) tam kapsama: kalan tüm kapsam-kolonları (canlı envanter
+  // tests/unit/support/degisiklikler-kapsam-kolonlari.json ile kilitli)
+  abort_tarihi: 'Abort tarihi',
+  active: 'Aktif',
+  adim_no: 'Adım no',
+  anahtar: 'Anahtar',
+  belirti: 'Belirti',
+  boy: 'Boy',
+  category: 'Kategori',
+  cins: 'Cins',
+  cinsiyet: 'Cinsiyet',
+  deneme_no: 'Deneme no',
+  denemeler: 'Denemeler',
+  ek_uygulamalar: 'Ek uygulamalar',
+  erteleme_notu: 'Erteleme notu',
+  ertelendi: 'Ertelendi',
+  etiketler: 'Etiketler',
+  etken_madde: 'Etken madde',
+  farm_id: 'Çiftlik',
+  grup: 'Grup',
+  gun_no: 'Gün no',
+  hedef_saat: 'Hedef saat',
+  hedef_tarih: 'Hedef tarih',
+  iptal_nedeni: 'İptal nedeni',
+  irk: 'Irk',
+  kapasite: 'Kapasite',
+  key: 'Anahtar',
+  kontrol_tarihi: 'Kontrol tarihi',
+  lokasyon: 'Lokasyon',
+  maliyet: 'Maliyet',
+  marka: 'Marka',
+  neden: 'Neden',
+  offset_gun: 'Ofset gün',
+  padok: 'Padok',
+  pasif_mi: 'Pasif mı',
+  plan_notu: 'Plan notu',
+  protokol: 'Protokol',
+  protokol_tipi: 'Protokol tipi',
+  referans_tipi: 'Referans tipi',
+  renk: 'Renk',
+  sablon_id: 'Şablon',
+  semptomlar: 'Semptomlar',
+  sira: 'Sıra',
+  sperma: 'Sperma',
+  stock_id: 'Stok ürünü',
+  tamamlanma_notu: 'Tamamlanma notu',
+  telefon: 'Telefon',
+  tohumlama_durumu: 'Tohumlama durumu',
+  tohumlama_onay_tarihi: 'Tohumlama onay tarihi',
+  tohumlama_plani: 'Tohumlama planı',
+  tohumlayan: 'Tohumlayan',
+  uygulama_notu: 'Uygulama notu',
+  uygulama_yolu: 'Uygulama yolu',
+  uygulayan: 'Uygulayan',
+  value: 'Değer',
+  veteriner_notu: 'Veteriner notu',
   tarih: 'Tarih',
   notlar: 'Notlar',
   notes: 'Not',
@@ -257,4 +313,15 @@ function tabloSecenekleri() {
   return Object.keys(DG_TABLO_ETIKETLERI)
     .map(kod => ({ kod, etiket: DG_TABLO_ETIKETLERI[kod] }))
     .sort((a, b) => a.etiket.localeCompare(b.etiket, 'tr'));
+}
+
+// LUNA-2/A3 kapsam kilidi: haritaları teste açan görünüüm (const'lar sandbox'a
+// kapanmadığından fonksiyon üzerinden verilir). Test:
+// tests/unit/degisiklikler-etiketler.test.js + support/degisiklikler-kapsam-kolonlari.json
+function kapsamHaritalari() {
+  return {
+    tabloEtiketleri: DG_TABLO_ETIKETLERI,
+    ortakAlanlar: DG_ORTAK_ALANLAR,
+    tabloOzelAlanlar: DG_ALAN_ETIKETLERI,
+  };
 }

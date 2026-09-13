@@ -5,7 +5,8 @@ const assert = require('node:assert');
 const { loadBrowserModule } = require('./support/loadModule');
 
 const { sandbox } = loadBrowserModule('js/degisiklikler/etiketler.js');
-const { tabloEtiketi, alanEtiketi, islemEtiketi, tabloSecenekleri } = sandbox;
+const { tabloEtiketi, alanEtiketi, islemEtiketi, tabloSecenekleri, kapsamHaritalari } = sandbox;
+const KAPSAM_KOLONLARI = require('./support/degisiklikler-kapsam-kolonlari.json');
 
 test('tabloEtiketi: bilinen iş tabloları Türkçe', () => {
   assert.strictEqual(tabloEtiketi('hayvanlar'), 'Hayvan');
@@ -14,28 +15,25 @@ test('tabloEtiketi: bilinen iş tabloları Türkçe', () => {
   assert.strictEqual(tabloEtiketi('cases'), 'Vaka');
 });
 
-test('LUNA-2: kapsam (39 tablo) TAMAMI haritada — fallback kullanılmaz', () => {
-  // Canlı DEMO trg_degisim_log attach listesi (2026-09-13, 39 tablo).
-  const KAPSAM = ['cases','diseases','dogum','drug_administrations','drug_classes',
-    'drug_products','drugs','gorev_log','grup_padok_eslem','hastalik_log',
-    'hayvan_override','hayvanlar','hekimler','irk_esik','kizginlik_log','padoklar',
-    'pedigree_meta','pedigree_nodes','pedigree_parentage','protokol_ayar',
-    'protokol_dismiss','protokol_instance','sablon_hastalik_eslem','semen_catalog',
-    'stok','stok_hareket','stok_kategorileri','tedavi','tedavi_sablonu',
-    'tedavi_sablonu_kalem','tohumlama','treatment_day_uygulamalar','treatment_days',
-    'uygulama_log','vaccination_log','vaccination_schedule','vaccine_diseases',
-    'vaccine_protocol_steps','vaccines'];
-  const insanlastir = (ad) => { const s = String(ad).replace(/_+/g, ' ').trim();
-    return s.charAt(0) === 'i' ? 'İ' + s.slice(1) : s.charAt(0).toUpperCase() + s.slice(1); };
-  // Üyelik testi insanlaştırma sezgisiyle değil, haritanın kendisiyle yapılır
-  // (tedavi/tohumlama gibi tek-kelimelik Türkçe adlarda etiket == insanlaştırma
-  //  olabilir — bu bir eksiklik değildir).
-  const kodlar = new Set(tabloSecenekleri().map(x => x.kod));
-  const eksik = KAPSAM.filter(t => !kodlar.has(t));
-  const fallbackaDusen = KAPSAM.filter(t => tabloEtiketi(t) === insanlastir(t)
-    && !['tedavi', 'tohumlama'].includes(t));
-  assert.deepStrictEqual(eksik, [], `haritadan eksik tablolar: ${eksik.join(', ')}`);
-  assert.deepStrictEqual(fallbackaDusen, [], `fallback'a düşen tablolar: ${fallbackaDusen.join(', ')}`);
+test('LUNA-2/A3: canlı kapsam (39 tablo / 393 kolon) TAMAMI açık etiketli', () => {
+  // Snapshot: canlı DEMO trg_degisim_log attach listesi + tüm kolonlar
+  // (2026-09-13; üretim: psql information_schema sorgusu, kırıntıda).
+  // YENİ KOLON EKLENDİĞİNDE: kolonu bu fixture'a ekle + etiketler.js'e Türkçe
+  // girdi yaz — fixture'da olmayan kolon testi geçırir, o yüzden fixture'ı
+  // şema değişiminde güncellemek mecburidir (kırılma noktası burası).
+  const { tabloEtiketleri, ortakAlanlar, tabloOzelAlanlar } = kapsamHaritalari();
+  const eksikTablo = [];
+  const eksikKolon = [];
+  for (const [tablo, kolonlar] of Object.entries(KAPSAM_KOLONLARI)) {
+    if (tabloEtiketleri[tablo] === undefined) eksikTablo.push(tablo);
+    for (const kolon of kolonlar) {
+      const ozel = tabloOzelAlanlar[tablo] && tabloOzelAlanlar[tablo][kolon] !== undefined;
+      const ortak = ortakAlanlar[kolon] !== undefined;
+      if (!ozel && !ortak) eksikKolon.push(`${tablo}.${kolon}`);
+    }
+  }
+  assert.deepStrictEqual(eksikTablo, [], `haritadan eksik tablolar: ${eksikTablo.join(', ')}`);
+  assert.deepStrictEqual(eksikKolon, [], `açık etiketi olmayan kolonlar: ${eksikKolon.join(', ')}`);
 });
 
 test('LUNA-2: luna bulgusu alanları artık Türkçe', () => {
