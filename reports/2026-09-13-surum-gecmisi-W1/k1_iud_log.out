@@ -1,0 +1,200 @@
+BEGIN
+CREATE TABLE
+DO
+== per-step results ==
+           tablo           |     adim     | beklenen | bulunan | sonuc |                                                    detay                                                     
+---------------------------+--------------+----------+---------+-------+--------------------------------------------------------------------------------------------------------------
+ cases                     | 1_I_sentetik | 1        | 1       | PASS  | {"id": "9d2dda08-cf03-4651-a91e-0bbebbe79254"}
+ cases                     | 2_U_bos      | 0        | 0       | PASS  | 
+ cases                     | 3_U          | 1        | 1       | PASS  | alan=notes
+ cases                     | 4_D          | 1        | 1       | PASS  | 
+ diseases                  | 1_I_sentetik | 1        | 1       | PASS  | {"id": "27139e71-f45e-4efd-8f82-25fa32f7bc88"}
+ diseases                  | 2_U_bos      | 0        | 0       | PASS  | 
+ diseases                  | 3_U          | 1        | 1       | PASS  | alan=name
+ diseases                  | 4_D          | 1        | 1       | PASS  | 
+ dogum                     | 1_I_sentetik | 1        | 1       | PASS  | {"id": "3065cfa9-fcff-49ed-baf3-3ba2e9510f64"}
+ dogum                     | 2_U_bos      | 0        | 0       | PASS  | 
+ dogum                     | 3_U          | 1        | 1       | PASS  | alan=yavru_cins
+ dogum                     | 4_D          | 1        | 1       | PASS  | 
+ drug_administrations      | 1_I_sentetik | 1        | 1       | PASS  | {"id": "59bce8cd-2a17-4448-b1a2-bf7fab334507"}
+ drug_administrations      | 2_U_bos      | 0        | 0       | PASS  | 
+ drug_administrations      | 3_U          | 1        | 1       | PASS  | alan=unit
+ drug_administrations      | 4_D          | 1        | 1       | PASS  | 
+ drug_classes              | 1_I_sentetik | 1        | 1       | PASS  | {"id": "e8ef3d09-1a9b-45fa-8674-0447a8b3738e"}
+ drug_classes              | 2_U_bos      | 0        | 0       | PASS  | 
+ drug_classes              | 3_U          | 1        | 1       | PASS  | alan=group_name
+ drug_classes              | 4_D          | 1        | 1       | PASS  | 
+ drug_products             | 1_I_sentetik | 1        | 1       | PASS  | {"id": "e291e157-1fcb-448f-9acc-5ddccf54a25d"}
+ drug_products             | 2_U_bos      | 0        | 0       | PASS  | 
+ drug_products             | 3_U          | 1        | 1       | PASS  | alan=brand_name
+ drug_products             | 4_D          | 1        | 1       | PASS  | 
+ drugs                     | 1_I_sentetik | 1        | 1       | PASS  | {"id": "c305c192-dfb5-4406-a032-8e4711e6609f"}
+ drugs                     | 2_U_bos      | 0        | 0       | PASS  | 
+ drugs                     | 3_U          | 1        | 1       | PASS  | alan=name
+ drugs                     | 4_D          | 1        | 1       | PASS  | 
+ gorev_log                 | 1_I_sentetik | 1        | 1       | PASS  | {"id": "62268337-6269-4c1e-8600-14d4f2aa80ee"}
+ gorev_log                 | 2_U_bos      | 0        | 0       | PASS  | 
+ gorev_log                 | 3_U          | 1        | 1       | PASS  | alan=gorev_tipi
+ gorev_log                 | 4_D          | 1        | 1       | PASS  | 
+ grup_padok_eslem          | 1_I_sentetik | 1        | 1       | PASS  | {"id": "47459fb2-f1c3-43ea-b967-a018e0bc1d2b"}
+ grup_padok_eslem          | 2_U_bos      | 0        | 0       | PASS  | 
+ grup_padok_eslem          | 3_U          | 1        | 1       | PASS  | alan=grup
+ grup_padok_eslem          | 4_D          | 1        | 1       | PASS  | 
+ hastalik_log              | 1_I_sentetik | 1        | 1       | PASS  | {"id": "6e1f519f-4a0c-4a94-bee3-7a0dfb198986"}
+ hastalik_log              | 2_U_bos      | 0        | 0       | PASS  | 
+ hastalik_log              | 3_U          | 1        | 1       | PASS  | alan=hayvan_id
+ hastalik_log              | 4_D          | 1        | 1       | PASS  | 
+ hayvan_override           | 1_I_sentetik | 1        | 1       | PASS  | {"kupe_no": "k1_bef6843f-afad-4fbc-b58b-12d2c1d4e9b7"}
+ hayvan_override           | 2_U_bos      | 0        | 0       | PASS  | 
+ hayvan_override           | 3_U          | 1        | 1       | PASS  | alan=notlar
+ hayvan_override           | 4_D          | 1        | 1       | PASS  | 
+ hayvanlar                 | 1_I_sentetik | 1        | 1       | PASS  | {"id": "k1_9ffd3fb6-a054-4e0d-b87d-91bc10410ab7"}
+ hayvanlar                 | 2_U_bos      | 0        | 0       | PASS  | 
+ hayvanlar                 | 3_U          | 1        | 1       | PASS  | alan=kupe_no
+ hayvanlar                 | 4_D          | 1        | 1       | PASS  | 
+ hekimler                  | 1_I_sentetik | 1        | 1       | PASS  | {"id": "k1_a0f3582b-26bb-491f-b9b7-7e331c57ed2f"}
+ hekimler                  | 2_U_bos      | 0        | 0       | PASS  | 
+ hekimler                  | 3_U          | 1        | 1       | PASS  | alan=ad
+ hekimler                  | 4_D          | 1        | 1       | PASS  | 
+ irk_esik                  | 1_I_sentetik | 1        | 1       | PASS  | {"id": "2b125170-25ee-47d4-9e84-5e6b1274db9a"}
+ irk_esik                  | 2_U_bos      | 0        | 0       | PASS  | 
+ irk_esik                  | 3_U          | 1        | 1       | PASS  | alan=irk
+ irk_esik                  | 4_D          | 1        | 1       | PASS  | 
+ kizginlik_log             | 1_I_sentetik | 1        | 1       | PASS  | {"id": "k1_b6c22bbb-bc72-4959-9dc9-8e326c80ab52"}
+ kizginlik_log             | 2_U_bos      | 0        | 0       | PASS  | 
+ kizginlik_log             | 3_U          | 1        | 1       | PASS  | alan=hayvan_id
+ kizginlik_log             | 4_D          | 1        | 1       | PASS  | 
+ padoklar                  | 1_I_sentetik | 1        | 1       | PASS  | {"id": "b0d0bccd-61e5-4c43-8667-e31a1a79b304"}
+ padoklar                  | 2_U_bos      | 0        | 0       | PASS  | 
+ padoklar                  | 3_U          | 1        | 1       | PASS  | alan=ad
+ padoklar                  | 4_D          | 1        | 1       | PASS  | 
+ pedigree_meta             | 1_I_sentetik | 1        | 1       | PASS  | {"key": "k1_92900d7f-35f3-4c90-ba12-af47cbf5a939", "farm_id": "400b9107-a85e-4126-af2c-fd7fe73fb68e"}
+ pedigree_meta             | 2_U_bos      | 0        | 0       | PASS  | 
+ pedigree_meta             | 3_U          | 1        | 1       | PASS  | alan=value
+ pedigree_meta             | 4_D          | 1        | 1       | PASS  | 
+ pedigree_nodes            | 1_I          | 1        | 1       | PASS  | 
+ pedigree_nodes            | 2_U_bos      | 0        | 0       | PASS  | 
+ pedigree_nodes            | 3_U          | 1        | 1       | PASS  | alan=display_name
+ pedigree_nodes            | 4_D          | 1        | 1       | PASS  | 
+ pedigree_parentage        | 1_I          | 1        | 1       | PASS  | 
+ pedigree_parentage        | 2_U_bos      | 0        | 0       | PASS  | 
+ pedigree_parentage        | 3_U          | 1        | 1       | PASS  | alan=source_ref
+ pedigree_parentage        | 4_D          | 1        | 1       | PASS  | 
+ protokol_ayar             | 1_I_sentetik | 1        | 1       | PASS  | {"anahtar": "k1_6d299499-d7dc-4923-8b75-621b6251221f"}
+ protokol_ayar             | 2_U_bos      | 0        | 0       | PASS  | 
+ protokol_ayar             | 3_U          | 1        | 1       | PASS  | alan=birim
+ protokol_ayar             | 4_D          | 1        | 1       | PASS  | 
+ protokol_dismiss          | 1_I_sentetik | 1        | 1       | PASS  | {"id": "0d5f2687-b586-4b57-843e-a526a84fc380"}
+ protokol_dismiss          | 2_U_bos      | 0        | 0       | PASS  | 
+ protokol_dismiss          | 3_U          | 1        | 1       | PASS  | alan=etken_kod
+ protokol_dismiss          | 4_D          | 1        | 1       | PASS  | 
+ protokol_instance         | 1_I_sentetik | 1        | 1       | PASS  | {"id": "d148614d-1cfe-48f8-9572-aff7b16d6147"}
+ protokol_instance         | 2_U_bos      | 0        | 0       | PASS  | 
+ protokol_instance         | 3_U          | 1        | 1       | PASS  | alan=tip
+ protokol_instance         | 4_D          | 1        | 1       | PASS  | 
+ sablon_hastalik_eslem     | 1_I_sentetik | 1        | 1       | PASS  | {"id": "b8baf2b7-ec94-4b05-9bfd-8e234ed633ca"}
+ sablon_hastalik_eslem     | 2_U_bos      | 0        | 0       | PASS  | 
+ sablon_hastalik_eslem     | 3_U          | 1        | 1       | PASS  | alan=disease_id (FK fallback)
+ sablon_hastalik_eslem     | 4_D          | 1        | 1       | PASS  | 
+ semen_catalog             | 1_I_sentetik | 1        | 1       | PASS  | {"id": "65728be4-3ea8-4bbc-8c04-fa2a184468a3"}
+ semen_catalog             | 2_U_bos      | 0        | 0       | PASS  | 
+ semen_catalog             | 3_U          | 1        | 1       | PASS  | alan=code
+ semen_catalog             | 4_D          | 1        | 1       | PASS  | 
+ stok                      | 1_I_sentetik | 1        | 1       | PASS  | {"id": "k1_c7aa2ac5-b51a-4c85-8975-1598b01a4fff"}
+ stok                      | 2_U_bos      | 0        | 0       | PASS  | 
+ stok                      | 3_U          | 1        | 1       | PASS  | alan=urun_adi
+ stok                      | 4_D          | 1        | 1       | PASS  | 
+ stok_hareket              | 1_I_sentetik | 1        | 1       | PASS  | {"id": "8c79e0b3-e115-4ab3-9ace-b0cde7e4fc0b"}
+ stok_hareket              | 2_U_bos      | 0        | 0       | PASS  | 
+ stok_hareket              | 3_U          | 1        | 1       | PASS  | alan=tur
+ stok_hareket              | 4_D          | 1        | 1       | PASS  | 
+ stok_kategorileri         | 1_I_sentetik | 1        | 1       | PASS  | {"id": "5d427523-455f-49ba-92f9-789ae163a653"}
+ stok_kategorileri         | 2_U_bos      | 0        | 0       | PASS  | 
+ stok_kategorileri         | 3_U          | 1        | 1       | PASS  | alan=ad
+ stok_kategorileri         | 4_D          | 1        | 1       | PASS  | 
+ tedavi                    | 1_I_sentetik | 1        | 1       | PASS  | {"id": "0a217381-4d4e-433e-9adb-081c0b319dcd"}
+ tedavi                    | 2_U_bos      | 0        | 0       | PASS  | 
+ tedavi                    | 3_U          | 1        | 1       | PASS  | alan=tani
+ tedavi                    | 4_D          | 1        | 1       | PASS  | 
+ tedavi_sablonu            | 1_I_sentetik | 1        | 1       | PASS  | {"id": "873c6c5e-5a2b-455d-93b3-6c42c974f18f"}
+ tedavi_sablonu            | 2_U_bos      | 0        | 0       | PASS  | 
+ tedavi_sablonu            | 3_U          | 1        | 1       | PASS  | alan=ad
+ tedavi_sablonu            | 4_D          | 1        | 1       | PASS  | 
+ tedavi_sablonu_kalem      | 1_I          | 1        | 1       | PASS  | 
+ tedavi_sablonu_kalem      | 2_U_bos      | 0        | 0       | PASS  | 
+ tedavi_sablonu_kalem      | 3_U          | 1        | 1       | PASS  | alan=unit
+ tedavi_sablonu_kalem      | 4_D          | 1        | 1       | PASS  | 
+ tohumlama                 | 1_I_sentetik | 1        | 1       | PASS  | {"id": "9efceca1-cdea-4a35-8515-7fac5b213a5c"}
+ tohumlama                 | 2_U_bos      | 0        | 0       | PASS  | 
+ tohumlama                 | 3_U          | 1        | 1       | PASS  | alan=sperma
+ tohumlama                 | 4_D          | 1        | 1       | PASS  | 
+ treatment_day_uygulamalar | 1_I          | 1        | 1       | PASS  | 
+ treatment_day_uygulamalar | 2_U_bos      | 0        | 0       | PASS  | 
+ treatment_day_uygulamalar | 3_U          | 1        | 1       | PASS  | alan=unit
+ treatment_day_uygulamalar | 4_D          | 1        | 1       | PASS  | 
+ treatment_days            | 1_I_sentetik | 1        | 1       | PASS  | {"id": "19107cd9-8cc9-4685-b3af-0141ab6f5d1d"}
+ treatment_days            | 2_U_bos      | 0        | 0       | PASS  | 
+ treatment_days            | 3_U          | 1        | 1       | PASS  | alan=notes
+ treatment_days            | 4_D          | 1        | 1       | PASS  | 
+ uygulama_log              | 1_I          | 1        | 1       | PASS  | 
+ uygulama_log              | 2_U_bos      | 0        | 0       | PASS  | 
+ uygulama_log              | 3_U          | 1        | 1       | PASS  | alan=etken_kod
+ uygulama_log              | 4_D          | 1        | 1       | PASS  | 
+ vaccination_log           | 1_I_sentetik | 1        | 1       | PASS  | {"id": "bdd72637-4104-404e-a9cd-73294f8cd728"}
+ vaccination_log           | 2_U_bos      | 0        | 0       | PASS  | 
+ vaccination_log           | 3_U          | 1        | 1       | PASS  | alan=unit
+ vaccination_log           | 4_D          | 1        | 1       | PASS  | 
+ vaccination_schedule      | 1_I_sentetik | 1        | 1       | PASS  | {"id": "cf8a225e-55db-4aeb-b0b2-2c220178ec97"}
+ vaccination_schedule      | 2_U_bos      | 0        | 0       | PASS  | 
+ vaccination_schedule      | 3_U          | 1        | 1       | PASS  | alan=target_type
+ vaccination_schedule      | 4_D          | 1        | 1       | PASS  | 
+ vaccine_diseases          | 1_I_sentetik | 1        | 1       | PASS  | {"disease_id": "1bb109ce-27b9-4cad-8acf-87cc871e285a", "vaccine_id": "c1ac0d34-e160-4dd5-ac11-167019cb6249"}
+ vaccine_diseases          | 2_U_bos      | 0        | 0       | PASS  | 
+ vaccine_diseases          | 3_U          | 1        | 1       | PASS  | alan=disease_id (FK fallback)
+ vaccine_diseases          | 4_D          | 1        | 1       | PASS  | 
+ vaccine_protocol_steps    | 1_I          | 1        | 1       | PASS  | 
+ vaccine_protocol_steps    | 2_U_bos      | 0        | 0       | PASS  | 
+ vaccine_protocol_steps    | 3_U          | 1        | 1       | PASS  | alan=label
+ vaccine_protocol_steps    | 4_D          | 1        | 1       | PASS  | 
+ vaccines                  | 1_I_sentetik | 1        | 1       | PASS  | {"id": "02a1b3fe-df09-43d6-a6ca-0dba9c59f3ff"}
+ vaccines                  | 2_U_bos      | 0        | 0       | PASS  | 
+ vaccines                  | 3_U          | 1        | 1       | PASS  | alan=name
+ vaccines                  | 4_D          | 1        | 1       | PASS  | 
+(156 satır)
+
+== summary ==
+ tablo_sayisi | pass | fail 
+--------------+------+------
+           39 |  156 |    0
+(1 satır)
+
+ tablo 
+-------
+(0 satır)
+
+== kaynak stamp under PostgREST-like caller ==
+                  set_config                  
+----------------------------------------------
+ {"sub":"k1-test-sub","role":"authenticated"}
+(1 satır)
+
+ set_config 
+------------
+ k1-betik
+(1 satır)
+
+SET
+UPDATE 1
+RESET
+ islem | degisen_alanlar |                                                                               kaynak                                                                               
+-------+-----------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ U     | {telefon}       | {"rol": "authenticated", "jwt_sub": "k1-test-sub", "app_name": "Supavisor", "jwt_role": "authenticated", "oturum_rolu": "postgres", "istemci_etiketi": "k1-betik"}
+(1 satır)
+
+== single txid for the whole script transaction ==
+ distinct_txid | rows_in_tx 
+---------------+------------
+             1 |        124
+(1 satır)
+
+ROLLBACK

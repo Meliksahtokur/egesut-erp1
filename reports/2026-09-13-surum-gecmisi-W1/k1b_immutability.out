@@ -1,0 +1,59 @@
+== seed one row (hayvanlar no-op-free update, rolled back later) ==
+BEGIN
+UPDATE 1
+ log_rows_in_tx 
+----------------
+              1
+(1 satır)
+
+== RED-BEFORE: guards disabled -> mutations succeed ==
+ALTER TABLE
+ALTER TABLE
+SAVEPOINT
+UPDATE 1
+ROLLBACK
+SAVEPOINT
+DELETE 1
+ROLLBACK
+ALTER TABLE
+ALTER TABLE
+== GREEN: guards enabled -> UPDATE refused ==
+SAVEPOINT
+psql:reports/2026-09-13-surum-gecmisi-W1/k1b_immutability.sql:27: ERROR:  degisim_log degistirilemez (UPDATE reddedildi)
+BAĞLAM:  PL/pgSQL function _degisim_log_degistirilemez() line 3 at RAISE
+ROLLBACK
+== GREEN: DELETE refused ==
+SAVEPOINT
+psql:reports/2026-09-13-surum-gecmisi-W1/k1b_immutability.sql:31: ERROR:  degisim_log degistirilemez (DELETE reddedildi)
+BAĞLAM:  PL/pgSQL function _degisim_log_degistirilemez() line 3 at RAISE
+ROLLBACK
+== GREEN: TRUNCATE refused ==
+SAVEPOINT
+psql:reports/2026-09-13-surum-gecmisi-W1/k1b_immutability.sql:35: ERROR:  degisim_log degistirilemez (TRUNCATE reddedildi)
+BAĞLAM:  PL/pgSQL function _degisim_log_degistirilemez() line 3 at RAISE
+ROLLBACK
+== authenticated role: INSERT/UPDATE/DELETE denied, SELECT allowed ==
+SET
+SAVEPOINT
+ select_ok 
+-----------
+ t
+(1 satır)
+
+ROLLBACK
+SAVEPOINT
+psql:reports/2026-09-13-surum-gecmisi-W1/k1b_immutability.sql:45: ERROR:  permission denied for table degisim_log
+İPUCU:  Grant the required privileges to the current role with: GRANT INSERT ON public.degisim_log TO authenticated;
+ROLLBACK
+SAVEPOINT
+psql:reports/2026-09-13-surum-gecmisi-W1/k1b_immutability.sql:48: ERROR:  permission denied for table degisim_log
+İPUCU:  Grant the required privileges to the current role with: GRANT DELETE ON public.degisim_log TO authenticated;
+ROLLBACK
+== anon role: SELECT denied ==
+SET
+SAVEPOINT
+psql:reports/2026-09-13-surum-gecmisi-W1/k1b_immutability.sql:53: ERROR:  permission denied for table degisim_log
+İPUCU:  Grant the required privileges to the current role with: GRANT SELECT ON public.degisim_log TO anon;
+ROLLBACK
+RESET
+ROLLBACK
