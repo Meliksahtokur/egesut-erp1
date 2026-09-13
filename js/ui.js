@@ -6651,21 +6651,23 @@ function caseGunModalRender() {
     document.body.appendChild(box);
   }
   const ay = _gunSecimAy, yil = _gunSecimYil;
-  const ilkGun = new Date(yil, ay, 1).getDay();
-  const bosluk = (ilkGun + 6) % 7;
-  const sonGun = new Date(yil, ay + 1, 0).getDate();
-  const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', {month:'long', year:'numeric'});
+  // Ortak ızgara çekirdeği (js/tarih/tarih.js — F3 birleşmesi: new Date/
+  // yerel-ayar üretimi kalmadı). Hücre sözleşmesi: null (boş — baştaki
+  // null'lar Pazartesi-bazlı boşluk, kuyruktakiler tam hafta dolgusu) |
+  // {iso, gun, ayIci}.
+  const hucreler = (tarihAyIzgara(yil, ay + 1) || { hucreler: [] }).hucreler;
+  const ayAdi = TARIH_AY_ADLARI[ay] + ' ' + yil;
   const bugunTr = bugun();
 
   let kareler = '';
-  for (let i = 0; i < bosluk; i++) kareler += '<div></div>';
-  for (let g = 1; g <= sonGun; g++) {
-    const iso = yil + '-' + String(ay+1).padStart(2,'0') + '-' + String(g).padStart(2,'0');
+  for (const h of hucreler) {
+    if (!h) { kareler += '<div></div>'; continue; }
+    const iso = h.iso;
     const secili = _gunSecimSecili.has(iso);
     const bugunMu = iso === bugunTr;
     kareler += '<div onclick="caseGunToggle(&#39;' + iso + '&#39;)" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;' +
       (secili ? 'background:var(--green);color:#fff;' : bugunMu ? 'background:rgba(78,154,42,.15);color:var(--green);border:1.5px solid var(--green);' : 'color:var(--ink);') +
-      '">' + g + '</div>';
+      '">' + h.gun + '</div>';
   }
 
   const seciliList = [..._gunSecimSecili].sort();
@@ -6683,7 +6685,7 @@ function caseGunModalRender() {
     '<button onclick="_gunSecimAy++;if(_gunSecimAy>11){_gunSecimAy=0;_gunSecimYil++;}caseGunModalRender()" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
-    ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    TARIH_GUN_ADLARI.map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
     '</div>' +
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">' + kareler + '</div>' +
     '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;margin-bottom:6px">Secili Gunler (' + seciliList.length + ')</div>' +
@@ -6742,10 +6744,11 @@ function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
 // ── TEK-TARİH TAKVİM MODALI — KANONİK bileşen (ui-map "Canonical date
 // selection"; sahibe direktifi 2026-09-09: yeni yüzeylerde yerel native
 // tarih inputu — type=date — KULLANILMAZ). Görsel dil: gun-tarih-modal
-// (caseGunModalRender); seçim kuralı: bc-tarih-takvim W20 (forms.js:1804) —
-// hücre tıkı seçimi DEĞİŞTİRİR, toggle yok. Izgara ortak çekirdekten
-// (js/tarih/tarih.js) gelir; ay ‹/› + başlıktan yıl ‹/› + gg.aa.yyyy el
-// girişi (saf tarihParse — hata satır içi, sessiz düzeltme yok).
+// (caseGunModalRender); seçim kuralı: W20 tek-seçim — hücre tıkı seçimi
+// DEĞİŞTİRİR, toggle yok (F3'ten beri bc yüzeyi de bu bileşende:
+// forms.js bcTarihSeciciAc). Izgara ortak çekirdekten (js/tarih/tarih.js)
+// gelir; ay ‹/› + başlıktan yıl ‹/› + gg.aa.yyyy el girişi (saf tarihParse
+// — hata satır içi, sessiz düzeltme yok).
 // Çağıran kendi durumunu getirir:
 //   tekTarihTakvimAc({ baslik, deger, onSec,      — onSec(iso) Onayla'da;
 //                      min, max,                  — dahil sınırlar (ISO);
@@ -6755,9 +6758,9 @@ function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
 let _tekTarihAy = 0, _tekTarihYil = 0, _tekTarihSecili = null;
 let _tekTarihBaslik = '📅 Takvimden Seç', _tekTarihOnSec = null;
 // F1 sertleştirme (G-20260913): aralık + kapalı-gün + temizleme + el girişi.
-// min/max geçerli ISO; kapaliGun(iso) → true = gün seçilemez (F3 bcTarihTakvim
-// bununla gelir); giriş hatası yeniden render'da satır içi gösterilir —
-// sessiz düzeltme YOK.
+// min/max geçerli ISO; kapaliGun(iso) → true = gün seçilemez (F3: bc yüzeyi
+// bcTarihSeciciAc ve tarihAlani* bu iletir); giriş hatası yeniden render'da
+// satır içi gösterilir — sessiz düzeltme YOK.
 let _tekTarihMin = null, _tekTarihMax = null;
 let _tekTarihTemizlenebilir = false, _tekTarihKapaliGun = null;
 let _tekTarihGirisMetni = '', _tekTarihGirisHata = '';
@@ -7030,6 +7033,9 @@ function tarihAlaniTakvimAc(el, o){
     min: alanMin || optMin || null,
     max: alanMax || optMax || null,
     temizlenebilir: o.temizlenebilir === true,
+    // F3 (G-20260913): şemadaki kapaliGun SESSİZCE DÜŞÜRÜLMEZ — fonksiyon
+    // değilse null (bileşen kapalı-gün katmanını devre dışı bırakır).
+    kapaliGun: typeof o.kapaliGun === 'function' ? o.kapaliGun : null,
     onSec: iso => {
       // Native parite: değer gerçekten değişmediyse change YAYILMAZ.
       const eski = el.value;
@@ -7043,6 +7049,8 @@ function tarihAlaniTakvimAc(el, o){
 // Alan sözleşme tablosu — her alan okuyucu/yazıcı bağlamına göre:
 // · max: 'bugun'  → submit doğrulaması 'ileri tarih olamaz' diyen alanlar
 // · temizlenebilir → submit yolu boş değeri meşru karşılayan alanlar
+// · kapaliGun: (iso) → true  → o gün seçilemez (F3 plumbing; henüz alan
+//   kullanmıyor — bileşene iletimi tarihAlaniTakvimAc'ta garantili)
 // · sınırsız      → görev hedef tarihleri (ta/te) — gelecek meşru
 const TARIH_ALANLARI = {
   'k-tarih':        { max: 'bugun' },                       // kızgınlık tarihi

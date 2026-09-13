@@ -283,3 +283,134 @@ test('saf katman yerel API kullanmaz — toLocale*/new Date/Intl/DOM yasağı', 
   assert.ok(!/Intl\s*\./.test(src), 'Intl kullanımı yasak');
   assert.ok(!/\bdocument\b|\bwindow\b/.test(src), 'saf katmanda DOM yok');
 });
+
+// ═══ F1 CARRY-OVER (F3, G-20260913) — kapaliGun/temizlenebilir DOM davranışı ═══
+// Kanonik bileşenin (js/ui.js tekTarihTakvim*) kapalı-gün + temizleme UI
+// sözleşmesinin otomatik kilidi — F1 tesliminde duman-testiyle doğrulanmış,
+// kalıcı testi yoktu. Yöntem: TESTING-01 loadBrowserModule vm-sandbox'ı
+// (gerçek tarih.js saf katmanı extra olarak enjekte edilir; Playwright
+// yerine seçildi — ünite hattında kalır, demo-DB bağımsız).
+const { loadBrowserModule, makeDomStub, makeElement } = require('./support/loadModule.js');
+
+function tekTakvimSandboxi(kapaliGun, opts = {}) {
+  const doc = makeDomStub();
+  const toasts = [];
+  const onSecSecimleri = [];
+  const { sandbox } = loadBrowserModule('js/ui.js', {
+    dom: doc,
+    extra: {
+      bugun: () => '2026-09-13',
+      toast: (m, isErr) => toasts.push({ m: String(m), isErr: !!isErr }),
+      esc: (s) => String(s || ''),
+      escAttr: (s) => String(s || ''),
+      fmtTarih: (iso) => { if (!iso) return '—'; const p = String(iso).slice(0, 10).split('-'); return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : iso; },
+      tarihAyIzgara, TARIH_AY_ADLARI, TARIH_GUN_ADLARI,
+      tarihGecerliMi, tarihParse, tarihAraliktaMi, tarihIsoTr, tarihYilKaydir,
+    },
+  });
+  // appendChild'lanan kutuyu getElementById köprüsüyle bul (W20 testköprüsü deseni).
+  const origGet = doc.getElementById.bind(doc);
+  doc.getElementById = (id) => origGet(id) || doc.body.children.find(c => c.id === id) || null;
+  sandbox.__toasts = toasts;
+  sandbox.__onSecSecimleri = onSecSecimleri; // canlı dizi — iddialar bunu okur
+  sandbox.__onSec = (iso) => onSecSecimleri.push(iso);
+  sandbox.__ac = () => sandbox.tekTarihTakvimAc({
+    baslik: '📅 Test',
+    deger: opts.deger !== undefined ? opts.deger : '2026-09-15',
+    min: opts.min || null,
+    max: opts.max || null,
+    temizlenebilir: opts.temizlenebilir === true,
+    kapaliGun: kapaliGun || null,
+    onSec: sandbox.__onSec,
+  });
+  return sandbox;
+}
+
+const TIK = (fn, iso) => fn + '(&#39;' + iso + '&#39;)';
+
+test('DOM kapaliGun: kapalı hücreler onclick\'siz + not-allowed çizilir, açık hücreler tıklanabilir', () => {
+  const sb = tekTakvimSandboxi(iso => iso === '2026-09-13' || iso === '2026-09-20');
+  sb.__ac();
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu, 'kutu açılır');
+  assert.ok(!kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-13')), 'kapalı gün 13 onclick taşımaz');
+  assert.ok(!kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-20')), 'kapalı gün 20 onclick taşımaz');
+  assert.ok(kutu.innerHTML.includes('not-allowed'), 'kapalı hücre imleci not-allowed');
+  assert.ok(kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-15')), 'açık gün tıklanabilir çizilir');
+});
+
+test('DOM kapaliGun: kapalı hücreye tık (doğrudan çağrı) seçimi DEĞİŞTİRMEZ — derinlik savunması', () => {
+  const sb = tekTakvimSandboxi(iso => iso === '2026-09-13');
+  sb.__ac();
+  sb.tekTarihTakvimSec('2026-09-13');
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Seçilen: 15.09.2026'), 'seçim değişmedi');
+  assert.strictEqual(sb.__onSecSecimleri?.length || 0, 0, 'onSec hiç çağrılmadı');
+});
+
+test('DOM kapaliGun: kapalı seçimle Onayla REDDEDER — onSec\'e ulaşmaz, kutu açık kalır, hata satır içi', () => {
+  // Açılış değeri BİREBİR kapalı gün: Onayla yolu kapalı-gün kontrolüne girer.
+  const sb = tekTakvimSandboxi(iso => iso === '2026-09-20', { deger: '2026-09-20' });
+  sb.__ac();
+  sb.tekTarihTakvimOnayla();
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu, 'Onayla kutuyu kapatmadı');
+  assert.ok(kutu.innerHTML.includes('Seçili gün kapalı — başka bir gün seçin'), 'satır içi hata');
+  assert.strictEqual(sb.__onSecSecimleri.length, 0, 'onSec REDDİ onaylamadı');
+  // Açık güne geçişten sonra Onayla normal akışa döner.
+  sb.tekTarihTakvimSec('2026-09-18');
+  sb.tekTarihTakvimOnayla();
+  assert.deepStrictEqual(sb.__onSecSecimleri, ['2026-09-18'], 'geçerli seçim onSec\'e gitti');
+  assert.strictEqual(sb.document.getElementById('tek-tarih-takvim'), null, 'kutu kapandı');
+});
+
+test('DOM kapaliGun: kapalı gün EL GİRİŞİYLE de seçilemez (Uygula → satır içi hata, seçim değişmez)', () => {
+  const sb = tekTakvimSandboxi(iso => iso === '2026-09-13');
+  // Stub DOM innerHTML'i parse etmez — giriş alanını el ile kaydet (render
+  // listener'ı bu el üzerinde çalışır, Uygula değerini buradan okur).
+  const inp = sb.document.__setEl('tek-tarih-giris', makeElement('input'));
+  sb.__ac();
+  inp.value = '13.09.2026';
+  sb.tekTarihTakvimGirisUygula();
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Seçili gün kapalı — başka bir gün seçin'), 'kapalı-gün el girişi reddi');
+  assert.ok(kutu.innerHTML.includes('Seçilen: 15.09.2026'), 'seçim değişmedi');
+  assert.ok(kutu.innerHTML.includes('value="13.09.2026"'), 'yazdığı korunur (sessiz düzeltme yok)');
+});
+
+test('DOM temizlenebilir: Temizle butonu çizilir; Temizle → Onayla onSec(null) verir', () => {
+  const sb = tekTakvimSandboxi(null, { temizlenebilir: true });
+  sb.__ac();
+  let kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('tekTarihTakvimTemizle()'), 'Temizle butonu var');
+  sb.tekTarihTakvimTemizle();
+  kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Seçilen: —'), 'seçim boşaldı');
+  sb.tekTarihTakvimOnayla();
+  assert.deepStrictEqual(sb.__onSecSecimleri, [null], 'onSec(null) — temizleme sözleşmesi');
+  assert.strictEqual(sb.document.getElementById('tek-tarih-takvim'), null, 'kutu kapandı');
+});
+
+test('DOM temizlenebilir: false ise Temizle butonu HİÇ çizilmez (eski W20 yüzeyi gibi)', () => {
+  const sb = tekTakvimSandboxi(null, { temizlenebilir: false });
+  sb.__ac();
+  const kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(!kutu.innerHTML.includes('tekTarihTakvimTemizle()'), 'Temizle yok');
+  assert.ok(!kutu.innerHTML.includes('Temizle'), 'Temizle etiketi de yok');
+});
+
+test('DOM kapaliGun plumbing: tarihAlaniTakvimAc şemadaki kapaliGun fonksiyonunu bileşene iletir (F2 carry-over)', () => {
+  const sb = tekTakvimSandboxi(null); // __ac kullanılmaz — bağlama katmanı doğrudan sürülür
+  const el = sb.document.__setEl('plumbing-tarih', makeElement('input'));
+  sb.tarihAlaniTakvimAc(el, { kapaliGun: iso => iso === '2026-09-20' });
+  let kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu, 'bağlama katmanı kanonik bileşeni açar');
+  assert.ok(!kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-20')), 'kapaliGun fonksiyonu iletildi — 20 kapalı çizilir');
+  assert.ok(kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-15')), '15 açık çizilir');
+  // Fonksiyon olmayan kapaliGun → null (sözleşme: yalnız fonksiyon iletilir,
+  // şemaya yanlış yazılan değer kapalı-gün katmanını sessizce devre dışı bırakır)
+  sb.tekTarihTakvimKapat();
+  sb.tarihAlaniTakvimAc(el, { kapaliGun: 'gecersiz-kural' });
+  kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-20')), 'fonksiyon olmayan kapaliGun → kapalı hücre yok');
+});
