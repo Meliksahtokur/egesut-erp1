@@ -36,7 +36,9 @@ yazınca dur"); zarf hazır: `.ss/surum-gecmisi-diff-luna-zarf.md` (root koşabi
 | F1+F2 DB | agent/surum-gecmisi-diff-W1 | 8c4b629 | **66324c5 (KABUL)** |
 | F3 UI | agent/surum-gecmisi-diff-W2 | 1e49fd4 | **a69358b (KABUL)** |
 | Docs checkpoint (ui-map + rpc-reference) | agent/surum-gecmisi-diff | feba7f2 | — |
-| Entegrasyon (stub sökümü, damga 20260913-16) | agent/surum-gecmisi-diff | d6acf03 | — (uç) |
+| Entegrasyon (stub sökümü, damga 20260913-16) | agent/surum-gecmisi-diff | d6acf03 | — |
+| merge: F3 işaret commit'i (root eşleşmesi için; gerçek merge a69358b) | agent/surum-gecmisi-diff | — | — |
+| Teslim raporu | agent/surum-gecmisi-diff | 97badf7 | — (uç: F3-işaret) |
 
 ## 2. Kapsam tablosu (F1) — 39 dahil / 11 hariç (gerekçeleriyle)
 
@@ -74,6 +76,10 @@ test edildi (k3).
   INSERT +81.8 µs/satır, UPDATE +147.0 µs/satır, DELETE +70.4 µs/satır.
   Lead'in bağımsız ölçümü tutarlı (100 satır UPDATE ≈ +96 ms, ~1 ms/satır
   pooler'lı üst sınır).
+- **FINAL-UÇ TAZE KOŞUM (root talebi, 2026-09-13 18:0x, uç f0814c4):** k1
+  **156 PASS / 0 FAIL**, k3 **43 PASS / 0 FAIL** (özet 43|0|43), k1b 6
+  beklenen-red, temizlik `degisim_log=0, bilet=0` — hepsi entegrasyon
+  sonrası uçta lead tarafından yeniden koşuldu (kayıt: kırıntı).
 - **K3 PASS** — W1 (k3): **43/43** — bilet akışları (SIFRE_AYARLI_DEGIL /
   SIFRE_HATALI / kalan_sn≈3600 / BILET_SURESI_DOLMUS + kullanım kaydı /
   bilinmeyen-uuid→BILET_GECERSIZ / **çok kullanımlılık: aynı bilet 8 revert**),
