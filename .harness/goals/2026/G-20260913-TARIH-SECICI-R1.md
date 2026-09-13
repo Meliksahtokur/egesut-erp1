@@ -20,6 +20,7 @@ write_manifest:
   - .harness/reports/2026-09-13-tarih-secici-r1.md
   - .claude/tasks/2026-09-13-tarih-secici-r1.md
   - .claude/tasks/2026-09-13-tarih-secici-r1-denetim.md
+  - .claude/tasks/2026-09-13-tarih-secici-r1-revizyon.md
   - .claude/reviews/2026-09-13-tarih-secici-r1-teslim.md
   - .claude/reviews/2026-09-13-tarih-secici-r1-denetim.md
 pattern_refs:
