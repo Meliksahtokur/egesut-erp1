@@ -46,6 +46,27 @@ test('LUNA-2: luna bulgusu alanları artık Türkçe', () => {
   assert.strictEqual(alanEtiketi('vaccine_protocol_steps', 'label'), 'Etiket');
 });
 
+test('LUNA-2 tam süpürme: İngilizce-adlı ve diyakritik-hassas kolonlar Türkçe', () => {
+  const CIFTLER = [
+    ['drug_products', 'brand_name', 'Marka'],
+    ['drug_products', 'std_dose', 'Standart doz'],
+    ['drugs', 'default_route', 'Varsayılan rota'],
+    ['pedigree_nodes', 'birth_date', 'Doğum tarihi'],
+    ['pedigree_nodes', 'sex', 'Cinsiyet'],
+    ['pedigree_parentage', 'confidence', 'Güven'],
+    ['semen_catalog', 'supplier', 'Tedarikçi'],
+    ['vaccines', 'is_mandatory', 'Zorunlu'],
+    ['vaccines', 'repeat_interval_days', 'Tekrar aralığı (gün)'],
+    ['dogum', 'buzagi_id', 'Buzağı kaydı'],
+    ['irk_esik', 'suttten_kesme_gun', 'Sütten kesme günü'],
+    ['protokol_ayar', 'deger', 'Değer'],
+    ['hayvan_override', 'kupe_no', 'Küpe no'],
+  ];
+  for (const [tablo, alan, beklenen] of CIFTLER) {
+    assert.strictEqual(alanEtiketi(tablo, alan), beklenen, `${tablo}.${alan}`);
+  }
+});
+
 test('tabloEtiketi: bilinmeyen tablo insanlaştırılır, çökmez', () => {
   assert.strictEqual(tabloEtiketi('yeni_tablo_adi'), 'Yeni tablo adi');
   assert.strictEqual(tabloEtiketi('islem_x'), 'İslem x', 'Türkçe büyük İ');

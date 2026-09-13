@@ -115,9 +115,12 @@ Hariç 12:
   (gorev_log, 7 satır) log'a düştü — o satırlar KASITLI olarak korunmuştur
   (LUNA-4 ilkesi: başkasının kaydına dokunulmaz).
 - **K4 PASS** — taban 796/795/1 (bilinen kırmızı `gecmis-pipeline:283`);
-  W2 sonrası 814/813/1; LUNA düzeltmeleriyle **816/815/1** (+2 LUNA-2 testi:
-  kapsam-39 harita üyeliği + bulgu alanlarının Türkçeliği). LUNA'nın ölçtüğü
-  ile birebir uyumlu.
+  W2 sonrası 814/813/1; LUNA düzeltmeleriyle **817/816/1** (+3 LUNA-2 testi:
+  kapsam-39 harita üyeliği, bulgu alanları, tam-süpürme çiftleri). LUNA'nın
+  ölçtüğü ile uyumlu; A3 öncesi ek süpürme: canlı 39 tablo / **393 kolon**
+  tarandı — İngilizce-adlı ~50 + diyakritik-hassas ~7 kolon haritaya eklendi
+  (`etiketler.js`); kalan ~336 kolon ya haritalı ya Türkçe-adlı
+  (insanlaştırma doğru Türkçe üretir: notlar→Notlar, durum→Durum).
 - **K5 PARTIAL → sahip** — 8 ekran görüntüsü (stub-dönemi, gerçek tıklama
   akışı) dalda; entegrasyonda stub söküldü, gerçek RPC'ler canlı (RPC düzeyi
   gerçek demo doğrulaması yukarıda). **Gerçek veriyle tarayıcı akışı sahip
@@ -150,8 +153,12 @@ Hariç 12:
      yazılır (tam bilet yalnız `surum_gizli`'de, korelasyon korunur).
      Regression: k3 S13.
    - **LUNA-2:** etiket haritası 4 eksik tablo (pedigree_meta/nodes/parentage,
-     semen_catalog) + 5 alan (display_name, source_ref, code, target_type,
-     label) ile tamamlandı; kapsam-39 üyelik testi eklendi.
+     semen_catalog) + 5 alan ile başlandı; A3 öncesi TAM SÜPÜRME yapıldı:
+     canlı 393 kolon tarandı, İngilizce-adlı ~50 kolon + diyakritik-hassas 7
+     kolon (buzagi_id, gun sonekleri, deger, kupe_no, guncellendi...) haritaya
+     eklendi; kalan fallback'ler Türkçe-adlı kolonlardır (insanlaştırma doğru
+     Türkçe verir). Üç unit testi (üyelik + bulgu alanları + süpürme
+     çiftleri).
    - **LUNA-3:** rapor tazelendi — DEMO/PROD ref'leri, canlı kapsam listesi
      (51/39/12, `tasks` gerekçeli), K2 taze koşum eşlemesi, diff hijyeni
      (`.out` trailing-whitespace temizliği; `git diff --check` temiz).
