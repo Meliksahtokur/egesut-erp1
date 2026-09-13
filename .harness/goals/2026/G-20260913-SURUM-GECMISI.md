@@ -142,8 +142,17 @@ degisim_listele(p_filtre jsonb) RETURNS jsonb
 
 degisim_onizle(p_hedef jsonb, p_seviye text) RETURNS jsonb
 -- p_seviye: 'alan'|'satir'|'islem'
--- p_hedef: {"txid":"<bigint>"} | {"tablo":"<tablo>","pk":"<uuid>"} |
---          {"tablo":"<tablo>","pk":"<uuid>","alan":"<kolon>"}
+-- p_hedef: {"txid":"<bigint>"} | {"tablo":"<tablo>","pk":"<deger>"[,"txid":"<bigint>"]} |
+--          {"tablo":"<tablo>","pk":"<deger>","alan":"<kolon>"[,"txid":"<bigint>"]}
+-- pk (W1 sorusu c9f7fd34, lead onaylı 2026-09-13): tek-kolon PK'da DEĞER
+-- string olarak (uuid/text/sayı — canlı demo: 19 text PK tablo, 2 sayısal),
+-- composite PK'da NESNE {pkkolon:deger} (vaccine_diseases, pedigree_meta);
+-- degisim_log.satir_pk her zaman jsonb nesnesidir, W2 görüntüde pk'yi
+-- satir_pk'nın tek değerinden okur.
+-- Opsiyonel p_hedef.txid (satır/alan hedefinde): verilirse o tx'in o
+-- satır/alan değişikliği hedeflenir; verilmezse satırın/alanın EN SON
+-- değişikliği. Çakışma kuralı DEĞİŞMEZ: hedef txid'den sonraki,
+-- plana dahil olmayan değişiklik yine CAKISMA (bypass yok).
 -- ok: {"ok":true,"seviye":"...","hedef":{...},"plan":[{"sira","tablo","pk",
 --      "islem","alanlar","eski","yeni","yapilacak"}],
 --      "cakismalar":[{"tablo","pk","alan"?,"neden"}],
