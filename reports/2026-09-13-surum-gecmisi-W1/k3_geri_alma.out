@@ -1,7 +1,4 @@
-  etiket_kurulumu   
---------------------
  k3-geri-alma-testi
-(1 satır)
 
 CREATE TABLE
 UPDATE 1
@@ -12,9 +9,8 @@ DELETE 0
 DELETE 0
 DELETE 0
 DO
-DELETE 0
-DELETE 0
-DELETE 0
+SELECT 0
+SELECT 0
 INSERT 0 1
 DO
 DO
@@ -92,6 +88,8 @@ DELETE 1
 COMMIT
 INSERT 0 1
 DELETE 1
+UPDATE 1
+INSERT 0 1
 UPDATE 1
 UPDATE 1
 DELETE 1
@@ -101,67 +99,59 @@ DELETE 1
 DELETE 1
 UPDATE 1
 ALTER TABLE
-DELETE 45
+DELETE 47
 ALTER TABLE
-DELETE 15
+DELETE 16
 DELETE 2
-DELETE 1
+DO
+INSERT 0 1
 INSERT 0 1
 == k3 sonuç tablosu ==
-                               vaka                                |                               beklenen                                |                                bulunan                                | sonuc |                                                                              detay                                                                               
--------------------------------------------------------------------+-----------------------------------------------------------------------+-----------------------------------------------------------------------+-------+------------------------------------------------------------------------------------------------------------------------------------------------------------------
- S0a bilet: şifre ayarlı değil                                     | SIFRE_AYARLI_DEGIL                                                    | SIFRE_AYARLI_DEGIL                                                    | PASS  | {"ok": false, "hata": "SIFRE_AYARLI_DEGIL"}
- S0b setup RPC authenticated ile                                   | permission denied                                                     | permission denied                                                     | PASS  | 42501
- S0c bilet RPC anon ile                                            | permission denied                                                     | permission denied                                                     | PASS  | 42501
- S0d setup RPC (postgres) şifre kur                                | ok=true                                                               | ok=true                                                               | PASS  | {"ok": true, "guncelleme": "2026-09-13T14:31:44.660038+00:00"}
- S0e bilet: yanlış şifre                                           | SIFRE_HATALI                                                          | SIFRE_HATALI                                                          | PASS  | {"ok": false, "hata": "SIFRE_HATALI"}
- S0f bilet: doğru şifre                                            | ok=true, kalan_sn≈3600                                                | -                                                                     | PASS  | 
- S0g bilet: süresi dolmuş                                          | BILET_SURESI_DOLMUS                                                   | BILET_SURESI_DOLMUS                                                   | PASS  | {"ok": false, "hata": "BILET_SURESI_DOLMUS", "detay": {"son_gecerlilik": "2026-09-13T14:26:45.315988+00:00"}}
- S0h dolmuş bilet kullanım kaydı                                   | 1 kayıt                                                               | 1                                                                     | PASS  | 
- S0i bilet: bilinmeyen uuid                                        | BILET_GECERSIZ                                                        | BILET_GECERSIZ                                                        | PASS  | {"ok": false, "hata": "BILET_GECERSIZ", "detay": {}}
- S0j bilet: NULL                                                   | BILET_GECERSIZ                                                        | BILET_GECERSIZ                                                        | PASS  | {"ok": false, "hata": "BILET_GECERSIZ", "detay": {}}
- S1a alan revert eski tx (sonra T2 var)                            | CAKISMA                                                               | CAKISMA                                                               | PASS  | {"ok": false, "hata": "CAKISMA", "detay": {"engeller": ["hekimler kaydı \"H3\": SONRAKI_DEGISIKLIK"], "cakismalar": [{"pk": "H3", "alan": "telefon", "txid": "12
- S1b alan revert (son değişiklik T2)                               | ok=true adim=1 telefon=~T1                                            | ok=true hat=- adim=1 tel=5550000~T1                                   | PASS  | 
- S1c revert-in-revert (alan, hedef=revert değişikliği)             | ok=true telefon=~T1~T2                                                | ok=true hat=- tel=5550000~T1~T2                                       | PASS  | 
- S2a satır önizleme: stok_uyari, çakışma yok                       | ok=true ga=true stok_uyari>=1 cakisma=0                               | ok=true ga=true stok_uyari=1 cakisma=0                                | PASS  | 
- S2b satır revert (son değişiklik = S1c reverti)                   | ok=true adim=1 telefon=~T1                                            | ok=true hat=- adim=1 tel=5550000~T1                                   | PASS  | 
- S2c revert kaynağı damgası (bilet+gerekçe)                        | bilet eşleşir, gerekçe eşleşir                                        | bilet=436b7053 gerekce=k3 S2b gerekçe                                 | PASS  | 
- S3a işlem önizleme (2 satır tek tx)                               | ok=true ga=true plan=2                                                | ok=true ga=true plan=2                                                | PASS  | 
- S3b işlem revert                                                  | ok=true adim=2 padok silindi aktif=true                               | ok=true hat=- adim=2 padok=0 aktif=true                               | PASS  | 
- S3c revert-in-revert (islem seviyesi)                             | ok=true adim=2 padok geri geldi aktif=false                           | ok=true hat=- adim=2 padok=1 aktif=false                              | PASS  | 
- S4a satır önizleme: KADEMELI çocuk plana girer                    | ok=true ga=true plan=2 kademeli>=1                                    | ok=true ga=true plan=2 kademeli=1                                     | PASS  | 
- S4b kademeli revert (baba+çocuk silinir)                          | ok=true adim=2 ikisi de gitti                                         | ok=true hat=- adim=2 padok=0 grup=0                                   | PASS  | 
- S5 satır revert: sonradan değişen çocuk engel                     | BAGIMLILIK_ENGELI, ENGEL>=1                                           | ok=false hat=BAGIMLILIK_ENGELI engel=1                                | PASS  | ok=false hata=BAGIMLILIK_ENGELI engel=1
- S6a composite PK revert (vaccine_diseases, nesne pk)              | ok=true adim=1 eski çift geri geldi                                   | -                                                                     | PASS  | 
- S6b composite PK revert (pedigree_meta, nesne pk + txid)          | ok=true value=v1                                                      | -                                                                     | PASS  | 
- S6c composite PK: INSERT revert, sonraki değişiklik var           | CAKISMA                                                               | CAKISMA                                                               | PASS  | {"ok": false, "hata": "CAKISMA", "detay": {"engeller": ["pedigree_meta kaydı {\"key\": \"k3-composite\", \"farm_id\": \"400b9107-a85e-4126-af2c-fd7fe73fb68e\"}:
- S7a olmayan pk                                                    | HEDEF_BULUNAMADI                                                      | HEDEF_BULUNAMADI                                                      | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI"}
- S7b sistem-kurulumu-öncesi değişiklik (logsuz satır)              | HEDEF_BULUNAMADI                                                      | HEDEF_BULUNAMADI                                                      | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI", "detay": {}}
- S7c boş txid                                                      | HEDEF_BULUNAMADI                                                      | HEDEF_BULUNAMADI                                                      | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI"}
- S7d geçersiz seviye                                               | GECERSIZ_SEVIYE                                                       | GECERSIZ_SEVIYE                                                       | PASS  | {"ok": false, "hata": "GECERSIZ_SEVIYE"}
- S7e kapsam dışı tablo                                             | GECERSIZ_HEDEF                                                        | GECERSIZ_HEDEF                                                        | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF"}
- S7f geçersiz pk şekli (dizi)                                      | GECERSIZ_HEDEF                                                        | GECERSIZ_HEDEF                                                        | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF"}
- S7g alan hedefi INSERT kaydında                                   | GECERSIZ_HEDEF                                                        | GECERSIZ_HEDEF                                                        | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF"}
- S8a listele txid → satır detayı (teknikal_mi dahil)               | ok=true detay=true kayitlar=2 teknikal_mi alanı var                   | ok=true detay=true n=2 teknikal_mi=t                                  | PASS  | 
- S8b listele tablo filtresi                                        | ok=true toplam>=3                                                     | ok=true toplam=7                                                      | PASS  | 
- S8c listele işlem tipi filtresi (D)                               | ok=true toplam>=2                                                     | ok=true toplam=2                                                      | PASS  | 
- S8d listele tarih aralığı (TR gün sınırı)                         | ok=true toplam>=1                                                     | ok=true toplam=20                                                     | PASS  | 
- S8e listele hayvan filtresi                                       | ok=true toplam>=1 ilk txid eşleşir                                    | ok=true toplam=1 ilktx=12737                                          | PASS  | 
- S8f listele authenticated rolüyle                                 | ok=true                                                               | ok=true                                                               | PASS  | 
- S9a bilet çok kullanımlı, her deneme kayda geçer                  | kayıt>=10, başarılı>=7                                                | kayit=12 basarili=8                                                   | PASS  | 
- S12a cascade silme önizleme: EKLE anne önce (topolojik)           | ok=true plan=2 ilk=tedavi_sablonu ikinci=tedavi_sablonu_kalem ga=true | ok=true plan=2 ilk=tedavi_sablonu ikinci=tedavi_sablonu_kalem ga=true | PASS  | 
- S12b cascade silme revert: anne+çocuk geri geldi                  | ok=true adim=2 sablon=1 kalem=1                                       | -                                                                     | PASS  | 
- S12c satır-seviyesi kısmi revert: kalan çocuk UYARI (engel değil) | onizle plan=1 uyari>=1; revert ok=true adim=1 sablon=1 kalem=0        | onizle=true plan=1 uyari=1 | ok=true hat=- adim=1 sablon=1 kalem=0    | PASS  | 
- S11 temizlik: demo başlangıç durumuna döndü                       | log=0 padok=0 hekim=1                                                 | log=0 padok=0 hekim=1                                                 | PASS  | 
-(43 satır)
+ S0a bilet: şifre durumu (ayarlı değilse SIFRE_AYARLI_DEGİL)           | paylaşılan-demo uyumlu                                                | SIFRE_AYARLI_DEGIL sifrevardi=f                                       | PASS  | {"ok": false, "hata": "SIFRE_AYARLI_DEGIL"}
+ S0b setup RPC authenticated ile                                       | permission denied                                                     | permission denied                                                     | PASS  | 42501
+ S0c bilet RPC anon ile                                                | permission denied                                                     | permission denied                                                     | PASS  | 42501
+ S0d setup RPC (postgres) şifre kur                                    | ok=true                                                               | ok=true                                                               | PASS  | {"ok": true, "guncelleme": "2026-09-13T16:34:16.741015+00:00"}
+ S0e bilet: yanlış şifre                                               | SIFRE_HATALI                                                          | SIFRE_HATALI                                                          | PASS  | {"ok": false, "hata": "SIFRE_HATALI"}
+ S0f bilet: doğru şifre                                                | ok=true, kalan_sn≈3600                                                | -                                                                     | PASS  |
+ S0g bilet: süresi dolmuş                                              | BILET_SURESI_DOLMUS                                                   | BILET_SURESI_DOLMUS                                                   | PASS  | {"ok": false, "hata": "BILET_SURESI_DOLMUS", "detay": {"son_gecerlilik": "2026-09-13T16:29:17.441162+00:00"}}
+ S0h dolmuş bilet kullanım kaydı                                       | 1 kayıt                                                               | 1                                                                     | PASS  |
+ S0i bilet: bilinmeyen uuid                                            | BILET_GECERSIZ                                                        | BILET_GECERSIZ                                                        | PASS  | {"ok": false, "hata": "BILET_GECERSIZ", "detay": {}}
+ S0j bilet: NULL                                                       | BILET_GECERSIZ                                                        | BILET_GECERSIZ                                                        | PASS  | {"ok": false, "hata": "BILET_GECERSIZ", "detay": {}}
+ S1a alan revert eski tx (sonra T2 var)                                | CAKISMA                                                               | CAKISMA                                                               | PASS  | {"ok": false, "hata": "CAKISMA", "detay": {"engeller": ["hekimler kaydı \"H3\": SONRAKI_DEGISIKLIK"], "cakismalar": [{"pk": "H3", "alan": "telefon", "txid": "14
+ S1b alan revert (son değişiklik T2)                                   | ok=true adim=1 telefon=~T1                                            | ok=true hat=- adim=1 tel=5550000~T1                                   | PASS  |
+ S1c revert-in-revert (alan, hedef=revert değişikliği)                 | ok=true telefon=~T1~T2                                                | ok=true hat=- tel=5550000~T1~T2                                       | PASS  |
+ S2a satır önizleme: stok_uyari, çakışma yok                           | ok=true ga=true stok_uyari>=1 cakisma=0                               | ok=true ga=true stok_uyari=1 cakisma=0                                | PASS  |
+ S2b satır revert (son değişiklik = S1c reverti)                       | ok=true adim=1 telefon=~T1                                            | ok=true hat=- adim=1 tel=5550000~T1                                   | PASS  |
+ S2c revert kaynağı damgası (bilet MASKELİ ilk-8, LUNA-1; gerekçe tam) | bilet=left8+…, gerekçe eşleşir                                        | bilet=f9e9cd42… gerekce=k3 S2b gerekçe                                | PASS  |
+ S3a işlem önizleme (2 satır tek tx)                                   | ok=true ga=true plan=2                                                | ok=true ga=true plan=2                                                | PASS  |
+ S3b işlem revert                                                      | ok=true adim=2 padok silindi aktif=true                               | ok=true hat=- adim=2 padok=0 aktif=true                               | PASS  |
+ S3c revert-in-revert (islem seviyesi)                                 | ok=true adim=2 padok geri geldi aktif=false                           | ok=true hat=- adim=2 padok=1 aktif=false                              | PASS  |
+ S4a satır önizleme: KADEMELI çocuk plana girer                        | ok=true ga=true plan=2 kademeli>=1                                    | ok=true ga=true plan=2 kademeli=1                                     | PASS  |
+ S4b kademeli revert (baba+çocuk silinir)                              | ok=true adim=2 ikisi de gitti                                         | ok=true hat=- adim=2 padok=0 grup=0                                   | PASS  |
+ S5 satır revert: sonradan değişen çocuk engel                         | BAGIMLILIK_ENGELI, ENGEL>=1                                           | ok=false hat=BAGIMLILIK_ENGELI engel=1                                | PASS  | ok=false hata=BAGIMLILIK_ENGELI engel=1
+ S6a composite PK revert (vaccine_diseases, nesne pk)                  | ok=true adim=1 eski çift geri geldi                                   | -                                                                     | PASS  |
+ S6b composite PK revert (pedigree_meta, nesne pk + txid)              | ok=true value=v1                                                      | -                                                                     | PASS  |
+ S6c composite PK: INSERT revert, sonraki değişiklik var               | CAKISMA                                                               | CAKISMA                                                               | PASS  | {"ok": false, "hata": "CAKISMA", "detay": {"engeller": ["pedigree_meta kaydı {\"key\": \"k3-composite\", \"farm_id\": \"400b9107-a85e-4126-af2c-fd7fe73fb68e\"}:
+ S7a olmayan pk                                                        | HEDEF_BULUNAMADI                                                      | HEDEF_BULUNAMADI                                                      | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI"}
+ S7b sistem-kurulumu-öncesi değişiklik (logsuz satır)                  | HEDEF_BULUNAMADI                                                      | HEDEF_BULUNAMADI                                                      | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI", "detay": {}}
+ S7c boş txid                                                          | HEDEF_BULUNAMADI                                                      | HEDEF_BULUNAMADI                                                      | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI"}
+ S7d geçersiz seviye                                                   | GECERSIZ_SEVIYE                                                       | GECERSIZ_SEVIYE                                                       | PASS  | {"ok": false, "hata": "GECERSIZ_SEVIYE"}
+ S7e kapsam dışı tablo                                                 | GECERSIZ_HEDEF                                                        | GECERSIZ_HEDEF                                                        | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF"}
+ S7f geçersiz pk şekli (dizi)                                          | GECERSIZ_HEDEF                                                        | GECERSIZ_HEDEF                                                        | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF"}
+ S7g alan hedefi INSERT kaydında                                       | GECERSIZ_HEDEF                                                        | GECERSIZ_HEDEF                                                        | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF"}
+ S8a listele txid → satır detayı (teknikal_mi dahil)                   | ok=true detay=true kayitlar=2 teknikal_mi alanı var                   | ok=true detay=true n=2 teknikal_mi=t                                  | PASS  |
+ S8b listele tablo filtresi                                            | ok=true toplam>=3                                                     | ok=true toplam=7                                                      | PASS  |
+ S8c listele işlem tipi filtresi (D)                                   | ok=true toplam>=2                                                     | ok=true toplam=2                                                      | PASS  |
+ S8d listele tarih aralığı (TR gün sınırı)                             | ok=true toplam>=1                                                     | ok=true toplam=27                                                     | PASS  |
+ S8e listele hayvan filtresi                                           | ok=true toplam>=1 ilk txid eşleşir                                    | ok=true toplam=1 ilktx=14262                                          | PASS  |
+ S8f listele authenticated rolüyle                                     | ok=true                                                               | ok=true                                                               | PASS  |
+ S9a bilet çok kullanımlı, her deneme kayda geçer                      | kayıt>=10, başarılı>=7                                                | kayit=12 basarili=8                                                   | PASS  |
+ S12a cascade silme önizleme: EKLE anne önce (topolojik)               | ok=true plan=2 ilk=tedavi_sablonu ikinci=tedavi_sablonu_kalem ga=true | ok=true plan=2 ilk=tedavi_sablonu ikinci=tedavi_sablonu_kalem ga=true | PASS  |
+ S12b cascade silme revert: anne+çocuk geri geldi                      | ok=true adim=2 sablon=1 kalem=1                                       | -                                                                     | PASS  |
+ S12c satır-seviyesi kısmi revert: kalan çocuk UYARI (engel değil)     | onizle plan=1 uyari>=1; revert ok=true adim=1 sablon=1 kalem=0        | onizle=true plan=1 uyari=1 | ok=true hat=- adim=1 sablon=1 kalem=0    | PASS  |
+ S13 LUNA-1: tam bilet log'a yazılmaz (ilk-8 maske)                    | tam-uuid=0, maskeli>=1                                                | ok=true tam=0 maske=15                                                | PASS  |
+ S11b LUNA-4: önceden varolan gizli kayıt korundu                      | bilet=0 sifre=0                                                       | bilet=0 sifre=0                                                       | PASS  |
+ S11 temizlik: demo başlangıç durumuna döndü                           | log=0 padok=0 hekim=1                                                 | log=0 padok=0 hekim=1                                                 | PASS  |
 
 == özet ==
- pass | fail | toplam 
-------+------+--------
-   43 |    0 |     43
-(1 satır)
-
- vaka | beklenen | bulunan | detay 
-------+----------+---------+-------
-(0 satır)
-
+   45 |    0 |     45

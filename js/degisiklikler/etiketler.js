@@ -43,6 +43,10 @@ const DG_TABLO_ETIKETLERI = {
   hayvan_override: 'Hayvan istisnası',
   islem_log: 'İşlem kaydı',
   cop_kutusu: 'Çöp kutusu',
+  pedigree_meta: 'Pedigree üst-verisi',
+  pedigree_nodes: 'Pedigree düğümü',
+  pedigree_parentage: 'Pedigree ebeveynliği',
+  semen_catalog: 'Sperma kataloğu',
 };
 
 // Tablodan bağımsız ortak alanlar
@@ -55,6 +59,11 @@ const DG_ORTAK_ALANLAR = {
   hayvan_id: 'Hayvan',
   animal_id: 'Hayvan',
   anne_id: 'Anne',
+  display_name: 'Görünen ad',
+  source_ref: 'Kaynak referansı',
+  code: 'Kod',
+  target_type: 'Hedef tipi',
+  label: 'Etiket',
   tarih: 'Tarih',
   notlar: 'Notlar',
   notes: 'Not',

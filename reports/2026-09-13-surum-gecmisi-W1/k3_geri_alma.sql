@@ -43,15 +43,21 @@ EXCEPTION WHEN others THEN
   RAISE;
 END;
 $do$;
-DELETE FROM surum_gizli.geri_alma_kullanim;
-DELETE FROM surum_gizli.geri_alma_bileti;
-DELETE FROM surum_gizli.sahip_sifresi;
+-- LUNA-4: paylaşılan gizli durum koşum başında anlık görüntülenir; temizlik
+-- yalnız bu koşumun ürettiği kayıtlara dokunur (önceden var olan bilet,
+-- kullanım ve sahip şifresi korunur — S11/S11b).
+CREATE TEMP TABLE k3_biletler_once AS SELECT bilet FROM surum_gizli.geri_alma_bileti;
+CREATE TEMP TABLE k3_sifre_once AS SELECT hash FROM surum_gizli.sahip_sifresi;
+SELECT EXISTS (SELECT 1 FROM k3_sifre_once) AS sifrevardi \gset
 
 -- ══ S0: password + ticket flow ═════════════════════════════════════════════
 WITH c AS (SELECT public.geri_alma_bileti_al('herhangi-bir-sey') AS j)
-INSERT INTO k3 SELECT 'S0a bilet: şifre ayarlı değil', 'SIFRE_AYARLI_DEGIL',
-  coalesce(j ->> 'hata', 'ok=true'),
-  CASE WHEN NOT (j ->> 'ok')::bool AND j ->> 'hata' = 'SIFRE_AYARLI_DEGIL' THEN 'PASS' ELSE 'FAIL' END,
+INSERT INTO k3 SELECT 'S0a bilet: şifre durumu (ayarlı değilse SIFRE_AYARLI_DEGİL)',
+  'paylaşılan-demo uyumlu',
+  coalesce(j ->> 'hata', 'ok=true') || ' sifrevardi=' || :'sifrevardi',
+  CASE WHEN (:'sifrevardi' = 't' AND NOT (j ->> 'ok')::bool AND j ->> 'hata' = 'SIFRE_HATALI')
+        OR (:'sifrevardi' <> 't' AND NOT (j ->> 'ok')::bool AND j ->> 'hata' = 'SIFRE_AYARLI_DEGIL')
+       THEN 'PASS' ELSE 'FAIL' END,
   j::text FROM c;
 
 DO $do$
@@ -182,9 +188,10 @@ SELECT kaynak -> 'geri_alma' ->> 'bilet' AS kb, kaynak -> 'geri_alma' ->> 'gerek
   FROM public.degisim_log
  WHERE tablo_adi = 'hekimler' AND kaynak -> 'geri_alma' IS NOT NULL
  ORDER BY id DESC LIMIT 1 \gset
-INSERT INTO k3 SELECT 'S2c revert kaynağı damgası (bilet+gerekçe)', 'bilet eşleşir, gerekçe eşleşir',
-  format('bilet=%s gerekce=%s', left(:'kb', 8), :'kg'),
-  CASE WHEN :'kb' = :'bilet' AND :'kg' = 'k3 S2b gerekçe' THEN 'PASS' ELSE 'FAIL' END, '';
+INSERT INTO k3 SELECT 'S2c revert kaynağı damgası (bilet MASKELİ ilk-8, LUNA-1; gerekçe tam)',
+  'bilet=left8+…, gerekçe eşleşir',
+  format('bilet=%s gerekce=%s', :'kb', :'kg'),
+  CASE WHEN :'kb' = left(:'bilet', 8) || '…' AND :'kg' = 'k3 S2b gerekçe' THEN 'PASS' ELSE 'FAIL' END, '';
 
 -- ══ S3: işlem seviyesi + revert-of-revert (islem) ══════════════════════════
 BEGIN;
@@ -476,6 +483,20 @@ INSERT INTO k3 SELECT 'S12c satır-seviyesi kısmi revert: kalan çocuk UYARI (e
         AND :'ok' = 'true' AND :'adim' = '1' AND :'sn' = '1' AND :'kn' = '0' THEN 'PASS' ELSE 'FAIL' END, '';
 DELETE FROM public.tedavi_sablonu WHERE id = :'s12';
 
+-- ══ S13 (LUNA-1): tam bilet degisim_log'a YAZILMAZ (maske) ══════════════════
+UPDATE public.hekimler SET ad = 'k3-luna-1-maske' WHERE id = 'H2';
+WITH c AS (SELECT public.degisim_geri_al(jsonb_build_object('tablo', 'hekimler', 'pk', 'H2'),
+                                          'satir', :'bilet'::uuid, 'luna-1 bilet maske') AS j)
+SELECT coalesce(j ->> 'ok', 'false') AS mok FROM c \gset
+SELECT count(*) AS tamuuid FROM public.degisim_log
+ WHERE kaynak::text LIKE '%' || :'bilet' || '%' \gset
+SELECT count(*) AS maskeli FROM public.degisim_log
+ WHERE kaynak -> 'geri_alma' ->> 'bilet' = left(:'bilet', 8) || '…' \gset
+INSERT INTO k3 SELECT 'S13 LUNA-1: tam bilet log''a yazılmaz (ilk-8 maske)',
+  'tam-uuid=0, maskeli>=1',
+  format('ok=%s tam=%s maske=%s', :'mok', :'tamuuid', :'maskeli'),
+  CASE WHEN :'mok' = 'true' AND :'tamuuid' = '0' AND :'maskeli'::int >= 1 THEN 'PASS' ELSE 'FAIL' END, '';
+
 -- ══ S11: temizlik — sentetik satırlar + k3 log kayıtları + şifre sıfırlama ══
 UPDATE public.hekimler SET telefon = :'h3tel', aktif = :'h3aktif'::boolean WHERE id = 'H3';
 UPDATE public.hekimler SET ad = :'h2ad' WHERE id = 'H2';
@@ -492,9 +513,34 @@ UPDATE public.hayvanlar SET notlar = regexp_replace(notlar, '~k3$', '')
 ALTER TABLE public.degisim_log DISABLE TRIGGER USER;
 DELETE FROM public.degisim_log WHERE kaynak ->> 'istemci_etiketi' = 'k3-geri-alma-testi';
 ALTER TABLE public.degisim_log ENABLE TRIGGER USER;
-DELETE FROM surum_gizli.geri_alma_kullanim;
-DELETE FROM surum_gizli.geri_alma_bileti;
-DELETE FROM surum_gizli.sahip_sifresi;
+-- LUNA-4: yalnız bu koşumun ürettiği gizli kayıtlar silinir; koşum öncesi
+-- varolan bilet/kullanım/sahip şifresi korunur (şifre üzerine yazıldıysa
+-- anlık görüntüden geri yüklenir).
+DELETE FROM surum_gizli.geri_alma_kullanim
+ WHERE bilet IN (SELECT bilet FROM surum_gizli.geri_alma_bileti
+                  WHERE bilet NOT IN (SELECT bilet FROM k3_biletler_once));
+DELETE FROM surum_gizli.geri_alma_bileti
+ WHERE bilet NOT IN (SELECT bilet FROM k3_biletler_once);
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM k3_sifre_once) THEN
+    UPDATE surum_gizli.sahip_sifresi SET hash = (SELECT hash FROM k3_sifre_once);
+  ELSE
+    DELETE FROM surum_gizli.sahip_sifresi;
+  END IF;
+END;
+$do$;
+
+SELECT count(*) AS oncekibilet FROM surum_gizli.geri_alma_bileti
+ WHERE bilet IN (SELECT bilet FROM k3_biletler_once) \gset
+SELECT count(*) AS oncekisifre FROM surum_gizli.sahip_sifresi
+ WHERE hash IN (SELECT hash FROM k3_sifre_once) \gset
+INSERT INTO k3 SELECT 'S11b LUNA-4: önceden varolan gizli kayıt korundu',
+  format('bilet=%s sifre=%s', (SELECT count(*) FROM k3_biletler_once), (SELECT count(*) FROM k3_sifre_once)),
+  format('bilet=%s sifre=%s', :'oncekibilet', :'oncekisifre'),
+  CASE WHEN :'oncekibilet' = (SELECT count(*)::text FROM k3_biletler_once)
+        AND :'oncekisifre' = (SELECT count(*)::text FROM k3_sifre_once)
+       THEN 'PASS' ELSE 'FAIL' END, '';
 
 SELECT count(*) AS logkalan FROM public.degisim_log
  WHERE kaynak ->> 'istemci_etiketi' = 'k3-geri-alma-testi' \gset

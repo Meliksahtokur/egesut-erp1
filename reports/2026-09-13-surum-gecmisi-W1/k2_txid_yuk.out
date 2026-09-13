@@ -2,50 +2,38 @@ BEGIN
 == (a) 100-row INSERT + 100-row UPDATE in one tx ==
 INSERT 0 100
 UPDATE 100
- islem | satir | txid_sayisi | hepsi_bu_tx 
--------+-------+-------------+-------------
  I     |   100 |           1 | t
  U     |   100 |           1 | t
-(2 satır)
 
 DELETE 100
 == (b) trigger overhead, N rows per op ==
 CREATE TABLE
 DO
- rep | trigger_acik |   op   |  n   |  ms   
------+--------------+--------+------+-------
-   1 | t            | DELETE | 2000 | 144.2
+   1 | t            | DELETE | 2000 | 220.2
    1 | f            | DELETE | 2000 |   3.2
-   2 | t            | DELETE | 2000 | 145.4
-   2 | f            | DELETE | 2000 |   3.4
-   3 | t            | DELETE | 2000 | 141.2
+   2 | t            | DELETE | 2000 | 220.3
+   2 | f            | DELETE | 2000 |   3.6
+   3 | t            | DELETE | 2000 | 230.0
    3 | f            | DELETE | 2000 |   3.7
-   1 | t            | INSERT | 2000 | 401.8
-   1 | f            | INSERT | 2000 |  33.5
-   2 | t            | INSERT | 2000 | 189.0
-   2 | f            | INSERT | 2000 |  33.9
-   3 | t            | INSERT | 2000 | 197.5
-   3 | f            | INSERT | 2000 |  35.2
-   1 | t            | UPDATE | 2000 | 548.3
-   1 | f            | UPDATE | 2000 |  35.4
-   2 | t            | UPDATE | 2000 | 296.6
-   2 | f            | UPDATE | 2000 |  35.7
-   3 | t            | UPDATE | 2000 | 329.7
-   3 | f            | UPDATE | 2000 |  38.6
-(18 satır)
+   1 | t            | INSERT | 2000 | 384.8
+   1 | f            | INSERT | 2000 |  44.8
+   2 | t            | INSERT | 2000 | 275.8
+   2 | f            | INSERT | 2000 |  55.2
+   3 | t            | INSERT | 2000 | 294.0
+   3 | f            | INSERT | 2000 |  53.2
+   1 | t            | UPDATE | 2000 | 459.3
+   1 | f            | UPDATE | 2000 |  47.3
+   2 | t            | UPDATE | 2000 | 412.0
+   2 | f            | UPDATE | 2000 |  55.0
+   3 | t            | UPDATE | 2000 | 510.8
+   3 | f            | UPDATE | 2000 |  44.8
 
 == median per op (ms) and per-row overhead (us) ==
-   op   | acik_ms | kapali_ms | oran  | ek_us_satir 
---------+---------+-----------+-------+-------------
- DELETE |   144.2 |       3.4 | 41.99 |        70.4
- INSERT |   197.5 |      33.9 |  5.82 |        81.8
- UPDATE |   329.7 |      35.7 |  9.24 |       147.0
-(3 satır)
+ DELETE |   220.3 |       3.6 | 60.75 |       108.4
+ INSERT |   294.0 |      53.2 |  5.52 |       120.4
+ UPDATE |   459.3 |      47.3 |  9.70 |       206.0
 
 == trigger state restored ==
-     tgname      | tgenabled 
------------------+-----------
  trg_degisim_log | O
-(1 satır)
 
 ROLLBACK

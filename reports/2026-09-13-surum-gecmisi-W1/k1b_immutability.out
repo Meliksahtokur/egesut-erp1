@@ -1,7 +1,7 @@
 == seed one row (hayvanlar no-op-free update, rolled back later) ==
 BEGIN
 UPDATE 1
- log_rows_in_tx 
+ log_rows_in_tx
 ----------------
               1
 (1 satır)
@@ -35,7 +35,7 @@ ROLLBACK
 == authenticated role: INSERT/UPDATE/DELETE denied, SELECT allowed ==
 SET
 SAVEPOINT
- select_ok 
+ select_ok
 -----------
  t
 (1 satır)

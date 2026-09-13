@@ -14,6 +14,38 @@ test('tabloEtiketi: bilinen iş tabloları Türkçe', () => {
   assert.strictEqual(tabloEtiketi('cases'), 'Vaka');
 });
 
+test('LUNA-2: kapsam (39 tablo) TAMAMI haritada — fallback kullanılmaz', () => {
+  // Canlı DEMO trg_degisim_log attach listesi (2026-09-13, 39 tablo).
+  const KAPSAM = ['cases','diseases','dogum','drug_administrations','drug_classes',
+    'drug_products','drugs','gorev_log','grup_padok_eslem','hastalik_log',
+    'hayvan_override','hayvanlar','hekimler','irk_esik','kizginlik_log','padoklar',
+    'pedigree_meta','pedigree_nodes','pedigree_parentage','protokol_ayar',
+    'protokol_dismiss','protokol_instance','sablon_hastalik_eslem','semen_catalog',
+    'stok','stok_hareket','stok_kategorileri','tedavi','tedavi_sablonu',
+    'tedavi_sablonu_kalem','tohumlama','treatment_day_uygulamalar','treatment_days',
+    'uygulama_log','vaccination_log','vaccination_schedule','vaccine_diseases',
+    'vaccine_protocol_steps','vaccines'];
+  const insanlastir = (ad) => { const s = String(ad).replace(/_+/g, ' ').trim();
+    return s.charAt(0) === 'i' ? 'İ' + s.slice(1) : s.charAt(0).toUpperCase() + s.slice(1); };
+  // Üyelik testi insanlaştırma sezgisiyle değil, haritanın kendisiyle yapılır
+  // (tedavi/tohumlama gibi tek-kelimelik Türkçe adlarda etiket == insanlaştırma
+  //  olabilir — bu bir eksiklik değildir).
+  const kodlar = new Set(tabloSecenekleri().map(x => x.kod));
+  const eksik = KAPSAM.filter(t => !kodlar.has(t));
+  const fallbackaDusen = KAPSAM.filter(t => tabloEtiketi(t) === insanlastir(t)
+    && !['tedavi', 'tohumlama'].includes(t));
+  assert.deepStrictEqual(eksik, [], `haritadan eksik tablolar: ${eksik.join(', ')}`);
+  assert.deepStrictEqual(fallbackaDusen, [], `fallback'a düşen tablolar: ${fallbackaDusen.join(', ')}`);
+});
+
+test('LUNA-2: luna bulgusu alanları artık Türkçe', () => {
+  assert.strictEqual(alanEtiketi('pedigree_nodes', 'display_name'), 'Görünen ad');
+  assert.strictEqual(alanEtiketi('pedigree_parentage', 'source_ref'), 'Kaynak referansı');
+  assert.strictEqual(alanEtiketi('semen_catalog', 'code'), 'Kod');
+  assert.strictEqual(alanEtiketi('vaccination_schedule', 'target_type'), 'Hedef tipi');
+  assert.strictEqual(alanEtiketi('vaccine_protocol_steps', 'label'), 'Etiket');
+});
+
 test('tabloEtiketi: bilinmeyen tablo insanlaştırılır, çökmez', () => {
   assert.strictEqual(tabloEtiketi('yeni_tablo_adi'), 'Yeni tablo adi');
   assert.strictEqual(tabloEtiketi('islem_x'), 'İslem x', 'Türkçe büyük İ');
