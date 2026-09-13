@@ -429,19 +429,27 @@ function muhafizKaynagi(ham) {
     .replace(/\/\/[^\n]*/g, '');
 }
 
-test('F4 muhafızı — index.html + js/ içinde type="date" girişi YASAK', () => {
+function jsDosyalari(fs, path, kok) {
+  // js/ altını ÖZYİNELEMELİ tarar (luna BULGU-8: düz çocuk taraması alt
+  // dizindeki girişleri kaçırıyordu)
+  const bul = [];
+  const gez = (goreceli) => {
+    const mutlak = path.join(kok, goreceli);
+    for (const d of fs.readdirSync(mutlak, { withFileTypes: true })) {
+      const yol = goreceli + '/' + d.name;
+      if (d.isDirectory()) gez(yol);
+      else if (d.name.endsWith('.js')) bul.push(yol);
+    }
+  };
+  gez('js');
+  return bul;
+}
+
+test('F4 muhafızı — index.html + js/ (özyinelemeli) içinde type="date" girişi YASAK', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const kok = path.join(__dirname, '..', '..');
-  const dosyalar = ['index.html'];
-  for (const dizin of ['js', 'js/tarih']) {
-    const mutlak = path.join(kok, dizin);
-    if (fs.existsSync(mutlak)) {
-      for (const d of fs.readdirSync(mutlak)) {
-        if (d.endsWith('.js')) dosyalar.push(dizin + '/' + d);
-      }
-    }
-  }
+  const dosyalar = ['index.html', ...jsDosyalari(fs, path, kok)];
   const ihlaller = [];
   for (const d of dosyalar) {
     const src = muhafizKaynagi(fs.readFileSync(path.join(kok, d), 'utf8'));
@@ -453,14 +461,48 @@ test('F4 muhafızı — index.html + js/ içinde type="date" girişi YASAK', () 
   assert.deepStrictEqual(ihlaller, [], 'native date girişi geri gelmez');
 });
 
-test('F4 muhafızı — gizli taşıyıcı runtime ataması bilinçli TEK noktada kalır', () => {
+test('F4 muhafızı — gizli taşıyıcı runtime ataması tüm js/ içinde bilinçli TEK noktada kalır', () => {
   const fs = require('node:fs');
-  const src = muhafizKaynagi(fs.readFileSync(require.resolve('../../js/ui.js'), 'utf8'));
+  const path = require('node:path');
+  const kok = path.join(__dirname, '..', '..');
   // js/utils/modal.js:15 openM auto-fill kancası, runtime .type="date"
-  // atamasıyla çalışır (F2 tasarım kararı). Bu istisna yalnız bağlama
-  // katmanında 1 kez olabilir — ikinci atama yeni native-surface demektir.
-  const atamalar = (src.match(/\.type\s*=\s*["']date["']/g) || []).length;
-  assert.strictEqual(atamalar, 1, 'gizli taşıyıcı .type="date" ataması yalnız 1 yerde olabilir, bulunan: ' + atamalar);
+  // atamasıyla çalışır (F2 tasarım kararı). İstisna TÜM js/ ağacında toplam
+  // 1 kez olabilir (luna BULGU-8: başka dosyada ikinci atama kaçmıştı) —
+  // ikinci atama yeni native-surface demektir.
+  const atamalar = jsDosyalari(fs, path, kok).reduce((toplam, d) => {
+    const src = muhafizKaynagi(fs.readFileSync(path.join(kok, d), 'utf8'));
+    return toplam + (src.match(/\.type\s*=\s*["']date["']/g) || []).length;
+  }, 0);
+  assert.strictEqual(atamalar, 1, 'gizli taşıyıcı .type="date" ataması tüm js/ içinde yalnız 1 yerde olabilir, bulunan: ' + atamalar);
+});
+
+test('F4 muhafızı — takvim-semantikli YENİ fonksiyon adı beyaz liste dışına çıkamaz', () => {
+  // luna BULGU-6: yeniden adlandırılmış kopya takvim renderer'ı isim
+  // muhafızına takılmıyordu. Takvim/gün-seçim semantiği taşıyan her yeni
+  // `function` adı bu beyaz listede olmak zorunda — liste F1-F3 teslim
+  // sonundaki meşru yüzeydir; yeni yüzey bu testin listesine bilinçli
+  // eklenir (review kanıtıyla), sessiz kopya gelmez.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const kok = path.join(__dirname, '..', '..');
+  const beyazListe = new Set([
+    'bcTakvimAc', 'bcTakvimAyDegistir', 'bcTakvimAyGosterim', 'bcTakvimAyKaydir',
+    'bcTakvimBaslikTarihi', 'bcTakvimChipEtiketi', 'bcTakvimdenGunler', 'bcTakvimKapat',
+    'bcTakvimOnayla', 'bcTakvimRender', 'bcTakvimSecimEkle', 'bcTakvimToggle',
+    'cdSablonTarihTakvimAc', 'cdtTakvimAc', 'tarihAlaniTakvimAc', 'tekTarihTakvimAc',
+    'tekTarihTakvimAyDegistir', 'tekTarihTakvimGirisUygula', 'tekTarihTakvimKapat',
+    'tekTarihTakvimOnayla', 'tekTarihTakvimRender', 'tekTarihTakvimSec',
+    'tekTarihTakvimTemizle', 'tekTarihTakvimYilDegistir', 'caseGunModalRender',
+    'bcTarihSeciciAc',
+  ]);
+  const yabancilar = [];
+  for (const d of jsDosyalari(fs, path, kok)) {
+    const src = muhafizKaynagi(fs.readFileSync(path.join(kok, d), 'utf8'));
+    for (const m of src.matchAll(/function\s+([A-Za-z0-9_$]+)/g)) {
+      if (/Takvim|GunSecim/i.test(m[1]) && !beyazListe.has(m[1])) yabancilar.push(d + ':' + m[1]);
+    }
+  }
+  assert.deepStrictEqual(yabancilar, [], 'beyaz liste dışı takvim fonksiyonu = kopya adayı');
 });
 
 test('F4 muhafızı — saf katmanda Date.now dahil tüm tarih-saat API’leri yasak (block-comment soyulmuş)', () => {

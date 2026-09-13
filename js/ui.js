@@ -2973,7 +2973,7 @@ async function openAnimalEdit(id){
   if(a.kupe_no)     document.getElementById('a-kupe').value=a.kupe_no;
   if(a.cinsiyet)    document.getElementById('a-cinsiyet').value=a.cinsiyet;
   if(a.dogum_tarihi) document.getElementById('a-dt').value=a.dogum_tarihi;
-  document.getElementById('a-dt').max=new Date().toISOString().slice(0,10);
+  document.getElementById('a-dt').max=bugun(); // 20260913-16: UTC yerine yerel bugün (luna BULGU-5 — gece-yarısı kayması)
   if(a.dogum_kg)    document.getElementById('a-dkg').value=a.dogum_kg;
   if(a.canli_agirlik) document.getElementById('a-agirlik').value=a.canli_agirlik;
   if(a.boy)         document.getElementById('a-boy').value=a.boy;
@@ -8108,7 +8108,7 @@ function openPlanliTohumlama(gorev){
   globalThis._planliTohumlamaGorevId=gorev.id;
   closeM('m-task-det');
   openMWithHayvan('m-insem','i-hid',hayvan.kupe_no||hayvan.devlet_kupe||hayvan.id);
-  setTimeout(()=>{ const tarih=document.getElementById('i-tarih'); if(tarih) tarih.value=new Date().toISOString().slice(0,10); },180);
+  setTimeout(()=>{ const tarih=document.getElementById('i-tarih'); if(tarih) tarih.value=bugun(); },180); // 20260913-16: UTC yerine yerel bugün (luna BULGU-4 — gece-yarısı kayması)
 }
 
 function _openInsemIntercept(hayvan,bekliyor){
