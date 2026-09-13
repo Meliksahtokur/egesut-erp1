@@ -190,3 +190,28 @@ invent new calendar widgets. Reuse the established calendar-modal language:
   the shared component.
 - Multiple dates: `js/ui.js:caseGunModalRender` (`gun-tarih-modal`, toggle
   selection + "Secili Gunler" chips).
+
+## js/degisiklikler/ — Değişiklikler sayfası (F3 2026-09-13; see TESTING-01)
+
+- `degisiklikler.js` — sayfa kontrolcüsü: tx-bazlı liste + filtreler (hayvan,
+  tarih aralığı — kanonik `tekTarihTakvimAc`, tablo, işlem tipi), detay
+  diff (eklenen yeşil / silinen kırmızı / eski→yeni), geri-al akışı
+  (önizleme `m-dg-onizle` → bilet modalı `m-dg-bilet` + kalan-süre
+  göstergesi → opsiyonel gerekçe → uygula), çevrimdışı kilidi, hayvan
+  detayından ön-dolu filtre (`js/ui.js:_detOzetHtml` guard'lı buton),
+  `popstate` ile geri/ileri navigasyonu.
+- `diff.js` (SAF) — `diffSatirlari`, `islemOzeti` (+ `ozetMetni`,
+  `degerMetni`, `pkKisa`); `tests/unit/degisiklikler-diff.test.js`.
+- `etiketler.js` (SAF) — `tabloEtiketi`, `alanEtiketi`, `islemEtiketi`,
+  `tabloSecenekleri`; şema aynası envanterli, bilinmeyen ad için kademeli
+  düşüş; `tests/unit/degisiklikler-etiketler.test.js`.
+- `degisiklikler-stub.js` — SÖKÜLDÜ (lead entegrasyonu 2026-09-13): script
+  satırı ve dosya kaldırıldı, gerçek RPC wrapper'ları canlı; geliştirme
+  sırasındaki stub söküm talimatı W2 raporundaydı.
+- Giriş: Kayıt sayfası `log-btn` girişi (Stok/Tanımlar biçimi); alt nav'a
+  7. buton eklenmedi (sahip UI testinde değerlendirilir).
+- Bilet saklama: `sessionStorage` (`ege_geri_alma_bileti`); süre client
+  saatinden hesaplanır, sunucu her kullanımda yeniden doğrular; "Bırak"
+  butonu ve `BILET_*` hatalarında düşer.
+- XSS: tüm dinamik metin `esc()`/`escAttr()`; jsonb revert hedefleri
+  `data-hi` indeksiyle bellekten çözülür, attribute'a serileştirilmez.

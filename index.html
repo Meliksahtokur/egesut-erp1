@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20260911-14">
+<link rel="manifest" href="manifest.json?v=20260913-16">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -796,9 +796,64 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <div class="log-text"><div class="log-title">Tanımlar</div><div class="log-sub">Hastalık, ilaç, kategori yönetimi</div></div>
         <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
       </div>
+      <div data-action="go-degisiklikler" class="log-btn" style="margin-top:2px">
+        <div class="log-ico" style="background:rgba(124,58,237,.12)">🧾</div>
+        <div class="log-text"><div class="log-title">Değişiklikler</div><div class="log-sub">Tüm kayıt değişiklikleri, fark görünümü ve güvenli geri alma</div></div>
+        <svg class="log-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
       <div id="stok-list-body" style="display:none"></div>
       <div class="sh" style="margin-top:6px"><span class="sh-title">Son Doğumlar</span></div>
       <div id="births-body"><div class="loader"><div class="spin"></div></div></div>
+    </div>
+  </div>
+
+  <!-- DEĞİŞİKLİKLER (G-20260913-SURUM-GECMISI F3) — js/degisiklikler/degisiklikler.js -->
+  <div id="pg-degisiklikler" class="pg">
+    <style>
+      #pg-degisiklikler .dg-bas{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+      #pg-degisiklikler .dg-filtre{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+      #pg-degisiklikler .dg-satir{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+      #pg-degisiklikler .dg-satir .fi{flex:1;min-width:0}
+      #pg-degisiklikler .dg-satir .fs-btn{flex:0 1 auto;white-space:nowrap}
+      #pg-degisiklikler .dg-kart,#pg-degisiklikler .dg-satir-kart,#pg-degisiklikler .dg-detay-bas{background:var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+      #pg-degisiklikler .dg-kart{cursor:pointer}
+      #pg-degisiklikler .dg-kart-ust{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+      #pg-degisiklikler .dg-kart-alt{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:.72rem;color:var(--ink2);margin-top:4px}
+      .dg-baslik{font-weight:800;font-size:.86rem;color:var(--ink)}
+      .dg-zaman,.dg-pk{font-size:.68rem;color:var(--ink3);white-space:nowrap}
+      .dg-kaynak{font-size:.64rem;color:var(--ink3);margin-top:4px;word-break:break-word}
+      .dg-kaynak-dis{color:var(--amber);font-weight:700}
+      .dg-rozet{display:inline-block;font-size:.62rem;font-weight:800;padding:1px 7px;border-radius:8px;background:var(--card3);color:var(--ink2)}
+      .dg-rozet-g{background:rgba(78,154,42,.15);color:var(--green)}
+      .dg-rozet-a{background:rgba(201,125,10,.15);color:var(--amber)}
+      .dg-rozet-r{background:rgba(192,50,26,.12);color:var(--red)}
+      .dg-sayac,.dg-not{font-size:.7rem;color:var(--ink3);margin:2px 0}
+      .dg-stub{background:#b07a2a;color:#1a130a;font-size:.68rem;font-weight:800;padding:5px 10px;border-radius:8px;margin-bottom:8px}
+      .dg-uyari{background:rgba(192,50,26,.1);color:var(--red);font-size:.74rem;font-weight:700;padding:8px 10px;border-radius:8px;margin-bottom:8px}
+      .dg-satir-bas{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px;font-size:.8rem}
+      .dg-alan{display:flex;gap:8px;align-items:flex-start;padding:4px 6px;border-radius:6px;font-size:.76rem;margin-bottom:2px}
+      .dg-alan-ad{flex:0 0 38%;color:var(--ink2);font-weight:700;word-break:break-word}
+      .dg-alan-deger{flex:1;min-width:0;word-break:break-word}
+      .dg-eklendi{background:rgba(78,154,42,.10)}
+      .dg-silindi{background:rgba(192,50,26,.08)}
+      .dg-degisti{background:rgba(201,125,10,.08)}
+      .dg-yeni{color:var(--green);font-weight:700}
+      .dg-eski{color:var(--red);text-decoration:line-through}
+      .dg-degisti .dg-eski{text-decoration:line-through}
+      .dg-ok{color:var(--ink3)}
+      .dg-ayni{color:var(--ink3)}
+      .dg-geri{margin-top:6px;font-size:.68rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);cursor:pointer}
+      .dg-geri-k{margin-top:0;padding:1px 7px;flex-shrink:0}
+      .dg-link{background:none;border:none;color:var(--blue);font-weight:700;font-size:.74rem;cursor:pointer;padding:6px 0}
+      .dg-tum{display:flex;gap:6px;align-items:center;cursor:pointer}
+      .dg-blok{border:1px solid var(--card3);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+      .dg-blok-r{border-color:rgba(192,50,26,.4)}
+      .dg-blok-a{border-color:rgba(201,125,10,.4)}
+      .dg-blok-bas{font-size:.72rem;font-weight:800;color:var(--ink2);margin-bottom:4px}
+      .dg-plan{padding:4px 0;border-bottom:1px dashed var(--card3);font-size:.76rem}
+    </style>
+    <div class="pg-inner">
+      <div id="dg-root"><div class="loader"><div class="spin"></div></div></div>
     </div>
   </div>
 
@@ -2211,6 +2266,38 @@ body.dark .ac-vurgu{color:#8ec6ff}
   </div>
 </div>
 
+<!-- ═══ DEĞİŞİKLİKLER: GERİ AL ÖNİZLEME (G-20260913-SURUM-GECMISI F3) ═══ -->
+<div id="m-dg-onizle" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="dg-onizle-baslik">↩ Geri Al — Önizleme</div>
+    <div class="m-body">
+      <div id="dg-onizle-govde"></div>
+      <div id="dg-onizle-engel" class="dg-uyari" hidden></div>
+      <div class="fg"><label class="flbl">Gerekçe (opsiyonel)</label>
+        <textarea id="dg-gerekce" class="fta" rows="2" maxlength="500" placeholder="Neden geri alınıyor?"></textarea>
+      </div>
+      <button class="btn btn-r" id="dg-onizle-onay" data-action="dg-onizle-onay" disabled>↩ Geri Almayı Uygula</button>
+      <button class="btn btn-o" data-action="dg-onizle-kapat" style="margin-top:6px">Vazgeç</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DEĞİŞİKLİKLER: GERİ ALMA BİLETİ (sahip şifresi → 1 saatlik bilet) ═══ -->
+<div id="m-dg-bilet" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title">🔒 Geri Alma Bileti</div>
+    <div class="m-body">
+      <div style="font-size:.78rem;color:var(--ink2);margin-bottom:10px;line-height:1.5">Geri almak için sahip şifresi gerekir. Şifre doğruysa 1 saat geçerli bir bilet alınır; bu süre içinde tekrar sorulmaz.</div>
+      <div id="dg-bilet-mesaj" class="dg-uyari" hidden></div>
+      <div class="fg"><label class="flbl">Sahip şifresi *</label>
+        <input id="dg-sifre" class="fi" type="password" autocomplete="current-password" data-keydown="dg-bilet-enter">
+      </div>
+      <button class="btn btn-g" id="dg-bilet-al-btn" data-action="dg-bilet-al">🔓 Bilet Al</button>
+      <button class="btn btn-o" data-action="dg-bilet-kapat" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- Supabase SDK -->
@@ -2218,27 +2305,30 @@ body.dark .ac-vurgu{color:#8ec6ff}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20260911-14"></script>
-    <script src="js/gecmis.js?v=20260911-14"></script>
-    <script src="js/utils/modal.js?v=20260911-14"></script>
-    <script src="js/utils/errorHandler.js?v=20260911-14"></script>
-    <script src="js/utils/events.js?v=20260911-14"></script>
-    <script src="js/config.js?v=20260911-14"></script>
-    <script src="js/state.js?v=20260911-14"></script>
-    <script src="js/api.js?v=20260911-14"></script>
-    <script src="js/auth.js?v=20260911-14"></script>
-    <script src="js/ui.js?v=20260911-14"></script>
-    <script src="js/forms.js?v=20260911-14"></script>
-    <script src="js/ai-asistan.js?v=20260911-14"></script>
-    <script src="js/demo.js?v=20260911-14"></script>
-    <script src="vendor/cytoscape.min.js?v=20260911-14"></script>
-    <script src="js/pedigree/pedigree-api.js?v=20260911-14"></script>
-    <script src="js/pedigree/pedigree-adapter.js?v=20260911-14"></script>
-    <script src="js/pedigree/pedigree-style.js?v=20260911-14"></script>
-    <script src="js/pedigree/pedigree-view.js?v=20260911-14"></script>
-    <script src="js/pedigree/pedigree-controller.js?v=20260911-14"></script>
-    <script src="js/app.js?v=20260911-14"></script>
-    <script src="js/utils/handlers.js?v=20260911-14"></script>
+    <script src="js/utils/helpers.js?v=20260913-16"></script>
+    <script src="js/gecmis.js?v=20260913-16"></script>
+    <script src="js/utils/modal.js?v=20260913-16"></script>
+    <script src="js/utils/errorHandler.js?v=20260913-16"></script>
+    <script src="js/utils/events.js?v=20260913-16"></script>
+    <script src="js/config.js?v=20260913-16"></script>
+    <script src="js/state.js?v=20260913-16"></script>
+    <script src="js/api.js?v=20260913-16"></script>
+    <script src="js/auth.js?v=20260913-16"></script>
+    <script src="js/ui.js?v=20260913-16"></script>
+    <script src="js/forms.js?v=20260913-16"></script>
+    <script src="js/ai-asistan.js?v=20260913-16"></script>
+    <script src="js/demo.js?v=20260913-16"></script>
+    <script src="vendor/cytoscape.min.js?v=20260913-16"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20260913-16"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20260913-16"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20260913-16"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20260913-16"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20260913-16"></script>
+    <script src="js/degisiklikler/etiketler.js?v=20260913-16"></script>
+    <script src="js/degisiklikler/diff.js?v=20260913-16"></script>
+    <script src="js/degisiklikler/degisiklikler.js?v=20260913-16"></script>
+    <script src="js/app.js?v=20260913-16"></script>
+    <script src="js/utils/handlers.js?v=20260913-16"></script>
 
 
     <!-- GEBELİK EKLE MODAL -->

@@ -677,6 +677,41 @@ clamp 0-8, yanıtta `effective_ancestor_depth`/`effective_descendant_depth` +
 fixture K bloğunda kilitli). Çağıran: `js/pedigree/pedigree-api.js`
 (subgraphForAnimal — Soy sekmesi).
 
+## Sürüm Geçmişi / Biletli Geri Al (G-20260913; demo-only — PROD deploy owner kapısı)
+
+Yeni diff/geri-al yüzü (eski 7 `*_geri_al` RPC'den BAĞIMSIZ; goal
+G-20260913-SURUM-GECMISI frozen sözleşme). Depo tarafı: `degisim_log`
+(immutable; AFTER trigger 40 iş tablosunda) + bilet/kullanım tabloları.
+Wrapper'lar `js/api.js`'te: `rpcGeriAlmaBiletiAl`, `rpcDegisimListele`,
+`rpcDegisimOnizle`, `rpcDegisimGeriAl` — çağıran:
+`js/degisiklikler/degisiklikler.js`.
+
+**`geri_alma_bileti_al(p_sifre text)`** → jsonb — pgcrypto doğrulama; 1 saat
+geçerli, çok kullanımlı bilet; her kullanım kaydı tutulur. Hata:
+`SIFRE_HATALI` / `SIFRE_AYARLI_DEGIL`.
+
+**`sahip_sifresi_ayarla(p_sifre text)`** → jsonb — kurulum RPC'si (şifre
+hash'i migration'a gömülmez; demo test şifresi bu RPC ile kurulur). ACL:
+yalnız postgres + service_role.
+
+**`degisim_listele(p_filtre jsonb)`** → jsonb — tx-bazlı gruplu liste
+(filtreler: baslangic, bitis, tablo, islem, hayvan_id, txid, sayfa, adet);
+`txid` filtresiyle satır-bazlı detay döner (`detay:true`; alanlar +
+`teknikal_mi`).
+
+**`degisim_onizle(p_hedef jsonb, p_seviye text)`** → jsonb — seviye
+`alan|satir|islem`; döner: plan + çakışmalar + bağımlılıklar + stok uyarısı +
+`geri_alinabilir`/`engeller`. `p_hedef.pk` tek-kolon PK'da skaler değer,
+composite'ta nesne `{pkkolon: deger}`; satır/alan hedeflerinde opsiyonel
+`txid` (verilmezse EN SON değişiklik).
+
+**`degisim_geri_al(p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text)`**
+→ jsonb — planı uygulama anında yeniden hesaplar; geçerli bilet zorunlu;
+geri alma kendi `degisim_log` kaydını yazar (`kaynak.geri_alma`) — geri
+almanın geri alınması mümkün. Hata: `BILET_GECERSIZ` /
+`BILET_SURESI_DOLMUS` / `CAKISMA` / `BAGIMLILIK_ENGELI` / `HEDEF_BULUNAMADI`.
+Çakışmada bypass yok (sahip kararı).
+
 ## Live-schema audit (demo probe, 2026-09-03)
 
 
