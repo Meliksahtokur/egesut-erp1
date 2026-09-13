@@ -43,6 +43,8 @@ Yıl dağılımı (tohumlama/aşı/doğum, §E-5): veri 2022'den başlar; 2026 e
 
 **"Süt" notu:** Ayrı süt-verimi/süt-satışı tablosu **yok** (§E-1: kolon listesi). Zarfın "süt" maddesi kodda **sütten kesme** olarak karşılık buluyor: `hayvanlar.suttten_kesme_tarihi` + `islem_log` tipi `SUTEN_KESME` (32 satır, §E-5) + `buzagi_sutten_kesme_*` RPC'leri. Stok kategorilerinde de süt yok (§E-4).
 
+**"Kuruya ayırma" notu:** Semada kuruya-ayırma verisi **yok** — `%kuru%` adında tablo/kolon yok (§E-11), `hayvanlar.durum` değerleri yalnız `Aktif/Ölü/Satıldı/Kesildi` (§E-5; "Kuru" durumu yok). Kuruya ayırma ürün kodunda türetilmiş bir plan bilgisi değil, muhtemelen son tohumlama tarihinden hesaplanan bir öneri — gün görünümünde "kuruya ayırma olayı" **kaynağı yoktur**; istenirse son-tohumlama+gün hesabıyla türetilen görünür kalem olur (goal taslağı kapsamı dışı).
+
 ### A.2 RLS / tenant
 
 - Her tabloda `tenant_id`/`isletme`/`farm_id` kolonu **yok** (§E-1 tam kolon dökümü).
@@ -62,6 +64,17 @@ Yıl dağılımı (tohumlama/aşı/doğum, §E-5): veri 2022'den başlar; 2026 e
 | `tohumlama` | `(hayvan_id, sonuc, …)` — `tarih` tek başına indexli **değil** |
 
 Index **yok**: `stok_hareket.tarih`, `cases.start_date`, `gorev_log.hedef_tarih`, `kizginlik_log.tarih`, `treatment_days.treatment_date`. Mevcut hacimde kritik değil; RPC seçeneği seçilirse (a) bölümündeki 3–4 index tek migration maddesidir.
+
+### A.4 Kapsam kararları — gun görünümüne girer mi?
+
+| Tablo | Karar | Gerekçe |
+|---|---|---|
+| `treatment_day_uygulamalar` | **Girmez (ayrı satır olarak)** | Fiili olay zaten `treatment_days` (gün) + `islem_log` (`TEDAVI_SEANS_TAMAM` 520, `SEANS_EKLENDI` 260, §E-5) üzerinden temsil edilir; ayrıca listeye almak **çift sayım** üretir. Seans detayı, gün görünümünden tek tıkla seans modalına inilir. |
+| `cop_kutusu` | **Girmez** | Silinmiş kayıt arşivi; "o gün ne oldu"nun öznesi değil. Geri yükleme akışına aittir (`geri_yuklendi`, 30 gün otomatik silme). |
+| `protokol_dismiss` | **Girmez** | Kullanıcının bildirim erteleyip ertelememesi — UI eylemi, hayvan olayı değil (30 benzeri satır). |
+| `hayvan_override` | **Girmez** | Metadata (güncelleme damgası taşır, olay taşımaz; `guncelleme_tarihi` def CURRENT_DATE). |
+| `bildirim_log` | **Opsiyonel** | Olay değil ama takvimle ilişkili (erteleme_tarihi). Faz 1 dışında tutulması önerilir; kararı lead verir. |
+| `protokol_instance` | **Girer** (baslangic/kapandi_at) | Hayvana bağlı gerçek durum değişimi; `_gmEventAt` map'ine 1 satır ekleme ile (Faz 1'de opsiyonel notuyla). |
 
 ## B. Mevcut altyapı (yeniden kullanılabilir olanlar)
 
@@ -94,13 +107,19 @@ Index **yok**: `stok_hareket.tarih`, `cases.start_date`, `gorev_log.hedef_tarih`
 - `asistan_hayvan_detay(p_kupe, p_id)` — hayvan detay toplama (tekil hayvan, çoklu kaynak).
 - IndexedDB pull altyapısı: `pullTables` + `REALTIME_TABLES` (`js/api.js:30-33,396,578`) — olay tablolarının tamamı cihazda.
 
+### B.5 Pedigree P1/P2 durumu (zarf soru 2'nin eksik cevabı — düzeltme turunda eklendi)
+
+- **PROD'da pedigree nesnesi YOK**: canlı `pg_proc`/`information_schema` taramasında `%pedigree%` adında **0 fonksiyon, 0 tablo** (§E-12 — boş küme).
+- Projection RPC'leri **depoda, deploy edilmemiş**: `supabase/migrations/20260911000002_pedigree_foundation.sql`, `20260911000003_pedigree_farm_backfill.sql`, `20260911000004_pedigree_projection_rpc.sql` (P2 devir belgesindeki "deploy sırası 7 migration" borcunun parçası). Demo ortamına uygulandığı bilgisini doğrulayamadım: demo projesine (`vtzqjmazsvurxdeondmi`) Mgmt API erişimi yok (HTTP 403, yetki kapsamı dışı) — bu madde root beyanıdır, ölçülmüş kanıt **değil**.
+- **"Tarihe git" etkisi:** pedigree projection RPC'leri prod'a girse bile gün görünümüne doğrudan girdi değildir (soy ağacı görünümü); yalnız doğum kayıtları (`dogum.anne_id`) ile kesişir. Faz 1 planını etkilemez.
+
 ## C. Timezone riski (timestamptz × UTC+3)
 
 - **DB TZ = UTC, ölçüldü** (§E-3): `current_setting('TimeZone')='UTC'`; sorgu anında `now()=10:38+00` ↔ TR 13:38.
 - `date` kolonları (`tohumlama.tarih`, `vaccination_log.vaccination_date`, …) TZ'siz — gün sorgusunda güvenli.
 - `timestamptz` kolonları (`islem_log.tarih`, `stok_hareket.tarih`, `tamamlanma_tarihi*`, `gerceklesme_at`, `kapandi_at`, `olusturma`): UTC'de saklanır; **Türkiye günü** için sunucu sorgusunda `((kolon) AT TIME ZONE 'Europe/Istanbul')::date = p_tarih` deseni gerekir. `Date::timestamptz` karşılaştırması UTC-değeriyle yapılırsa TR gece 00:00–03:00 arası kayıtlar yanlış güne düşer.
 - **Mevcut sapmalar (ölçülmüş):**
-  - 32 public RPC gövdesi `CURRENT_DATE` kullanıyor (§E-3) — UTC "bugün"; TR saatle 21:00–24:00 arasında girilen `CURRENT_DATE`-defaultlu kayıtlar bir **sonraki** TR gününe yazılır. Bu, "tarihe git" ile birlikte değerlendirilmeli: geçmiş görünümü hangi kaynağı okursa okusun, kayıt günü kolon zaten date ise sorunsuz; `islem_log.tarih` gibi timestamptz kaynaklarda istemci normalizasyonu (`_gmDateKey`, §B.1) bu kaymayı düzeltiyor.
+  - 32 public RPC gövdesi `CURRENT_DATE` kullanıyor (§E-3) — `CURRENT_DATE` sunucu TZ'sine (UTC) göre hesaplanır. UTC, TR'den 3 saat **geride** olduğundan sapma penceresi **TR 00:00–03:00**'tür ve yön **ÖNCEKİ TR gününe** yazmadır: TR 00:30'da UTC 21:30'dur (hâlâ dün) → `CURRENT_DATE`-defaultlu kayıt TR takviminde **bir önceki güne** düşer. Gün görünümü bu kayıtları TR 00:00–03:00 aralığında bir gün geride gösterir — kaynak `date` kolonu ise sorun yok (`CURRENT_DATE` yalnız default'tur, kullanıcı tarihi el ile girer); `islem_log.tarih` gibi timestamptz kaynaklarda istemci TR-günü normalizasyonu (`_gmDateKey`, §B.1) bu kaymayı düzeltir.
   - Ters örnekte dikkatlice işlenmiş: `cikis_yap` default tarihi `((now() AT TIME ZONE 'Europe/Istanbul'))::date` alıyor (canlı gövde, §E-7) — codebase'te bilinçli TR-TZ kullanımı **var**; "tarihe git" yüzeyi bu standardı izlemeli.
 - **İstemci pipeline'ı bu riski zaten çözmüş durumda** (`_gmDateKey` → `_GM_IST_GUN` Intl formatı, `js/gecmis.js:88-99`) — seçenek (c)'nin TZ açısından en sağlam yönü bu.
 
@@ -124,27 +143,50 @@ Index **yok**: `stok_hareket.tarih`, `cases.start_date`, `gorev_log.hedef_tarih`
 - **Bakım:** (a) ile aynı — her tablo değişiminde view güncellemesi.
 - **Kanıt karşılaştırması:** mevcut iki timeline view'in **kullanıcısı sıfır** ve biri bozuk (§B.2) — view yaklaşımının bu repoda **zaten başarısız olduğunu ölçülmüş şekilde biliyoruz**.
 
-### (c) İstemci tarafı: IndexedDB + `gecmis.js` dateKey filtresi — **ÖNERİLEN**
+### (c) İstemci tarafı: IndexedDB + `gecmis.js` **olay-günü** filtresi — **ÖNERİLEN (ayrı tarih kuralı şartıyla)**
 
-- **Tasarım:** (1) `gecmis.js`'e 5 eksik kaynak eklenir (`vaccination_log`, `stok_hareket`, `kizginlik_log`, `hayvanlar`-çıkış, opsiyonel `protokol_instance`); (2) `loadGecmis` yüzeyine "tarihe git" girişi: `tekTarihTakvimAc` (kanonik bileşen, §B.3) ile tarih seçilir → `entries.filter(e => e.dateKey === secilen)` (dateKey her entry'de hazır, `js/gecmis.js:171`); (3) opsiyonel URL/deep-link (`?gun=2025-11-17`).
-- **Performans:** _gecmisCollectSources zaten IndexedDB'den ~12k satırı her açılışta tarıyor; ek filtre O(n) tek geçiş, bellek-içi — telefonda bile <50ms mertebesi (ölçülmedi; hacim kanıtı §A.1).
+> **Root denetimi düzeltmesi (ölçülmüş):** İlk sürümde "dateKey her entry'de hazır, tek-satır filtre" deniyordu; bu **öncül tutmuyor**. `_gmDateKey`, `_gmEventAt` çıktısını normalize eder; `_gmEventAt` ise "defter günlüğü" (kayıt anı) tercih eder, **olay gününü değil**: tohumlama/uygulama_log/doğum için `created_at` önceliği (`js/gecmis.js:71,77,79`), cases için `closed_at` (`js/gecmis.js:75`). Canlı ölçüm — TR günü `created_at` ≠ olay `tarih`:
+
+| Tablo | toplam | created_at günü ≠ olay tarihi | oran |
+|---|---|---|---|
+| `tohumlama` | 282 | **252** | %89 |
+| `dogum` | 72 | **53** | %74 |
+| `vaccination_log` | 381 | **356** | %93 |
+| `uygulama_log` | 120 | **3** | %2,5 |
+
+(Kayıt çoğu kez olaydan sonra girilir — `created_at` kayıt anıdır. Aşı satırlarında sapma %93: root ölçümüne benim eklediğim kanıt; aşı kaynak eklenince aynı tuzağa düşmemek için bu ölçüm gereklidir. Sorgu: §E-13.)
+
+- **Tasarım (düzeltme sonrası):**
+  1. `gecmis.js`'e 5 eksik kaynak eklenir (`vaccination_log`, `stok_hareket`, `kizginlik_log`, `hayvanlar`-çıkış, opsiyonel `protokol_instance`).
+  2. **Ayrı tarih kuralı — gun görünümü kendi `olayGunu(sourceKey, row)` fonksiyonunu kullanır, `dateKey`'i **değiştirmez**:**
+     - **`date` kolonları** (`tohumlama.tarih`, `dogum.tarih`, `vaccination_log.vaccination_date`, `uygulama_log.tarih`, `kizginlik_log.tarih`, `cases.start_date`, `stok_hareket` yerine `planned_date` benzeri date'ler, `hayvanlar.cikis_tarihi/suttten_kesme_tarihi`): olay günü = kolonun kendisi — TZ'siz, güvenli.
+     - **`timestamptz` kolonları** (`islem_log.tarih`, `gorev_log.tamamlanma_tarihi`, `cases.closed_at`, `treatment_day_uygulamalar.uygulama_tamamlandi_at`): olay günü = TR günü (`_GM_IST_GUN.format(new Date(v))` — mevcut `_GM_IST_GUN` Intl biçimlendiricisi, `js/gecmis.js:88-97`, aynen yeniden kullanılır).
+     - `dateKey` (defter görünümü) mevcut davranışını **korur** — hayvan-kartı ve ana defter akışına dokunulmaz.
+  3. **`_gmPolicyRow` filtreleri gun görünümü için ayrıca ele alınır** (mevcut filtreler "tamamlanmış iş defteri" amacına göre yazıldı, `js/gecmis.js:34-52`):
+     - `cases`: `status === 'closed' && closed_at` şartı gun görünümünde **gevşetilir** — açık vakaların açılış günü (`start_date`) de o günün olayıdır; kapanış, `closed_at` TR günüyle ayrı kalem olarak görünür.
+     - `tohumlama`: `_GM_TOH_TERMINAL` allow-list'i gun görünümünde **gevşetilir** — tohumlama *işlemi* `tarih`'inde görünmeli (sonuç bekleyenler dâhil); terminal sonuçlar (Gebe/Bekliyor/Abort/Doğum) kendi sonuç günlerinde ayrı kalemlerdir.
+     - `gorev_log`: `tamamlanma_tarihi` şartı **kalır** (tamamlanma olayı) + ek kalem: `hedef_tarih`'inde bekleyen görevler "planlandı" görünümü (Faz 1'de opsiyonel).
+     - `islem_log`: `_GM_ISLEM_TIPLERI` allow-list'i gun görünümünde **genişletilir** — gün görünümü tüm işlem tiplerini gösterebilir (defter görünümündeki kürasyon orada kalır); tip başına görünüm etiketi goal'da tanımlanır.
+     - `dogum`/`uygulama_log`: filtre yok (default true) — değişmez.
+  4. `loadGecmis` yüzeyine "tarihe git" girişi: `tekTarihTakvimAc` (kanonik bileşen, §B.3) ile tarih seçilir → `entries.filter(e => e.olayGunu === secilen)`; (5) opsiyonel URL/deep-link (`?gun=2025-11-17`).
+- **Performans:** _gecmisCollectSources zaten IndexedDB'den ~12k satırı her açılışta tarıyor; `olayGunu` ek geçiş O(n), bellek-içi — telefonda bile <50ms mertebesi (ölçülmedi; hacim kanıtı §A.1).
 - **RLS/tenant:** sunucuya ek sorgu yok; mevcut pull RLS'i aynen.
 - **Offline:** **doğal tam kapsamlı** — veri cihazda; gün görünümü çevrimdışı çalışır (mevcut Geçmiş sekmesiyle aynı sözleşme: `navigator.onLine && !skipPull` tazeleme, `js/ui.js:4046-4047`).
-- **Bakım:** düşük — yeni tablo/olay = `_gmEventAt` map'ine bir satır; RPC/migration şartı yok. Defter↔Klasik mod, arama, CSV, geri-al hepsi ücretsiz gelir.
-- **TZ:** zaten çözülmüş (`_GM_IST_GUN` TR-günü normalize, §B.1/C).
-- **Risk/maliyet:** `gecmis.js` kaynak büyümesi (17→22 tablo) IndexedDB bellek ayak izini artırmaz (tablolar zaten TABLES pull listesinde); yalnız `islem_log`'a ikinci kez sayılan olayların **dedup** edilmesi gerekir (ör. tohumlama hem `tohumlama` hem `islem_log`'da) — mevcut pipeline bunu `kaynak önceliği` ile zaten yönetiyor; genişletmede aynı ilke korunmalı.
+- **Bakım:** düşük — yeni tablo/olay = `olayGunu` map'ine bir satır; RPC/migration şartı yok. Defter↔Klasik mod, arama, CSV, geri-al hepsi ücretsiz gelir.
+- **TZ:** iki ayrı kural, iki ayrı doğru: date kolonlarında kolon değeri (TZ'siz); timestamptz'ta TR-günü Intl (`_GM_IST_GUN`). `created_at` tabanlı dateKey'in olay-günü sanılması bu denetimde düzeltildi (§E-13).
+- **Risk/maliyet:** kaynak büyümesi IndexedDB bellek ayak izini artırmaz (tablolar zaten TABLES pull listesinde). Aynı olayın iki kaynaktan gelmesi (`islem_log` + kaynak tablo) gerçek bir konu: **dedup önceliği goal'da tablo bazında tanımlanmalı ve kabul kriteriyle ölçülmeli** (§G kriter 4) — mevcut pipeline'ın dedup davranışı bu rapor kapsamında ölçülmedi, iddia edilmez.
 
 ### Öneri
 
 **Seçenek (c) birincil**, (a) izleyici:
 
-1. **Faz 1 — (c):** "Tarihe git" girişi + dateKey filtresi + 5 eksik kaynak. Tek JS dosyaları paketi (`gecmis.js`, `ui.js` küçük yamalar, `api.js` pull listesine `vaccination_log/kizginlik_log` eki — TABLES'ta zaten varlar, yalnız `_gecmisCollectSources` listesi genişler). Migration **yok**.
+1. **Faz 1 — (c):** "Tarihe git" girişi + **ayrı olay-günü kuralı** (`olayGunu()`) + 5 eksik kaynak + gun görünümü politika ayarı (§D.c.2-3). JS paketi: `gecmis.js` (olayGunu + kaynaklar + politika), `ui.js` (yüzey + `_gecmisCollectSources:3872` ve `loadGecmis` pull listesi `:4047` genişletme). Migration **yok**.
 2. **Faz 2 — (a) yalnız gerekirse:** derin-geçmiş arşiv taraması (IndexedDB'ye inmemiş, çok eski yıllar) istenirse `gun_olaylari(p_tarih)` RPC'si; `hayvan_timeline_view`'in bozuk dalları o sırada düzeltilir ya da view DROP edilir (ayrı karışıklık azaltma maddesi olarak önerilir).
 
 ## E. Riskler
 
-1. **TZ sapması timestamptz kaynaklarda** (§C): RPC yazılırsa `AT TIME ZONE 'Europe/Istanbul'` zorunlu; istemcide `_gmDateKey` zaten doğru. `CURRENT_DATE` kullanan 32 RPC'nin gece sapması ayrı bir teknik-borç maddesi (kapsam dışı; rapor edilir).
-2. **Dedup:** `islem_log` birleşik günlük olduğundan çoğu olay iki kaynaktan gelir (ör. `ASI_KAYDI` 38 ↔ `vaccination_log` 381). Seçenek (c) genişletmesinde olay başına tek görünüm için kaynak önceliği belirlenmeli (mevcut pipeline deseni korunarak).
+1. **TZ sapması timestamptz kaynaklarda** (§C): RPC yazılırsa `AT TIME ZONE 'Europe/Istanbul'` zorunlu; istemcide TR-günü kuralı iki katmanlı — defter için `_gmDateKey` (mevcut), olay günü için `olayGunu()` (Faz 1'de tanımlanacak, §D.c). `CURRENT_DATE` kullanan 32 RPC'nin gece sapması (pencere TR 00:00–03:00, yön ÖNCEKİ gün) ayrı bir teknik-borç maddesi (kapsam dışı; rapor edilir).
+2. **Dedup:** `islem_log` birleşik günlük olduğundan çoğu olay iki kaynaktan gelir (ör. `ASI_KAYDI` 38 ↔ `vaccination_log` 381). Seçenek (c) genişletmesinde olay başına tek görünüm için kaynak önceliği goal'da tablo bazında beyan edilmeli ve kabul kriteriyle ölçülmelidir (§G kriter 5) — mevcut pipeline'ın dedup davranışı bu raporda ölçülmedi.
 3. **`stok_hareket` hayvansız:** %97 `referans_tipi` boş (§E-5) — stok hareketini gün görünümünde hayvana bağlamak mümkün değil; "Stok hareketi (genel)" olarak hayvansız kategori görünmesi doğru beklentidir.
 4. **Atıl/bozuk view borcu:** `hayvan_timeline_view` bozuk dallar taşır (§B.2) — "tarihe git" bu view üzerinden yapılırsa yanlış-eksik görünüm riski gerçek; öneri (c) bu riskten bağımsız, ama view'in DROP/fix kararı geciktirilmemeli.
 5. **Veri büyümesi:** (c) IndexedDB'de tüm tablo zaten cihazda; (a)/(b)'de index eklenmezse (§A.3) gün-sorgusu index'siz tablolarda (gorev_log 3055, stok_hareket 997) tarama yapar — bugün önemsiz, yıllar sonra değil.
@@ -170,25 +212,38 @@ sütten kesme, görev tamamlama) tek listede.
 
 ## Değişecek dosyalar
 - js/gecmis.js — 5 kaynak ekle (vaccination_log, kizginlik_log, stok_hareket,
-  hayvanlar-çıkış, protokol_instance[ops]); _gmEventAt/_gmPolicyRow map'leri;
-  dedup önceliği (islem_log üstü kaynak önceliği korunur)
+  hayvanlar-çıkış, protokol_instance[ops]); AYRI olay-günü kuralı: olayGunu()
+  (date kolonlarda kolon değeri, timestamptz'ta _GM_IST_GUN TR-günü);
+  gun görünümü için politika ayrımı (_gmPolicyRow aynen kalır, gün görünümü
+  cases açık-vaka açılışı + bekleyen tohumlama + genişletilmiş islem_log
+  tipleriyle ayrı kural — rapor §D.c.3); dedup önceliği tablo bazında
+  tanımlanır (goal'da beyan edilir, ölçü kriter 4)
 - js/ui.js — loadGecmis'e "Tarihe git" girişi (tekTarihTakvimAc), seçili-gün
-  filtre state'i (_gecmisGun), gün başlığı; _detRenderGecmis'e aynı giriş
-- js/api.js — _gecmisCollectSources pull listesine vaccination_log,
-  kizginlik_log (hayvanlar/stok_hareket TABLES'ta zaten var)
+  filtre state'i (_gecmisGun), gün başlığı; _detRenderGecmis'e aynı giriş;
+  _gecmisCollectSources (js/ui.js:3872) ve loadGecmis pullTables listesine
+  (js/ui.js:4047) vaccination_log + kizginlik_log eki
 - index.html — #pg-gecmis üst şeridi (Bugün/Dün/📅 butonları)
 - .harness/references/ui-map.md — tarih filtresi maddesi
+
+(Not: hayvanlar/stok_hareket TABLES sabitinde zaten var — js/api.js:30-33
+dokunulmaz.)
 
 ## Kabul kriterleri (ölçülebilir)
 1. 2025-11-17 gibi bir gün seçildiğinde o güne ait: tohumlama, aşı, doğum,
    vaka seansı ve stok hareketi kayıtları tek listede görünür (demo verisiyle).
-2. Çevrimdışında (skipPull) gün görünümü IndexedDB'den dolu çalışır.
-3. TR saatiyle gece 00:00-03:00 arası kaydedilmiş islem_log kaydı, TR gününe
-   göre doğru grupta görünür (_gmDateKey davranışı korunur).
-4. Dedup: aynı olay (örn. aşı) hem vaccination_log hem islem_log'dan gelen
-   tek entry görünür; toplam entry sayısı olay sayısıyla eşit.
-5. Defter/Klasik mod, arama, CSV dışa aktarım filtreyle birlikte çalışır.
-6. Yeni Playwright testi: takvimden gün seç → beklenen olay listesi.
+2. Olay günü doğruluğu: olayı geri tarihli girilmiş bir tohumlama kaydı
+   (created_at != tarih, canlıda 252/282 — rapor §D.c) OLAY gününün
+   grubunda görünür, kayıt anının gününde değil.
+3. Çevrimdışında (skipPull) gün görünümü IndexedDB'den dolu çalışır.
+4. TZ: TR saatiyle 00:00-03:00 arası yazılmış islem_log kaydı, TR gününe göre
+   doğru grupta görünür (olayGunu TR-günü kuralı; CURRENT_DATE sapma yönü:
+   ÖNCEKİ gün, rapor §C).
+5. Dedup: aynı olay (örn. aşı) hem vaccination_log hem islem_log'dan gelen
+   tek entry görünür; goal'da beyan edilen öncelik tablosuyla ölçülür —
+   toplam entry sayısı = beyan edilen önceliğe göre olay sayısı.
+6. Defter/Klasik mod, arama, CSV dışa aktarım filtreyle birlikte çalışır;
+   defter görünümü dateKey/eventAt davranışı DEĞİŞMEZ (mevcut testler yeşil).
+7. Yeni Playwright testi: takvimden gün seç → beklenen olay listesi.
 
 ## Kapsam dışı
 - gun_olaylari RPC / migration (yalnız derin-geçmiş ihtiyacında ayrı goal)
@@ -198,7 +253,9 @@ sütten kesme, görev tamamlama) tek listede.
 
 ## K. Kırıntı özeti
 
-Bu raporun üretimi boyunca şu kırıntılar `.crumbs/tarihe-git-arastirma.jsonl`'a yazılmalı (yazıldı): gate (zarf denetimi: bulgu yok), measurement (canlı şema envanteri + TZ + index ölçümleri), finding (atıl/bozuk `hayvan_timeline_view`; `cikis_yap` `islem_log` yazmıyor; `referans_tipi` %97 boş).
+Bu raporun üretimi boyunca `.crumbs/tarihe-git-arastirma.jsonl`'a yazılan kırıntılar: gate (zarf denetimi: bulgu yok), gate·dead-path (`hayvan_timeline_view` atıl ve bozuk), measurement (envanter + TZ + index), open_item (kapsam dışı borçlar), assumption (gitignore `reports/`).
+
+**Düzeltme turu (root denetimi @402c53a, 5 madde — hepsi işlendi):** (1) (c) önerisinin dateKey öncülü düzeltildi — `_gmEventAt` defter günlüğü (created_at/closed_at) tercih ediyor, canlı sapma ölçümüyle ayrı `olayGunu()` kuralı tanımlandı (§D.c, §E-13); (2) CURRENT_DATE sapma yönü düzeltildi — pencere TR 00:00–03:00, yön ÖNCEKİ gün (§C); (3) pedigree P1/P2 durumu eklendi — prod'da yok, migration 20260911000002..04 depoda, demo ölçümü yetki yok (§B.5); (4) goal taslağı yol düzeltmesi (js/ui.js:3872/4047) + kanıtsız dedup iddiası ve 17→22 sayısı çıkarıldı (§G); (5) kuruya-ayırma notu + §A.4 kapsam kararları (§A.1, §A.4).
 
 ---
 
@@ -276,3 +333,34 @@ Tüm sorgular Supabase Mgmt API `POST /v1/projects/zqnexqbdfvbhlxzelzju/database
   ```text
   grep: "hayvan_timeline_view" ve "treatment_timeline" → js/ altında 0 eşleşme
   ```
+- **E-11. Kuruya-ayırma taraması** (§A.1 "Kuruya ayırma" notu — boş küme kanıtı):
+  ```sql
+  SELECT table_name FROM information_schema.tables WHERE table_schema='public'
+  AND (table_name LIKE '%kuru%' OR table_name LIKE '%sut%');  -- 0 satır
+  ```
+- **E-12. Pedigree taraması** (§B.5 — prod'da yok, boş küme kanıtı):
+  ```sql
+  SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname='public' AND proname LIKE '%pedigree%'
+  UNION ALL SELECT table_name FROM information_schema.tables
+  WHERE table_schema='public' AND table_name LIKE '%pedigree%';  -- 0 satır
+  -- Migration kanıtı: supabase/migrations/20260911000002..04_pedigree_*.sql (depoda)
+  -- Demo ölçümü: Mgmt API demo projesine 403 (yetki yok) — root beyanıyla sınırlı
+  ```
+- **E-13. created_at ≠ olay-tarihi sapması** (§D.c düzeltme kanıtı — root denetimi ölçümü bağımsız tekrarlandı):
+  ```sql
+  SELECT 'tohumlama' t, count(*) n, count(*) FILTER (WHERE
+           ((created_at AT TIME ZONE 'Europe/Istanbul')::date IS DISTINCT FROM tarih)) sapma
+         FROM tohumlama WHERE tarih IS NOT NULL GROUP BY 1
+  UNION ALL SELECT 'dogum', count(*), count(*) FILTER (WHERE
+           ((created_at AT TIME ZONE 'Europe/Istanbul')::date IS DISTINCT FROM tarih))
+         FROM dogum WHERE tarih IS NOT NULL GROUP BY 1
+  UNION ALL SELECT 'uygulama_log', count(*), count(*) FILTER (WHERE
+           ((created_at AT TIME ZONE 'Europe/Istanbul')::date IS DISTINCT FROM tarih))
+         FROM uygulama_log WHERE tarih IS NOT NULL GROUP BY 1
+  UNION ALL SELECT 'vaccination_log', count(*), count(*) FILTER (WHERE
+           ((created_at AT TIME ZONE 'Europe/Istanbul')::date IS DISTINCT FROM vaccination_date))
+         FROM vaccination_log WHERE vaccination_date IS NOT NULL GROUP BY 1;
+  -- Sonuç: tohumlama 252/282, dogum 53/72, uygulama_log 3/120, vaccination_log 356/381
+  ```
+- **E-14. Kod kanıtı** (§D.c — `_gmEventAt` defter günlüğü tercihi): `js/gecmis.js:65-85` (`created_at` önceliği satır 71/77/79; `cases.closed_at` satır 75); `_gmPolicyRow` filtreleri `js/gecmis.js:34-52`.
