@@ -40,6 +40,14 @@ with a question on screen — do not guess.
   automated test. Add a DOM-level test — reuse W1's vm-sandbox approach
   (TESTING-01 `loadBrowserModule`) or a Playwright case in
   `tests/tarih-secici.spec.js`; your choice, declare it in the report.
+- **Close the F2 audit carry-over (ORTA):** the F2 binding layer
+  (`tarihAlaniTakvimAc`, js/ui.js ~7018-7045) passes only
+  `baslik/deger/min/max/temizlenebilir/onSec` to the canonical — a
+  `kapaliGun` option in the `TARIH_ALANLARI` schema would be SILENTLY
+  DROPPED. Wire `kapaliGun` through the schema + the call (one line +
+  schema field), so F3's `bcTarihTakvim` migration can express closed days
+  through the binding layer without a silent no-op. No field uses it yet —
+  the deliverable is the plumbing, not a field.
 - **`?v=` stamp:** bump to ONE new common value across ALL stamped local
   sources in index.html in the SAME commit (F2 already bumped once; use
   its value +1 style, e.g. `20260913-16`). Partial bump = automatic

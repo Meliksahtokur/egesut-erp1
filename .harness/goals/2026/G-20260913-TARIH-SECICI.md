@@ -63,10 +63,13 @@ implement_lane: glmf_workers
 
 ## Measured corrections to the task inventory (lead, 2026-09-13)
 
-1. `type="date"` count is **15, not 14**: index.html has the 14 listed
-   inputs; **js/ui.js contains 1 more (dynamically generated)**. Acceptance
-   "count is 0" therefore covers the dynamic one too — F2 migrates it as a
-   15th field (identify via grep before migration).
+1. **CORRECTED AGAIN (F2 audit):** the lead's initial "15th dynamic input"
+   claim was a GHOST — the js/ui.js grep hit was a COMMENT line, not a
+   real input. Actual native inputs = **14** (all in index.html), all
+   migrated in F2; source `type="date"` grep is 0 (acceptance met; runtime
+   `input.type='date'` property assignment on the hidden holder is a
+   deliberate, documented exception that keeps modal.js auto-fill working).
+   Earlier claim kept here for the audit trail.
 2. Task asks for the delivery report at `reports/…` but `reports/` is
    gitignored (`.gitignore:122`; only `.harness/reports/` is excepted).
    Report path is therefore `.harness/reports/2026-09-13-tarih-secici-teslim.md`.
