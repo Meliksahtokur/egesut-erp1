@@ -205,9 +205,9 @@ invent new calendar widgets. Reuse the established calendar-modal language:
 - `etiketler.js` (SAF) — `tabloEtiketi`, `alanEtiketi`, `islemEtiketi`,
   `tabloSecenekleri`; şema aynası envanterli, bilinmeyen ad için kademeli
   düşüş; `tests/unit/degisiklikler-etiketler.test.js`.
-- `degisiklikler-stub.js` — GEÇİCİ: kontrat-şekilli demo stub (W1 merge
-  entegrasyonunda sökülür: index.html script satırı + dosya + damga bump;
-  söküm talimatı W2 raporunda).
+- `degisiklikler-stub.js` — SÖKÜLDÜ (lead entegrasyonu 2026-09-13): script
+  satırı ve dosya kaldırıldı, gerçek RPC wrapper'ları canlı; geliştirme
+  sırasındaki stub söküm talimatı W2 raporundaydı.
 - Giriş: Kayıt sayfası `log-btn` girişi (Stok/Tanımlar biçimi); alt nav'a
   7. buton eklenmedi (sahip UI testinde değerlendirilir).
 - Bilet saklama: `sessionStorage` (`ege_geri_alma_bileti`); süre client
