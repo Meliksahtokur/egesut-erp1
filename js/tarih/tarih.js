@@ -143,35 +143,75 @@ function tarihGirisCoz(metin){
 // gelir. Silme doğal kalsın diye değer ayraçla bitiyorsa kuyruk noktası
 // KORUNUR (tam tarih uzunluğuna ulaşıldıysa eklenmez — '13.09.2026.' gibi
 // bozuk kuyruk oluşamaz). Döner { metin, hata }:
-// - hata: taşan segmentin adını taşıyan anlık uyarı ('Gün 1-31 olmalı',
-//   'Ay 1-12 olmalı', 'Yıl 4 hane olmalı') — POLITIKA: hane YUTULMAZ.
-//   Yutma, yapıştırılan geçersiz tarihi sessizce başka bir tarihe çevirirdi
-//   ('90.09.2026' → '9.09.2026' kabulü = sessiz düzeltme); sahip kuralı
-//   "yazılamasın ya da anında işaretlensin" — işaretleme seçildi. Gerçek
-//   ay-gün sayısı denetimi Uygula'da (tarihParse) yapılır.
+// - hata: segment uyarısı ('Gün 1-31 olmalı', 'Ay 1-12 olmalı', 'Yıl 4 hane
+//   olmalı', 'Rakam girmelisiniz'…) — R1 REVİZYON (denetim B1a/B2/B3) politika:
+//   maske metni ASLA sessizce başka bir metne/tarihe çevirmez. Taşan bölük
+//   yeniden bölünmez ('151.12.2026' → '15.11.2202' yasağı), taşan hane
+//   YUTULMAZ ('05.12.20265' metinde kalır), ayraç dışı rakam-dışı karakter
+//   SESSİZ SİLİNMEZ ('05.02.2026abc' — 'Rakam girmelisiniz'). Hatalı girişte
+//   metin yalnız ayraç-normalizasyonuyla birebir korunur; Uygula (üç yüzey)
+//   bu hatayı tarihGirisCoz'dan ÖNCE görür ve reddeder. Gerçek ay-gün sayısı
+//   denetimi Uygula'da (tarihParse) yapılır; 0 alt sınırı (00) burada görünür.
 function tarihMaskeUygula(ham){
   const s = String(ham == null ? '' : ham);
-  const rakamlar = s.replace(/\D/g, '');
-  // Segment planı: gün 2 hane / ay 2 hane / yıl 4 hane (değer tavanları ayrı).
+  if(!s) return { metin: '', hata: null };
+  const AYRAC = /[,.\/\-\s]+/g;
+  // B2: ayraç dışı her rakam-dışı karakter metni GEÇERSİZ kılar — eski
+  // davranış onları sessizce siliyordu, '05.02.2026abc' böylece geçerli
+  // '05.02.2026' kabulüne düşüyordu (sessiz veri dönüşümü yasak).
+  if(/[^0-9,.\/\-\s]/.test(s)){
+    return { metin: s.replace(AYRAC, '.'), hata: 'Rakam girmelisiniz' };
+  }
+  // Segment planı: gün 2 hane / ay 2 hane / yıl 4 hane (değer sınırları ayrı).
   const uzunluklar = [2, 2, 4];
-  const tavanlar  = [31, 12, null];
-  let metin = '', hata = null, kalan = rakamlar;
-  for(let i = 0; i < 3 && kalan.length; i++){
-    const parca = kalan.slice(0, uzunluklar[i]);
-    kalan = kalan.slice(parca.length);
-    if(i < 2){
-      if(Number(parca) > tavanlar[i]) hata = (i === 0 ? 'Gün 1-31 olmalı' : 'Ay 1-12 olmalı');
-    } else if(parca.length === uzunluklar[i] && kalan.length){
-      hata = 'Yıl 4 hane olmalı'; // 5. yıl hanesi yutulur ama sessiz kalmaz
+  const tavanlar  = [31, 12, 9999];
+  const mesajlar  = ['Gün 1-31 olmalı', 'Ay 1-12 olmalı', 'Yıl 1-9999 olmalı'];
+  const bolumler = s.split(AYRAC);
+  let sonDoluIdx = -1;
+  for(let i = bolumler.length - 1; i >= 0; i--){ if(bolumler[i]){ sonDoluIdx = i; break; } }
+  let metin = '', hata = null, ayracGerekli = false;
+  let seg = 0, segDolu = 0, segStr = '';
+  for(let b = 0; b < bolumler.length && hata === null; b++){
+    let bol = bolumler[b];
+    if(!bol) continue;
+    // B1a: son OLMAYAN bölük kendi slotuna sığmıyorsa kullanıcının açık
+    // segment sınırlarını kaydırıyor — yeniden bölünmez, ham hata döner.
+    if(b !== sonDoluIdx && bol.length > uzunluklar[seg] - segDolu){
+      const deger = Number(bol);
+      hata = (deger < 1 || deger > tavanlar[seg]) ? mesajlar[seg]
+           : (seg === 2 ? 'Yıl 4 hane olmalı' : (seg === 0 ? 'Gün en fazla 2 hane olabilir' : 'Ay en fazla 2 hane olabilir'));
+      break;
     }
-    metin += parca;
-    if(kalan.length && i < 2) metin += '.';
+    while(bol.length){
+      if(seg > 2){ hata = 'Yıl 4 hane olmalı'; break; } // yıl slotu taştı — hane YUTULMAZ
+      const yer = uzunluklar[seg] - segDolu;
+      const parca = bol.slice(0, yer);
+      bol = bol.slice(parca.length);
+      metin += (ayracGerekli ? '.' : '') + parca;
+      ayracGerekli = false;
+      segDolu += parca.length; segStr += parca;
+      if(segDolu === uzunluklar[seg]){
+        const deger = Number(segStr);
+        if(deger < 1 || deger > tavanlar[seg]) hata = mesajlar[seg]; // B3: alt sınır dahil
+        else if(seg < 2) ayracGerekli = true;
+        seg++; segDolu = 0; segStr = '';
+      }
+    }
+    // son olmayan bölük kısmi segmentte bitiyorsa: segment burada kapanır
+    if(hata === null && b !== sonDoluIdx && segDolu > 0){
+      ayracGerekli = true; seg++; segDolu = 0; segStr = '';
+    }
+  }
+  if(hata !== null){
+    // B1a: hatalı girişte metin ASLA yeniden yazılmaz — ayraç-normalizasyonu
+    // dışında birebir korunur (sessiz düzeltme yok; Uygula bu hatayla reddeder).
+    return { metin: s.replace(AYRAC, '.'), hata: hata };
   }
   // Kuyruk ayraç koruması: değer ayraçla bittiyse ('11.12.' geri-silme hâli,
   // ya da kullanıcı ayracı kendisi yazdıysa) nokta yerinde kalır; tam tarih
   // kurulduysa (10 karakter) kuyruk eklenmez.
   if(metin && metin.length < 10 && /[,.\/\-\s]$/.test(s)) metin += '.';
-  return { metin: metin, hata: hata };
+  return { metin: metin, hata: null };
 }
 
 // MASKE İMLECİ — eski imlecin önündeki rakam sayısını yeni maskeli metinde

@@ -204,10 +204,56 @@ test('tarihMaskeUygula: segment sınırı taşması ANINDA İŞARETLENİR — ha
   assert.match(yapistirilan.hata, /Gün 1-31/);
 });
 
-test('tarihMaskeUygula: yıl 4 haneyi aşamaz — fazlası yutulur + işaretlenir', () => {
+test('tarihMaskeUygula: yıl 4 haneyi aşamaz — yazdığı KORUNUR + işaretlenir (R1 revizyon B1a: hane yutma yasak)', () => {
+  // R1 denetimi B1a: taşan hane yutulursa maske sessizce başka bir metin
+  // üretir; politika TEKLEŞTİ — taşma yazılanı bozmaz, hatayla işaretler.
   const r = tarihMaskeUygula('05.12.20265');
-  assert.strictEqual(r.metin, '05.12.2026');
+  assert.strictEqual(r.metin, '05.12.20265');
   assert.match(r.hata, /Yıl 4 hane/);
+  // düz rakam akışında (ayraçsız) da aynı politika: 9. hane metinde kalır
+  const duz = tarihMaskeUygula('111220261');
+  assert.strictEqual(duz.metin, '111220261');
+  assert.match(duz.hata, /Yıl 4 hane/);
+});
+
+// ── R1 REVİZYON PİNLERİ (denetim bulguları B1a/B2/B3 — sessiz-yanlış-tarih yasak) ──
+
+test('R1 revizyon B1a: taşan segment yeniden BÖLÜNMEZ — yazılan metin birebir korunur', () => {
+  // Denetim sondası: '151.12.2026' eski maskede '15.11.2202'ye dönüşüyor,
+  // Uygula da 2202-11-15'i GEÇERLİ diye kabul ediyordu. Maske artık metni
+  // asla sessizce başka bir tarihe çevirmez: metin aynen kalır + hata.
+  const r = tarihMaskeUygula('151.12.2026');
+  assert.strictEqual(r.metin, '151.12.2026');
+  assert.match(r.hata, /Gün 1-31/);
+  // bölük-bölük yazım (açık ayraçlı) aynı kaderde: 3 haneli gün bölüğü taşar
+  const r2 = tarihMaskeUygula('151.12.26');
+  assert.strictEqual(r2.metin, '151.12.26');
+  assert.ok(r2.hata !== null, 'açık ayraçlı taşma da hatasız kalmaz');
+});
+
+test('R1 revizyon B2: ayraç dışı rakam-dışı karakter SESSİZ SİLİNMEZ — hata işaretler', () => {
+  const r = tarihMaskeUygula('05.02.2026abc');
+  assert.strictEqual(r.metin, '05.02.2026abc', 'junk metinden atılmaz');
+  assert.match(r.hata, /Rakam girmelisiniz/);
+  const r2 = tarihMaskeUygula('12,34x2026');
+  assert.strictEqual(r2.metin, '12.34x2026', 'ayraç normalleşir, junk yerinde kalır');
+  assert.match(r2.hata, /Rakam girmelisiniz/);
+  // meşru ayraç seti junk sayılmaz
+  assert.strictEqual(tarihMaskeUygula('13 09 2026').hata, null);
+});
+
+test('R1 revizyon B3: 00 alt sınırı maske tarafından GÖRÜLÜR — 0 değeri segment hatası', () => {
+  const gun = tarihMaskeUygula('00');
+  assert.strictEqual(gun.metin, '00');
+  assert.match(gun.hata, /Gün 1-31/);
+  const ay = tarihMaskeUygula('01.00');
+  assert.strictEqual(ay.metin, '01.00');
+  assert.match(ay.hata, /Ay 1-12/);
+  const yil = tarihMaskeUygula('05.12.0000');
+  assert.strictEqual(yil.metin, '05.12.0000');
+  assert.match(yil.hata, /Yıl 1-9999/);
+  // meşru değerler hatasız kalır
+  assert.strictEqual(tarihMaskeUygula('01.01.2026').hata, null);
 });
 
 test('tarihMaskeUygula: silme doğaldır — kuyruk ayraç korunur, geri alınmaz', () => {
@@ -221,8 +267,10 @@ test('tarihMaskeUygula: silme doğaldır — kuyruk ayraç korunur, geri alınma
   assert.strictEqual(tarihMaskeUygula('').metin, '');
   // yapıştırma (paste) tek input olayıdır — tam dizge aynı yoldan geçer
   assert.strictEqual(tarihMaskeUygula('11122026').metin, '11.12.2026');
-  // çöp non-digit girdi temizlenir
-  assert.strictEqual(tarihMaskeUygula('ab?!12cd2026').metin, '12.20.26');
+  // R1 revizyon B2: çöp rakam-dışı SESSİZ SİLİNMEZ — metin korunur + hata
+  const cop = tarihMaskeUygula('ab?!12cd2026');
+  assert.strictEqual(cop.metin, 'ab?!12cd2026');
+  assert.match(cop.hata, /Rakam girmelisiniz/);
 });
 
 test('tarihMaskeImlec: rakam sayısını koruyan imleç konumu — silme/ortada-yazma imleci kaçırmaz', () => {
@@ -592,7 +640,12 @@ test('R1 el girişi: 90,09,2026 Uygula → satır içi hata + seçim korunur + y
   const kutu = sb.document.getElementById('tek-tarih-takvim');
   assert.ok(kutu.innerHTML.includes('Seçilen: 15.09.2026'), 'seçim değişmedi');
   assert.ok(kutu.innerHTML.includes('value="90,09,2026"'), 'yazdığı korunur');
-  assert.ok(kutu.innerHTML.includes('Eylül 2026 30 gün — 90.09.2026 yok'), 'hata satır içi ve somut: ' + (kutu.innerHTML.match(/giris-hata[\s\S]{0,160}/) || [''])[0]);
+  // R1 review: kapı durumsuz olduğundan maske-geçersiz metin Apply'da ÖNCE
+  // maske katmanında yakalanır ('Gün 1-31 olmalı' — eski pinned mesaj
+  // 'Eylül 2026 30 gün…' tarihParse'ın sonradan reddiydi; iki yol da reddeder,
+  // maske mesajı artık birinci hat).
+  assert.ok(kutu.innerHTML.includes('Gün 1-31 olmalı'), 'hata satır içi ve somut: ' + (kutu.innerHTML.match(/giris-hata[\s\S]{0,160}/) || [''])[0]);
+  assert.ok(!kutu.innerHTML.includes('90.09.2026'), 'geçersiz değer tarihe çevrilip gösterilmez');
 });
 
 test('R1 maske bağı: input olayında 11122026 → 11.12.2026; taşan segment yuvaya anında yazar', () => {
@@ -615,6 +668,59 @@ test('R1 maske bağı: input olayında 11122026 → 11.12.2026; taşan segment y
   assert.strictEqual(inp.value, '39', 'hane yutulmaz (sessiz düzeltme yok)');
   assert.strictEqual(yuva.textContent, '⚠️ Gün 1-31 olmalı', 'uyarı yuvaya anında yazılır');
   assert.strictEqual(yuva.style.display, 'block', 'yuva görünür');
+});
+
+test('R1 revizyon B1b: maske hatası beklerken Uygula KAPIDA TAKILIR — yanlış-geçerli tarih seçilmez, onSec eski değeri verir', () => {
+  // Denetim sondası: maske '15.11.2202' + hata üretirken Uygula yalnız
+  // tarihGirisCoz'a bakıp 2202-11-15'i GEÇERLİ diye kabul ediyordu. Uygula
+  // artık bekleyen maske hatasını tarihGirisCoz'dan ÖNCE görür.
+  const sb = tekTakvimSandboxi(null);
+  const inp = sb.document.__setEl('tek-tarih-giris', makeElement('input'));
+  sb.document.__setEl('tek-tarih-giris-hata', makeElement('div')); // hata yuvası (render satır içi yazar)
+  sb.__ac();
+  inp.value = '151.12.2026';
+  inp.dispatchEvent('input', {}); // maske: metin korunur, hata yuvada
+  assert.strictEqual(inp.value, '151.12.2026', 'maske metni yeniden yazmadı (B1a)');
+  sb.tekTarihTakvimGirisUygula(); // Uygula: maske kapısı
+  let kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Seçilen: 15.09.2026'), 'yanlış-geçerli tarih seçilmedi');
+  assert.ok(kutu.innerHTML.includes('Gün 1-31 olmalı'), 'maske hatası satır içi görünür');
+  assert.ok(kutu.innerHTML.includes('value="151.12.2026"'), 'yazdığı korunur');
+  sb.tekTarihTakvimOnayla();
+  assert.deepStrictEqual(sb.__onSecSecimleri, ['2026-09-15'], 'onSec eski geçerli değeri aldı — taşma sızmadı');
+  // R1 review ÖNEMLİ: kapı DURUMSUZ — hata render'ından sonra İKİNCİ Uygula
+  // da maske hatasıyla reddedilir (tarayıcıda render input'u yeniden doğurur;
+  // kapı mevcut değerden yeniden hesaplar, depolanan sonuca yaslanmaz —
+  // stub elemanı yeniden doğurmaz, o ayrım tarayıcı gerçekliğidir).
+  sb.tekTarihTakvimGirisUygula();
+  kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Gün 1-31 olmalı'),
+    'ikinci Uygula da maske hatasıyla reddedilir (tarihGirisCoz "Tarih okunamadı" düşüşü yok)');
+  assert.ok(kutu.innerHTML.includes('Seçilen: 15.09.2026'), 'ikinci Uygula da yanlış seçim yapmaz');
+  // kurtarma: kullanıcı düzeltir → akış normale döner
+  inp.value = '17.09.2026';
+  inp.dispatchEvent('input', {});
+  sb.tekTarihTakvimGirisUygula();
+  kutu = sb.document.getElementById('tek-tarih-takvim');
+  assert.ok(kutu.innerHTML.includes('Seçilen: 17.09.2026'), 'düzeltme sonrası seçim güncellendi');
+  sb.tekTarihTakvimOnayla();
+  assert.deepStrictEqual(sb.__onSecSecimleri, ['2026-09-15', '2026-09-17'], 'kurtarma akışı onSec\'e gider');
+});
+
+test('R1 revizyon B5: caseGun sayfalama 1..9999 kenarında RED — ham modulo ayı bozmaz', () => {
+  // Denetim sondası: 1-Ocak ‹ → {y:1,m:11} (Aralık), 9999-Aralık › → {y:9999,m:0}
+  const sb = tekTakvimSandboxi(null);
+  sb.caseGunYilSec('1'); sb.caseGunAySec('0'); // Ocak 0001
+  sb.caseGunAyDegistir(-1);
+  let kutu = sb.document.getElementById('gun-tarih-modal');
+  assert.ok(kutu, 'caseGun modal çizilir');
+  assert.ok(kutu.innerHTML.includes('<option value="0" selected>Ocak</option>'), 'kenarda Ocak korunur (Aralık-1 kayması yok)');
+  assert.ok(kutu.innerHTML.includes('<option value="1" selected>1</option>'), 'yıl 0001 korunur');
+  sb.caseGunYilSec('9999'); sb.caseGunAySec('11'); // Aralık 9999
+  sb.caseGunAyDegistir(1);
+  kutu = sb.document.getElementById('gun-tarih-modal');
+  assert.ok(kutu.innerHTML.includes('<option value="11" selected>Aralık</option>'), 'kenarda Aralık korunur');
+  assert.ok(kutu.innerHTML.includes('<option value="9999" selected>9999</option>'), 'yıl 9999 (Ocak-9999 bozması yok)');
 });
 
 // ═══ F4 — STANDART KİLİDİ (G-20260913-TARIH-SECICI) ═══

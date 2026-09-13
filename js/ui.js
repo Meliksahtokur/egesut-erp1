@@ -6738,7 +6738,12 @@ function caseGunToggle(iso) {
 // etki alanı dışı temsilsiz ay üretemez (review tutarlılık bulgusu).
 function caseGunAyDegistir(delta) {
   const toplam = _gunSecimYil * 12 + _gunSecimAy + Math.trunc(Number(delta) || 0);
-  _gunSecimYil = Math.min(9999, Math.max(1, Math.floor(toplam / 12)));
+  const hedefYil = Math.floor(toplam / 12);
+  // R1 REVİZYON (denetim B5): hedef yıl 1..9999 dışına çıkıyorsa ham modulo
+  // UYGULANMAZ — sayfalama kenarda reddedilir, bulunduğun kenar ay/yıl korunur
+  // (1-Ocak ‹ → Ocak-1 kalır, eski davranışta 1-Aralık'a bozuluyordu).
+  if(!(hedefYil >= 1 && hedefYil <= 9999)) return;
+  _gunSecimYil = hedefYil;
   _gunSecimAy = ((toplam % 12) + 12) % 12;
   caseGunModalRender();
 }
@@ -6763,6 +6768,14 @@ function caseGunYilSec(deger) {
 function caseGunGirisUygula() {
   const inp = document.getElementById('case-gun-giris');
   const metin = inp ? inp.value : '';
+  // R1 REVİZYON B1b: bekleyen maske hatası tarihGirisCoz'dan ÖNCE reddeder.
+  const maskeHatasi = tarihSeciciMaskeHatasiAl('case-gun-giris');
+  if(maskeHatasi){
+    _gunSecimGirisMetni = metin;
+    _gunSecimGirisHatasi = maskeHatasi;
+    caseGunModalRender();
+    return;
+  }
   const r = tarihGirisCoz(metin);
   if (!r.ok) {
     _gunSecimGirisMetni = metin;
@@ -6896,6 +6909,15 @@ function tekTarihTakvimOnayla(){
 function tekTarihTakvimGirisUygula(){
   const inp = document.getElementById('tek-tarih-giris');
   const metin = inp ? inp.value : '';
+  // R1 REVİZYON B1b: bekleyen maske hatası tarihGirisCoz'dan ÖNCE reddeder
+  // (maske taşması geçerli-ama-yanlış ISO'yu Uygula'ya sızmaz).
+  const maskeHatasi = tarihSeciciMaskeHatasiAl('tek-tarih-giris');
+  if(maskeHatasi){
+    _tekTarihGirisMetni = metin;
+    _tekTarihGirisHata = maskeHatasi;
+    tekTarihTakvimRender();
+    return;
+  }
   const r = tarihGirisCoz(metin);
   if(!r.ok){
     _tekTarihGirisMetni = metin;
@@ -7046,6 +7068,9 @@ function tarihSeciciStilEnjekte(){
 // hata yuvasına ANINDA yazar (re-render yok — odak/imeç kaymaz); Enter
 // Uygula'yı tetikler. forms.js de bu pencere-global'ini kullanır
 // (tekTarihTakvimAc'in F3'ten beri süren paylaşım deseninin devamı).
+// R1 REVİZYON (denetim B1b): Uygula yolları tarihSeciciMaskeHatasiAl ile
+// bekleyen maske hatasını tarihGirisCoz'dan ÖNCE görür (maske taşması
+// yanlış-geçerli ISO üretemez, artık üretse bile Uygula'ya sızmaz).
 function tarihSeciciMaskeBagla(girisId, uygulaFn, hataId){
   const inp = document.getElementById(girisId);
   if(!inp) return;
@@ -7068,6 +7093,19 @@ function tarihSeciciMaskeBagla(girisId, uygulaFn, hataId){
   inp.addEventListener('keydown', e => {
     if(e.key === 'Enter'){ e.preventDefault(); if(typeof uygulaFn === 'function') uygulaFn(); }
   });
+}
+
+// R1 REVİZYON B1b — Uygula önü maske kapısı (üç yüzey ortak): girişte
+// bekleyen bir maske hatası varsa uygulama yolları tarihGirisCoz'u hiç
+// çağırmadan reddeder (maske taşması geçerli-ama-yanlış ISO üretemez).
+// R1 review (ÖNEMLİ→düzeltildi): kapı DURUMSUZDUR — maske sonucu depolanmaz,
+// MEVCUT değerden yeniden hesaplanır. Depolanan expando, Uygula-hata
+// yeniden-render'ında input'un yeniden doğmasıyla ölür ve ikinci Uygula'yı
+// kapısız bırakır; hatanın kalıcı metinde yaşaması bu yolla garanti edilir.
+function tarihSeciciMaskeHatasiAl(girisId){
+  const inp = document.getElementById(girisId);
+  if(!inp || !inp.value) return null;
+  return tarihMaskeUygula(inp.value).hata;
 }
 
 // Bulgu 4 — başlık dropdown'ları: seçim duruma yazar + yeniden çizer.
