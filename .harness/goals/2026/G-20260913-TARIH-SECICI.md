@@ -25,6 +25,7 @@ write_manifest:
   - .claude/tasks/2026-09-13-tarih-secici-f2.md
   - .claude/tasks/2026-09-13-tarih-secici-f3.md
   - .claude/tasks/2026-09-13-tarih-secici-f4.md
+  - .claude/tasks/2026-09-13-tarih-secici-luna.md
   - .claude/reviews/2026-09-13-tarih-secici-f1-teslim.md
   - .claude/reviews/2026-09-13-tarih-secici-f2-teslim.md
   - .claude/reviews/2026-09-13-tarih-secici-f3-teslim.md
