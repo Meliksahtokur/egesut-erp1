@@ -414,3 +414,72 @@ test('DOM kapaliGun plumbing: tarihAlaniTakvimAc şemadaki kapaliGun fonksiyonun
   kutu = sb.document.getElementById('tek-tarih-takvim');
   assert.ok(kutu.innerHTML.includes(TIK('tekTarihTakvimSec', '2026-09-20')), 'fonksiyon olmayan kapaliGun → kapalı hücre yok');
 });
+
+// ═══ F4 — STANDART KİLİDİ (G-20260913-TARIH-SECICI) ═══
+// Kanonik tarih seçimi artık tek yol: yeni type="date" girişi YASAK, kanonik
+// dışı takvim kopyası YENİDEN DOĞAMAZ, saf katman saflığı block-comment'i de
+// soyarak korunur. Bu bölüm F1/F2/F3 denetim bulgularını kalıcı olarak
+// kilitler (block-comment + Date.now + kopya sembol pinleri).
+
+// Yorum soyucu: block (/* */) + satır (//) — F1 denetim bulgusu: yalnız
+// satır yorumu soyan muhafız, /* */ arkasına gizlenen ihlali kaçırmıştı.
+function muhafizKaynagi(ham) {
+  return ham
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
+test('F4 muhafızı — index.html + js/ içinde type="date" girişi YASAK', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const kok = path.join(__dirname, '..', '..');
+  const dosyalar = ['index.html'];
+  for (const dizin of ['js', 'js/tarih']) {
+    const mutlak = path.join(kok, dizin);
+    if (fs.existsSync(mutlak)) {
+      for (const d of fs.readdirSync(mutlak)) {
+        if (d.endsWith('.js')) dosyalar.push(dizin + '/' + d);
+      }
+    }
+  }
+  const ihlaller = [];
+  for (const d of dosyalar) {
+    const src = muhafizKaynagi(fs.readFileSync(path.join(kok, d), 'utf8'));
+    // HTML attribute deseni (çift VE tek tırnak) yasak — görünür + gizli her
+    // şey. JS property ataması (.type = 'date') DEĞİL — o, gizli taşıyıcının
+    // bilinçli istisnasıdır (bir sonraki test tek noktaya pinler).
+    if (/(?<!\.)\btype\s*=\s*["']date["']/.test(src)) ihlaller.push(d);
+  }
+  assert.deepStrictEqual(ihlaller, [], 'native date girişi geri gelmez');
+});
+
+test('F4 muhafızı — gizli taşıyıcı runtime ataması bilinçli TEK noktada kalır', () => {
+  const fs = require('node:fs');
+  const src = muhafizKaynagi(fs.readFileSync(require.resolve('../../js/ui.js'), 'utf8'));
+  // js/utils/modal.js:15 openM auto-fill kancası, runtime .type="date"
+  // atamasıyla çalışır (F2 tasarım kararı). Bu istisna yalnız bağlama
+  // katmanında 1 kez olabilir — ikinci atama yeni native-surface demektir.
+  const atamalar = (src.match(/\.type\s*=\s*["']date["']/g) || []).length;
+  assert.strictEqual(atamalar, 1, 'gizli taşıyıcı .type="date" ataması yalnız 1 yerde olabilir, bulunan: ' + atamalar);
+});
+
+test('F4 muhafızı — saf katmanda Date.now dahil tüm tarih-saat API’leri yasak (block-comment soyulmuş)', () => {
+  const fs = require('node:fs');
+  const src = muhafizKaynagi(fs.readFileSync(require.resolve('../../js/tarih/tarih.js'), 'utf8'));
+  assert.ok(!/toLocale\w*\s*\(/.test(src), 'toLocale* kullanımı yasak');
+  assert.ok(!/new\s+Date\s*\(/.test(src), 'new Date kullanımı yasak');
+  assert.ok(!/Date\.now\s*\(/.test(src), 'Date.now kullanımı yasak (şimdiki zaman determinizmi bozar)');
+  assert.ok(!/Intl\s*\./.test(src), 'Intl kullanımı yasak');
+  assert.ok(!/\bdocument\b|\bwindow\b/.test(src), 'saf katmanda DOM yok');
+});
+
+test('F4 muhafızı — kaldırılan takvim kopyaları yeniden doğamaz; çoklu yüzeyler ortak çekirdeği çağırır', () => {
+  const fs = require('node:fs');
+  const ui = muhafizKaynagi(fs.readFileSync(require.resolve('../../js/ui.js'), 'utf8'));
+  const forms = muhafizKaynagi(fs.readFileSync(require.resolve('../../js/forms.js'), 'utf8'));
+  // F3'te kaldırılan tek-seçim kopyası geri gelemez
+  assert.ok(!/function\s+bcTarihTakvim\w*/.test(forms), 'bcTarihTakvim* sembolü kaldırıldı — geri gelmez');
+  // Çoklu-seçim yüzeyleri ortak ızgara çekirdeğini çağırmalı (F3 birleşmesi pini)
+  assert.ok((forms.match(/tarihAyIzgara\s*\(/g) || []).length >= 1, 'bcTakvim* ortak çekirdekte olmalı');
+  assert.ok((ui.match(/tarihAyIzgara\s*\(/g) || []).length >= 2, 'tekTarihTakvimAc + caseGunModalRender ortak çekirdekte olmalı');
+});

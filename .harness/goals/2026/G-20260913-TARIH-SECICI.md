@@ -9,20 +9,22 @@ branch: agent/tarih-secici-standardi
 worktree: /home/melik/.superset/worktrees/1dddb562-abe3-495c-970e-872567945510/agent/tarih-secici-standardi
 report: .harness/reports/2026-09-13-tarih-secici-teslim.md
 write_manifest:
-  - index.html                        # 14 native date input -> tarihAlaniBagla binding
-  - js/ui.js                          # tekTarihTakvimAc hardening + tarihAlaniBagla + caseGunModalRender grid refactor + dynamic input
-  - js/forms.js                       # bcTarihTakvim*/bcTakvim* consolidation + field readers (value contract preserved)
-  - js/app.js                         # reset points (app.js:600) keep working
-  - js/utils/handlers.js              # F3: single-line repoint of bcTarihTakvimAc's only prod caller (ratified by lead 2026-09-13)
+  - index.html
+  - js/ui.js
+  - js/forms.js
+  - js/app.js
+  - js/utils/handlers.js
   - .claude/tasks/2026-09-13-tarih-secici-f3-denetim.md
   - .claude/reviews/2026-09-13-tarih-secici-f3-denetim.md
-  - js/tarih/tarih.js                 # NEW pure date layer + grid core (single module, name FIXED by harness manifest matching)
-  - tests/unit/tarih-saf.test.js      # pure-layer + grid core unit tests (name FIXED)
-  - tests/unit/tarih-guard.test.js    # F4 guard test (optional new file; may extend tarih-saf instead)
+  - js/tarih/tarih.js
+  - tests/unit/tarih-saf.test.js
+  - tests/unit/tarih-guard.test.js
   - tests/unit/vaka-toplu-ac.test.js
-  - tests/tarih-secici.spec.js        # Playwright mobile-viewport TR calendar spec (F2+, demo DB)
-  - .harness/decisions/D-20260909-CANONICAL-DATE-PICKER.md   # F4: "this is THE component" + API
-  - .harness/references/ui-map.md     # F4: canonical date picker usage section
+  - tests/tarih-secici.spec.js
+  - .harness/decisions/D-20260909-CANONICAL-DATE-PICKER.md
+  - .harness/references/ui-map.md
+  - .harness/references/domain-rules.md
+  - .claude/reviews/2026-09-13-tarih-secici-f4-red-before.log
   - .harness/goals/2026/G-20260913-TARIH-SECICI.md
   - .harness/reports/2026-09-13-tarih-secici-teslim.md
   - .claude/tasks/2026-09-13-tarih-secici-f1.md
@@ -46,6 +48,7 @@ docs_authority:
       - .harness/goals/2026/G-20260913-TARIH-SECICI.md
       - .harness/decisions/D-20260909-CANONICAL-DATE-PICKER.md
       - .harness/references/ui-map.md
+      - .harness/references/domain-rules.md
       - .harness/reports/2026-09-13-tarih-secici-teslim.md
       - .claude/tasks/2026-09-13-tarih-secici-*.md
       - .claude/reviews/2026-09-13-tarih-secici-*.md
