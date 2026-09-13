@@ -133,6 +133,20 @@ toh_by_hayvan = defaultdict(list)
 for r in toh:
     if r.get('hayvan_id') and r.get('tarih'): toh_by_hayvan[r['hayvan_id']].append(d(r['tarih']))
 
+def anne_marker(tok, db_anne_kupe):
+    """Tablo/defter anne tokenu DB anne kupe'siyle uyumlu mu? (W5 root revizyonu)
+    'OK' = birebir ya da devlet kupe son-4; 'DB-NULL' = DB'de anne bağlantısı yok;
+    'FARK' = DB'de başka anne yazılı."""
+    if not db_anne_kupe or db_anne_kupe == '-': return 'DB-NULL'
+    h = by_kupe.get(norm_kupe(db_anne_kupe))
+    dk = norm_kupe((h or {}).get('devlet_kupe')) or ''
+    for seg in re.split(r'[-\s]+', str(tok)):
+        s = norm_kupe(seg)
+        if not s: continue
+        if s == norm_kupe(db_anne_kupe): return 'OK'
+        if re.fullmatch(r'\d{4}', s) and dk.endswith(s): return 'OK(son4)'
+    return 'FARK'
+
 def gebelik_kanit(anne_id, cand1, cand2):
     """anneın aday doğumdan önceki SON tohumlaması -> her iki aday için gebelik günü."""
     if not anne_id: return None
@@ -189,9 +203,11 @@ for tk, ttarih, tcins, tanne, tasi, tdurum, tolum, tirk in TABLO:
                      db=db_d.isoformat() if db_d else '-', durum=durum, kanit=kanit,
                      tcins=CINS[tcins], led_c=led_c, db_cins=(b or {}).get('cinsiyet','')[:1],
                      tanne=tanne, led_anne=led_anne, db_anne=db_anne or '-',
+                     anne_m=anne_marker(tanne, db_anne),
                      tdurum=tdurum, leddurum=('Satıldı' if led_not=='₺' else 'Öldü' if led_not=='ex' else 'Canlı'),
                      dbdurum=durum_db(b) or '-', tolum=tolum, tirk=tirk,
-                     dbirk=(b or {}).get('irk') or '-', vac=len(vacs), vac_ofs=vac_ofs,
+                     dbirk=(b or {}).get('irk') or '-', db_yirk=(dog_ev or {}).get('yavru_irk') or '-',
+                     vac=len(vacs), vac_ofs=vac_ofs,
                      devlet=(b or {}).get('devlet_kupe') or '-'))
 
 from collections import Counter
@@ -203,6 +219,15 @@ print()
 print('== AŞI TARİHİ OFFSETLERİ (DB doğumuna göre; sabit desen = protokolden üretilme):')
 for r in rows:
     if r['vac_ofs']: print(f"   {r['tk']}: {r['vac_ofs']} (toplam {r['vac']} kayıt)")
+print()
+print('== ANNE KARŞILAŞTIRMASI (T/L tokenı ↔ DB):')
+for r in rows:
+    if r['anne_m'] != 'OK': print(f"   {r['tk']}: T/L={r['tanne']} ↔ DB={r['db_anne']} → {r['anne_m']}")
+print()
+print('== IRK İKİ YÖNLÜ (tablo boş ama DB dolu dahil):')
+for r in rows:
+    if r['tirk'] or (r['dbirk'] and r['dbirk'] != '-'):
+        print(f"   {r['tk']}: T={r['tirk'] or '—'} | DB.irk={r['dbirk']} | DB.yavru_irk={r.get('db_yirk') or '-'}")
 print()
 print('== Q3/Q4 ÇEŞİTLİ:')
 for r in rows:
