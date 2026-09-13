@@ -15,6 +15,8 @@ write_manifest:
   - js/ui.js                      # ADDITIVE only: nav wiring + animal-detail link
   - tests/unit/                   # new pure-layer tests + fixtures
   - reports/                      # W1/W2/final delivery reports
+  - .harness/references/ui-map.md         # docs checkpoint (lead, W2 PROPOSED)
+  - .harness/references/rpc-reference.md  # docs checkpoint (lead, W2 PROPOSED)
   - .harness/goals/2026/G-20260913-SURUM-GECMISI.md
 pattern_refs: [MODAL-ROUTER-01, TESTING-01]
 pattern_exceptions: []
