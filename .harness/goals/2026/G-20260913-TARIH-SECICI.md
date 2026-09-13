@@ -16,6 +16,7 @@ write_manifest:
   - js/tarih/tarih.js                 # NEW pure date layer + grid core (single module, name FIXED by harness manifest matching)
   - tests/unit/tarih-saf.test.js      # pure-layer + grid core unit tests (name FIXED)
   - tests/unit/tarih-guard.test.js    # F4 guard test (optional new file; may extend tarih-saf instead)
+  - tests/unit/vaka-toplu-ac.test.js  # F2: stamp/manifest guard tests updated in place (existing file)
   - tests/tarih-secici.spec.js        # Playwright mobile-viewport TR calendar spec (F2+, demo DB)
   - .harness/decisions/D-20260909-CANONICAL-DATE-PICKER.md   # F4: "this is THE component" + API
   - .harness/references/ui-map.md     # F4: canonical date picker usage section
