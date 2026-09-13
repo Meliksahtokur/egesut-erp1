@@ -2615,7 +2615,8 @@ function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displa
     <button class="btn btn-g" style="margin-top:4px;padding:9px" onclick="openAnimalEdit('${a.id}')">✏️ Bilgileri Düzenle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="openNotModal('${a.id}','${displayId}')">📝 Not Ekle</button>
     <button class="btn btn-o" style="margin-top:6px;padding:9px" onclick="_hayvanHizliUygulama('${a.id}')">💉 Hızlı Uygulama</button>
-    <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>`;
+    <button class="btn" style="margin-top:6px;padding:9px;background:rgba(192,50,26,.08);color:var(--red);border:1px solid rgba(192,50,26,.2)" onclick="openCikisModal('${a.id}','${displayId}')">🚪 Çıkış Yap</button>
+    ${typeof degisikliklerHayvanIcin === 'function' ? `<button class="btn btn-o" style="margin-top:6px;padding:9px" data-action="dg-hayvan-degisiklikleri" data-hid="${escAttr(a.id)}" data-kupe="${escAttr(displayId)}">🧾 Bu hayvanın değişiklikleri</button>` : ''}`;
 }
 function _detUremeHtml(a,tohs,kizgs){
   const gebeTohumlama=tohs.find(t=>t.sonuc==='Gebe');

@@ -669,6 +669,23 @@ async function rpcReceteGuncelle(caseId, yeniPlan) {
   });
 }
 
+// ── SÜRÜM GEÇMİŞİ (G-20260913-SURUM-GECMISI F2 frozen contract) ─────
+// Kalıp: rpcSeansTamamla / rpcReceteGuncelle — ince sarmal, rpc() hata/ok:false
+// yolunu aynen kullanır. ok:false → Error, e.data.hata kodu taşır.
+// W1 merge'üne kadar js/degisiklikler/degisiklikler-stub.js bu 4 adı AYNI imzayla ezer.
+async function rpcGeriAlmaBiletiAl(sifre) {
+  return rpc('geri_alma_bileti_al', { p_sifre: sifre });
+}
+async function rpcDegisimListele(filtre = {}) {
+  return rpc('degisim_listele', { p_filtre: filtre || {} });
+}
+async function rpcDegisimOnizle(hedef, seviye) {
+  return rpc('degisim_onizle', { p_hedef: hedef, p_seviye: seviye });
+}
+async function rpcDegisimGeriAl(hedef, seviye, bilet, gerekce = null) {
+  return rpc('degisim_geri_al', { p_hedef: hedef, p_seviye: seviye, p_bilet: bilet, p_gerekce: gerekce || null });
+}
+
 /**
  * close_case_with_remaining — vakayı kapat, kalan seansları iptal et, stok iade
  * @param {string} caseId - cases.id
