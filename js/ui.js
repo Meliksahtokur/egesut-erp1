@@ -6740,8 +6740,8 @@ function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
 }
 
 // ── TEK-TARİH TAKVİM MODALI — KANONİK bileşen (ui-map "Canonical date
-// selection"; sahibe direktifi 2026-09-09: yeni yüzeylerde yerel
-// <input type="date"> KULLANILMAZ). Görsel dil: gun-tarih-modal
+// selection"; sahibe direktifi 2026-09-09: yeni yüzeylerde yerel native
+// tarih inputu — type=date — KULLANILMAZ). Görsel dil: gun-tarih-modal
 // (caseGunModalRender); seçim kuralı: bc-tarih-takvim W20 (forms.js:1804) —
 // hücre tıkı seçimi DEĞİŞTİRİR, toggle yok. Izgara ortak çekirdekten
 // (js/tarih/tarih.js) gelir; ay ‹/› + başlıktan yıl ‹/› + gg.aa.yyyy el
@@ -6926,6 +6926,143 @@ function tekTarihTakvimAyDegistir(delta){
 function tekTarihTakvimYilDegistir(delta){
   _tekTarihYil = tarihYilKaydir(_tekTarihYil, delta);
   tekTarihTakvimRender();
+}
+
+// ── TARİH ALANI BAĞLAMA — F2 (G-20260913-TARIH-SECICI) ──────────────
+// Statik formlardaki native tarih alanlarını kanonik bileşene bağlar
+// (karar D-20260909 kuralları: görünür buton + gizli input kalıbı).
+//
+// Düzen: id, native .value/.min/.max YANSIMASI ve change olayı GİZLİ
+// taşıyıcı input'ta kalır — okuyucu `el.value → ISO`, yazıcı
+// `el.value = ISO` ve dinamik `.min/.max` yazan hiçbir kod DEĞİŞMEZ.
+// Görünür yüzey, taşıyıcının hemen ardına eklenen butondur (gg.aa.yyyy):
+//   buton tıkı → tekTarihTakvimAc → onSec → taşıyıcı.value + buton etiketi.
+// Taşıyıcı görünmez ama etkileşim katmanı için "görünür" ölçüde bırakılır
+// (1×1, opacity:0, pointer-events:none) — mevcut e2e fill/toHaveValue
+// sözleşmesi kırılmaz; klavye sekme sırasına girmez (tabindex -1) ve
+// ekran okuyucuya kapalıdır (aria-hidden).
+// Buton etiketi: yazıcı yolu (value property setter, ana dünya) ve dış
+// yazımlar (input olayı) ile senkron kalır.
+// Native descriptor LOAD-time değil çağrı-time çözülür — ui.js, HTMLInputElement
+// olmayan vm-sandbox test ortamında da yüklenir.
+let _tarihAlanNativeValue = null;
+function _tarihAlanValueDescriptor(){
+  if(!_tarihAlanNativeValue && typeof HTMLInputElement !== 'undefined'){
+    _tarihAlanNativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  }
+  return _tarihAlanNativeValue;
+}
+function tarihAlaniBagla(id, opts){
+  const el = document.getElementById(id);
+  if(!el || el.tagName !== 'INPUT' || el._tarihBagli) return el; // idempotent
+  const nativeValue = _tarihAlanValueDescriptor();
+  if(!nativeValue) return el;
+  const o = opts || {};
+  el._tarihBagli = true;
+  // Orijinal görünüm butona taşınmadan ÖNCE yakalanır (aşağıdaki kaçış
+  // stilleri butona kopyalanmamalı).
+  const eskiStil = el.getAttribute('style') || '';
+  // Gizli taşıyıcı: sözleşmenin sahibi. Yerleşimden çekilir, dokunma almaz.
+  el.style.position = 'absolute';
+  el.style.width = '1px';
+  el.style.height = '1px';
+  el.style.opacity = '0';
+  el.style.pointerEvents = 'none';
+  el.style.border = 'none';
+  el.style.padding = '0';
+  el.setAttribute('tabindex', '-1');
+  el.setAttribute('aria-hidden', 'true');
+  // Runtime tipi native date KALIR (kaynakta type="text"): openM'in boş
+  // tarih alanlarını bugun() ile dolduran yazarı (utils/modal.js
+  // querySelectorAll('input[type=date]')) ve native value sanitizasyonu
+  // birebir çalışmaya devam eder. Kullanıcı bu inputa asla dokunamaz
+  // (pointer-events:none, görünmez); yüzey butondur.
+  el.type = 'date';
+  // Yazıcı kancası: ISO yazan kod buton etiketini de güncellesin. Saklama
+  // native'de kalır (izole dünya / toHaveValue / inputValue aynı ISO'yu görür).
+  const self = el;
+  Object.defineProperty(el, 'value', {
+    configurable: true,
+    get(){ return nativeValue.get.call(self); },
+    set(iso){
+      nativeValue.set.call(self, tarihGecerliMi(iso) ? iso : '');
+      tarihAlanEtiketGuncelle(self);
+    }
+  });
+  el.addEventListener('input', () => tarihAlanEtiketGuncelle(el)); // dış yazım (fill vb.)
+  // Görünür yüzey: taşıyıcının sınıfını ve Orijinal stilini devralır;
+  // yerleşim-kaçış stilleri kopyalanmaz.
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = id + '-btn';
+  btn.className = el.className || '';
+  btn.setAttribute('style', eskiStil);
+  btn.style.cssText += ';cursor:pointer;text-align:left;color:var(--ink)';
+  btn.setAttribute('aria-haspopup', 'dialog');
+  const flbl = el.previousElementSibling; // <label class="flbl"> — varsa ekran okuyucu bağlamı
+  if(flbl && flbl.classList && flbl.classList.contains('flbl')) btn.setAttribute('aria-label', (flbl.textContent || '').trim());
+  btn.addEventListener('click', () => tarihAlaniTakvimAc(el, o));
+  el.insertAdjacentElement('afterend', btn);
+  tarihAlanEtiketGuncelle(el);
+  return el;
+}
+function tarihAlanEtiketGuncelle(el){
+  const btn = document.getElementById(el.id + '-btn');
+  const nativeValue = _tarihAlanValueDescriptor();
+  if(!btn || !nativeValue) return;
+  const iso = nativeValue.get.call(el);
+  const metin = tarihGecerliMi(iso) ? '📅 ' + tarihIsoTr(iso)
+                                    : '📅 ' + (el.getAttribute('placeholder') || 'gg.aa.yyyy');
+  if(btn.textContent !== metin) btn.textContent = metin;
+}
+function tarihAlaniTakvimAc(el, o){
+  // Dinamik sınırlar: alanın .min/.max'ına yazan kod önce gelir (ISO);
+  // max: 'bugun' her açılışta taze değerlendirilir (LOAD-time referans YOK —
+  // ui.js vm-sandbox'ta da yüklenir, bugun orada tanımsızdır); fonksiyon da
+  // kabul edilir.
+  const alanMin = tarihGecerliMi(el.min) ? el.min : null;
+  const alanMax = tarihGecerliMi(el.max) ? el.max : null;
+  const optMin = o.min === 'bugun' ? bugun() : (typeof o.min === 'function' ? o.min() : o.min);
+  const optMax = o.max === 'bugun' ? bugun() : (typeof o.max === 'function' ? o.max() : o.max);
+  tekTarihTakvimAc({
+    baslik: o.baslik || '📅 Tarih Seç',
+    deger: el.value || null,
+    min: alanMin || optMin || null,
+    max: alanMax || optMax || null,
+    temizlenebilir: o.temizlenebilir === true,
+    onSec: iso => {
+      // Native parite: değer gerçekten değişmediyse change YAYILMAZ.
+      const eski = el.value;
+      el.value = iso || '';
+      // data-change bağlanan akışlar (ör. a-dt → animal-guncelle) native
+      // seçimle aynı olayı alsın.
+      if(el.value !== eski) el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+}
+// Alan sözleşme tablosu — her alan okuyucu/yazıcı bağlamına göre:
+// · max: 'bugun'  → submit doğrulaması 'ileri tarih olamaz' diyen alanlar
+// · temizlenebilir → submit yolu boş değeri meşru karşılayan alanlar
+// · sınırsız      → görev hedef tarihleri (ta/te) — gelecek meşru
+const TARIH_ALANLARI = {
+  'k-tarih':        { max: 'bugun' },                       // kızgınlık tarihi
+  'i-tarih':        { max: 'bugun' },                       // tohumlama tarihi
+  'tr-tarih':       { max: 'bugun' },                       // tekrar aşım tarihi
+  'v-date':         { max: 'bugun' },                       // aşı uygulama
+  'bv-tarih':       { max: 'bugun' },                       // toplu aşı — tek-aşı kuralıyla aynı kural
+  'sk-tarih':       { max: 'bugun', temizlenebilir: true }, // sütten kesme — okuyucu boşa bugun() der
+  'b-tarih':        { max: 'bugun' },                       // doğum tarihi — ileri olamaz
+  'a-dt':           { max: 'bugun', temizlenebilir: true }, // hayvan doğumu — boş geçilebilir (|| null)
+  'ta-tarih':       {},                                     // görev hedefi — gelecek serbest
+  'td-asi-tarih':   { max: 'bugun', temizlenebilir: true }, // detay açılışta .max=bugün yazar
+  'td-rapel-tarih': {},                                     // pencere .min/.max ile gelir (parent+14..21);
+                                                            // temizlenebilir DEĞİL — kayıt yolu boşu reddeder
+  'te-tarih':       {},                                     // görev düzenle — gelecek serbest
+  'cx-tarih':       { max: 'bugun' },                       // süründen çıkış olayı
+  'geb-tarih':      { max: 'bugun' },                       // gebelik teşhisi
+};
+function tarihAlanlariniBagla(){
+  for(const id in TARIH_ALANLARI) tarihAlaniBagla(id, TARIH_ALANLARI[id]);
 }
 
 // Şablon ilk-gün adapteri — çapa tarihi _cdSablonTarih'te kalır.
