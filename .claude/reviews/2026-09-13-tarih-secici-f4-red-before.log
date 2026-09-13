@@ -1,0 +1,23 @@
+=== RED-BEFORE 1: index.html'e type="date" enjeksiyonu ===
+ℹ tests 39
+ℹ pass 38
+ℹ fail 1
+=== RED-BEFORE 2: tarih.js'e block-comment arkasına Date.now ===
+ℹ tests 39
+ℹ pass 39
+ℹ fail 0
+=== RED-BEFORE 3: forms.js'e kopya sembolü geri getirme ===
+ℹ tests 39
+ℹ pass 38
+ℹ fail 1
+=== YEŞİL-AFTER: tüm enjeksiyonlar geri alındı ===
+ℹ tests 39
+ℹ pass 39
+ℹ fail 0
+=== RED-BEFORE 2 (duzgun): tarih.js'e GERCEK KOD olarak Date.now ===
+ℹ tests 39
+ℹ pass 38
+ℹ fail 1
+ℹ tests 39
+ℹ pass 39
+ℹ fail 0

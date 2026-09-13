@@ -404,3 +404,22 @@ Kaynak: `.claude/idle-reports/2026-08-31-docs-tutarlilik.md` §2.2 (çelişki) +
   ile aynı; Z VE offset'li ISO çevrilir, timezone'suz aynen).
 - **Geri-al butonu:** önceden hesaplanmış `undoRef` (islem ref > yalnız Bekliyor-son toh:; ABORT_KAYDI
   generic route); değerler dataset'te taşınır (helpers escAttr-inline yasağı).
+
+## 17. Tarih Alanı Kısıtları (2026-09-13, G-20260913-TARIH-SECICI F2)
+
+Tarih girişi artık tek kanonik bileşenden geçer (bkz. `D-20260909-CANONICAL-DATE-PICKER.md`
++ ui-map § Canonical date selection). Alan bazında giriş kısıtları (`TARIH_ALANLARI`
+şeması, js/ui.js) — bağlama katmanı uygular, RPC tarafı da bağımsız doğrular:
+
+- **Gelecek kabul etmez (`max: bugun`):** küpe/kayit tarihi (`k-tarih`), tohumlama
+  (`i-tarih`), tedavi (`tr-tarih`), vaka (`v-date`, `bv-tarih`), sütten kesme
+  (`sk-tarih`), doğum (`b-tarih`), hayvan güncelleme (`a-dt`), aşılama
+  (`td-asi-tarih`), çıkış (`cx-tarih`), gebelik kontrolü (`geb-tarih`).
+- **Gelecek meşru:** görev hedef tarihleri (`ta-tarih`, `te-tarih`) ve rapel
+  (`td-rapel-tarih`; parent+14..21 dinamik pencere).
+- **OWNER ONAYI BEKLEYEN davranış değişikliği:** `cx-tarih` (süründen çıkış) ve
+  `sk-tarih` (sütten kesme) eski UI'da gelecek tarihe izin veriyordu; F2 ile
+  `max=bugun` kısıtı geldi (RPC'ler kaydı anında zaten uygular — gelecek tarihli
+  çıkış/kesim aktif-hayvan mantığıyla çelişir). `bv-tarih` toplu-aşı tek-aşı
+  (`v-date`) kuralına hizalandı. Sahip istemezse `TARIH_ALANLARI`'nda tek satır
+  geri alma.
