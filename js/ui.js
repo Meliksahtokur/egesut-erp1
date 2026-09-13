@@ -6743,19 +6743,39 @@ function cdSablonListeBul(eslem, sablonlar, kalemler, diseaseId){
 // selection"; sahibe direktifi 2026-09-09: yeni yüzeylerde yerel
 // <input type="date"> KULLANILMAZ). Görsel dil: gun-tarih-modal
 // (caseGunModalRender); seçim kuralı: bc-tarih-takvim W20 (forms.js:1804) —
-// hücre tıkı seçimi DEĞİŞTİRİR, toggle yok; aralık sınırsız (geriye dönük
-// kayıt serbest). Çağıran kendi durumunu getirir:
-//   tekTarihTakvimAc({ baslik, deger, onSec })  — onSec(iso) Onayla'da.
+// hücre tıkı seçimi DEĞİŞTİRİR, toggle yok. Izgara ortak çekirdekten
+// (js/tarih/tarih.js) gelir; ay ‹/› + başlıktan yıl ‹/› + gg.aa.yyyy el
+// girişi (saf tarihParse — hata satır içi, sessiz düzeltme yok).
+// Çağıran kendi durumunu getirir:
+//   tekTarihTakvimAc({ baslik, deger, onSec,      — onSec(iso) Onayla'da;
+//                      min, max,                  — dahil sınırlar (ISO);
+//                      temizlenebilir,            — true → Temizle + onSec(null);
+//                      kapaliGun })               — kapaliGun(iso)→true =
+//                                                 kapalı gün, seçilemez.
 let _tekTarihAy = 0, _tekTarihYil = 0, _tekTarihSecili = null;
 let _tekTarihBaslik = '📅 Takvimden Seç', _tekTarihOnSec = null;
+// F1 sertleştirme (G-20260913): aralık + kapalı-gün + temizleme + el girişi.
+// min/max geçerli ISO; kapaliGun(iso) → true = gün seçilemez (F3 bcTarihTakvim
+// bununla gelir); giriş hatası yeniden render'da satır içi gösterilir —
+// sessiz düzeltme YOK.
+let _tekTarihMin = null, _tekTarihMax = null;
+let _tekTarihTemizlenebilir = false, _tekTarihKapaliGun = null;
+let _tekTarihGirisMetni = '', _tekTarihGirisHata = '';
 
 function tekTarihTakvimAc(opts){
-  const simdi = new Date();
-  _tekTarihAy  = simdi.getMonth();
-  _tekTarihYil = simdi.getFullYear();
-  _tekTarihSecili = opts?.deger || bugun();
+  // Açılış görünümü: seçili değer varsa O ay/yıl, yoksa bugün (eski hâl
+  // hep bugünün ayını açıyordu — doğum gibi geçmiş tarih için uygunsuzdu).
+  _tekTarihSecili = tarihGecerliMi(opts?.deger) ? opts.deger : bugun();
+  _tekTarihAy  = Number(_tekTarihSecili.slice(5, 7)) - 1;
+  _tekTarihYil = Number(_tekTarihSecili.slice(0, 4));
   _tekTarihBaslik = opts?.baslik || '📅 Takvimden Seç';
   _tekTarihOnSec  = opts?.onSec  || null;
+  _tekTarihMin = tarihGecerliMi(opts?.min) ? opts.min : null;
+  _tekTarihMax = tarihGecerliMi(opts?.max) ? opts.max : null;
+  _tekTarihTemizlenebilir = opts?.temizlenebilir === true;
+  _tekTarihKapaliGun = typeof opts?.kapaliGun === 'function' ? opts.kapaliGun : null;
+  _tekTarihGirisMetni = '';
+  _tekTarihGirisHata = '';
   tekTarihTakvimRender();
 }
 function tekTarihTakvimKapat(){
@@ -6763,12 +6783,75 @@ function tekTarihTakvimKapat(){
   if(box) box.remove();
 }
 function tekTarihTakvimSec(iso){
+  // Derinlik savunması: hücreler zaten kapalı çizilir; global çağrıya rağmen
+  // kapalı gün ve aralık dışı SEÇİLEMEZ.
+  if(_tekTarihKapaliGun && _tekTarihKapaliGun(iso)) return;
+  if(!tarihAraliktaMi(iso, _tekTarihMin, _tekTarihMax).ok) return;
+  _tekTarihGirisMetni = '';
+  _tekTarihGirisHata = '';
   _tekTarihSecili = iso;
   tekTarihTakvimRender();
 }
 function tekTarihTakvimOnayla(){
+  if(_tekTarihSecili){
+    // Seçim, açılıştan gelen eski değer bile olsa kurala tabi — kural dışı
+    // seçim çağıranın onSec'ine ASLA ulaşmaz.
+    if(_tekTarihKapaliGun && _tekTarihKapaliGun(_tekTarihSecili)){
+      _tekTarihGirisHata = 'Seçili gün kapalı — başka bir gün seçin';
+      tekTarihTakvimRender();
+      return;
+    }
+    const aralik = tarihAraliktaMi(_tekTarihSecili, _tekTarihMin, _tekTarihMax);
+    if(!aralik.ok){
+      _tekTarihGirisHata = aralik.error;
+      tekTarihTakvimRender();
+      return;
+    }
+  }
   if(_tekTarihOnSec) _tekTarihOnSec(_tekTarihSecili);
   tekTarihTakvimKapat();
+}
+// El girişi (gg.aa.yyyy / gg/aa/yyyy / gg-aa-yyyy / gg.aa.yy) — SAF
+// tarihParse üzerinden; hata → satır içi uyarı, yazdığı korunur; geçersiz
+// tarih SESSİZCE düzeltilmaz, seçim değişmez.
+function tekTarihTakvimGirisUygula(){
+  const inp = document.getElementById('tek-tarih-giris');
+  const metin = inp ? inp.value : '';
+  const r = tarihParse(metin);
+  if(!r.ok){
+    _tekTarihGirisMetni = metin;
+    _tekTarihGirisHata = r.error;
+    tekTarihTakvimRender();
+    return;
+  }
+  const aralik = tarihAraliktaMi(r.iso, _tekTarihMin, _tekTarihMax);
+  if(!aralik.ok){
+    _tekTarihGirisMetni = metin;
+    _tekTarihGirisHata = aralik.error;
+    tekTarihTakvimRender();
+    return;
+  }
+  // Kapalı gün el girişiyle de SEÇİLEMEZ — hücre tıkıyla aynı invaryant
+  // (aksi hâlde aynı hücre hem disable hem yeşil çizilir).
+  if(_tekTarihKapaliGun && _tekTarihKapaliGun(r.iso)){
+    _tekTarihGirisMetni = metin;
+    _tekTarihGirisHata = 'Seçili gün kapalı — başka bir gün seçin';
+    tekTarihTakvimRender();
+    return;
+  }
+  _tekTarihGirisMetni = '';
+  _tekTarihGirisHata = '';
+  _tekTarihSecili = r.iso;
+  _tekTarihYil = Number(r.iso.slice(0, 4));
+  _tekTarihAy  = Number(r.iso.slice(5, 7)) - 1;
+  tekTarihTakvimRender();
+}
+// temizlenebilir: true verilirse seçim kaldırılabilir — onSec(null) gider.
+function tekTarihTakvimTemizle(){
+  _tekTarihSecili = null;
+  _tekTarihGirisMetni = '';
+  _tekTarihGirisHata = '';
+  tekTarihTakvimRender();
 }
 function tekTarihTakvimRender(){
   let box = document.getElementById('tek-tarih-takvim');
@@ -6780,39 +6863,68 @@ function tekTarihTakvimRender(){
     document.body.appendChild(box);
   }
   const ay = _tekTarihAy, yil = _tekTarihYil;
-  const bosluk = (new Date(yil, ay, 1).getDay() + 6) % 7;
-  const sonGun = new Date(yil, ay + 1, 0).getDate();
-  const ayAdi = new Date(yil, ay, 1).toLocaleString('tr-TR', {month:'long', year:'numeric'});
+  // Ortak ızgara çekirdeği (js/tarih/tarih.js) — yeni Date/yerel yok; hücre
+  // sözleşmesi: null (boş) | {iso, gun, ayIci}. Çekirdek geçersiz girdide
+  // null garantiler; kelepırlar bugün ulaşılmasa da boş-ızgaraya düş.
+  const hucreler = tarihAyIzgara(yil, ay + 1)?.hucreler || [];
   let kareler = '';
-  for(let i = 0; i < bosluk; i++) kareler += '<div></div>';
-  for(let g = 1; g <= sonGun; g++){
-    const iso = yil + '-' + String(ay+1).padStart(2,'0') + '-' + String(g).padStart(2,'0');
-    kareler += '<div onclick="tekTarihTakvimSec(&#39;' + iso + '&#39;)" style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:pointer;' +
-      (iso === _tekTarihSecili ? 'background:var(--green);color:#fff;' : 'color:var(--ink);') + '">' + g + '</div>';
+  for(const h of hucreler){
+    if(!h){ kareler += '<div></div>'; continue; }
+    const kapali = (_tekTarihKapaliGun && _tekTarihKapaliGun(h.iso)) ||
+                   (_tekTarihMin && h.iso < _tekTarihMin) ||
+                   (_tekTarihMax && h.iso > _tekTarihMax);
+    const tik = kapali ? '' : ' onclick="tekTarihTakvimSec(&#39;' + h.iso + '&#39;)"';
+    kareler += '<div' + tik + ' style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.82rem;font-weight:700;cursor:' + (kapali ? 'not-allowed;opacity:.35;' : 'pointer;') +
+      (h.iso === _tekTarihSecili ? 'background:var(--green);color:#fff;' : 'color:var(--ink);') + '">' + h.gun + '</div>';
   }
   box.innerHTML =
     '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;max-height:85vh;overflow-y:auto">' +
     '<div style="font-size:.65rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">' + esc(_tekTarihBaslik) + '</div>' +
     '<div style="font-weight:800;font-size:.95rem;margin-bottom:12px">Seçilen: ' + fmtTarih(_tekTarihSecili) + '</div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
     '<button onclick="tekTarihTakvimAyDegistir(-1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">‹</button>' +
-    '<span style="font-weight:800;font-size:.9rem">' + ayAdi + '</span>' +
+    '<span style="font-weight:800;font-size:.9rem">' + TARIH_AY_ADLARI[ay] + ' ' + yil + '</span>' +
     '<button onclick="tekTarihTakvimAyDegistir(1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:4px 12px;cursor:pointer;font-size:1rem">›</button>' +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
-    ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'].map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    '<div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:12px">' +
+    '<button onclick="tekTarihTakvimYilDegistir(-1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:2px 10px;cursor:pointer;font-size:.8rem;color:var(--ink2)">‹</button>' +
+    '<span style="font-weight:700;font-size:.78rem;color:var(--ink2)">' + yil + '</span>' +
+    '<button onclick="tekTarihTakvimYilDegistir(1)" style="background:none;border:1px solid var(--card3);border-radius:8px;padding:2px 10px;cursor:pointer;font-size:.8rem;color:var(--ink2)">›</button>' +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:12px">' + kareler + '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:4px">' +
+    TARIH_GUN_ADLARI.map(g => '<div style="text-align:center;font-size:.6rem;font-weight:700;color:var(--ink3);padding:3px">' + g + '</div>').join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">' + kareler + '</div>' +
+    '<div style="display:flex;gap:6px;margin-bottom:4px">' +
+    '<input id="tek-tarih-giris" type="text" inputmode="numeric" placeholder="gg.aa.yyyy" value="' + escAttr(_tekTarihGirisMetni) + '" style="flex:1;min-width:0;background:var(--card2);border:1px solid var(--card3);border-radius:8px;padding:8px;font-size:.8rem;color:var(--ink)">' +
+    '<button onclick="tekTarihTakvimGirisUygula()" style="padding:8px 14px;background:var(--card2);border:1px solid var(--card3);border-radius:8px;font-size:.76rem;font-weight:700;cursor:pointer;color:var(--ink)">Uygula</button>' +
+    '</div>' +
+    (_tekTarihGirisHata ? '<div style="font-size:.72rem;font-weight:700;color:#c0392b;margin:0 0 8px">⚠️ ' + esc(_tekTarihGirisHata) + '</div>' : '') +
+    '<div style="display:grid;grid-template-columns:' + (_tekTarihTemizlenebilir ? '1fr 1fr 1fr' : '1fr 1fr') + ';gap:8px">' +
+    (_tekTarihTemizlenebilir ? '<button onclick="tekTarihTakvimTemizle()" style="padding:12px;background:#f0f0f0;color:var(--ink2);border:none;border-radius:10px;font-weight:700;cursor:pointer">Temizle</button>' : '') +
     '<button onclick="tekTarihTakvimOnayla()" style="padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer">Onayla</button>' +
     '<button onclick="tekTarihTakvimKapat()" style="padding:12px;background:#f0f0f0;border:none;border-radius:10px;font-weight:700;cursor:pointer">İptal</button>' +
     '</div></div>';
+  // El girişinde Enter = Uygula (form içinde değil; klavye yolu birinci sınıf).
+  const girisAlani = document.getElementById('tek-tarih-giris');
+  if(girisAlani) girisAlani.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); tekTarihTakvimGirisUygula(); }
+  });
   box.style.display = 'flex';
 }
 function tekTarihTakvimAyDegistir(delta){
   _tekTarihAy += Math.trunc(Number(delta) || 0);
   if(_tekTarihAy < 0){ _tekTarihAy = 11; _tekTarihYil--; }
   if(_tekTarihAy > 11){ _tekTarihAy = 0; _tekTarihYil++; }
+  // Izgara etki alanı 1..9999 — dışına sayfalama temsilsiz ay üretir; kelepır.
+  if(_tekTarihYil < 1){ _tekTarihYil = 1; _tekTarihAy = 0; }
+  if(_tekTarihYil > 9999){ _tekTarihYil = 9999; _tekTarihAy = 11; }
+  tekTarihTakvimRender();
+}
+// Başlıktan yıl seçimi — F1 (G-20260913): ay sayfalaması ‹/› yerinde kalır,
+// yıl ayrı ince sayfalamayla 1..9999'a kelepirli gezinir.
+function tekTarihTakvimYilDegistir(delta){
+  _tekTarihYil = tarihYilKaydir(_tekTarihYil, delta);
   tekTarihTakvimRender();
 }
 
