@@ -1,6 +1,6 @@
 ---
 id: G-20260913-TARIH-SECICI-R1
-status: in_progress
+status: done
 owner: root
 flow: ss_org
 created: 2026-09-13
