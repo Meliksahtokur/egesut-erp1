@@ -7,6 +7,26 @@ const { loadBrowserModule } = require('./support/loadModule');
 const { sandbox } = loadBrowserModule('js/degisiklikler/etiketler.js');
 const { tabloEtiketi, alanEtiketi, islemEtiketi, tabloSecenekleri, kapsamHaritalari } = sandbox;
 const KAPSAM_KOLONLARI = require('./support/degisiklikler-kapsam-kolonlari.json');
+const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
+
+// LUNA-3: canlı DEMO bağlantısı — ETIKET_LIVE_URL env'i kazanır; yoksa lead
+// makinesi gelenegi olan ana-checkout .env'inden kur. Bilgi yoksa test
+// ATLANIR (çevrimdışı unit koşumu bozulmaz).
+function canliPsqlArgumanlari() {
+  if (process.env.ETIKET_LIVE_URL) return [process.env.ETIKET_LIVE_URL];
+  const envYolu = '/home/melik/egesut-erp1/.env';
+  if (!fs.existsSync(envYolu)) return null;
+  const env = {};
+  for (const satir of fs.readFileSync(envYolu, 'utf8').split('\n')) {
+    const m = satir.match(/^([A-Z_]+)=(.*)$/);
+    if (m) env[m[1]] = m[2];
+  }
+  if (!env.SUPABASE_DEMO_REF || !env.SUPABASE_DEMO_DB_PASSWORD || !env.SUPABASE_DEMO_POOLER) return null;
+  return [`postgresql://postgres.${env.SUPABASE_DEMO_REF}:${env.SUPABASE_DEMO_DB_PASSWORD}@${env.SUPABASE_DEMO_POOLER}:5432/postgres`];
+}
+
+const CANLI = canliPsqlArgumanlari();
 
 test('tabloEtiketi: bilinen iş tabloları Türkçe', () => {
   assert.strictEqual(tabloEtiketi('hayvanlar'), 'Hayvan');
@@ -63,6 +83,28 @@ test('LUNA-2 tam süpürme: İngilizce-adlı ve diyakritik-hassas kolonlar Türk
   for (const [tablo, alan, beklenen] of CIFTLER) {
     assert.strictEqual(alanEtiketi(tablo, alan), beklenen, `${tablo}.${alan}`);
   }
+});
+
+test('LUNA-3: canlı DEMO information_schema ↔ harita (haritasız canlı kolon = KIRMIZI)', { skip: CANLI ? false : 'canlı DEMO bağlantı bilgisi yok — test atlanır' }, () => {
+  const tabloListesi = Object.keys(KAPSAM_KOLONLARI).map(t => `'${t}'`).join(',');
+  const sorgu = `SELECT DISTINCT c.relname||'.'||a.attname FROM pg_attribute a ` +
+    `JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace ` +
+    `WHERE n.nspname='public' AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped ` +
+    `AND c.relname IN (${tabloListesi}) ORDER BY 1`;
+  const cikti = execFileSync('psql', [CANLI[0], '-t', '-A', '-c', sorgu], { timeout: 60000 }).toString();
+  const ciftler = cikti.trim().split('\n').filter(Boolean);
+  assert.ok(ciftler.length > 0, 'canlı sorgu boş döndü — bağlantı/şema sorunu');
+  const { tabloEtiketleri, ortakAlanlar, tabloOzelAlanlar } = kapsamHaritalari();
+  const eksik = [];
+  for (const satir of ciftler) {
+    const nokta = satir.indexOf('.');
+    const tablo = satir.slice(0, nokta);
+    const kolon = satir.slice(nokta + 1);
+    if (tabloEtiketleri[tablo] === undefined) { eksik.push(`${tablo} (tablo başlığı)`); continue; }
+    const ozel = tabloOzelAlanlar[tablo] && tabloOzelAlanlar[tablo][kolon] !== undefined;
+    if (!ozel && ortakAlanlar[kolon] === undefined) eksik.push(`${tablo}.${kolon}`);
+  }
+  assert.deepStrictEqual(eksik, [], `canlı DEMO'da haritasız kolon: ${eksik.join(', ')}`);
 });
 
 test('tabloEtiketi: bilinmeyen tablo insanlaştırılır, çökmez', () => {

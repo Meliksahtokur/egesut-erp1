@@ -33,7 +33,7 @@ betiği paylaşılan gizli kayıtları artık silemiyor (yalnız kendi ürettiğ
 temizler + koruma vakası). Madde 5 (gerçek-RPC tarayıcı testi) sahip final
 testidir.
 
-Kabul sonuçları: **K1 PASS, K2 PASS, K3 PASS (45/45), K4 PASS, K5 PARTIAL
+Kabul sonuçları: **K1 PASS, K2 PASS, K3 PASS (46/46), K4 PASS, K5 PARTIAL
 (sahip final testine), K6 = bu rapor.** Şerit kuralı 2 (luna) bu teslimde
 İŞLENDİ — denetim koştu, bulgular kapandı.
 
@@ -177,7 +177,7 @@ Hariç 12:
 - `reports/2026-09-13-surum-gecmisi-W1/k1_iud_log.{sql,out}` — 156/156
 - `reports/2026-09-13-surum-gecmisi-W1/k1b_immutability.{sql,out}` — red-before + 6 red
 - `reports/2026-09-13-surum-gecmisi-W1/k2_txid_yuk.{sql,out}` — son (LUNA-fix) koşum
-- `reports/2026-09-13-surum-gecmisi-W1/k3_geri_alma.{sql,out}` — **45/45**, son koşum
+- `reports/2026-09-13-surum-gecmisi-W1/k3_geri_alma.{sql,out}` — **46/46**, son koşum
 - W2: `tests/unit/degisiklikler-*.test.js` (20 test) + 8 PNG + akış JSON'u
 - Lead tekrarları + karar zinciri: `.crumbs/surum-gecmisi-diff.jsonl`
 
