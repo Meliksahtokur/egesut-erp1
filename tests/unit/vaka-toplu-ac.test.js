@@ -2208,7 +2208,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // 20260911-13: hızlı uygulama çift-gönderim guard (rota-907)
     // 20260911-14: P2 Ağaç merge — pedigree modülleri + rota guard birleşimi; damga tek ortak değerde birleştirildi
     // 20260913-15: F2 kanonik tarih göcü — tarihAlaniBagla + 14 native input göcü + type="text"
-    // 20260913-16: F3 kopya birleşmesi — bcTarihTakvim* kalktı, bcTakvim*/caseGunModalRender ortak ızgara çekirdeğinde
+    // 20260913-16: F3 kopya birleşmesi — tek-seçim takvim kopyaları kaldırıldı, çoklu takvim + vaka günleri modalı ortak ızgara çekirdeğinde
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
