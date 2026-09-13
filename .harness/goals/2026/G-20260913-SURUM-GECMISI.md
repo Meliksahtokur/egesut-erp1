@@ -136,7 +136,9 @@ degisim_listele(p_filtre jsonb) RETURNS jsonb
 --      "toplam":N,"sayfa":1,"adet":50}
 -- txid filtresi verildiğinde AYNI RPC satır-bazlı entries döner:
 -- {"ok":true,"detay":true,"kayitlar":[{id,txid,zaman,tablo_adi,satir_pk,islem,
---   eski,yeni,degisen_alanlar,kaynak}]}
+--   eski,yeni,degisen_alanlar,teknikal_mi,kaynak}]}
+--   (teknikal_mi W2 istemi Q3, lead onayı 2026-09-13: UI "teknik" rozeti
+--    bu alandan; detay satırlarında bulunmalı)
 -- (gerekçe: hayvan/tarih filtresi + tx gruplama PostgREST jsonb ile
 -- yapılamaz; lead sözleşme kararı, root'a raporda bildirilir)
 
