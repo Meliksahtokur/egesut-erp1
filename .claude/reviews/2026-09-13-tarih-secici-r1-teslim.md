@@ -85,3 +85,59 @@ Ortam notu: worktree'de unit için `NODE_PATH` ana checkout; e2e için `node_mod
 5. **ui-map.md § canonical date selection** güncelleme adayı (`tarihGirisCoz`, dropdown başlık, 400px masaüstü kart) — write_manifest DIŞI olduğundan dokunulmadı; root için öneri.
 6. **e2e kapsamı:** kritik-akis / modal-router / smoke koşulmadı (takvim yüzeyine dokunmayan F2-bazlı regresyon seti seçildi).
 7. Zarf/goal frontmatter'daki `branch: agent/tarih-secici-standardi` alanı eski kopyadır (base_sha 46abbc8 + W-R1 zarfı "YOUR branch" diyor) — iş `agent/tarih-secici-standardi-R1` dalında yapıldı.
+
+---
+
+# REVİZYON TURU (W-R1, denetim: REVİZYON — G-20260913-TARIH-SECICI-R1)
+
+Tarih: 2026-09-14 · Yetki: `.claude/reviews/2026-09-13-tarih-secici-r1-denetim.md` (dal `agent/tarih-secici-r1-denetim`)
+Temiz-doğrulanan mevcut durum (üç-yüzey bağlantısı, mobil korunum, guard/damga) DOKUNULMADI.
+
+## Bulgu → düzeltme tablosu
+
+| # | Bulgu (seviye) | Ne değişti | Dosyalar | Test pini |
+|---|---|---|---|---|
+| 1a | KRİTİK — maske taşması `151.12.2026` → `15.11.2202` yanlış-geçerli ISO | `tarihMaskeUygula` yeniden yazıldı: taşan bölük YENİDEN BÖLÜNMEZ, taşan hane YUTULMAZ, ayraç dışı metin YENİDEN YAZILMAZ — hatalı girişte metin ayraç-normalizasyonu dışında birebir korunur + `hata` döner | js/tarih/tarih.js | `tarihMaskeUygula('151.12.2026')` → metin aynen + `/Gün 1-31/`; `151.12.26`, `05.12.20265`, `111220261` benzer; eski yutma pinleri tersine çevrildi |
+| 1b | KRİTİK — Uygula maske hatasını görmeden `tarihGirisCoz`'a düşüyor | Üç Uygula yolu da (`tekTarihTakvimGirisUygula`, `caseGunGirisUygula`, `bcTakvimGirisUygula`) `tarihGirisCoz`'dan ÖNCE `tarihSeciciMaskeHatasiAl` kapısından geçer. Kapı **DURUMSUZDUR** (aşağıda review notu): mevcut input değerinden `tarihMaskeUygula`'yı yeniden hesaplar | js/ui.js, js/forms.js | DOM pini: maske hatası beklerken Uygula → onSec ESKİ değeri alır (taşma sızmaz) + ikinci Uygula da maske hatasıyla reddedilir + kurtarma akışı |
+| 2 | ORTA — `05.02.2026abc` junk sessiz siliniyordu | Ayraç kümesi (`., / - boşluk`) dışındaki HER rakam-dışı karakter `Rakam girmelisiniz` hatası verir, metin korunur | js/tarih/tarih.js | `05.02.2026abc`, `12,34x2026`, `ab?!12cd2026` → metin aynen + `/Rakam girmelisiniz/`; eski yanlış-kabul pini (tarih-saf.test.js `ab?!12cd2026 → 12.20.26`) hataya çevrildi; `13 09 2026` meşru kalır |
+| 3 | DÜŞÜK — `00` alt sınırı görünmüyordu | Gün/ay segment değeri `< 1` → segment hatası; yıl tavanı `null` yerine `9999` → `0000` da yakalanır (`Yıl 1-9999 olmalı`) | js/tarih/tarih.js | `00` → `/Gün 1-31/`; `01.00` → `/Ay 1-12/`; `05.12.0000` → `/Yıl 1-9999/`; `01.01.2026` hatasız |
+| 4 | DÜŞÜK — bcTakvim `9999-12 ›` → yıl 10000 + boş ızgara | `bcTakvimAyDegistir`: offset güncellemesi sonrası hedef ay/yıl `bcTakvimAyGosterim` ile denetlenir; 1..9999 dışıysa adım RED (offset geri alınır, render atlanır) | js/forms.js | `9999-12-01` › → Aralık 9999 korunur, `10000` hiçbir yerde doğmaz; ‹ Kasım 9999 çalışır; `0001-01-01` ‹ → Ocak 0001 korunur |
+| 5 | DÜŞÜK — caseGun yıl kelepiri ayı bozuyordu (1-Ocak ‹ → Aralık-1) | `caseGunAyDegistir`: hedef yıl 1..9999 dışındaysa FONKSİYONDAN ÇIKILIR — ham modulo uygulanmaz, bulunduğun kenar ay/yıl korunur. **Beyan:** poliçe "kenarda sayfalama reddi" (ay/yıl tutarlı korunur; modulo-yeniden-hesap seçeneği uygulanmadı) | js/ui.js | `Ocak 0001` ‹ → Ocak-1 kalır; `Aralık 9999` › → Aralık-9999 kalır (Ocak-9999 bozması yok) |
+| 6 | DÜŞÜK — e2e üç-yüzey kapsamı | **Ölçülmüş sınırlılık olarak BEYAN** (test istenmedi): R1 tarayıcı testleri yalnız tekTarih yüzeyini sürer; bcTakvim ünite katmanında (vaka-toplu-ac DOM pinleri), caseGun çalışma-zamanı e2e kapsamı ertelenmiş boşluk | tests/ | — |
+
+## Kapı çıktıları (worker koştu)
+
+| Kapı | Sonuç |
+|---|---|
+| Unit tam (`node --test tests/unit/*.test.js`) | **863 test / 862 pass / 1 fail** — tek kırmızı hâlâ yalnız bilinen `_gmGroupHtml` (≥857 şartı sağlandı; +6 net test) |
+| Yeni pinler (B1a taşma / B2 junk / B3 `00`) | Üstteki tabloda; hepsi yeşil |
+| Playwright `tests/tarih-secici.spec.js` | **9/9 passed** (43.1s) — `11122026` happy path dahil; koşum Docker `mcr.microsoft.com/playwright:v1.58.2-noble`, `PLAYWRIGHT_DEMO_MODE=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080/`, konteyner-içi webServer bu worktree'yi servis etti (host 8080 docker-proxy'de; host tarayıcı dep bağımlılığı CachyOS'ta yok). Not: `test-results/`+`tests/report` root-sahipli eski Docker kalıntısı — çıktı `--output=/tmp/pw-out` ile konteyner-içine alındı, host'a root-artığı yazılmadı |
+| `?v=` damga | **20260913-18** tek ortak değer: `index.html` × 23 (22 script + manifest), `-17` kalıntı **0** (kalan tek `-17` referansı testteki negatif-substring koruma listesinde — doğru yer); damga testleri `-18`'e güncellendi; uygulama ile AYNI commit'te |
+| Guard beyaz liste | Değişmedi (beklentiye uygun): yeni ad `tarihSeciciMaskeHatasiAl` `/Takvim|GunSecim/i` desenine eşleşmez → liste gerektirmez; F4 muhafız testi yeşil |
+
+## Zorunlu review notu (sahip daimi kuralı)
+
+`bulgu: builtin code-reviewer (diff-scope tarama, 14 araç çağrısı, 20+ maske→çöz sondası) — KRİTİK 0, ÖNEMLİ 1, KÜÇÜK 2.`
+- ÖNEMLİ `tarihSeciciMaskeHatasiAl` depolanan expando'ya (`inp._tarihMaskeSonuc`) yaslanıyordu; tarayıcıda Uygula-hata yeniden-render'ı input'u innerHTML ile yeniden doğurduğu için kapı ikinci Uygula'da ölüyordu (bugün sızma yok — tüm maske-hata dizgelerini `tarihParse`'ın anchored regex'i reddediyor; mesaj farkı kozmetikti). **DÜZELTİLDİ:** kapı durumsuz yapıldı — mevcut değerden yeniden hesaplar (ui.js). İkinci-Uygula pini eklendi; yan etkisi: maske-geçersiz metin Apply'da artık önce maske mesajıyla reddedilir (`90,09,2026` pini buna göre güncellendi — iki mesaj da reddiydi, maske mesajı birinci hat oldu).
+- KÜÇÜK ayracı-bölük kısmi segmentlerinde (`0.5.2026`) 0-alt-sınır uyarısı satır içinde görünmez (red Apply'da '…yok' mesajıyla gelir; veri riski yok) → kabul edildi/beyanlı.
+- KÜÇÜK tam 10 karakterden sonraki kuyruk ayracı başarı yolunda sessizce düşer (kuyruk politikası — fonksiyon başlığındaki belgelenmiş tasarım; B2 ilkesiyle gerilim yorumlandı) → kabul edildi/beyanlı.
+- Reviewer kararı: beş denetim bulgusunun fix'i doğru ve testlerle kilitli; kritik-yanlış-geçerli-ISO üretimi taranan tüm uçlarda doğrulanamadı → **birleştirmeye hazır**.
+
+## Önceki teslimdeki açık-riskler durumu (§8 → güncel)
+
+- Madde 1 (maske ortadan-düzenleme) geçerli; ek kısıt artık sert: hatalı düzenlemede metin AYNEN korunur + Uygula kapıda (veri güvenliği önceki turdakinden güçlü).
+- Madde 6'ya ekleme: caseGun çalışma-zamanı e2e kapsamı ertelenmiş (bu turun BEYAN'ı, bulgu 6).
+
+## Revizyon turu değişen dosyalar (git diff --stat 0c198ee..çalışma-ağacı)
+
+```text
+ index.html                       |  46 ++++----
+ js/forms.js                      |  18 +++
+ js/tarih/tarih.js                |  80 ++++++++++----
+ js/ui.js                         |  40 ++++++-
+ tests/unit/tarih-saf.test.js     | 116 ++++++++++++++++++++-
+ tests/unit/vaka-toplu-ac.test.js |  30 ++++--
+ (kod+test: 6 dosya; ayrıca bu raporun kendisi 7. dosya olarak aynı commit'te)
+```
+
+`.ss/` BOARD dosyası commit dışıdır (önceki teslimle aynı). Merge YOK, push YOK.

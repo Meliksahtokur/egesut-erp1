@@ -1702,7 +1702,16 @@ function bcTakvimAc(){
 // bcTakvimAyGosterim içinde). Seçim Set'i DOKUNULMAZ — ay değişince
 // seçimler kalıcı.
 function bcTakvimAyDegistir(delta){
+  const onceki = _bcTkOffset;
   _bcTkOffset += Math.trunc(Number(delta) || 0);
+  // R1 REVİZYON (denetim B4): ızgara etki alanı 1..9999 — hedef ay sınır
+  // dışına çıkıyorsa adım REDDEDİLİR (offset geri alınır; 9999-12 › ile
+  // yıl 10000 + boş ızgara üretilmesi kapatıldı).
+  const yer = bcTakvimAyGosterim(_bcTkBaslangic(), _bcTkOffset);
+  if(!(yer.yil >= 1 && yer.yil <= 9999)){
+    _bcTkOffset = onceki;
+    return;
+  }
   bcTakvimRender();
 }
 
@@ -1731,6 +1740,15 @@ function bcTakvimYilSec(deger){
 function bcTakvimGirisUygula(){
   const inp = document.getElementById('bc-takvim-giris');
   const metin = inp ? inp.value : '';
+  // R1 REVİZYON B1b: bekleyen maske hatası tarihGirisCoz'dan ÖNCE reddeder
+  // (tarihSeciciMaskeHatasiAl — ui.js pencere-global'i, bagla ile aynı desen).
+  const maskeHatasi = tarihSeciciMaskeHatasiAl('bc-takvim-giris');
+  if(maskeHatasi){
+    _bcTkGirisMetni = metin;
+    _bcTkGirisHatasi = maskeHatasi;
+    bcTakvimRender();
+    return;
+  }
   const r = tarihGirisCoz(metin);
   if(!r.ok){
     _bcTkGirisMetni = metin;
