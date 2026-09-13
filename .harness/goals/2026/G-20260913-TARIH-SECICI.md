@@ -13,6 +13,9 @@ write_manifest:
   - js/ui.js                          # tekTarihTakvimAc hardening + tarihAlaniBagla + caseGunModalRender grid refactor + dynamic input
   - js/forms.js                       # bcTarihTakvim*/bcTakvim* consolidation + field readers (value contract preserved)
   - js/app.js                         # reset points (app.js:600) keep working
+  - js/utils/handlers.js              # F3: single-line repoint of bcTarihTakvimAc's only prod caller (ratified by lead 2026-09-13)
+  - .claude/tasks/2026-09-13-tarih-secici-f3-denetim.md
+  - .claude/reviews/2026-09-13-tarih-secici-f3-denetim.md
   - js/tarih/tarih.js                 # NEW pure date layer + grid core (single module, name FIXED by harness manifest matching)
   - tests/unit/tarih-saf.test.js      # pure-layer + grid core unit tests (name FIXED)
   - tests/unit/tarih-guard.test.js    # F4 guard test (optional new file; may extend tarih-saf instead)
