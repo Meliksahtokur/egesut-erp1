@@ -39,6 +39,14 @@ write_manifest:
   - tests/unit/degisiklikler-gurultu.test.js
   - .harness/references/ui-map.md
   - .harness/references/rpc-reference.md
+  - .harness/reports/2026-09-14-geri-alma-akisi-W3-nav-takvim.md
+  - js/app.js
+  - js/utils/modal.js
+  - tests/geri-alma-w3-nav.spec.js
+  - tests/unit/nav-geri-karar.test.js
+  - tests/unit/gecmis-gun-kumesi.test.js
+  - tests/unit/modal.test.js
+  - tests/unit/tarih-saf.test.js
 docs_authority:
   tracked_paths:
     write:
@@ -49,6 +57,7 @@ docs_authority:
       - .harness/reports/2026-09-14-geri-alma-akisi-W2-ui.md
       - .harness/references/ui-map.md
       - .harness/references/rpc-reference.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W3-nav-takvim.md
     append: []
   local_paths:
     write: []
