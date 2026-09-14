@@ -114,6 +114,31 @@ registerActions({
   // TG1-W3 (luna F4): gün görünümü yeni kartları DB kimliğini inline onclick
   // yerine dataset üzerinden taşır (escAttr + merkezi delegasyon — events.js)
   'gm-det': (el) => { if (el.dataset.det) openDet(el.dataset.det); },
+  // ═══ U1: geçmiş kartı tıklama delegasyonu (inline onclick YOK; id escAttr) ═══
+  // gm-islem: işlem aynası kartı → islem detay paneli (hayvan detay aynasının
+  // gittiği yer); panel TIKLANAN KARTIN altına açılır (_openIslemDetayRow).
+  'gm-islem': (el) => { const l = (globalThis._gmIslemLogById || {})[el.dataset.det]; if (l) _openIslemDetayRow(l, el); },
+  'gm-case': (el) => { if (el.dataset.det) openCaseDet(el.dataset.det); },
+  'gm-toh':  (el) => { if (el.dataset.det) openTohDet(el.dataset.det); },
+  'gm-stok': (el) => { if (el.dataset.det) openStokDet(el.dataset.det); },
+  'gm-kupe': (el) => { if (el.dataset.det) openDetByKupe(el.dataset.det); },
+  // U1 md.3: katlı toplu kart aç/kapa — altındaki tam kartlar görünür olur
+  'gm-kat-ac': (el) => {
+    const t = el.dataset.kat ? document.getElementById(el.dataset.kat) : null;
+    if (!t) return;
+    const acik = t.style.display === 'none';
+    t.style.display = acik ? 'block' : 'none';
+    const ok = el.querySelector('.gm-kat-ok');
+    if (ok) ok.textContent = acik ? '▾' : '▸';
+  },
+  // U1 md.4: gün özeti çip filtresi — Tümü (data-kat="") tekrar-kaldır; skipPull
+  'gm-gun-cip': (el) => {
+    const kat = el.dataset.kat || null;
+    _gecmisGunCip = (_gecmisGunCip === kat) ? null : kat;
+    _gecmisGunCiplerGuncelle();
+    const q = (document.getElementById('gecmis-search') || {}).value || '';
+    _gecmisRender(q);
+  },
   // TG1-W3 (luna F9): hayvan kartı geçmişi tarih şeridi — ana yüzeydeki şeridin
   // kart kapsamındaki eşi (tekTarihTakvimAc + banner deseni yeniden kullanılır)
   'gecmis-det-tarihe-git': () => gecmisDetTariheGitAc(),

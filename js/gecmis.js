@@ -34,6 +34,69 @@ const _GM_KATEGORI_EMOJI = {
   dogum: '🐄', tohumlama: '💉', hastalik: '🏥', gorev: '✅', uygulama: '💊', islem: '🐮',
   asi: '💉', kizginlik: '🔴', stok: '📦', cikis: '🚪', sutten: '🍼', protokol: '🩺',
 };
+
+// ── islem_log tip → TR etiket + emoji — TEK kaynak (U1 md.1) ──────────
+// Önceden İKİ kopya vardı: ui.js `_ISLEM_ETK`/`_ISLEM_ICO` (6 tip) ve
+// openIslemDetay içindeki yerel LABEL/ICO (14 tip) — birleştirildi. Kod
+// evreni: eski iki haritanın birleşimi + geri-alma rotaları (_GM_UNDO_ISLEM_TIPLERI)
+// + islem_log INSERT yazıcılarının TAM taraması (migration taraması; canlı demo
+// verisinde gözlenen GOREV_TAMAMLA/VAKA_TOHUMLAMA_EKLE ve geri_al/temizlik
+// komutları dâhil). Bilinmeyen tip _gmIslemTipEtiket'in okunur yedeğine düşer;
+// ham BUYUK_HARF_KOD kartta görünmez.
+const _GM_ISLEM_TIP_ETIKET = {
+  HAYVAN_EKLENDI: 'Hayvan Eklendi', HAYVAN_GUNCELLENDI: 'Hayvan Güncellendi',
+  TOHUMLAMA: 'Tohumlama', TOHUMLAMA_GUNCELLENDI: 'Tohumlama Güncellendi',
+  TOHUMLAMA_SONUC: 'Tohumlama Sonucu', TOHUMLAMA_OTOMATIK_BOS: 'Otomatik Boş Sonuç',
+  TOHUMLAMA_PLANLI_IPTAL: 'Planlı Tohumlama İptal', TOHUMLAMA_ERTELE: 'Tohumlama Ertelendi',
+  TOHUMLAMA_DURUMU_ONAYLA: 'Tohumlama Durumu Onaylandı', TOHUMLAMA_DUPLICATE_TEMIZLE: 'Tohumlama Temizliği',
+  DOGUM_KAYDI: 'Doğum', DOGUM_OTOMATIK: 'Otomatik Doğum Kaydı',
+  HASTALIK_KAYDI: 'Hastalık Kaydı', HASTALIK_GUNCELLENDI: 'Hastalık Güncellendi',
+  VAKA_ACILDI: 'Vaka Açılışı', VAKA_TOHUMLAMA_EKLE: 'Vaka Tohumlama Günü Eklendi',
+  KIZGINLIK_VAKA_ACILDI: 'Kızgınlık Vakası Açıldı',
+  TEDAVI_GUNCELLE: 'Tedavi Güncelle', TEDAVI_GUNCELLENDI: 'Tedavi Güncellendi',
+  TEDAVI_GUN_EKLENDI: 'Tedavi Günü Eklendi', TEDAVI_GUN_TAMAMLA: 'Tedavi Günü Tamamlandı',
+  TEDAVI_SIL: 'Tedavi Silindi', TEDAVI_SEANS_TAMAM: 'Seans Tamamlandı',
+  TEDAVI_SEANS_IPTAL: 'Seans İptal Edildi', SEANS_EKLENDI: 'Seans Eklendi',
+  SEANS_GUNCELLENDI: 'Seans Güncellendi', SEANS_SILINDI: 'Seans Silindi',
+  KIZGINLIK: 'Kızgınlık', KIZGINLIK_KAYDI: 'Kızgınlık Kaydı', ABORT_KAYDI: 'Abort',
+  ASI_KAYDI: 'Aşı Kaydı', ASI_EKLE: 'Aşı Eklendi', ASI_GUNCELLE: 'Aşı Güncellendi',
+  ASI_SIL: 'Aşı Silindi', ASI_ERTELEME: 'Aşı Ertelendi', ASI_GOREV_PLAN: 'Aşı Görevi Planlandı',
+  ASI_RAPEL_DUPE_CLEANUP: 'Aşı Rapel Temizliği', TOPLU_ILAC: 'Toplu İlaç',
+  GEBELIK_MANUEL: 'Gebelik Kaydı', SUTTEN_KESME_GERI_AL: 'Sütten Kesme Geri Alındı',
+  SATIS_KAYDI: 'Satış', OLUM_KAYDI: 'Ölüm', SUTTEN_KESME: 'Sütten Kesme',
+  KISIR_ISARETLE: 'Kısır İşaretle', KISIR_KALDIR: 'Kısır Kaldırıldı',
+  GOREV_EKLENDI: 'Görev Eklendi', GOREV_GUNCELLENDI: 'Görev Güncellendi',
+  GOREV_GUNCELLE: 'Görev Güncellendi', GOREV_TAMAMLA: 'Görev Tamamlandı', GOREV_OTOKAPAT: 'Görev Otomatik Kapandı',
+};
+const _GM_ISLEM_TIP_EMOJI = {
+  HAYVAN_EKLENDI: '🐮', HAYVAN_GUNCELLENDI: '✏️', TOHUMLAMA: '💉', TOHUMLAMA_GUNCELLENDI: '✏️',
+  TOHUMLAMA_SONUC: '🌱', TOHUMLAMA_OTOMATIK_BOS: '🌱', TOHUMLAMA_PLANLI_IPTAL: '⏸️',
+  TOHUMLAMA_ERTELE: '⏸️', TOHUMLAMA_DURUMU_ONAYLA: '✅', TOHUMLAMA_DUPLICATE_TEMIZLE: '🧹',
+  DOGUM_KAYDI: '🐄', DOGUM_OTOMATIK: '🐄', HASTALIK_KAYDI: '🏥', HASTALIK_GUNCELLENDI: '✏️',
+  VAKA_ACILDI: '🏥', VAKA_TOHUMLAMA_EKLE: '🌱', KIZGINLIK_VAKA_ACILDI: '🏥',
+  TEDAVI_GUNCELLE: '💊', TEDAVI_GUNCELLENDI: '✏️', TEDAVI_GUN_EKLENDI: '🩺',
+  TEDAVI_GUN_TAMAMLA: '✅', TEDAVI_SIL: '🗑️', TEDAVI_SEANS_TAMAM: '✅', TEDAVI_SEANS_IPTAL: '⏸️',
+  SEANS_EKLENDI: '🩺', SEANS_GUNCELLENDI: '✏️', SEANS_SILINDI: '🗑️',
+  KIZGINLIK: '🔴', KIZGINLIK_KAYDI: '🔴', ABORT_KAYDI: '⚠️',
+  ASI_KAYDI: '💉', ASI_EKLE: '💉', ASI_GUNCELLE: '✏️', ASI_SIL: '🗑️', ASI_ERTELEME: '⏸️',
+  ASI_GOREV_PLAN: '📅', ASI_RAPEL_DUPE_CLEANUP: '🧹', TOPLU_ILAC: '💊',
+  GEBELIK_MANUEL: '🩺', SUTTEN_KESME_GERI_AL: '↩️',
+  SATIS_KAYDI: '💰', OLUM_KAYDI: '💀', SUTTEN_KESME: '🍼',
+  KISIR_ISARETLE: '💲', KISIR_KALDIR: '⭕',
+  GOREV_EKLENDI: '➕', GOREV_GUNCELLENDI: '✏️', GOREV_GUNCELLE: '✏️', GOREV_TAMAMLA: '✅', GOREV_OTOKAPAT: '⏹️',
+};
+// Bilinmeyen tip için okunur yedek (U1 md.1): 'TEDAVI_GUN_EKLENDI' benzeri
+// bilinmeyen 'YENI_ISLEM_TIPI' → 'İşlem: yeni işlem tipi' (ham kod değil).
+// Düz toLowerCase (TR I→ı özel dönüşümü DEĞİL): 'TEDAVI'→'tedavi' okunur;
+// _gmTrLower 'tedavı' üretir — kod yedeğinde zarf örneği (dotted i) esastır.
+function _gmIslemTipEtiket(tip) {
+  const t = String(tip || '').trim();
+  if (_GM_ISLEM_TIP_ETIKET[t]) return _GM_ISLEM_TIP_ETIKET[t];
+  return t ? 'İşlem: ' + t.toLowerCase().replace(/_/g, ' ') : 'İşlem';
+}
+function _gmIslemTipEmoji(tip) {
+  return _GM_ISLEM_TIP_EMOJI[String(tip || '').trim()] || '📋';
+}
 const _GM_AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const _GM_GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 
@@ -458,6 +521,52 @@ function _gmGroup(visible) {
   return gruplar;
 }
 
+// ── Toplu işlem katlama (U1 md.3) ─────────────────────────
+// Aynı gün + aynı kaynak + aynı tip + AYNI DAKİKA'dan gelen ≥3 satır tek
+// düğüme katlanır (toplu RPC'ler tek işlemde onlarca özdeş islem_log/stok
+// satırı yazar — ham döküm "log gibi" görünür). SAF: DOM yazmaz; giriş
+// eventAt-desc sıralıysa çıkış sırası korunur (grup ilk üyesinin yerine oturur).
+// Zaman damgası olmayan satır (yalnız date kolonu) KATILMAZ — "aynı dakika"
+// kanıtı yokken birleştirmek bilgi yutar. Düğüm biçimi:
+//   {grup:true, tip, sourceKey, dakika, dateKey, eventAt, entries, count}
+//   {tek:true, entry}
+function _gmGunKatla(entries) {
+  const liste = entries || [];
+  const indeks = {};
+  const gruplar = [];
+  liste.forEach((e, i) => {
+    const d = e.data || {};
+    const tipAnahtar = e.type === 'islem' ? String(d.tip || '') : e.type;
+    const gunSaat = _gmCsvSaat(e.eventAt); // TR dakikası (Z/offset → Europe/Istanbul)
+    const dakika = gunSaat || '#' + i;     // saat'siz satır: benzersiz → asla katılmaz
+    const anahtar = [e.dateKey, e.sourceKey, tipAnahtar, dakika].join('|');
+    let g = indeks[anahtar];
+    if (!g) {
+      g = indeks[anahtar] = {
+        grup: true, tip: tipAnahtar, sourceKey: e.sourceKey, dakika,
+        dateKey: e.dateKey, eventAt: e.eventAt, entries: [], count: 0,
+      };
+      gruplar.push(g);
+    }
+    g.entries.push(e);
+    g.count++;
+  });
+  const dugumler = [];
+  gruplar.forEach(g => {
+    if (g.count >= 3) dugumler.push(g);
+    else g.entries.forEach(e => dugumler.push({ tek: true, entry: e }));
+  });
+  return dugumler;
+}
+
+// Gün özeti çip sayaçları (U1 md.4): kategori → olay sayısı (saf; çip render'ı
+// ui.js'te — sayaç filtre ÖNCESİ tüm günü sayar).
+function _gmGunKategoriSayac(entries) {
+  const s = {};
+  (entries || []).forEach(e => { const k = e && e.category; if (k) s[k] = (s[k] || 0) + 1; });
+  return s;
+}
+
 // Yerel bugünün YYYY-MM-DD anahtarı (Date UTC dönüşümü değil, takvim alanı)
 function _gmTodayKey(d) {
   const t = d || new Date();
@@ -485,6 +594,8 @@ function _gmGroupLabel(dateKey, todayKey) {
 }
 
 // Gün bölümü — native <details> (D12). entryHtmlFn ui.js kart üreticisidir.
+// U1 md.3: opts.katHtmlFn verilirse grup kartları ÖNCE katlanır (_gmGunKatla);
+// düğüm {grup:true} → katHtmlFn(düğüm), {tek:true} → entryHtmlFn(entry).
 function _gmGroupHtml(group, entryHtmlFn, opts) {
   opts = opts || {};
   const acik = opts.open !== false;
@@ -492,7 +603,8 @@ function _gmGroupHtml(group, entryHtmlFn, opts) {
     .filter(k => group.counters && group.counters[k])
     .map(k => `<span>${_GM_KATEGORI_EMOJI[k]} ${group.counters[k]}</span>`)
     .join('');
-  const kartlar = (group.entries || []).map(e => entryHtmlFn(e)).join('');
+  const dugumler = opts.katHtmlFn ? _gmGunKatla(group.entries) : (group.entries || []).map(e => ({ tek: true, entry: e }));
+  const kartlar = dugumler.map(d => d.grup ? opts.katHtmlFn(d) : entryHtmlFn(d.entry)).join('');
   return `<details class="gm-gun"${acik ? ' open' : ''} style="margin-bottom:10px">
   <summary style="cursor:pointer;list-style:none;display:flex;align-items:baseline;gap:10px;padding:7px 2px;user-select:none;flex-wrap:wrap">
     <span style="font-weight:800;font-size:.76rem;color:var(--ink);letter-spacing:.02em">${_gmGroupLabel(group.dateKey, opts.todayKey)}</span>
