@@ -40,10 +40,10 @@ DEĞİŞMEDİ (ayrı hat + dokunulmazlık testleri).
 | 4 | todayKey sözleşmesi (gerçek bugün; DÜN türetilir; seçili gün ASLA todayKey'e geçmez) | `_gmGroupLabel` DÜN artık todayKey'ten (koddaki yorum sözleşmeyi işler); `_gecmisRender` gün modu `todayKey:_gmTodayKey()` sabit; banner ayrı yüzey; test: enjekte `todayKey=2026-09-09` → DÜN=09-08 gerçek tarihten bağımsız + ay/yıl devri (09-30/10-01, 12-31/01-01) | **PASS** |
 | 5 | `_gmGroupHtml` DÜN time-bomb onarımı; **test mi kod mu — gerekçe**; 0 fail | **KOD düzeltildi, test DOKUNULMADI.** Gerekçe: zarf md.4 sözleşmesi "DÜN bugün'den türetilir" der; mevcut kod DÜN'ü sistem saatinden (`new Date()`−1) türetiyordu — enjekte edilen todayKey'yi yok sayıyordu. Test fixture'ı (`todayKey:'2026-09-09'`) sözleşmenin DOĞRU pinidir; hata koddadır. Taban 863/862/1 → final **882/882/0** | **PASS** |
 | 6 | Geçmiş giriş pull'ına `stok_hareket` | `js/ui.js` pull listesi +`stok_hareket` (+`vaccination_log`,`kizginlik_log` — rapor §G gereği; `hayvanlar` eklenmedi: boot pull kapsamında, gün hattı IDB'den okur — çekim maliyeti eklenmedi) | **PASS** |
-| 7 | `?v=` TEK değer, `20260914-01`+ | `grep -o "?v=[0-9-]*" index.html | sort | uniq -c` → **23× `20260914-01`** (22 script + manifest), `-18` kalıntısı 0; damga-pin testleri aynı değişiklikte güncellendi | **PASS** |
+| 7 | `?v=` TEK değer, `20260914-01`+ | `grep -o "?v=[0-9-]*" index.html | sort | uniq -c` → **23× `20260914-01`** (22 script + manifest), `-18` kalıntısı 0; damga-pin testleri aynı değişiklikte güncellendi — W2 tarihi damga; dalın final damgası `20260914-02` (bkz. FINAL KANIT) | **PASS** |
 | 8 | ui-map Geçmiş bölümü güncelle | `.harness/references/ui-map.md` +3 satır (olay-günü kuralı, gün hattı + DEDUP özeti, giriş + todayKey notu); anchor'lar `function` bildirimi olarak çözümleniyor | **PASS** |
 | 9 | Unit 0 fail | `NODE_PATH=/home/melik/egesut-erp1/node_modules node --test tests/unit/*.test.js` → **ℹ tests 882 · ℹ pass 882 · ℹ fail 0** (EXIT=0; taban 863/862/1, +19 test) | **PASS** |
-| 10 | Playwright tek koşum, komut + sonuç | Aşağıda §5 — **18 passed / 2 skipped / 0 failed (1.7m)** | **PASS** |
+| 10 | Playwright tek koşum, komut + sonuç | Aşağıda §5 — **18 passed / 2 skipped / 0 failed (1.7m)** (W2 geliştirme koşumu, GEÇERSİZ; FINAL: **20 passed / 1 skipped / 0 failed (2.0m)** — bkz. FINAL KANIT) | **PASS** |
 | 11 | Teslim raporu + dalına commit (TG1 işaretli) | bu dosya + commit | **PASS** |
 
 ## 4. DEDUP öncelik tablosu (bildirim — zarf md.3 "§D.c esas, sapma gerekçelendir")
@@ -73,7 +73,11 @@ hariç) görünür, defterin `_GM_ISLEM_TIPLERI` kürasyonu defterde aynen kalı
 aynası (`TEDAVI_SEANS_TAMAM`/`SEANS_EKLENDI`) baskılanMAZ — §A.4 kararı: seansın gün
 görünümündeki temsili budur (treatment_days ayrı satır olarak girmez).
 
-## 5. Playwright tek koşum (docker, demo-mode)
+## 5. Playwright geliştirme koşumu — W2 (GEÇERSİZ, TARİHÇE)
+
+> **Bu bölüm W2'nin geliştirme koşumudur (damga `20260914-01`) — raporun geçerli Playwright
+> kanıtı DEĞİLDİR; tarihçe olarak bilerek durur (silinmedi).** Tek final kanıt:
+> aşağıda **"FINAL KANIT — Playwright tek koşum (20260914-02)"** bölümü.
 
 ```bash
 docker run --rm \
@@ -174,17 +178,37 @@ okundu; her iddia kodla karşılaştırıldı, sonra düzeltildi.
   önlandı). Gate kırıntısı: workspace `1dddb562…`, `type: gate`, KABUL + 2 beyan.
 - **B (md.9 okuma):** "Yapısal olarak büyükse DURMA" → "DUR + ss-ask (goal stop-3)" okundu;
   uygulanmadı (büyükmedi).
-- **Playwright koşumları (dürüst döküm):** geliştirme koşumu-1 19p/1f/1s (F9 testinde sekme
-  tıkı eksi); koşum-2 19p/1f/1s (F9'da `waitForFunction` async-predicate yanlış-pozitif
-  geçişi — vaat nesnesine truthy diyor; `expect.poll`'a geçildi); **FİNAL BELGELİ KOŞUM:**
-  `20 passed / 1 skipped / 0 failed (2.0m)` — TG1'nin 5 testi dahil. Skip: gece-tarih:63
-  (küpeli-hayvan veri koşulu; TG1 dışı). Komut (belgeli tek koşum):
-  `docker run --rm -e PLAYWRIGHT_DEMO_MODE=1 -e PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080/ -v "$PWD":/work -v /home/melik/egesut-erp1/node_modules:/home/melik/egesut-erp1/node_modules -w /work mcr.microsoft.com/playwright:v1.58.2-noble bash -c "ln -sfn /home/melik/egesut-erp1/node_modules /work/node_modules && npx playwright test tests/tarihe-git.spec.js tests/tarih-secici.spec.js tests/gece-tarih.spec.js tests/sutten-kes.spec.js tests/offline-kuyruk.spec.js tests/sablon.spec.js --workers=1 --retries=0 --reporter=list --output=/tmp/pw-out"`
-  (worktree'de node_modules yok → konteyner içinde ana-checkout symlink'i; log:
-  `~/tmp/agents/w3-measure/w3-playwright-final.log`).
+- **Playwright koşumları (dürüst döküm):** geliştirme koşumları (GEÇERSİZ, TARİHÇE):
+  koşum-1 19p/1f/1s (F9 testinde sekme tıkı eksi); koşum-2 19p/1f/1s (F9'da
+  `waitForFunction` async-predicate yanlış-pozitif geçişi — vaat nesnesine truthy
+  diyor; `expect.poll`'a geçildi). Final belgeli koşum raporda TEK YERDE:
+  aşağıda **"FINAL KANIT — Playwright tek koşum (20260914-02)"** bölümü
+  (komut + sayılar + log yolu orada).
 - **Unit:** `NODE_PATH=/home/melik/egesut-erp1/node_modules node --test tests/unit/*.test.js`
   → **892/892/0** (W2 tabanı 882 + 10 yeni: 3 gecmis-gun adversarial + 7 gecmis-xss).
 - **Damga:** `?v=20260914-02` × 23 (22 script + manifest); damga-pin testleri aynı değişiklikte.
+
+## FINAL KANIT — Playwright tek koşum (W3 revizyonu sonrası, damga `20260914-02`)
+
+Bu bölüm raporun **tek geçerli final Playwright kanıtıdır**; W2'nin §5 koşumu (18 passed /
+2 skipped, damga `20260914-01`) ve yukarıdaki geliştirme koşumları GEÇERSİZ/tarihçedir.
+
+- **Komut** (belgeli tek koşum):
+  `docker run --rm -e PLAYWRIGHT_DEMO_MODE=1 -e PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080/ -v "$PWD":/work -v /home/melik/egesut-erp1/node_modules:/home/melik/egesut-erp1/node_modules -w /work mcr.microsoft.com/playwright:v1.58.2-noble bash -c "ln -sfn /home/melik/egesut-erp1/node_modules /work/node_modules && npx playwright test tests/tarihe-git.spec.js tests/tarih-secici.spec.js tests/gece-tarih.spec.js tests/sutten-kes.spec.js tests/offline-kuyruk.spec.js tests/sablon.spec.js --workers=1 --retries=0 --reporter=list --output=/tmp/pw-out"`
+  (worktree'de node_modules yok → konteyner içinde ana-checkout symlink'i.)
+- **Sonuç (logdan okundu, tahmin değil):** **20 passed / 1 skipped / 0 failed (2.0m)** —
+  toplam 21 test; TG1'nin 5 testi dahil (son koşan indeks ✓ 21).
+  **Log:** `~/tmp/agents/w3-measure/w3-playwright-final.log`.
+- **Damga kanıtı:** logdaki tüm kaynak istekleri `?v=20260914-02` ile 200/304 döndü
+  (`20260914-01` yanıtı yok).
+- **Kalan tek skip (KALIR, kaldırma):** `tests/gece-tarih.spec.js:63` — "bugünün doğum
+  tarihi 'ileri tarih' diye reddedilmez" testi, sürüde küpeli hayvan bulunamadığı için
+  veri-bağımlı `test.skip(!anneKupe, …)` kalkanıyla atlandı (beklenmedik veri durumunda
+  güvenli atlama; TG1 dışı). Not: düzeltme zarfı bu skip için `tests/tarihe-git.spec.js:28`
+  `test.skip(!IS_DEMO, …)` demo koruma kalkanına atıf yapmıştı; final log'a göre ateşlenen
+  skip `gece-tarih.spec.js:63`'tür. `tarihe-git.spec.js:28`'deki demo koruma kalkanı
+  (`test.skip(!IS_DEMO, …)`) ise koşumda ateşlenmedi (demo modda koşuldu) ve **kodda
+  aynen KALIR** — kaldırılmadı.
 
 ## Dondurma notu
 
@@ -216,7 +240,7 @@ Sahip kararıyla ~12:5x'te donduruldu; WIP commit `WIP(TG1-W3): dondurma noktasi
 - Damga: `grep -o "?v=[0-9-]*" index.html | sort | uniq -c` → **23× `20260914-02`** tek değer (+1 dinamik birleştirme noktası).
 - TG1 diff'inde eklenen inline `onclick="openDet`: **0** (yeni kartlar `data-action="gm-det"` + `escAttr` delegasyonu; kalan 21 occurrence TG1 öncesi legacy koddur — bu goal'in diff'i değildir).
 - DÜN handler: `js/utils/handlers.js:112` `dAgo(1)` (F5 düzeltmesi yerinde, gerekçe yorumuyla).
-- Playwright: TEKRAR KOŞULMADI (sahip kuralı) — W3'ün belgeli final koşumu esas: **20 passed / 1 skipped / 0 failed (2.0m)**, TG1'nin 5 testi koştu.
+- Playwright: TEKRAR KOŞULMADI (sahip kuralı) — yukarıdaki **FINAL KANIT** bölümündeki belgeli tek final koşumu esas: **20 passed / 1 skipped / 0 failed (2.0m)**, damga `20260914-02`, TG1'nin 5 testi koştu.
 
 ## Açık kalemler (root)
 - **Tabandan gelen 2 test_patterns.py kızılı** (stale `bcTarihTakvimAc` anchor'u ui-map Toplu vaka bölümünde + eski goal biçim hataları) — bdee91f'te de kızıl, TG1 dışı.
