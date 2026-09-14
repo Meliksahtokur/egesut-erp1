@@ -174,11 +174,19 @@ hedefledik (`olcum_zincir.out`):
 1. **Çakışma tam liste + zengin kayıt:** her `cakismalar` kaydına `zaman`,
    `degisen_alanlar`, `islem`, `log_id`; liste tüm sonraki değişiklikler.
    → UI "hangi günlerden" listesini ve zincir önerisini bu veriden kurar.
-2. **`zincir` seviyesi:** hedef + aynı (tablo,pk) sonraki TÜM değişiklikler
-   plan adımı olur (en yeni önce uygulanır); zincire dahil satırların sonraki
-   değişiklikleri çakışma SAYILMAZ; zincir DIŞI çakışma/ENGEL aynen bloklar
-   (bypass YOK korunur); `degisim_geri_al` zinciri TEK transaction'da uygular
-   → tek `geri_alma_txid`, tek telafi kaydı. Sınır 100 adım.
+2. **`zincir` seviyesi (ROOT K1 ile genişletildi):** kapsam yineli —
+   (a) hedef + aynı (tablo,pk) sonraki TÜM değişiklikler; (b) plan satırlarının
+   **bağımlılık grafiğindeki satırlarda** (alt kayıtlar + hayvan köprüsü:
+   hedef hayvana FK'lı satırlar) hedef txid'den sonraki ve **engel/çakışma
+   üreten** değişiklikler ("bağımlı adım" — sahibin tohumlama→sonuc→doğum
+   zinciri buradan girer; ilgisiz olaylar GİRMEZ). Sıralama: aynı satırda en
+   yeni önce, bağımlı adımlar topolojik önce. Zincire dahil satırların sonraki
+   değişiklikleri çakışma SAYILMAZ; zincir DIŞI gerçek çakışma/ENGEL aynen
+   bloklar (bypass YOK korunur); `degisim_geri_al` zinciri TEK transaction'da
+   uygular → tek `geri_alma_txid`, tek telafi kaydı. Sınır 100 adım.
+   **Sıralı rehber (çıkmaz engel YOK):** otomatik zincir kurulamıyorsa yanıt
+   `sirali_rehber[]` döndürür — en yeni önce, tekil hedefler + neden; UI her
+   satırda kendi geri-al düğmesini gösterir ("önce 5'i, sonra 4'ü geri al").
 3. **Köprü — kesin:** `islem_log.degisim_txid bigint` + BEFORE INSERT trigger
    (`txid_current()`; mevcut immutable trigger yalnız U/D'yi bloklar — INSERT
    serbest, ölçüldü). İş satırı + islem_log aynı RPC tx'inde yazılır → birebir.
@@ -192,11 +200,14 @@ hedefledik (`olcum_zincir.out`):
    Geçmiş akışı geri alınan olayı "…geri alındı" kartıyla anlatır; orijinaller
    değişmez (immutable korunur).
 
-### 3.3 Zincirin sınırları (dürüst liste)
-- Zincir yalnız **aynı satırın** sonraki değişikliklerini kapsar (sahibin
-  1-2-3-4-5 örneği: aynı kaydın olay zinciri). Başka satırlara taşan etki
-  zincir DIŞI çakışmadır → blok + açıklama.
-- INSERT geri al + sonradan değişmiş alt kayıt → ENGEL (koruma, aynen).
+### 3.3 Zincirin sınırları (dürüst liste — K1 sonrası)
+- Kapsam: aynı satır + **bağımlılık grafiğinden engel üreten** çapraz-satır
+  olaylar (aynı hayvan, FK/alt kayıt). Hayvanın ilgisiz sonraki olayları
+  (ör. haftalar sonraki kilo güncellemesi) zincire GİRMEZ.
+- Otomatik zincir kurulamayan durum kalmaz çıkmazsız: `sirali_rehber` tekil
+  adımları sırayla gösterir, her adımın kendi düğmesi vardır.
+- INSERT geri al + sonradan değişmiş alt kayıt → bağımlı adım olarak zincire
+  girer; aşılamaz ENGEL kalırsa rehbere düşer.
 - >100 adım → `ZINCIR_COK_UZUN` (demo ölçeğinde pratik değil; sınır bildirilir).
 
 ---
@@ -225,12 +236,11 @@ silinir + şifre modalı geri döner. a+b matematik onayı EMEKLİ (L2 goal'unda
 sahip "hızlı onay için a+b kalabilir" demişti; tek motor = tek onay türü —
 bilet zaten daha güçlü; root isterse a+b ön-adımı geri eklenir, açık kalem O-3).
 
-### 4.3 Prod uyumluluğu (açık kalem O-1 — root kararı)
-UI tek motora bağlanınca **L2'siz ortamda (prod bugün) geri al kalmaz**.
-Öneri: prod'a L2 (4 migration, teslimatında runbook hazır) + L4 migration'ları
-**deploy'dan ÖNCE** uygulanır (sıralı sahip kapısı). Alternatif: çalışma
-anismında `degisim_listele` yoklamasıyla eski yola düşen capability flag
-(maliyet: çift yol yaşar, "tek motor" ruhuna ters). Varsayılan: sıralı runbook.
+### 4.3 Prod uyumluluğu (O-1 ROOT KARARI: sıralı runbook, flag YOK)
+UI tek motora bağlanınca **L2'siz ortamda geri al kalmaz** — bu nedenle
+(K2): **L4 dalı, L2(4)+L4 migration'ları PROD'a uygulanmadıkça main'e
+MERGE EDİLMEZ.** Runbook sırası (hepsi root/sahip kapısı): prod migration'ları
+(L2 4 + L4 N) → salt-okunur teyit → merge/deploy. Capability flag YOK.
 
 ---
 
@@ -308,6 +318,7 @@ Her senaryo Playwright betiğiyle demo üzerinde yürünür; adım ekran görün
 | S1 | "Geri al butonu her yerde yok" | (1) Geçmiş kartı → Geri Al; (2) hayvan kartı Geçmiş → Geri Al; (3) işlem detayı paneli → Geri Al; (4) vaka detayı → Geri Al; (5) görev tamamlandı detayı → Geri Al; (6) Değişiklikler tx kartı → Geri Al | Altı yüzeyde de AYNI önizleme modalı açılır; onay sonrası aynı sonuç toast'u; hiçbirinde "baştan gir" yok |
 | S2 | "Her eylem geri alınamıyor" | Sırayla: tohumlama kaydet → geri al; doğum kaydet → geri al; görev tamamla → geri al; stok girişi → geri al; toplu aşı → geri al; satış (çıkış) → geri al | Her eylem sonrası önizleme "eylem cümlesi" ile açılır; geri al sonrası ilgili ekran (sürü/stok/geçmiş) eski değere döner; Geçmiş'te "…geri alındı" kartı |
 | S3 | "Çakışma blokajı yönlendirmiyor; zincir teklif etmeli" | Bir padok/hayvan kaydında 3 ardışık değişiklik kur (1-2-3); 1.'yi geri almaya çalış | Önizleme: "sonra N değişiklik var" listesi (gün-saat + insan dili) + "Zincir olarak geri al — N olay"; tıkla → kart listesi + "komple geri alınacak, onaylıyor musunuz?" → tek onay → "N olay birlikte geri alındı"; kayıt 1-öncesi duruma döner |
+| S3b | (K1) çapraz-satır zinciri | Bir hayvanda tohumlama → sonuc (Gebe) → doğum zinciri kur; tohumlama KAYDINI geri almaya çalış | Zincir önerisi DOĞUM olayını da kapsar (bağımlı adım, kart listesinde görünür); onay → üçü birlikte döner; hayvan kaydı ve üreme geçmişi 1-öncesi duruma döner. Otomatik zincir kurulamayan varyantta: sıralı rehber ("önce doğumu, sonra sonucu geri al") + her satırda kendi düğmesi — çıkmaz YOK |
 | S4 | "UI kontrol paneli, SQL tablosu değil" | Değişiklikler'i aç; görev tamamlama tx'ini bul; detayı aç | Başlık "Görev tamamlandı — 14.09 17:25 · 4019"; ekranda txid/UUID YOK (teknik blok katlı); yalnız değişen alanlar; boş alan yok; teknik/uygulama-dışı satır varsayılan gizli |
 | S5 | "Detayda hapsoldum, geri tuşu yok" | Hayvan kartı → işlem detayı → (tarayıcı geri); Geçmiş gün görünümü → (Android geri); Değişiklikler → tx detayı → (geri); takvim açıkken (geri); asistan/Değişiklikler sayfasında "← Geri" | Her geri: bir seviye YUKARI kapanır (detay/görünüm/takvim), sayfa kaybolmaz; hiçbir ekranda çıkışsız derinlik kalmaz |
 | S6 | "Takvimde olay günleri renkli, boş günler beyaz" | Geçmiş → Tarihe git (olayı olan ay); hayvan kartı Geçmiş → Tarihe git | Olaylı günlerde renkli nokta/dolgu, boş günler beyaz; seçili gün yeşili korunur; ay çevrilince işaretler güncellenir |
@@ -328,14 +339,24 @@ Her senaryo Playwright betiğiyle demo üzerinde yürünür; adım ekran görün
   ayrım aynen, telafi kaydıyla tutarlı).
 - Worktree node_modules yok — `NODE_PATH` ana checkout (bilinen ortam kısıtı).
 
-**Açık kalemler (root):**
-- **O-1 Prod sıralaması:** öneri = L2(4)+L4 migration'ları deploy'dan önce
-  uygula; alternatif = capability flag. (§4.3)
-- **O-2 Değişiklikler filtre takviminde işaretli gün:** varsayılan YOK (ek
-  pull); istenirse ayrı parça. (§6)
-- **O-3 a+b hızlı onayı** bilet yanında geri mı gelsin: varsayılan HAYIR. (§4.2)
-- **O-4 `tasks` tablosu** L2 kapsamına alınsın mı (LUNA notu, tek satır):
-  varsayılan HAYIR (araç altyapısı).
+**Açık kalemler (root):** — **ROOT KARARI 2026-09-14, hepsi KAPANDI:**
+- **O-1 Prod sıralaması:** sıralı runbook (L2 4 + L4 migration'ları prod'a
+  uygulanmadan L4 main'e GİRMEZ); capability flag YOK. (§4.3, goal K2)
+- **O-2 Değişiklikler filtre takviminde işaretli gün:** HAYIR (ek pull yok).
+- **O-3 a+b hızlı onayı:** HAYIR — bilet tek onay türü; sahibe teslim
+  raporunda bildirilecek.
+- **O-4 `tasks` tablosu L2 kapsamı:** HAYIR.
 
-— FAZ A sonu. Bu rapor onaylanana kadar kod yazılmaz; onay goal'u
-`in_progress` yapar ve W1/W2 zarfları hazırlanır.
+## 10. Root kapısı kaydı (2026-09-14)
+
+**Karar: KOŞULLU ONAY** (plan commit'i 9ff0873 üzerinden). Uygulanan koşullar:
+- **K1 — zincir kapsamı:** aynı-satır kapsamı genişletildi: bağımlılık
+  grafiğinden (alt kayıt + hayvan köprüsü) engel üreten çapraz-satır sonraki
+  olaylar zincire bağımlı adım olarak girer; otomatik zincir kurulamıyorsa
+  `sirali_rehber` (en yeni önce, her satırın kendi düğmesi) — çıkmaz engel
+  YOK. §3.2/§3.3/§8(S3b) ve goal frozen contract §3 güncellendi.
+- **K2 — main çıkışı:** L4 dalı, L2(4)+L4 migration'ları prod'a uygulanmadan
+  main'e merge edilmez; capability flag YOK. §4.3 + goal Constraints güncellendi.
+- Goal `status: active` (FAZ B başladı). O-1..O-4 yukarıdaki kararlarla kapandı.
+
+— FAZ A kapandı; FAZ B (W1 ∥ W2 → W3) bu kararlarla yürüyor.

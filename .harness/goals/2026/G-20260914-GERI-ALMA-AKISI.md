@@ -1,6 +1,6 @@
 ---
 id: G-20260914-GERI-ALMA-AKISI
-status: draft
+status: active
 owner: root
 flow: ss_org
 created: 2026-09-14
@@ -70,9 +70,9 @@ implement_lane: glmf_workers
 # G-20260914-GERI-ALMA-AKISI — Değişiklikler + geri alma: insan akışı
 
 ## Status
-draft (zarf dili: pending) — FAZ A (tasarım + plan) bu goal ile teslim edildi;
-kod YOK. Root plan kapısı: `.harness/reports/2026-09-14-geri-alma-akisi-plan.md`
-okunup onaylanmadan FAZ B başlamaz. Onay status'u `active` yapar.
+active — root KOŞULLU ONAY (2026-09-14, commit 9ff0873 kapısı): plan sağlam,
+FAZ B'ye geç. Koşullar K1 (zincir kapsamı, aşağıda frozen contract §3) ve
+K2 (main çıkışı, Constraints) işlendi; O-2/O-3/O-4 = HAYIR (Constraints).
 Not: FAZ B'de materialleşecek migration/test dosyaları kesin adları belirlenince
 write_manifest'e eklenir (goal kendini manifest'te içerir).
 
@@ -144,15 +144,35 @@ ALTER TABLE public.islem_log ADD COLUMN IF NOT EXISTS degisim_txid bigint;
 --    eşleşmeyebilir → UI "Değişiklikler'den seç" yönlendirmesi verir.)
 
 -- 3) p_seviye 'zincir' (ADDITIVE; 'alan'|'satir'|'islem' aynen)
+--    [ROOT K1, 2026-09-14: kapsam ilk tasarımda yalnız aynı satırdı; sahibin
+--    1-2-3-4-5 örneği aynı HAYVANIN farklı kayıtlarındaki olaylarıdır
+--    (tohumlama → sonuc → doğum). Kapsam genişletildi:]
 --    p_hedef: {tablo,pk,txid} | {txid}
---    plan: hedef adımı + aynı (tablo,pk) [islem hedefse tx'in tüm satırları]
---    için hedef txid'den SONRAKİ TÜM değişiklikler; sira = uygulanacak sıra
---    (en yeni önce). Her adım mevcut plan satırı alanları + txid + zaman.
---    geri_alinabilir: bağımlılık ENGEL'i zinciri bloklar (bypass yine YOK);
---    zincire dahil satırların sonraki değişiklikleri ÇAKIŞMA SAYILMAZ.
---    cakismalar: yalnız zincire DAHİL OLMAYAN satırlardaki sonraki değişiklikler.
+--    KAPSAM (yineli genişletme; başlangıç = hedef adımı):
+--    a) plandaki her (tablo,pk) için AYNI SATIRDA hedef txid'den sonraki
+--       tüm değişiklikler;
+--    b) plandaki satırların BAĞIMLILIK GRAFİĞİNDEKİ satırlar (alt kayıtlar +
+--       hayvan köprüsü: hedef satırın hayvanına FK'lı satırlar — motorun
+--       mevcut bağımlılık taraması yeniden kullanılır) üzerinde, hedef
+--       txid'den sonraki ve plana ENGEL/ÇAKIŞMA ÜRETEN değişiklikler
+--       ("bağımlı adım"). Yalnız engel üretenler girer: hayvanın ilgisiz
+--       sonraki olayları (ör. haftalar sonraki kilo güncellemesi) zincire
+--       GİRMEZ.
+--    SIRALAMA: aynı satırda en yeni önce; bağımlı adımlar topolojik olarak
+--    kendilerini bağlayan adımdan ÖNCE (çocuk önce revert edilir).
+--    Her adım mevcut plan satırı alanları + txid + zaman.
+--    geri_alinabilir: zincir DIŞI gerçek çakışma / aşılamaz bağımlılık ENGEL'i
+--    varsa false (bypass yine YOK); zincire dahil satırların sonraki
+--    değişiklikleri ÇAKIŞMA SAYILMAZ. cakismalar: yalnız zincire DAHİL
+--    OLMAYAN satırlardaki sonraki değişiklikler.
 --    degisim_geri_al 'zincir': TEK transaction, adımlar sira sırasıyla,
 --    tek geri_alma_txid; yanıt +{"zincir_adim":M}.
+--    SIRALI REHBER (çıkmaz engel YOK — root K1): geri_alinabilir=false iken
+--    yanıt 'sirali_rehber' döndürür: [{sira, hedef:{tablo,pk,txid}, zaman,
+--    ozet, neden_dahil_degil}] — kullanıcının TEK TEK geri alacağı sıralı
+--    liste, EN YENİ ÖNCE ("önce 5'i, sonra 4'ü geri al"). Rehber satırları
+--    tekil (satir/işlem) hedeflerdir; her biri UI'da kendi geri al düğmesiyle
+--    gösterilir. Rehber de ≤100 satır.
 --    Sınır: zincir >100 adım → GECERSIZ_HEDEF, detay.neden='ZINCIR_COK_UZUN'.
 
 -- 4) cakismalar kaydı zenginleştirme (ADDITIVE alanlar; TAM liste)
@@ -205,6 +225,9 @@ sistem öncesi değişiklik geri alınamaz.
 - **Zincir UX:** önizlemede çakışma görünce "Zincir olarak geri al — N olay
   birlikte" önerisi; zincir önizlemesi kart listesi (işlem diliyle); TEK
   onay + TEK bilet; sonuçta zincir özeti + geri-alınanı-geri-al bağlantısı.
+  Otomatik zincir kurulamıyorsa (root K1) **SIRALI REHBER modu**: "şu sırayla
+  tek tek geri al" listesi — her satır kendi geri-al düğmesi + sıra numarası
+  ("1. önce bunu, 2. sonra şunu"); çıkmaz engel YOK.
 - **Geri alınamayan:** neden + yapılabilir (açık Türkçe): sistem öncesi →
   kaydı düzenle yönlendirmesi; zincir dışı çakışma → zincir önerisi ya da
   "sonrakini önce geri al" sıra bilgisi; bağımlılık engeli → hangi alt
@@ -222,9 +245,11 @@ sistem öncesi değişiklik geri alınamaz.
 
 ## Work plan
 1. [lead] Bu goal + plan raporu (FAZ A) → commit `L4 plan` → ROOT KAPISI.
-2. [root] Plan onayı (onay/düzeltme). Onaysız kod YOK.
-3. [W1 glmf] Motor genişletmesi (frozen contract §1-5) + demo testleri
-   (zaman-hedefi, zincir, tam çakışma listesi, köprü kolonu) + unit baseline.
+2. [root] KOŞULLU ONAY verildi (K1 zincir kapsamı + K2 main çıkışı işlendi;
+   2026-09-14). FAZ B başladı.
+3. [W1 glmf] Motor genişletmesi (frozen contract §1-6, K1 dahil) + demo
+   testleri (zaman-hedefi, zincir aynı+çapraz satır, sıralı rehber, tam
+   çakışma listesi, köprü kolonu, telafi kaydı) + unit baseline.
 4. [W2 glmf] UI: tek geri-al girişi + çözücü + söküm + işlem dili + gürültü
    filtreleri + zincir UX + geri-alınamayan metinleri (W1 sözleşmesine karşı
    stub ile başlar, entegrasyonda gerçek RPC).
@@ -236,7 +261,7 @@ sistem öncesi değişiklik geri alınamaz.
 ## Acceptance mapping
 | Kabul | Sahip | Kanıt |
 |---|---|---|
-| Sahip senaryo 1-6 (plan raporu §8) tarayıcıda yürünür | lead | ekran görüntüleri `~/tmp/agents/l4-akis/` + PW tek koşum |
+| Sahip senaryo 1-6 + S3b çapraz-satır zincir (plan raporu §8) tarayıcıda yürünür | lead | ekran görüntüleri `~/tmp/agents/l4-akis/` + PW tek koşum |
 | Motor genişletmesi sözleşmeye uyum | W1 | demo RPC test çıktıları |
 | Tek motor (islemGeriAl yolu ölü) | W2 | grep kanıtı + unit |
 | Unit 0 fail | W1/W2/W3 | node --test çıktısı, baseline sayısı raporda |
@@ -245,6 +270,15 @@ sistem öncesi değişiklik geri alınamaz.
 
 ## Constraints
 - Demo ref: vtzqjmazsvurxdeondmi (ölçümler bu projede). PROD (zqnexqbdfvbhlxzelzju) DOKUNULMAZ.
+- **[ROOT K2, 2026-09-14] MAIN ÇIKIŞI:** tek motor legacy UI yollarını söktüğü
+  için **bu dal, L2'nin 4 migration'ı + L4 migration'ları PROD'a
+  uygulanmadıkça main'e MERGE EDİLMEZ** (root kapısı; sıralı runbook:
+  prod migration'ları → sonra merge/deploy). **Capability flag YOK** — tek
+  motor, eski yol sökülü; ara durum kalıcılaştırılmaz. O-1 bu kararla KAPANDI.
+- **[ROOT, 2026-09-14] Açık kalemler kapandı:** O-2 HAYIR (Değişiklikler
+  filtre takviminde işaretli gün YOK — ek pull); O-3 HAYIR (bilet TEK onay
+  türü; a+b dönmüyor — sahibe teslim raporunda bildirilecek); O-4 HAYIR
+  (`tasks` tablosu L2 kapsamına girmiyor).
 - Unit: `NODE_PATH=/home/melik/egesut-erp1/node_modules node --test tests/unit/*.test.js`; taban 938/938/0 (d4bd07f).
 - PW şablonu: `.harness/reports/2026-09-14-tarihe-git-f1.md` "FINAL KANIT"; denetçiler tekrar koşmaz.
 - Dil: sahip ile Türkçe; owner-directive bölümü Türkçe kalır.
