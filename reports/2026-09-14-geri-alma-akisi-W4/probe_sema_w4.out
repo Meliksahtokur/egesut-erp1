@@ -1,0 +1,256 @@
+BEGIN
+== 1. islem_log policy + grant + RLS ==
+    policyname    |  cmd   |  roles   | qual | with_check 
+------------------+--------+----------+------+------------
+ islem_log_select | SELECT | {public} | true | 
+ service_insert   | ALL    | {public} | true | true
+(2 satır)
+
+    grantee    | privilege_type 
+---------------+----------------
+ authenticated | INSERT
+ authenticated | SELECT
+ postgres      | DELETE
+ postgres      | INSERT
+ postgres      | REFERENCES
+ postgres      | SELECT
+ postgres      | TRIGGER
+ postgres      | TRUNCATE
+ postgres      | UPDATE
+(9 satır)
+
+ relrowsecurity | relforcerowsecurity 
+----------------+---------------------
+ t              | t
+(1 satır)
+
+== 2. islem_log kolonlar (tarih var? created_at yok? degisim_txid?) ==
+   column_name    |        data_type         
+------------------+--------------------------
+ id               | text
+ tip              | text
+ ana_hayvan_id    | text
+ tarih            | timestamp with time zone
+ kullanici_notu   | text
+ durum            | text
+ geri_alma_tarihi | timestamp with time zone
+ snapshot         | jsonb
+ ref_id           | text
+ ref_tablo        | text
+ payload          | jsonb
+ degisim_txid     | bigint
+(12 satır)
+
+== 3. islem_log triggerlar ==
+           tgname           |                                                                           pg_get_triggerdef                                                                           
+----------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ trg_islem_log_degisim_txid | CREATE TRIGGER trg_islem_log_degisim_txid BEFORE INSERT ON public.islem_log FOR EACH ROW WHEN ((new.degisim_txid IS NULL)) EXECUTE FUNCTION _islem_log_degisim_txid()
+ trg_islem_log_immutable    | CREATE TRIGGER trg_islem_log_immutable BEFORE DELETE OR UPDATE ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_immutable_guard()
+(2 satır)
+
+== 4. roller: superuser / bypassrls ==
+    rolname    | rolsuper | rolbypassrls 
+---------------+----------+--------------
+ anon          | f        | f
+ authenticated | f        | f
+ authenticator | f        | f
+ postgres      | f        | t
+ service_role  | f        | t
+(5 satır)
+
+== 5. degisim_log kolonlar ==
+   column_name   |        data_type         
+-----------------+--------------------------
+ id              | bigint
+ txid            | bigint
+ kayit_zamani    | timestamp with time zone
+ tablo_adi       | text
+ satir_pk        | jsonb
+ islem           | text
+ eski            | jsonb
+ yeni            | jsonb
+ degisen_alanlar | ARRAY
+ teknikal_mi     | boolean
+ kaynak          | jsonb
+(11 satır)
+
+== 6. kapsam tabloları (surum_gizli._kapsamda gövdesinden) ==
+                                   prosrc                                    
+-----------------------------------------------------------------------------
+                                                                            +
+   SELECT EXISTS (SELECT 1 FROM pg_trigger                                  +
+                   WHERE tgrelid = to_regclass(format('public.%I', p_tablo))+
+                     AND tgname = 'trg_degisim_log');                       +
+ 
+(1 satır)
+
+== 7. dogum -> tohumlama FK var mı? hayvan FK envanteri ==
+       child       |  parent   |     ccols      
+-------------------+-----------+----------------
+ cases             | hayvanlar | animal_id
+ dogum             | hayvanlar | anne_id
+ gorev_log         | hayvanlar | hayvan_id
+ protokol_dismiss  | hayvanlar | hayvan_id
+ protokol_instance | hayvanlar | hayvan_id
+ tedavi            | hayvanlar | hayvan_id
+ tohumlama         | cases     | case_id
+ tohumlama         | hayvanlar | hayvan_id
+ uygulama_log      | hayvanlar | hayvan_id
+ vaccination_log   | hayvanlar | animal_id
+ dogum             | hayvanlar | buzagi_id
+ pedigree_nodes    | hayvanlar | farm_animal_id
+(12 satır)
+
+== 8. test sahnesi tablolarının zorunlu kolonları ==
+ table_name |      column_name      | is_nullable |        data_type         |  column_default   
+------------+-----------------------+-------------+--------------------------+-------------------
+ dogum      | id                    | NO          | uuid                     | gen_random_uuid()
+ dogum      | anne_id               | YES         | text                     | 
+ dogum      | tarih                 | YES         | date                     | 
+ dogum      | yavru_cins            | YES         | text                     | 
+ dogum      | yavru_kupe            | YES         | text                     | 
+ dogum      | yavru_irk             | YES         | text                     | 
+ dogum      | dogum_tipi            | YES         | text                     | 'Normal'::text
+ dogum      | created_at            | YES         | timestamp with time zone | now()
+ dogum      | hekim_id              | YES         | text                     | 
+ dogum      | dogum_kg              | YES         | numeric                  | 
+ dogum      | baba_bilgi            | YES         | text                     | 
+ dogum      | olay_id               | YES         | uuid                     | gen_random_uuid()
+ dogum      | buzagi_id             | YES         | text                     | 
+ hayvanlar  | id                    | NO          | text                     | 
+ hayvanlar  | kupe_no               | YES         | text                     | 
+ hayvanlar  | cins                  | YES         | text                     | 
+ hayvanlar  | irk                   | YES         | text                     | 
+ hayvanlar  | dogum_tarihi          | YES         | date                     | 
+ hayvanlar  | dogum_kg              | YES         | numeric                  | 
+ hayvanlar  | kesim_kg              | YES         | numeric                  | 
+ hayvanlar  | grup                  | YES         | text                     | 
+ hayvanlar  | padok                 | YES         | text                     | 'P1'::text
+ hayvanlar  | durum                 | YES         | text                     | 'Aktif'::text
+ hayvanlar  | cikis_tarihi          | YES         | date                     | 
+ hayvanlar  | cikis_sebebi          | YES         | text                     | 
+ hayvanlar  | satis_fiyati          | YES         | numeric                  | 
+ hayvanlar  | created_at            | YES         | timestamp with time zone | now()
+ hayvanlar  | cinsiyet              | YES         | text                     | 
+ hayvanlar  | anne_id               | YES         | text                     | 
+ hayvanlar  | baba_bilgi            | YES         | text                     | 
+ hayvanlar  | canli_agirlik         | YES         | numeric                  | 
+ hayvanlar  | boy                   | YES         | numeric                  | 
+ hayvanlar  | renk                  | YES         | text                     | 
+ hayvanlar  | ayirici_ozellik       | YES         | text                     | 
+ hayvanlar  | devlet_kupe           | YES         | text                     | 
+ hayvanlar  | kategori              | YES         | text                     | 
+ hayvanlar  | suttten_kesme_tarihi  | YES         | date                     | 
+ hayvanlar  | tohumlama_onay_tarihi | YES         | date                     | 
+ hayvanlar  | tohumlama_durumu      | YES         | text                     | 
+ hayvanlar  | cikis_tipi            | YES         | text                     | 
+ hayvanlar  | notlar                | YES         | text                     | 
+ hayvanlar  | abort_sayisi          | YES         | integer                  | 0
+ hayvanlar  | padok_id              | YES         | uuid                     | 
+ hayvanlar  | kisir                 | YES         | boolean                  | false
+ hayvanlar  | etiketler             | YES         | ARRAY                    | '{}'::text[]
+ hayvanlar  | updated_at            | YES         | timestamp with time zone | now()
+ hayvanlar  | genc_anne             | YES         | boolean                  | 
+ tohumlama  | id                    | NO          | uuid                     | gen_random_uuid()
+ tohumlama  | hayvan_id             | YES         | text                     | 
+ tohumlama  | tarih                 | YES         | date                     | 
+ tohumlama  | sperma                | YES         | text                     | 
+ tohumlama  | irk_bilgisi           | YES         | text                     | 
+ tohumlama  | tohumlayan            | YES         | text                     | 
+ tohumlama  | kontrol_tarihi        | YES         | date                     | 
+ tohumlama  | sonuc                 | YES         | text                     | 'Bekliyor'::text
+ tohumlama  | deneme_no             | YES         | integer                  | 1
+ tohumlama  | created_at            | YES         | timestamp with time zone | now()
+ tohumlama  | hekim_id              | YES         | text                     | 
+ tohumlama  | dogum_tarihi          | YES         | date                     | 
+ tohumlama  | buzagi_kupe           | YES         | text                     | 
+ tohumlama  | abort_notlar          | YES         | text                     | 
+ tohumlama  | deneme_sayisi         | NO          | integer                  | 1
+ tohumlama  | denemeler             | NO          | jsonb                    | '[]'::jsonb
+ tohumlama  | ek_uygulamalar        | YES         | jsonb                    | '[]'::jsonb
+ tohumlama  | case_id               | YES         | uuid                     | 
+ tohumlama  | vwp_override          | YES         | boolean                  | false
+ tohumlama  | gerceklesme_at        | YES         | timestamp with time zone | 
+ tohumlama  | abort_tarihi          | YES         | date                     | 
+(68 satır)
+
+== 9. tohumlama triggerlar (gebe görev tetikleyicisi) ==
+             tgname              
+---------------------------------
+ tohumlama_cycle_iptal_trigger
+ trg_degisim_log
+ trg_deneme_no
+ trg_islem_tohumlama_abort
+ trg_islem_tohumlama_insert
+ trg_tohumlama_gebe_gorev
+ trg_tohumlama_gebe_sessiz_iptal
+ trg_tohumlama_guard
+ trg_tohumlama_kizginlik
+ trg_tohumlama_sessiz_iptal
+(10 satır)
+
+== 10. islem_log tip örnekleri (orijinal_tip çözümü için) ==
+             tip              
+------------------------------
+ ABORT_KAYDI
+ ASI_EKLE
+ ASI_GOREV_PLAN
+ ASI_GUNCELLE
+ ASI_KAYDI
+ ASI_RAPEL_DUPE_CLEANUP
+ ASI_SIL
+ CASE_CLOSED_EARLY
+ DOGUM_KAYDI
+ GEBE_ATAMA
+ GENC_ANNE_STATU
+ GENC_ANNE_STATU_TOPLU
+ GERI_ALINDI
+ GOREV_GUNCELLE
+ GOREV_OTOKAPAT
+ GOREV_TAMAMLA
+ GRUP_PADOK_UYUMLAMA
+ HAYVAN_EKLENDI
+ HEKIM_GUNCELLE
+ HIZLI_UYGULAMA
+ HIZLI_UYGULAMA_GERI_AL
+ KISIR_ISARETLE
+ KIZGINLIK
+ LEGACY_TEDAVI_ORPHAN_CLEANUP
+ padok_degisim
+ PADOK_EKLE
+ PADOK_GUNCELLE
+ PLANLI_TOHUMLAMA_TAMAMLA
+ PROTOKOL_AYAR
+ RECETE_GUNCELLENDI
+ SEANS_EKLENDI
+ SEANS_GUNCELLENDI
+ SEANS_SILINDI
+ STOK_EKLE
+ STOK_EKLEME
+ STOK_GUNCELLE
+ SUTEN_KESME
+ TEDAVI_GUN_EKLENDI
+ TEDAVI_GUN_TAMAMLA
+ TEDAVI_SEANS_IPTAL
+(40 satır)
+
+== 11. L4 fonksiyonları yerinde mi ==
+                       oid                        
+--------------------------------------------------
+ surum_gizli._degisim_plan(jsonb,text)
+ surum_gizli._degisim_uygula(jsonb)
+ surum_gizli._ekle_bagli(degisim_log,degisim_log)
+ surum_gizli._guncel_satir(text,jsonb)
+ surum_gizli._l4_zaman_txid(text,jsonb,text)
+ surum_gizli._l4_zincir(jsonb)
+ surum_gizli._pk_gorunum(jsonb)
+ surum_gizli._pk_json(text,jsonb)
+(8 satır)
+
+== 12. dogum örneği satır (kolon gerçekleri) ==
+                                                                                                                                                                                                               to_jsonb                                                                                                                                                                                                                
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"id": "44b86bc0-b6bf-48e4-84b5-3f5ec0ab0c9b", "tarih": "2025-12-04", "anne_id": "3d017aff-3eee-4a21-ac28-ffa70e20c07d", "olay_id": "dd0feb9f-3e69-4481-a825-a67872571b04", "dogum_kg": 55, "hekim_id": null, "buzagi_id": null, "yavru_irk": "Alaca holstein", "baba_bilgi": "Armada red | 09856565 | Holstein", "created_at": "2026-06-04T19:43:57.469993+00:00", "dogum_tipi": "Normal", "yavru_cins": "Dişi", "yavru_kupe": "55"}
+(1 satır)
+
+ROLLBACK

@@ -1,0 +1,69 @@
+BEGIN
+                                               fonksiyon                                               | definer |  sahip   
+-------------------------------------------------------------------------------------------------------+---------+----------
+ _islem_log_yaz()                                                                                      | t       | postgres
+ _vaka_ac_tek(text,uuid,text,date)                                                                     | t       | postgres
+ add_sessions_to_existing_day(uuid,jsonb)                                                              | t       | postgres
+ add_treatment_day_with_sessions(uuid,date,jsonb,uuid)                                                 | t       | postgres
+ add_treatment_day(uuid,date,time without time zone)                                                   | t       | postgres
+ add_vaccination(text,uuid,date,numeric,text,integer)                                                  | t       | postgres
+ asi_ekle(text,text,text,numeric,text,text,boolean,uuid[],text,jsonb,integer,numeric,numeric)          | t       | postgres
+ asi_gorev_planla(text,uuid,numeric,date,text)                                                         | t       | postgres
+ asi_guncelle(uuid,text,text,text,numeric,text,text,boolean,uuid[],text,jsonb,integer,numeric,numeric) | t       | postgres
+ asi_sil(uuid)                                                                                         | t       | postgres
+ asi_toplu_planla(text,date,jsonb,text)                                                                | t       | postgres
+ bulk_ilac(text[],text,numeric,text)                                                                   | t       | postgres
+ buzagi_sutten_kesme_geri_al(text)                                                                     | t       | postgres
+ buzagi_sutten_kesme_onayla(text,date)                                                                 | t       | postgres
+ case_geri_al(uuid)                                                                                    | t       | postgres
+ close_case_with_remaining(uuid,text)                                                                  | t       | postgres
+ degisim_geri_al(jsonb,text,uuid,text)                                                                 | t       | postgres
+ fn_islem_log()                                                                                        | t       | postgres
+ fn_padok_transfer_gorev_kapat()                                                                       | t       | postgres
+ gebelik_kaydet_manual(text,date,text)                                                                 | t       | postgres
+ gorev_guncelle(text,text,text,text)                                                                   | t       | postgres
+ gorev_tamamla(text,text)                                                                              | t       | postgres
+ hayvan_genc_anne_isaretle_toplu(text[],boolean)                                                       | t       | postgres
+ hayvan_genc_anne_isaretle(text,boolean)                                                               | t       | postgres
+ hayvan_kisir_isaretle(text,boolean)                                                                   | t       | postgres
+ hayvan_tohumlama_ertele(text,integer)                                                                 | t       | postgres
+ hayvan_tohumlanabilir_onayla(text)                                                                    | t       | postgres
+ hekim_ekle(text,text)                                                                                 | t       | postgres
+ hekim_guncelle(text,text,text,boolean)                                                                | t       | postgres
+ hizli_uygulama_geri_al(uuid)                                                                          | t       | postgres
+ hizli_uygulama(text,text,numeric,text,text,text)                                                      | t       | postgres
+ ilac_ekle(text,text,text,numeric,numeric,uuid,numeric,text,text)                                      | t       | postgres
+ kizginlik_vaka_ac(text,text,text,text)                                                                | t       | postgres
+ padok_degistir_toplu(text[],uuid,text[],text)                                                         | t       | postgres
+ padok_degistir(text,uuid,text)                                                                        | t       | postgres
+ padok_ekle(text,integer,integer)                                                                      | t       | postgres
+ padok_guncelle(uuid,text,integer,integer,boolean)                                                     | t       | postgres
+ padok_sil(uuid)                                                                                       | t       | postgres
+ planli_tohumlama_kaydet(uuid,text,date,text,text,text,jsonb,boolean)                                  | t       | postgres
+ protokol_ayar_guncelle(text,numeric)                                                                  | t       | postgres
+ remove_treatment_session(uuid)                                                                        | t       | postgres
+ seans_tamamla(uuid,boolean,text)                                                                      | t       | postgres
+ stok_arsivle(text)                                                                                    | t       | postgres
+ stok_ekle(text,text,text,numeric,numeric)                                                             | t       | postgres
+ stok_ekleme(text,numeric,text)                                                                        | t       | postgres
+ stok_guncelle(text,text,text,text,numeric)                                                            | t       | postgres
+ stok_hareket_ekle(text,text,numeric,text)                                                             | t       | postgres
+ tedavi_guncelle(text,numeric,text,integer,text,text)                                                  | t       | postgres
+ tedavi_sil(text)                                                                                      | t       | postgres
+ tohumlama_abort(text,text,date)                                                                       | t       | postgres
+ tohumlama_abort(text,text)                                                                            | t       | postgres
+ tohumlama_duplicate_bekliyor_temizle()                                                                | t       | postgres
+ tohumlama_geri_al(text)                                                                               | t       | postgres
+ tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)                                              | t       | postgres
+ tohumlama_sonuc_bekliyor(text)                                                                        | t       | postgres
+ tohumlama_sonuc_bos(text,text)                                                                        | t       | postgres
+ tohumlama_sonuc_gebe(text)                                                                            | t       | postgres
+ treatment_day_tamamla(uuid,text,uuid[])                                                               | t       | postgres
+ update_treatment_session(uuid,numeric,text,text,text)                                                 | t       | postgres
+ vaccination_dismiss(uuid,text)                                                                        | t       | postgres
+ vaccine_rapel_guncelle(uuid,integer)                                                                  | t       | postgres
+ vaka_tohumlama_ekle(uuid,date,time without time zone)                                                 | t       | postgres
+ vaka_toplu_ac(text[],uuid,jsonb,uuid,text,date,boolean,integer,text,text)                             | t       | postgres
+(63 satır)
+
+ROLLBACK
