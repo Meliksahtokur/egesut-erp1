@@ -456,6 +456,29 @@ function _dgSeviyeTamamla(hedef, seviye) {
   return hedef && hedef.txid ? 'islem' : 'satir';
 }
 
+// ── D2 (root R1 20260914-12): boş köprü için satır-yedeği (SAF, TEK tur) ──
+// Kural (BAĞLAYICI): degisim_txid varsa hedef HER ZAMAN köprüden kurulur — ilk
+// önizleme denemesi hep köprüyledir; tarih kontrolü ve zaman yedeği yalnız
+// köprüsüz resolver yolundadır (gecmis.js _gmGeriAlHedef zaten böyle). Ama
+// islem_log satırı iş değişikliğiyle AYRI işlemde yazılmışsa köprü BOŞALIR:
+// degisim_txid tx'inin degisim_log'da izi yoktur (islem_log izlenen tablo
+// listesinde değildir) → 'islem' seviyesi HEDEF_BULUNAMADI/LOG_YOK döner; oysa
+// hedef satırın KENDİ log geçmişi sağlamdır (geriye tarihli giriş çiftlikte
+// olağandır). Yedek hedef {tablo,pk} — ZAMANSIZ: satırın en yeni log'u karar
+// verir (RPC satir+txidsiz → ORDER BY id DESC LIMIT 1). Zaman yedeği BU YOLDA
+// DEVREYE GİRMEZ (kural md.1); yalnız köprü+satır hedefi ve yalnız LOG_YOK'ta.
+// GERI_ALINDI'nın {txid}-hedefi satırsızdır → yedek YOK (gerçekten izsiz tx).
+function _dgKopruSatirYedegi(hedef, e) {
+  if (!hedef || !hedef.txid || !hedef.tablo) return null;
+  if (hedef.pk == null || hedef.pk === '') return null;
+  if (hedef.alan) return null; // alan-seviyesi hedef satır-yedeğine İNMEZ (review minör-2)
+  const kod = e && e.data && e.data.hata;
+  if (kod !== 'HEDEF_BULUNAMADI') return null;
+  const neden = e && e.data && e.data.detay && e.data.detay.neden;
+  if (neden !== 'LOG_YOK') return null;
+  return { tablo: String(hedef.tablo), pk: hedef.pk };
+}
+
 async function dgOnizleGoster() {
   const h = _dg.bekleyen;
   if (!h) return;
@@ -481,6 +504,14 @@ async function dgOnizleGoster() {
     else if ((on.cakismalar || []).length) _dgEngelGoster('');                 // zincir önerisi konuşur
     else _dgEngelGoster(_dgEngelKutusu('Bu işlem şu koşullarda geri alınamaz — aşağıdaki yönlendirmeleri izleyebilirsin.', h.hedef));
   } catch (e) {
+    // D2: boş köprüde satır-yedeği TEK tur — hedef yine köprüden BAŞLAR,
+    // yedek zamansız {tablo,pk} (tarih kontrolü/zaman yedeği devreye girmez).
+    // Tek tur garanti: yedek hedef txid'sizdir → bu yol yeniden tetiklenmez.
+    const yedek = _dgKopruSatirYedegi(h.hedef, e);
+    if (yedek && _dg.bekleyen === h) {
+      _dg.bekleyen = Object.assign({}, h, { hedef: yedek, seviye: 'satir' });
+      return dgOnizleGoster();
+    }
     if (govde) govde.innerHTML = `<div class="dg-not">Önizleme alınamadı: ${esc(_dgHataMetni(e))}</div>`;
     _dgEngelGoster(_dgEngelKutusu(_dgHataMetni(e), h.hedef));
   }
