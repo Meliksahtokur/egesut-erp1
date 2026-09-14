@@ -2310,6 +2310,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // 20260914-11: L4 lead düzeltmesi — gmUndoClick DEDUP birleşik kart için IDB yedeği (+W6 stok uyarı txid) — gün görünümü geri-al butonu (defter ayrıcalığı kalktı)
     // 20260914-08: L4 lead dokunuşu — liste kartı başlıkları işlem dili (Padok ekleme), yürüyüş hazırlığı
     // 20260914-09: L4-W5 onarım turu — resolver tarih-yedeği (L4-05) + rehber 'satir' (L4-04) + GERI_ALINDI geçmişte (L4-06) + detay esc/küpe (L4-07) + modal tek-entry (L4-08)
+    // 20260914-11: L4-W6 mini onarım — stok_uyari txid/UUID görünürden çıkışı (L4-07 alt, luna tur-2): SQL 0004 ayrı alan (txid/hareket_id) + teknik katlama
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
