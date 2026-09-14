@@ -3896,15 +3896,23 @@ function _gmIslemBaslikEtiketi(e){
   a=String(a||'').trim();
   return a||'Genel';
 }
+// W8-D3: hayvan referans etiketi — ham id/UUID ASLA; çözülemeyen referans
+// '?' yerine nötr kısa etiket (root R1-D3: "kartta ? kalmayacak"). Saf çekirdek
+// gmHayvanEtiketVeya js/gecmis.js'te (TEK kaynak, testli).
+function _gmHayvanEtiketVeya(hid, nor){
+  if(typeof gmHayvanEtiketVeya==='function') return gmHayvanEtiketVeya(hid,nor,getState('animals'),globalThis._gmHayvanKupeById);
+  const a=hid?getState('animals').find(x=>x.id===hid||x.kupe_no===hid):null;
+  return (a&&(a.kupe_no||a.devlet_kupe))||(globalThis._gmHayvanKupeById||{})[hid]||nor||'Hayvan';
+}
 // Katlı grubun satır etiketi — tür bazlı (islem: başlık etiketi; stok: ürün; diğer: hayvan etiketi)
 function _gmKatSatirEtiket(e){
   const d=e.data||{};
   if(e.type==='islem') return _gmIslemBaslikEtiketi(e);
   if(e.type==='stok') return d._urunAdi||'Stok hareketi';
-  if(e.type==='cikis'||e.type==='sutten') return d.kupe_no||d.devlet_kupe||'?';
+  if(e.type==='cikis'||e.type==='sutten') return d.kupe_no||d.devlet_kupe||_gmHayvanEtiketVeya(d.id);
   const hid=d.hayvan_id||d.anne_id||d.animal_id;
-  const a=getState('animals').find(x=>x.id===hid||x.kupe_no===hid);
-  return (a&&(a.kupe_no||a.devlet_kupe))||(globalThis._gmHayvanKupeById||{})[hid]||'?';
+  const a=hid?getState('animals').find(x=>x.id===hid||x.kupe_no===hid):null;
+  return (a&&(a.kupe_no||a.devlet_kupe))||(globalThis._gmHayvanKupeById||{})[hid]||_gmHayvanEtiketVeya(hid);
 }
 // U1 md.3: katlanmış toplu kart — "🩺 Tedavi Günü Eklendi — 12 hayvan" + küpe
 // listesi (ilk 8, kalan "+N"); tıklayınca altındaki tam kartlar açılır (gm-kat-ac).
@@ -3936,8 +3944,7 @@ function _gecmisEntryHtml(e, overrideOc){
   const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
   const hkName=hk?` · ${esc(hk.ad)}`:''; // TG1-W3 (luna F3): DB metni escape
   const hayvanKey=data.hayvan_id||data.anne_id||data.animal_id;
-  const hayvanObj=getState('animals').find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);
-  const hayvanLabel=hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||hayvanKey;
+  const hayvanLabel=_gmHayvanEtiketVeya(hayvanKey); // W8-D3: ham id/UUID yerine çözülür; çözülmeyen → nötr etiket
   const ico=_GECMIS_ICO[type]||_gmIslemTipEmoji(data.tip); // U1: tek harita (gecmis.js)
   const icoBg=_GECMIS_BG[type]||'rgba(120,120,120,.1)';
   let oc='',title='',sub='';
@@ -3948,30 +3955,28 @@ function _gecmisEntryHtml(e, overrideOc){
   else if(type==='tohumlama') oc=data.id?`data-action="gm-toh" data-det="${escAttr(data.id)}" style="cursor:pointer"`:'';
   else if(type==='dogum') oc='';
   if(type==='dogum'){
-    const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id);
-    const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
-    title=`<span${data.anne_id?` data-action="gm-det" data-det="${escAttr(data.anne_id)}" style="cursor:pointer"`:''}>${esc(anneLabel)||'?'}</span> → <b${data.yavru_kupe?` data-action="gm-kupe" data-det="${escAttr(data.yavru_kupe)}" style="cursor:pointer;color:var(--blue)"`:''}>${esc(data.yavru_kupe)||'?'}</b> (${esc(data.yavru_cins||'?')})`; // U1: dataset delegasyonu
+    const anneLabel=_gmHayvanEtiketVeya(data.anne_id,'Anne'); // W8-D3: ham id/'?' yok
+    title=`<span${data.anne_id?` data-action="gm-det" data-det="${escAttr(data.anne_id)}" style="cursor:pointer"`:''}>${esc(anneLabel)}</span> → <b${data.yavru_kupe?` data-action="gm-kupe" data-det="${escAttr(data.yavru_kupe)}" style="cursor:pointer;color:var(--blue)"`:''}>${esc(data.yavru_kupe||'Yavru')}</b>${data.yavru_cins?` (${esc(data.yavru_cins)})`:''}`; // U1: dataset delegasyonu; W8-D3: (?) kalmaz
     sub=`${esc(data.dogum_tipi||'Normal')}${hkName}`; // TG1-W3 (luna F3): dogum_tipi escape
   } else if(type==='tohumlama'&&_sk==='tohumlama_sonuc'){
     // TG1 gün görünümü: terminal sonuç KALEMİ — kendi sonuç gününde ayrı satır
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
-    title=`${esc(hayvanLabel||'?')} — Gebelik muayenesi`;
-    sub=`Sonuç: <b style="color:${sc}">${esc(data.sonuc||'?')}</b>${hkName}`;
+    title=`${esc(hayvanLabel)} — Gebelik muayenesi`;
+    sub=`Sonuç: <b style="color:${sc}">${esc(data.sonuc||'—')}</b>${hkName}`;
   } else if(type==='tohumlama'){
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
-    title=`${esc(hayvanLabel||'?')} — ${esc(data.sperma||'?')}`;
+    title=`${esc(hayvanLabel)} — ${esc(data.sperma||'Tohumlama')}`; // W8-D3: DEDUP-birleşik kartta sperma boşsa islem etiketi ('?')
     sub=`${data.deneme_no||1}. Tohumlama · <b style="color:${sc}">${esc(data.sonuc||'Bekliyor')}</b>${hkName}`; // TG1-W3 (luna F3): sonuc escape
   } else if(type==='hastalik'){
     const sc=data.status==='active'?'var(--red)':'var(--green)';
     const _gunModu=!!e.olayGunu; // TG1 gün hattı entry'leri olayGunu taşır (defter taşımaz)
-    title=`${esc(hayvanLabel||'?')} — ${esc(data.disease_name||data.tani||'?')}`;
+    title=`${esc(hayvanLabel)} — ${esc(data.disease_name||data.tani||'Vaka')}`;
     sub=_sk==='cases_kapanis'
       ?`<b style="color:var(--green)">Vaka kapandı</b>${hkName}`                          // TG1: kapanış kalemi
       :_gunModu?`<b style="color:${sc}">Vaka açıldı</b>${hkName}`                         // TG1: açılış kalemi
       :`<b style="color:${sc}">${data.status==='active'?'Aktif':'Kapalı'}</b>${hkName}`;  // defter/klasik aynen
   } else if(type==='gorev'){
-    const gHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
-    const gLabel=gHayvan?(gHayvan.kupe_no||gHayvan.devlet_kupe):data.hayvan_id;
+    const gLabel=_gmHayvanEtiketVeya(data.hayvan_id,'GENEL'); // W8-D3: ham id yok; hayvansız görev GENEL (eski davranış, CSV aynasıyla birleşik)
     const _done=data.tamamlandi;
     const _pill=_done?'<span style="font-size:.6rem;padding:1px 6px;border-radius:8px;background:var(--card3);color:var(--ink3)">Tamamlandı</span>':'<span style="font-size:.6rem;padding:1px 6px;border-radius:8px;background:rgba(42,107,181,.15);color:var(--blue)">Bekliyor</span>';
     if(data.gorev_tipi==='TEDAVI_GUN'){
@@ -3983,15 +3988,20 @@ function _gecmisEntryHtml(e, overrideOc){
       if(data._caseId) oc=`data-action="gm-case" data-det="${escAttr(data._caseId)}" style="cursor:pointer"`; // U1: dataset delegasyonu
     } else {
       let _aLbl='';try{const _p=typeof data.aciklama==='string'?JSON.parse(data.aciklama):data.aciklama;_aLbl=_p?.label||data.aciklama||'';}catch(e){_aLbl=data.aciklama||'';}
-      title=`${esc(gLabel||'GENEL')} — ${esc(_aLbl)}`;
-      sub=`<span class="pill ${escAttr(data.gorev_tipi||'DIGER')}">${esc((data.gorev_tipi||'').replace(/_/g,' '))}</span> · ${_pill}${hkName}`; // TG1-W3 (luna F3): gorev_tipi class+metin escape
+      // W8-D3: boş etiket → tip etiketi (tamamlanan kart "Görev Tamamlandı" —
+      // R1 S1a kanıtı); pill ham kod değil TEK haritadan (gmKodDegerEtiketi;
+      // haritada olmayan değer aynen, alt çizgiler boşluğa düşer).
+      if(!_aLbl) _aLbl=data.tamamlandi?'Görev Tamamlandı':((typeof gmKodDegerEtiketi==='function'&&gmKodDegerEtiketi('gorev_tipi',data.gorev_tipi))||'Görev');
+      const _tipPill=(typeof gmKodDegerEtiketi==='function'&&gmKodDegerEtiketi('gorev_tipi',data.gorev_tipi))||String(data.gorev_tipi||'').replace(/_/g,' ');
+      title=`${esc(gLabel)} — ${esc(_aLbl)}`;
+      sub=`<span class="pill ${escAttr(data.gorev_tipi||'DIGER')}">${esc(_tipPill)}</span> · ${_pill}${hkName}`; // TG1-W3 (luna F3): gorev_tipi class+metin escape
       if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // U1: dataset delegasyonu
     }
   } else if(type==='uygulama'){
-    const uHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
-    const uLabel=uHayvan?(uHayvan.kupe_no||uHayvan.devlet_kupe):data.hayvan_id;
-    title=`${esc(uLabel||'?')} — ${esc(data._stokAdi||'?')}`;
-    sub=`${esc(String(data.doz??'?'))} ${esc(data.birim||'ml')} · ${esc(data.rota||'IM')}${data.notlar?' · '+esc(data.notlar):''}`; // TG1-W3 (luna F3): uygulama alanları escape
+    const uLabel=_gmHayvanEtiketVeya(data.hayvan_id); // W8-D3: ham id yok
+    title=`${esc(uLabel)} — ${esc(data._stokAdi||'Uygulama')}`;
+    const _unt=typeof gmNotlarGorunur==='function'?gmNotlarGorunur(data.notlar):data.notlar;
+    sub=`${esc(String(data.doz??'?'))} ${esc(data.birim||'ml')} · ${esc(data.rota||'IM')}${_unt?' · '+esc(_unt):''}`; // TG1-W3 (luna F3) escape + W8-D3: temizlenince ayraç da düşer
     if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // U1: dataset delegasyonu
   } else if(type==='islem'){
     const kupe=_gmIslemBaslikEtiketi(e); // U1 root-düzeltme-2: hayvansızda '?' yerine görev adı/'Genel'
@@ -4000,7 +4010,7 @@ function _gecmisEntryHtml(e, overrideOc){
     if(data.tip==='ASI_KAYDI') sub=esc(snap.vaccine_name||'');
     else if(data.tip==='ASI_ERTELEME') sub=esc(snap.erteleme_notu||snap.vaccine_name||'');
     else if(data.tip==='TOPLU_ILAC') sub=esc(snap.ilac_adi||'');
-    else sub=esc(snap.irk||snap.grup||'');
+    else { const _irk=snap.irk||snap.grup||''; sub=esc(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(_irk).trim())?'':_irk); } // W8-D3: ham UUID alt satıra da girmez
     // U1 md.2: işlem aynası kartı KOŞULSUZ tıklanabilir — hayvan detayındaki
     // aynanın gittiği yer: islem detay paneli (openIslemDetay hattı). id yoksa
     // hayvan detayına düşer (eski kayıtlar).
@@ -4008,12 +4018,12 @@ function _gecmisEntryHtml(e, overrideOc){
     else if(data.ana_hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.ana_hayvan_id)}" style="cursor:pointer"`;
   } else if(type==='asi'){
     // TG1 gün görünümü: vaccination_log kalemi (islem aynası dedup ile baskılanır)
-    title=`${esc(hayvanLabel||'?')} — ${esc(data._asiAdi||'Aşı')}`;
+    title=`${esc(hayvanLabel)} — ${esc(data._asiAdi||'Aşı')}`;
     sub=[data._asiAdi?'':'Aşı', data.next_due_date?`Rapel: ${fmtTarih(data.next_due_date)}`:''].filter(Boolean).join(' · ')+hkName;
     // TG1-W3 (luna F4): DB kimliği inline onclick yerine dataset + delegasyon
     if(data.animal_id) oc=`data-action="gm-det" data-det="${escAttr(data.animal_id)}" style="cursor:pointer"`;
   } else if(type==='kizginlik'){
-    title=`${esc(hayvanLabel||'?')} — Kızgınlık gözlemi`;
+    title=`${esc(hayvanLabel)} — Kızgınlık gözlemi`;
     sub=esc(data.belirti||'');
     if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   } else if(type==='stok'){
@@ -4021,21 +4031,22 @@ function _gecmisEntryHtml(e, overrideOc){
     // U1 md.2: stok_id bağlanabiliyorsa kart stok detayına gider
     const giris=['Giriş','İade','Düzeltme','Ekleme'].includes(data.tur);
     title=`${esc(data._urunAdi||'Stok hareketi')}`;
-    sub=`<b style="color:${giris?'var(--green)':'var(--red)'}">${giris?'+':'−'}${esc(String(data.miktar??'?'))} ${esc(data._birim||'')}</b> · ${esc(data.tur||'')}${data.notlar?' · '+esc(data.notlar):''}`;
+    const _nt=typeof gmNotlarGorunur==='function'?gmNotlarGorunur(data.notlar):data.notlar;
+    sub=`<b style="color:${giris?'var(--green)':'var(--red)'}">${giris?'+':'−'}${esc(String(data.miktar??'?'))} ${esc(data._birim||'')}</b> · ${esc(data.tur||'')}${_nt?' · '+esc(_nt):''}`; // W8-D3: makine referansı görünmez; temizlenince ayraç da düşer
     if(data.stok_id) oc=`data-action="gm-stok" data-det="${escAttr(data.stok_id)}" style="cursor:pointer"`;
   } else if(type==='cikis'){
     // hayvanlar satırının KENDİSİ kaynak — etiket satırdan, state aramasız
-    const lbl=data.kupe_no||data.devlet_kupe||data.id;
-    title=`${esc(lbl||'?')} — Çıkış`;
+    const lbl=data.kupe_no||data.devlet_kupe||_gmHayvanEtiketVeya(data.id);
+    title=`${esc(lbl)} — Çıkış`;
     sub=`<b>${esc(data.cikis_tipi||'Çıkış')}</b> · Süruden çıkarıldı`;
     oc=`data-action="gm-det" data-det="${escAttr(data.id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   } else if(type==='sutten'){
-    const lbl=data.kupe_no||data.devlet_kupe||data.id;
-    title=`${esc(lbl||'?')} — Sütten Kesme`;
+    const lbl=data.kupe_no||data.devlet_kupe||_gmHayvanEtiketVeya(data.id);
+    title=`${esc(lbl)} — Sütten Kesme`;
     sub='Sütten kesildi';
     oc=`data-action="gm-det" data-det="${escAttr(data.id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   } else if(type==='protokol'){
-    const lbl=hayvanLabel||data.kupe_no||data.devlet_kupe||'?';
+    const lbl=hayvanLabel||data.kupe_no||data.devlet_kupe||'Hayvan';
     title=`${esc(lbl)} — Protokol ${_sk==='protokol_instance_kapanis'?'kapandı':'başladı'}`;
     sub=_sk==='protokol_instance_kapanis'?'Protokol kapanışı':'Protokol başlangıcı';
     if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
@@ -4244,27 +4255,29 @@ function _gecmisCsvMeta(){
       }
       if(e.type==='dogum')return lblOf(d.anne_id);
       // TG1 tek-gün kategorileri: hayvanlar satırı KENDİ küpesini taşır
-      if(e.type==='cikis'||e.type==='sutten')return d.kupe_no||d.devlet_kupe||d.id||'';
+      if(e.type==='cikis'||e.type==='sutten')return d.kupe_no||d.devlet_kupe||_gmHayvanEtiketVeya(d.id); // W8-review-I3: ham id yerine nötr (detay kolonuyla birleşik)
       if(e.type==='stok')return '';
       return lblOf(d.hayvan_id||d.anne_id||d.animal_id);
     },
     detay:e=>{
       const d=e.data;
-      if(e.type==='dogum')return `${lblOf(d.anne_id)} → ${d.yavru_kupe||'?'} (${d.yavru_cins||'?'})`;
-      if(e.type==='tohumlama')return `${lblOf(d.hayvan_id)} — ${e.sourceKey==='tohumlama_sonuc'?'Gebelik muayenesi sonucu: '+(d.sonuc||'?'):(d.sperma||'?')}`;
-      if(e.type==='hastalik')return `${lblOf(d.animal_id)} — ${d.disease_name||d.tani||'?'}`;
+      // W8-D3: CSV = kartın düz metin aynası — '?' fallbacks kartlarla birlikte nötrleşti
+      if(e.type==='dogum')return `${lblOf(d.anne_id)} → ${d.yavru_kupe||'Yavru'}${d.yavru_cins?` (${d.yavru_cins})`:''}`;
+      if(e.type==='tohumlama')return `${lblOf(d.hayvan_id)} — ${e.sourceKey==='tohumlama_sonuc'?'Gebelik muayenesi sonucu: '+(d.sonuc||'—'):(d.sperma||'Tohumlama')}`;
+      if(e.type==='hastalik')return `${lblOf(d.animal_id)} — ${d.disease_name||d.tani||'Vaka'}`;
       if(e.type==='gorev'){
-        const gl=lblOf(d.hayvan_id)||'GENEL';
-        if(d.gorev_tipi==='TEDAVI_GUN')return `${gl} — ${d._lbl||('Gün '+(d._gunNo||'?')+' tedavisi')}`;
+        const gl=_gmHayvanEtiketVeya(d.hayvan_id,'GENEL'); // W8-review-I2: kartla birebir (hayvansız → GENEL)
+        if(d.gorev_tipi==='TEDAVI_GUN')return `${gl} — ${d._lbl||('Gün '+(d._gunNo||'—')+' tedavisi')}`;
         let _aLbl='';try{const p=typeof d.aciklama==='string'?JSON.parse(d.aciklama):d.aciklama;_aLbl=p?.label||d.aciklama||'';}catch(err){_aLbl=d.aciklama||'';}
+        if(!_aLbl)_aLbl=d.tamamlandi?'Görev Tamamlandı':((typeof gmKodDegerEtiketi==='function'&&gmKodDegerEtiketi('gorev_tipi',d.gorev_tipi))||'Görev');
         return `${gl} — ${_aLbl}`;
       }
-      if(e.type==='uygulama')return `${lblOf(d.hayvan_id)} — ${d._stokAdi||'?'}`;
+      if(e.type==='uygulama')return `${lblOf(d.hayvan_id)} — ${d._stokAdi||'Uygulama'}`;
       if(e.type==='asi')return `${lblOf(d.animal_id)} — ${d._asiAdi||'Aşı'}`;
       if(e.type==='kizginlik')return `${lblOf(d.hayvan_id)} — Kızgınlık`;
       if(e.type==='stok')return d._urunAdi||'Stok hareketi';
-      if(e.type==='cikis')return `${d.kupe_no||d.devlet_kupe||d.id||'?'} — Çıkış (${d.cikis_tipi||'?'})`;
-      if(e.type==='sutten')return `${d.kupe_no||d.devlet_kupe||d.id||'?'} — Sütten Kesme`;
+      if(e.type==='cikis')return `${d.kupe_no||d.devlet_kupe||_gmHayvanEtiketVeya(d.id)} — Çıkış (${d.cikis_tipi||'—'})`;
+      if(e.type==='sutten')return `${d.kupe_no||d.devlet_kupe||_gmHayvanEtiketVeya(d.id)} — Sütten Kesme`;
       if(e.type==='protokol')return `${lblOf(d.hayvan_id)} — Protokol`;
       const snap=d.snapshot||{};
       const k=snap.kupe_no||snap.devlet_kupe||lblOf(d.ana_hayvan_id)||'?';
@@ -4282,9 +4295,9 @@ function _gecmisCsvMeta(){
         parcalar.push('Tamamlandı');
         return parcalar.join(' · ');
       }
-      if(e.type==='uygulama')return `${d.doz||'?'} ${d.birim||'ml'} · ${d.rota||'IM'}${d.notlar?' · '+d.notlar:''}`;
+      if(e.type==='uygulama')return `${d.doz||'?'} ${d.birim||'ml'} · ${d.rota||'IM'}${(()=>{const n=typeof gmNotlarGorunur==='function'?gmNotlarGorunur(d.notlar):d.notlar;return n?' · '+n:'';})()}`; // W8-review-I3 aynası
       if(e.type==='asi')return d.next_due_date?`Rapel: ${d.next_due_date}`:'';
-      if(e.type==='stok')return `${['Giriş','İade','Düzeltme','Ekleme'].includes(d.tur)?'+':'−'}${d.miktar??'?'} ${d._birim||''} · ${d.tur||''}${d.notlar?' · '+d.notlar:''}`;
+      if(e.type==='stok')return `${['Giriş','İade','Düzeltme','Ekleme'].includes(d.tur)?'+':'−'}${d.miktar??'?'} ${d._birim||''} · ${d.tur||''}${d.notlar?' · '+(typeof gmNotlarGorunur==='function'?gmNotlarGorunur(d.notlar):d.notlar):''}`; // W8-D3 aynası
       if(e.type==='cikis')return d.cikis_tipi||'';
       if(e.type==='sutten')return 'Sütten kesildi';
       if(e.type==='protokol')return e.sourceKey==='protokol_instance_kapanis'?'Kapandı':'Başladı';

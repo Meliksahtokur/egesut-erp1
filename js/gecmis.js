@@ -102,6 +102,58 @@ function _gmIslemTipEmoji(tip) {
   return _GM_ISLEM_TIP_EMOJI[String(tip || '').trim()] || '📋';
 }
 
+// ── W8-D1/D3: ham kod ALAN DEĞERİ → TR etiket — TEK kaynak (saf) ─────
+// Değişiklikler tx detayı (D1) ve gün görünümü pill/başlık (D3) AYNI haritadan
+// okur. Haritada olmayan değer NULL döner — çağıran ham değeri aynen gösterir
+// (uydurma yok; root kuralı: bilinmeyen için etiket uydurulmaz).
+// gorev_tipi sözlüğü forms.js:3272 tipEtiket + canlı demo değerleriyle hizalı;
+// 'TEDAVI GUN' (boşluklu senaryo değeri, S4-02 kanıtı) ile 'TEDAVI_GUN' (alt
+// çizgili iç değer) İKİSİ de 'Tedavi Günü'ne düşer.
+const _GM_KOD_DEGER_ETIKET = {
+  gorev_tipi: {
+    'TEDAVI GUN': 'Tedavi Günü', TEDAVI_GUN: 'Tedavi Günü',
+    MANUEL: 'Genel', TEDAVI: 'Tedavi', ILAC_UYGULAMA: 'İlaç Uygulaması',
+    PADOK_DEGISIM: 'Padok Değişimi', MUAYENE: 'Muayene', ASI_PLANLI: 'Planlı Aşı',
+    ILERI_GEBE_ASI: 'İleri Gebe Aşısı', ILERI_GEBE: 'İleri Gebe Takviyesi',
+    SUTTEN_KESME: 'Sütten Kesme', DIGER: 'Diğer',
+  },
+  durum: { active: 'Aktif', closed: 'Kapandı', geri_alindi: 'Geri Alındı' },
+  status: { active: 'Aktif', closed: 'Kapandı' },
+};
+function gmKodDegerEtiketi(alan, deger) {
+  const m = _GM_KOD_DEGER_ETIKET[String(alan || '')];
+  if (!m) return null;
+  const v = typeof deger === 'string' ? deger.trim() : deger;
+  return Object.prototype.hasOwnProperty.call(m, v) ? m[v] : null;
+}
+
+// W8-D3 (saf): hayvan referans etiketi — ham id/UUID ASLA görünmez; çözülemeyen
+// referans '?' yerine nötr kısa etiket döner (root R1-D3: "kartta ? kalmayacak").
+// animals: state dizisi, kupeById: IDB hayvan indeksi (_gmHayvanKupeById deseni).
+function gmHayvanEtiketVeya(hid, nor, animals, kupeById) {
+  if (hid) {
+    const a = (animals || []).find(x => x && (x.id === hid || x.kupe_no === hid));
+    const l = a && (a.kupe_no || a.devlet_kupe);
+    if (l) return l;
+    if (kupeById && kupeById[hid]) return kupeById[hid];
+  }
+  return nor || 'Hayvan';
+}
+
+// W8-D3 (saf): notlar görüntü temizliği — trigger-üretili stok/uygulama
+// kayıtlarının notuna gömülü makine referansı ('Tedavi · drug_admin:<uuid>'
+// kalıbı; PW gecmis-ux görünür-UUID bulgusu) kartta görünmez: '<sozluk>:<uuid>'
+// tokenları atılır, okunur metin kalır (çözülemeyen → nötr: kimlik parçası yok).
+function gmNotlarGorunur(n) {
+  return String(n || '')
+    .replace(/[A-Za-z_]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '')
+    .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '') // çıplak UUID kalıntısı da temizlenir
+    .split('·')
+    .map(p => p.trim())
+    .filter(Boolean)
+    .join(' · ');
+}
+
 // ── L4-W2: tek geri-al motoru — SAF çözücü + işlem dili ───────────────
 // _gmGeriAlHedef(entry) → {tablo,pk,txid} | {tablo,pk,zaman} | {txid} | null.
 // Öncelik (goal frozen contract): 1) islem_log.degisim_txid (W1 köprüsü)
