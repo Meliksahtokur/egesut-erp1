@@ -401,6 +401,29 @@ function pullTables(tables = []) {
   return run;
 }
 
+// TG1-W3 (luna F10): islem_log 100-satır cap'i "seçilen gün için tüm olaylar"
+// vaadini kırıyordu (demo 4087 satır — son 100 dışındaki olaylar IDB'ye hiç
+// ulaşmıyordu). REST tek istekte 1000 satırda cap'lenir (ölçüldü: limit=5000
+// isteği 1000 döndü) → sayfalı tam çekim. Ölçüm (demo, 2026-09-14): 4087 satır
+// · ~1.6 sn · 2.6 MB — arka plan pull'u için kabul edilebilir. Tarih-aralıklı
+// çekim UYGUN DEĞİL: pull idbClearAndPut ile DEĞİŞTİRİR, aralıklı çekim diğer
+// günlerin satırlarını silerdi. Defter/klasik davranış ve çevrimdışı kriter
+// bozulmaz (skipPull akışı değişmedi; defter aynı hattın bütünüyle dolan
+// verisini okur).
+async function _fetchIslemLogTumu(){
+  const SAYFA = 1000, MAX_SAYFA = 50; // güven sınırı: 50k satır
+  let rows = [], off = 0;
+  for (let s = 0; s < MAX_SAYFA; s++) {
+    const { data, error } = await db.from('islem_log').select('*').order('tarih', { ascending: false }).range(off, off + SAYFA - 1);
+    if (error) return rows.length ? { data: rows, error } : { data: null, error };
+    if (!data || !data.length) break;
+    rows = rows.concat(data);
+    if (data.length < SAYFA) break;
+    off += SAYFA;
+  }
+  return { data: rows, error: null };
+}
+
 async function _pullTablesNow(tables = []) {
   try {
     const FETCHERS = {
@@ -424,7 +447,7 @@ async function _pullTablesNow(tables = []) {
       vaccination_log: () => db.from('vaccination_log').select('*'),
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
-      islem_log:    () => db.from('islem_log').select('*').order('tarih', { ascending: false }).limit(100),
+      islem_log:    () => _fetchIslemLogTumu(),
       uygulama_log: () => db.from('uygulama_log').select('*').order('created_at', { ascending: false }).limit(500),
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
       padoklar:         () => db.from('padoklar').select('*').eq('aktif', true).order('sira'),

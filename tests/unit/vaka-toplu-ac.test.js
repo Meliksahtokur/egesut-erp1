@@ -2276,7 +2276,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     assert.ok(/'bc-sablon-yukle-kapat':\s*\(\)\s*=>\s*bcSablonYukleKapat\(\)/.test(src));
   });
 
-  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260913-18 damgalı', () => {
+  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260914-03 damgalı', () => {
     const html = fs.readFileSync('index.html', 'utf8');
     assert.strictEqual((html.match(/data-action="bc-sablon-yukle-toggle"/g) || []).length, 1);
     assert.strictEqual((html.match(/id="bc-sablon-yukle-alan"/g) || []).length, 1);
@@ -2291,11 +2291,13 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // 20260913-16: F3 kopya birleşmesi — tek-seçim takvim kopyaları kaldırıldı, çoklu takvim + vaka günleri modalı ortak ızgara çekirdeğinde
     // 20260913-16: surum-gecmisi F3 — degisiklikler modülü + api/ui dokunuşu; TÜM damgalar tek değere çekildi
     // 20260913-17: F3 kopya birleşmesi — tek-seçim takvim kopyaları kaldırıldı, çoklu takvim + vaka günleri modalı ortak ızgara çekirdeğinde
-    // 20260913-18: R1 revizyon — maske taşma/junk/alt-sınır sertleşmesi + Uygula maske kapısı + takvim kenar kelepırleri
+    // 20260914-01: TG1 tarihe-git Faz 1 (öncesi 20260913-18: R1 revizyon) — maske taşma/junk/alt-sınır sertleşmesi + Uygula maske kapısı + takvim kenar kelepırleri
+    // 20260914-02: TG1-W3 revizyon (luna 10 bulgu) — dedup kesinleştirme + XSS escape + hayvan kartı gün şeridi + islem_log tam pull
+    // 20260914-03: E3 entegrasyon — TG1 faz1 (tarihe-git) R1 entegrasyonuyla birleşti; damga tek değere çekildi
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
-    const damgasiz = yerel.filter(s => !/\?v=20260913-18$/.test(s));
+    const damgasiz = yerel.filter(s => !/\?v=20260914-03$/.test(s));
     assert.deepStrictEqual(host(damgasiz), [], 'damgasız yerel script kalmamalı');
     assert.ok(/<!-- \?v= damgası: her js\/css değişikliğinde GÜNCELLE \(cache-busting\) -->/.test(html),
       'damga bakım notu ilk script etiketinin yanında');
@@ -2632,10 +2634,10 @@ describe('V2.3 (W21) — m-bulk-case tarih alanı yapısı + takvim aksiyonu + m
     assert.ok(ipucu && /overflow-wrap:\s*anywhere/.test(ipucu[0]), 'hint sarma stili (taşma kilidi)');
   });
 
-  it('manifest link de damgalı: manifest.json?v=20260913-18', () => {
+  it('manifest link de damgalı: manifest.json?v=20260914-03', () => {
     const html = fs.readFileSync('index.html', 'utf8');
-    assert.ok(html.includes('manifest.json?v=20260913-18'), 'manifest damgası 20260913-18');
-    for (const eski of ['20260913-17','20260913-16','20260913-15','20260911-14','20260911-13','20260909-12','20260909-11','20260909-10','20260909-9','20260909-8','20260909-7','20260909-6','20260909-5','20260909-4','20260909-3','20260909-2','20260909-1','20260908-1','20260907-4']) {
+    assert.ok(html.includes('manifest.json?v=20260914-03'), 'manifest damgası 20260914-03');
+    for (const eski of ['20260914-02','20260914-01','20260913-18','20260913-17','20260913-16','20260913-15','20260911-14','20260911-13','20260909-12','20260909-11','20260909-10','20260909-9','20260909-8','20260909-7','20260909-6','20260909-5','20260909-4','20260909-3','20260909-2','20260909-1','20260908-1','20260907-4']) {
       // substring tuzağı: '?v=20260909-1' '?v=20260909-12'i de yakalar → rakam-sonrası sınır şart
       assert.ok(!new RegExp('\\?v=' + eski + '(?![0-9])').test(html), 'eski ' + eski + ' damgası kalmaz');
     }

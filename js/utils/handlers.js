@@ -103,6 +103,23 @@ registerActions({
   'gecmis-hayvan':    (el) => loadGecmis('hayvan', el),
   'gecmis-search':    (() => { let _t; return (el) => { clearTimeout(_t); _t = setTimeout(() => _gecmisRender(el.value), 200); }; })(),
   'gecmis-csv':       () => _gmDownloadCsv(),
+  // TG1 Faz 1: "tarihe git" — kanonik tarih seçiciyle gün seçimi; Bugün/Dün
+  // hızlı girişleri; Kapat deftere döner (skipPull — veri tab girişinde çekildi).
+  'gecmis-tarihe-git': () => gecmisTariheGitAc(),
+  'gecmis-gun-bugun':  () => gecmisGunSec(bugun()),
+  // TG1-W3 (luna F5): dAgo yalnız gün-sayısı bekler — dAgo(bugun(),1) NaN-NaN-NaN
+  // üretiyordu (ölçüldü); doğru ifade dAgo(1).
+  'gecmis-gun-dun':    () => gecmisGunSec(dAgo(1)),
+  'gecmis-gun-kapat':  () => gecmisGunSec(null),
+  // TG1-W3 (luna F4): gün görünümü yeni kartları DB kimliğini inline onclick
+  // yerine dataset üzerinden taşır (escAttr + merkezi delegasyon — events.js)
+  'gm-det': (el) => { if (el.dataset.det) openDet(el.dataset.det); },
+  // TG1-W3 (luna F9): hayvan kartı geçmişi tarih şeridi — ana yüzeydeki şeridin
+  // kart kapsamındaki eşi (tekTarihTakvimAc + banner deseni yeniden kullanılır)
+  'gecmis-det-tarihe-git': () => gecmisDetTariheGitAc(),
+  'gecmis-det-gun-bugun':  () => gecmisDetGunSec(bugun()),
+  'gecmis-det-gun-dun':    () => gecmisDetGunSec(dAgo(1)),
+  'gecmis-det-gun-kapat':  () => gecmisDetGunSec(null),
   // D15 görünüm switch'i: Defter (gün gruplu saf-bitmiş) ↔ Klasik (eski düz liste).
   // skipPull ile ağ çekmeden anında geçiş; tercih localStorage'da kalıcı.
   'gecmis-gorunum-toggle': () => {
