@@ -195,3 +195,5 @@ postgres-language-server.jsonc
 # 2026-09-10: probe log + sır içeren lokal doküman
 .crumbs/
 .claude/security-report.md
+# 2026-09-14: ss rol ağı çalışma yüzeyi (board, görev zarfı, kırıntı hasadı) — lokal kayıt
+.ss/
