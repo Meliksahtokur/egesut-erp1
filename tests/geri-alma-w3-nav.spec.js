@@ -115,12 +115,16 @@ test('S5c: kart-içi gün görünümü geri → karta döner (det-back deseni ko
   await expect(banner(page)).toBeHidden();
 });
 
-test('S5d: Değişiklikler tx detayı geri → liste görünümü (stub)', async ({ page }) => {
-  await page.goto('./?stub', { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#pg-dash .sv', { timeout: 30000 });
-  await expect.poll(() => page.evaluate(() => window.DEGISIM_STUB === true), { timeout: 10000 }).toBe(true);
+test('S5d: Değişiklikler tx detayı geri → liste görünümü (gerçek RPC)', async ({ page }) => {
+  // Entegrasyon sonrası stub SÖKÜLDÜ (2026-09-14) — gerçek degisim_listele ile.
+  await openApp(page);
   await page.evaluate(() => degisikliklerAc());
-  await expect(page.locator('#dg-root .dg-stub')).toBeVisible();
+  await page.waitForSelector('#dg-liste .dg-sayac, #dg-liste .dg-kart', { timeout: 30000 });
+  if ((await page.locator('#dg-liste .dg-kart').count()) === 0) {
+    await page.locator('.gm-cip', { hasText: 'Uygulama dışı' }).first().click();
+    await page.waitForSelector('#dg-liste .dg-kart', { timeout: 15000 });
+  }
+  await expect(page.locator('#dg-root .dg-stub')).toHaveCount(0, 'stub yok — gerçek RPC');
 
   await page.locator('#dg-liste .dg-kart').first().click();
   await expect(page.locator('.dg-detay-bas .dg-baslik')).toBeVisible('detay açıldı');
