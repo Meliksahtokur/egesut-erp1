@@ -42,6 +42,10 @@ registerActions({
       history.back();
     }
   },
+  // W3 (hapsolmama): sayfa başlığındaki "← Geri" (pg-degisiklikler / pg-asistan).
+  // history.back() → popstate zinciri bir önceki girilebilinen sayfaya döner;
+  // history boşsa (nadir) Log sayfasına nav.
+  'nav-geri': () => navGeriDon(),
   'hayvan-git': () => {
     if (!_curTaskDet) return;
     fromTaskOpenDet(_curTaskDet.hayvan_id, _curTaskDet.id);
@@ -110,7 +114,7 @@ registerActions({
   // TG1-W3 (luna F5): dAgo yalnız gün-sayısı bekler — dAgo(bugun(),1) NaN-NaN-NaN
   // üretiyordu (ölçüldü); doğru ifade dAgo(1).
   'gecmis-gun-dun':    () => gecmisGunSec(dAgo(1)),
-  'gecmis-gun-kapat':  () => gecmisGunSec(null),
+  'gecmis-gun-kapat':  () => gecmisGunKapat(),
   // TG1-W3 (luna F4): gün görünümü yeni kartları DB kimliğini inline onclick
   // yerine dataset üzerinden taşır (escAttr + merkezi delegasyon — events.js)
   'gm-det': (el) => { if (el.dataset.det) openDet(el.dataset.det); },
@@ -146,7 +150,7 @@ registerActions({
   'gecmis-det-tarihe-git': () => gecmisDetTariheGitAc(),
   'gecmis-det-gun-bugun':  () => gecmisDetGunSec(bugun()),
   'gecmis-det-gun-dun':    () => gecmisDetGunSec(dAgo(1)),
-  'gecmis-det-gun-kapat':  () => gecmisDetGunSec(null),
+  'gecmis-det-gun-kapat':  () => gecmisDetGunKapat(),
   // D15 görünüm switch'i: Defter (gün gruplu saf-bitmiş) ↔ Klasik (eski düz liste).
   // skipPull ile ağ çekmeden anında geçiş; tercih localStorage'da kalıcı.
   'gecmis-gorunum-toggle': () => {
@@ -487,3 +491,57 @@ registerActions({
   'tr-sperma-select':   (el) => onTrSpermaSelect(el),
   'tr-sperma-text':     (el) => { g('tr-sperma').value = el.value; },
 });
+
+// ═══ W3 (hapsolmama) — geri tuşu karar makinesi (SAF) ═══
+// app.js popstate handler'ının dal sırasını SAF katmana taşır: "en üstteki
+// tek katman kapanır" — mevcut sıra korunur (modal → sessiz → sentinel →
+// proto-detay → kart-içi gün görünümü → kart (det) → state-guard → ana gün
+// görünümü → Değişiklikler tx detayı → sayfa nav). Unit testi:
+// tests/unit/nav-geri-karar.test.js (history durum matrisi).
+//
+// ctx: { modalBackGuard, sessizAcik, modalStack, sentinel, protoDetayAcik,
+//        detAcik, detGunAcik, gecmisGunAcik, txDetayAcik, state }
+// dönüş (tur): 'yut' | 'modal'{id} | 'sessiz' | 'sentinel' | 'proto-detay' |
+//        'det-gun' | 'det' | 'gun' | 'tx-detay' | 'sayfa'{pg}
+function navGeriKarar(ctx) {
+  ctx = ctx || {};
+  const state = ctx.state || {};
+  // Kod kaynaklı back (closeM / görünüm kapanışı) — tüket, altındaki şeyi yakma
+  if (ctx.modalBackGuard) return { tur: 'yut' };
+  // Sessiz sheet router modalı DEĞİL (REV-5) — Android geri yalnız sheet'i kapatsın
+  if (ctx.sessizAcik) return { tur: 'sessiz' };
+  // Açık router-modal varsa en üsttekini kapat (takvim dahil — W3 stack'te)
+  const stack = ctx.modalStack || [];
+  if (stack.length) return { tur: 'modal', id: stack[stack.length - 1] };
+  // Sentinel: history stack'in dibine ulaştık — uygulamadan çıkılacak
+  if (state.sentinel) return { tur: 'sentinel' };
+  if (ctx.protoDetayAcik) return { tur: 'proto-detay' };
+  // Kart İÇİ gün görünümü kartın en üst katmanı — kart kapanmadan o kapanır
+  if (ctx.detAcik && ctx.detGunAcik) return { tur: 'det-gun' };
+  if (ctx.detAcik) return { tur: 'det' };
+  // Modal/sheet state'leri sayfa taşımaz (B21) — görünüm zaten kapalıysa yut
+  if (state.protokol || state.proto_detay || state.modal) return { tur: 'yut' };
+  // Sayfa-içi görünüm katmanları (W3): ana gün görünümü, tx detayı
+  if (ctx.gecmisGunAcik) return { tur: 'gun' };
+  if (ctx.txDetayAcik) return { tur: 'tx-detay' };
+  return { tur: 'sayfa', pg: state.pg || 'dash' };
+}
+
+// W3: görünüm-entry kapanışında history düzeltmesi (closeM'in _modalBackGuard
+// deseninin görünüm katmanlarına uygulanışı). Normal kapanış (✕ Kapat,
+// "‹ Listeye dön") history'de görünüm entry'si bırakmasın diye back eder;
+// üretilen popstate guard tarafından tüketilir.
+function navViewBack() {
+  const st = history.state || {};
+  if (st.gun || st.dtx || st.dgun) {
+    globalThis._modalBackGuard = true;
+    history.back();
+  }
+}
+
+// W3: sayfa başlığındaki "← Geri" — önceki girilebilinen sayfaya dön;
+// history boşsa (nadir; doğrudan yüklenmiş sekme) Log sayfasına nav.
+function navGeriDon() {
+  if (history.length > 1) { history.back(); }
+  else if (typeof goTo === 'function') { goTo('log'); }
+}

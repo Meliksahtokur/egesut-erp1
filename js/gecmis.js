@@ -463,6 +463,16 @@ function _gmGunEntriesFromSources(sources, scope) {
   return sonuc;
 }
 
+// W3 (takvim işaretli günler): IDB havuzundan olay-günü kümesi (SAF — DOM yok).
+// DEDUP + gün politikaları _gmGunEntriesFromSources'tan AYNI şekilde uygulanır;
+// küme TAM zaman kapsamlıdır (ay sayfalama yeniden hesabı gerekmez — ay dışı
+// günler takvim ızgarasında zaten çizilmez). scope: {animalId} kart kapsamı.
+function _gmGunKumesiFromSources(sources, scope) {
+  const kume = new Set();
+  _gmGunEntriesFromSources(sources, scope || {}).forEach(e => { if (e.olayGunu) kume.add(e.olayGunu); });
+  return kume;
+}
+
 // TG1-W3 (luna F9): gün hattı entry'sinin hayvan referansı — kaynak bazlı
 // alan eşlemesi (defter _gmEntriesFromSources scope eşleşmeleriyle paralel).
 function _gmGunHayvanId(sourceKey, row) {

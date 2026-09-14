@@ -136,9 +136,16 @@ function setupForms() {
     escAttr: (s) => String(s || ''),
     fmtTarih: (iso) => { if (!iso) return '—'; const p = String(iso).slice(0, 10).split('-'); return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : iso; },
   };
+  // W3: takvim router-modali prod'da closeM'e bağlı — GERÇEK closeM'i aynı
+  // dom + history ile yükle (js/utils/modal.js birebir; taklit stub bayatması istemiyoruz).
+  const histStub = { state: null, pushState(s) { this.state = s; }, replaceState(s) { this.state = s; }, back() { this.state = null; }, go() {} };
+  const { sandbox: modalSb } = loadBrowserModule('js/utils/modal.js', {
+    dom: document,
+    extra: { g: (id) => document.getElementById(id), history: histStub },
+  });
   const { sandbox: uiSb, exposed: uiLetler } = loadBrowserModule('js/ui.js', {
     dom: document,
-    extra: { ...ortak, ...tarihExtras },
+    extra: { ...ortak, ...tarihExtras, closeM: modalSb.closeM, history: histStub },
     // R1: ortak nav/seçici stilleri üst-seviye const'tır (function olmadığı
     // için sandbox'a otomatik düşmez) — expose ile dışarı alınır.
     expose: ['_takvimNavStil', '_takvimSeciciStil'],
@@ -2276,7 +2283,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     assert.ok(/'bc-sablon-yukle-kapat':\s*\(\)\s*=>\s*bcSablonYukleKapat\(\)/.test(src));
   });
 
-  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260914-06 damgalı', () => {
+  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260914-07 damgalı', () => {
     const html = fs.readFileSync('index.html', 'utf8');
     assert.strictEqual((html.match(/data-action="bc-sablon-yukle-toggle"/g) || []).length, 1);
     assert.strictEqual((html.match(/id="bc-sablon-yukle-alan"/g) || []).length, 1);
@@ -2297,10 +2304,11 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // 20260914-04: U1 geçmiş UX — tek etiket haritası + dataset delegasyonu + katlama + gün özeti çipleri
     // 20260914-05: E4 entegrasyon — TG1+U1 (Geçmiş UX) merge; damga tek değere çekildi
     // 20260914-06: L4-W2 geri-alma tek motor — dgGeriAlAkisi tek giriş + zincir/rehber UX + a+b modalı sökümü + stub katmanı
+    // 20260914-07: L4-W3 gezinme — takvim/gün/tx-detay history + ESC + ← Geri başlıkları + takvim işaretli günler
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
-    const damgasiz = yerel.filter(s => !/\?v=20260914-06$/.test(s));
+    const damgasiz = yerel.filter(s => !/\?v=20260914-07$/.test(s));
     assert.deepStrictEqual(host(damgasiz), [], 'damgasız yerel script kalmamalı');
     assert.ok(/<!-- \?v= damgası: her js\/css değişikliğinde GÜNCELLE \(cache-busting\) -->/.test(html),
       'damga bakım notu ilk script etiketinin yanında');
@@ -2637,10 +2645,10 @@ describe('V2.3 (W21) — m-bulk-case tarih alanı yapısı + takvim aksiyonu + m
     assert.ok(ipucu && /overflow-wrap:\s*anywhere/.test(ipucu[0]), 'hint sarma stili (taşma kilidi)');
   });
 
-  it('manifest link de damgalı: manifest.json?v=20260914-06', () => {
+  it('manifest link de damgalı: manifest.json?v=20260914-07', () => {
     const html = fs.readFileSync('index.html', 'utf8');
-    assert.ok(html.includes('manifest.json?v=20260914-06'), 'manifest damgası 20260914-06');
-    for (const eski of ['20260914-05','20260914-04','20260914-03','20260914-02','20260914-01','20260913-18','20260913-17','20260913-16','20260913-15','20260911-14','20260911-13','20260909-12','20260909-11','20260909-10','20260909-9','20260909-8','20260909-7','20260909-6','20260909-5','20260909-4','20260909-3','20260909-2','20260909-1','20260908-1','20260907-4']) {
+    assert.ok(html.includes('manifest.json?v=20260914-07'), 'manifest damgası 20260914-07');
+    for (const eski of ['20260914-06','20260914-05','20260914-04','20260914-03','20260914-02','20260914-01','20260913-18','20260913-17','20260913-16','20260913-15','20260911-14','20260911-13','20260909-12','20260909-11','20260909-10','20260909-9','20260909-8','20260909-7','20260909-6','20260909-5','20260909-4','20260909-3','20260909-2','20260909-1','20260908-1','20260907-4']) {
       // substring tuzağı: '?v=20260909-1' '?v=20260909-12'i de yakalar → rakam-sonrası sınır şart
       assert.ok(!new RegExp('\\?v=' + eski + '(?![0-9])').test(html), 'eski ' + eski + ' damgası kalmaz');
     }

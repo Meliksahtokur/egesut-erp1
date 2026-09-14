@@ -101,60 +101,86 @@ async function goTo(pg, push = true) {
 }
 
 window.addEventListener('popstate', e => {
-  // Kod kaynaklı back (closeM / sheet kapatma) — tüket, altındaki şeyi yakma
-  if (globalThis._modalBackGuard) { globalThis._modalBackGuard = null; return; }
-  // Sessiz sheet'i router modalı DEĞİL (REV-5) — Android geri yalnız sheet'i
-  // kapatsın; sentinel confirm'e ve modal yığınına düşmesin.
-  const sessizBsPop = document.getElementById('sessiz-bs');
-  if (sessizBsPop && sessizBsPop.style.display !== 'none') {
-    sessizBsPop.remove();
-    globalThis._sessizReturn = false;
+  // Kod kaynaklı back (closeM / görünüm kapanışı) — tüket, altındaki şeyi yakma.
+  // W3: kapanışın continuation'u varsa (takvim Onayla → onSec, back traversal
+  // bittikten sonra koşmalı ki push ettiği entry sızmasın) burada çalışır.
+  if (globalThis._modalBackGuard) {
+    globalThis._modalBackGuard = null;
+    const _devam = globalThis._modalBackDevam;
+    globalThis._modalBackDevam = null;
+    if (typeof _devam === 'function') { _devam(); }
     return;
   }
-  // Açık router-modal varsa en üsttekini kapat (Android geri tuşu — tüm modallar).
-  // closeM: cleanup (_planliTohumlamaGorevId, form sıfırlama) + stack/history dahil.
-  // NOT: 'det' bu stack'te değil — kendi dalı aşağıda (sheet yeniden gösterimi yapar).
-  const _mstack = globalThis._modalStack || [];
-  if (_mstack.length) { closeM(_mstack[_mstack.length - 1]); return; }
-  // Sentinel: history stack'in dibine ulaştık — uygulamadan çıkılacak
-  if (e.state?.sentinel) {
-    if (confirm('Uygulamadan çıkmak istediğinizden emin misiniz?')) {
-      // Onayladı — tarayıcı/PWA kapanabilir, geri gidebilir
+  // W3: dal sırası ve karar SAF makinede (js/utils/handlers.js navGeriKarar) —
+  // mevcut sıra korunur: modal → sessiz → sentinel → proto-detay → kart-içi
+  // gün görünümü → kart (det) → state-guard → ana gün görünümü → tx detayı → sayfa.
+  const _sessizBsPop = document.getElementById('sessiz-bs');
+  const _protoDetay = document.getElementById('proto-detay-bs');
+  const _det = document.getElementById('det');
+  // typeof guard'lar: kısmi yüklemede (ui.js/degisiklikler.js yüklenemezse)
+  // popstate'in TÜMÜNÜ çökertme (W3 code-review sertleştirmesi) — let/const
+  // için typeof, bildirilmemişken güvenli, tanımlıyken de TDZ dışındadır.
+  const _karar = (typeof navGeriKarar === 'function' ? navGeriKarar : () => null)({
+    modalBackGuard: !!globalThis._modalBackGuard,
+    sessizAcik: !!(_sessizBsPop && _sessizBsPop.style.display !== 'none'),
+    modalStack: globalThis._modalStack || [],
+    sentinel: !!(e.state && e.state.sentinel),
+    protoDetayAcik: !!(_protoDetay && _protoDetay.style.display !== 'none'),
+    detAcik: !!(_det && _det.classList.contains('on')),
+    detGunAcik: (typeof _detGecmisGun !== 'undefined') && !!_detGecmisGun,
+    gecmisGunAcik: getState('currentPage') === 'gecmis' && (typeof _gecmisGun !== 'undefined') && !!_gecmisGun,
+    txDetayAcik: getState('currentPage') === 'degisiklikler' && (typeof _dg !== 'undefined') && !!(_dg && _dg.detayTxid),
+    state: e.state,
+  });
+  switch (_karar ? _karar.tur : 'sayfa') {
+    case 'yut': return;
+    case 'modal': closeM(_karar.id); return;
+    case 'sessiz':
+      _sessizBsPop.remove();
+      globalThis._sessizReturn = false;
       return;
-    }
-    // İptal — dash'e geri dön
-    history.pushState({pg:'dash'}, '', '#dash');
-    goTo('dash', false);
-    return;
+    case 'sentinel':
+      if (confirm('Uygulamadan çıkmak istediğinizden emin misiniz?')) {
+        // Onayladı — tarayıcı/PWA kapanabilir, geri gidebilir
+        return;
+      }
+      // İptal — dash'e geri dön
+      history.pushState({pg:'dash'}, '', '#dash');
+      goTo('dash', false);
+      return;
+    case 'proto-detay':
+      _protoDetay.remove();
+      // Protokol ekranı ve hayvan kartı tekrar göster
+      {
+        const _pBs = document.getElementById('protokol-bs');
+        if (_pBs) _pBs.style.display = 'flex';
+      }
+      return;
+    case 'det-gun':
+      if (typeof gecmisDetGunKapat === 'function') gecmisDetGunKapat();
+      return;
+    case 'det':
+      closeDet();
+      window._prevTaskId = null;
+      {
+        const _pBs2 = document.getElementById('protokol-bs');
+        if (_pBs2 && _pBs2.style.display === 'none') {
+          _pBs2.style.display = 'flex';
+          const _pd2 = document.getElementById('proto-detay-bs');
+          if (_pd2) _pd2.style.display = 'flex';
+        }
+      }
+      return;
+    case 'gun':
+      if (typeof gecmisGunKapat === 'function') gecmisGunKapat();
+      return;
+    case 'tx-detay':
+      if (typeof degisikliklerListeyeDon === 'function') degisikliklerListeyeDon();
+      return;
+    default:
+      // Sayfalar arası geri — history.back() ile geldiğimizde push etme
+      goTo((_karar && _karar.pg) || 'dash', false);
   }
-  // Protokol iş detay bottom-sheet açıksa kapat, protokol ekranına dön
-  const protoDetay = document.getElementById('proto-detay-bs');
-  if (protoDetay && protoDetay.style.display !== 'none') {
-    protoDetay.remove();
-    // Protokol ekranı ve hayvan kartı tekrar göster
-    const protokolBs = document.getElementById('protokol-bs');
-    if (protokolBs) protokolBs.style.display = 'flex';
-    return;
-  }
-
-  // Hayvan kartı açıksa ve protokol ekranı gizliyse — kartı kapat, protokol ekranlarını göster
-  const det = document.getElementById('det');
-  if (det?.classList.contains('on')) {
-    closeDet();
-    window._prevTaskId = null;
-    const protokolBs2 = document.getElementById('protokol-bs');
-    if (protokolBs2 && protokolBs2.style.display === 'none') {
-      protokolBs2.style.display = 'flex';
-      const protoDetay2 = document.getElementById('proto-detay-bs');
-      if (protoDetay2) protoDetay2.style.display = 'flex';
-    }
-    return;
-  }
-  // Modal/sheet state'leri sayfa taşımaz — dash'e atlamayı önle (B21: sheet
-  // girdisiyle karşılaşan back, ekranda sheet varken uygulamayı dash'a götürüyordu)
-  if (e.state?.protokol || e.state?.proto_detay || e.state?.modal) return;
-  // Sayfalar arası geri — history.back() ile geldiğimizde push etme
-  goTo(e.state?.pg || 'dash', false);
 });
 
 // ── RENDER FROM LOCAL ────────────────────────

@@ -464,9 +464,19 @@ function tekTakvimSandboxi(kapaliGun, opts = {}) {
   const doc = makeDomStub();
   const toasts = [];
   const onSecSecimleri = [];
+  // W3: takvim router-modali prod'da closeM'e bağlı (js/utils/modal.js) —
+  // GERÇEK closeM'i aynı dom + history ile yükle (taklit stub bayatması istemiyoruz:
+  // modal.js değişirse takvim kapanış testleri gerçek kodda kırılır).
+  const histStub = { state: null, pushState(s) { this.state = s; }, replaceState(s) { this.state = s; }, back() { this.state = null; }, go() {} };
+  const { sandbox: modalSb } = loadBrowserModule('js/utils/modal.js', {
+    dom: doc,
+    extra: { g: (id) => doc.getElementById(id), history: histStub },
+  });
   const { sandbox } = loadBrowserModule('js/ui.js', {
     dom: doc,
     extra: {
+      closeM: modalSb.closeM,
+      history: histStub,
       bugun: () => '2026-09-13',
       toast: (m, isErr) => toasts.push({ m: String(m), isErr: !!isErr }),
       esc: (s) => String(s || ''),

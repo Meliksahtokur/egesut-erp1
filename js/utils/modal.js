@@ -63,6 +63,9 @@ function openM(id) {
 }
 
 function closeM(id) {
+  // W3: takvim router-modali .on class kullanmaz — DOM'dan remove edilir.
+  // Her kapanış yolu (X, backdrop, ESC, geri tuşu, Onayla) closeM'den geçer.
+  if (id === 'tek-tarih-takvim') { g(id)?.remove(); }
   g(id)?.classList.remove('on');
   globalThis._modalStack = (globalThis._modalStack || []).filter(x => x !== id);
   // Android geri tuşu: bizim pushState ettiğimiz modalı back ile kapat.
@@ -109,3 +112,22 @@ function mClose(e, el) {
   // Backdrop kapatma da closeM'den geçsin — cleanup + history tek noktadan (B3)
   if (e.target === el) closeM(el.id);
 }
+
+// W3 (hapsolmama): ESC en üst router-modalı kapatır (takvim dahil — stack'te).
+// Capture fazında koşar. Autocomplete uzlaşması (review bulgusu — odak-bağımsız):
+// GÖRÜNÜR bir autocomplete paneli varsa ESC ÖNCE onları kapatır ve modal'a
+// dokunmaz; panel yoksa (ya da 2. ESC'te) en üst modal kapanır. Panel kapatma
+// acList/acNav'ın target-faz işiyle aynı davranıştır — capture önce koştuğundan
+// panel tek kez kapanır (çift kapanış yok; acNav sonrası no-op).
+// (İlk sürümde görünürlük taraması yalnız YUT-tı: odak dışındayken panel açık
+// kalınca ESC tamamen ölüyordu — code-review W3 bulgusu, düzeltildi.)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  let panelKapatildi = false;
+  document.querySelectorAll('[id^="ac-"], .ac-box').forEach(p => {
+    if (p.style.display && p.style.display !== 'none') { p.style.display = 'none'; panelKapatildi = true; }
+  });
+  if (panelKapatildi) return;
+  const stack = globalThis._modalStack || [];
+  if (stack.length) closeM(stack[stack.length - 1]);
+}, true);

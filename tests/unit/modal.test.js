@@ -80,6 +80,83 @@ test('closeM: element olmasa bile state eşleşiyorsa back() çağrılır (mevcu
   assert.strictEqual(calls.backs, 1);
 });
 
+// ── W3: takvim router-modali (tek-tarih-takvim) ──────────────────
+// Takvim .on class kullanmaz — DOM'dan remove() ile kapanır; closeM tüm
+// kapanış yolları (X, backdrop, ESC, geri tuşu, Onayla) için tek noktadır.
+test('closeM("tek-tarih-takvim"): element remove() edilir + back mekanizması ortak', () => {
+  const { api, doc, calls, history } = loadModal();
+  const el = doc.__setEl('tek-tarih-takvim', makeElement('div'));
+  const cikarilan = [];
+  el.remove = () => { cikarilan.push('tek-tarih-takvim'); };
+  history.state = { modal: 'tek-tarih-takvim' };
+  api.closeM('tek-tarih-takvim');
+  assert.deepStrictEqual(cikarilan, ['tek-tarih-takvim'], 'takvim DOM\'dan kaldırılmalı (.on class YOK)');
+  assert.strictEqual(calls.backs, 1, 'modal-stack deseni: history entry back ile temizlenir');
+  assert.ok(!(api._modalStack || []).includes('tek-tarih-takvim'), 'stack\'ten düşer');
+});
+
+test('closeM("tek-tarih-takvim"): state modal değilse back ÇAĞRILMAZ (görünüm kapanışı yalnız DOM)', () => {
+  const { api, doc, calls, history } = loadModal();
+  const el = doc.__setEl('tek-tarih-takvim', makeElement('div'));
+  const cikarilan = [];
+  el.remove = () => { cikarilan.push('x'); };
+  history.state = { pg: 'gecmis' };
+  api.closeM('tek-tarih-takvim');
+  assert.strictEqual(cikarilan.length, 1, 'DOM kapanır');
+  assert.strictEqual(calls.backs, 0, 'history dokunulmaz');
+});
+
+test('closeM: mevcut modal id\'leri remove() ÇAĞIRMAZ (regresyon — .on class deseni)', () => {
+  const { api, doc, calls, history } = loadModal();
+  const el = doc.__setEl('m-birth', makeElement('div'));
+  let removeCagri = 0;
+  el.remove = () => { removeCagri++; };
+  el.classList.add('on');
+  history.state = { modal: 'm-birth' };
+  api.closeM('m-birth');
+  assert.strictEqual(removeCagri, 0, 'mevcut modallar remove ile KAPANMAZ');
+  assert.ok(!el.classList.contains('on'));
+});
+
+// ── W3: ESC capture handler (modal.js sonundaki document keydown) ────
+// Davranış: görünür autocomplete paneli varsa ESC ÖNCE panelleri kapatır
+// (modal kalır); panel yoksa en üst router-modal kapanır. W3 code-review
+// bulgusunun kilidi: ilk sürümdeki "yalnız YUT" guard'ı odak-dışı panelde
+// ESC'i tamamen öldürüyordu.
+test('ESC: görünür autocomplete paneli kapatır, modal KALIR; 2. ESC modalı kapatır', () => {
+  const { api, doc, calls, history } = loadModal();
+  const el = doc.__setEl('m-birth', makeElement('div'));
+  el.classList.add('on');
+  const panel = doc.__setEl('ac-tahid', makeElement('div'));
+  panel.style.display = 'block'; // açık autocomplete paneli
+  doc.querySelectorAll = () => [panel]; // makeDomStub'ın stub seçiciyi test-eleme bağla
+  api._modalStack = ['m-birth']; // openM'in kurduğu stack durumu (sandbox'ta elle)
+  history.state = { modal: 'm-birth' };
+  doc.__dispatch('keydown', { key: 'Escape' });
+  assert.strictEqual(panel.style.display, 'none', '1. ESC paneli kapatmalı');
+  assert.ok(el.classList.contains('on'), '1. ESC modal AÇIK bırakmalı');
+  doc.__dispatch('keydown', { key: 'Escape' });
+  assert.ok(!el.classList.contains('on'), '2. ESC modalı kapatmalı');
+  assert.strictEqual(calls.backs, 1);
+});
+
+test('ESC: panel yokken en üst modal direkt kapanır (odak-bağımsız — review bulgusu)', () => {
+  const { api, doc, calls, history } = loadModal();
+  const el = doc.__setEl('m-birth', makeElement('div'));
+  el.classList.add('on');
+  api._modalStack = ['m-birth'];
+  history.state = { modal: 'm-birth' };
+  doc.__dispatch('keydown', { key: 'Escape' });
+  assert.ok(!el.classList.contains('on'), 'panel yok — ESC modalı kapatmalı (yutmamalı)');
+  assert.strictEqual(calls.backs, 1);
+});
+
+test('ESC: boş stack — no-op (sayfa görünümlerine dokunmaz)', () => {
+  const { api, doc, calls } = loadModal();
+  doc.__dispatch('keydown', { key: 'Escape' });
+  assert.strictEqual(calls.backs, 0);
+});
+
 test('closeM("m-insem"): planlı tohumlama bayrağı HER kapanış yolunda sıfırlanır', () => {
   const { api, doc } = loadModal();
   doc.__setEl('m-insem', makeElement('div'));
