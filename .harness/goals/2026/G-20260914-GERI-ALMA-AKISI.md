@@ -222,21 +222,52 @@ Geri alınabilirlik kuralları değişmez: çakışmada bypass YOK (zincir dış
 çakışma), bağımlılık ENGEL bloklar, `degisim_log`/bilet tabloları kapsam dışı,
 sistem öncesi değişiklik geri alınamaz.
 
-### K1 uygulama notu (lead kararı, W1 teslimi sonrası 2026-09-14)
+### K1 uygulama notu — ROOT NETLEŞTİRMESİ İLE DEĞİŞTİ (2026-09-14/2, luna L4-03)
 
-W1'in bağımsız ölçümü: `dogum`'un `tohumlama`'ya FK'sı yok (yalnız hayvan
-köprüsü) — S3b zinciri yalnız köprü INSERT'leri kabul edilerek kurulabiliyor.
-Bu nedenle **hayvan köprüsü üzerinden gelen sonraki INSERT'ler, engel üretmese
-de zincire bağımlı adım olarak girer** (root K1'in tohumlama→sonuc→doğum
-örneğinin tek mekanik yolu). Sınırlar: yalnız INSERT — üst-satır (hayvanlar
-satırının kendi, örn. kilo) ve kardeş satırların U/D düzenlemeleri zincire
-GİRMEZ. Aşırı dahil etme riski (ilgisiz aynı-hayvan INSERT'i) görünür onayla
-sınırlandırılır: zincir önizlemesi TAM kart listesi verir, sahibin tek onayı
-gerektirir; geri almanın geri alınması mümkün. Kanıt: W1 k4 V4a/V4b.
-Ek motor detayı (W1, sözleşmeye uygun): rehber birimleri `'l4_rehber': true`
-taşır — yalnız bu işaretli hedeflerde sonradan-dönülmüş değişiklik çakışma
-sayılmaz ("önce 5'i, sonra 4'ü" akışı); işaretsiz çağrılarda L2 kuralı aynen
-(k3 46/46).
+İLK not (köprü INSERT'leri engel üretmese de girer) **YÜRÜRLÜKTEN KALDIRILDI** —
+root bağlayıcı netleştirmesi: **zincire yalnız hedef için GERÇEK ENGEL/ÇAKIŞMA
+üreten adımlar girer:** (a) aynı satırın sonraki değişiklikleri (tanımı gereği
+çakışma üretirler); (b) **gerçek FK bağımlı alt kayıtlar** (`pg_constraint`'ten
+doğrulanan) üzerindeki, planı engelleyen sonraki değişiklikler. Aynı hayvanın
+**İLİGSİZ** olayları (aşı, kilo, başka kayıt) zincire **GİRMEZ**. Bağımlılık
+güvenle belirlenemiyorsa otomatik zincir YOK — `sirali_rehber` (çıkmaz engel
+yine yok). S3b senaryosu buna göre yeniden yorumlanır: aynı-satır sonuc
+değişikliği zincire girer; doğum yalnız gerçek FK/engel üretiyorsa girer,
+aksi hâlde rehberde sıralı adım olur.
+
+### Onarım turu sözleşmesi (root kararı 2026-09-14/2 — luna L4-01..L4-09, BAĞLAYICI)
+
+1. **L4-01:** `l4_rehber` bayrağı çağırandan OKUNMAZ — sunucu ÜRETİR ve
+   doğrular. İstemcinin `p_hedef`'e koyduğu `l4_rehber` YOK SAYILIR/reddedilir;
+   rehber gevşetmesi yalnız sunucunun kendi ürettiği rehber hedeflerinde geçerli
+   (W4 mekanizmayı seçer ve k4'te kanıtlar).
+2. **L4-02:** köprü trigger'ı `degisim_txid`'i HER ZAMAN `txid_current()` ile
+   yazar (istemci değeri ezilir). `tip='GERI_ALINDI'` yalnız `degisim_geri_al`
+   içinden yazılabilir (GUC kapısı; authenticated doğrudan INSERT reddi).
+   Ölçüldü (lead): uygulama `islem_log`'a yalnız SELECT yapıyor
+   (js/api.js:417) — doğrudan INSERT yok → authenticated INSERT ACL'i
+   kapatılabilir. Sahte `degisim_txid`/sahte `GERI_ALINDI` adversarial k4
+   vakaları ZORUNLU.
+3. **L4-03:** yukarıdaki K1 netleştirmesi — frozen contract §3(b) bu metinle
+   değişir.
+4. **L4-04:** rehber satırı TEKİL hedef seviyesiyle çağrılır (`satir`),
+   `islem` DEĞİL (UI + planner uyumu).
+5. **L4-05:** zaman yedeği `islem_log.tarih`'i kullanır (canlıda `created_at`
+   YOK — luna ölçümü; resolver bu yüzden çalışmıyordu).
+6. **L4-06:** `GERI_ALINDI` Geçmiş allow-list'e girer; telafi
+   `payload.orijinal_tip` GERÇEK işlem tipini taşır (degisim_txid köprüsünden;
+   harf-kümesi değil).
+7. **L4-07:** işlem detay payload değerleri `esc`'li; hayvan referansları
+   (buzagi_id/farm_animal_id dahil) küpeye dönüştürülür; `pk` yalnız teknik
+   katlamada.
+8. **L4-08:** önizleme modalı yeniden açılışında (zincir önerisi/⟲) fazladan
+   history entry EKLENMEZ (openM tekilleştirme).
+9. **L4-09:** teslim raporu + hedefe pinli S1-S6+S3b yürüyüşü lead'te (sonda).
+10. **k4 YENİDEN ÜRETİLİR** (root emri; eski zarf yasakları kalktı): W1 raporu
+    §3'teki 22 vaka + adversarial vakalar (ilgisiz aynı-hayvan INSERT zincire
+    girmez; sahte l4_rehber reddedilir; sahte GERI_ALINDI/degisim_txid
+    reddedilir) + k3 46 vaka regresyonu. Çıktılar `reports/` altına; worker
+    kapanmadan önce ana checkout'a kopyalanır.
 
 ## Frozen contract — FAZ B UI yüzeyleri (BINDING for W2/W3)
 
