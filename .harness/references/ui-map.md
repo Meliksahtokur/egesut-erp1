@@ -277,8 +277,12 @@ violation. Decision record: `D-20260909-CANONICAL-DATE-PICKER.md`.
   `ref_tablo+ref_id` → tip fallback zinciri.
 - İşlem dili: başlık `${olayEtiketi} — gg.aa ss:dd · kim` (tek kaynak
   gecmis.js haritası + `GERI_ALINDI`); ham UUID/tx yalnız `details.dg-teknik`
-  katlamasında. Gürültü: `teknikal_mi` + `app_name≠'egesut-web'` varsayılan
-  gizli ("Teknik (N)" / "Uygulama dışı (N)" çipleri).
+  katlamasında. Liste kartı başlığı da işlem dillidir (lead dokunuşu
+  2026-09-14, damga 20260914-08): `_dgKartBaslik` — sunucu `ozet.baslik`
+  ("padoklar (1)") yerine "Padok ekleme / güncelleme / değişikliği",
+  `kaynak.geri_alma` varsa "— geri alındı". Gürültü: `teknikal_mi` +
+  `app_name≠'egesut-web'` varsayılan gizli ("Teknik (N)" /
+  "Uygulama dışı (N)" çipleri).
 - Zincir/rehber: çakışmada `dg-zincir-oner` önerisi → zincir kart listesi →
   tek onay; kurulamıyorsa `dg-rehber-geri-al` satırları (sıra numaralı).
   Sonuç bloğunda `dg-geri-alinani-geri-al` (⟲) kısayolu.

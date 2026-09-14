@@ -9,11 +9,12 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { loadBrowserModule } = require('./support/loadModule.js');
 
+const etiketSandbox = loadBrowserModule('js/degisiklikler/etiketler.js', { extra: {} });
 const { sandbox, exposed } = loadBrowserModule('js/degisiklikler/degisiklikler.js', {
-  extra: { registerActions: () => {} },
-  expose: ['_dgRehberHazirla'],
+  extra: { registerActions: () => {}, tabloEtiketi: etiketSandbox.exposed.tabloEtiketi ?? etiketSandbox.sandbox.tabloEtiketi, islemEtiketi: etiketSandbox.exposed.islemEtiketi ?? etiketSandbox.sandbox.islemEtiketi },
+  expose: ['_dgRehberHazirla', '_dgKartBaslik'],
 });
-const { _dgRehberHazirla } = exposed;
+const { _dgRehberHazirla, _dgKartBaslik } = exposed;
 
 const R = (id, zaman, ozet) => ({ hedef: { tablo: 'tohumlama', pk: id, txid: id }, zaman, ozet });
 
@@ -56,4 +57,12 @@ test('rehber: neden_dahil_degil metni aynen taşınır', () => {
 test('sandbox: degisiklikler.js modülü aksiyon kaydıyla yüklenir', () => {
   assert.strictEqual(typeof sandbox.dgGeriAlAkisi, 'function');
   assert.strictEqual(typeof sandbox.dgGeriAlFromEntry, 'function');
+});
+
+// ── Liste kartı başlığı — işlem dili (L4 entegrasyon dokunuşu, plan §5) ─────
+test('kart başlığı: işlem dili; ham özet değil', () => {
+  assert.strictEqual(_dgKartBaslik({ baslik: 'padoklar (1)', islemler: { I: 1 } }, null), 'Padok ekleme');
+  assert.strictEqual(_dgKartBaslik({ baslik: 'tohumlama (1)', islemler: { U: 1 } }, { geri_alma: { bilet: 'x' } }), 'Tohumlama güncelleme — geri alındı');
+  assert.strictEqual(_dgKartBaslik({ baslik: 'gorev_log (2)', islemler: { I: 1, U: 1 } }, null), 'Görev değişikliği');
+  assert.strictEqual(_dgKartBaslik({ baslik: '?? (1)', islemler: {} }, null), '?? (1)'); // bilinmeyen biçim aynen geçer (savunmacı)
 });

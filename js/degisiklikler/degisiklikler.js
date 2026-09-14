@@ -232,6 +232,21 @@ function _dgKaynakMetni(k) {
 }
 // (eskiden _dgUygulamaDisi — L4-W2'de SAF katmana taşındı: diff.js dgUygulamaDisiMi)
 
+// Liste kartı başlığı — İŞLEM DİLİ (plan §5; sahibin "SQL tablosu değil" sözü):
+// sunucu ozet.baslik'i ham biçimdir ("padoklar (1)"); insan dilli başlık
+// istemcide üretilir: tablo adı baslik önekinden, işlem tipi ozet.islemler'den.
+// "Padok eklendi" / "Padok değişikliği" / geri almada "Padok eklendi — geri alındı".
+function _dgKartBaslik(o, kaynak) {
+  const ham = (o && o.baslik) || '';
+  const m = ham.match(/^([a-z_0-9]+)\s*\(/);
+  const tabloTr = m ? tabloEtiketi(m[1]) : '';
+  const isl = (o && o.islemler) || {};
+  const tipler = ['I', 'U', 'D'].filter(k => isl[k]);
+  const islTr = tipler.length === 1 ? islemEtiketi(tipler[0]).toLowerCase() : 'değişikliği';
+  const govde = tabloTr ? `${tabloTr} ${islTr}` : (ham || 'Değişiklik');
+  return kaynak && kaynak.geri_alma ? `${govde} — geri alındı` : govde;
+}
+
 function _dgListeCiz() {
   const liste = document.getElementById('dg-liste');
   if (!liste) return;
@@ -253,7 +268,7 @@ function _dgListeCiz() {
     const dis = dgUygulamaDisiMi(k.kaynak);
     return `<div class="dg-kart" role="button" data-action="dg-tx-ac" data-txid="${escAttr(String(k.txid))}">
       <div class="dg-kart-ust">
-        <span class="dg-baslik">${esc(o.baslik || 'Değişiklik')}</span>
+        <span class="dg-baslik">${esc(_dgKartBaslik(o, k.kaynak))}</span>
         <span class="dg-zaman">${esc(fmtTarihSaat(k.ilk_zaman))}</span>
       </div>
       <div class="dg-kart-alt">
