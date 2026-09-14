@@ -2726,13 +2726,14 @@ async function _detRenderGecmis(id,el,opts){
       return;
     }
 
-    // islem detay paneli indeksi (Geri Al modal desteği korunur)
+    // islem detay paneli (Geri Al modal desteği korunur); U1: kart → panel
+    // erişimi id haritasıyla (idx yarışı yok — her yüzey kendi id'lerini
+    // haritaya EKLER; uuid'ler çakışmaz, bayat-harita ölü kart üretmez)
     const islemLogs=entries.filter(e=>e.type==='islem').map(e=>e.data);
     globalThis._detGecmisLogs=islemLogs;
-    entries.forEach(e=>{
-      if(e.type==='islem') e._islemIdx=islemLogs.indexOf(e.data);
-      e.searchText=_gecmisSearchText(e);
-    });
+    const _logMap=globalThis._gmIslemLogById||(globalThis._gmIslemLogById={});
+    islemLogs.forEach(l=>{ if(l&&l.id) _logMap[l.id]=l; });
+    entries.forEach(e=>{ e.searchText=_gecmisSearchText(e); });
     globalThis._detGecmisEntries=entries;
 
     function _renderDetGecmisList(q){
@@ -2741,7 +2742,8 @@ async function _detRenderGecmis(id,el,opts){
       if(!bodyEl) return;
       if(!list.length){bodyEl.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>';return;}
       bodyEl.innerHTML=list.map(e=>{
-        if(e.type==='islem') return _gecmisEntryHtml(e,`onclick="openIslemDetay(${e._islemIdx})" style="cursor:pointer"`);
+        // U1: islem kartı artık _gecmisEntryHtml içinde gm-islem dataset'iyle
+        // tıklanır (ana listeyle AYNI yol — islem detay paneli kart altına açılır)
         if(e.type==='gorev' && e.data?.gorev_tipi!=='TEDAVI_GUN') return _gecmisEntryHtml(e,'');
         if(e.type==='uygulama') return _gecmisEntryHtml(e,'');
         return _gecmisEntryHtml(e);
@@ -2966,14 +2968,25 @@ async function islemGeriAl(islemId) {
 function openIslemDetay(idx){
   const l=(globalThis._detGecmisLogs||[])[idx];
   if(!l) return;
+  // U1: eski idx arayüzü korundu (harici çağrı ihtimali); panel hedefi eski
+  // #tab-gecmis .hist-row[idx] aramasıdır. Geçmiş kartları artık dataset+
+  // delegasyonla _openIslemDetayRow(l, kartEl) kullanır — panel kartın altına açılır.
+  const rows=document.getElementById('tab-gecmis')?.querySelectorAll('.hist-row');
+  _openIslemDetayRow(l, rows?.[idx]);
+}
+// U1 md.2: islem detay paneli — geçmiş kartından tıklanan kartın ALTINA açılır
+// (anchor=el); anchor verilmezse eski .hist-row davranışı aynen. ROOT KURALI
+// (2026-09-14): geri-al butonlarının yoluna DOKUNULMADI (yazma yolu U1 dışı —
+// tek-arg islemGeriAl kırığı rapora açık kalem); yalnız etiket/ikon ortak
+// haritadan gelir (js/gecmis.js — LABEL/ICO yerel kopyaları silindi).
+function _openIslemDetayRow(l, anchor){
+  if(!l) return;
   // ref_tablo varsa doğrudan ilgili detay modalını aç
   // ABORT_KAYDI hariç: abort kaydının Geri Al butonu bu panelde — toh det'e yönlendirme
   if(l.ref_tablo==='tohumlama' && l.ref_id && l.tip!=='ABORT_KAYDI'){ openTohDet(l.ref_id); return; }
   // TOHUMLAMA tipinde snapshot id varsa direkt aç
   const snapId=l.snapshot?.id;
   if(l.tip==='TOHUMLAMA' && snapId){ openTohDet(snapId); return; }
-  const LABEL={'HAYVAN_EKLENDI':'Hayvan Eklendi','TOHUMLAMA':'Tohumlama','DOGUM_KAYDI':'Doğum','HASTALIK_KAYDI':'Hastalık Kaydı','TEDAVI_GUNCELLE':'Tedavi Güncelle','KIZGINLIK':'Kızgınlık','ABORT_KAYDI':'Abort','SATIS_KAYDI':'Satış','OLUM_KAYDI':'Ölüm','SUTTEN_KESME':'Sütten Kesme','KISIR_ISARETLE':'Kısır İşareti','KISIR_KALDIR':'Kısır Kaldırıldı','VAKA_ACILDI':'Vaka Açılışı','TEDAVI_GUN_EKLENDI':'Tedavi Günü Eklendi'};
-  const ICO={'HAYVAN_EKLENDI':'🐮','TOHUMLAMA':'💉','DOGUM_KAYDI':'🐄','HASTALIK_KAYDI':'🏥','TEDAVI_GUNCELLE':'💊','KIZGINLIK':'🔴','ABORT_KAYDI':'⚠️','SATIS_KAYDI':'💰','OLUM_KAYDI':'💀','SUTTEN_KESME':'🍼','KISIR_ISARETLE':'💲','KISIR_KALDIR':'⭕','VAKA_ACILDI':'🏥','TEDAVI_GUN_EKLENDI':'💊'};
   const ALAN={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe'};
   const tarih=(l.created_at||l.tarih||'').slice(0,10);
   const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI','HAYVAN_GUNCELLENDI','VAKA_ACILDI','TEDAVI_GUN_EKLENDI'];
@@ -2985,29 +2998,33 @@ function openIslemDetay(idx){
   const gaBtn=GeriAlabilir.includes(l.tip)
     ? (l.tip === 'HAYVAN_GUNCELLENDI'
       ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="islemGeriAl('${l.id}')">↩️ Geri Al</button>`
-      : `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="openGeriAl('${l.id}','${LABEL[l.tip]||l.tip} — ${tarih} tarihli kayıt geri alınacak.')">↩ Geri Al</button>`)
+      : `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="openGeriAl('${l.id}','${_GM_ISLEM_TIP_ETIKET[l.tip]||l.tip} — ${tarih} tarihli kayıt geri alınacak.')">↩ Geri Al</button>`)
     : '';
   const html=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px;margin-top:8px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <span style="font-size:1.1rem">${ICO[l.tip]||'📋'}</span>
-      <span style="font-weight:700;font-size:.88rem">${LABEL[l.tip]||l.tip}</span>
+      <span style="font-size:1.1rem">${_gmIslemTipEmoji(l.tip)}</span>
+      <span style="font-weight:700;font-size:.88rem">${esc(_gmIslemTipEtiket(l.tip))}</span>
       <span style="margin-left:auto;font-size:.72rem;color:var(--ink3)">${tarih}</span>
     </div>
     ${satirlar||'<div style="font-size:.78rem;color:var(--ink3);text-align:center;padding:8px 0">Detay yok</div>'}
     ${gaBtn}
     <button class="btn btn-o" style="width:100%;margin-top:6px;font-size:.8rem" onclick="this.closest('.islem-detay-panel').remove()">Kapat</button>
   </div>`;
-  // Aynı panel açıksa kapat, yoksa ekle
-  const gecmisEl=document.getElementById('tab-gecmis');
-  const existing=gecmisEl?.querySelector('.islem-detay-panel');
+  // Aynı panel açıksa kapat, yoksa ekle — U1: önce tıklanan kart (anchor),
+  // yoksa eski .hist-row hedefi
+  const existing=document.querySelector('.islem-detay-panel');
   if(existing) existing.remove();
-  const rows=gecmisEl?.querySelectorAll('.hist-row');
-  const clickedRow=rows?.[idx];
-  if(clickedRow){
+  let hedef=anchor;
+  if(!hedef){
+    const gecmisEl=document.getElementById('tab-gecmis');
+    const rows=gecmisEl?.querySelectorAll('.hist-row');
+    hedef=rows?.[(globalThis._detGecmisLogs||[]).indexOf(l)];
+  }
+  if(hedef){
     const panel=document.createElement('div');
     panel.className='islem-detay-panel';
     panel.innerHTML=html;
-    clickedRow.insertAdjacentElement('afterend',panel);
+    hedef.insertAdjacentElement('afterend',panel);
   }
 }
 
@@ -3823,8 +3840,65 @@ const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',u
   asi:'💉',kizginlik:'🔴',stok:'📦',cikis:'🚪',sutten:'🍼',protokol:'🩺'};
 const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',uygulama:'rgba(120,80,200,.1)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',ASI_ERTELEME:'rgba(120,120,120,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)',
   asi:'rgba(0,160,200,.1)',kizginlik:'rgba(192,50,26,.1)',stok:'rgba(120,100,60,.12)',cikis:'rgba(120,120,120,.14)',sutten:'rgba(78,154,42,.1)',protokol:'rgba(42,107,181,.08)'};
-const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
-const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık',ASI_KAYDI:'💉 Aşı Kaydı',ASI_ERTELEME:'⏸️ Aşı Ertelendi',TOPLU_ILAC:'💊 Toplu İlaç'};
+// U1 md.1: _ISLEM_ICO/_ISLEM_ETK iki kopyası KALDIRILDI — islem_log tip etiket+
+// emoji TEK kaynak js/gecmis.js (_GM_ISLEM_TIP_ETIKET/_GM_ISLEM_TIP_EMOJI ve
+// _gmIslemTipEtiket/_gmIslemTipEmoji okunur yedeği).
+
+// U1 md.3: islem kartının küpe etiketi — _gecmisEntryHtml islem dalı ile katlı
+// kart satır etiketi AYNI kaynak (çıkarıldı; sıra: state → snapshot → çıkış-cache
+// → IDB hayvan indeksi). ROOT KURALI (2026-09-14): ham UUID ASLA görünmez —
+// çözülemeyen hayvan '?'e düşer.
+function _gecmisKupeLabel(e){
+  const d=e.data||{};
+  const snap=d.snapshot||{};
+  const hayvanObj=getState('animals').find(a=>a.id===d.ana_hayvan_id);
+  let _exitedCache={};try{_exitedCache=JSON.parse(localStorage.getItem('ege_exited_kupe')||'{}');}catch(err){}
+  return hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_exitedCache[d.ana_hayvan_id]
+    ||(globalThis._gmHayvanKupeById||{})[d.ana_hayvan_id]||'?';
+}
+// U1 (root düzeltme-2): hayvansız islem kartı başlık etiketi — '?' yerine
+// snapshot'taki görev adı/açıklaması, o da yoksa 'Genel'.
+function _gmIslemBaslikEtiketi(e){
+  const k=_gecmisKupeLabel(e);
+  if(k&&k!=='?') return k;
+  const snap=(e.data||{}).snapshot||{};
+  let a=snap.aciklama||snap.label||snap.notlar||'';
+  if(typeof a==='string'&&a.trim().startsWith('{')){try{a=JSON.parse(a).label||a;}catch(err){/* ham metin */}}
+  a=String(a||'').trim();
+  return a||'Genel';
+}
+// Katlı grubun satır etiketi — tür bazlı (islem: başlık etiketi; stok: ürün; diğer: hayvan etiketi)
+function _gmKatSatirEtiket(e){
+  const d=e.data||{};
+  if(e.type==='islem') return _gmIslemBaslikEtiketi(e);
+  if(e.type==='stok') return d._urunAdi||'Stok hareketi';
+  if(e.type==='cikis'||e.type==='sutten') return d.kupe_no||d.devlet_kupe||'?';
+  const hid=d.hayvan_id||d.anne_id||d.animal_id;
+  const a=getState('animals').find(x=>x.id===hid||x.kupe_no===hid);
+  return (a&&(a.kupe_no||a.devlet_kupe))||(globalThis._gmHayvanKupeById||{})[hid]||'?';
+}
+// U1 md.3: katlanmış toplu kart — "🩺 Tedavi Günü Eklendi — 12 hayvan" + küpe
+// listesi (ilk 8, kalan "+N"); tıklayınca altındaki tam kartlar açılır (gm-kat-ac).
+// Tüm DB kaynaklı metin esc/escAttr; id DOM anahtarı deterministik-temizdir.
+function _gmKatKartHtml(g){
+  const islemGrubu=g.sourceKey==='islem_log';
+  const etiket=islemGrubu?_gmIslemTipEtiket(g.tip):(_GM_KATEGORI_TR[g.tip]||_gmIslemTipEtiket(g.tip));
+  const emoji=islemGrubu?_gmIslemTipEmoji(g.tip):(_GM_KATEGORI_EMOJI[g.tip]||'📋');
+  const olcu=g.sourceKey==='stok_hareket'?'kayıt':'hayvan';
+  const etiketler=g.entries.map(_gmKatSatirEtiket).map(s=>String(s??''));
+  const ilk=etiketler.slice(0,8).map(x=>esc(x)).join(' · ');
+  const kalan=etiketler.length-8;
+  const katId='gm-kat-'+String((g.dateKey||'')+'-'+(g.sourceKey||'')+'-'+(g.tip||'')+'-'+(g.dakika||'')).replace(/[^a-zA-Z0-9]+/g,'-');
+  return `<div class="stok-item" style="background:var(--card);border:1.5px dashed var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start;cursor:pointer" data-action="gm-kat-ac" data-kat="${escAttr(katId)}">
+    <div style="width:36px;height:36px;border-radius:10px;background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0">${emoji}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${esc(etiket)} — ${Number(g.count)||0} ${olcu}</div>
+      <div style="font-size:.68rem;color:var(--ink2);margin-top:2px;overflow-wrap:anywhere">${ilk}${kalan>0?` <b>+${kalan}</b>`:''}</div>
+      <div style="font-size:.62rem;color:var(--ink3);margin-top:3px"><span class="gm-kat-ok">▸</span> Tıkla — ${Number(g.count)||0} kaydı göster</div>
+    </div>
+  </div>
+  <div class="gm-kat-acik" id="${escAttr(katId)}" style="display:none">${g.entries.map(e=>_gecmisEntryHtml(e)).join('')}</div>`;
+}
 
 function _gecmisEntryHtml(e, overrideOc){
   const {type,data}=e;
@@ -3835,17 +3909,19 @@ function _gecmisEntryHtml(e, overrideOc){
   const hayvanKey=data.hayvan_id||data.anne_id||data.animal_id;
   const hayvanObj=getState('animals').find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);
   const hayvanLabel=hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||hayvanKey;
-  const ico=_GECMIS_ICO[type]||(_ISLEM_ICO[data.tip]||'📋');
+  const ico=_GECMIS_ICO[type]||_gmIslemTipEmoji(data.tip); // U1: tek harita (gecmis.js)
   const icoBg=_GECMIS_BG[type]||'rgba(120,120,120,.1)';
   let oc='',title='',sub='';
   const _sk=e.sourceKey||type; // TG1: aynı tipin varyant kalemleri (sonuç/kapanış)
-  if(type==='hastalik') oc=`onclick="openCaseDet('${data.id}')" style="cursor:pointer"`;
-  else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
+  // U1 md.2: geçmiş kartlarında inline onclick YOK — DB kimliği dataset'te
+  // (escAttr) taşınır, tıklama handlers.js merkezi delegasyonuyla gider.
+  if(type==='hastalik') oc=data.id?`data-action="gm-case" data-det="${escAttr(data.id)}" style="cursor:pointer"`:'';
+  else if(type==='tohumlama') oc=data.id?`data-action="gm-toh" data-det="${escAttr(data.id)}" style="cursor:pointer"`:'';
   else if(type==='dogum') oc='';
   if(type==='dogum'){
     const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id);
     const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
-    title=`<span onclick="openDet('${data.anne_id}')" style="cursor:pointer">${esc(anneLabel)||'?'}</span> → <b onclick="openDetByKupe('${data.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${esc(data.yavru_kupe)||'?'}</b> (${esc(data.yavru_cins||'?')})`;
+    title=`<span${data.anne_id?` data-action="gm-det" data-det="${escAttr(data.anne_id)}" style="cursor:pointer"`:''}>${esc(anneLabel)||'?'}</span> → <b${data.yavru_kupe?` data-action="gm-kupe" data-det="${escAttr(data.yavru_kupe)}" style="cursor:pointer;color:var(--blue)"`:''}>${esc(data.yavru_kupe)||'?'}</b> (${esc(data.yavru_cins||'?')})`; // U1: dataset delegasyonu
     sub=`${esc(data.dogum_tipi||'Normal')}${hkName}`; // TG1-W3 (luna F3): dogum_tipi escape
   } else if(type==='tohumlama'&&_sk==='tohumlama_sonuc'){
     // TG1 gün görünümü: terminal sonuç KALEMİ — kendi sonuç gününde ayrı satır
@@ -3875,30 +3951,32 @@ function _gecmisEntryHtml(e, overrideOc){
       const drugLine=(data._drugNames||[]).length?`<div style="font-size:.66rem;color:var(--ink2);margin-top:1px">💊 ${esc(data._drugNames.join(', '))}</div>`:'';
       const disLine=data._disName?`<span style="font-size:.62rem;color:var(--ink3)">🏥 ${esc(data._disName)}</span> · `:'';
       sub=`${drugLine}<div style="margin-top:1px">${disLine}${_pill}</div>`;
-      if(data._caseId) oc=`onclick="openCaseDet('${data._caseId}')" style="cursor:pointer"`;
+      if(data._caseId) oc=`data-action="gm-case" data-det="${escAttr(data._caseId)}" style="cursor:pointer"`; // U1: dataset delegasyonu
     } else {
       let _aLbl='';try{const _p=typeof data.aciklama==='string'?JSON.parse(data.aciklama):data.aciklama;_aLbl=_p?.label||data.aciklama||'';}catch(e){_aLbl=data.aciklama||'';}
       title=`${esc(gLabel||'GENEL')} — ${esc(_aLbl)}`;
       sub=`<span class="pill ${escAttr(data.gorev_tipi||'DIGER')}">${esc((data.gorev_tipi||'').replace(/_/g,' '))}</span> · ${_pill}${hkName}`; // TG1-W3 (luna F3): gorev_tipi class+metin escape
-      if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
+      if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // U1: dataset delegasyonu
     }
   } else if(type==='uygulama'){
     const uHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
     const uLabel=uHayvan?(uHayvan.kupe_no||uHayvan.devlet_kupe):data.hayvan_id;
     title=`${esc(uLabel||'?')} — ${esc(data._stokAdi||'?')}`;
     sub=`${esc(String(data.doz??'?'))} ${esc(data.birim||'ml')} · ${esc(data.rota||'IM')}${data.notlar?' · '+esc(data.notlar):''}`; // TG1-W3 (luna F3): uygulama alanları escape
-    if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
+    if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // U1: dataset delegasyonu
   } else if(type==='islem'){
+    const kupe=_gmIslemBaslikEtiketi(e); // U1 root-düzeltme-2: hayvansızda '?' yerine görev adı/'Genel'
+    title=`${esc(kupe)} — ${esc(_gmIslemTipEtiket(data.tip))}`; // U1: tek harita + okunur yedek — ham kod YOK (luna F3 escape'i korunur)
     const snap=data.snapshot||{};
-    const hayvanObj2=getState('animals').find(a=>a.id===data.ana_hayvan_id);
-    const _exitedCache=JSON.parse(localStorage.getItem('ege_exited_kupe')||'{}');
-    const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_exitedCache[data.ana_hayvan_id]||data.ana_hayvan_id||'?';
-    title=`${esc(kupe)} — ${esc(_ISLEM_ETK[data.tip]||data.tip||'')}`; // TG1-W3 (luna F3): bilinmeyen islem tipi de escape
     if(data.tip==='ASI_KAYDI') sub=esc(snap.vaccine_name||'');
     else if(data.tip==='ASI_ERTELEME') sub=esc(snap.erteleme_notu||snap.vaccine_name||'');
     else if(data.tip==='TOPLU_ILAC') sub=esc(snap.ilac_adi||'');
     else sub=esc(snap.irk||snap.grup||'');
-    if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
+    // U1 md.2: işlem aynası kartı KOŞULSUZ tıklanabilir — hayvan detayındaki
+    // aynanın gittiği yer: islem detay paneli (openIslemDetay hattı). id yoksa
+    // hayvan detayına düşer (eski kayıtlar).
+    if(data.id) oc=`data-action="gm-islem" data-det="${escAttr(data.id)}" style="cursor:pointer"`;
+    else if(data.ana_hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.ana_hayvan_id)}" style="cursor:pointer"`;
   } else if(type==='asi'){
     // TG1 gün görünümü: vaccination_log kalemi (islem aynası dedup ile baskılanır)
     title=`${esc(hayvanLabel||'?')} — ${esc(data._asiAdi||'Aşı')}`;
@@ -3910,10 +3988,12 @@ function _gecmisEntryHtml(e, overrideOc){
     sub=esc(data.belirti||'');
     if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   } else if(type==='stok'){
-    // hayvansız kategori (rapor §E.3) — ürün adı zenginleştirmesi _urunAdi
+    // hayvansız kategori (rapor §E.3) — ürün adı zenginleştirmesi _urunAdi;
+    // U1 md.2: stok_id bağlanabiliyorsa kart stok detayına gider
     const giris=['Giriş','İade','Düzeltme','Ekleme'].includes(data.tur);
     title=`${esc(data._urunAdi||'Stok hareketi')}`;
     sub=`<b style="color:${giris?'var(--green)':'var(--red)'}">${giris?'+':'−'}${esc(String(data.miktar??'?'))} ${esc(data._birim||'')}</b> · ${esc(data.tur||'')}${data.notlar?' · '+esc(data.notlar):''}`;
+    if(data.stok_id) oc=`data-action="gm-stok" data-det="${escAttr(data.stok_id)}" style="cursor:pointer"`;
   } else if(type==='cikis'){
     // hayvanlar satırının KENDİSİ kaynak — etiket satırdan, state aramasız
     const lbl=data.kupe_no||data.devlet_kupe||data.id;
@@ -3964,7 +4044,7 @@ function _gecmisSearchText(e){
   }
   else if(e.type==='islem'){
     const snap=d.snapshot||{};
-    parts.push(_ISLEM_ETK[d.tip]||d.tip||'',snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||'');
+    parts.push(_gmIslemTipEtiket(d.tip),snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||''); // U1: etiket + yedek aramaya da düşer
   }
   // TG1 tek-gün görünümü kategorileri
   else if(e.type==='asi'){parts.push(d._asiAdi||'','aşı','aşı kaydı');}
@@ -4032,6 +4112,11 @@ async function _gecmisCollectSources(){
   const vacEnr=vacArr.map(r=>({...r,_asiAdi:vaxById[r.vaccine_id]?.name||''}));
   const stokSatiri=Object.fromEntries(stokArr.map(s=>[s.id,s]));
   const stkHrkEnr=stkHrkArr.map(r=>({...r,_urunAdi:stokById[r.stok_id]||'',_birim:stokSatiri[r.stok_id]?.birim||''}));
+  // U1 (root 2026-09-14 düzeltme-1): id→küpe indeksi — kartlarda ham UUID ASLA
+  // görünmesin. state 'animals' boot-pull commit'ini kaçırabilir; hayvanlar zaten
+  // bu collect'te IDB'den okunduğu için buradan indekslenir (state-gecikmesine
+  // karşı ikinci kaynak).
+  globalThis._gmHayvanKupeById=Object.fromEntries(hayvanArr.map(h=>[h.id,(h.kupe_no||h.devlet_kupe||'')]).filter(([,k])=>k));
   return {
     gorev_log:gorevEnr, tohumlama:tohArr, cases:casesEnr, dogum:dogumArr, uygulama_log:uyEnr, islem_log:islemArr,
     vaccination_log:vacEnr, kizginlik_log:kizArr, stok_hareket:stkHrkEnr, hayvanlar:hayvanArr, protokol_instance:protoArr,
@@ -4066,6 +4151,9 @@ function _gecmisRender(q){
   else if(f==='hastalik') list=list.filter(e=>e.category==='hastalik');
   else if(f==='gorev') list=list.filter(e=>e.category==='gorev'||e.category==='uygulama');
   else if(f==='hayvan') list=list.filter(e=>e.category==='islem');
+  // U1 md.4: gün modu kategori çip filtresi (istemci tarafı, ek pull yok;
+  // üst filtre düğmelerinden bağımsız daraltma — çip tekrar tık ile kalkar)
+  if(_gecmisGun&&_gecmisGunCip) list=list.filter(e=>e.category===_gecmisGunCip);
   const filtreliSayi=list.length;
   list=_gmSearch(list,q);
   const {visible,total}=_gmCap(list,300);
@@ -4081,17 +4169,19 @@ function _gecmisRender(q){
   // vurgusu banner'da ayrı). Klasik/Defter ayrımı gün görünümünde anlamsız.
   if(_gecmisGun){
     const grup=_gmGroup(visible)[0];
-    if(grup) el.innerHTML=hint+_gmGroupHtml(grup,_gecmisEntryHtml,{open:true,todayKey:_gmTodayKey()});
+    if(grup) el.innerHTML=hint+_gmGroupHtml(grup,_gecmisEntryHtml,{open:true,todayKey:_gmTodayKey(),katHtmlFn:_gmKatKartHtml}); // U1: katlama
     return;
   }
-  // Klasik görünüm (D15): gün gruplamasız eski düz liste
+  // Klasik görünüm (D15): gün gruplamasız eski düz liste — U1 md.15: etiket/
+  // tıklama/katlama burada da geçerli (katlama anahtarı dateKey taşır — gün güvenli)
   if(_gecmisKlasik()){
-    el.innerHTML=hint+visible.map(e=>_gecmisEntryHtml(e)).join('');
+    const dugumler=_gmGunKatla(visible);
+    el.innerHTML=hint+dugumler.map(d=>d.grup?_gmKatKartHtml(d):_gecmisEntryHtml(d.entry)).join('');
     return;
   }
   // arama aktifken tüm gün grupları açık zorunlu (spec C)
   const gruplar=_gmGroup(visible)
-    .map(g=>_gmGroupHtml(g,_gecmisEntryHtml,{open:!!q.trim(),todayKey:_gmTodayKey()}))
+    .map(g=>_gmGroupHtml(g,_gecmisEntryHtml,{open:!!q.trim(),todayKey:_gmTodayKey(),katHtmlFn:_gmKatKartHtml})) // U1: katlama
     .join('');
   el.innerHTML=hint+gruplar;
 }
@@ -4120,7 +4210,8 @@ function _gecmisCsvMeta(){
         const snap=d.snapshot||{};
         const a=animals.find(x=>x.id===d.ana_hayvan_id);
         let _ex={};try{_ex=JSON.parse(localStorage.getItem('ege_exited_kupe')||'{}');}catch(err){}
-        return a?.kupe_no||a?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_ex[d.ana_hayvan_id]||d.ana_hayvan_id||'';
+        // U1 root-düzeltme-1: UUID YOK — çözülmeyen küpe CSV'de boş kalır
+        return a?.kupe_no||a?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_ex[d.ana_hayvan_id]||(globalThis._gmHayvanKupeById||{})[d.ana_hayvan_id]||'';
       }
       if(e.type==='dogum')return lblOf(d.anne_id);
       // TG1 tek-gün kategorileri: hayvanlar satırı KENDİ küpesini taşır
@@ -4148,7 +4239,7 @@ function _gecmisCsvMeta(){
       if(e.type==='protokol')return `${lblOf(d.hayvan_id)} — Protokol`;
       const snap=d.snapshot||{};
       const k=snap.kupe_no||snap.devlet_kupe||lblOf(d.ana_hayvan_id)||'?';
-      return `${k} — ${_ISLEM_ETK[d.tip]||d.tip||''}`;
+      return `${k} — ${_gmIslemTipEtiket(d.tip)}`; // U1: tek harita + okunur yedek
     },
     ek:e=>{
       const d=e.data;
@@ -4207,9 +4298,13 @@ async function loadGecmis(f,btn,opts){
       : _gmEntriesFromSources(sources,null,{mode:_gecmisKlasik()?'klasik':'defter',tumu:_gecmisTumu});
     entries.forEach(e=>{ e.searchText=_gecmisSearchText(e); });
     _gecmisAllEntries=entries;
+    // U1 md.2: islem kartı → detay paneli id haritası (merge; det yüzeyiyle çakışmaz)
+    const _logMap=globalThis._gmIslemLogById||(globalThis._gmIslemLogById={});
+    entries.forEach(e=>{ if(e.type==='islem'&&e.data&&e.data.id) _logMap[e.data.id]=e.data; });
     _gecmisGunSayi=_gecmisGun?entries.length:0;
     _gecmisChipCounts();
     _gecmisGunBannerGuncelle();
+    _gecmisGunCiplerGuncelle(); // U1 md.4: gün özeti kategori çipleri
     const q=(document.getElementById('gecmis-search')||{}).value||'';
     _gecmisRender(q);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
@@ -4221,6 +4316,7 @@ async function loadGecmis(f,btn,opts){
 // girişleri şeritten. _gecmisGun=null → defter görünümü döner.
 let _gecmisGun=null;       // seçili gün (ISO YYYY-MM-DD) ya da null
 let _gecmisGunSayi=0;      // seçili günün (arama/filtre ÖNCESİ) olay sayısı
+let _gecmisGunCip=null;    // U1 md.4: gün modu kategori çip filtresi (category|null)
 function gecmisTariheGitAc(){
   tekTarihTakvimAc({
     baslik:'📅 Tarihe Git',
@@ -4231,6 +4327,7 @@ function gecmisTariheGitAc(){
 }
 function gecmisGunSec(iso){
   _gecmisGun=iso||null;
+  _gecmisGunCip=null; // U1: gün değişince çip filtresi sıfırlanır
   loadGecmis(null,null,{skipPull:true}); // veri tab girişinde çekildi; offline de çalışır
 }
 // Seçili gün vurgusu — banner todayKey'ten BAĞIMSIZ yüzeydir (sözleşme md.4):
@@ -4251,6 +4348,25 @@ function _gecmisGunBannerGuncelle(){
     </div>
     <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-gun-kapat" title="Gün görünümünden çık — deftere dön">✕ Kapat</button>
   </div>`;
+}
+// U1 md.4: gün özeti kategori çipleri — banner'ın altında sayaçlı çip satırı;
+// tık → o kategoriye filtre (tekrar tık/Tümü → kaldır). Sayaçlar filtre ÖNCESİ
+// tüm günü sayar (_gmGunKategoriSayac — gecmis.js saf). Yalnız gün modunda görünür.
+function _gecmisGunCiplerGuncelle(){
+  const w=document.getElementById('gecmis-gun-cipler');
+  // U1 (root düzeltme-3): gün modunda eski üst filtre satırı GİZLİ — tek filtre
+  // satırı çiplerdir, sayılar aynı pipeline'dan (tutarsız sayı olamaz)
+  const eskiSatir=document.getElementById('gecmis-filtre-satir');
+  if(eskiSatir) eskiSatir.style.display=_gecmisGun?'none':'flex';
+  if(!w) return;
+  if(!_gecmisGun){ w.style.display='none'; w.innerHTML=''; return; }
+  const s=_gmGunKategoriSayac(_gecmisAllEntries);
+  const katlar=Object.keys(_GM_KATEGORI_TR).filter(k=>s[k]).sort((a,b)=>s[b]-s[a]);
+  w.style.display='block';
+  w.innerHTML='<div class="gm-cip-sarm">'
+    +`<button class="gm-cip${_gecmisGunCip?'':' on'}" data-action="gm-gun-cip" data-kat="" title="Tüm kategorileri göster">Tümü (${_gecmisAllEntries.length})</button>`
+    +katlar.map(k=>`<button class="gm-cip${_gecmisGunCip===k?' on':''}" data-action="gm-gun-cip" data-kat="${escAttr(k)}" title="Yalnız ${esc(_GM_KATEGORI_TR[k]||k)} göster">${_GM_KATEGORI_EMOJI[k]||''} ${esc(_GM_KATEGORI_TR[k]||k)} (${s[k]})</button>`).join('')
+    +'</div>';
 }
 
 // ──────────────────────────────────────────
