@@ -345,12 +345,69 @@ const DG_HAYVAN_REF_ALANLARI = ['hayvan_id', 'animal_id', 'anne_id', 'ana_hayvan
 const DG_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function _dgDegerMetni(tablo, alan, v) {
   const ref = (DG_HAYVAN_REF_ALANLARI.includes(alan) || (tablo === 'hayvanlar' && alan === 'id')) && typeof v === 'string';
-  if (!ref) return degerMetni(v);
+  if (!ref) {
+    // W8-D1: bilinen kod değerleri işlem dilli (gecmis.js TEK harita kaynağı;
+    // haritada olmayan değer aynen kalır — uydurma yok).
+    if (typeof v === 'string' && typeof gmKodDegerEtiketi === 'function') {
+      const e = gmKodDegerEtiketi(alan, v);
+      if (e) return e;
+    }
+    return degerMetni(v);
+  }
   const h = typeof hayvanByKupeRef === 'function' ? hayvanByKupeRef(v) : null;
   const kupe = h && (h.kupe_no || h.devlet_kupe);
   if (kupe) return kupe;
+  // W8-review: görünür alan satırları dgAlanSatiriGorunurMu ile zaten eleniyor;
+  // bu '?' yedeği dgZincirAlanOzeti'nin UUID-skip kararında tüketicisi olan nötr işaret.
   if (DG_UUID_RE.test(v)) return '?';
   return degerMetni(v);
+}
+
+// W8-D1 (saf): görünür alan satırı kilidi — 'Kayıt no' (id) satırı ve ham UUID
+// değerli hücreler görünür listede ASLA; pk/UUID yalnız teknik katlamada (root
+// R1-D1 unit kilidi: görünür alanda UUID regex / tablo-özet kalıbı yok).
+function dgAlanSatiriGorunurMu(fark) {
+  if (!fark) return false;
+  if (fark.alan === 'id') return false;
+  const hamDeger = v => typeof v === 'string' && DG_UUID_RE.test(v.trim());
+  return !(hamDeger(fark.eski) || hamDeger(fark.yeni));
+}
+
+// W8-D1 (saf): tx'in "kim"i — küpe. Önce hayvanlar satırının KENDİ küpesi
+// (pk satırından, _gmHayvanKupeById deseni), sonra hayvan referans alanları;
+// çözülemeyen → '' (başlıkta parça hiç girmez — '?' yok).
+function dgTxKimMetni(rows, coz) {
+  const liste = Array.isArray(rows) ? rows : [];
+  for (const r of liste) {
+    if (!r) continue;
+    const yeni = r.yeni || {}, eski = r.eski || {};
+    if (r.tablo_adi === 'hayvanlar') {
+      const k = yeni.kupe_no || yeni.devlet_kupe || eski.kupe_no || eski.devlet_kupe;
+      if (k) return String(k);
+    }
+    for (const alan of DG_HAYVAN_REF_ALANLARI) {
+      const v = yeni[alan] != null ? yeni[alan] : eski[alan];
+      const k = v != null && coz ? coz(v) : '';
+      if (k) return String(k);
+    }
+  }
+  return '';
+}
+
+// W8-D1 (saf): tx detay başlık — liste kartıyla AYNI üretici (_dgKartBaslik)
+// + zaman + kim; _gmIslemBaslikSatiri kalıbı (root R1-D1 biçimi:
+// "Görev eklendi — 12.09 12:05 · L4Y-01"). Ham tablo-özet/kaynak/UUID YOK.
+// listeOzeti yoksa (doğrudan açılış/tazeleme) ham başlık satırdan kurulur.
+function dgDetayBaslikMetni(listeOzeti, rows, kaynak, coz, baslikSatiri) {
+  const liste = Array.isArray(rows) ? rows : [];
+  if (!liste.length) return 'İşlem';
+  const oz = islemOzeti(liste);
+  // tablo_adi boşsa ham başlık boş kalır → _dgKartBaslik nötr 'Değişiklik' verir
+  const ozet = listeOzeti || Object.assign(oz, { baslik: liste[0].tablo_adi ? liste[0].tablo_adi + ' (' + oz.satir_sayisi + ')' : '' });
+  const uret = baslikSatiri || (typeof _gmIslemBaslikSatiri === 'function' ? _gmIslemBaslikSatiri : null);
+  return uret
+    ? uret({ olayEtiketi: _dgKartBaslik(ozet, kaynak), zaman: liste[0].zaman || '', kim: dgTxKimMetni(liste, coz) })
+    : _dgKartBaslik(ozet, kaynak);
 }
 
 function _dgDetayCiz() {
@@ -374,7 +431,8 @@ function _dgDetayCiz() {
     const pk = _dgPk(r.satir_pk);
     const farklar = diffSatirlari(r.eski, r.yeni)
       .filter(d => r.islem !== 'U' || _dg.tumAlanlar || d.durum !== 'ayni')
-      .filter(d => _dg.tumAlanlar || !dgAlanBosMu(d));   // boş değer satırı gizli
+      .filter(d => _dg.tumAlanlar || !dgAlanBosMu(d))   // boş değer satırı gizli
+      .filter(dgAlanSatiriGorunurMu);                    // W8-D1: id/ham-UUID satırı görünürde ASLA
     const sirali = dgAlanSirala(tablo, farklar.map(d => d.alan));
     const siraliFarklar = sirali.map(a => farklar.find(d => d.alan === a)).filter(Boolean);
     const islemSinif = r.islem === 'I' ? 'dg-rozet-g' : r.islem === 'D' ? 'dg-rozet-r' : 'dg-rozet-a';
@@ -404,19 +462,25 @@ function _dgDetayCiz() {
       ${teknikKucuk}
     </div>`;
   }).join('');
-  // işlem dili başlık (S4): "Görev tamamlandı — 14.09 17:25 · 4019" kalıbı;
-  // ham tx YALNIZ teknik katlamada. ozet.baslik zaten işlem dilli (L2 listele).
-  const baslikMetni = (listeOzeti && listeOzeti.baslik) || 'İşlem';
+  // işlem dili başlık (S4, W8-D1): liste kartıyla AYNI üretici (_dgKartBaslik)
+  // + zaman + kim (küpe): "Görev eklendi — 12.09 12:05 · l4y-anne" kalıbı;
+  // ham tablo özeti/kaynak/tx YALNIZ teknik katlamada.
+  const cozKupe = id => {
+    const h = typeof hayvanByKupeRef === 'function' ? hayvanByKupeRef(id) : null;
+    return (h && (h.kupe_no || h.devlet_kupe)) || (globalThis._gmHayvanKupeById || {})[id] || '';
+  };
+  const baslikMetni = dgDetayBaslikMetni(listeOzeti, rows, kaynak, cozKupe);
   const islemBtn = _dgGeriAlBtn({ txid: _dg.detayTxid }, 'islem', 'İşlemi geri al');
   const teknikDetay = `<details class="dg-teknik"><summary>Teknik ayrıntı ▸</summary>
       <div class="dg-not">tx: ${esc(_dg.detayTxid)}</div>
+      ${rows.map(r => `<div class="dg-not">Kayıt: ${esc(tabloEtiketi(r.tablo_adi))} · ${esc(pkKisa(r.satir_pk))}</div>`).join('')}
       ${kaynak ? `<div class="dg-not">Kaynak: ${esc(JSON.stringify(kaynak))}</div>` : ''}
     </details>`;
   liste.innerHTML = `
     <button type="button" class="dg-link" data-action="dg-liste-don">‹ Listeye dön</button>
     <div class="dg-detay-bas">
       <div class="dg-baslik">${esc(baslikMetni)}</div>
-      <div class="dg-not">${esc(rows[0] ? fmtTarihSaat(rows[0].zaman) : '')} · ${esc(ozetMetni(ozet))} · ${esc(_dgKaynakMetni(kaynak))}</div>
+      <div class="dg-not">${esc(ozetMetni(ozet))}</div>
       ${kaynak && kaynak.geri_alma && kaynak.geri_alma.gerekce ? `<div class="dg-not">Gerekçe: ${esc(kaynak.geri_alma.gerekce)}</div>` : ''}
       ${teknikCip ? '<div class="gm-cip-satir">' + teknikCip + '</div>' : ''}
       <label class="dg-not dg-tum"><input type="checkbox" data-change="dg-tum-alanlar"${_dg.tumAlanlar ? ' checked' : ''}> Değişmeyen alanları da göster</label>
@@ -516,15 +580,53 @@ function _dgZincirOnerisiHtml(on) {
     <button type="button" class="btn btn-g" data-action="dg-zincir-oner" style="margin-top:6px">🔗 Zincir olarak geri al — ${esc(String(n))} olay birlikte</button></div>`;
 }
 
+// W8-D4 (saf): zincir adım fiili — sunucu ham kodu ('GUNCELLE'/'SIL'/'EKLE',
+// S3-03 kanıtı) işlem dilli geçmişe çekilir (root R1-D4). Haritada olmayan
+// yapilacak SERBEST METİNDİR ('Kayıt silinecek' — islem-detay önizleme yolu)
+// ve AYNEN kalır; yapilacak yoksa islemEtiketi(p.islem) yedeği.
+const DG_ZINCIR_YAPILACAK_ETIKET = { GUNCELLE: 'Güncellendi', SIL: 'Silindi', EKLE: 'Eklendi' };
+function dgZincirAdimEtiketi(p) {
+  if (!p) return '';
+  if (p.yapilacak) {
+    const y = DG_ZINCIR_YAPILACAK_ETIKET[String(p.yapilacak).trim()];
+    return y || String(p.yapilacak);
+  }
+  return p.islem ? islemEtiketi(p.islem) : '';
+}
+
+// W8-D4 (saf): değişen alan özeti — U adımlarında eski/yeni'den ilk anlamlı
+// 1-2 alan ("Padok adı: A → B"); etiketler alanEtiketi'den, değerler degerMetni.
+function dgZincirAlanOzeti(p) {
+  if (!p || p.islem !== 'U' || !Array.isArray(p.alanlar) || !p.alanlar.length) return '';
+  const sirali = typeof dgAlanSirala === 'function' ? dgAlanSirala(p.tablo, p.alanlar) : p.alanlar;
+  const parcalar = [];
+  for (const alan of sirali) {
+    if (alan === 'id') continue;   // pk özeti teknik katlamada
+    const e = p.eski ? p.eski[alan] : undefined;
+    const y = p.yeni ? p.yeni[alan] : undefined;
+    if (e === undefined && y === undefined) continue;
+    // W8-review-I1: değerler _dgDegerMetni'den (kod→TR, hayvan→küpe); hâlâ ham
+    // UUID/'?' ise alan özete GİRMEZ (görünür zincir kartında ham referans asla).
+    const em = _dgDegerMetni(p.tablo, alan, e);
+    const ym = _dgDegerMetni(p.tablo, alan, y);
+    if (em === '?' || ym === '?' || DG_UUID_RE.test(String(em)) || DG_UUID_RE.test(String(ym))) continue;
+    parcalar.push(`${alanEtiketi(p.tablo, alan)}: ${em} → ${ym}`);
+    if (parcalar.length >= 2) break;
+  }
+  return parcalar.join(' · ');
+}
+
 // Zincir plan kartı (bağımlı adımlar işaretli — K1)
 function _dgZincirKartHtml(p) {
   const zaman = p && p.zaman ? fmtTarihSaat(p.zaman) : '';
   const bagimli = !!(p && (p.bagimli || p.bagimli_adim));
+  const adim = dgZincirAdimEtiketi(p);
+  const ozet = dgZincirAlanOzeti(p);
   return `<div class="dg-plan">
       <span class="dg-rozet">${esc(String((p && p.sira) || ''))}</span>
       <b>${esc(p && p.tablo ? tabloEtiketi(p.tablo) : 'Değişiklik')}</b>${zaman ? ' <span class="dg-zaman">' + esc(zaman) + '</span>' : ''}
       ${bagimli ? '<span class="dg-rozet dg-rozet-a">bağımlı adım — bu geri almaya bağlı</span>' : ''}
-      <div class="dg-not">${esc((p && p.yapilacak) || (p && p.islem ? islemEtiketi(p.islem) : ''))}</div>
+      <div class="dg-not">${esc(adim)}${ozet ? ' — ' + esc(ozet) : ''}</div>
     </div>`;
 }
 
@@ -599,7 +701,7 @@ function _dgOnizleHtml(on, h) {
     : (on.plan || []).map(p => `<div class="dg-plan">
         <span class="dg-rozet">${esc(String(p.sira))}</span>
         <b>${esc(tabloEtiketi(p.tablo))}</b>
-        <div class="dg-not">${esc(p.yapilacak || islemEtiketi(p.islem))}${Array.isArray(p.alanlar) && p.alanlar.length ? ' — ' + esc(p.alanlar.map(a => alanEtiketi(p.tablo, a)).join(', ')) : ''}</div>
+        <div class="dg-not">${esc(dgZincirAdimEtiketi(p))}${Array.isArray(p.alanlar) && p.alanlar.length ? ' — ' + esc(p.alanlar.map(a => alanEtiketi(p.tablo, a)).join(', ')) : ''}</div>
       </div>`).join('');
   const zincirCumle = zincir && (on.plan || []).length
     ? `<div class="dg-not" data-test="dg-zincir-cumle"><b>${esc(String((on.plan || []).length))} olay sıralıdır, komple geri alınacak. Onaylıyor musunuz?</b></div>`

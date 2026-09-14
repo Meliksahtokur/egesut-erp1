@@ -2283,7 +2283,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     assert.ok(/'bc-sablon-yukle-kapat':\s*\(\)\s*=>\s*bcSablonYukleKapat\(\)/.test(src));
   });
 
-  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260914-11 damgalı', () => {
+  it('index.html: 📂 çipi + yükle alanı tek örnekte; her yerel script ?v=20260914-12 damgalı', () => {
     const html = fs.readFileSync('index.html', 'utf8');
     assert.strictEqual((html.match(/data-action="bc-sablon-yukle-toggle"/g) || []).length, 1);
     assert.strictEqual((html.match(/id="bc-sablon-yukle-alan"/g) || []).length, 1);
@@ -2311,10 +2311,11 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // 20260914-08: L4 lead dokunuşu — liste kartı başlıkları işlem dili (Padok ekleme), yürüyüş hazırlığı
     // 20260914-09: L4-W5 onarım turu — resolver tarih-yedeği (L4-05) + rehber 'satir' (L4-04) + GERI_ALINDI geçmişte (L4-06) + detay esc/küpe (L4-07) + modal tek-entry (L4-08)
     // 20260914-11: L4-W6 mini onarım — stok_uyari txid/UUID görünürden çıkışı (L4-07 alt, luna tur-2): SQL 0004 ayrı alan (txid/hareket_id) + teknik katlama
+    // 20260914-12: L4-W8 insan dili — D1 tx-detay başlık (_dgKartBaslik+zaman+küpe; Kayıt no/kaynak teknikte) + D3 kart etiketleri (boş başlık→tip etiketi, TEDAVI GUN→Tedavi Günü, (?)→nötr, ham id çözümü) + D4 zincir GUNCELLE/SIL→Güncellendi/Silindi (+alan özeti)
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
-    const damgasiz = yerel.filter(s => !/\?v=20260914-11$/.test(s));
+    const damgasiz = yerel.filter(s => !/\?v=20260914-12$/.test(s));
     assert.deepStrictEqual(host(damgasiz), [], 'damgasız yerel script kalmamalı');
     assert.ok(/<!-- \?v= damgası: her js\/css değişikliğinde GÜNCELLE \(cache-busting\) -->/.test(html),
       'damga bakım notu ilk script etiketinin yanında');
@@ -2651,10 +2652,10 @@ describe('V2.3 (W21) — m-bulk-case tarih alanı yapısı + takvim aksiyonu + m
     assert.ok(ipucu && /overflow-wrap:\s*anywhere/.test(ipucu[0]), 'hint sarma stili (taşma kilidi)');
   });
 
-  it('manifest link de damgalı: manifest.json?v=20260914-11', () => {
+  it('manifest link de damgalı: manifest.json?v=20260914-12', () => {
     const html = fs.readFileSync('index.html', 'utf8');
-    assert.ok(html.includes('manifest.json?v=20260914-11'), 'manifest damgası 20260914-11');
-    for (const eski of ['20260914-10','20260914-09','20260914-08','20260914-07','20260914-06','20260914-05','20260914-04','20260914-03','20260914-02','20260914-01','20260913-18','20260913-17','20260913-16','20260913-15','20260911-14','20260911-13','20260909-12','20260909-11','20260909-10','20260909-9','20260909-8','20260909-7','20260909-6','20260909-5','20260909-4','20260909-3','20260909-2','20260909-1','20260908-1','20260907-4']) {
+    assert.ok(html.includes('manifest.json?v=20260914-12'), 'manifest damgası 20260914-12');
+    for (const eski of ['20260914-11','20260914-10','20260914-09','20260914-08','20260914-07','20260914-06','20260914-05','20260914-04','20260914-03','20260914-02','20260914-01','20260913-18','20260913-17','20260913-16','20260913-15','20260911-14','20260911-13','20260909-12','20260909-11','20260909-10','20260909-9','20260909-8','20260909-7','20260909-6','20260909-5','20260909-4','20260909-3','20260909-2','20260909-1','20260908-1','20260907-4']) {
       // substring tuzağı: '?v=20260909-1' '?v=20260909-12'i de yakalar → rakam-sonrası sınır şart
       assert.ok(!new RegExp('\\?v=' + eski + '(?![0-9])').test(html), 'eski ' + eski + ' damgası kalmaz');
     }
