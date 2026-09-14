@@ -174,19 +174,30 @@ pre-check), `js/forms.js:islemGeriAl`.
   kancası) ve `js/utils/handlers.js` (`tab-pedigree` handler) — B3 dar
   dokunuş, root onaylı.
 
-## Canonical date selection (owner directive 2026-09-09)
+## Canonical date selection (owner directive 2026-09-09; migration complete 2026-09-13, G-20260913-TARIH-SECICI)
 
-New surfaces MUST NOT introduce native `<input type="date">` pickers or
-invent new calendar widgets. Reuse the established calendar-modal language:
+New surfaces MUST NOT introduce native `<input type="date">` pickers, locale
+-dependent date formatting, or new calendar widgets — the guard test
+(`tests/unit/tarih-saf.test.js` § "F4 — STANDART KİLİDİ") fails the suite on
+violation. Decision record: `D-20260909-CANONICAL-DATE-PICKER.md`.
 
-- Single date: canonical component `js/ui.js:tekTarihTakvimAc`
-  ({baslik, deger, onSec}) — bottom-sheet single-select calendar; visual
-  language of `js/ui.js:caseGunModalRender` (`gun-tarih-modal`), selection
-  rule of `js/forms.js:bcTarihTakvimRender` (W20 `bc-tarih-takvim`: tap
-  REPLACES the selection). Current users: template anchor date
-  (`js/ui.js:cdSablonTarihTakvimAc`) and planned-insemination date
-  (`js/ui.js:cdtTakvimAc`) on the active case. Bulk-case treatment date keeps
-  its W20 twin (`js/forms.js:bcTarihTakvimRender`) until that surface adopts
-  the shared component.
-- Multiple dates: `js/ui.js:caseGunModalRender` (`gun-tarih-modal`, toggle
-  selection + "Secili Gunler" chips).
+- **Form field binding (default path):** `tarihAlaniBagla` + the
+  `TARIH_ALANLARI` schema (js/ui.js) converts a declared field into a
+  readonly TR button + hidden ISO holder. The holder keeps the `.value`
+  → ISO contract, so reader JS and reset code need no changes. Per-field
+  opts: `min`, `max` (ISO), `temizlenebilir`, `kapaliGun(iso)`; schema
+  `max: 'bugun'` pins the field to today.
+- **Direct single-date:** `js/ui.js:tekTarihTakvimAc({baslik, deger,
+  onSec, min, max, temizlenebilir, kapaliGun})` — bottom-sheet calendar;
+  invalid manual entry (`gg.aa.yyyy` only, via `tarihParse`) shows an
+  inline error, never silent correction, never `mm/dd`.
+- **Multiple dates:** `js/ui.js:caseGunModalRender` (`gun-tarih-modal`,
+  toggle selection + "Secili Gunler" chips).
+- **Shared pure core:** every month grid renders through
+  `tarihAyIzgara(yil, ay)` from `js/tarih/tarih.js` (Monday-first,
+  locale-free, `null` for out-of-month cells). Do NOT write day-cell loops
+  anywhere else.
+- **Known intentional exception:** the hidden holder's runtime
+  `.type = 'date'` assignment (one place in the binding layer) keeps
+  `js/utils/modal.js` auto-fill working — pinned by the guard; a second
+  occurrence fails the suite.

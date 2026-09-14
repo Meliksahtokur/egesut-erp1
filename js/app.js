@@ -579,7 +579,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     const modal = e.target.closest('.modal');
     if (!modal) return;
-    const fields = Array.from(modal.querySelectorAll('input:not([disabled]),select:not([disabled]),textarea:not([disabled]),button.btn:not([disabled])'));
+    const fields = Array.from(modal.querySelectorAll('input:not([disabled]):not([tabindex="-1"]),select:not([disabled]),textarea:not([disabled]),button.btn:not([disabled])'));
     const idx = fields.indexOf(e.target);
     if (idx >= 0 && idx < fields.length - 1) fields[idx + 1].focus();
   }
@@ -595,6 +595,10 @@ window.addEventListener('load', withErrorHandling(async () => {
   history.replaceState({sentinel:true}, '', '#');
   history.pushState({pg:'dash'}, '', '#dash');
   try { await openDB(); } catch (e) { console.error('DB hatası:', e.message); }
+
+  // F2 (G-20260913): statik formların tarih alanları kanonik bileşene bağlı;
+  // aşağıdaki default'lar bağdan geçerek ekranda gg.aa.yyyy basar.
+  if (typeof tarihAlanlariniBagla === 'function') tarihAlanlariniBagla();
 
   const t = bugun();
   ['b-tarih','i-tarih','ta-tarih','k-tarih'].forEach(id => { const el = g(id); if (el) el.value = t; });
