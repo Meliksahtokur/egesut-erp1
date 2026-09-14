@@ -118,6 +118,8 @@ registerActions({
   // gm-islem: işlem aynası kartı → islem detay paneli (hayvan detay aynasının
   // gittiği yer); panel TIKLANAN KARTIN altına açılır (_openIslemDetayRow).
   'gm-islem': (el) => { const l = (globalThis._gmIslemLogById || {})[el.dataset.det]; if (l) _openIslemDetayRow(l, el); },
+  // L4-W2: geçmiş kartı ⟲/↩ butonu — tek motor girişi (_gmUndoButtonHtml data-action)
+  'gm-undo':  (el, e) => { if (e && e.stopPropagation) e.stopPropagation(); gmUndoClick(el.dataset.kind, el.dataset.id); },
   'gm-case': (el) => { if (el.dataset.det) openCaseDet(el.dataset.det); },
   'gm-toh':  (el) => { if (el.dataset.det) openTohDet(el.dataset.det); },
   'gm-stok': (el) => { if (el.dataset.det) openStokDet(el.dataset.det); },
@@ -181,6 +183,17 @@ registerActions({
   'sk-onayla':           (el) => skOnayla(el),
   'sutten-kes-tekil':    (el) => suttenKesTekil(el.dataset.hid, el),
   'sutten-kes-geri-al':  (el) => suttenKesGeriAl(el.dataset.hid, el),
+  // L4-W2: tek motor yüzey aksiyonları (detay paneli / vaka / toh-det / protokol)
+  'dg-det-geri-al':      (el) => { const l = (globalThis._gmIslemLogById || {})[el.dataset.det]; if (l) dgGeriAlFromEntry(l); },
+  'cd-geri-al':          () => { const l = globalThis._cdGeriAlEntry; if (l) dgGeriAlFromEntry(l); },
+  'td2-geri-al':         (el) => {
+    const ref = el.dataset.ref || '';
+    const l = globalThis._gmIslemLogById ? globalThis._gmIslemLogById[ref] : null;
+    if (l) { dgGeriAlFromEntry(l); return; }
+    if (ref.startsWith('toh:')) { dgGeriAlAkisi({ tablo: 'tohumlama', pk: ref.slice(4) }, 'satir', { olayEtiketi: 'Tohumlama', zaman: '', kim: '' }); return; }
+    toast('⚠️ Bu kayıt için geri alma hedefi çözülemedi — Değişiklikler sayfasından deneyin', true);
+  },
+  'protokol-geri-al':    (el) => _protokolGeriAl(el.dataset.ref),
   'pa-toggle':           (el) => { const s = document.getElementById(el.dataset.sec); if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none'; },
   'pa-chip':             (el) => protokolAyarKaydet(el.dataset.anahtar, el.dataset.deger),
   'open-animal-modal':   () => openM('m-animal'),
@@ -205,7 +218,6 @@ registerActions({
   'close-done-det':  () => closeM('m-done-det'),
   'close-case-det':  () => closeM('m-case-det'),
   'close-toh-det':   () => closeM('m-toh-det'),
-  'close-geri-al':   () => closeM('m-geri-al'),
   'close-not':       () => closeM('m-not'),
   'close-cikis':     () => closeM('m-cikis'),
   'close-gebelik':   () => closeM('m-gebelik'),
@@ -402,7 +414,6 @@ registerActions({
   'erken-kapat-onayla': (el) => caseErkenKapatOnayla(el),
   'toh-sonuc-kaydet':   () => tohSonucKaydet(),
   'toh-sonuc-bekliyor': () => tohSonuc('Bekliyor'),
-  'geri-al':            (el) => islemGeriAl(el, g('ga-hid').value),
   'submit-cikis':       (el) => submitCikis(el),
   'submit-gebelik':     (el) => submitGebelikEkle(el),
   'submit-task-add':    (el) => submitTaskAdd(el),

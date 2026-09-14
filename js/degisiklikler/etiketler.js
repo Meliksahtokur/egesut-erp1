@@ -283,6 +283,46 @@ const DG_ALAN_ETIKETLERI = {
 
 const DG_ISLEM_ETIKETLERI = { I: 'Ekleme', U: 'Güncelleme', D: 'Silme' };
 
+// L4-W2 (plan §5 — anlamlı alanlar): tablo-başına ÖNE ÇIKAN alan sırası
+// (3-6 kimlik alanı). Satır kartında alan satırları BU sırada önce listelenir;
+// kalan alanlar mevcut (diff) sırasını korur. Listede olmayan tabloda sıralama
+// yok (diff sırası aynen).
+const DG_ONE_CIKAN_ALANLAR = {
+  hayvanlar: ['kupe_no', 'devlet_kupe', 'cinsiyet', 'irk', 'grup', 'padok'],
+  dogum: ['tarih', 'yavru_kupe', 'yavru_cins', 'dogum_tipi'],
+  tohumlama: ['tarih', 'sperma', 'tohumlayan', 'sonuc'],
+  kizginlik_log: ['tarih', 'belirti', 'sonuc'],
+  cases: ['start_date', 'status', 'closed_at', 'plan_notu'],
+  treatment_days: ['treatment_date', 'day_no', 'tamamlandi'],
+  treatment_day_uygulamalar: ['planned_date', 'uygulayan', 'uygulanmadi'],
+  gorev_log: ['gorev_tipi', 'hedef_tarih', 'tamamlandi', 'tamamlanma_tarihi'],
+  vaccination_log: ['vaccination_date', 'dose_given', 'next_due_date'],
+  stok: ['urun_adi', 'miktar', 'birim'],
+  stok_hareket: ['tarih', 'tur', 'miktar', 'birim'],
+  hastalik_log: ['tarih', 'tani', 'siddet'],
+  protokol_instance: ['baslangic', 'alttip', 'kapandi_at'],
+  padoklar: ['ad', 'kapasite', 'sira'],
+};
+
+function oneCikanAlanlar(tablo) {
+  const sira = Object.prototype.hasOwnProperty.call(DG_ONE_CIKAN_ALANLAR, tablo)
+    ? DG_ONE_CIKAN_ALANLAR[tablo] : [];
+  return sira.slice();
+}
+
+// Alan adlarını öne-çıkan sıraya göre düzenler: önce DG_ONE_CIKAN_ALANLAR[tablo]
+// içindekiler (liste sırasıyla), ardından listede olmayanlar (giriş sırası aynen).
+// Tablo kayıtsa veya eşleşme yoksa giriş sırası DÖNER (yeni dizi).
+function dgAlanSirala(tablo, alanlar) {
+  const giris = Array.isArray(alanlar) ? alanlar.slice() : [];
+  const oncelik = oneCikanAlanlar(tablo);
+  if (!oncelik.length) return giris;
+  const oncekiler = new Set(oncelik);
+  const bastan = oncelik.filter(a => giris.includes(a));
+  const kalan = giris.filter(a => !oncekiler.has(a));
+  return bastan.concat(kalan);
+}
+
 function _dgInsanlastir(ad) {
   const s = String(ad == null ? '' : ad).replace(/_+/g, ' ').trim();
   if (!s) return '—';

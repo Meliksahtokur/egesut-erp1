@@ -1524,7 +1524,7 @@ async function _showProtokolEkran(){
     <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
       ${d.durum !== 'tamamlandi' && d.etken_kod ? `<button onclick="_protokolUygula(${i})" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.1);color:var(--blue);cursor:pointer">💉 Uygula</button>` : ''}
       ${d.durum !== 'tamamlandi' ? `<button onclick="_protokolDismiss(${i})" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>` : ''}
-      ${d.durum === 'tamamlandi' && d.kapatan_ref ? `<button data-ref="${escAttr(d.kapatan_ref)}" onclick="_protokolGeriAl(this.dataset.ref)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩ Geri Al</button>` : ''}
+      ${d.durum === 'tamamlandi' && d.kapatan_ref ? `<button data-action="protokol-geri-al" data-ref="${escAttr(d.kapatan_ref)}" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩ Geri Al</button>` : ''}
     </div>
   </div>`;
 
@@ -1574,7 +1574,7 @@ function _showProtokolDetay(hayvanId, protokol, activeIdx){
       : d.durum !== 'tamamlandi'
       ? `<button onclick="_protokolDismiss(${globalIdx})" style="font-size:.6rem;padding:3px 6px;border-radius:6px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`
       : d.kapatan_ref
-      ? `<button data-ref="${escAttr(d.kapatan_ref)}" onclick="_protokolGeriAl(this.dataset.ref)" style="font-size:.6rem;padding:3px 8px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩</button>`
+      ? `<button data-action="protokol-geri-al" data-ref="${escAttr(d.kapatan_ref)}" style="font-size:.6rem;padding:3px 8px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer">↩</button>`
       : '';
 
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--card2)">
@@ -2078,22 +2078,18 @@ async function _protokolDismiss(idx){
 }
 
 async function _protokolGeriAl(ref){
-  if (!confirm('Bu işlemi geri almak istediğinize emin misiniz?')) return;
-
-  const parts = ref.split(':');
-  if (parts[0] === 'uygulama_log' && parts[1]) {
-    try {
-      const res = await rpc('hizli_uygulama_geri_al', { p_uygulama_id: parts[1] });
-      if (res?.ok) {
-        toast('İşlem geri alındı');
-        await _islemSonrasiRefresh();
-      } else {
-        toast(res?.mesaj || 'Hata', true);
-      }
-    } catch(e) { toast('Hata: '+e.message, true); }
-  } else {
-    toast('Bu işlem geri alınamaz (farklı kaynak)', true);
-  }
+  // L4-W2: tek motor — protokol kapatması L2'ye bağlandı (hedef: uygulama_log
+  // satırı; eski hizli_uygulama_geri_al RPC yolu UI'dan söküldü).
+  const parts = String(ref||'').split(':');
+  if (parts[0] !== 'uygulama_log' || !parts[1]) { toast('Bu işlem geri alınamaz (farklı kaynak)', true); return; }
+  const uid = parts[1];
+  try {
+    const satirlar = await idbGetAll('uygulama_log');
+    const satir = satirlar.find(x => x && x.id === uid);
+    const hedef = { tablo: 'uygulama_log', pk: uid };
+    if (satir && satir.created_at) hedef.zaman = satir.created_at;
+    await dgGeriAlAkisi(hedef, 'satir', { olayEtiketi: 'Uygulama kaydı', zaman: (satir && satir.created_at) || '', kim: '' });
+  } catch(e) { toast('Hata: '+e.message, true); }
 }
 
 // §5: Ortak işlem sonrası yenileme — scanner + badge + açık ekranlar
@@ -2952,18 +2948,8 @@ function fromTaskOpenDet(hayvanId, taskId) {
 }
 
 // ── PADOK DEĞİŞTİR (hayvan kartı özet tab) ──
-// ── İŞLEM GERİ AL (genel — padok ve görev güncellemeleri) ──
-async function islemGeriAl(islemId) {
-  if (!confirm('Bu işlemi geri almak istediğinize emin misiniz?')) return;
-  try {
-    const res = await rpc('islem_geri_al', { p_islem_id: islemId });
-    toast('✅ İşlem geri alındı');
-    await pullTables(['hayvanlar', 'islem_log']);
-    if (typeof openDet === 'function' && window._detOpenId) openDet(window._detOpenId);
-  } catch (e) {
-    toast('❌ ' + e.message, true);
-  }
-}
+// ── İŞLEM GERİ AL: L4-W2 ile legacy yolu SÖKÜLDÜ — tek giriş
+// dgGeriAlAkisi (js/degisiklikler/degisiklikler.js) kullanılır. ──
 
 function openIslemDetay(idx){
   const l=(globalThis._detGecmisLogs||[])[idx];
@@ -2975,10 +2961,9 @@ function openIslemDetay(idx){
   _openIslemDetayRow(l, rows?.[idx]);
 }
 // U1 md.2: islem detay paneli — geçmiş kartından tıklanan kartın ALTINA açılır
-// (anchor=el); anchor verilmezse eski .hist-row davranışı aynen. ROOT KURALI
-// (2026-09-14): geri-al butonlarının yoluna DOKUNULMADI (yazma yolu U1 dışı —
-// tek-arg islemGeriAl kırığı rapora açık kalem); yalnız etiket/ikon ortak
-// haritadan gelir (js/gecmis.js — LABEL/ICO yerel kopyaları silindi).
+// (anchor=el); anchor verilmezse eski .hist-row davranışı aynen. L4-W2: geri-al
+// butonu tek motora (dgGeriAlAkisi) bağlandı — eski tek-arg islemGeriAl kırığı
+// ve openGeriAl a+b modalı söküldü; etiket/ikon ortak haritadan (js/gecmis.js).
 function _openIslemDetayRow(l, anchor){
   if(!l) return;
   // ref_tablo varsa doğrudan ilgili detay modalını aç
@@ -2989,16 +2974,17 @@ function _openIslemDetayRow(l, anchor){
   if(l.tip==='TOHUMLAMA' && snapId){ openTohDet(snapId); return; }
   const ALAN={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe'};
   const tarih=(l.created_at||l.tarih||'').slice(0,10);
-  const GeriAlabilir=['TOHUMLAMA','DOGUM_KAYDI','HASTALIK_KAYDI','ABORT_KAYDI','HAYVAN_GUNCELLENDI','VAKA_ACILDI','TEDAVI_GUN_EKLENDI'];
+  // L4-W2: buton kararı çözücüde — hedef üreten her kayıt geri alınabilir
+  const GeriAlabilir=_gmGeriAlHedef(l)?['*']:[];
   const payload=l.payload&&typeof l.payload==='object'?l.payload:{};
   const satirlar=Object.entries(payload)
     .filter(([k,v])=>!['hayvan_id','id','ana_hayvan_id'].includes(k)&&v!==null&&v!==undefined&&v!=='')
     .map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card3);font-size:.78rem"><span style="color:var(--ink3)">${ALAN[k]||k}</span><span style="font-weight:600;color:var(--ink);text-align:right;max-width:60%">${v}</span></div>`)
     .join('');
-  const gaBtn=GeriAlabilir.includes(l.tip)
-    ? (l.tip === 'HAYVAN_GUNCELLENDI'
-      ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="islemGeriAl('${l.id}')">↩️ Geri Al</button>`
-      : `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" onclick="openGeriAl('${l.id}','${_GM_ISLEM_TIP_ETIKET[l.tip]||l.tip} — ${tarih} tarihli kayıt geri alınacak.')">↩ Geri Al</button>`)
+  // L4-W2: tek motor — buton kararı _gmGeriAlHedef çözücüsündedir (6-tip kısıtı
+  // yok; HAYVAN_GUNCELLENDI kırığı dahil her çözülen olay tek girişe gider).
+  const gaBtn=GeriAlabilir.includes(l.tip)&&l.id
+    ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" data-action="dg-det-geri-al" data-det="${escAttr(String(l.id))}">↩ Geri Al</button>`
     : '';
   const html=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px;margin-top:8px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -4018,7 +4004,7 @@ function _gecmisEntryHtml(e, overrideOc){
       <div style="font-weight:700;font-size:.84rem;color:var(--ink)">${title}</div>
       <div style="font-size:.68rem;color:var(--ink3);margin-top:2px">${sub}</div>
       <div style="font-size:.62rem;color:var(--ink3);margin-top:3px">${type==='gorev'?(data.tamamlandi?'✅ ':'⏳ ')+d:d}</div>
-      ${_gmUndoButtonHtml(e.undoRef,{offline:!navigator.onLine})}
+      ${_gmUndoButtonHtml(e.undoRef,{offline:!navigator.onLine,etiket:(e.type==='islem'&&e.data.tip==='GERI_ALINDI')?'⟲ Geri alınanı geri al':undefined})}
     </div>
   </div>`;
 }
@@ -4268,12 +4254,17 @@ function _gecmisCsvMeta(){
   };
 }
 
-// Geri al butonu kart içinden → math-check modalı (spec E; asla genel yol yok)
+// Geri al butonu kart içinden → TEK GİRİŞ dgGeriAlAkisi (L4-W2; a+b modalı söküldü).
+// kind 'l2' → islem_log entry'si _gmIslemLogById'den çözülür (U1 haritası);
+// kind 'toh' → islem_log'suz Bekliyor kaydı: hedef tohumlama satırının kendisi.
 function gmUndoClick(kind,id){
-  const ozet=kind==='toh'
-    ?'Bu tohumlama kaydı silinecek (islem_log kaydı yok).'
-    :'Bu işlem geri alınacak.';
-  openGeriAl(kind==='toh'?'toh:'+id:id,ozet);
+  if(kind==='toh'){
+    dgGeriAlAkisi({tablo:'tohumlama',pk:id},'satir',{olayEtiketi:'Tohumlama',zaman:'',kim:''});
+    return;
+  }
+  const l=(globalThis._gmIslemLogById||{})[id];
+  if(!l){ toast('⚠️ Bu olay için geri alma hedefi çözülemedi — Değişiklikler sayfasından deneyin', true); return; }
+  dgGeriAlFromEntry(l);
 }
 
 async function loadGecmis(f,btn,opts){
@@ -6379,26 +6370,19 @@ async function openDoneTaskDet(id){
   openM('m-done-det');
 }
 function gorevGeriAl(){
+  // L4-W2: tek motor — görev tamamlaması L2'ye bağlandı (hedef: gorev_tamamla
+  // tx'i; eski gorev_geri_al RPC'si UI'dan söküldü, DB'de kalır).
   if(!_curTaskDet) return;
   const t=_curTaskDet;
-  openConfirm('Görevi Geri Al','Bu işlem aşı kaydını ve rapel görevini silecektir. Stok miktarı düzeltilecektir.',async()=>{
-    const btn=document.getElementById('dd-geri-al-btn');
-    if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
-    try{
-      const res=await rpc('gorev_geri_al',{p_gorev_id:t.id});
-      if(!res.ok){ toast(_trErr(res.mesaj||'Hata'),true); return; }
-      closeM('m-done-det');
-      await pullTables(['gorev_log','vaccination_log','stok_hareket']).catch(()=>{});
-      updateTaskBadge();
-      loadTasks(_curTaskFilter||'today',null,{skipPull:true});
-      loadDash();
-      toast(`↩️ Görev geri alındı${res.silinen_rapel?' · Rapel silindi':''}`);
-    }catch(e){
-      toast(_trErr(e.message),true);
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent='↩️ Geri Al';}
-    }
-  });
+  idbGetAll('islem_log').then(liste=>{
+    // geri_alindi guard'ı SEÇİCİ find'ın içinde (L4-W2 review-1: ölü guard düzeltmesi)
+    const islem=liste.find(l=>l.tip==='GOREV_TAMAMLA'
+      &&(l.ref_id===t.id||(l.snapshot&&l.snapshot.id===t.id))
+      &&(!l.durum||l.durum!=='geri_alindi'));
+    if(islem){ dgGeriAlFromEntry(islem); return; }
+    // islem_log kaydı yoksa (eski kayıt) hedef doğrudan görev satırı
+    dgGeriAlAkisi({tablo:'gorev_log',pk:t.id},'satir',{olayEtiketi:'Görev',zaman:t.tamamlanma_tarihi||'',kim:''});
+  }).catch(e=>{ toast('⚠️ Görev geçmişi okunamadı: '+(e&&e.message||'IDB hatası'), true); });
 }
 
 // ──────────────────────────────────────────
@@ -6535,9 +6519,9 @@ async function openCaseDet(caseId) {
   const geriAlBtn = document.getElementById('cd-geri-al-btn');
   if (geriAlBtn) {
     if (vakaIslem && aktif) {
-      const diseaseName = disease?.name || '?';
+      // L4-W2: tek motor — entry çözücüye gider (a+b modalı yok)
+      globalThis._cdGeriAlEntry = vakaIslem;
       geriAlBtn.style.display = 'block';
-      geriAlBtn.onclick = () => openGeriAl(vakaIslem.id, `Vaka geri alınacak: ${diseaseName} — tüm tedavi günleri silinir.`);
     } else {
       geriAlBtn.style.display = 'none';
     }

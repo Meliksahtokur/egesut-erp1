@@ -14,9 +14,8 @@
 const _GM_TOH_TERMINAL = ['Gebe', 'Boş', 'Doğum Yaptı', 'Abort'];
 // ana geçmiş listesinde gösterilen islem_log tipleri (bugünkü davranış)
 const _GM_ISLEM_TIPLERI = ['HAYVAN_EKLENDI', 'ABORT_KAYDI', 'KIZGINLIK_KAYDI', 'ASI_KAYDI', 'TOPLU_ILAC'];
-// islem geri alma butonunun route edildiği tipler (forms.js islemGeriAl rotasıyla örtüşür;
-// ABORT_KAYDI dahil — openIslemDetay da onu geri alınabilir sayar, generic geri_al yolu)
-const _GM_UNDO_ISLEM_TIPLERI = ['TOHUMLAMA', 'TOHUMLAMA_GUNCELLENDI', 'HASTALIK_KAYDI', 'VAKA_ACILDI', 'TEDAVI_GUN_EKLENDI', 'ABORT_KAYDI'];
+// GERİ AL (L4-W2): 6-tip kısıtı KALKTI — buton kararı _gmGeriAlHedef çözücüsündedir
+// (hedef üreten her islem kartında geri-al olur; çözülemeyen kartta buton yok).
 // Karttaki fmtTarihSaat Europe/Istanbul'a çevirir (helpers.js) — CSV ve dateKey
 // aynı kuralı izler; aksi halde gece saatlerinde kart/CSV/grup farklı gün gösterir.
 const _GM_TZ = 'Europe/Istanbul';
@@ -66,6 +65,7 @@ const _GM_ISLEM_TIP_ETIKET = {
   SATIS_KAYDI: 'Satış', OLUM_KAYDI: 'Ölüm', SUTTEN_KESME: 'Sütten Kesme',
   KISIR_ISARETLE: 'Kısır İşaretle', KISIR_KALDIR: 'Kısır Kaldırıldı',
   GOREV_EKLENDI: 'Görev Eklendi', GOREV_GUNCELLENDI: 'Görev Güncellendi',
+  GERI_ALINDI: 'Geri Alındı',
   GOREV_GUNCELLE: 'Görev Güncellendi', GOREV_TAMAMLA: 'Görev Tamamlandı', GOREV_OTOKAPAT: 'Görev Otomatik Kapandı',
 };
 const _GM_ISLEM_TIP_EMOJI = {
@@ -84,6 +84,7 @@ const _GM_ISLEM_TIP_EMOJI = {
   SATIS_KAYDI: '💰', OLUM_KAYDI: '💀', SUTTEN_KESME: '🍼',
   KISIR_ISARETLE: '💲', KISIR_KALDIR: '⭕',
   GOREV_EKLENDI: '➕', GOREV_GUNCELLENDI: '✏️', GOREV_GUNCELLE: '✏️', GOREV_TAMAMLA: '✅', GOREV_OTOKAPAT: '⏹️',
+  GERI_ALINDI: '↩️',
 };
 // Bilinmeyen tip için okunur yedek (U1 md.1): 'TEDAVI_GUN_EKLENDI' benzeri
 // bilinmeyen 'YENI_ISLEM_TIPI' → 'İşlem: yeni işlem tipi' (ham kod değil).
@@ -96,6 +97,97 @@ function _gmIslemTipEtiket(tip) {
 }
 function _gmIslemTipEmoji(tip) {
   return _GM_ISLEM_TIP_EMOJI[String(tip || '').trim()] || '📋';
+}
+
+// ── L4-W2: tek geri-al motoru — SAF çözücü + işlem dili ───────────────
+// _gmGeriAlHedef(entry) → {tablo,pk,txid} | {tablo,pk,zaman} | {txid} | null.
+// Öncelik (goal frozen contract): 1) islem_log.degisim_txid (W1 köprüsü;
+// stub'ta simüle) → 2) ref_tablo+ref_id+created_at → 3) tip-bazlı fallback
+// (DOGUM_KAYDI/KIZGINLIK payload kuralları; plan raporu §2 istisnaları).
+// null = buton YOK (Değişiklikler'e yönlendirme). Zaman yedeği yalnız
+// created_at'tan kurulur — islem_log.tarih İŞ tarihi olabilir (geç giriş),
+// kayit_zamani ile eşleşmez (W1 ZAMAN_ESLESME_YOK sözleşmesi).
+function _gmGeriAlHedef(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const snap = entry.snapshot && typeof entry.snapshot === 'object' ? entry.snapshot : {};
+  const payload = entry.payload && typeof entry.payload === 'object' ? entry.payload : {};
+  // 1) Kesin köprü: degisim_txid. GERI_ALINDI kartının txid'i geri alma
+  //    işlemidir → hedef = geri alma tx'i (akış f: geri alınanın geri alınması).
+  const txHam = entry.degisim_txid != null ? entry.degisim_txid : null;
+  if (txHam !== null && String(txHam).trim() !== '') {
+    const tx = String(txHam).trim();
+    if (!/^\d+$/.test(tx)) return null;
+    // anahtar sırası sözleşme biçimiyle aynı: {tablo,pk,txid} | {txid}
+    if (entry.tip !== 'GERI_ALINDI' && entry.ref_tablo && entry.ref_id != null) {
+      return { tablo: String(entry.ref_tablo), pk: entry.ref_id, txid: tx };
+    }
+    return { txid: tx };
+  }
+  // 2) ref_tablo + ref_id (+ created_at zaman yedeği)
+  if (entry.ref_tablo && entry.ref_id != null && entry.ref_id !== '') {
+    const hedef = { tablo: String(entry.ref_tablo), pk: entry.ref_id };
+    if (entry.created_at) hedef.zaman = entry.created_at;
+    return hedef;
+  }
+  // 3) Tip fallback — ref'in boş kaldığı tipler (ölçülmüş istisnalar)
+  const zaman = entry.created_at || '';
+  const kur = (tablo, pk) => {
+    if (pk == null || pk === '') return null;
+    return zaman ? { tablo, pk, zaman } : { tablo, pk };
+  };
+  switch (entry.tip) {
+    case 'DOGUM_KAYDI':
+      return kur('dogum', snap.id || payload.dogum_id);
+    case 'KIZGINLIK':
+    case 'KIZGINLIK_KAYDI':
+      return kur('kizginlik_log', snap.id || payload.kizginlik_id);
+    case 'TOHUMLAMA':
+    case 'TOHUMLAMA_GUNCELLENDI':
+    case 'ABORT_KAYDI':
+      return kur('tohumlama', snap.id || payload.tohumlama_id);
+    case 'HAYVAN_EKLENDI':
+    case 'HAYVAN_GUNCELLENDI':
+      return kur('hayvanlar', entry.ana_hayvan_id || snap.id);
+    case 'GOREV_TAMAMLA':
+      return kur('gorev_log', entry.ref_id || payload.gorev_id || snap.id);
+    case 'SUTTEN_KESME':
+      return kur('hayvanlar', entry.ana_hayvan_id || entry.ref_id);
+    default:
+      return null;
+  }
+}
+
+// GERI_ALINDI kartının işlem-dilli etiketi: payload.orijinal_tip → "Tohumlama geri alındı"
+function _gmGeriAlindiEtiketi(entry) {
+  const p = entry && entry.payload && typeof entry.payload === 'object' ? entry.payload : {};
+  const orig = p.orijinal_tip ? _gmIslemTipEtiket(p.orijinal_tip) : 'İşlem';
+  return orig + ' geri alındı';
+}
+
+// İşlem dili bağlamı (goal frozen contract): {olayEtiketi, zaman, kim}.
+// kim = küpe (IDB indeksi _gmHayvanKupeById) ya da snapshot küpesi; ham UUID ASLA.
+function _gmGeriAlBaglam(entry, kim) {
+  const d = entry && typeof entry === 'object' ? entry : {};
+  const snap = d.snapshot && typeof d.snapshot === 'object' ? d.snapshot : {};
+  const etiket = d.tip === 'GERI_ALINDI' ? _gmGeriAlindiEtiketi(d) : _gmIslemTipEtiket(d.tip);
+  const cozulmus = kim != null && kim !== ''
+    ? kim
+    : (snap.kupe_no || snap.devlet_kupe
+      || (d.ana_hayvan_id ? ((globalThis._gmHayvanKupeById || {})[d.ana_hayvan_id] || '') : ''));
+  return { olayEtiketi: etiket, zaman: d.created_at || d.tarih || '', kim: String(cozulmus || '') };
+}
+
+// Başlık şablonu (TEK kaynak — plan §5): `${olayEtiketi} — ${gg.aa ss:dd} · ${kim}`.
+// SAF: DOM yazmaz; ham tx/UUID üretmez (zaman yoksa o parça düşer).
+function _gmIslemBaslikSatiri(baglam) {
+  const b = baglam || {};
+  const gun = b.zaman ? _gmDateKey(b.zaman) : '';
+  const saat = b.zaman ? _gmCsvSaat(b.zaman) : '';
+  const gunSaat = gun ? gun.slice(8, 10) + '.' + gun.slice(5, 7) + (saat ? ' ' + saat : '') : '';
+  let s = b.olayEtiketi ? String(b.olayEtiketi) : 'İşlem';
+  if (gunSaat) s += ' — ' + gunSaat;
+  if (b.kim) s += ' · ' + b.kim;
+  return s;
 }
 const _GM_AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const _GM_GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
@@ -460,8 +552,9 @@ function _gmEntriesFromSources(sources, scope, opts) {
 function _gmUndoRef(type, data, ctx) {
   ctx = ctx || {};
   if (type === 'islem') {
-    if (!data.id || !_GM_UNDO_ISLEM_TIPLERI.includes(data.tip)) return null;
-    return { kind: 'islem', id: data.id };
+    // L4-W2: 6-tip kısıtı yok — çözücü hedef üretiyorsa buton var (tek motor)
+    if (!data.id || !_gmGeriAlHedef(data)) return null;
+    return { kind: 'l2', id: data.id };
   }
   if (type === 'tohumlama') {
     if (!data.id) return null;
@@ -469,7 +562,7 @@ function _gmUndoRef(type, data, ctx) {
     if (ctx.abortGuardedByTohId && ctx.abortGuardedByTohId[data.id]) return null;
     // islem_log referansı varsa o id ile geri alınır
     const refId = ctx.islemRefByTohId && ctx.islemRefByTohId[data.id];
-    if (refId) return { kind: 'islem', id: refId };
+    if (refId) return { kind: 'l2', id: refId }; // L4-W2: islem_log id → tek motor
     // Doğrudan toh: silme yolu YALNIZCA sonucu 'Bekliyor' olan SON kayıtta
     // (üretim guard'ı openTohDet — terminal sonuçlu kayıt asla doğrudan silinmez;
     // politika Bekliyor'u geçmişe almadığından pratikte bu yol üretilmez)
@@ -495,7 +588,8 @@ function _gmAttr(s) {
 // entity-escape edilmiş değer inline JS string'ine asla konmaz; onclick sabit stringdir).
 function _gmUndoButtonHtml(ref, opts) {
   if (!ref || (opts && opts.offline)) return '';
-  return `<button type="button" data-kind="${_gmAttr(ref.kind)}" data-id="${_gmAttr(ref.id)}" style="margin-top:6px;font-size:.66rem;font-weight:700;padding:3px 10px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red)" onclick="event.stopPropagation();gmUndoClick(this.dataset.kind,this.dataset.id)">↩ Geri Al</button>`;
+  const etiket = (opts && opts.etiket) || '↩ Geri Al';
+  return `<button type="button" data-action="gm-undo" data-kind="${_gmAttr(ref.kind)}" data-id="${_gmAttr(ref.id)}" style="margin-top:6px;font-size:.66rem;font-weight:700;padding:3px 10px;border-radius:8px;border:1.5px solid var(--red);background:transparent;color:var(--red);cursor:pointer">${_gmAttr(etiket)}</button>`;
 }
 
 // ── Cap + gün gruplama + sayaçlar (spec C, D12) ──────────
