@@ -12,9 +12,9 @@ const { loadBrowserModule } = require('./support/loadModule.js');
 const etiketSandbox = loadBrowserModule('js/degisiklikler/etiketler.js', { extra: {} });
 const { sandbox, exposed } = loadBrowserModule('js/degisiklikler/degisiklikler.js', {
   extra: { registerActions: () => {}, tabloEtiketi: etiketSandbox.exposed.tabloEtiketi ?? etiketSandbox.sandbox.tabloEtiketi, islemEtiketi: etiketSandbox.exposed.islemEtiketi ?? etiketSandbox.sandbox.islemEtiketi },
-  expose: ['_dgRehberHazirla', '_dgKartBaslik'],
+  expose: ['_dgRehberHazirla', '_dgKartBaslik', '_dgRehberTokenlari'],
 });
-const { _dgRehberHazirla, _dgKartBaslik } = exposed;
+const { _dgRehberHazirla, _dgKartBaslik, _dgRehberTokenlari } = exposed;
 
 const R = (id, zaman, ozet) => ({ hedef: { tablo: 'tohumlama', pk: id, txid: id }, zaman, ozet });
 
@@ -52,6 +52,29 @@ test('rehber: boş/bozuk giriş güvenli — hedefsiz satır düşürülür', ()
 test('rehber: neden_dahil_degil metni aynen taşınır', () => {
   const cikti = _dgRehberHazirla([Object.assign(R('a', '2026-09-13T18:30:00+03:00', 'Doğum kaydı'), { neden_dahil_degil: 'bu geri almaya bağlı' })]);
   assert.strictEqual(cikti[0].neden, 'bu geri almaya bağlı');
+});
+
+// ── L4-04 (onarım turu): rehber satırı TEKİL hedef seviyesiyle çağrılır ──
+// seviye 'satir' — 'islem' DEĞİL: 'islem' seviyesi tablo/pk'yi yok sayıp çok
+// satırlı tx'in BÜTÜN degisim_log satırlarını geri alırdı (luna L4-04).
+test('L4-04 — rehber tokenları seviye \'satir\' taşır (islem asla), hedef kesin', () => {
+  const tokenlar = _dgRehberTokenlari([
+    R('a', '2026-09-13T12:00:00+03:00', 'Tohumlama kaydı'),
+    R('c', '2026-09-13T18:30:00+03:00', 'Doğum kaydı'),
+  ]);
+  assert.strictEqual(tokenlar.length, 2);
+  tokenlar.forEach(t => {
+    assert.strictEqual(t.seviye, 'satir', 'tekil hedef — islem seviyesi YASAK');
+    assert.ok(!('alan' in t.hedef), 'alan seviyesi değildir');
+    assert.strictEqual(t.hedef.tablo, 'tohumlama');
+    assert.ok(t.hedef.pk && t.hedef.txid, 'hedef (tablo,pk,txid) tam gelir');
+    assert.ok(t.etiket && typeof t.etiket === 'string', 'etiket işlem dilli');
+  });
+});
+
+test('L4-04 — bozuk/boş girdide token üretimi güvenli', () => {
+  assert.strictEqual(_dgRehberTokenlari(null).length, 0);
+  assert.strictEqual(_dgRehberTokenlari([]).length, 0);
 });
 
 test('sandbox: degisiklikler.js modülü aksiyon kaydıyla yüklenir', () => {

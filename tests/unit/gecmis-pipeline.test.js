@@ -46,13 +46,13 @@ test('cases politika: status=closed VE closed_at dolu şart — closed_at boşsa
   assert.strictEqual(_gmPolicyRow('cases', { status: 'active', closed_at: '2026-09-01T12:00:00Z' }), false);
 });
 
-test('islem_log politika: 5 tip kabul, geri_alindi reddedilir, diğer tipler reddedilir', () => {
+test('islem_log politika: 6 tip kabul (L4-06: +GERI_ALINDI), geri_alindi durumu reddedilir, diğer tipler reddedilir', () => {
   const { _gmPolicyRow } = sandbox;
-  for (const tip of ['HAYVAN_EKLENDI', 'ABORT_KAYDI', 'KIZGINLIK_KAYDI', 'ASI_KAYDI', 'TOPLU_ILAC']) {
+  for (const tip of ['HAYVAN_EKLENDI', 'ABORT_KAYDI', 'KIZGINLIK_KAYDI', 'ASI_KAYDI', 'TOPLU_ILAC', 'GERI_ALINDI']) {
     assert.strictEqual(_gmPolicyRow('islem_log', { tip }), true, `${tip} kabul edilmeli`);
     assert.strictEqual(_gmPolicyRow('islem_log', { tip, durum: 'geri_alindi' }), false, `${tip} geri_alindi reddedilmeli`);
   }
-  assert.strictEqual(_gmPolicyRow('islem_log', { tip: 'TOHUMLAMA' }), false, '5 tip dışı reddedilmeli');
+  assert.strictEqual(_gmPolicyRow('islem_log', { tip: 'TOHUMLAMA' }), false, '6 tip dışı reddedilmeli');
   assert.strictEqual(_gmPolicyRow('islem_log', { tip: 'SATIS_KAYDI' }), false);
 });
 

@@ -49,6 +49,43 @@ test('openM: olmayan element → sessiz no-op, pushState ÇAĞRILMAZ', () => {
   assert.strictEqual(calls.pushes.length, 0);
 });
 
+// ── L4-08 (onarım turu): iç yeniden-açılışta TEK history entry ─────
+// dgOnizleGoster zincir önerisi/⟲ yollarında openM('m-dg-onizle')'i İKİNCİ kez
+// çağırır; guardsız push fazladan entry sızdırır, closeM tek back attığından
+// S5 "tek geri" bozulurdu. Invariant: açık modal başına TAM BİR modal-entry'si.
+test('L4-08: openM aynı modal history tepesinde ikinci kez — YENİ pushState YOK', () => {
+  const { api, doc, calls, history } = loadModal();
+  const el = doc.__setEl('m-dg-onizle', makeElement('div'));
+  api.openM('m-dg-onizle');
+  assert.strictEqual(calls.pushes.length, 1, 'ilk açılış push alır');
+  api.openM('m-dg-onizle'); // iç yeniden-açılış (zincir önerisi / ⟲ deseni)
+  assert.strictEqual(calls.pushes.length, 1, 'aynı-id üstteyken push EZİLMEZ');
+  assert.ok(el.classList.contains('on'), 'modal açık kalır');
+  assert.strictEqual(history.state?.modal, 'm-dg-onizle');
+});
+
+test('L4-08: open→open→close turunda TEK back her şeyi temizler (S5 tek-geri)', () => {
+  const { api, doc, calls, history } = loadModal();
+  const el = doc.__setEl('m-dg-onizle', makeElement('div'));
+  api.openM('m-dg-onizle');
+  api.openM('m-dg-onizle');
+  api.closeM('m-dg-onizle');
+  assert.strictEqual(calls.backs, 1, 'tek back');
+  assert.ok(!el.classList.contains('on'));
+  assert.strictEqual(history.state, null, 'entry sızmadı — altındaki görünüm bir back\'te kapanır');
+  assert.strictEqual((api._modalStack || []).length, 0);
+});
+
+test('L4-08: FARKLI modallar üst üste — her biri push alır (regresyon)', () => {
+  const { api, doc, calls } = loadModal();
+  doc.__setEl('m-dg-onizle', makeElement('div'));
+  doc.__setEl('m-dg-bilet', makeElement('div'));
+  api.openM('m-dg-onizle');
+  api.openM('m-dg-bilet');
+  assert.strictEqual(calls.pushes.length, 2, 'farklı id — yeni entry meşru');
+  assert.strictEqual(calls.pushes[1].modal, 'm-dg-bilet');
+});
+
 // ── closeM ─────────────────────────────────────────────────────
 test('closeM: "on" kalkar; history.state eşleşiyorsa back() çağrılır', () => {
   const { api, doc, calls, history } = loadModal();

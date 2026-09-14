@@ -2975,6 +2975,38 @@ function openIslemDetay(idx){
   const rows=document.getElementById('tab-gecmis')?.querySelectorAll('.hist-row');
   _openIslemDetayRow(l, rows?.[idx]);
 }
+// L4-07 (onarım turu): işlem detay payload satırları — SAF (string üretir,
+// DOM yazmaz; testli). Değerler esc()'li (stored-XSS kapanır); hayvan referans
+// alanları küpeye dönüşür (_gmHayvanKupeById deseni; çözülmezse '?' — ham UUID
+// ASLA görünmez). payload.id (etkilenen kaydın kendi pk'sı) teknik değerdir —
+// listede YOK.
+const _DET_UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const _DET_REF_ALANLARI=['hayvan_id','ana_hayvan_id','buzagi_id','farm_animal_id','anne_id','animal_id'];
+const _DET_ALAN_ETIKET={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe','orijinal_tip':'Geri alınan olay','seviye':'Kapsam','adim':'Adım'};
+// L4-06: telafi kaydı payload'ı (orijinal_tip/seviye/adim) artık listede GÖRÜNÜR
+// (review Minor-1) — anahtarlar ve değerleri işlem dilli etiketle basılır.
+const _DET_SEVIYE_ETIKET={alan:'Alan',satir:'Kayıt',islem:'İşlem',zincir:'Zincir'};
+function _detayDegerMetni(v){
+  if(v===null||v===undefined) return '';
+  if(typeof v==='object') return JSON.stringify(v);
+  return String(v);
+}
+function _islemDetaySatirlariHtml(payload){
+  const p=payload&&typeof payload==='object'?payload:{};
+  return Object.entries(p)
+    .filter(([k,v])=>k!=='id'&&v!==null&&v!==undefined&&v!=='')
+    .map(([k,v])=>{
+      let goster;
+      if(k==='orijinal_tip') goster=(typeof _gmIslemTipEtiket==='function')?_gmIslemTipEtiket(_detayDegerMetni(v)):_detayDegerMetni(v);
+      else if(k==='seviye') goster=_DET_SEVIYE_ETIKET[v]||_detayDegerMetni(v);
+      else if(_DET_REF_ALANLARI.includes(k)){
+        const kupe=(globalThis._gmHayvanKupeById||{})[String(v)];
+        goster=kupe||(_DET_UUID_RE.test(_detayDegerMetni(v))?'?':_detayDegerMetni(v));
+      } else goster=_detayDegerMetni(v);
+      return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card3);font-size:.78rem"><span style="color:var(--ink3)">${_DET_ALAN_ETIKET[k]||esc(k)}</span><span style="font-weight:600;color:var(--ink);text-align:right;max-width:60%">${esc(goster)}</span></div>`;
+    })
+    .join('');
+}
 // U1 md.2: islem detay paneli — geçmiş kartından tıklanan kartın ALTINA açılır
 // (anchor=el); anchor verilmezse eski .hist-row davranışı aynen. L4-W2: geri-al
 // butonu tek motora (dgGeriAlAkisi) bağlandı — eski tek-arg islemGeriAl kırığı
@@ -2987,18 +3019,14 @@ function _openIslemDetayRow(l, anchor){
   // TOHUMLAMA tipinde snapshot id varsa direkt aç
   const snapId=l.snapshot?.id;
   if(l.tip==='TOHUMLAMA' && snapId){ openTohDet(snapId); return; }
-  const ALAN={'tarih':'Tarih','sperma':'Sperma','sonuc':'Sonuç','deneme_no':'Deneme','tani':'Tanı','siddet':'Şiddet','durum':'Durum','hekim_id':'Hekim','yavru_kupe':'Yavru Küpe','yavru_cins':'Yavru Cinsiyet','dogum_tipi':'Doğum Tipi','notlar':'Not','irk':'Irk','grup':'Grup','kupe_no':'Küpe','devlet_kupe':'Devlet Küpe'};
   const tarih=(l.created_at||l.tarih||'').slice(0,10);
-  // L4-W2: buton kararı çözücüde — hedef üreten her kayıt geri alınabilir
-  const GeriAlabilir=_gmGeriAlHedef(l)?['*']:[];
-  const payload=l.payload&&typeof l.payload==='object'?l.payload:{};
-  const satirlar=Object.entries(payload)
-    .filter(([k,v])=>!['hayvan_id','id','ana_hayvan_id'].includes(k)&&v!==null&&v!==undefined&&v!=='')
-    .map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--card3);font-size:.78rem"><span style="color:var(--ink3)">${ALAN[k]||k}</span><span style="font-weight:600;color:var(--ink);text-align:right;max-width:60%">${v}</span></div>`)
-    .join('');
-  // L4-W2: tek motor — buton kararı _gmGeriAlHedef çözücüsündedir (6-tip kısıtı
-  // yok; HAYVAN_GUNCELLENDI kırığı dahil her çözülen olay tek girişe gider).
-  const gaBtn=GeriAlabilir.includes(l.tip)&&l.id
+  // L4-W2: buton kararı çözücüde — hedef üreten her kayıt geri alınabilir.
+  // W5 onarım: eski `['*'].includes(l.tip)` kalıntısı her zaman false üretiyor,
+  // panel butonu ÖLÜydü (sahibin "geri al butonu her yerde yok" sözü bu
+  // yüzde yaşıyordu) — çözücü kararı doğrudan kullanılır.
+  const geriAlabilir=!!_gmGeriAlHedef(l);
+  const satirlar=_islemDetaySatirlariHtml(l.payload);
+  const gaBtn=geriAlabilir&&l.id
     ? `<button class="btn" style="background:var(--red);color:#fff;width:100%;margin-top:10px" data-action="dg-det-geri-al" data-det="${escAttr(String(l.id))}">↩ Geri Al</button>`
     : '';
   const html=`<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:14px;margin-top:8px">

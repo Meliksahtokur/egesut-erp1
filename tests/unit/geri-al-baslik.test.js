@@ -52,9 +52,18 @@ test('GERI_ALINDI: payload.orijinal_tip → "Tohumlama geri alındı"', () => {
   assert.strictEqual(b, 'Görev Tamamlandı geri alındı — 14.09 18:02 · 4019');
 });
 
-test('GERI_ALINDI payload.orijinal_tip yoksa nötr "İşlem geri alındı"', () => {
-  assert.strictEqual(_gmGeriAlindiEtiketi({ tip: 'GERI_ALINDI' }), 'İşlem geri alındı');
-  assert.strictEqual(_gmGeriAlindiEtiketi(null), 'İşlem geri alındı');
+test('L4-06 — orijinal_tip gerçek tipi etiketler; harf-kümesi kalıntısı nötr "Kayıt geri alındı"', () => {
+  // W1'in eski SQL'i orijinal_tip'e I,U,D harf-kümesi yazıyordu; W4 gerçek tip
+  // yazar. Çözücü harf-kümesini (ve eksik/bilinmeyeni) işlem tipi GİBİ
+  // etiketLEMEZ — nötr 'Kayıt' döner ("İşlem: i,u,d geri alındı" üretmez).
+  assert.strictEqual(_gmGeriAlindiEtiketi({ tip: 'GERI_ALINDI', payload: { orijinal_tip: 'I,U,D' } }), 'Kayıt geri alındı');
+  assert.strictEqual(_gmGeriAlindiEtiketi({ tip: 'GERI_ALINDI', payload: { orijinal_tip: 'I' } }), 'Kayıt geri alındı');
+  assert.strictEqual(_gmGeriAlindiEtiketi({ tip: 'GERI_ALINDI', payload: { orijinal_tip: 'I, U ,D' } }), 'Kayıt geri alındı');
+  assert.strictEqual(_gmGeriAlindiEtiketi({ tip: 'GERI_ALINDI', payload: { orijinal_tip: '' } }), 'Kayıt geri alındı');
+  assert.strictEqual(_gmGeriAlindiEtiketi({ tip: 'GERI_ALINDI' }), 'Kayıt geri alındı');
+  assert.strictEqual(_gmGeriAlindiEtiketi(null), 'Kayıt geri alındı');
+  // gerçek tip aynen etiketlenir (W4 sözleşmesi)
+  assert.strictEqual(_gmGeriAlindiEtiketi({ tip: 'GERI_ALINDI', payload: { orijinal_tip: 'ASI_KAYDI' } }), 'Aşı Kaydı geri alındı');
 });
 
 test('GERI_ALINDI tip haritada: etiket Türkçe, ham kod yok', () => {

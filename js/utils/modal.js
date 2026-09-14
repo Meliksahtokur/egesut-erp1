@@ -8,8 +8,13 @@ function openM(id) {
   // güvenilmez, yığılmış modallarda en son açılan kapanmalı)
   globalThis._modalStack = (globalThis._modalStack || []).filter(x => x !== id);
   globalThis._modalStack.push(id);
-  // Android geri tuşu: modal açılışını history'e ekle (router)
-  history.pushState({modal:id}, '', '');
+  // Android geri tuşu: modal açılışını history'e ekle (router).
+  // L4-08 (onarım turu): aynı modal zaten history tepesindeyse YENİ entry
+  // EZİLMEZ — dgOnizleGoster iç yeniden-açılışı (zincir önerisi/⟲) openM'i
+  // ikinci kez çağırır; guardsız push fazladan entry sızdırır, closeM tek
+  // back attığından bir entry geriye kalır ve S5 "tek geri" bozulur.
+  // Invariant: açık modal başına TAM BİR modal-entry'si.
+  if (!((history.state && history.state.modal === id))) history.pushState({modal:id}, '', '');
   // Hayvan modalında doğum tarihi otomatik dolmasın — yaş hesabı bozuluyor
   if (id !== 'm-animal') {
     el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = bugun(); });
