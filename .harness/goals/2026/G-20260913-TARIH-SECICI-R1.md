@@ -41,7 +41,9 @@ implement_lane: glmf_workers
 
 # G-20260913-TARIH-SECICI-R1 — Sahip testi revizyonu (5 bulgu)
 
-- **Status:** IN_PROGRESS (2026-09-13, owner /goal directive)
+- **Status:** done (2026-09-13 owner /goal directive ile açıldı; 2026-09-14 lead
+  kabul + luna root KABUL ile kapandı — frontmatter `status: done` ile tutarlı,
+  bkz. `.harness/reports/2026-09-14-luna-root-kapisi-r1.md`)
 - **Task envelope:** `/home/melik/egesut-erp1/.ss/tasks/R1-tarih-secici-revizyon.md`
   (verbatim authority)
 - **Scope:** owner'un 5 test bulgusu — (1) ok boyut/kontrast/dokunma ≥40px,

@@ -70,8 +70,9 @@ problem bottom-sheet (`js/ui.js:sorunBottomSheet`), slide panels
 Toplu vaka (`index.html:m-bulk-case`, G-20260906-TOPLU-VAKA) sub-elements:
 `index.html:bc-yapistir` küpe yapıştırma (`js/forms.js:bcYapistirCoz`),
 `index.html:bc-disease-id` + `index.html:bc-sablon-list` (şablon radyo),
-`index.html:bc-tarih` BUTTON + `index.html:bc-tarih-takvim` tek-seçim takvim
-(`js/forms.js:bcTarihYaz`, `js/forms.js:bcTarihDeger`, `js/forms.js:bcTarihTakvimAc`),
+`index.html:bc-tarih` BUTTON + `index.html:bc-tarih-takvim` action →
+`js/forms.js:bcTarihSeciciAc` (canonical `js/ui.js:tekTarihTakvimAc`, single pick;
+write/read `js/forms.js:bcTarihYaz`, `js/forms.js:bcTarihDeger`),
 `index.html:bc-plan-gunler` gün kartları + `index.html:bc-gun-ekle-menu`
 (`js/forms.js:bcPlanRender`, `js/forms.js:bcGunKopyala`), şablon kaydet/yükle
 `index.html:bc-sablon-kaydet-alan` / `index.html:bc-sablon-yukle-alan`
@@ -174,27 +175,66 @@ pre-check), `js/forms.js:islemGeriAl`.
   kancası) ve `js/utils/handlers.js` (`tab-pedigree` handler) — B3 dar
   dokunuş, root onaylı.
 
-## Canonical date selection (owner directive 2026-09-09; migration complete 2026-09-13, G-20260913-TARIH-SECICI)
+## Canonical date selection (owner directive 2026-09-09; migration
+G-20260913-TARIH-SECICI complete 2026-09-13; R1 revision
+G-20260913-TARIH-SECICI-R1 — map updated 2026-09-14)
 
 New surfaces MUST NOT introduce native `<input type="date">` pickers, locale
 -dependent date formatting, or new calendar widgets — the guard test
 (`tests/unit/tarih-saf.test.js` § "F4 — STANDART KİLİDİ") fails the suite on
 violation. Decision record: `D-20260909-CANONICAL-DATE-PICKER.md`.
 
-- **Form field binding (default path):** `tarihAlaniBagla` + the
-  `TARIH_ALANLARI` schema (js/ui.js) converts a declared field into a
+- **Form field binding (default path):** `js/ui.js:tarihAlaniBagla` + the
+  `js/ui.js:TARIH_ALANLARI` schema converts a declared field into a
   readonly TR button + hidden ISO holder. The holder keeps the `.value`
   → ISO contract, so reader JS and reset code need no changes. Per-field
   opts: `min`, `max` (ISO), `temizlenebilir`, `kapaliGun(iso)`; schema
   `max: 'bugun'` pins the field to today.
-- **Direct single-date:** `js/ui.js:tekTarihTakvimAc({baslik, deger,
-  onSec, min, max, temizlenebilir, kapaliGun})` — bottom-sheet calendar;
-  invalid manual entry (`gg.aa.yyyy` only, via `tarihParse`) shows an
-  inline error, never silent correction, never `mm/dd`.
-- **Multiple dates:** `js/ui.js:caseGunModalRender` (`gun-tarih-modal`,
-  toggle selection + "Secili Gunler" chips).
+- **Direct single-date:** `js/ui.js:tekTarihTakvimAc` with
+  `{baslik, deger, onSec, min, max, temizlenebilir, kapaliGun}` — opens at
+  the selected value's month (no value → today), renders through
+  `js/ui.js:tekTarihTakvimRender`; selection clears/respects `min`, `max`
+  and `kapaliGun` both on cell taps and on manual entry.
+- **Three surfaces, one component:** every date-picker surface is the
+  canonical component — (1) tekTarih (`js/ui.js:tekTarihTakvimAc`,
+  single pick; bulk-case treatment date `js/forms.js:bcTarihSeciciAc`
+  delegates here), (2) bulk-case multi-day calendar
+  (`js/forms.js:bcTakvimAc` → `js/forms.js:bcTakvimRender`, container
+  `bc-gun-takvim`, window [başlangıç, başlangıç+30g], toggle selection;
+  validation is the SAF gate `js/forms.js:bcTakvimSecimEkle`), and
+  (3) case-day multi-pick (`js/ui.js:caseGunModalRender`,
+  `gun-tarih-modal`, toggle selection + "Seçili Günler" chips). Month
+  paging is clamped to the grid domain 1..9999 on every surface — edge
+  steps past the boundary are rejected, never wrap.
+- **Manual entry (all three surfaces):** the live input runs through the
+  mask `js/tarih/tarih.js:tarihMaskeUygula` — digits fill `GG.AA.YYYY`
+  segments, typed separators (`, / -` and space) normalize to `.`, and a
+  mask error NEVER rewrites the typed text (overflowing segments are not
+  re-split, extra digits are not swallowed, non-digit junk is not
+  silently deleted — it raises the inline error). Apply-path parsing is
+  `js/tarih/tarih.js:tarihGirisCoz` (→ `tarihParse`): `gg.aa.yyyy`
+  day-first only — `mm/dd` is NEVER interpreted — and no silent
+  correction. Bindings are `js/ui.js:tarihSeciciMaskeBagla` (Enter =
+  apply; caret preserved by `js/tarih/tarih.js:tarihMaskeImlec`);
+  Apply checks the pending mask error through the stateless gate
+  `js/ui.js:tarihSeciciMaskeHatasiAl` BEFORE `tarihGirisCoz`
+  (`js/ui.js:tekTarihTakvimGirisUygula`, `js/ui.js:caseGunGirisUygula`,
+  `js/forms.js:bcTakvimGirisUygula`). A valid entry jumps the calendar
+  to that month and selects it.
+- **Month/year dropdowns:** the header shows TR month + year `<select>`
+  beside the ‹/› arrows (≥40px hit targets, `var(--ink)` ground with
+  `var(--card)` glyph — `js/ui.js:_takvimNavStil`,
+  `js/ui.js:_takvimSeciciStil`); the old thin year-arrow row is gone.
+  The year list range is `js/tarih/tarih.js:tarihYilAraligi(min, max,
+  bugunYil)` — both bounds → [min,max]; one bound → other side ±120;
+  none → bugunYil−120..+10.
+- **Layout (R1):** one idempotent shared `<style>` via
+  `js/ui.js:tarihSeciciStilEnjekte` — `.tarih-modal-tasiyici` /
+  `.tarih-modal-kart`: at ≥900px a centered 400px compact card
+  (`max-width:calc(100vw - 32px)`); below 900px the full-width
+  bottom-sheet behavior is unchanged.
 - **Shared pure core:** every month grid renders through
-  `tarihAyIzgara(yil, ay)` from `js/tarih/tarih.js` (Monday-first,
+  `js/tarih/tarih.js:tarihAyIzgara(yil, ay)` (Monday-first,
   locale-free, `null` for out-of-month cells). Do NOT write day-cell loops
   anywhere else.
 - **Known intentional exception:** the hidden holder's runtime
