@@ -337,15 +337,20 @@ function degisikliklerListeyeDon() {
   if (typeof navViewBack === 'function') navViewBack();
 }
 
-// Hayvan referansı alanlarında UUID yerine küpe göster (yalnız gösterim; js/ui.js hayvanByKupeRef)
-const DG_HAYVAN_REF_ALANLARI = ['hayvan_id', 'animal_id', 'anne_id', 'ana_hayvan_id'];
+// Hayvan referansı alanlarında UUID yerine küpe göster (yalnız gösterim;
+// js/ui.js hayvanByKupeRef id ile de çözer). L4-07 (onarım turu): çözülemeyen
+// referansta ham UUID/önek ASLA görünmez — '?' döner; buzagi_id/farm_animal_id
+// dâhil. (Eski "kupe (uuid-önek)" gösterimi ham pk sızdırıyordu.)
+const DG_HAYVAN_REF_ALANLARI = ['hayvan_id', 'animal_id', 'anne_id', 'ana_hayvan_id', 'buzagi_id', 'farm_animal_id'];
+const DG_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function _dgDegerMetni(tablo, alan, v) {
-  const metin = degerMetni(v);
   const ref = (DG_HAYVAN_REF_ALANLARI.includes(alan) || (tablo === 'hayvanlar' && alan === 'id')) && typeof v === 'string';
-  if (!ref || typeof hayvanByKupeRef !== 'function') return metin;
-  const h = hayvanByKupeRef(v);
+  if (!ref) return degerMetni(v);
+  const h = typeof hayvanByKupeRef === 'function' ? hayvanByKupeRef(v) : null;
   const kupe = h && (h.kupe_no || h.devlet_kupe);
-  return kupe ? `${kupe} (${v.slice(0, 8)})` : metin;
+  if (kupe) return kupe;
+  if (DG_UUID_RE.test(v)) return '?';
+  return degerMetni(v);
 }
 
 function _dgDetayCiz() {
@@ -538,25 +543,40 @@ function _dgRehberHazirla(siraliRehber) {
   }));
 }
 
+// L4-04 (onarım turu): rehber satırı TEKİL hedef olarak çağrılır — seviye
+// 'satir' (islem DEĞİL: 'islem' seviyesi tablo/pk'yi yok sayıp çok satırlı
+// tx'in BÜTÜN degisim_log satırlarını geri alırdı). SAF — testli.
+function _dgRehberTokenlari(siraliRehber) {
+  return _dgRehberHazirla(siraliRehber).map(r => ({
+    hedef: r.hedef,
+    seviye: 'satir',
+    etiket: r.ozet || (r.hedef && r.hedef.tablo ? tabloEtiketi(r.hedef.tablo) : 'Değişiklik'),
+  }));
+}
+
 function _dgRehberBloku(siraliRehber) {
   const rehber = _dgRehberHazirla(siraliRehber);
   if (!rehber.length) return '';
+  const tokenlar = _dgRehberTokenlari(siraliRehber);
   const satirlar = rehber.map((r, i) => {
-    const baslik = r.ozet || (r.hedef && r.hedef.tablo ? tabloEtiketi(r.hedef.tablo) : 'Değişiklik');
     const zaman = r.zaman ? fmtTarihSaat(r.zaman) : '';
-    _dg.rehberHedefler.push({ hedef: r.hedef, seviye: 'islem', etiket: baslik });
-    return `<div class="dg-plan"><b>${esc(String(r.no))}. ${zaman ? 'önce ' : ''}</b>${esc(baslik)}${zaman ? ' <span class="dg-zaman">' + esc(zaman) + '</span>' : ''}${r.neden ? ' <span class="dg-not">(' + esc(r.neden) + ')</span>' : ''}
+    return `<div class="dg-plan"><b>${esc(String(r.no))}. ${zaman ? 'önce ' : ''}</b>${esc(tokenlar[i].etiket)}${zaman ? ' <span class="dg-zaman">' + esc(zaman) + '</span>' : ''}${r.neden ? ' <span class="dg-not">(' + esc(r.neden) + ')</span>' : ''}
       <button type="button" class="dg-geri" data-action="dg-rehber-geri-al" data-hi="${i}">↩ Geri Al</button></div>`;
   }).join('');
+  tokenlar.forEach(t => _dg.rehberHedefler.push(t));
   return `<div class="dg-blok dg-blok-a" data-test="dg-rehber"><div class="dg-blok-bas">🧭 Otomatik zincir kurulamadı — şu sırayla TEK TEK geri al</div>${satirlar}</div>`;
 }
 
-// Teknik ayrıntı katlaması (plan §5): tx/pk/kaynak YALNIZ burada — görünürde asla
+// Teknik ayrıntı katlaması (plan §5): tx/pk/kaynak YALNIZ burada — görünürde asla.
+// L4-07: önizleme planı adımlarının ham pk'ları da yalnız bu katlamada.
 function _dgTeknikDetayHtml(hedef, on) {
   const satirlar = [];
   if (hedef && hedef.txid) satirlar.push(['Hedef txid', String(hedef.txid)]);
   if (hedef && hedef.tablo) satirlar.push(['Hedef kayıt', hedef.tablo + ' · ' + pkKisa(hedef.pk)]);
   if (hedef && hedef.zaman) satirlar.push(['Hedef zaman', String(hedef.zaman)]);
+  ((on && on.plan) || []).forEach((p, i) => {
+    if (p && (p.tablo || p.pk != null)) satirlar.push(['Plan adımı ' + (p.sira != null ? p.sira : i + 1), (p.tablo || '?') + ' · ' + pkKisa(p.pk)]);
+  });
   if (on && on.kaynak) satirlar.push(['Kaynak', JSON.stringify(on.kaynak)]);
   if (!satirlar.length) return '';
   return `<details class="dg-teknik"><summary>Teknik ayrıntı ▸</summary>${satirlar.map(([k, v]) => `<div class="dg-not">${esc(k)}: ${esc(v)}</div>`).join('')}</details>`;
@@ -565,11 +585,13 @@ function _dgTeknikDetayHtml(hedef, on) {
 function _dgOnizleHtml(on, h) {
   h = h || _dg.bekleyen || {};
   const zincir = h.seviye === 'zincir';
+  // L4-07: plan kartında ham pk (pkKisa) GÖRÜNMEZ — küpe/isim işlem dili;
+  // pk yalnız teknik katlamada (_dgTeknikDetayHtml).
   const planHtml = zincir
     ? (on.plan || []).map(_dgZincirKartHtml).join('')
     : (on.plan || []).map(p => `<div class="dg-plan">
         <span class="dg-rozet">${esc(String(p.sira))}</span>
-        <b>${esc(tabloEtiketi(p.tablo))}</b> <span class="dg-pk">#${esc(pkKisa(p.pk))}</span>
+        <b>${esc(tabloEtiketi(p.tablo))}</b>
         <div class="dg-not">${esc(p.yapilacak || islemEtiketi(p.islem))}${Array.isArray(p.alanlar) && p.alanlar.length ? ' — ' + esc(p.alanlar.map(a => alanEtiketi(p.tablo, a)).join(', ')) : ''}</div>
       </div>`).join('');
   const zincirCumle = zincir && (on.plan || []).length

@@ -12,8 +12,11 @@
 // ── Sabitler ─────────────────────────────────────────────
 // tohumlama sonuç allow-list (canlı şema: non-terminal değer tam olarak 'Bekliyor')
 const _GM_TOH_TERMINAL = ['Gebe', 'Boş', 'Doğum Yaptı', 'Abort'];
-// ana geçmiş listesinde gösterilen islem_log tipleri (bugünkü davranış)
-const _GM_ISLEM_TIPLERI = ['HAYVAN_EKLENDI', 'ABORT_KAYDI', 'KIZGINLIK_KAYDI', 'ASI_KAYDI', 'TOPLU_ILAC'];
+// ana geçmiş listesinde gösterilen islem_log tipleri; L4-06 (onarım turu):
+// GERI_ALINDI telafi kaydı (W1 köprü trigger'ı yazan degisim_geri_al INSERT'i)
+// kartı Geçmiş akışına girer — "X geri alındı — 14.09 17:25 · küpe" (sahibin
+// örnek başlığı; etiket _gmGeriAlindiEtiketi, hedef çözücü geri alma tx'i).
+const _GM_ISLEM_TIPLERI = ['HAYVAN_EKLENDI', 'ABORT_KAYDI', 'KIZGINLIK_KAYDI', 'ASI_KAYDI', 'TOPLU_ILAC', 'GERI_ALINDI'];
 // GERİ AL (L4-W2): 6-tip kısıtı KALKTI — buton kararı _gmGeriAlHedef çözücüsündedir
 // (hedef üreten her islem kartında geri-al olur; çözülemeyen kartta buton yok).
 // Karttaki fmtTarihSaat Europe/Istanbul'a çevirir (helpers.js) — CSV ve dateKey
@@ -101,12 +104,15 @@ function _gmIslemTipEmoji(tip) {
 
 // ── L4-W2: tek geri-al motoru — SAF çözücü + işlem dili ───────────────
 // _gmGeriAlHedef(entry) → {tablo,pk,txid} | {tablo,pk,zaman} | {txid} | null.
-// Öncelik (goal frozen contract): 1) islem_log.degisim_txid (W1 köprüsü;
-// stub'ta simüle) → 2) ref_tablo+ref_id+created_at → 3) tip-bazlı fallback
-// (DOGUM_KAYDI/KIZGINLIK payload kuralları; plan raporu §2 istisnaları).
-// null = buton YOK (Değişiklikler'e yönlendirme). Zaman yedeği yalnız
-// created_at'tan kurulur — islem_log.tarih İŞ tarihi olabilir (geç giriş),
-// kayit_zamani ile eşleşmez (W1 ZAMAN_ESLESME_YOK sözleşmesi).
+// Öncelik (goal frozen contract): 1) islem_log.degisim_txid (W1 köprüsü)
+// → 2) ref_tablo+ref_id+zaman → 3) tip-bazlı fallback (DOGUM_KAYDI/KIZGINLIK
+// payload kuralları; plan raporu §2 istisnaları).
+// null = buton YOK (Değişiklikler'e yönlendirme).
+// L4-05 (onarım turu, BAĞLAYICI): zaman yedeği islem_log.tarih'ten kurulur —
+// canlı islem_log'ta created_at YOK (luna ölçümü; W1'in created_at sözleşmesi
+// bu yüzden hiç çalışmıyordu). tarih timestamptz default now() (faz1_core);
+// geç girilmiş İŞ tarihinde sunucu ZAMAN_ESLESME_YOK verir → UI yönlendirme
+// metni (DG_NEDEN_METNI.ZAMAN_ESLESME_YOK) devreye girer.
 function _gmGeriAlHedef(entry) {
   if (!entry || typeof entry !== 'object') return null;
   const snap = entry.snapshot && typeof entry.snapshot === 'object' ? entry.snapshot : {};
@@ -123,14 +129,15 @@ function _gmGeriAlHedef(entry) {
     }
     return { txid: tx };
   }
-  // 2) ref_tablo + ref_id (+ created_at zaman yedeği)
+  // 2) ref_tablo + ref_id (+ L4-05 zaman yedeği: tarih — created_at canlıda yok)
   if (entry.ref_tablo && entry.ref_id != null && entry.ref_id !== '') {
     const hedef = { tablo: String(entry.ref_tablo), pk: entry.ref_id };
-    if (entry.created_at) hedef.zaman = entry.created_at;
+    const zaman = entry.tarih || entry.created_at;
+    if (zaman) hedef.zaman = String(zaman);
     return hedef;
   }
   // 3) Tip fallback — ref'in boş kaldığı tipler (ölçülmüş istisnalar)
-  const zaman = entry.created_at || '';
+  const zaman = entry.tarih || entry.created_at || '';
   const kur = (tablo, pk) => {
     if (pk == null || pk === '') return null;
     return zaman ? { tablo, pk, zaman } : { tablo, pk };
@@ -157,11 +164,15 @@ function _gmGeriAlHedef(entry) {
   }
 }
 
-// GERI_ALINDI kartının işlem-dilli etiketi: payload.orijinal_tip → "Tohumlama geri alındı"
+// GERI_ALINDI kartının işlem-dilli etiketi: payload.orijinal_tip → "Tohumlama
+// geri alındı". L4-06 (onarım turu): orijinal_tip GERÇEK işlem tipidir (W4,
+// köprüden); eski harf-kümesi kalıntısı (I,U,D) ve bilinmeyen/eksik değer
+// işlem tipi GİBİ etiketLENMEZ — nötr 'Kayıt geri alındı' döner.
 function _gmGeriAlindiEtiketi(entry) {
   const p = entry && entry.payload && typeof entry.payload === 'object' ? entry.payload : {};
-  const orig = p.orijinal_tip ? _gmIslemTipEtiket(p.orijinal_tip) : 'İşlem';
-  return orig + ' geri alındı';
+  const ham = String(p.orijinal_tip || '').trim();
+  if (!ham || /^[IUD](\s*,\s*[IUD])*$/.test(ham)) return 'Kayıt geri alındı';
+  return _gmIslemTipEtiket(ham) + ' geri alındı';
 }
 
 // İşlem dili bağlamı (goal frozen contract): {olayEtiketi, zaman, kim}.
