@@ -4300,12 +4300,22 @@ function _gecmisCsvMeta(){
 // Geri al butonu kart içinden → TEK GİRİŞ dgGeriAlAkisi (L4-W2; a+b modalı söküldü).
 // kind 'l2' → islem_log entry'si _gmIslemLogById'den çözülür (U1 haritası);
 // kind 'toh' → islem_log'suz Bekliyor kaydı: hedef tohumlama satırının kendisi.
-function gmUndoClick(kind,id){
+async function gmUndoClick(kind,id){
   if(kind==='toh'){
     dgGeriAlAkisi({tablo:'tohumlama',pk:id},'satir',{olayEtiketi:'Tohumlama',zaman:'',kim:''});
     return;
   }
-  const l=(globalThis._gmIslemLogById||{})[id];
+  // L4 (lead düzeltmesi 2026-09-15): gün DEDUP'u islem-TOHUMLAMA kartını
+  // tohumlama-tablo girdisiyle birleştirir — birleşik kart type 'tohumlama'
+  // olduğundan _gmIslemLogById haritasına girmez, düğmenin islem-id'si burada
+  // çözülmezdi. Yedek: IDB'den birebir satırı çek (tek satırlık okuma).
+  let l=(globalThis._gmIslemLogById||{})[id];
+  if(!l){
+    try {
+      const tum = await idbGetAll('islem_log');
+      l = tum.find(x => x && x.id === id) || null;
+    } catch (_e) { l = null; }
+  }
   if(!l){ toast('⚠️ Bu olay için geri alma hedefi çözülemedi — Değişiklikler sayfasından deneyin', true); return; }
   dgGeriAlFromEntry(l);
 }

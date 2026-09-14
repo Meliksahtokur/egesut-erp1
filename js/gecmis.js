@@ -376,6 +376,10 @@ function olayGunu(sourceKey, row) {
 function _gmGunEntriesFromSources(sources, scope) {
   sources = sources || {};
   const out = [];
+  // L4 (lead düzeltmesi, 2026-09-14): "gün görünümü geri-al üretmez (defter
+  // ayrıcalığı)" L4-ÖNCESİ karardı; plan §1(a) sahibin BİRİNCİ yüzeyi gün
+  // görünümü — defterle AYNI çözücü üzerinden buton üretilir (tek motor).
+  const undoCtx = _gmUndoCtx(sources);
   const ekle = (sourceKey, entryType, row, v) => {
     const eventAt = _gmGunZaman(sourceKey, row);
     if (!eventAt) return;
@@ -386,7 +390,7 @@ function _gmGunEntriesFromSources(sources, scope) {
       eventAt,
       dateKey: _gmDateKey(eventAt),
       olayGunu: _gmDateKey(eventAt),
-      undoRef: null, // gün görünümü geri-al butonu üretmez (defter ayrıcalığı)
+      undoRef: _gmUndoRef(entryType, row, undoCtx),
       data: row,
       ...v,
     });

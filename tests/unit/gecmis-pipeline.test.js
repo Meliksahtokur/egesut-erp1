@@ -439,3 +439,20 @@ test('klasik mod eventAt: eski fallback zincirleri (gorev tamamlanma→created_a
   const c = _gmEntriesFromSources({ cases: [{ id: 'C1', status: 'active', start_date: '2026-09-05', created_at: '2026-09-05T09:00:00Z' }] }, null, { mode: 'klasik' });
   assert.strictEqual(c[0].eventAt, '2026-09-05T09:00:00Z');
 });
+
+// ── L4 (lead): gün görünümü de geri-al üretir (plan §1a; 'defter ayrıcalığı' kalktı) ──
+test('gün pipeline: çözülebilen islem kaydında undoRef dolu gelir', () => {
+  const { _gmGunEntriesFromSources } = sandbox;
+  const sources = { islem_log: [{ id: 'i1', tip: 'TOHUMLAMA', ana_hayvan_id: 'h1', tarih: '2026-09-14T10:00:00+03:00', ref_id: 't1', ref_tablo: 'tohumlama', degisim_txid: 123 }] };
+  const gun = _gmGunEntriesFromSources(sources);
+  const e = gun.find(x => x.type === 'islem');
+  assert.ok(e, 'gün entrysi üretildi');
+  assert.ok(e.undoRef && e.undoRef.kind === 'l2', 'undoRef dolu: ' + JSON.stringify(e.undoRef));
+});
+test('gün pipeline: çözülemeyen kayıtta undoRef null (buton yok)', () => {
+  const { _gmGunEntriesFromSources } = sandbox;
+  const sources = { islem_log: [{ id: 'i2', tip: 'BILINMEYEN_X', ana_hayvan_id: null, tarih: '2026-09-14T10:00:00+03:00' }] };
+  const gun = _gmGunEntriesFromSources(sources);
+  const e = gun.find(x => x.type === 'islem');
+  assert.strictEqual(e && e.undoRef, null);
+});
