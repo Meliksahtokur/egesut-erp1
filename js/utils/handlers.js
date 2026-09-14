@@ -103,6 +103,12 @@ registerActions({
   'gecmis-hayvan':    (el) => loadGecmis('hayvan', el),
   'gecmis-search':    (() => { let _t; return (el) => { clearTimeout(_t); _t = setTimeout(() => _gecmisRender(el.value), 200); }; })(),
   'gecmis-csv':       () => _gmDownloadCsv(),
+  // TG1 Faz 1: "tarihe git" — kanonik tarih seçiciyle gün seçimi; Bugün/Dün
+  // hızlı girişleri; Kapat deftere döner (skipPull — veri tab girişinde çekildi).
+  'gecmis-tarihe-git': () => gecmisTariheGitAc(),
+  'gecmis-gun-bugun':  () => gecmisGunSec(bugun()),
+  'gecmis-gun-dun':    () => gecmisGunSec(dAgo(bugun(), 1)),
+  'gecmis-gun-kapat':  () => gecmisGunSec(null),
   // D15 görünüm switch'i: Defter (gün gruplu saf-bitmiş) ↔ Klasik (eski düz liste).
   // skipPull ile ağ çekmeden anında geçiş; tercih localStorage'da kalıcı.
   'gecmis-gorunum-toggle': () => {
