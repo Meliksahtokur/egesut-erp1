@@ -2663,14 +2663,67 @@ function _detUremeHtml(a,tohs,kizgs){
   }
   return h;
 }
-async function _detRenderGecmis(id,el){
+// TG1-W3 (luna F9): hayvan kartı geçmişine tarih şeridi/gün filtresi — goal
+// "Değişecek dosyalar" maddesinin kapanışı. Ana yüzey şeridiyle AYNI mekanizma
+// (kanonik tekTarihTakvimAc + banner deseni + skipPull'suz yeniden render);
+// todayKey sözleşmesi burada da geçerli — seçili gün todayKey'e geçirilmez,
+// BUGÜN/DÜN etiketleri gerçek bugünden gelir.
+let _detGecmisGun=null;   // kart kapsamında seçili gün (ISO) ya da null
+let _detGecmisGunSayi=0;  // seçili günün (arama ÖNCESİ) olay sayısı
+let _detGecmisCtx=null;   // son render bağlamı {id, el} — şerit action'ları için
+function gecmisDetTariheGitAc(){
+  if(!_detGecmisCtx) return;
+  tekTarihTakvimAc({
+    baslik:'📅 Tarihe Git',
+    deger:_detGecmisGun||bugun(),
+    max:bugun(), // olay görünümü geçmişe bakar; gelecek gün boş kalırdı
+    onSec:iso=>{ if(iso) gecmisDetGunSec(iso); },
+  });
+}
+function gecmisDetGunSec(iso){
+  _detGecmisGun=iso||null;
+  if(_detGecmisCtx) _detRenderGecmis(_detGecmisCtx.id,_detGecmisCtx.el,{gunKoru:true});
+}
+function _detGecmisGunBannerGuncelle(){
+  const b=document.getElementById('det-gecmis-gun-banner');
+  if(!b) return;
+  if(!_detGecmisGun){ b.style.display='none'; b.innerHTML=''; return; }
+  const gunAd=_gmGroupLabel(_detGecmisGun)||_detGecmisGun; // gerçek bugüne göre
+  b.style.display='block';
+  b.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;padding:8px 12px;background:rgba(42,107,181,.08);border:1.5px solid rgba(42,107,181,.35);border-radius:12px">
+    <span style="font-size:1rem">📅</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:800;font-size:.8rem;color:var(--ink)">${esc(gunAd)} · ${esc(fmtTarih(_detGecmisGun))}</div>
+      <div style="font-size:.66rem;color:var(--ink3)">${_detGecmisGunSayi} olay</div>
+    </div>
+    <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-det-gun-kapat" title="Gün görünümünden çık — karta dön">✕ Kapat</button>
+  </div>`;
+}
+async function _detRenderGecmis(id,el,opts){
+  if(!(opts&&opts.gunKoru)) _detGecmisGun=null; // yeni kart açılışı gün süzmesini sıfırlar
+  _detGecmisCtx={id,el};
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     // D9 hayvan kartı paritesi: ana sekmeyle AYNI ortak veri hattı; kapsam
-    // pipeline'a bildirilir (kaynak bazında mevcut eşleşme kuralları uygulanır)
+    // pipeline'a bildirilir (kaynak bazında mevcut eşleşme kuralları uygulanır).
+    // TG1-W3: seçili gün varsa gün hattı (olayGunu + gün politikaları + DEDUP,
+    // hayvan kapsamıyla) — defter hattı aynen korunur.
     const sources=await _gecmisCollectSources();
-    const entries=_gmEntriesFromSources(sources,{animalId:id});
-    if(!entries.length){el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Kayıt yok</div>';return;}
+    const entries=_detGecmisGun
+      ? _gmGunEntriesFromSources(sources,{animalId:id}).filter(e=>e.olayGunu===_detGecmisGun)
+      : _gmEntriesFromSources(sources,{animalId:id});
+    _detGecmisGunSayi=_detGecmisGun?entries.length:0;
+    if(!entries.length){
+      el.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:9px;align-items:center;overflow-x:auto;padding-bottom:2px">
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-det-gun-bugun" title="Bugünün olayları">Bugün</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-det-gun-dun" title="Dünün olayları">Dün</button>
+        <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-det-tarihe-git" title="Takvimden gün seç — o gün ne oldu?">📅 Tarihe git</button>
+      </div>
+      <div id="det-gecmis-gun-banner" style="display:none"></div>
+      <div class="empty"><div class="empty-ico">📋</div>${_detGecmisGun?esc(fmtTarih(_detGecmisGun))+' gününe ait kayıt yok':'Kayıt yok'}</div>`;
+      _detGecmisGunBannerGuncelle();
+      return;
+    }
 
     // islem detay paneli indeksi (Geri Al modal desteği korunur)
     const islemLogs=entries.filter(e=>e.type==='islem').map(e=>e.data);
@@ -2695,12 +2748,19 @@ async function _detRenderGecmis(id,el){
     }
     globalThis._renderDetGecmisList=_renderDetGecmisList;
 
-    el.innerHTML=`<div style="padding:0 0 8px">
+    el.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:9px;align-items:center;overflow-x:auto;padding-bottom:2px">
+      <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-det-gun-bugun" title="Bugünün olayları">Bugün</button>
+      <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-det-gun-dun" title="Dünün olayları">Dün</button>
+      <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-det-tarihe-git" title="Takvimden gün seç — o gün ne oldu?">📅 Tarihe git</button>
+    </div>
+    <div id="det-gecmis-gun-banner" style="display:none"></div>
+    <div style="padding:0 0 8px">
       <input id="det-gecmis-search" type="search" placeholder="Ara… (sperma, ilaç, tanı)" autocomplete="off"
         style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid var(--card3);border-radius:10px;background:var(--card);color:var(--ink);font-size:.82rem"
         oninput="globalThis._renderDetGecmisList(this.value)">
     </div>
     <div id="det-gecmis-body"></div>`;
+    _detGecmisGunBannerGuncelle();
     _renderDetGecmisList('');
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
 }
@@ -3770,7 +3830,7 @@ function _gecmisEntryHtml(e, overrideOc){
   const date=e.eventAt||e.date;   // ortak hat: eventAt esas (plan Görev 5-4)
   const d=date&&date.length>10?fmtTarihSaat(date):fmtTarih(date);
   const hk=HEKIMLER.find(h=>h.id===data.hekim_id);
-  const hkName=hk?` · ${hk.ad}`:'';
+  const hkName=hk?` · ${esc(hk.ad)}`:''; // TG1-W3 (luna F3): DB metni escape
   const hayvanKey=data.hayvan_id||data.anne_id||data.animal_id;
   const hayvanObj=getState('animals').find(a=>a.id===hayvanKey||a.kupe_no===hayvanKey);
   const hayvanLabel=hayvanObj?.kupe_no||hayvanObj?.devlet_kupe||hayvanKey;
@@ -3785,7 +3845,7 @@ function _gecmisEntryHtml(e, overrideOc){
     const anneObj=getState('animals').find(a=>a.id===data.anne_id||a.kupe_no===data.anne_id);
     const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
     title=`<span onclick="openDet('${data.anne_id}')" style="cursor:pointer">${esc(anneLabel)||'?'}</span> → <b onclick="openDetByKupe('${data.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${esc(data.yavru_kupe)||'?'}</b> (${esc(data.yavru_cins||'?')})`;
-    sub=`${data.dogum_tipi||'Normal'}${hkName}`;
+    sub=`${esc(data.dogum_tipi||'Normal')}${hkName}`; // TG1-W3 (luna F3): dogum_tipi escape
   } else if(type==='tohumlama'&&_sk==='tohumlama_sonuc'){
     // TG1 gün görünümü: terminal sonuç KALEMİ — kendi sonuç gününde ayrı satır
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
@@ -3794,7 +3854,7 @@ function _gecmisEntryHtml(e, overrideOc){
   } else if(type==='tohumlama'){
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
     title=`${esc(hayvanLabel||'?')} — ${esc(data.sperma||'?')}`;
-    sub=`${data.deneme_no||1}. Tohumlama · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`;
+    sub=`${data.deneme_no||1}. Tohumlama · <b style="color:${sc}">${esc(data.sonuc||'Bekliyor')}</b>${hkName}`; // TG1-W3 (luna F3): sonuc escape
   } else if(type==='hastalik'){
     const sc=data.status==='active'?'var(--red)':'var(--green)';
     const _gunModu=!!e.olayGunu; // TG1 gün hattı entry'leri olayGunu taşır (defter taşımaz)
@@ -3810,7 +3870,7 @@ function _gecmisEntryHtml(e, overrideOc){
     const _pill=_done?'<span style="font-size:.6rem;padding:1px 6px;border-radius:8px;background:var(--card3);color:var(--ink3)">Tamamlandı</span>':'<span style="font-size:.6rem;padding:1px 6px;border-radius:8px;background:rgba(42,107,181,.15);color:var(--blue)">Bekliyor</span>';
     if(data.gorev_tipi==='TEDAVI_GUN'){
       const lbl=data._lbl||('Gün '+(data._gunNo||'?')+' tedavisi');
-      title=`${esc(gLabel||'?')} — ${lbl}`;
+      title=`${esc(gLabel||'?')} — ${esc(lbl)}`; // TG1-W3 (luna F3): tedavi etiketi (DB aciklama JSON'undan) escape
       const drugLine=(data._drugNames||[]).length?`<div style="font-size:.66rem;color:var(--ink2);margin-top:1px">💊 ${esc(data._drugNames.join(', '))}</div>`:'';
       const disLine=data._disName?`<span style="font-size:.62rem;color:var(--ink3)">🏥 ${esc(data._disName)}</span> · `:'';
       sub=`${drugLine}<div style="margin-top:1px">${disLine}${_pill}</div>`;
@@ -3818,21 +3878,21 @@ function _gecmisEntryHtml(e, overrideOc){
     } else {
       let _aLbl='';try{const _p=typeof data.aciklama==='string'?JSON.parse(data.aciklama):data.aciklama;_aLbl=_p?.label||data.aciklama||'';}catch(e){_aLbl=data.aciklama||'';}
       title=`${esc(gLabel||'GENEL')} — ${esc(_aLbl)}`;
-      sub=`<span class="pill ${data.gorev_tipi||'DIGER'}">${(data.gorev_tipi||'').replace(/_/g,' ')}</span> · ${_pill}${hkName}`;
+      sub=`<span class="pill ${escAttr(data.gorev_tipi||'DIGER')}">${esc((data.gorev_tipi||'').replace(/_/g,' '))}</span> · ${_pill}${hkName}`; // TG1-W3 (luna F3): gorev_tipi class+metin escape
       if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
     }
   } else if(type==='uygulama'){
     const uHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
     const uLabel=uHayvan?(uHayvan.kupe_no||uHayvan.devlet_kupe):data.hayvan_id;
     title=`${esc(uLabel||'?')} — ${esc(data._stokAdi||'?')}`;
-    sub=`${data.doz||'?'} ${data.birim||'ml'} · ${data.rota||'IM'}${data.notlar?' · '+esc(data.notlar):''}`;
+    sub=`${esc(String(data.doz??'?'))} ${esc(data.birim||'ml')} · ${esc(data.rota||'IM')}${data.notlar?' · '+esc(data.notlar):''}`; // TG1-W3 (luna F3): uygulama alanları escape
     if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
   } else if(type==='islem'){
     const snap=data.snapshot||{};
     const hayvanObj2=getState('animals').find(a=>a.id===data.ana_hayvan_id);
     const _exitedCache=JSON.parse(localStorage.getItem('ege_exited_kupe')||'{}');
     const kupe=hayvanObj2?.kupe_no||hayvanObj2?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_exitedCache[data.ana_hayvan_id]||data.ana_hayvan_id||'?';
-    title=`${esc(kupe)} — ${_ISLEM_ETK[data.tip]||data.tip}`;
+    title=`${esc(kupe)} — ${esc(_ISLEM_ETK[data.tip]||data.tip||'')}`; // TG1-W3 (luna F3): bilinmeyen islem tipi de escape
     if(data.tip==='ASI_KAYDI') sub=esc(snap.vaccine_name||'');
     else if(data.tip==='ASI_ERTELEME') sub=esc(snap.erteleme_notu||snap.vaccine_name||'');
     else if(data.tip==='TOPLU_ILAC') sub=esc(snap.ilac_adi||'');
@@ -3842,11 +3902,12 @@ function _gecmisEntryHtml(e, overrideOc){
     // TG1 gün görünümü: vaccination_log kalemi (islem aynası dedup ile baskılanır)
     title=`${esc(hayvanLabel||'?')} — ${esc(data._asiAdi||'Aşı')}`;
     sub=[data._asiAdi?'':'Aşı', data.next_due_date?`Rapel: ${fmtTarih(data.next_due_date)}`:''].filter(Boolean).join(' · ')+hkName;
-    if(data.animal_id) oc=`onclick="openDet('${data.animal_id}')" style="cursor:pointer"`;
+    // TG1-W3 (luna F4): DB kimliği inline onclick yerine dataset + delegasyon
+    if(data.animal_id) oc=`data-action="gm-det" data-det="${escAttr(data.animal_id)}" style="cursor:pointer"`;
   } else if(type==='kizginlik'){
     title=`${esc(hayvanLabel||'?')} — Kızgınlık gözlemi`;
     sub=esc(data.belirti||'');
-    if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
+    if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   } else if(type==='stok'){
     // hayvansız kategori (rapor §E.3) — ürün adı zenginleştirmesi _urunAdi
     const giris=['Giriş','İade','Düzeltme','Ekleme'].includes(data.tur);
@@ -3857,17 +3918,17 @@ function _gecmisEntryHtml(e, overrideOc){
     const lbl=data.kupe_no||data.devlet_kupe||data.id;
     title=`${esc(lbl||'?')} — Çıkış`;
     sub=`<b>${esc(data.cikis_tipi||'Çıkış')}</b> · Süruden çıkarıldı`;
-    oc=`onclick="openDet('${data.id}')" style="cursor:pointer"`;
+    oc=`data-action="gm-det" data-det="${escAttr(data.id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   } else if(type==='sutten'){
     const lbl=data.kupe_no||data.devlet_kupe||data.id;
     title=`${esc(lbl||'?')} — Sütten Kesme`;
     sub='Sütten kesildi';
-    oc=`onclick="openDet('${data.id}')" style="cursor:pointer"`;
+    oc=`data-action="gm-det" data-det="${escAttr(data.id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   } else if(type==='protokol'){
     const lbl=hayvanLabel||data.kupe_no||data.devlet_kupe||'?';
     title=`${esc(lbl)} — Protokol ${_sk==='protokol_instance_kapanis'?'kapandı':'başladı'}`;
     sub=_sk==='protokol_instance_kapanis'?'Protokol kapanışı':'Protokol başlangıcı';
-    if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
+    if(data.hayvan_id) oc=`data-action="gm-det" data-det="${escAttr(data.hayvan_id)}" style="cursor:pointer"`; // TG1-W3 (luna F4)
   }
   if(overrideOc!==undefined) oc=overrideOc;
   return `<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>

@@ -195,12 +195,19 @@ function olayGunu(sourceKey, row) {
 //   vaccination_log  > islem_log ASI_KAYDI      (hayvan+gün)
 //   kizginlik_log    > islem_log KIZGINLIK_KAYDI(hayvan+gün)
 //   hayvanlar_sutten > islem_log SUTEN_KESME    (hayvan+gün)
-//   tohumlama        > islem_log TOHUMLAMA      (ref_id→id, yoksa hayvan+gün)
-//   cases            > islem_log VAKA_ACILDI    (ref_id→id, yoksa hayvan+gün)
-//   herhangi kaynak  > stok_hareket (referans_id→kaynak id, aynı gün; %97
-//                     referanssız satır "genel stok hareketi" olarak KALIR —
-//                     rapor §E.3: hayvana bağlanamaz, doğru beklenti budur)
-function _gmGunEntriesFromSources(sources) {
+//   tohumlama        > islem_log TOHUMLAMA      (ref_id BOŞSA hayvan+gün)
+//   cases            > islem_log VAKA_ACILDI    (ref_id BOŞSA hayvan+gün)
+//   tohumlama        > stok_hareket             (referans_tipi='tohumlama' + id + gün)
+// TG1-W3 (luna F1/F2 kesinleştirmesi): ref_id DOLU islem aynasında baskılama
+// YALNIZ ref hedefi bulunursa VE olay-günü aynıysa; eşleşmeyen ref'te
+// HAYVAN+GÜN fallback'ı UYGULANMAZ (gerçek ayrı olay görünür kalır). Stok
+// baskılama yalnız referans_tipi doğrulamasıyla İLGİLİ kaynak ailesinin
+// birincil kayıt id'lerine bağlanır — canlıda tek çalışan aile 'tohumlama'
+// (tedavi seans stoku referans taşımaz: notlar 'drug_admin:' deseni; aşı
+// ailesi goal öncelik tablosunda baskılanmaz); aile dışı/non-stok entry
+// id'siyle gün eşleşmesi baskılama ÜRETMEZ. %97 referanssız satır "genel
+// stok hareketi" olarak KALIR (rapor §E.3).
+function _gmGunEntriesFromSources(sources, scope) {
   sources = sources || {};
   const out = [];
   const ekle = (sourceKey, entryType, row, v) => {
@@ -256,16 +263,16 @@ function _gmGunEntriesFromSources(sources) {
   });
 
   // DEDUP — kazanan kalemlerden baskı kümeleri kurulur, islem/stok baskılanır
-  const asiKey = new Set(), kizKey = new Set(), suttenKey = new Set(), tohRef = new Set(), tohKey = new Set();
-  const vakaRef = new Set(), vakaKey = new Set(), kaynakIdGun = new Set();
+  const asiKey = new Set(), kizKey = new Set(), suttenKey = new Set(), tohKey = new Set();
+  const tohRefGun = new Set(), vakaRefGun = new Set(), vakaKey = new Set();
+  const refId = v => (v === null || v === undefined) ? '' : String(v).trim();
   out.forEach(e => {
     const g = e.olayGunu, r = e.data || {};
     if (e.sourceKey === 'vaccination_log') asiKey.add(r.animal_id + '|' + g);
     else if (e.sourceKey === 'kizginlik_log') kizKey.add(r.hayvan_id + '|' + g);
     else if (e.sourceKey === 'hayvanlar_sutten') suttenKey.add(r.id + '|' + g);
-    else if (e.sourceKey === 'tohumlama') { tohRef.add(String(r.id)); tohKey.add(r.hayvan_id + '|' + g); }
-    else if (e.sourceKey === 'cases') { vakaRef.add(String(r.id)); vakaKey.add(r.animal_id + '|' + g); }
-    if (e.sourceKey !== 'stok_hareket' && r.id) kaynakIdGun.add(String(r.id) + '|' + g);
+    else if (e.sourceKey === 'tohumlama') { tohKey.add(r.hayvan_id + '|' + g); if (r.id) tohRefGun.add(refId(r.id) + '|' + g); }
+    else if (e.sourceKey === 'cases') { vakaKey.add(r.animal_id + '|' + g); if (r.id) vakaRefGun.add(refId(r.id) + '|' + g); }
   });
   const baskili = new Set();
   out.forEach(e => {
@@ -274,15 +281,45 @@ function _gmGunEntriesFromSources(sources) {
       if (r.tip === 'ASI_KAYDI' && asiKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
       if (r.tip === 'KIZGINLIK_KAYDI' && kizKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
       if (r.tip === 'SUTEN_KESME' && suttenKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
-      if (r.tip === 'TOHUMLAMA' && (tohRef.has(String(r.ref_id)) || tohKey.has(r.ana_hayvan_id + '|' + g))) return baskili.add(e);
-      if (r.tip === 'VAKA_ACILDI' && (vakaRef.has(String(r.ref_id)) || vakaKey.has(r.ana_hayvan_id + '|' + g))) return baskili.add(e);
-    } else if (e.sourceKey === 'stok_hareket' && r.referans_id && kaynakIdGun.has(String(r.referans_id) + '|' + g)) {
-      return baskili.add(e); // tohumlama/tedavi kaynaklı stok düşüşü — kaynak kalemi kazanır
+      // TG1-W3 (luna F1): ref_id DOLU ise yalnız id+gün eşleşmesi baskılar;
+      // HAYVAN+GÜN fallback'ı yalnız ref_id BOŞ aynada geçerli.
+      if (r.tip === 'TOHUMLAMA') {
+        const rid = refId(r.ref_id);
+        if (rid ? tohRefGun.has(rid + '|' + g) : tohKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
+      }
+      if (r.tip === 'VAKA_ACILDI') {
+        const rid = refId(r.ref_id);
+        if (rid ? vakaRefGun.has(rid + '|' + g) : vakaKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
+      }
+    } else if (e.sourceKey === 'stok_hareket' && refId(r.referans_id)
+      && String(r.referans_tipi || '').trim() === 'tohumlama'
+      && tohRefGun.has(refId(r.referans_id) + '|' + g)) {
+      // TG1-W3 (luna F2): stok baskılama yalnız aile+tipi doğrulamasıyla —
+      // tohumlama kaynaklı stok düşüşü, tohumlama kalemi kazanır.
+      return baskili.add(e);
     }
   });
-  const sonuc = baskili.size ? out.filter(e => !baskili.has(e)) : out;
+  let sonuc = baskili.size ? out.filter(e => !baskili.has(e)) : out;
+  // TG1-W3 (luna F9): hayvan kartının gün görünümü kapsamı — defter scope'uyla
+  // AYNI kaynak bazlı eşleşme kuralları; stok_hareket hayvansızdır (§E.3),
+  // hayvan kapsamında görünmez.
+  if (scope && scope.animalId) sonuc = sonuc.filter(e => _gmGunHayvanId(e.sourceKey, e.data || {}) === scope.animalId);
   sonuc.sort((a, b) => b.eventAt.localeCompare(a.eventAt));
   return sonuc;
+}
+
+// TG1-W3 (luna F9): gün hattı entry'sinin hayvan referansı — kaynak bazlı
+// alan eşlemesi (defter _gmEntriesFromSources scope eşleşmeleriyle paralel).
+function _gmGunHayvanId(sourceKey, row) {
+  if (sourceKey === 'tohumlama' || sourceKey === 'tohumlama_sonuc') return row.hayvan_id;
+  if (sourceKey === 'cases' || sourceKey === 'cases_kapanis') return row.animal_id;
+  if (sourceKey === 'dogum') return row.anne_id;
+  if (sourceKey === 'islem_log') return row.ana_hayvan_id;
+  if (sourceKey === 'vaccination_log') return row.animal_id;
+  if (sourceKey === 'hayvanlar' || sourceKey === 'hayvanlar_sutten') return row.id;
+  if (sourceKey === 'gorev_log' || sourceKey === 'uygulama_log' || sourceKey === 'kizginlik_log'
+    || sourceKey === 'protokol_instance' || sourceKey === 'protokol_instance_kapanis') return row.hayvan_id;
+  return null; // stok_hareket — hayvansız (§E.3)
 }
 
 // ── Geri alma bağlamı (openTohDet muhafazası, spec E) ─────

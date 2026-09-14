@@ -18,6 +18,11 @@ write_manifest:
   - tests/tarihe-git.spec.js
   - .harness/goals/2026/G-20260914-TARIHE-GIT.md
   - .harness/reports/2026-09-14-tarihe-git-f1.md
+  - js/utils/handlers.js
+  - js/api.js
+  - tests/unit/gecmis-gun.test.js
+  - tests/unit/gecmis-xss.test.js
+  - tests/unit/vaka-toplu-ac.test.js
 pattern_refs:
   - MODAL-ROUTER-01
   - OFFLINE-SYNC-01
@@ -142,6 +147,10 @@ sapması TR 00:00–03:00 penceresi, yön ÖNCEKİ gün (rapor §C).
 - `tests/unit/gecmis-olaygunu.test.js` — YENİ: `olayGunu` saf testleri (red-before),
   dedup önceliği, sourceKey, todayKey sözleşmesi.
 - `tests/tarihe-git.spec.js` — YENİ Playwright: takvimden gün seç → beklenen olay listesi.
+- (W3 revizyon, lead yetkisiyle — zarf TG1-W3 md.8) manifest'e `js/utils/handlers.js`
+  (W2'nin 4 action'ı), `js/api.js` (F10 islem_log pull cap), `tests/unit/gecmis-gun.test.js`
+  (W2'nin olaygunu kapsamını taşıyan gerçek dosya adı), `tests/unit/gecmis-xss.test.js`
+  (W3 adversarial) ve `tests/unit/vaka-toplu-ac.test.js` (damga-pin) eklendi.
 
 (Not: `hayvanlar`/`stok_hareket` TABLES sabitinde zaten var — `js/api.js:30-33`
 dokunulmaz. Yeni test dosya adları öneridir; eşdeğer kapsamda farklı ad, raporda

@@ -225,13 +225,84 @@ test('gün hattı DEDUP: referans_id bağlantılı stok düşüşü baskılanır
   const out = _gmGunEntriesFromSources({
     tohumlama: [{ id: 'T1', hayvan_id: 'A1', sonuc: 'Gebe', tarih: '2025-11-17' }],
     stok_hareket: [
-      { id: 'S1', stok_id: 'ST1', tur: 'Tohumlama', miktar: 1, tarih: '2025-11-17T08:00:00Z', referans_id: 'T1' }, // baskılanır
+      // TG1-W3 (luna F2): baskılama yalnız referans_tipi='tohumlama' aile
+      // doğrulamasıyla — canlıda tek referanslı aile budur (ölçüm: tedavi seans
+      // stoku 'drug_admin:' notlar desenli, referans taşımaz).
+      { id: 'S1', stok_id: 'ST1', tur: 'Tohumlama', miktar: 1, tarih: '2025-11-17T08:00:00Z', referans_id: 'T1', referans_tipi: 'tohumlama' }, // aile+tipi+gün → baskılanır
       { id: 'S2', stok_id: 'ST2', tur: 'Tedavi', miktar: 5, tarih: '2025-11-17T09:00:00Z' },                        // bağlantısız → kalır
-      { id: 'S3', stok_id: 'ST1', tur: 'Tohumlama', miktar: 1, tarih: '2025-12-01T08:00:00Z', referans_id: 'T1' }, // farklı gün → kalır
+      { id: 'S3', stok_id: 'ST1', tur: 'Tohumlama', miktar: 1, tarih: '2025-12-01T08:00:00Z', referans_id: 'T1', referans_tipi: 'tohumlama' }, // farklı gün → kalır
     ],
   });
   const stok = out.filter(e => e.sourceKey === 'stok_hareket');
-  assert.strictEqual(stok.map(e => e.data.id).sort().join(','), 'S2,S3', 'yalnız aynı gün ref bağlantılı olan baskılanır');
+  assert.strictEqual(stok.map(e => e.data.id).sort().join(','), 'S2,S3', 'yalnız aynı gün aile+tipi doğrulanan baskılanır');
+});
+
+// ── §B-W3: luna REVİZYON adversarial senaryoları (F1/F2) ───────────
+
+test('W3 adversarial (F1): ref_id DOLU islem aynasında eşleşme yoksa HAYVAN+GÜN fallback UYGULANMAZ', () => {
+  const { _gmGunEntriesFromSources } = sandbox;
+  const out = _gmGunEntriesFromSources({
+    tohumlama: [{ id: 'T1', hayvan_id: 'A1', sonuc: 'Gebe', tarih: '2025-11-17' }],
+    cases: [{ id: 'C1', animal_id: 'A1', status: 'active', start_date: '2025-11-17' }],
+    islem_log: [
+      { id: 'I1', tip: 'TOHUMLAMA', ana_hayvan_id: 'A1', ref_id: 'T1', tarih: '2025-11-18T07:00:00Z' },    // aynı id FARKLI gün → kalır
+      { id: 'I2', tip: 'TOHUMLAMA', ana_hayvan_id: 'A1', ref_id: 'YOK', tarih: '2025-11-17T08:00:00Z' },   // eşleşmeyen ref + aynı hayvan/gün → kalır
+      { id: 'I3', tip: 'VAKA_ACILDI', ana_hayvan_id: 'A1', ref_id: 'YOK', tarih: '2025-11-17T09:00:00Z' }, // eşleşmeyen ref + aynı hayvan/gün → kalır
+      { id: 'I4', tip: 'VAKA_ACILDI', ana_hayvan_id: 'A1', ref_id: 'C1', tarih: '2025-11-19T09:00:00Z' },  // aynı id FARKLI gün → kalır
+    ],
+  });
+  ['I1', 'I2', 'I3', 'I4'].forEach(id =>
+    assert.ok(out.some(e => e.data.id === id), `${id} görünür kalır (gerçek ayrı olay sessizce kaybolamaz)`));
+  // denge kontrolü: ref BOŞ aynada hayvan+gün fallback HÂLÂ baskılar
+  const out2 = _gmGunEntriesFromSources({
+    tohumlama: [{ id: 'T1', hayvan_id: 'A1', tarih: '2025-11-17' }],
+    islem_log: [{ id: 'I5', tip: 'TOHUMLAMA', ana_hayvan_id: 'A1', ref_id: null, tarih: '2025-11-17T07:00:00Z' }],
+  });
+  assert.ok(!out2.some(e => e.data.id === 'I5'), 'ref BOŞ → hayvan+gün fallback baskılar');
+});
+
+test('W3 adversarial (F2): stok referansı aile dışı/non-primary id ise baskılama ÜRETMEZ', () => {
+  const { _gmGunEntriesFromSources } = sandbox;
+  const out = _gmGunEntriesFromSources({
+    tohumlama: [{ id: 'T1', hayvan_id: 'A1', tarih: '2025-11-17' }],
+    vaccination_log: [{ id: 'V1', animal_id: 'A1', vaccination_date: '2025-11-17' }],
+    islem_log: [{ id: 'I4', tip: 'HAYVAN_EKLENDI', ana_hayvan_id: 'A1', tarih: '2025-11-17T06:00:00Z' }],
+    stok_hareket: [
+      // luna ölçümü: referans non-primary islem id'sine işaret ediyorsa stok kalemi
+      // görünür kalmalıydı — eski kod herhangi bir non-stok entry id'sini bastırıyordu.
+      { id: 'S1', stok_id: 'ST1', tur: 'Tedavi', miktar: 1, tarih: '2025-11-17T08:00:00Z', referans_id: 'I4' },                          // non-primary islem id → kalır
+      { id: 'S2', stok_id: 'ST1', tur: 'Tohumlama', miktar: 1, tarih: '2025-11-17T09:00:00Z', referans_id: 'T1' },                        // tipi YOK → aile doğrulanamaz → kalır
+      { id: 'S3', stok_id: 'ST2', tur: 'Aşı', miktar: 1, tarih: '2025-11-17T10:00:00Z', referans_id: 'V1', referans_tipi: 'vaccination' }, // aile dışı (goal tablosu: aşı stoku baskılanmaz) → kalır
+    ],
+  });
+  const stok = out.filter(e => e.sourceKey === 'stok_hareket');
+  assert.strictEqual(stok.map(e => e.data.id).sort().join(','), 'S1,S2,S3', 'aile+tipi doğrulamasız stok kalemi görünür kalır');
+});
+
+test('W3 (F9): hayvan kapsamı — gün hattı yalnız o hayvanın kalemlerini verir; stok hayvansız olduğundan kapsam dışı', () => {
+  const { _gmGunEntriesFromSources, _gmGunHayvanId } = sandbox;
+  const sources = {
+    tohumlama: [
+      { id: 'T1', hayvan_id: 'A1', tarih: '2025-11-17' },
+      { id: 'T2', hayvan_id: 'A2', tarih: '2025-11-17' },
+    ],
+    vaccination_log: [{ id: 'V1', animal_id: 'A1', vaccination_date: '2025-11-17' }],
+    islem_log: [
+      { id: 'I1', tip: 'ASI_KAYDI', ana_hayvan_id: 'A1', tarih: '2025-11-17T07:00:00Z' },  // aşı aynası — A1 kapsamında da baskılanır
+      { id: 'I2', tip: 'HAYVAN_EKLENDI', ana_hayvan_id: 'A2', tarih: '2025-11-17T08:00:00Z' }, // A2 → kapsam dışı
+    ],
+    stok_hareket: [{ id: 'S1', stok_id: 'ST1', tur: 'Tedavi', miktar: 1, tarih: '2025-11-17T09:00:00Z' }], // hayvansız → kapsam dışı
+    hayvanlar: [{ id: 'A1', cikis_tarihi: '2025-11-17', cikis_tipi: 'Satıldı' }],
+  };
+  const out = _gmGunEntriesFromSources(sources, { animalId: 'A1' });
+  assert.ok(out.some(e => e.sourceKey === 'tohumlama' && e.data.id === 'T1'), 'A1 tohumlaması kalır');
+  assert.ok(out.some(e => e.sourceKey === 'vaccination_log'), 'A1 aşısı kalır (birincil)');
+  assert.ok(!out.some(e => e.data.id === 'I1'), 'aşı aynası kapsamda da baskılanır (dedup kapsam ÖNCESİ)');
+  assert.ok(!out.some(e => e.data.id === 'T2' || e.data.id === 'I2'), 'başka hayvanın kalemleri girmez');
+  assert.ok(!out.some(e => e.sourceKey === 'stok_hareket'), 'stok hayvansız — hayvan kapsamında görünmez (§E.3)');
+  assert.ok(out.some(e => e.sourceKey === 'hayvanlar'), 'hayvanlar satırının kendi çıkışı kalır');
+  // yardımcı sözleşme: bilinmeyen kaynak → null (stok dahil)
+  assert.strictEqual(_gmGunHayvanId('stok_hareket', {}), null);
 });
 
 test('gün hattı: entry sıralaması eventAt desc', () => {
