@@ -40,7 +40,9 @@ implement_lane: glmf_workers
 
 # G-20260914-TARIHE-GIT — "Tarihe git: o gün ne oldu?" (Faz 1, istemci tarafı)
 
-- **Status:** PENDING (2026-09-14; lead `/goal` direktifiyle başlar)
+- **Status:** DONE (2026-09-14; kabul zinciri tamam: W1 goal → W2 implementasyon → luna
+  denetim/REVİZYON → W3 revizyon → lead kabul; frontmatter `status: done` ile tutarlı;
+  teslim raporu: `.harness/reports/2026-09-14-tarihe-git-f1.md`)
 - **Task envelope:** `/home/melik/egesut-erp1/.ss/tasks/L3-tarihe-git-faz1.md` (scopes
   this goal) · hazırlık zarfı: `.ss/tasks/TG1-W1-goal.md` (W1, bu dosyanın yazarı)
 - **Temel araştırma:** `reports/2026-09-13-tarihe-git-altyapi.md` (W2; §D.c seçenek (c),
