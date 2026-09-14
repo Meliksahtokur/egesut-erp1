@@ -19,7 +19,8 @@
    idbGetAll, idbPut, idbClearAndPut, getData, getQueue, removeFromQueue,
    openDB, syncNow, updateSyncBar,
    _gmEntriesFromSources, _gmCap, _gmGroup, _gmGroupHtml, _gmSearch,
-   _gmTodayKey, _gmUndoButtonHtml, _gmDownloadCsv
+   _gmTodayKey, _gmUndoButtonHtml, _gmDownloadCsv,
+   _gmGunEntriesFromSources, _gmGroupLabel, olayGunu
 */
 
 let _taskKategori='all';
@@ -3756,8 +3757,11 @@ async function loadUreme(tab='kizginlik'){
 // ──────────────────────────────────────────
 // GEÇMİŞ
 // ──────────────────────────────────────────
-const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',uygulama:'💊',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
-const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',uygulama:'rgba(120,80,200,.1)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',ASI_ERTELEME:'rgba(120,120,120,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)'};
+const _GECMIS_ICO = {dogum:'🐄',tohumlama:'💉',hastalik:'🏥',gorev:'✅',uygulama:'💊',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊',
+  // TG1 tek-gün görünümü kategorileri (defter hattı bu tiplerde entry üretmez)
+  asi:'💉',kizginlik:'🔴',stok:'📦',cikis:'🚪',sutten:'🍼',protokol:'🩺'};
+const _GECMIS_BG  = {dogum:'rgba(78,154,42,.1)',tohumlama:'rgba(42,107,181,.1)',hastalik:'rgba(192,50,26,.1)',gorev:'var(--card2)',uygulama:'rgba(120,80,200,.1)',islem:'rgba(120,120,120,.1)',ASI_KAYDI:'rgba(0,160,200,.1)',ASI_ERTELEME:'rgba(120,120,120,.1)',TOPLU_ILAC:'rgba(120,80,200,.1)',
+  asi:'rgba(0,160,200,.1)',kizginlik:'rgba(192,50,26,.1)',stok:'rgba(120,100,60,.12)',cikis:'rgba(120,120,120,.14)',sutten:'rgba(78,154,42,.1)',protokol:'rgba(42,107,181,.08)'};
 const _ISLEM_ICO  = {HAYVAN_EKLENDI:'🐮',ABORT_KAYDI:'⚠️',KIZGINLIK_KAYDI:'🔴',ASI_KAYDI:'💉',ASI_ERTELEME:'⏸️',TOPLU_ILAC:'💊'};
 const _ISLEM_ETK  = {HAYVAN_EKLENDI:'🐮 Hayvan Eklendi',ABORT_KAYDI:'⚠️ Abort',KIZGINLIK_KAYDI:'🔴 Kızgınlık',ASI_KAYDI:'💉 Aşı Kaydı',ASI_ERTELEME:'⏸️ Aşı Ertelendi',TOPLU_ILAC:'💊 Toplu İlaç'};
 
@@ -3773,6 +3777,7 @@ function _gecmisEntryHtml(e, overrideOc){
   const ico=_GECMIS_ICO[type]||(_ISLEM_ICO[data.tip]||'📋');
   const icoBg=_GECMIS_BG[type]||'rgba(120,120,120,.1)';
   let oc='',title='',sub='';
+  const _sk=e.sourceKey||type; // TG1: aynı tipin varyant kalemleri (sonuç/kapanış)
   if(type==='hastalik') oc=`onclick="openCaseDet('${data.id}')" style="cursor:pointer"`;
   else if(type==='tohumlama') oc=`onclick="openTohDet('${data.id}')" style="cursor:pointer"`;
   else if(type==='dogum') oc='';
@@ -3781,14 +3786,23 @@ function _gecmisEntryHtml(e, overrideOc){
     const anneLabel=anneObj?.kupe_no||anneObj?.devlet_kupe||data.anne_id;
     title=`<span onclick="openDet('${data.anne_id}')" style="cursor:pointer">${esc(anneLabel)||'?'}</span> → <b onclick="openDetByKupe('${data.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${esc(data.yavru_kupe)||'?'}</b> (${esc(data.yavru_cins||'?')})`;
     sub=`${data.dogum_tipi||'Normal'}${hkName}`;
+  } else if(type==='tohumlama'&&_sk==='tohumlama_sonuc'){
+    // TG1 gün görünümü: terminal sonuç KALEMİ — kendi sonuç gününde ayrı satır
+    const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
+    title=`${esc(hayvanLabel||'?')} — Gebelik muayenesi`;
+    sub=`Sonuç: <b style="color:${sc}">${esc(data.sonuc||'?')}</b>${hkName}`;
   } else if(type==='tohumlama'){
     const sc=data.sonuc==='Gebe'?'var(--green)':data.sonuc==='Boş'?'var(--red)':'var(--amber)';
     title=`${esc(hayvanLabel||'?')} — ${esc(data.sperma||'?')}`;
     sub=`${data.deneme_no||1}. Tohumlama · <b style="color:${sc}">${data.sonuc||'Bekliyor'}</b>${hkName}`;
   } else if(type==='hastalik'){
     const sc=data.status==='active'?'var(--red)':'var(--green)';
+    const _gunModu=!!e.olayGunu; // TG1 gün hattı entry'leri olayGunu taşır (defter taşımaz)
     title=`${esc(hayvanLabel||'?')} — ${esc(data.disease_name||data.tani||'?')}`;
-    sub=`<b style="color:${sc}">${data.status==='active'?'Aktif':'Kapalı'}</b>${hkName}`;
+    sub=_sk==='cases_kapanis'
+      ?`<b style="color:var(--green)">Vaka kapandı</b>${hkName}`                          // TG1: kapanış kalemi
+      :_gunModu?`<b style="color:${sc}">Vaka açıldı</b>${hkName}`                         // TG1: açılış kalemi
+      :`<b style="color:${sc}">${data.status==='active'?'Aktif':'Kapalı'}</b>${hkName}`;  // defter/klasik aynen
   } else if(type==='gorev'){
     const gHayvan=getState('animals').find(a=>a.id===data.hayvan_id);
     const gLabel=gHayvan?(gHayvan.kupe_no||gHayvan.devlet_kupe):data.hayvan_id;
@@ -3824,6 +3838,36 @@ function _gecmisEntryHtml(e, overrideOc){
     else if(data.tip==='TOPLU_ILAC') sub=esc(snap.ilac_adi||'');
     else sub=esc(snap.irk||snap.grup||'');
     if(snap.kupe_no||snap.devlet_kupe||['ASI_KAYDI','TOPLU_ILAC'].includes(data.tip)) oc=`onclick="openDet('${data.ana_hayvan_id}')" style="cursor:pointer"`;
+  } else if(type==='asi'){
+    // TG1 gün görünümü: vaccination_log kalemi (islem aynası dedup ile baskılanır)
+    title=`${esc(hayvanLabel||'?')} — ${esc(data._asiAdi||'Aşı')}`;
+    sub=[data._asiAdi?'':'Aşı', data.next_due_date?`Rapel: ${fmtTarih(data.next_due_date)}`:''].filter(Boolean).join(' · ')+hkName;
+    if(data.animal_id) oc=`onclick="openDet('${data.animal_id}')" style="cursor:pointer"`;
+  } else if(type==='kizginlik'){
+    title=`${esc(hayvanLabel||'?')} — Kızgınlık gözlemi`;
+    sub=esc(data.belirti||'');
+    if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
+  } else if(type==='stok'){
+    // hayvansız kategori (rapor §E.3) — ürün adı zenginleştirmesi _urunAdi
+    const giris=['Giriş','İade','Düzeltme','Ekleme'].includes(data.tur);
+    title=`${esc(data._urunAdi||'Stok hareketi')}`;
+    sub=`<b style="color:${giris?'var(--green)':'var(--red)'}">${giris?'+':'−'}${esc(String(data.miktar??'?'))} ${esc(data._birim||'')}</b> · ${esc(data.tur||'')}${data.notlar?' · '+esc(data.notlar):''}`;
+  } else if(type==='cikis'){
+    // hayvanlar satırının KENDİSİ kaynak — etiket satırdan, state aramasız
+    const lbl=data.kupe_no||data.devlet_kupe||data.id;
+    title=`${esc(lbl||'?')} — Çıkış`;
+    sub=`<b>${esc(data.cikis_tipi||'Çıkış')}</b> · Süruden çıkarıldı`;
+    oc=`onclick="openDet('${data.id}')" style="cursor:pointer"`;
+  } else if(type==='sutten'){
+    const lbl=data.kupe_no||data.devlet_kupe||data.id;
+    title=`${esc(lbl||'?')} — Sütten Kesme`;
+    sub='Sütten kesildi';
+    oc=`onclick="openDet('${data.id}')" style="cursor:pointer"`;
+  } else if(type==='protokol'){
+    const lbl=hayvanLabel||data.kupe_no||data.devlet_kupe||'?';
+    title=`${esc(lbl)} — Protokol ${_sk==='protokol_instance_kapanis'?'kapandı':'başladı'}`;
+    sub=_sk==='protokol_instance_kapanis'?'Protokol kapanışı':'Protokol başlangıcı';
+    if(data.hayvan_id) oc=`onclick="openDet('${data.hayvan_id}')" style="cursor:pointer"`;
   }
   if(overrideOc!==undefined) oc=overrideOc;
   return `<div class="stok-item" style="background:var(--card);border:1px solid var(--card3);border-radius:var(--r2);padding:11px 13px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start" ${oc}>
@@ -3860,6 +3904,13 @@ function _gecmisSearchText(e){
     const snap=d.snapshot||{};
     parts.push(_ISLEM_ETK[d.tip]||d.tip||'',snap.vaccine_name||'',snap.ilac_adi||'',snap.irk||'',snap.kupe_no||'',snap.devlet_kupe||'');
   }
+  // TG1 tek-gün görünümü kategorileri
+  else if(e.type==='asi'){parts.push(d._asiAdi||'','aşı','aşı kaydı');}
+  else if(e.type==='kizginlik'){parts.push(d.belirti||'','kızgınlık');}
+  else if(e.type==='stok'){parts.push(d._urunAdi||'',d.tur||'','stok','stok hareketi');}
+  else if(e.type==='cikis'){parts.push(d.kupe_no||'',d.devlet_kupe||'',d.cikis_tipi||'','çıkış','satış');}
+  else if(e.type==='sutten'){parts.push(d.kupe_no||'',d.devlet_kupe||'','sütten kesme');}
+  else if(e.type==='protokol'){parts.push('protokol',e.sourceKey==='protokol_instance_kapanis'?'kapandı':'başladı');}
   const hk=HEKIMLER.find(h=>h.id===d.hekim_id);
   if(hk)parts.push(hk.ad);
   return trLower(parts.join(' ')).replace(/\s+/g,' ');
@@ -3870,17 +3921,25 @@ let _gecmisAllVisible=[];
 // Ana sekme + hayvan kartı geçmişi ORTAK veri hattı (D9): toplama+zenginleştirme
 // burada, normalize→politika→arama→cap→gruplama js/gecmis.js'de.
 async function _gecmisCollectSources(){
-  const [gorevArr,tohArr,caseArr,dogumArr,uygArr,islemArr]=await Promise.all([
+  const [gorevArr,tohArr,caseArr,dogumArr,uygArr,islemArr,vacArr,kizArr,stkHrkArr,hayvanArr,protoArr]=await Promise.all([
     idbGetAll('gorev_log'), idbGetAll('tohumlama'), idbGetAll('cases'), idbGetAll('dogum'),
-    idbGetAll('uygulama_log').catch(()=>[]), idbGetAll('islem_log')
+    idbGetAll('uygulama_log').catch(()=>[]), idbGetAll('islem_log'),
+    // TG1 Faz 1: tek-gün görünümünün 5 yeni kaynağı (rapor §B.1) — hepsi TABLES
+    // pull kapsamında zaten IndexedDB'de; defter hattı bunları OKUMAZ (yalnız
+    // _gmGunEntriesFromSources tüketir).
+    idbGetAll('vaccination_log').catch(()=>[]), idbGetAll('kizginlik_log').catch(()=>[]),
+    idbGetAll('stok_hareket').catch(()=>[]), idbGetAll('hayvanlar').catch(()=>[]),
+    idbGetAll('protokol_instance').catch(()=>[])
   ]);
   // Zenginleştirme birleştirmeleri (gecmis.js saf kalır — data üzerinden taşınır)
-  const [tDays,adm,disArr,stokArr,prodArr]=await Promise.all([
+  const [tDays,adm,disArr,stokArr,prodArr,vacArr2]=await Promise.all([
     idbGetAll('treatment_days').catch(()=>[]), idbGetAll('drug_administrations').catch(()=>[]),
-    idbGetAll('diseases').catch(()=>[]), idbGetAll('stok').catch(()=>[]), idbGetAll('drug_products').catch(()=>[])
+    idbGetAll('diseases').catch(()=>[]), idbGetAll('stok').catch(()=>[]), idbGetAll('drug_products').catch(()=>[]),
+    idbGetAll('vaccines').catch(()=>[])
   ]);
   const stokById=Object.fromEntries(stokArr.map(s=>[s.id,s.urun_adi||'']));
   const prodById=Object.fromEntries(prodArr.map(p=>[p.id,p.brand_name||'']));
+  const vaxById=Object.fromEntries(vacArr2.map(v=>[v.id,v.name||'']));
   const drugsByDay={};
   adm.forEach(da=>{
     if(!da.treatment_day_id)return;
@@ -3907,7 +3966,14 @@ async function _gecmisCollectSources(){
     return {...r,_drugNames,_lbl,_gunNo,_disName,_caseId};
   });
   const uyEnr=uygArr.map(r=>({...r,_stokAdi:stokById[r.stok_id]||'?'}));
-  return { gorev_log:gorevEnr, tohumlama:tohArr, cases:casesEnr, dogum:dogumArr, uygulama_log:uyEnr, islem_log:islemArr };
+  // TG1: aşı adı vaccines kataloğundan, stok hareketi ürün adı+birimi stok'tan zenginleştirilir
+  const vacEnr=vacArr.map(r=>({...r,_asiAdi:vaxById[r.vaccine_id]?.name||''}));
+  const stokSatiri=Object.fromEntries(stokArr.map(s=>[s.id,s]));
+  const stkHrkEnr=stkHrkArr.map(r=>({...r,_urunAdi:stokById[r.stok_id]||'',_birim:stokSatiri[r.stok_id]?.birim||''}));
+  return {
+    gorev_log:gorevEnr, tohumlama:tohArr, cases:casesEnr, dogum:dogumArr, uygulama_log:uyEnr, islem_log:islemArr,
+    vaccination_log:vacEnr, kizginlik_log:kizArr, stok_hareket:stkHrkEnr, hayvanlar:hayvanArr, protokol_instance:protoArr,
+  };
 }
 
 // Görünüm tercihi: Defter (gün gruplu, saf-bitmiş) ↔ Klasik (eski düz liste,
@@ -3943,11 +4009,19 @@ function _gecmisRender(q){
   const {visible,total}=_gmCap(list,300);
   _gecmisAllVisible=visible;
   globalThis._gmCsvCtx={visible,meta:_gecmisCsvMeta()};
-  if(!visible.length){el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Kayıt bulunamadı</div>';return;}
+  if(!visible.length){el.innerHTML=`<div class="empty"><div class="empty-ico">📭</div>${_gecmisGun?'Bu güne ait kayıt yok':'Kayıt bulunamadı'}</div>`;return;}
   // cap ipucu (D7) / arama sonuç sayısı
   const hint=total>visible.length
     ?`<div style="font-size:.65rem;color:var(--ink3);margin-bottom:6px;padding:0 2px">İlk ${visible.length} / ${total} kayıt</div>`
     :(q.trim()&&total<filtreliSayi?`<div style="font-size:.65rem;color:var(--ink3);margin-bottom:6px;padding:0 2px">${total} / ${filtreliSayi} sonuç</div>`:'');
+  // TG1 Faz 1: tek-gün görünümü — tek gün grubu; todayKey = GERÇEK bugün
+  // (seçili gün ASLA todayKey'e geçirilmez — sözleşme md.4; seçili gün
+  // vurgusu banner'da ayrı). Klasik/Defter ayrımı gün görünümünde anlamsız.
+  if(_gecmisGun){
+    const grup=_gmGroup(visible)[0];
+    if(grup) el.innerHTML=hint+_gmGroupHtml(grup,_gecmisEntryHtml,{open:true,todayKey:_gmTodayKey()});
+    return;
+  }
   // Klasik görünüm (D15): gün gruplamasız eski düz liste
   if(_gecmisKlasik()){
     el.innerHTML=hint+visible.map(e=>_gecmisEntryHtml(e)).join('');
@@ -3987,12 +4061,15 @@ function _gecmisCsvMeta(){
         return a?.kupe_no||a?.devlet_kupe||snap.kupe_no||snap.devlet_kupe||_ex[d.ana_hayvan_id]||d.ana_hayvan_id||'';
       }
       if(e.type==='dogum')return lblOf(d.anne_id);
+      // TG1 tek-gün kategorileri: hayvanlar satırı KENDİ küpesini taşır
+      if(e.type==='cikis'||e.type==='sutten')return d.kupe_no||d.devlet_kupe||d.id||'';
+      if(e.type==='stok')return '';
       return lblOf(d.hayvan_id||d.anne_id||d.animal_id);
     },
     detay:e=>{
       const d=e.data;
       if(e.type==='dogum')return `${lblOf(d.anne_id)} → ${d.yavru_kupe||'?'} (${d.yavru_cins||'?'})`;
-      if(e.type==='tohumlama')return `${lblOf(d.hayvan_id)} — ${d.sperma||'?'}`;
+      if(e.type==='tohumlama')return `${lblOf(d.hayvan_id)} — ${e.sourceKey==='tohumlama_sonuc'?'Gebelik muayenesi sonucu: '+(d.sonuc||'?'):(d.sperma||'?')}`;
       if(e.type==='hastalik')return `${lblOf(d.animal_id)} — ${d.disease_name||d.tani||'?'}`;
       if(e.type==='gorev'){
         const gl=lblOf(d.hayvan_id)||'GENEL';
@@ -4001,6 +4078,12 @@ function _gecmisCsvMeta(){
         return `${gl} — ${_aLbl}`;
       }
       if(e.type==='uygulama')return `${lblOf(d.hayvan_id)} — ${d._stokAdi||'?'}`;
+      if(e.type==='asi')return `${lblOf(d.animal_id)} — ${d._asiAdi||'Aşı'}`;
+      if(e.type==='kizginlik')return `${lblOf(d.hayvan_id)} — Kızgınlık`;
+      if(e.type==='stok')return d._urunAdi||'Stok hareketi';
+      if(e.type==='cikis')return `${d.kupe_no||d.devlet_kupe||d.id||'?'} — Çıkış (${d.cikis_tipi||'?'})`;
+      if(e.type==='sutten')return `${d.kupe_no||d.devlet_kupe||d.id||'?'} — Sütten Kesme`;
+      if(e.type==='protokol')return `${lblOf(d.hayvan_id)} — Protokol`;
       const snap=d.snapshot||{};
       const k=snap.kupe_no||snap.devlet_kupe||lblOf(d.ana_hayvan_id)||'?';
       return `${k} — ${_ISLEM_ETK[d.tip]||d.tip||''}`;
@@ -4008,8 +4091,8 @@ function _gecmisCsvMeta(){
     ek:e=>{
       const d=e.data;
       if(e.type==='dogum')return `${d.dogum_tipi||'Normal'}${hkOf(d.hekim_id)?' · '+hkOf(d.hekim_id):''}`;
-      if(e.type==='tohumlama')return `${d.deneme_no||1}. Tohumlama · ${d.sonuc||''}${hkOf(d.hekim_id)?' · '+hkOf(d.hekim_id):''}`;
-      if(e.type==='hastalik')return `${d.status==='active'?'Aktif':'Kapalı'}${hkOf(d.hekim_id)?' · '+hkOf(d.hekim_id):''}`;
+      if(e.type==='tohumlama')return e.sourceKey==='tohumlama_sonuc'?`Sonuç: ${d.sonuc||''}`:`${d.deneme_no||1}. Tohumlama · ${d.sonuc||''}${hkOf(d.hekim_id)?' · '+hkOf(d.hekim_id):''}`;
+      if(e.type==='hastalik')return `${e.sourceKey==='cases_kapanis'?'Vaka kapandı':(d.status==='active'?'Aktif':'Kapalı')}${hkOf(d.hekim_id)?' · '+hkOf(d.hekim_id):''}`;
       if(e.type==='gorev'){
         const parcalar=[];
         if((d._drugNames||[]).length)parcalar.push(d._drugNames.join(', '));
@@ -4018,6 +4101,11 @@ function _gecmisCsvMeta(){
         return parcalar.join(' · ');
       }
       if(e.type==='uygulama')return `${d.doz||'?'} ${d.birim||'ml'} · ${d.rota||'IM'}${d.notlar?' · '+d.notlar:''}`;
+      if(e.type==='asi')return d.next_due_date?`Rapel: ${d.next_due_date}`:'';
+      if(e.type==='stok')return `${['Giriş','İade','Düzeltme','Ekleme'].includes(d.tur)?'+':'−'}${d.miktar??'?'} ${d._birim||''} · ${d.tur||''}${d.notlar?' · '+d.notlar:''}`;
+      if(e.type==='cikis')return d.cikis_tipi||'';
+      if(e.type==='sutten')return 'Sütten kesildi';
+      if(e.type==='protokol')return e.sourceKey==='protokol_instance_kapanis'?'Kapandı':'Başladı';
       const snap=d.snapshot||{};
       return snap.vaccine_name||snap.ilac_adi||snap.irk||snap.grup||'';
     },
@@ -4044,17 +4132,63 @@ async function loadGecmis(f,btn,opts){
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     // D14: sekme girişinde çevrimiçiyken taze veri çek; offline IDB önbelleği
-    // (görünüm/tümü toggle'ı skipPull ile — ağ bağlantısız anında geçiş)
-    if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','tohumlama','cases','dogum','treatment_days','drug_administrations','drug_products','stok','islem_log','uygulama_log','diseases']).catch(()=>{});
+    // (görünüm/tümü toggle'ı skipPull ile — ağ bağlantısız anında geçiş).
+    // TG1: vaccination_log + kizginlik_log (rapor §G) + stok_hareket (zarf md.6
+    // — gün görünümü bayat stok göstermesin) çekim listesine eklendi.
+    if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','tohumlama','cases','dogum','treatment_days','drug_administrations','drug_products','stok','islem_log','uygulama_log','diseases','vaccination_log','kizginlik_log','stok_hareket']).catch(()=>{});
     const sources=await _gecmisCollectSources();
-    const entries=_gmEntriesFromSources(sources,null,{mode:_gecmisKlasik()?'klasik':'defter',tumu:_gecmisTumu});
+    // TG1 Faz 1: seçili gün varsa tek-gün hattı (olayGunu kuralı + gün
+    // politikaları + DEDUP, js/gecmis.js _gmGunEntriesFromSources); yoksa
+    // defter/klasik hattı aynen. todayKey ASLA seçili güne geçirilmez (sözleşme).
+    const entries=_gecmisGun
+      ? _gmGunEntriesFromSources(sources).filter(e=>e.olayGunu===_gecmisGun)
+      : _gmEntriesFromSources(sources,null,{mode:_gecmisKlasik()?'klasik':'defter',tumu:_gecmisTumu});
     entries.forEach(e=>{ e.searchText=_gecmisSearchText(e); });
     _gecmisAllEntries=entries;
+    _gecmisGunSayi=_gecmisGun?entries.length:0;
     _gecmisChipCounts();
+    _gecmisGunBannerGuncelle();
     const q=(document.getElementById('gecmis-search')||{}).value||'';
     _gecmisRender(q);
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
   });
+}
+
+// ── TG1 Faz 1: "tarihe git" — tek-gün görünümü girişi ─────────────
+// Seçim kanonik tarih seçiciyle (tekTarihTakvimAc); Bugün/Dün hızlı
+// girişleri şeritten. _gecmisGun=null → defter görünümü döner.
+let _gecmisGun=null;       // seçili gün (ISO YYYY-MM-DD) ya da null
+let _gecmisGunSayi=0;      // seçili günün (arama/filtre ÖNCESİ) olay sayısı
+function gecmisTariheGitAc(){
+  tekTarihTakvimAc({
+    baslik:'📅 Tarihe Git',
+    deger:_gecmisGun||bugun(),
+    max:bugun(), // olay görünümü geçmişe bakar; gelecek gün boş kalırdı
+    onSec:iso=>{ if(iso) gecmisGunSec(iso); },
+  });
+}
+function gecmisGunSec(iso){
+  _gecmisGun=iso||null;
+  loadGecmis(null,null,{skipPull:true}); // veri tab girişinde çekildi; offline de çalışır
+}
+// Seçili gün vurgusu — banner todayKey'ten BAĞIMSIZ yüzeydir (sözleşme md.4):
+// BUGÜN/DÜN etiketi grup başlığında gerçek bugüne göre kalır; banner yalnızca
+// seçimi gösterir (etiket _gmGroupLabel'dan, gerçek todayKey ile).
+function _gecmisGunBannerGuncelle(){
+  const b=document.getElementById('gecmis-gun-banner');
+  if(!b) return;
+  if(!_gecmisGun){ b.style.display='none'; b.innerHTML=''; return; }
+  const gunAd=_gmGroupLabel(_gecmisGun) // BUGÜN/DÜN/d MMMM — gerçek bugüne göre
+    ||_gecmisGun;
+  b.style.display='block';
+  b.innerHTML=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;padding:8px 12px;background:rgba(42,107,181,.08);border:1.5px solid rgba(42,107,181,.35);border-radius:12px">
+    <span style="font-size:1rem">📅</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:800;font-size:.8rem;color:var(--ink)">${esc(gunAd)} · ${esc(fmtTarih(_gecmisGun))}</div>
+      <div style="font-size:.66rem;color:var(--ink3)">${_gecmisGunSayi} olay</div>
+    </div>
+    <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-gun-kapat" title="Gün görünümünden çık — deftere dön">✕ Kapat</button>
+  </div>`;
 }
 
 // ──────────────────────────────────────────
