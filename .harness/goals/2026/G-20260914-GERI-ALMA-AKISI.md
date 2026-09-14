@@ -8,8 +8,8 @@ base_sha: d4bd07fa05ef3231da1048b2e1496ffccb8eb5fc
 launch_sha: d4bd07fa05ef3231da1048b2e1496ffccb8eb5fc
 branch: agent/geri-alma-akisi
 worktree: /home/melik/.superset/worktrees/1dddb562-abe3-495c-970e-872567945510/agent/geri-alma-akisi
-plan_report: .harness/reports/2026-09-14-geri-alma-akisi-plan.md
-report: .harness/reports/2026-09-14-geri-alma-akisi-plan.md
+plan_report: .harness/reports/2026-09-14-geri-alma-akisi.md
+report: .harness/reports/2026-09-14-geri-alma-akisi.md
 task_envelope: /home/melik/egesut-erp1/.ss/tasks/L4-degisiklikler-geri-alma-insan-akisi.md
 write_manifest:
   - .harness/goals/2026/G-20260914-GERI-ALMA-AKISI.md
@@ -52,6 +52,9 @@ write_manifest:
   - tests/unit/gecmis-gun-kumesi.test.js
   - tests/unit/modal.test.js
   - tests/unit/tarih-saf.test.js
+  - supabase/migrations/20260914000004_l4_stok_uyari_txid.sql
+  - .harness/reports/2026-09-14-geri-alma-akisi-W6-mini.md
+  - tests/unit/l4-stok-uyari-txid.test.js
 docs_authority:
   tracked_paths:
     write:
@@ -65,6 +68,7 @@ docs_authority:
       - .harness/reports/2026-09-14-geri-alma-akisi-W3-nav-takvim.md
       - .harness/reports/2026-09-14-geri-alma-akisi-W4-db.md
       - .harness/reports/2026-09-14-geri-alma-akisi-W5-ui.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W6-mini.md
     append: []
   local_paths:
     write: []
