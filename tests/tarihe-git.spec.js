@@ -10,10 +10,17 @@
 //      türetilir — seçili gün todayKey'e asla geçmez.
 //   4. ✕ Kapat → defter görünümü döner.
 //
-// Veri disiplini: yalnız OKUMA — form submit YOK, DB yazımı YOK. Demo veri
-// miktarı bilinemediğinden "en zengin gün" sayfa içi pipeline'dan seçilir;
-// veri hiç yoksa test skip eder (veri-bağımlı skip konvansiyonu).
+// TG1-W3 (luna revizyonu):
+//   F5 — DÜN oracle'ı dAgo(1) (ürün handler'ıyla AYNI doğru ifade; eski
+//        dAgo(bugun(),1) NaN-NaN-NaN üretiyordu ve self-confirming'ti).
+//   F6 — "en zengin gün" sayısı artık ÜRÜN PIPELINE'INDAN türetilmez: statik
+//        fixture (aşağıda, ölçüm kaynağıyla belgelendi). Pipeline/dedup/pull
+//        hatası bu beklentiyi GEÇEMEZ.
+//   F7 — veri-bağımlı skip KALDIRILDI: fixture günü demo verisinde garantili
+//        (ölçüldü); test gerçekten KOŞAR.
+//   F9 — hayvan kartı geçmiş yüzeyinde de aynı tarih şeridi/gün filtresi.
 //
+// Veri disiplini: yalnız OKUMA — form submit YOK, DB yazımı YOK.
 // Ortam: PLAYWRIGHT_DEMO_MODE=1 (tarih-secici.spec.js ile aynı ayak izi).
 
 import { test, expect, openApp, navTo, IS_DEMO } from './support/app.js';
@@ -30,16 +37,23 @@ test.use({
 const takvim = page => page.locator('#tek-tarih-takvim');
 const banner = page => page.locator('#gecmis-gun-banner');
 
-// Sayfa içi pipeline'dan dedup SONRASI gün sayıları (unit hattının canlı aynası)
-async function gunSayilari(page) {
-  return page.evaluate(async () => {
-    const sources = await _gecmisCollectSources();
-    const all = _gmGunEntriesFromSources(sources);
-    const counts = {};
-    all.forEach(e => { counts[e.olayGunu] = (counts[e.olayGunu] || 0) + 1; });
-    return counts;
-  });
-}
+// ── F6: STATİK FİXTURE — self-oracle YASAK ─────────────────────────────
+// Ölçüm (2026-09-14): demo projesinden (vtzqjmazsvurxdeondmi) REST ile
+// uygulamanın çektiği yüzeylerin (hayvan_durum_view, v_gorev_log_sync,
+// stok_tuketim_view, düz tablolar) tam dökümü + düzeltilmiş
+// _gmGunEntriesFromSources (worktree js/gecmis.js) koşumu. Bu toplama
+// ulaşmak için F10 (islem_log TAM pull'u — eski 100-satır cap'i altında o
+// günün 107 islem satırından ~7'si bile gelmezdi) VE dedup (21 VAKA_ACILDI
+// aynası ref+gün eşleşmesiyle baskılanır) GEREKLİDİR — sayı her ikisinin
+// de canlı kanıtıdır. Demo verisi yeniden klonlanırsa bu fixture bilinçli
+// olarak kırmızıya düşer (yeniden ölçüm gerekir).
+const FIXTURE_GUN = {
+  gun: '2026-09-06',
+  toplam: 266, // dedup SONRASI (render cap 300 altında → kart sayısı = toplam)
+  // Kaynak dağılımı (ölçüm kaydı — DOM'dan sayılmaz, teşhis içindir):
+  //   islem_log 107 · stok_hareket 127 · gorev_log 11 · cases 21
+  metinler: ['Klinik Mastit', 'Klavil (vilsan)', 'Enrolen', 'Gun 1 tedavisi'],
+};
 
 test.describe('TG1 — "Tarihe git" tek-gün görünümü', () => {
 
@@ -66,45 +80,53 @@ test.describe('TG1 — "Tarihe git" tek-gün görünümü', () => {
     await expect(banner(page)).toContainText(/olay/);
   });
 
-  test('en zengin gün: banner sayısı dedup sonrası pipeline sayısıyla eşit, kartlar render', async ({ page }) => {
+  test('fixture günü: banner/kart sayısı STATİK beklentiyle eşit, kaynak temsil metinleri render (luna F6/F7)', async ({ page }) => {
     await openApp(page);
     await navTo(page, '#nb-gecmis');
 
-    const counts = await gunSayilari(page);
-    const gunler = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-    test.skip(!gunler.length, 'demo verisinde hiç olay günü yok — veri-bağımlı skip');
-    const hedef = gunler[0];
-
     // seçim UI katmanından (eski aylara takvim sayfalaması yerine tek nokta:
     // gecmisGunSec — handlers.js'teki butonların çağırdığı aynı kapı)
-    await page.evaluate(iso => gecmisGunSec(iso), hedef);
+    await page.evaluate(iso => gecmisGunSec(iso), FIXTURE_GUN.gun);
 
     await expect(banner(page)).toBeVisible();
-    await expect(banner(page)).toContainText(`${counts[hedef]} olay`);
+    await expect(banner(page)).toContainText(`${FIXTURE_GUN.toplam} olay`);
     await expect(page.locator('#gecmis-body .gm-gun')).toHaveCount(1);
+    // kart sayısı = dedup sonrası toplam (cap 300 altında — hint çıkmaz)
     const kartlar = await page.locator('#gecmis-body .stok-item').count();
-    expect(kartlar).toBe(counts[hedef]);
+    expect(kartlar).toBe(FIXTURE_GUN.toplam);
 
-    // todayKey sözleşmesi: hedef gün bugün DEĞİLSE etiket BUGÜN olamaz
-    const bugunIso = await page.evaluate(() => bugun());
-    if (hedef !== bugunIso) {
-      const etiket = await page.locator('#gecmis-body .gm-gun summary').innerText();
-      expect(etiket, 'seçili gün todayKey olamaz — gerçek etiket: ' + etiket).not.toContain('BUGÜN');
+    // kaynak/kategori temsil metinleri: vaka (Klinik Mastit), stok (ürün
+    // adları), görev (TEDAVI_GUN etiketi) — statik ölçümden
+    for (const metin of FIXTURE_GUN.metinler) {
+      await expect(page.locator('#gecmis-body')).toContainText(metin);
     }
+
+    // todayKey sözleşmesi: fixture günü bugün DEĞİL → etiket BUGÜN olamaz
+    const etiket = await page.locator('#gecmis-body .gm-gun summary').innerText();
+    expect(etiket, 'seçili gün todayKey olamaz — gerçek etiket: ' + etiket).not.toContain('BUGÜN');
   });
 
-  test('Dün hızlı girişi: grup etiketi DÜN (gerçek bugünden türetilir)', async ({ page }) => {
+  test('Dün hızlı girişi: grup etiketi DÜN (gerçek bugünden türetilir — luna F5)', async ({ page }) => {
     await openApp(page);
     await navTo(page, '#nb-gecmis');
 
     await page.click('[data-action="gecmis-gun-dun"]');
     await expect(banner(page)).toBeVisible();
 
-    const dun = await page.evaluate(() => dAgo(bugun(), 1));
+    // oracle ürünün DOĞRU ifadesiyle (dAgo yalnız gün sayısı alır) — eskiden
+    // test, handler'daki hatalı dAgo(bugun(),1) ifadesini tekrarlıyordu
+    const dun = await page.evaluate(() => dAgo(1));
     expect(await page.evaluate(() => _gecmisGun)).toBe(dun);
 
-    // olay varsa grup etiketi DÜN'dür (todayKey gerçek bugün — sözleşme md.4)
-    const counts = await gunSayilari(page);
+    // olay varsa grup etiketi DÜN'dür (todayKey gerçek bugün — sözleşme md.4);
+    // dallan bir veri-varlık koşuludur, beklenti oracle'ı değildir
+    const counts = await page.evaluate(async () => {
+      const sources = await _gecmisCollectSources();
+      const all = _gmGunEntriesFromSources(sources);
+      const c = {};
+      all.forEach(e => { c[e.olayGunu] = (c[e.olayGunu] || 0) + 1; });
+      return c;
+    });
     if (counts[dun]) {
       await expect(page.locator('#gecmis-body .gm-gun summary')).toContainText('DÜN');
     } else {
@@ -125,5 +147,43 @@ test.describe('TG1 — "Tarihe git" tek-gün görünümü', () => {
     // defter: gün-süzmesiz görünümden gelir — body dolu (grup ya da boş-uyarı)
     const bodyText = await page.locator('#gecmis-body').innerText();
     expect(bodyText.trim().length).toBeGreaterThan(0);
+  });
+
+  test('hayvan kartı geçmişi: aynı tarih şeridi + gün filtresi (luna F9)', async ({ page }) => {
+    await openApp(page);
+    await navTo(page, '#nb-gecmis');
+
+    // 002 küpeli hayvan (demo) — 2026-09-06'da 33 olayı var (ölçüm: 29 islem
+    // + 4 vaka; stok hayvansız olduğundan hayvan kapsamına girmez).
+    // Taze context: boot pull'u F10'un sayfalı tam islem_log çekimi arkasında
+    // toplu commit eder — openDet hayvanları IDB'den okuduğu için senkron
+    // bitmesini deterministik bekleriz (openDet'in kendi pull listesi ürün
+    // kodudur, dokunulmaz).
+    await page.waitForFunction(async () => (await idbGetAll('hayvanlar')).length > 0, null, { timeout: 20000 });
+    await page.evaluate(id => openDet(id), '17a7040c-68a1-4dc9-88ee-db67ac083397');
+    await expect(page.locator('#det')).toBeVisible();
+    await page.click('[data-action="tab-gecmis"]'); // det modal Geçmiş sekmesi
+
+    const strip = page.locator('[data-action="gecmis-det-tarihe-git"]');
+    await expect(strip).toBeVisible();
+    await expect(page.locator('[data-action="gecmis-det-gun-bugun"]')).toBeVisible();
+    await expect(page.locator('[data-action="gecmis-det-gun-dun"]')).toBeVisible();
+
+    // Bugün → kart banner'ı görünür (0 olay da meşru banner metnidir)
+    await page.click('[data-action="gecmis-det-gun-bugun"]');
+    const detBanner = page.locator('#det-gecmis-gun-banner');
+    await expect(detBanner).toBeVisible();
+    await expect(detBanner).toContainText(/olay/);
+
+    // ölçülmüş gün → sabit sayı (hayvan kapsamlı gün hattı)
+    await page.evaluate(iso => gecmisDetGunSec(iso), '2026-09-06');
+    await expect(detBanner).toContainText('33 olay');
+    const kartlar = await page.locator('#det-gecmis-body .stok-item').count();
+    expect(kartlar).toBe(33);
+
+    // ✕ Kapat → kartın defter görünümü döner, banner gizli
+    await page.click('[data-action="gecmis-det-gun-kapat"]');
+    await expect(detBanner).toBeHidden();
+    expect(await page.evaluate(() => _detGecmisGun)).toBe(null);
   });
 });
