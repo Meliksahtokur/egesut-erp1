@@ -19,6 +19,11 @@ write_manifest:
   - .harness/reports/2026-09-14-geri-alma-akisi-W2-ui.md
   - supabase/migrations/20260914000001_l4_islem_log_kopru.sql
   - supabase/migrations/20260914000002_l4_geri_alma_zincir.sql
+  - supabase/migrations/20260914000003_l4_onarim.sql
+  - .harness/reports/2026-09-14-geri-alma-akisi-W4-db.md
+  - .harness/reports/2026-09-14-geri-alma-akisi-W5-ui.md
+  - tests/unit/gecmis-geri-alindi.test.js
+  - tests/unit/islem-detay-guvenli.test.js
   - js/degisiklikler/degisiklikler.js
   - js/degisiklikler/diff.js
   - js/degisiklikler/etiketler.js
@@ -58,6 +63,8 @@ docs_authority:
       - .harness/references/ui-map.md
       - .harness/references/rpc-reference.md
       - .harness/reports/2026-09-14-geri-alma-akisi-W3-nav-takvim.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W4-db.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W5-ui.md
     append: []
   local_paths:
     write: []
