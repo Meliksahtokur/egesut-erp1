@@ -136,9 +136,16 @@ function setupForms() {
     escAttr: (s) => String(s || ''),
     fmtTarih: (iso) => { if (!iso) return '—'; const p = String(iso).slice(0, 10).split('-'); return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : iso; },
   };
+  // W3: takvim router-modali prod'da closeM'e bağlı — GERÇEK closeM'i aynı
+  // dom + history ile yükle (js/utils/modal.js birebir; taklit stub bayatması istemiyoruz).
+  const histStub = { state: null, pushState(s) { this.state = s; }, replaceState(s) { this.state = s; }, back() { this.state = null; }, go() {} };
+  const { sandbox: modalSb } = loadBrowserModule('js/utils/modal.js', {
+    dom: document,
+    extra: { g: (id) => document.getElementById(id), history: histStub },
+  });
   const { sandbox: uiSb, exposed: uiLetler } = loadBrowserModule('js/ui.js', {
     dom: document,
-    extra: { ...ortak, ...tarihExtras },
+    extra: { ...ortak, ...tarihExtras, closeM: modalSb.closeM, history: histStub },
     // R1: ortak nav/seçici stilleri üst-seviye const'tır (function olmadığı
     // için sandbox'a otomatik düşmez) — expose ile dışarı alınır.
     expose: ['_takvimNavStil', '_takvimSeciciStil'],
@@ -2297,7 +2304,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // 20260914-04: U1 geçmiş UX — tek etiket haritası + dataset delegasyonu + katlama + gün özeti çipleri
     // 20260914-05: E4 entegrasyon — TG1+U1 (Geçmiş UX) merge; damga tek değere çekildi
     // 20260914-06: L4-W2 geri-alma tek motor — dgGeriAlAkisi tek giriş + zincir/rehber UX + a+b modalı sökümü + stub katmanı
-    // 20260914-07: L4 entegrasyon — stub katmanı SÖKÜLDÜ (gerçek RPC), entegrasyon dumanı spec'i eklendi
+    // 20260914-07: L4 entegrasyon — stub katmanı SÖKÜLDÜ (gerçek RPC), entegrasyon dumanı spec'i eklendi; W3 gezinme — takvim/gün/tx-detay history + ESC + ← Geri başlıkları + takvim işaretli günler
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);

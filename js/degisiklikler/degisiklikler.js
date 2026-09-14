@@ -159,7 +159,10 @@ function _dgSayfaCiz() {
     <div id="dg-cevrimdisi" class="dg-uyari"${_dgCevrimici() ? ' hidden' : ''}>📴 Çevrimdışı — değişiklik geçmişi ve geri alma internet gerektirir.</div>
     <div class="dg-bas">
       <div class="sh-title">🧾 Değişiklikler</div>
-      <div id="dg-bilet"></div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button type="button" class="fs-btn" data-action="nav-geri" title="Önceki sayfaya dön">← Geri</button>
+        <div id="dg-bilet"></div>
+      </div>
     </div>
     <div class="dg-filtre">
       <div class="dg-satir">
@@ -291,8 +294,15 @@ async function degisiklikTxAc(txid) {
   const liste = document.getElementById('dg-liste');
   if (!liste || !txid) return;
   if (!_dgCevrimici()) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  const yeniAcilis = _dg.detayTxid !== String(txid);
   _dg.detayTxid = String(txid);
   _dg.detayTeknik = false;   // teknikal satırlar her detay açılışında varsayılan GİZLİ
+  // W3: tx detayı history'ye girer — geri tuşu detayı kapatır, liste görünümüne
+  // döner (popstate → navGeriKarar 'tx-detay' dalı), sayfa değişmez. Push yalnız
+  // YENİ açılışta; _dgAgDegisti yeniden-açılışı history sızdırmaz.
+  if (yeniAcilis && !(history.state && history.state.dtx === String(txid))) {
+    history.pushState({pg:'degisiklikler', dtx:String(txid)}, '', '');
+  }
   liste.innerHTML = '<div class="loader"><div class="spin"></div></div>';
   try {
     const r = await rpcDegisimListele({ txid: String(txid) });
@@ -302,6 +312,14 @@ async function degisiklikTxAc(txid) {
   } catch (e) {
     liste.innerHTML = `<button type="button" class="dg-link" data-action="dg-liste-don">‹ Listeye dön</button><div class="empty-s">⚠️ ${esc(_dgHataMetni(e))}</div>`;
   }
+}
+
+// W3: "‹ Listeye dön" + geri tuşu ortak kapanışı — detayı kapatır, liste
+// görünümüne döner; history'de tx entry'si bırakmaz (navViewBack guard'lı back).
+function degisikliklerListeyeDon() {
+  _dg.detayTxid = null;
+  _dgListeCiz();
+  if (typeof navViewBack === 'function') navViewBack();
 }
 
 // Hayvan referansı alanlarında UUID yerine küpe göster (yalnız gösterim; js/ui.js hayvanByKupeRef)
@@ -733,7 +751,7 @@ registerActions({
   'dg-islem':                 (el) => { if (el.dataset.islem) _dg.filtre.islem = el.dataset.islem; else delete _dg.filtre.islem; _dgSayfaCiz(); degisikliklerYukle(1); },
   'dg-daha':                  () => { if (!_dg.yukleniyor) degisikliklerYukle(_dg.sayfa + 1); },
   'dg-tx-ac':                 (el) => degisiklikTxAc(el.dataset.txid),
-  'dg-liste-don':             () => { _dg.detayTxid = null; _dgListeCiz(); },
+  'dg-liste-don':             () => degisikliklerListeyeDon(),
   'dg-tum-alanlar':           (el) => { _dg.tumAlanlar = !!el.checked; _dgDetayCiz(); },
   'dg-geri-al':               (el, e) => { if (e && e.stopPropagation) e.stopPropagation(); degisimGeriAlBaslat(parseInt(el.dataset.hi, 10)); },
   'dg-onizle-onay':           () => degisimGeriAlOnayla(),

@@ -2668,18 +2668,31 @@ function _detUremeHtml(a,tohs,kizgs){
 let _detGecmisGun=null;   // kart kapsamında seçili gün (ISO) ya da null
 let _detGecmisGunSayi=0;  // seçili günün (arama ÖNCESİ) olay sayısı
 let _detGecmisCtx=null;   // son render bağlamı {id, el} — şerit action'ları için
+let _detGecmisGunKumesi=null; // W3: kart takvimi işaretli günleri (Set<ISO>, animalId scope'lu)
 function gecmisDetTariheGitAc(){
   if(!_detGecmisCtx) return;
   tekTarihTakvimAc({
     baslik:'📅 Tarihe Git',
     deger:_detGecmisGun||bugun(),
     max:bugun(), // olay görünümü geçmişe bakar; gelecek gün boş kalırdı
+    // W3: olaylı günler — kart kapsamıyla (scope:{animalId}) hesaplı küme
+    isaretliGunler:_detGecmisGunKumesi||undefined,
     onSec:iso=>{ if(iso) gecmisDetGunSec(iso); },
   });
 }
 function gecmisDetGunSec(iso){
+  const _eski=_detGecmisGun;
   _detGecmisGun=iso||null;
+  // W3: kart-içi gün görünümü history'ye girer — geri tuşu görünümden karta
+  // döner (popstate 'det-gun' dalı → gecmisDetGunKapat), kart kapanmaz.
+  if(_detGecmisGun && _detGecmisGun!==_eski) history.pushState({pg:getState('currentPage')||'dash',dgun:_detGecmisGun},'','');
   if(_detGecmisCtx) _detRenderGecmis(_detGecmisCtx.id,_detGecmisCtx.el,{gunKoru:true});
+}
+// W3: ✕ Kapat + geri tuşu ortak kapanışı — det-back deseni korunur (kart açık kalır).
+function gecmisDetGunKapat(){
+  _detGecmisGun=null;
+  if(_detGecmisCtx) _detRenderGecmis(_detGecmisCtx.id,_detGecmisCtx.el,{gunKoru:true});
+  if(typeof navViewBack==='function') navViewBack();
 }
 function _detGecmisGunBannerGuncelle(){
   const b=document.getElementById('det-gecmis-gun-banner');
@@ -2706,6 +2719,8 @@ async function _detRenderGecmis(id,el,opts){
     // TG1-W3: seçili gün varsa gün hattı (olayGunu + gün politikaları + DEDUP,
     // hayvan kapsamıyla) — defter hattı aynen korunur.
     const sources=await _gecmisCollectSources();
+    // W3: kart takviminin işaretli günleri — hayvan kapsamlı küme (ek pull yok)
+    if(typeof _gmGunKumesiFromSources==='function') _detGecmisGunKumesi=_gmGunKumesiFromSources(sources,{animalId:id});
     const entries=_detGecmisGun
       ? _gmGunEntriesFromSources(sources,{animalId:id}).filter(e=>e.olayGunu===_detGecmisGun)
       : _gmEntriesFromSources(sources,{animalId:id});
@@ -4281,6 +4296,9 @@ async function loadGecmis(f,btn,opts){
     // — gün görünümü bayat stok göstermesin) çekim listesine eklendi.
     if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','tohumlama','cases','dogum','treatment_days','drug_administrations','drug_products','stok','islem_log','uygulama_log','diseases','vaccination_log','kizginlik_log','stok_hareket']).catch(()=>{});
     const sources=await _gecmisCollectSources();
+    // W3: takvim işaretli günleri — IDB havuzundan tam kapsamlı gün kümesi
+    // (ay sayfalama yeniden hesabı gerekmez; ay dışı günler takvimde zaten çizilmez)
+    if(typeof _gmGunKumesiFromSources==='function') _gecmisGunKumesi=_gmGunKumesiFromSources(sources);
     // TG1 Faz 1: seçili gün varsa tek-gün hattı (olayGunu kuralı + gün
     // politikaları + DEDUP, js/gecmis.js _gmGunEntriesFromSources); yoksa
     // defter/klasik hattı aynen. todayKey ASLA seçili güne geçirilmez (sözleşme).
@@ -4308,18 +4326,33 @@ async function loadGecmis(f,btn,opts){
 let _gecmisGun=null;       // seçili gün (ISO YYYY-MM-DD) ya da null
 let _gecmisGunSayi=0;      // seçili günün (arama/filtre ÖNCESİ) olay sayısı
 let _gecmisGunCip=null;    // U1 md.4: gün modu kategori çip filtresi (category|null)
+let _gecmisGunKumesi=null; // W3: takvim işaretli günleri (Set<ISO> — loadGecmis'te tazelenir)
 function gecmisTariheGitAc(){
   tekTarihTakvimAc({
     baslik:'📅 Tarihe Git',
     deger:_gecmisGun||bugun(),
     max:bugun(), // olay görünümü geçmişe bakar; gelecek gün boş kalırdı
+    // W3: olaylı günler — loadGecmis'in IDB havuzundan hesaplı küme (ek pull yok)
+    isaretliGunler:_gecmisGunKumesi||undefined,
     onSec:iso=>{ if(iso) gecmisGunSec(iso); },
   });
 }
 function gecmisGunSec(iso){
+  const _eski=_gecmisGun;
   _gecmisGun=iso||null;
   _gecmisGunCip=null; // U1: gün değişince çip filtresi sıfırlanır
+  // W3: gün görünümü history'ye girer — geri tuşu görünümden deftere döner
+  // (popstate → navGeriKarar 'gun' dalı → gecmisGunKapat), sayfa değişmez.
+  if(_gecmisGun && _gecmisGun!==_eski) history.pushState({pg:'gecmis',gun:_gecmisGun},'','');
   loadGecmis(null,null,{skipPull:true}); // veri tab girişinde çekildi; offline de çalışır
+}
+// W3: ✕ Kapat + geri tuşu ortak kapanışı — banner deseni aynen çalışır,
+// history'de gün entry'si bırakmaz (navViewBack guard'lı back).
+function gecmisGunKapat(){
+  _gecmisGun=null;
+  _gecmisGunCip=null;
+  loadGecmis(null,null,{skipPull:true});
+  if(typeof navViewBack==='function') navViewBack();
 }
 // Seçili gün vurgusu — banner todayKey'ten BAĞIMSIZ yüzeydir (sözleşme md.4):
 // BUGÜN/DÜN etiketi grup başlığında gerçek bugüne göre kalır; banner yalnızca
@@ -7148,6 +7181,9 @@ let _tekTarihBaslik = '📅 Takvimden Seç', _tekTarihOnSec = null;
 let _tekTarihMin = null, _tekTarihMax = null;
 let _tekTarihTemizlenebilir = false, _tekTarihKapaliGun = null;
 let _tekTarihGirisMetni = '', _tekTarihGirisHata = '';
+// W3: olaylı günler (Set<'YYYY-MM-DD'>) — işaretleme yalnız render katmanında;
+// boş gün beyaz kalır. Veriyi çağıran getirir (IDB yansıması; ek pull YOK).
+let _tekTarihIsaretliGunler = null;
 
 function tekTarihTakvimAc(opts){
   // Açılış görünümü: seçili değer varsa O ay/yıl, yoksa bugün (eski hâl
@@ -7161,13 +7197,23 @@ function tekTarihTakvimAc(opts){
   _tekTarihMax = tarihGecerliMi(opts?.max) ? opts.max : null;
   _tekTarihTemizlenebilir = opts?.temizlenebilir === true;
   _tekTarihKapaliGun = typeof opts?.kapaliGun === 'function' ? opts.kapaliGun : null;
+  _tekTarihIsaretliGunler = opts?.isaretliGunler instanceof Set ? opts.isaretliGunler : null;
   _tekTarihGirisMetni = '';
   _tekTarihGirisHata = '';
   tekTarihTakvimRender();
+  // W3 (hapsolmama): takvim history'ye girer — modal-stack deseni (openM'in
+  // pushState{_modal} yaklaşımı). Tarayıcı/Android geri takvimi KAPATIR,
+  // sayfa değişmez (popstate → navGeriKarar 'modal' dalı → closeM).
+  globalThis._modalStack = (globalThis._modalStack || []).filter(x => x !== 'tek-tarih-takvim');
+  globalThis._modalStack.push('tek-tarih-takvim');
+  if (!(history.state && history.state.modal === 'tek-tarih-takvim')) {
+    history.pushState({modal:'tek-tarih-takvim'}, '', '');
+  }
 }
 function tekTarihTakvimKapat(){
-  const box = document.getElementById('tek-tarih-takvim');
-  if(box) box.remove();
+  // Her kapanış yolu (X, backdrop, ESC, geri tuşu, Onayla) closeM'den geçer —
+  // DOM remove + stack + history tek noktadan (closeM'in takvim dalı).
+  closeM('tek-tarih-takvim');
 }
 function tekTarihTakvimSec(iso){
   // Derinlik savunması: hücreler zaten kapalı çizilir; global çağrıya rağmen
@@ -7195,8 +7241,19 @@ function tekTarihTakvimOnayla(){
       return;
     }
   }
-  if(_tekTarihOnSec) _tekTarihOnSec(_tekTarihSecili);
+  // W3: onSec'i back traversal'ı bittikten SONRA koştur (continuation). onSec
+  // gün görünümü gibi history push eden bir açılış yapabilir — back'in hâlâ
+  // kuyrukta olduğu anda push edilirse takvim entry'si history'de sızar.
+  // popstate guard (_modalBackGuard) tüketildiğinde continuation çalışır;
+  // back beklenmiyorsa (history state modal değilse) hemen koşturulur.
+  const _cb = _tekTarihOnSec, _secili = _tekTarihSecili;
+  globalThis._modalBackDevam = _cb ? () => _cb(_secili) : null;
   tekTarihTakvimKapat();
+  if (globalThis._modalBackDevam && !(history.state && history.state.modal === 'tek-tarih-takvim')) {
+    const _d = globalThis._modalBackDevam;
+    globalThis._modalBackDevam = null;
+    _d();
+  }
 }
 // El girişi (gg.aa.yyyy; R1: ayraç toleransı , / - boşluk da kabul) — SAF
 // tarihGirisCoz üzerinden (maske-normalizasyon + tarihParse); hata → satır
@@ -7258,7 +7315,8 @@ function tekTarihTakvimRender(){
     box.id = 'tek-tarih-takvim';
     box.className = 'tarih-modal-tasiyici';
     box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex';
-    box.onclick = e => { if(e.target === box) box.remove(); };
+    // W3: backdrop kapanışı da closeM'den — history + stack tek noktadan temizlensin
+    box.onclick = e => { if(e.target === box) closeM('tek-tarih-takvim'); };
     document.body.appendChild(box);
   }
   const ay = _tekTarihAy, yil = _tekTarihYil;
@@ -7273,8 +7331,16 @@ function tekTarihTakvimRender(){
                    (_tekTarihMin && h.iso < _tekTarihMin) ||
                    (_tekTarihMax && h.iso > _tekTarihMax);
     const tik = kapali ? '' : ' onclick="tekTarihTakvimSec(&#39;' + h.iso + '&#39;)"';
+    // W3: olaylı gün — küçük nokta + açık zemin tonu; BOŞ GÜN BEYAZ (sahibin
+    // sözü); seçili gün yeşili ve kapalı gün %35 opaklık kuralı korunur.
+    // İşaretleme yalnız render katmanında; tık mekanizması değişmedi.
+    const isaretli = !!(_tekTarihIsaretliGunler && _tekTarihIsaretliGunler.has(h.iso));
+    const secili = h.iso === _tekTarihSecili;
     kareler += '<div' + tik + ' style="aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:.9rem;font-weight:700;cursor:' + (kapali ? 'not-allowed;opacity:.35;' : 'pointer;') +
-      (h.iso === _tekTarihSecili ? 'background:var(--green);color:#fff;' : 'color:var(--ink);') + '">' + h.gun + '</div>';
+      (secili ? 'background:var(--green);color:#fff;' : isaretli ? 'background:rgba(201,125,10,.12);color:var(--ink);' : 'color:var(--ink);') +
+      ';position:relative;">' + h.gun +
+      (isaretli ? '<span data-isaretli-gun="' + h.iso + '" style="position:absolute;left:50%;bottom:3px;transform:translateX(-50%);width:5px;height:5px;border-radius:50%;background:' + (secili ? '#fff' : 'var(--amber)') + ';"></span>' : '') +
+      '</div>';
   }
   // R1 bulgu 4: başlıkta ay + yıl AÇILIR LİSTESİ (sahip taslağı: ikisi yan
   // yana). Ay ‹/› sayfalama okları yerinde kalır (bulgu 1: ≥40px, koyu zemin,
