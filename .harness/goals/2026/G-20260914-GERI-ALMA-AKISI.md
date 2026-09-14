@@ -55,6 +55,10 @@ write_manifest:
   - supabase/migrations/20260914000004_l4_stok_uyari_txid.sql
   - .harness/reports/2026-09-14-geri-alma-akisi-W6-mini.md
   - tests/unit/l4-stok-uyari-txid.test.js
+  - .harness/reports/2026-09-14-geri-alma-akisi-W7-D2.md
+  - .harness/reports/2026-09-14-geri-alma-akisi-W8-insan-dili.md
+  - tests/unit/geri-al-kopru-yedegi.test.js
+  - tests/unit/w8-insan-dili.test.js
 docs_authority:
   tracked_paths:
     write:
@@ -69,6 +73,8 @@ docs_authority:
       - .harness/reports/2026-09-14-geri-alma-akisi-W4-db.md
       - .harness/reports/2026-09-14-geri-alma-akisi-W5-ui.md
       - .harness/reports/2026-09-14-geri-alma-akisi-W6-mini.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W7-D2.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W8-insan-dili.md
     append: []
   local_paths:
     write: []
