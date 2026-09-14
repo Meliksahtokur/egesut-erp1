@@ -258,9 +258,30 @@ violation. Decision record: `D-20260909-CANONICAL-DATE-PICKER.md`.
 - `etiketler.js` (SAF) — `tabloEtiketi`, `alanEtiketi`, `islemEtiketi`,
   `tabloSecenekleri`; şema aynası envanterli, bilinmeyen ad için kademeli
   düşüş; `tests/unit/degisiklikler-etiketler.test.js`.
-- `degisiklikler-stub.js` — SÖKÜLDÜ (lead entegrasyonu 2026-09-13): script
-  satırı ve dosya kaldırıldı, gerçek RPC wrapper'ları canlı; geliştirme
-  sırasındaki stub söküm talimatı W2 raporundaydı.
+- `degisiklikler-stub.js` — SÖKÜLDÜ (L4 entegrasyonu 2026-09-14): script
+  satırı ve dosya kaldırıldı, gerçek RPC wrapper'ları canlı (`?stub` artık
+  etkisiz; stub spec'i `tests/degisiklikler-geri-alma.spec.js` kendini
+  atlar — gerçek-RPC dumanı `tests/entegrasyon-smoke.spec.js`).
+
+### L4 geri-alma yüzeyleri (G-20260914, W2 2026-09-14; tek motor)
+
+- TEK GİRİŞ: `dgGeriAlAkisi(hedef, seviye, baglam)` /
+  `dgGeriAlFromEntry(entry)` (degisiklikler.js) — önizleme `m-dg-onizle` +
+  bilet `m-dg-bilet` akışı her yüzeyde ortak. Bağlı yüzeyler (data-action):
+  Geçmiş kartı `gm-undo`, işlem detay paneli `dg-det-geri-al`, vaka detayı
+  `cd-geri-al`, tohumlama detayı `td2-geri-al`, protokol paneli
+  `protokol-geri-al`, görev detayı + sütten kesme (fonksiyon içinden
+  çözücüyle). a+b matematik modalı (`m-geri-al`) ve `islemGeriAl`
+  SÖKÜLDÜ; `asistan_plan_geri_al` hariç.
+- Çözücü: `_gmGeriAlHedef(entry)` (gecmis.js, SAF) — `degisim_txid` →
+  `ref_tablo+ref_id` → tip fallback zinciri.
+- İşlem dili: başlık `${olayEtiketi} — gg.aa ss:dd · kim` (tek kaynak
+  gecmis.js haritası + `GERI_ALINDI`); ham UUID/tx yalnız `details.dg-teknik`
+  katlamasında. Gürültü: `teknikal_mi` + `app_name≠'egesut-web'` varsayılan
+  gizli ("Teknik (N)" / "Uygulama dışı (N)" çipleri).
+- Zincir/rehber: çakışmada `dg-zincir-oner` önerisi → zincir kart listesi →
+  tek onay; kurulamıyorsa `dg-rehber-geri-al` satırları (sıra numaralı).
+  Sonuç bloğunda `dg-geri-alinani-geri-al` (⟲) kısayolu.
 - Giriş: Kayıt sayfası `log-btn` girişi (Stok/Tanımlar biçimi); alt nav'a
   7. buton eklenmedi (sahip UI testinde değerlendirilir).
 - Bilet saklama: `sessionStorage` (`ege_geri_alma_bileti`); süre client

@@ -712,6 +712,35 @@ almanın geri alınması mümkün. Hata: `BILET_GECERSIZ` /
 `BILET_SURESI_DOLMUS` / `CAKISMA` / `BAGIMLILIK_ENGELI` / `HEDEF_BULUNAMADI`.
 Çakışmada bypass yok (sahip kararı).
 
+## L4 motor genişletmesi (G-20260914; migration 20260914*, demo-only)
+
+Aynı 4 RPC, ADDITIVE genişletme (imzalar değişmez; `degisim_listele` aynı):
+
+- `islem_log.degisim_txid bigint` — BEFORE INSERT trigger `txid_current()`
+  yazar; iş satırıyla aynı tx'te yazılan islem_log kaydı degisim_log txid'siyle
+  birebir eşleşir (Geçmiş yüzeyinden kesin hedef köprüsü).
+- `p_hedef.zaman` (ISO8601, tablo+pk ile) — kayit_zamani'na en yakın log
+  satısı; en yakın >120 sn ise `HEDEF_BULUNAMADI` +
+  `detay.neden='ZAMAN_ESLESME_YOK'`. `txid` verilirse txid kazanır.
+  `HEDEF_BULUNAMADI` detay nedenleri: `SATIR_YOK|LOG_YOK|ZAMAN_ESLESME_YOK`.
+- `p_seviye='zincir'` — kapsamın yineli genişletmesi: (a) aynı satırdaki
+  sonraki tüm değişiklikler; (b) bağımlılık grafiği (FK çocuklar + hayvan
+  köprüsü kolonları) üzerinden hedef sonrası INSERT'ler (bağımlı adım).
+  Sıralama: aynı satırda en yeni önce, bağımlılar topolojik önce. Tek
+  transaction, tek `geri_alma_txid`, yanıtta `zincir_adim`. Sınır 100 adım:
+  `GECERSIZ_HEDEF` + `detay.neden='ZINCIR_COK_UZUN'`. Zincir dışı çakışma/
+  ENGEL'de bypass yine yok; `geri_alinabilir=false` iken yanıt `sirali_rehber`
+  döndürür: `[{sira, hedef{tablo,pk,txid,l4_rehber:true}, zaman, ozet,
+  neden_dahil_degil}]` — en yeni önce tekil geri alma sırası (UI her satıra
+  kendi düğmesi koyar). `l4_rehber` işaretli hedeflerde sonradan-dönülmüş
+  değişiklik çakışma sayılmaz; işaretsiz çağrıda L2 kuralı aynen.
+- `cakismalar` artık TAM liste; her kayıt + `zaman, degisen_alanlar, islem,
+  log_id`.
+- Telafi kaydı: `degisim_geri_al` her seviyede aynı tx'te `islem_log`'a
+  `tip='GERI_ALINDI'` INSERT (ref_id/ref_tablo, ana_hayvan_id, payload
+  {orijinal_tip, seviye, adim}); orijinal islem_log satırları değişmez.
+  (W1 teslim raporu: `.harness/reports/2026-09-14-geri-alma-akisi-W1-db.md`)
+
 ## Live-schema audit (demo probe, 2026-09-03)
 
 

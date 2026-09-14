@@ -695,7 +695,7 @@ async function rpcReceteGuncelle(caseId, yeniPlan) {
 // ── SÜRÜM GEÇMİŞİ (G-20260913-SURUM-GECMISI F2 frozen contract) ─────
 // Kalıp: rpcSeansTamamla / rpcReceteGuncelle — ince sarmal, rpc() hata/ok:false
 // yolunu aynen kullanır. ok:false → Error, e.data.hata kodu taşır.
-// W1 merge'üne kadar js/degisiklikler/degisiklikler-stub.js bu 4 adı AYNI imzayla ezer.
+// L4 entegrasyon (2026-09-14): stub katmanı söküldü — bu 4 wrapper gerçek RPC'lere gider.
 async function rpcGeriAlmaBiletiAl(sifre) {
   return rpc('geri_alma_bileti_al', { p_sifre: sifre });
 }

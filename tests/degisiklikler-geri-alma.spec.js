@@ -21,7 +21,10 @@ const HAM_UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
 async function bootStub(page) {
   await page.goto('./?stub', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#pg-dash .sv', { timeout: 30000 });
-  await expect.poll(() => page.evaluate(() => window.DEGISIM_STUB === true), { timeout: 10000 }).toBe(true);
+  // Entegrasyon sonrası (2026-09-14): stub katmanı söküldü — bu spec kendini atlar.
+  // Gerçek-RPC entegrasyon dumanı: tests/entegrasyon-smoke.spec.js.
+  const stubVar = await page.evaluate(() => window.DEGISIM_STUB === true);
+  if (!stubVar) test.skip(true, 'stub söküldü (L4 entegrasyon) — gerçek-RPC dumanına taşındı');
   await page.evaluate(() => degisikliklerAc());
   await expect(page.locator('#dg-root .dg-stub')).toBeVisible();
 }

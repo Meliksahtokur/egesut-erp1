@@ -30,6 +30,15 @@ write_manifest:
   - js/tarih/tarih.js
   - js/utils/handlers.js
   - index.html
+  - tests/degisiklikler-geri-alma.spec.js
+  - tests/entegrasyon-smoke.spec.js
+  - tests/unit/vaka-toplu-ac.test.js
+  - tests/unit/geri-al-hedef.test.js
+  - tests/unit/geri-al-baslik.test.js
+  - tests/unit/geri-al-rehber.test.js
+  - tests/unit/degisiklikler-gurultu.test.js
+  - .harness/references/ui-map.md
+  - .harness/references/rpc-reference.md
 docs_authority:
   tracked_paths:
     write:
@@ -38,6 +47,8 @@ docs_authority:
       - .harness/reports/2026-09-14-geri-alma-akisi.md
       - .harness/reports/2026-09-14-geri-alma-akisi-W1-db.md
       - .harness/reports/2026-09-14-geri-alma-akisi-W2-ui.md
+      - .harness/references/ui-map.md
+      - .harness/references/rpc-reference.md
     append: []
   local_paths:
     write: []
@@ -45,9 +56,7 @@ docs_authority:
       - .crumbs/geri-alma-akisi.jsonl
       - .ss/geri-alma-akisi-BOARD.md
   db: write
-  propose_only:
-    - .harness/references/ui-map.md
-    - .harness/references/rpc-reference.md
+  propose_only: []
 acceptance:
   - "Sahip senaryolari S1-S6 (plan raporu §8) tarayicida yurunur; ekran goruntuleri ~/tmp/agents/l4-akis/ altinda"
   - "Motor genisletmesi frozen contract'a uyum — W1 demo RPC test ciktilari"

@@ -156,7 +156,6 @@ function _dgSayfaCiz() {
   const islemBtn = (kod, etiket) =>
     `<button type="button" class="fs-btn${(f.islem || '') === kod ? ' on' : ''}" data-action="dg-islem" data-islem="${escAttr(kod)}">${esc(etiket)}</button>`;
   root.innerHTML = `
-    ${window.DEGISIM_STUB ? '<div class="dg-stub">🧪 Önizleme verisi (stub) — gerçek RPC\'ler W1 merge\'ünde bağlanır</div>' : ''}
     <div id="dg-cevrimdisi" class="dg-uyari"${_dgCevrimici() ? ' hidden' : ''}>📴 Çevrimdışı — değişiklik geçmişi ve geri alma internet gerektirir.</div>
     <div class="dg-bas">
       <div class="sh-title">🧾 Değişiklikler</div>
