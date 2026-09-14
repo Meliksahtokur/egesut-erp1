@@ -23,8 +23,17 @@ const _GM_TZ = 'Europe/Istanbul';
 const _GM_IST_GUN = new Intl.DateTimeFormat('en-CA', { timeZone: _GM_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
 const _GM_IST_SAAT = new Intl.DateTimeFormat('tr-TR', { timeZone: _GM_TZ, hour: '2-digit', minute: '2-digit', hour12: false });
 // kategori → TR etiket / gün sayacı emojisi (spec C sırası: 🐄 💉 🏥 ✅ 💊 🐮)
-const _GM_KATEGORI_TR = { dogum: 'Doğum', tohumlama: 'Tohumlama', hastalik: 'Hastalık', gorev: 'Görev', uygulama: 'Uygulama', islem: 'İşlem' };
-const _GM_KATEGORI_EMOJI = { dogum: '🐄', tohumlama: '💉', hastalik: '🏥', gorev: '✅', uygulama: '💊', islem: '🐮' };
+// TG1 Faz 1: tek-gün görünümünün yeni kaynak kategorileri de burada tanımlı —
+// defter hattı bu kategorilerde entry ÜRETMEZ (aşağıda §C dokunulmazlık testi),
+// yalnız gün hattı kullanır; CSV/grup sayacı ortak haritadan okur.
+const _GM_KATEGORI_TR = {
+  dogum: 'Doğum', tohumlama: 'Tohumlama', hastalik: 'Hastalık', gorev: 'Görev', uygulama: 'Uygulama', islem: 'İşlem',
+  asi: 'Aşı', kizginlik: 'Kızgınlık', stok: 'Stok Hareketi', cikis: 'Çıkış', sutten: 'Sütten Kesme', protokol: 'Protokol',
+};
+const _GM_KATEGORI_EMOJI = {
+  dogum: '🐄', tohumlama: '💉', hastalik: '🏥', gorev: '✅', uygulama: '💊', islem: '🐮',
+  asi: '💉', kizginlik: '🔴', stok: '📦', cikis: '🚪', sutten: '🍼', protokol: '🩺',
+};
 const _GM_AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 const _GM_GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
 
@@ -115,6 +124,167 @@ function _gmEventAtKlasik(sourceKey, row) {
   }
 }
 
+// ── Olay-günü kuralı — tek-gün görünümü (TG1 Faz 1, rapor §D.c) ──
+// Defter dateKey "kayıt anı"nı (created_at/closed_at) esas alır; olay-günü ise
+// OLAY'ın kendi tarih kolonunu. İki kural, iki ayrı doğru — dateKey davranışı
+// DEĞİŞMEZ. Normalizasyon _gmDateKey ile AYNI disiplini izler (_GM_TZ_ESNEK):
+// Z/offset damgalı timestamptz → Europe/Istanbul takvim günü (Intl); date
+// kolonu ve timezone'suz yerel yazım → değer aynen (TZ'siz, güvenli).
+// Canlı sapma kanıtı (rapor §D.c/§E-13): tohumlama'da 252/282, aşıda 356/381
+// satırda created_at günü ≠ olay günü — bu yüzden ayrı kolon haritası şart.
+function _gmGunZaman(sourceKey, row) {
+  if (!row) return '';
+  switch (sourceKey) {
+    case 'gorev_log': case 'gorev':
+      return row.tamamlanma_tarihi || '';                                   // timestamptz
+    case 'tohumlama':
+      return row.tarih || '';                                               // date
+    case 'tohumlama_sonuc':
+      // sonuç kalemi kendi sonuç gününde: Gebe/Boş→kontrol, Abort→abort, Doğum→doğum
+      if (row.sonuc === 'Doğum Yaptı') return row.dogum_tarihi || '';
+      if (row.sonuc === 'Abort') return row.abort_tarihi || '';
+      return row.kontrol_tarihi || '';
+    case 'cases': case 'hastalik':
+      return row.start_date || '';                                          // date — açılış
+    case 'cases_kapanis':
+      return row.closed_at || '';                                           // timestamptz — kapanış
+    case 'dogum':
+      return row.tarih || '';
+    case 'uygulama_log': case 'uygulama':
+      return row.tarih || '';
+    case 'islem_log': case 'islem':
+      return row.tarih || row.created_at || '';                             // timestamptz
+    case 'vaccination_log': case 'asi':
+      return row.vaccination_date || '';                                    // date
+    case 'kizginlik_log': case 'kizginlik':
+      return row.tarih || '';                                               // date
+    case 'stok_hareket':
+      return row.tarih || '';                                               // timestamptz
+    case 'hayvanlar':
+      return row.cikis_tarihi || '';                                        // date — satış/ölüm/kesim
+    case 'hayvanlar_sutten':
+      return row.suttten_kesme_tarihi || '';                                // date
+    case 'protokol_instance': case 'protokol':
+      return row.baslangic || '';                                           // date — açılış
+    case 'protokol_instance_kapanis':
+      return row.kapandi_at || '';                                          // timestamptz — kapanış
+    default:
+      return '';
+  }
+}
+
+// SAF olay-günü anahtarı: seçilen günün olaylarını süzmek için tek kapı.
+function olayGunu(sourceKey, row) {
+  const v = _gmGunZaman(sourceKey, row);
+  return v ? _gmDateKey(v) : '';
+}
+
+// ── Tek-gün görünümü hattı (TG1 Faz 1) ────────────────────
+// _gmEntriesFromSources'tan AYRI hat: politika seti gün görünümüne göre
+// gevşetilmiş (rapor §D.c.3) ve 5 yeni kaynak (rapor §B.1) burada işlenir —
+// defter hattına bu kaynaklar SIZMAZ. Politika farkları:
+//   cases: açık vakanın açılış günü de olaydır (status ne olursa); kapanış
+//          ayrı kalem (closed_at TR-günü)
+//   tohumlama: Bekliyor dâhil her tohumlama kendi tarihinde; terminal sonuç
+//          kendi sonuç gününde AYRI kalem (tohumlama_sonuc)
+//   islem_log: gün görünümü TÜM tipleri gösterebilir (defter kürasyonu
+//          _GM_ISLEM_TIPLERI ile defterde kalır); geri_alindi yine girmez
+//   gorev_log: tamamlanma şartı KALIR (tamamlanma olayı); iptal hariç
+// DEDUP öncelik tablosu (zarf md.3 — "islem_log birleşik günlük" aynaları;
+// eşleşme yalnız AYNI olay-günü + aynı hayvan/ref içinde baskılar):
+//   vaccination_log  > islem_log ASI_KAYDI      (hayvan+gün)
+//   kizginlik_log    > islem_log KIZGINLIK_KAYDI(hayvan+gün)
+//   hayvanlar_sutten > islem_log SUTEN_KESME    (hayvan+gün)
+//   tohumlama        > islem_log TOHUMLAMA      (ref_id→id, yoksa hayvan+gün)
+//   cases            > islem_log VAKA_ACILDI    (ref_id→id, yoksa hayvan+gün)
+//   herhangi kaynak  > stok_hareket (referans_id→kaynak id, aynı gün; %97
+//                     referanssız satır "genel stok hareketi" olarak KALIR —
+//                     rapor §E.3: hayvana bağlanamaz, doğru beklenti budur)
+function _gmGunEntriesFromSources(sources) {
+  sources = sources || {};
+  const out = [];
+  const ekle = (sourceKey, entryType, row, v) => {
+    const eventAt = _gmGunZaman(sourceKey, row);
+    if (!eventAt) return;
+    out.push({
+      type: entryType,
+      category: entryType,
+      sourceKey,
+      eventAt,
+      dateKey: _gmDateKey(eventAt),
+      olayGunu: _gmDateKey(eventAt),
+      undoRef: null, // gün görünümü geri-al butonu üretmez (defter ayrıcalığı)
+      data: row,
+      ...v,
+    });
+  };
+  const geriDegil = r => r && r.durum !== 'geri_alindi';
+
+  // mevcut 6 kaynak — gün politikasıyla
+  (sources.dogum || []).forEach(r => { if (r && r.tarih) ekle('dogum', 'dogum', r); });
+  (sources.tohumlama || []).forEach(r => {
+    if (!geriDegil(r) || !r.tarih) return;
+    ekle('tohumlama', 'tohumlama', r); // Bekliyor dâhil
+    if (_GM_TOH_TERMINAL.includes(r.sonuc) && olayGunu('tohumlama_sonuc', r)) ekle('tohumlama_sonuc', 'tohumlama', r);
+  });
+  (sources.cases || []).forEach(r => {
+    if (!r || !r.start_date) return;
+    ekle('cases', 'hastalik', r); // açık vakanın açılışı da olaydır
+    if (r.status === 'closed' && r.closed_at) ekle('cases_kapanis', 'hastalik', r);
+  });
+  (sources.gorev_log || []).forEach(r => {
+    if (r && r.tamamlandi === true && !!r.tamamlanma_tarihi && !r.iptal && geriDegil(r)) ekle('gorev_log', 'gorev', r);
+  });
+  (sources.uygulama_log || []).forEach(r => { if (r && r.tarih) ekle('uygulama_log', 'uygulama', r); });
+  (sources.islem_log || []).forEach(r => {
+    if (geriDegil(r) && (r.tarih || r.created_at)) ekle('islem_log', 'islem', r); // TÜM tipler; dedup baskılar
+  });
+
+  // TG1: 5 yeni kaynak (rapor §B.1)
+  (sources.vaccination_log || []).forEach(r => { if (r && r.vaccination_date) ekle('vaccination_log', 'asi', r); });
+  (sources.kizginlik_log || []).forEach(r => { if (r && r.tarih) ekle('kizginlik_log', 'kizginlik', r); });
+  (sources.stok_hareket || []).forEach(r => { if (r && !r.iptal && r.tarih) ekle('stok_hareket', 'stok', r); });
+  (sources.hayvanlar || []).forEach(r => {
+    if (!r) return;
+    if (r.cikis_tarihi && r.cikis_tipi) ekle('hayvanlar', 'cikis', r);
+    if (r.suttten_kesme_tarihi) ekle('hayvanlar_sutten', 'sutten', r);
+  });
+  (sources.protokol_instance || []).forEach(r => {
+    if (!r) return;
+    if (r.baslangic) ekle('protokol_instance', 'protokol', r);
+    if (r.kapandi_at) ekle('protokol_instance_kapanis', 'protokol', r);
+  });
+
+  // DEDUP — kazanan kalemlerden baskı kümeleri kurulur, islem/stok baskılanır
+  const asiKey = new Set(), kizKey = new Set(), suttenKey = new Set(), tohRef = new Set(), tohKey = new Set();
+  const vakaRef = new Set(), vakaKey = new Set(), kaynakIdGun = new Set();
+  out.forEach(e => {
+    const g = e.olayGunu, r = e.data || {};
+    if (e.sourceKey === 'vaccination_log') asiKey.add(r.animal_id + '|' + g);
+    else if (e.sourceKey === 'kizginlik_log') kizKey.add(r.hayvan_id + '|' + g);
+    else if (e.sourceKey === 'hayvanlar_sutten') suttenKey.add(r.id + '|' + g);
+    else if (e.sourceKey === 'tohumlama') { tohRef.add(String(r.id)); tohKey.add(r.hayvan_id + '|' + g); }
+    else if (e.sourceKey === 'cases') { vakaRef.add(String(r.id)); vakaKey.add(r.animal_id + '|' + g); }
+    if (e.sourceKey !== 'stok_hareket' && r.id) kaynakIdGun.add(String(r.id) + '|' + g);
+  });
+  const baskili = new Set();
+  out.forEach(e => {
+    const g = e.olayGunu, r = e.data || {};
+    if (e.sourceKey === 'islem_log') {
+      if (r.tip === 'ASI_KAYDI' && asiKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
+      if (r.tip === 'KIZGINLIK_KAYDI' && kizKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
+      if (r.tip === 'SUTEN_KESME' && suttenKey.has(r.ana_hayvan_id + '|' + g)) return baskili.add(e);
+      if (r.tip === 'TOHUMLAMA' && (tohRef.has(String(r.ref_id)) || tohKey.has(r.ana_hayvan_id + '|' + g))) return baskili.add(e);
+      if (r.tip === 'VAKA_ACILDI' && (vakaRef.has(String(r.ref_id)) || vakaKey.has(r.ana_hayvan_id + '|' + g))) return baskili.add(e);
+    } else if (e.sourceKey === 'stok_hareket' && r.referans_id && kaynakIdGun.has(String(r.referans_id) + '|' + g)) {
+      return baskili.add(e); // tohumlama/tedavi kaynaklı stok düşüşü — kaynak kalemi kazanır
+    }
+  });
+  const sonuc = baskili.size ? out.filter(e => !baskili.has(e)) : out;
+  sonuc.sort((a, b) => b.eventAt.localeCompare(a.eventAt));
+  return sonuc;
+}
+
 // ── Geri alma bağlamı (openTohDet muhafazası, spec E) ─────
 // Ham (politika öncesi) kaynaklardan türetilir: TOHUMLAMA islem_log referansları,
 // ABORT_KAYDI muhafazaları ve hayvan başına SON tohumlama id'si.
@@ -167,6 +337,8 @@ function _gmEntriesFromSources(sources, scope, opts) {
       out.push({
         type: entryType,
         category: entryType,
+        sourceKey, // TG1: kaynak tablo anahtarı açık taşınır — type↔sourceKey birebir
+                   // DEĞİL (cases→hastalik, islem_log→islem); tip'ten geri çözüm YASAK.
         eventAt,
         dateKey: _gmDateKey(eventAt),
         undoRef: _gmUndoRef(entryType, row, ctx),
@@ -257,11 +429,18 @@ function _gmTodayKey(d) {
 }
 
 function _gmGroupLabel(dateKey, todayKey) {
+  // TG1 todayKey sözleşmesi (zarf md.4): todayKey = GERÇEK bugün; DÜN bu
+  // günden türetilir — sistem saatinden ayrı olarak ASLA. Enjekte edilen
+  // todayKey (testler, tek-gün görünümü) gerçek saatten önceliklidir; tek-gün
+  // görünümü seçili günü todayKey'e GEÇİRMEZ (seçili gün vurgusu ayrı yüzeydedir).
   const bugun = todayKey || _gmTodayKey();
   if (dateKey === bugun) return 'BUGÜN';
-  const dun = new Date();
-  dun.setDate(dun.getDate() - 1);
-  if (dateKey === _gmTodayKey(dun)) return 'DÜN';
+  const parcaBugun = String(bugun).split('-').map(Number);
+  if (parcaBugun.length === 3 && parcaBugun.every(n => !isNaN(n))) {
+    // Date gün-arithmetiği ay/yıl devrini doğru yapar (31→1, Aralık→Ocak)
+    const dun = new Date(parcaBugun[0], parcaBugun[1] - 1, parcaBugun[2] - 1);
+    if (dateKey === _gmTodayKey(dun)) return 'DÜN';
+  }
   const parca = String(dateKey).split('-');
   const d = new Date(Number(parca[0]), Number(parca[1]) - 1, Number(parca[2]));
   if (isNaN(d.getTime())) return dateKey;
