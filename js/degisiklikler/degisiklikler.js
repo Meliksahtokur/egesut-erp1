@@ -577,6 +577,13 @@ function _dgTeknikDetayHtml(hedef, on) {
   ((on && on.plan) || []).forEach((p, i) => {
     if (p && (p.tablo || p.pk != null)) satirlar.push(['Plan adımı ' + (p.sira != null ? p.sira : i + 1), (p.tablo || '?') + ' · ' + pkKisa(p.pk)]);
   });
+  // W6 (L4-07 alt): stok uyarı txid/hareket kimlikleri YALNIZ burada —
+  // görünür Stok uyarısı bloğu yalnız metin basar (txid/UUID görünmez).
+  ((on && on.stok_uyari) || []).forEach(st => {
+    if (!st) return;
+    if (st.txid) satirlar.push(['Stok uyarı txid', String(st.txid)]);
+    if (st.hareket_id) satirlar.push(['Stok hareket', pkKisa(st.hareket_id)]);
+  });
   if (on && on.kaynak) satirlar.push(['Kaynak', JSON.stringify(on.kaynak)]);
   if (!satirlar.length) return '';
   return `<details class="dg-teknik"><summary>Teknik ayrıntı ▸</summary>${satirlar.map(([k, v]) => `<div class="dg-not">${esc(k)}: ${esc(v)}</div>`).join('')}</details>`;
@@ -615,7 +622,7 @@ function _dgOnizleHtml(on, h) {
     ${cakHtml}
     ${cakZincirDisi}
     ${bagHtml}
-    ${blok('📦 Stok uyarısı', on.stok_uyari, 'dg-blok-a', st => `<div class="dg-not">${esc(st.metin || '')}</div>`)}
+    ${blok('📦 Stok uyarısı', on.stok_uyari, 'dg-blok-a', st => `<div class="dg-not">${esc((st && st.metin) || '')}</div>`)}
     ${_dgTeknikDetayHtml(h.hedef, on)}`;
 }
 
