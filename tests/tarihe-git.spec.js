@@ -88,12 +88,29 @@ test.describe('TG1 — "Tarihe git" tek-gün görünümü', () => {
     // gecmisGunSec — handlers.js'teki butonların çağırdığı aynı kapı)
     await page.evaluate(iso => gecmisGunSec(iso), FIXTURE_GUN.gun);
 
+    // U1: tab-girişi pull yarışı — skipPull render, tam-pull'un IDB clear+put
+    // penceresine denk gelirse "0 olay" ara-render görür; final kanıtın veriye
+    // KONVERJE olmasını bekle (statik oracle aşağıda aynen korunur)
+    await expect.poll(async () => page.evaluate(() => _gecmisGunSayi),
+      { timeout: 30000, intervals: [500, 1000, 2500] }).toBeGreaterThan(0);
+
     await expect(banner(page)).toBeVisible();
     await expect(banner(page)).toContainText(`${FIXTURE_GUN.toplam} olay`);
     await expect(page.locator('#gecmis-body .gm-gun')).toHaveCount(1);
-    // kart sayısı = dedup sonrası toplam (cap 300 altında — hint çıkmaz)
-    const kartlar = await page.locator('#gecmis-body .stok-item').count();
-    expect(kartlar).toBe(FIXTURE_GUN.toplam);
+
+    // U1 katlama: banner OLAY sayısı sabit fixture'a eşit kalır (katlama render
+    // gruplamasıdır — pipeline'ı değiştirmez). DOM kart sayısı = olay toplamı +
+    // katlı grup sayısı (grup kartı 1 kart, içindeki üye kartlar DOM'da durur).
+    const olcum = await page.evaluate(async () => {
+      const sources = await _gecmisCollectSources();
+      const gunluk = _gmGunEntriesFromSources(sources).filter(e => e.olayGunu === _gecmisGun);
+      const dugumler = _gmGunKatla(gunluk);
+      const grup = dugumler.filter(d => d.grup).length;
+      const kart = document.querySelectorAll('#gecmis-body .stok-item').length;
+      return { olay: gunluk.length, grup, kart };
+    });
+    expect(olcum.olay).toBe(FIXTURE_GUN.toplam); // dedup sonrası toplam (cap 300 altı)
+    expect(olcum.kart).toBe(FIXTURE_GUN.toplam + olcum.grup); // katlı kart + üye kartlar
 
     // kaynak/kategori temsil metinleri: vaka (Klinik Mastit), stok (ürün
     // adları), görev (TEDAVI_GUN etiketi) — statik ölçümden

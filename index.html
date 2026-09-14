@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20260914-02">
+<link rel="manifest" href="manifest.json?v=20260914-04">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -254,6 +254,17 @@ body.dark .ac-vurgu{color:#8ec6ff}
 .ig-val{font-size:.9rem;font-weight:600;color:var(--ink);margin-top:2px}
 .hist-row{padding:11px 0;border-bottom:1px solid var(--card2);display:flex;gap:10px;align-items:flex-start}
 .hist-row:last-child{border-bottom:none}
+/* U1: gün özeti kategori çipleri + katlı toplu kart */
+.gm-cip-sarm{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.gm-cip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:14px;border:1.5px solid var(--card3);background:var(--card);font-size:.68rem;font-weight:700;color:var(--ink2);white-space:nowrap;cursor:pointer}
+.gm-cip.on{background:rgba(42,107,181,.15);border-color:var(--blue);color:var(--blue)}
+.gm-kat-acik{margin:2px 0 8px 12px;padding-left:8px;border-left:2px solid var(--card3)}
+@media (max-width:400px){
+  .gm-cip{padding:3px 8px;font-size:.62rem}
+  .gm-cip-sarm{gap:4px}
+  .gm-kat-acik{margin-left:4px;padding-left:6px}
+  #gecmis-body .stok-item{max-width:100%;box-sizing:border-box}
+}
 .hist-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;margin-top:4px}
 .hist-main{flex:1}
 .hist-title{font-weight:600;font-size:.85rem;color:var(--ink)}
@@ -739,7 +750,11 @@ body.dark .ac-vurgu{color:#8ec6ff}
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-tarihe-git" title="Takvimden gün seç — o gün ne oldu?">📅 Tarihe git</button>
       </div>
       <div id="gecmis-gun-banner" style="display:none"></div>
-      <div style="display:flex;gap:6px;margin-bottom:9px;overflow-x:auto;padding-bottom:2px">
+      <!-- U1 md.4: gün özeti kategori çipleri — JS ile dolar (_gecmisGunCiplerGuncelle) -->
+      <div id="gecmis-gun-cipler" style="display:none"></div>
+      <!-- U1 (root düzeltme-3): gün modunda TEK filtre satırı — bu eski satır
+           gizlenir, çipler aynı kaynaktan sayar (root talimatı 2026-09-14) -->
+      <div id="gecmis-filtre-satir" style="display:flex;gap:6px;margin-bottom:9px;overflow-x:auto;padding-bottom:2px">
         <button class="fs-btn on" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-hepsi">Hepsi</button>
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-dogum">🐄 Doğum</button>
         <button class="fs-btn" style="white-space:nowrap;flex-shrink:0" data-action="gecmis-tohumlama">💉 Tohumlama</button>
@@ -2227,28 +2242,28 @@ body.dark .ac-vurgu{color:#8ec6ff}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20260914-02"></script>
-    <script src="js/gecmis.js?v=20260914-02"></script>
-    <script src="js/utils/modal.js?v=20260914-02"></script>
-    <script src="js/utils/errorHandler.js?v=20260914-02"></script>
-    <script src="js/utils/events.js?v=20260914-02"></script>
-    <script src="js/config.js?v=20260914-02"></script>
-    <script src="js/state.js?v=20260914-02"></script>
-    <script src="js/api.js?v=20260914-02"></script>
-    <script src="js/auth.js?v=20260914-02"></script>
-    <script src="js/tarih/tarih.js?v=20260914-02"></script>
-    <script src="js/ui.js?v=20260914-02"></script>
-    <script src="js/forms.js?v=20260914-02"></script>
-    <script src="js/ai-asistan.js?v=20260914-02"></script>
-    <script src="js/demo.js?v=20260914-02"></script>
-    <script src="vendor/cytoscape.min.js?v=20260914-02"></script>
-    <script src="js/pedigree/pedigree-api.js?v=20260914-02"></script>
-    <script src="js/pedigree/pedigree-adapter.js?v=20260914-02"></script>
-    <script src="js/pedigree/pedigree-style.js?v=20260914-02"></script>
-    <script src="js/pedigree/pedigree-view.js?v=20260914-02"></script>
-    <script src="js/pedigree/pedigree-controller.js?v=20260914-02"></script>
-    <script src="js/app.js?v=20260914-02"></script>
-    <script src="js/utils/handlers.js?v=20260914-02"></script>
+    <script src="js/utils/helpers.js?v=20260914-04"></script>
+    <script src="js/gecmis.js?v=20260914-04"></script>
+    <script src="js/utils/modal.js?v=20260914-04"></script>
+    <script src="js/utils/errorHandler.js?v=20260914-04"></script>
+    <script src="js/utils/events.js?v=20260914-04"></script>
+    <script src="js/config.js?v=20260914-04"></script>
+    <script src="js/state.js?v=20260914-04"></script>
+    <script src="js/api.js?v=20260914-04"></script>
+    <script src="js/auth.js?v=20260914-04"></script>
+    <script src="js/tarih/tarih.js?v=20260914-04"></script>
+    <script src="js/ui.js?v=20260914-04"></script>
+    <script src="js/forms.js?v=20260914-04"></script>
+    <script src="js/ai-asistan.js?v=20260914-04"></script>
+    <script src="js/demo.js?v=20260914-04"></script>
+    <script src="vendor/cytoscape.min.js?v=20260914-04"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20260914-04"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20260914-04"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20260914-04"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20260914-04"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20260914-04"></script>
+    <script src="js/app.js?v=20260914-04"></script>
+    <script src="js/utils/handlers.js?v=20260914-04"></script>
 
 
     <!-- GEBELİK EKLE MODAL -->
