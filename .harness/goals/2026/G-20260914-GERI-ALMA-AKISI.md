@@ -17,6 +17,8 @@ write_manifest:
   - .harness/reports/2026-09-14-geri-alma-akisi.md
   - .harness/reports/2026-09-14-geri-alma-akisi-W1-db.md
   - .harness/reports/2026-09-14-geri-alma-akisi-W2-ui.md
+  - supabase/migrations/20260914000001_l4_islem_log_kopru.sql
+  - supabase/migrations/20260914000002_l4_geri_alma_zincir.sql
   - js/degisiklikler/degisiklikler.js
   - js/degisiklikler/diff.js
   - js/degisiklikler/etiketler.js
@@ -201,6 +203,22 @@ ALTER TABLE public.islem_log ADD COLUMN IF NOT EXISTS degisim_txid bigint;
 Geri alınabilirlik kuralları değişmez: çakışmada bypass YOK (zincir dışı
 çakışma), bağımlılık ENGEL bloklar, `degisim_log`/bilet tabloları kapsam dışı,
 sistem öncesi değişiklik geri alınamaz.
+
+### K1 uygulama notu (lead kararı, W1 teslimi sonrası 2026-09-14)
+
+W1'in bağımsız ölçümü: `dogum`'un `tohumlama`'ya FK'sı yok (yalnız hayvan
+köprüsü) — S3b zinciri yalnız köprü INSERT'leri kabul edilerek kurulabiliyor.
+Bu nedenle **hayvan köprüsü üzerinden gelen sonraki INSERT'ler, engel üretmese
+de zincire bağımlı adım olarak girer** (root K1'in tohumlama→sonuc→doğum
+örneğinin tek mekanik yolu). Sınırlar: yalnız INSERT — üst-satır (hayvanlar
+satırının kendi, örn. kilo) ve kardeş satırların U/D düzenlemeleri zincire
+GİRMEZ. Aşırı dahil etme riski (ilgisiz aynı-hayvan INSERT'i) görünür onayla
+sınırlandırılır: zincir önizlemesi TAM kart listesi verir, sahibin tek onayı
+gerektirir; geri almanın geri alınması mümkün. Kanıt: W1 k4 V4a/V4b.
+Ek motor detayı (W1, sözleşmeye uygun): rehber birimleri `'l4_rehber': true`
+taşır — yalnız bu işaretli hedeflerde sonradan-dönülmüş değişiklik çakışma
+sayılmaz ("önce 5'i, sonra 4'ü" akışı); işaretsiz çağrılarda L2 kuralı aynen
+(k3 46/46).
 
 ## Frozen contract — FAZ B UI yüzeyleri (BINDING for W2/W3)
 
