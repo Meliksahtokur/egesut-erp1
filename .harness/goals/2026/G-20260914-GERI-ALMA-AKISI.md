@@ -15,9 +15,12 @@ write_manifest:
   - .harness/goals/2026/G-20260914-GERI-ALMA-AKISI.md
   - .harness/reports/2026-09-14-geri-alma-akisi-plan.md
   - .harness/reports/2026-09-14-geri-alma-akisi.md
+  - .harness/reports/2026-09-14-geri-alma-akisi-W1-db.md
+  - .harness/reports/2026-09-14-geri-alma-akisi-W2-ui.md
   - js/degisiklikler/degisiklikler.js
   - js/degisiklikler/diff.js
   - js/degisiklikler/etiketler.js
+  - js/degisiklikler/degisiklikler-stub.js
   - js/gecmis.js
   - js/ui.js
   - js/forms.js
@@ -31,6 +34,8 @@ docs_authority:
       - .harness/goals/2026/G-20260914-GERI-ALMA-AKISI.md
       - .harness/reports/2026-09-14-geri-alma-akisi-plan.md
       - .harness/reports/2026-09-14-geri-alma-akisi.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W1-db.md
+      - .harness/reports/2026-09-14-geri-alma-akisi-W2-ui.md
     append: []
   local_paths:
     write: []
