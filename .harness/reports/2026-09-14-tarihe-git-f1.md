@@ -132,3 +132,69 @@ kuralı gereği TEKRAR EDİLMEDİ; skip atıfları spec kaynaklarından statik d
 ## 8. Kırıntılar
 
 `.crumbs/tarihe-git-faz1-W2.jsonl` — gate (kabul-et-basla, 6 bulgu) + bu teslim kırıntısı.
+
+---
+
+# REVİZYON TURU — W3 (luna denetimi 4K+6O → REVIZYON; zarf TG1-W3-revizyon, 2026-09-14)
+
+**Dal:** `agent/tarihe-git-faz1-W3` (taban main @ `2890817` = merge `agent/tarihe-git-faz1`;
+merge'i root yaptı — koltuğun izin katmanı 3 kez `git merge`'ü reddetti, kanıtlı eskalasyon).
+**Worker:** W3 (glmf) · **Zarf:** `.ss/tasks/TG1-W3-revizyon.md` · Denetim raporu VERİ olarak
+okundu; her iddia kodla karşılaştırıldı, sonra düzeltildi.
+
+## Bulgu → düzeltme → kanıt
+
+| # | Luna bulgusu | Düzeltme | Kanıt |
+|---|---|---|---|
+| F1 [K] | TOHUMLAMA/VAKA_ACILDI dedup ref'siz fallback'le ayrı olayı yutuyordu | `js/gecmis.js` — `ref_id` DOLU ise baskılama YALNIZ `id\|olay-günü` eşleşmesiyle (`tohRefGun`/`vakaRefGun` kümeleri gün taşır); HAYVAN+GÜN fallback'ı yalnız `ref_id` BOŞ aynada | `tests/unit/gecmis-gun.test.js` "W3 adversarial (F1)": aynı id farklı gün → görünür; eşleşmeyen ref + aynı hayvan/gün (TOHUMLAMA ve VAKA_ACILDI) → görünür; ref BOŞ → fallback hâlâ baskılar. Canlı: 2026-09-06'da 34 VAKA_ACILDI aynasından tam 21'i (ref+gün eşleşenler) baskılanır — kalan 13 gerçek ayrı olay olarak görünür (fixture toplamına gömülü) |
+| F2 [K] | stok dedup aile/tipi doğrulamadan her non-stok entry id'sini bastırıyordu | `js/gecmis.js` — baskılama yalnız `referans_tipi='tohumlama'` + `referans_id`→tohumlama.id + aynı gün. Yazıcı envanteri (migration'lar) ölçüldü: canlıda referanslı tek aile 'tohumlama'; tedavi seans stoku referanssız (`notlar='drug_admin:<id>'` deseni), 'vaccination' ailesi goal öncelik tablosunda baskılanmaz → kaynakIdGun kümesi tamamen kaldırıldı | "W3 adversarial (F2)": non-primary islem id'li stok → görünür; tipisiz/vaccination-tipili → görünür; aile+tipi+gün → baskılanır. Eski W2 stok testi yeni sözleşmeye çekildi (S1/S3'e `referans_tipi:'tohumlama'`) |
+| F3 [K] | gün görünümü 7 metin yolu ham DB metni taşıyordu | `js/ui.js` `_gecmisEntryHtml`: hekim adı (hkName), dogum_tipi, tohumlama sonucu, tedavi etiketi (`_lbl`), gorev_tipi (class=escAttr + metin=esc), uygulama doz/birim/rota, bilinmeyen islem tipi — hepsi `esc`/`escAttr` | `tests/unit/gecmis-xss.test.js` YENİ (7 test): `<img src=x onerror=…>` girdili tüm alanlar çıktıda ham tag ÜRETMEZ; class attribute birebir escAttr çıkışı (ham tırnak yok) |
+| F4 [K] | yeni kartlar DB kimliğini inline onclick'e gömüyordu | 5 yeni kart (aşı/kızgınlık/çıkış/sütten/protokol) `data-action="gm-det" data-det="${escAttr(id)}"` + merkezi delegasyon (`js/utils/events.js` data-action deseni; handler `js/utils/handlers.js` 'gm-det' → `openDet(el.dataset.det)`) | gecmis-xss.test.js: 5 kartta da `onclick=` YOK; `data-det` değeri birebir escAttr çıkışı (attribute kırılımı imkânsız; `'A' onmouseover=…` vektörü ölü alt-dizgiye iner) |
+| F5 [O] | DÜN handler `dAgo(bugun(),1)` NaN üretiyordu | `js/utils/handlers.js:~119` → `dAgo(1)` (kaynak doğrulaması: `helpers.js:16` `dAgo(n)` yalnız sayı); spec oracle'ı da aynı doğru ifade | e2e "Dün hızlı girişi… (luna F5)": `_gecmisGun === dAgo(1)` — ürünün DOĞRU ifadesiyle, self-confirming değil |
+| F6 [O] | "en zengin gün" e2e self-oracle'dı | statik fixture: **2026-09-06, 266 olay** (kaynak: islem 107 · stok 127 · gorev 11 · vaka 21). Ölçüm yöntemi: demo projesinden (vtzqjmazsvurxdeondmi) uygulamanın çektiği YÜZEYLERDEN (hayvan_durum_view, v_gorev_log_sync, stok_tuketim_view + düz tablolar) REST dökümü + düzeltilmiş pipeline koşumu (2026-09-14; artefaktlar `~/tmp/agents/w3-measure/`) | e2e fixture testi: banner "266 olay" + DOM kart sayısı 266 + temsil metinleri (Klinik Mastit, Klavil (vilsan), Enrolen, Gun 1 tedavisi). Bu toplam aynı zamanda F10'un canlı kanıtıdır: eski 100-satır cap ile o günün islem satırlarının tamamı gelemezdi; dedup da (21 ayna) toplamın içinde ölçülür |
+| F7 [O] | TG1 spec veri-bağımlı skip taşıyordu | skip kaldırıldı; fixture günü ölçümle garantili. TG1'nin 5 testi de KOŞTU (koşum çıktısında ✓ 17-21) | Final koşum: 0 TG1 skip. Kalan tek skip `gece-tarih.spec.js:63` (önceden-var olan, küpeli-hayvan koşulu — TG1 dışı, W3 kapsamı değil) |
+| F8 [O] | manifest handlers.js/vaka-toplu-ac.test.js kapsıyordu | goal write_manifest'e +5: `js/utils/handlers.js`, `js/api.js` (bkz. beyan A), `tests/unit/gecmis-gun.test.js` (W2'nin olaygunu-kapsamını taşıyan GERÇEK dosya adı), `tests/unit/gecmis-xss.test.js`, `tests/unit/vaka-toplu-ac.test.js`; "Değişecek dosyalar"a tek satır not — zarfla verilmiş lead yetkisiyle | goal dosyası diff'i (tek commit'te) |
+| F9 [O] | goal `_detRenderGecmis` gün girişi istiyor, rapor kapsam dışı sayıyordu | hayvan kartına aynı şerit: `gecmisDetTariheGitAc` (kanonik `tekTarihTakvimAc`), `gecmisDetGunSec`, `_detGecmisGunBannerGuncelle` (ana banner deseni), 4 action (`gecmis-det-*`); gün hattına `{animalId}` scope'u (`_gmGunHayvanId` — defter scope kurallarıyla paralel; stok hayvansız → kapsam dışı). Yapısal büyümedi (goal stop-3 tetiklenmedi) | unit "W3 (F9)": kapsam + kapsamda-dedup + stok-dışı; e2e "hayvan kartı geçmişi…": 002 küpesi @2026-09-06 = **33 olay** (29 islem+4 vaka; ölçümlü sabit beklenti), şerit + banner + Kapat dönüşü canlıda |
+| F10 [O] | islem_log pull cap=100 gün vaadini kırıyordu | `_fetchIslemLogTumu` (js/api.js): sayfalı tam çekim (1000'lük `range` sayfaları; üst sınır 50 sayfa). Ölçüm (demo, 2026-09-14): **4087 satır · 1641 ms · 2.57 MB**. REST tek istek 1000'de cap'lenir (ölçüldü: `limit=5000` → 1000 döndü) — naif limit artışı yetmezdi. Tarih-aralıklı çekim MİMARİYE AYKIRI: pull `idbClearAndPut` ile DEĞİŞTİRİR, aralıklı çekim diğer satırları silerdi (seçim gerekçesi). Yan etki (beyan): boot/geçmiş pull'ları ~+1.6 sn — pull arka planda, defter/klasik/çevrimdışı (skipPull) akışları değişmedi; e2e'ler yeşil | demo REST ölçüm çıktısı; e2e fixture 266 (tam pull olmadısı imkânsız); unit 892/892 |
+
+## Ölçümler (dışsal, tekrarlanabilir)
+
+- **demo islem_log:** 4087 satır; REST `limit=5000` → 1000 (server cap kanıtı); tam sayfalı
+  çekim 1641 ms / 2.57 MB (script: `~/tmp/agents/w3-measure/demo-rest.mjs`).
+- **F6 fixture gün seçimi:** en zengin gün 2026-05-09 (1484 olay — render cap 300'ü aşar,
+  kart sayısı=toplam iddiasını kırar) → 2026-09-06 seçildi (266 ≤ 300, 4 kaynak ailesi).
+- **Boot pull süresi (yan etki gözlemi, dbg timeline):** taze context'te `hayvanlar`
+  store'u ~5.5 sn'de commit edilir (pull toplu `Promise.all` — F10 sayfalama zinciriyle).
+  Uygulama ilk boyama bu sürede loader gösterir; davranış bozulmadı (tüm e2e yeşil).
+
+## Beyanlar
+
+- **A (gate bulgusu):** zarf md.10 `js/api.js`'i değiştiriyor ama md.8'ün manifest listesinde
+  yoktu — md.8'in lead yetkisiyle api.js de manifest'e girdi (W2'nin işlediği sınıfın tekrarı
+  önlandı). Gate kırıntısı: workspace `1dddb562…`, `type: gate`, KABUL + 2 beyan.
+- **B (md.9 okuma):** "Yapısal olarak büyükse DURMA" → "DUR + ss-ask (goal stop-3)" okundu;
+  uygulanmadı (büyükmedi).
+- **Playwright koşumları (dürüst döküm):** geliştirme koşumu-1 19p/1f/1s (F9 testinde sekme
+  tıkı eksi); koşum-2 19p/1f/1s (F9'da `waitForFunction` async-predicate yanlış-pozitif
+  geçişi — vaat nesnesine truthy diyor; `expect.poll`'a geçildi); **FİNAL BELGELİ KOŞUM:**
+  `20 passed / 1 skipped / 0 failed (2.0m)` — TG1'nin 5 testi dahil. Skip: gece-tarih:63
+  (küpeli-hayvan veri koşulu; TG1 dışı). Komut (belgeli tek koşum):
+  `docker run --rm -e PLAYWRIGHT_DEMO_MODE=1 -e PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080/ -v "$PWD":/work -v /home/melik/egesut-erp1/node_modules:/home/melik/egesut-erp1/node_modules -w /work mcr.microsoft.com/playwright:v1.58.2-noble bash -c "ln -sfn /home/melik/egesut-erp1/node_modules /work/node_modules && npx playwright test tests/tarihe-git.spec.js tests/tarih-secici.spec.js tests/gece-tarih.spec.js tests/sutten-kes.spec.js tests/offline-kuyruk.spec.js tests/sablon.spec.js --workers=1 --retries=0 --reporter=list --output=/tmp/pw-out"`
+  (worktree'de node_modules yok → konteyner içinde ana-checkout symlink'i; log:
+  `~/tmp/agents/w3-measure/w3-playwright-final.log`).
+- **Unit:** `NODE_PATH=/home/melik/egesut-erp1/node_modules node --test tests/unit/*.test.js`
+  → **892/892/0** (W2 tabanı 882 + 10 yeni: 3 gecmis-gun adversarial + 7 gecmis-xss).
+- **Damga:** `?v=20260914-02` × 23 (22 script + manifest); damga-pin testleri aynı değişiklikte.
+
+## Dondurma notu
+
+Sahip kararıyla ~12:5x'te donduruldu; WIP commit `WIP(TG1-W3): dondurma noktasi` atıldı
+(teslim işareti yok). 13:01 devam — bu bölüm dondurma sonrası tamamlandı.
+
+## Ertelenenler (W3)
+
+- Boot pull'unun uzaması (~+1.6 sn) kabul edildi; paralel sayfalama optimizasyonu istenirse
+  ayrı iş (ölçüm yukarıda).
+- `gece-tarih.spec.js:63` veri-bağımlı skip TG1 dışı bırakıldı (F7 kapsamı tarihe-git spec).
+- Luna bulguları DIŞINDA yeniden düzenleme yapılmadı (dar-tutum kuralı); W2'nin §7 maddeleri
+  aynen durur (F9 hariç — o bu turda kapatıldı).

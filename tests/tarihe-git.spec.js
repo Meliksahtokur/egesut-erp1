@@ -156,10 +156,12 @@ test.describe('TG1 — "Tarihe git" tek-gün görünümü', () => {
     // 002 küpeli hayvan (demo) — 2026-09-06'da 33 olayı var (ölçüm: 29 islem
     // + 4 vaka; stok hayvansız olduğundan hayvan kapsamına girmez).
     // Taze context: boot pull'u F10'un sayfalı tam islem_log çekimi arkasında
-    // toplu commit eder — openDet hayvanları IDB'den okuduğu için senkron
-    // bitmesini deterministik bekleriz (openDet'in kendi pull listesi ürün
-    // kodudur, dokunulmaz).
-    await page.waitForFunction(async () => (await idbGetAll('hayvanlar')).length > 0, null, { timeout: 20000 });
+    // toplu commit eder (~5-6 sn; ölçüldü) — openDet hayvanları IDB'den okuduğu
+    // için senkron bitmesini bekleriz. waitForFunction async predicate ile
+    // vaat-nesnesine anında true der (ölçüldü) → expect.poll kullanılır; her
+    // örnek gerçekten await edilir.
+    await expect.poll(async () => page.evaluate(async () => (await idbGetAll('hayvanlar')).length),
+      { timeout: 25000 }).toBeGreaterThan(0);
     await page.evaluate(id => openDet(id), '17a7040c-68a1-4dc9-88ee-db67ac083397');
     await expect(page.locator('#det')).toBeVisible();
     await page.click('[data-action="tab-gecmis"]'); // det modal Geçmiş sekmesi
