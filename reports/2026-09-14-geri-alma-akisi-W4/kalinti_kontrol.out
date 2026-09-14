@@ -1,0 +1,63 @@
+BEGIN
+== k4 kalıntısı ==
+ k4_log | k4_padok | k4_hayvan | k4_tohum | k4_dogum | k4_eslem | k4_islem | jeton_toplam 
+--------+----------+-----------+----------+----------+----------+----------+--------------
+      0 |        0 |         0 |        0 |        0 |        0 |        0 |           12
+(1 satır)
+
+== trigger durumu (hepsi t olmalı) ==
+          relname          |           tgname           | acik 
+---------------------------+----------------------------+------
+ cases                     | trg_degisim_log            | t
+ diseases                  | trg_degisim_log            | t
+ dogum                     | trg_degisim_log            | t
+ dogum                     | trg_islem_dogum            | t
+ drug_administrations      | trg_degisim_log            | t
+ drug_classes              | trg_degisim_log            | t
+ drug_products             | trg_degisim_log            | t
+ drugs                     | trg_degisim_log            | t
+ gorev_log                 | trg_degisim_log            | t
+ grup_padok_eslem          | trg_degisim_log            | t
+ hastalik_log              | trg_degisim_log            | t
+ hayvan_override           | trg_degisim_log            | t
+ hayvanlar                 | trg_degisim_log            | t
+ hayvanlar                 | trg_islem_hayvanlar        | t
+ hekimler                  | trg_degisim_log            | t
+ irk_esik                  | trg_degisim_log            | t
+ kizginlik_log             | trg_degisim_log            | t
+ padoklar                  | trg_degisim_log            | t
+ pedigree_meta             | trg_degisim_log            | t
+ pedigree_nodes            | trg_degisim_log            | t
+ pedigree_parentage        | trg_degisim_log            | t
+ protokol_ayar             | trg_degisim_log            | t
+ protokol_dismiss          | trg_degisim_log            | t
+ protokol_instance         | trg_degisim_log            | t
+ sablon_hastalik_eslem     | trg_degisim_log            | t
+ semen_catalog             | trg_degisim_log            | t
+ stok                      | trg_degisim_log            | t
+ stok_hareket              | trg_degisim_log            | t
+ stok_kategorileri         | trg_degisim_log            | t
+ tedavi                    | trg_degisim_log            | t
+ tedavi_sablonu            | trg_degisim_log            | t
+ tedavi_sablonu_kalem      | trg_degisim_log            | t
+ tohumlama                 | trg_degisim_log            | t
+ tohumlama                 | trg_islem_tohumlama_insert | t
+ tohumlama                 | trg_tohumlama_gebe_gorev   | t
+ treatment_day_uygulamalar | trg_degisim_log            | t
+ treatment_days            | trg_degisim_log            | t
+ uygulama_log              | trg_degisim_log            | t
+ vaccination_log           | trg_degisim_log            | t
+ vaccination_log           | trg_vaccination_stok       | t
+ vaccination_schedule      | trg_degisim_log            | t
+ vaccine_diseases          | trg_degisim_log            | t
+ vaccine_protocol_steps    | trg_degisim_log            | t
+ vaccines                  | trg_degisim_log            | t
+(44 satır)
+
+== sahip şifresi var mı (k3 dengeleyicisi) ==
+ sifre 
+-------
+     1
+(1 satır)
+
+ROLLBACK
