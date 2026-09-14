@@ -1,6 +1,6 @@
 ---
 id: G-20260914-TARIHE-GIT
-status: pending
+status: done
 owner: root
 flow: ss_org
 created: 2026-09-14

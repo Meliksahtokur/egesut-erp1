@@ -198,3 +198,38 @@ Sahip kararıyla ~12:5x'te donduruldu; WIP commit `WIP(TG1-W3): dondurma noktasi
 - `gece-tarih.spec.js:63` veri-bağımlı skip TG1 dışı bırakıldı (F7 kapsamı tarihe-git spec).
 - Luna bulguları DIŞINDA yeniden düzenleme yapılmadı (dar-tutum kuralı); W2'nin §7 maddeleri
   aynen durur (F9 hariç — o bu turda kapatıldı).
+
+---
+
+# LEAD TESLİM (kapanış) — 2026-09-14
+
+**Dal:** `agent/tarihe-git-faz1` (base main @ `bdee91f`) · **Goal:** `G-20260914-TARIHE-GIT` → status **done**.
+
+## Kabul zinciri
+1. **W1** (glmf) goal dosyası `7773716` — lead KABUL (5 kapı maddesi + 13 kriter + 5 stop + gerekçeli sapmalar); merge `b1756b4`.
+2. **W2** (glm) implementasyon `cee3297` — geçici kabul (unit 882/0, red-before 19→19, PW 18/2s/0f, damga `-01`); merge `5fff822`.
+3. **Luna denetim** `1ea174c` — VERDICT: REVİZYON (4 KRİTİK + 6 ÖNEMLİ, VM adversarial ölçümlü); rapor dalda `101472b`.
+4. **W3** (glm) revizyon `9503331` — F1-F10 giderildi; lead KABUL; merge `7c83663`.
+
+## Lead'in kendi ölçümleri (W3 sonrası, bu dalda)
+- Unit: `node --test tests/unit/*.test.js` → **tests 892 · pass 892 · fail 0** (lead koşumu).
+- Damga: `grep -o "?v=[0-9-]*" index.html | sort | uniq -c` → **23× `20260914-02`** tek değer (+1 dinamik birleştirme noktası).
+- TG1 diff'inde eklenen inline `onclick="openDet`: **0** (yeni kartlar `data-action="gm-det"` + `escAttr` delegasyonu; kalan 21 occurrence TG1 öncesi legacy koddur — bu goal'in diff'i değildir).
+- DÜN handler: `js/utils/handlers.js:112` `dAgo(1)` (F5 düzeltmesi yerinde, gerekçe yorumuyla).
+- Playwright: TEKRAR KOŞULMADI (sahip kuralı) — W3'ün belgeli final koşumu esas: **20 passed / 1 skipped / 0 failed (2.0m)**, TG1'nin 5 testi koştu.
+
+## Açık kalemler (root)
+- **Tabandan gelen 2 test_patterns.py kızılı** (stale `bcTarihTakvimAc` anchor'u ui-map Toplu vaka bölümünde + eski goal biçim hataları) — bdee91f'te de kızıl, TG1 dışı.
+- **Legacy 21 inline `onclick="openDet`** js/ui.js'te — TG1 öncesi XSS yüzeyi (escAttr'siz kimlik geçen varsa ayrı güvenlik işi; bu goal kapsamı dışında bilinçli bırakıldı).
+- **Boot/geçmiş pull ~+1.6 sn** (F10 tam sayfalı islem çekimi, arka planda; paralel sayfalama ayrı optimizasyon işi).
+- **`gece-tarih.spec.js:63`** veri-bağımlı skip (küpeli-hayvan koşulu; TG1 dışı).
+- **`.gitignore` +`.ss/`** (W3 hijyen commit'i `a019a56`, zarf yazma listesi dışında — ss rol ağı çalışma yüzeyini lokal tutar; root onayı için beyan).
+- **K1 interakasyonu:** bu dal W3 tabanı üzerinden K1 commit'lerini (ui-map tarih seçici bölümü, R1 goal gövde düzeltmesi, reports/k1 raporu) taşır — main'de zaten var, hasatta no-op.
+- **`bildirim_log` gün görünümü, ay-ızgara, `?gun=` deep-link, hayvan-kartı kategori çipleri** — goal kapsam dışı/ertelenmiş (Faz 2 adayları).
+
+## Süreç kaydı
+- ss-dispatch taban kapısı tools-bank misfire (cross-repo `_repo`) → dağıtım `superset workspaces create` primitive'iyle (rol sözleşmesinin tanımı; kırıntıda assumption).
+- Worker rolünde merge izin katmanınca yasak (W3'te 2× RED) → merge root tarafından `2890817`; ders: bundan sonra worker dalları lead dalından açılır.
+- Sahip dondurması ~12:5x–13:01 (WIP `2fc0653` teslim sayılmadan atlandı).
+- Kırıntılar: `/home/melik/egesut-erp1/.crumbs/tarihe-git-faz1.jsonl` (lead), `tarihe-git-faz1-W1/W2/W3.jsonl`, `tarihe-git-faz1-R1` (luna denetim kırıntıları kendi worktree'sinde).
+- Teslim ölçüm çıktıları workspace dışı: `~/tmp/agents/w2-red-before-gun.log`, `w2-green-gun2.log`, `~/tmp/agents/w3-measure/*` (demo-rest.mjs, fixture artefaktları, `w3-playwright-final.log`).
