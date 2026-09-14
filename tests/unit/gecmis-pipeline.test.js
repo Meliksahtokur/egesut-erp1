@@ -163,13 +163,15 @@ test('hayvan kapsamı (scope.animalId): kaynak bazında mevcut eşleşme aynen u
 
 // ── Görev 2: undoRef türetimi + geri al butonu ───────────────────
 
-test('undoRef islem: yalnızca route edilen tiplerde {kind:islem,id}', () => {
+test('undoRef islem (L4-W2): çözücü hedef üreten tipte {kind:l2,id}; 6-tip kısıtı kalktı', () => {
   const { _gmUndoRef } = sandbox;
-  for (const tip of ['TOHUMLAMA', 'TOHUMLAMA_GUNCELLENDI', 'HASTALIK_KAYDI', 'VAKA_ACILDI', 'TEDAVI_GUN_EKLENDI', 'ABORT_KAYDI']) {
-    assert.strictEqual(JSON.stringify(_gmUndoRef('islem', { id: 'IL1', tip })), JSON.stringify({ kind: 'islem', id: 'IL1' }), `${tip} geri alınabilir olmalı`);
+  // ref_tablo+ref_id dolu her tip çözülür — 6-tip kısıtı YOK (TOPLU_ILAC dahil)
+  for (const tip of ['TOHUMLAMA', 'TOHUMLAMA_GUNCELLENDI', 'HASTALIK_KAYDI', 'VAKA_ACILDI', 'TEDAVI_GUN_EKLENDI', 'ABORT_KAYDI', 'TOPLU_ILAC', 'GOREV_TAMAMLA']) {
+    const ref = _gmUndoRef('islem', { id: 'IL1', tip, ref_tablo: 'tohumlama', ref_id: 'T1' });
+    assert.deepStrictEqual({ kind: ref.kind, id: ref.id }, { kind: 'l2', id: 'IL1' }, `${tip} geri alınabilir olmalı`);
   }
-  assert.strictEqual(_gmUndoRef('islem', { id: 'IL2', tip: 'ASI_KAYDI' }), null);
-  assert.strictEqual(_gmUndoRef('islem', { id: 'IL3', tip: 'TOPLU_ILAC' }), null);
+  // ref boş + fallback pk'sız tip → null (buton yok kuralı korunur)
+  assert.strictEqual(_gmUndoRef('islem', { id: 'IL2', tip: 'BILINMEYEN_TIPI' }), null);
   assert.strictEqual(_gmUndoRef('islem', { tip: 'HASTALIK_KAYDI' }), null, 'idsiz kayıt buton alamaz');
 });
 
@@ -177,7 +179,7 @@ test('undoRef tohumlama: islem ref > yalnız Bekliyor-son kayıt toh:; terminal 
   const { _gmUndoRef } = sandbox;
   const ctx = { latestTohIdByAnimal: { A1: 'T9' }, islemRefByTohId: { T9: 'IL5' } };
   // islem_log referansı varsa o id ile geri alınır
-  assert.strictEqual(JSON.stringify(_gmUndoRef('tohumlama', { id: 'T9', sonuc: 'Gebe', hayvan_id: 'A1' }, ctx)), JSON.stringify({ kind: 'islem', id: 'IL5' }));
+  assert.strictEqual(JSON.stringify(_gmUndoRef('tohumlama', { id: 'T9', sonuc: 'Gebe', hayvan_id: 'A1' }, ctx)), JSON.stringify({ kind: 'l2', id: 'IL5' }));
   // referans yok + SON kayıt + sonuç Bekliyor → doğrudan silme yolu (openTohDet kuralı)
   assert.strictEqual(
     JSON.stringify(_gmUndoRef('tohumlama', { id: 'T9', sonuc: 'Bekliyor', hayvan_id: 'A1' }, { latestTohIdByAnimal: { A1: 'T9' }, islemRefByTohId: {} })),
@@ -219,23 +221,24 @@ test('entry üretimi undoRef bağlamını ham kaynaklardan kurar', () => {
   });
   const t9 = out.find(e => e.data.id === 'T9');
   const t7 = out.find(e => e.data.id === 'T7');
-  assert.strictEqual(JSON.stringify(t9.undoRef), JSON.stringify({ kind: 'islem', id: 'IL5' }));
+  assert.strictEqual(JSON.stringify(t9.undoRef), JSON.stringify({ kind: 'l2', id: 'IL5' }));
   assert.strictEqual(t7.undoRef, null, 'eski tohumlama buton almaz');
   // TOHUMLAMA tipindeki islem_log satırı politika gereği entry ÜRETMEZ ama bağlam kurar
   assert.strictEqual(out.filter(e => e.type === 'islem').length, 0);
 });
 
-test('_gmUndoButtonHtml: ref null → boş string; değerler dataset\'te, onclick sabit (helpers escAttr-inline yasağı)', () => {
+test('_gmUndoButtonHtml (L4-W2): ref null → boş string; değerler dataset\'te, inline onclick YOK (data-action delegasyonu)', () => {
   const { _gmUndoButtonHtml } = sandbox;
   assert.strictEqual(_gmUndoButtonHtml(null), '');
-  const html = _gmUndoButtonHtml({ kind: 'islem', id: 'IL5' });
-  // impl-review bulgu 4: entity-escape edilmiş değer inline JS string'ine konmaz —
-  // this.dataset deseni (helpers.js:90-96 kuralı); onclick gövdesi SABİT stringdir
-  assert.ok(html.includes('data-kind="islem"') && html.includes('data-id="IL5"'), 'data-kind/data-id attribute');
-  assert.ok(html.includes('gmUndoClick(this.dataset.kind,this.dataset.id)'), 'onclick dataset okur');
-  assert.ok(!/gmUndoClick\('/.test(html), 'inline JS string literali olmamalı');
-  assert.ok(html.includes('stopPropagation'), 'stopPropagation olmalı (kart onclick inden kaçış)');
+  const html = _gmUndoButtonHtml({ kind: 'l2', id: 'IL5' });
+  // L4-W2: delegasyon document düzeyinde (events.js) — buton data-action taşır,
+  // entity-escape edilmiş değer inline JS string'ine KONMAZ (dataset deseni aynen)
+  assert.ok(html.includes('data-action="gm-undo"'), 'delegasyon aksiyonu');
+  assert.ok(html.includes('data-kind="l2"') && html.includes('data-id="IL5"'), 'data-kind/data-id attribute');
+  assert.ok(!/onclick=/.test(html), 'inline onclick olmamalı');
   assert.ok(html.startsWith('<button'), 'buton elementi olmalı');
+  // etiket seçeneği: GERI_ALINDI kartı ⟲ kısayolu
+  assert.ok(_gmUndoButtonHtml({ kind: 'l2', id: 'IL5' }, { etiket: '⟲ Geri alınanı geri al' }).includes('Geri alınanı geri al'));
   // toh yolu
   const tohHtml = _gmUndoButtonHtml({ kind: 'toh', id: 'T9' });
   assert.ok(tohHtml.includes('data-kind="toh"') && tohHtml.includes('data-id="T9"'));
@@ -243,8 +246,8 @@ test('_gmUndoButtonHtml: ref null → boş string; değerler dataset\'te, onclic
 
 test('_gmUndoButtonHtml: offline seçeneğinde buton gizlenir (D13)', () => {
   const { _gmUndoButtonHtml } = sandbox;
-  assert.strictEqual(_gmUndoButtonHtml({ kind: 'islem', id: 'IL5' }, { offline: true }), '');
-  assert.ok(_gmUndoButtonHtml({ kind: 'islem', id: 'IL5' }, { offline: false }).includes('gmUndoClick'));
+  assert.strictEqual(_gmUndoButtonHtml({ kind: 'l2', id: 'IL5' }, { offline: true }), '');
+  assert.ok(_gmUndoButtonHtml({ kind: 'l2', id: 'IL5' }, { offline: false }).includes('data-action="gm-undo"'));
 });
 
 // ── Görev 3: cap + gün gruplama + sayaçlar + arama ───────────────

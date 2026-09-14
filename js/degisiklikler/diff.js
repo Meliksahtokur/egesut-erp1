@@ -88,6 +88,32 @@ function degerMetni(v) {
   return s === '' ? '""' : s;
 }
 
+// ── Gürültü ayracı (L4-W2, plan §5) — SAF ─────────────────────────────
+// Uygulama-dışı kaynak (app_name ≠ 'egesut-web') tx kartları ve teknikal
+// satırlar varsayılan GİZLİ; çip sayacı gizlilerden, liste görünenlerden kurulur.
+function dgUygulamaDisiMi(kaynak) {
+  return !!(kaynak && typeof kaynak === 'object' && kaynak.app_name && kaynak.app_name !== 'egesut-web');
+}
+function dgTeknikMi(satir) {
+  return !!(satir && satir.teknikal_mi);
+}
+// dgGurultuAyir(liste, gizliTest) → {gorunen, gizli, gizliSayi}
+// Çağıran gizliTest'i dgUygulamaDisiMi/dgTeknikMi'den türetir; sayaç FİLTRE
+// ÖNCESİ tam listeden sayılır (çip sayacı değişmez).
+function dgGurultuAyir(liste, gizliTest) {
+  const arr = Array.isArray(liste) ? liste : [];
+  const test = typeof gizliTest === 'function' ? gizliTest : () => false;
+  const gizli = arr.filter(test);
+  return { gorunen: arr.filter(x => !test(x)), gizli, gizliSayi: gizli.length };
+}
+// Boş değer satırı gizleme (plan §5 "boş değer → satır gizli"): diff satırının
+// iki tarafı da null/'' ise satır bilgi taşımaz.
+function dgAlanBosMu(d) {
+  if (!d || typeof d !== 'object') return true;
+  const bos = v => v == null || v === '';
+  return bos(d.eski) && bos(d.yeni);
+}
+
 // satir_pk (jsonb) → kısa gösterim: {"id":"a1b2…"} → "a1b2c3d4"
 function pkKisa(pk) {
   if (pk === null || pk === undefined) return '—';

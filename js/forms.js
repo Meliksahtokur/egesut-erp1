@@ -2819,16 +2819,18 @@ async function suttenKesTekil(hayvanId, btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
 async function suttenKesGeriAl(hayvanId, btn) {
+  // L4-W2: tek motor — sütten kesme L2'ye bağlandı (hedef: SUTTEN_KESME tx'i;
+  // çözülemeyen kayıtta hayvanlar satır hedefi — sunucu yönlendirmesi çalışır).
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const h = (getState('animals') || []).find(a => a.id === hayvanId);
-  if (!confirm(`${h ? getDisplayKupe(h) : 'Bu hayvan'} için sütten kesme geri alınacak. Onaylıyor musunuz?`)) return;
-  if (btn) { btn.disabled = true; btn.textContent = 'Geri alınıyor…'; }
+  const kim = h ? getDisplayKupe(h) : '';
   try {
-    await rpc('buzagi_sutten_kesme_geri_al', { p_hayvan_id: hayvanId });
-    toast('↩️ Sütten kesme geri alındı');
-    if (typeof closeDet === 'function') closeDet();
-    await pullTables(['hayvanlar','gorev_log','protokol_instance','islem_log']).catch(()=>{});
-    renderSafe();
+    const liste = await idbGetAll('islem_log');
+    // EN YENİ SUTTEN_KESME kaydı (L4-W2 review-3: first-match sıra bağımlılığı)
+    const adaylar = liste.filter(l => l.tip === 'SUTTEN_KESME' && (l.ref_id === hayvanId || l.ana_hayvan_id === hayvanId) && (!l.durum || l.durum !== 'geri_alindi'));
+    const islem = adaylar.sort((a, b) => String(b.created_at || b.tarih || '').localeCompare(String(a.created_at || a.tarih || '')))[0];
+    if (islem) { await dgGeriAlFromEntry(islem); return; }
+    await dgGeriAlAkisi({ tablo: 'hayvanlar', pk: hayvanId }, 'satir', { olayEtiketi: 'Sütten Kesme', zaman: (h && h.suttten_kesme_tarihi) || '', kim });
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '↩️ Sütten Kesmeyi Geri Al'; } }
 }
@@ -3455,76 +3457,9 @@ async function tohSonuc(sonuc, btn) {
   }
 }
 
-// ── GEBELİK İŞARETLE ────────────────────────
-// ── GERİ ALMA ────────────────────────────────
-function openGeriAl(islemLogId, ozet) {
-  const a = Math.floor(Math.random()*9)+1;
-  const b = Math.floor(Math.random()*9)+1;
-  g('ga-hid').value = islemLogId;
-  g('ga-ozet').textContent = ozet || 'Bu işlem geri alınacak.';
-  g('ga-math-label').textContent = `${a} + ${b}`;
-  g('ga-math-ans').value = '';
-  g('ga-math-ok').value = String(a + b);
-  openM('m-geri-al');
-}
-// ── İşlem Geri Al ──────────────────────────
-async function islemGeriAl(btn, islemLogId) {
-  const expected = parseInt(g('ga-math-ok').value);
-  const given    = parseInt(g('ga-math-ans').value);
-  if (isNaN(given) || given !== expected) { toast('⚠️ Hatalı onay cevabı', true); return; }
-  if (!navigator.onLine) { toast('⚠️ Geri alma için internet gerekli', true); return; }
-  if (btn) { btn.disabled = true; btn.textContent = 'Geri alınıyor…'; }
-
-  try {
-    // Doğrudan tohumlama silme (islem_log olmayan kayıtlar — agent/manuel)
-    if (String(islemLogId).startsWith('toh:')) {
-      const tohId = islemLogId.slice(4);
-      const res = await rpc('tohumlama_geri_al', { p_tohumlama_id: tohId });
-      toast('✅ Kayıt silindi');
-      closeM('m-geri-al'); closeM('m-toh-det'); closeM('m-det');
-      await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','islem_log']);
-      renderSafe();
-      return;
-    }
-
-    const islemList = await idbGetAll('islem_log');
-    const islem = islemList.find(i => i.id === islemLogId);
-    if (!islem) { toast('⚠️ İşlem bulunamadı', true); return; }
-
-    let rpcName = 'geri_al';
-    let rpcParams = { p_islem_id: islemLogId };
-
-    // Domain-specific geri alma
-    if ((islem.tip === 'TOHUMLAMA' || islem.tip === 'TOHUMLAMA_GUNCELLENDI') && islem.ref_id) {
-      rpcName = 'tohumlama_geri_al';
-      rpcParams = { p_tohumlama_id: islem.ref_id };
-    } else if (islem.tip === 'HASTALIK_KAYDI') {
-      // islem_log'daki HASTALIK_KAYDI eski hastalik_log tablosundan gelir
-      // cases tablosu icin trigger henuz eklenmedi, generic geri_al RPC kullan
-      rpcName = 'geri_al';
-      rpcParams = { p_islem_id: islemLogId };
-    } else if (islem.tip === 'VAKA_ACILDI' || islem.tip === 'TEDAVI_GUN_EKLENDI') {
-      rpcName = 'geri_al';
-      rpcParams = { p_islem_id: islemLogId };
-    }
-
-    const res = await rpc(rpcName, rpcParams);
-    toast('✅ İşlem geri alındı');
-    closeM('m-geri-al');
-    closeM('m-toh-det');
-    closeM('m-case-det');
-    // Hayvan kartı geçmişi de geri alma kaynağıdır — kart açık kalırsa bayat liste
-    // gösterir; renderSafe yalnız mevcut sayfayı yeniler (spec E: iki yüzey de taze)
-    closeM('m-det');
-    await pullTables(['tohumlama','gorev_log','hayvanlar','kizginlik_log','cases','treatment_days','stok_hareket','islem_log','drug_administrations']);
-    renderSafe();
-  } catch (e) {
-    const sebep = e?.message || String(e);
-    toast('❌ Geri alma başarısız: ' + sebep, true);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'İşlemi Geri Al'; }
-  }
-}
+// ── GERİ ALMA: L4-W2 ile legacy yolu SÖKÜLDÜ (openGeriAl + islemGeriAl + a+b
+// matematik modalı) — tüm geri alma işlemleri TEK girişten geçer:
+// dgGeriAlAkisi / dgGeriAlFromEntry (js/degisiklikler/degisiklikler.js). ──
 
 // ── STOK ─────────────────────────────────────
 async function submitStk(btn) {

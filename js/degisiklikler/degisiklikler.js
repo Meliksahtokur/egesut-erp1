@@ -20,13 +20,20 @@ const DG_HATA_METNI = {
   SIFRE_AYARLI_DEGIL: 'Sahip şifresi henüz ayarlanmamış (kurulum adımı gerekli).',
   BILET_GECERSIZ: 'Geri alma bileti geçersiz — şifreyle yeniden alın.',
   BILET_SURESI_DOLMUS: 'Geri alma biletinin süresi doldu — şifreyle yeniden alın.',
-  CAKISMA: 'Çakışma: hedef sonradan değişmiş. Önce sonraki değişikliği geri alın.',
-  BAGIMLILIK_ENGELI: 'Bağımlı alt kayıt engeli: önce bağımlı kaydı geri alın.',
+  CAKISMA: 'Bu olaydan sonra başka değişiklikler var — aşağıdaki zincir önerisini kullanabilirsin.',
+  BAGIMLILIK_ENGELI: 'Bu kayıt bağımlı alt kayıtlar içeriyor — önce onları geri alman gerekiyor (aşağıda listelendi).',
   HEDEF_BULUNAMADI: 'Hedef bulunamadı (sistem kurulmadan önceki değişiklikler geri alınamaz).',
   GECERSIZ_SEVIYE: 'Geçersiz geri alma seviyesi.',
   GECERSIZ_HEDEF: 'Geçersiz hedef (alan seviyesi yalnız güncellemelerde geçerlidir).',
+  ZINCIR_COK_UZUN: 'Zincir 100 adımı aşıyor — Değişiklikler listesinden adımları tek tek geri al.',
 };
-const DG_SEVIYE_METNI = { alan: 'Alanı geri al', satir: 'Satırı geri al', islem: 'İşlemi geri al' };
+// HEDEF_BULUNAMADI detay.neden → insan dilli + yönlendirmeli metin (W1 §5)
+const DG_NEDEN_METNI = {
+  SATIR_YOK: 'Bu kayıt artık mevcut değil — geri alınamaz.',
+  LOG_YOK: "Bu olay değişiklik takibi kurulmadan önce yapılmış — geri alınamaz. Kaydı hayvan kartından elle düzeltebilirsin.",
+  ZAMAN_ESLESME_YOK: 'Bu olay kayıtla eşleşemedi (geç girilmiş olabilir). Değişiklikler sayfasından günü seçip işlemi oradan geri al.',
+};
+const DG_SEVIYE_METNI = { alan: 'Alanı geri al', satir: 'Satırı geri al', islem: 'İşlemi geri al', zincir: 'Zincir olarak geri al' };
 
 const _dg = {
   filtre: {},            // {baslangic, bitis, tablo, islem, hayvan_id}
@@ -38,15 +45,31 @@ const _dg = {
   detay: [],
   tumAlanlar: false,
   hedefler: [],          // [{hedef, seviye, etiket}] — attribute'a jsonb yazmamak için
-  bekleyen: null,        // önizlemesi açık {hedef, seviye, etiket}
+  rehberHedefler: [],    // rehber satır tokenları — hedefler'den AYRI (önizleme kapanınca
+                         // detayın kendi tokenları geçersiz kalmasın)
+  bekleyen: null,        // önizlemesi açık {hedef, seviye, etiket, baglam}
+  sonuc: null,           // uygulama sonrası {adim, txid, etiket} — ⟲ kısayolu
+  gurultu: { uydis: false },  // liste: uygulama-dışı kartlar göster? (varsayılan GİZLİ)
+  detayTeknik: false,    // tx detay: teknikal satırlar göster? (varsayılan GİZLİ)
   yukleniyor: false,
   zamanlayici: null,
 };
 
 function _dgHataMetni(e) {
   const kod = e && e.data && e.data.hata;
+  const neden = e && e.data && e.data.detay && e.data.detay.neden;
+  if (kod === 'HEDEF_BULUNAMADI' && neden && DG_NEDEN_METNI[neden]) return DG_NEDEN_METNI[neden];
   if (kod && DG_HATA_METNI[kod]) return DG_HATA_METNI[kod];
   return (e && e.message) || 'İşlem başarısız';
+}
+// Engel metni + yönlendirme butonları (zarf D — insan dilli, bağlantılı).
+// Hata yolu: e.data.detay.neden; önizleme yolu: neden null → genel metin.
+function _dgEngelKutusu(metin, hedef) {
+  const butonlar = [];
+  if (hedef && hedef.tablo === 'hayvanlar' && hedef.pk)
+    butonlar.push(`<button type="button" class="dg-link" data-action="dg-git-hayvan" data-hid="${escAttr(String(hedef.pk))}">🐄 Hayvan kartını aç</button>`);
+  butonlar.push('<button type="button" class="dg-link" data-action="dg-git-degisiklikler">📂 Değişiklikler\'den seç</button>');
+  return `<div class="dg-uyari">⚠️ ${esc(metin)}</div><div class="dg-not">${butonlar.join(' ')}</div>`;
 }
 function _dgCevrimici() { return navigator.onLine !== false; }
 
@@ -205,9 +228,7 @@ function _dgKaynakMetni(k) {
   if (!k.app_name && k.rol) parca.push(k.rol);
   return parca.join(' · ') || '—';
 }
-function _dgUygulamaDisi(k) {
-  return !!(k && k.app_name && k.app_name !== 'egesut-web');
-}
+// (eskiden _dgUygulamaDisi — L4-W2'de SAF katmana taşındı: diff.js dgUygulamaDisiMi)
 
 function _dgListeCiz() {
   const liste = document.getElementById('dg-liste');
@@ -216,11 +237,19 @@ function _dgListeCiz() {
     liste.innerHTML = '<div class="empty-s">Bu filtrelerle değişiklik yok.</div>';
     return;
   }
-  const kartlar = _dg.kayitlar.map(k => {
+  // Gürültü (zarf B): uygulama-dışı kartlar varsayılan GİZLİ + "Uygulama dışı (N)"
+  // çipi (U1 çip deseni); sayaç FİLTRE ÖNCESİ toplamı verir.
+  const ayirici = dgGurultuAyir(_dg.kayitlar, r => dgUygulamaDisiMi(r.kaynak));
+  const gurunen = _dg.gurultu.uydis ? _dg.kayitlar : ayirici.gorunen;
+  const cipler = ayirici.gizliSayi
+    ? `<button type="button" class="gm-cip${_dg.gurultu.uydis ? ' on' : ''}" data-action="dg-gurultu-cip">Uygulama dışı (${esc(String(ayirici.gizliSayi))})${_dg.gurultu.uydis ? ' ✕' : ''}</button>`
+    : '';
+  const kartlar = gurunen.map(k => {
     const o = k.ozet || {};
     const isl = o.islemler || {};
     const rozet = (kod, sinif) => isl[kod] ? `<span class="dg-rozet ${sinif}">${esc(kod)} ${esc(String(isl[kod]))}</span>` : '';
-    return `<div class="dg-kart" role="button" data-action="dg-tx-ac" data-txid="${escAttr(k.txid)}">
+    const dis = dgUygulamaDisiMi(k.kaynak);
+    return `<div class="dg-kart" role="button" data-action="dg-tx-ac" data-txid="${escAttr(String(k.txid))}">
       <div class="dg-kart-ust">
         <span class="dg-baslik">${esc(o.baslik || 'Değişiklik')}</span>
         <span class="dg-zaman">${esc(fmtTarihSaat(k.ilk_zaman))}</span>
@@ -229,12 +258,12 @@ function _dgListeCiz() {
         <span>${esc(ozetMetni(o))}</span>
         ${rozet('I', 'dg-rozet-g')}${rozet('U', 'dg-rozet-a')}${rozet('D', 'dg-rozet-r')}
       </div>
-      <div class="dg-kaynak${_dgUygulamaDisi(k.kaynak) ? ' dg-kaynak-dis' : ''}">${_dgUygulamaDisi(k.kaynak) ? '⚠️ uygulama dışı · ' : ''}${esc(_dgKaynakMetni(k.kaynak))} · tx ${esc(String(k.txid))}</div>
+      <div class="dg-kaynak${dis ? ' dg-kaynak-dis' : ''}">${dis ? '⚠️ uygulama dışı · ' : ''}${esc(_dgKaynakMetni(k.kaynak))}</div>
     </div>`;
   }).join('');
   const dahaFazla = _dg.kayitlar.length < _dg.toplam
     ? `<button type="button" class="btn btn-o" data-action="dg-daha">Daha fazla (${esc(String(_dg.toplam - _dg.kayitlar.length))})</button>` : '';
-  liste.innerHTML = `<div class="dg-sayac">${esc(String(_dg.toplam))} işlem</div>${kartlar}${dahaFazla}`;
+  liste.innerHTML = `<div class="dg-sayac">${esc(String(_dg.toplam))} işlem</div>${cipler ? '<div class="gm-cip-satir">' + cipler + '</div>' : ''}${kartlar || (_dg.kayitlar.length ? '<div class="dg-not">Gürültü filtresinde görünür kayıt yok — çipi açabilirsin.</div>' : '')}${dahaFazla}`;
 }
 
 // ── İşlem detayı: satır satır diff ──────────────────────────────────
@@ -264,6 +293,7 @@ async function degisiklikTxAc(txid) {
   if (!liste || !txid) return;
   if (!_dgCevrimici()) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   _dg.detayTxid = String(txid);
+  _dg.detayTeknik = false;   // teknikal satırlar her detay açılışında varsayılan GİZLİ
   liste.innerHTML = '<div class="loader"><div class="spin"></div></div>';
   try {
     const r = await rpcDegisimListele({ txid: String(txid) });
@@ -290,17 +320,28 @@ function _dgDetayCiz() {
   const liste = document.getElementById('dg-liste');
   if (!liste) return;
   _dg.hedefler = [];
+  // NOT: _dg.detayTeknik BURADA sıfırlanmaz — çip aç-kapa yeniden render çağırır;
+  // sıfırlama yalnız YENİ detay açılışında yapılır (degisiklikTxAc).
   const rows = _dg.detay;
   const ozet = islemOzeti(rows);
   const kaynak = rows[0] && rows[0].kaynak;
-  const baslik = (_dg.kayitlar.find(k => String(k.txid) === _dg.detayTxid) || {}).ozet;
-  const satirHtml = rows.map(r => {
+  const listeOzeti = (_dg.kayitlar.find(k => String(k.txid) === _dg.detayTxid) || {}).ozet;
+  // Gürültü (zarf B): teknikal satırlar varsayılan GİZLİ + "Teknik (N)" çipi
+  const teknikAyir = dgGurultuAyir(rows, dgTeknikMi);
+  const gorunen = _dg.detayTeknik ? rows : teknikAyir.gorunen;
+  const teknikCip = teknikAyir.gizliSayi
+    ? `<button type="button" class="gm-cip${_dg.detayTeknik ? ' on' : ''}" data-action="dg-teknik-cip">Teknik (${esc(String(teknikAyir.gizliSayi))})${_dg.detayTeknik ? ' ✕' : ''}</button>`
+    : '';
+  const satirHtml = gorunen.map(r => {
     const tablo = r.tablo_adi;
     const pk = _dgPk(r.satir_pk);
     const farklar = diffSatirlari(r.eski, r.yeni)
-      .filter(d => r.islem !== 'U' || _dg.tumAlanlar || d.durum !== 'ayni');
+      .filter(d => r.islem !== 'U' || _dg.tumAlanlar || d.durum !== 'ayni')
+      .filter(d => _dg.tumAlanlar || !dgAlanBosMu(d));   // boş değer satırı gizli
+    const sirali = dgAlanSirala(tablo, farklar.map(d => d.alan));
+    const siraliFarklar = sirali.map(a => farklar.find(d => d.alan === a)).filter(Boolean);
     const islemSinif = r.islem === 'I' ? 'dg-rozet-g' : r.islem === 'D' ? 'dg-rozet-r' : 'dg-rozet-a';
-    const alanlar = farklar.map(d => {
+    const alanlar = siraliFarklar.map(d => {
       let deger;
       if (d.durum === 'eklendi') deger = `<span class="dg-yeni">${esc(_dgDegerMetni(tablo, d.alan, d.yeni))}</span>`;
       else if (d.durum === 'silindi') deger = `<span class="dg-eski">${esc(_dgDegerMetni(tablo, d.alan, d.eski))}</span>`;
@@ -313,78 +354,222 @@ function _dgDetayCiz() {
         <span class="dg-alan-deger">${deger}</span>${alanBtn}
       </div>`;
     }).join('');
-    const satirBtn = pk != null ? _dgGeriAlBtn({ tablo, pk, txid: _dg.detayTxid }, 'satir', `${tabloEtiketi(tablo)} ${pkKisa(r.satir_pk)}`) : '';
+    const satirBtn = pk != null ? _dgGeriAlBtn({ tablo, pk, txid: _dg.detayTxid }, 'satir', `${tabloEtiketi(tablo)}`) : '';
+    // satır pk (ham teknik değer) yalnız katlı teknik blokta
+    const teknikKucuk = `<details class="dg-teknik dg-teknik-s"><summary>Teknik ▸</summary><div class="dg-not">${esc(pkKisa(r.satir_pk))}${r.teknikal_mi ? ' · teknik satır' : ''}</div></details>`;
     return `<div class="dg-satir-kart">
       <div class="dg-satir-bas">
         <span class="dg-rozet ${islemSinif}">${esc(islemEtiketi(r.islem))}</span>
         <b>${esc(tabloEtiketi(tablo))}</b>
-        <span class="dg-pk" title="${escAttr(JSON.stringify(r.satir_pk))}">#${esc(pkKisa(r.satir_pk))}</span>
-        ${r.teknikal_mi ? '<span class="dg-rozet">teknik</span>' : ''}
       </div>
       ${alanlar || '<div class="dg-not">Görünür alan farkı yok.</div>'}
       ${satirBtn}
+      ${teknikKucuk}
     </div>`;
   }).join('');
-  const islemBtn = _dgGeriAlBtn({ txid: _dg.detayTxid }, 'islem', `İşlem tx ${_dg.detayTxid}`);
+  // işlem dili başlık (S4): "Görev tamamlandı — 14.09 17:25 · 4019" kalıbı;
+  // ham tx YALNIZ teknik katlamada. ozet.baslik zaten işlem dilli (L2 listele).
+  const baslikMetni = (listeOzeti && listeOzeti.baslik) || 'İşlem';
+  const islemBtn = _dgGeriAlBtn({ txid: _dg.detayTxid }, 'islem', 'İşlemi geri al');
+  const teknikDetay = `<details class="dg-teknik"><summary>Teknik ayrıntı ▸</summary>
+      <div class="dg-not">tx: ${esc(_dg.detayTxid)}</div>
+      ${kaynak ? `<div class="dg-not">Kaynak: ${esc(JSON.stringify(kaynak))}</div>` : ''}
+    </details>`;
   liste.innerHTML = `
     <button type="button" class="dg-link" data-action="dg-liste-don">‹ Listeye dön</button>
     <div class="dg-detay-bas">
-      <div class="dg-baslik">${esc((baslik && baslik.baslik) || 'İşlem')} · tx ${esc(_dg.detayTxid)}</div>
+      <div class="dg-baslik">${esc(baslikMetni)}</div>
       <div class="dg-not">${esc(rows[0] ? fmtTarihSaat(rows[0].zaman) : '')} · ${esc(ozetMetni(ozet))} · ${esc(_dgKaynakMetni(kaynak))}</div>
       ${kaynak && kaynak.geri_alma && kaynak.geri_alma.gerekce ? `<div class="dg-not">Gerekçe: ${esc(kaynak.geri_alma.gerekce)}</div>` : ''}
+      ${teknikCip ? '<div class="gm-cip-satir">' + teknikCip + '</div>' : ''}
       <label class="dg-not dg-tum"><input type="checkbox" data-change="dg-tum-alanlar"${_dg.tumAlanlar ? ' checked' : ''}> Değişmeyen alanları da göster</label>
       ${islemBtn}
+      ${teknikDetay}
     </div>
-    ${satirHtml || '<div class="empty-s">Bu işlemde kayıt yok.</div>'}`;
+    ${satirHtml || '<div class="empty-s">' + (teknikAyir.gizliSayi ? 'Görünür kayıt yok — Teknik çipini açabilirsin.' : 'Bu işlemde kayıt yok.') + '</div>'}`;
 }
 
-// ── Geri al akışı: önizleme → (bilet) → gerekçe → uygula → sonuç ────
-async function degisimGeriAlBaslat(hi) {
-  const h = _dg.hedefler[hi];
-  if (!h) return;
+// ── L4-W2: TEK geri-al girişi (önizleme → bilet → uygula → sonuç) ────
+// dgGeriAlAkisi(hedef, seviye, baglam) — TÜM yüzeyler (Geçmiş kartı, hayvan
+// kartı, işlem detay paneli, vaka/görev/protokol/sütten/tohumlama detayları,
+// Değişiklikler) BURAYA gelir. baglam = {olayEtiketi, zaman, kim} (işlem dili).
+async function dgGeriAlAkisi(hedef, seviye, baglam) {
   if (!_dgCevrimici()) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  _dg.bekleyen = h;
+  if (!hedef) { toast('⚠️ Bu olay için geri alma hedefi çözülemedi — Değişiklikler sayfasından deneyin', true); return; }
+  const b = baglam || {};
+  const etiket = _gmIslemBaslikSatiri(b);
+  _dg.bekleyen = { hedef, seviye: _dgSeviyeTamamla(hedef, seviye), etiket, baglam: b };
+  await dgOnizleGoster();
+}
+
+// islem_log/geçmiş entry'sinden giriş: çözücü (_gmGeriAlHedef, js/gecmis.js TEK
+// kaynak) hedefi kurar; seviye hedefin şeklinden türetilir. null hedef → buton
+// üretilmemiş olmalıydı; çağrıldıysa yönlendirme mesajı (çıkımaz yok).
+function dgGeriAlFromEntry(entry, seviye) {
+  const hedef = _gmGeriAlHedef(entry);
+  if (!hedef) { toast('⚠️ Bu olay için geri alma hedefi çözülemedi — Değişiklikler sayfasından deneyin', true); return null; }
+  const s = seviye || (hedef.txid ? 'islem' : 'satir');
+  return dgGeriAlAkisi(hedef, s, _gmGeriAlBaglam(entry));
+}
+
+function _dgSeviyeTamamla(hedef, seviye) {
+  if (seviye === 'zincir') return 'zincir';
+  if (hedef && hedef.alan) return 'alan';
+  if (seviye === 'alan' || seviye === 'satir' || seviye === 'islem') return seviye;
+  return hedef && hedef.txid ? 'islem' : 'satir';
+}
+
+async function dgOnizleGoster() {
+  const h = _dg.bekleyen;
+  if (!h) return;
   const govde = document.getElementById('dg-onizle-govde');
   const baslik = document.getElementById('dg-onizle-baslik');
-  if (baslik) baslik.textContent = '↩ ' + DG_SEVIYE_METNI[h.seviye] + ' — ' + h.etiket;
+  const onayBtn = document.getElementById('dg-onizle-onay');
+  const fg = document.querySelector('#m-dg-onizle .fg');
+  if (baslik) baslik.textContent = (h.seviye === 'zincir' ? '🔗 Zincir geri al — ' : '↩ ') + h.etiket;
+  if (onayBtn) { onayBtn.hidden = false; onayBtn.textContent = h.seviye === 'zincir' ? '🔗 Zinciri Geri Al' : '↩ Geri Almayı Uygula'; }
+  if (fg) fg.hidden = false;
   if (govde) govde.innerHTML = '<div class="loader"><div class="spin"></div></div>';
   const gerekce = document.getElementById('dg-gerekce'); if (gerekce) gerekce.value = '';
-  _dgOnayDurumu(false, '');
+  _dgEngelGoster('');
+  _dgOnayDurumu(false);
   openM('m-dg-onizle');
   try {
     const on = await rpcDegisimOnizle(h.hedef, h.seviye);
     if (_dg.bekleyen !== h) return;
-    if (govde) govde.innerHTML = _dgOnizleHtml(on);
-    _dgOnayDurumu(!!on.geri_alinabilir, on.geri_alinabilir ? '' : (on.engeller || []).join(' '));
+    _dg.rehberHedefler = [];   // rehber satır düğmeleri için token kaydı (hedefler'e DOKUNMA — detayın tokenları canlı kalmalı)
+    if (govde) govde.innerHTML = _dgOnizleHtml(on, h);
+    if (on.geri_alinabilir) _dgOnayDurumu(true);
+    else if (on.sirali_rehber && on.sirali_rehber.length) _dgEngelGoster('');  // rehber modu — çıkımaz yok
+    else if ((on.cakismalar || []).length) _dgEngelGoster('');                 // zincir önerisi konuşur
+    else _dgEngelGoster(_dgEngelKutusu('Bu işlem şu koşullarda geri alınamaz — aşağıdaki yönlendirmeleri izleyebilirsin.', h.hedef));
   } catch (e) {
-    if (govde) govde.innerHTML = `<div class="dg-uyari">⚠️ ${esc(_dgHataMetni(e))}</div>`;
-    _dgOnayDurumu(false, _dgHataMetni(e));
+    if (govde) govde.innerHTML = `<div class="dg-not">Önizleme alınamadı: ${esc(_dgHataMetni(e))}</div>`;
+    _dgEngelGoster(_dgEngelKutusu(_dgHataMetni(e), h.hedef));
   }
 }
 
-// Satır/alan hedefi ARTIK txid taşıyor (lead sözleşme güncellemesi): hedeflenen
-// sürüm sunucuda kesinleşir; yanlış-sürüm koruması sunucunun CAKISMA /
-// HEDEF_BULUNAMADI yollarında kalır — istemci kopyası yapılmaz.
-function _dgOnayDurumu(acik, engelMetni) {
+function _dgOnayDurumu(acik) {
   const btn = document.getElementById('dg-onizle-onay');
   if (btn) { btn.disabled = !acik; btn.style.opacity = acik ? '' : '.45'; }
+}
+function _dgEngelGoster(icerikHtml) {
   const eng = document.getElementById('dg-onizle-engel');
-  if (eng) { eng.textContent = engelMetni || ''; eng.hidden = !engelMetni; }
+  if (eng) { eng.innerHTML = icerikHtml || ''; eng.hidden = !icerikHtml; }
 }
 
-function _dgOnizleHtml(on) {
-  const plan = (on.plan || []).map(p => `<div class="dg-plan">
-      <span class="dg-rozet">${esc(String(p.sira))}</span>
-      <b>${esc(tabloEtiketi(p.tablo))}</b> <span class="dg-pk">#${esc(pkKisa(p.pk))}</span>
-      <div class="dg-not">${esc(p.yapilacak || islemEtiketi(p.islem))}${Array.isArray(p.alanlar) && p.alanlar.length ? ' — ' + esc(p.alanlar.map(a => alanEtiketi(p.tablo, a)).join(', ')) : ''}</div>
-    </div>`).join('');
+// Çakışma satırı — İNSAN DİLLİ (ham pk/UUID YOK): zaman · tablo · alanlar · işlem
+function _dgCakismaSatiri(c) {
+  const parca = [];
+  if (c && c.zaman) parca.push(fmtTarihSaat(c.zaman));
+  parca.push(c && c.tablo ? tabloEtiketi(c.tablo) : 'Değişiklik');
+  if (c && Array.isArray(c.degisen_alanlar) && c.degisen_alanlar.length)
+    parca.push(c.degisen_alanlar.map(a => alanEtiketi(c.tablo, a)).join(', '));
+  if (c && c.islem) parca.push(islemEtiketi(c.islem));
+  return parca.join(' · ');
+}
+
+// Zincir önerisi (sahibin 3-4-5 akışı): çakışma artık blok DEĞİL öneri
+function _dgZincirOnerisiHtml(on) {
+  const n = (on.cakismalar || []).length;
+  if (!n) return '';
+  const liste = on.cakismalar.map(c => `<div class="dg-not">${esc(_dgCakismaSatiri(c))}</div>`).join('');
+  return `<div class="dg-blok dg-blok-a" data-test="dg-zincir-oneri"><div class="dg-blok-bas">🔗 Bu olaydan sonra ${esc(String(n))} değişiklik daha var</div>
+    ${liste}
+    <button type="button" class="btn btn-g" data-action="dg-zincir-oner" style="margin-top:6px">🔗 Zincir olarak geri al — ${esc(String(n))} olay birlikte</button></div>`;
+}
+
+// Zincir plan kartı (bağımlı adımlar işaretli — K1)
+function _dgZincirKartHtml(p) {
+  const zaman = p && p.zaman ? fmtTarihSaat(p.zaman) : '';
+  const bagimli = !!(p && (p.bagimli || p.bagimli_adim));
+  return `<div class="dg-plan">
+      <span class="dg-rozet">${esc(String((p && p.sira) || ''))}</span>
+      <b>${esc(p && p.tablo ? tabloEtiketi(p.tablo) : 'Değişiklik')}</b>${zaman ? ' <span class="dg-zaman">' + esc(zaman) + '</span>' : ''}
+      ${bagimli ? '<span class="dg-rozet dg-rozet-a">bağımlı adım — bu geri almaya bağlı</span>' : ''}
+      <div class="dg-not">${esc((p && p.yapilacak) || (p && p.islem ? islemEtiketi(p.islem) : ''))}</div>
+    </div>`;
+}
+
+// Sıralı rehber (K1 — çıkımaz engel YOK): SAF hazırlık — en yeni önce,
+// 1..N numara; zamansız satır sonda kendi sırasında. DOM yazmaz (testli).
+function _dgRehberHazirla(siraliRehber) {
+  const liste = (Array.isArray(siraliRehber) ? siraliRehber : []).filter(r => r && r.hedef);
+  const damgalilar = liste.filter(r => r.zaman).sort((a, b) => String(b.zaman).localeCompare(String(a.zaman)));
+  const damgasizlar = liste.filter(r => !r.zaman);
+  return damgalilar.concat(damgasizlar).map((r, i) => ({
+    no: i + 1,
+    hedef: r.hedef,
+    zaman: r.zaman || '',
+    ozet: r.ozet || '',
+    neden: r.neden_dahil_degil || '',
+  }));
+}
+
+function _dgRehberBloku(siraliRehber) {
+  const rehber = _dgRehberHazirla(siraliRehber);
+  if (!rehber.length) return '';
+  const satirlar = rehber.map((r, i) => {
+    const baslik = r.ozet || (r.hedef && r.hedef.tablo ? tabloEtiketi(r.hedef.tablo) : 'Değişiklik');
+    const zaman = r.zaman ? fmtTarihSaat(r.zaman) : '';
+    _dg.rehberHedefler.push({ hedef: r.hedef, seviye: 'islem', etiket: baslik });
+    return `<div class="dg-plan"><b>${esc(String(r.no))}. ${zaman ? 'önce ' : ''}</b>${esc(baslik)}${zaman ? ' <span class="dg-zaman">' + esc(zaman) + '</span>' : ''}${r.neden ? ' <span class="dg-not">(' + esc(r.neden) + ')</span>' : ''}
+      <button type="button" class="dg-geri" data-action="dg-rehber-geri-al" data-hi="${i}">↩ Geri Al</button></div>`;
+  }).join('');
+  return `<div class="dg-blok dg-blok-a" data-test="dg-rehber"><div class="dg-blok-bas">🧭 Otomatik zincir kurulamadı — şu sırayla TEK TEK geri al</div>${satirlar}</div>`;
+}
+
+// Teknik ayrıntı katlaması (plan §5): tx/pk/kaynak YALNIZ burada — görünürde asla
+function _dgTeknikDetayHtml(hedef, on) {
+  const satirlar = [];
+  if (hedef && hedef.txid) satirlar.push(['Hedef txid', String(hedef.txid)]);
+  if (hedef && hedef.tablo) satirlar.push(['Hedef kayıt', hedef.tablo + ' · ' + pkKisa(hedef.pk)]);
+  if (hedef && hedef.zaman) satirlar.push(['Hedef zaman', String(hedef.zaman)]);
+  if (on && on.kaynak) satirlar.push(['Kaynak', JSON.stringify(on.kaynak)]);
+  if (!satirlar.length) return '';
+  return `<details class="dg-teknik"><summary>Teknik ayrıntı ▸</summary>${satirlar.map(([k, v]) => `<div class="dg-not">${esc(k)}: ${esc(v)}</div>`).join('')}</details>`;
+}
+
+function _dgOnizleHtml(on, h) {
+  h = h || _dg.bekleyen || {};
+  const zincir = h.seviye === 'zincir';
+  const planHtml = zincir
+    ? (on.plan || []).map(_dgZincirKartHtml).join('')
+    : (on.plan || []).map(p => `<div class="dg-plan">
+        <span class="dg-rozet">${esc(String(p.sira))}</span>
+        <b>${esc(tabloEtiketi(p.tablo))}</b> <span class="dg-pk">#${esc(pkKisa(p.pk))}</span>
+        <div class="dg-not">${esc(p.yapilacak || islemEtiketi(p.islem))}${Array.isArray(p.alanlar) && p.alanlar.length ? ' — ' + esc(p.alanlar.map(a => alanEtiketi(p.tablo, a)).join(', ')) : ''}</div>
+      </div>`).join('');
+  const zincirCumle = zincir && (on.plan || []).length
+    ? `<div class="dg-not" data-test="dg-zincir-cumle"><b>${esc(String((on.plan || []).length))} olay sıralıdır, komple geri alınacak. Onaylıyor musunuz?</b></div>`
+    : '';
+  const rehberHtml = (!on.geri_alinabilir && on.sirali_rehber && on.sirali_rehber.length)
+    ? _dgRehberBloku(on.sirali_rehber) : '';
+  const cakHtml = (!zincir && (on.cakismalar || []).length) ? _dgZincirOnerisiHtml(on) : '';
+  const cakZincirDisi = (zincir && !on.geri_alinabilir && (on.cakismalar || []).length)
+    ? `<div class="dg-blok dg-blok-r"><div class="dg-blok-bas">⚠️ Zincire girmeyen gerçek çakışmalar — önce bunları TEK TEK geri al</div>${on.cakismalar.map(c => `<div class="dg-not">${esc(_dgCakismaSatiri(c))}</div>`).join('')}</div>`
+    : '';
   const blok = (baslik, dizi, sinif, fn) => dizi && dizi.length
     ? `<div class="dg-blok ${sinif}"><div class="dg-blok-bas">${baslik}</div>${dizi.map(fn).join('')}</div>` : '';
+  const bagimliSayi = (on.bagimliliklar || []).filter(b => b.etki === 'ENGEL').length;
+  const bagHtml = blok('🔗 Bağımlılıklar' + (bagimliSayi ? ` — ${bagimliSayi} alt kayıt ÖNCE geri alınmalı` : ''), on.bagimliliklar, 'dg-blok-a',
+    b => `<div class="dg-not"><span class="dg-rozet ${b.etki === 'ENGEL' ? 'dg-rozet-r' : 'dg-rozet-a'}">${esc(b.etki)}</span> ${esc(tabloEtiketi(b.tablo))}${b.etki === 'ENGEL' ? ' — önce bunu geri al ya da sil' : ''}${b.iliski ? ' (' + esc(b.iliski) + ')' : ''}</div>`);
   return `
-    <div class="dg-blok"><div class="dg-blok-bas">Plan (${esc(String((on.plan || []).length))} adım)</div>${plan || '<div class="dg-not">Plan boş.</div>'}</div>
-    ${blok('⚠️ Çakışmalar', on.cakismalar, 'dg-blok-r', c => `<div class="dg-not">${esc(tabloEtiketi(c.tablo))} #${esc(pkKisa(c.pk))}${c.alan ? ' · ' + esc(alanEtiketi(c.tablo, c.alan)) : ''} — ${esc(c.neden || '')}</div>`)}
-    ${blok('🔗 Bağımlılıklar', on.bagimliliklar, 'dg-blok-a', b => `<div class="dg-not"><span class="dg-rozet ${b.etki === 'ENGEL' ? 'dg-rozet-r' : 'dg-rozet-a'}">${esc(b.etki)}</span> ${esc(tabloEtiketi(b.tablo))} #${esc(pkKisa(b.pk))} (${esc(b.iliski || '')})</div>`)}
-    ${blok('📦 Stok uyarısı', on.stok_uyari, 'dg-blok-a', s => `<div class="dg-not">${esc(s.metin || '')}</div>`)}`;
+    ${rehberHtml}
+    ${zincirCumle}
+    <div class="dg-blok"><div class="dg-blok-bas">${zincir ? '🔗 Zincir planı (' + esc(String((on.plan || []).length)) + ' olay)' : 'Plan (' + esc(String((on.plan || []).length)) + ' adım)'}</div>${planHtml || '<div class="dg-not">Plan boş.</div>'}</div>
+    ${cakHtml}
+    ${cakZincirDisi}
+    ${bagHtml}
+    ${blok('📦 Stok uyarısı', on.stok_uyari, 'dg-blok-a', st => `<div class="dg-not">${esc(st.metin || '')}</div>`)}
+    ${_dgTeknikDetayHtml(h.hedef, on)}`;
+}
+
+// Değişiklikler sayfası kendi düğmeleri (alan/satır/işlem) — token → tek giriş
+async function degisimGeriAlBaslat(hi) {
+  const h = _dg.hedefler[hi];
+  if (!h) return;
+  await dgGeriAlAkisi(h.hedef, h.seviye, { olayEtiketi: h.etiket, zaman: '', kim: '' });
 }
 
 async function degisimGeriAlOnayla() {
@@ -424,6 +609,39 @@ async function degisimBiletAl(btn) {
   }
 }
 
+// Sonuç bloğu — ⟲ Geri alınanı geri al (akış f): hedef = geri alma tx'i.
+// tx değeri metne HİÇ yazılmaz; yalnız aksiyonun kullandığı state'te taşınır.
+function _dgSonucHtml(sc) {
+  if (!sc) return '';
+  const bas = sc.zincir
+    ? `✅ ${esc(String(sc.adim))} olay birlikte geri alındı`
+    : `✅ ${esc(sc.etiket || 'İşlem')} geri alındı`;
+  return `<div class="dg-sonuc" data-test="dg-sonuc">
+    <div class="dg-sonuc-bas">${bas}</div>
+    <div class="dg-not">${sc.zincir ? esc(String(sc.adim)) + ' olay tek işlemde geri alındı' : 'İşlem geri alındı'}</div>
+    ${sc.txid ? '<button type="button" class="dg-geri" data-action="dg-geri-alinani-geri-al">⟲ Geri alınanı geri al</button>' : ''}
+  </div>`;
+}
+function _dgSonucToast(sc) {
+  return sc && sc.zincir
+    ? `✅ ${sc.adim} olay birlikte geri alındı`
+    : `✅ Geri alındı — ${(sc && sc.etiket) || 'işlem'}`;
+}
+// Geri alma sonrası yüzey tazeleme: Değişiklikler'de liste+tx detayı; diğer
+// yüzeylerde (Geçmiş/vaka/görev/…) ilgili tablolar + mevcut sayfa render'ı.
+async function _dgSonrasiTazele(r) {
+  if (getState('currentPage') === 'degisiklikler') {
+    await degisikliklerYukle(1);
+    if (r && r.geri_alma_txid) await degisiklikTxAc(r.geri_alma_txid);
+    return;
+  }
+  const tablolar = ['hayvanlar', 'tohumlama', 'dogum', 'gorev_log', 'cases', 'treatment_days',
+    'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'islem_log',
+    'uygulama_log', 'kizginlik_log', 'vaccination_log', 'protokol_instance'];
+  try { await pullTables(tablolar); } catch (e) { /* çevrimdışı yol — toast verildi */ }
+  if (typeof renderSafe === 'function') renderSafe();
+}
+
 async function _dgUygula(bilet) {
   const h = _dg.bekleyen;
   if (!h) return;
@@ -433,11 +651,19 @@ async function _dgUygula(bilet) {
   const gerekce = gerekceEl && gerekceEl.value.trim() ? gerekceEl.value.trim() : null;
   try {
     const r = await rpcDegisimGeriAl(h.hedef, h.seviye, bilet, gerekce);
+    const adim = Number((r && r.uygulanan_adim) || 1);
+    _dg.sonuc = { adim, txid: r && r.geri_alma_txid ? String(r.geri_alma_txid) : '', etiket: h.etiket, zincir: h.seviye === 'zincir' };
     _dg.bekleyen = null;
-    closeM('m-dg-onizle');
-    toast(`✅ Geri alındı — ${r.uygulanan_adim} adım (yeni tx ${r.geri_alma_txid})`);
-    await degisikliklerYukle(1);
-    if (r.geri_alma_txid) await degisiklikTxAc(r.geri_alma_txid);
+    // Modal AÇIK kalır: sonuç bloğu + ⟲ kısayol (her yüzeyde aynı — akış f)
+    const govde = document.getElementById('dg-onizle-govde');
+    if (govde) govde.innerHTML = _dgSonucHtml(_dg.sonuc);
+    const onayB = document.getElementById('dg-onizle-onay');
+    if (onayB) onayB.hidden = true;
+    const fg = document.querySelector('#m-dg-onizle .fg');
+    if (fg) fg.hidden = true;
+    _dgEngelGoster('');
+    toast(_dgSonucToast(_dg.sonuc));
+    await _dgSonrasiTazele(r);
   } catch (e) {
     const kod = e && e.data && e.data.hata;
     if (kod === 'BILET_GECERSIZ' || kod === 'BILET_SURESI_DOLMUS') {
@@ -447,7 +673,8 @@ async function _dgUygula(bilet) {
       if (btn) btn.disabled = false;
       return;
     }
-    _dgOnayDurumu(false, _dgHataMetni(e));
+    _dgOnayDurumu(false);
+    _dgEngelGoster(_dgEngelKutusu(_dgHataMetni(e), h.hedef));
   }
 }
 
@@ -511,7 +738,31 @@ registerActions({
   'dg-tum-alanlar':           (el) => { _dg.tumAlanlar = !!el.checked; _dgDetayCiz(); },
   'dg-geri-al':               (el, e) => { if (e && e.stopPropagation) e.stopPropagation(); degisimGeriAlBaslat(parseInt(el.dataset.hi, 10)); },
   'dg-onizle-onay':           () => degisimGeriAlOnayla(),
-  'dg-onizle-kapat':          () => { _dg.bekleyen = null; closeM('m-dg-onizle'); },
+  'dg-onizle-kapat':          () => {
+    _dg.bekleyen = null; _dg.sonuc = null;
+    const onayB = document.getElementById('dg-onizle-onay');
+    if (onayB) { onayB.hidden = false; onayB.disabled = false; onayB.style.opacity = ''; onayB.textContent = '↩ Geri Almayı Uygula'; }
+    const fg = document.querySelector('#m-dg-onizle .fg');
+    if (fg) fg.hidden = false;
+    _dgEngelGoster('');
+    closeM('m-dg-onizle');
+  },
+  // ── L4-W2: zincir + rehber + gürültü + sonuç kısayolları ──
+  'dg-zincir-oner':           () => { const h = _dg.bekleyen; if (h) dgGeriAlAkisi(h.hedef, 'zincir', h.baglam); },
+  'dg-rehber-geri-al':        (el, e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const k = _dg.rehberHedefler[parseInt(el.dataset.hi, 10)];
+    if (k) dgGeriAlAkisi(k.hedef, k.seviye, { olayEtiketi: k.etiket, zaman: '', kim: '' });
+  },
+  'dg-gurultu-cip':           () => { _dg.gurultu.uydis = !_dg.gurultu.uydis; _dgListeCiz(); },
+  'dg-teknik-cip':            () => { _dg.detayTeknik = !_dg.detayTeknik; _dgDetayCiz(); },
+  'dg-geri-alinani-geri-al':  () => {
+    const tx = _dg.sonuc && _dg.sonuc.txid;
+    if (!tx) return;
+    dgGeriAlAkisi({ txid: tx }, 'islem', { olayEtiketi: 'Geri alma işlemi', zaman: '', kim: '' });
+  },
+  'dg-git-degisiklikler':     () => { closeM('m-dg-onizle'); _dg.bekleyen = null; degisikliklerAc(); },
+  'dg-git-hayvan':            (el) => { if (el.dataset.hid && typeof openDet === 'function') openDet(el.dataset.hid); },
   'dg-bilet-al':              (el) => degisimBiletAl(el),
   'dg-bilet-enter':           (p) => { if (p.key === 'Enter') { p.event.preventDefault(); degisimBiletAl(document.getElementById('dg-bilet-al-btn')); } },
   'dg-bilet-kapat':           () => closeM('m-dg-bilet'),
