@@ -8,8 +8,12 @@ Prod ve demo'ya HİÇBİR ŞEY YAZILMAZ — açılışta READ ONLY guard self-te
 bunu kanıtlar (yazma denemesi reddedilmeli).
 
 Dört kontrol (her biri alt komut; `hepsi` hepsini koşar):
-  sizinta  demo-doğumlu satırların prod'da bulunması (PK küme farkı + opsiyonel
-           --kopya-tarihi ile created_at sinyali); ayrıca prod-only satır sayısı
+  sizinti  demo-doğumlu satırların prod'da bulunması — hüküm kopya-sonrası
+           created_at sinyaline bağlıdır (varsayılan kopya tarihi 2026-07-02:
+           docs/demo-mirror-ROADMAP.md D0). Kesişimde klon imzası (demo/prod
+           created_at birebir eşit = `demo_klonla()` prod→demo akışı) AYIKLANIR;
+           hüküm yalnız şüpheli (created_at farklı) satırlara bağlanır. PK küme
+           farkı ve prod-only sayısı bilgidir. Takma ad: sizinta
   isaret   prod text/varchar/jsonb kolonlarında test işaretleri (sayı + yerel bağlam)
   koken    yeni tabloların (pedigree_*, semen_catalog) ve doldurulan kolonların
            (dogum.buzagi_id, drug_products.std_dose) prod kaynağa bağlanması
@@ -24,7 +28,8 @@ Kullanım:
   python3 scripts/veri-eslesme-kontrol.py hepsi
   python3 scripts/veri-eslesme-kontrol.py isaret --ek-isaret eksper
   python3 scripts/veri-eslesme-kontrol.py statik --dosya 20260911000002 --dosya 20260911000003
-  python3 scripts/veri-eslesme-kontrol.py sizinta --kopya-tarihi 2026-06-01T00:00:00+03:00
+  python3 scripts/veri-eslesme-kontrol.py sizinti            # takma ad: sizinta
+  python3 scripts/veri-eslesme-kontrol.py sizinti --kopya-tarihi 2026-07-02T00:00:00+03:00
 
 Her prod migration uygulamasından sonra tekrar koşulur.
 """
@@ -175,7 +180,9 @@ def cmd_sizinta(prod, demo, args, out):
     ortak = sorted(set(pt) & set(dt_))
     sonuc = {"ortak_tablo": len(ortak), "pk_yok": sorted(set(ortak) - set(ppk) - set(dpk)),
              "atlanan_buyuk": [], "demo_dogumlu": {}, "sizinti": {}, "prod_only": {},
-             "kopya_tarihi": args.kopya_tarihi, "kopya_sonrasi_prodda": {}}
+             "kopya_tarihi": args.kopya_tarihi, "kopya_sonrasi_prodda": {},
+             "kopya_sonrasi_klon_imzali": {}, "kopya_sonrasi_supheli": {},
+             "kopya_sonrasi_olculmeyen": []}
     for t in ortak:
         if t not in ppk or t not in dpk:
             continue
@@ -203,7 +210,11 @@ def cmd_sizinta(prod, demo, args, out):
                 bulunan += int(n or 0)
             sonuc["sizinti"][t] = bulunan
         sonuc["prod_only"][t] = len(pset - dset)
-        # Opsiyonel created_at sinyali: kopyadan sonra doğan demo satırı prod'da var mı.
+        # created_at sinyali (varsayılan açık): kopyadan sonra doğan demo satırı
+        # prod'da var mı — SIZINTI hükmü bu ölçüme bağlıdır. KESİŞİM satırları
+        # ikiye ayrılır: klon imzalı (demo/prod created_at birebir eşit —
+        # `demo_klonla()` prod_fdw'den created_at dahil birebir kopyalar, meşru
+        # prod→demo akışı) ve ŞÜPHELİ (created_at farklı — elle/uygunsuz kopya).
         if args.kopya_tarihi:
             cols = demo.sql(
                 "SELECT column_name AS c FROM information_schema.columns "
@@ -213,19 +224,39 @@ def cmd_sizinta(prod, demo, args, out):
             if cols:
                 ca = cols[0]["c"]
                 sonraki = demo.sql(
-                    f"SELECT {ca}::text AS pk FROM public.{qident(t)} WHERE {qident(ca)} > "
+                    f"SELECT {qident(ppk[t][0])}::text AS pk, extract(epoch from {qident(ca)})::text AS ep "
+                    f"FROM public.{qident(t)} WHERE {qident(ca)} > "
                     + qstr(args.kopya_tarihi) + ";", f"kopya-sonrasi:{t}")
-                pkeys = [r["pk"] for r in (sonraki or [])][:MAX_SATIR]
+                dmap = {r["pk"]: r["ep"] for r in (sonraki or [])}
+                pkeys = list(dmap)[:MAX_SATIR]
                 if pkeys:
-                    n = prod.scalar(
-                        f"SELECT count(*) AS n FROM public.{qident(t)} t WHERE t.{qident(ppk[t][0])}::text IN ("
+                    prows = prod.sql(
+                        f"SELECT {qident(ppk[t][0])}::text AS pk, extract(epoch from {qident(ca)})::text AS ep "
+                        f"FROM public.{qident(t)} WHERE {qident(ppk[t][0])}::text IN ("
                         + ",".join(qstr(k) for k in pkeys) + ");", f"kopya-sonrasi-prod:{t}")
-                    sonuc["kopya_sonrasi_prodda"][t] = int(n or 0)
-    out["sizinta"] = sonuc
-    toplam_sizinti = sum(sonuc["sizinti"].values()) + sum(sonuc["kopya_sonrasi_prodda"].values())
-    print(f"[sizinta] ortak={sonuc['ortak_tablo']} pk_yok={len(sonuc['pk_yok'])} "
-          f"demo_dogumlu_toplam={sum(sonuc['demo_dogumlu'].values())} "
-          f"SIZINTI={toplam_sizinti} prod_only_toplam={sum(sonuc['prod_only'].values())}")
+                    pmap = {r["pk"]: r["ep"] for r in (prows or [])}
+                    kesisim = [k for k in pkeys if k in pmap]
+                    supheli = [k for k in kesisim if pmap[k] != dmap[k]]
+                    sonuc["kopya_sonrasi_prodda"][t] = len(kesisim)
+                    sonuc["kopya_sonrasi_klon_imzali"][t] = len(kesisim) - len(supheli)
+                    sonuc["kopya_sonrasi_supheli"][t] = len(supheli)
+                else:
+                    sonuc["kopya_sonrasi_prodda"][t] = 0
+            else:
+                sonuc["kopya_sonrasi_olculmeyen"].append(t)
+    out["sizinti"] = sonuc
+    # Hükme yalnız kopya-sonrası ŞÜPHELİ ölçümü girer: ham kesişim (prodda)
+    # klon akışını (meşru prod→demo) da sayar, PK-farkı (zarf formülü, tanımı
+    # gereği hep 0) bilgi olarak ozette kalır.
+    toplam_sizinti = sum(sonuc["kopya_sonrasi_supheli"].values())
+    print(f"[sizinti] ortak={sonuc['ortak_tablo']} kopya_tarihi={sonuc['kopya_tarihi']} "
+          f"SIZINTI(supheli)={toplam_sizinti} "
+          f"bilgi: kesisim={sum(sonuc['kopya_sonrasi_prodda'].values())} "
+          f"(klon_imzali={sum(sonuc['kopya_sonrasi_klon_imzali'].values())}) "
+          f"pk_farki={sum(sonuc['sizinti'].values())} "
+          f"demo_dogumlu={sum(sonuc['demo_dogumlu'].values())} "
+          f"prod_only={sum(sonuc['prod_only'].values())} "
+          f"olculmeyen={len(sonuc['kopya_sonrasi_olculmeyen'])}")
     return toplam_sizinti
 
 
@@ -435,15 +466,17 @@ def cmd_statik(args, out):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("komut", choices=["sizinta", "isaret", "koken", "statik", "hepsi"])
+    ap.add_argument("komut", choices=["sizinti", "sizinta", "isaret", "koken", "statik", "hepsi"])
     ap.add_argument("--cikti", default=None,
                     help="çıktı dizini (varsayılan: ~/tmp/agents/veri-eslesme-<tarih>/, REPO DIŞI)")
     ap.add_argument("--ek-isaret", action="append", default=None,
                     help="isaret kontrolüne ek işaret (tekrarlanabilir)")
     ap.add_argument("--dosya", action="append", default=None,
                     help="statik kontrol migration öneği (tekrarlanabilir; varsayılan: bugünün 10 dosyası)")
-    ap.add_argument("--kopya-tarihi", default=None,
-                    help="demo kopyasının alındığı tarih (ISO) — created_at sinyali için")
+    ap.add_argument("--kopya-tarihi", default="2026-07-02T00:00:00+03:00",
+                    help="demo kopyasının prod'dan alındığı tarih (ISO; varsayılan 2026-07-02 — "
+                         "docs/demo-mirror-ROADMAP.md D0). Kopyadan sonra doğan demo satırının "
+                         "prod'da bulunması (kopya_sonrasi_prodda) HÜKME girer")
     args = ap.parse_args()
 
     gun = dt.date.today().strftime("%Y%m%d")
@@ -463,7 +496,7 @@ def main():
     out: dict = {"tarih": dt.datetime.now().isoformat(timespec="seconds"),
                  "prod_ref": PROD_REF, "demo_ref": demo_ref, "cikti_dizini": str(cikti)}
     bulgu = 0
-    if args.komut in ("sizinta", "hepsi"):
+    if args.komut in ("sizinti", "sizinta", "hepsi"):
         bulgu += cmd_sizinta(prod, demo, args, out)
     if args.komut in ("isaret", "hepsi"):
         bulgu += cmd_isaret(prod, args, out, cikti)

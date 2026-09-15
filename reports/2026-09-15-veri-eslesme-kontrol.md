@@ -13,11 +13,13 @@ tekrar koşulur). Bu koşu: `python3 scripts/veri-eslesme-kontrol.py hepsi`.
 HÜKÜM: BULGU: 59 (betik, mekanik)
 ```
 
-İnsan değerlendirmesiyle: **bugünkü 10 migration prod'a demo/test verisi
-SOKMADI.** Betiğin `BULGU: 59`'u 59 tablo×kolon×işaret eşleşme kombinasyonudur;
-dağılım ve gerekçeler aşağıda. Tek gerçek veri bulgusu, migration'lardan aylar
-önce (2026-05-16 – 2026-06-06) açılmış sahibin 6 test hayvan kaydıdır —
-migration kaynaklı değildir, silinmesi ayrı sahip kararıdır.
+Hüküm bileşimi: sızıntı (kopya-sonrası **şüpheli**) **0** + köken yetimi **0**
++ işaret eşleşen kombinasyon **59** = 59. İnsan değerlendirmesiyle: **bugünkü
+10 migration prod'a demo/test verisi SOKMADI.** Betiğin `BULGU: 59`'u 59
+tablo×kolon×işaret eşleşme kombinasyonudur; dağılım ve gerekçeler aşağıda. Tek
+gerçek veri bulgusu, migration'lardan aylar önce (2026-05-16 – 2026-06-06)
+açılmış sahibin 6 test hayvan kaydıdır — migration kaynaklı değildir,
+silinmesi ayrı sahip kararıdır.
 
 Salt-okunur kanıt: betik açılışında her iki DB'de READ ONLY guard self-test
 koşar (`BEGIN READ ONLY; CREATE TEMP TABLE ...` → **reddedildi**, `read-only`
@@ -25,27 +27,46 @@ hatası döndü); tüm sorgular `BEGIN READ ONLY; ... ROLLBACK;` sarmındadır.
 Prod'a ve demo'ya hiçbir şey yazılmadı; `sorgular.sql` kanıt dosyası çıktı
 dizininde.
 
-## Kontrol 1 — `sizinta` (demo-doğumlu satırın prod'da bulunması)
+## Kontrol 1 — `sizinti` (demo-doğumlu satırın prod'da bulunması)
+
+Kopya tarihi **2026-07-02** (belgeli: `docs/demo-mirror-ROADMAP.md` D0 — demo
+o tarihte prod'dan pg_dump ile kuruldu; betiğin `--kopya-tarihi` varsayılanı).
+Ölçüm: demo'da `created_at > kopya` olan satırların PK'ları prod'da aranır;
+**kesişim `demo_klonla()` imzasıyla ayıklanır** (D2: RPC prod_fdw'den
+`INSERT … SELECT` ile `created_at` dahil birebir kopyalar; UI "↻ Prod'dan
+Klonla" butonu on-demand çalıştırır). Klon akışı meşru prod→demo yönüdür;
+hüküm yalnız **şüpheli**ye (demo/prod `created_at` FARKLI kesişim satırı —
+elle/uygunsuz kopya izi) bağlanır.
 
 | Ölçüm | Değer |
 |---|---|
 | Ortak tablo (public, iki DB'de de) | 49 |
 | PK'sız (kontrol edilemeyen) tablo | 0 |
 | Satır sayısı eşiği (100k) aşıp atlanan tablo | 0 |
-| Demo-doğumlu satır toplamı (demo PK − prod PK) | 1950 |
-| **SIZINTI** (demo-doğumlu PK'nın prod'da bulunanı) | **0** |
+| Kopya sonrası doğan demo satırından PK'ı prod'da bulunan (ham kesişim) | 3328 |
+| — klon imzalı (`created_at` demo≡prod birebir) | 3328 |
+| — **ŞÜPHELİ** (`created_at` farklı) = **SIZINTI** | **0** |
+| PK-farkı sinyali (zarf formülü; bilgi, hüküm dışı) | 0 |
+| Demo-doğumlu satır toplamı (demo PK − prod PK; bilgi) | 1950 |
 | Prod-only satır toplamı (bilgi: sahibin gerçek kullanımı) | 1834 |
+| created_at'i olmayan, kopya-sonrası sinyali ölçülemeyen tablo | 12 |
+
+**SIZINTI = 0 — TEMİZ.** Ham kesişimin 3328 satırı (37 tabloda; `gorev_log`
+1477, `stok_hareket` 539, `drug_administrations` 385, …) **tamamı** klon
+imzalıdır: satırlar prod'da kopyadan sonra doğmuş, `demo_klonla()` demo'ya
+taşımıştır (örnek kanıt: `gorev_log` kesişiminin 1477/1477'sinde demo/prod
+`created_at` birebir eşit). Demo→prod yönünde sızıntı yok; şüpheli 0, root'un
+bağımsız ölçümüyle uyumlu.
 
 Notlar:
 
-- Zarf formülü (demo PK kümesi − prod PK kümesi elemanlarının prod'da aranması)
-  tanımı gereği her zaman 0 döner; betik yine de her tablo için prod'da ayrı
-  sorgu ile kanıtlar. Kopya sonrası doğumu `created_at` sinyaliyle yakalayan
-  `--kopya-tarihi` parametresi eklendi; bu koşuda verilmedi (kopya tarihi
-  belgeli değil), sinyal koşulmadı.
-- Sızıntının asıl görünür kanalı bu koşunun kontrol 2 bulgusuyla çelişmez:
-  prod'daki 6 test hayvanının PK'sı demo'da da mevcuttur (6/6) — yani kopya
-  yönü prod→demo'dur (demo, prod'dan kopyalanmıştır); demo→prod sızıntısı yok.
+- Zarfın PK-farkı formülü (demo PK − prod PK kümesinin prod'da aranması) tanımı
+  gereği her zaman 0 döner; betik bilgi olarak üretir, hükme girmez.
+- created_at'siz 12 tablo (`islem_log`, `bildirim_log`, `pedigree_meta`, …)
+  için kopya-sonrası sinyali ölçülemez — bu tablolarda sızıntı göstergesi
+  olarak kontrol 2 (işaret) ve kontrol 3 (köken) devrededir.
+- Kontrol 2 bulgusuyla tutarlı: prod'daki 6 test hayvanının PK'sı demo'da da
+  mevcut (6/6) — kopya/klon yönü prod→demo; ters yön kanıtı yok.
 
 ## Kontrol 2 — `isaret` (prod'da test işaretleri)
 
@@ -116,30 +137,32 @@ eşleşiyor.
 
 ```bash
 python3 scripts/veri-eslesme-kontrol.py hepsi          # hepsi (önerilen)
-python3 scripts/veri-eslesme-kontrol.py sizinta        # yalnız PK-sızıntı kontrolü
+python3 scripts/veri-eslesme-kontrol.py sizinti        # takma ad: sizinta
 python3 scripts/veri-eslesme-kontrol.py isaret --ek-isaret eksper
 python3 scripts/veri-eslesme-kontrol.py koken
 python3 scripts/veri-eslesme-kontrol.py statik --dosya 20260912000001
-python3 scripts/veri-eslesme-kontrol.py sizinta --kopya-tarihi 2026-06-01T00:00:00+03:00
+python3 scripts/veri-eslesme-kontrol.py sizinti --kopya-tarihi 2026-07-02T00:00:00+03:00
 python3 scripts/veri-eslesme-kontrol.py hepsi --cikti /ozel/dizin
 ```
 
-- **Ne zaman koşulur:** her prod migration uygulamasından sonra; ayrıca demo
-  kopyası alındığında `--kopya-tarihi` ile.
+- **Ne zaman koşulur:** her prod migration uygulamasından sonra. `--kopya-tarihi`
+  varsayılanı **2026-07-02** (docs/demo-mirror-ROADMAP.md D0 — demo'nun prod'dan
+  kurulduğu tarih); demo yeniden kurulursa güncellenmelidir.
 - Bağlantı: Management API (`SUPABASE_MANAGEMENT_TOKEN` @ tools-bank/.env;
   `SUPABASE_DEMO_REF`+`SUPABASE_DEMO_PAT` @ egesut-erp1/.env). Token hiçbir
   çıktıya yazılmaz.
 - Çıktı: `ozet.json` (yalnız sayı/ad) + `sorgular.sql` (kanıt) +
   `isaret-baglam.txt` (eşleşme bağlamları — satır değeri içerdiğinden yalnız
   repo-dışı çıktı dizininde) — varsayılan `~/tmp/agents/veri-eslesme-<tarih>/`.
-- Hüküm: `TEMIZ` / `BULGU: <n>` (n = sızıntı + yetim + işaret kombinasyonu);
-  sorgu hatası varsa `HATA: <n> sorgu koşulamadı` (bu koşuda hata 0).
+- Hüküm: `TEMIZ` / `BULGU: <n>` (n = şüpheli sızıntı + yetim + işaret
+  kombinasyonu); sorgu hatası varsa `HATA: <n> sorgu koşulamadı` (bu koşuda
+  hata 0).
 
 ## Bu koşunun özet tablosu
 
 | Kontrol | Sonuç |
 |---|---|
-| sizinta | SIZINTI 0 (49 ortak tablonun tamamında) |
+| sizinti | ŞÜPHELİ 0 — ham kesişim 3328'in tamamı klon imzalı (49 ortak tablo; 12'sinde created_at yok) |
 | isaret | 59 kombinasyon / 2550 satır → 6'sı gerçek (migration-dışı, eski), geri kalanı alan adı + ajan tablosu yanlış pozitifi |
 | koken | YETİM 0 (7 bağ da 0) |
 | statik | türetilmiş 0; sabit 47 (hepsi referans seed); rpc-govdesi 38 |
