@@ -1,0 +1,17 @@
+{
+ "sorgu": "SELECT count(*) AS n, max(version) AS son, min(version) AS ilk FROM supabase_migrations.schema_migrations;",
+ "demo": [
+  {
+   "n": 2,
+   "son": "20260706052550",
+   "ilk": "20260706040737"
+  }
+ ],
+ "prod": [
+  {
+   "n": 124,
+   "son": "20260531400000",
+   "ilk": "20260303000001"
+  }
+ ]
+}
