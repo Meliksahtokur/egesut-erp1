@@ -1,0 +1,37 @@
+BEGIN
+== trigger tanimlari ==
+                                                                pg_get_triggerdef                                                                
+-------------------------------------------------------------------------------------------------------------------------------------------------
+ CREATE TRIGGER trg_islem_log_degisim_txid BEFORE INSERT ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_degisim_txid()
+ CREATE TRIGGER trg_islem_log_geri_alindi_kapisi BEFORE INSERT ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_geri_alindi_kapisi()
+ CREATE TRIGGER trg_islem_log_immutable BEFORE DELETE OR UPDATE ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_immutable_guard()
+(3 satır)
+
+== policy ==
+    policyname    |  cmd   |     roles      | with_check 
+------------------+--------+----------------+------------
+ islem_log_select | SELECT | {public}       | 
+ service_insert   | INSERT | {service_role} | true
+(2 satır)
+
+== authenticated grant ==
+    grantee    | privilege_type 
+---------------+----------------
+ authenticated | SELECT
+(1 satır)
+
+== jeton tablosu ==
+      relname       
+--------------------
+ l4_rehber_adimlari
+(1 satır)
+
+== fonksiyonlar ==
+                 oid                 
+-------------------------------------
+ _islem_log_degisim_txid()
+ _islem_log_geri_alindi_kapisi()
+ surum_gizli._l4_rehber_uyesi(jsonb)
+(3 satır)
+
+ROLLBACK

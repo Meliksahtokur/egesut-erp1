@@ -8,8 +8,13 @@ function openM(id) {
   // güvenilmez, yığılmış modallarda en son açılan kapanmalı)
   globalThis._modalStack = (globalThis._modalStack || []).filter(x => x !== id);
   globalThis._modalStack.push(id);
-  // Android geri tuşu: modal açılışını history'e ekle (router)
-  history.pushState({modal:id}, '', '');
+  // Android geri tuşu: modal açılışını history'e ekle (router).
+  // L4-08 (onarım turu): aynı modal zaten history tepesindeyse YENİ entry
+  // EZİLMEZ — dgOnizleGoster iç yeniden-açılışı (zincir önerisi/⟲) openM'i
+  // ikinci kez çağırır; guardsız push fazladan entry sızdırır, closeM tek
+  // back attığından bir entry geriye kalır ve S5 "tek geri" bozulur.
+  // Invariant: açık modal başına TAM BİR modal-entry'si.
+  if (!((history.state && history.state.modal === id))) history.pushState({modal:id}, '', '');
   // Hayvan modalında doğum tarihi otomatik dolmasın — yaş hesabı bozuluyor
   if (id !== 'm-animal') {
     el.querySelectorAll('input[type=date]').forEach(i => { if (!i.value) i.value = bugun(); });
@@ -63,6 +68,9 @@ function openM(id) {
 }
 
 function closeM(id) {
+  // W3: takvim router-modali .on class kullanmaz — DOM'dan remove edilir.
+  // Her kapanış yolu (X, backdrop, ESC, geri tuşu, Onayla) closeM'den geçer.
+  if (id === 'tek-tarih-takvim') { g(id)?.remove(); }
   g(id)?.classList.remove('on');
   globalThis._modalStack = (globalThis._modalStack || []).filter(x => x !== id);
   // Android geri tuşu: bizim pushState ettiğimiz modalı back ile kapat.
@@ -109,3 +117,22 @@ function mClose(e, el) {
   // Backdrop kapatma da closeM'den geçsin — cleanup + history tek noktadan (B3)
   if (e.target === el) closeM(el.id);
 }
+
+// W3 (hapsolmama): ESC en üst router-modalı kapatır (takvim dahil — stack'te).
+// Capture fazında koşar. Autocomplete uzlaşması (review bulgusu — odak-bağımsız):
+// GÖRÜNÜR bir autocomplete paneli varsa ESC ÖNCE onları kapatır ve modal'a
+// dokunmaz; panel yoksa (ya da 2. ESC'te) en üst modal kapanır. Panel kapatma
+// acList/acNav'ın target-faz işiyle aynı davranıştır — capture önce koştuğundan
+// panel tek kez kapanır (çift kapanış yok; acNav sonrası no-op).
+// (İlk sürümde görünürlük taraması yalnız YUT-tı: odak dışındayken panel açık
+// kalınca ESC tamamen ölüyordu — code-review W3 bulgusu, düzeltildi.)
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  let panelKapatildi = false;
+  document.querySelectorAll('[id^="ac-"], .ac-box').forEach(p => {
+    if (p.style.display && p.style.display !== 'none') { p.style.display = 'none'; panelKapatildi = true; }
+  });
+  if (panelKapatildi) return;
+  const stack = globalThis._modalStack || [];
+  if (stack.length) closeM(stack[stack.length - 1]);
+}, true);

@@ -1,0 +1,81 @@
+{
+ "measured_at": "2026-09-15T19:30:51.463845+03:00",
+ "prod_ref": "zqnexqbdfvbhlxzelzju",
+ "wrap": "BEGIN READ ONLY; ... ROLLBACK;",
+ "files": {
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql": {
+   "fn_toplam": 2,
+   "fn_canli": 0,
+   "nesne_eksik": [
+    "degisim_log tablosu"
+   ],
+   "durum": "KISMİ"
+  },
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql": {
+   "fn_toplam": 13,
+   "fn_canli": 0,
+   "nesne_eksik": [
+    "surum_gizli şeması"
+   ],
+   "durum": "KISMİ"
+  },
+  "20260913000003_surum_gecmisi_f2_sahip_sifresi.sql": {
+   "fn_toplam": 1,
+   "fn_canli": 0,
+   "nesne_eksik": [
+    "sahip_sifresi_ayarla service_role EXECUTE grant"
+   ],
+   "durum": "KISMİ"
+  },
+  "20260913000004_luna_bilet_maske.sql": {
+   "fn_toplam": 1,
+   "fn_canli": 0,
+   "nesne_eksik": [],
+   "durum": "EKSİK"
+  },
+  "20260914000001_l4_islem_log_kopru.sql": {
+   "fn_toplam": 1,
+   "fn_canli": 0,
+   "nesne_eksik": [
+    "islem_log.degisim_txid",
+    "trg_islem_log_degisim_txid"
+   ],
+   "durum": "KISMİ"
+  },
+  "20260914000002_l4_geri_alma_zincir.sql": {
+   "fn_toplam": 5,
+   "fn_canli": 0,
+   "nesne_eksik": [],
+   "durum": "EKSİK"
+  },
+  "20260914000003_l4_onarim.sql": {
+   "fn_toplam": 7,
+   "fn_canli": 0,
+   "nesne_eksik": [
+    "surum_gizli.l4_rehber_adimlari"
+   ],
+   "durum": "KISMİ"
+  },
+  "20260914000004_l4_stok_uyari_txid.sql": {
+   "fn_toplam": 2,
+   "fn_canli": 0,
+   "nesne_eksik": [],
+   "durum": "EKSİK"
+  }
+ },
+ "islem_log_authenticated_INSERT_grant": true,
+ "objects_snapshot": {
+  "degisim_log_var": false,
+  "surum_gizli_var": false,
+  "surum_gizli_tables": [],
+  "trg_degisim_log_count": 0,
+  "islem_log_triggers": [
+   "trg_islem_log_immutable"
+  ],
+  "pgcrypto": {
+   "crypt_var": true,
+   "gen_salt_var": true
+  }
+ },
+ "prereq_fail": []
+}

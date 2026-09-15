@@ -1,0 +1,262 @@
+{
+ "trg_degisim_log_tables": [
+  {
+   "t": "cases"
+  },
+  {
+   "t": "diseases"
+  },
+  {
+   "t": "dogum"
+  },
+  {
+   "t": "drug_administrations"
+  },
+  {
+   "t": "drug_classes"
+  },
+  {
+   "t": "drug_products"
+  },
+  {
+   "t": "drugs"
+  },
+  {
+   "t": "gorev_log"
+  },
+  {
+   "t": "grup_padok_eslem"
+  },
+  {
+   "t": "hastalik_log"
+  },
+  {
+   "t": "hayvan_override"
+  },
+  {
+   "t": "hayvanlar"
+  },
+  {
+   "t": "hekimler"
+  },
+  {
+   "t": "irk_esik"
+  },
+  {
+   "t": "kizginlik_log"
+  },
+  {
+   "t": "padoklar"
+  },
+  {
+   "t": "pedigree_meta"
+  },
+  {
+   "t": "pedigree_nodes"
+  },
+  {
+   "t": "pedigree_parentage"
+  },
+  {
+   "t": "protokol_ayar"
+  },
+  {
+   "t": "protokol_dismiss"
+  },
+  {
+   "t": "protokol_instance"
+  },
+  {
+   "t": "sablon_hastalik_eslem"
+  },
+  {
+   "t": "semen_catalog"
+  },
+  {
+   "t": "stok"
+  },
+  {
+   "t": "stok_hareket"
+  },
+  {
+   "t": "stok_kategorileri"
+  },
+  {
+   "t": "tedavi"
+  },
+  {
+   "t": "tedavi_sablonu"
+  },
+  {
+   "t": "tedavi_sablonu_kalem"
+  },
+  {
+   "t": "tohumlama"
+  },
+  {
+   "t": "treatment_day_uygulamalar"
+  },
+  {
+   "t": "treatment_days"
+  },
+  {
+   "t": "uygulama_log"
+  },
+  {
+   "t": "vaccination_log"
+  },
+  {
+   "t": "vaccination_schedule"
+  },
+  {
+   "t": "vaccine_diseases"
+  },
+  {
+   "t": "vaccine_protocol_steps"
+  },
+  {
+   "t": "vaccines"
+  }
+ ],
+ "degisim_log_grants": [
+  {
+   "grantee": "agent_readonly",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "authenticated",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "demo_reader",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "DELETE"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "INSERT"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "REFERENCES"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "TRIGGER"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "TRUNCATE"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "UPDATE"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "DELETE"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "INSERT"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "REFERENCES"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "TRIGGER"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "TRUNCATE"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "UPDATE"
+  }
+ ],
+ "sg_tables": [
+  {
+   "t": "geri_alma_bileti"
+  },
+  {
+   "t": "geri_alma_kullanim"
+  },
+  {
+   "t": "l4_rehber_adimlari"
+  },
+  {
+   "t": "sahip_sifresi"
+  }
+ ],
+ "sg_grants": [],
+ "il_grants": [
+  {
+   "grantee": "authenticated",
+   "privilege_type": "REFERENCES"
+  },
+  {
+   "grantee": "authenticated",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "authenticated",
+   "privilege_type": "TRIGGER"
+  }
+ ],
+ "il_policies": [
+  {
+   "policyname": "islem_log_select",
+   "cmd": "SELECT",
+   "roles": "{public}",
+   "qual": "true",
+   "with_check": null
+  },
+  {
+   "policyname": "service_insert",
+   "cmd": "INSERT",
+   "roles": "{service_role}",
+   "qual": null,
+   "with_check": "true"
+  }
+ ],
+ "il_triggers": [
+  {
+   "tgname": "trg_islem_log_degisim_txid"
+  },
+  {
+   "tgname": "trg_islem_log_geri_alindi_kapisi"
+  },
+  {
+   "tgname": "trg_islem_log_immutable"
+  }
+ ],
+ "il_txid_trig": [
+  {
+   "tdef": "CREATE TRIGGER trg_islem_log_degisim_txid BEFORE INSERT ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_degisim_txid()"
+  }
+ ],
+ "l4_rehber": [
+  {
+   "r": "surum_gizli.l4_rehber_adimlari"
+  }
+ ],
+ "il_col": [
+  {
+   "tip": "bigint"
+  }
+ ]
+}

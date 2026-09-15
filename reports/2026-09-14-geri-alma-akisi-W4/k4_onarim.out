@@ -1,0 +1,225 @@
+ etiket_kurulumu 
+-----------------
+ k4-onarim-testi
+(1 satır)
+
+CREATE TABLE
+CREATE TABLE
+DELETE 0
+DELETE 0
+DELETE 0
+DELETE 0
+DELETE 0
+DELETE 0
+DO
+DO
+DELETE 0
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+SELECT 1
+SELECT 12
+INSERT 0 1
+INSERT 0 3
+INSERT 0 3
+BEGIN
+INSERT 0 1
+INSERT 0 1
+COMMIT
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+BEGIN
+INSERT 0 1
+INSERT 0 1
+COMMIT
+UPDATE 1
+BEGIN
+INSERT 0 1
+COMMIT
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+BEGIN
+INSERT 0 1
+INSERT 0 1
+COMMIT
+DO
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+BEGIN
+INSERT 0 1
+INSERT 0 1
+COMMIT
+UPDATE 1
+UPDATE 1
+DO
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+INSERT 0 1
+INSERT 0 1
+BEGIN
+INSERT 0 101
+COMMIT
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+DO
+BEGIN
+ROLLBACK
+INSERT 0 1
+INSERT 0 1
+UPDATE 1
+BEGIN
+INSERT 0 1
+COMMIT
+INSERT 0 2
+BEGIN
+DELETE 1
+ROLLBACK
+INSERT 0 1
+DO
+DELETE 101
+DELETE 1
+DELETE 2
+DELETE 7
+DELETE 4
+DELETE 3
+ALTER TABLE
+DELETE 8
+ALTER TABLE
+ALTER TABLE
+DELETE 360
+ALTER TABLE
+DELETE 4
+DELETE 0
+DELETE 8
+DELETE 1
+DO
+INSERT 0 12
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+INSERT 0 1
+== k4_onarim sonuç tablosu ==
+                                                  vaka                                                   |                                             beklenen                                             |                                     bulunan                                     | sonuc |                                                                              detay                                                                               
+---------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------+---------------------------------------------------------------------------------+-------+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ S0 şifre kur                                                                                            | ok=true                                                                                          | ok=true                                                                         | PASS  | {"ok": true, "guncelleme": "2026-09-14T20:43:47.900391+00:00"}
+ V2 köprü: iş satırı + islem_log aynı tx → degisim_txid == degisim_log.txid                              | eşit                                                                                             | islem_log=18871 degisim_log=18871                                               | PASS  | 
+ V1a zaman: kayit_zamani verilir → aynı tx eşleşir                                                       | ok=true hedef.txid=INSERT tx                                                                     | ok=true hedef=18874                                                             | PASS  | {"ok": true, "plan": [{"pk": "cdc28c59-c8fd-4cdc-a797-f9b0dc88e0b3", "eski": null, "sira": 1, "txid": "18874", "yeni": {"ad": "k4-P5", "id": "cdc28c59-c8fd-4cdc
+ V1b zaman: 120 sn aşan → HEDEF_BULUNAMADI + ZAMAN_ESLESME_YOK (en_yakin dolu)                           | HEDEF_BULUNAMADI/ZAMAN_ESLESME_YOK                                                               | HEDEF_BULUNAMADI/ZAMAN_ESLESME_YOK enyakin=t                                    | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI", "detay": {"neden": "ZAMAN_ESLESME_YOK", "zaman": "2020-01-01 00:00:00+00", "en_yakin": "2026-09-14T20:43:49.477024+00:
+ V1c txid + zaman birlikte → txid kazanır                                                                | ok=true hedef.txid=UPDATE tx                                                                     | ok=true hedef=18875                                                             | PASS  | {"ok": true, "plan": [{"pk": "cdc28c59-c8fd-4cdc-a797-f9b0dc88e0b3", "eski": {"ad": "k4-P5"}, "sira": 1, "txid": "18875", "yeni": {"ad": "k4-P5-b"}, "islem": "U
+ V1d olmayan (geçerli-tip) pk → neden=SATIR_YOK                                                          | HEDEF_BULUNAMADI/SATIR_YOK                                                                       | HEDEF_BULUNAMADI/SATIR_YOK                                                      | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI", "detay": {"neden": "SATIR_YOK"}}
+ V1e var olan ama logsuz satır → neden=LOG_YOK                                                           | HEDEF_BULUNAMADI/LOG_YOK                                                                         | HEDEF_BULUNAMADI/LOG_YOK                                                        | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI", "detay": {"neden": "LOG_YOK"}}
+ V1f zincir boş txid → neden=LOG_YOK                                                                     | HEDEF_BULUNAMADI/LOG_YOK                                                                         | HEDEF_BULUNAMADI/LOG_YOK                                                        | PASS  | {"ok": false, "hata": "HEDEF_BULUNAMADI", "detay": {"neden": "LOG_YOK"}}
+ V4a zincir çapraz-satır (K1 YENİ): dogum FK'sı YOK → plana GİRMEZ                                       | ok=true plan=2 (yalnız tohumlama); dogum ne planda ne bağımlılıkta                               | ok=true plan=2 dogum_plan=0 dogum_bag=0                                         | PASS  | [{"pk": "205915b5-1b67-4bec-acdc-c0a0e647955e", "eski": {"sperma": "k4-v4-sperma"}, "sira": 1, "txid": "18887", "yeni": {"sperma": "k4-v4-sperma2"}, "islem": "U
+ V4b çapraz zincir uygula (K1 YENİ): 2 adım tek tx; tohumlama=0 dogum=1 hayvan=1                         | ok=true adim=2 tek-rtx; doğum BAĞIMSIZ kayıt olarak kalır                                        | ok=true hat=- adim=2 tohumlama=0 dogum=1 hayvan=1                               | PASS  | {"ok": true, "zincir_adim": 2, "geri_alma_txid": "18891", "uygulanan_adim": 2}
+ V6a telafi: GERI_ALINDI + orijinal_tip=TOHUMLAMA (GERÇEK tip, harf kümesi YOK)                          | orijinal_tip=TOHUMLAMA seviye=zincir adim=2 ana_hayvan=k4-H2; telafi degisim_txid=geri_alma_txid | otip=TOHUMLAMA seviye=zincir adim=2 ahv=k4-H2 rtx_esit=t                        | PASS  | tip=GERI_ALINDI ref=tohumlama/205915b5-1b67-4bec-acdc-c0a0e647955e dtx=18891
+ V6b orijinal islem_log satırı değişmedi (tam-satır karşılaştırma)                                       | birebir aynı                                                                                     | ayni=t                                                                          | PASS  | 
+ V8a satır hedef E1 → çakışma TAM liste (E2 VE E3) + zaman/degisen_alanlar/islem/log_id                  | cakisma=2, her kayıt zengin                                                                      | cakisma=2 ilk_alan=["sperma"]                                                   | PASS  | {"ok": true, "plan": [{"pk": "076d6821-1fdd-428f-a302-634879d27a6a", "eski": null, "sira": 1, "txid": "18897", "yeni": {"id": "076d6821-1fdd-428f-a302-634879d27
+ V8b alan hedef (E2/sperma) → sperma'ya dokunan TÜM sonraki değişiklikler (E3)                           | cakisma=1 (E3)                                                                                   | cakisma=1                                                                       | PASS  | {"ok": true, "plan": [{"pk": "076d6821-1fdd-428f-a302-634879d27a6a", "eski": {"sperma": "k4-v8-s1"}, "sira": 1, "txid": "18898", "yeni": {"sperma": "k4-v8-s2"},
+ V3a zincir aynı-satır: 3 adım, sira E3→E2→E1                                                            | ok=true plan=3 plan[0]=U plan[2]=I                                                               | ok=true plan=3 s0=U s2=I                                                        | PASS  | 
+ V3b zincir uygula: TEK transaction, tek geri_alma_txid, satır silinir                                   | ok=true adim=3 padok=0                                                                           | ok=true hat=- adim=3 padok=0                                                    | PASS  | 
+ V6c padok zincirinin telafi kaydı: orijinal_tip = hedef tablo + işlem etiketi (fallback)                | orijinal_tip=padoklar ekleme, guncelleme (adim=3; harf kümesi YOK)                               | otip=padoklar ekleme, guncelleme adim=3                                         | PASS  | 
+ V5a rehber: kaymalı zincirde geri_alinabilir=false, rehber sıralı (kaymalı T2 dışarıda)                 | ok=true ga=false rehber=1 (yalnız T1; hedef BAYRAKSIZ)                                           | ok=true ga=false rehber=1 r0=tohumlama/18913 neden=ZINCIR_DISI_CAKISMA bayrak=f | PASS  | [{"ozet": "tohumlama · I", "sira": 1, "hedef": {"pk": "660e58d3-783c-4f08-b892-146fb6ad08bb", "txid": "18913", "tablo": "tohumlama"}, "zaman": "2026-09-14T20:43
+ V5a2 jeton kaydı (L4-01): sunucu rehber adımını kayda geçti                                             | kayit(T1)=1 kayit(T2)=0                                                                          | T1=1 T2=0                                                                       | PASS  | 
+ V5b rehber sırasıyla tekil geri alma (satir, bayraksız — L4-01/L4-04 uyumu)                             | ok=true adim=1 T1 silinir                                                                        | ok=true hat=- adim=1 T1=0                                                       | PASS  | 
+ V5c-0 rehber: [T3@txC, T3@txB, T3@tX] (blok T4'te, kaymalı dışarıda)                                    | ga=false rehber=3 u0=txC u1=txB u2=tX                                                            | ga=false rn=3 u0=t u1=t u2=t                                                    | PASS  | 
+ V5c rehber sırasıyla 3/3 (3. adım iz-çifti gevşetmesiyle geçer; bayrak yok)                             | ok1 ok2 ok3 — T3 silinir                                                                         | 1=true/- 2=true/- 3=true/- T3=0                                                 | PASS  | 
+ V7 zincir >100 adım → GECERSIZ_HEDEF + ZINCIR_COK_UZUN                                                  | GECERSIZ_HEDEF/ZINCIR_COK_UZUN                                                                   | GECERSIZ_HEDEF/ZINCIR_COK_UZUN                                                  | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF", "detay": {"neden": "ZINCIR_COK_UZUN", "sinir": 100, "zincir_adim": 102}}
+ V7b başlangıç adımı >100 (tx genişliği) → ZINCIR_COK_UZUN                                               | GECERSIZ_HEDEF/ZINCIR_COK_UZUN                                                                   | GECERSIZ_HEDEF/ZINCIR_COK_UZUN                                                  | PASS  | {"ok": false, "hata": "GECERSIZ_HEDEF", "detay": {"neden": "ZINCIR_COK_UZUN", "sinir": 100, "zincir_adim": 101}}
+ A1 ilgisiz aynı-hayvan INSERT (aşı/kayıt) zincire GİRMEZ (K1 yeni)                                      | plan=2 (yalnız tohumlama); aşı ne planda ne bağımlılıkta                                         | plan=2 asi_plan=f asi_bag=f                                                     | PASS  | [{"pk": "f68df402-9075-4f73-b9fb-064903b3975e", "eski": {"sperma": "k4-a1-t"}, "sira": 1, "txid": "18950", "yeni": {"sperma": "k4-a1-t2"}, "islem": "U", "tablo"
+ A2-1 sahte l4_rehber (temiz sonraki giriş var, üye değil) → gevşetme YOK                                | CAKISMA                                                                                          | CAKISMA                                                                         | PASS  | {"ok": false, "hata": "CAKISMA", "detay": {"engeller": ["tohumlama kaydı \"8662dcab-a326-4b87-a12f-261a3ed3d614\": SONRAKI_DEGISIKLIK"], "cakismalar": [{"pk": "
+ A2-2 sahte l4_rehber (kaymalı satır, üye değil) → gevşetme YOK                                          | CAKISMA (GUNCEL_DURUM_FARKLI)                                                                    | CAKISMA                                                                         | PASS  | {"ok": false, "hata": "CAKISMA", "detay": {"engeller": ["tohumlama kaydı \"7aacdbf3-92bf-41f2-b640-5625b57a9ff3\": GUNCEL_DURUM_FARKLI"], "cakismalar": [{"pk": 
+ A3 sahte GERI_ALINDI doğrudan INSERT (postgres, GUC yok) → RED                                          | exception 42501                                                                                  | 42501                                                                           | PASS  | GERI_ALINDI kaydi yalnizca degisim_geri_al icinden yazilabilir
+ A4 sahte degisim_txid (istemci değeri 424242424) → ezilir                                               | degisim_txid == txid_current() (≠ 424242424)                                                     | damga=18962 beklenen=18962                                                      | PASS  | 
+ A5 K1-yeni: doğum FK'sız → plan/rehber/bağımlılık DIŞI; tohumlama silinimi dogum'u engellemiyor (ölçüm) | dogum hiçbir listede yok; DELETE tohumlama engellenmez (satır sayısı silme sonrası 0)            | dogum_plan=0 dogum_bag=0 dogum_rehber=0 silme_sonrasi_sayi=0                    | PASS  | silindi_rollback=0 plan=[{"pk": "4f73ec79-bb8d-4fc0-b079-f5320be12eba", "eski": {"sonuc": "Bekliyor"}, "sira": 1, "txid": "18965", "yeni": {"son
+ A6 authenticated islem_log INSERT → RED                                                                 | permission denied                                                                                | 42501                                                                           | PASS  | permission denied for table islem_log
+ TEMIZLIK: log=0 padok=0 hayvan=0 islem_log=0 jeton=0 (şifre metadata birebir)                           | hepsi 0 / sifretam=t                                                                             | log=0 padok=0 hayvan=0 islem=0 jeton=0 sifretam=t                               | PASS  | 
+(32 satır)
+
+== özet ==
+ pass | fail | toplam 
+------+------+--------
+   32 |    0 |     32
+(1 satır)
+
+ vaka | beklenen | bulunan | detay 
+------+----------+---------+-------
+(0 satır)
+

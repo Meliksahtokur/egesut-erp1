@@ -1,0 +1,314 @@
+[
+ {
+  "table": "agent_messages",
+  "backup": 94,
+  "live": 94,
+  "aciklama": null
+ },
+ {
+  "table": "agent_plans",
+  "backup": 5,
+  "live": 5,
+  "aciklama": null
+ },
+ {
+  "table": "agent_threads",
+  "backup": 26,
+  "live": 26,
+  "aciklama": null
+ },
+ {
+  "table": "bildirim_log",
+  "backup": 70,
+  "live": 70,
+  "aciklama": null
+ },
+ {
+  "table": "cases",
+  "backup": 113,
+  "live": 113,
+  "aciklama": null
+ },
+ {
+  "table": "chat",
+  "backup": 14,
+  "live": 14,
+  "aciklama": null
+ },
+ {
+  "table": "code_embeddings",
+  "backup": 4482,
+  "live": 4482,
+  "aciklama": null
+ },
+ {
+  "table": "cop_kutusu",
+  "backup": 0,
+  "live": 0,
+  "aciklama": null
+ },
+ {
+  "table": "diseases",
+  "backup": 47,
+  "live": 47,
+  "aciklama": null
+ },
+ {
+  "table": "dogum",
+  "backup": 72,
+  "live": 72,
+  "aciklama": null
+ },
+ {
+  "table": "drug_administrations",
+  "backup": 651,
+  "live": 651,
+  "aciklama": null
+ },
+ {
+  "table": "drug_classes",
+  "backup": 52,
+  "live": 52,
+  "aciklama": null
+ },
+ {
+  "table": "drug_products",
+  "backup": 33,
+  "live": 33,
+  "aciklama": null
+ },
+ {
+  "table": "drugs",
+  "backup": 17,
+  "live": 17,
+  "aciklama": null
+ },
+ {
+  "table": "entity_graph",
+  "backup": 15,
+  "live": 15,
+  "aciklama": null
+ },
+ {
+  "table": "goose_embeddings",
+  "backup": 167,
+  "live": 167,
+  "aciklama": null
+ },
+ {
+  "table": "gorev_log",
+  "backup": 3100,
+  "live": 3100,
+  "aciklama": null
+ },
+ {
+  "table": "grup_padok_eslem",
+  "backup": 10,
+  "live": 10,
+  "aciklama": null
+ },
+ {
+  "table": "hastalik_log",
+  "backup": 0,
+  "live": 0,
+  "aciklama": null
+ },
+ {
+  "table": "hayvan_override",
+  "backup": 0,
+  "live": 0,
+  "aciklama": null
+ },
+ {
+  "table": "hayvanlar",
+  "backup": 166,
+  "live": 166,
+  "aciklama": null
+ },
+ {
+  "table": "hekimler",
+  "backup": 3,
+  "live": 3,
+  "aciklama": null
+ },
+ {
+  "table": "irk_esik",
+  "backup": 7,
+  "live": 7,
+  "aciklama": null
+ },
+ {
+  "table": "islem_log",
+  "backup": 4262,
+  "live": 4262,
+  "aciklama": null
+ },
+ {
+  "table": "kizginlik_log",
+  "backup": 30,
+  "live": 30,
+  "aciklama": null
+ },
+ {
+  "table": "memory_notes",
+  "backup": 274,
+  "live": 274,
+  "aciklama": null
+ },
+ {
+  "table": "padoklar",
+  "backup": 9,
+  "live": 9,
+  "aciklama": null
+ },
+ {
+  "table": "pedigree_meta",
+  "backup": 0,
+  "live": 0,
+  "aciklama": null
+ },
+ {
+  "table": "pedigree_nodes",
+  "backup": 166,
+  "live": 166,
+  "aciklama": null
+ },
+ {
+  "table": "pedigree_parentage",
+  "backup": 59,
+  "live": 59,
+  "aciklama": null
+ },
+ {
+  "table": "protokol_ayar",
+  "backup": 9,
+  "live": 9,
+  "aciklama": null
+ },
+ {
+  "table": "protokol_dismiss",
+  "backup": 35,
+  "live": 35,
+  "aciklama": null
+ },
+ {
+  "table": "protokol_instance",
+  "backup": 141,
+  "live": 141,
+  "aciklama": null
+ },
+ {
+  "table": "sablon_hastalik_eslem",
+  "backup": 45,
+  "live": 45,
+  "aciklama": null
+ },
+ {
+  "table": "semen_catalog",
+  "backup": 0,
+  "live": 0,
+  "aciklama": null
+ },
+ {
+  "table": "stok",
+  "backup": 49,
+  "live": 49,
+  "aciklama": null
+ },
+ {
+  "table": "stok_hareket",
+  "backup": 1018,
+  "live": 1018,
+  "aciklama": null
+ },
+ {
+  "table": "stok_kategorileri",
+  "backup": 16,
+  "live": 16,
+  "aciklama": null
+ },
+ {
+  "table": "tasks",
+  "backup": 48,
+  "live": 48,
+  "aciklama": null
+ },
+ {
+  "table": "tedavi",
+  "backup": 0,
+  "live": 0,
+  "aciklama": null
+ },
+ {
+  "table": "tedavi_sablonu",
+  "backup": 10,
+  "live": 10,
+  "aciklama": null
+ },
+ {
+  "table": "tedavi_sablonu_kalem",
+  "backup": 57,
+  "live": 57,
+  "aciklama": null
+ },
+ {
+  "table": "tohumlama",
+  "backup": 282,
+  "live": 282,
+  "aciklama": null
+ },
+ {
+  "table": "treatment_day_uygulamalar",
+  "backup": 577,
+  "live": 577,
+  "aciklama": null
+ },
+ {
+  "table": "treatment_days",
+  "backup": 433,
+  "live": 433,
+  "aciklama": null
+ },
+ {
+  "table": "ui_logs",
+  "backup": 265,
+  "live": 265,
+  "aciklama": null
+ },
+ {
+  "table": "uygulama_log",
+  "backup": 122,
+  "live": 122,
+  "aciklama": null
+ },
+ {
+  "table": "vaccination_log",
+  "backup": 381,
+  "live": 381,
+  "aciklama": null
+ },
+ {
+  "table": "vaccination_schedule",
+  "backup": 4,
+  "live": 4,
+  "aciklama": null
+ },
+ {
+  "table": "vaccine_diseases",
+  "backup": 17,
+  "live": 17,
+  "aciklama": null
+ },
+ {
+  "table": "vaccine_protocol_steps",
+  "backup": 14,
+  "live": 14,
+  "aciklama": null
+ },
+ {
+  "table": "vaccines",
+  "backup": 12,
+  "live": 12,
+  "aciklama": null
+ }
+]

@@ -1,0 +1,215 @@
+{
+ "tarih": "2026-09-15T19:50:25",
+ "prod_ref": "zqnexqbdfvbhlxzelzju",
+ "demo_ref": "vtzqjmazsvurxdeondmi",
+ "cikti_dizini": "/home/melik/tmp/agents/p7-vevk-statik",
+ "statik": {
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql": {
+   "insert": 1,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 1,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "degisim_log",
+     "satir": 146,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql": {
+   "insert": 3,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 3,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 715,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 883,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 941,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260913000003_surum_gecmisi_f2_sahip_sifresi.sql": {
+   "insert": 1,
+   "update": 1,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 2,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 27,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "surum_gizli",
+     "satir": 31,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260913000004_luna_bilet_maske.sql": {
+   "insert": 1,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 1,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "degisim_log",
+     "satir": 84,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260914000001_l4_islem_log_kopru.sql": {
+   "insert": 0,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 0,
+   "ifadeler": []
+  },
+  "20260914000002_l4_geri_alma_zincir.sql": {
+   "insert": 3,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 3,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 1159,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "islem_log",
+     "satir": 1251,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 1269,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260914000003_l4_onarim.sql": {
+   "insert": 4,
+   "update": 0,
+   "delete": 1,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 5,
+   "ifadeler": [
+    {
+     "tur": "DELETE",
+     "tablo": "surum_gizli",
+     "satir": 1152,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 1154,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": [
+      "jsonb_to_recordset"
+     ]
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 1229,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "islem_log",
+     "satir": 1342,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 1361,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260914000004_l4_stok_uyari_txid.sql": {
+   "insert": 1,
+   "update": 0,
+   "delete": 1,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 2,
+   "ifadeler": [
+    {
+     "tur": "DELETE",
+     "tablo": "surum_gizli",
+     "satir": 1008,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "surum_gizli",
+     "satir": 1010,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": [
+      "jsonb_to_recordset"
+     ]
+    }
+   ]
+  }
+ },
+ "hatalar": {
+  "prod": [],
+  "demo": []
+ },
+ "hukum": "TEMIZ"
+}

@@ -1,0 +1,17 @@
+{
+ "started": "2026-09-15T14:54:30.958839+03:00",
+ "prod_ref": "zqnexqbdfvbhlxzelzju",
+ "files": [
+  {
+   "n": 1,
+   "file": "20260910000002_sperma_eslesme_sertlestirme.sql",
+   "ok": true,
+   "duration_s": 0.8,
+   "response_file": "apply_01_20260910000002_sperma_eslesme_sertlestirme.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu gibi — tek istek; atomiklik dosyanın tek DO $do$ statement'ından"
+  }
+ ],
+ "finished": "2026-09-15T14:54:30.958864+03:00",
+ "total_s": 0.8
+}

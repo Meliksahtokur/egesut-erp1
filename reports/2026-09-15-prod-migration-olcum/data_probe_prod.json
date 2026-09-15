@@ -1,0 +1,117 @@
+{
+ "abort_tarihi_backfill": {
+  "ok": true,
+  "rows": [
+   {
+    "toplam": 282,
+    "abort_tarihi_bos": 0
+   }
+  ]
+ },
+ "dogum_olay_id_backfill": {
+  "ok": true,
+  "rows": [
+   {
+    "toplam": 72,
+    "olay_id_bos": 0
+   }
+  ]
+ },
+ "asi_stok_satirlari": {
+  "ok": true,
+  "rows": [
+   {
+    "asi_stok_satiri": 12
+   }
+  ]
+ },
+ "asi_stok_baglanti": {
+  "ok": true,
+  "rows": [
+   {
+    "name": "Coglavax",
+    "bagli": true
+   },
+   {
+    "name": "Vac-Sules Feedlot",
+    "bagli": true
+   }
+  ]
+ },
+ "asi_planli_gorev": {
+  "ok": true,
+  "rows": [
+   {
+    "asi_planli": 3
+   }
+  ]
+ },
+ "postpartum_d53_gorev": {
+  "ok": true,
+  "rows": [
+   {
+    "d53_gorev": 46
+   }
+  ]
+ },
+ "dozaj_seed": {
+  "ok": true,
+  "rows": {
+   "message": "Failed to run sql query: ERROR:  42703: column \"std_dose\" does not exist\nLINE 1: BEGIN READ ONLY; SELECT count(*) AS toplam, count(*) FILTER (WHERE std_dose IS NOT NULL) AS std_dose_dolu FROM public.drug_products; ROLLBACK;\n                                                                           ^\n"
+  }
+ },
+ "dozaj_min_max": {
+  "ok": true,
+  "rows": {
+   "message": "Failed to run sql query: ERROR:  42703: column \"std_dose_min\" does not exist\nLINE 1: BEGIN READ ONLY; SELECT count(*) FILTER (WHERE std_dose_min IS NOT NULL) AS min_dolu, count(*) FILTER (WHERE std_dose_max IS NOT NULL) AS max_dolu FROM public.drug_products; ROLLBACK;\n                                                       ^\n"
+  }
+ },
+ "asi_seed_vaccines": {
+  "ok": true,
+  "rows": [
+   {
+    "seed_marka": 0
+   }
+  ]
+ },
+ "buzagi_id_backfill": {
+  "ok": true,
+  "rows": {
+   "message": "Failed to run sql query: ERROR:  42703: column \"buzagi_id\" does not exist\nLINE 1: BEGIN READ ONLY; SELECT count(*) AS toplam, count(*) FILTER (WHERE buzagi_id IS NOT NULL) AS buzagi_dolu FROM public.dogum; ROLLBACK;\n                                                                           ^\n"
+  }
+ },
+ "pedigree_nodes": {
+  "ok": true,
+  "rows": {
+   "message": "Failed to run sql query: ERROR:  42P01: relation \"public.pedigree_nodes\" does not exist\nLINE 1: BEGIN READ ONLY; SELECT count(*) AS node FROM public.pedigree_nodes; ROLLBACK;\n                                                      ^\n"
+  }
+ },
+ "pedigree_parentage": {
+  "ok": true,
+  "rows": {
+   "message": "Failed to run sql query: ERROR:  42P01: relation \"public.pedigree_parentage\" does not exist\nLINE 1: BEGIN READ ONLY; SELECT count(*) AS bag FROM public.pedigree_parentage; ROLLBACK;\n                                                     ^\n"
+  }
+ },
+ "degisim_log": {
+  "ok": true,
+  "rows": {
+   "message": "Failed to run sql query: ERROR:  42P01: relation \"public.degisim_log\" does not exist\nLINE 1: BEGIN READ ONLY; SELECT count(*) AS kayit FROM public.degisim_log; ROLLBACK;\n                                                       ^\n"
+  }
+ },
+ "satir_sayilari": {
+  "ok": true,
+  "rows": [
+   {
+    "hayvanlar": 166,
+    "tohumlama": 282,
+    "dogum": 72,
+    "gorev_log": 3084,
+    "cases": 113,
+    "drug_products": 33,
+    "vaccines": 12,
+    "stok": 49,
+    "islem_log": 4253
+   }
+  ]
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "tohumlama_kaydet::demo-canli_vs_dosya-a": 0,
+ "tohumlama_kaydet::prod-canli_vs_dosya-a": 14,
+ "tohumlama_kaydet::demo-canli_vs_prod-canli": 11,
+ "tohumlama_kaydet::dosya-b_vs_dosya-a": 14,
+ "tohumlama_tekrar_kaydet::demo-canli_vs_dosya-a": 0,
+ "tohumlama_tekrar_kaydet::prod-canli_vs_dosya-a": 13,
+ "tohumlama_tekrar_kaydet::prod-canli_vs_dosya-c": 0,
+ "tohumlama_tekrar_kaydet::demo-canli_vs_prod-canli": 11
+}

@@ -20,15 +20,16 @@
 ```bash
 export GH_TOKEN=$(git remote get-url origin | sed -E 's|https://([^@]+)@.*|\1|')   # PAT git remote'da gömülü
 RID=$(gh run list --workflow=db-backup.yml -L1 --json databaseId -q '.[0].databaseId')
-gh run download "$RID" -D /tmp/bk
+gh run download "$RID" -D ~/tmp/bk
 openssl enc -d -aes-256-cbc -pbkdf2 -pass pass:"$BACKUP_PASSWORD" \
-  -in /tmp/bk/*/egesut_*.pg.enc -out /tmp/bk/dump.pg     # BACKUP_PASSWORD = GitHub secret
-# demo'ya sadece public: pg_restore --schema=public --no-owner -d "<demo psql url>" /tmp/bk/dump.pg
+  -in ~/tmp/bk/*/egesut_*.pg.enc -out ~/tmp/bk/dump.pg     # BACKUP_PASSWORD = GitHub secret
+# demo'ya sadece public: pg_restore --schema=public --no-owner -d "<demo psql url>" ~/tmp/bk/dump.pg
 ```
-**Not:** `BACKUP_PASSWORD` yok (şifreli artifact çözülemiyor). Onun yerine D0'da **doğrudan prod'dan** çekildi (aşağı bkz).
+**Not (tarihçe):** O tarihte `BACKUP_PASSWORD` çözülemez durumdaydı (secret 2026-05-31'de kurulmuştu ama değeri kimseye kaydedilmemişti; şifreli artifact açılamıyordu) — onun yerine D0'da **doğrudan prod'dan** çekildi (aşağı bkz).
+**Güncel (2026-09-15):** Secret 2026-09-15T13:04:28Z'de yenilendi ve doğrulandı: `workflow_dispatch` koşusu `34972792930` success, artifact yerelde yeni parolayla çözüldü (`PGDMP` başlığı, `pg_restore --list` 1230 TOC satırı, 52 public TABLE DATA). Eski parola değeri kalıcı kayıp olduğundan **2026-05-31..2026-09-15 arası `DB Backup` artifact'leri kalıcı olarak açılamaz** (boş parola dahil tüm denemeler `bad decrypt`). Parola sahibin parola yöneticisindedir; değeri hiçbir belgeye yazılmaz.
 
 ### D0 GERÇEKLEŞEN yöntem (2026-07-02) — pg_dump via demo_reader
-`BACKUP_PASSWORD` olmadığı için şifreli artifact yerine prod'dan doğrudan çekildi:
+`BACKUP_PASSWORD` o tarihte değeri kimsede olmadığı için şifreli artifact yerine prod'dan doğrudan çekildi (tarihçe; secret 2026-09-15'te yenilendi — yukarıdaki "Güncel" notu):
 1. Prod'da `demo_reader` rolü (Management API/SB_MGMT_TOKEN ile, LOGIN + SELECT-only + **BYPASSRLS**). BYPASSRLS şart: policy'si `TO authenticated` olan tablolar (ör. drug_products) aksi halde 0 satır döner.
 2. `pg_dump --schema=public --no-owner` prod (aws-1-eu-west-1 pooler, user `demo_reader.<prodref>`), **hariç:** `code_embeddings/entity_graph/memory_notes` (AI-infra, vector) tabloları + `agent_threads/messages/plans` **verisi** (gerçek kullanıcı sohbeti sızmasın; yapı kalır). Dump ~1.8MB (prod'un 207MB'ı embeddings+chat'ten; farm verisi minik → **D3 egress endişesi yok**).
 3. `pg_restore --no-owner` demo'ya.

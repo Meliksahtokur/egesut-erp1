@@ -1,0 +1,23 @@
+--- dosya-b
++++ dosya-a
+@@ -135,13 +135,13 @@
+ (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL',
+ '35. Gün gebelik kontrolü', p_tarih + 35, false, v_kaynak, v_inst_id);
+ 
+-INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar, iptal)
+-SELECT s.id, 'Tohumlama', 1,
+-'Tohumlama — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id), false
+-FROM public.stok s
+-WHERE (s.urun_adi ILIKE '%' || p_sperma || '%' OR s.urun_adi = p_sperma)
+-AND s.kategori = 'Sperma'
+-LIMIT 1;
++-- BUG-002 (M2): matcher paylasilan helper'a baglandi — bos/whitespace ad
++-- dusurmez, exact once, sonra substring; kategori='Sperma' kapsami helper'da.
++-- Canli notlar metni (kupe_no) birebir korunur.
++PERFORM public.fn_sperma_stok_dus(
++p_sperma,
++'Tohumlama — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id)
++);
+ 
+ IF p_ek_uygulamalar IS NOT NULL AND jsonb_array_length(p_ek_uygulamalar) > 0 THEN
+ FOR v_ek IN SELECT * FROM jsonb_array_elements(p_ek_uygulamalar) LOOP
