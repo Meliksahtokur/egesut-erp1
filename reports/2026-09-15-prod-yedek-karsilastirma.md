@@ -156,6 +156,12 @@ penceresine sızan kullanım yok.
    biçimleri 5 varyant + boş parola pbkdf2'li/pbkdf2'siz; tümü `bad decrypt`,
    değer hiçbir çıktıya yazılmadı) kayıt amacıyla burada durur; deneme
    **durduruldu**, `egesut_20260915.pg.enc` repo dışı klasörde DOKUNULMAMIŞ duruyor.
+   **Kayıt (root 2026-09-15):** boş-parola denemesinin başarısız çıktısı
+   `dump.pg` (24,7 MB; PGDMP başlığı yok, `pg_restore` okuyamıyor) klasörde kalmıştı
+   — çalışma betiğim `rm -f` ile temizlemişti ama son boş-parola denemesi yeniden
+   yazmıştı ve temizliği atlanmıştı; dosya **root tarafından silindi**. Bu çıktının
+   içeriği decrypt başarısız olduğundan okunabilir veri DEĞİL (şifreli çöp);
+   git'e hiç girmedi. `enc` dokunulmadan duruyor.
 2. **C ölçümü P4 öncesi/sonrası iki anlık:** ilk C, P4 teslim ilanından önce
    alındı (root'un o anki talimatıyla Y↔C'ye hemen geçilmişti); P4 ilanı
    gelince zarf şartına uygun biçimde C yenilendi. P4-öncesi görüntü
