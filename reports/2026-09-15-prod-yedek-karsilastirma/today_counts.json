@@ -1,0 +1,72 @@
+{
+ "pencere": "2026-09-15 00:00 TSI – 2026-09-15 13:52 TSI (damgalar UTC kabul, TSI'ya çevrildi; TSI=UTC+3)",
+ "tables": {
+  "cases": {
+   "kolon": "created_at",
+   "pencere_toplam": 1,
+   "saat": {
+    "2026-09-15 12:00 TSI": 1
+   },
+   "pencere_ustu_bugun": 0
+  },
+  "drug_administrations": {
+   "kolon": "created_at",
+   "pencere_toplam": 6,
+   "saat": {
+    "2026-09-15 12:00 TSI": 6
+   },
+   "pencere_ustu_bugun": 0
+  },
+  "gorev_log": {
+   "kolon": "created_at",
+   "pencere_toplam": 16,
+   "saat": {
+    "2026-09-15 08:00 TSI": 3,
+    "2026-09-15 11:00 TSI": 4,
+    "2026-09-15 12:00 TSI": 9
+   },
+   "pencere_ustu_bugun": 0
+  },
+  "islem_log": {
+   "kolon": "tarih",
+   "pencere_toplam": 7,
+   "saat": {
+    "2026-09-15 11:00 TSI": 3,
+    "2026-09-15 12:00 TSI": 4
+   },
+   "pencere_ustu_bugun": 0
+  },
+  "stok_hareket": {
+   "kolon": "created_at",
+   "pencere_toplam": 6,
+   "saat": {
+    "2026-09-15 12:00 TSI": 6
+   },
+   "pencere_ustu_bugun": 0
+  },
+  "treatment_day_uygulamalar": {
+   "kolon": "updated_at",
+   "pencere_toplam": 6,
+   "saat": {
+    "2026-09-15 12:00 TSI": 6
+   },
+   "pencere_ustu_bugun": 0
+  },
+  "treatment_days": {
+   "kolon": "created_at",
+   "pencere_toplam": 3,
+   "saat": {
+    "2026-09-15 12:00 TSI": 3
+   },
+   "pencere_ustu_bugun": 0
+  }
+ },
+ "islem_log_tip": {
+  "pencere_toplam": 7,
+  "tip": {
+   "GOREV_TAMAMLA": 3,
+   "TEDAVI_GUN_EKLENDI": 3,
+   "VAKA_ACILDI": 1
+  }
+ }
+}
