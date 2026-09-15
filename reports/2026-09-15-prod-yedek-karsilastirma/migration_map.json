@@ -1,0 +1,2141 @@
+{
+ "col:abort_notlar@tohumlama": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:abort_tarihi@tohumlama": [
+  "20260830000010_abort_vwp_penceresi.sql"
+ ],
+ "col:add@agent_plans": [
+  "20260622000006_asistan_plan_geri_al.sql"
+ ],
+ "col:add@dogum": [
+  "20260303000004_foreign_keys.sql",
+  "20260911000001_dogum_buzagi_id_foundation.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:add@drug_classes": [
+  "20260530000002_ilac_seed.sql"
+ ],
+ "col:add@drug_products": [
+  "20260909100000_dozaj_std_dose_seed.sql"
+ ],
+ "col:add@gorev_log": [
+  "20260303000004_foreign_keys.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:add@stok_hareket": [
+  "20260303000004_foreign_keys.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:add@tohumlama": [
+  "20260303000004_foreign_keys.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:anne_id@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:ayirici_ozellik@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:baba_bilgi@dogum": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:baba_bilgi@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:boy@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:buzagi_id@dogum": [
+  "20260911000001_dogum_buzagi_id_foundation.sql"
+ ],
+ "col:buzagi_kupe@tohumlama": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:canli_agirlik@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:case_id@tohumlama": [
+  "20260526000002_tohumlama_case_link.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:cikis_sebebi@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:cikis_tarihi@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:cikis_tipi@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:cinsiyet@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:column@drop": [
+  "20260603000001_protokol_etken_kod.sql"
+ ],
+ "col:created_at@tohumlama": [
+  "20260517000001_kizginlik_uyari_view.sql"
+ ],
+ "col:default_route@drugs": [
+  "20260529000002_drugs_fix_columns.sql"
+ ],
+ "col:default_unit@drugs": [
+  "20260529000002_drugs_fix_columns.sql"
+ ],
+ "col:degisim_txid@islem_log": [
+  "20260914000001_l4_islem_log_kopru.sql"
+ ],
+ "col:deneme_sayisi@tohumlama": [
+  "20260522000004_tekrar_asim.sql"
+ ],
+ "col:devlet_kupe@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:dogum_kg@dogum": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:dogum_kg@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:dogum_tarihi@tohumlama": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:drop@agent_plans": [
+  "20260622000006_asistan_plan_geri_al.sql"
+ ],
+ "col:drop@drug_classes": [
+  "20260530000001_ilac_kategori_fix.sql"
+ ],
+ "col:drop@drug_products": [
+  "20260909100000_dozaj_std_dose_seed.sql"
+ ],
+ "col:drop@gorev_log": [
+  "20260522000002_tohumlama_cycle_iptal.sql"
+ ],
+ "col:drop@hastalik_log": [
+  "20260303000002_add_columns.sql",
+  "20260427000002_orphan_columns_cleanup.sql",
+  "20260502000003_drop_orphan_objects.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:drop@tohumlama": [
+  "20260522000004_tekrar_asim.sql"
+ ],
+ "col:durum@hayvanlar": [
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:ek_uygulamalar@tohumlama": [
+  "20260526000003_ek_uygulama_stok.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@agent_messages": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "col:enable@agent_plans": [
+  "20260622000001_agent_plans.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@agent_threads": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "col:enable@cases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@degisim_log": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql"
+ ],
+ "col:enable@diseases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@dogum": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@drug_administrations": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@drug_classes": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@drug_products": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@drugs": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@grup_padok_eslem": [
+  "20260511000001_padoklar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@hayvan_override": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@hekimler": [
+  "20260308000009_sperma_stok_fix.sql",
+  "20260511000002_hekim_sperma_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@padoklar": [
+  "20260511000001_padoklar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@pedigree_meta": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "col:enable@pedigree_nodes": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "col:enable@pedigree_parentage": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "col:enable@protokol_ayar": [
+  "20260620000001_protokol_ayar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@protokol_dismiss": [
+  "20260603000004_protokol_scanner.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@protokol_instance": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@sablon_hastalik_eslem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@semen_catalog": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "col:enable@stok_kategorileri": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@tedavi": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@tedavi_sablonu": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@tedavi_sablonu_kalem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@treatment_day_uygulamalar": [
+  "20260613000003_bug059_seans_rls_policy_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@treatment_days": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@ui_logs": [
+  "20260401000034_ui_telemetry.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@uygulama_log": [
+  "20260603000002_uygulama_log.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@vaccination_log": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@vaccination_schedule": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@vaccine_diseases": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@vaccine_protocol_steps": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:enable@vaccines": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:ertelendi@vaccination_log": [
+  "20260502000005_asi_dismiss.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:esik@stok": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:etiketler@hayvanlar": [
+  "20260602000001_etiketler_kolonu.sql"
+ ],
+ "col:etken_kod@drug_classes": [
+  "20260710000001_protokol_etken_kod_authoritative.sql"
+ ],
+ "col:etken_kod@gorev_log": [
+  "20260603000001_protokol_etken_kod.sql"
+ ],
+ "col:etken_madde@vaccines": [
+  "20260619000010_asi_schema.sql"
+ ],
+ "col:exists@if": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:genc_anne@hayvanlar": [
+  "20260614000003_genc_anne_kolon_rpc.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:gerceklesme_at@tohumlama": [
+  "20260722000002_sablon_planli_tohumlama.sql"
+ ],
+ "col:grup@hayvanlar": [
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:hedef_saat@gorev_log": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:hekim_id@dogum": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:hekim_id@gorev_log": [
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:iptal@gorev_log": [
+  "20260303000002_add_columns.sql",
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:kapatan_ref@gorev_log": [
+  "20260603000001_protokol_etken_kod.sql"
+ ],
+ "col:kategori@drugs": [
+  "20260529000003_drugs_kategori_stokkat_tip.sql"
+ ],
+ "col:kategori@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:kategori@stok": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:kategori_id@drug_classes": [
+  "20260530000001_ilac_kategori_fix.sql"
+ ],
+ "col:kaynak@gorev_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:kisir@hayvanlar": [
+  "20260513000001_kisir_flag.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:kullanim_sayisi@irk_esik": [
+  "20260306000008_blok1_backend.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:kupe_no@hayvanlar": [
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:lokasyon@hastalik_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:marka@vaccines": [
+  "20260619000010_asi_schema.sql"
+ ],
+ "col:miktar@gorev_log": [
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:notlar@hayvanlar": [
+  "20260306000008_blok1_backend.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:olay_id@dogum": [
+  "20260901000001_ikiz_dogum_olay_id.sql"
+ ],
+ "col:padok@hayvanlar": [
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:padok_hedef@gorev_log": [
+  "20260303000002_add_columns.sql",
+  "20260303000003_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:padok_id@hayvanlar": [
+  "20260511000001_padoklar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:payload@islem_log": [
+  "20260308000009_sperma_stok_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:plan_notu@cases": [
+  "20260528000001_tedavi_gun_ux.sql"
+ ],
+ "col:planned_time@treatment_days": [
+  "20260528000001_tedavi_gun_ux.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:protokol_instance_id@gorev_log": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:protokol_tipi@vaccines": [
+  "20260619000010_asi_schema.sql"
+ ],
+ "col:ref_id@islem_log": [
+  "20260311000016_ref_id_hastalik_rpc.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:ref_tohumlama_id@gorev_log": [
+  "20260522000002_tohumlama_cycle_iptal.sql"
+ ],
+ "col:referans_tipi@stok_hareket": [
+  "20260312000021_tedavi_guncelle.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:renk@hayvanlar": [
+  "20260303000002_add_columns.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:satis_fiyati@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:seans_admin_id@drug_administrations": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:seans_admin_id@gorev_log": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:seans_sayisi@treatment_days": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:siddet@hastalik_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:sonuc@kizginlik_log": [
+  "20260502000004_kizginlik_postpartum.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:std_dose@drug_products": [
+  "20260909100000_dozaj_std_dose_seed.sql"
+ ],
+ "col:std_dose_min@drug_products": [
+  "20260909110000_dozaj_helper_min_max_rpc.sql"
+ ],
+ "col:stock_item_id@drugs": [
+  "20260529000002_drugs_fix_columns.sql"
+ ],
+ "col:suttten_kesme_tarihi@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:tamamlandi@treatment_days": [
+  "20260525000002_treatment_day_done.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:tedavi_case_id@kizginlik_log": [
+  "20260519000002_kizginlik_tedavi_sil.sql"
+ ],
+ "col:tip@stok_kategorileri": [
+  "20260529000003_drugs_kategori_stokkat_tip.sql"
+ ],
+ "col:tohumlama_durumu@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:tohumlama_onay_tarihi@hayvanlar": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:tohumlama_plani@tedavi_sablonu": [
+  "20260722000002_sablon_planli_tohumlama.sql"
+ ],
+ "col:treatment_time@treatment_days": [
+  "20260325000025_treatment_time.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:updated_at@hayvanlar": [
+  "20260308000010_hayvan_guncelle.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:uygulama_yolu@tedavi": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "col:uygulanmadi@drug_administrations": [
+  "20260528000001_tedavi_gun_ux.sql"
+ ],
+ "col:vwp_override@tohumlama": [
+  "20260531200000_faz_b_vwp_enforcement.sql"
+ ],
+ "fn:_asistan_ref_coz": [
+  "20260622000002_asistan_plan_engine.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_asistan_step_calistir": [
+  "20260622000002_asistan_plan_engine.sql",
+  "20260622000003_step_hizli_uygulama.sql",
+  "20260622000004_step_vaka_tedavi.sql",
+  "20260622000005_step_ureme_padok_dogum.sql",
+  "20260622000008_step_islem_geri_al.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_asistan_step_dogrula": [
+  "20260622000002_asistan_plan_engine.sql",
+  "20260622000003_step_hizli_uygulama.sql",
+  "20260622000004_step_vaka_tedavi.sql",
+  "20260622000005_step_ureme_padok_dogum.sql",
+  "20260622000007_zengin_onizleme.sql",
+  "20260622000008_step_islem_geri_al.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_ayar": [
+  "20260620000001_protokol_ayar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_debug_protokol_ozet": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_degisim_log_degistirilemez": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql"
+ ],
+ "fn:_degisim_log_yaz": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql",
+  "20260913000004_luna_bilet_maske.sql"
+ ],
+ "fn:_dogum_buzagi_backfill": [
+  "20260911000001_dogum_buzagi_id_foundation.sql"
+ ],
+ "fn:_etken_kod_bul": [
+  "20260603000001_protokol_etken_kod.sql",
+  "20260604000001_protokol_gorev_entegrasyon.sql",
+  "20260608000001_bug056_057_fix.sql",
+  "20260610000001_bug064_etken_kod_vitamin_audit.sql",
+  "20260705000001_etken_kod_bul_asi_rota_stok_fix.sql",
+  "20260710000001_protokol_etken_kod_authoritative.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_gorev_dinle": [
+  "20260603000001_protokol_etken_kod.sql",
+  "20260603000005_protokol_fix_v2.sql",
+  "20260604000002_gorev_dinle_uuid_fix.sql",
+  "20260628000002_dogum_pg_etken_kod_link.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_guard_dogum_ileri_tarih": [
+  "20260831000003_tablo_guard_triggerlari.sql"
+ ],
+ "fn:_guard_hayvanlar_cinsiyet_grup": [
+  "20260831000003_tablo_guard_triggerlari.sql"
+ ],
+ "fn:_guard_tohumlama_yas_cinsiyet": [
+  "20260831000003_tablo_guard_triggerlari.sql"
+ ],
+ "fn:_islem_log_degisim_txid": [
+  "20260914000001_l4_islem_log_kopru.sql",
+  "20260914000003_l4_onarim.sql"
+ ],
+ "fn:_islem_log_geri_alindi_kapisi": [
+  "20260914000003_l4_onarim.sql"
+ ],
+ "fn:_islem_log_immutable_guard": [
+  "20260706000002_critical6_islem_log_immutable.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_islem_log_yaz": [
+  "20260306000008_blok1_backend.sql",
+  "20260308000009_sperma_stok_fix.sql",
+  "20260310000012_trigger_fix.sql",
+  "20260311000016_ref_id_hastalik_rpc.sql",
+  "20260512000003_islem_log_old_snapshot.sql",
+  "20260512000007_trigger_tohumlama_fix.sql",
+  "20260830000030_cift_abort_log_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_kizginlik_case_close": [
+  "20260519000002_kizginlik_tedavi_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_pedigree_parent_set_core": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:_protokol_kapat": [
+  "20260605000004_cikis_yap_rpc.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_sessiz_gorev_iptal": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_tohumlama_gorev_uygunluk": [
+  "20260730000002_vaka_tohumlama_ekle.sql"
+ ],
+ "fn:_tohumlama_kizginlik_kapat": [
+  "20260519000002_kizginlik_tedavi_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_trg_case_ureme_sessiz_iptal": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_trg_gorev_parent_kapandi": [
+  "20260626000020_trg_gorev_parent_kapandi.sql",
+  "20260626000060_cascade_zincir_guard_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_trg_hayvan_cikis_gorev_iptal": [
+  "20260626000030_trg_hayvan_cikis_gorev_iptal.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_trg_kizginlik_sessiz_iptal": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_trg_pedigree_hayvan_insert": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:_trg_tohumlama_gebe_sessiz_iptal": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_trg_tohumlama_sessiz_iptal": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:_vaka_ac_tek": [
+  "20260906120000_vaka_toplu_ac.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:abort_kaydet": [
+  "20260306000008_blok1_backend.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:add_drug_administration": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:add_sessions_to_existing_day": [
+  "20260613000004_seans_incremental_edit.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:add_treatment_day": [
+  "20260312000022_case_management.sql",
+  "20260527000001_vaka_geri_alma_islem_log.sql",
+  "20260527000002_stok_iade_gecmis_tarih.sql",
+  "20260527000003_geri_al_chain_ve_stok_iptal.sql",
+  "20260528000001_tedavi_gun_ux.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:add_treatment_day_with_sessions": [
+  "20260611000002_bug059_rpcs.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:add_vaccination": [
+  "20260331000032_vaccination_module.sql",
+  "20260511000004_add_vaccination_rapel_fix.sql",
+  "20260619000020_asi_primer_rapel.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:agent_plans_prune": [
+  "20260622000001_agent_plans.sql"
+ ],
+ "fn:agent_threads_prune": [
+  "20260621000004_agent_prune_cron.sql"
+ ],
+ "fn:asi_ekle": [
+  "20260619000011_asi_rpcs.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asi_gorev_planla": [
+  "20260902000003_asi_planli_gorev.sql",
+  "20260902000004_asi_toplu_gorev.sql"
+ ],
+ "fn:asi_guncelle": [
+  "20260619000011_asi_rpcs.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asi_planli_tamamla": [
+  "20260902000003_asi_planli_gorev.sql"
+ ],
+ "fn:asi_sil": [
+  "20260619000011_asi_rpcs.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asi_toplu_planla": [
+  "20260902000004_asi_toplu_gorev.sql"
+ ],
+ "fn:asistan_hayvan_detay": [
+  "20260621000003_asistan_hayvan_detay.sql",
+  "20260901000002_kupe_revizyon.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asistan_plan_geri_al": [
+  "20260622000006_asistan_plan_geri_al.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asistan_plan_iptal": [
+  "20260706000003_medium_be_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asistan_plan_olustur": [
+  "20260622000002_asistan_plan_engine.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asistan_plan_uygula": [
+  "20260622000002_asistan_plan_engine.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asistan_sql_calistir": [
+  "20260621000002_agent_readonly_sql.sql",
+  "20260706000004_m6_be_asistan_sql_invoker.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:asistan_tumunu_sil": [
+  "20260706000003_medium_be_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:assert_is_operator": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:besleme_tamam": [
+  "20260521000005_besleme_gorevi.sql",
+  "20260522000001_besleme_tamam_fix.sql",
+  "20260605000009_besleme_protokol_instance.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:bulk_ilac": [
+  "20260427000011_bulk_ilac.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:bulk_vaccination": [
+  "20260427000010_bulk_vaccination.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:buzagi_sutten_kesme_geri_al": [
+  "20260620000004_sutten_kesme_toplu_geri_al.sql",
+  "20260620000009_sutten_kesme_geri_al_guard.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:buzagi_sutten_kesme_kontrol": [
+  "20260513000002_buzagi_sutten_kesme.sql",
+  "20260620000006_sutten_kesme_kontrol.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:buzagi_sutten_kesme_onayla": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "20260620000003_sutten_kesme_onayla.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:buzagi_sutten_kesme_toplu": [
+  "20260620000004_sutten_kesme_toplu_geri_al.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:case_geri_al": [
+  "20260520000001_tohumlama_case_geri_al.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:case_plan_notu_guncelle": [
+  "20260528000001_tedavi_gun_ux.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:cikis_yap": [
+  "20260605000004_cikis_yap_rpc.sql",
+  "20260706000003_medium_be_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:close_case": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:close_case_with_remaining": [
+  "20260611000002_bug059_rpcs.sql",
+  "20260613000002_bug059_erken_kapat_done_iade_fix.sql",
+  "20260730000001_sablon_tohumlama_opsiyonel_ve_yasam_dongusu.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:create_case": [
+  "20260312000022_case_management.sql",
+  "20260527000001_vaka_geri_alma_islem_log.sql",
+  "20260906120000_vaka_toplu_ac.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:current_farm_id": [
+  "20260701214717_farm_id_foundation.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:degisim_geri_al": [
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql",
+  "20260914000002_l4_geri_alma_zincir.sql",
+  "20260914000003_l4_onarim.sql"
+ ],
+ "fn:degisim_listele": [
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql"
+ ],
+ "fn:degisim_onizle": [
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql",
+  "20260914000002_l4_geri_alma_zincir.sql",
+  "20260914000003_l4_onarim.sql"
+ ],
+ "fn:delete_treatment_day": [
+  "20260403000002_delete_treatment_day.sql",
+  "20260527000003_geri_al_chain_ve_stok_iptal.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:disease_ekle": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:disease_guncelle": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:disease_sil": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:dogum_kaydet": [
+  "20260306000008_blok1_backend.sql",
+  "20260326000026_grup_padok_fixes.sql",
+  "20260326000027_besi_trigger_baba_fixes.sql",
+  "20260521000005_besleme_gorevi.sql",
+  "20260603000001_protokol_etken_kod.sql",
+  "20260605000001_dogum_kaydet_besleme_fix.sql",
+  "20260605000006_dogum_kaydet_update.sql",
+  "20260628000001_dogum_kaydet_pg_d11_to_d39.sql",
+  "20260628000002_dogum_pg_etken_kod_link.sql",
+  "20260710000001_protokol_etken_kod_authoritative.sql",
+  "20260730000002_dogum_sonrasi_e_vitamini.sql",
+  "20260901000001_ikiz_dogum_olay_id.sql",
+  "20260901000002_kupe_revizyon.sql",
+  "20260906000001_postpartum_d53_e_vitamin_tek.sql",
+  "20260911000001_dogum_buzagi_id_foundation.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_administration_stok_dusum": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_class_ekle": [
+  "20260530000003_ilac_rpcler.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_class_guncelle": [
+  "20260530000003_ilac_rpcler.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_class_sil": [
+  "20260530000003_ilac_rpcler.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_class_varsayilan_yukle": [
+  "20260530000003_ilac_rpcler.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_ekle": [
+  "20260529000001_tanimlar_crud.sql",
+  "20260529000003_drugs_kategori_stokkat_tip.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_guncelle": [
+  "20260529000001_tanimlar_crud.sql",
+  "20260529000003_drugs_kategori_stokkat_tip.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_product_ekle": [
+  "20260401000001_drug_product_ekle.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:drug_sil": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_dinle_drug_admin": [
+  "20260603000003_dinleme_trigger.sql",
+  "20260628000002_dogum_pg_etken_kod_link.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_dinle_uygulama": [
+  "20260603000003_dinleme_trigger.sql",
+  "20260628000002_dogum_pg_etken_kod_link.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_dinle_vaccination": [
+  "20260603000003_dinleme_trigger.sql",
+  "20260628000002_dogum_pg_etken_kod_link.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_gebe_gorev_yarat": [
+  "20260509000004_gebe_gorev_trigger.sql",
+  "20260603000001_protokol_etken_kod.sql",
+  "20260605000008_gebe_trigger_update.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_gebe_grup_guncelle": [
+  "20260326000026_grup_padok_fixes.sql"
+ ],
+ "fn:fn_gorev_asip_iade": [
+  "20260902000003_asi_planli_gorev.sql"
+ ],
+ "fn:fn_hayvan_grup_padok_sync": [
+  "20260717000001_hayvan_grup_padok_sync.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_islem_log": [
+  "20260326000028_fix_tohumlama_trigger_dogum.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_padok_transfer_gorev_kapat": [
+  "20260618000001_toplu_grup_padok.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:fn_sperma_stok_dus": [
+  "20260910000001_planli_tohumlama_sperma_dus.sql"
+ ],
+ "fn:gebelik_kaydet_manual": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "20260605000002_timezone_fix.sql",
+  "20260910000003_gebelik_kaydet_manual_42804_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:gebelik_protokol_kontrol": [
+  "20260519000001_gebelik_protokol_birlestirme.sql",
+  "20260521000001_gebelik_protokol_kontrol_hayvan_listesi.sql",
+  "20260521000005_besleme_gorevi.sql",
+  "20260522000002_tohumlama_cycle_iptal.sql",
+  "20260605000009_besleme_protokol_instance.sql",
+  "20260613000001_asi_rapel_dupe_fix.sql",
+  "20260620000007_gebelik_kontrol_config.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:geri_al": [
+  "20260326000029_geri_al_rpc.sql",
+  "20260527000001_vaka_geri_alma_islem_log.sql",
+  "20260527000002_stok_iade_gecmis_tarih.sql",
+  "20260527000003_geri_al_chain_ve_stok_iptal.sql",
+  "20260830000032_geri_al_uuid_fallback.sql",
+  "20260830000033_geri_al_hardening.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:geri_alma_bileti_al": [
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql"
+ ],
+ "fn:get_vaccination_schedule": [
+  "20260331000032_vaccination_module.sql",
+  "20260730000002_dogum_sonrasi_e_vitamini.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:gorev_geri_al": [
+  "20260510000001_gorev_geri_al.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:gorev_guncelle": [
+  "20260706000005_h14_gorev_guncelle_islem_log.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:gorev_log_cycle_guard": [
+  "20260522000002_tohumlama_cycle_iptal.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:gorev_orphan_temizle": [
+  "20260626000050_gorev_orphan_temizle_cron.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:gorev_tamamla": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "20260518000001_gorev_tamamla_kuru_donem.sql",
+  "20260531000001_kuru_donem_padok_id_fix.sql",
+  "20260604000001_protokol_gorev_entegrasyon.sql",
+  "20260618000001_toplu_grup_padok.sql",
+  "20260620000005_gorev_tamamla_sutten_kes.sql",
+  "20260717000001_hayvan_grup_padok_sync.sql",
+  "20260902000003_asi_planli_gorev.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:grup_padok_eslem_toggle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hastalik_guncelle": [
+  "20260311000016_ref_id_hastalik_rpc.sql",
+  "20260311000017_hastalik_rpc_cast_fix.sql",
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "20260312000020_hastalik_guncelle_tarih.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hastalik_kapat": [
+  "20260311000016_ref_id_hastalik_rpc.sql",
+  "20260311000017_hastalik_rpc_cast_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hastalik_kaydet": [
+  "20260306000008_blok1_backend.sql",
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hastalik_sil": [
+  "20260311000016_ref_id_hastalik_rpc.sql",
+  "20260311000017_hastalik_rpc_cast_fix.sql",
+  "20260311000018_hastalik_sil_fix.sql",
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_belirsiz_ureme_listele": [
+  "20260614000005_stat_belirsiz.sql",
+  "20260901000001_ikiz_dogum_olay_id.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_ekle": [
+  "20260306000008_blok1_backend.sql",
+  "20260511000003_hayvan_rpc_padok_id.sql",
+  "20260706000006_h11_hayvan_yas_grup_validasyon.sql",
+  "20260901000002_kupe_revizyon.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_genc_anne_isaretle": [
+  "20260614000003_genc_anne_kolon_rpc.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_genc_anne_isaretle_toplu": [
+  "20260614000006_genc_anne_toplu.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_guncelle": [
+  "20260308000010_hayvan_guncelle.sql",
+  "20260511000003_hayvan_rpc_padok_id.sql",
+  "20260513000005_hayvan_guncelle_kisir.sql",
+  "20260706000006_h11_hayvan_yas_grup_validasyon.sql",
+  "20260901000002_kupe_revizyon.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_kilo_guncelle": [
+  "20260909110000_dozaj_helper_min_max_rpc.sql"
+ ],
+ "fn:hayvan_kisir_isaretle": [
+  "20260513000001_kisir_flag.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_not_ekle": [
+  "20260306000008_blok1_backend.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_tohumlama_ertele": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hayvan_tohumlanabilir_onayla": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hekim_ekle": [
+  "20260308000009_sperma_stok_fix.sql",
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hekim_guncelle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hekim_listesi": [
+  "20260308000009_sperma_stok_fix.sql"
+ ],
+ "fn:hekim_sil": [
+  "20260511000002_hekim_sperma_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hizli_uygulama": [
+  "20260603000002_uygulama_log.sql",
+  "20260610000001_bug064_etken_kod_vitamin_audit.sql",
+  "20260613000006_hizli_uygulama_p_bbirim_typo_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:hizli_uygulama_geri_al": [
+  "20260603000002_uygulama_log.sql",
+  "20260610000001_bug064_etken_kod_vitamin_audit.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:ilac_dozaj_guncelle": [
+  "20260909110000_dozaj_helper_min_max_rpc.sql"
+ ],
+ "fn:ilac_ekle": [
+  "20260619000002_ilac_ekle_atomik.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:ileri_gebe_asi_tamamla": [
+  "20260509000003_ileri_gebe_asi_tamamla.sql",
+  "20260525000003_rota_rapel_duve_kontrol.sql",
+  "20260603000005_protokol_fix_v2.sql",
+  "20260613000001_asi_rapel_dupe_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:ileri_gebe_gorev_kontrol": [
+  "20260509000001_ileri_gebe_gorev.sql",
+  "20260509000002_ileri_gebe_asi_gorev_update.sql",
+  "20260605000008_gebe_trigger_update.sql",
+  "20260613000001_asi_rapel_dupe_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:irk_listesi": [
+  "20260306000008_blok1_backend.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:islem_geri_al": [
+  "20260512000004_islem_geri_al_genel.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kategori_ekle": [
+  "20260529000001_tanimlar_crud.sql",
+  "20260529000003_drugs_kategori_stokkat_tip.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kategori_guncelle": [
+  "20260529000001_tanimlar_crud.sql",
+  "20260529000003_drugs_kategori_stokkat_tip.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kategori_sil": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kizginlik_kaydet": [
+  "20260306000008_blok1_backend.sql",
+  "20260526000001_postpartum_gozlem.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kizginlik_sil": [
+  "20260519000002_kizginlik_tedavi_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kizginlik_tedavi_baglanti_kur": [
+  "20260519000002_kizginlik_tedavi_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kizginlik_vaka_ac": [
+  "20260526000002_tohumlama_case_link.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kizginlik_yok_kaydet": [
+  "20260502000004_kizginlik_postpartum.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:kupe_musait_mi": [
+  "20260306000006_faz1_core.sql",
+  "20260901000002_kupe_revizyon.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:laktasyon_kuru_kontrol": [
+  "20260513000003_laktasyon_kuru_kontrol.sql",
+  "20260513000006_laktasyon_kuru_kontrol_revize.sql",
+  "20260518000001_gorev_tamamla_kuru_donem.sql",
+  "20260518000002_kuru_donem_hotfix.sql",
+  "20260518000003_laktasyon_kuru_kontrol_final.sql"
+ ],
+ "fn:link_drug_to_stock": [
+  "20260312000024_link_drug_to_stock.sql",
+  "20260403000004_link_drug_to_stock.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:list_vaccinations": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:padok_degistir": [
+  "20260512000001_padok_degistir_rpc.sql",
+  "20260602000002_padok_rpc_kapasite.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:padok_degistir_toplu": [
+  "20260512000002_padok_degistir_toplu_rpc.sql",
+  "20260602000002_padok_rpc_kapasite.sql",
+  "20260618000001_toplu_grup_padok.sql",
+  "20260706000003_medium_be_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:padok_ekle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:padok_guncelle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:padok_sil": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:padok_transfer_gorev_uzlastir": [
+  "20260618000001_toplu_grup_padok.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:pedigree_ensure_farm_node": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:pedigree_external_upsert": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:pedigree_farm_backfill": [
+  "20260911000003_pedigree_farm_backfill.sql"
+ ],
+ "fn:pedigree_integrity_report": [
+  "20260911000003_pedigree_farm_backfill.sql"
+ ],
+ "fn:pedigree_is_ancestor": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:pedigree_parent_set": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:pedigree_subgraph": [
+  "20260911000004_pedigree_projection_rpc.sql"
+ ],
+ "fn:pedigree_subgraph_for_animal": [
+  "20260911000004_pedigree_projection_rpc.sql"
+ ],
+ "fn:pedigree_try_timestamptz": [
+  "20260911000003_pedigree_farm_backfill.sql"
+ ],
+ "fn:planli_tohumlama_kaydet": [
+  "20260722000002_sablon_planli_tohumlama.sql",
+  "20260722000003_planli_tohumlama_bagimsiz_event.sql",
+  "20260730000001_sablon_tohumlama_opsiyonel_ve_yasam_dongusu.sql"
+ ],
+ "fn:protokol_ayar_guncelle": [
+  "20260620000001_protokol_ayar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:protokol_eksik_tara": [
+  "20260603000004_protokol_scanner.sql",
+  "20260603000005_protokol_fix_v2.sql",
+  "20260624000001_postpartum_pg_d11_to_d39.sql",
+  "20260624000020_protokol_eksik_tara_null_guard_fix.sql",
+  "20260710000001_protokol_etken_kod_authoritative.sql",
+  "20260718000001_protokol_scanner_task_authority.sql",
+  "20260730000002_dogum_sonrasi_e_vitamini.sql",
+  "20260906000001_postpartum_d53_e_vitamin_tek.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:protokol_gorev_bol": [
+  "20260710000001_protokol_etken_kod_authoritative.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:protokol_orphan_audit": [
+  "20260710000001_protokol_etken_kod_authoritative.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:protokol_orphan_temizle": [
+  "20260710000001_protokol_etken_kod_authoritative.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:recete_guncelle": [
+  "20260611000002_bug059_rpcs.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:remove_drug_administration": [
+  "20260312000023_remove_drug_admin.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:remove_treatment_session": [
+  "20260613000004_seans_incremental_edit.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:rls_auto_enable": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:sahip_sifresi_ayarla": [
+  "20260913000003_surum_gecmisi_f2_sahip_sifresi.sql"
+ ],
+ "fn:seans_tamamla": [
+  "20260611000002_bug059_rpcs.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:seed_defaults": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:semen_catalog_upsert": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "fn:sessiz_hayvanlar_gorev_olustur": [
+  "20260531300000_faz_c_eligible_sessiz.sql",
+  "20260531400000_sessiz_hayvan_yas_filtresi.sql",
+  "20260625000020_sessiz_reconcile.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:sessiz_hayvanlar_listele": [
+  "20260531300000_faz_c_eligible_sessiz.sql",
+  "20260531400000_sessiz_hayvan_yas_filtresi.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:sessiz_hayvanlar_reconcile": [
+  "20260625000020_sessiz_reconcile.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:set_deneme_no": [
+  "20260303000005_triggers.sql",
+  "20260521000003_gebelik_deneme_no_per_cycle.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:set_treatment_day_no": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:sperma_sil": [
+  "20260511000002_hekim_sperma_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stale_tohumlama_gorev_temizle": [
+  "20260522000003_stale_tohumlama_gorev_temizle.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stat_gebelik_ozet": [
+  "20260530180000_stat_gebelik_ozet.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stat_suru_ozet": [
+  "20260530200000_stat_suru_ozet.sql",
+  "20260530220000_stat_suru_ozet_v2.sql",
+  "20260531100000_faz_a_42gun_kisir_sperma.sql",
+  "20260531300000_faz_c_eligible_sessiz.sql",
+  "20260614000002_stat_suru_ozet_v3.sql",
+  "20260625000030_stat_suru_ozet_readonly.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stok_arsivle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stok_duzelt": [
+  "20260511000005_stok_duzelt.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stok_ekle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "20260530000003_ilac_rpcler.sql",
+  "20260619000003_stok_ekle_ilac_guard.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stok_ekleme": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stok_guncelle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "20260530000003_ilac_rpcler.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:stok_hareket_ekle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:surum_gizli": [
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql",
+  "20260914000002_l4_geri_alma_zincir.sql",
+  "20260914000003_l4_onarim.sql",
+  "20260914000004_l4_stok_uyari_txid.sql"
+ ],
+ "fn:tedavi_ekle": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "20260312000021_tedavi_guncelle.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tedavi_guncelle": [
+  "20260312000021_tedavi_guncelle.sql",
+  "20260706000003_medium_be_fixes.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tedavi_sablon_kaydet": [
+  "20260613000008_sablon_rpc.sql",
+  "20260722000001_tedavi_sablon_gun_ofsetlerini_koru.sql",
+  "20260722000002_sablon_planli_tohumlama.sql",
+  "20260730000001_sablon_tohumlama_opsiyonel_ve_yasam_dongusu.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tedavi_sablon_sil": [
+  "20260613000008_sablon_rpc.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tedavi_sablon_tohumlama_gorev_ekle": [
+  "20260722000002_sablon_planli_tohumlama.sql",
+  "20260722000003_planli_tohumlama_bagimsiz_event.sql",
+  "20260730000001_sablon_tohumlama_opsiyonel_ve_yasam_dongusu.sql",
+  "20260730000002_vaka_tohumlama_ekle.sql",
+  "20260909000001_sablon_aktif_vakaya_uygula.sql"
+ ],
+ "fn:tedavi_sablon_uygula": [
+  "20260613000009_sablon_uygula.sql",
+  "20260909000001_sablon_aktif_vakaya_uygula.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tedavi_sil": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "20260312000021_tedavi_guncelle.sql",
+  "20260706000001_be_h1_tedavi_sil_islem_log.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:test_dollar_block": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:test_migrate_working": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_abort": [
+  "20260330000031_tohumlama_sonuc_rpcs.sql",
+  "20260502000002_tohumlama_abort_formal.sql",
+  "20260830000010_abort_vwp_penceresi.sql",
+  "20260830000034_review_fix_paketi.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_cycle_gorevcil_iptal": [
+  "20260522000002_tohumlama_cycle_iptal.sql",
+  "20260522000004_tekrar_asim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_duplicate_bekliyor_temizle": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_geri_al": [
+  "20260520000001_tohumlama_case_geri_al.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_kaydet": [
+  "20260306000008_blok1_backend.sql",
+  "20260308000009_sperma_stok_fix.sql",
+  "20260326000030_tohumlama_event_stack.sql",
+  "20260521000003_gebelik_deneme_no_per_cycle.sql",
+  "20260522000002_tohumlama_cycle_iptal.sql",
+  "20260522000005_tohumlama_kaydet_hardblock.sql",
+  "20260526000003_ek_uygulama_stok.sql",
+  "20260531200000_faz_b_vwp_enforcement.sql",
+  "20260601000005_tohumlama_kaydet_otomatik_bos.sql",
+  "20260605000002_timezone_fix.sql",
+  "20260605000007_tohumlama_kaydet_update.sql",
+  "20260624000010_tohumlama_kaydet_otomatik_bos_v2.sql",
+  "20260730000001_sablon_tohumlama_opsiyonel_ve_yasam_dongusu.sql",
+  "20260830000010_abort_vwp_penceresi.sql",
+  "20260830000034_review_fix_paketi.sql",
+  "20260910000002_sperma_eslesme_sertlestirme.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_orphan_gorev_temizle": [
+  "20260625000040_orphan_cron_capture.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_sonuc_bekliyor": [
+  "20260327000001_tohumlama_sonuc_bos_bekliyor.sql",
+  "20260427000001_tohumlama_sonuc_bekliyor.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_sonuc_bos": [
+  "20260327000001_tohumlama_sonuc_bos_bekliyor.sql",
+  "20260330000031_tohumlama_sonuc_rpcs.sql",
+  "20260409000002_fix_tohumlama_sonuc_bos.sql",
+  "20260502000001_tohumlama_sonuc_bos_formal.sql",
+  "20260512000006_tohumlama_sonuc_bos.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_sonuc_gebe": [
+  "20260326000030_tohumlama_event_stack.sql",
+  "20260409000001_fix_tohumlama_sonuc_gebe.sql",
+  "20260509000001_ileri_gebe_gorev.sql",
+  "20260722000004_tohumlama_son_kayit_tarih_siralama.sql",
+  "20260730000001_sablon_tohumlama_opsiyonel_ve_yasam_dongusu.sql",
+  "20260830000031_gebe_sonuc_mesaji.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:tohumlama_tekrar_kaydet": [
+  "20260522000004_tekrar_asim.sql",
+  "20260605000002_timezone_fix.sql",
+  "20260722000004_tohumlama_son_kayit_tarih_siralama.sql",
+  "20260910000002_sperma_eslesme_sertlestirme.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:treatment_day_not_guncelle": [
+  "20260525000004_treatment_day_not.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:treatment_day_tamamla": [
+  "20260525000002_treatment_day_done.sql",
+  "20260528000001_tedavi_gun_ux.sql",
+  "20260608000001_bug056_057_fix.sql",
+  "20260611000002_bug059_rpcs.sql",
+  "20260613000005_tedavi_gun_tamamla_eksik_update.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:trg_sutten_kesme_kapat": [
+  "20260620000002_sutten_kesme_trigger.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:trg_sutten_kesme_normalize": [
+  "20260620000002_sutten_kesme_trigger.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:update_drug_administration": [
+  "20260403000003_update_drug_administration.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:update_treatment_session": [
+  "20260613000004_seans_incremental_edit.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:update_treatment_time": [
+  "20260325000025_treatment_time.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:vaccination_dismiss": [
+  "20260502000005_asi_dismiss.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:vaccination_stok_dusum": [
+  "20260331000032_vaccination_module.sql",
+  "20260902000002_asi_stok_serbest_dusum.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:vaccine_rapel_guncelle": [
+  "20260516000001_faz1_rpc_bypass_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "fn:vaka_tohumlama_ekle": [
+  "20260730000002_vaka_tohumlama_ekle.sql"
+ ],
+ "fn:vaka_toplu_ac": [
+  "20260906120000_vaka_toplu_ac.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:agent_messages_thread_idx@agent_messages": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "idx:agent_plans_pkey@agent_plans": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:agent_threads_user_idx@agent_threads": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "idx:cases_animal_id_idx@cases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:cases_status_idx@cases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:da_seans_admin_id_idx@drug_administrations": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:dogum_buzagi_id_uidx@dogum": [
+  "20260911000001_dogum_buzagi_id_foundation.sql"
+ ],
+ "idx:dogum_pkey@dogum": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:drug_admin_day_id_idx@drug_administrations": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:hayvan_override_pkey@hayvan_override": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:hayvanlar_kupe_no_key@hayvanlar": [
+  "20260901000002_kupe_revizyon.sql"
+ ],
+ "idx:idx_agent_plans_durum@agent_plans": [
+  "20260622000001_agent_plans.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_agent_plans_thread@agent_plans": [
+  "20260622000001_agent_plans.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_bildirim_durum@bildirim_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_bildirim_hayvan@bildirim_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_bildirim_tip@bildirim_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_cop_geri@cop_kutusu": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_cop_silme@cop_kutusu": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_cop_tablo@cop_kutusu": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_degisim_log_tablo_pk@degisim_log": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql"
+ ],
+ "idx:idx_degisim_log_txid@degisim_log": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql"
+ ],
+ "idx:idx_degisim_log_zaman@degisim_log": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql"
+ ],
+ "idx:idx_dogum_anne_tarih@dogum": [
+  "20260603000004_protokol_scanner.sql",
+  "20260603000005_protokol_fix_v2.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_drug_products_brand_class@drug_products": [
+  "20260401000001_drug_product_ekle.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_geri_alma_kullanim_bilet@surum_gizli": [
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql"
+ ],
+ "idx:idx_gorev_log_etken@gorev_log": [
+  "20260603000001_protokol_etken_kod.sql"
+ ],
+ "idx:idx_gorev_log_ref_tohumlama@gorev_log": [
+  "20260522000002_tohumlama_cycle_iptal.sql"
+ ],
+ "idx:idx_gorev_protokol@gorev_log": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_hayvanlar_etiketler@hayvanlar": [
+  "20260602000001_etiketler_kolonu.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_islem_durum@islem_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_islem_hayvan@islem_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_islem_log_degisim_txid@islem_log": [
+  "20260914000001_l4_islem_log_kopru.sql"
+ ],
+ "idx:idx_islem_tarih@islem_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_parentage_farm_child@pedigree_parentage": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "idx:idx_parentage_farm_parent@pedigree_parentage": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "idx:idx_parentage_farm_role_child@pedigree_parentage": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "idx:idx_pedigree_nodes_farm_kind@pedigree_nodes": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "idx:idx_pi_hayvan_durum@protokol_instance": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_pi_kaynak_ref@protokol_instance": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_pi_tip_alttip@protokol_instance": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_tohumlama_hayvan_sonuc@tohumlama": [
+  "20260603000005_protokol_fix_v2.sql"
+ ],
+ "idx:idx_tohumlama_hayvan_sonuc_tarih@tohumlama": [
+  "20260603000004_protokol_scanner.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_ui_logs_session@ui_logs": [
+  "20260401000034_ui_telemetry.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_uygulama_log_hayvan@uygulama_log": [
+  "20260603000002_uygulama_log.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:idx_uygulama_log_tarih@uygulama_log": [
+  "20260603000002_uygulama_log.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:kizginlik_log_cozuldu_idx@kizginlik_log": [
+  "20260519000002_kizginlik_tedavi_sil.sql"
+ ],
+ "idx:she_disease_idx@sablon_hastalik_eslem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:she_sablon_idx@sablon_hastalik_eslem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:tdu_case_date_idx@treatment_day_uygulamalar": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:tdu_day_id_idx@treatment_day_uygulamalar": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:tdu_late_idx@treatment_day_uygulamalar": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:tdu_open_idx@treatment_day_uygulamalar": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:tedavi_pkey@tedavi": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:treatment_days_case_id_idx@treatment_days": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:tsk_sablon_idx@tedavi_sablonu_kalem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:ui_logs_pkey@ui_logs": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:uq_gorev_rota_2doz_active@gorev_log": [
+  "20260613000001_asi_rapel_dupe_fix.sql"
+ ],
+ "idx:uq_pedigree_nodes_registry@pedigree_nodes": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "idx:vac_log_animal_id_idx@vaccination_log": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:vac_log_date_idx@vaccination_log": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:vac_log_vaccine_id_idx@vaccination_log": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:vac_schedule_vaccine_id_idx@vaccination_schedule": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:vaccine_diseases_disease_idx@vaccine_diseases": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "idx:vaccine_protocol_steps_vac_idx@vaccine_protocol_steps": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:agent_messages_owner@agent_messages": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "pol:agent_plans_insert@agent_plans": [
+  "20260622000001_agent_plans.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:agent_plans_select@agent_plans": [
+  "20260622000001_agent_plans.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:agent_plans_update@agent_plans": [
+  "20260622000001_agent_plans.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:agent_threads_owner@agent_threads": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "pol:allow all@dogum": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:allow all@kizginlik_log": [
+  "20260616000001_kizginlik_log_rls_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:allow all@tedavi": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:allow_all@pedigree_meta": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "pol:allow_all@pedigree_nodes": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "pol:allow_all@pedigree_parentage": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "pol:allow_all@public": [
+  "20260306000008_blok1_backend.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:allow_all@semen_catalog": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "pol:anon insert@ui_logs": [
+  "20260401000034_ui_telemetry.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon select kizginlik_log@kizginlik_log": [
+  "20260409000003_fix_kizginlik_log_select_policy.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon select@ui_logs": [
+  "20260401000034_ui_telemetry.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_all@dogum": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_all_protokol_dismiss@protokol_dismiss": [
+  "20260603000004_protokol_scanner.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_all_sablon_hastalik_eslem@sablon_hastalik_eslem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_all_tedavi_sablonu@tedavi_sablonu": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_all_tedavi_sablonu_kalem@tedavi_sablonu_kalem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_all_uygulama_log@uygulama_log": [
+  "20260603000002_uygulama_log.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_insert_drug_classes@drug_classes": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_insert_drug_products@drug_products": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_read_drug_classes@drug_classes": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:anon_read_drug_products@drug_products": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:cases_all@cases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:degisim_log_select@degisim_log": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql"
+ ],
+ "pol:diseases_select@diseases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:drug_administrations_all@drug_administrations": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:drugs_select@drugs": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:gpe_all@grup_padok_eslem": [
+  "20260511000001_padoklar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:hekimler_all@hekimler": [
+  "20260308000009_sperma_stok_fix.sql",
+  "20260511000002_hekim_sperma_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:padoklar_all@padoklar": [
+  "20260511000001_padoklar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:protokol_ayar_all@protokol_ayar": [
+  "20260620000001_protokol_ayar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:protokol_instance_all@protokol_instance": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:service_insert@islem_log": [
+  "20260914000003_l4_onarim.sql"
+ ],
+ "pol:stok_kat_all@stok_kategorileri": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:stok_kat_select@stok_kategorileri": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:tedavi_delete@tedavi": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:tedavi_insert@tedavi": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:tedavi_select@tedavi": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:tedavi_update@tedavi": [
+  "20260312000019_tedavi_yeniden_tasarim.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:treatment_day_uygulamalar_all@treatment_day_uygulamalar": [
+  "20260613000003_bug059_seans_rls_policy_fix.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:treatment_days_all@treatment_days": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:vac_log_all@vaccination_log": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:vac_schedule_select@vaccination_schedule": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:vaccine_diseases_all@vaccine_diseases": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:vaccine_protocol_steps_all@vaccine_protocol_steps": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "pol:vaccines_select@vaccines": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:agent_messages": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "tbl:agent_plans": [
+  "20260622000001_agent_plans.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:agent_threads": [
+  "20260621000001_agent_threads.sql"
+ ],
+ "tbl:as": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:bildirim_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:buzagi_takip": [
+  "20260303000001_initial_schema.sql"
+ ],
+ "tbl:cases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:cop_kutusu": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:degisim_log": [
+  "20260913000001_surum_gecmisi_f1_degisim_log.sql"
+ ],
+ "tbl:diseases": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:dogum": [
+  "20260303000001_initial_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:drug_administrations": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:drug_classes": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:drug_products": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:drugs": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:gorev_log": [
+  "20260303000001_initial_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:grup_padok_eslem": [
+  "20260511000001_padoklar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:hastalik_log": [
+  "20260303000001_initial_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:hayvan_override": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:hayvanlar": [
+  "20260303000001_initial_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:hekimler": [
+  "20260308000009_sperma_stok_fix.sql",
+  "20260511000002_hekim_sperma_sil.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:irk_esik": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:islem_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:kizginlik_log": [
+  "20260306000006_faz1_core.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:padoklar": [
+  "20260511000001_padoklar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:pedigree_meta": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "tbl:pedigree_nodes": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "tbl:pedigree_parentage": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "tbl:protokol_ayar": [
+  "20260620000001_protokol_ayar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:protokol_dismiss": [
+  "20260603000004_protokol_scanner.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:protokol_instance": [
+  "20260605000003_protokol_instance_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:sablon_hastalik_eslem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:semen_catalog": [
+  "20260911000002_pedigree_foundation.sql"
+ ],
+ "tbl:stok": [
+  "20260303000001_initial_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:stok_hareket": [
+  "20260303000001_initial_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:stok_kategorileri": [
+  "20260529000001_tanimlar_crud.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:surum_gizli": [
+  "20260913000002_surum_gecmisi_f2_geri_alma.sql",
+  "20260914000003_l4_onarim.sql"
+ ],
+ "tbl:tedavi": [
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:tedavi_sablonu": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:tedavi_sablonu_kalem": [
+  "20260613000007_sablon_tablolar.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:tohumlama": [
+  "20260303000001_initial_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:treatment_day_uygulamalar": [
+  "20260611000001_bug059_treatment_sessions.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:treatment_days": [
+  "20260312000022_case_management.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:ui_logs": [
+  "20260401000034_ui_telemetry.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:uygulama_log": [
+  "20260603000002_uygulama_log.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:vaccination_log": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:vaccination_schedule": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:vaccine_diseases": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:vaccine_protocol_steps": [
+  "20260619000010_asi_schema.sql",
+  "99999999999999_ground_truth.sql"
+ ],
+ "tbl:vaccines": [
+  "20260331000032_vaccination_module.sql",
+  "99999999999999_ground_truth.sql"
+ ]
+}

@@ -1,0 +1,1036 @@
+{
+ "fonksiyonlar": {
+  "sadece_Y": [],
+  "sadece_C": [
+   "public._dogum_buzagi_backfill()",
+   "public._pedigree_parent_set_core(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text, p_source_ref text, p_replace boolean, p_evidence jsonb)",
+   "public._trg_pedigree_hayvan_insert()",
+   "public.assert_is_operator()",
+   "public.fn_sperma_stok_dus(p_sperma text, p_notlar text)",
+   "public.hayvan_kilo_guncelle(p_id text, p_canli_agirlik numeric)",
+   "public.ilac_dozaj_guncelle(p_id uuid, p_guncellemeler jsonb)",
+   "public.pedigree_ensure_farm_node(p_hayvan_id text)",
+   "public.pedigree_external_upsert(p_display_name text, p_node_id uuid, p_sex text, p_breed text, p_birth_date date, p_registry_system text, p_registry_code text)",
+   "public.pedigree_farm_backfill()",
+   "public.pedigree_integrity_report()",
+   "public.pedigree_is_ancestor(p_ancestor uuid, p_descendant uuid)",
+   "public.pedigree_parent_set(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text, p_source_ref text, p_replace boolean, p_evidence jsonb)",
+   "public.pedigree_subgraph(p_focus_node_id uuid, p_ancestor_depth integer, p_descendant_depth integer)",
+   "public.pedigree_subgraph_for_animal(p_hayvan_id text, p_ancestor_depth integer, p_descendant_depth integer)",
+   "public.pedigree_try_timestamptz(p_value text)",
+   "public.semen_catalog_upsert(p_display_name text, p_id uuid, p_bull_node_id uuid, p_registry_system text, p_registry_code text, p_stock_id text, p_code text, p_supplier text, p_semen_type text, p_active boolean)"
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 17,
+  "gövde_farklı_ortak": [
+   [
+    "public._guard_tohumlama_yas_cinsiyet()",
+    "13a0a02039",
+    "a9bc818b5c"
+   ],
+   [
+    "public.dogum_kaydet(p_anne_id text, p_tarih date, p_kupe text, p_cins text, p_tip text, p_kg numeric, p_baba text, p_hekim_id text)",
+    "9a48f9aa56",
+    "bc629de489"
+   ],
+   [
+    "public.gebelik_kaydet_manual(p_hayvan_id text, p_tarih date, p_sperma text)",
+    "314d9c0397",
+    "3952e9daa2"
+   ],
+   [
+    "public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb, p_vwp_override boolean)",
+    "e144cf1f71",
+    "e4ab00a63d"
+   ],
+   [
+    "public.tohumlama_tekrar_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text)",
+    "64dc7fc09a",
+    "83fe917252"
+   ]
+  ],
+  "gövde_farklı_sayi": 5,
+  "sadece_C_migration": {
+   "public._dogum_buzagi_backfill()": [
+    "20260911000001_dogum_buzagi_id_foundation.sql"
+   ],
+   "public._pedigree_parent_set_core(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text, p_source_ref text, p_replace boolean, p_evidence jsonb)": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public._trg_pedigree_hayvan_insert()": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.assert_is_operator()": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.fn_sperma_stok_dus(p_sperma text, p_notlar text)": [
+    "20260910000001_planli_tohumlama_sperma_dus.sql"
+   ],
+   "public.hayvan_kilo_guncelle(p_id text, p_canli_agirlik numeric)": [
+    "20260909110000_dozaj_helper_min_max_rpc.sql"
+   ],
+   "public.ilac_dozaj_guncelle(p_id uuid, p_guncellemeler jsonb)": [
+    "20260909110000_dozaj_helper_min_max_rpc.sql"
+   ],
+   "public.pedigree_ensure_farm_node(p_hayvan_id text)": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_external_upsert(p_display_name text, p_node_id uuid, p_sex text, p_breed text, p_birth_date date, p_registry_system text, p_registry_code text)": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_farm_backfill()": [
+    "20260911000003_pedigree_farm_backfill.sql"
+   ],
+   "public.pedigree_integrity_report()": [
+    "20260911000003_pedigree_farm_backfill.sql"
+   ],
+   "public.pedigree_is_ancestor(p_ancestor uuid, p_descendant uuid)": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_parent_set(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text, p_source_ref text, p_replace boolean, p_evidence jsonb)": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_subgraph(p_focus_node_id uuid, p_ancestor_depth integer, p_descendant_depth integer)": [
+    "20260911000004_pedigree_projection_rpc.sql"
+   ],
+   "public.pedigree_subgraph_for_animal(p_hayvan_id text, p_ancestor_depth integer, p_descendant_depth integer)": [
+    "20260911000004_pedigree_projection_rpc.sql"
+   ],
+   "public.pedigree_try_timestamptz(p_value text)": [
+    "20260911000003_pedigree_farm_backfill.sql"
+   ],
+   "public.semen_catalog_upsert(p_display_name text, p_id uuid, p_bull_node_id uuid, p_registry_system text, p_registry_code text, p_stock_id text, p_code text, p_supplier text, p_semen_type text, p_active boolean)": [
+    "20260911000002_pedigree_foundation.sql"
+   ]
+  },
+  "gövde_farklı_migration": {
+   "public._guard_tohumlama_yas_cinsiyet()": [
+    "20260831000003_tablo_guard_triggerlari.sql"
+   ],
+   "public.dogum_kaydet(p_anne_id text, p_tarih date, p_kupe text, p_cins text, p_tip text, p_kg numeric, p_baba text, p_hekim_id text)": [
+    "20260306000008_blok1_backend.sql",
+    "20260326000026_grup_padok_fixes.sql",
+    "20260326000027_besi_trigger_baba_fixes.sql",
+    "20260521000005_besleme_gorevi.sql",
+    "20260603000001_protokol_etken_kod.sql",
+    "20260605000001_dogum_kaydet_besleme_fix.sql",
+    "20260605000006_dogum_kaydet_update.sql",
+    "20260628000001_dogum_kaydet_pg_d11_to_d39.sql",
+    "20260628000002_dogum_pg_etken_kod_link.sql",
+    "20260710000001_protokol_etken_kod_authoritative.sql",
+    "20260730000002_dogum_sonrasi_e_vitamini.sql",
+    "20260901000001_ikiz_dogum_olay_id.sql",
+    "20260901000002_kupe_revizyon.sql",
+    "20260906000001_postpartum_d53_e_vitamin_tek.sql",
+    "20260911000001_dogum_buzagi_id_foundation.sql",
+    "99999999999999_ground_truth.sql"
+   ],
+   "public.gebelik_kaydet_manual(p_hayvan_id text, p_tarih date, p_sperma text)": [
+    "20260516000001_faz1_rpc_bypass_fix.sql",
+    "20260605000002_timezone_fix.sql",
+    "20260910000003_gebelik_kaydet_manual_42804_fix.sql",
+    "99999999999999_ground_truth.sql"
+   ],
+   "public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb, p_vwp_override boolean)": [
+    "20260306000008_blok1_backend.sql",
+    "20260308000009_sperma_stok_fix.sql",
+    "20260326000030_tohumlama_event_stack.sql",
+    "20260521000003_gebelik_deneme_no_per_cycle.sql",
+    "20260522000002_tohumlama_cycle_iptal.sql",
+    "20260522000005_tohumlama_kaydet_hardblock.sql",
+    "20260526000003_ek_uygulama_stok.sql",
+    "20260531200000_faz_b_vwp_enforcement.sql",
+    "20260601000005_tohumlama_kaydet_otomatik_bos.sql",
+    "20260605000002_timezone_fix.sql",
+    "20260605000007_tohumlama_kaydet_update.sql",
+    "20260624000010_tohumlama_kaydet_otomatik_bos_v2.sql",
+    "20260730000001_sablon_tohumlama_opsiyonel_ve_yasam_dongusu.sql",
+    "20260830000010_abort_vwp_penceresi.sql",
+    "20260830000034_review_fix_paketi.sql",
+    "20260910000002_sperma_eslesme_sertlestirme.sql",
+    "99999999999999_ground_truth.sql"
+   ],
+   "public.tohumlama_tekrar_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text)": [
+    "20260522000004_tekrar_asim.sql",
+    "20260605000002_timezone_fix.sql",
+    "20260722000004_tohumlama_son_kayit_tarih_siralama.sql",
+    "20260910000002_sperma_eslesme_sertlestirme.sql",
+    "99999999999999_ground_truth.sql"
+   ]
+  }
+ },
+ "tablolar": {
+  "sadece_Y": [],
+  "sadece_C": [
+   "pedigree_meta",
+   "pedigree_nodes",
+   "pedigree_parentage",
+   "semen_catalog"
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 4,
+  "sadece_C_migration": {
+   "pedigree_meta": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "pedigree_nodes": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "pedigree_parentage": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "semen_catalog": [
+    "20260911000002_pedigree_foundation.sql"
+   ]
+  }
+ },
+ "kolonlar": {
+  "sadece_Y": [],
+  "sadece_C": [
+   "dogum@buzagi_id",
+   "drug_products@std_dose",
+   "drug_products@std_dose_max",
+   "drug_products@std_dose_min",
+   "drug_products@std_dose_unit",
+   "pedigree_meta@farm_id",
+   "pedigree_meta@key",
+   "pedigree_meta@value",
+   "pedigree_nodes@birth_date",
+   "pedigree_nodes@breed",
+   "pedigree_nodes@country_code",
+   "pedigree_nodes@created_at",
+   "pedigree_nodes@display_name",
+   "pedigree_nodes@farm_animal_id",
+   "pedigree_nodes@farm_id",
+   "pedigree_nodes@founder_status",
+   "pedigree_nodes@id",
+   "pedigree_nodes@metadata",
+   "pedigree_nodes@node_kind",
+   "pedigree_nodes@registry_code",
+   "pedigree_nodes@registry_system",
+   "pedigree_nodes@sex",
+   "pedigree_nodes@updated_at",
+   "pedigree_parentage@child_node_id",
+   "pedigree_parentage@confidence",
+   "pedigree_parentage@created_at",
+   "pedigree_parentage@evidence",
+   "pedigree_parentage@farm_id",
+   "pedigree_parentage@id",
+   "pedigree_parentage@parent_node_id",
+   "pedigree_parentage@parent_role",
+   "pedigree_parentage@source_ref",
+   "pedigree_parentage@source_type",
+   "semen_catalog@active",
+   "semen_catalog@bull_node_id",
+   "semen_catalog@code",
+   "semen_catalog@created_at",
+   "semen_catalog@display_name",
+   "semen_catalog@farm_id",
+   "semen_catalog@id",
+   "semen_catalog@metadata",
+   "semen_catalog@semen_type",
+   "semen_catalog@stock_id",
+   "semen_catalog@supplier"
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 44,
+  "öznitelik_farklı": [],
+  "öznitelik_farklı_sayi": 0,
+  "sadece_C_migration": {
+   "dogum@buzagi_id": [
+    "20260911000001_dogum_buzagi_id_foundation.sql"
+   ],
+   "drug_products@std_dose": [
+    "20260909100000_dozaj_std_dose_seed.sql"
+   ],
+   "drug_products@std_dose_max": [],
+   "drug_products@std_dose_min": [
+    "20260909110000_dozaj_helper_min_max_rpc.sql"
+   ],
+   "drug_products@std_dose_unit": [],
+   "pedigree_meta@farm_id": [],
+   "pedigree_meta@key": [],
+   "pedigree_meta@value": [],
+   "pedigree_nodes@birth_date": [],
+   "pedigree_nodes@breed": [],
+   "pedigree_nodes@country_code": [],
+   "pedigree_nodes@created_at": [],
+   "pedigree_nodes@display_name": [],
+   "pedigree_nodes@farm_animal_id": [],
+   "pedigree_nodes@farm_id": [],
+   "pedigree_nodes@founder_status": [],
+   "pedigree_nodes@id": [],
+   "pedigree_nodes@metadata": [],
+   "pedigree_nodes@node_kind": [],
+   "pedigree_nodes@registry_code": [],
+   "pedigree_nodes@registry_system": [],
+   "pedigree_nodes@sex": [],
+   "pedigree_nodes@updated_at": [],
+   "pedigree_parentage@child_node_id": [],
+   "pedigree_parentage@confidence": [],
+   "pedigree_parentage@created_at": [],
+   "pedigree_parentage@evidence": [],
+   "pedigree_parentage@farm_id": [],
+   "pedigree_parentage@id": [],
+   "pedigree_parentage@parent_node_id": [],
+   "pedigree_parentage@parent_role": [],
+   "pedigree_parentage@source_ref": [],
+   "pedigree_parentage@source_type": [],
+   "semen_catalog@active": [],
+   "semen_catalog@bull_node_id": [],
+   "semen_catalog@code": [],
+   "semen_catalog@created_at": [],
+   "semen_catalog@display_name": [],
+   "semen_catalog@farm_id": [],
+   "semen_catalog@id": [],
+   "semen_catalog@metadata": [],
+   "semen_catalog@semen_type": [],
+   "semen_catalog@stock_id": [],
+   "semen_catalog@supplier": []
+  }
+ },
+ "triggerlar": {
+  "sadece_Y": [],
+  "sadece_C": [
+   "public.hayvanlar.trg_pedigree_hayvan_insert"
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 1,
+  "gövde_farklı": [],
+  "sadece_C_migration": {
+   "public.hayvanlar.trg_pedigree_hayvan_insert": []
+  }
+ },
+ "policyler": {
+  "sadece_Y": [],
+  "sadece_C": [
+   "public.pedigree_meta.allow_all",
+   "public.pedigree_nodes.allow_all",
+   "public.pedigree_parentage.allow_all",
+   "public.semen_catalog.allow_all"
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 4,
+  "gövde_farklı": []
+ },
+ "grant_tablo": {
+  "sadece_Y": [],
+  "sadece_C": [
+   [
+    "public",
+    "pedigree_meta",
+    "agent_readonly",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "demo_reader",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "postgres",
+    "DELETE"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "postgres",
+    "INSERT"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "postgres",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "postgres",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "postgres",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "postgres",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "postgres",
+    "UPDATE"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "service_role",
+    "DELETE"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "service_role",
+    "INSERT"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "service_role",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "service_role",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "service_role",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "service_role",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "pedigree_meta",
+    "service_role",
+    "UPDATE"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "agent_readonly",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "demo_reader",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "postgres",
+    "DELETE"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "postgres",
+    "INSERT"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "postgres",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "postgres",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "postgres",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "postgres",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "postgres",
+    "UPDATE"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "service_role",
+    "DELETE"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "service_role",
+    "INSERT"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "service_role",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "service_role",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "service_role",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "service_role",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "pedigree_nodes",
+    "service_role",
+    "UPDATE"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "agent_readonly",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "demo_reader",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "postgres",
+    "DELETE"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "postgres",
+    "INSERT"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "postgres",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "postgres",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "postgres",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "postgres",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "postgres",
+    "UPDATE"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "service_role",
+    "DELETE"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "service_role",
+    "INSERT"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "service_role",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "service_role",
+    "SELECT"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "service_role",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "service_role",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "pedigree_parentage",
+    "service_role",
+    "UPDATE"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "agent_readonly",
+    "SELECT"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "authenticated",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "authenticated",
+    "SELECT"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "authenticated",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "authenticated",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "demo_reader",
+    "SELECT"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "postgres",
+    "DELETE"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "postgres",
+    "INSERT"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "postgres",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "postgres",
+    "SELECT"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "postgres",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "postgres",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "postgres",
+    "UPDATE"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "service_role",
+    "DELETE"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "service_role",
+    "INSERT"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "service_role",
+    "REFERENCES"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "service_role",
+    "SELECT"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "service_role",
+    "TRIGGER"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "service_role",
+    "TRUNCATE"
+   ],
+   [
+    "public",
+    "semen_catalog",
+    "service_role",
+    "UPDATE"
+   ]
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 68
+ },
+ "grant_routine": {
+  "sadece_Y": [],
+  "sadece_C": [
+   [
+    "public",
+    "_dogum_buzagi_backfill",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "_dogum_buzagi_backfill",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "_dogum_buzagi_backfill",
+    "service_role",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "_pedigree_parent_set_core",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "_trg_pedigree_hayvan_insert",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "assert_is_operator",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "fn_sperma_stok_dus",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "fn_sperma_stok_dus",
+    "service_role",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "hayvan_kilo_guncelle",
+    "PUBLIC",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "hayvan_kilo_guncelle",
+    "anon",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "hayvan_kilo_guncelle",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "hayvan_kilo_guncelle",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "hayvan_kilo_guncelle",
+    "service_role",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "ilac_dozaj_guncelle",
+    "PUBLIC",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "ilac_dozaj_guncelle",
+    "anon",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "ilac_dozaj_guncelle",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "ilac_dozaj_guncelle",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "ilac_dozaj_guncelle",
+    "service_role",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_ensure_farm_node",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_external_upsert",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_external_upsert",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_farm_backfill",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_integrity_report",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_integrity_report",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_is_ancestor",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_parent_set",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_parent_set",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_subgraph",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_subgraph",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_subgraph_for_animal",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_subgraph_for_animal",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "pedigree_try_timestamptz",
+    "postgres",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "semen_catalog_upsert",
+    "authenticated",
+    "EXECUTE"
+   ],
+   [
+    "public",
+    "semen_catalog_upsert",
+    "postgres",
+    "EXECUTE"
+   ]
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 34
+ },
+ "indexler": {
+  "sadece_Y": [],
+  "sadece_C": [
+   "public.dogum.dogum_buzagi_id_uidx",
+   "public.pedigree_meta.pedigree_meta_pkey",
+   "public.pedigree_nodes.idx_pedigree_nodes_farm_kind",
+   "public.pedigree_nodes.pedigree_nodes_farm_animal_id_key",
+   "public.pedigree_nodes.pedigree_nodes_farm_id_id_key",
+   "public.pedigree_nodes.pedigree_nodes_pkey",
+   "public.pedigree_nodes.uq_pedigree_nodes_registry",
+   "public.pedigree_parentage.idx_parentage_farm_child",
+   "public.pedigree_parentage.idx_parentage_farm_parent",
+   "public.pedigree_parentage.idx_parentage_farm_role_child",
+   "public.pedigree_parentage.pedigree_parentage_farm_child_role_key",
+   "public.pedigree_parentage.pedigree_parentage_pkey",
+   "public.semen_catalog.semen_catalog_farm_stock_key",
+   "public.semen_catalog.semen_catalog_pkey"
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 14,
+  "gövde_farklı": [],
+  "sadece_C_migration": {
+   "public.dogum.dogum_buzagi_id_uidx": [
+    "20260911000001_dogum_buzagi_id_foundation.sql"
+   ],
+   "public.pedigree_meta.pedigree_meta_pkey": [],
+   "public.pedigree_nodes.idx_pedigree_nodes_farm_kind": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_nodes.pedigree_nodes_farm_animal_id_key": [],
+   "public.pedigree_nodes.pedigree_nodes_farm_id_id_key": [],
+   "public.pedigree_nodes.pedigree_nodes_pkey": [],
+   "public.pedigree_nodes.uq_pedigree_nodes_registry": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_parentage.idx_parentage_farm_child": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_parentage.idx_parentage_farm_parent": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_parentage.idx_parentage_farm_role_child": [
+    "20260911000002_pedigree_foundation.sql"
+   ],
+   "public.pedigree_parentage.pedigree_parentage_farm_child_role_key": [],
+   "public.pedigree_parentage.pedigree_parentage_pkey": [],
+   "public.semen_catalog.semen_catalog_farm_stock_key": [],
+   "public.semen_catalog.semen_catalog_pkey": []
+  }
+ },
+ "constraintler": {
+  "sadece_Y": [],
+  "sadece_C": [
+   "public.dogum.dogum_buzagi_id_fkey",
+   "public.drug_products.drug_products_std_dose_unit_check",
+   "public.pedigree_meta.pedigree_meta_pkey",
+   "public.pedigree_nodes.chk_pedigree_nodes_kind_invariant",
+   "public.pedigree_nodes.pedigree_nodes_farm_animal_id_fkey",
+   "public.pedigree_nodes.pedigree_nodes_farm_animal_id_key",
+   "public.pedigree_nodes.pedigree_nodes_farm_id_id_key",
+   "public.pedigree_nodes.pedigree_nodes_founder_status_check",
+   "public.pedigree_nodes.pedigree_nodes_node_kind_check",
+   "public.pedigree_nodes.pedigree_nodes_pkey",
+   "public.pedigree_parentage.chk_parentage_parent_ne_child",
+   "public.pedigree_parentage.fk_parentage_child_farm_node",
+   "public.pedigree_parentage.fk_parentage_parent_farm_node",
+   "public.pedigree_parentage.pedigree_parentage_confidence_check",
+   "public.pedigree_parentage.pedigree_parentage_farm_child_role_key",
+   "public.pedigree_parentage.pedigree_parentage_parent_role_check",
+   "public.pedigree_parentage.pedigree_parentage_pkey",
+   "public.pedigree_parentage.pedigree_parentage_source_type_check",
+   "public.semen_catalog.fk_semen_catalog_bull_farm_node",
+   "public.semen_catalog.semen_catalog_farm_stock_key",
+   "public.semen_catalog.semen_catalog_pkey",
+   "public.semen_catalog.semen_catalog_stock_id_fkey"
+  ],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 22,
+  "gövde_farklı": []
+ },
+ "viewler": {
+  "sadece_Y": [],
+  "sadece_C": [],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 0,
+  "gövde_farklı": []
+ },
+ "extensionlar": {
+  "sadece_Y": [],
+  "sadece_C": [],
+  "sadece_Y_sayi": 0,
+  "sadece_C_sayi": 0,
+  "sürüm_farklı": []
+ }
+}
