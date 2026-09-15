@@ -1,0 +1,22 @@
+--- prod-canli
++++ dosya-a
+@@ -38,13 +38,12 @@
+ (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL', '21. Gün gebelik kontrolü', p_tarih + 21, false, v_toh.id::text),
+ (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL', '35. Gün gebelik kontrolü', p_tarih + 35, false, v_toh.id::text);
+ 
+-INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar, iptal)
+-SELECT s.id, 'Tohumlama', 1,
+-'Tekrar Aşım ' || (v_toh.deneme_sayisi + 1) || '. deneme — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id), false
+-FROM public.stok s
+-WHERE (s.urun_adi ILIKE '%' || p_sperma || '%' OR s.urun_adi = p_sperma)
+-AND s.kategori = 'Sperma'
+-LIMIT 1;
++-- BUG-002 (M2): matcher paylasilan helper'a baglandi (canli notlar metni
++-- korunur); bos/whitespace ad artik rastgele Sperma satirindan dusmez.
++PERFORM public.fn_sperma_stok_dus(
++p_sperma,
++'Tekrar Aşım ' || (v_toh.deneme_sayisi + 1) || '. deneme — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id)
++);
+ 
+ RETURN jsonb_build_object('ok', true, 'tohumlama_id', v_toh.id, 'deneme_sayisi', v_toh.deneme_sayisi + 1);
+ END;
