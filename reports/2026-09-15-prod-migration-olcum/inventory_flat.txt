@@ -1,0 +1,329 @@
+== 20260830000010_abort_vwp_penceresi.sql
+   functions {"name": "public.tohumlama_abort", "args_raw": "p_tohumlama_id text, p_notlar text DEFAULT NULL::text, p_abort_tarihi date DEFAULT CURRENT_DATE"}
+   functions {"name": "public.tohumlama_kaydet", "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false"}
+   columns {"schema": "public", "table": "tohumlama", "column": "abort_tarihi"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.tohumlama_abort(text, text, date)", "to": "anon, authenticated;"}
+   dml {"kind": "UPDATE", "target": "tohumlama"}
+== 20260830000020_sessiz_vaka_filtresi_kaldir.sql
+   views {"schema": "public", "view": "v_eligible"}
+== 20260830000030_cift_abort_log_fix.sql
+   functions {"name": "public._islem_log_yaz", "args_raw": ""}
+== 20260830000031_gebe_sonuc_mesaji.sql
+   functions {"name": "public.tohumlama_sonuc_gebe", "args_raw": "p_tohumlama_id text"}
+== 20260830000032_geri_al_uuid_fallback.sql
+   functions {"name": "public.geri_al", "args_raw": "p_islem_id text"}
+== 20260830000033_geri_al_hardening.sql
+   functions {"name": "public.geri_al", "args_raw": "p_islem_id text"}
+   grants {"priv": "REVOKE EXECUTE", "kind": "FUNCTION", "obj": "public.tohumlama_abort(text, text, date)", "to": "anon;"}
+== 20260830000034_review_fix_paketi.sql
+   functions {"name": "public.tohumlama_abort", "args_raw": "p_tohumlama_id text, p_notlar text DEFAULT NULL::text, p_abort_tarihi date DEFAULT CURRENT_DATE"}
+   functions {"name": "public.tohumlama_kaydet", "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false"}
+   grants {"priv": "REVOKE EXECUTE", "kind": "FUNCTION", "obj": "public.abort_kaydet(text, text)", "to": "authenticated, anon;"}
+   dml {"kind": "UPDATE", "target": "tohumlama"}
+== 20260831000001_sessiz_ankra_fixi.sql
+   views {"schema": "public", "view": "v_eligible"}
+== 20260831000002_duve_sessiz_13ay.sql
+   views {"schema": "public", "view": "v_eligible"}
+== 20260831000003_tablo_guard_triggerlari.sql
+   functions {"name": "public._guard_hayvanlar_cinsiyet_grup", "args_raw": ""}
+   functions {"name": "public._guard_tohumlama_yas_cinsiyet", "args_raw": ""}
+   functions {"name": "public._guard_dogum_ileri_tarih", "args_raw": ""}
+   triggers {"name": "trg_hayvanlar_guard", "schema": "public", "table": "hayvanlar", "timing": "BEFORE INSERT OR UPDATE OF cinsiyet, grup, dogum_tarihi"}
+   triggers {"name": "trg_tohumlama_guard", "schema": "public", "table": "tohumlama", "timing": "BEFORE INSERT OR UPDATE OF hayvan_id, tarih"}
+   triggers {"name": "trg_dogum_guard", "schema": "public", "table": "dogum", "timing": "BEFORE INSERT OR UPDATE OF tarih"}
+   drops {"kind": "TRIGGER", "name": "trg_hayvanlar_guard", "table": "hayvanlar"}
+   drops {"kind": "TRIGGER", "name": "trg_tohumlama_guard", "table": "tohumlama"}
+   drops {"kind": "TRIGGER", "name": "trg_dogum_guard", "table": "dogum"}
+== 20260901000001_ikiz_dogum_olay_id.sql
+   functions {"name": "public.dogum_kaydet", "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi', p_tip text DEFAULT 'Normal', p_kg numeric DEFAULT NULL, p_baba text DEFAULT NULL, p_hekim_id text DEFAULT NULL"}
+   functions {"name": "public.hayvan_belirsiz_ureme_listele", "args_raw": ""}
+   columns {"schema": "public", "table": "dogum", "column": "olay_id"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)", "to": "anon, authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.hayvan_belirsiz_ureme_listele()", "to": "anon, authenticated;"}
+   grants {"priv": "SELECT", "kind": "TABLE", "obj": "public.v_ureme_dongusu", "to": "anon, authenticated;"}
+   views {"schema": "public", "view": "v_ureme_dongusu"}
+   dml {"kind": "UPDATE", "target": "dogum"}
+== 20260901000002_kupe_revizyon.sql
+   functions {"name": "public.kupe_musait_mi", "args_raw": "p_kupe_no text, p_devlet_kupe text, p_hayvan_id text DEFAULT NULL"}
+   functions {"name": "public.dogum_kaydet", "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text"}
+   functions {"name": "public.hayvan_ekle", "args_raw": "p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT 'Genel'::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_anne_id text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text, p_padok_id uuid DEFAULT NULL::uuid"}
+   functions {"name": "public.hayvan_guncelle", "args_raw": "p_id text, p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT NULL::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_notlar text DEFAULT NULL::text, p_anne_id text DEFAULT NULL::text, p_padok_id uuid DEFAULT NULL::uuid, p_kisir boolean DEFAULT NULL::boolean"}
+   functions {"name": "public.asistan_hayvan_detay", "args_raw": "p_kupe text DEFAULT NULL::text, p_id text DEFAULT NULL::text"}
+   indexes {"name": "hayvanlar_kupe_no_key", "schema": "public", "table": "hayvanlar", "unique": true}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.dogum_kaydet(text, date, text, text, text, numeric, text, text)", "to": "anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.asistan_hayvan_detay(text, text)", "to": "PUBLIC;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.asistan_hayvan_detay(text, text)", "to": "authenticated, anon;"}
+== 20260902000001_asi_stok_backfill.sql
+   dml {"kind": "INSERT", "target": "stok"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+== 20260902000002_asi_stok_serbest_dusum.sql
+   functions {"name": "public.vaccination_stok_dusum", "args_raw": ""}
+== 20260902000003_asi_planli_gorev.sql
+   functions {"name": "public.asi_gorev_planla", "args_raw": "p_hayvan_id text, p_vaccine_id uuid, p_doz numeric, p_tarih date, p_aciklama text DEFAULT NULL"}
+   functions {"name": "public.asi_planli_tamamla", "args_raw": "p_gorev_id text, p_tarih date, p_doz numeric DEFAULT NULL, p_vaccine_id uuid DEFAULT NULL"}
+   functions {"name": "public.fn_gorev_asip_iade", "args_raw": ""}
+   functions {"name": "public.gorev_tamamla", "args_raw": "p_gorev_id text, p_padok_hedef text DEFAULT NULL::text"}
+   triggers {"name": "trg_gorev_asip_iade", "schema": "public", "table": "gorev_log", "timing": "AFTER UPDATE OF iptal"}
+   drops {"kind": "TRIGGER", "name": "trg_gorev_asip_iade", "table": "gorev_log"}
+   dml {"kind": "UPDATE", "target": "gorev_log"}
+== 20260902000004_asi_toplu_gorev.sql
+   functions {"name": "public.asi_gorev_planla", "args_raw": "p_hayvan_id text, p_vaccine_id uuid, p_doz numeric, p_tarih date, p_aciklama text DEFAULT NULL"}
+   functions {"name": "public.asi_toplu_planla", "args_raw": "p_hayvan_id text, p_tarih date, p_items jsonb, p_aciklama text DEFAULT NULL"}
+== 20260906000001_postpartum_d53_e_vitamin_tek.sql
+   functions {"name": "public.dogum_kaydet", "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text"}
+   functions {"name": "public.protokol_eksik_tara", "args_raw": ""}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.dogum_kaydet(text, date, text, text, text, numeric, text, text)", "to": "anon, authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.protokol_eksik_tara()", "to": "anon, authenticated;"}
+   dml {"kind": "UPDATE", "target": "gorev_log"}
+   dml {"kind": "UPDATE", "target": "gorev_log"}
+   dml {"kind": "UPDATE", "target": "gorev_log"}
+== 20260906120000_vaka_toplu_ac.sql
+   functions {"name": "public._vaka_ac_tek", "args_raw": "p_hayvan_id text, p_disease_id uuid, p_notes text DEFAULT NULL, p_tarih date DEFAULT NULL"}
+   functions {"name": "public.create_case", "args_raw": "p_animal_id text, p_disease_id uuid, p_notes text DEFAULT NULL"}
+   functions {"name": "public.vaka_toplu_ac", "args_raw": "p_animal_ids text[], p_disease_id uuid, p_items jsonb DEFAULT NULL, p_sablon_id uuid DEFAULT NULL, p_notes text DEFAULT NULL, p_tarih date DEFAULT NULL, p_tohumlama boolean DEFAULT false, p_tohumlama_gun_offset int DEFAULT 0, p_tohumlama_saat text DEFAULT NULL, p_tohumlama_cakisma text DEFAULT 'ekle'"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.create_case(text, uuid, text)", "to": "anon, authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text)", "to": "anon, authenticated;"}
+   drops {"kind": "FUNCTION", "name": "public._vaka_ac_tek(text, uuid, text)", "table": null}
+   drops {"kind": "FUNCTION", "name": "public.create_case(text, uuid, text)", "table": null}
+   drops {"kind": "FUNCTION", "name": "public.vaka_toplu_ac(text[], uuid, uuid)", "table": null}
+   drops {"kind": "FUNCTION", "name": "public.vaka_toplu_ac(text[], uuid, uuid, text)", "table": null}
+   drops {"kind": "FUNCTION", "name": "public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text)", "table": null}
+   drops {"kind": "FUNCTION", "name": "public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text)", "table": null}
+== 20260909000001_sablon_aktif_vakaya_uygula.sql
+   functions {"name": "public.tedavi_sablon_uygula", "args_raw": "p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL"}
+   functions {"name": "public.tedavi_sablon_tohumlama_gorev_ekle", "args_raw": "p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.tedavi_sablon_uygula(uuid, uuid, date)", "to": "anon, authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid, date)", "to": "anon, authenticated;"}
+   drops {"kind": "FUNCTION", "name": "public.tedavi_sablon_uygula(uuid, uuid)", "table": null}
+   drops {"kind": "FUNCTION", "name": "public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid)", "table": null}
+== 20260909100000_dozaj_std_dose_seed.sql
+   columns {"schema": "public", "table": "drug_products", "column": "std_dose"}
+   columns {"schema": "public", "table": "drug_products", "column": "std_dose_unit"}
+   columns {"schema": "public", "table": "drug_products", "column": "constraint"}
+   constraints {"schema": "public", "table": "drug_products", "name": "drug_products_std_dose_unit_check", "kind": "CHECK"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+   dml {"kind": "UPDATE", "target": "vaccines"}
+== 20260909110000_dozaj_helper_min_max_rpc.sql
+   functions {"name": "public.ilac_dozaj_guncelle", "args_raw": "p_id uuid, p_guncellemeler jsonb"}
+   functions {"name": "public.hayvan_kilo_guncelle", "args_raw": "p_id text, p_canli_agirlik numeric"}
+   columns {"schema": "public", "table": "drug_products", "column": "std_dose_min"}
+   columns {"schema": "public", "table": "drug_products", "column": "std_dose_max"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.ilac_dozaj_guncelle(uuid, jsonb)", "to": "anon, authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.hayvan_kilo_guncelle(text, numeric)", "to": "anon, authenticated;"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+   dml {"kind": "UPDATE", "target": "drug_products"}
+== 20260910000001_planli_tohumlama_sperma_dus.sql
+   functions {"name": "public.fn_sperma_stok_dus", "args_raw": "p_sperma text, p_notlar text DEFAULT NULL::text"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.fn_sperma_stok_dus(text, text)", "to": "PUBLIC;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.fn_sperma_stok_dus(text, text)", "to": "anon;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.fn_sperma_stok_dus(text, text)", "to": "authenticated;"}
+== 20260910000002_sperma_eslesme_sertlestirme.sql
+   functions {"name": "public.tohumlama_tekrar_kaydet", "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text", "via_do": true}
+== 20260910000003_gebelik_kaydet_manual_42804_fix.sql
+   functions {"name": "public.gebelik_kaydet_manual", "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text DEFAULT NULL::text"}
+== 20260911000001_dogum_buzagi_id_foundation.sql
+   functions {"name": "public.dogum_kaydet", "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text"}
+   functions {"name": "public._dogum_buzagi_backfill", "args_raw": ""}
+   indexes {"name": "dogum_buzagi_id_uidx", "schema": "public", "table": "dogum", "unique": true}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public._dogum_buzagi_backfill()", "to": "PUBLIC;"}
+== 20260911000002_pedigree_foundation.sql
+   functions {"name": "public.assert_is_operator", "args_raw": ""}
+   functions {"name": "public.pedigree_ensure_farm_node", "args_raw": "p_hayvan_id text"}
+   functions {"name": "public.pedigree_is_ancestor", "args_raw": "p_ancestor uuid, p_descendant uuid"}
+   functions {"name": "public._pedigree_parent_set_core", "args_raw": "p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text DEFAULT 'manual', p_source_ref text DEFAULT NULL, p_replace boolean DEFAULT false, p_evidence jsonb DEFAULT NULL"}
+   functions {"name": "public.pedigree_parent_set", "args_raw": "p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text DEFAULT 'manual', p_source_ref text DEFAULT NULL, p_replace boolean DEFAULT false, p_evidence jsonb DEFAULT NULL"}
+   functions {"name": "public.pedigree_external_upsert", "args_raw": "p_display_name text, p_node_id uuid DEFAULT NULL, p_sex text DEFAULT NULL, p_breed text DEFAULT NULL, p_birth_date date DEFAULT NULL, p_registry_system text DEFAULT NULL, p_registry_code text DEFAULT NULL"}
+   functions {"name": "public.semen_catalog_upsert", "args_raw": "p_display_name text, p_id uuid DEFAULT NULL, p_bull_node_id uuid DEFAULT NULL, p_registry_system text DEFAULT NULL, p_registry_code text DEFAULT NULL, p_stock_id text DEFAULT NULL, p_code text DEFAULT NULL, p_supplier text DEFAULT NULL, p_semen_type text DEFAULT NULL, p_active boolean DEFAULT true"}
+   functions {"name": "public._trg_pedigree_hayvan_insert", "args_raw": ""}
+   tables {"schema": "public", "table": "pedigree_nodes"}
+   tables {"schema": "public", "table": "pedigree_parentage"}
+   tables {"schema": "public", "table": "semen_catalog"}
+   tables {"schema": "public", "table": "pedigree_meta"}
+   triggers {"name": "trg_pedigree_hayvan_insert", "schema": "public", "table": "hayvanlar", "timing": "AFTER INSERT"}
+   policies {"name": "allow_all", "schema": "public", "table": "pedigree_nodes"}
+   policies {"name": "allow_all", "schema": "public", "table": "pedigree_parentage"}
+   policies {"name": "allow_all", "schema": "public", "table": "semen_catalog"}
+   policies {"name": "allow_all", "schema": "public", "table": "pedigree_meta"}
+   indexes {"name": "uq_pedigree_nodes_registry", "schema": "public", "table": "pedigree_nodes", "unique": true}
+   indexes {"name": "idx_pedigree_nodes_farm_kind", "schema": "public", "table": "pedigree_nodes", "unique": false}
+   indexes {"name": "idx_parentage_farm_child", "schema": "public", "table": "pedigree_parentage", "unique": false}
+   indexes {"name": "idx_parentage_farm_parent", "schema": "public", "table": "pedigree_parentage", "unique": false}
+   indexes {"name": "idx_parentage_farm_role_child", "schema": "public", "table": "pedigree_parentage", "unique": false}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "public.pedigree_nodes", "to": "anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "public.pedigree_parentage", "to": "anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "public.pedigree_meta", "to": "anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "public.semen_catalog", "to": "anon;"}
+   grants {"priv": "REVOKE INSERT, UPDATE, DELETE", "kind": "TABLE", "obj": "public.semen_catalog", "to": "authenticated;"}
+   grants {"priv": "SELECT", "kind": "TABLE", "obj": "public.semen_catalog", "to": "authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.assert_is_operator()", "to": "PUBLIC, anon, authenticated, service_role;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_ensure_farm_node(text)", "to": "PUBLIC, anon, authenticated, service_role;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_is_ancestor(uuid,uuid)", "to": "PUBLIC, anon, authenticated, service_role;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb)", "to": "PUBLIC, anon, authenticated, service_role;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)", "to": "PUBLIC, anon, service_role;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)", "to": "authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_external_upsert(text,uuid,text,text,date,text,text)", "to": "PUBLIC, anon, service_role;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.pedigree_external_upsert(text,uuid,text,text,date,text,text)", "to": "authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)", "to": "PUBLIC, anon, service_role;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)", "to": "authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public._trg_pedigree_hayvan_insert()", "to": "PUBLIC, anon, authenticated, service_role;"}
+   drops {"kind": "POLICY", "name": "allow_all", "table": "pedigree_nodes"}
+   drops {"kind": "POLICY", "name": "allow_all", "table": "pedigree_parentage"}
+   drops {"kind": "POLICY", "name": "allow_all", "table": "semen_catalog"}
+   drops {"kind": "POLICY", "name": "allow_all", "table": "pedigree_meta"}
+   drops {"kind": "TRIGGER", "name": "trg_pedigree_hayvan_insert", "table": "hayvanlar"}
+   rls {"schema": "public", "table": "pedigree_nodes", "op": "ENABLE"}
+   rls {"schema": "public", "table": "pedigree_parentage", "op": "ENABLE"}
+   rls {"schema": "public", "table": "semen_catalog", "op": "ENABLE"}
+   rls {"schema": "public", "table": "pedigree_meta", "op": "ENABLE"}
+== 20260911000003_pedigree_farm_backfill.sql
+   functions {"name": "public.pedigree_try_timestamptz", "args_raw": "p_value text"}
+   functions {"name": "public.pedigree_farm_backfill", "args_raw": ""}
+   functions {"name": "public.pedigree_integrity_report", "args_raw": ""}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_try_timestamptz(text)", "to": "PUBLIC, anon, authenticated, service_role;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_farm_backfill()", "to": "PUBLIC, anon, authenticated, service_role;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_integrity_report()", "to": "PUBLIC, anon;"}
+   grants {"priv": "REVOKE EXECUTE", "kind": "FUNCTION", "obj": "public.pedigree_integrity_report()", "to": "service_role;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.pedigree_integrity_report()", "to": "authenticated;"}
+== 20260911000004_pedigree_projection_rpc.sql
+   functions {"name": "public.pedigree_subgraph", "args_raw": "p_focus_node_id uuid, p_ancestor_depth integer DEFAULT 4, p_descendant_depth integer DEFAULT 1"}
+   functions {"name": "public.pedigree_subgraph_for_animal", "args_raw": "p_hayvan_id text, p_ancestor_depth integer DEFAULT 4, p_descendant_depth integer DEFAULT 1"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_subgraph(uuid, integer, integer)", "to": "PUBLIC, anon, service_role;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.pedigree_subgraph(uuid, integer, integer)", "to": "authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.pedigree_subgraph_for_animal(text, integer, integer)", "to": "PUBLIC, anon, service_role;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.pedigree_subgraph_for_animal(text, integer, integer)", "to": "authenticated;"}
+== 20260913000001_surum_gecmisi_f1_degisim_log.sql
+   functions {"name": "public._degisim_log_degistirilemez", "args_raw": ""}
+   functions {"name": "public._degisim_log_yaz", "args_raw": ""}
+   tables {"schema": "public", "table": "degisim_log"}
+   triggers {"name": "trg_degisim_log_immutable", "schema": "public", "table": "degisim_log", "timing": "BEFORE UPDATE OR DELETE"}
+   triggers {"name": "trg_degisim_log_no_truncate", "schema": "public", "table": "degisim_log", "timing": "BEFORE TRUNCATE"}
+   policies {"name": "degisim_log_select", "schema": "public", "table": "degisim_log"}
+   indexes {"name": "idx_degisim_log_tablo_pk", "schema": "public", "table": "degisim_log", "unique": false}
+   indexes {"name": "idx_degisim_log_txid", "schema": "public", "table": "degisim_log", "unique": false}
+   indexes {"name": "idx_degisim_log_zaman", "schema": "public", "table": "degisim_log", "unique": false}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "public.degisim_log", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "SELECT", "kind": "TABLE", "obj": "public.degisim_log", "to": "authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public._degisim_log_yaz()", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public._degisim_log_degistirilemez()", "to": "PUBLIC, anon, authenticated;"}
+   drops {"kind": "POLICY", "name": "degisim_log_select", "table": "degisim_log"}
+   drops {"kind": "TRIGGER", "name": "trg_degisim_log_immutable", "table": "degisim_log"}
+   drops {"kind": "TRIGGER", "name": "trg_degisim_log_no_truncate", "table": "degisim_log"}
+   rls {"schema": "public", "table": "degisim_log", "op": "ENABLE"}
+== 20260913000002_surum_gecmisi_f2_geri_alma.sql
+   functions {"name": "surum_gizli._cagiran", "args_raw": ""}
+   functions {"name": "surum_gizli._kapsamda", "args_raw": "p_tablo text"}
+   functions {"name": "surum_gizli._pk_kolonlar", "args_raw": "p_tablo text"}
+   functions {"name": "surum_gizli._pk_json", "args_raw": "p_tablo text, p_pk jsonb"}
+   functions {"name": "surum_gizli._pk_gorunum", "args_raw": "p_satir_pk jsonb"}
+   functions {"name": "surum_gizli._guncel_satir", "args_raw": "p_tablo text, p_satir_pk jsonb"}
+   functions {"name": "surum_gizli._ekle_bagli", "args_raw": "p_eklenecek public.degisim_log, p_cocik public.degisim_log"}
+   functions {"name": "surum_gizli._degisim_plan", "args_raw": "p_hedef jsonb, p_seviye text"}
+   functions {"name": "surum_gizli._degisim_uygula", "args_raw": "p_plan jsonb"}
+   functions {"name": "public.geri_alma_bileti_al", "args_raw": "p_sifre text"}
+   functions {"name": "public.degisim_listele", "args_raw": "p_filtre jsonb DEFAULT '{}'::jsonb"}
+   functions {"name": "public.degisim_onizle", "args_raw": "p_hedef jsonb, p_seviye text"}
+   functions {"name": "public.degisim_geri_al", "args_raw": "p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text DEFAULT NULL"}
+   tables {"schema": "surum_gizli", "table": "sahip_sifresi"}
+   tables {"schema": "surum_gizli", "table": "geri_alma_bileti"}
+   tables {"schema": "surum_gizli", "table": "geri_alma_kullanim"}
+   indexes {"name": "idx_geri_alma_kullanim_bilet", "schema": "surum_gizli", "table": "geri_alma_kullanim", "unique": false}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "SCHEMA surum_gizli", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "ALL TABLES IN SCHEMA surum_gizli", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "ALL FUNCTIONS IN SCHEMA surum_gizli", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.geri_alma_bileti_al(text)", "to": "PUBLIC, anon;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.degisim_listele(jsonb)", "to": "PUBLIC, anon;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.degisim_onizle(jsonb, text)", "to": "PUBLIC, anon;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.degisim_geri_al(jsonb, text, uuid, text)", "to": "PUBLIC, anon;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.geri_alma_bileti_al(text)", "to": "authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.degisim_listele(jsonb)", "to": "authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.degisim_onizle(jsonb, text)", "to": "authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.degisim_geri_al(jsonb, text, uuid, text)", "to": "authenticated;"}
+== 20260913000003_surum_gecmisi_f2_sahip_sifresi.sql
+   functions {"name": "public.sahip_sifresi_ayarla", "args_raw": "p_sifre text"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public.sahip_sifresi_ayarla(text)", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "EXECUTE", "kind": "FUNCTION", "obj": "public.sahip_sifresi_ayarla(text)", "to": "service_role;"}
+== 20260913000004_luna_bilet_maske.sql
+   functions {"name": "public._degisim_log_yaz", "args_raw": ""}
+== 20260914000001_l4_islem_log_kopru.sql
+   functions {"name": "public._islem_log_degisim_txid", "args_raw": ""}
+   columns {"schema": "public", "table": "islem_log", "column": "degisim_txid"}
+   triggers {"name": "trg_islem_log_degisim_txid", "schema": "public", "table": "islem_log", "timing": "BEFORE INSERT"}
+   indexes {"name": "idx_islem_log_degisim_txid", "schema": "public", "table": "islem_log", "unique": false}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public._islem_log_degisim_txid()", "to": "PUBLIC, anon, authenticated;"}
+   drops {"kind": "TRIGGER", "name": "trg_islem_log_degisim_txid", "table": "islem_log"}
+== 20260914000002_l4_geri_alma_zincir.sql
+   functions {"name": "surum_gizli._l4_zaman_txid", "args_raw": "p_tablo text, p_pk jsonb, p_zaman text, OUT o_txid bigint, OUT o_neden text, OUT o_enyakin timestamptz"}
+   functions {"name": "surum_gizli._degisim_plan", "args_raw": "p_hedef jsonb, p_seviye text"}
+   functions {"name": "surum_gizli._l4_zincir", "args_raw": "p_hedef jsonb"}
+   functions {"name": "public.degisim_onizle", "args_raw": "p_hedef jsonb, p_seviye text"}
+   functions {"name": "public.degisim_geri_al", "args_raw": "p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text DEFAULT NULL"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "surum_gizli._l4_zaman_txid(text, jsonb, text)", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "surum_gizli._l4_zincir(jsonb)", "to": "PUBLIC, anon, authenticated;"}
+== 20260914000003_l4_onarim.sql
+   functions {"name": "public._islem_log_degisim_txid", "args_raw": ""}
+   functions {"name": "public._islem_log_geri_alindi_kapisi", "args_raw": ""}
+   functions {"name": "surum_gizli._l4_rehber_uyesi", "args_raw": "p_hedef jsonb"}
+   functions {"name": "surum_gizli._degisim_plan", "args_raw": "p_hedef jsonb, p_seviye text"}
+   functions {"name": "surum_gizli._l4_zincir", "args_raw": "p_hedef jsonb"}
+   functions {"name": "public.degisim_onizle", "args_raw": "p_hedef jsonb, p_seviye text"}
+   functions {"name": "public.degisim_geri_al", "args_raw": "p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text DEFAULT NULL"}
+   tables {"schema": "surum_gizli", "table": "l4_rehber_adimlari"}
+   triggers {"name": "trg_islem_log_degisim_txid", "schema": "public", "table": "islem_log", "timing": "BEFORE INSERT"}
+   triggers {"name": "trg_islem_log_geri_alindi_kapisi", "schema": "public", "table": "islem_log", "timing": "BEFORE INSERT"}
+   policies {"name": "service_insert", "schema": "public", "table": "islem_log"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "public._islem_log_geri_alindi_kapisi()", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE INSERT", "kind": "TABLE", "obj": "public.islem_log", "to": "authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "TABLE", "obj": "surum_gizli.l4_rehber_adimlari", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "surum_gizli._l4_rehber_uyesi(jsonb)", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "surum_gizli._l4_rehber_uyesi(jsonb)", "to": "PUBLIC, anon, authenticated;"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "surum_gizli._degisim_plan(jsonb, text)", "to": "PUBLIC, anon, authenticated;"}
+   drops {"kind": "TRIGGER", "name": "trg_islem_log_degisim_txid", "table": "islem_log"}
+   drops {"kind": "TRIGGER", "name": "trg_islem_log_geri_alindi_kapisi", "table": "islem_log"}
+   drops {"kind": "POLICY", "name": "service_insert", "table": "islem_log"}
+== 20260914000004_l4_stok_uyari_txid.sql
+   functions {"name": "surum_gizli._degisim_plan", "args_raw": "p_hedef jsonb, p_seviye text"}
+   functions {"name": "surum_gizli._l4_zincir", "args_raw": "p_hedef jsonb"}
+   grants {"priv": "REVOKE ALL", "kind": "FUNCTION", "obj": "surum_gizli._degisim_plan(jsonb, text)", "to": "PUBLIC, anon, authenticated;"}
