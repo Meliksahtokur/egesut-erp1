@@ -222,8 +222,8 @@
     [
      "grant",
      "REVOKE EXECUTE ON public.abort_kaydet(text, text) TO authenticated, anon;",
-     "OK",
-     "authenticated:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260830000034_review_fix_paketi.sql"
     ],
     [
      "dml",
@@ -251,8 +251,8 @@
     [
      "grant",
      "REVOKE EXECUTE ON public.abort_kaydet(text, text) TO authenticated, anon;",
-     "OK",
-     "authenticated:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260830000034_review_fix_paketi.sql"
     ],
     [
      "dml",
@@ -462,20 +462,20 @@
     [
      "grant",
      "EXECUTE ON public.dogum_kaydet(text,date,text,text,text,numeric,text,text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.hayvan_belirsiz_ureme_listele() TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
     ],
     [
      "grant",
      "SELECT ON public.v_ureme_dongusu TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
     ],
     [
      "dml",
@@ -515,20 +515,20 @@
     [
      "grant",
      "EXECUTE ON public.dogum_kaydet(text,date,text,text,text,numeric,text,text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.hayvan_belirsiz_ureme_listele() TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
     ],
     [
      "grant",
      "SELECT ON public.v_ureme_dongusu TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
     ],
     [
      "dml",
@@ -594,8 +594,8 @@
     [
      "grant",
      "EXECUTE ON public.asistan_hayvan_detay(text, text) TO authenticated, anon;",
-     "OK",
-     "authenticated:OK, anon:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000002_kupe_revizyon.sql"
     ]
    ]
   ],
@@ -653,8 +653,8 @@
     [
      "grant",
      "EXECUTE ON public.asistan_hayvan_detay(text, text) TO authenticated, anon;",
-     "OK",
-     "authenticated:OK, anon:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000002_kupe_revizyon.sql"
     ]
    ]
   ]
@@ -870,14 +870,14 @@
     [
      "grant",
      "EXECUTE ON public.dogum_kaydet(text, date, text, text, text, numeric, text, text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.protokol_eksik_tara() TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
     ],
     [
      "dml",
@@ -917,14 +917,14 @@
     [
      "grant",
      "EXECUTE ON public.dogum_kaydet(text, date, text, text, text, numeric, text, text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.protokol_eksik_tara() TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
     ],
     [
      "dml",
@@ -972,14 +972,14 @@
     [
      "grant",
      "EXECUTE ON public.create_case(text, uuid, text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
     ],
     [
      "drop",
@@ -1043,14 +1043,14 @@
     [
      "grant",
      "EXECUTE ON public.create_case(text, uuid, text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
     ],
     [
      "drop",
@@ -1110,14 +1110,14 @@
     [
      "grant",
      "EXECUTE ON public.tedavi_sablon_uygula(uuid, uuid, date) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid, date) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
     ],
     [
      "drop",
@@ -1151,14 +1151,14 @@
     [
      "grant",
      "EXECUTE ON public.tedavi_sablon_uygula(uuid, uuid, date) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid, date) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
     ],
     [
      "drop",
@@ -1669,7 +1669,7 @@
  },
  "20260909110000_dozaj_helper_min_max_rpc.sql": {
   "prod": [
-   "KISMİ",
+   "EKSİK",
    [
     [
      "fonksiyon",
@@ -1698,14 +1698,14 @@
     [
      "grant",
      "EXECUTE ON public.ilac_dozaj_guncelle(uuid, jsonb) TO anon, authenticated;",
-     "FAIL",
-     "anon:YOK:EXECUTE, authenticated:YOK:EXECUTE"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.hayvan_kilo_guncelle(text, numeric) TO anon, authenticated;",
-     "FAIL",
-     "anon:YOK:EXECUTE, authenticated:YOK:EXECUTE"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
     ],
     [
      "dml",
@@ -1799,14 +1799,14 @@
     [
      "grant",
      "EXECUTE ON public.ilac_dozaj_guncelle(uuid, jsonb) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
     ],
     [
      "grant",
      "EXECUTE ON public.hayvan_kilo_guncelle(text, numeric) TO anon, authenticated;",
-     "OK",
-     "anon:OK, authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
     ],
     [
      "dml",
@@ -2250,20 +2250,20 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_nodes TO anon, authenticated;",
-     "OK",
-     "anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_parentage TO anon, authenticated;",
-     "OK",
-     "anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_meta TO anon, authenticated;",
-     "OK",
-     "anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2286,32 +2286,32 @@
     [
      "grant",
      "REVOKE ALL ON public.assert_is_operator() TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_ensure_farm_node(text) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_is_ancestor(uuid,uuid) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2322,8 +2322,8 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_external_upsert(text,uuid,text,text,date,text,text) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2334,8 +2334,8 @@
     [
      "grant",
      "REVOKE ALL ON public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2346,8 +2346,8 @@
     [
      "grant",
      "REVOKE ALL ON public._trg_pedigree_hayvan_insert() TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "drop",
@@ -2543,20 +2543,20 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_nodes TO anon, authenticated;",
-     "OK",
-     "anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_parentage TO anon, authenticated;",
-     "OK",
-     "anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_meta TO anon, authenticated;",
-     "OK",
-     "anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2579,32 +2579,32 @@
     [
      "grant",
      "REVOKE ALL ON public.assert_is_operator() TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_ensure_farm_node(text) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_is_ancestor(uuid,uuid) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2615,8 +2615,8 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_external_upsert(text,uuid,text,text,date,text,text) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2627,8 +2627,8 @@
     [
      "grant",
      "REVOKE ALL ON public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "grant",
@@ -2639,8 +2639,8 @@
     [
      "grant",
      "REVOKE ALL ON public._trg_pedigree_hayvan_insert() TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
     ],
     [
      "drop",
@@ -2700,20 +2700,20 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_try_timestamptz(text) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_farm_backfill() TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_integrity_report() TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
     ],
     [
      "grant",
@@ -2753,20 +2753,20 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_try_timestamptz(text) TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_farm_backfill() TO PUBLIC, anon, authenticated, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.pedigree_integrity_report() TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
     ],
     [
      "grant",
@@ -2802,8 +2802,8 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_subgraph(uuid, integer, integer) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
     ],
     [
      "grant",
@@ -2814,8 +2814,8 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_subgraph_for_animal(text, integer, integer) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
     ],
     [
      "grant",
@@ -2843,8 +2843,8 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_subgraph(uuid, integer, integer) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
     ],
     [
      "grant",
@@ -2855,8 +2855,8 @@
     [
      "grant",
      "REVOKE ALL ON public.pedigree_subgraph_for_animal(text, integer, integer) TO PUBLIC, anon, service_role;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, service_role:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
     ],
     [
      "grant",
@@ -3168,26 +3168,26 @@
     [
      "grant",
      "REVOKE ALL ON public.degisim_log TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "grant",
      "SELECT ON public.degisim_log TO authenticated;",
-     "FAIL",
-     "authenticated:YOK:SELECT"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public._degisim_log_yaz() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public._degisim_log_degistirilemez() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "drop",
@@ -3210,7 +3210,7 @@
    ]
   ],
   "demo": [
-   "KISMİ",
+   "CANLI",
    [
     [
      "fonksiyon",
@@ -3509,26 +3509,26 @@
     [
      "grant",
      "REVOKE ALL ON public.degisim_log TO PUBLIC, anon, authenticated;",
-     "FAIL",
-     "public:OK-yok, anon:OK-yok, authenticated:HÂLÂ VAR:SELECT"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "grant",
      "SELECT ON public.degisim_log TO authenticated;",
-     "OK",
-     "authenticated:OK"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public._degisim_log_yaz() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public._degisim_log_degistirilemez() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
     ],
     [
      "drop",
@@ -3660,44 +3660,44 @@
     [
      "grant",
      "REVOKE ALL ON SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON ALL TABLES IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON ALL FUNCTIONS IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.geri_alma_bileti_al(text) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.degisim_listele(jsonb) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.degisim_onizle(jsonb, text) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.degisim_geri_al(jsonb, text, uuid, text) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
@@ -3833,44 +3833,44 @@
     [
      "grant",
      "REVOKE ALL ON SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON ALL TABLES IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON ALL FUNCTIONS IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.geri_alma_bileti_al(text) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.degisim_listele(jsonb) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.degisim_onizle(jsonb, text) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON public.degisim_geri_al(jsonb, text, uuid, text) TO PUBLIC, anon;",
-     "OK",
-     "public:OK-yok, anon:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
     ],
     [
      "grant",
@@ -3912,8 +3912,8 @@
     [
      "grant",
      "REVOKE ALL ON public.sahip_sifresi_ayarla(text) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000003_surum_gecmisi_f2_sahip_sifresi.sql"
     ],
     [
      "grant",
@@ -3935,8 +3935,8 @@
     [
      "grant",
      "REVOKE ALL ON public.sahip_sifresi_ayarla(text) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000003_surum_gecmisi_f2_sahip_sifresi.sql"
     ],
     [
      "grant",
@@ -3973,7 +3973,7 @@
  },
  "20260914000001_l4_islem_log_kopru.sql": {
   "prod": [
-   "KISMİ",
+   "EKSİK",
    [
     [
      "fonksiyon",
@@ -4002,8 +4002,8 @@
     [
      "grant",
      "REVOKE ALL ON public._islem_log_degisim_txid() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000001_l4_islem_log_kopru.sql"
     ],
     [
      "drop",
@@ -4043,8 +4043,8 @@
     [
      "grant",
      "REVOKE ALL ON public._islem_log_degisim_txid() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000001_l4_islem_log_kopru.sql"
     ],
     [
      "drop",
@@ -4057,7 +4057,7 @@
  },
  "20260914000002_l4_geri_alma_zincir.sql": {
   "prod": [
-   "KISMİ",
+   "EKSİK",
    [
     [
      "fonksiyon",
@@ -4092,14 +4092,14 @@
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_zaman_txid(text, jsonb, text) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_zincir(jsonb) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
     ]
    ]
   ],
@@ -4139,14 +4139,14 @@
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_zaman_txid(text, jsonb, text) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_zincir(jsonb) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
     ]
    ]
   ]
@@ -4224,8 +4224,8 @@
     [
      "grant",
      "REVOKE ALL ON public._islem_log_geri_alindi_kapisi() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
@@ -4236,20 +4236,20 @@
     [
      "grant",
      "REVOKE ALL ON surum_gizli.l4_rehber_adimlari TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
@@ -4349,8 +4349,8 @@
     [
      "grant",
      "REVOKE ALL ON public._islem_log_geri_alindi_kapisi() TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
@@ -4361,20 +4361,20 @@
     [
      "grant",
      "REVOKE ALL ON surum_gizli.l4_rehber_adimlari TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
      "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
     ],
     [
      "grant",
@@ -4405,7 +4405,7 @@
  },
  "20260914000004_l4_stok_uyari_txid.sql": {
   "prod": [
-   "KISMİ",
+   "EKSİK",
    [
     [
      "fonksiyon",
@@ -4422,8 +4422,8 @@
     [
      "grant",
      "REVOKE ALL ON surum_gizli._degisim_plan(jsonb, text) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000004_l4_stok_uyari_txid.sql"
     ]
    ]
   ],
@@ -4445,8 +4445,8 @@
     [
      "grant",
      "REVOKE ALL ON surum_gizli._degisim_plan(jsonb, text) TO PUBLIC, anon, authenticated;",
-     "OK",
-     "public:OK-yok, anon:OK-yok, authenticated:OK-yok"
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000004_l4_stok_uyari_txid.sql"
     ]
    ]
   ]

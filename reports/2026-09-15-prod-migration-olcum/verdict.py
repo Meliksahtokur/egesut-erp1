@@ -264,9 +264,10 @@ def check_grant(g, tag):
 
 
 # recreated-later kümesi (drop sonrası aynı nesne sonraki dosyalarda yeniden yaratılıyorsa drop ölçülemez)
-# grant zaman çizelgesi: sonraki dosyanın aynı (obj, rol, ayrıcalık) üzerindeki
-# işlemi bu dosyadaki grant'i geçersiz kılar (final-state ölçümü bozmamak için)
+# grant zaman çizelgesi: sonraki (aynı dosyada daha geç YA DA sonraki dosyadaki)
+# aynı (obj, rol, ayrıcalık) işlemi öncekini geçersiz kılar
 GRANT_TL = []
+_seq = 0
 for _i, _fn in enumerate(FILES):
     for _g in INV[_fn]["grants"]:
         _priv = _g["priv"].upper().rstrip(";").strip()
@@ -274,19 +275,39 @@ for _i, _fn in enumerate(FILES):
         _privs = {p.strip() for p in (_priv.replace("REVOKE", "", 1) if _rev else _priv)
                   .replace("ALL", "SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER").split(",") if p.strip()}
         for _role in [t.strip().strip('"').lower().rstrip(";").strip() for t in _g["to"].split(",")]:
-            GRANT_TL.append({"i": _i, "obj": _g["obj"].lower().rstrip(";").strip(),
+            GRANT_TL.append({"seq": _seq, "i": _i, "obj": _g["obj"].lower().rstrip(";").strip(),
                              "kind": _g["kind"], "role": _role, "privs": _privs, "rev": _rev})
+            _seq += 1
+
+# her dosyanın grant'lerinin başlangıç seq'i (madde sırasıyla eşlemek için)
+FN_GRANT_SEQ = {}
+for _i, _fn in enumerate(FILES):
+    FN_GRANT_SEQ[_fn] = (FN_GRANT_SEQ.get(FILES[_i - 1], (0, 0))[1] if _i else 0,
+                         sum(len(INV[f]["grants"]) for f in FILES[:_i + 1]))
 
 
 def grant_superseded(g, fi):
+    """Bu grant maddesini geçersiz kılan sonraki zaman-çizelgesi kaydının dosyası."""
     obj = g["obj"].lower().rstrip(";").strip()
     priv = g["priv"].upper().rstrip(";").strip()
     rev = priv.startswith("REVOKE")
     privs = {p.strip() for p in (priv.replace("REVOKE", "", 1) if rev else priv)
              .replace("ALL", "SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER").split(",") if p.strip()}
+    # bu maddenin GRANT_TL'deki seq'ini bul: dosyanın grant bloğundaki konumuyla eşle
+    fn_grants = [x for x in GRANT_TL if x["i"] == fi]
+    my_seq = None
+    hits = [k for k, e in enumerate(GRANT_TL) if e["i"] == fi
+            and e["obj"] == obj and e["role"] in [t.strip().strip('"').lower().rstrip(";").strip()
+                                                  for t in g["to"].split(",")]
+            and (e["privs"] & privs)]
+    if hits:
+        my_seq = GRANT_TL[hits[0]]["seq"]
     for t in [x.strip().strip('"').lower().rstrip(";").strip() for x in g["to"].split(",")]:
         for e in GRANT_TL:
-            if e["i"] > fi and e["obj"] == obj and e["role"] == t and (e["privs"] & privs):
+            if my_seq is not None:
+                if e["seq"] > my_seq and e["obj"] == obj and e["role"] == t and (e["privs"] & privs):
+                    return e["i"]
+            elif e["i"] > fi and e["obj"] == obj and e["role"] == t and (e["privs"] & privs):
                 return e["i"]
     return None
 
