@@ -1,8 +1,7 @@
 -- ═══════════════════════════════════════════════════════
 -- GROUND TRUTH MIGRATION — REFERANS, CALISTIRMAYIN
--- Tarih: 2026-09-15
+-- Tarih: 2026-05-13
 -- Tum migration'larin birlestirilmis hali, sifirdan kurulum icin referans.
--- Son senkron: 2026-09-15 (G1) — canli prod salt-okunur envanterle incremental guncelleme
 -- ═══════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.hayvanlar (
@@ -319,7 +318,7 @@ SELECT DISTINCT ON (kl.hayvan_id) kl.id AS kizginlik_id,
         END AS durum
    FROM (kizginlik_log kl
      JOIN hayvanlar h ON (((h.id = kl.hayvan_id) AND (h.durum = 'Aktif'::text))))
-  WHERE (kl.olusturma >= (now() - '2 days'::interval))
+  WHERE (kl.olusturma >= (now() - '3 days'::interval))
   ORDER BY kl.hayvan_id, kl.olusturma DESC;;
 
 -- ════════════════════════════════════════════════════════════════
@@ -517,7 +516,6 @@ BEGIN
 END;
 $function$
 ;
--- FUNCTION: public.asistan_hayvan_detay(p_kupe text, p_id text)
 CREATE OR REPLACE FUNCTION public.asistan_hayvan_detay(p_kupe text DEFAULT NULL::text, p_id text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -531,7 +529,6 @@ BEGIN
   SELECT * INTO v_h FROM hayvanlar
    WHERE (p_id IS NOT NULL AND id = p_id)
       OR (p_kupe IS NOT NULL AND kupe_no = p_kupe)
-   ORDER BY (durum = 'Aktif') DESC, id
    LIMIT 1;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('bulundu', false);
@@ -1190,7 +1187,6 @@ BEGIN
 END;
 $function$;
 
--- FUNCTION: public.gebelik_kaydet_manual(p_hayvan_id text, p_tarih date, p_sperma text)
 CREATE OR REPLACE FUNCTION public.gebelik_kaydet_manual(p_hayvan_id text, p_tarih date, p_sperma text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -1198,7 +1194,7 @@ CREATE OR REPLACE FUNCTION public.gebelik_kaydet_manual(p_hayvan_id text, p_tari
 AS $function$
 DECLARE
   v_hayvan record;
-  v_tohumlama_id uuid;
+  v_tohumlama_id text;
   v_snapshot jsonb;
   v_deneme integer;
 BEGIN
@@ -1217,7 +1213,7 @@ BEGIN
     RAISE EXCEPTION 'Hayvanın aktif gebeliği bulunuyor';
   END IF;
 
-  v_tohumlama_id := gen_random_uuid();
+  v_tohumlama_id := gen_random_uuid()::text;
 
   SELECT COALESCE(MAX(deneme_no), 0) + 1 INTO v_deneme
   FROM public.tohumlama WHERE hayvan_id = p_hayvan_id;
@@ -1227,7 +1223,7 @@ BEGIN
 
   v_snapshot := jsonb_build_object(
     'olusturulan', jsonb_build_array(jsonb_build_object(
-      'tablo', 'tohumlama', 'id', v_tohumlama_id::text,
+      'tablo', 'tohumlama', 'id', v_tohumlama_id,
       'veri', jsonb_build_object(
         'hayvan_id', p_hayvan_id, 'tarih', p_tarih,
         'sperma', p_sperma, 'sonuc', 'Gebe', 'deneme_no', v_deneme
@@ -1243,8 +1239,7 @@ BEGIN
 
   RETURN jsonb_build_object('ok', true, 'tohumlama_id', v_tohumlama_id);
 END;
-$function$
-;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.stok_arsivle(p_stok_id text)
  RETURNS jsonb
@@ -2064,84 +2059,94 @@ DROP VIEW IF EXISTS public.hayvan_durum_view CASCADE;
 
 -- Gebelik özet
 CREATE OR REPLACE VIEW public.gebelik_ozet_view AS
-SELECT count(*) FILTER (WHERE (sonuc = 'Gebe'::text)) AS gebe_sayisi,
-    count(*) FILTER (WHERE (sonuc = 'Bekliyor'::text)) AS bekleyen_sayisi,
-    count(*) FILTER (WHERE (sonuc = 'Abort'::text)) AS abort_sayisi,
-    count(*) FILTER (WHERE (sonuc = 'Doğum Yaptı'::text)) AS dogum_yapti_sayisi,
-    round(((100.0 * (count(*) FILTER (WHERE (sonuc = ANY (ARRAY['Gebe'::text, 'Doğum Yaptı'::text]))))::numeric) / (NULLIF(count(*), 0))::numeric), 1) AS gebelik_orani_pct
-   FROM tohumlama
-  WHERE (tarih >= (CURRENT_DATE - '1 year'::interval));
+SELECT
+  COUNT(*) FILTER (WHERE sonuc = 'Gebe')        AS gebe_sayisi,
+  COUNT(*) FILTER (WHERE sonuc = 'Bekliyor')    AS bekleyen_sayisi,
+  COUNT(*) FILTER (WHERE sonuc = 'Abort')       AS abort_sayisi,
+  COUNT(*) FILTER (WHERE sonuc = 'Doğum Yaptı') AS dogum_yapti_sayisi,
+  ROUND(
+    100.0 * COUNT(*) FILTER (WHERE sonuc IN ('Gebe','Doğum Yaptı'))
+    / NULLIF(COUNT(*), 0), 1
+  ) AS gebelik_orani_pct
+FROM public.tohumlama
+WHERE tarih >= CURRENT_DATE - interval '12 months';
 
 -- Hastalık istatistik
 CREATE OR REPLACE VIEW public.hastalik_istatistik_view AS
-SELECT tani,
-    kategori,
-    count(*) AS toplam,
-    count(*) FILTER (WHERE (durum = 'Aktif'::text)) AS aktif,
-    count(*) FILTER (WHERE (durum = 'İyileşti'::text)) AS iyilesti,
-    min(tarih) AS ilk_gorulme,
-    max(tarih) AS son_gorulme
-   FROM hastalik_log
-  GROUP BY tani, kategori
-  ORDER BY (count(*)) DESC;
+SELECT
+  tani,
+  kategori,
+  COUNT(*)                                           AS toplam,
+  COUNT(*) FILTER (WHERE durum = 'Aktif')            AS aktif,
+  COUNT(*) FILTER (WHERE durum = 'İyileşti')         AS iyilesti,
+  MIN(tarih)                                         AS ilk_gorulme,
+  MAX(tarih)                                         AS son_gorulme
+FROM public.hastalik_log
+GROUP BY tani, kategori
+ORDER BY toplam DESC;
 
 -- Stok tüketim
 CREATE OR REPLACE VIEW public.stok_tuketim_view AS
-SELECT s.id,
-    s.urun_adi,
-    s.kategori,
-    s.birim,
-    s.baslangic_miktar,
-    s.esik,
-    COALESCE(sum(sh.miktar) FILTER (WHERE (NOT sh.iptal)), (0)::numeric) AS toplam_kullanim,
-    (s.baslangic_miktar - COALESCE(sum(sh.miktar) FILTER (WHERE (NOT sh.iptal)), (0)::numeric)) AS guncel_stok,
-        CASE
-            WHEN ((s.baslangic_miktar - COALESCE(sum(sh.miktar) FILTER (WHERE (NOT sh.iptal)), (0)::numeric)) <= (0)::numeric) THEN 'tukendi'::text
-            WHEN ((s.baslangic_miktar - COALESCE(sum(sh.miktar) FILTER (WHERE (NOT sh.iptal)), (0)::numeric)) <= s.esik) THEN 'kritik'::text
-            ELSE 'normal'::text
-        END AS stok_durum,
-    s.drug_product_id
-   FROM (stok s
-     LEFT JOIN stok_hareket sh ON ((sh.stok_id = s.id)))
-  GROUP BY s.id, s.urun_adi, s.kategori, s.birim, s.baslangic_miktar, s.esik, s.drug_product_id;
+SELECT
+  s.id,
+  s.urun_adi,
+  s.kategori,
+  s.birim,
+  s.baslangic_miktar,
+  s.esik,
+  COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) AS toplam_kullanim,
+  s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) AS guncel_stok,
+  CASE
+    WHEN s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) <= 0
+    THEN 'tukendi'
+    WHEN s.baslangic_miktar - COALESCE(SUM(sh.miktar) FILTER (WHERE NOT sh.iptal), 0) <= s.esik
+    THEN 'kritik'
+    ELSE 'normal'
+  END AS stok_durum,
+  s.drug_product_id
+FROM public.stok s
+LEFT JOIN public.stok_hareket sh ON sh.stok_id = s.id
+GROUP BY s.id, s.urun_adi, s.kategori, s.birim, s.baslangic_miktar, s.esik, s.drug_product_id;
 
 -- ──────────────────────────────────────────
 -- 9. DUPLICATE KONTROL FONKSİYONU
 -- Frontend kayıt öncesi bu fonksiyonu çağırır
 -- ──────────────────────────────────────────
--- FUNCTION: public.kupe_musait_mi(p_kupe_no text, p_devlet_kupe text, p_hayvan_id text)
-CREATE OR REPLACE FUNCTION public.kupe_musait_mi(p_kupe_no text, p_devlet_kupe text, p_hayvan_id text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
-AS $function$
+CREATE OR REPLACE FUNCTION public.kupe_musait_mi(
+  p_kupe_no     text,
+  p_devlet_kupe text,
+  p_hayvan_id   text DEFAULT NULL  -- güncelleme için mevcut ID hariç tut
+)
+RETURNS jsonb AS $func$
 DECLARE
-  v_aktif_cakisma text; v_devlet_cakisma text;
-  v_gecmis_id text; v_gecmis_durum text;
+  v_kupe_cakisma    text;
+  v_devlet_cakisma  text;
 BEGIN
-  IF p_kupe_no IS NOT NULL AND p_kupe_no <> '' THEN
-    SELECT id INTO v_aktif_cakisma FROM public.hayvanlar
-     WHERE kupe_no = p_kupe_no AND durum = 'Aktif'
-       AND (p_hayvan_id IS NULL OR id <> p_hayvan_id) LIMIT 1;
-    IF v_aktif_cakisma IS NULL THEN
-      SELECT id, durum INTO v_gecmis_id, v_gecmis_durum FROM public.hayvanlar
-       WHERE kupe_no = p_kupe_no AND durum IS DISTINCT FROM 'Aktif'
-         AND (p_hayvan_id IS NULL OR id <> p_hayvan_id)
-       ORDER BY cikis_tarihi DESC NULLS LAST, id DESC LIMIT 1;
-    END IF;
+  -- İşletme küpesi çakışması
+  IF p_kupe_no IS NOT NULL AND p_kupe_no != '' THEN
+    SELECT id INTO v_kupe_cakisma
+    FROM public.hayvanlar
+    WHERE kupe_no = p_kupe_no
+      AND (p_hayvan_id IS NULL OR id != p_hayvan_id)
+    LIMIT 1;
   END IF;
-  IF p_devlet_kupe IS NOT NULL AND p_devlet_kupe <> '' THEN
-    SELECT id INTO v_devlet_cakisma FROM public.hayvanlar
-     WHERE devlet_kupe = p_devlet_kupe
-       AND (p_hayvan_id IS NULL OR id <> p_hayvan_id) LIMIT 1;
+
+  -- Devlet küpesi çakışması
+  IF p_devlet_kupe IS NOT NULL AND p_devlet_kupe != '' THEN
+    SELECT id INTO v_devlet_cakisma
+    FROM public.hayvanlar
+    WHERE devlet_kupe = p_devlet_kupe
+      AND (p_hayvan_id IS NULL OR id != p_hayvan_id)
+    LIMIT 1;
   END IF;
+
   RETURN jsonb_build_object(
-    'musait', (v_aktif_cakisma IS NULL AND v_devlet_cakisma IS NULL),
-    'kupe_cakisma_id', v_aktif_cakisma,
-    'kupe_gecmis_id', v_gecmis_id,
-    'kupe_gecmis_durum', v_gecmis_durum,
-    'devlet_cakisma_id', v_devlet_cakisma);
-END; $function$
-; LANGUAGE plpgsql;
+    'musait',           (v_kupe_cakisma IS NULL AND v_devlet_cakisma IS NULL),
+    'kupe_cakisma_id',  v_kupe_cakisma,
+    'devlet_cakisma_id',v_devlet_cakisma
+  );
+END;
+$func$ LANGUAGE plpgsql;
 
 -- ──────────────────────────────────────────
 -- 10. BAŞLAT
@@ -2163,12 +2168,22 @@ ALTER TABLE public.irk_esik  ADD COLUMN IF NOT EXISTS kullanim_sayisi integer NO
 -- ──────────────────────────────────────────────────────────────
 -- 2. HAYVAN_EKLE — Yeni hayvan kaydı
 -- ──────────────────────────────────────────────────────────────
--- FUNCTION: public.hayvan_ekle(p_kupe_no text, p_devlet_kupe text, p_irk text, p_cinsiyet text, p_dogum_tarihi date, p_grup text, p_padok text, p_dogum_kg numeric, p_anne_id text, p_baba_bilgi text, p_canli_agirlik numeric, p_boy numeric, p_renk text, p_ayirici_ozellik text)
--- FUNCTION: public.hayvan_ekle(p_kupe_no text, p_devlet_kupe text, p_irk text, p_cinsiyet text, p_dogum_tarihi date, p_grup text, p_padok text, p_dogum_kg numeric, p_anne_id text, p_baba_bilgi text, p_canli_agirlik numeric, p_boy numeric, p_renk text, p_ayirici_ozellik text, p_padok_id uuid)
-CREATE OR REPLACE FUNCTION public.hayvan_ekle(p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT 'Genel'::text, p_padok text DEFAULT 'P1'::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_anne_id text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
-AS $function$
+CREATE OR REPLACE FUNCTION public.hayvan_ekle(
+  p_kupe_no        text    DEFAULT NULL,
+  p_devlet_kupe    text    DEFAULT NULL,
+  p_irk            text    DEFAULT NULL,
+  p_cinsiyet       text    DEFAULT NULL,
+  p_dogum_tarihi   date    DEFAULT NULL,
+  p_grup           text    DEFAULT 'Genel',
+  p_padok          text    DEFAULT 'P1',
+  p_dogum_kg       numeric DEFAULT NULL,
+  p_anne_id        text    DEFAULT NULL,
+  p_baba_bilgi     text    DEFAULT NULL,
+  p_canli_agirlik  numeric DEFAULT NULL,
+  p_boy            numeric DEFAULT NULL,
+  p_renk           text    DEFAULT NULL,
+  p_ayirici_ozellik text   DEFAULT NULL
+) RETURNS jsonb AS $$
 DECLARE
   v_chk  jsonb;
   v_id   text;
@@ -2213,72 +2228,7 @@ BEGIN
 
   RETURN jsonb_build_object('ok', true, 'hayvan_id', v_id);
 END;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.hayvan_ekle(p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT 'Genel'::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_anne_id text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text, p_padok_id uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_id text;
-  v_padok_id uuid;
-  v_padok_ad text;
-  v_yas_gun integer;
-  v_chk jsonb;
-BEGIN
-  -- Küpe çakışma kontrolü (K1/K2): işletme=aktif-filtreli, devlet=global
-  SELECT public.kupe_musait_mi(p_kupe_no, p_devlet_kupe) INTO v_chk;
-  IF NOT (v_chk->>'musait')::boolean THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj',
-      CASE WHEN v_chk->>'kupe_cakisma_id' IS NOT NULL
-        THEN 'İşletme küpesi zaten kayıtlı (aktif): ' || COALESCE(p_kupe_no,'')
-        ELSE 'Devlet küpesi zaten kayıtlı: ' || COALESCE(p_devlet_kupe,'') END);
-  END IF;
-
-  -- H-11: Yaş/grup validasyonu (js/forms.js:66-77 birebir)
-  -- Sadece doğum tarihi verildiğinde kontrol et (nullable alan — mevcut satırlar NULL olabilir)
-  IF p_dogum_tarihi IS NOT NULL THEN
-    v_yas_gun := floor((current_date - p_dogum_tarihi));
-    IF v_yas_gun < 0 THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', 'Doğum tarihi ileri tarih olamaz');
-    END IF;
-    IF p_grup = 'Süt İçen Buzağı' AND v_yas_gun > 180 THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', '6 aylıktan büyük hayvan "Süt İçen Buzağı" grubuna eklenemez');
-    END IF;
-    IF (p_grup = 'Süt İçen Buzağı' OR p_grup = 'Sütten Kesilmiş Buzağı') AND v_yas_gun > 365 THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', '12 aylıktan büyük hayvan buzağı grubuna eklenemez');
-    END IF;
-  END IF;
-
-  v_id := gen_random_uuid()::text;
-
-  IF p_padok_id IS NOT NULL THEN
-    v_padok_id := p_padok_id;
-    SELECT ad INTO v_padok_ad FROM padoklar WHERE id = p_padok_id;
-  ELSIF p_padok IS NOT NULL THEN
-    SELECT id, ad INTO v_padok_id, v_padok_ad FROM padoklar WHERE ad = p_padok;
-    IF v_padok_id IS NULL THEN
-      v_padok_ad := p_padok;
-    END IF;
-  END IF;
-
-  INSERT INTO hayvanlar (
-    id, kupe_no, devlet_kupe, irk, cinsiyet, dogum_tarihi,
-    grup, padok, padok_id, durum, dogum_kg, anne_id, baba_bilgi,
-    canli_agirlik, boy, renk, ayirici_ozellik
-  ) VALUES (
-    v_id, NULLIF(p_kupe_no,''), NULLIF(p_devlet_kupe,''),
-    NULLIF(p_irk,''), p_cinsiyet, p_dogum_tarihi,
-    p_grup, v_padok_ad, v_padok_id, 'Aktif', p_dogum_kg, p_anne_id, p_baba_bilgi,
-    p_canli_agirlik, p_boy, p_renk, p_ayirici_ozellik
-  );
-
-  RETURN jsonb_build_object('ok', true, 'id', v_id);
-END;
-$function$
-; LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 -- ──────────────────────────────────────────────────────────────
 -- 3. DOGUM_KAYDET — Doğum + buzağı + görevler tek transaction
@@ -2565,60 +2515,87 @@ WHERE payload IS NULL;
 -- ──────────────────────────────────────────────────────────────
 DROP VIEW IF EXISTS public.hayvan_timeline_view;
 
-CREATE OR REPLACE VIEW public.hayvan_timeline_view AS
-SELECT d.anne_id AS hayvan_id,
-    'DOGUM_KAYDI'::text AS tip,
-    'birth_recorded'::text AS event_type,
-    (d.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('yavru_kupe', d.yavru_kupe, 'yavru_cins', d.yavru_cins, 'dogum_tipi', d.dogum_tipi, 'dogum_kg', d.dogum_kg, 'hekim_id', d.hekim_id) AS detay,
-    (d.id)::text AS kaynak_id
-   FROM dogum d
+CREATE VIEW public.hayvan_timeline_view AS
+-- Doğum
+SELECT
+  d.anne_id                        AS hayvan_id,
+  'DOGUM_KAYDI'                    AS tip,
+  'birth_recorded'                 AS event_type,
+  d.tarih::timestamptz             AS zaman,
+  jsonb_build_object(
+    'yavru_kupe', d.yavru_kupe,
+    'yavru_cins', d.yavru_cins,
+    'dogum_tipi', d.dogum_tipi,
+    'dogum_kg',   d.dogum_kg,
+    'hekim_id',   d.hekim_id
+  )                                AS detay,
+  d.id                             AS kaynak_id
+FROM public.dogum d
+
 UNION ALL
- SELECT t.hayvan_id,
-    'TOHUMLAMA'::text AS tip,
-    'insemination_performed'::text AS event_type,
-    (t.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('sperma', t.sperma, 'sonuc', t.sonuc, 'deneme_no', t.deneme_no, 'hekim_id', t.hekim_id) AS detay,
-    (t.id)::text AS kaynak_id
-   FROM tohumlama t
+
+-- Tohumlama
+SELECT
+  t.hayvan_id,
+  'TOHUMLAMA'                      AS tip,
+  'insemination_performed'         AS event_type,
+  t.tarih::timestamptz             AS zaman,
+  jsonb_build_object(
+    'sperma',      t.sperma,
+    'sonuc',       t.sonuc,
+    'deneme_no',   t.deneme_no,
+    'hekim_id',    t.hekim_id
+  )                                AS detay,
+  t.id::text                       AS kaynak_id
+FROM public.tohumlama t
+
 UNION ALL
- SELECT hl.hayvan_id,
-    'HASTALIK_KAYDI'::text AS tip,
-    'treatment_recorded'::text AS event_type,
-    (hl.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('tani', hl.tani, 'kategori', hl.kategori, 'siddet', hl.siddet, 'durum', hl.durum, 'hekim_id', hl.hekim_id) AS detay,
-    (hl.id)::text AS kaynak_id
-   FROM hastalik_log hl
+
+-- Hastalık
+SELECT
+  hl.hayvan_id,
+  'HASTALIK_KAYDI'                 AS tip,
+  'treatment_recorded'             AS event_type,
+  hl.tarih::timestamptz            AS zaman,
+  jsonb_build_object(
+    'tani',      hl.tani,
+    'kategori',  hl.kategori,
+    'siddet',    hl.siddet,
+    'durum',     hl.durum,
+    'hekim_id',  hl.hekim_id
+  )                                AS detay,
+  hl.id                            AS kaynak_id
+FROM public.hastalik_log hl
+
 UNION ALL
- SELECT kl.hayvan_id,
-    'KIZGINLIK'::text AS tip,
-    'estrus_detected'::text AS event_type,
-    (kl.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('belirti', kl.belirti, 'notlar', kl.notlar) AS detay,
-    kl.id AS kaynak_id
-   FROM kizginlik_log kl
+
+-- Kızgınlık
+SELECT
+  kl.hayvan_id,
+  'KIZGINLIK'                      AS tip,
+  'estrus_detected'                AS event_type,
+  kl.tarih::timestamptz            AS zaman,
+  jsonb_build_object(
+    'belirti', kl.belirti,
+    'notlar',  kl.notlar
+  )                                AS detay,
+  kl.id                            AS kaynak_id
+FROM public.kizginlik_log kl
+
 UNION ALL
- SELECT il.ana_hayvan_id AS hayvan_id,
-    il.tip,
-    COALESCE((il.payload ->> 'event_type'::text), lower(il.tip)) AS event_type,
-    il.tarih AS zaman,
-        CASE
-            WHEN ((il.snapshot ? 'old'::text) AND ((il.snapshot -> 'old'::text) ? 'padok_id'::text) AND (((il.snapshot -> 'old'::text) ->> 'padok_id'::text) IS DISTINCT FROM ((il.snapshot -> 'new'::text) ->> 'padok_id'::text))) THEN jsonb_build_object('padok_degisti', true, 'eski_padok', ((il.snapshot -> 'old'::text) ->> 'padok'::text), 'yeni_padok', ((il.snapshot -> 'new'::text) ->> 'padok'::text), 'eski_padok_id', ((il.snapshot -> 'old'::text) ->> 'padok_id'::text), 'yeni_padok_id', ((il.snapshot -> 'new'::text) ->> 'padok_id'::text))
-            ELSE jsonb_build_object('padok_degisti', false)
-        END AS detay,
-    il.id AS kaynak_id
-   FROM islem_log il
-  WHERE (il.tip = ANY (ARRAY['HAYVAN_GUNCELLENDI'::text, 'HAYVAN_EKLENDI'::text]))
-UNION ALL
- SELECT il.ana_hayvan_id AS hayvan_id,
-    il.tip,
-    COALESCE((il.payload ->> 'event_type'::text), lower(il.tip)) AS event_type,
-    il.tarih AS zaman,
-    COALESCE((il.payload -> 'meta'::text), il.snapshot) AS detay,
-    il.id AS kaynak_id
-   FROM islem_log il
-  WHERE (il.tip = ANY (ARRAY['ABORT_KAYDI'::text, 'SATIS_KAYDI'::text, 'OLUM_KAYDI'::text, 'SUTTEN_KESME'::text]))
-  ORDER BY 4 DESC;
+
+-- Hayvan eklendi / güncellendi (islem_log'dan)
+SELECT
+  il.ana_hayvan_id                 AS hayvan_id,
+  il.tip,
+  COALESCE(il.payload->>'event_type', lower(il.tip)) AS event_type,
+  il.tarih                         AS zaman,
+  COALESCE(il.payload->'meta', il.snapshot) AS detay,
+  il.id                            AS kaynak_id
+FROM public.islem_log il
+WHERE il.tip IN ('HAYVAN_EKLENDI', 'ABORT_KAYDI', 'SATIS_KAYDI', 'OLUM_KAYDI', 'SUTTEN_KESME')
+
+ORDER BY zaman DESC;
 
 -- ──────────────────────────────────────────────────────────────
 -- 5. TOHUMLAMA_KAYDET — validasyon + sperma stok fix
@@ -2642,22 +2619,32 @@ GRANT EXECUTE ON FUNCTION public.tohumlama_kaydet(text, date, text, text, text, 
 ALTER TABLE public.hayvanlar
   ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
--- FUNCTION: public.hayvan_guncelle(p_id text, p_kupe_no text, p_devlet_kupe text, p_irk text, p_cinsiyet text, p_dogum_tarihi date, p_grup text, p_padok text, p_dogum_kg numeric, p_canli_agirlik numeric, p_boy numeric, p_renk text, p_ayirici_ozellik text)
--- FUNCTION: public.hayvan_guncelle(p_id text, p_kupe_no text, p_devlet_kupe text, p_irk text, p_cinsiyet text, p_dogum_tarihi date, p_grup text, p_padok text, p_dogum_kg numeric, p_canli_agirlik numeric, p_boy numeric, p_renk text, p_ayirici_ozellik text, p_baba_bilgi text, p_notlar text, p_anne_id text, p_padok_id uuid)
--- FUNCTION: public.hayvan_guncelle(p_id text, p_kupe_no text, p_devlet_kupe text, p_irk text, p_cinsiyet text, p_dogum_tarihi date, p_grup text, p_padok text, p_dogum_kg numeric, p_canli_agirlik numeric, p_boy numeric, p_renk text, p_ayirici_ozellik text, p_baba_bilgi text, p_notlar text, p_anne_id text, p_padok_id uuid, p_kisir boolean)
-CREATE OR REPLACE FUNCTION public.hayvan_guncelle(p_id text, p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT NULL::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.hayvan_guncelle(
+  p_id              text,
+  p_kupe_no         text    DEFAULT NULL,
+  p_devlet_kupe     text    DEFAULT NULL,
+  p_irk             text    DEFAULT NULL,
+  p_cinsiyet        text    DEFAULT NULL,
+  p_dogum_tarihi    date    DEFAULT NULL,
+  p_grup            text    DEFAULT NULL,
+  p_padok           text    DEFAULT NULL,
+  p_dogum_kg        numeric DEFAULT NULL,
+  p_canli_agirlik   numeric DEFAULT NULL,
+  p_boy             numeric DEFAULT NULL,
+  p_renk            text    DEFAULT NULL,
+  p_ayirici_ozellik text    DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_hayvan record;
+  v_chk    jsonb;
 BEGIN
   SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Hayvan bulunamadı: %', p_id;
   END IF;
 
+  -- Küpe değişiyorsa çakışma kontrolü (kendi küpesini hariç tut)
   IF p_kupe_no IS NOT NULL AND p_kupe_no <> '' AND p_kupe_no <> COALESCE(v_hayvan.kupe_no,'') THEN
     IF EXISTS (SELECT 1 FROM public.hayvanlar WHERE kupe_no = p_kupe_no AND id <> p_id) THEN
       RAISE EXCEPTION 'İşletme küpesi zaten kayıtlı: %', p_kupe_no;
@@ -2671,158 +2658,26 @@ BEGIN
   END IF;
 
   UPDATE public.hayvanlar SET
-    kupe_no         = COALESCE(NULLIF(p_kupe_no,''),         kupe_no),
-    devlet_kupe     = COALESCE(NULLIF(p_devlet_kupe,''),     devlet_kupe),
-    irk             = COALESCE(NULLIF(p_irk,''),             irk),
-    cinsiyet        = COALESCE(NULLIF(p_cinsiyet,''),        cinsiyet),
-    dogum_tarihi    = COALESCE(p_dogum_tarihi,               dogum_tarihi),
-    grup            = COALESCE(NULLIF(p_grup,''),            grup),
-    padok           = COALESCE(NULLIF(p_padok,''),           padok),
-    dogum_kg        = COALESCE(p_dogum_kg,                   dogum_kg),
-    canli_agirlik   = COALESCE(p_canli_agirlik,              canli_agirlik),
-    boy             = COALESCE(p_boy,                        boy),
-    renk            = COALESCE(NULLIF(p_renk,''),            renk),
-    ayirici_ozellik = COALESCE(NULLIF(p_ayirici_ozellik,''), ayirici_ozellik)
+    kupe_no          = COALESCE(NULLIF(p_kupe_no,''),         kupe_no),
+    devlet_kupe      = COALESCE(NULLIF(p_devlet_kupe,''),     devlet_kupe),
+    irk              = COALESCE(NULLIF(p_irk,''),             irk),
+    cinsiyet         = COALESCE(NULLIF(p_cinsiyet,''),        cinsiyet),
+    dogum_tarihi     = COALESCE(p_dogum_tarihi,               dogum_tarihi),
+    grup             = COALESCE(NULLIF(p_grup,''),            grup),
+    padok            = COALESCE(NULLIF(p_padok,''),           padok),
+    dogum_kg         = COALESCE(p_dogum_kg,                   dogum_kg),
+    canli_agirlik    = COALESCE(p_canli_agirlik,              canli_agirlik),
+    boy              = COALESCE(p_boy,                        boy),
+    renk             = COALESCE(NULLIF(p_renk,''),            renk),
+    ayirici_ozellik  = COALESCE(NULLIF(p_ayirici_ozellik,''), ayirici_ozellik),
+    updated_at       = now()
   WHERE id = p_id;
+
+  -- islem_log trigger otomatik yazacak (HAYVAN_GUNCELLENDI)
 
   RETURN jsonb_build_object('ok', true, 'hayvan_id', p_id);
 END;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.hayvan_guncelle(p_id text, p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT NULL::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_notlar text DEFAULT NULL::text, p_anne_id text DEFAULT NULL::text, p_padok_id uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_padok_id uuid;
-  v_padok_ad text;
-BEGIN
-  IF p_padok_id IS NOT NULL THEN
-    v_padok_id := p_padok_id;
-    SELECT ad INTO v_padok_ad FROM padoklar WHERE id = p_padok_id;
-  ELSIF p_padok IS NOT NULL THEN
-    SELECT id, ad INTO v_padok_id, v_padok_ad FROM padoklar WHERE ad = p_padok;
-  END IF;
-
-  UPDATE hayvanlar SET
-    kupe_no          = COALESCE(NULLIF(p_kupe_no,''),        kupe_no),
-    devlet_kupe      = COALESCE(NULLIF(p_devlet_kupe,''),    devlet_kupe),
-    irk              = COALESCE(NULLIF(p_irk,''),            irk),
-    cinsiyet         = COALESCE(NULLIF(p_cinsiyet,''),       cinsiyet),
-    dogum_tarihi     = COALESCE(p_dogum_tarihi,              dogum_tarihi),
-    grup             = COALESCE(NULLIF(p_grup,''),           grup),
-    padok            = COALESCE(v_padok_ad,                  padok),
-    padok_id         = COALESCE(v_padok_id,                  padok_id),
-    dogum_kg         = COALESCE(p_dogum_kg,                  dogum_kg),
-    canli_agirlik    = COALESCE(p_canli_agirlik,             canli_agirlik),
-    boy              = COALESCE(p_boy,                       boy),
-    renk             = COALESCE(NULLIF(p_renk,''),           renk),
-    ayirici_ozellik  = COALESCE(NULLIF(p_ayirici_ozellik,''),ayirici_ozellik),
-    baba_bilgi       = COALESCE(NULLIF(p_baba_bilgi,''),     baba_bilgi),
-    notlar           = COALESCE(NULLIF(p_notlar,''),         notlar),
-    anne_id          = COALESCE(NULLIF(p_anne_id,''),        anne_id)
-  WHERE id = p_id;
-
-  RETURN jsonb_build_object('ok', true);
-END;
-$function$
-;
-
-CREATE OR REPLACE FUNCTION public.hayvan_guncelle(p_id text, p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT NULL::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_notlar text DEFAULT NULL::text, p_anne_id text DEFAULT NULL::text, p_padok_id uuid DEFAULT NULL::uuid, p_kisir boolean DEFAULT NULL::boolean)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_padok_id uuid;
-  v_padok_ad text;
-  v_gebe     boolean;
-  v_efektif_dt   date;
-  v_efektif_grup text;
-  v_yas_gun integer;
-  v_chk jsonb;
-BEGIN
-  -- Küpe değişiyorsa çakışma kontrolü (K1/K2) — kendi kaydı hariç (p_hayvan_id = p_id)
-  IF (p_kupe_no IS NOT NULL AND p_kupe_no <> '') OR (p_devlet_kupe IS NOT NULL AND p_devlet_kupe <> '') THEN
-    SELECT public.kupe_musait_mi(p_kupe_no, p_devlet_kupe, p_id) INTO v_chk;
-    IF NOT (v_chk->>'musait')::boolean THEN
-      RETURN jsonb_build_object('ok', false, 'error',
-        CASE WHEN v_chk->>'kupe_cakisma_id' IS NOT NULL
-          THEN 'İşletme küpesi zaten kayıtlı (aktif): ' || COALESCE(p_kupe_no,'')
-          ELSE 'Devlet küpesi zaten kayıtlı: ' || COALESCE(p_devlet_kupe,'') END);
-    END IF;
-  END IF;
-
-  -- Kısır işaretleme validation: gebe hayvan kısır olamaz
-  IF p_kisir IS NOT NULL AND p_kisir = true THEN
-    SELECT EXISTS (
-      SELECT 1 FROM tohumlama t
-      WHERE t.hayvan_id = p_id AND t.sonuc = 'Gebe'
-    ) INTO v_gebe;
-    IF v_gebe THEN
-      RETURN jsonb_build_object('ok', false, 'error', 'Gebe hayvan kısır olarak işaretlenemez');
-    END IF;
-  END IF;
-
-  -- H-11: Yaş/grup validasyonu (js/forms.js:66-77 birebir)
-  -- p_dogum_tarihi VEYA p_grup güncelleniyorsa, EFEKTİF (yeni ya da mevcut
-  -- satırdan gelen, COALESCE ile) değerler üzerinden kontrol et.
-  -- Eğer ikisi de NULL geliyorsa (sadece diğer alanlar güncelleniyor), mevcut
-  -- satırın değerleri kullanılır.
-  IF p_dogum_tarihi IS NOT NULL OR p_grup IS NOT NULL THEN
-    SELECT COALESCE(p_dogum_tarihi, h.dogum_tarihi),
-           COALESCE(NULLIF(p_grup, ''), h.grup)
-      INTO v_efektif_dt, v_efektif_grup
-      FROM hayvanlar h
-     WHERE h.id = p_id;
-
-    IF v_efektif_dt IS NOT NULL THEN
-      v_yas_gun := floor((current_date - v_efektif_dt));
-      IF v_yas_gun < 0 THEN
-        RETURN jsonb_build_object('ok', false, 'error', 'Doğum tarihi ileri tarih olamaz');
-      END IF;
-      IF v_efektif_grup = 'Süt İçen Buzağı' AND v_yas_gun > 180 THEN
-        RETURN jsonb_build_object('ok', false, 'error', '6 aylıktan büyük hayvan "Süt İçen Buzağı" grubuna eklenemez');
-      END IF;
-      IF (v_efektif_grup = 'Süt İçen Buzağı' OR v_efektif_grup = 'Sütten Kesilmiş Buzağı') AND v_yas_gun > 365 THEN
-        RETURN jsonb_build_object('ok', false, 'error', '12 aylıktan büyük hayvan buzağı grubuna eklenemez');
-      END IF;
-    END IF;
-  END IF;
-
-  IF p_padok_id IS NOT NULL THEN
-    v_padok_id := p_padok_id;
-    SELECT ad INTO v_padok_ad FROM padoklar WHERE id = p_padok_id;
-  ELSIF p_padok IS NOT NULL THEN
-    SELECT id, ad INTO v_padok_id, v_padok_ad FROM padoklar WHERE ad = p_padok;
-  END IF;
-
-  UPDATE hayvanlar SET
-    kupe_no          = COALESCE(NULLIF(p_kupe_no,''),        kupe_no),
-    devlet_kupe      = COALESCE(NULLIF(p_devlet_kupe,''),    devlet_kupe),
-    irk              = COALESCE(NULLIF(p_irk,''),            irk),
-    cinsiyet         = COALESCE(NULLIF(p_cinsiyet,''),       cinsiyet),
-    dogum_tarihi     = COALESCE(p_dogum_tarihi,              dogum_tarihi),
-    grup             = COALESCE(NULLIF(p_grup,''),           grup),
-    padok            = COALESCE(v_padok_ad,                  padok),
-    padok_id         = COALESCE(v_padok_id,                  padok_id),
-    dogum_kg         = COALESCE(p_dogum_kg,                  dogum_kg),
-    canli_agirlik    = COALESCE(p_canli_agirlik,             canli_agirlik),
-    boy              = COALESCE(p_boy,                       boy),
-    renk             = COALESCE(NULLIF(p_renk,''),           renk),
-    ayirici_ozellik  = COALESCE(NULLIF(p_ayirici_ozellik,''),ayirici_ozellik),
-    baba_bilgi       = COALESCE(NULLIF(p_baba_bilgi,''),     baba_bilgi),
-    notlar           = COALESCE(NULLIF(p_notlar,''),         notlar),
-    anne_id          = COALESCE(NULLIF(p_anne_id,''),        anne_id),
-    kisir            = COALESCE(p_kisir,                     kisir)
-  WHERE id = p_id;
-
-  RETURN jsonb_build_object('ok', true);
-END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.hayvan_guncelle(text,text,text,text,text,date,text,text,numeric,numeric,numeric,text,text) TO anon, authenticated;
 -- ═══════════════════════════════════════════════════════════════
@@ -2926,24 +2781,25 @@ COMMENT ON COLUMN public.stok.kategori IS 'İlaç | Sperma | Malzeme | Yem | Di�
 -- ──────────────────────────────────────────────────────────────
 DROP VIEW IF EXISTS public.tedavi_view CASCADE;
 CREATE OR REPLACE VIEW public.tedavi_view AS
-SELECT t.id,
-    t.hayvan_id,
-    t.vaka_id,
-    t.tarih,
-    t.tani,
-    t.miktar,
-    t.uygulama_yolu,
-    t.hekim_id,
-    t.bekleme_suresi_gun,
-    t.sut_yasagi_bitis,
-    t.aktif,
-    t.notlar,
-    t.created_at,
-    s.urun_adi AS ilac_adi,
-    s.birim AS ilac_birim,
-    s.kategori AS ilac_kategori
-   FROM (tedavi t
-     LEFT JOIN stok s ON ((s.id = t.ilac_stok_id)));
+SELECT
+  t.id,
+  t.hayvan_id,
+  t.vaka_id,
+  t.tarih,
+  t.tani,
+  t.miktar,
+  t.uygulama_yolu,
+  t.hekim_id,
+  t.bekleme_suresi_gun,
+  t.sut_yasagi_bitis,
+  t.aktif,
+  t.notlar,
+  t.created_at,
+  s.urun_adi   AS ilac_adi,
+  s.birim      AS ilac_birim,
+  s.kategori   AS ilac_kategori
+FROM public.tedavi t
+LEFT JOIN public.stok s ON s.id = t.ilac_stok_id;
 
 -- ──────────────────────────────────────────────────────────────
 -- 4. HASTALIK_KAYDET — ilaçları tedavi tablosuna yazar
@@ -3246,12 +3102,9 @@ ALTER FUNCTION public.tedavi_ekle SECURITY DEFINER;
 -- ──────────────────────────────────────────────────────────────
 DROP FUNCTION IF EXISTS public.tedavi_sil(text);
 
--- FUNCTION: public.tedavi_sil(p_tedavi_id text)
-CREATE OR REPLACE FUNCTION public.tedavi_sil(p_tedavi_id text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.tedavi_sil(
+  p_tedavi_id text
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_tedavi  record;
   v_stok    record;
@@ -3263,39 +3116,29 @@ BEGIN
 
   SELECT * INTO v_stok FROM public.stok WHERE id = v_tedavi.ilac_stok_id;
 
+  -- Ledger: stok iadesi — yeni pozitif hareket ekle
   INSERT INTO public.stok_hareket (
     id, stok_id, tur, miktar, notlar, iptal, referans_tipi, referans_id
   ) VALUES (
     gen_random_uuid(),
     v_tedavi.ilac_stok_id,
     'Tedavi İptal',
-    v_tedavi.miktar,
+    v_tedavi.miktar,   -- pozitif = iade
     'Tedavi silindi — ' || COALESCE(v_tedavi.tani, '?'),
     false,
     'tedavi_iptal',
     p_tedavi_id
   );
 
+  -- Stok miktarını geri ekle
   UPDATE public.stok SET miktar = miktar + v_tedavi.miktar WHERE id = v_tedavi.ilac_stok_id;
 
-  INSERT INTO public.islem_log (
-    tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu, durum
-  ) VALUES (
-    'TEDAVI_SIL',
-    v_tedavi.hayvan_id,
-    p_tedavi_id,
-    'tedavi',
-    jsonb_build_object('silinen', to_jsonb(v_tedavi)),
-    format('Tedavi silindi — %s', COALESCE(v_tedavi.tani, '?')),
-    'aktif'
-  );
-
+  -- Tedavi kaydını sil
   DELETE FROM public.tedavi WHERE id::text = p_tedavi_id;
 
   RETURN jsonb_build_object('ok', true);
 END;
-$function$
-;
+$$;
 
 ALTER FUNCTION public.tedavi_sil SECURITY DEFINER;
 
@@ -3304,12 +3147,14 @@ ALTER FUNCTION public.tedavi_sil SECURITY DEFINER;
 -- ──────────────────────────────────────────────────────────────
 DROP FUNCTION IF EXISTS public.tedavi_guncelle(text,numeric,text,integer,text,text);
 
--- FUNCTION: public.tedavi_guncelle(p_tedavi_id text, p_miktar numeric, p_uygulama_yolu text, p_bekleme_gun integer, p_hekim_id text, p_notlar text)
-CREATE OR REPLACE FUNCTION public.tedavi_guncelle(p_tedavi_id text, p_miktar numeric DEFAULT NULL::numeric, p_uygulama_yolu text DEFAULT NULL::text, p_bekleme_gun integer DEFAULT NULL::integer, p_hekim_id text DEFAULT NULL::text, p_notlar text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.tedavi_guncelle(
+  p_tedavi_id       text,
+  p_miktar          numeric  DEFAULT NULL,
+  p_uygulama_yolu   text     DEFAULT NULL,
+  p_bekleme_gun     integer  DEFAULT NULL,
+  p_hekim_id        text     DEFAULT NULL,
+  p_notlar          text     DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_tedavi  record;
   v_stok    record;
@@ -3322,31 +3167,35 @@ BEGIN
   END IF;
 
   v_yeni_miktar := COALESCE(p_miktar, v_tedavi.miktar);
-  v_fark := v_tedavi.miktar - v_yeni_miktar;
+  v_fark := v_tedavi.miktar - v_yeni_miktar;  -- pozitif = stok geri döner, negatif = daha fazla kullanım
 
   IF v_fark <> 0 THEN
     SELECT * INTO v_stok FROM public.stok WHERE id = v_tedavi.ilac_stok_id;
 
+    -- Yetersiz stok kontrolü (daha fazla kullanılacaksa)
     IF v_fark < 0 AND v_stok.miktar < ABS(v_fark) THEN
       RETURN jsonb_build_object('ok', false, 'mesaj', 'Yetersiz stok: ' || COALESCE(v_stok.urun_adi,'?'));
     END IF;
 
+    -- Ledger: fark hareketi
     INSERT INTO public.stok_hareket (
       id, stok_id, tur, miktar, notlar, iptal, referans_tipi, referans_id
     ) VALUES (
       gen_random_uuid(),
       v_tedavi.ilac_stok_id,
       'Tedavi Düzeltme',
-      v_fark,
+      v_fark,   -- pozitif = iade, negatif = ek kullanım
       'Tedavi güncellendi — ' || COALESCE(v_tedavi.tani, '?'),
       false,
       'tedavi_duzeltme',
       p_tedavi_id
     );
 
+    -- Stok miktarını güncelle
     UPDATE public.stok SET miktar = miktar + v_fark WHERE id = v_tedavi.ilac_stok_id;
   END IF;
 
+  -- Tedavi kaydını güncelle
   UPDATE public.tedavi SET
     miktar             = v_yeni_miktar,
     uygulama_yolu      = COALESCE(p_uygulama_yolu,  uygulama_yolu),
@@ -3360,23 +3209,9 @@ BEGIN
     notlar             = COALESCE(p_notlar,           notlar)
   WHERE id::text = p_tedavi_id;
 
-  -- M-4(BE) FIX: audit trail — BE-H-1 (tedavi_sil) ile aynı desen
-  INSERT INTO public.islem_log (
-    tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu, durum
-  ) VALUES (
-    'TEDAVI_GUNCELLENDI',
-    v_tedavi.hayvan_id,
-    p_tedavi_id,
-    'tedavi',
-    jsonb_build_object('eski_miktar', v_tedavi.miktar, 'yeni_miktar', v_yeni_miktar),
-    format('Tedavi güncellendi — %s', COALESCE(v_tedavi.tani, '?')),
-    'aktif'
-  );
-
   RETURN jsonb_build_object('ok', true);
 END;
-$function$
-;
+$$;
 
 ALTER FUNCTION public.tedavi_guncelle SECURITY DEFINER;
 
@@ -3715,75 +3550,13 @@ CREATE TRIGGER trg_set_day_no
 -- Trigger kaldırıldı çünkü drug_id kolonu yok (stok_id + drug_product_id kullanılıyor)
 -- ──────────────────────────────────────────────────────────────
 -- Trigger kaldırıldı: stok hareketi add_drug_administration RPC içinde yapılıyor
--- FUNCTION: public.drug_administration_stok_dusum()
 CREATE OR REPLACE FUNCTION public.drug_administration_stok_dusum()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_stok_id   text;
-  v_drug_name text;
-  v_animal_id text;
-  v_kupe_no   text;
-  v_guncel    numeric;
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  -- İlacın stok bağlantısını kontrol et
-  SELECT d.stock_item_id, d.name
-  INTO   v_stok_id, v_drug_name
-  FROM   public.drugs d
-  WHERE  d.id = NEW.drug_id;
-
-  -- Stok bağlantısı yoksa ledger kaydı yapmadan geç
-  IF v_stok_id IS NULL THEN
-    RETURN NEW;
-  END IF;
-
-  -- Hayvan küpe no'sunu bul (notlar için)
-  SELECT c.animal_id INTO v_animal_id
-  FROM   public.treatment_days td
-  JOIN   public.cases c ON c.id = td.case_id
-  WHERE  td.id = NEW.treatment_day_id;
-
-  SELECT kupe_no INTO v_kupe_no
-  FROM   public.hayvanlar
-  WHERE  id = v_animal_id;
-
-  -- Stok yeterliliği kontrolü
-  SELECT COALESCE(s.baslangic_miktar, 0)
-         - COALESCE((
-             SELECT SUM(sh.miktar)
-             FROM   public.stok_hareket sh
-             WHERE  sh.stok_id = v_stok_id
-               AND  NOT sh.iptal
-           ), 0)
-  INTO v_guncel
-  FROM public.stok s
-  WHERE s.id = v_stok_id;
-
-  IF v_guncel < NEW.dose THEN
-    RAISE EXCEPTION 'Yetersiz stok: % (mevcut: %, istenen: %)',
-      v_drug_name, v_guncel, NEW.dose;
-  END IF;
-
-  -- Ledger: pozitif = kullanım (frontend bu değeri SUM'dan düşürür)
-  INSERT INTO public.stok_hareket (
-    stok_id, tur, miktar, notlar, iptal,
-    referans_tipi, referans_id
-  ) VALUES (
-    v_stok_id,
-    'Tedavi',
-    NEW.dose,   -- POZİTİF — mevcut ledger mantığıyla uyumlu
-    v_drug_name || ' — ' || COALESCE(v_kupe_no, v_animal_id),
-    false,
-    'drug_administration',
-    NEW.id::text
-  );
-
+  -- This trigger is disabled. Stock ledger is handled by RPC.
   RETURN NEW;
 END;
-$function$
-;
+$$;
 
 -- ──────────────────────────────────────────────────────────────
 -- 8. VIEW: treatment_timeline
@@ -4473,12 +4246,12 @@ $$;
 -- 9e. treatment_day_tamamla
 DROP FUNCTION IF EXISTS public.treatment_day_tamamla(uuid, text);
 DROP FUNCTION IF EXISTS public.treatment_day_tamamla(uuid, text, uuid[]);
--- FUNCTION: public.add_treatment_day_with_sessions(p_case_id uuid, p_date date, p_sessions jsonb, p_existing_day_id uuid)
-CREATE OR REPLACE FUNCTION public.add_treatment_day_with_sessions(p_case_id uuid, p_date date, p_sessions jsonb DEFAULT NULL::jsonb, p_existing_day_id uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.add_treatment_day_with_sessions(
+  p_case_id            uuid,
+  p_date               date,
+  p_sessions           jsonb DEFAULT NULL,
+  p_existing_day_id    uuid DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_day_id         uuid;
   v_gorev_id       uuid;
@@ -4498,6 +4271,7 @@ DECLARE
 BEGIN
   v_is_update := p_existing_day_id IS NOT NULL;
 
+  -- Day no: yeni gun ise MAX+1, mevcut gun ise mevcut day_no
   IF v_is_update THEN
     SELECT day_no INTO v_day_no
     FROM public.treatment_days
@@ -4510,6 +4284,7 @@ BEGIN
     FROM public.treatment_days WHERE case_id = p_case_id;
   END IF;
 
+  -- Case
   SELECT * INTO v_case FROM public.cases WHERE id = p_case_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Vaka bulunamadi');
@@ -4520,6 +4295,7 @@ BEGIN
 
   v_gecmis := p_date < CURRENT_DATE;
 
+  -- Onceki gun varsa parent_id
   IF v_day_no > 1 THEN
     SELECT g.id INTO v_prev_gorev_id
     FROM public.gorev_log g
@@ -4528,13 +4304,16 @@ BEGIN
     LIMIT 1;
   END IF;
 
+  -- YENI: seans sayisi
   v_seans_sayisi := CASE WHEN p_sessions IS NULL THEN NULL ELSE jsonb_array_length(p_sessions)::smallint END;
   v_first_time   := CASE 
     WHEN p_sessions IS NULL THEN NULL
     ELSE (p_sessions->0->>'planned_time')::time
   END;
 
+  -- Day INSERT veya UPDATE
   IF v_is_update THEN
+    -- ONCE eski alt verileri temizle (drug_admins, seanslar, gorevler, stok iade)
     UPDATE public.stok_hareket sh
     SET iptal = true
     FROM public.drug_administrations da
@@ -4548,6 +4327,7 @@ BEGIN
     WHERE gorev_tipi = 'TEDAVI_SEANS'
       AND (aciklama::jsonb->>'day_id')::uuid = p_existing_day_id;
 
+    -- Mevcut gunu guncelle
     UPDATE public.treatment_days
     SET planned_time = v_first_time,
         seans_sayisi = v_seans_sayisi,
@@ -4555,6 +4335,7 @@ BEGIN
     WHERE id = p_existing_day_id
     RETURNING id INTO v_day_id;
 
+    -- Mevcut TEDAVI_GUN gorevini yeniden ac
     UPDATE public.gorev_log
     SET tamamlandi = false,
         tamamlanma_tarihi = NULL,
@@ -4581,6 +4362,7 @@ BEGIN
     RETURNING id INTO v_day_id;
   END IF;
 
+  -- Ana TEDAVI_GUN gorev
   IF NOT v_is_update THEN
     INSERT INTO public.gorev_log(
       id, gorev_tipi, hayvan_id, hedef_tarih, aciklama,
@@ -4600,9 +4382,11 @@ BEGIN
     RETURNING id INTO v_gorev_id;
   END IF;
 
+  -- YENI: N seans dongusu
   IF p_sessions IS NOT NULL THEN
     FOR v_session IN SELECT * FROM jsonb_array_elements(p_sessions)
     LOOP
+      -- treatment_day_uygulamalar INSERT (sira_no YOK, planned_time ile siralama)
       INSERT INTO public.treatment_day_uygulamalar(
         treatment_day_id, case_id, planned_time, planned_date,
         stok_id, drug_product_id, dose, unit, route
@@ -4620,6 +4404,7 @@ BEGIN
 
       v_admin_ids := array_append(v_admin_ids, v_admin_id);
 
+      -- drug_administrations INSERT
       INSERT INTO public.drug_administrations(
         treatment_day_id, stok_id, drug_product_id, dose, unit, route,
         seans_admin_id
@@ -4635,14 +4420,17 @@ BEGIN
       )
       RETURNING id INTO v_drug_admin_id;
 
+      -- Stok INSERT (drug_admin_id ile birebir izlenebilir)
       v_stok_id := v_session->>'stok_id';
       IF v_stok_id IS NOT NULL AND (v_session->>'dose')::numeric > 0 THEN
         INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar)
         VALUES (v_stok_id, 'Tedavi', (v_session->>'dose')::numeric,
                 'drug_admin:' || v_drug_admin_id::text)
         RETURNING id INTO v_stok_hareket_id;
+        -- Not: stok_hareket_ref kolonu Faz 1'de yok, stok iade drug_admins.notlar pattern'i ile yapilir
       END IF;
 
+      -- Her seans icin ayri TEDAVI_SEANS gorev
       INSERT INTO public.gorev_log(
         id, gorev_tipi, hayvan_id, hedef_tarih, hedef_saat,
         aciklama, tamamlandi, parent_id, seans_admin_id
@@ -4661,6 +4449,7 @@ BEGIN
     END LOOP;
   END IF;
 
+  -- Audit
   INSERT INTO public.islem_log(id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
   VALUES (
     gen_random_uuid()::text,
@@ -4670,7 +4459,7 @@ BEGIN
     jsonb_build_object(
       'olusturulan', jsonb_build_array(
         jsonb_build_object('tablo', 'treatment_days', 'id', v_day_id::text),
-        jsonb_build_object('tablo', 'gorev_log', 'id', v_gorev_id::text)
+        jsonb_build_object('tablo', 'gorev_log', 'id', v_gorev_id)
       ) || COALESCE((
         SELECT jsonb_agg(jsonb_build_object('tablo', 'treatment_day_uygulamalar', 'id', id::text))
         FROM unnest(v_admin_ids) AS id
@@ -4686,8 +4475,7 @@ BEGIN
     'gorev_id', v_gorev_id, 'gecmis', v_gecmis
   );
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.add_treatment_day_with_sessions TO anon, authenticated;
 
@@ -5135,15 +4923,14 @@ GRANT EXECUTE ON FUNCTION public.recete_guncelle TO anon, authenticated;
 -- Spec: L804-907
 -- Vakayı erken kapat. Tüm kalan seanslar uygulanmadi olarak işaretlenir + stok iade.
 DROP FUNCTION IF EXISTS public.close_case_with_remaining(uuid, text);
--- FUNCTION: public.close_case_with_remaining(p_case_id uuid, p_not text)
-CREATE OR REPLACE FUNCTION public.close_case_with_remaining(p_case_id uuid, p_not text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.close_case_with_remaining(
+  p_case_id  uuid,
+  p_not      text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_remaining_count int;
 BEGIN
+  -- 1. Stok iade: SEANS olan drug_admins (seans_admin_id NOT NULL)
   UPDATE public.stok_hareket sh
   SET iptal = true
   FROM public.drug_administrations da
@@ -5151,31 +4938,34 @@ BEGIN
     ON tdu.id = da.seans_admin_id
   WHERE tdu.case_id = p_case_id
     AND tdu.uygulanmadi = false
-    AND tdu.uygulama_tamamlandi_at IS NULL
+    AND tdu.uygulama_tamamlandi_at IS NULL   -- biten seans iade EDILMEZ
     AND sh.notlar = 'drug_admin:' || da.id::text
     AND sh.iptal = false;
 
+  -- ESKI VAKA FALLBACK: seans_admin_id NULL olan drug_admins (seans tablosu kullanilmamis)
   UPDATE public.stok_hareket sh
   SET iptal = true
   FROM public.drug_administrations da
   JOIN public.treatment_days td ON td.id = da.treatment_day_id
   WHERE td.case_id = p_case_id
     AND da.seans_admin_id IS NULL
-    AND td.tamamlandi = false
+    AND td.tamamlandi = false                 -- tamamlanmis gun iade EDILMEZ
     AND (da.uygulanmadi IS NULL OR da.uygulanmadi = false)
     AND sh.notlar = 'drug_admin:' || da.id::text
     AND sh.iptal = false;
 
+  -- 2. Seans tablosu: uygulanmadi=true
   UPDATE public.treatment_day_uygulamalar
   SET uygulanmadi = true,
       iptal_nedeni = 'Vaka erken kapatildi' || COALESCE(': ' || p_not, ''),
       updated_at = now()
   WHERE case_id = p_case_id
     AND uygulanmadi = false
-    AND uygulama_tamamlandi_at IS NULL;
+    AND uygulama_tamamlandi_at IS NULL;       -- biten seans "yapilmadi" YAPILMAZ
 
   GET DIAGNOSTICS v_remaining_count = ROW_COUNT;
 
+  -- 3. drug_admins senkron (seans uzerinden)
   UPDATE public.drug_administrations da
   SET uygulanmadi = true
   FROM public.treatment_day_uygulamalar tdu
@@ -5184,41 +4974,38 @@ BEGIN
     AND tdu.uygulanmadi = true
     AND da.uygulanmadi IS DISTINCT FROM true;
 
+  -- ESKI VAKA FALLBACK
   UPDATE public.drug_administrations da
   SET uygulanmadi = true
   FROM public.treatment_days td
   WHERE td.id = da.treatment_day_id
     AND td.case_id = p_case_id
     AND da.seans_admin_id IS NULL
-    AND td.tamamlandi = false
+    AND td.tamamlandi = false                 -- tamamlanmis gun korunur
     AND da.uygulanmadi IS DISTINCT FROM true;
 
+  -- 4. treatment_days tamamlandi
   UPDATE public.treatment_days
   SET tamamlandi = true, tamamlanma_tarihi = now()
   WHERE case_id = p_case_id AND tamamlandi = false;
 
-  -- 5. gorev_log kalan acik gorevler — gorev_tipi guard (JSON-olmayan aciklama'lari cast'ten ele)
+  -- 5. gorev_log kalan acik gorevler
+  -- NOT: gorev_tipi guard zorunlu — aksi halde gorev_log'daki JSON-olmayan
+  -- (emoji'li duz metin) aciklama'lar g.aciklama::jsonb cast'inde 22P02 verir.
   UPDATE public.gorev_log g
   SET tamamlandi = true, tamamlanma_tarihi = now()
   FROM public.treatment_days td
   WHERE td.case_id = p_case_id
     AND g.gorev_tipi IN ('TEDAVI_GUN','TEDAVI_SEANS')
-    AND (CASE WHEN g.aciklama IS JSON OBJECT
-              THEN (g.aciklama::jsonb->>'day_id') END)::uuid = td.id
+    AND (g.aciklama::jsonb->>'day_id')::uuid = td.id
     AND g.tamamlandi = false;
 
-  -- 5b. Planlı tohumlama gorevi bagimsiz (parent_id/day_id yok) — adim 5'in
-  -- treatment_days JOIN'i onu GOREMEZ. Vaka kapaninca acikta kalmasin.
-  UPDATE public.gorev_log
-  SET iptal = true, tamamlandi = true, tamamlanma_tarihi = now()
-  WHERE gorev_tipi = 'TOHUMLAMA_PLANLI'
-    AND kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:' || p_case_id::text || ':%'
-    AND tamamlandi = false AND iptal = false;
-
+  -- 6. Case kapat
   UPDATE public.cases
   SET status = 'closed', closed_at = now()
   WHERE id = p_case_id;
 
+  -- 7. Audit
   INSERT INTO public.islem_log(id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
   VALUES (
     gen_random_uuid()::text, 'CASE_CLOSED_EARLY',
@@ -5233,8 +5020,7 @@ BEGIN
 
   RETURN jsonb_build_object('ok', true, 'iptal_edilen_seans', v_remaining_count);
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.close_case_with_remaining TO anon, authenticated;
 
@@ -5243,13 +5029,12 @@ GRANT EXECUTE ON FUNCTION public.close_case_with_remaining TO anon, authenticate
 -- Tedavi gününü kapat. Eski (drug_admin) + yeni (seans) akış destekler.
 -- Idempotent: zaten tamamlanmışsa noop.
 DROP FUNCTION IF EXISTS public.treatment_day_tamamla(uuid, text, uuid[]);
--- FUNCTION: public.treatment_day_tamamla(p_day_id uuid, p_not text, p_uygulanmadi_ids uuid[])
-CREATE OR REPLACE FUNCTION public.treatment_day_tamamla(p_day_id uuid, p_not text DEFAULT NULL::text, p_uygulanmadi_ids uuid[] DEFAULT '{}'::uuid[])
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
+CREATE OR REPLACE FUNCTION public.treatment_day_tamamla(
+  p_day_id           uuid,
+  p_not              text    DEFAULT NULL,
+  p_uygulanmadi_ids  uuid[]  DEFAULT '{}'
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_day        public.treatment_days%ROWTYPE;
   v_seans_sayisi int;
@@ -5257,48 +5042,99 @@ DECLARE
   v_uygulanmadi int;
   v_onceki      boolean;
   v_admin_id    uuid;
-  v_case_animal text;
 BEGIN
   SELECT * INTO v_day FROM public.treatment_days WHERE id = p_day_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Tedavi gunu bulunamadi: %', p_day_id; END IF;
   IF v_day.tamamlandi THEN
     RETURN jsonb_build_object('ok', true, 'day_id', p_day_id, 'mesaj', 'Zaten tamamlanmis (idempotent)');
   END IF;
-  SELECT animal_id INTO v_case_animal FROM public.cases WHERE id = v_day.case_id;
+
+  -- Onceki gun tamamlanmali
   SELECT EXISTS(
     SELECT 1 FROM public.treatment_days
     WHERE case_id = v_day.case_id AND day_no < v_day.day_no
       AND (tamamlandi IS NULL OR tamamlandi = false)
   ) INTO v_onceki;
   IF v_onceki THEN RAISE EXCEPTION 'Onceki tedavi gunleri tamamlanmadan bu gun tamamlanamaz'; END IF;
+
+  -- YENI: seans_sayisi > 0 ise "tum seanslar done" kontrolu
   v_seans_sayisi := COALESCE(v_day.seans_sayisi, 1);
   IF v_seans_sayisi > 1 THEN
-    SELECT COUNT(*) FILTER (WHERE uygulama_tamamlandi_at IS NOT NULL),
-           COUNT(*) FILTER (WHERE uygulanmadi = true)
+    SELECT
+      COUNT(*) FILTER (WHERE uygulama_tamamlandi_at IS NOT NULL),
+      COUNT(*) FILTER (WHERE uygulanmadi = true)
     INTO v_tamam, v_uygulanmadi
     FROM public.treatment_day_uygulamalar WHERE treatment_day_id = p_day_id;
+
     IF (v_tamam + v_uygulanmadi + COALESCE(array_length(p_uygulanmadi_ids, 1), 0)) < v_seans_sayisi THEN
-      RAISE EXCEPTION 'Tum seanslar tamamlanmadi';
+      RAISE EXCEPTION 'Tum seanslar tamamlanmadi (%/% done, % uygulanmadi)', 
+        v_tamam, v_seans_sayisi, v_uygulanmadi;
     END IF;
   END IF;
+
+  -- Uygulanmadi isaretlemeleri
+  -- p_uygulanmadi_ids: drug_admins.id (eski) veya tdu.id (yeni) olabilir
   IF array_length(p_uygulanmadi_ids, 1) > 0 THEN
-    FOREACH v_admin_id IN ARRAY p_uygulanmadi_ids LOOP
-      UPDATE public.drug_administrations SET uygulanmadi=true WHERE id=v_admin_id AND treatment_day_id=p_day_id AND uygulanmadi IS DISTINCT FROM true;
-      UPDATE public.drug_administrations SET uygulanmadi=true WHERE seans_admin_id=v_admin_id AND treatment_day_id=p_day_id AND uygulanmadi IS DISTINCT FROM true;
-      UPDATE public.treatment_day_uygulamalar SET uygulama_tamamlandi_at=COALESCE(uygulama_tamamlandi_at, now()), uygulama_notu=COALESCE(uygulama_notu, p_not), gerceklesme_saati=COALESCE(gerceklesme_saati, NOW()::time), updated_at=now() WHERE id=v_admin_id AND uygulama_tamamlandi_at IS NULL AND uygulanmadi=false;
-      UPDATE public.stok_hareket sh SET iptal=true FROM public.drug_administrations da WHERE (da.seans_admin_id=v_admin_id OR da.id=v_admin_id) AND da.treatment_day_id=p_day_id AND sh.notlar='drug_admin:'||da.id::text AND sh.iptal=false;
+    FOREACH v_admin_id IN ARRAY p_uygulanmadi_ids
+    LOOP
+      -- 1. drug_admins'de ara (eski tek-seans)
+      UPDATE public.drug_administrations
+      SET uygulanmadi = true
+      WHERE id = v_admin_id
+        AND treatment_day_id = p_day_id
+        AND uygulanmadi IS DISTINCT FROM true;
+
+      -- 2. Bulunamadiysa seans tablosu uzerinden (yeni cok-seans)
+      -- v_admin_id = tdu.id, seans_admin_id FK ile bagli drug_admins'leri bul
+      UPDATE public.drug_administrations
+      SET uygulanmadi = true
+      WHERE seans_admin_id = v_admin_id
+        AND treatment_day_id = p_day_id
+        AND uygulanmadi IS DISTINCT FROM true;
+
+      -- Seans tablosunu da isaretle
+      UPDATE public.treatment_day_uygulamalar
+      SET uygulama_tamamlandi_at = COALESCE(uygulama_tamamlandi_at, now()),
+          uygulama_notu = COALESCE(uygulama_notu, p_not),
+          gerceklesme_saati = COALESCE(gerceklesme_saati, NOW()::time),
+          updated_at = now()
+      WHERE id = v_admin_id
+        AND uygulama_tamamlandi_at IS NULL
+        AND uygulanmadi = false;
+
+      -- 3. Stok iade: stok_hareket_ref kolonu Faz 1'de yok.
+      -- Bunun yerine: v_admin_id = tdu.id ise seans uzerinden bulunan drug_admins'lerin notlar pattern'i
+      UPDATE public.stok_hareket sh
+      SET iptal = true
+      FROM public.drug_administrations da
+      WHERE (
+        -- v_admin_id tdu.id ise (seans uzerinden)
+        da.seans_admin_id = v_admin_id
+        OR
+        -- v_admin_id drug_admins.id ise (eski tek-seans)
+        da.id = v_admin_id
+      )
+      AND da.treatment_day_id = p_day_id
+      AND sh.notlar = 'drug_admin:' || da.id::text
+      AND sh.iptal = false;
     END LOOP;
   END IF;
-  -- ═══ FIX: tamamlandi olarak işaretle + audit ═══
-  UPDATE public.treatment_days SET tamamlandi=true, tamamlanma_tarihi=now(), tamamlanma_notu=p_not WHERE id=p_day_id;
-  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
-  VALUES ('TEDAVI_GUN_TAMAMLA', v_case_animal, p_day_id::text, 'treatment_days',
-    jsonb_build_object('olusturulan','[]'::jsonb, 'guncellenen', jsonb_build_array(jsonb_build_object('tablo','treatment_days','id',p_day_id::text)), 'silinen','[]'::jsonb),
-    format('Tedavi günü %s tamamlandı', p_day_id));
-  RETURN jsonb_build_object('ok', true, 'day_id', p_day_id, 'mesaj', 'Tedavi günü tamamlandı');
+
+  -- Gun done
+  UPDATE public.treatment_days
+  SET tamamlandi = true, tamamlanma_tarihi = now(), tamamlanma_notu = p_not
+  WHERE id = p_day_id;
+
+  -- Gorev log
+  UPDATE public.gorev_log
+  SET tamamlandi = true, tamamlanma_tarihi = now()
+  WHERE gorev_tipi IN ('TEDAVI_GUN', 'TEDAVI_SEANS')
+    AND tamamlandi = false
+    AND (aciklama::jsonb->>'day_id')::uuid = p_day_id;
+
+  RETURN jsonb_build_object('ok', true, 'day_id', p_day_id);
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.treatment_day_tamamla TO anon, authenticated;
 
@@ -5487,12 +5323,10 @@ $$;
 
 -- Uygula: şablon kalemlerini gun_no'ya göre gruplayıp add_treatment_day_with_sessions motorunu besler
 DROP FUNCTION IF EXISTS public.tedavi_sablon_uygula(uuid, uuid);
--- FUNCTION: public.tedavi_sablon_uygula(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date)
-CREATE OR REPLACE FUNCTION public.tedavi_sablon_uygula(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL::date)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.tedavi_sablon_uygula(
+  p_case_id    uuid,
+  p_sablon_id  uuid
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_case         record;
   v_gun_no       smallint;
@@ -5516,7 +5350,7 @@ BEGIN
     SELECT DISTINCT gun_no FROM public.tedavi_sablonu_kalem
     WHERE sablon_id = p_sablon_id ORDER BY gun_no
   LOOP
-    v_date := COALESCE(p_baslangic_tarihi, v_case.start_date) + (v_gun_no - 1);
+    v_date := v_case.start_date + (v_gun_no - 1);
 
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
              'planned_time',    to_char(k.planned_time,'HH24:MI'),
@@ -5555,8 +5389,7 @@ BEGIN
   RETURN jsonb_build_object('ok', true,
     'gun_sayisi', v_gun_sayisi, 'seans_sayisi', v_seans_sayisi, 'atlanan', v_atlanan);
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.tedavi_sablon_kaydet(uuid, text, text, jsonb, jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.tedavi_sablon_sil(uuid) TO anon, authenticated;
@@ -5731,32 +5564,33 @@ NOTIFY pgrst, 'reload schema';
 -- ══════════════════════════════════════════════════════════════
 
 CREATE OR REPLACE VIEW public.treatment_timeline AS
-SELECT h.id AS animal_id,
-    h.kupe_no,
-    c.id AS case_id,
-    c.status AS case_status,
-    c.start_date AS case_start,
-    dis.name AS disease,
-    dis.category AS disease_category,
-    td.id AS day_id,
-    td.day_no,
-    td.treatment_date,
-    dp.id AS drug_id,
-    COALESCE(dp.brand_name, s.urun_adi, '?'::text) AS drug,
-    da.id AS administration_id,
-    da.dose,
-    da.unit,
-    da.route,
-    da.notes AS admin_notes,
-    da.stok_id,
-    td.treatment_time
-   FROM ((((((treatment_days td
-     JOIN cases c ON ((c.id = td.case_id)))
-     JOIN hayvanlar h ON ((h.id = c.animal_id)))
-     JOIN diseases dis ON ((dis.id = c.disease_id)))
-     LEFT JOIN drug_administrations da ON ((da.treatment_day_id = td.id)))
-     LEFT JOIN drug_products dp ON ((dp.id = da.drug_product_id)))
-     LEFT JOIN stok s ON ((s.id = da.stok_id)));
+SELECT
+  h.id              AS animal_id,
+  h.kupe_no,
+  c.id              AS case_id,
+  c.status          AS case_status,
+  c.start_date      AS case_start,
+  dis.name          AS disease,
+  dis.category      AS disease_category,
+  td.id             AS day_id,
+  td.day_no,
+  td.treatment_date,
+  dp.id             AS drug_id,
+  COALESCE(dp.brand_name, s.urun_adi, '?') AS drug,
+  da.id             AS administration_id,
+  da.dose,
+  da.unit,
+  da.route,
+  da.notes          AS admin_notes,
+  da.stok_id,
+  td.treatment_time
+FROM treatment_days td
+  JOIN  cases             c   ON c.id   = td.case_id
+  JOIN  hayvanlar         h   ON h.id   = c.animal_id
+  JOIN  diseases          dis ON dis.id = c.disease_id
+  LEFT JOIN drug_administrations da  ON da.treatment_day_id = td.id
+  LEFT JOIN drug_products        dp  ON dp.id = da.drug_product_id
+  LEFT JOIN stok                 s   ON s.id  = da.stok_id;
 
 NOTIFY pgrst, 'reload schema';
 -- ══════════════════════════════════════════════════════════════
@@ -5903,12 +5737,11 @@ $$;
 -- Bu fonksiyon migration 013'te SQL Editor üzerinden uygulandı,
 -- repo'ya hiç eklenmemişti. DB reset'e karşı kalıcı hale getiriliyor.
 
--- FUNCTION: public.geri_al(p_islem_id text)
 CREATE OR REPLACE FUNCTION public.geri_al(p_islem_id text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 DECLARE
   v_snapshot  jsonb;
   v_item      jsonb;
@@ -5928,30 +5761,12 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'hata', 'islem bulunamadi');
   END IF;
 
-  -- GÜVENLİK (review 2026-08-30): whitelist öndoğrulama — snapshot'taki tüm tablo
-  -- adları bilinen undo yüzeyleriyle sınırlı (üretim geçmişi envanterinden türetildi).
-  -- İzinsiz tablo görülürse HİÇBİR mutasyona başlamadan döner (tek transaction; kısmi uygulama yok).
-  FOR v_item IN
-    SELECT * FROM jsonb_array_elements(COALESCE(v_snapshot->'olusturulan','[]'::jsonb))
-    UNION ALL
-    SELECT * FROM jsonb_array_elements(COALESCE(v_snapshot->'guncellenen','[]'::jsonb))
-  LOOP
-    IF v_item->>'tablo' IS NULL OR v_item->>'tablo' NOT IN (
-      'treatment_day_uygulamalar','gorev_log','treatment_days','hayvanlar',
-      'uygulama_log','cases','tohumlama','stok_hareket','stok','vaccination_log',
-      'drug_products','protokol_ayar','hekimler','padoklar','vaccines'
-    ) THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'Snapshot izin verilmeyen tablo iceriyor: ' || COALESCE(v_item->>'tablo','?'));
-    END IF;
-  END LOOP;
-
   FOR v_item IN SELECT * FROM jsonb_array_elements(v_snapshot->'olusturulan')
   LOOP
     v_tablo := v_item->>'tablo';
     v_pk    := v_item->>'id';
 
     IF v_tablo = 'treatment_days' THEN
-      -- Stok iade: iptal=true (audit trail korunur — DELETE değil)
       UPDATE public.stok_hareket
       SET iptal = true
       WHERE notlar IN (
@@ -5959,11 +5774,9 @@ BEGIN
         FROM public.drug_administrations da
         WHERE da.treatment_day_id = v_pk::uuid
       );
-      -- Tedavi günü sil (CASCADE: drug_administrations otomatik)
       DELETE FROM public.treatment_days WHERE id = v_pk::uuid;
 
     ELSIF v_tablo = 'cases' THEN
-      -- TEDAVI_GUN gorev orphan temizliği (snapshot'ta değil, manuel sil)
       DELETE FROM public.gorev_log g
       WHERE g.gorev_tipi = 'TEDAVI_GUN'
         AND EXISTS (
@@ -5973,7 +5786,6 @@ BEGIN
             AND (g.aciklama::jsonb->>'day_id')::uuid = td.id
         );
 
-      -- Stok iade: tüm treatment_days için iptal=true
       UPDATE public.stok_hareket
       SET iptal = true
       WHERE notlar IN (
@@ -5983,13 +5795,12 @@ BEGIN
         WHERE td.case_id = v_pk::uuid
       );
 
-      -- Case sil (CASCADE zinciri)
       DELETE FROM public.cases WHERE id = v_pk::uuid;
 
     ELSE
       BEGIN
         EXECUTE format('DELETE FROM %I WHERE id = $1', v_tablo) USING v_pk;
-      EXCEPTION WHEN SQLSTATE '42883' OR SQLSTATE '22P02' THEN
+      EXCEPTION WHEN others THEN
         EXECUTE format('DELETE FROM %I WHERE id = $1::uuid', v_tablo) USING v_pk;
       END;
     END IF;
@@ -6016,25 +5827,14 @@ BEGIN
         v_tablo,
         array_to_string(v_set_parts, ', ')
       );
-      BEGIN
-        EXECUTE v_sql USING v_pk;
-      EXCEPTION WHEN SQLSTATE '42883' OR SQLSTATE '22P02' THEN
-        -- uuid PK'lı tablolar (tohumlama vb.) için tip fallback'i —
-        -- yalnız tip hatalarında; diğer hatalar aynen yükselir
-        EXECUTE format(
-          'UPDATE %I SET %s WHERE id = $1::uuid',
-          v_tablo,
-          array_to_string(v_set_parts, ', ')
-        ) USING v_pk;
-      END;
+      EXECUTE v_sql USING v_pk;
     END IF;
   END LOOP;
 
   UPDATE islem_log SET durum = 'geri_alindi' WHERE id = p_islem_id;
   RETURN jsonb_build_object('ok', true);
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.geri_al(text) TO anon, authenticated;
 -- Migration: tohumlama event stack — önceki Bekliyor→Boş + islem_log snapshot + tohumlama_sonuc_gebe RPC
@@ -6185,16 +5985,13 @@ CREATE INDEX IF NOT EXISTS vac_log_date_idx ON public.vaccination_log(vaccinatio
 -- ══════════════════════════════════════════════════════════════
 -- 4. TRIGGER: vaccination_log → stok_hareket (ledger)
 -- ══════════════════════════════════════════════════════════════
--- FUNCTION: public.vaccination_stok_dusum()
 CREATE OR REPLACE FUNCTION public.vaccination_stok_dusum()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_stok_id      text;
+  v_stok_id   text;
   v_vaccine_name text;
-  v_kupe_no      text;
+  v_kupe_no   text;
+  v_guncel    numeric;
 BEGIN
   -- Aşının stok bağlantısını kontrol et
   SELECT v.stock_item_id, v.name
@@ -6212,8 +6009,24 @@ BEGIN
   FROM   public.hayvanlar
   WHERE  id = NEW.animal_id;
 
-  -- Ledger: pozitif = kullanım. Serbest düşüm — net stok eksiye düşebilir
-  -- (kullanıcı kararı 2026-09-02: ilaç/seans akışlarıyla uyum, uygulama engellenmez).
+  -- Stok yeterliliği kontrolü
+  SELECT COALESCE(s.baslangic_miktar, 0)
+         - COALESCE((
+             SELECT SUM(sh.miktar)
+             FROM   public.stok_hareket sh
+             WHERE  sh.stok_id = v_stok_id
+               AND  NOT sh.iptal
+           ), 0)
+  INTO v_guncel
+  FROM public.stok s
+  WHERE s.id = v_stok_id;
+
+  IF v_guncel < NEW.dose_given THEN
+    RAISE EXCEPTION 'Yetersiz stok: % (mevcut: %, istenen: %)',
+      v_vaccine_name, v_guncel, NEW.dose_given;
+  END IF;
+
+  -- Ledger: pozitif = kullanım
   INSERT INTO public.stok_hareket (
     stok_id, tur, miktar, notlar, iptal,
     referans_tipi, referans_id
@@ -6229,8 +6042,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$
-;
+$$;
 
 DROP TRIGGER IF EXISTS trg_vaccination_stok ON public.vaccination_log;
 CREATE TRIGGER trg_vaccination_stok
@@ -6240,40 +6052,87 @@ CREATE TRIGGER trg_vaccination_stok
 -- ══════════════════════════════════════════════════════════════
 -- 5. RPC: add_vaccination — Aşı uygula + stok düş + görev üret
 -- ══════════════════════════════════════════════════════════════
--- FUNCTION: public.get_vaccination_schedule(p_animal_id text)
-CREATE OR REPLACE FUNCTION public.get_vaccination_schedule(p_animal_id text)
- RETURNS TABLE(vaccine_id uuid, vaccine_name text, disease_target text, dose numeric, unit text, route text, schedule_date date, is_due boolean, notes text)
- LANGUAGE plpgsql
- STABLE
-AS $function$
+CREATE OR REPLACE FUNCTION public.get_vaccination_schedule(
+  p_animal_id text
+) RETURNS TABLE(
+  vaccine_id        uuid,
+  vaccine_name      text,
+  disease_target    text,
+  dose              numeric,
+  unit              text,
+  route             text,
+  schedule_date     date,
+  is_due            boolean,
+  notes             text
+) LANGUAGE plpgsql STABLE AS $$
 DECLARE
-  v_animal record; v_birth_date date; v_today date := CURRENT_DATE; v_age_days integer; v_schedule_rec record; v_last_vac_date date;
+  v_animal        record;
+  v_birth_date    date;
+  v_today         date := CURRENT_DATE;
+  v_age_days      integer;
+  v_schedule_rec  record;
+  v_last_vac_date date;
 BEGIN
-  SELECT * INTO v_animal FROM public.hayvanlar WHERE id = p_animal_id AND durum = 'Aktif';
-  IF NOT FOUND THEN RETURN; END IF;
+  -- Hayvan bilgilerini al
+  SELECT * INTO v_animal
+  FROM public.hayvanlar
+  WHERE id = p_animal_id AND durum = 'Aktif';
+
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+
   v_birth_date := v_animal.dogum_tarihi;
-  v_age_days := COALESCE(v_today - v_birth_date, 0);
+  v_age_days := CASE
+    WHEN v_birth_date IS NOT NULL
+    THEN v_today - v_birth_date
+    ELSE 0
+  END;
+
+  -- Her aşı protokolü için
   FOR v_schedule_rec IN
-    SELECT vs.*, v.name AS vaccine_name, v.disease_target, v.dose, v.unit, v.route
-    FROM public.vaccination_schedule vs JOIN public.vaccines v ON v.id = vs.vaccine_id
+    SELECT vs.*, v.name as vaccine_name, v.disease_target, v.dose, v.unit, v.route
+    FROM public.vaccination_schedule vs
+    JOIN public.vaccines v ON v.id = vs.vaccine_id
     WHERE vs.target_type IN ('tüm', v_animal.cinsiyet,
-      CASE WHEN v_animal.cinsiyet = 'Dişi' AND v_age_days < 365 THEN 'buzağı'
-           WHEN v_animal.cinsiyet = 'Dişi' AND v_age_days < 730 THEN 'düve' ELSE 'inek' END)
+      CASE WHEN v_animal.cinsiyet = 'Dişi' AND v_animal.yas_gun < 365 THEN 'buzağı'
+           WHEN v_animal.cinsiyet = 'Dişi' AND v_animal.yas_gun < 730 THEN 'düve'
+           ELSE 'inek' END)
     ORDER BY vs.sequence_order
   LOOP
-    IF v_schedule_rec.timing_type = 'yas' AND v_birth_date IS NOT NULL THEN schedule_date := v_birth_date + v_schedule_rec.timing_days;
+    -- Zamanlama tipi göre tarih hesapla
+    IF v_schedule_rec.timing_type = 'yas' AND v_birth_date IS NOT NULL THEN
+      schedule_date := v_birth_date + (v_schedule_rec.timing_days || ' days')::interval;
     ELSIF v_schedule_rec.timing_type = 'dogum_sonra' THEN
-      SELECT MAX(tarih) INTO v_last_vac_date FROM public.dogum WHERE anne_id = p_animal_id;
-      IF v_last_vac_date IS NULL THEN CONTINUE; END IF;
-      schedule_date := v_last_vac_date + v_schedule_rec.timing_days;
-    ELSE CONTINUE; END IF;
-    is_due := schedule_date <= v_today; vaccine_id := v_schedule_rec.vaccine_id; vaccine_name := v_schedule_rec.vaccine_name;
-    disease_target := v_schedule_rec.disease_target; dose := v_schedule_rec.dose; unit := v_schedule_rec.unit; route := v_schedule_rec.route; notes := v_schedule_rec.notes;
+      -- Son doğum tarihini bul
+      SELECT MAX(tarih) INTO v_last_vac_date
+      FROM public.dogum
+      WHERE hayvan_id = p_animal_id;
+      
+      IF v_last_vac_date IS NOT NULL THEN
+        schedule_date := v_last_vac_date + (v_schedule_rec.timing_days || ' days')::interval;
+      ELSE
+        CONTINUE; -- Doğum yoksa bu protokolü atla
+      END IF;
+    ELSE
+      CONTINUE; -- Diğer timing_type'lar henüz implement değil
+    END IF;
+
+    -- Geçmiş mi, gelecek mi?
+    is_due := schedule_date <= v_today;
+
+    vaccine_id := v_schedule_rec.vaccine_id;
+    vaccine_name := v_schedule_rec.vaccine_name;
+    disease_target := v_schedule_rec.disease_target;
+    dose := v_schedule_rec.dose;
+    unit := v_schedule_rec.unit;
+    route := v_schedule_rec.route;
+    notes := v_schedule_rec.notes;
+
     RETURN NEXT;
   END LOOP;
 END;
-$function$
-;
+$$;
 
 -- ══════════════════════════════════════════════════════════════
 -- 7. RPC: list_vaccinations — Hayvan aşı geçmişi
@@ -6902,41 +6761,92 @@ END $$;
 
 BEGIN;
 
--- FUNCTION: public.tohumlama_sonuc_bekliyor(p_tohumlama_id text)
-CREATE OR REPLACE FUNCTION public.tohumlama_sonuc_bekliyor(p_tohumlama_id text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.tohumlama_sonuc_bekliyor(
+  p_tohumlama_id text
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_toh               record;
   v_islem_id          text := gen_random_uuid()::text;
   v_onceki_durum      text;
   v_onceki_toh_sonuc  text;
   v_snapshot          jsonb;
+  v_hayvan_snapshot   jsonb;
 BEGIN
-  SELECT * INTO v_toh FROM public.tohumlama WHERE id::text = p_tohumlama_id;
-  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'Tohumlama bulunamadi'); END IF;
-  IF v_toh.sonuc != 'Boş' THEN RETURN jsonb_build_object('ok', false, 'error', 'Sadece Boş durumundaki tohumlama Bekliyor yapilabilir'); END IF;
-  v_onceki_toh_sonuc := v_toh.sonuc;
-  SELECT snapshot INTO v_snapshot FROM public.islem_log WHERE ref_id = p_tohumlama_id AND ref_tablo = 'tohumlama' AND tip = 'TOHUMLAMA_SONUC' ORDER BY tarih DESC LIMIT 1;
-  IF v_snapshot IS NOT NULL THEN
-    SELECT elem->'onceki'->>'tohumlama_durumu' INTO v_onceki_durum FROM jsonb_array_elements(v_snapshot->'guncellenen') AS elem WHERE elem->>'tablo' = 'hayvanlar';
+  -- 1. Find tohumlama by id, require sonuc is 'Boş'
+  SELECT * INTO v_toh FROM public.tohumlama
+  WHERE id::text = p_tohumlama_id;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Tohumlama bulunamadı');
   END IF;
-  IF v_onceki_durum IS NULL THEN v_onceki_durum := 'Tohumlanabilir'; END IF;
+
+  -- Only 'Boş' can be reverted to 'Bekliyor'
+  IF v_toh.sonuc != 'Boş' THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Sadece Boş durumundaki tohumlama Bekliyor yapılabilir');
+  END IF;
+
+  -- Save current tohumlama.sonuc for logging
+  v_onceki_toh_sonuc := v_toh.sonuc;
+
+  -- 2. Get previous hayvanlar.tohumlama_durumu from islem_log (snapshot of BOS_ATAMA event)
+  SELECT snapshot INTO v_snapshot
+  FROM public.islem_log
+  WHERE ref_id = p_tohumlama_id
+    AND ref_tablo = 'tohumlama'
+    AND tip = 'TOHUMLAMA_SONUC'
+  ORDER BY tarih DESC
+  LIMIT 1;
+
+  IF v_snapshot IS NOT NULL THEN
+    -- Extract previous tohumlama_durumu from snapshot
+    SELECT elem->'onceki'->>'tohumlama_durumu' INTO v_onceki_durum
+    FROM jsonb_array_elements(v_snapshot->'guncellenen') AS elem
+    WHERE elem->>'tablo' = 'hayvanlar';
+  END IF;
+
+  -- Fallback: if no snapshot found, default to 'Tohumlanabilir'
+  IF v_onceki_durum IS NULL THEN
+    v_onceki_durum := 'Tohumlanabilir';
+  END IF;
+
+  -- 3. Set tohumlama.sonuc = 'Bekliyor'
   UPDATE public.tohumlama SET sonuc = 'Bekliyor' WHERE id::text = p_tohumlama_id;
-  UPDATE public.hayvanlar SET tohumlama_durumu = v_onceki_durum WHERE id = v_toh.hayvan_id AND durum = 'Aktif';
+
+  -- 4. Revert hayvanlar.tohumlama_durumu to prior state
+  UPDATE public.hayvanlar
+  SET tohumlama_durumu = v_onceki_durum
+  WHERE id = v_toh.hayvan_id
+    AND durum = 'Aktif';
+
+  -- 5. Write islem_log with tip='TOHUMLAMA_SONUC'
   INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
-  VALUES (v_islem_id, 'TOHUMLAMA_SONUC', v_toh.hayvan_id, p_tohumlama_id, 'tohumlama',
-    jsonb_build_object('olusturulan', '[]'::jsonb, 'guncellenen', jsonb_build_array(
-      jsonb_build_object('tablo', 'tohumlama', 'id', p_tohumlama_id, 'onceki', jsonb_build_object('sonuc', v_onceki_toh_sonuc)),
-      jsonb_build_object('tablo', 'hayvanlar', 'id', v_toh.hayvan_id, 'onceki', jsonb_build_object('tohumlama_durumu', v_onceki_durum))
-    ))
+  VALUES (
+    v_islem_id,
+    'TOHUMLAMA_SONUC',
+    v_toh.hayvan_id,
+    p_tohumlama_id,
+    'tohumlama',
+    jsonb_build_object(
+      'olusturulan', '[]'::jsonb,
+      'guncellenen', jsonb_build_array(
+        jsonb_build_object(
+          'tablo', 'tohumlama',
+          'id', p_tohumlama_id,
+          'onceki', jsonb_build_object('sonuc', v_onceki_toh_sonuc)
+        ),
+        jsonb_build_object(
+          'tablo', 'hayvanlar',
+          'id', v_toh.hayvan_id,
+          'onceki', jsonb_build_object('tohumlama_durumu', v_onceki_durum)
+        )
+      )
+    )
   );
+
   RETURN jsonb_build_object('ok', true, 'islem_id', v_islem_id);
 END;
-$function$
-;
+$$;
 
 COMMIT;
 -- Drop orphan columns no longer used by the clinical system
@@ -7146,76 +7056,80 @@ NOTIFY pgrst, 'reload schema';
 
 BEGIN;
 
--- FUNCTION: public.tohumlama_abort(p_tohumlama_id text, p_notlar text)
--- FUNCTION: public.tohumlama_abort(p_tohumlama_id text, p_notlar text, p_abort_tarihi date)
-CREATE OR REPLACE FUNCTION public.tohumlama_abort(p_tohumlama_id text, p_notlar text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.tohumlama_abort(
+  p_tohumlama_id text,
+  p_notlar       text DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_toh           record;
   v_islem_id      text := gen_random_uuid()::text;
   v_onceki_durum  text;
   v_onceki_tarih  date;
 BEGIN
-  SELECT * INTO v_toh FROM public.tohumlama WHERE id::text = p_tohumlama_id;
-  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'Tohumlama bulunamadı'); END IF;
-  IF v_toh.sonuc != 'Gebe' THEN RETURN jsonb_build_object('ok', false, 'error', 'Sadece Gebe durumundaki tohumlama abort edilebilir'); END IF;
-  SELECT tohumlama_durumu, tohumlama_onay_tarihi INTO v_onceki_durum, v_onceki_tarih FROM public.hayvanlar WHERE id = v_toh.hayvan_id AND durum = 'Aktif';
-  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'Hayvan aktif değil'); END IF;
-  UPDATE public.tohumlama SET sonuc = 'Abort', abort_notlar = p_notlar WHERE id::text = p_tohumlama_id;
-  UPDATE public.hayvanlar SET tohumlama_durumu = NULL, tohumlama_onay_tarihi = NULL WHERE id = v_toh.hayvan_id;
-  INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
-  VALUES (v_islem_id, 'ABORT_KAYDI', v_toh.hayvan_id, p_tohumlama_id, 'tohumlama',
-    jsonb_build_object('olusturulan', '[]'::jsonb, 'guncellenen', jsonb_build_array(jsonb_build_object('tablo', 'tohumlama', 'id', p_tohumlama_id, 'onceki', jsonb_build_object('sonuc', v_toh.sonuc)), jsonb_build_object('tablo', 'hayvanlar', 'id', v_toh.hayvan_id, 'onceki', jsonb_build_object('tohumlama_durumu', v_onceki_durum, 'tohumlama_onay_tarihi', v_onceki_tarih))), 'notlar', p_notlar));
-  RETURN jsonb_build_object('ok', true, 'islem_id', v_islem_id);
-END;
-$function$
-;
+  SELECT * INTO v_toh FROM public.tohumlama
+  WHERE id::text = p_tohumlama_id;
 
-CREATE OR REPLACE FUNCTION public.tohumlama_abort(p_tohumlama_id text, p_notlar text DEFAULT NULL::text, p_abort_tarihi date DEFAULT CURRENT_DATE)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_toh           record;
-  v_islem_id      text := gen_random_uuid()::text;
-  v_onceki_durum  text;
-  v_onceki_tarih  date;
-BEGIN
-  SELECT * INTO v_toh FROM public.tohumlama WHERE id::text = p_tohumlama_id;
-  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'Tohumlama bulunamadı'); END IF;
-  IF v_toh.sonuc != 'Gebe' THEN RETURN jsonb_build_object('ok', false, 'error', 'Sadece Gebe durumundaki tohumlama abort edilebilir'); END IF;
-  IF p_abort_tarihi > CURRENT_DATE THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Abort tarihi ileri tarih olamaz');
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Tohumlama bulunamadı');
   END IF;
-  IF p_abort_tarihi < v_toh.tarih THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Abort tarihi, tohumlama tarihinden (' || v_toh.tarih || ') önce olamaz');
-  END IF;
-  SELECT tohumlama_durumu, tohumlama_onay_tarihi INTO v_onceki_durum, v_onceki_tarih FROM public.hayvanlar WHERE id = v_toh.hayvan_id AND durum = 'Aktif';
-  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'Hayvan aktif değil'); END IF;
-  UPDATE public.tohumlama SET sonuc = 'Abort', abort_notlar = p_notlar, abort_tarihi = COALESCE(p_abort_tarihi, CURRENT_DATE) WHERE id::text = p_tohumlama_id;
-  UPDATE public.hayvanlar SET tohumlama_durumu = NULL, tohumlama_onay_tarihi = NULL WHERE id = v_toh.hayvan_id;
 
-  -- REVIEW #10: bu tohumlamadan doğan açık görev (21/35g gebelik kontrolü vb.)
-  -- ve protokol scaffold'unu kapat — gebe/dogum yolları kendi temizliğini yapıyordu
-  UPDATE public.gorev_log
-  SET iptal = true
-  WHERE kaynak = 'TOH-' || v_toh.id::text
-    AND tamamlandi = false AND iptal = false;
-  UPDATE public.protokol_instance
-  SET durum = 'iptal'
-  WHERE kaynak_ref = 'TOH-' || v_toh.id::text AND durum = 'aktif';
+  IF v_toh.sonuc != 'Gebe' THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Sadece Gebe durumundaki tohumlama abort edilebilir');
+  END IF;
+
+  -- Hayvanın önceki tohumlama_durumu kaydet (geri alınabilmesi için)
+  SELECT tohumlama_durumu, tohumlama_onay_tarihi INTO v_onceki_durum, v_onceki_tarih
+  FROM public.hayvanlar
+  WHERE id = v_toh.hayvan_id
+    AND durum = 'Aktif';
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'Hayvan aktif değil');
+  END IF;
+
+  -- Tohumlama sonucunu Abort yap
+  UPDATE public.tohumlama
+  SET sonuc = 'Abort', abort_notlar = p_notlar
+  WHERE id::text = p_tohumlama_id;
+
+  -- Hayvanın tohumlama_durumu ve onay tarihini sıfırla
+  UPDATE public.hayvanlar
+  SET tohumlama_durumu = NULL,
+      tohumlama_onay_tarihi = NULL
+  WHERE id = v_toh.hayvan_id;
 
   INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
-  VALUES (v_islem_id, 'ABORT_KAYDI', v_toh.hayvan_id, p_tohumlama_id, 'tohumlama',
-    jsonb_build_object('olusturulan', '[]'::jsonb, 'guncellenen', jsonb_build_array(jsonb_build_object('tablo', 'tohumlama', 'id', p_tohumlama_id, 'onceki', jsonb_build_object('sonuc', v_toh.sonuc, 'abort_tarihi', v_toh.abort_tarihi)), jsonb_build_object('tablo', 'hayvanlar', 'id', v_toh.hayvan_id, 'onceki', jsonb_build_object('tohumlama_durumu', v_onceki_durum, 'tohumlama_onay_tarihi', v_onceki_tarih))), 'notlar', p_notlar));
+  VALUES (
+    v_islem_id,
+    'ABORT_KAYDI',
+    v_toh.hayvan_id,
+    p_tohumlama_id,
+    'tohumlama',
+    jsonb_build_object(
+      'olusturulan', '[]'::jsonb,
+      'guncellenen', jsonb_build_array(
+        jsonb_build_object(
+          'tablo', 'tohumlama',
+          'id', p_tohumlama_id,
+          'onceki', jsonb_build_object('sonuc', v_toh.sonuc)
+        ),
+        jsonb_build_object(
+          'tablo', 'hayvanlar',
+          'id', v_toh.hayvan_id,
+          'onceki', jsonb_build_object(
+            'tohumlama_durumu', v_onceki_durum,
+            'tohumlama_onay_tarihi', v_onceki_tarih
+          )
+        )
+      ),
+      'notlar', p_notlar
+    )
+  );
+
   RETURN jsonb_build_object('ok', true, 'islem_id', v_islem_id);
 END;
-$function$
-;
+$$;
 
 COMMIT;
 -- Migration: 20260502000003_drop_orphan_objects.sql
@@ -7337,12 +7251,13 @@ GRANT EXECUTE ON FUNCTION public.vaccination_dismiss TO anon, authenticated;-- M
 BEGIN;
 
 -- 1. ileri_gebe_gorev_kontrol
--- FUNCTION: public.ileri_gebe_asi_tamamla(p_gorev_id text, p_vaccine_id uuid, p_tarih date, p_doz numeric)
-CREATE OR REPLACE FUNCTION public.ileri_gebe_asi_tamamla(p_gorev_id text, p_vaccine_id uuid, p_tarih date DEFAULT CURRENT_DATE, p_doz numeric DEFAULT NULL::numeric)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.ileri_gebe_asi_tamamla(
+  p_gorev_id   text,
+  p_vaccine_id uuid,
+  p_tarih      date    DEFAULT CURRENT_DATE,
+  p_doz        numeric DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_gorev       gorev_log%ROWTYPE;
   v_vax_result  jsonb;
@@ -7350,6 +7265,7 @@ DECLARE
   v_rapel_tarih date;
   v_is_first    boolean;
 BEGIN
+  -- 1. Görevi çek ve kontrol et
   SELECT * INTO v_gorev FROM gorev_log WHERE id = p_gorev_id::uuid;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
@@ -7358,6 +7274,7 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev zaten tamamlanmış');
   END IF;
 
+  -- 2. Aşıyı kaydet (add_vaccination → vaccination_log + stok trigger)
   SELECT public.add_vaccination(
     v_gorev.hayvan_id::text, p_vaccine_id, p_tarih, p_doz, 'GorevID:' || p_gorev_id
   ) INTO v_vax_result;
@@ -7366,34 +7283,30 @@ BEGIN
     RETURN v_vax_result;
   END IF;
 
+  -- 3. Görevi tamamla
   UPDATE gorev_log
   SET tamamlandi = true, tamamlanma_tarihi = now()
   WHERE id = p_gorev_id::uuid;
 
+  -- 4. 1. doz ise rapel görevi oluştur (21 gün sonra)
   v_is_first := v_gorev.aciklama ILIKE '%1. doz%';
   IF v_is_first THEN
-    PERFORM 1 FROM hayvanlar
-    WHERE id = v_gorev.hayvan_id AND grup ILIKE '%Düve%';
-    IF FOUND THEN
-      v_rapel_tarih := p_tarih + 21;
-      v_rapel_id := gen_random_uuid();
-      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, parent_id, kaynak, etken_kod)
-      VALUES (
-        v_rapel_id,
-        v_gorev.hayvan_id,
-        'ILERI_GEBE_ASI',
-        '💉 Rota-Corona Aşısı (2. doz — düve)',
-        v_rapel_tarih,
-        false,
-        v_gorev.stok_id,
-        1,
-        v_gorev.id,
-        'ILERI_GEBE',
-        'ROTA_2DOZ'
-      )
-      ON CONFLICT (hayvan_id, etken_kod) WHERE etken_kod = 'ROTA_2DOZ' AND iptal = false AND tamamlandi = false
-      DO NOTHING;
-    END IF;
+    v_rapel_tarih := p_tarih + 21;
+    v_rapel_id := gen_random_uuid();
+    INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, parent_id, kaynak)
+    VALUES (
+      v_rapel_id,
+      v_gorev.hayvan_id,
+      'ILERI_GEBE_ASI',
+      '💉 Rota-Corona Aşısı (2. doz)',
+      v_rapel_tarih,
+      false,
+      v_gorev.stok_id,
+      1,
+      v_gorev.id,
+      'ILERI_GEBE'
+    )
+    ON CONFLICT DO NOTHING;
   END IF;
 
   RETURN jsonb_build_object(
@@ -7403,8 +7316,7 @@ BEGIN
     'rapel_tarih', v_rapel_tarih
   );
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.ileri_gebe_asi_tamamla(text,uuid,date,numeric) TO anon, authenticated;
 
@@ -7482,79 +7394,28 @@ GRANT EXECUTE ON FUNCTION public.gorev_geri_al(text) TO anon, authenticated;
 
 -- ── gorev_tamamla ──
 DROP FUNCTION IF EXISTS public.gorev_tamamla(text, text, text, numeric, text, text);
--- FUNCTION: public.gorev_tamamla(p_gorev_id text, p_padok_hedef text)
-CREATE OR REPLACE FUNCTION public.gorev_tamamla(p_gorev_id text, p_padok_hedef text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.gorev_tamamla(
+  p_gorev_id text,
+  p_padok_hedef text DEFAULT NULL
+)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_gorev record; v_hayvan record; v_snapshot jsonb;
   v_stok_dusuldu boolean := false; v_padok_guncellendi boolean := false;
   v_olusturulan jsonb := '[]'::jsonb; v_guncellenen jsonb := '[]'::jsonb;
   v_padok_id uuid;
-  v_hedef_padok text;
-  v_yeni_grup text;
 BEGIN
-  SELECT * INTO v_gorev
-    FROM public.gorev_log
-   WHERE id = p_gorev_id::uuid
-   FOR UPDATE;
+  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id::uuid;
   IF NOT FOUND THEN RAISE EXCEPTION 'Görev bulunamadı: %', p_gorev_id; END IF;
   IF v_gorev.tamamlandi THEN RETURN jsonb_build_object('ok', true, 'mesaj', 'Görev zaten tamamlanmış'); END IF;
   IF v_gorev.iptal THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev iptal edilmiş, tamamlanamaz'); END IF;
 
+  -- SUTTEN_KESME görevi → gerçek kesimi tetikle (her kaynaktan garanti)
   IF v_gorev.gorev_tipi = 'SUTTEN_KESME' AND v_gorev.hayvan_id IS NOT NULL THEN
     PERFORM public.buzagi_sutten_kesme_onayla(v_gorev.hayvan_id);
     UPDATE public.gorev_log SET tamamlandi=true, tamamlanma_tarihi=COALESCE(tamamlanma_tarihi, now())
       WHERE id=p_gorev_id::uuid AND tamamlandi=false;
     RETURN jsonb_build_object('ok', true, 'gorev_id', p_gorev_id, 'sutten_kesme', true);
-  END IF;
-
-  v_hedef_padok := COALESCE(NULLIF(btrim(p_padok_hedef), ''), NULLIF(btrim(v_gorev.padok_hedef), ''));
-
-  IF v_gorev.gorev_tipi = 'PADOK_DEGISIM'
-     AND v_gorev.hayvan_id IS NOT NULL
-     AND v_hedef_padok IS NULL THEN
-    RAISE EXCEPTION 'Padok değişim görevinin hedef padoku boş: %', p_gorev_id
-      USING ERRCODE = 'check_violation';
-  END IF;
-
-  IF v_hedef_padok IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
-    SELECT * INTO v_hayvan
-      FROM public.hayvanlar
-     WHERE id = v_gorev.hayvan_id
-     FOR UPDATE;
-
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'Görevin hayvanı bulunamadı: %', v_gorev.hayvan_id
-        USING ERRCODE = 'foreign_key_violation';
-    ELSE
-      SELECT id INTO v_padok_id
-        FROM public.padoklar
-       WHERE ad = v_hedef_padok;
-      IF NOT FOUND THEN
-        RAISE EXCEPTION 'Hedef padok bulunamadı: %', v_hedef_padok
-          USING ERRCODE = 'foreign_key_violation';
-      END IF;
-
-      v_yeni_grup := v_hayvan.grup;
-      IF v_gorev.gorev_tipi = 'PADOK_DEGISIM'
-         AND v_gorev.aciklama ILIKE '%Kuru döneme%' THEN
-        v_yeni_grup := 'Sağmal (Kuru)';
-      END IF;
-
-      IF EXISTS (SELECT 1 FROM public.grup_padok_eslem WHERE grup = v_yeni_grup)
-         AND NOT EXISTS (
-           SELECT 1
-             FROM public.grup_padok_eslem
-            WHERE grup = v_yeni_grup
-              AND padok_id = v_padok_id
-         ) THEN
-        RAISE EXCEPTION 'Grup % için hedef padok geçersiz: %', v_yeni_grup, v_hedef_padok
-          USING ERRCODE = 'check_violation';
-      END IF;
-    END IF;
   END IF;
 
   v_guncellenen := v_guncellenen || jsonb_build_object(
@@ -7564,28 +7425,26 @@ BEGIN
   );
   UPDATE public.gorev_log SET tamamlandi=true, tamamlanma_tarihi=now() WHERE id=p_gorev_id::uuid;
 
-  -- ASI_PLANLI muaf: planlı görevin stok düşümü yalnız asi_planli_tamamla üzerinden
-  -- olur (plan rezervasyonu + gerçek uygulama); generic 'Görev' satırı çift düşüm olurdu
-  IF v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL AND v_gorev.miktar > 0
-     AND v_gorev.gorev_tipi IS DISTINCT FROM 'ASI_PLANLI' THEN
+  IF v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL AND v_gorev.miktar > 0 THEN
     v_stok_dusuldu := true;
     INSERT INTO public.stok_hareket (id,stok_id,tur,miktar,notlar,iptal)
     VALUES (gen_random_uuid(),v_gorev.stok_id,'Görev',v_gorev.miktar,'GorevID:'||p_gorev_id,false);
   END IF;
 
-  IF v_hedef_padok IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
-    v_padok_guncellendi := true;
-    v_guncellenen := v_guncellenen || jsonb_build_object(
-      'tablo','hayvanlar','id',v_gorev.hayvan_id,
-      'onceki',jsonb_build_object('grup',v_hayvan.grup,'padok',v_hayvan.padok,'padok_id',v_hayvan.padok_id),
-      'sonraki',jsonb_build_object('grup',v_yeni_grup,'padok',v_hedef_padok,'padok_id',v_padok_id)
-    );
-
-    UPDATE public.hayvanlar
-       SET grup = v_yeni_grup,
-           padok = v_hedef_padok,
-           padok_id = v_padok_id
-     WHERE id = v_gorev.hayvan_id;
+  IF p_padok_hedef IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
+    SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id=v_gorev.hayvan_id;
+    IF FOUND THEN
+      v_padok_guncellendi := true;
+      -- BUG B fix: padok_id de güncellenir
+      SELECT id INTO v_padok_id FROM public.padoklar WHERE ad=p_padok_hedef;
+      UPDATE public.hayvanlar
+         SET padok=p_padok_hedef, padok_id=COALESCE(v_padok_id, padok_id)
+       WHERE id=v_gorev.hayvan_id;
+      -- BUG A fix: 'Sağmal (Kuru Dönem)' yerine eslem-kanonik 'Sağmal (Kuru)'
+      IF v_gorev.gorev_tipi='PADOK_DEGISIM' AND v_gorev.aciklama ILIKE '%Kuru döneme%' THEN
+        UPDATE public.hayvanlar SET grup='Sağmal (Kuru)' WHERE id=v_gorev.hayvan_id;
+      END IF;
+    END IF;
   END IF;
 
   v_snapshot := jsonb_build_object('olusturulan',v_olusturulan,'guncellenen',v_guncellenen,'silinen','[]'::jsonb);
@@ -7597,16 +7456,16 @@ BEGIN
 
   RETURN jsonb_build_object('ok',true,'gorev_id',p_gorev_id,'stok_dusuldu',v_stok_dusuldu,'padok_guncellendi',v_padok_guncellendi);
 END;
-$function$
-;
+$$;
 GRANT EXECUTE ON FUNCTION public.gorev_tamamla(text,text) TO anon, authenticated;
 
--- FUNCTION: public.gorev_guncelle(p_id text, p_aciklama text, p_hedef_tarih text, p_gorev_tipi text)
-CREATE OR REPLACE FUNCTION public.gorev_guncelle(p_id text, p_aciklama text DEFAULT NULL::text, p_hedef_tarih text DEFAULT NULL::text, p_gorev_tipi text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+-- ── gorev_guncelle ──
+CREATE OR REPLACE FUNCTION public.gorev_guncelle(
+  p_id text,
+  p_aciklama text DEFAULT NULL,
+  p_hedef_tarih text DEFAULT NULL,
+  p_gorev_tipi text DEFAULT NULL
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   UPDATE public.gorev_log
   SET
@@ -7617,11 +7476,9 @@ BEGIN
   IF NOT FOUND THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
   END IF;
-  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu, durum) VALUES ('GOREV_GUNCELLE', (SELECT hayvan_id::text FROM public.gorev_log WHERE id = p_id::uuid), p_id, 'gorev_log', jsonb_build_object('guncellenen', jsonb_build_object('aciklama',p_aciklama,'hedef_tarih',p_hedef_tarih,'gorev_tipi',p_gorev_tipi)), format('Gorev guncellendi -- id=%s', p_id), 'aktif');
   RETURN jsonb_build_object('ok', true);
 END;
-$function$
-;
+$$;
 GRANT EXECUTE ON FUNCTION public.gorev_guncelle(text, text, text, text) TO anon, authenticated;
 
 END;
@@ -7703,54 +7560,19 @@ END;
 DROP VIEW IF EXISTS public.tohumlanabilir_hayvanlar CASCADE;
 DROP VIEW IF EXISTS public.hayvan_durum_view CASCADE;
 
-CREATE OR REPLACE VIEW public.tohumlanabilir_hayvanlar AS
-SELECT id,
-    kupe_no,
-    devlet_kupe,
-    irk,
-    cinsiyet,
-    dogum_tarihi,
-    grup,
-    padok_id,
-    padok,
-    durum,
-    anne_id,
-    kategori,
-    tohumlama_durumu,
-    tohumlama_onay_tarihi,
-    suttten_kesme_tarihi,
-    cikis_tipi,
-    cikis_tarihi,
-    cikis_sebebi,
-    satis_fiyati,
-    notlar,
-    dogum_kg,
-    canli_agirlik,
-    boy,
-    renk,
-    ayirici_ozellik,
-    baba_bilgi,
-    abort_sayisi,
-    yas_gun,
-    tohumlama_esik_gun,
-    kisir,
-    toh_id,
-    toh_tarih,
-    sperma,
-    toh_sonuc,
-    toh_gun,
-    aktif_hastalik_sayisi,
-    hesap_kategori,
-    tohumlama_bildirisi_gerekli,
-    suttten_kesme_bildirisi_gerekli,
-    dogum_yaklasti,
-    dogum_gecikme_gun,
-    tohumlama_durumu_hesap,
-    repeat_breed_active,
-    repeat_breed_past,
-    repeat_breed_count
-   FROM hayvan_durum_view
-  WHERE (tohumlama_durumu_hesap = 'tohumlanabilir'::text);
+CREATE VIEW public.tohumlanabilir_hayvanlar AS
+SELECT id, kupe_no, devlet_kupe, irk, cinsiyet, dogum_tarihi,
+  grup, padok_id, padok, durum, anne_id, kategori,
+  tohumlama_durumu, tohumlama_onay_tarihi, suttten_kesme_tarihi,
+  cikis_tipi, cikis_tarihi, cikis_sebebi, satis_fiyati, notlar,
+  dogum_kg, canli_agirlik, boy, renk, ayirici_ozellik, baba_bilgi, abort_sayisi,
+  yas_gun, tohumlama_esik_gun,
+  toh_id, toh_tarih, sperma, toh_sonuc, toh_gun,
+  aktif_hastalik_sayisi, hesap_kategori,
+  tohumlama_bildirisi_gerekli, suttten_kesme_bildirisi_gerekli,
+  dogum_yaklasti, dogum_gecikme_gun, tohumlama_durumu_hesap
+FROM hayvan_durum_view
+WHERE tohumlama_durumu_hesap = 'tohumlanabilir';
 
 GRANT SELECT ON public.tohumlanabilir_hayvanlar TO anon, authenticated;
 -- Migration: hekimler tablosu oluştur (production'da yoktu) + hekim_sil + sperma_sil RPCs
@@ -7823,9 +7645,109 @@ END;
 -- Backward compat: p_padok text still works via name lookup
 BEGIN;
 
+CREATE OR REPLACE FUNCTION public.hayvan_ekle(
+  p_kupe_no        text    DEFAULT NULL,
+  p_devlet_kupe    text    DEFAULT NULL,
+  p_irk            text    DEFAULT NULL,
+  p_cinsiyet       text    DEFAULT NULL,
+  p_dogum_tarihi   date    DEFAULT NULL,
+  p_grup           text    DEFAULT 'Genel',
+  p_padok          text    DEFAULT NULL,
+  p_dogum_kg       numeric DEFAULT NULL,
+  p_anne_id        text    DEFAULT NULL,
+  p_baba_bilgi     text    DEFAULT NULL,
+  p_canli_agirlik  numeric DEFAULT NULL,
+  p_boy            numeric DEFAULT NULL,
+  p_renk           text    DEFAULT NULL,
+  p_ayirici_ozellik text   DEFAULT NULL,
+  p_padok_id       uuid    DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_id text;
+  v_padok_id uuid;
+  v_padok_ad text;
+BEGIN
+  v_id := gen_random_uuid()::text;
 
+  IF p_padok_id IS NOT NULL THEN
+    v_padok_id := p_padok_id;
+    SELECT ad INTO v_padok_ad FROM padoklar WHERE id = p_padok_id;
+  ELSIF p_padok IS NOT NULL THEN
+    SELECT id, ad INTO v_padok_id, v_padok_ad FROM padoklar WHERE ad = p_padok;
+    IF v_padok_id IS NULL THEN
+      v_padok_ad := p_padok;
+    END IF;
+  END IF;
 
+  INSERT INTO hayvanlar (
+    id, kupe_no, devlet_kupe, irk, cinsiyet, dogum_tarihi,
+    grup, padok, padok_id, durum, dogum_kg, anne_id, baba_bilgi,
+    canli_agirlik, boy, renk, ayirici_ozellik
+  ) VALUES (
+    v_id, NULLIF(p_kupe_no,''), NULLIF(p_devlet_kupe,''),
+    NULLIF(p_irk,''), p_cinsiyet, p_dogum_tarihi,
+    p_grup, v_padok_ad, v_padok_id, 'Aktif', p_dogum_kg, p_anne_id, p_baba_bilgi,
+    p_canli_agirlik, p_boy, p_renk, p_ayirici_ozellik
+  );
 
+  RETURN jsonb_build_object('ok', true, 'id', v_id);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.hayvan_guncelle(
+  p_id              text,
+  p_kupe_no         text    DEFAULT NULL,
+  p_devlet_kupe     text    DEFAULT NULL,
+  p_irk             text    DEFAULT NULL,
+  p_cinsiyet        text    DEFAULT NULL,
+  p_dogum_tarihi    date    DEFAULT NULL,
+  p_grup            text    DEFAULT NULL,
+  p_padok           text    DEFAULT NULL,
+  p_dogum_kg        numeric DEFAULT NULL,
+  p_canli_agirlik   numeric DEFAULT NULL,
+  p_boy             numeric DEFAULT NULL,
+  p_renk            text    DEFAULT NULL,
+  p_ayirici_ozellik text    DEFAULT NULL,
+  p_baba_bilgi      text    DEFAULT NULL,
+  p_notlar          text    DEFAULT NULL,
+  p_anne_id         text    DEFAULT NULL,
+  p_padok_id        uuid    DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_padok_id uuid;
+  v_padok_ad text;
+BEGIN
+  IF p_padok_id IS NOT NULL THEN
+    v_padok_id := p_padok_id;
+    SELECT ad INTO v_padok_ad FROM padoklar WHERE id = p_padok_id;
+  ELSIF p_padok IS NOT NULL THEN
+    SELECT id, ad INTO v_padok_id, v_padok_ad FROM padoklar WHERE ad = p_padok;
+  END IF;
+
+  UPDATE hayvanlar SET
+    kupe_no          = COALESCE(NULLIF(p_kupe_no,''),        kupe_no),
+    devlet_kupe      = COALESCE(NULLIF(p_devlet_kupe,''),    devlet_kupe),
+    irk              = COALESCE(NULLIF(p_irk,''),            irk),
+    cinsiyet         = COALESCE(NULLIF(p_cinsiyet,''),       cinsiyet),
+    dogum_tarihi     = COALESCE(p_dogum_tarihi,              dogum_tarihi),
+    grup             = COALESCE(NULLIF(p_grup,''),           grup),
+    padok            = COALESCE(v_padok_ad,                  padok),
+    padok_id         = COALESCE(v_padok_id,                  padok_id),
+    dogum_kg         = COALESCE(p_dogum_kg,                  dogum_kg),
+    canli_agirlik    = COALESCE(p_canli_agirlik,             canli_agirlik),
+    boy              = COALESCE(p_boy,                       boy),
+    renk             = COALESCE(NULLIF(p_renk,''),           renk),
+    ayirici_ozellik  = COALESCE(NULLIF(p_ayirici_ozellik,''),ayirici_ozellik),
+    baba_bilgi       = COALESCE(NULLIF(p_baba_bilgi,''),     baba_bilgi),
+    notlar           = COALESCE(NULLIF(p_notlar,''),         notlar),
+    anne_id          = COALESCE(NULLIF(p_anne_id,''),        anne_id)
+  WHERE id = p_id;
+
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
 
 END;
 -- Migration: add_vaccination RPC — primer 2.doz + muadil gecmis kontrolu (Faz 1.5)
@@ -8077,25 +7999,41 @@ GRANT EXECUTE ON FUNCTION public.padok_degistir(text, uuid, text) TO anon, authe
 DROP FUNCTION IF EXISTS public.padok_degistir_toplu(text[], uuid);
 DROP FUNCTION IF EXISTS public.padok_degistir_toplu(text[], uuid, text[]);
 
--- FUNCTION: public.padok_degistir_toplu(p_hayvan_ids text[], p_yeni_padok_id uuid, p_etiketler text[], p_yeni_grup text)
-CREATE OR REPLACE FUNCTION public.padok_degistir_toplu(p_hayvan_ids text[], p_yeni_padok_id uuid, p_etiketler text[] DEFAULT NULL::text[], p_yeni_grup text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.padok_degistir_toplu(
+  p_hayvan_ids text[],
+  p_yeni_padok_id uuid,
+  p_etiketler text[] DEFAULT NULL,
+  p_yeni_grup text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
 DECLARE
   v_yeni_padok   padoklar%ROWTYPE;
   v_aktif_sayisi integer;
   v_hayvan_id    text;
   v_hayvan       hayvanlar%ROWTYPE;
   v_eslem_var    boolean;
-  v_hedef_grup   text;
 BEGIN
+  -- Hedef padok var mı?
   SELECT * INTO v_yeni_padok FROM padoklar WHERE id = p_yeni_padok_id;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Hedef padok bulunamadı');
   END IF;
 
+  -- Grup-padok uyum guard (UI bypass koruması)
+  IF p_yeni_grup IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM grup_padok_eslem
+      WHERE grup = p_yeni_grup AND padok_id = p_yeni_padok_id
+    ) INTO v_eslem_var;
+    IF NOT v_eslem_var THEN
+      RETURN jsonb_build_object('success', false, 'error', 'grup_padok_uyumsuz');
+    END IF;
+  END IF;
+
+  -- Kapasite hard block (validasyon, yazma yok)
   IF v_yeni_padok.kapasite IS NOT NULL THEN
     SELECT COUNT(*) INTO v_aktif_sayisi
       FROM hayvanlar
@@ -8111,6 +8049,7 @@ BEGIN
     END IF;
   END IF;
 
+  -- Hayvan validasyonları (validasyon, yazma yok)
   FOREACH v_hayvan_id IN ARRAY p_hayvan_ids LOOP
     SELECT * INTO v_hayvan FROM hayvanlar WHERE id = v_hayvan_id;
     IF NOT FOUND THEN
@@ -8119,27 +8058,10 @@ BEGIN
     IF v_hayvan.padok_id = p_yeni_padok_id THEN
       RETURN jsonb_build_object('success', false, 'error', 'Hayvan zaten bu padokta: ' || v_hayvan_id);
     END IF;
-
-    -- M-2(BE) FIX: p_yeni_grup NULL ise hayvanın MEVCUT grubu hedef padok ile uyumlu mu kontrol et
-    -- (eskiden bu dal hiç çalışmıyordu, guard tamamen atlanıyordu).
-    v_hedef_grup := COALESCE(p_yeni_grup, v_hayvan.grup);
-    IF v_hedef_grup IS NOT NULL THEN
-      SELECT EXISTS (
-        SELECT 1 FROM grup_padok_eslem
-        WHERE grup = v_hedef_grup AND padok_id = p_yeni_padok_id
-      ) INTO v_eslem_var;
-      IF NOT v_eslem_var THEN
-        RETURN jsonb_build_object(
-          'success', false, 'error', 'grup_padok_uyumsuz',
-          'hayvan_id', v_hayvan_id, 'grup', v_hedef_grup
-        );
-      END IF;
-    END IF;
   END LOOP;
 
+  -- Tüm validasyonlar geçti — yazma işlemleri
   FOREACH v_hayvan_id IN ARRAY p_hayvan_ids LOOP
-    SELECT * INTO v_hayvan FROM hayvanlar WHERE id = v_hayvan_id;
-
     UPDATE hayvanlar
        SET padok_id   = p_yeni_padok_id,
            padok      = v_yeni_padok.ad,
@@ -8153,6 +8075,7 @@ BEGIN
             || COALESCE(' (grup: ' || p_yeni_grup || ')', ''));
   END LOOP;
 
+  -- Etiket güncelleme (varsa, mevcut etiketlerle birleştir)
   IF p_etiketler IS NOT NULL AND array_length(p_etiketler, 1) > 0 THEN
     UPDATE hayvanlar
        SET etiketler = array(
@@ -8169,8 +8092,7 @@ BEGIN
     'yeni_grup',     p_yeni_grup
   );
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.padok_degistir_toplu(text[], uuid, text[], text) TO anon, authenticated;
 
@@ -8285,72 +8207,120 @@ BEGIN;
 
 DROP VIEW IF EXISTS public.hayvan_timeline_view;
 
-CREATE OR REPLACE VIEW public.hayvan_timeline_view AS
-SELECT d.anne_id AS hayvan_id,
-    'DOGUM_KAYDI'::text AS tip,
-    'birth_recorded'::text AS event_type,
-    (d.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('yavru_kupe', d.yavru_kupe, 'yavru_cins', d.yavru_cins, 'dogum_tipi', d.dogum_tipi, 'dogum_kg', d.dogum_kg, 'hekim_id', d.hekim_id) AS detay,
-    (d.id)::text AS kaynak_id
-   FROM dogum d
+CREATE VIEW public.hayvan_timeline_view AS
+-- Doğum
+SELECT
+  d.anne_id                        AS hayvan_id,
+  'DOGUM_KAYDI'                    AS tip,
+  'birth_recorded'                 AS event_type,
+  d.tarih::timestamptz             AS zaman,
+  jsonb_build_object(
+    'yavru_kupe', d.yavru_kupe,
+    'yavru_cins', d.yavru_cins,
+    'dogum_tipi', d.dogum_tipi,
+    'dogum_kg',   d.dogum_kg,
+    'hekim_id',   d.hekim_id
+  )                                AS detay,
+  d.id::text                       AS kaynak_id
+FROM public.dogum d
+
 UNION ALL
- SELECT t.hayvan_id,
-    'TOHUMLAMA'::text AS tip,
-    'insemination_performed'::text AS event_type,
-    (t.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('sperma', t.sperma, 'sonuc', t.sonuc, 'deneme_no', t.deneme_no, 'hekim_id', t.hekim_id) AS detay,
-    (t.id)::text AS kaynak_id
-   FROM tohumlama t
+
+-- Tohumlama
+SELECT
+  t.hayvan_id,
+  'TOHUMLAMA'                      AS tip,
+  'insemination_performed'         AS event_type,
+  t.tarih::timestamptz             AS zaman,
+  jsonb_build_object(
+    'sperma',      t.sperma,
+    'sonuc',       t.sonuc,
+    'deneme_no',   t.deneme_no,
+    'hekim_id',    t.hekim_id
+  )                                AS detay,
+  t.id::text                       AS kaynak_id
+FROM public.tohumlama t
+
 UNION ALL
- SELECT hl.hayvan_id,
-    'HASTALIK_KAYDI'::text AS tip,
-    'treatment_recorded'::text AS event_type,
-    (hl.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('tani', hl.tani, 'kategori', hl.kategori, 'siddet', hl.siddet, 'durum', hl.durum, 'hekim_id', hl.hekim_id) AS detay,
-    (hl.id)::text AS kaynak_id
-   FROM hastalik_log hl
+
+-- Hastalık
+SELECT
+  hl.hayvan_id,
+  'HASTALIK_KAYDI'                 AS tip,
+  'treatment_recorded'             AS event_type,
+  hl.tarih::timestamptz            AS zaman,
+  jsonb_build_object(
+    'tani',      hl.tani,
+    'kategori',  hl.kategori,
+    'siddet',    hl.siddet,
+    'durum',     hl.durum,
+    'hekim_id',  hl.hekim_id
+  )                                AS detay,
+  hl.id::text                       AS kaynak_id
+FROM public.hastalik_log hl
+
 UNION ALL
- SELECT kl.hayvan_id,
-    'KIZGINLIK'::text AS tip,
-    'estrus_detected'::text AS event_type,
-    (kl.tarih)::timestamp with time zone AS zaman,
-    jsonb_build_object('belirti', kl.belirti, 'notlar', kl.notlar) AS detay,
-    kl.id AS kaynak_id
-   FROM kizginlik_log kl
+
+-- Kızgınlık
+SELECT
+  kl.hayvan_id,
+  'KIZGINLIK'                      AS tip,
+  'estrus_detected'                AS event_type,
+  kl.tarih::timestamptz            AS zaman,
+  jsonb_build_object(
+    'belirti', kl.belirti,
+    'notlar',  kl.notlar
+  )                                AS detay,
+  kl.id::text                       AS kaynak_id
+FROM public.kizginlik_log kl
+
 UNION ALL
- SELECT il.ana_hayvan_id AS hayvan_id,
-    il.tip,
-    COALESCE((il.payload ->> 'event_type'::text), lower(il.tip)) AS event_type,
-    il.tarih AS zaman,
-        CASE
-            WHEN ((il.snapshot ? 'old'::text) AND ((il.snapshot -> 'old'::text) ? 'padok_id'::text) AND (((il.snapshot -> 'old'::text) ->> 'padok_id'::text) IS DISTINCT FROM ((il.snapshot -> 'new'::text) ->> 'padok_id'::text))) THEN jsonb_build_object('padok_degisti', true, 'eski_padok', ((il.snapshot -> 'old'::text) ->> 'padok'::text), 'yeni_padok', ((il.snapshot -> 'new'::text) ->> 'padok'::text), 'eski_padok_id', ((il.snapshot -> 'old'::text) ->> 'padok_id'::text), 'yeni_padok_id', ((il.snapshot -> 'new'::text) ->> 'padok_id'::text))
-            ELSE jsonb_build_object('padok_degisti', false)
-        END AS detay,
-    il.id AS kaynak_id
-   FROM islem_log il
-  WHERE (il.tip = ANY (ARRAY['HAYVAN_GUNCELLENDI'::text, 'HAYVAN_EKLENDI'::text]))
+
+-- Hayvan Güncellemeleri (islem_log'dan, PADOK_ODAKLI)
+SELECT
+  il.ana_hayvan_id                 AS hayvan_id,
+  il.tip,
+  COALESCE(il.payload->>'event_type', lower(il.tip)) AS event_type,
+  il.tarih                         AS zaman,
+  CASE
+    -- Padok değişikliği varsa detaya ekle
+    WHEN il.snapshot ? 'old' AND il.snapshot->'old' ? 'padok_id'
+         AND il.snapshot->'old'->>'padok_id' IS DISTINCT FROM il.snapshot->'new'->>'padok_id'
+    THEN jsonb_build_object(
+      'padok_degisti', true,
+      'eski_padok', il.snapshot->'old'->>'padok',
+      'yeni_padok', il.snapshot->'new'->>'padok',
+      'eski_padok_id', il.snapshot->'old'->>'padok_id',
+      'yeni_padok_id', il.snapshot->'new'->>'padok_id'
+    )
+    ELSE jsonb_build_object('padok_degisti', false)
+  END                               AS detay,
+  il.id::text                        AS kaynak_id
+FROM public.islem_log il
+WHERE il.tip IN ('HAYVAN_GUNCELLENDI', 'HAYVAN_EKLENDI')
+
 UNION ALL
- SELECT il.ana_hayvan_id AS hayvan_id,
-    il.tip,
-    COALESCE((il.payload ->> 'event_type'::text), lower(il.tip)) AS event_type,
-    il.tarih AS zaman,
-    COALESCE((il.payload -> 'meta'::text), il.snapshot) AS detay,
-    il.id AS kaynak_id
-   FROM islem_log il
-  WHERE (il.tip = ANY (ARRAY['ABORT_KAYDI'::text, 'SATIS_KAYDI'::text, 'OLUM_KAYDI'::text, 'SUTTEN_KESME'::text]))
-  ORDER BY 4 DESC;
+
+-- Diğer islem_log tipleri (ABORT, SATIS, OLUM, SUTTEN_KESME)
+SELECT
+  il.ana_hayvan_id                 AS hayvan_id,
+  il.tip,
+  COALESCE(il.payload->>'event_type', lower(il.tip)) AS event_type,
+  il.tarih                         AS zaman,
+  COALESCE(il.payload->'meta', il.snapshot) AS detay,
+  il.id                             AS kaynak_id
+FROM public.islem_log il
+WHERE il.tip IN ('ABORT_KAYDI', 'SATIS_KAYDI', 'OLUM_KAYDI', 'SUTTEN_KESME')
+
+ORDER BY zaman DESC;
 
 GRANT SELECT ON public.hayvan_timeline_view TO anon, authenticated;
 
 COMMIT;-- Migration: tohumlama_sonuc_bos RPC
 BEGIN;
 
--- FUNCTION: public._islem_log_yaz()
 CREATE OR REPLACE FUNCTION public._islem_log_yaz()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_tip          text;
   v_hayvan_id    text;
@@ -8371,13 +8341,18 @@ BEGIN
       v_hayvan_id := NEW.anne_id;
       v_snapshot := to_jsonb(NEW);
     WHEN 'tohumlama' THEN
-      -- FIX (2026-08-30): UPDATE'larda trigger tamamen sessiz — tüm RPC'ler
-      -- (tohumlama_abort dahil) kendi islem_log kaydını INSERT eder.
-      -- Önceki sürüm RPC + trigger çift ABORT_KAYDI üretiyordu.
+      -- FIX: UPDATE'lerde ABORT_KAYDI varsayma — tüm RPC'ler kendi islem_log'unu yapıyor
       IF TG_OP = 'INSERT' THEN
         v_tip := 'TOHUMLAMA';
       ELSE
-        RETURN NEW;
+        -- UPDATE: sadece abort (RPC dışı) durumunda logla
+        -- RPC'ler (tohumlama_abort, tohumlama_sonuc_bos, vb.) kendi islem_log'unu INSERT eder
+        IF NEW.sonuc = 'Abort' AND OLD.sonuc != 'Abort' THEN
+          v_tip := 'ABORT_KAYDI';
+        ELSE
+          -- RPC tarafından yönetilen UPDATE — trigger sessizce geç
+          RETURN NEW;
+        END IF;
       END IF;
       v_hayvan_id := NEW.hayvan_id;
       v_snapshot := to_jsonb(NEW);
@@ -8426,8 +8401,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$
-;
+$$;
 
 COMMIT;
 -- Migration: kisir flag + hayvan_kisir_isaretle RPC
@@ -8635,211 +8609,129 @@ END;
 
 BEGIN;
 
-CREATE OR REPLACE VIEW public.hayvan_durum_view AS
+CREATE VIEW public.hayvan_durum_view AS
 WITH yas AS (
-         SELECT h.id,
-            h.kupe_no,
-            h.devlet_kupe,
-            h.irk,
-            h.cinsiyet,
-            h.dogum_tarihi,
-            h.grup,
-            h.padok_id,
-            COALESCE(pk.ad, h.padok) AS padok,
-            h.durum,
-            h.anne_id,
-            h.kategori,
-            h.tohumlama_durumu,
-            h.tohumlama_onay_tarihi,
-            h.suttten_kesme_tarihi,
-            h.cikis_tipi,
-            h.cikis_tarihi,
-            h.cikis_sebebi,
-            h.satis_fiyati,
-            h.notlar,
-            h.dogum_kg,
-            h.canli_agirlik,
-            h.boy,
-            h.renk,
-            h.ayirici_ozellik,
-            h.baba_bilgi,
-            h.abort_sayisi,
-            h.kisir,
-                CASE
-                    WHEN (h.dogum_tarihi IS NOT NULL) THEN (CURRENT_DATE - h.dogum_tarihi)
-                    ELSE NULL::integer
-                END AS yas_gun,
-            COALESCE(ie.tohumlama_gun, 365) AS tohumlama_esik_gun
-           FROM ((hayvanlar h
-             LEFT JOIN padoklar pk ON ((pk.id = h.padok_id)))
-             LEFT JOIN irk_esik ie ON ((ie.irk = h.irk)))
-        ), son_tohumlama AS (
-         SELECT DISTINCT ON (tohumlama.hayvan_id) tohumlama.hayvan_id,
-            tohumlama.id AS toh_id,
-            tohumlama.tarih AS toh_tarih,
-            tohumlama.sperma,
-            tohumlama.sonuc AS toh_sonuc,
-            (CURRENT_DATE - tohumlama.tarih) AS toh_gun
-           FROM tohumlama
-          ORDER BY tohumlama.hayvan_id, tohumlama.tarih DESC
-        ), aktif_hastalik AS (
-         SELECT hastalik_log.hayvan_id,
-            count(*) AS hastalik_sayisi
-           FROM hastalik_log
-          WHERE (hastalik_log.durum = 'Aktif'::text)
-          GROUP BY hastalik_log.hayvan_id
-        ), repeat_breed AS (
-         SELECT t1.hayvan_id,
-            count(*) AS yakin_sayisi
-           FROM tohumlama t1
-          WHERE (EXISTS ( SELECT 1
-                   FROM tohumlama t2
-                  WHERE ((t2.hayvan_id = t1.hayvan_id) AND (t2.id <> t1.id) AND (abs((t2.tarih - t1.tarih)) <= 15))))
-          GROUP BY t1.hayvan_id
-        )
- SELECT y.id,
-    y.kupe_no,
-    y.devlet_kupe,
-    y.irk,
-    y.cinsiyet,
-    y.dogum_tarihi,
-    y.grup,
-    y.padok_id,
-    y.padok,
-    y.durum,
-    y.anne_id,
-    y.kategori,
-    y.tohumlama_durumu,
-    y.tohumlama_onay_tarihi,
-    y.suttten_kesme_tarihi,
-    y.cikis_tipi,
-    y.cikis_tarihi,
-    y.cikis_sebebi,
-    y.satis_fiyati,
-    y.notlar,
-    y.dogum_kg,
-    y.canli_agirlik,
-    y.boy,
-    y.renk,
-    y.ayirici_ozellik,
-    y.baba_bilgi,
-    y.abort_sayisi,
-    y.kisir,
-    y.yas_gun,
-    y.tohumlama_esik_gun,
-    st.toh_id,
-    st.toh_tarih,
-    st.sperma,
-    st.toh_sonuc,
-    st.toh_gun,
-    COALESCE(ah.hastalik_sayisi, (0)::bigint) AS aktif_hastalik_sayisi,
-        CASE
-            WHEN (y.cikis_tipi IS NOT NULL) THEN 'suruden_cikti'::text
-            WHEN ((y.suttten_kesme_tarihi IS NULL) AND (y.yas_gun <= 75)) THEN 'sut_icen'::text
-            WHEN ((y.suttten_kesme_tarihi IS NOT NULL) AND (y.yas_gun <= 180)) THEN 'suttten_kesilmis'::text
-            WHEN ((y.cinsiyet = 'Erkek'::text) AND (y.yas_gun > 180)) THEN 'besi'::text
-            WHEN ((y.cinsiyet = 'Dişi'::text) AND ((y.yas_gun >= 181) AND (y.yas_gun <= 365))) THEN 'duve_kucuk'::text
-            WHEN ((y.cinsiyet = 'Dişi'::text) AND ((y.yas_gun >= 366) AND (y.yas_gun <= 730))) THEN 'duve_buyuk'::text
-            WHEN ((y.cinsiyet = 'Dişi'::text) AND (y.yas_gun > 730)) THEN 'sagmal'::text
-            ELSE 'genel'::text
-        END AS hesap_kategori,
-        CASE
-            WHEN ((y.cinsiyet = 'Dişi'::text) AND (y.yas_gun >= y.tohumlama_esik_gun) AND ((st.toh_sonuc IS NULL) OR (st.toh_sonuc = 'Boş'::text))) THEN true
-            ELSE false
-        END AS tohumlama_bildirisi_gerekli,
-        CASE
-            WHEN ((y.suttten_kesme_tarihi IS NULL) AND ((y.yas_gun >= 76) AND (y.yas_gun <= 180))) THEN true
-            ELSE false
-        END AS suttten_kesme_bildirisi_gerekli,
-        CASE
-            WHEN ((st.toh_sonuc = 'Gebe'::text) AND (((280 - st.toh_gun) >= 0) AND ((280 - st.toh_gun) <= 7))) THEN true
-            ELSE false
-        END AS dogum_yaklasti,
-        CASE
-            WHEN ((st.toh_sonuc = 'Gebe'::text) AND (st.toh_gun > 280)) THEN (st.toh_gun - 280)
-            ELSE 0
-        END AS dogum_gecikme_gun,
-        CASE
-            WHEN (st.toh_sonuc = 'Gebe'::text) THEN 'gebe'::text
-            WHEN (st.toh_sonuc = 'Bekliyor'::text) THEN 'bekliyor'::text
-            WHEN ((y.yas_gun >= y.tohumlama_esik_gun) AND (y.cinsiyet = 'Dişi'::text)) THEN 'tohumlanabilir'::text
-            ELSE 'erken'::text
-        END AS tohumlama_durumu_hesap,
-        CASE
-            WHEN ((st.toh_sonuc = 'Bekliyor'::text) AND (EXISTS ( SELECT 1
-               FROM tohumlama t2
-              WHERE ((t2.hayvan_id = st.hayvan_id) AND (t2.id <> st.toh_id) AND (abs((t2.tarih - st.toh_tarih)) <= 21))))) THEN true
-            ELSE false
-        END AS repeat_breed_active,
-        CASE
-            WHEN ((COALESCE(rb.yakin_sayisi, (0)::bigint) >= 2) AND (NOT ((st.toh_sonuc = 'Bekliyor'::text) AND (EXISTS ( SELECT 1
-               FROM tohumlama t2
-              WHERE ((t2.hayvan_id = st.hayvan_id) AND (t2.id <> st.toh_id) AND (abs((t2.tarih - st.toh_tarih)) <= 21))))))) THEN true
-            ELSE false
-        END AS repeat_breed_past,
-        CASE
-            WHEN ((st.toh_sonuc = 'Bekliyor'::text) AND (EXISTS ( SELECT 1
-               FROM tohumlama t2
-              WHERE ((t2.hayvan_id = st.hayvan_id) AND (t2.id <> st.toh_id) AND (abs((t2.tarih - st.toh_tarih)) <= 21))))) THEN ( SELECT count(*) AS count
-               FROM tohumlama
-              WHERE ((tohumlama.hayvan_id = st.hayvan_id) AND (tohumlama.tarih >= (st.toh_tarih - 21)) AND (tohumlama.tarih <= st.toh_tarih)))
-            ELSE COALESCE(rb.yakin_sayisi, (0)::bigint)
-        END AS repeat_breed_count
-   FROM (((yas y
-     LEFT JOIN son_tohumlama st ON ((st.hayvan_id = y.id)))
-     LEFT JOIN aktif_hastalik ah ON ((ah.hayvan_id = y.id)))
-     LEFT JOIN repeat_breed rb ON ((rb.hayvan_id = y.id)));
+  SELECT
+    h.id,
+    h.kupe_no,
+    h.devlet_kupe,
+    h.irk,
+    h.cinsiyet,
+    h.dogum_tarihi,
+    h.grup,
+    h.padok_id,
+    COALESCE(pk.ad, h.padok) AS padok,
+    h.durum,
+    h.anne_id,
+    h.kategori,
+    h.tohumlama_durumu,
+    h.tohumlama_onay_tarihi,
+    h.suttten_kesme_tarihi,
+    h.cikis_tipi,
+    h.cikis_tarihi,
+    h.cikis_sebebi,
+    h.satis_fiyati,
+    h.notlar,
+    h.dogum_kg,
+    h.canli_agirlik,
+    h.boy,
+    h.renk,
+    h.ayirici_ozellik,
+    h.baba_bilgi,
+    h.abort_sayisi,
+    h.kisir,
+    CASE
+      WHEN h.dogum_tarihi IS NOT NULL
+      THEN CURRENT_DATE - h.dogum_tarihi
+      ELSE NULL
+    END AS yas_gun,
+    COALESCE(ie.tohumlama_gun, 365) AS tohumlama_esik_gun
+  FROM public.hayvanlar h
+  LEFT JOIN public.padoklar pk ON pk.id = h.padok_id
+  LEFT JOIN public.irk_esik ie ON ie.irk = h.irk
+),
+son_tohumlama AS (
+  SELECT DISTINCT ON (hayvan_id)
+    hayvan_id,
+    id    AS toh_id,
+    tarih AS toh_tarih,
+    sperma,
+    sonuc AS toh_sonuc,
+    (CURRENT_DATE - tarih) AS toh_gun
+  FROM public.tohumlama
+  ORDER BY hayvan_id, tarih DESC
+),
+aktif_hastalik AS (
+  SELECT hayvan_id, COUNT(*) AS hastalik_sayisi
+  FROM public.hastalik_log
+  WHERE durum = 'Aktif'
+  GROUP BY hayvan_id
+)
+SELECT
+  y.*,
+  st.toh_id,
+  st.toh_tarih,
+  st.sperma,
+  st.toh_sonuc,
+  st.toh_gun,
+  COALESCE(ah.hastalik_sayisi, 0) AS aktif_hastalik_sayisi,
+  CASE
+    WHEN y.cikis_tipi IS NOT NULL THEN 'suruden_cikti'
+    WHEN y.suttten_kesme_tarihi IS NULL AND y.yas_gun <= 75 THEN 'sut_icen'
+    WHEN y.suttten_kesme_tarihi IS NOT NULL AND y.yas_gun <= 180 THEN 'suttten_kesilmis'
+    WHEN y.cinsiyet = 'Erkek' AND y.yas_gun > 180 THEN 'besi'
+    WHEN y.cinsiyet = 'Dişi' AND y.yas_gun BETWEEN 181 AND 365 THEN 'duve_kucuk'
+    WHEN y.cinsiyet = 'Dişi' AND y.yas_gun BETWEEN 366 AND 730 THEN 'duve_buyuk'
+    WHEN y.cinsiyet = 'Dişi' AND y.yas_gun > 730 THEN 'sagmal'
+    ELSE 'genel'
+  END AS hesap_kategori,
+  CASE
+    WHEN y.cinsiyet = 'Dişi'
+      AND y.yas_gun >= y.tohumlama_esik_gun
+      AND (st.toh_sonuc IS NULL OR st.toh_sonuc = 'Boş')
+    THEN true
+    ELSE false
+  END AS tohumlama_bildirisi_gerekli,
+  CASE
+    WHEN y.suttten_kesme_tarihi IS NULL AND y.yas_gun BETWEEN 76 AND 180
+    THEN true
+    ELSE false
+  END AS suttten_kesme_bildirisi_gerekli,
+  CASE
+    WHEN st.toh_sonuc = 'Gebe' AND (280 - st.toh_gun) BETWEEN 0 AND 7
+    THEN true
+    ELSE false
+  END AS dogum_yaklasti,
+  CASE
+    WHEN st.toh_sonuc = 'Gebe' AND st.toh_gun > 280
+    THEN st.toh_gun - 280
+    ELSE 0
+  END AS dogum_gecikme_gun,
+  CASE
+    WHEN st.toh_sonuc = 'Gebe' THEN 'gebe'
+    WHEN st.toh_sonuc = 'Bekliyor' THEN 'bekliyor'
+    WHEN y.yas_gun >= y.tohumlama_esik_gun AND y.cinsiyet = 'Dişi' THEN 'tohumlanabilir'
+    ELSE 'erken'
+  END AS tohumlama_durumu_hesap
+FROM yas y
+LEFT JOIN son_tohumlama st ON st.hayvan_id = y.id
+LEFT JOIN aktif_hastalik ah ON ah.hayvan_id = y.id;
 
 GRANT SELECT ON public.hayvan_durum_view TO anon, authenticated;
 
-CREATE OR REPLACE VIEW public.tohumlanabilir_hayvanlar AS
-SELECT id,
-    kupe_no,
-    devlet_kupe,
-    irk,
-    cinsiyet,
-    dogum_tarihi,
-    grup,
-    padok_id,
-    padok,
-    durum,
-    anne_id,
-    kategori,
-    tohumlama_durumu,
-    tohumlama_onay_tarihi,
-    suttten_kesme_tarihi,
-    cikis_tipi,
-    cikis_tarihi,
-    cikis_sebebi,
-    satis_fiyati,
-    notlar,
-    dogum_kg,
-    canli_agirlik,
-    boy,
-    renk,
-    ayirici_ozellik,
-    baba_bilgi,
-    abort_sayisi,
-    yas_gun,
-    tohumlama_esik_gun,
-    kisir,
-    toh_id,
-    toh_tarih,
-    sperma,
-    toh_sonuc,
-    toh_gun,
-    aktif_hastalik_sayisi,
-    hesap_kategori,
-    tohumlama_bildirisi_gerekli,
-    suttten_kesme_bildirisi_gerekli,
-    dogum_yaklasti,
-    dogum_gecikme_gun,
-    tohumlama_durumu_hesap,
-    repeat_breed_active,
-    repeat_breed_past,
-    repeat_breed_count
-   FROM hayvan_durum_view
-  WHERE (tohumlama_durumu_hesap = 'tohumlanabilir'::text);
+CREATE VIEW public.tohumlanabilir_hayvanlar AS
+SELECT id, kupe_no, devlet_kupe, irk, cinsiyet, dogum_tarihi,
+  grup, padok_id, padok, durum, anne_id, kategori,
+  tohumlama_durumu, tohumlama_onay_tarihi, suttten_kesme_tarihi,
+  cikis_tipi, cikis_tarihi, cikis_sebebi, satis_fiyati, notlar,
+  dogum_kg, canli_agirlik, boy, renk, ayirici_ozellik, baba_bilgi, abort_sayisi,
+  yas_gun, tohumlama_esik_gun, kisir,
+  toh_id, toh_tarih, sperma, toh_sonuc, toh_gun,
+  aktif_hastalik_sayisi, hesap_kategori,
+  tohumlama_bildirisi_gerekli, suttten_kesme_bildirisi_gerekli,
+  dogum_yaklasti, dogum_gecikme_gun, tohumlama_durumu_hesap
+FROM hayvan_durum_view
+WHERE tohumlama_durumu_hesap = 'tohumlanabilir';
 
 GRANT SELECT ON public.tohumlanabilir_hayvanlar TO anon, authenticated;
 
@@ -8847,7 +8739,73 @@ END;
 -- Migration: hayvan_guncelle RPC'ye p_kisir parametresi + gebe validation
 BEGIN;
 
+CREATE OR REPLACE FUNCTION public.hayvan_guncelle(
+  p_id              text,
+  p_kupe_no         text    DEFAULT NULL,
+  p_devlet_kupe     text    DEFAULT NULL,
+  p_irk             text    DEFAULT NULL,
+  p_cinsiyet        text    DEFAULT NULL,
+  p_dogum_tarihi    date    DEFAULT NULL,
+  p_grup            text    DEFAULT NULL,
+  p_padok           text    DEFAULT NULL,
+  p_dogum_kg        numeric DEFAULT NULL,
+  p_canli_agirlik   numeric DEFAULT NULL,
+  p_boy             numeric DEFAULT NULL,
+  p_renk            text    DEFAULT NULL,
+  p_ayirici_ozellik text    DEFAULT NULL,
+  p_baba_bilgi      text    DEFAULT NULL,
+  p_notlar          text    DEFAULT NULL,
+  p_anne_id         text    DEFAULT NULL,
+  p_padok_id        uuid    DEFAULT NULL,
+  p_kisir           boolean DEFAULT NULL
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_padok_id uuid;
+  v_padok_ad text;
+  v_gebe     boolean;
+BEGIN
+  -- Kısır işaretleme validation: gebe hayvan kısır olamaz
+  IF p_kisir IS NOT NULL AND p_kisir = true THEN
+    SELECT EXISTS (
+      SELECT 1 FROM tohumlama t
+      WHERE t.hayvan_id = p_id AND t.sonuc = 'Gebe'
+    ) INTO v_gebe;
+    IF v_gebe THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'Gebe hayvan kısır olarak işaretlenemez');
+    END IF;
+  END IF;
 
+  IF p_padok_id IS NOT NULL THEN
+    v_padok_id := p_padok_id;
+    SELECT ad INTO v_padok_ad FROM padoklar WHERE id = p_padok_id;
+  ELSIF p_padok IS NOT NULL THEN
+    SELECT id, ad INTO v_padok_id, v_padok_ad FROM padoklar WHERE ad = p_padok;
+  END IF;
+
+  UPDATE hayvanlar SET
+    kupe_no          = COALESCE(NULLIF(p_kupe_no,''),        kupe_no),
+    devlet_kupe      = COALESCE(NULLIF(p_devlet_kupe,''),    devlet_kupe),
+    irk              = COALESCE(NULLIF(p_irk,''),            irk),
+    cinsiyet         = COALESCE(NULLIF(p_cinsiyet,''),       cinsiyet),
+    dogum_tarihi     = COALESCE(p_dogum_tarihi,              dogum_tarihi),
+    grup             = COALESCE(NULLIF(p_grup,''),           grup),
+    padok            = COALESCE(v_padok_ad,                  padok),
+    padok_id         = COALESCE(v_padok_id,                  padok_id),
+    dogum_kg         = COALESCE(p_dogum_kg,                  dogum_kg),
+    canli_agirlik    = COALESCE(p_canli_agirlik,             canli_agirlik),
+    boy              = COALESCE(p_boy,                       boy),
+    renk             = COALESCE(NULLIF(p_renk,''),           renk),
+    ayirici_ozellik  = COALESCE(NULLIF(p_ayirici_ozellik,''),ayirici_ozellik),
+    baba_bilgi       = COALESCE(NULLIF(p_baba_bilgi,''),     baba_bilgi),
+    notlar           = COALESCE(NULLIF(p_notlar,''),         notlar),
+    anne_id          = COALESCE(NULLIF(p_anne_id,''),        anne_id),
+    kisir            = COALESCE(p_kisir,                     kisir)
+  WHERE id = p_id;
+
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
 
 END;
 -- Migration: laktasyon_kuru_kontrol RPC (revize) — dogum tablosu olmadan
@@ -8897,36 +8855,30 @@ BEGIN
 END;
 $$;
 
--- FUNCTION: public.drug_ekle(p_name text, p_default_unit text, p_default_route text, p_stock_item_id text, p_kategori text)
-CREATE OR REPLACE FUNCTION public.drug_ekle(p_name text, p_default_unit text DEFAULT NULL::text, p_default_route text DEFAULT NULL::text, p_stock_item_id text DEFAULT NULL::text, p_kategori text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.drug_ekle(p_name text, p_default_unit text DEFAULT NULL, p_default_route text DEFAULT NULL, p_stock_item_id text DEFAULT NULL, p_kategori text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_id uuid;
 BEGIN
-  IF p_name IS NULL OR trim(p_name) = '' THEN RETURN jsonb_build_object('ok',false,'mesaj','İlaç adı zorunlu'); END IF;
-  IF EXISTS (SELECT 1 FROM drugs WHERE lower(name)=lower(trim(p_name))) THEN RETURN jsonb_build_object('ok',false,'mesaj','Bu isimde ilaç zaten var'); END IF;
-  INSERT INTO drugs (name,default_unit,default_route,stock_item_id,kategori)
-  VALUES (trim(p_name),p_default_unit,p_default_route,p_stock_item_id,p_kategori) RETURNING id INTO v_id;
-  RETURN jsonb_build_object('ok',true,'id',v_id);
-END;$function$
-;
+  IF EXISTS (SELECT 1 FROM drugs WHERE LOWER(name) = LOWER(p_name)) THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu ilaç zaten var');
+  END IF;
+  INSERT INTO drugs (name, default_unit, default_route, stock_item_id, kategori)
+  VALUES (p_name, p_default_unit, p_default_route, p_stock_item_id, p_kategori) RETURNING id INTO v_id;
+  RETURN jsonb_build_object('ok', true, 'id', v_id);
+END;
+$$;
 
--- FUNCTION: public.drug_guncelle(p_id uuid, p_name text, p_default_unit text, p_default_route text, p_stock_item_id text, p_kategori text)
-CREATE OR REPLACE FUNCTION public.drug_guncelle(p_id uuid, p_name text DEFAULT NULL::text, p_default_unit text DEFAULT NULL::text, p_default_route text DEFAULT NULL::text, p_stock_item_id text DEFAULT NULL::text, p_kategori text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.drug_guncelle(p_id uuid, p_name text DEFAULT NULL, p_default_unit text DEFAULT NULL, p_default_route text DEFAULT NULL, p_stock_item_id text DEFAULT NULL, p_kategori text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM drugs WHERE id=p_id) THEN RETURN jsonb_build_object('ok',false,'mesaj','İlaç bulunamadı'); END IF;
-  IF p_name IS NOT NULL AND EXISTS (SELECT 1 FROM drugs WHERE lower(name)=lower(trim(p_name)) AND id<>p_id) THEN RETURN jsonb_build_object('ok',false,'mesaj','Bu isimde başka ilaç var'); END IF;
-  UPDATE drugs SET name=COALESCE(NULLIF(trim(p_name),''),name), default_unit=p_default_unit,
-    default_route=p_default_route, stock_item_id=p_stock_item_id, kategori=p_kategori WHERE id=p_id;
-  RETURN jsonb_build_object('ok',true);
-END;$function$
-;
+  IF p_name IS NOT NULL AND EXISTS (SELECT 1 FROM drugs WHERE LOWER(name) = LOWER(p_name) AND id != p_id) THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu isimde başka bir ilaç var');
+  END IF;
+  UPDATE drugs SET name=COALESCE(NULLIF(trim(p_name),''),name), default_unit=p_default_unit, default_route=p_default_route, stock_item_id=p_stock_item_id, kategori=p_kategori WHERE id=p_id;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'İlaç bulunamadı'); END IF;
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.drug_sil(p_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -8945,35 +8897,37 @@ BEGIN
 END;
 $$;
 
--- FUNCTION: public.kategori_ekle(p_ad text, p_tip text)
-CREATE OR REPLACE FUNCTION public.kategori_ekle(p_ad text, p_tip text DEFAULT 'genel'::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE v_id uuid; v_max int;
+CREATE OR REPLACE FUNCTION public.kategori_ekle(p_ad text, p_tip text DEFAULT 'genel')
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_id uuid;
 BEGIN
-  IF p_ad IS NULL OR trim(p_ad)='' THEN RETURN jsonb_build_object('ok',false,'mesaj','Kategori adı zorunlu'); END IF;
-  IF EXISTS (SELECT 1 FROM stok_kategorileri WHERE lower(ad)=lower(trim(p_ad))) THEN RETURN jsonb_build_object('ok',false,'mesaj','Bu kategori zaten var'); END IF;
-  SELECT COALESCE(MAX(sira),0) INTO v_max FROM stok_kategorileri;
-  INSERT INTO stok_kategorileri (ad,sira,tip) VALUES (trim(p_ad),v_max+1,p_tip) RETURNING id INTO v_id;
-  RETURN jsonb_build_object('ok',true,'id',v_id);
-END;$function$
-;
+  IF EXISTS (SELECT 1 FROM stok_kategorileri WHERE LOWER(ad) = LOWER(p_ad)) THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu kategori zaten var');
+  END IF;
+  INSERT INTO stok_kategorileri (ad, sira, tip) VALUES (p_ad, COALESCE((SELECT MAX(sira) FROM stok_kategorileri),0)+1, p_tip) RETURNING id INTO v_id;
+  RETURN jsonb_build_object('ok', true, 'id', v_id);
+END;
+$$;
 
--- FUNCTION: public.kategori_guncelle(p_id uuid, p_new_ad text, p_tip text)
-CREATE OR REPLACE FUNCTION public.kategori_guncelle(p_id uuid, p_new_ad text DEFAULT NULL::text, p_tip text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.kategori_guncelle(p_id uuid, p_new_ad text DEFAULT NULL, p_tip text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_old_ad text;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM stok_kategorileri WHERE id=p_id) THEN RETURN jsonb_build_object('ok',false,'mesaj','Kategori bulunamadı'); END IF;
-  IF p_new_ad IS NOT NULL AND EXISTS (SELECT 1 FROM stok_kategorileri WHERE lower(ad)=lower(trim(p_new_ad)) AND id<>p_id) THEN RETURN jsonb_build_object('ok',false,'mesaj','Bu isimde kategori var'); END IF;
-  UPDATE stok_kategorileri SET ad=COALESCE(NULLIF(trim(p_new_ad),''),ad), tip=COALESCE(p_tip,tip) WHERE id=p_id;
-  RETURN jsonb_build_object('ok',true);
-END;$function$
-;
+  IF p_new_ad IS NOT NULL AND EXISTS (SELECT 1 FROM stok_kategorileri WHERE LOWER(ad) = LOWER(p_new_ad) AND id != p_id) THEN
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu isimde başka bir kategori var');
+  END IF;
+  SELECT ad INTO v_old_ad FROM stok_kategorileri WHERE id = p_id;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Kategori bulunamadı'); END IF;
+  IF p_new_ad IS NOT NULL THEN
+    UPDATE stok SET kategori = p_new_ad WHERE kategori = v_old_ad;
+    UPDATE stok_kategorileri SET ad = p_new_ad WHERE id = p_id;
+  END IF;
+  IF p_tip IS NOT NULL THEN
+    UPDATE stok_kategorileri SET tip = p_tip WHERE id = p_id;
+  END IF;
+  RETURN jsonb_build_object('ok', true);
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.kategori_sil(p_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
@@ -8990,69 +8944,44 @@ BEGIN
 END;
 $$;
 
--- FUNCTION: public.seed_defaults(p_tip text)
 CREATE OR REPLACE FUNCTION public.seed_defaults(p_tip text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_count integer := 0;
 BEGIN
   IF p_tip = 'diseases' THEN
     WITH ins AS (
       INSERT INTO diseases (name, category) VALUES
-        ('Mastitis', 'Meme'),
-        ('Laminitis', 'Ayak'),
-        ('Metritis', 'Üreme'),
-        ('Retensio', 'Üreme'),
-        ('Ketozis', 'Metabolik'),
-        ('Hipokalsemi', 'Metabolik'),
-        ('Pnömoni', 'Solunum'),
-        ('İshal', 'Sindirim'),
-        ('Neonatal Zayıflık', 'Buzağı'),
-        ('Göbek İltihabı', 'Buzağı')
-      ON CONFLICT (name) DO NOTHING
-      RETURNING 1
+        ('Mastitis','Meme'),('Laminitis','Ayak'),('Metritis','Üreme'),('Retensio','Üreme'),
+        ('Ketozis','Metabolik'),('Hipokalsemi','Metabolik'),('Pnömoni','Solunum'),
+        ('İshal','Sindirim'),('Neonatal Zayıflık','Buzağı'),('Göbek İltihabı','Buzağı')
+      ON CONFLICT (name) DO NOTHING RETURNING 1
     ) SELECT COUNT(*) INTO v_count FROM ins;
-
   ELSIF p_tip = 'drugs' THEN
     WITH ins AS (
       INSERT INTO drugs (name, default_unit, default_route) VALUES
-        ('Makrovil', 'ml', 'IM'),
-        ('Enrolen', 'ml', 'IM'),
-        ('Florkem', 'ml', 'IM'),
-        ('Penicilin', 'ml', 'IM'),
-        ('Oksitetrasiklin', 'ml', 'IM'),
-        ('Meloksikam', 'ml', 'IV'),
-        ('Flunixin', 'ml', 'IV'),
-        ('Deksametazon', 'ml', 'IM'),
-        ('Kalsiyum Boroglukonat', 'ml', 'IV'),
-        ('B12 Vitamini', 'ml', 'IM'),
-        ('AD3E Vitamini', 'ml', 'IM'),
-        ('Albendazol', 'ml', 'PO'),
-        ('İvermektin', 'ml', 'SC')
-      ON CONFLICT (name) DO NOTHING
-      RETURNING 1
+        ('Makrovil','ml','IM'),('Enrolen','ml','IM'),('Florkem','ml','IM'),('Penicilin','ml','IM'),
+        ('Oksitetrasiklin','ml','IM'),('Meloksikam','ml','IV'),('Flunixin','ml','IV'),
+        ('Deksametazon','ml','IM'),('Kalsiyum Boroglukonat','ml','IV'),
+        ('B12 Vitamini','ml','IM'),('AD3E Vitamini','ml','IM'),
+        ('Albendazol','ml','PO'),('İvermektin','ml','SC')
+      ON CONFLICT (name) DO NOTHING RETURNING 1
     ) SELECT COUNT(*) INTO v_count FROM ins;
-
   ELSIF p_tip = 'kategoriler' THEN
     WITH ins AS (
-      INSERT INTO stok_kategorileri (ad, sira) VALUES
-        ('Antibiyotik', 1), ('NSAID', 2), ('Hormon', 3), ('Vitamin', 4),
-        ('Antiparaziter', 5), ('Diğer İlaç', 6), ('Aşı', 7), ('Sperma', 8),
-        ('Yem', 9), ('Sarf', 10), ('Ekipman', 11), ('Diğer', 12)
-      ON CONFLICT (ad) DO NOTHING
-      RETURNING 1
+      INSERT INTO stok_kategorileri (ad, sira, tip) VALUES
+        ('Antibiyotik',1,'ilac'),('NSAID',2,'ilac'),('Hormon',3,'ilac'),('Vitamin',4,'ilac'),
+        ('Antiparaziter',5,'ilac'),('Diğer İlaç',6,'ilac'),('Aşı',7,'genel'),('Sperma',8,'genel'),
+        ('Yem',9,'genel'),('Sarf',10,'genel'),('Ekipman',11,'genel'),('Diğer',12,'genel'),
+        ('Tohumlama',13,'genel'),('Metabolik',14,'ilac'),('GI İlaçlar',15,'ilac'),
+        ('Topikal',16,'ilac'),('Anestezik / Sedatif',17,'ilac')
+      ON CONFLICT (ad) DO NOTHING RETURNING 1
     ) SELECT COUNT(*) INTO v_count FROM ins;
-
   ELSE
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Geçersiz tip: diseases | drugs | kategoriler');
   END IF;
-
   RETURN jsonb_build_object('ok', true, 'eklenen', v_count);
 END;
-$function$
-;
+$$;
 
 -- ──────────────────────────────────────────────────────────────
 -- drug_class CRUD RPCs
@@ -9405,66 +9334,59 @@ GRANT EXECUTE ON FUNCTION public.stat_gebelik_ozet(date, date, text, text, text)
 -- NOT: CREATE OR REPLACE kolon sırasını değiştiremediği için kategori, cycle_no mevcut sırada tutuldu.
 CREATE OR REPLACE VIEW public.v_ureme_dongusu AS
 WITH numbered AS (
-         SELECT t.id,
-            t.hayvan_id,
-            t.tarih,
-            t.sonuc,
-            t.deneme_no,
-            lower(TRIM(BOTH FROM split_part(t.sperma, '|'::text, 1))) AS sperma_norm,
-            sum(
-                CASE
-                    WHEN (t.deneme_no = 1) THEN 1
-                    ELSE 0
-                END) OVER (PARTITION BY t.hayvan_id ORDER BY t.tarih, t.deneme_no ROWS UNBOUNDED PRECEDING) AS cycle_no,
-            h.padok,
-            h.durum,
-            h.genc_anne AS h_genc_anne,
-            h.grup AS h_grup,
-            ( SELECT count(DISTINCT d2.olay_id) AS count
-                   FROM dogum d2
-                  WHERE (d2.anne_id = h.id)) AS dogum_sayisi
-           FROM (tohumlama t
-             JOIN hayvanlar h ON ((h.id = t.hayvan_id)))
-          WHERE ((h.cinsiyet = 'Dişi'::text) AND (h.kisir IS NOT TRUE))
-        )
- SELECT hayvan_id,
-    padok,
-    durum,
-        CASE
-            WHEN (cycle_no >= 2) THEN 'İnek'::text
-            WHEN (h_genc_anne = true) THEN 'Düve'::text
-            WHEN (h_genc_anne = false) THEN 'İnek'::text
-            WHEN ((h_grup ~~* '%düve%'::text) OR (h_grup ~~* '%duve%'::text)) THEN 'Düve'::text
-            WHEN (dogum_sayisi >= 2) THEN 'Düve'::text
-            ELSE 'İnek'::text
-        END AS kategori,
-    cycle_no,
-    min(tarih) AS baslangic,
-    max(tarih) AS bitis,
-    max(deneme_no) AS deneme_sayisi,
-        CASE
-            WHEN bool_or((sonuc = ANY (ARRAY['Gebe'::text, 'Doğum Yaptı'::text]))) THEN 'Gebe'::text
-            WHEN bool_or((sonuc = 'Abort'::text)) THEN 'Abort'::text
-            WHEN bool_or((sonuc = 'Bekliyor'::text)) THEN 'Bekliyor'::text
-            ELSE 'Boş'::text
-        END AS sonuc,
-    max(
-        CASE
-            WHEN (sonuc = ANY (ARRAY['Gebe'::text, 'Doğum Yaptı'::text])) THEN sperma_norm
-            ELSE NULL::text
-        END) AS gebe_sperma,
-    (array_agg(sperma_norm ORDER BY deneme_no DESC))[1] AS son_sperma
-   FROM numbered
-  GROUP BY hayvan_id, padok, durum, cycle_no, h_genc_anne, h_grup, dogum_sayisi;
+  SELECT
+    t.id,
+    t.hayvan_id,
+    t.tarih,
+    t.sonuc,
+    t.deneme_no,
+    LOWER(TRIM(split_part(t.sperma, '|', 1))) AS sperma_norm,
+    SUM(CASE WHEN t.deneme_no = 1 THEN 1 ELSE 0 END)
+      OVER (PARTITION BY t.hayvan_id ORDER BY t.tarih, t.deneme_no
+            ROWS UNBOUNDED PRECEDING) AS cycle_no,
+    h.padok,
+    h.durum,
+    h.genc_anne AS h_genc_anne,
+    h.grup      AS h_grup,
+    (SELECT COUNT(DISTINCT d2.olay_id) FROM public.dogum d2 WHERE d2.anne_id = h.id) AS dogum_sayisi
+  FROM public.tohumlama t
+  JOIN public.hayvanlar h ON h.id = t.hayvan_id
+  WHERE h.cinsiyet = 'Dişi'
+    AND h.kisir IS NOT TRUE
+)
+SELECT
+  hayvan_id, padok, durum,
+  CASE
+    WHEN cycle_no >= 2 THEN 'İnek'
+    WHEN h_genc_anne = true  THEN 'Düve'
+    WHEN h_genc_anne = false THEN 'İnek'
+    WHEN h_grup ILIKE '%düve%' OR h_grup ILIKE '%duve%' THEN 'Düve'
+    WHEN dogum_sayisi >= 2 THEN 'Düve'
+    ELSE 'İnek'
+  END AS kategori,
+  cycle_no,
+  MIN(tarih)           AS baslangic,
+  MAX(tarih)           AS bitis,
+  MAX(deneme_no)       AS deneme_sayisi,
+  CASE
+    WHEN bool_or(sonuc IN ('Gebe','Doğum Yaptı')) THEN 'Gebe'
+    WHEN bool_or(sonuc = 'Abort')                 THEN 'Abort'
+    WHEN bool_or(sonuc = 'Bekliyor')              THEN 'Bekliyor'
+    ELSE 'Boş'
+  END                  AS sonuc,
+  MAX(CASE WHEN sonuc IN ('Gebe','Doğum Yaptı') THEN sperma_norm END) AS gebe_sperma,
+  (ARRAY_AGG(sperma_norm ORDER BY deneme_no DESC))[1] AS son_sperma
+FROM numbered
+GROUP BY hayvan_id, padok, durum, cycle_no, h_genc_anne, h_grup, dogum_sayisi;
 
 GRANT SELECT ON public.v_ureme_dongusu TO anon, authenticated;
 
--- FUNCTION: public.stat_suru_ozet(p_padok text, p_son_donem boolean)
-CREATE OR REPLACE FUNCTION public.stat_suru_ozet(p_padok text DEFAULT NULL::text, p_son_donem boolean DEFAULT true)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+-- ── stat_suru_ozet v5 — 42-gün + sperma_all + sessiz (salt-okuma) ═══
+CREATE OR REPLACE FUNCTION public.stat_suru_ozet(
+  p_padok     text    DEFAULT NULL,
+  p_son_donem boolean DEFAULT true
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_hayvan    jsonb;
   v_gebelik   jsonb;
@@ -9513,6 +9435,7 @@ BEGIN
   ) INTO v_gebelik
   FROM hayvan_stat;
 
+  -- Üreme verimliliği (Düve/İnek × 3 katman: ham CR / hayvan ort / cycle ort 1/N) — lifetime
   WITH basari AS (
     SELECT v.hayvan_id, v.kategori, 1.0 / NULLIF(v.deneme_sayisi, 0) AS skor
     FROM public.v_ureme_dongusu v
@@ -9549,25 +9472,20 @@ BEGIN
   )
   SELECT jsonb_object_agg(grp, payload) INTO v_verim
   FROM (
-    SELECT
-      CASE WHEN ks.k = 'Düve' THEN 'duve' ELSE 'inek' END AS grp,
+    SELECT CASE WHEN ks.k = 'Düve' THEN 'duve' ELSE 'inek' END AS grp,
       jsonb_build_object(
-        'ham', jsonb_build_object(
-          'tohumlama', COALESCE(hm.tohumlama, 0), 'gebe', COALESCE(hm.gebe, 0),
-          'bos', COALESCE(hm.bos, 0), 'bekliyor', COALESCE(hm.bekliyor, 0),
-          'cr', ROUND(100.0 * COALESCE(hm.gebe, 0) / NULLIF(hm.tohumlama, 0), 1)
-        ),
-        'hayvan_ort',   (SELECT ROUND(100.0 * AVG(animal_skor), 1) FROM per_animal pa WHERE pa.kategori = ks.k),
-        'hayvan_sayisi',(SELECT COUNT(*) FROM per_animal pa WHERE pa.kategori = ks.k),
-        'cycle_ort',    (SELECT ROUND(100.0 * AVG(skor), 1) FROM basari b WHERE b.kategori = ks.k),
+        'ham', jsonb_build_object('tohumlama', COALESCE(hm.tohumlama, 0), 'gebe', COALESCE(hm.gebe, 0), 'bos', COALESCE(hm.bos, 0), 'bekliyor', COALESCE(hm.bekliyor, 0), 'cr', ROUND(100.0 * COALESCE(hm.gebe, 0) / NULLIF(hm.tohumlama, 0), 1)),
+        'hayvan_ort', (SELECT ROUND(100.0 * AVG(animal_skor), 1) FROM per_animal pa WHERE pa.kategori = ks.k),
+        'hayvan_sayisi', (SELECT COUNT(*) FROM per_animal pa WHERE pa.kategori = ks.k),
+        'cycle_ort', (SELECT ROUND(100.0 * AVG(skor), 1) FROM basari b WHERE b.kategori = ks.k),
         'cycle_sayisi', (SELECT COUNT(*) FROM basari b WHERE b.kategori = ks.k)
       ) AS payload
     FROM (SELECT unnest(ARRAY['Düve','İnek']) AS k) ks
     LEFT JOIN ham hm ON hm.kategori = ks.k
   ) z;
 
-  SELECT COALESCE(jsonb_agg(row_j ORDER BY (row_j->>'oran')::numeric DESC NULLS LAST), '[]'::jsonb)
-  INTO v_sperma_pi
+  -- Sperma performansı tohumlama-başına (winning-straw değil): gebe atış / toplam atış
+  SELECT COALESCE(jsonb_agg(row_j ORDER BY (row_j->>'oran')::numeric DESC NULLS LAST), '[]'::jsonb) INTO v_sperma_pi
   FROM (
     SELECT jsonb_build_object('ad', sp, 'toplam', toplam, 'gebe', gebe, 'oran', ROUND(100.0 * gebe / NULLIF(toplam, 0), 1)) AS row_j
     FROM (
@@ -9588,12 +9506,11 @@ BEGIN
     || jsonb_build_object('ureme_verimlilik', COALESCE(v_verim, '{}'::jsonb), 'sperma_pi', COALESCE(v_sperma_pi, '[]'::jsonb));
 
   RETURN jsonb_build_object(
-    'hayvan', COALESCE(v_hayvan, '{"toplam":0,"inek":0,"duve":0,"buzagi":0,"erkek":0,"kisir":0,"hasta":0,"tohumlanan":0,"sessiz":0,"belirsiz":0}'::jsonb),
+    'hayvan', COALESCE(v_hayvan, '{"toplam":0,"inek":0,"duve":0,"buzagi":0,"erkek":0,"kisir":0,"hasta":0,"tohumlanan":0,"sessiz":0}'::jsonb),
     'gebelik', v_gebelik
   );
 END;
-$function$
-;
+$$;
 
 GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenticated;
 
@@ -9611,46 +9528,53 @@ GRANT EXECUTE ON FUNCTION public.stat_suru_ozet(text, boolean) TO anon, authenti
 -- v4 (2026-08-31): düve (event'siz) sessiz_gun ham yaş yerine 13 aylık uygunluk noktasından
 --                  sayılır; RPC p_min_gun=55 ile düve listeye 13 ay + 55 günde girer.
 CREATE OR REPLACE VIEW public.v_eligible AS
-SELECT h.id,
+ SELECT h.id,
     h.kupe_no,
     h.grup,
     h.padok,
     son_dogum.tarih AS son_dogum_tarihi,
-    (CURRENT_DATE - son_dogum.tarih) AS dogum_gun,
+    CURRENT_DATE - son_dogum.tarih AS dogum_gun,
     son_event.tarih AS son_aktivite_tarihi,
-        CASE
-            WHEN (son_event.tarih IS NOT NULL) THEN (CURRENT_DATE - son_event.tarih)
-            WHEN (son_dogum.tarih IS NOT NULL) THEN (CURRENT_DATE - son_dogum.tarih)
-            WHEN (h.dogum_tarihi IS NOT NULL) THEN GREATEST(0, (CURRENT_DATE - ((h.dogum_tarihi + '1 year 1 mon'::interval))::date))
-            ELSE NULL::integer
-        END AS sessiz_gun
-   FROM ((hayvanlar h
+    CASE
+        WHEN son_event.tarih IS NOT NULL THEN CURRENT_DATE - son_event.tarih
+        WHEN son_dogum.tarih   IS NOT NULL THEN CURRENT_DATE - son_dogum.tarih
+        WHEN h.dogum_tarihi    IS NOT NULL THEN GREATEST(0, CURRENT_DATE - ((h.dogum_tarihi + INTERVAL '1 year 1 mon')::date))
+        ELSE NULL::integer
+    END AS sessiz_gun
+   FROM hayvanlar h
      LEFT JOIN LATERAL ( SELECT max(d.tarih) AS tarih
            FROM dogum d
-          WHERE (d.anne_id = h.id)) son_dogum ON (true))
+          WHERE d.anne_id = h.id) son_dogum ON true
      LEFT JOIN LATERAL ( SELECT max(ev.tarih) AS tarih
            FROM ( SELECT t.tarih
                    FROM tohumlama t
-                  WHERE (t.hayvan_id = h.id)
+                  WHERE t.hayvan_id = h.id
                 UNION ALL
                  SELECT k.tarih
                    FROM kizginlik_log k
-                  WHERE (k.hayvan_id = h.id)
+                  WHERE k.hayvan_id = h.id
                 UNION ALL
                  SELECT t.abort_tarihi
                    FROM tohumlama t
-                  WHERE ((t.hayvan_id = h.id) AND (t.abort_tarihi IS NOT NULL))
+                  WHERE t.hayvan_id = h.id AND t.abort_tarihi IS NOT NULL
                 UNION ALL
                  SELECT t.dogum_tarihi
                    FROM tohumlama t
-                  WHERE ((t.hayvan_id = h.id) AND (t.dogum_tarihi IS NOT NULL))
+                  WHERE t.hayvan_id = h.id AND t.dogum_tarihi IS NOT NULL
                 UNION ALL
                  SELECT d.tarih
                    FROM dogum d
-                  WHERE (d.anne_id = h.id)) ev) son_event ON (true))
-  WHERE ((h.cinsiyet = 'Dişi'::text) AND (h.durum = 'Aktif'::text) AND (h.kisir IS NOT TRUE) AND (h.grup !~~* '%buzağı%'::text) AND (h.grup !~~* '%buzagi%'::text) AND (h.grup !~~* '%Küçük%'::text) AND (h.grup !~~* '%Kucuk%'::text) AND ((h.dogum_tarihi IS NULL) OR (h.dogum_tarihi <= (CURRENT_DATE - '1 year 1 mon'::interval))) AND (NOT (EXISTS ( SELECT 1
-           FROM tohumlama t
-          WHERE ((t.hayvan_id = h.id) AND (t.sonuc = 'Gebe'::text))))) AND ((son_event.tarih IS NULL) OR (son_event.tarih < (CURRENT_DATE - 55))));
+                  WHERE d.anne_id = h.id) ev) son_event ON true
+  WHERE h.cinsiyet = 'Dişi'::text
+    AND h.durum = 'Aktif'::text
+    AND h.kisir IS NOT TRUE
+    AND h.grup !~~* '%buzağı%'::text
+    AND h.grup !~~* '%buzagi%'::text
+    AND h.grup !~~* '%Küçük%'::text
+    AND h.grup !~~* '%Kucuk%'::text
+    AND (h.dogum_tarihi IS NULL OR h.dogum_tarihi <= (CURRENT_DATE - '1 year 1 mon'::interval))
+    AND NOT (EXISTS ( SELECT 1 FROM tohumlama t WHERE t.hayvan_id = h.id AND t.sonuc = 'Gebe'::text))
+    AND (son_event.tarih IS NULL OR son_event.tarih < (CURRENT_DATE - 55));
 GRANT SELECT ON public.v_eligible TO anon, authenticated;
 
 -- ── sessiz_hayvanlar_listele ──
@@ -9811,12 +9735,10 @@ CREATE TRIGGER trg_case_ureme_sessiz_iptal
 
 -- 1. tohumlama_kaydet (5-param) — eski kontrol görevlerini yeni kayıt öncesi iptal et
 DROP FUNCTION IF EXISTS public.tohumlama_kaydet(text, date, text, text, text);
--- FUNCTION: public.tohumlama_sonuc_gebe(p_tohumlama_id text)
-CREATE OR REPLACE FUNCTION public.tohumlama_sonuc_gebe(p_tohumlama_id text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.tohumlama_sonuc_gebe(
+  p_tohumlama_id text
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_toh               record;
   v_son_toh_id        text;
@@ -9830,19 +9752,13 @@ BEGIN
   END IF;
 
   IF v_toh.sonuc != 'Bekliyor' THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj',
-      CASE
-        WHEN v_toh.sonuc = 'Abort' THEN 'Bu tohumlama kaydı abort edildi — tekrar gebe işaretlenemez. Hayvanı tekrar tohumlamak için yeni bir tohumlama kaydı girin.'
-        ELSE 'Sadece Bekliyor durumundaki tohumlama gebe ilanı alabilir'
-      END);
+    RETURN jsonb_build_object('ok', false, 'mesaj', 'Sadece Bekliyor durumundaki tohumlama gebe ilanı alabilir');
   END IF;
 
   SELECT id::text INTO v_son_toh_id
   FROM public.tohumlama
   WHERE hayvan_id = v_toh.hayvan_id
-  ORDER BY tarih DESC, created_at DESC, id::text DESC
-  LIMIT 1
-  FOR UPDATE;
+  ORDER BY tarih DESC, created_at DESC, id::text DESC LIMIT 1 FOR UPDATE;
 
   IF v_son_toh_id != p_tohumlama_id THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Sadece son tohumlama gebe ilanı alabilir');
@@ -9857,15 +9773,16 @@ BEGIN
   UPDATE public.tohumlama SET sonuc = 'Gebe' WHERE id::text = p_tohumlama_id;
   UPDATE public.hayvanlar SET tohumlama_durumu = 'Gebe' WHERE id = v_toh.hayvan_id;
 
+  -- Bekleyen gebelik kontrol görevlerini topla ve iptal et (sebep: gebe)
   SELECT COALESCE(array_agg(id::text), '{}') INTO v_iptal_gorev_ids
   FROM public.gorev_log
   WHERE hayvan_id = v_toh.hayvan_id
-    AND gorev_tipi IN ('GEBELIK_KONTROL', 'TOHUMLAMA_HAZIRLIK', 'TOHUMLAMA_PLANLI')
+    AND gorev_tipi IN ('GEBELIK_KONTROL', 'TOHUMLAMA_HAZIRLIK')
     AND NOT tamamlandi AND NOT iptal;
 
   UPDATE public.gorev_log SET iptal = true
   WHERE hayvan_id = v_toh.hayvan_id
-    AND gorev_tipi IN ('GEBELIK_KONTROL', 'TOHUMLAMA_HAZIRLIK', 'TOHUMLAMA_PLANLI')
+    AND gorev_tipi IN ('GEBELIK_KONTROL', 'TOHUMLAMA_HAZIRLIK')
     AND NOT tamamlandi AND NOT iptal;
 
   INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
@@ -9884,8 +9801,7 @@ BEGIN
 
   RETURN jsonb_build_object('ok', true, 'islem_id', v_islem_id);
 END;
-$function$
-;
+$$;
 GRANT EXECUTE ON FUNCTION public.tohumlama_sonuc_gebe(text) TO anon, authenticated;
 
 -- 3. tohumlama_sonuc_bos — Boş atanınca bekleyen kontrol görevlerini iptal et
@@ -10020,51 +9936,53 @@ BEGIN
 END;
 $$;
 
--- FUNCTION: public._gorev_dinle(p_hayvan_id text, p_etken_kod text, p_ref text, p_tarih date)
-CREATE OR REPLACE FUNCTION public._gorev_dinle(p_hayvan_id text, p_etken_kod text, p_ref text DEFAULT NULL::text, p_tarih date DEFAULT NULL::date)
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public._gorev_dinle(
+  p_hayvan_id text,
+  p_etken_kod text,
+  p_ref text
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_gorev_id uuid;
 BEGIN
   IF p_etken_kod IS NULL OR p_hayvan_id IS NULL THEN
     RETURN;
   END IF;
+
   SELECT id INTO v_gorev_id
   FROM public.gorev_log
   WHERE hayvan_id = p_hayvan_id
     AND etken_kod = p_etken_kod
     AND tamamlandi = false
     AND iptal = false
-  ORDER BY
-    CASE WHEN p_tarih IS NULL THEN 0 ELSE abs(hedef_tarih - p_tarih) END ASC,  -- uygulama tarihine en yakın adım
-    hedef_tarih ASC                                                            -- eşitlikte en erken
-  LIMIT 1
-  FOR UPDATE;
+  ORDER BY hedef_tarih ASC
+  LIMIT 1;
+
   IF v_gorev_id IS NOT NULL THEN
     UPDATE public.gorev_log
-    SET tamamlandi = true, tamamlanma_tarihi = now(), kapatan_ref = p_ref
+    SET tamamlandi = true,
+        tamamlanma_tarihi = now(),
+        kapatan_ref = p_ref
     WHERE id = v_gorev_id;
   END IF;
 END;
-$function$
-;
+$$;
 
--- FUNCTION: public.hizli_uygulama(p_hayvan_id text, p_stok_id text, p_doz numeric, p_birim text, p_rota text, p_notlar text)
-CREATE OR REPLACE FUNCTION public.hizli_uygulama(p_hayvan_id text, p_stok_id text, p_doz numeric, p_birim text, p_rota text, p_notlar text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
+CREATE OR REPLACE FUNCTION public.hizli_uygulama(
+  p_hayvan_id text,
+  p_stok_id text,
+  p_doz numeric,
+  p_birim text,
+  p_rota text,
+  p_notlar text
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_hayvan hayvanlar%ROWTYPE;
-  v_stok   record;
-  v_etken  text;
-  v_id     uuid;
-  v_kalan  numeric;
+  v_hayvan record;
+  v_stok record;
+  v_etken text;
+  v_id uuid;
+  v_kalan numeric;
 BEGIN
   SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
   IF NOT FOUND THEN
@@ -10082,20 +10000,7 @@ BEGIN
   VALUES (p_hayvan_id, p_stok_id, v_etken, p_doz, p_birim, p_rota, p_notlar)
   RETURNING id INTO v_id;
 
-  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
-  VALUES (
-    'HIZLI_UYGULAMA',
-    p_hayvan_id,
-    v_id::text,
-    'uygulama_log',
-    jsonb_build_object(
-      'olusturulan', jsonb_build_array(jsonb_build_object('tablo','uygulama_log','id',v_id::text)),
-      'guncellenen', '[]'::jsonb,
-      'silinen', '[]'::jsonb
-    ),
-    format('Hızlı Uygulama — %s — %s %s %s', v_hayvan.kupe_no, v_stok.urun_adi, p_doz, p_birim)
-  );
-
+  -- Stok düşüm
   INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
   VALUES (gen_random_uuid(), p_stok_id, 'Hızlı Uygulama', p_doz,
           'Hızlı Uygulama — ' || v_hayvan.kupe_no || ' — ' || v_stok.urun_adi, false);
@@ -10114,18 +10019,14 @@ BEGIN
     'stok_kalan', COALESCE(v_kalan, 0)
   );
 END;
-$function$
-;
+$$;
 
--- FUNCTION: public.hizli_uygulama_geri_al(p_uygulama_id uuid)
-CREATE OR REPLACE FUNCTION public.hizli_uygulama_geri_al(p_uygulama_id uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
+CREATE OR REPLACE FUNCTION public.hizli_uygulama_geri_al(
+  p_uygulama_id uuid
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
-  v_uyg    record;
+  v_uyg record;
   v_hayvan record;
 BEGIN
   SELECT * INTO v_uyg FROM public.uygulama_log WHERE id = p_uygulama_id;
@@ -10135,62 +10036,30 @@ BEGIN
 
   SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = v_uyg.hayvan_id;
 
-  -- Stok iade (ters hareket) — mevcut blok, KORUNDU
+  -- Stok iade (ters hareket)
   IF v_uyg.stok_id IS NOT NULL THEN
     INSERT INTO public.stok_hareket (id, stok_id, tur, miktar, notlar, iptal)
     VALUES (gen_random_uuid(), v_uyg.stok_id, 'İade (Hızlı Uyg.)', -v_uyg.doz,
             'Geri Al — ' || COALESCE(v_hayvan.kupe_no, v_uyg.hayvan_id), false);
   END IF;
 
-  -- YENİ: islem_log audit (Bonus simetri) — mevcut yapı AYNEN korundu
-  INSERT INTO public.islem_log (
-    tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu, durum, geri_alma_tarihi
-  )
-  VALUES (
-    'HIZLI_UYGULAMA_GERI_AL',
-    v_uyg.hayvan_id,
-    p_uygulama_id::text,
-    'uygulama_log',
-    jsonb_build_object(
-      'olusturulan', '[]'::jsonb,
-      'guncellenen', COALESCE((
-        SELECT jsonb_agg(jsonb_build_object(
-          'tablo','gorev_log','id',g.id::text,'alan','tamamlandi','eski',true,'yeni',false
-        ))
-        FROM public.gorev_log g
-        WHERE g.kapatan_ref = 'uygulama_log:' || p_uygulama_id::text
-      ), '[]'::jsonb),
-      'silinen', jsonb_build_array(jsonb_build_object(
-        'tablo','uygulama_log','id',p_uygulama_id::text
-      ))
-    ),
-    format('Hızlı Uygulama Geri Al — %s — uygulama_id=%s', v_hayvan.kupe_no, p_uygulama_id),
-    'geri_alindi',
-    now()
-  );
-
-  -- Bu uygulama ile kapanan görevi tekrar aç — mevcut blok, KORUNDU
+  -- Bu uygulama ile kapanan görevi tekrar aç
   UPDATE public.gorev_log
   SET tamamlandi = false,
       tamamlanma_tarihi = NULL,
       kapatan_ref = NULL
   WHERE kapatan_ref = 'uygulama_log:' || p_uygulama_id::text;
 
-  -- uygulama_log DELETE — mevcut blok, KORUNDU
   DELETE FROM public.uygulama_log WHERE id = p_uygulama_id;
 
   RETURN jsonb_build_object('ok', true);
 END;
-$function$
-;
+$$;
 
 -- Protokol eksik tara scanner (Task 11)
--- FUNCTION: public.protokol_eksik_tara()
 CREATE OR REPLACE FUNCTION public.protokol_eksik_tara()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_result jsonb := '[]'::jsonb;
   v_today date := CURRENT_DATE;
@@ -10199,12 +10068,9 @@ DECLARE
   v_tamamlanma timestamptz;
   v_kapatan text;
 BEGIN
-
-  -- ═══ A. DOĞUM SONRASI PROTOKOL (0-63 gün) ═══
+  -- A. DOĞUM SONRASI PROTOKOL
   FOR v_rec IN
-    SELECT d.id AS dogum_id, d.anne_id AS hayvan_id, d.tarih AS dogum_tarihi,
-           h.kupe_no, h.grup,
-           a.gun, a.ek, a.aciklama
+    SELECT d.id, d.anne_id AS hayvan_id, d.tarih AS dogum_tarihi, h.kupe_no, h.grup, a.gun, a.ek, a.aciklama
     FROM (
       SELECT DISTINCT ON (anne_id) *
       FROM public.dogum
@@ -10212,380 +10078,132 @@ BEGIN
     ) d
     JOIN public.hayvanlar h ON h.id = d.anne_id AND h.durum = 'Aktif'
     CROSS JOIN (VALUES
-      (0,  'OKSITOSIN', 'Doğum günü: Oksitosin'),
-      (0,  'ADEMIN',    'Doğum günü: Ademin'),
-      (0,  'KALSIYUM',  'Doğum günü: Kalsiyum'),
-      (2,  'PG',        '2. Gün PG'),
-      (39, 'PG',        '39. Gün PG (Presynch-14 senkron)'),
-      (25, 'PG',        '25. Gün PG'),
-      (53, 'E_VIT',     '53. Gün: E Vitamini')
-    ) AS a(gun, ek, aciklama)
-    WHERE d.tarih >= v_today - 70
-      AND d.tarih <= v_today
+      (0,'OKSITOSIN','Dogum gunu: Oksitosin'),(0,'ADEMIN','Dogum gunu: Ademin'),(0,'KALSIYUM','Dogum gunu: Kalsiyum'),
+      (2,'PG','2. Gun PG'),(11,'PG','11. Gun PG'),(25,'PG','25. Gun PG'),
+      (53,'ADEMIN','53. Gun: Ademin'),(54,'E_VIT','54. Gun: Yeldif')
+    ) AS a(gun,ek,aciklama)
+    WHERE d.tarih >= v_today - 70 AND d.tarih <= v_today
   LOOP
     DECLARE
       v_hedef date := v_rec.dogum_tarihi + v_rec.gun;
-      v_gecikme int;
-      v_durum text;
+      v_gecikme int; v_durum text;
     BEGIN
       IF v_hedef > v_today + 7 THEN CONTINUE; END IF;
+      v_found := false; v_tamamlanma := NULL; v_kapatan := NULL;
 
-      v_found := false;
-      v_tamamlanma := NULL;
-      v_kapatan := NULL;
+      SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan
+      FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_rec.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
 
-      SELECT true, g.tamamlanma_tarihi, g.kapatan_ref
-      INTO v_found, v_tamamlanma, v_kapatan
-      FROM gorev_log g
-      WHERE g.hayvan_id = v_rec.hayvan_id
-        AND g.etken_kod = v_rec.ek
-        AND g.tamamlandi = true
-        AND g.hedef_tarih BETWEEN v_hedef - 3 AND v_hedef + 3
-      LIMIT 1;
-
-      IF v_found IS NOT TRUE THEN
-        SELECT true INTO v_found
-        FROM uygulama_log u
-        WHERE u.hayvan_id = v_rec.hayvan_id
-          AND (u.etken_kod = v_rec.ek
-               OR public._etken_kod_bul(u.stok_id, NULL) = v_rec.ek)
-          AND u.tarih BETWEEN v_hedef - 3 AND v_hedef + 3
-        LIMIT 1;
-      END IF;
-
-      IF v_found IS NOT TRUE THEN
-        SELECT true INTO v_found
-        FROM drug_administrations da
-        JOIN treatment_days td ON td.id = da.treatment_day_id
-        JOIN cases c ON c.id = td.case_id
-        WHERE c.animal_id = v_rec.hayvan_id
-          AND public._etken_kod_bul(da.stok_id, NULL) = v_rec.ek
-          AND da.created_at::date BETWEEN v_hedef - 3 AND v_hedef + 3
-        LIMIT 1;
-      END IF;
-
-      IF v_found IS NOT TRUE THEN
-        SELECT true INTO v_found
-        FROM protokol_dismiss pd
-        WHERE pd.hayvan_id = v_rec.hayvan_id
-          AND pd.etken_kod = v_rec.ek
-          AND pd.protokol = 'DOGUM_PROTOKOL'
-        LIMIT 1;
-      END IF;
+      IF v_found IS NOT TRUE THEN SELECT true, u.created_at, 'uygulama_log:'||u.id::text INTO v_found, v_tamamlanma, v_kapatan FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_rec.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 ORDER BY u.created_at DESC LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM drug_administrations da JOIN treatment_days td ON td.id=da.treatment_day_id JOIN cases c ON c.id=td.case_id WHERE c.animal_id=v_rec.hayvan_id AND public._etken_kod_bul(da.stok_id,NULL)=v_rec.ek AND da.created_at::date BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_rec.ek AND pd.protokol='DOGUM_PROTOKOL' LIMIT 1; END IF;
 
       v_gecikme := v_today - v_hedef;
+      IF v_found IS TRUE AND v_tamamlanma IS NOT NULL AND v_tamamlanma >= now()-interval '24 hours' THEN v_durum:='tamamlandi';
+      ELSIF v_found IS TRUE THEN CONTINUE;
+      ELSIF v_gecikme >= 0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
 
-      IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma >= now() - interval '24 hours' THEN
-        v_durum := 'tamamlandi';
-      ELSIF v_found THEN
-        CONTINUE;
-      ELSIF v_gecikme >= 0 THEN
-        v_durum := 'eksik';
-      ELSE
-        v_durum := 'yaklasan';
-      END IF;
-
-      v_result := v_result || jsonb_build_object(
-        'hayvan_id', v_rec.hayvan_id,
-        'kupe_no', v_rec.kupe_no,
-        'grup', v_rec.grup,
-        'protokol', 'DOGUM_PROTOKOL',
-        'adim', v_rec.aciklama,
-        'etken_kod', v_rec.ek,
-        'hedef_tarih', v_hedef,
-        'gecikme_gun', v_gecikme,
-        'durum', v_durum,
-        'tamamlanma_tarihi', v_tamamlanma,
-        'kapatan_ref', v_kapatan
-      );
+      v_result := v_result || jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','DOGUM_PROTOKOL','adim',v_rec.aciklama,'etken_kod',v_rec.ek,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
     END;
   END LOOP;
 
-  -- ═══ B. İLERI GEBE PROTOKOL (240-265 gün) ═══
+  -- B. İLERI GEBE PROTOKOL
   FOR v_rec IN
-    SELECT t.id AS toh_id, t.hayvan_id, t.tarih AS toh_tarihi,
-           h.kupe_no, h.grup
-    FROM public.tohumlama t
-    JOIN public.hayvanlar h ON h.id = t.hayvan_id AND h.durum = 'Aktif'
-    WHERE t.sonuc = 'Gebe'
-      AND (v_today - t.tarih::date) >= 230
+    SELECT t.id,t.hayvan_id,t.tarih::date AS toh_tarihi,h.kupe_no,h.grup
+    FROM public.tohumlama t JOIN public.hayvanlar h ON h.id=t.hayvan_id AND h.durum='Aktif'
+    WHERE t.sonuc='Gebe' AND (v_today-t.tarih::date)>=230
   LOOP
-    DECLARE
-      v_a record;
+    DECLARE v_a record;
     BEGIN
-      FOR v_a IN
-        SELECT * FROM (VALUES
-          (240, 'ROTA',   '💉 Rota-Corona Aşısı'),
-          (260, 'ADEMIN', '💊 SC Ademin uygulaması'),
-          (265, 'E_VIT',  '💊 IM E Vitamini uygulaması')
-        ) AS t(gun, ek, aciklama)
-      LOOP
-        DECLARE
-          v_hedef date := v_rec.toh_tarihi::date + v_a.gun;
-          v_gecikme int;
-          v_durum text;
-          v_task_exists boolean := false;
-          v_task_tamamlandi boolean := false;
-          v_task_hedef date;
+      FOR v_a IN SELECT * FROM (VALUES(240,'ROTA','Rota-Corona Aşısı'),(260,'ADEMIN','SC Ademin uygulaması'),(265,'E_VIT','IM E Vitamini uygulaması')) AS t(gun,ek,aciklama) LOOP
+        DECLARE v_hedef date:=v_rec.toh_tarihi+v_a.gun; v_gecikme int; v_durum text;
         BEGIN
-          IF v_hedef > v_today + 7 THEN CONTINUE; END IF;
-
-          v_found := false;
-          v_tamamlanma := NULL;
-          v_kapatan := NULL;
-
-          -- Mevcut aktif gebelik instance'ındaki gerçek görev otoritedir.
-          -- Tamamlanan kayıt varsa onu; yoksa en yeni açık görevi seç.
-          SELECT true, g.hedef_tarih, g.tamamlandi,
-                 g.tamamlanma_tarihi, g.kapatan_ref
-          INTO v_task_exists, v_task_hedef, v_task_tamamlandi,
-               v_tamamlanma, v_kapatan
-          FROM gorev_log g
-          JOIN protokol_instance pi ON pi.id = g.protokol_instance_id
-          WHERE g.hayvan_id = v_rec.hayvan_id
-            AND g.etken_kod = v_a.ek
-            AND NOT COALESCE(g.iptal, false)
-            AND pi.hayvan_id = v_rec.hayvan_id
-            AND pi.tip = 'UREME'
-            AND pi.alttip = 'GEBELIK'
-            AND pi.baslangic = v_rec.toh_tarihi::date
-            AND pi.durum = 'aktif'
-          ORDER BY g.tamamlandi DESC, g.created_at DESC
-          LIMIT 1;
-
-          IF v_task_exists IS TRUE THEN
-            v_hedef := v_task_hedef;
-            v_found := v_task_tamamlandi;
-          ELSE
-            -- Instance bağlantısı olmayan legacy görevler için mevcut davranış.
-            SELECT true, g.tamamlanma_tarihi, g.kapatan_ref
-            INTO v_found, v_tamamlanma, v_kapatan
-            FROM gorev_log g
-            WHERE g.hayvan_id = v_rec.hayvan_id
-              AND g.etken_kod = v_a.ek
-              AND g.tamamlandi = true
-              AND g.hedef_tarih BETWEEN v_hedef - 3 AND v_hedef + 3
-            LIMIT 1;
-          END IF;
-
-          IF v_found IS NOT TRUE AND v_a.ek = 'ROTA' THEN
-            SELECT true INTO v_found
-            FROM vaccination_log vl
-            JOIN vaccines v ON v.id = vl.vaccine_id
-            WHERE vl.animal_id = v_rec.hayvan_id
-              AND v.name ILIKE '%Rota%'
-              AND vl.vaccination_date BETWEEN v_hedef - 7 AND v_hedef + 7
-            LIMIT 1;
-          END IF;
-
-          IF v_found IS NOT TRUE THEN
-            SELECT true INTO v_found
-            FROM uygulama_log u
-            WHERE u.hayvan_id = v_rec.hayvan_id
-              AND (u.etken_kod = v_a.ek
-                   OR public._etken_kod_bul(u.stok_id, NULL) = v_a.ek)
-              AND u.tarih BETWEEN v_hedef - 3 AND v_hedef + 3
-            LIMIT 1;
-          END IF;
-
-          IF v_found IS NOT TRUE THEN
-            SELECT true INTO v_found
-            FROM drug_administrations da
-            JOIN treatment_days td ON td.id = da.treatment_day_id
-            JOIN cases c ON c.id = td.case_id
-            WHERE c.animal_id = v_rec.hayvan_id
-              AND public._etken_kod_bul(da.stok_id, NULL) = v_a.ek
-              AND da.created_at::date BETWEEN v_hedef - 3 AND v_hedef + 3
-            LIMIT 1;
-          END IF;
-
-          IF v_found IS NOT TRUE THEN
-            SELECT true INTO v_found
-            FROM protokol_dismiss pd
-            WHERE pd.hayvan_id = v_rec.hayvan_id
-              AND pd.etken_kod = v_a.ek
-              AND pd.protokol = 'ILERI_GEBE_PROTOKOL'
-            LIMIT 1;
-          END IF;
-
-          v_gecikme := v_today - v_hedef;
-
-          IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma >= now() - interval '24 hours' THEN
-            v_durum := 'tamamlandi';
-          ELSIF v_found THEN
-            CONTINUE;
-          ELSIF v_gecikme >= 0 THEN
-            v_durum := 'eksik';
-          ELSE
-            v_durum := 'yaklasan';
-          END IF;
-
-          v_result := v_result || jsonb_build_object(
-            'hayvan_id', v_rec.hayvan_id,
-            'kupe_no', v_rec.kupe_no,
-            'grup', v_rec.grup,
-            'protokol', 'ILERI_GEBE_PROTOKOL',
-            'adim', v_a.aciklama,
-            'etken_kod', v_a.ek,
-            'hedef_tarih', v_hedef,
-            'gecikme_gun', v_gecikme,
-            'durum', v_durum,
-            'tamamlanma_tarihi', v_tamamlanma,
-            'kapatan_ref', v_kapatan
-          );
+          IF v_hedef>v_today+7 THEN CONTINUE; END IF;
+          v_found:=false; v_tamamlanma:=NULL; v_kapatan:=NULL;
+          SELECT true,g.tamamlanma_tarihi,g.kapatan_ref INTO v_found,v_tamamlanma,v_kapatan FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.etken_kod=v_a.ek AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+3 LIMIT 1;
+          IF v_found IS NOT TRUE AND v_a.ek='ROTA' THEN SELECT true INTO v_found FROM vaccination_log vl JOIN vaccines v ON v.id=vl.vaccine_id WHERE vl.animal_id=v_rec.hayvan_id AND v.name ILIKE '%Rota%' AND vl.vaccination_date BETWEEN v_hedef-7 AND v_hedef+7 LIMIT 1; END IF;
+          IF v_found IS NOT TRUE THEN SELECT true, u.created_at, 'uygulama_log:'||u.id::text INTO v_found, v_tamamlanma, v_kapatan FROM uygulama_log u WHERE u.hayvan_id=v_rec.hayvan_id AND u.etken_kod=v_a.ek AND u.tarih BETWEEN v_hedef-3 AND v_hedef+3 ORDER BY u.created_at DESC LIMIT 1; END IF;
+          IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.etken_kod=v_a.ek AND pd.protokol='ILERI_GEBE_PROTOKOL' LIMIT 1; END IF;
+          v_gecikme:=v_today-v_hedef;
+          IF v_found IS TRUE AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found IS TRUE THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
+          v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','ILERI_GEBE_PROTOKOL','adim',v_a.aciklama,'etken_kod',v_a.ek,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
         END;
       END LOOP;
     END;
   END LOOP;
 
-  -- ═══ C. KIZGINLIK TAKİBİ (55-70 gün) ═══
+  -- C. KIZGINLIK TAKİBİ
   FOR v_rec IN
-    SELECT d.id AS dogum_id, d.anne_id AS hayvan_id, d.tarih AS dogum_tarihi,
-           h.kupe_no, h.grup
+    SELECT d.id,d.anne_id AS hayvan_id,d.tarih AS dogum_tarihi,h.kupe_no,h.grup
     FROM (
       SELECT DISTINCT ON (anne_id) *
       FROM public.dogum
       ORDER BY anne_id, tarih DESC
     ) d
-    JOIN public.hayvanlar h ON h.id = d.anne_id AND h.durum = 'Aktif'
-    WHERE (v_today - d.tarih) BETWEEN 55 AND 75
+    JOIN public.hayvanlar h ON h.id=d.anne_id AND h.durum='Aktif'
+    WHERE (v_today-d.tarih) BETWEEN 55 AND 75
   LOOP
-    DECLARE
-      v_hedef date := v_rec.dogum_tarihi + 58;
-      v_gecikme int := v_today - v_hedef;
-      v_durum text;
+    DECLARE v_hedef date:=v_rec.dogum_tarihi+58; v_gecikme int:=v_today-v_hedef; v_durum text;
     BEGIN
-      v_found := false;
-      v_tamamlanma := NULL;
-      v_kapatan := NULL;
-
-      SELECT true, g.tamamlanma_tarihi
-      INTO v_found, v_tamamlanma
-      FROM gorev_log g
-      WHERE g.hayvan_id = v_rec.hayvan_id
-        AND g.aciklama ILIKE '%kızgınlık%'
-        AND g.tamamlandi = true
-        AND g.hedef_tarih BETWEEN v_hedef - 3 AND v_hedef + 7
-      LIMIT 1;
-
-      IF v_found IS NOT TRUE THEN
-        SELECT true INTO v_found
-        FROM kizginlik_log k
-        WHERE k.hayvan_id = v_rec.hayvan_id
-          AND k.tarih >= v_rec.dogum_tarihi + 50
-        LIMIT 1;
-      END IF;
-
-      IF v_found IS NOT TRUE THEN
-        SELECT true INTO v_found
-        FROM tohumlama t
-        WHERE t.hayvan_id = v_rec.hayvan_id
-          AND t.tarih >= v_rec.dogum_tarihi + 50
-        LIMIT 1;
-      END IF;
-
-      IF v_found IS NOT TRUE THEN
-        SELECT true INTO v_found
-        FROM protokol_dismiss pd
-        WHERE pd.hayvan_id = v_rec.hayvan_id
-          AND pd.protokol = 'KIZGINLIK_TAKIP'
-        LIMIT 1;
-      END IF;
-
-      IF v_found AND v_tamamlanma IS NOT NULL AND v_tamamlanma >= now() - interval '24 hours' THEN
-        v_durum := 'tamamlandi';
-      ELSIF v_found THEN
-        CONTINUE;
-      ELSIF v_gecikme >= 0 THEN
-        v_durum := 'eksik';
-      ELSE
-        v_durum := 'yaklasan';
-      END IF;
-
-      v_result := v_result || jsonb_build_object(
-        'hayvan_id', v_rec.hayvan_id,
-        'kupe_no', v_rec.kupe_no,
-        'grup', v_rec.grup,
-        'protokol', 'KIZGINLIK_TAKIP',
-        'adim', '⚡ 58-63. gün kızgınlık takibi',
-        'etken_kod', NULL,
-        'hedef_tarih', v_hedef,
-        'gecikme_gun', v_gecikme,
-        'durum', v_durum,
-        'tamamlanma_tarihi', v_tamamlanma,
-        'kapatan_ref', v_kapatan
-      );
+      v_found:=false; v_tamamlanma:=NULL; v_kapatan:=NULL;
+      SELECT true,g.tamamlanma_tarihi INTO v_found,v_tamamlanma FROM gorev_log g WHERE g.hayvan_id=v_rec.hayvan_id AND g.aciklama ILIKE '%kizginlik%' AND g.tamamlandi=true AND g.hedef_tarih BETWEEN v_hedef-3 AND v_hedef+7 LIMIT 1;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM kizginlik_log k WHERE k.hayvan_id=v_rec.hayvan_id AND k.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM tohumlama t WHERE t.hayvan_id=v_rec.hayvan_id AND t.tarih>=v_rec.dogum_tarihi+50 LIMIT 1; END IF;
+      IF v_found IS NOT TRUE THEN SELECT true INTO v_found FROM protokol_dismiss pd WHERE pd.hayvan_id=v_rec.hayvan_id AND pd.protokol='KIZGINLIK_TAKIP' LIMIT 1; END IF;
+      IF v_found IS TRUE AND v_tamamlanma IS NOT NULL AND v_tamamlanma>=now()-interval '24 hours' THEN v_durum:='tamamlandi'; ELSIF v_found IS TRUE THEN CONTINUE; ELSIF v_gecikme>=0 THEN v_durum:='eksik'; ELSE v_durum:='yaklasan'; END IF;
+      v_result:=v_result||jsonb_build_object('hayvan_id',v_rec.hayvan_id,'kupe_no',v_rec.kupe_no,'grup',v_rec.grup,'protokol','KIZGINLIK_TAKIP','adim','58-63. gun kizginlik takibi','etken_kod',NULL,'hedef_tarih',v_hedef,'gecikme_gun',v_gecikme,'durum',v_durum,'tamamlanma_tarihi',v_tamamlanma,'kapatan_ref',v_kapatan);
     END;
   END LOOP;
 
   RETURN v_result;
 END;
-$function$
-;
+$$;
 
 -- Dinleme trigger fonksiyonları + trigger'lar
--- FUNCTION: public.fn_dinle_vaccination()
 CREATE OR REPLACE FUNCTION public.fn_dinle_vaccination()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_etken text;
 BEGIN
   v_etken := public._etken_kod_bul(NULL, NEW.vaccine_id);
   IF v_etken IS NOT NULL THEN
-    PERFORM public._gorev_dinle(NEW.animal_id, v_etken, 'vaccination_log:' || NEW.id::text, NEW.vaccination_date);
+    PERFORM public._gorev_dinle(NEW.animal_id, v_etken, 'vaccination_log:' || NEW.id::text);
   END IF;
   RETURN NEW;
 END;
-$function$
-;
+$$;
 DROP TRIGGER IF EXISTS trg_dinle_vaccination ON public.vaccination_log;
 CREATE TRIGGER trg_dinle_vaccination AFTER INSERT ON public.vaccination_log FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_vaccination();
 
--- FUNCTION: public.fn_dinle_uygulama()
 CREATE OR REPLACE FUNCTION public.fn_dinle_uygulama()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF NEW.etken_kod IS NOT NULL THEN
-    PERFORM public._gorev_dinle(NEW.hayvan_id, NEW.etken_kod, 'uygulama_log:' || NEW.id::text, NEW.tarih);
+    PERFORM public._gorev_dinle(NEW.hayvan_id, NEW.etken_kod, 'uygulama_log:' || NEW.id::text);
   END IF;
   RETURN NEW;
 END;
-$function$
-;
+$$;
 DROP TRIGGER IF EXISTS trg_dinle_uygulama ON public.uygulama_log;
 CREATE TRIGGER trg_dinle_uygulama AFTER INSERT ON public.uygulama_log FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_uygulama();
 
--- FUNCTION: public.fn_dinle_drug_admin()
 CREATE OR REPLACE FUNCTION public.fn_dinle_drug_admin()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_etken text;
   v_animal_id text;
 BEGIN
   v_etken := public._etken_kod_bul(NEW.stok_id, NULL);
-  IF v_etken IS NULL THEN
-    RETURN NEW;
-  END IF;
+  IF v_etken IS NULL THEN RETURN NEW; END IF;
   SELECT c.animal_id INTO v_animal_id
-  FROM public.treatment_days td
-  JOIN public.cases c ON c.id = td.case_id
+  FROM public.treatment_days td JOIN public.cases c ON c.id = td.case_id
   WHERE td.id = NEW.treatment_day_id;
   IF v_animal_id IS NOT NULL THEN
-    PERFORM public._gorev_dinle(v_animal_id, v_etken, 'drug_admin:' || NEW.id::text, NEW.created_at::date);
+    PERFORM public._gorev_dinle(v_animal_id, v_etken, 'drug_admin:' || NEW.id::text);
   END IF;
   RETURN NEW;
 END;
-$function$
-;
+$$;
 DROP TRIGGER IF EXISTS trg_dinle_drug_admin ON public.drug_administrations;
 CREATE TRIGGER trg_dinle_drug_admin AFTER INSERT ON public.drug_administrations FOR EACH ROW EXECUTE FUNCTION public.fn_dinle_drug_admin();
 
@@ -10645,12 +10263,16 @@ $$;
 GRANT EXECUTE ON FUNCTION public._protokol_kapat(text, text) TO anon, authenticated;
 
 -- 4. cikis_yap
--- FUNCTION: public.dogum_kaydet(p_anne_id text, p_tarih date, p_kupe text, p_cins text, p_tip text, p_kg numeric, p_baba text, p_hekim_id text)
-CREATE OR REPLACE FUNCTION public.dogum_kaydet(p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+CREATE OR REPLACE FUNCTION public.dogum_kaydet(
+  p_anne_id    text,
+  p_tarih      date,
+  p_kupe       text,
+  p_cins       text    DEFAULT 'Dişi',
+  p_tip        text    DEFAULT 'Normal',
+  p_kg         numeric DEFAULT NULL,
+  p_baba       text    DEFAULT NULL,
+  p_hekim_id   text    DEFAULT NULL
+) RETURNS jsonb AS $$
 DECLARE
   v_anne           record;
   v_dogum_id       uuid := gen_random_uuid();
@@ -10718,9 +10340,6 @@ BEGIN
   VALUES (v_buzagi_id, p_kupe, v_anne.irk, p_tarih, p_anne_id, v_baba_bilgi, p_cins,
           'Süt İçen Buzağı', 'Buzağı Padok (Süt İçenler)', 'Aktif', p_kg);
 
-  -- buzagi_id baglama (Task 0.5, spec Rev 2 par.2): dogum satirini buzagiya ayni transaction icinde bagla
-  UPDATE public.dogum SET buzagi_id = v_buzagi_id WHERE id = v_dogum_id;
-
   SELECT COUNT(*) INTO v_yavru_sirasi FROM public.dogum WHERE olay_id = v_olay_id;
 
   IF v_anne_yan_etki THEN
@@ -10742,7 +10361,9 @@ BEGIN
       (gen_random_uuid(), p_anne_id, 'ILAC', '2. Gün PG',             p_tarih + 2,  false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', '11. Gün PG',            p_tarih + 11, false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', '25. Gün PG',            p_tarih + 25, false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
-      (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: E Vitamini',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'E_VIT',     v_anne_inst_id),
+      (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Ademin',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'ADEMIN',    v_anne_inst_id),
+      (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: Yeldif',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'E_VIT',     v_anne_inst_id),
+      (gen_random_uuid(), p_anne_id, 'ILAC', '54. Gün: Yeldif',       p_tarih + 54, false, 'DOGUM-' || p_anne_id, 'E_VIT',     v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'DIGER','⚡ 58-63. gün kızgınlık takibi', p_tarih + 58, false, 'DOGUM-' || p_anne_id, NULL, v_anne_inst_id);
 
     UPDATE public.tohumlama
@@ -10775,14 +10396,13 @@ BEGIN
 
   RETURN jsonb_build_object(
     'ok', true, 'buzagi_id', v_buzagi_id, 'dogum_id', v_dogum_id,
-    'gorev_sayisi', (CASE WHEN v_anne_yan_etki THEN 8 ELSE 0 END) + 7,
+    'gorev_sayisi', (CASE WHEN v_anne_yan_etki THEN 10 ELSE 0 END) + 7,
     'anne_inst_id', v_anne_inst_id,
     'buzagi_inst_id', v_buzagi_inst_id, 'tohumlama_kapatildi', v_sayac,
     'coklu_dogum', v_ikinci, 'olay_id', v_olay_id, 'yavru_sirasi', v_yavru_sirasi
   );
 END;
-$function$
-; LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.dogum_kaydet(text,date,text,text,text,numeric,text,text) TO anon, authenticated;
 
 -- 6. tohumlama_kaydet (protokol_instance_id entegrasyonu)
@@ -10828,12 +10448,9 @@ CREATE TRIGGER trg_tohumlama_gebe_gorev
   AFTER UPDATE ON tohumlama
   FOR EACH ROW EXECUTE FUNCTION public.fn_gebe_gorev_yarat();
 
--- FUNCTION: public.ileri_gebe_gorev_kontrol()
+-- 8. ileri_gebe_gorev_kontrol (protokol_instance_id entegrasyonu)
 CREATE OR REPLACE FUNCTION public.ileri_gebe_gorev_kontrol()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_olusturulan int := 0;
   v_sayac       int := 0;
@@ -10861,7 +10478,6 @@ BEGIN
     INSERT INTO public.protokol_instance (hayvan_id, tip, alttip, kaynak_ref, baslangic, durum)
     VALUES (v_toh.hayvan_id, 'UREME', 'GEBELIK', v_kaynak, v_toh.tarih::date, 'aktif')
     ON CONFLICT (kaynak_ref) DO NOTHING;
-
     SELECT id INTO v_inst_id FROM public.protokol_instance WHERE kaynak_ref = v_kaynak;
 
     IF v_gun >= 240 THEN
@@ -10869,61 +10485,39 @@ BEGIN
       INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, kaynak, protokol_instance_id)
       SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE_ASI',
              '💉 Rota-Corona Aşısı (1. doz)', v_hedef, false, v_stok_id, 1, v_kaynak, v_inst_id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM gorev_log
-        WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💉 Rota-Corona Aşısı (1. doz)'
-      );
-      GET DIAGNOSTICS v_sayac = ROW_COUNT;
-      v_olusturulan := v_olusturulan + v_sayac;
+      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💉 Rota-Corona Aşısı (1. doz)');
+      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
-    -- 261. gün DEĞİŞEN BLOK
     IF v_gun >= 261 AND v_hayvan.grup ILIKE '%Düve%' THEN
       v_hedef := v_toh.tarih::date + 261;
-      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, kaynak, protokol_instance_id, etken_kod)
+      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, kaynak, protokol_instance_id)
       SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE_ASI',
-             '💉 Rota-Corona Aşısı (2. doz — düve)', v_hedef, false, v_stok_id, 1, v_kaynak, v_inst_id,
-             'ROTA_2DOZ'
-      WHERE NOT EXISTS (
-        SELECT 1 FROM gorev_log
-        WHERE hayvan_id = v_toh.hayvan_id
-          AND etken_kod = 'ROTA_2DOZ'
-          AND iptal = false
-      );
-      GET DIAGNOSTICS v_sayac = ROW_COUNT;
-      v_olusturulan := v_olusturulan + v_sayac;
+             '💉 Rota-Corona Aşısı (2. doz — düve)', v_hedef, false, v_stok_id, 1, v_kaynak, v_inst_id
+      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💉 Rota-Corona Aşısı (2. doz — düve)');
+      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
     IF v_gun >= 260 THEN
       v_hedef := v_toh.tarih::date + 260;
       INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, protokol_instance_id)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE',
-             '💊 SC Ademin uygulaması', v_hedef, false, v_kaynak, v_inst_id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💊 SC Ademin uygulaması'
-      );
-      GET DIAGNOSTICS v_sayac = ROW_COUNT;
-      v_olusturulan := v_olusturulan + v_sayac;
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE', '💊 SC Ademin uygulaması', v_hedef, false, v_kaynak, v_inst_id
+      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💊 SC Ademin uygulaması');
+      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
     IF v_gun >= 265 THEN
       v_hedef := v_toh.tarih::date + 265;
       INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, protokol_instance_id)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE',
-             '💊 IM E Vitamini uygulaması', v_hedef, false, v_kaynak, v_inst_id
-      WHERE NOT EXISTS (
-        SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💊 IM E Vitamini uygulaması'
-      );
-      GET DIAGNOSTICS v_sayac = ROW_COUNT;
-      v_olusturulan := v_olusturulan + v_sayac;
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE', '💊 IM E Vitamini uygulaması', v_hedef, false, v_kaynak, v_inst_id
+      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💊 IM E Vitamini uygulaması');
+      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
     END IF;
-
   END LOOP;
 
   RETURN jsonb_build_object('ok', true, 'olusturulan', v_olusturulan);
 END;
-$function$
-;
+$$;
 GRANT EXECUTE ON FUNCTION public.ileri_gebe_gorev_kontrol() TO anon, authenticated;
 
 -- 9. gebelik_protokol_kontrol (eşikler protokol_ayar/_ayar config'inde; besleme = BESLEME_OTOMATIK)
@@ -11032,59 +10626,35 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.gebelik_protokol_kontrol() TO anon, authenticated;
 
--- FUNCTION: public.besleme_tamam(p_gorev_id text)
+-- 10. besleme_tamam (protokol_instance_id zincirleme)
 CREATE OR REPLACE FUNCTION public.besleme_tamam(p_gorev_id text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_gorev gorev_log%ROWTYPE;
   v_yeni_id uuid;
 BEGIN
-  -- 1. Görevi çek
   SELECT * INTO v_gorev FROM gorev_log WHERE id = p_gorev_id::uuid;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
-  END IF;
-  IF v_gorev.tamamlandi OR v_gorev.iptal THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev zaten kapalı');
-  END IF;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı'); END IF;
+  IF v_gorev.tamamlandi OR v_gorev.iptal THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev zaten kapalı'); END IF;
 
-  -- 2. Tamamla
-  UPDATE gorev_log
-  SET tamamlandi = true, tamamlanma_tarihi = now()
-  WHERE id = p_gorev_id::uuid;
+  UPDATE gorev_log SET tamamlandi = true, tamamlanma_tarihi = now() WHERE id = p_gorev_id::uuid;
 
-  -- 3. Hayvan hâlâ gebe mi kontrol et (doğum yapmışsa zinciri kesme)
-  IF NOT EXISTS (
-    SELECT 1 FROM tohumlama
-    WHERE hayvan_id = v_gorev.hayvan_id
-      AND sonuc = 'Gebe'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM tohumlama WHERE hayvan_id = v_gorev.hayvan_id AND sonuc = 'Gebe') THEN
     RETURN jsonb_build_object('ok', true, 'zincir', 'hayvan_artik_gebe_degil');
   END IF;
 
-  -- 4. Zincirleme: ertesi gün için aynı besleme tipini oluştur
   v_yeni_id := gen_random_uuid();
-  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih,
-                         tamamlandi, kaynak, parent_id)
-  SELECT v_yeni_id, v_gorev.hayvan_id, 'BESLEME',
-         v_gorev.aciklama,
-         v_gorev.hedef_tarih + 1,
-         false, 'BESLEME_OTOMATIK', v_gorev.id   -- uuid direkt, ::text cast yok
+  INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, parent_id, protokol_instance_id)
+  SELECT v_yeni_id, v_gorev.hayvan_id, 'BESLEME', v_gorev.aciklama, v_gorev.hedef_tarih + 1,
+         false, COALESCE(v_gorev.kaynak, 'BESLEME-' || v_gorev.hayvan_id), v_gorev.id, v_gorev.protokol_instance_id
   WHERE NOT EXISTS (
-    SELECT 1 FROM gorev_log
-    WHERE hayvan_id = v_gorev.hayvan_id
-      AND aciklama = v_gorev.aciklama
-      AND hedef_tarih = v_gorev.hedef_tarih + 1
-      AND iptal = false
+    SELECT 1 FROM gorev_log WHERE hayvan_id = v_gorev.hayvan_id AND aciklama = v_gorev.aciklama
+      AND hedef_tarih = v_gorev.hedef_tarih + 1 AND iptal = false
   );
 
   RETURN jsonb_build_object('ok', true, 'yeni_gorev_id', v_yeni_id, 'tarih', v_gorev.hedef_tarih + 1);
 END;
-$function$
-;
+$$;
 GRANT EXECUTE ON FUNCTION public.besleme_tamam(text) TO anon, authenticated;
 
 NOTIFY pgrst, 'reload schema';
@@ -11137,23 +10707,27 @@ BEGIN
 END;
 $function$;
 
--- FUNCTION: public.tohumlama_tekrar_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text)
 CREATE OR REPLACE FUNCTION public.tohumlama_tekrar_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
 AS $function$
 DECLARE
-  v_hayvan record;
-  v_toh record;
-  v_eski jsonb;
+  v_hayvan   record;
+  v_toh      record;
+  v_eski     jsonb;
   v_yeni_denemeler jsonb;
 BEGIN
   SELECT * INTO v_hayvan
   FROM public.hayvanlar
   WHERE id = p_hayvan_id AND durum = 'Aktif';
-  IF NOT FOUND THEN RAISE EXCEPTION 'Hayvan bulunamadı: %', p_hayvan_id; END IF;
-  IF p_tarih > CURRENT_DATE THEN RAISE EXCEPTION 'Tarih ileri olamaz'; END IF;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Hayvan bulunamadı: %', p_hayvan_id;
+  END IF;
+
+  IF p_tarih > CURRENT_DATE THEN
+    RAISE EXCEPTION 'Tarih ileri olamaz';
+  END IF;
 
   SELECT * INTO v_toh
   FROM public.tohumlama
@@ -11162,44 +10736,67 @@ BEGIN
     AND tarih >= CURRENT_DATE - INTERVAL '15 days'
   ORDER BY tarih DESC, created_at DESC, id::text DESC
   LIMIT 1;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Son 15 gün içinde Bekliyor tohumlama bulunamadı'; END IF;
 
-  v_eski := jsonb_build_object('no', v_toh.deneme_sayisi, 'tarih', v_toh.tarih, 'sperma', v_toh.sperma, 'hekim_id', v_toh.hekim_id);
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Son 15 gün içinde Bekliyor tohumlama bulunamadı';
+  END IF;
+
+  v_eski := jsonb_build_object(
+    'no',       v_toh.deneme_sayisi,
+    'tarih',    v_toh.tarih,
+    'sperma',   v_toh.sperma,
+    'hekim_id', v_toh.hekim_id
+  );
   v_yeni_denemeler := v_toh.denemeler || jsonb_build_array(v_eski);
 
   UPDATE public.tohumlama
-  SET tarih = p_tarih, sperma = p_sperma, hekim_id = COALESCE(p_hekim_id, hekim_id),
-      irk_bilgisi = COALESCE(p_irk_bilgisi, irk_bilgisi),
-      deneme_sayisi = deneme_sayisi + 1, denemeler = v_yeni_denemeler
+  SET tarih         = p_tarih,
+      sperma        = p_sperma,
+      hekim_id      = COALESCE(p_hekim_id, hekim_id),
+      irk_bilgisi   = COALESCE(p_irk_bilgisi, irk_bilgisi),
+      deneme_sayisi = deneme_sayisi + 1,
+      denemeler     = v_yeni_denemeler
   WHERE id = v_toh.id;
 
-  UPDATE public.gorev_log SET iptal = true
-  WHERE hayvan_id = p_hayvan_id AND tamamlandi = false AND iptal = false
+  UPDATE public.gorev_log
+  SET iptal = true
+  WHERE hayvan_id = p_hayvan_id
+    AND tamamlandi = false
+    AND iptal = false
     AND gorev_tipi IN ('TOHUMLAMA_HAZIRLIK', 'GEBELIK_KONTROL');
 
-  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, ref_tohumlama_id)
+  INSERT INTO public.gorev_log
+    (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, ref_tohumlama_id)
   VALUES
-    (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL', '21. Gün gebelik kontrolü', p_tarih + 21, false, v_toh.id::text),
-    (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL', '35. Gün gebelik kontrolü', p_tarih + 35, false, v_toh.id::text);
+    (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL',
+     '21. Gün gebelik kontrolü', p_tarih + 21, false, v_toh.id::text),
+    (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL',
+     '35. Gün gebelik kontrolü', p_tarih + 35, false, v_toh.id::text);
 
-  -- BUG-002 (M2): matcher paylasilan helper'a baglandi (canli notlar metni
-  -- korunur); bos/whitespace ad artik rastgele Sperma satirindan dusmez.
-  PERFORM public.fn_sperma_stok_dus(
-    p_sperma,
-    'Tekrar Aşım ' || (v_toh.deneme_sayisi + 1) || '. deneme — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id)
+  INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar, iptal)
+  SELECT
+    s.id, 'Tohumlama', 1,
+    'Tekrar Aşım ' || (v_toh.deneme_sayisi + 1) || '. deneme — ' ||
+      COALESCE(v_hayvan.kupe_no, p_hayvan_id),
+    false
+  FROM public.stok s
+  WHERE (s.urun_adi ILIKE '%' || p_sperma || '%' OR s.urun_adi = p_sperma)
+    AND s.kategori = 'Sperma'
+  LIMIT 1;
+
+  RETURN jsonb_build_object(
+    'ok',           true,
+    'tohumlama_id', v_toh.id,
+    'deneme_sayisi', v_toh.deneme_sayisi + 1
   );
-
-  RETURN jsonb_build_object('ok', true, 'tohumlama_id', v_toh.id, 'deneme_sayisi', v_toh.deneme_sayisi + 1);
 END;
-$function$
-;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.test_migrate_working()
  RETURNS text
  LANGUAGE plpgsql
 AS $function$BEGIN RETURN 'ok'; END;$function$;
 
--- FUNCTION: public.cikis_yap(p_hayvan_id text, p_cikis_tipi text, p_cikis_tarihi date, p_cikis_sebebi text, p_satis_fiyati numeric)
 CREATE OR REPLACE FUNCTION public.cikis_yap(p_hayvan_id text, p_cikis_tipi text, p_cikis_tarihi date DEFAULT ((now() AT TIME ZONE 'Europe/Istanbul'::text))::date, p_cikis_sebebi text DEFAULT NULL::text, p_satis_fiyati numeric DEFAULT NULL::numeric)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -11214,12 +10811,8 @@ BEGIN
     v_durum_yeni := 'Ölü';
   ELSIF p_cikis_tipi = 'satis' THEN
     v_durum_yeni := 'Satıldı';
-  ELSIF p_cikis_tipi = 'kesim' THEN
-    v_durum_yeni := 'Kesildi';
-  ELSIF p_cikis_tipi = 'kayip' THEN
-    v_durum_yeni := 'Kayıp';
   ELSE
-    RAISE EXCEPTION 'Geçersiz çıkış tipi: % (beklenen: olum, satis, kesim veya kayip)', p_cikis_tipi;
+    RAISE EXCEPTION 'Geçersiz çıkış tipi: % (beklenen: olum veya satis)', p_cikis_tipi;
   END IF;
 
   UPDATE public.hayvanlar
@@ -11259,196 +10852,41 @@ BEGIN
     'iptal_protokol',  v_iptal_inst_say
   );
 END;
-$function$
-;
+$function$;
 
 
--- FUNCTION: public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb, p_vwp_override boolean)
-CREATE OR REPLACE FUNCTION public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false)
+CREATE OR REPLACE FUNCTION public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT NULL::boolean)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
 AS $function$
 DECLARE
-  v_hayvan         record;
-  v_yas_gun        integer;
-  v_deneme         integer;
-  v_toh_id         uuid := gen_random_uuid();
-  v_ek             jsonb;
-  v_ek_stok        uuid;
-  v_son_dogum      date;
-  v_son_abort      date;
-  v_anchor_tip     text;
-  v_anchor_date    date;
-  v_vwp_gun        integer;
-  v_inst_id        uuid;
-  v_kaynak         text;
-  v_eski_tohumlama record;
-  v_iptal_gorev    integer := 0;
-  v_iptal_inst     integer := 0;
-  v_islem_id       text    := gen_random_uuid()::text;
-  v_snapshot       jsonb;
+  v_id text;
+  v_hayvan record;
+  v_result jsonb;
+  v_deneme integer;
 BEGIN
-  SELECT * INTO v_hayvan FROM public.hayvanlar
-    WHERE id = p_hayvan_id AND durum = 'Aktif';
-  IF NOT FOUND THEN RAISE EXCEPTION 'Hayvan bulunamadı: %', p_hayvan_id; END IF;
-  IF v_hayvan.cinsiyet = 'Erkek' THEN RAISE EXCEPTION 'Erkek hayvana tohumlama yapılamaz'; END IF;
+  v_id := gen_random_uuid()::text;
 
-  IF v_hayvan.dogum_tarihi IS NOT NULL THEN
-    v_yas_gun := CURRENT_DATE - v_hayvan.dogum_tarihi;
-    IF v_yas_gun < 365 THEN
-      RAISE EXCEPTION '12 aydan küçük hayvana tohumlama yapılamaz (% gün)', v_yas_gun;
-    END IF;
+  SELECT * INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id AND durum = 'Aktif';
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'hata', 'Aktif hayvan bulunamadı: ' || p_hayvan_id);
   END IF;
 
-  IF EXISTS (SELECT 1 FROM public.tohumlama WHERE hayvan_id = p_hayvan_id AND sonuc = 'Gebe') THEN
-    RAISE EXCEPTION 'Hayvan zaten gebe — önce gebeliği kapatın';
+  IF p_tarih > CURRENT_DATE THEN
+    RETURN jsonb_build_object('ok', false, 'hata', 'İleri tarihli tohumlama kaydedilemez');
   END IF;
-
-  IF p_tarih > (NOW() AT TIME ZONE 'Europe/Istanbul')::date THEN
-    RAISE EXCEPTION 'Tohumlama tarihi ileri tarih olamaz';
-  END IF;
-
-  SELECT MAX(d.tarih) INTO v_son_dogum FROM public.dogum d WHERE d.anne_id = p_hayvan_id;
-  SELECT MAX(t.abort_tarihi) INTO v_son_abort FROM public.tohumlama t
-    WHERE t.hayvan_id = p_hayvan_id AND t.sonuc = 'Abort' AND t.abort_tarihi IS NOT NULL;
-  v_anchor_tip := NULL; v_anchor_date := NULL; v_vwp_gun := NULL;
-  IF v_son_abort IS NOT NULL AND (v_son_dogum IS NULL OR v_son_abort > v_son_dogum) THEN
-    v_anchor_tip := 'ABORT'; v_anchor_date := v_son_abort;
-    v_vwp_gun := p_tarih - v_son_abort;
-    IF v_vwp_gun < 55 AND NOT p_vwp_override THEN
-      RAISE EXCEPTION 'ABORT_VWP_VIOLATION:%:%', v_vwp_gun, 55;
-    END IF;
-  ELSIF v_son_dogum IS NOT NULL THEN
-    v_anchor_tip := 'DOGUM'; v_anchor_date := v_son_dogum;
-    v_vwp_gun := p_tarih - v_son_dogum;
-    IF v_vwp_gun < 55 AND NOT p_vwp_override THEN
-      RAISE EXCEPTION 'VWP_VIOLATION:%:%', v_vwp_gun, 55;
-    END IF;
-  END IF;
-
-  -- OTOMATIK BOS + ORPHAN TEMIZLEME
-  FOR v_eski_tohumlama IN
-    SELECT id, deneme_no, tarih, sperma
-    FROM public.tohumlama
-    WHERE hayvan_id = p_hayvan_id AND sonuc = 'Bekliyor'
-    FOR UPDATE
-  LOOP
-    UPDATE public.tohumlama SET sonuc = 'Boş' WHERE id = v_eski_tohumlama.id;
-
-    UPDATE public.gorev_log
-      SET iptal = true
-      WHERE kaynak = 'TOH-' || v_eski_tohumlama.id::text
-        AND tamamlandi = false
-        AND iptal = false;
-    GET DIAGNOSTICS v_iptal_gorev = ROW_COUNT;
-
-    UPDATE public.protokol_instance
-      SET durum = 'iptal'
-      WHERE kaynak_ref = 'TOH-' || v_eski_tohumlama.id::text
-        AND durum = 'aktif';
-    GET DIAGNOSTICS v_iptal_inst = ROW_COUNT;
-
-    v_snapshot := jsonb_build_object(
-      'olusturulan', jsonb_build_array(
-        jsonb_build_object('tablo', 'tohumlama', 'id', v_toh_id::text, 'veri', jsonb_build_object(
-          'hayvan_id', p_hayvan_id, 'tarih', p_tarih, 'sperma', p_sperma,
-          'hekim_id', p_hekim_id, 'irk_bilgisi', p_irk_bilgisi,
-          'sonuc', 'Bekliyor', 'deneme_no', v_deneme
-        ))
-      ),
-      'guncellenen', jsonb_build_array(
-        jsonb_build_object(
-          'tablo', 'tohumlama', 'id', v_eski_tohumlama.id::text,
-          'onceki', jsonb_build_object('sonuc', 'Bekliyor'),
-          'sonraki', jsonb_build_object('sonuc', 'Boş', 'sebep', 'OTOMATIK_YENI_TOHUMLAMA')
-        )
-      ),
-      'iptal_gorev_sayisi', v_iptal_gorev,
-      'iptal_instance_sayisi', v_iptal_inst,
-      'notlar', 'Yeni tohumlama girildi — eski Bekliyor cycle otomatik kapatildi'
-    );
-    INSERT INTO public.islem_log (id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
-    VALUES (v_islem_id, 'TOHUMLAMA_OTOMATIK_BOS', p_hayvan_id,
-            v_eski_tohumlama.id::text, 'tohumlama', v_snapshot);
-  END LOOP;
 
   SELECT COALESCE(MAX(deneme_no), 0) + 1 INTO v_deneme
   FROM public.tohumlama WHERE hayvan_id = p_hayvan_id;
 
-  INSERT INTO public.tohumlama
-    (id, hayvan_id, tarih, sperma, irk_bilgisi, hekim_id, sonuc, deneme_no, ek_uygulamalar, vwp_override)
-  VALUES
-    (v_toh_id, p_hayvan_id, p_tarih, p_sperma, p_irk_bilgisi, p_hekim_id, 'Bekliyor', v_deneme,
-     p_ek_uygulamalar,
-     CASE WHEN v_anchor_tip IS NOT NULL AND v_vwp_gun < 55 THEN true ELSE false END);
+  INSERT INTO public.tohumlama (id, hayvan_id, tarih, sperma, hekim_id, irk_bilgisi, sonuc, deneme_no)
+  VALUES (v_id, p_hayvan_id, p_tarih, p_sperma, p_hekim_id, p_irk_bilgisi, 'Bekliyor', v_deneme)
+  RETURNING to_jsonb(tohumlama.*) INTO v_result;
 
-  IF v_anchor_tip IS NOT NULL AND v_vwp_gun < 55 AND p_vwp_override THEN
-    INSERT INTO public.islem_log (id, tip, ana_hayvan_id, snapshot)
-    VALUES (
-      gen_random_uuid()::text, 'VWP_OVERRIDE', p_hayvan_id,
-      jsonb_build_object('tohumlama_id', v_toh_id, 'vwp_gun', v_vwp_gun, 'anchor_tip', v_anchor_tip, 'anchor_date', v_anchor_date)
-    );
-  END IF;
-
-  v_kaynak := 'TOH-' || v_toh_id::text;
-
-  INSERT INTO public.protokol_instance (hayvan_id, tip, alttip, kaynak_ref, baslangic, durum)
-  VALUES (p_hayvan_id, 'UREME', 'TOHUMLAMA', v_kaynak, p_tarih, 'aktif')
-  RETURNING id INTO v_inst_id;
-
-  INSERT INTO public.gorev_log
-    (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, protokol_instance_id)
-  VALUES
-    (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL',
-     '21. Gün gebelik kontrolü', p_tarih + 21, false, v_kaynak, v_inst_id),
-    (gen_random_uuid(), p_hayvan_id, 'GEBELIK_KONTROL',
-     '35. Gün gebelik kontrolü', p_tarih + 35, false, v_kaynak, v_inst_id);
-
-  -- BUG-002 (M2): matcher paylasilan helper'a baglandi — bos/whitespace ad
-  -- dusurmez, exact once, sonra substring; kategori='Sperma' kapsami helper'da.
-  -- Canli notlar metni (kupe_no) birebir korunur.
-  PERFORM public.fn_sperma_stok_dus(
-    p_sperma,
-    'Tohumlama — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id)
-  );
-
-  IF p_ek_uygulamalar IS NOT NULL AND jsonb_array_length(p_ek_uygulamalar) > 0 THEN
-    FOR v_ek IN SELECT * FROM jsonb_array_elements(p_ek_uygulamalar) LOOP
-      IF (v_ek->>'stok_id') IS NOT NULL AND (v_ek->>'stok_id') <> '' THEN
-        v_ek_stok := (v_ek->>'stok_id')::uuid;
-        INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar, iptal)
-        VALUES (
-          v_ek_stok, 'Tohumlama',
-          COALESCE((v_ek->>'doz')::numeric, 1),
-          'Tohumlama ek uygulama: ' || COALESCE(v_ek->>'tur', '') || ' — ' || COALESCE(v_hayvan.kupe_no, p_hayvan_id),
-          false
-        );
-      END IF;
-    END LOOP;
-  END IF;
-
-  -- Hayvan dogrudan (gorev uzerinden degil) tohumlandiysa acik planli tohumlama
-  -- gorevi artik konusuz kalir. planli_tohumlama_kaydet bu fonksiyonu icerden
-  -- cagirir ve HEMEN ARDINDAN kendi gorevini iptal=false + tamamlandi=true
-  -- yapar; sirali oldugu icin dogru sonuc kazanir.
-  UPDATE public.gorev_log
-  SET iptal = true, tamamlandi = true, tamamlanma_tarihi = now()
-  WHERE hayvan_id = p_hayvan_id
-    AND gorev_tipi = 'TOHUMLAMA_PLANLI'
-    AND tamamlandi = false AND iptal = false;
-
-  RETURN jsonb_build_object(
-    'ok',                       true,
-    'tohumlama_id',             v_toh_id,
-    'deneme_no',                v_deneme,
-    'inst_id',                  v_inst_id,
-    'otomatik_bos_sayisi',      v_iptal_gorev,
-    'otomatik_iptal_instance',  v_iptal_inst
-  );
+  RETURN jsonb_build_object('ok', true, 'id', v_id, 'data', v_result);
 END;
-$function$
-;
+$function$;
 
 
 NOTIFY pgrst, 'reload schema';
@@ -11676,7 +11114,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM PUBLIC;
 
 -- VIEW: v_gorev_log_sync
 CREATE OR REPLACE VIEW public.v_gorev_log_sync AS
-SELECT gorev_log.id,
+ SELECT gorev_log.id,
     gorev_log.hayvan_id,
     gorev_log.gorev_tipi,
     gorev_log.aciklama,
@@ -11699,7 +11137,7 @@ SELECT gorev_log.id,
     gorev_log.seans_admin_id,
     gorev_log.hedef_saat
    FROM gorev_log
-  WHERE ((NOT gorev_log.tamamlandi) AND (NOT gorev_log.iptal))
+  WHERE NOT gorev_log.tamamlandi AND NOT gorev_log.iptal
 UNION ALL
  SELECT kapali.id,
     kapali.hayvan_id,
@@ -11746,14 +11184,14 @@ UNION ALL
             gorev_log.seans_admin_id,
             gorev_log.hedef_saat
            FROM gorev_log
-          WHERE (gorev_log.tamamlandi OR gorev_log.iptal)
+          WHERE gorev_log.tamamlandi OR gorev_log.iptal
           ORDER BY gorev_log.created_at DESC NULLS LAST
          LIMIT 300) kapali;
 ;
 
 -- VIEW: v_orphan_gorev
 CREATE OR REPLACE VIEW public.v_orphan_gorev AS
-SELECT id,
+ SELECT id,
     hayvan_id,
     gorev_tipi,
     aciklama,
@@ -11776,13 +11214,13 @@ SELECT id,
     seans_admin_id,
     hedef_saat
    FROM gorev_log g
-  WHERE ((NOT tamamlandi) AND (NOT iptal) AND ((NOT (EXISTS ( SELECT 1
+  WHERE NOT tamamlandi AND NOT iptal AND (NOT (EXISTS ( SELECT 1
            FROM hayvanlar h
-          WHERE ((h.id = g.hayvan_id) AND (h.durum = 'Aktif'::text))))) OR ((parent_id IS NOT NULL) AND (gorev_tipi <> ALL (ARRAY['BESLEME'::text, 'BUZAGI_BAKIM'::text, 'TEDAVI_GUN'::text, 'ILERI_GEBE_ASI'::text])) AND (NOT (EXISTS ( SELECT 1
+          WHERE h.id = g.hayvan_id AND h.durum = 'Aktif'::text)) OR parent_id IS NOT NULL AND (gorev_tipi <> ALL (ARRAY['BESLEME'::text, 'BUZAGI_BAKIM'::text, 'TEDAVI_GUN'::text, 'ILERI_GEBE_ASI'::text])) AND NOT (EXISTS ( SELECT 1
            FROM gorev_log p
-          WHERE (p.id = g.parent_id))))) OR ((parent_id IS NOT NULL) AND (EXISTS ( SELECT 1
+          WHERE p.id = g.parent_id)) OR parent_id IS NOT NULL AND (EXISTS ( SELECT 1
            FROM gorev_log p
-          WHERE ((p.id = g.parent_id) AND (p.tamamlandi OR p.iptal) AND (p.gorev_tipi <> g.gorev_tipi)))))));
+          WHERE p.id = g.parent_id AND (p.tamamlandi OR p.iptal) AND p.gorev_tipi <> g.gorev_tipi)));
 ;
 
 -- FUNCTION: _trg_gorev_parent_kapandi
@@ -12006,7 +11444,120 @@ $function$
 
 REVOKE ALL ON FUNCTION public.fn_hayvan_grup_padok_sync() FROM PUBLIC;
 
+-- FUNCTION: gorev_tamamla
+CREATE OR REPLACE FUNCTION public.gorev_tamamla(p_gorev_id text, p_padok_hedef text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_gorev record; v_hayvan record; v_snapshot jsonb;
+  v_stok_dusuldu boolean := false; v_padok_guncellendi boolean := false;
+  v_olusturulan jsonb := '[]'::jsonb; v_guncellenen jsonb := '[]'::jsonb;
+  v_padok_id uuid;
+  v_hedef_padok text;
+  v_yeni_grup text;
+BEGIN
+  SELECT * INTO v_gorev
+    FROM public.gorev_log
+   WHERE id = p_gorev_id::uuid
+   FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Görev bulunamadı: %', p_gorev_id; END IF;
+  IF v_gorev.tamamlandi THEN RETURN jsonb_build_object('ok', true, 'mesaj', 'Görev zaten tamamlanmış'); END IF;
+  IF v_gorev.iptal THEN RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev iptal edilmiş, tamamlanamaz'); END IF;
 
+  IF v_gorev.gorev_tipi = 'SUTTEN_KESME' AND v_gorev.hayvan_id IS NOT NULL THEN
+    PERFORM public.buzagi_sutten_kesme_onayla(v_gorev.hayvan_id);
+    UPDATE public.gorev_log SET tamamlandi=true, tamamlanma_tarihi=COALESCE(tamamlanma_tarihi, now())
+      WHERE id=p_gorev_id::uuid AND tamamlandi=false;
+    RETURN jsonb_build_object('ok', true, 'gorev_id', p_gorev_id, 'sutten_kesme', true);
+  END IF;
+
+  v_hedef_padok := COALESCE(NULLIF(btrim(p_padok_hedef), ''), NULLIF(btrim(v_gorev.padok_hedef), ''));
+
+  IF v_gorev.gorev_tipi = 'PADOK_DEGISIM'
+     AND v_gorev.hayvan_id IS NOT NULL
+     AND v_hedef_padok IS NULL THEN
+    RAISE EXCEPTION 'Padok değişim görevinin hedef padoku boş: %', p_gorev_id
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF v_hedef_padok IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
+    SELECT * INTO v_hayvan
+      FROM public.hayvanlar
+     WHERE id = v_gorev.hayvan_id
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Görevin hayvanı bulunamadı: %', v_gorev.hayvan_id
+        USING ERRCODE = 'foreign_key_violation';
+    ELSE
+      SELECT id INTO v_padok_id
+        FROM public.padoklar
+       WHERE ad = v_hedef_padok;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Hedef padok bulunamadı: %', v_hedef_padok
+          USING ERRCODE = 'foreign_key_violation';
+      END IF;
+
+      v_yeni_grup := v_hayvan.grup;
+      IF v_gorev.gorev_tipi = 'PADOK_DEGISIM'
+         AND v_gorev.aciklama ILIKE '%Kuru döneme%' THEN
+        v_yeni_grup := 'Sağmal (Kuru)';
+      END IF;
+
+      IF EXISTS (SELECT 1 FROM public.grup_padok_eslem WHERE grup = v_yeni_grup)
+         AND NOT EXISTS (
+           SELECT 1
+             FROM public.grup_padok_eslem
+            WHERE grup = v_yeni_grup
+              AND padok_id = v_padok_id
+         ) THEN
+        RAISE EXCEPTION 'Grup % için hedef padok geçersiz: %', v_yeni_grup, v_hedef_padok
+          USING ERRCODE = 'check_violation';
+      END IF;
+    END IF;
+  END IF;
+
+  v_guncellenen := v_guncellenen || jsonb_build_object(
+    'tablo','gorev_log','id',p_gorev_id,
+    'onceki', jsonb_build_object('tamamlandi',v_gorev.tamamlandi,'tamamlanma_tarihi',v_gorev.tamamlanma_tarihi),
+    'sonraki', jsonb_build_object('tamamlandi',true,'tamamlanma_tarihi',now())
+  );
+  UPDATE public.gorev_log SET tamamlandi=true, tamamlanma_tarihi=now() WHERE id=p_gorev_id::uuid;
+
+  IF v_gorev.stok_id IS NOT NULL AND v_gorev.miktar IS NOT NULL AND v_gorev.miktar > 0 THEN
+    v_stok_dusuldu := true;
+    INSERT INTO public.stok_hareket (id,stok_id,tur,miktar,notlar,iptal)
+    VALUES (gen_random_uuid(),v_gorev.stok_id,'Görev',v_gorev.miktar,'GorevID:'||p_gorev_id,false);
+  END IF;
+
+  IF v_hedef_padok IS NOT NULL AND v_gorev.hayvan_id IS NOT NULL THEN
+    v_padok_guncellendi := true;
+    v_guncellenen := v_guncellenen || jsonb_build_object(
+      'tablo','hayvanlar','id',v_gorev.hayvan_id,
+      'onceki',jsonb_build_object('grup',v_hayvan.grup,'padok',v_hayvan.padok,'padok_id',v_hayvan.padok_id),
+      'sonraki',jsonb_build_object('grup',v_yeni_grup,'padok',v_hedef_padok,'padok_id',v_padok_id)
+    );
+
+    UPDATE public.hayvanlar
+       SET grup = v_yeni_grup,
+           padok = v_hedef_padok,
+           padok_id = v_padok_id
+     WHERE id = v_gorev.hayvan_id;
+  END IF;
+
+  v_snapshot := jsonb_build_object('olusturulan',v_olusturulan,'guncellenen',v_guncellenen,'silinen','[]'::jsonb);
+  INSERT INTO public.islem_log (tip,ana_hayvan_id,ref_id,ref_tablo,snapshot,kullanici_notu)
+  VALUES ('GOREV_TAMAMLA',v_gorev.hayvan_id,p_gorev_id,'gorev_log',v_snapshot,
+    format('Görev tamamlandı (stok: %s, padok: %s)',
+      CASE WHEN v_stok_dusuldu THEN 'evet' ELSE 'hayır' END,
+      CASE WHEN v_padok_guncellendi THEN 'evet' ELSE 'hayır' END));
+
+  RETURN jsonb_build_object('ok',true,'gorev_id',p_gorev_id,'stok_dusuldu',v_stok_dusuldu,'padok_guncellendi',v_padok_guncellendi);
+END;
+$function$
+;
 
 -- TRIGGER: trg_hayvan_grup_padok_sync
 DROP TRIGGER IF EXISTS trg_hayvan_grup_padok_sync ON public.hayvanlar;
@@ -12439,3908 +11990,3 @@ CREATE TRIGGER trg_kizginlik_case_close AFTER UPDATE OF status ON public.cases F
 -- TRIGGER: trg_tohumlama_kizginlik
 DROP TRIGGER IF EXISTS trg_tohumlama_kizginlik ON public.tohumlama;
 CREATE TRIGGER trg_tohumlama_kizginlik AFTER INSERT ON public.tohumlama FOR EACH ROW EXECUTE FUNCTION _tohumlama_kizginlik_kapat();
--- ════════════════════════════════════════════════════════════════
--- SENKRON 2026-09-15 (G1) — canlı prod aynası, incremental güncelleme
--- Kapsam: pedigree + semen_catalog + degisim_log tabloları, kolon eklemeleri,
---         L2/L4 fonksiyonları, guard trigger'ları, dozaj/sperma helper'ları,
---         surum_gizli şeması (YALNIZ YAPI — satır verisi içermez),
---         S1 anon/PUBLIC EXECUTE geri alma (yalnız yetki)
--- Kaynak: canlı prod salt-okunur envanter (Mgmt API, 2026-09-15/16)
--- ════════════════════════════════════════════════════════════════
-
--- ── 1. YENİ TABLOLAR (2026-09-11..15 arası migration'lar) ──
-
--- TABLO: degisim_log
-CREATE TABLE IF NOT EXISTS public.degisim_log (
-  id bigint GENERATED ALWAYS AS IDENTITY,
-  txid bigint NOT NULL,
-  kayit_zamani timestamptz DEFAULT now(),
-  tablo_adi text NOT NULL,
-  satir_pk jsonb NOT NULL,
-  islem text NOT NULL,
-  eski jsonb,
-  yeni jsonb,
-  degisen_alanlar text[],
-  teknikal_mi boolean DEFAULT false,
-  kaynak jsonb NOT NULL,
-  CONSTRAINT degisim_log_islem_check CHECK ((islem = ANY (ARRAY['I'::text, 'U'::text, 'D'::text]))),
-  CONSTRAINT degisim_log_pkey PRIMARY KEY (id)
-);
-ALTER TABLE public.degisim_log ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_degisim_log_tablo_pk ON public.degisim_log USING btree (tablo_adi, satir_pk);
-CREATE INDEX IF NOT EXISTS idx_degisim_log_txid ON public.degisim_log USING btree (txid);
-CREATE INDEX IF NOT EXISTS idx_degisim_log_zaman ON public.degisim_log USING btree (kayit_zamani);
-GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.degisim_log TO service_role;
-GRANT SELECT ON public.degisim_log TO agent_readonly;
-GRANT SELECT ON public.degisim_log TO demo_reader;
-GRANT SELECT ON public.degisim_log TO authenticated;
-CREATE POLICY degisim_log_select ON public.degisim_log FOR SELECT TO PUBLIC USING (true);
-
--- TABLO: pedigree_meta
-CREATE TABLE IF NOT EXISTS public.pedigree_meta (
-  farm_id uuid DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e'::uuid,
-  key text NOT NULL,
-  value text NOT NULL,
-  CONSTRAINT pedigree_meta_pkey PRIMARY KEY (farm_id, key)
-);
-ALTER TABLE public.pedigree_meta ENABLE ROW LEVEL SECURITY;
-GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.pedigree_meta TO service_role;
-GRANT SELECT ON public.pedigree_meta TO agent_readonly;
-GRANT SELECT ON public.pedigree_meta TO demo_reader;
-CREATE POLICY allow_all ON public.pedigree_meta FOR ALL TO PUBLIC USING (true) WITH CHECK (true);
-
--- TABLO: pedigree_nodes
-CREATE TABLE IF NOT EXISTS public.pedigree_nodes (
-  id uuid DEFAULT gen_random_uuid(),
-  farm_id uuid DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e'::uuid,
-  farm_animal_id text,
-  node_kind text NOT NULL,
-  display_name text,
-  registry_system text,
-  registry_code text,
-  sex text,
-  breed text,
-  birth_date date,
-  country_code text,
-  founder_status text DEFAULT 'ordinary'::text,
-  metadata jsonb DEFAULT '{}'::jsonb,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now(),
-  CONSTRAINT chk_pedigree_nodes_kind_invariant CHECK ((((node_kind = 'farm_animal'::text) AND (farm_animal_id IS NOT NULL)) OR ((node_kind = 'external_animal'::text) AND (farm_animal_id IS NULL)))),
-  CONSTRAINT pedigree_nodes_farm_animal_id_fkey FOREIGN KEY (farm_animal_id) REFERENCES hayvanlar(id) ON DELETE CASCADE,
-  CONSTRAINT pedigree_nodes_farm_animal_id_key UNIQUE (farm_id, farm_animal_id),
-  CONSTRAINT pedigree_nodes_farm_id_id_key UNIQUE (farm_id, id),
-  CONSTRAINT pedigree_nodes_founder_status_check CHECK ((founder_status = ANY (ARRAY['explicit_founder'::text, 'ordinary'::text]))),
-  CONSTRAINT pedigree_nodes_node_kind_check CHECK ((node_kind = ANY (ARRAY['farm_animal'::text, 'external_animal'::text]))),
-  CONSTRAINT pedigree_nodes_pkey PRIMARY KEY (id)
-);
-ALTER TABLE public.pedigree_nodes ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_pedigree_nodes_farm_kind ON public.pedigree_nodes USING btree (farm_id, node_kind);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_pedigree_nodes_registry ON public.pedigree_nodes USING btree (farm_id, registry_system, registry_code) WHERE ((registry_system IS NOT NULL) AND (registry_code IS NOT NULL));
-GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.pedigree_nodes TO service_role;
-GRANT SELECT ON public.pedigree_nodes TO agent_readonly;
-GRANT SELECT ON public.pedigree_nodes TO demo_reader;
-CREATE POLICY allow_all ON public.pedigree_nodes FOR ALL TO PUBLIC USING (true) WITH CHECK (true);
-
--- TABLO: pedigree_parentage
-CREATE TABLE IF NOT EXISTS public.pedigree_parentage (
-  id uuid DEFAULT gen_random_uuid(),
-  farm_id uuid DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e'::uuid,
-  parent_node_id uuid NOT NULL,
-  child_node_id uuid NOT NULL,
-  parent_role text NOT NULL,
-  source_type text NOT NULL,
-  source_ref text,
-  evidence jsonb DEFAULT '{}'::jsonb,
-  confidence numeric DEFAULT 1.0,
-  created_at timestamptz DEFAULT now(),
-  CONSTRAINT chk_parentage_parent_ne_child CHECK ((parent_node_id <> child_node_id)),
-  CONSTRAINT fk_parentage_child_farm_node FOREIGN KEY (farm_id, child_node_id) REFERENCES pedigree_nodes(farm_id, id) ON DELETE CASCADE,
-  CONSTRAINT fk_parentage_parent_farm_node FOREIGN KEY (farm_id, parent_node_id) REFERENCES pedigree_nodes(farm_id, id) ON DELETE CASCADE,
-  CONSTRAINT pedigree_parentage_confidence_check CHECK (((confidence >= (0)::numeric) AND (confidence <= (1)::numeric))),
-  CONSTRAINT pedigree_parentage_farm_child_role_key UNIQUE (farm_id, child_node_id, parent_role),
-  CONSTRAINT pedigree_parentage_parent_role_check CHECK ((parent_role = ANY (ARRAY['dam'::text, 'sire'::text]))),
-  CONSTRAINT pedigree_parentage_pkey PRIMARY KEY (id),
-  CONSTRAINT pedigree_parentage_source_type_check CHECK ((source_type = ANY (ARRAY['birth'::text, 'manual'::text, 'import'::text, 'reconcile'::text])))
-);
-ALTER TABLE public.pedigree_parentage ENABLE ROW LEVEL SECURITY;
-CREATE INDEX IF NOT EXISTS idx_parentage_farm_child ON public.pedigree_parentage USING btree (farm_id, child_node_id);
-CREATE INDEX IF NOT EXISTS idx_parentage_farm_parent ON public.pedigree_parentage USING btree (farm_id, parent_node_id);
-CREATE INDEX IF NOT EXISTS idx_parentage_farm_role_child ON public.pedigree_parentage USING btree (farm_id, parent_role, child_node_id);
-GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.pedigree_parentage TO service_role;
-GRANT SELECT ON public.pedigree_parentage TO agent_readonly;
-GRANT SELECT ON public.pedigree_parentage TO demo_reader;
-CREATE POLICY allow_all ON public.pedigree_parentage FOR ALL TO PUBLIC USING (true) WITH CHECK (true);
-
--- TABLO: semen_catalog
-CREATE TABLE IF NOT EXISTS public.semen_catalog (
-  id uuid DEFAULT gen_random_uuid(),
-  farm_id uuid DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e'::uuid,
-  bull_node_id uuid NOT NULL,
-  stock_id text,
-  code text,
-  display_name text NOT NULL,
-  supplier text,
-  semen_type text,
-  active boolean DEFAULT true,
-  metadata jsonb DEFAULT '{}'::jsonb,
-  created_at timestamptz DEFAULT now(),
-  CONSTRAINT fk_semen_catalog_bull_farm_node FOREIGN KEY (farm_id, bull_node_id) REFERENCES pedigree_nodes(farm_id, id),
-  CONSTRAINT semen_catalog_farm_stock_key UNIQUE (farm_id, stock_id),
-  CONSTRAINT semen_catalog_pkey PRIMARY KEY (id),
-  CONSTRAINT semen_catalog_stock_id_fkey FOREIGN KEY (stock_id) REFERENCES stok(id) ON DELETE SET NULL
-);
-ALTER TABLE public.semen_catalog ENABLE ROW LEVEL SECURITY;
-GRANT SELECT, TRUNCATE, REFERENCES, TRIGGER ON public.semen_catalog TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.semen_catalog TO service_role;
-GRANT SELECT ON public.semen_catalog TO agent_readonly;
-GRANT SELECT ON public.semen_catalog TO demo_reader;
-CREATE POLICY allow_all ON public.semen_catalog FOR ALL TO PUBLIC USING (true) WITH CHECK (true);
-
--- ── 2. MEVCUT TABLOLARA KOLON EKLEMELERİ (canlı ile eş için) ──
-ALTER TABLE public.dogum ADD COLUMN IF NOT EXISTS buzagi_id text;
-ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose numeric;
-ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose_max numeric;
-ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose_min numeric;
-ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose_unit text;
-ALTER TABLE public.drugs ADD COLUMN IF NOT EXISTS description text;
-ALTER TABLE public.gorev_log ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
-ALTER TABLE public.gorev_log ADD COLUMN IF NOT EXISTS ref_tohumlama_id text;
-ALTER TABLE public.gorev_log ADD COLUMN IF NOT EXISTS stok_dusuldu boolean DEFAULT false;
-ALTER TABLE public.hastalik_log ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
-ALTER TABLE public.hastalik_log ADD COLUMN IF NOT EXISTS kapanis_tarihi date;
-ALTER TABLE public.hastalik_log ADD COLUMN IF NOT EXISTS veteriner_notu text;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS abort_sayisi integer DEFAULT 0;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS cins text;
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
-ALTER TABLE public.hayvanlar ADD COLUMN IF NOT EXISTS kesim_kg numeric;
-ALTER TABLE public.islem_log ADD COLUMN IF NOT EXISTS degisim_txid bigint;
-ALTER TABLE public.islem_log ADD COLUMN IF NOT EXISTS ref_tablo text;
-ALTER TABLE public.kizginlik_log ADD COLUMN IF NOT EXISTS cozuldu boolean DEFAULT false;
-ALTER TABLE public.kizginlik_log ADD COLUMN IF NOT EXISTS tedavi_case_id uuid;
-ALTER TABLE public.stok ADD COLUMN IF NOT EXISTS birim_turu text;
-ALTER TABLE public.stok ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
-ALTER TABLE public.stok ADD COLUMN IF NOT EXISTS drug_product_id uuid;
-ALTER TABLE public.stok ADD COLUMN IF NOT EXISTS maliyet numeric DEFAULT 0;
-ALTER TABLE public.stok ADD COLUMN IF NOT EXISTS notlar text;
-ALTER TABLE public.stok ADD COLUMN IF NOT EXISTS tur text;
-ALTER TABLE public.stok_hareket ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
-ALTER TABLE public.stok_hareket ADD COLUMN IF NOT EXISTS referans_id text;
-ALTER TABLE public.stok_hareket ADD COLUMN IF NOT EXISTS tarih timestamptz DEFAULT now();
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS abort_tarihi date;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS deneme_sayisi integer DEFAULT 1;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS denemeler jsonb DEFAULT '[]'::jsonb;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS gerceklesme_at timestamptz;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS irk_bilgisi text;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS kontrol_tarihi date;
-ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS tohumlayan text;
-ALTER TABLE public.treatment_days ADD COLUMN IF NOT EXISTS tamamlanma_notu text;
-ALTER TABLE public.treatment_days ADD COLUMN IF NOT EXISTS tamamlanma_tarihi timestamptz;
-ALTER TABLE public.vaccination_log ADD COLUMN IF NOT EXISTS erteleme_notu text;
-
--- 2b. eklenen kolonlara bağlı FK kısıtları (canlı aynası)
-ALTER TABLE public.dogum ADD CONSTRAINT dogum_buzagi_id_fkey FOREIGN KEY (buzagi_id) REFERENCES hayvanlar(id) ON DELETE SET NULL;
-ALTER TABLE public.stok ADD CONSTRAINT stok_drug_product_id_fkey FOREIGN KEY (drug_product_id) REFERENCES drug_products(id);
-ALTER TABLE public.kizginlik_log ADD CONSTRAINT kizginlik_log_tedavi_case_id_fkey FOREIGN KEY (tedavi_case_id) REFERENCES cases(id) ON DELETE SET NULL;
-ALTER TABLE public.drug_administrations ADD CONSTRAINT drug_administrations_seans_admin_id_fkey FOREIGN KEY (seans_admin_id) REFERENCES treatment_day_uygulamalar(id) ON DELETE SET NULL;
-
--- ── 3. EKSİK INDEX VE UNIQUE KISITLARI (mevcut tablolar) ──
-CREATE UNIQUE INDEX IF NOT EXISTS dogum_buzagi_id_uidx ON public.dogum USING btree (buzagi_id) WHERE (buzagi_id IS NOT NULL);
-CREATE INDEX IF NOT EXISTS idx_gorev_log_etken ON public.gorev_log USING btree (hayvan_id, etken_kod) WHERE ((tamamlandi = false) AND (iptal = false) AND (etken_kod IS NOT NULL));
-CREATE INDEX IF NOT EXISTS idx_gorev_log_ref_tohumlama ON public.gorev_log USING btree (ref_tohumlama_id) WHERE (ref_tohumlama_id IS NOT NULL);
-CREATE INDEX IF NOT EXISTS idx_islem_log_degisim_txid ON public.islem_log USING btree (degisim_txid);
-CREATE INDEX IF NOT EXISTS idx_tohumlama_hayvan_sonuc ON public.tohumlama USING btree (hayvan_id, sonuc, tarih);
-CREATE INDEX IF NOT EXISTS kizginlik_log_cozuldu_idx ON public.kizginlik_log USING btree (cozuldu);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_gorev_rota_2doz_active ON public.gorev_log USING btree (hayvan_id, etken_kod) WHERE ((etken_kod = 'ROTA_2DOZ'::text) AND (iptal = false) AND (tamamlandi = false));
-CREATE UNIQUE INDEX IF NOT EXISTS uq_hayvanlar_devlet_kupe ON public.hayvanlar USING btree (devlet_kupe) WHERE (devlet_kupe IS NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_hayvanlar_kupe_no ON public.hayvanlar USING btree (kupe_no) WHERE (kupe_no IS NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS hayvanlar_kupe_no_key ON public.hayvanlar USING btree (kupe_no) WHERE ((durum = 'Aktif'::text) AND (kupe_no IS NOT NULL) AND (kupe_no <> ''::text));
-
--- ── 4. RLS ENABLE (canlıda açık, GT'de eksik olanlar) ──
-ALTER TABLE public.hayvanlar ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.gorev_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.hastalik_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.irk_esik ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.islem_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.kizginlik_log ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.stok ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.stok_hareket ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.tohumlama ENABLE ROW LEVEL SECURITY;
-
--- ── 5. EKSİK RLS POLICY'LERİ (mevcut tablolar) ──
-CREATE POLICY degisim_log_select ON public.degisim_log FOR SELECT TO PUBLIC USING (true);
-CREATE POLICY anon_read_drug_products_sel ON public.drug_products FOR SELECT TO anon, authenticated USING (true);
-CREATE POLICY islem_log_select ON public.islem_log FOR SELECT TO PUBLIC USING (true);
-CREATE POLICY service_insert ON public.islem_log FOR INSERT TO service_role WITH CHECK (true);
-CREATE POLICY anon insert kizginlik_log ON public.kizginlik_log FOR INSERT TO anon WITH CHECK (true);
-
--- ── 6. EKSİK FONKSİYONLAR (37 adet, canlı pg_get_functiondef) ──
-
--- FUNCTION: public._degisim_log_degistirilemez()
-CREATE OR REPLACE FUNCTION public._degisim_log_degistirilemez()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-BEGIN
-  RAISE EXCEPTION 'degisim_log degistirilemez (% reddedildi)', TG_OP
-    USING ERRCODE = 'insufficient_privilege';
-END;
-$function$
-;
-
--- FUNCTION: public._degisim_log_yaz()
-CREATE OR REPLACE FUNCTION public._degisim_log_yaz()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  -- Technical columns (live DEMO inventory 2026-09-13): bookkeeping
-  -- timestamps only. A U touching only these is logged with teknikal_mi=true.
-  c_teknik  CONSTANT text[] := ARRAY['created_at','updated_at','olusturma',
-                                     'guncelleme','guncelleme_tarihi','guncellendi'];
-  v_eski    jsonb;
-  v_yeni    jsonb;
-  v_kaynak_satir jsonb;
-  v_pk      jsonb := '{}'::jsonb;
-  v_alanlar text[];
-  v_claims  jsonb;
-  v_headers jsonb;
-  v_rol     text;
-  v_bilet   text;
-  v_kaynak  jsonb;
-  i         int;
-BEGIN
-  IF TG_OP = 'INSERT' THEN
-    v_yeni := to_jsonb(NEW);
-    v_kaynak_satir := v_yeni;
-  ELSIF TG_OP = 'UPDATE' THEN
-    v_eski := to_jsonb(OLD);
-    v_yeni := to_jsonb(NEW);
-    v_kaynak_satir := v_yeni;
-    SELECT array_agg(k ORDER BY k) INTO v_alanlar
-      FROM jsonb_object_keys(v_yeni) AS k
-     WHERE (v_yeni -> k) IS DISTINCT FROM (v_eski -> k);
-    IF v_alanlar IS NULL THEN
-      RETURN NULL;                       -- no content change → no record
-    END IF;
-  ELSE
-    v_eski := to_jsonb(OLD);
-    v_kaynak_satir := v_eski;
-  END IF;
-
-  FOR i IN 0 .. TG_NARGS - 1 LOOP
-    v_pk := v_pk || jsonb_build_object(TG_ARGV[i], v_kaynak_satir -> TG_ARGV[i]);
-  END LOOP;
-
-  BEGIN
-    v_claims := nullif(current_setting('request.jwt.claims', true), '')::jsonb;
-  EXCEPTION WHEN others THEN v_claims := NULL;
-  END;
-  BEGIN
-    v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
-  EXCEPTION WHEN others THEN v_headers := NULL;
-  END;
-
-  -- SECURITY DEFINER masks current_user; the 'role' GUC keeps the caller's
-  -- SET ROLE (PostgREST: authenticated/anon). Fall back to the login role.
-  v_rol := nullif(current_setting('role', true), 'none');
-  v_bilet := nullif(current_setting('app.geri_alma_bileti', true), '');
-
-  v_kaynak := jsonb_strip_nulls(jsonb_build_object(
-    'rol',             coalesce(v_rol, session_user::text),
-    'oturum_rolu',     session_user::text,
-    'jwt_sub',         v_claims ->> 'sub',
-    'jwt_role',        v_claims ->> 'role',
-    'app_name',        nullif(current_setting('application_name', true), ''),
-    'istemci_etiketi', coalesce(nullif(current_setting('app.istemci_etiketi', true), ''),
-                                v_headers ->> 'x-client-info')
-  ));
-  IF v_bilet IS NOT NULL THEN
-    v_kaynak := v_kaynak || jsonb_build_object('geri_alma', jsonb_strip_nulls(jsonb_build_object(
-      'bilet',   left(v_bilet, 8) || '…', -- LUNA-1: tam bilet public log'a yazilmaz (maske: ilk 8 + ellipsis)
-      'gerekce', nullif(current_setting('app.geri_alma_gerekce', true), ''))));
-  END IF;
-
-  INSERT INTO public.degisim_log
-    (txid, tablo_adi, satir_pk, islem, eski, yeni, degisen_alanlar, teknikal_mi, kaynak)
-  VALUES
-    (txid_current(), TG_TABLE_NAME, v_pk, left(TG_OP, 1), v_eski, v_yeni, v_alanlar,
-     coalesce(v_alanlar <@ c_teknik, false), v_kaynak);
-
-  RETURN NULL;
-END;
-$function$
-;
-
--- FUNCTION: public._dogum_buzagi_backfill()
-CREATE OR REPLACE FUNCTION public._dogum_buzagi_backfill()
- RETURNS jsonb
- LANGUAGE plpgsql
-AS $function$
-DECLARE
-  r        record;
-  v_aday   integer;
-  v_calf   text;
-  v_auto   integer := 0;
-  v_cok    integer := 0;
-  v_tarih  integer := 0;
-  v_yok    integer := 0;
-BEGIN
-  FOR r IN
-    SELECT d.id, d.yavru_kupe, d.tarih
-    FROM public.dogum d
-    WHERE d.buzagi_id IS NULL
-  LOOP
-    SELECT count(*) INTO v_aday
-    FROM public.hayvanlar h
-    WHERE h.kupe_no = r.yavru_kupe;
-
-    IF v_aday = 0 THEN v_yok := v_yok + 1; CONTINUE; END IF;
-    IF v_aday > 1 THEN v_cok := v_cok + 1; CONTINUE; END IF;
-
-    SELECT h.id INTO v_calf
-    FROM public.hayvanlar h
-    WHERE h.kupe_no = r.yavru_kupe
-      AND h.dogum_tarihi = r.tarih;
-
-    IF v_calf IS NULL THEN v_tarih := v_tarih + 1; CONTINUE; END IF;
-
-    -- unique index oncesi guven: ayni calf'i baska bir dogum zaten claim ettiyse yazma
-    IF EXISTS (
-      SELECT 1 FROM public.dogum d2
-      WHERE d2.buzagi_id = v_calf AND d2.id <> r.id
-    ) THEN
-      v_cok := v_cok + 1; CONTINUE;
-    END IF;
-
-    UPDATE public.dogum SET buzagi_id = v_calf WHERE id = r.id;
-    v_auto := v_auto + 1;
-  END LOOP;
-
-  RETURN jsonb_build_object('auto', v_auto, 'cok-aday', v_cok,
-                            'tarih-uyumsuz', v_tarih, 'aday-yok', v_yok);
-END
-$function$
-;
-
--- FUNCTION: public._guard_dogum_ileri_tarih()
-CREATE OR REPLACE FUNCTION public._guard_dogum_ileri_tarih()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-BEGIN
-  IF NEW.tarih IS NOT NULL
-     AND NEW.tarih > (NOW() AT TIME ZONE 'Europe/Istanbul')::date THEN
-    RAISE EXCEPTION 'Doğum tarihi ileri tarih olamaz: %', NEW.tarih;
-  END IF;
-  RETURN NEW;
-END $function$
-;
-
--- FUNCTION: public._guard_hayvanlar_cinsiyet_grup()
-CREATE OR REPLACE FUNCTION public._guard_hayvanlar_cinsiyet_grup()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-BEGIN
-  IF NEW.cinsiyet = 'Erkek' AND (NEW.grup ILIKE 'Sağmal%' OR NEW.grup ILIKE 'Gebe%') THEN
-    RAISE EXCEPTION 'Erkek hayvan Sağmal/Gebe grubuna eklenemez (grup: %)', NEW.grup;
-  END IF;
-  IF NEW.dogum_tarihi IS NOT NULL
-     AND NEW.dogum_tarihi > (NOW() AT TIME ZONE 'Europe/Istanbul')::date THEN
-    RAISE EXCEPTION 'Doğum tarihi ileri tarih olamaz: %', NEW.dogum_tarihi;
-  END IF;
-  RETURN NEW;
-END $function$
-;
-
--- FUNCTION: public._guard_tohumlama_yas_cinsiyet()
-CREATE OR REPLACE FUNCTION public._guard_tohumlama_yas_cinsiyet()
- RETURNS trigger
- LANGUAGE plpgsql
-AS $function$
-DECLARE
-  v_cinsiyet text;
-  v_dogum    date;
-BEGIN
-  SELECT cinsiyet, dogum_tarihi INTO v_cinsiyet, v_dogum
-    FROM public.hayvanlar WHERE id = NEW.hayvan_id;
-  IF NOT FOUND THEN
-    RETURN NEW; -- hayvan referansı çözülemiyor: FK/yetki katmanı ilgilenir
-  END IF;
-  IF v_cinsiyet = 'Erkek' THEN
-    RAISE EXCEPTION 'Erkek hayvana tohumlama kaydı yapılamaz (hayvan: %)', NEW.hayvan_id;
-  END IF;
-  IF v_dogum IS NOT NULL AND (NEW.tarih - v_dogum) < 365 THEN
-    RAISE EXCEPTION '12 aydan küçük hayvana tohumlama kaydı yapılamaz (tohumlama anındaki yaş: % gün)', (NEW.tarih - v_dogum);
-  END IF;
-  RETURN NEW;
-END $function$
-;
-
--- FUNCTION: public._islem_log_degisim_txid()
-CREATE OR REPLACE FUNCTION public._islem_log_degisim_txid()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO 'pg_catalog'
-AS $function$
-BEGIN
-  -- L4-02a: istemci değeri fark etmeksizin EZİLİR
-  NEW.degisim_txid := txid_current();
-  RETURN NEW;
-END;
-$function$
-;
-
--- FUNCTION: public._islem_log_geri_alindi_kapisi()
-CREATE OR REPLACE FUNCTION public._islem_log_geri_alindi_kapisi()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO 'pg_catalog'
-AS $function$
-BEGIN
-  IF NEW.tip = 'GERI_ALINDI'
-     AND coalesce(current_setting('app.geri_alma_aktif', true), '') <> 'on' THEN
-    RAISE EXCEPTION 'GERI_ALINDI kaydi yalnizca degisim_geri_al icinden yazilabilir'
-      USING ERRCODE = '42501';
-  END IF;
-  RETURN NEW;
-END;
-$function$
-;
-
--- FUNCTION: public._pedigree_parent_set_core(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text, p_source_ref text, p_replace boolean, p_evidence jsonb)
-CREATE OR REPLACE FUNCTION public._pedigree_parent_set_core(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text DEFAULT 'manual'::text, p_source_ref text DEFAULT NULL::text, p_replace boolean DEFAULT false, p_evidence jsonb DEFAULT NULL::jsonb)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_farm        uuid := public.current_farm_id();
-  v_edge_id     uuid;
-  v_cur_parent  uuid;
-  v_parent_sex  text;
-BEGIN
-  -- Parentage mutasyonunu serialize et (check-then-use penceresini kapat)
-  PERFORM pg_advisory_xact_lock(hashtext('pedigree_parentage'));
-
-  IF p_role NOT IN ('dam','sire') THEN
-    RAISE EXCEPTION 'gecersiz parent_role: %', p_role;
-  END IF;
-  IF p_source_type NOT IN ('birth','manual','import','reconcile') THEN
-    RAISE EXCEPTION 'gecersiz source_type: %', p_source_type;
-  END IF;
-  IF p_child_node_id = p_parent_node_id THEN
-    RAISE EXCEPTION 'parent = child reddedildi';
-  END IF;
-
-  -- same-farm check (DDL composite FK ikinci savunma; burada açık mesaj)
-  IF NOT EXISTS (SELECT 1 FROM public.pedigree_nodes
-                  WHERE farm_id = v_farm AND id = p_child_node_id) THEN
-    RAISE EXCEPTION 'child node bulunamadi ya da farkli farm: %', p_child_node_id;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.pedigree_nodes
-                  WHERE farm_id = v_farm AND id = p_parent_node_id) THEN
-    RAISE EXCEPTION 'parent node bulunamadi ya da farkli farm: %', p_parent_node_id;
-  END IF;
-
-  -- explicit_founder node'a parent edge eklenmez (önce ordinary yapılır)
-  IF EXISTS (SELECT 1 FROM public.pedigree_nodes
-              WHERE farm_id = v_farm AND id = p_child_node_id
-                AND founder_status = 'explicit_founder') THEN
-    RAISE EXCEPTION 'explicit_founder node parent edge alamaz (once ordinary yapilmeli)';
-  END IF;
-
-  -- Sex kontrolü fail-closed DEĞİL (veri uyumu): bilinen değerlerde reddet
-  SELECT sex INTO v_parent_sex
-    FROM public.pedigree_nodes
-   WHERE farm_id = v_farm AND id = p_parent_node_id;
-  IF p_role = 'dam' AND v_parent_sex = 'male' THEN
-    RAISE EXCEPTION 'bilinen erkek dam olamaz';
-  END IF;
-  IF p_role = 'sire' AND v_parent_sex = 'female' THEN
-    RAISE EXCEPTION 'bilinen disi sire olamaz';
-  END IF;
-
-  -- Cycle: parent, child'ın dölü olamaz (yeni edge parent→child döngü kapatır)
-  IF public.pedigree_is_ancestor(p_child_node_id, p_parent_node_id) THEN
-    RAISE EXCEPTION 'cycle reddedildi: child zaten parent''in atasi';
-  END IF;
-
-  -- Mevcut edge: aynı role
-  SELECT id, parent_node_id INTO v_edge_id, v_cur_parent
-    FROM public.pedigree_parentage
-   WHERE farm_id = v_farm AND child_node_id = p_child_node_id AND parent_role = p_role;
-
-  IF v_edge_id IS NOT NULL THEN
-    IF v_cur_parent = p_parent_node_id THEN
-      RETURN v_edge_id;  -- idempotent success
-    END IF;
-    -- F3 (tur-1): üç-değerli tuzak — NULL p_replace açık onay DEĞİLDİR (fail-closed)
-    IF p_replace IS NOT TRUE THEN
-      RAISE EXCEPTION 'farkli parent — sessiz overwrite yok; p_replace=true gerekli';
-    END IF;
-    UPDATE public.pedigree_parentage
-       SET parent_node_id = p_parent_node_id,
-           source_type    = p_source_type,
-           source_ref     = p_source_ref,
-           evidence       = COALESCE(p_evidence, '{}'::jsonb)
-     WHERE id = v_edge_id
-    RETURNING id INTO v_edge_id;
-    RETURN v_edge_id;
-  END IF;
-
-  INSERT INTO public.pedigree_parentage
-    (farm_id, parent_node_id, child_node_id, parent_role, source_type, source_ref, evidence)
-  VALUES
-    (v_farm, p_parent_node_id, p_child_node_id, p_role, p_source_type, p_source_ref,
-     COALESCE(p_evidence, '{}'::jsonb))
-  RETURNING id INTO v_edge_id;
-
-  RETURN v_edge_id;
-END;
-$function$
-;
-
--- FUNCTION: public._tohumlama_gorev_uygunluk(p_hayvan_id text, p_tarih date)
-CREATE OR REPLACE FUNCTION public._tohumlama_gorev_uygunluk(p_hayvan_id text, p_tarih date)
- RETURNS text
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
-AS $function$
-DECLARE v_h record;
-BEGIN
-  SELECT * INTO v_h FROM public.hayvanlar WHERE id = p_hayvan_id;
-  IF NOT FOUND OR v_h.durum <> 'Aktif' THEN
-    RETURN 'Hayvan aktif değil';
-  END IF;
-  IF v_h.cinsiyet = 'Erkek' THEN
-    RETURN 'Erkek hayvana tohumlama görevi açılmaz';
-  END IF;
-  IF v_h.dogum_tarihi IS NOT NULL AND (p_tarih - v_h.dogum_tarihi) < 365 THEN
-    RETURN 'Hayvan hedef tarihte 12 aydan küçük';
-  END IF;
-  IF EXISTS (SELECT 1 FROM public.tohumlama WHERE hayvan_id = p_hayvan_id AND sonuc = 'Gebe') THEN
-    RETURN 'Hayvan gebe';
-  END IF;
-  RETURN NULL;
-END;
-$function$
-;
-
--- FUNCTION: public._trg_pedigree_hayvan_insert()
-CREATE OR REPLACE FUNCTION public._trg_pedigree_hayvan_insert()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-BEGIN
-  PERFORM public.pedigree_ensure_farm_node(NEW.id);
-  RETURN NULL;  -- AFTER trigger: dönüş değeri yok sayılır
-END;
-$function$
-;
-
--- FUNCTION: public.asi_gorev_planla(p_hayvan_id text, p_vaccine_id uuid, p_doz numeric, p_tarih date, p_aciklama text)
-CREATE OR REPLACE FUNCTION public.asi_gorev_planla(p_hayvan_id text, p_vaccine_id uuid, p_doz numeric, p_tarih date, p_aciklama text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_vax      record;
-  v_hayvan   text;
-  v_gorev_id uuid := gen_random_uuid();
-BEGIN
-  IF p_doz IS NULL OR p_doz <= 0 THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Doz pozitif olmalı');
-  END IF;
-
-  SELECT * INTO v_vax FROM public.vaccines WHERE id = p_vaccine_id;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Aşı bulunamadı');
-  END IF;
-  IF v_vax.stock_item_id IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Aşının stok bağlantısı yok: ' || v_vax.name);
-  END IF;
-
-  IF p_hayvan_id IS NOT NULL THEN
-    SELECT id INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id;
-    IF NOT FOUND THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı');
-    END IF;
-  END IF;
-
-  -- Mükerrer plan koruması: aynı hayvan + aynı aşı stoğu + aynı gün, açık görev
-  IF EXISTS (
-    SELECT 1 FROM public.gorev_log
-     WHERE gorev_tipi = 'ASI_PLANLI'
-       AND tamamlandi = false
-       AND iptal = false
-       AND stok_id = v_vax.stock_item_id
-       AND hedef_tarih = p_tarih
-       AND ((p_hayvan_id IS NULL AND hayvan_id IS NULL) OR hayvan_id = p_hayvan_id)
-  ) THEN
-    RETURN jsonb_build_object(
-      'ok', false,
-      'mesaj', v_vax.name || ' için ' || p_tarih || ' tarihinde zaten planlı bir görev var',
-      'kod', 'DUPLICATE');
-  END IF;
-
-  INSERT INTO public.gorev_log
-    (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, kaynak)
-  VALUES
-    (v_gorev_id, p_hayvan_id, 'ASI_PLANLI',
-     COALESCE(NULLIF(btrim(p_aciklama), ''), '💉 ' || v_vax.name || ' (planlı)'),
-     p_tarih, false, v_vax.stock_item_id, p_doz, 'MANUEL');
-
-  INSERT INTO public.stok_hareket
-    (stok_id, tur, miktar, notlar, iptal, referans_tipi, referans_id)
-  VALUES
-    (v_vax.stock_item_id, 'Aşı (Plan)', p_doz, 'GorevID:' || v_gorev_id::text, false, 'asi_plan', v_gorev_id::text);
-
-  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
-  VALUES ('ASI_GOREV_PLAN', p_hayvan_id, v_gorev_id::text, 'gorev_log',
-    jsonb_build_object(
-      'olusturulan', jsonb_build_array(jsonb_build_object('tablo', 'gorev_log', 'id', v_gorev_id::text)),
-      'vaccine', v_vax.name, 'doz', p_doz, 'tarih', p_tarih),
-    'Planlı aşı görevi: ' || v_vax.name || ' ' || p_doz || 'ml');
-
-  RETURN jsonb_build_object('ok', true, 'gorev_id', v_gorev_id::text);
-END;
-$function$
-;
-
--- FUNCTION: public.asi_planli_tamamla(p_gorev_id text, p_tarih date, p_doz numeric, p_vaccine_id uuid)
-CREATE OR REPLACE FUNCTION public.asi_planli_tamamla(p_gorev_id text, p_tarih date, p_doz numeric DEFAULT NULL::numeric, p_vaccine_id uuid DEFAULT NULL::uuid)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_gorev      gorev_log%ROWTYPE;
-  v_vaccine_id uuid;
-  v_vax_result jsonb;
-  v_doz        numeric;
-BEGIN
-  SELECT * INTO v_gorev FROM public.gorev_log WHERE id = p_gorev_id::uuid;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
-  END IF;
-  IF v_gorev.gorev_tipi IS DISTINCT FROM 'ASI_PLANLI' THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev planlı aşı görevi değil');
-  END IF;
-  IF v_gorev.tamamlandi THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev zaten tamamlanmış');
-  END IF;
-  IF v_gorev.iptal THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev iptal edilmiş');
-  END IF;
-
-  -- Aşı: form seçimi öncelikli; yoksa görevin stok bağlantısından çöz
-  -- (stok_id serbest metin — bozuk formatta ham cast yerine zarif ok:false)
-  IF p_vaccine_id IS NULL AND v_gorev.stok_id LIKE 'STOK-AŞI-%' THEN
-    BEGIN
-      v_vaccine_id := split_part(v_gorev.stok_id, 'STOK-AŞI-', 2)::uuid;
-    EXCEPTION WHEN OTHERS THEN
-      v_vaccine_id := NULL;
-    END;
-  END IF;
-  v_vaccine_id := COALESCE(p_vaccine_id, v_vaccine_id);
-  IF v_vaccine_id IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Görevde aşı bağlantısı yok');
-  END IF;
-
-  v_doz := COALESCE(p_doz, v_gorev.miktar);
-
-  SELECT public.add_vaccination(v_gorev.hayvan_id, v_vaccine_id, p_tarih, v_doz, NULL)
-    INTO v_vax_result;
-  IF (v_vax_result->>'ok')::boolean IS NOT TRUE THEN
-    RETURN v_vax_result; -- rezervasyon açık kalır (flip başarıdan SONRA — hayvan hatasında depozito yanmaz)
-  END IF;
-
-  -- gorev_geri_al aşıyı 'GorevID:' notundan bulur. Notu INSERT SONRASI yazıyoruz:
-  -- add_vaccination'in rapel kararı (v_is_gorev_triggered) etkilenmez, yıllık rapel üretimi sürer.
-  UPDATE public.vaccination_log
-     SET notes = 'GorevID:' || p_gorev_id
-   WHERE id = (v_vax_result->>'vaccination_id')::uuid;
-
-  -- Rezervasyonu kapat → net düşüm = gerçek uygulama (add_vaccination trigger'ı yazar).
-  -- Aynı transaction: add_vaccination istisna atarsa flip dahil her şey geri alınır.
-  UPDATE public.stok_hareket
-     SET iptal = true
-   WHERE referans_tipi = 'asi_plan'
-     AND referans_id = p_gorev_id
-     AND NOT iptal;
-
-  UPDATE public.gorev_log
-     SET tamamlandi = true, tamamlanma_tarihi = now()
-   WHERE id = p_gorev_id::uuid;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'vaccination_id', v_vax_result->>'vaccination_id',
-    'next_due', v_vax_result->>'next_due'
-  );
-END;
-$function$
-;
-
--- FUNCTION: public.asi_toplu_planla(p_hayvan_id text, p_tarih date, p_items jsonb, p_aciklama text)
-CREATE OR REPLACE FUNCTION public.asi_toplu_planla(p_hayvan_id text, p_tarih date, p_items jsonb, p_aciklama text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_item       jsonb;
-  v_vax        record;
-  v_hayvan     text;
-  v_parent_id  uuid := gen_random_uuid();
-  v_child_id   uuid;
-  v_ad         int := 0;
-  v_isimler    text := '';
-  v_cakisan    jsonb := '[]'::jsonb;
-BEGIN
-  IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Aşı listesi boş');
-  END IF;
-  IF p_hayvan_id IS NOT NULL THEN
-    SELECT id INTO v_hayvan FROM public.hayvanlar WHERE id = p_hayvan_id;
-    IF NOT FOUND THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı');
-    END IF;
-  END IF;
-
-  -- Önce tümünü doğrula (tek biri sorunluysa hiçbiri yaratılmaz)
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    SELECT * INTO v_vax FROM public.vaccines WHERE id = (v_item->>'vaccine_id')::uuid;
-    IF NOT FOUND THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', 'Aşı bulunamadı (index ' || v_ad || ')');
-    END IF;
-    IF v_vax.stock_item_id IS NULL THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', 'Aşının stok bağlantısı yok: ' || v_vax.name);
-    END IF;
-    IF COALESCE((v_item->>'doz')::numeric, 0) <= 0 THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', 'Doz pozitif olmalı: ' || v_vax.name);
-    END IF;
-    IF EXISTS (
-      SELECT 1 FROM public.gorev_log
-       WHERE gorev_tipi = 'ASI_PLANLI'
-         AND tamamlandi = false
-         AND iptal = false
-         AND stok_id = v_vax.stock_item_id
-         AND hedef_tarih = p_tarih
-         AND ((p_hayvan_id IS NULL AND hayvan_id IS NULL) OR hayvan_id = p_hayvan_id)
-    ) THEN
-      v_cakisan := v_cakisan || jsonb_build_array(v_vax.name || ' (' || p_tarih || ' planlı)');
-    END IF;
-    v_ad := v_ad + 1;
-  END LOOP;
-
-  IF jsonb_array_length(v_cakisan) > 0 THEN
-    RETURN jsonb_build_object('ok', false, 'kod', 'DUPLICATE', 'cakisan', v_cakisan,
-      'mesaj', 'Bu tarih için zaten planlı: ' || (SELECT string_agg(x, ', ') FROM jsonb_array_elements_text(v_cakisan) x));
-  END IF;
-
-  INSERT INTO public.gorev_log
-    (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak)
-  VALUES
-    (v_parent_id, p_hayvan_id, 'ASI_PLANLI',
-     COALESCE(NULLIF(btrim(p_aciklama), ''), '💉 Toplu aşı (' || jsonb_array_length(p_items) || ' aşı)'),
-     p_tarih, false, 'MANUEL');
-
-  FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    SELECT * INTO v_vax FROM public.vaccines WHERE id = (v_item->>'vaccine_id')::uuid;
-    v_child_id := gen_random_uuid();
-
-    INSERT INTO public.gorev_log
-      (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi,
-       stok_id, miktar, kaynak, parent_id)
-    VALUES
-      (v_child_id, p_hayvan_id, 'ASI_PLANLI',
-       '💉 ' || v_vax.name || ' — ' || (v_item->>'doz') || ' ' || COALESCE(v_vax.unit, 'ml'),
-       p_tarih, false, v_vax.stock_item_id, (v_item->>'doz')::numeric, 'MANUEL', v_parent_id);
-
-    INSERT INTO public.stok_hareket
-      (stok_id, tur, miktar, notlar, iptal, referans_tipi, referans_id)
-    VALUES
-      (v_vax.stock_item_id, 'Aşı (Plan)', (v_item->>'doz')::numeric,
-       'GorevID:' || v_child_id::text, false, 'asi_plan', v_child_id::text);
-
-    v_isimler := v_isimler || CASE WHEN v_isimler = '' THEN '' ELSE ', ' END || v_vax.name;
-  END LOOP;
-
-  INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
-  VALUES ('ASI_GOREV_PLAN', p_hayvan_id, v_parent_id::text, 'gorev_log',
-    jsonb_build_object(
-      'olusturulan', jsonb_build_array(jsonb_build_object('tablo', 'gorev_log', 'id', v_parent_id::text, 'tip', 'toplu')),
-      'vaccines', p_items, 'tarih', p_tarih),
-    'Toplu aşı görevi: ' || v_isimler);
-
-  RETURN jsonb_build_object('ok', true, 'parent_id', v_parent_id::text, 'adet', jsonb_array_length(p_items));
-END;
-$function$
-;
-
--- FUNCTION: public.assert_is_operator()
-CREATE OR REPLACE FUNCTION public.assert_is_operator()
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_owner text;
-BEGIN
-  SELECT value INTO v_owner FROM public.pedigree_meta
-   WHERE farm_id = public.current_farm_id() AND key = 'op_owner_uid';
-  IF v_owner IS NULL THEN
-    RAISE EXCEPTION 'op_owner_uid tanimli degil - sistem kapali (fail-closed)';
-  END IF;
-  IF coalesce(auth.uid()::text, '') <> v_owner THEN
-    RAISE EXCEPTION 'operator degil';
-  END IF;
-END;
-$function$
-;
-
--- FUNCTION: public.degisim_geri_al(p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text)
-CREATE OR REPLACE FUNCTION public.degisim_geri_al(p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text DEFAULT NULL::text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  c_hayvan_kolonlar CONSTANT text[] := ARRAY['hayvan_id','ana_hayvan_id','animal_id',
-                                             'anne_id','buzagi_id','farm_animal_id'];
-  v_b    surum_gizli.geri_alma_bileti;
-  v_plan jsonb;
-  v_res  jsonb;
-  v_n    int;
-  s      record;
-  v_htablo text;
-  v_hsatir jsonb;
-  v_ref    text;
-  v_hayvan text;
-  v_otip   text;
-BEGIN
-  IF p_bilet IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'BILET_GECERSIZ', 'detay', '{}'::jsonb);
-  END IF;
-  SELECT * INTO v_b FROM surum_gizli.geri_alma_bileti WHERE bilet = p_bilet;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'BILET_GECERSIZ', 'detay', '{}'::jsonb);
-  END IF;
-  IF v_b.son_gecerlilik <= clock_timestamp() THEN
-    v_res := jsonb_build_object('ok', false, 'hata', 'BILET_SURESI_DOLMUS',
-                                'detay', jsonb_build_object('son_gecerlilik', v_b.son_gecerlilik));
-    INSERT INTO surum_gizli.geri_alma_kullanim (bilet, hedef, seviye, gerekce, sonuc, kaynak)
-    VALUES (p_bilet, p_hedef, p_seviye, p_gerekce, v_res, surum_gizli._cagiran());
-    RETURN v_res;
-  END IF;
-
-  -- serialize reverts; plan, lock the rows it touches, then re-plan so the
-  -- conflict check runs against locked, current state (race-safe). The lock
-  -- and re-plan sit in their own subtransaction: a deadlock/timeout there
-  -- returns ok:false instead of escaping (which would skip the usage record).
-  PERFORM pg_advisory_xact_lock(hashtext('degisim_geri_al'));
-  v_plan := CASE WHEN p_seviye = 'zincir' THEN surum_gizli._l4_zincir(p_hedef)
-                 ELSE surum_gizli._degisim_plan(p_hedef, p_seviye) END;
-  IF (v_plan ->> 'ok')::boolean THEN
-    BEGIN
-      FOR s IN
-        SELECT DISTINCT x.tablo, x.satir_pk FROM jsonb_to_recordset(v_plan -> 'plan') AS x(tablo text, satir_pk jsonb)
-      LOOP
-        EXECUTE format('SELECT 1 FROM public.%1$I WHERE (%2$s) = (SELECT %2$s FROM jsonb_populate_record(NULL::public.%1$I, $1)) FOR UPDATE',
-                       s.tablo, surum_gizli._pk_kolonlar(s.tablo)) USING s.satir_pk;
-      END LOOP;
-      v_plan := CASE WHEN p_seviye = 'zincir' THEN surum_gizli._l4_zincir(p_hedef)
-                     ELSE surum_gizli._degisim_plan(p_hedef, p_seviye) END;
-    EXCEPTION WHEN others THEN
-      v_res := jsonb_build_object('ok', false, 'hata', 'UYGULAMA_HATASI',
-                                  'detay', jsonb_build_object('asama', 'KILIT_PLAN',
-                                                              'sqlstate', SQLSTATE, 'mesaj', SQLERRM));
-    END;
-  END IF;
-
-  IF v_res IS NOT NULL THEN
-    NULL;  -- lock/plan phase already failed; fall through to the usage record
-  ELSIF NOT (v_plan ->> 'ok')::boolean THEN
-    v_res := jsonb_build_object('ok', false, 'hata', v_plan ->> 'hata',
-                                'detay', coalesce(v_plan -> 'detay', '{}'::jsonb));
-  ELSIF jsonb_array_length(v_plan -> 'cakismalar') > 0 THEN
-    v_res := jsonb_build_object('ok', false, 'hata', 'CAKISMA',
-                                'detay', jsonb_build_object('cakismalar', v_plan -> 'cakismalar',
-                                                            'engeller', v_plan -> 'engeller')
-                                          || CASE WHEN p_seviye = 'zincir'
-                                                  THEN jsonb_build_object('sirali_rehber', v_plan -> 'sirali_rehber')
-                                                  ELSE '{}'::jsonb END);
-  ELSIF NOT (v_plan ->> 'geri_alinabilir')::boolean
-        AND jsonb_array_length(v_plan -> 'plan') > 0 THEN
-    v_res := jsonb_build_object('ok', false, 'hata', 'BAGIMLILIK_ENGELI',
-                                'detay', jsonb_build_object('bagimliliklar', v_plan -> 'bagimliliklar',
-                                                            'engeller', v_plan -> 'engeller')
-                                          || CASE WHEN p_seviye = 'zincir'
-                                                  THEN jsonb_build_object('sirali_rehber', v_plan -> 'sirali_rehber')
-                                                  ELSE '{}'::jsonb END);
-  ELSIF jsonb_array_length(v_plan -> 'plan') = 0 THEN
-    v_res := jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI', 'detay', '{}'::jsonb);
-  ELSE
-    PERFORM set_config('app.geri_alma_bileti', p_bilet::text, true);
-    PERFORM set_config('app.geri_alma_gerekce', coalesce(p_gerekce, ''), true);
-    BEGIN
-      v_n := surum_gizli._degisim_uygula(v_plan -> 'plan');
-    EXCEPTION WHEN others THEN
-      -- a business trigger/constraint refused a step: nothing was applied
-      v_res := jsonb_build_object('ok', false, 'hata', 'UYGULAMA_HATASI',
-                                  'detay', jsonb_build_object('sqlstate', SQLSTATE, 'mesaj', SQLERRM));
-    END;
-
-    IF v_res IS NULL THEN
-      -- L4 §6 + L4-06: telafi kaydı — aynı transaction içinde; INSERT yalnız
-      -- app.geri_alma_aktif GUC'iyle açılır (yukarıda). Telafi yazımı
-      -- başarısızsa istisna yayılır → tüm geri alma transaction'ı geri
-      -- döner (atomik; telafisiz revert kalmaz).
-      v_htablo := v_plan -> 'hedef' ->> 'tablo';
-      v_hsatir := v_plan -> 'hedef' -> 'satir_pk';
-      IF v_htablo IS NULL THEN
-        SELECT x.tablo, x.satir_pk INTO v_htablo, v_hsatir
-          FROM jsonb_to_recordset(v_plan -> 'plan')
-            AS x(sira int, tablo text, satir_pk jsonb)
-         ORDER BY x.sira LIMIT 1;
-      END IF;
-      v_ref := CASE WHEN (SELECT count(*) FROM jsonb_object_keys(v_hsatir)) = 1
-                    THEN (SELECT v #>> '{}' FROM jsonb_each(v_hsatir) AS e(k, v))
-                    ELSE v_hsatir::text END;
-      IF v_htablo = 'hayvanlar' THEN
-        v_hayvan := (SELECT v #>> '{}' FROM jsonb_each(v_hsatir) AS e(k, v));
-      ELSE
-        SELECT coalesce(x.yeni, x.eski) ->> k INTO v_hayvan
-          FROM jsonb_to_recordset(v_plan -> 'plan')
-            AS x(sira int, tablo text, satir_pk jsonb, yeni jsonb, eski jsonb)
-          CROSS JOIN LATERAL unnest(c_hayvan_kolonlar) AS k
-         WHERE x.tablo = v_htablo AND x.satir_pk = v_hsatir
-           AND coalesce(x.yeni, x.eski) ->> k IS NOT NULL
-         ORDER BY x.sira LIMIT 1;
-      END IF;
-      -- L4-06: orijinal_tip GERÇEK islem_log tipidir — degisim_txid köprüsünden
-      -- çözülür (aynı tx'te yazılan islem_log satır(lar)ının tipi). Köprüden
-      -- çözülmezse hedef tablo + işlem etiketi; 'I,U' harf kümesi KALDI.
-      SELECT string_agg(DISTINCT il.tip, ', ' ORDER BY il.tip) INTO v_otip
-        FROM public.islem_log il
-       WHERE il.degisim_txid IN (SELECT x.txid::bigint
-                                   FROM jsonb_to_recordset(v_plan -> 'plan') AS x(txid text));
-      IF coalesce(v_otip, '') = '' THEN
-        SELECT format('%s %s', v_htablo,
-                 string_agg(DISTINCT CASE x.islem WHEN 'I' THEN 'ekleme'
-                                                  WHEN 'U' THEN 'guncelleme'
-                                                  WHEN 'D' THEN 'silme'
-                                                  ELSE x.islem END, ', '
-                            ORDER BY CASE x.islem WHEN 'I' THEN 'ekleme'
-                                                  WHEN 'U' THEN 'guncelleme'
-                                                  WHEN 'D' THEN 'silme'
-                                                  ELSE x.islem END))
-          INTO v_otip
-          FROM jsonb_to_recordset(v_plan -> 'plan') AS x(islem text);
-      END IF;
-
-      -- L4-02b: GERI_ALINDI kapısı — GUC penceresi kapının gerçek kullanımına
-      -- (telafi INSERT'i) sıkıştırıldı (review sertleştirmesi).
-      PERFORM set_config('app.geri_alma_aktif', 'on', true);
-      INSERT INTO public.islem_log
-        (tip, ref_id, ref_tablo, ana_hayvan_id, payload, snapshot)
-      VALUES
-        ('GERI_ALINDI', v_ref, v_htablo, v_hayvan,
-         jsonb_build_object('orijinal_tip', v_otip, 'seviye', p_seviye, 'adim', v_n),
-         '{}'::jsonb);
-
-      v_res := jsonb_build_object('ok', true,
-                                  'geri_alma_txid', txid_current()::text,
-                                  'uygulanan_adim', v_n);
-      IF p_seviye = 'zincir' THEN
-        v_res := v_res || jsonb_build_object('zincir_adim', jsonb_array_length(v_plan -> 'plan'));
-      END IF;
-    END IF;
-    PERFORM set_config('app.geri_alma_bileti', '', true);
-    PERFORM set_config('app.geri_alma_gerekce', '', true);
-    PERFORM set_config('app.geri_alma_aktif', '', true);
-  END IF;
-
-  INSERT INTO surum_gizli.geri_alma_kullanim (bilet, hedef, seviye, gerekce, sonuc, geri_alma_txid, kaynak)
-  VALUES (p_bilet, p_hedef, p_seviye, p_gerekce, v_res,
-          CASE WHEN (v_res ->> 'ok')::boolean THEN txid_current() END,
-          surum_gizli._cagiran());
-  RETURN v_res;
-END;
-$function$
-;
-
--- FUNCTION: public.degisim_listele(p_filtre jsonb)
-CREATE OR REPLACE FUNCTION public.degisim_listele(p_filtre jsonb DEFAULT '{}'::jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  f        jsonb := coalesce(p_filtre, '{}'::jsonb);
-  v_txid   bigint;
-  v_sayfa  int;
-  v_adet   int;
-  v_bas    timestamptz;
-  v_bit    timestamptz;
-  v_hayvan text := nullif(f ->> 'hayvan_id', '');
-  v_tablo  text := nullif(f ->> 'tablo', '');
-  v_islem  text := nullif(f ->> 'islem', '');
-  v_toplam bigint;
-  v_liste  jsonb;
-BEGIN
-  BEGIN
-    v_txid  := nullif(f ->> 'txid', '')::bigint;
-    v_sayfa := greatest(coalesce(nullif(f ->> 'sayfa', '')::int, 1), 1);
-    v_adet  := least(greatest(coalesce(nullif(f ->> 'adet', '')::int, 50), 1), 200);
-    -- day bounds are Turkey calendar days (UI date filter is gg.aa.yyyy)
-    v_bas := (nullif(f ->> 'baslangic', '')::date)::timestamp AT TIME ZONE 'Europe/Istanbul';
-    v_bit := ((nullif(f ->> 'bitis', '')::date) + 1)::timestamp AT TIME ZONE 'Europe/Istanbul';
-  EXCEPTION WHEN others THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_FILTRE');
-  END;
-
-  IF v_txid IS NOT NULL THEN
-    RETURN jsonb_build_object(
-      'ok', true,
-      'detay', true,
-      'kayitlar', coalesce((
-        SELECT jsonb_agg(jsonb_build_object(
-                 'id', id, 'txid', txid::text, 'zaman', kayit_zamani,
-                 'tablo_adi', tablo_adi, 'satir_pk', satir_pk, 'islem', islem,
-                 'eski', eski, 'yeni', yeni, 'degisen_alanlar', degisen_alanlar,
-                 'teknikal_mi', teknikal_mi, 'kaynak', kaynak) ORDER BY id)
-          FROM public.degisim_log WHERE txid = v_txid), '[]'::jsonb));
-  END IF;
-
-  WITH eslesen AS (
-    SELECT DISTINCT l.txid
-      FROM public.degisim_log l
-     WHERE (v_bas IS NULL OR l.kayit_zamani >= v_bas)
-       AND (v_bit IS NULL OR l.kayit_zamani < v_bit)
-       AND (v_tablo IS NULL OR l.tablo_adi = v_tablo)
-       AND (v_islem IS NULL OR l.islem = v_islem)
-       AND (v_hayvan IS NULL
-            OR (l.tablo_adi = 'hayvanlar' AND l.satir_pk ->> 'id' = v_hayvan)
-            OR EXISTS (SELECT 1
-                         FROM unnest(ARRAY['hayvan_id','anne_id','buzagi_id','animal_id',
-                                           'farm_animal_id','ana_hayvan_id']) k
-                        WHERE coalesce(l.yeni, l.eski) ->> k = v_hayvan))
-  ), gruplar AS (
-    SELECT l.txid,
-           min(l.kayit_zamani) AS ilk_zaman,
-           min(l.id) AS ilk_id,
-           count(DISTINCT l.tablo_adi) AS tablo_sayisi,
-           count(*) AS satir_sayisi,
-           count(*) FILTER (WHERE l.islem = 'I') AS n_i,
-           count(*) FILTER (WHERE l.islem = 'U') AS n_u,
-           count(*) FILTER (WHERE l.islem = 'D') AS n_d,
-           bool_and(l.teknikal_mi) AS teknik,
-           bool_or(l.kaynak ? 'geri_alma') AS geri_alma
-      FROM public.degisim_log l JOIN eslesen USING (txid)
-     GROUP BY l.txid
-  ), sayfa AS (
-    SELECT g.*, count(*) OVER () AS toplam
-      FROM gruplar g
-     ORDER BY g.ilk_zaman DESC, g.txid DESC
-     OFFSET (v_sayfa - 1) * v_adet LIMIT v_adet
-  )
-  SELECT max(s.toplam),
-         jsonb_agg(jsonb_build_object(
-           'txid', s.txid::text,
-           'ilk_zaman', s.ilk_zaman,
-           'ozet', jsonb_build_object(
-             'tablo_sayisi', s.tablo_sayisi,
-             'satir_sayisi', s.satir_sayisi,
-             'islemler', jsonb_build_object('I', s.n_i, 'U', s.n_u, 'D', s.n_d),
-             'baslik', (SELECT string_agg(format('%s (%s)', t.tablo_adi, t.n), ', ' ORDER BY t.n DESC, t.tablo_adi)
-                          FROM (SELECT tablo_adi, count(*) AS n FROM public.degisim_log
-                                 WHERE txid = s.txid GROUP BY 1) t),
-             'teknik', s.teknik,
-             'geri_alma', s.geri_alma),
-           'kaynak', (SELECT kaynak FROM public.degisim_log WHERE id = s.ilk_id))
-           ORDER BY s.ilk_zaman DESC, s.txid DESC)
-    INTO v_toplam, v_liste
-    FROM sayfa s;
-
-  -- an OFFSET past the end returns no rows, so count separately then
-  IF v_toplam IS NULL THEN
-    WITH eslesen AS (
-      SELECT DISTINCT l.txid FROM public.degisim_log l
-       WHERE (v_bas IS NULL OR l.kayit_zamani >= v_bas)
-         AND (v_bit IS NULL OR l.kayit_zamani < v_bit)
-         AND (v_tablo IS NULL OR l.tablo_adi = v_tablo)
-         AND (v_islem IS NULL OR l.islem = v_islem)
-         AND (v_hayvan IS NULL
-              OR (l.tablo_adi = 'hayvanlar' AND l.satir_pk ->> 'id' = v_hayvan)
-              OR EXISTS (SELECT 1
-                           FROM unnest(ARRAY['hayvan_id','anne_id','buzagi_id','animal_id',
-                                             'farm_animal_id','ana_hayvan_id']) k
-                          WHERE coalesce(l.yeni, l.eski) ->> k = v_hayvan)))
-    SELECT count(*) INTO v_toplam FROM eslesen;
-  END IF;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'kayitlar', coalesce(v_liste, '[]'::jsonb),
-    'toplam', v_toplam,
-    'sayfa', v_sayfa,
-    'adet', v_adet);
-END;
-$function$
-;
-
--- FUNCTION: public.degisim_onizle(p_hedef jsonb, p_seviye text)
-CREATE OR REPLACE FUNCTION public.degisim_onizle(p_hedef jsonb, p_seviye text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-BEGIN
-  IF p_seviye = 'zincir' THEN
-    RETURN surum_gizli._l4_zincir(p_hedef);
-  END IF;
-  RETURN surum_gizli._degisim_plan(p_hedef, p_seviye);
-END;
-$function$
-;
-
--- FUNCTION: public.fn_gorev_asip_iade()
-CREATE OR REPLACE FUNCTION public.fn_gorev_asip_iade()
- RETURNS trigger
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-BEGIN
-  UPDATE public.stok_hareket
-     SET iptal = true
-   WHERE referans_tipi = 'asi_plan'
-     AND referans_id = NEW.id::text
-     AND NOT iptal;
-  RETURN NEW;
-END;
-$function$
-;
-
--- FUNCTION: public.fn_sperma_stok_dus(p_sperma text, p_notlar text)
-CREATE OR REPLACE FUNCTION public.fn_sperma_stok_dus(p_sperma text, p_notlar text DEFAULT NULL::text)
- RETURNS void
- LANGUAGE plpgsql
-AS $function$
-DECLARE
-  v_stok_id text;
-BEGIN
-  -- (a) NULL/whitespace ad asla düşüm üretmez ('' → ILIKE '%%' rastgele satır
-  -- kusurunun kapanışı); regex, btrim'in kaçırdığı tab/newline/CR'yi de kapsar.
-  IF p_sperma IS NULL OR p_sperma ~ '^\s*$' THEN
-    RETURN;
-  END IF;
-
-  -- (b) Exact eşleşme önceliklidir.
-  SELECT s.id INTO v_stok_id
-    FROM public.stok s
-   WHERE s.kategori = 'Sperma'
-     AND s.urun_adi = p_sperma
-   LIMIT 1;
-
-  -- (c) Exact yoksa substring ILIKE (canlı davranışla aynı eşleşme ailesi).
-  IF v_stok_id IS NULL THEN
-    SELECT s.id INTO v_stok_id
-      FROM public.stok s
-     WHERE s.kategori = 'Sperma'
-       AND s.urun_adi ILIKE '%' || p_sperma || '%'
-     LIMIT 1;
-  END IF;
-
-  IF v_stok_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  -- (d) Ledger: pozitif miktar = kullanım; canlı INSERT şekliyle aynı kolonlar.
-  -- p_notlar çağıranın verdiği metinle yazılabilir (kupe_no/deneme bilgisi);
-  -- verilmezse 'Tohumlama — ' || p_sperma.
-  INSERT INTO public.stok_hareket (stok_id, tur, miktar, notlar, iptal)
-  VALUES (v_stok_id, 'Tohumlama', 1,
-          COALESCE(p_notlar, 'Tohumlama — ' || p_sperma), false);
-END;
-$function$
-;
-
--- FUNCTION: public.geri_alma_bileti_al(p_sifre text)
-CREATE OR REPLACE FUNCTION public.geri_alma_bileti_al(p_sifre text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  v_hash text;
-  v_b    surum_gizli.geri_alma_bileti;
-BEGIN
-  SELECT hash INTO v_hash FROM surum_gizli.sahip_sifresi WHERE id = 1;
-  IF v_hash IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'SIFRE_AYARLI_DEGIL');
-  END IF;
-  IF p_sifre IS NULL OR extensions.crypt(p_sifre, v_hash) IS DISTINCT FROM v_hash THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'SIFRE_HATALI');
-  END IF;
-
-  INSERT INTO surum_gizli.geri_alma_bileti (son_gecerlilik, kaynak)
-  VALUES (now() + interval '1 hour', surum_gizli._cagiran())
-  RETURNING * INTO v_b;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'bilet', v_b.bilet,
-    'olusturma', v_b.olusturma,
-    'son_gecerlilik', v_b.son_gecerlilik,
-    'kalan_sn', greatest(0, floor(extract(epoch FROM v_b.son_gecerlilik - now())))::int);
-END;
-$function$
-;
-
--- FUNCTION: public.hayvan_kilo_guncelle(p_id text, p_canli_agirlik numeric)
-CREATE OR REPLACE FUNCTION public.hayvan_kilo_guncelle(p_id text, p_canli_agirlik numeric)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-BEGIN
-  IF p_id IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'hayvan_id gerekli');
-  END IF;
-  IF p_canli_agirlik IS NULL OR p_canli_agirlik <= 0 THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'canlı ağırlık > 0 olmalı');
-  END IF;
-  UPDATE public.hayvanlar SET canli_agirlik = p_canli_agirlik WHERE id = p_id;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Hayvan bulunamadı');
-  END IF;
-  RETURN jsonb_build_object('ok', true, 'id', p_id, 'canli_agirlik', p_canli_agirlik);
-END;
-$function$
-;
-
--- FUNCTION: public.ilac_dozaj_guncelle(p_id uuid, p_guncellemeler jsonb)
-CREATE OR REPLACE FUNCTION public.ilac_dozaj_guncelle(p_id uuid, p_guncellemeler jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_row   public.drug_products%ROWTYPE;
-  v_json  jsonb := COALESCE(p_guncellemeler, '{}'::jsonb);
-  v_unit  text;
-  v_dose  numeric;
-  v_min   numeric;
-  v_max   numeric;
-  v_conc  numeric;
-BEGIN
-  IF p_id IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'drug_product_id gerekli');
-  END IF;
-  SELECT * INTO v_row FROM public.drug_products WHERE id = p_id;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'İlaç kartı bulunamadı');
-  END IF;
-
-  v_unit := COALESCE(v_json->>'std_dose_unit', v_row.std_dose_unit);
-  IF v_unit IS NOT NULL AND v_unit NOT IN ('ml/kg','mg/kg','ml/hayvan') THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'std_dose_unit geçersiz: ' || v_unit);
-  END IF;
-
-  v_dose := COALESCE((v_json->>'std_dose')::numeric, v_row.std_dose);
-  IF v_dose IS NOT NULL AND v_dose <= 0 THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'std_dose > 0 olmalı');
-  END IF;
-
-  v_min := COALESCE((v_json->>'std_dose_min')::numeric, v_row.std_dose_min);
-  v_max := COALESCE((v_json->>'std_dose_max')::numeric, v_row.std_dose_max);
-  IF v_min IS NOT NULL AND v_max IS NOT NULL AND v_min > v_max THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'min > max olamaz');
-  END IF;
-
-  v_conc := COALESCE((v_json->>'concentration')::numeric, v_row.concentration);
-  IF v_conc IS NOT NULL AND v_conc <= 0 THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'concentration > 0 olmalı');
-  END IF;
-
-  UPDATE public.drug_products SET
-    std_dose            = COALESCE((v_json->>'std_dose')::numeric,            std_dose),
-    std_dose_unit       = COALESCE(v_json->>'std_dose_unit',                  std_dose_unit),
-    std_dose_min        = COALESCE((v_json->>'std_dose_min')::numeric,        std_dose_min),
-    std_dose_max        = COALESCE((v_json->>'std_dose_max')::numeric,        std_dose_max),
-    concentration       = COALESCE((v_json->>'concentration')::numeric,       concentration),
-    concentration_unit  = COALESCE(v_json->>'concentration_unit',             concentration_unit)
-  WHERE id = p_id;
-
-  RETURN jsonb_build_object('ok', true, 'id', p_id,
-    'std_dose', v_dose, 'std_dose_unit', v_unit,
-    'std_dose_min', v_min, 'std_dose_max', v_max, 'concentration', v_conc);
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_ensure_farm_node(p_hayvan_id text)
-CREATE OR REPLACE FUNCTION public.pedigree_ensure_farm_node(p_hayvan_id text)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_node_id uuid;
-  v_sex     text;
-BEGIN
-  SELECT id INTO v_node_id
-    FROM public.pedigree_nodes
-   WHERE farm_id = public.current_farm_id() AND farm_animal_id = p_hayvan_id;
-  IF v_node_id IS NOT NULL THEN
-    RETURN v_node_id;
-  END IF;
-
-  SELECT CASE cinsiyet WHEN 'Erkek' THEN 'male' WHEN 'Dişi' THEN 'female' ELSE NULL END
-    INTO v_sex
-    FROM public.hayvanlar
-   WHERE id = p_hayvan_id;
-
-  INSERT INTO public.pedigree_nodes (farm_animal_id, node_kind, sex)
-  VALUES (p_hayvan_id, 'farm_animal', v_sex)
-  ON CONFLICT (farm_id, farm_animal_id) DO UPDATE SET updated_at = now()
-  RETURNING id INTO v_node_id;
-
-  RETURN v_node_id;
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_external_upsert(p_display_name text, p_node_id uuid, p_sex text, p_breed text, p_birth_date date, p_registry_system text, p_registry_code text)
-CREATE OR REPLACE FUNCTION public.pedigree_external_upsert(p_display_name text, p_node_id uuid DEFAULT NULL::uuid, p_sex text DEFAULT NULL::text, p_breed text DEFAULT NULL::text, p_birth_date date DEFAULT NULL::date, p_registry_system text DEFAULT NULL::text, p_registry_code text DEFAULT NULL::text)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_farm     uuid := public.current_farm_id();
-  v_id       uuid;
-  v_norm_sex text := CASE p_sex WHEN 'Erkek' THEN 'male'
-                                 WHEN 'Dişi'  THEN 'female'
-                                 ELSE p_sex END;
-BEGIN
-  PERFORM public.assert_is_operator();
-
-  IF p_node_id IS NOT NULL THEN
-    UPDATE public.pedigree_nodes
-       SET display_name    = COALESCE(p_display_name, display_name),
-           sex             = COALESCE(v_norm_sex, sex),
-           breed           = COALESCE(p_breed, breed),
-           birth_date      = COALESCE(p_birth_date, birth_date),
-           registry_system = COALESCE(p_registry_system, registry_system),
-           registry_code   = COALESCE(p_registry_code, registry_code),
-           updated_at      = now()
-     WHERE id = p_node_id AND farm_id = v_farm AND node_kind = 'external_animal'
-    RETURNING id INTO v_id;
-    IF v_id IS NULL THEN
-      RAISE EXCEPTION 'external node bulunamadi ya da farkli farm: %', p_node_id;
-    END IF;
-    RETURN v_id;
-  END IF;
-
-  -- Aynı registry identity ikinci kez oluşmaz: bul-duysa-dön (idempotent)
-  IF p_registry_system IS NOT NULL AND p_registry_code IS NOT NULL THEN
-    SELECT id INTO v_id
-      FROM public.pedigree_nodes
-     WHERE farm_id = v_farm
-       AND registry_system = p_registry_system
-       AND registry_code   = p_registry_code;
-    IF v_id IS NOT NULL THEN
-      RETURN v_id;
-    END IF;
-  END IF;
-
-  INSERT INTO public.pedigree_nodes
-    (node_kind, display_name, sex, breed, birth_date, registry_system, registry_code)
-  VALUES
-    ('external_animal', p_display_name, v_norm_sex, p_breed, p_birth_date,
-     p_registry_system, p_registry_code)
-  RETURNING id INTO v_id;
-
-  RETURN v_id;
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_farm_backfill()
-CREATE OR REPLACE FUNCTION public.pedigree_farm_backfill()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_farm         uuid := public.current_farm_id();
-  r              record;
-  v_child_node   uuid;
-  v_dam_node     uuid;
-  v_nodes_before integer;
-  v_nodes_after  integer;
-  v_edges_before integer;
-  v_edges_after  integer;
-  v_matched      integer := 0;
-  v_skipped      integer := 0;
-BEGIN
-  IF to_regclass('public.pedigree_nodes') IS NULL
-     OR to_regclass('public.pedigree_parentage') IS NULL THEN
-    RAISE EXCEPTION 'pedigree foundation yok — once 20260911000002 koşmalı';
-  END IF;
-
-  SELECT count(*) INTO v_nodes_before
-    FROM public.pedigree_nodes
-   WHERE farm_id = v_farm AND node_kind = 'farm_animal';
-
-  -- 2.1: tüm farm hayvanları için idempotent node (ensure bul-yoksa-yarat)
-  FOR r IN SELECT id FROM public.hayvanlar
-  LOOP
-    PERFORM public.pedigree_ensure_farm_node(r.id);
-  END LOOP;
-
-  SELECT count(*) INTO v_nodes_after
-    FROM public.pedigree_nodes
-   WHERE farm_id = v_farm AND node_kind = 'farm_animal';
-
-  SELECT count(*) INTO v_edges_before
-    FROM public.pedigree_parentage
-   WHERE farm_id = v_farm;
-
-  -- 2.2: yalnız güvenli satırlar (buzagi_id FK predicate — başlıktaki tam SQL)
-  FOR r IN
-    SELECT c.id AS cid, c.anne_id AS pid
-      FROM public.hayvanlar c
-     WHERE c.anne_id IS NOT NULL
-       AND EXISTS (SELECT 1 FROM public.hayvanlar p WHERE p.id = c.anne_id)
-       AND c.dogum_tarihi IS NOT NULL
-       AND EXISTS (SELECT 1 FROM public.dogum d
-                    WHERE d.buzagi_id = c.id
-                      AND d.anne_id  = c.anne_id
-                      AND d.tarih   <= c.dogum_tarihi)
-  LOOP
-    v_matched := v_matched + 1;
-    BEGIN
-      v_child_node := public.pedigree_ensure_farm_node(r.cid);
-      v_dam_node   := public.pedigree_ensure_farm_node(r.pid);
-      -- confidence: kolon default 1.0 (plan: confidence = 1); sessiz overwrite
-      -- YOK — mevcut farklı dam varsa core reddeder, satır atlanır.
-      PERFORM public._pedigree_parent_set_core(
-        v_child_node, 'dam', v_dam_node, 'reconcile', 'pedigree_farm_backfill', false, NULL);
-    EXCEPTION WHEN OTHERS THEN
-      v_skipped := v_skipped + 1;
-    END;
-  END LOOP;
-
-  SELECT count(*) INTO v_edges_after
-    FROM public.pedigree_parentage
-   WHERE farm_id = v_farm;
-
-  RETURN jsonb_build_object(
-    'farm_id',               v_farm,
-    'nodes_total',           v_nodes_after,
-    'nodes_created',         v_nodes_after - v_nodes_before,
-    'maternal_safe_rows',    v_matched,
-    'maternal_edges_created', v_edges_after - v_edges_before,
-    'maternal_edges_skipped', v_skipped);
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_integrity_report()
-CREATE OR REPLACE FUNCTION public.pedigree_integrity_report()
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_farm           uuid := public.current_farm_id();
-  v_cutoff_raw     text;
-  v_cutoff_ts      timestamptz;
-  v_cutoff_iso     text;
-  v_cutoff_state   text;      -- 'ok' | 'tanimsiz' | 'gecersiz'
-  v_has_semen_col  boolean;
-  v_static_groups  jsonb;
-  v_pc_count       integer;
-  v_pc_items       jsonb;
-  v_groups         jsonb;
-  v_ordered        jsonb;
-BEGIN
-  -- Cutoff okuması NULL-güvenli: anahtar yok → 'tanimsiz', cast NULL → 'gecersiz'
-  SELECT value INTO v_cutoff_raw
-    FROM public.pedigree_meta
-   WHERE farm_id = v_farm AND key = 'semen_controlled_cutoff';
-
-  IF v_cutoff_raw IS NULL THEN
-    v_cutoff_state := 'tanimsiz';
-  ELSE
-    v_cutoff_ts := public.pedigree_try_timestamptz(v_cutoff_raw);
-    IF v_cutoff_ts IS NULL THEN
-      v_cutoff_state := 'gecersiz';
-    ELSE
-      v_cutoff_state := 'ok';
-      v_cutoff_iso := to_char(v_cutoff_ts AT TIME ZONE 'UTC',
-                              'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
-    END IF;
-  END IF;
-
-  -- Geçici nesne guard'ları (P1: ikisi de yok → ilgili gruplar emit edilmez)
-  SELECT EXISTS (
-    SELECT 1 FROM information_schema.columns
-     WHERE table_schema = 'public' AND table_name = 'tohumlama'
-       AND column_name = 'semen_id'
-  ) INTO v_has_semen_col;
-
-  -- ── Statik bulgu evreni (UNION ALL; her kod tek branch, severity tek yerde)
-  WITH f(code, fkey, detail) AS (
-    -- farm_animal_node_eksik (warning): hayvanlar satırı için node yok; key=hayvan_id
-    SELECT 'farm_animal_node_eksik', h.id,
-           'pedigree_nodes(farm_animal) satırı yok'
-      FROM public.hayvanlar h
-     WHERE NOT EXISTS (SELECT 1 FROM public.pedigree_nodes pn
-                        WHERE pn.farm_id = v_farm AND pn.farm_animal_id = h.id)
-    UNION ALL
-    -- unresolved_anne_id (warning): key=hayvan_id
-    SELECT 'unresolved_anne_id', h.id,
-           'anne_id=' || h.anne_id || ' hayvanlar''da bulunamadı'
-      FROM public.hayvanlar h
-     WHERE h.anne_id IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM public.hayvanlar p WHERE p.id = h.anne_id)
-    UNION ALL
-    -- unresolved_baba_bilgi (info): pedigree_legacy_identity_map materializasyonu
-    -- Task 8'de iner — inmeden önce bu grup EMİT EDİLMEZ (r12-F69). Sorgu Task 8
-    -- migration'ınca bu UNION'a eklenecek. P1'de branch yoktur.
-    SELECT 'unresolved_baba_bilgi', NULL, NULL
-      WHERE false
-    UNION ALL
-    -- child_without_dam (warning): farm animal, 1 yaş üstü, dam edge yok; key=hayvan_id
-    SELECT 'child_without_dam', pn.farm_animal_id,
-           'dam edge yok; dogum_tarihi=' || COALESCE(h.dogum_tarihi::text, 'NULL')
-      FROM public.pedigree_nodes pn
-      JOIN public.hayvanlar h ON h.id = pn.farm_animal_id
-     WHERE pn.farm_id = v_farm AND pn.node_kind = 'farm_animal'
-       AND COALESCE(h.dogum_tarihi, pn.birth_date) < (current_date - interval '1 year')
-       AND NOT EXISTS (SELECT 1 FROM public.pedigree_parentage pp
-                        WHERE pp.farm_id = v_farm
-                          AND pp.child_node_id = pn.id
-                          AND pp.parent_role = 'dam')
-    UNION ALL
-    -- child_without_sire (info): farm animal, sire edge yok; key=hayvan_id
-    SELECT 'child_without_sire', pn.farm_animal_id,
-           'sire edge yok'
-      FROM public.pedigree_nodes pn
-     WHERE pn.farm_id = v_farm AND pn.node_kind = 'farm_animal'
-       AND NOT EXISTS (SELECT 1 FROM public.pedigree_parentage pp
-                        WHERE pp.farm_id = v_farm
-                          AND pp.child_node_id = pn.id
-                          AND pp.parent_role = 'sire')
-    UNION ALL
-    -- role_sex_contradiction (warning): key=edge-id
-    SELECT 'role_sex_contradiction', pp.id::text,
-           pp.parent_role || ' edge ama parent sex=' || COALESCE(pnp.sex, 'NULL')
-      FROM public.pedigree_parentage pp
-      JOIN public.pedigree_nodes pnp
-        ON pnp.farm_id = pp.farm_id AND pnp.id = pp.parent_node_id
-     WHERE pp.farm_id = v_farm
-       AND ( (pp.parent_role = 'dam'  AND pnp.sex = 'male')
-          OR (pp.parent_role = 'sire' AND pnp.sex = 'female') )
-    UNION ALL
-    -- duplicate_registry (blocker): key=registry_code
-    SELECT 'duplicate_registry', pn.registry_code,
-           'registry_system=' || pn.registry_system || ' node_sayisi=' || count(*)
-      FROM public.pedigree_nodes pn
-     WHERE pn.farm_id = v_farm
-       AND pn.registry_system IS NOT NULL AND pn.registry_code IS NOT NULL
-     GROUP BY pn.registry_system, pn.registry_code
-    HAVING count(*) > 1
-    UNION ALL
-    -- legacy_semen_no_mapping (warning): DISTINCT tohumlama.sperma karşılıksız —
-    -- Task 8 materializasyonu; inmeden EMİT EDİLMEZ (r12-F69).
-    SELECT 'legacy_semen_no_mapping', NULL, NULL
-      WHERE false
-    UNION ALL
-    -- cycle_count (blocker): recursive CTE, UNION dedup guard (sonsuz traversal
-    -- yok); her döngü bileşeni 1 item, key = bileşenin min node-id
-    -- (min(text) — PG'nin min(uuid) aggregate'i yoktur, kimlik text'te karşılaştırılır)
-    SELECT 'cycle_count', min(rep.rep_id),
-           'döngü üyeleri: ' || string_agg(rep.node::text, ',' ORDER BY rep.node)
-      FROM (
-        WITH RECURSIVE reach(src, dst) AS (
-          SELECT pp.parent_node_id, pp.child_node_id
-            FROM public.pedigree_parentage pp
-           WHERE pp.farm_id = v_farm
-          UNION
-          SELECT r.src, pp.child_node_id
-            FROM public.pedigree_parentage pp
-            JOIN reach r ON pp.parent_node_id = r.dst
-           WHERE pp.farm_id = v_farm
-        ),
-        on_cycle AS (
-          SELECT DISTINCT src FROM reach WHERE src = dst
-        )
-        SELECT o.src AS node,
-               (SELECT min(o2.src::text) FROM on_cycle o2
-                 WHERE EXISTS (SELECT 1 FROM reach r1
-                                WHERE r1.src = o.src AND r1.dst = o2.src)
-                   AND EXISTS (SELECT 1 FROM reach r2
-                                WHERE r2.src = o2.src AND r2.dst = o.src)) AS rep_id
-          FROM on_cycle o
-      ) rep
-     GROUP BY rep.rep_id
-    UNION ALL
-    -- parent_born_after_child (warning): parent doğum > child doğum; key=<child>:<role>
-    SELECT 'parent_born_after_child',
-           COALESCE(pnc.farm_animal_id, pnc.id::text) || ':' || pp.parent_role,
-           'parent doğum ' || COALESCE(hp.dogum_tarihi, pnp.birth_date)::text
-             || ' > child doğum ' || COALESCE(hc.dogum_tarihi, pnc.birth_date)::text
-      FROM public.pedigree_parentage pp
-      JOIN public.pedigree_nodes pnc
-        ON pnc.farm_id = pp.farm_id AND pnc.id = pp.child_node_id
-      JOIN public.pedigree_nodes pnp
-        ON pnp.farm_id = pp.farm_id AND pnp.id = pp.parent_node_id
-      LEFT JOIN public.hayvanlar hc ON hc.id = pnc.farm_animal_id
-      LEFT JOIN public.hayvanlar hp ON hp.id = pnp.farm_animal_id
-     WHERE pp.farm_id = v_farm
-       AND COALESCE(hp.dogum_tarihi, pnp.birth_date) IS NOT NULL
-       AND COALESCE(hc.dogum_tarihi, pnc.birth_date) IS NOT NULL
-       AND COALESCE(hp.dogum_tarihi, pnp.birth_date)
-         > COALESCE(hc.dogum_tarihi, pnc.birth_date)
-    UNION ALL
-    -- maternal_tarihsel_uyumsuz (blocker): dam var + tarihli ama çocuğun KENDİ
-    -- doğum kaydı erken-değil/hiç yok; key=hayvan_id
-    SELECT 'maternal_tarihsel_uyumsuz', c.id,
-           'anne_id=' || c.anne_id || ' dogum_tarihi=' || c.dogum_tarihi::text
-             || ' — çocuğun kendi doğum kaydı yok ya da tarihi geç'
-      FROM public.hayvanlar c
-     WHERE c.anne_id IS NOT NULL
-       AND EXISTS (SELECT 1 FROM public.hayvanlar p WHERE p.id = c.anne_id)
-       AND c.dogum_tarihi IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM public.dogum d
-                        WHERE d.buzagi_id = c.id
-                          AND d.anne_id  = c.anne_id
-                          AND d.tarih   <= c.dogum_tarihi)
-    UNION ALL
-    -- maternal_tarih_bilinmiyor (warning): key=hayvan_id
-    SELECT 'maternal_tarih_bilinmiyor', c.id,
-           'anne_id dolu, dogum_tarihi NULL — edge yaratılmadı'
-      FROM public.hayvanlar c
-     WHERE c.anne_id IS NOT NULL AND c.dogum_tarihi IS NULL
-    UNION ALL
-    -- legacy_anne_graph_dam_celiskisi (warning; r9-F48): hayvanlar.anne_id ile
-    -- graph dam edge'i farklı; key=hayvan_id
-    SELECT 'legacy_anne_graph_dam_celiskisi', h.id,
-           'anne_id=' || h.anne_id || ' graph=' || substring(pp.parent_node_id::text, 1, 8)
-      FROM public.hayvanlar h
-      JOIN public.pedigree_nodes pnc
-        ON pnc.farm_id = v_farm AND pnc.farm_animal_id = h.id
-      JOIN public.pedigree_parentage pp
-        ON pp.farm_id = v_farm AND pp.child_node_id = pnc.id AND pp.parent_role = 'dam'
-      JOIN public.pedigree_nodes pna
-        ON pna.farm_id = v_farm AND pna.farm_animal_id = h.anne_id
-     WHERE h.anne_id IS NOT NULL
-       AND pp.parent_node_id <> pna.id
-    UNION ALL
-    -- dogum_anne_graph_dam_celiskisi (warning; r8-F44/r12-F66): buzağı node
-    -- buzagi_id FK'dan çözülür; key=dogum.id. buzagi_id NULL → bulgu YOK
-    -- (o satır dogum_buzagi_missing altında görünür).
-    SELECT 'dogum_anne_graph_dam_celiskisi', d.id::text,
-           'dogum.anne_id=' || d.anne_id || ' graph=' || substring(pp.parent_node_id::text, 1, 8)
-      FROM public.dogum d
-      JOIN public.pedigree_nodes pnc
-        ON pnc.farm_id = v_farm AND pnc.farm_animal_id = d.buzagi_id
-      JOIN public.pedigree_parentage pp
-        ON pp.farm_id = v_farm AND pp.child_node_id = pnc.id AND pp.parent_role = 'dam'
-      JOIN public.pedigree_nodes pna
-        ON pna.farm_id = v_farm AND pna.farm_animal_id = d.anne_id
-     WHERE d.buzagi_id IS NOT NULL AND d.anne_id IS NOT NULL
-       AND pp.parent_node_id <> pna.id
-    UNION ALL
-    -- suspiciously_young_parent (warning; r8-F44/r10-F61): 0 <= fark < 548 gün;
-    -- negatif fark buraya GİRMEZ (o, parent_born_after_child'in konusu);
-    -- key=<child_hayvan_id>:<parent_role>
-    SELECT 'suspiciously_young_parent',
-           COALESCE(pnc.farm_animal_id, pnc.id::text) || ':' || pp.parent_role,
-           'parent ' || pnp.id::text || ' yaşı '
-             || (COALESCE(hc.dogum_tarihi, pnc.birth_date)
-                 - COALESCE(hp.dogum_tarihi, pnp.birth_date))::text || ' gün'
-      FROM public.pedigree_parentage pp
-      JOIN public.pedigree_nodes pnc
-        ON pnc.farm_id = pp.farm_id AND pnc.id = pp.child_node_id
-      JOIN public.pedigree_nodes pnp
-        ON pnp.farm_id = pp.farm_id AND pnp.id = pp.parent_node_id
-      LEFT JOIN public.hayvanlar hc ON hc.id = pnc.farm_animal_id
-      LEFT JOIN public.hayvanlar hp ON hp.id = pnp.farm_animal_id
-     WHERE pp.farm_id = v_farm
-       AND COALESCE(hc.dogum_tarihi, pnc.birth_date) IS NOT NULL
-       AND COALESCE(hp.dogum_tarihi, pnp.birth_date) IS NOT NULL
-       AND COALESCE(hc.dogum_tarihi, pnc.birth_date)
-         - COALESCE(hp.dogum_tarihi, pnp.birth_date) >= 0
-       AND COALESCE(hc.dogum_tarihi, pnc.birth_date)
-         - COALESCE(hp.dogum_tarihi, pnp.birth_date) < 548
-    UNION ALL
-    -- cutoff_invalid (blocker): helper NULL döndü; key="cutoff", detail=ham değer
-    SELECT 'cutoff_invalid', 'cutoff',
-           'değer timestamptz''e cast edilemedi: ' || v_cutoff_raw
-     WHERE v_cutoff_state = 'gecersiz'
-    UNION ALL
-    -- dogum_buzagi_missing (info): Task 0.5 konservatif backfill eşleşmeyen
-    -- legacy satır; key=dogum.id
-    SELECT 'dogum_buzagi_missing', d.id::text,
-           'tarih=' || d.tarih::text || ' yavru_kupe=' || COALESCE(d.yavru_kupe, 'NULL')
-      FROM public.dogum d
-     WHERE d.buzagi_id IS NULL
-  )
-  SELECT COALESCE(jsonb_agg(
-           jsonb_build_object('code', g.code, 'severity', s.sev, 'items', g.items)
-           ORDER BY s.rank, g.code), '[]'::jsonb)
-    INTO v_static_groups
-    FROM (
-      SELECT code,
-             jsonb_agg(jsonb_build_object('key', fkey, 'detail', detail) ORDER BY fkey) AS items
-        FROM f
-       GROUP BY code
-    ) g
-    JOIN (VALUES
-      ('farm_animal_node_eksik',           'warning', 2),
-      ('unresolved_anne_id',               'warning', 2),
-      ('unresolved_baba_bilgi',            'info',    3),
-      ('child_without_dam',                'warning', 2),
-      ('child_without_sire',               'info',    3),
-      ('role_sex_contradiction',           'warning', 2),
-      ('duplicate_registry',               'blocker', 1),
-      ('legacy_semen_no_mapping',          'warning', 2),
-      ('cycle_count',                      'blocker', 1),
-      ('parent_born_after_child',          'warning', 2),
-      ('maternal_tarihsel_uyumsuz',        'blocker', 1),
-      ('maternal_tarih_bilinmiyor',        'warning', 2),
-      ('legacy_anne_graph_dam_celiskisi',  'warning', 2),
-      ('dogum_anne_graph_dam_celiskisi',   'warning', 2),
-      ('suspiciously_young_parent',        'warning', 2),
-      ('post_cutoff_null_semen',           'blocker', 1),
-      ('cutoff_invalid',                   'blocker', 1),
-      ('dogum_buzagi_missing',             'info',    3)
-    ) s(code, sev, rank) ON s.code = g.code;
-
-  v_groups := v_static_groups;
-
-  -- post_cutoff_null_semen (blocker; r12-F68 ayırım kuralı): yalnız sperma dolu
-  -- + semen_id NULL satırlar ihlaldir. Dinamik SQL: kolon Task 10'da iner; kolon
-  -- yoksa grup atlanır (cutoff tanimsizken de atlanır — emisyon kuralı).
-  -- F1 (root-gate tur-1): jsonb_build_object NULL döndürmediği için sıfır ihlalde
-  -- bile grup items:null ile emit ediliyordu → sayım guard'ı: grup YALNIZ >=1
-  -- ihlal satırında oluşturulur/eklenir (absent-group kuralı).
-  IF v_cutoff_state = 'ok' AND v_has_semen_col THEN
-    EXECUTE $q$
-      SELECT count(*),
-             jsonb_agg(jsonb_build_object(
-                        'key', t.id::text,
-                        'detail', 'created_at > cutoff, sperma=' || t.sperma)
-                      ORDER BY t.id::text)
-        FROM public.tohumlama t
-       WHERE t.created_at > $1
-         AND t.semen_id IS NULL
-         AND t.sperma IS NOT NULL AND btrim(t.sperma) <> ''
-    $q$ INTO v_pc_count, v_pc_items USING v_cutoff_ts;
-    IF v_pc_count > 0 THEN
-      v_groups := v_groups || jsonb_build_array(jsonb_build_object(
-        'code', 'post_cutoff_null_semen', 'severity', 'blocker', 'items', v_pc_items));
-    END IF;
-  END IF;
-
-  -- Deterministik sıra: blocker → warning → info, sonra code (dinamik grup da
-  -- bu sıraya oturur).
-  SELECT COALESCE(jsonb_agg(gr ORDER BY
-           CASE gr->>'severity' WHEN 'blocker' THEN 1 WHEN 'warning' THEN 2 ELSE 3 END,
-           gr->>'code'), '[]'::jsonb)
-    INTO v_ordered
-    FROM jsonb_array_elements(v_groups) gr;
-
-  RETURN jsonb_build_object(
-    'generated_at', to_char(clock_timestamp() AT TIME ZONE 'UTC',
-                            'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-    'cutoff',       COALESCE(v_cutoff_iso, v_cutoff_state),
-    'groups',       v_ordered);
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_is_ancestor(p_ancestor uuid, p_descendant uuid)
-CREATE OR REPLACE FUNCTION public.pedigree_is_ancestor(p_ancestor uuid, p_descendant uuid)
- RETURNS boolean
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-  WITH RECURSIVE up AS (
-    SELECT pp.parent_node_id AS node_id
-      FROM public.pedigree_parentage pp
-     WHERE pp.farm_id = public.current_farm_id() AND pp.child_node_id = p_descendant
-    UNION
-    SELECT pp.parent_node_id
-      FROM public.pedigree_parentage pp
-      JOIN up ON pp.child_node_id = up.node_id
-     WHERE pp.farm_id = public.current_farm_id()
-  )
-  SELECT EXISTS (SELECT 1 FROM up WHERE node_id = p_ancestor);
-$function$
-;
-
--- FUNCTION: public.pedigree_parent_set(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text, p_source_ref text, p_replace boolean, p_evidence jsonb)
-CREATE OR REPLACE FUNCTION public.pedigree_parent_set(p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text DEFAULT 'manual'::text, p_source_ref text DEFAULT NULL::text, p_replace boolean DEFAULT false, p_evidence jsonb DEFAULT NULL::jsonb)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-BEGIN
-  PERFORM public.assert_is_operator();
-  RETURN public._pedigree_parent_set_core(
-    p_child_node_id, p_role, p_parent_node_id,
-    p_source_type, p_source_ref, p_replace, p_evidence);
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_subgraph(p_focus_node_id uuid, p_ancestor_depth integer, p_descendant_depth integer)
-CREATE OR REPLACE FUNCTION public.pedigree_subgraph(p_focus_node_id uuid, p_ancestor_depth integer DEFAULT 4, p_descendant_depth integer DEFAULT 1)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_farm   uuid := public.current_farm_id();
-  v_focus  uuid;
-  v_anc    integer;
-  v_desc   integer;
-  v_result jsonb;
-BEGIN
-  -- ── Guard'lar: parametreler önce (deterministik hata önceliği) ───────────
-  IF p_focus_node_id IS NULL THEN
-    RAISE EXCEPTION 'focus node id gerekli';
-  END IF;
-  IF p_ancestor_depth IS NULL OR p_ancestor_depth < 0 THEN
-    RAISE EXCEPTION 'gecersiz ancestor depth (NULL/negatif reddedilir): %', p_ancestor_depth;
-  END IF;
-  IF p_descendant_depth IS NULL OR p_descendant_depth < 0 THEN
-    RAISE EXCEPTION 'gecersiz descendant depth (NULL/negatif reddedilir): %', p_descendant_depth;
-  END IF;
-
-  -- Clamp (red değil): MVP üst sınırlar — meta efektif değeri taşır.
-  v_anc  := LEAST(p_ancestor_depth, 8);
-  v_desc := LEAST(p_descendant_depth, 3);
-
-  -- Same-farm check: focus bu farm'da olmalı.
-  SELECT id INTO v_focus
-    FROM public.pedigree_nodes
-   WHERE farm_id = v_farm AND id = p_focus_node_id;
-  IF v_focus IS NULL THEN
-    RAISE EXCEPTION 'focus node bulunamadi ya da farkli farm: %', p_focus_node_id;
-  END IF;
-
-  -- ── Traversal: recursive CTE + path uuid[] cycle guard ──────────────────
-  WITH RECURSIVE anc AS (
-    SELECT pp.parent_node_id AS node_id, 1 AS depth,
-           ARRAY[pp.parent_node_id]::uuid[] AS path
-      FROM public.pedigree_parentage pp
-     WHERE pp.farm_id = v_farm
-       AND pp.child_node_id = v_focus
-       AND v_anc >= 1
-    UNION ALL
-    SELECT pp.parent_node_id, a.depth + 1, a.path || pp.parent_node_id
-      FROM public.pedigree_parentage pp
-      JOIN anc a ON pp.child_node_id = a.node_id
-     WHERE pp.farm_id = v_farm
-       AND a.depth < v_anc
-       AND NOT (pp.parent_node_id = ANY(a.path))
-  ),
-  desc_ AS (
-    SELECT pp.child_node_id AS node_id, 1 AS depth,
-           ARRAY[pp.child_node_id]::uuid[] AS path
-      FROM public.pedigree_parentage pp
-     WHERE pp.farm_id = v_farm
-       AND pp.parent_node_id = v_focus
-       AND v_desc >= 1
-    UNION ALL
-    SELECT pp.child_node_id, d.depth + 1, d.path || pp.child_node_id
-      FROM public.pedigree_parentage pp
-      JOIN desc_ d ON pp.parent_node_id = d.node_id
-     WHERE pp.farm_id = v_farm
-       AND d.depth < v_desc
-       AND NOT (pp.child_node_id = ANY(d.path))
-  ),
-  visited AS (
-    -- side: truncation kontrolü yön-bazlıdır — ata yönünde derinlik 2'de
-    -- durmuş bir node (limit 4), döl yönü limitinde durmuş SANILMAMALI
-    -- (ölçüldü: E4 kırmızısı — diamond paylaşılan atası iki yönün
-    -- derinlik havuzuna karışıyordu).
-    SELECT v_focus AS node_id, 0 AS depth, 'anc' AS side
-    UNION ALL SELECT v_focus, 0, 'desc'
-    UNION ALL SELECT node_id, depth, 'anc' FROM anc
-    UNION ALL SELECT node_id, depth, 'desc' FROM desc_
-  ),
-  visited_min AS (
-    SELECT node_id, MIN(depth) AS depth FROM visited GROUP BY node_id
-  ),
-  visited_min_side AS (
-    SELECT node_id, side, MIN(depth) AS depth FROM visited GROUP BY node_id, side
-  ),
-  nodes_json AS (
-    SELECT jsonb_agg(
-      jsonb_build_object(
-        'id', n.id,
-        'kind', n.node_kind,
-        'farm_animal_id', n.farm_animal_id,
-        'label', CASE WHEN n.node_kind = 'farm_animal'
-                      THEN COALESCE(h.kupe_no, n.display_name, n.farm_animal_id, n.id::text)
-                      ELSE COALESCE(n.display_name, n.registry_code, n.id::text) END,
-        'sex', CASE WHEN n.node_kind = 'farm_animal'
-                    THEN COALESCE(CASE h.cinsiyet WHEN 'Erkek' THEN 'male'
-                                                  WHEN 'Dişi'  THEN 'female' END, n.sex)
-                    ELSE n.sex END,
-        'breed', CASE WHEN n.node_kind = 'farm_animal'
-                      THEN COALESCE(h.irk, n.breed) ELSE n.breed END,
-        'birth_date', CASE WHEN n.node_kind = 'farm_animal'
-                           THEN COALESCE(h.dogum_tarihi, n.birth_date)
-                           ELSE n.birth_date END
-      ) ORDER BY n.id) AS j
-      FROM visited_min vm
-      JOIN public.pedigree_nodes n ON n.farm_id = v_farm AND n.id = vm.node_id
-      LEFT JOIN public.hayvanlar h ON h.id = n.farm_animal_id
-  ),
-  edges_json AS (
-    SELECT jsonb_agg(
-      jsonb_build_object(
-        'id', pp.id,
-        'source', pp.parent_node_id,
-        'target', pp.child_node_id,
-        'role', pp.parent_role,
-        'source_type', pp.source_type
-      ) ORDER BY pp.id) AS j
-      FROM public.pedigree_parentage pp
-     WHERE pp.farm_id = v_farm
-       AND EXISTS (SELECT 1 FROM visited_min vp WHERE vp.node_id = pp.parent_node_id)
-       AND EXISTS (SELECT 1 FROM visited_min vc WHERE vc.node_id = pp.child_node_id)
-  ),
-  trunc_anc AS (
-    SELECT EXISTS (
-      SELECT 1
-        FROM visited_min_side vm
-        JOIN public.pedigree_parentage pp
-          ON pp.farm_id = v_farm AND pp.child_node_id = vm.node_id
-       WHERE vm.side = 'anc' AND vm.depth = v_anc
-         -- Review bulgusu #1 (ölçüldü: E5 kırmızısı): "sınır edge'i var" ≠
-         -- "gezilmemiş komşu var". Limit derinliğindeki node'un komşusu
-         -- ZATEN visited ise kapanış tamdır → flag YOK (inbred DAG
-         -- false-pozitifi: tam kapsanan graf 'daha fazla kuşak' der).
-         AND NOT EXISTS (SELECT 1 FROM visited_min v2
-                          WHERE v2.node_id = pp.parent_node_id)
-    ) AS t
-  ),
-  trunc_desc AS (
-    SELECT EXISTS (
-      SELECT 1
-        FROM visited_min_side vm
-        JOIN public.pedigree_parentage pp
-          ON pp.farm_id = v_farm AND pp.parent_node_id = vm.node_id
-       WHERE vm.side = 'desc' AND vm.depth = v_desc
-         AND NOT EXISTS (SELECT 1 FROM visited_min v2
-                          WHERE v2.node_id = pp.child_node_id)
-    ) AS t
-  )
-  SELECT jsonb_build_object(
-    'focus', v_focus,
-    'nodes', COALESCE((SELECT j FROM nodes_json), '[]'::jsonb),
-    'edges', COALESCE((SELECT j FROM edges_json), '[]'::jsonb),
-    'meta', jsonb_build_object(
-      'ancestor_depth', v_anc,
-      'descendant_depth', v_desc,
-      'truncated', (SELECT t FROM trunc_anc) OR (SELECT t FROM trunc_desc))
-  )
-  INTO v_result;
-
-  RETURN v_result;
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_subgraph_for_animal(p_hayvan_id text, p_ancestor_depth integer, p_descendant_depth integer)
-CREATE OR REPLACE FUNCTION public.pedigree_subgraph_for_animal(p_hayvan_id text, p_ancestor_depth integer DEFAULT 4, p_descendant_depth integer DEFAULT 1)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_node uuid;
-BEGIN
-  IF p_hayvan_id IS NULL THEN
-    RAISE EXCEPTION 'hayvan id gerekli';
-  END IF;
-  SELECT id INTO v_node
-    FROM public.pedigree_nodes
-   WHERE farm_id = public.current_farm_id() AND farm_animal_id = p_hayvan_id;
-  IF v_node IS NULL THEN
-    RAISE EXCEPTION 'hayvan icin pedigree node bulunamadi ya da farkli farm: %', p_hayvan_id;
-  END IF;
-  RETURN public.pedigree_subgraph(v_node, p_ancestor_depth, p_descendant_depth);
-END;
-$function$
-;
-
--- FUNCTION: public.pedigree_try_timestamptz(p_value text)
-CREATE OR REPLACE FUNCTION public.pedigree_try_timestamptz(p_value text)
- RETURNS timestamp with time zone
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-BEGIN
-  RETURN p_value::timestamptz;
-EXCEPTION WHEN others THEN
-  RETURN NULL;
-END;
-$function$
-;
-
--- FUNCTION: public.planli_tohumlama_kaydet(p_gorev_id uuid, p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb, p_vwp_override boolean)
-CREATE OR REPLACE FUNCTION public.planli_tohumlama_kaydet(p_gorev_id uuid, p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE v_gorev record; v_result jsonb; v_tohumlama_id text;
-BEGIN
-  SELECT * INTO v_gorev FROM public.gorev_log WHERE id=p_gorev_id FOR UPDATE;
-  IF NOT FOUND OR v_gorev.gorev_tipi<>'TOHUMLAMA_PLANLI' THEN RAISE EXCEPTION 'Planlı tohumlama görevi bulunamadı'; END IF;
-  IF v_gorev.tamamlandi OR v_gorev.iptal THEN RAISE EXCEPTION 'Görev kapalı'; END IF;
-  IF v_gorev.hayvan_id<>p_hayvan_id THEN RAISE EXCEPTION 'Görev hayvanı ile tohumlama hayvanı eşleşmiyor'; END IF;
-  v_result:=public.tohumlama_kaydet(p_hayvan_id,p_tarih,p_sperma,p_hekim_id,p_irk_bilgisi,p_ek_uygulamalar,p_vwp_override);
-  v_tohumlama_id:=v_result->>'tohumlama_id';
-  UPDATE public.tohumlama SET gerceklesme_at=now() WHERE id=v_tohumlama_id::uuid;
-  UPDATE public.gorev_log SET tamamlandi=true,iptal=false,tamamlanma_tarihi=now(),ref_tohumlama_id=v_tohumlama_id WHERE id=p_gorev_id;
-  INSERT INTO public.islem_log(id,tip,ana_hayvan_id,ref_id,ref_tablo,snapshot)
-  VALUES(gen_random_uuid()::text,'PLANLI_TOHUMLAMA_TAMAMLA',p_hayvan_id,p_gorev_id::text,'gorev_log',jsonb_build_object('tohumlama_id',v_tohumlama_id));
-  RETURN v_result || jsonb_build_object('gorev_id',p_gorev_id);
-END; $function$
-;
-
--- FUNCTION: public.sahip_sifresi_ayarla(p_sifre text)
-CREATE OR REPLACE FUNCTION public.sahip_sifresi_ayarla(p_sifre text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-BEGIN
-  IF p_sifre IS NULL OR length(p_sifre) < 8 THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'SIFRE_KISA');
-  END IF;
-
-  INSERT INTO surum_gizli.sahip_sifresi (id, hash, guncelleme)
-  VALUES (1, extensions.crypt(p_sifre, extensions.gen_salt('bf', 10)), now())
-  ON CONFLICT (id) DO UPDATE SET hash = EXCLUDED.hash, guncelleme = EXCLUDED.guncelleme;
-
-  UPDATE surum_gizli.geri_alma_bileti
-     SET son_gecerlilik = now()
-   WHERE son_gecerlilik > now();
-
-  RETURN jsonb_build_object('ok', true, 'guncelleme', now());
-END;
-$function$
-;
-
--- FUNCTION: public.semen_catalog_upsert(p_display_name text, p_id uuid, p_bull_node_id uuid, p_registry_system text, p_registry_code text, p_stock_id text, p_code text, p_supplier text, p_semen_type text, p_active boolean)
-CREATE OR REPLACE FUNCTION public.semen_catalog_upsert(p_display_name text, p_id uuid DEFAULT NULL::uuid, p_bull_node_id uuid DEFAULT NULL::uuid, p_registry_system text DEFAULT NULL::text, p_registry_code text DEFAULT NULL::text, p_stock_id text DEFAULT NULL::text, p_code text DEFAULT NULL::text, p_supplier text DEFAULT NULL::text, p_semen_type text DEFAULT NULL::text, p_active boolean DEFAULT true)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_farm      uuid := public.current_farm_id();
-  v_id        uuid;
-  v_bull      uuid;
-  v_cur_bull  uuid;
-  v_sex       text;
-  v_kategori  text;
-  v_refs      integer := 0;
-  v_semen_id_kolon boolean;
-BEGIN
-  PERFORM pg_advisory_xact_lock(hashtext('pedigree_semen_catalog'));
-  PERFORM public.assert_is_operator();
-
-  -- (a) stock guard: verilen stok Sperma kategorisinde olmalı
-  IF p_stock_id IS NOT NULL THEN
-    SELECT kategori INTO v_kategori FROM public.stok WHERE id = p_stock_id;
-    IF v_kategori IS NULL THEN
-      RAISE EXCEPTION 'stok bulunamadi: %', p_stock_id;
-    END IF;
-    IF v_kategori <> 'Sperma' THEN
-      RAISE EXCEPTION 'stok kategorisi Sperma degil: %', v_kategori;
-    END IF;
-  END IF;
-
-  IF p_id IS NOT NULL THEN
-    SELECT bull_node_id INTO v_cur_bull
-      FROM public.semen_catalog
-     WHERE farm_id = v_farm AND id = p_id;
-    IF v_cur_bull IS NULL THEN
-      RAISE EXCEPTION 'semen_catalog satiri bulunamadi: %', p_id;
-    END IF;
-
-    -- Tarihsel kimlik değişmezliği (r10-F57/r12-F78)
-    SELECT EXISTS (
-      SELECT 1 FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = 'tohumlama'
-         AND column_name = 'semen_id'
-    ) INTO v_semen_id_kolon;
-    IF v_semen_id_kolon THEN
-      EXECUTE 'SELECT count(*) FROM public.tohumlama WHERE semen_id = $1'
-         INTO v_refs USING p_id;
-    END IF;
-    IF p_bull_node_id IS NOT NULL AND p_bull_node_id <> v_cur_bull THEN
-      IF v_refs > 0 THEN
-        RAISE EXCEPTION 'bull_node_id degistirilemez: satir % tohumlama kaydi tarafindan referans ediliyor', v_refs;
-      END IF;
-      -- (b) guard güncelleme yolunda da geçerli: yeni bull female olamaz
-      SELECT sex INTO v_sex
-        FROM public.pedigree_nodes
-       WHERE farm_id = v_farm AND id = p_bull_node_id;
-      IF v_sex IS NULL THEN
-        RAISE EXCEPTION 'bull node bulunamadi ya da farkli farm: %', p_bull_node_id;
-      END IF;
-      IF v_sex = 'female' THEN
-        RAISE EXCEPTION 'bull node female olamaz';
-      END IF;
-    END IF;
-
-    UPDATE public.semen_catalog
-       SET bull_node_id  = COALESCE(p_bull_node_id, bull_node_id),
-           stock_id      = COALESCE(p_stock_id, stock_id),
-           code          = COALESCE(p_code, code),
-           display_name  = COALESCE(p_display_name, display_name),
-           supplier      = COALESCE(p_supplier, supplier),
-           semen_type    = COALESCE(p_semen_type, semen_type),
-           active        = p_active
-     WHERE farm_id = v_farm AND id = p_id
-    RETURNING id INTO v_id;
-    RETURN v_id;
-  END IF;
-
-  -- Bull çözümü: verilmediyse external bull node yarat (sex='male' yazar)
-  IF p_bull_node_id IS NOT NULL THEN
-    v_bull := p_bull_node_id;
-  ELSE
-    v_bull := public.pedigree_external_upsert(
-      p_display_name, NULL, 'male', NULL, NULL, p_registry_system, p_registry_code);
-  END IF;
-
-  -- (b) bull node guard: bilinen female node bull olamaz
-  SELECT sex INTO v_sex
-    FROM public.pedigree_nodes
-   WHERE farm_id = v_farm AND id = v_bull;
-  IF v_sex IS NULL THEN
-    RAISE EXCEPTION 'bull node bulunamadi ya da farkli farm: %', v_bull;
-  END IF;
-  IF v_sex = 'female' THEN
-    RAISE EXCEPTION 'bull node female olamaz';
-  END IF;
-
-  INSERT INTO public.semen_catalog
-    (bull_node_id, stock_id, code, display_name, supplier, semen_type, active)
-  VALUES
-    (v_bull, p_stock_id, p_code, p_display_name, p_supplier, p_semen_type, p_active)
-  RETURNING id INTO v_id;
-
-  RETURN v_id;
-END;
-$function$
-;
-
--- FUNCTION: public.tedavi_sablon_tohumlama_gorev_ekle(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date)
-CREATE OR REPLACE FUNCTION public.tedavi_sablon_tohumlama_gorev_ekle(p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL::date)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_plan  jsonb;
-  v_case  record;
-  v_sebep text;
-  v_id    uuid;
-  v_date  date;
-  v_time  time;
-BEGIN
-  -- nullif(...,'null'::jsonb): kolonda jsonb 'null' skaleri duruyor olabilir.
-  SELECT nullif(tohumlama_plani, 'null'::jsonb) INTO v_plan
-  FROM public.tedavi_sablonu WHERE id = p_sablon_id;
-  IF v_plan IS NULL THEN
-    RETURN jsonb_build_object('ok', true, 'olustu', false);
-  END IF;
-  IF (v_plan->>'gun_ofset') IS NULL OR nullif(v_plan->>'planned_time','') IS NULL THEN
-    RETURN jsonb_build_object('ok', true, 'olustu', false, 'sebep', 'Şablondaki tohumlama planı eksik');
-  END IF;
-
-  SELECT * INTO v_case FROM public.cases WHERE id = p_case_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Vaka bulunamadı'; END IF;
-
-  IF EXISTS (SELECT 1 FROM public.gorev_log
-             WHERE kaynak = 'TEDAVI_SABLON_TOHUMLAMA:' || p_case_id::text || ':' || p_sablon_id::text) THEN
-    RETURN jsonb_build_object('ok', true, 'olustu', false);
-  END IF;
-
-  v_date := COALESCE(p_baslangic_tarihi, v_case.start_date) + (v_plan->>'gun_ofset')::integer;
-  v_time := (v_plan->>'planned_time')::time;
-
-  -- Uygun değilse vaka açılışı patlamaz; görev açılmaz, sebep UI'a döner.
-  v_sebep := public._tohumlama_gorev_uygunluk(v_case.animal_id, v_date);
-  IF v_sebep IS NOT NULL THEN
-    RETURN jsonb_build_object('ok', true, 'olustu', false, 'sebep', v_sebep);
-  END IF;
-
-  INSERT INTO public.gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, kaynak)
-  VALUES(gen_random_uuid(), v_case.animal_id, 'TOHUMLAMA_PLANLI', 'Planlı tohumlama', v_date, v_time, false,
-          'TEDAVI_SABLON_TOHUMLAMA:' || p_case_id::text || ':' || p_sablon_id::text)
-  RETURNING id INTO v_id;
-  RETURN jsonb_build_object('ok', true, 'olustu', true, 'gorev_id', v_id);
-END;
-$function$
-;
-
--- FUNCTION: public.vaka_tohumlama_ekle(p_case_id uuid, p_tarih date, p_saat time without time zone)
-CREATE OR REPLACE FUNCTION public.vaka_tohumlama_ekle(p_case_id uuid, p_tarih date, p_saat time without time zone DEFAULT '08:00:00'::time without time zone)
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
-AS $function$
-DECLARE
-  v_case  record;
-  v_sebep text;
-  v_id    uuid;
-BEGIN
-  IF p_tarih IS NULL OR p_saat IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Tarih ve saat zorunlu');
-  END IF;
-
-  SELECT * INTO v_case FROM public.cases WHERE id = p_case_id;
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Vaka bulunamadı');
-  END IF;
-  IF v_case.status <> 'active' THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Kapalı vakaya tohumlama eklenemez');
-  END IF;
-
-  -- Vaka başına aynı anda tek açık planlı tohumlama.
-  IF EXISTS (SELECT 1 FROM public.gorev_log
-             WHERE gorev_tipi = 'TOHUMLAMA_PLANLI'
-               AND kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:' || p_case_id::text || ':%'
-               AND NOT tamamlandi AND NOT iptal) THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu vakada zaten açık bir planlı tohumlama var');
-  END IF;
-
-  -- Elle eklemede uygunluk SESSİZ atlanmaz — kullanıcı bilerek istedi, sebebi görsün.
-  v_sebep := public._tohumlama_gorev_uygunluk(v_case.animal_id, p_tarih);
-  IF v_sebep IS NOT NULL THEN
-    RETURN jsonb_build_object('ok', false, 'mesaj', v_sebep);
-  END IF;
-
-  INSERT INTO public.gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, kaynak)
-  VALUES (gen_random_uuid(), v_case.animal_id, 'TOHUMLAMA_PLANLI', 'Planlı tohumlama', p_tarih, p_saat, false,
-          'TEDAVI_SABLON_TOHUMLAMA:' || p_case_id::text || ':MANUEL')
-  RETURNING id INTO v_id;
-
-  INSERT INTO public.islem_log(id, tip, ana_hayvan_id, ref_id, ref_tablo, snapshot)
-  VALUES (gen_random_uuid()::text, 'VAKA_TOHUMLAMA_EKLE', v_case.animal_id, v_id::text, 'gorev_log',
-          jsonb_build_object('case_id', p_case_id, 'hedef_tarih', p_tarih, 'hedef_saat', p_saat));
-
-  RETURN jsonb_build_object('ok', true, 'gorev_id', v_id);
-END;
-$function$
-;
-
--- ── 7. EKSİK TRIGGER'LAR (10 adet, canlı pg_get_triggerdef) ──
-
--- TRIGGER: trg_degisim_log -> cases
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.cases;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.cases FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log_immutable -> degisim_log
-DROP TRIGGER IF EXISTS trg_degisim_log_immutable ON public.degisim_log;
-CREATE TRIGGER trg_degisim_log_immutable BEFORE DELETE OR UPDATE ON public.degisim_log FOR EACH ROW EXECUTE FUNCTION _degisim_log_degistirilemez();
-
--- TRIGGER: trg_degisim_log_no_truncate -> degisim_log
-DROP TRIGGER IF EXISTS trg_degisim_log_no_truncate ON public.degisim_log;
-CREATE TRIGGER trg_degisim_log_no_truncate BEFORE TRUNCATE ON public.degisim_log FOR EACH STATEMENT EXECUTE FUNCTION _degisim_log_degistirilemez();
-
--- TRIGGER: trg_degisim_log -> diseases
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.diseases;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.diseases FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> dogum
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.dogum;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.dogum FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_dogum_guard -> dogum
-DROP TRIGGER IF EXISTS trg_dogum_guard ON public.dogum;
-CREATE TRIGGER trg_dogum_guard BEFORE INSERT OR UPDATE OF tarih ON public.dogum FOR EACH ROW EXECUTE FUNCTION _guard_dogum_ileri_tarih();
-
--- TRIGGER: trg_degisim_log -> drug_administrations
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.drug_administrations;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.drug_administrations FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> drug_classes
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.drug_classes;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.drug_classes FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> drug_products
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.drug_products;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.drug_products FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> drugs
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.drugs;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.drugs FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> gorev_log
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.gorev_log;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.gorev_log FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_gorev_asip_iade -> gorev_log
-DROP TRIGGER IF EXISTS trg_gorev_asip_iade ON public.gorev_log;
-CREATE TRIGGER trg_gorev_asip_iade AFTER UPDATE OF iptal ON public.gorev_log FOR EACH ROW WHEN ((new.iptal AND (NOT COALESCE(old.iptal, false)))) EXECUTE FUNCTION fn_gorev_asip_iade();
-
--- TRIGGER: trg_degisim_log -> grup_padok_eslem
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.grup_padok_eslem;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.grup_padok_eslem FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> hastalik_log
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.hastalik_log;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.hastalik_log FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> hayvan_override
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.hayvan_override;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.hayvan_override FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('kupe_no');
-
--- TRIGGER: trg_degisim_log -> hayvanlar
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.hayvanlar;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.hayvanlar FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_hayvanlar_guard -> hayvanlar
-DROP TRIGGER IF EXISTS trg_hayvanlar_guard ON public.hayvanlar;
-CREATE TRIGGER trg_hayvanlar_guard BEFORE INSERT OR UPDATE OF cinsiyet, grup, dogum_tarihi ON public.hayvanlar FOR EACH ROW EXECUTE FUNCTION _guard_hayvanlar_cinsiyet_grup();
-
--- TRIGGER: trg_pedigree_hayvan_insert -> hayvanlar
-DROP TRIGGER IF EXISTS trg_pedigree_hayvan_insert ON public.hayvanlar;
-CREATE TRIGGER trg_pedigree_hayvan_insert AFTER INSERT ON public.hayvanlar FOR EACH ROW EXECUTE FUNCTION _trg_pedigree_hayvan_insert();
-
--- TRIGGER: trg_degisim_log -> hekimler
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.hekimler;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.hekimler FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> irk_esik
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.irk_esik;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.irk_esik FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_islem_log_degisim_txid -> islem_log
-DROP TRIGGER IF EXISTS trg_islem_log_degisim_txid ON public.islem_log;
-CREATE TRIGGER trg_islem_log_degisim_txid BEFORE INSERT ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_degisim_txid();
-
--- TRIGGER: trg_islem_log_geri_alindi_kapisi -> islem_log
-DROP TRIGGER IF EXISTS trg_islem_log_geri_alindi_kapisi ON public.islem_log;
-CREATE TRIGGER trg_islem_log_geri_alindi_kapisi BEFORE INSERT ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_geri_alindi_kapisi();
-
--- TRIGGER: trg_degisim_log -> kizginlik_log
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.kizginlik_log;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.kizginlik_log FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> padoklar
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.padoklar;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.padoklar FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> pedigree_meta
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.pedigree_meta;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.pedigree_meta FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('farm_id', 'key');
-
--- TRIGGER: trg_degisim_log -> pedigree_nodes
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.pedigree_nodes;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.pedigree_nodes FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> pedigree_parentage
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.pedigree_parentage;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.pedigree_parentage FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> protokol_ayar
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.protokol_ayar;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.protokol_ayar FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('anahtar');
-
--- TRIGGER: trg_degisim_log -> protokol_dismiss
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.protokol_dismiss;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.protokol_dismiss FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> protokol_instance
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.protokol_instance;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.protokol_instance FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> sablon_hastalik_eslem
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.sablon_hastalik_eslem;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.sablon_hastalik_eslem FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> semen_catalog
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.semen_catalog;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.semen_catalog FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> stok
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.stok;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.stok FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> stok_hareket
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.stok_hareket;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.stok_hareket FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> stok_kategorileri
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.stok_kategorileri;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.stok_kategorileri FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> tedavi
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.tedavi;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.tedavi FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> tedavi_sablonu
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.tedavi_sablonu;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.tedavi_sablonu FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> tedavi_sablonu_kalem
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.tedavi_sablonu_kalem;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.tedavi_sablonu_kalem FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> tohumlama
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.tohumlama;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.tohumlama FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_tohumlama_guard -> tohumlama
-DROP TRIGGER IF EXISTS trg_tohumlama_guard ON public.tohumlama;
-CREATE TRIGGER trg_tohumlama_guard BEFORE INSERT OR UPDATE OF hayvan_id, tarih ON public.tohumlama FOR EACH ROW EXECUTE FUNCTION _guard_tohumlama_yas_cinsiyet();
-
--- TRIGGER: trg_degisim_log -> treatment_day_uygulamalar
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.treatment_day_uygulamalar;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.treatment_day_uygulamalar FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> treatment_days
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.treatment_days;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.treatment_days FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> uygulama_log
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.uygulama_log;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.uygulama_log FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> vaccination_log
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.vaccination_log;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.vaccination_log FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> vaccination_schedule
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.vaccination_schedule;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.vaccination_schedule FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> vaccine_diseases
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.vaccine_diseases;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.vaccine_diseases FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('vaccine_id', 'disease_id');
-
--- TRIGGER: trg_degisim_log -> vaccine_protocol_steps
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.vaccine_protocol_steps;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.vaccine_protocol_steps FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- TRIGGER: trg_degisim_log -> vaccines
-DROP TRIGGER IF EXISTS trg_degisim_log ON public.vaccines;
-CREATE TRIGGER trg_degisim_log AFTER INSERT OR DELETE OR UPDATE ON public.vaccines FOR EACH ROW EXECUTE FUNCTION _degisim_log_yaz('id');
-
--- ════════════════════════════════════════════════════════════════
--- SURUM_GIZLI ŞEMASI (L2 sürüm geçmişi + L4 geri alma zinciri)
--- YALNIZ YAPI — satır verisi (bilet, şifre hash, kullanım kaydı) İÇERMEZ.
--- Erişim: SECURITY DEFINER RPC'ler üzerinden; tablolar doğrudan açılmaz.
--- ════════════════════════════════════════════════════════════════
-CREATE SCHEMA IF NOT EXISTS surum_gizli;
-
--- TABLO: surum_gizli.geri_alma_bileti (yapı)
-CREATE TABLE IF NOT EXISTS surum_gizli.geri_alma_bileti (
-  bilet uuid DEFAULT gen_random_uuid(),
-  olusturma timestamptz DEFAULT now(),
-  son_gecerlilik timestamptz NOT NULL,
-  kaynak jsonb DEFAULT '{}'::jsonb,
-  CONSTRAINT geri_alma_bileti_pkey PRIMARY KEY (bilet)
-);
-
--- TABLO: surum_gizli.geri_alma_kullanim (yapı)
-CREATE TABLE IF NOT EXISTS surum_gizli.geri_alma_kullanim (
-  id bigint GENERATED ALWAYS AS IDENTITY,
-  bilet uuid NOT NULL,
-  zaman timestamptz DEFAULT now(),
-  hedef jsonb,
-  seviye text,
-  gerekce text,
-  sonuc jsonb NOT NULL,
-  geri_alma_txid bigint,
-  kaynak jsonb DEFAULT '{}'::jsonb,
-  CONSTRAINT geri_alma_kullanim_bilet_fkey FOREIGN KEY (bilet) REFERENCES surum_gizli.geri_alma_bileti(bilet),
-  CONSTRAINT geri_alma_kullanim_pkey PRIMARY KEY (id)
-);
-CREATE INDEX IF NOT EXISTS idx_geri_alma_kullanim_bilet ON surum_gizli.geri_alma_kullanim USING btree (bilet);
-
--- TABLO: surum_gizli.l4_rehber_adimlari (yapı)
-CREATE TABLE IF NOT EXISTS surum_gizli.l4_rehber_adimlari (
-  id bigint GENERATED ALWAYS AS IDENTITY,
-  tablo text NOT NULL,
-  satir_pk jsonb NOT NULL,
-  txid bigint NOT NULL,
-  kok_txid bigint,
-  olusturma timestamptz DEFAULT now(),
-  CONSTRAINT l4_rehber_adimlari_pkey PRIMARY KEY (id),
-  CONSTRAINT ux_l4_rehber_adim UNIQUE (tablo, txid, satir_pk)
-);
-
--- TABLO: surum_gizli.sahip_sifresi (yapı)
-CREATE TABLE IF NOT EXISTS surum_gizli.sahip_sifresi (
-  id integer DEFAULT 1,
-  hash text NOT NULL,
-  guncelleme timestamptz DEFAULT now(),
-  CONSTRAINT sahip_sifresi_id_check CHECK ((id = 1)),
-  CONSTRAINT sahip_sifresi_pkey PRIMARY KEY (id)
-);
-
--- FUNCTION: surum_gizli._cagiran()
-CREATE OR REPLACE FUNCTION surum_gizli._cagiran()
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  v_claims  jsonb;
-  v_headers jsonb;
-BEGIN
-  BEGIN
-    v_claims := nullif(current_setting('request.jwt.claims', true), '')::jsonb;
-  EXCEPTION WHEN others THEN v_claims := NULL;
-  END;
-  BEGIN
-    v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
-  EXCEPTION WHEN others THEN v_headers := NULL;
-  END;
-  RETURN jsonb_strip_nulls(jsonb_build_object(
-    'rol',      coalesce(nullif(current_setting('role', true), 'none'), session_user::text),
-    'jwt_sub',  v_claims ->> 'sub',
-    'jwt_role', v_claims ->> 'role',
-    'app_name', nullif(current_setting('application_name', true), ''),
-    'istemci_etiketi', coalesce(nullif(current_setting('app.istemci_etiketi', true), ''),
-                                v_headers ->> 'x-client-info')));
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._degisim_plan(p_hedef jsonb, p_seviye text)
-CREATE OR REPLACE FUNCTION surum_gizli._degisim_plan(p_hedef jsonb, p_seviye text)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  c_teknik  CONSTANT text[] := ARRAY['created_at','updated_at','olusturma',
-                                     'guncelleme','guncelleme_tarihi','guncellendi'];
-  v_txid    bigint;
-  v_tablo   text;
-  v_pk      jsonb;
-  v_alan    text;
-  v_zaman   text;
-  v_neden   text;
-  v_enyakin timestamptz;
-  v_ids     bigint[];
-  v_work    bigint[];
-  v_eid     bigint;
-  v_cids    bigint[];
-  v_ctx     bigint[];
-  v_cpk     jsonb;
-  v_cur     jsonb;
-  v_fields  text[];
-  v_exists  boolean;
-  v_rehber  boolean;   -- L4-01: sunucu-üretimi rehber adımı mı?
-  e         public.degisim_log;
-  fk        record;
-  ch        record;
-  r         record;
-  v_ekle    public.degisim_log[];
-  v_sirali  public.degisim_log[];
-  v_topo    public.degisim_log[] := ARRAY[]::public.degisim_log[];
-  v_n       int;
-  v_derece  int[];
-  v_cikti   boolean[];
-  v_kalan   int;
-  v_bulundu boolean;
-  i         int;
-  j         int;
-  v_plan    jsonb  := '[]'::jsonb;
-  v_cak     jsonb  := '[]'::jsonb;
-  v_cak_e   jsonb;
-  v_bag     jsonb  := '[]'::jsonb;
-  v_stok    jsonb  := '[]'::jsonb;
-  v_eng     text[] := '{}';
-  v_sira    int    := 0;
-BEGIN
-  IF p_seviye IS NULL OR p_seviye NOT IN ('alan', 'satir', 'islem') THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_SEVIYE');
-  END IF;
-  IF p_hedef IS NULL OR jsonb_typeof(p_hedef) <> 'object' THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-  END IF;
-  IF nullif(p_hedef ->> 'txid', '') IS NOT NULL THEN
-    BEGIN
-      v_txid := (p_hedef ->> 'txid')::bigint;
-    EXCEPTION WHEN others THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-    END;
-  END IF;
-  -- L4 §2: optional 'zaman' (ISO text) with tablo+pk; an explicit txid wins
-  v_zaman := nullif(p_hedef ->> 'zaman', '');
-
-  -- ── 1. target entries ──
-  IF p_seviye = 'islem' THEN
-    IF v_txid IS NULL THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-    END IF;
-    SELECT array_agg(id ORDER BY id) INTO v_ids FROM public.degisim_log WHERE txid = v_txid;
-    IF v_ids IS NULL THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-        'detay', jsonb_build_object('neden', 'LOG_YOK'));
-    END IF;
-  ELSE
-    v_tablo := p_hedef ->> 'tablo';
-    IF v_tablo IS NULL OR NOT surum_gizli._kapsamda(v_tablo) THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-    END IF;
-    v_pk := surum_gizli._pk_json(v_tablo, p_hedef -> 'pk');
-    IF v_pk IS NULL THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-    END IF;
-
-    IF p_seviye = 'alan' THEN
-      v_alan := p_hedef ->> 'alan';
-      IF v_alan IS NULL OR NOT EXISTS (
-           SELECT 1 FROM pg_attribute
-            WHERE attrelid = format('public.%I', v_tablo)::regclass
-              AND attname = v_alan AND attnum > 0 AND NOT attisdropped) THEN
-        RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-      END IF;
-      IF v_txid IS NULL AND v_zaman IS NOT NULL THEN
-        SELECT o_txid, o_neden, o_enyakin INTO v_txid, v_neden, v_enyakin
-          FROM surum_gizli._l4_zaman_txid(v_tablo, v_pk, v_zaman);
-        IF v_txid IS NULL THEN
-          IF v_neden = 'ZAMAN_GECERSIZ' THEN
-            RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-          END IF;
-          RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-            'detay', jsonb_build_object('neden', v_neden, 'zaman', v_zaman,
-                                        'en_yakin', v_enyakin));
-        END IF;
-      END IF;
-      IF v_txid IS NULL THEN
-        SELECT txid INTO v_txid FROM public.degisim_log
-         WHERE tablo_adi = v_tablo AND satir_pk = v_pk
-           AND (islem <> 'U' OR v_alan = ANY (degisen_alanlar))
-         ORDER BY id DESC LIMIT 1;
-      END IF;
-      IF v_txid IS NULL OR NOT EXISTS (
-           SELECT 1 FROM public.degisim_log
-            WHERE txid = v_txid AND tablo_adi = v_tablo AND satir_pk = v_pk) THEN
-        RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-          'detay', jsonb_build_object('neden',
-            CASE WHEN v_txid IS NULL
-                  AND surum_gizli._guncel_satir(v_tablo, v_pk) IS NULL
-                 THEN 'SATIR_YOK' ELSE 'LOG_YOK' END));
-      END IF;
-      SELECT array_agg(id ORDER BY id) INTO v_ids FROM public.degisim_log
-       WHERE txid = v_txid AND tablo_adi = v_tablo AND satir_pk = v_pk
-         AND islem = 'U' AND v_alan = ANY (degisen_alanlar);
-      IF v_ids IS NULL THEN
-        -- the row changed in that tx, but not as an UPDATE of this field
-        RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-      END IF;
-    ELSE
-      IF v_txid IS NULL AND v_zaman IS NOT NULL THEN
-        SELECT o_txid, o_neden, o_enyakin INTO v_txid, v_neden, v_enyakin
-          FROM surum_gizli._l4_zaman_txid(v_tablo, v_pk, v_zaman);
-        IF v_txid IS NULL THEN
-          IF v_neden = 'ZAMAN_GECERSIZ' THEN
-            RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-          END IF;
-          RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-            'detay', jsonb_build_object('neden', v_neden, 'zaman', v_zaman,
-                                        'en_yakin', v_enyakin));
-        END IF;
-      END IF;
-      IF v_txid IS NULL THEN
-        SELECT txid INTO v_txid FROM public.degisim_log
-         WHERE tablo_adi = v_tablo AND satir_pk = v_pk
-         ORDER BY id DESC LIMIT 1;
-        IF v_txid IS NULL THEN
-          RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-            'detay', jsonb_build_object('neden',
-              CASE WHEN surum_gizli._guncel_satir(v_tablo, v_pk) IS NULL
-                   THEN 'SATIR_YOK' ELSE 'LOG_YOK' END));
-        END IF;
-      END IF;
-      SELECT array_agg(id ORDER BY id) INTO v_ids FROM public.degisim_log
-       WHERE txid = v_txid AND tablo_adi = v_tablo AND satir_pk = v_pk;
-      IF v_ids IS NULL THEN
-        RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-          'detay', jsonb_build_object('neden', 'LOG_YOK'));
-      END IF;
-
-      -- stock movements of the same tx that reference this row join the plan
-      IF v_tablo <> 'stok_hareket'
-         AND (SELECT count(*) FROM jsonb_object_keys(v_pk)) = 1 THEN
-        v_ids := v_ids || ARRAY(
-          SELECT id FROM public.degisim_log
-           WHERE txid = v_txid AND tablo_adi = 'stok_hareket'
-             AND coalesce(yeni, eski) ->> 'referans_id' = (SELECT v #>> '{}' FROM jsonb_each(v_pk) AS x(k, v))
-             AND id <> ALL (v_ids));
-      END IF;
-    END IF;
-  END IF;
-
-  IF v_ids IS NULL THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-      'detay', jsonb_build_object('neden', 'LOG_YOK'));
-  END IF;
-
-  -- L4-01: rehber gevşetme yetkisi istemciden OKUNMAZ — sunucunun
-  -- l4_rehber_adimlari kaydından doğrulanır; yalnız satır-seviyesi hedeflerde
-  -- (L4-04) geçerlidir. p_hedef'teki herhangi bir 'l4_rehber' anahtarı
-  -- bilinçli olarak yok sayılır.
-  v_rehber := p_seviye = 'satir' AND surum_gizli._l4_rehber_uyesi(p_hedef);
-
-  -- ── 2. dependencies of rows the plan will DELETE (reverting an INSERT) ──
-  IF p_seviye <> 'alan' THEN
-    v_work := ARRAY(SELECT id FROM public.degisim_log WHERE id = ANY (v_ids) AND islem = 'I' ORDER BY id);
-    WHILE cardinality(v_work) > 0 LOOP
-      v_eid := v_work[1];
-      v_work := v_work[2:];
-      SELECT * INTO e FROM public.degisim_log WHERE id = v_eid;
-      FOR fk IN
-        SELECT cc.relname::text AS child, con.conrelid AS child_rel, con.confdeltype,
-               array_agg(ca.attname::text ORDER BY k.ord) AS ccols,
-               array_agg(pa.attname::text ORDER BY k.ord) AS pcols
-          FROM pg_constraint con
-          JOIN pg_class cc ON cc.oid = con.conrelid
-          CROSS JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS k(ck, pk, ord)
-          JOIN pg_attribute ca ON ca.attrelid = con.conrelid AND ca.attnum = k.ck
-          JOIN pg_attribute pa ON pa.attrelid = con.confrelid AND pa.attnum = k.pk
-         WHERE con.contype = 'f'
-           AND con.confrelid = format('public.%I', e.tablo_adi)::regclass
-           AND cc.relnamespace = 'public'::regnamespace
-         GROUP BY 1, 2, 3
-      LOOP
-        FOR ch IN EXECUTE format(
-            'SELECT to_jsonb(c) AS j FROM public.%I c WHERE (%s) = (SELECT %s FROM jsonb_populate_record(NULL::public.%I, $1))',
-            fk.child,
-            (SELECT string_agg(format('c.%I', x), ', ') FROM unnest(fk.ccols) x),
-            (SELECT string_agg(format('%I', x), ', ') FROM unnest(fk.pcols) x),
-            e.tablo_adi)
-          USING e.yeni
-        LOOP
-          SELECT jsonb_object_agg(a.attname, ch.j -> a.attname) INTO v_cpk
-            FROM pg_constraint pc
-            CROSS JOIN LATERAL unnest(pc.conkey) AS u(n)
-            JOIN pg_attribute a ON a.attrelid = pc.conrelid AND a.attnum = u.n
-           WHERE pc.conrelid = fk.child_rel AND pc.contype = 'p';
-          SELECT array_agg(id), array_agg(DISTINCT txid) INTO v_cids, v_ctx
-            FROM public.degisim_log WHERE tablo_adi = fk.child AND satir_pk = v_cpk;
-
-          IF v_cids && v_ids THEN
-            CONTINUE;                                   -- already in the plan
-          ELSIF v_cids IS NULL THEN
-            -- untracked child (pre-system or written with triggers off)
-            v_bag := v_bag || jsonb_build_object(
-              'tablo', fk.child, 'pk', surum_gizli._pk_gorunum(v_cpk), 'satir_pk', v_cpk,
-              'iliski', format('%s(%s) -> %s', fk.child, array_to_string(fk.ccols, ','), e.tablo_adi),
-              'etki', CASE WHEN fk.confdeltype = 'n' THEN 'UYARI' ELSE 'ENGEL' END);
-            IF fk.confdeltype <> 'n' THEN
-              v_eng := v_eng || format('%s kaydı %s geçmişi olmayan bağımlı kayıt', fk.child, surum_gizli._pk_gorunum(v_cpk));
-            END IF;
-          ELSIF v_ctx = ARRAY[e.txid] THEN
-            -- child born and only changed in the same tx: cascade it
-            v_bag := v_bag || jsonb_build_object(
-              'tablo', fk.child, 'pk', surum_gizli._pk_gorunum(v_cpk), 'satir_pk', v_cpk,
-              'iliski', format('%s(%s) -> %s', fk.child, array_to_string(fk.ccols, ','), e.tablo_adi),
-              'etki', 'KADEMELI');
-            v_ids := v_ids || v_cids;
-            v_work := v_work || ARRAY(SELECT id FROM public.degisim_log WHERE id = ANY (v_cids) AND islem = 'I');
-          ELSE
-            v_bag := v_bag || jsonb_build_object(
-              'tablo', fk.child, 'pk', surum_gizli._pk_gorunum(v_cpk), 'satir_pk', v_cpk,
-              'iliski', format('%s(%s) -> %s', fk.child, array_to_string(fk.ccols, ','), e.tablo_adi),
-              'etki', 'ENGEL');
-            v_eng := v_eng || format('%s kaydı %s hedef işlemden sonra değişmiş bağımlı kayıt', fk.child, surum_gizli._pk_gorunum(v_cpk));
-          END IF;
-        END LOOP;
-      END LOOP;
-    END LOOP;
-
-    -- rows the plan re-INSERTs (reverting a DELETE) need their FK parents
-    FOR e IN SELECT * FROM public.degisim_log WHERE id = ANY (v_ids) AND islem = 'D' LOOP
-      FOR fk IN
-        SELECT pcl.relname::text AS parent, con.confdeltype,
-               array_agg(ca.attname::text ORDER BY k.ord) AS ccols,
-               array_agg(pa.attname::text ORDER BY k.ord) AS pcols
-          FROM pg_constraint con
-          JOIN pg_class pcl ON pcl.oid = con.confrelid
-          CROSS JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS k(ck, pk, ord)
-          JOIN pg_attribute ca ON ca.attrelid = con.conrelid AND ca.attnum = k.ck
-          JOIN pg_attribute pa ON pa.attrelid = con.confrelid AND pa.attnum = k.pk
-         WHERE con.contype = 'f'
-           AND con.conrelid = format('public.%I', e.tablo_adi)::regclass
-           AND pcl.relnamespace = 'public'::regnamespace
-         GROUP BY 1, 2
-      LOOP
-        CONTINUE WHEN EXISTS (SELECT 1 FROM unnest(fk.ccols) c WHERE e.eski ->> c IS NULL);
-        EXECUTE format(
-          'SELECT EXISTS (SELECT 1 FROM public.%I p WHERE (%s) = (SELECT %s FROM jsonb_populate_record(NULL::public.%I, $1)))',
-          fk.parent,
-          (SELECT string_agg(format('p.%I', x), ', ') FROM unnest(fk.pcols) x),
-          (SELECT string_agg(format('%I', x), ', ') FROM unnest(fk.ccols) x),
-          e.tablo_adi)
-          INTO v_exists USING e.eski;
-        IF NOT v_exists AND NOT EXISTS (
-             SELECT 1 FROM public.degisim_log d
-              WHERE d.id = ANY (v_ids) AND d.tablo_adi = fk.parent AND d.islem = 'D'
-                AND NOT EXISTS (SELECT 1 FROM unnest(fk.pcols, fk.ccols) AS u(p, c)
-                                 WHERE d.eski ->> u.p IS DISTINCT FROM e.eski ->> u.c)) THEN
-          v_bag := v_bag || jsonb_build_object(
-            'tablo', fk.parent, 'pk', NULL,
-            'iliski', format('%s(%s) -> %s(%s)', e.tablo_adi, array_to_string(fk.ccols, ','),
-                             fk.parent, array_to_string(fk.pcols, ',')),
-            'etki', 'ENGEL');
-          v_eng := v_eng || format('%s kaydı geri eklenemez: üst kayıt (%s) yok', e.tablo_adi, fk.parent);
-        END IF;
-      END LOOP;
-    END LOOP;
-  END IF;
-
-  -- ── 3. conflicts: L4 §4 — the FULL list of later changes on each planned
-  --    row (UI builds the chain offer from this), or state drift ──
-  FOR r IN
-    SELECT tablo_adi, satir_pk, max(id) AS son_id
-      FROM public.degisim_log WHERE id = ANY (v_ids) GROUP BY 1, 2
-  LOOP
-    SELECT coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
-             'tablo', l.tablo_adi, 'pk', surum_gizli._pk_gorunum(r.satir_pk),
-             'satir_pk', r.satir_pk, 'alan', v_alan, 'neden', 'SONRAKI_DEGISIKLIK',
-             'txid', l.txid::text, 'zaman', l.kayit_zamani,
-             'degisen_alanlar', to_jsonb(l.degisen_alanlar),
-             'islem', l.islem, 'log_id', l.id)) ORDER BY l.id), '[]'::jsonb)
-      INTO v_cak_e
-      FROM public.degisim_log l
-     WHERE l.tablo_adi = r.tablo_adi AND l.satir_pk = r.satir_pk
-       AND l.id > r.son_id AND l.id <> ALL (v_ids)
-       AND (p_seviye <> 'alan' OR l.islem <> 'U' OR v_alan = ANY (l.degisen_alanlar))
-       -- L4 sıralı rehber (L4-01): gevşetme yalnız sunucunun l4_rehber_adimlari
-       -- kaydında adımı barındırması hâlinde ve yalnız satır-seviyesinde geçerli
-       -- ("önce 5'i, sonra 4'ü geri al" akışı). İşaretsiz/üye-olmayan her
-       -- çağrıda L2'nin katı kuralı AYNEN korunur (k3 S6c).
-       AND (
-             NOT coalesce(v_rehber, false)
-             OR (l.kaynak ? 'geri_alma' = false
-                 AND NOT EXISTS (
-                       SELECT 1 FROM public.degisim_log r2
-                        WHERE r2.tablo_adi = l.tablo_adi AND r2.satir_pk = l.satir_pk
-                          AND r2.id > l.id AND r2.kaynak ? 'geri_alma')));
-    IF jsonb_array_length(v_cak_e) > 0 THEN
-      v_cak := v_cak || v_cak_e;
-      CONTINUE;
-    END IF;
-
-    SELECT * INTO e FROM public.degisim_log WHERE id = r.son_id;
-    v_cur := surum_gizli._guncel_satir(r.tablo_adi, r.satir_pk);
-    IF e.islem = 'D' THEN
-      IF v_cur IS NOT NULL THEN
-        v_cak := v_cak || jsonb_strip_nulls(jsonb_build_object(
-          'tablo', r.tablo_adi, 'pk', surum_gizli._pk_gorunum(r.satir_pk), 'satir_pk', r.satir_pk,
-          'neden', 'GUNCEL_DURUM_FARKLI'));
-      END IF;
-    ELSE
-      v_fields := CASE WHEN p_seviye = 'alan' THEN ARRAY[v_alan]
-                       ELSE ARRAY(SELECT jsonb_object_keys(e.yeni)) END;
-      IF v_cur IS NULL OR EXISTS (
-           SELECT 1 FROM unnest(v_fields) f
-            WHERE f <> ALL (c_teknik) AND v_cur ? f
-              AND (v_cur -> f) IS DISTINCT FROM (e.yeni -> f)) THEN
-        v_cak := v_cak || jsonb_strip_nulls(jsonb_build_object(
-          'tablo', r.tablo_adi, 'pk', surum_gizli._pk_gorunum(r.satir_pk), 'satir_pk', r.satir_pk,
-          'alan', v_alan, 'neden', 'GUNCEL_DURUM_FARKLI'));
-      END IF;
-    END IF;
-  END LOOP;
-
-  SELECT v_eng || coalesce(array_agg(format('%s kaydı %s: %s', c ->> 'tablo', c -> 'pk', c ->> 'neden')), '{}')
-    INTO v_eng FROM jsonb_array_elements(v_cak) c;
-
-  -- ── 4. stock advisories (informational, never blocking) ──
-  IF p_seviye <> 'islem' THEN
-    FOR e IN
-      SELECT * FROM public.degisim_log
-       WHERE txid = v_txid AND tablo_adi = 'stok_hareket' AND id <> ALL (v_ids)
-    LOOP
-      v_stok := v_stok || jsonb_build_object(
-        'stok_id', coalesce(e.yeni, e.eski) ->> 'stok_id',
-        'metin', 'Aynı işlemdeki stok hareketi bu geri almaya dahil değil; stok elle kontrol edilmeli',
-        'hareket_id', e.satir_pk ->> 'id');
-    END LOOP;
-  END IF;
-  FOR r IN
-    SELECT DISTINCT tablo_adi, satir_pk FROM public.degisim_log
-     WHERE id = ANY (v_ids) AND tablo_adi <> 'stok_hareket'
-       AND (SELECT count(*) FROM jsonb_object_keys(satir_pk)) = 1
-  LOOP
-    FOR e IN
-      SELECT * FROM public.degisim_log l
-       WHERE l.tablo_adi = 'stok_hareket' AND l.id <> ALL (v_ids)
-         AND coalesce(l.yeni, l.eski) ->> 'referans_id' = (SELECT v #>> '{}' FROM jsonb_each(r.satir_pk) AS x(k, v))
-    LOOP
-      v_stok := v_stok || jsonb_build_object(
-        'stok_id', coalesce(e.yeni, e.eski) ->> 'stok_id',
-        'metin', format('%s kaydına bağlı stok hareketi bu geri almaya dahil değil; stok elle kontrol edilmeli',
-                        r.tablo_adi),
-        'txid', e.txid::text);
-    END LOOP;
-  END LOOP;
-
-  -- ── 5. plan steps ──
-  -- EKLE steps (reverting DELETEs) are topologically ordered parents-first:
-  -- cascade children carry HIGHER log ids than the parent, so plain id-DESC
-  -- would re-insert the child before its parent (FK 23503, deterministic
-  -- failure). U/SIL steps keep reverse log order (undo-last-first). Kahn's
-  -- algorithm over the plan-local FK graph; on an impossible cycle fall
-  -- back to id order for the remainder.
-  SELECT coalesce(array_agg(x ORDER BY x.id), ARRAY[]::public.degisim_log[])
-    INTO v_ekle
-    FROM public.degisim_log x
-   WHERE x.id = ANY (v_ids) AND x.islem = 'D';
-  SELECT coalesce(array_agg(x ORDER BY x.id DESC), ARRAY[]::public.degisim_log[])
-    INTO v_sirali
-    FROM public.degisim_log x
-   WHERE x.id = ANY (v_ids) AND x.islem <> 'D';
-
-  v_n := coalesce(cardinality(v_ekle), 0);
-  IF v_n > 0 THEN
-    v_derece := array_fill(0, ARRAY[v_n]);
-    v_cikti  := array_fill(false, ARRAY[v_n]);
-    FOR i IN 1 .. v_n LOOP
-      FOR j IN 1 .. v_n LOOP
-        CONTINUE WHEN i = j;
-        IF surum_gizli._ekle_bagli(v_ekle[j], v_ekle[i]) THEN   -- i depends on j
-          v_derece[i] := v_derece[i] + 1;
-        END IF;
-      END LOOP;
-    END LOOP;
-    v_kalan := v_n;
-    WHILE v_kalan > 0 LOOP
-      v_bulundu := false;
-      FOR i IN 1 .. v_n LOOP
-        CONTINUE WHEN v_cikti[i] OR v_derece[i] > 0;
-        v_cikti[i] := true;
-        v_kalan := v_kalan - 1;
-        v_bulundu := true;
-        v_topo := v_topo || v_ekle[i];
-        FOR j IN 1 .. v_n LOOP
-          CONTINUE WHEN v_cikti[j];
-          IF surum_gizli._ekle_bagli(v_ekle[i], v_ekle[j]) THEN
-            v_derece[j] := v_derece[j] - 1;
-          END IF;
-        END LOOP;
-        EXIT;
-      END LOOP;
-      IF NOT v_bulundu THEN   -- cycle: emit remaining in id order
-        FOR i IN 1 .. v_n LOOP
-          CONTINUE WHEN v_cikti[i];
-          v_cikti[i] := true;
-          v_kalan := v_kalan - 1;
-          v_topo := v_topo || v_ekle[i];
-        END LOOP;
-      END IF;
-    END LOOP;
-    v_sirali := v_topo || v_sirali;
-  END IF;
-
-  -- cascade children erased together with a parent whose DELETE is being
-  -- reverted only partially (satir-level on the parent): they stay gone —
-  -- informational, never blocking
-  IF p_seviye <> 'islem' THEN
-    FOR e IN SELECT * FROM public.degisim_log WHERE id = ANY (v_ids) AND islem = 'D' LOOP
-      FOR ch IN
-        SELECT c.* FROM public.degisim_log c
-         WHERE c.txid = e.txid AND c.islem = 'D' AND c.id <> ALL (v_ids)
-           AND surum_gizli._ekle_bagli(e, c)
-      LOOP
-        v_bag := v_bag || jsonb_build_object(
-          'tablo', ch.tablo_adi, 'pk', surum_gizli._pk_gorunum(ch.satir_pk), 'satir_pk', ch.satir_pk,
-          'iliski', format('%s kaydı %s ile aynı işlemde silinmiş ve bu geri almaya dahil değil',
-                           ch.tablo_adi, e.tablo_adi),
-          'etki', 'UYARI');
-      END LOOP;
-    END LOOP;
-  END IF;
-
-  FOREACH e IN ARRAY v_sirali LOOP
-    v_sira := v_sira + 1;
-    v_fields := CASE WHEN e.islem <> 'U' THEN NULL
-                     WHEN p_seviye = 'alan' THEN ARRAY[v_alan]
-                     ELSE e.degisen_alanlar END;
-    v_plan := v_plan || jsonb_build_object(
-      'sira', v_sira,
-      'log_id', e.id,
-      'txid', e.txid::text,
-      'tablo', e.tablo_adi,
-      'pk', surum_gizli._pk_gorunum(e.satir_pk),
-      'satir_pk', e.satir_pk,
-      'islem', e.islem,
-      'alanlar', to_jsonb(v_fields),
-      'eski', CASE e.islem WHEN 'U' THEN (SELECT jsonb_object_agg(f, e.eski -> f) FROM unnest(v_fields) f)
-                           WHEN 'D' THEN e.eski END,
-      'yeni', CASE e.islem WHEN 'U' THEN (SELECT jsonb_object_agg(f, e.yeni -> f) FROM unnest(v_fields) f)
-                           WHEN 'I' THEN e.yeni END,
-      'yapilacak', CASE e.islem WHEN 'U' THEN 'GUNCELLE' WHEN 'I' THEN 'SIL' ELSE 'EKLE' END);
-  END LOOP;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'seviye', p_seviye,
-    'hedef', jsonb_strip_nulls(jsonb_build_object(
-               'txid', v_txid::text, 'tablo', v_tablo,
-               'pk', CASE WHEN v_pk IS NOT NULL THEN surum_gizli._pk_gorunum(v_pk) END,
-               'satir_pk', v_pk, 'alan', v_alan)),
-    'plan', v_plan,
-    'cakismalar', v_cak,
-    'bagimliliklar', v_bag,
-    'stok_uyari', v_stok,
-    'geri_alinabilir', jsonb_array_length(v_cak) = 0 AND cardinality(v_eng) = 0
-                       AND jsonb_array_length(v_plan) > 0,
-    'engeller', to_jsonb(v_eng));
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._degisim_uygula(p_plan jsonb)
-CREATE OR REPLACE FUNCTION surum_gizli._degisim_uygula(p_plan jsonb)
- RETURNS integer
- LANGUAGE plpgsql
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  s      record;
-  v_pkc  text;
-  v_cols text;
-  v_n    int;
-  v_top  int := 0;
-BEGIN
-  FOR s IN
-    SELECT * FROM jsonb_to_recordset(p_plan)
-      AS x(sira int, tablo text, satir_pk jsonb, islem text, alanlar text[], eski jsonb)
-     ORDER BY sira
-  LOOP
-    v_pkc := surum_gizli._pk_kolonlar(s.tablo);
-    IF s.islem = 'U' THEN
-      SELECT string_agg(quote_ident(f), ', ') INTO v_cols
-        FROM unnest(s.alanlar) f
-       WHERE EXISTS (SELECT 1 FROM pg_attribute a
-                      WHERE a.attrelid = format('public.%I', s.tablo)::regclass
-                        AND a.attname = f AND a.attnum > 0 AND NOT a.attisdropped);
-      EXECUTE format(
-        'UPDATE public.%1$I SET (%2$s) = (SELECT %2$s FROM jsonb_populate_record(NULL::public.%1$I, $1)) '
-        'WHERE (%3$s) = (SELECT %3$s FROM jsonb_populate_record(NULL::public.%1$I, $2))',
-        s.tablo, v_cols, v_pkc) USING s.eski, s.satir_pk;
-    ELSIF s.islem = 'I' THEN
-      EXECUTE format(
-        'DELETE FROM public.%1$I WHERE (%2$s) = (SELECT %2$s FROM jsonb_populate_record(NULL::public.%1$I, $1))',
-        s.tablo, v_pkc) USING s.satir_pk;
-    ELSE
-      SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY a.attnum) INTO v_cols
-        FROM pg_attribute a
-       WHERE a.attrelid = format('public.%I', s.tablo)::regclass
-         AND a.attnum > 0 AND NOT a.attisdropped AND a.attgenerated = ''
-         AND a.attidentity <> 'a' AND s.eski ? a.attname;
-      EXECUTE format(
-        'INSERT INTO public.%1$I (%2$s) SELECT %2$s FROM jsonb_populate_record(NULL::public.%1$I, $1)',
-        s.tablo, v_cols) USING s.eski;
-    END IF;
-    GET DIAGNOSTICS v_n = ROW_COUNT;
-    IF v_n <> 1 THEN
-      RAISE EXCEPTION 'geri alma adımı % (% %) % satır etkiledi, 1 bekleniyordu', s.sira, s.tablo, s.satir_pk, v_n;
-    END IF;
-    v_top := v_top + 1;
-  END LOOP;
-  RETURN v_top;
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._ekle_bagli(p_eklenecek degisim_log, p_cocik degisim_log)
-CREATE OR REPLACE FUNCTION surum_gizli._ekle_bagli(p_eklenecek degisim_log, p_cocik degisim_log)
- RETURNS boolean
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  v_ok boolean;
-BEGIN
-  SELECT EXISTS (
-    SELECT 1
-      FROM pg_constraint con
-     WHERE con.contype = 'f'
-       AND con.conrelid = format('public.%I', p_cocik.tablo_adi)::regclass
-       AND con.confrelid = format('public.%I', p_eklenecek.tablo_adi)::regclass
-       AND NOT EXISTS (
-             SELECT 1
-               FROM unnest(con.conkey, con.confkey) AS u(ck, pk)
-               JOIN pg_attribute ca ON ca.attrelid = con.conrelid AND ca.attnum = u.ck
-               JOIN pg_attribute pa ON pa.attrelid = con.confrelid AND pa.attnum = u.pk
-              WHERE coalesce(p_cocik.eski ->> ca.attname, '')
-                    IS DISTINCT FROM coalesce(p_eklenecek.satir_pk ->> pa.attname, '')))
-    INTO v_ok;
-  RETURN v_ok;
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._guncel_satir(p_tablo text, p_satir_pk jsonb)
-CREATE OR REPLACE FUNCTION surum_gizli._guncel_satir(p_tablo text, p_satir_pk jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  v_pkc text := surum_gizli._pk_kolonlar(p_tablo);
-  v_row jsonb;
-BEGIN
-  EXECUTE format('SELECT to_jsonb(x) FROM public.%1$I x WHERE (%2$s) = (SELECT %2$s FROM jsonb_populate_record(NULL::public.%1$I, $1))',
-                 p_tablo, v_pkc)
-    INTO v_row USING p_satir_pk;
-  RETURN v_row;
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._kapsamda(p_tablo text)
-CREATE OR REPLACE FUNCTION surum_gizli._kapsamda(p_tablo text)
- RETURNS boolean
- LANGUAGE sql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-  SELECT EXISTS (SELECT 1 FROM pg_trigger
-                  WHERE tgrelid = to_regclass(format('public.%I', p_tablo))
-                    AND tgname = 'trg_degisim_log');
-$function$
-;
-
--- FUNCTION: surum_gizli._l4_rehber_uyesi(p_hedef jsonb)
-CREATE OR REPLACE FUNCTION surum_gizli._l4_rehber_uyesi(p_hedef jsonb)
- RETURNS boolean
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  v_tablo text;
-  v_pk    jsonb;
-  v_txid  bigint;
-BEGIN
-  IF p_hedef IS NULL OR jsonb_typeof(p_hedef) <> 'object' THEN
-    RETURN false;
-  END IF;
-  v_tablo := nullif(p_hedef ->> 'tablo', '');
-  IF v_tablo IS NOT NULL THEN
-    v_pk := surum_gizli._pk_json(v_tablo, p_hedef -> 'pk');
-  END IF;
-  BEGIN
-    v_txid := (p_hedef ->> 'txid')::bigint;
-  EXCEPTION WHEN others THEN
-    RETURN false;
-  END;
-  IF v_tablo IS NULL OR v_pk IS NULL OR v_txid IS NULL THEN
-    RETURN false;   -- rehber adımları her zaman {tablo, pk, txid} taşır
-  END IF;
-  RETURN EXISTS (
-    SELECT 1 FROM surum_gizli.l4_rehber_adimlari a
-     WHERE a.tablo = v_tablo
-       AND a.satir_pk IS NOT DISTINCT FROM v_pk
-       AND a.txid = v_txid
-       AND a.olusturma > now() - interval '7 days');
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._l4_zaman_txid(p_tablo text, p_pk jsonb, p_zaman text, OUT o_txid bigint, OUT o_neden text, OUT o_enyakin timestamp with time zone)
-CREATE OR REPLACE FUNCTION surum_gizli._l4_zaman_txid(p_tablo text, p_pk jsonb, p_zaman text, OUT o_txid bigint, OUT o_neden text, OUT o_enyakin timestamp with time zone)
- RETURNS record
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  v_zt timestamptz;
-BEGIN
-  o_txid    := NULL;
-  o_neden   := NULL;
-  o_enyakin := NULL;
-  BEGIN
-    v_zt := p_zaman::timestamptz;
-  EXCEPTION WHEN others THEN
-    o_neden := 'ZAMAN_GECERSIZ';
-    RETURN;
-  END;
-  SELECT l.txid INTO o_txid
-    FROM public.degisim_log l
-   WHERE l.tablo_adi = p_tablo AND l.satir_pk = p_pk
-     AND l.kayit_zamani BETWEEN v_zt - interval '120 seconds'
-                            AND v_zt + interval '120 seconds'
-   ORDER BY abs(extract(epoch FROM l.kayit_zamani - v_zt)), l.id
-   LIMIT 1;
-  IF o_txid IS NOT NULL THEN
-    RETURN;
-  END IF;
-  SELECT l.kayit_zamani INTO o_enyakin
-    FROM public.degisim_log l
-   WHERE l.tablo_adi = p_tablo AND l.satir_pk = p_pk
-   ORDER BY abs(extract(epoch FROM l.kayit_zamani - v_zt)), l.id
-   LIMIT 1;
-  IF o_enyakin IS NULL THEN
-    o_neden := CASE WHEN surum_gizli._guncel_satir(p_tablo, p_pk) IS NULL
-                    THEN 'SATIR_YOK' ELSE 'LOG_YOK' END;
-  ELSE
-    o_neden := 'ZAMAN_ESLESME_YOK';
-  END IF;
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._l4_zincir(p_hedef jsonb)
-CREATE OR REPLACE FUNCTION surum_gizli._l4_zincir(p_hedef jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  c_teknik  CONSTANT text[] := ARRAY['created_at','updated_at','olusturma',
-                                     'guncelleme','guncelleme_tarihi','guncellendi'];
-  c_adim_siniri CONSTANT int := 100;
-
-  v_txid       bigint;
-  v_tablo      text;
-  v_pk         jsonb;
-  v_zaman      text;
-  v_neden      text;
-  v_enyakin    timestamptz;
-  v_hedef_txid bigint;
-  v_ids        bigint[];
-  v_add        bigint[];
-  v_min        bigint;
-  v_taranan    bigint[] := '{}'::bigint[];
-  e            public.degisim_log;
-  r            record;
-  fk           record;
-  ch           record;
-  s            record;
-  v_cpk        jsonb;
-  v_cids       bigint[];
-  v_ctx        bigint[];
-  v_cur        jsonb;
-  v_fields     text[];
-  v_exists     boolean;
-  v_eng_sayi   int := 0;
-  v_bloke_birim jsonb := '[]'::jsonb;
-  v_ekle       public.degisim_log[];
-  v_sirali     public.degisim_log[];
-  v_topo       public.degisim_log[] := ARRAY[]::public.degisim_log[];
-  v_n          int;
-  v_derece     int[];
-  v_cikti      boolean[];
-  v_kalan      int;
-  v_bulundu    boolean;
-  i            int;
-  j            int;
-  v_sira       int := 0;
-  v_plan       jsonb := '[]'::jsonb;
-  v_cak        jsonb := '[]'::jsonb;
-  v_bag        jsonb := '[]'::jsonb;
-  v_stok       jsonb := '[]'::jsonb;
-  v_eng        text[] := '{}';
-  v_ga         boolean;
-  v_rehber     jsonb := NULL;
-BEGIN
-  IF p_hedef IS NULL OR jsonb_typeof(p_hedef) <> 'object' THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-  END IF;
-
-  IF nullif(p_hedef ->> 'txid', '') IS NOT NULL THEN
-    BEGIN
-      v_txid := (p_hedef ->> 'txid')::bigint;
-    EXCEPTION WHEN others THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-    END;
-  END IF;
-  v_zaman := nullif(p_hedef ->> 'zaman', '');
-
-  -- ── 1. hedef adımı: {txid} | {tablo,pk[,txid|zaman]} ──
-  IF v_txid IS NOT NULL THEN
-    v_hedef_txid := v_txid;
-    -- {tablo,pk,txid} formu: SATIR-KÖKLÜ hedef (yalnız bu satırın o tx'teki
-    -- girişleri + aynı-tx stok hareketleri başlangıç adımıdır; {txid} tek
-    -- başına verildiğinde tx BÜTÜNÜ başlangıçtır). Böylece W2, satır önizle
-    -- mesinde kullandığı hedefi zincire de geçebilir (sessiz genişleme yok).
-    v_tablo := nullif(p_hedef ->> 'tablo', '');
-    IF v_tablo IS NOT NULL THEN
-      IF NOT surum_gizli._kapsamda(v_tablo) THEN
-        RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-      END IF;
-      v_pk := surum_gizli._pk_json(v_tablo, p_hedef -> 'pk');
-      IF v_pk IS NULL THEN
-        RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-      END IF;
-      SELECT array_agg(id ORDER BY id) INTO v_ids
-        FROM public.degisim_log
-       WHERE txid = v_txid AND tablo_adi = v_tablo AND satir_pk = v_pk;
-      IF v_ids IS NULL THEN
-        RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-          'detay', jsonb_build_object('neden', 'LOG_YOK'));
-      END IF;
-      IF (SELECT count(*) FROM jsonb_object_keys(v_pk)) = 1 THEN
-        v_ids := v_ids || ARRAY(
-          SELECT id FROM public.degisim_log
-           WHERE txid = v_txid AND tablo_adi = 'stok_hareket'
-             AND coalesce(yeni, eski) ->> 'referans_id' = (SELECT v #>> '{}' FROM jsonb_each(v_pk) AS x(k, v))
-             AND id <> ALL (v_ids));
-      END IF;
-    ELSE
-      SELECT array_agg(id ORDER BY id) INTO v_ids FROM public.degisim_log WHERE txid = v_txid;
-      IF v_ids IS NULL THEN
-        RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-          'detay', jsonb_build_object('neden', 'LOG_YOK'));
-      END IF;
-    END IF;
-  ELSE
-    v_tablo := p_hedef ->> 'tablo';
-    IF v_tablo IS NULL OR NOT surum_gizli._kapsamda(v_tablo) THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-    END IF;
-    v_pk := surum_gizli._pk_json(v_tablo, p_hedef -> 'pk');
-    IF v_pk IS NULL THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM public.degisim_log
-                    WHERE tablo_adi = v_tablo AND satir_pk = v_pk) THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-        'detay', jsonb_build_object('neden',
-          CASE WHEN surum_gizli._guncel_satir(v_tablo, v_pk) IS NULL
-               THEN 'SATIR_YOK' ELSE 'LOG_YOK' END));
-    END IF;
-
-    IF v_zaman IS NOT NULL THEN
-      SELECT o_txid, o_neden, o_enyakin INTO v_txid, v_neden, v_enyakin
-        FROM surum_gizli._l4_zaman_txid(v_tablo, v_pk, v_zaman);
-      IF v_txid IS NULL THEN
-        IF v_neden = 'ZAMAN_GECERSIZ' THEN
-          RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF');
-        END IF;
-        RETURN jsonb_build_object('ok', false, 'hata', 'HEDEF_BULUNAMADI',
-          'detay', jsonb_build_object('neden', v_neden, 'zaman', v_zaman,
-                                      'en_yakin', v_enyakin));
-      END IF;
-    ELSE
-      SELECT txid INTO v_txid FROM public.degisim_log
-       WHERE tablo_adi = v_tablo AND satir_pk = v_pk
-       ORDER BY id DESC LIMIT 1;
-    END IF;
-    v_hedef_txid := v_txid;
-
-    SELECT array_agg(id ORDER BY id) INTO v_ids
-      FROM public.degisim_log
-     WHERE txid = v_txid AND tablo_adi = v_tablo AND satir_pk = v_pk;
-    -- stock movements of the same tx that reference this row join the chain
-    -- (satir precedenti)
-    IF (SELECT count(*) FROM jsonb_object_keys(v_pk)) = 1 THEN
-      v_ids := v_ids || ARRAY(
-        SELECT id FROM public.degisim_log
-         WHERE txid = v_txid AND tablo_adi = 'stok_hareket'
-           AND coalesce(yeni, eski) ->> 'referans_id' = (SELECT v #>> '{}' FROM jsonb_each(v_pk) AS x(k, v))
-           AND id <> ALL (v_ids));
-    END IF;
-  END IF;
-
-  -- sınır: hedef adımı KENDİ BAŞINDA 100 adımı aşiyorsa da ZINCIR_COK_UZUN
-  -- (kapanış döngüsü büyüme yolunda denetler; başlangıç burada denetlenir)
-  IF cardinality(v_ids) > c_adim_siniri THEN
-    RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF',
-      'detay', jsonb_build_object('neden', 'ZINCIR_COK_UZUN',
-                                  'zincir_adim', cardinality(v_ids),
-                                  'sinir', c_adim_siniri));
-  END IF;
-
-  SELECT min(id) INTO v_min FROM public.degisim_log WHERE id = ANY (v_ids);
-
-  -- ── 2. yineli kapsam kapanışı (K1 YENİ, luna L4-03): (a) zincir
-  --    satırlarında hedef adımından SONRAKİ tüm değişiklikler; (b)
-  --    pg_constraint'ten doğrulanan GERÇEK FK alt kayıtlarında planı
-  --    GERÇEKTEN engelleyen değişiklikler. Aynı hayvanın İLİGSİZ olayları
-  --    (aşı, kilo, başka kayıt) zincire GİRMEZ — eski kolon-adı hayvan
-  --    köprüsü kaldırıldı. Bağımlılık FK yoluyla güvenle belirlenemeyen
-  --    satırlar zincire otomatik girmez; çakışma/engel varsa sirali_rehber. ──
-  LOOP
-    v_add := '{}'::bigint[];
-
-    -- (a) zincir satırlarında, hedef adımından SONRAKİ tüm değişiklikler
-    v_add := v_add || coalesce(ARRAY(
-      SELECT l.id
-        FROM public.degisim_log l
-        JOIN (SELECT d.tablo_adi, d.satir_pk, min(d.id) AS ilk_id
-                FROM public.degisim_log d
-               WHERE d.id = ANY (v_ids) GROUP BY 1, 2) g
-          ON g.tablo_adi = l.tablo_adi AND g.satir_pk = l.satir_pk
-       WHERE l.id > g.ilk_id AND l.id <> ALL (v_ids)), '{}'::bigint[]);
-
-    -- (b) FK çocuklar: zincirdeki INSERT adımlarının (silinecek satırlar)
-    --     bağımlılık taraması — yalnız pg_constraint'ten doğrulanan gerçek
-    --     FK'lar. İzlenen çocuğun hedef'ten sonraki girişleri bağımlı adım
-    --     olur; izlenmeyen çocuk (logsuz) silmeyi bloklar → aşılamaz ENGEL
-    --     (bypass yok).
-    FOR e IN
-      SELECT * FROM public.degisim_log
-       WHERE id = ANY (v_ids) AND islem = 'I' AND id <> ALL (v_taranan)
-       ORDER BY id
-    LOOP
-      v_taranan := v_taranan || e.id;
-      FOR fk IN
-        SELECT cc.relname::text AS child, con.conrelid AS child_rel, con.confdeltype,
-               array_agg(ca.attname::text ORDER BY k.ord) AS ccols,
-               array_agg(pa.attname::text ORDER BY k.ord) AS pcols
-          FROM pg_constraint con
-          JOIN pg_class cc ON cc.oid = con.conrelid
-          CROSS JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS k(ck, pk, ord)
-          JOIN pg_attribute ca ON ca.attrelid = con.conrelid AND ca.attnum = k.ck
-          JOIN pg_attribute pa ON pa.attrelid = con.confrelid AND pa.attnum = k.pk
-         WHERE con.contype = 'f'
-           AND con.confrelid = format('public.%I', e.tablo_adi)::regclass
-           AND cc.relnamespace = 'public'::regnamespace
-         GROUP BY 1, 2, 3
-      LOOP
-        FOR ch IN EXECUTE format(
-            'SELECT to_jsonb(c) AS j FROM public.%I c WHERE (%s) = (SELECT %s FROM jsonb_populate_record(NULL::public.%I, $1))',
-            fk.child,
-            (SELECT string_agg(format('c.%I', x), ', ') FROM unnest(fk.ccols) x),
-            (SELECT string_agg(format('%I', x), ', ') FROM unnest(fk.pcols) x),
-            e.tablo_adi)
-          USING e.yeni
-        LOOP
-          SELECT jsonb_object_agg(a.attname, ch.j -> a.attname) INTO v_cpk
-            FROM pg_constraint pc
-            CROSS JOIN LATERAL unnest(pc.conkey) AS u(n)
-            JOIN pg_attribute a ON a.attrelid = pc.conrelid AND a.attnum = u.n
-           WHERE pc.conrelid = fk.child_rel AND pc.contype = 'p';
-          CONTINUE WHEN EXISTS (
-            SELECT 1 FROM public.degisim_log d
-             WHERE d.id = ANY (v_ids) AND d.tablo_adi = fk.child AND d.satir_pk = v_cpk);
-
-          SELECT array_agg(id), array_agg(DISTINCT txid) INTO v_cids, v_ctx
-            FROM public.degisim_log WHERE tablo_adi = fk.child AND satir_pk = v_cpk;
-
-          IF v_cids IS NULL THEN
-            v_bag := v_bag || jsonb_build_object(
-              'tablo', fk.child, 'pk', surum_gizli._pk_gorunum(v_cpk), 'satir_pk', v_cpk,
-              'iliski', format('%s(%s) -> %s', fk.child, array_to_string(fk.ccols, ','), e.tablo_adi),
-              'etki', CASE WHEN fk.confdeltype = 'n' THEN 'UYARI' ELSE 'ENGEL' END);
-            IF fk.confdeltype <> 'n' THEN
-              v_eng := v_eng || format('%s kaydı %s geçmişi olmayan bağımlı kayıt', fk.child, surum_gizli._pk_gorunum(v_cpk));
-            END IF;
-          ELSE
-            v_bag := v_bag || jsonb_build_object(
-              'tablo', fk.child, 'pk', surum_gizli._pk_gorunum(v_cpk), 'satir_pk', v_cpk,
-              'iliski', format('%s(%s) -> %s', fk.child, array_to_string(fk.ccols, ','), e.tablo_adi),
-              'etki', CASE WHEN v_ctx = ARRAY[v_hedef_txid] THEN 'KADEMELI' ELSE 'BAGIMLI_ADIM' END);
-            -- yalnız hedef adımından sonraki girişler (çocuğun hedef-öncesi
-            -- geçmişi geri alınmaz)
-            v_add := v_add || coalesce(ARRAY(
-                       SELECT x FROM unnest(v_cids) x WHERE x > v_min), '{}'::bigint[]);
-          END IF;
-        END LOOP;
-      END LOOP;
-    END LOOP;
-
-    v_add := ARRAY(SELECT DISTINCT x FROM unnest(v_add) x WHERE x <> ALL (v_ids));
-    EXIT WHEN cardinality(v_add) = 0;
-
-    v_ids := v_ids || v_add;
-    IF cardinality(v_ids) > c_adim_siniri THEN
-      RETURN jsonb_build_object('ok', false, 'hata', 'GECERSIZ_HEDEF',
-        'detay', jsonb_build_object('neden', 'ZINCIR_COK_UZUN',
-                                    'zincir_adim', cardinality(v_ids),
-                                    'sinir', c_adim_siniri));
-    END IF;
-  END LOOP;
-
-  -- engel sayısı anlık görüntüsü: çakışma metinleri v_eng'e birleştirilmeden
-  -- ÖNCE (yoksa ZINCIR_DISI_ENGEL ayrımı ölü kod olur)
-  v_eng_sayi := cardinality(v_eng);
-
-    -- EKLE adımları (D girişleri) üst kayıt ister — f2 planıyla aynı ENGEL
-    -- kuralı (bypass yok): ilk durumda üst kayıt yoksa ve o üst de zincirde
-    -- geri eklenecek değilse, otomatik zincir kurulamaz → rehber düşer.
-    FOR e IN SELECT * FROM public.degisim_log WHERE id = ANY (v_ids) AND islem = 'D' LOOP
-      FOR fk IN
-        SELECT pcl.relname::text AS parent, con.confdeltype,
-               array_agg(ca.attname::text ORDER BY k.ord) AS ccols,
-               array_agg(pa.attname::text ORDER BY k.ord) AS pcols
-          FROM pg_constraint con
-          JOIN pg_class pcl ON pcl.oid = con.confrelid
-          CROSS JOIN LATERAL unnest(con.conkey, con.confkey) WITH ORDINALITY AS k(ck, pk, ord)
-          JOIN pg_attribute ca ON ca.attrelid = con.conrelid AND ca.attnum = k.ck
-          JOIN pg_attribute pa ON pa.attrelid = con.confrelid AND pa.attnum = k.pk
-         WHERE con.contype = 'f'
-           AND con.conrelid = format('public.%I', e.tablo_adi)::regclass
-           AND pcl.relnamespace = 'public'::regnamespace
-         GROUP BY 1, 2
-      LOOP
-        CONTINUE WHEN EXISTS (SELECT 1 FROM unnest(fk.ccols) c WHERE e.eski ->> c IS NULL);
-        EXECUTE format(
-          'SELECT EXISTS (SELECT 1 FROM public.%I p WHERE (%s) = (SELECT %s FROM jsonb_populate_record(NULL::public.%I, $1)))',
-          fk.parent,
-          (SELECT string_agg(format('p.%I', x), ', ') FROM unnest(fk.pcols) x),
-          (SELECT string_agg(format('%I', x), ', ') FROM unnest(fk.ccols) x),
-          e.tablo_adi)
-          INTO v_exists USING e.eski;
-        IF NOT v_exists AND NOT EXISTS (
-             SELECT 1 FROM public.degisim_log d
-              WHERE d.id = ANY (v_ids) AND d.tablo_adi = fk.parent AND d.islem = 'D'
-                AND NOT EXISTS (SELECT 1 FROM unnest(fk.pcols, fk.ccols) AS u(p, c)
-                                 WHERE d.eski ->> u.p IS DISTINCT FROM e.eski ->> u.c)) THEN
-          v_bag := v_bag || jsonb_build_object(
-            'tablo', fk.parent, 'pk', NULL,
-            'iliski', format('%s(%s) -> %s(%s)', e.tablo_adi, array_to_string(fk.ccols, ','),
-                             fk.parent, array_to_string(fk.pcols, ',')),
-            'etki', 'ENGEL');
-          v_eng := v_eng || format('%s kaydı geri eklenemez: üst kayıt (%s) yok', e.tablo_adi, fk.parent);
-          -- bu EKLE birimi rehberde tekil geri alınamaz → işaretle (süzülür)
-          v_bloke_birim := v_bloke_birim || jsonb_build_object(
-            'tablo', e.tablo_adi, 'satir_pk', e.satir_pk, 'txid', e.txid::text);
-        END IF;
-      END LOOP;
-    END LOOP;
-
-  -- bilgi (engel değil): zincirdeki D girişiyle aynı tx'te kademeli silinmiş
-  -- ama zincire girmemiş çocuklar — f2 planındaki UYARI paritesi
-  FOR e IN SELECT * FROM public.degisim_log WHERE id = ANY (v_ids) AND islem = 'D' LOOP
-    FOR ch IN
-      SELECT c.* FROM public.degisim_log c
-       WHERE c.txid = e.txid AND c.islem = 'D' AND c.id <> ALL (v_ids)
-         AND surum_gizli._ekle_bagli(e, c)
-    LOOP
-      v_bag := v_bag || jsonb_build_object(
-        'tablo', ch.tablo_adi, 'pk', surum_gizli._pk_gorunum(ch.satir_pk), 'satir_pk', ch.satir_pk,
-        'iliski', format('%s kaydı %s ile aynı işlemde silinmiş ve bu geri almaya dahil değil',
-                         ch.tablo_adi, e.tablo_adi),
-        'etki', 'UYARI');
-    END LOOP;
-  END LOOP;
-
-  -- ── 3. çakışmalar: zincire DAHIL OLMAYAN satırların sonraki değişiklikleri
-  --    sayılmaz; yalnız izlenmeyen yolcularla durum kayması (drift) çakışmadır
-  FOR r IN
-    SELECT tablo_adi, satir_pk, max(id) AS son_id
-      FROM public.degisim_log WHERE id = ANY (v_ids) GROUP BY 1, 2
-  LOOP
-    SELECT * INTO e FROM public.degisim_log WHERE id = r.son_id;
-    v_cur := surum_gizli._guncel_satir(r.tablo_adi, r.satir_pk);
-    IF e.islem = 'D' THEN
-      IF v_cur IS NOT NULL THEN
-        v_cak := v_cak || jsonb_strip_nulls(jsonb_build_object(
-          'tablo', r.tablo_adi, 'pk', surum_gizli._pk_gorunum(r.satir_pk), 'satir_pk', r.satir_pk,
-          'neden', 'GUNCEL_DURUM_FARKLI'));
-      END IF;
-    ELSE
-      v_fields := ARRAY(SELECT jsonb_object_keys(e.yeni));
-      IF v_cur IS NULL OR EXISTS (
-           SELECT 1 FROM unnest(v_fields) f
-            WHERE f <> ALL (c_teknik) AND v_cur ? f
-              AND (v_cur -> f) IS DISTINCT FROM (e.yeni -> f)) THEN
-        v_cak := v_cak || jsonb_strip_nulls(jsonb_build_object(
-          'tablo', r.tablo_adi, 'pk', surum_gizli._pk_gorunum(r.satir_pk), 'satir_pk', r.satir_pk,
-          'neden', 'GUNCEL_DURUM_FARKLI'));
-      END IF;
-    END IF;
-  END LOOP;
-
-  SELECT v_eng || coalesce(array_agg(format('%s kaydı %s: %s', c ->> 'tablo', c -> 'pk', c ->> 'neden')), '{}')
-    INTO v_eng FROM jsonb_array_elements(v_cak) c;
-
-  -- ── 4. stok uyarıları (bilgi; engel değil) ──
-  FOR r IN
-    SELECT DISTINCT tablo_adi, satir_pk FROM public.degisim_log
-     WHERE id = ANY (v_ids) AND tablo_adi <> 'stok_hareket'
-       AND (SELECT count(*) FROM jsonb_object_keys(satir_pk)) = 1
-  LOOP
-    FOR e IN
-      SELECT * FROM public.degisim_log l
-       WHERE l.tablo_adi = 'stok_hareket' AND l.id <> ALL (v_ids)
-         AND coalesce(l.yeni, l.eski) ->> 'referans_id' = (SELECT v #>> '{}' FROM jsonb_each(r.satir_pk) AS x(k, v))
-    LOOP
-      v_stok := v_stok || jsonb_build_object(
-        'stok_id', coalesce(e.yeni, e.eski) ->> 'stok_id',
-        'metin', format('%s kaydına bağlı stok hareketi bu geri almaya dahil değil; stok elle kontrol edilmeli',
-                        r.tablo_adi),
-        'txid', e.txid::text);
-    END LOOP;
-  END LOOP;
-
-  -- ── 5. plan adımları: aynı satırda en yeni önce (id DESC); bağımlı adımlar
-  --    (daha büyük log id) doğal olarak bağlandıkları adımdan ÖNCE gelir;
-  --    EKLE adımları (D girişleri) mevcut topolojik desenle anne-önce ──
-  SELECT coalesce(array_agg(x ORDER BY x.id), ARRAY[]::public.degisim_log[])
-    INTO v_ekle
-    FROM public.degisim_log x
-   WHERE x.id = ANY (v_ids) AND x.islem = 'D';
-  SELECT coalesce(array_agg(x ORDER BY x.id DESC), ARRAY[]::public.degisim_log[])
-    INTO v_sirali
-    FROM public.degisim_log x
-   WHERE x.id = ANY (v_ids) AND x.islem <> 'D';
-
-  v_n := coalesce(cardinality(v_ekle), 0);
-  IF v_n > 0 THEN
-    v_derece := array_fill(0, ARRAY[v_n]);
-    v_cikti  := array_fill(false, ARRAY[v_n]);
-    FOR i IN 1 .. v_n LOOP
-      FOR j IN 1 .. v_n LOOP
-        CONTINUE WHEN i = j;
-        IF surum_gizli._ekle_bagli(v_ekle[j], v_ekle[i]) THEN
-          v_derece[i] := v_derece[i] + 1;
-        END IF;
-      END LOOP;
-    END LOOP;
-    v_kalan := v_n;
-    WHILE v_kalan > 0 LOOP
-      v_bulundu := false;
-      FOR i IN 1 .. v_n LOOP
-        CONTINUE WHEN v_cikti[i] OR v_derece[i] > 0;
-        v_cikti[i] := true;
-        v_kalan := v_kalan - 1;
-        v_bulundu := true;
-        v_topo := v_topo || v_ekle[i];
-        FOR j IN 1 .. v_n LOOP
-          CONTINUE WHEN v_cikti[j];
-          IF surum_gizli._ekle_bagli(v_ekle[i], v_ekle[j]) THEN
-            v_derece[j] := v_derece[j] - 1;
-          END IF;
-        END LOOP;
-        EXIT;
-      END LOOP;
-      IF NOT v_bulundu THEN
-        FOR i IN 1 .. v_n LOOP
-          CONTINUE WHEN v_cikti[i];
-          v_cikti[i] := true;
-          v_kalan := v_kalan - 1;
-          v_topo := v_topo || v_ekle[i];
-        END LOOP;
-      END IF;
-    END LOOP;
-    v_sirali := v_topo || v_sirali;
-  END IF;
-
-  FOREACH e IN ARRAY v_sirali LOOP
-    v_sira := v_sira + 1;
-    v_plan := v_plan || jsonb_build_object(
-      'sira', v_sira,
-      'log_id', e.id,
-      'txid', e.txid::text,
-      'tablo', e.tablo_adi,
-      'pk', surum_gizli._pk_gorunum(e.satir_pk),
-      'satir_pk', e.satir_pk,
-      'islem', e.islem,
-      'alanlar', CASE WHEN e.islem = 'U' THEN to_jsonb(e.degisen_alanlar) END,
-      'eski', CASE e.islem WHEN 'U' THEN (SELECT jsonb_object_agg(f, e.eski -> f) FROM unnest(e.degisen_alanlar) f)
-                           WHEN 'D' THEN e.eski END,
-      'yeni', CASE e.islem WHEN 'U' THEN (SELECT jsonb_object_agg(f, e.yeni -> f) FROM unnest(e.degisen_alanlar) f)
-                           WHEN 'I' THEN e.yeni END,
-      'zaman', e.kayit_zamani,
-      'yapilacak', CASE e.islem WHEN 'U' THEN 'GUNCELLE' WHEN 'I' THEN 'SIL' ELSE 'EKLE' END);
-  END LOOP;
-
-  v_ga := jsonb_array_length(v_cak) = 0 AND cardinality(v_eng) = 0
-          AND jsonb_array_length(v_plan) > 0;
-
-  -- ── 6. sıralı rehber (K1): otomatik zincir kurulamıyorsa kullanıcıya TEK
-  --    TEK geri alma listesi. Sıra = plan adım sırası (aynı satırda en yeni
-  --    önce; bağımlı birim bağlandığı birimden ÖNCE) → rehberi bu sırayla
-  --    izleyen kullanıcı her birimi tekil (satir) hedefle geri alabilir.
-  --    Durum kaymalı satırlar tekil geri alınamaz → rehber dışı.
-  --    L4-01/L4-04: hedef artık 'l4_rehber' bayrağı TAŞIMAZ — gevşetme
-  --    yetkisi sunucunun l4_rehber_adimlari kaydından gelir (aşağıda yazılır). ──
-  IF NOT v_ga THEN
-    v_rehber := '[]'::jsonb;
-    FOR s IN
-      SELECT x.tablo, x.satir_pk, x.txid, x.islem, x.zaman
-        FROM jsonb_to_recordset(v_plan)
-          AS x(sira int, tablo text, satir_pk jsonb, txid text, islem text,
-               zaman timestamptz)
-       ORDER BY x.sira
-    LOOP
-      CONTINUE WHEN EXISTS (   -- durum kayması: tekil geri alınamaz
-        SELECT 1 FROM jsonb_array_elements(v_cak) c
-         WHERE c ->> 'tablo' = s.tablo
-           AND c -> 'satir_pk' IS NOT DISTINCT FROM s.satir_pk
-           AND c ->> 'neden' = 'GUNCEL_DURUM_FARKLI');
-      CONTINUE WHEN EXISTS (   -- üst kaydı yok: EKLE birimi tekil geri alınamaz
-        SELECT 1 FROM jsonb_array_elements(v_bloke_birim) bb
-         WHERE bb ->> 'tablo' = s.tablo
-           AND bb -> 'satir_pk' IS NOT DISTINCT FROM s.satir_pk
-           AND bb ->> 'txid' = s.txid);
-      CONTINUE WHEN EXISTS (
-        SELECT 1 FROM jsonb_array_elements(v_rehber) rb
-         WHERE rb -> 'hedef' ->> 'tablo' = s.tablo
-           AND rb -> 'hedef' ->> 'txid' = s.txid
-           AND rb -> 'hedef' -> 'pk' IS NOT DISTINCT FROM
-               surum_gizli._pk_gorunum(s.satir_pk));
-      v_rehber := v_rehber || jsonb_build_object(
-        'sira', jsonb_array_length(v_rehber) + 1,
-        'hedef', jsonb_build_object('tablo', s.tablo,
-                                    'pk', surum_gizli._pk_gorunum(s.satir_pk),
-                                    'txid', s.txid),
-        'satir_pk', s.satir_pk,
-        'zaman', s.zaman,
-        'ozet', format('%s · %s', s.tablo, s.islem),
-        'neden_dahil_degil', CASE
-          WHEN v_eng_sayi > 0 THEN 'ZINCIR_DISI_ENGEL'
-          ELSE 'ZINCIR_DISI_CAKISMA'
-        END);
-    END LOOP;
-
-    -- L4-01: sunucu-üretimi rehber adımları kalıcı kayda geçer — gevşetme
-    -- yetkisi yalnız bu kayıttan okunur (_l4_rehber_uyesi). İstemci bayrağı
-    -- hiçbir yerde okunmaz. 7 günden eski adımlar tembel temizlikle düşer.
-    IF jsonb_array_length(v_rehber) > 0 THEN
-      DELETE FROM surum_gizli.l4_rehber_adimlari
-       WHERE olusturma < now() - interval '7 days';
-      INSERT INTO surum_gizli.l4_rehber_adimlari (tablo, satir_pk, txid, kok_txid)
-      SELECT g.hedef ->> 'tablo', g.satir_pk, (g.hedef ->> 'txid')::bigint, v_hedef_txid
-        FROM jsonb_to_recordset(v_rehber)
-          AS g(sira int, hedef jsonb, satir_pk jsonb, zaman timestamptz,
-               ozet text, neden_dahil_degil text)
-       WHERE g.hedef ->> 'txid' ~ '^[0-9]+$'
-      ON CONFLICT (tablo, txid, satir_pk) DO NOTHING;
-    END IF;
-  END IF;
-
-  RETURN jsonb_build_object(
-    'ok', true,
-    'seviye', 'zincir',
-    'hedef', jsonb_strip_nulls(jsonb_build_object(
-               'txid', v_hedef_txid::text, 'tablo', v_tablo,
-               'pk', CASE WHEN v_pk IS NOT NULL THEN surum_gizli._pk_gorunum(v_pk) END,
-               'satir_pk', v_pk)),
-    'plan', v_plan,
-    'cakismalar', v_cak,
-    'bagimliliklar', v_bag,
-    'stok_uyari', v_stok,
-    'geri_alinabilir', v_ga,
-    'engeller', to_jsonb(v_eng),
-    'zincir_adim', jsonb_array_length(v_plan),
-    'sirali_rehber', v_rehber);
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._pk_gorunum(p_satir_pk jsonb)
-CREATE OR REPLACE FUNCTION surum_gizli._pk_gorunum(p_satir_pk jsonb)
- RETURNS jsonb
- LANGUAGE sql
- IMMUTABLE
- SET search_path TO 'pg_catalog'
-AS $function$
-  SELECT CASE WHEN (SELECT count(*) FROM jsonb_object_keys(p_satir_pk)) = 1
-              THEN (SELECT to_jsonb(v #>> '{}') FROM jsonb_each(p_satir_pk) AS e(k, v))
-              ELSE p_satir_pk END;
-$function$
-;
-
--- FUNCTION: surum_gizli._pk_json(p_tablo text, p_pk jsonb)
-CREATE OR REPLACE FUNCTION surum_gizli._pk_json(p_tablo text, p_pk jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-DECLARE
-  v_cols  text[];
-  v_types text[];
-  v_out   jsonb := '{}'::jsonb;
-  v_val   jsonb;
-  i       int;
-BEGIN
-  SELECT array_agg(a.attname::text ORDER BY k.ord),
-         array_agg(format_type(a.atttypid, a.atttypmod) ORDER BY k.ord)
-    INTO v_cols, v_types
-    FROM pg_constraint c
-    CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)
-    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum
-   WHERE c.conrelid = to_regclass(format('public.%I', p_tablo)) AND c.contype = 'p';
-  IF v_cols IS NULL OR p_pk IS NULL THEN
-    RETURN NULL;
-  END IF;
-
-  IF jsonb_typeof(p_pk) = 'object' THEN
-    FOR i IN 1 .. array_length(v_cols, 1) LOOP
-      IF NOT p_pk ? v_cols[i] OR jsonb_typeof(p_pk -> v_cols[i]) = 'null' THEN
-        RETURN NULL;
-      END IF;
-      EXECUTE format('SELECT to_jsonb(%L::%s)', p_pk ->> v_cols[i], v_types[i]) INTO v_val;
-      v_out := v_out || jsonb_build_object(v_cols[i], v_val);
-    END LOOP;
-  ELSIF array_length(v_cols, 1) = 1 AND jsonb_typeof(p_pk) IN ('string', 'number') THEN
-    EXECUTE format('SELECT to_jsonb(%L::%s)', p_pk #>> '{}', v_types[1]) INTO v_val;
-    v_out := jsonb_build_object(v_cols[1], v_val);
-  ELSE
-    RETURN NULL;
-  END IF;
-  RETURN v_out;
-EXCEPTION WHEN others THEN
-  RETURN NULL;   -- value does not cast to the PK type
-END;
-$function$
-;
-
--- FUNCTION: surum_gizli._pk_kolonlar(p_tablo text)
-CREATE OR REPLACE FUNCTION surum_gizli._pk_kolonlar(p_tablo text)
- RETURNS text
- LANGUAGE sql
- STABLE
- SET search_path TO 'pg_catalog', 'public'
-AS $function$
-  SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord)
-    FROM pg_constraint c
-    CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord)
-    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum
-   WHERE c.conrelid = to_regclass(format('public.%I', p_tablo)) AND c.contype = 'p';
-$function$
-;
-
--- ════════════════════════════════════════════════════════════════
--- S1 — Güvenlik: anon/PUBLIC EXECUTE geri alma (20260915000001 migration aynası)
--- Bu bölümdeki genel kalkanlar, yukarıdaki bölümlerdeki tüm
--- "GRANT EXECUTE ... TO anon, authenticated" satırlarının anon kısmını
--- geçersiz kılar (etkin durum: anon 0 fonksiyon, authenticated tam).
--- Fonksiyon-tek REVOKE listesi için: supabase/migrations/20260915000001_anon_execute_geri_al.sql
--- ════════════════════════════════════════════════════════════════
-REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, PUBLIC;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM PUBLIC;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
