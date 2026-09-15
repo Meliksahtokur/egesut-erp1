@@ -1,0 +1,2603 @@
+{
+ "20260830000010_abort_vwp_penceresi.sql": {
+  "functions": [
+   {
+    "name": "public.tohumlama_abort",
+    "args_raw": "p_tohumlama_id text, p_notlar text DEFAULT NULL::text, p_abort_tarihi date DEFAULT CURRENT_DATE",
+    "stmt_len": 2150
+   },
+   {
+    "name": "public.tohumlama_kaydet",
+    "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false",
+    "stmt_len": 7568
+   }
+  ],
+  "tables": [],
+  "columns": [
+   {
+    "schema": "public",
+    "table": "tohumlama",
+    "column": "abort_tarihi",
+    "raw": "ALTER TABLE public.tohumlama ADD COLUMN IF NOT EXISTS abort_tarihi date;"
+   }
+  ],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.tohumlama_abort(text, text, date)",
+    "to": "anon, authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "tohumlama"
+   }
+  ],
+  "other": []
+ },
+ "20260830000020_sessiz_vaka_filtresi_kaldir.sql": {
+  "functions": [],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [
+   {
+    "schema": "public",
+    "view": "v_eligible"
+   }
+  ],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260830000030_cift_abort_log_fix.sql": {
+  "functions": [
+   {
+    "name": "public._islem_log_yaz",
+    "args_raw": "",
+    "stmt_len": 2856
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260830000031_gebe_sonuc_mesaji.sql": {
+  "functions": [
+   {
+    "name": "public.tohumlama_sonuc_gebe",
+    "args_raw": "p_tohumlama_id text",
+    "stmt_len": 2932
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260830000032_geri_al_uuid_fallback.sql": {
+  "functions": [
+   {
+    "name": "public.geri_al",
+    "args_raw": "p_islem_id text",
+    "stmt_len": 3541
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260830000033_geri_al_hardening.sql": {
+  "functions": [
+   {
+    "name": "public.geri_al",
+    "args_raw": "p_islem_id text",
+    "stmt_len": 4713
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.tohumlama_abort(text, text, date)",
+    "to": "anon;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260830000034_review_fix_paketi.sql": {
+  "functions": [
+   {
+    "name": "public.tohumlama_abort",
+    "args_raw": "p_tohumlama_id text, p_notlar text DEFAULT NULL::text, p_abort_tarihi date DEFAULT CURRENT_DATE",
+    "stmt_len": 3166
+   },
+   {
+    "name": "public.tohumlama_kaydet",
+    "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false",
+    "stmt_len": 7628
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.abort_kaydet(text, text)",
+    "to": "authenticated, anon;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "tohumlama"
+   }
+  ],
+  "other": []
+ },
+ "20260831000001_sessiz_ankra_fixi.sql": {
+  "functions": [],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [
+   {
+    "schema": "public",
+    "view": "v_eligible"
+   }
+  ],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260831000002_duve_sessiz_13ay.sql": {
+  "functions": [],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [
+   {
+    "schema": "public",
+    "view": "v_eligible"
+   }
+  ],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260831000003_tablo_guard_triggerlari.sql": {
+  "functions": [
+   {
+    "name": "public._guard_hayvanlar_cinsiyet_grup",
+    "args_raw": "",
+    "stmt_len": 1394
+   },
+   {
+    "name": "public._guard_tohumlama_yas_cinsiyet",
+    "args_raw": "",
+    "stmt_len": 886
+   },
+   {
+    "name": "public._guard_dogum_ileri_tarih",
+    "args_raw": "",
+    "stmt_len": 458
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [
+   {
+    "name": "trg_hayvanlar_guard",
+    "schema": "public",
+    "table": "hayvanlar",
+    "timing": "BEFORE INSERT OR UPDATE OF cinsiyet, grup, dogum_tarihi"
+   },
+   {
+    "name": "trg_tohumlama_guard",
+    "schema": "public",
+    "table": "tohumlama",
+    "timing": "BEFORE INSERT OR UPDATE OF hayvan_id, tarih"
+   },
+   {
+    "name": "trg_dogum_guard",
+    "schema": "public",
+    "table": "dogum",
+    "timing": "BEFORE INSERT OR UPDATE OF tarih"
+   }
+  ],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [
+   {
+    "kind": "TRIGGER",
+    "name": "trg_hayvanlar_guard",
+    "table": "hayvanlar"
+   },
+   {
+    "kind": "TRIGGER",
+    "name": "trg_tohumlama_guard",
+    "table": "tohumlama"
+   },
+   {
+    "kind": "TRIGGER",
+    "name": "trg_dogum_guard",
+    "table": "dogum"
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260901000001_ikiz_dogum_olay_id.sql": {
+  "functions": [
+   {
+    "name": "public.dogum_kaydet",
+    "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi', p_tip text DEFAULT 'Normal', p_kg numeric DEFAULT NULL, p_baba text DEFAULT NULL, p_hekim_id text DEFAULT NULL",
+    "stmt_len": 8199
+   },
+   {
+    "name": "public.hayvan_belirsiz_ureme_listele",
+    "args_raw": "",
+    "stmt_len": 1058
+   }
+  ],
+  "tables": [],
+  "columns": [
+   {
+    "schema": "public",
+    "table": "dogum",
+    "column": "olay_id",
+    "raw": "ALTER TABLE public.dogum ADD COLUMN IF NOT EXISTS olay_id uuid DEFAULT gen_random_uuid();"
+   }
+  ],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.hayvan_belirsiz_ureme_listele()",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "SELECT",
+    "kind": "TABLE",
+    "obj": "public.v_ureme_dongusu",
+    "to": "anon, authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [
+   {
+    "schema": "public",
+    "view": "v_ureme_dongusu"
+   }
+  ],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "dogum"
+   }
+  ],
+  "other": []
+ },
+ "20260901000002_kupe_revizyon.sql": {
+  "functions": [
+   {
+    "name": "public.kupe_musait_mi",
+    "args_raw": "p_kupe_no text, p_devlet_kupe text, p_hayvan_id text DEFAULT NULL",
+    "stmt_len": 1704
+   },
+   {
+    "name": "public.dogum_kaydet",
+    "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text",
+    "stmt_len": 9835
+   },
+   {
+    "name": "public.hayvan_ekle",
+    "args_raw": "p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT 'Genel'::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_anne_id text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text, p_padok_id uuid DEFAULT NULL::uuid",
+    "stmt_len": 3359
+   },
+   {
+    "name": "public.hayvan_guncelle",
+    "args_raw": "p_id text, p_kupe_no text DEFAULT NULL::text, p_devlet_kupe text DEFAULT NULL::text, p_irk text DEFAULT NULL::text, p_cinsiyet text DEFAULT NULL::text, p_dogum_tarihi date DEFAULT NULL::date, p_grup text DEFAULT NULL::text, p_padok text DEFAULT NULL::text, p_dogum_kg numeric DEFAULT NULL::numeric, p_canli_agirlik numeric DEFAULT NULL::numeric, p_boy numeric DEFAULT NULL::numeric, p_renk text DEFAULT NULL::text, p_ayirici_ozellik text DEFAULT NULL::text, p_baba_bilgi text DEFAULT NULL::text, p_notlar text DEFAULT NULL::text, p_anne_id text DEFAULT NULL::text, p_padok_id uuid DEFAULT NULL::uuid, p_kisir boolean DEFAULT NULL::boolean",
+    "stmt_len": 5177
+   },
+   {
+    "name": "public.asistan_hayvan_detay",
+    "args_raw": "p_kupe text DEFAULT NULL::text, p_id text DEFAULT NULL::text",
+    "stmt_len": 1652
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [
+   {
+    "name": "hayvanlar_kupe_no_key",
+    "schema": "public",
+    "table": "hayvanlar",
+    "unique": true
+   }
+  ],
+  "grants": [
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.dogum_kaydet(text, date, text, text, text, numeric, text, text)",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.asistan_hayvan_detay(text, text)",
+    "to": "PUBLIC;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.asistan_hayvan_detay(text, text)",
+    "to": "authenticated, anon;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260902000001_asi_stok_backfill.sql": {
+  "functions": [],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "INSERT",
+    "target": "stok"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   }
+  ],
+  "other": []
+ },
+ "20260902000002_asi_stok_serbest_dusum.sql": {
+  "functions": [
+   {
+    "name": "public.vaccination_stok_dusum",
+    "args_raw": "",
+    "stmt_len": 1883
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260902000003_asi_planli_gorev.sql": {
+  "functions": [
+   {
+    "name": "public.asi_gorev_planla",
+    "args_raw": "p_hayvan_id text, p_vaccine_id uuid, p_doz numeric, p_tarih date, p_aciklama text DEFAULT NULL",
+    "stmt_len": 3315
+   },
+   {
+    "name": "public.asi_planli_tamamla",
+    "args_raw": "p_gorev_id text, p_tarih date, p_doz numeric DEFAULT NULL, p_vaccine_id uuid DEFAULT NULL",
+    "stmt_len": 2769
+   },
+   {
+    "name": "public.fn_gorev_asip_iade",
+    "args_raw": "",
+    "stmt_len": 547
+   },
+   {
+    "name": "public.gorev_tamamla",
+    "args_raw": "p_gorev_id text, p_padok_hedef text DEFAULT NULL::text",
+    "stmt_len": 5061
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [
+   {
+    "name": "trg_gorev_asip_iade",
+    "schema": "public",
+    "table": "gorev_log",
+    "timing": "AFTER UPDATE OF iptal"
+   }
+  ],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [
+   {
+    "kind": "TRIGGER",
+    "name": "trg_gorev_asip_iade",
+    "table": "gorev_log"
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "gorev_log"
+   }
+  ],
+  "other": []
+ },
+ "20260902000004_asi_toplu_gorev.sql": {
+  "functions": [
+   {
+    "name": "public.asi_gorev_planla",
+    "args_raw": "p_hayvan_id text, p_vaccine_id uuid, p_doz numeric, p_tarih date, p_aciklama text DEFAULT NULL",
+    "stmt_len": 3179
+   },
+   {
+    "name": "public.asi_toplu_planla",
+    "args_raw": "p_hayvan_id text, p_tarih date, p_items jsonb, p_aciklama text DEFAULT NULL",
+    "stmt_len": 4060
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260906000001_postpartum_d53_e_vitamin_tek.sql": {
+  "functions": [
+   {
+    "name": "public.dogum_kaydet",
+    "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text",
+    "stmt_len": 8855
+   },
+   {
+    "name": "public.protokol_eksik_tara",
+    "args_raw": "",
+    "stmt_len": 11263
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.dogum_kaydet(text, date, text, text, text, numeric, text, text)",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.protokol_eksik_tara()",
+    "to": "anon, authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "gorev_log"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "gorev_log"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "gorev_log"
+   }
+  ],
+  "other": []
+ },
+ "20260906120000_vaka_toplu_ac.sql": {
+  "functions": [
+   {
+    "name": "public._vaka_ac_tek",
+    "args_raw": "p_hayvan_id text, p_disease_id uuid, p_notes text DEFAULT NULL, p_tarih date DEFAULT NULL",
+    "stmt_len": 1706
+   },
+   {
+    "name": "public.create_case",
+    "args_raw": "p_animal_id text, p_disease_id uuid, p_notes text DEFAULT NULL",
+    "stmt_len": 268
+   },
+   {
+    "name": "public.vaka_toplu_ac",
+    "args_raw": "p_animal_ids text[], p_disease_id uuid, p_items jsonb DEFAULT NULL, p_sablon_id uuid DEFAULT NULL, p_notes text DEFAULT NULL, p_tarih date DEFAULT NULL, p_tohumlama boolean DEFAULT false, p_tohumlama_gun_offset int DEFAULT 0, p_tohumlama_saat text DEFAULT NULL, p_tohumlama_cakisma text DEFAULT 'ekle'",
+    "stmt_len": 21546
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.create_case(text, uuid, text)",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text)",
+    "to": "anon, authenticated;"
+   }
+  ],
+  "drops": [
+   {
+    "kind": "FUNCTION",
+    "name": "public._vaka_ac_tek(text, uuid, text)",
+    "table": null
+   },
+   {
+    "kind": "FUNCTION",
+    "name": "public.create_case(text, uuid, text)",
+    "table": null
+   },
+   {
+    "kind": "FUNCTION",
+    "name": "public.vaka_toplu_ac(text[], uuid, uuid)",
+    "table": null
+   },
+   {
+    "kind": "FUNCTION",
+    "name": "public.vaka_toplu_ac(text[], uuid, uuid, text)",
+    "table": null
+   },
+   {
+    "kind": "FUNCTION",
+    "name": "public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text)",
+    "table": null
+   },
+   {
+    "kind": "FUNCTION",
+    "name": "public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text)",
+    "table": null
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260909000001_sablon_aktif_vakaya_uygula.sql": {
+  "functions": [
+   {
+    "name": "public.tedavi_sablon_uygula",
+    "args_raw": "p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL",
+    "stmt_len": 2904
+   },
+   {
+    "name": "public.tedavi_sablon_tohumlama_gorev_ekle",
+    "args_raw": "p_case_id uuid, p_sablon_id uuid, p_baslangic_tarihi date DEFAULT NULL",
+    "stmt_len": 2002
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.tedavi_sablon_uygula(uuid, uuid, date)",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid, date)",
+    "to": "anon, authenticated;"
+   }
+  ],
+  "drops": [
+   {
+    "kind": "FUNCTION",
+    "name": "public.tedavi_sablon_uygula(uuid, uuid)",
+    "table": null
+   },
+   {
+    "kind": "FUNCTION",
+    "name": "public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid)",
+    "table": null
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260909100000_dozaj_std_dose_seed.sql": {
+  "functions": [],
+  "tables": [],
+  "columns": [
+   {
+    "schema": "public",
+    "table": "drug_products",
+    "column": "std_dose",
+    "raw": "ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose numeric, ADD COLUMN IF NOT EXISTS std_dose_unit text;"
+   },
+   {
+    "schema": "public",
+    "table": "drug_products",
+    "column": "std_dose_unit",
+    "raw": "ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose numeric, ADD COLUMN IF NOT EXISTS std_dose_unit text;"
+   }
+  ],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [
+   {
+    "schema": "public",
+    "table": "drug_products",
+    "name": "drug_products_std_dose_unit_check",
+    "kind": "CHECK"
+   }
+  ],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "vaccines"
+   }
+  ],
+  "other": [
+   {
+    "raw": "COMMENT ON COLUMN public.drug_products.std_dose IS 'Sığırda standart doz değeri — birim std_dose_unit';"
+   },
+   {
+    "raw": "COMMENT ON COLUMN public.drug_products.std_dose_unit IS 'ml/kg | mg/kg (concentration ile ml''e çevrilir) | ml/hayvan (sabit)';"
+   }
+  ]
+ },
+ "20260909110000_dozaj_helper_min_max_rpc.sql": {
+  "functions": [
+   {
+    "name": "public.ilac_dozaj_guncelle",
+    "args_raw": "p_id uuid, p_guncellemeler jsonb",
+    "stmt_len": 2940
+   },
+   {
+    "name": "public.hayvan_kilo_guncelle",
+    "args_raw": "p_id text, p_canli_agirlik numeric",
+    "stmt_len": 1203
+   }
+  ],
+  "tables": [],
+  "columns": [
+   {
+    "schema": "public",
+    "table": "drug_products",
+    "column": "std_dose_min",
+    "raw": "ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose_min numeric, ADD COLUMN IF NOT EXISTS std_dose_max numeric;"
+   },
+   {
+    "schema": "public",
+    "table": "drug_products",
+    "column": "std_dose_max",
+    "raw": "ALTER TABLE public.drug_products ADD COLUMN IF NOT EXISTS std_dose_min numeric, ADD COLUMN IF NOT EXISTS std_dose_max numeric;"
+   }
+  ],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.ilac_dozaj_guncelle(uuid, jsonb)",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.hayvan_kilo_guncelle(text, numeric)",
+    "to": "anon, authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   },
+   {
+    "kind": "UPDATE",
+    "target": "drug_products"
+   }
+  ],
+  "other": [
+   {
+    "raw": "COMMENT ON COLUMN public.drug_products.std_dose_min IS 'Prospektüs alt doz (birim std_dose_unit) — NULL ise helper yalnız varsayılan çipi';"
+   },
+   {
+    "raw": "COMMENT ON COLUMN public.drug_products.std_dose_max IS 'Prospektüs üst doz (birim std_dose_unit) — NULL ise helper yalnız varsayılan çipi';"
+   }
+  ]
+ },
+ "20260910000001_planli_tohumlama_sperma_dus.sql": {
+  "functions": [
+   {
+    "name": "public.fn_sperma_stok_dus",
+    "args_raw": "p_sperma text, p_notlar text DEFAULT NULL::text",
+    "stmt_len": 4102
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.fn_sperma_stok_dus(text, text)",
+    "to": "PUBLIC;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.fn_sperma_stok_dus(text, text)",
+    "to": "anon;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.fn_sperma_stok_dus(text, text)",
+    "to": "authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260910000002_sperma_eslesme_sertlestirme.sql": {
+  "functions": [
+   {
+    "name": "public.tohumlama_tekrar_kaydet",
+    "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text",
+    "stmt_len": 2364,
+    "via_do": true
+   },
+   {
+    "name": "public.tohumlama_kaydet",
+    "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text DEFAULT NULL::text, p_ek_uygulamalar jsonb DEFAULT '[]'::jsonb, p_vwp_override boolean DEFAULT false",
+    "via_do": true
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": [
+   {
+    "raw": "DO> BEGIN CREATE OR REPLACE FUNCTION public.tohumlama_kaydet(p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text DEFAULT NULL::text, p_irk_bilgisi text D"
+   },
+   {
+    "raw": "DO> END"
+   }
+  ]
+ },
+ "20260910000003_gebelik_kaydet_manual_42804_fix.sql": {
+  "functions": [
+   {
+    "name": "public.gebelik_kaydet_manual",
+    "args_raw": "p_hayvan_id text, p_tarih date, p_sperma text DEFAULT NULL::text",
+    "stmt_len": 3601
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260911000001_dogum_buzagi_id_foundation.sql": {
+  "functions": [
+   {
+    "name": "public.dogum_kaydet",
+    "args_raw": "p_anne_id text, p_tarih date, p_kupe text, p_cins text DEFAULT 'Dişi'::text, p_tip text DEFAULT 'Normal'::text, p_kg numeric DEFAULT NULL::numeric, p_baba text DEFAULT NULL::text, p_hekim_id text DEFAULT NULL::text",
+    "stmt_len": 8717
+   },
+   {
+    "name": "public._dogum_buzagi_backfill",
+    "args_raw": "",
+    "stmt_len": 1549
+   }
+  ],
+  "tables": [],
+  "columns": [
+   {
+    "schema": "public",
+    "table": "dogum",
+    "column": "buzagi_id",
+    "raw": "DO-blok koşullu: ADD COLUMN buzagi_id text NULL CONSTRAINT dogum_buzagi_id_fkey REFERENCES hayvanlar(id) ON DELETE SET NULL"
+   }
+  ],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [
+   {
+    "name": "dogum_buzagi_id_uidx",
+    "schema": "public",
+    "table": "dogum",
+    "unique": true
+   }
+  ],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public._dogum_buzagi_backfill()",
+    "to": "PUBLIC;"
+   }
+  ],
+  "drops": [],
+  "constraints": [
+   {
+    "schema": "public",
+    "table": "dogum",
+    "name": "dogum_buzagi_id_fkey",
+    "kind": "FOREIGN KEY"
+   }
+  ],
+  "views": [],
+  "rls": [],
+  "dml": [
+   {
+    "kind": "UPDATE",
+    "target": "dogum",
+    "note": "DO-blok içinden _dogum_buzagi_backfill() çağrısı (buzagi_id backfill)"
+   }
+  ],
+  "other": [
+   {
+    "raw": "DO> BEGIN IF NOT EXISTS ( SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'dogum' AND column_name = 'buzagi_id' ) THEN ALTER"
+   },
+   {
+    "raw": "DO> END IF;"
+   },
+   {
+    "raw": "DO> IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conrelid = 'public.dogum'::regclass AND conname = 'dogum_buzagi_id_fkey' ) THEN ALTER TABLE public.dogum ADD C"
+   },
+   {
+    "raw": "DO> END IF;"
+   },
+   {
+    "raw": "DO> END"
+   },
+   {
+    "raw": "COMMENT ON COLUMN public.dogum.buzagi_id IS 'Yavru buzaginin hayvanlar.id baglantisi (Task 0.5, spec Rev 2). ON DELETE SET NULL: dogum tarihsel olaydir, calf si"
+   },
+   {
+    "raw": "DO> DECLARE v_sayac jsonb;"
+   },
+   {
+    "raw": "DO> BEGIN v_sayac := public._dogum_buzagi_backfill();"
+   },
+   {
+    "raw": "DO> RAISE NOTICE 'buzagi_id backfill: auto=% cok-aday=% tarih-uyumsuz=% aday-yok=%', v_sayac->>'auto', v_sayac->>'cok-aday', v_sayac->>'tarih-uyumsuz', v_sayac->>'a"
+   },
+   {
+    "raw": "DO> END"
+   }
+  ]
+ },
+ "20260911000002_pedigree_foundation.sql": {
+  "functions": [
+   {
+    "name": "public.assert_is_operator",
+    "args_raw": "",
+    "stmt_len": 605
+   },
+   {
+    "name": "public.pedigree_ensure_farm_node",
+    "args_raw": "p_hayvan_id text",
+    "stmt_len": 1042
+   },
+   {
+    "name": "public.pedigree_is_ancestor",
+    "args_raw": "p_ancestor uuid, p_descendant uuid",
+    "stmt_len": 700
+   },
+   {
+    "name": "public._pedigree_parent_set_core",
+    "args_raw": "p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text DEFAULT 'manual', p_source_ref text DEFAULT NULL, p_replace boolean DEFAULT false, p_evidence jsonb DEFAULT NULL",
+    "stmt_len": 3997
+   },
+   {
+    "name": "public.pedigree_parent_set",
+    "args_raw": "p_child_node_id uuid, p_role text, p_parent_node_id uuid, p_source_type text DEFAULT 'manual', p_source_ref text DEFAULT NULL, p_replace boolean DEFAULT false, p_evidence jsonb DEFAULT NULL",
+    "stmt_len": 658
+   },
+   {
+    "name": "public.pedigree_external_upsert",
+    "args_raw": "p_display_name text, p_node_id uuid DEFAULT NULL, p_sex text DEFAULT NULL, p_breed text DEFAULT NULL, p_birth_date date DEFAULT NULL, p_registry_system text DEFAULT NULL, p_registry_code text DEFAULT NULL",
+    "stmt_len": 2215
+   },
+   {
+    "name": "public.semen_catalog_upsert",
+    "args_raw": "p_display_name text, p_id uuid DEFAULT NULL, p_bull_node_id uuid DEFAULT NULL, p_registry_system text DEFAULT NULL, p_registry_code text DEFAULT NULL, p_stock_id text DEFAULT NULL, p_code text DEFAULT NULL, p_supplier text DEFAULT NULL, p_semen_type text DEFAULT NULL, p_active boolean DEFAULT true",
+    "stmt_len": 4334
+   },
+   {
+    "name": "public._trg_pedigree_hayvan_insert",
+    "args_raw": "",
+    "stmt_len": 505
+   }
+  ],
+  "tables": [
+   {
+    "schema": "public",
+    "table": "pedigree_nodes"
+   },
+   {
+    "schema": "public",
+    "table": "pedigree_parentage"
+   },
+   {
+    "schema": "public",
+    "table": "semen_catalog"
+   },
+   {
+    "schema": "public",
+    "table": "pedigree_meta"
+   }
+  ],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [
+   {
+    "name": "trg_pedigree_hayvan_insert",
+    "schema": "public",
+    "table": "hayvanlar",
+    "timing": "AFTER INSERT"
+   }
+  ],
+  "policies": [
+   {
+    "name": "allow_all",
+    "schema": "public",
+    "table": "pedigree_nodes"
+   },
+   {
+    "name": "allow_all",
+    "schema": "public",
+    "table": "pedigree_parentage"
+   },
+   {
+    "name": "allow_all",
+    "schema": "public",
+    "table": "semen_catalog"
+   },
+   {
+    "name": "allow_all",
+    "schema": "public",
+    "table": "pedigree_meta"
+   }
+  ],
+  "indexes": [
+   {
+    "name": "uq_pedigree_nodes_registry",
+    "schema": "public",
+    "table": "pedigree_nodes",
+    "unique": true
+   },
+   {
+    "name": "idx_pedigree_nodes_farm_kind",
+    "schema": "public",
+    "table": "pedigree_nodes",
+    "unique": false
+   },
+   {
+    "name": "idx_parentage_farm_child",
+    "schema": "public",
+    "table": "pedigree_parentage",
+    "unique": false
+   },
+   {
+    "name": "idx_parentage_farm_parent",
+    "schema": "public",
+    "table": "pedigree_parentage",
+    "unique": false
+   },
+   {
+    "name": "idx_parentage_farm_role_child",
+    "schema": "public",
+    "table": "pedigree_parentage",
+    "unique": false
+   }
+  ],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "public.pedigree_nodes",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "public.pedigree_parentage",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "public.pedigree_meta",
+    "to": "anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "public.semen_catalog",
+    "to": "anon;"
+   },
+   {
+    "priv": "REVOKE INSERT, UPDATE, DELETE",
+    "kind": "TABLE",
+    "obj": "public.semen_catalog",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "SELECT",
+    "kind": "TABLE",
+    "obj": "public.semen_catalog",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.assert_is_operator()",
+    "to": "PUBLIC, anon, authenticated, service_role;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_ensure_farm_node(text)",
+    "to": "PUBLIC, anon, authenticated, service_role;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_is_ancestor(uuid,uuid)",
+    "to": "PUBLIC, anon, authenticated, service_role;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb)",
+    "to": "PUBLIC, anon, authenticated, service_role;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)",
+    "to": "PUBLIC, anon, service_role;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_external_upsert(text,uuid,text,text,date,text,text)",
+    "to": "PUBLIC, anon, service_role;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_external_upsert(text,uuid,text,text,date,text,text)",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)",
+    "to": "PUBLIC, anon, service_role;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public._trg_pedigree_hayvan_insert()",
+    "to": "PUBLIC, anon, authenticated, service_role;"
+   }
+  ],
+  "drops": [
+   {
+    "kind": "POLICY",
+    "name": "allow_all",
+    "table": "pedigree_nodes"
+   },
+   {
+    "kind": "POLICY",
+    "name": "allow_all",
+    "table": "pedigree_parentage"
+   },
+   {
+    "kind": "POLICY",
+    "name": "allow_all",
+    "table": "semen_catalog"
+   },
+   {
+    "kind": "POLICY",
+    "name": "allow_all",
+    "table": "pedigree_meta"
+   },
+   {
+    "kind": "TRIGGER",
+    "name": "trg_pedigree_hayvan_insert",
+    "table": "hayvanlar"
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [
+   {
+    "schema": "public",
+    "table": "pedigree_nodes",
+    "op": "ENABLE"
+   },
+   {
+    "schema": "public",
+    "table": "pedigree_parentage",
+    "op": "ENABLE"
+   },
+   {
+    "schema": "public",
+    "table": "semen_catalog",
+    "op": "ENABLE"
+   },
+   {
+    "schema": "public",
+    "table": "pedigree_meta",
+    "op": "ENABLE"
+   }
+  ],
+  "dml": [],
+  "other": []
+ },
+ "20260911000003_pedigree_farm_backfill.sql": {
+  "functions": [
+   {
+    "name": "public.pedigree_try_timestamptz",
+    "args_raw": "p_value text",
+    "stmt_len": 3923
+   },
+   {
+    "name": "public.pedigree_farm_backfill",
+    "args_raw": "",
+    "stmt_len": 2890
+   },
+   {
+    "name": "public.pedigree_integrity_report",
+    "args_raw": "",
+    "stmt_len": 14903
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_try_timestamptz(text)",
+    "to": "PUBLIC, anon, authenticated, service_role;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_farm_backfill()",
+    "to": "PUBLIC, anon, authenticated, service_role;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_integrity_report()",
+    "to": "PUBLIC, anon;"
+   },
+   {
+    "priv": "REVOKE EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_integrity_report()",
+    "to": "service_role;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_integrity_report()",
+    "to": "authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": [
+   {
+    "raw": "DO> DECLARE v_r jsonb;"
+   },
+   {
+    "raw": "DO> BEGIN v_r := public.pedigree_farm_backfill();"
+   },
+   {
+    "raw": "DO> RAISE NOTICE 'pedigree_farm_backfill: %', v_r::text;"
+   },
+   {
+    "raw": "DO> END"
+   }
+  ]
+ },
+ "20260911000004_pedigree_projection_rpc.sql": {
+  "functions": [
+   {
+    "name": "public.pedigree_subgraph",
+    "args_raw": "p_focus_node_id uuid, p_ancestor_depth integer DEFAULT 4, p_descendant_depth integer DEFAULT 1",
+    "stmt_len": 9716
+   },
+   {
+    "name": "public.pedigree_subgraph_for_animal",
+    "args_raw": "p_hayvan_id text, p_ancestor_depth integer DEFAULT 4, p_descendant_depth integer DEFAULT 1",
+    "stmt_len": 734
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_subgraph(uuid, integer, integer)",
+    "to": "PUBLIC, anon, service_role;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_subgraph(uuid, integer, integer)",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_subgraph_for_animal(text, integer, integer)",
+    "to": "PUBLIC, anon, service_role;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.pedigree_subgraph_for_animal(text, integer, integer)",
+    "to": "authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260913000001_surum_gecmisi_f1_degisim_log.sql": {
+  "functions": [
+   {
+    "name": "public._degisim_log_degistirilemez",
+    "args_raw": "",
+    "stmt_len": 351
+   },
+   {
+    "name": "public._degisim_log_yaz",
+    "args_raw": "",
+    "stmt_len": 3209
+   }
+  ],
+  "tables": [
+   {
+    "schema": "public",
+    "table": "degisim_log"
+   }
+  ],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [
+   {
+    "name": "trg_degisim_log_immutable",
+    "schema": "public",
+    "table": "degisim_log",
+    "timing": "BEFORE UPDATE OR DELETE"
+   },
+   {
+    "name": "trg_degisim_log_no_truncate",
+    "schema": "public",
+    "table": "degisim_log",
+    "timing": "BEFORE TRUNCATE"
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "cases",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "diseases",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "dogum",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "drug_administrations",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "drug_classes",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "drug_products",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "drugs",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "gorev_log",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "grup_padok_eslem",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "hastalik_log",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "hayvan_override",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "hayvanlar",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "hekimler",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "irk_esik",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "kizginlik_log",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "padoklar",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "pedigree_meta",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "pedigree_nodes",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "pedigree_parentage",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "protokol_ayar",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "protokol_dismiss",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "protokol_instance",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "sablon_hastalik_eslem",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "semen_catalog",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "stok",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "stok_hareket",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "stok_kategorileri",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "tedavi",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "tedavi_sablonu",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "tedavi_sablonu_kalem",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "tohumlama",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "treatment_day_uygulamalar",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "treatment_days",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "uygulama_log",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "vaccination_log",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "vaccination_schedule",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "vaccine_diseases",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "vaccine_protocol_steps",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   },
+   {
+    "name": "trg_degisim_log",
+    "schema": "public",
+    "table": "vaccines",
+    "timing": "AFTER INSERT OR UPDATE OR DELETE (DO-blok EXECUTE format ile, 39 tablo)",
+    "via_do": true
+   }
+  ],
+  "policies": [
+   {
+    "name": "degisim_log_select",
+    "schema": "public",
+    "table": "degisim_log"
+   }
+  ],
+  "indexes": [
+   {
+    "name": "idx_degisim_log_tablo_pk",
+    "schema": "public",
+    "table": "degisim_log",
+    "unique": false
+   },
+   {
+    "name": "idx_degisim_log_txid",
+    "schema": "public",
+    "table": "degisim_log",
+    "unique": false
+   },
+   {
+    "name": "idx_degisim_log_zaman",
+    "schema": "public",
+    "table": "degisim_log",
+    "unique": false
+   }
+  ],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "public.degisim_log",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "SELECT",
+    "kind": "TABLE",
+    "obj": "public.degisim_log",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public._degisim_log_yaz()",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public._degisim_log_degistirilemez()",
+    "to": "PUBLIC, anon, authenticated;"
+   }
+  ],
+  "drops": [
+   {
+    "kind": "POLICY",
+    "name": "degisim_log_select",
+    "table": "degisim_log"
+   },
+   {
+    "kind": "TRIGGER",
+    "name": "trg_degisim_log_immutable",
+    "table": "degisim_log"
+   },
+   {
+    "kind": "TRIGGER",
+    "name": "trg_degisim_log_no_truncate",
+    "table": "degisim_log"
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [
+   {
+    "schema": "public",
+    "table": "degisim_log",
+    "op": "ENABLE"
+   }
+  ],
+  "dml": [],
+  "other": [
+   {
+    "raw": "COMMENT ON TABLE public.degisim_log IS 'G-20260913-SURUM-GECMISI F1: immutable row-version log. One row per changed business row; txid groups a transaction.';"
+   },
+   {
+    "raw": "DO> $ DECLARE v_tablolar text[] := ARRAY[ 'cases','diseases','dogum','drug_administrations', 'drug_classes','drug_products','drugs','gorev_log','grup_padok_eslem', "
+   },
+   {
+    "raw": "DO> t text;"
+   },
+   {
+    "raw": "DO> v_args text;"
+   },
+   {
+    "raw": "DO> BEGIN FOR t IN SELECT cl.relname::text FROM pg_trigger g JOIN pg_class cl ON cl.oid = g.tgrelid JOIN pg_namespace cn ON cn.oid = cl.relnamespace WHERE g.tgname "
+   },
+   {
+    "raw": "DO> END LOOP;"
+   },
+   {
+    "raw": "DO> FOREACH t IN ARRAY v_tablolar LOOP SELECT string_agg(quote_literal(a.attname), ', ' ORDER BY k.ord) INTO v_args FROM pg_constraint c CROSS JOIN LATERAL unnest(c"
+   },
+   {
+    "raw": "DO> IF v_args IS NULL THEN RAISE EXCEPTION 'degisim_log attach: % has no primary key', t;"
+   },
+   {
+    "raw": "DO> END IF;"
+   },
+   {
+    "raw": "DO> IF EXISTS ( SELECT 1 FROM pg_constraint c2 CROSS JOIN LATERAL unnest(c2.conkey) AS u(attnum) JOIN pg_attribute a ON a.attrelid = c2.conrelid AND a.attnum = u.at"
+   },
+   {
+    "raw": "DO> END IF;"
+   },
+   {
+    "raw": "DO> EXECUTE format('DROP TRIGGER IF EXISTS trg_degisim_log ON public.%I', t);"
+   },
+   {
+    "raw": "DO> EXECUTE format( 'CREATE TRIGGER trg_degisim_log AFTER INSERT OR UPDATE OR DELETE ON public.%I ' 'FOR EACH ROW EXECUTE FUNCTION public._degisim_log_yaz(%s)', t, "
+   },
+   {
+    "raw": "DO> END LOOP;"
+   },
+   {
+    "raw": "DO> END;"
+   },
+   {
+    "raw": "DO> $"
+   }
+  ]
+ },
+ "20260913000002_surum_gecmisi_f2_geri_alma.sql": {
+  "functions": [
+   {
+    "name": "surum_gizli._cagiran",
+    "args_raw": "",
+    "stmt_len": 1049
+   },
+   {
+    "name": "surum_gizli._kapsamda",
+    "args_raw": "p_tablo text",
+    "stmt_len": 377
+   },
+   {
+    "name": "surum_gizli._pk_kolonlar",
+    "args_raw": "p_tablo text",
+    "stmt_len": 531
+   },
+   {
+    "name": "surum_gizli._pk_json",
+    "args_raw": "p_tablo text, p_pk jsonb",
+    "stmt_len": 1559
+   },
+   {
+    "name": "surum_gizli._pk_gorunum",
+    "args_raw": "p_satir_pk jsonb",
+    "stmt_len": 415
+   },
+   {
+    "name": "surum_gizli._guncel_satir",
+    "args_raw": "p_tablo text, p_satir_pk jsonb",
+    "stmt_len": 548
+   },
+   {
+    "name": "surum_gizli._ekle_bagli",
+    "args_raw": "p_eklenecek public.degisim_log, p_cocik public.degisim_log",
+    "stmt_len": 1197
+   },
+   {
+    "name": "surum_gizli._degisim_plan",
+    "args_raw": "p_hedef jsonb, p_seviye text",
+    "stmt_len": 18537
+   },
+   {
+    "name": "surum_gizli._degisim_uygula",
+    "args_raw": "p_plan jsonb",
+    "stmt_len": 2090
+   },
+   {
+    "name": "public.geri_alma_bileti_al",
+    "args_raw": "p_sifre text",
+    "stmt_len": 1051
+   },
+   {
+    "name": "public.degisim_listele",
+    "args_raw": "p_filtre jsonb DEFAULT '{}'::jsonb",
+    "stmt_len": 4971
+   },
+   {
+    "name": "public.degisim_onizle",
+    "args_raw": "p_hedef jsonb, p_seviye text",
+    "stmt_len": 241
+   },
+   {
+    "name": "public.degisim_geri_al",
+    "args_raw": "p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text DEFAULT NULL",
+    "stmt_len": 4562
+   }
+  ],
+  "tables": [
+   {
+    "schema": "surum_gizli",
+    "table": "sahip_sifresi"
+   },
+   {
+    "schema": "surum_gizli",
+    "table": "geri_alma_bileti"
+   },
+   {
+    "schema": "surum_gizli",
+    "table": "geri_alma_kullanim"
+   }
+  ],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [
+   {
+    "name": "idx_geri_alma_kullanim_bilet",
+    "schema": "surum_gizli",
+    "table": "geri_alma_kullanim",
+    "unique": false
+   }
+  ],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "SCHEMA surum_gizli",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "ALL TABLES IN SCHEMA surum_gizli",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "ALL FUNCTIONS IN SCHEMA surum_gizli",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.geri_alma_bileti_al(text)",
+    "to": "PUBLIC, anon;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.degisim_listele(jsonb)",
+    "to": "PUBLIC, anon;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.degisim_onizle(jsonb, text)",
+    "to": "PUBLIC, anon;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.degisim_geri_al(jsonb, text, uuid, text)",
+    "to": "PUBLIC, anon;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.geri_alma_bileti_al(text)",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.degisim_listele(jsonb)",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.degisim_onizle(jsonb, text)",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.degisim_geri_al(jsonb, text, uuid, text)",
+    "to": "authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": [
+   {
+    "raw": "CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;"
+   },
+   {
+    "raw": "CREATE SCHEMA IF NOT EXISTS surum_gizli;"
+   },
+   {
+    "raw": "ALTER DEFAULT PRIVILEGES IN SCHEMA surum_gizli REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;"
+   }
+  ]
+ },
+ "20260913000003_surum_gecmisi_f2_sahip_sifresi.sql": {
+  "functions": [
+   {
+    "name": "public.sahip_sifresi_ayarla",
+    "args_raw": "p_sifre text",
+    "stmt_len": 699
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public.sahip_sifresi_ayarla(text)",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "EXECUTE",
+    "kind": "FUNCTION",
+    "obj": "public.sahip_sifresi_ayarla(text)",
+    "to": "service_role;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260913000004_luna_bilet_maske.sql": {
+  "functions": [
+   {
+    "name": "public._degisim_log_yaz",
+    "args_raw": "",
+    "stmt_len": 3645
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260914000001_l4_islem_log_kopru.sql": {
+  "functions": [
+   {
+    "name": "public._islem_log_degisim_txid",
+    "args_raw": "",
+    "stmt_len": 243
+   }
+  ],
+  "tables": [],
+  "columns": [
+   {
+    "schema": "public",
+    "table": "islem_log",
+    "column": "degisim_txid",
+    "raw": "ALTER TABLE public.islem_log ADD COLUMN IF NOT EXISTS degisim_txid bigint;"
+   }
+  ],
+  "drop_columns": [],
+  "triggers": [
+   {
+    "name": "trg_islem_log_degisim_txid",
+    "schema": "public",
+    "table": "islem_log",
+    "timing": "BEFORE INSERT"
+   }
+  ],
+  "policies": [],
+  "indexes": [
+   {
+    "name": "idx_islem_log_degisim_txid",
+    "schema": "public",
+    "table": "islem_log",
+    "unique": false
+   }
+  ],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public._islem_log_degisim_txid()",
+    "to": "PUBLIC, anon, authenticated;"
+   }
+  ],
+  "drops": [
+   {
+    "kind": "TRIGGER",
+    "name": "trg_islem_log_degisim_txid",
+    "table": "islem_log"
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": [
+   {
+    "raw": "COMMENT ON COLUMN public.islem_log.degisim_txid IS 'L4 G-20260914-GERI-ALMA-AKISI: txid of the transaction that wrote this log row; equals degisim_log.txid when"
+   }
+  ]
+ },
+ "20260914000002_l4_geri_alma_zincir.sql": {
+  "functions": [
+   {
+    "name": "surum_gizli._l4_zaman_txid",
+    "args_raw": "p_tablo text, p_pk jsonb, p_zaman text, OUT o_txid bigint, OUT o_neden text, OUT o_enyakin timestamptz",
+    "stmt_len": 1345
+   },
+   {
+    "name": "surum_gizli._degisim_plan",
+    "args_raw": "p_hedef jsonb, p_seviye text",
+    "stmt_len": 21658
+   },
+   {
+    "name": "surum_gizli._l4_zincir",
+    "args_raw": "p_hedef jsonb",
+    "stmt_len": 24610
+   },
+   {
+    "name": "public.degisim_onizle",
+    "args_raw": "p_hedef jsonb, p_seviye text",
+    "stmt_len": 406
+   },
+   {
+    "name": "public.degisim_geri_al",
+    "args_raw": "p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text DEFAULT NULL",
+    "stmt_len": 7601
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "surum_gizli._l4_zaman_txid(text, jsonb, text)",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "surum_gizli._l4_zincir(jsonb)",
+    "to": "PUBLIC, anon, authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ },
+ "20260914000003_l4_onarim.sql": {
+  "functions": [
+   {
+    "name": "public._islem_log_degisim_txid",
+    "args_raw": "",
+    "stmt_len": 541
+   },
+   {
+    "name": "public._islem_log_geri_alindi_kapisi",
+    "args_raw": "",
+    "stmt_len": 480
+   },
+   {
+    "name": "surum_gizli._l4_rehber_uyesi",
+    "args_raw": "p_hedef jsonb",
+    "stmt_len": 941
+   },
+   {
+    "name": "surum_gizli._degisim_plan",
+    "args_raw": "p_hedef jsonb, p_seviye text",
+    "stmt_len": 22017
+   },
+   {
+    "name": "surum_gizli._l4_zincir",
+    "args_raw": "p_hedef jsonb",
+    "stmt_len": 23623
+   },
+   {
+    "name": "public.degisim_onizle",
+    "args_raw": "p_hedef jsonb, p_seviye text",
+    "stmt_len": 406
+   },
+   {
+    "name": "public.degisim_geri_al",
+    "args_raw": "p_hedef jsonb, p_seviye text, p_bilet uuid, p_gerekce text DEFAULT NULL",
+    "stmt_len": 8988
+   }
+  ],
+  "tables": [
+   {
+    "schema": "surum_gizli",
+    "table": "l4_rehber_adimlari"
+   }
+  ],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [
+   {
+    "name": "trg_islem_log_degisim_txid",
+    "schema": "public",
+    "table": "islem_log",
+    "timing": "BEFORE INSERT"
+   },
+   {
+    "name": "trg_islem_log_geri_alindi_kapisi",
+    "schema": "public",
+    "table": "islem_log",
+    "timing": "BEFORE INSERT"
+   }
+  ],
+  "policies": [
+   {
+    "name": "service_insert",
+    "schema": "public",
+    "table": "islem_log"
+   }
+  ],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "public._islem_log_geri_alindi_kapisi()",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE INSERT",
+    "kind": "TABLE",
+    "obj": "public.islem_log",
+    "to": "authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "TABLE",
+    "obj": "surum_gizli.l4_rehber_adimlari",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "surum_gizli._l4_rehber_uyesi(jsonb)",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "surum_gizli._l4_rehber_uyesi(jsonb)",
+    "to": "PUBLIC, anon, authenticated;"
+   },
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "surum_gizli._degisim_plan(jsonb, text)",
+    "to": "PUBLIC, anon, authenticated;"
+   }
+  ],
+  "drops": [
+   {
+    "kind": "TRIGGER",
+    "name": "trg_islem_log_degisim_txid",
+    "table": "islem_log"
+   },
+   {
+    "kind": "TRIGGER",
+    "name": "trg_islem_log_geri_alindi_kapisi",
+    "table": "islem_log"
+   },
+   {
+    "kind": "POLICY",
+    "name": "service_insert",
+    "table": "islem_log"
+   }
+  ],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": [
+   {
+    "raw": "COMMENT ON POLICY service_insert ON public.islem_log IS 'L4-02 (G-20260914-GERI-ALMA-AKISI W4): was FOR ALL TO public; authenticated direct INSERT closed. Busin"
+   }
+  ]
+ },
+ "20260914000004_l4_stok_uyari_txid.sql": {
+  "functions": [
+   {
+    "name": "surum_gizli._degisim_plan",
+    "args_raw": "p_hedef jsonb, p_seviye text",
+    "stmt_len": 21935
+   },
+   {
+    "name": "surum_gizli._l4_zincir",
+    "args_raw": "p_hedef jsonb",
+    "stmt_len": 23555
+   }
+  ],
+  "tables": [],
+  "columns": [],
+  "drop_columns": [],
+  "triggers": [],
+  "policies": [],
+  "indexes": [],
+  "grants": [
+   {
+    "priv": "REVOKE ALL",
+    "kind": "FUNCTION",
+    "obj": "surum_gizli._degisim_plan(jsonb, text)",
+    "to": "PUBLIC, anon, authenticated;"
+   }
+  ],
+  "drops": [],
+  "constraints": [],
+  "views": [],
+  "rls": [],
+  "dml": [],
+  "other": []
+ }
+}
