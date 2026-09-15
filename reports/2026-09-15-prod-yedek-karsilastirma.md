@@ -10,17 +10,21 @@ döküm/anlık görüntüler repo dışındadır: `/home/melik/tmp/agents/github
 
 ## 0. Özet (sahibin beklentisi tuttu mu?)
 
-**Y↔C (13:52 → P4 sonrası canlı): EVET tuttu — çıkan HER fark (şema ve veri) bugün
-prod'a uygulanan migration dosyalarından birine bağlandı; AÇIKLANAMAYAN yok.**
-G↔Y (04:00 GitHub yedeği → 13:52) penceresi **beklemede**: artifact çözülemedi
-(parola sorusu sahibe döndürüldü, §6) — G geldiğinde §5 betikleriyle aynı yöntemle
-tamamlanacak.
+**EVET tuttu — karşılaştırılan tüm pencerelerde çıkan HER fark (şema ve veri)
+bugün prod'a uygulanan migration dosyalarından birine ya da sahibin bugünkü
+uygulama kullanımına bağlandı; AÇIKLANAMAYAN yok.**
+Y↔C (13:52 → P4 sonrası canlı): tüm farklar migration'larda (§2). Sahibin bugün
+öğlene kadarki değişiklikleri Y yedeği içinden sayımla ayrıştırıldı (§5).
+**G pası (GitHub 04:00 yedeği) sahibin kararıyla İPTAL:** `BACKUP_PASSWORD`
+değeri kimsede yok (`docs/demo-mirror-ROADMAP.md` 28–31, 2026-07-02 kaydı:
+"`BACKUP_PASSWORD` yok (şifreli artifact çözülemiyor)"); decrypt denemeleri
+durduruldu, `enc` dosyasına dokunulmadı.
 
 ## 1. Noktalar
 
 | Nokta | Ne | Zaman | Kaynak |
 |---|---|---|---|
-| G | GitHub `DB Backup` koşusu artifact `egesut-backup-34922980952` (2026-09-15T02:54:47Z, success) | 02:54Z | `egesut_20260915.pg.enc` — **şifreli, çözülemedi (soru açık)** |
+| G | GitHub `DB Backup` artifact `egesut-backup-34922980952` (2026-09-15T02:54:47Z, success) | 02:54Z | `egesut_20260915.pg.enc` — **İPTAL: parola kimsede yok (sahip kararı); enc'e dokunulmadı** |
 | Y | 13:52 ara yedek (Adım A öncesi, 48 tablo) | 13:52–13:54 yerel | `/home/melik/tmp/agents/prod-yedek-2026-09-15/` (salt okundu) |
 | C | Canlı prod dökümü, **P4 tesliminden SONRA** (52 tablo) | 15:2x yerel | `github-yedek-2026-09-15/live_c/` (repo dışı) |
 
@@ -63,7 +67,7 @@ Her kategoride `sadece_Y = 0` (hiçbir nesne silinmedi/kaldırılmadı); tüm fa
 | Kolon öznitelik değişimi | 0 | — |
 | View / extension | 0 fark | — |
 
-G↔C şema karşılaştırması: **beklemede** (G parolası).
+G↔C şema karşılaştırması: **İPTAL** (sahip kararı: parola kimsede yok).
 
 ## 2b. Veri — Y↔C (PK-bazlı; tam sayılar `data_counts.json`)
 
@@ -94,13 +98,14 @@ log tablosunda yeni kayıt yok** — Y ve C bu tablolarda birebir aynı →
 migration'lar arasında/dan sonra uygulama yazımı olmadı; yukarıdaki tüm veri
 farkları migration içeriğinden gelir.
 
-G↔Y veri karşılaştırması (04:00–13:52 sahiplik penceresi): **beklemede** (G
-parolası).
+G↔Y veri karşılaştırması (04:00–13:52 penceresi): **İPTAL** (sahip kararı).
 
 ## 3. AÇIKLANAMAYAN farklar
 
-**Yok.** Y↔C'de çıkan her şema ve veri farkı bir migration dosyasına bağlandı
-(§2a/§2b). G tarafı çözülünce bu bölüm G↔Y ve G↔C için de doldurulacak.
+**Yok.** Karşılaştırılan tüm pencerelerde çıkan her şema ve veri farkı bir
+migration dosyasına bağlandı (§2a/§2b); sahibin bugünkü uygulama kullanımı da
+sayım düzeyinde ayrıştırıldı (§5). G penceresi sahibin kararıyla kapsam dışı
+(parola kimsede yok) — bu karar sonrası kapsamda "açıklanamayan" bırakmadı.
 
 ## 4. Yöntem
 
@@ -112,24 +117,45 @@ parolası).
   `$function$` span'inden); şema kategorilerinde küme-farkı + gövde md5; veride
   PK-bazlı eklenen/silinen/değişen sayımı (ortak-kolon normalizasyonu);
   `supabase/migrations/*.sql` taranarak nesne→dosya haritası (`migration_map.json`).
-- Decrypt denemeleri: artifact `openssl enc -d -aes-256-cbc` ile — .env'deki aday
-  biçimleri (5 varyant; değer hiçbir yere yazılmadı) + sahibin bildirdiği boş
-  parola (`-pbkdf2` ve `-pbkdf2`siz): **tümü `bad decrypt`** (§6).
+- `y_today_counts.py` (§5): Y yedeği içinde bugün penceresi sayımı; damgalar UTC
+  kabul edilip TSI'ya (UTC+3) çevrildi.
 
-## 5. G geldiğinde çalışacak kalan adımlar
+## 5. Sahibin bugün (00:00–13:52 TSI) değişiklikleri — Y yedeği içinden sayım
 
-`pg_restore --list` → yeni yerel DB `egesut_ghyedek_20260915` restore → aynı
-`c_snapshot.py` şema yakalaması yerel DB'ye koşulur → `y_c_compare.py` G↔Y ve
-G↔C pasları. Yerel Postgres 18.6 hazır (dump PG17, uyumlu); mevcut DB'lere
-(`egesut_lsp` dahil) dokunulmayacak.
+Pencere: 2026-09-15 00:00–13:52 TSI (= UTC 2026-09-14T21:00Z–10:52Z). Kaynak: Y
+yedeğinin satır verisi (yalnız SAYIM, değer yok — `today_counts.json`). Her
+tablo için tek zaman kolonu: `updated_at` > `created_at` > `tarih` > öteki
+adaylar (kolon başına sayının ne yakaladığı: updated_at=güncelleme, created_at=ekleme).
 
-## 6. Sapmalar / açık sorular
+| Tablo (kolon) | Pencere toplamı | Saat kovası (TSI) |
+|---|---|---|
+| `gorev_log` (created_at) | 16 | 08:00 → 3, 11:00 → 4, 12:00 → 9 |
+| `islem_log` (tarih) | 7 | 11:00 → 3, 12:00 → 4 |
+| `drug_administrations` (created_at) | 6 | 12:00 → 6 |
+| `stok_hareket` (tarih) | 6 | 12:00 → 6 |
+| `treatment_day_uygulamalar` (updated_at) | 6 | 12:00 → 6 |
+| `treatment_days` (created_at) | 3 | 12:00 → 3 |
+| `cases` (created_at) | 1 | 12:00 → 1 |
+| **Toplam** | **45** | 08:00 → 3 · 11:00 → 7 · 12:00 → 35 |
 
-1. **G parolası (AÇIK SORU — sahibe döndürüldü):** `egesut_20260915.pg.enc`
-   çözülemedi. Denenenler: `.env` aday parçaları (5 varyant), boş parola
-   (`-pbkdf2`'li ve'siz). Tümü `bad decrypt`. Parola değeri hiçbir çıktıya,
-   dosyaya, log'a yazılmadı. GitHub artifact hâlâ
-   `/home/melik/tmp/agents/github-yedek-2026-09-15/` altında duruyor.
+`islem_log` işlem tipi bazında sayım (pencere içi 7 kayıt):
+`GOREV_TAMAMLA` 3 · `TEDAVI_GUN_EKLENDI` 3 · `VAKA_ACILDI` 1.
+
+UTC varsayım denetimi: pencere üstünde (≥13:00 TSI) bugün kaydı **0** — Y 13:52
+TSI'da alındığı için damgaların UTC olduğu kabulü tutarlı (Adım A raporundaki
+"en son yazım 09:12 UTC" notuyla da aynı). Bu sayılar aynı zamanda §2b'deki
+"Y↔C penceresinde uygulama yazımı yok" bulgusuyla birleşince tam tablo: sahibin
+değişikliklerinin TAMAMI 13:52'den ÖNCEDE, Y yedeğinin İÇİNDE; migration
+penceresine sızan kullanım yok.
+
+## 6. Sapmalar / kararlar
+
+1. **G pası İPTAL (sahip kararı):** `BACKUP_PASSWORD` değeri kimsede yok — kanıt
+   `docs/demo-mirror-ROADMAP.md` 28–31 (2026-07-02): "`BACKUP_PASSWORD` yok
+   (şifreli artifact çözülemiyor)". Bu işte yapılan decrypt denemeleri (.env aday
+   biçimleri 5 varyant + boş parola pbkdf2'li/pbkdf2'siz; tümü `bad decrypt`,
+   değer hiçbir çıktıya yazılmadı) kayıt amacıyla burada durur; deneme
+   **durduruldu**, `egesut_20260915.pg.enc` repo dışı klasörde DOKUNULMAMIŞ duruyor.
 2. **C ölçümü P4 öncesi/sonrası iki anlık:** ilk C, P4 teslim ilanından önce
    alındı (root'un o anki talimatıyla Y↔C'ye hemen geçilmişti); P4 ilanı
    gelince zarf şartına uygun biçimde C yenilendi. P4-öncesi görüntü
@@ -140,7 +166,7 @@ G↔C pasları. Yerel Postgres 18.6 hazır (dump PG17, uyumlu); mevcut DB'lere
    veri değişikliği değil).
 4. Prod verisi git'e girmedi: commit edilen JSON çıktıları yalnız nesne adı,
    sayı, saat kovası, md5 ve migration dosya adı içerir; satır içeriği, küpe,
-   isim, PK listesi içermez (`git diff --cached --stat` + içerik denetimi §7).
+   isim, PK listesi içermez (`git diff --cached --stat` + içerik denetimi).
 5. `tohumlama_kaydet` P3 referansında `cf6949f61d` idi (Adım A sonrası probe);
    C-ilk ölçümde `e144cf1f71` görüldü — bu, P3 raporundaki canlı-gövde değeridir
    (Adım A raporu §2 ayak iziyle tutarlı); #5 sonrası `e4ab00a63d` (#5/demo
