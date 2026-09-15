@@ -1,0 +1,1366 @@
+{
+ "tarih": "2026-09-15T19:50:16",
+ "prod_ref": "zqnexqbdfvbhlxzelzju",
+ "demo_ref": "vtzqjmazsvurxdeondmi",
+ "cikti_dizini": "/home/melik/tmp/agents/p7-vevk-cikti",
+ "sizinti": {
+  "ortak_tablo": 50,
+  "pk_yok": [],
+  "atlanan_buyuk": [],
+  "demo_dogumlu": {
+   "agent_messages": 0,
+   "agent_plans": 0,
+   "agent_threads": 0,
+   "bildirim_log": 0,
+   "cases": 48,
+   "chat": 0,
+   "cop_kutusu": 0,
+   "degisim_log": 229,
+   "diseases": 0,
+   "dogum": 0,
+   "drug_administrations": 197,
+   "drug_classes": 0,
+   "drug_products": 0,
+   "drugs": 0,
+   "goose_embeddings": 0,
+   "gorev_log": 571,
+   "grup_padok_eslem": 0,
+   "hastalik_log": 0,
+   "hayvan_override": 0,
+   "hayvanlar": 1,
+   "hekimler": 0,
+   "irk_esik": 0,
+   "islem_log": 349,
+   "kizginlik_log": 0,
+   "padoklar": 0,
+   "pedigree_meta": 0,
+   "pedigree_nodes": 167,
+   "pedigree_parentage": 59,
+   "protokol_ayar": 0,
+   "protokol_dismiss": 0,
+   "protokol_instance": 15,
+   "sablon_hastalik_eslem": 4,
+   "semen_catalog": 0,
+   "stok": 0,
+   "stok_hareket": 200,
+   "stok_kategorileri": 0,
+   "tasks": 0,
+   "tedavi": 0,
+   "tedavi_sablonu": 4,
+   "tedavi_sablonu_kalem": 10,
+   "tohumlama": 1,
+   "treatment_day_uygulamalar": 197,
+   "treatment_days": 131,
+   "ui_logs": 0,
+   "uygulama_log": 0,
+   "vaccination_log": 0,
+   "vaccination_schedule": 0,
+   "vaccine_diseases": 0,
+   "vaccine_protocol_steps": 0,
+   "vaccines": 0
+  },
+  "sizinti": {
+   "cases": 0,
+   "degisim_log": 0,
+   "drug_administrations": 0,
+   "gorev_log": 0,
+   "hayvanlar": 0,
+   "islem_log": 0,
+   "pedigree_nodes": 0,
+   "pedigree_parentage": 0,
+   "protokol_instance": 0,
+   "sablon_hastalik_eslem": 0,
+   "stok_hareket": 0,
+   "tedavi_sablonu": 0,
+   "tedavi_sablonu_kalem": 0,
+   "tohumlama": 0,
+   "treatment_day_uygulamalar": 0,
+   "treatment_days": 0
+  },
+  "prod_only": {
+   "agent_messages": 94,
+   "agent_plans": 5,
+   "agent_threads": 26,
+   "bildirim_log": 4,
+   "cases": 23,
+   "chat": 0,
+   "cop_kutusu": 0,
+   "degisim_log": 0,
+   "diseases": 3,
+   "dogum": 0,
+   "drug_administrations": 160,
+   "drug_classes": 1,
+   "drug_products": 1,
+   "drugs": 0,
+   "goose_embeddings": 0,
+   "gorev_log": 381,
+   "grup_padok_eslem": 0,
+   "hastalik_log": 0,
+   "hayvan_override": 0,
+   "hayvanlar": 0,
+   "hekimler": 0,
+   "irk_esik": 0,
+   "islem_log": 439,
+   "kizginlik_log": 5,
+   "padoklar": 0,
+   "pedigree_meta": 0,
+   "pedigree_nodes": 166,
+   "pedigree_parentage": 59,
+   "protokol_ayar": 0,
+   "protokol_dismiss": 3,
+   "protokol_instance": 11,
+   "sablon_hastalik_eslem": 0,
+   "semen_catalog": 0,
+   "stok": 1,
+   "stok_hareket": 208,
+   "stok_kategorileri": 0,
+   "tasks": 0,
+   "tedavi": 0,
+   "tedavi_sablonu": 0,
+   "tedavi_sablonu_kalem": 0,
+   "tohumlama": 7,
+   "treatment_day_uygulamalar": 160,
+   "treatment_days": 112,
+   "ui_logs": 0,
+   "uygulama_log": 15,
+   "vaccination_log": 1,
+   "vaccination_schedule": 0,
+   "vaccine_diseases": 0,
+   "vaccine_protocol_steps": 0,
+   "vaccines": 0
+  },
+  "kopya_tarihi": "2026-07-02T00:00:00+03:00",
+  "kopya_sonrasi_prodda": {
+   "agent_messages": 0,
+   "agent_plans": 0,
+   "agent_threads": 0,
+   "cases": 63,
+   "chat": 0,
+   "diseases": 5,
+   "dogum": 13,
+   "drug_administrations": 385,
+   "drug_classes": 5,
+   "drug_products": 7,
+   "drugs": 0,
+   "goose_embeddings": 0,
+   "gorev_log": 1477,
+   "hastalik_log": 0,
+   "hayvanlar": 13,
+   "padoklar": 0,
+   "pedigree_nodes": 0,
+   "pedigree_parentage": 0,
+   "protokol_instance": 48,
+   "sablon_hastalik_eslem": 34,
+   "semen_catalog": 0,
+   "stok": 9,
+   "stok_hareket": 539,
+   "stok_kategorileri": 0,
+   "tasks": 0,
+   "tedavi": 0,
+   "tedavi_sablonu": 7,
+   "tedavi_sablonu_kalem": 41,
+   "tohumlama": 17,
+   "treatment_day_uygulamalar": 363,
+   "treatment_days": 240,
+   "ui_logs": 0,
+   "uygulama_log": 60,
+   "vaccination_log": 2,
+   "vaccination_schedule": 0,
+   "vaccine_protocol_steps": 0,
+   "vaccines": 0
+  },
+  "kopya_sonrasi_klon_imzali": {
+   "cases": 63,
+   "diseases": 5,
+   "dogum": 13,
+   "drug_administrations": 385,
+   "drug_classes": 5,
+   "drug_products": 7,
+   "gorev_log": 1477,
+   "hayvanlar": 13,
+   "pedigree_nodes": 0,
+   "pedigree_parentage": 0,
+   "protokol_instance": 48,
+   "sablon_hastalik_eslem": 34,
+   "stok": 9,
+   "stok_hareket": 539,
+   "tedavi_sablonu": 7,
+   "tedavi_sablonu_kalem": 41,
+   "tohumlama": 17,
+   "treatment_day_uygulamalar": 363,
+   "treatment_days": 240,
+   "uygulama_log": 60,
+   "vaccination_log": 2
+  },
+  "kopya_sonrasi_supheli": {
+   "cases": 0,
+   "diseases": 0,
+   "dogum": 0,
+   "drug_administrations": 0,
+   "drug_classes": 0,
+   "drug_products": 0,
+   "gorev_log": 0,
+   "hayvanlar": 0,
+   "pedigree_nodes": 0,
+   "pedigree_parentage": 0,
+   "protokol_instance": 0,
+   "sablon_hastalik_eslem": 0,
+   "stok": 0,
+   "stok_hareket": 0,
+   "tedavi_sablonu": 0,
+   "tedavi_sablonu_kalem": 0,
+   "tohumlama": 0,
+   "treatment_day_uygulamalar": 0,
+   "treatment_days": 0,
+   "uygulama_log": 0,
+   "vaccination_log": 0
+  },
+  "kopya_sonrasi_olculmeyen": [
+   "bildirim_log",
+   "cop_kutusu",
+   "degisim_log",
+   "grup_padok_eslem",
+   "hayvan_override",
+   "hekimler",
+   "irk_esik",
+   "islem_log",
+   "kizginlik_log",
+   "pedigree_meta",
+   "protokol_ayar",
+   "protokol_dismiss",
+   "vaccine_diseases"
+  ]
+ },
+ "isaret": {
+  "isaretler": [
+   "l4-yuruyus",
+   "fixture",
+   "deneme",
+   "test",
+   "demo",
+   "w2b",
+   "k1",
+   "k2",
+   "k3",
+   "k4",
+   "k5",
+   "k6",
+   "yuruyus",
+   "root-gate"
+  ],
+  "eslesen_kombinasyon": 59,
+  "eslesen_toplam_satir": 2550,
+  "eslesen": [
+   {
+    "tablo": "islem_log",
+    "kolon": "snapshot",
+    "isaret": "deneme",
+    "sayi": 1170
+   },
+   {
+    "tablo": "code_embeddings",
+    "kolon": "content",
+    "isaret": "test",
+    "sayi": 411
+   },
+   {
+    "tablo": "hayvan_timeline_view",
+    "kolon": "detay",
+    "isaret": "deneme",
+    "sayi": 288
+   },
+   {
+    "tablo": "code_embeddings",
+    "kolon": "source",
+    "isaret": "test",
+    "sayi": 137
+   },
+   {
+    "tablo": "code_embeddings",
+    "kolon": "content",
+    "isaret": "deneme",
+    "sayi": 115
+   },
+   {
+    "tablo": "islem_log",
+    "kolon": "payload",
+    "isaret": "deneme",
+    "sayi": 73
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "test",
+    "sayi": 69
+   },
+   {
+    "tablo": "goose_embeddings",
+    "kolon": "content",
+    "isaret": "test",
+    "sayi": 30
+   },
+   {
+    "tablo": "islem_log",
+    "kolon": "snapshot",
+    "isaret": "test",
+    "sayi": 29
+   },
+   {
+    "tablo": "treatment_timeline",
+    "kolon": "kupe_no",
+    "isaret": "test",
+    "sayi": 29
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "tags",
+    "isaret": "test",
+    "sayi": 22
+   },
+   {
+    "tablo": "islem_log",
+    "kolon": "payload",
+    "isaret": "test",
+    "sayi": 19
+   },
+   {
+    "tablo": "code_embeddings",
+    "kolon": "source",
+    "isaret": "deneme",
+    "sayi": 17
+   },
+   {
+    "tablo": "stok_hareket",
+    "kolon": "notlar",
+    "isaret": "test",
+    "sayi": 16
+   },
+   {
+    "tablo": "agent_messages",
+    "kolon": "icerik",
+    "isaret": "test",
+    "sayi": 12
+   },
+   {
+    "tablo": "gorev_log",
+    "kolon": "aciklama",
+    "isaret": "test",
+    "sayi": 8
+   },
+   {
+    "tablo": "islem_log",
+    "kolon": "kullanici_notu",
+    "isaret": "test",
+    "sayi": 8
+   },
+   {
+    "tablo": "ui_logs",
+    "kolon": "payload",
+    "isaret": "test",
+    "sayi": 7
+   },
+   {
+    "tablo": "hayvan_durum_view",
+    "kolon": "kupe_no",
+    "isaret": "test",
+    "sayi": 6
+   },
+   {
+    "tablo": "hayvan_timeline_view",
+    "kolon": "detay",
+    "isaret": "test",
+    "sayi": 6
+   },
+   {
+    "tablo": "hayvanlar",
+    "kolon": "kupe_no",
+    "isaret": "test",
+    "sayi": 6
+   },
+   {
+    "tablo": "treatment_day_uygulamalar",
+    "kolon": "iptal_nedeni",
+    "isaret": "test",
+    "sayi": 6
+   },
+   {
+    "tablo": "agent_threads",
+    "kolon": "baslik",
+    "isaret": "test",
+    "sayi": 5
+   },
+   {
+    "tablo": "drug_classes",
+    "kolon": "group_name",
+    "isaret": "test",
+    "sayi": 5
+   },
+   {
+    "tablo": "stok_hareket",
+    "kolon": "notlar",
+    "isaret": "deneme",
+    "sayi": 5
+   },
+   {
+    "tablo": "bildirim_log",
+    "kolon": "mesaj",
+    "isaret": "test",
+    "sayi": 4
+   },
+   {
+    "tablo": "goose_embeddings",
+    "kolon": "content",
+    "isaret": "demo",
+    "sayi": 3
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "k5",
+    "sayi": 3
+   },
+   {
+    "tablo": "tasks",
+    "kolon": "description",
+    "isaret": "test",
+    "sayi": 3
+   },
+   {
+    "tablo": "agent_messages",
+    "kolon": "metadata",
+    "isaret": "test",
+    "sayi": 2
+   },
+   {
+    "tablo": "dogum",
+    "kolon": "yavru_kupe",
+    "isaret": "test",
+    "sayi": 2
+   },
+   {
+    "tablo": "goose_embeddings",
+    "kolon": "content",
+    "isaret": "deneme",
+    "sayi": 2
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "fixture",
+    "sayi": 2
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "k1",
+    "sayi": 2
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "k2",
+    "sayi": 2
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "source",
+    "isaret": "test",
+    "sayi": 2
+   },
+   {
+    "tablo": "tohumlama",
+    "kolon": "buzagi_kupe",
+    "isaret": "test",
+    "sayi": 2
+   },
+   {
+    "tablo": "cases",
+    "kolon": "notes",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "entity_graph",
+    "kolon": "description",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "entity_graph",
+    "kolon": "entity",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "entity_graph",
+    "kolon": "entity_type",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "goose_embeddings",
+    "kolon": "title",
+    "isaret": "deneme",
+    "sayi": 1
+   },
+   {
+    "tablo": "hayvan_durum_view",
+    "kolon": "notlar",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "hayvan_timeline_view",
+    "kolon": "hayvan_id",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "hayvanlar",
+    "kolon": "notlar",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "hekimler",
+    "kolon": "ad",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "islem_log",
+    "kolon": "ana_hayvan_id",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "demo",
+    "sayi": 1
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "k3",
+    "sayi": 1
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "content",
+    "isaret": "k4",
+    "sayi": 1
+   },
+   {
+    "tablo": "memory_notes",
+    "kolon": "tags",
+    "isaret": "demo",
+    "sayi": 1
+   },
+   {
+    "tablo": "tasks",
+    "kolon": "title",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "treatment_day_uygulamalar",
+    "kolon": "uygulama_notu",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "treatment_days",
+    "kolon": "tamamlanma_notu",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "uygulama_log",
+    "kolon": "etken_kod",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "uygulama_log",
+    "kolon": "notlar",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "v_eligible",
+    "kolon": "kupe_no",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "v_gorev_log_sync",
+    "kolon": "aciklama",
+    "isaret": "test",
+    "sayi": 1
+   },
+   {
+    "tablo": "vaccination_log",
+    "kolon": "notes",
+    "isaret": "test",
+    "sayi": 1
+   }
+  ]
+ },
+ "koken": {
+  "fk": [
+   {
+    "tablo": "pedigree_nodes",
+    "kolonlar": "farm_animal_id",
+    "hedef": "hayvanlar",
+    "hedef_kolonlar": "id",
+    "yetim": 0
+   },
+   {
+    "tablo": "pedigree_parentage",
+    "kolonlar": "farm_id,child_node_id",
+    "hedef": "pedigree_nodes",
+    "hedef_kolonlar": "farm_id,id",
+    "yetim": 0
+   },
+   {
+    "tablo": "pedigree_parentage",
+    "kolonlar": "farm_id,parent_node_id",
+    "hedef": "pedigree_nodes",
+    "hedef_kolonlar": "farm_id,id",
+    "yetim": 0
+   },
+   {
+    "tablo": "semen_catalog",
+    "kolonlar": "farm_id,bull_node_id",
+    "hedef": "pedigree_nodes",
+    "hedef_kolonlar": "farm_id,id",
+    "yetim": 0
+   },
+   {
+    "tablo": "semen_catalog",
+    "kolonlar": "stock_id",
+    "hedef": "stok",
+    "hedef_kolonlar": "id",
+    "yetim": 0
+   }
+  ],
+  "ad_eslesme": [
+   {
+    "tablo": "semen_catalog",
+    "kolon": "display_name",
+    "hedef": "tohumlama",
+    "hedef_kolon": "sperma",
+    "baglanamayan": 0
+   }
+  ],
+  "doldurulan": [
+   {
+    "tablo": "dogum",
+    "kolon": "buzagi_id",
+    "hedef": "hayvanlar",
+    "yetim": 0
+   }
+  ],
+  "std_dose_dolu": 26
+ },
+ "statik": {
+  "20260831000003_tablo_guard_triggerlari.sql": {
+   "insert": 0,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 0,
+   "ifadeler": []
+  },
+  "20260909100000_dozaj_std_dose_seed.sql": {
+   "insert": 0,
+   "update": 37,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 37,
+   "rpc_govdesi": 0,
+   "ifadeler": [
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 32,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 33,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 34,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 35,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 36,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 37,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 38,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 39,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 40,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 41,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 42,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 43,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 44,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 45,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 48,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 49,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 50,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 51,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 54,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 55,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 56,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 57,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 58,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 59,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 60,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 61,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 64,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 68,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 69,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 70,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 71,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 72,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 73,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 74,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 75,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 76,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "vaccines",
+     "satir": 77,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260909110000_dozaj_helper_min_max_rpc.sql": {
+   "insert": 0,
+   "update": 12,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 10,
+   "rpc_govdesi": 2,
+   "ifadeler": [
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 25,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 26,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 27,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 28,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 29,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 30,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 31,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 32,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 33,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 34,
+     "tur_sinif": "sabit",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "drug_products",
+     "satir": 86,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "hayvanlar",
+     "satir": 122,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260910000001_planli_tohumlama_sperma_dus.sql": {
+   "insert": 1,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 1,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "stok_hareket",
+     "satir": 83,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260910000002_sperma_eslesme_sertlestirme.sql": {
+   "insert": 7,
+   "update": 6,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 13,
+   "ifadeler": [
+    {
+     "tur": "UPDATE",
+     "tablo": "tohumlama",
+     "satir": 115,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "gorev_log",
+     "satir": 117,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "protokol_instance",
+     "satir": 124,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "islem_log",
+     "satir": 149,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "tohumlama",
+     "satir": 157,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "islem_log",
+     "satir": 165,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "protokol_instance",
+     "satir": 174,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "gorev_log",
+     "satir": 178,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "stok_hareket",
+     "satir": 198,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "gorev_log",
+     "satir": 213,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "tohumlama",
+     "satir": 259,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "gorev_log",
+     "satir": 265,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "gorev_log",
+     "satir": 269,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260910000003_gebelik_kaydet_manual_42804_fix.sql": {
+   "insert": 2,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 2,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "tohumlama",
+     "satir": 62,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "islem_log",
+     "satir": 77,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260911000001_dogum_buzagi_id_foundation.sql": {
+   "insert": 7,
+   "update": 6,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 13,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "dogum",
+     "satir": 117,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "hayvanlar",
+     "satir": 122,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "dogum",
+     "satir": 127,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "hayvanlar",
+     "satir": 132,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "protokol_instance",
+     "satir": 134,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "gorev_log",
+     "satir": 142,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "tohumlama",
+     "satir": 153,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "gorev_log",
+     "satir": 158,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "protokol_instance",
+     "satir": 161,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "protokol_instance",
+     "satir": 165,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "gorev_log",
+     "satir": 169,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "gorev_log",
+     "satir": 172,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "dogum",
+     "satir": 234,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260911000002_pedigree_foundation.sql": {
+   "insert": 4,
+   "update": 3,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 7,
+   "ifadeler": [
+    {
+     "tur": "INSERT",
+     "tablo": "pedigree_nodes",
+     "satir": 191,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "pedigree_parentage",
+     "satir": 305,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "pedigree_parentage",
+     "satir": 315,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "pedigree_nodes",
+     "satir": 370,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "pedigree_nodes",
+     "satir": 398,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "UPDATE",
+     "tablo": "semen_catalog",
+     "satir": 485,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    },
+    {
+     "tur": "INSERT",
+     "tablo": "semen_catalog",
+     "satir": 517,
+     "tur_sinif": "rpc-govdesi",
+     "kaynaklar": []
+    }
+   ]
+  },
+  "20260911000003_pedigree_farm_backfill.sql": {
+   "insert": 0,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 0,
+   "ifadeler": []
+  },
+  "20260911000004_pedigree_projection_rpc.sql": {
+   "insert": 0,
+   "update": 0,
+   "delete": 0,
+   "turetilmis": 0,
+   "sabit": 0,
+   "rpc_govdesi": 0,
+   "ifadeler": []
+  }
+ },
+ "hatalar": {
+  "prod": [],
+  "demo": []
+ },
+ "hukum": "BULGU: 59"
+}

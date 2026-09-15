@@ -1,0 +1,368 @@
+{
+ "tables_pub_degisim_log": [
+  {
+   "var": false
+  }
+ ],
+ "surum_gizli_var": [
+  {
+   "var": false
+  }
+ ],
+ "surum_gizli_tables": [],
+ "trg_degisim_log_tables": [],
+ "islem_log_degisim_txid": [],
+ "trg_islem_log": [
+  {
+   "tgname": "trg_islem_log_immutable",
+   "tdef": "CREATE TRIGGER trg_islem_log_immutable BEFORE DELETE OR UPDATE ON public.islem_log FOR EACH ROW EXECUTE FUNCTION _islem_log_immutable_guard()"
+  }
+ ],
+ "islem_log_grants": [
+  {
+   "grantee": "agent_readonly",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "authenticated",
+   "privilege_type": "INSERT"
+  },
+  {
+   "grantee": "authenticated",
+   "privilege_type": "REFERENCES"
+  },
+  {
+   "grantee": "authenticated",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "authenticated",
+   "privilege_type": "TRIGGER"
+  },
+  {
+   "grantee": "demo_reader",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "DELETE"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "INSERT"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "REFERENCES"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "TRIGGER"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "TRUNCATE"
+  },
+  {
+   "grantee": "postgres",
+   "privilege_type": "UPDATE"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "DELETE"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "INSERT"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "REFERENCES"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "SELECT"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "TRIGGER"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "TRUNCATE"
+  },
+  {
+   "grantee": "service_role",
+   "privilege_type": "UPDATE"
+  }
+ ],
+ "islem_log_policies": [
+  {
+   "schemaname": "public",
+   "tablename": "islem_log",
+   "policyname": "islem_log_select",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "SELECT",
+   "qual": "true",
+   "with_check": null
+  },
+  {
+   "schemaname": "public",
+   "tablename": "islem_log",
+   "policyname": "service_insert",
+   "permissive": "PERMISSIVE",
+   "roles": "{public}",
+   "cmd": "ALL",
+   "qual": "true",
+   "with_check": "true"
+  }
+ ],
+ "pgcrypto_fns": [
+  {
+   "crypt_var": true,
+   "gen_salt_var": true
+  }
+ ],
+ "degisim_log_grants": [],
+ "tables39": [
+  {
+   "t": "cases",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "diseases",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "dogum",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "drug_administrations",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "drug_classes",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "drug_products",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "drugs",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "gorev_log",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "grup_padok_eslem",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "hastalik_log",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "hayvan_override",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "hayvanlar",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "hekimler",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "irk_esik",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "kizginlik_log",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "padoklar",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "pedigree_meta",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "pedigree_nodes",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "pedigree_parentage",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "protokol_ayar",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "protokol_dismiss",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "protokol_instance",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "sablon_hastalik_eslem",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "semen_catalog",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "stok",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "stok_hareket",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "stok_kategorileri",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "tedavi",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "tedavi_sablonu",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "tedavi_sablonu_kalem",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "tohumlama",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "treatment_day_uygulamalar",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "treatment_days",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "uygulama_log",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "vaccination_log",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "vaccination_schedule",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "vaccine_diseases",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "vaccine_protocol_steps",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  },
+  {
+   "t": "vaccines",
+   "tablo_var": true,
+   "pk_sayisi": 1,
+   "identity_pk": false
+  }
+ ]
+}

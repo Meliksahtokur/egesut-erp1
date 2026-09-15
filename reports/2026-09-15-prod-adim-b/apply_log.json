@@ -1,0 +1,85 @@
+{
+ "started": "2026-09-15T19:41:57.474701+03:00",
+ "prod_ref": "zqnexqbdfvbhlxzelzju",
+ "backup_dir": "/home/melik/tmp/agents/prod-yedek-2026-09-15-adim-b",
+ "sentinel_precheck": {
+  "dl": null,
+  "sg": false
+ },
+ "files": [
+  {
+   "n": 1,
+   "file": "20260913000001_surum_gecmisi_f1_degisim_log.sql",
+   "ok": true,
+   "duration_s": 0.8,
+   "response_file": "apply_01_20260913000001_surum_gecmisi_f1_degisim_log.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; dosyanın kendi BEGIN/COMMIT'i (çift sarmalama yok)"
+  },
+  {
+   "n": 2,
+   "file": "20260913000002_surum_gecmisi_f2_geri_alma.sql",
+   "ok": true,
+   "duration_s": 1.5,
+   "response_file": "apply_02_20260913000002_surum_gecmisi_f2_geri_alma.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; dosyanın kendi BEGIN/COMMIT'i (çift sarmalama yok)"
+  },
+  {
+   "n": 3,
+   "file": "20260913000003_surum_gecmisi_f2_sahip_sifresi.sql",
+   "ok": true,
+   "duration_s": 0.6,
+   "response_file": "apply_03_20260913000003_surum_gecmisi_f2_sahip_sifresi.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; dosyanın kendi BEGIN/COMMIT'i (çift sarmalama yok)"
+  },
+  {
+   "n": 4,
+   "file": "20260913000004_luna_bilet_maske.sql",
+   "ok": true,
+   "duration_s": 0.7,
+   "response_file": "apply_04_20260913000004_luna_bilet_maske.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; tek CREATE OR REPLACE statement (kendiliğinden atomik)"
+  },
+  {
+   "n": 5,
+   "file": "20260914000001_l4_islem_log_kopru.sql",
+   "ok": true,
+   "duration_s": 0.8,
+   "response_file": "apply_05_20260914000001_l4_islem_log_kopru.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; dosyanın kendi BEGIN/COMMIT'i (çift sarmalama yok)"
+  },
+  {
+   "n": 6,
+   "file": "20260914000002_l4_geri_alma_zincir.sql",
+   "ok": true,
+   "duration_s": 0.7,
+   "response_file": "apply_06_20260914000002_l4_geri_alma_zincir.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; dosyanın kendi BEGIN/COMMIT'i (çift sarmalama yok)"
+  },
+  {
+   "n": 7,
+   "file": "20260914000003_l4_onarim.sql",
+   "ok": true,
+   "duration_s": 1.2,
+   "response_file": "apply_07_20260914000003_l4_onarim.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; dosyanın kendi BEGIN/COMMIT'i (çift sarmalama yok)"
+  },
+  {
+   "n": 8,
+   "file": "20260914000004_l4_stok_uyari_txid.sql",
+   "ok": true,
+   "duration_s": 0.9,
+   "response_file": "apply_08_20260914000004_l4_stok_uyari_txid.txt",
+   "detail": "OK (0 sonuç kümesi)",
+   "sent_as": "dosya metni olduğu like — tek istek; dosyanın kendi BEGIN/COMMIT'i (çift sarmalama yok)"
+  }
+ ],
+ "finished": "2026-09-15T19:42:04.745098+03:00",
+ "total_s": 7.3
+}
