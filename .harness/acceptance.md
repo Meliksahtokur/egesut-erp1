@@ -69,7 +69,10 @@ mutation. A migration commit inside the range is not evidence of deployment.
 
 Push is not deploy. A migration commit is not a DB mutation. Live deployment,
 DB writes, and destructive actions each require their own explicit gate and
-evidence from the owning environment.
+evidence from the owning environment. Deployment evidence includes the
+`schema_migrations` record for the applied version and the ground-truth
+refresh step from the DB runbook (`.harness/runbooks/db-migration.md`); an
+apply missing either is delivered as an explicit balance, not as done.
 
 ## Hook boundary
 
