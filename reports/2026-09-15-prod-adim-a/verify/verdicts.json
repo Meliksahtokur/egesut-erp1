@@ -1,0 +1,4454 @@
+{
+ "20260830000010_abort_vwp_penceresi.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_abort(text,text,date)",
+     "OK",
+     "gövde= 20260830000034_review_fix_paketi.sql sürümü (son tanım 20260830000034_review_fix_paketi.sql; prod'da 20260830000034_review_fix_paketi.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)",
+     "OK",
+     "gövde= 20260830000034_review_fix_paketi.sql sürümü (son tanım 20260910000002_sperma_eslesme_sertlestirme.sql; prod'da 20260830000034_review_fix_paketi.sql)"
+    ],
+    [
+     "kolon",
+     "tohumlama.abort_tarihi",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.tohumlama_abort(text, text, date) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260830000033_geri_al_hardening.sql"
+    ],
+    [
+     "dml",
+     "UPDATE tohumlama",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_abort(text,text,date)",
+     "OK",
+     "gövde= 20260830000034_review_fix_paketi.sql sürümü (son tanım 20260830000034_review_fix_paketi.sql; prod'da 20260830000034_review_fix_paketi.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)",
+     "MISMATCH",
+     "gövde hiçbir dosya sürümüyle eşleşmedi (md5 57c69264f4; son tanım 20260910000002_sperma_eslesme_sertlestirme.sql md5 d41d8cd98f)"
+    ],
+    [
+     "kolon",
+     "tohumlama.abort_tarihi",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.tohumlama_abort(text, text, date) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260830000033_geri_al_hardening.sql"
+    ],
+    [
+     "dml",
+     "UPDATE tohumlama",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260830000020_sessiz_vaka_filtresi_kaldir.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "view",
+     "v_eligible",
+     "OK",
+     "var"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "view",
+     "v_eligible",
+     "OK",
+     "var"
+    ]
+   ]
+  ]
+ },
+ "20260830000030_cift_abort_log_fix.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._islem_log_yaz()",
+     "OK",
+     "gövde= 20260830000030_cift_abort_log_fix.sql sürümü"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._islem_log_yaz()",
+     "OK",
+     "gövde= 20260830000030_cift_abort_log_fix.sql sürümü"
+    ]
+   ]
+  ]
+ },
+ "20260830000031_gebe_sonuc_mesaji.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_sonuc_gebe(text)",
+     "OK",
+     "gövde= 20260830000031_gebe_sonuc_mesaji.sql sürümü"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_sonuc_gebe(text)",
+     "OK",
+     "gövde= 20260830000031_gebe_sonuc_mesaji.sql sürümü"
+    ]
+   ]
+  ]
+ },
+ "20260830000032_geri_al_uuid_fallback.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.geri_al(text)",
+     "OK",
+     "gövde= 20260830000033_geri_al_hardening.sql sürümü (son tanım 20260830000033_geri_al_hardening.sql; prod'da 20260830000033_geri_al_hardening.sql)"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.geri_al(text)",
+     "OK",
+     "gövde= 20260830000033_geri_al_hardening.sql sürümü (son tanım 20260830000033_geri_al_hardening.sql; prod'da 20260830000033_geri_al_hardening.sql)"
+    ]
+   ]
+  ]
+ },
+ "20260830000033_geri_al_hardening.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.geri_al(text)",
+     "OK",
+     "gövde= 20260830000033_geri_al_hardening.sql sürümü (son tanım 20260830000033_geri_al_hardening.sql; prod'da 20260830000033_geri_al_hardening.sql)"
+    ],
+    [
+     "grant",
+     "REVOKE EXECUTE ON public.tohumlama_abort(text, text, date) TO anon;",
+     "OK",
+     "anon:OK-yok"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.geri_al(text)",
+     "OK",
+     "gövde= 20260830000033_geri_al_hardening.sql sürümü (son tanım 20260830000033_geri_al_hardening.sql; prod'da 20260830000033_geri_al_hardening.sql)"
+    ],
+    [
+     "grant",
+     "REVOKE EXECUTE ON public.tohumlama_abort(text, text, date) TO anon;",
+     "OK",
+     "anon:OK-yok"
+    ]
+   ]
+  ]
+ },
+ "20260830000034_review_fix_paketi.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_abort(text,text,date)",
+     "OK",
+     "gövde= 20260830000034_review_fix_paketi.sql sürümü (son tanım 20260830000034_review_fix_paketi.sql; prod'da 20260830000034_review_fix_paketi.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)",
+     "OK",
+     "gövde= 20260830000034_review_fix_paketi.sql sürümü (son tanım 20260910000002_sperma_eslesme_sertlestirme.sql; prod'da 20260830000034_review_fix_paketi.sql)"
+    ],
+    [
+     "grant",
+     "REVOKE EXECUTE ON public.abort_kaydet(text, text) TO authenticated, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260830000034_review_fix_paketi.sql"
+    ],
+    [
+     "dml",
+     "UPDATE tohumlama",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_abort(text,text,date)",
+     "OK",
+     "gövde= 20260830000034_review_fix_paketi.sql sürümü (son tanım 20260830000034_review_fix_paketi.sql; prod'da 20260830000034_review_fix_paketi.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)",
+     "MISMATCH",
+     "gövde hiçbir dosya sürümüyle eşleşmedi (md5 57c69264f4; son tanım 20260910000002_sperma_eslesme_sertlestirme.sql md5 d41d8cd98f)"
+    ],
+    [
+     "grant",
+     "REVOKE EXECUTE ON public.abort_kaydet(text, text) TO authenticated, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260830000034_review_fix_paketi.sql"
+    ],
+    [
+     "dml",
+     "UPDATE tohumlama",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260831000001_sessiz_ankra_fixi.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "view",
+     "v_eligible",
+     "OK",
+     "var"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "view",
+     "v_eligible",
+     "OK",
+     "var"
+    ]
+   ]
+  ]
+ },
+ "20260831000002_duve_sessiz_13ay.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "view",
+     "v_eligible",
+     "OK",
+     "var"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "view",
+     "v_eligible",
+     "OK",
+     "var"
+    ]
+   ]
+  ]
+ },
+ "20260831000003_tablo_guard_triggerlari.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._guard_hayvanlar_cinsiyet_grup()",
+     "OK",
+     "gövde= 20260831000003_tablo_guard_triggerlari.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._guard_tohumlama_yas_cinsiyet()",
+     "OK",
+     "gövde= 20260831000003_tablo_guard_triggerlari.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._guard_dogum_ileri_tarih()",
+     "OK",
+     "gövde= 20260831000003_tablo_guard_triggerlari.sql sürümü"
+    ],
+    [
+     "trigger",
+     "trg_hayvanlar_guard ON hayvanlar",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_tohumlama_guard ON tohumlama",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_dogum_guard ON dogum",
+     "OK",
+     "var"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_hayvanlar_guard",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_tohumlama_guard",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_dogum_guard",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._guard_hayvanlar_cinsiyet_grup()",
+     "OK",
+     "gövde= 20260831000003_tablo_guard_triggerlari.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._guard_tohumlama_yas_cinsiyet()",
+     "OK",
+     "gövde= 20260831000003_tablo_guard_triggerlari.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._guard_dogum_ileri_tarih()",
+     "OK",
+     "gövde= 20260831000003_tablo_guard_triggerlari.sql sürümü"
+    ],
+    [
+     "trigger",
+     "trg_hayvanlar_guard ON hayvanlar",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_tohumlama_guard ON tohumlama",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_dogum_guard ON dogum",
+     "OK",
+     "var"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_hayvanlar_guard",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_tohumlama_guard",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_dogum_guard",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ]
+ },
+ "20260901000001_ikiz_dogum_olay_id.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_belirsiz_ureme_listele()",
+     "OK",
+     "gövde= 20260901000001_ikiz_dogum_olay_id.sql sürümü"
+    ],
+    [
+     "kolon",
+     "dogum.olay_id",
+     "OK",
+     "var"
+    ],
+    [
+     "view",
+     "v_ureme_dongusu",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.dogum_kaydet(text,date,text,text,text,numeric,text,text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.hayvan_belirsiz_ureme_listele() TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
+    ],
+    [
+     "grant",
+     "SELECT ON public.v_ureme_dongusu TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
+    ],
+    [
+     "dml",
+     "UPDATE dogum",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_belirsiz_ureme_listele()",
+     "OK",
+     "gövde= 20260901000001_ikiz_dogum_olay_id.sql sürümü"
+    ],
+    [
+     "kolon",
+     "dogum.olay_id",
+     "OK",
+     "var"
+    ],
+    [
+     "view",
+     "v_ureme_dongusu",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.dogum_kaydet(text,date,text,text,text,numeric,text,text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.hayvan_belirsiz_ureme_listele() TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
+    ],
+    [
+     "grant",
+     "SELECT ON public.v_ureme_dongusu TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000001_ikiz_dogum_olay_id.sql"
+    ],
+    [
+     "dml",
+     "UPDATE dogum",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260901000002_kupe_revizyon.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.kupe_musait_mi(text,text,text)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_ekle(text,text,text,text,date,text,text,numeric,text,text,numeric,numeric,text,text,uuid)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_guncelle(text,text,text,text,text,date,text,text,numeric,numeric,numeric,text,text,text,text,text,uuid,boolean)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.asistan_hayvan_detay(text,text)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "index",
+     "hayvanlar_kupe_no_key",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.dogum_kaydet(text, date, text, text, text, numeric, text, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.asistan_hayvan_detay(text, text) TO PUBLIC;",
+     "OK",
+     "public:OK-yok"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.asistan_hayvan_detay(text, text) TO authenticated, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000002_kupe_revizyon.sql"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.kupe_musait_mi(text,text,text)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_ekle(text,text,text,text,date,text,text,numeric,text,text,numeric,numeric,text,text,uuid)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_guncelle(text,text,text,text,text,date,text,text,numeric,numeric,numeric,text,text,text,text,text,uuid,boolean)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.asistan_hayvan_detay(text,text)",
+     "OK",
+     "gövde= 20260901000002_kupe_revizyon.sql sürümü"
+    ],
+    [
+     "index",
+     "hayvanlar_kupe_no_key",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.dogum_kaydet(text, date, text, text, text, numeric, text, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.asistan_hayvan_detay(text, text) TO PUBLIC;",
+     "OK",
+     "public:OK-yok"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.asistan_hayvan_detay(text, text) TO authenticated, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260901000002_kupe_revizyon.sql"
+    ]
+   ]
+  ]
+ },
+ "20260902000001_asi_stok_backfill.sql": {
+  "prod": [
+   "N/A",
+   [
+    [
+     "dml",
+     "INSERT stok",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "N/A",
+   [
+    [
+     "dml",
+     "INSERT stok",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260902000002_asi_stok_serbest_dusum.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.vaccination_stok_dusum()",
+     "OK",
+     "gövde= 20260902000002_asi_stok_serbest_dusum.sql sürümü"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.vaccination_stok_dusum()",
+     "OK",
+     "gövde= 20260902000002_asi_stok_serbest_dusum.sql sürümü"
+    ]
+   ]
+  ]
+ },
+ "20260902000003_asi_planli_gorev.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.asi_gorev_planla(text,uuid,numeric,date,text)",
+     "OK",
+     "gövde= 20260902000004_asi_toplu_gorev.sql sürümü (son tanım 20260902000004_asi_toplu_gorev.sql; prod'da 20260902000004_asi_toplu_gorev.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.asi_planli_tamamla(text,date,numeric,uuid)",
+     "OK",
+     "gövde= 20260902000003_asi_planli_gorev.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.fn_gorev_asip_iade()",
+     "OK",
+     "gövde= 20260902000003_asi_planli_gorev.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.gorev_tamamla(text,text)",
+     "OK",
+     "gövde= 20260902000003_asi_planli_gorev.sql sürümü"
+    ],
+    [
+     "trigger",
+     "trg_gorev_asip_iade ON gorev_log",
+     "OK",
+     "var"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_gorev_asip_iade",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.asi_gorev_planla(text,uuid,numeric,date,text)",
+     "OK",
+     "gövde= 20260902000004_asi_toplu_gorev.sql sürümü (son tanım 20260902000004_asi_toplu_gorev.sql; prod'da 20260902000004_asi_toplu_gorev.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.asi_planli_tamamla(text,date,numeric,uuid)",
+     "OK",
+     "gövde= 20260902000003_asi_planli_gorev.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.fn_gorev_asip_iade()",
+     "OK",
+     "gövde= 20260902000003_asi_planli_gorev.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.gorev_tamamla(text,text)",
+     "OK",
+     "gövde= 20260902000003_asi_planli_gorev.sql sürümü"
+    ],
+    [
+     "trigger",
+     "trg_gorev_asip_iade ON gorev_log",
+     "OK",
+     "var"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_gorev_asip_iade",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260902000004_asi_toplu_gorev.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.asi_gorev_planla(text,uuid,numeric,date,text)",
+     "OK",
+     "gövde= 20260902000004_asi_toplu_gorev.sql sürümü (son tanım 20260902000004_asi_toplu_gorev.sql; prod'da 20260902000004_asi_toplu_gorev.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.asi_toplu_planla(text,date,jsonb,text)",
+     "OK",
+     "gövde= 20260902000004_asi_toplu_gorev.sql sürümü"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.asi_gorev_planla(text,uuid,numeric,date,text)",
+     "OK",
+     "gövde= 20260902000004_asi_toplu_gorev.sql sürümü (son tanım 20260902000004_asi_toplu_gorev.sql; prod'da 20260902000004_asi_toplu_gorev.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.asi_toplu_planla(text,date,jsonb,text)",
+     "OK",
+     "gövde= 20260902000004_asi_toplu_gorev.sql sürümü"
+    ]
+   ]
+  ]
+ },
+ "20260906000001_postpartum_d53_e_vitamin_tek.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.protokol_eksik_tara()",
+     "OK",
+     "gövde= 20260906000001_postpartum_d53_e_vitamin_tek.sql sürümü"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.dogum_kaydet(text, date, text, text, text, numeric, text, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.protokol_eksik_tara() TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.protokol_eksik_tara()",
+     "MISMATCH",
+     "gövde hiçbir dosya sürümüyle eşleşmedi (md5 956bbd2f52; son tanım 20260906000001_postpartum_d53_e_vitamin_tek.sql md5 5957a1e204)"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.dogum_kaydet(text, date, text, text, text, numeric, text, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.protokol_eksik_tara() TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906000001_postpartum_d53_e_vitamin_tek.sql"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE gorev_log",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260906120000_vaka_toplu_ac.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._vaka_ac_tek(text,uuid,text,date)",
+     "OK",
+     "gövde= 20260906120000_vaka_toplu_ac.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.create_case(text,uuid,text)",
+     "OK",
+     "gövde= 20260906120000_vaka_toplu_ac.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.vaka_toplu_ac(text[],uuid,jsonb,uuid,text,date,boolean,integer,text,text)",
+     "OK",
+     "gövde= 20260906120000_vaka_toplu_ac.sql sürümü"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.create_case(text, uuid, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
+    ],
+    [
+     "drop",
+     "FN public._vaka_ac_tek(text, uuid, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FUNCTION public.create_case(text, uuid, text)",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, uuid)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, uuid, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._vaka_ac_tek(text,uuid,text,date)",
+     "OK",
+     "gövde= 20260906120000_vaka_toplu_ac.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.create_case(text,uuid,text)",
+     "OK",
+     "gövde= 20260906120000_vaka_toplu_ac.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.vaka_toplu_ac(text[],uuid,jsonb,uuid,text,date,boolean,integer,text,text)",
+     "OK",
+     "gövde= 20260906120000_vaka_toplu_ac.sql sürümü"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.create_case(text, uuid, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text, text) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260906120000_vaka_toplu_ac.sql"
+    ],
+    [
+     "drop",
+     "FN public._vaka_ac_tek(text, uuid, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FUNCTION public.create_case(text, uuid, text)",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, uuid)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, uuid, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.vaka_toplu_ac(text[], uuid, jsonb, uuid, text, date, boolean, int, text)",
+     "OK-yok",
+     "düşürülmüş"
+    ]
+   ]
+  ]
+ },
+ "20260909000001_sablon_aktif_vakaya_uygula.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.tedavi_sablon_uygula(uuid,uuid,date)",
+     "OK",
+     "gövde= 20260909000001_sablon_aktif_vakaya_uygula.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.tedavi_sablon_tohumlama_gorev_ekle(uuid,uuid,date)",
+     "OK",
+     "gövde= 20260909000001_sablon_aktif_vakaya_uygula.sql sürümü"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.tedavi_sablon_uygula(uuid, uuid, date) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid, date) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
+    ],
+    [
+     "drop",
+     "FN public.tedavi_sablon_uygula(uuid, uuid)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid)",
+     "OK-yok",
+     "düşürülmüş"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.tedavi_sablon_uygula(uuid,uuid,date)",
+     "OK",
+     "gövde= 20260909000001_sablon_aktif_vakaya_uygula.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.tedavi_sablon_tohumlama_gorev_ekle(uuid,uuid,date)",
+     "OK",
+     "gövde= 20260909000001_sablon_aktif_vakaya_uygula.sql sürümü"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.tedavi_sablon_uygula(uuid, uuid, date) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid, date) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909000001_sablon_aktif_vakaya_uygula.sql"
+    ],
+    [
+     "drop",
+     "FN public.tedavi_sablon_uygula(uuid, uuid)",
+     "OK-yok",
+     "düşürülmüş"
+    ],
+    [
+     "drop",
+     "FN public.tedavi_sablon_tohumlama_gorev_ekle(uuid, uuid)",
+     "OK-yok",
+     "düşürülmüş"
+    ]
+   ]
+  ]
+ },
+ "20260909100000_dozaj_std_dose_seed.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "kolon",
+     "drug_products.std_dose",
+     "OK",
+     "var"
+    ],
+    [
+     "kolon",
+     "drug_products.std_dose_unit",
+     "OK",
+     "var"
+    ],
+    [
+     "constraint",
+     "drug_products_std_dose_unit_check",
+     "OK",
+     "var"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "kolon",
+     "drug_products.std_dose",
+     "OK",
+     "var"
+    ],
+    [
+     "kolon",
+     "drug_products.std_dose_unit",
+     "OK",
+     "var"
+    ],
+    [
+     "constraint",
+     "drug_products_std_dose_unit_check",
+     "OK",
+     "var"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE vaccines",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260909110000_dozaj_helper_min_max_rpc.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.ilac_dozaj_guncelle(uuid,jsonb)",
+     "OK",
+     "gövde= 20260909110000_dozaj_helper_min_max_rpc.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_kilo_guncelle(text,numeric)",
+     "OK",
+     "gövde= 20260909110000_dozaj_helper_min_max_rpc.sql sürümü"
+    ],
+    [
+     "kolon",
+     "drug_products.std_dose_min",
+     "OK",
+     "var"
+    ],
+    [
+     "kolon",
+     "drug_products.std_dose_max",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.ilac_dozaj_guncelle(uuid, jsonb) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.hayvan_kilo_guncelle(text, numeric) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.ilac_dozaj_guncelle(uuid,jsonb)",
+     "OK",
+     "gövde= 20260909110000_dozaj_helper_min_max_rpc.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.hayvan_kilo_guncelle(text,numeric)",
+     "OK",
+     "gövde= 20260909110000_dozaj_helper_min_max_rpc.sql sürümü"
+    ],
+    [
+     "kolon",
+     "drug_products.std_dose_min",
+     "OK",
+     "var"
+    ],
+    [
+     "kolon",
+     "drug_products.std_dose_max",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.ilac_dozaj_guncelle(uuid, jsonb) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.hayvan_kilo_guncelle(text, numeric) TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260909110000_dozaj_helper_min_max_rpc.sql"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ],
+    [
+     "dml",
+     "UPDATE drug_products",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260910000001_planli_tohumlama_sperma_dus.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.fn_sperma_stok_dus(text,text)",
+     "OK",
+     "gövde= 20260910000001_planli_tohumlama_sperma_dus.sql sürümü"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.fn_sperma_stok_dus(text, text) TO PUBLIC;",
+     "OK",
+     "public:OK-yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.fn_sperma_stok_dus(text, text) TO anon;",
+     "OK",
+     "anon:OK-yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.fn_sperma_stok_dus(text, text) TO authenticated;",
+     "OK",
+     "authenticated:OK-yok"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.fn_sperma_stok_dus(text,text)",
+     "OK",
+     "gövde= 20260910000001_planli_tohumlama_sperma_dus.sql sürümü"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.fn_sperma_stok_dus(text, text) TO PUBLIC;",
+     "OK",
+     "public:OK-yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.fn_sperma_stok_dus(text, text) TO anon;",
+     "OK",
+     "anon:OK-yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.fn_sperma_stok_dus(text, text) TO authenticated;",
+     "OK",
+     "authenticated:OK-yok"
+    ]
+   ]
+  ]
+ },
+ "20260910000002_sperma_eslesme_sertlestirme.sql": {
+  "prod": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_tekrar_kaydet(text,date,text,text,text)",
+     "MISMATCH",
+     "gövde hiçbir dosya sürümüyle eşleşmedi (md5 f7b2d72ed7; son tanım 20260910000002_sperma_eslesme_sertlestirme.sql md5 811a0b35c0)"
+    ],
+    [
+     "fonksiyon",
+     "public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)",
+     "OK",
+     "gövde= 20260830000034_review_fix_paketi.sql sürümü (son tanım 20260910000002_sperma_eslesme_sertlestirme.sql; prod'da 20260830000034_review_fix_paketi.sql)"
+    ]
+   ]
+  ],
+  "demo": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public.tohumlama_tekrar_kaydet(text,date,text,text,text)",
+     "OK",
+     "gövde= 20260910000002_sperma_eslesme_sertlestirme.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)",
+     "MISMATCH",
+     "gövde hiçbir dosya sürümüyle eşleşmedi (md5 57c69264f4; son tanım 20260910000002_sperma_eslesme_sertlestirme.sql md5 d41d8cd98f)"
+    ]
+   ]
+  ]
+ },
+ "20260910000003_gebelik_kaydet_manual_42804_fix.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.gebelik_kaydet_manual(text,date,text)",
+     "OK",
+     "gövde= 20260910000003_gebelik_kaydet_manual_42804_fix.sql sürümü"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.gebelik_kaydet_manual(text,date,text)",
+     "OK",
+     "gövde= 20260910000003_gebelik_kaydet_manual_42804_fix.sql sürümü"
+    ]
+   ]
+  ]
+ },
+ "20260911000001_dogum_buzagi_id_foundation.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public._dogum_buzagi_backfill()",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü"
+    ],
+    [
+     "kolon",
+     "dogum.buzagi_id",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "dogum_buzagi_id_uidx",
+     "OK",
+     "var"
+    ],
+    [
+     "constraint",
+     "dogum_buzagi_id_fkey",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._dogum_buzagi_backfill() TO PUBLIC;",
+     "OK",
+     "public:OK-yok"
+    ],
+    [
+     "dml",
+     "UPDATE dogum",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.dogum_kaydet(text,date,text,text,text,numeric,text,text)",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü (son tanım 20260911000001_dogum_buzagi_id_foundation.sql; prod'da 20260911000001_dogum_buzagi_id_foundation.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public._dogum_buzagi_backfill()",
+     "OK",
+     "gövde= 20260911000001_dogum_buzagi_id_foundation.sql sürümü"
+    ],
+    [
+     "kolon",
+     "dogum.buzagi_id",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "dogum_buzagi_id_uidx",
+     "OK",
+     "var"
+    ],
+    [
+     "constraint",
+     "dogum_buzagi_id_fkey",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._dogum_buzagi_backfill() TO PUBLIC;",
+     "OK",
+     "public:OK-yok"
+    ],
+    [
+     "dml",
+     "UPDATE dogum",
+     "VERİ",
+     "veri-düzeyi spot-check ayrı"
+    ]
+   ]
+  ]
+ },
+ "20260911000002_pedigree_foundation.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.assert_is_operator()",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_ensure_farm_node(text)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_is_ancestor(uuid,uuid)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_external_upsert(text,uuid,text,text,date,text,text)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._trg_pedigree_hayvan_insert()",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "tablo",
+     "pedigree_nodes",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "pedigree_parentage",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "semen_catalog",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "pedigree_meta",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_pedigree_hayvan_insert ON hayvanlar",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON pedigree_nodes",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON pedigree_parentage",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON semen_catalog",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON pedigree_meta",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "uq_pedigree_nodes_registry",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_pedigree_nodes_farm_kind",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_parentage_farm_child",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_parentage_farm_parent",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_parentage_farm_role_child",
+     "OK",
+     "var"
+    ],
+    [
+     "rls",
+     "pedigree_nodes",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "rls",
+     "pedigree_parentage",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "rls",
+     "semen_catalog",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "rls",
+     "pedigree_meta",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_nodes TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_parentage TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_meta TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.semen_catalog TO anon;",
+     "OK",
+     "anon:OK-yok"
+    ],
+    [
+     "grant",
+     "REVOKE INSERT, UPDATE, DELETE ON public.semen_catalog TO authenticated;",
+     "OK",
+     "authenticated:OK-yok"
+    ],
+    [
+     "grant",
+     "SELECT ON public.semen_catalog TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.assert_is_operator() TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_ensure_farm_node(text) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_is_ancestor(uuid,uuid) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_external_upsert(text,uuid,text,text,date,text,text) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_external_upsert(text,uuid,text,text,date,text,text) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._trg_pedigree_hayvan_insert() TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_pedigree_hayvan_insert",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.assert_is_operator()",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_ensure_farm_node(text)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_is_ancestor(uuid,uuid)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_external_upsert(text,uuid,text,text,date,text,text)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean)",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._trg_pedigree_hayvan_insert()",
+     "OK",
+     "gövde= 20260911000002_pedigree_foundation.sql sürümü"
+    ],
+    [
+     "tablo",
+     "pedigree_nodes",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "pedigree_parentage",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "semen_catalog",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "pedigree_meta",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_pedigree_hayvan_insert ON hayvanlar",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON pedigree_nodes",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON pedigree_parentage",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON semen_catalog",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "allow_all ON pedigree_meta",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "uq_pedigree_nodes_registry",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_pedigree_nodes_farm_kind",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_parentage_farm_child",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_parentage_farm_parent",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_parentage_farm_role_child",
+     "OK",
+     "var"
+    ],
+    [
+     "rls",
+     "pedigree_nodes",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "rls",
+     "pedigree_parentage",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "rls",
+     "semen_catalog",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "rls",
+     "pedigree_meta",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_nodes TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_parentage TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_meta TO anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.semen_catalog TO anon;",
+     "OK",
+     "anon:OK-yok"
+    ],
+    [
+     "grant",
+     "REVOKE INSERT, UPDATE, DELETE ON public.semen_catalog TO authenticated;",
+     "OK",
+     "authenticated:OK-yok"
+    ],
+    [
+     "grant",
+     "SELECT ON public.semen_catalog TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.assert_is_operator() TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_ensure_farm_node(text) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_is_ancestor(uuid,uuid) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._pedigree_parent_set_core(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_parent_set(uuid,text,uuid,text,text,boolean,jsonb) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_external_upsert(text,uuid,text,text,date,text,text) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_external_upsert(text,uuid,text,text,date,text,text) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.semen_catalog_upsert(text,uuid,uuid,text,text,text,text,text,text,boolean) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._trg_pedigree_hayvan_insert() TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000002_pedigree_foundation.sql"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY allow_all",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_pedigree_hayvan_insert",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ]
+ },
+ "20260911000003_pedigree_farm_backfill.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.pedigree_try_timestamptz(text)",
+     "OK",
+     "gövde= 20260911000003_pedigree_farm_backfill.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_farm_backfill()",
+     "OK",
+     "gövde= 20260911000003_pedigree_farm_backfill.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_integrity_report()",
+     "OK",
+     "gövde= 20260911000003_pedigree_farm_backfill.sql sürümü"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_try_timestamptz(text) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_farm_backfill() TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_integrity_report() TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
+    ],
+    [
+     "grant",
+     "REVOKE EXECUTE ON public.pedigree_integrity_report() TO service_role;",
+     "OK",
+     "service_role:OK-yok"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_integrity_report() TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.pedigree_try_timestamptz(text)",
+     "OK",
+     "gövde= 20260911000003_pedigree_farm_backfill.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_farm_backfill()",
+     "OK",
+     "gövde= 20260911000003_pedigree_farm_backfill.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_integrity_report()",
+     "OK",
+     "gövde= 20260911000003_pedigree_farm_backfill.sql sürümü"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_try_timestamptz(text) TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_farm_backfill() TO PUBLIC, anon, authenticated, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_integrity_report() TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000003_pedigree_farm_backfill.sql"
+    ],
+    [
+     "grant",
+     "REVOKE EXECUTE ON public.pedigree_integrity_report() TO service_role;",
+     "OK",
+     "service_role:OK-yok"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_integrity_report() TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ]
+   ]
+  ]
+ },
+ "20260911000004_pedigree_projection_rpc.sql": {
+  "prod": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.pedigree_subgraph(uuid,integer,integer)",
+     "OK",
+     "gövde= 20260911000004_pedigree_projection_rpc.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_subgraph_for_animal(text,integer,integer)",
+     "OK",
+     "gövde= 20260911000004_pedigree_projection_rpc.sql sürümü"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_subgraph(uuid, integer, integer) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_subgraph(uuid, integer, integer) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_subgraph_for_animal(text, integer, integer) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_subgraph_for_animal(text, integer, integer) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.pedigree_subgraph(uuid,integer,integer)",
+     "OK",
+     "gövde= 20260911000004_pedigree_projection_rpc.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.pedigree_subgraph_for_animal(text,integer,integer)",
+     "OK",
+     "gövde= 20260911000004_pedigree_projection_rpc.sql sürümü"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_subgraph(uuid, integer, integer) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_subgraph(uuid, integer, integer) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.pedigree_subgraph_for_animal(text, integer, integer) TO PUBLIC, anon, service_role;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260911000004_pedigree_projection_rpc.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.pedigree_subgraph_for_animal(text, integer, integer) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ]
+   ]
+  ]
+ },
+ "20260913000001_surum_gecmisi_f1_degisim_log.sql": {
+  "prod": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public._degisim_log_degistirilemez()",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public._degisim_log_yaz()",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "tablo",
+     "degisim_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log_immutable ON degisim_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log_no_truncate ON degisim_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON cases",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON diseases",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON dogum",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drug_administrations",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drug_classes",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drug_products",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drugs",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON gorev_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON grup_padok_eslem",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hastalik_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hayvan_override",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hayvanlar",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hekimler",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON irk_esik",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON kizginlik_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON padoklar",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON pedigree_meta",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON pedigree_nodes",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON pedigree_parentage",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON protokol_ayar",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON protokol_dismiss",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON protokol_instance",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON sablon_hastalik_eslem",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON semen_catalog",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON stok",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON stok_hareket",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON stok_kategorileri",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tedavi",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tedavi_sablonu",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tedavi_sablonu_kalem",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tohumlama",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON treatment_day_uygulamalar",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON treatment_days",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON uygulama_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccination_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccination_schedule",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccine_diseases",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccine_protocol_steps",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccines",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "policy",
+     "degisim_log_select ON degisim_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "index",
+     "idx_degisim_log_tablo_pk",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "index",
+     "idx_degisim_log_txid",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "index",
+     "idx_degisim_log_zaman",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "rls",
+     "degisim_log",
+     "FAIL",
+     "relrowsecurity=False"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_log TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "grant",
+     "SELECT ON public.degisim_log TO authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._degisim_log_yaz() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._degisim_log_degistirilemez() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "drop",
+     "POLICY degisim_log_select",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_degisim_log_immutable",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_degisim_log_no_truncate",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._degisim_log_degistirilemez()",
+     "OK",
+     "gövde= 20260913000001_surum_gecmisi_f1_degisim_log.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public._degisim_log_yaz()",
+     "OK",
+     "gövde= 20260913000004_luna_bilet_maske.sql sürümü (son tanım 20260913000004_luna_bilet_maske.sql; prod'da 20260913000004_luna_bilet_maske.sql)"
+    ],
+    [
+     "tablo",
+     "degisim_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log_immutable ON degisim_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log_no_truncate ON degisim_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON cases",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON diseases",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON dogum",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drug_administrations",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drug_classes",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drug_products",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON drugs",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON gorev_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON grup_padok_eslem",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hastalik_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hayvan_override",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hayvanlar",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON hekimler",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON irk_esik",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON kizginlik_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON padoklar",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON pedigree_meta",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON pedigree_nodes",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON pedigree_parentage",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON protokol_ayar",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON protokol_dismiss",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON protokol_instance",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON sablon_hastalik_eslem",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON semen_catalog",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON stok",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON stok_hareket",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON stok_kategorileri",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tedavi",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tedavi_sablonu",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tedavi_sablonu_kalem",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON tohumlama",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON treatment_day_uygulamalar",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON treatment_days",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON uygulama_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccination_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccination_schedule",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccine_diseases",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccine_protocol_steps",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_degisim_log ON vaccines",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "degisim_log_select ON degisim_log",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_degisim_log_tablo_pk",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_degisim_log_txid",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_degisim_log_zaman",
+     "OK",
+     "var"
+    ],
+    [
+     "rls",
+     "degisim_log",
+     "OK",
+     "relrowsecurity=True"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_log TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "grant",
+     "SELECT ON public.degisim_log TO authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._degisim_log_yaz() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._degisim_log_degistirilemez() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000001_surum_gecmisi_f1_degisim_log.sql"
+    ],
+    [
+     "drop",
+     "POLICY degisim_log_select",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_degisim_log_immutable",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_degisim_log_no_truncate",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ]
+ },
+ "20260913000002_surum_gecmisi_f2_geri_alma.sql": {
+  "prod": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "surum_gizli._cagiran()",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._kapsamda(text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._pk_kolonlar(text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._pk_json(text,jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._pk_gorunum(jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._guncel_satir(text,jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._ekle_bagli(degisim_log,degisim_log)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_uygula(jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.geri_alma_bileti_al(text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_listele(jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_onizle(jsonb,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_geri_al(jsonb,text,uuid,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "tablo",
+     "sahip_sifresi",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "tablo",
+     "geri_alma_bileti",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "tablo",
+     "geri_alma_kullanim",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "index",
+     "idx_geri_alma_kullanim_bilet",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON ALL TABLES IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON ALL FUNCTIONS IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.geri_alma_bileti_al(text) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_listele(jsonb) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_onizle(jsonb, text) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_geri_al(jsonb, text, uuid, text) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.geri_alma_bileti_al(text) TO authenticated;",
+     "FAIL",
+     "authenticated:YOK:EXECUTE"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.degisim_listele(jsonb) TO authenticated;",
+     "FAIL",
+     "authenticated:YOK:EXECUTE"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.degisim_onizle(jsonb, text) TO authenticated;",
+     "FAIL",
+     "authenticated:YOK:EXECUTE"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.degisim_geri_al(jsonb, text, uuid, text) TO authenticated;",
+     "FAIL",
+     "authenticated:YOK:EXECUTE"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "surum_gizli._cagiran()",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._kapsamda(text)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._pk_kolonlar(text)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._pk_json(text,jsonb)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._pk_gorunum(jsonb)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._guncel_satir(text,jsonb)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._ekle_bagli(degisim_log,degisim_log)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000004_l4_stok_uyari_txid.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_uygula(jsonb)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.geri_alma_bileti_al(text)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_listele(jsonb)",
+     "OK",
+     "gövde= 20260913000002_surum_gecmisi_f2_geri_alma.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_onizle(jsonb,text)",
+     "OK",
+     "gövde= 20260914000002_l4_geri_alma_zincir.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_geri_al(jsonb,text,uuid,text)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "tablo",
+     "sahip_sifresi",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "geri_alma_bileti",
+     "OK",
+     "var"
+    ],
+    [
+     "tablo",
+     "geri_alma_kullanim",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_geri_alma_kullanim_bilet",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON ALL TABLES IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON ALL FUNCTIONS IN SCHEMA surum_gizli TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.geri_alma_bileti_al(text) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_listele(jsonb) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_onizle(jsonb, text) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.degisim_geri_al(jsonb, text, uuid, text) TO PUBLIC, anon;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000002_surum_gecmisi_f2_geri_alma.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.geri_alma_bileti_al(text) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.degisim_listele(jsonb) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.degisim_onizle(jsonb, text) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.degisim_geri_al(jsonb, text, uuid, text) TO authenticated;",
+     "OK",
+     "authenticated:OK"
+    ]
+   ]
+  ]
+ },
+ "20260913000003_surum_gecmisi_f2_sahip_sifresi.sql": {
+  "prod": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public.sahip_sifresi_ayarla(text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.sahip_sifresi_ayarla(text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000003_surum_gecmisi_f2_sahip_sifresi.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.sahip_sifresi_ayarla(text) TO service_role;",
+     "FAIL",
+     "service_role:YOK:EXECUTE"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public.sahip_sifresi_ayarla(text)",
+     "OK",
+     "gövde= 20260913000003_surum_gecmisi_f2_sahip_sifresi.sql sürümü"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public.sahip_sifresi_ayarla(text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260913000003_surum_gecmisi_f2_sahip_sifresi.sql"
+    ],
+    [
+     "grant",
+     "EXECUTE ON public.sahip_sifresi_ayarla(text) TO service_role;",
+     "OK",
+     "service_role:OK"
+    ]
+   ]
+  ]
+ },
+ "20260913000004_luna_bilet_maske.sql": {
+  "prod": [
+   "EKSİK",
+   [
+    [
+     "fonksiyon",
+     "public._degisim_log_yaz()",
+     "MISSING",
+     "yok"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._degisim_log_yaz()",
+     "OK",
+     "gövde= 20260913000004_luna_bilet_maske.sql sürümü (son tanım 20260913000004_luna_bilet_maske.sql; prod'da 20260913000004_luna_bilet_maske.sql)"
+    ]
+   ]
+  ]
+ },
+ "20260914000001_l4_islem_log_kopru.sql": {
+  "prod": [
+   "EKSİK",
+   [
+    [
+     "fonksiyon",
+     "public._islem_log_degisim_txid()",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "kolon",
+     "islem_log.degisim_txid",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_islem_log_degisim_txid ON islem_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "index",
+     "idx_islem_log_degisim_txid",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._islem_log_degisim_txid() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000001_l4_islem_log_kopru.sql"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_islem_log_degisim_txid",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._islem_log_degisim_txid()",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "kolon",
+     "islem_log.degisim_txid",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_islem_log_degisim_txid ON islem_log",
+     "OK",
+     "var"
+    ],
+    [
+     "index",
+     "idx_islem_log_degisim_txid",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._islem_log_degisim_txid() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000001_l4_islem_log_kopru.sql"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_islem_log_degisim_txid",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ]
+ },
+ "20260914000002_l4_geri_alma_zincir.sql": {
+  "prod": [
+   "EKSİK",
+   [
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zaman_txid(text,jsonb,text,bigint,text,timestamp with time zone)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zincir(jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_onizle(jsonb,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_geri_al(jsonb,text,uuid,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_zaman_txid(text, jsonb, text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_zincir(jsonb) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zaman_txid(text,jsonb,text,bigint,text,timestamp with time zone)",
+     "OK",
+     "gövde= 20260914000002_l4_geri_alma_zincir.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000004_l4_stok_uyari_txid.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zincir(jsonb)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000004_l4_stok_uyari_txid.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_onizle(jsonb,text)",
+     "OK",
+     "gövde= 20260914000002_l4_geri_alma_zincir.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_geri_al(jsonb,text,uuid,text)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_zaman_txid(text, jsonb, text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_zincir(jsonb) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000002_l4_geri_alma_zincir.sql"
+    ]
+   ]
+  ]
+ },
+ "20260914000003_l4_onarim.sql": {
+  "prod": [
+   "KISMİ",
+   [
+    [
+     "fonksiyon",
+     "public._islem_log_degisim_txid()",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public._islem_log_geri_alindi_kapisi()",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_rehber_uyesi(jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zincir(jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_onizle(jsonb,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_geri_al(jsonb,text,uuid,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "tablo",
+     "l4_rehber_adimlari",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_islem_log_degisim_txid ON islem_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "trigger",
+     "trg_islem_log_geri_alindi_kapisi ON islem_log",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "policy",
+     "service_insert ON islem_log",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._islem_log_geri_alindi_kapisi() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE INSERT ON public.islem_log TO authenticated;",
+     "FAIL",
+     "authenticated:HÂLÂ VAR:INSERT"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli.l4_rehber_adimlari TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._degisim_plan(jsonb, text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000004_l4_stok_uyari_txid.sql"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_islem_log_degisim_txid",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_islem_log_geri_alindi_kapisi",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY service_insert",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "public._islem_log_degisim_txid()",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public._islem_log_geri_alindi_kapisi()",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_rehber_uyesi(jsonb)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000004_l4_stok_uyari_txid.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zincir(jsonb)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000004_l4_stok_uyari_txid.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_onizle(jsonb,text)",
+     "OK",
+     "gövde= 20260914000002_l4_geri_alma_zincir.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "public.degisim_geri_al(jsonb,text,uuid,text)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000003_l4_onarim.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "tablo",
+     "l4_rehber_adimlari",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_islem_log_degisim_txid ON islem_log",
+     "OK",
+     "var"
+    ],
+    [
+     "trigger",
+     "trg_islem_log_geri_alindi_kapisi ON islem_log",
+     "OK",
+     "var"
+    ],
+    [
+     "policy",
+     "service_insert ON islem_log",
+     "OK",
+     "var"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON public._islem_log_geri_alindi_kapisi() TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE INSERT ON public.islem_log TO authenticated;",
+     "OK",
+     "authenticated:OK-yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli.l4_rehber_adimlari TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._l4_rehber_uyesi(jsonb) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000003_l4_onarim.sql"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._degisim_plan(jsonb, text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000004_l4_stok_uyari_txid.sql"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_islem_log_degisim_txid",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "TRIGGER trg_islem_log_geri_alindi_kapisi",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ],
+    [
+     "drop",
+     "POLICY service_insert",
+     "ARA-DURUM",
+     "sonraki dosyada yeniden yaratıldı"
+    ]
+   ]
+  ]
+ },
+ "20260914000004_l4_stok_uyari_txid.sql": {
+  "prod": [
+   "EKSİK",
+   [
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zincir(jsonb)",
+     "MISSING",
+     "yok"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._degisim_plan(jsonb, text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000004_l4_stok_uyari_txid.sql"
+    ]
+   ]
+  ],
+  "demo": [
+   "CANLI",
+   [
+    [
+     "fonksiyon",
+     "surum_gizli._degisim_plan(jsonb,text)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000004_l4_stok_uyari_txid.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "fonksiyon",
+     "surum_gizli._l4_zincir(jsonb)",
+     "OK",
+     "gövde= 20260914000003_l4_onarim.sql sürümü (son tanım 20260914000004_l4_stok_uyari_txid.sql; prod'da 20260914000003_l4_onarim.sql)"
+    ],
+    [
+     "grant",
+     "REVOKE ALL ON surum_gizli._degisim_plan(jsonb, text) TO PUBLIC, anon, authenticated;",
+     "ARA-DURUM",
+     "sonraki dosya değiştirdi: 20260914000004_l4_stok_uyari_txid.sql"
+    ]
+   ]
+  ]
+ }
+}
