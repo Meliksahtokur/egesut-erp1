@@ -1,6 +1,6 @@
 ---
 id: G-20260913-SURUM-GECMISI
-status: in_progress
+status: done
 owner: root
 flow: ss_org
 created: 2026-09-13
@@ -27,8 +27,35 @@ implement_lane: glmf_workers
 # G-20260913-SURUM-GECMISI — Version history + diff UI + ticketed revert
 
 ## Status
-in_progress — lead lane `agent/surum-gecmisi-diff`; workers W1 (F1+F2 DB),
-W2 (F3 UI, contract-shaped stub until W1 merges).
+done — closed 2026-09-15 (D4 documentation closure; criterion evaluation in
+the Closure section below). Lead lane was `agent/surum-gecmisi-diff`;
+workers W1 (F1+F2 DB), W2 (F3 UI). Code, migrations, prod application, and
+the main merge (`6a0edb1`) are all complete.
+
+## Closure (2026-09-15, D4)
+
+Prod application evidence (owner approval, 2026-09-15): the L2 4 migrations
+were applied to prod — commits `e3c281e`/`b75d154`, merged to main as
+`6a0edb1`. Root live measurement (recorded in commit `b75d154` message):
+`surum_gizli` schema present, `trg_degisim_log` installed on 39 tables,
+`islem_log` denies authenticated INSERT.
+
+Owner UI walkthrough: **sahip doğruladı (2026-09-15 canlı)**.
+
+Criterion-level result (evidence per `reports/2026-09-13-surum-gecmisi-teslim.md` §3):
+
+| Kabul | Sonuç | Kanıt |
+|---|---|---|
+| 1 I/U/D log + immutability (demo) | PASS | W1 demo test betiği 156/156 (39 tablo; no-op ve kaynak vakaları dahil) |
+| 2 Tek txid + trigger yükü | PASS | üç bağımsız koşum, medyan ek yük raporda |
+| 3 Revert testleri (demo) | PASS | 46/46 (43 W1 vakası + luna düzeltme vakaları; iki tur tekrar) |
+| 4 Unit + saf katman | PASS | taban 796/795/1; bilinen kırmızı `gecmis-pipeline.test.js:283` constraint gereği hariç |
+| 5 UI açılır + sahip testi | PASS | 8 ekran görüntüsü raporda; K5 PARTIAL'ın sahip ayağı: sahip doğruladı (2026-09-15 canlı) |
+| 6 Teslim raporu | PASS | `reports/2026-09-13-surum-gecmisi-teslim.md` |
+
+Known open (outside this goal, owner-decided separate wave): prod
+`schema_migrations` records (D3 §7b) and ground-truth regen (D3 §7c) are
+pending; they do not block this closure.
 
 ## Date
 2026-09-13

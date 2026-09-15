@@ -36,8 +36,9 @@ UPDATED | NO_CHANGE_REQUIRED | PROPOSED | OUT_OF_SCOPE
 
 The engine routes current Git paths to relevant surfaces. UI changes require
 UI map, pattern, and test evaluation. RPC/migration changes require live-schema,
-RPC reference, domain, deploy-boundary, and test evaluation. Harness and goal
-changes require their contract/tests and goal/generated-view surfaces.
+RPC reference, domain, deploy-boundary, migration-registry, ground-truth, and
+test evaluation. Harness and goal changes require their contract/tests and
+goal/generated-view surfaces.
 
 ## Authority and evidence
 
@@ -115,6 +116,8 @@ Required-surface names map to the document or evidence that owns them:
 | `rpc_reference` | `.harness/references/rpc-reference.md` |
 | `domain_rules` | `.harness/references/domain-rules.md` |
 | `deploy_boundary` | the report's deploy record; push is not deploy |
+| `migration_registry` | `schema_migrations` record evidence for applied versions |
+| `ground_truth` | `supabase/migrations/99999999999999_ground_truth.sql` refresh state |
 | `decisions` | `.harness/decisions/` records |
 | `harness_contract` | `.harness/contract.md` and this document |
 | `harness_tests` | `tests/harness/` |

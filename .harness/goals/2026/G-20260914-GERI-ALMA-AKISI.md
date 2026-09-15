@@ -1,6 +1,6 @@
 ---
 id: G-20260914-GERI-ALMA-AKISI
-status: active
+status: done
 owner: root
 flow: ss_org
 created: 2026-09-14
@@ -88,7 +88,7 @@ acceptance:
   - "Motor genisletmesi frozen contract'a uyum — W1 demo RPC test ciktilari"
   - "Tek motor: islemGeriAl/m-geri-al cagrisi 0 (grep + unit)"
   - "Unit 0 fail; PW tek belgelenmis kosum"
-  - "DB degisikligi YALNIZ demo; prod'a hicbir sey uygulanmadi"
+  - "L4 4 migration 2026-09-15'te sahip onayiyle prod'a uygulandi (commit e3c281e); onceki 'yalniz demo' kisiti sahibin prod onayiyle kalkti"
   - "Teslim raporu .harness/reports/2026-09-14-geri-alma-akisi.md"
 stop_conditions:
   - "Root plan onayi gelmeden kod YAZILMAZ (FAZ A kapisi)"
@@ -112,11 +112,47 @@ implement_lane: glmf_workers
 # G-20260914-GERI-ALMA-AKISI — Değişiklikler + geri alma: insan akışı
 
 ## Status
-active — root KOŞULLU ONAY (2026-09-14, commit 9ff0873 kapısı): plan sağlam,
-FAZ B'ye geç. Koşullar K1 (zincir kapsamı, aşağıda frozen contract §3) ve
-K2 (main çıkışı, Constraints) işlendi; O-2/O-3/O-4 = HAYIR (Constraints).
-Not: FAZ B'de materialleşecek migration/test dosyaları kesin adları belirlenince
-write_manifest'e eklenir (goal kendini manifest'te içerir).
+done — closed 2026-09-15 (D4 documentation closure; criterion evaluation in
+the Closure section below). History: root KOŞULLU ONAY (2026-09-14, commit
+9ff0873 kapısı) ile FAZ B başladı; K1 (zincir kapsamı) ve K2 (main çıkışı)
+işlendi; O-2/O-3/O-4 = HAYIR. Kod, migration'lar, prod uygulaması ve main
+merge'i (`6a0edb1`) tamam.
+
+## Closure (2026-09-15, D4)
+
+**K2 kapısı sağlandı ve merge gerçekleşti:** L2+L4 8 migration 2026-09-15'te
+sahip onayıyla prod'a uygulandı (`e3c281e`: 8/8 OK, 7.3 s; yedek
+`prod-yedek-2026-09-15-adim-b`; root canlı ölçümü commit `b75d154`
+mesajında). "PROD'a uygulama = ayrı sahip kapısı" stop-condition'ı bu onayla
+işletildi; dal main'e `6a0edb1` ile merge edildi. Kabul listesindeki
+"DB yalnız demo; prod'a hiçbir şey uygulanmadı" maddesi gerçek durumuyla
+değiştirildi (yukarıda, frontmatter).
+
+**Sahip UI yürüyüşü:** sahip doğruladı (2026-09-15 canlı).
+
+Criterion-level sonuç (kanıt: `.harness/reports/2026-09-14-geri-alma-akisi.md`):
+
+| Kabul | Sonuç | Kanıt |
+|---|---|---|
+| S1-S6 tarayıcı yürüyüşü + ekran görüntüleri | PASS | `~/tmp/agents/l4-akis/`; S1b/S1c 4fad122 koşumunda kanıtlı (flaky notu aşağıda); sahip doğruladı (2026-09-15 canlı) |
+| Motor genişletmesi frozen contract uyumu | PASS | W1 demo RPC test çıktıları; k4 yeniden üretim + adversarial vakalar (rapor §2) |
+| Tek motor (islemGeriAl yolu ölü) | PASS | `islemGeriAl`/`openGeriAl`/`m-geri-al`/`ga-*` grep 0 + unit |
+| Unit 0 fail; PW tek koşum | PASS | unit 1067/1067/0 (taban 938); PW 16/16, Docker demo, TEK belgelenmiş koşum |
+| L4 4 migration prod'a uygulandı (sahip onayı) | PASS | `e3c281e` (8/8 OK, 7.3 s) + `b75d154` root ölçümü; L2+L4 birlikte |
+| Teslim raporu | PASS | `.harness/reports/2026-09-14-geri-alma-akisi.md` |
+
+**Bilinen sınır / ertelenen küçük iş** (rapor §7 kalem 5-6; kapanışı
+engellemez):
+
+- S1b (hayvan kartı) ve S1c (işlem detay paneli) walk-extra flaky — kart
+  render yarışı; eski kanıt `eski-4fad122/S1c-*` (rapor §7.5).
+- Walk betiği `toastBekle('geri al')` zaafiyeti — başarı/hata toast'ı
+  ayrışmıyor; bu teslimde başarı iddiaları DB telafi kayıtlarıyla
+  saniye-eşleşmeli doğrulandı; betik düzeltmesi sonraki dokunuşta (rapor
+  §7.6).
+
+Bu goal dışında, ayrı dalgada (sahip kararı): prod `schema_migrations`
+kayıtları (D3 §7b) ve GT regen (D3 §7c).
 
 ## Date
 2026-09-14

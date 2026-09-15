@@ -102,6 +102,13 @@ or explicit owner choice. See `task-modes.md`.
   skills, snapshots, RPC references, and generated summaries are subordinate
   references and may be stale.
 - A migration file in Git is not evidence of deployment.
+- A migration is deployed only through the DB runbook
+  (`.harness/runbooks/db-migration.md`): documentation first, then backup,
+  dry run, apply, `schema_migrations` record, ground-truth refresh,
+  verification, merge. Apply, record, and ground-truth refresh are
+  inseparable. A deployment without the runbook is not complete; an applied
+  migration missing its record or its ground-truth refresh is reported as an
+  explicit balance in the delivery report.
 - Live DB writes require an explicit owner instruction. High-risk
   DROP/RENAME/TRUNCATE operations require a final specific approval.
 - New tenant-scoped tables use
