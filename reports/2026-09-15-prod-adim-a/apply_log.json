@@ -1,0 +1,80 @@
+{
+ "started": "2026-09-15T13:55:59.317105+03:00",
+ "prod_ref": "zqnexqbdfvbhlxzelzju",
+ "files": [
+  {
+   "n": 1,
+   "file": "20260831000003_tablo_guard_triggerlari.sql",
+   "ok": true,
+   "duration_s": 0.6,
+   "response_file": "apply_01_20260831000003_tablo_guard_triggerlari.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 2,
+   "file": "20260909100000_dozaj_std_dose_seed.sql",
+   "ok": true,
+   "duration_s": 0.5,
+   "response_file": "apply_02_20260909100000_dozaj_std_dose_seed.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 3,
+   "file": "20260909110000_dozaj_helper_min_max_rpc.sql",
+   "ok": true,
+   "duration_s": 0.7,
+   "response_file": "apply_03_20260909110000_dozaj_helper_min_max_rpc.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 4,
+   "file": "20260910000001_planli_tohumlama_sperma_dus.sql",
+   "ok": true,
+   "duration_s": 0.5,
+   "response_file": "apply_04_20260910000001_planli_tohumlama_sperma_dus.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 5,
+   "file": "20260910000003_gebelik_kaydet_manual_42804_fix.sql",
+   "ok": true,
+   "duration_s": 0.5,
+   "response_file": "apply_05_20260910000003_gebelik_kaydet_manual_42804_fix.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 6,
+   "file": "20260911000001_dogum_buzagi_id_foundation.sql",
+   "ok": true,
+   "duration_s": 1.1,
+   "response_file": "apply_06_20260911000001_dogum_buzagi_id_foundation.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 7,
+   "file": "20260911000002_pedigree_foundation.sql",
+   "ok": true,
+   "duration_s": 0.8,
+   "response_file": "apply_07_20260911000002_pedigree_foundation.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 8,
+   "file": "20260911000003_pedigree_farm_backfill.sql",
+   "ok": true,
+   "duration_s": 0.7,
+   "response_file": "apply_08_20260911000003_pedigree_farm_backfill.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  },
+  {
+   "n": 9,
+   "file": "20260911000004_pedigree_projection_rpc.sql",
+   "ok": true,
+   "duration_s": 0.6,
+   "response_file": "apply_09_20260911000004_pedigree_projection_rpc.txt",
+   "detail": "OK (0 sonuç kümesi)"
+  }
+ ],
+ "finished": "2026-09-15T13:56:05.163979+03:00",
+ "total_s": 6.0
+}
