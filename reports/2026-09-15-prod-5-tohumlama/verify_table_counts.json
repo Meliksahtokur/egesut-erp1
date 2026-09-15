@@ -1,0 +1,262 @@
+[
+ {
+  "table": "agent_messages",
+  "backup": 94,
+  "live_after": 94
+ },
+ {
+  "table": "agent_plans",
+  "backup": 5,
+  "live_after": 5
+ },
+ {
+  "table": "agent_threads",
+  "backup": 26,
+  "live_after": 26
+ },
+ {
+  "table": "bildirim_log",
+  "backup": 70,
+  "live_after": 70
+ },
+ {
+  "table": "cases",
+  "backup": 113,
+  "live_after": 113
+ },
+ {
+  "table": "chat",
+  "backup": 14,
+  "live_after": 14
+ },
+ {
+  "table": "code_embeddings",
+  "backup": 4482,
+  "live_after": 4482
+ },
+ {
+  "table": "cop_kutusu",
+  "backup": 0,
+  "live_after": 0
+ },
+ {
+  "table": "diseases",
+  "backup": 47,
+  "live_after": 47
+ },
+ {
+  "table": "dogum",
+  "backup": 72,
+  "live_after": 72
+ },
+ {
+  "table": "drug_administrations",
+  "backup": 646,
+  "live_after": 646
+ },
+ {
+  "table": "drug_classes",
+  "backup": 52,
+  "live_after": 52
+ },
+ {
+  "table": "drug_products",
+  "backup": 33,
+  "live_after": 33
+ },
+ {
+  "table": "drugs",
+  "backup": 17,
+  "live_after": 17
+ },
+ {
+  "table": "entity_graph",
+  "backup": 15,
+  "live_after": 15
+ },
+ {
+  "table": "goose_embeddings",
+  "backup": 167,
+  "live_after": 167
+ },
+ {
+  "table": "gorev_log",
+  "backup": 3084,
+  "live_after": 3084
+ },
+ {
+  "table": "grup_padok_eslem",
+  "backup": 10,
+  "live_after": 10
+ },
+ {
+  "table": "hastalik_log",
+  "backup": 0,
+  "live_after": 0
+ },
+ {
+  "table": "hayvan_override",
+  "backup": 0,
+  "live_after": 0
+ },
+ {
+  "table": "hayvanlar",
+  "backup": 166,
+  "live_after": 166
+ },
+ {
+  "table": "hekimler",
+  "backup": 3,
+  "live_after": 3
+ },
+ {
+  "table": "irk_esik",
+  "backup": 7,
+  "live_after": 7
+ },
+ {
+  "table": "islem_log",
+  "backup": 4253,
+  "live_after": 4253
+ },
+ {
+  "table": "kizginlik_log",
+  "backup": 30,
+  "live_after": 30
+ },
+ {
+  "table": "memory_notes",
+  "backup": 274,
+  "live_after": 274
+ },
+ {
+  "table": "padoklar",
+  "backup": 9,
+  "live_after": 9
+ },
+ {
+  "table": "pedigree_meta",
+  "backup": 0,
+  "live_after": 0
+ },
+ {
+  "table": "pedigree_nodes",
+  "backup": 166,
+  "live_after": 166
+ },
+ {
+  "table": "pedigree_parentage",
+  "backup": 59,
+  "live_after": 59
+ },
+ {
+  "table": "protokol_ayar",
+  "backup": 9,
+  "live_after": 9
+ },
+ {
+  "table": "protokol_dismiss",
+  "backup": 35,
+  "live_after": 35
+ },
+ {
+  "table": "protokol_instance",
+  "backup": 141,
+  "live_after": 141
+ },
+ {
+  "table": "sablon_hastalik_eslem",
+  "backup": 45,
+  "live_after": 45
+ },
+ {
+  "table": "semen_catalog",
+  "backup": 0,
+  "live_after": 0
+ },
+ {
+  "table": "stok",
+  "backup": 49,
+  "live_after": 49
+ },
+ {
+  "table": "stok_hareket",
+  "backup": 1007,
+  "live_after": 1007
+ },
+ {
+  "table": "stok_kategorileri",
+  "backup": 16,
+  "live_after": 16
+ },
+ {
+  "table": "tasks",
+  "backup": 48,
+  "live_after": 48
+ },
+ {
+  "table": "tedavi",
+  "backup": 0,
+  "live_after": 0
+ },
+ {
+  "table": "tedavi_sablonu",
+  "backup": 10,
+  "live_after": 10
+ },
+ {
+  "table": "tedavi_sablonu_kalem",
+  "backup": 57,
+  "live_after": 57
+ },
+ {
+  "table": "tohumlama",
+  "backup": 282,
+  "live_after": 282
+ },
+ {
+  "table": "treatment_day_uygulamalar",
+  "backup": 572,
+  "live_after": 572
+ },
+ {
+  "table": "treatment_days",
+  "backup": 428,
+  "live_after": 428
+ },
+ {
+  "table": "ui_logs",
+  "backup": 265,
+  "live_after": 265
+ },
+ {
+  "table": "uygulama_log",
+  "backup": 122,
+  "live_after": 122
+ },
+ {
+  "table": "vaccination_log",
+  "backup": 381,
+  "live_after": 381
+ },
+ {
+  "table": "vaccination_schedule",
+  "backup": 4,
+  "live_after": 4
+ },
+ {
+  "table": "vaccine_diseases",
+  "backup": 17,
+  "live_after": 17
+ },
+ {
+  "table": "vaccine_protocol_steps",
+  "backup": 14,
+  "live_after": 14
+ },
+ {
+  "table": "vaccines",
+  "backup": 12,
+  "live_after": 12
+ }
+]

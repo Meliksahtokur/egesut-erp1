@@ -1,0 +1,55 @@
+{
+ "measured_at": "2026-09-15T14:55:53.654992+03:00",
+ "prod_ref": "zqnexqbdfvbhlxzelzju",
+ "wrap": "BEGIN READ ONLY; ... ROLLBACK;",
+ "fns": {
+  "tohumlama_kaydet": {
+   "overload_count": 1,
+   "variants": [
+    {
+     "args": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text, p_ek_uygulamalar jsonb, p_vwp_override boolean",
+     "ret": "jsonb",
+     "nargs": 7,
+     "secdef": true,
+     "vol": "v",
+     "owner": "postgres",
+     "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres,anon=X/postgres}",
+     "md5_normall": "e4ab00a63d",
+     "body_len": 7295
+    }
+   ]
+  },
+  "tohumlama_tekrar_kaydet": {
+   "overload_count": 1,
+   "variants": [
+    {
+     "args": "p_hayvan_id text, p_tarih date, p_sperma text, p_hekim_id text, p_irk_bilgisi text",
+     "ret": "jsonb",
+     "nargs": 5,
+     "secdef": true,
+     "vol": "v",
+     "owner": "postgres",
+     "proacl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+     "md5_normall": "83fe917252",
+     "body_len": 2107
+    }
+   ]
+  },
+  "fn_sperma_stok_dus": {
+   "overload_count": 1,
+   "variants": [
+    {
+     "args": "p_sperma text, p_notlar text",
+     "ret": "void",
+     "nargs": 2,
+     "secdef": false,
+     "vol": "v",
+     "owner": "postgres",
+     "proacl": "{postgres=X/postgres,service_role=X/postgres}",
+     "md5_normall": "72a4660c14",
+     "body_len": 1133
+    }
+   ]
+  }
+ }
+}
