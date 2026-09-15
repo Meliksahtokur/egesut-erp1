@@ -185,6 +185,8 @@ postgres-language-server.jsonc
 # 2026-09-11: pedigree Task 1.7 — migration dry-run kapısı tracked (plan Task 1.7)
 !scripts/db-dry-run.sh
 !scripts/refresh_lsp_schema.sh
+# 2026-09-15: P6 — kalıcı prod veri eşleşme kontrol betiği tracked
+!scripts/veri-eslesme-kontrol.py
 !/tests/harness/
 !/tests/harness/**/*.py
 !/.harness/bin/
