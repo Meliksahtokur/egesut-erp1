@@ -39,7 +39,7 @@ SQL_FILE=""
 DATA_MODE="auto"   # auto | off | on
 KEEP_DB=0
 
-usage() { echo "Kullanım: $0 <migration.sql> [--data-mode auto|off|on] [--keep-db]" >&2; exit 64; }
+usage() { echo "Kullanım: $0 <migration.sql> [--data-mode auto|off|on] [--db-url <engine-url>] [--keep-db]" >&2; exit 64; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +47,8 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || usage
       DATA_MODE="$2"; shift 2 ;;
     --data-mode=*) DATA_MODE="${1#*=}"; shift ;;
+    --db-url)     [[ $# -ge 2 ]] || usage; VAL_DB_URL="$2"; shift 2 ;;
+    --db-url=*)   VAL_DB_URL="${1#*=}"; shift ;;
     --keep-db) KEEP_DB=1; shift ;;
     -h|--help) usage ;;
     *)
@@ -62,8 +64,12 @@ case "$DATA_MODE" in auto|off|on) ;; *) echo "❌ Geçersiz --data-mode: $DATA_M
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/../.env"
 LOCAL_LSP_URL=""
+VAL_DB_URL="${VAL_DB_URL:-}"
 if [[ -f "$ENV_FILE" ]]; then
   LOCAL_LSP_URL=$(grep -E "^LOCAL_LSP_URL=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+  # Doğrulama motoru (opsiyonel): --db-url argümanı env'i ezer. Örnek .env:
+  #   VAL_DB_URL=postgres://postgres:val@127.0.0.1:5433/postgres  (supabase/postgres:17 konteyneri)
+  [[ -n "$VAL_DB_URL" ]] || VAL_DB_URL=$(grep -E "^VAL_DB_URL=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
 fi
 : "${LOCAL_LSP_URL:?LOCAL_LSP_URL missing — .env dosyasını kontrol et (egesut_lsp şema aynası bağlantısı)}"
 command -v sqlfluff >/dev/null || { echo "❌ sqlfluff PATH'te değil (~/.local/bin)" >&2; exit 78; }
@@ -76,8 +82,11 @@ TMPROOT="${SS_TMP_ROOT:-${TMPDIR:-}}"
 [[ -n "$TMPROOT" ]] || { echo "❌ TMPDIR ya da SS_TMP_ROOT set değil — disk-tabanlı geçici kök gerekli." >&2; exit 78; }
 WORK=$(mktemp -d "$TMPROOT/dbval.XXXXXXXX")
 
-# Bakım bağlantısı (DB yaratma/drop için): aynayla aynı küme, postgres DB.
-MAINT_URL="$(echo "$LOCAL_LSP_URL" | sed -E 's#/[^//?]+$#/postgres#')"
+# Bakım bağlantısı (DB yaratma/drop için): motor kümesinin postgres DB'si.
+# Motor = VAL_DB_URL (dış PG, örn. supabase 17 konteyneri) ya da ayna kümesi.
+ENGINE_BASE="${VAL_DB_URL:-$LOCAL_LSP_URL}"
+MAINT_URL="$(echo "$ENGINE_BASE" | sed -E 's#/[^//?]+$#/postgres#')"
+db_url_of() { echo "$1" | sed -E "s#/[^//?]+(\?.*)?\$#/${2}#"; }
 
 # Oluşturduğumuz izole DB'ler (trap'te drop edilir).
 declare -a OWN_DBS=()
@@ -160,7 +169,9 @@ elif [[ $SQUAWK_RC -eq 1 ]]; then
   if [[ ${SQ_ERRORS:-0} -gt 0 ]]; then
     log_result "A.squawk" "FAIL" "squawk ERROR düzeyi ihlal(ler) (bkz. rapor çıktısı)"
   else
-    log_result "A.squawk" "INCONCLUSIVE" "squawk yalnız WARNING düzeyi bulgu (${SQ_WARN} adet) — FAIL değil, rapora kaydedildi (bkz. çıktı)"
+    # WARNING düzeyi bulgular raporda görünür kalır ama sonucu etkilemez (sahip
+    # düzeltmesi D: statik analiz kesin hüküm VERMEZ — nihai karar execute'ta).
+    log_result "A.squawk" "PASS" "ERROR düzeyi ihlal yok; ${SQ_WARN} WARNING rapora kaydedildi (bkz. çıktı)"
   fi
 else
   log_result "A.squawk" "FAIL" "squawk arızası (rc=$SQUAWK_RC)"
@@ -238,8 +249,10 @@ BASELINE_META="(meta alınamadı)"
 run_baseline() { # $1 = ek etiket (log)
   local tag="$1" out_json
   # timeout 900: baseline'in Mgmt API çağrısı takılırsa sonsuz bekleme YOK — fail-closed.
-  if ! log_cmd "timeout 900 bash '$BASELINE_SH' --json  # ($tag)" || \
-     ! timeout 900 bash "$BASELINE_SH" --json > "$BASELINE_OUT" 2>&1; then
+  BASELINE_ARGS=(--json)
+  [[ -n "$VAL_DB_URL" ]] && BASELINE_ARGS+=(--db-url "$VAL_DB_URL")
+  if ! log_cmd "timeout 900 bash '$BASELINE_SH' ${BASELINE_ARGS[*]}  # ($tag)" || \
+     ! timeout 900 bash "$BASELINE_SH" "${BASELINE_ARGS[@]}" > "$BASELINE_OUT" 2>&1; then
     echo "❌ Baseline kurulumu başarısız ($tag) — restore hatası = FAIL (SPEC C1)." >&2
     log_result "C1.baseline-restore-$tag" "FAIL" "db-build-baseline.sh hata verdi; çıktı raporda"
     return 1
@@ -266,7 +279,7 @@ run_baseline() { # $1 = ek etiket (log)
 C1_OK=0
 if run_baseline "schema"; then
   C1_OK=1
-  ISO_URL="$(echo "$LOCAL_LSP_URL" | sed -E "s#/[^//?]+(\?.*)?\$#/$C1_DB#")"
+  ISO_URL="$(db_url_of "$ENGINE_BASE" "$C1_DB")"
 
   # Etkilenen tablolar: ALTER TABLE hedefleri + CREATE TABLE isimleri.
   AFFECTED=$( { cat "$CREATED_FILE"; { grep -ioE 'ALTER[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true; } | awk '{print $NF}' | tr '[:upper:]' '[:lower:]' | sed 's/^public\.//'; } | sort -u )
@@ -361,7 +374,7 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
   C2_OK=0
   if run_baseline "data"; then
     C2_OK=1
-    C2_URL="$(echo "$LOCAL_LSP_URL" | sed -E "s#/[^//?]+(\?.*)?\$#/$C1_DB#")"
+    C2_URL="$(db_url_of "$ENGINE_BASE" "$C1_DB")"
 
     # Sentetik tohumlama: NOT NULL kolonları information_schema'dan oku (kolon adı
     # UYDURMA); default'u olanlar atlanır; değer tip bazlı üretilir; farm_id varsa

@@ -41,16 +41,22 @@ fi
 DB_NAME="egesut_val_tmp"
 JSON_MODE=0
 PARITE_OUT=""
+VAL_DB_URL=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --db-name)    DB_NAME="${2:?--db-name değer ister}"; shift 2 ;;
     --parite-out) PARITE_OUT="${2:?--parite-out değer ister}"; shift 2 ;;
+    --db-url)     VAL_DB_URL="${2:?--db-url değer ister}"; shift 2 ;;
     --json)       JSON_MODE=1; shift ;;
     -h|--help)    grep '^#' "$0" | head -30; exit 0 ;;
     *) printf '❌ Bilinmeyen argüman: %s\n' "$1" >&2; exit 64 ;;
   esac
 done
+
+# Doğrulama MOTORU: varsayılan = aynanın kümesi (yerel PG). --db-url verilirse
+# izole DB'ler o motorda kurulur (ör. Supabase postgres:17 konteyneri — prod ile
+# birebir major sürüm paritesi için). Parite ölçümü de motor üzerinden yapılır.
 
 # Geçici kök: sabit /tmp YASAK (kullanıcı kuralı) — TMPDIR/SS_TMP_ROOT zorunlu.
 TMP_ROOT="${SS_TMP_ROOT:-${TMPDIR:-}}"
@@ -65,6 +71,7 @@ trap 'rm -rf "$OUT_DIR"' EXIT
 
 : "${LOCAL_LSP_URL:?LOCAL_LSP_URL missing — .env'i kontrol et}"
 : "${SB_MGMT_TOKEN:?SB_MGMT_TOKEN missing — .env'i kontrol et}"
+ENGINE_URL="${VAL_DB_URL:-$LOCAL_LSP_URL}"
 : "${SB_PROJECT_REF:=zqnexqbdfvbhlxzelzju}"
 
 say()  { printf '\033[1;34m▶ %s\033[0m\n' "$*"; }
@@ -97,7 +104,8 @@ PROD_CNT=$(mgt_query "
     (SELECT COUNT(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public') AS f,
     (SELECT COUNT(*)::int FROM information_schema.views WHERE table_schema='public') AS v" | jq -c '.[0] // empty')
 
-LOCAL_VER=$(psql "$LOCAL_LSP_URL" -tAc "SELECT current_setting('server_version')" | tr -d ' ')
+# Parite 'yerel' tarafı DOĞRULAMA MOTORUNU ölçer (izole DB'ler orada koşar).
+LOCAL_VER=$(psql "$ENGINE_URL" -tAc "SELECT current_setting('server_version')" | tr -d ' ')
 PROD_MAJOR="${PROD_VER%%.*}"; LOCAL_MAJOR="${LOCAL_VER%%.*}"
 
 # Yerel aynada kurulu extension'lar (ayna gerçek PG kurulumu, prod farkı burada görünür)
@@ -174,7 +182,7 @@ say "İzole DB kuruluyor: $DB_NAME"
 # Bağlantı URI'sını PG* env'ine ayrıştır (dropdb/createdb URI'yi dbname sanıp
 # parolayı NOTICE ile sızdırabiliyor — env yolu temiz ve davranışı deterministik).
 # Beklenen biçim: postgres://[kullanıcı[:parola]@]host[:port]/veritabanı
-URI_BODY="${LOCAL_LSP_URL#*://}"
+URI_BODY="${ENGINE_URL#*://}"
 URI_NOPATH="${URI_BODY%%/*}"
 URI_AUTH=""; URI_HOSTPORT="$URI_NOPATH"
 if [[ "$URI_NOPATH" == *@* ]]; then

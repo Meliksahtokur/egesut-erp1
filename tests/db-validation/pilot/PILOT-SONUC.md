@@ -93,3 +93,20 @@ Düzeltilen bug'lar:
 5. Rapor yazımı INT/TERM/HUP tuzağına bağlandı (fail-open kapatıldı).
 
 Açık kalem (sahip): kapı mevcut ortamda PASS üretmez — parite uyumsuz (yerel PG 18.6 vs prod 17.6; ayna fonksiyon sayısı 214 vs prod 221 → refresh_lsp_schema.sh koşulmalı). PG major eşitlemesi (17.x yan yüklemesi) sahip kararidir.
+
+---
+
+## Final (2026-09-24, gece) — PG17 motoru + taze ayna ile KULLANIMA HAZIR
+
+Ortam: izole motor = supabase/postgres:17.6.1.093 konteyneri (port 5433, VAL_DB_URL
+.env'de) — prod ile birebir major; ayna taze (T=54 F=243 V=13 = canlı; refresh'e
+uygulama-şemaları adımı eklendi: surum_gizli).
+
+| Senaryo | Sonuç | Exit |
+|---|---|---|
+| pozitif.sql | **PASS** (parite uyumlu, A.squawk WARNING'leri raporda, hüküm vermez) | **0** |
+| negatif-syntax.sql | FAIL | 1 |
+| negatif-cakisma.sql | FAIL | 1 |
+
+Kapı artık gerçek PASS üretir. squawk politikası: ERROR=FAIL, WARNING=rapor kaydı
+(sahip düzeltmesi D: statik katman kesin hüküm vermez).
