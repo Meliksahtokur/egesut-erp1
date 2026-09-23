@@ -36,6 +36,9 @@ jobs:
           cp icon-192.svg icon-512.svg _site/ 2>/dev/null || true
           # Uygulama JS ağacı
           cp -r js _site/js
+          # Vendor kütüphaneleri (pedigree cytoscape) — 2026-09-24: whitelist'te
+          # eksikti, Pages'te 404 üretiyordu (ovsync kapı-4 dumanında yakalandı)
+          cp -r vendor _site/vendor 2>/dev/null || true
           # Jekyll'i tamamen devre dışı bırak
           touch _site/.nojekyll
           echo "== _site içeriği =="
