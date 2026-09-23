@@ -102,6 +102,9 @@ or explicit owner choice. See `task-modes.md`.
   skills, snapshots, RPC references, and generated summaries are subordinate
   references and may be stale.
 - A migration file in Git is not evidence of deployment.
+- Any change touching the database requires a db-validation gate report
+  (`PASS` from `scripts/db-validate.sh`, under `reports/db-validation-*`);
+  production apply remains an owner gate.
 - A migration is deployed only through the DB runbook
   (`.harness/runbooks/db-migration.md`): documentation first, then backup,
   dry run, apply, `schema_migrations` record, ground-truth refresh,

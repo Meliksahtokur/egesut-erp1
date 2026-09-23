@@ -81,6 +81,7 @@ Built-in `LSP` aracı yoksa (Goose/DeepSeek) panik yok: aynı işi `gitnexus` (k
    ```
    Hata kodlarını yakalar (42703 yok-kolon / 42P01 yok-tablo / 42883 yok-fonksiyon).
    Uyguladıktan sonra `refresh_lsp_schema.sh` ile aynayı tazele.
+5b. **db-validation kapısı (ZORUNLU):** dry-run sonrası `scripts/db-validate.sh <migration>` kanıtı olmadan migration teslim edilmez — taslak üzerinde ve final dosyada koş, rapor `reports/db-validation-<sha8>.md`; detay: `.claude/skills/db-validation/SKILL.md`.
 
 6. **farm_id ileri-disiplini (YENİ nesne ise):**
    - Yeni tablo **tenant-scoped** mu? → `farm_id uuid NOT NULL DEFAULT '400b9107-a85e-4126-af2c-fd7fe73fb68e'` kolonu + `(farm_id, ...)` index. FK YOK (farms Faz 2'de).
