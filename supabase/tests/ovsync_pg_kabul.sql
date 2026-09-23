@@ -1203,9 +1203,9 @@ BEGIN
   v_r := public.dogum_kaydet(v_a, v_d, pg_temp.kb_id('KBY'));
   v_olay := v_r->>'olay_id';
   SELECT * INTO v_g FROM public.gorev_log WHERE hayvan_id = v_a AND gorev_tipi = 'OVSYNC_BASLAT';
-  PERFORM pg_temp.kb_ok(v_g.hedef_tarih = v_d + 50 AND v_g.hedef_saat = '10:00' AND v_g.kaynak = 'ILK-TOH-DOGUM-' || v_olay
-                        AND NOT v_g.tamamlandi AND NOT v_g.iptal AND v_g.aciklama LIKE 'D50:%',
-    'T28''', 'doğum → OVSYNC_BASLAT D50 10:00, kaynak ILK-TOH-DOGUM-<olay_id>', row_to_json(v_g)::text);
+  PERFORM pg_temp.kb_ok(v_g.hedef_tarih = v_d + 51 AND v_g.hedef_saat = '10:00' AND v_g.kaynak = 'ILK-TOH-DOGUM-' || v_olay
+                        AND NOT v_g.tamamlandi AND NOT v_g.iptal AND v_g.aciklama LIKE 'Ovsynch-56 başlat%',
+    'T28''', 'doğum → OVSYNC_BASLAT dogum+51 10:00, kaynak ILK-TOH-DOGUM-<olay_id>', row_to_json(v_g)::text);
   SELECT * INTO v_i FROM public.protokol_instance WHERE id = v_g.protokol_instance_id;
   PERFORM pg_temp.kb_ok(v_i.tip = 'UREME' AND v_i.alttip = 'ILK_TOHUMLAMA' AND v_i.kaynak_ref = v_g.kaynak AND v_i.baslangic = v_d AND v_i.durum = 'aktif',
     'T28''', 'protokol_instance UREME/ILK_TOHUMLAMA aktif', row_to_json(v_i)::text);
@@ -1247,7 +1247,7 @@ BEGIN
   SELECT * INTO v_c FROM public.cases WHERE id = (v_r->>'case_id')::uuid;
   PERFORM pg_temp.kb_ok(v_c.animal_id = v_b AND v_c.status = 'active' AND v_c.start_date = v_s AND v_c.protocol_family = 'OVSYNC'
                         AND v_c.source_template_id = pg_temp.kb_c('OVSYNC_SABLON')::uuid AND v_c.disease_id = pg_temp.kb_c('OVSYNC_HASTALIK')::uuid
-                        AND v_c.notes = 'İlk tohumlama zinciri (D50)',
+                        AND v_c.notes = 'İlk tohumlama zinciri',
     'S8-start', 'Ovsync vakası (provenance damgalı)', row_to_json(v_c)::text);
   SELECT count(*) INTO v_n FROM public.treatment_day_uygulamalar WHERE case_id = v_c.id;
   PERFORM pg_temp.kb_ok(v_n = 4, 'S8-start', '4 şablon seansı', v_n::text);
@@ -1288,8 +1288,8 @@ BEGIN
   INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_c, CURRENT_DATE - 60, 'Gebe', 'KB-SP') RETURNING id INTO v_toh;
   v_r := public.tohumlama_abort(p_tohumlama_id := v_toh::text, p_notlar := 'kb abort', p_abort_tarihi := v_ad);
   SELECT * INTO v_g FROM public.gorev_log WHERE hayvan_id = v_c AND gorev_tipi = 'OVSYNC_BASLAT';
-  PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND v_g.hedef_tarih = v_ad + 50 AND v_g.hedef_saat = '10:00' AND v_g.kaynak = 'ILK-TOH-ABORT-' || v_toh,
-    'T29', 'abort → OVSYNC_BASLAT abort_tarihi+50, kaynak ILK-TOH-ABORT-<id>', coalesce(row_to_json(v_g)::text, v_r::text));
+  PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND v_g.hedef_tarih = v_ad + 51 AND v_g.hedef_saat = '10:00' AND v_g.kaynak = 'ILK-TOH-ABORT-' || v_toh,
+    'T29', 'abort → OVSYNC_BASLAT abort_tarihi+51, kaynak ILK-TOH-ABORT-<id>', coalesce(row_to_json(v_g)::text, v_r::text));
   PERFORM pg_temp.kb_ok((SELECT baslangic FROM public.protokol_instance WHERE id = v_g.protokol_instance_id) = v_ad, 'T29', 'instance başlangıcı abort tarihi', NULL);
 
   SELECT count(*) INTO v_n FROM pg_proc WHERE proname = 'tohumlama_abort' AND pronamespace = 'public'::regnamespace;
@@ -1315,16 +1315,12 @@ BEGIN
   PERFORM pg_temp.kb_ok(v_n = 1, 'T20', 'tohumlama → OVSYNC_BASLAT ILK_TOH_MUAF:TOHUMLAMA', v_n::text);
   PERFORM pg_temp.kb_ok((SELECT durum FROM public.protokol_instance WHERE id = v_gorev.protokol_instance_id) = 'iptal', 'T20', 'rota instance iptal', NULL);
 
-  -- (b) start_first_service_protocol muafiyetleri
-  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_e, CURRENT_DATE - 5, 'Bekliyor', 'KB-SP');   -- TOHUMLAMA_VAR
+  -- (b) start_first_service_protocol muafiyetleri (R3.2 SK7: TOHUMLAMA_VAR kalktı, BEKLIYOR eklendi)
+  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_e, CURRENT_DATE - 5, 'Bekliyor', 'KB-SP');   -- BEKLIYOR
   INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_f, CURRENT_DATE - 100, 'Gebe', 'KB-SP');     -- GEBE (olay öncesi)
   PERFORM pg_temp.kb_ovsync_vaka(v_g);                                                                                 -- AKTIF_SENKRONIZASYON
-  FOR v_h, v_bek IN SELECT * FROM (VALUES (v_e, 'TOHUMLAMA_VAR'), (v_f, 'GEBE'), (v_g, 'AKTIF_SENKRONIZASYON'), (v_p, 'AKTIF_DEGIL')) x LOOP
+  FOR v_h, v_bek IN SELECT * FROM (VALUES (v_e, 'BEKLIYOR'), (v_f, 'GEBE'), (v_g, 'AKTIF_SENKRONIZASYON'), (v_p, 'AKTIF_DEGIL')) x LOOP
     v_gid := public._ilk_tohumlama_rota_kur(v_h, CURRENT_DATE - 50, pg_temp.kb_id('ILK-TOH-KB'));
-    IF v_h = v_e THEN
-      -- rota tohumlamadan önce kurulmuş olsun: tohumlama olay tarihinden sonra
-      NULL;
-    END IF;
     v_r := public.start_first_service_protocol(v_gid);
     PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND v_r->>'atlandi' = v_bek, 'T20', 'atlandi=' || v_bek, v_r::text);
     SELECT * INTO v_gorev FROM public.gorev_log WHERE id = v_gid;
@@ -1332,10 +1328,10 @@ BEGIN
     PERFORM pg_temp.kb_ok((SELECT durum FROM public.protokol_instance WHERE id = v_gorev.protokol_instance_id) = 'iptal', 'T20', v_bek || ': instance iptal', NULL);
     SELECT count(*) INTO v_n FROM public.islem_log WHERE tip = 'FIRST_SERVICE_SKIPPED' AND ref_id = v_gid::text AND payload->>'neden' = v_bek;
     PERFORM pg_temp.kb_ok(v_n = 1, 'T20', v_bek || ': FIRST_SERVICE_SKIPPED (klinik gerekçe görünür)', v_n::text);
-    SELECT count(*) INTO v_n FROM public.cases WHERE animal_id = v_h AND notes = 'İlk tohumlama zinciri (D50)';
+    SELECT count(*) INTO v_n FROM public.cases WHERE animal_id = v_h AND notes = 'İlk tohumlama zinciri';
     PERFORM pg_temp.kb_ok(v_n = 0, 'T20', v_bek || ': vaka açılmaz', v_n::text);
   END LOOP;
-  RAISE NOTICE 'PASS T20: tohumlama OVSYNC_BASLAT''ı muaf eder; start TOHUMLAMA_VAR/GEBE/AKTIF_SENKRONIZASYON/AKTIF_DEGIL ile atlar (audit + instance iptal)';
+  RAISE NOTICE 'PASS T20: tohumlama OVSYNC_BASLAT''ı muaf eder; start BEKLIYOR/GEBE/AKTIF_SENKRONIZASYON/AKTIF_DEGIL ile atlar (audit + instance iptal)';
 END $t$;
 
 -- T31: uygunsuz hayvanda da görev kurulur; elle iptal (REST PATCH yolu) denetim kaydına düşer
@@ -1356,10 +1352,14 @@ END $t$;
 -- Zamanlayıcı: görev başına hata izolasyonu + sayaç + FIRST_SERVICE_CRON; cron job kaydı
 DO $t$
 DECLARE
-  v_iyi text := pg_temp.kb_hayvan(); v_kotu text := pg_temp.kb_hayvan(300); v_gi uuid; v_gk uuid; v_z jsonb; v_n int; v_log jsonb;
+  v_iyi text := pg_temp.kb_hayvan(); v_kotu text := pg_temp.kb_hayvan(300); v_gi uuid; v_gk uuid; v_z jsonb; v_n int;
 BEGIN
   v_gi := public._ilk_tohumlama_rota_kur(v_iyi,  CURRENT_DATE - 50, pg_temp.kb_id('ILK-TOH-KB'));
-  v_gk := public._ilk_tohumlama_rota_kur(v_kotu, CURRENT_DATE - 50, pg_temp.kb_id('ILK-TOH-KB'));   -- genç: D60 TAI uygunsuz → zincir hatası
+  -- R3.2: kural hesabı genç düveye gelecek hedef verir (due değil); kalıcı hatalı
+  -- görev senaryosu için geçmiş hedefli görev doğrudan yerleştirilir (genç: TAI uygunsuz → zincir hatası)
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_kotu, 'OVSYNC_BASLAT', 'kb kötü (genç)', CURRENT_DATE - 1, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_gk;
   v_z := public.ilk_tohumlama_zamanlayici();
   PERFORM pg_temp.kb_ok((v_z->>'ok')::boolean IS FALSE AND (v_z->>'hata_sayisi')::int >= 1
                         AND (v_z->>'islenen')::int = (v_z->>'baslatilan')::int + (v_z->>'atlanan')::int + (v_z->>'zaten')::int + (v_z->>'hata_sayisi')::int,
@@ -1374,9 +1374,14 @@ BEGIN
   PERFORM pg_temp.kb_ok(v_n = 1, 'S8-cron', 'kötü görev açık kalır', v_n::text);
   SELECT count(*) INTO v_n FROM public.cases WHERE animal_id = v_iyi AND protocol_family = 'OVSYNC';
   PERFORM pg_temp.kb_ok(v_n = 1, 'S8-cron', 'iyi hayvanda vaka', v_n::text);
-  SELECT payload INTO v_log FROM public.islem_log WHERE tip = 'FIRST_SERVICE_CRON' ORDER BY degisim_txid DESC NULLS LAST LIMIT 1;
-  PERFORM pg_temp.kb_ok((v_log->>'hata_sayisi')::int = (v_z->>'hata_sayisi')::int AND (v_log->>'baslatilan')::int = (v_z->>'baslatilan')::int,
-    'S8-cron', 'FIRST_SERVICE_CRON özeti = dönüş', coalesce(v_log::text, '<log yok>'));
+  -- FIRST_SERVICE_CRON özeti: aynı transaction'da birden çok koşum olabileceğinden
+  -- (degisim_txid eşit) "dönüşle eşleşen satır VAR" biçiminde sınanır.
+  SELECT count(*) INTO v_n FROM public.islem_log
+   WHERE tip = 'FIRST_SERVICE_CRON'
+     AND (payload->>'hata_sayisi')::int = (v_z->>'hata_sayisi')::int
+     AND (payload->>'baslatilan')::int  = (v_z->>'baslatilan')::int
+     AND (payload->>'islenen')::int     = (v_z->>'islenen')::int;
+  PERFORM pg_temp.kb_ok(v_n >= 1, 'S8-cron', 'FIRST_SERVICE_CRON özeti = dönüş (eşleşen satır)', v_n::text);
   IF to_regclass('cron.job') IS NOT NULL THEN
     SELECT count(*) INTO v_n FROM cron.job WHERE jobname = 'ilk-tohumlama-ovsync-baslat' AND schedule = '0 4 * * *'
        AND command ILIKE '%ilk_tohumlama_zamanlayici()%';
@@ -1385,17 +1390,31 @@ BEGIN
   RAISE NOTICE 'PASS S8-cron: zamanlayıcı hatayı görev başına izole eder, sayaçlar tutarlı, özet audit; cron job kayıtlı';
 END $t$;
 
--- R3.1 (#6): zamanlayıcı en yeni hedef_tarih'li OVSYNC_BASLAT görevini önce işler
--- (hedef_tarih DESC, id) — kalıcı hatalı eski bir görev kuyruğun başında oturup
--- yeni hayvanların D50 başlangıcını geciktirmesin.
+-- R3.1 (#6) + R3.2: zamanlayıcı en yeni hedef_tarih'li OVSYNC_BASLAT görevini
+-- önce işler (hedef_tarih DESC, id) — kalıcı hatalı eski bir görev kuyruğun
+-- başında oturup yeni hayvanların başlangıcını geciktirmesin. R3.2 ile hedef =
+-- GREATEST(kural, bugün) olduğundan kurulum anında hedef hiçbir zaman geçmiş
+-- değildir; farklı geçmiş hedefler doğrudan yerleştirilerek sıra sınanır.
 DO $t$
 DECLARE
   v_h1 text := pg_temp.kb_hayvan(); v_h2 text := pg_temp.kb_hayvan(); v_h3 text := pg_temp.kb_hayvan();
   v_g1 uuid; v_g2 uuid; v_g3 uuid; v_z jsonb; v_sira uuid[];
 BEGIN
-  v_g1 := public._ilk_tohumlama_rota_kur(v_h1, CURRENT_DATE - 60, pg_temp.kb_id('ILK-TOH-KB'));  -- hedef CURRENT_DATE-10 (en eski)
-  v_g2 := public._ilk_tohumlama_rota_kur(v_h2, CURRENT_DATE - 55, pg_temp.kb_id('ILK-TOH-KB'));  -- hedef CURRENT_DATE-5
-  v_g3 := public._ilk_tohumlama_rota_kur(v_h3, CURRENT_DATE - 51, pg_temp.kb_id('ILK-TOH-KB'));  -- hedef CURRENT_DATE-1 (en yeni)
+  -- önceki koşumların taramasından kalabilecek açık görevler temizlenir
+  UPDATE public.gorev_log SET iptal = true, tamamlandi = true
+   WHERE hayvan_id IN (v_h1, v_h2, v_h3) AND gorev_tipi = 'OVSYNC_BASLAT'
+     AND COALESCE(tamamlandi, false) = false AND COALESCE(iptal, false) = false;
+
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_h1, 'OVSYNC_BASLAT', 'kb sıra (eski)', CURRENT_DATE - 10, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_g1;
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_h2, 'OVSYNC_BASLAT', 'kb sıra (orta)', CURRENT_DATE - 5, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_g2;
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_h3, 'OVSYNC_BASLAT', 'kb sıra (yeni)', CURRENT_DATE - 1, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_g3;
+
   v_z := public.ilk_tohumlama_zamanlayici();
   SELECT array_agg((e->>'gorev_id')::uuid ORDER BY ord) INTO v_sira
     FROM jsonb_array_elements(v_z->'baslatilanlar') WITH ORDINALITY AS t(e, ord)
@@ -1418,13 +1437,17 @@ DECLARE
     'public.hizli_uygulama_geri_al(uuid)', 'public.close_case_with_remaining(uuid,text)',
     'public.tohumlama_kaydet(text,date,text,text,text,jsonb,boolean)', 'public.tedavi_sablon_uygula(uuid,uuid,date)',
     'public.dogum_kaydet(text,date,text,text,text,numeric,text,text)', 'public.tohumlama_abort(text,text,date)',
-    'public.start_first_service_protocol(uuid)', 'public.ilk_tohumlama_zamanlayici()'];
+    'public.start_first_service_protocol(uuid)', 'public.ilk_tohumlama_zamanlayici(boolean)',
+    'public.ovsync_baslat_uyarilari()'];
   v_ic text[] := ARRAY[
     'public._ovsync_pg_aktif()', 'public._trg_drug_classes_sistem_koru()', 'public._tohumlama_pencere(timestamptz)',
     'public._pg_urun_durumu(text,uuid)', 'public._pg_kapi(text,text,uuid,boolean)', 'public._pg_sonrasi_tohumlama(uuid)',
     'public._pg_olay_isle(text,text,text,text,uuid,timestamptz,jsonb,text)', 'public._pg_kapi_detay(jsonb,text,text)',
     'public._vaka_kapat(uuid,text,text,jsonb)', 'public._ilk_tohumlama_rota_kur(text,date,text)',
-    'public._trg_uygulama_log_pg_geri_al()', 'public._son_tohumlama(text)'];
+    'public._trg_uygulama_log_pg_geri_al()', 'public._son_tohumlama(text)',
+    'public._ovsync_kural_tarihi(text)', 'public._ovsync_baslat_gorev_kur(text,date,text,date)',
+    'public._acik_disi_ovsync_hedef(text)', 'public._acik_disi_gorev_kur(text)',
+    'public._ovsync_gecis_sk10()'];
   v_f text; v_oid oid;
 BEGIN
   FOREACH v_f IN ARRAY v_rpc || v_ic LOOP
@@ -1445,7 +1468,7 @@ BEGIN
                              'public.hizli_uygulama(text,text,numeric,text,text,text,boolean,text)',
                              'public.seans_tamamla(uuid,boolean,text)',
                              'public.bulk_ilac(text[],text,numeric,text)', 'public.drug_class_ekle(text,text,text,uuid)',
-                             'public.tohumlama_abort(text,text)'] LOOP
+                             'public.tohumlama_abort(text,text)', 'public.ilk_tohumlama_zamanlayici()'] LOOP
     PERFORM pg_temp.kb_ok(to_regprocedure(v_f) IS NULL, 'ACL', v_f || ' DROP edildi', 'hâlâ var');
   END LOOP;
   -- S-9: abort_kaydet authenticated'a kapalı
@@ -1531,6 +1554,175 @@ BEGIN
   -- iz bırakma: geçici şifre satırı da bu transaction'da temizlenir (ROLLBACK zaten gidecekti)
   DELETE FROM surum_gizli.sahip_sifresi WHERE id = 1 AND extensions.crypt(v_sifre, hash) = hash;
   RAISE NOTICE 'PASS MK10-ui: gerçek degisim_geri_al(''satir'') yolu (UI motoru) → event işaretli, PG görevi iptal, GEBELIK_KONTROL geri açık';
+END $t$;
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- BÖLÜM 9 — R3.2 (SK6–SK10): açık dişi kuralı, tetikler, geçiş, dry-run, SK9
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- R32-1/SK6: doğum → anne hedef = doğum+51 (gün sayımı: doğumun ertesi günü 1.)
+-- R32-2/SK8: dişi buzağı → düve kuralı (dogum_tarihi + 12 ay 21 gün), kaynak ILK-TOH-DUVE
+DO $t$
+DECLARE
+  v_a text := pg_temp.kb_hayvan(); v_r jsonb; v_buzagi text; v_b date := CURRENT_DATE - 3;
+  v_g record; v_n int;
+BEGIN
+  v_r := public.dogum_kaydet(v_a, v_b, pg_temp.kb_id('KBY'));   -- p_cins default 'Dişi'
+  v_buzagi := v_r->>'buzagi_id';
+
+  SELECT * INTO v_g FROM public.gorev_log WHERE hayvan_id = v_a AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal;
+  PERFORM pg_temp.kb_ok(v_g.hedef_tarih = v_b + 51 AND v_g.hedef_saat = '10:00'
+                        AND v_g.kaynak = 'ILK-TOH-DOGUM-' || (v_r->>'olay_id'),
+    'R32-1/SK6', 'anne → hedef doğum+51', row_to_json(v_g)::text);
+
+  SELECT * INTO v_g FROM public.gorev_log WHERE hayvan_id = v_buzagi AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal;
+  PERFORM pg_temp.kb_ok(v_g.hedef_tarih = (v_b + interval '12 months 21 days')::date
+                        AND v_g.kaynak = 'ILK-TOH-DUVE-' || v_buzagi,
+    'R32-2/SK8', 'dişi buzağı → düve kuralı (dt+12a21g), kaynak ILK-TOH-DUVE', row_to_json(v_g)::text);
+  -- erkek buzağı görev almaz (aşağıdaki ayrı fixture)
+  DECLARE v_ae text := pg_temp.kb_hayvan(); v_re jsonb; v_be text; BEGIN
+    v_re := public.dogum_kaydet(v_ae, CURRENT_DATE - 2, pg_temp.kb_id('KBY'), 'Erkek', 'Normal', NULL, NULL, '500');
+    v_be := v_re->>'buzagi_id';
+    SELECT count(*) INTO v_n FROM public.gorev_log WHERE hayvan_id = v_be AND gorev_tipi = 'OVSYNC_BASLAT';
+    PERFORM pg_temp.kb_ok(v_n = 0, 'R32-2/SK8', 'erkek buzağı → görev yok', v_n::text);
+  END;
+  RAISE NOTICE 'PASS R32-1/2: doğum → anne +51; dişi buzağı → düve 12a21g; erkek buzağı yok';
+END $t$;
+
+-- R32-3/SK8: Boş sonucu → görev; hedef = GREATEST(kural, bugün) — geç kalan bekletilmez (MK11)
+-- dogum_kaydet artık otomatik rota açtığından fixture doğum satırını doğrudan ekler
+-- (yan etki yok; kural tabanı = bu doğum).
+DO $t$
+DECLARE
+  v_b text := pg_temp.kb_hayvan(); v_toh uuid; v_r jsonb; v_g record; v_n int; v_d date := CURRENT_DATE - 70;
+BEGIN
+  INSERT INTO public.dogum (id, anne_id, tarih, yavru_cins, yavru_kupe, olay_id)
+  VALUES (gen_random_uuid(), v_b, v_d, 'Dişi', pg_temp.kb_id('KBY'), gen_random_uuid());
+  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_b, v_d + 40, 'Bekliyor', 'KB-SP') RETURNING id INTO v_toh;
+  v_r := public.tohumlama_sonuc_bos(v_toh::text);
+  SELECT * INTO v_g FROM public.gorev_log WHERE hayvan_id = v_b AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal;
+  PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND v_g.hedef_tarih = GREATEST(v_d + 51, (now() AT TIME ZONE 'Europe/Istanbul')::date)
+                        AND v_g.kaynak = 'ACIK-DISI-' || v_b || '-' || (v_d + 51)::text,
+    'R32-3/SK8', 'Boş sonucu → görev, hedef GREATEST(kural, bugün), kaynak ACIK-DISI-<hayvan>-<kural>', row_to_json(v_g)::text);
+  RAISE NOTICE 'PASS R32-3: Boş → açık dişi görevi (bekletilmez)';
+END $t$;
+
+-- R32-4/SK8: tarama idempotent — iki koşum, tek görev; kaynak_ref UNIQUE
+DO $t$
+DECLARE
+  v_c text := pg_temp.kb_hayvan(800); v_z jsonb; v_n int;
+BEGIN
+  v_z := public.ilk_tohumlama_zamanlayici();
+  SELECT count(*) INTO v_n FROM public.gorev_log WHERE hayvan_id = v_c AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal;
+  IF v_n = 0 THEN  -- ilk koşumda açılmadıysa (tarama cap/limit etkisi) elle garantile
+    PERFORM pg_temp.kb_ok(public._acik_disi_gorev_kur(v_c) IS NOT NULL, 'R32-4', 'fixture: görev açıldı', NULL);
+  END IF;
+  v_z := public.ilk_tohumlama_zamanlayici();   -- ikinci koşum
+  SELECT count(*) INTO v_n FROM public.gorev_log WHERE hayvan_id = v_c AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal;
+  PERFORM pg_temp.kb_ok(v_n = 1, 'R32-4', 'iki tarama koşumu → tek görev', v_n::text);
+  PERFORM pg_temp.kb_ok(public._acik_disi_gorev_kur(v_c) IS NULL, 'R32-4', 'üçüncü çağrı → NULL (kaynak unique)', NULL);
+  RAISE NOTICE 'PASS R32-4: tarama idempotent';
+END $t$;
+
+-- R32-5/SK7: dogum_tarihi NULL düve → görev yok, raporlanır (dry-run duve_tabansiz)
+DO $t$
+DECLARE
+  v_d text := pg_temp.kb_id('KB'); v_z jsonb; v_n int; v_baskasi int;
+BEGIN
+  INSERT INTO public.hayvanlar (id, kupe_no, cinsiyet, durum, irk) VALUES (v_d, v_d, 'Dişi', 'Aktif', 'Holstein');
+  PERFORM pg_temp.kb_ok(public._acik_disi_gorev_kur(v_d) IS NULL, 'R32-5', 'tabansız düve → görev yok', NULL);
+  SELECT count(*) INTO v_baskasi FROM public.gorev_log WHERE hayvan_id = v_d AND gorev_tipi = 'OVSYNC_BASLAT';
+  PERFORM pg_temp.kb_ok(v_baskasi = 0, 'R32-5', 'tabansız düve → hiç görev yazılmadı', v_baskasi::text);
+  v_z := public.ilk_tohumlama_zamanlayici(p_dry_run := true);
+  PERFORM pg_temp.kb_ok((v_z->>'duve_tabansiz')::int >= 1, 'R32-5', 'dry-run duve_tabansiz ≥ 1 (raporlanır)', v_z->>'duve_tabansiz');
+  RAISE NOTICE 'PASS R32-5: tabansız düve raporlanır, görev almaz';
+END $t$;
+
+-- R32-7/SK7: Gebe ve Bekliyor hayvana görev açılmaz
+DO $t$
+DECLARE
+  v_g text := pg_temp.kb_hayvan(); v_k text := pg_temp.kb_hayvan(); v_n int;
+BEGIN
+  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_g, CURRENT_DATE - 10, 'Gebe', 'KB-SP');
+  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_k, CURRENT_DATE - 10, 'Bekliyor', 'KB-SP');
+  PERFORM pg_temp.kb_ok(public._acik_disi_gorev_kur(v_g) IS NULL, 'R32-7', 'Gebe → görev yok', NULL);
+  PERFORM pg_temp.kb_ok(public._acik_disi_gorev_kur(v_k) IS NULL, 'R32-7', 'Bekliyor → görev yok', NULL);
+  SELECT count(*) INTO v_n FROM public.gorev_log WHERE hayvan_id IN (v_g, v_k) AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal;
+  PERFORM pg_temp.kb_ok(v_n = 0, 'R32-7', 'Gebe/Bekliyor → hiç görev', v_n::text);
+  RAISE NOTICE 'PASS R32-7: Gebe/Bekliyor muaf';
+END $t$;
+
+-- R32-8/SK8: dry-run bayrak kapalıyken de çalışır, hiçbir şey yazmaz
+DO $t$
+DECLARE
+  v_once int; v_sonra int; v_z jsonb;
+BEGIN
+  SELECT count(*) INTO v_once FROM public.gorev_log WHERE gorev_tipi = 'OVSYNC_BASLAT';
+  UPDATE public.protokol_ayar SET deger = 0 WHERE anahtar = 'ovsync_pg_kurallari_aktif';
+  v_z := public.ilk_tohumlama_zamanlayici(p_dry_run := true);
+  PERFORM pg_temp.kb_ok((v_z->>'ok')::boolean AND (v_z->>'dry_run')::boolean,
+    'R32-8', 'bayrak kapalı + dry-run → {ok, dry_run}', v_z::text);
+  SELECT count(*) INTO v_sonra FROM public.gorev_log WHERE gorev_tipi = 'OVSYNC_BASLAT';
+  PERFORM pg_temp.kb_ok(v_once = v_sonra, 'R32-8', 'dry-run hiçbir görev yazmadı', (v_once - v_sonra)::text);
+  -- bayrak kapalı, dry-run DEĞİL → atlandi:KAPALI (yazma yok)
+  v_z := public.ilk_tohumlama_zamanlayici();
+  PERFORM pg_temp.kb_ok(v_z->>'atlandi' = 'KAPALI', 'R32-8', 'bayrak kapalı → atlandi:KAPALI', v_z::text);
+  UPDATE public.protokol_ayar SET deger = 1 WHERE anahtar = 'ovsync_pg_kurallari_aktif';
+  RAISE NOTICE 'PASS R32-8: dry-run bayraktan bağımsız, yazmasız';
+END $t$;
+
+-- R32-9/SK9: ovsync_baslat_uyarilari — yalnız hedef ≤ bugün+2 görevler listelenir
+DO $t$
+DECLARE
+  v_h text := pg_temp.kb_hayvan(900); v_yakin uuid; v_uzak uuid; v_u jsonb; v_n int;
+BEGIN
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_h, 'OVSYNC_BASLAT', 'kb yakın', (now() AT TIME ZONE 'Europe/Istanbul')::date + 1, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_yakin;
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_h, 'OVSYNC_BASLAT', 'kb uzak', (now() AT TIME ZONE 'Europe/Istanbul')::date + 10, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_uzak;
+  v_u := public.ovsync_baslat_uyarilari();
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_u->'uyarilar') e WHERE (e->>'gorev_id')::uuid = v_yakin;
+  PERFORM pg_temp.kb_ok((v_u->>'ok')::boolean AND v_n = 1, 'R32-9', 'hedef−2g içindeki görev listede', v_n::text);
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_u->'uyarilar') e WHERE (e->>'gorev_id')::uuid = v_uzak;
+  PERFORM pg_temp.kb_ok(v_n = 0, 'R32-9', 'uzak görev listede değil', v_n::text);
+  RAISE NOTICE 'PASS R32-9/SK9: uyarı listesi hedef−2g filtresiyle';
+END $t$;
+
+-- R32-10/SK10: geçiş — tohumlanmış + açıksız-seanslı aktif Ovsync vakası
+--              TOHUMLAMA ile kapanır, TEK audit; ikinci koşum 0; açık seanslı kalır
+DO $t$
+DECLARE
+  v_x text := pg_temp.kb_hayvan(); v_y text := pg_temp.kb_hayvan();
+  v_case1 uuid; v_case2 uuid; v_r jsonb; v_n int; v_toh uuid;
+BEGIN
+  v_case1 := pg_temp.kb_ovsync_vaka(v_x);
+  v_case2 := pg_temp.kb_ovsync_vaka(v_y);
+  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_x, CURRENT_DATE, 'Boş', 'KB-SP') RETURNING id INTO v_toh;
+  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_y, CURRENT_DATE, 'Boş', 'KB-SP');
+  -- her iki vakanın seanslarını kapat; sonra v_y'dekini yeniden AÇ (002 senaryosu)
+  UPDATE public.treatment_days SET tamamlandi = true WHERE case_id IN (v_case1, v_case2);
+  UPDATE public.treatment_days SET tamamlandi = false WHERE case_id = v_case2 AND day_no = 1;
+
+  v_r := public._ovsync_gecis_sk10();
+  PERFORM pg_temp.kb_ok((v_r->>'kapatilan')::int = 1
+                        AND (v_r->'case_ids'->>0)::uuid = v_case1,
+    'R32-10', 'yalnız açıksız-seanslı vaka kapatıldı', v_r::text);
+  PERFORM pg_temp.kb_ok((SELECT status FROM public.cases WHERE id = v_case1) = 'closed'
+                        AND (SELECT close_reason FROM public.cases WHERE id = v_case1) = 'TOHUMLAMA',
+    'R32-10', 'vaka closed + close_reason=TOHUMLAMA', NULL);
+  SELECT count(*) INTO v_n FROM public.islem_log WHERE tip = 'CASE_CLOSED_BY_TOHUMLAMA' AND ref_id = v_case1::text;
+  PERFORM pg_temp.kb_ok(v_n = 1, 'R32-10', 'TEK CASE_CLOSED_BY_TOHUMLAMA audit', v_n::text);
+  SELECT count(*) INTO v_n FROM public.islem_log WHERE tip = 'CASE_CLOSED_EARLY' AND ref_id = v_case1::text;
+  PERFORM pg_temp.kb_ok(v_n = 0, 'R32-10', 'CASE_CLOSED_EARLY yazılmadı', v_n::text);
+  PERFORM pg_temp.kb_ok((SELECT status FROM public.cases WHERE id = v_case2) = 'active',
+    'R32-10', 'açık seanslı vaka (002 senaryosu) devam eder', NULL);
+
+  v_r := public._ovsync_gecis_sk10();
+  PERFORM pg_temp.kb_ok((v_r->>'kapatilan')::int = 0, 'R32-10', 'ikinci koşum 0 (idempotent)', v_r::text);
+  RAISE NOTICE 'PASS R32-10/SK10: geçiş tek audit, açık seanslı dokunulmaz, idempotent';
 END $t$;
 
 
