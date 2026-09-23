@@ -54,6 +54,7 @@ const _katTipMap={
   vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
   muayene:['MUAYENE','GEBELIK_KONTROL','VETERINER_KONTROL'],
   tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
+  ureme:  ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT'],   // P3: Ovsync/PG görev tipleri 'Diğer'e düşmesin
   bakim:  ['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME','BUZAGI_BAKIM'],
   diger:  null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
@@ -922,6 +923,298 @@ async function tdAsiVaxSec(vId){
   }catch(e){ console.warn('vaccine lookup:',e.message); }
 }
 
+
+// ──────────────────────────────────────────
+// ──────────────────────────────────────────
+// P5: PG kapısı modalı (dinamik bottom-sheet; modal-router invariant: pushState)
+// _pgKapiHata(e, tekrarDene) — PG_KAPI hatasını yakalar, koda göre ekran verir.
+// tekrarDene(onay, gerekce): çağıran tarafın aynı işlemi onay parametreleriyle
+// yeniden gönderen kapanışı. Gebe (BLOCK_PREGNANT) için "yine de uygula" YOK.
+function _pgKapiAc(kodTam, detayJson, tekrarDene){
+  const kod = String(kodTam||'').replace('PG_KAPI:','');
+  let detay = {};
+  try { detay = JSON.parse(detayJson || '{}'); } catch(e) {}
+  const kz = detay.kupe_no ?? detay.kupe ?? '';
+
+  let box = document.getElementById('pg-kapi-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'pg-kapi-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _pgKapiKapat(); };
+
+  let body = '';
+  if (kod === 'BLOCK_PREGNANT') {
+    body = `<div style="font-size:.85rem;line-height:1.5">🔴 <b>Gebe inekte PG uygulanamaz</b>${kz?` (${esc(kz)})`:''}.<br><span style="font-size:.72rem;color:var(--ink3)">Gebelik sonlandırma ayrı, yetkili klinik işlemdir — bu ekrandan geçmez.</span></div>
+      <button class="btn" style="width:100%;margin-top:14px;padding:10px;font-weight:700" onclick="_pgKapiKapat()">Tamam</button>`;
+  } else if (kod === 'REQUIRE_ACK_PENDING') {
+    body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Son tohumlama sonucu Bekliyor</b>${kz?` — ${esc(kz)}`:''}${detay.tohumlama_tarihi?` · ${fmtTarih(detay.tohumlama_tarihi)}`:''}${detay.deneme_no?` · deneme ${esc(String(detay.deneme_no))}`:''}.<br><span style="font-size:.72rem;color:var(--ink3)">PG gebeliği sonlandırabilir. "Boş ata ve uygula" tohumlamayı Boş yapıp PG'yi aynı zincirde uygular.</span></div>
+      <label style="font-size:.7rem;font-weight:600;display:block;margin:10px 0 4px">Gerekçe *</label>
+      <input id="pg-kapi-gerekce" class="fi" placeholder="Örn: 35. gün kontrolü negatif" oninput="document.getElementById('pg-kapi-onayla').disabled=!this.value.trim()">
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn" style="flex:1;padding:10px;background:var(--card2);color:var(--ink)" onclick="_pgKapiKapat()">Vazgeç</button>
+        <button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiBosAtaUygula()">Boş ata ve uygula</button>
+      </div>`;
+  } else if (kod === 'BLOCK_CATALOG_UNRESOLVED') {
+    body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Ürünün PG katalog bağı belirsiz.</b><br><span style="font-size:.72rem;color:var(--ink3)">Katalog kaydı düzeltilmeden uygulama yapılamaz (yöneticiye bildirin).</span></div>
+      <button class="btn" style="width:100%;margin-top:14px;padding:10px;font-weight:700" onclick="_pgKapiKapat()">Tamam</button>`;
+  } else {
+    body = `<div style="font-size:.85rem">İşlem reddedildi: ${esc(kodTam || 'PG_KAPI')}</div>
+      <button class="btn" style="width:100%;margin-top:14px;padding:10px;font-weight:700" onclick="_pgKapiKapat()">Tamam</button>`;
+  }
+
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.95rem;margin-bottom:10px">🚫 PG Güvenlik Kapısı</div>
+    ${body}
+  </div>`;
+  document.body.appendChild(box);
+  history.pushState({pg_kapi:true}, '', '');
+  window.__pgKapiTekrar = tekrarDene || null;
+  window.__pgKapiToh = detay.tohumlama_id || null;
+}
+function _pgKapiHata(e, tekrarDene){
+  const msg = e?.message || String(e);
+  const m = /^(PG_KAPI:[A-Z_]+):([\s\S]*)$/.exec(msg);
+  if (!m) return false;         // PG_KAPI değil — çağıran normal hata akışına dönsün
+  _pgKapiAc(m[1], m[2], tekrarDene);
+  return true;
+}
+function _pgKapiKapat(){
+  const box = document.getElementById('pg-kapi-bs');
+  if (box) box.remove();
+  window.__pgKapiTekrar = null; window.__pgKapiToh = null;
+  if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
+}
+// [Boş ata ve uygula]: tohumlama_sonuc_bos → aynı zincirde uygulama p_pg_onay=true
+// (tek ekranda; ikinci dokunuş yarışı buton kilidiyle engellenir — idempotency sunucuda)
+async function _pgKapiBosAtaUygula(){
+  const btn = document.getElementById('pg-kapi-onayla');
+  const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
+  if (!gerekce || !window.__pgKapiToh || !window.__pgKapiTekrar) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  try {
+    const r = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: window.__pgKapiToh, p_notlar: 'PG öncesi değerlendirme: ' + gerekce });
+    if (!r?.ok) { toast(r?.error || 'Boş atanamadı', true); if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; } return; }
+    toast('Tohumlama Boş yapıldı — PG uygulanıyor…');
+    await window.__pgKapiTekrar(true, gerekce);
+    _pgKapiKapat();
+  } catch (e2) {
+    toast('❌ ' + getUserMessage(e2), true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
+  }
+}
+
+// ──────────────────────────────────────────
+// P6: Erteleme modalı — mevcut tarih giriş kalıbı + pencere canlı önizleme
+function _erteleModal(gorevId){
+  (async () => {
+    const t = (await getData('gorev_log')).find(g => g.id === gorevId);
+    if (!t || t.gorev_tipi !== 'TOHUMLAMA_PLANLI' || t.tamamlandi || t.iptal) { toast('Görev ertelenemez', true); return; }
+    const bugunIso = new Date().toISOString().slice(0,10);
+    let box = document.getElementById('ertele-bs');
+    if (box) box.remove();
+    box = document.createElement('div');
+    box.id = 'ertele-bs';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+    box.onclick = e => { if (e.target === box) _erteleKapat(); };
+    box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+      <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🗓️ Tohumlamayı Ertele</div>
+      <div style="font-size:.72rem;color:var(--ink3);margin-bottom:12px">Mevcut hedef: ${fmtTarih(t.hedef_tarih)} ${(t.hedef_saat||'').slice(0,5)}</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Yeni tarih</label>
+          <input id="ert-tarih" type="text" placeholder="gg.aa.yyyy" value="${bugunIso}" class="fi" style="width:100%"></div>
+        <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Saat (boş = mevcut)</label>
+          <input id="ert-saat" type="time" class="fi" style="width:100%" placeholder="${(t.hedef_saat||'09:00').slice(0,5)}"></div>
+      </div>
+      <div id="ert-onizleme" style="font-size:.72rem;color:var(--blue);margin:8px 0"></div>
+      <button id="ert-btn" class="btn" style="width:100%;padding:10px;font-weight:700" onclick="_erteleKaydet('${escAttr(gorevId)}')">Ertele</button>
+    </div>`;
+    document.body.appendChild(box);
+    history.pushState({ertele:true}, '', '');
+    const onizle = () => {
+      const gun = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
+      const saat = (document.getElementById('ert-saat')?.value) || (t.hedef_saat||'09:00:00').slice(0,5);
+      const o = document.getElementById('ert-onizleme');
+      if (o && gun) o.textContent = 'Kaydedilecek: ' + pencereYuvarla(gun + ' ' + saat.slice(0,5)) + ' (pencere yuvarlaması)';
+    };
+    document.getElementById('ert-tarih')?.addEventListener('change', onizle);
+    document.getElementById('ert-saat')?.addEventListener('input', onizle);
+    onizle();
+  })();
+}
+function _erteleKapat(){
+  const box = document.getElementById('ertele-bs');
+  if (box) box.remove();
+  if (history.state?.ertele) { globalThis._modalBackGuard = true; history.back(); }
+}
+async function _erteleKaydet(gorevId){
+  const btn = document.getElementById('ert-btn');
+  const tarih = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
+  const saat = document.getElementById('ert-saat')?.value || null;
+  if (!tarih) { toast('Tarih gg.aa.yyyy biçiminde girin', true); return; }
+  if (tarih < new Date().toISOString().slice(0,10)) { toast('Geçmiş tarih seçilemez', true); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  try {
+    const r = await rpc('tohumlama_gorev_ertele', { p_gorev_id: gorevId, p_yeni_tarih: tarih, p_yeni_saat: saat });
+    toast('✅ Ertelendi → ' + fmtTarih(r.hedef_tarih) + ' ' + (r.hedef_saat||'').slice(0,5) + (r.uyari ? ' · ⚠️ ' + r.uyari : ''));
+    _erteleKapat();
+    loadTasks(_curTaskFilter||'today');
+  } catch (e) {
+    toast('❌ ' + getUserMessage(e), true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Ertele'; }
+  }
+}
+
+// ──────────────────────────────────────────
+// P7: Toplu PG sonucu modalı — applied/blocked/requires_ack; tekrar gönderim
+// YALNIZ requires_ack işaretli alt kümesi (applied asla yeniden gönderilmez).
+function _topluSonucModal(res, tekrarGonder){
+  const applied = res?.applied || [];
+  const blocked = res?.blocked || [];
+  const ack = res?.requires_ack || [];
+  let box = document.getElementById('toplu-sonuc-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'toplu-sonuc-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _topluSonucKapat(); };
+  const kz = h => getState('animals').find(a => a.id === (h.hayvan_id||h))?.kupe_no || (h.hayvan_id||h);
+  const ackHtml = ack.length ? `<div style="font-weight:800;font-size:.78rem;color:#b8860b;margin:12px 0 6px">⚠️ Onay gerekli (${ack.length})</div>
+    ${ack.map(h => `<label style="display:flex;gap:8px;align-items:center;font-size:.78rem;margin-bottom:6px">
+      <input type="checkbox" class="ts-ack" value="${escAttr(h.hayvan_id||'')}">
+      <span>${esc(kz(h))}${h.tohumlama_tarihi?' — '+fmtTarih(h.tohumlama_tarihi)+(h.deneme_no?' · deneme '+h.deneme_no:''):''}</span>
+      <input class="ts-gerekce" data-h="${escAttr(h.hayvan_id||'')}" placeholder="gerekçe" style="flex:1;min-width:0;padding:4px 8px;border-radius:6px;border:1px solid var(--border);font-size:.7rem">
+    </label>`).join('')}
+    <button id="ts-tekrar" class="btn" style="width:100%;margin-top:10px;padding:10px;font-weight:700" onclick="_topluTekrarGonder()">Seçilenleri tekrar gönder</button>` : '';
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.95rem;margin-bottom:10px">💊 Toplu Uygulama Sonucu</div>
+    ${applied.length?`<div style="font-weight:800;font-size:.78rem;color:var(--green);margin-bottom:6px">✅ Uygulandı (${applied.length})</div><div style="font-size:.74rem;color:var(--ink3);margin-bottom:6px">${applied.map(h=>esc(kz(h))).join(', ')}</div>`:''}
+    ${blocked.length?`<div style="font-weight:800;font-size:.78rem;color:var(--red2);margin:12px 0 6px">🚫 Engellendi (${blocked.length})</div>
+      ${blocked.map(h=>`<div style="font-size:.74rem;margin-bottom:4px">${esc(kz(h))} — ${esc(h.code||h.sebep||'engellendi')}</div>`).join('')}`:''}
+    ${ackHtml}
+    <button class="btn" style="width:100%;margin-top:14px;padding:10px;background:var(--card2);color:var(--ink)" onclick="_topluSonucKapat()">Kapat</button>
+  </div>`;
+  document.body.appendChild(box);
+  history.pushState({toplu_sonuc:true}, '', '');
+  window.__topluTekrar = tekrarGonder || null;
+}
+function _topluSonucKapat(){
+  const box = document.getElementById('toplu-sonuc-bs');
+  if (box) box.remove();
+  window.__topluTekrar = null;
+  if (history.state?.toplu_sonuc) { globalThis._modalBackGuard = true; history.back(); }
+}
+async function _topluTekrarGonder(){
+  const secilen = [...document.querySelectorAll('.ts-ack:checked')].map(c => c.value);
+  if (!secilen.length) { toast('En az bir hayvan seçin', true); return; }
+  const gerekceler = {};
+  document.querySelectorAll('.ts-gerekce').forEach(g => { if (g.value.trim()) gerekceler[g.dataset.h] = g.value.trim(); });
+  const eksik = secilen.filter(id => !gerekceler[id]);
+  if (eksik.length) { toast('Seçilenlerin hepsi için gerekçe gerekli', true); return; }
+  const btn = document.getElementById('ts-tekrar');
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  try {
+    const r = await window.__topluTekrar(secilen, gerekceler);
+    toast(`Tekrar gönderim tamam (uygulanan: ${r?.applied?.length ?? r?.success ?? '?'})`);
+    _topluSonucKapat();
+    await pullTables(['gorev_log','islem_log','stok','stok_hareket']).catch(()=>{});
+    loadTasks(_curTaskFilter||'today');
+  } catch (e) {
+    toast('❌ ' + getUserMessage(e), true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Seçilenleri tekrar gönder'; }
+  }
+}
+
+
+// F4: native date YASAK — metin giriş (gg.aa.yyyy ya da yyyy-mm-dd) → 'YYYY-MM-DD' | null
+function _ovsyncTarihOku(v){
+  const t=String(v||'').trim();
+  let m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(t);
+  if(m) return m[3]+'-'+m[2]+'-'+m[1];
+  m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if(m) return m[0];
+  return null;
+}
+// ──────────────────────────────────────────
+// OVSYNC/PG (PLAN 2026-09-24 P3–P10)
+// ──────────────────────────────────────────
+// P3: TOHUMLAMA_PLANLI kaynak etiketi (şablon TAI / PG+48s / ilk tohumlama)
+function _tohKaynakEtiket(t){
+  if(t.gorev_tipi!=='TOHUMLAMA_PLANLI') return '';
+  const k=t.kaynak||'';
+  if(k.indexOf('PG_TOHUMLAMA:')===0) return '<span class="pill" style="background:rgba(192,50,26,.08);color:#b3541e;border:1px solid rgba(192,50,26,.15)">PG sonrası (+48s)</span>';
+  if(k.indexOf('TEDAVI_SABLON_TOHUMLAMA:')===0) return '<span class="pill" style="background:rgba(30,100,200,.08);color:var(--blue);border:1px solid rgba(30,100,200,.15)">Şablon TAI</span>';
+  if(k.indexOf('ILK-TOH-')===0||k.indexOf('ACIK-DISI-')===0) return '<span class="pill" style="background:rgba(78,154,42,.1);color:var(--green);border:1px solid rgba(78,154,42,.2)">İlk tohumlama</span>';
+  return '';
+}
+// P3: kalan/gecikmiş gün etiketi (OVSYNC_BASLAT ve TOHUMLAMA_PLANLI)
+function _kalanGunEtiket(t){
+  if(!t.hedef_tarih) return '';
+  if(t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT') return '';
+  const bugun=new Date(); bugun.setHours(0,0,0,0);
+  const h=new Date(t.hedef_tarih+'T00:00:00');
+  const gun=Math.round((h-bugun)/86400000);
+  if(gun>0) return `<span style="font-size:.62rem;color:var(--ink3)">· ${gun} gün kaldı</span>`;
+  if(gun===0) return '<span style="font-size:.62rem;color:#b8860b">· bugün</span>';
+  return `<span style="font-size:.62rem;color:var(--red2)">· ${-gun} gün gecikmiş</span>`;
+}
+// P3/P4: OVSYNC_BASLAT kart butonları — [Başlat] atomik RPC, [İptal] mevcut PATCH yolu
+function _ovsyncBaslatBtnHtml(t){
+  if(t.gorev_tipi!=='OVSYNC_BASLAT'||t.tamamlandi||t.iptal) return '';
+  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
+    <button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`;
+}
+// P6: TOHUMLAMA_PLANLI kartına [Ertele]
+function _tohErteleBtnHtml(t){
+  if(t.gorev_tipi!=='TOHUMLAMA_PLANLI'||t.tamamlandi||t.iptal) return '';
+  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
+}
+// P4/P10: OVSYNC_BASLAT başlatma — atomik zincir RPC + detaylı bildirim
+async function ovsyncBaslat(gorevId){
+  if(!gorevId) return;
+  try{
+    const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId});
+    if(r&&r.atlandi){ toast('Atlandı: '+r.atlandi,true); }
+    else if(r&&r.zaten){ toast('Protokol zaten başlatılmış'); }
+    else{
+      toast('✅ Ovsynch-56 başlatıldı — TAI hedefi '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''));
+      // P10/B1: detaylı bildirim (izin varsa); panel kalıcı kaynak
+      _ovsyncBildirim('İlk tohumlama protokolü başlatıldı','Ovsynch-56 seansları açıldı. TAI hedefi: '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''));
+    }
+    await pullTables(['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','stok','stok_hareket']).catch(()=>{});
+    closeM('m-task-det'); updateTaskBadge(); loadTasks(_curTaskFilter||'today',null,{skipPull:true}); loadDash();
+    window.__protokolUyarilar=null;   // protokol ekranı taze veriyle açılsın
+  }catch(e){ toast('❌ '+getUserMessage(e),true); }
+}
+// P4: elle iptal — mevcut gorev_log PATCH yolu (degisim_log denetim kaydı T31)
+async function ovsyncIptal(gorevId){
+  if(!gorevId||!confirm('İlk tohumlama görevi iptal edilsin mi?')) return;
+  try{
+    const t=(await getData('gorev_log')).find(g=>g.id===gorevId);
+    if(!t){ toast('Görev bulunamadı',true); return; }
+    await write('gorev_log',{...t,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString(),iptal:true},'PATCH',`id=eq.${gorevId}`);
+    toast('Görev iptal edildi');
+    updateTaskBadge(); loadTasks(_curTaskFilter||'today');
+  }catch(e){ toast('❌ '+getUserMessage(e),true); }
+}
+// P10/B3: bildirim yardımcısı — izin yoksa sessiz düşme YOK (rozet panelde); yalnız iki olayda kullanılır
+function _ovsyncBildirim(baslik,govde){
+  try{
+    if(!('Notification' in window)) return;
+    if(Notification.permission==='granted'){ new Notification(baslik,{body:govde,tag:'ovsync-pg'}); }
+    // denied/default: panel zaten kalıcı kaynak; ilk kullanıcı etkileşiminde tek istem
+  }catch(e){ /* bildirim başarısızlığı akışı etkilemez */ }
+}
+// P10/B2: açılış özeti — hedefi gelmiş OVSYNC_BASLAT varsa tek bildirim (cron yedeğinin UI aynası)
+async function ovsyncAcilisOzeti(){
+  try{
+    if(!('Notification' in window)||Notification.permission!=='granted') return;
+    const r=await rpc('ovsync_baslat_uyarilari',{});
+    const due=(r&&r.uyarilar||[]).filter(u=>u.hedef_tarih<=new Date().toISOString().slice(0,10));
+    if(due.length) new Notification(due.length+' hayvanda ilk tohumlama protokolü başlatılacak',{body:due.map(u=>u.kupe_no).slice(0,10).join(', ')+(due.length>10?'…':''),tag:'ovsync-acilis'});
+  }catch(e){ /* açılış bildirimi best-effort */ }
+}
+
 function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
   const planTime=t.gorev_tipi==='TOHUMLAMA_PLANLI'
     ? (t.hedef_saat||'').slice(0,5)
@@ -951,17 +1244,19 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           ${diseaseName?`<span class="pill" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2)">🏥 ${esc(diseaseName)}</span>`:''}
+          ${_tohKaynakEtiket(t)}
         </div>
         <div class="tc-desc">${esc(t.gorev_tipi==='TEDAVI_GUN'?(()=>{try{return JSON.parse(t.aciklama||'{}').label||t.aciklama;}catch(e){return t.aciklama;}})():t.aciklama||'')}</div>
-        <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${t.stok_id?`<span>💊 ${esc(_stokAdi(t.stok_id))}</span>`:''}</div>
+        <div class="tc-meta"><span>${fmtTarih(t.hedef_tarih)}${planTime?` <span style="color:var(--blue);font-size:.65rem">🕐 ${planTime}</span>`:''}</span>${_kalanGunEtiket(t)}${t.stok_id?`<span>💊 ${esc(_stokAdi(t.stok_id))}</span>`:''}</div>
       </div>
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
+      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
+    <div style="display:flex;gap:6px;align-items:center">${_ovsyncBaslatBtnHtml(t)}${_tohErteleBtnHtml(t)}</div>
     ${drugHtml}${subHtml}
   </div>`;
 }
@@ -1498,7 +1793,7 @@ async function _showProtokolEkran(){
   if (!data || !data.length) {
     try { data = await rpc('protokol_eksik_tara', {}); } catch(e) { toast('Hata: '+e.message, true); return; }
   }
-  if (!data || !data.length) { toast('Protokol uyarısı yok'); return; }
+  // P4: protokol_eksik_tara boş olsa bile OVSYNC_BASLAT bölümü varsa ekran açılır
 
   let box = document.getElementById('protokol-bs');
   if (box) box.remove();
@@ -1507,6 +1802,7 @@ async function _showProtokolEkran(){
   box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
   box.onclick = e => { if (e.target === box) _closeProtokolListe(); };
 
+  data = data || [];
   const eksik = data.filter(u => u.durum === 'eksik');
   const yaklasan = data.filter(u => u.durum === 'yaklasan');
   const tamamlandi = data.filter(u => u.durum === 'tamamlandi');
@@ -1515,7 +1811,7 @@ async function _showProtokolEkran(){
   const _ikon = d => d.durum === 'eksik' ? '🔴' : d.durum === 'yaklasan' ? '🟡' : '✅';
   const _gun = d => d.durum === 'eksik' ? d.gecikme_gun + ' gün gecikmiş' : d.durum === 'yaklasan' ? Math.abs(d.gecikme_gun || 0) + ' gün kaldı' : '';
 
-  const _satirHtml = (d, i) => `<div class="arow" data-p="${escAttr(d.protokol)}" style="border-left:3px solid ${_renk(d)};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_showProtokolDetay('${d.hayvan_id}',this.dataset.p,${i})">
+  const _satirHtml = (d, i) => `<div class="arow" data-p="${escAttr(d.protokol)}" style="border-left:3px solid ${_renk(d)};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_showProtokolDetay('${escAttr(d.hayvan_id)}',this.dataset.p,${i})">
     <div style="flex:1">
       <div style="font-weight:700;font-size:.8rem">${_ikon(d)} ${esc(d.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(d.grup||'')}</span></div>
       <div style="font-size:.7rem;color:var(--ink3)">${esc(d.adim)} · ${_gun(d)}</div>
@@ -1528,14 +1824,40 @@ async function _showProtokolEkran(){
     </div>
   </div>`;
 
+  // P4/SK9: OVSYNC_BASLAT görevleri hedef−2 günden itibaren EN ÜSTTE ayrı bölümde
+  // (saat-hassas; cron'un taradığı aynı RPC'den). index yerine gorev_id — bayat cache tuzağı yok.
+  let ovHtml = '';
+  try {
+    const ov = await rpc('ovsync_baslat_uyarilari', {});
+    const ovList = (ov && ov.uyarilar) || [];
+    if (ovList.length) {
+      const _ovSatir = u => `<div class="arow" style="border-left:3px solid var(--green);margin-bottom:6px;padding:8px 10px">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.8rem">🌱 ${esc(u.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(u.kategori||'')}</span></div>
+          <div style="font-size:.7rem;color:var(--ink3)">Ovsynch-56 başlat · hedef ${fmtTarih(u.hedef_tarih)} ${(u.hedef_saat||'').slice(0,5)} · TAI ${fmtTarih(u.tai_tarihi)}</div>
+          <div style="font-size:.6rem;opacity:.5">${u.taban_turu==='duve'?'Düve — 12a21g':u.taban_turu==='abort'?'Abort sonrası':u.taban_turu==='dogum'?'Doğum sonrası':'Açık dişi'}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
+          <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>
+        </div>
+      </div>`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})</div>${ovList.map(_ovSatir).join('')}`;
+    }
+  } catch(e) { /* RPC yoksa (bayrak/A1 öncesi) bölüm sessizce atlanmaz — konsola düşer */ console.warn('ovsync_baslat_uyarilari:', e.message); }
+  if (!data.length && !ovHtml) { toast('Protokol uyarısı yok'); return; }
+
   const eksikHtml = eksik.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🔴 Gecikmiş (${eksik.length})</div>${eksik.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
   const yakHtml = yaklasan.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:#b8860b">🟡 Yaklaşan (${yaklasan.length})</div>${yaklasan.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
   const tamHtml = tamamlandi.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:#2e7d32">✅ Son 24 Saat (${tamamlandi.length})</div>${tamamlandi.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
 
+  // P10/B3: bildirim izni kapalıysa rozet — sessiz düşme görünür kalsın
+  const bildirimRozet = ('Notification' in window && Notification.permission !== 'granted')
+    ? ' <span style="font-size:.6rem;color:#b8860b;border:1px solid #b8860b;border-radius:8px;padding:1px 6px;vertical-align:middle">bildirim kapalı</span>' : '';
   box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
-    <div style="font-weight:800;font-size:1rem;margin-bottom:4px">📋 Protokol Uyarıları</div>
+    <div style="font-weight:800;font-size:1rem;margin-bottom:4px">📋 Protokol Uyarıları${bildirimRozet}</div>
     <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">Doğum sonrası, ileri gebe, kızgınlık takibi</div>
-    ${eksikHtml}${yakHtml}${tamHtml}
+    ${ovHtml}${eksikHtml}${yakHtml}${tamHtml}
   </div>`;
   history.pushState({protokol:true}, '', '');
   document.body.appendChild(box);
@@ -1977,6 +2299,12 @@ async function _protokolUygula(idx){
       <div style="flex:2"><label style="font-size:.7rem;font-weight:600">Doz</label><div style="display:flex;gap:4px"><input id="pu-doz" type="number" step="0.1" min="0.1" value="1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem;flex:1;min-width:0">${_dozBtn}</div></div>
       <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Birim</label><input id="pu-birim" value="${ilkBirim}" readonly style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:.8rem;background:var(--card2);color:var(--ink3)"></div>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Uygulama zamanı (opsiyonel)</label>
+        <input id="pu-tarih" type="text" placeholder="gg.aa.yyyy" class="fi" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"></div>
+      <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Saat</label>
+        <input id="pu-saat" type="time" class="fi" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"></div>
+    </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
     <button id="pu-kaydet-btn" onclick="_protokolUygulaKaydet('${d.hayvan_id}',${idx})" class="btn" style="width:100%;padding:10px;font-weight:700">Kaydet</button>
@@ -2003,9 +2331,28 @@ async function _protokolUygulaKaydet(hayvanId, idx){
   if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
-    const res = await rpc('hizli_uygulama', {
-      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: ''
+    // P8: opsiyonel uygulama anı (boş → gönderilmez; MK7: 5dk ileri / 7 gün geri)
+    const olcGun = _ovsyncTarihOku(document.getElementById('pu-tarih')?.value);
+    if (document.getElementById('pu-tarih')?.value?.trim() && !olcGun) { toast('Uygulama tarihi gg.aa.yyyy olmalı', true); if(kaydetBtn){kaydetBtn.disabled=false;kaydetBtn.textContent='Kaydet';} return; }
+    const olcSaat = document.getElementById('pu-saat')?.value || '';
+    let occurredAt = null;
+    if (olcGun) {
+      occurredAt = new Date(olcGun + 'T' + (olcSaat || '12:00') + ':00').toISOString();
+    }
+    const params = {
+      p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: '',
+      ...(occurredAt ? { p_occurred_at: occurredAt } : {})
+    };
+    // P5: PG kapısı reaktif — sunucu RAISE'ı _pgKapiHata yakalar; onaylı tekrar
+    // aynı parametrelere p_pg_onay/p_pg_gerekce eklenerek gönderilir (tek ekranda)
+    const res = await rpc('hizli_uygulama', params).catch(e => {
+      const retry = (onay, gerekce) => rpc('hizli_uygulama', {
+        ...params, p_pg_onay: onay, p_pg_gerekce: gerekce || null
+      });
+      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
+      throw e;
     });
+    if (res?._pgKapi) return;
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();

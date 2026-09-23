@@ -342,6 +342,12 @@ async function submitInsem(btn) {
     });
     globalThis._vwpOverride = false;
     globalThis._planliTohumlamaGorevId = null;
+    // P9: tohumlama senkronizasyon vakasını kapattıysa additive özet (tek alert)
+    const kapatilan = result?.kapatilan_senkronizasyon_vakalari || result?.kapatilan_ovsyncler || [];
+    if (Array.isArray(kapatilan) && kapatilan.length) {
+      const ozet = kapatilan.map(v => `${v.hayvan_kupe || v.kupe_no || ''} (${v.iptal_seans ?? '?'} seans iptal)`).join(', ');
+      toast(`✅ Tohumlama kaydedildi — ${kapatilan.length} senkronizasyon protokolü tohumlama ile sonlandırıldı: ${ozet}`);
+    }
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
 
@@ -360,7 +366,7 @@ async function submitInsem(btn) {
     _ekUygulamalar = [];
     _ekListeGoster();
     checkSpermaUyari();
-    pullTables(['tohumlama','gorev_log','hayvanlar']).then(() => {
+    pullTables(['tohumlama','gorev_log','hayvanlar','islem_log','cases','treatment_days','treatment_day_uygulamalar','stok','stok_hareket']).then(() => {
       renderSafe();
       if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
       // Kızgınlık sekmesindeyse liste yenilensin
@@ -371,6 +377,9 @@ async function submitInsem(btn) {
   } catch (e) {
     // REVIEW #12: bayat override flag'i sonraki hayvanın submit'ini sessizce geçmesin
     globalThis._vwpOverride = false;
+    // REVIEW (ön-inceleme, high): hata dalında planlı görev flag'i de sıfırlanmalı —
+    // bayat gorev_id ile FARKLI hayvan girilip tekrar submit edilmesin
+    globalThis._planliTohumlamaGorevId = null;
     const msg = e?.message || e?.toString() || '';
     // NOT: ABORT_VWP_VIOLATION alt dize olarak VWP_VIOLATION içerir; abort dalı
     // ÖNCE test edilmezse abort hatası doğum-bazlı dala düşer.
@@ -3829,6 +3838,11 @@ async function submitBulkIlac() {
   if (miktar <= 0) { toast('Miktar sıfırdan büyük olmalı'); return; }
   const notes = document.getElementById('bi-notes')?.value || null;
 
+  // REVIEW (ön-inceleme): çift tık toplu uygulamayı iki kez işler — kilit
+  const biBtn = document.getElementById('bi-submit-btn');
+  if (window._biGonderiyor) return;
+  window._biGonderiyor = true;
+  if (biBtn) { biBtn.disabled = true; biBtn.textContent = 'İşleniyor…'; }
   try {
     const result = await rpc('bulk_ilac', {
       p_animal_ids: animalIds,
@@ -3836,6 +3850,19 @@ async function submitBulkIlac() {
       p_miktar: miktar,
       p_notlar: notes
     });
+
+    // P7: karışık sonuç → tek modal; tekrar gönderim YALNIZ requires_ack alt kümesi
+    if (Array.isArray(result?.applied) || Array.isArray(result?.requires_ack) || Array.isArray(result?.blocked)) {
+      const tekrar = (secilen, gerekceler) => rpc('bulk_ilac', {
+        p_animal_ids: secilen,
+        p_ilac_stok_id: ilacId,
+        p_miktar: miktar,
+        p_notlar: notes,
+        p_pg_onaylar: secilen,
+        p_pg_gerekce: Object.entries(gerekceler||{}).map(([h,g]) => h + ': ' + g).join(' | ') || null
+      });
+      if (typeof _topluSonucModal === 'function') _topluSonucModal(result, tekrar);
+    }
 
     const div = document.getElementById('bi-result');
     if (div) {
@@ -3854,6 +3881,9 @@ async function submitBulkIlac() {
     toast('❌ ' + getUserMessage(e), true);
     const div = document.getElementById('bi-result');
     if (div) div.innerHTML = `<div style="margin-top:8px;font-size:.8rem;color:var(--red2)">❌ Hata: ${esc(e.message)}</div>`;
+  } finally {
+    window._biGonderiyor = false;
+    if (biBtn) { biBtn.disabled = false; biBtn.textContent = 'Uygula'; }
   }
 }
 

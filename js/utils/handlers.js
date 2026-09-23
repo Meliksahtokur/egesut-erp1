@@ -92,6 +92,7 @@ registerActions({
   'task-kat-vitamin': (el) => setTaskKat('vitamin', el),
   'task-kat-muayene': (el) => setTaskKat('muayene', el),
   'task-kat-tedavi':  (el) => setTaskKat('tedavi', el),
+  'task-kat-ureme':   (el) => setTaskKat('ureme', el),
   'task-kat-bakim':   (el) => setTaskKat('bakim', el),
   'task-kat-diger':   (el) => setTaskKat('diger', el),
 

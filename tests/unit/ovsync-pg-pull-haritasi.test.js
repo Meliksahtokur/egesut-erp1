@@ -21,16 +21,14 @@ test('P2: tohumlama_kaydet cases + seanslar + islem_log çeker (S-7)', () => {
 test('P2/R3.2: sonuc/abort yolları gorev_log çeker', () => {
   for (const r of ['tohumlama_sonuc_gebe', 'tohumlama_sonuc_bos', 'tohumlama_abort']) icerir(r, 'gorev_log');
 });
-test('P2: yeni RPC satırları kayıtlı', () => {
-  for (const r of ['start_first_service_protocol', 'tohumlama_gorev_ertele', 'pg_uyari_kontrol', 'ovsync_baslat_uyarilari', 'ilk_tohumlama_zamanlayici']) {
-    assert.ok(Array.isArray(T[r]), `${r} RPC_TABLES'te yok`);
+test('P2: yeni RPC satırları kayıtlı; salt-okuma RPC\'ler haritada DEĞİL (dolu dizi invariantı)', () => {
+  for (const r of ['start_first_service_protocol', 'tohumlama_gorev_ertele', 'ilk_tohumlama_zamanlayici']) {
+    assert.ok(Array.isArray(T[r]) && T[r].length, `${r} RPC_TABLES'te yok/boş`);
   }
-});
-test('P2: salt-okuma RPC\'ler boş pull seti', () => {
-  assert.deepEqual(T.pg_uyari_kontrol, []);
-  assert.deepEqual(T.ovsync_baslat_uyarilari, []);
+  assert.ok(!('pg_uyari_kontrol' in T), 'salt-okuma RPC haritada olmamalı');
+  assert.ok(!('ovsync_baslat_uyarilari' in T), 'salt-okuma RPC haritada olmamalı');
 });
 test('P2: yeni Ovsync/PG RPC pull setlerinde protokol_instance yok (devrilmiş fikir)', () => {
-  const yeni = ['start_first_service_protocol', 'tohumlama_gorev_ertele', 'pg_uyari_kontrol', 'ovsync_baslat_uyarilari', 'ilk_tohumlama_zamanlayici'];
+  const yeni = ['start_first_service_protocol', 'tohumlama_gorev_ertele', 'ilk_tohumlama_zamanlayici'];
   for (const r of yeni) assert.ok(!T[r].includes('protokol_instance'), `${r} → protokol_instance var`);
 });

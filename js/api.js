@@ -319,8 +319,8 @@ const RPC_TABLES = {
   // P2 (Ovsync/PG): yeni RPC pull setleri
   start_first_service_protocol: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket'],
   tohumlama_gorev_ertele:    ['gorev_log','islem_log'],
-  pg_uyari_kontrol:          [],   // salt-okuma onizleme; pull yok
-  ovsync_baslat_uyarilari:   [],   // salt-okuma; panel kendi tazeler
+  // pg_uyari_kontrol / ovsync_baslat_uyarilari salt-okuma: RPC_TABLES'te DEGIL
+  // (invariant: her deger dolu dizi; pull istemeyen RPC haritaya girmez)
   ilk_tohumlama_zamanlayici: ['gorev_log','cases','treatment_days','treatment_day_uygulamalar','islem_log'],
   add_treatment_day:         ['cases','treatment_days'],
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
@@ -679,13 +679,25 @@ async function rpcAddTreatmentDayWithSessions(caseId, date, sessions, existingDa
  * @param {string|null} not - seans notu (opsiyonel)
  * @returns {Promise<{ok, seans_done, mesaj?}>}
  */
-async function rpcSeansTamamla(seansAdminId, uygulanmadi = false, not = null) {
+async function rpcSeansTamamla(seansAdminId, uygulanmadi = false, not = null, pgOnay = false, pgGerekce = null) {
   if (!seansAdminId) throw new Error('seansAdminId zorunlu');
-  return rpc('seans_tamamla', {
+  const cagri = (onay, gerekce) => rpc('seans_tamamla', {
     p_seans_admin_id: seansAdminId,
     p_uygulanmadi: !!uygulanmadi,
     p_not: not,
+    p_pg_onay: !!onay,
+    p_pg_gerekce: gerekce || null,
   });
+  // P5: seans PG kapısı — RAISE'ı yakala, onaylı tekrarı modal zincirine ver.
+  // uygulanmadi=true yolu uygulamadır değil; kapı uygulanmayan çağrıda atlanır.
+  try {
+    return await cagri(pgOnay, pgGerekce);
+  } catch (e) {
+    if (!uygulanmadi && typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) {
+      return { ok: false, _pgKapi: true };
+    }
+    throw e;
+  }
 }
 
 /**
