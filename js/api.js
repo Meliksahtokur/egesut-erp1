@@ -292,14 +292,18 @@ async function write(table, data, method = 'POST', filter = '') {
 // Her RPC hangi tabloları etkiliyor — sadece onlar çekilir
 const RPC_TABLES = {
   hayvan_ekle:               ['hayvanlar'],
+  // R3.2: dogum anne + dişi buzağı OVSYNC_BASLAT aciyor
   dogum_kaydet:              ['hayvanlar','dogum','gorev_log','tohumlama'],
-  tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket','hayvanlar'],
-  planli_tohumlama_kaydet:   ['tohumlama','gorev_log','stok','stok_hareket','hayvanlar','islem_log'],
+  // P2: S-7 vaka kapanisi (cases + seanslar); review: islem_log yaziyordu
+  tohumlama_kaydet:          ['tohumlama','gorev_log','stok','stok_hareket','hayvanlar','islem_log','cases','treatment_days','treatment_day_uygulamalar'],
+  planli_tohumlama_kaydet:   ['tohumlama','gorev_log','stok','stok_hareket','hayvanlar','islem_log','cases','treatment_days','treatment_day_uygulamalar'],
   tohumlama_tekrar_kaydet:   ['tohumlama','gorev_log','stok_hareket'],
-  tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log'],
-  tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log'],
+  tohumlama_sonuc_gebe:      ['hayvanlar','tohumlama','islem_log','gorev_log'],
+  // R3.2: sonuc_bos artik OVSYNC_BASLAT gorevu de aciyor (acik disi)
+  tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log','gorev_log'],
   tohumlama_sonuc_bekliyor:  ['hayvanlar','tohumlama','islem_log'],
-  tohumlama_abort:           ['hayvanlar','tohumlama','islem_log'],
+  // R3.2: abort ILK-TOH-ABORT gorevu aciyor
+  tohumlama_abort:           ['hayvanlar','tohumlama','islem_log','gorev_log'],
   kizginlik_kaydet:          ['kizginlik_log','gorev_log'],
   kizginlik_sil:             ['kizginlik_log'],
   kizginlik_tedavi_baglanti_kur:['kizginlik_log'],
@@ -312,6 +316,12 @@ const RPC_TABLES = {
   // birebir aynısı. NOT: offline-replay RPC_MAP'e (ui.js dataTrafficTekGonder)
   // EKLENMEZ — online-only RPC.
   vaka_toplu_ac:             ['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log'],
+  // P2 (Ovsync/PG): yeni RPC pull setleri
+  start_first_service_protocol: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket'],
+  tohumlama_gorev_ertele:    ['gorev_log','islem_log'],
+  pg_uyari_kontrol:          [],   // salt-okuma onizleme; pull yok
+  ovsync_baslat_uyarilari:   [],   // salt-okuma; panel kendi tazeler
+  ilk_tohumlama_zamanlayici: ['gorev_log','cases','treatment_days','treatment_day_uygulamalar','islem_log'],
   add_treatment_day:         ['cases','treatment_days'],
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
   remove_drug_administration:['stok','stok_hareket','drug_administrations'],
@@ -321,7 +331,8 @@ const RPC_TABLES = {
   asi_guncelle:              ['vaccines','vaccine_protocol_steps','vaccine_diseases','stok','islem_log'],
   asi_sil:                   ['vaccines','vaccine_protocol_steps','vaccine_diseases','stok','islem_log'],
   bulk_vaccination:          ['vaccination_log','gorev_log','stok_hareket','islem_log'],
-  bulk_ilac:                  ['islem_log','stok','stok_hareket'],
+  // P2: S-4 toplu yol gorev acabilir (PG+48s); review: gorev_log eksikti
+  bulk_ilac:                  ['islem_log','stok','stok_hareket','gorev_log'],
   ileri_gebe_asi_tamamla:    ['vaccination_log','gorev_log','stok_hareket','islem_log'],
   delete_treatment_day:      ['cases','treatment_days','drug_administrations','stok','stok_hareket'],
   update_treatment_time:     ['treatment_days'],

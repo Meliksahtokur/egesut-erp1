@@ -12,11 +12,51 @@ const USER_FRIENDLY = {
   'PGRST': 'Veritabanı işlemi başarısız oldu.',
 };
 
+// PG_KAPI:<KOD>:<json> ayrıştırıcı (PLAN P1). JSON bozuksa bile KOD gösterilir —
+// fail-loud; tanınmayan kod jeneriğe düşmez, KOD kendisi gösterilir.
+function pgKapiMesaj(msg) {
+  const m = /^(PG_KAPI:[A-Z_]+):(.*)$/s.exec(msg);
+  if (!m) return null;
+  const kodTam = m[1];
+  let detay = {};
+  try { detay = JSON.parse(m[2]); } catch (e) { /* detay bozuksa KOD yine gösterilir */ }
+  const sozluk = (typeof PG_HATA_SOZLUGU !== 'undefined') ? PG_HATA_SOZLUGU : {};
+  const sablon = sozluk[kodTam] || null;
+  const doldur = (t) => t
+    .replace('{kupe}', detay.kupe_no ?? detay.kupe ?? '')
+    .replace('{tarih}', detay.tohumlama_tarihi ?? detay.tarih ?? '')
+    .replace('{deneme}', detay.deneme_no ?? '')
+    .replace('{gun}', detay.gun ?? '');
+  if (sablon) {
+    return doldur(sablon)
+      .replace(/\(\s*\)/g, '')            // boş parantez kalıntısı
+      .replace(/,\s*,/g, ',')             // art arda virgül
+      .replace(/,\s*\./g, '.')            // nokta öncesi virgül
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+  // Sözlükte olmayan yeni PG_KAPI kodu: KOD'u görünür kıl (sessiz jenerik YOK)
+  return 'İşlem reddedildi: ' + kodTam.replace('PG_KAPI:', '');
+}
+
 function getUserMessage(err) {
   const msg = err?.message || String(err);
+  // 1) PG_KAPI sözleşmesi (en özel; önce bak)
+  const pg = pgKapiMesaj(msg);
+  if (pg) return pg;
+  // 2) Ovsync/PG yeni hata kodları (config sözlüğünden, tek kaynak)
+  if (typeof PG_HATA_SOZLUGU !== 'undefined') {
+    for (const [k, v] of Object.entries(PG_HATA_SOZLUGU)) {
+      if (msg.includes(k)) return v;
+    }
+  }
+  // 3) Kalıplı çeviriler
   for (const [k, v] of Object.entries(USER_FRIENDLY)) {
     if (msg.includes(k)) return v;
   }
+  // 4) Tanınmayan mesaj: jenerik EZME YOK — sunucunun Türkçe 'mesaj'ı zaten
+  // anlamlıysa (nokta içeriyor + 15+ karakter) olduğu gibi gösterilir.
+  if (msg.length >= 15 && /[a-zçğıöşü]/i.test(msg) && /[.!?]$|[.!?]\s|:/.test(msg)) return msg;
   return 'Bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
 }
 
