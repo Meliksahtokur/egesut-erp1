@@ -23,6 +23,12 @@ SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000cafe
 -- ── Yardımcılar (pg_temp) ───────────────────────────────────────────────────
 -- PASS sayacı: her başarılı kb_ok çağrısı bir satır ekler; betiğin sonunda
 -- sayılır ve 'OZET: N PASS' ile basılır. ROLLBACK ile birlikte yok olur.
+-- Istanbul yerel bugünü — fixture tarihleri CURRENT_DATE (UTC) yerine bunu kullanır:
+-- kapı gun hesabı Istanbul günüyle yapıyor, 00:00-03:00 arası 1 gün kayması testi kırmamalı
+CREATE FUNCTION pg_temp.kb_bugun() RETURNS date LANGUAGE sql STABLE AS $f$
+  SELECT (now() AT TIME ZONE 'Europe/Istanbul')::date
+$f$;
+
 CREATE TEMP TABLE kb_gecti (id serial PRIMARY KEY);
 
 CREATE FUNCTION pg_temp.kb_ok(p_kosul boolean, p_test text, p_beklenen text, p_gercek text)
@@ -436,8 +442,9 @@ END $t$;
 DO $t$
 DECLARE
   v_g text := pg_temp.kb_hayvan(); v_toh uuid; v_r jsonb; v_hata text; v_det jsonb; v_n int;
+  v_gun date := (pg_temp.kb_bugun() - 40);  -- UTC/CURRENT_DATE kaymasına bağışık
 BEGIN
-  v_r := public.tohumlama_kaydet(v_g, CURRENT_DATE - 40, 'KB-SP');
+  v_r := public.tohumlama_kaydet(v_g, v_gun, 'KB-SP');
   v_toh := (v_r->>'tohumlama_id')::uuid;
   v_r := public.tohumlama_sonuc_gebe(v_toh::text);
   PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean, 'T06', 'fixture gebe', v_r::text);
@@ -508,7 +515,7 @@ BEGIN
   INSERT INTO public.stok (id, urun_adi, kategori, baslangic_miktar, drug_product_id)
   VALUES (v_stok, 'KB PG toplu', 'Diğer İlaç', 100, pg_temp.kb_c('PG_URUN')::uuid);
   INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES
-    (v_g, CURRENT_DATE - 60, 'Gebe', 'KB-SP'), (v_b, CURRENT_DATE - 12, 'Bekliyor', 'KB-SP'), (v_b2, CURRENT_DATE - 30, 'Bekliyor', 'KB-SP');
+    (v_g, pg_temp.kb_bugun() - 60, 'Gebe', 'KB-SP'), (v_b, pg_temp.kb_bugun() - 12, 'Bekliyor', 'KB-SP'), (v_b2, pg_temp.kb_bugun() - 30, 'Bekliyor', 'KB-SP');
 
   v_r := public.bulk_ilac(ARRAY[v_g, v_b, v_c, v_b2], v_stok, 2, 'kb t08', ARRAY[v_b2], 'kb gerekçe');
   PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND (v_r->>'total')::int = 4 AND (v_r->>'success')::int = 2
@@ -545,7 +552,7 @@ DECLARE
 BEGIN
   FOREACH v_gun IN ARRAY ARRAY[10, 26, 35] LOOP
     v_h := pg_temp.kb_hayvan();
-    v_r := public.tohumlama_kaydet(v_h, CURRENT_DATE - v_gun, 'KB-SP');
+    v_r := public.tohumlama_kaydet(v_h, pg_temp.kb_bugun() - v_gun, 'KB-SP');
     v_toh := (v_r->>'tohumlama_id')::uuid;
     v_hata := NULL;
     BEGIN
@@ -581,7 +588,7 @@ DO $t$
 DECLARE
   v_t text := pg_temp.kb_hayvan(); v_r jsonb; v_toh uuid; v_hata text;
 BEGIN
-  v_r := public.tohumlama_kaydet(v_t, CURRENT_DATE - 30, 'KB-SP');
+  v_r := public.tohumlama_kaydet(v_t, pg_temp.kb_bugun() - 30, 'KB-SP');
   v_toh := (v_r->>'tohumlama_id')::uuid;
   v_r := public.pg_uyari_kontrol(ARRAY[v_t], pg_temp.kb_c('PG_STOK'));
   PERFORM pg_temp.kb_ok(v_r->>'pg' = 'PG' AND v_r->'hayvanlar'->0->>'karar' = 'REQUIRE_ACK_PENDING'
