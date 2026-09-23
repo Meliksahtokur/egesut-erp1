@@ -160,3 +160,22 @@ CI otomasyonu kapsam dışı (repo test stratejisi: lokal yeter).
 
 *Goal kaydı: `.harness/goals/2026/G-20260910-UREME-STOK-BUGFIX.md`
 (BUG-001..003 fix zarfı; lead GLM + worker GLMF kolunda).*
+
+### BUG-TAILSCALE-DNS — Tailscale MagicDNS, Supabase proje alt alan adlarını negatif-cache'liyor [open]
+
+**Tarih:** 2026-09-24 · **Bulgu yeri:** lokal geliştirme (http://localhost:8123)
+
+**Belirti:** Demo projesi `vtzqjmazsvurxdeondmi.supabase.co` makineden
+çözülemiyor (NXDOMAIN). Prod alt alanı çözülüyor. Tarayıcıda demo "bağlanamıyorum"
+olarak görünüyordu; Chromium headless (DoH açık) sorunsuz bağlanıyordu — kod/sunucu sağlam.
+
+**Kök neden:** Tailscale MagicDNS (`100.100.100.100`) systemd-resolved upstream'i;
+başarısız bir çözümleme NXDOMAIN olarak cache'leniyor.
+
+**Geçici çözüm (doğrulandı):** `resolvectl flush-caches`. Tarayıcıda "Güvenli DNS
+kullan" (DoH) açık profil etkilenmez.
+
+**Kalıcı çözüm adayları:** Tailscale DNS override kapat / upstream bypass /
+per-link nameserver. Üretim (GitHub Pages) etkilenmez.
+
+**Etki:** yalnızca lokal geliştirme/test kesintileri.
