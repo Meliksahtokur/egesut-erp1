@@ -14,7 +14,10 @@ Every delivery states:
 - docs-update outcome;
 - `PASS`, `PARTIAL`, `FAIL`, or `INCONCLUSIVE` per criterion;
 - residual risks and unmeasured live boundaries;
-- restoration of temporary mutations and artifacts.
+- restoration of temporary mutations and artifacts;
+- for DB-touching changes, the db-validation report
+  (`reports/db-validation-<sha8>.md`, `PASS`) citing the migration file's
+  SHA-256 and the baseline schema version.
 
 Review `git status --short` together with the diff. Untracked additions do not
 appear in `git diff --stat`. In a persistently dirty checkout, scope status to

@@ -38,7 +38,8 @@ if [[ -z "$TMP_ROOT" ]]; then
   exit 78
 fi
 OUT_DIR=$(mktemp -d "$TMP_ROOT/refresh_lsp.XXXXXXXX")
-trap 'rm -rf "$OUT_DIR"' EXIT
+# Başarısızlıkta temp KORUNUR (hata dosyaları incelensin diye); başarıda silinir.
+trap 'rc=$?; [[ $rc -eq 0 ]] && rm -rf "$OUT_DIR" || echo "⚠️ Hata: temp korundu: $OUT_DIR" >&2' EXIT
 
 API="https://api.supabase.com/v1/projects/${SB_PROJECT_REF}/database/query"
 mgt_query() {
@@ -112,6 +113,46 @@ echo "$TABLES_DDL" > "$OUT_DIR/tables.sql"
 TABLES_GEN=$(grep -c '^CREATE TABLE' "$OUT_DIR/tables.sql" || echo 0)
 echo "  tables.sql: $(wc -c <"$OUT_DIR/tables.sql") byte, $TABLES_GEN CREATE TABLE"
 
+# ── 3b) UYGULAMA ŞEMALARI (public dışı) ────────────────────────────────
+# 2026-09-24 vakası: public fonksiyonları surum_gizli'ye referans veriyor;
+# şema kurulmadan fn yüklemesi kırılıyor. Uygulamaya ait şemalar AÇIK LİSTEDİR
+# (platform şemaları — auth/storage/realtime/tiger/... — aynaya ALINMAZ);
+# prod'da yeni bir uygulama şeması belirirse buraya eklenmeli, yoksa fn hata
+# sayacı fail-closed şekilde yüzeye çıkarır.
+APP_SCHEMAS="surum_gizli"
+SCHEMA_LIST_SQL="'"$(echo "$APP_SCHEMAS" | tr ' ' ',' | sed "s/,/','/g")"'"
+say "3b/7 Uygulama şemaları üretiliyor ($APP_SCHEMAS)…"
+APP_SCHEMA_DDL=$(mgt_query "
+  SELECT string_agg('CREATE SCHEMA IF NOT EXISTS '||quote_ident(nspname)||';', E'\n')
+  FROM pg_namespace WHERE nspname IN ($SCHEMA_LIST_SQL)" | jq -r '.[0].string_agg // ""')
+APP_TABLES_DDL=$(mgt_query "
+  SELECT string_agg(stmt, E'\n')
+  FROM (
+    SELECT 'CREATE TABLE IF NOT EXISTS '||quote_ident(c.table_schema)||'.'||quote_ident(c.table_name)||' ('||
+           string_agg(
+             quote_ident(c.column_name)||' '||
+             CASE
+               WHEN c.data_type='USER-DEFINED' THEN c.udt_name
+               WHEN c.data_type='ARRAY' THEN 'text[]'
+               WHEN c.character_maximum_length IS NOT NULL
+                    AND c.data_type IN ('character varying','character','text')
+                 THEN c.data_type||'('||c.character_maximum_length||')'
+               ELSE c.data_type
+             END||
+             CASE WHEN c.is_nullable='NO' THEN ' NOT NULL' ELSE '' END,
+             ', ' ORDER BY c.ordinal_position
+           )||');' AS stmt
+    FROM information_schema.columns c
+    WHERE c.table_schema IN ($SCHEMA_LIST_SQL)
+      AND c.table_name IN (
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema IN ($SCHEMA_LIST_SQL) AND table_type='BASE TABLE'
+      )
+    GROUP BY c.table_schema, c.table_name
+  ) t" | jq -r '.[0].string_agg // ""')
+{ echo "$APP_SCHEMA_DDL"; echo "$APP_TABLES_DDL"; } > "$OUT_DIR/app_schemas.sql"
+echo "  app_schemas.sql: $(wc -c <"$OUT_DIR/app_schemas.sql") byte"
+
 # ── 4) FONKSİYONLAR (pg_get_functiondef, satır başına 1 fn) ───────────
 # string_agg gövde içinde $$/CREATE kelimesi yüzünden bozuluyor → her fn'i ayrı satır olarak çek.
 say "4/7 Fonksiyonlar üretiliyor (her biri ayrı satır)…"
@@ -119,7 +160,7 @@ say "4/7 Fonksiyonlar üretiliyor (her biri ayrı satır)…"
 FN_JSON=$(mgt_query "
   SELECT json_agg(pg_get_functiondef(p.oid) ORDER BY p.oid)
   FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-  WHERE n.nspname='public'" | jq -c '.[0].json_agg // []')
+  WHERE n.nspname='public' OR n.nspname IN ($SCHEMA_LIST_SQL)" | jq -c '.[0].json_agg // []')
 FN_COUNT=$(echo "$FN_JSON" | jq 'length')
 echo "  $FN_COUNT fonksiyon JSON array olarak alındı"
 
@@ -211,6 +252,7 @@ load_sql() {
 
 load_sql "$OUT_DIR/types.sql"   types
 load_sql "$OUT_DIR/tables.sql"  tables
+load_sql "$OUT_DIR/app_schemas.sql" app_schemas
 # fn parts (50'li partiler)
 for f in "$OUT_DIR"/fn_parts/fn_part_*.sql; do
   [[ -s "$f" ]] || continue
