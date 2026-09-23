@@ -638,6 +638,9 @@ window.addEventListener('load', withErrorHandling(async () => {
     if (el) el.innerHTML = `<div class="empty" style="padding:20px">⚠️ Yükleme hatası: ${esc(e.message)}<br><button class="btn btn-g" style="margin-top:12px" onclick="location.reload()">Yenile</button></div>`;
   }
   updateSyncBar();
+  // P10/B2: hedefi gelmiş ilk tohumlama görevleri varsa tek özet bildirimi
+  // (izin verilmemişse hiçbir şey olmaz — panel kalıcı kaynak)
+  if (typeof ovsyncAcilisOzeti === 'function') { try { ovsyncAcilisOzeti(); } catch (e) {} }
 
   // Background sync başlat (organik realtime geçişi — 30sn interval)
   startBackgroundSync(30000);

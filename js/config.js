@@ -172,3 +172,51 @@ const GOREV_GRUP_SIRA = [
   'Sağmal (Laktasyonda)',
   'Sağmal (Kuru)',
 ];
+
+// ══════════════════════════════════════════
+// Ovsync/PG — hata sözleşmesi ve tohumlama saat pencereleri
+// (PLAN 2026-09-24 P1/P6; SPEC S-4/S-5/S-6, MK1/MK6)
+// getUserMessage bu sözlüğü tek kaynak olarak okur (errorHandler'da kopya yok).
+
+// Sunucudan RAISE ile gelen 'KOD:json' / 'KOD' önekli hata kodları.
+// Değerler {msg} şablonundaki alanlarla doldurulur: {kupe}, {gun}, {tarih}, {deneme}.
+const PG_HATA_SOZLUGU = {
+  'PG_KAPI:BLOCK_PREGNANT': 'Gebe inekte PG uygulanamaz ({kupe}). Gebelik sonlandırma ayrı yetkili klinik işlemdir.',
+  'PG_KAPI:REQUIRE_ACK_PENDING': 'Son tohumlama sonucu Bekliyor ({kupe}, {tarih}, deneme {deneme}) — onay ver ya da Boş ata.',
+  'PG_KAPI:BLOCK_CATALOG_UNRESOLVED': 'Ürünün PG kataloğu bağı belirsiz — katalog kaydı düzeltilmeden uygulama yapılamaz.',
+  'PG_ZAMAN_GECERSIZ': 'Uygulama zamanı geçersiz (en çok 5 dk ileri / 7 gün geri girilebilir).',
+  'SISTEM_ETKEN_MADDE': 'Sistem etken maddesi değiştirilemez/silinemez.',
+  'KATALOG_SINIF_KODU_KILITLI': 'Bu katalog satırının sınıf kodu kilitli — değiştirilemez.',
+};
+
+// Tohumlama saat pencereleri (MK1, kapalı aralık, Europe/Istanbul).
+// JS aynası: ui.js erteleme modalı canlı önizlemede DB _tohumlama_pencere ile
+// aynı sonucu vermeli. Asla erkene yuvarlanmaz.
+const TOHUMLAMA_PENCERELERI = [
+  { bas: '09:00', son: '12:00' },
+  { bas: '18:00', son: '21:00' },
+];
+
+// Pencereye ileri yuvarlama (MK1): verilen 'YYYY-MM-DD HH:MM' yerel an
+// pencere içindeyse olduğu gibi; değilse bir sonraki pencere başlangıcı.
+// DB'deki _tohumlama_pencere IMMUTABLE gövdesinin aynası (birim testte karşılaştırılır).
+function pencereYuvarla(ts) {
+  const [gun, saat] = ts.split(' ');
+  const [h, m] = saat.split(':').map(Number);
+  const dk = h * 60 + m;
+  for (const p of TOHUMLAMA_PENCERELERI) {
+    const [ph, pm] = p.bas.split(':').map(Number);
+    const [sh, sm] = p.son.split(':').map(Number);
+    if (dk >= ph * 60 + pm && dk <= sh * 60 + sm) return `${gun} ${saat}`;  // pencere içinde: olduğu gibi
+  }
+  // 12:00–18:00 arası → 18:00 (aynı gün); 21:00–09:00 arası → ertesi gün 09:00
+  const [e1] = TOHUMLAMA_PENCERELERI[0].bas.split(':').map(Number);
+  const [s2] = TOHUMLAMA_PENCERELERI[1].son.split(':').map(Number);
+  const [b2] = TOHUMLAMA_PENCERELERI[1].bas.split(':').map(Number);
+  if (dk < e1 * 60) return `${gun} ${TOHUMLAMA_PENCERELERI[0].bas}`;
+  if (dk < b2 * 60) return `${gun} ${TOHUMLAMA_PENCERELERI[1].bas}`;
+  const [y, mo, d] = gun.split('-').map(Number);
+  const ertesi = new Date(Date.UTC(y, mo - 1, d + 1));
+  const iso = ertesi.toISOString().slice(0, 10);
+  return `${iso} ${TOHUMLAMA_PENCERELERI[0].bas}`;
+}

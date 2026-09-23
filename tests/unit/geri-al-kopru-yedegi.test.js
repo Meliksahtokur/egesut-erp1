@@ -1,6 +1,6 @@
 // tests/unit/geri-al-kopru-yedegi.test.js
 // L4-W7 D2 (root R1 düzeltmesi) — köprü-ÖNCE-tarih-sonra kuralı + boş köprü
-// satır-yedeği (damga 20260914-12).
+// satır-yedeği (damga 20260924-01).
 //
 // Kural (BAĞLAYICI, .ss/tasks/L4-R1-root-duzeltme.md D2):
 //   degisim_txid varsa hedef HER ZAMAN köprüden kurulur; tarih kontrolü ve
