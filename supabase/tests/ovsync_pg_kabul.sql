@@ -1679,6 +1679,23 @@ BEGIN
   RAISE NOTICE 'PASS R32-8: dry-run bayraktan bağımsız, yazmasız';
 END $t$;
 
+-- R32-11 (20260924000002): dry-run BAYRAK KAPALIYKEN de adayları SAYAR
+-- (kapı-5 hatası: eligibility bayrak kapısına takılıyordu, prod önizleme hep 0'dı)
+DO $t$
+DECLARE
+  v_h text := pg_temp.kb_hayvan(1500); v_z jsonb; v_n int;
+BEGIN
+  UPDATE public.protokol_ayar SET deger = 0 WHERE anahtar = 'ovsync_pg_kurallari_aktif';
+  INSERT INTO public.dogum (id, anne_id, tarih, yavru_cins, yavru_kupe, olay_id)
+  VALUES (gen_random_uuid(), v_h, pg_temp.kb_bugun() - 70, 'Dişi', pg_temp.kb_id('KBY'), gen_random_uuid());
+  v_z := public.ilk_tohumlama_zamanlayici(p_dry_run := true);
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_z->'acilacaklar') e WHERE e->>'hayvan_id' = v_h;
+  PERFORM pg_temp.kb_ok(v_n = 1, 'R32-11', 'bayrak 0 + dry-run → aday SAYILIR (kapı-5 önizleme)', v_n::text);
+  PERFORM pg_temp.kb_ok(public._acik_disi_gorev_kur(v_h) IS NULL, 'R32-11', 'bayrak 0 → hâlâ görev YOK (MK5 korunur)', NULL);
+  UPDATE public.protokol_ayar SET deger = 1 WHERE anahtar = 'ovsync_pg_kurallari_aktif';
+  RAISE NOTICE 'PASS R32-11: dry-run sayar, yaratma bayrakta';
+END $t$;
+
 -- R32-9/SK9: ovsync_baslat_uyarilari — yalnız hedef ≤ bugün+2 görevler listelenir
 DO $t$
 DECLARE
