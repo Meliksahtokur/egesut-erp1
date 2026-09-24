@@ -72,23 +72,33 @@ CREATE OR REPLACE FUNCTION public.gorev_tamamla(
   p_iptal       boolean DEFAULT false          -- YENİ (sona ekli, geriye uyumlu)
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, pg_temp             -- mevcut canlı ayar ne ise o korunur [UNKNOWN: canlı SET satırı]
+-- [AYNA-OBSERVED 2026-09-25 + R3 V1 teyidi: canlıda SET search_path satırı YOK —
+--  plan §0 ile aynı; canlı header aynen korunur, bu taslaktaki SET satırı UYGULANMAZ]
 AS $fn$
 DECLARE
   -- mevcut canlı gövdedeki DECLARE bloğu aynen korunur
 BEGIN
   -- ═══ T5 branşı — ek koşul, mevcut mantık ikame EDİLMEZ ═══
+  -- (konum: canlı gövdede NOT FOUND kontrolünün hemen ardından, `IF v_gorev.tamamlandi`
+  --  erken-dönüşünden ÖNCE — CONFIRMED 20260902000003:203-206)
   IF p_iptal IS TRUE THEN
     UPDATE public.gorev_log
        SET tamamlandi = true,
            tamamlanma_tarihi = COALESCE(tamamlanma_tarihi, now()),
            iptal = true
-     WHERE id::text = p_gorev_id;
+     WHERE id = p_gorev_id::uuid;   -- canlı desenle aynı cast (20260902000003:203; id::text cast'i index-sargable değil)
     IF NOT FOUND THEN
       RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
     END IF;
-    -- islem_log izi: canlı gövdedeki tamamlandı-iz deseninin aynısı, aciklama
-    -- 'Görev iptal edildi (offline replay)' [UNKNOWN: canlı islem_log INSERT deseni]
+    -- islem_log izi [AYNA-OBSERVED 2026-09-25: canlı gövdede tek INSERT var — kolonlar
+    -- (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu); 'aciklama' kolonu YOK;
+    -- INSERT fonksiyon sonunda, VALUES ('GOREV_TAMAMLA', v_gorev.hayvan_id, p_gorev_id,
+    -- 'gorev_log', v_snapshot, format('Görev tamamlandı (stok: %s, padok: %s)', …)). Branş izi
+    -- AYNI kolon setiyle yazılır — Adım 1 demo teyidi korunur]:
+    -- INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
+    -- VALUES ('GOREV_TAMAMLA', v_gorev.hayvan_id, p_gorev_id, 'gorev_log',
+    --         '{"olusturulan":[],"guncellenen":[],"silinen":[]}'::jsonb,
+    --         'Görev iptal edildi (offline replay)');
     RETURN jsonb_build_object('ok', true, 'gorev_id', p_gorev_id, 'iptal', true);
   END IF;
   -- ═══ mevcut canlı gövde aynen devam eder ═══
@@ -191,20 +201,24 @@ _savePending(); updatePendingFab();
 
 ### 7.1 Kanıt ve sahibin bağlayıcı kararı
 - Muafiyet fonksiyonu `_acik_disi_ovsync_hedef`: CONFIRMED `20260924000001:L237` (fn), `:265-271` aktif `cases.protocol_family IS NOT NULL` bloğu (`:269`), `:273-280` açık `gorev_tipi='OVSYNC_BASLAT'` bloğu (`:275`). Senkron zincir görevleri (ILAC/TOHUMLAMA_HAZIRLIK) iki blokta da GÖRÜNMÜYOR → T1 boşluğu.
+- **Onarım turu — canlı hedef düzeltmesi:** canlı `_acik_disi_ovsync_hedef` İNCE SARMALAYICIDIR (AYNA `pg_get_functiondef` OBSERVED 2026-09-25: gövde yalnız `_ovsync_pg_aktif` kapısı + `RETURN public._acik_disi_hedef_ic(p_hayvan_id)`; CONFIRMED `20260924000002:74-90`). T1 ek koşulu **`_acik_disi_hedef_ic`** gövdesine yazılır — canlı OVSYNC_BASLAT bloğunun (`20260924000002:53-59`) arkasına, `_ovsync_kural_tarihi` çağrısının (:61) önüne; sarmalayıcı ve `ilk_tohumlama_zamanlayici` DOKUNULMAZ (plan §0/ENGEL-1 + Adım 11 ile aynı). Yukarıdaki :237/:265-271/:273-280 satırları 20260924000001 MİGRASYON DOSYASININ kanıtıdır; canlı gövde referansı değildir.
 - **Sahibin kararı (bağlayıcı):** 188 çift zincir **KASITLI, dokunulmaz** (sentez §9-S4). T1 önerisi "kasıtlı ardışık zincirleri engellemeyecek şekilde" revize edilir: mevcut OVSYNC_BASLAT bloğu **ikame edilmez**, üçüncü bir koşul **EKLENİR**; kasıtlı akış (Presynch görevleri kapanınca yeni hedef üretilir) korunur çünkü ek koşul yalnız **açık** senkron görevi varken üretimi durdurur, görevler kapanınca zamanlayıcı normal üretimine döner.
-- 188'in kendisi mevcut :273-280 bloğuyla zaten muaf (açık OVSYNC_BASLAT'ı var — demo OBSERVED). Ek koşul 188 davranışını DEĞİŞTİRMEZ (kabul testi D7 ile kanıtlanır).
+- 188'in kendisi mevcut OVSYNC_BASLAT bloğuyla (canlıda `_acik_disi_hedef_ic` :53-59 karşılığı; migrate-dosyası 20260924000001:273-280) zaten muaf (açık OVSYNC_BASLAT'ı var — demo OBSERVED). Ek koşul 188 davranışını DEĞİŞTİRMEZ (kabul testi D7 ile kanıtlanır).
 - T2 (168/186 canlı çift-planlama örnekleri, OBSERVED): kalıcı fix Plan 2 R1 reconcile + Plan 4'e aittir — **bu spec yalnız doğrulama ölçümünü taşır** (D9), implementasyon taşımaz.
 
 ### 7.2 Migration taslağı — F2 (gövde-seviyesi)
 
 ```sql
--- 20260925000002_cila_t1_acik_disi_senkron_muafiyet.sql (TASLAK — gövde CANLI
--- pg_get_functiondef('_acik_disi_ovsync_hedef(text)')'den kopyalanır; şu blok
--- mevcut :273-280 bloğunun ARKASINA EKLENİR)
-CREATE OR REPLACE FUNCTION public._acik_disi_ovsync_hedef(p_hayvan_id text)
+-- 20260925000002_cila_t1_acik_disi_senkron_muafiyet.sql (TASLAK — ONARIM TURU
+-- HEDEF DÜZELTMESİ: gövde CANLI pg_get_functiondef('_acik_disi_hedef_ic(text)')'den
+-- kopyalanır; canlı OVSYNC_BASLAT bloğunun (20260924000002:53-59 karşılığı) ARKASINA,
+-- _ovsync_kural_tarihi çağrısının (:61) ÖNÜNE EKLENİR. Sarmalayıcı
+-- _acik_disi_ovsync_hedef DOKUNULMAZ — bkz. §7.1 + plan §0/ENGEL-1)
+CREATE OR REPLACE FUNCTION public._acik_disi_hedef_ic(p_hayvan_id text)
 RETURNS date ... (canlı imza/ayarlar aynen) AS $fn$
 DECLARE ... (canlı) BEGIN
-  ... (canlı gövde: MK3 gebelik otoritesi + :265-271 vaka bloğu + :273-280 OVSYNC_BASLAT bloğu aynen) ...
+  ... (canlı gövde aynen: MK3 gebelik otoritesi + aktif-vaka bloğu + OVSYNC_BASLAT bloğu;
+       migrate-dosyası kanıt karşılıkları 20260924000001:265-271/:273-280, canlı ic :21-68 içinde) ...
   -- ═══ T1 ek koşulu — açık senkron-protokol görevi varsa yeni açık-dişi hedef üretme ═══
   IF EXISTS (
     SELECT 1 FROM public.gorev_log g
@@ -218,8 +232,9 @@ DECLARE ... (canlı) BEGIN
   END IF;
   ... (canlı kuyruk: _ovsync_kural_tarihi + GREATEST) ...
 END; $fn$;
-REVOKE ALL ON FUNCTION public._acik_disi_ovsync_hedef(text) FROM PUBLIC, anon, authenticated;
--- (yardımcı fonksiyon — mevcut desen :293; harici çağrı beklenmiyorsa GRANT yazılmaz)
+REVOKE ALL ON FUNCTION public._acik_disi_hedef_ic(text) FROM PUBLIC, anon, authenticated;
+-- (yardımcı fonksiyon — canlı desen 20260924000002:72; harici çağrı beklenmiyorsa GRANT yazılmaz.
+--  _acik_disi_ovsync_hedef sarmalayıcısı + ilk_tohumlama_zamanlayici aynen korunur — plan Adım 11)
 ```
 
 **Kapsam parametresi (S1 — sahibe tek-cümlelik soru, sentez §9-12):** filtre yalnız Presynch-14 damgalı görevlerle mi sınırlanmalı, her senkron ILAC zinciri mi kapsansın? Taslak geniş kapsam (`%senkron%`) ile yazıldı; S1 cevabı dar-kapsam isterse yalnız `kaynak ILIKE '%senkron%presynch%'`-tipi daraltma yapılır (final apply ÖNCEKİ, kapı 3.2-4 canlı doğrulamasından sonra).
@@ -246,7 +261,7 @@ WHERE g.gorev_tipi='VETERINER_KONTROL' AND COALESCE(g.tamamlandi,false)=false AN
 
 ### 8.2 D18 — Erteleme özeti görünmüyor + ham hata JSON'u
 - Kanıt: RPC `toplam_erteleme_gun` döndürüyor CONFIRMED `20260923000003:L620-625`; UI toast'u bu alanı göstermiyor CONFIRMED `js/ui.js:1058-1059` (R3 onarımda satır tazelendi; `_erteleKaydet` :1050-1066); `GOREV_ERTELENEMEZ`/`GECMIS_TARIH` kodları sözlükte yok → errorHandler jenerik dalına düşüyor (CONFIRMED `js/utils/errorHandler.js` USER_FRIENDLY döngüsü :54-56; sözlük :7-13'te 5 anahtar; `js/config.js:183` PG_HATA_SOZLUGU'nda da bu iki kod YOK — çakışma riski yok).
-- **F5:** toast'a `r.toplam_erteleme_gun` eklenir: `'✅ Ertelendi → … · toplam N gün erteleme'` (N>0 ise). **F7:** `USER_FRIENDLY`'ye `GOREV_ERTELENEMEZ` ve `GECMIS_TARIH` anahtarları (Türkçe cümleler) eklenir.
+- **F5:** toast'a `r.toplam_erteleme_gun` eklenir: `'✅ Ertelendi → … · toplam N gün erteleme'` (N>0 ise). **F7:** `USER_FRIENDLY`'ye `GOREV_ERTELENEMEZ` ve `GECMIS_TARIH` anahtarları (Türkçe cümleler) eklenir. *(Onarım turu gerekçe-notu: alternatif hedef `js/config.js` `PG_HATA_SOZLUGU` (:183 — errorHandler katman-2 döngüsü :46-51 bu sözlüğü `msg.includes` ile tarar) idi; davranış eşdeğer olduğundan F7 bilinçli olarak `errorHandler.js`'te tutuldu — spec §2 dosya zarfı (F1-F8) böylece değişmez. Uygulayıcı iki hedeften birini seçebilir; davranış testi U6 ikisinde de aynıdır.)*
 - Kabul: **D11 (demo):** ertelenmiş görevde toast toplam günü gösteriyor; **U6 (birim):** getUserMessage iki kod için Türkçe cümle döndürüyor; zincir-tipi görev (BESLEME) ertelenmek istendiğinde ham JSON değil Türkçe mesaj.
 
 ### 8.3 D19 — Vaka-kapanış özeti eksik + ölü fallback anahtarı
@@ -255,12 +270,12 @@ WHERE g.gorev_tipi='VETERINER_KONTROL' AND COALESCE(g.tamamlandi,false)=false AN
 - Kabul: **U7 (birim):** mock result ile özet metni üretimi (N=2, M=3 → doğru cümle; hepsi 0 → özet YOK, yalnız standart toast). **D12 (demo):** tohumlama kaydında senkron vakası kapanan senaryoda özet görünüyor (plan-5 §3.2 K1/K2 yürüyüşüne bağlanır).
 
 ### 8.4 D17 — `start_first_service_protocol` pull seti alt-küme
-- Kanıt: CONFIRMED `js/api.js:321` — set `['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket']`; plan kümesinde olup eksik üç katalog tablosu: `diseases`, `drugs`, `tedavi_sablonu` (tablo adları CONFIRMED `js/api.js:35`).
+- Kanıt: CONFIRMED `js/api.js:320` — set `['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket']`; plan kümesinde olup eksik üç katalog tablosu: `diseases`, `drugs`, `tedavi_sablonu` (tablo adları CONFIRMED `js/api.js:32-35`).
 - **F4:** üç tablo sete eklenir. Katalog tabloları küçüktür; pull maliyeti önemsiz (INFERRED).
 - Kabul: **D13 (demo):** RPC tetiklendiğinde üç tablonun IDB'ye indiği (get sayıları > 0) ve `TABLES` filtresiyle çakışmadığı; **U8 (birim):** `RPC_TABLES.start_first_service_protocol` seti tamamlanmış.
 
 ### 8.5 O11 — TZ drift: `p_occurred_at` browser-yerel saat
-- Kanıt: CONFIRMED `js/ui.js:2338-2340` — `occurredAt = new Date(olcGun + 'T' + (olcSaat || '12:00') + ':00').toISOString()` → girilen tarih+saat **tarayıcının yerel dilimiyle** yorumlanır; PLAN Europe/Istanbul der. `p_occurred_at` üreten tek nokta burası (OBSERVED grep — `js/` ağacında tek `p_occurred_at` satırı).
+- Kanıt: CONFIRMED `js/ui.js:2338-2341` (atama :2340) — `occurredAt = new Date(olcGun + 'T' + (olcSaat || '12:00') + ':00').toISOString()` → girilen tarih+saat **tarayıcının yerel dilimiyle** yorumlanır; PLAN Europe/Istanbul der. `p_occurred_at` üreten tek nokta burası (OBSERVED grep — `js/` ağacında tek `p_occurred_at` satırı :2344).
 - **F5:** sabit İstanbul ofsetiyle anchor: `new Date(olcGun + 'T' + (olcSaat || '12:00') + ':00+03:00').toISOString()` (Türkiye kalıcı +03, DST yok — INFERRED; standart kural "PLAN İstanbul der"). Kullanıcı başka dilimde olsa da kayıt İstanbul saatiyle sabitlenir; mevcut TR kullanıcılarında davranış farkı yalnız +03 dışı yerel dilim kurulu cihazlarda ortaya çıkar (düzeltme).
 - Kabul: **U9 (birim):** `_protokolUygulaKaydet` tarih-saat kurulumu mock'lanır — '24.09.2026 12:00' → `2026-09-24T09:00:00.000Z` (İstanbul +03 sabitlenmiş); cihaz-diliminden bağımsız aynı çıktı.
 
@@ -274,7 +289,7 @@ WHERE g.gorev_tipi='VETERINER_KONTROL' AND COALESCE(g.tamamlandi,false)=false AN
 - Kanıt: rozet yalnız `protokol_eksik_tara` çıktısını sayıyor CONFIRMED `js/ui.js:413-424` (rozet filtresi :417); `protokol_eksik_tara`'da OVSYNC bölümü YOK (bölümler: A doğum-sonrası :25, B ileri gebe :127, C kızgınlık :264 — CONFIRMED `20260718000001:L25,L127,L264` + `RETURN v_result` :344; **canlı gövdede de OVSYNC yok — R3 onarımında OBSERVED**, plan V10); panelin OVSYNC bölümü ayrı RPC `ovsync_baslat_uyarilari`'ndan besleniyor CONFIRMED `js/ui.js:1829-1847` (ovHtml :1829, rpc :1831, ovList :1832; canlıda RPC mevcut — OBSERVED).
 - **Tasarım (b2 — varsayılan, DB değişikliği YOK):** `loadDash` rozet bloğu ikinci RPC'yi de çağırıp tek rozette birleştirir: `rozet = aktifProtokolSayısı + ovUyarıSayısı`; `window.__ovsyncUyarilar` önbelleğine yazar, panel (ui.js:1832, ovList okuma — R3 onarımda satır tazelendi) taze kayıt yoksa bu önbelleği kullanır (çift çağrı önlenir; panel açılışında kendi çağrısı her zaman tazeler).
 - **Alternatif (a) — S3'e bağlı:** OVSYNC bölümünün `protokol_eksik_tara`'a katılması (tek DB kaynağı) — SK9/D9 tercihiyle çelişip çelişmediği sahibe sorulur; bu turda uygulanmaz, kayıt altında.
-- Kabul: **D14 (demo — ölçülebilir formül):** rozet sayısı == panel başlık toplamı `(🔴 Gecikmiş + 🟡 Yaklaşan + 🌱 İlk Tohumlama)`; `99+` üstü tırmanma davranışı korunur; **U11 (birim):** birleştirme fonksiyonu (`protokol n + ov m` → n+m; ov çağrısı hata → yalnız n, konsol uyarı — mevcut `catch` deseni ui.js:424).
+- Kabul: **D14 (demo — ölçülebilir formül):** rozet sayısı == panel başlık toplamı `(🔴 Gecikmiş + 🟡 Yaklaşan + 🌱 İlk Tohumlama)`; `99+` üstü tırmanma davranışı korunur; **U11 (birim):** birleştirme fonksiyonu (`protokol n + ov m` → n+m; ov çağrısı hata → yalnız n, konsol uyarı — mevcut `catch` deseni ui.js:423).
 
 ## 10. T11 — Sahibe not (kod değişikliği YOK)
 
@@ -285,25 +300,25 @@ WHERE g.gorev_tipi='VETERINER_KONTROL' AND COALESCE(g.tamamlandi,false)=false AN
 | Değişiklik | Geri dönüş |
 |---|---|
 | F1 (`gorev_tamamla` +p_iptal) | Öncesi canlı gövde `pg_get_functiondef` çıktısı migration başına yorum olarak gömülür; geri dönüş = o gövdeyle `CREATE OR REPLACE` (eski imzaya döner; yeni 3-arg imza DROP edilir). UI tarafı `p_iptal` gönderimi tek satır — revert basit. |
-| F2 (`_acik_disi_ovsync_hedef` ek koşul) | Aynı yöntem: öncesi canlı gövde gömülü; geri dönüş = eski gövde geri yüklenir. Ek koşul tek blok olduğundan blok-silmeli revert de yeterli. |
-| F3 (overload DROP) | `DROP` geri alınamaz — F3 apply'dan ÖNCE eski overload gövdesi migration içine `CREATE OR REPLACE FUNCTION public.tohumlama_sonuc_bos(text) ...` olarak gömülür (revert = yeniden oluştur). Bu gömme F3'ün zorunlu bölümüdür. |
+| F2 (`_acik_disi_hedef_ic` ek koşul — onarım turu hedef düzeltmesi; sarmalayıcı `_acik_disi_ovsync_hedef` DOKUNULMAZ) | Aynı yöntem: öncesi canlı `pg_get_functiondef('_acik_disi_hedef_ic(text)')` gömülü; geri dönüş = eski gövde geri yüklenir. Ek koşul tek blok olduğundan blok-silmeli revert de yeterli. |
+| F3 (overload DROP — **İPTAL**, §5.3; satır kayıt amaçlı) | `DROP` geri alınamaz — (uygulanmış olsaydı) F3 apply'dan ÖNCE eski overload gövdesi migration içine `CREATE OR REPLACE FUNCTION public.tohumlama_sonuc_bos(text) ...` olarak gömülürdü (revert = yeniden oluştur). Canlıda overload olmadığından bu satır geçerliliğini yitirdi. |
 | F4-F7 (JS) | Git revert; `?v=` sürüm damgası tek değer güncellenir (teslim mekaniği kuralı). |
-| Demo DB verisi | T5/T1/T6 demo-apply adımları şema-değişikliktir, veri silmez; T2 ölçümü salt-okunurdur. Veri yazan tek adım Plan 2 temizliğidir (bu spec dışı, dry-run'lı). |
+| Demo DB verisi | T5/T1 demo-apply adımları şema-değişikliktir, veri silmez (T6/F3 iptal — §5.3); T2 ölçümü salt-okunurdur. Veri yazan tek adım Plan 2 temizliğidir (bu spec dışı, dry-run'lı). |
 
 ## 12. Varsayımlar ve UNKNOWN listesi
 
 | # | İfade | Etiket |
 |---|---|---|
 | V1 | `gorev_tamamla` canlı imzası `(text,text)` (ground_truth:7486'dan) | **CONFIRMED — canlı (R3 onarımı):** demo pg_proc'ta tek imza `(text,text)`, `SET search_path` YOK; F1 apply öncesi birebir gövde karşılaştırması K-4 olarak sürer |
-| V2 | canlı `gorev_tamamla` gövdesinde islem_log INSERT deseni mevcut (F1 iptal-branı izini ona göre yazar) | **UNKNOWN** — canlı gövde okuması şart (Adım 1) |
+| V2 | canlı `gorev_tamamla` gövdesinde islem_log INSERT deseni mevcut (F1 iptal-branı izini ona göre yazar) | **AYNA-OBSERVED (2. onarım turu, 2026-09-25):** VAR — tek INSERT fonksiyon sonunda; kolonlar `tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu` ('aciklama' YOK). Adım 1 demo gövde okuması (K-4) aynen koşulur |
 | V3 | senkron zincir görevlerinde `kaynak`/`aciklama` 'senkron' damgası canlı demo'da geçiyor | **CONFIRMED — canlı (R3 onarımı):** 16 satır (tamamı ILAC, "39. Gün PG (Presynch-14 senkron)"), 2'si açık; bkz. §7.2 |
 | V4 | canlıda `tohumlama_sonuc_bos` (text) overload'ı hâlâ duruyor ve davranışsal fark taşıyor | **ÇÜRÜTÜLDÜ — canlı (R3 onarımı):** demo pg_proc'ta tek imza `(text,text)`; overload YOK → F3 İPTAL (§5.3) |
 | V5 | Türkiye saat dilimi kalıcı +03 (DST yok) → O11 fix'i tek sabit ofsetle güvenli | INFERRED (genel bilgi) + plan kuralı |
-| V6 | RPC_MAP replay'inin queuelanan `gorev_log` PATCH'lerini iptal-tipli op'lar olarak aldığı (üretici `write()` yolu, ui.js:1193) | CONFIRMED kod yolu; canlı kuyruk içerik dağılımı UNKNOWN (client-IDB — ölçülemez, tasarım her iki opu doğru taşıyacak şekilde) |
+| V6 | RPC_MAP replay'inin queuelanan `gorev_log` PATCH'lerini iptal-tipli op'lar olarak aldığı (üretici `write()` yolu, ui.js:1190-1199 — write :1195) | CONFIRMED kod yolu; canlı kuyruk içerik dağılımı UNKNOWN (client-IDB — ölçülemez, tasarım her iki opu doğru taşıyacak şekilde) |
 | V7 | `start_first_service_protocol` pull setine üç katalog tablosu eklenmesinin kullanıcı-görünür yan etkisi yok | INFERRED (katalog küçük + B27 fetcher'ları mevcut, api.js:472) |
 | V8 | rozet birleştirmesi için ek RPC çağrısı dashboard yükünü kabul edilebilir ölçüde artırır (mevcut 2 RPC'ye 1 ekleme) | INFERRED |
-| V9 | 188'in kasıtlı zinciri F2'den etkilenmez (açık OVSYNC_BASLAT bloğu :273-280 korunur) | CONFIRMED (kod yapısı) + demo OBSERVED — D7 ile mühürlenir |
-| V10 | `protokol_eksik_tara`'da OVSYNC bölümü yok | CONFIRMED `20260718000001` bölüm yapısı (canlı gövde de Adım 0'da tek sorguyla teyit edilir) |
+| V9 | 188'in kasıtlı zinciri F2'den etkilenmez (açık OVSYNC_BASLAT bloğu korunur — canlıda `_acik_disi_hedef_ic` :53-59 karşılığı; migrate-dosyası 20260924000001:273-280) | CONFIRMED (kod yapısı) + demo OBSERVED — D7 ile mühürlenir |
+| V10 | `protokol_eksik_tara`'da OVSYNC bölümü yok | CONFIRMED `20260718000001` bölüm yapısı (L25/L127/L264 + RETURN :344); **R3 onarımında canlıdan da teyit edildi — OBSERVED** (pg_get_functiondef'te 'OVSYNC' yok) |
 
 ## 13. Açık kararlar (Tur 2 başında sahibe seri sunulur — spec'i DURDURMAZ, varsayılanla ilerler)
 

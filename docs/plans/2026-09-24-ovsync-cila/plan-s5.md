@@ -19,7 +19,7 @@ Diğer teyitler (bu plan yazılırken):
 - **T6 canlı ölçümü (R3 onarımı):** demo pg_proc'ta `tohumlama_sonuc_bos` **tek imza `(text,text)`**; legacy `(text)` overload **YOK** (prod'da da tek imza — yan gözlem). Repo: `20260403000001:L6` DROP etmiş, `20260512000006` tekrar CREATE etmiş; canlı nihai durum tek imza. → **Adım 12 (F3) KESİN ATLANIR**; `20260512000006` anon-GRANT risk kaydı canlıda fonksiyon olmadığından kapanır.
 - **V3 damga ölçümü (R3 onarımı):** demo `gorev_log`'da `kaynak ILIKE '%senkron%' OR aciklama ILIKE '%senkron%'` → **16 satır** (tamamı ILAC, `aciklama='39. Gün PG (Presynch-14 senkron)'`, `kaynak='DOGUM-<uuid>'`), **2'si açık**. Damga `aciklama`'da → F2'nin geniş-kapsam filtresi canlı veriyle uyumlu; **ENGEL-4 kalktı, Adım 11 koşulsuz yazılır**.
 - **V10 canlı teyit (R3 onarımı):** canlı `protokol_eksik_tara()` gövdesinde OVSYNC bölümü yok (pg_get_functiondef LIKE sorgusu: false) — rozet tasarım b2 ön-şartı sağlam; canlı `ovsync_baslat_uyarilari` ve `tohumlama_gorev_ertele` RPC'leri mevcut; demo'da açık OVSYNC_BASLAT 29 satır (D7 yürütülebilir).
-- **MCP hedef uyarısı (R3 onarımı — OPERASYONEL RİSK):** tools-bank `supabase_migrate`/`supabase_query` MCP bağlantısı **PROD projesine** bakar (fdw_prod_srv=0 + schema_migrations=124 = prod imzası; demo imzası fdw_prod_srv≥1). Bu MCP ile "demo ölçümü" sanarak sorgu/apply koşmak **prod okur/yazar**. Demo işlemleri için: repo kök `.env`'deki `SUPABASE_DEMO_PAT` ile `curl -X POST https://api.supabase.com/v1/projects/vtzqjmazsvurxdeondmi/database/query` (R3 onarımında ölçümler bu yolla koşuldu — çalıştığı OBSERVED) veya `SUPABASE_DEMO_DB_PASSWORD` + `SUPABASE_DEMO_POOLER` ile psql.
+- **MCP hedef uyarısı (R3 onarımı — OPERASYONEL RİSK):** tools-bank `supabase_migrate`/`supabase_query` MCP bağlantısı **PROD projesine** bakar (fdw_prod_srv=0 + schema_migrations=124 = prod imzası; demo imzası fdw_prod_srv≥1). Bu MCP ile "demo ölçümü" sanarak sorgu/apply koşmak **prod okur/yazar**. Demo işlemleri için: `SUPABASE_DEMO_PAT` ile `curl -X POST https://api.supabase.com/v1/projects/vtzqjmazsvurxdeondmi/database/query` (R3 onarımında ölçümler bu yolla koşuldu — çalıştığı OBSERVED) veya `SUPABASE_DEMO_DB_PASSWORD` + `SUPABASE_DEMO_POOLER` ile psql. **Yol notu (2. onarım turu, 2026-09-25):** `SUPABASE_DEMO_PAT` bu worktree kökünde DEĞİL, **ana checkout `/home/melik/egesut-erp1/.env`'de** (CONFIRMED: worktree kökünde `.env` yok); implementer değişkeni ana checkout'tan okur, çalışmayı worktree dizininde sürdürür.
 - `flushPendingDone` güncel gövde: CONFIRMED `js/ui.js:583-597` (spec R3 onarımında :583-597'ye tazelendi; `_pendingDone.clear()` :587, catch :593, `recoverPendingDone` :598-605).
 - `seansTamamla` toast: CONFIRMED `js/forms.js:4012-4014`; `rpcSeansTamamla` PG-kapı dönüşü CONFIRMED `js/api.js:693-701`.
 - `buildRpcParams` gorev_tamamla dalı: CONFIRMED `js/ui.js:9426-9427`; RPC_MAP replay eşlemesi CONFIRMED `js/ui.js:9245`; iptal üreticisi CONFIRMED `js/ui.js:1190-1199` (`write('gorev_log',{...iptal:true},'PATCH')` — op.data[0]'da `id` ve `iptal:true` taşınır).
@@ -75,7 +75,7 @@ Sorgular (salt-okunur, demo):
 3. **V3 (F2 için — damga ölçümü, spec §7.2):** `SELECT gorev_tipi, kaynak, count(*) FROM public.gorev_log WHERE gorev_tipi IN ('ILAC','TOHUMLAMA_HAZIRLIK','TEDAVI_GUN') GROUP BY 1,2 ORDER BY 3 DESC LIMIT 30;` + `aciklama` örnekleri. '**senkron**' damgası geçmiyorsa → F2 YAZILMAZ (ENGEL-4), bulgu S1 ile sahibe. **R3 notu: kapandı — damga VAR (16 satır, 2 açık, `aciklama` alanında; bkz. §0). Ölçümün kesin sorgusu ILIKE-based olmalı; LIMIT-30 count-sıralı kesit damgalı satırları gösteremez (R3'te bu tuzak görüldü).**
 4. **V10 teyidi:** `SELECT pg_get_functiondef('public.protokol_eksik_tara()'::regprocedure)` içinde 'OVSYNC' bölümü yok mu (rozet tasarım b2'nin ön-şartı).
 5. **D7 ön-ölçümü:** `SELECT public._acik_disi_ovsync_hedef('<188-in-hayvan-id>');` çıktısını kaydet (apply-sonrası birebir-eş karşılaştırmanın AYAĞI). 188'in id'si demo `gorev_log`'dan çözülür (açık OVSYNC_BASLAT'lı hayvan).
-6. **Canlı gövdelerin F1/F2/F3'e gömülecek kopyaları** (K-4): `gorev_tamamla`, `_acik_disi_hedef_ic`, `tohumlama_sonuc_bos(text)` pg_get_functiondef çıktıları ölçüm raporuna aynen yazılır.
+6. **Canlı gövdelerin F1/F2'ye gömülecek kopyaları** (K-4): `gorev_tamamla`, `_acik_disi_hedef_ic` pg_get_functiondef çıktıları ölçüm raporuna aynen yazılır. *(F3 İPTAL — R3: `tohumlama_sonuc_bos(text)` gövmesi kalktı, canlıda fonksiyon yok; bkz. §0/Adım 12.)*
 
 **Kapı:** K-7. **Doğrulama (Ö1):** ölçüm raporunda 6 başlık dolu; imza listeleri + dağılım + ayrıcalıklar sayısal. **Commit:** `reports: cila Tur2 Adım1 canlı şema ölçümleri (V1-V3/V10, T6 dağılım, D7 ön-ölçüm)`.
 
@@ -105,7 +105,9 @@ Sorgular (salt-okunur, demo):
   END IF;
 ```
   - İdempotentlik: görev zaten `iptal=true` ise UPDATE koşulsuz tekrar yazar, aynı dönüşü verir (replay tekrar denemesinde zararsız). Zaten `tamamlandi=true` AMA `iptal=false` bir göreve `p_iptal=true` gelirse iptal damgası ekler — replay-race'te beklenen birleşim (otomatik sync önce tamamlayıp iptali taşımış olabilir; nihai durum tutarlı).
-  - **V2'ye bağlı iz:** Adım 1'de canlı gövdede islem_log INSERT deseni çıktıysa, branşa aynı desenle `aciklama='Görev iptal edildi (offline replay)'` INSERT'i eklenir; çıkmadıysa iz eklenmez (PATCH-yolunun degisim_log trigger izi dışında ek borç yazılmaz).
+  - **V2 izi (2. onarım turunda aynadan ÇÖZÜLDÜ — VAR):** canlı gövdede tek islem_log INSERT var (fonksiyon sonunda; kolonlar `tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu` — `'aciklama'` kolonu YOK; AYNA-OBSERVED 2026-09-25, spec §12-V2). Branşa aynı kolon setiyle iz eklenir:
+    `INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu) VALUES ('GOREV_TAMAMLA', v_gorev.hayvan_id, p_gorev_id, 'gorev_log', '{"olusturulan":[],"guncellenen":[],"silinen":[]}'::jsonb, 'Görev iptal edildi (offline replay)');`
+    Adım 1 demo gövde-okuması (K-4) aynen koşulur — desen canlı demo'da birebir teyit edilmeden apply yok. (PATCH-yolunun degisim_log trigger izi dışında ek borç yazılmaz.)
 - Kuyruk (GRANT'lara kadar canlı gövdenin tamamı) + sonda:
 ```sql
 REVOKE ALL ON FUNCTION public.gorev_tamamla(text, text, boolean) FROM PUBLIC, anon;
@@ -462,8 +464,8 @@ F8'e **U7**: `loadExtractedFunction('js/forms.js','_vakaKapanisOzeti')` — n=2,
 
 ```
 Adım 0 → Adım 1 ─┬→ Adım 2 → Adım 3 → Adım 4 → Adım 5
-                 ├→ Adım 11  (V3 ölçümüne bağlı; damga yoksa atlanır)
-                 └→ Adım 12  (sahip onayına bağlı; en sonda)
+                 ├→ Adım 11  (R3: V3 kanıtlandı — koşulsuz yazılır)
+                 └→ Adım 12  (R3 onarımında İPTAL — koşulmaz; geçerli: Adım 13 → Adım 14)
 Adım 0 → Adım 6 → Adım 7 → Adım 8 → Adım 9 → Adım 10 → Adım 13 (13a→13g sıralı) → Adım 14
 (Adım 5 ve Adım 11/12 DB kulvarı; Adım 6-13 JS kulvarı — iki kulvar farklı agent'ta paralel AÇILABİLİR,
  yalnız Adım 13 öncesi Adım 9 bitmiş olmalı; Adım 14 hepsinin sonu.)
