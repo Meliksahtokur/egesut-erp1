@@ -267,7 +267,7 @@ function _dashSutBuzagiBandi(animals,vaccines,vaxLogs,tasks,schRows,kesimEsik,to
   const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🍼 Süt İçen Buzağılar (${liste.length}) ${kesimBtn}</span>`;
   return band((gecikVar||liste.some(a=>a.yas>=esik))?'red':'amber',title,rows.join(''));
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml,muayeneList){
   const _dd=ddMap||{};
   const _getDis=t=>{if(t.gorev_tipi!=='TEDAVI_GUN')return '';try{return _dd[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}};
   const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
@@ -309,6 +309,12 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
       }).join(''));
   }
   if(sutBuzagiHtml) h+=sutBuzagiHtml;   // 🍼 Süt İçen Buzağılar — ileri gebelerin hemen altı
+  // S2: 🔬 Gebelik Muayenesi Bekleyenler — sessiz bandının HEMEN ÜSTÜNDE izole kırmızı bant
+  if((muayeneList||[]).length){
+    const mTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">🔬 Gebelik Muayenesi Bekleyenler (${muayeneList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
+    h+=band('red',mTitle,
+      muayeneList.slice(0,8).map(m=>`<div class="arow" onclick="openDet('${escAttr(m.hayvan_id)}')"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
+  }
   if((sessizList||[]).length){
     const sTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">❗ Sessiz Hayvanlar (${sessizList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
     const sessizTop=[...(sessizList||[])].sort((a,b)=>{const af=a.sessiz_gun>=9999?1:0,bf=b.sessiz_gun>=9999?1:0;return af-bf||b.sessiz_gun-a.sessiz_gun;});
@@ -397,6 +403,10 @@ async function loadDash(){
     let sessizList=[];
     try{ const sl=await rpc('sessiz_hayvanlar_listele',{}); if(sl&&sl.length) sessizList=sl; }catch(e){/* sessiz */}
 
+    // 🔬 Gebelik muayenesi listesi (S2) — band, sessiz bandının hemen üstünde
+    let muayeneList=[];
+    try{ const ml=await rpc('gebelik_muayene_listele',{}); if(ml&&ml.length) muayeneList=ml; }catch(e){/* sessiz — RPC henüz yoksa bantsız devam */}
+
     // TEDAVI_GUN teşhis haritası (dashboard kartları için)
     const _dtDays=await idbGetAll('treatment_days').catch(()=>[]);
     const _dtDiseases=await idbGetAll('diseases').catch(()=>[]);
@@ -408,7 +418,7 @@ async function loadDash(){
 
     // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
     // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
-    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
@@ -1687,7 +1697,10 @@ function _sessizGrupla(list){
 async function _showSessizList(){
   try{
     const list=await rpc('sessiz_hayvanlar_listele',{});
-    if(!list||!list.length){toast('Sessiz hayvan yok');return;}
+    // S2: muayene listesi — sheet'in en üstündeki izole bölümün verisi
+    let muayene=[];
+    try{ const ml=await rpc('gebelik_muayene_listele',{}); if(ml&&ml.length) muayene=ml; }catch(e){/* sessiz */}
+    if((!list||!list.length)&&!muayene.length){toast('Sessiz hayvan yok');return;}
     globalThis._sessizReturn=false; // taze açılış eski dönüş işaretini ezer
     const existedBefore=!!document.getElementById('sessiz-bs'); // öksüz history girdisi birikmesin (proto-detay deseni)
     let box=document.getElementById('sessiz-bs');
@@ -1697,8 +1710,10 @@ async function _showSessizList(){
     box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
     box.onclick=e=>{if(e.target===box)_sessizSheetKapat();};
     const row=s=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz'} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
-    const rows=_sessizGrupla(list).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
-    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${list.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">55+ gündür kızgınlık/tohumlama kaydı yok</div>${rows}</div>`;
+    const mRow=m=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${escAttr(m.hayvan_id)}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const muayeneRows=muayene.length?`<div style="font-size:.68rem;font-weight:800;color:var(--red2);margin:12px 0 4px;letter-spacing:.02em">🔬 Gebelik Muayenesi Bekleyenler · ${muayene.length}</div>${muayene.map(mRow).join('')}`:'';
+    const rows=muayeneRows+_sessizGrupla(list||[]).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
+    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${(list||[]).length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">50+ gündür kızgınlık/tohumlama kaydı yok</div>${rows}</div>`;
     if(!existedBefore) history.pushState({sessiz_bs:1}, '', '');
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}
@@ -2680,7 +2695,7 @@ function _applySuruStatHtml(el,d,padok){
   const dnSection=`<div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnFirst}${restBtn}</div>`;
 
   const sessizCount=h.sessiz||0;
-  const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">55+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
+  const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">50+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
   const belirsizCount=h.belirsiz||0;
   const belirsizSection=belirsizCount>0?`<div class="stat-section"><div class="stat-section-title">⚠️ Belirsiz Üreme Statüsü (${belirsizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">Düve mi olgun inek mi belirsiz — incelenip işaretlenmeli</div><div class="stat-row"><span onclick="_showBelirsizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
 
