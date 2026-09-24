@@ -22,15 +22,13 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 SET LOCAL statement_timeout = '30s';
 
--- ── 1) protokol_ayar seed: Bekliyor→muayene eşiği ─────────────────────
+-- ── 1) protokol_ayar seed: Bekliyor→muayene eşiği (İLK-UYGULAMA tohumu) ──
 -- NOT: canlıda anahtar PK'lidir (canlı pg_constraint: protokol_ayar_pkey —
 -- 20260923000002 kanıtı) ancak db-validate baseline'ı PK'yi yeniden kurmadığı
--- için ON CONFLICT yerine PK-bağımsız idempotent desen (update-önce/insert-eksikse).
-UPDATE public.protokol_ayar
-   SET deger = 40, birim = 'gün', min_deger = 0, max_deger = 120,
-       aciklama = 'Tohumlama sonrası sessiz muafiyet penceresi; dolanlar gebelik muayenesine yönlenir',
-       guncellendi = now()
- WHERE anahtar = 'sessiz_tohumlama_muafiyet_gun';
+-- için ON CONFLICT yerine PK-bağımsız insert-eksikse deseni kullanılır.
+-- S2-ONARIM (final review DÜŞÜK bulgu): koşulsuz UPDATE kaldırıldı — re-apply
+-- sahibin UI'dan değiştirdiği değeri EZMEMELİ (son-yazar-kazaner). Anahtar
+-- yalnız bu migration'la doğar: eksikse 40 ile kurulur, varsa DOKUNULMAZ.
 INSERT INTO public.protokol_ayar (anahtar, deger, birim, min_deger, max_deger, aciklama)
 SELECT 'sessiz_tohumlama_muafiyet_gun', 40, 'gün', 0, 120,
        'Tohumlama sonrası sessiz muafiyet penceresi; dolanlar gebelik muayenesine yönlenir'
@@ -78,7 +76,8 @@ WHERE h.cinsiyet = 'Dişi'::text AND h.durum = 'Aktif'::text AND h.kisir IS NOT 
 CREATE OR REPLACE FUNCTION public.sessiz_hayvanlar_listele(
   p_padok   text    DEFAULT NULL,
   p_min_gun integer DEFAULT 50
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp AS $$
 BEGIN
   RETURN (SELECT COALESCE(jsonb_agg(
     jsonb_build_object('hayvan_id', e.id, 'kupe_no', e.kupe_no, 'grup', e.grup, 'padok', e.padok,
@@ -94,6 +93,7 @@ CREATE OR REPLACE FUNCTION public.sessiz_hayvanlar_reconcile()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $function$
 DECLARE
   v_uretilen  integer := 0;
@@ -152,6 +152,7 @@ CREATE OR REPLACE FUNCTION public.stat_suru_ozet(p_padok text DEFAULT NULL::text
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path = public, pg_temp
 AS $function$
 DECLARE
   v_hayvan    jsonb;

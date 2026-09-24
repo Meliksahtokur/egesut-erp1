@@ -243,3 +243,21 @@ S2'de aşıldı: C1 PASS (tüm alt-kriterler), genel INCONCLUSIVE yalnız bu bil
 **Etki:** işlevsel etkisi yok; kod-kalitesi devri. #1 (v_eligible any-Bekliyor vs
 en-yeni-kayıt otoritesi) ve #2 (50+ metni ↔ prod DB 55 eşiği penceresi) sahibin
 kararına/bilgisine sunuldu — teslim raporuna bakınız.
+
+### NOT-TEST-TRIAJ-S2 — 3 birim-test kırmızısı pre-existing; bu dalın regreyonu değil [open / triaj]
+
+**Tarih:** 2026-09-25 · **Kaynak:** S2 final review 2. tur (sapma-12/14; kanıt: worktree koşumu
+1089/1092, HEAD baseline arşiv koşumu 1086/1089 — aynı 3 fail)
+
+1. `tests/unit/vaka-toplu-ac.test.js:2574` ve `:2594` — bc-tarih takvim "gelecek güne tık" ve
+   "ay ‹/› Ekim 2026" sayfalama testleri ay-bağlı kırılgan (bugüne-göre tasarım, tarihe-sabit
+   değil — W20 dili). Bacf648 baseline'ında da aynı ikisi düşer.
+2. `tests/unit/degisiklikler-etiketler.test.js` LUNA-3 — canlı DEMO'da etiket-haritası olmayan
+   7 kolon: `cases.close_reason`, `cases.protocol_family`, `cases.protocol_snapshot`,
+   `cases.source_template_id`, `drug_classes.farmakolojik_sinif_kodu`, `drug_classes.sistem`,
+   `tedavi_sablonu.protokol_ailesi`. Kolonlar 20260923000005/06 + 2026092400000x ovsync
+   vaka-kapanış ailesinden; `git diff bacf648..HEAD` içinde 0 geçiş (CONFIRMED grep).
+   Fix vektörü: `js/degisiklikler/etiketler.js` haritasına 7 Türkçe etiket eklenmesi —
+   S2 kapsamı dışında, ayrı tur.
+
+**Etki:** teslimi engellemez; regresyon-SIFIR kanıtı sapma-12 karşılaştırmasındadır.
