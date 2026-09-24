@@ -536,6 +536,16 @@ ankraj = MAX(kızgınlık, tohumlama, abort_tarihi, dogum_tarihi, dogum). Aktif 
 
 ---
 
+## Üreme Temizlik (tek-seferlik, 2026-09-25)
+
+**`ureme_temizlik_reconcile(p_dry_run?, p_gruplar?)`** → jsonb `{R1, R2, KISIR_INSTANCE, KISIR_GOREV, dry_run, zaman}`
+— stale "Sessiz hayvan" görevleri (R1 aktif protocol_family vakası, R2 son tohumlama Gebe/Bekliyor) + kısır hayvan
+aktif UREME instance'ları ve açık zincir görevleri (KISIR) için tek-seferlik dry-run'lı tasfiye. Silme YOK —
+`iptal=true` + `kapatan_ref` + `islem_log('UREME_TEMIZLIK')` audit. `p_dry_run` default `true`.
+Çağrı yeri: koşum betiği/reports (js çağırmaz). Spec: `docs/plans/2026-09-24-ovsync-cila/spec-s3.md`.
+
+---
+
 ## İstatistik
 
 **`stat_suru_ozet(p_padok?, p_son_donem?)`** → jsonb
