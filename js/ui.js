@@ -1713,7 +1713,11 @@ async function _showSessizList(){
     const mRow=m=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${escAttr(m.hayvan_id)}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
     const muayeneRows=muayene.length?`<div style="font-size:.68rem;font-weight:800;color:var(--red2);margin:12px 0 4px;letter-spacing:.02em">🔬 Gebelik Muayenesi Bekleyenler · ${muayene.length}</div>${muayene.map(mRow).join('')}`:'';
     const rows=muayeneRows+_sessizGrupla(list||[]).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
-    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${(list||[]).length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">50+ gündür kızgınlık/tohumlama kaydı yok</div>${rows}</div>`;
+    // S2 review-fix: sessiz=0 + muayene>0 iken sheet başlığı muayene odaklı olur ("(0)" tuzağı yok)
+    const sBaslik=(list||[]).length
+      ?`<div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${(list||[]).length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">50+ gündür kızgınlık/tohumlama kaydı yok</div>`
+      :`<div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🔬 Gebelik Muayenesi Bekleyenler (${muayene.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">Son tohumlaması ≥40 gün önce Bekliyor — gebelik muayenesi bekleniyor</div>`;
+    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">${sBaslik}${rows}</div>`;
     if(!existedBefore) history.pushState({sessiz_bs:1}, '', '');
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}

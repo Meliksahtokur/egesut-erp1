@@ -210,7 +210,7 @@ Kısır temizlik dry-run'ında bu vakalar listelenip sahip onayından geçecek (
 
 ### BUG-DBVAL-BORC — db-validate baseline borçları: PK kurmuyor + pg_cron yok + C2 text-PK seeder bozuk [open / borç]
 
-**Tarih:** 2026-09-25 · **Kaynak:** ovsync-cila spec-s2 §11 / `reports/db-validation-bf06b2aa.md` (final migration SHA bf06b2aa…, 2026-09-25 00:36/00:44 koşumları)
+**Tarih:** 2026-09-25 · **Kaynak:** ovsync-cila spec-s2 §11 / `reports/db-validation-ddf69fa0.md` (final migration SHA ddf69fa0… — review-fix search_path sonrası; ilk tur raporu bf06b2aa)
 
 **Durum:** db-validation kapısının izole baseline'ında üç aracı borç:
 1. Baseline PK/unique'ları yeniden kurmuyor → migration'daki `ON CONFLICT (anahtar)` patlar
@@ -222,3 +222,24 @@ Kısır temizlik dry-run'ında bu vakalar listelenip sahip onayından geçecek (
 
 **Etki:** kapı bu üç durumda INCONCLUSIVE döner; her migration bunları kendince aşmak zorunda.
 S2'de aşıldı: C1 PASS (tüm alt-kriterler), genel INCONCLUSIVE yalnız bu bilinen borçlardan.
+
+### BUG-S2-REVIEW-TEMIZLIK — S2 final-review temizlik borçları (bilinçli devir) [open / borç]
+
+**Tarih:** 2026-09-25 · **Kaynak:** S2 son review kapısı (8 bulgudan fix edilmeyen 3'ü — #6/#7/#8 fix edildi, #1/#2 teslim raporunda sahibe sunuldu)
+
+1. **reuse:** `gebelik_muayene_listele`/`_uret` son-tohumlama seçimini inline tutuyor
+   (ORDER BY tarih DESC, created_at DESC LIMIT 1); mevcut `public._son_tohumlama`
+   (20260923000003:L66) tek-tanım yerine geçebilirdi. Fonksiyonel test+demo kabulü
+   bu gövdeyle kanıtlandığından bu turda DEĞİŞMEDİ; birleşik temizlik migration'ında
+   yardımcıya geçiş yapılmalı.
+2. **verim:** ui.js loadDash/_showSessizList içinde sessiz+muayene fetch'leri sıralı
+   await; Promise.all ile paralelleşebilirdi. Çevre loadDash zaten sıralı await
+   deseniyle yazılı — tutarlık için korundu; sayfa-yükleme toplam iyileştirmesi
+   ayrı bir verim turuna bırakıldı.
+3. **sadeleşme:** `_dashBands` 15 konumsal parametre; drift riski bir kez yaşandı
+   (F1/F2 — test yorumu belgeliyor). options-objesi yapısal çözüm ama imza
+   değişimi S1'in bölgelerine de dokunur; tek-kulvar refactor olarak planlanmalı.
+
+**Etki:** işlevsel etkisi yok; kod-kalitesi devri. #1 (v_eligible any-Bekliyor vs
+en-yeni-kayıt otoritesi) ve #2 (50+ metni ↔ prod DB 55 eşiği penceresi) sahibin
+kararına/bilgisine sunuldu — teslim raporuna bakınız.

@@ -287,6 +287,7 @@ CREATE OR REPLACE FUNCTION public.gebelik_muayene_listele()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $function$
 BEGIN
   RETURN (
@@ -326,6 +327,7 @@ CREATE OR REPLACE FUNCTION public.gebelik_muayene_gorev_uret(p_dry_run boolean D
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $function$
 DECLARE
   v_esik      integer := public._ayar('sessiz_tohumlama_muafiyet_gun', 40)::int;
