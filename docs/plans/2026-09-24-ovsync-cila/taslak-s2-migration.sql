@@ -354,12 +354,14 @@ BEGIN
       'tohumlama_id', v_rec.tohumlama_id, 'son_tohumlama_tarihi', v_rec.tarih,
       'bekliyor_gun', v_rec.bekliyor_gun);
     IF NOT p_dry_run THEN
+      -- ref_tohumlama_id TEXT kolonudur (canlı information_schema OBSERVED 2026-09-24;
+      -- 20260522000002:L23) → tohumlama.id uuid için ::text kuralı (20260522000004:L137 deseni).
       INSERT INTO public.gorev_log
         (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal, kaynak, ref_tohumlama_id)
       VALUES (
         gen_random_uuid(), v_rec.hayvan_id, 'GEBELIK_KONTROL',
         format('🔬 Gebelik muayenesi: %s. gün Bekliyor (%s)', v_rec.bekliyor_gun, v_rec.kupe_no),
-        CURRENT_DATE, false, false, 'GEBELIK-KONTROL-' || v_rec.tohumlama_id, v_rec.tohumlama_id);
+        CURRENT_DATE, false, false, 'GEBELIK-KONTROL-' || v_rec.tohumlama_id, v_rec.tohumlama_id::text);
       v_uretilen := v_uretilen + 1;
     END IF;
   END LOOP;

@@ -131,7 +131,7 @@ SELECT h.kupe_no, g.kaynak FROM gorev_log g JOIN hayvanlar h ON h.id = g.hayvan_
                                    ORDER BY t2.tarih DESC NULLS LAST, t2.created_at DESC NULLS LAST LIMIT 1));  -- ZORUNLU 0
      SELECT count(*) AS kupe173_listede
        FROM jsonb_array_elements(public.sessiz_hayvanlar_listele()) s WHERE s->>'kupe_no' = '173';              -- ZORUNLU 0
-     SELECT jsonb_array_length(public.sessiz_hayvanlar_listele()) AS sessiz_sonra;                              -- öncesi 11; beklenen ≈ 9 (180+173 çıkar — son tohumlamaları Bekliyor; 9999 ikilisi kalır; F3)
+     SELECT jsonb_array_length(public.sessiz_hayvanlar_listele()) AS sessiz_sonra;                              -- öncesi 11 (PROD gözlemi); beklenen ≈ 8 (180+173+Test inek 3 çıkar — son ikisinin tohumlaması Bekliyor, Test3'ün ESKİ Bekliyor kaydı D1'e takılır; 9999 ikilisi kalır; F9)
      ```
    - **A2 — muayene listesi:**
      ```sql
@@ -146,13 +146,13 @@ SELECT h.kupe_no, g.kaynak FROM gorev_log g JOIN hayvanlar h ON h.id = g.hayvan_
      SELECT public.gebelik_muayene_gorev_uret(true);
      ```
      `dry_run=true`, `esik_gun=40`, `adet`+`liste` tam kupe listesiyle kanıt zarfına kopyalanır. **`false` argümanıyla koşum YOK** — gerçek üretim gece 05:10 cron'undadır (S9 onay kapısı; T-e/T-f davranışı izole DB'de zaten kanıtlı).
-   - **A4 — onaylı reconcile koşumu (demo yazımı sahibin onaylı — SPEC §7-A4 açıkça ister):**
+   - **A4 — onaylı reconcile koşumu (demo yazımı sahibin onaylı — SPEC §7-A4 açıkça ister; beklentiler F10 ile düzeltildi — 186/168 eligible kaldığı için görevleri AÇIK kalır):**
      ```sql
      SELECT public.sessiz_hayvanlar_reconcile();          -- {uretilen, kapatilan, zaman} → zarfa
-     SELECT h.kupe_no, g.kaynak, g.iptal, g.kapatan_ref
+     SELECT h.kupe_no, g.iptal, g.kapatan_ref
        FROM gorev_log g JOIN hayvanlar h ON h.id = g.hayvan_id
-      WHERE g.kaynak LIKE 'SESSIZ-%' AND g.tamamlandi = false AND g.iptal = false
-        AND h.kupe_no IN ('173','186','168');              -- ZORUNLU 0 satır (hepsi kapandı)
+      WHERE g.kaynak LIKE 'SESSIZ-%' AND g.tamamlandi = false
+        AND h.kupe_no IN ('173','186','168');
      SELECT count(*) AS bekliyorlu_acik_sessiz_gorev
        FROM gorev_log g JOIN hayvanlar h ON h.id = g.hayvan_id
       WHERE g.gorev_tipi = 'VETERINER_KONTROL' AND g.kaynak LIKE 'SESSIZ-%'
@@ -161,7 +161,7 @@ SELECT h.kupe_no, g.kaynak FROM gorev_log g JOIN hayvanlar h ON h.id = g.hayvan_
                       AND t.id = (SELECT t2.id FROM tohumlama t2 WHERE t2.hayvan_id = t.hayvan_id
                                   ORDER BY t2.tarih DESC NULLS LAST, t2.created_at DESC NULLS LAST LIMIT 1));  -- ZORUNLU 0
      ```
-     Beklenen: `kapatilan ≥ 3` (173/186/168'in açık görevleri; Adım 0 öncesi ölçümüyle karşılaştır), `uretilen` yalnız gerçek 50+ sessizler için (raporla). İkinci koşum idempotent (T-h): `SELECT public.sessiz_hayvanlar_reconcile();` → `0/0` beklenir — koş ve kaydet.
+     Beklenen (PROD projeksiyonu — F10; DEMO'da Adım 0 açık-görev ölçümüyle karşılaştır): `kapatilan = 1` — yalnız 173'ün görevi `iptal=true, kapatan_ref='sessiz-noteligible'` olur (ZORUNLU); 186/168 `iptal=false` KALIR (ZORUNLU — son tohumlamaları Doğum Yaptı, hâlâ 50+ sessizler); `uretilen = 0` (144/149/122/002 adaylarının 30 gün içinde tamamlanmış SESSIZ görevi var — cooldown engeller; F10 kanıtı). İkinci koşum idempotent (T-h): `SELECT public.sessiz_hayvanlar_reconcile();` → `0/0` beklenir — koş ve kaydet.
    - **A5 — stat ↔ listele eşitliği (ZORUNLU eşitlik, D5):**
      ```sql
      SELECT (public.stat_suru_ozet()->'hayvan'->>'sessiz') AS stat_s,
@@ -273,7 +273,7 @@ SELECT h.kupe_no, g.kaynak FROM gorev_log g JOIN hayvanlar h ON h.id = g.hayvan_
   test('S2: 🔬 bandı ❗ Sessiz Hayvanlar bandından ÖNCE (izole üst bant)', () => {
     const s = [{hayvan_id:'s1', kupe_no:'9', grup:'Sağmal', sessiz_gun:70, son_aktivite:null}];
     const m = [{hayvan_id:'m1', kupe_no:'2', grup:'Sağmal', bekliyor_gun:45, son_tohumlama_tarihi:'2026-08-10'}];
-    const h = _dashBands(0,[],[],[],[],0,[],[],{},[],[],{},[], s, '', m);
+    const h = _dashBands(0,[],[],[],[],0,[],[],{},[],[],{}, s, '', m);
     assert.ok(h.indexOf('🔬') < h.indexOf('❗ Sessiz Hayvanlar'), 'muayene önce');
   });
   ```
@@ -335,7 +335,7 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>
 
 1. `git log --oneline main..HEAD` → A/B/C commit'leri; `git status --short` → yalnız ön-existing kirli dosyalar (kendi yazmadıkların). `git diff --stat main..HEAD` → yalnız zarf dosyaları: yeni migration, `js/ui.js`, `index.html`, `tests/unit/ui-pure.test.js`, `BUGS.md`. Başka dosya görünüyorsa DUR ve raporla.
 2. `npm run test:unit` ikinci teyit (damga sonrası) + `gitnexus detect_changes` temiz.
-3. **Ölçü raporu** (teslim özeti içine): sessiz liste öncesi (Adım 0 DEMO ölçümü; PROD gözlemi 11 — F7) → SONRA (A1 `sessiz_sonra`; beklenen ≈9), sessiz stat öncesi (PROD gözlemi 9) → SONRA (A5; D5 hizalamasıyla eşit olmalı), muayene popülasyonu A3 `adet` (PROD gözlemi filtreli 3: 180/173/902 — F7), reconcile `kapatilan`/`uretilen`. Öncesi değerler Adım 0 DEMO kanalı çıktısından.
+3. **Ölçü raporu** (teslim özeti içine): sessiz liste öncesi (Adım 0 DEMO ölçümü; PROD gözlemi 11 — F7) → SONRA (A1 `sessiz_sonra`; beklenen ≈8 — F9), sessiz stat öncesi (PROD gözlemi 9) → SONRA (A5; D5 hizalamasıyla eşit olmalı; beklenen ≈8), muayene popülasyonu A3 `adet` (PROD gözlemi filtreli 3: 180/173/902 — F7), reconcile `kapatilan`/`uretilen` (PROD projeksiyonu 1/0 — F10). Öncesi değerler Adım 0 DEMO kanalı çıktısından.
 4. **Teslim tanımı (sahibin isteği: "direkt demo testte hazır"):** migration DEMO'da canlı + A1-A8 kanıtlı; UI dalda commit'li + unit yeşil; sahibin yürüyüşü hazır: worktree kökünde `npm run serve:local` → http://127.0.0.1:8080. **Sahip yürüyüş checklist'i (SPEC §7-B3-5 — ajan browser koşmaz):**
    - Dashboard'da `🔬 Gebelik Muayenesi Bekleyenler (N)` bandı `❗ Sessiz Hayvanlar` bandının TAM ÜSTÜNDE, kırmızı; satır metni "N. gün Bekliyor · Son tohumlama: …"; "Tümünü Gör" sheet'i açar;
    - Sheet'te en üstte `🔬 Gebelik Muayenesi Bekleyenler · N` bölümü; altında gruplar "50+ gündür" alt-metniyle; "Hiç kayıt yok" en altta (bb4ea92 kuralı);

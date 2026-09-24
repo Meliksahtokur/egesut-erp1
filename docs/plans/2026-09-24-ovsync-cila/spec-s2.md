@@ -132,10 +132,10 @@ AND t.tarih <= CURRENT_DATE - public._ayar('sessiz_tohumlama_muafiyet_gun', 40):
 ## 7. Kabul testleri (implementer demo apply sonrası işaretler; ölçülebilir)
 
 **A — DB katmanı (demo, service_role bağlantı):**
-1. `sessiz_hayvanlar_listele({})` çıktısında `sonuc='Bekliyor'` son-tohumlamalı SIFIR hayvan; 173 (548df203) listede YOK. (Adet + ID ile raporlanır; beklenen ≈ 9 — 180 ve 173 listeden çıkar, 186'nın son tohumlaması Bekliyor olmadığından kalır.)
+1. `sessiz_hayvanlar_listele({})` çıktısında `sonuc='Bekliyor'` son-tohumlamalı SIFIR hayvan; 173 (548df203) listede YOK. (Adet + ID ile raporlanır; beklenen ≈ 8 — 180, 173 **ve Test inek 3** listeden çıkar: 180/173'ün son tohumlaması Bekliyor, Test3'ün ise ESKİ bir Bekliyor kaydı var → D1 any-Bekliyor'la düşer; 186/168 kalır — son tohumlamaları Doğum Yaptı, hiç Bekliyor kayıtları yok. PROD verisiyle projeksiyon F9; DEMO ölçümü Adım 0'da esastır.)
 2. `gebelik_muayene_listele()` 173'ü İÇERİR (`bekliyor_gun ≈ 56` — 2026-07-30 tohumlamadan bugüne; v1.0'daki "≈ 57" sapması F3 ile düzeltildi), 40 günden genç Bekliyor'lar YOK; her satırda `acik_gorev_var` doğru. Beklenen küçük küme (PROD gözlemi — F7; DEMO ölçümü Adım 0'da): 180 (91g), 173 (56g), 902 (54g).
 3. `gebelik_muayene_gorev_uret(true)` dry-run listesi teslim paketinde sahibe sunulur (adet + kupe listesi).
-4. `reconcile` sonrası 173/186/168'in açık `SESSIZ-*` görevleri `iptal=true, kapatan_ref='sessiz-noteligible'`; `gorev_log`'da Bekliyor-hayvana açık SESSIZ görev kalmamış.
+4. `reconcile` koşumu beklentileri (v1.0'daki "173/186/168 hepsi kapanır" beklentisi F10 ile düzeltildi — 186/168'in son tohumlaması Doğum Yaptı, Bekliyor kaydı yok → eligible kalırlar, görevleri AÇIK KALIR): **173'ün** açık `SESSIZ-*` görevi `iptal=true, kapatan_ref='sessiz-noteligible'` olur (ZORUNLU); 186/168'in açık görevleri `iptal=false` olarak KALIR (ZORUNLU — hâlâ 50+ sessizler); `gorev_log`'da (son-tohumlaması-)Bekliyor hayvana açık SESSIZ görev kalmaz (ZORUNLU 0). PROD verisiyle projeksiyon: `kapatilan=1, uretilen=0` (144/149/122/002'nin 30 gün içinde tamamlanmış SESSIZ görevi var → cooldown üretimi engeller — F10 kanıtı); DEMO ölçümü Adım 0'la karşılaştırılır.
 5. `stat_suru_ozet()->'hayvan'->>'sessiz'` = `jsonb_array_length(sessiz_hayvanlar_listele())` (eşitlik zorunlu — D5).
 6. Dört tüketici tutarlılığı: `v_eligible`'da `EXISTS (sonuc='Bekliyor')` satır sayısı = 0 (doğrudan SQL sayımı).
 7. Cron: `SELECT * FROM cron.job WHERE jobname='gebelik-muayene-daily'` 1 satır, schedule `10 5 * * *`; ertesi sabah koşumunda `_uret` görevleri görünür ve dry-run listesiyle tutarlı.
@@ -161,7 +161,7 @@ AND t.tarih <= CURRENT_DATE - public._ayar('sessiz_tohumlama_muafiyet_gun', 40):
 3. Demo doğrulama seti §7-A 1-8 koş, çıktılar `reports/`'a (teslim kanıtı). Dry-run listesi sahibe.
 4. `ui.js` + `index.html` + unit testler → `node --test tests/unit/` → commit.
 5. Lokal smoke: `?demo` ile aç, dashboard bantlarını gör (ajan koşmazsa sahibin yürüyüşü için checklist §7-B3-5).
-6. `gitnexus detect_changes` + BUGS.md borç kaydı + teslim özeti (öncesi/sonrası sayaç raporu: sessiz 11→beklenen, muayene ~3-7).
+6. `gitnexus detect_changes` + BUGS.md borç kaydı + teslim özeti (öncesi/sonrası sayaç raporu: sessiz 11→beklenen ≈8 — F9; muayene beklenen 3 — PROD gözlemi, DEMO'da Adım 0).
 
 ## 9. Geri-dönüş planı
 
@@ -209,7 +209,7 @@ UI geri dönüşü: `git revert <ui-commit>` (+ `?v=` damgası yeniden). Data: `
 
 - **ENGEL değil, BORÇ (kapı aracı):** db-validate baseline'ı (a) PK/unique'ları yeniden kurmuyor (ON CONFLICT ilk koşumu kırdı), (b) pg_cron yok, (c) C2 seeder text-PK tablolarda bozuk SQL üretiyor. Üçü de taslakta deseni değiştirerek aşıldı; `BUGS.md`/borç kaydına işlenmelidir (§4-6).
 - **RISK (düşük):** 50'ye düşüş liste kümesini büyütür (5 gün erken giriş). Bugün 50-54 bandında Bekliyor-olmayan hayvan görünmüyor (OBSERVED: p_min_gun=50 → hâlâ 11); D1 kalkanı sayesinde 50-54 bandındaki Bekliyor hayvanlar (ör. 902: 54g Bekliyor) sessiz listesine GİREMEZ — muayene listesine düşer (onarım turunda OBSERVED). İlk cron sonrası fark dry-run raporuyla izlenir (plan-4 T1-(f)).
-- **RISK (düşük):** stat hizalaması sessiz sayısını 9→11'e çıkarırken, eşik+D1 değişimi listeyi 11→≈9'a indirir (180+173 çıkar; 9999 ikilisi COALESCE ile sayılır) → net beklenen stat=listele≈9. Davranış değişimi, sahibe öncesi/sonrası raporlanır (D5 gerekçesiyle bilinçli).
+- **RISK (düşük):** stat hizalaması sessiz sayısını 9→8'e çıkarırken (9999 ikilisi COALESCE ile sayılmaya başlar), eşik+D1 değişimi listeyi 11→≈8'e indirir (180+173+Test inek 3 çıkar — F9 projeksiyonu; 9999 ikilisi COALESCE ile sayılır) → net beklenen stat=listele≈8. Davranış değişimi, sahibe öncesi/sonrası raporlanır (D5 gerekçesiyle bilinçli).
 - **gitnexus indeksi** worktree'yi kapsamıyor (main@d6a41c0, 4 commit geri — OBSERVED; onarım turunda 2026-09-24 yeniden doğrulandı: aynı durum). LSP yerinde çalıştı (§7-C2). **Uygulama kuralı (S4 onarım turuyla hizalı):** `gitnexus analyze` ana checkout yolunda koşarsa main dalını indeksler; implementer analyze'i bu worktree yolunda koşturmalı ki indeks dal ucunu alsın; iş sonrası analyze ZORUNLU (yerel kural).
 
 ## 12. Onarım turu bulguları (v1.0 → v1.1, 2026-09-24)
@@ -219,7 +219,7 @@ v1.0'ın TÜM kanıt satırları repo + canlı şemadan TEK TEK yeniden doğrula
 tools-bank kanalından koşuldu — sonradan o kanalın PROD'a bağlı olduğu kesinleşti, F7; YAZMA yapılmadı:
 salt-SELECT + readonly RPC + BEGIN/ROLLBACK probe). Sonuç: Z1-Z12, Z14-Z16, D1-D6, §5 taslak yapısı,
 §6 rapor referansları (`e3025b23`, `5c03f108`, `73d7ec2f` — üçü de diskte mevcut) ve §7 kapıları DOĞRULANDI;
-aşağıdaki sekiz bulgu düzeltildi/işlendi:
+aşağıdaki on bulgu düzeltildi/işlendi (F9-F10 eşzamanlı ikinci onarım yazıcısından):
 
 | # | Bulgu | Kanıt | Çözüm |
 |---|---|---|---|
@@ -231,6 +231,8 @@ aşağıdaki sekiz bulgu düzeltildi/işlendi:
 | F6 | gitnexus analyze yolu kuralı eksikti: ana checkout path'inde koşan analyze main'i indeksler, dal ucunu değil (S4 onarım turunun 0a kuralı bu plana işlenmemişti); indeks durumu yeniden OBSERVED (hâlâ `d6a41c0`/main) | OBSERVED `list_repos` 2026-09-24 | §11 + plan Adım 0.2/Adım 6'ya worktree-analyze kuralı işlendi |
 | F7 | **KANAL:** tools-bank `supabase_*` kanalı **PROD**'a bağlı (ref `zqnexqbdfvbhlxzelzju`); v1.0'ın Z8-Z13 "canlı demo" etiketleri ve plan Adım 2.1'in "supabase_migrate demo'ya bakar → DEMO apply" emri **PROD-apply riski** taşıyordu — uygulanmış olsaydı migration PROD'a yazılacaktı. Bu onarım turunun kendi canlı sorguları da PROD'da koştu (salt-SELECT/readonly RPC/rollback probe — yazma yok) | CONFIRMED `~/tools-bank/mcp_server/server.py` + `js/api.js:23-24`; S1 fafdda1 (KANAL KURALI) + S5 onarim-r3.md B3 (fdw_prod_srv=0 + schema_migrations=124 prod imzası) ile bağımsız çapraz-teyit | SPEC §2'ye kanal notu; plana KANAL KURALI başlığı + Adım 0.4/2.1/2.2/A3/5.3 + sapma tablosu 2/10 yeniden yazıldı; DEMO kanalı: `SUPABASE_DEMO_REF=vtzqjmazsvurxdeondmi` + `SUPABASE_DEMO_PAT` Mgmt query endpoint / demo pooler psql |
 | F8 | taslak `_uret` INSERT uuid→text: `pg_cast`'ta uuid→text satırı YOK; canlı PG 17.6 probe'unda assignment yine de kabul edildi (ASSIGN OK) — ancak sürüm-bağımsız güvenlik için eşzamanlı S2 kulvarı taslağa `v_rec.tohumlama_id::text` sertleştirmesi ekledi; bu, kod tabanının kendi deseniyle örtüşür (`20260522000004:L140-141` `v_toh.id::text`) | OBSERVED probe (PROD PG 17.6) + CONFIRMED `20260522000004_tekrar_asim.sql:L137-141` + taslak diff | taslak sertleştirmesi BENİMSENDİ (bu onarım taslağa dokunmadı — çakışma önleme); T-e PASS bu iki mekanizma ile tutarlı |
+| F9 | Post-migration sessiz liste beklentisi ≈9 DEĞİL ≈8: F3 satırı yalnız 180+173'ün düşeceğini yazıyordu; **Test inek 3**'ün son tohumlaması Doğum Yaptı olsa da ESKİ bir `sonuc='Bekliyor'` kaydı VAR → D1 any-Bekliyor ile o da listeden düşer. Yeni-view mantığının birebir SQL kopyasıyla PROD projeksiyonu: kalan küme {2044, 906 (9999), 144, 149, 122, 002, 168, 186} = **8**; (kupe 31: yaş-fallback sessiz_gun=15 < 50 → girmez). stat=listele=8 beklenir | OBSERVED PROD SQL 2026-09-24 (per-hayvan son_sonuc/any_bekliyor dökümü + projection sorgusu) | §7-A1, §11 RISK, plan Adım 2-A1/Adım 5 "≈9"→"≈8" olarak düzeltildi |
+| F10 | §7-A4/plan A4 reconcile beklentisi 186/168 için YANLIŞTI ("hepsi kapanır, ZORUNLU 0 satır" — kapı asla yeşile dönmezdi): 186/168'in son tohumlaması Doğum Yaptı, hiç Bekliyor kaydı yok → post-migration v_eligible'da KALIRLAR (sessiz_gun 56/60 ≥50) → görevleri açık kalır. Açık SESSIZ görev bugün yalnız 168/173/186'da (1'er); reconcile projeksiyonu: **kapatilan=1 (yalnız 173), uretilen=0** (144/149/122/002'nin 30 gün içinde tamamlanmış SESSIZ görevi var — cooldown engeller) | OBSERVED PROD SQL 2026-09-24 (son_sonuc dökümü + açık-görev sayımı + cooldown sayımı) | §7-A4 ve plan A4 beklentileri yeniden yazıldı: 173 kapanır (ZORUNLU), 186/168 açık kalır (ZORUNLU), bekliyorlu-açık-SESSIZ=0 (ZORUNLU) |
 
 Onarım turu **kod değişikliği YAPMAZ** — yazma yetkisi yalnız bu dizindeki spec/plan dosyalarına aittir.
 Eşzamanlı onarım yazıcılarıyla çakışma yoktur: bu tur yalnız `spec-s2.md` + `plan-s2.md`'ye dokunur.
