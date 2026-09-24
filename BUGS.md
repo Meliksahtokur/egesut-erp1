@@ -207,3 +207,18 @@ görünür uyarısı) yeterli.
 **Tarih:** 2026-09-24 · **Sahip notu:** Gebe hayvan kısır atanamamalıydı (öyle ayarlanmıştı); değilse de
 önemli değil — insanlar gebe hayvanı kısır atanmaz, yalnız agent temizlik betikleri yanlışlıkla yapabilir.
 Kısır temizlik dry-run'ında bu vakalar listelenip sahip onayından geçecek (plan-1 S2). Acil iş değil, kalsın.
+
+### BUG-DBVAL-BORC — db-validate baseline borçları: PK kurmuyor + pg_cron yok + C2 text-PK seeder bozuk [open / borç]
+
+**Tarih:** 2026-09-25 · **Kaynak:** ovsync-cila spec-s2 §11 / `reports/db-validation-bf06b2aa.md` (final migration SHA bf06b2aa…, 2026-09-25 00:36/00:44 koşumları)
+
+**Durum:** db-validation kapısının izole baseline'ında üç aracı borç:
+1. Baseline PK/unique'ları yeniden kurmuyor → migration'daki `ON CONFLICT (anahtar)` patlar
+   (çözüm deseni: PK-bağımsız update-önce/insert-eksikse — S2 migration §1).
+2. Baseline'da pg_cron yok → `cron.schedule` pg_cron-koruyan DO bloğu ister (S2 migration §9).
+3. C2 sentetik seeder text-PK tablolarda bozuk SQL üretir (`INSERT ... VALUES ()` syntax error)
+   → C2 INCONCLUSIVE kalır; boşluk manuel fonksiyonel testlerle dolduruldu (spec-s2 §6 T-a…T-m)
+   ve S2 apply-sonrası DEMO kabul setiyle (A1-A8) çapraz-kanıtlandı.
+
+**Etki:** kapı bu üç durumda INCONCLUSIVE döner; her migration bunları kendince aşmak zorunda.
+S2'de aşıldı: C1 PASS (tüm alt-kriterler), genel INCONCLUSIVE yalnız bu bilinen borçlardan.
