@@ -501,9 +501,9 @@ registerActions({
 // tests/unit/nav-geri-karar.test.js (history durum matrisi).
 //
 // ctx: { modalBackGuard, sessizAcik, modalStack, sentinel, protoDetayAcik,
-//        detAcik, detGunAcik, gecmisGunAcik, txDetayAcik, state }
+//        ovsyncYardimAcik, detAcik, detGunAcik, gecmisGunAcik, txDetayAcik, state }
 // dönüş (tur): 'yut' | 'modal'{id} | 'sessiz' | 'sentinel' | 'proto-detay' |
-//        'det-gun' | 'det' | 'gun' | 'tx-detay' | 'sayfa'{pg}
+//        'ovsync-yardim' | 'det-gun' | 'det' | 'gun' | 'tx-detay' | 'sayfa'{pg}
 function navGeriKarar(ctx) {
   ctx = ctx || {};
   const state = ctx.state || {};
@@ -517,11 +517,14 @@ function navGeriKarar(ctx) {
   // Sentinel: history stack'in dibine ulaştık — uygulamadan çıkılacak
   if (state.sentinel) return { tur: 'sentinel' };
   if (ctx.protoDetayAcik) return { tur: 'proto-detay' };
+  // S4/M2: Ovsynch-56 yardım katmanı (alt-sheet, remove-edilir) — proto-detay'dan sonra:
+  // yardım yalnız panel başlığından açılır, proto-detay açıkken ?'e ulaşılamaz (z350)
+  if (ctx.ovsyncYardimAcik) return { tur: 'ovsync-yardim' };
   // Kart İÇİ gün görünümü kartın en üst katmanı — kart kapanmadan o kapanır
   if (ctx.detAcik && ctx.detGunAcik) return { tur: 'det-gun' };
   if (ctx.detAcik) return { tur: 'det' };
   // Modal/sheet state'leri sayfa taşımaz (B21) — görünüm zaten kapalıysa yut
-  if (state.protokol || state.proto_detay || state.modal) return { tur: 'yut' };
+  if (state.protokol || state.proto_detay || state.ovsync_yardim || state.modal) return { tur: 'yut' };
   // Sayfa-içi görünüm katmanları (W3): ana gün görünümü, tx detayı
   if (ctx.gecmisGunAcik) return { tur: 'gun' };
   if (ctx.txDetayAcik) return { tur: 'tx-detay' };

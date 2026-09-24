@@ -1176,7 +1176,7 @@ function _ovsyncBaslatBtnHtml(t){
   const _h=(typeof getState==='function'?getState('animals'):[]).find(a=>a.id===t.hayvan_id);
   const _ipt=`<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`;
   if(_h&&_h.kisir) return `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — başlatılamaz</span>${_ipt}`;
-  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>${_ipt}`;
+  return `<button data-g="${escAttr(t.id)}" data-h="${escAttr(t.hayvan_id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g,this.dataset.h)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>${_ipt}`;
 }
 // P6: TOHUMLAMA_PLANLI kartına [Ertele]
 function _tohErteleBtnHtml(t){
@@ -1184,7 +1184,8 @@ function _tohErteleBtnHtml(t){
   return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
 }
 // P4/P10: OVSYNC_BASLAT başlatma — atomik zincir RPC + detaylı bildirim
-async function ovsyncBaslat(gorevId){
+// S4/N2: hayvanId opsiyonel — bildirim/banner hayvan kartına gider (boşsa eski davranış)
+async function ovsyncBaslat(gorevId, hayvanId){
   if(!gorevId) return;
   try{
     const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId});
@@ -1193,7 +1194,7 @@ async function ovsyncBaslat(gorevId){
     else{
       toast('✅ Ovsynch-56 başlatıldı — TAI hedefi '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''));
       // P10/B1: detaylı bildirim (izin varsa); panel kalıcı kaynak
-      _ovsyncBildirim('İlk tohumlama protokolü başlatıldı','Ovsynch-56 seansları açıldı. TAI hedefi: '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''));
+      _ovsyncBildirim('İlk tohumlama protokolü başlatıldı','Ovsynch-56 seansları açıldı. TAI hedefi: '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''), hayvanId);
     }
     await pullTables(['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','stok','stok_hareket']).catch(()=>{});
     closeM('m-task-det'); updateTaskBadge(); loadTasks(_curTaskFilter||'today',null,{skipPull:true}); loadDash();
@@ -1212,11 +1213,20 @@ async function ovsyncIptal(gorevId){
   }catch(e){ toast('❌ '+getUserMessage(e),true); }
 }
 // P10/B3: bildirim yardımcısı — izin yoksa sessiz düşme YOK (rozet panelde); yalnız iki olayda kullanılır
-function _ovsyncBildirim(baslik,govde){
+// S4/N2: hayvanId varken bildirim tıklanabilir hedefe bağlanır (Notification onclick +
+// izin yoksa app-içi banner). kupeNo opsiyonel — banner kupe'yi getData'dan çözer.
+function _ovsyncBildirim(baslik,govde,hayvanId,kupeNo){
   try{
-    if(!('Notification' in window)) return;
-    if(Notification.permission==='granted'){ new Notification(baslik,{body:govde,tag:'ovsync-pg'}); }
-    // denied/default: panel zaten kalıcı kaynak; ilk kullanıcı etkileşiminde tek istem
+    if(!('Notification' in window)){
+      if(hayvanId) _ovsyncBildirimBanner(hayvanId,kupeNo);
+      return;
+    }
+    if(Notification.permission==='granted'){
+      const notif = new Notification(baslik,{body:govde,tag:'ovsync-pg'});
+      if(hayvanId){ notif.onclick = () => { try { window.focus(); openDet(hayvanId); } catch(e){} }; }
+    }
+    else if(hayvanId){ _ovsyncBildirimBanner(hayvanId,kupeNo); }
+    // denied/default + hayvanId yok: panel zaten kalıcı kaynak; ilk kullanıcı etkileşiminde tek istem
   }catch(e){ /* bildirim başarısızlığı akışı etkilemez */ }
 }
 // P10/B2: açılış özeti — hedefi gelmiş OVSYNC_BASLAT varsa tek bildirim (cron yedeğinin UI aynası)
@@ -1854,21 +1864,7 @@ async function _showProtokolEkran(){
     const ov = await rpc('ovsync_baslat_uyarilari', {});
     const ovList = (ov && ov.uyarilar) || [];
     if (ovList.length) {
-      const _ovSatir = u => `<div class="arow" style="border-left:3px solid var(--green);margin-bottom:6px;padding:8px 10px">
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:.8rem">🌱 ${esc(u.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(u.kategori||'')}</span></div>
-          <div style="font-size:.7rem;color:var(--ink3)">Ovsynch-56 başlat · hedef ${fmtTarih(u.hedef_tarih)} ${(u.hedef_saat||'').slice(0,5)} · TAI ${fmtTarih(u.tai_tarihi)}</div>
-          <div style="font-size:.6rem;opacity:.5">${u.taban_turu==='duve'?'Düve — 12a21g':u.taban_turu==='abort'?'Abort sonrası':u.taban_turu==='dogum'?'Doğum sonrası':'Açık dişi'}</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          ${u.kisir
-            ? `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — üreme planı yok</span>
-               <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`
-            : `<button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
-               <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`}
-        </div>
-      </div>`;
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})</div>${ovList.map(_ovSatir).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   } catch(e) { /* RPC yoksa (bayrak/A1 öncesi) bölüm sessizce atlanmaz — konsola düşer */ console.warn('ovsync_baslat_uyarilari:', e.message); }
   if (!data.length && !ovHtml) { toast('Protokol uyarısı yok'); return; }
@@ -1963,6 +1959,86 @@ function _protoDetayHayvanGit(hayvanId){
   const protokolBs = document.getElementById('protokol-bs');
   if (protokolBs) protokolBs.style.display = 'none';
   openDet(hayvanId);
+}
+
+// S4/N1+M1: Protokol panelindeki İlk Tohumlama satırı — satır tıklaması hayvan kartını
+// açar (_protoDetayHayvanGit; popstate 'det' vakası paneli geri getirir), buton hücresi
+// stopPropagation sarmallı (_satirHtml deseni). "Ovsynch-56" adı sahibin kararıyla korunur;
+// hedef_saat koşullu basılır (boş saat → çift-ayraç kozmetiği yok).
+// S1: kisir hayvanda Başlat YOK, kilitli rozet VAR; ✕ her durumda çizilir.
+function _ovUyariSatirHtml(u){
+  return `<div class="arow" style="border-left:3px solid var(--green);margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_protoDetayHayvanGit('${escAttr(u.hayvan_id)}')">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.8rem">🌱 ${esc(u.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(u.kategori||'')}</span></div>
+          <div style="font-size:.7rem;color:var(--ink3)">Başlat: Ovsynch-56 senkronu (56 günlük program) · Hedef: ${fmtTarih(u.hedef_tarih)}${u.hedef_saat ? ' ' + String(u.hedef_saat).slice(0, 5) : ''} · Zamanlanmış tohumlama (TAI): ${fmtTarih(u.tai_tarihi)}</div>
+          <div style="font-size:.6rem;opacity:.5">${u.taban_turu==='duve'?'Düve — 12a21g':u.taban_turu==='abort'?'Abort sonrası':u.taban_turu==='dogum'?'Doğum sonrası':'Açık dişi'}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
+          ${u.kisir
+            ? `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — üreme planı yok</span>
+               <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`
+            : `<button data-g="${escAttr(u.gorev_id)}" data-h="${escAttr(u.hayvan_id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g,this.dataset.h)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
+               <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`}
+        </div>
+      </div>`;
+}
+
+// S4/M2+M3: Ovsynch-56/TAI yardım katmanı (sahip kararı: yardım balonu İSTENİYOR).
+// _showProtokolDetay öncülü alt-sheet kalıbı; seans sayısı canlı şablondan teyitli (4 kalem).
+function _showOvsyncYardim(){
+  const existedBefore = !!document.getElementById('ovsync-yardim-bs');
+  let box = document.getElementById('ovsync-yardim-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'ovsync-yardim-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:350;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _closeOvsyncYardim(); };
+  const _madde = (baslik, metin) => `<div style="margin-bottom:12px">
+      <div style="font-weight:800;font-size:.82rem;margin-bottom:3px">${baslik}</div>
+      <div style="font-size:.75rem;color:var(--ink3);line-height:1.45">${metin}</div>
+    </div>`;
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:70vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-weight:800;font-size:.95rem">❓ İlk Tohumlama (Ovsynch-56) nedir?</div>
+      <button onclick="_closeOvsyncYardim()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--ink3)">✕</button>
+    </div>
+    ${_madde('"Ovsynch-56"', 'İneklerde doğum sonrası ilk tohumlama zamanlaması için kullanılan senkron programı. Başlat\'a dokununca 4 seanslı hormon zinciri (1./8./9./10. gün) ve tohumlama görevi açılır.')}
+    ${_madde('TAI (Zamanlanmış Tohumlama)', 'Zincirin sonunda planlanan tohumlama. Ekrandaki tarih, başlatma hedefinin 10 gün sonrasıdır.')}
+    ${_madde('Neden bu hayvan?', 'Düve: doğumdan 12 ay 21 gün sonra. İnek: son doğum/aborttan 51 gün sonra. Görev, hedeften 2 gün önce listede belirir.')}
+  </div>`;
+  if (!existedBefore) history.pushState({ovsync_yardim:true}, '', '');
+  document.body.appendChild(box);
+}
+function _closeOvsyncYardim(){
+  const box = document.getElementById('ovsync-yardim-bs');
+  if (!box) return;
+  box.remove();
+  if (history.state?.ovsync_yardim) { globalThis._modalBackGuard = true; history.back(); }
+}
+
+// S4/N2: app-içi bildirim banner'ı — Notification izni yokken Başlat başarıdır
+// tıklanabilir alt-sheet (z310: panel 300 üstü, proto-detay 350 altı). pushState YOK
+// (transient toast-sınıfı yüzey); satır tıklaması banner'ı kaldırıp hayvan kartını açar.
+async function _ovsyncBildirimBanner(hayvanId, kupeNo){
+  try{
+    let kupe = kupeNo;
+    if (!kupe) {
+      try { kupe = ((await getData('hayvanlar')) || []).find(a => a.id === hayvanId)?.kupe_no; } catch(e) {}
+    }
+    const box = document.createElement('div');
+    box.id = 'ovsync-bildirim-bs';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:310;display:flex;align-items:flex-end';
+    box.onclick = e => { if (e.target === box) box.remove(); };
+    box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))">
+      <div style="font-weight:800;font-size:.85rem;margin-bottom:8px">✅ İlk tohumlama protokolü başlatıldı</div>
+      <div onclick="document.getElementById('ovsync-bildirim-bs')?.remove();openDet('${escAttr(hayvanId)}')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px;border-radius:10px;border:1px solid var(--card2);background:rgba(78,154,42,.08);cursor:pointer">
+        <span style="font-weight:700;font-size:.8rem">🌱 ${esc(kupe || '—')} · Hayvan kartına git →</span>
+        <span style="color:var(--ink3)">›</span>
+      </div>
+    </div>`;
+    document.body.appendChild(box);
+    setTimeout(() => { if (box.parentNode) box.remove(); }, 10000);
+  }catch(e){ /* banner başarısızlığı akışı etkilemez */ }
 }
 
 // §2: drug_class bazlı etken filtreleme (aktif ingredient üzerinden)
