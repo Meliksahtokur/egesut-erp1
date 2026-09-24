@@ -1,7 +1,7 @@
 # PLAN S4 — İlk Tohumlama satırı hayvan kartına gider + Ovsynch-56/TAI yardım balonu + yaş denetimi
 
 > **Kaynak spec:** `docs/plans/2026-09-24-ovsync-cila/spec-s4.md` (**v1.1 onarım turu**) · Girdi planı: `reports/plans/ovsync-cila-plan-3.md`
-> **Onarım turu (2026-09-24):** bu plan da onarım turundan geçti — 0a worktree-analyze kuralı, 0b 33-çağrı beklentisi, Adım 1 E.2 kapsam düzeltmesi, Adım 2 e2e RPC-stub şartı, Adım 3 E.6 stopPropagation iddiası, Adım 4 pencere-boş teslim notu, kanıt tablosu tazelemesi (§9). Spec tarafı: spec-s4.md §13.
+> **Onarım turu (2026-09-24):** bu plan da onarım turundan geçti — 0a worktree-analyze kuralı, 0b 33-çağrı beklentisi, Adım 1 E.2 kapsam düzeltmesi, Adım 2 e2e RPC-stub şartı, Adım 3 E.6 stopPropagation iddiası, Adım 4 pencere-zaman-bağlı teslim notu (F10 çapraz-check'li), kanıt tablosu tazelemesi (§9). Spec tarafı: spec-s4.md §13.
 > **Dal:** `ovysch-feature-cila-turu` · **Prod push/merge YASAK.** Commit'ler yalnız bu dala, her anlamlı adımdan sonra.
 > **Migration YOK** (spec §6.1): bu planda `supabase/migrations/*` üreten adım yoktur; `scripts/db-validate.sh` kapısı **N/A**dır — yine de Adım 4'te "migration üretilmedi" kanıtı istenir (bir dosya belirdiyse spec sapmasıdır, kapı zorunlu olur).
 > **Tek-yazıcı zarf:** Bu planın dosya seti (`js/ui.js`, `js/utils/handlers.js`, `js/app.js`, `tests/unit/ovsync-pg-ui.test.js`, `tests/modal-router.spec.js`, `index.html`) **yalnız bu zarfa aittir**. Eşzamanlı agent sayısı 10 olabilir → başka bir lane aynı dosyalarda commit görürse bu plan koşulmaz/askıya alınır ve ENGEL olarak raporlanır (§3).
@@ -136,9 +136,9 @@ Yeni testler:
   `injectProtokolUyari` yardımcısı (satır 27-37) TEK BAŞINA YETMEZ: o yardımcı yalnız
   `window.__protokolUyarilar`'ı besler (Gecikmiş/Yaklaşan/Tamam bölümleri), ama `?` rozetinin
   yaşadığı İlk Tohumlama bölümü `_showProtokolEkran` içindeki
-  `await rpc('ovsync_baslat_uyarilari')` sonucuyla kurulur (ui.js:1830-1845). Canlı demo bugün
-  pencere-boş (OBSERVED 2026-09-24: açık 29 görevin en yakın hedefi 2026-10-06 > bugün+2 → RPC
-  0 satır) → rozet render edilmez, test açılamazdı. Yeni test ÖNCE RPC'yi stub'lar:
+  `await rpc('ovsync_baslat_uyarilari')` sonucuyla kurulur (ui.js:1830-1845). Canlı demo penceresi
+  ZAMANA BAĞLIDIR (spec V-5/F10 — 2026-09-24 gecesi iki ölçüm: yazıcıda 0 satır, çapraz-check'te
+  1 satır [kupe 32, hedef 2026-09-26]) → canlı veriyle test deterministik DEĞİL. Yeni test ÖNCE RPC'yi stub'lar:
   `page.route('**/rest/v1/rpc/ovsync_baslat_uyarilari**', …fulfill({ok:true, uyarilar:[{gorev_id,
   hayvan_id, kupe_no, kategori, hedef_tarih, hedef_saat:'10:00', tai_tarihi, kaynak:'ILK-TOH-DUVE-e2e',
   taban_turu:'duve'}]}))` (yalnız bu testin scope'unda; `injectProtokolUyari` sonrası `_showProtokolEkran`
@@ -209,13 +209,16 @@ Kod yazımı bu adımda YALNIZ Adım 1-3 çıktısında beklenen-etki dışı bu
 5. **Kabul checklist'i** (spec §7 A1-A4, B5-B8, C9-C11, D12-D13) madde madde işaretlenir; C9 için
    "PWA Notification tıklaması tarayıcıya bağlıdır — birincil yol app-içi banner" notu, D12 için
    Adım 0e Y2 raporu (`sapma<0` satır YA yok YA kök-neden kolonlarıyla açıklanmış), kabul 16 için
-   "sahip yürüyüşü öncesi hard-reload" notu teslim metnine yazılır. **Pencere-boş teslim notu
-   (onarım turu, OBSERVED 2026-09-24):** canlı demo'da 29 açık OVSYNC_BASLAT görevinin en yakın
-   hedefi 2026-10-06 olduğundan panelin İlk Tohumlama bölümü ~2026-10-04'e (hedef−2) kadar BOŞ
-   görünür; satır navigasyonu/yardım katmanının sahip yürüyüşü bu tarihten ÖNCE yapılacaksa
+   "sahip yürüyüşü öncesi hard-reload" notu teslim metnine yazılır. **Pencere zaman-bağlı teslim
+   notu (onarım turu, OBSERVED 2026-09-24 — F10 ile düzeltildi):** İlk Tohumlama bölümünün
+   doluluğu yürüyüş gününe bağlıdır — hedefi 2026-09-26 olan görev (kupe 32) 26 Eylüze kadar
+   panelde GÖRÜNÜR; bu tarihten sonra pencere ~2026-10-04'e (sıradaki hedef 2026-10-06'nın
+   hedef−2'si) kadar BOŞ kalır. Teslim anında `ovsync_baslat_uyarilari` satır sayısı yeniden
+   ölçülür; pencere o an boşsa satır navigasyonu/yardım katmanının sahip yürüyüşü için
    sentetik e2e kanıtı (RPC stub'lı modal-router testi) + Adım 0e Y2 raporu birincil kanıttır —
    teslim metnine açıkça yazılır. **U-1 yanıtı (OBSERVED):** açık görevlerde `hedef_saat IS NULL`
-   oranı 0/29 — koşullu-basım kuralı pratikte nötr, Y2 raporuna bilgi satırı olarak eklenir.
+   oranı 0 (0/29 yazıcı + 0/31 çapraz-check) — koşullu-basım kuralı pratikte nötr, Y2 raporuna
+   bilgi satırı olarak eklenir.
 6. **Teslim zarfı:** değişen dosya listesi + commit SHA'ları + Y2 raporu + test çıktıları; "demo teste
    hazır" ibaresiyle sahibe sunulur. **Son review kapısı:** iş bittikten sonra ayrı bir review turu
    (sahip isteği — kod incelemesi + kabullerin bağımsız teyidi) geçmeden iş "bitti" ilan edilmez.
@@ -241,9 +244,10 @@ S1 lane (kısır UI kilidi) → S4 üstüne yazar; S4 kilidi silmez (§0)
   banner; kabul 9 bilinçli best-effort — ENGEL değil, belgelenir.
 - **Y2'de `sapma<0` satır çıkarsa:** filtre YAZILMAZ (Y1 — tek otorite sunucu); satırlar kök-neden
   kolonlarıyla raporda tek tek açıklanır (kabul 12); kural düzeltmesi bu spec DIŞI (Plan 1).
-- **Canlı demo penceresi boş (onarım turu gözlemi):** RPC `ovsync_baslat_uyarilari` bugün 0 satır
-  dönüyor (en yakın hedef 2026-10-06). Bu ENGEL DEĞİLDİR — unit testler (E.1-E.6) veriyle beslenir,
-  e2e RPC stub ile deterministik açılır (Adım 2); sahip yürüyüşü notu Adım 4.5'te.
+- **Canlı demo penceresi zaman-bağlı (onarım turu gözlemi, spec F10 ile düzeltildi):** RPC
+  `ovsync_baslat_uyarilari` 2026-09-24 gecesi iki ölçümde 0 ve 1 satır döndü (doluluk hedef−2
+  kuralına göre gün gün değişir). Bu ENGEL DEĞİLDİR — unit testler (E.1-E.6) veriyle beslenir,
+  e2e RPC stub ile deterministik açılır (Adım 2); sahip yürüyüşü notu Adım 4'ün 5. maddesinde.
 - **GEBELIK_KONTROL bildirim metni sahipliği (U-3, UNKNOWN):** bu planda YOK; decomposition'da
   tek sahibe bağlanmalı — buraya sürüklenirse ENGEL olarak işaretlenir.
 
@@ -268,11 +272,11 @@ commit'te — **ayrık revert YASAK**; öksüz `{ovsync_yardim}` girdisi bırak�
 | 8 | `?v=20260924-01` index.html:11 ve 2326-2331+ tek değer | CONFIRMED grep |
 | 9 | Unit altyapı `loadBrowserModule` function'ları sandbox'a koyar; test dosyası ui.js'i expose'la yüklüyor | CONFIRMED tests/unit/support/loadModule.js:10-12,168 + ovsync-pg-ui.test.js:12-16 |
 | 10 | e2e koşum `npm run test:docker:demo` (PLAYWRIGHT_DEMO_MODE) | CONFIRMED package.json scripts |
-| 11 | Y2 sorgusunun tablo/kolon adları (gorev_log, hayvanlar, dogum, tohumlama, `_ovsync_kural_tarihi`) | CONFIRMED spec §6.2 + **canlı demo'da SORGU BÜTÜNÜ koştu (OBSERVED 2026-09-24):** 29 açık görev, hata yok — uygulayıcı 0e'de yeniden koşar |
+| 11 | Y2 sorgusunun tablo/kolon adları (gorev_log, hayvanlar, dogum, tohumlama, `_ovsync_kural_tarihi`) | CONFIRMED spec §6.2 + **canlı demo'da SORGU BÜTÜNÜ koştu (OBSERVED 2026-09-24):** 29-31 açık görev (iki ölçüm; canlı veri kayar), hata yok — uygulayıcı 0e'de yeniden koşar |
 | 12 | Canlı demo OVSYNC şablonu 4 seans | OBSERVED 2026-09-24 (B24, iki kez: spec yazımı + onarım turu) — 0d'de teyit |
 | 13 | `openDet` çağrı yüzeyi: ui.js 23 + çapraz-modül 10 = 33 satır; tanım `js/ui.js:3220` | CONFIRMED grep, onarım turu (spec B10) |
-| 14 | Canlı demo RPC penceresi boş: `ovsync_baslat_uyarilari` 0 satır; açık 29 görevin en yakın hedefi 2026-10-06 | OBSERVED canlı demo SELECT+RPC 2026-09-24 |
-| 15 | U-1 yanıtı: açık görevlerde `hedef_saat IS NULL` = 0/29 | OBSERVED canlı demo SELECT 2026-09-24 |
+| 14 | Canlı demo RPC penceresi zaman-bağlı: aynı gece iki ölçüm — yazıcı 0 satır (min hedef okuması 2026-10-06 = en yakın görevin TAI'si), çapraz-check **1 satır** (kupe 32, hedef 2026-09-26, tai 2026-10-06); 26 Eylüden sonra pencere ~2026-10-04'e kadar boşalır | OBSERVED canlı demo SELECT+RPC, iki ölçüm 2026-09-24 (spec V-5/F10) |
+| 15 | U-1 yanıtı: açık görevlerde `hedef_saat IS NULL` = 0 (0/29 yazıcı + 0/31 çapraz-check; payda canlı kayar) | OBSERVED canlı demo SELECT 2026-09-24 |
 | 16 | `start_first_service_protocol` canlı gövdesinin başarı RETURN clause'unda `hayvan_id` yok; `ovsync_baslat_uyarilari` canlı gövdesi `hayvan_id`/`taban_turu`/pencere (+2) içerir | OBSERVED canlı demo `pg_get_functiondef` 2026-09-24 |
 | 17 | `injectProtokolUyari` yalnız `window.__protokolUyarilar` besler; İlk Tohumlama bölümü RPC kaynaklıdır → e2e'ye RPC stub şart | CONFIRMED `tests/modal-router.spec.js:27-37` + `js/ui.js:1830-1845` okuma |
 | 18 | Toast aralığı: `_toastPump` :55, textContent :63, `toast()` :72-86 (`js/utils/helpers.js`) | CONFIRMED grep, onarım turu ikinci düzeltme |
