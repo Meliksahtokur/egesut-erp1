@@ -1,6 +1,7 @@
 # PLAN S5 — Tutarlılık Paketi T1-T11 Uygulama Planı (spec-s5 implementasyonu)
 
 - **Tarih:** 2026-09-24 · **Dal:** `ovysch-feature-cila-turu` (prod push/merge YOK; commitler yalnız bu dala)
+- **R3 onarım revizyonu (2026-09-24):** reviewer FAIL sonrası tüm kanıt iddiaları yeniden doğrulandı. Plan değişiklikleri: **Adım 12 (F3/T6) KESİN ATLANIR** (canlıda legacy overload yok — §0); **K-7 değişti** (`supabase_migrate` MCP prod hedeflidir, demo için YASAK; demo yolu `SUPABASE_DEMO_PAT` query endpoint / psql-demo — §0 ve ENGEL-5); Adım 0 baseline'ı koşuldu (1086/1089, 3 bilinen kırmızı); V3 damga kanıtlandı (ENGEL-4 kalktı); V1 canlı teyit edildi.
 - **Girdi:** `docs/plans/2026-09-24-ovsync-cila/spec-s5.md` (bağlayıcı), `reports/plans/ovsync-cila-plan-5.md` (§3 checklist sahibin yürüyüşüdür), canlı repo kodu (bu plan yazılırken satır düzeyinde yeniden doğrulandı; kanıt etiketli)
 - **Sahip talimatı (bağlayıcı):** demo DB'ye yazmak serbest; eşzamanlı agent ≤10; **kesintisiz koş**; teslim "demo'da teste hazır" halde; iş bitince **son review kapısı** koşulur.
 - **Bağlayıcı varsayılanlar (spec §13 açık kararları — sahibin onayı beklemeden):** S2=**Seçenek A** (`p_iptal` RPC parametresi), S1=**geniş kapsam** (`%senkron%` damgası), S3=**b2** (DB'siz rozet birleştirme), T9 + erteleme-geneli **BORÇ** (BUGS.md, fix YOK).
@@ -14,8 +15,12 @@ Spec §7.2, T1 ek koşulunun `20260924000001:L273-280` OVSYNC_BASLAT bloğunun a
 **Sonuç:** F2'nin ek koşulu `_acik_disi_hedef_ic` içine yazılır (Adım 11). Spec'in fonksiyonel şartı (OVSYNC_BASLAT bloğu ikame edilmez, üçüncü koşul EKLENİR; 188 korunur) aynen geçerlidir — sadece fiziksel hedef değişir. Dry-run dalı da `ic`'yi kullandığından (CONFIRMED `20260924000002:93-95,246`) önizleme/gerçek tutarlılığı korunur. Bu sapma "canlı şema tek otorite" kuralının tahmin ettiği tiptedir; apply öncesi canlı `pg_get_functiondef` doğrulaması zaten zorunlu kapı.
 
 Diğer teyitler (bu plan yazılırken):
-- `gorev_tamamla` son tam tanım: CONFIRMED `20260902000003_asi_planli_gorev.sql:189` — imza `(p_gorev_id text, p_padok_hedef text DEFAULT NULL::text)`, gövde `SECURITY DEFINER`, **`SET search_path` satırı YOK**; ACL: `20260915000001_anon_execute_geri_al.sql:64` anon+PUBLIC'ten REVOKE etmiş. → F1 taslağındaki `SET search_path` satırı **eklenmez** (canlı header aynen korunur; bu turda güvenlik refactoru YOK).
-- `flushPendingDone` güncel gövde: CONFIRMED `js/ui.js:583-597` (spec :585-602 ile uyumlu; `_pendingDone.clear()` :587, catch :593, `recoverPendingDone` :598-605).
+- `gorev_tamamla` son tam tanım: CONFIRMED `20260902000003_asi_planli_gorev.sql:189` — imza `(p_gorev_id text, p_padok_hedef text DEFAULT NULL::text)`, gövde `SECURITY DEFINER`, **`SET search_path` satırı YOK**; ACL: `20260915000001_anon_execute_geri_al.sql:64` anon+PUBLIC'ten REVOKE etmiş. → F1 taslağındaki `SET search_path` satırı **eklenmez** (canlı header aynen korunur; bu turda güvenlik refactoru YOK). **Canlı teyit (R3 onarımı, demo pg_proc):** tek imza `gorev_tamamla(text,text)`, SET search_path YOK — plan hedefiyle birebir.
+- **T6 canlı ölçümü (R3 onarımı):** demo pg_proc'ta `tohumlama_sonuc_bos` **tek imza `(text,text)`**; legacy `(text)` overload **YOK** (prod'da da tek imza — yan gözlem). Repo: `20260403000001:L6` DROP etmiş, `20260512000006` tekrar CREATE etmiş; canlı nihai durum tek imza. → **Adım 12 (F3) KESİN ATLANIR**; `20260512000006` anon-GRANT risk kaydı canlıda fonksiyon olmadığından kapanır.
+- **V3 damga ölçümü (R3 onarımı):** demo `gorev_log`'da `kaynak ILIKE '%senkron%' OR aciklama ILIKE '%senkron%'` → **16 satır** (tamamı ILAC, `aciklama='39. Gün PG (Presynch-14 senkron)'`, `kaynak='DOGUM-<uuid>'`), **2'si açık**. Damga `aciklama`'da → F2'nin geniş-kapsam filtresi canlı veriyle uyumlu; **ENGEL-4 kalktı, Adım 11 koşulsuz yazılır**.
+- **V10 canlı teyit (R3 onarımı):** canlı `protokol_eksik_tara()` gövdesinde OVSYNC bölümü yok (pg_get_functiondef LIKE sorgusu: false) — rozet tasarım b2 ön-şartı sağlam; canlı `ovsync_baslat_uyarilari` ve `tohumlama_gorev_ertele` RPC'leri mevcut; demo'da açık OVSYNC_BASLAT 29 satır (D7 yürütülebilir).
+- **MCP hedef uyarısı (R3 onarımı — OPERASYONEL RİSK):** tools-bank `supabase_migrate`/`supabase_query` MCP bağlantısı **PROD projesine** bakar (fdw_prod_srv=0 + schema_migrations=124 = prod imzası; demo imzası fdw_prod_srv≥1). Bu MCP ile "demo ölçümü" sanarak sorgu/apply koşmak **prod okur/yazar**. Demo işlemleri için: repo kök `.env`'deki `SUPABASE_DEMO_PAT` ile `curl -X POST https://api.supabase.com/v1/projects/vtzqjmazsvurxdeondmi/database/query` (R3 onarımında ölçümler bu yolla koşuldu — çalıştığı OBSERVED) veya `SUPABASE_DEMO_DB_PASSWORD` + `SUPABASE_DEMO_POOLER` ile psql.
+- `flushPendingDone` güncel gövde: CONFIRMED `js/ui.js:583-597` (spec R3 onarımında :583-597'ye tazelendi; `_pendingDone.clear()` :587, catch :593, `recoverPendingDone` :598-605).
 - `seansTamamla` toast: CONFIRMED `js/forms.js:4012-4014`; `rpcSeansTamamla` PG-kapı dönüşü CONFIRMED `js/api.js:693-701`.
 - `buildRpcParams` gorev_tamamla dalı: CONFIRMED `js/ui.js:9426-9427`; RPC_MAP replay eşlemesi CONFIRMED `js/ui.js:9245`; iptal üreticisi CONFIRMED `js/ui.js:1190-1199` (`write('gorev_log',{...iptal:true},'PATCH')` — op.data[0]'da `id` ve `iptal:true` taşınır).
 - `_pgKapiBosAtaUygula` ölü dal: CONFIRMED `js/ui.js:996-997`; `rpc()` ok:false→throw CONFIRMED `js/api.js:86-90` (şu an yalnız `data.mesaj` okur).
@@ -40,7 +45,7 @@ Diğer teyitler (bu plan yazılırken):
 | K-4 Canlı şema | Her `CREATE OR REPLACE` apply'dan hemen önce canlı demo `pg_get_functiondef` çıktısıyla birebirleştirilir; canlı gövde, revert için migration'a yorum olarak gömülür. |
 | K-5 Commit | Her anlamlı adım sonrası bu dala commit; prod push/merge yok. |
 | K-6 Tek yazıcı | JS kulvarı F4-F7 **sıralı** (paralel değil); `reports/` salt-okunur girdi. Aynı anda tek agent JS kulvarında çalışır; DB kulvarı (F1-F3) ve test kulvarı (F8) ayrı agent'a açılabilir (≤10 eşzamanlı kuralı). |
-| K-7 Demo/prod | Demo DB'ye yazmak serbest (Mgmt API `supabase_migrate` veya psql-demo); prod'a HİÇ dokunma. Canlı ölçümler için PostgREST **kullanma** (pg_proc PGRST205 — OBSERVED); Mgmt API SELECT ya da psql. |
+| K-7 Demo/prod | Demo DB'ye yazmak serbest; prod'a HİÇ dokunma. **`supabase_migrate` MCP bu turda YASAK — prod hedeflidir** (bkz. §0 MCP uyarısı). Demo ölçüm/apply yolu: `SUPABASE_DEMO_PAT` ile Mgmt query endpoint (curl) ya da psql-demo. Canlı ölçümler için PostgREST **kullanma** (pg_proc PGRST205 — OBSERVED). |
 | K-8 Test yürüyüşü | Tarayıcı-yürüyüşü maddeleri (D4/D5/D10/D11/D12/D13/D14 UI kanıtı, K1-K8) **sahibindir**; ajan DB/kod/birim kapılarını koşar. |
 
 **Kabul testi haritası** (spec'ten): birim U1,U4-U11 → F8; demo-ajan D1,D2,D3(kod),D6(metin),D7,D8; demo-sahip D4,D5,D10-D14,Ö3; ölçüm Ö1,Ö2; ertelenmiş D9 (bkz. ENGEL-2).
@@ -52,7 +57,7 @@ Diğer teyitler (bu plan yazılırken):
 **Dosya:** yok (yalnız koşum/okuma). **Bağımlılık:** yok — her şeyin öncesi.
 
 1. gitnexus indeks tazeliği: `git log --oneline -1` vs indeks HEAD; bayatsa `gitnexus analyze` (K-1).
-2. Baseline suite: `npm run test:unit` koştur; **3 bilinen kırmızının** (plan-5 §3.4: 2 tarih-seçici UI regresyonu + 1 canlı DEMO şema — bugün OBSERVED) aynen kırmızı olduğunu ve **yeni** kırmızı olmadığını kaydet. Bu çıktı Adım 14'ün "suite yeşil veya belgeli-müsaadelı" kapısının referansıdır.
+2. Baseline suite: `npm run test:unit` koştur; **3 bilinen kırmızının** (plan-5 §3.4: 2 tarih-seçici UI regresyonu + 1 canlı DEMO şema — bugün OBSERVED) aynen kırmızı olduğunu ve **yeni** kırmızı olmadığını kaydet. Bu çıktı Adım 14'ün "suite yeşil veya belgeli-müsaadelı" kapısının referansıdır. **R3 onarımında koşuldu (2026-09-24):** 1089 test / 1086 pass / **3 fail** — (1) LUNA-3 canlı DEMO information_schema, (2) bc-tarih "gelecek güne tık", (3) bc-tarih "ay ‹/› etiket değişir" — beklentiyle birebir; implementasyon öncesi yeniden koşum gerekmez, bu kayıt referanstır.
 3. Mevcut `gorev_tamamla` 2-arg çağıranlarının listesi (grep `gorev_tamamla` js/) — F1 sonrası 2-arg çağrıların eski (text,text) overload'a düşeceğinin (T5 branşından geçmeyeceğinin) çağıran-bazı teyidi. Beklenen: `js/ui.js:592` (flushPendingDone — iptal taşımaz, T5 gerektirmez), `js/forms.js` çağrıları (hepsi iptalsiz tamamlama).
 
 **Doğrulama:** baseline notu teslim raporuna işlenir. **Commit:** yok (değişiklik yok).
@@ -65,9 +70,9 @@ Diğer teyitler (bu plan yazılırken):
 
 Sorgular (salt-okunur, demo):
 
-1. **V1+V2 (F1 için):** `SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname='gorev_tamamla' AND p.pronamespace='public'::regnamespace;` → canlı imza(lar) + gövde. Beklenen: tek imza (text,text); gövde 20260902000003:189+ ile eş mi; islem_log INSERT deseni var mı (spec V2).
-2. **T6 ölçümü (spec §5.2):** `tohumlama_sonuc_bos` tüm imzalar + gövdeler; `sonuc`/`tohumlama_durumu` 'Boş'/'Bos' dağılımı; `has_function_privilege('anon', oid, 'EXECUTE')`.
-3. **V3 (F2 için — damga ölçümü, spec §7.2):** `SELECT gorev_tipi, kaynak, count(*) FROM public.gorev_log WHERE gorev_tipi IN ('ILAC','TOHUMLAMA_HAZIRLIK','TEDAVI_GUN') GROUP BY 1,2 ORDER BY 3 DESC LIMIT 30;` + `aciklama` örnekleri. '**senkron**' damgası geçmiyorsa → F2 YAZILMAZ (ENGEL-4), bulgu S1 ile sahibe.
+1. **V1+V2 (F1 için):** `SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname='gorev_tamamla' AND p.pronamespace='public'::regnamespace;` → canlı imza(lar) + gövde. Beklenen: tek imza (text,text); gövde 20260902000003:189+ ile eş mi; islem_log INSERT deseni var mı (spec V2). **R3 notu: imza bölümü canlıdan teyitli (tek imza, SET-yok); kalan tek bilinmeyen gövde-içi islem_log desenidir (V2).**
+2. **T6 ölçümü (spec §5.2):** `tohumlama_sonuc_bos` tüm imzalar + gövdeler; `sonuc`/`tohumlama_durumu` 'Boş'/'Bos' dağılımı; `has_function_privilege('anon', oid, 'EXECUTE')`. **R3 notu: imza bölümü kapandı — canlıda tek imza (text,text), overload YOK (bkz. §0); Adım 1'den kalan yalnız 'Boş/Bos' dağılımı + anon ayrıcalık sayımı (Ö1 kapama kanıtı).**
+3. **V3 (F2 için — damga ölçümü, spec §7.2):** `SELECT gorev_tipi, kaynak, count(*) FROM public.gorev_log WHERE gorev_tipi IN ('ILAC','TOHUMLAMA_HAZIRLIK','TEDAVI_GUN') GROUP BY 1,2 ORDER BY 3 DESC LIMIT 30;` + `aciklama` örnekleri. '**senkron**' damgası geçmiyorsa → F2 YAZILMAZ (ENGEL-4), bulgu S1 ile sahibe. **R3 notu: kapandı — damga VAR (16 satır, 2 açık, `aciklama` alanında; bkz. §0). Ölçümün kesin sorgusu ILIKE-based olmalı; LIMIT-30 count-sıralı kesit damgalı satırları gösteremez (R3'te bu tuzak görüldü).**
 4. **V10 teyidi:** `SELECT pg_get_functiondef('public.protokol_eksik_tara()'::regprocedure)` içinde 'OVSYNC' bölümü yok mu (rozet tasarım b2'nin ön-şartı).
 5. **D7 ön-ölçümü:** `SELECT public._acik_disi_ovsync_hedef('<188-in-hayvan-id>');` çıktısını kaydet (apply-sonrası birebir-eş karşılaştırmanın AYAĞI). 188'in id'si demo `gorev_log`'dan çözülür (açık OVSYNC_BASLAT'lı hayvan).
 6. **Canlı gövdelerin F1/F2/F3'e gömülecek kopyaları** (K-4): `gorev_tamamla`, `_acik_disi_hedef_ic`, `tohumlama_sonuc_bos(text)` pg_get_functiondef çıktıları ölçüm raporuna aynen yazılır.
@@ -281,7 +286,7 @@ Dış `catch (e2)` (:1001-1004) aynen kalır (ilk rpc throw'u için).
 
 - **D4 (kod+birim kanıtı; modal-yürüyüşü sahibin/K5):** U4 kanıtı + `recoverPendingDone` dokunulmadığı diff'te görünür (Vazgeç → op pending'de → sayfa yenileme → recoverPendingDone tekrar dener).
 - **D5 (ön-kanıt ajan; saha kanıtı sahibin):** Adım 7/9 diff'leri + U5 (yüklendiyse). "Boş ata ve uygula" 2-adım akışının saha doğrulaması sahibin K5 yürüyüşüne not edilir.
-- **D6 (ajan, demo):** `SELECT public.tohumlama_sonuc_bos('00000000-0000-0000-0000-000000000000', NULL);` — sunucu hata metni (ör. `20260924000001:524` civarı Türkçe cümle) U10 mock-mesajının gerçek desene uyduğunu gösterir; toast görünümleri sahibin yürüyüşünde.
+- **D6 (ajan, demo):** `SELECT public.tohumlama_sonuc_bos('00000000-0000-0000-0000-000000000000', NULL);` — nil-uuid için beklenen sunucu metni **"Tohumlama bulunamadı"** (`20260924000001:522`); "Sadece Bekliyor…" metni (`:526`) istenirse `sonuc!='Bekliyor'` gerçek bir tohumlama id'siyle çağrılır (R3 notu — metin çifti netleştirildi). Sunucu `'error'` alanlı Türkçe dönüş, U10 mock-mesajının gerçek desene uyduğunu gösterir; toast görünümleri sahibin yürüyüşünde.
 
 **Commit:** `reports: cila T3/T4/T8 kabul — D4 kod kanıtı, D6 demo hata-metni örneği` (ölçüm raporuna ek).
 
@@ -289,7 +294,7 @@ Dış `catch (e2)` (:1001-1004) aynen kalır (ilk rpc throw'u için).
 
 ## Adım 11 — F2 (T1): açık senkron zinciri muafiyeti (DRIFT-DÜZELTİLMİŞ HEDEF)
 
-**Dosya:** `supabase/migrations/20260925000002_cila_t1_acik_disi_senkron_muafiyet.sql` (YENİ). **Bağımlılık:** Adım 1'in **V3 damga ölçümü** — damga yoksa BU ADIM ATLANIR ve ENGEL-4 raporlanır (kesinti yok, sıradaki adıma geçilir). **Kapılar:** K-2 (taslak+final), K-3, K-4.
+**Dosya:** `supabase/migrations/20260925000002_cila_t1_acik_disi_senkron_muafiyet.sql` (YENİ). **Bağımlılık:** Adım 1'in **V3 damga ölçümü** — damga yoksa BU ADIM ATLANIR ve ENGEL-4 raporlanır (kesinti yok, sıradaki adıma geçilir). **R3 notu: bağımlılık çözüldü — damga canlıda VAR (16 satır, 2 açık; §0); bu adım koşulsuz yazılır.** **Kapılar:** K-2 (taslak+final), K-3, K-4.
 
 İçerik:
 - Başlık yorumu: amaç + spec §7.1 sahibin kararı (**188 kasıtlı çift zincir KASITLI, dokunulmaz**) + **drift notu**: hedef `_acik_disi_hedef_ic` (bkz. §0) + Adım 1 canlı `pg_get_functiondef('_acik_disi_hedef_ic(text)')` ve `_acik_disi_ovsync_hedef(text)` gövdeleri aynen gömülü (revert kaynağı).
@@ -322,14 +327,16 @@ Koşum sırası: taslak db-validate PASS → final db-validate PASS → **D7 (kr
 
 ---
 
-## Adım 12 — F3 (T6): koşullu legacy overload DROP — **ONAY KAPISI, en sonda değerlendirilir**
+## Adım 12 — F3 (T6): koşullu legacy overload DROP — **R3 ONARIMINDA KESİN İPTAL — ADIM KOŞULMAZ**
 
-**Dosya:** `supabase/migrations/20260925000003_cila_t6_sonuc_bos_overload_temizligi.sql` (YENİ, **koşullu**). **Bağımlılık:** Adım 1'in T6 ölçümü + **sahibin onayı** (spec §5.3 koşul 3 — kesintisiz koşuyla uyumlu olarak bu adım turun SONUNA taşındı; ölçüm raporu teslim paketiyle sunulur).
+**R3 onarım kararı (bağlayıcı):** canlı demo `pg_proc` ölçümü `tohumlama_sonuc_bos` için **tek imza `(text,text)`** gösterdi; legacy `(text)` overload canlıda YOK (bkz. §0 T6 canlı ölçümü). Koşul-1 tutmadığından bu adım **koşulsuz atlanır**: `20260925000003_*` dosyası yazılmaz, uygulanmaz, sahibe onay sorusu da sorulmaz (bilgi notu olarak Ö1 ölçüm kaydı teslimde sunulur). "Kod değişikliği 0" bu kalemin meşru teslimidir. Aşağıdaki tarihsel taslak yalnız kayıt amaçlıdır.
+
+**[TARİHSEL — koşul sağlanamadı]** Dosya: `supabase/migrations/20260925000003_cila_t6_sonuc_bos_overload_temizligi.sql` (YENİ, koşullu). Bağımlılık: Adım 1'in T6 ölçümü + sahibin onayı.
 
 **Koşullar (üçü TAMAM değilse BU DOSYA YAZILMAZ/UYGULANMAZ — "kod değişikliği 0" meşru teslim):**
-1. Canlıda `(text)` + `(text,text)` overload'ları birlikte duruyor (Adım 1);
-2. `(text)` gövdesi kanonikten davranışsal fark taşıyor (ASCII 'Bos' / yan-etki farkı — Adım 1 gövde-karşılaştırması);
-3. Sahip ölçüm raporunu onayladı (Adım 14 tesliminde sorulur; onay gelmezse ENGEL-3 olarak kapanır).
+1. ~~Canlıda `(text)` + `(text,text)` overload'ları birlikte duruyor (Adım 1)~~ — **TUTMADI (R3 canlı ölçümü: tek imza)**;
+2. `(text)` gövdesi kanonikten davranışsal fark taşıyor (ASCII 'Bos' / yan-etki farkı — Adım 1 gövde-karşılaştırması) — değerlendirilemez;
+3. Sahip ölçüm raporunu onayladı (Adım 14 tesliminde sorulur; onay gelmezse ENGEL-3 olarak kapanır) — gerek kalmadı.
 
 İçerik (yazılırsa):
 ```sql
@@ -433,8 +440,8 @@ F8'e **U7**: `loadExtractedFunction('js/forms.js','_vakaKapanisOzeti')` — n=2,
 
 1. **`?v=` damga bump:** `index.html` tüm `?v=20260924-01` → `?v=20260924-02` (tek değer; F4-F7+T5 JS değişimi cache-busting zorunlu — spec §11 revert-tablosu ima eder; damga-koruma testleri vaka-toplu-ac'ta yeşil kalmalı). **Commit:** `spec: cila teslim — ?v= 20260924-02 (JS paketi cache-busting)`.
 2. **Tam doğrulama:** `npm run test:unit` → Adım 0 baseline'ına göre: yeni kırmızı 0; U1/U4-U11 yeşil; 3 eski kırmızı belgeli-müsaadelı (triage notu raporda).
-3. **gitnexus kapanış:** `gitnexus analyze` (indeks çalışılan commit'i yansıtsın) + `detect_changes` → beklenen-dışı dosya/sembol ETKİSİ yok (tek-yazıcı zarf ihlali taraması). Depo listesi: F1-F3 migrations, F4 api.js, F5 ui.js, F6 forms.js, F7 errorHandler.js, F8 test, index.html, BUGS.md **HARİÇ** (başlangıçta M BUGS.md vardı — bu plana ait değil, dokunma).
-4. **Teslim raporu** `reports/plans/ovsync-cila-tur2-teslim.md`: (a) adım-adım kanıt linkleri; (b) ENGEL listesi (aşağıdaki bölüm + koşumda çıkanlar); (c) **T11 sahibe not** (spec §10 — tek paragraf); (d) sahibin yürüyüşü talimatı: plan-5 §3 checklist + S5'e bağlanan maddeler (K5=PG kapı/T4-T3, K8=rozet/T10, Veri Trafik=T5↑ + O10 confirm); (e) **Açık kararlar seri sunumu:** S1 (kapsam teyidi — geniş varsayılan uygulandı), S2 (A uygulandı), S3 (b2 uygulandı), T6-F3 onayı (Adım 12); (f) D9 hatırlatması: T2 kabul ölçümü Plan 2 temizliğinden SONRA koşulacak (sorgu spec §7.3-3'te hazır).
+3. **gitnexus kapanış:** `gitnexus analyze` (indeks çalışılan commit'i yansıtsın) + `detect_changes` → beklenen-dışı dosya/sembol ETKİSİ yok (tek-yazıcı zarf ihlali taraması). Depo listesi: F1-F2 migrations (F3 iptal — Adım 12), F4 api.js, F5 ui.js, F6 forms.js, F7 errorHandler.js, F8 test, index.html, BUGS.md **HARİÇ** (başlangıçta M BUGS.md vardı — bu plana ait değil, dokunma). **R3 notu:** BUGS.md'deki commit'siz iki borç girdisi (BUG-ERTELEME-KURAL-GENEL :183, BUG-KUYRUK-SHEMA-VERSIYONU :195) bu turun borç kayıtlarıdır — içeriğine dokunulmadan **teslim kulvarınca commit edilmelidir** (spec §14-8 notuyla uyumlu).
+4. **Teslim raporu** `reports/plans/ovsync-cila-tur2-teslim.md`: (a) adım-adım kanıt linkleri; (b) ENGEL listesi (aşağıdaki bölüm + koşumda çıkanlar); (c) **T11 sahibe not** (spec §10 — tek paragraf); (d) sahibin yürüyüşü talimatı: plan-5 §3 checklist + S5'e bağlanan maddeler (K5=PG kapı/T4-T3, K8=rozet/T10, Veri Trafik=T5↑ + O10 confirm); (e) **Açık kararlar seri sunumu:** S1 (kapsam teyidi — geniş varsayılan uygulandı; R3 notu: canlıda 'senkron' damgalı tek desen Presynch-14), S2 (A uygulandı), S3 (b2 uygulandı), ~~T6-F3 onayı~~ → **bilgi notu: F3 iptal, canlıda overload zaten yok (Adım 12)**; (f) D9 hatırlatması: T2 kabul ölçümü Plan 2 temizliğinden SONRA koşulacak (sorgu spec §7.3-3'te hazır).
 5. **Son review kapısı (sahibin talebi):** teslimden AYRI bir review turu — tüm U/D/Ö maddeleri yeniden ölçülür; BUGS.md'ye yeni borç EKLENMEDİĞİ teyit edilir (T9/erteleme-geneli borç satırları değişmedi). Review'ın girdisi: bu plan + teslim raporu + `git diff main...HEAD`.
 
 **Commit:** `reports: cila Tur2 teslim raporu — kanıt endeksi, engeller, açık kararlar, review brief`.
@@ -445,9 +452,9 @@ F8'e **U7**: `loadExtractedFunction('js/forms.js','_vakaKapanisOzeti')` — n=2,
 
 - **ENGEL-1 (çözüldü, belgeli):** Spec §7.2 hedef-gövde bayat — canlı `_acik_disi_ovsync_hedef` sarmalayıcı; T1 koşulu `_acik_disi_hedef_ic`'e yazılır (§0; CONFIRMED 20260924000002:21-90). Plan uyarlanmış; spec'i durdurmaz.
 - **ENGEL-2 (bağımlılık, bu tur dışı):** **D9** (T2 kabul ölçümü: sessiz VETERINER_KONTROL ∩ açık senkron görev çakışması=0) Plan 2 temizliğinden SONRA anlamlı — bu turda koşulamaz; sorgu hazır, teslim raporunda ertelenmiş-adım olarak işaretli.
-- **ENGEL-3 (onay kapısı):** **F3 (T6)** üçüncü koşulu sahibin onayı — tur sonunda ölçüm raporuyla sunulur; onay yoksa yazılmaz/uygulanmaz (kod-değişikliği-0 meşru teslim). Kesintisiz koşuyu bozmaz (Adım 12 turun sonuna taşındı).
-- **ENGEL-4 (ölçüme bağlı):** **F2**, Adım 1 V3 damga ölçümüne bağlı — 'senkron' damgası canlı demo verisinde yoksa F2 yazılmaz; bulgu S1 (kapsam sorusu) ile birlikte sahibe taşınır.
-- **ENGEL-5 (araç riski, fallback'li):** Canlı şema ölçümü PostgREST'ten kapalı (PGRST205 — OBSERVED). Yol: Mgmt API SELECT (`supabase_migrate`; oturum bayatsa MCP restart gerekebilir — memory 2026-08-30) veya psql-demo. İkisi de çalışmazsa Adım 1 ENGEL olarak raporlanır ve yalnız JS kulvarı (Adım 6-9, 13) koşmaya devam eder.
+- **ENGEL-3 (R3 ONARIMINDA KAPANDI):** ~~F3 (T6) sahibin onayı~~ — canlı ölçüm overload'ın yok olduğunu gösterdi (§0); Adım 12 koşulsuz atlanır, onay sorusu kalktı. Kalan: Ö1 ölçüm kaydının teslim paketinde bilgi notu olarak sunulması.
+- **ENGEL-4 (R3 ONARIMINDA KAPANDI):** ~~F2 damga ölçümüne bağlı~~ — 'senkron' damgası canlıda VAR (16 satır, 2 açık, `aciklama` alanında; §0). F2/Adım 11 koşulsuz yazılır.
+- **ENGEL-5 (R3 ONARIMINDA TANISI KESİNLEŞTİ):** PostgREST pg_proc'e kapalı (PGRST205 — OBSERVED) + **`supabase_migrate` MCP prod hedeflidir** (fdw_prod_srv=0 + migrasyon=124 = prod imzası; §0 MCP uyarısı). Çalışan demo yolu: repo kök `.env`'deki `SUPABASE_DEMO_PAT` ile Mgmt query endpoint (curl) — R3 onarım ölçümleri bu yolla koşuldu (OBSERVED, çalışıyor); yedek: `SUPABASE_DEMO_DB_PASSWORD`+`SUPABASE_DEMO_POOLER` ile psql.
 - **ENGEL-6 (sahip katılımı):** D4/D5/D10/D11/D12/D13/D14 saha kanıtı + Ö3 + K1-K8 yürüyüşü + **son review kapısı** sahibin katılımını gerektirir; ajan bu maddeleri "sahip-yürüyüşü" etiketiyle teslim paketinde hazır bırakır.
 - **ENGEL-7 (yarış disiplini):** ≤10 eşzamanlı agent'ta JS kulvarı (F4-F7) TEK yazıcıdır (K-6); paralelleştirme yalnız DB (F1-F3) ve test (F8) kulvarlarına açıktır. ui.js iki agent tarafından eşzamanlı düzenLENEMEZ.
 
