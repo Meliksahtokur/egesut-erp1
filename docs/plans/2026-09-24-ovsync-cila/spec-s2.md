@@ -1,6 +1,8 @@
 # SPEC S2 — Sessiz sınıflandırma: eşik 55→50, kapsam Boş+bilinmeyen, Bekliyor ≥40g gebelik muayenesi + izole vurgulu liste (M3)
 
+> Spec sürümü: **1.1** (onarım turu revizyonu — bulgular F1-F8, bkz. §12) · Tarih: 2026-09-24
 - **Tarih:** 2026-09-24 · **Dal:** `ovysch-feature-cila-turu` · **Tur:** 2 (Adım 2, sentez §3)
+- **Revizyon:** v1.1 — 3. tur review onarımı (bulgu listesi orkestrasyona ulaşmadı: `BULGULAR: undefined` → tüm kanıt tablosu repo + canlı demo'dan TEK TEK yeniden doğrulandı; bulgu-işlem tablosu §12)
 - **Girdiler:** `reports/plans/ovsync-cila-plan-4.md` (sahip emirleri + skeptik revizyon), `reports/plans/ovsync-cila-sentez.md` (§3 sıra, §5A sınıflandırma kuralı, §9 karar tablosu), canlı kod + canlı demo DB.
 - **Uygulayıcı yazma zarfı:** yalnız §4'teki dosyalar. Prod'a push/merge YASAK; migration yalnız DEMO'ya uygulanır (sahip onayı var — 2026-09-24 "demo dbye yazılabilir").
 - **Kanıt etiketleri:** CONFIRMED (dosya:satır) / OBSERVED (canlı komut-sorgu, bu oturum) / INFERRED / UNKNOWN.
@@ -21,6 +23,8 @@ Sahibin kararları (bağlayıcı, sentez §9 S5/S8): sessiz eşiği **50**; kaps
 
 ## 2. Kanıtlı zemin (bu spec yazılırken yeniden doğrulandı)
 
+> **KANAL NOTU (onarım turu F7, bağlayıcı):** tools-bank `supabase_*` MCP kanalı **PROD**'a bağlıdır (ref `zqnexqbdfvbhlxzelzju` — CONFIRMED `~/tools-bank/mcp_server/server.py` + `js/api.js:23-24`; S1 fafdda1 + S5 R3/B3 ile aynı kural). Aşağıda "tools-bank sorgusu" etiketli OBSERVED satırları **PROD gözlemidir**; "demo REST" etiketlilerin kanalı bu onarımda doğrulanamadı. DEMO gerçek değerleri uygulamanın Adım 0'ında DEMO kanalından (`SUPABASE_DEMO_PAT` + Mgmt query endpoint / demo pooler psql; ref `vtzqjmazsvurxdeondmi`) ölçülür ve bu tablonun yerine geçer; sapma varsa kanıt zarfına yazılır.
+
 | # | Bulgu | Kanıt |
 |---|---|---|
 | Z1 | `v_eligible` güncel tanım: yalnız `sonuc='Gebe'` hariç tutulur (L34), eşik sabiti 55 (L35), `durum='Aktif'` (L31), düve 13ay fallback `GREATEST` dahil | CONFIRMED `supabase/migrations/20260831000002_duve_sessiz_13ay.sql:L31-35` |
@@ -34,8 +38,8 @@ Sahibin kararları (bağlayıcı, sentez §9 S5/S8): sessiz eşiği **50**; kaps
 | Z9 | Canlı demo `sessiz_hayvanlar_listele({})`: 11 kayıt, min 56 (173, 186), 9999×2 (906, 2044) → eşik 55 çalışıyor | OBSERVED (demo REST, authenticated) |
 | Z10 | 173: son tohumlama 2026-07-30 `Bekliyor` (`ce96ca6d`), açık `VETERINER_KONTROL "Sessiz hayvan: 56 gündür"` (`e341a0a9`, kaynak `SESSIZ-<id>`) — plan-4 S4'ün "kapanmıştı" notundan SONRA reconcile tarafından YENİDEN üretilmiş; 186 ve 168'de de açık SESSIZ görevleri var → canlı cron aktif | OBSERVED (demo REST) · cron aktifliği INFERRED (görev yeniden üretimi) |
 | Z11 | Canlı demo `stat_suru_ozet` `sessiz=9` ↔ listele 11: stat `COALESCE`'sız `e.sessiz_gun >= 55` NULL satırları (hiç-kayıt-yok) saymıyor — MEVCUT tutarsızlık | OBSERVED + CONFIRMED `20260625000030:L24` |
-| Z12 | 173'ün 21./35. gün GEBELIK_KONTROL'leri TAMAMLANMIŞ ama sonuc hâlâ Bekliyor; demo'da 45 açık GEBELIK_KONTROL var (21/35 gün deseni, `ref_tohumlama_id` NULL üretiliyor) | OBSERVED (demo REST) + CONFIRMED `20260531200000_faz_b_vwp_enforcement.sql:L101-108` (INSERT kolon listesinde ref_tohumlama_id yok) |
-| Z13 | Canlı demo'da Bekliyor ≥40g tohumlaması olan ~7 hayvan (kaba ölçüm, son-tohumlama filtresi olmadan) → muayene popülasyonu ~3-7 | OBSERVED (demo REST) |
+| Z12 | 173'ün 21./35. gün GEBELIK_KONTROL'leri TAMAMLANMIŞ ama sonuc hâlâ Bekliyor (onarım turunda canlı yeniden teyit: her iki görev `tamamlandi=true`, `kaynak='TOH-ce96ca6d-…'` — Bekliyor tohumlamasının kendi id'si); 45 açık GEBELIK_KONTROL var (onarım turunda yeniden OBSERVED) (21/35 gün deseni, `ref_tohumlama_id` NULL üretiliyor) | OBSERVED (tools-bank kanalı = PROD, onarım turu 2026-09-24 — F7) + CONFIRMED `20260531200000_faz_b_vwp_enforcement.sql:L101-108` (INSERT kolon listesinde ref_tohumlama_id yok) |
+| Z13 | Bekliyor ≥40g tohumlaması (tools-bank kanalı = **PROD**, F7): **kaba 5** (son-tohumlama filtresi olmadan), **son-tohumlama filtreli 3** — önizleme: 180 (91g), 173 (56g), 902 (54g) (2026-09-24 onarım turu ölçümü; sayı zamanla kayar, teslimde Adım 0 DEMO ölçümü esastır) | OBSERVED (tools-bank kanalı = PROD, onarım turu 2026-09-24) |
 | Z14 | ACL disiplini: genel kalkan `REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, PUBLIC` + default privilege kapanışı; yeni migration anon GRANT yazmaz | CONFIRMED `20260915000001_anon_execute_geri_al.sql` (kapanış bloğu) + `20260924000001:L47-48/L500-501` deseni |
 | Z15 | MK3 gebelik otoritesi `tohumlama.sonuc`'u doğrudan okur (v_eligible kullanmaz) → bu spec MK3'ü etkilemez | CONFIRMED `20260924000001_ovsync_pg_r32_acik_disi.sql:L258-265` |
 | Z16 | `?v=` damgası tek değer (`20260924-01`), js değişiminde güncellenir | CONFIRMED `index.html:L2325-2335` |
@@ -60,14 +64,14 @@ Dört nokta (Z2): `v_eligible` L35 → 50; `listele` default → 50; `reconcile`
 
 **D6 — ACL:** üç değişen fonksiyon + iki yeni fonksiyon için `REVOKE ... FROM PUBLIC, anon` + `GRANT ... TO authenticated, service_role`; `_uret` authenticated'a kapalı (yalnız cron+service_role; dry-run raporu psql/MCP service_role bağlamından alınır) — Z14.
 
-**D7 — UI:** `_dashBands` imzasına 16. parametre `muayeneList`; sessiz bandından HEMEN ÖNCE `🔬 Gebelik Muayenesi Bekleyenler (N)` kırmızı band (satır: kupe + "N. gün Bekliyor" + `openDet`); `_showSessizList` sheet'inde en üstte ayrı `🔬` bölümü (sayaçlı), altında mevcut gruplar; `_sessizGrupla` İMZASI DEĞİŞMEZ (9999-en-altta kuralı korunur, mevcut unit testler bozulmaz); iki "55+ gündür" metni "50+ gündür" olur.
+**D7 — UI:** `_dashBands` imzasına **15. parametre** `muayeneList` (mevcut imza 14 parametredir — `js/ui.js:270`, onarım turunda sayıldı: negStk…sutBuzagiHtml; v1.0'daki "16." işaretlemesi off-by-one idi, F1); sessiz bandından HEMEN ÖNCE `🔬 Gebelik Muayenesi Bekleyenler (N)` kırmızı band (satır: kupe + "N. gün Bekliyor" + `openDet`); `_showSessizList` sheet'inde en üstte ayrı `🔬` bölümü (sayaçlı), altında mevcut gruplar; `_sessizGrupla` İMZASI DEĞİŞMEZ (9999-en-altta kuralı korunur, mevcut unit testler bozulmaz); iki "55+ gündür" metni "50+ gündür" olur.
 
 ## 4. Dokunulacak dosyalar — TAM liste (tek-yazıcı zarfı)
 
 | # | Dosya | İşlem | Noktalar |
 |---|---|---|---|
 | 1 | `docs/plans/2026-09-24-ovsync-cila/taslak-s2-migration.sql` | VAR (bu spec ile teslim) | Doğrulanmış migration taslağı — final migration'ın byte-bazlı kaynağı |
-| 2 | `supabase/migrations/20260925000001_sessiz_siniflandirma.sql` | **YENİ** | İçerik = (1) dosyası. Uygulamadan ÖNCE `scripts/db-validate.sh` final koşumu ZORUNLU (db-validation kapısı) |
+| 2 | `supabase/migrations/20260925000002_sessiz_siniflandirma.sql` | **YENİ** | İçerik = (1) dosyası. *(Numara düzeltmesi: plan-s2 sapma-1 — S1 `20260925000001_ovsync_kisir_blok`'u aldığından bu plan `…000002`'yi kullanır; `20260925000001` taslak adı bayat.)* Uygulamadan ÖNCE `scripts/db-validate.sh` final koşumu ZORUNLU (db-validation kapısı) |
 | 3 | `js/ui.js` | DÜZENLE | (a) L270 `_dashBands` imzası sonuna `muayeneList` parametresi; (b) L411 çağrıya `muayeneList` geçişi; (c) L397-398 yanına `muayeneList` fetch'i (`rpc('gebelik_muayene_listele',{})`, try/catch aynı desen); (d) L312 `if((sessizList||[]).length){` bloğunun HEMEN ÖNCESİNE muayene bandı; (e) L1687-1707 `_showSessizList`: ikinci rpc fetch + sheet üstünde `🔬` bölümü + L1701 alt-metin "55+ gündür"→"50+ gündür"; (f) L2683 "55+ gündür"→"50+ gündür" |
 | 4 | `index.html` | DÜZENLE | `?v=` damgası tek değer yükseltme (ör. `20260925-01`) — ui.js değiştiği için zorunlu (Z16) |
 | 5 | `tests/unit/ui-pure.test.js` | DÜZENLE | `_sessizGrupla` regresyon testleri AYNEN kalır; §7-B2 maddeleri için yeni saf-test blokları (muayene sıralaması yardımcısı eklenirse) |
@@ -128,8 +132,8 @@ AND t.tarih <= CURRENT_DATE - public._ayar('sessiz_tohumlama_muafiyet_gun', 40):
 ## 7. Kabul testleri (implementer demo apply sonrası işaretler; ölçülebilir)
 
 **A — DB katmanı (demo, service_role bağlantı):**
-1. `sessiz_hayvanlar_listele({})` çıktısında `sonuc='Bekliyor'` son-tohumlamalı SIFIR hayvan; 173 (548df203) listede YOK. (Adet + ID ile raporlanır.)
-2. `gebelik_muayene_listele()` 173'ü İÇERİR (`bekliyor_gun ≈ 57`), 40 günden genç Bekliyor'lar YOK; her satırda `acik_gorev_var` doğru.
+1. `sessiz_hayvanlar_listele({})` çıktısında `sonuc='Bekliyor'` son-tohumlamalı SIFIR hayvan; 173 (548df203) listede YOK. (Adet + ID ile raporlanır; beklenen ≈ 9 — 180 ve 173 listeden çıkar, 186'nın son tohumlaması Bekliyor olmadığından kalır.)
+2. `gebelik_muayene_listele()` 173'ü İÇERİR (`bekliyor_gun ≈ 56` — 2026-07-30 tohumlamadan bugüne; v1.0'daki "≈ 57" sapması F3 ile düzeltildi), 40 günden genç Bekliyor'lar YOK; her satırda `acik_gorev_var` doğru. Beklenen küçük küme (PROD gözlemi — F7; DEMO ölçümü Adım 0'da): 180 (91g), 173 (56g), 902 (54g).
 3. `gebelik_muayene_gorev_uret(true)` dry-run listesi teslim paketinde sahibe sunulur (adet + kupe listesi).
 4. `reconcile` sonrası 173/186/168'in açık `SESSIZ-*` görevleri `iptal=true, kapatan_ref='sessiz-noteligible'`; `gorev_log`'da Bekliyor-hayvana açık SESSIZ görev kalmamış.
 5. `stat_suru_ozet()->'hayvan'->>'sessiz'` = `jsonb_array_length(sessiz_hayvanlar_listele())` (eşitlik zorunlu — D5).
@@ -204,6 +208,29 @@ UI geri dönüşü: `git revert <ui-commit>` (+ `?v=` damgası yeniden). Data: `
 ## 11. ENGEL / riskler (çözülemeyen yok; borçlar kayıtlı)
 
 - **ENGEL değil, BORÇ (kapı aracı):** db-validate baseline'ı (a) PK/unique'ları yeniden kurmuyor (ON CONFLICT ilk koşumu kırdı), (b) pg_cron yok, (c) C2 seeder text-PK tablolarda bozuk SQL üretiyor. Üçü de taslakta deseni değiştirerek aşıldı; `BUGS.md`/borç kaydına işlenmelidir (§4-6).
-- **RISK (düşük):** 50'ye düşüş liste kümesini büyütür (5 gün erken giriş). Bugün 50-54 bandında hayvan yok (OBSERVED: p_min_gun=50 → hâlâ 11); ilk cron sonrası fark dry-run raporuyla izlenir (plan-4 T1-(f)).
-- **RISK (düşük):** stat hizalaması sessiz sayısını 9→11'e çıkarır (davranış değişimi, sahibe öncesi/sonrası raporlanır — D5 gerekçesiyle bilinçli).
-- **gitnexus indeksi** worktree'yi kapsamıyor (main@d6a41c0, 4 commit geri — OBSERVED); LSP yerinde çalıştı (§7-C2). Implementer yerel kural gereği iş sonrası `gitnexus analyze` koşar.
+- **RISK (düşük):** 50'ye düşüş liste kümesini büyütür (5 gün erken giriş). Bugün 50-54 bandında Bekliyor-olmayan hayvan görünmüyor (OBSERVED: p_min_gun=50 → hâlâ 11); D1 kalkanı sayesinde 50-54 bandındaki Bekliyor hayvanlar (ör. 902: 54g Bekliyor) sessiz listesine GİREMEZ — muayene listesine düşer (onarım turunda OBSERVED). İlk cron sonrası fark dry-run raporuyla izlenir (plan-4 T1-(f)).
+- **RISK (düşük):** stat hizalaması sessiz sayısını 9→11'e çıkarırken, eşik+D1 değişimi listeyi 11→≈9'a indirir (180+173 çıkar; 9999 ikilisi COALESCE ile sayılır) → net beklenen stat=listele≈9. Davranış değişimi, sahibe öncesi/sonrası raporlanır (D5 gerekçesiyle bilinçli).
+- **gitnexus indeksi** worktree'yi kapsamıyor (main@d6a41c0, 4 commit geri — OBSERVED; onarım turunda 2026-09-24 yeniden doğrulandı: aynı durum). LSP yerinde çalıştı (§7-C2). **Uygulama kuralı (S4 onarım turuyla hizalı):** `gitnexus analyze` ana checkout yolunda koşarsa main dalını indeksler; implementer analyze'i bu worktree yolunda koşturmalı ki indeks dal ucunu alsın; iş sonrası analyze ZORUNLU (yerel kural).
+
+## 12. Onarım turu bulguları (v1.0 → v1.1, 2026-09-24)
+
+Reviewer onarım-öncesi turda FAIL verdi; bulgu listesi orkestrasyona ulaşmadı (BULGULAR: undefined) →
+v1.0'ın TÜM kanıt satırları repo + canlı şemadan TEK TEK yeniden doğrulandı (bu turun canlı sorguları
+tools-bank kanalından koşuldu — sonradan o kanalın PROD'a bağlı olduğu kesinleşti, F7; YAZMA yapılmadı:
+salt-SELECT + readonly RPC + BEGIN/ROLLBACK probe). Sonuç: Z1-Z12, Z14-Z16, D1-D6, §5 taslak yapısı,
+§6 rapor referansları (`e3025b23`, `5c03f108`, `73d7ec2f` — üçü de diskte mevcut) ve §7 kapıları DOĞRULANDI;
+aşağıdaki sekiz bulgu düzeltildi/işlendi:
+
+| # | Bulgu | Kanıt | Çözüm |
+|---|---|---|---|
+| F1 | "`_dashBands`'e 16. parametre" off-by-one — imzada **14 parametre** var (`negStk…sutBuzagiHtml`), `muayeneList` 15. olur | CONFIRMED `js/ui.js:270` (grep ile sayım) | D7 + plan 3b/3f "15. parametre" olarak düzeltildi |
+| F2 | Plan 3f unit test 1-2, 15-parametreli fonksiyona **16 argüman** geçiriyordu; test 2'de liste verisi 16. pozisyonda DISCARD oluyor, `muayeneList=''` kalıyor → test KIRMIZI patlardı | CONFIRMED arg sayımı: `…,[],null,'', m` = 16 öğe | Test çağrıları 15 argümana indirildi (fazlalık `''` kaldırıldı); test 3 zaten 15 argümanla doğruydu |
+| F3 | Z13 bayat + A2 bekleyen-gün sapması: canlıda bugün kaba 5 / son-tohumlama filtreli 3 (180:91g, 173:56g, 902:54g); 173 için `bekliyor_gun` bugün **56** (v1.0 "≈57" demişti) | OBSERVED demo SQL 2026-09-24 (`CURRENT_DATE - t.tarih`) | Z13, §7-A1/A2, plan Adım 0/2/5 beklenenleri güncellendi; sessiz liste için beklenen ≈9 eklendi (180+173 çıkar) |
+| F4 | Plan Adım 1.4 grep beklentileri taslakla uyumsuzdu: `COALESCE(e.sessiz_gun, 9999) >= 50` gerçek **1** (beklenen "2" yazılmıştı — `listele` eşik-parametreli `>= p_min_gun`, sabit-50 COALESCE yalnız stat'ta); `'>= 50'` yorumu view'i sayıyordu ama view eşiği `< (CURRENT_DATE - 50)` kalıba uymuyor (gerçek 3 = reconcile 2 + stat 1) | CONFIRMED taslak grep koşumu (6/3/0/1/1) | Plan 1.4 yorum+beklenenleri gerçek değerlerle hizalandı; view için ayrı `grep -c 'CURRENT_DATE - 50'` kontrolü eklendi |
+| F5 | Z8/Z9/Z10/Z11/Z12 canlı teyitleri tazelendi + tip-güvenlik kanıtı eklendi: `hayvanlar.id`/`tohumlama.hayvan_id`/`gorev_log.hayvan_id` TEXT, `tohumlama.id`/`gorev_log.id` UUID, `gorev_log.ref_tohumlama_id` TEXT; plan A1/A4 sorguları tip-güvenli | OBSERVED tools-bank kanalı = PROD (information_schema, 2026-09-24 — F7) | §2/§7'de kanıt etiketleri "onarım turunda yeniden OBSERVED" olarak tazelendi; tip haritası bu §12'de |
+| F6 | gitnexus analyze yolu kuralı eksikti: ana checkout path'inde koşan analyze main'i indeksler, dal ucunu değil (S4 onarım turunun 0a kuralı bu plana işlenmemişti); indeks durumu yeniden OBSERVED (hâlâ `d6a41c0`/main) | OBSERVED `list_repos` 2026-09-24 | §11 + plan Adım 0.2/Adım 6'ya worktree-analyze kuralı işlendi |
+| F7 | **KANAL:** tools-bank `supabase_*` kanalı **PROD**'a bağlı (ref `zqnexqbdfvbhlxzelzju`); v1.0'ın Z8-Z13 "canlı demo" etiketleri ve plan Adım 2.1'in "supabase_migrate demo'ya bakar → DEMO apply" emri **PROD-apply riski** taşıyordu — uygulanmış olsaydı migration PROD'a yazılacaktı. Bu onarım turunun kendi canlı sorguları da PROD'da koştu (salt-SELECT/readonly RPC/rollback probe — yazma yok) | CONFIRMED `~/tools-bank/mcp_server/server.py` + `js/api.js:23-24`; S1 fafdda1 (KANAL KURALI) + S5 onarim-r3.md B3 (fdw_prod_srv=0 + schema_migrations=124 prod imzası) ile bağımsız çapraz-teyit | SPEC §2'ye kanal notu; plana KANAL KURALI başlığı + Adım 0.4/2.1/2.2/A3/5.3 + sapma tablosu 2/10 yeniden yazıldı; DEMO kanalı: `SUPABASE_DEMO_REF=vtzqjmazsvurxdeondmi` + `SUPABASE_DEMO_PAT` Mgmt query endpoint / demo pooler psql |
+| F8 | taslak `_uret` INSERT uuid→text: `pg_cast`'ta uuid→text satırı YOK; canlı PG 17.6 probe'unda assignment yine de kabul edildi (ASSIGN OK) — ancak sürüm-bağımsız güvenlik için eşzamanlı S2 kulvarı taslağa `v_rec.tohumlama_id::text` sertleştirmesi ekledi; bu, kod tabanının kendi deseniyle örtüşür (`20260522000004:L140-141` `v_toh.id::text`) | OBSERVED probe (PROD PG 17.6) + CONFIRMED `20260522000004_tekrar_asim.sql:L137-141` + taslak diff | taslak sertleştirmesi BENİMSENDİ (bu onarım taslağa dokunmadı — çakışma önleme); T-e PASS bu iki mekanizma ile tutarlı |
+
+Onarım turu **kod değişikliği YAPMAZ** — yazma yetkisi yalnız bu dizindeki spec/plan dosyalarına aittir.
+Eşzamanlı onarım yazıcılarıyla çakışma yoktur: bu tur yalnız `spec-s2.md` + `plan-s2.md`'ye dokunur.
