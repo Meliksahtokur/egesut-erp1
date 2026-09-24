@@ -6,6 +6,8 @@
 - **Kapsam:** T5 (replay iptali) → T3/T4 (PG zinciri atomikliği + flush kaybı) → T1/T2 (çift senkron) → T6 (doğrulama) → T7/T8/T10 (tutarlılık cilası)
 - **Kapsam DIŞI (borç — fix YOK):** T9 kuyruk şema-versiyonu (`BUGS.md:195` BUG-KUYRUK-SHEMA-VERSIYONU [open/borç]) ve erteleme geneli (`BUGS.md:183` BUG-ERTELEME-KURAL-GENEL [open/borç]) — sahibin bağlayıcı kararı. T11 kod değişikliği değildir (§10, sahibe not). T7'nin O12/P3-P10 bildirim zenginliği kalemi Plan 3'ün işidir (bu spec'te YOK).
 
+> **3. ONARIM TURU (2026-09-24, 23:40+ — R3 + 2. tur sonrası kalan boşluklar):** Doğrulama bağımsız olarak tekrar koşuldu (repo satır-okumaları + **canlı demo psql pooler**, salt-okunur; R3'ün PAT-query-endpoint bulgularıyla uyumlu). R3/2. turun kapattıkları teyit edildi (F3 İPTAL, V3 damga VAR, T1 hedefi `_acik_disi_hedef_ic`, V2 islem_log izi, satır tazelemeleri — bunlara dokunulmadı). **Bu turun kapattığı kalan boşluklar:** (1) **§5.2 ölçüm SQL'i bozuktu** — `tohumlama_durumu` kolonu `tohumlama` tablosunda YOK (canlı ERROR, OBSERVED); kolon `hayvanlar`'dadır; sorgu düzeltildi + dağılımlar canlı ölçüldü (Ö1 kapandı). (2) **§7.3 D7 yanlış beklentiydi** — 188 için fonksiyon canlıda NULL döndürüyor (açık OVSYNC_BASLAT muafiyeti; kural tarihi 2026-10-06 hazır); "üretim döndürüyor" ifadesi düzeltildi, iki-kanıt tasarımı (NULL=NULL eş + genel üretim sayısı 13/115) yazıldı. (3) `F7 hedefi` konusunda 2. turun "errorHandler.js'te bilinçli tutma" kararı benimsendi; config.js PG_HATA_SOZLUGU alternatifi kayıt altında (§8.2 notu). Ayrıntılı kayıt: `onarim-tur3.md`.
+
 ---
 
 ## 1. Amaç
@@ -26,8 +28,8 @@ Bu spec'in implementation'ı **yalnızca** aşağıdaki dosyalara yazar. Başka 
 
 | # | Dosya | İş kalemleri | Yazıcı kulvarı |
 |---|---|---|---|
-| F1 | `supabase/migrations/20260925000001_cila_t5_gorev_tamamla_p_iptal.sql` (YENİ) | T5 | DB kulvarı |
-| F2 | `supabase/migrations/20260925000002_cila_t1_acik_disi_senkron_muafiyet.sql` (YENİ) | T1 | DB kulvarı |
+| F1 | `supabase/migrations/<BOŞ-NUMARA>_cila_t5_gorev_tamamla_p_iptal.sql` (YENİ — numara koşum anında boş olan en düşük `20260925NNNNNN`; S1/S2/S3 bu turun 001-004 bandını kullanıyor — plan-s5 Adım 2 numara kuralı) | T5 | DB kulvarı |
+| F2 | `supabase/migrations/<BOŞ-NUMARA>_cila_t1_acik_disi_senkron_muafiyet.sql` (YENİ — aynı numara kuralı, F1'den SONRAKİ boş numara) | T1 | DB kulvarı |
 | F3 | ~~`supabase/migrations/20260925000003_cila_t6_sonuc_bos_overload_temizligi.sql`~~ (**İPTAL — R3 onarım:** canlı demo `pg_proc` ölçümü tek imza `(text,text)` gösterdi; legacy `(text)` overload canlıda YOK → §5.3 koşul-1 tutmuyor, kod değişikliği 0 meşru teslim) | T6 | DB kulvarı |
 | F4 | `js/api.js` | T5 (yok — api.js dokunulmaz T5'te), T8 (`rpc()` mesaj zenginleştirme :86-90), T7-D17 (`RPC_TABLES.start_first_service_protocol` :320) | JS kulvarı |
 | F5 | `js/ui.js` | T3 (ui tarafı `_pgKapiBosAtaUygula` :990-1005), T4 (`flushPendingDone` :583-597), T5 (`buildRpcParams` :9426-9427), T7-O10 (`dataTrafficGonder` :9229-9235), T7-D18 (`_erteleKaydet` toast :1058-1059), T7-O11 (`_protokolUygulaKaydet` :2338-2341), T8 (ölü dal :997), T10 (`loadDash` rozet bloğu :413-424 + panel önbellek :1829-1847) | JS kulvarı (aynı yazıcı, F4-F7 ile **sıralı**, paralel DEĞİL) |
@@ -63,7 +65,9 @@ Mevcut test dosyaları (`tests/unit/ovsync-pg-*.test.js`, `tests/unit/*tarih*`) 
 ### 4.3 Migration taslağı — F1 (gövde-seviyesi)
 
 ```sql
--- 20260925000001_cila_t5_gorev_tamamla_p_iptal.sql  (TASLAK — apply öncesi
+-- <BOŞ-NUMARA>_cila_t5_gorev_tamamla_p_iptal.sql  (TASLAK — dosya adı koşum anında boş olan
+-- en düşük 20260925NNNNNN ile verilir; S1/S2/S3 bu turda 001-004 bandını kullanıyor — plan-s5
+-- Adım 2 numara kuralı. Apply öncesi
 -- canlı pg_get_functiondef('gorev_tamamla(text,text)') ile birebirleştirilir;
 -- gövdenin kalanı CANLI tanımdan kopyalanır, aşağıdaki branş ÜSTTE eklenir)
 CREATE OR REPLACE FUNCTION public.gorev_tamamla(
@@ -139,11 +143,17 @@ FROM pg_proc p
 WHERE p.proname = 'tohumlama_sonuc_bos' AND p.pronamespace = 'public'::regnamespace;
 
 SELECT sonuc, count(*) FROM public.tohumlama
-WHERE sonuc ILIKE '%bos%' OR tohumlama_durumu ILIKE '%bos%' GROUP BY 1;  -- 'Boş'/'Bos' dağılımı
--- (ikinci kolon ayrı sorgu: SELECT tohumlama_durumu, count(*) ... )
+WHERE sonuc ILIKE '%bos%' GROUP BY 1;  -- 'Boş'/'Bos' dağılımı (tohumlama TABLOSUNDA sonuc var)
+-- 3. ONARIM TURU DÜZELTMESİ: tohumlama_durumu kolonu tohumlama'da YOK (canlı ERROR:
+-- "column tohumlama_durumu does not exist" — OBSERVED 2026-09-24); kolon hayvanlar'dadır:
+SELECT tohumlama_durumu, count(*) FROM public.hayvanlar GROUP BY 1;
 SELECT p.oid::regprocedure::text, has_function_privilege('anon', p.oid, 'EXECUTE')
 FROM pg_proc p WHERE p.proname='tohumlama_sonuc_bos';                     -- anon EXECUTE durumu
 ```
+**3. onarım turunda bu sorgular canlı demo'da KOŞULDU (psql pooler, 2026-09-24) — Ö1 kanıtı tamamlandı:**
+- İmza: tek imza `(text,text)` (R3 ile tutarlı); `anon EXECUTE=false`, `authenticated=true`.
+- `tohumlama.sonuc` dağılımı: **'Boş' 137, 'Doğum Yaptı' 82, 'Gebe' 43, 'Bekliyor' 31, 'Abort' 4** — ASCII `'Bos'` **0 satır** (kanonik gövdenin Türkçe-İ yazımıyla veri tutarlı).
+- `hayvanlar.tohumlama_durumu` dağılımı (bu kolon `hayvanlar`'da): NULL 91, **'gebe' 38 (küçük harf!)**, 'Gebe' 28, 'Boş' 8, **'bos' 2 (ASCII!)**, 'Tohumlanabilir' 1. → **Veri-notu (kapsam dışı, kayıt):** hayvanlar.tohumlama_durumu'nda case-variant kirliliği var ('gebe'/'bos' küçük/ASCII değerler); kanonik RPC'ler 'Boş'/'Gebe' yazar. Muafiyet/muhabir otoritesi bu kolonu DEĞİL `tohumlama.sonuc`'u okur (ic gövdesi `v_son IN ('Gebe','Bekliyor')` — canlı `tohumlama.sonuc` değerleri temiz: 'Gebe' 43/'Bekliyor' 31, case-variant yok); kirli kolonu okuyan başka kod yolları bu spec'in kapsamı dışıdır ve T6 ölçüm raporuna not olarak işlenir.
 
 ### 5.3 F3 koşullu migration taslağı — **R3 ONARIMINDA İPTAL EDİLDİ**
 Koşul-1 canlı ölçümle çöktü: demo `pg_proc`'ta `(text)` overload **yok** (§5.1). Koşullar:
@@ -209,7 +219,8 @@ _savePending(); updatePendingFab();
 ### 7.2 Migration taslağı — F2 (gövde-seviyesi)
 
 ```sql
--- 20260925000002_cila_t1_acik_disi_senkron_muafiyet.sql (TASLAK — ONARIM TURU
+-- <BOŞ-NUMARA>_cila_t1_acik_disi_senkron_muafiyet.sql (TASLAK — dosya adı plan-s5 numara
+-- kuralıyla atanır, F1'den SONRAKİ boş numara — ONARIM TURU
 -- HEDEF DÜZELTMESİ: gövde CANLI pg_get_functiondef('_acik_disi_hedef_ic(text)')'den
 -- kopyalanır; canlı OVSYNC_BASLAT bloğunun (20260924000002:53-59 karşılığı) ARKASINA,
 -- _ovsync_kural_tarihi çağrısının (:61) ÖNÜNE EKLENİR. Sarmalayıcı
@@ -241,8 +252,8 @@ REVOKE ALL ON FUNCTION public._acik_disi_hedef_ic(text) FROM PUBLIC, anon, authe
 **V3 — R3 ONARIMINDA ÇÖZÜLDÜ (damga VAR):** canlı demo ölçümü (2026-09-24, SUPABASE_DEMO_PAT query endpoint) `kaynak ILIKE '%senkron%' OR aciklama ILIKE '%senkron%'` filtresiyle **16 satır** buldu — tamamı `ILAC`, `aciklama='39. Gün PG (Presynch-14 senkron)'`, `kaynak='DOGUM-<uuid>'`; **2 tanesi açık** (tamamlandi=false, iptal=false). Damga `aciklama` alanında taşıdığından spec'teki geniş-kapsam filtresi (`kaynak OR aciklama`) canlı veriyle uyumludur; ENGEL-4 tetiklenmez, F2 yazılır. S1 notu: canlıda 'senkron' damgalı tek desen Presynch-14 PG görevleridir — dar-kapsam (presynch) alternatifi de aynı 16 satırı yakalar; canlı veri düzeyinde iki kapsamın farkı bugün sıfırdır (fark ancak gelecekte farklı adlandırılmış senkron göreviyle ortaya çıkar).
 
 ### 7.3 Kabul testleri
-1. **D7 (demo, kritik — 188 koruması):** hayvan 188 için `_acik_disi_ovsync_hedef` F2 sonrası da üretim döndürüyor (kasıtlı zincir etkilenmedi) — apply öncesi/sonrası çıktı birebir eş.
-2. **D8 (demo):** açık senkron ILAC görevi olan (ve açık OVSYNC_BASLAT'ı olmayan) test hayvanında fonksiyon NULL döner; görev kapatıldıktan sonra tekrar tarih döndürür (ardışık zincir akışı korunur).
+1. **D7 (demo, kritik — 188 koruması; 3. onarım turunda canlı veriyle netleştirildi):** hayvan 188 (kupe `188`, id `f5124a14-ab80-4028-a799-09d165466b24` — canlı çözüldü) için `_acik_disi_ovsync_hedef` F2 sonrası **apply öncesiyle birebir eş** döner. **Düzeltme:** 188'in açık OVSYNC_BASLAT görevi (OVSYNC_BASLAT bloğu) nedeniyle fonksiyon 188 için ŞU AN da **NULL** döndürüyor (canlı 2026-09-24 ölçümü: `_acik_disi_ovsync_hedef('f5124a14-…')` → NULL; `_ovsync_kural_tarihi` = 2026-10-06 üretim için hazir — görev kapanınca devreye girer). Yani eş-kanıtı **NULL=NULL**'dur; "üretim döndürüyor" beklentisi yanlıştı. Zincirin ETKİLENMEDİĞİNİN güçlü kanıtı için **D7-b zorunludur:** apply öncesi/sonrası genel üretim sayısı eş olmalı — `SELECT count(*) FILTER (WHERE public._acik_disi_ovsync_hedef(id) IS NOT NULL) AS ureten, count(*) AS toplam FROM public.hayvanlar WHERE durum='Aktif' AND cinsiyet='Dişi'` → **ön-ölçüm kaydedildi: 13/115 (canlı, 2026-09-24)**; apply sonrası aynı sorgu 13/115 vermeli.
+2. **D8 (demo):** açık senkron ILAC görevi olan (ve açık OVSYNC_BASLAT'ı olmayan) test hayvanında fonksiyon NULL döner; görev kapatıldıktan sonra tekrar tarih döndürür (ardışık zincir akışı korunur). **3. onarım turu notu:** test satırında damga **`aciklama` alanına** yazılmalı (`aciklama ILIKE '%senkron%'` — canlı üretim deseni budur: '39. Gün PG (Presynch-14 senkron)', kaynak 'DOGUM-<uuid>'; `kaynak` alanında canlıda 'senkron' damgası 0 satırdır). Filtredeki `kaynak ILIKE` bacağı canlı veriyle ölü-bacak olsa da zararsızdır (OR ile birlikte aciklama bacağı testi taşır).
 3. **D9 (demo ölçüm, T2):** Adım 3 temizlik sonrası — açık sessiz `VETERINER_KONTROL` görevi İLE aynı hayvanda açık `TEDAVI_GUN`/`ILAC` senkron görevi çakışması **0 satır**:
 ```sql
 SELECT count(*) FROM public.gorev_log g

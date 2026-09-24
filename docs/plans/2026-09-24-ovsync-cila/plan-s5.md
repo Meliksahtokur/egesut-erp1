@@ -71,10 +71,10 @@ Diğer teyitler (bu plan yazılırken):
 Sorgular (salt-okunur, demo):
 
 1. **V1+V2 (F1 için):** `SELECT pg_get_functiondef(p.oid) FROM pg_proc p WHERE p.proname='gorev_tamamla' AND p.pronamespace='public'::regnamespace;` → canlı imza(lar) + gövde. Beklenen: tek imza (text,text); gövde 20260902000003:189+ ile eş mi; islem_log INSERT deseni var mı (spec V2). **R3 notu: imza bölümü canlıdan teyitli (tek imza, SET-yok); kalan tek bilinmeyen gövde-içi islem_log desenidir (V2).**
-2. **T6 ölçümü (spec §5.2):** `tohumlama_sonuc_bos` tüm imzalar + gövdeler; `sonuc`/`tohumlama_durumu` 'Boş'/'Bos' dağılımı; `has_function_privilege('anon', oid, 'EXECUTE')`. **R3 notu: imza bölümü kapandı — canlıda tek imza (text,text), overload YOK (bkz. §0); Adım 1'den kalan yalnız 'Boş/Bos' dağılımı + anon ayrıcalık sayımı (Ö1 kapama kanıtı).**
+2. **T6 ölçümü (spec §5.2):** `tohumlama_sonuc_bos` tüm imzalar + gövdeler; `sonuc`/`tohumlama_durumu` 'Boş'/'Bos' dağılımı; `has_function_privilege('anon', oid, 'EXECUTE')`. **R3 notu: imza bölümü kapandı — canlıda tek imza (text,text), overload YOK (bkz. §0); Adım 1'den kalan yalnız 'Boş/Bos' dağılımı + anon ayrıcalık sayımı (Ö1 kapama kanıtı).** **3. TUR NOTU (Ö1 KAPANDI — canlı koşuldu, 2026-09-24 psql pooler):** (a) spec §5.2'nin eski sorgusu BOZUKTU — `tohumlama_durumu` kolonu `tohumlama` tablosunda YOK (canlı ERROR, OBSERVED); kolon `hayvanlar`'dadır, sorgular iki ayrı SELECT olarak düzeltildi (spec §5.2). (b) Ölçüm sonuçları: `tohumlama.sonuc` = 'Boş' 137 / 'Doğum Yaptı' 82 / 'Gebe' 43 / 'Bekliyor' 31 / 'Abort' 4 — ASCII 'Bos' **0**; `hayvanlar.tohumlama_durumu` = NULL 91 / 'gebe' 38 / 'Gebe' 28 / 'Boş' 8 / 'bos' 2 / 'Tohumlanabilir' 1 (case-variant veri-notu: kapsam dışı, ölçüm raporuna işlenir). (c) `anon EXECUTE=false` (her iki fonksiyon: gorev_tamamla + tohumlama_sonuc_bos), `authenticated=true`. → Adım 1'in T6 kaleminden kalan iş **yok**; ölçüm raporuna bu kanıtlar aynen taşınır.
 3. **V3 (F2 için — damga ölçümü, spec §7.2):** `SELECT gorev_tipi, kaynak, count(*) FROM public.gorev_log WHERE gorev_tipi IN ('ILAC','TOHUMLAMA_HAZIRLIK','TEDAVI_GUN') GROUP BY 1,2 ORDER BY 3 DESC LIMIT 30;` + `aciklama` örnekleri. '**senkron**' damgası geçmiyorsa → F2 YAZILMAZ (ENGEL-4), bulgu S1 ile sahibe. **R3 notu: kapandı — damga VAR (16 satır, 2 açık, `aciklama` alanında; bkz. §0). Ölçümün kesin sorgusu ILIKE-based olmalı; LIMIT-30 count-sıralı kesit damgalı satırları gösteremez (R3'te bu tuzak görüldü).**
-4. **V10 teyidi:** `SELECT pg_get_functiondef('public.protokol_eksik_tara()'::regprocedure)` içinde 'OVSYNC' bölümü yok mu (rozet tasarım b2'nin ön-şartı).
-5. **D7 ön-ölçümü:** `SELECT public._acik_disi_ovsync_hedef('<188-in-hayvan-id>');` çıktısını kaydet (apply-sonrası birebir-eş karşılaştırmanın AYAĞI). 188'in id'si demo `gorev_log`'dan çözülür (açık OVSYNC_BASLAT'lı hayvan).
+4. **V10 teyidi:** `SELECT pg_get_functiondef('public.protokol_eksik_tara()'::regprocedure)` içinde 'OVSYNC' bölümü yok mu (rozet tasarım b2'nin ön-şartı). **3. TUR NOTU: kapandı — canlıda `position('OVSYNC' in pg_get_functiondef(...)) = 0` (OBSERVED 2026-09-24).**
+5. **D7 ön-ölçümü:** `SELECT public._acik_disi_ovsync_hedef('<188-in-hayvan-id>');` çıktısını kaydet (apply-sonrası birebir-eş karşılaştırmanın AYAĞI). 188'in id'si demo `gorev_log`'dan çözülür (açık OVSYNC_BASLAT'lı hayvan). **3. TUR NOTU: kapandı — 188 = kupe `188`, id `f5124a14-ab80-4028-a799-09d165466b24` (Aktif, 1 açık OVSYNC_BASLAT); ön-ölçüm çıktısı **NULL** (açık OVSYNC_BASLAT muafiyeti; `_ovsync_kural_tarihi`=2026-10-06 hazır). D7 eş-kanıtı NULL=NULL'dur; güçlü kanıt için **D7-b** zorunlu: `SELECT count(*) FILTER (WHERE public._acik_disi_ovsync_hedef(id) IS NOT NULL), count(*) FROM public.hayvanlar WHERE durum='Aktif' AND cinsiyet='Dişi'` → **ön-ölçüm 13/115**; apply sonrası aynı değer beklenir (spec §7.3-D7).**
 6. **Canlı gövdelerin F1/F2'ye gömülecek kopyaları** (K-4): `gorev_tamamla`, `_acik_disi_hedef_ic` pg_get_functiondef çıktıları ölçüm raporuna aynen yazılır. *(F3 İPTAL — R3: `tohumlama_sonuc_bos(text)` gövmesi kalktı, canlıda fonksiyon yok; bkz. §0/Adım 12.)*
 
 **Kapı:** K-7. **Doğrulama (Ö1):** ölçüm raporunda 6 başlık dolu; imza listeleri + dağılım + ayrıcalıklar sayısal. **Commit:** `reports: cila Tur2 Adım1 canlı şema ölçümleri (V1-V3/V10, T6 dağılım, D7 ön-ölçüm)`.
@@ -83,7 +83,7 @@ Sorgular (salt-okunur, demo):
 
 ## Adım 2 — F1 taslak migration (T5) + db-validate (taslak koşumu)
 
-**Dosya:** `supabase/migrations/20260925000001_cila_t5_gorev_tamamla_p_iptal.sql` (YENİ). **Bağımlılık:** Adım 1 (V1/V2 çözülmüş olmalı). **Kapılar:** K-2 (taslak), K-3, K-4.
+**Dosya:** `supabase/migrations/<BOŞ-NUMARA>_cila_t5_gorev_tamamla_p_iptal.sql` (YENİ). **Numara kuralı (tutarlılık-turu düzeltmesi — 2026-09-24):** bu turda migration numara uzayı paylaşımlıdır — S1 `20260925000001_ovsync_kisir_blok`, S2 `20260925000002_sessiz_siniflandirma` (plan-s2 sapma-1), S3 en-boş-numara (`20260925000004_ureme_temizlik_reconcile` örnek), S4 migration ÜRETMEZ. Bu yüzden spec §2'deki sabit `20260925000001`/`…00002` adları geçersizdir; Adım 2/Adım 11 başında `ls supabase/migrations/ | grep '^20260925'` ile **kullanılmayan en düşük `20260925NNNNNN`** alınır ve plan boyunca sabitlenir (plan-s3 0d ile aynı kural). **Bağımlılık:** Adım 1 (V1/V2 çözülmüş olmalı). **Kapılar:** K-2 (taslak), K-3, K-4.
 
 İçerik (diff-seviyesi):
 - Başlık yorumu: amaç (T5, spec §4) + Adım 1'deki canlı `pg_get_functiondef('gorev_tamamla(text,text)')` çıktısı **aynen gömülü** (revert kaynağı, spec §11).
@@ -116,7 +116,7 @@ GRANT EXECUTE ON FUNCTION public.gorev_tamamla(text, text, boolean) TO authentic
   Eski `(text,text)` imzası **dokunulmaz** (2-arg çağıranlar + revert kolaylığı; spec §11 revert'i eski imzaya dönüşü destekler).
 - `NOTIFY` / diğer side-effect: canlı gövde ne yapıyorsa aynen (Adım 1 gövdesi otorite).
 
-**Doğrulama:** `bash scripts/db-validate.sh supabase/migrations/20260925000001_cila_t5_gorev_tamamla_p_iptal.sql` → PASS (çıktı reports/db-validation-*.md; U2'nin ilk koşumu). FAIL ise gövde-canlı farkını düzelt, tekrar koş. **Commit:** `spec: cila T5 taslak — gorev_tamamla p_iptal (db-validate PASS, taslak koşum)`.
+**Doğrulama:** `bash scripts/db-validate.sh supabase/migrations/<BOŞ-NUMARA>_cila_t5_gorev_tamamla_p_iptal.sql` → PASS (çıktı reports/db-validation-*.md; U2'nin ilk koşumu). FAIL ise gövde-canlı farkını düzelt, tekrar koş. **Commit:** `spec: cila T5 taslak — gorev_tamamla p_iptal (db-validate PASS, taslak koşum)`.
 
 ---
 
@@ -126,7 +126,7 @@ GRANT EXECUTE ON FUNCTION public.gorev_tamamla(text, text, boolean) TO authentic
 
 1. Taslak başlığındaki "TASLAK" işaretini kaldır; canlı-gövde gömmesinin Adım 1 çıktısıyla birebir olduğunu gözle doğrula (diff yorum içi).
 2. `bash scripts/db-validate.sh ...` **final dosyada tekrar** → PASS (U2'nin ikinci kanıtı).
-3. **Demo apply:** Mgmt API (`supabase_migrate`) ile migration içeriğini çalıştır. Apply öncesi Adım 1'deki canlı gövde satır sayısı/hash notu ile karşılaştır (bayatlanma yok mu).
+3. **Demo apply (K-7 kanalı):** migration içeriğini `SUPABASE_DEMO_PAT` ile Mgmt query endpoint (curl) ya da psql-demo ile çalıştır — **`supabase_migrate` MCP KULLANILMAZ** (o kanal PROD hedeflidir — K-7/ENGEL-5; bu satır v1.0'daki `supabase_migrate` yazımının düzeltmesidir). Apply öncesi Adım 1'deki canlı gövde satır sayısı/hash notu ile karşılaştır (bayatlanma yok mu).
 4. Apply-sonrası canlı doğrulama (ajan, Mgmt API/psql):
    - `SELECT p.oid::regprocedure::text FROM pg_proc p WHERE p.proname='gorev_tamamla' AND p.pronamespace='public'::regnamespace;` → **iki** imza: `(text,text)` + `(text,text,boolean)`.
    - `SELECT has_function_privilege('anon', 'public.gorev_tamamla(text,text,boolean)'::regprocedure, 'EXECUTE');` → **false**; authenticated → **true**.
@@ -296,7 +296,7 @@ Dış `catch (e2)` (:1001-1004) aynen kalır (ilk rpc throw'u için).
 
 ## Adım 11 — F2 (T1): açık senkron zinciri muafiyeti (DRIFT-DÜZELTİLMİŞ HEDEF)
 
-**Dosya:** `supabase/migrations/20260925000002_cila_t1_acik_disi_senkron_muafiyet.sql` (YENİ). **Bağımlılık:** Adım 1'in **V3 damga ölçümü** — damga yoksa BU ADIM ATLANIR ve ENGEL-4 raporlanır (kesinti yok, sıradaki adıma geçilir). **R3 notu: bağımlılık çözüldü — damga canlıda VAR (16 satır, 2 açık; §0); bu adım koşulsuz yazılır.** **Kapılar:** K-2 (taslak+final), K-3, K-4.
+**Dosya:** `supabase/migrations/<BOŞ-NUMARA>_cila_t1_acik_disi_senkron_muafiyet.sql` (YENİ — numara Adım 2 kuralıyla atanan bir sonraki boş numara; S1/S2/S3/S5-T5 sonrası örnek `20260925000005`). **Bağımlılık:** Adım 1'in **V3 damga ölçümü** — damga yoksa BU ADIM ATLANIR ve ENGEL-4 raporlanır (kesinti yok, sıradaki adıma geçilir). **R3 notu: bağımlılık çözüldü — damga canlıda VAR (16 satır, 2 açık; §0); bu adım koşulsuz yazılır.** **Kapılar:** K-2 (taslak+final), K-3, K-4.
 
 İçerik:
 - Başlık yorumu: amaç + spec §7.1 sahibin kararı (**188 kasıtlı çift zincir KASITLI, dokunulmaz**) + **drift notu**: hedef `_acik_disi_hedef_ic` (bkz. §0) + Adım 1 canlı `pg_get_functiondef('_acik_disi_hedef_ic(text)')` ve `_acik_disi_ovsync_hedef(text)` gövdeleri aynen gömülü (revert kaynağı).
@@ -321,9 +321,9 @@ Dış `catch (e2)` (:1001-1004) aynen kalır (ilk rpc throw'u için).
 - Sonda mevcut ACL satırları aynen: `COMMENT ON FUNCTION ...` + `REVOKE ALL ON FUNCTION public._acik_disi_hedef_ic(text) FROM PUBLIC, anon, authenticated;` — **GRANT YOK** (yardımcı; canlı :72 deseni).
 - `_acik_disi_ovsync_hedef` sarmalayıcısı ve `ilk_tohumlama_zamanlayici` DOKUNULMAZ.
 
-Koşum sırası: taslak db-validate PASS → final db-validate PASS → **D7 (kritik)**: apply ÖNCESİ Adım 1 kaydı vs apply SONRASI `SELECT public._acik_disi_ovsync_hedef('<188-id>');` **birebir eş** (kasıtlı zincir korundu — V9 mühürü) → demo apply → apply-sonrası gövde-teyit (pg_get_functiondef ek bloğu içeriyor).
+Koşum sırası: taslak db-validate PASS → final db-validate PASS → **D7 (kritik; 3. tur netleştirmesi)**: apply ÖNCESİ Adım 1 kaydı vs apply SONRASI `SELECT public._acik_disi_ovsync_hedef('f5124a14-ab80-4028-a799-09d165466b24');` — 188'in ön-ölçümü **NULL**'dur (açık OVSYNC_BASLAT muafiyeti; canlı 2026-09-24) → eş-kanıtı **NULL=NULL**; kasıtlı zincirin genel üretimi etkilemediğinin kanıtı ayrıca **D7-b** ile mühürlenir: `SELECT count(*) FILTER (WHERE public._acik_disi_ovsync_hedef(id) IS NOT NULL), count(*) FROM public.hayvanlar WHERE durum='Aktif' AND cinsiyet='Dişi'` apply öncesi **13/115** (ön-ölçüm kaydı) = apply sonrası (V9 mühürü; spec §7.3-D7) → demo apply → apply-sonrası gövde-teyit (pg_get_functiondef ek bloğu içeriyor).
 
-**D8 (ajan, demo):** test hayvanına (açık OVSYNC_BASLAT'ı OLMAYAN) `kaynak ILIKE '%senkron%'`'lu açık ILAC görevi yaz → `_acik_disi_ovsync_hedef` → NULL; görev kapat (`tamamlandi=true`) → tarih döner (ardışık-zincir akışı korunur). Test satırları Adım 14 öncesi temizlenir ya da `iptal=true` pasife çekilir.
+**D8 (ajan, demo; 3. tur damga-alan düzeltmesi):** test hayvanına (açık OVSYNC_BASLAT'ı OLMAYAN) açık ILAC görevi yaz — damga **`aciklama` alanında** olmalı (`aciklama='39. Gün PG (Presynch-14 senkron)'` deseni; `kaynak` alanına damga yazmak canlı üretim deseniyle hizasızdır ve filtreyi test etmez: canlıda `kaynak ILIKE '%senkron%'` 0 satırdır) → `_acik_disi_ovsync_hedef` → NULL; görev kapat (`tamamlandi=true`) → tarih döner (ardışık-zincir akışı korunur). Test satırları Adım 14 öncesi temizlenir ya da `iptal=true` pasife çekilir.
 
 **Commit:** `spec: cila T1 — açık senkron zincirinde açık-dişi üretim muafiyeti (_acik_disi_hedef_ic, 188 korundu: D7 eş)`.
 
@@ -440,7 +440,7 @@ F8'e **U7**: `loadExtractedFunction('js/forms.js','_vakaKapanisOzeti')` — n=2,
 
 **Dosyalar:** `index.html` (tek satır), teslim raporu, BUGS.md (dokunma — yalnız teyit).
 
-1. **`?v=` damga bump:** `index.html` tüm `?v=20260924-01` → `?v=20260924-02` (tek değer; F4-F7+T5 JS değişimi cache-busting zorunlu — spec §11 revert-tablosu ima eder; damga-koruma testleri vaka-toplu-ac'ta yeşil kalmalı). **Commit:** `spec: cila teslim — ?v= 20260924-02 (JS paketi cache-busting)`.
+1. **`?v=` damga bump:** `index.html`'deki güncel TEK değeri (sıra s1→s5 gereği S1/S2/S4 `?v=20260925-01`'e bump etmiş olur; hâlâ `20260924-01` ise onu esas al) `20260925-02`'ye yükselt — tek değer, TÜM etiketler; eski değer 0'a düşmeli (tek-değer kuralı; F4-F7+T5 JS değişimi cache-busting zorunlu; damga-koruma testleri vaka-toplu-ac'ta yeşil kalmalı). *(Tutarlılık düzeltmesi: v1.0'daki `20260924-02` hedefi S1/S2/S4'ün `20260925-01` bump'ıyla ÇELİŞİYORDU — sonraki sıradaki plan kazanır.)* **Commit:** `spec: cila teslim — ?v= 20260925-02 (JS paketi cache-busting)`.
 2. **Tam doğrulama:** `npm run test:unit` → Adım 0 baseline'ına göre: yeni kırmızı 0; U1/U4-U11 yeşil; 3 eski kırmızı belgeli-müsaadelı (triage notu raporda).
 3. **gitnexus kapanış:** `gitnexus analyze` (indeks çalışılan commit'i yansıtsın) + `detect_changes` → beklenen-dışı dosya/sembol ETKİSİ yok (tek-yazıcı zarf ihlali taraması). Depo listesi: F1-F2 migrations (F3 iptal — Adım 12), F4 api.js, F5 ui.js, F6 forms.js, F7 errorHandler.js, F8 test, index.html, BUGS.md **HARİÇ** (başlangıçta M BUGS.md vardı — bu plana ait değil, dokunma). **R3 notu:** BUGS.md'deki commit'siz iki borç girdisi (BUG-ERTELEME-KURAL-GENEL :183, BUG-KUYRUK-SHEMA-VERSIYONU :195) bu turun borç kayıtlarıdır — içeriğine dokunulmadan **teslim kulvarınca commit edilmelidir** (spec §14-8 notuyla uyumlu).
 4. **Teslim raporu** `reports/plans/ovsync-cila-tur2-teslim.md`: (a) adım-adım kanıt linkleri; (b) ENGEL listesi (aşağıdaki bölüm + koşumda çıkanlar); (c) **T11 sahibe not** (spec §10 — tek paragraf); (d) sahibin yürüyüşü talimatı: plan-5 §3 checklist + S5'e bağlanan maddeler (K5=PG kapı/T4-T3, K8=rozet/T10, Veri Trafik=T5↑ + O10 confirm); (e) **Açık kararlar seri sunumu:** S1 (kapsam teyidi — geniş varsayılan uygulandı; R3 notu: canlıda 'senkron' damgalı tek desen Presynch-14), S2 (A uygulandı), S3 (b2 uygulandı), ~~T6-F3 onayı~~ → **bilgi notu: F3 iptal, canlıda overload zaten yok (Adım 12)**; (f) D9 hatırlatması: T2 kabul ölçümü Plan 2 temizliğinden SONRA koşulacak (sorgu spec §7.3-3'te hazır).
