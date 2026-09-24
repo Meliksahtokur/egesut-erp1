@@ -261,3 +261,44 @@ kararına/bilgisine sunuldu — teslim raporuna bakınız.
    S2 kapsamı dışında, ayrı tur.
 
 **Etki:** teslimi engellemez; regresyon-SIFIR kanıtı sapma-12 karşılaştırmasındadır.
+
+### BUG-SESSIZ-GEBE-SON-KAYIT — v_eligible 'Gebe hariç' any-record; muayene RPC'si son-kayıt otoritesi (hizalama borcu) [open / borç]
+
+**Tarih:** 2026-09-25 · **Kaynak:** S2 son-review ORTA bulgusunun onarımı sırasında belirlendi (20260925000003)
+
+`v_eligible`'ın `NOT EXISTS (sonuc='Gebe')` filtresi HERHANGİ bir Gebe kaydına bakar;
+`gebelik_muayene_listele/_uret` yalnız SON tohumlamaya bakar (ORDER BY tarih DESC,
+created_at DESC LIMIT 1). Son tohumlaması Boş/Doğum Yaptı ama geçmişte Gebe kaydı olan
+hayvan iki akış arasında tutarsız eleme yaşar (demo vakası 'Test inek 3' — onarım
+20260925000003 ile Bekliyor bacağı son-kayıta bağlandı; Gebe bacağı bilinçli DOKUNULMADI:
+ön-existing ana-davranışı, tek-başına kapsam kararıdır). Fix vektörü: Gebe filtresini de
+son-kayıt alt-sorgusuna bağlamak — sahibin "kapsam yalnız Boş+durumu-bilinmeyen" kararıyla
+hizalanır, ama vaka kapanış/geri-alım akışlarında Gebe-yeniden-açılma senaryoları önce
+ölçülmelidir.
+
+**Etki:** sessiz havuzunda muhafazakâr-eksik (hayvan görülmeyebilir); yanlış-görev üretmez.
+
+### NOT-SESSIZ-VIEW-LISTELE-ASIMETRI — v_eligible WHERE'i, son_event=NULL dalında sessiz_gun>=50'den geniş [open / bilgi]
+
+**Tarih:** 2026-09-25 · **Kaynak:** onarım sonrası canlı demo gözlemi (kupe '31': v_eligible'da VAR,
+sessiz_gun=15 — listele/reconcile/stat hediyeleri COALESCE(sessiz_gun,9999)>=50 ile eler, OBSERVED)
+
+v_eligible'ın WHERE'i yalnız `son_event.tarih < bugün-50 VEYA son_event IS NULL` şartını taşır;
+son-event'siz hayvan dogum_tarihi-temelli küçük sessiz_gun ile view'a girer. TÜM canlı tüketiciler
+(sessiz_hayvanlar_listele, sessiz_hayvanlar_reconcile, stat_suru_ozet) kendi sessiz_gun>=50
+guard'ını taşıdığından davranış sızıntısı YOK; yalnız view adı ile WHERE'in vaadi arasındaki
+boşluk kayıt altına alındı. Fix vektörü: view'a `AND COALESCE(sessiz_gun,9999) >= 50` eklenmesi
+(tek nokta; tüketici guard'ları sadeleşebilir).
+
+### BUG-XSS-OPENDET-KALAN — ui.js'te escAttr'sız inline openDet argümanları (ana-gövde geneli) [open / borç]
+
+**Tarih:** 2026-09-25 · **Kaynak:** S2 final review DÜŞÜK bulgusu + onarım
+
+Sessiz-ailesi iki satır (bant + sheet) onarımda escAttr'e hizalandı (2026-09-25,
+js/ui.js). Kalan escAttr'sız inline `openDet('...')` noktaları: js/ui.js:178 (aşı
+bandı), ~:308 (ileri-gebe bandı), ~:1616 (hayvan kartı tık), ~:2947-2957 (pedigree),
+~:3840-3841 (geçmiş noktaları). Tümü DB-uuid argüman taşıdığından pratik risk düşük;
+ana-gövdeye yayılmış tek-tur XSS hizalaması ayrı hardening turu olarak planlanmalı
+(S2'deki escAttr disiplini referans).
+
+**Etki:** hayvan_id kaynakları DB-uuid; istismar yolu yok bilinen veride — hijyen borcu.
