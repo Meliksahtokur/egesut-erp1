@@ -179,3 +179,31 @@ kullan" (DoH) açık profil etkilenmez.
 per-link nameserver. Üretim (GitHub Pages) etkilenmez.
 
 **Etki:** yalnızca lokal geliştirme/test kesintileri.
+
+### BUG-ERTELEME-KURAL-GENEL — tohumlama_gorev_ertele yalnız tohumlama görevlerini kabul ediyor; erteleme kuralları genel değil [open / borç]
+
+**Tarih:** 2026-09-24 · **Kaynak:** ovsync cila turu araştırması (reports/plans/ovsync-cila-plan-2.md §5A)
+
+**Durum:** `tohumlama_gorev_ertele(uuid, date, time)` yalnız `TOHUMLAMA_PLANLI` kabul eder
+(`TIP_UYGUN_DEGIL`, 20260923000003_ovsync_pg_yardimcilar.sql:L540/L562). Tohumlama-dışı görevlerin
+ertelenmesi tek noktadan kurallı değil.
+
+**Sahip kararı (2026-09-24):** bu turda tam fix BEKLESİN. Hedef tasarım kaydedildi: hibrit, ağırlık DB'de —
+kurallar `gorev_ertele_kural` tablosunda (protokol_ayar deseni), pencere/geçmiş-tarih kontrolü RPC gövdesinde,
+JS kopyası YASAK.
+
+### BUG-KUYRUK-SHEMA-VERSIYONU — IndexedDB _queue eski-alanlı kayıtları yeni şemaya sessiz gönderiyor (Plan 5 T9) [open / borç]
+
+**Tarih:** 2026-09-24 · **Kanıt:** js/api.js:110, 175-181, 536-566 · **Kaynak:** ovsync-cila-plan-5.md
+
+**Durum:** Offline kuyruğundaki kayıtlar form-unun o anki alanlarıyla saklanıyor; form şeması değişince
+eski kayıtlar uyumsuz alanlarla sunucuya gider → sessiz hata.
+
+**Sahip kararı (2026-09-24):** bu turda tam fix YOK — borç kaydı + ucuz ikame (kuyruğa dead-letter
+görünür uyarısı) yeterli.
+
+### NOT-KISIR-GEBE-OTORITE — Bir hayvan hem kısır hem "gebe" kayıtlı (demo: küpe 184) [open / acil değil]
+
+**Tarih:** 2026-09-24 · **Sahip notu:** Gebe hayvan kısır atanamamalıydı (öyle ayarlanmıştı); değilse de
+önemli değil — insanlar gebe hayvanı kısır atanmaz, yalnız agent temizlik betikleri yanlışlıkla yapabilir.
+Kısır temizlik dry-run'ında bu vakalar listelenip sahip onayından geçecek (plan-1 S2). Acil iş değil, kalsın.

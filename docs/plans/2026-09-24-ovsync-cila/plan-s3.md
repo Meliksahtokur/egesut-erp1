@@ -48,9 +48,10 @@ görev sayısı + aktif UREME instance sayısı; (c) 188 `0818cd2e` İLAÇ göre
 Adım 4-5 beklenen-etki tabloları taze ölçümle yeniden yazılır (E-2).
 **0d — Migration dosya numarası çakışma kontrolü:** spec-s1 `…000001_ovsync_kisir_blok.sql`, spec-s2
 `…000001_sessiz_siniflandirma.sql` (+ revert için `…000002_sessiz_siniflandirma_geri_al.sql` isteniyor — CONFIRMED spec-s2:164),
-plan-s5 `…000001/2/3_cila_t*.sql` istiyor (CONFIRMED üç plan dosyası) — spec-s3 taslağı da
-`20260925000001_ureme_temizlik_reconcile.sql` adını taşıyor; **dört lane 001 numarasında
-toplanmış durumda**. Kural: temizlik migration'ı koşum anında `ls supabase/migrations/` ile **kullanılmayan en
+plan-s5 `…000001/2/3_cila_t*.sql` istiyordu (v1.0 — CONFIRMED üç plan dosyası; **tutarlılık turu güncellemesi:**
+S5 de dinamikleştirildi — spec-s5 §2/plan-s5 Adım 2 `<BOŞ-NUMARA>` kuralı; sabit istem kalmadı) — spec-s3 taslağı da
+`20260925000001_ureme_temizlik_reconcile.sql` adını taşıyor; **başta dört lane 001 numarasında toplanmıştı**.
+Kural: temizlik migration'ı koşum anında `ls supabase/migrations/` ile **kullanılmayan en
 düşük `20260925NNNNNN` numarasını** alır; bugün (23:10) `20260925*` dosyası hiç YOK — beklenen örnek
 `20260925000004_ureme_temizlik_reconcile.sql`
 (S1/S2/S5 gerçekten 001-003'e yerleşmişse). Dosya adı baş yorumundaki `Migration:` satırıyla da eşleşir.
@@ -126,7 +127,7 @@ Adım 2'deki env kalıbıyla (REF/POOLER/DB_PASSWORD'ten kurulan URL):
 `schema_migrations`'a bakma — kayıt yazmaz, K22; kanıt pg_proc + has_function_privilege'dır**).
 **Doğrulama:** `SELECT pronoun…` yerine `SELECT proname FROM pg_proc WHERE proname='ureme_temizlik_reconcile';` → 1 satır;
 `SELECT proacl … has_function_privilege('anon', …)` → anon EXECUTE YOK (REVOKE kanıtı); `NOTIFY pgrst` sonrası PostgREST
-yeniden yüklenir (RPC tools-bank `supabase_rpc` ile çağrılabilir).
+yeniden yüklenir (RPC doğrulaması DEMO kanalından — Mgmt query endpoint / demo pooler psql; tools-bank `supabase_rpc` KULLANILMAZ: o kanal PROD'a bağlıdır — spec-s1 KANAL KURALI, plan-s2 F7).
 **4b — rpc-reference girdisi:** `.harness/references/rpc-reference.md` → "Sessiz Hayvan (2026-08-31 güncel)" bölümünün
 hemen altına yeni alt bölüm `## Üreme Temizlik (tek-seferlik, 2026-09-25)`:
 

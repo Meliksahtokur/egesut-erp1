@@ -2,7 +2,7 @@
 
 - **Tarih:** 2026-09-24 · **Spec-yazar:** prd-to-spec ajanı (S-3) · **Worktree:** `ovysch-feature-cila-turu`
 - **Rev-2 (2026-09-24 ~23:30, 3. tur review onarımı):** canlı demo şeması yeniden ölçüldü; dört bulgu işlendi — (1) R1'in `cases.protocol_family` veri çapası demo'da sürüklenmiş (pf NULL ×132, K20), (2) demo'da pg_cron YOK (K18/K21), (3) demo `schema_migrations` bayat — 0b kapısı davranışsal yapıldı (K22, E-7), (4) `_trg_gorev_parent_kapandi` cascade'i OBSERVED'a çıkarıldı ve taslak KISIR-B sıralaması düzeltildi (K23/V-3/D-2). Beklenen küme farkı: R1=0 / R2=1 / KISIR_GOREV=27 senaryosu bu spec'te birinci senaryodur (§6).
-- **Girdi çapaları:** `reports/plans/ovsync-cila-plan-2.md` (sahibin emirleri + §5A araştırma), `reports/plans/ovsync-cila-sentez.md` (§3 Adım 3 sırası, §5A sınıflandırma kuralı, §9 karar tablosu), canlı kod (`CONFIRMED` dosya:satır) ve canlı demo şeması (`OBSERVED` — tools-bank supabase salt-okunur sorguları, 2026-09-24).
+- **Girdi çapaları:** `reports/plans/ovsync-cila-plan-2.md` (sahibin emirleri + §5A araştırma), `reports/plans/ovsync-cila-sentez.md` (§3 Adım 3 sırası, §5A sınıflandırma kuralı, §9 karar tablosu), canlı kod (`CONFIRMED` dosya:satır) ve canlı şema (`OBSERVED` — tools-bank supabase sorguları, 2026-09-24). **KANAL NOTU (tutarlılık turu):** tools-bank `supabase_*` kanalı PROD'a bağlıdır (spec-s1 KANAL KURALI, plan-s2 F7) — aşağıdaki K11-K18 "OBSERVED" etiketli demo değerleri bu kanaldan okunmuşsa PROD okumasıdır; bağlayıcı olan koşum günü plan-s3 Adım 0c'nin **DEMO kanalından** (Mgmt query endpoint / demo pooler psql) taze ölçümüdür.
 - **Kanıt sözlüğü:** `CONFIRMED` = dosya:satır ile kodda teyitli · `OBSERVED` = canlı demo DB salt-okunur sorgu çıktısı · `INFERRED` = kanıttan çıkarım · `UNKNOWN` = bu oturumda teyit edilemedi.
 
 ---
@@ -20,7 +20,7 @@ Bu spec **iki ayrı zarf** taşır; ikisinin tur-içi durumu FARKLIDIR:
 
 **Sınır (kapsam disiplini):** Sessiz eşik 55→50 ve Bekliyor ≥40g gebelik-muayenesi kuralı **SPEC S-4**'ündür. Zarf A'nın temizliği **eşik-bağımsız** tasarlandı: R1 aktif-vaka testini, R2 tohumlama-sonucu testini okur; hiçbir yerde `sessiz_gun` eşiğine bakmaz. Böylece S-4'ün view değişikliğinden bağımsız doğru çalışır.
 
-**A3 güncellemesi (plan-2 §3):** "Bugün hedefli açık OVSYNC_BASLAT'ları yarına ertele" operasyonu bugün **moot**: canlıda hedefi 2026-09-24 olan sıfır açık OVSYNC_BASLAT var; en erken hedef 2026-09-26 (`OBSERVED`, 31 açık OVSYNC_BASLAT listelendi).
+**A3 güncellemesi (plan-2 §3):** "Bugün hedefli açık OVSYNC_BASLAT'ları yarına ertele" operasyonu bugün **moot**: canlıda hedefi 2026-09-24 olan sıfır açık OVSYNC_BASLAT var; en erken hedef 2026-09-26 (`OBSERVED` — tools-bank/PROD kanalı: 31 açık; DEMO'da 29, en erken hedef 2026-10-06 — spec-s1 K12. Mootluk iki kanalda da geçerlidir: hedefi 2026-09-24 olan açık görev iki kanalda da yok).
 
 ---
 
@@ -72,7 +72,7 @@ Bu spec **iki ayrı zarf** taşır; ikisinin tur-içi durumu FARKLIDIR:
 
 | Dosya | İşlem | Not |
 |---|---|---|
-| `supabase/migrations/20260925000001_ureme_temizlik_reconcile.sql` | **YENİ** | Ad/tarih implementer tarafından kaydırılabilir; içerik §5'teki validated taslak (sha `b02f28ff…`) |
+| `supabase/migrations/<boş-numara>_ureme_temizlik_reconcile.sql` | **YENİ** | Ad/tarih implementer tarafından kaydırılabilir; **numara plan-s3 Adım 0d kuralıyla verilir** (koşum anında boş olan en düşük `20260925NNNNNN` — bu turda S1/S2 001-002'yi kullanıyor, aşağıdaki `20260925000001` taslak adı BAYATTİR); içerik §5'teki validated taslak (sha `b02f28ff…`) |
 | `.harness/references/rpc-reference.md` | ekleme | Yalnız yeni RPC girdisi (İmza + amaç + çağrı yeri: koşum betiği); mevcut satırlara dokunma |
 | `reports/ureme-temizlik-kosum-<tarih>.md` | YENİ | Dry-run + koşum çıktısı (reports/ gitignore — commit DIŞI) |
 
@@ -112,7 +112,7 @@ Zarf A'da **JS dosyası YOK**: temizlik saf DB operasyonudur; iptal görevler UI
 
 ### 5.1 Taslağın tamamı
 
-Dosya: `supabase/migrations/20260925000001_ureme_temizlik_reconcile.sql` · SHA-256 başı: `b02f28ff` (aşağıdaki metin birebir doğrulanan taslaktır; implementer yalnız baş yorumundaki SPEC yolunu ve gerekirse dosya adını günceller — her içerik değişikliği yeniden db-validate gerektirir).
+Dosya: `supabase/migrations/<boş-numara>_ureme_temizlik_reconcile.sql` (final numara plan-s3 Adım 0d kuralıyla; aşağıdaki `20260925000001` başlığı yalnız taslak-tarihseldir) · SHA-256 başı: `b02f28ff` (aşağıdaki metin birebir doğrulanan taslaktır; implementer yalnız baş yorumundaki SPEC yolunu ve gerekirse dosya adını günceller — her içerik değişikliği yeniden db-validate gerektirir).
 
 ```sql
 -- Migration: ureme_temizlik_reconcile — stale sessiz görevleri + kısır zincirleri tek-seferlik,
