@@ -1,6 +1,8 @@
 # PLAN S1 — Kısır hayvan Ovsync bloğu (implementasyon planı)
 
 > **Tarih:** 2026-09-24 · **Dal:** `ovysch-feature-cila-turu` · **SPEC:** `docs/plans/2026-09-24-ovsync-cila/spec-s1.md`
+> **Plan sürümü:** 1.1 (onarım turu — iki geçiş: R1-R6 repo çapaları, R7-R10 kanal/yapı/şema doğrulaması; bkz. son "Onarım turu kaydı" bölümü)
+> **KANAL KURALI (bağlayıcı):** tools-bank `supabase_*` MCP araçları **PROD**'a bağlı (ref `zqnexqbdfvbhlxzelzju` — CONFIRMED `~/tools-bank/mcp_server/server.py:307-312` + `js/api.js:23-24`). Bu plandaki TÜM demo okuma/apply adımları demo kanalını kullanır: `/home/melik/egesut-erp1/.env` → `SUPABASE_DEMO_REF` (`vtzqjmazsvurxdeondmi`) + `SUPABASE_DEMO_PAT` ile Mgmt API `POST /v1/projects/$SUPABASE_DEMO_REF/database/query` (kalıcı; saatlik `~/tmp/*token*` dosyalarına bağımlı DEĞİL) veya demo pooler psql. Prod'a yalnız SELECT ile bilinçli karşılaştırma hariç hiçbir kanıtta kullanılmaz (R7-R10).
 > **Bant:** Prod'a PUSH/MERGE YOK. Demo DB yazımı sahibin 2026-09-24 onayıyla SERBEST. Commitler yalnız bu dala.
 > **Tek-yazıcı zarf:** `supabase/migrations/20260925000001_ovsync_kisir_blok.sql` (YENİ), `supabase/tests/ovsync_pg_kabul.sql` (APPEND), `js/ui.js` (iki lokal nokta), `index.html` (damga). Zarf-dışı dosyaya yazma YOK.
 > **Eşzamanlılık (10 agent):** migration numarası tek-atama (Adım 1 başında `ls` ile doğrulanır); `js/ui.js` bu turun tek-yazıcı dosyasıdır — Plan 3'ün ui.js kulvarı Adım 4'ün commit'inden önce başlamaz.
@@ -13,7 +15,7 @@
 |---|---|---|---|
 | 0 | Ön-kontrol + canlı gövde ölçümü | — | 4 gövde repo çapalarıyla birebir |
 | 1 | Migration dosyası (M1+M2+M3+U1) | 0 | `db-validate.sh` taslakta PASS → commit A |
-| 2 | Kabul blokları S1-T1…T7 + izole koşum | 1 | `OZET: N1 PASS`, N1 ≥ N0 → commit B |
+| 2 | Kabul blokları S1-T1…T7 + izole koşum | 1 | `OZET: N1 PASS`, N1 = N0 + 19 → commit B |
 | 3 | Demo apply + T8-T10 salt-okunur doğrulama | 2 + final db-validate | 3/3 NULL, 0 kisir açık görevli, dry-run temiz |
 | 4 | UI kilidi (ui.js iki nokta + damga) | 3 (RPC alanı hazır olsun) | `detect_changes` + `test:unit` yeşil → commit C |
 | 5 | Tam-dogrulama taraması | 1-4 | self-check listesi tam |
@@ -27,13 +29,13 @@
 
 1. `git status --short` → yalnız ön-existing `BUGS.md` kirli; commit'lerde **stage disiplini**: yalnız `git add <belirli dosya>`, sonra `git diff --cached --stat` ile doğrula (BUGS.md'yi süpürme).
 2. GitNexus indeksi bayat (OBSERVED 2026-09-24: `list_repos` → egesut-erp1, 4 commit geride, main checkout). Kural gereği: `gitnexus analyze /home/melik/egesut-erp1` çalıştır; sonra impact'ler:
-   - `start_first_service_protocol` (upstream) → beklenen arayan: `ilk_tohumlama_zamanlayici`, `js/forms.js` rpc çağrısı;
+   - `start_first_service_protocol` (upstream) → beklenen arayanlar: `ilk_tohumlama_zamanlayici` (SQL, 20260924000002:L206) + `js/ui.js:1176` (`ovsyncBaslat` rpc çağrısı — `js/forms.js`'te arayan YOK; `js/api.js:320` yalnız RPC→tablo etki haritası);
    - `ovsync_baslat_uyarilari` (upstream) → beklenen: `js/ui.js` protokol paneli;
    - `_acik_disi_hedef_ic` / `_acik_disi_ovsync_hedef` (upstream) → beklenen: `_acik_disi_gorev_kur`, zamanlayıcı;
    - `_ovsyncBaslatBtnHtml` (upstream) → beklenen: `renderTask` (:L1259) + `tests/unit/ovsync-pg-ui.test.js`.
    Beklenmedik bir arayan çıkarsa DUR ve raporla (zarf genişletmesi gerekir).
 3. `code-change-precheck` skill'ini yükle ve sözleşmesini uygula (iş bitince LSP kapanır — Adım 6).
-4. **Canlı gövde ölçümü** (DEMO; tools-bank `supabase_migrate` kanalıyla salt-SELECT — bu kanalla bu turda asla UPDATE/DELETE gönderme):
+4. **Canlı gövde ölçümü** (DEMO kanalı — BAĞLAYICI KANAL KURALI: tools-bank `supabase_*` araçları PROD'a bakar, ref `zqnexqbdfvbhlxzelzju` — CONFIRMED `~/tools-bank/mcp_server/server.py` `SB_URL`/`SB_PROJECT` satırları + `js/api.js:23-24` (PROD_URL/DEMO_URL). DEMO ref: `vtzqjmazsvurxdeondmi`. Bu turdaki TÜM demo ölçüm/apply DEMO kanalından: `curl -X POST https://api.supabase.com/v1/projects/$SUPABASE_DEMO_REF/database/query` (`.env` → `SUPABASE_DEMO_REF`+`SUPABASE_DEMO_PAT`) veya demo pooler psql. tools-bank kanalı bu turda HİÇBİR adımda kullanılmaz — okuma dâhil (spec §13/V8)) — bu kanalla asla UPDATE/DELETE gönderme:
 
 ```sql
 SELECT proname, pg_get_functiondef(oid)
@@ -108,7 +110,7 @@ Tam `CREATE OR REPLACE FUNCTION public._acik_disi_hedef_ic(p_hayvan_id text) …
     ELSIF COALESCE(v_h.kisir, false) THEN
       v_neden := 'KISIR';
   ```
-  Zincir sonrası sıra: `AKTIF_DEGIL → KISIR → (ELSE) MK3 GEBE/BEKLIYOR/AKTIF_SENKRONIZASYON` (SPEC §4.2 — KISIR GEBE'den ÖNCE; sırayı T6 kilitler). :L714-729 MK3 bloğu AYNEN KORUNUR. `SELECT * INTO v_h … FOR UPDATE` (:L710) DEĞİŞMEZ — `kisir` zaten `v_h`'te taşınır. Muafiyet kapanış yolu (:L731-744) DEĞİŞMEZ — `kapatan_ref='ILK_TOH_MUAF:KISIR'`, instance `iptal`, `FIRST_SERVICE_SKIPPED`, dönüş `{ok:true, atlandi:'KISIR', gorev_id}` otomatik gelir.
+  Zincir sonrası sıra: `AKTIF_DEGIL → KISIR → (ELSE) MK3 GEBE/BEKLIYOR/AKTIF_SENKRONIZASYON` (SPEC §4.2 — KISIR GEBE'den ÖNCE; sırayı T6 kilitler). :L714-729 MK3 bloğu AYNEN KORUNUR. **Yapı notu (onarım turu):** canlı blok düz ELSIF zinciri DEĞİL — `IF AKTIF_DEGIL THEN … ELSE <iç-IF MK3, :L719-728> END IF`; mekanik, `ELSE` satırını `ELSIF COALESCE(v_h.kisir,false) THEN v_neden := 'KISIR'; ELSE` biçiminde BÖLMEKTİR (MK3 iç-IF'i ELSE içinde kalır — spec §6.2 "Canlı yapı notu"). `SELECT * INTO v_h … FOR UPDATE` (:L710) DEĞİŞMEZ — `kisir` zaten `v_h`'te taşınır. Muafiyet kapanış yolu (:L731-744) DEĞİŞMEZ — `kapatan_ref='ILK_TOH_MUAF:KISIR'`, instance `iptal`, `FIRST_SERVICE_SKIPPED`, dönüş `{ok:true, atlandi:'KISIR', gorev_id}` otomatik gelir.
 - **COMMENT güncelle (:L847-848):** muafiyet listesine `KISIR` ekle: `'… Muafiyetler: AKTIF_DEGIL/KISIR/GEBE/BEKLIYOR/AKTIF_SENKRONIZASYON (TOHUMLAMA_VAR kalktı, SK7; KISIR S1).'` (davranışsız, dokümantasyon doğruluğu)
 - **ACL aynen (:L850-851):** `REVOKE ALL … FROM PUBLIC, anon; GRANT EXECUTE … TO authenticated, service_role;`
 
@@ -155,7 +157,7 @@ COMMENT: `'… S1: kisir alanı eklendi (UI kilidi için). Salt-okuma.'`; ACL ay
 
 ## Adım 2 — Kabul blokları: `supabase/tests/ovsync_pg_kabul.sql` (APPEND) + izole koşum
 
-**İSİM UYARISI (spec'ten isim sapması, gerekçeli):** spec §5 "R32-11 blokları" der ama `R32-11` etiketi dosyada ZATEN VAR (CONFIRMED `supabase/tests/ovsync_pg_kabul.sql:L1686-1698` — "dry-run BAYRAK KAPALIYKEN de adayları SAYAR" bloğu). Yeni bloklar **`S1-T1`…`S1-T7`** etiketini kullanır; APPEND noktası: son blok (`R32-10`/SK10, `PASS R32-10/SK10 …` NOTICE'ıyla biter) ile `-- ÖZET` ayıracı ARASI. Yalnız ekleme; mevcut hiçbir satır değişmez.
+**İSİM UYARISI (spec'ten isim sapması, gerekçeli):** spec §5 "R32-11 blokları" der ama `R32-11` etiketi dosyada ZATEN VAR (CONFIRMED `supabase/tests/ovsync_pg_kabul.sql:L1682-1696` — "dry-run BAYRAK KAPALIYKEN de adayları SAYAR" bloğu). Yeni bloklar **`S1-T1`…`S1-T6`** etiketini kullanır (T7 ayrı blok değildir — mevcut blokların koşumudur); APPEND noktası: son blok (`R32-10`/SK10, `PASS R32-10/SK10 …` NOTICE'ı :L1749, `END $t$;` :L1750) ile `-- ÖZET` ayıracı (:L1754) ARASI. Yalnız ekleme; mevcut hiçbir satır değişmez.
 
 **Sözleşme (K15, README):** betik migration uygulamaz, BEGIN/ROLLBACK taşırmaz; her test DO bloğu; `pg_temp.kb_ok(koşul, etiket, beklenen, gerçek)` — FAIL ilk exception'da koşumu durdurur; sonda `OZET: N PASS`.
 
@@ -184,11 +186,15 @@ psql -h 127.0.0.1 -U lsp_user -d egesut_ovsync_kabul -tAc 'SELECT 1' 2>/dev/null
 
 (NOT: README'deki zincir `2026092300000{1..6}` ile sınırlı ve bayat — R32 blokları 09-24 migrasyonlarını gerektirir; README spec zarfında dokunulmayacaklar listesinde olduğundan YENİLENMEZ, bu düzeltilmiş zincir kullanılır.)
 
+**Kabul şeması notu (onarım turu):** `build.sh` kabul şemasını **canlı PROD public şemasının VERİSİZ kopyasından** kurar (CONFIRMED `scripts/kabul-db/build.sh:2,51` — `SB_PROJECT_REF` öntanımlı prod ref). S1 bloklarının elle INSERT'leri bu şemada güvenli: `hayvanlar`'da default'suz NOT NULL tek kolon `id` (OBSERVED demo `information_schema`, 2026-09-24 — demo prod klonu; S1-T5'in `dogum_tarihi`'siz INSERT'i geçerli); `gorev_log`/`tohumlama`'da zorunlu kolon yok; `cases(animal_id,disease_id)`/`islem_log(tip,snapshot)`/`protokol_ayar(anahtar,deger)` zorunluları yalnız okunan/UPDATE'lenen tablolar.
+
 **Beklenen:** `KABUL TAMAM: tüm testler PASS` + `OZET: N0 PASS`. Bir FAIL çıkarsa: yeni migration'ın mevcut blokları kırdığı demektir → Adım 1'e dön (muhtemel aday: R32-5 `duve_tabansiz ≥ 1` ve R32-11 `acilacaklar` üyeliği — ikisi de kisir=false fixture kullandığından kırılmamalı; kırılırsa DIFF'leri gözden geçir).
 
 ### 2b — S1-T1…T7 bloklarını APPEND et
 
-Aşağıdaki yedi DO bloğunu aynen ekle (ÖZET ayıracından önce):
+Aşağıdaki altı DO bloğunu aynen ekle (ÖZET ayıracından önce; S1-T7 ayrı blok değildir — bkz. 2b sonu):
+
+**Bayrak devri (önemli):** S1 blokları `ovsync_pg_kurallari_aktif = 1` devralır — R32-11 bloğunun son UPDATE'i :L1695'te `deger = 1` yapar (CONFIRMED `supabase/tests/ovsync_pg_kabul.sql:L1688/L1695`; kolon `numeric` — CONFIRMED `20260620000001_protokol_ayar.sql:L6`, mevcut deseni :L428). S1-T1 ek olarak kendisi de bayrağı 1'e çeker; S1-T2/T3/T4/T6'nın `start_first_service_protocol` çağrıları bu sayede `OZELLIK_KAPALI` fırlatmaz (CONFIRMED `20260924000001:L687-690`).
 
 ```sql
 -- ════════════════════════════════════════════════════════════════════════════
@@ -278,7 +284,7 @@ BEGIN
   PERFORM pg_temp.kb_ok((v_z2->>'taranan')::int = (v_z1->>'taranan')::int + 1,
     'S1-T5', 'taranan yalnız +1 (kisir hayvanlar sayılmaz — DIFF A)', (v_z1->>'taranan') || ' -> ' || (v_z2->>'taranan'));
   PERFORM pg_temp.kb_ok((v_z2->>'duve_tabansiz')::int = (v_z1->>'duve_tabansiz')::int,
-    'S1-T5', 'duve_tabansiz değişmedi (kisir+tabansız sayılmaz — DIFF B)', (v_z1->>'duve_tabansiz') || ' -> ' || (v_z2->>'duve_tabansiz'));
+    'S1-T5', 'duve_tabansiz değişmedi (kisir+tabansız sayılmaz — DIFF A filtreli taraması; dry-run sayacı dry döngüde 20260924000002:L137-153''te hesaplanır, DIFF B gerçek-dal sayacıdır :L262-277)', (v_z1->>'duve_tabansiz') || ' -> ' || (v_z2->>'duve_tabansiz'));
   SELECT count(*) INTO v_n FROM jsonb_array_elements(v_z2->'acilacaklar') e WHERE e->>'hayvan_id' = v_kisir_tabanli;
   PERFORM pg_temp.kb_ok(v_n = 0, 'S1-T5', 'kisir+tabanlı acilacaklar''da YOK', v_n::text);
   SELECT count(*) INTO v_n FROM jsonb_array_elements(v_z2->'acilacaklar') e WHERE e->>'hayvan_id' = v_norm;
@@ -309,7 +315,7 @@ END $t$;
 
 2a'daki zincir komutunu AYNI şekilde tekrar çalıştır → `~/tmp/s1-kabul.log`. **Kapı:**
 - `KABUL TAMAM: tüm testler PASS`;
-- `OZET: N1 PASS` ve **N1 = N0 + 11** (S1-T1: 4 + S1-T2: 4 + S1-T3: 3 + S1-T4: 2 + S1-T5: 4 + S1-T6: 2 = 19 kb_ok çağrısı; bekleme: N1 ≥ N0 + 19 — sayaç farkını log'dan doğrula; uyuşmazsa blokları say ve raporu buna göre ver).
+- `OZET: N1 PASS` ve **N1 = N0 + 19** (S1-T1: 4 + S1-T2: 4 + S1-T3: 3 + S1-T4: 2 + S1-T5: 4 + S1-T6: 2 = 19 kb_ok çağrısı — beklenen fark TAM 19; sayaç farkını log'dan doğrula, uyuşmazsa blokları satır satır say ve raporu buna göre ver).
 - Tek FAIL → ilgili bloğu düzelt, yeniden koş (sarmalayıcı ROLLBACK attığından DB kirli kalmaz).
 
 **Commit B:**
@@ -326,8 +332,8 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>
 **Sıra disiplini:** ÖNCE final db-validate, SONRA apply (db-validation kapısı: "apply etmeden ÖNCE finalde").
 
 1. `bash scripts/db-validate.sh supabase/migrations/20260925000001_ovsync_kisir_blok.sql` → çıkış 0 (final dosyada; Adım 1'den beri dosya değişmediyse tekrarı formel).
-2. **Apply (DEMO — sahibin onayıyla):** tools-bank `supabase_migrate` aracına dosyanın TAM içeriğini gönder. Bu kanal demo'ya bakar (spec kanıtları OBSERVED bu kanaldan).
-3. **Apply doğrulama (salt-SELECT, aynı kanal):**
+2. **Apply (DEMO — sahibin onayıyla):** dosyanın TAM içeriğini DEMO kanalına uygula: `POST /v1/projects/$SUPABASE_DEMO_REF/database/query` gövdesinde `{"query": "<tam migration SQL>"}` (Mgmt API; `SUPABASE_DEMO_PAT`). **UYARI (onarım turu):** tools-bank `supabase_migrate` KULLANILMAZ — o kanal PROD'a yazar (CONFIRMED server.py `SB_PROJECT= zqnexqbdfvbhlxzelzju`); v1.0'daki "bu kanal demo'ya bakar" cümlesi YANLIŞTI ve Adım 3'ü PROD-apply riski taşıyordu.
+3. **Apply doğrulama (salt-SELECT, aynı DEMO kanalı):**
    ```sql
    SELECT proname,
           position('IF v_h.kisir'      in pg_get_functiondef(oid)) > 0 AS m1_ok,
@@ -363,8 +369,8 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>
     WHERE g.gorev_tipi='OVSYNC_BASLAT'
       AND COALESCE(g.tamamlandi,false)=false AND COALESCE(g.iptal,false)=false;
    ```
-   Beklenen: `kisir_acik_gorevli=0`, `acik_toplam=31` (K12). tools-bank `supabase_rpc` ile `ovsync_baslat_uyarilari` çağır → `uyarilar[].kisir` anahtarı hepsinde boolean ve `false` (K12 ile tutarlı).
-6. **T10:** `supabase_rpc` → `ilk_tohumlama_zamanlayici` params `{"p_dry_run": true}` (salt-okuma dal) → `acilacaklar[]` içinde kupe 184/199/208 YOK; `taranan`/`duve_tabansiz` değerlerini kaydet (Adım 6 zarfına kanıt).
+   Beklenen: `kisir_acik_gorevli=0` (tek şart); `acik_toplam` tarih-bağımlı sabit DEĞİLDİR — OBSERVED 2026-09-24 DEMO'da 29 (v1.0'daki "31" tools-bank kanalından yanlışlıkla PROD ölçümüydü — K12'nin 1.1 düzeltmesi). `ovsync_baslat_uyarilari`'ni DEMO kanalından `SELECT public.ovsync_baslat_uyarilari();` ile çağır → `uyarilar[].kisir` anahtarı hepsinde boolean ve `false`.
+6. **T10:** DEMO kanalından `SELECT public.ilk_tohumlama_zamanlayici(true);` (salt-okuma dal; tools-bank `supabase_rpc` KULLANILMAZ — PROD'a gider) → `acilacaklar[]` içinde kupe 184/199/208 YOK; `taranan`/`duve_tabansiz` değerlerini kaydet (Adım 6 zarfına kanıt).
 7. Sorun yoksa UI'ya geç (Adım 4). Apply hatası olursa: hatayı düzelt (dosya + commit), db-validate, yeniden apply — engel çıkarsa "ENGEL:" diye raporla ve UI'ya devam et (UI, DB'siz de güvenli: `u.kisir`/`_h.kisir` gelmezse normal buton çizilir, DB muafiyeti M2 zaten korur).
 
 **Commit yok** (DB işlemi; kanıtlar Adım 6 zarfına).
@@ -435,7 +441,7 @@ grep -c '?v=20260924-01' index.html   # 0 beklenir
 1. `git log --oneline main..HEAD` → A, B, C commit'leri; `git status --short` → yalnız ön-existing `BUGS.md`.
 2. `git diff --stat main..HEAD` → yalnız zarf dosyaları: yeni migration, `supabase/tests/ovsync_pg_kabul.sql`, `js/ui.js`, `index.html`. Başkası görünüyorsa DUR ve raporla.
 3. Kabul zincirini SON kez koş (2c komutu) → `OZET: N1 PASS` teyidi (tutarlılık).
-4. Demo'da 188 çift zincir dokunulmazlık kontrolü (sahip kararı, K12): `supabase_query` → `gorev_log` açık `OVSYNC_BASLAT`, `kupe_no=188` hedef `2026-10-06` hâlâ açık; `cases`'te 188'in aktif zinciri değişmedi.
+4. Demo'da 188 çift zincir dokunulmazlık kontrolü (sahip kararı, K12; DEMO kanalından): açık `OVSYNC_BASLAT`, `kupe_no=188` hedef `2026-10-06` hâlâ açık (OBSERVED 2026-09-24: görev `bcd5fe9d…`, `kisir=false`); `cases`'te 188'in aktif zinciri değişmedi.
 5. U3 çelişkisizlik (kod taraması): `grep -n 'ovsyncBaslat' js/ui.js` → yalnız :L1164-çevresi (4a), :L1841-çevresi (4b) ve `ovsyncBaslat` tanımı — hayvan kartında buton yokluğu korunur (K10).
 6. `npm run test:unit` ikinci teyit (damga değişimi sonrası).
 
@@ -464,9 +470,31 @@ grep -c '?v=20260924-01' index.html   # 0 beklenir
 
 | # | Sapma/not | Gerekçe |
 |---|---|---|
-| 1 | Yeni kabul blok etiketi `S1-T1…T6` (spec §5 "R32-11" demişti) | `R32-11` etiketi dosyada zaten var — CONFIRMED `supabase/tests/ovsync_pg_kabul.sql:L1686` |
+| 1 | Yeni kabul blok etiketi `S1-T1…T6` (spec §5 "R32-11" demişti; spec 1.1'de etiket güncellendi) | `R32-11` etiketi dosyada zaten var — CONFIRMED `supabase/tests/ovsync_pg_kabul.sql:L1682-1696` |
 | 2 | Damga 26 satırın tamamına uygulanır (spec §5 "tek satır" demişti) | tek-değer `?v=` kuralı; önceki bump `fe5f91d` da tüm satırları değiştirdi — CONFIRMED |
 | 3 | `_ovsyncBaslatBtnHtml`'e `typeof getState==='function'` koruması eklendi (spec §7.1 sketch'i korumasızdı) | T14 birim-yeşil şartı; sandbox'ta `getState` yok — CONFIRMED `tests/unit/ovsync-pg-ui.test.js` + `support/loadModule.js` |
 | 4 | M2 COMMENT'ine `KISIR` eklendi (spec'te açıkça istenmemişti) | muafiyet listesi dokümantasyon doğruluğu; davranışsız |
 | 5 | Gerçek-dal tarama SELECT'i filtresiz kaldı (yalnız dry-run SELECT + duve_tabansiz filtreli) | spec §6.3 kararı; gerçek dalda davranışı `_ic` NULL'u taşır — bilinçli asimetri |
 | 6 | tests/README.md'deki koşum zinciri bayat kalıyor (09-24 migrasyonları yok) | README spec zarfında dokunulmayacaklar listesinde; düzeltilmiş zincir bu planda |
+
+## Onarım turu kaydı (1.1 — 2026-09-24, 3. review turu sonrası)
+
+Review bulguları orkestratöre aktarılmadığından (BULGULAR alanı boş geldi) plan/spec repodan ve canlı demo şemasından TEK TEK yeniden doğrulandı; doğrulanan bulgular ve giderimler:
+
+| # | Bulgular | Giderim | Kanıt |
+|---|---|---|---|
+| R1 | Adım 2c kapısında sayaç çelişkisi: "N1 = N0 + 11" yazıyordu, blok aritmetiği 19 | "N1 = N0 + 19 (beklenen fark TAM 19)" olarak düzeltildi; "≥" belirsizliği kaldırıldı | plan içi aritmetik: S1-T1:4 + T2:4 + T3:3 + T4:2 + T5:4 + T6:2 = 19 — CONFIRMED (2b bloklarındaki kb_ok çağrı sayımı) |
+| R2 | R32-11 çapa satırı hatalıydı (:L1686-1698 / :L1686) | :L1682-1696 olarak düzeltildi (etiket yorumu :L1682, PASS NOTICE :L1696) | CONFIRMED `supabase/tests/ovsync_pg_kabul.sql:L1682-1696` |
+| R3 | S1-T5'in dry-run `duve_tabansiz` iddiası "DIFF B"ye bağlanmıştı; oysa dry-run çıktısındaki sayaç dry döngüde (:L137-153) DIFF A'nın filtreli tarama SELECT'inden beslenir; DIFF B (:L262-277) GERÇEK-dal sayacıdır — dry-run koşumunda hiç çalışmaz | Assertion etiketi DIFF A'ya bağlandı ve iki sayacın ayrımı açıklığa kavuşturuldu (davranış beklentisi değişmedi; iddia zaten doğruydu, atıf yanlıştı) | CONFIRMED `20260924000002:L128-134` (dry scan), `:L137-153` (dry sayaç), `:L178-184` (dry çıktı), `:L262-277` (gerçek dal) |
+| R4 | 2b girişi "yedi DO bloğu" diyordu, blok sayısı 6 | "altı DO bloğu" olarak düzeltildi | CONFIRMED (plan içi tutarlılık) |
+| R5 | S1 bloklarının bayrak devri örtüktü (T2/T3/T6 `OZELLIK_KAPALI`'ya karşı) | Bayrak devri paragrafı eklendi: R32-11 son UPDATE :L1695 `deger=1`; kolon numeric; S1-T1 kendi 1'i çeker | CONFIRMED `supabase/tests/ovsync_pg_kabul.sql:L1688/L1695`, `20260620000001_protokol_ayar.sql:L6`, `20260924000001:L687-690` |
+| R6 | APPEND noktası çapasızdı | :L1749 (R32-10 PASS NOTICE) / :L1750 (END) / :L1754 (ÖZET) çapaları eklendi | CONFIRMED `supabase/tests/ovsync_pg_kabul.sql` |
+| R7 | **KANAL HATASI (kritik):** v1.0 planı Adım 0/3/5'te demo ölçüm ve apply için tools-bank `supabase_*`/`supabase_migrate`/`supabase_rpc` kanalını gösteriyordu; o kanal PROD'a bağlı (ref `zqnexqbdfvbhlxzelzju`). "supabase_migrate ile demo'ya apply" talimatı PROD-apply riski taşıyordu | Adım 0 kanal kuralı + Adım 3 apply/doğrulama + T9/T10 + Adım 5.4 DEMO kanalına (Mgmt API `SUPABASE_DEMO_REF`/`SUPABASE_DEMO_PAT` veya demo pooler psql) çevrildi; T9'un "acik_toplam=31" sabit beklentisi kaldırıldı (DEMO 29, tarih-bağımlı) | CONFIRMED `~/tools-bank/mcp_server/server.py` `SB_URL`/`SB_PROJECT` + `js/api.js:23-24`; OBSERVED demo kanalı 2026-09-24 (aşağıda) |
+| R8 | M2 DIFF mekanik notu: canlı muafiyet bloğu düz ELSIF zinciri değil, `IF AKTIF_DEGIL … ELSE <iç-IF MK3 :L719-728> END IF` yapısındadır | Plan M2 zaten doğru mekanik veriyordu (ELSIF'i ELSE'den önceye ekle = ELSE'i böl); spec §6.2 "Canlı yapı notu" ile netleştirildi, plana işaret eklendi | CONFIRMED `20260924000001:L711-729` |
+| R9 | S1-T5'in elle `hayvanlar` INSERT'i (dogum_tarihi'siz) şema riski sorusu — kabul DB'si prod-şemadan kuruluyor | Güvenli: üç tabloda default'suz NOT NULL tek kolon `hayvanlar.id` — planın tüm INSERT kolon setleri yeterli; dogum_tarihi'sizlik zaten bilinçli (tabansız düve fixture'ı) | OBSERVED demo `information_schema.columns` (`is_nullable='NO' AND column_default IS NULL`) → yalnız `hayvanlar.id` (2026-09-24) |
+| R10 | Kanıt-zarf/rollback kanal etiketi + spec §9 rollback'te `:L662-846` çapası (boş satır dahil) | Adım 6 kanıt zarfı zaten "(tarih+kanal)" istiyor — kanal = DEMO; spec §9 `:L662-845` ($fn$; satırı) olarak netleştirildi | CONFIRMED `20260924000001:L844-845`; plan Adım 6 kanıt zarfı maddesi |
+| R11 | Adım 0 impact satırı `start_first_service_protocol` için beklenen arayanı `js/forms.js` diye yazıyordu — yanlış: JS'te tek çağıran `js/ui.js:1176` (`ovsyncBaslat` içinde rpc); forms.js'te arayan yok (`js/api.js:320` yalnız RPC→tablo etki haritası). Spec V6 da `_vaka_ac_tek` çağıranlarını eksik sayıyordu (üçüncü çağıran `vaka_toplu_ac`, 20260906120000:L522) | Adım 0 satırı gerçek çağıranlarla düzeltildi; spec V6 üç çağıranı numaralandı (spec §13 satır 10) | CONFIRMED `grep -rn start_first_service_protocol js/` → yalnız `js/ui.js:1176` + `js/api.js:320`; `grep -n _vaka_ac_tek supabase/migrations/20260906120000_vaka_toplu_ac.sql` (:L257 create_case, :L522 toplu); `20260923000006:L528` (start gövdesi içinde) — üçüncü onarım geçişi 2026-09-24 |
+
+Doğrulanıp DEĞİŞTİRİLMEYEN çapalar (3. turda yeniden ölçüldü, sağlam): `20260924000002:L21-68` `_ic` gövdesi + :L33 DIFF-1 eski satır + :L34-36 IF bloğu + :L70-72 COMMENT/REVOKE; `20260924000001:L662-845` start gövdesi + :L710 SELECT*INTO + :L712/713 KISIR-ELSIF sokma noktası + :L731-744 muafiyet kapanışı + :L847-851 COMMENT/ACL; `20260924000002:L99-295` zamanlayıcı gövdesi + :L97 DROP + :L297-301 COMMENT/ACL; `20260924000001:L1089-1126` uyarılar gövdesi (kisir sokma noktası :L1102 arkası); `js/ui.js` :L1162-1166 / :L1164-1165 / :L1173 / :L1177 / :L1190-1199 / :L1244 / :L1259 / :L1588 / :L1834-1844 / :L1840-1843; `index.html:24` --amber, `:L2336` ui.js damgası, `?v=20260924-01` tam 26 satır; `js/state.js:92` getState global; unit sandbox extras'ında getState YOK (`tests/unit/ovsync-pg-ui.test.js:L12-16`, test çağrısı :L40-45); kb yardımcıları ve INSERT sütun listeleri tests/ovsync_pg_kabul.sql öncülleriyle birebir (:L34-41 kb_ok, :L49-57 kb_hayvan, :L1415+ görev INSERT'i, :L297 tohumlama INSERT'i).
+
+Canlı ölçüm (OBSERVED 2026-09-24, **DEMO kanalı** — Mgmt API `SUPABASE_DEMO_REF`): 184/199/208 `kisir=true, Aktif, Dişi`; AÇIK OVSYNC_BASLAT **29** (kisir_acik=0); 188 görevi `bcd5fe9d…` hedef 2026-10-06 açık, `kisir=false`; üç senkron vakası DEMO'da `status='active', protocol_family=NULL` (tools-bank kanalı bunların PROD ölçümünü verirdi: orada 31 görev ve family='OVSYNC' — kanal kuralı R7). Demo'da `_acik_disi_hedef_ic` gövdesi ESKİ :L33 satırını taşıyor ve dört fonksiyonun hiçbirinde `kisir` geçmiyor (diff hedefleri demo'da da taze). `kisir=true` hayvanlar: 6 (115/185 Satıldı, 184/199/204/208 Aktif — 204'ün açık görevi yok, M1 üretimi kapatır). Migration numarası `20260925000001` hâlâ boş (OBSERVED `ls supabase/migrations/`).
