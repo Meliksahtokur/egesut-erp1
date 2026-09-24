@@ -309,6 +309,13 @@ BEGIN
                     WHERE t2.hayvan_id = t.hayvan_id
                     ORDER BY t2.tarih DESC NULLS LAST, t2.created_at DESC NULLS LAST
                     LIMIT 1)
+      -- Onarım (final review DÜŞÜK bulgu): _uret:345-348 ile AYNI 30-gün tamamlanmış-
+      -- cooldown filtresi — yakın zamanda muayenesi tamamlanan hayvan liste gürültüsü
+      -- olmasın. Açık görev filtrelenmez (acik_gorev_var bayrağı ayrıştırır).
+      AND NOT EXISTS (SELECT 1 FROM public.gorev_log g
+                      WHERE g.kaynak = 'GEBELIK-KONTROL-' || t.id
+                        AND g.tamamlandi = true
+                        AND g.tamamlanma_tarihi >= (CURRENT_DATE - 30))
     ) s
   );
 END;

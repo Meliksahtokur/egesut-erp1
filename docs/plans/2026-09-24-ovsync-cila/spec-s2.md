@@ -165,7 +165,7 @@ AND t.tarih <= CURRENT_DATE - public._ayar('sessiz_tohumlama_muafiyet_gun', 40):
 
 ## 9. Geri-dönüş planı
 
-**Prensip:** yeni nesneler DROP; dört değişen nesne, migration geçmişindeki değişmez dosyalardaki gövdelerin yeniden CREATE OR REPLACE'i (history immutable — dosya:satır referansları kesindir). Aşağıdaki SQL `supabase/migrations/20260925000002_sessiz_siniflandirma_geri_al.sql` olarak yazılır ve SADECE demo'da, sahip onayıyla koşulur:
+**Prensip:** yeni nesneler DROP; dört değişen nesne, migration geçmişindeki değişmez dosyalardaki gövdelerin yeniden CREATE OR REPLACE'i (history immutable — dosya:satır referansları kesindir). Aşağıdaki SQL `supabase/migrations/<BOŞ-NUMARA>_sessiz_siniflandirma_geri_al.sql` olarak yazılır (numara koşum anında `ls supabase/migrations/` ile kullanılmayan en düşük `20260925NNNNNN` alınır — İLERİ migration `20260925000002`'yi kullandığından revert'e sabit numara ATANMAZ; plan-s2 rollback bölümüyle aynı kural) ve SADECE demo'da, sahip onayıyla koşulur:
 
 ```sql
 BEGIN;
@@ -236,3 +236,15 @@ aşağıdaki on bulgu düzeltildi/işlendi (F9-F10 eşzamanlı ikinci onarım ya
 
 Onarım turu **kod değişikliği YAPMAZ** — yazma yetkisi yalnız bu dizindeki spec/plan dosyalarına aittir.
 Eşzamanlı onarım yazıcılarıyla çakışma yoktur: bu tur yalnız `spec-s2.md` + `plan-s2.md`'ye dokunur.
+
+## 13. Final review onarımı (v1.1 → v1.2, 2026-09-25 — onarım ajanı)
+
+Final review bulgularının işlendiği tur; SAHİP ONAYLI üretim zarfı (Adım 1-5) bu turda uygulanır:
+
+| # | Bulgular → işlenen |
+|---|---|
+| R1 | §9 revert dosya adına sabit `20260925000002` verilmişti; İLERİ migration aynı numarayı kullanır (plan-s2 Adım 1) → §9 `<BOŞ-NUMARA>` kuralına çevrildi (plan-s3 0d / plan-s5 `<BOŞ-NUMARA>` konvansiyonuyla uyumlu) |
+| R2 | `gebelik_muayene_listele`, `_uret`:345-348'deki 30-gün tamamlanmış-cooldown filtresini taşımıyordu (final review DÜŞÜK bulgu) → taslağa AYNI `NOT EXISTS` bloğu eklendi (`kaynak='GEBELIK-KONTROL-' \|\| t.id`, `tamamlandi=true`, `tamamlanma_tarihi >= CURRENT_DATE - 30`); açık görev filtrelenmez (`acik_gorev_var` bayrağı ayrıştırır). §6 T-c kanıtı eski taslak üzerindedir; eklenen blok demo A2 koşumunda doğrudan doğrulanır (apply anında GEBELIK_KONTROL görevi hiç yoktur → filtre no-op, 173 listede kalır — beklenti değişmez) |
+| R3 | db-validation kanıtı bayattı: doğrulanan taslak SHA `e3025b23…` ≠ commit'lenen taslak (`::text` fix'i doğrulama SONRASI) → Adım 1 final-db-validate kapısı CAYDIRICI değil BLOKER olarak uygulanır: C1 PASS olmadan apply YOK; rapor final dosyanın SHA'sını taşır |
+| R4 | DEMO canlı şema kanalı önceki turlarda doğrudan doğrulanamamıştı → Adım 0 DEMO kanalı ölçümü (Mgmt query endpoint `SUPABASE_DEMO_REF`+`SUPABASE_DEMO_PAT`, fallback demo pooler psql) apply ÖNCESİ ZORUNLU; çapa imzaları + ÖNCE sayaçları kanıt zarfına yazılır |
+| R5 | Entegrasyon boşluğu netleştirildi: `gebelik_muayene_listele`/`_uret` için `js/` çağrı noktası S2 Adım 3 (UI) ile gelir; pg_cron'suz demo'da üretim vektörü elle `SELECT public.gebelik_muayene_gorev_uret(false);` (psql/Mgmt, service_role bağlamı — sahibin onaylı koşumu) → plan A7 notu güçlendirildi; UI teslim edilene kadar durum: "cron+şema hazır, UI bekliyor" |
