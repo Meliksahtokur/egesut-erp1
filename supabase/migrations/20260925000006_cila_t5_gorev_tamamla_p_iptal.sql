@@ -3,8 +3,12 @@
 -- Tarih: 2026-09-25 · SPEC: docs/plans/2026-09-24-ovsync-cila/spec-s5.md §4 (T5)
 -- Amaç: gorev_tamamla'ya opsiyonel p_iptal — offline kuyruk replay'i iptal-PATCH'i
 --   yanlışlıkla 'tamamlandı'ya çevirmesin (Seçenek A; sahibin onaylı varsayılanı).
--- Kapsam: tek fonksiyon; YENİ 3-arg imza; mevcut (text,text) imzası DOKUNULMAZ
---   (2-arg çağıranlar + revert kolaylığı). Anon GRANT YOK.
+-- Kapsam: tek fonksiyon; TEK imza (text,text,boolean) — eski (text,text) imzası
+--   DROP edilir. ONARIM SAPMASI (canlı-önce bulgu): plan/spec'in "eski imza dokunulmaz"
+--   varsayımı PostgREST adlı-gösterimde YANLIŞ ÇIKTI — iki overload'da da default'lu
+--   argümanlar 2-arg çağrıyı 42725 'function is not unique'e düşürüyor (OBSERVED demo,
+--   2026-09-25; hem 1-arg hem 2-arg adlı çağrı). Tek-imza ile tüm mevcut çağrılar
+--   (p_iptal'siz) default false ile çalışmayı sürdürür. Anon GRANT YOK.
 -- Kanal: yalnız DEMO (sahip onaylı); prod ayrı sahip kapısıdır.
 --
 -- REVERT KAYNAĞI — apply-öncesi canlı demo pg_get_functiondef('gorev_tamamla') (birebir):
@@ -15,8 +19,8 @@
 --  SECURITY DEFINER
 
 -- ----------------------------------------------------------------------------
--- Geri dönüş: yukarıdaki canlı gövdeyle CREATE OR REPLACE (eski imzaya döner;
--- yeni 3-arg imza DROP edilir: DROP FUNCTION public.gorev_tamamla(text,text,boolean);)
+-- Geri dönüş: yukarıdaki canlı gövdeyle CREATE OR REPLACE (eski (text,text) imzaya döner;
+-- sonra DROP FUNCTION public.gorev_tamamla(text, text, boolean);)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.gorev_tamamla(p_gorev_id text, p_padok_hedef text DEFAULT NULL::text, p_iptal boolean DEFAULT false)
@@ -154,6 +158,10 @@ BEGIN
   RETURN jsonb_build_object('ok',true,'gorev_id',p_gorev_id,'stok_dusuldu',v_stok_dusuldu,'padok_guncellendi',v_padok_guncellendi);
 END;
 $function$;
+
+-- T5 onarım: tek-imza disiplini — eski (text,text) imzası kalkar; aksi halde
+-- PostgREST adlı-çağrılar iki default'lu aday arasında belirsiz kalır (42725, OBSERVED).
+DROP FUNCTION IF EXISTS public.gorev_tamamla(text, text);
 
 REVOKE ALL ON FUNCTION public.gorev_tamamla(text, text, boolean) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.gorev_tamamla(text, text, boolean) TO authenticated;
