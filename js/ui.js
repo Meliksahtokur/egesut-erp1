@@ -1169,10 +1169,14 @@ function _kalanGunEtiket(t){
   return `<span style="font-size:.62rem;color:var(--red2)">· ${-gun} gün gecikmiş</span>`;
 }
 // P3/P4: OVSYNC_BASLAT kart butonları — [Başlat] atomik RPC, [İptal] mevcut PATCH yolu
+// P3/P4: OVSYNC_BASLAT kart butonları — [Başlat] atomik RPC, [İptal] mevcut PATCH yolu
+// S1: kisir hayvanda Başlat YOK, kilitli rozet VAR; ✕ her durumda çizilir.
 function _ovsyncBaslatBtnHtml(t){
   if(t.gorev_tipi!=='OVSYNC_BASLAT'||t.tamamlandi||t.iptal) return '';
-  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
-    <button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`;
+  const _h=(typeof getState==='function'?getState('animals'):[]).find(a=>a.id===t.hayvan_id);
+  const _ipt=`<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`;
+  if(_h&&_h.kisir) return `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — başlatılamaz</span>${_ipt}`;
+  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>${_ipt}`;
 }
 // P6: TOHUMLAMA_PLANLI kartına [Ertele]
 function _tohErteleBtnHtml(t){
@@ -1857,8 +1861,11 @@ async function _showProtokolEkran(){
           <div style="font-size:.6rem;opacity:.5">${u.taban_turu==='duve'?'Düve — 12a21g':u.taban_turu==='abort'?'Abort sonrası':u.taban_turu==='dogum'?'Doğum sonrası':'Açık dişi'}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
-          <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>
+          ${u.kisir
+            ? `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — üreme planı yok</span>
+               <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`
+            : `<button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
+               <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`}
         </div>
       </div>`;
       ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})</div>${ovList.map(_ovSatir).join('')}`;
