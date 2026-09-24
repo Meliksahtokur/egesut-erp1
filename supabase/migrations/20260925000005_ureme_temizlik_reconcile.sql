@@ -134,7 +134,13 @@ BEGIN
         FROM public.gorev_log g
         JOIN public.hayvanlar h ON h.id = g.hayvan_id
        WHERE h.kisir IS TRUE
-         AND g.gorev_tipi IN ('OVSYNC_BASLAT', 'TEDAVI_GUN', 'TEDAVI_SEANS')
+         -- ONARIM (2026-09-25): TOHUMLAMA_PLANLI eklendi — spec §6 taban çizgisi
+         -- kısır hayvanların 3 açık TOHUMLAMA_PLANLI görevini kümede SAYIYORDU
+         -- (27=24+3) ama §5.1 taslağın IN-listesi onu kapsamıyordu; kısır
+         -- hayvanın planlı tohumlama görevi zincirin parçasıdır (sahibe kararı:
+         -- kısır zincirleri kapatılır). K24: TOHUMLAMA_PLANLI'nın açık çocuğu
+         -- yok → cascade no-op, D-2 sıralaması güvenli kalır.
+         AND g.gorev_tipi IN ('OVSYNC_BASLAT', 'TEDAVI_GUN', 'TEDAVI_SEANS', 'TOHUMLAMA_PLANLI')
          AND COALESCE(g.tamamlandi, false) = false
          AND COALESCE(g.iptal, false) = false
        ORDER BY g.hayvan_id, g.gorev_tipi DESC, g.id  -- D-2: SEANS (çocuk) GUN (ebeveyn)'den ÖNCE; bkz. §5.1 tasarım notları
