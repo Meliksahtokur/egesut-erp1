@@ -1751,6 +1751,118 @@ END $t$;
 
 
 -- ════════════════════════════════════════════════════════════════════════════
+-- S1 — Kısır hayvan Ovsync bloğu (SPEC: docs/plans/2026-09-24-ovsync-cila/spec-s1.md §8)
+-- Migration: 20260925000001_ovsync_kisir_blok
+-- ════════════════════════════════════════════════════════════════════════════
+
+-- S1-T1 (D1): kisir=true → üç üretim kanalı bloke
+DO $t$
+DECLARE v_a text; v_gid uuid; v_n int;
+BEGIN
+  UPDATE public.protokol_ayar SET deger = 1 WHERE anahtar = 'ovsync_pg_kurallari_aktif';  -- bayrak açıkken de blok
+  v_a := pg_temp.kb_hayvan(800, 'Aktif', true);
+  PERFORM pg_temp.kb_ok(public._acik_disi_hedef_ic(v_a) IS NULL, 'S1-T1', 'kisir: _acik_disi_hedef_ic NULL', NULL);
+  PERFORM pg_temp.kb_ok(public._acik_disi_ovsync_hedef(v_a) IS NULL, 'S1-T1', 'kisir: _acik_disi_ovsync_hedef NULL (bayrak 1)', NULL);
+  v_gid := public._acik_disi_gorev_kur(v_a);
+  PERFORM pg_temp.kb_ok(v_gid IS NULL, 'S1-T1', 'kisir: _acik_disi_gorev_kur NULL', NULL);
+  SELECT count(*) INTO v_n FROM public.gorev_log WHERE hayvan_id = v_a AND gorev_tipi = 'OVSYNC_BASLAT';
+  PERFORM pg_temp.kb_ok(v_n = 0, 'S1-T1', 'kisir: OVSYNC_BASLAT üretilmedi', v_n::text);
+  RAISE NOTICE 'PASS S1-T1: kisir üretim bloğu (ic/hedef/kur NULL, görev 0)';
+END $t$;
+
+-- S1-T2 (D2): elle kurulmuş açık görev → Başlat atlanır, zincir açılmaz (instance'sız — R32-9 adabı)
+DO $t$
+DECLARE v_a text; v_gid uuid; v_r jsonb; v_n int;
+BEGIN
+  v_a := pg_temp.kb_hayvan(800, 'Aktif', true);
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_a, 'OVSYNC_BASLAT', 'S1-T2 elle kurulmuş', CURRENT_DATE, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_gid;
+  v_r := public.start_first_service_protocol(v_gid);
+  PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND v_r->>'atlandi' = 'KISIR', 'S1-T2', 'atlandi=KISIR', v_r::text);
+  SELECT count(*) INTO v_n FROM public.gorev_log WHERE id = v_gid AND iptal AND tamamlandi AND kapatan_ref = 'ILK_TOH_MUAF:KISIR';
+  PERFORM pg_temp.kb_ok(v_n = 1, 'S1-T2', 'görev iptal+tamamlandı, ILK_TOH_MUAF:KISIR', v_n::text);
+  SELECT count(*) INTO v_n FROM public.cases WHERE animal_id = v_a AND protocol_family = 'OVSYNC';
+  PERFORM pg_temp.kb_ok(v_n = 0, 'S1-T2', 'vaka açılmadı', v_n::text);
+  SELECT count(*) INTO v_n FROM public.islem_log WHERE tip = 'FIRST_SERVICE_SKIPPED' AND ref_id = v_gid::text AND payload->>'neden' = 'KISIR';
+  PERFORM pg_temp.kb_ok(v_n = 1, 'S1-T2', 'FIRST_SERVICE_SKIPPED audit (neden=KISIR)', v_n::text);
+  RAISE NOTICE 'PASS S1-T2: Başlat kısırdı atlar, zincir yok, audit var';
+END $t$;
+
+-- S1-T3 (D4): işaret kaldırılınca normal kurala döner (fail-closed DEĞİL)
+DO $t$
+DECLARE v_a text; v_gid uuid; v_n int;
+BEGIN
+  v_a := pg_temp.kb_hayvan(800, 'Aktif', true);
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_a, 'OVSYNC_BASLAT', 'S1-T3 ön-kapatma', CURRENT_DATE, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_gid;
+  PERFORM pg_temp.kb_ok((public.start_first_service_protocol(v_gid)->>'atlandi') = 'KISIR', 'S1-T3', 'ön-koşul: kisir iken atlandı', NULL);
+  UPDATE public.hayvanlar SET kisir = false WHERE id = v_a;
+  PERFORM pg_temp.kb_ok(public._acik_disi_gorev_kur(v_a) IS NOT NULL, 'S1-T3', 'kisir=false → görev AÇILIR', NULL);
+  SELECT count(*) INTO v_n FROM public.gorev_log WHERE hayvan_id = v_a AND gorev_tipi = 'OVSYNC_BASLAT' AND NOT iptal AND kaynak LIKE 'ACIK-DISI-%';
+  PERFORM pg_temp.kb_ok(v_n = 1, 'S1-T3', 'açık-dişi görevi kuruldu', v_n::text);
+  RAISE NOTICE 'PASS S1-T3: işaret kaldırılınca normal kurala dönüş';
+END $t$;
+
+-- S1-T4 (D3 veri zemini): RPC kisir alanı + açık-görev filtresi davranışı korunur
+DO $t$
+DECLARE v_a text; v_gid uuid; v_r jsonb; v_n int;
+BEGIN
+  v_a := pg_temp.kb_hayvan(800, 'Aktif', true);
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_a, 'OVSYNC_BASLAT', 'S1-T4 pencere-içi', CURRENT_DATE, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_gid;
+  v_r := public.ovsync_baslat_uyarilari();
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_r->'uyarilar') e
+   WHERE e->>'gorev_id' = v_gid::text AND jsonb_typeof(e->'kisir') = 'boolean' AND (e->>'kisir')::boolean;
+  PERFORM pg_temp.kb_ok(v_n = 1, 'S1-T4', 'kisir hayvan listede, kisir boolean=true', v_n::text);
+  UPDATE public.gorev_log SET iptal = true, tamamlandi = true WHERE id = v_gid;   -- elle kapatma yolu
+  v_r := public.ovsync_baslat_uyarilari();
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_r->'uyarilar') e WHERE e->>'gorev_id' = v_gid::text;
+  PERFORM pg_temp.kb_ok(v_n = 0, 'S1-T4', 'kapalı görev listeden düşer (filtre değişmedi)', v_n::text);
+  RAISE NOTICE 'PASS S1-T4: RPC kisir alanı + pencere filtresi';
+END $t$;
+
+-- S1-T5 (D5): dry-run raporu kısırı yanlış kategoriye yazmaz (delta yöntemi)
+DO $t$
+DECLARE v_z1 jsonb; v_z2 jsonb; v_norm text; v_kisir_tabanli text; v_n int;
+BEGIN
+  v_z1 := public.ilk_tohumlama_zamanlayici(p_dry_run := true);          -- ÖNCE
+  v_norm        := pg_temp.kb_hayvan(800, 'Aktif', false);              -- kontrol: aday
+  v_kisir_tabanli := pg_temp.kb_hayvan(800, 'Aktif', true);             -- kisir + tabanlı (acilacaklar adayı OLAMAZ)
+  INSERT INTO public.hayvanlar (id, kupe_no, cinsiyet, durum, irk, kisir)   -- kisir + tabansız (duve_tabansiz adayı OLAMAZ)
+  VALUES (pg_temp.kb_id('KB'), pg_temp.kb_id('KB'), 'Dişi', 'Aktif', 'Holstein', true);
+  v_z2 := public.ilk_tohumlama_zamanlayici(p_dry_run := true);          -- SONRA
+  PERFORM pg_temp.kb_ok((v_z2->>'taranan')::int = (v_z1->>'taranan')::int + 1,
+    'S1-T5', 'taranan yalnız +1 (kisir hayvanlar sayılmaz — DIFF A)', (v_z1->>'taranan') || ' -> ' || (v_z2->>'taranan'));
+  PERFORM pg_temp.kb_ok((v_z2->>'duve_tabansiz')::int = (v_z1->>'duve_tabansiz')::int,
+    'S1-T5', 'duve_tabansiz değişmedi (kisir+tabansız sayılmaz — dry-run sayacı DIFF-A filtreli taramadan türetilir)', (v_z1->>'duve_tabansiz') || ' -> ' || (v_z2->>'duve_tabansiz'));
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_z2->'acilacaklar') e WHERE e->>'hayvan_id' = v_kisir_tabanli;
+  PERFORM pg_temp.kb_ok(v_n = 0, 'S1-T5', 'kisir+tabanlı acilacaklar''da YOK', v_n::text);
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(v_z2->'acilacaklar') e WHERE e->>'hayvan_id' = v_norm;
+  PERFORM pg_temp.kb_ok(v_n = 1, 'S1-T5', 'kontrol (kisir=false) acilacaklar''da VAR', v_n::text);
+  RAISE NOTICE 'PASS S1-T5: dry-run kısırdı hiçbir sayaca/ listeye yazmaz';
+END $t$;
+
+-- S1-T6 (D2/§4.2): kisir + son tohumlama Gebe → atlandi=KISIR (GEBE değil; sıra kilitlenir)
+DO $t$
+DECLARE v_a text; v_gid uuid; v_r jsonb; v_n int;
+BEGIN
+  v_a := pg_temp.kb_hayvan(800, 'Aktif', true);
+  INSERT INTO public.tohumlama (hayvan_id, tarih, sonuc, sperma) VALUES (v_a, CURRENT_DATE - 100, 'Gebe', 'KB-SP');
+  INSERT INTO public.gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, tamamlandi, iptal, kaynak)
+  VALUES (gen_random_uuid(), v_a, 'OVSYNC_BASLAT', 'S1-T6 çelişki', CURRENT_DATE, '10:00', false, false, pg_temp.kb_id('ILK-TOH-KB'))
+  RETURNING id INTO v_gid;
+  v_r := public.start_first_service_protocol(v_gid);
+  PERFORM pg_temp.kb_ok((v_r->>'ok')::boolean AND v_r->>'atlandi' = 'KISIR', 'S1-T6', 'atlandi=KISIR (GEBE değil)', v_r::text);
+  SELECT count(*) INTO v_n FROM public.gorev_log WHERE id = v_gid AND kapatan_ref = 'ILK_TOH_MUAF:KISIR';
+  PERFORM pg_temp.kb_ok(v_n = 1, 'S1-T6', 'kapatan_ref ILK_TOH_MUAF:KISIR', v_n::text);
+  RAISE NOTICE 'PASS S1-T6: KISIR muafiyeti GEBE''den önce';
+END $t$;
+
+
+-- ════════════════════════════════════════════════════════════════════════════
 -- ÖZET
 -- ════════════════════════════════════════════════════════════════════════════
 DO $t$
