@@ -1,6 +1,7 @@
 # SPEC S-3 — Stale Temizlik + Erteleme Geneli (Tur 2, Adım 3)
 
 - **Tarih:** 2026-09-24 · **Spec-yazar:** prd-to-spec ajanı (S-3) · **Worktree:** `ovysch-feature-cila-turu`
+- **Rev-2 (2026-09-24 ~23:30, 3. tur review onarımı):** canlı demo şeması yeniden ölçüldü; dört bulgu işlendi — (1) R1'in `cases.protocol_family` veri çapası demo'da sürüklenmiş (pf NULL ×132, K20), (2) demo'da pg_cron YOK (K18/K21), (3) demo `schema_migrations` bayat — 0b kapısı davranışsal yapıldı (K22, E-7), (4) `_trg_gorev_parent_kapandi` cascade'i OBSERVED'a çıkarıldı ve taslak KISIR-B sıralaması düzeltildi (K23/V-3/D-2). Beklenen küme farkı: R1=0 / R2=1 / KISIR_GOREV=27 senaryosu bu spec'te birinci senaryodur (§6).
 - **Girdi çapaları:** `reports/plans/ovsync-cila-plan-2.md` (sahibin emirleri + §5A araştırma), `reports/plans/ovsync-cila-sentez.md` (§3 Adım 3 sırası, §5A sınıflandırma kuralı, §9 karar tablosu), canlı kod (`CONFIRMED` dosya:satır) ve canlı demo şeması (`OBSERVED` — tools-bank supabase salt-okunur sorguları, 2026-09-24).
 - **Kanıt sözlüğü:** `CONFIRMED` = dosya:satır ile kodda teyitli · `OBSERVED` = canlı demo DB salt-okunur sorgu çıktısı · `INFERRED` = kanıttan çıkarım · `UNKNOWN` = bu oturumda teyit edilemedi.
 
@@ -50,13 +51,18 @@ Bu spec **iki ayrı zarf** taşır; ikisinin tur-içi durumu FARKLIDIR:
 | K10 | OVSYNC_BASLAT idempotensi: `protokol_instance.kaynak_ref` UNIQUE (`'ACIK-DISI-<id>-<kural>'`); instance varsa ikinci çağrı NULL; yeni rota eski açık OVSYNC_BASLAT'ı `ILK_TOH_YENI_OLAY` ile kapatır; `gorev_log`'da `kaynak_ref` kolonu YOK (`kaynak` var) | CONFIRMED aynı dosya `:141-147,150-159,174-179,299-300` + canlı constraint `protokol_instance_kaynak_unique` (OBSERVED) |
 | K11 | Canlı fonksiyon seti: `gorev_ertele` YOK; `tohumlama_gorev_ertele`, `sessiz_hayvanlar_reconcile`, `sessiz_hayvanlar_listele`, `_tohumlama_pencere`, `hayvan_tohumlama_ertele` VAR | OBSERVED pg_proc sorgusu |
 | K12 | Canlı `protokol_ayar`: 10 satır, `ovsync_pg_kurallari_aktif=1`, sessiz/erteleme anahtarı YOK | OBSERVED select |
-| K13 | Demo'da 3 açık "Sessiz hayvan" görevi (24.09 hedefli): 168 `5fe2ef8b`, 173 `e341a0a9`, 186 `65012b75`; üçünün `kapatan_ref=NULL` | OBSERVED gorev_log sorgusu |
-| K14 | 168 ve 186: aktif `cases` satırı `protocol_family='OVSYNC'` + açık 4-gün `TEDAVI_GUN/SEANS` zincirleri + açık `TOHUMLAMA_PLANLI` görevi; 173: son tohumlama 2026-07-30 `sonuc='Bekliyor'` | OBSERVED |
-| K15 | Kısır durumu: 184/208'te aktif `ILERI_GEBE-<id>` instance (tip=UREME, alttip=GEBELIK); 184/199/208'te toplam 24 açık zincir görevi (8+8+8 TEDAVI_GUN/SEANS); 199'un aktif instance'ı YOK; üçünün de OVSYNC_BASLAT'ı kapalı (`case:<uuid>`) | OBSERVED |
+| K13 | Demo'da 3 açık "Sessiz hayvan" görevi (24.09 hedefli): 168 `5fe2ef8b`, 173 `e341a0a9`, 186 `65012b75`; üçünün `kapatan_ref=NULL`. **23:15 yeniden ölçüm: birebir aynı** | OBSERVED gorev_log sorgusu (2 ölçüm) |
+| K14 | 168 ve 186: aktif `cases` satırı (`f90731be`/`b284807a`, `status='active'`) + açık 4-gün `TEDAVI_GUN/SEANS` zincirleri + açık `TOHUMLAMA_PLANLI` görevi; 173: son tohumlama 2026-07-30 `sonuc='Bekliyor'`. **İlk ölçümde pf='OVSYNC' sanıldı — 23:15 yeniden ölçümde pf NULL (bkz. K20)** | OBSERVED |
+| K15 | Kısır durumu: 184/208'te aktif `ILERI_GEBE-<id>` instance (tip=UREME, alttip=GEBELIK); 184/199/208'de **27** açık zincir görevi (8+8+8 TEDAVI_GUN/SEANS = 24 **+ 3 TOHUMLAMA_PLANLI**, hedef 2026-10-04: 184=`113c327f`, 199=`9c3c7180`, 208=`af9dd507`); 199'un aktif instance'ı YOK; üçünün de açık OVSYNC_BASLAT'ı YOK; **kısır kümesi 3→6 büyüdü: +115/204/185 (açık görevleri ve aktif instance'ları YOK — kapsam etkisi sıfır)** | OBSERVED (23:15 yeniden ölçüm) |
 | K16 | `kupe 168/173/186 → kisir=false, tohumlama_durumu='gebe'`; `184/199 → kisir=true, tdm='gebe'`; `208 → kisir=true, tdm='-'` | OBSERVED hayvanlar sorgusu |
 | K17 | Demo'da `TOHUMLAMA_ERTELE` islem_log kaydı = 0 (ilk-hedef hesabı hedef_tarih'e düşer); `PROTOKOL_AYAR` = 2 | OBSERVED islem_log sorgusu |
-| K18 | İlgili crons: `sessiz-reconcile-daily` 05:00, `gorev-orphan-temizle-daily` 05:15, `ilk-tohumlama-ovsync-baslat` 04:00 | OBSERVED cron.job |
+| K18 | Cron kayıtları: ilk ölçümde `cron.job` listesi OBSERVED sanıldı; **23:15 yeniden ölçüm: demo'da pg_cron YOK** (`pg_extension` boş, `cron` şeması yok — `cron.job` sorgusu "relation does not exist" verir). Cron semantiği (`sessiz-reconcile-daily` 05:00 vb.) **PROD'a aittir**; demo'da yeniden-üretim vektörü yalnız **ELLE** `sessiz_hayvanlar_reconcile()` çağrısıdır | OBSERVED 23:15 |
 | K19 | `kapatan_ref` kolonu `20260603000001_protokol_etken_kod.sql:13`'ten beri var | CONFIRMED |
+| K20 | **R1 veri çapası sürüklenmiş:** demo `cases.protocol_family` **132 satırın tümünde NULL** (`IS NOT NULL` = 0 satır) → R1 yüklemi canlıda **0** döner; 168/186'nın aktif case'leri duruyor (`status='active'`) ama pf boş. R32 üretim muafiyeti (K9) ve S-4'ün view fix'i de aynı veriye dayanır — bu bir **veri-borcu**dur (U-6/E-6); RPC kuralının hatası DEĞİL | OBSERVED 23:15 |
+| K21 | 168/186'nın MK3 son tohumlaması `sonuc='Doğum Yaptı'` (2025-09-12 / 2025-10-29) → **R2 de yakalamaz**; pf NULL iken bu iki görevin kapanması R1/R2'nin hiçbir koluna düşmez — görevler açık kalır (sapma değil, veri gerçeği) | OBSERVED 23:15 |
+| K22 | Demo `supabase_migrations.schema_migrations` **bayat**: en üst `20260706052550` (repo geçmişi 20260924'te). Ham `psql -f` apply bu tabloya KAYIT YAZMAZ → S1/S2 apply kontrolü bu sorguyla demo'da **asla** görünmez; kapı davranışsal kanıtla kurulmalı (E-7) | OBSERVED 23:10 |
+| K23 | Trigger envanteri (gorev_log/protokol_instance/cases): `gorev_log_cycle_guard_trigger` (yalnız INSERT, NEW.iptal guard), `trg_degisim_log` (I/U/D → `degisim_log` tablosuna yazar; islem_log DEĞİL), `trg_gorev_asip_iade` (UPDATE; yalnız `referans_tipi='asi_plan'` eşleşmesine yazar — hedef tiplerimiz eşleşmez → no-op), **`trg_gorev_parent_kapandi` (U/D): kapanan görevin çapraz-tip açık çocuklarını `kapatan_ref='parent-kapandi'` ile KAPATIR**; `protokol_instance.trg_degisim_log`; `cases.trg_kizginlik_case_close` (yalnız active→closed geçişinde kizginlik_log'a yazar) | OBSERVED (pg_get_functiondef, 23:20) |
+| K24 | KISIR hedef kümesinde ebeveyn-çocuk ilişkisi: her tarih çiftinde **TEDAVI_SEANS, TEDAVI_GUN'ün çocuğu** (`parent_id` bağlı; 12 çift: 184/199/208 × 4 gün) → parent_kapandi cascade'i KISIR-B içinde kalır; SESSIZ vet görevlerinin ve TOHUMLAMA_PLANLI'ların açık çocuğu YOK; kısır hayvanlarda açık OVSYNC_BASLAT YOK | OBSERVED 23:20 |
 
 ---
 
@@ -92,13 +98,13 @@ Zarf A'da **JS dosyası YOK**: temizlik saf DB operasyonudur; iptal görevler UI
 
 ## 4. Zarf A — koşum akışı (sıralı, operasyonel)
 
-1. **Sıra bağımlılığı (ENGEL E-1):** Koşum, sentez §3 Adım 1 (kısır blok) ve Adım 2 (v_eligible yeniden sınıflandırma) demo'ya uygulandıktan SONRA yapılır. Neden: R1/R2 görevleri kapatılıp hayvan hâlâ eski `v_eligible`'da ise 05:00 `sessiz-reconcile-daily` görevi **yeniden üretir** (K7: iptal için cooldown yok). Taze kanıt: 173'ün görevi Tur 1 içinde kapanmıştı, bugün yeniden açık (K13; kapanma→yeniden-üretim INFERRED).
+1. **Sıra bağımlılığı (ENGEL E-1):** Koşum, sentez §3 Adım 1 (kısır blok) ve Adım 2 (v_eligible yeniden sınıflandırma) demo'ya uygulandıktan SONRA yapılır. Neden: R1/R2 görevleri kapatılıp hayvan hâlâ eski `v_eligible`'da ise görev **yeniden üretilir** — üretim vektörü PROD'da 05:00 `sessiz-reconcile-daily` cron'u (K7: iptal için cooldown yok), **demo'da pg_cron olmadığından (K18/K21) elle `sessiz_hayvanlar_reconcile()` çağrısıdır** (test/lane çağrıları dahil). Taze kanıt: 173'ün görevi Tur 1 içinde kapanmıştı, bugün yeniden açık (K13; kapanma→yeniden-üretim INFERRED — demo'da elle çağrı yoluyla). Apply kanıtı **davranışsaldır** (K22: `schema_migrations` demo'da kör kapı): S1 → kısır hayvana `_acik_disi_hedef_ic` NULL döner; S2 → `sessiz_hayvanlar_listele` default eşiği 50 + `v_eligible` tanımında Bekliyor hariç.
 2. Migration dosyasını §5 taslağından yaz → `scripts/db-validate.sh <dosya>` PASS (taslakta koşuldu, §5.2).
 3. Migration'ı **demo** DB'ye uygula (prod'a ASLA).
 4. **Dry-run:** `SELECT public.ureme_temizlik_reconcile(true);` → çıktıyı rapora dök (`reports/ureme-temizlik-kosum-<tarih>.md`), grup bazlı tablo halinde: R1 / R2 / KISIR_INSTANCE / KISIR_GOREV, her satırda gorev_id + küpe + açıklama + uygulanacak `kapatan_ref`.
 5. **Onay kapısı:** KISIR grubu sahibin S1 kararıyla **ön-onaylıdır** ("evet, kapatılsın"). R1/R2 grupları plan-2 akışı gereği dry-run tablosuyla sahibe sunulur; onay gelmeden `p_dry_run=false` koşulmaz. (Orkestratör notu: sahibin "kesintisiz koş" talimatı KISIR + nesnel R1/R2 vakaları için okunabilir; onay damgası rapora mutlaka işlenir.)
 6. **Onaylı koşum:** `SELECT public.ureme_temizlik_reconcile(false, ARRAY['R1','R2','KISIR']);` (onay gelmeyen grup dizide çıkarılır).
-7. **Cron izleme:** koşumu izleyen `sessiz_hayvanlar_reconcile()` koşumunda (05:00 cron ya da elle çağrı) `uretilen=0, kapatilan=0` beklenir (T-A4). `gorev-orphan-temizle-daily` (05:15) ile temassızdır — o yalnız `v_orphan_gorev` kümesini kapatır.
+7. **Yeniden üretim denetimi (T-A4):** koşumu izleyen `sessiz_hayvanlar_reconcile()` **elle çağrısında** `uretilen=0, kapatilan=0` beklenir (demo'da pg_cron YOK — K18; cron-tabanlı izleme maddesi PROD'a aittir, bu turun kapsamı dışıdır). `gorev-orphan-temizle-daily` (05:15, PROD) ile temassızdır — o yalnız `v_orphan_gorev` kümesini kapatır.
 
 ---
 
@@ -243,7 +249,7 @@ BEGIN
          AND g.gorev_tipi IN ('OVSYNC_BASLAT', 'TEDAVI_GUN', 'TEDAVI_SEANS')
          AND COALESCE(g.tamamlandi, false) = false
          AND COALESCE(g.iptal, false) = false
-       ORDER BY g.hayvan_id, g.id
+       ORDER BY g.hayvan_id, g.gorev_tipi DESC, g.id  -- D-2: SEANS (çocuk) GUN (ebeveyn)'den ÖNCE; bkz. §5.1 tasarım notları
     LOOP
       v_k_gorev := v_k_gorev || jsonb_build_object('gorev_id', r.id, 'hayvan_id', r.hayvan_id,
                     'kupe_no', r.kupe_no, 'gorev_tipi', r.gorev_tipi, 'aciklama', r.aciklama);
@@ -292,6 +298,8 @@ COMMIT;
 
 Tasarım notları: R1 kapatan_ref değeri `OVSYNC_KAPLANDI` plan-2 R1 metninden aynen alınır; MK3 sıralaması (`tarih DESC, created_at DESC`) K9'daki otorite tanımıyla birebir; R1⊃R2 çift-kapatma önleme R2'de `NOT EXISTS` ile; kapatılan instance/görev listesi snapshot `guncellenen`'e onceki/sonraki ile yazılır (L4 `surum_gecmisi` geri-alma deseniyle uyumlu).
 
+**D-2 (Rev-2 trigger-sırası düzeltmesi):** Canlı demo'da her tarih çiftinde `TEDAVI_SEANS`, `TEDAVI_GUN`'ün **çocuğudur** (K24) ve `_trg_gorev_parent_kapandi` UPDATE tetiği, kapanan ebeveynin çapraz-tip açık çocuklarını `kapatan_ref='parent-kapandi'` ile kapatır (K23). Taslağın eski `ORDER BY g.hayvan_id, g.id` sıralamasında bir GUN ebeveynden ÖNCE işlenebilirdi: tetik çocuğu kendisi kapatır, sonra RPC aynı satırı güncelleyip `kapatan_ref`'i ezerek snapshot `onceki` değerini yalan söylerdi. Düzeltme: `ORDER BY g.hayvan_id, g.gorev_tipi DESC, g.id` — `'TEDAVI_SEANS' > 'TEDAVI_GUN'` sözlük sırasıyla **çocuklar önce** kapanır; ebeveyn kapanınca tetiğin cascade'i `NOT c.iptal` guard'ına takılıp no-op olur; tüm satırlar `KISIR_TEMIZLIK` ref'iyle, doğru onceki/sonraki snapshot'ıyla kapanır. Cascade'in hedef-küme DIŞINA çıkmadığı K24 ile ölçülüdür (SESSIZ/TOHUMLAMA_PLANLI/OVSYNC_BASLAT hedeflerinin açık çocuğu yok). Bu içerik değişikliği de D-1 gibi **final dosyada db-validate'i zorunlu kılar** (Adım-2 kapısı zaten koşulsuzdur).
+
 ### 5.2 Taslak db-validation kanıtı (kapı koşuldu)
 
 `bash scripts/db-validate.sh <taslak>` — 2026-09-24, rapor `db-validation-b02f28ff.md`:
@@ -312,11 +320,11 @@ Ortam notu: worktree kökünde `.env` yoktu (db-validate `scripts/../.env` okur)
 
 ## 6. Zarf A — kabul testleri (ölçülebilir)
 
-Ölçüm taban çizgisi 2026-09-24 `OBSERVED` (K13/K15): R1 = {168→`5fe2ef8b`, 186→`65012b75`}, R2 = {173→`e341a0a9`}, KISIR_INSTANCE = 2 (`ILERI_GEBE-…184`, `ILERI_GEBE-…208`), KISIR_GOREV = 24 (184/199/208 × 8). Koşum günü taze dry-run çıktısı esastan geçer; sapma varsa raporlanır, test değerleri taze ölçümle yeniden yazılır.
+Ölçüm taban çizgisi (Rev-2, 2026-09-24 23:15 `OBSERVED`, K13/K15/K20/K21): **R1 = 0** (pf NULL ×132 — bkz. K20), R2 = {173→`e341a0a9`}, KISIR_INSTANCE = 2 (`ILERI_GEBE-…184` `5570df8f`, `ILERI_GEBE-…208` `9bc82033`), KISIR_GOREV = **27** (24 TEDAVI_GUN/SEANS + 3 TOHUMLAMA_PLANLI: `113c327f`/`9c3c7180`/`af9dd507`). **Bu veri hâliyle beklenen koşum: toplam 30 kayıt (0+1+2+27); 168/186'nın SESSIZ görevleri (R1-boş + R2-dışı, K21) açık kalır.** pf verisi borcu kapanırsa (U-6) taban çizgisi spec'in ilk ölçümüne döner: R1 = {168, 186} → toplam 32. Koşum günü taze dry-run çıktısı esastan geçer; 0f sentetik R1 kanıtı (plan) kuralın kendisinin çalıştığını ayrıca gösterir.
 
 - **T-A1 (kapı):** Final migration dosyasında `scripts/db-validate.sh` → sonuç PASS veya (aynı C2 tohum-üretici kısıtı tekrarlırsa) INCONCLUSIVE-with-C1-PASS; FAIL kabul DEĞİL.
 - **T-A2 (dry-run salt-okunurluk):** Koşum öncesi/sonrası `SELECT count(*) FROM gorev_log WHERE iptal` + `protokol_instance WHERE durum='iptal'` farkı **0**; dönen jsonb'de yukarıdaki taban çizgisi kümesi satır satır görünüyor; her R1 kaydında kupe + aciklama + gorev_id var.
-- **T-A3 (onaylı koşum):** `p_dry_run=false` sonrası (a) hedef görevlerin tümünde `iptal=true` ve grup-bazlı doğru `kapatan_ref` (R1=`OVSYNC_KAPLANDI`, R2=`TOHUMLAMA_SONUCU_VAR`, KISIR=`KISIR_TEMIZLIK`); (b) `islem_log`'da **tam 1** `tip='UREME_TEMIZLIK'` satırı; `snapshot.guncellenen` uzunluğu = kapatılan toplam kayıt; `olusturulan`/`silinen` boş; (c) instance'larda `durum='iptal'`, `kapandi_sebep='KISIR_TEMIZLIK'`, `kapandi_at` dolu.
+- **T-A3 (onaylı koşum):** `p_dry_run=false` sonrası (a) hedef görevlerin tümünde `iptal=true` ve grup-bazlı doğru `kapatan_ref` (R1=`OVSYNC_KAPLANDI`, R2=`TOHUMLAMA_SONUCU_VAR`, KISIR=`KISIR_TEMIZLIK`); (b) `islem_log`'da **tam 1** `tip='UREME_TEMIZLIK'` satırı; `snapshot.guncellenen` uzunluğu = kapatılan toplam kayıt (D-2 sıralamasıyla tetik cascade'i snapshot'a karışmaz); `olusturulan`/`silinen` boş; (c) instance'larda `durum='iptal'`, `kapandi_sebep='KISIR_TEMIZLIK'`, `kapandi_at` dolu. **Trigger gürültüsü (beklenen, T-A3'ü bozmaz):** `trg_degisim_log` her UPDATE'e `degisim_log` satırı yazar (islem_log DEĞİL — K23); D-2 sayesinde `parent-kapandi` ref'i hiçbir hedefte KALICI yazılmaz (cascade no-op).
 - **T-A4 (yeniden üretim yok — Adım 1-2 bağımlı):** Koşumdan sonra `SELECT public.sessiz_hayvanlar_reconcile();` → `uretilen=0 AND kapatilan=0`. Adım 1-2 demo'ya uygulanmadan koşulursa bu test BEKLENEN ŞEKİLDE fail eder ve koşum sonraki adıma ertelenir (E-1).
 - **T-A5 (dokunulmazlar):** Koşum diff'inde şunlar YOK: 188'in İLAÇ görevi (`0818cd2e`), 168/186'nın aktif OVSYNC `TEDAVI_GUN/SEANS` zincirleri (Gun 1-4), 168/186'nın `TOHUMLAMA_PLANLI` görevleri, 186'nın `ILERI_GEBE` instance'ı (kisir=false — K16), `tohumlama` tablosu, tamamlanmış/iptal hiçbir kayıt.
 - **T-A6 (regresyon):** `tohumlama_gorev_ertele` gövdesine diff YOK (dosya değişmedi kanıtı); demo'da bir açık `TOHUMLAMA_PLANLI` görev ertelenip eski haline döndürülerek RPC akışı canlı doğrulanır; `hayvan_tohumlama_ertele` akışına dokunulmaz.
@@ -491,27 +499,31 @@ NOTIFY pgrst, 'reload schema';
 ## 9. Varsayımlar ve UNKNOWN kayıtları
 
 **Varsayımlar (kanıtlı):**
-- V-1: Aktif ovsync zinciri tespiti için `cases.status='active' AND protocol_family IS NOT NULL` yeterli ve otoritedir — üretim muafiyeti aynı önsözü kullanıyor (K9). [CONFIRMED]
-- V-2: R1⊃R2 çakışması bugünkü canlıda örneklenmedi (168/186 yalnız R1; 173 yalnız R2) ama kod çakışmayı R1 lehine çözer. [INFERRED, kod-düzeyinde güvence]
-- V-3: KISIR-B'nin hayvan-bazlı (instance-bağımsız) kapatması 199'un yetim zincirlerini yakalar; instance-bağlı görev kapatma trigger'ları (`etken_kod` guard'ı) `iptal` güncellemesine dokunmadığından tetiklenmez. [INFERRED — K19/20260923000002 trigger kapsamı; koşum sonrası T-A3 diff'iyle doğrulanır]
-- V-4: Temizlik sonrası S-4 view değişikliği bu hayvanları sessiz üretimden düşürür (sahibin tanımı: ovsync tedavisinde olan sessiz sayılmaz). S-4 bunu garanti etmezse T-A4 kalıcı olarak fail eder → S-4'e kesin gereksinim olarak yansıtılmalı. [INFERRED]
+- V-1: Aktif ovsync zinciri tespiti için `cases.status='active' AND protocol_family IS NOT NULL` **kod otoritesi**dir — üretim muafiyeti aynı önsözü kullanıyor (K9). [CONFIRMED] **Ancak veri çapası demo'da şu an boştur: pf NULL ×132 (K20) → yüklem canlıda 0 verir.** Kuralın hatası değil, veri borcudur (U-6/E-6); koşum planı buna göre R1=0'ı birinci senaryo sayar (§6) ve plan 0f sentetik pf kanıtıyla kuralın kendisini doğrular.
+- V-2: R1⊃R2 çakışması bugünkü canlıda örneklenmedi (pf NULL iken hiçbiri R1'de değil) ama kod çakışmayı R1 lehine çözer. [INFERRED, kod-düzeyinde güvence]
+- V-3: KISIR-B'nin hayvan-bazlı (instance-bağımsız) kapatması 199'un yetim zincirlerini yakalar. **Rev-2: trigger davranışı INFERRED'den OBSERVED'a çıktı (K23/K24)** — `iptal` UPDATE'ine dokunan tek tetik `trg_gorev_parent_kapandi`'dır; cascade'i yalnız çapraz-tip açık çocukları kapatır, KISIR kümesinde SEANS(çocuk)⊂GUN(ebeveyn) ilişkisi vardır ve D-2 sıralamasıyla cascade no-op'a düşer; `cycle_guard` INSERT-only, `asip_iade` hedef tiplerde eşleşmez, `degisim_log` yalnız audit yazar.
+- V-4: Temizlik sonrası S-4/S-2'nin view değişikliği bu hayvanları sessiz üretimden düşürür (sahibin tanımı: ovsync tedavisinde olan sessiz sayılmaz; S-2 kapsamı yalnız Boş+durumu-bilinmeyen — Bekliyor ≥40g ayrı gebelik-muayenesi görevine gider). S-4 bunu garanti etmezse T-A4 kalıcı olarak fail eder → S-4'e kesin gereksinim olarak yansıtılmalı. Demo'da yeniden üretim vektörü elle çağrıdır (K18). [INFERRED]
 
 **UNKNOWN:**
 - **U-1:** 199'un açık TEDAVI görevlerinin `protokol_instance_id` değerleri kapandı instance'a mı bağlı, NULL mu (temizliği etkilemez — KISIR-B hayvan-bazlı; dry-run raporunda görünür).
 - **U-2:** 186'nın aktif `ILERI_GEBE` instance'ının kaynağı (kisir=false + tdm='gebe' kombinasyonu) — KISIR kapsamı DIŞI; `NOT-KISIR-GEBE-OTORITE` normalizasyonuna kalır.
 - **U-3:** `sessiz_gun=9999` ("hiç kayıt yok"; sentezde 906/2044) hayvanların bugünkü açık görev durumu — Adım 0 taze ölçümü.
 - **U-4:** R2'nin `sonuc='Abort'`/`'Boş'` hayvanlarda davranışı: bu spec'te dokunulmaz (R2 yalnız Gebe/Bekliyor); kapsamı S-4'ün üçlü sınıflandırması belirler.
-- **U-5:** `gorev-orphan-temizle`'nin `v_orphan_gorev` kümesinin KISIR-R1/R2 hedefleriyle kesişimi (kesişirse çifte `kapatan_ref` yazımı: son yazar kazanır — zararsız ama raporda notlanır).
+- **U-5:** `gorev-orphan-temizle`'nin `v_orphan_gorev` kümesinin KISIR-R1/R2 hedefleriyle kesişimi (kesişirse çifte `kapatan_ref` yazımı: son yazar kazanır — zararsız ama raporda notlanır; demo'da cron yoksa yalnız elle çağrı riski).
+- **U-6 (Rev-2, veri-borcu):** demo `cases.protocol_family` neden NULL ×132? (demo klonlama/restore pf verisini taşımıyor olabilir; ilk ölçümde dolu görünmesi bir lane'in demo yazımıyla da açıklanamaz — iki ölçüm arasındaki 25 dakikada demo refresh olmuş olabilir). R32 üretim muafiyeti + R1 + S-4 view fix'i bu kolona dayanır; **boş kaldığı sürece 168/186 tipi çakışma demo'da çözülmez.** Sahibin pf veri-borcu kararı: demo'ya pf backfill mi, klonlama-borcu kaydı mı? [UNKNOWN — bu tura dokunulmaz]
 
 ---
 
 ## 10. Engeller ve bağımlılık kayıtları (orchestrator'a)
 
-- **E-1 (sıra bağımlılığı — en kritik):** Temizlik koşumu Adım 1 (kısır blok) + Adım 2 (S-4 view) demo'ya uygulanmadan yapılırsa 05:00 cron kapatılan görevleri yeniden üretir (K7 + K13 taze kanıtı). Koşum Adım 1-2 sonrasına ÇEKİLMELİ; dry-run ise her zaman güvenle koşulabilir (salt-okunur).
-- **E-2 (bayat ölçüm):** §6 taban çizgisi 2026-09-24 ölçümüdür; koşum günü taze dry-run esas alınır.
-- **E-3 (kapı ortamı):** db-validate çalışma dizini kökünde `.env` arar; worktree'de yok. Workaround mini-körök (~/tmp) kullanıldı; implementer kendi .env'iyle final dosyayı yeniden koşmalı.
+- **E-1 (sıra bağımlılığı — en kritik):** Temizlik koşumu Adım 1 (kısır blok) + Adım 2 (S-4 view) demo'ya uygulanmadan yapılırsa kapatılan görevler yeniden üretilir — PROD'da 05:00 cron'la (K7), **demo'da pg_cron yokken elle `sessiz_hayvanlar_reconcile()` çağrısıyla** (K18 + K13 taze kanıtı). Koşum Adım 1-2 sonrasına ÇEKİLMELİ; dry-run ise her zaman güvenle koşulabilir (salt-okunur).
+- **E-2 (bayat ölçüm):** §6 taban çizgisi Rev-2 (23:15) ölçümüdür; koşum günü taze dry-run esas alınır (R1=0 senaryosu dahil).
+- **E-3 (kapı ortamı):** db-validate çalışma dizini kökünde `.env` arar; worktree'de yok. Workaround mini-körök (~/tmp) kullanıldı; implementer kendi .env'iyle final dosyayı yeniden koşmalı. **Düzeltme: ana checkout `.env`'inde `SUPABASE_DEMO_DB_URL` diye bir değişken YOK; gerçek değişkenler `SUPABASE_DEMO_REF` + `SUPABASE_DEMO_POOLER` + `SUPABASE_DEMO_DB_PASSWORD`'dir — psql URL'si bunlardan kurulur (plan Adım 2-6'da uygulanmıştır).**
 - **E-4 (C2 tohum kısıtı):** Validator'un `islem_log` sentetik-tohum üretimi `VALUES ()` syntax hatası veriyor (araç kısıtı); C1 apply PASS + C2 apply PASS ile telafi edildi; finalde aynı kısıt tekrarlarsa INCONCLUSIVE-with-C1-PASS kabul kriteridir.
-- **E-5 (Zarf B kapısı):** Erteleme geneli sahibin açık borç kararındadır (BUGS.md). Bu spec Zarf B'yi UYGULAMAZ; kapı sahibin "borç aç" kararıyla.
+- **E-5 (Zarf B kapısı):** Erteleme geneli sahibin açık borç kararındadır (BUGS.md `BUG-ERTELEME-KURAL-GENEL`, satır 183 — 23:10 doğrulandı). Bu spec Zarf B'yi UYGULAMAZ; kapı sahibin "borç aç" kararıyla.
+- **E-6 (Rev-2, R1 veri sürüklenmesi):** demo `cases.protocol_family` NULL ×132 (K20) → R1 canlıda 0; 168/186 görevleri R2-dışı da (K21) → beklenen koşum 30 kayıt. Bu ENGEL DEĞİLDİR (veri gerçeği); plan 0f sentetik kanıt + rapor notu ile işler; kalıcı çözüm U-6'da sahibin kararıdır.
+- **E-7 (Rev-2, kör kapı):** demo `schema_migrations` bayat (üst: 20260706052550) ve ham psql apply kayıt yazmaz (K22) → S1/S2 apply kontrolü yalnız davranışsal kanıtla yapılır (spec §4.1).
+- **E-8 (Rev-2, trigger cascade):** `_trg_gorev_parent_kapandi` çapraz-tip çocukları kapatır (K23); taslağa D-2 sıralaması işlendi, final db-validate zaten zorunlu.
 
 ---
 
