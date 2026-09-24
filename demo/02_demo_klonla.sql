@@ -23,6 +23,7 @@ SET statement_timeout TO '300s'   -- authenticated rolünün ~8s limiti FDW ağ-
 AS $fn$
 DECLARE
   ins_order text[];   -- topolojik FK sırası (ebeveyn -> çocuk), runtime hesaplanır
+  extra_tables text[] := '{}';  -- set-dışı ama set'e FK ile referans veren tablolar (sadece boşaltılır)
   trunc_list text;
   rec record;
   t text; cols text; n bigint; rows_total bigint := 0;
@@ -64,13 +65,53 @@ BEGIN
     RAISE EXCEPTION 'demo_klonla: klonlanacak tablo bulunamadı (prod_fdw boş mu?)';
   END IF;
 
+  -- 0b) TERS KAPANIŞ (referencing closure): klon setine (transitif) FK ile referans
+  --     veren ama set-DIŞINDA kalan public tabloları yakala (örn. prod_fdw'de karşılığı
+  --     olmayan pedigree_nodes / semen_catalog / pg_application_event). Bunlar set
+  --     tablolarını TRUNCATE etmeyi bloklar (2BP01) → boşaltılır ama prod'dan
+  --     KOPYALANMAZ (demo-lokal içerik: sohbet, soy-kütüğü grafı vb.). Seed'e ad-filtresi
+  --     YOK: demo_klon_log / vector tabloları FK'sız oldukları için zaten kapanışa girmez;
+  --     ileride FK'yi set'e çevirirlerse kural doğal olarak kapsar. CASCADE KULLANILMAZ —
+  --     kapsam açık ve loglanır ('ekstra_bosalan').
+  WITH RECURSIVE set_tables AS (
+    SELECT c.oid, c.relname
+    FROM pg_class c JOIN pg_namespace nsp ON nsp.oid = c.relnamespace
+    WHERE nsp.nspname='public' AND c.relkind='r'
+      AND c.relname NOT LIKE 'agent\_%'
+      AND c.relname <> 'demo_klon_log'
+      AND c.relname NOT IN ('code_embeddings','entity_graph','memory_notes')
+      AND EXISTS (SELECT 1 FROM pg_class fc JOIN pg_namespace fn ON fn.oid=fc.relnamespace
+                  WHERE fn.nspname='prod_fdw' AND fc.relname=c.relname)
+  ),
+  closure(oid) AS (
+    SELECT oid FROM set_tables
+    UNION
+    SELECT con.conrelid
+    FROM closure c
+    JOIN pg_constraint con ON con.contype='f' AND con.confrelid = c.oid
+    WHERE con.conrelid <> con.confrelid
+  )
+  SELECT COALESCE(array_agg(DISTINCT relname ORDER BY relname), '{}'::text[])
+    INTO extra_tables
+  FROM closure cl
+  JOIN pg_class c ON c.oid = cl.oid
+  JOIN pg_namespace nsp ON nsp.oid = c.relnamespace
+  WHERE nsp.nspname='public'
+    AND c.relkind='r'
+    AND NOT EXISTS (SELECT 1 FROM set_tables st WHERE st.oid = cl.oid);
+
   -- 1) app trigger'larını sustur (klon prod'u birebir yansıtsın; postgres superuser değil → USER, ALL değil)
   FOREACH t IN ARRAY ins_order LOOP
     EXECUTE format('ALTER TABLE public.%I DISABLE TRIGGER USER', t);
   END LOOP;
 
-  -- 2) hepsini tek deyimde boşalt (FK-güvenli: tüm set listeli)
-  SELECT string_agg('public.'||quote_ident(x), ', ') INTO trunc_list FROM unnest(ins_order) x;
+  -- 2) hepsini tek deyimde boşalt (FK-güvenli: set + set'e referans veren set-dışı çocuklar)
+  WITH all_tabs AS (
+    SELECT x FROM unnest(ins_order) x
+    UNION
+    SELECT x FROM unnest(extra_tables) x
+  )
+  SELECT string_agg('public.'||quote_ident(x), ', ') INTO trunc_list FROM all_tabs;
   EXECUTE 'TRUNCATE ' || trunc_list;
 
   -- 3) ebeveyn->çocuk sırayla kopyala; kolonlar = demo ∩ prod_fdw (iki yönlü drift-güvenli)
@@ -108,7 +149,9 @@ BEGIN
 
   ms := round(extract(epoch from clock_timestamp()-started)*1000);
   INSERT INTO public.demo_klon_log(satir_sayisi, sure_ms, durum) VALUES (rows_total, ms, 'OK');
-  RETURN jsonb_build_object('ok', true, 'rows', rows_total, 'ms', ms, 'tables', array_length(ins_order,1));
+  RETURN jsonb_build_object('ok', true, 'rows', rows_total, 'ms', ms,
+    'tables', array_length(ins_order,1),
+    'ekstra_bosalan', to_jsonb(extra_tables));
 END;
 $fn$;
 

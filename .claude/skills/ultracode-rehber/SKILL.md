@@ -1,6 +1,6 @@
 ---
 name: ultracode-rehber
-description: egesut-erp1 reposunda hangi isi hangi ss-workflow ile kosacagini, MAX_CONC=6 parcalleme kuralini ve KANIT etiketi disiplinini anlatir. Kullanicinin ya da bir ust ajanin "ultracode", "harness isleri", "paralel inceleme", "repo haritasi" demesi ya da bu repoya workflow katmani kurulmasi gerektiginde kullan.
+description: egesut-erp1 reposunda hangi isi hangi ss-workflow ile kosacagini, dinamik MAX_CONC (RAM'den tureyen) paralellik kuralini ve KANIT etiketi disiplinini anlatir. Kullanicinin ya da bir ust ajanin "ultracode", "harness isleri", "paralel inceleme", "repo haritasi" demesi ya da bu repoya workflow katmani kurulmasi gerektiginde kullan.
 ---
 
 # ultracode-rehber — egesut-erp1 harness kilavuzu
@@ -21,12 +21,15 @@ Repo-ozel sartlar (aksi halde yazilarin BLOKLANIR — hookify guardlari):
 - Eski migration DOSYALMAZ (append-only canli gecmis).
 - `js/ui.js` 10.6k satirlik monolit — degisiklik oncesi `ss-parallel-review` kos.
 
-## MAX_CONC=6 kurali
+## MAX_CONC dinamik kurali (sahip karari 2026-09-24; eski sabit 6 KALKTI)
 
-- Her workflow ayni anda EN FAZLA 6 ajan firlatir (`MAX_CONC = 6` sabiti).
-- Boyutlar/acilar 6'dan fazlaysa 6'lik gruplar halinde sirali yurutulur.
-- Sebep: makine bellek/pids tavani (onceki fork-bomb olaylari) — parcak sayisi
-  asla sabitten buyuk somut literal olmamali; dinamik hesap YOK.
+- Her workflow ayni anda EN FAZLA MAX_CONC ajan firlatir. MAX_CONC dinamik:
+  kosu basinda `free -b` ile available RAM olculur, floor((available-6GB)/1.5GB),
+  TAVAN 16. Ram-probe ajani olcumden turetir (fail-closed).
+- Fazlar siralidir (Find→Verify, Scan→Synthesize); yalniz faz-ici bagimsiz isler
+  paralellesir. Sentez/karar katmani TEK ajandir, fan-out'a bolunmez.
+- Sebep: makine bellek/pids tavani (onceki fork-bomb/OOM olaylari) — parcak
+  sayisi asla sabitten buyuk somut literal olmamali.
 - Scriptlerde `Date.now` / `Math.random` YASAK (deterministik plan), TypeScript
   annotasyon YASAK (saf JS, `node --check` gecmeli).
 

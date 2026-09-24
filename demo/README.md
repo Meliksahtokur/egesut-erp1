@@ -23,15 +23,17 @@ Tam yol haritası: `../docs/demo-mirror-ROADMAP.md`. Mimari: Seçenek D (ayrı p
 **Hiçbir tablo/kolon adı gömülü değil** — kapsam, FK sırası, kolonlar ve sequence'ler tek transaction içinde demo'nun kendi katalogundan (`pg_class`/`pg_constraint`/`information_schema`) hesaplanır. Demo'ya tablo/kolon eklenince klon **otomatik** kapsar; fonksiyonu yeniden üretmek gerekmez.
 
 Tek transaction, atomik (yarım-klon yok):
-1. **Kapsam + topolojik sıra runtime:** public base tabloları (agent_* / demo_klon_log / 3 vector-infra hariç, sadece `prod_fdw`'de karşılığı olanlar). FK grafiğinden recursive CTE ile en-uzun-ebeveyn-yolu sırası (DAG, self-FK hariç) → ebeveyn önce.
+1. **Kapsam + topolojik sıra runtime:** public base tabloları (agent_* / demo_klon_log / 3 vector-infra hariç, sadece `prod_fdw`'de karşılığı olanlar). FK grafiğinden recursive CTE ile en-uzun-ebeveyn-yolu sırası (DAG, self-FK hariç) → ebeveyn önce. Ardından **ters kapanış (referencing closure):** klon setine transitif FK ile referans veren set-dışı tablolar da TRUNCATE kapsamına eklenir (bkz. alttaki paragraf).
 2. Her tabloda `DISABLE TRIGGER USER` — app trigger'ları susar (klon prod'u birebir yansıtır, sahte görev üretmez). `postgres` sahip olduğu için yeter; `DISABLE TRIGGER ALL` superuser ister (Supabase'de yasak).
 3. Tüm tabloları tek `TRUNCATE` deyiminde boşalt (FK-güvenli).
 4. **Topolojik sırayla** (ebeveyn→çocuk) `INSERT..SELECT FROM prod_fdw.*`. Kolon listesi = **demo ∩ prod_fdw** kesişimi (iki yönlü drift-güvenli).
 5. `SET CONSTRAINTS ALL IMMEDIATE` — ertelenmiş FK kontrollerini zorla (yoksa `pending trigger events` → `ALTER TABLE` patlar).
 6. `ENABLE TRIGGER USER` geri aç. Set tablolarının sequence'lerini runtime bulup `setval`.
-7. `demo_klon_log`'a satır sayısı + süre + durum yaz. Dönüş: `{ok, rows, ms, tables}`.
+7. `demo_klon_log`'a satır sayısı + süre + durum yaz. Dönüş: `{ok, rows, ms, tables, ekstra_bosalan}`.
 
-Çağrı: `SELECT public.demo_klonla();` → 44 tablo / ~6700 satır / ~1-2 sn. `GRANT EXECUTE ... TO authenticated`.
+**Ters kapanış (referencing closure):** `prod_fdw`'de karşılığı olmayan ama set tablolarına FK ile referans veren demo-lokal tablolar (örn. `pedigree_nodes`, `pedigree_parentage`, `pg_application_event`, `semen_catalog`) klon setinde değildir ama set'i `TRUNCATE` etmeyi bloklar (Postgres 2BP01: "cannot truncate a table referenced in a foreign key constraint"). `demo_klonla()` bu tabloları recursive CTE ile (transitif) yakalar, TRUNCATE listesine katar ve **boşaltır ama prod'dan kopyalamaz** — içerik demo-lokaldir ve prod klonuna girmez. `TRUNCATE ... CASCADE` bilinçli olarak KULLANILMAZ: kapsam açık hesaplanır ve dönüşte `ekstra_bosalan` olarak loglanır. `demo_klon_log` ve vector-infra tabloları FK'sız oldukları için kapanışa doğal olarak girmez.
+
+Çağrı: `SELECT public.demo_klonla();` → 42 tablo + 4 ekstra-boşalan / ~13k satır / ~2 sn. `GRANT EXECUTE ... TO authenticated`.
 
 ## Kapsam
 
