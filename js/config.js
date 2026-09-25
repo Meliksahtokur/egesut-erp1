@@ -187,6 +187,8 @@ const PG_HATA_SOZLUGU = {
   'PG_ZAMAN_GECERSIZ': 'Uygulama zamanı geçersiz (en çok 5 dk ileri / 7 gün geri girilebilir).',
   'SISTEM_ETKEN_MADDE': 'Sistem etken maddesi değiştirilemez/silinemez.',
   'KATALOG_SINIF_KODU_KILITLI': 'Bu katalog satırının sınıf kodu kilitli — değiştirilemez.',
+  // cila2 C1 — DB 000018 trigger/şablon guard RAISE kodu
+  'KISIR_HAYVAN_OVSYNC_YASAK': 'Kısır işaretli hayvana Ovsync protokolü açılamaz.',
 };
 
 // Tohumlama saat pencereleri (MK1, kapalı aralık, Europe/Istanbul).

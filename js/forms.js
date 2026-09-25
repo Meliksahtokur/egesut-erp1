@@ -500,6 +500,26 @@ async function submitKizginlik(btn) {
 }
 
 // ── VAKA AÇ (CLN-02) ────────────────────────
+// cila2 C1 — kısır hayvanda Ovsync hardblock (istemci aynası; DB 000018 fail-closed).
+// OVSYNC ailesi hastalıklarını sablon_hastalik_eslem × tedavi_sablonu'dan çözer.
+function _ovsyncAileHastalikIdleri(eslem, sablonlar){
+  const ovids = new Set((sablonlar||[]).filter(s=>s && s.protokol_ailesi==='OVSYNC').map(s=>s.id));
+  return new Set((eslem||[]).filter(e=>ovids.has(e.sablon_id)).map(e=>e.disease_id));
+}
+// Kısır + OVSYNC-aile hastalığıysa Türkçe sebep, değilse null (pure — unit testli).
+function _kisirOvsyncNedeni(hayvan, diseaseId, ovsyncIds){
+  if(!hayvan || !hayvan.kisir || !diseaseId) return null;
+  return (ovsyncIds && ovsyncIds.has(diseaseId))
+    ? 'kısır işaretli — Ovsync protokolü açılamaz' : null;
+}
+async function _ovsyncAileHastalikIdSet(){
+  try{
+    const eslem = await idbGetAll('sablon_hastalik_eslem');
+    const sablonlar = await idbGetAll('tedavi_sablonu');
+    return _ovsyncAileHastalikIdleri(eslem, sablonlar);
+  }catch(e){ console.warn('[ovsync-kisir] eşlem okunamadı — DB katmanı keser:', e); return new Set(); }
+}
+
 // diseases dropdown'u DB'den doldur
 async function loadDiseasesDropdown() {
   const sel = g('d-disease-id');
@@ -511,6 +531,11 @@ async function loadDiseasesDropdown() {
   const filtrelenmis = sadeceUreme
     ? list.filter(d => (d.category || '').toLowerCase() === 'üreme')
     : list;
+
+  // cila2 C1: kısır işaretli hayvanda OVSYNC-aileli hastalıklar KİLİTLİ
+  // (DB 000018 aynası — seçenek görünür ama seçilemez, sebep Türkçe).
+  const aktifHayvan = (typeof hayvanByKupeRef === 'function' && v('d-hid')) ? hayvanByKupeRef(v('d-hid')) : null;
+  const ovsyncIds = (aktifHayvan && aktifHayvan.kisir) ? await _ovsyncAileHastalikIdSet() : null;
 
   // Kategoriye göre grupla
   const grouped = {};
@@ -526,7 +551,9 @@ async function loadDiseasesDropdown() {
     grouped[cat].forEach(d => {
       const o = document.createElement('option');
       o.value = d.id;
-      o.textContent = d.name;
+      const kisirKilit = _kisirOvsyncNedeni(aktifHayvan, d.id, ovsyncIds);
+      o.textContent = kisirKilit ? `${d.name} — 💲 ${kisirKilit}` : d.name;
+      o.disabled = !!kisirKilit;
       o.dataset.category = d.category || '';
       og.appendChild(o);
     });
@@ -611,6 +638,13 @@ async function submitCase(btn) {
 
   const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
+
+  // cila2 C1: kısır + OVSYNC-aile hastalığı → istemcide engelle (DB 000018 aynası)
+  if (hayvan.kisir) {
+    const ovsyncIds = await _ovsyncAileHastalikIdSet();
+    const kisirNeden = _kisirOvsyncNedeni(hayvan, diseaseId, ovsyncIds);
+    if (kisirNeden) { toast(`⚠️ ${hayvan.kupe_no || hid}: ${kisirNeden}`, true); return; }
+  }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
   try {
@@ -2482,11 +2516,23 @@ function bcSonucBantlari(satirlar, opts){
 // listesini gözden geçirir; form sıfırlanmaz (chips kalır).
 async function submitBulkCase(btn){
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const liste = globalThis._bcHayvanlar || [];
+  let liste = globalThis._bcHayvanlar || [];
   if (!liste.length) { toast('⚠️ En az bir hayvan seçin', true); return; }
   if (liste.length > 200) { toast('⚠️ En fazla 200 hayvan', true); return; }
   const diseaseId = v('bc-disease-id');
   if (!diseaseId) { toast('⚠️ Hastalık seçin', true); return; }
+
+  // cila2 C1: OVSYNC-aile hastalığında kısır işaretli hayvanlar AÇILAMAZ
+  // (DB 000018 fail-closed) — istemci aynası: kısır olanları düşür, bildir.
+  const bcOvsyncIds = await _ovsyncAileHastalikIdSet();
+  if (bcOvsyncIds.has(diseaseId)) {
+    const kisirli = liste.filter(h => h.kisir);
+    if (kisirli.length) {
+      liste = liste.filter(h => !h.kisir);
+      toast(`⚠️ ${kisirli.length} kısır işaretli hayvan atlandı — Ovsync protokolü açılamaz`, true);
+      if (!liste.length) return;
+    }
+  }
 
   // V1.1/V2 manuel çoklu gün yolu — toplayıcı hatalıysa ilk hata toast'lanır
   // ve akış durur; kalem varsa p_items yolu açılır (p_sablon_id null —
