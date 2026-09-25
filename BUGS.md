@@ -482,3 +482,21 @@ Başlat'tan sonra zincir TEDAVI_SEANS olur → iki kaynağın dışına düşer.
 ile seansları eler, gecikme kolu yok, `hedef_saat` okumaz (ui.js:10553,10560).
 **Yön:** aktif Üreme vakalarının gecikmiş/yaklaşan seanslarını dönen 3. kaynak → panel + `_rozetTopla`;
 bildirimKontrol parent_id'li seansları ve gecikmeyi kapsamalı. Bkz. BUG-CILA-PROTOCOL-FAMILY-BOS.
+
+---
+
+### BUG-OFFLINE-UNCHECK-TAMAMLA (pre_existing — 2026-09-25 ultrareview bulgusu, düzeltilmedi — bilinçli erteleme)
+
+Offline iken bir alt-görevin check'inin kaldırılması (tamamlandi:false PATCH) kuyruğa ayrı kayıt olarak
+girer; reconnect'te dataTrafficTekGonder gorev_log PATCH'lerini gorev_tamamla RPC'sine yönlendirir ve
+buildRpcParams 'gorev_tamamla' dalı (js/ui.js:9686-9688) yalnız data.id/data.padok/data.iptal okur —
+data.tamamlandi okumaz. SQL gorev_tamamla
+(supabase/migrations/20260925000006_cila_t5_gorev_tamamla_p_iptal.sql) koşulsuz tamamlandi=true yazar
+(p_iptal hariç). Sonuç: offline check→un-check yapan kullanıcının son eylemi sunucuda
+kalıcı 'tamamlandı' olarak replay edilir.
+
+Kanıt satırları: js/ui.js:1435 (toggleSub write PATCH), js/ui.js:1503 (toggleSubDet),
+js/api.js:175-182 (queueOp dedup yok), js/ui.js:9505 (RPC_MAP), js/ui.js:9686-9688 (buildRpcParams),
+20260925000006 (SQL taraf).
+Kaynak rapor: /home/melik/.herdr/worktrees/egesut-erp1/review-cila-kod/reports/2026-09-25-ultrareview-cila-kod.md
+Not: js/ui.js satır numaraları 2026-09-25 HEAD'ine göredir; U2 refactoringi (commit f6cc0bb) sonrası ~6 satır kayabilir.
