@@ -242,6 +242,36 @@ hata; UI'da seçenek yok.
 gömülmüş. **Sahip:** "ben böyle bir şey istemedim". **Kabul:** sahiple görünüm kararı (önceki ayrı panel
 geri mi, belirgin ayrı bölüm mü) → uygulama.
 
-### DATA-906-GEBE-KAYDI-YOK — 906 sekiz aylık gebe ama sistemde hiç tohumlama kaydı yok [open]
+### DATA-906-GEBE-KAYDI-YOK — 906 sekiz aylık gebe ama sistemde hiç tohumlama kaydı yok [fixed 2026-09-25 — mimar, gebelik_kaydet_manual 2026-01-25 starred]
 **Durum (prod, 2026-09-25):** `durum=Aktif, kisir=false, tohumlama kaydı yok, açık görev yok`. Açık dişi
 sayılıp cron'dan OVSYNC_BASLAT alabilir. **Aksiyon:** gebelik kaydı (tohumlama sonucu Gebe, ~8 ay önce) girilmeli.
+
+---
+
+## Borçlar — sahip P5b demo testi, 2026-09-25 akşam (test/p5b-demo 3a77456)
+
+Sahip kararı: bu gece yeni tur yok; aşağıdakiler borç. Her biri ayrı kalem, kabul ölçütü sahibin cümlesiyle.
+
+### DEBT-PG-VWP-SESSIZ — PG VWP penceresine düşerse TAI oluşmuyor, bildirim yok [open]
+`_pg_sonrasi_tohumlama` (erteleme DONE sahip kapısı #2): PG olayı VWP_ICINDE/UYGUNSUZ → TAI yok + bildirim yok (sessiz kırılma). **Kabul:** kullanıcıya görünür uyarı/bildirim.
+
+### DEBT-TEDAVI-TAI-SENKRON — Tedavi uzayınca TAI kendiliğinden kaymıyor [open]
+Erteleme DONE #3. Şu an elle erteleme gerekiyor. **Kabul:** tedavi günü eklenince/kaydırılınca bağlı TAI da kayar (ya da kullanıcıya sorulur).
+
+### DEBT-BASLAT-IPTAL-INSTANCE — Başlatma görevi iptalinde protokol_instance açık kalıyor [open]
+Erteleme DONE #5 (ön-var). **Kabul:** görev iptali instance'ı da kapatır.
+
+### DEBT-ERTELE-SHEET-BOYUT — Erteleme penceresi geniş ekran açılıyor, tedavi planı ebatında olmalı [open]
+**Sahip:** "ertelemenin wide screen değil tedavi plan ebatlarında olması lazım". **Kabul:** erteleme sheet'i tedavi planı sheet'iyle aynı boyut/yerleşim.
+
+### DEBT-ERTELE-CIFT-YOL — Görev ertelemesi iki ayrı yoldan yapılıyor; takvim düzenleme ekranının altında açılıyor [open]
+**Sahip:** "görev erteleme çift fonksiyon ile yapılıyor — düzenleme butonu ve listedeki erteleme butonu; görev düzenle üzerinden gidilen takvim garip davranıyor, düzenleme ekranının altında açılıyor; var olan şeyi tekrar yapmışız — ikisini birleştirip fixleyelim". **Kabul:** tek erteleme akışı (tek RPC `gorev_ertele` + tek sheet); düzenleme ekranındaki tarih değişikliği aynı akışa yönlenir; takvim üstte/doğru katmanda açılır.
+
+### DEBT-OVSYNC-ERKEN-BASLAT — Başlat, kural gününden haftalar önce basılabiliyor → gelecek tarihli aktif vaka [open]
+**Belirti (demo):** 11 ay 11 günlük düve 38 (R093215052) "Ovsync Protokol · 04.11.2026 · Aktif"; demo'da 5 vaka (188, 110, 008, 38, 169) bugün açılmış, başlangıçları 06.10–07.11. **Prod: 0** (ölçüldü 2026-09-25). **Kök:** `start_first_service_protocol` hedef/kural günü > bugün ise reddetmiyor (başlangıcı GREATEST(hedef, bugün) yapıp açıyor); 000019 kapısı yalnız görev ÜRETİMİNDE. **Kabul:** DB'de başlatma yalnız kural günü − 2 gün penceresinde (erken → `atlandi:ERKEN`/hata); UI'da Başlat butonu pencere dışında gizli; demo'daki 5 erken vaka temizlenir.
+
+### DEBT-HIZLI-PG-KAPI-UI — Hızlı Uygulama ile PG: onay penceresi yerine "hata" [open — doğrulanmalı]
+**Sahip:** "173'e hızlı uygulama ile PG yaptım hata verdi". **Ölçüm (demo, BEGIN…ROLLBACK):** sunucu `PG_KAPI:REQUIRE_ACK_PENDING` döndürüyor (173, 57 gün önce tohumlanmış, sonuç Bekliyor) — bu KASITLI kapı; UI `_pgKapiHata` (ui.js:1088) mesajın `^PG_KAPI:` ile BAŞLAMASINI bekliyor. Onay penceresi açılmadıysa mesaj bir katmanda önek almış olabilir (api.js rpc hata yolu `main`'e göre değişti: `data.mesaj || data.error`). **Kabul:** Bekliyor/gebe hayvana PG → onay penceresi (Boş ata ve uygula / vazgeç); main'de davranış karşılaştırması (regresyon mu ön-var mı).
+
+### DEBT-PG-TAI-SAAT — Test inek 3: PG sonrası TAI +48s yerine ~+59s (28.09 09:00) [open — doğrulanmalı]
+**Sahip:** "48 değil 72 saat sonra görev oluşturması — saatten kaynaklı da olabilir". Muhtemel neden `_tohumlama_pencere` yuvarlaması (akşam PG → +48s gece → ertesi sabah penceresine). **Kabul:** kural belgelensin; sahip isterse yuvarlama yönü (önceki akşam / sonraki sabah) ayarı. Ayrıca sahip: "var olan planlı tohumlama PG'ye göre yeniden tarihlensin" — E3 vakayı kapatıp yeni TAI açıyor; sonuç aynı, sahip kabul etti.
