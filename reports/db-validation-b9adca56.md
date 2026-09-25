@@ -1,11 +1,11 @@
 # DB Validation Raporu — b9adca56
 
-- Tarih: 2026-09-25 16:29:46+0300
+- Tarih: 2026-09-25 17:08:14+0300
 - Migration: `/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100004_gorev_ertele_rpcs.sql`
 - SHA-256: `b9adca56ff97a70ed3892a1780f48551a347a722bd37f1fb8196ef9df7deb221`
-- Baseline (C1): {'tablo': 55, 'fonksiyon': 243, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': "bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)", 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} · parite: uyumlu
+- Baseline (C1): {'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} · parite: uyumlu
 - Data mode: koşulmadı (migration veri dokmuyor, --data-mode=auto)
-- Genel sonuç: **PASS**
+- Genel sonuç: **FAIL**
 
 ## Faz bazlı sonuç tablosu
 
@@ -13,15 +13,11 @@
 |---|---|---|
 | A.sqlfluff-parse | PASS | parse hatası yok (stil uyarısı: 0) |
 | A.squawk | PASS | varsayılan kurallar (istisna: require-concurrent-index-creation,ban-drop-table) ihlal yok |
-| B.sema-uyum | PASS | tüm FROM/JOIN/ALTER/REFERENCES hedefleri biliniyor (ayna ya da migration-içi) |
-| C1.baseline-restore-schema | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 55, 'fonksiyon': 243, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': "bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)", 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
-| C1.migration-apply | PASS | psql ON_ERROR_STOP ile hatasız uygulandı |
-| C1.postcheck-nesne | PASS | migration-içi yaratılan tüm nesneler izole DB'de mevcut |
-| C1.postcheck-rls | PASS | RLS farkları: yok; etkilenen tablolar relrowsecurity: (yeni tablo ya da aynada yok) |
-| C1.ortam-paritesi | PASS | baseline parite_durumu=uyumlu |
-| C1.baseline-restore-data | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 55, 'fonksiyon': 243, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': "bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)", 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
-| C2.sentetik-tohum | PASS | etkilenen tablolara sentetik satır eklendi |
-| C2.veri-uyumluluk | PASS | sentetik veri üzerinde migration hatasız; unique/fk ihlali yok |
+| B.sema-uyum | INCONCLUSIVE | statik çözülemedi (C1'e bırakıldı): gorev_ertele_kural  |
+| C1.baseline-restore-schema | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
+| C1.migration-apply | FAIL | psql hatası ; ayrıntı raporda |
+| C1.baseline-restore-data | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
+| C2.veri-uyumluluk | FAIL | tohumlu veri üzerinde apply hatası; ayrıntı raporda |
 
 ## Uygulanan komutlar
 
@@ -75,7 +71,7 @@ Found 0 issues in 1 file 🎉
 ```
 [1;34m▶ FAZ-0 Ortam paritesi (Mgmt API, salt-okunur)…[0m
 [1;34m▶   Parite: uyumlu (prod=17.6 yerel=17.6) → /home/melik/tmp/agents/parite-egesut_val_tmp.txt[0m
-[1;34m▶   Ayna tazeliği: bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)[0m
+[1;34m▶   Ayna tazeliği: taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)[0m
 [1;34m▶ İzole DB kuruluyor: egesut_val_tmp[0m
 [1;34m▶ Roller kuruluyor (NOLOGIN)…[0m
 DO
@@ -89,7 +85,7 @@ Makefile:182: must be installed from CPAN. To do so, simply run:
 Makefile:183: cpan TAP::Parser::SourceHandler::pgTAP
 [1;34m▶ pgTAP yükleniyor (370922 byte, ayrı 'pgtap' şemasına)…[0m
 ALTER DATABASE
-{"db_name":"egesut_val_tmp","tablo":55,"fonksiyon":243,"view":13,"pgtap_fn":1085,"parite_durum":"uyumlu","baseline_kaynak":"egesut_lsp","ayna_tazelik":"bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)","parite_dosya":"/home/melik/tmp/agents/parite-egesut_val_tmp.txt","prod_pg":"17.6","yerel_pg":"17.6"}
+{"db_name":"egesut_val_tmp","tablo":54,"fonksiyon":244,"view":13,"pgtap_fn":1085,"parite_durum":"uyumlu","baseline_kaynak":"egesut_lsp","ayna_tazelik":"taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)","parite_dosya":"/home/melik/tmp/agents/parite-egesut_val_tmp.txt","prod_pg":"17.6","yerel_pg":"17.6"}
 ```
 
 ### C1 apply (`apply.out`)
@@ -97,15 +93,9 @@ ALTER DATABASE
 BEGIN
 SET
 SET
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-REVOKE
-REVOKE
-GRANT
-REVOKE
-GRANT
-COMMIT
+psql:/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100004_gorev_ertele_rpcs.sql:73: ERROR:  relation "public.gorev_ertele_kural" does not exist
+LINE 13:        FROM public.gorev_ertele_kural k
+                     ^
 ```
 
 ### C2 apply (tohumlu) (`c2_apply.out`)
@@ -113,15 +103,9 @@ COMMIT
 BEGIN
 SET
 SET
-CREATE FUNCTION
-CREATE FUNCTION
-CREATE FUNCTION
-REVOKE
-REVOKE
-GRANT
-REVOKE
-GRANT
-COMMIT
+psql:/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100004_gorev_ertele_rpcs.sql:73: ERROR:  relation "public.gorev_ertele_kural" does not exist
+LINE 13:        FROM public.gorev_ertele_kural k
+                     ^
 ```
 
 ### C2 sentetik tohum (`seed.log`)

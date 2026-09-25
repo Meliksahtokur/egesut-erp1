@@ -1,11 +1,11 @@
 # DB Validation Raporu — a5505160
 
-- Tarih: 2026-09-25 16:19:38+0300
+- Tarih: 2026-09-25 17:08:28+0300
 - Migration: `/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100005_bagimsiz_pg_vaka_kapat.sql`
 - SHA-256: `a55051601eba51eb7a65a6c539e7891f32f69c78741d0ed2d214fe7630d44ca5`
-- Baseline (C1): {'tablo': 55, 'fonksiyon': 243, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': "bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)", 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} · parite: uyumlu
+- Baseline (C1): {'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} · parite: uyumlu
 - Data mode: koşulmadı (migration veri dokmuyor, --data-mode=auto)
-- Genel sonuç: **PASS**
+- Genel sonuç: **INCONCLUSIVE**
 
 ## Faz bazlı sonuç tablosu
 
@@ -14,14 +14,14 @@
 | A.sqlfluff-parse | PASS | parse hatası yok (stil uyarısı: 0) |
 | A.squawk | PASS | ERROR düzeyi ihlal yok; 1 WARNING rapora kaydedildi (bkz. çıktı) |
 | B.sema-uyum | PASS | tüm FROM/JOIN/ALTER/REFERENCES hedefleri biliniyor (ayna ya da migration-içi) |
-| C1.baseline-restore-schema | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 55, 'fonksiyon': 243, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': "bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)", 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
+| C1.baseline-restore-schema | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
 | C1.migration-apply | PASS | psql ON_ERROR_STOP ile hatasız uygulandı |
 | C1.postcheck-nesne | PASS | migration-içi yaratılan tüm nesneler izole DB'de mevcut |
 | C1.postcheck-rls | PASS | RLS farkları: yok; etkilenen tablolar relrowsecurity: cases:0→0 |
 | C1.ortam-paritesi | PASS | baseline parite_durumu=uyumlu |
-| C1.baseline-restore-data | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 55, 'fonksiyon': 243, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': "bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)", 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
-| C2.sentetik-tohum | PASS | etkilenen tablolara sentetik satır eklendi |
-| C2.veri-uyumluluk | PASS | sentetik veri üzerinde migration hatasız; unique/fk ihlali yok |
+| C1.baseline-restore-data | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
+| C2.sentetik-tohum | INCONCLUSIVE | bazı tablolara sentetik satır eklenemedi (seed.log); veri senaryosu kısmi |
+| C2.veri-uyumluluk | INCONCLUSIVE | tohumlama kısmi — veri uyumluluğu tam kanıtlanmadı |
 
 ## Uygulanan komutlar
 
@@ -79,7 +79,7 @@ Found 1 issue in 1 file (checked 1 source file)
 ```
 [1;34m▶ FAZ-0 Ortam paritesi (Mgmt API, salt-okunur)…[0m
 [1;34m▶   Parite: uyumlu (prod=17.6 yerel=17.6) → /home/melik/tmp/agents/parite-egesut_val_tmp.txt[0m
-[1;34m▶   Ayna tazeliği: bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)[0m
+[1;34m▶   Ayna tazeliği: taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)[0m
 [1;34m▶ İzole DB kuruluyor: egesut_val_tmp[0m
 [1;34m▶ Roller kuruluyor (NOLOGIN)…[0m
 DO
@@ -93,7 +93,7 @@ Makefile:182: must be installed from CPAN. To do so, simply run:
 Makefile:183: cpan TAP::Parser::SourceHandler::pgTAP
 [1;34m▶ pgTAP yükleniyor (370922 byte, ayrı 'pgtap' şemasına)…[0m
 ALTER DATABASE
-{"db_name":"egesut_val_tmp","tablo":55,"fonksiyon":243,"view":13,"pgtap_fn":1085,"parite_durum":"uyumlu","baseline_kaynak":"egesut_lsp","ayna_tazelik":"bilinmiyor (ayna sayımı prod'dan farklı — ayna bayat olabilir: yerel T=55 F=243 V=13, prod T=54 F=244 V=13; refresh_lsp_schema.sh koş)","parite_dosya":"/home/melik/tmp/agents/parite-egesut_val_tmp.txt","prod_pg":"17.6","yerel_pg":"17.6"}
+{"db_name":"egesut_val_tmp","tablo":54,"fonksiyon":244,"view":13,"pgtap_fn":1085,"parite_durum":"uyumlu","baseline_kaynak":"egesut_lsp","ayna_tazelik":"taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)","parite_dosya":"/home/melik/tmp/agents/parite-egesut_val_tmp.txt","prod_pg":"17.6","yerel_pg":"17.6"}
 ```
 
 ### C1 apply (`apply.out`)
@@ -134,5 +134,9 @@ LINE 1: ... ELSE (SELECT quote_literal(min(f.id)::text) FROM public.far...
 (genel) public.farm yok/boş — farm_id tohum değeri '1' fallback
 cases: sentetik satır eklendi (id, animal_id, disease_id, start_date, status)
 islem_log: sentetik satır eklendi (id, tip, durum, snapshot)
-pg_application_event: sentetik satır eklendi (id, source_type, source_id, hayvan_id, occurred_at, karar, created_at)
+ERROR:  column "farm_id" is of type uuid but expression is of type integer
+LINE 1: ...at, karar, created_at) VALUES (gen_random_uuid(), 1, 'dbval_...
+                                                             ^
+HINT:  You will need to rewrite or cast the expression.
+pg_application_event: sentetik satır EKLENEMEDİ (bkz. hata yukarıda)
 ```
