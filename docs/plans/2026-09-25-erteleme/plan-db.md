@@ -538,3 +538,10 @@ dahil) + tablo varlık kontrolü kapsamda.
 3. `hayvan_tohumlama_ertele` (SK3) ve `_tohumlama_pencere` gövdesi bu kulvarda hiçbir
    adımda değişmez; `tohumlama_gorev_ertele` yalnız ÇAĞRILIR (E0/E2 probeleri).
 4. Tüm probeler BEGIN…ROLLBACK zarfında; demo kalıcı veri değişikliği YOK (E0 deseni).
+5. **Probe arşiv yolu (F4/C-3):** kabul kanıtlarındaki `.probe-*`, `.verify-*` ve
+   `.pg-*` dosya referansları çalışma ağacında DEĞİL, arşivdedir:
+   `~/tmp/i-db/probes/` (kanıt satırı `[OBSERVED .probe-e5-kirmizi.sql]` →
+   `/home/melik/tmp/i-db/probes/.probe-e5-kirmizi.sql`; çıktılar `*.out` yan
+   dosyalarında). F4 turu probeleri: `.probe-f4-kirmizi.sql` / `.probe-f4-yesil.sql`
+   (+ `.out`), B-2 provası `.prod-kaydir-demo-prova.out` ve prod-dal mekanik duruş
+   kanıtı `.prod-kaydir-prodmod-KOPYA.sql`.
