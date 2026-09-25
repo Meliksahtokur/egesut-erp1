@@ -1378,7 +1378,25 @@ async function _protokolIptalAkisi(vaka){
     await pullTables(RPC_TABLES.protokol_iptal).catch(()=>{});
     updateTaskBadge(); loadTasks(_curTaskFilter||'today'); loadDash();
     window.__protokolUyarilar=null;   // protokol ekranı taze veriyle açılsın
+    return true;   // C-1: vaka detay yüzeyi (cdProtokolIptal) başarıda modalı kapatabilsin
   }catch(e){ toast('❌ '+getUserMessage(e),true); }
+}
+// C-1 (E4 onarım, 2026-09-25): protokol iptal YÜZEYİ vaka detayında.
+// 'Protokolü iptal et' bugün yalnız AÇIK OVSYNC_BASLAT kartındaki ✕
+// butonundan erişilebiliyordu; protokol başlayınca (görev tamamlanır)
+// yüzey kalmıyordu — zarf E4 ölçütü 'aktif ovsync vakasında Protokolü
+// iptal et' karşılanmıyordu. Vaka detayındaki #cd-protokol-iptal-btn
+// (cd-gun-bolum komşuluğu, E0 cd-kaydir-btn deseni) AKTİF +
+// protocol_family'li vakada görünür (openCaseDet → ertelemeBtnGuncelle;
+// online-only E6) ve aynı _protokolIptalAkisi A dalına devreder — İKİNCİ
+// AKIŞ KOPYASI YOK. protocol_family UI'da zaten mevcut (cases pull
+// select('*')) — api.js değişikliği gerekmez.
+async function cdProtokolIptal(){
+  if(_ertelemeOfflineGuard('protokol-iptal')) return;   // E6: online-only (plan 3c)
+  const c=(typeof _curCase!=='undefined')?_curCase:null;   // vm-extract koşum koruması (ui.js:6980 deseni)
+  if(!c||c.status!=='active'||!c.protocol_family) return;   // yüzey yalnız protokol ailesi aktif vakada
+  const ok=await _protokolIptalAkisi(c);
+  if(ok) closeM('m-case-det');   // vaka kapandı → detay ekranı kapanır (erken-kapat deseni)
 }
 // P10/B3: bildirim yardımcısı — izin yoksa sessiz düşme YOK (rozet panelde); yalnız iki olayda kullanılır
 // S4/N2: hayvanId varken bildirim tıklanabilir hedefe bağlanır (Notification onclick +
@@ -7720,6 +7738,11 @@ function ertelemeBtnGuncelle() {
   const online = _ertelemeOnline();
   const cdBtn = document.getElementById('cd-kaydir-btn');
   if (cdBtn) cdBtn.style.display = online ? 'block' : 'none';
+  // C-1 (E4 onarım): protokol iptal yüzeyi — online + AKTİF + protocol_family'li
+  // vaka (openCaseDet _curCase'i kurar). _curCase vm-extract koşumlarında
+  // bulunmayabilir — typeof koruması (ui.js:6980 deseni).
+  const cdPBtn = document.getElementById('cd-protokol-iptal-btn');
+  if (cdPBtn) cdPBtn.style.display = (online && typeof _curCase !== 'undefined' && _curCase && _curCase.status === 'active' && _curCase.protocol_family) ? 'block' : 'none';
   document.querySelectorAll('[data-ertele]').forEach(b => { b.style.display = online ? '' : 'none'; });
 }
 window.addEventListener('online',  () => ertelemeBtnGuncelle());

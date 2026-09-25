@@ -2170,6 +2170,13 @@ body.dark .ac-vurgu{color:#8ec6ff}
              (E6: ertelemeBtnGuncelle gizler/gösterir; RPC vaka_kalan_gunleri_kaydir) -->
         <button id="cd-kaydir-btn" class="btn" style="background:none;border:1.5px solid var(--amber);color:var(--amber);width:100%;margin-bottom:6px"
           onclick="cdKaydirAc()">⏩ Kalan Günleri Kaydır</button>
+        <!-- C-1 (E4 onarım 2026-09-25): başlamış protokol zinciri (AKTİF +
+             protocol_family'li vaka) için iptal yüzeyi — ✕ butonu yalnız AÇIK
+             OVSYNC_BASLAT kartındaydı; protokol başlayınca yüzey kalmıyordu.
+             openCaseDet + ertelemeBtnGuncelle gösterir; online-only (E6);
+             akış _protokolIptelAkisi A dalı (rpc protokol_iptal) -->
+        <button id="cd-protokol-iptal-btn" class="btn" style="display:none;background:none;border:1.5px solid var(--red);color:var(--red);width:100%;margin-bottom:6px"
+          onclick="cdProtokolIptal()">🛑 Protokolü İptal Et</button>
       </div>
       <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Tedavi Günleri</div>
       <div id="cd-timeline" style="font-size:.82rem"></div>
