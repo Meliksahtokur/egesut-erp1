@@ -28,7 +28,7 @@
 
 - **F7 hedefi:** 2. turun "errorHandler.js'te bilinçli tutma" kararı benimsendi (davranış `msg.includes` döngüsünde eşdeğer; dosya zarfı F1-F8 korunuyor). `js/config.js` `PG_HATA_SOZLUGU` (:183) alternatifi spec §8.2'de kayıt altında. Bu turun doğrulaması: `GOREV_ERTELENEMEZ`/`GECMIS_TARIH` iki sözlükte de yok (çakışma riski 0); jenerik dal ham `KOD:{json}` metnini geçirir ( getUserMessage errorHandler:59 ':' kuralıyla) — bulgu geçerli.
 - **K-7 / ENGEL-5:** `supabase_migrate` MCP = PROD hedefli (R3 B3) — bu turda doğrulandı ve benimsendi; bu turun canlı ölçümleri psql pooler kanalıyla yapıldı (PROD'a dokunulmadı; tools-bank `SB_PROJECT=zqne…` server.py:312 — R3 ile uyumlu).
-- **Tutarlılık turu paralel düzenmeleri** (migration `<BOŞ-NUMARA>` kuralı, `?v=20260925-02` bump koordinasyonu, Adım 3-3 K-7 kanal notu): aynı dosyada paralel ajanın tamam edilmiş, benimkiyle çakışmayan düzeltmeleri — benimsendi, dokunulmadı.
+- **Tutarlılık turu paralel düzenmeleri** (migration `<BOŞ-NUMARA>` kuralı, `?v=20260925-02` bump koordinasyonu (S5 kapanışında uygulandı — 2026-09-25, index.html tek değer -02), Adım 3-3 K-7 kanal notu): aynı dosyada paralel ajanın tamam edilmiş, benimkiyle çakışmayan düzeltmeleri — benimsendi, dokunulmadı.
 
 ## 4. ENGEL durumu (bu tur sonrası)
 
