@@ -302,3 +302,14 @@ ana-gövdeye yayılmış tek-tur XSS hizalaması ayrı hardening turu olarak pla
 (S2'deki escAttr disiplini referans).
 
 **Etki:** hayvan_id kaynakları DB-uuid; istismar yolu yok bilinen veride — hijyen borcu.
+
+### BUG-SESSIZ-SON-TOHUMLAMA-INLINE — son-tohumlama seçimi 3. inline kopya (view dâhil) [open / borç]
+
+**Tarih:** 2026-09-25 · **Kaynak:** son review kapısı (BİLGİ bulgusu)
+
+`ORDER BY tarih DESC NULLS LAST, created_at DESC NULLS LAST LIMIT 1` desenini artık ÜÇ yer
+inline taşıyor: `v_eligible` (20260925000003 — onarım fix'i), `gebelik_muayene_listele/_uret`
+(20260925000002). Mevcut `public._son_tohumlama(hayvan_id)` (20260923000003) tek-tanım yerine
+geçebilir; view için `COALESCE((SELECT sonuc FROM public._son_tohumlama(h.id)), '')` formu
+yeterli. Birleşik temizlik migration'ında dört kullanım tek yardımcıya bağlanmalı (davranış-eş;
+bu turda dokunulmadı — BUG-S2-REVIEW-TEMIZLIK #1'in kapsamını genişletir).
