@@ -425,6 +425,19 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 Kabul ölçütü (zarf): *başlamış ovsync zincirinin gecikmiş/yaklaşan seansları panelde + `_rozetTopla`'da; `bildirimKontrol` parent_id'li seansları ve gecikmeyi kapsar, `hedef_saat` okur; unit test + demo RPC çıktısında 8 gecikmiş Buserin seansı panel kaynağında görünür.*
 
+> **F4 onarım notu (2026-09-25, F4-UI) — K8 sabit-8 ölçütünün sapması.** Zarfın "demo RPC çıktısında
+> **8 gecikmiş** Buserin seansı panel kaynağında görünür" ibaresi teslim anında harfiyen ölçülemez
+> duruma geldi: aynı turun **K10** adımı (sahip talimatı 2b, k10-sonuc.md / commit 080ee57) aynı
+> seanslara +2 gün erteledi — gorev_log.hedef_tarih 64 satır, treatment_days.planned_date 32 satır.
+> Canlı demo RPC ölçümü (ref vtzqjmazsvurxdeondmi, salt-okuma): planın sabit-8 spot sorgusu = **0**;
+> RPC toplam 11 (gecikmis 0-1 — gün-içi saat-bağımlı, 002'nin gün-2 seansı 10:00'yı geçince gecikmişe döner,
+> Buserin değil), **Buserin satırı 9 ve tümü 'yaklasan'** (8× gün-1 2026-09-26 10:00 — K10'un 8 vakasının
+> küpeleri 122/144/149/168/186/28/31/Test inek 3 birebir — + 002 gün-4). Kabul bu yüzden eşitlik-tabanlı
+> yedekle kanıtlandı: (1) RPC = bağımsız SQL eşitliği (11 = 11; kırıntı #59), (2) Buserin seanslarının
+> panel kaynağında görünür olması (9 satır), (3) unit K8-3 sabit-8 fixture'ı test tarafını kapatıyor.
+> **DONE dosyasını yazan ajan bu sapmayı K8 kaleminde ve sahip_kapisi altında açıkça listelemelidir**
+> ("K8 TAMAM" iddiası harfiyen değil öz itibarıyla karşılandı) — kırıntı type:open_item olarak da düşüldü.
+
 **`k8_needs_rpc = true`.** Yeni RPC `ovsync_seans_uyarilari()` — gövde K-DB/I-DB kulvarı (migration numarası I-DB'nin sırası); P-UI yalnız sözleşme sahibi. K8'in UI bölümü RPC varlığına beklemesiz şipşak (RPC yoksa `rpc()` throw → sessiz boş bölüm).
 
 ### Task 7: RPC sözleşmesi — K-DB'ye iş bildirimi
