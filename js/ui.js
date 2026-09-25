@@ -2096,14 +2096,22 @@ function _protoDetayHayvanGit(hayvanId){
 // hedef_saat koşullu basılır (boş saat → çift-ayraç kozmetiği yok).
 // S1: kisir hayvanda Başlat YOK, kilitli rozet VAR; ✕ her durumda çizilir.
 function _ovUyariSatirHtml(u){
-  return `<div class="arow" style="border-left:3px solid var(--green);margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_protoDetayHayvanGit('${escAttr(u.hayvan_id)}')">
+  // C5 (cila2): görevsiz öneri satırı (kuralı bugün+2 içinde, görev kural günü doğar)
+  // — "Başlat" daveti yerine görevin otomatik açılacağı bilgi etiketi basılır.
+  const oneriMi = !u.gorev_id;
+  const ustSatir = oneriMi
+    ? 'Uyarı: ilk tohumlama kuralı yaklaşıyor'
+    : 'Başlat: Ovsynch-56 senkronu (56 günlük program)';
+  return `<div class="arow" style="border-left:3px solid ${oneriMi?'#b8860b':'var(--green)'};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_protoDetayHayvanGit('${escAttr(u.hayvan_id)}')">
         <div style="flex:1">
           <div style="font-weight:700;font-size:.8rem">🌱 ${esc(u.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(u.kategori||'')}</span></div>
-          <div style="font-size:.7rem;color:var(--ink3)">Başlat: Ovsynch-56 senkronu (56 günlük program) · Hedef: ${fmtTarih(u.hedef_tarih)}${u.hedef_saat ? ' ' + String(u.hedef_saat).slice(0, 5) : ''} · Zamanlanmış tohumlama (TAI): ${fmtTarih(u.tai_tarihi)}</div>
+          <div style="font-size:.7rem;color:var(--ink3)">${ustSatir} · Hedef: ${fmtTarih(u.hedef_tarih)}${u.hedef_saat ? ' ' + String(u.hedef_saat).slice(0, 5) : ''} · Zamanlanmış tohumlama (TAI): ${fmtTarih(u.tai_tarihi)}</div>
           <div style="font-size:.6rem;opacity:.5">${u.taban_turu==='duve'?'Düve — 12a21g':u.taban_turu==='abort'?'Abort sonrası':u.taban_turu==='dogum'?'Doğum sonrası':'Açık dişi'}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
-          ${_ovsyncBaslatKilitHtml(!!u.kisir, u.gorev_id, u.hayvan_id, false)}
+          ${oneriMi
+            ? '<span style="font-size:.62rem;font-weight:700;color:#b8860b">📅 Görev hedef gününde otomatik açılır</span>'
+            : _ovsyncBaslatKilitHtml(!!u.kisir, u.gorev_id, u.hayvan_id, false)}
         </div>
       </div>`;
 }
