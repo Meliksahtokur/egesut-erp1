@@ -60,13 +60,13 @@ const _katTipMap={
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
 const _planliUremeTipler=['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'];   // K7: planlı üreme görevleri Bugün'de 7-gün pencereyle (ASI_PLANLI örneği)
-// K7: hastalık kategorisi 'Üreme' olan vakaların TEDAVI_SEANS/TEDAVI_GUN'leri Üreme sekmesine
-// aittir (ovsync zinciri tedavi vakası açar — BUG-UREME-SEKMESI-FILTRE). Kategori DB otoritesi: diseases.category.
-function _uremeVakaCaseIds(cases,diseases){
-  const _dById=Object.fromEntries((diseases||[]).map(d=>[d.id,d]));
-  const s=new Set();
-  (cases||[]).forEach(c=>{ const d=c&&_dById[c.disease_id]; if(d&&d.category==='Üreme') s.add(c.id); });
-  return s;
+// C3 (cila2): üreme-vaka kümesi hastalık KATEGORİSİ değil PROTOKOL AİLESİ bazlıdır.
+// K7'nin category='Üreme' ayrımı Metrit/Endometrit gibi tedavi vakalarının
+// seanslarını Üreme filtresine sızdırıyordu (BUG-UREME-FILTRE-SIZINTI).
+// protocol_family='OVSYNC' damgası (K4, 20260925000013:144-147) yalnız başlamış
+// ovsync zincirlerine yazılır — Metrit vb. NULL kalır, Tedavi'de listelenir.
+function _uremeVakaCaseIds(cases){
+  return new Set((cases||[]).filter(c=>c&&c.protocol_family==='OVSYNC').map(c=>c.id));
 }
 function _uremeGorevMi(t,uremeCaseIdler,tdById,seansById){
   if(!t) return false;
@@ -727,7 +727,7 @@ async function loadTasks(f,btn,opts){
     const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
     const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
     const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
-    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases,_allTaskDiseases);   // K7
+    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases);   // C3: protocol_family='OVSYNC' kümesi
     if(f==='done'){
       // Besleme zincirinde her görev (ilk hariç) parent_id'li → eski filtre hepsini gizliyordu.
       // Sadece geri alınabilir ucu göster: çocuğu tamamlanmamış besleme tamamlaması.
@@ -769,7 +769,13 @@ async function loadTasks(f,btn,opts){
     const _d7=dFwd(null,7);
     const _d1=dFwd(null,1);
     const _d30=dFwd(null,30);
-    if(f==='today') data=data.filter(t=>_bugunFiltreUygun(t,today,_d7));   // K7: ASI_PLANLI 7-gün penceresi + planlı üreme (OVSYNC_BASLAT/TOHUMLAMA_PLANLI)
+    // K7: ASI_PLANLI 7-gün penceresi + planlı üreme (OVSYNC_BASLAT/TOHUMLAMA_PLANLI).
+    // C3 (cila2): Üreme kategorisi seçiliyken pencere TÜM üreme görevlerine açılır —
+    // ovsync vakasının yaklaşan TEDAVI_GUN/SEANS'ları da Bugün+Üreme'de görünür
+    // ("tohumlama ve ovsync görevleri üremede görünmüyor" belirtisi).
+    if(f==='today') data=data.filter(t=>_bugunFiltreUygun(t,today,_d7)
+      ||(_taskKategori==='ureme'&&_kategoriFiltreUygun(t,'ureme',_uremeCaseIdler,_tdById,_seansById)
+         &&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     else if(f==='all'){
       data=data.filter(t=>t.hedef_tarih>today);
@@ -813,26 +819,40 @@ async function loadTasks(f,btn,opts){
     data.forEach(t=>{ if(t.gorev_tipi==='TEDAVI_SEANS'){ const sd=_seansById[t.seans_admin_id]; if(sd?.treatment_day_id)seansDayIds.add(sd.treatment_day_id); } });
     // TEDAVI_GUN gorev aciklamasi JSON {day_id, planned_time, label, ...} — try/catch fallback
     const _gorevAciklama=t=>{ try{ return JSON.parse(t.aciklama||'{}'); }catch(e){ return {}; } };
+    // C3 (cila2): grup anahtarı hayvan|DAY_ID yerine hayvan|TARİH — aynı hayvana
+    // aynı gün açılan ikinci şablon uygulaması (tekillik guard'ı yok, gerçek veri:
+    // aynı (case,tarih) çift day-set'leri) iki ayrı ayraç altında üst üste
+    // görünüyordu ("iki görev üst üste çakışıyor"). Tek ayraca iner; "Gün N·M"
+    // etiketi benzersiz gün numaralarını sırayla listeler.
     const grupMap={};
     data.forEach(t=>{
       if(t.gorev_tipi!=='TEDAVI_SEANS')return;
       const seans=_seansById[t.seans_admin_id]; if(!seans)return;
       const dayId=seans.treatment_day_id;
-      const key=(t.hayvan_id||'')+'|'+dayId;
+      const td=_tdById[dayId];
+      const key=(t.hayvan_id||'')+'|'+(t.hedef_tarih||td?.treatment_date||'');
       if(!grupMap[key]){
-        const td=_tdById[dayId];
         const animal=getState('animals').find(a=>a.id===t.hayvan_id);
         grupMap[key]={ hayvan_id:t.hayvan_id, day_id:dayId,
           date:t.hedef_tarih||td?.treatment_date||'',
-          gunNo:td?.day_no||'?', totalGun:td?_caseDayCount[td.case_id]||0:0,
+          gunNoSet:new Set(), totalGun:td?_caseDayCount[td.case_id]||0:0,
           animalLabel:animal?(animal.kupe_no||animal.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—'),
           grupAd:animal?.grup||(t.hayvan_id?'':'GENEL'),
           disease:_dayDiseaseMap[dayId]||'',
-          seansTotal:_seansDayStat[dayId]?.total||0, seansDone:_seansDayStat[dayId]?.done||0,
           items:[] };
       }
+      if(td?.day_no!=null) grupMap[key].gunNoSet.add(td.day_no);
       grupMap[key].items.push({ task:t, seans,
         drugName:_prodMap[seans.drug_product_id]?.brand_name||_stokNameMap[seans.stok_id]||'İlaç' });
+    });
+    // C3: ayraç ilerlemesi items'tan (görünen görevlerden) sayılır — _seansDayStat
+    // süzgeç dışı seansları da saydığı için birleşik grupta yanıltıcı olur.
+    Object.values(grupMap).forEach(g=>{
+      const guns=[...g.gunNoSet].sort((a,b)=>a-b);
+      g.gunNo=guns.length?guns.join('·'):'?';
+      if(guns.length>1) g.totalGun=0;   // çoklu gün → "N/M" kesri anlamsız, yalnız liste
+      g.seansTotal=g.items.length;
+      g.seansDone=g.items.filter(i=>i.seans.uygulama_tamamlandi_at||i.seans.uygulanmadi).length;
     });
     // --- Blokları (normal kart + seans grubu) topla; her bloğa F3/F4 meta'sı ---
     // F3 katmanları: tarih → saat → hayvan grubu → küpe (doğal sıra).
