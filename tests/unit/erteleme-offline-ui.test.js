@@ -61,17 +61,19 @@ test('E6-1: ertelemeBtnGuncelle — offline #cd-kaydir-btn VE [data-ertele] buto
   }).ertelemeBtnGuncelle());
 });
 
-test('E6-2: _tohErteleBtnHtml — offline buton ÜRETİLMEZ; online data-ertele rozetiyle üretilir', () => {
+test('E6-2: _erteleBtnHtml — offline buton ÜRETİLMEZ; online data-ertele rozetiyle üretilir', () => {
   const t = { id: 'g1', gorev_tipi: 'TOHUMLAMA_PLANLI', tamamlandi: false, iptal: false };
-  const offline = e6Yukle(['_tohErteleBtnHtml'], { navigator: { onLine: false }, escAttr: escAttrMirror })._tohErteleBtnHtml;
+  // E1-UI sonrası buton kural cache'den karar verir — kural kardeşi ctx'e veriliyor
+  const kuralCtx = { ertelemeKuralGetir: tip => (tip === 'TOHUMLAMA_PLANLI' ? { ertelenebilir: true, pencere_kurali: 'tohumlama' } : null) };
+  const offline = e6Yukle(['_erteleBtnHtml'], { navigator: { onLine: false }, escAttr: escAttrMirror, ...kuralCtx })._erteleBtnHtml;
   assert.strictEqual(offline(t), '', 'offline → kart HTML üretiminde buton YOK');
-  const online = e6Yukle(['_tohErteleBtnHtml'], { navigator: { onLine: true }, escAttr: escAttrMirror })._tohErteleBtnHtml;
+  const online = e6Yukle(['_erteleBtnHtml'], { navigator: { onLine: true }, escAttr: escAttrMirror, ...kuralCtx })._erteleBtnHtml;
   const html = online(t);
   assert.ok(html.includes('🗓️ Ertele'), 'online → buton üretilir');
   assert.ok(html.includes('data-ertele'), 'canlı-DOM görünürlük güncellemesi için rozet taşır');
   assert.ok(html.includes('_erteleModal'), 'modal açışına kablolu');
-  // mevcut tip/durum kilidi korunur
-  assert.strictEqual(online({ ...t, gorev_tipi: 'TEDAVI_GUN' }), '', 'TOHUMLAMA_PLANLI dışı kart butonsuz');
+  // mevcut durum kilidi korunur (tip kilidi E1-UI ile kural cache'e taşındı —
+  // TEDAVI_GUN/kayıtsız tip butonsuz davranışı orada ayrıca kilitli)
   assert.strictEqual(online({ ...t, tamamlandi: true }), '', 'tamamlanmış görevde butonsuz');
   assert.strictEqual(online({ ...t, iptal: true }), '', 'iptal görevde butonsuz');
 });
