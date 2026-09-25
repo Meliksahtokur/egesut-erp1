@@ -253,6 +253,36 @@ tarih red; kapalı tip `GOREV_ERTELENEMEZ:<json>`; OVSYNC_BASLAT ertelemesi sonr
 zamanlayıcı çağrısı çift görev ÜRETMEZ; `tohumlama_gorev_ertele` sözleşmesi değişmedi;
 db-validate PASS; yeni unit fail 0.
 
+**KABUL KANITI (2026-09-25, I-DB):**
+- Kırmızı [OBSERVED .probe-e1b-kirmizi.sql]: `gorev_ertele(uuid,date)` ve
+  `gorev_ertele_kural_listele()` "function does not exist"; pg_proc'ta yalnız
+  `tohumlama_gorev_ertele`.
+- SAPMA (kırıntı 17:35): §3.2-8(b) kaynak_ref senkronu YAPILMAZ — canlı kanıtla çift
+  katmanlı koruma (protokol_instance_kaynak_unique + _acik_disi_hedef_ic açık-görev
+  kontrolü); anahtar yeniden yazmak idempotansı zayıflatırdı; (a) kolu vacuous (açık
+  OVSYNC_BASLAT = zincir başlamamış).
+- SAPMA (kırıntı 18:00): helper adı `_gorev_ertele_kural` → **`gorev_ertele_kural_get`**
+  — M3 tablosu PG otomatik `_gorev_ertele_kural` DİZİ tipini yaratır; baş-altçizgili
+  ad tiplenmemiş literal'li çağrıda tip-dönüşümü olarak çözümlenip "malformed array
+  literal" üretir [OBSERVED].
+- db-validate: taslak+final **PASS** `reports/db-validation-3f6d08d2.md` (ilk taslak
+  095467b9: ayna M3'süzdü → M3 yerel aynaya uygulandı; 0811... adı değişikliği öncesi).
+- Demo apply: 3×CREATE FUNCTION + REVOKE/GRANT; statements n=1 len=11159; canlı:
+  gorev_ertele_kural_get STABLE/SECDEF/search_path tırnaksız, gorev_ertele VOLATILE
+  SECDEF, listele STABLE SECDEF; grants: authenticated EXECUTE (gorev_ertele +
+  listele), anon YOK.
+- Yeşil ana probeler [OBSERVED .probe-e1b-yesil.sql, 28 satır]: 18/18 ertelenebilir tip
+  ok=true hedef=2026-10-20 (6 tip senetik satır zarf içinde); GECMIS_TARIH ×2;
+  TEDAVI_GUN/SEANS TIP_ERTELENEMEZ (kural_kaynagi=tablo); FOO fail-closed
+  (kural_kaynagi=fail-closed-default); kapalı→GOREV_ACIK_DEGIL; rastgele→GOREV_BULUNAMADI;
+  pencere: TOHUMLAMA_PLANLI 16:30→18:00 yuvarlandı, DIGER 16:30→16:30 korundu;
+  tohumlama_gorev_ertele DEĞİŞMEDİ (ok=true 21.10 10:30).
+- ZORUNLU çift-görev testi [OBSERVED .probe-e1b-ovsync.sql]: hayvan f5124a14, görev
+  2026-10-06→2026-10-10; `ilk_tohumlama_zamanlayici(false)` GERÇEK dal ROLLBACK
+  zarfında: baslatilan=0 tarama_acilan=0 hata=0; sonrasında açık OVSYNC_BASLAT=1
+  (çift YOK); kaynak anahtarı tek; aktif instance=1 (yeni üretilmedi).
+- Unit: 1138/1141 (bilinen 3: bc-tarih ×2, LUNA-3; yeni fail 0).
+
 ### Adım 4 — E3: bağımsız PG aktif protokol vakasını kapatır (M5)
 
 **RA VERDICT: IMPLEMENT (bağlayıcı).** Ayırıcı = `pg_application_event.source_type`
