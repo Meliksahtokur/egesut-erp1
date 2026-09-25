@@ -11,21 +11,29 @@ const { loadExtractedFunction, extractFunctionSource, makeElement } = require('.
 // fmtTarih aynası (js/utils/helpers.js:18 — ISO→DD.MM.YYYY)
 const fmtTarihMirror = (iso) => { if (!iso) return '—'; const p = iso.slice(0, 10).split('-'); return p.length === 3 ? `${p[2]}.${p[1]}.${p[0]}` : iso; };
 
-// extract + değerlendir — çağrılan fonksiyonun globals'ı test verir (K8-5 deseni)
+// extract + değerlendir — çağrılan fonksiyonun globals'ı test verir (K8-5 deseni).
+// E6 sonrası görünürlük fonksiyonu _ertelemeOnline kardeşine başvurur —
+// her extract'ta kardeşi de ctx'e koy (bağımlılık yüklemesi).
 function kaydirFn(name, ctxExtra) {
   const src = extractFunctionSource('js/ui.js', name);
   const ctx = { console, Math, JSON, Number, parseInt, ...ctxExtra };
   vm.createContext(ctx);
+  if (name === 'ertelemeBtnGuncelle') {
+    vm.runInContext(extractFunctionSource('js/ui.js', '_ertelemeOnline'), ctx, { filename: 'js/ui.js#_ertelemeOnline' });
+  }
   return vm.runInContext(`(${src})`, ctx, { filename: `js/ui.js#${name}` });
 }
 
 // Akış fonksiyonu kardeşleriyle birlikte yükler (akor: özet + hata üreticileri
-// aynı modül-scope'tan gelir; izole ctx'te elle deklare edilir)
+// aynı modül-scope'tan gelir; izole ctx'te elle deklare edilir; E6 sonrası
+// offline guard kardeşleri de akışın girişinde gereklidir)
 function kaydirAkisFn(ctxExtra) {
   const ctx = { console, Math, JSON, Number, parseInt, ...ctxExtra };
   vm.createContext(ctx);
   vm.runInContext(extractFunctionSource('js/ui.js', '_kaydirOzetMetni'), ctx, { filename: 'js/ui.js#_kaydirOzetMetni' });
   vm.runInContext(extractFunctionSource('js/ui.js', '_kaydirHataMesaj'), ctx, { filename: 'js/ui.js#_kaydirHataMesaj' });
+  vm.runInContext(extractFunctionSource('js/ui.js', '_ertelemeOnline'), ctx, { filename: 'js/ui.js#_ertelemeOnline' });
+  vm.runInContext(extractFunctionSource('js/ui.js', '_ertelemeOfflineGuard'), ctx, { filename: 'js/ui.js#_ertelemeOfflineGuard' });
   vm.runInContext(extractFunctionSource('js/ui.js', 'caseKalanGunleriKaydir'), ctx, { filename: 'js/ui.js#caseKalanGunleriKaydir' });
   return ctx.caseKalanGunleriKaydir;
 }
@@ -51,29 +59,31 @@ test('E0-UI-2: index.html — buton cd-gun-bolum içinde (aktif-vaka alanı), on
   assert.ok(bolum.includes('onclick="cdKaydirAc()"'), 'statik onclick deseni');
 });
 
-test('E0-UI-3: görünürlük — offline gizler, online gösterir; openCaseDet açılışta kurar', () => {
+test('E0-UI-3: görünürlük — offline gizler, online gösterir; openCaseDet açılışta kurar (E6: ertelemeBtnGuncelle)', () => {
   const el = makeElement('button');
   el.style.display = 'block';
-  const doc = { getElementById: id => (id === 'cd-kaydir-btn' ? el : null) };
-  const gizle = kaydirFn('cdKaydirBtnGuncelle', { document: doc, navigator: { onLine: false } });
+  const doc = { getElementById: id => (id === 'cd-kaydir-btn' ? el : null), querySelectorAll: () => [] };
+  const gizle = kaydirFn('ertelemeBtnGuncelle', { document: doc, navigator: { onLine: false } });
   gizle();
   assert.strictEqual(el.style.display, 'none', 'offline → gizli');
-  const goster = kaydirFn('cdKaydirBtnGuncelle', { document: doc, navigator: { onLine: true } });
+  const goster = kaydirFn('ertelemeBtnGuncelle', { document: doc, navigator: { onLine: true } });
   goster();
   assert.strictEqual(el.style.display, 'block', 'online → görünür');
   // buton DOM'da yoksa çökmez
-  kaydirFn('cdKaydirBtnGuncelle', { document: { getElementById: () => null }, navigator: { onLine: false } })();
+  kaydirFn('ertelemeBtnGuncelle', { document: { getElementById: () => null, querySelectorAll: () => [] }, navigator: { onLine: false } })();
   // kablolama: openCaseDet görünürlüğü kurar + online/offline olayları dinler
   const src = fs.readFileSync('js/ui.js', 'utf8');
   const ocd = src.slice(src.indexOf('async function openCaseDet'), src.indexOf('function fmtGunSaat'));
-  assert.ok(ocd.includes('cdKaydirBtnGuncelle()'), 'openCaseDet açılışta görünürlüğü kurar');
+  assert.ok(ocd.includes('ertelemeBtnGuncelle()'), 'openCaseDet açılışta görünürlüğü kurar');
   assert.ok(src.includes("window.addEventListener('offline'") && src.includes("window.addEventListener('online'"),
     'online/offline olaylarında görünürlük canlı güncellenir');
 });
 
 test('E0-UI-4: offline stub — RPC çağrılmaz, "İnternet yok" toast', async () => {
   const cagri = [], toastlar = [];
+  const sessizKonsol = { log() {}, warn() {}, error() {}, info() {}, debug() {} };   // E6 guard logunu sustur
   const r = kaydirAkisFn({
+    console: sessizKonsol,
     navigator: { onLine: false },
     rpc: async (...a) => { cagri.push(a); return { ok: true }; },
     toast: (m, e) => toastlar.push({ m, e }),

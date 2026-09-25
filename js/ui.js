@@ -1106,6 +1106,9 @@ async function _pgKapiBosAtaUygula(){
 // ──────────────────────────────────────────
 // P6: Erteleme modalı — mevcut tarih giriş kalıbı + pencere canlı önizleme
 function _erteleModal(gorevId){
+  // E6: offline'da modal açılmaz (buton zaten gizli — render sonrası
+  // bağlantı düşmesi yarışı için giriş guard'ı)
+  if (_ertelemeOfflineGuard('tohumlama-ertele')) return;
   (async () => {
     const t = (await getData('gorev_log')).find(g => g.id === gorevId);
     if (!t || t.gorev_tipi !== 'TOHUMLAMA_PLANLI' || t.tamamlandi || t.iptal) { toast('Görev ertelenemez', true); return; }
@@ -1147,6 +1150,8 @@ function _erteleKapat(){
   if (history.state?.ertele) { globalThis._modalBackGuard = true; history.back(); }
 }
 async function _erteleKaydet(gorevId){
+  // E6: modal açıkken bağlantı düşerse Ertele tıklaması RPC'ye ulaşmaz
+  if (_ertelemeOfflineGuard('tohumlama-ertele-kaydet')) return;
   const btn = document.getElementById('ert-btn');
   const tarih = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
   const saat = document.getElementById('ert-saat')?.value || null;
@@ -1269,10 +1274,12 @@ function _ovsyncBaslatBtnHtml(t){
   if(_h&&_h.kisir) return `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — başlatılamaz</span>${_ipt}`;
   return `<button data-g="${escAttr(t.id)}" data-h="${escAttr(t.hayvan_id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g,this.dataset.h)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>${_ipt}`;
 }
-// P6: TOHUMLAMA_PLANLI kartına [Ertele]
+// P6: TOHUMLAMA_PLANLI kartına [Ertele] — E6: offline'da ÜRETİLMEZ;
+// data-ertele rozeti ertelemeBtnGuncelle'in canlı-DOM görünürlük taramasına girer.
 function _tohErteleBtnHtml(t){
   if(t.gorev_tipi!=='TOHUMLAMA_PLANLI'||t.tamamlandi||t.iptal) return '';
-  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
+  if(!_ertelemeOnline()) return '';
+  return `<button data-g="${escAttr(t.id)}" data-ertele="1" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
 }
 // T10: rozet = protokol_eksik_tara aktif sayısı + ovsync_baslat_uyarilari sayısı (tek rozet birleştirme)
 // K8: 3. kaynak — başlamış ovsync zincirinin seans uyarıları (ovsync_seans_uyarilari)
@@ -7190,7 +7197,7 @@ async function openCaseDet(caseId) {
 
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
-  cdKaydirBtnGuncelle();   // E0: "Kalan günleri kaydır" online-only görünürlük
+  ertelemeBtnGuncelle();   // E6: erteleme/kaydırma butonları online-only görünürlük
 
   // Geri Al butonu kontrolü — islem_log'da VAKA_ACILDI kaydı varsa göster
   let islemler = await idbGetAll('islem_log');
@@ -7615,16 +7622,44 @@ async function _updateKapatBtn(caseId) {
 // tohumlama_gorev_ertele pencere/GECMIS_TARIH korumasından geçer.
 // Buton AKTİF vakada görünür (cd-gun-bolum yalnız aktifken açık) ve
 // ONLINE-only: offline'da gizlenir; yine tetiklenirse toast + RPC ÇAĞRILMAZ
-// (E6 genellemesi sonraki faz — burada yalnız bu butonun basit guard'ı).
+// (E6: guard bu buton için yazılmıştı, aşağıdaki genel zemine taşındı).
 
-// Görünürlük: openCaseDet açılışta + online/offline olaylarında güncellenir.
-function cdKaydirBtnGuncelle() {
-  const btn = document.getElementById('cd-kaydir-btn');
-  if (!btn) return;
-  btn.style.display = (typeof navigator !== 'undefined' && navigator.onLine) ? 'block' : 'none';
+// ═══ E6 — OFFLINE ERTELEME KAPISI (2026-09-25, erteleme-genel S7) ═══
+// Sahip kararı S7 (bağlayıcı): erteleme/kaydırma yolları online-only'dir.
+// navigator.onLine === false iken butonların TAMAMI gizlenir (kart üretimi
+// hiç çizmez + canlı DOM online/offline olaylarıyla güncellenir); yine
+// tetiklenirse birleşik offline toast + console kaydı (metin guard içinde)
+// ve RPC ÇAĞRILMAZ. rpcOptimistic'in genel guard'ı (js/api.js) yeterli
+// DEĞİL — erteleme yolları rpc()'yi direkt çağırır; giriş guard'ı burada.
+
+// Tek çevrimdurumu kaynağı — navigator tanımsızsa (eski koşum) online say.
+function _ertelemeOnline() {
+  return !(typeof navigator !== 'undefined' && navigator.onLine === false);
 }
-window.addEventListener('online',  () => cdKaydirBtnGuncelle());
-window.addEventListener('offline', () => cdKaydirBtnGuncelle());
+
+// Ortak giriş guard'ı: offline ise toast + console kaydı atar ve true döner;
+// çağıran erken çıkar, RPC'ye ulaşmaz. Tüm erteleme/kaydırma giriş
+// noktaları (cdKaydirAc, caseKalanGunleriKaydir, _erteleModal,
+// _erteleKaydet) bu TEK fonksiyondan geçer — kopya-yapıştır yok.
+function _ertelemeOfflineGuard(yol) {
+  if (_ertelemeOnline()) return false;
+  toast('İnternet yok — erteleme yapılamadı', true);
+  console.warn('[erteleme] offline — rpc çağrılmadı', yol || '');
+  return true;
+}
+
+// Görünürlük (E0 cdKaydirBtnGuncelle'in genelleşmesi): vaka detayındaki
+// #cd-kaydir-btn + görev kartlarındaki [data-ertele] erteleme butonları
+// tek yerden. openCaseDet açılışta + online/offline olaylarında çağırır;
+// kart üretimi (_tohErteleBtnHtml) offline'da butonu hiç çizmez.
+function ertelemeBtnGuncelle() {
+  const online = _ertelemeOnline();
+  const cdBtn = document.getElementById('cd-kaydir-btn');
+  if (cdBtn) cdBtn.style.display = online ? 'block' : 'none';
+  document.querySelectorAll('[data-ertele]').forEach(b => { b.style.display = online ? '' : 'none'; });
+}
+window.addEventListener('online',  () => ertelemeBtnGuncelle());
+window.addEventListener('offline', () => ertelemeBtnGuncelle());
 
 // Kaydırma sayfası (bottom sheet) — caseDaySaatAc/not-modal görsel dili.
 // Saf üretici: tests/unit/erteleme-kaydir-ui.test.js kilitli.
@@ -7646,12 +7681,8 @@ function cdKaydirSheetHtml() {
 }
 
 function cdKaydirAc() {
-  // Offline guard: sayfa açılmaz, RPC zaten çağrılmaz
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    toast('İnternet yok — kaydırma yapılamadı', true);
-    console.log('[E0-kaydir] offline: sayfa açılmadı, RPC çağrılmadı');
-    return;
-  }
+  // E6 offline kapısı: sayfa açılmaz, RPC zaten çağrılmaz
+  if (_ertelemeOfflineGuard('kaydir')) return;
   if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
   let box = document.getElementById('kaydir-modal');
   if (box) box.remove();
@@ -7707,12 +7738,7 @@ function _kaydirHataMesaj(msg) {
 }
 
 async function caseKalanGunleriKaydir(gun) {
-  // E6 (bu buton için basit guard): offline'da RPC ÇAĞRILMAZ
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    console.log('[E0-kaydir] offline: RPC çağrılmadı');
-    toast('İnternet yok — kaydırma yapılamadı', true);
-    return;
-  }
+  if (_ertelemeOfflineGuard('kaydir')) return;   // E6: offline'da RPC ÇAĞRILMAZ
   if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
   const n = parseInt(gun, 10);
   if (!Number.isFinite(n) || n < 1) { toast('Geçerli bir gün sayısı girin (en az 1)', true); return; }
