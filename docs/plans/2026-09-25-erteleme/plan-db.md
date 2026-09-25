@@ -445,6 +445,26 @@ tipleri zaten açık). E2'nin teslimi = demo'da uçtan uca senaryo kanıtı + a�
 **Kabul ölçütü (zarf E2):** senaryo demo'da BEGIN…ROLLBACK ile adım adım kanıtlı; eksik
 parça açık listesi çıkarılmış.
 
+**KABUL KANITI (2026-09-25, I-DB):** [OBSERVED .probe-e2-s4.sql, 10 satır]
+- K0: ovsync vaka c065e94e active/OVSYNC; paralel vaka 6bb625d6 active/NULL
+  (gün 1: 6.09 tamam, gün 2: 24.09 açık).
+- S1 bağımsız PG (`_pg_olay_isle` HIZLI_UYGULAMA, sentetik kapi — hizli_uygulama'nın
+  kapi-sonrası aynı kod yolu): ovsync vaka **closed close_reason=PG** (E3);
+  **TAI PG+48 AÇIK** kaynak=`PG_TOHUMLAMA:<event>` hedef 27.09 18:00 (pencere).
+- S2 tedavi uzar: `vaka_kalan_gunleri_kaydir(6bb625d6, 2)` (E0 — çağrıldı,
+  dokunulmadı): ok=true, taşınan 1 gün satırı + 1 üst görev + 2 seans; gün 2
+  24.09→26.09; TAMAMLANAN gün 1 (6.09) değişmedi; seans hedef saatleri 16:00
+  korundu.
+- S3 TAI ertelenebilir: `gorev_ertele` (E1) ile TAI 27.09→29.09 18:00 (pencere
+  yuvarlaması devrede), toplam_erteleme_gun=2.
+- ROLLBACK temiz: kalan PG event 0, ovsync vaka active, paralel ilk açık gün
+  24.09'a döndü, kalan PG TAI 0.
+- **Eksik parça açık listesi** (RA bulguları; DONE sahip kapısına):
+  1. PG olayı `VWP_ICINDE`/`UYGUNSUZ` sonuçlanırsa TAI hiç oluşmaz — kullanıcıya
+     görev/bildirim düşmez, senaryo sessizce kırılır [CONFIRMED
+     _pg_sonrasi_tohumlama 136-151];
+  2. tedavi bitişi ↔ TAI senkronu YOK (otomatik öteleme yok; manuel erteleme var).
+
 ### Adım 7 — E7: gövde doğrulama kapsamı (scripts; migration YOK)
 
 - 7a. Doğrula: `scripts/lib/govde_karsilastir.py` varsayılan glob'u
