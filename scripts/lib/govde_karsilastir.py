@@ -41,6 +41,13 @@ CREATE_FN_RE = re.compile(
 CREATE_VIEW_RE = re.compile(
     r"CREATE\s+OR\s+REPLACE\s+VIEW\s+public\.([A-Za-z_][A-Za-z0-9_]*)\s+AS\s",
     re.IGNORECASE)
+# [E7/7b 2026-09-25] CREATE TABLE hedefleri: gövde doğrulamada tablo VARLIK kontrolü
+# (emit_sql yalnız fonksiyon/view/statements sınadığından yeni katalog tabloları
+# kapsam dışı kalıyordu — örn. gorev_ertele_kural). Kolon/kısıt karşılaştırması YOK:
+# yalnız to_regclass düzeyinde varlık.
+CREATE_TABLE_RE = re.compile(
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?public\.([A-Za-z_][A-Za-z0-9_]*)\s*\(",
+    re.IGNORECASE)
 TAG_RE = re.compile(r"\$[A-Za-z0-9_]*\$")
 
 # Tek-parçalı tip adları: parametre-adı düşürme kararında FIRST token tipse
@@ -163,11 +170,13 @@ ALTER_SP_RE = re.compile(
 
 def scan_files(files):
     """Dosya listesi → son-yazıcı fonksiyon/görünüm haritası + DROP hedefleri
-    + ALTER-search_path öznitelik yamaları (kümülatif semantik)."""
+    + ALTER-search_path öznitelik yamaları (kümülatif semantik)
+    + CREATE TABLE hedef adları (E7/7b varlık kontrolü)."""
     fns = {}    # (ad, identity) → {'file':, 'def':}
     views = {}  # ad → {'file':, 'def':}
     drops = []  # {'name':, 'identity':}
     alter_sp = set()  # (ad, identity) — sonrasına SET search_path uygulanmış
+    tables = set()  # public.<ad> CREATE TABLE hedefleri
     for path in files:
         with open(path, encoding='utf-8') as f:
             text = f.read()
@@ -198,7 +207,9 @@ def scan_files(files):
             drops.append({'name': m.group(1), 'identity': identity_args(m.group(2))})
         for m in ALTER_SP_RE.finditer(code):
             alter_sp.add((m.group(1), identity_args(m.group(2))))
-    return fns, views, drops, alter_sp
+        for m in CREATE_TABLE_RE.finditer(code):
+            tables.add(m.group(1))
+    return fns, views, drops, alter_sp, tables
 
 
 def normalize_def(defn):
@@ -294,8 +305,10 @@ def emit_sql(objs):
                       | {d['name'] for d in objs['drops']}
                       | {a['name'] for a in objs.get('alter_only', [])})
     vw_names = sorted(objs['views'])
+    tbl_names = sorted(objs.get('tables', []))
     fn_arr = ', '.join("'%s'" % n for n in fn_names) or "''"
     vw_arr = ', '.join("'%s'" % n for n in vw_names) or "''"
+    tbl_arr = ', '.join("'%s'" % n for n in tbl_names) or "''"
     return ("SELECT jsonb_build_object(\n"
             "  'functions', COALESCE((SELECT jsonb_agg(jsonb_build_object(\n"
             "       'name', p.proname,\n"
@@ -307,6 +320,10 @@ def emit_sql(objs):
             "       'name', c.relname, 'def', pg_get_viewdef(c.oid)) ORDER BY c.relname)\n"
             "     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace\n"
             f"     WHERE n.nspname = 'public' AND c.relkind = 'v' AND c.relname IN ({vw_arr})), '[]'::jsonb),\n"
+            "  'tables', COALESCE((SELECT jsonb_agg(jsonb_build_object(\n"
+            "       'name', c.relname) ORDER BY c.relname)\n"
+            "     FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace\n"
+            f"     WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname IN ({tbl_arr})), '[]'::jsonb),\n"
             "  'statements_null', COALESCE((SELECT jsonb_agg(jsonb_build_object(\n"
             "       'version', version, 'name', name) ORDER BY version)\n"
             "     FROM supabase_migrations.schema_migrations\n"
@@ -335,7 +352,7 @@ def main():
     files = sorted(globmod.glob(full_pattern))
     if not files:
         raise SystemExit(f"HATA: tarama deseni boş: {pattern}")
-    fns, views, drops, alter_sp = scan_files(files)
+    fns, views, drops, alter_sp, tables = scan_files(files)
     drop_keys = {(d['name'], d['identity']) for d in drops}
     # [F4/K2] ALTER-only hedefler: seride CREATE tanımı olmayan, yalnız ALTER
     # FUNCTION ... SET search_path ile dokunulan fonksiyonlar. Dropped olanlar
@@ -347,6 +364,7 @@ def main():
             'functions': sorted(({'name': k[0], 'identity': k[1]} for k in fns),
                                 key=lambda d: (d['name'], d['identity'])),
             'views': sorted(views.keys()),
+            'tables': sorted(tables),
             'drops': drops,
             'alter_only': sorted(({'name': k[0], 'identity': k[1]} for k in alter_only),
                                  key=lambda d: (d['name'], d['identity'])),
@@ -429,6 +447,17 @@ def main():
             fark += 1
         else:
             print(f"OK   DROP {d['name']}({d['identity']}) — canlıda yok (doğru)")
+
+    # [E7/7b] CREATE TABLE hedefleri: canlıda VARLIK (to_regclass düzeyi;
+    # kolon/kısıt karşılaştırması kapsam dışı — migration dosyası şemayı
+    # tam tanımladığından db-validate C1 postcheck o katmanı sınar).
+    live_tables = {t['name'] for t in live.get('tables', [])}
+    for name in sorted(tables):
+        if name in live_tables:
+            print(f"OK   TABLE {name} — canlıda var")
+        else:
+            print(f"DIFF TABLE {name} — canlıda YOK (CREATE TABLE uygulanmamış)")
+            fark += 1
 
     for rec in live.get('statements_null', []):
         print(f"DIFF STAMPS {rec['version']} ({rec.get('name','')}) — statements NULL")

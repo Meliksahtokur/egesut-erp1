@@ -73,7 +73,7 @@ AS $function$
 $function$;
 
 -- ── 2) Genel erteleme RPC ─────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.gorev_ertele(p_gorev_id uuid, p_yeni_tarih date, p_yeni_saat time DEFAULT NULL::time without time zone)
+CREATE OR REPLACE FUNCTION public.gorev_ertele(p_gorev_id uuid, p_yeni_tarih date, p_yeni_saat time without time zone DEFAULT NULL::time without time zone)
 RETURNS jsonb
 LANGUAGE plpgsql
 VOLATILE

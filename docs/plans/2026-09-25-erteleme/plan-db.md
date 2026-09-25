@@ -486,6 +486,28 @@ parça açık listesi çıkarılmış.
 **Kabul ölçütü (zarf E7):** `GOVDE_FARK: 0`; 202609251* serisi (vaka_kalan_gunleri_kaydir
 dahil) + tablo varlık kontrolü kapsamda.
 
+**KABUL KANITI (2026-09-25, I-DB):**
+- 7a [OBSERVED]: varsayılan glob `20260925*.sql` → `202609251*` otomatik kapsanır;
+  `--list-objects` çıktısında vaka_kalan_gunleri_kaydir + M2-M6'nın tüm
+  yeni/yeniden tanımlı fonksiyonları (add_treatment_day_with_sessions,
+  _vaka_kapat, _pg_olay_isle, gorev_ertele_kural_get, gorev_ertele,
+  gorev_ertele_kural_listele, protokol_iptal) + `tables: [gorev_ertele_kural]`.
+- 7b UYGULANDI: `CREATE_TABLE_RE` taraması + `emit_sql`'e `'tables'` bölümü
+  (pg_class relkind='r') + karşılaştırma fazında tablo VARLIK kontrolü
+  (kolon/kısıt katmanı db-validate C1 postcheck'te — bilinçli ayrım).
+- 7c [OBSERVED]: M2-M6 CREATE OR REPLACE → drops listesinde yalnız cila'nın
+  gorev_tamamla(text,text) girdisi var (OK — canlıda yok).
+- 7d **GOVDE_FARK: 0** [OBSERVED tam çıktı]; negatif test: yok_bir_tablo_probe
+  tek dosyalı glob → `DIFF TABLE … canlıda YOK` + GOVDE_FARK: 1 (mekanizma
+  DIFF üretebiliyor kanıtı).
+- E7 sırasında bulunan ve giderilen iki engel: (1) M4 imzasında `time` →
+  `time without time zone` (identity anahtarı canlıyla eşleşmiyordu; dosya
+  düzeltildi + demo re-apply + statements UPDATE — db-validate PASS b9adca56);
+  (2) cila 000013'teki `tohumulama` yazım hatası benim tabanımın ÖNCESİNDE
+  cila dalında 176f7ea/000017 ile düzeltilmişti (demo canlısı o sürüm) →
+  U1 commit'i dallarıma cherry-pick edildi (dc4ca21); cila dosyalarına
+  elle dokunulmadı.
+
 ## 5. G2 kapısı (kulvar çıkışı)
 
 - Tüm migration'lar (`20260925100001` dahil) db-validate **PASS** (raporlar `reports/`).
