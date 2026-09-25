@@ -189,6 +189,17 @@ const PG_HATA_SOZLUGU = {
   'KATALOG_SINIF_KODU_KILITLI': 'Bu katalog satırının sınıf kodu kilitli — değiştirilemez.',
   // cila2 C1 — DB 000018 trigger/şablon guard RAISE kodu
   'KISIR_HAYVAN_OVSYNC_YASAK': 'Kısır işaretli hayvana Ovsync protokolü açılamaz.',
+  // E1-UI (erteleme-genel D18): gorev_ertele RAISE ailesi. Mesaj gövdesi
+  // 'KOD:{"sebep":"ALT_TIP",…}' biçiminde gelir; getUserMessage adım-2 includes
+  // eşleşmesi sebep kodlarını JSON içinden yakalar — alt tipler aile-jenerik
+  // metne DÜŞMEZ (step-2, USER_FRIENDLY'nin 'GOREV_ERTELENEMEZ' genelinden önce).
+  'TIP_ERTELENEMEZ': 'Bu görev tipi ertelenemez (kural: tedavi gün/seans görevleri protokol tarafından yönetilir).',
+  'GOREV_ACIK_DEGIL': 'Yalnız açık görevler ertelenebilir — görev tamamlanmış ya da iptal edilmiş.',
+  'GOREV_BULUNAMADI': 'Görev bulunamadı — başka bir cihazda silinmiş olabilir.',
+  'MAX_ASIM': 'Erteleme sınırı aşıldı (bu görev tipi için izin verilen en çok erteleme günü).',
+  'GECMIS_TARIH': 'Geçmiş tarihe erteleme yapılamaz.',
+  // E4-UI: protokol_iptal RAISE ailesi (sebep: VAKA_ACIK_DEGIL / PROTOKOL_VAKASI_DEGIL)
+  'PROTOKOL_IPTAL_EDILEMEZ': 'Protokol vakası iptal edilemedi — vaka kapalı ya da protokol vakası değil.',
 };
 
 // Tohumlama saat pencereleri (MK1, kapalı aralık, Europe/Istanbul).

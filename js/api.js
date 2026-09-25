@@ -319,8 +319,18 @@ const RPC_TABLES = {
   // P2 (Ovsync/PG): yeni RPC pull setleri
   start_first_service_protocol: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu'],
   tohumlama_gorev_ertele:    ['gorev_log','islem_log'],
+  // E1-UI (erteleme-genel): genel gorev erteleme — tohumlama_gorev_ertele deseni.
+  // RPC_MAP'e (ui.js dataTrafficTekGonder, offline kuyruk replay) BILINCLI girmez:
+  // erteleme online-only'dir (E6 kapisu) — vaka_toplu_ac gerekce kalibi.
+  gorev_ertele:              ['gorev_log','islem_log'],
+  // E4-UI (erteleme-genel): protokol iptali — vaka + gorev/seans/gun kapanisi +
+  // stok iadesi + instance kapanisi (+ yeniden-baslat yeni gorevi). RPC_MAP'e
+  // BILINCLI girmez — online-only (E6 guard ovsyncIptal girişinde).
+  protokol_iptal:            ['gorev_log','islem_log','cases','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','protokol_instance'],
   // pg_uyari_kontrol / ovsync_baslat_uyarilari salt-okuma: RPC_TABLES'te DEGIL
-  // (invariant: her deger dolu dizi; pull istemeyen RPC haritaya girmez)
+  // (invariant: her deger dolu dizi; pull istemeyen RPC haritaya girmez;
+  //  gorev_ertele_kural_listele de salt-okuma — kural cache'i ui.js'te rpc() +
+  //  setState ile yenilenir, ovsync_baslat_uyarilari deseni)
   ilk_tohumlama_zamanlayici: ['gorev_log','cases','treatment_days','treatment_day_uygulamalar','islem_log'],
   add_treatment_day:         ['cases','treatment_days'],
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],

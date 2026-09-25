@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20260925-06">
+<link rel="manifest" href="manifest.json?v=20260925-07">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -2166,6 +2166,17 @@ body.dark .ac-vurgu{color:#8ec6ff}
           <button type="button" class="btn" id="cd-sablon-tarih-btn" data-action="cd-sablon-takvim-ac" style="background:var(--card);border:1px solid var(--card3);width:100%;font-size:.82rem;text-align:left">📅 Şablonun ilk günü: —</button>
           <div id="cd-sablon-list" style="margin-top:8px;max-height:180px;overflow-y:auto"></div>
         </div>
+        <!-- E0 (erteleme-genel S5): aktif vaka kalan günlerini +N kaydır — online-only
+             (E6: ertelemeBtnGuncelle gizler/gösterir; RPC vaka_kalan_gunleri_kaydir) -->
+        <button id="cd-kaydir-btn" class="btn" style="background:none;border:1.5px solid var(--amber);color:var(--amber);width:100%;margin-bottom:6px"
+          onclick="cdKaydirAc()">⏩ Kalan Günleri Kaydır</button>
+        <!-- C-1 (E4 onarım 2026-09-25): başlamış protokol zinciri (AKTİF +
+             protocol_family'li vaka) için iptal yüzeyi — ✕ butonu yalnız AÇIK
+             OVSYNC_BASLAT kartındaydı; protokol başlayınca yüzey kalmıyordu.
+             openCaseDet + ertelemeBtnGuncelle gösterir; online-only (E6);
+             akış _protokolIptelAkisi A dalı (rpc protokol_iptal) -->
+        <button id="cd-protokol-iptal-btn" class="btn" style="display:none;background:none;border:1.5px solid var(--red);color:var(--red);width:100%;margin-bottom:6px"
+          onclick="cdProtokolIptal()">🛑 Protokolü İptal Et</button>
       </div>
       <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📋 Tedavi Günleri</div>
       <div id="cd-timeline" style="font-size:.82rem"></div>
@@ -2323,31 +2334,31 @@ body.dark .ac-vurgu{color:#8ec6ff}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20260925-06"></script>
-    <script src="js/gecmis.js?v=20260925-06"></script>
-    <script src="js/utils/modal.js?v=20260925-06"></script>
-    <script src="js/utils/errorHandler.js?v=20260925-06"></script>
-    <script src="js/utils/events.js?v=20260925-06"></script>
-    <script src="js/config.js?v=20260925-06"></script>
-    <script src="js/state.js?v=20260925-06"></script>
-    <script src="js/api.js?v=20260925-06"></script>
-    <script src="js/auth.js?v=20260925-06"></script>
-    <script src="js/tarih/tarih.js?v=20260925-06"></script>
-    <script src="js/ui.js?v=20260925-06"></script>
-    <script src="js/forms.js?v=20260925-06"></script>
-    <script src="js/ai-asistan.js?v=20260925-06"></script>
-    <script src="js/demo.js?v=20260925-06"></script>
-    <script src="vendor/cytoscape.min.js?v=20260925-06"></script>
-    <script src="js/pedigree/pedigree-api.js?v=20260925-06"></script>
-    <script src="js/pedigree/pedigree-adapter.js?v=20260925-06"></script>
-    <script src="js/pedigree/pedigree-style.js?v=20260925-06"></script>
-    <script src="js/pedigree/pedigree-view.js?v=20260925-06"></script>
-    <script src="js/pedigree/pedigree-controller.js?v=20260925-06"></script>
-    <script src="js/degisiklikler/etiketler.js?v=20260925-06"></script>
-    <script src="js/degisiklikler/diff.js?v=20260925-06"></script>
-    <script src="js/degisiklikler/degisiklikler.js?v=20260925-06"></script>
-    <script src="js/app.js?v=20260925-06"></script>
-    <script src="js/utils/handlers.js?v=20260925-06"></script>
+    <script src="js/utils/helpers.js?v=20260925-07"></script>
+    <script src="js/gecmis.js?v=20260925-07"></script>
+    <script src="js/utils/modal.js?v=20260925-07"></script>
+    <script src="js/utils/errorHandler.js?v=20260925-07"></script>
+    <script src="js/utils/events.js?v=20260925-07"></script>
+    <script src="js/config.js?v=20260925-07"></script>
+    <script src="js/state.js?v=20260925-07"></script>
+    <script src="js/api.js?v=20260925-07"></script>
+    <script src="js/auth.js?v=20260925-07"></script>
+    <script src="js/tarih/tarih.js?v=20260925-07"></script>
+    <script src="js/ui.js?v=20260925-07"></script>
+    <script src="js/forms.js?v=20260925-07"></script>
+    <script src="js/ai-asistan.js?v=20260925-07"></script>
+    <script src="js/demo.js?v=20260925-07"></script>
+    <script src="vendor/cytoscape.min.js?v=20260925-07"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20260925-07"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20260925-07"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20260925-07"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20260925-07"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20260925-07"></script>
+    <script src="js/degisiklikler/etiketler.js?v=20260925-07"></script>
+    <script src="js/degisiklikler/diff.js?v=20260925-07"></script>
+    <script src="js/degisiklikler/degisiklikler.js?v=20260925-07"></script>
+    <script src="js/app.js?v=20260925-07"></script>
+    <script src="js/utils/handlers.js?v=20260925-07"></script>
 
 
     <!-- GEBELİK EKLE MODAL -->

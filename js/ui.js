@@ -458,6 +458,9 @@ async function loadDash(){
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
+      // E1-UI: erteleme kural cache'i her dash yüklenişinde tazelenir
+      // (ovsync_baslat_uyarilari deseni — salt-okuma RPC, haritada değil)
+      await ertelemeKurallariYenile(true);
       const proto = await rpc('protokol_eksik_tara', {});
       window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
       const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
@@ -711,6 +714,10 @@ async function loadTasks(f,btn,opts){
     const today=bugun();
     // skipPull: çağıran zaten pullTables yaptıysa içerideki tekrar pull'u atla (çift network fix)
     if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
+    // E1-UI: kural cache boşsa bir kez çek — genel [Ertele] butonları ilk
+    // render'da kurallı çizilsin (cache doluysa/60sn sükunette no-op; sonrasında
+    // loadDash rozet tarayıcısı tazeler)
+    await ertelemeKurallariYenile();
     const all=await idbGetAll('gorev_log');
     // K7: vaka-kategorili seans/gün eşlemesi süzgeçlerden ÖNCE kurulur —
     // Üreme sekmesi diseases.category='Üreme' vakasının TEDAVI_SEANS/TEDAVI_GUN'lerini kapsar.
@@ -1120,10 +1127,18 @@ async function _pgKapiBosAtaUygula(){
 
 // ──────────────────────────────────────────
 // P6: Erteleme modalı — mevcut tarih giriş kalıbı + pencere canlı önizleme
+// E1-UI: genel erteleme — tip kilidi kural cache'den (js'e tip listesi
+// YAZILMAZ); pencere önizlemesi YALNIZ pencere_kurali='tohumlama' tiplerinde.
 function _erteleModal(gorevId){
+  // E6: offline'da modal açılmaz (buton zaten gizli — render sonrası
+  // bağlantı düşmesi yarışı için giriş guard'ı)
+  if (_ertelemeOfflineGuard('gorev-ertele')) return;
   (async () => {
     const t = (await getData('gorev_log')).find(g => g.id === gorevId);
-    if (!t || t.gorev_tipi !== 'TOHUMLAMA_PLANLI' || t.tamamlandi || t.iptal) { toast('Görev ertelenemez', true); return; }
+    // E1-UI: kayıtsız/ertelenemez tip → aynı "Görev ertelenemez" toast'u
+    // (fail-closed ayna — DB gorev_ertele_kural_get default'u ile aynı karar)
+    const kural = t ? ertelemeKuralGetir(t.gorev_tipi) : null;
+    if (!t || t.tamamlandi || t.iptal || !kural || !kural.ertelenebilir) { toast('Görev ertelenemez', true); return; }
     const bugunIso = new Date().toISOString().slice(0,10);
     let box = document.getElementById('ertele-bs');
     if (box) box.remove();
@@ -1132,7 +1147,7 @@ function _erteleModal(gorevId){
     box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
     box.onclick = e => { if (e.target === box) _erteleKapat(); };
     box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
-      <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🗓️ Tohumlamayı Ertele</div>
+      <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🗓️ Görevi Ertele</div>
       <div style="font-size:.72rem;color:var(--ink3);margin-bottom:12px">Mevcut hedef: ${fmtTarih(t.hedef_tarih)} ${(t.hedef_saat||'').slice(0,5)}</div>
       <div style="display:flex;gap:8px;margin-bottom:6px">
         <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Yeni tarih</label>
@@ -1149,7 +1164,11 @@ function _erteleModal(gorevId){
       const gun = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
       const saat = (document.getElementById('ert-saat')?.value) || (t.hedef_saat||'09:00:00').slice(0,5);
       const o = document.getElementById('ert-onizleme');
-      if (o && gun) o.textContent = 'Kaydedilecek: ' + pencereYuvarla(gun + ' ' + saat.slice(0,5)) + ' (pencere yuvarlaması)';
+      // E1-UI: pencereYuvarla yalnız pencere_kurali='tohumlama' tiplerinde
+      // (DB _tohumlama_pencere aynası); diğer tiplerde verilen saat olduğu gibi.
+      if (o && gun) o.textContent = kural.pencere_kurali === 'tohumlama'
+        ? 'Kaydedilecek: ' + pencereYuvarla(gun + ' ' + saat.slice(0,5)) + ' (pencere yuvarlaması)'
+        : 'Kaydedilecek: ' + gun + ' ' + saat.slice(0,5);
     };
     document.getElementById('ert-tarih')?.addEventListener('change', onizle);
     document.getElementById('ert-saat')?.addEventListener('input', onizle);
@@ -1162,6 +1181,8 @@ function _erteleKapat(){
   if (history.state?.ertele) { globalThis._modalBackGuard = true; history.back(); }
 }
 async function _erteleKaydet(gorevId){
+  // E6: modal açıkken bağlantı düşerse Ertele tıklaması RPC'ye ulaşmaz
+  if (_ertelemeOfflineGuard('gorev-ertele-kaydet')) return;
   const btn = document.getElementById('ert-btn');
   const tarih = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
   const saat = document.getElementById('ert-saat')?.value || null;
@@ -1169,7 +1190,9 @@ async function _erteleKaydet(gorevId){
   if (tarih < new Date().toISOString().slice(0,10)) { toast('Geçmiş tarih seçilemez', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   try {
-    const r = await rpc('tohumlama_gorev_ertele', { p_gorev_id: gorevId, p_yeni_tarih: tarih, p_yeni_saat: saat });
+    // E1-UI: genel RPC (imza tohumlama_gorev_ertele ile aynı; cevap alanları
+    // toplam_erteleme_gun/uyari dahil birebir — D18 gösterimi aşağıda)
+    const r = await rpc('gorev_ertele', { p_gorev_id: gorevId, p_yeni_tarih: tarih, p_yeni_saat: saat });
     toast('✅ Ertelendi → ' + fmtTarih(r.hedef_tarih) + ' ' + (r.hedef_saat||'').slice(0,5)
       + ((r.toplam_erteleme_gun|0) > 0 ? ' · toplam ' + r.toplam_erteleme_gun + ' gün erteleme' : '')
       + (r.uyari ? ' · ⚠️ ' + r.uyari : ''));
@@ -1291,10 +1314,18 @@ function _ovsyncBaslatBtnHtml(t){
   const _h=(typeof getState==='function'?getState('animals'):[]).find(a=>a.id===t.hayvan_id);
   return _ovsyncBaslatKilitHtml(!!(_h&&_h.kisir), t.id, t.hayvan_id, true);
 }
-// P6: TOHUMLAMA_PLANLI kartına [Ertele]
-function _tohErteleBtnHtml(t){
-  if(t.gorev_tipi!=='TOHUMLAMA_PLANLI'||t.tamamlandi||t.iptal) return '';
-  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
+// E1-UI: genel [🗓️ Ertele] butonu — kural cache'den (JS'e tip listesi YAZILMAZ):
+// ertelenebilir tipteki AÇIK görev kartlarında çizilir (OVSYNC_BASLAT kartında
+// [Başlat] yanında); TEDAVI_GUN/TEDAVI_SEANS (kural f) ve kayıtsız tipler
+// BUTONSUZ — fail-closed ayna (DB gorev_ertele_kural_get default'u).
+// E6: offline'da ÜRETİLMEZ; data-ertele rozeti ertelemeBtnGuncelle'in
+// canlı-DOM görünürlük taramasına girer.
+function _erteleBtnHtml(t){
+  if(t.tamamlandi||t.iptal) return '';
+  const kural=ertelemeKuralGetir(t.gorev_tipi);
+  if(!kural||!kural.ertelenebilir) return '';
+  if(!_ertelemeOnline()) return '';
+  return `<button data-g="${escAttr(t.id)}" data-ertele="1" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
 }
 // T10: rozet = protokol_eksik_tara aktif sayısı + ovsync_baslat_uyarilari sayısı (tek rozet birleştirme)
 function _rozetTopla(n, m){ return (n|0) + (m|0); }
@@ -1319,16 +1350,74 @@ async function ovsyncBaslat(gorevId, hayvanId){
     window.__protokolUyarilar=null;   // protokol ekranı taze veriyle açılsın
   }catch(e){ toast('❌ '+getUserMessage(e),true); }
 }
-// P4: elle iptal — mevcut gorev_log PATCH yolu (degisim_log denetim kaydı T31)
+// E4-UI (erteleme-genel): protokol iptali — vaka bağlamına göre iki dal.
+//  A) Hayvanın AKTİF protokol vakası VAR → rpc('protokol_iptal'): vaka + kalan
+//     görev/seans/gün kapanışı + stok iadesi + instance kapanışı + isteğe bağlı
+//     TEK yeniden-başlat görevi (onay akışı _protokolIptalAkisi'nda).
+//  B) Vaka YOK (önü-başlangıç OVSYNC_BASLAT — × butonunun asıl durumu; vaka
+//     start_first_service_protocol anında açılır, 000017:132) →
+//     rpc('gorev_tamamla', {p_iptal:true}) T5 dalı: görev kapanır + audit
+//     yazılır. Eski REST PATCH yolu KALKTI (offline kuyruğa REST bypass yazma
+//     yok). Not: önü-başlangıç rotasının instance'ı aktif kalır — bu duruma
+//     özel DB tarafında RPC yok (kırıntı decision 2026-09-25).
 async function ovsyncIptal(gorevId){
-  if(!gorevId||!confirm('İlk tohumlama görevi iptal edilsin mi?')) return;
+  if(_ertelemeOfflineGuard('protokol-iptal')) return;   // E6: online-only (plan 3c)
+  if(!gorevId) return;
+  let t=null;
+  try{ t=(await getData('gorev_log')).find(g=>g.id===gorevId)||null; }catch(e){}
+  if(!t){ toast('Görev bulunamadı',true); return; }
+  // Vaka bağlamı: aynı hayvanın AKTİF protokol vakası (başlamış zincir;
+  // bayat kart yarışında × buraya düşer)
+  let vaka=null;
+  try{ vaka=(await getData('cases')).find(c=>c.animal_id===t.hayvan_id&&c.status==='active'&&c.protocol_family)||null; }catch(e){}
+  if(vaka) return _protokolIptalAkisi(vaka);
+  // B dalı: önü-başlangıç görev iptali — RPC + audit (eski PATCH yolu yok)
+  if(!confirm('İlk tohumlama görevi iptal edilsin mi?')) return;
   try{
-    const t=(await getData('gorev_log')).find(g=>g.id===gorevId);
-    if(!t){ toast('Görev bulunamadı',true); return; }
-    await write('gorev_log',{...t,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString(),iptal:true},'PATCH',`id=eq.${gorevId}`);
-    toast('Görev iptal edildi');
+    const r=await rpc('gorev_tamamla',{p_gorev_id:gorevId,p_iptal:true});
+    toast(r&&r.mesaj?r.mesaj:'Görev iptal edildi');
     updateTaskBadge(); loadTasks(_curTaskFilter||'today');
   }catch(e){ toast('❌ '+getUserMessage(e),true); }
+}
+// E4-UI A dalı: 'Protokolü iptal et' onay akışı — iptal edilecekler özeti
+// (açık gün/seans sayısı + stok iadesi bilgisi) → isteğe bağlı yeniden başlat
+// (p_yeniden_baslat) → RPC → sonuç toast + etkilenen tabloların pull'ı.
+async function _protokolIptalAkisi(vaka){
+  let acikGun=0, acikSeans=0;
+  try{
+    acikGun=(await idbGetAll('treatment_days')).filter(td=>td.case_id===vaka.id&&!td.tamamlandi).length;
+    acikSeans=(await idbGetAll('treatment_day_uygulamalar')).filter(s=>s.case_id===vaka.id&&!s.uygulanmadi&&!s.uygulama_tamamlandi_at).length;
+  }catch(e){}
+  if(!confirm(`Protokol vakası iptal edilsin mi?\n\nKapanacak: ${acikGun} açık tedavi günü, ${acikSeans} uygulanmamış seans.\nKullanılmayan ilaçlar stoğa iade edilir.`)) return;
+  const yeniden=confirm('Yeniden başlat görevi (OVSYNC_BASLAT) oluşturulsun mu?');
+  try{
+    const r=await rpc('protokol_iptal',{p_vaka_id:vaka.id,p_yeniden_baslat:!!yeniden,p_not:null});
+    toast('✅ Protokol iptal edildi — '+(r.kapanan_gorev|0)+' görev, '+(r.kapanan_seans|0)+' seans kapandı'
+      +((r.iade|0)>0?' · '+r.iade+' stok iadesi':'')
+      +(r.yeni_gorev_id?' · yeniden başlat görevi kuruldu':'')
+      +(r.yeniden_not?' · '+r.yeniden_not:''));
+    await pullTables(RPC_TABLES.protokol_iptal).catch(()=>{});
+    updateTaskBadge(); loadTasks(_curTaskFilter||'today'); loadDash();
+    window.__protokolUyarilar=null;   // protokol ekranı taze veriyle açılsın
+    return true;   // C-1: vaka detay yüzeyi (cdProtokolIptal) başarıda modalı kapatabilsin
+  }catch(e){ toast('❌ '+getUserMessage(e),true); }
+}
+// C-1 (E4 onarım, 2026-09-25): protokol iptal YÜZEYİ vaka detayında.
+// 'Protokolü iptal et' bugün yalnız AÇIK OVSYNC_BASLAT kartındaki ✕
+// butonundan erişilebiliyordu; protokol başlayınca (görev tamamlanır)
+// yüzey kalmıyordu — zarf E4 ölçütü 'aktif ovsync vakasında Protokolü
+// iptal et' karşılanmıyordu. Vaka detayındaki #cd-protokol-iptal-btn
+// (cd-gun-bolum komşuluğu, E0 cd-kaydir-btn deseni) AKTİF +
+// protocol_family'li vakada görünür (openCaseDet → ertelemeBtnGuncelle;
+// online-only E6) ve aynı _protokolIptalAkisi A dalına devreder — İKİNCİ
+// AKIŞ KOPYASI YOK. protocol_family UI'da zaten mevcut (cases pull
+// select('*')) — api.js değişikliği gerekmez.
+async function cdProtokolIptal(){
+  if(_ertelemeOfflineGuard('protokol-iptal')) return;   // E6: online-only (plan 3c)
+  const c=(typeof _curCase!=='undefined')?_curCase:null;   // vm-extract koşum koruması (ui.js:6980 deseni)
+  if(!c||c.status!=='active'||!c.protocol_family) return;   // yüzey yalnız protokol ailesi aktif vakada
+  const ok=await _protokolIptalAkisi(c);
+  if(ok) closeM('m-case-det');   // vaka kapandı → detay ekranı kapanır (erken-kapat deseni)
 }
 // P10/B3: bildirim yardımcısı — izin yoksa sessiz düşme YOK (rozet panelde); yalnız iki olayda kullanılır
 // S4/N2: hayvanId varken bildirim tıklanabilir hedefe bağlanır (Notification onclick +
@@ -1398,7 +1487,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
-    <div style="display:flex;gap:6px;align-items:center">${_ovsyncBaslatBtnHtml(t)}${_tohErteleBtnHtml(t)}</div>
+    <div style="display:flex;gap:6px;align-items:center">${_ovsyncBaslatBtnHtml(t)}${_erteleBtnHtml(t)}</div>
     ${drugHtml}${subHtml}
   </div>`;
 }
@@ -7183,6 +7272,7 @@ async function openCaseDet(caseId) {
 
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
+  ertelemeBtnGuncelle();   // E6: erteleme/kaydırma butonları online-only görünürlük
 
   // Geri Al butonu kontrolü — islem_log'da VAKA_ACILDI kaydı varsa göster
   let islemler = await idbGetAll('islem_log');
@@ -7597,6 +7687,185 @@ async function _updateKapatBtn(caseId) {
   const aktif = _curCase?.status === 'active';
   if (erkenBtn)  erkenBtn.style.display = (aktif && !hepsiDone) ? 'block' : 'none';
   if (erkenForm) erkenForm.style.display = 'none';
+}
+
+// ═══ E0 — KALAN GÜNLERİ KAYDIR (2026-09-25, erteleme-genel S5) ═══
+// Aktif vaka kartında vakanın TAMAMLANMAMIŞ günlerinin +N kaydırılması.
+// RPC: vaka_kalan_gunleri_kaydir (migration 20260925100001) — açık gün
+// satırları + TEDAVI_GUN/TEDAVI_SEANS görevleri + seans planları + şablon
+// TAI tek atomik işlemde kayar; tamamlanmışlara dokunmaz; TAI ayrıca
+// tohumlama_gorev_ertele pencere/GECMIS_TARIH korumasından geçer.
+// Buton AKTİF vakada görünür (cd-gun-bolum yalnız aktifken açık) ve
+// ONLINE-only: offline'da gizlenir; yine tetiklenirse toast + RPC ÇAĞRILMAZ
+// (E6: guard bu buton için yazılmıştı, aşağıdaki genel zemine taşındı).
+
+// ═══ E6 — OFFLINE ERTELEME KAPISI (2026-09-25, erteleme-genel S7) ═══
+// Sahip kararı S7 (bağlayıcı): erteleme/kaydırma yolları online-only'dir.
+// navigator.onLine === false iken butonların TAMAMI gizlenir (kart üretimi
+// hiç çizmez + canlı DOM online/offline olaylarıyla güncellenir); yine
+// tetiklenirse birleşik offline toast + console kaydı (metin guard içinde)
+// ve RPC ÇAĞRILMAZ. rpcOptimistic'in genel guard'ı (js/api.js) yeterli
+// DEĞİL — erteleme yolları rpc()'yi direkt çağırır; giriş guard'ı burada.
+
+// Tek çevrimdurumu kaynağı — navigator tanımsızsa (eski koşum) online say.
+function _ertelemeOnline() {
+  return !(typeof navigator !== 'undefined' && navigator.onLine === false);
+}
+
+// Ortak giriş guard'ı: offline ise toast + console kaydı atar ve true döner;
+// çağıran erken çıkar, RPC'ye ulaşmaz. Tüm erteleme/kaydırma giriş
+// noktaları (cdKaydirAc, caseKalanGunleriKaydir, _erteleModal,
+// _erteleKaydet) bu TEK fonksiyondan geçer — kopya-yapıştır yok.
+function _ertelemeOfflineGuard(yol) {
+  if (_ertelemeOnline()) return false;
+  toast('İnternet yok — erteleme yapılamadı', true);
+  console.warn('[erteleme] offline — rpc çağrılmadı', yol || '');
+  return true;
+}
+
+// Görünürlük (E0 cdKaydirBtnGuncelle'in genelleşmesi): vaka detayındaki
+// #cd-kaydir-btn + görev kartlarındaki [data-ertele] erteleme butonları
+// tek yerden. openCaseDet açılışta + online/offline olaylarında çağırır;
+// kart üretimi (_erteleBtnHtml) offline'da butonu hiç çizmez.
+function ertelemeBtnGuncelle() {
+  const online = _ertelemeOnline();
+  const cdBtn = document.getElementById('cd-kaydir-btn');
+  if (cdBtn) cdBtn.style.display = online ? 'block' : 'none';
+  // C-1 (E4 onarım): protokol iptal yüzeyi — online + AKTİF + protocol_family'li
+  // vaka (openCaseDet _curCase'i kurar). _curCase vm-extract koşumlarında
+  // bulunmayabilir — typeof koruması (ui.js:6980 deseni).
+  const cdPBtn = document.getElementById('cd-protokol-iptal-btn');
+  if (cdPBtn) cdPBtn.style.display = (online && typeof _curCase !== 'undefined' && _curCase && _curCase.status === 'active' && _curCase.protocol_family) ? 'block' : 'none';
+  document.querySelectorAll('[data-ertele]').forEach(b => { b.style.display = online ? '' : 'none'; });
+}
+window.addEventListener('online',  () => ertelemeBtnGuncelle());
+window.addEventListener('offline', () => ertelemeBtnGuncelle());
+
+// ═══ E1-UI — GENEL ERTELEME KURAL CACHE'İ (2026-09-25, erteleme-genel) ═══
+// Kural TEK kaynak: canlı gorev_ertele_kural_listele RPC'si — JS'e tip listesi
+// KOPYALANMAZ (plan §1). Cache AppState'e yazılır ('ertelemeKurallari':
+// {gorev_tipi: {ertelenebilir, pencere_kurali}}); renderTask/_erteleModal
+// senkron okur. Yenileme: loadDash rozet tarayıcısı (ovsync_baslat_uyarilari
+// deseni — her dash yüklenişinde) + loadTasks girişinde cache boşsa (ilk
+// renderda butonlar hazır olsun; 60 sn hata-sükuneti RPC yoksa çekiştirmez).
+// Offline: cache eski kalabilir (§8-6 kabulü) — butonlar zaten gizli (E6).
+// Cache yoksa FAIL-CLOSED: kayıtsız tip → buton yok, modal açılmaz.
+let _ertelemeKuralSonDeneme = 0;
+function ertelemeKurallariGetir() { return getState('ertelemeKurallari') || {}; }
+function ertelemeKuralGetir(tip) { return ertelemeKurallariGetir()[tip] || null; }
+async function ertelemeKurallariYenile(zorla) {
+  if (!zorla && Object.keys(ertelemeKurallariGetir()).length) return;   // cache dolu
+  const simdi = Date.now();
+  if (!zorla && simdi - _ertelemeKuralSonDeneme < 60000) return;        // hata sükuneti
+  _ertelemeKuralSonDeneme = simdi;
+  if (!_ertelemeOnline()) return;                                      // offline: mevcut cache
+  try {
+    const rows = await rpc('gorev_ertele_kural_listele', {});
+    if (Array.isArray(rows) && rows.length) {
+      const m = {};
+      rows.forEach(r => { if (r && r.gorev_tipi) m[r.gorev_tipi] = { ertelenebilir: !!r.ertelenebilir, pencere_kurali: r.pencere_kurali || 'yok' }; });
+      setState('ertelemeKurallari', m);
+    }
+  } catch (e) { console.warn('gorev_ertele_kural_listele:', e.message); }
+}
+
+// Kaydırma sayfası (bottom sheet) — caseDaySaatAc/not-modal görsel dili.
+// Saf üretici: tests/unit/erteleme-kaydir-ui.test.js kilitli.
+function cdKaydirSheetHtml() {
+  return `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));box-sizing:border-box">
+    <div style="font-weight:800;font-size:.9rem;margin-bottom:6px">⏩ Kalan Günleri Kaydır</div>
+    <div style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin-bottom:12px">Vakanın tamamlanmamış günleri, seans planları ve planlı tohumlaması seçtiğin kadar ileri kayar. Tamamlanmış günler değişmez, tarihler geçmişe düşmez.</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button data-gun="1" onclick="caseKalanGunleriKaydir(1)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+1</button>
+      <button data-gun="2" onclick="caseKalanGunleriKaydir(2)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+2</button>
+      <button data-gun="3" onclick="caseKalanGunleriKaydir(3)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+3</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input type="number" id="kaydir-ozel-input" min="1" max="365" step="1" inputmode="numeric" placeholder="Gün" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">
+      <button id="kaydir-ozel-btn" onclick="cdKaydirOzelUygula()" style="flex:1;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Gün Kaydır</button>
+      <button onclick="document.getElementById('kaydir-modal').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Vazgeç</button>
+    </div>
+  </div>`;
+}
+
+function cdKaydirAc() {
+  // E6 offline kapısı: sayfa açılmaz, RPC zaten çağrılmaz
+  if (_ertelemeOfflineGuard('kaydir')) return;
+  if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
+  let box = document.getElementById('kaydir-modal');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'kaydir-modal';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) box.remove(); };
+  box.innerHTML = cdKaydirSheetHtml();
+  document.body.appendChild(box);
+}
+
+// Özel gün girişi — mini-form uygula butonu
+function cdKaydirOzelUygula() {
+  const v = document.getElementById('kaydir-ozel-input')?.value;
+  caseKalanGunleriKaydir(v);
+}
+
+// RPC sonucu → özet toast metni. Sıfır sayılar listelenmez; hepsi sıfırsa
+// (vakada açık kalem kalmamışsa) ayrı mesaj. Tarih aralığı insan dilinde.
+function _kaydirOzetMetni(r) {
+  const d = r || {};
+  const parca = [];
+  if (d.tasinan_gun_satiri)      parca.push(`${d.tasinan_gun_satiri} gün satırı`);
+  if (d.tasinan_gorev)           parca.push(`${d.tasinan_gorev} görev`);
+  if (d.tasinan_seans)           parca.push(`${d.tasinan_seans} seans görevi`);
+  if (d.tasinan_uygulama_satiri) parca.push(`${d.tasinan_uygulama_satiri} seans planı`);
+  if (d.tai)                     parca.push(`${d.tai} tohumlama`);
+  if (!parca.length) return 'Kaydırılacak açık kalem bulunamadı';
+  let m = `✅ +${d.gun} gün kaydırıldı: ${parca.join(', ')}`;
+  if (d.ilk_tarih || d.son_tarih) m += ` → ${fmtTarih(d.ilk_tarih)} .. ${fmtTarih(d.son_tarih)}`;
+  return m;
+}
+
+// VAKA_KAYDIRILAMAZ:<json> ailesi (+ iç içe geçebilen tohumlama hataları)
+// → Türkçe mesaj. Bilinmeyen mesaj olduğu gibi kalır (sessiz yutma yok).
+function _kaydirHataMesaj(msg) {
+  const m = String(msg || '');
+  const i = m.indexOf('VAKA_KAYDIRILAMAZ:');
+  if (i !== -1) {
+    try {
+      const j = JSON.parse(m.slice(i + 'VAKA_KAYDIRILAMAZ:'.length));
+      const tr = {
+        GECERSIZ_GUN:    'Geçersiz gün sayısı — en az 1 girin',
+        VAKA_BULUNAMADI: 'Vaka bulunamadı',
+        VAKA_ACIK_DEGIL: 'Vaka açık değil — yalnız aktif vakalar kaydırılabilir',
+      };
+      if (tr[j.sebep]) return tr[j.sebep] + (j.status ? ` (durum: ${j.status})` : '');
+    } catch (_) { /* JSON çözülemedi → ham mesaj düşer */ }
+  }
+  if (m.includes('GECMIS_TARIH'))      return 'Tohumlama tarihi geçmişe düşemez — kaydırma yapılmadı';
+  if (m.includes('GOREV_ERTELENEMEZ')) return 'Planlı tohumlama ertelenemedi — kaydırma yapılmadı';
+  return m;
+}
+
+async function caseKalanGunleriKaydir(gun) {
+  if (_ertelemeOfflineGuard('kaydir')) return;   // E6: offline'da RPC ÇAĞRILMAZ
+  if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
+  const n = parseInt(gun, 10);
+  if (!Number.isFinite(n) || n < 1) { toast('Geçerli bir gün sayısı girin (en az 1)', true); return; }
+  const ozelBtn = document.getElementById('kaydir-ozel-btn');
+  if (ozelBtn) { ozelBtn.disabled = true; ozelBtn.textContent = '…'; }
+  try {
+    const r = await rpc('vaka_kalan_gunleri_kaydir', { p_case_id: _curCase.id, p_gun: n });
+    document.getElementById('kaydir-modal')?.remove();
+    toast(_kaydirOzetMetni(r));
+    // Tazele: kaydırılan tüm yüzeyler (gün satırı, görev, seans planı, audit)
+    await pullTables(['treatment_days','gorev_log','treatment_day_uygulamalar','islem_log']).catch(() => {});
+    if (_curCase) {
+      await renderCaseTimeline(_curCase.id);
+      _updateKapatBtn(_curCase.id);
+    }
+  } catch (e) {
+    toast('❌ ' + _kaydirHataMesaj(e.message), true);
+    if (ozelBtn) { ozelBtn.disabled = false; ozelBtn.textContent = 'Gün Kaydır'; }
+  }
 }
 
 async function caseGunEkle() {

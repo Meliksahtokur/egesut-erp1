@@ -11,10 +11,18 @@ const escAttrMirror = (s) => String(s ?? '')
 
 const { sandbox, exposed } = loadBrowserModule('js/ui.js', {
   extra: { esc: escMirror, escAttr: escAttrMirror, fmtTarih,
-           getData: async () => [{ id:'h1', kupe_no:'K1' }] },
+           getData: async () => [{ id:'h1', kupe_no:'K1' }],
+           // E1-UI (erteleme-genel): _erteleBtnHtml kural cache'den okur
+           // (getState('ertelemeKurallari')) — DB seed aynası enjekte edildi;
+           // 'animals' gibi diğer anahtarlar eski davranışta kalır (boş dizi —
+           // _ovsyncBaslatBtnHtml'in getState('animals').find yolu kırılmasın)
+           getState: (k) => (k === 'ertelemeKurallari'
+             ? { TOHUMLAMA_PLANLI: { ertelenebilir: true, pencere_kurali: 'tohumlama' },
+                 OVSYNC_BASLAT:   { ertelenebilir: true, pencere_kurali: 'tohumlama' } }
+             : []) },
   expose: ['_katTipMap'],
 });
-const { _tohKaynakEtiket, _kalanGunEtiket, _ovsyncBaslatBtnHtml, _tohErteleBtnHtml } = sandbox;
+const { _tohKaynakEtiket, _kalanGunEtiket, _ovsyncBaslatBtnHtml, _erteleBtnHtml } = sandbox;
 
 test('P3: _katTipMap üreme kategorisi TOHUMLAMA_PLANLI + OVSYNC_BASLAT içerir', () => {
   assert.deepEqual(exposed._katTipMap.ureme, ['TOHUMLAMA_PLANLI', 'OVSYNC_BASLAT']);
@@ -44,9 +52,12 @@ test('P3/P6: OVSYNC_BASLAT [Başlat]/[İptal]; TOHUMLAMA_PLANLI [Ertele]; kapal�
   assert.match(_ovsyncBaslatBtnHtml(t), /ovsyncIptal/);
   assert.equal(_ovsyncBaslatBtnHtml({ ...t, tamamlandi:true }), '');
   const p = { id:'g2', gorev_tipi:'TOHUMLAMA_PLANLI', tamamlandi:false, iptal:false };
-  assert.match(_tohErteleBtnHtml(p), /Ertele/);
-  assert.equal(_tohErteleBtnHtml({ ...p, iptal:true }), '');
-  assert.equal(_tohErteleBtnHtml(t), '');   // OVSYNC_BASLAT kartına ertele yok
+  assert.match(_erteleBtnHtml(p), /Ertele/);
+  assert.equal(_erteleBtnHtml({ ...p, iptal:true }), '');
+  // E1-UI değişimi (erteleme-genel): OVSYNC_BASLAT kartına DA ertele gelir —
+  // kural cache ertelenebilir=true (DB seed; [Başlat] yanında üretilir);
+  // eski 'OVSYNC_BASLAT kartına ertele yok' sabiti bu kulvarda bilinçli döndü
+  assert.match(_erteleBtnHtml(t), /Ertele/);
 });
 
 test('P3: buton id escAttr ile girer (XSS disiplini)', () => {
