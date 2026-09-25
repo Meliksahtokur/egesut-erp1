@@ -179,3 +179,69 @@ kullan" (DoH) açık profil etkilenmez.
 per-link nameserver. Üretim (GitHub Pages) etkilenmez.
 
 **Etki:** yalnızca lokal geliştirme/test kesintileri.
+
+---
+
+### BUG-SS-SHIM-FORKBOMB — `_realbin` shim'i ilk 1024 baytta tanıyamıyor → git/tmux shim kendini çağırıyor [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar oturumu, `ss-lead-glm-high` tmux koltuğu açılışı · **Sahip:** tools-bank (`.superset/bin/`)
+**İlgili:** 2026-09-21 S8 dersi (wake-tesisat fork bomb) — aynı ailenin tekrarı; konu defalarca araştırıldı.
+
+**Belirti:** Codex'in başlattığı tmux sunucusunda (`tmux show-environment -g`'de `SS_*` yok) açılan koltuk
+saniyeler içinde ölüyor; pane'de `bash: fork: Resource temporarily unavailable`. Pane scope'u
+`tmux-spawn-<uuid>.scope` **3000/3000 pids** — 2999 × `bash …/.superset/bin/shim/git … config --get alias.config`.
+
+**Kök neden [OBSERVED]:**
+- `ss-role-common:188-206` `_realbin` bir adayı shim sayarken `head -c 1024 | grep SS_REAL_` kullanıyor.
+- git shim'inde ilk `SS_REAL_` **1102. bayt**ta (K11-fix 303cde4d, 2026-09-22 başlığı uzattı); tmux shim'inde
+  **2837. bayt**ta (aynı gizli bug); superset shim 918 (şimdilik içeride).
+- `SS_REAL_GIT` boş ortamda `_realbin` shim'in kendisini "gerçek git" döndürür → `export SS_REAL_GIT=<shim>`
+  → shim `real=$SS_REAL_GIT` ile kendini exec eder; alias çözümü (`shim/git:122`, `"$real" config --get alias.config`)
+  sonsuz özyineleme.
+- Ortamında `SS_REAL_GIT=/usr/bin/git` zaten olan oturumlar (ör. root claude) etkilenmez → hata ortam-bağımlı, gizli kalır.
+
+**Geçici çözüm (uygulandı):** koltuğu `tmux new … -e SS_REAL_GIT=/usr/bin/git -e SS_REAL_TMUX=/usr/bin/tmux
+-e SS_REAL_SUPERSET=/home/melik/.superset/bin/superset` ile açmak. Temizlik: `tmux kill-session` + sahipsiz kalan
+süreçler için yalnız o pane scope'u `systemctl --user stop tmux-spawn-<uuid>.scope` (pkill/kill -9 değil).
+
+**Kalıcı düzeltme yönü (shim'e dokunma kuralı K2 — sahip kararı):** tanıma bayt-penceresine bağlı olmamalı —
+ör. her shim'in 2. satırına sabit işaret (`# SS_SHIM_MARKER`) ve `_realbin` bunu `head -n 3` ile arasın; ya da
+aday `realpath`'i `…/.superset/bin/shim/` altındaysa ele. Ek savunma: shim `real` kendi `realpath`'ine eşitse
+`exit 127` (fail-closed) — özyineleme tek adımda kesilir.
+
+---
+
+## Sahip P5 demo testi — 2026-09-25 (test/p5-demo 09d018d = cila 1abf3ee + erteleme E0)
+
+Kaynak: sahibin `http://127.0.0.1:8090/index.html?demo` yürüyüşü. Kalemler cila dalında AÇIK;
+"kalıcı kod fix'i" ile "mevcut veri temizliği" ayrı kalem olarak ele alınmalı.
+
+### BUG-UREME-FILTRE-SIZINTI — Görevler › Üreme filtresine alakasız görevler giriyor [open]
+**Belirti:** Üreme filtresinde saat grubu altında Ovsync seansı + Şablon TAI ile birlikte **008 · Metrit ·
+Sefanel** tedavi seansı listeleniyor. Ovsync'li hastanın alakasız görevleri de geliyor ya da iki görev üst
+üste çakışıyor. Buna karşılık **tohumlama ve ovsync görevlerinin çoğu Üreme'de GÖRÜNMÜYOR** (yalnız 1 tane).
+**İlgili:** K7 (37e4069, `tests/unit/gorev-kat-filtre.test.js` PASS ama canlı davranış tutmuyor) — birim testin
+fixture'ı gerçek veri şeklini temsil etmiyor olabilir. **Kabul:** demo'da Üreme = yalnız üreme görev tipleri
+(TOHUMLAMA_PLANLI, OVSYNC_BASLAT, ovsync vakasının TEDAVI_GUN/SEANS'ı, muayene…); tedavi vakası seansı yok;
+tüm açık üreme görevleri görünür (sayı SQL ile eşit).
+
+### BUG-KISIR-BADGE-KART — Hayvan kartında 💲 Kısır rozeti görünmüyor [open]
+**Belirti:** Liste satırında "💲 Kısır" var, hayvan detay kartında yok. **Kabul:** `kisir=true` hayvanın kartında rozet.
+
+### BUG-KISIR-OVSYNC-HARDBLOCK — Kısır hayvanda ovsync açılışı her yoldan engellenmeli (DB + UI) [open]
+**Sahip talimatı (tekrar):** "kısır hayvanda zaten ovsync açılması hem db hem frontend katmanlarında
+hardblocklanmalı — söyledim ama yapılmamış". Cila K3/U2 yalnız OVSYNC_BASLAT üretimi + Başlat butonunu
+kapattı. **Kapsam:** vaka açma/şablon uygulama (Ovsync şablonu elle seçilirse), `start_first_service_protocol`,
+cron, toplu açma — DB'de tek noktada `RAISE` (fail-closed), UI'da seçenek gizli/kilitli.
+**Veri olayı (prod, 2026-09-25):** 184/199/208 kısır hayvanlarda 24.09'da ovsync başlamıştı → mimar P1 ile
+`_vaka_kapat(ERKEN_KAPANIS)` kapattı. **Kabul:** demo'da kısır hayvana ovsync vakası açma denemesi her yoldan
+hata; UI'da seçenek yok.
+
+### BUG-OVSYNC-SEANS-PANEL-GORUNUM — K8 ovsync seansları ana listeye monte edildi, sahip istemedi [open]
+**Belirti:** Sabahki (öncesi) görünüm daha iyiydi; yeni hâlde liste üstte ama dikkat çekmiyor, ana listeye
+gömülmüş. **Sahip:** "ben böyle bir şey istemedim". **Kabul:** sahiple görünüm kararı (önceki ayrı panel
+geri mi, belirgin ayrı bölüm mü) → uygulama.
+
+### DATA-906-GEBE-KAYDI-YOK — 906 sekiz aylık gebe ama sistemde hiç tohumlama kaydı yok [open]
+**Durum (prod, 2026-09-25):** `durum=Aktif, kisir=false, tohumlama kaydı yok, açık görev yok`. Açık dişi
+sayılıp cron'dan OVSYNC_BASLAT alabilir. **Aksiyon:** gebelik kaydı (tohumlama sonucu Gebe, ~8 ay önce) girilmeli.
