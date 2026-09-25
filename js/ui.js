@@ -59,6 +59,42 @@ const _katTipMap={
   diger:  null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
+const _planliUremeTipler=['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'];   // K7: planlı üreme görevleri Bugün'de 7-gün pencereyle (ASI_PLANLI örneği)
+// K7: hastalık kategorisi 'Üreme' olan vakaların TEDAVI_SEANS/TEDAVI_GUN'leri Üreme sekmesine
+// aittir (ovsync zinciri tedavi vakası açar — BUG-UREME-SEKMESI-FILTRE). Kategori DB otoritesi: diseases.category.
+function _uremeVakaCaseIds(cases,diseases){
+  const _dById=Object.fromEntries((diseases||[]).map(d=>[d.id,d]));
+  const s=new Set();
+  (cases||[]).forEach(c=>{ const d=c&&_dById[c.disease_id]; if(d&&d.category==='Üreme') s.add(c.id); });
+  return s;
+}
+function _uremeGorevMi(t,uremeCaseIdler,tdById,seansById){
+  if(!t) return false;
+  if((_katTipMap.ureme||[]).includes(t.gorev_tipi)) return true;
+  if(t.gorev_tipi==='TEDAVI_SEANS'){
+    const s=seansById&&seansById[t.seans_admin_id];
+    const td=s&&tdById&&tdById[s.treatment_day_id];
+    return !!(td&&uremeCaseIdler&&uremeCaseIdler.has(td.case_id));
+  }
+  if(t.gorev_tipi==='TEDAVI_GUN'){
+    let a={}; try{ a=JSON.parse(t.aciklama||'{}'); }catch(e){}
+    const td=a.day_id&&tdById&&tdById[a.day_id];
+    return !!(td&&uremeCaseIdler&&uremeCaseIdler.has(td.case_id));
+  }
+  return false;
+}
+function _kategoriFiltreUygun(t,kat,uremeCaseIdler,tdById,seansById){
+  if(kat==='all') return true;
+  if(kat==='diger') return !_allKatTips.includes(t.gorev_tipi);
+  if(kat==='ureme') return _uremeGorevMi(t,uremeCaseIdler,tdById,seansById);
+  if(kat==='tedavi') return (_katTipMap.tedavi||[]).includes(t.gorev_tipi)&&!_uremeGorevMi(t,uremeCaseIdler,tdById,seansById);
+  return (_katTipMap[kat]||[]).includes(t.gorev_tipi);
+}
+function _bugunFiltreUygun(t,today,d7){
+  if(t.hedef_tarih===today) return true;
+  const planli=t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI'||_planliUremeTipler.includes(t.gorev_tipi);
+  return planli&&t.hedef_tarih>today&&t.hedef_tarih<=d7;
+}
 function setTaskKat(kat,btn){
   _taskKategori=kat;
   document.querySelectorAll('.kat-btn').forEach(b=>b.classList.remove('on'));
@@ -665,6 +701,17 @@ async function loadTasks(f,btn,opts){
     // skipPull: çağıran zaten pullTables yaptıysa içerideki tekrar pull'u atla (çift network fix)
     if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
     const all=await idbGetAll('gorev_log');
+    // K7: vaka-kategorili seans/gün eşlemesi süzgeçlerden ÖNCE kurulur —
+    // Üreme sekmesi diseases.category='Üreme' vakasının TEDAVI_SEANS/TEDAVI_GUN'lerini kapsar.
+    const _allTDays=await idbGetAll('treatment_days').catch(()=>[]);
+    const _allTaskCases=await idbGetAll('cases').catch(()=>[]);
+    const _allTaskDiseases=await idbGetAll('diseases').catch(()=>[]);
+    const _caseById=Object.fromEntries(_allTaskCases.map(c=>[c.id,c]));
+    const _diseaseById=Object.fromEntries(_allTaskDiseases.map(d=>[d.id,d.name||'']));
+    const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
+    const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
+    const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
+    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases,_allTaskDiseases);   // K7
     if(f==='done'){
       // Besleme zincirinde her görev (ilk hariç) parent_id'li → eski filtre hepsini gizliyordu.
       // Sadece geri alınabilir ucu göster: çocuğu tamamlanmamış besleme tamamlaması.
@@ -675,8 +722,7 @@ async function loadTasks(f,btn,opts){
         return !t.parent_id;
       });
       done.sort((a,b)=>(b.tamamlanma_tarihi||b.hedef_tarih||'').localeCompare(a.tamamlanma_tarihi||a.hedef_tarih||''));
-      if(_taskKategori==='diger'){ done=done.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
-      else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; done=done.filter(t=>tips.includes(t.gorev_tipi)); }
+      if(_taskKategori!=='all') done=done.filter(t=>_kategoriFiltreUygun(t,_taskKategori,_uremeCaseIdler,_tdById,_seansById));   // K7: done sekmesi açık sekmelerle aynı kategori dilimini kullanır
       if(!done.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Henüz tamamlanan görev yok</div>'; return; }
       el.innerHTML=done.slice(0,150).map(t=>{
         const rapelChild=all.find(c=>c.parent_id===t.id&&!c.tamamlandi);
@@ -707,7 +753,7 @@ async function loadTasks(f,btn,opts){
     const _d7=dFwd(null,7);
     const _d1=dFwd(null,1);
     const _d30=dFwd(null,30);
-    if(f==='today') data=data.filter(t=>t.hedef_tarih===today||((t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI')&&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
+    if(f==='today') data=data.filter(t=>_bugunFiltreUygun(t,today,_d7));   // K7: ASI_PLANLI 7-gün penceresi + planlı üreme (OVSYNC_BASLAT/TOHUMLAMA_PLANLI)
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     else if(f==='all'){
       data=data.filter(t=>t.hedef_tarih>today);
@@ -715,8 +761,7 @@ async function loadTasks(f,btn,opts){
       else if(_pendWin==='7')  data=data.filter(t=>t.hedef_tarih<=_d7);
       else if(_pendWin==='30') data=data.filter(t=>t.hedef_tarih<=_d30);
     }
-    if(_taskKategori==='diger'){ data=data.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
-    else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
+    data=data.filter(t=>_kategoriFiltreUygun(t,_taskKategori,_uremeCaseIdler,_tdById,_seansById));   // K7: tedavi↔üreme seans ayrımı tek noktadan
     data.sort((a,b)=>{
       const dCmp=(a.hedef_tarih||'').localeCompare(b.hedef_tarih||'');
       if(dCmp!==0) return dCmp;
@@ -738,16 +783,10 @@ async function loadTasks(f,btn,opts){
       _dayDrugMap[da.treatment_day_id].push({name:_prodMap[da.drug_product_id]?.brand_name||_stokNameMap[da.stok_id]||'İlaç',dose:da.dose,unit:da.unit,route:da.route});
     });
     // TEDAVI_GUN için teshis adı: treatment_days → cases → diseases
-    const _allTDays=await idbGetAll('treatment_days').catch(()=>[]);
-    const _allTaskCases=await idbGetAll('cases').catch(()=>[]);
-    const _allTaskDiseases=await idbGetAll('diseases').catch(()=>[]);
-    const _caseById=Object.fromEntries(_allTaskCases.map(c=>[c.id,c]));
-    const _diseaseById=Object.fromEntries(_allTaskDiseases.map(d=>[d.id,d.name||'']));
+    // (K7: _allTDays/_allTaskCases/_allTaskDiseases/_caseById/_diseaseById/_allSeans/_seansById/_tdById
+    //  haritaları yukarıda, süzgeçlerden önce kuruldu — burada yalnız türetilen tablolar)
     const _dayDiseaseMap={};
     _allTDays.forEach(td=>{ const c=_caseById[td.case_id]; if(c?.disease_id)_dayDiseaseMap[td.id]=_diseaseById[c.disease_id]||''; });
-    const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
-    const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
-    const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
     const _caseDayCount={};
     _allTDays.forEach(td=>{ _caseDayCount[td.case_id]=(_caseDayCount[td.case_id]||0)+1; });
     // Gün başına seans ilerlemesi (ayraçta "1/3 seans")
