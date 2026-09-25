@@ -84,7 +84,7 @@ async function rpc(name, params = {}) {
   if (error) throw new Error(_trErr(error.message));
   // ok:false gövdesini (oneri, detay vb.) hataya taşır — çağıranlar e.data ile okur
   if (data && data.ok === false) {
-    const err = new Error(data.mesaj || 'İşlem başarısız');
+    const err = new Error(data.mesaj || data.error || 'İşlem başarısız');   // T8: sunucu 'error' alanlı Türkçe mesaj kaybolmasın
     err.data = data;
     throw err;
   }
@@ -317,7 +317,7 @@ const RPC_TABLES = {
   // EKLENMEZ — online-only RPC.
   vaka_toplu_ac:             ['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log'],
   // P2 (Ovsync/PG): yeni RPC pull setleri
-  start_first_service_protocol: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket'],
+  start_first_service_protocol: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu'],
   tohumlama_gorev_ertele:    ['gorev_log','islem_log'],
   // pg_uyari_kontrol / ovsync_baslat_uyarilari salt-okuma: RPC_TABLES'te DEGIL
   // (invariant: her deger dolu dizi; pull istemeyen RPC haritaya girmez)

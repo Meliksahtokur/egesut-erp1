@@ -343,11 +343,10 @@ async function submitInsem(btn) {
     globalThis._vwpOverride = false;
     globalThis._planliTohumlamaGorevId = null;
     // P9: tohumlama senkronizasyon vakasını kapattıysa additive özet (tek alert)
-    const kapatilan = result?.kapatilan_senkronizasyon_vakalari || result?.kapatilan_ovsyncler || [];
-    if (Array.isArray(kapatilan) && kapatilan.length) {
-      const ozet = kapatilan.map(v => `${v.hayvan_kupe || v.kupe_no || ''} (${v.iptal_seans ?? '?'} seans iptal)`).join(', ');
-      toast(`✅ Tohumlama kaydedildi — ${kapatilan.length} senkronizasyon protokolü tohumlama ile sonlandırıldı: ${ozet}`);
-    }
+    // D19: ölü 'kapatilan_ovsyncler' fallback'i silindi; özete iptal-görev sayısı eklendi
+    const kapatilan = result?.kapatilan_senkronizasyon_vakalari || [];
+    const _ozet = _vakaKapanisOzeti(kapatilan, result?.otomatik_bos_sayisi);
+    if (_ozet) toast(_ozet);
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
 
@@ -4004,6 +4003,19 @@ function sorunToggle(cb) {
 // (seans planı düzenleme ve erken kapat ui.js'de: caseSeansFormAc, caseErkenKapat*)
 // ══════════════════════════════════════════
 
+// D19: vaka-kapanış özeti — N senkron vakası / M otomatik-iptal görevi > 0 ise cümle;
+// hepsi 0 → null (çağıran standart toast'a düşer)
+function _vakaKapanisOzeti(kapatilan, otoBos){
+  const n = Array.isArray(kapatilan) ? kapatilan.length : 0;
+  const m = otoBos | 0;
+  if (!n && !m) return null;
+  let s = '✅ Tohumlama kaydedildi';
+  if (n) s += ' — ' + n + ' senkronizasyon protokolü tohumlama ile sonlandırıldı: '
+    + kapatilan.map(v => `${v.hayvan_kupe || v.kupe_no || ''} (${v.iptal_seans ?? '?'} seans iptal)`).join(', ');
+  if (m) s += (n ? ',' : ' —') + ' ' + m + ' görev otomatik iptal edildi';
+  return s;
+}
+
 async function seansTamamla(seansId, uygulanmadi, btn) {
   if (!seansId) { toast('❌ Seans ID eksik', true); return; }
   const row = btn?.closest('.seans-row, .seans-gorev-card');
@@ -4011,6 +4023,7 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
   if (btn) btn.textContent = '…';
   try {
     const res = await rpcSeansTamamla(seansId, uygulanmadi, null);
+    if (res?._pgKapi) return;   // T3: PG kapı modalı açıldı — sahte başarı toast'u YOK (modal akışı yönetir)
     toast(uygulanmadi ? '↩ Yapılamadı işaretlendi, stok iade edildi' : '✓ Seans tamamlandı');
     await pullTables(['treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'treatment_days', 'gorev_log', 'cases']);
     // Açık görünümleri tazele

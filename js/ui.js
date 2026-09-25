@@ -425,10 +425,18 @@ async function loadDash(){
       const proto = await rpc('protokol_eksik_tara', {});
       window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
       const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
+      // T10: rozet İlk Tohumlama uyarılarını da sayar (panelin tek diğer kaynağı)
+      let ovSayi = 0;
+      try {
+        const ov = await rpc('ovsync_baslat_uyarilari', {});
+        window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
+        ovSayi = window.__ovsyncUyarilar.length;
+      } catch(e) { console.warn('ovsync_baslat_uyarilari (rozet):', e.message); }
+      const toplam = _rozetTopla(aktif.length, ovSayi);
       const bb = document.getElementById('bellbadge');
       if (bb) {
-        bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
-        bb.style.display = aktif.length > 0 ? 'flex' : 'none';
+        bb.textContent = toplam > 99 ? '99+' : toplam;
+        bb.style.display = toplam > 0 ? 'flex' : 'none';
       }
     } catch(e) { console.warn('protokol_eksik_tara:', e.message); }
     // Transfer görev reconciliation (trigger'dan kaçanları kapat — idempotent)
@@ -594,14 +602,18 @@ async function flushPendingDone(){
   if(!_pendingDone.size) return;
   if(!navigator.onLine){ toast('⚠️ Çevrimiçi olunca uygulanacak'); return; }
   const items=[..._pendingDone.values()];
-  _pendingDone.clear(); _savePending(); updatePendingFab();
+  const kalan=new Map(_pendingDone);   // T4: clear SONRA — yalnız BAŞARILI op pending'den düşer
   for(const it of items){
     try {
       if(it.type==='seans') await rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null);
       else if(it.type==='besleme') await rpc('besleme_tamam', {p_gorev_id:it.params.gorevId});
       else if(it.type==='gorev') await rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null});
-    } catch(e){ toast('❌ Görev uygulanamadı: '+(e.message||''), true); }
+      kalan.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);
+    } catch(e){ toast('❌ Görev uygulanamadı: '+(e.message||''), true); /* op pending'de kalır */ }
   }
+  _pendingDone.clear();
+  kalan.forEach((v,k)=>_pendingDone.set(k,v));
+  _savePending(); updatePendingFab();
   try { await pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']); } catch(e){}
   if(typeof updateTaskBadge==='function') updateTaskBadge();
 }
@@ -1004,9 +1016,17 @@ async function _pgKapiBosAtaUygula(){
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   try {
     const r = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: window.__pgKapiToh, p_notlar: 'PG öncesi değerlendirme: ' + gerekce });
-    if (!r?.ok) { toast(r?.error || 'Boş atanamadı', true); if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; } return; }
     toast('Tohumlama Boş yapıldı — PG uygulanıyor…');
-    await window.__pgKapiTekrar(true, gerekce);
+    // T3b: tekrar çağrısı hata atarsa modal AÇIK kalır — yarım durum görünür,
+    // aynı butonla yalnız-PG-retry mümkün (rpc ok:false gövdesi throw'a dönüşür:
+    // eski ölü `if (!r?.ok)` dalı kaldırıldı — T8)
+    try {
+      await window.__pgKapiTekrar(true, gerekce);
+    } catch (e3) {
+      toast('⚠️ Tohumlama Boş kaydedildi, PG uygulanamadı — aynı butonla tekrar deneyin: ' + (getUserMessage ? getUserMessage(e3) : e3.message), true);
+      if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
+      return;
+    }
     _pgKapiKapat();
   } catch (e2) {
     toast('❌ ' + getUserMessage(e2), true);
@@ -1066,7 +1086,9 @@ async function _erteleKaydet(gorevId){
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   try {
     const r = await rpc('tohumlama_gorev_ertele', { p_gorev_id: gorevId, p_yeni_tarih: tarih, p_yeni_saat: saat });
-    toast('✅ Ertelendi → ' + fmtTarih(r.hedef_tarih) + ' ' + (r.hedef_saat||'').slice(0,5) + (r.uyari ? ' · ⚠️ ' + r.uyari : ''));
+    toast('✅ Ertelendi → ' + fmtTarih(r.hedef_tarih) + ' ' + (r.hedef_saat||'').slice(0,5)
+      + ((r.toplam_erteleme_gun|0) > 0 ? ' · toplam ' + r.toplam_erteleme_gun + ' gün erteleme' : '')
+      + (r.uyari ? ' · ⚠️ ' + r.uyari : ''));
     _erteleKapat();
     loadTasks(_curTaskFilter||'today');
   } catch (e) {
@@ -1183,6 +1205,11 @@ function _tohErteleBtnHtml(t){
   if(t.gorev_tipi!=='TOHUMLAMA_PLANLI'||t.tamamlandi||t.iptal) return '';
   return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
 }
+// T10: rozet = protokol_eksik_tara aktif sayısı + ovsync_baslat_uyarilari sayısı (tek rozet birleştirme)
+function _rozetTopla(n, m){ return (n|0) + (m|0); }
+// O11: PLAN Europe/Istanbul der — Türkiye kalıcı +03 (DST yok); cihaz diliminden bağımsız
+function _istanbulAnIso(gun, saat){ return new Date(gun + 'T' + (saat || '12:00') + ':00+03:00').toISOString(); }
+
 // P4/P10: OVSYNC_BASLAT başlatma — atomik zincir RPC + detaylı bildirim
 // S4/N2: hayvanId opsiyonel — bildirim/banner hayvan kartına gider (boşsa eski davranış)
 async function ovsyncBaslat(gorevId, hayvanId){
@@ -1862,11 +1889,19 @@ async function _showProtokolEkran(){
   let ovHtml = '';
   try {
     const ov = await rpc('ovsync_baslat_uyarilari', {});
-    const ovList = (ov && ov.uyarilar) || [];
+    window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
+    const ovList = window.__ovsyncUyarilar;
     if (ovList.length) {
       ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
-  } catch(e) { /* RPC yoksa (bayrak/A1 öncesi) bölüm sessizce atlanmaz — konsola düşer */ console.warn('ovsync_baslat_uyarilari:', e.message); }
+  } catch(e) {
+    // T10: taze çağrı başarısızsa rozet önbelleğine düş (bayat-fallback; konsol uyarısıyla)
+    console.warn('ovsync_baslat_uyarilari:', e.message);
+    const ovList = Array.isArray(window.__ovsyncUyarilar) ? window.__ovsyncUyarilar : [];
+    if (ovList.length) {
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+    }
+  }
   if (!data.length && !ovHtml) { toast('Protokol uyarısı yok'); return; }
 
   const eksikHtml = eksik.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🔴 Gecikmiş (${eksik.length})</div>${eksik.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
@@ -2439,7 +2474,7 @@ async function _protokolUygulaKaydet(hayvanId, idx){
     const olcSaat = document.getElementById('pu-saat')?.value || '';
     let occurredAt = null;
     if (olcGun) {
-      occurredAt = new Date(olcGun + 'T' + (olcSaat || '12:00') + ':00').toISOString();
+      occurredAt = _istanbulAnIso(olcGun, olcSaat);   // O11: sabit İstanbul +03 anchor (cihaz-diliminden bağımsız)
     }
     const params = {
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: '',
@@ -9330,6 +9365,14 @@ async function dataTrafficYenile(){
 }
 async function dataTrafficGonder(e){
   const btn=(e||window.event).target;
+  // O10: toplu gönderim öncesi sayı+tablo kırılımı önizlemesi (tek-kayıt ↑ onaysız kalır)
+  const q=await getQueue();
+  if(q.length){
+    const kirilim={};
+    q.forEach(o=>{ kirilim[o.table]=(kirilim[o.table]||0)+1; });
+    const ozet=Object.entries(kirilim).map(([t,n])=>`${t} × ${n}`).join(', ');
+    if(!confirm(`Bekleyen ${q.length} kayıt gönderilecek: ${ozet}. Onaylıyor musunuz?`)) return;
+  }
   btn.disabled=true; btn.textContent='Gönderiliyor…';
   await syncNow();
   await dataTrafficYenile();
@@ -9526,7 +9569,8 @@ function buildRpcParams(rpcName, data, op) {
         p_route: data.route
       };
     case 'gorev_tamamla':
-      return { p_gorev_id: data.id, p_padok_hedef: data.padok || null };
+      return { p_gorev_id: data.id, p_padok_hedef: data.padok || null,
+               p_iptal: data.iptal === true };   // T5: iptal-PATCH replay'i iptal olarak gider
     case 'gorev_guncelle':
       // canlı: (p_id, p_aciklama, p_hedef_tarih, p_gorev_tipi)
       return {

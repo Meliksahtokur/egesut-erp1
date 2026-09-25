@@ -10,6 +10,9 @@ const USER_FRIENDLY = {
   'timeout': 'İşlem zaman aşımına uğradı.',
   'duplicate key': 'Bu kayıt zaten mevcut.',
   'PGRST': 'Veritabanı işlemi başarısız oldu.',
+  // D18: erteleme kuralları — RAISE kodları msg.includes ile eşleşir
+  'GOREV_ERTELENEMEZ': 'Bu görev ertelenemez (protokol/zincir kuralı).',
+  'GECMIS_TARIH': 'Geçmiş tarihe erteleme yapılamaz.',
 };
 
 // PG_KAPI:<KOD>:<json> ayrıştırıcı (PLAN P1). JSON bozuksa bile KOD gösterilir —
