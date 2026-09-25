@@ -1,6 +1,6 @@
 # DB Validation Raporu — 4df69cd3
 
-- Tarih: 2026-09-25 18:29:17+0300
+- Tarih: 2026-09-25 18:36:37+0300
 - Migration: `/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100007_erteleme_f4_onarim.sql`
 - Priors (6): /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100002_add_treatment_day_ust_gorev_tarihi.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100003_gorev_ertele_kural_tablo_seed.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100004_gorev_ertele_rpcs.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100005_bagimsiz_pg_vaka_kapat.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100006_protokol_iptal.sql
 - SHA-256: `4df69cd3508e487f713097d5580bd66f9ce857729ed5910b1c84f0f28d1da670`

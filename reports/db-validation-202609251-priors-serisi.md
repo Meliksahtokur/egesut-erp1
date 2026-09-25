@@ -1,6 +1,6 @@
 # db-validate --priors Seri Koşusu (G2 yeniden-üretilebilirlik) — 2026-09-25
 
-- Oturum: tek arka plan koşusu (erteleme-genel/f4-db); hedef başına C1+C2 baseline + priors
+- Oturum: tek arka plan koşusu (erteleme-genel/f4-gate); hedef başına C1+C2 baseline + priors
 - Motor: VAL_DB_URL (postgres:17) · baseline: egesut_lsp aynası (prod, taze)
 
 | Hedef | Priors | Sonuç | Rapor |

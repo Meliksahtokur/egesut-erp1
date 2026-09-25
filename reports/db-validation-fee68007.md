@@ -1,6 +1,6 @@
 # DB Validation Raporu — fee68007
 
-- Tarih: 2026-09-25 18:28:59+0300
+- Tarih: 2026-09-25 18:36:22+0300
 - Migration: `/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100006_protokol_iptal.sql`
 - Priors (5): /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100002_add_treatment_day_ust_gorev_tarihi.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100003_gorev_ertele_kural_tablo_seed.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100004_gorev_ertele_rpcs.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100005_bagimsiz_pg_vaka_kapat.sql
 - SHA-256: `fee68007be6ec0391029959a170174bbef474930b9957d74210fd6b6942b6f39`

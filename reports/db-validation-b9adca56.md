@@ -1,6 +1,6 @@
 # DB Validation Raporu — b9adca56
 
-- Tarih: 2026-09-25 18:28:21+0300
+- Tarih: 2026-09-25 18:35:50+0300
 - Migration: `/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100004_gorev_ertele_rpcs.sql`
 - Priors (3): /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100002_add_treatment_day_ust_gorev_tarihi.sql /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100003_gorev_ertele_kural_tablo_seed.sql
 - SHA-256: `b9adca56ff97a70ed3892a1780f48551a347a722bd37f1fb8196ef9df7deb221`
