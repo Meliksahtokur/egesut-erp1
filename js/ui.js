@@ -7190,6 +7190,7 @@ async function openCaseDet(caseId) {
 
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
+  cdKaydirBtnGuncelle();   // E0: "Kalan günleri kaydır" online-only görünürlük
 
   // Geri Al butonu kontrolü — islem_log'da VAKA_ACILDI kaydı varsa göster
   let islemler = await idbGetAll('islem_log');
@@ -7604,6 +7605,133 @@ async function _updateKapatBtn(caseId) {
   const aktif = _curCase?.status === 'active';
   if (erkenBtn)  erkenBtn.style.display = (aktif && !hepsiDone) ? 'block' : 'none';
   if (erkenForm) erkenForm.style.display = 'none';
+}
+
+// ═══ E0 — KALAN GÜNLERİ KAYDIR (2026-09-25, erteleme-genel S5) ═══
+// Aktif vaka kartında vakanın TAMAMLANMAMIŞ günlerinin +N kaydırılması.
+// RPC: vaka_kalan_gunleri_kaydir (migration 20260925100001) — açık gün
+// satırları + TEDAVI_GUN/TEDAVI_SEANS görevleri + seans planları + şablon
+// TAI tek atomik işlemde kayar; tamamlanmışlara dokunmaz; TAI ayrıca
+// tohumlama_gorev_ertele pencere/GECMIS_TARIH korumasından geçer.
+// Buton AKTİF vakada görünür (cd-gun-bolum yalnız aktifken açık) ve
+// ONLINE-only: offline'da gizlenir; yine tetiklenirse toast + RPC ÇAĞRILMAZ
+// (E6 genellemesi sonraki faz — burada yalnız bu butonun basit guard'ı).
+
+// Görünürlük: openCaseDet açılışta + online/offline olaylarında güncellenir.
+function cdKaydirBtnGuncelle() {
+  const btn = document.getElementById('cd-kaydir-btn');
+  if (!btn) return;
+  btn.style.display = (typeof navigator !== 'undefined' && navigator.onLine) ? 'block' : 'none';
+}
+window.addEventListener('online',  () => cdKaydirBtnGuncelle());
+window.addEventListener('offline', () => cdKaydirBtnGuncelle());
+
+// Kaydırma sayfası (bottom sheet) — caseDaySaatAc/not-modal görsel dili.
+// Saf üretici: tests/unit/erteleme-kaydir-ui.test.js kilitli.
+function cdKaydirSheetHtml() {
+  return `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));box-sizing:border-box">
+    <div style="font-weight:800;font-size:.9rem;margin-bottom:6px">⏩ Kalan Günleri Kaydır</div>
+    <div style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin-bottom:12px">Vakanın tamamlanmamış günleri, seans planları ve planlı tohumlaması seçtiğin kadar ileri kayar. Tamamlanmış günler değişmez, tarihler geçmişe düşmez.</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button data-gun="1" onclick="caseKalanGunleriKaydir(1)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+1</button>
+      <button data-gun="2" onclick="caseKalanGunleriKaydir(2)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+2</button>
+      <button data-gun="3" onclick="caseKalanGunleriKaydir(3)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+3</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input type="number" id="kaydir-ozel-input" min="1" max="365" step="1" inputmode="numeric" placeholder="Gün" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">
+      <button id="kaydir-ozel-btn" onclick="cdKaydirOzelUygula()" style="flex:1;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Gün Kaydır</button>
+      <button onclick="document.getElementById('kaydir-modal').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Vazgeç</button>
+    </div>
+  </div>`;
+}
+
+function cdKaydirAc() {
+  // Offline guard: sayfa açılmaz, RPC zaten çağrılmaz
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    toast('İnternet yok — kaydırma yapılamadı', true);
+    console.log('[E0-kaydir] offline: sayfa açılmadı, RPC çağrılmadı');
+    return;
+  }
+  if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
+  let box = document.getElementById('kaydir-modal');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'kaydir-modal';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) box.remove(); };
+  box.innerHTML = cdKaydirSheetHtml();
+  document.body.appendChild(box);
+}
+
+// Özel gün girişi — mini-form uygula butonu
+function cdKaydirOzelUygula() {
+  const v = document.getElementById('kaydir-ozel-input')?.value;
+  caseKalanGunleriKaydir(v);
+}
+
+// RPC sonucu → özet toast metni. Sıfır sayılar listelenmez; hepsi sıfırsa
+// (vakada açık kalem kalmamışsa) ayrı mesaj. Tarih aralığı insan dilinde.
+function _kaydirOzetMetni(r) {
+  const d = r || {};
+  const parca = [];
+  if (d.tasinan_gun_satiri)      parca.push(`${d.tasinan_gun_satiri} gün satırı`);
+  if (d.tasinan_gorev)           parca.push(`${d.tasinan_gorev} görev`);
+  if (d.tasinan_seans)           parca.push(`${d.tasinan_seans} seans görevi`);
+  if (d.tasinan_uygulama_satiri) parca.push(`${d.tasinan_uygulama_satiri} seans planı`);
+  if (d.tai)                     parca.push(`${d.tai} tohumlama`);
+  if (!parca.length) return 'Kaydırılacak açık kalem bulunamadı';
+  let m = `✅ +${d.gun} gün kaydırıldı: ${parca.join(', ')}`;
+  if (d.ilk_tarih || d.son_tarih) m += ` → ${fmtTarih(d.ilk_tarih)} .. ${fmtTarih(d.son_tarih)}`;
+  return m;
+}
+
+// VAKA_KAYDIRILAMAZ:<json> ailesi (+ iç içe geçebilen tohumlama hataları)
+// → Türkçe mesaj. Bilinmeyen mesaj olduğu gibi kalır (sessiz yutma yok).
+function _kaydirHataMesaj(msg) {
+  const m = String(msg || '');
+  const i = m.indexOf('VAKA_KAYDIRILAMAZ:');
+  if (i !== -1) {
+    try {
+      const j = JSON.parse(m.slice(i + 'VAKA_KAYDIRILAMAZ:'.length));
+      const tr = {
+        GECERSIZ_GUN:    'Geçersiz gün sayısı — en az 1 girin',
+        VAKA_BULUNAMADI: 'Vaka bulunamadı',
+        VAKA_ACIK_DEGIL: 'Vaka açık değil — yalnız aktif vakalar kaydırılabilir',
+      };
+      if (tr[j.sebep]) return tr[j.sebep] + (j.status ? ` (durum: ${j.status})` : '');
+    } catch (_) { /* JSON çözülemedi → ham mesaj düşer */ }
+  }
+  if (m.includes('GECMIS_TARIH'))      return 'Tohumlama tarihi geçmişe düşemez — kaydırma yapılmadı';
+  if (m.includes('GOREV_ERTELENEMEZ')) return 'Planlı tohumlama ertelenemedi — kaydırma yapılmadı';
+  return m;
+}
+
+async function caseKalanGunleriKaydir(gun) {
+  // E6 (bu buton için basit guard): offline'da RPC ÇAĞRILMAZ
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    console.log('[E0-kaydir] offline: RPC çağrılmadı');
+    toast('İnternet yok — kaydırma yapılamadı', true);
+    return;
+  }
+  if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
+  const n = parseInt(gun, 10);
+  if (!Number.isFinite(n) || n < 1) { toast('Geçerli bir gün sayısı girin (en az 1)', true); return; }
+  const ozelBtn = document.getElementById('kaydir-ozel-btn');
+  if (ozelBtn) { ozelBtn.disabled = true; ozelBtn.textContent = '…'; }
+  try {
+    const r = await rpc('vaka_kalan_gunleri_kaydir', { p_case_id: _curCase.id, p_gun: n });
+    document.getElementById('kaydir-modal')?.remove();
+    toast(_kaydirOzetMetni(r));
+    // Tazele: kaydırılan tüm yüzeyler (gün satırı, görev, seans planı, audit)
+    await pullTables(['treatment_days','gorev_log','treatment_day_uygulamalar','islem_log']).catch(() => {});
+    if (_curCase) {
+      await renderCaseTimeline(_curCase.id);
+      _updateKapatBtn(_curCase.id);
+    }
+  } catch (e) {
+    toast('❌ ' + _kaydirHataMesaj(e.message), true);
+    if (ozelBtn) { ozelBtn.disabled = false; ozelBtn.textContent = 'Gün Kaydır'; }
+  }
 }
 
 async function caseGunEkle() {
