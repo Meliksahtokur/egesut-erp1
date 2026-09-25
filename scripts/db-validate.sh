@@ -188,12 +188,32 @@ grep -ioE '^[[:space:]]*CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?(U
 # (IF NOT EXISTS satırı da dahil edildi). Ek temizlik:
 sed -i -E 's/^(if|not|exists)$//' "$CREATED_FILE"
 
+# [FIX 2026-09-25 G2-onarım] CTE isimleri de migration-içi yaratılan nesnedir:
+#   `WITH [RECURSIVE] u AS (…) FROM u` zincirinde u tablo DEĞİL CTE'dir; SPEC
+#   Faz B "migration içinde yaratılan nesneler önce hesaba katılır" gereği CTE
+#   isimleri known listesine girer. `AS (` parantez şartı WITH ORDINALITY /
+#   WITH CHECK gibi anahtar kelime yakalamalarını keser; ardıl CTE'ler
+#   `), name AS (` deseninden yakalanır (aynı satırda olanlar).
+CTE_FILE="$WORK/cte.txt"
+{
+  grep -ioE 'WITH[[:space:]]+(RECURSIVE[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]+AS[[:space:]]*\(' "$SQL_ABS" || true
+  grep -ioE ',[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]+AS[[:space:]]*\(' "$SQL_ABS" || true
+} | awk '{print $(NF-2)}' | tr '[:upper:]' '[:lower:]' | grep -E '^[a-z_][a-z0-9_]*$' | sort -u > "$CTE_FILE" || true
+
+# [FIX 2026-09-25 G2-onarım] GRANT/REVOKE deyimleri rol adı taşır (FROM PUBLIC,
+#   FROM authenticated, TO service_role) — bunlar tablo referansı DEĞİLDİR ama
+#   FROM regex'ine takılıp 'authenticated public' gibi sahte unresolved üretiyordu.
+#   Referans çıkarımından önce bu deyimler metinden soyulur (noktalı virgüle dek,
+#   çok-satır dahil; yorumlardaki örnekler de zararsızca düşer).
+NOGRANT_FILE="$WORK/sql_nogrant.sql"
+sed -E 's/\b(GRANT|REVOKE)\b[^;]*;?/ /g' "$SQL_ABS" > "$NOGRANT_FILE"
+
 # Kalan dış referanslar: FROM/JOIN/ALTER TABLE ... / REFERENCES ... hedef isimleri.
 REFS_FILE="$WORK/refs.txt"
 {
-  grep -ioE '(FROM|JOIN)[[:space:]]+(ONLY[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true
-  grep -ioE 'ALTER[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true
-  grep -ioE 'REFERENCES[[:space:]]+[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true
+  grep -ioE '(FROM|JOIN)[[:space:]]+(ONLY[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$NOGRANT_FILE" || true
+  grep -ioE 'ALTER[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$NOGRANT_FILE" || true
+  grep -ioE 'REFERENCES[[:space:]]+[A-Za-z_][A-Za-z0-9_.]*' "$NOGRANT_FILE" || true
 } | awk '{print $NF}' | tr '[:upper:]' '[:lower:]' | sed 's/^public\.//' | sort -u > "$REFS_FILE" || true
 
 # egesut_lsp aynasındaki tablo+view+routine isimleri.
@@ -208,7 +228,14 @@ if psql_q "$LOCAL_LSP_URL" "
 " "$LSP_OBJS.full"; then
   grep -E '^[a-z0-9_]+$' "$LSP_OBJS.full" | sort -u > "$LSP_OBJS"
   # Referanslardan migration-içi yaratılanlar ve aynada olanlar düşer; kalan = çözülemedi.
-  KNOWN="$WORK/known.txt"; sort -u "$LSP_OBJS" "$CREATED_FILE" > "$KNOWN"
+  # [FIX 2026-09-25 G2-onarım] CTE isimleri migration-içi yaratılan arasındadır;
+  #   sistem şemalı referanslar (pg_catalog.*, information_schema.*) her PG
+  #   kurulumunda mevcut olduğundan bilinir sayılır (aynanın public-filtresine
+  #   takılan gerçek referanslardı).
+  KNOWN="$WORK/known.txt"
+  { sort -u "$LSP_OBJS" "$CREATED_FILE" "$CTE_FILE"
+    grep -E '^(pg_catalog|information_schema)\.' "$REFS_FILE" || true
+  } | sort -u > "$KNOWN"
   UNRESOLVED=$(comm -23 "$REFS_FILE" "$KNOWN")
   if [[ -n "$UNRESOLVED" ]]; then
     log_result "B.sema-uyum" "INCONCLUSIVE" "statik çözülemedi (C1'e bırakıldı): $(echo "$UNRESOLVED" | tr '\n' ' ')"
@@ -379,8 +406,15 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
     # Sentetik tohumlama: NOT NULL kolonları information_schema'dan oku (kolon adı
     # UYDURMA); default'u olanlar atlanır; değer tip bazlı üretilir; farm_id varsa
     # önce gerçek bir farm satırı seç, yoksa farm'a da satır ekle (tenant bütünlüğü).
+    # [FIX 2026-09-25 G2-onarım] farm değeri VALS sorgusunun İÇİNDEKİ alt sorgudan
+    #   alınıyordu; public.farm bu aynada YOK → tüm VALS sorgusu parse aşamasında
+    #   kırılıp stderr /dev/null'a yutuluyor, VALUES () üretip tohum kırılıyordu.
+    #   Artık değer bir kez, varlık-guard'lı (to_regclass) ve quote_literal'li
+    #   hesaplanır; hata varsa seed.log'a düşer (sessiz hata yutma kapatıldı).
     SEED_LOG="$WORK/seed.log"; : > "$SEED_LOG"
     SEED_FAIL=0
+    FARM_MIN=$(psql "$C2_URL" -qAt -c "SELECT CASE WHEN pg_catalog.to_regclass('public.farm') IS NULL THEN NULL ELSE (SELECT quote_literal(min(f.id)::text) FROM public.farm f) END" 2>>"$SEED_LOG" || true)
+    [[ -z "$FARM_MIN" ]] && { FARM_MIN="'1'"; echo "(genel) public.farm yok/boş — farm_id tohum değeri '1' fallback" >> "$SEED_LOG"; }
     for t in $DML_TABLES; do
       # Tablo izole DB'de var mı? (yeni CREATE edilmiş olabilir — baseline sonrası yoksa C2 tohumlaması C1 apply sonrası anlamına gelir;
       # bu durumda migration'ın kendisi tabloyu yaratır → tohumlamayı apply sonrasına bırakamayız, tablo yoksa 'yeni tablo' notu düş.)
@@ -392,18 +426,30 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
       COLS_SQL="SELECT string_agg(format('%I', column_name), ', ') FROM information_schema.columns WHERE table_schema='public' AND table_name='$t' AND is_nullable='NO' AND column_default IS NULL"
       COLS=$(psql "$C2_URL" -qAt -c "$COLS_SQL" 2>/dev/null || true)
       [[ -z "$COLS" ]] && { echo "$t: zorunlu-default'suz kolon yok" >> "$SEED_LOG"; continue; }
-      # Değer ifadeleri: tip bazlı; kolon adları ŞEMADAN geldi (uydurma yok). farm_id → gerçek farm.
+      # Değer ifadeleri: tip bazlı; kolon adları ŞEMADAN geldi (uydurma yok).
+      # [FIX 2026-09-25 G2-onarım] farm_id dalı önceden hesaplanan FARM_MIN literalını
+      #   kullanır; jsonb literal '''{}''' doğru SQL string'i üretir (önceki '\'{}\''
+      #   bozuk metin veriyordu); time tipleri için '''00:00''' dalı eklendi
+      #   ('dbval_…' metni time'a cast edilemiyordu).
       VALS_SQL="SELECT string_agg(CASE
-          WHEN column_name IN ('farm_id') THEN COALESCE((SELECT min(f.id)::text) FROM public.farm f), '1')
+          WHEN column_name IN ('farm_id') THEN ${FARM_MIN}
           WHEN data_type='integer' OR data_type='bigint' OR data_type='smallint' OR data_type='numeric' THEN '1'
           WHEN data_type='boolean' THEN 'false'
           WHEN data_type='date' THEN 'CURRENT_DATE'
           WHEN data_type LIKE 'timestamp%' THEN 'now()'
           WHEN data_type='uuid' THEN 'gen_random_uuid()'
-          WHEN data_type='jsonb' OR data_type='json' THEN '\'{}\''
+          WHEN data_type LIKE 'time%' THEN '''00:00'''
+          WHEN data_type='jsonb' OR data_type='json' THEN '''{}'''
           ELSE format('''dbval_%s''', column_name)
         END, ', ') FROM information_schema.columns WHERE table_schema='public' AND table_name='$t' AND is_nullable='NO' AND column_default IS NULL"
-      VALS=$(psql "$C2_URL" -qAt -c "$VALS_SQL" 2>/dev/null || true)
+      VALS_ERR="$WORK/vals.err"; : > "$VALS_ERR"
+      VALS=$(psql "$C2_URL" -qAt -c "$VALS_SQL" 2>"$VALS_ERR" || true)
+      if [[ -z "$VALS" ]]; then
+        # Boş VALUES () ile INSERT denemek anlamsız syntax hatası üretir; açık logla.
+        echo "$t: sentetik DEĞER üretilemedi (VALS sorgusu boş/hata): $(head -2 "$VALS_ERR" | tr '\n' ' ')" >> "$SEED_LOG"
+        SEED_FAIL=1
+        continue
+      fi
       if psql "$C2_URL" -v ON_ERROR_STOP=1 -qc "INSERT INTO public.$t ($COLS) VALUES ($VALS)" >> "$SEED_LOG" 2>&1; then
         echo "$t: sentetik satır eklendi ($COLS)" >> "$SEED_LOG"
       else
