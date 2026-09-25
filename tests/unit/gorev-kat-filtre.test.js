@@ -2,15 +2,18 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { loadExtractedFunction } = require('./support/loadModule.js');
+const { loadBrowserModule, loadExtractedFunction } = require('./support/loadModule.js');
 
-const _katTipMap = {
-  asi:['ASI_PLANLI'], vitamin:[], muayene:[],
-  tedavi:['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
-  ureme:['TOHUMLAMA_PLANLI','OVSYNC_BASLAT'], bakim:[], diger:null
-};
-const _allKatTips = Object.values(_katTipMap).filter(Boolean).flat();
-const _planliUremeTipler = ['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'];
+// F4/K7: sabitler js/ui.js KAYNAĞINDAN çıkar — fixture kopyası gerçek haritayı gölgeliyordu
+// (gerçek _katTipMap.ureme bozulsa bile bu testler geçiyordu). expose kalıbı: const'lar vm
+// lexical scope'unda kaldığı için ikinci script ile dışarı alınır (loadModule.js dokümanı).
+const _uiExposed = loadBrowserModule('js/ui.js', {
+  extra: { esc:s=>String(s), escAttr:s=>String(s), fmtTarih:s=>String(s) },
+  expose: ['_katTipMap', '_allKatTips', '_planliUremeTipler'],
+}).exposed;
+const _katTipMap = _uiExposed._katTipMap;
+const _allKatTips = _uiExposed._allKatTips;
+const _planliUremeTipler = _uiExposed._planliUremeTipler;
 const ortak = { _katTipMap, _allKatTips, _planliUremeTipler };
 
 // fixture: bir Ovsync (Üreme) vakası + bir Mastit (Meme) vakası
@@ -72,4 +75,17 @@ test('K7-4: loadTasks kablolaması — yardımcılar çağrılıyor (kaynak kan�
   const ixHarita=lt.indexOf('_uremeVakaCaseIds(');
   const ixFiltre=lt.indexOf('_kategoriFiltreUygun(');
   assert.ok(ixHarita>-1&&ixFiltre>-1&&ixHarita<ixFiltre, 'üreme vaka kümesi süzgeçlerden ÖNCE kurulmalı');
+});
+
+// F4/K7: gerçek harita içeriğini kilitle — yukarıdaki sabitler js/ui.js kaynağından geldiği
+// için bu assertion'lar kaynaktaki geri düşüşü (ör. TOHUMLAMA_PLANLI silinmesi) yakalar.
+test('K7-5: gerçek _katTipMap/_planliUremeTipler içeriği kilitli (kaynak-sabitleri, fixture değil)', () => {
+  assert.ok(Array.isArray(_katTipMap.ureme) && _katTipMap.ureme.includes('TOHUMLAMA_PLANLI')
+    && _katTipMap.ureme.includes('OVSYNC_BASLAT'), 'üreme listesi planlı üreme tiplerini içerir');
+  assert.ok(Array.isArray(_katTipMap.tedavi) && _katTipMap.tedavi.includes('TEDAVI_SEANS')
+    && _katTipMap.tedavi.includes('TEDAVI_GUN'), 'tedavi listesi seans/gün tiplerini içerir');
+  assert.deepStrictEqual([..._planliUremeTipler].sort(), ['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'],
+    '_planliUremeTipler tam olarak bu iki tip');
+  assert.ok(_allKatTips.includes('TEDAVI_SEANS') && _allKatTips.includes('OVSYNC_BASLAT')
+    && _allKatTips.includes('ASI_PLANLI'), '_allKatTips türetilmiş liste ipuçlarını taşır');
 });
