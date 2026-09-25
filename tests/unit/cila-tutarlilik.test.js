@@ -54,6 +54,7 @@ test('T4/U4: hatalı op pending\'de kalır, başarılılar düşer (clear-önce 
     updatePendingFab: () => { calls.fab = (calls.fab||0)+1; },
     _savePending: () => { calls.saved++; lastSaved = [...pending.values().map(v => v.gorevId)]; },
     _pendingDone: pending,
+    _flushInFlight: false, _flushHataToast: new Map(),   // K9: tek-uçuş kilidi + hata-toast soğuması ctx üyeleri
   };
   ctx.globalThis = ctx;
   const flushPendingDone = loadFlushPendingDone(ctx);
@@ -61,6 +62,63 @@ test('T4/U4: hatalı op pending\'de kalır, başarılılar düşer (clear-önce 
   assert.deepStrictEqual([...pending.keys()], ['g2'], 'yalnız hatalı op kalmalı');
   assert.ok(calls.saved >= 1, '_savePending çağrılmalı');
   assert.deepStrictEqual(lastSaved, ['g2'], 'kalıcı yazım kalanı içermeli');
+});
+
+// ── K9: flushPendingDone tek-uçuş + uçuşta-eklenen koruma ──────────────────
+function _k9Ctx(pending, rpcImpl, toastSink){
+  const calls={ toasts:[] };
+  const ctx={
+    console, Date, Math, JSON, Map, Set, Promise,
+    navigator:{ onLine:true },
+    toast:(m,e)=>{ calls.toasts.push(String(m)); if(toastSink) toastSink(m,e); },
+    rpc: rpcImpl, rpcSeansTamamla: async()=>({ok:true}),
+    pullTables: async()=>{}, updateTaskBadge: ()=>{}, updatePendingFab: ()=>{},
+    _savePending: ()=>{}, _pendingDone: pending,
+    _flushInFlight: false, _flushHataToast: new Map(),
+  };
+  ctx.globalThis=ctx;
+  return { ctx, calls };
+}
+
+test('K9-a: eşzamanlı iki çağrı — her görev YALNIZ bir kez gönderilir', async () => {
+  const pending=new Map([['g1',{type:'gorev',gorevId:'g1',params:{gorevId:'g1'}}]]);
+  const sends=[];
+  const { ctx } = _k9Ctx(pending, async (name,params)=>{ sends.push(params.p_gorev_id); await new Promise(r=>setTimeout(r,20)); return {ok:true}; });
+  const flush=loadFlushPendingDone(ctx);
+  const p1=flush(); const p2=flush();      // app.js:81 + loadTasks:631 yarışı
+  await Promise.all([p1,p2]);
+  assert.deepStrictEqual(sends, ['g1'], 'tek gönderim beklenir, ikinci çağrı uçuş açmaz');
+  assert.strictEqual(pending.size, 0);
+});
+
+test('K9-b: uçuş sırasında eklenen kalem korunur (silinmez)', async () => {
+  const pending=new Map([['g1',{type:'gorev',gorevId:'g1',params:{gorevId:'g1'}}]]);
+  let rpcCalled=false;
+  const { ctx } = _k9Ctx(pending, async ()=>{
+    if(!rpcCalled){ rpcCalled=true; await new Promise(r=>setTimeout(r,20));
+      // togglePendingDone:625'in yaptığı şey — await penceresinde yeni kalem
+      pending.set('g2',{type:'gorev',gorevId:'g2',params:{gorevId:'g2'}});
+    }
+    return {ok:true};
+  });
+  const flush=loadFlushPendingDone(ctx);
+  await flush();
+  assert.ok(pending.has('g2'), 'uçuşta eklenen g2 silinmemeli');
+  assert.ok(!pending.has('g1'), 'başarılı g1 düşmeli');
+});
+
+test('K9-c: kalıcı hata — aynı mesaj ikinci flush\'ta tekrar toast basmaz', async () => {
+  const pending=new Map([['g2',{type:'gorev',gorevId:'g2',params:{gorevId:'g2'}}]]);
+  let msg='sunucu hatası';
+  const { ctx, calls } = _k9Ctx(pending, async ()=>{ throw new Error(msg); });
+  const flush=loadFlushPendingDone(ctx);
+  await flush(); await flush();                    // iki loadTasks turu
+  const hataToastlari=calls.toasts.filter(t=>t.includes('Görev uygulanamadı'));
+  assert.strictEqual(hataToastlari.length, 1, 'aynı kalıcı hata bir kez toastlanır');
+  assert.ok(pending.has('g2'), 'hatalı op pending\'de kalır');
+  msg='farklı hata';                               // yeni hata → tekrar bildir
+  await flush();
+  assert.strictEqual(calls.toasts.filter(t=>t.includes('Görev uygulanamadı')).length, 2);
 });
 
 // ── T3/U5: seansTamamla PG-kapı guard ──────────────────────────────────────

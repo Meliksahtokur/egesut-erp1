@@ -558,6 +558,8 @@ function showHasta(){
 // ── ERTELENMİŞ COMMIT (Model A) — bekleyen tamamlamalar ──
 // Inline ✓ tıkları anında RPC göndermez; kuyruğa girer, filtre/sayfa değişiminde flush edilir.
 let _pendingDone = new Map();   // key(gorevId|seansId) → {type,gorevId,params,cardId}
+let _flushInFlight = false;   // K9: tek-uçuş kilidi — eşzamanlı flush çağrısı ikinci gönderim açmaz
+let _flushHataToast = new Map();   // K9: key → {msg,ts} — kalıcı hatada tekrar toast soğuması (5 dk)
 function _savePending(){
   try { localStorage.setItem('_pendingDone', JSON.stringify([..._pendingDone.values()])); } catch(e){}
 }
@@ -600,22 +602,34 @@ function togglePendingDone(type, gorevId, btn, extra){
 }
 async function flushPendingDone(){
   if(!_pendingDone.size) return;
+  if(_flushInFlight) return;               // K9: tek-uçuş — eşzamanlı çağrı (app.js:81 + loadTasks) ikinci gönderim açmaz
   if(!navigator.onLine){ toast('⚠️ Çevrimiçi olunca uygulanacak'); return; }
-  const items=[..._pendingDone.values()];
-  const kalan=new Map(_pendingDone);   // T4: clear SONRA — yalnız BAŞARILI op pending'den düşer
-  for(const it of items){
-    try {
-      if(it.type==='seans') await rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null);
-      else if(it.type==='besleme') await rpc('besleme_tamam', {p_gorev_id:it.params.gorevId});
-      else if(it.type==='gorev') await rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null});
-      kalan.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);
-    } catch(e){ toast('❌ Görev uygulanamadı: '+(e.message||''), true); /* op pending'de kalır */ }
-  }
-  _pendingDone.clear();
-  kalan.forEach((v,k)=>_pendingDone.set(k,v));
-  _savePending(); updatePendingFab();
-  try { await pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']); } catch(e){}
-  if(typeof updateTaskBadge==='function') updateTaskBadge();
+  _flushInFlight=true;
+  try {
+    const items=[..._pendingDone.values()];
+    for(const it of items){
+      try {
+        if(it.type==='seans') await rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null);
+        else if(it.type==='besleme') await rpc('besleme_tamam', {p_gorev_id:it.params.gorevId});
+        else if(it.type==='gorev') await rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null});
+        _pendingDone.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);   // K9: yalnız BAŞARILI op düşer; uçuşta eklenenlere dokunulmaz
+        _flushHataToast.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);
+      } catch(e){
+        const _msg=String((e&&e.message)||e);
+        const _key=it.type==='seans'?it.params.seansId:it.params.gorevId;
+        const _prev=_flushHataToast.get(_key);
+        const _now=Date.now();
+        if(!_prev||_prev.msg!==_msg||_now-_prev.ts>5*60*1000){
+          toast('❌ Görev uygulanamadı: '+_msg, true);
+          _flushHataToast.set(_key,{msg:_msg,ts:_now});
+        }
+        /* op pending'de kalır */
+      }
+    }
+    _savePending(); updatePendingFab();
+    try { await pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']); } catch(e){}
+    if(typeof updateTaskBadge==='function') updateTaskBadge();
+  } finally { _flushInFlight=false; }
 }
 async function recoverPendingDone(){
   try {
