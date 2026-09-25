@@ -26,9 +26,10 @@
 --   PROD ref : zqnexqbdfvbhlxzelzju  → seride kayıt YOK (2026-09-25 itibarıyla)
 --   Varsayılan mod DEMO: işaret yoksa betik DURUR (demo-modu prod'da koşamaz).
 --   PROD modu İKİ ayrı bilinçli düzenleme gerektirir: \set prod_mod true + aşağıdaki
---   $guard$ bloğu içinde v_prod_onay literal'i (dosyada tek yer).
---   NOT: cila 20260925 serisi prod'a da uygulanırsa demo işareti zayıflar — o durumda
---   bu varsayım yeniden değerlendirilmelidir.
+--   $guard$ bloğu içinde v_prod_onay literal'i (dosyada tek yer); ayrıca ortamda
+--   20260925 işaret sayısı 0 OLMALI (B-2/F4: sapmada EXCEPTION — mekanik duruş).
+--   NOT: cila 20260925 serisi prod'a da uygulanırsa demo işareti zayıflar VE prod
+--   dalı işaret zorlamasıyla DURUR — o durumda bu betik yeniden değerlendirilmelidir.
 -- POOLER DİKKAT: gövdenin tamamı TEK transaction içinde (supavisor txn-modu: temp
 --   tablolar otokomut cümleleri arasında yaşamaz [OBSERVED duman testi]). İşlem-sonrası
 --   kontrol temp tablosuz, psql \gset değişkenleriyle yapılır.
@@ -53,8 +54,10 @@
 \set ON_ERROR_STOP on
 
 -- ============================ TEK DÜZENLEME NOKTASI ==========================
--- Vaka listesi (virgülle; provenans: 2026-09-25 demo provası — 1 ovsync + 1 normal)
-\set vaka_ids '03b10e2a-1800-43b0-864d-c392329727b3, 81a4376c-bd01-46fa-a411-aedd9f2ed2e9'
+-- Vaka listesi (virgülle; provenans: 2026-09-25 demo provası — 1 ovsync + 1 normal;
+-- F4 turunda güncellendi: 03b10e2a hayvanına ait İKİNCİ aktif vaka 2e89d269 aynı gün
+-- açılmıştı — KAPSAM_DISI_ACIK_TEDAVI_GOREV guard'ı listeyi genişletmemizi istedi)
+\set vaka_ids '03b10e2a-1800-43b0-864d-c392329727b3, 81a4376c-bd01-46fa-a411-aedd9f2ed2e9, 2e89d269-4b00-4ef9-a0dc-6702830698b4'
 -- Kaydırma gün sayısı (>=1; tek yönlü İLERİ)
 \set p_gun 2
 -- false: PROVA (BEGIN…ROLLBACK) | true: GERÇEK UYGULAMA
@@ -110,7 +113,14 @@ BEGIN
     IF v_prod_onay IS DISTINCT FROM 'zqnexqbdfvbhlxzelzju' THEN
       RAISE EXCEPTION 'PROD_MOD_KILITLI: prod_mod=true ama guard icindeki v_prod_onay hala YOK — sahip eliyle ac';
     END IF;
-    RAISE NOTICE 'PROD MOD acildi (sahip karari); bu ortamda 20260925 isaret sayisi=% (0 beklenir)', v_marker;
+    -- [F4/B-2] Ortam dogrulamasi: PROD modunda 20260925 isaret sayisi 0 OLMALI
+    -- (betigin varlik nedeni: E0 RPC + serinin prod'da OLMAMASI). Isaret varsa
+    -- ortam beklentisi bozulmustur (cila serisi prod'a girmis ya da hedef PROD
+    -- degil — ornek. demo'ya karsi prod modu) → yanlis-ortam kosusu mekanik DURUR.
+    IF v_marker <> 0 THEN
+      RAISE EXCEPTION 'PROD_MOD_ISARET_UYUSMAZ: bu ortamda 20260925 isaret sayisi=% (PROD modunda 0 beklenir) — cila/erteleme serisi bu ortamda kayitli; yanlis-ortam kosusu mekanik durduruldu', v_marker;
+    END IF;
+    RAISE NOTICE 'PROD MOD acildi (sahip karari); 20260925 isaret sayisi=0 DOGRULANDI';
   END IF;
 
   -- Vaka varlık kontrolü
