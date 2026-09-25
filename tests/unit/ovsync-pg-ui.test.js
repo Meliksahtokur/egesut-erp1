@@ -94,7 +94,7 @@ test('S4/E.3: M1 insan-dili metin — saatli/saatsiz (çift-ayraç yok)', () => 
 
 test('S4/E.3b: S1 kısır kilidi satır extraksiyonunda korunur (rozet VAR, Başlat YOK, ✕ VAR)', () => {
   const html = _ovUyariSatirHtml(_u({ kisir: true }));
-  assert.ok(html.includes('💲 Kısır işaretli — üreme planı yok'));
+  assert.ok(html.includes('💲 Kısır işaretli — başlatılamaz'));
   assert.ok(!html.includes('▶ Başlat'));
   assert.match(html, /ovsyncIptal/);
 });
