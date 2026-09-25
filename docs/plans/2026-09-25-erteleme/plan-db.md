@@ -395,6 +395,28 @@ Gövde (tek transaction):
 **Kabul ölçütü (zarf E4):** iptal sonrası instance kapalı, açık seans 0; yeniden başlat
 TEK görev üretir; db-validate PASS; yeni unit fail 0.
 
+**KABUL KANITI (2026-09-25, I-DB):**
+- Kırmızı [OBSERVED]: `protokol_iptal(uuid)` "function does not exist"; repo/JS
+  çakışması 0 (grep).
+- db-validate: taslak+final **PASS** `reports/db-validation-fee68007.md` (ara tur
+  3b78a2c6: ilk taslakta protokol_iptal audit'inde aggregate-olmayan FILTER hatası —
+  CASE WHEN'e çevrildi; demo drop+re-apply).
+- Demo apply: ALTER ×2 + CREATE ×2 + REVOKE/GRANT; canlı: CHECK 4 değerli
+  (…+PG+IPTAL), protokol_iptal VOLATILE SECDEF tırnaksız search_path, authenticated
+  EXECUTE; statements n=1 (fee68007 dosyası).
+- Yeşil [OBSERVED .probe-e4-yesil.sql, 8 satır]: 25a638aa iptal+yeniden → ok=true,
+  kapanan_gorev=9 kapanan_seans=4 **iade=4**; vaka closed/**IPTAL**; açık gün=0
+  açık seans görev=0; **TEK** yeni OVSYNC_BASLAT (kaynak
+  `PROTOKOL-IPTAL-25a638aa-…`, sayım=1); audit=2 (PROTOKOL_IPTAL +
+  CASE_CLOSED_BY_IPTAL); c065e94e iptal (yeniden YOK) → iade=3, yeni görev 0,
+  açık OVSYNC_BASLAT=0; kapalı vaka → `VAKA_ACIK_DEGIL`; NULL-family →
+  `PROTOKOL_VAKASI_DEGIL`; ROLLBACK temiz (3 vaka active).
+- Instance notu: kapanan_instance=0 — protokol BAŞLAMIŞ vakalarda instance zaten
+  `tamamlandi` (ACIK-DISI…, kapandi_sebep=case:<id>); yalnız BAŞLAMAMIŞ rotanın
+  aktif instance'ı kapanır (iptal UPDATE'i); restart yeni aktif instance kurar
+  (kaynak PROTOKOL-IPTAL-<case>) — tasarım gereği.
+- Unit: 1138/1141 (bilinen 3, yeni fail 0). × butonu bağlantısı plan-ui.md E4-UI'de.
+
 ### Adım 6 — E2: tedavi-sonucu ertelenebilirlik — S4 senaryosu kanıtı (migration YOK)
 
 **RA verdict (bağlayıcı): dedike tip YOK** → E1 seed'ine YENİ satır gerekmez (kontrol
