@@ -205,8 +205,17 @@ CTE_FILE="$WORK/cte.txt"
 #   FROM regex'ine takılıp 'authenticated public' gibi sahte unresolved üretiyordu.
 #   Referans çıkarımından önce bu deyimler metinden soyulur (noktalı virgüle dek,
 #   çok-satır dahil; yorumlardaki örnekler de zararsızca düşer).
+# [FIX 2026-09-25 F4/G2] soyucu ÇOK-SATIRLI hale getirildi: satır-bazlı sed'in
+#   [^;]*'i satır sonunda duruyordu — `GRANT …\n TO role;` biçiminde devam satırı
+#   metinde kalıyor, rol adı refs'e sızıp hayali INCONCLUSIVE (kapı yanlış-
+#   bloklama) üretiyordu. İki aşama: (1) '--' yorum satırları düşürülür —
+#   yorumdaki 'GRANT …' örneği deyim değildir, peşinden ';' gelmezse -0777 maskesi
+#   dosyanın geri kalanını yutardı; (2) perl -0777 tüm dosyayı tek pattern-uzayında
+#   tutar, [^;]* yeni satırdan geçer → deyim ilk ';'e dek tamamen maskelenir.
+#   (Blok yorum /* */ bu repoda kullanılmıyor; sözdizimi otoritesi Faz A'dır.)
 NOGRANT_FILE="$WORK/sql_nogrant.sql"
-sed -E 's/\b(GRANT|REVOKE)\b[^;]*;?/ /g' "$SQL_ABS" > "$NOGRANT_FILE"
+sed -E 's/--.*$//' "$SQL_ABS" \
+  | perl -0777 -pe 's/\b(GRANT|REVOKE)\b[^;]*;?/ /g' > "$NOGRANT_FILE"
 
 # Kalan dış referanslar: FROM/JOIN/ALTER TABLE ... / REFERENCES ... hedef isimleri.
 REFS_FILE="$WORK/refs.txt"
