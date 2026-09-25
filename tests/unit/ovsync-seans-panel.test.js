@@ -53,7 +53,7 @@ test('K8-5: bildirimKontrol — gecikmiş seans bildirir, hedef_saat okur, dedup
   const vm=require('node:vm');
   const src=require('./support/loadModule.js').extractFunctionSource('js/ui.js','bildirimKontrol');
   const bildirimler=[];
-  class FakeNotif{ constructor(title,opts){ bildirimler.push({title,tag:opts&&opts.tag}); } }
+  class FakeNotif{ constructor(title,opts){ bildirimler.push({title,tag:opts&&opts.tag,body:opts&&opts.body}); } }
   FakeNotif.permission='granted';
   const storage=(()=>{ const m=new Map(); return {getItem:k=>m.get(k)??null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)}; })();
   class FixedDate extends Date { constructor(...a){ if(a.length===0) super('2026-09-25T09:30:00+03:00'); else super(...a); } }
@@ -62,6 +62,9 @@ test('K8-5: bildirimKontrol — gecikmiş seans bildirir, hedef_saat okur, dedup
      hedef_tarih:'2026-09-24', hedef_saat:'10:00:00', aciklama:'Gün 1/4 Buserin'},          // gecikmiş (dün 10:00)
     {id:'gBugun', hayvan_id:'h1', gorev_tipi:'TEDAVI_SEANS', parent_id:'gP2', tamamlandi:false,
      hedef_tarih:'2026-09-25', hedef_saat:'12:30:00', aciklama:'öğle seansı'},              // 3 saat sonra → erken uyarı (hedef_saat!)
+    {id:'gJson', hayvan_id:'h1', gorev_tipi:'TEDAVI_SEANS', parent_id:'gP3', tamamlandi:false,
+     hedef_tarih:'2026-09-24', hedef_saat:'11:00:00',                                       // gecikmiş + JSON açıklama (F4/K8)
+     aciklama:JSON.stringify({label:'Gun 2 - Seans (08:00)', day_id:'da9e87c3-0f56-4775-aee9-7140aadd55bb', admin_id:'9b2c1a69-332b-49b0-a96b-5c4103847280', planned_time:'08:00'})},
   ];
   const ctx={ console, Date:FixedDate, Math, JSON, Map, Set, Promise, Number,
     Notification:FakeNotif, window:{ Notification:FakeNotif },
@@ -75,6 +78,13 @@ test('K8-5: bildirimKontrol — gecikmiş seans bildirir, hedef_saat okur, dedup
   const tags=bildirimler.map(b=>b.tag);
   assert.ok(tags.some(t=>String(t).startsWith('gSeans_gecik_2026-09-25')), 'gecikmiş seans bildirimi + günlük dedup anahtarı');
   assert.ok(bildirimler.some(b=>String(b.tag)==='gBugun_2026-09-25'), '3-saat-erken penceresi hedef_saat=12:30 üzerinden (08:00 sabiti değil)');
+  // F4/K8: JSON açıklamalı seans — gövde ham JSON değil label; düz metin olduğu gibi kalır
+  const bj=bildirimler.find(b=>String(b.tag)==='gJson_gecik_2026-09-25');
+  assert.ok(bj, 'JSON açıklamalı seans gecikmiş kolunda bildirilir');
+  assert.strictEqual(bj.body, 'Gun 2 - Seans (08:00)', 'gövde JSON\'ın label alanı olmalı (F4/K8)');
+  assert.ok(!String(bj.body).includes('"day_id"'), 'gövde çiğ JSON basmaz');
+  const bs=bildirimler.find(b=>String(b.tag)==='gSeans_gecik_2026-09-25');
+  assert.strictEqual(bs.body, 'Gün 1/4 Buserin', 'düz metin açıklama değişmeden kalır');
   const n1=bildirimler.length;
   await bk();   // ikinci koşum (saatlik interval)
   assert.strictEqual(bildirimler.length, n1, 'dedup — tekrar bildirim yok');

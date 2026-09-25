@@ -10668,25 +10668,28 @@ async function bildirimKontrol(){
   for(const g2 of gorevler){
     const hedef=new Date(g2.hedef_tarih+'T'+String(g2.hedef_saat||'08:00').slice(0,5)+':00');   // K8: hedef_saat okunur
     const fark=(hedef-now)/3600000;
+    // F4/K8: TEDAVI_SEANS açıklamaları JSON ({"label":"Gun 2 - Seans (08:00)",...}) olabilir —
+    // gövde ham JSON basmasın, label çözülür (done-listesindeki ui.js:743 deseni).
+    const govde=(()=>{ try{ return JSON.parse(g2.aciklama||'{}').label||g2.aciklama||''; }catch(e){ return g2.aciklama||''; } })();
     const gecKey=`${g2.id}_gecik_${bugunStr}`;
     if(g2.hedef_tarih<bugunStr&&!gosterilen[gecKey]&&_gecSayi<5){                              // K8: gecikme kolu, döngü başına ≤5
       const hayvan=getState('animals').find(a=>a.id===g2.hayvan_id);
       const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe):'Genel';
-      new Notification(`⚠️ Gecikmiş: ${kupe}`,{body:g2.aciklama||'',tag:gecKey});
+      new Notification(`⚠️ Gecikmiş: ${kupe}`,{body:govde,tag:gecKey});
       gosterilen[gecKey]=simdi; _gecSayi++;
     }
     const key=`${g2.id}_${g2.hedef_tarih}`;
     if(fark>2.5&&fark<=3.5&&!gosterilen[key]){
       const hayvan=getState('animals').find(a=>a.id===g2.hayvan_id);
       const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe):'Genel';
-      new Notification(`⏰ 3 saat sonra: ${kupe}`,{body:g2.aciklama||'',tag:key});
+      new Notification(`⏰ 3 saat sonra: ${kupe}`,{body:govde,tag:key});
       gosterilen[key]=simdi;
     }
     const sabahKey=`${g2.id}_sabah`;
     if(g2.hedef_tarih===bugunStr&&fark>=-0.5&&fark<=0.5&&!gosterilen[sabahKey]){
       const hayvan=getState('animals').find(a=>a.id===g2.hayvan_id);
       const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe):'Genel';
-      new Notification(`📋 Bugün: ${kupe}`,{body:g2.aciklama||'',tag:sabahKey});
+      new Notification(`📋 Bugün: ${kupe}`,{body:govde,tag:sabahKey});
       gosterilen[sabahKey]=simdi;
     }
   }
