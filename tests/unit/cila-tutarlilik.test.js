@@ -43,6 +43,7 @@ test('T4/U4: hatalı op pending\'de kalır, başarılılar düşer (clear-önce 
   const ctx = {
     console, Date, Math, JSON, Map, Set,
     navigator: { onLine: true },
+    setTimeout, clearTimeout,   // F4/K9: flush döngüsündeki op-başına zaman sınırı vm bağlamında da gerekli
     toast: () => {},
     rpc: async (name, params) => {
       if (params && params.p_gorev_id === 'g2') throw new Error('sunucu hatası');
@@ -55,6 +56,7 @@ test('T4/U4: hatalı op pending\'de kalır, başarılılar düşer (clear-önce 
     _savePending: () => { calls.saved++; lastSaved = [...pending.values().map(v => v.gorevId)]; },
     _pendingDone: pending,
     _flushInFlight: false, _flushHataToast: new Map(),   // K9: tek-uçuş kilidi + hata-toast soğuması ctx üyeleri
+    _flushBeklenen: null, _flushOpMs: 60000, _flushPullMs: 60000,   // F4/K9: uçuş promise'i + op zaman sınırları
   };
   ctx.globalThis = ctx;
   const flushPendingDone = loadFlushPendingDone(ctx);
@@ -70,11 +72,13 @@ function _k9Ctx(pending, rpcImpl, toastSink){
   const ctx={
     console, Date, Math, JSON, Map, Set, Promise,
     navigator:{ onLine:true },
+    setTimeout, clearTimeout,   // F4/K9: op-başına zaman sınırı vm bağlamında gerekli
     toast:(m,e)=>{ calls.toasts.push(String(m)); if(toastSink) toastSink(m,e); },
     rpc: rpcImpl, rpcSeansTamamla: async()=>({ok:true}),
     pullTables: async()=>{}, updateTaskBadge: ()=>{}, updatePendingFab: ()=>{},
     _savePending: ()=>{}, _pendingDone: pending,
     _flushInFlight: false, _flushHataToast: new Map(),
+    _flushBeklenen: null, _flushOpMs: 60000, _flushPullMs: 60000,   // F4/K9
   };
   ctx.globalThis=ctx;
   return { ctx, calls };
@@ -119,6 +123,37 @@ test('K9-c: kalıcı hata — aynı mesaj ikinci flush\'ta tekrar toast basmaz',
   msg='farklı hata';                               // yeni hata → tekrar bildir
   await flush();
   assert.strictEqual(calls.toasts.filter(t=>t.includes('Görev uygulanamadı')).length, 2);
+});
+
+// ── F4/K9: uçuş promise'i + op-başına zaman sınırı ─────────────────────────
+test('F4/K9-d: uçuştaki flush — ikinci çağrı uçuşun bitişini BEKLER (sessiz erken dönüş yok)', async () => {
+  const pending=new Map([['g1',{type:'gorev',gorevId:'g1',params:{gorevId:'g1'}}]]);
+  let kapiAc; const kapi=new Promise(r=>{ kapiAc=r; });   // rpc kapanana dek flush sürer
+  const sends=[];
+  const { ctx } = _k9Ctx(pending, async (name,params)=>{ sends.push(params.p_gorev_id); await kapi; return {ok:true}; });
+  const flush=loadFlushPendingDone(ctx);
+  const p1=flush();
+  const p2=flush();      // loadTasks:688 yarışı — eski kodta anında undefined dönüyordu (bayat liste render'ı)
+  assert.ok(p2 && typeof p2.then==='function', 'kilitliyken uçuşun promise\'i dönmeli (undefined değil; vm-realm Promise\'i instanceof dış realm\'e takılır — thenable kontrolü)');
+  let p2Bitti=false; p2.then(()=>{ p2Bitti=true; });
+  await new Promise(r=>setTimeout(r,25));
+  assert.strictEqual(p2Bitti, false, 'kapı açılmadan ikinci çağrı çözülmemeli');
+  kapiAc();
+  await Promise.all([p1,p2]);
+  assert.strictEqual(p2Bitti, true, 'uçuş bitince ikinci çağrı da çözülür');
+  assert.deepStrictEqual(sends, ['g1'], 'tek gönderim korunur');
+  assert.strictEqual(pending.size, 0);
+});
+
+test('F4/K9-e: askıda RPC — op zaman sınırı kilidi süresiz tutmaz; kalem pending\'de kalır + toast', async () => {
+  const pending=new Map([['g1',{type:'gorev',gorevId:'g1',params:{gorevId:'g1'}}]]);
+  const { ctx, calls } = _k9Ctx(pending, ()=>new Promise(()=>{}));   // hiç çözülmeyen rpc (ağ askısı)
+  ctx._flushOpMs=20;                                                  // sınırı test için küçült
+  const flush=loadFlushPendingDone(ctx);
+  await flush();   // zaman sınırı olmasaydı bu await hiç dönmezdi (test asılırdı)
+  assert.ok(pending.has('g1'), 'askıda op pending\'de kalır — kalem kaybolmaz');
+  assert.ok(calls.toasts.some(t=>t.includes('zaman aşımı')), 'askıda op kullanıcıya bildirilir: '+calls.toasts.join('|'));
+  assert.strictEqual(ctx._flushInFlight, false, 'kilit serbest kalmalı');
 });
 
 // ── T3/U5: seansTamamla PG-kapı guard ──────────────────────────────────────

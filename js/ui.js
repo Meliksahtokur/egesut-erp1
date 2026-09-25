@@ -603,6 +603,9 @@ function showHasta(){
 let _pendingDone = new Map();   // key(gorevId|seansId) → {type,gorevId,params,cardId}
 let _flushInFlight = false;   // K9: tek-uçuş kilidi — eşzamanlı flush çağrısı ikinci gönderim açmaz
 let _flushHataToast = new Map();   // K9: key → {msg,ts} — kalıcı hatada tekrar toast soğuması (5 dk)
+let _flushBeklenen = null;    // F4/K9: uçuştaki flush'in promise'i — kilitliyken çağıranlar bunu bekler (sessiz erken dönüş yok)
+let _flushOpMs = 30000;       // F4/K9: op başına ağ zaman sınırı — timeoutsuz askıda RPC kilidi soket ölümüne dek tutmasın
+let _flushPullMs = 60000;     // F4/K9: kapanış pullTables'ının sınırı (7 tablo — daha cömert)
 function _savePending(){
   try { localStorage.setItem('_pendingDone', JSON.stringify([..._pendingDone.values()])); } catch(e){}
 }
@@ -645,16 +648,20 @@ function togglePendingDone(type, gorevId, btn, extra){
 }
 async function flushPendingDone(){
   if(!_pendingDone.size) return;
-  if(_flushInFlight) return;               // K9: tek-uçuş — eşzamanlı çağrı (app.js:81 + loadTasks) ikinci gönderim açmaz
+  if(_flushInFlight) return _flushBeklenen;   // K9+F4: tek-uçuş — ikinci gönderim açmaz; uçuşun BİTİŞİ beklenir (loadTasks bayat IDB'den render etmez)
   if(!navigator.onLine){ toast('⚠️ Çevrimiçi olunca uygulanacak'); return; }
   _flushInFlight=true;
-  try {
+  // F4/K9: rpc()/pullTables timeoutsuz — tek askıda ağ çağrısı kilidi soket ölümüne/page reload'a
+  // kadar tutuyordu. Op başına zaman sınırı: aşarsa op hata sayılır (pending'de kalır + toast),
+  // kilit serbest kalır; aşan RPC arka planda sonuçlansa bile tamamlandı idempotenttir.
+  const _rz=(p,ms,ne)=>{ let _t; const _ta=new Promise((_,rej)=>{ _t=setTimeout(()=>rej(new Error('zaman aşımı: '+(ne||'işlem'))), ms); }); return Promise.race([p,_ta]).finally(()=>clearTimeout(_t)); };
+  const run=(async()=>{
     const items=[..._pendingDone.values()];
     for(const it of items){
       try {
-        if(it.type==='seans') await rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null);
-        else if(it.type==='besleme') await rpc('besleme_tamam', {p_gorev_id:it.params.gorevId});
-        else if(it.type==='gorev') await rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null});
+        if(it.type==='seans') await _rz(rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null), _flushOpMs, 'seans gönderimi');
+        else if(it.type==='besleme') await _rz(rpc('besleme_tamam', {p_gorev_id:it.params.gorevId}), _flushOpMs, 'görev gönderimi');
+        else if(it.type==='gorev') await _rz(rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null}), _flushOpMs, 'görev gönderimi');
         _pendingDone.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);   // K9: yalnız BAŞARILI op düşer; uçuşta eklenenlere dokunulmaz
         _flushHataToast.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);
       } catch(e){
@@ -670,9 +677,11 @@ async function flushPendingDone(){
       }
     }
     _savePending(); updatePendingFab();
-    try { await pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']); } catch(e){}
+    try { await _rz(pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']), _flushPullMs, 'veri yenileme'); } catch(e){}
     if(typeof updateTaskBadge==='function') updateTaskBadge();
-  } finally { _flushInFlight=false; }
+  })();
+  _flushBeklenen=run.catch(()=>{});   // F4/K9: bekleyen çağıranlar reddi yutulmuş promise alır (eski sessiz-dönüş semantiği)
+  try { await run; } finally { _flushInFlight=false; _flushBeklenen=null; }
 }
 async function recoverPendingDone(){
   try {
