@@ -1,7 +1,8 @@
 # DB Validation Raporu — 7d66b886
 
-- Tarih: 2026-09-25 17:07:46+0300
+- Tarih: 2026-09-25 18:27:44+0300
 - Migration: `/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100002_add_treatment_day_ust_gorev_tarihi.sql`
+- Priors (1): /home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql
 - SHA-256: `7d66b8866ddf85a264def76a3314348fc5f334f1d5b77817ff00cec915a1d700`
 - Baseline (C1): {'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} · parite: uyumlu
 - Data mode: koşulmadı (migration veri dokmuyor, --data-mode=auto)
@@ -15,11 +16,13 @@
 | A.squawk | PASS | varsayılan kurallar (istisna: require-concurrent-index-creation,ban-drop-table) ihlal yok |
 | B.sema-uyum | PASS | tüm FROM/JOIN/ALTER/REFERENCES hedefleri biliniyor (ayna ya da migration-içi) |
 | C1.baseline-restore-schema | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
+| priors.C1.20260925100001_vaka_kalan_gunleri_kaydir.sql | PASS | prior migration hatasız uygulandı |
 | C1.migration-apply | PASS | psql ON_ERROR_STOP ile hatasız uygulandı |
 | C1.postcheck-nesne | PASS | migration-içi yaratılan tüm nesneler izole DB'de mevcut |
 | C1.postcheck-rls | PASS | RLS farkları: yok; etkilenen tablolar relrowsecurity: (yeni tablo ya da aynada yok) |
 | C1.ortam-paritesi | PASS | baseline parite_durumu=uyumlu |
 | C1.baseline-restore-data | PASS | db=egesut_val_tmp parite=uyumlu meta={'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} |
+| priors.C2.20260925100001_vaka_kalan_gunleri_kaydir.sql | PASS | prior migration hatasız uygulandı |
 | C2.sentetik-tohum | PASS | etkilenen tablolara sentetik satır eklendi |
 | C2.veri-uyumluluk | PASS | sentetik veri üzerinde migration hatasız; unique/fk ihlali yok |
 
@@ -30,8 +33,10 @@ $ sqlfluff lint --dialect postgres '/home/melik/.herdr/worktrees/egesut-erp1/ovy
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table '/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100002_add_treatment_day_ust_gorev_tarihi.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
 $ timeout 900 bash '/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql'  # prior (C1)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100002_add_treatment_day_ust_gorev_tarihi.sql'  # db=egesut_val_tmp
 $ timeout 900 bash '/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (data)
+$ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql'  # prior (C2)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100002_add_treatment_day_ust_gorev_tarihi.sql'  # C2 db=egesut_val_tmp (tohumlu)
 ```
 
@@ -102,11 +107,33 @@ COMMIT
 ERROR:  relation "public.farm" does not exist
 LINE 1: ... ELSE (SELECT quote_literal(min(f.id)::text) FROM public.far...
                                                              ^
-(genel) public.farm yok/boş — farm_id tohum değeri '1' fallback
+(genel) public.farm yok/boş — farm_id tohum değeri sabit zero-uuid fallback
 drug_administrations: sentetik satır eklendi (id, treatment_day_id, dose, unit)
 gorev_log: sentetik satır eklendi (id)
 islem_log: sentetik satır eklendi (id, tip, durum, snapshot)
 stok_hareket: sentetik satır eklendi (id)
 treatment_day_uygulamalar: sentetik satır eklendi (id, treatment_day_id, case_id, planned_time, planned_date, dose, unit)
 treatment_days: sentetik satır eklendi (id, case_id, treatment_date)
+```
+
+### Prior apply (`prior_C1_20260925100001_vaka_kalan_gunleri_kaydir.sql.out`)
+```
+BEGIN
+SET
+SET
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
+```
+
+### Prior apply (`prior_C2_20260925100001_vaka_kalan_gunleri_kaydir.sql.out`)
+```
+BEGIN
+SET
+SET
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
 ```

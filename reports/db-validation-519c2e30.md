@@ -1,6 +1,6 @@
 # DB Validation Raporu — 519c2e30
 
-- Tarih: 2026-09-25 17:07:32+0300
+- Tarih: 2026-09-25 18:27:28+0300
 - Migration: `/home/melik/.herdr/worktrees/egesut-erp1/ovysch-feature-erteleme/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql`
 - SHA-256: `519c2e308a47c002c389839d117f4394350809309888094be235c7e77201486a`
 - Baseline (C1): {'tablo': 54, 'fonksiyon': 244, 'view': 13, 'pgtap_fn': 1085, 'parite_durum': 'uyumlu', 'baseline_kaynak': 'egesut_lsp', 'ayna_tazelik': 'taze (nesne sayımı prod ile eşleşiyor: T=54 F=244 V=13)', 'parite_dosya': '/home/melik/tmp/agents/parite-egesut_val_tmp.txt', 'prod_pg': '17.6', 'yerel_pg': '17.6'} · parite: uyumlu
@@ -108,6 +108,6 @@ COMMIT
 ERROR:  relation "public.farm" does not exist
 LINE 1: ... ELSE (SELECT quote_literal(min(f.id)::text) FROM public.far...
                                                              ^
-(genel) public.farm yok/boş — farm_id tohum değeri '1' fallback
+(genel) public.farm yok/boş — farm_id tohum değeri sabit zero-uuid fallback
 islem_log: sentetik satır eklendi (id, tip, durum, snapshot)
 ```
