@@ -176,6 +176,21 @@ satır), `KIZGINLIK_TAKIP`, `DOGUM_TAKIP`. **`<BOS>` legacy tipine satır YOK.**
 **Kabul ölçütü:** seed satır sayısı 20 (matrisle birebir); anon erişim yok; db-validate
 PASS; statements dolu; yeni unit fail 0.
 
+**KABUL KANITI (2026-09-25, I-DB):**
+- Kırmızı [OBSERVED]: `\d gorev_ertele_kural` → "Did not find any relation".
+- db-validate: taslak+final **PASS** `reports/db-validation-f03f1a95.md` (ilk taslak
+  dee50a59: authenticated default-privilege sızıntısı düzeltme ÖNCESİ).
+- Demo apply (düzeltilmiş final): CREATE TABLE/COMMENT×4/INSERT 0 20/ALTER/REVOKE/GRANT/
+  COMMIT; `schema_migrations` 20260925100003 statements n=1 len=5257.
+- Canlı kontrol [OBSERVED .verify-e1a-live.sql]: toplam=20 (18 açık + 2 kapalı);
+  pencere: tohumlama×3 (OVSYNC_BASLAT/TOHUMLAMA_HAZIRLIK/TOHUMLAMA_PLANLI), yok×17;
+  OVSYNC_BASLAT `zincir_tetikler={"tai_ofset_gun": 10}`, max_erteleme_gun NULL,
+  asimi_uyari_gun 7; RLS=t; tablo yetkileri YALNIZ postgres+service_role
+  (anon VE authenticated kapalı — ilk apply'da authenticated'ın Supabase
+  default-privilege CRUD'u sızdı, REVOKE listesine eklendi, demo'da drop+re-apply);
+  farm_id kolonu YOK (7 kolon).
+- Unit: 1138/1141 (bilinen 3, yeni fail 0) — M4 sonunda yeniden koşulacak.
+
 ### Adım 3 — E1-b: `_gorev_ertele_kural` + `gorev_ertele` + `gorev_ertele_kural_listele` (M4)
 
 **Gövdehtar plan-erteleme-genel §3.2-3.3 (aynen):**
