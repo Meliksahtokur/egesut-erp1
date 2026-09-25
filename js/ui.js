@@ -468,14 +468,9 @@ async function loadDash(){
         window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
         ovSayi = window.__ovsyncUyarilar.length;
       } catch(e) { console.warn('ovsync_baslat_uyarilari (rozet):', e.message); }
-      // K8: rozetin 3. kaynağı — başlamış ovsync zincirinin gecikmiş/yaklaşan seansları
-      let seansSayi = 0;
-      try {
-        const su = await rpc('ovsync_seans_uyarilari', {});
-        window.__ovsyncSeansUyarilar = (su && su.uyarilar) || [];
-        seansSayi = window.__ovsyncSeansUyarilar.length;
-      } catch(e) { console.warn('ovsync_seans_uyarilari (rozet):', e.message); }
-      const toplam = _rozetTopla(aktif.length, ovSayi, seansSayi);
+      // C4 (cila2): K8'in 3. rozet kaynağı (ovsync seans uyarıları) geri alındı —
+      // sahip "ana listeye monte etmişler, ben böyle bir şey istemedim; sabahki yeterli".
+      const toplam = _rozetTopla(aktif.length, ovSayi);
       const bb = document.getElementById('bellbadge');
       if (bb) {
         bb.textContent = toplam > 99 ? '99+' : toplam;
@@ -1302,8 +1297,7 @@ function _tohErteleBtnHtml(t){
   return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
 }
 // T10: rozet = protokol_eksik_tara aktif sayısı + ovsync_baslat_uyarilari sayısı (tek rozet birleştirme)
-// K8: 3. kaynak — başlamış ovsync zincirinin seans uyarıları (ovsync_seans_uyarilari)
-function _rozetTopla(n, m, o){ return (n|0) + (m|0) + (o|0); }
+function _rozetTopla(n, m){ return (n|0) + (m|0); }
 // O11: PLAN Europe/Istanbul der — Türkiye kalıcı +03 (DST yok); cihaz diliminden bağımsız
 function _istanbulAnIso(gun, saat){ return new Date(gun + 'T' + (saat || '12:00') + ':00+03:00').toISOString(); }
 
@@ -1999,17 +1993,10 @@ async function _showProtokolEkran(){
       ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   }
-  // K8: başlamış ovsync zincirinin gecikmiş/yaklaşan seansları — panelin 3. kaynağı
-  // (taze çağrı hata verirse rozet taramasının doldurduğu önbelleğe düşer — T10 kalıbı)
-  let seansHtml = '';
-  try {
-    const su = await rpc('ovsync_seans_uyarilari', {});
-    window.__ovsyncSeansUyarilar = (su && su.uyarilar) || [];
-  } catch(e) {
-    console.warn('ovsync_seans_uyarilari:', e.message);
-  }
-  seansHtml = _ovSeansBolumHtml(Array.isArray(window.__ovsyncSeansUyarilar) ? window.__ovsyncSeansUyarilar : []);
-  if (!data.length && !ovHtml && !seansHtml) { toast('Protokol uyarısı yok'); return; }
+  // C4 (cila2): K8'in seanslar panel bölümü geri alındı — sahip:
+  // "ana listeye monte etmişler, ben böyle bir şey istemedim; sabahki yeterli".
+  // Ovsync seansları Görevler listesinde normal görev satırları olarak görünür (1f01e8b hâli).
+  if (!data.length && !ovHtml) { toast('Protokol uyarısı yok'); return; }
 
   const eksikHtml = eksik.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🔴 Gecikmiş (${eksik.length})</div>${eksik.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
   const yakHtml = yaklasan.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:#b8860b">🟡 Yaklaşan (${yaklasan.length})</div>${yaklasan.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
@@ -2021,7 +2008,7 @@ async function _showProtokolEkran(){
   box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:1rem;margin-bottom:4px">📋 Protokol Uyarıları${bildirimRozet}</div>
     <div style="font-size:.75rem;color:var(--ink3);margin-bottom:12px">Doğum sonrası, ileri gebe, kızgınlık takibi</div>
-    ${ovHtml}${seansHtml}${eksikHtml}${yakHtml}${tamHtml}
+    ${ovHtml}${eksikHtml}${yakHtml}${tamHtml}
   </div>`;
   history.pushState({protokol:true}, '', '');
   document.body.appendChild(box);
@@ -2121,40 +2108,9 @@ function _ovUyariSatirHtml(u){
       </div>`;
 }
 
-// K8: dakika → "1g 2sa" / "20sa 36dk" / "30dk" (sahip dökümü biçimi)
-function _dkInsanOkur(dk){
-  dk=Math.max(0, Math.round(Number(dk)||0));
-  if(dk<60) return dk+'dk';
-  if(dk<1440) return Math.floor(dk/60)+'sa '+(dk%60)+'dk';
-  return Math.floor(dk/1440)+'g '+Math.floor((dk%1440)/60)+'sa';
-}
-// K8: başlamış ovsync zincirinin seans uyarı satırı (ovsync_seans_uyarilari satırı).
-// RPC gecikme_dk DÖNMEZ — durum='gecikmis' satırda eksikse istemcide hesaplanır
-// (TR kalıcı +03:00 — O11 gerekçesiyle aynı sabit ofset).
-function _ovSeansSatirHtml(u){
-  const gecikmis=u.durum==='gecikmis';
-  let gecDk=u.gecikme_dk;
-  if(gecikmis&&(gecDk==null||gecDk==='')){
-    try{ gecDk=Math.max(0,Math.round((Date.now()-new Date(u.hedef_tarih+'T'+String(u.hedef_saat||'08:00').slice(0,5)+':00+03:00').getTime())/60000)); }catch(e){ gecDk=null; }
-  }
-  return `<div class="arow" style="border-left:3px solid ${gecikmis?'var(--red2)':'#b8860b'};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_protoDetayHayvanGit('${escAttr(u.hayvan_id)}')">
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:.8rem">${gecikmis?'🔴':'🟡'} ${esc(u.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(u.grup||'')}</span></div>
-          <div style="font-size:.7rem;color:var(--ink3)">Gün ${u.gun_no!=null?u.gun_no:'?'}/${u.toplam_gun!=null?u.toplam_gun:'?'}${u.seans_adi?' · '+esc(u.seans_adi):''} · ${fmtTarih(u.hedef_tarih)} ${u.hedef_saat?String(u.hedef_saat).slice(0,5):''}</div>
-          <div style="font-size:.6rem;opacity:.5">${gecikmis?('⚠ '+_dkInsanOkur(gecDk)+' gecikti'):'yaklaşan seans'}</div>
-        </div>
-      </div>`;
-}
-// K8: panel bölümü — gecikmiş üstte, yaklaşan altta (protokol paneli 3. kaynak)
-function _ovSeansBolumHtml(list){
-  if(!Array.isArray(list)||!list.length) return '';
-  const gec=list.filter(u=>u.durum==='gecikmis');
-  const yak=list.filter(u=>u.durum!=='gecikmis');
-  return `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🧪 Ovsync Seansları (${list.length})</div>`
-    +(gec.length?`<div style="font-size:.65rem;color:var(--red2);margin-bottom:4px">${gec.length} gecikmiş</div>`:'')
-    +gec.map(_ovSeansSatirHtml).join('')
-    +(yak.length?yak.map(_ovSeansSatirHtml).join(''):'');
-}
+// C4 (cila2): K8'in panel seans yardımcıları geri alındı — seanslar bölümü
+// 1f01e8b hâlinde yoktu; ovsync seansları Görevler listesinde normal görev
+// satırları olarak görünür. Seans uyarı RPC'si veri katmanında kalır (dokunulmaz).
 
 // S4/M2+M3: Ovsynch-56/TAI yardım katmanı (sahip kararı: yardım balonu İSTENİYOR).
 // _showProtokolDetay öncülü alt-sheet kalıbı; seans sayısı canlı şablondan teyitli (4 kalem).
@@ -10694,40 +10650,27 @@ async function bildirimKontrol(){
   const now=new Date();
   const bugunStr=bugun();
   const yarin=dFwd(bugunStr,1);
-  // K8: seanslar (parent_id'li TEDAVI_SEANS) dahil + gecikmiş görevler kolu
-  const _seansMi=g=>g.gorev_tipi==='TEDAVI_SEANS';
-  const gorevler=await getData('gorev_log',g=>!g.tamamlandi&&!g.iptal&&(
-    (_seansMi(g)&&(g.hedef_tarih===bugunStr||g.hedef_tarih===yarin||g.hedef_tarih<bugunStr))||
-    (!g.parent_id&&(g.hedef_tarih===bugunStr||g.hedef_tarih===yarin))));
+  // C4 (cila2): K8'in seans/gecikme genişletmesi geri alındı — 1f01e8b hâli:
+  // yalnız parent_id'siz görevler, bugün+yarın penceresi.
+  const gorevler=await getData('gorev_log',g=>!g.tamamlandi&&!g.iptal&&!g.parent_id&&(g.hedef_tarih===bugunStr||g.hedef_tarih===yarin));
   // M-26 fix: localStorage bozuk/eski formatta JSON içerebilir — try/catch yoktu, crash riski.
   let gosterilen; try { gosterilen=JSON.parse(localStorage.getItem('bildirim_gosterilen')||'{}'); } catch(_){ gosterilen={}; }
   const simdi=Date.now();
-  let _gecSayi=0;
   for(const g2 of gorevler){
-    const hedef=new Date(g2.hedef_tarih+'T'+String(g2.hedef_saat||'08:00').slice(0,5)+':00');   // K8: hedef_saat okunur
+    const hedef=new Date(g2.hedef_tarih+'T08:00:00');
     const fark=(hedef-now)/3600000;
-    // F4/K8: TEDAVI_SEANS açıklamaları JSON ({"label":"Gun 2 - Seans (08:00)",...}) olabilir —
-    // gövde ham JSON basmasın, label çözülür (done-listesindeki ui.js:743 deseni).
-    const govde=(()=>{ try{ return JSON.parse(g2.aciklama||'{}').label||g2.aciklama||''; }catch(e){ return g2.aciklama||''; } })();
-    const gecKey=`${g2.id}_gecik_${bugunStr}`;
-    if(g2.hedef_tarih<bugunStr&&!gosterilen[gecKey]&&_gecSayi<5){                              // K8: gecikme kolu, döngü başına ≤5
-      const hayvan=getState('animals').find(a=>a.id===g2.hayvan_id);
-      const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe):'Genel';
-      new Notification(`⚠️ Gecikmiş: ${kupe}`,{body:govde,tag:gecKey});
-      gosterilen[gecKey]=simdi; _gecSayi++;
-    }
     const key=`${g2.id}_${g2.hedef_tarih}`;
     if(fark>2.5&&fark<=3.5&&!gosterilen[key]){
       const hayvan=getState('animals').find(a=>a.id===g2.hayvan_id);
       const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe):'Genel';
-      new Notification(`⏰ 3 saat sonra: ${kupe}`,{body:govde,tag:key});
+      new Notification(`⏰ 3 saat sonra: ${kupe}`,{body:g2.aciklama||'',tag:key});
       gosterilen[key]=simdi;
     }
     const sabahKey=`${g2.id}_sabah`;
     if(g2.hedef_tarih===bugunStr&&fark>=-0.5&&fark<=0.5&&!gosterilen[sabahKey]){
       const hayvan=getState('animals').find(a=>a.id===g2.hayvan_id);
       const kupe=hayvan?(hayvan.kupe_no||hayvan.devlet_kupe):'Genel';
-      new Notification(`📋 Bugün: ${kupe}`,{body:govde,tag:sabahKey});
+      new Notification(`📋 Bugün: ${kupe}`,{body:g2.aciklama||'',tag:sabahKey});
       gosterilen[sabahKey]=simdi;
     }
   }
