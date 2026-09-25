@@ -313,3 +313,38 @@ inline taşıyor: `v_eligible` (20260925000003 — onarım fix'i), `gebelik_muay
 geçebilir; view için `COALESCE((SELECT sonuc FROM public._son_tohumlama(h.id)), '')` formu
 yeterli. Birleşik temizlik migration'ında dört kullanım tek yardımcıya bağlanmalı (davranış-eş;
 bu turda dokunulmadı — BUG-S2-REVIEW-TEMIZLIK #1'in kapsamını genişletir).
+
+### BUG-UREME-SEKMESI-FILTRE — Görevler'de "Üreme" sekmesi görevleri filtrelemiyor, "gösterilecek görev yok" veriyor [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** sahibin demo yürüyüşü (http://127.0.0.1:8123/?demo)
+
+**Belirti:** Görevler ekranında Üreme sekmesine basınca üreme görevleri
+(OVSYNC_BASLAT, TOHUMLAMA_PLANLI vb.) listelenmiyor; "gösterilecek görev yok"
+diyor. Görevler ana listede var (canlı demo DB: OVSYNC_BASLAT 29 açık, 
+TOHUMLAMA_PLANLI 9 açık).
+
+**Muhtemel yön:** js/ui.js görev-sekme filtresi yeni ovsync/görev tiplerini
+üreme kategorisine eşlemiyor ya da sekme filtre koşulu yeni tip adlarıyla
+uyumsuz.
+
+---
+
+### BUG-PROTOKOL-OVSYNC-AYRIK — Ovsync protokol görevleri protokol panelinde görünmüyor, yalnız Görevler'de görünüyor [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** sahibin demo yürüyüşü
+
+**Belirti:** Sahibin ekran dökümünde ovsync protokol görevleri (Gün 1/4,
+Buserin 2.5ml · IM, 7 hayvan — 28/31/122/144/149/168/186/Test inek 3, tümü
+"⚠ 20sa 36dk gecikti") YALNIZ Görevler listesinde; Protokol Uyarıları
+panelinde yok. Panelde yalnız DOGUM_PROTOKOL (117/002/122/186/188) ve
+ILERI_GEBE_PROTOKOL satırları var — Protokol Uyarıları başlığındaki ovsync
+grubu ayrı "Düve (Büyük) 2 / Sağmal 6" bloklarında duruyor.
+
+**Sahip notu:** "protokolde ovsync görevleri yok sadece görevlerde var."
+Panel↔Görevler arasında ovsync zincirlerinin dağılımı tasarımsal olarak
+gözden geçirilmeli (sahip fix istemedi — tespit kaydı, başka agent'e
+devredilecek).
+
+**Ek gözlem (aynı dökümden):** 7 ovsync görevi "20sa 36dk gecikti" aynı
+damgayla — 24.09.2026 10:00 hedefi, gün-1 seansları uygulanmamış. zincir
+ilerlemesi bekliyor.
