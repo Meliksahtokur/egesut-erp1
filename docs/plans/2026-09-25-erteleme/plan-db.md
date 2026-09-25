@@ -335,6 +335,31 @@ flowchart TD
 **Kabul ölçütü (zarf E3):** bağımsız PG → vaka kapandı + kalan seanslar kapandı + stok
 iadesi; protokol içi PG seansı → vaka AÇIK; Ovsynch-56 zinciri bozulmadı.
 
+**KABUL KANITI (2026-09-25, I-DB):**
+- 4a bulgu düzeltmesi: kapanış-neden uzayı YALNIZ gövdede değil — `cases_close_reason_check`
+  CHECK kısıtında da yaşıyor [OBSERVED \d cases]; M5 ikisini birden genişletti ('PG').
+- Kırmızı [OBSERVED .probe-e3-kirmizi.sql]: `_vaka_kapat(...,'PG',...)` →
+  "_vaka_kapat: geçersiz close_reason: PG".
+- db-validate: taslak+final **PASS** `reports/db-validation-a5505160.md` (ara turlar:
+  DROP CONSTRAINT ayna constraint'sizliği → IF EXISTS; `IS DISTINCT FROM x` B-faz
+  regex yanlış-pozitifleri → parantezleme; C2 tohumlayıcı farm_id uuid hatası →
+  aynaya prod default'u `400b9107…` geri yüklendi — tam veri modunda PASS).
+- Demo apply: ALTER TABLE ×2 + CREATE FUNCTION ×2 + REVOKE ×2; statements n=1 len=15726;
+  canlı: CHECK ('ERKEN_KAPANIS','TOHUMLAMA','PG'); iki gövde SECDEF + tırnaksız
+  search_path; _pg_olay_isle kancası (v_seans_case/FOR UPDATE) canlı.
+- Yeşil [OBSERVED .probe-e3-yesil.sql, 11 satır]: bağımsız PG (HIZLI_UYGULAMA,
+  sentetik kapi ALLOW+pg) → vaka c065e94e **closed close_reason=PG**,
+  CASE_CLOSED_BY_PG audit=1, açık gün/seans görev/seans satırı=0, **stok iade=3**;
+  şablon TAI kapalı, **PG+48 TAI AÇIK ve kapatan YOK**; gün tarihleri ONCE=SONRA
+  (18/25/26/27.09 — d0→d7=7, +1, +1 zincir korunmuş); protokol içi seans (25a638aa
+  KENDİ seansı, TEDAVI_SEANS) → vaka **active**; protocol_family NULL vaka
+  (6bb625d6) + bağımsız PG → **active**; kontrol zinciri 26.09→3/4/5.10 değişmedi;
+  ROLLBACK temiz (kalan event=0).
+- Kenar kararlar (DONE sahip kapısına): (i) ILAC "25. Gün PG" görev-tamamlama
+  yolu bağımsız sınıflanır — aktif ovsync vakasını kapatır (tıbben tutarlı);
+  (ii) bağımsız PG geri alınınca kapatılan vaka geri AÇILMAZ (v1).
+- Unit: 1138/1141 (bilinen 3, yeni fail 0).
+
 ### Adım 5 — E4-DB: `protokol_iptal` RPC (M6)
 
 **RPC adı KESİNLEŞTİ: `protokol_iptal(p_vaka_id uuid, p_yeniden_baslat boolean DEFAULT
