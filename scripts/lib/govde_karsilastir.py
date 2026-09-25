@@ -11,12 +11,20 @@ Kullanım:
   govde_karsilastir.py --repo <kok> --live live.json        # faz 2: karşılaştır
   (opsiyonel: --files '<glob>' — negatif testte tek geçici dosya beslemek için)
 
-Çıkış: fonksiyon/görünüm başına OK|DIFF satırları + DROP/statement kontrolleri;
-son satır GOVDE_FARK: <n>; exit 0 yalnız n=0.
+Çıkış: fonksiyon/görünüm başına OK|DIFF satırları + DROP/statement kontrolleri
++ ALTER-only hedefler (seride CREATE'i olmayıp yalnız ALTER FUNCTION ... SET
+search_path ile dokunulan fonksiyonlar) için tırnaksız search_path (K5)
+öznitelik denetimi; son satır GOVDE_FARK: <n>; exit 0 yalnız n=0.
+[F4/K2] Bu kapsamın gerekçesi: 20260925000004 yalnız ALTER içerdiğinden
+protokol_ayar_guncelle(text,numeric) CREATE tabanlı kümeye hiç girmiyordu.
 
 Normalizasyon kuralları (yorumlar KORUNUR — guard'lar yorumlarla belgeli):
   - dollar-quote etiketleri kanonikleştir ($fn$/$fnx$/$$ → $function$)
-  - SET search_path gösterimleri eşitlenir (TO 'public','pg_temp' ≡ = public, pg_temp ≡ ='public, pg_temp')
+  - SET search_path İKİ-DEĞERLİ gösterimi eşitlenir (TO 'public','pg_temp' ≡ = public, pg_temp)
+  - TEK-TIRNAKLI tek-değer form (= 'public, pg_temp') EŞİTLENMEZ (F4/K2): bu bir
+    gösterim farkı değil, var olmayan "public, pg_temp" şemasına kilitleyen bilinen
+    semantik hatadır (mimar C1) — karşılaştırma fark üretir; dosya+canlı İKİSİ de
+    tırnaklıysa K5 ihlali DIFF'i ayrıca yazılır (aşağıya bakınız)
   - öznitelik bölgesinde VOLATILE anahtar sözcüğü düşürülür (pg_get_functiondef varsayılanı yazmaz)
   - sondaki ';' düşürülür; boşluk dizileri tek boşluğa iner
 """
@@ -200,9 +208,11 @@ def normalize_def(defn):
     if m and m.group(1) != '$function$':
         tag = re.escape(m.group(1))
         t = re.sub(tag, '$function$', t)
+    # Yalnız İKİ-DEĞERLİ tırnaklı liste gösterimi eşitlenir (meşru render farkı).
+    # TEK-TIRNAKLI tek-değer 'public, pg_temp' bilinçli olarak EŞİTLENMEZ (F4/K2,
+    # mimar C1): o form search_path'i var olmayan tek şemaya kilitler — normalizasyon
+    # katmanı bunu maskelediğinde tek-taraflı canlı regresyon bile OK üretiyordu.
     t = re.sub(r"SET\s+search_path\s+TO\s+'public'\s*,\s*'pg_temp'",
-               'SET search_path = public, pg_temp', t, flags=re.IGNORECASE)
-    t = re.sub(r"SET\s+search_path\s*=\s*'public, pg_temp'",
                'SET search_path = public, pg_temp', t, flags=re.IGNORECASE)
     # öznitelik bölgesi (AS $function$'e kadar): VOLATILE düşür, imza cast'lerini eşitle
     m = re.search(r"AS\s+\$function\$", t, re.IGNORECASE)
@@ -235,6 +245,21 @@ def ensure_sp_attr(defn):
     return defn[:m.start()] + 'SET search_path = public, pg_temp ' + defn[m.start():]
 
 
+# [F4/K2] K5 öznitelik denetimi: tırnaksız kanonik form ile bilinen-hatalı
+# tek-tırnaklı tek-değer formu ayrıştırılır (ikisi normalize sonrası ayrışır).
+SP_UNQUOTED_RE = re.compile(
+    r"SET\s+search_path\s*(?:=|TO)\s*public\s*,\s*pg_temp\b", re.IGNORECASE)
+SP_QUOTED1_RE = re.compile(
+    r"SET\s+search_path\s*(?:=|TO)\s*'public, pg_temp'", re.IGNORECASE)
+
+
+def sp_attr_region(defn):
+    """SET search_path öznitelik bölgesi: AS $..$ etiketine KADAR olan kısım.
+    Gövde içinde geçen aynı metin (yorum/alıntı) K5 denetimine girmez."""
+    m = re.search(r"AS\s+\$[A-Za-z0-9_]*\$", defn, re.IGNORECASE)
+    return defn[:m.start()] if m else defn
+
+
 def normalize_view_def(defn):
     """Görünüm normalizasyonu: boşluk + TÜM parantezler düşürülür.
 
@@ -262,8 +287,12 @@ def first_diff(a, b, ctx=90):
 
 
 def emit_sql(objs):
-    """Canlı çekim SQL'ini üret (isim listeleri gömülü; boş liste → sentinel '')."""
-    fn_names = sorted({f['name'] for f in objs['functions']} | {d['name'] for d in objs['drops']})
+    """Canlı çekim SQL'ini üret (isim listeleri gömülü; boş liste → sentinel '').
+    [F4/K2] ALTER-only hedef adları da çekilir — seride CREATE'i olmayan
+    fonksiyonların canlı proconfig'i ancak böyle sınanabilir."""
+    fn_names = sorted({f['name'] for f in objs['functions']}
+                      | {d['name'] for d in objs['drops']}
+                      | {a['name'] for a in objs.get('alter_only', [])})
     vw_names = sorted(objs['views'])
     fn_arr = ', '.join("'%s'" % n for n in fn_names) or "''"
     vw_arr = ', '.join("'%s'" % n for n in vw_names) or "''"
@@ -307,6 +336,11 @@ def main():
     if not files:
         raise SystemExit(f"HATA: tarama deseni boş: {pattern}")
     fns, views, drops, alter_sp = scan_files(files)
+    drop_keys = {(d['name'], d['identity']) for d in drops}
+    # [F4/K2] ALTER-only hedefler: seride CREATE tanımı olmayan, yalnız ALTER
+    # FUNCTION ... SET search_path ile dokunulan fonksiyonlar. Dropped olanlar
+    # hariç (DROP edilmiş imza için öznitelik denetimi anlamsız).
+    alter_only = sorted(k for k in alter_sp if k not in fns and k not in drop_keys)
 
     if args.list_objects:
         print(json.dumps({
@@ -314,6 +348,8 @@ def main():
                                 key=lambda d: (d['name'], d['identity'])),
             'views': sorted(views.keys()),
             'drops': drops,
+            'alter_only': sorted(({'name': k[0], 'identity': k[1]} for k in alter_only),
+                                 key=lambda d: (d['name'], d['identity'])),
             'files': [os.path.basename(f) for f in files],
         }, ensure_ascii=False))
         return
@@ -336,9 +372,41 @@ def main():
         expected = ensure_sp_attr(meta['def']) if (name, ident) in alter_sp else meta['def']
         a, b = normalize_def(expected), normalize_def(ldef)
         if a == b:
-            print(f"OK   {name}({ident})  [{meta['file']}]")
+            # [F4/K2] K5 değişmezi: iki taraf TÜMÜYLE eşit olsa bile tırnaklı
+            # tek-değer search_path gösterim farkı değil bilinen semantik hatadır
+            # (mimar C1) — dosya+canlı ikisi de tırnaklıysa drift yoktur ama
+            # ihlal vardır; kapı bunu da DIFF sayar.
+            if SP_QUOTED1_RE.search(sp_attr_region(expected)):
+                print(f"DIFF {name}({ident})  [{meta['file']}] — K5 İHLALİ: "
+                      f"tırnaklı tek-değer 'public, pg_temp' (var olmayan şema); "
+                      f"dosya↔canlı eşit ama form hatalı")
+                fark += 1
+            else:
+                print(f"OK   {name}({ident})  [{meta['file']}]")
         else:
             print(f"DIFF {name}({ident})  [{meta['file']}] — {first_diff(a, b)}")
+            fark += 1
+
+    # [F4/K2] ALTER-only hedefler: seride CREATE'i yok, yalnız ALTER ile
+    # search_path kilidi vurulmuş (ör. protokol_ayar_guncelle — 000004).
+    # Canlıdan pg_get_functiondef çekilir; tırnaksız kanonik öznitelik var mı?
+    for name, ident in alter_only:
+        ldef = live_by_key.get((name, ident))
+        if ldef is None:
+            print(f"DIFF SP {name}({ident})  [alter-only] — canlıda YOK")
+            fark += 1
+            continue
+        attr = sp_attr_region(normalize_def(ldef))
+        if SP_QUOTED1_RE.search(attr):
+            print(f"DIFF SP {name}({ident})  [alter-only] — K5 İHLALİ: canlıda "
+                  f"tırnaklı tek-değer 'public, pg_temp' (var olmayan şema)")
+            fark += 1
+        elif SP_UNQUOTED_RE.search(attr):
+            print(f"OK   SP {name}({ident})  [alter-only] — "
+                  f"search_path = public, pg_temp (tırnaksız, K5)")
+        else:
+            print(f"DIFF SP {name}({ident})  [alter-only] — canlıda tırnaksız "
+                  f"SET search_path = public, pg_temp özniteliği YOK")
             fark += 1
 
     live_views = {v['name']: v['def'] for v in live.get('views', [])}

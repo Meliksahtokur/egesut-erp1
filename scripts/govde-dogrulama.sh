@@ -5,6 +5,10 @@
 # son-yazan semantiği) ve v_eligible görünümünün canlı DEMO gövdesiyle
 # eşitliğini sınar; ayrıca DROP edilmiş imzaların yokluğunu ve
 # supabase_migrations.schema_migrations statements doluluğunu kontrol eder.
+# [F4/K2] ALTER-only hedefler (seride CREATE'i olmayıp yalnız ALTER FUNCTION
+# ... SET search_path ile dokunulanlar, örn. protokol_ayar_guncelle) da canlıdan
+# çekilip tırnaksız search_path (K5) özniteliğiyle sınanır; tırnaklı tek-değer
+# 'public, pg_temp' formu eşitlik fark etmeksizin ihlal sayılır (mimar C1).
 #
 # Kullanım:
 #   bash scripts/govde-dogrulama.sh [--files '<glob>']   # negatif test: geçici dosya
