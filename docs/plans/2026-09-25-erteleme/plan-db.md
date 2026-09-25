@@ -106,6 +106,26 @@ UPDATE dalındaki `UPDATE public.gorev_log SET …` bloğuna `hedef_tarih = p_da
 **Kabul ölçütü (zarf E5):** demo probe kırmızı→yeşil kanıtlanmış; db-validate PASS;
 statements dolu; yeni unit fail 0.
 
+**KABUL KANITI (2026-09-25, I-DB):**
+- Kırmızı [OBSERVED .probe-e5-kirmizi.sql]: vaka `6bb625d6` gün-2 `e9d7cdb0`, update
+  2026-09-24→28: `treatment_date=2026-09-28` + etiket "28.09.2026" AMA üst
+  `TEDAVI_GUN.hedef_tarih=2026-09-24` ESKİDE — kırmızı; ROLLBACK temiz.
+- Ek bulgu (karar kırıntısı): canlı DELETE `TEDAVI_SEANS AND (aciklama::jsonb…)` tüm
+  satırlarda cast yapar; demo'da 1 legacy JSON-dışı satır (`0c211851`,
+  'CHILD-TED-CONTAIN', iptal=t) update dalını cast hatasıyla KIRIYORDU → M2 aynı
+  ifadedeye `left(aciklama,1)='{'` guard'ı ekledi (E0 deseni).
+- M2 = canlı gövde + 4 değişiklik (hedef_tarih=p_date / DELETE guard / tırnaksız
+  search_path / pg_catalog-nitelikli jsonb_array_elements+unnest — Faz B çözümü).
+- db-validate: taslak+final **PASS** `reports/db-validation-7d66b886.md`.
+- Demo apply: CREATE FUNCTION/REVOKE/GRANT/COMMIT; `schema_migrations` 20260925100002
+  statements n=1 len=10491 created_by=erteleme-genel-i-db; canlı proconfig
+  `search_path=public, pg_temp` (tırnaksız, E0'la birebir), grants
+  authenticated/postgres/service_role.
+- Yeşil [OBSERVED .probe-e5-yesil.sql, legacy satır VARken]: üst görev
+  `hedef_tarih=2026-09-28` + etiket taze; 2 seans `hedef_tarih=2026-09-28`
+  `hedef_saat=16:00` korunur; gün satırı + 2 plan satırı 28.09; ROLLBACK temiz.
+- Unit: **1138/1141** — fail 3 = tam bilinen baz (bc-tarih ×2, LUNA-3); yeni fail 0.
+
 ### Adım 2 — E1-a: `gorev_ertele_kural` tablosu + seed (M3)
 
 **Tasarım (plan-erteleme-genel §3.1 gövdesiyle):** `gorev_tipi text PRIMARY KEY`,
