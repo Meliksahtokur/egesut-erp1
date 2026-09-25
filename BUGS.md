@@ -348,3 +348,137 @@ devredilecek).
 **Ek gözlem (aynı dökümden):** 7 ovsync görevi "20sa 36dk gecikti" aynı
 damgayla — 24.09.2026 10:00 hedefi, gün-1 seansları uygulanmamış. zincir
 ilerlemesi bekliyor.
+
+---
+
+## Mimar dal incelemesi — 2026-09-25 (ovysch-feature-cila-turu @1f01e8b)
+
+Kaynak rapor: `reports/2026-09-25-cila-dal-inceleme-mimar.md` (ana checkout, gitignore'lu).
+6 salt-okunur kulvar + mimar nokta-kontrolü; prod incelenmedi, Playwright koşulmadı.
+
+### BUG-CILA-000008-ESIK-GERI-DONUS — sessiz reconcile eşiği 50→55'e geri döndü [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** YÜKSEK (merge öncesi şart)
+
+000008 `sessiz_hayvanlar_reconcile`'ı 20260625000020 gövdesinden yeniden yazdı; 000002'nin 50 günlük
+eşiği üret/kapat bacaklarında 55 oldu (000008:34,73 vs 000002:107,140). listele/stat/v_eligible 50'de.
+KAPAT bacağı 50–54 gün aralığındaki meşru SESSIZ görevleri `sessiz-noteligible` ile iptal eder.
+000008 başlığındaki "önceki gövde 20260625000020" yanlış (önceki = 000002). Demo canlı gövde 55 [OBSERVED].
+**Yön:** 000009 ile eşik 50 + başlık düzeltmesi; sapma ledger'ına kayıt.
+
+---
+
+### BUG-CILA-DEMO-000007-UYGULANMADI — T1 muafiyeti kayıtlı ama canlı değil [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** YÜKSEK
+
+Demo schema_migrations 000007'yi gösteriyor; canlı `_acik_disi_hedef_ic` 000001 gövdesinde, `senkron`
+filtresi (000007:126-135) yok [OBSERVED prosrc]. pg_proc xmin sırası 000001'in 000006'dan sonra yeniden
+koşulup T1'i ezdiğine işaret ediyor [INFERRED]. Demo'daki 8 cila kaydının hepsinde `statements` NULL
+(elle girilmiş); 20260923/24 serisinin kaydı yok ama nesneleri canlı — demo migration geçmişi yetkili değil.
+**Yön:** demo'da 000007 yeniden uygulanmalı; prod uygulamasında her dosyadan sonra gövde imzası doğrulanmalı.
+
+---
+
+### BUG-CILA-KISIR-DOGUM-ABORT-KANCA — doğum/abort yolu kısır guard'ını atlıyor [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** ORTA
+
+`dogum_kaydet` ve `tohumlama_abort` → `_ilk_tohumlama_rota_kur` → `_ovsync_baslat_gorev_kur` zincirinde
+kisir/Aktif/Dişi kontrolü yok [OBSERVED demo prosrc]. Kısır inek doğum/abort yaparsa OVSYNC_BASLAT açılır
+(M2 + UI kilidi başlatmayı engeller, görev/uyarı kirliliği kalır). 000001:17-19 "olay kancaları bu
+gövdeden beslenir" yorumu bu iki kanca için yanlış; spec-s1 hedef 1 "tüm olay kancaları" diyor.
+184/199 "Doğum Yaptı", 208 son kaydı Abort → senaryo gerçekçi.
+Ek (DÜŞÜK): `ilk_tohumlama_zamanlayici` dry-run `baslatilacaklar` listesi kısır filtresi taşımıyor
+(000001:350-361); 184/199/208 kısır vakaları hâlâ `status='active'` (spec-s1 §305 kapatılacak diyor).
+
+---
+
+### BUG-CILA-PROTOCOL-FAMILY-BOS — ovsync vakalarında cases.protocol_family hiç dolmuyor [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** YÜKSEK
+
+Demo'da 12 aktif Ovsync vakasının 0'ında dolu [OBSERVED]. Buna dayanan guard'lar ölü:
+`start_first_service_protocol` AKTIF_SENKRONIZASYON kontrolü, 000008 reconcile guard'ı, ureme_temizlik R1
+(168/186 stale SESSIZ çapalarının temizlenmemesiyle ilişkili). BUG-PROTOKOL-OVSYNC-AYRIK'ın doğal filtre
+anahtarı da bu alan. Main'den (ovsync-pg) gelen kök; bu dal üzerine guard kurdu.
+
+---
+
+### BUG-CILA-000004-SEARCH-PATH-TIRNAK — search_path tek var-olmayan şemaya kilitli [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** ORTA
+
+000004:27-28 `SET search_path = 'public, pg_temp'` → "public, pg_temp" adlı tek şema; sertleştirme
+etkisiz (demo proconfig tırnaklı, `current_schemas`={pg_catalog}) [OBSERVED]. 25-26'daki "semantik aynı"
+notu yanlış. **Yön:** tırnaksız `public, pg_temp`. Aynı turda 000006 `gorev_tamamla(text,text,boolean)`'a
+search_path eklenmeli (proconfig NULL).
+
+---
+
+### BUG-CILA-000005-GRANT — tek-seferlik temizlik RPC'si authenticated'a açık [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** ORTA
+
+`ureme_temizlik_reconcile` başlığı "tek-seferlik DEMO aracı, prod'a uygulanmaz" (000005:4) ama
+migrations/ altında ve `authenticated`'a GRANT'li (000005:185-186), rol koruması yok; tek REST çağrısıyla
+`p_dry_run=false` toplu iptal, her çağrıda o an kurala uyanları yeniden kapatır.
+**Yön:** GRANT service_role'e daraltılmalı ya da koşum sonrası DROP; prod'a gidip gitmeyeceği sahip kararı.
+
+---
+
+### BUG-CILA-MIGRATION-TRANSACTION — cila migration'larında transaction disiplini tutarsız [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** DÜŞÜK (dağıtım riski)
+
+000001/000006/000007/000008 BEGIN/COMMIT taşımıyor (autocommit'te 000006'da CREATE ile REVOKE arası yeni
+imza anlık PUBLIC-EXECUTE'lu; yarıda kalırsa iki overload → 42725); 000002/3/4/5 kendi BEGIN/COMMIT'ini
+taşıyor → `psql -1` toplu koşumda iç COMMIT tek-transaction'ı bozar. Prod'a dosya dosya uygulanmalı.
+
+---
+
+### BUG-CILA-FLUSH-PENDING-YARIS — flushPendingDone eşzamanlılık/kayıp [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi · **Önem:** ORTA (bu dalın davranış farkı)
+
+js/ui.js:601-616: başta kopya, sonda liste temizlenip kopyadan geri yükleniyor → dönüş sürerken eklenen
+tamamlamalar silinir; kilit yok, loadTasks (ui.js:631) + app.js:81 aynı işlemleri iki kez gönderebilir;
+kalıcı hatalı işlem her loadTasks'ta yeniden denenip toast basar.
+Ek (DÜŞÜK): ui.js:316,324,1753,1754,2005,2069 `onclick="openDet('${escAttr(x)}')"` — escAttr JS-string
+bağlamını kaçırmaz; yön `data-*` + `this.dataset`.
+
+---
+
+### BORC-CILA-KARSILANMAYAN — talimatname maddeleri karşılanmadı [open]
+
+**Tarih:** 2026-09-25 · **Bulgu yeri:** mimar dal incelemesi (talimat: yurutme-haritasi-ss-research-2026-09-23.md)
+
+- (2b) Aktif ovsync görevlerini yarına erteleme yapılmadı — spec-s3:23'te "bugün hedefli OVSYNC_BASLAT"a
+  daraltılıp "moot" ilan edildi (sayım PROD kanalından).
+- (2c) Genel erteleme (tohumlama/aşı/tedavi + UI) borçta; BUGS.md:191'deki "sahip kararı"nın kaydı sentez
+  §9'da bulunamadı [UNKNOWN].
+- (3d) OVSYNC_SABLON_BELIRSIZ kök nedeni hiçbir spec'e girmedi; demo'daki aktif şablon sayısı ölçülmedi
+  (spec-s4 B24 ölçümü tools-bank=PROD kanalından).
+- (3c) Düve eşikleri tutarsız: ovsync 12a21g, sessiz akışı 13 ay; yardım metni düveyi açıklamıyor.
+- T9 "dead-letter görünür uyarısı" ikamesi yapılmadı. Kayıtsız sapmalar: 000008, 000004, 000003 (R7 sahip
+  onayı şartı), a4807db (plan D2 2-arg imzayı korumayı öngörüyordu).
+
+---
+
+### KÖK NEDEN — BUG-UREME-SEKMESI-FILTRE ve BUG-PROTOKOL-OVSYNC-AYRIK (mimar, 2026-09-25)
+
+İkisi de bu dalın regresyonu DEĞİL; main'de de var (ovsync-pg / fe5f91d ile gelen tasarım eksiği).
+
+**BUG-UREME-SEKMESI-FILTRE:** (1) Görevler varsayılan "Bugün" filtresiyle açılır (index.html:692); tarih
+süzmesi kategoriden önce (ui.js:696-705). Açık 29 OVSYNC_BASLAT (10-06→) + 9 TOHUMLAMA_PLANLI (09-28→10-04)
+hepsi ileri tarihli → yalnız "Bekleyen"de görünür. (2) Başlamış zincir tedavi vakası (hastalık "Ovsync
+Protokol", kategori "Üreme") + TEDAVI_SEANS/TEDAVI_GUN üretir; bu tipler `tedavi` kategorisinde (ui.js:56)
+→ gecikmiş Buserin seansları Tedavi sekmesinde. **Yön:** Üreme eşlemesi vaka hastalık kategorisine göre de
+yapılmalı + planlı üreme görevleri için ASI_PLANLI'deki 7-gün penceresi gibi istisna (ui.js:696).
+
+**BUG-PROTOKOL-OVSYNC-AYRIK:** Panel yalnız `protokol_eksik_tara` (DOGUM/ILERI_GEBE/KIZGINLIK) +
+`ovsync_baslat_uyarilari` (yalnız açık OVSYNC_BASLAT, hedef−2g) okur (ui.js:1851-1905; rozet 425-440).
+Başlat'tan sonra zincir TEDAVI_SEANS olur → iki kaynağın dışına düşer. `bildirimKontrol` `!g.parent_id`
+ile seansları eler, gecikme kolu yok, `hedef_saat` okumaz (ui.js:10553,10560).
+**Yön:** aktif Üreme vakalarının gecikmiş/yaklaşan seanslarını dönen 3. kaynak → panel + `_rozetTopla`;
+bildirimKontrol parent_id'li seansları ve gecikmeyi kapsamalı. Bkz. BUG-CILA-PROTOCOL-FAMILY-BOS.
