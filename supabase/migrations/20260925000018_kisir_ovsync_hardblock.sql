@@ -56,6 +56,13 @@ BEGIN
 END;
 $$;
 
+-- MİMAR NOTU (2026-09-25, C1 ek kabul): bu migration'ın ilk taslağı guard'ı
+-- (uuid, boolean) imzasıyla kurdu; sonraki düzeltmede imza cases.animal_id'in
+-- tipine (text) çekildi. CREATE OR REPLACE farklı imzada ESKİ overload'u
+-- düşürmez — demo'da iki overload bir arada kaldı (ölü uuid overload'u ilk
+-- probe'ta 'function does not exist' üretmişti). Tek taşınabilir temizlik:
+DROP FUNCTION IF EXISTS public._kisir_ovsync_guard(uuid, boolean);
+
 -- ── 3) cases guard trigger'ı (BEFORE INSERT/UPDATE) ──────────────────────────
 CREATE OR REPLACE FUNCTION public._guard_cases_kisir_ovsync()
 RETURNS trigger
