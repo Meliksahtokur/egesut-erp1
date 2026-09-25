@@ -44,17 +44,17 @@ BEGIN
 
   -- ═══ T5 branşı (cila 20260925000006) — offline kuyruk replay'i iptal-PATCH'i
   --     İPTAL olarak kapatır; mevcut mantık ikame EDİLMEZ. Konum: NOT FOUND
-  --     kontrolünün hemen ardından, tamamlandi/iptal erken-dönüşlerinden ÖNCE
-  --     (idempotent: tekrar replay zararsız; replay-race'te nihai durum tutarlı).
-  IF p_iptal IS TRUE THEN
+  --     kontrolünün hemen ardından, tamamlandi/iptal erken-dönüşlerinden ÖNCE.
+  --     REVIEW DÜŞÜK-1 düzeltmesi (2026-09-25): tamamlandi-guard'ı — zaten
+  --     tamamlanmış (gerçek tamamlanma) görev, sonradan replay edilen bayat
+  --     iptal-PATCH'le İPTAL'e çevrİLMEZ; erken-dönüşe düşer ('zaten tamamlanmış').
+  --     İç IF NOT FOUND ölü koddur (dış FOR UPDATE zaten raise eder) — kaldırıldı.
+  IF p_iptal IS TRUE AND v_gorev.tamamlandi IS NOT TRUE THEN
     UPDATE public.gorev_log
        SET tamamlandi = true,
            tamamlanma_tarihi = COALESCE(tamamlanma_tarihi, now()),
            iptal = true
      WHERE id = p_gorev_id::uuid;
-    IF NOT FOUND THEN
-      RETURN jsonb_build_object('ok', false, 'mesaj', 'Görev bulunamadı');
-    END IF;
     INSERT INTO public.islem_log (tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)
     VALUES ('GOREV_TAMAMLA', v_gorev.hayvan_id, p_gorev_id, 'gorev_log',
             '{"olusturulan":[],"guncellenen":[],"silinen":[]}'::jsonb,
