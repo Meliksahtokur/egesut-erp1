@@ -73,9 +73,13 @@ test('P3: buton id escAttr ile girer (XSS disiplini)', () => {
 // ════════════════════════════════════════════════════════════════════════════
 const { _ovUyariSatirHtml, _showOvsyncYardim, _closeOvsyncYardim, _ovsyncBildirimBanner } = sandbox;
 
+// K4-UI (p5b-fix): panel satırları RPC filtresiyle daima hedef ≤ bugün+2 gelir;
+// fixture varsayılanı pencere SINIRINA (bugün+2, dahil → Başlat görünür) çekildi.
+const _iso = (d) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const _gunEkle = (n) => { const d = new Date(); d.setDate(d.getDate()+n); return _iso(d); };
 const _u = (over = {}) => ({
   gorev_id: 'gv-1', hayvan_id: 'h-1', kupe_no: '51', kategori: 'Düve',
-  hedef_tarih: '2026-10-06', hedef_saat: '10:00', tai_tarihi: '2026-10-16',
+  hedef_tarih: _gunEkle(2), hedef_saat: '10:00', tai_tarihi: '2026-10-16',
   taban_turu: 'duve', kisir: false, ...over,
 });
 
@@ -153,4 +157,20 @@ test('S4/E.6: iki Başlat butonu da data-h + 2-arg çağrı taşır; panel Başl
   assert.match(kart, /ovsyncBaslat\(this\.dataset\.g,this\.dataset\.h\)/);
   const panel = _ovUyariSatirHtml(_u());
   assert.match(panel, /onclick="event\.stopPropagation\(\);ovsyncBaslat\(this\.dataset\.g,this\.dataset\.h\)"/);
+});
+
+test('K4-UI: hedef−2 penceresi dışında Başlat ÇİZİLMEZ (kart + panel); ✕ kalır; pencere içi görünür', () => {
+  const ileride = _gunEkle(10); // bugün+10 → pencereGun 10 > 2
+  const kart = _ovsyncBaslatBtnHtml({ id:'g9', hayvan_id:'h-1', gorev_tipi:'OVSYNC_BASLAT', tamamlandi:false, iptal:false, hedef_tarih: ileride });
+  assert.ok(!kart.includes('▶ Başlat'), 'pencere dışı kartta Başlat olmamalı');
+  assert.ok(kart.includes('8 gün sonra başlatılabilir'), 'bilgi etiketi basılmalı');
+  assert.match(kart, /ovsyncIptal/, '✕ pencere dışında da çizilmeli');
+  // panel satırı aynı koşulda (bayat-önbellek savunması — RPC filtresi tek başına yeterli değil)
+  const panel = _ovUyariSatirHtml(_u({ hedef_tarih: ileride }));
+  assert.ok(!panel.includes('▶ Başlat'), 'pencere dışı panelde Başlat olmamalı');
+  assert.match(panel, /gün sonra başlatılabilir/);
+  assert.match(panel, /ovsyncIptal/);
+  // pencere içi (bugün+1) → Başlat görünür
+  const kart2 = _ovsyncBaslatBtnHtml({ id:'g8', hayvan_id:'h-1', gorev_tipi:'OVSYNC_BASLAT', tamamlandi:false, iptal:false, hedef_tarih: _gunEkle(1) });
+  assert.ok(kart2.includes('▶ Başlat'), 'pencere içi kartta Başlat olmalı');
 });
