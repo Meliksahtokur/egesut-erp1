@@ -273,6 +273,10 @@ Erteleme DONE #5 (ön-var). **Kabul:** görev iptali instance'ı da kapatır.
 ### DEBT-HIZLI-PG-KAPI-UI — Hızlı Uygulama ile PG: onay penceresi yerine "hata" [fixed 2026-09-26 — p5b-fix K3: hayvan detay Hızlı Uygulama _pgKapiHata zincirine bağlandı; ön-var (main'de de vardı); UI testi p5c R10 PASS]
 **Sahip:** "173'e hızlı uygulama ile PG yaptım hata verdi". **Ölçüm (demo, BEGIN…ROLLBACK):** sunucu `PG_KAPI:REQUIRE_ACK_PENDING` döndürüyor (173, 57 gün önce tohumlanmış, sonuç Bekliyor) — bu KASITLI kapı; UI `_pgKapiHata` (ui.js:1088) mesajın `^PG_KAPI:` ile BAŞLAMASINI bekliyor. Onay penceresi açılmadıysa mesaj bir katmanda önek almış olabilir (api.js rpc hata yolu `main`'e göre değişti: `data.mesaj || data.error`). **Kabul:** Bekliyor/gebe hayvana PG → onay penceresi (Boş ata ve uygula / vazgeç); main'de davranış karşılaştırması (regresyon mu ön-var mı).
 
+### DEBT-YAS-GOSTERIM-GUN — Hayvan kartı yaşı ay seviyesinde gösteriyor; 12 ay 21 günlük düve "1 yıl 0 ay" görünüyor [open]
+- Sahip 2026-09-26 sahada fark etti: prod 32 (doğum 05.09.2025) bugün 386 gün = 1 yıl 0 ay **21 gün**, kart "1 yıl 0 ay" yazıyor → Ovsync'e "12 aylık düve girmiş" izlenimi (kural 12 ay 21 gün, veri doğru — domain-rules §18.1).
+- İstenen: genç dişilerde (öneri: < 2 yaş) yaş gün hanesiyle ("1 yıl 0 ay 21 gün"); üreme kuralları gün hassasiyetinde. Küçük UI kalemi (yaş biçimleyici, detay kartı başlığı).
+
 ### DEBT-PG-TAI-SAAT — Test inek 3: PG sonrası TAI +48s yerine ~+59s (28.09 09:00) [open — doğrulanmalı]
 **Sahip:** "48 değil 72 saat sonra görev oluşturması — saatten kaynaklı da olabilir". Muhtemel neden `_tohumlama_pencere` yuvarlaması (akşam PG → +48s gece → ertesi sabah penceresine). **Kabul:** kural belgelensin; sahip isterse yuvarlama yönü (önceki akşam / sonraki sabah) ayarı. Ayrıca sahip: "var olan planlı tohumlama PG'ye göre yeniden tarihlensin" — E3 vakayı kapatıp yeni TAI açıyor; sonuç aynı, sahip kabul etti.
 
