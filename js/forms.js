@@ -521,9 +521,14 @@ async function _ovsyncAileHastalikIdSet(){
 }
 
 // diseases dropdown'u DB'den doldur
+// K6 — yarış-guard: doldurma çağrıları sıralanır; innerHTML'i yalnız EN SON
+// çağrı yazabilir (bayat async doldurma taze seçimi/DOM'u ezmez).
+let _ddFillSeq = 0;
 async function loadDiseasesDropdown() {
   const sel = g('d-disease-id');
   if (!sel) return;
+  const my = ++_ddFillSeq;
+  const oncekiDeger = sel.value;
   const list = await idbGetAll('diseases');
   
   // Kızgınlık tedavi akışından geliniyorsa sadece Üreme hastalıklarını göster
@@ -544,6 +549,11 @@ async function loadDiseasesDropdown() {
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(d);
   });
+
+  // K6 — bayat async doldurma yazmasın: bu çağrıdan yenisi açıldıysa çık
+  // (innerHTML yazımından hemen önce — kilit çözümündeki ikinci await'i de kapsar)
+  if (my !== _ddFillSeq) return;
+
   sel.innerHTML = '<option value="">— Hastalık seçin —</option>';
   Object.keys(grouped).sort((a,b) => a.localeCompare(b, 'tr', {sensitivity:'base'})).forEach(cat => {
     const og = document.createElement('optgroup');
@@ -559,6 +569,15 @@ async function loadDiseasesDropdown() {
     });
     sel.appendChild(og);
   });
+
+  // K6 — seçim-koruma: önceki değer yeni listede hâlâ seçilebilir durumdaysa
+  // geri koy. Kilitliyse/kalktıysa geri KONMAZ — düşme halinde mevcut
+  // onDiseaseSelect zinciri çalışır (kategori etiketi gizle + şablon bloğu
+  // kapa); korunursa onDiseaseSelect ÇAĞRILMAZ, DOM'a dokunulmaz.
+  if (oncekiDeger) {
+    const opt = [...sel.options].find(o => o.value === oncekiDeger);
+    if (opt && !opt.disabled) { sel.value = oncekiDeger; return; }
+  }
 
   // Sadece Üreme ise info notu ekle
   if (sadeceUreme) {
@@ -806,6 +825,7 @@ function bcChipEkle(hayvan){
     cinsiyet: hayvan.cinsiyet ?? null,
     dogum_tarihi: hayvan.dogum_tarihi ?? null,
     durum: hayvan.durum ?? null,
+    kisir: !!hayvan.kisir, // K6 — submitBulkCase kısır-düşme filtresi (2529) bunu okur
   });
   bcChipsRender();
   return true;
