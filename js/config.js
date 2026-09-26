@@ -189,6 +189,8 @@ const PG_HATA_SOZLUGU = {
   'KATALOG_SINIF_KODU_KILITLI': 'Bu katalog satırının sınıf kodu kilitli — değiştirilemez.',
   // cila2 C1 — DB 000018 trigger/şablon guard RAISE kodu
   'KISIR_HAYVAN_OVSYNC_YASAK': 'Kısır işaretli hayvana Ovsync protokolü açılamaz.',
+  // K4 (p5b-fix) — ovsync_baslat erken çağrı kapısı RAISE kodu (000002)
+  'OVSYNC_ERKEN': 'Protokol henüz başlatılamaz — pencere hedef tarihten 2 gün önce açılır.',
   // E1-UI (erteleme-genel D18): gorev_ertele RAISE ailesi. Mesaj gövdesi
   // 'KOD:{"sebep":"ALT_TIP",…}' biçiminde gelir; getUserMessage adım-2 includes
   // eşleşmesi sebep kodlarını JSON içinden yakalar — alt tipler aile-jenerik

@@ -1297,22 +1297,34 @@ function _kalanGunEtiket(t){
   if(gun===0) return '<span style="font-size:.62rem;color:#b8860b">· bugün</span>';
   return `<span style="font-size:.62rem;color:var(--red2)">· ${-gun} gün gecikmiş</span>`;
 }
+// K4 (p5b-fix): OVSYNC_BASLAT başlatma penceresi — hedef güne kalan gün
+// (_kalanGunEtiket matematiği: yerel geceyarısı normalize + T00:00:00 ayrıştırma);
+// hedef_tarih yoksa null. Pencere hedef−2 gününde açılır (DB 000002 aynası).
+function _ovsyncBaslatPencereGunu(t){
+  if(!t?.hedef_tarih) return null;
+  const bugun=new Date(); bugun.setHours(0,0,0,0);
+  const h=new Date(t.hedef_tarih+'T00:00:00');
+  return Math.round((h-bugun)/86400000);
+}
 // P3/P4: OVSYNC_BASLAT kart butonları — [Başlat] atomik RPC, [İptal] mevcut PATCH yolu
 // P3/P4: OVSYNC_BASLAT kart butonları — [Başlat] atomik RPC, [İptal] mevcut PATCH yolu
 // S1 (ortak yardımcı): OVSYNC_BASLAT kısır-kilit + Başlat/İptal markup'ı — görev kartı
 // (_ovsyncBaslatBtnHtml) ve protokol paneli (_ovUyariSatirHtml) TEK buradan alır;
 // kopylar drift etmişti (başlatılamaz / üreme planı yok) — kilit metni tek: "başlatılamaz".
 // stopProp=false: çağıran sarmalayıcı zaten event.stopPropagation() yapıyor (panel satırı).
-function _ovsyncBaslatKilitHtml(kisir, gorevId, hayvanId, stopProp){
+function _ovsyncBaslatKilitHtml(kisir, gorevId, hayvanId, stopProp, pencereGun){
   const _ipt=`<button data-g="${escAttr(gorevId)}" onclick="${stopProp?'event.stopPropagation();':''}ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`;
   if(kisir) return `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — başlatılamaz</span>${_ipt}`;
+  // K4 (p5b-fix): pencere henüz kapalı — ▶ Başlat ÇİKMEZ; RPC erken çağrı kapısı
+  // (000002 OVSYNC_ERKEN) UI katında aynalanır. Kısır kilidi önceliği korunur.
+  if(typeof pencereGun==='number' && pencereGun>2) return `<span style="font-size:.62rem;font-weight:700;color:var(--ink3)">📅 ${pencereGun-2} gün sonra başlatılabilir</span>${_ipt}`;
   return `<button data-g="${escAttr(gorevId)}" data-h="${escAttr(hayvanId)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g,this.dataset.h)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>${_ipt}`;
 }
 // S1: kisir hayvanda Başlat YOK, kilitli rozet VAR; ✕ her durumda çizilir.
 function _ovsyncBaslatBtnHtml(t){
   if(t.gorev_tipi!=='OVSYNC_BASLAT'||t.tamamlandi||t.iptal) return '';
   const _h=(typeof getState==='function'?getState('animals'):[]).find(a=>a.id===t.hayvan_id);
-  return _ovsyncBaslatKilitHtml(!!(_h&&_h.kisir), t.id, t.hayvan_id, true);
+  return _ovsyncBaslatKilitHtml(!!(_h&&_h.kisir), t.id, t.hayvan_id, true, _ovsyncBaslatPencereGunu(t));
 }
 // E1-UI: genel [🗓️ Ertele] butonu — kural cache'den (JS'e tip listesi YAZILMAZ):
 // ertelenebilir tipteki AÇIK görev kartlarında çizilir (OVSYNC_BASLAT kartında
@@ -2200,7 +2212,7 @@ function _ovUyariSatirHtml(u){
         <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
           ${oneriMi
             ? '<span style="font-size:.62rem;font-weight:700;color:#b8860b">📅 Görev hedef gününde otomatik açılır</span>'
-            : _ovsyncBaslatKilitHtml(!!u.kisir, u.gorev_id, u.hayvan_id, false)}
+            : _ovsyncBaslatKilitHtml(!!u.kisir, u.gorev_id, u.hayvan_id, false, _ovsyncBaslatPencereGunu(u))}
         </div>
       </div>`;
 }
@@ -2847,9 +2859,19 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
   if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
-    const res = await rpc('hizli_uygulama', {
+    const params = {
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: ''
+    };
+    // P5: PG kapısı reaktif — sunucu RAISE'ı _pgKapiHata yakalar; onaylı tekrar
+    // aynı parametrelere p_pg_onay/p_pg_gerekce eklenerek gönderilir (tek ekranda)
+    const res = await rpc('hizli_uygulama', params).catch(e => {
+      const retry = (onay, gerekce) => rpc('hizli_uygulama', {
+        ...params, p_pg_onay: onay, p_pg_gerekce: gerekce || null
+      });
+      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
+      throw e;
     });
+    if (res?._pgKapi) return;
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
@@ -9447,6 +9469,8 @@ function acHayvan(inputId,listId){
 function selHayvan(inputId,listId,val){
   const el=document.getElementById(inputId); if(el) el.value=val;
   const ac=document.getElementById(listId); if(ac) ac.style.display='none';
+  // K6 — hayvan seçimi hastalık dropdown'unu kısır kilidiyle tazeler (cila2 C1 aynası)
+  if(inputId==='d-hid' && typeof loadDiseasesDropdown==='function') loadDiseasesDropdown();
 }
 // G-20260906-TOPLU-VAKA — m-bulk-case çoklu küpe autocomplete.
 // acHayvan klonu (tek-select akışı %100 korunur): satır seçimi inputa YAZMAZ,
