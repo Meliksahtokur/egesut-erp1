@@ -343,11 +343,10 @@ async function submitInsem(btn) {
     globalThis._vwpOverride = false;
     globalThis._planliTohumlamaGorevId = null;
     // P9: tohumlama senkronizasyon vakasını kapattıysa additive özet (tek alert)
-    const kapatilan = result?.kapatilan_senkronizasyon_vakalari || result?.kapatilan_ovsyncler || [];
-    if (Array.isArray(kapatilan) && kapatilan.length) {
-      const ozet = kapatilan.map(v => `${v.hayvan_kupe || v.kupe_no || ''} (${v.iptal_seans ?? '?'} seans iptal)`).join(', ');
-      toast(`✅ Tohumlama kaydedildi — ${kapatilan.length} senkronizasyon protokolü tohumlama ile sonlandırıldı: ${ozet}`);
-    }
+    // D19: ölü 'kapatilan_ovsyncler' fallback'i silindi; özete iptal-görev sayısı eklendi
+    const kapatilan = result?.kapatilan_senkronizasyon_vakalari || [];
+    const _ozet = _vakaKapanisOzeti(kapatilan, result?.otomatik_bos_sayisi);
+    if (_ozet) toast(_ozet);
 
     toast('✅ Tohumlama kaydedildi + 2 kontrol görevi oluşturuldu');
 
@@ -501,10 +500,35 @@ async function submitKizginlik(btn) {
 }
 
 // ── VAKA AÇ (CLN-02) ────────────────────────
+// cila2 C1 — kısır hayvanda Ovsync hardblock (istemci aynası; DB 000018 fail-closed).
+// OVSYNC ailesi hastalıklarını sablon_hastalik_eslem × tedavi_sablonu'dan çözer.
+function _ovsyncAileHastalikIdleri(eslem, sablonlar){
+  const ovids = new Set((sablonlar||[]).filter(s=>s && s.protokol_ailesi==='OVSYNC').map(s=>s.id));
+  return new Set((eslem||[]).filter(e=>ovids.has(e.sablon_id)).map(e=>e.disease_id));
+}
+// Kısır + OVSYNC-aile hastalığıysa Türkçe sebep, değilse null (pure — unit testli).
+function _kisirOvsyncNedeni(hayvan, diseaseId, ovsyncIds){
+  if(!hayvan || !hayvan.kisir || !diseaseId) return null;
+  return (ovsyncIds && ovsyncIds.has(diseaseId))
+    ? 'kısır işaretli — Ovsync protokolü açılamaz' : null;
+}
+async function _ovsyncAileHastalikIdSet(){
+  try{
+    const eslem = await idbGetAll('sablon_hastalik_eslem');
+    const sablonlar = await idbGetAll('tedavi_sablonu');
+    return _ovsyncAileHastalikIdleri(eslem, sablonlar);
+  }catch(e){ console.warn('[ovsync-kisir] eşlem okunamadı — DB katmanı keser:', e); return new Set(); }
+}
+
 // diseases dropdown'u DB'den doldur
+// K6 — yarış-guard: doldurma çağrıları sıralanır; innerHTML'i yalnız EN SON
+// çağrı yazabilir (bayat async doldurma taze seçimi/DOM'u ezmez).
+let _ddFillSeq = 0;
 async function loadDiseasesDropdown() {
   const sel = g('d-disease-id');
   if (!sel) return;
+  const my = ++_ddFillSeq;
+  const oncekiDeger = sel.value;
   const list = await idbGetAll('diseases');
   
   // Kızgınlık tedavi akışından geliniyorsa sadece Üreme hastalıklarını göster
@@ -513,6 +537,11 @@ async function loadDiseasesDropdown() {
     ? list.filter(d => (d.category || '').toLowerCase() === 'üreme')
     : list;
 
+  // cila2 C1: kısır işaretli hayvanda OVSYNC-aileli hastalıklar KİLİTLİ
+  // (DB 000018 aynası — seçenek görünür ama seçilemez, sebep Türkçe).
+  const aktifHayvan = (typeof hayvanByKupeRef === 'function' && v('d-hid')) ? hayvanByKupeRef(v('d-hid')) : null;
+  const ovsyncIds = (aktifHayvan && aktifHayvan.kisir) ? await _ovsyncAileHastalikIdSet() : null;
+
   // Kategoriye göre grupla
   const grouped = {};
   filtrelenmis.forEach(d => {
@@ -520,6 +549,11 @@ async function loadDiseasesDropdown() {
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(d);
   });
+
+  // K6 — bayat async doldurma yazmasın: bu çağrıdan yenisi açıldıysa çık
+  // (innerHTML yazımından hemen önce — kilit çözümündeki ikinci await'i de kapsar)
+  if (my !== _ddFillSeq) return;
+
   sel.innerHTML = '<option value="">— Hastalık seçin —</option>';
   Object.keys(grouped).sort((a,b) => a.localeCompare(b, 'tr', {sensitivity:'base'})).forEach(cat => {
     const og = document.createElement('optgroup');
@@ -527,12 +561,23 @@ async function loadDiseasesDropdown() {
     grouped[cat].forEach(d => {
       const o = document.createElement('option');
       o.value = d.id;
-      o.textContent = d.name;
+      const kisirKilit = _kisirOvsyncNedeni(aktifHayvan, d.id, ovsyncIds);
+      o.textContent = kisirKilit ? `${d.name} — 💲 ${kisirKilit}` : d.name;
+      o.disabled = !!kisirKilit;
       o.dataset.category = d.category || '';
       og.appendChild(o);
     });
     sel.appendChild(og);
   });
+
+  // K6 — seçim-koruma: önceki değer yeni listede hâlâ seçilebilir durumdaysa
+  // geri koy. Kilitliyse/kalktıysa geri KONMAZ — düşme halinde mevcut
+  // onDiseaseSelect zinciri çalışır (kategori etiketi gizle + şablon bloğu
+  // kapa); korunursa onDiseaseSelect ÇAĞRILMAZ, DOM'a dokunulmaz.
+  if (oncekiDeger) {
+    const opt = [...sel.options].find(o => o.value === oncekiDeger);
+    if (opt && !opt.disabled) { sel.value = oncekiDeger; return; }
+  }
 
   // Sadece Üreme ise info notu ekle
   if (sadeceUreme) {
@@ -612,6 +657,13 @@ async function submitCase(btn) {
 
   const hayvan = hayvanByKupeRef(hid); // K7: küpe eşleşmesinde aktif önce
   if (!hayvan) { toast(`⚠️ "${hid}" sürüde kayıtlı değil`, true); return; }
+
+  // cila2 C1: kısır + OVSYNC-aile hastalığı → istemcide engelle (DB 000018 aynası)
+  if (hayvan.kisir) {
+    const ovsyncIds = await _ovsyncAileHastalikIdSet();
+    const kisirNeden = _kisirOvsyncNedeni(hayvan, diseaseId, ovsyncIds);
+    if (kisirNeden) { toast(`⚠️ ${hayvan.kupe_no || hid}: ${kisirNeden}`, true); return; }
+  }
 
   if (btn) { btn.disabled = true; btn.textContent = 'Açılıyor…'; }
   try {
@@ -773,6 +825,7 @@ function bcChipEkle(hayvan){
     cinsiyet: hayvan.cinsiyet ?? null,
     dogum_tarihi: hayvan.dogum_tarihi ?? null,
     durum: hayvan.durum ?? null,
+    kisir: !!hayvan.kisir, // K6 — submitBulkCase kısır-düşme filtresi (2529) bunu okur
   });
   bcChipsRender();
   return true;
@@ -2483,11 +2536,23 @@ function bcSonucBantlari(satirlar, opts){
 // listesini gözden geçirir; form sıfırlanmaz (chips kalır).
 async function submitBulkCase(btn){
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
-  const liste = globalThis._bcHayvanlar || [];
+  let liste = globalThis._bcHayvanlar || [];
   if (!liste.length) { toast('⚠️ En az bir hayvan seçin', true); return; }
   if (liste.length > 200) { toast('⚠️ En fazla 200 hayvan', true); return; }
   const diseaseId = v('bc-disease-id');
   if (!diseaseId) { toast('⚠️ Hastalık seçin', true); return; }
+
+  // cila2 C1: OVSYNC-aile hastalığında kısır işaretli hayvanlar AÇILAMAZ
+  // (DB 000018 fail-closed) — istemci aynası: kısır olanları düşür, bildir.
+  const bcOvsyncIds = await _ovsyncAileHastalikIdSet();
+  if (bcOvsyncIds.has(diseaseId)) {
+    const kisirli = liste.filter(h => h.kisir);
+    if (kisirli.length) {
+      liste = liste.filter(h => !h.kisir);
+      toast(`⚠️ ${kisirli.length} kısır işaretli hayvan atlandı — Ovsync protokolü açılamaz`, true);
+      if (!liste.length) return;
+    }
+  }
 
   // V1.1/V2 manuel çoklu gün yolu — toplayıcı hatalıysa ilk hata toast'lanır
   // ve akış durur; kalem varsa p_items yolu açılır (p_sablon_id null —
@@ -4004,6 +4069,19 @@ function sorunToggle(cb) {
 // (seans planı düzenleme ve erken kapat ui.js'de: caseSeansFormAc, caseErkenKapat*)
 // ══════════════════════════════════════════
 
+// D19: vaka-kapanış özeti — N senkron vakası / M otomatik-iptal görevi > 0 ise cümle;
+// hepsi 0 → null (çağıran standart toast'a düşer)
+function _vakaKapanisOzeti(kapatilan, otoBos){
+  const n = Array.isArray(kapatilan) ? kapatilan.length : 0;
+  const m = otoBos | 0;
+  if (!n && !m) return null;
+  let s = '✅ Tohumlama kaydedildi';
+  if (n) s += ' — ' + n + ' senkronizasyon protokolü tohumlama ile sonlandırıldı: '
+    + kapatilan.map(v => `${v.hayvan_kupe || v.kupe_no || ''} (${v.iptal_seans ?? '?'} seans iptal)`).join(', ');
+  if (m) s += (n ? ',' : ' —') + ' ' + m + ' görev otomatik iptal edildi';
+  return s;
+}
+
 async function seansTamamla(seansId, uygulanmadi, btn) {
   if (!seansId) { toast('❌ Seans ID eksik', true); return; }
   const row = btn?.closest('.seans-row, .seans-gorev-card');
@@ -4011,6 +4089,7 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
   if (btn) btn.textContent = '…';
   try {
     const res = await rpcSeansTamamla(seansId, uygulanmadi, null);
+    if (res?._pgKapi) return;   // T3: PG kapı modalı açıldı — sahte başarı toast'u YOK (modal akışı yönetir)
     toast(uygulanmadi ? '↩ Yapılamadı işaretlendi, stok iade edildi' : '✓ Seans tamamlandı');
     await pullTables(['treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'treatment_days', 'gorev_log', 'cases']);
     // Açık görünümleri tazele

@@ -59,6 +59,42 @@ const _katTipMap={
   diger:  null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
+const _planliUremeTipler=['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'];   // K7: planlı üreme görevleri Bugün'de 7-gün pencereyle (ASI_PLANLI örneği)
+// C3 (cila2): üreme-vaka kümesi hastalık KATEGORİSİ değil PROTOKOL AİLESİ bazlıdır.
+// K7'nin category='Üreme' ayrımı Metrit/Endometrit gibi tedavi vakalarının
+// seanslarını Üreme filtresine sızdırıyordu (BUG-UREME-FILTRE-SIZINTI).
+// protocol_family='OVSYNC' damgası (K4, 20260925000013:144-147) yalnız başlamış
+// ovsync zincirlerine yazılır — Metrit vb. NULL kalır, Tedavi'de listelenir.
+function _uremeVakaCaseIds(cases){
+  return new Set((cases||[]).filter(c=>c&&c.protocol_family==='OVSYNC').map(c=>c.id));
+}
+function _uremeGorevMi(t,uremeCaseIdler,tdById,seansById){
+  if(!t) return false;
+  if((_katTipMap.ureme||[]).includes(t.gorev_tipi)) return true;
+  if(t.gorev_tipi==='TEDAVI_SEANS'){
+    const s=seansById&&seansById[t.seans_admin_id];
+    const td=s&&tdById&&tdById[s.treatment_day_id];
+    return !!(td&&uremeCaseIdler&&uremeCaseIdler.has(td.case_id));
+  }
+  if(t.gorev_tipi==='TEDAVI_GUN'){
+    let a={}; try{ a=JSON.parse(t.aciklama||'{}'); }catch(e){}
+    const td=a.day_id&&tdById&&tdById[a.day_id];
+    return !!(td&&uremeCaseIdler&&uremeCaseIdler.has(td.case_id));
+  }
+  return false;
+}
+function _kategoriFiltreUygun(t,kat,uremeCaseIdler,tdById,seansById){
+  if(kat==='all') return true;
+  if(kat==='diger') return !_allKatTips.includes(t.gorev_tipi);
+  if(kat==='ureme') return _uremeGorevMi(t,uremeCaseIdler,tdById,seansById);
+  if(kat==='tedavi') return (_katTipMap.tedavi||[]).includes(t.gorev_tipi)&&!_uremeGorevMi(t,uremeCaseIdler,tdById,seansById);
+  return (_katTipMap[kat]||[]).includes(t.gorev_tipi);
+}
+function _bugunFiltreUygun(t,today,d7){
+  if(t.hedef_tarih===today) return true;
+  const planli=t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI'||_planliUremeTipler.includes(t.gorev_tipi);
+  return planli&&t.hedef_tarih>today&&t.hedef_tarih<=d7;
+}
 function setTaskKat(kat,btn){
   _taskKategori=kat;
   document.querySelectorAll('.kat-btn').forEach(b=>b.classList.remove('on'));
@@ -267,7 +303,7 @@ function _dashSutBuzagiBandi(animals,vaccines,vaxLogs,tasks,schRows,kesimEsik,to
   const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🍼 Süt İçen Buzağılar (${liste.length}) ${kesimBtn}</span>`;
   return band((gecikVar||liste.some(a=>a.yas>=esik))?'red':'amber',title,rows.join(''));
 }
-function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml){
+function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml,muayeneList){
   const _dd=ddMap||{};
   const _getDis=t=>{if(t.gorev_tipi!=='TEDAVI_GUN')return '';try{return _dd[JSON.parse(t.aciklama||'{}').day_id]||'';}catch(e){return '';}};
   const _rt=(t,cls)=>renderTask(t,cls,[],[],_getDis(t));
@@ -309,13 +345,19 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
       }).join(''));
   }
   if(sutBuzagiHtml) h+=sutBuzagiHtml;   // 🍼 Süt İçen Buzağılar — ileri gebelerin hemen altı
+  // S2: 🔬 Gebelik Muayenesi Bekleyenler — sessiz bandının HEMEN ÜSTÜNDE izole kırmızı bant
+  if((muayeneList||[]).length){
+    const mTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">🔬 Gebelik Muayenesi Bekleyenler (${muayeneList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
+    h+=band('red',mTitle,
+      muayeneList.slice(0,8).map(m=>`<div class="arow" onclick="openDet('${escAttr(m.hayvan_id)}')"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`).join(''));
+  }
   if((sessizList||[]).length){
     const sTitle=`<span style="display:flex;align-items:center;gap:8px;width:100%">❗ Sessiz Hayvanlar (${sessizList.length})<button onclick="_showSessizList()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--red2);background:rgba(192,50,26,.1);color:var(--red2);cursor:pointer;white-space:nowrap;margin-left:auto">Tümünü Gör →</button></span>`;
     const sessizTop=[...(sessizList||[])].sort((a,b)=>{const af=a.sessiz_gun>=9999?1:0,bf=b.sessiz_gun>=9999?1:0;return af-bf||b.sessiz_gun-a.sessiz_gun;});
     h+=band('red',sTitle,
       sessizTop.slice(0,8).map(s=>{
         const gunTxt=s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz';
-        return `<div class="arow" onclick="openDet('${s.hayvan_id}')"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${gunTxt} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+        return `<div class="arow" onclick="openDet('${escAttr(s.hayvan_id)}')"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${gunTxt} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
       }).join(''));
   }
   if(nearBirth.length){
@@ -397,6 +439,10 @@ async function loadDash(){
     let sessizList=[];
     try{ const sl=await rpc('sessiz_hayvanlar_listele',{}); if(sl&&sl.length) sessizList=sl; }catch(e){/* sessiz */}
 
+    // 🔬 Gebelik muayenesi listesi (S2) — band, sessiz bandının hemen üstünde
+    let muayeneList=[];
+    try{ const ml=await rpc('gebelik_muayene_listele',{}); if(ml&&ml.length) muayeneList=ml; }catch(e){/* sessiz — RPC henüz yoksa bantsız devam */}
+
     // TEDAVI_GUN teşhis haritası (dashboard kartları için)
     const _dtDays=await idbGetAll('treatment_days').catch(()=>[]);
     const _dtDiseases=await idbGetAll('diseases').catch(()=>[]);
@@ -408,17 +454,30 @@ async function loadDash(){
 
     // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
     // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
-    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
+      // E1-UI: erteleme kural cache'i her dash yüklenişinde tazelenir
+      // (ovsync_baslat_uyarilari deseni — salt-okuma RPC, haritada değil)
+      await ertelemeKurallariYenile(true);
       const proto = await rpc('protokol_eksik_tara', {});
       window.__protokolUyarilar = Array.isArray(proto) ? proto : [];
       const aktif = window.__protokolUyarilar.filter(u => u.durum === 'eksik' || u.durum === 'yaklasan');
+      // T10: rozet İlk Tohumlama uyarılarını da sayar (panelin tek diğer kaynağı)
+      let ovSayi = 0;
+      try {
+        const ov = await rpc('ovsync_baslat_uyarilari', {});
+        window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
+        ovSayi = window.__ovsyncUyarilar.length;
+      } catch(e) { console.warn('ovsync_baslat_uyarilari (rozet):', e.message); }
+      // C4 (cila2): K8'in 3. rozet kaynağı (ovsync seans uyarıları) geri alındı —
+      // sahip "ana listeye monte etmişler, ben böyle bir şey istemedim; sabahki yeterli".
+      const toplam = _rozetTopla(aktif.length, ovSayi);
       const bb = document.getElementById('bellbadge');
       if (bb) {
-        bb.textContent = aktif.length > 99 ? '99+' : aktif.length;
-        bb.style.display = aktif.length > 0 ? 'flex' : 'none';
+        bb.textContent = toplam > 99 ? '99+' : toplam;
+        bb.style.display = toplam > 0 ? 'flex' : 'none';
       }
     } catch(e) { console.warn('protokol_eksik_tara:', e.message); }
     // Transfer görev reconciliation (trigger'dan kaçanları kapat — idempotent)
@@ -540,6 +599,11 @@ function showHasta(){
 // ── ERTELENMİŞ COMMIT (Model A) — bekleyen tamamlamalar ──
 // Inline ✓ tıkları anında RPC göndermez; kuyruğa girer, filtre/sayfa değişiminde flush edilir.
 let _pendingDone = new Map();   // key(gorevId|seansId) → {type,gorevId,params,cardId}
+let _flushInFlight = false;   // K9: tek-uçuş kilidi — eşzamanlı flush çağrısı ikinci gönderim açmaz
+let _flushHataToast = new Map();   // K9: key → {msg,ts} — kalıcı hatada tekrar toast soğuması (5 dk)
+let _flushBeklenen = null;    // F4/K9: uçuştaki flush'in promise'i — kilitliyken çağıranlar bunu bekler (sessiz erken dönüş yok)
+let _flushOpMs = 30000;       // F4/K9: op başına ağ zaman sınırı — timeoutsuz askıda RPC kilidi soket ölümüne dek tutmasın
+let _flushPullMs = 60000;     // F4/K9: kapanış pullTables'ının sınırı (7 tablo — daha cömert)
 function _savePending(){
   try { localStorage.setItem('_pendingDone', JSON.stringify([..._pendingDone.values()])); } catch(e){}
 }
@@ -582,18 +646,40 @@ function togglePendingDone(type, gorevId, btn, extra){
 }
 async function flushPendingDone(){
   if(!_pendingDone.size) return;
+  if(_flushInFlight) return _flushBeklenen;   // K9+F4: tek-uçuş — ikinci gönderim açmaz; uçuşun BİTİŞİ beklenir (loadTasks bayat IDB'den render etmez)
   if(!navigator.onLine){ toast('⚠️ Çevrimiçi olunca uygulanacak'); return; }
-  const items=[..._pendingDone.values()];
-  _pendingDone.clear(); _savePending(); updatePendingFab();
-  for(const it of items){
-    try {
-      if(it.type==='seans') await rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null);
-      else if(it.type==='besleme') await rpc('besleme_tamam', {p_gorev_id:it.params.gorevId});
-      else if(it.type==='gorev') await rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null});
-    } catch(e){ toast('❌ Görev uygulanamadı: '+(e.message||''), true); }
-  }
-  try { await pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']); } catch(e){}
-  if(typeof updateTaskBadge==='function') updateTaskBadge();
+  _flushInFlight=true;
+  // F4/K9: rpc()/pullTables timeoutsuz — tek askıda ağ çağrısı kilidi soket ölümüne/page reload'a
+  // kadar tutuyordu. Op başına zaman sınırı: aşarsa op hata sayılır (pending'de kalır + toast),
+  // kilit serbest kalır; aşan RPC arka planda sonuçlansa bile tamamlandı idempotenttir.
+  const _rz=(p,ms,ne)=>{ let _t; const _ta=new Promise((_,rej)=>{ _t=setTimeout(()=>rej(new Error('zaman aşımı: '+(ne||'işlem'))), ms); }); return Promise.race([p,_ta]).finally(()=>clearTimeout(_t)); };
+  const run=(async()=>{
+    const items=[..._pendingDone.values()];
+    for(const it of items){
+      try {
+        if(it.type==='seans') await _rz(rpcSeansTamamla(it.params.seansId, it.params.uygulanmadi, null), _flushOpMs, 'seans gönderimi');
+        else if(it.type==='besleme') await _rz(rpc('besleme_tamam', {p_gorev_id:it.params.gorevId}), _flushOpMs, 'görev gönderimi');
+        else if(it.type==='gorev') await _rz(rpc('gorev_tamamla', {p_gorev_id:it.params.gorevId, p_padok_hedef:it.params.padok||null}), _flushOpMs, 'görev gönderimi');
+        _pendingDone.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);   // K9: yalnız BAŞARILI op düşer; uçuşta eklenenlere dokunulmaz
+        _flushHataToast.delete(it.type==='seans'?it.params.seansId:it.params.gorevId);
+      } catch(e){
+        const _msg=String((e&&e.message)||e);
+        const _key=it.type==='seans'?it.params.seansId:it.params.gorevId;
+        const _prev=_flushHataToast.get(_key);
+        const _now=Date.now();
+        if(!_prev||_prev.msg!==_msg||_now-_prev.ts>5*60*1000){
+          toast('❌ Görev uygulanamadı: '+_msg, true);
+          _flushHataToast.set(_key,{msg:_msg,ts:_now});
+        }
+        /* op pending'de kalır */
+      }
+    }
+    _savePending(); updatePendingFab();
+    try { await _rz(pullTables(['gorev_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','cases']), _flushPullMs, 'veri yenileme'); } catch(e){}
+    if(typeof updateTaskBadge==='function') updateTaskBadge();
+  })();
+  _flushBeklenen=run.catch(()=>{});   // F4/K9: bekleyen çağıranlar reddi yutulmuş promise alır (eski sessiz-dönüş semantiği)
+  try { await run; } finally { _flushInFlight=false; _flushBeklenen=null; }
 }
 async function recoverPendingDone(){
   try {
@@ -628,7 +714,22 @@ async function loadTasks(f,btn,opts){
     const today=bugun();
     // skipPull: çağıran zaten pullTables yaptıysa içerideki tekrar pull'u atla (çift network fix)
     if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
+    // E1-UI: kural cache boşsa bir kez çek — genel [Ertele] butonları ilk
+    // render'da kurallı çizilsin (cache doluysa/60sn sükunette no-op; sonrasında
+    // loadDash rozet tarayıcısı tazeler)
+    await ertelemeKurallariYenile();
     const all=await idbGetAll('gorev_log');
+    // K7: vaka-kategorili seans/gün eşlemesi süzgeçlerden ÖNCE kurulur —
+    // Üreme sekmesi diseases.category='Üreme' vakasının TEDAVI_SEANS/TEDAVI_GUN'lerini kapsar.
+    const _allTDays=await idbGetAll('treatment_days').catch(()=>[]);
+    const _allTaskCases=await idbGetAll('cases').catch(()=>[]);
+    const _allTaskDiseases=await idbGetAll('diseases').catch(()=>[]);
+    const _caseById=Object.fromEntries(_allTaskCases.map(c=>[c.id,c]));
+    const _diseaseById=Object.fromEntries(_allTaskDiseases.map(d=>[d.id,d.name||'']));
+    const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
+    const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
+    const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
+    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases);   // C3: protocol_family='OVSYNC' kümesi
     if(f==='done'){
       // Besleme zincirinde her görev (ilk hariç) parent_id'li → eski filtre hepsini gizliyordu.
       // Sadece geri alınabilir ucu göster: çocuğu tamamlanmamış besleme tamamlaması.
@@ -639,8 +740,7 @@ async function loadTasks(f,btn,opts){
         return !t.parent_id;
       });
       done.sort((a,b)=>(b.tamamlanma_tarihi||b.hedef_tarih||'').localeCompare(a.tamamlanma_tarihi||a.hedef_tarih||''));
-      if(_taskKategori==='diger'){ done=done.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
-      else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; done=done.filter(t=>tips.includes(t.gorev_tipi)); }
+      if(_taskKategori!=='all') done=done.filter(t=>_kategoriFiltreUygun(t,_taskKategori,_uremeCaseIdler,_tdById,_seansById));   // K7: done sekmesi açık sekmelerle aynı kategori dilimini kullanır
       if(!done.length){ el.innerHTML='<div class="empty"><div class="empty-ico">📭</div>Henüz tamamlanan görev yok</div>'; return; }
       el.innerHTML=done.slice(0,150).map(t=>{
         const rapelChild=all.find(c=>c.parent_id===t.id&&!c.tamamlandi);
@@ -671,7 +771,13 @@ async function loadTasks(f,btn,opts){
     const _d7=dFwd(null,7);
     const _d1=dFwd(null,1);
     const _d30=dFwd(null,30);
-    if(f==='today') data=data.filter(t=>t.hedef_tarih===today||((t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ILERI_GEBE_ASI')&&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
+    // K7: ASI_PLANLI 7-gün penceresi + planlı üreme (OVSYNC_BASLAT/TOHUMLAMA_PLANLI).
+    // C3 (cila2): Üreme kategorisi seçiliyken pencere TÜM üreme görevlerine açılır —
+    // ovsync vakasının yaklaşan TEDAVI_GUN/SEANS'ları da Bugün+Üreme'de görünür
+    // ("tohumlama ve ovsync görevleri üremede görünmüyor" belirtisi).
+    if(f==='today') data=data.filter(t=>_bugunFiltreUygun(t,today,_d7)
+      ||(_taskKategori==='ureme'&&_kategoriFiltreUygun(t,'ureme',_uremeCaseIdler,_tdById,_seansById)
+         &&t.hedef_tarih>today&&t.hedef_tarih<=_d7));
     else if(f==='late') data=data.filter(t=>t.hedef_tarih<today);
     else if(f==='all'){
       data=data.filter(t=>t.hedef_tarih>today);
@@ -679,8 +785,7 @@ async function loadTasks(f,btn,opts){
       else if(_pendWin==='7')  data=data.filter(t=>t.hedef_tarih<=_d7);
       else if(_pendWin==='30') data=data.filter(t=>t.hedef_tarih<=_d30);
     }
-    if(_taskKategori==='diger'){ data=data.filter(t=>!_allKatTips.includes(t.gorev_tipi)); }
-    else if(_taskKategori!=='all'){ const tips=_katTipMap[_taskKategori]||[]; data=data.filter(t=>tips.includes(t.gorev_tipi)); }
+    data=data.filter(t=>_kategoriFiltreUygun(t,_taskKategori,_uremeCaseIdler,_tdById,_seansById));   // K7: tedavi↔üreme seans ayrımı tek noktadan
     data.sort((a,b)=>{
       const dCmp=(a.hedef_tarih||'').localeCompare(b.hedef_tarih||'');
       if(dCmp!==0) return dCmp;
@@ -702,16 +807,10 @@ async function loadTasks(f,btn,opts){
       _dayDrugMap[da.treatment_day_id].push({name:_prodMap[da.drug_product_id]?.brand_name||_stokNameMap[da.stok_id]||'İlaç',dose:da.dose,unit:da.unit,route:da.route});
     });
     // TEDAVI_GUN için teshis adı: treatment_days → cases → diseases
-    const _allTDays=await idbGetAll('treatment_days').catch(()=>[]);
-    const _allTaskCases=await idbGetAll('cases').catch(()=>[]);
-    const _allTaskDiseases=await idbGetAll('diseases').catch(()=>[]);
-    const _caseById=Object.fromEntries(_allTaskCases.map(c=>[c.id,c]));
-    const _diseaseById=Object.fromEntries(_allTaskDiseases.map(d=>[d.id,d.name||'']));
+    // (K7: _allTDays/_allTaskCases/_allTaskDiseases/_caseById/_diseaseById/_allSeans/_seansById/_tdById
+    //  haritaları yukarıda, süzgeçlerden önce kuruldu — burada yalnız türetilen tablolar)
     const _dayDiseaseMap={};
     _allTDays.forEach(td=>{ const c=_caseById[td.case_id]; if(c?.disease_id)_dayDiseaseMap[td.id]=_diseaseById[c.disease_id]||''; });
-    const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
-    const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
-    const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
     const _caseDayCount={};
     _allTDays.forEach(td=>{ _caseDayCount[td.case_id]=(_caseDayCount[td.case_id]||0)+1; });
     // Gün başına seans ilerlemesi (ayraçta "1/3 seans")
@@ -722,26 +821,40 @@ async function loadTasks(f,btn,opts){
     data.forEach(t=>{ if(t.gorev_tipi==='TEDAVI_SEANS'){ const sd=_seansById[t.seans_admin_id]; if(sd?.treatment_day_id)seansDayIds.add(sd.treatment_day_id); } });
     // TEDAVI_GUN gorev aciklamasi JSON {day_id, planned_time, label, ...} — try/catch fallback
     const _gorevAciklama=t=>{ try{ return JSON.parse(t.aciklama||'{}'); }catch(e){ return {}; } };
+    // C3 (cila2): grup anahtarı hayvan|DAY_ID yerine hayvan|TARİH — aynı hayvana
+    // aynı gün açılan ikinci şablon uygulaması (tekillik guard'ı yok, gerçek veri:
+    // aynı (case,tarih) çift day-set'leri) iki ayrı ayraç altında üst üste
+    // görünüyordu ("iki görev üst üste çakışıyor"). Tek ayraca iner; "Gün N·M"
+    // etiketi benzersiz gün numaralarını sırayla listeler.
     const grupMap={};
     data.forEach(t=>{
       if(t.gorev_tipi!=='TEDAVI_SEANS')return;
       const seans=_seansById[t.seans_admin_id]; if(!seans)return;
       const dayId=seans.treatment_day_id;
-      const key=(t.hayvan_id||'')+'|'+dayId;
+      const td=_tdById[dayId];
+      const key=(t.hayvan_id||'')+'|'+(t.hedef_tarih||td?.treatment_date||'');
       if(!grupMap[key]){
-        const td=_tdById[dayId];
         const animal=getState('animals').find(a=>a.id===t.hayvan_id);
         grupMap[key]={ hayvan_id:t.hayvan_id, day_id:dayId,
           date:t.hedef_tarih||td?.treatment_date||'',
-          gunNo:td?.day_no||'?', totalGun:td?_caseDayCount[td.case_id]||0:0,
+          gunNoSet:new Set(), totalGun:td?_caseDayCount[td.case_id]||0:0,
           animalLabel:animal?(animal.kupe_no||animal.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—'),
           grupAd:animal?.grup||(t.hayvan_id?'':'GENEL'),
           disease:_dayDiseaseMap[dayId]||'',
-          seansTotal:_seansDayStat[dayId]?.total||0, seansDone:_seansDayStat[dayId]?.done||0,
           items:[] };
       }
+      if(td?.day_no!=null) grupMap[key].gunNoSet.add(td.day_no);
       grupMap[key].items.push({ task:t, seans,
         drugName:_prodMap[seans.drug_product_id]?.brand_name||_stokNameMap[seans.stok_id]||'İlaç' });
+    });
+    // C3: ayraç ilerlemesi items'tan (görünen görevlerden) sayılır — _seansDayStat
+    // süzgeç dışı seansları da saydığı için birleşik grupta yanıltıcı olur.
+    Object.values(grupMap).forEach(g=>{
+      const guns=[...g.gunNoSet].sort((a,b)=>a-b);
+      g.gunNo=guns.length?guns.join('·'):'?';
+      if(guns.length>1) g.totalGun=0;   // çoklu gün → "N/M" kesri anlamsız, yalnız liste
+      g.seansTotal=g.items.length;
+      g.seansDone=g.items.filter(i=>i.seans.uygulama_tamamlandi_at||i.seans.uygulanmadi).length;
     });
     // --- Blokları (normal kart + seans grubu) topla; her bloğa F3/F4 meta'sı ---
     // F3 katmanları: tarih → saat → hayvan grubu → küpe (doğal sıra).
@@ -994,9 +1107,17 @@ async function _pgKapiBosAtaUygula(){
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   try {
     const r = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: window.__pgKapiToh, p_notlar: 'PG öncesi değerlendirme: ' + gerekce });
-    if (!r?.ok) { toast(r?.error || 'Boş atanamadı', true); if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; } return; }
     toast('Tohumlama Boş yapıldı — PG uygulanıyor…');
-    await window.__pgKapiTekrar(true, gerekce);
+    // T3b: tekrar çağrısı hata atarsa modal AÇIK kalır — yarım durum görünür,
+    // aynı butonla yalnız-PG-retry mümkün (rpc ok:false gövdesi throw'a dönüşür:
+    // eski ölü `if (!r?.ok)` dalı kaldırıldı — T8)
+    try {
+      await window.__pgKapiTekrar(true, gerekce);
+    } catch (e3) {
+      toast('⚠️ Tohumlama Boş kaydedildi, PG uygulanamadı — aynı butonla tekrar deneyin: ' + (getUserMessage ? getUserMessage(e3) : e3.message), true);
+      if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
+      return;
+    }
     _pgKapiKapat();
   } catch (e2) {
     toast('❌ ' + getUserMessage(e2), true);
@@ -1006,10 +1127,18 @@ async function _pgKapiBosAtaUygula(){
 
 // ──────────────────────────────────────────
 // P6: Erteleme modalı — mevcut tarih giriş kalıbı + pencere canlı önizleme
+// E1-UI: genel erteleme — tip kilidi kural cache'den (js'e tip listesi
+// YAZILMAZ); pencere önizlemesi YALNIZ pencere_kurali='tohumlama' tiplerinde.
 function _erteleModal(gorevId){
+  // E6: offline'da modal açılmaz (buton zaten gizli — render sonrası
+  // bağlantı düşmesi yarışı için giriş guard'ı)
+  if (_ertelemeOfflineGuard('gorev-ertele')) return;
   (async () => {
     const t = (await getData('gorev_log')).find(g => g.id === gorevId);
-    if (!t || t.gorev_tipi !== 'TOHUMLAMA_PLANLI' || t.tamamlandi || t.iptal) { toast('Görev ertelenemez', true); return; }
+    // E1-UI: kayıtsız/ertelenemez tip → aynı "Görev ertelenemez" toast'u
+    // (fail-closed ayna — DB gorev_ertele_kural_get default'u ile aynı karar)
+    const kural = t ? ertelemeKuralGetir(t.gorev_tipi) : null;
+    if (!t || t.tamamlandi || t.iptal || !kural || !kural.ertelenebilir) { toast('Görev ertelenemez', true); return; }
     const bugunIso = new Date().toISOString().slice(0,10);
     let box = document.getElementById('ertele-bs');
     if (box) box.remove();
@@ -1018,7 +1147,7 @@ function _erteleModal(gorevId){
     box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
     box.onclick = e => { if (e.target === box) _erteleKapat(); };
     box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
-      <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🗓️ Tohumlamayı Ertele</div>
+      <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🗓️ Görevi Ertele</div>
       <div style="font-size:.72rem;color:var(--ink3);margin-bottom:12px">Mevcut hedef: ${fmtTarih(t.hedef_tarih)} ${(t.hedef_saat||'').slice(0,5)}</div>
       <div style="display:flex;gap:8px;margin-bottom:6px">
         <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Yeni tarih</label>
@@ -1035,7 +1164,11 @@ function _erteleModal(gorevId){
       const gun = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
       const saat = (document.getElementById('ert-saat')?.value) || (t.hedef_saat||'09:00:00').slice(0,5);
       const o = document.getElementById('ert-onizleme');
-      if (o && gun) o.textContent = 'Kaydedilecek: ' + pencereYuvarla(gun + ' ' + saat.slice(0,5)) + ' (pencere yuvarlaması)';
+      // E1-UI: pencereYuvarla yalnız pencere_kurali='tohumlama' tiplerinde
+      // (DB _tohumlama_pencere aynası); diğer tiplerde verilen saat olduğu gibi.
+      if (o && gun) o.textContent = kural.pencere_kurali === 'tohumlama'
+        ? 'Kaydedilecek: ' + pencereYuvarla(gun + ' ' + saat.slice(0,5)) + ' (pencere yuvarlaması)'
+        : 'Kaydedilecek: ' + gun + ' ' + saat.slice(0,5);
     };
     document.getElementById('ert-tarih')?.addEventListener('change', onizle);
     document.getElementById('ert-saat')?.addEventListener('input', onizle);
@@ -1048,6 +1181,8 @@ function _erteleKapat(){
   if (history.state?.ertele) { globalThis._modalBackGuard = true; history.back(); }
 }
 async function _erteleKaydet(gorevId){
+  // E6: modal açıkken bağlantı düşerse Ertele tıklaması RPC'ye ulaşmaz
+  if (_ertelemeOfflineGuard('gorev-ertele-kaydet')) return;
   const btn = document.getElementById('ert-btn');
   const tarih = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
   const saat = document.getElementById('ert-saat')?.value || null;
@@ -1055,8 +1190,12 @@ async function _erteleKaydet(gorevId){
   if (tarih < new Date().toISOString().slice(0,10)) { toast('Geçmiş tarih seçilemez', true); return; }
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   try {
-    const r = await rpc('tohumlama_gorev_ertele', { p_gorev_id: gorevId, p_yeni_tarih: tarih, p_yeni_saat: saat });
-    toast('✅ Ertelendi → ' + fmtTarih(r.hedef_tarih) + ' ' + (r.hedef_saat||'').slice(0,5) + (r.uyari ? ' · ⚠️ ' + r.uyari : ''));
+    // E1-UI: genel RPC (imza tohumlama_gorev_ertele ile aynı; cevap alanları
+    // toplam_erteleme_gun/uyari dahil birebir — D18 gösterimi aşağıda)
+    const r = await rpc('gorev_ertele', { p_gorev_id: gorevId, p_yeni_tarih: tarih, p_yeni_saat: saat });
+    toast('✅ Ertelendi → ' + fmtTarih(r.hedef_tarih) + ' ' + (r.hedef_saat||'').slice(0,5)
+      + ((r.toplam_erteleme_gun|0) > 0 ? ' · toplam ' + r.toplam_erteleme_gun + ' gün erteleme' : '')
+      + (r.uyari ? ' · ⚠️ ' + r.uyari : ''));
     _erteleKapat();
     loadTasks(_curTaskFilter||'today');
   } catch (e) {
@@ -1158,19 +1297,56 @@ function _kalanGunEtiket(t){
   if(gun===0) return '<span style="font-size:.62rem;color:#b8860b">· bugün</span>';
   return `<span style="font-size:.62rem;color:var(--red2)">· ${-gun} gün gecikmiş</span>`;
 }
+// K4 (p5b-fix): OVSYNC_BASLAT başlatma penceresi — hedef güne kalan gün
+// (_kalanGunEtiket matematiği: yerel geceyarısı normalize + T00:00:00 ayrıştırma);
+// hedef_tarih yoksa null. Pencere hedef−2 gününde açılır (DB 000002 aynası).
+function _ovsyncBaslatPencereGunu(t){
+  if(!t?.hedef_tarih) return null;
+  const bugun=new Date(); bugun.setHours(0,0,0,0);
+  const h=new Date(t.hedef_tarih+'T00:00:00');
+  return Math.round((h-bugun)/86400000);
+}
 // P3/P4: OVSYNC_BASLAT kart butonları — [Başlat] atomik RPC, [İptal] mevcut PATCH yolu
+// P3/P4: OVSYNC_BASLAT kart butonları — [Başlat] atomik RPC, [İptal] mevcut PATCH yolu
+// S1 (ortak yardımcı): OVSYNC_BASLAT kısır-kilit + Başlat/İptal markup'ı — görev kartı
+// (_ovsyncBaslatBtnHtml) ve protokol paneli (_ovUyariSatirHtml) TEK buradan alır;
+// kopylar drift etmişti (başlatılamaz / üreme planı yok) — kilit metni tek: "başlatılamaz".
+// stopProp=false: çağıran sarmalayıcı zaten event.stopPropagation() yapıyor (panel satırı).
+function _ovsyncBaslatKilitHtml(kisir, gorevId, hayvanId, stopProp, pencereGun){
+  const _ipt=`<button data-g="${escAttr(gorevId)}" onclick="${stopProp?'event.stopPropagation();':''}ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`;
+  if(kisir) return `<span style="font-size:.62rem;font-weight:700;color:var(--amber)">💲 Kısır işaretli — başlatılamaz</span>${_ipt}`;
+  // K4 (p5b-fix): pencere henüz kapalı — ▶ Başlat ÇİKMEZ; RPC erken çağrı kapısı
+  // (000002 OVSYNC_ERKEN) UI katında aynalanır. Kısır kilidi önceliği korunur.
+  if(typeof pencereGun==='number' && pencereGun>2) return `<span style="font-size:.62rem;font-weight:700;color:var(--ink3)">📅 ${pencereGun-2} gün sonra başlatılabilir</span>${_ipt}`;
+  return `<button data-g="${escAttr(gorevId)}" data-h="${escAttr(hayvanId)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g,this.dataset.h)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>${_ipt}`;
+}
+// S1: kisir hayvanda Başlat YOK, kilitli rozet VAR; ✕ her durumda çizilir.
 function _ovsyncBaslatBtnHtml(t){
   if(t.gorev_tipi!=='OVSYNC_BASLAT'||t.tamamlandi||t.iptal) return '';
-  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
-    <button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>`;
+  const _h=(typeof getState==='function'?getState('animals'):[]).find(a=>a.id===t.hayvan_id);
+  return _ovsyncBaslatKilitHtml(!!(_h&&_h.kisir), t.id, t.hayvan_id, true, _ovsyncBaslatPencereGunu(t));
 }
-// P6: TOHUMLAMA_PLANLI kartına [Ertele]
-function _tohErteleBtnHtml(t){
-  if(t.gorev_tipi!=='TOHUMLAMA_PLANLI'||t.tamamlandi||t.iptal) return '';
-  return `<button data-g="${escAttr(t.id)}" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
+// E1-UI: genel [🗓️ Ertele] butonu — kural cache'den (JS'e tip listesi YAZILMAZ):
+// ertelenebilir tipteki AÇIK görev kartlarında çizilir (OVSYNC_BASLAT kartında
+// [Başlat] yanında); TEDAVI_GUN/TEDAVI_SEANS (kural f) ve kayıtsız tipler
+// BUTONSUZ — fail-closed ayna (DB gorev_ertele_kural_get default'u).
+// E6: offline'da ÜRETİLMEZ; data-ertele rozeti ertelemeBtnGuncelle'in
+// canlı-DOM görünürlük taramasına girer.
+function _erteleBtnHtml(t){
+  if(t.tamamlandi||t.iptal) return '';
+  const kural=ertelemeKuralGetir(t.gorev_tipi);
+  if(!kural||!kural.ertelenebilir) return '';
+  if(!_ertelemeOnline()) return '';
+  return `<button data-g="${escAttr(t.id)}" data-ertele="1" onclick="event.stopPropagation();_erteleModal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">🗓️ Ertele</button>`;
 }
+// T10: rozet = protokol_eksik_tara aktif sayısı + ovsync_baslat_uyarilari sayısı (tek rozet birleştirme)
+function _rozetTopla(n, m){ return (n|0) + (m|0); }
+// O11: PLAN Europe/Istanbul der — Türkiye kalıcı +03 (DST yok); cihaz diliminden bağımsız
+function _istanbulAnIso(gun, saat){ return new Date(gun + 'T' + (saat || '12:00') + ':00+03:00').toISOString(); }
+
 // P4/P10: OVSYNC_BASLAT başlatma — atomik zincir RPC + detaylı bildirim
-async function ovsyncBaslat(gorevId){
+// S4/N2: hayvanId opsiyonel — bildirim/banner hayvan kartına gider (boşsa eski davranış)
+async function ovsyncBaslat(gorevId, hayvanId){
   if(!gorevId) return;
   try{
     const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId});
@@ -1179,30 +1355,97 @@ async function ovsyncBaslat(gorevId){
     else{
       toast('✅ Ovsynch-56 başlatıldı — TAI hedefi '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''));
       // P10/B1: detaylı bildirim (izin varsa); panel kalıcı kaynak
-      _ovsyncBildirim('İlk tohumlama protokolü başlatıldı','Ovsynch-56 seansları açıldı. TAI hedefi: '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''));
+      _ovsyncBildirim('İlk tohumlama protokolü başlatıldı','Ovsynch-56 seansları açıldı. TAI hedefi: '+fmtTarih(r.baslangic?new Date(new Date(r.baslangic).getTime()+10*86400000).toISOString().slice(0,10):''), hayvanId);
     }
     await pullTables(['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','stok','stok_hareket']).catch(()=>{});
     closeM('m-task-det'); updateTaskBadge(); loadTasks(_curTaskFilter||'today',null,{skipPull:true}); loadDash();
     window.__protokolUyarilar=null;   // protokol ekranı taze veriyle açılsın
   }catch(e){ toast('❌ '+getUserMessage(e),true); }
 }
-// P4: elle iptal — mevcut gorev_log PATCH yolu (degisim_log denetim kaydı T31)
+// E4-UI (erteleme-genel): protokol iptali — vaka bağlamına göre iki dal.
+//  A) Hayvanın AKTİF protokol vakası VAR → rpc('protokol_iptal'): vaka + kalan
+//     görev/seans/gün kapanışı + stok iadesi + instance kapanışı + isteğe bağlı
+//     TEK yeniden-başlat görevi (onay akışı _protokolIptalAkisi'nda).
+//  B) Vaka YOK (önü-başlangıç OVSYNC_BASLAT — × butonunun asıl durumu; vaka
+//     start_first_service_protocol anında açılır, 000017:132) →
+//     rpc('gorev_tamamla', {p_iptal:true}) T5 dalı: görev kapanır + audit
+//     yazılır. Eski REST PATCH yolu KALKTI (offline kuyruğa REST bypass yazma
+//     yok). Not: önü-başlangıç rotasının instance'ı aktif kalır — bu duruma
+//     özel DB tarafında RPC yok (kırıntı decision 2026-09-25).
 async function ovsyncIptal(gorevId){
-  if(!gorevId||!confirm('İlk tohumlama görevi iptal edilsin mi?')) return;
+  if(_ertelemeOfflineGuard('protokol-iptal')) return;   // E6: online-only (plan 3c)
+  if(!gorevId) return;
+  let t=null;
+  try{ t=(await getData('gorev_log')).find(g=>g.id===gorevId)||null; }catch(e){}
+  if(!t){ toast('Görev bulunamadı',true); return; }
+  // Vaka bağlamı: aynı hayvanın AKTİF protokol vakası (başlamış zincir;
+  // bayat kart yarışında × buraya düşer)
+  let vaka=null;
+  try{ vaka=(await getData('cases')).find(c=>c.animal_id===t.hayvan_id&&c.status==='active'&&c.protocol_family)||null; }catch(e){}
+  if(vaka) return _protokolIptalAkisi(vaka);
+  // B dalı: önü-başlangıç görev iptali — RPC + audit (eski PATCH yolu yok)
+  if(!confirm('İlk tohumlama görevi iptal edilsin mi?')) return;
   try{
-    const t=(await getData('gorev_log')).find(g=>g.id===gorevId);
-    if(!t){ toast('Görev bulunamadı',true); return; }
-    await write('gorev_log',{...t,tamamlandi:true,tamamlanma_tarihi:new Date().toISOString(),iptal:true},'PATCH',`id=eq.${gorevId}`);
-    toast('Görev iptal edildi');
+    const r=await rpc('gorev_tamamla',{p_gorev_id:gorevId,p_iptal:true});
+    toast(r&&r.mesaj?r.mesaj:'Görev iptal edildi');
     updateTaskBadge(); loadTasks(_curTaskFilter||'today');
   }catch(e){ toast('❌ '+getUserMessage(e),true); }
 }
-// P10/B3: bildirim yardımcısı — izin yoksa sessiz düşme YOK (rozet panelde); yalnız iki olayda kullanılır
-function _ovsyncBildirim(baslik,govde){
+// E4-UI A dalı: 'Protokolü iptal et' onay akışı — iptal edilecekler özeti
+// (açık gün/seans sayısı + stok iadesi bilgisi) → isteğe bağlı yeniden başlat
+// (p_yeniden_baslat) → RPC → sonuç toast + etkilenen tabloların pull'ı.
+async function _protokolIptalAkisi(vaka){
+  let acikGun=0, acikSeans=0;
   try{
-    if(!('Notification' in window)) return;
-    if(Notification.permission==='granted'){ new Notification(baslik,{body:govde,tag:'ovsync-pg'}); }
-    // denied/default: panel zaten kalıcı kaynak; ilk kullanıcı etkileşiminde tek istem
+    acikGun=(await idbGetAll('treatment_days')).filter(td=>td.case_id===vaka.id&&!td.tamamlandi).length;
+    acikSeans=(await idbGetAll('treatment_day_uygulamalar')).filter(s=>s.case_id===vaka.id&&!s.uygulanmadi&&!s.uygulama_tamamlandi_at).length;
+  }catch(e){}
+  if(!confirm(`Protokol vakası iptal edilsin mi?\n\nKapanacak: ${acikGun} açık tedavi günü, ${acikSeans} uygulanmamış seans.\nKullanılmayan ilaçlar stoğa iade edilir.`)) return;
+  const yeniden=confirm('Yeniden başlat görevi (OVSYNC_BASLAT) oluşturulsun mu?');
+  try{
+    const r=await rpc('protokol_iptal',{p_vaka_id:vaka.id,p_yeniden_baslat:!!yeniden,p_not:null});
+    toast('✅ Protokol iptal edildi — '+(r.kapanan_gorev|0)+' görev, '+(r.kapanan_seans|0)+' seans kapandı'
+      +((r.iade|0)>0?' · '+r.iade+' stok iadesi':'')
+      +(r.yeni_gorev_id?' · yeniden başlat görevi kuruldu':'')
+      +(r.yeniden_not?' · '+r.yeniden_not:''));
+    await pullTables(RPC_TABLES.protokol_iptal).catch(()=>{});
+    updateTaskBadge(); loadTasks(_curTaskFilter||'today'); loadDash();
+    window.__protokolUyarilar=null;   // protokol ekranı taze veriyle açılsın
+    return true;   // C-1: vaka detay yüzeyi (cdProtokolIptal) başarıda modalı kapatabilsin
+  }catch(e){ toast('❌ '+getUserMessage(e),true); }
+}
+// C-1 (E4 onarım, 2026-09-25): protokol iptal YÜZEYİ vaka detayında.
+// 'Protokolü iptal et' bugün yalnız AÇIK OVSYNC_BASLAT kartındaki ✕
+// butonundan erişilebiliyordu; protokol başlayınca (görev tamamlanır)
+// yüzey kalmıyordu — zarf E4 ölçütü 'aktif ovsync vakasında Protokolü
+// iptal et' karşılanmıyordu. Vaka detayındaki #cd-protokol-iptal-btn
+// (cd-gun-bolum komşuluğu, E0 cd-kaydir-btn deseni) AKTİF +
+// protocol_family'li vakada görünür (openCaseDet → ertelemeBtnGuncelle;
+// online-only E6) ve aynı _protokolIptalAkisi A dalına devreder — İKİNCİ
+// AKIŞ KOPYASI YOK. protocol_family UI'da zaten mevcut (cases pull
+// select('*')) — api.js değişikliği gerekmez.
+async function cdProtokolIptal(){
+  if(_ertelemeOfflineGuard('protokol-iptal')) return;   // E6: online-only (plan 3c)
+  const c=(typeof _curCase!=='undefined')?_curCase:null;   // vm-extract koşum koruması (ui.js:6980 deseni)
+  if(!c||c.status!=='active'||!c.protocol_family) return;   // yüzey yalnız protokol ailesi aktif vakada
+  const ok=await _protokolIptalAkisi(c);
+  if(ok) closeM('m-case-det');   // vaka kapandı → detay ekranı kapanır (erken-kapat deseni)
+}
+// P10/B3: bildirim yardımcısı — izin yoksa sessiz düşme YOK (rozet panelde); yalnız iki olayda kullanılır
+// S4/N2: hayvanId varken bildirim tıklanabilir hedefe bağlanır (Notification onclick +
+// izin yoksa app-içi banner). kupeNo opsiyonel — banner kupe'yi getData'dan çözer.
+function _ovsyncBildirim(baslik,govde,hayvanId,kupeNo){
+  try{
+    if(!('Notification' in window)){
+      if(hayvanId) _ovsyncBildirimBanner(hayvanId,kupeNo);
+      return;
+    }
+    if(Notification.permission==='granted'){
+      const notif = new Notification(baslik,{body:govde,tag:'ovsync-pg'});
+      if(hayvanId){ notif.onclick = () => { try { window.focus(); openDet(hayvanId); } catch(e){} }; }
+    }
+    else if(hayvanId){ _ovsyncBildirimBanner(hayvanId,kupeNo); }
+    // denied/default + hayvanId yok: panel zaten kalıcı kaynak; ilk kullanıcı etkileşiminde tek istem
   }catch(e){ /* bildirim başarısızlığı akışı etkilemez */ }
 }
 // P10/B2: açılış özeti — hedefi gelmiş OVSYNC_BASLAT varsa tek bildirim (cron yedeğinin UI aynası)
@@ -1256,7 +1499,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
-    <div style="display:flex;gap:6px;align-items:center">${_ovsyncBaslatBtnHtml(t)}${_tohErteleBtnHtml(t)}</div>
+    <div style="display:flex;gap:6px;align-items:center">${_ovsyncBaslatBtnHtml(t)}${_erteleBtnHtml(t)}</div>
     ${drugHtml}${subHtml}
   </div>`;
 }
@@ -1687,7 +1930,10 @@ function _sessizGrupla(list){
 async function _showSessizList(){
   try{
     const list=await rpc('sessiz_hayvanlar_listele',{});
-    if(!list||!list.length){toast('Sessiz hayvan yok');return;}
+    // S2: muayene listesi — sheet'in en üstündeki izole bölümün verisi
+    let muayene=[];
+    try{ const ml=await rpc('gebelik_muayene_listele',{}); if(ml&&ml.length) muayene=ml; }catch(e){/* sessiz */}
+    if((!list||!list.length)&&!muayene.length){toast('Sessiz hayvan yok');return;}
     globalThis._sessizReturn=false; // taze açılış eski dönüş işaretini ezer
     const existedBefore=!!document.getElementById('sessiz-bs'); // öksüz history girdisi birikmesin (proto-detay deseni)
     let box=document.getElementById('sessiz-bs');
@@ -1696,9 +1942,15 @@ async function _showSessizList(){
     box.id='sessiz-bs';
     box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
     box.onclick=e=>{if(e.target===box)_sessizSheetKapat();};
-    const row=s=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${s.hayvan_id}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz'} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
-    const rows=_sessizGrupla(list).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
-    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))"><div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${list.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">55+ gündür kızgınlık/tohumlama kaydı yok</div>${rows}</div>`;
+    const row=s=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${escAttr(s.hayvan_id)}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(s.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(s.grup||'')}</span></div><div class="arow-sub">${s.sessiz_gun>=9999?'Hiç kayıt yok':s.sessiz_gun+' gündür sessiz'} · Son: ${esc(s.son_aktivite||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const mRow=m=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${escAttr(m.hayvan_id)}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const muayeneRows=muayene.length?`<div style="font-size:.68rem;font-weight:800;color:var(--red2);margin:12px 0 4px;letter-spacing:.02em">🔬 Gebelik Muayenesi Bekleyenler · ${muayene.length}</div>${muayene.map(mRow).join('')}`:'';
+    const rows=muayeneRows+_sessizGrupla(list||[]).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
+    // S2 review-fix: sessiz=0 + muayene>0 iken sheet başlığı muayene odaklı olur ("(0)" tuzağı yok)
+    const sBaslik=(list||[]).length
+      ?`<div style="font-weight:800;font-size:.95rem;margin-bottom:4px">❗ Sessiz Hayvanlar (${(list||[]).length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">50+ gündür kızgınlık/tohumlama kaydı yok</div>`
+      :`<div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🔬 Gebelik Muayenesi Bekleyenler (${muayene.length})</div><div style="font-size:.75rem;color:var(--ink3);margin-bottom:14px">Son tohumlaması ≥40 gün önce Bekliyor — gebelik muayenesi bekleniyor</div>`;
+    box.innerHTML=`<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:75vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">${sBaslik}${rows}</div>`;
     if(!existedBefore) history.pushState({sessiz_bs:1}, '', '');
     document.body.appendChild(box);
   }catch(e){toast('Hata: '+e.message);}
@@ -1829,22 +2081,22 @@ async function _showProtokolEkran(){
   let ovHtml = '';
   try {
     const ov = await rpc('ovsync_baslat_uyarilari', {});
-    const ovList = (ov && ov.uyarilar) || [];
+    window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
+    const ovList = window.__ovsyncUyarilar;
     if (ovList.length) {
-      const _ovSatir = u => `<div class="arow" style="border-left:3px solid var(--green);margin-bottom:6px;padding:8px 10px">
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:.8rem">🌱 ${esc(u.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(u.kategori||'')}</span></div>
-          <div style="font-size:.7rem;color:var(--ink3)">Ovsynch-56 başlat · hedef ${fmtTarih(u.hedef_tarih)} ${(u.hedef_saat||'').slice(0,5)} · TAI ${fmtTarih(u.tai_tarihi)}</div>
-          <div style="font-size:.6rem;opacity:.5">${u.taban_turu==='duve'?'Düve — 12a21g':u.taban_turu==='abort'?'Abort sonrası':u.taban_turu==='dogum'?'Doğum sonrası':'Açık dişi'}</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncBaslat(this.dataset.g)" style="font-size:.65rem;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--green);background:rgba(78,154,42,.12);color:var(--green);cursor:pointer">▶ Başlat</button>
-          <button data-g="${escAttr(u.gorev_id)}" onclick="ovsyncIptal(this.dataset.g)" style="font-size:.65rem;padding:4px 8px;border-radius:8px;border:1px solid #999;background:transparent;color:#999;cursor:pointer">✕</button>
-        </div>
-      </div>`;
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})</div>${ovList.map(_ovSatir).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
-  } catch(e) { /* RPC yoksa (bayrak/A1 öncesi) bölüm sessizce atlanmaz — konsola düşer */ console.warn('ovsync_baslat_uyarilari:', e.message); }
+  } catch(e) {
+    // T10: taze çağrı başarısızsa rozet önbelleğine düş (bayat-fallback; konsol uyarısıyla)
+    console.warn('ovsync_baslat_uyarilari:', e.message);
+    const ovList = Array.isArray(window.__ovsyncUyarilar) ? window.__ovsyncUyarilar : [];
+    if (ovList.length) {
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+    }
+  }
+  // C4 (cila2): K8'in seanslar panel bölümü geri alındı — sahip:
+  // "ana listeye monte etmişler, ben böyle bir şey istemedim; sabahki yeterli".
+  // Ovsync seansları Görevler listesinde normal görev satırları olarak görünür (1f01e8b hâli).
   if (!data.length && !ovHtml) { toast('Protokol uyarısı yok'); return; }
 
   const eksikHtml = eksik.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🔴 Gecikmiş (${eksik.length})</div>${eksik.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
@@ -1937,6 +2189,94 @@ function _protoDetayHayvanGit(hayvanId){
   const protokolBs = document.getElementById('protokol-bs');
   if (protokolBs) protokolBs.style.display = 'none';
   openDet(hayvanId);
+}
+
+// S4/N1+M1: Protokol panelindeki İlk Tohumlama satırı — satır tıklaması hayvan kartını
+// açar (_protoDetayHayvanGit; popstate 'det' vakası paneli geri getirir), buton hücresi
+// stopPropagation sarmallı (_satirHtml deseni). "Ovsynch-56" adı sahibin kararıyla korunur;
+// hedef_saat koşullu basılır (boş saat → çift-ayraç kozmetiği yok).
+// S1: kisir hayvanda Başlat YOK, kilitli rozet VAR; ✕ her durumda çizilir.
+function _ovUyariSatirHtml(u){
+  // C5 (cila2): görevsiz öneri satırı (kuralı bugün+2 içinde, görev kural günü doğar)
+  // — "Başlat" daveti yerine görevin otomatik açılacağı bilgi etiketi basılır.
+  const oneriMi = !u.gorev_id;
+  const ustSatir = oneriMi
+    ? 'Uyarı: ilk tohumlama kuralı yaklaşıyor'
+    : 'Başlat: Ovsynch-56 senkronu (56 günlük program)';
+  return `<div class="arow" style="border-left:3px solid ${oneriMi?'#b8860b':'var(--green)'};margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_protoDetayHayvanGit('${escAttr(u.hayvan_id)}')">
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.8rem">🌱 ${esc(u.kupe_no||'?')} <span style="font-size:.6rem;opacity:.6">${esc(u.kategori||'')}</span></div>
+          <div style="font-size:.7rem;color:var(--ink3)">${ustSatir} · Hedef: ${fmtTarih(u.hedef_tarih)}${u.hedef_saat ? ' ' + String(u.hedef_saat).slice(0, 5) : ''} · Zamanlanmış tohumlama (TAI): ${fmtTarih(u.tai_tarihi)}</div>
+          <div style="font-size:.6rem;opacity:.5">${u.taban_turu==='duve'?'Düve — 12a21g':u.taban_turu==='abort'?'Abort sonrası':u.taban_turu==='dogum'?'Doğum sonrası':'Açık dişi'}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
+          ${oneriMi
+            ? '<span style="font-size:.62rem;font-weight:700;color:#b8860b">📅 Görev hedef gününde otomatik açılır</span>'
+            : _ovsyncBaslatKilitHtml(!!u.kisir, u.gorev_id, u.hayvan_id, false, _ovsyncBaslatPencereGunu(u))}
+        </div>
+      </div>`;
+}
+
+// C4 (cila2): K8'in panel seans yardımcıları geri alındı — seanslar bölümü
+// 1f01e8b hâlinde yoktu; ovsync seansları Görevler listesinde normal görev
+// satırları olarak görünür. Seans uyarı RPC'si veri katmanında kalır (dokunulmaz).
+
+// S4/M2+M3: Ovsynch-56/TAI yardım katmanı (sahip kararı: yardım balonu İSTENİYOR).
+// _showProtokolDetay öncülü alt-sheet kalıbı; seans sayısı canlı şablondan teyitli (4 kalem).
+function _showOvsyncYardim(){
+  const existedBefore = !!document.getElementById('ovsync-yardim-bs');
+  let box = document.getElementById('ovsync-yardim-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'ovsync-yardim-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:350;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _closeOvsyncYardim(); };
+  const _madde = (baslik, metin) => `<div style="margin-bottom:12px">
+      <div style="font-weight:800;font-size:.82rem;margin-bottom:3px">${baslik}</div>
+      <div style="font-size:.75rem;color:var(--ink3);line-height:1.45">${metin}</div>
+    </div>`;
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:70vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-weight:800;font-size:.95rem">❓ İlk Tohumlama (Ovsynch-56) nedir?</div>
+      <button onclick="_closeOvsyncYardim()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--ink3)">✕</button>
+    </div>
+    ${_madde('"Ovsynch-56"', 'İneklerde doğum sonrası ilk tohumlama zamanlaması için kullanılan senkron programı. Başlat\'a dokununca 4 seanslı hormon zinciri (1./8./9./10. gün) ve tohumlama görevi açılır.')}
+    ${_madde('TAI (Zamanlanmış Tohumlama)', 'Zincirin sonunda planlanan tohumlama. Ekrandaki tarih, başlatma hedefinin 10 gün sonrasıdır.')}
+    ${_madde('Neden bu hayvan?', 'Düve: doğumdan 12 ay 21 gün sonra. İnek: son doğum/aborttan 51 gün sonra. Görev, hedeften 2 gün önce listede belirir.')}
+  </div>`;
+  if (!existedBefore) history.pushState({ovsync_yardim:true}, '', '');
+  document.body.appendChild(box);
+}
+function _closeOvsyncYardim(){
+  const box = document.getElementById('ovsync-yardim-bs');
+  if (!box) return;
+  box.remove();
+  if (history.state?.ovsync_yardim) { globalThis._modalBackGuard = true; history.back(); }
+}
+
+// S4/N2: app-içi bildirim banner'ı — Notification izni yokken Başlat başarıdır
+// tıklanabilir alt-sheet (z310: panel 300 üstü, proto-detay 350 altı). pushState YOK
+// (transient toast-sınıfı yüzey); satır tıklaması banner'ı kaldırıp hayvan kartını açar.
+async function _ovsyncBildirimBanner(hayvanId, kupeNo){
+  try{
+    let kupe = kupeNo;
+    if (!kupe) {
+      try { kupe = ((await getData('hayvanlar')) || []).find(a => a.id === hayvanId)?.kupe_no; } catch(e) {}
+    }
+    const box = document.createElement('div');
+    box.id = 'ovsync-bildirim-bs';
+    box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:310;display:flex;align-items:flex-end';
+    box.onclick = e => { if (e.target === box) box.remove(); };
+    box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))">
+      <div style="font-weight:800;font-size:.85rem;margin-bottom:8px">✅ İlk tohumlama protokolü başlatıldı</div>
+      <div onclick="document.getElementById('ovsync-bildirim-bs')?.remove();openDet('${escAttr(hayvanId)}')" style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px;border-radius:10px;border:1px solid var(--card2);background:rgba(78,154,42,.08);cursor:pointer">
+        <span style="font-weight:700;font-size:.8rem">🌱 ${esc(kupe || '—')} · Hayvan kartına git →</span>
+        <span style="color:var(--ink3)">›</span>
+      </div>
+    </div>`;
+    document.body.appendChild(box);
+    setTimeout(() => { if (box.parentNode) box.remove(); }, 10000);
+  }catch(e){ /* banner başarısızlığı akışı etkilemez */ }
 }
 
 // §2: drug_class bazlı etken filtreleme (aktif ingredient üzerinden)
@@ -2337,7 +2677,7 @@ async function _protokolUygulaKaydet(hayvanId, idx){
     const olcSaat = document.getElementById('pu-saat')?.value || '';
     let occurredAt = null;
     if (olcGun) {
-      occurredAt = new Date(olcGun + 'T' + (olcSaat || '12:00') + ':00').toISOString();
+      occurredAt = _istanbulAnIso(olcGun, olcSaat);   // O11: sabit İstanbul +03 anchor (cihaz-diliminden bağımsız)
     }
     const params = {
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: '',
@@ -2519,9 +2859,19 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
   if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
-    const res = await rpc('hizli_uygulama', {
+    const params = {
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: ''
+    };
+    // P5: PG kapısı reaktif — sunucu RAISE'ı _pgKapiHata yakalar; onaylı tekrar
+    // aynı parametrelere p_pg_onay/p_pg_gerekce eklenerek gönderilir (tek ekranda)
+    const res = await rpc('hizli_uygulama', params).catch(e => {
+      const retry = (onay, gerekce) => rpc('hizli_uygulama', {
+        ...params, p_pg_onay: onay, p_pg_gerekce: gerekce || null
+      });
+      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
+      throw e;
     });
+    if (res?._pgKapi) return;
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
@@ -2680,7 +3030,7 @@ function _applySuruStatHtml(el,d,padok){
   const dnSection=`<div class="stat-section"><div class="stat-section-title">🔢 Deneme Dağılımı</div>${dnFirst}${restBtn}</div>`;
 
   const sessizCount=h.sessiz||0;
-  const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">55+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
+  const sessizSection=sessizCount>0?`<div class="stat-section"><div class="stat-section-title">❗ Sessiz Hayvanlar (${sessizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">50+ gündür tohumlama/kızgınlık kaydı yok</div><div class="stat-row"><span onclick="_showSessizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
   const belirsizCount=h.belirsiz||0;
   const belirsizSection=belirsizCount>0?`<div class="stat-section"><div class="stat-section-title">⚠️ Belirsiz Üreme Statüsü (${belirsizCount})</div><div class="stat-row" style="color:var(--ink3);font-size:.7rem">Düve mi olgun inek mi belirsiz — incelenip işaretlenmeli</div><div class="stat-row"><span onclick="_showBelirsizList()" style="cursor:pointer;color:var(--blue);font-size:.72rem;font-weight:600">Listeyi gör →</span></div></div>`:'';
 
@@ -2911,6 +3261,17 @@ function filterA(){
 // ──────────────────────────────────────────
 // HAYVAN DETAY — helpers
 // ──────────────────────────────────────────
+// C2 (cila2): detay kartı chip'leri — liste satırı rozet diliyle parite.
+// Kısır hayvanda "💲 Kısır" chip'i (amber), _animalTagsHtml'teki badge ile aynı renk.
+function _detChipsHtml(a,tohs,aktifHst,activeCases){
+  return [
+    {cls:'chip-k',txt:a.grup||'?'},
+    {cls:'chip-k',txt:a.padok||'?'},
+    aktifHst>0||activeCases.length>0?{cls:'chip-r',txt:`🚨 ${activeCases.length||aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
+    a.kisir?{style:'background:rgba(255,160,0,.15);color:var(--amber)',txt:'💲 Kısır'}:null,
+    (()=>{const gToh=tohs.filter(t=>t.sonuc==='Gebe').sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''))[0]; if(!gToh)return null; const gun=Math.floor((Date.now()-new Date(gToh.tarih))/86400000); return {cls:'chip-g',txt:`🤰 ${gun}. gün · Tahmini: ${dFwd(gToh.tarih,280)}`};})(),
+  ].filter(Boolean).map(c=>`<div class="chip ${c.cls||''}"${c.style?` style="${c.style}"`:''}>${esc(c.txt)}</div>`).join('');
+}
 function _detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId){
   const infoFields=[{l:'Devlet Küpe',v:a.devlet_kupe||'—'},{l:'İşletme Küpe',v:a.kupe_no||'—'},{l:'Irk',v:a.irk||'—'},{l:'Cinsiyet',v:a.cinsiyet||'—'},{l:'Grup',v:a.grup||'—'},{l:'Padok',v:a.padok||'—'},{l:'Doğum',v:fmtTarih(a.dogum_tarihi)||'—'},{l:'Doğum Kg',v:a.dogum_kg?a.dogum_kg+' kg':'—'},{l:'Canlı Ağırlık',v:a.canli_agirlik?a.canli_agirlik+' kg':'—'},{l:'Boy',v:a.boy?a.boy+' cm':'—'},{l:'Renk',v:a.renk||'—'},{l:'Ayırt Edici',v:a.ayirici_ozellik||'—'},{l:'Durum',v:a.durum||'—'},{l:'Baba (Sperma)',v:a.baba_bilgi||'—'}];
   const anneObj=a.anne_id?getState('animals').find(x=>x.id===a.anne_id):null;
@@ -3271,12 +3632,7 @@ async function openDet(id, keepTab){
     const displayId=a.devlet_kupe||a.kupe_no||a.id;
     document.getElementById('det-name').textContent=displayId;
     document.getElementById('det-meta').textContent=`${a.irk||'—'} · ${a.padok||'?'}`;
-    document.getElementById('det-chips').innerHTML=[
-      {cls:'chip-k',txt:a.grup||'?'},
-      {cls:'chip-k',txt:a.padok||'?'},
-      aktifHst>0||activeCases.length>0?{cls:'chip-r',txt:`🚨 ${activeCases.length||aktifHst} aktif vaka`}:{cls:'chip-g',txt:'✅ Sağlıklı'},
-      (()=>{const gToh=tohs.filter(t=>t.sonuc==='Gebe').sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''))[0]; if(!gToh)return null; const gun=Math.floor((Date.now()-new Date(gToh.tarih))/86400000); return {cls:'chip-g',txt:`🤰 ${gun}. gün · Tahmini: ${dFwd(gToh.tarih,280)}`};})(),
-    ].filter(Boolean).map(c=>`<div class="chip ${c.cls}">${c.txt}</div>`).join('');
+    document.getElementById('det-chips').innerHTML=_detChipsHtml(a,tohs,aktifHst,activeCases);
 
     document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
 
@@ -6938,6 +7294,7 @@ async function openCaseDet(caseId) {
 
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
+  ertelemeBtnGuncelle();   // E6: erteleme/kaydırma butonları online-only görünürlük
 
   // Geri Al butonu kontrolü — islem_log'da VAKA_ACILDI kaydı varsa göster
   let islemler = await idbGetAll('islem_log');
@@ -7352,6 +7709,185 @@ async function _updateKapatBtn(caseId) {
   const aktif = _curCase?.status === 'active';
   if (erkenBtn)  erkenBtn.style.display = (aktif && !hepsiDone) ? 'block' : 'none';
   if (erkenForm) erkenForm.style.display = 'none';
+}
+
+// ═══ E0 — KALAN GÜNLERİ KAYDIR (2026-09-25, erteleme-genel S5) ═══
+// Aktif vaka kartında vakanın TAMAMLANMAMIŞ günlerinin +N kaydırılması.
+// RPC: vaka_kalan_gunleri_kaydir (migration 20260925100001) — açık gün
+// satırları + TEDAVI_GUN/TEDAVI_SEANS görevleri + seans planları + şablon
+// TAI tek atomik işlemde kayar; tamamlanmışlara dokunmaz; TAI ayrıca
+// tohumlama_gorev_ertele pencere/GECMIS_TARIH korumasından geçer.
+// Buton AKTİF vakada görünür (cd-gun-bolum yalnız aktifken açık) ve
+// ONLINE-only: offline'da gizlenir; yine tetiklenirse toast + RPC ÇAĞRILMAZ
+// (E6: guard bu buton için yazılmıştı, aşağıdaki genel zemine taşındı).
+
+// ═══ E6 — OFFLINE ERTELEME KAPISI (2026-09-25, erteleme-genel S7) ═══
+// Sahip kararı S7 (bağlayıcı): erteleme/kaydırma yolları online-only'dir.
+// navigator.onLine === false iken butonların TAMAMI gizlenir (kart üretimi
+// hiç çizmez + canlı DOM online/offline olaylarıyla güncellenir); yine
+// tetiklenirse birleşik offline toast + console kaydı (metin guard içinde)
+// ve RPC ÇAĞRILMAZ. rpcOptimistic'in genel guard'ı (js/api.js) yeterli
+// DEĞİL — erteleme yolları rpc()'yi direkt çağırır; giriş guard'ı burada.
+
+// Tek çevrimdurumu kaynağı — navigator tanımsızsa (eski koşum) online say.
+function _ertelemeOnline() {
+  return !(typeof navigator !== 'undefined' && navigator.onLine === false);
+}
+
+// Ortak giriş guard'ı: offline ise toast + console kaydı atar ve true döner;
+// çağıran erken çıkar, RPC'ye ulaşmaz. Tüm erteleme/kaydırma giriş
+// noktaları (cdKaydirAc, caseKalanGunleriKaydir, _erteleModal,
+// _erteleKaydet) bu TEK fonksiyondan geçer — kopya-yapıştır yok.
+function _ertelemeOfflineGuard(yol) {
+  if (_ertelemeOnline()) return false;
+  toast('İnternet yok — erteleme yapılamadı', true);
+  console.warn('[erteleme] offline — rpc çağrılmadı', yol || '');
+  return true;
+}
+
+// Görünürlük (E0 cdKaydirBtnGuncelle'in genelleşmesi): vaka detayındaki
+// #cd-kaydir-btn + görev kartlarındaki [data-ertele] erteleme butonları
+// tek yerden. openCaseDet açılışta + online/offline olaylarında çağırır;
+// kart üretimi (_erteleBtnHtml) offline'da butonu hiç çizmez.
+function ertelemeBtnGuncelle() {
+  const online = _ertelemeOnline();
+  const cdBtn = document.getElementById('cd-kaydir-btn');
+  if (cdBtn) cdBtn.style.display = online ? 'block' : 'none';
+  // C-1 (E4 onarım): protokol iptal yüzeyi — online + AKTİF + protocol_family'li
+  // vaka (openCaseDet _curCase'i kurar). _curCase vm-extract koşumlarında
+  // bulunmayabilir — typeof koruması (ui.js:6980 deseni).
+  const cdPBtn = document.getElementById('cd-protokol-iptal-btn');
+  if (cdPBtn) cdPBtn.style.display = (online && typeof _curCase !== 'undefined' && _curCase && _curCase.status === 'active' && _curCase.protocol_family) ? 'block' : 'none';
+  document.querySelectorAll('[data-ertele]').forEach(b => { b.style.display = online ? '' : 'none'; });
+}
+window.addEventListener('online',  () => ertelemeBtnGuncelle());
+window.addEventListener('offline', () => ertelemeBtnGuncelle());
+
+// ═══ E1-UI — GENEL ERTELEME KURAL CACHE'İ (2026-09-25, erteleme-genel) ═══
+// Kural TEK kaynak: canlı gorev_ertele_kural_listele RPC'si — JS'e tip listesi
+// KOPYALANMAZ (plan §1). Cache AppState'e yazılır ('ertelemeKurallari':
+// {gorev_tipi: {ertelenebilir, pencere_kurali}}); renderTask/_erteleModal
+// senkron okur. Yenileme: loadDash rozet tarayıcısı (ovsync_baslat_uyarilari
+// deseni — her dash yüklenişinde) + loadTasks girişinde cache boşsa (ilk
+// renderda butonlar hazır olsun; 60 sn hata-sükuneti RPC yoksa çekiştirmez).
+// Offline: cache eski kalabilir (§8-6 kabulü) — butonlar zaten gizli (E6).
+// Cache yoksa FAIL-CLOSED: kayıtsız tip → buton yok, modal açılmaz.
+let _ertelemeKuralSonDeneme = 0;
+function ertelemeKurallariGetir() { return getState('ertelemeKurallari') || {}; }
+function ertelemeKuralGetir(tip) { return ertelemeKurallariGetir()[tip] || null; }
+async function ertelemeKurallariYenile(zorla) {
+  if (!zorla && Object.keys(ertelemeKurallariGetir()).length) return;   // cache dolu
+  const simdi = Date.now();
+  if (!zorla && simdi - _ertelemeKuralSonDeneme < 60000) return;        // hata sükuneti
+  _ertelemeKuralSonDeneme = simdi;
+  if (!_ertelemeOnline()) return;                                      // offline: mevcut cache
+  try {
+    const rows = await rpc('gorev_ertele_kural_listele', {});
+    if (Array.isArray(rows) && rows.length) {
+      const m = {};
+      rows.forEach(r => { if (r && r.gorev_tipi) m[r.gorev_tipi] = { ertelenebilir: !!r.ertelenebilir, pencere_kurali: r.pencere_kurali || 'yok' }; });
+      setState('ertelemeKurallari', m);
+    }
+  } catch (e) { console.warn('gorev_ertele_kural_listele:', e.message); }
+}
+
+// Kaydırma sayfası (bottom sheet) — caseDaySaatAc/not-modal görsel dili.
+// Saf üretici: tests/unit/erteleme-kaydir-ui.test.js kilitli.
+function cdKaydirSheetHtml() {
+  return `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));box-sizing:border-box">
+    <div style="font-weight:800;font-size:.9rem;margin-bottom:6px">⏩ Kalan Günleri Kaydır</div>
+    <div style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin-bottom:12px">Vakanın tamamlanmamış günleri, seans planları ve planlı tohumlaması seçtiğin kadar ileri kayar. Tamamlanmış günler değişmez, tarihler geçmişe düşmez.</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button data-gun="1" onclick="caseKalanGunleriKaydir(1)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+1</button>
+      <button data-gun="2" onclick="caseKalanGunleriKaydir(2)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+2</button>
+      <button data-gun="3" onclick="caseKalanGunleriKaydir(3)" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">+3</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:stretch">
+      <input type="number" id="kaydir-ozel-input" min="1" max="365" step="1" inputmode="numeric" placeholder="Gün" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">
+      <button id="kaydir-ozel-btn" onclick="cdKaydirOzelUygula()" style="flex:1;padding:12px;background:var(--blue);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Gün Kaydır</button>
+      <button onclick="document.getElementById('kaydir-modal').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Vazgeç</button>
+    </div>
+  </div>`;
+}
+
+function cdKaydirAc() {
+  // E6 offline kapısı: sayfa açılmaz, RPC zaten çağrılmaz
+  if (_ertelemeOfflineGuard('kaydir')) return;
+  if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
+  let box = document.getElementById('kaydir-modal');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'kaydir-modal';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) box.remove(); };
+  box.innerHTML = cdKaydirSheetHtml();
+  document.body.appendChild(box);
+}
+
+// Özel gün girişi — mini-form uygula butonu
+function cdKaydirOzelUygula() {
+  const v = document.getElementById('kaydir-ozel-input')?.value;
+  caseKalanGunleriKaydir(v);
+}
+
+// RPC sonucu → özet toast metni. Sıfır sayılar listelenmez; hepsi sıfırsa
+// (vakada açık kalem kalmamışsa) ayrı mesaj. Tarih aralığı insan dilinde.
+function _kaydirOzetMetni(r) {
+  const d = r || {};
+  const parca = [];
+  if (d.tasinan_gun_satiri)      parca.push(`${d.tasinan_gun_satiri} gün satırı`);
+  if (d.tasinan_gorev)           parca.push(`${d.tasinan_gorev} görev`);
+  if (d.tasinan_seans)           parca.push(`${d.tasinan_seans} seans görevi`);
+  if (d.tasinan_uygulama_satiri) parca.push(`${d.tasinan_uygulama_satiri} seans planı`);
+  if (d.tai)                     parca.push(`${d.tai} tohumlama`);
+  if (!parca.length) return 'Kaydırılacak açık kalem bulunamadı';
+  let m = `✅ +${d.gun} gün kaydırıldı: ${parca.join(', ')}`;
+  if (d.ilk_tarih || d.son_tarih) m += ` → ${fmtTarih(d.ilk_tarih)} .. ${fmtTarih(d.son_tarih)}`;
+  return m;
+}
+
+// VAKA_KAYDIRILAMAZ:<json> ailesi (+ iç içe geçebilen tohumlama hataları)
+// → Türkçe mesaj. Bilinmeyen mesaj olduğu gibi kalır (sessiz yutma yok).
+function _kaydirHataMesaj(msg) {
+  const m = String(msg || '');
+  const i = m.indexOf('VAKA_KAYDIRILAMAZ:');
+  if (i !== -1) {
+    try {
+      const j = JSON.parse(m.slice(i + 'VAKA_KAYDIRILAMAZ:'.length));
+      const tr = {
+        GECERSIZ_GUN:    'Geçersiz gün sayısı — en az 1 girin',
+        VAKA_BULUNAMADI: 'Vaka bulunamadı',
+        VAKA_ACIK_DEGIL: 'Vaka açık değil — yalnız aktif vakalar kaydırılabilir',
+      };
+      if (tr[j.sebep]) return tr[j.sebep] + (j.status ? ` (durum: ${j.status})` : '');
+    } catch (_) { /* JSON çözülemedi → ham mesaj düşer */ }
+  }
+  if (m.includes('GECMIS_TARIH'))      return 'Tohumlama tarihi geçmişe düşemez — kaydırma yapılmadı';
+  if (m.includes('GOREV_ERTELENEMEZ')) return 'Planlı tohumlama ertelenemedi — kaydırma yapılmadı';
+  return m;
+}
+
+async function caseKalanGunleriKaydir(gun) {
+  if (_ertelemeOfflineGuard('kaydir')) return;   // E6: offline'da RPC ÇAĞRILMAZ
+  if (!_curCase || _curCase.status !== 'active') { toast('Yalnız aktif vaka kaydırılabilir', true); return; }
+  const n = parseInt(gun, 10);
+  if (!Number.isFinite(n) || n < 1) { toast('Geçerli bir gün sayısı girin (en az 1)', true); return; }
+  const ozelBtn = document.getElementById('kaydir-ozel-btn');
+  if (ozelBtn) { ozelBtn.disabled = true; ozelBtn.textContent = '…'; }
+  try {
+    const r = await rpc('vaka_kalan_gunleri_kaydir', { p_case_id: _curCase.id, p_gun: n });
+    document.getElementById('kaydir-modal')?.remove();
+    toast(_kaydirOzetMetni(r));
+    // Tazele: kaydırılan tüm yüzeyler (gün satırı, görev, seans planı, audit)
+    await pullTables(['treatment_days','gorev_log','treatment_day_uygulamalar','islem_log']).catch(() => {});
+    if (_curCase) {
+      await renderCaseTimeline(_curCase.id);
+      _updateKapatBtn(_curCase.id);
+    }
+  } catch (e) {
+    toast('❌ ' + _kaydirHataMesaj(e.message), true);
+    if (ozelBtn) { ozelBtn.disabled = false; ozelBtn.textContent = 'Gün Kaydır'; }
+  }
 }
 
 async function caseGunEkle() {
@@ -8933,6 +9469,8 @@ function acHayvan(inputId,listId){
 function selHayvan(inputId,listId,val){
   const el=document.getElementById(inputId); if(el) el.value=val;
   const ac=document.getElementById(listId); if(ac) ac.style.display='none';
+  // K6 — hayvan seçimi hastalık dropdown'unu kısır kilidiyle tazeler (cila2 C1 aynası)
+  if(inputId==='d-hid' && typeof loadDiseasesDropdown==='function') loadDiseasesDropdown();
 }
 // G-20260906-TOPLU-VAKA — m-bulk-case çoklu küpe autocomplete.
 // acHayvan klonu (tek-select akışı %100 korunur): satır seçimi inputa YAZMAZ,
@@ -9228,6 +9766,14 @@ async function dataTrafficYenile(){
 }
 async function dataTrafficGonder(e){
   const btn=(e||window.event).target;
+  // O10: toplu gönderim öncesi sayı+tablo kırılımı önizlemesi (tek-kayıt ↑ onaysız kalır)
+  const q=await getQueue();
+  if(q.length){
+    const kirilim={};
+    q.forEach(o=>{ kirilim[o.table]=(kirilim[o.table]||0)+1; });
+    const ozet=Object.entries(kirilim).map(([t,n])=>`${t} × ${n}`).join(', ');
+    if(!confirm(`Bekleyen ${q.length} kayıt gönderilecek: ${ozet}. Onaylıyor musunuz?`)) return;
+  }
   btn.disabled=true; btn.textContent='Gönderiliyor…';
   await syncNow();
   await dataTrafficYenile();
@@ -9424,7 +9970,8 @@ function buildRpcParams(rpcName, data, op) {
         p_route: data.route
       };
     case 'gorev_tamamla':
-      return { p_gorev_id: data.id, p_padok_hedef: data.padok || null };
+      return { p_gorev_id: data.id, p_padok_hedef: data.padok || null,
+               p_iptal: data.iptal === true };   // T5: iptal-PATCH replay'i iptal olarak gider
     case 'gorev_guncelle':
       // canlı: (p_id, p_aciklama, p_hedef_tarih, p_gorev_tipi)
       return {
@@ -10404,7 +10951,9 @@ async function bildirimKontrol(){
   const now=new Date();
   const bugunStr=bugun();
   const yarin=dFwd(bugunStr,1);
-  const gorevler=await getData('gorev_log',g=>!g.tamamlandi&&!g.parent_id&&(g.hedef_tarih===bugunStr||g.hedef_tarih===yarin));
+  // C4 (cila2): K8'in seans/gecikme genişletmesi geri alındı — 1f01e8b hâli:
+  // yalnız parent_id'siz görevler, bugün+yarın penceresi.
+  const gorevler=await getData('gorev_log',g=>!g.tamamlandi&&!g.iptal&&!g.parent_id&&(g.hedef_tarih===bugunStr||g.hedef_tarih===yarin));
   // M-26 fix: localStorage bozuk/eski formatta JSON içerebilir — try/catch yoktu, crash riski.
   let gosterilen; try { gosterilen=JSON.parse(localStorage.getItem('bildirim_gosterilen')||'{}'); } catch(_){ gosterilen={}; }
   const simdi=Date.now();

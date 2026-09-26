@@ -7,6 +7,7 @@
 #
 # Kullanım:
 #   bash scripts/db-validate.sh <migration.sql> [--data-mode auto|off|on] [--keep-db]
+#                              [--priors <p1.sql> <p2.sql> ...]
 #
 # FAZLAR (SPEC §3):
 #   A  Statik risk     sqlfluff --dialect postgres (parse hatası = FAIL; stil = uyarı)
@@ -38,8 +39,9 @@ export LC_ALL=C LANG=C
 SQL_FILE=""
 DATA_MODE="auto"   # auto | off | on
 KEEP_DB=0
+declare -a PRIORS=()   # [F4/G2] hedeften ÖNCE sırayla uygulanacak migration'lar
 
-usage() { echo "Kullanım: $0 <migration.sql> [--data-mode auto|off|on] [--db-url <engine-url>] [--keep-db]" >&2; exit 64; }
+usage() { echo "Kullanım: $0 <migration.sql> [--data-mode auto|off|on] [--db-url <engine-url>] [--keep-db] [--priors <p1.sql> <p2.sql> ...]" >&2; exit 64; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -50,6 +52,16 @@ while [[ $# -gt 0 ]]; do
     --db-url)     [[ $# -ge 2 ]] || usage; VAL_DB_URL="$2"; shift 2 ;;
     --db-url=*)   VAL_DB_URL="${1#*=}"; shift ;;
     --keep-db) KEEP_DB=1; shift ;;
+    # [F4/G2] --priors: serinin önceki migration'ları — C1/C2 baseline-restore
+    # sonrası, HEDEF migration'dan ÖNCE sırayla uygulanır (bayraksız çağrı
+    # davranışı değişmez). Birden çok dosya boşlukla ayrılır; liste ilk
+    # -- bayraklı argümanda biter.
+    --priors)
+      shift
+      while [[ $# -gt 0 && "$1" != --* ]]; do
+        [[ -f "$1" ]] || { echo "❌ Prior dosya bulunamadı: $1" >&2; exit 64; }
+        PRIORS+=("$(readlink -f "$1")"); shift
+      done ;;
     -h|--help) usage ;;
     *)
       [[ -z "$SQL_FILE" ]] || { echo "❌ Fazla konum argümanı: $1" >&2; usage; }
@@ -123,6 +135,26 @@ psql_q() {
   psql "$url" -v ON_ERROR_STOP=1 -qAt -c "$sql" > "$outf" 2>&1
 }
 
+# [F4/G2] apply_priors: --priors listesini izole DB'ye sırayla uygular.
+# Her prior bağımsız transaction'lı migration dosyasıdır (kendi BEGIN…COMMIT'i).
+# Hata = o faz için FAIL + 1 döner; hedef apply çağıran tarafta atlanır.
+apply_priors() { # $1 = izole DB url, $2 = faz etiketi (C1|C2)
+  local url="$1" tag="$2" p out rc=0
+  for p in "${PRIORS[@]}"; do
+    out="$WORK/prior_${tag}_$(basename "$p").out"
+    log_cmd "psql -v ON_ERROR_STOP=1 -f '$p'  # prior ($tag)"
+    if psql "$url" -v ON_ERROR_STOP=1 -f "$p" > "$out" 2>&1; then
+      log_result "priors.$tag.$(basename "$p")" "PASS" "prior migration hatasız uygulandı"
+    else
+      log_result "priors.$tag.$(basename "$p")" "FAIL" "prior migration uygulanamadı; hata raporda"
+      echo "❌ Prior migration başarısız ($tag): $p" >&2
+      awk '/ERROR:/{p=8} p&&p--' "$out" | head -8 >&2
+      rc=1
+    fi
+  done
+  return $rc
+}
+
 # ══════════════════════════════════════════════════════════════════════
 # FAZ A — Statik risk (sqlfluff + squawk)
 # ══════════════════════════════════════════════════════════════════════
@@ -188,12 +220,55 @@ grep -ioE '^[[:space:]]*CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?(U
 # (IF NOT EXISTS satırı da dahil edildi). Ek temizlik:
 sed -i -E 's/^(if|not|exists)$//' "$CREATED_FILE"
 
+# [F4/G2] Prior dosyalarında yaratılan nesneler de hedef öncesi şemada mevcuttur
+# (priors hedeften ÖNCE uygulanır) — Faz B bilinen-kümesine girerler. Vak'a:
+# 100004'ün `FROM public.gorev_ertele_kural` referansı aynada yok + hedefte
+# yaratılmıyor; prior 100003 yaratıyor → priorsuz Faz B INCONCLUSIVE veriyordu.
+PRIOR_CREATED_FILE="$WORK/prior_created.txt"; : > "$PRIOR_CREATED_FILE"
+if [[ ${#PRIORS[@]} -gt 0 ]]; then
+  for p in "${PRIORS[@]}"; do
+    grep -ioE '^[[:space:]]*CREATE[[:space:]]+(OR[[:space:]]+REPLACE[[:space:]]+)?(UNIQUE[[:space:]]+)?(TABLE|INDEX|FUNCTION|VIEW|MATERIALIZED[[:space:]]+VIEW|TYPE|SCHEMA|TRIGGER|POLICY|EXTENSION|SEQUENCE)[[:space:]]+(IF[[:space:]]+NOT[[:space:]]+EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$p" \
+      | awk '{print $NF}' | tr '[:upper:]' '[:lower:]' | sed 's/^public\.//' >> "$PRIOR_CREATED_FILE" || true
+  done
+  sed -i -E 's/^(if|not|exists)$//' "$PRIOR_CREATED_FILE"
+  sort -u "$PRIOR_CREATED_FILE" -o "$PRIOR_CREATED_FILE"
+fi
+
+# [FIX 2026-09-25 G2-onarım] CTE isimleri de migration-içi yaratılan nesnedir:
+#   `WITH [RECURSIVE] u AS (…) FROM u` zincirinde u tablo DEĞİL CTE'dir; SPEC
+#   Faz B "migration içinde yaratılan nesneler önce hesaba katılır" gereği CTE
+#   isimleri known listesine girer. `AS (` parantez şartı WITH ORDINALITY /
+#   WITH CHECK gibi anahtar kelime yakalamalarını keser; ardıl CTE'ler
+#   `), name AS (` deseninden yakalanır (aynı satırda olanlar).
+CTE_FILE="$WORK/cte.txt"
+{
+  grep -ioE 'WITH[[:space:]]+(RECURSIVE[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*[[:space:]]+AS[[:space:]]*\(' "$SQL_ABS" || true
+  grep -ioE ',[[:space:]]*[A-Za-z_][A-Za-z0-9_]*[[:space:]]+AS[[:space:]]*\(' "$SQL_ABS" || true
+} | awk '{print $(NF-2)}' | tr '[:upper:]' '[:lower:]' | grep -E '^[a-z_][a-z0-9_]*$' | sort -u > "$CTE_FILE" || true
+
+# [FIX 2026-09-25 G2-onarım] GRANT/REVOKE deyimleri rol adı taşır (FROM PUBLIC,
+#   FROM authenticated, TO service_role) — bunlar tablo referansı DEĞİLDİR ama
+#   FROM regex'ine takılıp 'authenticated public' gibi sahte unresolved üretiyordu.
+#   Referans çıkarımından önce bu deyimler metinden soyulur (noktalı virgüle dek,
+#   çok-satır dahil; yorumlardaki örnekler de zararsızca düşer).
+# [FIX 2026-09-25 F4/G2] soyucu ÇOK-SATIRLI hale getirildi: satır-bazlı sed'in
+#   [^;]*'i satır sonunda duruyordu — `GRANT …\n TO role;` biçiminde devam satırı
+#   metinde kalıyor, rol adı refs'e sızıp hayali INCONCLUSIVE (kapı yanlış-
+#   bloklama) üretiyordu. İki aşama: (1) '--' yorum satırları düşürülür —
+#   yorumdaki 'GRANT …' örneği deyim değildir, peşinden ';' gelmezse -0777 maskesi
+#   dosyanın geri kalanını yutardı; (2) perl -0777 tüm dosyayı tek pattern-uzayında
+#   tutar, [^;]* yeni satırdan geçer → deyim ilk ';'e dek tamamen maskelenir.
+#   (Blok yorum /* */ bu repoda kullanılmıyor; sözdizimi otoritesi Faz A'dır.)
+NOGRANT_FILE="$WORK/sql_nogrant.sql"
+sed -E 's/--.*$//' "$SQL_ABS" \
+  | perl -0777 -pe 's/\b(GRANT|REVOKE)\b[^;]*;?/ /g' > "$NOGRANT_FILE"
+
 # Kalan dış referanslar: FROM/JOIN/ALTER TABLE ... / REFERENCES ... hedef isimleri.
 REFS_FILE="$WORK/refs.txt"
 {
-  grep -ioE '(FROM|JOIN)[[:space:]]+(ONLY[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true
-  grep -ioE 'ALTER[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true
-  grep -ioE 'REFERENCES[[:space:]]+[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true
+  grep -ioE '(FROM|JOIN)[[:space:]]+(ONLY[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$NOGRANT_FILE" || true
+  grep -ioE 'ALTER[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$NOGRANT_FILE" || true
+  grep -ioE 'REFERENCES[[:space:]]+[A-Za-z_][A-Za-z0-9_.]*' "$NOGRANT_FILE" || true
 } | awk '{print $NF}' | tr '[:upper:]' '[:lower:]' | sed 's/^public\.//' | sort -u > "$REFS_FILE" || true
 
 # egesut_lsp aynasındaki tablo+view+routine isimleri.
@@ -208,7 +283,15 @@ if psql_q "$LOCAL_LSP_URL" "
 " "$LSP_OBJS.full"; then
   grep -E '^[a-z0-9_]+$' "$LSP_OBJS.full" | sort -u > "$LSP_OBJS"
   # Referanslardan migration-içi yaratılanlar ve aynada olanlar düşer; kalan = çözülemedi.
-  KNOWN="$WORK/known.txt"; sort -u "$LSP_OBJS" "$CREATED_FILE" > "$KNOWN"
+  # [FIX 2026-09-25 G2-onarım] CTE isimleri migration-içi yaratılan arasındadır;
+  #   sistem şemalı referanslar (pg_catalog.*, information_schema.*) her PG
+  #   kurulumunda mevcut olduğundan bilinir sayılır (aynanın public-filtresine
+  #   takılan gerçek referanslardı).
+  KNOWN="$WORK/known.txt"
+  { sort -u "$LSP_OBJS" "$CREATED_FILE" "$CTE_FILE"
+    [[ -s "$PRIOR_CREATED_FILE" ]] && cat "$PRIOR_CREATED_FILE"
+    grep -E '^(pg_catalog|information_schema)\.' "$REFS_FILE" || true
+  } | sort -u > "$KNOWN"
   UNRESOLVED=$(comm -23 "$REFS_FILE" "$KNOWN")
   if [[ -n "$UNRESOLVED" ]]; then
     log_result "B.sema-uyum" "INCONCLUSIVE" "statik çözülemedi (C1'e bırakıldı): $(echo "$UNRESOLVED" | tr '\n' ' ')"
@@ -277,9 +360,16 @@ run_baseline() { # $1 = ek etiket (log)
 }
 
 C1_OK=0
+C1_PRIOR_FAIL=0
 if run_baseline "schema"; then
   C1_OK=1
   ISO_URL="$(db_url_of "$ENGINE_BASE" "$C1_DB")"
+
+  # [F4/G2] Priors: HEDEFTEN ÖNCE uygula (RLS ön-durum ve nesne kontrolleri
+  # prior-sonrası şemayı ölçer — fark yalnız hedef migration'a atfedilir).
+  if [[ ${#PRIORS[@]} -gt 0 ]] && ! apply_priors "$ISO_URL" "C1"; then
+    C1_PRIOR_FAIL=1
+  fi
 
   # Etkilenen tablolar: ALTER TABLE hedefleri + CREATE TABLE isimleri.
   AFFECTED=$( { cat "$CREATED_FILE"; { grep -ioE 'ALTER[[:space:]]+TABLE[[:space:]]+(IF[[:space:]]+EXISTS[[:space:]]+)?[A-Za-z_][A-Za-z0-9_.]*' "$SQL_ABS" || true; } | awk '{print $NF}' | tr '[:upper:]' '[:lower:]' | sed 's/^public\.//'; } | sort -u )
@@ -291,7 +381,10 @@ if run_baseline "schema"; then
   # Migration'ı uygula: herhangi bir hata = FAIL + hatalı satır/SQLSTATE.
   APPLY_OUT="$WORK/apply.out"
   log_cmd "psql -v ON_ERROR_STOP=1 -f '$SQL_ABS'  # db=$C1_DB"
-  if psql "$ISO_URL" -v ON_ERROR_STOP=1 -f "$SQL_ABS" > "$APPLY_OUT" 2>&1; then
+  if [[ $C1_PRIOR_FAIL -eq 1 ]]; then
+    log_result "C1.migration-apply" "FAIL" "prior uygulanamadı — hedef apply koşulmadı"
+    echo "❌ C1 hedef apply atlandı (prior hatası)." >&2
+  elif psql "$ISO_URL" -v ON_ERROR_STOP=1 -f "$SQL_ABS" > "$APPLY_OUT" 2>&1; then
     log_result "C1.migration-apply" "PASS" "psql ON_ERROR_STOP ile hatasız uygulandı"
 
     # Post-check 1: yaratılan nesneler gerçekten var mı?
@@ -372,15 +465,33 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
   } | tr '[:upper:]' '[:lower:]' | sed 's/^public\.//' | sort -u )
 
   C2_OK=0
+  C2_PRIOR_FAIL=0
   if run_baseline "data"; then
     C2_OK=1
     C2_URL="$(db_url_of "$ENGINE_BASE" "$C1_DB")"
 
+    # [F4/G2] Priors: sentetik tohumlama ÖNCESİ uygula (tohumlama ve apply
+    # prior-sonrası şemada koşar — örn. hedefin DML tablosu priors'tan gelirse).
+    if [[ ${#PRIORS[@]} -gt 0 ]] && ! apply_priors "$C2_URL" "C2"; then
+      C2_PRIOR_FAIL=1
+    fi
+
     # Sentetik tohumlama: NOT NULL kolonları information_schema'dan oku (kolon adı
     # UYDURMA); default'u olanlar atlanır; değer tip bazlı üretilir; farm_id varsa
     # önce gerçek bir farm satırı seç, yoksa farm'a da satır ekle (tenant bütünlüğü).
+    # [FIX 2026-09-25 G2-onarım] farm değeri VALS sorgusunun İÇİNDEKİ alt sorgudan
+    #   alınıyordu; public.farm bu aynada YOK → tüm VALS sorgusu parse aşamasında
+    #   kırılıp stderr /dev/null'a yutuluyor, VALUES () üretip tohum kırılıyordu.
+    #   Artık değer bir kez, varlık-guard'lı (to_regclass) ve quote_literal'li
+    #   hesaplanır; hata varsa seed.log'a düşer (sessiz hata yutma kapatıldı).
     SEED_LOG="$WORK/seed.log"; : > "$SEED_LOG"
     SEED_FAIL=0
+    FARM_MIN=$(psql "$C2_URL" -qAt -c "SELECT CASE WHEN pg_catalog.to_regclass('public.farm') IS NULL THEN NULL ELSE (SELECT quote_literal(min(f.id)::text) FROM public.farm f) END" 2>>"$SEED_LOG" || true)
+    # [F4/G2] farm yokluğu fallback'i: '1' DEĞİL sabit zero-uuid — farm_id kolonları
+    # uuid; '1' integer ifade → tohum INSERT'i tip hatasıyla kırılıp C2'yi
+    # INCONCLUSIVE'a düşürüyordu (pg_application_event vak'ası, seri koşusu).
+    # public.farm bu aynada hiç yok → ihlal edilecek FK de yok.
+    [[ -z "$FARM_MIN" ]] && { FARM_MIN="'''00000000-0000-0000-0000-000000000000'''"; echo "(genel) public.farm yok/boş — farm_id tohum değeri sabit zero-uuid fallback" >> "$SEED_LOG"; }
     for t in $DML_TABLES; do
       # Tablo izole DB'de var mı? (yeni CREATE edilmiş olabilir — baseline sonrası yoksa C2 tohumlaması C1 apply sonrası anlamına gelir;
       # bu durumda migration'ın kendisi tabloyu yaratır → tohumlamayı apply sonrasına bırakamayız, tablo yoksa 'yeni tablo' notu düş.)
@@ -392,18 +503,30 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
       COLS_SQL="SELECT string_agg(format('%I', column_name), ', ') FROM information_schema.columns WHERE table_schema='public' AND table_name='$t' AND is_nullable='NO' AND column_default IS NULL"
       COLS=$(psql "$C2_URL" -qAt -c "$COLS_SQL" 2>/dev/null || true)
       [[ -z "$COLS" ]] && { echo "$t: zorunlu-default'suz kolon yok" >> "$SEED_LOG"; continue; }
-      # Değer ifadeleri: tip bazlı; kolon adları ŞEMADAN geldi (uydurma yok). farm_id → gerçek farm.
+      # Değer ifadeleri: tip bazlı; kolon adları ŞEMADAN geldi (uydurma yok).
+      # [FIX 2026-09-25 G2-onarım] farm_id dalı önceden hesaplanan FARM_MIN literalını
+      #   kullanır; jsonb literal '''{}''' doğru SQL string'i üretir (önceki '\'{}\''
+      #   bozuk metin veriyordu); time tipleri için '''00:00''' dalı eklendi
+      #   ('dbval_…' metni time'a cast edilemiyordu).
       VALS_SQL="SELECT string_agg(CASE
-          WHEN column_name IN ('farm_id') THEN COALESCE((SELECT min(f.id)::text) FROM public.farm f), '1')
+          WHEN column_name IN ('farm_id') THEN ${FARM_MIN}
           WHEN data_type='integer' OR data_type='bigint' OR data_type='smallint' OR data_type='numeric' THEN '1'
           WHEN data_type='boolean' THEN 'false'
           WHEN data_type='date' THEN 'CURRENT_DATE'
           WHEN data_type LIKE 'timestamp%' THEN 'now()'
           WHEN data_type='uuid' THEN 'gen_random_uuid()'
-          WHEN data_type='jsonb' OR data_type='json' THEN '\'{}\''
+          WHEN data_type LIKE 'time%' THEN '''00:00'''
+          WHEN data_type='jsonb' OR data_type='json' THEN '''{}'''
           ELSE format('''dbval_%s''', column_name)
         END, ', ') FROM information_schema.columns WHERE table_schema='public' AND table_name='$t' AND is_nullable='NO' AND column_default IS NULL"
-      VALS=$(psql "$C2_URL" -qAt -c "$VALS_SQL" 2>/dev/null || true)
+      VALS_ERR="$WORK/vals.err"; : > "$VALS_ERR"
+      VALS=$(psql "$C2_URL" -qAt -c "$VALS_SQL" 2>"$VALS_ERR" || true)
+      if [[ -z "$VALS" ]]; then
+        # Boş VALUES () ile INSERT denemek anlamsız syntax hatası üretir; açık logla.
+        echo "$t: sentetik DEĞER üretilemedi (VALS sorgusu boş/hata): $(head -2 "$VALS_ERR" | tr '\n' ' ')" >> "$SEED_LOG"
+        SEED_FAIL=1
+        continue
+      fi
       if psql "$C2_URL" -v ON_ERROR_STOP=1 -qc "INSERT INTO public.$t ($COLS) VALUES ($VALS)" >> "$SEED_LOG" 2>&1; then
         echo "$t: sentetik satır eklendi ($COLS)" >> "$SEED_LOG"
       else
@@ -415,7 +538,10 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
     # Tohumlanmış veri üzerinde migration'ı uygula → unique/fk ihlali yakala.
     C2_APPLY="$WORK/c2_apply.out"
     log_cmd "psql -v ON_ERROR_STOP=1 -f '$SQL_ABS'  # C2 db=$C1_DB (tohumlu)"
-    if psql "$C2_URL" -v ON_ERROR_STOP=1 -f "$SQL_ABS" > "$C2_APPLY" 2>&1; then
+    if [[ $C2_PRIOR_FAIL -eq 1 ]]; then
+      log_result "C2.veri-uyumluluk" "FAIL" "prior uygulanamadı — hedef apply koşulmadı"
+      echo "❌ C2 hedef apply atlandı (prior hatası)." >&2
+    elif psql "$C2_URL" -v ON_ERROR_STOP=1 -f "$SQL_ABS" > "$C2_APPLY" 2>&1; then
       if [[ $SEED_FAIL -eq 1 ]]; then
         log_result "C2.sentetik-tohum" "INCONCLUSIVE" "bazı tablolara sentetik satır eklenemedi (seed.log); veri senaryosu kısmi"
         log_result "C2.veri-uyumluluk" "INCONCLUSIVE" "tohumlama kısmi — veri uyumluluğu tam kanıtlanmadı"
@@ -464,6 +590,9 @@ yaz_rapor() {
   echo ""
   echo "- Tarih: $TS"
   echo "- Migration: \`$SQL_ABS\`"
+  if [[ ${#PRIORS[@]} -gt 0 ]]; then
+    echo "- Priors (${#PRIORS[@]}): ${PRIORS[*]}"
+  fi
   echo "- SHA-256: \`$SHA256\`"
   echo "- Baseline (C1): ${BASELINE_META:-alınamadı} · parite: $PARITE"
   echo "- Data mode: $DATA_STATUS"
@@ -499,6 +628,15 @@ yaz_rapor() {
       head -40 "$WORK/$fn"
       echo '```'
     fi
+  done
+  # [F4/G2] prior uygulama çıktıları (varsa)
+  for f in "$WORK"/prior_*.out; do
+    [[ -e "$f" ]] || continue
+    echo ""
+    echo "### Prior apply (\`$(basename "$f")\`)"
+    echo '```'
+    tail -15 "$f"
+    echo '```'
   done
 } > "$REPORT"
 }

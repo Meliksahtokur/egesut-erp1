@@ -190,6 +190,9 @@ postgres-language-server.jsonc
 # 2026-09-24: db-validation kapısı — migration doğrulama scriptleri tracked (SPEC: docs/plans/2026-09-24-db-validation-kapisi-spec.md)
 !scripts/db-build-baseline.sh
 !scripts/db-validate.sh
+# 2026-09-25: cila-onarım K2 — gövde doğrulama kapısı tracked (plan-db.md Task 8)
+!scripts/govde-dogrulama.sh
+!scripts/lib/govde_karsilastir.py
 !/tests/harness/
 !/tests/harness/**/*.py
 !/.harness/bin/

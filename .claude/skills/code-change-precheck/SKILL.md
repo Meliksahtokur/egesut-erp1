@@ -19,6 +19,8 @@ sorusunun cevabını görmek.
 
 ## Ne zaman zorunlu
 
+- **Her şeyden önce:** `.harness/references/domain-rules.md` okunur (sahip kuralı 2026-09-26) —
+  plan/spec/SQL/JS değişikliği iş kuralına uymuyorsa blast-radius temiz olsa da yanlıştır.
 - **Migration / SQL yazmadan önce** (yeni RPC, ALTER, kolon/tablo ekleme-değiştirme, view).
 - **JS değiştirmeden önce** (`js/ui.js`, `api.js`, `forms.js`, `ai-asistan.js` vb. — özellikle
   global fonksiyon/`rpc`/`pullTables` gibi çok yerden çağrılanlar).

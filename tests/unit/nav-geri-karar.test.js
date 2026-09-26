@@ -168,3 +168,17 @@ test('actions: gecmis-gun-kapat/gecmis-det-gun-kapat/nav-geri kayıtlı', () => 
   assert.strictEqual(typeof actions['nav-geri'], 'function');
   assert.strictEqual(typeof actions['go-back'], 'function');
 });
+
+// ── S4/M2: ovsync-yardim vakası (proto-detay'dan sonra; DOM remove-edilir) ──
+
+test('navGeriKarar: açık ovsync yardım sheet → ovsync-yardim', () => {
+  const { api } = loadHandlers();
+  const k = api.navGeriKarar({ ovsyncYardimAcik: true });
+  assert.strictEqual(k.tur, 'ovsync-yardim');
+});
+
+test('navGeriKarar: {ovsync_yardim} state (DOM yok) → yut (sayfa taşınmaz)', () => {
+  const { api } = loadHandlers();
+  const k = api.navGeriKarar({ state: { ovsync_yardim: true } });
+  assert.strictEqual(k.tur, 'yut');
+});

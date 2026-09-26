@@ -28,3 +28,6 @@ Sonuç **PASS** olmadan sahibe test verilmez.
 4. Hepsi PASS → ancak o zaman sahibe link + liste verilir.
 
 Playwright koşumu belgelendiyse tekrarlanmaz; demo sahip şifresine dokunulmaz.
+
+**Domain kuralları ZORUNLU (sahip, 2026-09-26):** plan/spec/SQL/implementasyon yazmadan ÖNCE
+`.harness/references/domain-rules.md` okunur; çelişkide dur ve sahibe sor (AGENTS.md Start here #2).

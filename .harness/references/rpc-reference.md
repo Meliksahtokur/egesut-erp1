@@ -201,8 +201,11 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 
 ## Görev Sistemi (gorev_log)
 
-**`gorev_tamamla(p_gorev_id, p_padok_hedef?)`** → jsonb
+**`gorev_tamamla(p_gorev_id, p_padok_hedef?, p_iptal?)`** → jsonb
 → Görevi tamamlar; SUTTEN_KESME tipinde `buzagi_sutten_kesme_onayla`'yı çağırır (her kaynaktan kesim garantisi).
+→ `p_iptal=true` (T5, 20260925000006): offline replay iptal-PATCH'i iptal olarak kapatır
+  (`iptal=true, tamamlandi=true`, audit 'Görev iptal edildi (offline replay)'); tek-imza — eski
+  (text,text) overload kalktı (iki default'lu overload PostgREST adlı-çağrıda 42725 veriyordu).
 → Çağrı: forms.js:1047; ui.js:468, 4855, 4920; replay: ui.js:6789.
 
 **`gorev_guncelle(p_id, p_aciklama?, p_hedef_tarih?, p_gorev_tipi?)`** → jsonb
@@ -533,6 +536,16 @@ ile yazılır (helper sheet "Uygula" aynı anda ikisini çağırır).
 
 **`v_eligible`** (view): Dişi + Aktif + kısır değil + buzağı/küçük değil + ≥13 ay + hiç Gebe yok + son event >55g;
 ankraj = MAX(kızgınlık, tohumlama, abort_tarihi, dogum_tarihi, dogum). Aktif vaka filtresi YOK (20260830000020).
+
+---
+
+## Üreme Temizlik (tek-seferlik, 2026-09-25)
+
+**`ureme_temizlik_reconcile(p_dry_run?, p_gruplar?)`** → jsonb `{R1, R2, KISIR_INSTANCE, KISIR_GOREV, dry_run, zaman}`
+— stale "Sessiz hayvan" görevleri (R1 aktif protocol_family vakası, R2 son tohumlama Gebe/Bekliyor) + kısır hayvan
+aktif UREME instance'ları ve açık zincir görevleri (KISIR) için tek-seferlik dry-run'lı tasfiye. Silme YOK —
+`iptal=true` + `kapatan_ref` + `islem_log('UREME_TEMIZLIK')` audit. `p_dry_run` default `true`.
+Çağrı yeri: koşum betiği/reports (js çağırmaz). Spec: `docs/plans/2026-09-24-ovsync-cila/spec-s3.md`.
 
 ---
 

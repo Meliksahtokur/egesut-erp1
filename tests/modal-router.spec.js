@@ -206,3 +206,51 @@ test('B21: sheet açıkken Android geri → uygulama dash\'e atlamaz, sayfa yeri
   await expect(page.locator('#pg-suru')).toHaveClass(/on/);
   await expect(page.locator('#pg-dash')).not.toHaveClass(/on/);
 });
+
+// ═════════════════════════════════════════════════════════════════════════════
+// S4 — İlk Tohumlama yardım katmanı: ? → sheet açılır, Android geri sheet'i
+// kapatır, panel (protokol-bs) ekranda kalır (dash'e atlama YOK — B22 invariantı).
+// RPC-stub ŞART: İlk Tohumlama bölümü canlı demo penceresi KANAL+GÜN bağımlıdır
+// (plan-s4 Adım 2 onarım turu bulgusu) — oysuz deterministik değildir.
+// ═════════════════════════════════════════════════════════════════════════════
+
+test('S4: ? → ovsync yardım sheet açılır; geri tuşu sheet kapatır, panel yerinde kalır', async ({ page }) => {
+  await page.route('**/rest/v1/rpc/ovsync_baslat_uyarilari**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ok: true, uyarilar: [{
+        gorev_id: 'e2e-gorev', hayvan_id: 'e2e-hayvan', kupe_no: 'E2E-KUPE',
+        kategori: 'TEST', kisir: false, hedef_tarih: '2026-10-06',
+        hedef_saat: '10:00', tai_tarihi: '2026-10-16',
+        kaynak: 'ILK-TOH-DUVE-e2e', taban_turu: 'duve',
+      }] }),
+    }));
+  await openApp(page);
+  await navTo(page, '#nb-suru');
+
+  await injectProtokolUyari(page);
+
+  // İlk Tohumlama bölümü RPC-stub verisiyle yeniden kurulur
+  await page.evaluate(() => _showProtokolEkran());
+  await expect(page.locator('#protokol-bs')).toBeAttached();
+  await expect(page.locator('#protokol-bs')).toContainText('İlk Tohumlama (1)');
+
+  // ? rozet → yardım sheet
+  await page.locator('#protokol-bs button', { hasText: '?' }).first().click();
+  await expect(page.locator('#ovsync-yardim-bs')).toBeAttached();
+  await expect(page.locator('#ovsync-yardim-bs')).toContainText('Ovsynch-56');
+  await expect(page.locator('#ovsync-yardim-bs')).toContainText('TAI');
+  await expect(page.locator('#ovsync-yardim-bs')).toContainText('12 ay 21 gün');
+
+  // Kullanıcı geri tuşu → yardım sheet kapanır, panel ekranda kalır
+  await page.goBack();
+  await expect(page.locator('#ovsync-yardim-bs')).toHaveCount(0);
+  await expect(page.locator('#protokol-bs')).toBeAttached();
+  await expect(page.locator('#pg-suru')).toHaveClass(/on/);
+  await expect(page.locator('#pg-dash')).not.toHaveClass(/on/);
+
+  // Temizlik: panel backdrop ile kapatılır (sonraki testlere öksüz bırakma)
+  await backdropTap(page, '#protokol-bs > div');
+  await expect(page.locator('#protokol-bs')).toHaveCount(0);
+});

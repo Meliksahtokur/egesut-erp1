@@ -126,6 +126,7 @@ window.addEventListener('popstate', e => {
     modalStack: globalThis._modalStack || [],
     sentinel: !!(e.state && e.state.sentinel),
     protoDetayAcik: !!(_protoDetay && _protoDetay.style.display !== 'none'),
+    ovsyncYardimAcik: !!document.getElementById('ovsync-yardim-bs'),
     detAcik: !!(_det && _det.classList.contains('on')),
     detGunAcik: (typeof _detGecmisGun !== 'undefined') && !!_detGecmisGun,
     gecmisGunAcik: getState('currentPage') === 'gecmis' && (typeof _gecmisGun !== 'undefined') && !!_gecmisGun,
@@ -154,6 +155,13 @@ window.addEventListener('popstate', e => {
       {
         const _pBs = document.getElementById('protokol-bs');
         if (_pBs) _pBs.style.display = 'flex';
+      }
+      return;
+    case 'ovsync-yardim':
+      // S4/M2: yardım katmanı remove edilir — panel (protokol-bs) ekranda kalır
+      {
+        const _oyb = document.getElementById('ovsync-yardim-bs');
+        if (_oyb) _oyb.remove();
       }
       return;
     case 'det-gun':

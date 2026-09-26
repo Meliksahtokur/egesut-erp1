@@ -51,6 +51,10 @@ function openM(id) {
     if(g('d-sempt')) g('d-sempt').value = '';
     updateSemptomDropdown('');
     filterHastalikList();
+    // K6-onarim (p5b-fix F4): acilista hastalik secimi sifirlanir — closeDisease
+    // d-hid'yi temizler ama d-disease-id'yi temizlemez; K6 secim-koruma dalı
+    // bayat secimi geri koymasin (submit'siz kapanan modal baska hayvana tasınmaz).
+    if(g('d-disease-id')) g('d-disease-id').value = '';
     loadDiseasesDropdown('');
   }
   if (id === 'm-bulk-vaccine') {

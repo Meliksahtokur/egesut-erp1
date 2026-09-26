@@ -26,11 +26,11 @@ const escAttrMirror = (s) => String(s ?? '')
 // Tam modülü BİR KEZ yükle (8k satır derleme maliyeti), sandbox'ı testlerde yeniden kullan.
 const { sandbox, exposed } = loadBrowserModule('js/ui.js', {
   extra: { esc: escMirror, escAttr: escAttrMirror, fmtTarih },
-  expose: ['_katTipMap', 'OZEL_ALT_TIPLER'],
+  expose: ['_katTipMap', 'OZEL_ALT_TIPLER', '_dashBands'],
 });
 const {
   yasHesapla, band, _dashVacAlerts, _yeniDogumGun,
-  _durumClr, _durumTxt, renderSeansGrupAyrac, _asiVaccineCoz, _sessizGrupla, _asiStokKalanlar,
+  _durumClr, _durumTxt, renderSeansGrupAyrac, _asiVaccineCoz, _sessizGrupla, _asiStokKalanlar, _dashBands,
 } = sandbox;
 
 // ── Tarih yardımcıları (yerel takvim; yasHesapla new Date() ile yerel çalışır) ──
@@ -582,4 +582,30 @@ test('_asiStokKalanlar: stok satırı yoksa null (bağlantısız aşı)', () => 
   const k=_asiStokKalanlar([{id:'v-x',stock_item_id:'STOK-AŞI-v-x'},{id:'v-y',stock_item_id:null}],STOK_ORNEK,[]);
   assert.equal(k['v-x'], null);
   assert.equal(k['v-y'], null);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// S2 — 🔬 muayene bandı (_dashBands 15. parametre muayeneList — F1; RPC bekliyor_gun DESC döner)
+// ÇAĞRI DISİPLİNİ (F2): 15 argüman — 13:sessizList, 14:sutBuzagiHtml, 15:muayeneList.
+// Fazladan argüman JS'te sessizce DÜŞER: v1.0'daki 16-argümanlı çağrılarda liste verisi
+// 16. pozisyona kayıp test 2 KIRMIZI patlıyordu.
+// ════════════════════════════════════════════════════════════════════════════
+test('S2: muayeneList boş/null → 🔬 bandı YOK', () => {
+  const h = _dashBands(0,[],[],[],[],0,[],[],{},[],[],{},[], null, null);
+  assert.ok(!h.includes('🔬'), 'muayene bandı çizilmemeli');
+});
+test('S2: muayeneList dolu → 🔬 bant + sayaç; satırlar girdi (RPC DESC) sırasıyla', () => {
+  const m = [
+    {hayvan_id:'m2', kupe_no:'2', grup:'Sağmal', bekliyor_gun:56, son_tohumlama_tarihi:'2026-07-30'},
+    {hayvan_id:'m1', kupe_no:'1', grup:'Sağmal', bekliyor_gun:45, son_tohumlama_tarihi:'2026-08-10'},
+  ];
+  const h = _dashBands(0,[],[],[],[],0,[],[],{},[],[],{},[], null, m);
+  assert.ok(h.includes('🔬 Gebelik Muayenesi Bekleyenler (2)'), 'başlık + sayaç');
+  assert.ok(h.indexOf('56. gün') < h.indexOf('45. gün'), 'RPC DESC sırası korunmalı');
+});
+test('S2: 🔬 bandı ❗ Sessiz Hayvanlar bandından ÖNCE (izole üst bant)', () => {
+  const s = [{hayvan_id:'s1', kupe_no:'9', grup:'Sağmal', sessiz_gun:70, son_aktivite:null}];
+  const m = [{hayvan_id:'m1', kupe_no:'2', grup:'Sağmal', bekliyor_gun:45, son_tohumlama_tarihi:'2026-08-10'}];
+  const h = _dashBands(0,[],[],[],[],0,[],[],{},[],[],{}, s, '', m);
+  assert.ok(h.indexOf('🔬') < h.indexOf('❗ Sessiz Hayvanlar'), 'muayene önce');
 });
