@@ -14,3 +14,6 @@ Herdr and external worker systems are explicit-only flows.
 
 Task completion does not authorize automatic commit, merge, push, deploy, or
 database mutation. The active goal and owner gates control those actions.
+
+**Domain kuralları ZORUNLU (sahip, 2026-09-26):** plan/spec/SQL/implementasyon yazmadan ÖNCE
+`.harness/references/domain-rules.md` okunur; çelişkide dur ve sahibe sor (AGENTS.md Start here #2).

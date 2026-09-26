@@ -9,6 +9,10 @@
 
 Yeni özellik geliştirirken veya mevcut kodu değiştirirken bu kurallara uyulmalıdır.
 
+> **ZORUNLU OKUMA (sahip kuralı 2026-09-26):** plan, spec, SQL (migration/RPC/sorgu) ya da implementasyon
+> yazmadan ÖNCE bu dosya okunur. Kuralla çelişen istek → dur, sahibe sor. Yeni sahip kararı aynı turda
+> buraya işlenir (bölüm + tarih + kaynak).
+
 > **2026-09-01 revizyonu (Idle-A):** docs denetimi `.claude/idle-reports/2026-08-31-docs-tutarlilik.md`
 > §2.2'deki 8 çelişki ve §2.3'teki 8 bayatlık bu sürümde düzeltildi — gerekçeler dosya sonundaki
 > **Düzeltme Günlüğü**'nde. Kanonik imza kaynağı: `.claude/schema-snapshots/2026-08-31-live-schema-imzalar.md`.
@@ -138,7 +142,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 - **Sayaç ankrajı = en yeni üreme event'i** (20260831000001): kızgınlık, tohumlama, abort (`tohumlama.abort_tarihi`), doğum (`dogum` tablosu veya `tohumlama.dogum_tarihi`). Gebe kalıp doğum yapan/abort yapan ineğin sayacı **eski tohumlama tarihinden sayılmaz** — doğum/abort çapası sayaçları sıfırlar.
 - **Listeye giriş:** en yeni event 55 günden eskiyse hayvan sessiz listededir; doğum/abort sonrası ilk 55 gün listede görünmez (v_eligible WHERE).
-- **Event'siz düveler** (20260831000002): sayaç ham yaş değil, **13 aylık tohumlama uygunluk noktasından** sayılır; RPC `p_min_gun=55` ile düve listeye **13 ay + 55 gün**de girer. 13 aydan önce tohumlama yapılmadığı için genç düve listede görünmez.
+- **Event'siz düveler** (20260831000002; eşik 20260925000019 ile güncellendi): sayaç ham yaş değil, **12 ay 21 günlük uygunluk noktasından** (Ovsync kural günü, §18.1) sayılır; RPC `p_min_gun=55` ile düve listeye **12 ay 21 gün + 55 gün**de girer. Kural gününden önce genç düve listede görünmez.
 - **"Hiç kayıt yok" (9999):** ne event'i ne doğum bilgisi olan hayvanlarda `sessiz_gun` NULL'dur; RPC `COALESCE(...,9999)` ile 9999 döner. UI'da (dashboard bandı + modal) **en altta** sıralanır (bb4ea92) — sentinel-son sıralama her iki yüzeyde de client-side yapılır.
 - `v_eligible` SADECE sessiz akışlarını besler (listele/reconcile/stat); tohumlama form uygunluk listesi client-side `_eligibleHayvanlar()`'dır — view'dan bağımsız.
 - Bilinen tutarsızlık: `stat_suru_ozet` sessiz sayacı `sessiz_gun >= 55` (NULL hariç), liste ise 9999'ları içerir → istatistik, listeden "hiç kayıt yok" kadar düşük görünür. **Kök neden canlıda doğrulandı (2026-09-02):** `20260625000030_stat_suru_ozet_readonly.sql` gövdesine yazılırken v3'teki COALESCE düşmüş. Taslak hazır: `.claude/draft-migrations/20260902000000_stat_suru_ozet_sessiz_coalesce.sql` (tek satır restore; otomatik-deploy emniyeti için migrations/ DIŞINDA — deploy emrinde supabase/migrations/'a taşınır). Analiz: `.claude/idle-reports/2026-09-02-sessiz-9999-analiz.md`. Not: `sessiz_hayvanlar_reconcile` da bilinçli COALESCE'siz — NULL hayvanlara vet-kontrol görevi üretilmez (veri eksiği olan hayvanlara görev spam'i olmasın).
@@ -423,3 +427,41 @@ Tarih girişi artık tek kanonik bileşenden geçer (bkz. `D-20260909-CANONICAL-
   çıkış/kesim aktif-hayvan mantığıyla çelişir). `bv-tarih` toplu-aşı tek-aşı
   (`v-date`) kuralına hizalandı. Sahip istemezse `TARIH_ALANLARI`'nda tek satır
   geri alma.
+
+## 18. Üreme Protokolleri — Ovsync / PG / Kısır / Erteleme (2026-09-26, p5b sürümü)
+
+Kaynak: SPEC `docs/plans/2026-09-23-ovsync-pg-tohumlama-SPEC.md` (R3/R3.1/R3.2) + cila/erteleme/p5b-fix
+migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) + sahip kararları
+(2026-09-23..26). Davranış `protokol_ayar.ovsync_pg_kurallari_aktif` bayrağı arkasındadır (prod+demo AÇIK).
+
+1. **Ovsync kural günü (tek hesap noktası `_ovsync_kural_tarihi`):** düve `dogum_tarihi + 12 ay 21 gün`;
+   doğum/abort geçmişi olan dişi `GREATEST(son doğum, son abort) + 51 gün`.
+2. **Görev doğumu:** `OVSYNC_BASLAT` görevi kural GÜNÜ doğar, önce doğmaz (tüm üretim yolları
+   `_ovsync_baslat_gorev_kur` çekirdeğinden geçer). Uyarı 2 gün önceden 🔔 panelin **🌱 İlk Tohumlama**
+   bölümüne düşer (`ovsync_baslat_uyarilari`); görevsiz satır "📅 Görev hedef gününde otomatik açılır"
+   der ve kural günü = bugün dahildir.
+3. **Başlatma penceresi:** hedef − 2 günden önce ▶ Başlat çizilmez ("📅 N gün sonra başlatılabilir";
+   ✕ ve Ertele kalır); `start_first_service_protocol` erken çağrıyı `OVSYNC_ERKEN:{…}` ile reddeder.
+   Otomatik yollar (zamanlayıcı, reconcile) yalnız `hedef <= bugün` görevleri başlatır.
+4. **Elle Vaka Aç (Ovsync hastalığı) — yaş kontrolü YOK, bilinçli:** sahip kararı (2026-09-26)
+   "elle açıyorsam bir sebebi vardır". Bu yola yaş/kural-günü kapısı EKLENMEZ.
+5. **Kısır hard-block:** `hayvanlar.kisir = true` hayvan hiçbir yoldan Ovsync'e giremez (DB tetikleyicisi
+   `trg_cases_kisir_ovsync` + `_kisir_ovsync_guard`; 8 giriş yolu). UI: detay kartında "💲 Kısır" rozeti,
+   Vaka Aç'ta seçenek kilidi + submit-guard, toplu vakada kısır düşer ve bildirilir, Başlat yerine kilit etiketi.
+6. **PG → +48 s TAI:** her gerçek PG (protokol içi dahil) +48 s `TOHUMLAMA_PLANLI` açar; YALNIZ uygun
+   hayvanda (ırk eşiği `irk_esik.tohumlama_gun`, düvede tipik 365 g; doğum/abort sonrası bekleme —
+   `_tohumlama_gorev_uygunluk`). Uygunsuz hayvanda görev açılmaz, `UYGUNSUZ` olay kaydı düşer —
+   bu doğru davranıştır, regresyon değildir. TAI açık planlı tohumlamanın yerine geçer; son PG kazanır.
+7. **Bağımsız PG aktif Ovsync vakasında:** vaka `closed / close_reason = PG`, protokol görevleri kapanır.
+8. **PG onay kapısı:** sunucu `PG_KAPI:*` RAISE ettiğinde HER UI giriş noktası `_pgKapiHata` zinciriyle
+   onay penceresi (`#pg-kapi-bs`: Boş ata ve uygula / Vazgeç) açar; düz "Hata" toast'ı YASAK.
+   Yeni bir PG giriş noktası eklenirse aynı sarmal zorunludur.
+9. **Protokol iptal (`protokol_iptal`):** vaka `IPTAL` ile kapanır, açık gün/seans kapanır, stok iade
+   edilir; yeniden başlat görevi istenirse kural günü doğar (kural gelmeden görev satırı yok).
+10. **Erteleme:** ertelenebilir görev tipleri `gorev_ertele_kural` tablosundan okunur — JS'e tip listesi
+    YAZILMAZ; `TEDAVI_GUN`/`TEDAVI_SEANS` ertelenmez (fail-closed, butonsuz). Çevrimdışıyken erteleme
+    ve kaydırma butonları gizlenir, tetiklenirse "İnternet yok" toast'ı, RPC yok. "⏩ Kalan Günleri
+    Kaydır" yalnız açık günleri taşır, tamamlanan gün sabit kalır.
+11. **Gebe otoritesi:** `hayvanlar.tohumlama_durumu` gebelik otoritesi DEĞİLDİR; son `tohumlama.sonuc` esastır.
+12. **Kapsam:** tüm açık dişiler (Boş dahil); muaf: Gebe / Bekliyor / aktif senkronizasyon / Aktif değil /
+    açık `OVSYNC_BASLAT` görevi olan.

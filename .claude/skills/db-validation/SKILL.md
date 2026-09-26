@@ -12,6 +12,8 @@ onların yerine geçmez.
 
 ## Ne zaman ZORUNLU (sahip söylemeden)
 
+0. Herhangi bir SQL yazmadan ÖNCE `.harness/references/domain-rules.md` okunur (sahip kuralı
+   2026-09-26) — iş kuralıyla çelişen SQL doğrulamadan geçse bile yanlıştır.
 1. `supabase/migrations/` altına yeni bir `.sql` yazmadan ÖNCE — **taslak
    üzerinde** (hata erken yakalanır, yeniden yazım ucuz olur).
 2. Migration'ı teslim etmeden ÖNCE — **final dosyada** (dosya değiştiyse

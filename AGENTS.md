@@ -9,12 +9,15 @@ map or a runtime adapter as an independent policy source.
 ## Start here
 
 1. Read `.harness/contract.md`.
-2. Select Fast or Full mode with `.harness/task-modes.md`.
-3. Follow `.harness/flow-routing.md`; ask the owner when an ambiguous
+2. **MANDATORY:** before writing any plan, spec, SQL (migration, RPC, query) or
+   implementation, read `.harness/references/domain-rules.md`; a request that
+   contradicts a rule → stop and ask the owner; record new owner decisions there.
+3. Select Fast or Full mode with `.harness/task-modes.md`.
+4. Follow `.harness/flow-routing.md`; ask the owner when an ambiguous
    multi-worker or long-running flow was not selected.
-4. If Full mode applies, read the active goal before writing anything.
-5. Read `.harness/acceptance.md` before claiming completion.
-6. Load only the applicable runtime adapter under `.harness/runtimes/`.
+5. If Full mode applies, read the active goal before writing anything.
+6. Read `.harness/acceptance.md` before claiming completion.
+7. Load only the applicable runtime adapter under `.harness/runtimes/`.
 
 ## Project shape
 
