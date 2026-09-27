@@ -201,5 +201,5 @@ git commit -m "docs(plan): coklu-kaydirma plan isaretleri + rpc-reference kaydi"
 
 ## Teslim Sonrası (bu planın DIŞI, sıra sabit)
 
-1. glmf-max koltuğunda 8 maddelik demo testi → hepsi PASS.
+1. glmf-max koltuğunda 9 maddelik demo testi → hepsi PASS.
 2. Sahibin kapısı: demo + test listesi sunulur; prod DB apply (migration Management API/runbook) ve merge AYRI sahip onayı.
