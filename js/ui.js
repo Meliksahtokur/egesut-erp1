@@ -1503,12 +1503,44 @@ function _cokluSecimToggle(gorevId,checked){
   _cokluSecimBarGuncelle();
 }
 
-// Temizle: Set + storage birlikte boşalır (SPEC §4); görünen checkbox'lar işaretsizleşir
+// Temizle: Set + storage birlikte boşalır (SPEC §4); görünen checkbox'lar işaretsizleşir.
+// fix-tur1 (I-1): temizlik belirsizlik uyarısını da sıfırlar — kullanıcı seçimi
+// bıraktıysa "tekrar deneme riski" uyarısının yaşamasi anlamsızdır.
 function _cokluSecimTemizle(){
   window._ckSecilenGorevler=new Set();
   _cokluSecimKaliciYaz();
+  window._ckKaydirBelirsiz=false;
   document.querySelectorAll('.task-sec-kutu').forEach(k=>{ k.checked=false; });
   _cokluSecimBarGuncelle();
+}
+
+// fix-tur1 (I-3): seçim ∩ yüklü görev kümesi. Yüklü kaynak = IndexedDB
+// gorev_log (loadTasks'ın kaynağı; görev listesi state cache'ine girmez).
+// Okuma hatasında FAIL-OPEN: seçim KISMAZ — IDB erişilemezse sunucu tarafı
+// GOREV_COZULEMEDI kısmi-başarıyla zaten raporlar; yanlışlıkla tüm seçimi
+// silmek daha zararlı.
+async function _cokluSecimGecerliIds(){
+  const secim=window._ckSecilenGorevler||new Set();
+  if(!secim.size) return new Set();
+  let yuklu=null;
+  try{ yuklu=await idbGetAll('gorev_log'); }catch(e){ yuklu=null; }
+  if(!Array.isArray(yuklu)) return new Set([...secim]);
+  const yukluIds=new Set(yuklu.map(t=>t&&t.id).filter(Boolean));
+  return new Set([...secim].filter(id=>yukluIds.has(id)));
+}
+
+// fix-tur1 (I-3): seçimi verilen geçerli kümeye indirir; düşen id sayısını
+// döner (forms.js onay metninde bildirir). Set + sessionStorage TEK noktadan.
+function _cokluSecimPrune(gecerli){
+  const once=window._ckSecilenGorevler||new Set();
+  const kalan=new Set([...once].filter(id=>gecerli.has(id)));
+  const dusenSayi=once.size-kalan.size;
+  if(dusenSayi>0){
+    window._ckSecilenGorevler=kalan;
+    _cokluSecimKaliciYaz();
+    _cokluSecimBarGuncelle();
+  }
+  return dusenSayi;
 }
 
 // Çubuk görünürlük + sayaç: ≥1 seçim VE online iken görünür (SPEC §4 + E6).

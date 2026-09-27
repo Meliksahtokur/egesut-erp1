@@ -274,7 +274,10 @@ function t4BasariliGovde(opts = {}) {
 }
 
 // forms.js tam-modül sandbox'ı + iz kayıtları. opts.api = apiCokluKaydir
-// davranışı; opts.online = navigator.onLine (varsayılan true).
+// davranışı; opts.online = navigator.onLine (varsayılan true);
+// opts.gecerli = _cokluSecimGecerliIds kesişim kümesi (undefined → tüm seçim
+// geçerli — ui.js fail-open aynası); opts.idb = idbGetAll stub'u
+// (tablo adı → satırlar; fix-tur1 I-2/I-4 çözümleme testleri için).
 function t4kur(opts = {}) {
   const document = makeDomStub();
   const toasts = [];
@@ -285,6 +288,8 @@ function t4kur(opts = {}) {
   const durum = {
     api: opts.api || (async () => t4BasariliGovde()),
     online: opts.online !== false,
+    gecerli: opts.gecerli,
+    idb: opts.idb,
   };
   const { sandbox } = loadBrowserModule('js/forms.js', {
     dom: document,
@@ -298,6 +303,20 @@ function t4kur(opts = {}) {
       openConfirm: (title, desc, onConfirm) => { document.__confirm = { title, desc, onConfirm }; },
       pullTables: async (tables) => { pullCagrilari.push(tables); },
       renderSafe: () => { renderSayisi++; },
+      _cokluSecimGecerliIds: async () => {
+        // ui.js fail-open aynası: gecerli tanımsızsa tüm seçim geçerli sayılır
+        const secim = sandbox.window._ckSecilenGorevler || new Set();
+        if (!durum.gecerli) return new Set([...secim]);
+        return new Set([...secim].filter(id => durum.gecerli.has(id)));
+      },
+      _cokluSecimPrune: (gecerli) => {
+        // ui.js aynası: kesişim-dışı id'ler Set'ten düşürülür, sayı döner
+        const once = sandbox.window._ckSecilenGorevler || new Set();
+        const kalan = new Set([...once].filter(id => gecerli.has(id)));
+        const n = once.size - kalan.size;
+        if (n) sandbox.window._ckSecilenGorevler = kalan;
+        return n;
+      },
       _cokluSecimTemizle: () => {
         const el = sandbox.window._ckKaydirSonucEl;
         temizleIzleri.push(el && el.style.display === 'block' ? 'bant-acik' : 'bant-yok');
@@ -316,7 +335,7 @@ function t4kur(opts = {}) {
       cl: () => {},
       getState: () => null,
       setState: () => {},
-      idbGetAll: async () => [],
+      idbGetAll: async (tablo) => (durum.idb ? durum.idb(tablo) : []),
       getData: async () => [],
       hayvanByKupeRef: () => null,
       loadDrugsCache: async () => {},
@@ -345,7 +364,7 @@ test('F1-T4-a: doğrulama — Set boş → sessiz çıkış; gün boş/0/nedizal
     const { sandbox, document, toasts, apiCagrilari } = t4kur();
     t4SecimYap(sandbox, document, '3');
     sandbox.window._ckSecilenGorevler = new Set();
-    sandbox.cokluKaydirBaslat();
+    await sandbox.cokluKaydirBaslat();
     assert.ok(!document.__confirm, 'Set boşken onay açılmaz');
     assert.strictEqual(apiCagrilari.length, 0);
     assert.ok(!toasts.length, 'Set boşken sessiz çıkış (çubuk gizlidir)');
@@ -360,17 +379,17 @@ test('F1-T4-a: doğrulama — Set boş → sessiz çıkış; gün boş/0/nedizal
   for (const d of durumlar) {
     const { sandbox, document, toasts, apiCagrilari } = t4kur();
     t4SecimYap(sandbox, document, d.gun);
-    sandbox.cokluKaydirBaslat();
+    await sandbox.cokluKaydirBaslat();
     assert.ok(!document.__confirm, d.neden + ': onay AÇILMAZ');
     assert.strictEqual(apiCagrilari.length, 0, d.neden + ': RPC çağrılmaz');
     assert.ok(toasts.some(t => t.isErr), d.neden + ': toast basılır');
   }
 });
 
-test('F1-T4-b: geçerli girişte openConfirm — SPEC metni birebir ("N görev +N gün kaydırılacak (bağlı vakaların …)") + callback cokluKaydirOnayla', () => {
+test('F1-T4-b: geçerli girişte openConfirm — SPEC metni birebir ("N görev +N gün kaydırılacak (bağlı vakaların …)") + callback cokluKaydirOnayla', async () => {
   const { sandbox, document } = t4kur();
   t4SecimYap(sandbox, document, '3');
-  sandbox.cokluKaydirBaslat();
+  await sandbox.cokluKaydirBaslat();
   assert.ok(document.__confirm, 'onay diyaloğu açılır');
   assert.ok(document.__confirm.desc.includes('2 görev +3 gün kaydırılacak'), 'görev sayısı + gün onay metninde');
   assert.ok(document.__confirm.desc.includes('bağlı vakaların tüm açık günleri/görevleri/seansları ve planlı tohumlaması birlikte kayar'), 'kapsam uyarısı onay metninde');
@@ -381,7 +400,7 @@ test('F1-T4-c: başarılı koşum — RPC([ids],N) → bant "2 vaka kaydırıld�
   const kur = t4kur();
   const { sandbox, document, apiCagrilari, pullCagrilari, temizleIzleri } = kur;
   const btn = t4SecimYap(sandbox, document, '3');
-  sandbox.cokluKaydirBaslat();
+  await sandbox.cokluKaydirBaslat();
   await document.__confirm.onConfirm();
 
   assert.strictEqual(apiCagrilari.length, 1, 'tek RPC');
@@ -424,24 +443,34 @@ test('F1-T4-d: bant şeması (pure) — Kaydırılan M vaka + Atlanan satırlar�
   assert.ok(html.includes('Atlanan (1)') && !html.includes('VAKA_KAYDIRILAMAZ:{"sebep"'), 'zarf öneki soyulur');
 });
 
-test('F1-T4-e: RPC reject — buton tekrar enabled + hata bandı + hata toast; seçim/renderSafe DOKUNULMAZ (kilitli kalmaz)', async () => {
+test('F1-T4-e (fix-tur1 I-1): RPC reject — SONUÇ BELİRSİZ yolu: önce pull+renderSafe (veri tazelenir), belirsizlik bandı + hata mesajı; seçim TEMİZLENMEZ, buton normal metinle serbest KALMAZ', async () => {
   const kur = t4kur({
     api: async () => { throw new Error('VAKA_KAYDIRILAMAZ:{"sebep":"GECERSIZ_GUN","gun":99}'); },
   });
-  const { sandbox, document, toasts, apiCagrilari, temizleIzleri } = kur;
+  const { sandbox, document, toasts, apiCagrilari, pullCagrilari, temizleIzleri } = kur;
   const btn = t4SecimYap(sandbox, document, '3');
-  sandbox.cokluKaydirBaslat();
+  await sandbox.cokluKaydirBaslat();
   await assert.doesNotReject(() => document.__confirm.onConfirm(), 'onay yolu kullanıcıya fırlatmaz');
 
   assert.strictEqual(apiCagrilari.length, 1, 'RPC denendi');
-  assert.strictEqual(btn.disabled, false, 'buton serbest (kilitli kalmaz)');
-  assert.ok(toasts.some(t => t.isErr), 'hata toast basılır');
+  // (a) catch yolu ÖNCE veriyi tazeler — ağ kopması sunucu tarafında işlem
+  // yapılmış olabilir; liste gerçeği göstersin
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(pullCagrilari[0])),
+    ['gorev_log', 'treatment_days', 'treatment_day_uygulamalar', 'islem_log'], 'catch yolu pull(RPC_TABLES seti)');
+  assert.strictEqual(kur.renderSayisi, 1, 'catch yolunda renderSafe ÇAĞRILIR (getter canlı okunur)');
+  // (b) belirsizlik bandı — sessiz hata/başarı YASAK, mesaj + sebep görünür
   const bant = sandbox.window._ckKaydirSonucEl;
-  assert.ok(bant && bant.style.display === 'block', 'hata bandı görünür');
-  assert.ok(bant.innerHTML.includes('Hata (1)'), 'hata bandı başlığı');
+  assert.ok(bant && bant.style.display === 'block', 'belirsizlik bandı görünür');
+  assert.ok(bant.innerHTML.includes('Sonuç belirsiz'), 'belirsizlik başlığı');
+  assert.ok(bant.innerHTML.includes('tekrar deneme'), 'tekrar-deneme uyarısı');
   assert.ok(bant.innerHTML.includes('GECERSIZ_GUN'), 'hata sebebi bantta');
-  assert.strictEqual(kur.renderSayisi, 0, 'reject yolunda renderSafe ÇAĞRILMAZ (getter canlı okunur)');
-  assert.deepStrictEqual(temizleIzleri, [], 'reject yolunda seçim temizlenmez (kullanıcı tekrar deneyebilir)');
+  assert.ok(toasts.some(t => t.isErr), 'hata toast basılır');
+  // (c) seçim temizlenmez ama buton normal metinle serbest bırakılmaz
+  assert.deepStrictEqual(temizleIzleri, [], 'reject yolunda seçim temizlenmez');
+  assert.strictEqual(sandbox.window._ckSecilenGorevler.size, 2, 'Set korunur (tekrar deneme imkânı)');
+  assert.strictEqual(sandbox.window._ckKaydirBelirsiz, true, 'belirsizlik bayrağı set edilir');
+  assert.strictEqual(btn.disabled, false, 'buton kilitli kalmaz');
+  assert.strictEqual(btn.textContent, '⚠ Kontrol et — tekrar deneme riski', 'buton normal metinle DÖNMEZ — kontrol uyarısı taşır');
 });
 
 test('F1-T4-f: offline savunma-derinliği — Baslat ve Onayla çevrimdışında RPC ÇAĞRILMAZ, "İnternet" toast', async () => {
@@ -449,7 +478,7 @@ test('F1-T4-f: offline savunma-derinliği — Baslat ve Onayla çevrimdışında
   {
     const { sandbox, document, toasts, apiCagrilari } = t4kur({ online: false });
     t4SecimYap(sandbox, document, '3');
-    sandbox.cokluKaydirBaslat();
+    await sandbox.cokluKaydirBaslat();
     assert.ok(!document.__confirm, 'offline onay açılmaz');
     assert.strictEqual(apiCagrilari.length, 0, 'offline RPC çağrılmaz');
     assert.ok(toasts.some(t => /İnternet/.test(t.m)), '"İnternet" toast');
@@ -471,7 +500,7 @@ test('F1-T4-g: çift-gönderim kilidi — RPC koşumu sırasında ikinci çağr�
     api: (...a) => new Promise((res) => { coz = () => res(t4BasariliGovde()); apiCagrilari.push({ args: a }); }),
   });
   const btn = t4SecimYap(sandbox, document, '3');
-  sandbox.cokluKaydirBaslat();
+  await sandbox.cokluKaydirBaslat();
   const kosum = document.__confirm.onConfirm();
   assert.strictEqual(btn.disabled, true, 'koşum sırasında buton disabled');
   const rpcOncesi = apiCagrilari.length;
@@ -481,9 +510,10 @@ test('F1-T4-g: çift-gönderim kilidi — RPC koşumu sırasında ikinci çağr�
   await kosum;
   assert.strictEqual(apiCagrilari.length, rpcOncesi, 'sonuç değişmez');
   assert.strictEqual(btn.disabled, false, 'koşum bitince buton serbest');
+  assert.strictEqual(btn.textContent, '⏩ Seçilenleri Kaydır', 'başarılı koşumda buton metni normal');
 });
 
-test('F1-T4-h: kablolama — document delegasyonu [data-aksiyon="coklu-kaydir"] → cokluKaydirBaslat; band kapatma DOM\'dan kaldırır', () => {
+test('F1-T4-h: kablolama — document delegasyonu [data-aksiyon="coklu-kaydir"] → cokluKaydirBaslat; band kapatma DOM\'dan kaldırır', async () => {
   // Kaynak denetimi (F1-T3-h deseni): buton ui.js'te inline handler'sız +
   // her render'da yeniden çizildiğinden bağlama document-delegasyon olmalı.
   const src = require('node:fs').readFileSync('js/forms.js', 'utf8');
@@ -495,14 +525,15 @@ test('F1-T4-h: kablolama — document delegasyonu [data-aksiyon="coklu-kaydir"] 
   t4SecimYap(sandbox, document, '3');
   const btn = document.getElementById('k-coklu-onayla');
   btn.closest = () => btn; // makeElement stub closest'i test için bağlanır
-  document.__dispatch('click', { target: btn });
+  await document.__dispatch('click', { target: btn });
+  await new Promise(r => setImmediate(r)); // async Baslat'ın mikro-görev zincirini boşalt
   assert.ok(document.__confirm, 'delegasyon tıkı onay diyaloğunu açar');
 });
 
 test('F1-T4-i: bant kapatma — _cokluKaydirBantiKapat elementi kaldırır + cache düşer; yeniden koşumda bant içeriği TAZELENİR', async () => {
   const { sandbox, document, durum } = t4kur();
   const btn = t4SecimYap(sandbox, document, '2');
-  sandbox.cokluKaydirBaslat();
+  await sandbox.cokluKaydirBaslat();
   await document.__confirm.onConfirm();
   const bant = sandbox.window._ckKaydirSonucEl;
   assert.ok(bant && bant.style.display === 'block', 'bant görünür');
@@ -518,7 +549,7 @@ test('F1-T4-i: bant kapatma — _cokluKaydirBantiKapat elementi kaldırır + cac
     ],
   });
   sandbox.window._ckSecilenGorevler = new Set(['g3']);
-  sandbox.cokluKaydirBaslat();
+  await sandbox.cokluKaydirBaslat();
   await document.__confirm.onConfirm();
   const bant2 = sandbox.window._ckKaydirSonucEl;
   assert.ok(bant2 && bant2 !== bant, 'kapatılan element yeniden kullanILMAZ — taze kapsayıcı');
@@ -569,5 +600,160 @@ test('F1-T5-c: index.html tüm ?v= referansları TEK ayrık değerde (değer-ba�
   assert.ok(damgalar.length >= 14, 'dosyada ?v= referans sayısı: ' + damgalar.length);
   const ayrik = [...new Set(damgalar)];
   assert.strictEqual(ayrik.length, 1, 'tüm ?v= referansları tek değerde: ' + ayrik.join(' / '));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FIX-TUR 1 (dış-review 2026-09-27) — I-1 belirsiz sonuç, I-2 kör onay,
+// I-3 görünmez seçim, I-4 UUID bandı. RPC/MIGRATION DEĞİŞMEZ.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// I-3 yardımcıları (js/ui.js): kesişim + prune + Temizle belirsiz bayrağı
+test('F1-T3-j (fix-tur1): _cokluSecimGecerliIds seçimi yüklü gorev_log ile kesiştirir; _cokluSecimPrune düşeni Set+storage\'dan atar; IDB hatasında fail-open; Temizle belirsiz bayrağını sıfırlar', async () => {
+  t3reset();
+  const sb = T3.sandbox;
+  sb.idbGetAll = async (tablo) => tablo === 'gorev_log'
+    ? [gunTask({ id: 'g1' }), gunTask({ id: 'g2' })]
+    : [];
+  sb.window._ckSecilenGorevler = new Set(['g1', 'g2', 'g-x']);
+  const gecerli = await sb._cokluSecimGecerliIds();
+  assert.ok(gecerli.has('g1') && gecerli.has('g2') && !gecerli.has('g-x'), 'kesişim yüklü görevlerle');
+  const dusen = sb._cokluSecimPrune(gecerli);
+  assert.strictEqual(dusen, 1, 'düşen sayısı döner');
+  assert.ok(!sb.window._ckSecilenGorevler.has('g-x'), 'düşen id Set\'ten atılır');
+  assert.deepStrictEqual(JSON.parse(sb.sessionStorage.getItem('ege_coklu_secim')).sort(), ['g1', 'g2'], 'sessionStorage senkron düşer');
+  // IDB okunamazsa fail-open — seçim KISMAZ (yanlışlıkla tüm seçim silinmesin;
+  // sunucu tarafı GOREV_COZULEMEDI kısmi-başarı ile zaten raporlar)
+  t3reset();
+  T3.sandbox.idbGetAll = async () => { throw new Error('idb yok'); };
+  T3.sandbox.window._ckSecilenGorevler = new Set(['g1']);
+  const failOpen = await T3.sandbox._cokluSecimGecerliIds();
+  assert.ok(failOpen.has('g1'), 'okuma hatası → fail-open (seçim korunur)');
+  // Temizle belirsizlik bayrağını sıfırlar (I-1: kullanıcı seçimi bıraktıysa uyarı kalkar)
+  T3.sandbox.window._ckKaydirBelirsiz = true;
+  assert.doesNotThrow(() => T3.sandbox._cokluSecimTemizle());
+  assert.strictEqual(T3.sandbox.window._ckKaydirBelirsiz, false, 'Temizle belirsiz uyarısını sıfırlar');
+});
+
+// I-2: onay metninde hayvan listesi — kupe + tarih aralığı, max 8 satır,
+// '+X hayvan daha', çözülemeyen görev satırı
+test('F1-T4-j (fix-tur1 I-2): onay metni seçilen görevleri kupe+tarih aralığı ile listeler (max 8, fazlası "+X hayvan daha"); çözülemeyen görev sayacı içerir', async () => {
+  // 2 hayvanlı normal durum
+  {
+    const { sandbox, document } = t4kur({
+      idb: async (tablo) => {
+        if (tablo === 'gorev_log') return [
+          { id: 'g1', gorev_tipi: 'TEDAVI_GUN', hayvan_id: 'h-1', hedef_tarih: '2026-10-01', aciklama: '{}' },
+          { id: 'g2', gorev_tipi: 'TEDAVI_GUN', hayvan_id: 'h-1', hedef_tarih: '2026-10-03', aciklama: '{}' },
+          { id: 'gx', gorev_tipi: 'TEDAVI_GUN', hayvan_id: 'h-2', hedef_tarih: '2026-10-02', aciklama: '{}' },
+        ];
+        if (tablo === 'hayvanlar') return [
+          { id: 'h-1', kupe_no: 'TR-111' },
+          { id: 'h-2', kupe_no: 'TR-222' },
+        ];
+        return [];
+      },
+    });
+    sandbox.window._ckSecilenGorevler = new Set(['g1', 'g2', 'gx']);
+    const girdi = makeElement('input'); girdi.value = '3';
+    document.__setEl('k-coklu-gun', girdi);
+    document.__setEl('k-coklu-onayla', makeElement('button'));
+    await sandbox.cokluKaydirBaslat();
+    const desc = document.__confirm.desc;
+    assert.ok(desc.includes('TR-111') && desc.includes('TR-222'), 'her hayvanın kupe\'si listede');
+    assert.ok(desc.includes('2026-10-01 → 2026-10-03'), 'aynı hayvanın tarih aralığı min→max');
+    assert.ok(!desc.includes('çözülemeyen'), 'tüm görevler çözümlendiğinde çözülemeyen satırı YOK');
+  }
+  // çözülemeyen görev
+  {
+    const { sandbox, document } = t4kur();
+    t4SecimYap(sandbox, document, '3');   // idb boş → hiçbir görev çözülemez
+    await sandbox.cokluKaydirBaslat();
+    assert.ok(document.__confirm.desc.includes('çözülemeyen 2 görev atlanacak'), 'çözülemeyen görev sayısı bildirilir');
+  }
+  // 9 hayvan → 8 satır + "+1 hayvan daha"
+  {
+    const gorevler = [], hayvanlar = [];
+    for (let i = 1; i <= 9; i++) {
+      gorevler.push({ id: 'g' + i, gorev_tipi: 'TEDAVI_GUN', hayvan_id: 'h-' + i, hedef_tarih: '2026-10-0' + ((i % 9) + 1), aciklama: '{}' });
+      hayvanlar.push({ id: 'h-' + i, kupe_no: 'TR-' + i });
+    }
+    const { sandbox, document } = t4kur({
+      idb: async (tablo) => (tablo === 'gorev_log' ? gorevler : tablo === 'hayvanlar' ? hayvanlar : []),
+    });
+    sandbox.window._ckSecilenGorevler = new Set(gorevler.map(g => g.id));
+    const girdi = makeElement('input'); girdi.value = '2';
+    document.__setEl('k-coklu-gun', girdi);
+    document.__setEl('k-coklu-onayla', makeElement('button'));
+    await sandbox.cokluKaydirBaslat();
+    const desc = document.__confirm.desc;
+    assert.strictEqual((desc.match(/• TR-/g) || []).length, 8, 'en fazla 8 hayvan satırı');
+    assert.ok(desc.includes('+1 hayvan daha'), 'fazlası "+X hayvan daha" satırı');
+    assert.ok(desc.includes('TR-8') && !desc.includes('TR-9'), 'ilk 8 hayvan satırda; 9\'cusu yalnız "+1 hayvan daha" arkasında');
+  }
+});
+
+// I-3: submit anında kesişim — listede olmayan (artık yüklü değil) görev
+// confirm'de bildirilir + Set/sessionStorage'dan düşürülür; RPC'ye yalnız
+// geçerli kesişim gider
+test('F1-T4-k (fix-tur1 I-3): kesişim-dışı görevler onayda bildirilir, Set\'ten düşer ve RPC\'ye GÖNDERİLMEZ', async () => {
+  const { sandbox, document, apiCagrilari } = t4kur({ gecerli: new Set(['g1']) });
+  const btn = t4SecimYap(sandbox, document, '3');   // Set = {g1, g2}
+  await sandbox.cokluKaydirBaslat();
+  assert.ok(document.__confirm.desc.includes('1 görev artık listede değil — atlanacak'), 'kesişim-dışı sayısı onay metninde');
+  assert.strictEqual(sandbox.window._ckSecilenGorevler.size, 1, 'Set kesişime indirilir');
+  await document.__confirm.onConfirm();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(apiCagrilari[0].args)), [['g1'], 3], 'RPC yalnız geçerli kesişimi alır');
+  // tam kesişimde uyarı satırı YOK
+  const kur2 = t4kur({ gecerli: new Set(['g1', 'g2']) });
+  t4SecimYap(kur2.sandbox, kur2.document, '3');
+  await kur2.sandbox.cokluKaydirBaslat();
+  assert.ok(!kur2.document.__confirm.desc.includes('artık listede değil'), 'tam kesişimde uyarı yok');
+});
+
+// I-1 devam: belirsizlikten sonra yeniden Baslat → confirm'de uyarı satırı;
+// başarılı koşum bayrağı temizler + buton normal metne döner
+test('F1-T4-l (fix-tur1 I-1): belirsiz sonucu izleyen onayda uyarı satırı tekrar görünür; başarılı koşum bayrağı ve buton metnini normale çevirir', async () => {
+  let at = 0;
+  const kur = t4kur({
+    api: async () => {
+      at++;
+      if (at === 1) throw new Error('ağ hatası: yanıt alınamadı');
+      return t4BasariliGovde();
+    },
+  });
+  const { sandbox, document } = kur;
+  const btn = t4SecimYap(sandbox, document, '3');
+  await sandbox.cokluKaydirBaslat();
+  await document.__confirm.onConfirm();          // 1. koşum: belirsiz
+  assert.strictEqual(sandbox.window._ckKaydirBelirsiz, true, '1. koşum belirsiz bırakır');
+  await sandbox.cokluKaydirBaslat();             // tekrar dene → confirm'de uyarı
+  assert.ok(document.__confirm.desc.includes('BELİRSİZ'), 'belirsizlik uyarısı confirm metnine taşınır');
+  await document.__confirm.onConfirm();          // 2. koşum: başarılı
+  assert.strictEqual(sandbox.window._ckKaydirBelirsiz, false, 'başarılı koşum bayrağı temizler');
+  assert.strictEqual(btn.textContent, '⏩ Seçilenleri Kaydır', 'buton normal metne döner');
+});
+
+// I-4: bantta case_id UUID'si yerine kupe — çözülemeyen vaka kısa-id fallback
+test('F1-T4-m (fix-tur1 I-4): sonuç bandı vakayı kupe ile gösterir (cases→animal_id→hayvanlar); çözülemeyen vaka kısa-id fallback', async () => {
+  const kur = t4kur({
+    idb: async (tablo) => {
+      if (tablo === 'cases') return [
+        { id: '11111111-aaaa-bbbb-cccc-dddddddd001', animal_id: 'h-77' },
+      ];
+      if (tablo === 'hayvanlar') return [{ id: 'h-77', kupe_no: 'TR-777' }];
+      return [];
+    },
+  });
+  const { sandbox, document } = kur;
+  t4SecimYap(sandbox, document, '3');
+  await sandbox.cokluKaydirBaslat();
+  await document.__confirm.onConfirm();
+  const bant = sandbox.window._ckKaydirSonucEl;
+  assert.ok(bant.innerHTML.includes('Vaka TR-777'), 'çözülen vaka kupe ile gösterilir');
+  assert.ok(bant.innerHTML.includes('Vaka 22222222'), 'çözülemeyen vaka kısa-id fallback');
+  assert.ok(!bant.innerHTML.includes('Vaka 11111111'), 'çözülen vaka için UUID gösterilmez');
+  // pure fonksiyon da haritayla çalışır (sıfır harita → fallback)
+  const ham = sandbox._cokluKaydirBanti(t4BasariliGovde(), {});
+  assert.ok(ham.includes('Vaka 11111111'), 'haritasız çağrıda fallback (pure sözleşme korunur)');
 });
 
