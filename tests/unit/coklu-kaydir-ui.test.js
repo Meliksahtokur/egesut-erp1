@@ -250,3 +250,280 @@ test('F1-T3-h: kablolama — loadTasks her render\'da _cokluSecimYukle + çubuk 
   assert.ok(rt.includes('_cokluSecimKutuHtml(t)'), 'renderTask checkbox yardımcısını çağırır');
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Task 4: çoklu kaydırma onay + submit + bantlı sonuç (js/forms.js)
+// Tam modül sandbox'ı (vaka-toplu-kisir-dusme.test.js `kur` deseni) — forms.js
+// vm'de yüklenir; apiCokluKaydir/openConfirm/pullTables/renderSafe/
+// _cokluSecimTemizle stub enjekte edilir (gerçek RPC YOK).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// RPC'nin kısmi-başarı gövdesi (20260927000001 dönüş şeması):
+// {ok, toplam, kaydirilan, atlanan(SAYI), hatalar:[{gorev_id|case_id, sebep}], detaylar:[...]}
+function t4BasariliGovde(opts = {}) {
+  return {
+    ok: true,
+    toplam: opts.toplam ?? 2,
+    kaydirilan: opts.kaydirilan ?? 2,
+    atlanan: opts.atlanan ?? 0,
+    hatalar: opts.hatalar || [],
+    detaylar: opts.detaylar ?? [
+      { case_id: '11111111-aaaa-bbbb-cccc-dddddddd001', ilk_tarih: '2026-10-01', son_tarih: '2026-10-04', tasinan_gun_satiri: 3, tasinan_gorev: 2, tasinan_seans: 1 },
+      { case_id: '22222222-aaaa-bbbb-cccc-dddddddd002', ilk_tarih: '2026-10-02', son_tarih: '2026-10-05', tasinan_gun_satiri: 2, tasinan_gorev: 1, tasinan_seans: 0 },
+    ],
+  };
+}
+
+// forms.js tam-modül sandbox'ı + iz kayıtları. opts.api = apiCokluKaydir
+// davranışı; opts.online = navigator.onLine (varsayılan true).
+function t4kur(opts = {}) {
+  const document = makeDomStub();
+  const toasts = [];
+  const apiCagrilari = [];
+  const pullCagrilari = [];
+  let renderSayisi = 0;
+  let temizleIzleri = [];
+  const durum = {
+    api: opts.api || (async () => t4BasariliGovde()),
+    online: opts.online !== false,
+  };
+  const { sandbox } = loadBrowserModule('js/forms.js', {
+    dom: document,
+    extra: {
+      navigator: { userAgent: 'node-test', onLine: durum.online },
+      toast: (m, isErr) => toasts.push({ m: String(m), isErr: !!isErr }),
+      apiCokluKaydir: async (...a) => {
+        apiCagrilari.push({ args: a });
+        return durum.api(...a);
+      },
+      openConfirm: (title, desc, onConfirm) => { document.__confirm = { title, desc, onConfirm }; },
+      pullTables: async (tables) => { pullCagrilari.push(tables); },
+      renderSafe: () => { renderSayisi++; },
+      _cokluSecimTemizle: () => {
+        const el = sandbox.window._ckKaydirSonucEl;
+        temizleIzleri.push(el && el.style.display === 'block' ? 'bant-acik' : 'bant-yok');
+        sandbox.window._ckSecilenGorevler = new Set();
+      },
+      RPC_TABLES: { vaka_kalan_gunleri_kaydir_coklu: ['gorev_log', 'treatment_days', 'treatment_day_uygulamalar', 'islem_log'] },
+      band: (cls, title, content) => `<div class="aband" data-cls="${cls}"><div class="aband-hdr">${title}</div><div class="aband-body">${content}</div></div>`,
+      fmtTarih: (d) => String(d || ''),
+      esc: (s) => String(s ?? ''),
+      escAttr: (s) => String(s ?? ''),
+      getUserMessage: (e) => String(e?.message || e),
+      // forms.js yüklemesinde dokunulan diğer global'ler (kisir-deseni)
+      db: { rpc: async () => ({ data: null, error: null }), from: () => { throw new Error('test stub'); } },
+      g: (id) => document.getElementById(id),
+      v: (id) => { const el = document.getElementById(id); return (el && el.value) || ''; },
+      cl: () => {},
+      getState: () => null,
+      setState: () => {},
+      idbGetAll: async () => [],
+      getData: async () => [],
+      hayvanByKupeRef: () => null,
+      loadDrugsCache: async () => {},
+    },
+  });
+  return { sandbox, document, toasts, apiCagrilari, pullCagrilari, durum,
+    get renderSayisi() { return renderSayisi; },
+    get temizleIzleri() { return temizleIzleri; } };
+}
+
+// Seçim Set'i doldur + gün girişi koy (varsayılan: 2 görev, +3 gün)
+function t4SecimYap(sb, document, gunDeger) {
+  sb.window._ckSecilenGorevler = new Set(['g1', 'g2']);
+  const girdi = makeElement('input');
+  girdi.value = gunDeger === undefined ? '3' : gunDeger;
+  document.__setEl('k-coklu-gun', girdi);
+  const btn = makeElement('button');
+  btn.textContent = '⏩ Seçilenleri Kaydır';
+  document.__setEl('k-coklu-onayla', btn);
+  return btn;
+}
+
+test('F1-T4-a: doğrulama — Set boş → sessiz çıkış; gün boş/0/nedizali/31 üstü → RPC ÇAĞRILMAZ + açıklayıcı toast', async () => {
+  // Set boş → sessiz çıkış (çubuk zaten 0 seçimde gizli)
+  {
+    const { sandbox, document, toasts, apiCagrilari } = t4kur();
+    t4SecimYap(sandbox, document, '3');
+    sandbox.window._ckSecilenGorevler = new Set();
+    sandbox.cokluKaydirBaslat();
+    assert.ok(!document.__confirm, 'Set boşken onay açılmaz');
+    assert.strictEqual(apiCagrilari.length, 0);
+    assert.ok(!toasts.length, 'Set boşken sessiz çıkış (çubuk gizlidir)');
+  }
+  const durumlar = [
+    { gun: '', neden: 'gün boş' },
+    { gun: '0', neden: '0 gün' },
+    { gun: '1.5', neden: 'nedizali' },
+    { gun: '32', neden: '31 üstü' },
+    { gun: 'abc', neden: 'sayı değil' },
+  ];
+  for (const d of durumlar) {
+    const { sandbox, document, toasts, apiCagrilari } = t4kur();
+    t4SecimYap(sandbox, document, d.gun);
+    sandbox.cokluKaydirBaslat();
+    assert.ok(!document.__confirm, d.neden + ': onay AÇILMAZ');
+    assert.strictEqual(apiCagrilari.length, 0, d.neden + ': RPC çağrılmaz');
+    assert.ok(toasts.some(t => t.isErr), d.neden + ': toast basılır');
+  }
+});
+
+test('F1-T4-b: geçerli girişte openConfirm — SPEC metni birebir ("N görev +N gün kaydırılacak (bağlı vakaların …)") + callback cokluKaydirOnayla', () => {
+  const { sandbox, document } = t4kur();
+  t4SecimYap(sandbox, document, '3');
+  sandbox.cokluKaydirBaslat();
+  assert.ok(document.__confirm, 'onay diyaloğu açılır');
+  assert.ok(document.__confirm.desc.includes('2 görev +3 gün kaydırılacak'), 'görev sayısı + gün onay metninde');
+  assert.ok(document.__confirm.desc.includes('bağlı vakaların tüm açık günleri/görevleri/seansları ve planlı tohumlaması birlikte kayar'), 'kapsam uyarısı onay metninde');
+  assert.strictEqual(document.__confirm.onConfirm, sandbox.cokluKaydirOnayla, 'onay callback\'i cokluKaydirOnayla');
+});
+
+test('F1-T4-c: başarılı koşum — RPC([ids],N) → bant "2 vaka kaydırıldı" → pull(RPC_TABLES seti) → renderSafe → temizle → buton serbest', async () => {
+  const kur = t4kur();
+  const { sandbox, document, apiCagrilari, pullCagrilari, temizleIzleri } = kur;
+  const btn = t4SecimYap(sandbox, document, '3');
+  sandbox.cokluKaydirBaslat();
+  await document.__confirm.onConfirm();
+
+  assert.strictEqual(apiCagrilari.length, 1, 'tek RPC');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(apiCagrilari[0].args)), [['g1', 'g2'], 3], 'apiCokluKaydir([...Set], N)');
+  const bant = sandbox.window._ckKaydirSonucEl; // bant kapsayıcısı (window cache)
+  assert.ok(bant, 'bant kapsayıcısı yaratılır');
+  assert.strictEqual(bant.id, 'k-coklu-sonuc', 'kapsayıcı id');
+  assert.strictEqual(bant.style.display, 'block', 'bant görünür (sessiz başarı YASAK)');
+  assert.ok(bant.innerHTML.includes('2 vaka kaydırıldı'), 'bant başlığı kaydırılan vaka sayısını verir');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(pullCagrilari[0])),
+    ['gorev_log', 'treatment_days', 'treatment_day_uygulamalar', 'islem_log'], 'pull seti RPC_TABLES kaydı');
+  assert.strictEqual(kur.renderSayisi, 1, 'renderSafe çağrılır (getter canlı okunur)');
+  assert.deepStrictEqual(temizleIzleri, ['bant-acik'], 'seçim temizliği bant gösterildikten SONRA koşar');
+  assert.strictEqual(sandbox.window._ckSecilenGorevler.size, 0, 'Set temizlenir');
+  assert.strictEqual(btn.disabled, false, 'buton koşum sonunda serbest');
+  assert.strictEqual(btn.textContent, '⏩ Seçilenleri Kaydır', 'buton etiketi geri gelir');
+});
+
+test('F1-T4-d: bant şeması (pure) — Kaydırılan M vaka + Atlanan satırları + Hatalar satırları; id inline-handler interpolasyonu YASAK', () => {
+  const { sandbox } = t4kur();
+  const sonuc = t4BasariliGovde({
+    toplam: 4, kaydirilan: 2, atlanan: 1,
+    hatalar: [
+      { case_id: '33333333-aaaa-bbbb-cccc-dddddddd003', sebep: 'VAKA_KAYDIRILAMAZ:{"sebep":"VAKA_ACIK_DEGIL","case_id":"33333333-aaaa-bbbb-cccc-dddddddd003"}' },
+      { gorev_id: 'g9', sebep: 'GOREV_COZULEMEDI' },
+    ],
+  });
+  const html = sandbox._cokluKaydirBanti(sonuc);
+  assert.ok(typeof html === 'string', 'bant pure — HTML string döner');
+  assert.ok(html.includes('2 vaka kaydırıldı'), 'kaydırılan sayısı');
+  assert.ok(html.includes('Atlanan (1)'), 'atlanan bandı görünür (sessiz başarı yok)');
+  assert.ok(html.includes('VAKA_ACIK_DEGIL'), 'atlanan sebep metni görünür');
+  assert.ok(html.includes('Hata (1)'), 'hata bandı görünür');
+  assert.ok(html.includes('GOREV_COZULEMEDI'), 'hata sebep metni görünür');
+  assert.ok(html.includes('Vaka 33333333') && html.includes('Görev g9'), 'satır etiketleri metin taşıyıcı');
+  const onclickSayisi = html.split('onclick=').length - 1;
+  assert.strictEqual(onclickSayisi, 0, 'PURE bantta inline handler YOK (kapatma chrome\'undadır, T4-i)');
+  assert.ok(!html.includes('data-aksiyon'), 'pure bant etkileşim attribute\'u taşımaz');
+  // VAKA_KAYDIRILAMAZ zarfı soyulur (kullanıcı-dostu sebep kalır)
+  assert.ok(html.includes('Atlanan (1)') && !html.includes('VAKA_KAYDIRILAMAZ:{"sebep"'), 'zarf öneki soyulur');
+});
+
+test('F1-T4-e: RPC reject — buton tekrar enabled + hata bandı + hata toast; seçim/renderSafe DOKUNULMAZ (kilitli kalmaz)', async () => {
+  const kur = t4kur({
+    api: async () => { throw new Error('VAKA_KAYDIRILAMAZ:{"sebep":"GECERSIZ_GUN","gun":99}'); },
+  });
+  const { sandbox, document, toasts, apiCagrilari, temizleIzleri } = kur;
+  const btn = t4SecimYap(sandbox, document, '3');
+  sandbox.cokluKaydirBaslat();
+  await assert.doesNotReject(() => document.__confirm.onConfirm(), 'onay yolu kullanıcıya fırlatmaz');
+
+  assert.strictEqual(apiCagrilari.length, 1, 'RPC denendi');
+  assert.strictEqual(btn.disabled, false, 'buton serbest (kilitli kalmaz)');
+  assert.ok(toasts.some(t => t.isErr), 'hata toast basılır');
+  const bant = sandbox.window._ckKaydirSonucEl;
+  assert.ok(bant && bant.style.display === 'block', 'hata bandı görünür');
+  assert.ok(bant.innerHTML.includes('Hata (1)'), 'hata bandı başlığı');
+  assert.ok(bant.innerHTML.includes('GECERSIZ_GUN'), 'hata sebebi bantta');
+  assert.strictEqual(kur.renderSayisi, 0, 'reject yolunda renderSafe ÇAĞRILMAZ (getter canlı okunur)');
+  assert.deepStrictEqual(temizleIzleri, [], 'reject yolunda seçim temizlenmez (kullanıcı tekrar deneyebilir)');
+});
+
+test('F1-T4-f: offline savunma-derinliği — Baslat ve Onayla çevrimdışında RPC ÇAĞRILMAZ, "İnternet" toast', async () => {
+  // Baslat yolu
+  {
+    const { sandbox, document, toasts, apiCagrilari } = t4kur({ online: false });
+    t4SecimYap(sandbox, document, '3');
+    sandbox.cokluKaydirBaslat();
+    assert.ok(!document.__confirm, 'offline onay açılmaz');
+    assert.strictEqual(apiCagrilari.length, 0, 'offline RPC çağrılmaz');
+    assert.ok(toasts.some(t => /İnternet/.test(t.m)), '"İnternet" toast');
+  }
+  // Onayla yolu (savunma-derinliği: ui.js çubuğu zaten gizler; bekleme yok)
+  {
+    const { sandbox, document, toasts, apiCagrilari } = t4kur({ online: false });
+    t4SecimYap(sandbox, document, '3');
+    sandbox.window._ckKaydirBekleyenGun = 3;
+    await sandbox.cokluKaydirOnayla();
+    assert.strictEqual(apiCagrilari.length, 0, 'offline Onayla RPC çağrılmaz');
+    assert.ok(toasts.some(t => /İnternet/.test(t.m)), '"İnternet" toast (Onayla yolu)');
+  }
+});
+
+test('F1-T4-g: çift-gönderim kilidi — RPC koşumu sırasında ikinci çağrı gitmez; buton disabled', async () => {
+  let coz;
+  const { sandbox, document, apiCagrilari } = t4kur({
+    api: (...a) => new Promise((res) => { coz = () => res(t4BasariliGovde()); apiCagrilari.push({ args: a }); }),
+  });
+  const btn = t4SecimYap(sandbox, document, '3');
+  sandbox.cokluKaydirBaslat();
+  const kosum = document.__confirm.onConfirm();
+  assert.strictEqual(btn.disabled, true, 'koşum sırasında buton disabled');
+  const rpcOncesi = apiCagrilari.length;
+  await sandbox.cokluKaydirOnayla(); // ikinci çağrı: kilide takılır
+  assert.strictEqual(apiCagrilari.length, rpcOncesi, 'koşum sırasında ikinci çağrı GİTMEZ');
+  coz();
+  await kosum;
+  assert.strictEqual(apiCagrilari.length, rpcOncesi, 'sonuç değişmez');
+  assert.strictEqual(btn.disabled, false, 'koşum bitince buton serbest');
+});
+
+test('F1-T4-h: kablolama — document delegasyonu [data-aksiyon="coklu-kaydir"] → cokluKaydirBaslat; band kapatma DOM\'dan kaldırır', () => {
+  // Kaynak denetimi (F1-T3-h deseni): buton ui.js'te inline handler'sız +
+  // her render'da yeniden çizildiğinden bağlama document-delegasyon olmalı.
+  const src = require('node:fs').readFileSync('js/forms.js', 'utf8');
+  assert.ok(src.includes("addEventListener('click'"), 'document-seviyesi click delegasyonu');
+  assert.ok(src.includes('[data-aksiyon="coklu-kaydir"]'), 'delegasyon data-aksiyon dataset\'i üzerinden');
+  assert.ok(src.includes('cokluKaydirBaslat()'), 'delegasyon cokluKaydirBaslat\'ı tetikler');
+  // Davranışsal: stub target.closest ile delegasyon tıkı gerçekten Baslat'ı çalıştırır
+  const { sandbox, document } = t4kur();
+  t4SecimYap(sandbox, document, '3');
+  const btn = document.getElementById('k-coklu-onayla');
+  btn.closest = () => btn; // makeElement stub closest'i test için bağlanır
+  document.__dispatch('click', { target: btn });
+  assert.ok(document.__confirm, 'delegasyon tıkı onay diyaloğunu açar');
+});
+
+test('F1-T4-i: bant kapatma — _cokluKaydirBantiKapat elementi kaldırır + cache düşer; yeniden koşumda bant içeriği TAZELENİR', async () => {
+  const { sandbox, document, durum } = t4kur();
+  const btn = t4SecimYap(sandbox, document, '2');
+  sandbox.cokluKaydirBaslat();
+  await document.__confirm.onConfirm();
+  const bant = sandbox.window._ckKaydirSonucEl;
+  assert.ok(bant && bant.style.display === 'block', 'bant görünür');
+  assert.ok(bant.innerHTML.includes('onclick="_cokluKaydirBantiKapat()"'), 'chrome kapatma handler\'ı parametresiz global');
+  assert.ok(bant.innerHTML.includes('Çoklu Kaydırma Sonucu'), 'chrome başlığı');
+  sandbox._cokluKaydirBantiKapat();
+  assert.ok(!document.body.children.includes(bant), 'kapatma elementi body\'den kaldırır');
+  assert.strictEqual(sandbox.window._ckKaydirSonucEl, null, 'kapatma cache\'i düşürür');
+  // yeniden koşum: kapatılmış bandın yerine TAZE bant açılır (eski içerik sızmaz)
+  durum.api = async () => t4BasariliGovde({
+    toplam: 1, kaydirilan: 1, detaylar: [
+      { case_id: '99999999-aaaa-bbbb-cccc-dddddddd009', ilk_tarih: '2026-11-01', son_tarih: '2026-11-04', tasinan_gun_satiri: 1, tasinan_gorev: 0, tasinan_seans: 0 },
+    ],
+  });
+  sandbox.window._ckSecilenGorevler = new Set(['g3']);
+  sandbox.cokluKaydirBaslat();
+  await document.__confirm.onConfirm();
+  const bant2 = sandbox.window._ckKaydirSonucEl;
+  assert.ok(bant2 && bant2 !== bant, 'kapatılan element yeniden kullanILMAZ — taze kapsayıcı');
+  assert.ok(bant2.style.display === 'block', 'yeni koşumda bant yeniden görünür');
+  assert.ok(bant2.innerHTML.includes('1 vaka kaydırıldı') && bant2.innerHTML.includes('Vaka 99999999'), 'yeni koşum içeriği TAZE (eski 2-vaka içeriği sızmadı)');
+  assert.strictEqual(btn.disabled, false);
+});
+
