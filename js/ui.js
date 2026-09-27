@@ -712,6 +712,9 @@ async function loadTasks(f,btn,opts){
   if(!el.querySelector('.task-card')) el.innerHTML='<div class="loader"><div class="spin"></div></div>';
   try {
     const today=bugun();
+    // F1 Task 3: seçim durumu sessionStorage'dan geri yüklenir — tab/filtre geçişinde
+    // seçimler korunur (SPEC §4); checkbox'lar aşağıdaki render'da Set'e göre işaretlenir.
+    _cokluSecimYukle();
     // skipPull: çağıran zaten pullTables yaptıysa içerideki tekrar pull'u atla (çift network fix)
     if(navigator.onLine && !(opts&&opts.skipPull)) await pullTables(['gorev_log','treatment_days','cases','diseases','treatment_day_uygulamalar','drug_administrations','drug_products','stok']).catch(()=>{});
     // E1-UI: kural cache boşsa bir kez çek — genel [Ertele] butonları ilk
@@ -933,7 +936,12 @@ async function loadTasks(f,btn,opts){
       const cls=t.hedef_tarih<today?'late':_clsMid;
       _html+='<div style="margin-left:8px">'+renderTask(t,cls,allSubs.filter(s=>s.parent_id===t.id),b.drugs,b.teshis)+'</div>';
     });
+    // F1 Task 3: seçim çubuğu görev listesi başında — index.html'deki statik
+    // konteyner (Task 5) mevcutsa dinamik çubuk çizilmez (id çakışması yok);
+    // konteyner nerede olursa olsun görünürlük/sayaç TEK _cokluSecimBarGuncelle'den.
+    if(!document.getElementById('k-coklu-bar')) _html=_cokluSecimBarHtml()+_html;
     el.innerHTML=_html;
+    _cokluSecimBarGuncelle();
   } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
   });
 }
@@ -1458,6 +1466,120 @@ async function ovsyncAcilisOzeti(){
   }catch(e){ /* açılış bildirimi best-effort */ }
 }
 
+// ═══ F1 Task 3 — ÇOKLU SEÇİM + KAYDIRMA ÇUBUĞU (2026-09-27, coklu-kaydirma) ═══
+// SPEC §4: Görevler ekranında açık TEDAVI_GUN/TEDAVI_SEANS kartlarında checkbox
+// (fail-closed: diğer tiplerde çizilmez); seçim durumu oturum-içi Set + sessionStorage
+// senkronu — tab geçişlerinde korunur, sekme kapanınca düşer. Seçim çubuğu ≥1 seçimde
+// görünür; E6: navigator.onLine=false iken gizli. RPC'ye BURADA DOKUNULMAZ — onay
+// akışı Task 4'te forms.js'te bağlanır (apiCokluKaydir, js/api.js). Değerler dataset
+// ile taşınır (escAttr-inline yasağı).
+window._ckSecilenGorevler=window._ckSecilenGorevler||new Set();
+
+// Seçilebilirlik: yalnız açık tedavi gün/seans kartları (fail-closed ayna)
+function _cokluSecimUygun(t){
+  return !t.tamamlandi&&!t.iptal&&(t.gorev_tipi==='TEDAVI_GUN'||t.gorev_tipi==='TEDAVI_SEANS');
+}
+
+// sessionStorage → Set (her görev-listesi render'ında çağrılır — tab-geçişi koruması)
+function _cokluSecimYukle(){
+  let arr=[];
+  try{ arr=JSON.parse(sessionStorage.getItem('ege_coklu_secim')||'[]'); }catch(e){ arr=[]; }
+  window._ckSecilenGorevler=new Set(Array.isArray(arr)?arr.filter(x=>typeof x==='string'&&x):[]);
+  return window._ckSecilenGorevler;
+}
+
+// Set → sessionStorage (bozuk storage sessizce yutulur — seçim kaybı, çökme değil)
+function _cokluSecimKaliciYaz(){
+  try{ sessionStorage.setItem('ege_coklu_secim',JSON.stringify([...(window._ckSecilenGorevler||[])])); }catch(e){}
+}
+
+// Checkbox tıkı: Set + storage + çubuğu tek noktadan günceller
+function _cokluSecimToggle(gorevId,checked){
+  if(!gorevId) return;
+  if(!window._ckSecilenGorevler) _cokluSecimYukle();
+  if(checked) window._ckSecilenGorevler.add(gorevId);
+  else window._ckSecilenGorevler.delete(gorevId);
+  _cokluSecimKaliciYaz();
+  _cokluSecimBarGuncelle();
+}
+
+// Temizle: Set + storage birlikte boşalır (SPEC §4); görünen checkbox'lar işaretsizleşir.
+// fix-tur1 (I-1): temizlik belirsizlik uyarısını da sıfırlar — kullanıcı seçimi
+// bıraktıysa "tekrar deneme riski" uyarısının yaşamasi anlamsızdır.
+function _cokluSecimTemizle(){
+  window._ckSecilenGorevler=new Set();
+  _cokluSecimKaliciYaz();
+  window._ckKaydirBelirsiz=false;
+  document.querySelectorAll('.task-sec-kutu').forEach(k=>{ k.checked=false; });
+  _cokluSecimBarGuncelle();
+}
+
+// fix-tur1 (I-3): seçim ∩ yüklü görev kümesi. Yüklü kaynak = IndexedDB
+// gorev_log (loadTasks'ın kaynağı; görev listesi state cache'ine girmez).
+// Okuma hatasında FAIL-OPEN: seçim KISMAZ — IDB erişilemezse sunucu tarafı
+// GOREV_COZULEMEDI kısmi-başarıyla zaten raporlar; yanlışlıkla tüm seçimi
+// silmek daha zararlı.
+async function _cokluSecimGecerliIds(){
+  const secim=window._ckSecilenGorevler||new Set();
+  if(!secim.size) return new Set();
+  let yuklu=null;
+  try{ yuklu=await idbGetAll('gorev_log'); }catch(e){ yuklu=null; }
+  if(!Array.isArray(yuklu)) return new Set([...secim]);
+  const yukluIds=new Set(yuklu.map(t=>t&&t.id).filter(Boolean));
+  return new Set([...secim].filter(id=>yukluIds.has(id)));
+}
+
+// fix-tur1 (I-3): seçimi verilen geçerli kümeye indirir; düşen id sayısını
+// döner (forms.js onay metninde bildirir). Set + sessionStorage TEK noktadan.
+function _cokluSecimPrune(gecerli){
+  const once=window._ckSecilenGorevler||new Set();
+  const kalan=new Set([...once].filter(id=>gecerli.has(id)));
+  const dusenSayi=once.size-kalan.size;
+  if(dusenSayi>0){
+    window._ckSecilenGorevler=kalan;
+    _cokluSecimKaliciYaz();
+    _cokluSecimBarGuncelle();
+  }
+  return dusenSayi;
+}
+
+// Çubuk görünürlük + sayaç: ≥1 seçim VE online iken görünür (SPEC §4 + E6).
+// Statik konteyner (index.html, Task 5) olsa da olmasa da TEK buradan senkronlanır.
+function _cokluSecimBarGuncelle(){
+  const bar=document.getElementById('k-coklu-bar');
+  if(!bar) return;
+  const n=(window._ckSecilenGorevler||new Set()).size;
+  const sayac=document.getElementById('k-coklu-sayac');
+  if(sayac) sayac.textContent=n+' görev seçili';
+  bar.hidden=(n===0)||!_ertelemeOnline();
+  bar.style.display=bar.hidden?'none':'flex';
+}
+
+// Hızlı chip: +N değerini gün girişine yazar (RPC çağrılmaz — onay Task 4'te)
+function _cokluSecimGunDoldur(gun){
+  const girdi=document.getElementById('k-coklu-gun');
+  if(girdi) girdi.value=String(gun);
+}
+
+// Çubuk markup'ı — loadTasks statik konteyner yoksa görev listesi başına çizer.
+// Onay butonunun handler'ı YOKTUR (Task 4 forms.js bağlar); id + data-aksiyon hazır.
+function _cokluSecimBarHtml(){
+  return `<div id="k-coklu-bar" hidden style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 2px 10px;padding:8px 10px;border-radius:10px;background:rgba(30,100,200,.07);border:1px solid var(--card3);font-size:.72rem">
+    <span id="k-coklu-sayac" style="font-weight:800;color:var(--ink)">0 görev seçili</span>
+    <span style="display:flex;gap:4px">${[1,2,3,7].map(n=>`<button type="button" data-gun="${n}" onclick="_cokluSecimGunDoldur(this.dataset.gun)" style="font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">+${n}</button>`).join('')}</span>
+    <input id="k-coklu-gun" type="number" min="1" max="31" placeholder="+gün" inputmode="numeric" style="width:64px;padding:4px 6px;border-radius:8px;border:1px solid var(--card3);font-size:.72rem">
+    <button type="button" id="k-coklu-onayla" data-aksiyon="coklu-kaydir" style="font-size:.68rem;font-weight:800;padding:5px 10px;border-radius:8px;border:none;background:var(--green);color:#fff;cursor:pointer">⏩ Seçilenleri Kaydır</button>
+    <button type="button" id="k-coklu-temizle" onclick="_cokluSecimTemizle()" style="font-size:.68rem;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--card3);background:transparent;color:var(--ink3);cursor:pointer">Temizle</button>
+  </div>`;
+}
+
+// Görev kartı checkbox'ı — yalnız _cokluSecimUygun kartlarında; Set'tekiler işaretli doğar
+function _cokluSecimKutuHtml(t){
+  if(!_cokluSecimUygun(t)) return '';
+  const _secili=window._ckSecilenGorevler&&window._ckSecilenGorevler.has(t.id);
+  return `<input type="checkbox" class="task-sec-kutu" data-gorev-id="${escAttr(t.id)}"${_secili?' checked':''} onclick="event.stopPropagation();_cokluSecimToggle(this.dataset.gorevId,this.checked)" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer;flex-shrink:0" title="Çoklu kaydırma için seç">`;
+}
+
 function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
   const planTime=t.gorev_tipi==='TOHUMLAMA_PLANLI'
     ? (t.hedef_saat||'').slice(0,5)
@@ -1484,6 +1606,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
     <div class="tc-header">
       <div class="tc-main">
         <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+          ${_cokluSecimKutuHtml(t)}
           <span class="tc-id">${(()=>{const h=getState('animals').find(a=>a.id===t.hayvan_id);return h?(h.kupe_no||h.devlet_kupe):(t.hayvan_id?.length>20?'BZ-'+t.hayvan_id.slice(-4):t.hayvan_id||'—');})()} </span>
           <span class="pill ${t.gorev_tipi||'DIGER'}">${(t.gorev_tipi==='ASI_PLANLI'||t.gorev_tipi==='ASI_HATIRLATMA'||t.gorev_tipi==='ASI_RAPEL')?'💉 ':''}${(t.gorev_tipi||'').replace(/_/g,' ')}</span>
           ${diseaseName?`<span class="pill" style="background:rgba(192,50,26,.1);color:var(--red);border:1px solid rgba(192,50,26,.2)">🏥 ${esc(diseaseName)}</span>`:''}
@@ -1536,6 +1659,7 @@ function renderSeansGorevKart(task, seans, opts={}){
     </div>`;
   }
   return `<div class="seans-gorev-card s-${state}" id="sg-${task.id}">
+    ${_cokluSecimKutuHtml(task)}
     <button class="sg-check" onclick="event.stopPropagation();togglePendingDone('seans','${task.id}',this,{seansId:'${seans.id}',uygulanmadi:false})" title="Uygulandı"></button>
     <span class="sg-saat">${esc(saat)}</span>
     <div class="sg-info"><div class="sg-ilac">${drug}</div><div class="sg-meta">${esc(meta)}${durumEk?' '+durumEk:''}</div></div>
@@ -7759,6 +7883,9 @@ function ertelemeBtnGuncelle() {
   const cdPBtn = document.getElementById('cd-protokol-iptal-btn');
   if (cdPBtn) cdPBtn.style.display = (online && typeof _curCase !== 'undefined' && _curCase && _curCase.status === 'active' && _curCase.protocol_family) ? 'block' : 'none';
   document.querySelectorAll('[data-ertele]').forEach(b => { b.style.display = online ? '' : 'none'; });
+  // F1 Task 3: seçim çubuğu görünürlüğü de TEK bu yardımcıdan senkronlanır (E6 parite).
+  // typeof guard: vm-extract koşumlarında yardımcı ctx'te olmayabilir (ui.js:1326 deseni).
+  if(typeof _cokluSecimBarGuncelle==='function') _cokluSecimBarGuncelle();
 }
 window.addEventListener('online',  () => ertelemeBtnGuncelle());
 window.addEventListener('offline', () => ertelemeBtnGuncelle());

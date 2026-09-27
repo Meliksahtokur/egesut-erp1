@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20260926-08">
+<link rel="manifest" href="manifest.json?v=20260927-09">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -712,6 +712,19 @@ body.dark .ac-vurgu{color:#8ec6ff}
       </div>
       <div id="task-search-bar" style="padding:0 14px 8px">
         <input class="fi" id="task-srch" placeholder="🔍 Küpe / ilaç / hastalık / tip ara…" autocomplete="off" oninput="taskSrch()" style="width:100%;padding:8px 12px;border:1px solid var(--brd);border-radius:8px;font-size:.78rem">
+      </div>
+      <!-- F1 Task 5: çoklu kaydırma çubuğu STATİK konteyneri — loadTasks bu id'yi
+           görünce dinamik çubuğu çizmez (ui.js `!getElementById('k-coklu-bar')` koşulu);
+           görünürlük + sayaç TEK _cokluSecimBarGuncelle'den, onay tıkı forms.js
+           document-delegasyonundan gelir. İç markup js/ui.js _cokluSecimBarHtml()
+           ile eşsenkron tutulmalı (bilinçli çift kaynak; dinamik yol yalnız
+           konteyner yoksa çizer). -->
+      <div id="k-coklu-bar" hidden style="display:none;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 2px 10px;padding:8px 10px;border-radius:10px;background:rgba(30,100,200,.07);border:1px solid var(--card3);font-size:.72rem">
+        <span id="k-coklu-sayac" style="font-weight:800;color:var(--ink)">0 görev seçili</span>
+        <span style="display:flex;gap:4px"><button type="button" data-gun="1" onclick="_cokluSecimGunDoldur(this.dataset.gun)" style="font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">+1</button><button type="button" data-gun="2" onclick="_cokluSecimGunDoldur(this.dataset.gun)" style="font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">+2</button><button type="button" data-gun="3" onclick="_cokluSecimGunDoldur(this.dataset.gun)" style="font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">+3</button><button type="button" data-gun="7" onclick="_cokluSecimGunDoldur(this.dataset.gun)" style="font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:8px;border:1px solid var(--blue);background:rgba(30,100,200,.08);color:var(--blue);cursor:pointer">+7</button></span>
+        <input id="k-coklu-gun" type="number" min="1" max="31" placeholder="+gün" inputmode="numeric" style="width:64px;padding:4px 6px;border-radius:8px;border:1px solid var(--card3);font-size:.72rem">
+        <button type="button" id="k-coklu-onayla" data-aksiyon="coklu-kaydir" style="font-size:.68rem;font-weight:800;padding:5px 10px;border-radius:8px;border:none;background:var(--green);color:#fff;cursor:pointer">⏩ Seçilenleri Kaydır</button>
+        <button type="button" id="k-coklu-temizle" onclick="_cokluSecimTemizle()" style="font-size:.68rem;font-weight:700;padding:5px 10px;border-radius:8px;border:1px solid var(--card3);background:transparent;color:var(--ink3);cursor:pointer">Temizle</button>
       </div>
       <div id="tasks-body"><div class="loader"><div class="spin"></div></div></div>
     </div>
@@ -2334,31 +2347,31 @@ body.dark .ac-vurgu{color:#8ec6ff}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20260926-08"></script>
-    <script src="js/gecmis.js?v=20260926-08"></script>
-    <script src="js/utils/modal.js?v=20260926-08"></script>
-    <script src="js/utils/errorHandler.js?v=20260926-08"></script>
-    <script src="js/utils/events.js?v=20260926-08"></script>
-    <script src="js/config.js?v=20260926-08"></script>
-    <script src="js/state.js?v=20260926-08"></script>
-    <script src="js/api.js?v=20260926-08"></script>
-    <script src="js/auth.js?v=20260926-08"></script>
-    <script src="js/tarih/tarih.js?v=20260926-08"></script>
-    <script src="js/ui.js?v=20260926-08"></script>
-    <script src="js/forms.js?v=20260926-08"></script>
-    <script src="js/ai-asistan.js?v=20260926-08"></script>
-    <script src="js/demo.js?v=20260926-08"></script>
-    <script src="vendor/cytoscape.min.js?v=20260926-08"></script>
-    <script src="js/pedigree/pedigree-api.js?v=20260926-08"></script>
-    <script src="js/pedigree/pedigree-adapter.js?v=20260926-08"></script>
-    <script src="js/pedigree/pedigree-style.js?v=20260926-08"></script>
-    <script src="js/pedigree/pedigree-view.js?v=20260926-08"></script>
-    <script src="js/pedigree/pedigree-controller.js?v=20260926-08"></script>
-    <script src="js/degisiklikler/etiketler.js?v=20260926-08"></script>
-    <script src="js/degisiklikler/diff.js?v=20260926-08"></script>
-    <script src="js/degisiklikler/degisiklikler.js?v=20260926-08"></script>
-    <script src="js/app.js?v=20260926-08"></script>
-    <script src="js/utils/handlers.js?v=20260926-08"></script>
+    <script src="js/utils/helpers.js?v=20260927-09"></script>
+    <script src="js/gecmis.js?v=20260927-09"></script>
+    <script src="js/utils/modal.js?v=20260927-09"></script>
+    <script src="js/utils/errorHandler.js?v=20260927-09"></script>
+    <script src="js/utils/events.js?v=20260927-09"></script>
+    <script src="js/config.js?v=20260927-09"></script>
+    <script src="js/state.js?v=20260927-09"></script>
+    <script src="js/api.js?v=20260927-09"></script>
+    <script src="js/auth.js?v=20260927-09"></script>
+    <script src="js/tarih/tarih.js?v=20260927-09"></script>
+    <script src="js/ui.js?v=20260927-09"></script>
+    <script src="js/forms.js?v=20260927-09"></script>
+    <script src="js/ai-asistan.js?v=20260927-09"></script>
+    <script src="js/demo.js?v=20260927-09"></script>
+    <script src="vendor/cytoscape.min.js?v=20260927-09"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20260927-09"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20260927-09"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20260927-09"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20260927-09"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20260927-09"></script>
+    <script src="js/degisiklikler/etiketler.js?v=20260927-09"></script>
+    <script src="js/degisiklikler/diff.js?v=20260927-09"></script>
+    <script src="js/degisiklikler/degisiklikler.js?v=20260927-09"></script>
+    <script src="js/app.js?v=20260927-09"></script>
+    <script src="js/utils/handlers.js?v=20260927-09"></script>
 
 
     <!-- GEBELİK EKLE MODAL -->

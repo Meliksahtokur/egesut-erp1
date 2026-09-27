@@ -279,6 +279,32 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
   islem_log `TOHUMLAMA_PLANLI_IPTAL`, sonra yeni görev); geçersiz mod fail-fast 'Geçersiz çakışma modu'.
   Çağrı: forms.js `submitBulkCase` (ONLINE-ONLY — `RPC_TABLES`'ta, offline-replay `RPC_MAP`'te değil).
 
+**`vaka_kalan_gunleri_kaydir_coklu(p_gorev_ids uuid[], p_gun integer)`** → jsonb *(20260927000001 —
+  F1 çoklu kaydırma; **PROD'A DEPLOY EDİLMEDİ — sahibin kapısı**; repo-only migration, canlıya
+  uygulanmadı)*
+→ Görev listesinden çoklu vaka kaydırma (G-20260927-COKLU-KAYDIR): UI checkbox'larından gelen AÇIK
+  TEDAVI_GUN/TEDAVI_SEANS görev id'lerini alır; görev→vaka çözümünü DB'de yapar (`gorev_log.aciklama`
+  JSON'unun `day_id`'si → `treatment_days.case_id`), DISTINCT vaka kümesinin her üyesini mevcut TEKLİ
+  `vaka_kalan_gunleri_kaydir(uuid, integer)`'a (20260925100001, gövdesi DEĞİŞMEDİ) delege eder —
+  gövde kopyası YOK. Kısmi başarı: tek vakanın hatası çağrıyı düşürmez, alt-işlem geri sarılır ve
+  `hatalar`'a `{case_id, sebep: SQLERRM}` satırı düşer; `VAKA_ACIK_DEGIL` ayrıca `atlanan` sayacına
+  yazılır. Dedup: aynı vakaya bağlı çok görev TEK kaydırmaya iner (DISTINCT case_id), `detaylar`'da
+  vaka başına 1 satır. Fail-fast guard'lar (hiçbir vakaya dokunmadan, tekli RPC ile aynı
+  `VAKA_KAYDIRILAMAZ:<json>` ailesi): `BOS_LISTE` (NULL/boş dizi) · `GECERSIZ_GUN` (p_gun NULL veya
+  1..31 dışı) · `LIMIT_ASIM` (>200 görev). Çözülemeyen görev fail-fast DEĞİL — `hatalar`'a
+  `{gorev_id, sebep:'GOREV_COZULEMEDI'}` satırı. Dönüş: `{ok:true, toplam, kaydirilan, atlanan,
+  hatalar:[…], detaylar:[{case_id, ilk_tarih, son_tarih, tasinan_gun_satiri, tasinan_gorev,
+  tasinan_seans, tasinan_uygulama_satiri, tai}]}` (toplam = kaydirilan + atlanan + vaka-hata satırları;
+  GOREV_COZULEMEDI satırları ek kalem). Audit: TEK `islem_log` `VAKA_KAYDIR_TOPLU` (ref_tablo
+  'cases', payload: gun/toplam/kaydirilan/atlanan/hatalar) — vaka-başına `VAKA_KAYDIR` kayıtları iç
+  RPC'den gelir, ikinci kez yazılmaz. Kapı: `REVOKE ALL FROM PUBLIC, anon` + `GRANT EXECUTE TO
+  authenticated`. farm_id yok (UPDATE-only; islem_log global — 20260925100001 gerekçesi).
+  Çağrı: forms.js `cokluKaydirOnayla` → api.js `apiCokluKaydir` (api.js:773); `RPC_TABLES`
+  (api.js:329) pull seti gorev_log/treatment_days/treatment_day_uygulamalar/islem_log — offline-replay
+  `RPC_MAP`'E EKLENMEDİ (online-only, vaka_toplu_ac ile aynı; offline'da çubuk gizli).
+  Kaynak: `docs/plans/2026-09-27-coklu-kaydirma-SPEC.md` + `docs/plans/2026-09-27-coklu-kaydirma-PLAN.md`
+  (Task 1); db-validate PASS: `reports/db-validation-a8e4414a.md`.
+
 **`close_case(p_case_id uuid)`** → jsonb *(LEGACY — korundu)*
 → Basit kapatma; akıllı versiyon `close_case_with_remaining`. Çağrı: ui.js:5995.
 

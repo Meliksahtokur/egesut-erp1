@@ -4150,3 +4150,298 @@ async function submitAsiEkle(btn){
   }catch(e){ toast('❌ '+getUserMessage(e),true); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='💾 Kaydet'; } }
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// F1 (coklu-kaydirma) Task 4 — çoklu kaydırma onay + submit + bantlı sonuç
+// SPEC §4 (docs/plans/2026-09-27-coklu-kaydirma-SPEC.md):
+//   k-coklu-onayla → cokluKaydirBaslat (Set/gün doğrulama + openConfirm)
+//   → cokluKaydirOnayla (apiCokluKaydir → bant → pull → renderSafe → temizle)
+// Bant şeması RPC dönüşüne aittir: {ok, toplam, kaydirilan, atlanan(SAYI),
+//   hatalar:[{gorev_id|case_id, sebep}], detaylar:[{case_id, ilk_tarih, ...}]} —
+//   bcSonucBantlari/_topluSonucModal başka yanıt şemalarına sıkı bağlı olduğundan
+//   REUSE UYGUN DEĞİL (plan-review bulgusu); desen alınır, şema KENDİMİZİN.
+// Sessiz başarı YASAK: atlanan/hatalar doluysa bantta mutlaka görünür.
+// ═══════════════════════════════════════════════════════════════════════
+
+// VAKA_KAYDIRILAMAZ:{"sebep":...} zarfını soyar (iç RPC SQLERRM'i); iç sebep
+// yoksa ham metin döner. Saf.
+function _ckSebepMetni(sebep){
+  const s = String(sebep || 'bilinmeyen hata');
+  if (s.indexOf('VAKA_KAYDIRILAMAZ:') === 0) {
+    try {
+      const j = JSON.parse(s.slice('VAKA_KAYDIRILAMAZ:'.length));
+      if (j && j.sebep) return String(j.sebep);
+    } catch (e) { /* bozuk zarf → ham metin */ }
+  }
+  return s;
+}
+
+// Kısa nesne etiketi (uuid ilk 8 hane) — yalnız METİN taşıyıcı, tıklanabilir değil.
+function _ckKisaId(id){
+  const s = String(id || '');
+  return s.length > 8 ? s.slice(0, 8) + '…' : s;
+}
+
+// ── fix-tur1 (I-2/I-4) çözümleme yardımcıları ───────────────────────────────
+// case_id → kupe haritası: cases → animal_id → hayvanlar.kupe_no/devlet_kupe.
+// Hayvanlar önce state cache'inden (getState('animals')), boşsa IDB'den okunur.
+// Her hata boş harita döner — bant fallback kısa-id ile devam eder (çökmez).
+async function _ckCaseKupeHaritasi(){
+  const harita = {};
+  try {
+    let hayvanlar = getState('animals') || [];
+    if (!hayvanlar.length) { try { hayvanlar = await idbGetAll('hayvanlar'); } catch (e) { hayvanlar = []; } }
+    const hayvanById = {};
+    (Array.isArray(hayvanlar) ? hayvanlar : []).forEach(a => { if (a && a.id) hayvanById[a.id] = a; });
+    const cases = await idbGetAll('cases');
+    (Array.isArray(cases) ? cases : []).forEach(c => {
+      const h = c && c.animal_id ? hayvanById[c.animal_id] : null;
+      const kupe = h ? (h.kupe_no || h.devlet_kupe || '') : '';
+      if (c && c.id && kupe) harita[c.id] = kupe;
+    });
+  } catch (e) { /* IDB/state yoksa boş harita — fallback kısa-id */ }
+  return harita;
+}
+
+// Vaka etiketi: kupe çözülebiliyorsa "Vaka TR-123", çözülemiyorsa kısa-id
+// fallback (I-4 — ham UUID kullanıcıya gösterilmez).
+function _ckVakaEtiketi(caseId, kupeHarita){
+  const kupe = kupeHarita ? kupeHarita[caseId] : null;
+  return kupe ? 'Vaka ' + kupe : 'Vaka ' + _ckKisaId(caseId);
+}
+
+// Seçim özeti (I-2 — onay metninde hayvan listesi): görev id'leri hayvan
+// bazında gruplanır (görev satırı hayvan_id taşır — renderTask aynısı),
+// kupe + seçili görevlerin min→max hedef_tarih aralığı listelenir.
+// Görev satırı ya da hayvanı çözülemeyen id'ler "cozulemeyen" sayılır.
+async function _ckSecimOzeti(ids){
+  const bos = { satirlar: [], hayvanSayisi: 0, cozulemeyen: ids.length };
+  let gorevler = [];
+  try { gorevler = await idbGetAll('gorev_log'); } catch (e) { return bos; }
+  let hayvanlar = getState('animals') || [];
+  if (!hayvanlar.length) { try { hayvanlar = await idbGetAll('hayvanlar'); } catch (e) { hayvanlar = []; } }
+  const gorevById = {};
+  (Array.isArray(gorevler) ? gorevler : []).forEach(t => { if (t && t.id) gorevById[t.id] = t; });
+  const hayvanById = {};
+  (Array.isArray(hayvanlar) ? hayvanlar : []).forEach(a => { if (a && a.id) hayvanById[a.id] = a; });
+  const gruplar = {};   // hayvan_id → { kupe, min, max, n }
+  let cozulemeyen = 0;
+  ids.forEach(id => {
+    const t = gorevById[id];
+    if (!t) { cozulemeyen++; return; }
+    const a = t.hayvan_id ? hayvanById[t.hayvan_id] : null;
+    const kupe = a ? (a.kupe_no || a.devlet_kupe || '') : '';
+    if (!kupe) { cozulemeyen++; return; }
+    const g = gruplar[t.hayvan_id] || (gruplar[t.hayvan_id] = { kupe, min: '', max: '', n: 0 });
+    g.n++;
+    if (t.hedef_tarih) {
+      if (!g.min || t.hedef_tarih < g.min) g.min = t.hedef_tarih;
+      if (!g.max || t.hedef_tarih > g.max) g.max = t.hedef_tarih;
+    }
+  });
+  const satirlar = Object.values(gruplar).map(g =>
+    '• ' + g.kupe +
+    (g.min ? (g.min === g.max ? ' · ' + fmtTarih(g.min) : ' · ' + fmtTarih(g.min) + ' → ' + fmtTarih(g.max)) : '') +
+    ' (' + g.n + ' görev)');
+  return { satirlar, hayvanSayisi: satirlar.length, cozulemeyen };
+}
+
+// Çoklu-kaydırma sonuç bandı — PURE, DOM'a dokunmaz (bcSonucBantlari deseni;
+// band() global'i js/ui.js'ten). Üç bant sabit sırayla: Kaydırılan (green) →
+// Atlanan (amber) → Hata (red); atlananlar hatalar dizisinden
+// VAKA_ACIK_DEGIL süzüyle ayrılır (RPC v_atlanan sayacıyla aynı küme).
+// fix-tur1 (I-4): kupeHarita (case_id → kupe, _ckCaseKupeHaritasi) verilirse
+// vakalar kupe ile gösterilir; yoksa/çözülemezse kısa-id fallback.
+// Hiçbir bant oluşmazsa da görünür uyarı döner — sessiz sonuç YASAK.
+function _cokluKaydirBanti(sonuc, kupeHarita){
+  const r = sonuc || {};
+  const hatalar = Array.isArray(r.hatalar) ? r.hatalar : [];
+  const detaylar = Array.isArray(r.detaylar) ? r.detaylar : [];
+  const kaydirilan = r.kaydirilan || 0;
+  const atlanan = r.atlanan || 0;
+  const atlananSatirlar = hatalar.filter(h => String(h?.sebep || '').indexOf('VAKA_ACIK_DEGIL') !== -1);
+  const hataSatirlari = hatalar.filter(h => String(h?.sebep || '').indexOf('VAKA_ACIK_DEGIL') === -1);
+
+  const satir = (ikon, baslik, sub) =>
+    '<div class="arow" style="cursor:default"><div class="arow-left">' +
+    '<div class="arow-id" style="font-size:.8rem">' + ikon + ' ' + escAttr(baslik) + '</div>' +
+    (sub ? '<div class="arow-sub" style="font-size:.72rem">' + escAttr(sub) + '</div>' : '') +
+    '</div></div>';
+
+  const bantlar = [];
+  if (kaydirilan > 0) {
+    const rows = detaylar.map(d => satir('✅', _ckVakaEtiketi(d?.case_id, kupeHarita),
+      (d?.ilk_tarih || d?.son_tarih)
+        ? 'kalan günler ' + fmtTarih(d.ilk_tarih) + ' → ' + fmtTarih(d.son_tarih) +
+          ' · ' + (d.tasinan_gun_satiri || 0) + ' gün satırı, ' + (d.tasinan_gorev || 0) + ' görev, ' + (d.tasinan_seans || 0) + ' seans'
+        : ''));
+    bantlar.push(band('green', kaydirilan + ' vaka kaydırıldı',
+      '<div style="max-height:220px;overflow-y:auto">' + rows.join('') + '</div>'));
+  }
+  if (atlanan > 0 || atlananSatirlar.length) {
+    const rows = atlananSatirlar.map(h => satir('⏭',
+      h?.case_id ? _ckVakaEtiketi(h.case_id, kupeHarita) : 'Vaka', _ckSebepMetni(h?.sebep)));
+    bantlar.push(band('amber', 'Atlanan (' + (atlanan || atlananSatirlar.length) + ')',
+      '<div style="max-height:160px;overflow-y:auto">' + rows.join('') + '</div>'));
+  }
+  if (hataSatirlari.length) {
+    const rows = hataSatirlari.map(h => satir('❌',
+      h?.gorev_id ? 'Görev ' + _ckKisaId(h.gorev_id) : (h?.case_id ? _ckVakaEtiketi(h.case_id, kupeHarita) : 'Hata'),
+      _ckSebepMetni(h?.sebep)));
+    bantlar.push(band('red', 'Hata (' + hataSatirlari.length + ')',
+      '<div style="max-height:160px;overflow-y:auto">' + rows.join('') + '</div>'));
+  }
+  if (!bantlar.length) {
+    return band('amber', 'Hiç vaka kaydırılamadı',
+      '<div class="arow" style="cursor:default"><div class="arow-left">' +
+      '<div class="arow-sub" style="font-size:.72rem">Seçili görevler vakaya çözümlenemedi</div>' +
+      '</div></div>');
+  }
+  return bantlar.join('');
+}
+
+// Bandı göster: body-seviyesi kapsayıcı (#k-coklu-sonuc). Görev listesi
+// konteyneri her renderSafe'de yeniden yazıldığından bant O KONTEYNERE değil
+// body'ye sabitlenir (fixed, alt-navigasyon üstünde) — renderSafe sonrası
+// hayatta kalır; ✕ ile kapanır (SPEC: bant kapanmadan yeniden gönderilemez —
+// kapatma _cokluKaydirBantiKapat'ta). Kapsayıcı referansı window önbelleğinde
+// tutulur (ui.js _ckSecilenGorevler deseni): kapatılınca cache düşer, yeni
+// koşumda TAZE bant yaratılır — eski içerik sızmaz.
+function _cokluKaydirBantiGoster(html){
+  let el = window._ckKaydirSonucEl || null;
+  if (!el || !el.parentNode) {                    // yoksa/kaldırılmışsa yeniden yarat
+    el = document.createElement('div');
+    el.id = 'k-coklu-sonuc';
+    el.setAttribute('style',
+      'position:fixed;left:12px;right:12px;bottom:calc(var(--nav,56px) + var(--safe,0px) + 58px);' +
+      'z-index:9000;max-height:55vh;overflow-y:auto;border-radius:14px;background:var(--card,#fff);' +
+      'box-shadow:0 8px 30px rgba(0,0,0,.25);padding:10px;display:none');
+    document.body.appendChild(el);
+  }
+  window._ckKaydirSonucEl = el;
+  el.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">' +
+    '<span style="font-size:.74rem;font-weight:800;color:var(--ink)">⏩ Çoklu Kaydırma Sonucu</span>' +
+    '<button type="button" data-aksiyon="coklu-sonuc-kapat" onclick="_cokluKaydirBantiKapat()" ' +
+    'style="border:none;background:transparent;color:var(--ink3);font-size:.9rem;cursor:pointer;padding:2px 6px">✕</button>' +
+    '</div>' + html;
+  el.style.display = 'block';
+  return el;
+}
+
+function _cokluKaydirBantiKapat(){
+  const el = window._ckKaydirSonucEl;
+  if (el) el.remove();
+  window._ckKaydirSonucEl = null;
+}
+
+// Onay çubuğu → diyaloğu: Set boşsa sessiz çıkış (çubuk 0 seçimde zaten gizli);
+// gün girişi tam sayı 1-31 değilse açıklayıcı toast + çıkış. Doğrulanmış gün
+// _ckKaydirBekleyenGun'de Baslat→Onayla el sıkışmasıyla taşınır (dataset deseni).
+// fix-tur1 (I-3): onaydan ÖNCE seçim yüklü görev kümesiyle kesiştirilir —
+// kesişim-dışı id'ler Set + sessionStorage'dan düşürülür ve onay metninde
+// bildirilir. fix-tur1 (I-2): onay metnine kupe + tarih aralığı listesi eklenir
+// (kör onay kalkar). fix-tur1 (I-1): belirsizlik bayrağı varsa uyarı satırı
+// tekrar gösterilir.
+async function cokluKaydirBaslat(){
+  if (window._ckKaydirKosuyor) return;                      // koşumda yeniden tetiklenmez
+  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  const secim = window._ckSecilenGorevler || new Set();
+  if (!secim.size) return;                                  // Set boş → sessiz çıkış
+  const girdi = document.getElementById('k-coklu-gun');
+  const ham = String((girdi && girdi.value) || '').trim();
+  if (!ham) { toast('⚠️ Gün sayısı girin (1-31)', true); return; }
+  const gun = Number(ham);
+  if (!Number.isInteger(gun)) { toast('⚠️ Gün sayısı tam sayı olmalı (örn. 3)', true); return; }
+  if (gun < 1 || gun > 31) { toast('⚠️ Gün sayısı 1-31 arasında olmalı (RPC sınırı)', true); return; }
+  // I-3: seçim ∩ yüklü görevler; düşenler onayda bildirilir
+  let dusen = 0;
+  try {
+    const gecerli = await _cokluSecimGecerliIds();
+    dusen = _cokluSecimPrune(gecerli);
+  } catch (e) { /* kesişim best-effort — RPC guard'ları yine devrede */ }
+  const guncel = window._ckSecilenGorevler || new Set();
+  if (!guncel.size) { toast('⚠️ Seçili görevler artık listede değil', true); return; }
+  // I-2: hayvan listesi (kupe + tarih aralığı) — kör onayı engeller
+  let ozet = { satirlar: [], hayvanSayisi: 0, cozulemeyen: 0 };
+  try { ozet = await _ckSecimOzeti([...guncel]); } catch (e) { /* özet best-effort */ }
+  let desc = guncel.size + ' görev +' + gun + ' gün kaydırılacak (bağlı vakaların tüm açık günleri/görevleri/seansları ve planlı tohumlaması birlikte kayar)';
+  if (ozet.satirlar.length) {
+    desc += '\n' + ozet.satirlar.slice(0, 8).join('\n');
+    if (ozet.hayvanSayisi > 8) desc += '\n+' + (ozet.hayvanSayisi - 8) + ' hayvan daha';
+  }
+  if (ozet.cozulemeyen > 0) desc += '\nçözülemeyen ' + ozet.cozulemeyen + ' görev atlanacak';
+  if (dusen > 0) desc += '\n' + dusen + ' görev artık listede değil — atlanacak';
+  if (window._ckKaydirBelirsiz) desc += '\n⚠️ ÖNCEKİ DENEEMENİN SONUCU BELİRSİZ — görev listesinde günler güncel; emin olmadan tekrar denemeyin';
+  window._ckKaydirBekleyenGun = gun;
+  openConfirm('⏩ Çoklu Kaydırma Onayı', desc, cokluKaydirOnayla);
+}
+
+// Onaydaki koşum: buton disabled → apiCokluKaydir → bant → pull(RPC_TABLES
+// kaydı) → renderSafe → seçim temizliği → buton serbest. rpc() hata/ok:false'ta
+// throw eder. Çift-gönderim kilidi: disabled + _ckKaydirKosuyor bayrağı
+// (savunma-derinliği).
+// fix-tur1 (I-1): RPC İLERİ-YÖNLÜDÜR (geri alınamaz) — reject, sunucunun
+// kaydetmiş ama yanıtın ağda kaybolmuş olma ihtimalini de taşır (SONUÇ
+// BELİRSİZ). Bu yüzden catch yolu: (a) ÖNCE pull+renderSafe (liste gerçeği
+// göstersin), (b) belirsizlik bandı + hata mesajı, (c) seçim TEMİZLENMEZ ama
+// buton normal metinle serbest bırakılmaz ("⚠ Kontrol et" uyarısı) ve
+// _ckKaydirBelirsiz bayrağı sonraki onayda uyarıyı tekrar gösterir.
+async function cokluKaydirOnayla(){
+  const gun = window._ckKaydirBekleyenGun;
+  window._ckKaydirBekleyenGun = null;
+  if (!Number.isInteger(gun) || gun < 1 || gun > 31) { toast('⚠️ Geçersiz kaydırma isteği — yeniden deneyin', true); return; }
+  if (window._ckKaydirKosuyor) return;                      // çift-gönderim kilidi
+  if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
+  const ids = [...(window._ckSecilenGorevler || new Set())];
+  if (!ids.length) { toast('⚠️ Seçili görev yok', true); return; }
+  const tablolar = (typeof RPC_TABLES !== 'undefined' && RPC_TABLES && RPC_TABLES.vaka_kalan_gunleri_kaydir_coklu)
+    ? RPC_TABLES.vaka_kalan_gunleri_kaydir_coklu
+    : ['gorev_log', 'treatment_days', 'treatment_day_uygulamalar', 'islem_log'];
+  window._ckKaydirKosuyor = true;
+  const btn = document.getElementById('k-coklu-onayla');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Kaydırılıyor…'; }
+  try {
+    const sonuc = await apiCokluKaydir(ids, gun);
+    // Bant ÖNCE basılır — buton ancak bant göründükten sonra serbest kalır.
+    // I-4: vakalar kupe ile gösterilir (çözülemeyen → kısa-id fallback).
+    const kupeHarita = await _ckCaseKupeHaritasi();
+    _cokluKaydirBantiGoster(_cokluKaydirBanti(sonuc, kupeHarita));
+    await pullTables(tablolar).catch(console.warn);
+    renderSafe();
+    _cokluSecimTemizle();
+    window._ckKaydirBelirsiz = false;                       // temiz koşum bayrağı söndürür
+  } catch (e) {
+    // I-1: sonuç belirsiz — önce veriyi tazele, sonra belirsizlik bandı.
+    const msg = getUserMessage(e);
+    window._ckKaydirBelirsiz = true;
+    await pullTables(tablolar).catch(() => {});             // ağ da kopmuş olabilir — best-effort
+    renderSafe();
+    _cokluKaydirBantiGoster(band('amber', '⚠️ Sonuç belirsiz',
+      'İşlem sunucuda uygulanmış olabilir — görev listesinde günler güncel; emin olmadan tekrar denemeyin.\nHata: ' + escAttr(msg)));
+    toast('⚠️ Sonuç belirsiz — listeyi kontrol edin: ' + msg, true);
+  } finally {
+    window._ckKaydirKosuyor = false;
+    const b = document.getElementById('k-coklu-onayla');    // renderSafe çubuğu yeniden çizmiş olabilir
+    if (b) {
+      b.disabled = false;
+      b.textContent = window._ckKaydirBelirsiz
+        ? '⚠ Kontrol et — tekrar deneme riski'
+        : '⏩ Seçilenleri Kaydır';
+    }
+  }
+}
+
+// Çubuk onay butonunun bağlanması: buton ui.js tarafından her görev-listesi
+// render'ında inline handler'sız yeniden çizildiğinden bağlama TEK
+// document-seviyesi delegasyonla yapılır (data-aksiyon dataset'i — id
+// interpolasyonu yok). Idempotent: guard bayrağı çift-listener'ı önler.
+function _ckKaydirClick(ev){
+  const t = ev && ev.target;
+  const el = t && typeof t.closest === 'function' ? t.closest('[data-aksiyon="coklu-kaydir"]') : null;
+  if (el) cokluKaydirBaslat();
+}
+if (!window._ckKaydirBaglandi) {
+  window._ckKaydirBaglandi = true;
+  document.addEventListener('click', _ckKaydirClick);
+}

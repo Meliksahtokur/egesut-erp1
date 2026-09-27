@@ -323,6 +323,10 @@ const RPC_TABLES = {
   // RPC_MAP'e (ui.js dataTrafficTekGonder, offline kuyruk replay) BILINCLI girmez:
   // erteleme online-only'dir (E6 kapisu) — vaka_toplu_ac gerekce kalibi.
   gorev_ertele:              ['gorev_log','islem_log'],
+  // F1 (coklu-kaydirma): gorev listesinden coklu vaka kaydirma — vaka_kalan_gunleri_kaydir
+  // pull setinin coklu hali. RPC_MAP'e (ui.js dataTrafficTekGonder) BILINCLI girmez:
+  // online-only'dir — vaka_toplu_ac gerekce kalibi.
+  vaka_kalan_gunleri_kaydir_coklu: ['gorev_log','treatment_days','treatment_day_uygulamalar','islem_log'],
   // E4-UI (erteleme-genel): protokol iptali — vaka + gorev/seans/gun kapanisi +
   // stok iadesi + instance kapanisi (+ yeniden-baslat yeni gorevi). RPC_MAP'e
   // BILINCLI girmez — online-only (E6 guard ovsyncIptal girişinde).
@@ -753,5 +757,24 @@ async function rpcCloseCaseWithRemaining(caseId, not = null) {
   return rpc('close_case_with_remaining', {
     p_case_id: caseId,
     p_not: not,
+  });
+}
+
+/**
+ * vaka_kalan_gunleri_kaydir_coklu — görev listesindeki vakaların kalan günlerini
+ * topluca +N kaydır (F1 coklu-kaydirma). Kısmi başarı sözleşmesi: RPC gövdesi
+ * {ok, toplam, kaydirilan, atlanan, hatalar, detaylar} döner; rpc() hata/ok:false
+ * yolunda throw eder (e.data gövdeyi taşır) — buraya gelen res hep ok:true'dur.
+ * Online-only: RPC_MAP'e (offline replay) girmez, pull seti RPC_TABLES'te.
+ * @param {string[]} gorevIds - gorev_log.id listesi
+ * @param {number} gun - kaydırma günü (pozitif tam sayı, tek yönlü ileri)
+ * @returns {Promise<{ok, toplam, kaydirilan, atlanan, hatalar, detaylar}>}
+ */
+async function apiCokluKaydir(gorevIds, gun) {
+  if (!Array.isArray(gorevIds) || !gorevIds.length) throw new Error('gorevIds boş olamaz');
+  if (!Number.isInteger(gun) || gun < 1) throw new Error('gun pozitif tam sayı olmalı');
+  return rpc('vaka_kalan_gunleri_kaydir_coklu', {
+    p_gorev_ids: gorevIds,
+    p_gun: gun,
   });
 }
