@@ -527,3 +527,47 @@ test('F1-T4-i: bant kapatma — _cokluKaydirBantiKapat elementi kaldırır + cac
   assert.strictEqual(btn.disabled, false);
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Task 5: index.html statik çubuk konteyneri + ?v= damgası değer-bağımsızlığı
+// Statik konteyner (id=k-coklu-bar) loadTasks'taki `!getElementById('k-coklu-bar')`
+// koşuluyla dinamik çubuğu susturur (zero-friction geçiş); görünürlük/sayaç TEK
+// _cokluSecimBarGuncelle'den senkronlanır. Damga testleri değer-bağımsız: bump
+// testi kırmaz, karışık damga kılar (plan-review Critical kök fix —
+// vaka-toplu-ac sweep ile aynı sözleşme).
+// ═══════════════════════════════════════════════════════════════════════════
+test('F1-T5-a: index.html statik k-coklu-bar konteyneri tam 1 kez ve tasks-body DIŞINDA (loadTasks re-render silmez)', () => {
+  const html = fs.readFileSync('index.html', 'utf8');
+  assert.strictEqual((html.match(/id="k-coklu-bar"/g) || []).length, 1,
+    'statik konteyner tam 1 kez (id varlığı dinamik yolu sessizleştirir)');
+  const barIdx = html.indexOf('id="k-coklu-bar"');
+  const bodyIdx = html.indexOf('id="tasks-body"');
+  assert.ok(barIdx !== -1, 'k-coklu-bar konteyneri index.html\'de');
+  assert.ok(bodyIdx !== -1, 'tasks-body index.html\'de');
+  assert.ok(barIdx < bodyIdx, 'konteyner görev listesi başlığının altında, tasks-body\'den ÖNCE');
+  // innerHTML senaryosu: konteyner tasks-body div'i İÇİNE yazılmışsa ilk render'da silinir
+  assert.ok(!/<div id="tasks-body"[^>]*>[\s\S]*id="k-coklu-bar"/.test(html),
+    'konteyner tasks-body İÇİNDE DEĞİL');
+});
+
+test('F1-T5-b: statik konteyner içeriği tam — sayaç/chip/girdi/onayla/temizle id\'leri + delegasyon data-aksiyonu', () => {
+  const html = fs.readFileSync('index.html', 'utf8');
+  const kesit = html.slice(html.indexOf('id="k-coklu-bar"'), html.indexOf('id="tasks-body"'));
+  for (const id of ['k-coklu-sayac', 'k-coklu-gun', 'k-coklu-onayla', 'k-coklu-temizle']) {
+    assert.strictEqual((kesit.match(new RegExp('id="' + id + '"', 'g')) || []).length, 1,
+      id + ' konteyner içinde tam 1 kez');
+  }
+  assert.strictEqual((kesit.match(/data-aksiyon="coklu-kaydir"/g) || []).length, 1,
+    'onay butonu forms.js document-delegasyon data-aksiyonunu taşır');
+  for (const gun of ['1', '2', '3', '7']) {
+    assert.ok(kesit.includes('data-gun="' + gun + '"'), '+' + gun + ' hızlı chip');
+  }
+});
+
+test('F1-T5-c: index.html tüm ?v= referansları TEK ayrık değerde (değer-bağımsız — bump testi kırmaz)', () => {
+  const html = fs.readFileSync('index.html', 'utf8');
+  const damgalar = [...html.matchAll(/\?v=([0-9]{8}-[0-9]+)/g)].map(m => m[1]);
+  assert.ok(damgalar.length >= 14, 'dosyada ?v= referans sayısı: ' + damgalar.length);
+  const ayrik = [...new Set(damgalar)];
+  assert.strictEqual(ayrik.length, 1, 'tüm ?v= referansları tek değerde: ' + ayrik.join(' / '));
+});
+
