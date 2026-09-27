@@ -600,3 +600,39 @@ js/api.js:175-182 (queueOp dedup yok), js/ui.js:9505 (RPC_MAP), js/ui.js:9686-96
 20260925000006 (SQL taraf).
 Kaynak rapor: /home/melik/.herdr/worktrees/egesut-erp1/review-cila-kod/reports/2026-09-25-ultrareview-cila-kod.md
 Not: js/ui.js satır numaraları 2026-09-25 HEAD'ine göredir; U2 refactoringi (commit f6cc0bb) sonrası ~6 satır kayabilir.
+
+---
+
+## Teknik Borçlar — F1 Çoklu Kaydırma (2026-09-27, merge 4c4f4e4, prod apply ✓)
+
+Kaynak: runs/2026-09-27-f1-coklu-kaydirma.md · dış review: mimar-Claude 2 tur (raporlar worktree .ss/ son kopyası run dosyasında) · spec/plan: docs/plans/2026-09-27-coklu-kaydirma-*.md
+
+### DEBT-CK-BELIRSIZ-DETERMINISTIK — Belirsiz-sonuç koruması yanlış güvence verebiliyor [open — sahibin kararıyla açık]
+Ağ kopukken pullTables sessizce başarısız olur, renderSafe IDB'deki ESKİ tarihleri çizer; kullanıcı "uygulanmamış" sanıp tekrar denerse +2N (kaydırma geri alınamaz). Deterministik çözüm: catch'te pull başarılıysa seçili görevlerin hedef_tarih karşılaştırması → "uygulandı/uygulanmadı" kesinleştir; pull-fail'de tekrar-deneme KİLİTLİ. Kalıcı çözüm: RPC'ye p_istek_id idempotency (RPC dokunuşu). Ayrıca try bloğu yalnız apiCokluKaydir'ı sarmalı (başarılı işlem sonrası UI hatası "belirsiz" raporlayabiliyor). Kaynak: mimar teyit N-1/N-4.
+
+### DEBT-CK-KOHORT-MODU — Kohortta kısmi kaydırma sürüyü ikiye bölüyor [open — sahibin kararı]
+Şu an vaka-başına atomik: seçimde kapalı vaka varsa o atlanır, diğerleri kayar → kohort bölünür. Alternatif: hepsi-ya-da-hiçbiri (DB ön-kontrol, tek kapalı vaka tüm işlemi reddeder). Sahibe soruldu, karar bekliyor (mimar I-6).
+
+### DEBT-CK-CTE-TEK-GECIS — cozulen CTE'nin iki birebir kopyası var [open — sonraki SQL dokunuşunda zorunlu]
+vaka_kalan_gunleri_kaydir_coklu (20260927000001:97-111, 125-139): iki CTE kopyası bugün senkron ama tek tanıma indirilmeli (ilk FOR'da gid+case_id topla, ikinci FOR DISTINCT unnest). Bugün senkron bozulursa dedup/çözümleme ikiye ayrılır.
+
+### DEBT-BC-TARIH-CURUMESI — vaka-toplu-ac bc-tarih 2 testi tarih-bağımlı kırılıyor [open]
+tests/unit/vaka-toplu-ac.test.js:2585/2605 — fixture "bugun+2" sınırına takılıyor (Ekim-2026 rotu); F1 ve önceki turlarda "bilinen borç" olarak geçildi. Değer-bağımsız tarih üretimine çevrilmeli.
+
+### DEBT-CK-API-31-GUARD — apiCokluKaydir'da 31 üst-guard yok [Minor]
+Caller + DB (GECERSIZ_GUN) çift katman var; helper'a >31 reddi eklenmeli (savunma-derinliği).
+
+### DEBT-CK-CAPE-ESLIK-TESTI — statik çubuk ↔ _cokluSecimBarHtml çapraz-eşlik testi yok [Minor]
+index.html statik konteyner ile ui.js dinamik üretici iki kopya; tek tarafta yapılan düzenleme sessizce sapar (bugün statik kopya canlı, dinamik dal ölü-yedek). Sandbox'ta _cokluSecimBarHtml normalize-çıktısı ≡ index.html kesiti testi eklenebilir.
+
+### DEBT-CK-TEMIZLE-BUTON — Temizle buton etiketini sıfırlamıyor [Minor kozmetik]
+Bayrak/storage sıfırlanıyor ama buton "⚠ Kontrol et" etiketinde kalıyor (re-demo ui-R3-sonuc.json). Etiket eski hâline dönmeli.
+
+### DEBT-CK-SEBEP-METINLERI — bantta sebep kodları ham + GOREV_COZULEMEDI'de küpe yok [Minor]
+Atlanan/hata satırlarında GECMIS_TARIH:{...} gibi ham JSON görünüyor (Türkçeleştirilmeli); GOREV_COZULEMEDI satırları hâlâ görev-uuid (küpe çözümü cases üzerinden eklenebilir); satırlar tıklanamaz. Kaynak: mimar teyit N/I-4 kalanı.
+
+### DEBT-DBVALIDATE-STIL-SAYACI — db-validate raporu stil sayacında çelişki [Minor]
+Rapor tablosu "sqlfluff stil uyarısı: 0" derken sqlfluff.out 6 stil bulgusu + "FAIL" başlığı gösteriyor; parse-hata 0 (geçiş doğru, metin yanıltıcı). Rapora tek satır açıklama: "FAIL = stil ihlali, parse hatası 0".
+
+### DEBT-CK-R6-TAI-TESTI — TAI GECMIS_TARIH kısmi-hata senaryosu test edilmedi [Minor]
++7 sonrası TAI tarihi geçmişe düşerse vaka-başına tam geri sarma (VAKA_ACIK_DEGİL gibi hata bandında) — demo senaryosu koşulmadı (mimar R6). R3'ün tarifi de route.fetch()+abort() ile netleştirilmeli (mevcut haliyle I-1 yolunu her tetiklemeyebilir).
