@@ -177,7 +177,7 @@ git commit -m "chore(release): damga bumbu (tek deger) + coklu-kaydir cubuk kont
 
 **Interfaces:**
 - Consumes: Task 1-5 tamamı.
-- Produces: glmf demo test zarfı içeriği (aşağıdaki 8 madde).
+- Produces: glmf demo test zarfı içeriği (aşağıdaki 9 madde).
 
 - [x] **Step 1: Tam unit koşumu** — Run: `npm run test:unit` Expected: tümü PASS (Review Focus 5: erteleme-kaydir-ui.test.js dahil).
 - [x] **Step 2: Final db-validate** — migration üzerinde PASS (zaten Task 1'de; migration değiştiyse tekrar).
