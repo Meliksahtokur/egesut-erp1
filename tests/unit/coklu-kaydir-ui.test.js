@@ -103,15 +103,15 @@ function gunTask(opts = {}) {
   };
 }
 
-test('F1-T3-a: açık TEDAVI_GUN/TEDAVI_SEANS kartında checkbox var — dataset deseni, id interpolasyonu yok; ILAC\'ta yok', () => {
+test('F1-T3-a: açık TEDAVI_GUN kartında checkbox var — dataset deseni, id interpolasyonu yok; ILAC\'ta yok', () => {
   t3reset();
   const html = T3.sandbox.renderTask(gunTask());
   assert.ok(html.includes('class="task-sec-kutu"'), 'checkbox çizilir');
   assert.ok(html.includes('data-gorev-id="gungorev-1"'), 'görev id dataset attribute\'ta (escAttr\'li)');
   assert.ok(html.includes('this.dataset.gorevId'), 'onclick dataset üzerinden okur');
   assert.ok(!html.includes("_cokluSecimToggle('gungorev-1"), 'id inline-handler\'a interpolasyon YASAK');
-  const seansHtml = T3.sandbox.renderTask(gunTask({ id: 'seansgorev-2', tip: 'TEDAVI_SEANS' }));
-  assert.ok(seansHtml.includes('class="task-sec-kutu"'), 'TEDAVI_SEANS kartında da checkbox');
+  // Not (fix-1 review): TEDAVI_SEANS görevleri Görevler ekranında renderTask'tan
+  // GEÇMEZ — renderSeansGorevKart mini-kartıyla çizilir; gerçek-akış kapsamı T3-i'de.
   const ilacHtml = T3.sandbox.renderTask(gunTask({ id: 'ilacgorev-3', tip: 'ILAC' }));
   assert.ok(!ilacHtml.includes('task-sec-kutu'), 'ILAC kartında checkbox YOK (fail-closed)');
 });
@@ -207,6 +207,31 @@ test('F1-T3-g: chip tıkı k-coklu-gun değerini doldurur', () => {
   const girdi = T3.sandbox.document.__setEl('k-coklu-gun', makeElement('input'));
   T3.sandbox._cokluSecimGunDoldur('3');
   assert.strictEqual(girdi.value, '3', 'chip değeri girişe yazılır');
+});
+
+test('F1-T3-i (fix-1): gerçek akış — renderSeansGorevKart açık mini-kartta checkbox VAR ve toggle Set\'i günceller; kapalı (done/cancelled) mini-kartta YOK', () => {
+  t3reset();
+  const sb = T3.sandbox;
+  const task = { id: 'seansgorev-9', gorev_tipi: 'TEDAVI_SEANS', tamamlandi: false, iptal: false, hedef_tarih: '2099-01-01' };
+  // AÇIK seans (gelecek planlı → computeSeansState 'scheduled' → açık dal)
+  const acik = sb.renderSeansGorevKart(task, { id: 'seans-a', planned_date: '2099-01-01', planned_time: '10:00' }, { drugName: 'GnRH' });
+  assert.ok(acik.includes('class="task-sec-kutu"'), 'açık mini-kartta selection checkbox VAR');
+  assert.ok(acik.includes('data-gorev-id="seansgorev-9"'), 'task id dataset attribute\'ta (escAttr\'li)');
+  assert.ok(acik.includes('this.dataset.gorevId'), 'onclick dataset üzerinden okur');
+  assert.ok(!acik.includes("_cokluSecimToggle('seansgorev-9"), 'id inline-handler\'a interpolasyon YASAK');
+  // checkbox akışı gerçek toggle yardımcısına bağlanır (Set + storage)
+  sb._cokluSecimToggle('seansgorev-9', true);
+  assert.ok(sb.window._ckSecilenGorevler.has('seansgorev-9'), 'toggle Set\'i günceller');
+  assert.deepStrictEqual(JSON.parse(sb.sessionStorage.getItem('ege_coklu_secim')), ['seansgorev-9'], 'storage senkron');
+  // KAPALI dallar — kart görünür ama checkbox YOK (done / cancelled)
+  const doneKart = sb.renderSeansGorevKart(task, { id: 'seans-b', planned_date: '2099-01-01', planned_time: '10:00', uygulama_tamamlandi_at: '2099-01-01T10:05:00Z' }, { drugName: 'GnRH' });
+  assert.ok(!doneKart.includes('task-sec-kutu'), 'done mini-kartında checkbox YOK');
+  const iptalKart = sb.renderSeansGorevKart(task, { id: 'seans-c', planned_date: '2099-01-01', planned_time: '10:00', uygulanmadi: true }, { drugName: 'GnRH' });
+  assert.ok(!iptalKart.includes('task-sec-kutu'), 'cancelled mini-kartında checkbox YOK');
+  // görev-tarafı kapalıysa (tamamlandi) kart açık dahi olsa checkbox YOK (çift-taraf fail-closed)
+  sb.window._ckSecilenGorevler = new Set();
+  const kapaliGorev = sb.renderSeansGorevKart({ ...task, tamamlandi: true }, { id: 'seans-d', planned_date: '2099-01-01', planned_time: '10:00' }, { drugName: 'GnRH' });
+  assert.ok(!kapaliGorev.includes('task-sec-kutu'), 'tamamlanmış seans görevinde checkbox YOK');
 });
 
 test('F1-T3-h: kablolama — loadTasks her render\'da _cokluSecimYukle + çubuk çizer/günceller; renderTask checkbox dalını çağırır', () => {

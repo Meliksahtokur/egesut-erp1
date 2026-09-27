@@ -1627,6 +1627,7 @@ function renderSeansGorevKart(task, seans, opts={}){
     </div>`;
   }
   return `<div class="seans-gorev-card s-${state}" id="sg-${task.id}">
+    ${_cokluSecimKutuHtml(task)}
     <button class="sg-check" onclick="event.stopPropagation();togglePendingDone('seans','${task.id}',this,{seansId:'${seans.id}',uygulanmadi:false})" title="Uygulandı"></button>
     <span class="sg-saat">${esc(saat)}</span>
     <div class="sg-info"><div class="sg-ilac">${drug}</div><div class="sg-meta">${esc(meta)}${durumEk?' '+durumEk:''}</div></div>
