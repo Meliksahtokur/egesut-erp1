@@ -31,6 +31,10 @@ const require = createRequire(path.join(REPO, 'package.json'));
 const espree = require('espree');
 
 const ISLEMLER = new Set(['select', 'insert', 'update', 'upsert', 'delete']);
+// v2.3 (EGESUT-V23-ETIKET kalem 2): dolaylı tablo yardımcıları — türetim atlas v2.3
+// motoruyla (tools-bank/atlas/atlas.mjs TABLO_YARDIMCILARI) birebir; Map: prototip
+// zehirlenmesine kapalı (toLocaleString dersi). Çıplak çağrı biçimi.
+const TABLO_YARDIMCILARI = new Map([['getData', 'okuma'], ['pullTables', 'tazeleme'], ['_pullTablesNow', 'tazeleme']]);
 const ETIKET_DESEN = /^@(rpc|tablo|olay)\b\s*(.*)$/;
 
 // --- argümanlar -------------------------------------------------------------
@@ -103,6 +107,14 @@ function etiketCoz(comment) {
     const satir = { tip, ham: ham.trim(), dogrulanamadiSorun: null };
     if (tip === 'rpc') {
       satir.adlar = govde.split(',').map(s => s.trim()).filter(Boolean);
+      // v2.3: koşullu çift işareti — yalnız SON adın sonundaki '(koşullu)' eki soyulur
+      // (etiket çıkarıcısı atlas-etiket'in yazdığı tek biçim; satır.kosullu bilgi amaçlı)
+      const son = satir.adlar[satir.adlar.length - 1];
+      if (son && son.endsWith('(koşullu)')) {
+        satir.adlar[satir.adlar.length - 1] = son.slice(0, -'(koşullu)'.length).trim();
+        satir.kosullu = true;
+      }
+      satir.adlar = satir.adlar.filter(Boolean);
       if (satir.adlar.length === 0) satir.dogrulanamadiSorun = `tanınmayan @rpc satırı (ad yok): ${ham.trim()}`;
     } else if (tip === 'tablo') {
       satir.girisler = [];
@@ -151,8 +163,29 @@ function govdeOlc(fnDugumu) {
         tablolar.get(deger).add(null);
       } else if (ad === 'rpc' && deger !== null) {
         rpcler.add(deger);
+      } else if (ad === 'rpc') {
+        // v2.3-KA1: ternary literal çifti — iki dal da kaydedilir (atlas.mjs ile birebir)
+        const kosul = ilkArg && ilkArg.type === 'ConditionalExpression'
+          ? [ilkArg.consequent, ilkArg.alternate].map(x => x && x.type === 'Literal' && typeof x.value === 'string' ? x.value : null)
+          : null;
+        if (kosul && kosul[0] !== null && kosul[1] !== null) {
+          rpcler.add(kosul[0]); rpcler.add(kosul[1]);
+        }
       } else if (ad === 'addEventListener' && deger !== null) {
         olaylar.add(deger);
+      } else if (TABLO_YARDIMCILARI.has(ad) && dugum.callee.type === 'Identifier') {
+        // v2.3-KA2: dolaylı tablo erişimi — getData('t') → okuma;
+        // pullTables/_pullTablesNow(['a','b']) dizi literal → tazeleme (atlas.mjs ile birebir)
+        const islem = TABLO_YARDIMCILARI.get(ad);
+        const a0 = dugum.arguments[0];
+        const adaylar = a0 && a0.type === 'ArrayExpression' ? a0.elements
+          : a0 && a0.type === 'Literal' && typeof a0.value === 'string' ? [a0] : [];
+        for (const el of adaylar) {
+          if (el && el.type === 'Literal' && typeof el.value === 'string') {
+            if (!tablolar.has(el.value)) tablolar.set(el.value, new Set());
+            tablolar.get(el.value).add(islem);
+          }
+        }
       } else if (ISLEMLER.has(ad)) {
         // işlem çağrısı: callee.object zincirinde geriye yürüyüp .from('<lit>') ara
         let o = dugum.callee.object;
@@ -293,6 +326,21 @@ function kirmiziKontrol(kayitlar) {
       return `'${eksik}' yok`;
     }
     return null;
+  }) && tam;
+  // v2.3 kolları (EGESUT-V23-ETIKET kalem 2): yeni sözlük de bozulmaya yakalanmalı
+  tam = kos('K5 koşullu-rpc-ad', ks => {
+    const k = ks.find(x => x._satir.tip === 'rpc' && x._satir.kosullu && x._satir.adlar.length);
+    if (!k) return null;
+    k._satir.adlar = ['olmayan_kosullu_ad'];
+    return "rpc('olmayan_kosullu_ad') yok (koşullu satır)";
+  }) && tam;
+  tam = kos('K6 yardimci-tablo-ad', ks => {
+    const k = ks.find(x => x._satir.tip === 'tablo' && (x._satir.girisler || []).some(g => g.islem === 'okuma' || g.islem === 'tazeleme'));
+    if (!k) return null;
+    const g = k._satir.girisler.find(x => x.islem === 'okuma' || x.islem === 'tazeleme');
+    const eski_ad = g.tablo;
+    g.tablo = 'olmayan_yardimci_tablo';
+    return `.from('${eski_ad}')/${g.islem} bozuldu → olmayan_yardimci_tablo`;
   }) && tam;
   for (const k of kollar) console.log(`  [kirmizi] ${k.ad}: ${k.sonuc}`);
   return tam;
