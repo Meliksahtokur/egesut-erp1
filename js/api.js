@@ -531,6 +531,7 @@ function pullTables(tables = []) {
  * 'islem_log' tablosundan en son 50.000 kaydı (her sayfa 1000 satır) alarak döner.
  * Veritabanı hatası oluşursa hata bilgisini, yoksa toplanan kayıtları döndürür.
  * @returns {Object} { data: Kayıtlar dizisi, error: Hata mesajı (varsa) } objesi.
+ * @tablo islem_log (select)
  */
 async function _fetchIslemLogTumu(){
   const SAYFA = 1000, MAX_SAYFA = 50; // güven sınırı: 50k satır
@@ -551,6 +552,7 @@ async function _fetchIslemLogTumu(){
  * sonuçları işler ve hata durumunda uyarı verir. Başarılı olan tablolardan gelen verileri işlenmiş hale getirir.
  * @param {Array} tables İşlenecek tablo isimlerinin listesi. Varsayılan olarak boş dizidir.
  * @returns {Promise<void>} İşlem tamamlandığında (başarılı veya hata) void döner.
+ * @tablo bildirim_log (select), cases (select), cop_kutusu (select), diseases (select), dogum (select), drug_administrations (select), drug_classes (select), drug_products (select), drugs (select), grup_padok_eslem (select), hayvan_durum_view (select), hekimler (select), kizginlik_log (select), padoklar (select), protokol_ayar (select), protokol_instance (select), sablon_hastalik_eslem (select), stok_hareket (select), stok_kategorileri (select), stok_tuketim_view (select), tedavi_sablonu_kalem (select), tedavi_sablonu (select), tohumlama (select), treatment_day_uygulamalar (select), treatment_days (select), uygulama_log (select), v_gorev_log_sync (select), vaccination_log (select), vaccination_schedule (select), vaccine_diseases (select), vaccine_protocol_steps (select), vaccines (select)
  */
 async function _pullTablesNow(tables = []) {
   try {
@@ -558,97 +560,116 @@ async function _pullTablesNow(tables = []) {
       /**
        * 'hayvan_durum_view' tablosundan tüm kayıtları seçer.
        * @returns {Array} Seçilen tüm hayvan kayıtlarından oluşan dizi.
+       * @tablo hayvan_durum_view (select)
        */
       hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
       /**
        * 'v_gorev_log_sync' tablosundan tüm sütunları seçerek veri döndürür.
        * @returns {Object} Seçilen tüm sütunlardan oluşan veri seti.
+       * @tablo v_gorev_log_sync (select)
        */
       gorev_log:    () => db.from('v_gorev_log_sync').select('*'),
       /**
        * 'stok_tuketim_view' tablosundan tüm sütunları seçerek stok tüketim verilerini döndürür.
        * @returns {Array} Seçilen stok tüketim kayıtlarından oluşan dizi.
+       * @tablo stok_tuketim_view (select)
        */
       stok:         () => db.from('stok_tuketim_view').select('*'),
       /**
        * 'stok_hareket' tablosundan tüm kayıtları seçer.
        * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       * @tablo stok_hareket (select)
        */
       stok_hareket: () => db.from('stok_hareket').select('*'),
       /**
        * 'cases' tablosundan en son oluşturulmuş 200 kaydı seçer ve sıralar.
        * @returns {Array} En yeni 200 'case' kaydı içeren dizi.
+       * @tablo cases (select)
        */
       cases:        () => db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
       /**
        * 'diseases' tablosundan tüm kayıtları seçer, önce 'category' sonra 'name' sütunlarına göre sıralar.
        * @returns {Array} Sıralanmış hastalık kayıtlarından oluşan dizi.
+       * @tablo diseases (select)
        */
       diseases:     () => db.from('diseases').select('*').order('category').order('name'),
       /**
        * 'drugs' tablosundan tüm sütunları seçip 'name' sütununa göre sıralanmış ilaç listesini döndürür.
        * @returns {Array} İlaç kayıtlarından oluşan dizi.
+       * @tablo drugs (select)
        */
       drugs:        () => db.from('drugs').select('*').order('name'),
       /**
        * 'drug_classes' tablosundan tüm kayıtları seçip 'group_name' sütununa göre sıralanmış bir liste döndürür.
        * @returns {Array} group_name sütununa göre sıralanmış ilaç sınıfları kayıtlarından oluşan dizi.
+       * @tablo drug_classes (select)
        */
       drug_classes: () => db.from('drug_classes').select('*').order('group_name'),
       /**
        * 'drug_products' tablosundan tüm sütunları seçip 'brand_name' sütununa göre sıralanmış veriyi döndürür.
        * @returns {Object} Seçilen ve sıralanmış drug_products verisi.
+       * @tablo drug_products (select)
        */
       drug_products:() => db.from('drug_products').select('*').order('brand_name'),
       /**
        * 'drug_administrations' tablosundan tüm kayıtları seçer.
        * @returns {Object} Seçilen tüm drug_administrations kayıtlarını içeren nesne.
+       * @tablo drug_administrations (select)
        */
       drug_administrations: () => db.from('drug_administrations').select('*'),
       /**
        * 'treatment_days' tablosundan tüm kayıtları seçer.
        * @returns {Array} treatment_days tablosundaki tüm kayıtlardan oluşan dizi.
+       * @tablo treatment_days (select)
        */
       treatment_days: () => db.from('treatment_days').select('*'),
       /**
        * 'treatment_day_uygulamalar' tablosundan tüm kayıtları seçer.
        * @returns {Array} Seçilen tüm kayıtlardan oluşan dizi.
+       * @tablo treatment_day_uygulamalar (select)
        */
       treatment_day_uygulamalar: () => db.from('treatment_day_uygulamalar').select('*'),
       /**
        * 'tohumlama' tablosundan tüm kayıtları seçer.
        * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       * @tablo tohumlama (select)
        */
       tohumlama:    () => db.from('tohumlama').select('*'),
       /**
        * 'vaccines' tablosundan tüm sütunları seçerek kayıtları döndürür.
        * @returns {Array} Vaccine kayıtlarından oluşan dizi.
+       * @tablo vaccines (select)
        */
       vaccines:     () => db.from('vaccines').select('*'),
       /**
        * vaccine_diseases tablosundan tüm kayıtları seçer ve döndürür.
        * @returns {Array} vaccine_diseases tablosundaki tüm kayıtlardan oluşan dizi.
+       * @tablo vaccine_diseases (select)
        */
       vaccine_diseases: () => db.from('vaccine_diseases').select('*'),
       /**
        * 'vaccine_protocol_steps' tablosundan tüm kayıtları seçer ve döndürür.
        * @returns {Array} vaccine_protocol_steps tablosundaki tüm kayıtlardan oluşan dizi.
+       * @tablo vaccine_protocol_steps (select)
        */
       vaccine_protocol_steps: () => db.from('vaccine_protocol_steps').select('*'),
       /**
        * 'vaccination_schedule' tablosundan tüm kayıtları seçer ve döndürür.
        * @returns {Array} vaccination_schedule tablosundaki tüm kayıtlardan oluşan dizi.
+       * @tablo vaccination_schedule (select)
        */
       vaccination_schedule: () => db.from('vaccination_schedule').select('*'),
       vaccination_log: () => db.from('vaccination_log').select('*'),
       /**
        * 'dogum' tablosundan en son 100 kaydı tarih sırasına göre (azalan) seçer.
        * @returns {Object} Seçilen 100 kaydı içeren nesne.
+       * @tablo dogum (select)
        */
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
       /**
        * 'bildirim_log' tablosundan durumu 'bekliyor' olan tüm kayıtları seçer.
        * @returns {Object} Seçilen kayıtlardan oluşan veritabanı sonucu.
+       * @tablo bildirim_log (select)
        */
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
       /**
@@ -660,57 +681,68 @@ async function _pullTablesNow(tables = []) {
       /**
        * 'kizginlik_log' tablosundan tüm kayıtları seçer.
        * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       * @tablo kizginlik_log (select)
        */
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
       /**
        * 'padoklar' tablosundan aktif olan kayıtları sıralı olarak seçer.
        * @returns {Object} Seçilen aktif padok kayıtlarından oluşan nesne.
+       * @tablo padoklar (select)
        */
       padoklar:         () => db.from('padoklar').select('*').eq('aktif', true).order('sira'),
       /**
        * 'grup_padok_eslem' tablosundan tüm kayıtları seçer.
        * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       * @tablo grup_padok_eslem (select)
        */
       grup_padok_eslem: () => db.from('grup_padok_eslem').select('*'),
       /**
        * 'hekimler' tablosundan aktif olan hekimleri seçer.
        * @returns {Array} Aktif hekimlerin kayıtlarından oluşan dizi.
+       * @tablo hekimler (select)
        */
       hekimler:         () => db.from('hekimler').select('*').eq('aktif', true),
       /**
        * Veritabanındaki 'stok_kategorileri' tablosundan tüm kayıtları seçip 'sira' sütununa göre sıralar.
        * @returns {Array} Sıralanmış stok kategori kayıtlarından oluşan dizi.
+       * @tablo stok_kategorileri (select)
        */
       stok_kategorileri:() => db.from('stok_kategorileri').select('*').order('sira'),
       /**
        * 'tedavi_sablonu' tablosundan tüm kayıtları seçip 'ad' sütununa göre sıralanmış bir liste döndürür.
        * @returns {Object} Seçilen ve sıralanmış veri setini içeren obje.
+       * @tablo tedavi_sablonu (select)
        */
       tedavi_sablonu:        () => db.from('tedavi_sablonu').select('*').order('ad'),
       /**
        * 'sablon_hastalik_eslem' tablosundan tüm kayıtları seçer.
        * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       * @tablo sablon_hastalik_eslem (select)
        */
       sablon_hastalik_eslem: () => db.from('sablon_hastalik_eslem').select('*'),
       /**
        * 'tedavi_sablonu_kalem' tablosundan tüm kayıtları seçer.
        * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       * @tablo tedavi_sablonu_kalem (select)
        */
       tedavi_sablonu_kalem:  () => db.from('tedavi_sablonu_kalem').select('*'),
       /**
        * 'protokol_ayar' tablosundan tüm kayıtları seçer.
        * @returns {Array} Seçilen tüm protokol ayar kayıtlarından oluşan dizi.
+       * @tablo protokol_ayar (select)
        */
       protokol_ayar:    () => db.from('protokol_ayar').select('*'),
       // B27: TABLES'ta olup fetcher'ı olmayanlar sessiz no-op'tu — eklendi
       /**
        * 'protokol_instance' tablosundan tüm kayıtları seçer.
        * @returns {Array} Seçilen tüm protokol_instance kayıtlarından oluşan dizi.
+       * @tablo protokol_instance (select)
        */
       protokol_instance: () => db.from('protokol_instance').select('*'),
       /**
        * 'cop_kutusu' tablosundan tüm kayıtları seçer ve döndürür.
        * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       * @tablo cop_kutusu (select)
        */
       cop_kutusu:        () => db.from('cop_kutusu').select('*'),
       // ileri_gebe_view: () => db.from('ileri_gebe_view').select('*'), — dashboard RPC sonucu kullanıyor
@@ -930,6 +962,7 @@ async function getData(table, filterFn) {
  * @param {Array<{planned_time, stok_id, dose, unit, route}>} sessions
  * @param {string|null} existingDayId - treatment_days.id (replace modu)
  * @returns {Promise<{ok, day_id, day_no, seans_sayisi, mesaj?}>}
+ * @rpc add_treatment_day_with_sessions
  */
 async function rpcAddTreatmentDayWithSessions(caseId, date, sessions, existingDayId = null) {
   if (!caseId) throw new Error('caseId zorunlu');
@@ -950,6 +983,7 @@ async function rpcAddTreatmentDayWithSessions(caseId, date, sessions, existingDa
  * @param {boolean} uygulanmadi - true=stok iade, false=uygulandı
  * @param {string|null} not - seans notu (opsiyonel)
  * @returns {Promise<{ok, seans_done, mesaj?}>}
+ * @rpc seans_tamamla
  */
 async function rpcSeansTamamla(seansAdminId, uygulanmadi = false, not = null, pgOnay = false, pgGerekce = null) {
   if (!seansAdminId) throw new Error('seansAdminId zorunlu');
@@ -958,6 +992,7 @@ async function rpcSeansTamamla(seansAdminId, uygulanmadi = false, not = null, pg
    * @param {boolean} onay Seansın onaylanıp onaylanmadığını belirten boolean değer.
    * @param {string} gerekce Onay verilmediğinde veya ek bilgi gerektiğinde sağlanan gerekçe metni.
    * @returns {Promise} RPC çağrısının sonucu döndürür.
+   * @rpc seans_tamamla
    */
   const cagri = (onay, gerekce) => rpc('seans_tamamla', {
     p_seans_admin_id: seansAdminId,
@@ -983,6 +1018,7 @@ async function rpcSeansTamamla(seansAdminId, uygulanmadi = false, not = null, pg
  * @param {string} caseId - cases.id
  * @param {Array<{day_no, tarih, sessions: [...]}>} yeniPlan
  * @returns {Promise<{ok, gun_sayisi, seans_adet, mesaj?}>}
+ * @rpc recete_guncelle
  */
 async function rpcReceteGuncelle(caseId, yeniPlan) {
   if (!caseId) throw new Error('caseId zorunlu');
@@ -1001,6 +1037,7 @@ async function rpcReceteGuncelle(caseId, yeniPlan) {
  * Verilen şifre ile geri alma bileti alma işlemi başlatır.
  * @param {string} sifre Geri alma işlemi için kullanılacak şifre.
  * @returns {Promise} İşlem sonucunu içeren Promise nesnesi.
+ * @rpc geri_alma_bileti_al
  */
 async function rpcGeriAlmaBiletiAl(sifre) {
   return rpc('geri_alma_bileti_al', { p_sifre: sifre });
@@ -1009,6 +1046,7 @@ async function rpcGeriAlmaBiletiAl(sifre) {
  * Verilen filtreye göre değişim listesini getirir.
  * @param {Object} filtre Filtreleme kriterlerini içeren nesne.
  * @returns {Promise} Filtrelenmiş değişim listesini döndüren Promise.
+ * @rpc degisim_listele
  */
 async function rpcDegisimListele(filtre = {}) {
   return rpc('degisim_listele', { p_filtre: filtre || {} });
@@ -1018,6 +1056,7 @@ async function rpcDegisimListele(filtre = {}) {
  * @param {string} hedef Önizleme yapılacak hedef.
  * @param {number} seviye Önizleme yapılacak seviye.
  * @returns {Promise} Değişim önizleme verisini içeren Promise.
+ * @rpc degisim_onizle
  */
 async function rpcDegisimOnizle(hedef, seviye) {
   return rpc('degisim_onizle', { p_hedef: hedef, p_seviye: seviye });
@@ -1029,6 +1068,7 @@ async function rpcDegisimOnizle(hedef, seviye) {
  * @param {string} bilet İşlem için gerekli olan bilet bilgisi.
  * @param {string|null} gerekce İşlem gerekçesi (varsayılan: null).
  * @returns {Promise} İşlem sonucunu içeren Promise nesnesi.
+ * @rpc degisim_geri_al
  */
 async function rpcDegisimGeriAl(hedef, seviye, bilet, gerekce = null) {
   return rpc('degisim_geri_al', { p_hedef: hedef, p_seviye: seviye, p_bilet: bilet, p_gerekce: gerekce || null });
@@ -1039,6 +1079,7 @@ async function rpcDegisimGeriAl(hedef, seviye, bilet, gerekce = null) {
  * @param {string} caseId - cases.id
  * @param {string|null} not - kapatma notu (opsiyonel)
  * @returns {Promise<{ok, kalan_seans_sayisi, iade_edilen_adet, mesaj?}>}
+ * @rpc close_case_with_remaining
  */
 async function rpcCloseCaseWithRemaining(caseId, not = null) {
   if (!caseId) throw new Error('caseId zorunlu');
@@ -1057,6 +1098,7 @@ async function rpcCloseCaseWithRemaining(caseId, not = null) {
  * @param {string[]} gorevIds - gorev_log.id listesi
  * @param {number} gun - kaydırma günü (pozitif tam sayı, tek yönlü ileri)
  * @returns {Promise<{ok, toplam, kaydirilan, atlanan, hatalar, detaylar}>}
+ * @rpc vaka_kalan_gunleri_kaydir_coklu
  */
 async function apiCokluKaydir(gorevIds, gun) {
   if (!Array.isArray(gorevIds) || !gorevIds.length) throw new Error('gorevIds boş olamaz');
