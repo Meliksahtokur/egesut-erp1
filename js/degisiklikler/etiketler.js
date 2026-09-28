@@ -304,6 +304,11 @@ const DG_ONE_CIKAN_ALANLAR = {
   padoklar: ['ad', 'kapasite', 'sira'],
 };
 
+/**
+ * DG_ONE_CIKAN_ALANLAR konfigürasyon objesinde belirtilen tablo için tanımlı sıralama dizisini kopyalar.
+ * @param {string} tablo Konfigürasyon objesinde anahtar olarak kullanılan tablo adı.
+ * @returns {Array} Belirtilen tablo için tanımlı sıralama dizisi veya tanımlı değilse boş dizi.
+ */
 function oneCikanAlanlar(tablo) {
   const sira = Object.prototype.hasOwnProperty.call(DG_ONE_CIKAN_ALANLAR, tablo)
     ? DG_ONE_CIKAN_ALANLAR[tablo] : [];
@@ -313,6 +318,13 @@ function oneCikanAlanlar(tablo) {
 // Alan adlarını öne-çıkan sıraya göre düzenler: önce DG_ONE_CIKAN_ALANLAR[tablo]
 // içindekiler (liste sırasıyla), ardından listede olmayanlar (giriş sırası aynen).
 // Tablo kayıtsa veya eşleşme yoksa giriş sırası DÖNER (yeni dizi).
+/**
+ * Verilen tablodan öncelikli alanları belirleyip, bunları giris dizisinin başına alarak
+ * geri kalan alanları sırayla ekler ve yeni bir dizi döndürür.
+ * @param {Object} tablo Tablo nesnesi.
+ * @param {Array} alanlar Sıralanacak alan isimlerinden oluşan dizi.
+ * @returns {Array} Öncelikli alanlardan oluşan dizi ile geri kalan alanların birleşimi.
+ */
 function dgAlanSirala(tablo, alanlar) {
   const giris = Array.isArray(alanlar) ? alanlar.slice() : [];
   const oncelik = oneCikanAlanlar(tablo);
@@ -323,6 +335,11 @@ function dgAlanSirala(tablo, alanlar) {
   return bastan.concat(kalan);
 }
 
+/**
+ * Boş veya null ise '—' döndürür; aksi takdirde altı çizili karakterleri boşlukla değiştirir, baş harfi büyük yapar (i/ı için İ/I) ve düzeltmiş ismi döndürür.
+ * @param {string} ad - İşlenecek isim stringi.
+ * @returns {string} Düzenlenmiş isim veya '—' placeholder.
+ */
 function _dgInsanlastir(ad) {
   const s = String(ad == null ? '' : ad).replace(/_+/g, ' ').trim();
   if (!s) return '—';
@@ -331,12 +348,23 @@ function _dgInsanlastir(ad) {
   return buyuk + s.slice(1);
 }
 
+/**
+ * Verilen tablo adını DG_TABLO_ETIKETLERI objesinde kontrol eder; varsa etiketi döndürür, yoksa _dgInsanlastir fonksiyonu ile oluşturulmuş etiketi döndürür.
+ * @param {string} tablo Tablonun adı.
+ * @returns {string} Tabloya ait etiket.
+ */
 function tabloEtiketi(tablo) {
   return Object.prototype.hasOwnProperty.call(DG_TABLO_ETIKETLERI, tablo)
     ? DG_TABLO_ETIKETLERI[tablo]
     : _dgInsanlastir(tablo);
 }
 
+/**
+ * Verilen tablo ve alan adı için görüntüleme etiketini döndürür; önce tabloya özel etiketlere, ardından ortak alan etiketlerine bakar, bulamazsa alan adını insan-okur biçime dönüştürür.
+ * @param {string} tablo - Alanın ait olduğu tablonun adı.
+ * @param {string} alan - Etiketi aranacak alanın adı.
+ * @returns {string} Bulunan etiket ya da insanlaştırılmış alan adı.
+ */
 function alanEtiketi(tablo, alan) {
   const ozel = Object.prototype.hasOwnProperty.call(DG_ALAN_ETIKETLERI, tablo) ? DG_ALAN_ETIKETLERI[tablo] : null;
   if (ozel && Object.prototype.hasOwnProperty.call(ozel, alan)) return ozel[alan];
@@ -344,11 +372,22 @@ function alanEtiketi(tablo, alan) {
   return _dgInsanlastir(alan);
 }
 
+/**
+ * DG_ISLEM_ETIKETLERI objesindeki kod için etiketi döndürür; yoksa kodu veya varsayılan '—' değerini string olarak döndürür.
+ * @param {string} kod Aranan etiket kodu.
+ * @returns {string} Bulunan etiket değeri veya kodun kendisi (veya varsayılan değer).
+ */
 function islemEtiketi(kod) {
   return Object.prototype.hasOwnProperty.call(DG_ISLEM_ETIKETLERI, kod) ? DG_ISLEM_ETIKETLERI[kod] : String(kod ?? '—');
 }
 
 // Filtre açılır listesi için sabit sıra: [{kod, etiket}]
+/**
+ * DG_TABLO_ETIKETLERI nesnesindeki tüm etiket kodlarını alıp,
+ * her bir kod için etiket adını ekleyerek bir nesne dizisi oluşturur
+ * ve bu diziyi etiket isimlerine göre Türkçe alfabetik sıraya göre sıralar.
+ * @returns {Array} Kod ve etiket içeren nesnelerden oluşan, etiketlere göre sıralı dizi.
+ */
 function tabloSecenekleri() {
   return Object.keys(DG_TABLO_ETIKETLERI)
     .map(kod => ({ kod, etiket: DG_TABLO_ETIKETLERI[kod] }))
@@ -358,6 +397,10 @@ function tabloSecenekleri() {
 // LUNA-2/A3 kapsam kilidi: haritaları teste açan görünüüm (const'lar sandbox'a
 // kapanmadığından fonksiyon üzerinden verilir). Test:
 // tests/unit/degisiklikler-etiketler.test.js + support/degisiklikler-kapsam-kolonlari.json
+/**
+ * Tablo etiketleri, ortak alanlar ve tablo özel alanları içeren bir nesne döndürür.
+ * @returns {Object} tabloEtiketleri, ortakAlanlar ve tabloOzelAlanlar özelliklerini içeren nesne.
+ */
 function kapsamHaritalari() {
   return {
     tabloEtiketleri: DG_TABLO_ETIKETLERI,

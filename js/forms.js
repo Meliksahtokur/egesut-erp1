@@ -29,8 +29,19 @@
 //   2) geçmiş kullanım → ℹ️ bilgi (dataset.soft=1 — engel değil, recycle mümkün)
 //   3) temiz          → uyarı temizlenir
 // Uyarı elementinde kalan metin + soft bayrağı submit'lerde _kupeUyarisi ile okunur.
+/**
+ * Verilen elemanın metin içeriğinin var olup olmadığını ve soft verisinin '1' olup olmadığını kontrol eder.
+ * @param {HTMLElement} el Kontrol edilecek HTML elemanı.
+ * @returns {boolean} Elemanın textContent özelliği tanımlı ve dataset.soft değeri '1' değilse true döndürür.
+ */
 const _kupeUyarisi = el => el?.textContent && el.dataset.soft !== '1';
 
+/**
+ * Verilen alanın (devlet küpesi veya hayvan küpesi) geçerliliğini kontrol eder,
+ * uyarı mesajını ilgili elemana yazar ve durum bilgisini (soft) günceller.
+ * @param {string} alan Kontrol edilecek alan adı (örn: 'a-kupe', 'a-devlet').
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function _kupeKontrolEt(alan) {
   const deger = v(alan).trim();
   const warnId = alan + '-warn';
@@ -78,6 +89,12 @@ async function _kupeKontrolEt(alan) {
 }
 
 // ── YENİ HAYVAN ─────────────────────────────
+/**
+ * İnternet bağlantısı, küpe çakışmaları ve form geçerliliği kontrollerini yapar;
+ * hayvan kaydı (ekleme) veya güncelleme işlemi gerçekleştirir, UI'yi temizler ve tabloyu yeniler.
+ * @param {HTMLElement} btn Kayıt butonu referansı (opsiyonel).
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda void döner.
+ */
 async function submitAnimal(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
 
@@ -175,6 +192,13 @@ async function submitAnimal(btn) {
 }
 
 // ── DOĞUM ────────────────────────────────────
+/**
+ * Doğum kaydı formunu doğrulayarak (anne, tarih, küpe, cins, ağırlık vb. kontrolleri yaparak)
+ * sunucuya gönderir, başarılı olursa kaydı yapar, ikiz durumu varsa bildirir, formu sıfırlar
+ * ve ilgili tabloları günceller. Hata durumunda kullanıcıya hata mesajı gösterir.
+ * @param {HTMLElement} btn Kayıt butonu (disabled ve metin güncellemesi için).
+ * @returns {Promise<void>} Doğum kaydı işlemi tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function submitBirth(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
 
@@ -249,6 +273,11 @@ async function submitBirth(btn) {
 let _ekUygulamalar = [];
 let _ekSeciliTur = null;
 
+/**
+ * Seçilen ek türünü ayarlar, ilgili çipi aktif hale getirir ve stok satırını görünür kılıp o tür için stok yüklemesini başlatır.
+ * @param {HTMLElement} btn - Tıklanan ek çip butonu; `dataset.tur` özelliğinden seçilen tür alınır.
+ * @returns {void} Döndürülen değer yok.
+ */
 function ekChipSec(btn) {
   _ekSeciliTur = btn.dataset.tur;
   document.querySelectorAll('.ek-chip').forEach(b => b.classList.remove('aktif'));
@@ -257,6 +286,11 @@ function ekChipSec(btn) {
   _ekStokYukle(_ekSeciliTur);
 }
 
+/**
+ * IndexedDB'deki stok kayıtlarını türe göre filtreleyip 'ek-stok-sel' seçim listesini doldurur.
+ * @param {string} tur - Stok kayıtlarını filtrelemek için kullanılan tür adı (ör. 'GnRH', 'PG', 'E Vitamini').
+ * @returns {Promise<void>} Seçim listesi doldurulduğunda tamamlanan promise.
+ */
 async function _ekStokYukle(tur) {
   const tum = await idbGetAll('stok');
   const sel = document.getElementById('ek-stok-sel');
@@ -276,6 +310,12 @@ async function _ekStokYukle(tur) {
     filtreli.map(s => `<option value="${s.id}" data-ad="${esc(s.urun_adi)}" data-birim="${s.birim||'adet'}">${esc(s.urun_adi)} (${s.miktar||0} ${s.birim||'adet'})</option>`).join('');
 }
 
+/**
+ * Ek stok seçimli uygulama ekleme formundaki bilgileri alarak
+ * seçili uygulama türüne göre yeni bir uygulama kaydı oluşturur,
+ * bu kaydı içeren listeye ekler, formu temizler ve seçili türü sıfırlar.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function ekUygulamaEkle() {
   const sel = document.getElementById('ek-stok-sel');
   const doz = parseFloat(document.getElementById('ek-doz').value) || 0;
@@ -296,11 +336,24 @@ function ekUygulamaEkle() {
   _ekSeciliTur = null;
 }
 
+/**
+ * Verilen indeksdeki ek uygulamayı listeden kaldırır ve listeyi günceller.
+ * @param {number} idx Silinecek ek uygulamanın listedeki indeks numarası.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function ekUygulama_sil(idx) {
   _ekUygulamalar.splice(idx, 1);
   _ekListeGoster();
 }
 
+/**
+ * Ek liste elemanlarını (uygulamaları) DOM'a render eder.
+ * Eğer _ekUygulamalar dizisi boşsa, 'ek-liste' elemanını gizler;
+ * değilse elemanı görünür yapar ve her uygulama için bir satır oluşturur.
+ * Her satırda uygulama türü, stok adı (varsa), doz, birim ve yol bilgisi gösterilir.
+ * Ayrıca her satırın sonunda uygulamayı silmek için bir buton bulunur.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _ekListeGoster() {
   const el = document.getElementById('ek-liste');
   if (!_ekUygulamalar.length) { el.style.display = 'none'; return; }
@@ -314,6 +367,11 @@ function _ekListeGoster() {
 }
 
 // ── TOHUMLAMA ────────────────────────────────
+/**
+ * Tohumlama formunu doğrular ve RPC üzerinden tohumlama kaydını oluşturur; VWP ihlali durumunda kullanıcıya override onayı sorar, senkronizasyon vakası kapanış özeti ve başarı bildirimi gösterir, formu temizleyip ilgili tabloları yeniden çeker.
+ * @param {HTMLElement|null} btn - Submit butonu; işlem sırasında devre dışı bırakılır ve metni güncellenir, yoksa bu işlemler atlanır.
+ * @returns {Promise<void>} Kayıt işleminin tamamlanmasını bekleyen promise; değer döndürmez.
+ */
 async function submitInsem(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const hid    = v('i-hid');
@@ -413,6 +471,11 @@ async function submitInsem(btn) {
 }
 
 // ── TEKRAR AŞIM ───────────────────────────────
+/**
+ * Tekrar aşım formunu doğrular, RPC üzerinden kaydeder ve ilgili tabloları yeniler.
+ * @param {HTMLElement|null} btn - Tıklanan buton; kaydetme sırasında devre dışı bırakılıp metni değiştirilir.
+ * @returns {Promise<void>} Kayıt işleminin tamamlanmasını belirten promise.
+ */
 async function submitTekrarAsim(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const hid    = document.getElementById('tr-hid').value;
@@ -444,6 +507,13 @@ async function submitTekrarAsim(btn) {
   } finally { if (btn) { btn.disabled = false; btn.textContent = '🔁 Tekrar Kaydet + Görevleri Güncelle'; } }
 }
 
+/**
+ * Belirtilen hayvan ID ve kupe numarasını kullanarak tekrar asım işlemi için form alanlarını doldurur.
+ * Hayvan ID'sini, kupe numarasını ve tarihi ayarlar, hekim listesini günceller ve sperma seçimlerini temizler.
+ * @param {string} hayvanId - İşlem yapılacak hayvanın ID'si.
+ * @param {string} kupeNo - Kupe numarası.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function openTekrarAsim(hayvanId, kupeNo) {
   document.getElementById('tr-hid').value = hayvanId;
   document.getElementById('tr-kupe-label').textContent = kupeNo;
@@ -464,6 +534,22 @@ function openTekrarAsim(hayvanId, kupeNo) {
 }
 
 // ── KIZGINLIK ────────────────────────────────
+/**
+ * Kızgınlık kayıt formunu doğrular ve sunucudaki kızgınlık kaydını oluşturur.
+ *
+ * Çevrimdışıysa veya zorunlu alanlar (küpe, tarih) eksikse hata bildirimi gösterir;
+ * tarihi bugünden ileri olamaz. Küpe, sürüdeki bir hayvanla eşleştirilir; eşleşme
+ * yoksa kayıt yapılmaz. Kayıt sırasında buton devre dışı bırakılır ve "Kaydediliyor…"
+ * metnine alınır; işlem bitince eski haline döndürülür. Başarıda modal kapatılır,
+ * form alanları temizlenir ve ilgili tablolar yeniden çekilerek ekran güncellenir.
+ * Sunucu, 12 aydan küçük hayvan gibi öneri içeren bir red dönerse öneri mesajla
+ * birlikte kullanıcıya gösterilir.
+ *
+ * @param {HTMLElement|null} btn - Kayıt işlemini tetikleyen buton; işlem sırasında
+ *   devre dışı bırakılıp metni değiştirilir, null olabilir.
+ * @returns {Promise<void>} Kayıt işleminin sonucunu belirten değer döndürmez;
+ *   kullanıcıya toast bildirimleriyle bilgi verilir.
+ */
 async function submitKizginlik(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const hid   = v('k-hid');
@@ -502,16 +588,35 @@ async function submitKizginlik(btn) {
 // ── VAKA AÇ (CLN-02) ────────────────────────
 // cila2 C1 — kısır hayvanda Ovsync hardblock (istemci aynası; DB 000018 fail-closed).
 // OVSYNC ailesi hastalıklarını sablon_hastalik_eslem × tedavi_sablonu'dan çözer.
+/**
+ * Sablonların protokol_ailesi 'OVSYNC' olanlarının id'lerini alarak bir küme oluşturur.
+ * Ardından eslem dizisindeki ve bu id'lerin içinde olan kayıtların disease_id değerlerini filtreleyip döndürür.
+ * @param {Array} eslem Filtrelenmesi istenen kayıtların bulunduğu dizi.
+ * @param {Array} sablonlar Protokol ailesi kontrolü için referans alınacak sablonların bulunduğu dizi.
+ * @returns {Set} disease_id değerlerinden oluşan küme.
+ */
 function _ovsyncAileHastalikIdleri(eslem, sablonlar){
   const ovids = new Set((sablonlar||[]).filter(s=>s && s.protokol_ailesi==='OVSYNC').map(s=>s.id));
   return new Set((eslem||[]).filter(e=>ovids.has(e.sablon_id)).map(e=>e.disease_id));
 }
 // Kısır + OVSYNC-aile hastalığıysa Türkçe sebep, değilse null (pure — unit testli).
+/**
+ * Verilen hayvanın kısır durumu ve diseaseId'nin ovsyncIds içinde olup olmadığını kontrol ederek
+ * ilgili protokol durumu hakkında bilgi döndürür.
+ * @param {Object} hayvan Kontrol edilecek hayvan nesnesi.
+ * @param {string} diseaseId Hastalık ID'si.
+ * @param {Set} ovsyncIds Ovsync protokolü ID'lerinden oluşan bir Set.
+ * @returns {string|null} Hayvan kısır işaretliyse ve diseaseId ovsyncIds içindeyse 'kısır işaretli — Ovsync protokolü açılamaz' stringini, aksi takdirde null döndürür.
+ */
 function _kisirOvsyncNedeni(hayvan, diseaseId, ovsyncIds){
   if(!hayvan || !hayvan.kisir || !diseaseId) return null;
   return (ovsyncIds && ovsyncIds.has(diseaseId))
     ? 'kısır işaretli — Ovsync protokolü açılamaz' : null;
 }
+/**
+ * 'sablon_hastalik_eslem' ve 'tedavi_sablonu' tablosundan verileri okuyup eşlemeyi gerçekleştiren fonksiyon.
+ * @returns {Set} Eşleme işlemi sonucunda oluşturulan hastalık ID'lerinden oluşan Set.
+ */
 async function _ovsyncAileHastalikIdSet(){
   try{
     const eslem = await idbGetAll('sablon_hastalik_eslem');
@@ -524,6 +629,11 @@ async function _ovsyncAileHastalikIdSet(){
 // K6 — yarış-guard: doldurma çağrıları sıralanır; innerHTML'i yalnız EN SON
 // çağrı yazabilir (bayat async doldurma taze seçimi/DOM'u ezmez).
 let _ddFillSeq = 0;
+/**
+ * Hastalık listesini getirir, kızgınlık tedavisi durumu varsa sadece üreme hastalıklarını filtreler,
+ * kısır hayvanlarda OVSYNC ile kilitli hastalıkları engeller ve seçiciye gruplandırılmış seçenekleri ekler.
+ * @returns {Promise<void>}
+ */
 async function loadDiseasesDropdown() {
   const sel = g('d-disease-id');
   if (!sel) return;
@@ -592,6 +702,10 @@ async function loadDiseasesDropdown() {
   }
 }
 
+/**
+ * Hastalık seçim listesindeki seçime göre kategori etiketini günceller ve şablon seçimini yeniden oluşturur.
+ * @returns {Promise<void>} Şablon seçimi oluşturulduktan sonra çözülen bir Promise.
+ */
 async function onDiseaseSelect() {
   const sel = g('d-disease-id');
   const catEl = g('d-disease-cat');
@@ -609,6 +723,13 @@ async function onDiseaseSelect() {
 // G-20260906-TOPLU-VAKA: container-parametrize edildi — varsayılan argümanlar
 // m-disease çağrısını birebir korur (blok: <prefix>-sablon-blok, radio adı:
 // <prefix>-sablon, seçim hedefi: d→_seciliSablonId / bc→_bcSeciliSablonId).
+/**
+ * Belirtilen hastalık ID'si için tedavi şablonlarını listeler ve kullanıcı seçimini kaydeden bir render fonksiyonu.
+ * @param {string} diseaseId Seçilecek hastalığın ID'si.
+ * @param {string} containerId Şablon listesinin yerleştirileceği DOM elementinin ID'si (varsayılan: 'd-sablon-list').
+ * @param {string} prefix Konteyner ve değişken ön ekleri için kullanılan prefix (varsayılan: 'd').
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix='d'){
   const blok = g(prefix+'-sablon-blok'); const list = g(containerId);
   if(prefix==='bc') globalThis._bcSeciliSablonId = null;
@@ -648,6 +769,13 @@ async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix
   });
 }
 
+/**
+ * İnternet bağlantısı, hayvan ve hastalık seçimi doğrulanarak yeni bir vaka oluşturur.
+ * Kısırlık ve OVSYNC hastalığı kısıtlamalarını kontrol eder, varsa şablon uygular,
+ * kızgınlık tedavi bağlantısı kurar ve ilgili tabloları günceller.
+ * @param {HTMLElement} btn Tıklanan buton (opsiyonel).
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function submitCase(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const hid       = v('d-hid');
@@ -736,11 +864,22 @@ async function submitCase(btn) {
 //     yazılır (draft değil). Detay: plan bölümü başındaki sözleşme.
 //   globalThis._bcAktifGunCard → number|null (açık gün kartı)
 //   globalThis._bcSeansFormGun → number|null (açık '＋ seans ekle' formu)
+/**
+ * Verilen nesenden 'kupe_no', 'devlet_kupe' veya 'id' alanlarından ilk bulunanı döndürür.
+ * @param {Object} h Nesne.
+ * @returns {string|null} Bulunan değer veya null.
+ */
 function _bcKupeGoster(h){ return h.kupe_no || h.devlet_kupe || h.id; }
 
 // m-bulk-case açılış yükleyicisi — openM hook'u ve 'open-bulk-case' aksiyonu çağırır.
 // Hastalık dropdown'u loadDiseasesDropdown ile aynı kaynaktan gruplanır; kızgınlık
 // üreme-filtresi (globalThis._kizginlikTedaviId) TOPLU akışa sızdırılmaz.
+/**
+ * Bulk case form sayfasını sıfırlar, gün kartlarını ve seans formlarını başlatır,
+ * şablon alanlarını gizler, varsayılan tarih/saat ayarlarını yapar, ilaç önbelleğini yükler,
+ * hastalık listesini kategoriye göre gruplayarak dropdown menüsüne doldurur.
+ * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
+ */
 async function loadBulkCaseForm(){
   globalThis._bcHayvanlar = [];
   globalThis._bcSeciliSablonId = null;
@@ -799,6 +938,10 @@ async function loadBulkCaseForm(){
 }
 
 // m-bulk-case hastalık seçimi — onDiseaseSelect aynası (bc konteynerleri, bc şablon state'i)
+/**
+ * Seçilen hastalık kaydının kategori bilgisini gösterir veya gizler ve ilgili şablon listesini yeniden oluşturur.
+ * @returns {Promise<void>} Şablon seçimi oluşturulduktan sonra tamamlanan promise.
+ */
 async function bcDiseaseSelect() {
   const sel = g('bc-disease-id');
   const catEl = g('bc-disease-cat');
@@ -815,6 +958,11 @@ async function bcDiseaseSelect() {
 // Chip mekaniği — _bcHayvanlar id bazlı dedupe'lu, sıra korunur
 // V1.2: cinsiyet/dogum_tarihi/durum da taşınır — tohumlama uygunluk ön-kontrolü
 // (bcTohumUygunOlmayanlar) ve blok görünürlüğü bu alanlardan okur.
+/**
+ * Kimliği olan hayvanı küpe bilgisiyle birlikte global hayvan listesine ekler; kimlik yoksa veya hayvan zaten listede varsa eklemez.
+ * @param {Object} hayvan - Eklenecek hayvan kaydı.
+ * @returns {boolean} Hayvan başarıyla eklendiyse true, kimlik yoksa veya zaten listede varsa false.
+ */
 function bcChipEkle(hayvan){
   if(!hayvan?.id) return false;
   globalThis._bcHayvanlar = globalThis._bcHayvanlar || [];
@@ -830,10 +978,19 @@ function bcChipEkle(hayvan){
   bcChipsRender();
   return true;
 }
+/**
+ * Belirtilen ID'ye sahip hayvanı listeden çıkarır ve arayüzü günceller.
+ * @param {number} id Çıkarılacak hayvanın benzersiz kimlik numarası.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function bcChipCikar(id){
   globalThis._bcHayvanlar = (globalThis._bcHayvanlar||[]).filter(x=>x.id!==id);
   bcChipsRender();
 }
+/**
+ * 'bc-chips' kutusunu güncel hayvan listesine göre render eder, sayacı günceller ve tohumlama bloğunun durumunu (aktif/devre dışı) ayarlar.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcChipsRender(){
   const kutu = g('bc-chips');
   const sayac = g('bc-sayac');
@@ -866,11 +1023,22 @@ function bcChipsRender(){
 }
 
 // Yapıştırma kutusu → token listesi (satır/virgül/noktalı virgül, trim, boş at, dedupe)
+/**
+ * Metin parametresindeki satır, virgül ve noktalı virgül karakterleriyle ayrılmış,
+ * boşlukları temizlenmiş ve boş olan öğeleri filtrelenmiş benzersiz değerleri döndürür.
+ * @param {string} metin İşlenecek metin stringi.
+ * @returns {string[]} Temizlenmiş ve benzersiz metin parçalarından oluşan dizi.
+ */
 function bcKupeParse(metin){
   return [...new Set(String(metin||'').split(/[\n,;]+/).map(t=>t.trim()).filter(Boolean))];
 }
 // Toplu çözümleme: her token hayvanByKupeRef ile çözülür (K7: aktif öncelikli),
 // bulunan chip'e düşer, bulunamayan kırmızı listede. Tümü çözülürse kutu temizlenir.
+/**
+ * Yapıştırma kutusundan okunan tokenleri işleyerek ilgili hayvanları sisteme ekler.
+ * Tokenler parse edilir, bulunanlar hayvan listesi eklenir, bulunamayanlar hata kutusuna yazdırılır.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcYapistirCoz(){
   const kutu = g('bc-yapistir');
   const hataKutu = g('bc-bulunamayan');
@@ -913,6 +1081,11 @@ function bcYapistirCoz(){
 
 // YYYY-MM-DD → Date.UTC gün sayısı (TZ-safe; new Date(string) KULLANMA —
 // yerel saat dilimi kaydırması 365 gün sınırını 1 güne kaydırabilir).
+/**
+ * Verilen tarih stringini (YYYY-MM-DD formatında) alıp Unix zaman dilimindeki UTC gün sayısına dönüştürür.
+ * @param {string} t Tarih stringi (YYYY-MM-DD formatında).
+ * @returns {number|null} Hesaplanmış UTC gün sayısı veya geçersiz giriş için null.
+ */
 function _bcUtcGun(t){
   const p = String(t || '').split('-').map(Number);
   if(p.length !== 3 || p.some(x => !Number.isFinite(x))) return null;
@@ -921,6 +1094,12 @@ function _bcUtcGun(t){
 
 // Geçmiş plan tarihi mi? YYYY-MM-DD string karşılaştırması yeterli (sıralı biçim).
 // Boş/null → false: doğrulama yok, NULL=bugün kararı sunucunun.
+/**
+ * Verilen tarih stringini bugünün tarih stringi ile karşılaştırarak geçmiş plan tarihini kontrol eder.
+ * @param {string} tarihStr - Karşılaştırılacak tarih stringi.
+ * @param {string} bugunStr - Bugünün tarih stringi.
+ * @returns {boolean} Geçmiş tarih ise true, yoksa false döndürür.
+ */
 function bcGecmisPlanTarihiMi(tarihStr, bugunStr){
   if(!tarihStr) return false;
   return String(tarihStr) < String(bugunStr);
@@ -962,6 +1141,11 @@ function bcTohumHedefTarih(tarihStr, gun){
 //   disabled-bos   → seçim yok; 'Hayvan seçince aktifleşir'
 //   disabled-erkek → tümü Erkek; kırmızı uyarı, hâlâ disabled
 //   aktif          → orijinal uygunluk ipucu, tam opaklık
+/**
+ * Verilen hayvan listesine göre tohumlama bloğunun durumunu ve ilgili ipuçlarını belirler.
+ * @param {Array} hayvanlar Kontrol edilecek hayvan kayıtlarından oluşan dizi.
+ * @returns {Object} Durum kodunu ('disabled-bos', 'disabled-erkek', 'aktif') ve açıklama ipucunu içeren nesne.
+ */
 function bcTohumBlokDurumu(hayvanlar){
   const liste = hayvanlar || [];
   if(!liste.length) return { mod: 'disabled-bos', ipucu: 'Hayvan seçince aktifleşir' };
@@ -1002,6 +1186,11 @@ function bcTarihIpucuGuncelle(){
 // 'YYYY-MM-DD' → 'DD.MM.YYYY' (SAF — toLocaleString/new Date YOK; yerelden
 // bağımsız string dilimleme). Biçim dışı / ay 01-12 veya gün 01-31 dışı → ''
 // (bugün fallback YOK — boş alan placeholder gösterir).
+/**
+ * ISO 8601 formatındaki tarih stringini (YYYY-MM-DD) Türkçe tarih formatına (GG.AY.YYYY) dönüştürür.
+ * @param {string} iso ISO 8601 formatında bir tarih stringi (örn: "2023-10-05").
+ * @returns {string} Türkçe formatında tarih stringi (örn: "05.10.2023") veya geçersiz giriş için boş string.
+ */
 function bcIsoTrGoster(iso){
   const s = String(iso || '');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
@@ -1013,6 +1202,12 @@ function bcIsoTrGoster(iso){
 
 // 'DD.MM.YYYY' → 'YYYY-MM-DD' (SAF — bcIsoTrGoster'in yuvarlama çifti).
 // Biçim dışı / aralık dışı → ''.
+/**
+ * "GG.AA.YYYY" formatında bir tarih stringini alır ve "YYYY-MM-DD" formatına dönüştürür.
+ * Geçersiz tarih formatı veya mantıksal olarak hatalı tarihler (örneğin 32. gün) için boş string döndürür.
+ * @param {string} tr "GG.AA.YYYY" formatında bir tarih stringi.
+ * @returns {string} "YYYY-MM-DD" formatında geçerli bir tarih stringi veya boş string.
+ */
 function bcTrGosterIso(tr){
   const s = String(tr || '').trim();
   const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
@@ -1024,6 +1219,10 @@ function bcTrGosterIso(tr){
 
 // Kanonik ISO okuma — m-bulk-case tarih tüketicilerinin TEK kaynağı:
 // bcTarihIpucuGuncelle / bcPlanRender / _bcTkBaslangic / submitBulkCase.
+/**
+ * Global `_bcTarihIso` değişkeninin geçerli bir ISO 8601 tarih formatı (YYYY-MM-DD) olup olmadığını kontrol eder ve geçerli ise tarihi döndürür, değilse boş string döndürür.
+ * @returns {string} Geçerli bir tarih stringi veya boş string.
+ */
 function bcTarihDeger(){
   const iso = globalThis._bcTarihIso;
   return (typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)) ? iso : '';
@@ -1033,6 +1232,12 @@ function bcTarihDeger(){
 // kanonik ISO AYNI ANDA yazılır; geçersiz/boş ISO → etiket '📅 Tarih seç' +
 // kanonik boş (yarım durum imkânsız). İpucu/plan tazeleme çağıranın işi
 // (tek sorumluluk).
+/**
+ * ISO 8601 tarih formatındaki bir stringi alır, gösterim formatına dönüştürür ve
+ * sayfa üzerindeki 'bc-tarih' elementini günceller.
+ * @param {string} iso ISO 8601 formatında bir tarih stringi.
+ * @returns {void}
+ */
 function bcTarihYaz(iso){
   const gosterim = bcIsoTrGoster(iso);
   globalThis._bcTarihIso = gosterim ? String(iso) : '';
@@ -1047,6 +1252,15 @@ function bcTarihYaz(iso){
 // toggle YOK). Sınırlar: min = bugun, maks = bugun+365 (başlangıç bir yıldan
 // ileri planlanamaz). Red: { ok:false, secim: dokunulmamış, mesaj } — UI toast.
 // UTC aritmetik (_bcUtcGun) — yerel saat dilimi sınırı 1 güne kaydıramaz.
+/**
+ * Verilen seçim, ISO tarih ve bugün tarihi parametrelerini alarak tarih geçerliliğini kontrol eder.
+ * Bugün tarihi hesaplanamazsa, tarih geçersizse, geçmiş tarih seçilirse veya 365 gün ötesi tarih seçilirse hata döner.
+ * Aksi takdirde seçilen tarihi string olarak döndürür.
+ * @param {any} secim Seçim değeri.
+ * @param {string} tarihISO ISO formatında tarih stringi.
+ * @param {string} bugunStr Bugünün ISO formatındaki tarih stringi.
+ * @returns {Object} İşlem sonucu içeren {ok, secim, mesaj} objesi.
+ */
 function bcTarihSecimEkle(secim, tarihISO, bugunStr){
   const bugunGun = _bcUtcGun(bugunStr);
   const isoGun = _bcUtcGun(tarihISO);
@@ -1061,6 +1275,10 @@ function bcTarihSecimEkle(secim, tarihISO, bugunStr){
 }
 
 // HIZLI_SAATLER çipleri (config.js) — ek-chip deseni, bc-tohum-saat'i doldurur.
+/**
+ * 'bc-tohum-saat-chips' seçili kutuya hızlı saat seçeneklerini (veya varsayılan saatleri) içeren butonlar oluşturarak ekler.
+ * @returns {void}
+ */
 function bcTohumSaatChipsRender(){
   const kutu = g('bc-tohum-saat-chips');
   if(!kutu) return;
@@ -1106,6 +1324,13 @@ function bcTohumSaatChipsRender(){
 // Gün № düzenleme doğrulaması: tam sayı 1..31 + mevcut başka günle
 // çakışmama (gi = düzenlenen günün index'i — kendisiyle çakışma sayılmaz).
 // Başarısızlık mesajları builder diliyle birebir: aralık + teklik.
+/**
+ * Belirtilen gün numarası (1-31 arası tam sayı) için kontrol yapar ve aynı gün içinde başka bir seans olup olmadığını doğrular.
+ * @param {Array} gunler Kontrol edilecek seansların bulunduğu dizi.
+ * @param {number} gi Kontrol edilecek seansın dizi içindeki indeks.
+ * @param {number} yeniGun Kontrol edilecek yeni gün numarası.
+ * @returns {Object} { ok: boolean, mesaj: string|null } içeren bir nesne.
+ */
 function bcGunNoKontrol(gunler, gi, yeniGun){
   const n = Number(yeniGun);
   if(!Number.isInteger(n) || n < 1 || n > 31) return { ok: false, mesaj: 'Gün 1-31 aralığında bir tam sayı olmalı' };
@@ -1122,6 +1347,13 @@ function bcGunNoKontrol(gunler, gi, yeniGun){
 // tekrarlı, herhangi hedef 1..31 dışı veya ondalık (bcGunNoKontrol aralığı).
 // Boş seanslı kaynak da kopyalanır (saf semantiği total; boş-kaynak UI
 // politikası bcGunKopyalaUygula'da).
+/**
+ * Kaynak günde tanımlı seansları, verilen hedef gün(ler)e kopyalar; hedef günün mevcut kaydını güncelleyip olmayan günleri yeni kayıt olarak ekler.
+ * @param {Array} gunler - Her elemanı { gun, seanslar } biçiminde olan gün kayıtları dizisi.
+ * @param {number} kaynakGun - Seansların kopyalanacağı kaynak gün numarası.
+ * @param {Array} hedefler - Seansların kopyalanacağı hedef gün numaralarının dizisi.
+ * @returns {Object|null} Başarılıysa { gunler, degisti, olusturuldu } nesnesini; geçersiz girdi durumunda null döndürür.
+ */
 function bcGunKopyalaCoklu(gunler, kaynakGun, hedefler){
   const liste = gunler || [];
   const src = liste.find(g => g.gun === kaynakGun);
@@ -1143,6 +1375,13 @@ function bcGunKopyalaCoklu(gunler, kaynakGun, hedefler){
 // artık bcGunKopyalaCoklu çekirdeğine TEK-ELEMANLI delege olur (bilinçli
 // V2.2.1 adaptasyonu: iç şekil {gunler, degisti, olusturuldu} → dış boolean;
 // '📋 Önceki günden' menü yolu dahil tüm kopyalamalar tek çekirdekte).
+/**
+ * Verilen gün listesindeki kayıtları, kaynak günden hedef güne kopyalar ve sonucu döndürür.
+ * @param {Array} gunler Kopyalanacak kayıtların bulunduğu gün listesi.
+ * @param {string} kaynakGun Kaynak olarak alınacak gün.
+ * @param {string} hedefGun Kayıtların kopyalanacağı hedef gün.
+ * @returns {Object|null} Kopyalama işlemi başarılıysa { gunler, olusturuldu } içeren nesne, başarısızysa null.
+ */
 function bcGunKopyala(gunler, kaynakGun, hedefGun){
   const r = bcGunKopyalaCoklu(gunler, kaynakGun, [hedefGun]);
   if(!r) return null;
@@ -1153,6 +1392,13 @@ function bcGunKopyala(gunler, kaynakGun, hedefGun){
 // göre gün numaralarına çevirir. Başlangıçtan ÖNCEKİ tarihler
 // filtrelenir; dedupe + ASC; gün = UTC gün farkı + 1. Başlangıç
 // geçersizse [] (TZ-safe aritmetik — _bcUtcGun ile, new Date(string) yok).
+/**
+ * Verilen tarih dizisinden, başlangıç tarihinden (veya o tarihten sonra) gelen ve benzersiz günleri alır.
+ * Başlangıç tarihi geçersizse boş dizi döndürür.
+ * @param {Array} dates İşlenecek tarih dizisi.
+ * @param {string} startDateStr Başlangıç tarihi için string formatındaki değer.
+ * @returns {Array} Başlangıç tarihinden itibaren geçen gün sayılarını içeren dizi.
+ */
 function bcTakvimdenGunler(dates, startDateStr){
   const bas = _bcUtcGun(startDateStr);
   if(bas === null) return [];
@@ -1177,6 +1423,10 @@ function _bcGunTarihEtiketi(gun, tarihStr){
 
 // Planı bc-plan-gunler'e çizer. Başlık tarihleri bc-tarih'ten HESAPLANIR
 // (Gün N = tarih + N−1) — tarih veya gün № her değiştiğinde yeniden çizilir.
+/**
+ * 'bc-plan-gunler' kutusunu alıp içine gün kartlarını oluşturarak yerleştirir, etiket butonunu günceller ve şablon özetini canlıya alır.
+ * @returns {void} Hiçbir değer döndürmez.
+ */
 function bcPlanRender(){
   const kutu = g('bc-plan-gunler');
   if(!kutu) return;
@@ -1193,6 +1443,12 @@ function bcPlanRender(){
 // katlı '＋ Bu güne seans ekle' formu ve V2.2.1 ÇOKLU kopyalama alanı
 // (bc-gkopya-toggle başlığı → bc-gkopya-alan-<gun>: diğer günlere
 // .ek-chip işaret çipleri + '+№ ekle' + ✅ Uygula).
+/**
+ * Belirtilen gün numarasına ait kart HTML'ini oluşturur. Günün aktif olup olmadığını kontrol eder, seans ve ilaç sayılarını hesaplar, seans ekleme ve gün kopyalama arayüzünü oluşturur.
+ * @param {Object} gn Gün bilgilerini içeren nesne (gun, seanslar vb. özelliklere sahip).
+ * @param {string} tarihStr Tarih etiketi için kullanılacak string.
+ * @returns {string} Gün kartının HTML yapısını içeren string.
+ */
 function _bcGunKartiHtml(gn, tarihStr){
   const gun = gn.gun;
   const seanslar = gn.seanslar || [];
@@ -1236,6 +1492,11 @@ function _bcGunKartiHtml(gn, tarihStr){
 // V2.2.1 — çoklu kopyalama hedef çipleri: KAYNAK DIŞI her mevcut gün için
 // bir .ek-chip (HIZLI_SAATLER çip dili; işaret = .aktif, bc-gun-kopya-chip
 // delege toggle'ı). '+№ ekle' yeni çipleri bu kapsayıcıya ekler.
+/**
+ * Verilen gün adını içeren kayıtları filtreleyip, kalan kayıtlar için kopyalama butonları oluşturan HTML string'i döndürür.
+ * @param {string} gun Filtreleme işlemi için kullanılacak gün adı.
+ * @returns {string} Kopyalama butonlarının HTML kodundan oluşan string.
+ */
 function _bcKopyaChipsHtml(gun){
   return (globalThis._bcGunler || [])
     .filter(g => g.gun !== gun)
@@ -1246,6 +1507,13 @@ function _bcKopyaChipsHtml(gun){
 // Bir günün seans blokları — '⏰ Seans · SS:DD' başlığı + 🗑 seans; kalem
 // satırları '💊 <ad> <doz> <birim> · <yol> 🗑'. Aynı ilaç farklı seanslarda
 // (farklı saat) GEÇERLİ — saat-grup dilinin özü.
+/**
+ * Belirtilen gün için seansları ve her seansın ilaçlarını HTML div yapısında listeler.
+ * Her seans için saat bilgisi, seansı silme butonu ve varsa ilaçların detayları (ad, doz, birim, uygulama yolu) gösterilir.
+ * İlaç bulunmayan seanslar için uyarı mesajı gösterilir.
+ * @param {Object} gn Gün bilgisi ve seanslar dizisi içeren nesne.
+ * @returns {string} Seanslar ve ilaçları içeren HTML string.
+ */
 function _bcSeansHtml(gn){
   const gun = gn.gun;
   return (gn.seanslar || []).map((s, si) => `
@@ -1268,6 +1536,11 @@ function _bcSeansHtml(gn){
 // listesini + başlık sayacını günceller — açık seans formunun draft'ı
 // (işaretli kutular + doz girişleri) KORUNUR, yalnız saat sıfırlanır
 // (seans A → saat değiştir → seans B akışı).
+/**
+ * Belirtilen günün seanslarını bulup ilgili kutuya HTML içeriği yerleştirir ve seans sayısını ile ilaç sayısını gösterir.
+ * @param {string} gun İşlem yapılacak gün adı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _bcSeanslariCiz(gun){
   const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
   const kutu = g('bc-gseanslar-' + gun);
@@ -1282,6 +1555,11 @@ function _bcSeanslariCiz(gun){
 // Katlı '＋ seans ekle' formu — sablonSeansAc/caseSeansEkleFormAc dili:
 // saat girişi (varsayılan 09:00) + HIZLI_SAATLER çipleri + gruplu ilaç
 // checkbox listesi + doz satırları + [Seansı Ekle]/Vazgeç.
+/**
+ * Belirtilen gün için saat seçimi, ilaç grupları ve doz girişi içeren bir seans formu HTML yapısı döndürür.
+ * @param {string} gun Seçilecek seansın tarihi.
+ * @returns {string} Seans formunu oluşturan HTML string.
+ */
 function _bcSeansFormHtml(gun){
   const saatler = (typeof HIZLI_SAATLER !== 'undefined' && HIZLI_SAATLER) || ['08:00', '16:00', '20:00'];
   const chips = saatler.map(t => `<button type="button" class="ek-chip" data-action="bc-saat-chip" data-t="${t}">${t}</button>`).join('');
@@ -1307,6 +1585,12 @@ function _bcSeansFormHtml(gun){
 // Seans formunun gruplu ilaç listesi — bcIlacListesiRender dilinin
 // (caseDrugFormAc aynası) seans formu uyarlaması: bc-schk checkbox'ları,
 // stok renkli kalan, etken madde satırı.
+/**
+ * İlaç önbelleğindeki ilaçları isimlerine göre alfabetik sıralayarak gruplar halinde HTML etiketleri döndürür.
+ * Her grup başlığı altında, stok durumu (guncel) ve birim bilgisi içeren checkbox'lı ilaç satırlarını oluşturur.
+ * Stok durumu kırmızı (<=0), turuncu (<=10) veya yeşil (>10) olarak renklendirilir; stok yoksa gri yazılır.
+ * @returns {string} Gruplanmış ilaç satırlarından oluşan HTML string'i veya stok yoksa gösterilecek mesaj.
+ */
 function _bcSeansDrugGruplariHtml(){
   const cache = _drugsCache || [];
   const groups = {};
@@ -1334,10 +1618,18 @@ function _bcSeansDrugGruplariHtml(){
 
 // ═══ V2.1 [+ Gün ▾] MENÜSÜ ═══
 
+/**
+ * 'bc-gun-ekle-menu' ID'li menü elemanını bulup, mevcut görünüm durumunu tersine çevirerek (görünürse gizler, gizliyse gösterir) günceller.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcGunEkleMenuToggle(){
   const menu = g('bc-gun-ekle-menu');
   if(menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
 }
+/**
+ * 'bc-gun-ekle-menu' ID'li menü elemanını bulup varsa ekran dışına çıkarır.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcGunEkleMenuKapat(){
   const menu = g('bc-gun-ekle-menu');
   if(menu) menu.style.display = 'none';
@@ -1351,6 +1643,10 @@ function bcGunEkleMenuKapat(){
 // (sahip kararı P3). V2.3 (W18): tohumlama kutusu işaretliyse tohumlama
 // planı da ŞABLONA kaydedilir (bcSablonTohumPayload).
 
+/**
+ * 'bc-sablon-kaydet-alan' elementini gösterir veya gizler; gösteriliyorsa hazırlama fonksiyonunu çağırır.
+ * @returns {void}
+ */
 function bcSablonKaydetToggle(){
   const alan = g('bc-sablon-kaydet-alan');
   if(!alan) return;
@@ -1358,6 +1654,10 @@ function bcSablonKaydetToggle(){
   alan.style.display = aciliyor ? 'block' : 'none';
   if(aciliyor) bcSablonKaydetHazirla();
 }
+/**
+ * 'bc-sablon-kaydet-alan' kimlikli alanı gizleyerek şablon kaydetme penceresini kapatır.
+ * @returns {void} Değer döndürmez.
+ */
 function bcSablonKaydetKapat(){
   const alan = g('bc-sablon-kaydet-alan');
   if(alan) alan.style.display = 'none';
@@ -1365,6 +1665,11 @@ function bcSablonKaydetKapat(){
 
 // Form açılışında placeholder + özet: placeholder '<HastalıkAdı> — N gün'
 // (hastalık seçiliyken); özet satırı bcSablonOzetMetni canlı değeri.
+/**
+ * Kayıt formundaki hastalık seçeneğinden (varsa) metin ve gün sayısı bilgisi alarak
+ * şablon adı placeholder'ını günceller ve özet güncelleme fonksiyonunu tetikler.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcSablonKaydetHazirla(){
   const adEl = g('bc-sablon-kaydet-ad');
   if(adEl){
@@ -1380,6 +1685,11 @@ function bcSablonKaydetHazirla(){
 
 // Özet satırı tazeleme — plan her değiştiğinde (bcPlanRender) form açıksa
 // canlı kalır.
+/**
+ * 'bc-sablon-kaydet-alan' alanı görünürse 'bc-sablon-kaydet-ozet' elementine
+ * globalThis._bcGunler dizisinden oluşturulan özet metnini ayarlar.
+ * @returns {void}
+ */
 function bcSablonKaydetOzetGuncelle(){
   const alan = g('bc-sablon-kaydet-alan');
   if(!alan || alan.style.display !== 'block') return;
@@ -1387,6 +1697,12 @@ function bcSablonKaydetOzetGuncelle(){
   if(ozet) ozet.textContent = bcSablonOzetMetni(globalThis._bcGunler || []);
 }
 
+/**
+ * Hastalık seçimi, şablon adı ve seans kalemleri doğrulandıktan sonra toplu vaka planından şablon kaydedilir.
+ * Tohumlama planı (eğer işaretliyse) ve plan offset bilgisi payload'a eklenir.
+ * Kayıt başarılı olduğunda ilgili tablolara pull işlemi yapılır ve şablon listesi yenilenir.
+ * @returns {Promise<void>} Şablon kaydedilme işlemi tamamlandığında veya hata oluştuğunda Promise.
+ */
 async function bcSablonKaydet(){
   const diseaseId = v('bc-disease-id');
   if(!diseaseId){ toast('⚠️ Önce hastalık seçin', true); return; }
@@ -1441,6 +1757,10 @@ async function bcSablonKaydet(){
 // (hızlı uygulama) DOKUNULMAZ kalır; bu alan AYRI bir geri çağırma yolu —
 // sahibin 'şablon geri çağırma akışı' geri bildirimine cevap.
 
+/**
+ * Şablon yükleme alanını açıp kapatır; açılıyorsa şablon listesini yeniden oluşturur.
+ * @returns {void}
+ */
 function bcSablonYukleToggle(){
   const alan = g('bc-sablon-yukle-alan');
   if(!alan) return;
@@ -1448,6 +1768,10 @@ function bcSablonYukleToggle(){
   alan.style.display = aciliyor ? 'block' : 'none';
   if(aciliyor) bcSablonYukleListeRender();
 }
+/**
+ * 'bc-sablon-yukle-alan' ID'li alanı bulup varsa görünürliğini gizler.
+ * @returns {void} Hiçbir değer döndürmez.
+ */
 function bcSablonYukleKapat(){
   const alan = g('bc-sablon-yukle-alan');
   if(alan) alan.style.display = 'none';
@@ -1456,6 +1780,10 @@ function bcSablonYukleKapat(){
 // Seçili hastalığa bağlı şablonları listeler — _renderSablonSecim veri
 // kaynağının aynısı (sablon_hastalik_eslem + tedavi_sablonu +
 // tedavi_sablonu_kalem, IndexedDB); satır: ad + 'N gün · M seans' + [Yükle].
+/**
+ * Seçili hastalığa bağlı tedavi şablonlarını IndexedDB'den çekip liste alanına gün, seans ve tohumlama bilgileriyle birlikte render eder; hastalık seçilmemişse ya da eşleşen şablon yoksa uygun bilgilendirme mesajı gösterir.
+ * @returns {Promise<void>} Liste HTML'i oluşturulduktan sonra çözülen promise.
+ */
 async function bcSablonYukleListeRender(){
   const list = g('bc-sablon-yukle-list');
   if(!list) return;
@@ -1486,12 +1814,21 @@ async function bcSablonYukleListeRender(){
 
 // [Yükle]: editörde kalem varsa ÖNCE onay (openConfirm, radyosuz — mevcut
 // planın üzerine yazma uyarısı), sonra uygula; kalem yoksa doğrudan.
+/**
+ * Belirtilen kimliğe sahip tedavi şablonunu IndexedDB'den yükler; editörde ilaç içeren seanslar varsa kullanıcıya onay sorarak mevcut planın üzerine yazar, yoksa doğrudan uygular.
+ * @param {string|number} sablonId - Yüklenecek tedavi şablonunun kimliği. Boşsa hiçbir işlem yapılmaz.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise; şablon bulunamazsa kullanıcıya uyarı gösterir ve hiçbir şey uygulamaz.
+ */
 async function bcSablonYukle(sablonId){
   if(!sablonId) return;
   const sablon = (await idbGetAll('tedavi_sablonu')).find(s => s.id === sablonId);
   if(!sablon){ toast('⚠️ Şablon bulunamadı', true); return; }
   const kalemler = (await idbGetAll('tedavi_sablonu_kalem')).filter(k => k.sablon_id === sablonId);
   const kalemVar = (globalThis._bcGunler || []).some(gn => (gn.seanslar || []).some(se => Object.keys(se.ilaclar || {}).length > 0));
+  /**
+   * Şablonu kalemlerle birlikte yükleyip uygulayan fonksiyonu çalıştırır.
+   * @returns {*} Şablon yükleme ve uygulama işleminin sonucu.
+   */
   const uygula = () => bcSablonYukleUygula(sablon, kalemler);
   if(kalemVar){
     openConfirm('⚠️ Mevcut plan değiştirilecek',
@@ -1506,6 +1843,13 @@ async function bcSablonYukle(sablonId){
 // alanlarını şablondan ayarla; şablon radyosunu 'Şablonsuz'a çek (gönderim
 // p_items yolu — karşılıklı dışlama); planı yeniden çiz. Boş şablon
 // (yalnız tohumlama / kalemsiz) tek boş gün-1 kartıyla açılır.
+/**
+ * Verilen şablonu işleyerek plan oluşturur, global değişkenleri günceller,
+ * tohumlama ayarlarını uygular ve şablonu uygular.
+ * @param {Object} sablon İşlenecek şablon nesnesi.
+ * @param {Array} kalemler Şablona eklenecek kalemler dizisi.
+ * @returns {void}
+ */
 async function bcSablonYukleUygula(sablon, kalemler){
   const plan = bcSablondenPlan(Object.assign({}, sablon, { kalemler }), _drugsCache || []);
   globalThis._bcGunler = plan.gunler.length ? plan.gunler : [{ gun: 1, seanslar: [] }];
@@ -1527,6 +1871,11 @@ async function bcSablonYukleUygula(sablon, kalemler){
 }
 
 // ＋ Boş gün: sıradaki ardışık № (maks+1 — builder sablonGunEkle dili).
+/**
+ * Mevcut gün listesindeki maksimum gün numarasını bulur, bir sonraki gün numarasını hesaplar,
+ * bu yeni günü listeye ekler, listeyi gün numarasına göre sıralar ve aktif gün kartını günceller.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcGunEkleBos(){
   const gunler = globalThis._bcGunler || (globalThis._bcGunler = []);
   if(gunler.length >= 31){ toast('⚠️ En fazla 31 gün', true); return; }
@@ -1540,6 +1889,10 @@ function bcGunEkleBos(){
 // 📋 Önceki günden: açık kartın (yoksa en büyük №'lu günün) seanslarını
 // taşıyan yeni gün — V2.2.1'de bcGunKopyalaCoklu çekirdeğine TEK hedefle
 // delege (sıradaki yeni ordinal = maks+1).
+/**
+ * Aktif gün kartını (veya en yüksek günü) kaynak alarak bir sonraki günü ekler; 31 gün sınırını kontrol eder, kopyalama başarısızsa boş gün ekler, planı yeniden çizer ve toast bildirimi gösterir.
+ * @returns {void}
+ */
 function bcGunEkleOncekiGunden(){
   const gunler = globalThis._bcGunler || (globalThis._bcGunler = []);
   if(gunler.length >= 31){ toast('⚠️ En fazla 31 gün', true); return; }
@@ -1559,6 +1912,11 @@ function bcGunEkleOncekiGunden(){
 // ═══ V2.1 GÜN KARTI İŞLEMLERİ ═══
 
 // Kart başlığı: tek kart açılır (builder gibi); açık karta tekrar dokunuş kapatır.
+/**
+ * Verilen silah ID'si ile aktif olan silah kartını değiştirir veya mevcut aktif silahı pasif yapar.
+ * @param {string} gun Değiştirilecek veya aktif edilecek silahın ID'si.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcGunToggle(gun){
   globalThis._bcAktifGunCard = globalThis._bcAktifGunCard === gun ? null : gun;
   bcPlanRender();
@@ -1581,6 +1939,13 @@ function bcGunSil(gun){
 // 'Başlangıçtan gün' № değişimi (bc-gno-<gun>): doğrula (1..31 + teklik —
 // değilse builder mesajı + revert), ASC yeniden sırala; başlık tarihleri
 // yeni № ile yeniden hesaplanır (bcPlanRender).
+/**
+ * Verilen elementin 'gun' verisinden elde edilen eski gün değeri ile kontrol edilir,
+ * geçerli değilse planı yeniden render eder; geçerliyse yeni gün değeri ile güncellenir,
+ * sıralama yapılır ve ilgili global değişkenler güncellenerek plan yeniden render edilir.
+ * @param {HTMLElement} el Güncellenecek gün elementini içeren DOM elementi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcGunNoDegisti(el){
   const eskiGun = Number(el && el.dataset ? el.dataset.gun : NaN);
   const gunler = globalThis._bcGunler || [];
@@ -1598,6 +1963,11 @@ function bcGunNoDegisti(el){
 
 // V2.2.1 — kopyalama alanı aç/kapa ('📋 Bu günü şu günlere kopyala ▸/▾';
 // kart başlığı ▾/▸ dili — tek alan açık, Uygula sonrası kapanır).
+/**
+ * Kopya açık gün durumunu verilen güne göre açıp kapatır ve planı yeniden render eder.
+ * @param {*} gun - Kopya görünümünün açılacağı gün; aynı gün tekrar verilirse kopya görünümü kapatılır.
+ * @returns {void} Döndürülen değer yok.
+ */
 function bcGunKopyaToggle(gun){
   globalThis._bcKopyaAcikGun = globalThis._bcKopyaAcikGun === gun ? null : gun;
   bcPlanRender();
@@ -1606,6 +1976,11 @@ function bcGunKopyaToggle(gun){
 // V2.2.1 — '+№ ekle': girilen №'yu hedef çipi olarak seçime EKLER (mevcut
 // çip varsa yalnız işaretlenir). Gün burada OLUŞTURULMAZ — Uygula'da tembel
 // doğar (plan state dokunulmaz); doğrulama bcGunNoKontrol aralık dili.
+/**
+ * Kaynak güne ait çipler konteynerine, belirtilen hedef gün için bir "gün kopya" çipi ekler; çip zaten varsa aktifleştirir.
+ * @param {number} kaynakGun - Çiplerin ekleneceği kaynak gün numarası.
+ * @returns {void} Bir değer döndürmez.
+ */
 function bcGunKopyaNoEkle(kaynakGun){
   const input = g('bc-gkopya-no-' + kaynakGun);
   const konteyner = g('bc-gkopya-chips-' + kaynakGun);
@@ -1632,6 +2007,11 @@ function bcGunKopyaNoEkle(kaynakGun){
 // olur (bcGunKopyalaCoklu). Boş kaynak gün kopyalanamaz (hedefi boşaltma
 // veri kaybı — V2.1 politikası). Başarıda plan yeniden çizilir + kopyalama
 // alanı KAPANIR; toast '📋 Gün K → Gün a, b (X değişti, Y oluşturuldu)'.
+/**
+ * Kaynak gündeki seansları, seçili hedef günlere kopyalar; planı yeniden render eder ve kullanıcıya toast bildirimi gösterir.
+ * @param {number|string} kaynakGun - Seansların kopyalanacağı kaynak gün.
+ * @returns {void} Hiçbir değer döndürmez; kopyalama başarısızsa veya seçim eksikse sadece toast gösterir.
+ */
 function bcGunKopyalaUygula(kaynakGun){
   const gunler = globalThis._bcGunler || [];
   const src = gunler.find(g => g.gun === kaynakGun);
@@ -1676,6 +2056,13 @@ let _bcTkGirisMetni = '', _bcTkGirisHatasi = '';
 
 // Ay kaydırma: (yil, ayIdx 0..11) + delta tam sayı → normalize {yil, ay}.
 // Yıl sınırı her iki yönde doğru taşar (Aralık 2026 +1 → Ocak 2027).
+/**
+ * Verilen yıl, ay indeksi ve delta değerlerini kullanarak takvim tarihini hesaplar.
+ * @param {number} yil - Yıl değeri.
+ * @param {number} ayIdx - Ay indeksi (0'dan başlayan).
+ * @param {number} delta - Ay kaydırma miktarı.
+ * @returns {Object} Hesaplanmış yıl ve ay değerlerini içeren nesne ({yil, ay}).
+ */
 function bcTakvimAyKaydir(yil, ayIdx, delta){
   const toplam = Math.trunc(Number(yil) || 0) * 12 + Math.trunc(Number(ayIdx) || 0) + Math.trunc(Number(delta) || 0);
   return { yil: Math.floor(toplam / 12), ay: ((toplam % 12) + 12) % 12 };
@@ -1691,6 +2078,12 @@ function bcTakvimAyKaydir(yil, ayIdx, delta){
 // new Date/yerel-ayar üretimi kalmadı, hafta matematiği tek kaynakta).
 // Başlangıç geçersizse bugün'ün ayine düşer (patlamaz; _bcTkBaslangic
 // zaten bugün fallback'li); yıl 1..9999 dışında boş ızgara döner.
+/**
+ * Geçerli bir başlangıç tarihi stringi veya ay ofseti verilerek Belgesel Takviminde gösterilecek ay bilgilerini hesaplar.
+ * @param {string} baslangicDateStr Geçerli bir başlangıç tarihi stringi (YYYY-MM-DD formatında) veya boş.
+ * @param {number} ayOffset Ay kaydırma ofseti.
+ * @returns {Object} Yıl, ay adı etiketi, baştaki boşluk sayısı ve gün hücrelerinden oluşan nesne.
+ */
 function bcTakvimAyGosterim(baslangicDateStr, ayOffset){
   const p = String(baslangicDateStr || '').split('-').map(Number);
   const gecerli = p.length === 3 && p.every(x => Number.isFinite(x));
@@ -1732,6 +2125,11 @@ function bcTakvimSecimEkle(secimler, tarihISO, baslangicDateStr){
 }
 
 // Başlık tarihi 'YYYY-MM-DD' → 'DD.MM.YYYY' (TR); geçersiz → bugün.
+/**
+ * 'Y-A-G' biçimindeki tarih dizgesini 'GG.AA.YYYY' biçimine dönüştürür; geçersiz girdide bugünün tarihini kullanır.
+ * @param {string} tarihStr - 'Yil-Ay-Gun' biçiminde tarih dizgesi; boş veya geçersizse bugünün tarihi kullanılır.
+ * @returns {string} 'GG.AA.YYYY' biçiminde, sıfırlarla doldurulmuş tarih dizgesi.
+ */
 function bcTakvimBaslikTarihi(tarihStr){
   const p = String(tarihStr || '').split('-').map(Number);
   const t = (p.length === 3 && p.every(x => Number.isFinite(x))) ? p : bugun().split('-').map(Number);
@@ -1740,6 +2138,11 @@ function bcTakvimBaslikTarihi(tarihStr){
 
 // Seçim çipi 'YYYY-MM-DD' → 'DD.AA' (eski MM.AA '09.15' ters-okuması
 // kilitlenir); biçim dışı → ''.
+/**
+ * ISO tarih biçimindeki (YYYY-AA-GG) girdiyi "GG.AA" biçimine çevirir; geçersiz girdi için boş dize döndürür.
+ * @param {*} iso - YYYY-AA-GG biçiminde tarih içeren değer.
+ * @returns {string} "GG.AA" biçiminde gün.ay ifadesi; girdi geçerli bir ISO tarih değilse boş dize.
+ */
 function bcTakvimChipEtiketi(iso){
   const s = String(iso || '');
   return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.slice(8, 10) + '.' + s.slice(5, 7) : '';
@@ -1747,11 +2150,19 @@ function bcTakvimChipEtiketi(iso){
 
 // ── V2.2 DOM KATMANI (ince — yalnız saf katmanı tüketir) ──
 
+/**
+ * Kanonik ISO tarih değerini döndürür; yoksa bugünün tarihini döndürür.
+ * @returns {string} bcTarihDeger() sonucu, boşsa bugunun tarihi.
+ */
 function _bcTkBaslangic(){
   // V2.3-W20: kanonik ISO tek kapıdan (input.value artık DD.MM.YYYY görünüm)
   return bcTarihDeger() || bugun();
 }
 
+/**
+ * Doğum günü takvimi görünümünü sıfırlayıp açar; ofseti ve seçimleri temizler.
+ * @returns {void}
+ */
 function bcTakvimAc(){
   _bcTkOffset = 0;
   _bcTkSecili = new Set();
@@ -1780,6 +2191,11 @@ function bcTakvimAyDegistir(delta){
 // R1 bulgu 4: başlık dropdown işleyicileri — offset TEK skaler durum olduğu
 // için ay/yıl seçimi offset deltasıdır (hedef ay-indeksi − görüntülenen ay;
 // yıl ve ay ayrı seçicilerdir, biri ötekinin yılını kaydırmaz).
+/**
+ * Verilen ay değerini doğrulayarak geçerli bir ay seçimi yapar, offset'i günceller ve takvimi yeniden render eder.
+ * @param {number} deger Seçilecek ay numarası (0-11 arası).
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcTakvimAySec(deger){
   const ay = Math.trunc(Number(deger));
   if(!(ay >= 0 && ay <= 11)) return;
@@ -1787,6 +2203,11 @@ function bcTakvimAySec(deger){
   _bcTkOffset += ay - yer.ay;
   bcTakvimRender();
 }
+/**
+ * Verilen yılı alarak BC takvimindeki offset değerini günceller ve takvimi yeniden render eder.
+ * @param {number} deger - Ayarlanacak yıl değeri.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcTakvimYilSec(deger){
   const yil = Math.trunc(Number(deger));
   if(!(yil >= 1 && yil <= 9999)) return;
@@ -1799,6 +2220,10 @@ function bcTakvimYilSec(deger){
 // bcTakvimSecimEkle kapısından seçime ekler/çıkarır (hücre tıkıyla AYNI
 // doğrulama: başlangıç öncesi red, 31-gün üst sınırı), görünüm o aya atlar;
 // red → satır içi hata (toast değil — kanonik yüzeydekiyle aynı dil).
+/**
+ * 'bc-takvim-giris' alanındaki tarih girişini çözümleyip geçerliyse takvim seçimine ekler; maske veya ayrıştırma hatasında hatayı kaydedip takvim yeniden çizer.
+ * @returns {void} Değer döndürmez.
+ */
 function bcTakvimGirisUygula(){
   const inp = document.getElementById('bc-takvim-giris');
   const metin = inp ? inp.value : '';
@@ -1835,6 +2260,16 @@ function bcTakvimGirisUygula(){
   bcTakvimRender();
 }
 
+/**
+ * Tedavi günlerini takvimden seçmek için modal pencereyi oluşturur veya günceller.
+ * Takvim kapsayıcısı yoksa oluşturulur; başlangıç tarihinden itibaren 31 günlük
+ * aralıkta ay görünümü hesaplanır. Mevcut (planlı) günler mavi vurgulanır ve
+ * tıklanamaz; geçmiş tarihler seçilemez; seçili tarihler yeşil işaretlenir ve
+ * etiket (chip) olarak listelenir. Ay/yıl dropdown'ları, elle gg.aa.yyyy girişi
+ * (maske ve Enter desteğiyle), giriş hata mesajı ile "Ekle" ve "İptal" düğmelerini
+ * içeren kart HTML'i kapsayıcıya yazılır; arka plana tıklayınca kapanır.
+ * @returns {void} Değer döndürmez; sonucu DOM'a yazar.
+ */
 function bcTakvimRender(){
   tarihSeciciStilEnjekte();
   let box = document.getElementById('bc-gun-takvim');
@@ -1934,6 +2369,10 @@ function bcTakvimToggle(iso){
 // Onayla: yeni tarihler boş gün olarak eklenir (bir günün seansı olmak
 // zorunda — ilk yeni günün '＋ seans ekle' formu AÇIK gelir); mevcut
 // günler birleştirilir (dokunulmaz). Üst sınır 31.
+/**
+ * Takvimden seçilen günleri seans listesine ekler; yeni gün yoksa uyarı verir, en fazla 31 gün tutar, günleri sıralayıp seans formunu açar.
+ * @returns {void} Bir değer döndürmez.
+ */
 function bcTakvimOnayla(){
   const gunNolar = bcTakvimdenGunler([..._bcTkSecili], _bcTkBaslangic());
   const gunler = globalThis._bcGunler || (globalThis._bcGunler = []);
@@ -1953,6 +2392,10 @@ function bcTakvimOnayla(){
   bcSeansFormAc(ilk); // boş gün tek başına kalamaz: seans formu açık gelir
 }
 
+/**
+ * ID'si 'bc-gun-takvim' olan elemanı DOM'dan kaldırır.
+ * @returns {void} Hiçbir değer döndürmez.
+ */
 function bcTakvimKapat(){
   const box = document.getElementById('bc-gun-takvim');
   if(box) box.remove();
@@ -1970,12 +2413,21 @@ function bcTakvimKapat(){
 // (F3): açılış ayı artık değerin ayıdır (eski hep bugünün ayını açıyordu);
 // aralık dışı hücre zaten kapalı çizilir, tıklama toast'suz yoksayılır
 // (eski bileşen 'Geçmiş tarih seçilemez' toastı atıyordu).
+/**
+ * Tek tarih takvimini tedavi tarihi seçimi için açar; bugünden itibaren bir yıla kadar tarih seçimine izin verir ve seçilen tarihi yazar, ipucunu güncelleyip planı yeniden çizer.
+ * @returns {void}
+ */
 function bcTarihSeciciAc(){
   tekTarihTakvimAc({
     baslik: '📅 Tedavi Tarihi — Takvimden Seç',
     deger: bcTarihDeger() || bugun(),
     min: bugun(),
     max: dFwd(bugun(), 365),
+    /**
+     * ISO formatındaki tarih stringini işleyerek ilgili tarih yazısını günceller, ipucunu yeniler ve planı yeniden render eder.
+     * @param {string} iso ISO formatındaki tarih stringi.
+     * @returns {void} Fonksiyon bir değer döndürmez.
+     */
     onSec: iso => {
       if(!iso) return; // temizlenebilir değil — null seçim yolu yok (savunma)
       bcTarihYaz(iso);
@@ -1987,12 +2439,21 @@ function bcTarihSeciciAc(){
 
 // ═══ V2.1 SEANS FORMU ('＋ Bu güne seans ekle') ═══
 
+/**
+ * Belirtilen gün parametresini global değişkenlere atar, ilaç önbelleğini (cache) yoksa yükler ve plan render işlemini başlatır.
+ * @param {string} gun İşlem yapılacak gün parametresi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 async function bcSeansFormAc(gun){
   if(!(_drugsCache && _drugsCache.length)){ try { await loadDrugsCache(); } catch(_) {} }
   globalThis._bcSeansFormGun = gun;
   globalThis._bcAktifGunCard = gun;
   bcPlanRender();
 }
+/**
+ * _bcSeansFormGun değişkenini sıfırlayıp plan görünümünü yeniden çizer.
+ * @returns {void} Döndürmez.
+ */
 function bcSeansVazgec(){
   globalThis._bcSeansFormGun = null;
   bcPlanRender();
@@ -2001,6 +2462,12 @@ function bcSeansVazgec(){
 // İlaç checkbox'ı → doz satırı (#bc-srow-<id>: doz/birim/yol ön-dolular,
 // doz BOŞ). Değerler [Seansı Ekle] onayında okunur — anlık state sync yok
 // (bc-irow deseninin seans formu uyarlaması).
+/**
+ * Seçili olan satır kontrolünü (checkbox) kontrol eder; işaretliyse yeni satır ekler ve alanı gösterir,
+ * işaretlenmezse ilgili satırı kaldırır ve boş kalırsa alanı gizler.
+ * @param {Object} chk Checkbox elemanı ve dataset bilgileri içeren nesne.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcSeansChkChange(chk){
   const satirlar = g('bc-sdoz-satirlar');
   if(!satirlar) return;
@@ -2015,6 +2482,11 @@ function bcSeansChkChange(chk){
   }
 }
 
+/**
+ * Verilen doz satırı verisinden (ds) DOM elemanı oluşturur; hayvan ID'lerini, doz, birim ve uygulama yolu seçeneğini içeren bir satır HTML'i döndürür.
+ * @param {Object} ds Doz satırı verisi (id, name, route, unit vb. özelliklere sahip).
+ * @returns {HTMLElement} Oluşturulan doz satırı div elemanı.
+ */
 function _bcSeansDozSatiri(ds){
   const id = ds.id;
   const name = String(ds.name || id).replace(/"/g, '&quot;');
@@ -2047,6 +2519,13 @@ function _bcSeansDozSatiri(ds){
   return row;
 }
 
+/**
+ * Belirtilen saat değerini 'bc-gsaat' elemanına ayarlar ve butona 'aktif' sınıfını ekler.
+ * Buton varsa, aynı ebeveyn içindeki tüm '.ek-chip' elemanlarından 'aktif' sınıfını kaldırır.
+ * @param {string} t Ayarlanacak saat değeri.
+ * @param {HTMLElement} btn 'aktif' sınıfını eklenmesi ve diğer chip'lerin pasif hale getirilmesi gereken buton elemanı.
+ * @returns {void}
+ */
 function bcSeansSaatChip(t, btn){
   const i = g('bc-gsaat');
   if(i) i.value = t;
@@ -2059,6 +2538,13 @@ function bcSeansSaatChip(t, btn){
 // ekler, seans listesini cerrahi çizer; form AÇIK kalır, yalnız saat
 // sıfırlanır (seans A → 20:00 → seans B akışı). Kalem state'e girmeden
 // şablon Şablonsuz'a döner (karşılıklı dışlama).
+/**
+ * Belirtilen gün için seans ekleme işlemini gerçekleştirir.
+ * Kullanıcı tarafından seçilen saat ve ilaçları (doz, birim, yol) doğrular,
+ * seçilen ilaçları günün seans listesine ekler ve seans çizimini günceller.
+ * @param {string} gun Eklenecek seansın yapılacağı gün adı.
+ * @returns {void} İşlem başarılı veya hata durumunda bir değer döndürmez.
+ */
 function bcSeansEkle(gun){
   const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
   if(!gunObj) return;
@@ -2103,6 +2589,12 @@ function bcSeansEkle(gun){
   bcButonEtiketi();
 }
 
+/**
+ * Belirtilen günün seans dizisinden verilen indeksdeki seansı siler.
+ * @param {string} gun Silinmesi istenen günün adı.
+ * @param {number} si Silinmesi istenen seansın dizideki indeks numarası.
+ * @returns {void} İşlem başarılıysa undefined döndürür, hata durumunda işlemi iptal eder.
+ */
 function bcSeansSil(gun, si){
   const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
   if(!gunObj || !gunObj.seanslar || gunObj.seanslar[si] === undefined) return;
@@ -2110,6 +2602,14 @@ function bcSeansSil(gun, si){
   bcPlanRender();
 }
 
+/**
+ * Belirtilen gün ve seans numarasındaki ilaç listesinden verilen drugId'yi siler.
+ * İlaç listesi boş kalırsa, o seansı günden kaldırır.
+ * @param {string} gun Silinmek istenen günün adı.
+ * @param {number} si Silinmek istenen seansın dizideki indeksi.
+ * @param {string} drugId Silinmek istenen ilacın ID'si.
+ * @returns {void} İşlem tamamlandıktan sonra bir değer döndürmez.
+ */
 function bcKalemSil(gun, si, drugId){
   const gunObj = (globalThis._bcGunler || []).find(g => g.gun === gun);
   const seans = gunObj && gunObj.seanslar ? gunObj.seanslar[si] : null;
@@ -2136,6 +2636,11 @@ function bcSablonaDonustur(){
 // Karşılıklı dışlama (şablon→kalem): gerçek bir şablon seçildiyse TÜM
 // günlerin seansları temizlenir + açık seans formu kapanır (V2.1'de kalem
 // state'i seansların içindedir — eski 'secili state' düzlemi kalktı).
+/**
+ * Seçili tüm şablon ilaç onay kutularını temizler, günlerin seanslarını boşaltır,
+ * aktif gün bilgisini sıfırlar ve planı ile buton etiketini yeniden çizer.
+ * @returns {void}
+ */
 function bcSablonIlacTemizle(){
   document.querySelectorAll('.bc-schk:checked').forEach(chk => { chk.checked = false; });
   (globalThis._bcGunler || []).forEach(gn => { gn.seanslar = []; });
@@ -2148,10 +2653,19 @@ function bcSablonIlacTemizle(){
 // ilaç varsa "💊 Tedaviyi Uygula", yoksa "🩺 Vakaları Aç". Yalnız seans
 // state'i sorgulanır — kalem [Seansı Ekle] onayıyla state'e yazıldığından
 // DOM sorgusuna gerek kalmadı (V2'deki aktif-gün DOM kontrolü kalktı).
+/**
+ * Global `_bcGunler` dizisinden seanslar ve ilaçlar içeren kayıtları kontrol ederek,
+ * en az bir ilacı olan bir kayıt bulunduğunda '💊 Tedaviyi Uygula', yoksa '🩺 Vakaları Aç' döndürür.
+ * @returns {string} Duruma göre döndürülen Türkçe mesaj.
+ */
 function bcButonMetni(){
   const varMi = (globalThis._bcGunler || []).some(gn => (gn.seanslar || []).some(s => Object.keys(s.ilaclar || {}).length > 0));
   return varMi ? '💊 Tedaviyi Uygula' : '🩺 Vakaları Aç';
 }
+/**
+ * 'bc-submit' ID'li buton elemanını bulup, mevcut buton metni fonksiyonundan gelen değeri butonun metni olarak ayarlar.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bcButonEtiketi(){
   const btn = g('bc-submit');
   if(btn) btn.textContent = bcButonMetni();
@@ -2171,6 +2685,11 @@ function bcButonEtiketi(){
 //     seansları sunucuda ayrı planned_time'lı uygulamalara düşer).
 //   - drug_product_id/stok_id: kalem state'inde check anında çözülür;
 //     eksikse _drugsCache fallback (legacy stok kaleminde drug_product_id null).
+/**
+ * Global `_bcGunler` dizisinden geçerli günleri, seansları ve ilaç kalemlerini kontrol ederek
+ * hataları toplar ve geçerli kalemleri döndürür.
+ * @returns {Object} `hatalar` (hata mesajları dizisi) ve `items` (geçerli gün ve kalemler objesi dizisi) içeren bir nesne.
+ */
 function bcGunlardenItems(){
   const gunler = globalThis._bcGunler || [];
   const herhangiKalem = gunler.some(gn => (gn.seanslar || []).some(s => Object.keys(s.ilaclar || {}).length > 0));
@@ -2222,6 +2741,13 @@ function bcGunlardenItems(){
 // seans saati, dose Number, route boş→null; legacy/stok_id çözümü
 // bcGunlardenItems aynası. Doğrulama YAPMAZ — çağıran (bcSablonKaydet)
 // bcGunlardenItems hatalarını önce raporlar. Saf (girdi mutasyonlanmaz).
+/**
+ * Verilen günler dizisindeki seansları ve ilaçları işleyerek,
+ * stok bilgilerini ve miras (legacy) durumlarını kontrol ederek
+ * kalemler dizisi oluşturur.
+ * @param {Array} gunler İşlenecek günlerin (gun objeleri) bulunduğu dizi.
+ * @returns {Array} Oluşturulan kalemlerden oluşan dizi.
+ */
 function bcSablonKalemleriOlustur(gunler){
   const kalemler = [];
   (gunler || []).slice().sort((a, b) => a.gun - b.gun).forEach(gn => {
@@ -2251,6 +2777,11 @@ function bcSablonKalemleriOlustur(gunler){
 // 'N gün · M seans' dilinin aynısı (N = kalem taşıyan gün sayısı,
 // M = kalem sayısı). Taslak/geçersiz kalemler (doz/birim boş) SAYILMAZ;
 // geçerli kalem yoksa 'İçerik: boş plan'.
+/**
+ * Verilen gün listesi için geçerli kalemleri filtreleyip, toplam gün ve seans sayısıyla birlikte özet metni döndürür.
+ * @param {Array} gunler Filtreleme işlemi için kullanılacak gün listesi.
+ * @returns {String} Gün ve seans sayısını içeren özet metin veya 'İçerik: boş plan' mesajı.
+ */
 function bcSablonOzetMetni(gunler){
   const gecerli = bcSablonKalemleriOlustur(gunler).filter(k => Number.isFinite(k.dose) && k.unit);
   if(!gecerli.length) return 'İçerik: boş plan';
@@ -2267,6 +2798,14 @@ function bcSablonOzetMetni(gunler){
 // jsonb 'null' gönderimi doğrulamayı bozar; anahtarın yokluğu = tohumlama
 // yok). gun 0..365 kelepir (submitBulkCase paritesi + RPC guard), geçersiz/
 // boş saat '08:00' varsayılanına düşer. Saf, DOM'suz.
+/**
+ * Verilen istek için şablon tohum payload'ı oluşturur; istek yoksa null döndürür.
+ * Gün ofseti 0-365 aralığına kırpılır, saat "HH:MM" biçiminde değilse '08:00' varsayılanı kullanılır.
+ * @param {*} istenen - Tohum payload'ının oluşturulup oluşturulmayacağını belirleyen istek değeri; falsy ise null döner.
+ * @param {string} gunStr - Gün ofseti olarak ayrıştırılacak gün değeri metni.
+ * @param {string} saatStr - Planlanan saat metni; "HH:MM" biçiminde olmalıdır.
+ * @returns {Object|null} {gun_ofset, planned_time} alanlarını içeren nesne ya da istek yoksa null.
+ */
 function bcSablonTohumPayload(istenen, gunStr, saatStr){
   if(!istenen) return null;
   const n = Number.parseInt(gunStr, 10);
@@ -2290,6 +2829,12 @@ function bcSablonTohumPayload(istenen, gunStr, saatStr){
 //   tohumlama: {gun_ofset, planned_time} | null — 20260730000001 normalize
 //   dili: geçersiz/eksik alan → null.
 // Saf (girdi mutasyonlanmaz) — uygulayıcı bcSablonYukleUygula.
+/**
+ * Sablon objesinden planlanmış ilaçları gün ve saat bazında gruplayarak döndürür.
+ * @param {Object} sablon İlaç planı bilgilerini içeren sablon nesnesi.
+ * @param {Array} drugs İlaç önbelleği dizi; tanımlı değilse global _drugsCache kullanılır.
+ * @returns {Object} Gün ve saat anahtarlarıyla ilaç detaylarını içeren obje.
+ */
 function bcSablondenPlan(sablon, drugs){
   // _drugsCache ui.js'te bildirilen script-ler-arası lexical global'dir —
   // typeof guard'ı (vm test sandbox'ında bağlantı yok; UI çağıranı açık
@@ -2353,6 +2898,12 @@ function bcMukerrerBul(hayvanlar, cases, diseaseId){
 // listesine satır ekler — onay akışı sürer; sunucu per-case soft-skip
 // (yalnız 'Bu vakada zaten açık bir planlı tohumlama var' duplikelerini
 // atlar) semantiği DEĞİŞMEZ. Saf, DOM'suz.
+/**
+ * Verilen hayvan ve görev listelerinden, planlı tohumlama görevi olan, tamamlanmamış ve iptal edilmemiş olanları filtreleyip döndürür.
+ * @param {Array} hayvanlar Filtreleme yapılacak hayvan kayıtlarının bulunduğu dizi.
+ * @param {Array} gorevler Hayvanlara atanan görevlerin bulunduğu dizi.
+ * @returns {Array} Planlı tohumlama görevi bulunan hayvanların ID, kupe ve hedef tarih bilgilerini içeren nesnelerden oluşan dizi.
+ */
 function bcTohumCakismaBul(hayvanlar, gorevler){
   return (hayvanlar || []).filter(h =>
     h?.id && (gorevler || []).some(gt =>
@@ -2372,6 +2923,11 @@ function bcTohumCakismaBul(hayvanlar, gorevler){
 
 // V2.1 — uyarı satırı kısa tarih: 'YYYY-MM-DD' → 'DD.AA'; boş/geçersiz → '—'.
 // Saf, DOM'suz.
+/**
+ * ISO 8601 formatındaki (YYYY-MM-DD) tarih stringini "GG.AA" (Gün.Ay) formatına dönüştürür.
+ * @param {string} iso ISO 8601 formatında bir tarih stringi (örn: "2023-10-05").
+ * @returns {string} "GG.AA" formatında tarih stringi veya geçersiz giriş için "—".
+ */
 function bcTarihKisa(iso){
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
   return m ? `${m[3]}.${m[2]}` : '—';
@@ -2382,6 +2938,12 @@ function bcTarihKisa(iso){
 // halde null (radyo gösterilmez). Varsayılan 'atla' — MUHAFAZAKÂR (eski plan
 // korunur; sahip kararı 2026-09-06). Değer kümesi W15 RPC sözleşmesi:
 // p_tohumlama_cakisma ∈ {'ekle','uzerine_yaz','atla'}.
+/**
+ * Tohum isteği ve çakışanlar dizisi verildiğinde, çakışma yönetimi seçeneklerini döndürür.
+ * @param {boolean} tohumIste Tohum isteğinin var olup olmadığını belirten bayrak.
+ * @param {Array} cakisanlar Çakışan öğelerden oluşan dizi.
+ * @returns {Object|null} Seçenekler objesi (isim, varsayilan, secenekler) veya geçerli parametreler yoksa null.
+ */
 function bcCakismaRadyosu(tohumIste, cakisanlar){
   if(!tohumIste || !(cakisanlar || []).length) return null;
   return {
@@ -2396,6 +2958,12 @@ function bcCakismaRadyosu(tohumIste, cakisanlar){
 
 // V2.2.2 (W16) — radyo sonucu → payload değeri (saf). Radyo gösterilmediyse
 // veya seçim RPC değer kümesinden değilse 'ekle' — eski davranış birebir.
+/**
+ * Radyo değişkeni tanımlıysa ve seçim 'uzerine_yaz' veya 'atla' ise seçimi, değilse 'ekle' değerini döndürür.
+ * @param {boolean} radyoVar Radyo değişkeninin var olup olmadığını belirten değer.
+ * @param {string} secim Seçim değeri ('uzerine_yaz', 'atla' veya 'ekle').
+ * @returns {string} Seçim değeri veya varsayılan olarak döndürülen 'ekle' değeri.
+ */
 function bcCakismaPayloadDegeri(radyoVar, secim){
   return (radyoVar && (secim === 'uzerine_yaz' || secim === 'atla')) ? secim : 'ekle';
 }
@@ -2413,6 +2981,13 @@ function bcCakismaPayloadDegeri(radyoVar, secim){
 // (additive — üzerine yazma yoksa anahtar yok; W15 RPC sözleşmesi).
 // hata satırları KASTEN haritalanmaz (inert): hata durumunda kart açılmaz.
 // Saf, DOM'suz.
+/**
+ * Verilen sonuç nesnesindeki 'acilan', 'atlanan' ve 'hatalar' listelerini işleyerek
+ * her bir kayıt için tip, kupe, ilacSayisi, gunSayisi, tohumlama durumu,
+ * üzerine_yazildi tarihleri, hayvanId ve mesaj gibi alanları içeren satır dizisi döndürür.
+ * @param {Object} result İşlenecek sonuç nesnesi; 'acilan', 'atlanan' ve 'hatalar' anahtarları içeren alt diziler barındırabilir.
+ * @returns {Array} İşlenmiş satırlardan oluşan dizi.
+ */
 function bcSonucSatirlari(result){
   const r = result || {};
   const satirlar = [];
@@ -2447,6 +3022,12 @@ function bcSonucSatirlari(result){
 // V2 — manuel ok-satırı metin eki: manuel {gun_sayisi, seans_sayisi} →
 // ' + N gün · M ilaç'; yalnız seans varsa eski ' + M ilaç' fallback; ikisi de
 // yoksa '' (ek yok). Saf, DOM'suz.
+/**
+ * Manuel nesnesindeki 'gun_sayisi' ve 'seans_sayisi' alanlarını kontrol ederek
+ * ilgili değerlerin sayısal olup olmadığını doğrular ve uygun formatta bir string döndürür.
+ * @param {Object} manuel Manuel nesnesi; 'gun_sayisi' ve 'seans_sayisi' alanlarını içerebilir.
+ * @returns {string} Hem gün hem ilaç varsa " + X gün · Y ilaç", sadece ilaç varsa " + Y ilaç", yoksa boş string.
+ */
 function bcManuelSatirEki(manuel){
   const m = manuel || {};
   const gun = typeof m.gun_sayisi === 'number' ? m.gun_sayisi : null;
@@ -2472,6 +3053,14 @@ function bcManuelSatirEki(manuel){
 // V2.2.1: hayvanId'lı satır data-action="bc-sonuc-hayvan" taşır — dokunuş
 // m-bulk-case'i kapatıp hayvan kartını açar (handlers.js).
 // Saf, DOM'suz.
+/**
+ * Satırları (ok, atlanan, hata) gruplayarak HTML bantları oluşturur;
+ * açılanlar için tohumlama ve şablon bilgilerini, atlananlar/hatalar için mesajları ekler;
+ * hayvanId içeren satırlara tıklanabilirlik ve veri atributları ekler.
+ * @param {Array} satirlar İşlenecek satır dizisi.
+ * @param {Object} opts Seçenekler objesi (acilan, tohumIste, tohumSaat).
+ * @returns {String} Gruplanmış satırları içeren HTML stringi.
+ */
 function bcSonucBantlari(satirlar, opts){
   const o = opts || {};
   const acilanlar = o.acilan || [];
@@ -2534,6 +3123,14 @@ function bcSonucBantlari(satirlar, opts){
 // ön-kontrol (openConfirm) → tek rpc('vaka_toplu_ac') → bc-sonuc bant
 // render → pullTables(submitCase seti). Modal KAPANMAZ — kullanıcı sonuç
 // listesini gözden geçirir; form sıfırlanmaz (chips kalır).
+/**
+ * Seçili hayvanları doğrulayarak toplu vaka açma işlemini gerçekleştirir.
+ * İnternet bağlantısı, hayvan sayısı, hastalık seçimi, kısır hayvan durumu,
+ * tarih uygunluğu, tohumlama ayarları ve çakışma kontrolleri gibi ön koşulları kontrol eder.
+ * Uygun olmayan kayıtları filtreler, sunucuya istek gönderir ve sonuçları UI'da gösterir.
+ * @param {HTMLElement} btn Tıklanma olayını tetikleyen buton elemanı.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülür.
+ */
 async function submitBulkCase(btn){
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   let liste = globalThis._bcHayvanlar || [];
@@ -2606,6 +3203,10 @@ async function submitBulkCase(btn){
   const cakismaRadyosu = bcCakismaRadyosu(tohumIste, tohumCakisan);
   let cakismaSecim = null; // 'uzerine_yaz' | 'atla' — onay radyosundan
 
+  /**
+   * Toplu vaka açma isteğini RPC üzerinden gönderir; dönen sonuçları renkli grup bantlarıyla gösterir, başarı/hata toast'ı basar, tabloları çeker ve arayüzü yeniden render eder. İşlem boyunca butonu devre dışı bırakır ve finally'de dinamik etikete döndürür.
+   * @returns {Promise<void>} Sonuç bantlarının gösterilmesi, toast bildirimleri, pullTables/loadDrugsCache çağrıları ve renderSafe işlemleri tamamlandığında çözülen promise.
+   */
   const gonder = async () => {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Gönderiliyor…'; }
     try {
@@ -2690,6 +3291,14 @@ async function submitBulkCase(btn){
 }
 
 // ── ABORT ────────────────────────────────────
+/**
+ * İnternet bağlantısı kontrolü yapılarak, kullanıcı onayıyla belirli bir hayvan için abort veya erken doğum kaydı oluşturur.
+ * Abort tarihini kullanıcıdan alır (boş bırakılırsa bugünün tarihi kullanılır), tarih formatını ve tohumlama tarihine göre geçerliliğini kontrol eder.
+ * Geçerli ise 'tohumlama_abort' RPC çağrısı yapar, işlem logunu günceller, arayüzü yeniden render eder ve detay sayfasını açar.
+ * @param {string} hayvanId Abort işlemi yapılacak hayvanın ID'si.
+ * @param {string} tohId İlgili tohumlama kaydı (pregnancy) ID'si.
+ * @returns {Promise<void>} Abort kaydı başarıyla oluşturulursa undefined döndürür, hata durumunda hata mesajı gösterir.
+ */
 async function abortKaydet(hayvanId, tohId) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!confirm('Bu hayvanda abort / erken doğum mu oldu? Gebelik kaydı kapatılacak.')) return;
@@ -2729,6 +3338,13 @@ async function abortKaydet(hayvanId, tohId) {
 }
 
 // ── HAYVAN NOTU EKLE ─────────────────────────
+/**
+ * İnternet bağlantısı kontrolü yapılarak, belirtilen hayvan ID'si için girilen notu kaydeden,
+ * arayüzü temizleyen ve ilgili hayvan detayını açan asenkron fonksiyondur.
+ * @param {string} hayvanId Kaydedilecek notun bağlanacağı hayvanın benzersel kimliği.
+ * @param {HTMLElement} btn Kayıt işlemi sırasında devre dışı bırakılacak ve metni güncellenecek buton elemanı.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function hayvanNotEkle(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const notText = (g('not-input')?.value || '').trim();
@@ -2745,6 +3361,13 @@ async function hayvanNotEkle(hayvanId, btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Not Ekle'; } }
 }
 
+/**
+ * Belirtilen hayvan ID'si ve kupe bilgisi ile not ekleme modalını açar,
+ * modal başlığını günceller, gizli alanı doldurur ve modalı görünür kılar.
+ * @param {string} hayvanId - Not eklenecek hayvanın ID'si.
+ * @param {string} kupe - Modal başlığına eklenecek kupe bilgisi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function openNotModal(hayvanId, kupe) {
   g('not-hid').value = hayvanId;
   g('not-title').textContent = `📝 Not Ekle — ${kupe}`;
@@ -2753,6 +3376,11 @@ function openNotModal(hayvanId, kupe) {
 }
 
 // ── SÜRÜDEN ÇIKIŞ ────────────────────────────
+/**
+ * Çıkış onayını işler; hayvanın durumunu günceller, ilgili verileri sunucuya gönderir ve arayüzü temizler.
+ * @param {HTMLElement} btn Onay butonu referansı; işlem sırasında devre dışı bırakılır ve işlem sonrası tekrar aktif edilir.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function submitCikis(btn) {
   const expected = parseInt(g('cx-math-ok').value);
   const given    = parseInt(g('cx-math-ans').value);
@@ -2800,13 +3428,27 @@ async function submitCikis(btn) {
 // ── SÜTTEN KESME ─────────────────────────────
 // Süt içen buzağı seti: aktif + kesilmemiş + (grup 'Buzağı' içerir VEYA yaş ≤ 180g)
 // Saf katman helpers.js'te (sutIcenBuzagiSec) — dashboard kartı sayacıyla tek kaynak.
+/**
+ * Süte hayvanlar arasından süte inen buzağıları seçip döndürür.
+ * @returns {Array} Seçilen süte inen buzağı kayıtlarından oluşan dizi.
+ */
 function _sutIcenBuzagilar() {
   return sutIcenBuzagiSec(getState('animals'));
 }
 // Kesim eşiği: protokol_ayar 'sutten_kesme_gun' (varsayılan 60)
+/**
+ * Protokol ayarlarından 'sutten_kesme_gun' anahtarına karşılık gelen değeri alarak sütten kesme gününü belirler.
+ * Eğer bu ayar bulunamazsa varsayılan olarak 60 gün döndürür.
+ * @returns {number} Sütten kesme günü sayısı.
+ */
 function suttenKesmeEsigi() {
   return +(getState('protokol_ayar')?.find(x => x.anahtar === 'sutten_kesme_gun')?.deger ?? 60);
 }
+/**
+ * Süt içen buzağıları 'sk-liste' elementine seçim listesi olarak render eder; özet satırını günceller ve isteğe bağlı filtre metnine göre küpe numarasına göre süzer.
+ * @param {string} [filter] - Küpe numarasında arama yapmak için büyük/küçük harf duyarsız filtre metni; boş veya verilmediyse tüm buzağılar listelenir.
+ * @returns {void} Hiçbir değer döndürmez; sonuçları DOM'a yazar ('sk-liste' elementi yoksa işlem yapılmaz).
+ */
 function renderBuzagiPicker(filter) {
   const liste = document.getElementById('sk-liste');
   if (!liste) return;
@@ -2841,9 +3483,19 @@ function openSuttenKesModal() {
   if (ara) { ara.value = ''; ara.oninput = () => renderBuzagiPicker(ara.value); }
   openM('m-sutten-kes');
 }
+/**
+ * '#sk-liste' içindeki tüm onay kutularını verilen duruma göre işaretler veya kaldırır.
+ * @param {boolean} durum - Onay kutularının işaretli (true) veya işaretsiz (false) olacağı durum.
+ * @returns {void} Döndürülecek bir değer yok.
+ */
 function skHepsiniSec(durum) {
   document.querySelectorAll('#sk-liste input[type=checkbox]').forEach(cb => cb.checked = durum);
 }
+/**
+ * Seçili olan checkbox'ların ID'lerini alıp submitSuttenKes fonksiyonuna göndererek işlemi başlatır.
+ * @param {HTMLElement} btn Tıklanan buton elemanı.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülür.
+ */
 async function skOnayla(btn) {
   const secili = [...document.querySelectorAll('#sk-liste input[type=checkbox]:checked')].map(cb => cb.dataset.id);
   await submitSuttenKes(secili, btn);
@@ -2892,6 +3544,13 @@ async function suttenKesTekil(hayvanId, btn) {
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
 }
+/**
+ * İnternet bağlantısı kontrolü yapılarak, belirtilen hayvan için en yeni sütten kesme işlem kaydı bulunur ve bu kaydı geri alır.
+ * Eğer işlem kaydı bulunamazsa, hayvan kaydı üzerinde 'Sütten Kesme' etiketli bir akış işlemi başlatır.
+ * @param {string} hayvanId Geri alınacak sütten kesme işlemiyle ilgili hayvanın benzersiz kimliği.
+ * @param {HTMLElement} btn İşlem tamamlandıktan sonra aktif hale getirilecek buton elemanı.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function suttenKesGeriAl(hayvanId, btn) {
   // L4-W2: tek motor — sütten kesme L2'ye bağlandı (hedef: SUTTEN_KESME tx'i;
   // çözülemeyen kayıtta hayvanlar satır hedefi — sunucu yönlendirmesi çalışır).
@@ -2917,8 +3576,17 @@ window.suttenKesTekil = suttenKesTekil;
 window.suttenKesGeriAl = suttenKesGeriAl;
 
 // ── PROTOKOL AYARLARI (Ayarlar paneli) ───────
+/**
+ * Protokol ayarlarını yükler, ilgili form alanlarını mevcut değerlerle doldurur ve 'sutten_kesme_gun' seçeneği için butonları oluşturur.
+ * @returns {void}
+ */
 function protokolAyarYukle() {
   const rows = getState('protokol_ayar') || [];
+  /**
+   * Verilen anahtar (k) değerine sahip satırı bulup, o satırdaki 'deger' alanını döndürür.
+   * @param {any} k Aranan anahtar değeri.
+   * @returns {any} Anahtara eşleşen satırdaki 'deger' değeri yoksa undefined.
+   */
   const val = k => rows.find(r => r.anahtar === k)?.deger;
   document.querySelectorAll('#m-ayarlar [data-ayar]').forEach(inp => {
     const v = val(inp.dataset.ayar); if (v != null) inp.value = v;
@@ -2931,6 +3599,12 @@ function protokolAyarYukle() {
       `<button class="btn ${+cur===g?'':'btn-g'}" data-action="pa-chip" data-anahtar="sutten_kesme_gun" data-deger="${g}" style="font-size:.72rem;padding:3px 8px">${g}</button>`).join('');
   }
 }
+/**
+ * Verilen protokol ayarı anahtarını ve değerini günceller, arayüzü yeniler ve hata durumunda kullanıcıya bildirim gösterir.
+ * @param {string} anahtar Güncellenecek protokol ayarının anahtarı.
+ * @param {number|string} deger Güncellenecek protokol ayarının değeri.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda void döner.
+ */
 async function protokolAyarKaydet(anahtar, deger) {
   try {
     await rpc('protokol_ayar_guncelle', { p_anahtar: anahtar, p_deger: +deger });
@@ -2944,6 +3618,13 @@ window.protokolAyarYukle = protokolAyarYukle;
 window.protokolAyarKaydet = protokolAyarKaydet;
 
 // ── TOHUMLANABILIR ONAY ──────────────────────
+/**
+ * İnternet bağlantısı kontrolü yapılarak belirtilen hayvanın tohumlanabilir olarak onaylanmasını sağlar.
+ * Onay başarılı olduğunda ilgili tabloyu günceller ve butonu eski haline getirir.
+ * @param {number|string} hayvanId Onaylanacak hayvanın benzersiz kimlik numarası.
+ * @param {HTMLElement} btn Tıklanma olayını tetikleyen buton elemanı (opsiyonel).
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen bir Promise.
+ */
 async function submitTohumOnayla(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const h = getState('animals').find(a => a.id === hayvanId);
@@ -2971,6 +3652,12 @@ async function submitTohumErtele(hayvanId, ay, btn) {
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '⏰ Ertele'; } }
 }
+/**
+ * Belirtilen hayvan ID'si ve kupe bilgisi ile tohumlama erteleme formunu açar.
+ * @param {string} hayvanId - Tohumlama yapılacak hayvanın ID'si.
+ * @param {string} kupe - Tohumlama yapılacak kupe bilgisi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function openTohumErtele(hayvanId, kupe) {
   g('te-hid').value = hayvanId;
   g('te-title').textContent = `⏰ Tohumlama Ertele — ${kupe}`;
@@ -2980,6 +3667,12 @@ function openTohumErtele(hayvanId, kupe) {
 
 // ── ORTAK AŞI PICKER (checkbox + arama) ────────────
 // m-vaccine (prefix 'v') ve m-bulk-vaccine (prefix 'bv') paylaşır
+/**
+ * Verilen konteyner ID'sindeki aşı listesini oluşturur. Aşıları 'Zorunlu Aşılar' ve 'Diğer Aşılar' gruplarına ayırarak HTML olarak render eder.
+ * @param {string} containerId Render edilecek HTML elemanının ID'si.
+ * @param {string} prefix Oluşturulan HTML elemanlarında ve event handler'larında kullanılacak ön ek.
+ * @returns {void}
+ */
 async function renderVaccinePicker(containerId, prefix){
   const vaccines = (await getData('vaccines')) || [];
   const c = document.getElementById(containerId);
@@ -3007,6 +3700,12 @@ async function renderVaccinePicker(containerId, prefix){
     '<div id="'+prefix+'-rows" style="margin-top:8px"></div>';
 }
 
+/**
+ * Belirli bir önekli liste elemanlarını, verilen arama terimine göre filtreleyip gösterir veya gizler.
+ * @param {string} prefix Arama yapılacak listeyi belirten önek (örneğin 'vaccine-picker').
+ * @param {string} term Arama yapılacak terim. Boş ise tüm öğeler gösterilir.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function vaccinePickerSearch(prefix, term){
   const t=(term||'').toLowerCase().trim();
   document.querySelectorAll('#'+prefix+'-list .vp-item').forEach(el=>{
@@ -3015,6 +3714,12 @@ function vaccinePickerSearch(prefix, term){
 }
 
 // Seçili aşı satırlarını topla: [{id,name,dose,stdDose,offset,defOffset}]
+/**
+ * Belirli bir önek (prefix) ile başlayan ve seçili olan aşı satırlarını toplar.
+ * Seçili kontrollerin ID'si, adı, doz miktarı, standart doz ve offset değerlerini içeren bir dizi döndürür.
+ * @param {string} prefix Seçili kontrollerin ve ilgili inputların ID'lerinde kullanılabilecek önek (örneğin "vaccine").
+ * @returns {Array} Seçili aşı kayıtlarının (id, name, dose, stdDose, offset, defOffset) içeren nesnelerden oluşan dizi.
+ */
 function selectedVaccineRows(prefix){
   const out=[];
   document.querySelectorAll('.'+prefix+'-chk:checked').forEach(chk=>{
@@ -3033,6 +3738,10 @@ function selectedVaccineRows(prefix){
 }
 
 // ── AŞI MODAL (çoklu picker) ─────────────────
+/**
+ * İlgili tablolardan cache güncellemesi yapılarak aşı seçiciyi render eder ve tarih alanına varsayılan değer atar; ayrıca hayvan ID'si değiştiğinde satır yenileme dinleyicisini bağlar.
+ * @returns {Promise<void>} İşlemin tamamlanması.
+ */
 async function loadVaccinesDropdown() {
   // Ö4: naive hesabı için cache garanti (vaccination_log + vaccine_diseases + protocol_steps)
   await pullTables(['vaccination_log','vaccine_diseases','vaccine_protocol_steps']).catch(()=>{});
@@ -3045,6 +3754,14 @@ async function loadVaccinesDropdown() {
 }
 
 // muadil naive: hayvanın bu aşıyı kapsayan hastalık geçmişi var mı?
+/**
+ * Belirli bir hayvanın ve aşı ID'si için aşı loglarını kontrol eder;
+ * hayvanın bu aşıyı almış olması veya bu aşı ile korunan hastalıkların,
+ * hayvanın daha önce aldığı başka aşılarla korunduğu hastalıklarla örtüşmesi durumunda false döner.
+ * @param {string} animalId Kontrol edilecek hayvanın ID'si.
+ * @param {string} vaccineId Kontrol edilecek aşı ID'si.
+ * @returns {boolean} Hayvanın bu aşıya uygun olup olmadığına dair boolean değer.
+ */
 function _vaccineNaive(animalId, vaccineId){
   const logs=(getState('vaccination_log')||[]).filter(l=>l.animal_id===animalId);
   if(!logs.length) return true;
@@ -3057,10 +3774,23 @@ function _vaccineNaive(animalId, vaccineId){
   }
   return true;
 }
+/**
+ * Belirtilen aşı ID'sine sahip ve adım numarası 2 olan protokol adımını bulup,
+ * bu adımın 'offset_gun' değerini döndürür.
+ * @param {number} vaccineId Aşı kimliği.
+ * @returns {number|null} Bulunan adımın 'offset_gun' değeri veya bulunamazsa null.
+ */
 function _vStep2(vaccineId){
   const s=(getState('vaccine_protocol_steps')||[]).find(x=>x.vaccine_id===vaccineId && x.adim_no===2);
   return s? s.offset_gun : null;
 }
+/**
+ * Verilen checkbox'ın durumu (checked/unchecked) değiştiğinde, ilgili satırı ekranda gösterir veya gizler.
+ * Checkbox işaretliyse, hayvan bilgisi, doz ve offset hesaplama adımlarını gerçekleştiren yeni bir satır oluşturur.
+ * Checkbox işaretlenmemişse, ilgili ID'li satırı DOM'dan kaldırır.
+ * @param {Object} chk İşlem yapılacak checkbox elemanı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function vChkChange(chk){
   const id=chk.dataset.id, rows=document.getElementById('v-rows');
   if(!rows) return;
@@ -3087,11 +3817,20 @@ function vChkChange(chk){
   } else { document.getElementById('v-row-'+id)?.remove(); }
 }
 // Hayvan değişince seçili satırların naive hint'lerini yeniden hesapla
+/**
+ * Seçili olan tüm checkbox'ların (v-chk) ID'lerine sahip satırları DOM'dan kaldırır ve vChkChange fonksiyonunu tetikler.
+ * @returns {void}
+ */
 function _vRefreshRows(){
   document.querySelectorAll('.v-chk:checked').forEach(chk=>{ document.getElementById('v-row-'+chk.dataset.id)?.remove(); vChkChange(chk); });
 }
 
 // ── AŞI UYGULA (tek hayvan, çoklu aşı) ───────
+/**
+ * İnternet bağlantısı ve form geçerliliği kontrollerinden sonra seçili hayvan ve aşıları kaydederek işlemi gerçekleştirir.
+ * @param {HTMLElement} btn Kayıt butonu; işlem sırasında devre dışı bırakılır ve işlem tamamlandıktan sonra tekrar aktif edilir.
+ * @returns {Promise<void>} İşlem tamamlandığında (başarılı veya başarısız) çağrılan fonksiyon.
+ */
 async function submitVaccination(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const hid = v('v-hid');
@@ -3129,12 +3868,26 @@ async function submitVaccination(btn) {
   }
 }
 
+/**
+ * Belirli form alanlarını (v-hid, v-date, v-notes) temizleyerek değerlerini boşaltır ve vaccine picker'ı 'v' değerine ayarlar.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function resetVaccineForm() {
   ['v-hid','v-date','v-notes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   if (typeof renderVaccinePicker === 'function') renderVaccinePicker('v-vaccine-picker','v');
 }
 
 // ── GÖREV TAMAMLA ────────────────────────────
+/**
+ * Belirtilen görevi tamamlayarak arayüzü günceller, logları çeker ve hata durumunda uyarı gösterir.
+ * @param {number|string} id Görev ID'si.
+ * @param {number|string} hid Görev hedef ID'si.
+ * @param {number|string} stokId Stok ID'si.
+ * @param {number} miktar Miktar değeri.
+ * @param {number|string} padok Padok ID'si.
+ * @param {HTMLElement} btn Tıklanma durumunu (loading/hata) yönetmek için kullanılan buton elemanı.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata yakalandığında void döner.
+ */
 async function doneTask(id, hid, stokId, miktar, padok, btn) {
   btn.disabled = true;
   btn.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px"></div>';
@@ -3163,6 +3916,13 @@ async function doneTask(id, hid, stokId, miktar, padok, btn) {
 // Tedavi plan modalindeki gruplu checkbox dilinin aşıya uyarlanması: birden çok aşı
 // seçilebilir; her seçim için doz satırı açılır (standart doz dolu gelir).
 let _taVaxCache = [];
+/**
+ * 'ASI_PLANLI' değeri verilirse aşı alanını gösterir, yoksa gizler.
+ * Aşı stok verilerini çeker, zorunlu ve diğer aşıları gruplar.
+ * Her aşı için kalan stok miktarını hesaplar ve HTML listesi oluşturarak 'ta-vax-liste' elementine yazar.
+ * @param {string} val - Aşı planlama durumu ('ASI_PLANLI' olmalı).
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 async function taskAddTipDegisti(val){
   const alani=document.getElementById('ta-asi-alani');
   if(!alani) return;
@@ -3197,6 +3957,11 @@ async function taskAddTipDegisti(val){
   }catch(e){ toast('Aşı listesi yüklenemedi', true); }
 }
 // Checkbox işaretlenince doz satırı aç/kapat (standart doz dolu gelir)
+/**
+ * Vaksinin kontrol kutucuğunun durumu değiştiğinde, kutucu işaretliyse ilgili doz giriş satırını ekleme, işaretli değilse satırı kaldırma işlemini yapar.
+ * @param {HTMLElement} chk Kontrol durumu (checked/unchecked) izlenen HTML element (genellikle bir checkbox).
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function taskAddVaxChkChange(chk){
   const satirlari=document.getElementById('ta-doz-satirlari'); if(!satirlari) return;
   const vax=_taVaxCache.find(v=>v.id===chk.dataset.id);
@@ -3215,6 +3980,10 @@ function taskAddVaxChkChange(chk){
   }
 }
 // İşaretli aşıları topla → [{vaccine_id,doz,name,unit}] (doz girilmemişse standart)
+/**
+ * Seçili aşılar için doz bilgilerini toplar ve döndürür.
+ * @returns {Array} Seçili aşıların ID'si, doz miktarı, adı ve birimi içeren nesnelerden oluşan dizi.
+ */
 function taskAddSeciliAsilar(){
   const out=[];
   document.querySelectorAll('.ta-vaxchk:checked').forEach(chk=>{
@@ -3227,6 +3996,10 @@ function taskAddSeciliAsilar(){
   return out;
 }
 // Manuel görev formunu her açılışta sıfırla (bayat tip/doz/aşı taşınmaz)
+/**
+ * Manuel girişli formu sıfırlar, ilgili alanları temizler ve tip değişikliği olayını tetikler.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function taskAddFormSifirla(){
   const tt=document.getElementById('ta-tip'); if(tt) tt.value='MANUEL';
   ['ta-hid','ta-desc'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -3235,6 +4008,12 @@ function taskAddFormSifirla(){
   taskAddTipDegisti('');
 }
 // Hayvanın 1 yıl içinde aynı hastalığı kapsayan aşısı var mı? (marka bağımsız; _vaccineNaive'in 1 yıllık hali)
+/**
+ * Son bir yıl içinde, belirtilen aşıyla aynı aşı ya da en az bir ortak hastalık kapsamına giren bir aşılama kaydı varsa uyarı bilgisi döndürür.
+ * @param {string|number} hayvanId - Kontrol edilecek hayvanın kimliği.
+ * @param {string|number} vaccineId - Karşılaştırma yapılacak aşının kimliği.
+ * @returns {Object|null} Tekrar uyarısı varsa {tarih, ad} şeklinde bilgi, yoksa null.
+ */
 function _asiTekrarUyariBilgisi(hayvanId, vaccineId){
   const sinir=new Date(); sinir.setDate(sinir.getDate()-365);
   const isoSinir=sinir.toISOString().slice(0,10);
@@ -3252,6 +4031,16 @@ function _asiTekrarUyariBilgisi(hayvanId, vaccineId){
   return null;
 }
 
+/**
+ * "Görev Ekle" formunu doğrulayıp görev kaydını oluşturur. Planlı aşı tipinde
+ * seçili aşıları, dozları, küpe eşleşmesini ve mükerrer planları kontrol eder;
+ * gerekirse stok rezerve eden RPC çağrısıyla tek/toplu aşı görevi planlar,
+ * 1 yıllık tekrar uyarısı varsa kullanıcıya onay sorar. Diğer görev tiplerinde
+ * doğrudan gorev_log kaydı yazar; sonunda görev listesini ve panoyu yeniler,
+ * butonu geçici olarak devre dışı bırakıp eski haline döndürür.
+ * @param {HTMLElement|null} btn - Tıklanan buton; işlem süresince devre dışı bırakılır, boş geçilebilir.
+ * @returns {Promise<void>} Görev oluşturma işleminin tamamlanmasını bekleyen Promise; değer döndürmez.
+ */
 async function submitTaskAdd(btn) {
   const desc  = v('ta-desc');
   const tarih = v('ta-tarih');
@@ -3287,6 +4076,10 @@ async function submitTaskAdd(btn) {
         const u = _asiTekrarUyariBilgisi(hayvan.id, it.vaccine_id);
         return u ? `• ${it.name}: bu hayvan ${fmtTarih(u.tarih)} tarihinde "${u.ad}" olmuş` : null;
       }).filter(Boolean);
+      /**
+       * Aşı görevi oluşturma işlemini gerçekleştirir. Tek bir aşı için 'asi_gorev_planla' veya birden fazla aşı için 'asi_toplu_planla' RPC çağrısı yapar, stok hareketlerini günceller ve kullanıcıya bildirim gösterir.
+       * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda çağrılan Promise.
+       */
       const olustur = async () => {
         let res;
         if (items.length === 1) {
@@ -3324,6 +4117,11 @@ async function submitTaskAdd(btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Görev Oluştur'; } }
 }
 
+/**
+ * Görev düzenleme formundaki değişiklikleri doğrular ve onay penceresi açarak kaydetme işlemini başlatır.
+ * @param {HTMLElement} btn - Düzenlemeyi tetikleyen düğme; onay sonrası kaydetme fonksiyonuna iletilir.
+ * @returns {Promise<void>} Doğrulama başarısızsa veya değişiklik yoksa kaydetme başlatılmadan sonlanır.
+ */
 async function submitTaskEdit(btn) {
   if(!_curTaskDet) return;
   const desc  = v('te-desc');
@@ -3351,6 +4149,15 @@ async function submitTaskEdit(btn) {
   openConfirm('✏️ Görevi Düzenle', diffSatirlari.join('\n'), async() => kaydetTaskEdit(btn, t, degisen));
 }
 
+/**
+ * Görev düzenleme formundaki değişiklikleri sunucuya göndererek görevi günceller,
+ * başarılı olursa bildirimi gösterir, modalı kapatır, görev listesini ve dashboard'u yeniler,
+ * ardından görev detayını açar. Hata durumunda kullanıcıya hata mesajı gösterir.
+ * @param {HTMLElement} btn Kayıt butonu elemanı.
+ * @param {Object} t Güncellenecek görev nesnesi.
+ * @param {Object} degisen Güncellenen görev alanları içeren nesne.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function kaydetTaskEdit(btn, t, degisen) {
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
   try {
@@ -3371,6 +4178,10 @@ async function kaydetTaskEdit(btn, t, degisen) {
 }
 
 // ── HASTALIK KAPAT ───────────────────────────
+/**
+ * Mevcut hastalık kaydını kapatır, kullanıcıya başarı mesajı gösterir ve ilgili tabloyu yeniler.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda undefined döndürür.
+ */
 async function hstKapat() {
   if (!_curHst) return;
   try {
@@ -3384,6 +4195,10 @@ async function hstKapat() {
 // _editMode: true iken submitDisease → hastalik_guncelle çağırır
 let _editMode = false;
 
+/**
+ * Hastalık/tedavi düzenleme formunu ve modalını sıfırlayıp kapatır: düzenleme modunu kapatır, form alanlarını temizler, ilaç satırları, tanı seçenekleri ve semptom çiplerini boşaltır, seçili semptom ve ilaç önbelleğini sıfırlar.
+ * @returns {void}
+ */
 function closeDisease() {
   _editMode = false;
   globalThis._kizginlikTedaviId = null;
@@ -3405,6 +4220,10 @@ function closeDisease() {
   closeM('m-disease');
 }
 
+/**
+ * Seçili hastalık kaydını düzenleme modunda açar; form alanlarını mevcut kayıt verileriyle doldurur, semptom çiplerini oluşturur, detay modalını kapatıp düzenleme modalını açar.
+ * @returns {void} Hiçbir değer döndürmez; aktif hasta kaydı yoksa işlem yapılmadan çıkar.
+ */
 function hstDuzenleAc() {
   if (!_curHst) return;
   _editMode = true;
@@ -3450,6 +4269,13 @@ function hstDuzenleAc() {
 }
 
 
+/**
+ * Hastalık kaydı güncellemesini yapar, form verilerini toplar ve sunucuya gönderir.
+ * Başarılı güncelleme durumunda bildirim gösterir, ilgili tabloyu yeniler ve arayüzü günceller.
+ * Hata durumunda hata mesajını gösterir ve butonu tekrar aktif eder.
+ * @param {HTMLElement} btn Güncelleme işlemi sırasında devre dışı bırakılan buton elemanı.
+ * @returns {Promise<void>} Güncelleme işleminin tamamlanmasını bekleyen Promise.
+ */
 async function hstGuncelle(btn) {
   if (!_curHst) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Kaydediliyor…'; }
@@ -3471,6 +4297,10 @@ async function hstGuncelle(btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Kaydet + Görevler'; } }
 }
 
+/**
+ * Mevcut hastalık kaydını silmek için onay ister, silme işlemini gerçekleştirir ve ilgili tabloları günceller.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda undefined döndürür.
+ */
 async function hstSilOnay() {
   if (!_curHst) return;
   const onay = confirm(`"${_curHst.tani || 'Bu kayıt'}" silinecek. Emin misin?`);
@@ -3485,11 +4315,23 @@ async function hstSilOnay() {
 
 // ── TOHUMLAMA SONUÇ ──────────────────────────
 // openTohDet → ui.js'de tanımlı
+/**
+ * Seçili "toh-sonuc" radyo düğmesinin değerini alıp TOH sonucunu kaydeder; seçim yoksa uyarı gösterir.
+ * @returns {Promise<void>} Sonucun kaydedilmesi tamamlandığında çözülen bir Promise.
+ */
 async function tohSonucKaydet() {
   const sel = document.querySelector('input[name="toh-sonuc"]:checked');
   if (!sel) { toast('Sonuç seçin'); return; }
   await tohSonuc(sel.value);
 }
+/**
+ * Belirtilen tohumlama kaydının durumunu günceller (Gebe, Boş veya Bekliyor),
+ * ilgili RPC çağrılarını yapar, başarı mesajı gösterir, tablo verilerini çeker,
+ * detay modalını kapatır ve hayvan detayını yeniden açar.
+ * @param {string} sonuc Kaydın yeni durumu ('Gebe', 'Boş' veya 'Bekliyor').
+ * @param {HTMLElement} btn Tıklanan buton elemanı.
+ * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
+ */
 async function tohSonuc(sonuc, btn) {
   if (!_curToh) return;
   if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {
@@ -3536,6 +4378,12 @@ async function tohSonuc(sonuc, btn) {
 // dgGeriAlAkisi / dgGeriAlFromEntry (js/degisiklikler/degisiklikler.js). ──
 
 // ── STOK ─────────────────────────────────────
+/**
+ * Manuel stok ekleme işlemi başlatır, geçerli bir miktar kontrolü yapar,
+ * RPC çağrısı ile stoğu ekler, ilgili tabloları günceller ve arayüzü yeniler.
+ * @param {HTMLElement} btn Tıklanma olayını tetikleyen buton elemanı.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function submitStk(btn) {
   const mik = Number.parseFloat(g('se-mik').value);
   if (!mik || mik <= 0) { toast('Geçerli miktar girin', true); return; }
@@ -3554,6 +4402,13 @@ async function submitStk(btn) {
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Stok Ekle'; } }
 }
 
+/**
+ * Stok ekleme formundaki verileri alarak yeni bir stok kalemi oluşturur veya mevcut stok miktarını günceller.
+ * İlaç kategorisi seçildiyse etken madde ve konsantrasyon gibi ek doğrulamalar yapar, yoksa standart stok kaydını oluşturur.
+ * Başarılı kayıt sonrası formu temizler, ilgili tabloları yeniler ve paneli günceller.
+ * @param {HTMLElement} btn Kayıt butonu; işlem sırasında devre dışı bırakılır ve işlem sonrası tekrar aktif edilir.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function submitStokAdd(btn) {
   const kat  = g('sa-kat')?.value || 'Antibiyotik';
   if(navigator.onLine) await pullTables(['stok_kategorileri']);
@@ -3626,6 +4481,11 @@ async function submitStokAdd(btn) {
 
 
 // ── GEBELİK EKLE ─────────────────────────────
+/**
+ * Gebelik kaydetme formunu doğrular, gerekli kontrolleri yapar ve veriyi sunucuya kaydeder.
+ * @param {HTMLElement} btn Kayıt butonu referansı; işlem sırasında devre dışı bırakılır ve işlem sonrası tekrar aktif edilir.
+ * @returns {Promise<void>} Kayıt işlemi tamamlandığında veya hata oluştuğunda çözülen bir Promise.
+ */
 async function submitGebelikEkle(btn) {
   const modal = document.getElementById('m-gebelik');
   const hayvanId = modal?._hayvanId;
@@ -3647,6 +4507,11 @@ async function submitGebelikEkle(btn) {
 }
 
 // ── BİLDİRİM ─────────────────────────────────
+/**
+ * Belirtilen bildirim ID'sini 'görüldü' durumuna günceller, bildirim listesini yeniler ve bildirim rozetini günceller.
+ * @param {string} bildirimId Güncellenecek bildirim için benzersel kimlik.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda (toast ile bildirildiğinde) undefined döndürür.
+ */
 async function bildirimGoruldu(bildirimId) {
   try {
     await write('bildirim_log', { durum: 'goruldu' }, 'PATCH', `id=eq.${bildirimId}`);
@@ -3659,6 +4524,10 @@ async function bildirimGoruldu(bildirimId) {
 // hatırlatma) sürüm kullanılır — buradaki eskisi (B11) yükleme sırası
 // gereği kazanıp saatlik tekrarlayan bildirim spam'i üretiyordu. Silindi.
 
+/**
+ * Tarayıcı bildirim desteğini kontrol eder, iOS cihazlarda gerekli ön koşulları sağlar ve bildirim izni ister.
+ * @returns {boolean} Bildirim izni başarıyla alındıysa true, aksi takdirde false döndürür.
+ */
 async function bildirimIzniAl() {
   if (!('Notification' in window)) { toast('Tarayıcınız bildirimleri desteklemiyor', true); return false; }
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -3669,6 +4538,10 @@ async function bildirimIzniAl() {
   return result === 'granted';
 }
 
+/**
+ * Bildirim izni ister; izin verilirse bildirimleri etkinleştirip kontrolü başlatır, verilmezse uyarı gösterir.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise.
+ */
 async function bildirimAc() {
   const izin = await bildirimIzniAl();
   if (izin) { toast('✅ Bildirimler açık!'); localStorage.setItem('bildirim_aktif', '1'); bildirimKontrol(); }
@@ -3679,6 +4552,10 @@ async function bildirimAc() {
 // T-07 — İLAÇ YÖNETİMİ (hastalık detay)
 // ──────────────────────────────────────────
 
+/**
+ * İlaç formunun görünürlüğünü açıp kapatır; form gizliyken görünür yapılır ve form alanları ile ilaç önbelleği sıfırlanır.
+ * @returns {void}
+ */
 function hstIlacFormToggle() {
   const f = document.getElementById('hd-ilac-form');
   if (!f) return;
@@ -3724,6 +4601,12 @@ async function hstIlacEkle(btn) {
 }
 
 
+/**
+ * Kullanıcıdan onay aldıktan sonra RPC ile tedavi kaydını siler, arayüzü ve ilgili tabloları günceller.
+ * @async
+ * @param {number|string} tedaviId - Silinecek tedavi kaydının kimliği.
+ * @returns {Promise<void>} İşlem tamamlandığında hiçbir değer döndürmez.
+ */
 async function hstIlacSil(tedaviId) {
   if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
   try {
@@ -3735,6 +4618,12 @@ async function hstIlacSil(tedaviId) {
 }
 
 // ── İLAÇ–STOK BAĞLAMA ────────────────────────────────────────
+/**
+ * İlaç ile stok kalemi arasındaki bağlantıyı kaydeder veya kaldırır; başarılı olursa ilaç önbelleğini güncelleyerek 'drugs' tablosunu yeniden çeker.
+ * @param {string|number} drugId - Bağlanacak ilacın kimliği.
+ * @param {string|number} stockItemId - Bağlanacak stok kaleminin kimliği; boş string verilirse bağlantı kaldırılır (NULL kaydedilir).
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen promise; hata durumunda kullanıcıya hata mesajı gösterilir.
+ */
 async function submitDrugStokLink(drugId, stockItemId) {
   // Boş string → NULL (bağlantı kaldır)
   const stockId = stockItemId || null;
@@ -3751,6 +4640,10 @@ async function submitDrugStokLink(drugId, stockItemId) {
 }
 
 // ── TOPLU AŞILAMA ─────────────────────────────────────────────
+/**
+ * Hayvan durumlarından padok bilgilerini çıkarır, tekrarları kaldırır, Türkçe alfabetik sıralama yapar ve dropdown listesine ekler.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function loadBulkVaccinePadoklar() {
   const animals = getState('animals');
   if (!animals || !animals.length) return;
@@ -3761,6 +4654,10 @@ async function loadBulkVaccinePadoklar() {
     padoklar.map(p => `<option value="${p}">${p}</option>`).join('');
 }
 
+/**
+ * Seçilen padoka ait hayvanları getirip toplu aşılama listesinde küpe numaralarıyla gösterir; seçilen hayvanların ID'lerini global değişkende saklar.
+ * @returns {Promise<void>} Liste güncellemesi tamamlanır, değer döndürmez.
+ */
 async function loadBulkVaccineHayvanlar() {
   const padok = document.getElementById('bv-padok')?.value;
   if (!padok) { toast('Padok seçin'); return; }
@@ -3785,6 +4682,10 @@ async function loadBulkVaccineHayvanlar() {
   window._bvAnimalIds = animals.map(a => a.id);
 }
 
+/**
+ * Toplu aşı kaydı formunu hazırlar: gerekli tabloları çeker, aşı seçiciyi render eder, tarih alanını boşsa bugünün tarihiyle doldurur ve eski sonuç içeriğini temizler.
+ * @returns {Promise<void>} Hazırlık işlemleri tamamlandığında çözülen bir Promise.
+ */
 async function loadBulkVaccineVaccines() {
   // Ö4: muadil/protokol cache (bulk'ta naive hint yok ama tutarlilik icin)
   await pullTables(['vaccine_diseases','vaccine_protocol_steps']).catch(()=>{});
@@ -3795,6 +4696,11 @@ async function loadBulkVaccineVaccines() {
 }
 
 // Bulk'ta naive hint YOK (çok hayvan) — sadece doz satırı, .vp-off yok
+/**
+ * Seçili kontrol elemanına (checkbox) bağlı olarak, ID'si o elemanın dataset'inde tanımlı olan bir satırı (row) oluşturur veya mevcut olanı siler.
+ * @param {HTMLElement} chk Tıklanan veya durumu değişen checkbox elemanı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function bvChkChange(chk){
   const id=chk.dataset.id, rows=document.getElementById('bv-rows');
   if(!rows) return;
@@ -3808,6 +4714,10 @@ function bvChkChange(chk){
   } else { document.getElementById('bv-row-'+id)?.remove(); }
 }
 
+/**
+ * Seçilen hayvanlar için toplu aşılama işlemini gerçekleştirir; her seçili aşı için RPC çağrısı yapar, sonuçları arayüzde gösterir ve ilgili tabloları yeniler.
+ * @returns {Promise<void>} İşlem tamamlandığında hiçbir değer döndürmez.
+ */
 async function submitBulkVaccination() {
   const animalIds = window._bvAnimalIds || [];
   if (!animalIds.length) { toast('Önce hayvanları getirin'); return; }
@@ -3850,6 +4760,10 @@ async function submitBulkVaccination() {
 // TOPLU İLAÇ — m-bulk-ilac modal
 // ============================================================
 
+/**
+ * Hayvan kayıtlarındaki padokları tekrarsız ve Türkçe alfabetik sıralı olarak "bi-padok" seçim listesini doldurur.
+ * @returns {Promise<void>} Padok listesi yoksa veya seçim öğesi bulunamazsa işlem yapılmadan sonlanır.
+ */
 async function loadBulkIlacPadoklar() {
   const animals = getState('animals');
   if (!animals || !animals.length) return;
@@ -3860,6 +4774,10 @@ async function loadBulkIlacPadoklar() {
     padoklar.map(p => `<option value="${p}">${p}</option>`).join('');
 }
 
+/**
+ * Seçili padoka ait hayvanları filtreleyerek toplu ilaçlama listesinde görüntüler ve seçilen hayvan kimliklerini kaydeder.
+ * @returns {Promise<void>} Herhangi bir değer döndürmez.
+ */
 async function loadBulkIlacHayvanlar() {
   const padok = document.getElementById('bi-padok')?.value;
   if (!padok) { toast('Padok seçin'); return; }
@@ -3884,6 +4802,11 @@ async function loadBulkIlacHayvanlar() {
   window._biAnimalIds = animals.map(a => a.id);
 }
 
+/**
+ * Belirli ilaç kategorilerindeki stokları filtreleyip, bunları 'bi-ilac-sel' seçici elemanına
+ * opsiyonlar olarak yükler.
+ * @returns {void}
+ */
 async function loadBulkIlacDropdown() {
   const DRUG_KATEGORI = ['İlaç','Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç'];
   const stoklar = (getState('stock') || []).filter(s => DRUG_KATEGORI.includes(s.kategori));
@@ -3893,6 +4816,10 @@ async function loadBulkIlacDropdown() {
     stoklar.map(s => `<option value="${s.id}">${esc(s.urun_adi)} (${s.guncel ?? 0} ${s.birim || 'adet'})</option>`).join('');
 }
 
+/**
+ * Toplu ilaç uygulama formunu doğrulayıp seçili hayvanlara bulk_ilac RPC'si ile ilaç uygular; sonucu modal ve özet olarak gösterir, verileri yeniler. Çift tıklamaya karşı kilit içerir.
+ * @returns {Promise<void>} Hiçbir değer döndürmez.
+ */
 async function submitBulkIlac() {
   const animalIds = window._biAnimalIds || [];
   if (!animalIds.length) { toast('Önce padok seçip hayvanları getirin'); return; }
@@ -3918,6 +4845,12 @@ async function submitBulkIlac() {
 
     // P7: karışık sonuç → tek modal; tekrar gönderim YALNIZ requires_ack alt kümesi
     if (Array.isArray(result?.applied) || Array.isArray(result?.requires_ack) || Array.isArray(result?.blocked)) {
+      /**
+       * Seçilen hayvanlar için ilac stok bilgisi, miktar, notlar ve gerekçeler içeren bir istek oluşturarak RPC çağrısı yapar.
+       * @param {Array} secilen Seçilen hayvanların kimlikleri.
+       * @param {Object} gerekceler Hayvanların gerekçeleri içeren bir nesne.
+       * @returns {Object} RPC çağrısının sonucu.
+       */
       const tekrar = (secilen, gerekceler) => rpc('bulk_ilac', {
         p_animal_ids: secilen,
         p_ilac_stok_id: ilacId,
@@ -3957,6 +4890,13 @@ async function submitBulkIlac() {
 // ============================================================
 
 // Tab switcher — works for both modals via prefix
+/**
+ * Belirtilen tab'ı aktif hale getirir, diğer tab'ları gizler ve ilgili buton stillerini günceller.
+ * Eğer tab 'serbest' ise, serbest listesi yüklenir.
+ * @param {string} prefix Tab ve bölüm ID'lerinin ön ekidir.
+ * @param {string} tab Aktif edilecek tab'ın adı ('padok', 'filtre' veya 'serbest').
+ * @returns {void}
+ */
 function bulkTabSwitch(prefix, tab) {
   try {
     ['padok','filtre','serbest'].forEach(t => {
@@ -3976,6 +4916,13 @@ function bulkTabSwitch(prefix, tab) {
 }
 
 // Filter-based selection
+/**
+ * Mevcut filtrelenmiş hayvan listesinden (padok seçimi) belirli bir öneki (prefix) kullanılarak
+ * durum ve yaş aralığına göre filtreleme yapar, seçilen hayvanların ID'lerini pencereye kaydeder
+ * ve önizleme listesini günceller.
+ * @param {string} prefix - Filtreleme yapılacak alanın öneki (örn: 'bv' veya 'bi').
+ * @returns {void}
+ */
 function applyBulkFiltre(prefix) {
   // Start from current filtered list (padok selection), not all animals
   let idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
@@ -4025,6 +4972,11 @@ function applyBulkFiltre(prefix) {
 }
 
 // Populate serbest seçim checkbox list
+/**
+ * Belirtilen önekli (prefix) ID'ye sahip HTML elemanını bulup, mevcut hayvan listesini (animals) bu elemanın içine checkbox'lar ve detaylar (kupe, padok, ırk) içeren etiketler olarak render eder.
+ * @param {string} prefix Render edilecek liste elemanının ID'sinin başında kullanılması gereken önek (örn: "s-list" için "s").
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function loadBulkSerbest(prefix) {
   const animals = getState('animals');
   const div = document.getElementById(prefix + '-s-list');
@@ -4040,6 +4992,12 @@ function loadBulkSerbest(prefix) {
 }
 
 // Filter checkbox list by search
+/**
+ * Belirli bir önek (prefix) içeren arama kutusundaki değere göre,
+ * ilgili listedeki etiketleri (label) filtreler ve eşleşmeyenleri gizler.
+ * @param {string} prefix Filtreleme yapılacak listenin ID'sinin başlangıç kısmını belirten önek.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function filterBulkSerbest(prefix) {
   const q = trLower(document.getElementById(prefix + '-s-ara')?.value || '') || '';
   const labels = document.querySelectorAll('#' + prefix + '-s-list label');
@@ -4049,6 +5007,12 @@ function filterBulkSerbest(prefix) {
 }
 
 // Update selected IDs from checkboxes
+/**
+ * Belirli bir önek (prefix) ile başlayan seçili checkbox'ların değerlerini alıp
+ * ilgili global değişkene atar ve sayısını günceller.
+ * @param {string} prefix Seçili checkbox'ların ID'sinin başlangıç kısmını belirten önek.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function updateBulkSerbest(prefix) {
   const boxes = document.querySelectorAll('#' + prefix + '-s-list input[type=checkbox]:checked');
   const idKey = prefix === 'bv' ? '_bvAnimalIds' : '_biAnimalIds';
@@ -4058,6 +5022,11 @@ function updateBulkSerbest(prefix) {
 }
 
 // ── SORUN TESPİT TOGGLE (tohumlama modalı) ──
+/**
+ * Sorun onay kutusunun durumuna göre başparmak öğesinin arka plan rengini günceller ve global sorunu değişkenini ayarlar.
+ * @param {Object} cb - Değişikliği tetikleyen onay kutusu öğesi.
+ * @returns {void}
+ */
 function sorunToggle(cb) {
   const thumb = document.getElementById('i-sorun-thumb');
   thumb.style.background = cb.checked ? 'var(--red2)' : 'var(--card3)';
@@ -4071,6 +5040,12 @@ function sorunToggle(cb) {
 
 // D19: vaka-kapanış özeti — N senkron vakası / M otomatik-iptal görevi > 0 ise cümle;
 // hepsi 0 → null (çağıran standart toast'a düşer)
+/**
+ * Verilen kapanış listesi ve otomatik iptal sayısına göre özet mesajı oluşturur.
+ * @param {Array} kapatilan Kapanış işlemi yapılan kayıtlar dizisi.
+ * @param {number} otoBos Otomatik iptal edilen görev sayısı.
+ * @returns {string|null} Oluşturulan özet mesajı veya hiç bir durum yoksa null.
+ */
 function _vakaKapanisOzeti(kapatilan, otoBos){
   const n = Array.isArray(kapatilan) ? kapatilan.length : 0;
   const m = otoBos | 0;
@@ -4082,6 +5057,14 @@ function _vakaKapanisOzeti(kapatilan, otoBos){
   return s;
 }
 
+/**
+ * Belirtilen seans ID'si için seans durumunu günceller, ilgili butonları devre dışı bırakır ve başarı/hata durumuna göre kullanıcıya bildirim gösterir.
+ * Seans tamamlandıysa ilgili tablolardan verileri çeker, vaka zaman çizelgesini ve görev listesini tazeleyerek arayüzü günceller.
+ * @param {string} seansId Seansın benzersiz kimlik numarası.
+ * @param {boolean} uygulanmadi Seansın uygulanmadığı durumu işaretleyen bayrak.
+ * @param {HTMLElement} btn Tıklanan buton elemanı.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function seansTamamla(seansId, uygulanmadi, btn) {
   if (!seansId) { toast('❌ Seans ID eksik', true); return; }
   const row = btn?.closest('.seans-row, .seans-gorev-card');
@@ -4117,6 +5100,15 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
 }
 
 // ── Aşı ekle/düzenle submit (içerik-odaklı) ──
+/**
+ * Aşı ekleme formundaki verileri doğrulayarak yeni bir aşı kaydeder veya mevcut bir aşıyı günceller.
+ * Formu önceden senkronize eder, preparat adı ve internet bağlantısı gibi zorunlu kontrolleri yapar.
+ * Aşı adı, marka, etken madde, dozaj, hastalık ID'leri, protokol türü ve stok bilgileri gibi parametreleri
+ * RPC çağrısı aracılığıyla işler. Başarılı işlemden sonra kullanıcıya bildirim gösterir, modalı kapatır ve
+ * ilgili tabloları yeniden yükler.
+ * @param {HTMLElement} btn Kayded butonu; işlemden sonra devre dışı bırakılır ve metni güncellenir.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function submitAsiEkle(btn){
   if(typeof _syncAsiForm==='function') _syncAsiForm();
   const s = _asiEdit;
@@ -4165,6 +5157,12 @@ async function submitAsiEkle(btn){
 
 // VAKA_KAYDIRILAMAZ:{"sebep":...} zarfını soyar (iç RPC SQLERRM'i); iç sebep
 // yoksa ham metin döner. Saf.
+/**
+ * 'VAKA_KAYDIRILAMAZ:' öneki içeren metinleri JSON olarak parse ederek 'sebep' alanını döndürür;
+ * parse başarısız olursa veya önek bulunamazsa ham metni döndürür.
+ * @param {string} sebep Girdi metni.
+ * @returns {string} Parse edilen sebep metni veya ham girdi metni.
+ */
 function _ckSebepMetni(sebep){
   const s = String(sebep || 'bilinmeyen hata');
   if (s.indexOf('VAKA_KAYDIRILAMAZ:') === 0) {
@@ -4177,6 +5175,11 @@ function _ckSebepMetni(sebep){
 }
 
 // Kısa nesne etiketi (uuid ilk 8 hane) — yalnız METİN taşıyıcı, tıklanabilir değil.
+/**
+ * Verilen kimlik değerini en fazla 8 karaktere kısaltır ve uzunsa sonuna üç nokta ekler.
+ * @param {string} id Kısaltılacak veya boşaltılacak kimlik değeri.
+ * @returns {string} 8 karakterden kısa olan veya 8 karakterle sonlandırılmış (üç nokta ile) string.
+ */
 function _ckKisaId(id){
   const s = String(id || '');
   return s.length > 8 ? s.slice(0, 8) + '…' : s;
@@ -4186,6 +5189,10 @@ function _ckKisaId(id){
 // case_id → kupe haritası: cases → animal_id → hayvanlar.kupe_no/devlet_kupe.
 // Hayvanlar önce state cache'inden (getState('animals')), boşsa IDB'den okunur.
 // Her hata boş harita döner — bant fallback kısa-id ile devam eder (çökmez).
+/**
+ * Hayvan ve vaka veritabanından (IDB) veya state'den okunarak, her vakanın (case) ID'sine karşılık gelen kupe numarasını içeren bir obje döndürür.
+ * @returns {Object} Vaka ID'leri anahtar, kupe numaraları değer olarak tutulan obje.
+ */
 async function _ckCaseKupeHaritasi(){
   const harita = {};
   try {
@@ -4205,6 +5212,12 @@ async function _ckCaseKupeHaritasi(){
 
 // Vaka etiketi: kupe çözülebiliyorsa "Vaka TR-123", çözülemiyorsa kısa-id
 // fallback (I-4 — ham UUID kullanıcıya gösterilmez).
+/**
+ * Verilen caseId için kupeHarita objesindeki kaydı kontrol eder; varsa etiketi döndürür, yoksa kısa ID'yi kullanır.
+ * @param {string} caseId Vaka kimliği.
+ * @param {Object} kupeHarita Kupe bilgilerini içeren nesne.
+ * @returns {string} Vaka etiketi.
+ */
 function _ckVakaEtiketi(caseId, kupeHarita){
   const kupe = kupeHarita ? kupeHarita[caseId] : null;
   return kupe ? 'Vaka ' + kupe : 'Vaka ' + _ckKisaId(caseId);
@@ -4214,6 +5227,11 @@ function _ckVakaEtiketi(caseId, kupeHarita){
 // bazında gruplanır (görev satırı hayvan_id taşır — renderTask aynısı),
 // kupe + seçili görevlerin min→max hedef_tarih aralığı listelenir.
 // Görev satırı ya da hayvanı çözülemeyen id'ler "cozulemeyen" sayılır.
+/**
+ * Seçili görev kimlikleri için hayvan bazında özet satırları oluşturur; her hayvanın küpe numarası, hedef tarih aralığı ve görev sayısını içeren bir özet döndürür.
+ * @param {Array} ids - Özeti çıkarılacak görev kimlikleri.
+ * @returns {Promise<{satirlar: Array<string>, hayvanSayisi: number, cozulemeyen: number}>} Özet satırları, eşlenen hayvan sayısı ve çözülemeyen görev sayısını içeren nesne.
+ */
 async function _ckSecimOzeti(ids){
   const bos = { satirlar: [], hayvanSayisi: 0, cozulemeyen: ids.length };
   let gorevler = [];
@@ -4253,6 +5271,12 @@ async function _ckSecimOzeti(ids){
 // fix-tur1 (I-4): kupeHarita (case_id → kupe, _ckCaseKupeHaritasi) verilirse
 // vakalar kupe ile gösterilir; yoksa/çözülemezse kısa-id fallback.
 // Hiçbir bant oluşmazsa da görünür uyarı döner — sessiz sonuç YASAK.
+/**
+ * Kaydırılan, atlanan ve hata içeren vaka satırlarını filtreleyerek renkli bilgi bantları oluşturur.
+ * @param {Object} sonuc Kaydırma işlemi sonuçlarını içeren nesne (hatalar, detaylar, kaydirilan, atlanan vb. özelliklere sahip).
+ * @param {Object} kupeHarita Vaka etiketleme işlemleri için kullanılan harita nesnesi.
+ * @returns {String} Oluşturulan bilgi bantlarının HTML içeriğini içeren string.
+ */
 function _cokluKaydirBanti(sonuc, kupeHarita){
   const r = sonuc || {};
   const hatalar = Array.isArray(r.hatalar) ? r.hatalar : [];
@@ -4262,6 +5286,13 @@ function _cokluKaydirBanti(sonuc, kupeHarita){
   const atlananSatirlar = hatalar.filter(h => String(h?.sebep || '').indexOf('VAKA_ACIK_DEGIL') !== -1);
   const hataSatirlari = hatalar.filter(h => String(h?.sebep || '').indexOf('VAKA_ACIK_DEGIL') === -1);
 
+  /**
+   * Verilen ikon, başlık ve alt başlık bilgilerini kullanarak stilize edilmiş bir HTML satırı oluşturur.
+   * @param {string} ikon Gösterilecek ikon ifadesi.
+   * @param {string} baslik Satırın ana başlık metni.
+   * @param {string} sub Satırın alt başlık metni (opsiyonel).
+   * @returns {string} Oluşturulan HTML satır kodu.
+   */
   const satir = (ikon, baslik, sub) =>
     '<div class="arow" style="cursor:default"><div class="arow-left">' +
     '<div class="arow-id" style="font-size:.8rem">' + ikon + ' ' + escAttr(baslik) + '</div>' +
@@ -4307,6 +5338,12 @@ function _cokluKaydirBanti(sonuc, kupeHarita){
 // kapatma _cokluKaydirBantiKapat'ta). Kapsayıcı referansı window önbelleğinde
 // tutulur (ui.js _ckSecilenGorevler deseni): kapatılınca cache düşer, yeni
 // koşumda TAZE bant yaratılır — eski içerik sızmaz.
+/**
+ * Çoklu kaydırma sonucunu göstermek için gerekli olan DOM elementini oluşturur veya mevcut olanı getirir.
+ * Verilen HTML içeriğini bu elementin içine yerleştirir ve elementi görünür hale getirir.
+ * @param {string} html Gösterilecek HTML içeriği.
+ * @returns {HTMLElement} Çoklu kaydırma sonucunu gösteren div elementi.
+ */
 function _cokluKaydirBantiGoster(html){
   let el = window._ckKaydirSonucEl || null;
   if (!el || !el.parentNode) {                    // yoksa/kaldırılmışsa yeniden yarat
@@ -4329,6 +5366,10 @@ function _cokluKaydirBantiGoster(html){
   return el;
 }
 
+/**
+ * Kaydırma sonucuna ait elemanı DOM'dan kaldırır ve global referansı sıfırlar.
+ * @returns {void}
+ */
 function _cokluKaydirBantiKapat(){
   const el = window._ckKaydirSonucEl;
   if (el) el.remove();
@@ -4387,6 +5428,13 @@ async function cokluKaydirBaslat(){
 // göstersin), (b) belirsizlik bandı + hata mesajı, (c) seçim TEMİZLENMEZ ama
 // buton normal metinle serbest bırakılmaz ("⚠ Kontrol et" uyarısı) ve
 // _ckKaydirBelirsiz bayrağı sonraki onayda uyarıyı tekrar gösterir.
+/**
+ * Seçili görevlerin (vaka) kalan günlerini belirli bir süre için kaydırma işlemini başlatır,
+ * işlem sırasında kullanıcı arayüzünü kilitleyebilir, sunucu yanıtını işler,
+ * sonuç durumuna göre (başarılı, belirsiz veya hata) ilgili uyarı bandlarını gösterir
+ * ve işlem sonrası arayüzü serbest bırakır.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function cokluKaydirOnayla(){
   const gun = window._ckKaydirBekleyenGun;
   window._ckKaydirBekleyenGun = null;
@@ -4436,6 +5484,11 @@ async function cokluKaydirOnayla(){
 // render'ında inline handler'sız yeniden çizildiğinden bağlama TEK
 // document-seviyesi delegasyonla yapılır (data-aksiyon dataset'i — id
 // interpolasyonu yok). Idempotent: guard bayrağı çift-listener'ı önler.
+/**
+ * 'coklu-kaydir' aksiyonuna sahip en yakın elemana tıklanıp tıklanmadığını kontrol eder ve tıklanıldıysa çoklu kaydırma işlemini başlatır.
+ * @param {Event} ev - Tıklama olayını temsil eden olay nesnesi.
+ * @returns {void} Hiçbir değer döndürmez.
+ */
 function _ckKaydirClick(ev){
   const t = ev && ev.target;
   const el = t && typeof t.closest === 'function' ? t.closest('[data-aksiyon="coklu-kaydir"]') : null;

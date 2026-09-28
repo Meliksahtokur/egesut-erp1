@@ -21,10 +21,25 @@
     'For security purposes, you can only request this after 60 seconds.': 'Güvenlik için 60 saniyede bir deneyebilirsin',
     'New password should be different from the old password.': 'Yeni şifre eskisinden farklı olmalı',
   };
+  /**
+   * Verilen hata mesajını AUTH_ERR sözlüğündeki karşılıkla eşleştirir; eşleşme yoksa mesajın kendisini, boşsa varsayılan hata metnini döndürür.
+   * @param {*} m - Çevrilecek hata mesajı; boş olabilir.
+   * @returns {string} Sözlükten bulunan açıklama, mesajın dize karşılığı ya da varsayılan 'Bir hata oluştu' metni.
+   */
   const authErr = m => AUTH_ERR[String(m || '')] || String(m || 'Bir hata oluştu');
 
+  /**
+   * Mevcut sayfanın kaynağı (origin) ve yolunu (pathname) birleştirerek yönlendirme URL'sini döndürür.
+   * @returns {string} Origin ve pathname'in birleşiminden oluşan URL.
+   */
   const redirectUrl = () => window.location.origin + window.location.pathname;
 
+  /**
+   * Belirtilen metni ve tipine göre 'auth-msg' elementini günceller.
+   * @param {string} text Gösterilecek metin.
+   * @param {string} type Mesajın rengini belirleyen tip ('err', 'ok' veya varsayılan).
+   * @returns {void} Hiçbir değer döndürmez.
+   */
   function msg(text, type) {
     const m = document.getElementById('auth-msg');
     if (!m) return;
@@ -33,6 +48,14 @@
   }
 
   // Bir butonu `secs` saniye disable edip geri sayım gösterir.
+  /**
+   * Verilen butonu devre dışı bırakır, etiketini soğuma süresiyle günceller ve her saniye süreyi azaltır.
+   * Süre bitince butonu tekrar aktif eder ve etiketi orijinal haline getirir.
+   * @param {HTMLElement} btn Devre dışı bırakılacak buton elemanı.
+   * @param {number} secs Soğuma süresi (saniye cinsinden).
+   * @param {string} label Butonun gösterilecek başlık metni.
+   * @returns {void} Fonksiyon bir değer döndürmez.
+   */
   function startCooldown(btn, secs, label) {
     if (!btn) return;
     let n = secs;
@@ -46,6 +69,11 @@
     }, 1000);
   }
 
+  /**
+   * Giriş veya kayıt modunu belirler ve ilgili form elemanlarını (tab'lar, buton metni, şifre alanı vb.) bu moda göre günceller.
+   * @param {string} next - 'login' veya 'signup' değerlerinden biri olan yeni mod.
+   * @returns {void}
+   */
   function setMode(next) {
     mode = next;
     document.getElementById('auth-tab-login').classList.toggle('on', mode === 'login');
@@ -59,6 +87,12 @@
     msg('');
   }
 
+  /**
+   * Kullanıcı giriş veya kayıt formundaki e-posta ve şifre alanlarını alarak doğrulama işlemi başlatır.
+   * Giriş modunda oturum açar, kayıt modunda ise kullanıcıyı kaydeder ve doğrulama e-postası gönderir.
+   * İşlem başarılı olduğunda sayfayı yeniler, hata durumunda hata mesajı gösterir.
+   * @returns {Promise<void>} İşlem tamamlandığında boş bir Promise döndürür.
+   */
   async function submit() {
     const email = document.getElementById('auth-email').value.trim();
     const pass = document.getElementById('auth-pass').value;
@@ -90,6 +124,11 @@
   }
 
   // Kayıt sonrası "doğrulama mailini tekrar gönder" butonunu göster + ilk 60sn cooldown.
+  /**
+   * Belirtilen e-posta adresi için yeniden gönderme butonunu gösterir ve tıklanıldığında e-posta adresine tekrar kayıt onay maili gönderir.
+   * @param {string} email Yeniden gönderilecek e-posta adresi.
+   * @returns {void} Fonksiyon bir değer döndürmez.
+   */
   function showResend(email) {
     const r = document.getElementById('auth-resend');
     if (!r) return;
@@ -108,6 +147,10 @@
     startCooldown(r, 60, 'Tekrar gönder'); // mail az önce gitti → ilk tur beklesin
   }
 
+  /**
+   * Girilen e-posta adresine şifre sıfırlama bağlantısı içeren bir e-posta gönderir; başarılı olursa 60 saniyelik geri sayım başlatır.
+   * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise.
+   */
   async function forgotPassword() {
     const email = document.getElementById('auth-email').value.trim();
     if (!email) { msg('Önce e-posta adresini yaz', 'err'); return; }
@@ -123,6 +166,11 @@
     }
   }
 
+  /**
+   * Giriş/Kayıt ekranını DOM'a ekler, stil tanımlar ve butonlara tıklama olaylarını bağlar.
+   * Eğer 'auth-overlay' elementi zaten varsa fonksiyon hemen döner.
+   * @returns {void}
+   */
   function renderAuthScreen() {
     if (document.getElementById('auth-overlay')) return;
     const style = document.createElement('style');
@@ -169,6 +217,10 @@
   }
 
   // Şifre sıfırlama linkine tıklanınca (PASSWORD_RECOVERY) "yeni şifre belirle" ekranı.
+  /**
+   * Şifre sıfırlama ekranını oluşturur ve ekrana ekler.
+   * @returns {void}
+   */
   function renderResetScreen() {
     if (document.getElementById('auth-reset-overlay')) return;
     const el = document.createElement('div');
@@ -187,9 +239,21 @@
     document.getElementById('reset-pass').addEventListener('keydown', e => { if (e.key === 'Enter') submitReset(); });
   }
 
+  /**
+   * Şifre sıfırlama formundaki yeni şifreyi doğrular ve kullanıcının şifresini günceller.
+   * Şifre 6 karakterden kısaysa hata mesajı gösterir; başarılı olursa sayfayı yeniden yükler,
+   * hata olursa mesaj gösterip düğmeyi yeniden etkinleştirir.
+   * @returns {Promise<void>} İşlem tamamlandığında hiçbir değer döndürmez.
+   */
   async function submitReset() {
     const p = document.getElementById('reset-pass').value;
     const rm = document.getElementById('reset-msg');
+    /**
+     * rm öğesi varsa metin içeriğini ve yazı rengini ayarlar.
+     * @param {string} t - Ayarlanacak metin içeriği.
+     * @param {string} c - Ayarlanacak yazı rengi.
+     * @returns {void} Geriye değer döndürmez.
+     */
     const setMsg = (t, c) => { if (rm) { rm.textContent = t; rm.style.color = c; } };
     if (!p || p.length < 6) { setMsg('Şifre en az 6 karakter olmalı', '#ff6b5b'); return; }
     const btn = document.getElementById('reset-submit');
@@ -222,6 +286,12 @@
   window.authChangePassword = async function () {
     const inp = document.getElementById('hesap-yeni-sifre');
     const m = document.getElementById('hesap-msg');
+    /**
+     * Eğer `m` değişkeni tanımlıysa, metin içeriğini `t` ve rengini `c` ile günceller.
+     * @param {string} t Güncellenecek metin içeriği.
+     * @param {string} c Metnin rengi.
+     * @returns {void}
+     */
     const setM = (t, c) => { if (m) { m.textContent = t; m.style.color = c; } };
     const p = inp ? inp.value : '';
     if (!p || p.length < 6) { setM('Şifre en az 6 karakter olmalı', '#ff6b5b'); return; }

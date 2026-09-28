@@ -7,6 +7,13 @@
 // Test sırasında kullanıcı hareketleri ve UI hatalarını Supabase'e loglar
 const _sessionId = Math.random().toString(36).slice(2, 9);
 
+/**
+ * Verilen seviye ve mesajla bir UI log kaydını veritabanına yazar; hata oluşursa sessizce yutar.
+ * @param {string} level - Log seviyesi.
+ * @param {string} message - Log mesajı.
+ * @param {Object} [extra={}] - Ek bilgiler; 'source' alanı ve payload olarak saklanır.
+ * @returns {Promise<void>} Log yazma işleminin sonucunu taşıyan promise; hatalar yutulur.
+ */
 async function uiLog(level, message, extra = {}) {
   try {
     await db.from('ui_logs').insert({
@@ -26,6 +33,10 @@ async function uiLog(level, message, extra = {}) {
 
 // DB'den hekimleri yükle (IDB 'hekimler' üzerinden — canlıda hekim_listesi RPC'si yok,
 // o dal her açılışta hataya düşüp config fallback'ine kalıyordu)
+/**
+ * Veritabanından hekimleri yükleyip hekim seçim kutularını doldurur.
+ * @returns {Promise<void>} İşlemin tamamlandığını gösteren Promise.
+ */
 async function loadHekimler() {
   await loadHekimlerFromDB();
   populateHekimSelects();
@@ -55,21 +66,41 @@ let _curBildirimTab = 'bekliyor';
 
 // helpers.js, modal.js'den geliyor (js/utils/)
 // Sync bar
+/**
+ * Senkron kuyruğunu kontrol eder; kuyruk boşsa senkron çubuğunu gizler, doluysa bekleyen kayıt sayısını gösteren bir uyarı mesajı ayarlar.
+ * @returns {void}
+ */
 function updateSyncBar() {
   getQueue().then(q => {
     if (!q.length) { hideSyncBar(); return; }
     setSyncBar('warn', `⏳ ${q.length} kayıt bekliyor — internet gelince otomatik gönderilecek`);
   });
 }
+/**
+ * Senkronizasyon çubuğunun durumunu ve metnini günceller.
+ * @param {string} type Çubuğun durumu için kullanılacak sınıf adı.
+ * @param {string} txt Çubuğun yanında gösterilecek metin.
+ * @returns {void}
+ */
 function setSyncBar(type, txt) {
   const bar = g('sync-bar');
   if (!bar) return;
   bar.className = 'on ' + type;
   g('sync-bar-txt').textContent = txt;
 }
+/**
+ * 'sync-bar' elementini bulup varsa sınıfını temizleyerek gizlenmesini sağlar.
+ * @returns {void}
+ */
 function hideSyncBar() { const bar = g('sync-bar'); if (bar) bar.className = ''; }
 
 // ── ROUTING ─────────────────────────────────
+/**
+ * Mevcut sayfa durumunu günceller, sessiz sheet'leri temizler, tarayıcı geçmişine (history) yeni sayfa kaydeder ve ilgili sayfa elemanlarını aktif hale getirir. Sayfa değişimine göre özel yükleme işlemleri (dash, stok listesi, görevler vb.) başlatır.
+ * @param {string} pg Yeni sayfa adı (örneğin: 'tasks', 'dash', 'raporlar').
+ * @param {boolean} push Tarayıcı geçmişi (history) güncellemek için true ise, false ise güncelleme yapmaz. Varsayılan değeri true'dür.
+ * @returns {Promise<void>} İşlemlerin tamamlandığını gösteren Promise.
+ */
 async function goTo(pg, push = true) {
   // REV-5: sayfa değişince gizli sessiz sheet'ini ve dönüş işaretini temizle —
   // det'tan çıkıp başka sayfaya geçilirse öksüz sheet kalmasın
@@ -192,6 +223,10 @@ window.addEventListener('popstate', e => {
 });
 
 // ── RENDER FROM LOCAL ────────────────────────
+/**
+ * Yerel verilerden (hayvanlar ve stok) mevcut sayfayı yeniden çizer; güncel sayfaya göre ilgili yükleme fonksiyonlarını çalıştırır ve uyarı/bildirim bileşenlerini günceller.
+ * @returns {Promise<void>} Sayfanın yeniden çizilmesi tamamlandığında çözülen bir Promise.
+ */
 async function renderFromLocal() {
   await Promise.all([loadAnimals(), loadStock()]);
   const pg = getState('currentPage') || 'dash';
@@ -207,15 +242,31 @@ async function renderFromLocal() {
   updateBildirimBadge();
 }
 
+/**
+ * Bildirim modülü için bildirim sayacını günceller.
+ * @returns {void}
+ */
 function updateBildirimBadge() { /* Sprint 3 — bildirim modülü */ }
+/**
+ * Bildirim modülü için Sprint 3 kapsamında bildirimleri yükler.
+ * @returns {Promise} Bildirimlerin yüklendiğini gösteren Promise nesnesi.
+ */
 async function loadBildirimler() { /* Sprint 3 — bildirim modülü */ }
 
+/**
+ * Supabase'den veri çeker ve yerel veriye göre arayüzü yeniden render eder.
+ * @returns {Promise<void>} Supabase'den çekme ve yerel render işlemleri tamamlandığında çözülen bir Promise.
+ */
 async function refreshAll() {
   await pullFromSupabase();
   await renderFromLocal();
 }
 
 // ── HEKİM SELECTS ───────────────────────────
+/**
+ * Varsayılan ve özel hekimleri birleştirerek tüm hekim seçim kutularını (b-hekim, i-hekim, d-hekim, ta-hekim, tr-hekim) doldurur ve her birini varsayılan hekime ayarlar.
+ * @returns {void}
+ */
 function populateHekimSelects() {
   const all = [...HEKIMLER, ..._customHekimler];
   ['b-hekim','i-hekim','d-hekim','ta-hekim','tr-hekim'].forEach(id => {
@@ -240,6 +291,12 @@ function populateHekimSelects() {
 // Backend'den irk listesi çek, dropdown'ı doldur
 const IRK_LISTESI_SABIT = ['Holstein','Simental','Montofon','Jersey','Angus','Diğer'];
 
+/**
+ * DB'den kullanım sıklığına göre sıralanmış ırk listesini getirir,
+ * sabit ırk listesini önceliklendirerek birleştirir ve dropdown'a ekler.
+ * DB hatası durumunda ise sadece sabit ırk listesini gösterir.
+ * @returns {void}
+ */
 async function loadIrkDropdown() {
   const sel = g('a-irk-sel'); if (!sel) return;
   try {
@@ -263,6 +320,10 @@ async function loadIrkDropdown() {
       '<option value="__diger__">+ Diğer (yazın)</option>';
   }
 }
+/**
+ * Irk seçim kutusunda 'Diğer' seçiliyse serbest metin alanını görünür ve etkin hale getirir; aksi halde gizler, devre dışı bırakır ve değerini temizler.
+ * @returns {void} Bir değer döndürmez.
+ */
 function irkSecimDegisti() {
   const sel = g('a-irk-sel');
   const txt = g('a-irk-txt');
@@ -277,6 +338,10 @@ function irkSecimDegisti() {
     txt.value = '';
   }
 }
+/**
+ * 'a-irk-sel' seçeneğinin değeri '__diger__' ise 'a-irk-txt' alanındaki metni döndürür, aksi takdirde 'a-irk-sel' seçeneğinin değerini döndürür.
+ * @returns {string} Seçilen değer veya girilen metin.
+ */
 function getIrkValue() {
   const sel = g('a-irk-sel');
   const txt = g('a-irk-txt');
@@ -289,6 +354,11 @@ function getIrkValue() {
 // Grup → padok seçenekleri
 // GRUP_PADOK config.js'den geliyor
 
+/**
+ * Cinsiyet, doğum tarihi ve hayvanın doğum/tohumlama geçmişine göre hayvan formundaki grup (grup seçimi) açılır listesini uygun seçeneklerle günceller.
+ * Cinsiyet seçilmemişse grup ve padok listelerine uyarı seçeneği koyar; erkek hayvan için ipucu metni gösterir.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise; grup seçenekleri ve ipucu güncellenmiş olarak döner.
+ */
 async function animalFormGuncelle() {
   const cinsiyet = v('a-cinsiyet');
   const dt       = v('a-dt');
@@ -365,6 +435,11 @@ async function animalFormGuncelle() {
   animalGrupDegisti();
 }
 
+/**
+ * Seçili besleme grubuna ait padokları listeler, UUID'leri bulur ve seçili padok alanını günceller.
+ * Besi grubu seçildiyse cinsiyete göre varsayılan padok seçilir.
+ * @returns {void}
+ */
 function animalGrupDegisti() {
   const grup    = v('a-grup');
   const padokSel = g('a-padok');
@@ -390,6 +465,10 @@ function animalGrupDegisti() {
 }
 
 // ── SPERMA LİSTESİ ──────────────────────────
+/**
+ * Sperma modunda stok seçim panelini gösterir, sperma stoklarını yükleyip açılır listeye doldurur.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise.
+ */
 async function spermaModStok() {
   g('sperma-stok-area').style.display = 'block';
   g('sperma-elle-area').style.display = 'none';
@@ -420,6 +499,10 @@ async function spermaModStok() {
   g('i-sperma').value = '';
 }
 
+/**
+ * Sperma kaydını elle giriş moduna geçirir: stok alanını gizleyip elle giriş alanını gösterir, düğme arka planlarını günceller ve giriş alanını sıfırlayarak ipucu metnini ayarlar.
+ * @returns {void}
+ */
 function spermaModElle() {
   g('sperma-stok-area').style.display = 'none';
   g('sperma-elle-area').style.display = 'block';
@@ -430,6 +513,11 @@ function spermaModElle() {
   g('sperma-hint').textContent = 'Boğa kodu veya sperma adını yazın';
 }
 
+/**
+ * Veritabanından kullanılan tüm sperm kayıtlarını çeker, varsayılan ve özel sperm listelerini birleştirerek
+ * benzersiz bir sperm seçeneği listesini oluşturur ve 'dl-sperma' DOM elementine HTML option etiketleri olarak yazar.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 async function buildSpermaList() {
   const tohs = await idbGetAll('tohumlama');
 
@@ -449,6 +537,10 @@ async function buildSpermaList() {
 }
 
 // ── HASTALIK AUTOCOMPLETE ───────────────────
+/**
+ * Hastalık sıklık verilerini sıfırlar; hastalıklar tablosu kullanıldığı için eskisi gibi kayıt toplamaz.
+ * @returns {Promise<void>} Hiçbir değer döndürmez.
+ */
 async function buildDiseaseFreq() {
   _disFreq = {}; // hastalik_log kaldırıldı — diseases tablosu kullanılıyor
 }
@@ -456,6 +548,10 @@ async function buildDiseaseFreq() {
 // SEMPTOM_KAT config.js'den geliyor
 // SEMPTOM_GENEL config.js'den geliyor
 
+/**
+ * Hastalık kategorisi seçildiğinde, ilgili hastalık ve lokasyon seçeneklerini günceller, semptom dropdown'ını yeniler ve tanı alanını temizler.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function filterHastalikList() {
   const kat     = g('d-kat')?.value || '';
   const wrap    = g('tani-secenekler');
@@ -496,6 +592,11 @@ function filterHastalikList() {
 
 let _semptomSecili = [];
 
+/**
+ * Belirtilen kategoriye ait semptom listesini filtreleyerek seçilmemiş olanları dropdown'a ekler.
+ * @param {string|undefined} kat Filtreleme yapılacak kategori adı veya undefined.
+ * @returns {void}
+ */
 function updateSemptomDropdown(kat) {
   const sel = g('sempt-ekle'); if (!sel) return;
   const liste = (kat && SEMPTOM_KAT[kat]) ? SEMPTOM_KAT[kat] : SEMPTOM_GENEL;
@@ -505,6 +606,12 @@ function updateSemptomDropdown(kat) {
   sel.style.display = kalanlar.length ? 'block' : 'none';
 }
 
+/**
+ * Kullanıcının seçtiği semptom değerini doğrulayıp, tekrar eklenmemesi koşuluyla semptom listesine ekler,
+ * görsel olarak bir "chip" (etiket) oluşturur, ilgili input alanını sıfırlar ve altındaki dropdown'u günceller.
+ * @param {HTMLSelectElement} sel Semptom seçeneği içeren HTML select elementi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function semptomEkle(sel) {
   const val = sel.value; if (!val) return;
   if (!sel._noReset) sel.value = '';
@@ -520,6 +627,12 @@ function semptomEkle(sel) {
   updateSemptomDropdown(kat);
 }
 
+/**
+ * Seçili semptomu listeden çıkarır, ilgili DOM elemanını kaldırır ve dropdown'u günceller.
+ * @param {string} val Silinmesi istenen semptom değeri.
+ * @param {HTMLElement} chip Silinmesi istenen DOM elemanı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function semptomKaldir(val, chip) {
   _semptomSecili = _semptomSecili.filter(s => s !== val);
   chip?.remove();
@@ -531,6 +644,11 @@ function semptomKaldir(val, chip) {
 // ── DÜZENLEME FORMU SEMPTOM SİSTEMİ ────────────
 let _hdeSmptSecili = [];
 
+/**
+ * Belirtilen kategoriye ait semptom listesinden seçili olanları çıkararak kalanları dropdown'a ekler.
+ * @param {string} kat Seçilecek kategori adı (varsa).
+ * @returns {void}
+ */
 function hdeUpdateSmptDropdown(kat) {
   const sel = g('hde-sempt-ekle'); if (!sel) return;
   const liste = (kat && SEMPTOM_KAT[kat]) ? SEMPTOM_KAT[kat] : SEMPTOM_GENEL;
@@ -540,6 +658,11 @@ function hdeUpdateSmptDropdown(kat) {
   sel.style.display = kalanlar.length ? '' : 'none';
 }
 
+/**
+ * Seçili değeri alıp semptom listesine ekler, tekrarlayan değerleri engeller ve görsel çip (chip) oluşturur.
+ * @param {HTMLSelectElement} sel Semptom seçici elemanı.
+ * @returns {void}
+ */
 function hdeSmptomEkle(sel) {
   const val = sel.value; if (!val) return;
   sel.value = '';
@@ -554,6 +677,12 @@ function hdeSmptomEkle(sel) {
   hdeUpdateSmptDropdown(g('hde-tani')?.dataset?.kat || '');
 }
 
+/**
+ * Seçili semptom listesinden verilen değeri filtreleyip çıkarır, ilgili chip elementini kaldırır ve semptom listesini günceller.
+ * @param {string} val Filtrelenmek istenen semptom değeri.
+ * @param {HTMLElement} chip Kaldırılacak chip DOM elementi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function hdeSmptomKaldir(val, chip) {
   _hdeSmptSecili = _hdeSmptSecili.filter(s => s !== val);
   chip?.remove();
@@ -562,6 +691,12 @@ function hdeSmptomKaldir(val, chip) {
 }
 
 // ── DÜZENLEME FORMU TANI AUTOCOMPLETE ────────────
+/**
+ * Belirtilen butonun 'lok-on' sınıfını değiştirerek rengini ve kenarlığını günceller; aktif lokasyonların metinlerini alıp 'hde-lokasyon' inputuna yazdırır.
+ * @param {HTMLElement} val Butonun değeri veya referansı (kodda doğrudan kullanılmamış olsa da imza gereği belirtilir).
+ * @param {HTMLElement} btn Tıklanan buton elemanı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function hdeToggleLok(val, btn) {
   btn.classList.toggle('lok-on');
   if (btn.classList.contains('lok-on')) {
@@ -584,6 +719,12 @@ function toggleLokasyon(val, btn) {
   g('d-lokasyon').value = secili.join(', ');
 }
 
+/**
+ * Tanı butonlarını sıfırlar, ilgili form alanlarını temizler ve seçili butonu vurgular.
+ * @param {string} val Tanı değeri.
+ * @param {HTMLElement} btn Seçili buton elemanı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function selDis(val, btn) {
   g('d-tani').value = val;
   g('ac-dis').style.display = 'none';
@@ -719,6 +860,10 @@ window.addEventListener('appinstalled', () => {
   _pwaPrompt = null;
   toast('✅ EgeSüt ana ekrana eklendi!');
 });
+/**
+ * PWA kurulum istemini tetikler; istem yoksa kullanıcıya manuel kurulum talimatı gösterir.
+ * @returns {void}
+ */
 function pwaInstall() {
   if (_pwaPrompt) {
     _pwaPrompt.prompt();

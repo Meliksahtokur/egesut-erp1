@@ -23,12 +23,23 @@ const TARIH_AY_ADLARI  = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Tem
 const TARIH_GUN_ADLARI = ['Pt','Sa','Ca','Pe','Cu','Ct','Pz'];
 
 // Artık yıl — Gregorjen kural, saf bölme.
+/**
+ * Verilen yılı artık yıl olup olmadığını kontrol eder.
+ * @param {number} yil - Kontrol edilecek yıl.
+ * @returns {boolean} Yıl artık yıl ise true, değilse false döndürür.
+ */
 function tarihArtikYilMi(yil){
   return (yil % 4 === 0 && yil % 100 !== 0) || yil % 400 === 0;
 }
 
 // Ayın gün sayısı — ay 1..12 dışıysa 0 (çağıran hata yolu belirler).
 // Şubat ayrı dallanır (artık yıl); tablo dizini 1 bu yüzden hiç okunmaz.
+/**
+ * Verilen yıl ve ay için o ayın kaç gün olduğunu döndürür.
+ * @param {number} yil - Hesaplanacak tarih için yıl değeri.
+ * @param {number} ay - Hesaplanacak tarih için ay değeri (1-12 arası).
+ * @returns {number} Belirtilen ayın gün sayısı; ay geçersizse 0, Şubat'ta ise yılın artık olup olmadığına göre 28 veya 29.
+ */
 function tarihAyGunSayisi(yil, ay){
   if(ay < 1 || ay > 12) return 0;
   if(ay === 2) return tarihArtikYilMi(yil) ? 29 : 28;
@@ -37,6 +48,13 @@ function tarihAyGunSayisi(yil, ay){
 
 // Miladî gün numarası (1970-01-01 = 0) — Hinnant days_from_civil, saf tam
 // sayı. DÂHİLİ: dışa açılmaz, testler hafta-konumu üzerinden doğrular.
+/**
+ * Verilen yıl, ay ve gün değerlerine göre Gregorian takvimine göre gün numarasını hesaplar.
+ * @param {number} yil - Yıl değeri.
+ * @param {number} ay - Ay değeri (1-12 arası).
+ * @param {number} gun - Gün değeri.
+ * @returns {number} Hesaplanmış gün numarası.
+ */
 function _tarihGunNo(yil, ay, gun){
   const y2 = ay <= 2 ? yil - 1 : yil;
   const cag = Math.floor(y2 / 400);
@@ -49,6 +67,11 @@ function _tarihGunNo(yil, ay, gun){
 // 'YYYY-MM-DD' takvim tarihi mi? (31.02 / 13. ay / kısa biçim RED — sessiz
 // düzeltme yok; 2026-2-05 gibi esnek biçimler geçersizdir). Yıl 1..9999
 // (ızgara etki alanıyla aynı — 0000 yılı ızgarada temsilsiz, reddedilir).
+/**
+ * ISO 8601 formatında (YYYY-MM-DD) verilen bir tarih stringini geçerliliğini kontrol eder.
+ * @param {string|null} iso ISO 8601 formatında bir tarih stringi veya null.
+ * @returns {boolean} Geçerli bir tarih ise true, değilse false döndürür.
+ */
 function tarihGecerliMi(iso){
   const s = String(iso == null ? '' : iso);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -59,6 +82,11 @@ function tarihGecerliMi(iso){
 
 // 'YYYY-MM-DD' → 'GG.AA.YYYY' (bcIsoTrGoster'in paylaşıma geçen hâli);
 // geçersiz → '' (bugün fallback YOK).
+/**
+ * ISO 8601 formatındaki tarih stringini 'GG.AA.YYYY' formatına dönüştürür.
+ * @param {string} iso ISO 8601 formatında bir tarih stringi (örn: "2023-10-25").
+ * @returns {string} Dönüştürülmüş tarih stringi veya geçersiz giriş için boş string.
+ */
 function tarihIsoTr(iso){
   if(!tarihGecerliMi(iso)) return '';
   const s = String(iso);
@@ -69,6 +97,11 @@ function tarihIsoTr(iso){
 // baştan sona) + 2 haneli yıl gg.aa.yy → 2000+yy. GÜN ÖNCE (05.02.2026 =
 // 5 Şubat; mm/dd OKUNMASI YOK). Sessiz düzeltme yok: 31.02, 13. ay, çöp,
 // karışık ayraç, yıl-önce biçim → { ok:false, error } (açık Türkçe mesaj).
+/**
+ * "gg.aa.yyyy" biçimindeki tarih metnini ayrıştırıp ISO ("yyyy-aa-gg") biçimine çevirir; ayraç baştan sona tek tür olmalıdır ve gün/ay/yıl geçerliliği denetlenir.
+ * @param {*} metin - Ayrıştırılacak tarih metni; null/undefined boş sayılır.
+ * @returns {{ok:boolean, iso?:string, error?:string}} Başarıda ok:true ve iso alanını, başarısızlıkta ok:false ve error mesajını içeren nesne.
+ */
 function tarihParse(metin){
   const s = String(metin == null ? '' : metin).trim();
   // \2 geri-başvurusu: ayraç baştan sona TEK tür olur — 05/02.2026 karışık
@@ -89,6 +122,13 @@ function tarihParse(metin){
 // MIN/MAX ARALIK KONTROLÜ — sınırlar dahil (kapalı aralık). Sınır geçerli
 // ISO değilse o sınır yok sayılır (sınırlar kod tarafından verilir; kullanıcı
 // girdisi değildir). ISO karşılaştırması sözlüksel = kronolojik.
+/**
+ * Geçerli bir ISO tarihini, belirtilen minimum ve maksimum tarih aralığı içinde olup olmadığını kontrol eder.
+ * @param {string} iso Kontrol edilecek ISO formatındaki tarih.
+ * @param {string} min Tarih aralığının başlangıç tarihi (opsiyonel).
+ * @param {string} max Tarih aralığının bitiş tarihi (opsiyonel).
+ * @returns {Object} { ok: boolean, error: string|null } yapısında bir nesne döndürür.
+ */
 function tarihAraliktaMi(iso, min, max){
   if(!tarihGecerliMi(iso)) return { ok:false, error:'Geçersiz tarih' };
   if(tarihGecerliMi(min) && iso < min) return { ok:false, error:'Tarih ' + tarihIsoTr(min) + ' tarihinden önce olamaz' };
@@ -101,6 +141,12 @@ function tarihAraliktaMi(iso, min, max){
 // { iso:'YYYY-MM-DD', gun, ayIci:true }, ay-dışı konum null. Yol (leading)
 // null sayısı = ayın 1. gününün hafta içi konumu; kuyruk (trailing) tam
 // haftaya tamamlayan null'lar.
+/**
+ * Verilen yıl ve ay için geçerli günleri hesaplayıp, haftanın gününe göre hizalanmış bir dizi döndürür.
+ * @param {number} yil - Geçerli bir yıl (1 ile 9999 arası tam sayı).
+ * @param {number} ay - Geçerli bir ay (1 ile 12 arası tam sayı).
+ * @returns {Object|null} Yıl, ay ve hizalanmış gün hücrelerini içeren bir nesne veya geçersiz girişlerde null.
+ */
 function tarihAyIzgara(yil, ay){
   if(!Number.isInteger(yil) || yil < 1 || yil > 9999) return null;
   if(!Number.isInteger(ay) || ay < 1 || ay > 12) return null;
@@ -120,6 +166,13 @@ function tarihAyIzgara(yil, ay){
 
 // YIL SEÇİM MATEMATİĞİ — 1..9999'a kelepirli (ızgara etki alanı); delta
 // tam sayıya yuvarlanır, sayı değilse 0.
+/**
+ * Verilen yıl değerine delta adımı kadar yıl ekleyip çıkararak yeni bir yıl hesaplar.
+ * Hesaplanan yıl 1 ile 9999 arasında tutulur.
+ * @param {number} yil İşlenecek yıl değeri.
+ * @param {number} delta Yıl için eklenecek veya çıkarılacak adım miktarı.
+ * @returns {number} Sınırlandırılmış yeni yıl değeri.
+ */
 function tarihYilKaydir(yil, delta){
   const adim = Math.trunc(Number(delta) || 0);
   return Math.min(9999, Math.max(1, (Number(yil) || 0) + adim));
@@ -134,6 +187,11 @@ function tarihYilKaydir(yil, delta){
 // GİRİŞ ÇÖZÜMLEYİCİ (Uygula yolu) — ayraç toleransı: ',' '/' '-' ve boşluk
 // '.'a normalize edilir, sonra tarihParse konuşur (mm/dd yorumu YOK, hayali
 // tarih sessizce düzeltilmez). DOM yok.
+/**
+ * Verilen metni tarih ayracı karakterlerini (nokta, virgül, eğik çizgi, tire, boşluk) noktaya çevirerek ayrıştırmaya hazır hale getirir ve ayrıştırılmış tarihi döndürür.
+ * @param {*} metin - Ayrıştırılacak tarih girdisi; null veya undefined ise boş dize olarak ele alınır.
+ * @returns {*} Ayracı nokta olarak normalize edilmiş metinden ayrıştırılmış tarih değeri.
+ */
 function tarihGirisCoz(metin){
   return tarihParse(String(metin == null ? '' : metin).replace(/[,.\/\-\s]+/g, '.'));
 }
@@ -152,6 +210,12 @@ function tarihGirisCoz(metin){
 //   metin yalnız ayraç-normalizasyonuyla birebir korunur; Uygula (üç yüzey)
 //   bu hatayı tarihGirisCoz'dan ÖNCE görür ve reddeder. Gerçek ay-gün sayısı
 //   denetimi Uygula'da (tarihParse) yapılır; 0 alt sınırı (00) burada görünür.
+/**
+ * Ham metni tarih formatına dönüştürür; rakam olmayan karakterleri hata olarak bildirir,
+ * gün/ay/yıl segmentlerini doğrular ve uygun ayraçlarla (nokta) birleştirir.
+ * @param {string|null} ham Girdi metni.
+ * @returns {{metin: string, hata: string|null}} İşlenmiş metin ve varsa hata mesajı içeren nesne.
+ */
 function tarihMaskeUygula(ham){
   const s = String(ham == null ? '' : ham);
   if(!s) return { metin: '', hata: null };
@@ -219,6 +283,12 @@ function tarihMaskeUygula(ham){
 // soluna düşerse sonraki hane segmente karışır); rakam azalırsa (silme)
 // metin sonuna kıskanır. Bileşen input olayında setSelectionRange ile
 // uygular; saf, test edilebilir.
+/**
+ * Metin içindeki rakamları sayarak, belirtilen sıradaki rakamdan sonraki rakam olmayan karakterlerin de dahil edildiği imleç konumunu (indeks) döndürür.
+ * @param {*} yeniMetin - Rakamları sayılacak metin; null veya tanımsız ise boş dize olarak ele alınır.
+ * @param {number} rakamSayisi - Hedeflenen rakam sayısı; 0'dan büyük değilse 0 döndürülür.
+ * @returns {number} Belirtilen sıradaki rakamı izleyen son rakam olmayan karakterden sonraki konum; yeterli rakam yoksa metnin uzunluğu.
+ */
 function tarihMaskeImlec(yeniMetin, rakamSayisi){
   const s = String(yeniMetin == null ? '' : yeniMetin);
   if(!(rakamSayisi > 0)) return 0;
@@ -240,8 +310,20 @@ function tarihMaskeImlec(yeniMetin, rakamSayisi){
 // öbür taraf ±120 yıl; ikisi de yoksa bugunYil-120 .. bugunYil+10 (raporda
 // beyanlı varsayılan). Sonuç 1..9999'a kelepirli; geçersiz ISO sınır yok
 // sayılır (tarihAraliktaMi aynı tavır). DOM yok.
+/**
+ * Verilen tarih aralıklarından ve bugünün yılından hareketle geçerli bir yıl aralığı hesaplar. Tarihlerden yıl çıkarılamadığı durumlarda varsayılan yayılım (120 yıl) kullanır ve sonuç 1–9999 aralığına sabitlenir.
+ * @param {*} min - Başlangıç tarihi; geçerliyse ilk 4 karakteri başlangıç yılı olarak alınır.
+ * @param {*} max - Bitiş tarihi; geçerliyse ilk 4 karakteri bitiş yılı olarak alınır.
+ * @param {*} bugunYil - Bugünün yılı; sayıya çevrilemezse 0 kabul edilir.
+ * @returns {Array<number>} İki elemanlı [minYil, maxYil] dizisi; alt sınır en az 1, üst sınır en fazla 9999 olacak şekilde sınırlandırılmıştır.
+ */
 function tarihYilAraligi(min, max, bugunYil){
   const simdi = Math.trunc(Number(bugunYil) || 0);
+  /**
+   * Geçerli bir tarih değeri ise ilk dört karakterini alıp sayıya çevirir, değilse null döndürür.
+   * @param {any} v - İşlenecek tarih değeri.
+   * @returns {number|null} Geçerli tarih ise dört haneli yıl sayısı, değilse null.
+   */
   const yilOf = v => (tarihGecerliMi(v) ? Number(String(v).slice(0, 4)) : null);
   const minYil = yilOf(min), maxYil = yilOf(max);
   let a, b;

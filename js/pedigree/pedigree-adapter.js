@@ -17,6 +17,12 @@
 // esc()/escAttr() ile kaçırılır — bu dosyanın sorumluluğu değil.
 'use strict';
 
+/**
+ * Null veya undefined olan değerleri fallback ile, diğer durumlarda ise değeri string olarak döndürür.
+ * @param {*} val Dönüştürülecek değer.
+ * @param {*} fallback Değer null/undefined ise kullanılacak yedek değer.
+ * @returns {string} String tipinde döndürülen değer.
+ */
 function _pedigreeSafeStr(val, fallback) {
   if (val === null || val === undefined) return fallback || '';
   const s = String(val);
@@ -24,6 +30,12 @@ function _pedigreeSafeStr(val, fallback) {
 }
 
 // Tek node kaydını Cytoscape node elementine çevirir. ctx: {focusId, childCount, childRoles}
+/**
+ * Soy ağacı düğümünü (node) Cytoscape tarzı bir öğe nesnesine dönüştürür; geçersiz id içeren düğümler için null döndürür.
+ * @param {Object} n - Dönüştürülecek soy ağacı düğümü (id, label, farm_animal_id, kind, sex, breed, birth_date alanları).
+ * @param {Object} ctx - Dönüştürme bağlamı; focusId, childRoles ve childCount haritalarını içerir.
+ * @returns {Object|null} group, data ve classes alanlarından oluşan düğüm öğesi; id boşsa null.
+ */
 function _pedigreeNodeToElement(n, ctx) {
   const id = _pedigreeSafeStr(n.id);
   if (!id) return null;
@@ -53,6 +65,12 @@ function _pedigreeNodeToElement(n, ctx) {
 
 // RPC projection payload → {nodes:[], edges:[], meta:{}} Cytoscape element seti.
 // Bozuk/eksik girdi patlamaz: null/{} → boş küme; uçları olmayan edge düşer.
+/**
+ * Pedigree veri yapısını (payload) işleyerek, tekrar eden ID'leri filtreleyen,
+ * geçerli kenarları (edges) ve düğümleri (nodes) içeren temizlenmiş bir çıktı objesi döndürür.
+ * @param {Object} payload İşlenecek pedigree verisi (nodes, edges, focus, meta alanları içermelidir).
+ * @returns {Object} nodes, edges ve meta alanlarını içeren temizlenmiş çıktı objesi.
+ */
 function pedigreeToElements(payload) {
   const out = { nodes: [], edges: [], meta: (payload && typeof payload === 'object' && payload.meta) || {} };
   if (!payload || typeof payload !== 'object') return out;

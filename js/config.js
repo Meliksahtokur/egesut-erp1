@@ -59,6 +59,10 @@ let GRUP_PADOK = {
 // Padoklar listesi (DB'den yüklenir)
 let PADOKLAR = [];
 
+/**
+ * Padok listesi ile grup-padok eşleme verilerini paralel olarak yükler; grup bazlı padok adı haritasını global değişkenlere aktarır. Veri boşsa veya hata oluşursa mevcut değerler korunur.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise; anlamlı bir değer döndürmez.
+ */
 async function loadPadokConfig() {
   try {
     const [padoklar, eslem] = await Promise.all([
@@ -80,6 +84,10 @@ async function loadPadokConfig() {
   } catch(e) { console.warn('loadPadokConfig failed:', e.message); }
 }
 
+/**
+ * Veritabanından hekimleri çeker ve HEKIMLER küresel değişkenine id ve ad alanlarıyla eşleştirilmiş bir dizi olarak atar.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function loadHekimlerFromDB() {
   try {
     const rows = await getData('hekimler');
@@ -138,12 +146,25 @@ const MAX_SEANS_PER_DAY = 10;
 // ══════════════════════════════════════════
 const KUPE_ERKEK_MIN = 500, KUPE_ERKEK_MAX = 599;
 
+/**
+ * Erkek hayvanlarda kulak küpe numarasının tanımlı aralıkta olup olmadığını kontrol eder; cinsiyet 'Erkek' değilse veya küpe sayısal değilse uygun kabul eder.
+ * @param {*} kupe - Kontrol edilecek kulak küpe numarası.
+ * @param {string} cinsiyet - Hayvanın cinsiyeti.
+ * @returns {boolean} Küpe numarası uygunsa true, aksi halde false.
+ */
 function erkekKupeUygunMu(kupe, cinsiyet) {
   if (cinsiyet !== 'Erkek' || !/^\d+$/.test(String(kupe || ''))) return true;
   const n = parseInt(kupe, 10);
   return n >= KUPE_ERKEK_MIN && n <= KUPE_ERKEK_MAX;
 }
 
+/**
+ * Aktif hayvanların kullandığı küpe numaralarını hariç tutarak, belirtilen cinsiyet için boş küpe numarası önerileri üretir. Erkek için KUPE_ERKEK_MIN–KUPE_ERKEK_MAX aralığını, dişi için bu aralık dışındaki 1–999 numaralarını önerir.
+ * @param {Array} hayvanlar - Küpe numarası sorgulanacak hayvan kayıtlarının listesi; boş veya eksik olabilir.
+ * @param {string} cinsiyet - 'Erkek' ise erkek küpe aralığı kullanılır.
+ * @param {number} [adet=10] - Döndürülecek maksimum öneri sayısı.
+ * @returns {Array} Kullanılmayan küpe numaralarının dize olarak bulunduğu dizi.
+ */
 function bosKupeOner(hayvanlar, cinsiyet, adet = 10) {
   const dolu = new Set((hayvanlar || [])
     .filter(a => a && a.durum === 'Aktif' && a.kupe_no && /^\d+$/.test(String(a.kupe_no)))
@@ -215,6 +236,11 @@ const TOHUMLAMA_PENCERELERI = [
 // Pencereye ileri yuvarlama (MK1): verilen 'YYYY-MM-DD HH:MM' yerel an
 // pencere içindeyse olduğu gibi; değilse bir sonraki pencere başlangıcı.
 // DB'deki _tohumlama_pencere IMMUTABLE gövdesinin aynası (birim testte karşılaştırılır).
+/**
+ * Verilen "YYYY-MM-DD HH:MM" biçimindeki zaman damgasını TOHUMLAMA_PENCERELERI içinde tanımlı tohumlama pencerelerine yuvarlar. Zaman bir pencere içindeyse olduğu gibi döndürülür; pencere dışındaysa en yakın pencere başlangıcına, son pencerenin sonunu aşarsa ertesi günün ilk penceresine taşınır.
+ * @param {string} ts - "YYYY-MM-DD HH:MM" biçiminde zaman damgası.
+ * @returns {string} Yuvarlanmış, "YYYY-MM-DD HH:MM" biçiminde zaman damgası.
+ */
 function pencereYuvarla(ts) {
   const [gun, saat] = ts.split(' ');
   const [h, m] = saat.split(':').map(Number);

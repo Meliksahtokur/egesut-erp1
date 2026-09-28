@@ -51,6 +51,13 @@ const PEDIGREE_CACHE = new Map();
 
 // Anahtar: farm:<farm_id>:<rpc>:<focus>:<params>:v<algo_version>
 // params anahtar-sıra-bağımsız serileştirilir (deterministik anahtar).
+/**
+ * Parametrelerin anahtarlarını alfabetik sıraya koyarak, undefined olanları null'a çevirir ve farm ID, RPC adı, odak noktası, sıralanmış parametreler ve algoritma versiyonunu içeren bir cache anahtarı oluşturur.
+ * @param {string} rpcName RPC çağrısının adı.
+ * @param {string} focus Odak noktası.
+ * @param {Object} params Parametreler objesi.
+ * @returns {string} Cache anahtarını temsil eden bir dize.
+ */
 function _pedigreeCacheKey(rpcName, focus, params) {
   const sorted = {};
   Object.keys(params).sort().forEach(k => {
@@ -66,6 +73,12 @@ function _pedigreeCacheKey(rpcName, focus, params) {
 // bozulmadan kalır. Ağdan gelenlerde false, cache'ten servis edilenlerde true.
 // integrityReport() mühürsüz — P1 kontratı (cutoff/generated_at/groups)
 // üst-düzey meta eklemeden korunur (luna F5).
+/**
+ * Verilen yükü (payload) kontrol edip, nesne ise meta alanına 'cached' değerini ekler ve yükü döndürür.
+ * @param {Object|Array|null} payload İşlenecek yük nesnesi veya dizisi.
+ * @param {boolean} cached Cache durumu (true/false).
+ * @returns {Object|Array|null} İşlenmiş veya değiştirilmemiş yük nesnesi/dizisi.
+ */
 function _sealCached(payload, cached) {
   if (payload && !Array.isArray(payload) && typeof payload === 'object') {
     if (!payload.meta || typeof payload.meta !== 'object') payload.meta = {};
@@ -86,6 +99,14 @@ let PEDIGREE_CACHE_REVISION = 0;
 // sealable: projection çağrıları true (meta.cached mührü), integrityReport
 // false (kontrat şekli). Savunma kopyaları korunur: çağıran (W3 adapter)
 // payload'ı mutate edebilir; cache ve çağıran bağımsız kopyalar alır.
+/**
+ * RPC çağrısı yapılarak gelen veriyi önbelleğe alır veya önbellekten eşleşen bir kayıt varsa döndürür.
+ * @param {string} rpcName RPC çağrısının adı.
+ * @param {any} focus Odak parametresi.
+ * @param {any} params RPC çağrısı için parametreler.
+ * @param {boolean} sealable Verinin mühürlenip mühürlenmeyeceğini belirten bayrak.
+ * @returns {any} Önbellekten bulunan veya RPC'den gelen ve gerekirse mühürlenmiş veri.
+ */
 async function _pedigreeFetchCached(rpcName, focus, params, sealable) {
   const key = _pedigreeCacheKey(rpcName, focus, params);
   if (PEDIGREE_CACHE.has(key)) {

@@ -4,6 +4,11 @@
 // (tests/unit/degisiklikler-diff.test.js).
 
 // Anahtar sırasından bağımsız, derin eşitlik için kararlı serileştirme
+/**
+ * Verilen değeri derinlemesine JSON formatına dönüştürür; dizi ve nesne yapılarını koruyarak sıralı anahtarlarla string'ler döndürür.
+ * @param {*} v Dönüştürülecek değer.
+ * @returns {string} JSON benzeri string formatında dönüştürülmüş değer.
+ */
 function _dgKararli(v) {
   if (v === undefined) return 'undefined';
   if (v === null || typeof v !== 'object') return JSON.stringify(v);
@@ -11,6 +16,11 @@ function _dgKararli(v) {
   return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + _dgKararli(v[k])).join(',') + '}';
 }
 
+/**
+ * Verilen değeri kontrol edip nesne ise döndürür, yoksa null döndürür.
+ * @param {*} v Kontrol edilecek değer.
+ * @returns {*} Nesne ise o nesne, değilse null.
+ */
 function _dgNesne(v) {
   return v && typeof v === 'object' && !Array.isArray(v) ? v : null;
 }
@@ -21,6 +31,14 @@ function _dgNesne(v) {
 //  - yeni yok (DELETE)  → tüm alanlar 'silindi'
 //  - ikisi de var (UPDATE) → alan bazında karşılaştırma; eksik değer null gösterilir
 // Sıra: eski satırın alan sırası, ardından yalnız yenide olan alanlar.
+/**
+ * İki nesne arasındaki alan (property) farklarını tespit eder;
+ * sadece birinde olan alanları 'eklendi' veya 'silindi' olarak,
+ * her ikisinde olan alanları ise değerlerini karşılaştırarak 'ayni' veya 'degisti' olarak etiketler.
+ * @param {Object} eski Karşılaştırma için eski nesne.
+ * @param {Object} yeni Karşılaştırma için yeni nesne.
+ * @returns {Array} Her satır için { alan, eski, yeni, durum } yapısında nesnelerden oluşan dizi.
+ */
 function diffSatirlari(eski, yeni) {
   const e = _dgNesne(eski), y = _dgNesne(yeni);
   if (!e && !y) return [];
@@ -46,6 +64,11 @@ function diffSatirlari(eski, yeni) {
 // islemOzeti(rows) -> {tablo_sayisi, satir_sayisi, islemler:{I,U,D}}
 // rows: degisim_log detay kayıtları ({tablo_adi, satir_pk, islem}).
 // Aynı satırın aynı tx içindeki birden çok sürümü tek satır sayılır.
+/**
+ * Verilen satır dizisini işleyerek tabloların, satırların sayısını ve islemlerin (I, U, D) dağılımını döndürür.
+ * @param {Array} rows İşlenecek satır nesnelerinden oluşan dizi.
+ * @returns {Object} tablo_sayisi, satir_sayisi ve islemler (I, U, D sayıları) içeren nesne.
+ */
 function islemOzeti(rows) {
   const liste = Array.isArray(rows) ? rows : [];
   const tablolar = new Set();
@@ -61,6 +84,11 @@ function islemOzeti(rows) {
 }
 
 // "3 tablo · 5 satır" özet parçası (başlık çağıranda eklenir)
+/**
+ * Verilen nesnin tablo ve satır sayılarını alıp bunları metin formatında birleştirerek döndürür.
+ * @param {Object} ozet Nesne içinde 'tablo_sayisi' ve 'satir_sayisi' özelliklerini içeren nesne.
+ * @returns {String} Tablo ve satır sayılarını içeren formatta bir dize.
+ */
 function ozetMetni(ozet) {
   const o = ozet || {};
   return (o.tablo_sayisi || 0) + ' tablo · ' + (o.satir_sayisi || 0) + ' satır';
@@ -69,6 +97,11 @@ function ozetMetni(ozet) {
 // Hücre değerini okunur düz metne çevirir (HTML ÜRETMEZ — çağıran esc() uygular).
 //  null/undefined → '—' · bool → Evet/Hayır · 'YYYY-MM-DD' → gg.aa.yyyy ·
 //  ISO zaman damgası → gg.aa.yyyy SS:DD (İstanbul) · nesne/dizi → JSON
+/**
+ * Farklı tipteki bir değeri kullanıcıya gösterilecek metne dönüştürür; null/undefined için '—', boolean için 'Evet'/'Hayır', nesneler için JSON, tarih ve tarih-saat dizgilerini Türkçe biçime çevirir.
+ * @param {*} v - Metne dönüştürülecek değer.
+ * @returns {string} Değerin görüntülenmeye uygun hâli: null/undefined için '—', boolean için 'Evet'/'Hayır', sayı için dizgi karşılığı, nesne için JSON dizgisi, 'YYYY-AA-GG' biçimli dizgiler için 'GG.AA.YYYY', saat dilimi bilgili tarih-saatler için tr-TR yerel ayarına göre (Europe/Istanbul) biçimlendirilmiş dizgi, saat dilimi bilgisiz tarih-saatler için 'GG.AA.YYYY SS:DD', boş dizgi için '""', diğer dizgiler için kendisi.
+ */
 function degerMetni(v) {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'boolean') return v ? 'Evet' : 'Hayır';
@@ -91,15 +124,31 @@ function degerMetni(v) {
 // ── Gürültü ayracı (L4-W2, plan §5) — SAF ─────────────────────────────
 // Uygulama-dışı kaynak (app_name ≠ 'egesut-web') tx kartları ve teknikal
 // satırlar varsayılan GİZLİ; çip sayacı gizlilerden, liste görünenlerden kurulur.
+/**
+ * Verilen nesnenin app_name özelliği var olup olmadığını ve 'egesut-web' değeri olup olmadığını kontrol ederek sonucu döndürür.
+ * @param {Object} kaynak Kontrol edilecek nesne.
+ * @returns {Boolean} Nesne geçerliyse ve app_name 'egesut-web' değilse true, aksi halde false.
+ */
 function dgUygulamaDisiMi(kaynak) {
   return !!(kaynak && typeof kaynak === 'object' && kaynak.app_name && kaynak.app_name !== 'egesut-web');
 }
+/**
+ * Verilen satır nesnesinin 'teknikal_mi' özelliğinin true olup olmadığını kontrol eder.
+ * @param {Object} satir Kontrol edilecek nesne.
+ * @returns {boolean} Nesne var ise ve 'teknikal_mi' özelliği true ise true, aksi halde false döndürür.
+ */
 function dgTeknikMi(satir) {
   return !!(satir && satir.teknikal_mi);
 }
 // dgGurultuAyir(liste, gizliTest) → {gorunen, gizli, gizliSayi}
 // Çağıran gizliTest'i dgUygulamaDisiMi/dgTeknikMi'den türetir; sayaç FİLTRE
 // ÖNCESİ tam listeden sayılır (çip sayacı değişmez).
+/**
+ * Verilen listedeki öğeleri gizli test fonksiyonuna göre görünür ve gizli olarak ayırır.
+ * @param {*} liste - Ayrılacak öğe dizisi; dizi değilse boş dizi olarak ele alınır.
+ * @param {Function} gizliTest - Öğenin gizli olup olmadığını belirleyen fonksiyon; fonksiyon değilse hiçbir öğe gizli sayılmaz.
+ * @returns {{gorunen: Array, gizli: Array, gizliSayi: number}} Görünen öğeler, gizli öğeler ve gizli öğe sayısını içeren nesne.
+ */
 function dgGurultuAyir(liste, gizliTest) {
   const arr = Array.isArray(liste) ? liste : [];
   const test = typeof gizliTest === 'function' ? gizliTest : () => false;
@@ -108,13 +157,30 @@ function dgGurultuAyir(liste, gizliTest) {
 }
 // Boş değer satırı gizleme (plan §5 "boş değer → satır gizli"): diff satırının
 // iki tarafı da null/'' ise satır bilgi taşımaz.
+/**
+ * d nesnesinin hem eski hem yeni değerinin boş olup olmadığını kontrol eder.
+ * @param {Object} d - eski ve yeni özelliklerini içeren nesne.
+ * @returns {boolean} Nesne geçersizse veya eski ve yeni değerlerinin ikisi de null/undefined ya da boş dize ise true, aksi halde false.
+ */
 function dgAlanBosMu(d) {
   if (!d || typeof d !== 'object') return true;
+  /**
+   * Verilen değerin null, undefined veya boş string olup olmadığını kontrol eder.
+   * @param {*} v Kontrol edilecek değer.
+   * @returns {boolean} Değer boş ise true, değilse false döndürür.
+   */
   const bos = v => v == null || v === '';
   return bos(d.eski) && bos(d.yeni);
 }
 
 // satir_pk (jsonb) → kısa gösterim: {"id":"a1b2…"} → "a1b2c3d4"
+/**
+ * Birincil anahtarı (pk) kısaltılmış biçimde gösterilecek metne dönüştürür.
+ * Boş değerler için '—', tek alanlı anahtarlar için sadece o değerin ilk 8 karakteri,
+ * birden fazla alanlı anahtarlar için her alanın ilk 8 karakterinin '/' ile birleştirilmiş halini döndürür.
+ * @param {*} pk - Kısaltılacak birincil anahtar; null, ilkel değer veya dizi olmayan bir nesne olabilir.
+ * @returns {string} Kısaltılmış anahtar metni.
+ */
 function pkKisa(pk) {
   if (pk === null || pk === undefined) return '—';
   if (typeof pk !== 'object') return String(pk).slice(0, 8);

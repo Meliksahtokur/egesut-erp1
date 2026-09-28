@@ -7,6 +7,12 @@
 
 // CSS değişkenini oku; yoksa fallback'e düş. getComputedStyle yoksa (sandbox)
 // yalnız fallback'ler kullanılır.
+/**
+ * CSS özelliğinin (name) computed değerini alıp boşsa fallback değerini döndürür.
+ * @param {string} name Alınacak CSS özelliğinin adı.
+ * @param {*} fallback Özelliğin bulunamadığı veya boş olduğu durumda kullanılacak yedek değer.
+ * @returns {*} CSS özelliğinin değeri veya fallback değeri.
+ */
 function _pedigreeToken(name, fallback) {
   try {
     const cs = getComputedStyle(document.documentElement).getPropertyValue(name);
@@ -18,6 +24,10 @@ function _pedigreeToken(name, fallback) {
 }
 
 // Tema token kümesi — fallback değerleri index.html :root paletinin aynasıdır.
+/**
+ * Pedigree teması için renk ve stil tokenlarını içeren bir nesne döndürür.
+ * @returns {Object} Tema renk tokenlarını (card, ink, green, blue vb.) içeren nesne.
+ */
 function pedigreeThemeTokens() {
   return {
     card: _pedigreeToken('--card', '#f7f4ee'),
@@ -38,6 +48,10 @@ function pedigreeThemeTokens() {
 // Cytoscape style dizisi. farm/external ayrımı yalnız renkle değil — ŞEKİL
 // (ellipse ↔ round-hexagon) + KENAR (düz ↔ kesikli) ile de yapılır (renk-körü
 // erişilebilirlik). focus düğümü mavi kalın kenarla öne çıkar.
+/**
+ * Pedigree grafiği için düğüm ve kenar stillerini tanımlayan konfigürasyon dizisi döndürür.
+ * @returns {Array} Dizi içindeki her öğe, selector ve style özelliklerini içeren bir stil nesnesidir.
+ */
 function pedigreeStyle() {
   const t = pedigreeThemeTokens();
   return [

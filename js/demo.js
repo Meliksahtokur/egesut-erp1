@@ -8,6 +8,12 @@
   const db = window.db;
 
   // ── Prod'dan klonla (senkronizasyon) ──
+  /**
+   * Kullanıcı onayı alındıktan sonra demo verilerini prod verileriyle senkronize eder,
+   * butonu engeller, işlem sonucunda sayfa yeniler ve hata durumunda butonu eski haline getirir.
+   * @param {HTMLElement} btn Senkronizasyon butonu; işlem sırasında metni ve aktif durumunu günceller.
+   * @returns {void} İşlem tamamlandıktan veya hata oluştuğundan sonra bir değer döndürmez.
+   */
   async function klonla(btn) {
     if (!confirm('Demo verisi prod\'un GÜNCEL kopyasıyla değiştirilecek.\nBuradaki demo değişiklikleri SİLİNİR. Devam edilsin mi?')) return;
     const old = btn ? btn.textContent : '';
@@ -24,6 +30,11 @@
   }
 
   // ── Şema-diff uyarısı (prod'a tablo/kolon eklendi mi?) ──
+  /**
+   * Demo ortamındaki eksik tablolar ve kolonları tespit ederek uyarı mesajı oluşturur.
+   * @param {HTMLElement} bar Mesajın ekleneceği DOM elemanı.
+   * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+   */
   async function semaDiffKontrol(bar) {
     try {
       const { data, error } = await db.rpc('demo_sema_diff');
@@ -39,6 +50,12 @@
   }
 
   // ── Demo bandı (topbar altına) ──
+  /**
+   * Üst çubuğun (topbar) sonuna geçici bir demo bar elementi ekler.
+   * Bar içinde "Prod'dan Klonla" ve "Çıkış" butonları oluşturur,
+   * asistan butonunu gizler ve bar ile ilgili kontrol fonksiyonlarını çağırır.
+   * @returns {void} Fonksiyon bir değer döndürmez.
+   */
   function injectBar() {
     const topbar = document.getElementById('topbar');
     if (!topbar || document.getElementById('demo-bar')) return;
@@ -60,6 +77,12 @@
   }
 
   // ── Girişten sonra hatırlatma popup'ı ("bir daha gösterme") ──
+  /**
+   * Demo hesap bildirim penceresini ekrana getirir.
+   * Eğer 'EGESUT_DEMO_POPUP_OFF' yerel depolama anahtarı '1' ise veya 'demo-popup' elementi zaten varsa pencere gösterilmez.
+   * Pencere, kullanıcıya demo hesabı uyarısı gösterir ve kapatma veya kalıcı olarak gizleme seçeneği sunar.
+   * @returns {void} Fonksiyon bir değer döndürmez.
+   */
   function showPopup() {
     if (localStorage.getItem('EGESUT_DEMO_POPUP_OFF') === '1') return;
     if (document.getElementById('demo-popup')) return;
@@ -81,6 +104,10 @@
     });
   }
 
+  /**
+   * Araç çubuğunu sayfaya enjekte eder ve açılır pencereyi gösterir; başlatma işlevini gerçekleştirir.
+   * @returns {void}
+   */
   function init() { injectBar(); showPopup(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();

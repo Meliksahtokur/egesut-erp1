@@ -1,6 +1,11 @@
 // js/utils/modal.js
 // Modal yönetimi (app.js'den taşındı)
 
+/**
+ * Verilen kimlikteki modalı açar; router yığınına ve history'ye kaydeder, modal türüne özel form hazırlıklarını yapar.
+ * @param {string} id - Açılacak modalın DOM kimliği.
+ * @returns {void} Değer döndürmez; modal bulunamazsa sessizce çıkar.
+ */
 function openM(id) {
   const el = g(id); if (!el) return;
   el.classList.add('on');
@@ -71,6 +76,12 @@ function openM(id) {
   }
 }
 
+/**
+ * Verilen modal ID'ye sahip modalı DOM'dan kaldırır, 'on' class'ını siler, modal yığınını günceller,
+ * Android geri tuşu durumunu yönetir ve 'm-insem' veya 'm-animal' gibi özel ID'ler için formu sıfırlar.
+ * @param {string} id Kapatılacak modalın benzersiz kimlik etiketi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function closeM(id) {
   // W3: takvim router-modali .on class kullanmaz — DOM'dan remove edilir.
   // Her kapanış yolu (X, backdrop, ESC, geri tuşu, Onayla) closeM'den geçer.
@@ -112,11 +123,23 @@ function closeM(id) {
 
 // Küpe alanı kalıntı temizliği (blur uyarı metinleri + soft bayrak + öneri listeleri).
 // closeM'den HER kapanış yolunda (X, overlay, ESC, geri tuşu) çağrılır.
+/**
+ * Uyarı metin alanlarını temizler ve öneri listelerini gizler.
+ * @param {Array} warnIdler - İçeriği temizlenecek ve 'soft' veri özniteliği silinecek uyarı elemanlarının kimlikleri.
+ * @param {Array} onerListeIdler - Görüntüden gizlenecek öneri listesi elemanlarının kimlikleri.
+ * @returns {void} Döndürdüğü değer yok.
+ */
 function _kupeFormKalintiTemizle(warnIdler, onerListeIdler){
   (warnIdler||[]).forEach(id=>{ const el=g(id); if(el){ el.textContent=''; delete el.dataset.soft; } });
   (onerListeIdler||[]).forEach(id=>{ const el=g(id); if(el) el.style.display='none'; });
 }
 
+/**
+ * Tıklanan elementin target'ı el ile eşleşirse, el'in ID'sini alarak closeM fonksiyonunu çağırır.
+ * @param {Event} e Tıklama olayı.
+ * @param {HTMLElement} el Kapatılacak element.
+ * @returns {void}
+ */
 function mClose(e, el) {
   // Backdrop kapatma da closeM'den geçsin — cleanup + history tek noktadan (B3)
   if (e.target === el) closeM(el.id);

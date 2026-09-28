@@ -50,6 +50,11 @@ const _ERR_MAP = [
   ['network',             'Sunucuya ulaşılamıyor'],
   ['Failed to fetch',     'Sunucuya ulaşılamıyor'],
 ];
+/**
+ * Mesajı alıp hata kodlarını içeren bir diziyle eşleştirir ve eşleşen bir hata kodu bulunursa onu, yoksa orijinal mesajı döndürür.
+ * @param {string} msg - İşlenecek hata mesajı.
+ * @returns {string} Eşleşen hata kodu veya orijinal mesaj.
+ */
 function _trErr(msg) {
   const m = String(msg || '');
   const found = _ERR_MAP.find(([k]) => m.toLowerCase().includes(k.toLowerCase()));
@@ -94,6 +99,10 @@ async function rpc(name, params = {}) {
 // ── INDEXEDDB ───────────────────────────────
 let _idb;
 
+/**
+ * 'egesut_v12' IndexedDB veritabanını siler ve sayfayı yeniler.
+ * @returns {Promise} Veritabanı silinip sayfa yenilenmesi işleminin tamamlanmasını temsil eden Promise.
+ */
 async function clearAndReloadIDB() {
   // M-23 fix: eskiden 'egesut_v9' siliyordu ama openDB() 'egesut_v12' açıyordu —
   // v9 zaten hiç açılmadığı için deleteDatabase no-op'tu, fonksiyon aslında bir işe
@@ -105,6 +114,11 @@ async function clearAndReloadIDB() {
   });
 }
 
+/**
+ * 'egesut_v12' adlı IndexedDB veritabanını açar, gerekli tabloları oluşturur,
+ * eksik index'leri ekler ve veritabanı güncellemesi sırasında bloklandıysa kullanıcıya bildirim gösterir.
+ * @returns {Promise} Veritabanı bağlantısını döndüren Promise nesnesi.
+ */
 async function openDB() {
   return new Promise((res, rej) => {
     const req = indexedDB.open('egesut_v12', DB_VER);
@@ -132,6 +146,11 @@ async function openDB() {
   });
 }
 
+/**
+ * Verilen IndexedDB mağazasından (store) tüm kayıtları okuyup Promise olarak döndürür.
+ * @param {string} store Okunacak kayıtların bulunduğu mağaza (store) adı.
+ * @returns {Promise<Array>} Mağazadaki tüm kayıtlardan oluşan dizi veya hata.
+ */
 async function idbGetAll(store) {
   return new Promise((res, rej) => {
     const tx = _idb.transaction(store, 'readonly');
@@ -141,6 +160,12 @@ async function idbGetAll(store) {
   });
 }
 
+/**
+ * Verilen store adında bir IndexedDB transaction oluşturur, belirtilen store'daki tüm satırları (rows) bu store'ya ekler veya günceller ve işlem tamamlandığında Promise'i çözer.
+ * @param {string} store İşlem yapılacak IndexedDB store'ının adı.
+ * @param {Array} rows Store'ya eklenecek veya güncellenecek nesne dizisi.
+ * @returns {Promise} İşlem tamamlandığında çözülür, hata oluştuğunda reddedilir.
+ */
 async function idbPut(store, rows) {
   return new Promise((res, rej) => {
     const tx = _idb.transaction(store, 'readwrite');
@@ -151,6 +176,12 @@ async function idbPut(store, rows) {
   });
 }
 
+/**
+ * Verilen store'daki tüm kayıtları siler ve ardından sağlanan yeni satırları ekler.
+ * @param {string} store İşlem yapılacak IndexedDB store'ının adı.
+ * @param {Array} rows Silinip eklenecek kayıtların dizi.
+ * @returns {Promise} İşlemin tamamlanmasını bekleyen Promise.
+ */
 async function idbClearAndPut(store, rows) {
   return new Promise((res, rej) => {
     const tx = _idb.transaction(store, 'readwrite');
@@ -162,6 +193,12 @@ async function idbClearAndPut(store, rows) {
   });
 }
 
+/**
+ * Belirtilen IndexedDB deposundan verilen kimliği (ID) taşıyan kaydı siler.
+ * @param {string} store Silinmesi istenen verinin bulunduğu depo (store) adı.
+ * @param {any} id Silinecek kaydı tanımlayan benzersiz kimlik (ID).
+ * @returns {Promise} İşlemin tamamlanıp tamamlanmadığını bildiren Promise nesnesi.
+ */
 async function idbDelete(store, id) {
   return new Promise((res, rej) => {
     const tx = _idb.transaction(store, 'readwrite');
@@ -172,6 +209,12 @@ async function idbDelete(store, id) {
 }
 
 // ── OFFLINE QUEUE ───────────────────────────
+/**
+ * Verilen işlemin (op) verisini '_queue' adlı IndexedDB işleminin '_queue' depolama alanına ekler.
+ * İşlem tamamlandığında Promise'i çözer, hata oluşursa hata mesajını reddeder.
+ * @param {Object} op Eklenmesi gereken işlemin (operation) nesnesi.
+ * @returns {Promise} İşlemin tamamlanmasını veya başarısız olmasını temsil eden Promise.
+ */
 async function queueOp(op) {
   return new Promise((res, rej) => {
     const tx = _idb.transaction('_queue', 'readwrite');
@@ -181,6 +224,10 @@ async function queueOp(op) {
   });
 }
 
+/**
+ * '_queue' adlı IndexedDB saklama alanından tüm kayıtları okuyup döndürür.
+ * @returns {Promise<Array>} Kayıtların bulunduğu dizi veya hata durumunda Promise.reject.
+ */
 async function getQueue() {
   return new Promise((res, rej) => {
     const tx = _idb.transaction('_queue', 'readonly');
@@ -190,6 +237,11 @@ async function getQueue() {
   });
 }
 
+/**
+ * Belirtilen kimlikli öğeyi '_queue' veritabanından siler.
+ * @param {string} qid Silinecek öğenin kimliği.
+ * @returns {Promise} İşlemin tamamlanmasını bekleme için Promise döndürür.
+ */
 async function removeFromQueue(qid) {
   return new Promise((res, rej) => {
     const tx = _idb.transaction('_queue', 'readwrite');
@@ -200,6 +252,15 @@ async function removeFromQueue(qid) {
 }
 
 // ── SDK YARDIMCILARI ────────────────────────
+/**
+ * Verilen tablodaki belirtilen kaydı (id ile eşleşen satırı) günceller.
+ * Güncelleme sırasında 'id' alanı hariç undefined olan tüm alanlar temizlenir (null gönderilerek).
+ * Kayıt sunucuda bulunamazsa (silinmişse) özel bir hata fırlatır.
+ * @param {string} table Güncellenecek tablonun adı.
+ * @param {any} id Güncellenecek kaydın benzersiz kimlik değeri.
+ * @param {Object} changes Güncellenecek alanların ve yeni değerlerinin içerdği nesne.
+ * @returns {Promise<void>} Güncelleme başarılı olduğunda boş Promise döndürür.
+ */
 async function dbUpdate(table, id, changes) {
   // B16: null/'' SUNUCUYA GİDER — eskiden filtrelendikleri için hiçbir alan
   // sunucuda temizlenemiyordu (toggleSub geri-alında tamamlanma_tarihi hayaleti).
@@ -217,6 +278,12 @@ async function dbUpdate(table, id, changes) {
   }
 }
 
+/**
+ * Verilen tabloya satırları ekler; null, undefined veya boş olan alanları temizler ve eksik ID'ler için rastgele UUID oluşturur.
+ * @param {string} table Eklemelerin yapılacağı tablo adı.
+ * @param {Array|Object} rows Eklenmesi gereken satır verisi; tek bir nesne veya nesnelerden oluşan bir dizi.
+ * @returns {Array} İşlem sonrası orijinal satır verilerini içeren dizi.
+ */
 async function dbInsert(table, rows) {
   const arr = Array.isArray(rows) ? rows : [rows];
   arr.forEach(r => { if (!r.id) r.id = crypto.randomUUID(); });
@@ -229,6 +296,14 @@ async function dbInsert(table, rows) {
 // ── OFFLINE-FIRST WRITE ─────────────────────
 // Basit tablo işlemleri için (görev tamamla, stok hareketi vb.)
 // Karmaşık işlemler → rpc() kullanır, bu fonksiyon değil
+/**
+ * Verilen tablo ve filtre (id=eq. içermeli) ile eşleşen kaydı bulup günceller;
+ * çevrimdışıysa işleği kuyruğa ekler, çevrimdışı değilse sunucuya gönderir ve kuyruğu temizler.
+ * @param {string} table Güncellenecek tablonun adı.
+ * @param {string} filter Tablodaki kaydı belirlemek için kullanılan filtre (id=eq. ile başlamalı).
+ * @param {Array} arr Güncellenecek alanların ve değerlerin bulunduğu dizi.
+ * @returns {Array} Güncellenen kayıt nesnesini içeren dizi.
+ */
 async function _writePatch(table, filter, arr) {
   const idMatch = filter.match(/id=eq\.([^&]+)/);
   // B28: id=eq. dışı filtreyle PATCH eskiden null dönüp _writePost'a düşüyordu —
@@ -258,6 +333,14 @@ async function _writePatch(table, filter, arr) {
   return [merged];
 }
 
+/**
+ * Verilen tablo için kayıtları işler, eksik ID'leri oluşturur, veritabanına kaydeder ve çevrimdışı modda veya hata durumunda işlemleri kuyruğa ekler.
+ * @param {Object} table İşlenecek tablo nesnesi.
+ * @param {Array} arr İşlenecek kayıt dizisi.
+ * @param {string} method Kullanılacak yöntem (örneğin 'insert' veya 'update').
+ * @param {Object} filter Filtreleme kriterleri.
+ * @returns {Array} İşlenen kayıt dizisi.
+ */
 async function _writePost(table, arr, method, filter) {
   arr.forEach(r => { if (!r.id) r.id = crypto.randomUUID(); });
   await idbPut(table, arr);
@@ -406,6 +489,10 @@ const RPC_TABLES = {
 // ── RENDER DEBOUNCE ─────────────────────────
 // Kısa sürede çok çağrı gelirse sadece 1 render yapar
 let _renderTimer;
+/**
+ * Render timer'ını sıfırlar ve 60 milisaniye sonra renderFromLocal fonksiyonunu çalıştırarak render işlemini tetikler.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function renderSafe() {
   clearTimeout(_renderTimer);
   _renderTimer = setTimeout(() => renderFromLocal(), 60);
@@ -418,6 +505,11 @@ function renderSafe() {
 let _pullChain = Promise.resolve();
 
 // Sadece belirtilen tabloları Supabase'den çek
+/**
+ * Verilen tablo listesi için veri çekme zincirini başlatır ve sonucu döndürür.
+ * @param {Array} tables Çekilecek tablo listesi.
+ * @returns {Promise} Tablo verilerinin çekilmesi işlemi için Promise.
+ */
 function pullTables(tables = []) {
   _suruStatCache = {};
   if (!tables.length) return Promise.resolve();
@@ -435,6 +527,11 @@ function pullTables(tables = []) {
 // günlerin satırlarını silerdi. Defter/klasik davranış ve çevrimdışı kriter
 // bozulmaz (skipPull akışı değişmedi; defter aynı hattın bütünüyle dolan
 // verisini okur).
+/**
+ * 'islem_log' tablosundan en son 50.000 kaydı (her sayfa 1000 satır) alarak döner.
+ * Veritabanı hatası oluşursa hata bilgisini, yoksa toplanan kayıtları döndürür.
+ * @returns {Object} { data: Kayıtlar dizisi, error: Hata mesajı (varsa) } objesi.
+ */
 async function _fetchIslemLogTumu(){
   const SAYFA = 1000, MAX_SAYFA = 50; // güven sınırı: 50k satır
   let rows = [], off = 0;
@@ -449,42 +546,172 @@ async function _fetchIslemLogTumu(){
   return { data: rows, error: null };
 }
 
+/**
+ * Verilen tablo isimlerinden oluşan dizideki her bir tablo için ilgili veritabanı sorgusunu (fetcher) çalıştırır,
+ * sonuçları işler ve hata durumunda uyarı verir. Başarılı olan tablolardan gelen verileri işlenmiş hale getirir.
+ * @param {Array} tables İşlenecek tablo isimlerinin listesi. Varsayılan olarak boş dizidir.
+ * @returns {Promise<void>} İşlem tamamlandığında (başarılı veya hata) void döner.
+ */
 async function _pullTablesNow(tables = []) {
   try {
     const FETCHERS = {
+      /**
+       * 'hayvan_durum_view' tablosundan tüm kayıtları seçer.
+       * @returns {Array} Seçilen tüm hayvan kayıtlarından oluşan dizi.
+       */
       hayvanlar:    () => db.from('hayvan_durum_view').select('*'),
+      /**
+       * 'v_gorev_log_sync' tablosundan tüm sütunları seçerek veri döndürür.
+       * @returns {Object} Seçilen tüm sütunlardan oluşan veri seti.
+       */
       gorev_log:    () => db.from('v_gorev_log_sync').select('*'),
+      /**
+       * 'stok_tuketim_view' tablosundan tüm sütunları seçerek stok tüketim verilerini döndürür.
+       * @returns {Array} Seçilen stok tüketim kayıtlarından oluşan dizi.
+       */
       stok:         () => db.from('stok_tuketim_view').select('*'),
+      /**
+       * 'stok_hareket' tablosundan tüm kayıtları seçer.
+       * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       */
       stok_hareket: () => db.from('stok_hareket').select('*'),
+      /**
+       * 'cases' tablosundan en son oluşturulmuş 200 kaydı seçer ve sıralar.
+       * @returns {Array} En yeni 200 'case' kaydı içeren dizi.
+       */
       cases:        () => db.from('cases').select('*').order('created_at', { ascending: false }).limit(200),
+      /**
+       * 'diseases' tablosundan tüm kayıtları seçer, önce 'category' sonra 'name' sütunlarına göre sıralar.
+       * @returns {Array} Sıralanmış hastalık kayıtlarından oluşan dizi.
+       */
       diseases:     () => db.from('diseases').select('*').order('category').order('name'),
+      /**
+       * 'drugs' tablosundan tüm sütunları seçip 'name' sütununa göre sıralanmış ilaç listesini döndürür.
+       * @returns {Array} İlaç kayıtlarından oluşan dizi.
+       */
       drugs:        () => db.from('drugs').select('*').order('name'),
+      /**
+       * 'drug_classes' tablosundan tüm kayıtları seçip 'group_name' sütununa göre sıralanmış bir liste döndürür.
+       * @returns {Array} group_name sütununa göre sıralanmış ilaç sınıfları kayıtlarından oluşan dizi.
+       */
       drug_classes: () => db.from('drug_classes').select('*').order('group_name'),
+      /**
+       * 'drug_products' tablosundan tüm sütunları seçip 'brand_name' sütununa göre sıralanmış veriyi döndürür.
+       * @returns {Object} Seçilen ve sıralanmış drug_products verisi.
+       */
       drug_products:() => db.from('drug_products').select('*').order('brand_name'),
+      /**
+       * 'drug_administrations' tablosundan tüm kayıtları seçer.
+       * @returns {Object} Seçilen tüm drug_administrations kayıtlarını içeren nesne.
+       */
       drug_administrations: () => db.from('drug_administrations').select('*'),
+      /**
+       * 'treatment_days' tablosundan tüm kayıtları seçer.
+       * @returns {Array} treatment_days tablosundaki tüm kayıtlardan oluşan dizi.
+       */
       treatment_days: () => db.from('treatment_days').select('*'),
+      /**
+       * 'treatment_day_uygulamalar' tablosundan tüm kayıtları seçer.
+       * @returns {Array} Seçilen tüm kayıtlardan oluşan dizi.
+       */
       treatment_day_uygulamalar: () => db.from('treatment_day_uygulamalar').select('*'),
+      /**
+       * 'tohumlama' tablosundan tüm kayıtları seçer.
+       * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       */
       tohumlama:    () => db.from('tohumlama').select('*'),
+      /**
+       * 'vaccines' tablosundan tüm sütunları seçerek kayıtları döndürür.
+       * @returns {Array} Vaccine kayıtlarından oluşan dizi.
+       */
       vaccines:     () => db.from('vaccines').select('*'),
+      /**
+       * vaccine_diseases tablosundan tüm kayıtları seçer ve döndürür.
+       * @returns {Array} vaccine_diseases tablosundaki tüm kayıtlardan oluşan dizi.
+       */
       vaccine_diseases: () => db.from('vaccine_diseases').select('*'),
+      /**
+       * 'vaccine_protocol_steps' tablosundan tüm kayıtları seçer ve döndürür.
+       * @returns {Array} vaccine_protocol_steps tablosundaki tüm kayıtlardan oluşan dizi.
+       */
       vaccine_protocol_steps: () => db.from('vaccine_protocol_steps').select('*'),
+      /**
+       * 'vaccination_schedule' tablosundan tüm kayıtları seçer ve döndürür.
+       * @returns {Array} vaccination_schedule tablosundaki tüm kayıtlardan oluşan dizi.
+       */
       vaccination_schedule: () => db.from('vaccination_schedule').select('*'),
       vaccination_log: () => db.from('vaccination_log').select('*'),
+      /**
+       * 'dogum' tablosundan en son 100 kaydı tarih sırasına göre (azalan) seçer.
+       * @returns {Object} Seçilen 100 kaydı içeren nesne.
+       */
       dogum:        () => db.from('dogum').select('*').order('tarih', { ascending: false }).limit(100),
+      /**
+       * 'bildirim_log' tablosundan durumu 'bekliyor' olan tüm kayıtları seçer.
+       * @returns {Object} Seçilen kayıtlardan oluşan veritabanı sonucu.
+       */
       bildirim_log: () => db.from('bildirim_log').select('*').eq('durum', 'bekliyor'),
+      /**
+       * Tüm işlem loglarını getirir.
+       * @returns {Promise} İşlem loglarını içeren Promise nesnesi.
+       */
       islem_log:    () => _fetchIslemLogTumu(),
       uygulama_log: () => db.from('uygulama_log').select('*').order('created_at', { ascending: false }).limit(500),
+      /**
+       * 'kizginlik_log' tablosundan tüm kayıtları seçer.
+       * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       */
       kizginlik_log:() => db.from('kizginlik_log').select('*'),
+      /**
+       * 'padoklar' tablosundan aktif olan kayıtları sıralı olarak seçer.
+       * @returns {Object} Seçilen aktif padok kayıtlarından oluşan nesne.
+       */
       padoklar:         () => db.from('padoklar').select('*').eq('aktif', true).order('sira'),
+      /**
+       * 'grup_padok_eslem' tablosundan tüm kayıtları seçer.
+       * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       */
       grup_padok_eslem: () => db.from('grup_padok_eslem').select('*'),
+      /**
+       * 'hekimler' tablosundan aktif olan hekimleri seçer.
+       * @returns {Array} Aktif hekimlerin kayıtlarından oluşan dizi.
+       */
       hekimler:         () => db.from('hekimler').select('*').eq('aktif', true),
+      /**
+       * Veritabanındaki 'stok_kategorileri' tablosundan tüm kayıtları seçip 'sira' sütununa göre sıralar.
+       * @returns {Array} Sıralanmış stok kategori kayıtlarından oluşan dizi.
+       */
       stok_kategorileri:() => db.from('stok_kategorileri').select('*').order('sira'),
+      /**
+       * 'tedavi_sablonu' tablosundan tüm kayıtları seçip 'ad' sütununa göre sıralanmış bir liste döndürür.
+       * @returns {Object} Seçilen ve sıralanmış veri setini içeren obje.
+       */
       tedavi_sablonu:        () => db.from('tedavi_sablonu').select('*').order('ad'),
+      /**
+       * 'sablon_hastalik_eslem' tablosundan tüm kayıtları seçer.
+       * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       */
       sablon_hastalik_eslem: () => db.from('sablon_hastalik_eslem').select('*'),
+      /**
+       * 'tedavi_sablonu_kalem' tablosundan tüm kayıtları seçer.
+       * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       */
       tedavi_sablonu_kalem:  () => db.from('tedavi_sablonu_kalem').select('*'),
+      /**
+       * 'protokol_ayar' tablosundan tüm kayıtları seçer.
+       * @returns {Array} Seçilen tüm protokol ayar kayıtlarından oluşan dizi.
+       */
       protokol_ayar:    () => db.from('protokol_ayar').select('*'),
       // B27: TABLES'ta olup fetcher'ı olmayanlar sessiz no-op'tu — eklendi
+      /**
+       * 'protokol_instance' tablosundan tüm kayıtları seçer.
+       * @returns {Array} Seçilen tüm protokol_instance kayıtlarından oluşan dizi.
+       */
       protokol_instance: () => db.from('protokol_instance').select('*'),
+      /**
+       * 'cop_kutusu' tablosundan tüm kayıtları seçer ve döndürür.
+       * @returns {Object} Seçilen tüm kayıtlardan oluşan nesne.
+       */
       cop_kutusu:        () => db.from('cop_kutusu').select('*'),
       // ileri_gebe_view: () => db.from('ileri_gebe_view').select('*'), — dashboard RPC sonucu kullanıyor
     };
@@ -535,6 +762,12 @@ async function rpcOptimistic(name, params = {}, { onSuccess, onError, successMsg
 }
 
 // ── PULL FROM SUPABASE ──────────────────────
+/**
+ * Verilen tablo listesinden '_queue' hariç olanları Supabase'den çekmeye çalışır.
+ * Başarılı işlem durumunda 'dot' elementinden 'off' ve 'warn' sınıflarını kaldırır.
+ * Hata durumunda 'dot' elementine 'off' sınıfını ekler ve hatayı konsola yazar.
+ * @returns {Promise<void>} İşlemin tamamlanmasını bekleme.
+ */
 async function pullFromSupabase() {
   try {
     await pullTables(TABLES.filter(t => t !== '_queue'));
@@ -551,6 +784,12 @@ let _syncing = false;
 // Veri Trafik panelinden manuel 'Gönder' hâlâ mümkün)
 const _syncFailCount = {};
 
+/**
+ * İnternet bağlantısı varsa ve senkronizasyon yapılmıyorsa, kuyruktaki işlemleri sırayla işler.
+ * Sunucu ile senkronize edilecek verileri (INSERT veya PATCH) işler, başarısız olanları kuyruğa bırakır
+ * ve hedef satırın silinmesi durumunda kuyruktan kaldırır. İşlem tamamlandığında senkronizasyon barını günceller.
+ * @returns {Promise<void>} Senkronizasyon işleminin tamamlanmasını temsil eden Promise.
+ */
 async function syncNow() {
   if (_syncing || !navigator.onLine) return;
   _syncing = true;
@@ -602,6 +841,11 @@ async function syncNow() {
 // Hedef: Supabase Realtime WebSocket kanalları (sonraki sprint)
 let _backgroundSyncInterval = null;
 
+/**
+ * Belirtilen aralıklarla arka plan senkronizasyonunu başlatır veya mevcut aralığı temizler.
+ * @param {number} intervalMs Senkronizasyonun tekrarlanacağı milisaniye cinsinden aralık süresi. Varsayılan değer 30000'dir.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function startBackgroundSync(intervalMs = 30000) {
   if (_backgroundSyncInterval) clearInterval(_backgroundSyncInterval);
   _backgroundSyncInterval = setInterval(() => {
@@ -612,6 +856,9 @@ function startBackgroundSync(intervalMs = 30000) {
   
 }
 
+/**
+ * Arka plan senkronizasyonu aralığını durdurur ve ilgili zamanlayıcıyı temizler.
+ */
 function stopBackgroundSync() {
   if (_backgroundSyncInterval) {
     clearInterval(_backgroundSyncInterval);
@@ -626,6 +873,11 @@ function stopBackgroundSync() {
 const REALTIME_TABLES = ['hayvanlar','gorev_log','stok','stok_hareket','tohumlama','dogum','kizginlik_log','islem_log','ui_logs','treatment_days','treatment_day_uygulamalar','protokol_ayar'];
 let _realtimeChannel = null;
 
+/**
+ * ERP tablosundaki değişiklikleri dinleyerek ilgili tabloları günceller ve kullanıcı arayüzünü (UI) gerçek zamanlı olarak yeniler.
+ * Bağlantı durumu (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT) kontrol edilerek arka plan senkronizasyonu (polling) başlatılır veya durdurulur.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function initRealtime() {
   if (_realtimeChannel) return; // zaten başlatıldı
 
@@ -654,6 +906,12 @@ function initRealtime() {
     });
 }
 
+/**
+ * Verilen tablodan tüm kayıtları getirir ve opsiyonel bir filtre fonksiyonu varsa onları uygular.
+ * @param {string} table İndenilecek tablonun adı.
+ * @param {Function} filterFn Kayıtları filtrelemek için kullanılan fonksiyon.
+ * @returns {Array} Filtrelenmiş veya orijinal tablo verisi.
+ */
 async function getData(table, filterFn) {
   const data = await idbGetAll(table);
   return filterFn ? data.filter(filterFn) : data;
@@ -695,6 +953,12 @@ async function rpcAddTreatmentDayWithSessions(caseId, date, sessions, existingDa
  */
 async function rpcSeansTamamla(seansAdminId, uygulanmadi = false, not = null, pgOnay = false, pgGerekce = null) {
   if (!seansAdminId) throw new Error('seansAdminId zorunlu');
+  /**
+   * Seans tamamlama işlemi için gerekli onay ve gerekçe bilgilerini alarak RPC çağrısı yapar.
+   * @param {boolean} onay Seansın onaylanıp onaylanmadığını belirten boolean değer.
+   * @param {string} gerekce Onay verilmediğinde veya ek bilgi gerektiğinde sağlanan gerekçe metni.
+   * @returns {Promise} RPC çağrısının sonucu döndürür.
+   */
   const cagri = (onay, gerekce) => rpc('seans_tamamla', {
     p_seans_admin_id: seansAdminId,
     p_uygulanmadi: !!uygulanmadi,
@@ -733,15 +997,39 @@ async function rpcReceteGuncelle(caseId, yeniPlan) {
 // Kalıp: rpcSeansTamamla / rpcReceteGuncelle — ince sarmal, rpc() hata/ok:false
 // yolunu aynen kullanır. ok:false → Error, e.data.hata kodu taşır.
 // L4 entegrasyon (2026-09-14): stub katmanı söküldü — bu 4 wrapper gerçek RPC'lere gider.
+/**
+ * Verilen şifre ile geri alma bileti alma işlemi başlatır.
+ * @param {string} sifre Geri alma işlemi için kullanılacak şifre.
+ * @returns {Promise} İşlem sonucunu içeren Promise nesnesi.
+ */
 async function rpcGeriAlmaBiletiAl(sifre) {
   return rpc('geri_alma_bileti_al', { p_sifre: sifre });
 }
+/**
+ * Verilen filtreye göre değişim listesini getirir.
+ * @param {Object} filtre Filtreleme kriterlerini içeren nesne.
+ * @returns {Promise} Filtrelenmiş değişim listesini döndüren Promise.
+ */
 async function rpcDegisimListele(filtre = {}) {
   return rpc('degisim_listele', { p_filtre: filtre || {} });
 }
+/**
+ * Belirtilen hedef ve seviye parametrelerini kullanarak değişim önizlemesini alır.
+ * @param {string} hedef Önizleme yapılacak hedef.
+ * @param {number} seviye Önizleme yapılacak seviye.
+ * @returns {Promise} Değişim önizleme verisini içeren Promise.
+ */
 async function rpcDegisimOnizle(hedef, seviye) {
   return rpc('degisim_onizle', { p_hedef: hedef, p_seviye: seviye });
 }
+/**
+ * Belirtilen hedef, seviye ve bilet bilgilerini kullanarak değişim geri alma işlemi başlatır.
+ * @param {string} hedef İşlem yapılacak hedef kimlik veya kod.
+ * @param {number} seviye İşlem yapılacak seviye değeri.
+ * @param {string} bilet İşlem için gerekli olan bilet bilgisi.
+ * @param {string|null} gerekce İşlem gerekçesi (varsayılan: null).
+ * @returns {Promise} İşlem sonucunu içeren Promise nesnesi.
+ */
 async function rpcDegisimGeriAl(hedef, seviye, bilet, gerekce = null) {
   return rpc('degisim_geri_al', { p_hedef: hedef, p_seviye: seviye, p_bilet: bilet, p_gerekce: gerekce || null });
 }

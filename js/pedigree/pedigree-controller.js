@@ -25,16 +25,34 @@ let _pedPaneBuilt = false;    // #tab-pedigree kabuğu kurulu mu (openDet her a�
 let _pedSurface = 'soyagaci'; // 'soyagaci' | 'genetik'
 let _pedLastPayload = null;   // external sheet ebeveyn özeti için son projection
 
+/**
+ * Ped'in aktif odağındaki düğüm ID'si veya ped ID'sini döndürür.
+ * @returns {string} Aktif odağın ID'si veya boş string.
+ */
 function _pedActiveFocusKey() { return _pedFocusNodeId || _pedFocusId || ''; }
+/**
+ * Aktif odak anahtarı, ata derinliği ve torun derinliği değerlerini birleştirerek bir anahtar dizisi oluşturur.
+ * @returns {string} Odak anahtarı, ata derinliği ve torun derinliğinin iki nokta ile ayrıldığı birleşik anahtar.
+ */
 function _pedRenderKey() { return _pedActiveFocusKey() + ':' + _pedAncDepth + ':' + _pedDescDepth; }
 // Aktif focus için ÇİZİLİ görünüm var mı (derinlik fark etmez) — plan Rev 3:
 // zaten render edilmiş görünüm ekranda kalır; yeni istek başarısızsa eziLMESİN.
+/**
+ * Ped view ve render edilmiş anahtar varsa, aktif odak anahtarının render edilmiş anahtarda başlangıç olarak yer alıp yer olmadığını kontrol eder.
+ * @returns {boolean} Eğer render edilmiş anahtar aktif odak anahtarı ile başlıyorsa true, yoksa false döndürür.
+ */
 function _pedFocusCiziliMi() {
   return !!(_pedView && _pedRenderedKey &&
     _pedRenderedKey.indexOf(_pedActiveFocusKey() + ':') === 0);
 }
 
 // ── W2 seam: {data,error} | payload | Promise<...> normalize ────────────────
+/**
+ * Geliştirici tarafından sağlanan ham veri (raw) pedigo (pedigree) yapısını işler,
+ * Promise ise çözülür, hata mesajı varsa fırlatılır ve geçerli bir pedigree nesnesi kontrol edilir.
+ * @param {any} raw Geliştirici tarafından sağlanan ham veri (Promise, hata objesi veya pedigree objesi).
+ * @returns {Object} Geçerli bir pedigree nesnesi (nodes içeren obje).
+ */
 async function _pedResolvePayload(raw) {
   let p = raw;
   if (p && typeof p.then === 'function') p = await p;
@@ -51,6 +69,12 @@ async function _pedResolvePayload(raw) {
 // ── openDet entegrasyonu: focus değişimi (RPC çağırmaz — lazy) ──────────────
 // openDet her açılışta tab-pedigree innerHTML'ini temizlediği için kabuk
 // her zaman yeniden kurulur; aynı hayvan için de view yok edilir (mount ölü).
+/**
+ * Belirtilen hayvan ID'sini odak noktası olarak ayarlar, ilgili derinlikleri ve render durumu sıfırlar.
+ * @param {string|null} animalId Odaklanılacak hayvanın ID'si.
+ * @param {boolean} tabActive Aktif tab durumu; true ise pedigreeTabActivated fonksiyonu çağrılır.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function pedigreeSetFocus(animalId, tabActive) {
   const next = animalId ? String(animalId) : null;
   if (next !== _pedFocusId) {
@@ -68,6 +92,10 @@ function pedigreeSetFocus(animalId, tabActive) {
 }
 
 // ── Sekme ilk aktive olduğunda tetiklenir (lazy-load) ───────────────────────
+/**
+ * Pedigree sekmesi aktif edildiğinde çalışır; gerekli paneyi oluşturur, hayvan seçimi olup olmadığını kontrol eder ve mevcut görünüm için veriyi yükler.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function pedigreeTabActivated() {
   if (!g('tab-pedigree')) return;
   pedigreeEnsurePane();
@@ -85,6 +113,13 @@ function pedigreeEnsurePane() {
   const pane = g('tab-pedigree');
   if (!pane) return;
   _pedSurface = 'soyagaci';
+  /**
+   * Verilen y değeri, metin ve aktif durumu içeren bir tab butonu HTML elemanı döndürür.
+   * @param {string} y Tab ile ilişkili veri değeri.
+   * @param {string} txt Butonun gösterilecek metni.
+   * @param {boolean} on Butonun aktif olup olmadığını belirten durum.
+   * @returns {string} Oluşturulan butonun HTML kodu.
+   */
   const _subBtn = (y, txt, on) => `<button class="tab2${on ? ' on' : ''}" data-y="${y}" onclick="showTab2(this.dataset.y,this);pedigreeSecYuzey(this.dataset.y)">${txt}</button>`;
   pane.innerHTML =
     `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
@@ -109,17 +144,30 @@ function pedigreeEnsurePane() {
 }
 
 // Alt yüzey seçimi (Genetik yer tutucu; Soy Ağacı'na dönüşte eksik görünümü yükle)
+/**
+ * 'genetik' veya 'soyagaci' yüzeyini global değişkene atar; 'soyagaci' seçilirse soy ağacı sekmesini etkinleştirir.
+ * @param {string} y - 'genetik' ise 'genetik', aksi halde 'soyagaci' yüzeyi seçilir.
+ * @returns {void} Değer döndürmez.
+ */
 function pedigreeSecYuzey(y) {
   _pedSurface = y === 'genetik' ? 'genetik' : 'soyagaci';
   if (_pedSurface === 'soyagaci') pedigreeTabActivated();
 }
 
+/**
+ * Pedigree derinliği ipucu metnini günceller.
+ * @returns {void}
+ */
 function pedigreeDepthHintGuncelle() {
   const el = g('ped-depth-hint');
   if (el) el.textContent = _pedAncDepth + ' kuşak atası · ' + _pedDescDepth + ' kuşak yavru';
 }
 
 // ── +2 kuşak (ata yönü; DB MVP max 8 — RPC clamp'e rağmen istemci de sınırlar) ──
+/**
+ * En fazla 8 kuşak derinliğine kadar soyağacı derinliğini artırır ve ilgili güncellemeleri yapar.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function pedigreeKusakArtir() {
   if (_pedAncDepth >= 8) { toast('En fazla 8 kuşak istenebilir'); return; }
   _pedAncDepth = Math.min(8, _pedAncDepth + 2);
@@ -163,6 +211,10 @@ async function pedigreeLoad() {
   }
 }
 
+/**
+ * Pedigree ağacı kutusunun yükleme animasyonunu oluşturur.
+ * @returns {void}
+ */
 function pedigreeTreeBoxLoading() {
   const box = g('ped-tree-box');
   if (!box) return;
@@ -170,6 +222,12 @@ function pedigreeTreeBoxLoading() {
     '<div class="skel" style="height:14px;width:' + w + ';margin:0 16px 12px"></div>').join('') + '</div>';
 }
 
+/**
+ * Pedigree ağacını belirli bir hayvan düğümü verileriyle render eder.
+ * Mevcut pedigree görünümünü yok eder, yeni bir görünüm başlatır ve düğüm tıklama olayını bağlar.
+ * @param {Object} els Pedigree ağacı için gerekli olan düğüm verilerini içeren nesne.
+ * @returns {void}
+ */
 function pedigreeRenderTree(els) {
   const box = g('ped-tree-box');
   if (!box) return;
@@ -188,6 +246,11 @@ function pedigreeRenderTree(els) {
   }
 }
 
+/**
+ * Pedigree ağacının kutusunu bulup, belirtilen mesajı içeren bir boşluk mesajı gösterir.
+ * @param {string} msg Gösterilecek mesaj metni.
+ * @returns {void} Hiçbir değer döndürmez.
+ */
 function pedigreeShowEmpty(msg) {
   const box = g('ped-tree-box');
   if (box) {
@@ -197,6 +260,13 @@ function pedigreeShowEmpty(msg) {
 
 // ── Hata: plan Rev 3 — zaten çizili görünüm ekranda KALIR; yalnız YENİ
 // görünüm isteği açık hata verir (çevrimdışı rozetli). ──────────────────────
+/**
+ * Hata mesajını işleyerek, çevrimdışı durumunu tespit eder ve kullanıcıya uygun bildirim gösterir.
+ * Eğer odak noktası çiziliyse (pedFocusCiziliMi), badge'i günceller ve toast bildirimi gösterir.
+ * Aksi takdirde, ağaç kutusuna hata mesajını ve "Yeniden dene" butonunu içeren HTML'i yerleştirir.
+ * @param {Event} e Hata olayı veya hata nesnesi.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function pedigreeShowError(e) {
   const msg = (e && e.message) || 'Bilinmeyen hata';
   const offline = /çevrimdışı|offline/i.test(String(msg));
@@ -219,6 +289,11 @@ function pedigreeShowError(e) {
 // ── cached/offline rozeti ────────────────────────────────────────────────────
 // 'cache' sinyali payload.meta.cached ile gelir (W2 seam — set etmiyorsa rozet
 // sessiz kalır); ağ kesikse success de 'offline' rozetle gelir.
+/**
+ * Son payload'daki meta verisinden 'cached' değeri olup olmadığını kontrol ederek 'cache' döner,
+ * yoksa tarayıcı çevrimiçi durumu kontrol edilerek 'offline' döner, aksi takdirde boş string döndürür.
+ * @returns {string} 'cache', 'offline' veya boş string.
+ */
 function pedigreeBadgeKind() {
   const meta = (_pedLastPayload && _pedLastPayload.meta) || {};
   if (meta.cached === true) return 'cache';
@@ -226,6 +301,11 @@ function pedigreeBadgeKind() {
   return '';
 }
 
+/**
+ * Belirtilen tür (kind) için ped badge elementini günceller veya gizler.
+ * @param {string} kind Badge türü ('cache' veya 'offline').
+ * @returns {void} Hiçbir değer döndürmez.
+ */
 function pedigreeSetBadge(kind) {
   const el = g('ped-badge');
   if (!el) return;
@@ -240,6 +320,11 @@ function pedigreeSetBadge(kind) {
 }
 
 // ── Node tık yönlendirme ─────────────────────────────────────────────────────
+/**
+ * Soy ağacı düğümüne tıklandığında işlenir; düğüm türüne göre detay ekranı veya bilgi sheet'i açar.
+ * @param {Object} node - Tıklanan soy ağacı düğümü.
+ * @returns {void} Döndürmez; veri alınamazsa veya boşsa sessizce çıkar.
+ */
 function pedigreeNodeTiklandi(node) {
   let d;
   try { d = node.data(); } catch (err) { return; }
@@ -250,9 +335,22 @@ function pedigreeNodeTiklandi(node) {
 
 // ── External detail sheet — non-router silent sheet (MODAL-ROUTER-01'de
 // ayrıcalıklı yüzey: doğrudan DOM'dan kalkar, history girişi tutmaz) ─────────
+/**
+ * Verilen dış kaynak düğümünün (node) detaylarını içeren sabit pozisyonlu bir bilgi paneli oluşturur.
+ * Panel, ebeveyn özetini, cinsiyet, ırk, doğum tarihi gibi bilgileri ve "merkez yap" butonunu içerir.
+ * Panelin arka planına tıklanınca fonksiyon çağrılarak panel kaldırılır.
+ * @param {Object} d Dış kaynak düğümünün veri objesi (id, label, sex, breed, birth_date vb. içerir).
+ * @returns {void} Fonksiyon bir değer döndürmez, DOM'a bir element ekler.
+ */
 function pedigreeExternalSheet(d) {
   pedigreeExtSheetKaldir();
   const parents = _pedEbeveynOzet(d.id);
+  /**
+   * Bir anahtar ve değeri alarak, flexbox düzeninde yan yana yerleştirilmiş, solda anahtarı, sağda değeri (boşsa '—') gösteren bir HTML satırı döndürür.
+   * @param {string} k Gösterilecek anahtar (label) metni.
+   * @param {string} val Gösterilecek değer metni.
+   * @returns {string} Flexbox stilleri ve içerik içeren bir HTML string'i.
+   */
   const satir = (k, val) => '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--card3);font-size:.78rem">' +
     '<span style="color:var(--ink3)">' + k + '</span><span style="font-weight:600;color:var(--ink);text-align:right">' + esc(val || '—') + '</span></div>';
   const ov = document.createElement('div');
@@ -274,12 +372,21 @@ function pedigreeExternalSheet(d) {
   document.body.appendChild(ov);
 }
 
+/**
+ * 'ped-ext-sheet' ID'li elemanı ve ebeveynini bulup, elemanı DOM'dan kaldırır.
+ * @returns {void} Hiçbir değer döndürmez.
+ */
 function pedigreeExtSheetKaldir() {
   const ov = document.getElementById('ped-ext-sheet');
   if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
 }
 
 // Son projection'dan düğümün ebeveyn özeti (çeviri — hesap yok)
+/**
+ * Verilen düğüm kimliğine sahip düğüme gelen kenarlara göre ebeveyn özetlerini döndürür.
+ * @param {string|number} nodeId - Ebeveynleri aranacak hedef düğümün kimliği.
+ * @returns {Array} {role, label} alanlarına sahip ebeveyn özet kayıtlarından oluşan dizi; gerekli veriler yoksa boş dizi.
+ */
 function _pedEbeveynOzet(nodeId) {
   const p = _pedLastPayload;
   if (!p || !Array.isArray(p.edges) || !Array.isArray(p.nodes) || !nodeId) return [];
@@ -291,6 +398,12 @@ function _pedEbeveynOzet(nodeId) {
 }
 
 // ── "Bu node'u merkez yap": fokus node uuid eksenine geç (subgraphForNode) ──
+/**
+ * Verilen düğüm ID'sini kullanarak pedigrı görünümünü soy ağacı moduna geçirir,
+ * ilgili derinlik ayarlarını yapar ve veriyi yeniden yükler.
+ * @param {string} nodeId - Pedigrı görüntülemek için seçilen düğümün ID'si.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function pedigreeMerkezYap(nodeId) {
   if (!nodeId) return;
   pedigreeExtSheetKaldir();

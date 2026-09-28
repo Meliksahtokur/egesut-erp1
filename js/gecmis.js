@@ -93,11 +93,21 @@ const _GM_ISLEM_TIP_EMOJI = {
 // bilinmeyen 'YENI_ISLEM_TIPI' → 'İşlem: yeni işlem tipi' (ham kod değil).
 // Düz toLowerCase (TR I→ı özel dönüşümü DEĞİL): 'TEDAVI'→'tedavi' okunur;
 // _gmTrLower 'tedavı' üretir — kod yedeğinde zarf örneği (dotted i) esastır.
+/**
+ * Verilen işlem tipini (string veya undefined) alıp, önceden tanımlı etiket dizisinden eşleşen bir değeri döndürür; yoksa stringi temizleyip "İşlem: " önekiyle birlikte küçük harf ve alt çizgi dönüşümlerini uygulayarak döndürür.
+ * @param {string} tip İşlem tipini belirten string değeri.
+ * @returns {string} İşlem tipine karşılık gelen etiket veya formatlanmış string.
+ */
 function _gmIslemTipEtiket(tip) {
   const t = String(tip || '').trim();
   if (_GM_ISLEM_TIP_ETIKET[t]) return _GM_ISLEM_TIP_ETIKET[t];
   return t ? 'İşlem: ' + t.toLowerCase().replace(/_/g, ' ') : 'İşlem';
 }
+/**
+ * Verilen işlem tipini anahtar olarak kullanarak ilgili emojiyi döndürür; bulunamazsa varsayılan '📋' emojisini döndürür.
+ * @param {string} tip İşlem tipi.
+ * @returns {string} İşlem tipine karşılık gelen emoji veya varsayılan '📋' emojisi.
+ */
 function _gmIslemTipEmoji(tip) {
   return _GM_ISLEM_TIP_EMOJI[String(tip || '').trim()] || '📋';
 }
@@ -120,6 +130,12 @@ const _GM_KOD_DEGER_ETIKET = {
   durum: { active: 'Aktif', closed: 'Kapandı', geri_alindi: 'Geri Alındı' },
   status: { active: 'Aktif', closed: 'Kapandı' },
 };
+/**
+ * Verilen alan adı için etiket objesinden, belirtilen değere karşılık gelen etiket değerini döndürür.
+ * @param {string} alan Etiket objesinin anahtarını belirlemek için kullanılan alan adı.
+ * @param {string} deger Etiket objesinde aranacak değer.
+ * @returns {string|null} Bulunan etiket değeri veya bulunamazsa null.
+ */
 function gmKodDegerEtiketi(alan, deger) {
   const m = _GM_KOD_DEGER_ETIKET[String(alan || '')];
   if (!m) return null;
@@ -130,6 +146,14 @@ function gmKodDegerEtiketi(alan, deger) {
 // W8-D3 (saf): hayvan referans etiketi — ham id/UUID ASLA görünmez; çözülemeyen
 // referans '?' yerine nötr kısa etiket döner (root R1-D3: "kartta ? kalmayacak").
 // animals: state dizisi, kupeById: IDB hayvan indeksi (_gmHayvanKupeById deseni).
+/**
+ * Verilen hayvan ID'sine göre küpe numarası/etiketi bulmaya çalışır; bulunamazsa yedek değeri döndürür.
+ * @param {string|number|null} hid - Aranacak hayvan ID'si veya küpe numarası.
+ * @param {string|null} nor - Küpe bulunamazsa kullanılacak yedek etiket değeri.
+ * @param {Array<Object>} [animals] - Hayvan kayıtlarının listesi.
+ * @param {Object<string, string>} [kupeById] - Hayvan ID'sine göre küpe numarası eşleme tablosu.
+ * @returns {string} Bulunan küpe numarası/etiketi, yoksa 'nor' değeri veya 'Hayvan'.
+ */
 function gmHayvanEtiketVeya(hid, nor, animals, kupeById) {
   if (hid) {
     const a = (animals || []).find(x => x && (x.id === hid || x.kupe_no === hid));
@@ -144,6 +168,12 @@ function gmHayvanEtiketVeya(hid, nor, animals, kupeById) {
 // kayıtlarının notuna gömülü makine referansı ('Tedavi · drug_admin:<uuid>'
 // kalıbı; PW gecmis-ux görünür-UUID bulgusu) kartta görünmez: '<sozluk>:<uuid>'
 // tokenları atılır, okunur metin kalır (çözülemeyen → nötr: kimlik parçası yok).
+/**
+ * Girilen metindeki UUID'leri (hem isimli hem çıplak formatlar) temizleyip,
+ * kalan parçaları nokta üstü çizili (·) boşluklarla birleştirir.
+ * @param {string} n Temizlenmesi istenen metin.
+ * @returns {string} Temizlenmiş ve yeniden biçimlendirilmiş metin.
+ */
 function gmNotlarGorunur(n) {
   return String(n || '')
     .replace(/[A-Za-z_]+:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '')
@@ -165,6 +195,12 @@ function gmNotlarGorunur(n) {
 // bu yüzden hiç çalışmıyordu). tarih timestamptz default now() (faz1_core);
 // geç girilmiş İŞ tarihinde sunucu ZAMAN_ESLESME_YOK verir → UI yönlendirme
 // metni (DG_NEDEN_METNI.ZAMAN_ESLESME_YOK) devreye girer.
+/**
+ * Giriş nesnesindeki değişiklik bilgilerine (txid, ref_tablo, ref_id, tip vb.) dayanarak
+ * ilgili hedef kayıt bilgisini (tablo, pk, zaman) çıkarır ve döndürür.
+ * @param {Object} entry İşlem kaydı veya değişiklik nesnesi.
+ * @returns {Object|null} Hedef kayıt bilgisi {tablo, pk, zaman, txid} yapısında bir nesne veya hata durumunda null.
+ */
 function _gmGeriAlHedef(entry) {
   if (!entry || typeof entry !== 'object') return null;
   const snap = entry.snapshot && typeof entry.snapshot === 'object' ? entry.snapshot : {};
@@ -190,6 +226,12 @@ function _gmGeriAlHedef(entry) {
   }
   // 3) Tip fallback — ref'in boş kaldığı tipler (ölçülmüş istisnalar)
   const zaman = entry.tarih || entry.created_at || '';
+  /**
+   * Verilen tablo ve birincil anahtar bilgisiyle bir kayıt referansı oluşturur; pk boşsa null döndürür.
+   * @param {*} tablo - Referansın ait olduğu tablo.
+   * @param {*} pk - Kaydın birincil anahtarı; null veya boş string ise null döndürülür.
+   * @returns {Object|null} tablo ve pk alanlarını içeren nesne; pk geçersizse null.
+   */
   const kur = (tablo, pk) => {
     if (pk == null || pk === '') return null;
     return zaman ? { tablo, pk, zaman } : { tablo, pk };
@@ -229,6 +271,12 @@ function _gmGeriAlindiEtiketi(entry) {
 
 // İşlem dili bağlamı (goal frozen contract): {olayEtiketi, zaman, kim}.
 // kim = küpe (IDB indeksi _gmHayvanKupeById) ya da snapshot küpesi; ham UUID ASLA.
+/**
+ * Giriş nesnesindeki işlem tipine göre etiket belirleyip, kimlik bilgilerini öncelik sırasına göre doldurarak bir nesne döndürür.
+ * @param {Object} entry İşlem detaylarını içeren nesne.
+ * @param {string} kim Kimlik bilgisi (küpe_no veya devlet_kupe).
+ * @returns {Object} { olayEtiketi, zaman, kim } özelliklerini içeren nesne.
+ */
 function _gmGeriAlBaglam(entry, kim) {
   const d = entry && typeof entry === 'object' ? entry : {};
   const snap = d.snapshot && typeof d.snapshot === 'object' ? d.snapshot : {};
@@ -242,6 +290,12 @@ function _gmGeriAlBaglam(entry, kim) {
 
 // Başlık şablonu (TEK kaynak — plan §5): `${olayEtiketi} — ${gg.aa ss:dd} · ${kim}`.
 // SAF: DOM yazmaz; ham tx/UUID üretmez (zaman yoksa o parça düşer).
+/**
+ * Verilen bağlam objesinden tarih, saat, olay etiketi ve kullanıcı bilgilerini alarak
+ * bunları belirli bir formatla birleştirip işlem başlığı metnini oluşturur.
+ * @param {Object} baglam İşlem başlığı oluşturulacak verilerin bulunduğu bağlam objesi.
+ * @returns {String} Oluşturulan işlem başlığı metni.
+ */
 function _gmIslemBaslikSatiri(baglam) {
   const b = baglam || {};
   const gun = b.zaman ? _gmDateKey(b.zaman) : '';
@@ -258,6 +312,13 @@ const _GM_GUNLER = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'C
 // ── Politika filtresi (spec B tablosu) ───────────────────
 // sourceKey: kaynak tablo anahtarı (gorev_log/tohumlama/cases/dogum/uygulama_log/islem_log)
 // veya entry tipi (gorev/tohumlama/hastalik/dogum/uygulama/islem) — ikisi de kabul.
+/**
+ * Görev, tohumlama, vaka, işlem gibi farklı kaynak anahtarlarına göre kayıtların geçerliliğini kontrol eder.
+ * Kaynak anahtarına göre farklı kurallar (tamamlanma tarihi, durum, iptal durumu, kapalı vaka tarihi vb.) uygulanır.
+ * @param {string} sourceKey Kayıt kaynağını belirleyen anahtar (örn: 'gorev_log', 'tohumlama', 'cases', 'islem_log').
+ * @param {Object} row Kontrol edilecek kayıt nesnesi.
+ * @returns {boolean} Kayıt geçerliliğine göre true veya false döndürür.
+ */
 function _gmPolicyRow(sourceKey, row) {
   if (!row) return false;
   switch (sourceKey) {
@@ -281,6 +342,12 @@ function _gmPolicyRow(sourceKey, row) {
 // Klasik görünüm politikası (eski düz-liste davranışı): gorev dışında her şey
 // kabul; gorev filtresi (tamamlandi/parent_id) çağıran tarafta _gecmisTumu'ye
 // göre satır satır uygulanır. islem yine 5 tip.
+/**
+ * Verilen satırın genel müdürlük politika kurallarına göre gösterilip gösterilemeyeceğini belirler.
+ * @param {string} sourceKey - Satırın geldiği veri kaynağının anahtarı.
+ * @param {Object|null} row - Kontrol edilecek satır kaydı.
+ * @returns {boolean} Satır gösterilebilirse true, aksi halde false.
+ */
 function _gmPolicyRowKlasik(sourceKey, row) {
   if (!row) return false;
   if (sourceKey === 'islem_log' || sourceKey === 'islem')
@@ -289,6 +356,12 @@ function _gmPolicyRowKlasik(sourceKey, row) {
 }
 
 // ── Olay zamanı (spec B eventAt sütunu) ──────────────────
+/**
+ * Kaynak anahtarına göre verilen satırdan olayın zaman değerini (tarih/saat) döndürür; eşleşen anahtar yoksa boş string döner.
+ * @param {string} sourceKey - Olayın kaynağını belirten anahtar (ör. 'gorev_log', 'tohumlama', 'cases', 'dogum', 'uygulama_log', 'islem_log').
+ * @param {Object} row - Olay verilerini içeren satır kaydı.
+ * @returns {string} Uygun alanlardan seçilen tarih/saat değeri; bulunamazsa boş string.
+ */
 function _gmEventAt(sourceKey, row) {
   switch (sourceKey) {
     case 'gorev_log': case 'gorev':
@@ -315,6 +388,11 @@ function _gmEventAt(sourceKey, row) {
 // Z VEYA explicit offset'li (+03:00) damgalar Intl ile çevrilir; timezone'suz
 // yerel yazımlar aynen korunur (impl-review-r2: yalnız Z kontrolü +00:00'ı kaçırıyordu).
 const _GM_TZ_ESNEK = /(Z|[+-]\d{2}:\d{2})$/;
+/**
+ * Verilen tarih stringini geçerli bir tarih formatına dönüştürmeye çalışır; başarısız olursa ilk 10 karakterini döndürür.
+ * @param {string} eventAt - İşlenecek tarih stringi.
+ * @returns {string} Formatlanmış tarih stringi veya orijinal stringin ilk 10 karakteri.
+ */
 function _gmDateKey(eventAt) {
   const s = String(eventAt || '');
   if (_GM_TZ_ESNEK.test(s)) {
@@ -324,6 +402,12 @@ function _gmDateKey(eventAt) {
 }
 
 // Klasik modda eski eventAt kuralları (tarih=fallback'li, bekleyen dahil)
+/**
+ * Farklı kaynak anahtarlarına göre ilgili satır verisinden tarih bilgisini döndürür.
+ * @param {string} sourceKey Kaynak anahtarı ('gorev_log', 'tohumlama', 'cases', 'dogum', 'islem_log' vb.).
+ * @param {Object} row Kayıt satır objesi.
+ * @returns {string} Kayıt tarihini içeren string veya boş string.
+ */
 function _gmEventAtKlasik(sourceKey, row) {
   switch (sourceKey) {
     case 'gorev_log': case 'gorev':
@@ -350,6 +434,12 @@ function _gmEventAtKlasik(sourceKey, row) {
 // kolonu ve timezone'suz yerel yazım → değer aynen (TZ'siz, güvenli).
 // Canlı sapma kanıtı (rapor §D.c/§E-13): tohumlama'da 252/282, aşıda 356/381
 // satırda created_at günü ≠ olay günü — bu yüzden ayrı kolon haritası şart.
+/**
+ * Belirtilen kaynağın (sourceKey) ve satır (row) verisine göre ilgili tarih değerini döndürür.
+ * @param {string} sourceKey Kaynağı belirleyen anahtar (örn: 'gorev_log', 'tohumlama', 'cases' vb.).
+ * @param {Object} row Kayıt satırı nesnesi.
+ * @returns {string} İlgili tarih değeri (string) veya yoksa boş string.
+ */
 function _gmGunZaman(sourceKey, row) {
   if (!row) return '';
   switch (sourceKey) {
@@ -392,6 +482,12 @@ function _gmGunZaman(sourceKey, row) {
 }
 
 // SAF olay-günü anahtarı: seçilen günün olaylarını süzmek için tek kapı.
+/**
+ * Verilen anahtar ve satır üzerinden gün zamanını alıp, bu zamanı tarih anahtarına dönüştürür.
+ * @param {string} sourceKey Anahtar değeri.
+ * @param {object} row Satır nesnesi.
+ * @returns {string} Tarih anahtarı veya boş string.
+ */
 function olayGunu(sourceKey, row) {
   const v = _gmGunZaman(sourceKey, row);
   return v ? _gmDateKey(v) : '';
@@ -425,6 +521,13 @@ function olayGunu(sourceKey, row) {
 // ailesi goal öncelik tablosunda baskılanmaz); aile dışı/non-stok entry
 // id'siyle gün eşleşmesi baskılama ÜRETMEZ. %97 referanssız satır "genel
 // stok hareketi" olarak KALIR (rapor §E.3).
+/**
+ * Kaynak verilerinden (dogum, tohumlama, cases, gorev_log, uygulama_log, islem_log, vaccination_log, kizginlik_log, stok_hareket, hayvanlar, protokol_instance)
+ * belirli kurallara göre olay kayıtlarını (entry) oluşturur, gereksiz tekrarları (dedup) filtreler ve istenen hayvan kapsamına göre sonuçları sıralar.
+ * @param {Object} sources Kaynak verilerini içeren nesne.
+ * @param {Object} scope Filtreleme için hayvan ID gibi ek parametreleri içeren nesne.
+ * @returns {Array} Olay kayıtlarından oluşan dizi.
+ */
 function _gmGunEntriesFromSources(sources, scope) {
   sources = sources || {};
   const out = [];
@@ -432,6 +535,15 @@ function _gmGunEntriesFromSources(sources, scope) {
   // ayrıcalığı)" L4-ÖNCESİ karardı; plan §1(a) sahibin BİRİNCİ yüzeyi gün
   // görünümü — defterle AYNI çözücü üzerinden buton üretilir (tek motor).
   const undoCtx = _gmUndoCtx(sources);
+  /**
+   * Verilen kaynağın zamanını alarak, o zaman için bir olay kaydı oluşturur ve bu kaydı `out` dizisine ekler.
+   * Kayıt, giriş türü, kaynak anahtarı, olay zamanı, tarih anahtarı, geri alma referansı, satır verisi ve eklenen `v` nesnesinin özelliklerini içerir.
+   * @param {string} sourceKey Kaynağın anahtarı.
+   * @param {string} entryType Giriş türü.
+   * @param {Object} row Satır verisi.
+   * @param {Object} v Eklenen ek veriler.
+   * @returns {void} Fonksiyon bir değer döndürmez.
+   */
   const ekle = (sourceKey, entryType, row, v) => {
     const eventAt = _gmGunZaman(sourceKey, row);
     if (!eventAt) return;
@@ -447,6 +559,11 @@ function _gmGunEntriesFromSources(sources, scope) {
       ...v,
     });
   };
+  /**
+   * Verilen nesnin var olup olmadığını ve durumunun 'geri_alindi' olmadığını kontrol eder.
+   * @param {Object} r Kontrol edilecek nesne.
+   * @returns {boolean} Nesne geçerliyse ve durumu 'geri_alindi' değilse true, aksi halde false.
+   */
   const geriDegil = r => r && r.durum !== 'geri_alindi';
 
   // mevcut 6 kaynak — gün politikasıyla
@@ -487,6 +604,11 @@ function _gmGunEntriesFromSources(sources, scope) {
   // DEDUP — kazanan kalemlerden baskı kümeleri kurulur, islem/stok baskılanır
   const asiKey = new Set(), kizKey = new Set(), suttenKey = new Set(), tohKey = new Set();
   const tohRefGun = new Set(), vakaRefGun = new Set(), vakaKey = new Set();
+  /**
+   * Verilen değeri null veya undefined ise boş string, aksi takdirde trim edilmiş string olarak döndürür.
+   * @param {*} v Dönüştürülecek değer.
+   * @returns {string} Temizlenmiş string veya boş string.
+   */
   const refId = v => (v === null || v === undefined) ? '' : String(v).trim();
   out.forEach(e => {
     const g = e.olayGunu, r = e.data || {};
@@ -534,6 +656,12 @@ function _gmGunEntriesFromSources(sources, scope) {
 // DEDUP + gün politikaları _gmGunEntriesFromSources'tan AYNI şekilde uygulanır;
 // küme TAM zaman kapsamlıdır (ay sayfalama yeniden hesabı gerekmez — ay dışı
 // günler takvim ızgarasında zaten çizilmez). scope: {animalId} kart kapsamı.
+/**
+ * Verilen kaynaklardan olay günü bilgisi olan kayıtları alıp, bu kayıtların olay günlerini içeren bir küme oluşturur.
+ * @param {Array} sources Kayıtların bulunduğu kaynak dizi.
+ * @param {Object} scope Erişim kapsamı (opsiyonel).
+ * @returns {Set} Olay günlerini içeren küme.
+ */
 function _gmGunKumesiFromSources(sources, scope) {
   const kume = new Set();
   _gmGunEntriesFromSources(sources, scope || {}).forEach(e => { if (e.olayGunu) kume.add(e.olayGunu); });
@@ -542,6 +670,12 @@ function _gmGunKumesiFromSources(sources, scope) {
 
 // TG1-W3 (luna F9): gün hattı entry'sinin hayvan referansı — kaynak bazlı
 // alan eşlemesi (defter _gmEntriesFromSources scope eşleşmeleriyle paralel).
+/**
+ * Belirtilen kaynağın (sourceKey) türüne göre ilgili hayvan kimliğini döndürür.
+ * @param {string} sourceKey Kaynağı belirleyen anahtar (örn: 'tohumlama', 'cases', 'dogum' vb.).
+ * @param {Object} row Kaynak verisi içeren satır nesnesi.
+ * @returns {string|null} İlgili hayvan ID'si veya bulunamazsa null.
+ */
 function _gmGunHayvanId(sourceKey, row) {
   if (sourceKey === 'tohumlama' || sourceKey === 'tohumlama_sonuc') return row.hayvan_id;
   if (sourceKey === 'cases' || sourceKey === 'cases_kapanis') return row.animal_id;
@@ -557,6 +691,13 @@ function _gmGunHayvanId(sourceKey, row) {
 // ── Geri alma bağlamı (openTohDet muhafazası, spec E) ─────
 // Ham (politika öncesi) kaynaklardan türetilir: TOHUMLAMA islem_log referansları,
 // ABORT_KAYDI muhafazaları ve hayvan başına SON tohumlama id'si.
+/**
+ * İşlem loglarını ve TOHUMLAMA kayıtlarını işleyerek referans haritalarını oluşturur.
+ * TOHUMLAMA kayıtlarından işlem referans ID'lerini, ABORT_KAYDI kayıtlarından iptal edilenleri ve
+ * hayvan başına en güncel TOHUMLAMA ID'lerini belirler.
+ * @param {Object} sources İşlem logları, TOHUMLAMA kayıtları ve diğer gerekli verileri içeren nesne.
+ * @returns {Object} islemRefByTohId, abortGuardedByTohId ve latestTohIdByAnimal içeren nesne.
+ */
 function _gmUndoCtx(sources) {
   const islemRefByTohId = {};
   const abortGuardedByTohId = {};
@@ -580,6 +721,16 @@ function _gmUndoCtx(sources) {
 // scope:   {animalId?} — hayvan kartı geçmişi için kaynak bazında mevcut eşleşme kuralları
 // opts:    {mode:'defter'|'klasik', tumu:boolean} — klasik mod eski davranışı geri getirir
 // Çıktı: eventAt desc sıralı entry listesi; eventAt'i boş kalan satır entry üretmez.
+/**
+ * Verilen kaynak verilerinden (dogum, tohumlama, cases, gorev_log, uygulama_log, islem_log)
+ * belirli bir hayvan ID'sine ait ve politikaya uygun girişleri filtreleyerek,
+ * iptal edilmiş veya tamamlanmamış (klasik modda) kayıtları hariç tutarak
+ * zaman sırasına göre (en yeni ileri) sıralanmış bir dizi döndürür.
+ * @param {Object} sources Kaynak verileri içeren nesne.
+ * @param {Object} scope Kapsam bilgileri (animalId dahil).
+ * @param {Object} opts Seçenekler (mode, tumu vb.).
+ * @returns {Array} Filtrelenmiş ve sıralanmış giriş kayıtlarından oluşan dizi.
+ */
 function _gmEntriesFromSources(sources, scope, opts) {
   sources = sources || {};
   scope = scope || {};
@@ -588,6 +739,14 @@ function _gmEntriesFromSources(sources, scope, opts) {
   const id = scope.animalId;
   const ctx = _gmUndoCtx(sources);
   const out = [];
+  /**
+   * Verilen kaynak tablodaki satırları politika filtrelerinden geçirip uygun olanları çıkış listesine (out) ekler.
+   * @param {string} sourceKey - Satırların geldiği kaynak tablo anahtarı.
+   * @param {string} entryType - Eklenen kayda atanan giriş/kategori tipi.
+   * @param {Array} rows - İşlenecek satır kayıtları; null/undefined ise işlem yapılmaz.
+   * @param {Function} match - Satırın kapsama girip girmediğini belirleyen opsiyonel filtre fonksiyonu.
+   * @returns {void} Hiçbir değer döndürmez; uygun satırlar out dizisine eklenir.
+   */
   const push = (sourceKey, entryType, rows, match) => {
     (rows || []).forEach(row => {
       if (!row) return;
@@ -626,6 +785,13 @@ function _gmEntriesFromSources(sources, scope, opts) {
 }
 
 // ── undoRef türetimi (spec E — önceden hesaplanır, genel kural YOK) ──
+/**
+ * İşlem, tohumlama veya diğer görev türlerine göre referans ID'yi belirler ve uygun koşulları sağladığında { kind, id } objesini döndürür; aksi takdirde null döndürür.
+ * @param {string} type İşlem türü ('islem', 'tohumlama' vb.).
+ * @param {Object} data İşlem veya tohumlama verisi.
+ * @param {Object} ctx Bağlam objesi (abortGuardedByTohId, islemRefByTohId, latestTohIdByAnimal vb. içerir).
+ * @returns {Object|null} { kind: 'l2' | 'toh', id: string } objesi veya null.
+ */
 function _gmUndoRef(type, data, ctx) {
   ctx = ctx || {};
   if (type === 'islem') {
@@ -653,6 +819,11 @@ function _gmUndoRef(type, data, ctx) {
 }
 
 // onclick attribute değeri için minik kaçış (helpers.js'e bağımlılık yok)
+/**
+ * Verilen değeri HTML özniteliği içinde güvenli kullanılacak şekilde kaçırır; &,',",< karakterlerini HTML karşılıklarıyla değiştirir. null/undefined değerler boş dizeye dönüştürülür.
+ * @param {*} s - Kaçırılacak değer; null veya undefined ise boş dize kabul edilir.
+ * @returns {string} HTML özniteliği için güvenli hale getirilmiş metin.
+ */
 function _gmAttr(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/'/g, '&#39;')
@@ -663,6 +834,12 @@ function _gmAttr(s) {
 // overrideOc dış onclick'ini etkilemez. ref yok/çevrimdışı → buton YOK (D10/D13).
 // Değerler dataset'te taşınır (this.dataset deseni — helpers.js:90-96 kuralı:
 // entity-escape edilmiş değer inline JS string'ine asla konmaz; onclick sabit stringdir).
+/**
+ * Geri alma işlemi için buton HTML'ini oluşturur. Offline modda veya geçersiz referansta buton döndürmez.
+ * @param {Object} ref Geri alma işlemi referansı.
+ * @param {Object} opts Opsiyonel ayarlar objesi (offline, etiket vb.).
+ * @returns {string} Buton elementini içeren HTML stringi.
+ */
 function _gmUndoButtonHtml(ref, opts) {
   if (!ref || (opts && opts.offline)) return '';
   const etiket = (opts && opts.etiket) || '↩ Geri Al';
@@ -670,6 +847,12 @@ function _gmUndoButtonHtml(ref, opts) {
 }
 
 // ── Cap + gün gruplama + sayaçlar (spec C, D12) ──────────
+/**
+ * Verilen giriş dizisinden ilk n elemanı alarak görünür öğeleri ve toplam eleman sayısını döndürür.
+ * @param {Array} entries Görünür kılınacak giriş dizisi.
+ * @param {number} n Döndürülecek maksimum eleman sayısı (varsayılan: 300).
+ * @returns {Object} { visible: Görünür elemanlar dizisi, total: Toplam eleman sayısı } objesi.
+ */
 function _gmCap(entries, n) {
   const hepsi = entries || [];
   return { visible: hepsi.slice(0, n || 300), total: hepsi.length };
@@ -677,6 +860,11 @@ function _gmCap(entries, n) {
 
 // Görünen dilimden tarih bazlı sıralı gruplar; sayaçlar YALNIZ o grubun
 // görünen kayıtlarından sayılır (yalnız mevcut kategori anahtarları).
+/**
+ * Verilen tarih anahtarlarındaki kayıtları gruplayarak, her grup için tarih anahtarı, girişler ve kategori sayacıları içeren nesneler dizisi döndürür.
+ * @param {Array} visible Tarih anahtarlarına göre gruplanacak kayıtların bulunduğu dizi.
+ * @returns {Array} Her bir eleman için {dateKey, entries, counters} özelliklerine sahip nesnelerden oluşan dizi.
+ */
 function _gmGroup(visible) {
   const gruplar = [];
   const indeks = {};
@@ -701,6 +889,13 @@ function _gmGroup(visible) {
 // kanıtı yokken birleştirmek bilgi yutar. Düğüm biçimi:
 //   {grup:true, tip, sourceKey, dakika, dateKey, eventAt, entries, count}
 //   {tek:true, entry}
+/**
+ * Verilen giriş kayıtlarını (entries) gruplar halinde işleyerek, belirli kriterlere (tip, kaynak, tarih anahtarı, dakika) göre eşleşen kayıtları birleştirir.
+ * Her bir grup için eşleşen kayıtların sayısı (count) 3 veya daha fazla ise, bu grup bir düğüm (node) olarak kabul edilir.
+ * Eğer bir grupta 3'ten az kayıt varsa, bu gruptaki her kayıt tek başına bir düğüm olarak işaretlenir.
+ * @param {Array} entries İşlenecek giriş kayıtlarının dizisi.
+ * @returns {Array} Gruplanmış veya tekil kayıtlardan oluşan düğüm (node) nesnelerinin dizisi.
+ */
 function _gmGunKatla(entries) {
   const liste = entries || [];
   const indeks = {};
@@ -732,6 +927,12 @@ function _gmGunKatla(entries) {
 
 // Gün özeti çip sayaçları (U1 md.4): kategori → olay sayısı (saf; çip render'ı
 // ui.js'te — sayaç filtre ÖNCESİ tüm günü sayar).
+/**
+ * Verilen giriş dizisinden her bir öğenin 'category' özelliğini alarak
+ * bu kategorilere göre bir sayma tablosu oluşturur.
+ * @param {Array} entries Sayılacak kategoriler içeren öğeler dizisi.
+ * @returns {Object} Kategorileri anahtar ve sayıları değer olarak içeren bir nesne.
+ */
 function _gmGunKategoriSayac(entries) {
   const s = {};
   (entries || []).forEach(e => { const k = e && e.category; if (k) s[k] = (s[k] || 0) + 1; });
@@ -739,12 +940,28 @@ function _gmGunKategoriSayac(entries) {
 }
 
 // Yerel bugünün YYYY-MM-DD anahtarı (Date UTC dönüşümü değil, takvim alanı)
+/**
+ * Verilen tarih nesnesi (veya varsayılan olarak bugünün tarihi) için YYYY-MM-DD formatında bir tarih stringi döndürür.
+ * @param {Date} d Tarih nesnesi.
+ * @returns {string} YYYY-MM-DD formatında tarih stringi.
+ */
 function _gmTodayKey(d) {
   const t = d || new Date();
+  /**
+   * Verilen değeri string olarak dönüştürür ve en az iki karakter uzunluğunda olacak şekilde soldan '0' ile doldurur.
+   * @param {*} x Dönüştürülecek ve formatlanacak değer.
+   * @returns {string} En az iki karakter uzunluğunda, soldan '0' ile doldurulmuş string.
+   */
   const p = x => String(x).padStart(2, '0');
   return t.getFullYear() + '-' + p(t.getMonth() + 1) + '-' + p(t.getDate());
 }
 
+/**
+ * Verilen tarih anahtarını (dateKey) bugünün veya dünün etiketiyle ('BUGÜN', 'DÜN') eşleştirir; eşleşme yoksa tarih formatında döndürür.
+ * @param {string} dateKey Eşleştirilecek tarih anahtarı (genellikle "YYYY-MM-DD" formatında).
+ * @param {string} todayKey Sistem saatinden bağımsız, öncelikli olarak kullanılan "gerçek bugün" anahtarı (test senaryolarında veya tek-gün görünümünde kullanılır).
+ * @returns {string} "BUGÜN", "DÜN" veya tarih formatında (gün ay gün) bir string.
+ */
 function _gmGroupLabel(dateKey, todayKey) {
   // TG1 todayKey sözleşmesi (zarf md.4): todayKey = GERÇEK bugün; DÜN bu
   // günden türetilir — sistem saatinden ayrı olarak ASLA. Enjekte edilen
@@ -767,6 +984,13 @@ function _gmGroupLabel(dateKey, todayKey) {
 // Gün bölümü — native <details> (D12). entryHtmlFn ui.js kart üreticisidir.
 // U1 md.3: opts.katHtmlFn verilirse grup kartları ÖNCE katlanır (_gmGunKatla);
 // düğüm {grup:true} → katHtmlFn(düğüm), {tek:true} → entryHtmlFn(entry).
+/**
+ * Belirli bir grup için HTML detay kartı oluşturur.
+ * @param {Object} group Grup nesnesi, dateKey, entries ve counters gibi özellikleri içerir.
+ * @param {Function} entryHtmlFn Giriş öğelerini HTML'e dönüştüren fonksiyon.
+ * @param {Object} opts Seçenekler nesnesi (open, katHtmlFn, todayKey vb. içerir).
+ * @returns {String} Grup başlığı, emoji sayacı ve içerik kartlarını içeren HTML detay elementi.
+ */
 function _gmGroupHtml(group, entryHtmlFn, opts) {
   opts = opts || {};
   const acik = opts.open !== false;
@@ -787,11 +1011,22 @@ function _gmGroupHtml(group, entryHtmlFn, opts) {
 
 // ── Arama (spec A: _gecmisSearchText semantiği) ──────────
 // helpers.js'teki trLower ile aynı kural — modül bağımsızlığı için yerel kopya.
+/**
+ * Verilen stringi Türkçe karakter dönüşümleri (İ->i, I->ı) uygulayarak tamamen küçük harfe çevirir.
+ * @param {string} s Dönüştürülecek string.
+ * @returns {string} Küçük harflere ve düzeltilmiş Türkçe karakterlere sahip string.
+ */
 function _gmTrLower(s) {
   return String(s).replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase();
 }
 
 // Çok terimli AND araması; entry.searchText ui.js toplama adımında doldurulur.
+/**
+ * Verilen giriş kayıtlarını filtreleyerek, arama sorgusunda belirtilen tüm terimleri içeren kayıtları döndürür.
+ * @param {Array} entries Filtrelenmesi gereken kayıtlar dizisi.
+ * @param {string} q Arama sorgusu (terimler arası boşluklarla ayrılmış).
+ * @returns {Array} Sorguda belirtilen tüm terimleri içeren kayıtlardan oluşan dizi.
+ */
 function _gmSearch(entries, q) {
   const terimler = _gmTrLower(q || '').trim().split(/\s+/).filter(Boolean);
   const hepsi = entries || [];
@@ -804,6 +1039,11 @@ function _gmSearch(entries, q) {
 
 // ── CSV üretimi (spec D — WYSIWYG görünen dilim üzerinden) ──
 // HTML etiketlerini at, boşlukları topla (kart alt metinlerinden düz metin).
+/**
+ * Verilen stringdeki tüm HTML etiketlerini kaldırıp, gereksiz boşlukları temizleyerek düz metin döndürür.
+ * @param {string|null} s Temizlenmesi istenen string.
+ * @returns {string} Etiketlerden arındırılmış ve boşluklar düzeltilmiş string.
+ */
 function _gmStripTags(s) {
   return String(s == null ? '' : s)
     .replace(/<[^>]*>/g, ' ')
@@ -811,6 +1051,11 @@ function _gmStripTags(s) {
     .trim();
 }
 
+/**
+ * CSV alanı olarak güvenli hale getirmek için verilen değeri kaçış karakterleriyle düzenler; formül enjeksiyonuna karşı ' öneki ekler ve gerektiğinde çift tırnak içine alır.
+ * @param {*} v Kaçış karakterleri uygulanacak değer; null veya undefined ise boş metin olarak ele alınır.
+ * @returns {string} CSV'ye güvenle eklenebilecek biçimlendirilmiş metin.
+ */
 function _gmCsvEscape(v) {
   let s = String(v == null ? '' : v);
   // formül enjeksiyonu koruması: = + - @ ile başlayan metin alanlarına ' öneki
@@ -818,10 +1063,20 @@ function _gmCsvEscape(v) {
   return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
+/**
+ * Verilen tarih stringini 'YYYY-MM-DD' formatından 'DD.MM.YYYY' formatına dönüştürür.
+ * @param {string} eventAt Tarih bilgisi içeren 'YYYY-MM-DD' formatında bir string.
+ * @returns {string} 'DD.MM.YYYY' formatında dönüştürülmüş tarih stringi.
+ */
 function _gmCsvTarih(eventAt) {
   return _gmDateKey(eventAt).split('-').reverse().join('.');
 }
 
+/**
+ * Verilen saat stringini (opsiyonel zaman dilimi bilgisiyle) işleyerek geçerli bir saat formatına dönüştürür veya stringin belirli bir kısmını (T ile başlayan ISO formatı varsa) döndürür.
+ * @param {string} eventAt - İşlenecek saat bilgisi içeren string.
+ * @returns {string} İşlenmiş saat değeri veya boş string.
+ */
 function _gmCsvSaat(eventAt) {
   const s = String(eventAt || '');
   if (_GM_TZ_ESNEK.test(s)) {
@@ -831,10 +1086,21 @@ function _gmCsvSaat(eventAt) {
 }
 
 // visible: _gmCap sonucu görünen dilim; meta: {kupe,detay,ek,hekim,tip} — her biri (entry)=>string.
+/**
+ * Verilen event kayıtlarını (visible) CSV formatında, belirtilen meta verileri (meta) ile doldurarak döndürür.
+ * @param {Array} visible İşlenecek event kayıtlarının dizisi.
+ * @param {Object} meta CSV satırlarını doldurmak için kullanılacak meta veriler (kupe, detay, ek, hekim, tip vb.).
+ * @returns {String} BOM karakteri ile başlayan, satırlar arasında \r\n ile ayrılmış CSV formatında bir string.
+ */
 function _gmCsv(visible, meta) {
   const m = meta || {};
   const satirlar = ['Tarih;Saat;Kategori;Küpe;Detay;Ek Bilgi;Hekim;Tip'];
   (visible || []).forEach(e => {
+    /**
+     * Verilen fonksiyonu çağırarak sonucu etiketleri temizleyip CSV formatına uygun hale getirir.
+     * @param {Function} fn Dönüşü string olarak beklenen bir fonksiyon.
+     * @returns {string} CSV formatında ve etiketlerden arındırılmış bir string.
+     */
     const h = fn => _gmCsvEscape(_gmStripTags(typeof fn === 'function' ? fn(e) : ''));
     satirlar.push([
       _gmCsvEscape(_gmCsvTarih(e.eventAt)),
@@ -852,6 +1118,10 @@ function _gmCsv(visible, meta) {
 
 // İndirgeme — yalnız ana sekme görünümündeki görünen dilim (D7). ui.js her
 // render'da globalThis._gmCsvCtx = {visible, meta} günceller.
+/**
+ * Görünür CSV bağlamındaki kayıtları alıp CSV formatında bir dosya oluşturur ve tarayıcıda indirir.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function _gmDownloadCsv() {
   const ctx = globalThis._gmCsvCtx;
   if (!ctx || !ctx.visible || !ctx.visible.length) return;

@@ -3,10 +3,21 @@
 
 const ACTIONS = {};
 
+/**
+ * Belirtilen adlı aksiyona (action) verilen işleyiciyi (handler) kaydeden fonksiyondur.
+ * @param {string} action Kaydedilecek aksiyonun adı.
+ * @param {Function} handler Aksiyon tetiklendiğinde çalışacak işleyici fonksiyonu.
+ * @returns {void}
+ */
 function registerAction(action, handler) {
   ACTIONS[action] = handler;
 }
 
+/**
+ * Verilen map nesnesindeki tüm girişleri ACTIONS nesnesine atar.
+ * @param {Object} map Kaydedilecek girişleri içeren nesne.
+ * @returns {void}
+ */
 function registerActions(map) {
   Object.entries(map).forEach(([k, v]) => ACTIONS[k] = v);
 }

@@ -504,6 +504,12 @@ registerActions({
 //        ovsyncYardimAcik, detAcik, detGunAcik, gecmisGunAcik, txDetayAcik, state }
 // dönüş (tur): 'yut' | 'modal'{id} | 'sessiz' | 'sentinel' | 'proto-detay' |
 //        'ovsync-yardim' | 'det-gun' | 'det' | 'gun' | 'tx-detay' | 'sayfa'{pg}
+/**
+ * Verilen bağlam (ctx) objesindeki aktif modal, sheet veya görünüm durumlarını kontrol ederek
+ * hangi katmanın kapatılması gerektiğini belirleyen geri karar mekanizmasını döndürür.
+ * @param {Object} ctx Fonksiyonun karar almasını etkileyen durum değişkenlerini (modalBackGuard, sessizAcik, modalStack, state vb.) içeren bağlam objesi.
+ * @returns {Object} Kapatılması gereken katmanın türünü ('yut', 'sessiz', 'modal', 'sentinel', 'proto-detay', 'ovsync-yardim', 'det-gun', 'det', 'gun', 'tx-detay', 'sayfa') ve opsiyonel ID veya sayfa bilgisini içeren obje.
+ */
 function navGeriKarar(ctx) {
   ctx = ctx || {};
   const state = ctx.state || {};
@@ -535,6 +541,10 @@ function navGeriKarar(ctx) {
 // deseninin görünüm katmanlarına uygulanışı). Normal kapanış (✕ Kapat,
 // "‹ Listeye dön") history'de görünüm entry'si bırakmasın diye back eder;
 // üretilen popstate guard tarafından tüketilir.
+/**
+ * Mevcut geçmiş durumunda gun, dtx veya dgun bayraklarından biri varsa _modalBackGuard'ı ayarlayıp bir önceki sayfaya döner.
+ * @returns {void} Döndürdüğü değer yok.
+ */
 function navViewBack() {
   const st = history.state || {};
   if (st.gun || st.dtx || st.dgun) {
@@ -545,6 +555,10 @@ function navViewBack() {
 
 // W3: sayfa başlığındaki "← Geri" — önceki girilebilinen sayfaya dön;
 // history boşsa (nadir; doğrudan yüklenmiş sekme) Log sayfasına nav.
+/**
+ * Tarayıcı geçmişi geri tuşuna basıldığında önceki sayfaya gider veya 'goTo' fonksiyonu tanımlıysa 'log' sayfasına yönlendirir.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function navGeriDon() {
   if (history.length > 1) { history.back(); }
   else if (typeof goTo === 'function') { goTo('log'); }

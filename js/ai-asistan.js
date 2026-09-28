@@ -5,6 +5,11 @@ let _asistanBekliyor = false;
 let _asistanAbort = null;
 
 // Gönder butonunu yazma sırasında ⏹ Durdur'a çevir
+/**
+ * Asistan gönder düğmesinin metnini, arka plan rengini ve başlığını, asistanın yazıp yazmadığına göre günceller.
+ * @param {boolean} yaziyor - Asistanın şu anda yanıt üretip üretmediği; true ise durdur, değilse gönder görünümüne geçer.
+ * @returns {void} Döndürme değeri yok.
+ */
 function _asistanBtnDurum(yaziyor) {
   const btn = document.getElementById('asistan-gonder-btn');
   if (!btn) return;
@@ -14,25 +19,49 @@ function _asistanBtnDurum(yaziyor) {
 }
 
 // Textarea içerikle birlikte büyüsün (max 140px)
+/**
+ * Verilen elemanın yüksekliğini otomatik olarak ayarlayarak, içeriğin sığdığı maksimum yüksekliği (140px'yi geçmemek üzere) belirler.
+ * @param {HTMLElement} inp Yüksekliği ayarlanacak HTML elemanı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _asistanAutoGrow(inp) {
   inp.style.height = 'auto';
   inp.style.height = Math.min(inp.scrollHeight, 140) + 'px';
 }
+/**
+ * 'asistan-input' ID'li giriş elemanının değerini ve yüksekliğini sıfırlar.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _asistanInputReset() {
   const inp = document.getElementById('asistan-input');
   if (inp) { inp.value = ''; inp.style.height = 'auto'; }
 }
 
+/**
+ * Kullanıcı oturumundan erişim token'ını alıp döndürür.
+ * @returns {string|null} Geçerli bir oturum varsa erişim token'ı, yoksa null.
+ */
 async function _asistanToken() {
   const { data } = await window.db.auth.getSession();
   return data?.session?.access_token || null;
 }
 
+/**
+ * Verilen stringdeki özel karakterleri (&, <, >) HTML entity'lerine dönüştürerek güvenli bir string döndürür.
+ * @param {string} s Dönüştürülecek string.
+ * @returns {string} Özel karakterleri HTML entity'leri içeren string.
+ */
 function _asistanEsc(s) {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // MiniMax-M3 <think> bloklarını canlı akışta gizle (tamamlanmış + açık kalmış)
+/**
+ * Girilen metindeki `<think>` etiketleri ve bunların içindeki içeriği temizleyerek döndürür.
+ * Açık veya kapanmamış etiketler de dahil olmak üzere tüm varyasyonları kaldırır.
+ * @param {string} s Temizlenmesi istenen metin.
+ * @returns {string} Temizlenmiş metin.
+ */
 function _asistanStripThink(s) {
   let t = (s || '').replace(/<think>[\s\S]*?<\/think>/g, ''); // eşli blok
   t = t.replace(/<think>[\s\S]*$/, '');                       // kapanmamış blok → sonuna kadar gizle
@@ -41,6 +70,12 @@ function _asistanStripThink(s) {
 }
 
 // assistant cevabını 3 katman + katlanır SQL ile render et
+/**
+ * Metni HTML formatına dönüştürür; opsiyonel SQL sorgusu varsa detay kutusu içinde eklenir.
+ * @param {string} text İşlenmesi ve HTML'e dönüştürülmesi gereken metin.
+ * @param {string} sql Çalıştırılan SQL sorgusu (opsiyonel).
+ * @returns {string} İşlenmiş HTML içeriği.
+ */
 function _asistanCevapHtml(text, sql) {
   let html = _asistanEsc(_asistanStripThink(text)).replace(/\n/g, '<br>');
   if (sql) {
@@ -50,6 +85,13 @@ function _asistanCevapHtml(text, sql) {
   return html;
 }
 
+/**
+ * Kullanıcı veya asistan rolüne göre stilize edilmiş bir mesaj balonu elementi oluşturur.
+ * Rol 'user' ise sağa hizalanmış yeşil arkaplanlı, aksi takdirde sola hizalanmış kart arkaplanlı bir div döndürür.
+ * @param {string} rol Balonun ait olduğu rol ('user' veya 'asistan').
+ * @param {string} html Balonun içine yerleştirilecek HTML içeriği.
+ * @returns {HTMLElement} Oluşturulan div elementi.
+ */
 function _asistanBalon(rol, html) {
   const sag = rol === 'user';
   const div = document.createElement('div');
@@ -59,6 +101,11 @@ function _asistanBalon(rol, html) {
 }
 
 // Kullanıcı balonu — "düzenle" (son promtu iptal/düzenle) butonlu
+/**
+ * Kullanıcı mesajı için düzenleme butonu eklenmiş bir balon elementi oluşturur.
+ * @param {string} text Gönderilecek mesaj metni.
+ * @returns {HTMLElement} Oluşturulan balon elementi.
+ */
 function _asistanUserBalon(text) {
   const div = _asistanBalon('user', _asistanEsc(text));
   div.dataset.role = 'user';
@@ -73,6 +120,12 @@ function _asistanUserBalon(text) {
 }
 
 // Asistan balonuna tek-tık kopyala butonu ekle (temiz metni panoya)
+/**
+ * Verilen div elemanına, temizlenmiş metni kopyalama işlevi için bir buton ekler.
+ * @param {HTMLElement} div Butonu ekleneceği HTML elemanı.
+ * @param {string} cleanText Kopyalanacak metin içeriği.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _asistanKopyaEkle(div, cleanText) {
   if (!cleanText) return;
   div.dataset.copy = encodeURIComponent(cleanText);
@@ -84,6 +137,11 @@ function _asistanKopyaEkle(div, cleanText) {
   div.appendChild(btn);
 }
 
+/**
+ * Kullanıcının sorduğu soruyu işleyerek asistan cevabını oluşturur, akışkan yazma (streaming) modunda cevabı ekrana yazar, kullanıcı iptal etmesi durumunda işlemi durdurur ve varsa SQL planı ile ilgili kartları gösterir.
+ * @param {string} soru Kullanıcının sorduğu soru metni.
+ * @returns {Promise<void>} İşlem tamamlandığında veya iptal edildiğinde çözülür.
+ */
 async function asistanGonder(soru) {
   // Yazma sürerken butona tekrar basmak = DURDUR
   if (_asistanBekliyor) { if (_asistanAbort) _asistanAbort.abort(); return; }
@@ -168,6 +226,11 @@ async function asistanGonder(soru) {
 
 // Son promtu (veya herhangi bir kullanıcı mesajını) düzenle:
 // o mesaj + sonrasını DB'den ve DOM'dan sil, metni input'a geri yükle
+/**
+ * Asistan sohbetindeki bir kullanıcı mesajını düzenleme moduna alır: ilgili balonu ve sonrasındaki tüm mesajları DOM'dan ve veritabanından kaldırır, mesaj metnini giriş alanına geri yazıp odaklanır. Eğer asistan bir yanıtı işliyorsa (_asistanBekliyor) veya geçerli bir mesaj balonu bulunamazsa hiçbir işlem yapmaz. _asistanThreadId varsa, veritabanındaki eşleşen kullanıcı mesajından itibaren aynı konumdaki ve sonrasındaki tüm agent_messages kayıtları silinir; DOM temizliği veritabanı hatasından bağımsız olarak yapılır. Sohbet tamamen boşaldıysa boş durum görünümü yeniden gösterilir.
+ * @param {HTMLElement} el - Düzenlenecek kullanıcı mesajına ait balon içindeki bir DOM öğesi; en yakın [data-role="user"] balonu bundan bulunur.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen promise; herhangi bir değer döndürmez.
+ */
 async function asistanMesajDuzenle(el) {
   if (_asistanBekliyor) return;
   const bubble = el.closest('[data-role="user"]');
@@ -199,10 +262,20 @@ async function asistanMesajDuzenle(el) {
 }
 
 // Asistan cevabını tek tıkla panoya kopyala
+/**
+ * Verilen elemanın veri setinde bulunan kopyalanacak metni kopyalayıp,
+ * başarılı olursa elemanın metnini geçici olarak "✓ Kopyalandı" olarak günceller.
+ * @param {HTMLElement} el Kopyalama tetikleyici elemanı.
+ * @returns {Promise<void>} Kopyalama işleminin tamamlanmasını bekleyen Promise.
+ */
 async function asistanMesajKopyala(el) {
   const bubble = el.closest('[data-copy]');
   const txt = bubble ? decodeURIComponent(bubble.dataset.copy || '') : '';
   if (!txt) return;
+  /**
+   * Öğenin metin içeriğini geçici olarak '✓ Kopyalandı' ile değiştirir ve 1500 ms sonra orijinal metni geri yükler.
+   * @returns {void} Döndürme değeri yok.
+   */
   const ok = () => { const o = el.textContent; el.textContent = '✓ Kopyalandı'; setTimeout(() => { el.textContent = o; }, 1500); };
   try {
     await navigator.clipboard.writeText(txt);
@@ -216,6 +289,10 @@ async function asistanMesajKopyala(el) {
   }
 }
 
+/**
+ * Aktif asistan thread'indeki son asistan mesajına ait SQL sorgusunu döndürür.
+ * @returns {Promise<string|null>} Son asistan mesajının metadata'sındaki SQL; thread yoksa veya bulunamazsa null.
+ */
 async function _asistanSonSql() {
   if (!_asistanThreadId) return null;
   const { data } = await window.db.from('agent_messages')
@@ -224,6 +301,10 @@ async function _asistanSonSql() {
   return data?.[0]?.metadata?.sql || null;
 }
 
+/**
+ * Aktif asistan iş parçacığındaki en son 'assistant' rolündeki mesajın metadata'sını getirir.
+ * @returns {Promise<Object|null>} Bulunan mesajın metadata'sı; iş parçacığı yoksa veya kayıt bulunamazsa null.
+ */
 async function _asistanSonMeta() {
   if (!_asistanThreadId) return null;
   const { data } = await window.db.from('agent_messages')
@@ -233,6 +314,12 @@ async function _asistanSonMeta() {
 }
 
 // Onay bekleyen plan için diff kartı (numaralı + güvence + Onayla/Vazgeç)
+/**
+ * Asistan sohbet kutusuna, onay bekleyen işlemleri numaralı satırlarla gösteren ve "Onayla ve Uygula" ile "Vazgeç" butonları içeren bir plan kartı oluşturup ekler; kartı görünür hale getirmek için kaydırır.
+ * @param {HTMLElement} box - Plan kartının ekleneceği DOM elemanı.
+ * @param {Object} plan - Görsellenecek plan nesnesi.
+ * @returns {void}
+ */
 function _asistanPlanKarti(box, plan) {
   const div = document.createElement('div');
   div.className = 'asistan-plan-karti';
@@ -255,6 +342,12 @@ function _asistanPlanKarti(box, plan) {
 }
 
 // Uygulanmış plan için "Geri Al" kartı
+/**
+ * Belirtilen plan ID'si için 'Uygulandı' mesajını içeren bir geri alma kartı oluşturur ve ekrana ekler.
+ * @param {HTMLElement} box Kartın ekleneceği DOM elemanı.
+ * @param {string} planId Geri alınacak planın ID'si.
+ * @returns {void}
+ */
 function _asistanUndoKarti(box, planId) {
   const div = document.createElement('div');
   div.className = 'asistan-undo-karti';
@@ -266,6 +359,12 @@ function _asistanUndoKarti(box, planId) {
   div.scrollIntoView({ behavior: 'smooth' });
 }
 
+/**
+ * Verilen plan ID'sine ait butonları devre dışı bırakır ve onay mesajını gönderir.
+ * @param {string} pid Planın benzersiz kimlik numarası.
+ * @param {HTMLElement} el Plan kartı elemanı.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function asistanPlanOnayla(pid, el) {
   if (el) el.closest('.asistan-plan-karti')?.querySelectorAll('button').forEach(b => b.disabled = true);
   window.asistanGonder('Onaylıyorum, planı uygula. (plan_id: ' + pid + ')');
@@ -273,6 +372,12 @@ function asistanPlanOnayla(pid, el) {
 // M-19 fix: eskiden sadece DOM'dan kaldırıp LLM'e "vazgeçtim" mesajı gönderiyordu —
 // DB'deki agent_plans.durum='pending' kaydı hiç kapanmıyordu. Artık asistan_plan_geri_al
 // ile aynı desende doğrudan RPC (LLM'e gitmeden).
+/**
+ * Belirtilen plan ID'sine sahip planı iptal eder, başarılı olursa ilgili kartı DOM'dan kaldırır.
+ * @param {string} pid İptal edilecek planın ID'si.
+ * @param {HTMLElement} el İptal edilecek planın bulunduğu kart elemanı (opsiyonel).
+ * @returns {Promise<void>} İşlem sonucunu içeren Promise.
+ */
 async function asistanPlanVazgec(pid, el) {
   const kart = el ? el.closest('.asistan-plan-karti') : null;
   if (kart) kart.querySelectorAll('button').forEach(b => b.disabled = true);
@@ -291,6 +396,12 @@ async function asistanPlanVazgec(pid, el) {
 }
 
 // Geri al — LLM'e gitmeden doğrudan RPC (hızlı + güvenli)
+/**
+ * Belirtilen plan ID'sine ait işlemleri geri alır, hata durumunda uyarı gösterir ve başarılı geri alma durumunda ilgili kartı kaldırır.
+ * @param {string} pid Geri alınacak planın ID'si.
+ * @param {HTMLElement} el Geri alma butonu veya tetikleyici elemanı (opsiyonel).
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözümlenen (void) bir Promise.
+ */
 async function asistanPlanGeriAl(pid, el) {
   const kart = el ? el.closest('.asistan-undo-karti') : null;
   if (el) { el.disabled = true; el.textContent = '↩ Geri alınıyor…'; }
@@ -314,6 +425,10 @@ async function asistanPlanGeriAl(pid, el) {
   }
 }
 
+/**
+ * Asistan mesaj alanını temizler, yeni bir sohbet başlatır ve thread ID'yi sıfırlar.
+ * @returns {void}
+ */
 function asistanYeniSohbet() {
   _asistanThreadId = null;
   document.getElementById('asistan-mesajlar').innerHTML = '';
@@ -321,6 +436,10 @@ function asistanYeniSohbet() {
   if (bos) bos.style.display = '';
 }
 
+/**
+ * Asistan arayüzünü başlatır: mevcut sohbet yoksa yeni sohbet açar, giriş alanına otomatik büyüme dinleyicisi bağlar ve odağı giriş alanına verir.
+ * @returns {void}
+ */
 function asistanInit() {
   if (!_asistanThreadId) asistanYeniSohbet();
   const inp = document.getElementById('asistan-input');
@@ -330,6 +449,10 @@ function asistanInit() {
   }
 }
 
+/**
+ * Asistan geçmiş konuşmalarını (thread'leri) yükler ve listeler.
+ * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
+ */
 async function asistanGecmisAc() {
   const list = document.getElementById('asistan-thread-list');
   list.innerHTML = 'Yükleniyor...';
@@ -347,10 +470,22 @@ async function asistanGecmisAc() {
   });
 }
 
+/**
+ * 'asistan-drawer' elementini gizleyerek asistan çekmecini kapatır.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function asistanDrawerKapat() {
   document.getElementById('asistan-drawer').style.display = 'none';
 }
 
+/**
+ * Verilen asistan thread'ini açar: global thread kimliğini günceller, drawer'ı kapatır,
+ * mesaj kutusunu temizler ve thread'e ait mesajları created_at sırasına göre veritabanından
+ * çekerek kullanıcı mesajları için kullanıcı balonu, asistan mesajları için kopyalama
+ * düğmeli asistan balonu olarak mesaj kutusuna ekler.
+ * @param {string} tid - Açılacak asistan thread'inin kimliği (thread_id).
+ * @returns {Promise<void>} Hiçbir değer döndürmez.
+ */
 async function asistanThreadAc(tid) {
   _asistanThreadId = tid;
   asistanDrawerKapat();
@@ -371,6 +506,11 @@ async function asistanThreadAc(tid) {
   });
 }
 
+/**
+ * Belirtilen kimlikteki asistan sohbet dizisini veritabanından siler, silinen dizi aktifse yeni sohbet başlatır ve sohbet geçmişini açar.
+ * @param {string} tid - Silinecek sohbet dizisinin (thread) kimliği.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise.
+ */
 async function asistanThreadSil(tid) {
   await window.db.from('agent_threads').delete().eq('id', tid);
   if (_asistanThreadId === tid) asistanYeniSohbet();
@@ -380,6 +520,10 @@ async function asistanThreadSil(tid) {
 // M-20 fix: eskiden client'a select('id') ile çekip tek tek delete ediyordu —
 // supabase-js default 1000 satır limiti yüzünden 1000+ thread'i olan kullanıcıda
 // kalanlar sessizce siliniyordu, ayrıca N+1 istek. Artık tek RPC, tek DELETE.
+/**
+ * Kullanıcı onayı alındıktan sonra tüm asistan sohbet geçmişini siler, yeni bir sohbet başlatır ve asistan çekmecini kapatır.
+ * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
+ */
 async function asistanTumunuSil() {
   if (!confirm('Tüm sohbet geçmişi silinecek. Emin misiniz?')) return;
   const { error } = await window.db.rpc('asistan_tumunu_sil');

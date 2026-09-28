@@ -55,6 +55,11 @@ const _dg = {
   zamanlayici: null,
 };
 
+/**
+ * Hata nesnelerinden kod ve detay bilgilerini alarak, öncelikli olarak detay nedenine, ardından hata koduna göre metin döndürür.
+ * @param {Object} e Hata nesnesi.
+ * @returns {string} Hata mesajı veya varsayılan başarısız mesajı.
+ */
 function _dgHataMetni(e) {
   const kod = e && e.data && e.data.hata;
   const neden = e && e.data && e.data.detay && e.data.detay.neden;
@@ -64,6 +69,12 @@ function _dgHataMetni(e) {
 }
 // Engel metni + yönlendirme butonları (zarf D — insan dilli, bağlantılı).
 // Hata yolu: e.data.detay.neden; önizleme yolu: neden null → genel metin.
+/**
+ * Verilen metni uyarı kutusu içine yerleştirir ve hedef tablosu 'hayvanlar' ise hayvan kartı açma butonu, her zaman ise değişiklikler seçme butonu ekleyerek HTML yapısını döndürür.
+ * @param {string} metin Uyarı mesajı olarak kullanılacak metin.
+ * @param {Object} hedef Hedef nesnesi; 'hayvanlar' tablosu ve 'pk' özelliği varsa hayvan kartı butonu eklenir.
+ * @returns {string} Uyarı mesajı ve ilgili butonların bulunduğu HTML kodu.
+ */
 function _dgEngelKutusu(metin, hedef) {
   const butonlar = [];
   if (hedef && hedef.tablo === 'hayvanlar' && hedef.pk)
@@ -71,9 +82,18 @@ function _dgEngelKutusu(metin, hedef) {
   butonlar.push('<button type="button" class="dg-link" data-action="dg-git-degisiklikler">📂 Değişiklikler\'den seç</button>');
   return `<div class="dg-uyari">⚠️ ${esc(metin)}</div><div class="dg-not">${butonlar.join(' ')}</div>`;
 }
+/**
+ * Tarayıcının çevrimiçi olup olmadığını kontrol eder.
+ * @returns {boolean} Tarayıcının çevrimiçi olduğu durumda true, yoksa false döndürür.
+ */
 function _dgCevrimici() { return navigator.onLine !== false; }
 
 // ── Bilet (1 saat; sessionStorage — sekme kapanınca biter) ──────────
+/**
+ * DG_BILET_ANAHTAR anahtarıyla sessionStorage'dan bilet verisini çeker,
+ * geçerlilik süresini kontrol eder ve süresi dolmuşsa veya veri bozuksa temizleyip null döndürür.
+ * @returns {Object|null} Geçerli bilet nesnesi veya null.
+ */
 function _dgBiletOku() {
   try {
     const raw = sessionStorage.getItem(DG_BILET_ANAHTAR);
@@ -86,6 +106,11 @@ function _dgBiletOku() {
     return b;
   } catch (_) { return null; }
 }
+/**
+ * Bilet bilgilerini alıp geçerlilik süresini hesaplayarak sessionStorage'a kaydeder veya siler.
+ * @param {Object} b Bilet nesnesi; 'kalan_sn' (kalan saniye) ve 'bilet' (bilet verisi) özelliklerini içerir.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _dgBiletYaz(b) {
   try {
     // Süre istemci saatinden kalan_sn ile hesaplanır (sunucu son_gecerlilik'i ile
@@ -95,9 +120,18 @@ function _dgBiletYaz(b) {
     else sessionStorage.removeItem(DG_BILET_ANAHTAR);
   } catch (_) { /* depolama kapalı → bilet yalnız bu işlemde kullanılır */ }
 }
+/**
+ * Verilen biletin son geçerlilik tarihine kadar kalan süreyi dakikada hesaplar.
+ * @param {Object} b Bilet nesnesi, içinde 'son_gecerlilik' (tarih) özelliği olmalıdır.
+ * @returns {Number} Kalan dakika sayısı (negatif ise 0).
+ */
 function _dgBiletKalanDk(b) {
   return b ? Math.max(0, Math.ceil((new Date(b.son_gecerlilik).getTime() - Date.now()) / 60000)) : 0;
 }
+/**
+ * 'dg-bilet' elementini bulup, mevcut bilet durumuna göre geri alma süresini gösterir veya bilet yok mesajını yazar.
+ * @returns {void}
+ */
 function _dgBiletGostergesi() {
   const el = document.getElementById('dg-bilet');
   if (!el) return;
@@ -108,6 +142,11 @@ function _dgBiletGostergesi() {
 }
 
 // ── Sayfa girişi ────────────────────────────────────────────────────
+/**
+ * Filtreleme ayarlarını belirler, detay işlem kimliğini sıfırlar, 'degisiklikler' sayfasına gider, sayfayı çizer, zamanlayıcıyı başlatır ve ilk değişiklikleri yükler.
+ * @param {Object} onFiltre Filtreleme parametrelerini içeren nesne.
+ * @returns {Promise<void>} İşlemin tamamlandığında çözülür.
+ */
 async function degisikliklerAc(onFiltre) {
   if (onFiltre) {
     _dg.filtre = Object.assign({}, onFiltre.filtre || {});
@@ -143,16 +182,33 @@ window.addEventListener('popstate', e => {
 });
 
 // Hayvan detayından: filtre ön-dolu (js/ui.js _detOzetHtml → data-action dg-hayvan-degisiklikleri)
+/**
+ * Varsa açık detay penceresini kapatır ve belirtilen hayvana ait değişiklikler görünümünü açar.
+ * @param {*} hayvanId - Değişiklikleri listelenecek hayvanın kimliği.
+ * @param {string} [kupe] - Hayvanın küpe numarası; verilmezse boş string kullanılır.
+ * @returns {*} degisikliklerAc fonksiyonunun döndürdüğü sonuç.
+ */
 function degisikliklerHayvanIcin(hayvanId, kupe) {
   if (typeof closeDet === 'function') closeDet();
   return degisikliklerAc({ filtre: { hayvan_id: hayvanId }, hayvanKupe: kupe || '' });
 }
 
+/**
+ * Değişiklikler sayfasının filtreleme ve işlem butonlarını içeren HTML yapısını oluşturur.
+ * Sayfa başlığı, navigasyon butonları, hayvan küpe, tarih aralığı, tablo seçimi ve ekleme/güncelleme/silme butonlarını render eder.
+ * @returns {void}
+ */
 function _dgSayfaCiz() {
   const root = document.getElementById('dg-root');
   if (!root) return;
   const f = _dg.filtre;
   const tablolar = tabloSecenekleri();
+  /**
+   * Verilen işlem koduna göre buton sınıfını ayarlayarak HTML buton elementi döndürür.
+   * @param {string} kod Butonun işlemi tanımlamak için kullanılan kod.
+   * @param {string} etiket Butonun içinde gösterilecek metin etiketi.
+   * @returns {string} Oluşturulan buton elementinin HTML string'i.
+   */
   const islemBtn = (kod, etiket) =>
     `<button type="button" class="fs-btn${(f.islem || '') === kod ? ' on' : ''}" data-action="dg-islem" data-islem="${escAttr(kod)}">${esc(etiket)}</button>`;
   root.innerHTML = `
@@ -190,6 +246,11 @@ function _dgSayfaCiz() {
   _dgBiletGostergesi();
 }
 
+/**
+ * Belirtilen sayfayı yükleyerek değişiklik listesini günceller veya hata durumunda listeyi koruyarak hatayı ekler.
+ * @param {number} sayfa Yüklenmesi istenen sayfa numarası.
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 async function degisikliklerYukle(sayfa) {
   const liste = document.getElementById('dg-liste');
   if (!liste) return;
@@ -221,6 +282,13 @@ async function degisikliklerYukle(sayfa) {
   }
 }
 
+/**
+ * Verilen nesnenin çeşitli özelliklerine (geri_alma, app_name, istemci_etiketi, rol) bakarak
+ * bunları birleştirip tek bir metin stringi döndürür. Eğer nesne geçersizse veya özellikler
+ * yoksa '—' karakterini döndürür.
+ * @param {Object} k Nesne parametresi.
+ * @returns {String} Birleştirilmiş özelliklerin nokta üstü çizili (' · ') ile ayrılmış hali veya '—'.
+ */
 function _dgKaynakMetni(k) {
   if (!k || typeof k !== 'object') return '—';
   const parca = [];
@@ -247,6 +315,10 @@ function _dgKartBaslik(o, kaynak) {
   return kaynak && kaynak.geri_alma ? `${govde} — geri alındı` : govde;
 }
 
+/**
+ * Değişiklik günlüğü listesini DOM'a çizer; boş durum, gürültü (uygulama dışı) çipi, kartlar ve "Daha fazla" düğmesini oluşturur.
+ * @returns {void}
+ */
 function _dgListeCiz() {
   const liste = document.getElementById('dg-liste');
   if (!liste) return;
@@ -264,6 +336,12 @@ function _dgListeCiz() {
   const kartlar = gurunen.map(k => {
     const o = k.ozet || {};
     const isl = o.islemler || {};
+    /**
+     * Verilen kod için isl dizisinden veri var mı kontrol eder, varsa ilgili sınıf ve metni içeren bir rozet HTML elemanı döndürür.
+     * @param {string} kod - Kontrol edilecek kod.
+     * @param {string} sinif - Rozet için kullanılacak CSS sınıfı.
+     * @returns {string} Kod bulunduğunda oluşturulan rozet HTML elemanı, yoksa boş string.
+     */
     const rozet = (kod, sinif) => isl[kod] ? `<span class="dg-rozet ${sinif}">${esc(kod)} ${esc(String(isl[kod]))}</span>` : '';
     const dis = dgUygulamaDisiMi(k.kaynak);
     return `<div class="dg-kart" role="button" data-action="dg-tx-ac" data-txid="${escAttr(String(k.txid))}">
@@ -284,10 +362,22 @@ function _dgListeCiz() {
 }
 
 // ── İşlem detayı: satır satır diff ──────────────────────────────────
+/**
+ * Verilen hedef, seviye ve etiket bilgilerini içeren yeni bir kayıt oluşturup hedefler dizisine ekler ve dizinin güncel indeksini döndürür.
+ * @param {Object} hedef Hedef nesnesi.
+ * @param {number} seviye Hedefin seviyesi.
+ * @param {string} etiket Hedefin etiketi.
+ * @returns {number} Yeni eklenen kaydı temsil eden dizinin indeks numarası.
+ */
 function _dgHedefKaydet(hedef, seviye, etiket) {
   _dg.hedefler.push({ hedef, seviye, etiket });
   return _dg.hedefler.length - 1;
 }
+/**
+ * Tek kolonlu bir nesne ise içini, çok kolonlu ise nesneyi döndürür; null ise null döndürür.
+ * @param {object|string|null} satirPk Satır PK değeri.
+ * @returns {object|string|null} İşlenmiş satır PK değeri.
+ */
 function _dgPk(satirPk) {
   // Lead sözleşme güncellemesi (goal 3674e62): p_hedef.pk tek-kolon PK'da SKALER
   // değer (uuid/text/sayı), composite PK'da NESNE {pkkolon: deger}. Gösterim
@@ -299,6 +389,14 @@ function _dgPk(satirPk) {
   }
   return satirPk == null ? null : satirPk;
 }
+/**
+ * Çevrimiçiyse hedefi kaydedip geri alma (undo) butonu HTML'i oluşturur; çevrimdışı veya hedef yoksa boş dize döndürür.
+ * @param {Object} hedef - Geri alınacak hedef nesne; boşsa boş dize döndürülür.
+ * @param {number} seviye - Geri alma seviyesi; DG_SEVIYE_METNI içindeki metni belirler.
+ * @param {string} etiket - Hedefle birlikte kaydedilen etiket.
+ * @param {boolean} kucuk - Doğruysa küçük buton sınıfı eklenir ve metin etiketi gösterilmez.
+ * @returns {string} Geri alma butonunun HTML'i veya boş dize.
+ */
 function _dgGeriAlBtn(hedef, seviye, etiket, kucuk) {
   if (!_dgCevrimici() || !hedef) return '';        // _gmUndoButtonHtml offline kalıbı
   const i = _dgHedefKaydet(hedef, seviye, etiket);
@@ -331,6 +429,10 @@ async function degisiklikTxAc(txid) {
 
 // W3: "‹ Listeye dön" + geri tuşu ortak kapanışı — detayı kapatır, liste
 // görünümüne döner; history'de tx entry'si bırakmaz (navViewBack guard'lı back).
+/**
+ * Detay ID'sini sıfırlar, liste çizimi yapar ve varsa geri dönüş fonksiyonunu çağırır.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function degisikliklerListeyeDon() {
   _dg.detayTxid = null;
   _dgListeCiz();
@@ -343,6 +445,13 @@ function degisikliklerListeyeDon() {
 // dâhil. (Eski "kupe (uuid-önek)" gösterimi ham pk sızdırıyordu.)
 const DG_HAYVAN_REF_ALANLARI = ['hayvan_id', 'animal_id', 'anne_id', 'ana_hayvan_id', 'buzagi_id', 'farm_animal_id'];
 const DG_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * Hücre değerini görüntülenebilir metne çevirir; hayvan referans alanlarında değeri küpe numarasına çözmeye çalışır, bilinen kod değerlerini etiketle değiştirir.
+ * @param {string} tablo - Değerin ait olduğu tablo adı.
+ * @param {string} alan - Değerin ait olduğu alan (sütun) adı.
+ * @param {*} v - Metne çevrilecek hücre değeri.
+ * @returns {string} Görüntülenebilir değer metni; çözümlenemeyen UUID referansları için '?'.
+ */
 function _dgDegerMetni(tablo, alan, v) {
   const ref = (DG_HAYVAN_REF_ALANLARI.includes(alan) || (tablo === 'hayvanlar' && alan === 'id')) && typeof v === 'string';
   if (!ref) {
@@ -366,9 +475,19 @@ function _dgDegerMetni(tablo, alan, v) {
 // W8-D1 (saf): görünür alan satırı kilidi — 'Kayıt no' (id) satırı ve ham UUID
 // değerli hücreler görünür listede ASLA; pk/UUID yalnız teknik katlamada (root
 // R1-D1 unit kilidi: görünür alanda UUID regex / tablo-özet kalıbı yok).
+/**
+ * Bir fark kaydının alan satırı olarak görünüp görünmeyeceğini belirler. 'id' alanındaki farklar ile eski veya yeni değeri UUID olan farklar gizlenir.
+ * @param {Object|null} fark - Değişiklik farkı kaydı; 'alan', 'eski' ve 'yeni' özelliklerini içerebilir.
+ * @returns {boolean} Fark satırı görüntülenecekse true, aksi halde false.
+ */
 function dgAlanSatiriGorunurMu(fark) {
   if (!fark) return false;
   if (fark.alan === 'id') return false;
+  /**
+   * Verilen değerin bir string olup olmadığını ve DG_UUID_RE düzenini karşılayıp karşılamadığını kontrol eder.
+   * @param {string} v Kontrol edilecek string değer.
+   * @returns {boolean} Değer geçerli bir DG UUID formatındaysa true, değilse false döndürür.
+   */
   const hamDeger = v => typeof v === 'string' && DG_UUID_RE.test(v.trim());
   return !(hamDeger(fark.eski) || hamDeger(fark.yeni));
 }
@@ -376,6 +495,12 @@ function dgAlanSatiriGorunurMu(fark) {
 // W8-D1 (saf): tx'in "kim"i — küpe. Önce hayvanlar satırının KENDİ küpesi
 // (pk satırından, _gmHayvanKupeById deseni), sonra hayvan referans alanları;
 // çözülemeyen → '' (başlıkta parça hiç girmez — '?' yok).
+/**
+ * Verilen satır dizisinden 'hayvanlar' tablosuna ait kayıtlar için öncelikli olarak 'kupe_no' veya 'devlet_kupe' alanlarını, yoksa DG_HAYVAN_REF_ALANLARI dizisinde tanımlı alanları kontrol ederek ilk bulunan geçerli değeri döndürür.
+ * @param {Array} rows İşlenecek satırlardan oluşan dizi.
+ * @param {Function} coz Değerleri işleme sokmak için kullanılan dönüşüm fonksiyonu.
+ * @returns {string} Bulunan ilk geçerli kimlik değeri veya boş string.
+ */
 function dgTxKimMetni(rows, coz) {
   const liste = Array.isArray(rows) ? rows : [];
   for (const r of liste) {
@@ -398,6 +523,17 @@ function dgTxKimMetni(rows, coz) {
 // + zaman + kim; _gmIslemBaslikSatiri kalıbı (root R1-D1 biçimi:
 // "Görev eklendi — 12.09 12:05 · L4Y-01"). Ham tablo-özet/kaynak/UUID YOK.
 // listeOzeti yoksa (doğrudan açılış/tazeleme) ham başlık satırdan kurulur.
+/**
+ * Verilen liste özeti, satır dizisi ve kaynak bilgilerini alarak işlem başlık metnini oluşturur.
+ * Liste boşsa 'İşlem' döner, aksi takdirde tablo adı ve satır sayısı gibi bilgileri içeren özeti hazırlar.
+ * Başlık satırı üretme fonksiyonu varsa onu kullanarak, yoksa doğrudan kart başlığı fonksiyonunu çağırır.
+ * @param {Object} listeOzeti Liste özeti bilgisi.
+ * @param {Array} rows İşlem satırlarından oluşan dizi.
+ * @param {Object} kaynak Kaynak bilgisi.
+ * @param {Object} coz Çözüm bilgisi.
+ * @param {Function} baslikSatiri Başlık satırı üretme fonksiyonu.
+ * @returns {String} Oluşturulan işlem başlık metni.
+ */
 function dgDetayBaslikMetni(listeOzeti, rows, kaynak, coz, baslikSatiri) {
   const liste = Array.isArray(rows) ? rows : [];
   if (!liste.length) return 'İşlem';
@@ -410,6 +546,12 @@ function dgDetayBaslikMetni(listeOzeti, rows, kaynak, coz, baslikSatiri) {
     : _dgKartBaslik(ozet, kaynak);
 }
 
+/**
+ * Detay görünümünü çizer: seçili işlemin (txid) satır kartlarını, başlık ve özet bilgilerini,
+ * teknik satır gizleme çipini, "değişmeyen alanları da göster" seçeneğini, geri alma düğmelerini
+ * ve teknik ayrıntı katlamasını içeren HTML'i liste konteynerine yazar.
+ * @returns {void}
+ */
 function _dgDetayCiz() {
   const liste = document.getElementById('dg-liste');
   if (!liste) return;
@@ -465,6 +607,11 @@ function _dgDetayCiz() {
   // işlem dili başlık (S4, W8-D1): liste kartıyla AYNI üretici (_dgKartBaslik)
   // + zaman + kim (küpe): "Görev eklendi — 12.09 12:05 · l4y-anne" kalıbı;
   // ham tablo özeti/kaynak/tx YALNIZ teknik katlamada.
+  /**
+   * Verilen kimlik (id) ile ilgili kupenin bilgilerini (kupe_no veya devlet_kupe) döndürür.
+   * @param {string} id Kupenin benimseneceği kimlik.
+   * @returns {string} Kupenin numarası, devlet kupesi veya boş bir string.
+   */
   const cozKupe = id => {
     const h = typeof hayvanByKupeRef === 'function' ? hayvanByKupeRef(id) : null;
     return (h && (h.kupe_no || h.devlet_kupe)) || (globalThis._gmHayvanKupeById || {})[id] || '';
@@ -494,6 +641,13 @@ function _dgDetayCiz() {
 // dgGeriAlAkisi(hedef, seviye, baglam) — TÜM yüzeyler (Geçmiş kartı, hayvan
 // kartı, işlem detay paneli, vaka/görev/protokol/sütten/tohumlama detayları,
 // Değişiklikler) BURAYA gelir. baglam = {olayEtiketi, zaman, kim} (işlem dili).
+/**
+ * İnternet bağlantısı ve geri alma hedefi varsa, belirtilen hedef ve seviye bilgilerini bekleyen işlemler listesine ekler.
+ * @param {any} hedef Geri alma işlemi için hedeflenen öğe.
+ * @param {any} seviye Geri alma işlemi için seviye bilgisi.
+ * @param {Object} baglam İşlemin bağlamı (opsiyonel).
+ * @returns {Promise<void>} İşlem tamamlandığında boş bir Promise.
+ */
 async function dgGeriAlAkisi(hedef, seviye, baglam) {
   if (!_dgCevrimici()) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   if (!hedef) { toast('⚠️ Bu olay için geri alma hedefi çözülemedi — Değişiklikler sayfasından deneyin', true); return; }
@@ -506,6 +660,12 @@ async function dgGeriAlAkisi(hedef, seviye, baglam) {
 // islem_log/geçmiş entry'sinden giriş: çözücü (_gmGeriAlHedef, js/gecmis.js TEK
 // kaynak) hedefi kurar; seviye hedefin şeklinden türetilir. null hedef → buton
 // üretilmemiş olmalıydı; çağrıldıysa yönlendirme mesajı (çıkımaz yok).
+/**
+ * Verilen giriş kaydı için geri alma hedefini belirleyip, işlem veya satir seviyesine göre geri alma işlemini gerçekleştirir.
+ * @param {Object} entry Geri alma işlemi için kullanılan giriş kaydı.
+ * @param {string} seviye Geri alma işleminin uygulanacağı seviye ('islem' veya 'satir').
+ * @returns {any} Başarılıysa geri alma sonucu döndürür, başarısız olursa null döndürür.
+ */
 function dgGeriAlFromEntry(entry, seviye) {
   const hedef = _gmGeriAlHedef(entry);
   if (!hedef) { toast('⚠️ Bu olay için geri alma hedefi çözülemedi — Değişiklikler sayfasından deneyin', true); return null; }
@@ -513,6 +673,12 @@ function dgGeriAlFromEntry(entry, seviye) {
   return dgGeriAlAkisi(hedef, s, _gmGeriAlBaglam(entry));
 }
 
+/**
+ * Verilen hedef nesnesi ve seviye parametresine göre işlem türünü belirler.
+ * @param {Object} hedef İşlem yapılacak hedef nesnesi.
+ * @param {string} seviye İşlem seviyesi ('zincir', 'alan', 'satir', 'islem').
+ * @returns {string} Belirlenen işlem türü ('zincir', 'alan', 'satir' veya 'islem').
+ */
 function _dgSeviyeTamamla(hedef, seviye) {
   if (seviye === 'zincir') return 'zincir';
   if (hedef && hedef.alan) return 'alan';
@@ -532,6 +698,12 @@ function _dgSeviyeTamamla(hedef, seviye) {
 // verir (RPC satir+txidsiz → ORDER BY id DESC LIMIT 1). Zaman yedeği BU YOLDA
 // DEVREYE GİRMEZ (kural md.1); yalnız köprü+satır hedefi ve yalnız LOG_YOK'ta.
 // GERI_ALINDI'nın {txid}-hedefi satırsızdır → yedek YOK (gerçekten izsiz tx).
+/**
+ * Hedef-seviyesi hata olayından ('HEDEF_BULUNAMADI' ve neden 'LOG_YOK' olan) bir tablo-PK yedeği satırı üretir; koşullar sağlanmazsa null döndürür.
+ * @param {Object} hedef - Hedef kaydı; txid, tablo ve pk alanları bulunmalıdır, alan alanı içermemelidir.
+ * @param {Object} e - Hata olayı; data.hata ve data.detay.neden alanları kontrol edilir.
+ * @returns {Object|null} Uygunsa { tablo, pk } nesnesi, aksi halde null.
+ */
 function _dgKopruSatirYedegi(hedef, e) {
   if (!hedef || !hedef.txid || !hedef.tablo) return null;
   if (hedef.pk == null || hedef.pk === '') return null;
@@ -543,6 +715,11 @@ function _dgKopruSatirYedegi(hedef, e) {
   return { tablo: String(hedef.tablo), pk: hedef.pk };
 }
 
+/**
+ * Bekleyen bir işlem varsa, ilgili öğeleri DOM'da gösterir, önizleme verilerini RPC çağrısı ile alır,
+ * geri alım durumunu ayarlar ve hata durumunda yedek hedefe geçiş yapmayı dener.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda yedekleme denendiğinde undefined döndürür.
+ */
 async function dgOnizleGoster() {
   const h = _dg.bekleyen;
   if (!h) return;
@@ -581,16 +758,31 @@ async function dgOnizleGoster() {
   }
 }
 
+/**
+ * 'dg-onizle-onay' butonunun aktif durumunu değiştirir; butonu devre dışı bırakır veya tekrar aktif eder.
+ * @param {boolean} acik Butonun açık (aktif) olup olmadığını belirten değer.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _dgOnayDurumu(acik) {
   const btn = document.getElementById('dg-onizle-onay');
   if (btn) { btn.disabled = !acik; btn.style.opacity = acik ? '' : '.45'; }
 }
+/**
+ * Verilen HTML içeriğini 'dg-onizle-engel' elementine yerleştirir ve içerik varsa görünür, yoksa gizler.
+ * @param {string} icerikHtml Gösterilecek HTML içeriği.
+ * @returns {void}
+ */
 function _dgEngelGoster(icerikHtml) {
   const eng = document.getElementById('dg-onizle-engel');
   if (eng) { eng.innerHTML = icerikHtml || ''; eng.hidden = !icerikHtml; }
 }
 
 // Çakışma satırı — İNSAN DİLLİ (ham pk/UUID YOK): zaman · tablo · alanlar · işlem
+/**
+ * Verilen nesnenin zaman etiketini, tablo etiketini (varsa), değişen alanları (varsa) ve işlem etiketini (varsa) birleştirerek tek bir string döndürür.
+ * @param {Object} c İşlem veya veri nesnesi.
+ * @returns {string} Birleştirilmiş etiketlerden oluşan string.
+ */
 function _dgCakismaSatiri(c) {
   const parca = [];
   if (c && c.zaman) parca.push(fmtTarihSaat(c.zaman));
@@ -616,6 +808,11 @@ function _dgZincirOnerisiHtml(on) {
 // yapilacak SERBEST METİNDİR ('Kayıt silinecek' — islem-detay önizleme yolu)
 // ve AYNEN kalır; yapilacak yoksa islemEtiketi(p.islem) yedeği.
 const DG_ZINCIR_YAPILACAK_ETIKET = { GUNCELLE: 'Güncellendi', SIL: 'Silindi', EKLE: 'Eklendi' };
+/**
+ * Verilen nesne için belirli bir etiket döndürür.
+ * @param {Object} p İşlem veya yapılandırma nesnesi.
+ * @returns {String} Belirlenen etiket veya boş string.
+ */
 function dgZincirAdimEtiketi(p) {
   if (!p) return '';
   if (p.yapilacak) {
@@ -627,6 +824,16 @@ function dgZincirAdimEtiketi(p) {
 
 // W8-D4 (saf): değişen alan özeti — U adımlarında eski/yeni'den ilk anlamlı
 // 1-2 alan ("Padok adı: A → B"); etiketler alanEtiketi'den, değerler degerMetni.
+/**
+ * Güncelleme işlemi (islem 'U') için değişen alanların kısa özet metnini üretir; en fazla iki alanı "eski → yeni" biçiminde birleştirir.
+ * @param {Object} p - Özetlenecek parametre nesnesi.
+ * @param {string} p.islem - İşlem türü; yalnızca 'U' ise özet üretilir.
+ * @param {Array} p.alanlar - Özetlenecek alan adları dizisi.
+ * @param {string} p.tablo - Alan etiketlerinin alınacağı tablo adı.
+ * @param {Object} [p.eski] - Alanların eski değerlerini içeren nesne.
+ * @param {Object} [p.yeni] - Alanların yeni değerlerini içeren nesne.
+ * @returns {string} "alan: eski → yeni" parçalarından oluşan özet metni; koşullar sağlanmazsa boş dize.
+ */
 function dgZincirAlanOzeti(p) {
   if (!p || p.islem !== 'U' || !Array.isArray(p.alanlar) || !p.alanlar.length) return '';
   const sirali = typeof dgAlanSirala === 'function' ? dgAlanSirala(p.tablo, p.alanlar) : p.alanlar;
@@ -648,6 +855,11 @@ function dgZincirAlanOzeti(p) {
 }
 
 // Zincir plan kartı (bağımlı adımlar işaretli — K1)
+/**
+ * Verilen zincir adım nesnesinden HTML kart yapısını oluşturur.
+ * @param {Object} p Zincir adım bilgilerini içeren nesne (zaman, bagimli, sira, tablo, etiket vb. özelliklere sahip).
+ * @returns {string} Zincir adım için oluşturulmuş HTML kodu.
+ */
 function _dgZincirKartHtml(p) {
   const zaman = p && p.zaman ? fmtTarihSaat(p.zaman) : '';
   const bagimli = !!(p && (p.bagimli || p.bagimli_adim));
@@ -663,6 +875,13 @@ function _dgZincirKartHtml(p) {
 
 // Sıralı rehber (K1 — çıkımaz engel YOK): SAF hazırlık — en yeni önce,
 // 1..N numara; zamansız satır sonda kendi sırasında. DOM yazmaz (testli).
+/**
+ * Verilen sıralı rehber dizisinden hedefi olan kayıtları filtreleyerek,
+ * zaman bilgisi olan kayıtları (zamanına göre azalan sırada) ve zaman bilgisi olmayan kayıtları
+ * birleştirip numaralandırılmış bir nesne dizisi döndürür.
+ * @param {Array} siraliRehber Hedef ve zaman bilgisi içerebilecek kayıtlardan oluşan dizi.
+ * @returns {Array} Numaralandırılmış (no), hedef, zaman, özet ve neden alanlarına sahip nesnelerden oluşan dizi.
+ */
 function _dgRehberHazirla(siraliRehber) {
   const liste = (Array.isArray(siraliRehber) ? siraliRehber : []).filter(r => r && r.hedef);
   const damgalilar = liste.filter(r => r.zaman).sort((a, b) => String(b.zaman).localeCompare(String(a.zaman)));
@@ -679,6 +898,11 @@ function _dgRehberHazirla(siraliRehber) {
 // L4-04 (onarım turu): rehber satırı TEKİL hedef olarak çağrılır — seviye
 // 'satir' (islem DEĞİL: 'islem' seviyesi tablo/pk'yi yok sayıp çok satırlı
 // tx'in BÜTÜN degisim_log satırlarını geri alırdı). SAF — testli.
+/**
+ * Verilen rehber dizisini işleyerek her bir öğe için hedef, seviye ve etiket içeren yeni bir dizi döndürür.
+ * @param {Object} siraliRehber İşlenecek rehber dizisi.
+ * @returns {Array} Hedef, seviye ve etiket özelliklerine sahip nesnelerden oluşan dizi.
+ */
 function _dgRehberTokenlari(siraliRehber) {
   return _dgRehberHazirla(siraliRehber).map(r => ({
     hedef: r.hedef,
@@ -687,6 +911,11 @@ function _dgRehberTokenlari(siraliRehber) {
   }));
 }
 
+/**
+ * Verilen sıralı rehber verisini işleyerek otomatik zincir kurulamadı uyarısı ve geri alma butonları içeren bir rehber bloğu HTML yapısı döndürür.
+ * @param {Array} siraliRehber İşlenecek sıralı rehber verisi.
+ * @returns {string} Rehber bloğunu oluşturan HTML string'i.
+ */
 function _dgRehberBloku(siraliRehber) {
   const rehber = _dgRehberHazirla(siraliRehber);
   if (!rehber.length) return '';
@@ -702,6 +931,12 @@ function _dgRehberBloku(siraliRehber) {
 
 // Teknik ayrıntı katlaması (plan §5): tx/pk/kaynak YALNIZ burada — görünürde asla.
 // L4-07: önizleme planı adımlarının ham pk'ları da yalnız bu katlamada.
+/**
+ * Hedef ve plan/stok uyarı verilerini teknik ayrıntı satırlarına dönüştürerek HTML detay bloğu oluşturur.
+ * @param {Object} hedef Hedef nesnesi (txid, tablo, zaman vb. özellikleri içermelidir).
+ * @param {Object} on Plan adımları ve stok uyarıları içeren nesne.
+ * @returns {string} Teknik ayrıntı başlığı ve satırlarını içeren HTML detay elementi.
+ */
 function _dgTeknikDetayHtml(hedef, on) {
   const satirlar = [];
   if (hedef && hedef.txid) satirlar.push(['Hedef txid', String(hedef.txid)]);
@@ -722,6 +957,12 @@ function _dgTeknikDetayHtml(hedef, on) {
   return `<details class="dg-teknik"><summary>Teknik ayrıntı ▸</summary>${satirlar.map(([k, v]) => `<div class="dg-not">${esc(k)}: ${esc(v)}</div>`).join('')}</details>`;
 }
 
+/**
+ * Plan, zincir, çakışma, bağımlılık ve stok uyarıları gibi çeşitli blokları oluşturarak teknik detay HTML'i döndürür.
+ * @param {Object} on Plan, zincir, çakışma ve bağımlılık gibi verileri içeren nesne.
+ * @param {Object} h Bekleyen durum veya hedef verisi içeren nesne.
+ * @returns {string} Oluşturulan HTML içeriği.
+ */
 function _dgOnizleHtml(on, h) {
   h = h || _dg.bekleyen || {};
   const zincir = h.seviye === 'zincir';
@@ -743,6 +984,14 @@ function _dgOnizleHtml(on, h) {
   const cakZincirDisi = (zincir && !on.geri_alinabilir && (on.cakismalar || []).length)
     ? `<div class="dg-blok dg-blok-r"><div class="dg-blok-bas">⚠️ Zincire girmeyen gerçek çakışmalar — önce bunları TEK TEK geri al</div>${on.cakismalar.map(c => `<div class="dg-not">${esc(_dgCakismaSatiri(c))}</div>`).join('')}</div>`
     : '';
+  /**
+   * Dizi boş değilse, verilen başlık ve dizi elemanlarının eşlenmesiyle HTML bloğu oluşturur; dizi yoksa veya boşsa boş dize döndürür.
+   * @param {string} baslik - Blok başlığı.
+   * @param {Array} dizi - Blokta gösterilecek öğeler dizisi.
+   * @param {string} sinif - Blok div'ine eklenecek CSS sınıfı.
+   * @param {Function} fn - Her dizi elemanını HTML dizesine dönüştüren eşleme fonksiyonu.
+   * @returns {string} Oluşturulan HTML bloğu; dizi yoksa veya boşsa boş dize.
+   */
   const blok = (baslik, dizi, sinif, fn) => dizi && dizi.length
     ? `<div class="dg-blok ${sinif}"><div class="dg-blok-bas">${baslik}</div>${dizi.map(fn).join('')}</div>` : '';
   const bagimliSayi = (on.bagimliliklar || []).filter(b => b.etki === 'ENGEL').length;
@@ -760,12 +1009,21 @@ function _dgOnizleHtml(on, h) {
 }
 
 // Değişiklikler sayfası kendi düğmeleri (alan/satır/işlem) — token → tek giriş
+/**
+ * Belirtilen hedef indeksi için geri alma işlemi başlatır.
+ * @param {number} hi Hedeflerin dizisindeki indeks.
+ * @returns {Promise<void>} İşlem tamamlandığında çözülür.
+ */
 async function degisimGeriAlBaslat(hi) {
   const h = _dg.hedefler[hi];
   if (!h) return;
   await dgGeriAlAkisi(h.hedef, h.seviye, { olayEtiketi: h.etiket, zaman: '', kim: '' });
 }
 
+/**
+ * Bekleyen bir bilet varsa, internet bağlantısını kontrol eder, bilet bilgilerini okur ve uygulayarak işlemi tamamlar.
+ * @returns {Promise<void>} İşlem tamamlandığında veya iptal edildiğinde boş bir Promise.
+ */
 async function degisimGeriAlOnayla() {
   if (!_dg.bekleyen) return;
   if (!_dgCevrimici()) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -774,6 +1032,11 @@ async function degisimGeriAlOnayla() {
   await _dgUygula(b.bilet);
 }
 
+/**
+ * Bilet mesaj alanını gösterir ve içeriği belirler.
+ * @param {string} mesaj Gösterilecek mesaj metni.
+ * @returns {void}
+ */
 function _dgBiletModalAc(mesaj) {
   cl('dg-sifre');
   const m = document.getElementById('dg-bilet-mesaj');
@@ -781,6 +1044,12 @@ function _dgBiletModalAc(mesaj) {
   openM('m-dg-bilet');
 }
 
+/**
+ * İnternet bağlantısı ve şifre doğrulaması yapılarak geri alma bileti alır,
+ * varsa bekleyen işlemleri uygular ve kullanıcıya bildirim gösterir.
+ * @param {HTMLElement} btn Tıklanma olayını tetikleyen buton elemanı.
+ * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
+ */
 async function degisimBiletAl(btn) {
   if (!_dgCevrimici()) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const inp = document.getElementById('dg-sifre');
@@ -805,6 +1074,11 @@ async function degisimBiletAl(btn) {
 
 // Sonuç bloğu — ⟲ Geri alınanı geri al (akış f): hedef = geri alma tx'i.
 // tx değeri metne HİÇ yazılmaz; yalnız aksiyonun kullandığı state'te taşınır.
+/**
+ * Geri alma sonucu nesnesinden bir sonuç HTML bloğu oluşturur; boş/eksik sonuçta boş dize döndürür.
+ * @param {Object|null} sc - Geri alma sonucu verisi; zincir, adim, etiket ve txid alanlarını içerebilir.
+ * @returns {string} Oluşturulan sonuç HTML bloğu; sc yoksa boş dize.
+ */
 function _dgSonucHtml(sc) {
   if (!sc) return '';
   const bas = sc.zincir
@@ -816,6 +1090,11 @@ function _dgSonucHtml(sc) {
     ${sc.txid ? '<button type="button" class="dg-geri" data-action="dg-geri-alinani-geri-al">⟲ Geri alınanı geri al</button>' : ''}
   </div>`;
 }
+/**
+ * Verilen nesne üzerinden zincir var mı kontrol edilir; varsa adim bilgisiyle birlikte geri alma mesajı, yoksa etiket bilgisiyle (veya varsayılan 'işlem' ile) geri alma mesajı döndürür.
+ * @param {Object} sc Nesne parametresi; zincir, adim ve etiket özelliklerini içerebilir.
+ * @returns {string} Geri alma işlemiyle ilgili durum mesajı.
+ */
 function _dgSonucToast(sc) {
   return sc && sc.zincir
     ? `✅ ${sc.adim} olay birlikte geri alındı`
@@ -823,6 +1102,12 @@ function _dgSonucToast(sc) {
 }
 // Geri alma sonrası yüzey tazeleme: Değişiklikler'de liste+tx detayı; diğer
 // yüzeylerde (Geçmiş/vaka/görev/…) ilgili tablolar + mevcut sayfa render'ı.
+/**
+ * Sayfa 'degisiklikler' ise değişiklikleri yükler ve geri alma işlemi varsa o işlemi başlatır,
+ * aksi takdirde belirtilen tabloları çeker ve renderSafe fonksiyonu varsa onu çalıştırır.
+ * @param {Object} r Geri alma işlemi için gerekli olan veri objesi (geri_alma_txid içerebilir).
+ * @returns {Promise<void>} İşlemin tamamlandığında çözülür.
+ */
 async function _dgSonrasiTazele(r) {
   if (getState('currentPage') === 'degisiklikler') {
     await degisikliklerYukle(1);
@@ -836,6 +1121,11 @@ async function _dgSonrasiTazele(r) {
   if (typeof renderSafe === 'function') renderSafe();
 }
 
+/**
+ * Bekleyen değişiklik geri alma talebini onaylar: bilet ve gerekce ile RPC çağrısını yapar, sonucu modalda gösterir; bilet geçersizse yeniden bilet ister, diğer hatalarda engel kutusu gösterir.
+ * @param {string} bilet - Geri alma işlemi için kullanılacak bilet değeri.
+ * @returns {Promise<void>} İşlem sonucunda değer döndürmez.
+ */
 async function _dgUygula(bilet) {
   const h = _dg.bekleyen;
   if (!h) return;
@@ -872,10 +1162,20 @@ async function _dgUygula(bilet) {
   }
 }
 
+/**
+ * Belirtilen tarih filtresi (başlangıç veya bitiş) için tarih seçici takvimi açar ve seçilen tarihi kaydederek sayfayı yeniden çizer.
+ * @param {string} uc Tarih filtresinin türünü belirten kod ('baslangic' veya 'bitis').
+ * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ */
 function _dgTarihSec(uc) {
   tekTarihTakvimAc({
     baslik: uc === 'baslangic' ? '📅 Başlangıç tarihi' : '📅 Bitiş tarihi',
     deger: _dg.filtre[uc] || bugun(),
+    /**
+     * Verilen ISO tarih değerini filtredeki ilgili alana kaydeder; başlangıç bitişten büyükse ikisini takas eder, ardından sayfayı çizip değişiklikleri yükler.
+     * @param {string} iso - Filtre alanına atanacak ISO tarih değeri.
+     * @returns {void}
+     */
     onSec: iso => {
       _dg.filtre[uc] = iso;
       if (_dg.filtre.baslangic && _dg.filtre.bitis && _dg.filtre.baslangic > _dg.filtre.bitis) {
@@ -886,6 +1186,10 @@ function _dgTarihSec(uc) {
   });
 }
 
+/**
+ * 'dg-hayvan' girişindeki küpe referansına göre değişiklik günlüğü filtresini hayvana uygular; boş girişte filtreyi temizler, eşleşen hayvan yoksa uyarı gösterir.
+ * @returns {void}
+ */
 function _dgHayvanUygula() {
   const inp = document.getElementById('dg-hayvan');
   const ref = inp ? inp.value.trim() : '';
@@ -898,6 +1202,10 @@ function _dgHayvanUygula() {
 }
 
 // Çevrimiçi/çevrimdışı geçişinde sayfayı yeniden çiz (açık ise)
+/**
+ * Sayfa 'degisiklikler' değilse işlemi iptal eder. Eğer çevrimdışıysa boş liste gösterir, açık olan detayları kapatır ve bekleyen durumu sıfırlar. Çevrimliyse açık detay varsa onu açar, yoksa değişiklikleri yükler.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
 function _dgAgDegisti() {
   if (getState('currentPage') !== 'degisiklikler') return;
   const acikDetay = _dg.detayTxid;
