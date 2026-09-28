@@ -5,6 +5,7 @@
  * Verilen kimlikteki modalı açar; router yığınına ve history'ye kaydeder, modal türüne özel form hazırlıklarını yapar.
  * @param {string} id - Açılacak modalın DOM kimliği.
  * @returns {void} Değer döndürmez; modal bulunamazsa sessizce çıkar.
+* @tablo tohumlanabilir_hayvanlar (select)
  */
 function openM(id) {
   const el = g(id); if (!el) return;

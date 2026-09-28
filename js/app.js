@@ -13,6 +13,7 @@ const _sessionId = Math.random().toString(36).slice(2, 9);
  * @param {string} message - Log mesajı.
  * @param {Object} [extra={}] - Ek bilgiler; 'source' alanı ve payload olarak saklanır.
  * @returns {Promise<void>} Log yazma işleminin sonucunu taşıyan promise; hatalar yutulur.
+* @tablo ui_logs (insert)
  */
 async function uiLog(level, message, extra = {}) {
   try {
@@ -296,6 +297,7 @@ const IRK_LISTESI_SABIT = ['Holstein','Simental','Montofon','Jersey','Angus','Di
  * sabit ırk listesini önceliklendirerek birleştirir ve dropdown'a ekler.
  * DB hatası durumunda ise sadece sabit ırk listesini gösterir.
  * @returns {void}
+* @rpc irk_listesi
  */
 async function loadIrkDropdown() {
   const sel = g('a-irk-sel'); if (!sel) return;
