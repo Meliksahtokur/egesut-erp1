@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;}
+  body{background:#eef1f4;color:#263238;width:420px;margin:0 auto;padding-bottom:20px;}
+  .h{background:#37474f;color:#fff;padding:12px 14px;font-weight:700;font-size:16px;}
+  .h small{display:block;font-size:10px;opacity:.75;font-weight:400;margin-top:2px;}
+  .kpi{display:flex;gap:6px;padding:8px 12px;background:#fff;border-bottom:1px solid #e0e4e8;font-size:10px;color:#607d8b;}
+  .kpi div{border:1px solid #e0e4e8;border-radius:8px;padding:3px 8px;}
+  .bolum{font-size:11px;color:#78909c;padding:12px 14px 4px;font-weight:600;letter-spacing:.3px;}
+  .bant{background:#fff;border:1px solid #e0e4e8;border-radius:10px;margin:4px 12px 8px;overflow:hidden;}
+  .bt{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13px;font-weight:700;}
+  .bt .sayi{margin-left:auto;font-size:11px;font-weight:600;color:#78909c;}
+  .bt .link{font-size:11px;color:#1565c0;font-weight:500;}
+  .red{border-left:5px solid #c62828;} .red .bt{color:#c62828;}
+  .amber{border-left:5px solid #f9a825;} .amber .bt{color:#b26a00;}
+  .satir{display:flex;justify-content:space-between;padding:6px 14px;font-size:12px;color:#455a64;border-top:1px solid #f0f2f4;}
+  .satir span.r{color:#90a4ae;font-size:11px;}
+  .yenibant{background:#fff;border:1.5px dashed #1565c0;border-radius:10px;margin:4px 12px 10px;padding:10px 12px;display:flex;align-items:center;gap:8px;}
+  .yenibant .i{font-size:16px;}
+  .yenibant .t{font-size:13px;font-weight:700;color:#1565c0;}
+  .yenibant .cipler{margin-left:auto;display:flex;gap:4px;}
+  .cip{font-size:10px;font-weight:600;border-radius:7px;padding:2px 7px;background:#e3f2fd;color:#1565c0;}
+  .cip.kritik{background:#ffebee;color:#c62828;}
+  .nokta{width:8px;height:8px;border-radius:50%;background:#c62828;display:inline-block;margin-left:4px;}
+  .aciklama{font-size:10px;color:#90a4ae;padding:2px 14px 6px;line-height:1.5;}
+  .karsilastirma{margin:10px 12px;background:#fff;border:1px solid #e0e4e8;border-radius:10px;padding:10px 12px;font-size:11px;color:#546e7a;line-height:1.6;}
+  .karsilastirma b{color:#263238;}
+</style>
+</head>
+<body>
+
+<div class="h">EgeSüt — Dashboard<small>mevcut yüzeyler + yeni ovsync girişi (öneri: tek satır bant)</small></div>
+<div class="kpi"><div>İnek 157</div><div>Düve 41</div><div>Açık vaka 6</div><div>Bugün 3</div></div>
+
+<div class="bolum">MEVCUT BANTLAR (satırlı — dashboard'ı dolduran stil)</div>
+
+<div class="bant red">
+  <div class="bt">🔇 Sessiz Hayvanlar <span class="link">Tümünü Gör →</span><span class="sayi">14</span></div>
+  <div class="satir"><b>902</b> · 62 gün <span class="r">Doğum 07.05</span></div>
+  <div class="satir"><b>177</b> · 58 gün <span class="r">Doğum 12.05</span></div>
+  <div class="satir"><b>041</b> · 55 gün <span class="r">Doğum 19.05</span></div>
+  <div class="satir" style="color:#b0bec5;">+ 11 daha</div>
+</div>
+
+<div class="bant amber">
+  <div class="bt">🐄 İleri Gebeler <span class="link">Tümünü Gör →</span><span class="sayi">9</span></div>
+  <div class="satir"><b>D-148</b> · 268 gün <span class="r">≥260 anyonik</span></div>
+  <div class="satir"><b>D-019</b> · 261 gün <span class="r">≥260 anyonik</span></div>
+  <div class="satir" style="color:#b0bec5;">+ 7 daha</div>
+</div>
+
+<div class="bolum">ÜST STAT BUTONLARI — mevcut `.dash-row` (ui.js:259-270) + boş 6. hücre</div>
+
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 12px 8px;">
+  <div style="background:#fff;border:1px solid #e0e4e8;border-radius:12px;padding:12px 6px;text-align:center;">
+    <div style="font-size:20px;font-weight:800;">157</div><div style="font-size:10px;color:#546e7a;margin-top:3px;">Aktif Hayvan ›</div>
+  </div>
+  <div style="background:#fff;border:1px solid #e0e4e8;border-radius:12px;padding:12px 6px;text-align:center;">
+    <div style="font-size:20px;font-weight:800;">62</div><div style="font-size:10px;color:#546e7a;margin-top:3px;">Gebe ›</div>
+  </div>
+  <div style="background:#fff;border:1px solid #c62828;border-radius:12px;padding:12px 6px;text-align:center;">
+    <div style="font-size:20px;font-weight:800;color:#c62828;">3</div><div style="font-size:10px;color:#c62828;margin-top:3px;">Aktif Hastalık ›</div>
+  </div>
+  <div style="background:#fff;border:1px solid #f9a825;border-radius:12px;padding:12px 6px;text-align:center;">
+    <div style="font-size:20px;font-weight:800;color:#b26a00;">5</div><div style="font-size:10px;color:#b26a00;margin-top:3px;">🍼 Sütten Kes ›</div>
+  </div>
+  <div style="background:#fff;border:1px solid #c62828;border-radius:12px;padding:12px 6px;text-align:center;">
+    <div style="font-size:20px;font-weight:800;color:#c62828;">8</div><div style="font-size:10px;color:#c62828;margin-top:3px;">Bekleyen Görev ›</div>
+  </div>
+  <div style="background:#e3f2fd;border:1.5px dashed #1565c0;border-radius:12px;padding:12px 6px;text-align:center;position:relative;">
+    <div style="font-size:20px;font-weight:800;color:#1565c0;">12<span style="font-size:11px;vertical-align:top;">●</span></div>
+    <div style="font-size:10px;color:#1565c0;font-weight:700;margin-top:3px;">🔄 Ovsync ›</div>
+  </div>
+</div>
+<div class="aciklama"><b>Boş 6. hücre = 🔄 Ovsync butonu</b> (mevcut `.sc` stat deseni: sayı + etiket).
+Görsel uyarı basit: kritik gün (bugün aksiyon / geciken / kontrol vakti) → buton kırmızı `alert` stili;
+sade bekleyen-başlatma → amber `warn`; sakin → yeşil `ok`. Sayı = aktif zincir. Tıkla → kendi tam ekranı.</div>
+
+<div class="karsilastirma">
+<b>Karar:</b> giriş = `.dash-row`'a 6. stat butonu + 🔔 protokol paneli "Tüm takibi aç →" linki.
+Takip ekrani dashboard'da YAŞAMAZ — kendi full-sheet ekranı (detay çok). Dashboard'a bant/satır listesi YOK.
+</div>
+
+</body>
+</html>
