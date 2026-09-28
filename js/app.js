@@ -243,13 +243,13 @@ async function renderFromLocal() {
 }
 
 /**
- * Bildirim modülü için bildirim sayacını günceller.
+ * Henüz uygulanmadı (Sprint 3 — bildirim modülü); çağrılabilir no-op.
  * @returns {void}
  */
 function updateBildirimBadge() { /* Sprint 3 — bildirim modülü */ }
 /**
- * Bildirim modülü için Sprint 3 kapsamında bildirimleri yükler.
- * @returns {Promise} Bildirimlerin yüklendiğini gösteren Promise nesnesi.
+ * Henüz uygulanmadı (Sprint 3 — bildirim modülü); çağrılabilir no-op.
+ * @returns {Promise<void>}
  */
 async function loadBildirimler() { /* Sprint 3 — bildirim modülü */ }
 
