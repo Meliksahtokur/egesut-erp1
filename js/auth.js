@@ -170,7 +170,7 @@
    * Giriş/Kayıt ekranını DOM'a ekler, stil tanımlar ve butonlara tıklama olaylarını bağlar.
    * Eğer 'auth-overlay' elementi zaten varsa fonksiyon hemen döner.
    * @returns {void}
-  * @olay click, keydown
+   * @olay click, keydown
    */
   function renderAuthScreen() {
     if (document.getElementById('auth-overlay')) return;
@@ -221,7 +221,7 @@
   /**
    * Şifre sıfırlama ekranını oluşturur ve ekrana ekler.
    * @returns {void}
-  * @olay click, keydown
+   * @olay click, keydown
    */
   function renderResetScreen() {
     if (document.getElementById('auth-reset-overlay')) return;

@@ -187,7 +187,7 @@ function trLower(s) { return s.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCa
  * Genel autocomplete
  * @param {string} inputId
  * @param {object} opts - { source: string[] | async (q) => string[], onSelect: (val) => void }
-* @olay click, input, keydown, mousedown
+ * @olay click, input, keydown, mousedown
  */
 function setupAutocomplete(inputId, opts) {
   const input = g(inputId);
@@ -209,7 +209,7 @@ function setupAutocomplete(inputId, opts) {
   /**
    * Öneri listesini yeniden oluşturur; listenin ilk 10 ögesini <li> olarak ekler, tıklamada ögeyi seçer ve liste boşsa gizler.
    * @returns {void}
-  * @olay mousedown
+   * @olay mousedown
    */
   function render() {
     ul.innerHTML = ''; idx = -1;

@@ -230,7 +230,7 @@ async function asistanGonder(soru) {
  * Asistan sohbetindeki bir kullanıcı mesajını düzenleme moduna alır: ilgili balonu ve sonrasındaki tüm mesajları DOM'dan ve veritabanından kaldırır, mesaj metnini giriş alanına geri yazıp odaklanır. Eğer asistan bir yanıtı işliyorsa (_asistanBekliyor) veya geçerli bir mesaj balonu bulunamazsa hiçbir işlem yapmaz. _asistanThreadId varsa, veritabanındaki eşleşen kullanıcı mesajından itibaren aynı konumdaki ve sonrasındaki tüm agent_messages kayıtları silinir; DOM temizliği veritabanı hatasından bağımsız olarak yapılır. Sohbet tamamen boşaldıysa boş durum görünümü yeniden gösterilir.
  * @param {HTMLElement} el - Düzenlenecek kullanıcı mesajına ait balon içindeki bir DOM öğesi; en yakın [data-role="user"] balonu bundan bulunur.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen promise; herhangi bir değer döndürmez.
-* @tablo agent_messages (delete), agent_messages (select)
+ * @tablo agent_messages (delete), agent_messages (select)
  */
 async function asistanMesajDuzenle(el) {
   if (_asistanBekliyor) return;
@@ -293,7 +293,7 @@ async function asistanMesajKopyala(el) {
 /**
  * Aktif asistan thread'indeki son asistan mesajına ait SQL sorgusunu döndürür.
  * @returns {Promise<string|null>} Son asistan mesajının metadata'sındaki SQL; thread yoksa veya bulunamazsa null.
-* @tablo agent_messages (select)
+ * @tablo agent_messages (select)
  */
 async function _asistanSonSql() {
   if (!_asistanThreadId) return null;
@@ -306,7 +306,7 @@ async function _asistanSonSql() {
 /**
  * Aktif asistan iş parçacığındaki en son 'assistant' rolündeki mesajın metadata'sını getirir.
  * @returns {Promise<Object|null>} Bulunan mesajın metadata'sı; iş parçacığı yoksa veya kayıt bulunamazsa null.
-* @tablo agent_messages (select)
+ * @tablo agent_messages (select)
  */
 async function _asistanSonMeta() {
   if (!_asistanThreadId) return null;
@@ -380,7 +380,7 @@ function asistanPlanOnayla(pid, el) {
  * @param {string} pid İptal edilecek planın ID'si.
  * @param {HTMLElement} el İptal edilecek planın bulunduğu kart elemanı (opsiyonel).
  * @returns {Promise<void>} İşlem sonucunu içeren Promise.
-* @rpc asistan_plan_iptal
+ * @rpc asistan_plan_iptal
  */
 async function asistanPlanVazgec(pid, el) {
   const kart = el ? el.closest('.asistan-plan-karti') : null;
@@ -405,7 +405,7 @@ async function asistanPlanVazgec(pid, el) {
  * @param {string} pid Geri alınacak planın ID'si.
  * @param {HTMLElement} el Geri alma butonu veya tetikleyici elemanı (opsiyonel).
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözümlenen (void) bir Promise.
-* @rpc asistan_plan_geri_al
+ * @rpc asistan_plan_geri_al
  */
 async function asistanPlanGeriAl(pid, el) {
   const kart = el ? el.closest('.asistan-undo-karti') : null;
@@ -444,7 +444,7 @@ function asistanYeniSohbet() {
 /**
  * Asistan arayüzünü başlatır: mevcut sohbet yoksa yeni sohbet açar, giriş alanına otomatik büyüme dinleyicisi bağlar ve odağı giriş alanına verir.
  * @returns {void}
-* @olay input
+ * @olay input
  */
 function asistanInit() {
   if (!_asistanThreadId) asistanYeniSohbet();
@@ -458,7 +458,7 @@ function asistanInit() {
 /**
  * Asistan geçmiş konuşmalarını (thread'leri) yükler ve listeler.
  * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
-* @tablo agent_threads (select)
+ * @tablo agent_threads (select)
  */
 async function asistanGecmisAc() {
   const list = document.getElementById('asistan-thread-list');
@@ -492,7 +492,7 @@ function asistanDrawerKapat() {
  * düğmeli asistan balonu olarak mesaj kutusuna ekler.
  * @param {string} tid - Açılacak asistan thread'inin kimliği (thread_id).
  * @returns {Promise<void>} Hiçbir değer döndürmez.
-* @tablo agent_messages (select)
+ * @tablo agent_messages (select)
  */
 async function asistanThreadAc(tid) {
   _asistanThreadId = tid;
@@ -518,7 +518,7 @@ async function asistanThreadAc(tid) {
  * Belirtilen kimlikteki asistan sohbet dizisini veritabanından siler, silinen dizi aktifse yeni sohbet başlatır ve sohbet geçmişini açar.
  * @param {string} tid - Silinecek sohbet dizisinin (thread) kimliği.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise.
-* @tablo agent_threads (delete)
+ * @tablo agent_threads (delete)
  */
 async function asistanThreadSil(tid) {
   await window.db.from('agent_threads').delete().eq('id', tid);
@@ -532,7 +532,7 @@ async function asistanThreadSil(tid) {
 /**
  * Kullanıcı onayı alındıktan sonra tüm asistan sohbet geçmişini siler, yeni bir sohbet başlatır ve asistan çekmecini kapatır.
  * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
-* @rpc asistan_tumunu_sil
+ * @rpc asistan_tumunu_sil
  */
 async function asistanTumunuSil() {
   if (!confirm('Tüm sohbet geçmişi silinecek. Emin misiniz?')) return;
