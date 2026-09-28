@@ -96,6 +96,7 @@ async function _kupeKontrolEt(alan) {
  * @param {HTMLElement} btn Kayıt butonu referansı (opsiyonel).
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda void döner.
  * @rpc hayvan_ekle, hayvan_genc_anne_isaretle, hayvan_guncelle
+ * @tablo hayvanlar (tazeleme)
  */
 async function submitAnimal(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -201,6 +202,7 @@ async function submitAnimal(btn) {
  * @param {HTMLElement} btn Kayıt butonu (disabled ve metin güncellemesi için).
  * @returns {Promise<void>} Doğum kaydı işlemi tamamlandığında veya hata oluştuğunda çözülen Promise.
  * @rpc dogum_kaydet
+ * @tablo dogum (tazeleme), gorev_log (tazeleme), hayvanlar (tazeleme), tohumlama (tazeleme)
  */
 async function submitBirth(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -374,6 +376,8 @@ function _ekListeGoster() {
  * Tohumlama formunu doğrular ve RPC üzerinden tohumlama kaydını oluşturur; VWP ihlali durumunda kullanıcıya override onayı sorar, senkronizasyon vakası kapanış özeti ve başarı bildirimi gösterir, formu temizleyip ilgili tabloları yeniden çeker.
  * @param {HTMLElement|null} btn - Submit butonu; işlem sırasında devre dışı bırakılır ve metni güncellenir, yoksa bu işlemler atlanır.
  * @returns {Promise<void>} Kayıt işleminin tamamlanmasını bekleyen promise; değer döndürmez.
+ * @rpc planli_tohumlama_kaydet, tohumlama_kaydet (koşullu)
+ * @tablo cases (tazeleme), gorev_log (tazeleme), hayvanlar (tazeleme), islem_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), tohumlama (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function submitInsem(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -479,6 +483,7 @@ async function submitInsem(btn) {
  * @param {HTMLElement|null} btn - Tıklanan buton; kaydetme sırasında devre dışı bırakılıp metni değiştirilir.
  * @returns {Promise<void>} Kayıt işleminin tamamlanmasını belirten promise.
  * @rpc tohumlama_tekrar_kaydet
+ * @tablo gorev_log (tazeleme), hayvanlar (tazeleme), tohumlama (tazeleme)
  */
 async function submitTekrarAsim(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -554,6 +559,7 @@ function openTekrarAsim(hayvanId, kupeNo) {
  * @returns {Promise<void>} Kayıt işleminin sonucunu belirten değer döndürmez;
  *   kullanıcıya toast bildirimleriyle bilgi verilir.
  * @rpc kizginlik_kaydet
+ * @tablo gorev_log (tazeleme), kizginlik_log (tazeleme)
  */
 async function submitKizginlik(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -781,6 +787,7 @@ async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix
  * @param {HTMLElement} btn Tıklanan buton (opsiyonel).
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc create_case, kizginlik_tedavi_baglanti_kur, tedavi_sablon_tohumlama_gorev_ekle, tedavi_sablon_uygula
+ * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drugs (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function submitCase(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -1709,6 +1716,7 @@ function bcSablonKaydetOzetGuncelle(){
  * Kayıt başarılı olduğunda ilgili tablolara pull işlemi yapılır ve şablon listesi yenilenir.
  * @returns {Promise<void>} Şablon kaydedilme işlemi tamamlandığında veya hata oluştuğunda Promise.
  * @rpc tedavi_sablon_kaydet
+ * @tablo sablon_hastalik_eslem (tazeleme), tedavi_sablonu_kalem (tazeleme), tedavi_sablonu (tazeleme)
  */
 async function bcSablonKaydet(){
   const diseaseId = v('bc-disease-id');
@@ -3138,6 +3146,7 @@ function bcSonucBantlari(satirlar, opts){
  * @param {HTMLElement} btn Tıklanma olayını tetikleyen buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülür.
  * @rpc vaka_toplu_ac
+ * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drugs (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function submitBulkCase(btn){
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -3215,6 +3224,7 @@ async function submitBulkCase(btn){
    * Toplu vaka açma isteğini RPC üzerinden gönderir; dönen sonuçları renkli grup bantlarıyla gösterir, başarı/hata toast'ı basar, tabloları çeker ve arayüzü yeniden render eder. İşlem boyunca butonu devre dışı bırakır ve finally'de dinamik etikete döndürür.
    * @returns {Promise<void>} Sonuç bantlarının gösterilmesi, toast bildirimleri, pullTables/loadDrugsCache çağrıları ve renderSafe işlemleri tamamlandığında çözülen promise.
    * @rpc vaka_toplu_ac
+   * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drugs (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
    */
   const gonder = async () => {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Gönderiliyor…'; }
@@ -3308,6 +3318,7 @@ async function submitBulkCase(btn){
  * @param {string} tohId İlgili tohumlama kaydı (pregnancy) ID'si.
  * @returns {Promise<void>} Abort kaydı başarıyla oluşturulursa undefined döndürür, hata durumunda hata mesajı gösterir.
  * @rpc tohumlama_abort
+ * @tablo hayvanlar (tazeleme), islem_log (tazeleme), tohumlama (okuma), tohumlama (tazeleme)
  */
 async function abortKaydet(hayvanId, tohId) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -3355,6 +3366,7 @@ async function abortKaydet(hayvanId, tohId) {
  * @param {HTMLElement} btn Kayıt işlemi sırasında devre dışı bırakılacak ve metni güncellenecek buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
  * @rpc hayvan_not_ekle
+ * @tablo hayvanlar (tazeleme)
  */
 async function hayvanNotEkle(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -3392,6 +3404,7 @@ function openNotModal(hayvanId, kupe) {
  * @param {HTMLElement} btn Onay butonu referansı; işlem sırasında devre dışı bırakılır ve işlem sonrası tekrar aktif edilir.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
  * @rpc cikis_yap
+ * @tablo gorev_log (tazeleme), hayvanlar (tazeleme), protokol_instance (tazeleme)
  */
 async function submitCikis(btn) {
   const expected = parseInt(g('cx-math-ok').value);
@@ -3617,6 +3630,7 @@ function protokolAyarYukle() {
  * @param {number|string} deger Güncellenecek protokol ayarının değeri.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda void döner.
  * @rpc protokol_ayar_guncelle
+ * @tablo protokol_ayar (okuma), protokol_ayar (tazeleme)
  */
 async function protokolAyarKaydet(anahtar, deger) {
   try {
@@ -3638,6 +3652,7 @@ window.protokolAyarKaydet = protokolAyarKaydet;
  * @param {HTMLElement} btn Tıklanma olayını tetikleyen buton elemanı (opsiyonel).
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen bir Promise.
  * @rpc hayvan_tohumlanabilir_onayla
+ * @tablo hayvanlar (tazeleme)
  */
 async function submitTohumOnayla(hayvanId, btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -3686,6 +3701,7 @@ function openTohumErtele(hayvanId, kupe) {
  * @param {string} containerId Render edilecek HTML elemanının ID'si.
  * @param {string} prefix Oluşturulan HTML elemanlarında ve event handler'larında kullanılacak ön ek.
  * @returns {void}
+ * @tablo vaccines (okuma)
  */
 async function renderVaccinePicker(containerId, prefix){
   const vaccines = (await getData('vaccines')) || [];
@@ -3756,6 +3772,7 @@ function selectedVaccineRows(prefix){
  * İlgili tablolardan cache güncellemesi yapılarak aşı seçiciyi render eder ve tarih alanına varsayılan değer atar; ayrıca hayvan ID'si değiştiğinde satır yenileme dinleyicisini bağlar.
  * @returns {Promise<void>} İşlemin tamamlanması.
  * @olay change
+ * @tablo vaccination_log (tazeleme), vaccine_diseases (tazeleme), vaccine_protocol_steps (tazeleme)
  */
 async function loadVaccinesDropdown() {
   // Ö4: naive hesabı için cache garanti (vaccination_log + vaccine_diseases + protocol_steps)
@@ -3846,6 +3863,7 @@ function _vRefreshRows(){
  * @param {HTMLElement} btn Kayıt butonu; işlem sırasında devre dışı bırakılır ve işlem tamamlandıktan sonra tekrar aktif edilir.
  * @returns {Promise<void>} İşlem tamamlandığında (başarılı veya başarısız) çağrılan fonksiyon.
  * @rpc add_vaccination
+ * @tablo gorev_log (tazeleme), hayvanlar (tazeleme), stok_hareket (tazeleme), vaccination_log (tazeleme)
  */
 async function submitVaccination(btn) {
   if (!navigator.onLine) { toast('⚠️ İnternet bağlantısı gerekli', true); return; }
@@ -3904,6 +3922,7 @@ function resetVaccineForm() {
  * @param {HTMLElement} btn Tıklanma durumunu (loading/hata) yönetmek için kullanılan buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata yakalandığında void döner.
  * @rpc gorev_tamamla
+ * @tablo gorev_log (tazeleme), hayvanlar (tazeleme)
  */
 async function doneTask(id, hid, stokId, miktar, padok, btn) {
   btn.disabled = true;
@@ -3939,6 +3958,7 @@ let _taVaxCache = [];
  * Her aşı için kalan stok miktarını hesaplar ve HTML listesi oluşturarak 'ta-vax-liste' elementine yazar.
  * @param {string} val - Aşı planlama durumu ('ASI_PLANLI' olmalı).
  * @returns {void} Fonksiyon bir değer döndürmez.
+ * @tablo stok_hareket (okuma), stok (okuma), vaccines (okuma), vaccines (tazeleme)
  */
 async function taskAddTipDegisti(val){
   const alani=document.getElementById('ta-asi-alani');
@@ -4058,6 +4078,7 @@ function _asiTekrarUyariBilgisi(hayvanId, vaccineId){
  * @param {HTMLElement|null} btn - Tıklanan buton; işlem süresince devre dışı bırakılır, boş geçilebilir.
  * @returns {Promise<void>} Görev oluşturma işleminin tamamlanmasını bekleyen Promise; değer döndürmez.
  * @rpc asi_gorev_planla, asi_toplu_planla
+ * @tablo gorev_log (okuma), stok_hareket (tazeleme), stok (tazeleme), vaccination_log (tazeleme), vaccine_diseases (tazeleme)
  */
 async function submitTaskAdd(btn) {
   const desc  = v('ta-desc');
@@ -4098,6 +4119,7 @@ async function submitTaskAdd(btn) {
        * Aşı görevi oluşturma işlemini gerçekleştirir. Tek bir aşı için 'asi_gorev_planla' veya birden fazla aşı için 'asi_toplu_planla' RPC çağrısı yapar, stok hareketlerini günceller ve kullanıcıya bildirim gösterir.
        * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda çağrılan Promise.
        * @rpc asi_gorev_planla, asi_toplu_planla
+       * @tablo stok_hareket (tazeleme), stok (tazeleme)
        */
       const olustur = async () => {
         let res;
@@ -4202,6 +4224,7 @@ async function kaydetTaskEdit(btn, t, degisen) {
  * Mevcut hastalık kaydını kapatır, kullanıcıya başarı mesajı gösterir ve ilgili tabloyu yeniler.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda undefined döndürür.
  * @rpc hastalik_kapat
+ * @tablo cases (tazeleme)
  */
 async function hstKapat() {
   if (!_curHst) return;
@@ -4297,6 +4320,7 @@ function hstDuzenleAc() {
  * @param {HTMLElement} btn Güncelleme işlemi sırasında devre dışı bırakılan buton elemanı.
  * @returns {Promise<void>} Güncelleme işleminin tamamlanmasını bekleyen Promise.
  * @rpc hastalik_guncelle
+ * @tablo cases (tazeleme)
  */
 async function hstGuncelle(btn) {
   if (!_curHst) return;
@@ -4323,6 +4347,7 @@ async function hstGuncelle(btn) {
  * Mevcut hastalık kaydını silmek için onay ister, silme işlemini gerçekleştirir ve ilgili tabloları günceller.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda undefined döndürür.
  * @rpc hastalik_sil
+ * @tablo cases (tazeleme)
  */
 async function hstSilOnay() {
   if (!_curHst) return;
@@ -4355,6 +4380,7 @@ async function tohSonucKaydet() {
  * @param {HTMLElement} btn Tıklanan buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
  * @rpc tohumlama_sonuc_bekliyor, tohumlama_sonuc_bos
+ * @tablo hayvanlar (tazeleme), islem_log (tazeleme), tohumlama (tazeleme)
  */
 async function tohSonuc(sonuc, btn) {
   if (!_curToh) return;
@@ -4408,6 +4434,7 @@ async function tohSonuc(sonuc, btn) {
  * @param {HTMLElement} btn Tıklanma olayını tetikleyen buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
  * @rpc stok_ekleme
+ * @tablo stok_hareket (tazeleme), stok (tazeleme)
  */
 async function submitStk(btn) {
   const mik = Number.parseFloat(g('se-mik').value);
@@ -4434,6 +4461,7 @@ async function submitStk(btn) {
  * @param {HTMLElement} btn Kayıt butonu; işlem sırasında devre dışı bırakılır ve işlem sonrası tekrar aktif edilir.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc ilac_ekle, stok_ekle, stok_ekleme
+ * @tablo drug_products (tazeleme), stok_kategorileri (tazeleme), stok (tazeleme)
  */
 async function submitStokAdd(btn) {
   const kat  = g('sa-kat')?.value || 'Antibiyotik';
@@ -4512,6 +4540,7 @@ async function submitStokAdd(btn) {
  * @param {HTMLElement} btn Kayıt butonu referansı; işlem sırasında devre dışı bırakılır ve işlem sonrası tekrar aktif edilir.
  * @returns {Promise<void>} Kayıt işlemi tamamlandığında veya hata oluştuğunda çözülen bir Promise.
  * @rpc gebelik_kaydet_manual
+ * @tablo hayvanlar (tazeleme), tohumlama (tazeleme)
  */
 async function submitGebelikEkle(btn) {
   const modal = document.getElementById('m-gebelik');
@@ -4634,6 +4663,7 @@ async function hstIlacEkle(btn) {
  * @param {number|string} tedaviId - Silinecek tedavi kaydının kimliği.
  * @returns {Promise<void>} İşlem tamamlandığında hiçbir değer döndürmez.
  * @rpc tedavi_sil
+ * @tablo stok_hareket (tazeleme), stok (tazeleme), tedavi (tazeleme)
  */
 async function hstIlacSil(tedaviId) {
   if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
@@ -4652,6 +4682,7 @@ async function hstIlacSil(tedaviId) {
  * @param {string|number} stockItemId - Bağlanacak stok kaleminin kimliği; boş string verilirse bağlantı kaldırılır (NULL kaydedilir).
  * @returns {Promise<void>} İşlem tamamlandığında çözülen promise; hata durumunda kullanıcıya hata mesajı gösterilir.
  * @rpc link_drug_to_stock
+ * @tablo drugs (tazeleme)
  */
 async function submitDrugStokLink(drugId, stockItemId) {
   // Boş string → NULL (bağlantı kaldır)
@@ -4714,6 +4745,7 @@ async function loadBulkVaccineHayvanlar() {
 /**
  * Toplu aşı kaydı formunu hazırlar: gerekli tabloları çeker, aşı seçiciyi render eder, tarih alanını boşsa bugünün tarihiyle doldurur ve eski sonuç içeriğini temizler.
  * @returns {Promise<void>} Hazırlık işlemleri tamamlandığında çözülen bir Promise.
+ * @tablo vaccine_diseases (tazeleme), vaccine_protocol_steps (tazeleme)
  */
 async function loadBulkVaccineVaccines() {
   // Ö4: muadil/protokol cache (bulk'ta naive hint yok ama tutarlilik icin)
@@ -4747,6 +4779,7 @@ function bvChkChange(chk){
  * Seçilen hayvanlar için toplu aşılama işlemini gerçekleştirir; her seçili aşı için RPC çağrısı yapar, sonuçları arayüzde gösterir ve ilgili tabloları yeniler.
  * @returns {Promise<void>} İşlem tamamlandığında hiçbir değer döndürmez.
  * @rpc bulk_vaccination
+ * @tablo gorev_log (tazeleme), islem_log (tazeleme), stok_hareket (tazeleme), vaccination_log (tazeleme)
  */
 async function submitBulkVaccination() {
   const animalIds = window._bvAnimalIds || [];
@@ -4850,6 +4883,7 @@ async function loadBulkIlacDropdown() {
  * Toplu ilaç uygulama formunu doğrulayıp seçili hayvanlara bulk_ilac RPC'si ile ilaç uygular; sonucu modal ve özet olarak gösterir, verileri yeniler. Çift tıklamaya karşı kilit içerir.
  * @returns {Promise<void>} Hiçbir değer döndürmez.
  * @rpc bulk_ilac
+ * @tablo islem_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme)
  */
 async function submitBulkIlac() {
   const animalIds = window._biAnimalIds || [];
@@ -5096,6 +5130,7 @@ function _vakaKapanisOzeti(kapatilan, otoBos){
  * @param {boolean} uygulanmadi Seansın uygulanmadığı durumu işaretleyen bayrak.
  * @param {HTMLElement} btn Tıklanan buton elemanı.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo cases (tazeleme), drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function seansTamamla(seansId, uygulanmadi, btn) {
   if (!seansId) { toast('❌ Seans ID eksik', true); return; }
@@ -5141,6 +5176,7 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
  * @param {HTMLElement} btn Kayded butonu; işlemden sonra devre dışı bırakılır ve metni güncellenir.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen Promise.
  * @rpc asi_ekle, asi_guncelle
+ * @tablo stok_hareket (tazeleme), stok (tazeleme), vaccine_diseases (tazeleme), vaccine_protocol_steps (tazeleme), vaccines (tazeleme)
  */
 async function submitAsiEkle(btn){
   if(typeof _syncAsiForm==='function') _syncAsiForm();

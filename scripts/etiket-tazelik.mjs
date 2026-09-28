@@ -332,18 +332,17 @@ function kirmiziKontrol(kayitlar) {
     const k = ks.find(x => x._satir.tip === 'rpc' && x._satir.kosullu && x._satir.adlar.length);
     if (!k) return null;
     k._satir.adlar = ['olmayan_kosullu_ad'];
-    return "rpc('olmayan_kosullu_ad') yok (koşullu satır)";
+    return "rpc('olmayan_kosullu_ad') yok";
   }) && tam;
   tam = kos('K6 yardimci-tablo-ad', ks => {
     const k = ks.find(x => x._satir.tip === 'tablo' && (x._satir.girisler || []).some(g => g.islem === 'okuma' || g.islem === 'tazeleme'));
     if (!k) return null;
     const g = k._satir.girisler.find(x => x.islem === 'okuma' || x.islem === 'tazeleme');
-    const eski_ad = g.tablo;
     g.tablo = 'olmayan_yardimci_tablo';
-    return `.from('${eski_ad}')/${g.islem} bozuldu → olmayan_yardimci_tablo`;
+    return ".from('olmayan_yardimci_tablo') yok";
   }) && tam;
   for (const k of kollar) console.log(`  [kirmizi] ${k.ad}: ${k.sonuc}`);
-  return tam;
+  return { tam, kollar };
 }
 
 // --- ana akış ----------------------------------------------------------------
@@ -363,9 +362,12 @@ for (const dosya of dosyalar) {
 
 if (KIRMIZI) {
   console.log(`kırmızı kontrol — etiketli satır paydası: ${kayitlar.length}`);
-  const tam = kirmiziKontrol(kayitlar);
-  console.log(tam ? 'kırmızı kontrol: 4/4 YAKALANDI' : 'kırmızı kontrol: EKSİK — bazı kollar kaçtı');
-  process.exitCode = tam ? 0 : 1;
+  const kirmizi = kirmiziKontrol(kayitlar);
+  const canli = kirmizi.kollar.filter(k => k.sonuc !== 'ATLANDI (uygun örnek yok)').length;
+  console.log(kirmizi.tam
+    ? `kırmızı kontrol: YAKALANDI (${canli} canlı kol / ${kirmizi.kollar.length} kol)`
+    : 'kırmızı kontrol: EKSİK — bazı kollar kaçtı');
+  process.exitCode = kirmizi.tam ? 0 : 1;
 } else {
   const dogru = kayitlar.filter(k => k.hukum === 'DOĞRU').length;
   const hatali = kayitlar.filter(k => k.hukum === 'HATALI').length;

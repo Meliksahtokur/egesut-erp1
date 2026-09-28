@@ -337,6 +337,7 @@ function _dashVacAlerts(today,vaxLogs,vaccines,aktifIdler){
  * ilgili hayvan listesini günceller ve görev loglarını yükler.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda undefined döndürür.
  * @rpc gebelik_protokol_kontrol
+ * @tablo gorev_log (tazeleme)
  */
 async function ileriGebeKontrol(){
   try {
@@ -542,6 +543,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
  * dashboard HTML içeriğini oluşturur ve 'dash-body' elementine yerleştirir.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc buzagi_sutten_kesme_kontrol, gebelik_muayene_listele, ovsync_baslat_uyarilari, padok_transfer_gorev_uzlastir, protokol_eksik_tara, sessiz_hayvanlar_listele
+ * @tablo cases (okuma), dogum (okuma), gorev_log (okuma), hayvanlar (okuma), kizginlik_log (okuma), tohumlama (okuma), vaccination_log (okuma), vaccination_schedule (okuma), vaccines (okuma)
  */
 async function loadDash(){
   const el=document.getElementById('dash-body');
@@ -665,6 +667,7 @@ async function loadDash(){
  * @param {string|number|null} dogumId - İlgili doğumun kimliği; verilmezse null gönderilir.
  * @returns {Promise<void>} İşlem sonucunu döndürmez; sonuç toast bildirimiyle kullanıcıya iletilir.
  * @rpc kizginlik_yok_kaydet
+ * @tablo kizginlik_log (tazeleme)
  */
 async function kizginlikYoktu(hayvanId, dogumId) {
   if (!confirm('Bu hayvanda kızgınlık gözlemlenmedi olarak kaydet?')) return;
@@ -699,6 +702,7 @@ function kizginlikTedaviAc(kayitId, kupe) {
  * @param {number} kayitId Silinecek kızgınlık kaydının benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc kizginlik_sil
+ * @tablo kizginlik_log (tazeleme)
  */
 async function kizginlikSil(kayitId) {
   if (!confirm('Bu kızgınlık kaydını silmek istediğinize emin misiniz?')) return;
@@ -754,6 +758,7 @@ async function updateKizginlikAlert() {
  * @param {string} vaxName Kapatılacak aşı uyarısının adı.
  * @returns {void} İşlem sonucu hakkında bilgi vermez.
  * @rpc vaccination_dismiss
+ * @tablo islem_log (tazeleme), vaccination_log (tazeleme)
  */
 async function asiDismiss(vacLogId, vaxName) {
   const note = prompt(`"${vaxName}" aşı uyarısını kapat\nNot giriniz (zorunlu):`);
@@ -958,6 +963,7 @@ async function recoverPendingDone(){
  * @param {HTMLElement} [btn] - 'on' sınıfı eklenecek filtre butonu; diğer .fs-btn butonlarından 'on' kaldırılır.
  * @param {Object} [opts] - Seçenekler. skipPull: true ise içerideki pullTables çağrısı atlanır.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen promise; görev listesi DOM'a işlenmiş olarak döner.
+ * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drug_products (tazeleme), gorev_log (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function loadTasks(f,btn,opts){
   f=f||_curTaskFilter||'today';   // argümansız çağrı (ör. beslemeGunTamam) aktif filtreye düşsün — yoksa filtresiz tüm görevler (geciken dahil) listelenir
@@ -1296,6 +1302,7 @@ function _asiStokKalanlar(vaccines,stockRows,hareketRows){
  * Verilen stok öğesi ID'si olan öğe için kalan stok miktarını hesaplayıp döndürür.
  * @param {Object} vax Stok öğesi bilgilerini içeren nesne (stock_item_id ve id alanları gereklidir).
  * @returns {number|null} Hesaplanan kalan stok miktarı veya geçerli parametre yoksa null.
+ * @tablo stok_hareket (okuma), stok (okuma)
  */
 async function _asiStokKalan(vax){
   if(!vax||!vax.stock_item_id) return null;
@@ -1334,6 +1341,7 @@ async function topluTekUygula(childId){
  * Toplu aşı görevlerini belirtilen tarihte sırayla uygular; başarılı olanlar varsa ana görevi tamamlar, tabloları yeniler ve arayüzü günceller. Hiç çocuk görev yoksa veya hiçbiri uygulanamazsa hata bildirimi gösterir.
  * @returns {Promise<void>} İşlem sonucunda döndürülen değer yok.
  * @rpc asi_planli_tamamla, gorev_tamamla
+ * @tablo gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), vaccination_log (tazeleme)
  */
 async function topluHepsiniUygula(){
   const tarih=document.getElementById('td-asi-tarih')?.value||bugun();
@@ -1364,6 +1372,7 @@ async function topluHepsiniUygula(){
  * Verilen vaxId'ye sahip aşı kaydını bulup form elemanına ayarlar.
  * @param {string} vId Aranan aşı kaydının ID'si.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo vaccines (okuma)
  */
 async function tdAsiVaxSec(vId){
   _curTaskVaccineId=vId||null;
@@ -1494,6 +1503,7 @@ async function _pgKapiBosAtaUygula(){
  * @param {string} gorevId Ertelenecek görevin benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @olay change, input
+ * @tablo gorev_log (okuma)
  */
 function _erteleModal(gorevId){
   // E6: offline'da modal açılmaz (buton zaten gizli — render sonrası
@@ -1640,6 +1650,7 @@ function _topluSonucKapat(){
 /**
  * İşaretli onay kutularından seçilen hayvanlar için toplu tekrar gönderim işlemi yapar; gerekçe kontrolü yapar, butonu devre dışı bırakır ve işlem sonucuna göre tabloları yeniler.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen, değer döndürmeyen promise.
+ * @tablo gorev_log (tazeleme), islem_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme)
  */
 async function _topluTekrarGonder(){
   const secilen = [...document.querySelectorAll('.ts-ack:checked')].map(c => c.value);
@@ -1806,6 +1817,7 @@ function _istanbulAnIso(gun, saat){ return new Date(gun + 'T' + (saat || '12:00'
  * @param {string} hayvanId - İşlem yapılacak hayvanın kimliği.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc start_first_service_protocol
+ * @tablo cases (tazeleme), drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function ovsyncBaslat(gorevId, hayvanId){
   if(!gorevId) return;
@@ -1838,6 +1850,7 @@ async function ovsyncBaslat(gorevId, hayvanId){
  * @param {string} gorevId İptal edilecek görevin benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc gorev_tamamla
+ * @tablo cases (okuma), gorev_log (okuma)
  */
 async function ovsyncIptal(gorevId){
   if(_ertelemeOfflineGuard('protokol-iptal')) return;   // E6: online-only (plan 3c)
@@ -2253,6 +2266,7 @@ function toggleSeansAksiyon(taskId){
  * @param {string} parentId Alt görevin bağlı olduğu ana görevin ID'si.
  * @param {HTMLElement} el Görevin DOM elemanı (kodda doğrudan kullanılmamaktadır).
  * @returns {Promise<void>} İşlem tamamlandığında boş bir Promise döndürür.
+ * @tablo gorev_log (okuma)
  */
 async function toggleSub(subId,parentId,el){
   const subs=await getData('gorev_log',t=>t.id===subId);
@@ -2352,6 +2366,7 @@ async function _detaySubsVeEtiket(parentId){
  * @param {string} parentId Alt görevin bağlı olduğu ana görevin ID'si.
  * @param {HTMLElement} el Tıklanan DOM elementi.
  * @returns {Promise<void>} Güncelleme işleminin tamamlanması durumunda undefined döndürür.
+ * @tablo gorev_log (okuma)
  */
 async function toggleSubDet(subId,parentId,el){
   const subs=await getData('gorev_log',t=>t.id===subId);
@@ -2520,6 +2535,7 @@ async function beslemeGunTamam(id,btn){
 /**
  * Sürü görünümünü yükler: aktif hayvanları, gebelik/bekleyen tohumlama, son doğum ve son tohumlama haritalarını, aktif hasta vakalarını ve hastalık listesini getirip state'e yazarak hayvan tablosunu ve istatistik/padoluk doluluk çubuğunu render eder; hata durumunda tablo gövdesine uyarı mesajı basar.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen promise; değer döndürmez.
+ * @tablo cases (okuma), diseases (okuma), dogum (okuma), hayvanlar (okuma), protokol_ayar (okuma), tohumlama (okuma)
  */
 async function loadAnimals(){
   const el=document.getElementById('suru-body');
@@ -2862,6 +2878,7 @@ function _belirsizSelPredik(mode){
  * @param {any} val - İşaretlenecek hayvanların türünü belirten değer (varsa).
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda void döner.
  * @rpc hayvan_belirsiz_ureme_listele, hayvan_genc_anne_isaretle_toplu
+ * @tablo hayvanlar (tazeleme)
  */
 async function _belirsizApply(val){
   const ids=[..._belirsizSel]; if(!ids.length) return;
@@ -3192,6 +3209,7 @@ function _closeOvsyncYardim(){
  * @param {string} hayvanId - Hayvanın benzersiz kimliği; detay sayfasına yönlendirmede kullanılır.
  * @param {string} [kupeNo] - Hayvanın kupe numarası; verilmezse hayvanlar listesinden kupe_no alanı sorgulanır.
  * @returns {Promise<void>} Banner gösterimi tamamlandığında çözülen, değer döndürmeyen Promise.
+ * @tablo hayvanlar (okuma)
  */
 async function _ovsyncBildirimBanner(hayvanId, kupeNo){
   try{
@@ -3581,6 +3599,7 @@ function _dozSheetCiplerCiz(kart, btn, ids) {
  * @param {Object} cip Aktif bir çip (chip) nesnesi ise çip ile ilgili işlemler (doz okuma, sayfa kapatma) yapılır.
  * @returns {Promise<void>} İşlemlerin tamamlandığı veya başarısız olduğu durumu temsil eden Promise.
  * @rpc hayvan_kilo_guncelle, ilac_dozaj_guncelle
+ * @tablo drug_products (tazeleme), hayvanlar (tazeleme)
  */
 async function _dozSheetUygula(btn, mini, kart, ids, cip) {
   const okunan = _dozSheetOku();
@@ -3782,7 +3801,7 @@ async function _protokolUygulaKaydet(hayvanId, idx){
  * Protokol uyarısını kullanıcı onayıyla geçersiz kılar; dismiss kaydını upsert eder, eşleşen açık görevleri alt görevleriyle birlikte kapatır ve ilgili ekranları tazeler.
  * @param {number} idx - window.__protokolUyarilar dizisindeki uyarının indeksi.
  * @returns {Promise<void>} İşlem sonucunda değer döndürmez; hata durumunda hata mesajıyla toast gösterir.
- * @tablo gorev_log (select), protokol_dismiss (upsert)
+ * @tablo gorev_log (okuma), gorev_log (select), gorev_log (tazeleme), protokol_dismiss (upsert)
  */
 async function _protokolDismiss(idx){
   const d = window.__protokolUyarilar[idx];
@@ -3862,6 +3881,7 @@ async function _protokolGeriAl(ref){
  * bildirim badge'ini günceller, görev badge'ini yeniler ve açık protokol ekranını kapatıp yeniler.
  * @returns {void} Fonksiyon bir değer döndürmez.
  * @rpc protokol_eksik_tara
+ * @tablo stok_hareket (tazeleme), uygulama_log (tazeleme)
  */
 async function _islemSonrasiRefresh(){
   try { await pullTables(['uygulama_log', 'stok_hareket']); } catch(e) {}
@@ -4905,6 +4925,7 @@ function _detGorevHtml(a,tasks,subs,today){
  * @param {string} id Açılacak hayvanın benzersiz kimlik numarası (id, küpe_no veya devlet_kupe).
  * @param {boolean} keepTab Mevcut sekmede kalınacak mı? (true ise geçmişi güncellemez, false ise yeni bir sayfa geçmişi oluşturur).
  * @returns {Promise<void>} Verilerin çekilmesi ve arayüzün güncellenmesi işlemi tamamlandığında çözülür.
+ * @tablo cases (okuma), cases (tazeleme), diseases (tazeleme), dogum (okuma), drug_classes (tazeleme), drug_products (tazeleme), drugs (tazeleme), gorev_log (okuma), gorev_log (tazeleme), hayvanlar (okuma), kizginlik_log (okuma), kizginlik_log (tazeleme), tohumlama (okuma), uygulama_log (okuma), uygulama_log (tazeleme), vaccination_log (okuma), vaccination_log (tazeleme), vaccines (tazeleme)
  */
 async function openDet(id, keepTab){
   _detOpenId=id;
@@ -5318,6 +5339,7 @@ async function loadBirths(){
 /**
  * Sonucu 'Gebe' olan tohumlama kayıtlarını getirir, 280 günlük gebelik süresine göre tahmini doğum tarihini ve kalan günü hesaplar; hayvan eşleşmesi bulunanları kalan güne göre artan sıralayıp, arama kutusu ve her satır tıklandığında anneSeç fonksiyonunu çağıran bir alt sayfa (bottom sheet) modal olarak gösterir.
  * @returns {Promise<void>} Modal oluşturup sayfaya ekledikten sonra hiçbir değer döndürmez.
+ * @tablo tohumlama (okuma)
  */
 async function gebeledenSec(){
   const tohs=await getData('tohumlama',t=>t.sonuc==='Gebe');
@@ -5756,6 +5778,7 @@ function sorunSec(id, tani, e) {
  * @param {string} kizId Kızgınlık kaydı kimliği (opsiyonel).
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc kizginlik_vaka_ac
+ * @tablo cases (tazeleme), kizginlik_log (tazeleme), tohumlama (tazeleme)
  */
 async function sorunVakaAc(tohId, kizId) {
   if (!_sorunSecilen) { toast('Sorun türü seçin', true); return; }
@@ -5852,6 +5875,7 @@ function kizginlikFiltre(deger,btn){
  * Bekleyen ve mevcut gebe tohumlamaları listeler, her biri için detay bilgisi ve eylem butonları ekler.
  * @param {HTMLElement} el Tohumlama listesi HTML'ini oluşturmak için kullanılan DOM elementi.
  * @returns {void} Fonksiyon doğrudan DOM elementinin innerHTML'ini güncelleyerek yanıt verir.
+ * @tablo tohumlama (okuma)
  */
 async function _uremeGebelik(el){
   // ── Bekleyen tohumlamalar bölümü ──
@@ -5925,6 +5949,7 @@ async function _uremeGebelik(el){
  * @param {string|number} kupe - Onay mesajında gösterilecek hayvanın küpe numarası.
  * @returns {Promise<void>} İşlem tamamlanırken çözülen bir Promise; onay iptal edilirse hiçbir işlem yapmaz.
  * @rpc tohumlama_sonuc_gebe
+ * @tablo hayvanlar (tazeleme), islem_log (tazeleme), tohumlama (tazeleme)
  */
 async function gebeAta(tohId, kupe){
   openConfirm('Gebe İşaretle',`${kupe} — gebe olarak işaretlensin mi?`,async()=>{
@@ -6705,6 +6730,7 @@ async function gmUndoClick(kind,id){
  * @param {HTMLElement} btn Aktif buton; varsa diğer butonlardan 'on' sınıfı kaldırılır ve bu butona eklenir.
  * @param {Object} opts Seçenekler objesi; skipPull özelliği varsa ve true ise çevrimiçi veri çekimi atlanır.
  * @returns {Promise<void>} Veri yükleme işlemi tamamlandığında veya hata oluştuğunda çözülür.
+ * @tablo cases (tazeleme), diseases (tazeleme), dogum (tazeleme), drug_administrations (tazeleme), drug_products (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), tohumlama (tazeleme), treatment_days (tazeleme), uygulama_log (tazeleme), vaccination_log (tazeleme)
  */
 async function loadGecmis(f,btn,opts){
   _curGecmisFilter=f||_curGecmisFilter||'hepsi';
@@ -6887,6 +6913,7 @@ function openStk(id){
  * @param {HTMLElement} sel İlaç ID'sini içeren form elemanı (value özelliği ile).
  * @returns {Promise<void>} Bağlantı işleminin tamamlanması durumunda undefined döndürür.
  * @rpc link_drug_to_stock
+ * @tablo drugs (okuma)
  */
 async function stokDrugBagla(stokId, sel) {
   const drugId = sel.value || null;
@@ -6923,7 +6950,7 @@ async function openStokAdd() {
  * seçili tip 'ilac' ise etken madde dropdown'ını ve stok kategorisini otomatik doldurur.
  * @param {string} tip Seçilecek kayıt tipi ('ilac', 'sperma' veya 'ekipman').
  * @returns {void} Fonksiyon bir değer döndürmez.
- * @tablo drug_classes (select)
+ * @tablo drug_classes (select), drug_classes (tazeleme), stok_kategorileri (tazeleme)
  */
 async function saTipSec(tip) {
   ['ilac','sperma','ekipman'].forEach(t => {
@@ -7106,6 +7133,7 @@ function _tanimFiltrele(q){
  * Hastalık tanımlarını veritabanından çeker, kategoriye göre gruplandırır ve aktif vaka sayıları ile birlikte HTML yapısı oluşturarak belirtilen elemana render eder.
  * @param {HTMLElement} el Render edilecek HTML elemanı.
  * @returns {void} Fonksiyon yan etkisi olarak elemanın içeriğini değiştirir, değer döndürmez.
+ * @tablo cases (tazeleme), diseases (tazeleme)
  */
 async function _renderHastaliklar(el){
   await pullTables(['diseases','cases']);
@@ -7271,6 +7299,7 @@ async function _tanimVarsayilan(tip){
  * butonları ekler.
  * @param {HTMLElement} el Verilen HTML elemanına içeriği yazılacak hedef DOM elemanı.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo drug_classes (tazeleme), drug_products (tazeleme), stok_kategorileri (tazeleme)
  */
 async function _renderIlacSiniflari(el){
   await pullTables(['drug_classes','drug_products','stok_kategorileri']);
@@ -7546,6 +7575,7 @@ async function _dcDeleteIngredient(id){
  * Eğer kategori tanımları yoksa boş durum mesajı gösterir.
  * @param {HTMLElement} el Kategori listesinin render edileceği DOM elementi.
  * @returns {void}
+ * @tablo stok_kategorileri (tazeleme), stok (tazeleme)
  */
 async function _renderKategoriler(el){
   await pullTables(['stok_kategorileri','stok']);
@@ -7600,6 +7630,7 @@ const _KAT_RENK_SABLON = {Meme:'#e91e63',Üreme:'#9c27b0',Metabolik:'#ff9800',Ay
  * Oluşturulan HTML içeriğini verilen DOM elemanına yerleştirir.
  * @param {HTMLElement} el Şablon listesinin render edileceği DOM elemanı.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo diseases (tazeleme), sablon_hastalik_eslem (tazeleme), tedavi_sablonu_kalem (tazeleme), tedavi_sablonu (tazeleme)
  */
 async function _renderSablonlar(el){
   if(navigator.onLine){
@@ -7653,6 +7684,7 @@ async function _renderSablonlar(el){
  * @param {string} id Silinecek şablonun benzersiz kimlik numarası.
  * @returns {void} İşlem tamamlandığında veya hata oluştuğunda bir değer döndürmez.
  * @rpc tedavi_sablon_sil
+ * @tablo sablon_hastalik_eslem (tazeleme), tedavi_sablonu_kalem (tazeleme), tedavi_sablonu (tazeleme)
  */
 async function silSablon(id){
   const s = (await idbGetAll('tedavi_sablonu')).find(x=>x.id===id);
@@ -7970,6 +8002,7 @@ function sablonSeansEkle(gi){
  * Tedavi şablonu düzenleme formundaki verileri doğrulayıp `tedavi_sablon_kaydet` RPC'si üzerinden kaydeder, ilgili tabloları çeker ve tanımlar panelini yeniler. Doğrulama hatası veya RPC hatasında kullanıcıya hata bildirimi gösterir.
  * @returns {Promise<void>} Kayıt işleminin tamamlanmasını belirten promise; değer döndürmez.
  * @rpc tedavi_sablon_kaydet
+ * @tablo sablon_hastalik_eslem (tazeleme), tedavi_sablonu_kalem (tazeleme), tedavi_sablonu (tazeleme)
  */
 async function sablonKaydet(){
   _syncSablonAd();
@@ -8122,6 +8155,7 @@ function _buildTabFilter(ilacAdlari){
  * işlem butonlarını render eder; ayrıca aşı (vaccine) kartlarını protokol ve stok
  * bilgileriyle birlikte panele ekler.
  * @returns {Promise<void>} Panel HTML'i DOM'a yazıldığında çözülen promise.
+ * @tablo diseases (okuma), stok_kategorileri (tazeleme), vaccine_diseases (okuma), vaccine_protocol_steps (okuma), vaccines (okuma)
  */
 async function loadStokPanel(){
   const el=document.getElementById('stok-panel-body'); if(!el) return;
@@ -8283,6 +8317,7 @@ async function openStokDet(stokId){
  * Detay modalında düzenlenen stok kaydını doğrular, RPC ile günceller ve stok panelini yeniler.
  * @returns {Promise<void>} Güncelleme işleminin tamamlanmasını bekleyen promise; ürün adı boşsa veya hata oluşursa güncelleme yapılmadan erken döner.
  * @rpc stok_guncelle
+ * @tablo stok (tazeleme)
  */
 async function stokDetKaydet(){
   if(!_curStokDet) return;
@@ -8324,6 +8359,7 @@ async function stokDetArsivle(){
  * Stok düzeltme formundaki yeni miktarı kaydeder; geçersiz miktar girişini reddeder, RPC ile stoğu düzeltir, ilgili tabloları yeniden çeker ve arayüzü günceller.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen bir promise; hiçbir değer döndürmez.
  * @rpc stok_duzelt
+ * @tablo stok_hareket (tazeleme), stok (tazeleme)
  */
 async function stokDuzeltKaydet(){
   if(!_curStokDet) return;
@@ -8340,6 +8376,7 @@ async function stokDuzeltKaydet(){
 /**
  * Tüm stok hareketlerini tarih sırasına göre (yeniden eskiye) getirip modal içinde listeler; iptal edilen tedavi hareketleri için iade kaydıyla birlikte üstü çizili şekilde gösterir, veri çekme hatasında tekrar deneme butonu içeren bir hata mesajı görüntüler.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise; anlamlı bir değer döndürmez.
+ * @tablo stok_hareket (okuma)
  */
 async function tumStokHareketleriniGoster(){
   const el=document.getElementById('stok-hareketler-body');
@@ -8536,6 +8573,7 @@ async function loadStokList(){
  * başlangıç, kullanılan ve kalan miktar bilgilerini içeren bir modal pencere oluşturur.
  * @param {string} stokId - Stok hareketlerinin sorgulanacağı stokun ID'si.
  * @returns {void} Fonksiyon bir değer döndürmez, DOM'a modal element ekler.
+ * @tablo stok_hareket (okuma)
  */
 async function stokHareketGor(stokId){
   const s=getState('stock').find(x=>x.id===stokId); if(!s) return;
@@ -9066,6 +9104,7 @@ async function _gorevStokSecVeTamamla(gorev){
  * @param {number|null} padokHedef - Görevin padok hedefi; verilmezse null gönderilir.
  * @returns {Promise<void>} Herhangi bir değer döndürmez; sonuçlar toast bildirimleriyle yansıtılır.
  * @rpc gorev_tamamla, hizli_uygulama
+ * @tablo gorev_log (tazeleme), hayvanlar (tazeleme)
  */
 async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
   const kaydetBtn=document.getElementById('pu-kaydet-btn');
@@ -9154,6 +9193,7 @@ async function gorevTedaviGunDone(){
  * @param {Array} uygulanmadiIds İade edilecek ilaçların ID'lerinden oluşan dizi.
  * @returns {void} İşlem sonucu toast mesajı ile bildirilir, fonksiyon bir değer döndürmez.
  * @rpc gorev_tamamla, treatment_day_tamamla
+ * @tablo drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_days (tazeleme)
  */
 async function _tedaviGunExecute(uygulanmadiIds){
   const btn=document.getElementById('td-tedavi-gun-btn');
@@ -9195,6 +9235,7 @@ function asiFormAc(){
  * ilgili tabloları yeniden çeker ve varsa bir sonraki rapel tarihini toast ile bildirir.
  * @returns {Promise<void>} İşlem sonunda değer döndürmez.
  * @rpc add_vaccination, asi_planli_tamamla, gorev_tamamla, ileri_gebe_asi_tamamla
+ * @tablo gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), vaccination_log (tazeleme)
  */
 async function asiUygulaVeTamamla(){
   if(!_curTaskDet){ toast('Görev bulunamadı',true); return; }
@@ -9292,6 +9333,7 @@ async function openTaskEdit(){
  * Seçili görevi iptal eder, görev loguna iptal bilgisi ekler, bağlı alt görevleri de iptal durumuna geçirir,
  * kullanıcıya iptal bildirimi gösterir ve ilgili arayüzleri günceller.
  * @returns {Promise<void>} İşlem tamamlandığında boş bir Promise döndürür.
+ * @tablo gorev_log (okuma), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme)
  */
 async function detayIptal(){
   if(!_curTaskDet) return;
@@ -9389,6 +9431,7 @@ let _drugsCache = [];
  * Ayrıca drug_product_id'si olmayan ancak geçerli kategorilere sahip eski stok kalemlerini
  * fallback olarak ekler ve sonucu güncel stok miktarına göre azalan sırada sıralar.
  * @returns {Promise<Array>} İlaç bilgilerini içeren dizi.
+ * @tablo drug_classes (tazeleme), drug_products (tazeleme), stok_hareket (tazeleme), stok (tazeleme)
  */
 async function loadDrugsCache() {
   if (!_drugsCache.length) {
@@ -9480,6 +9523,7 @@ async function renderCasesForAnimal(animalId) {
  * ve tedavi zaman çizelgesini render eder.
  * @param {string} caseId - Detayları gösterilecek vakanın benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo drug_administrations (tazeleme), islem_log (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function openCaseDet(caseId) {
   const cases    = await idbGetAll('cases');
@@ -9856,6 +9900,7 @@ function caseDaySaatAc(dayId, currentTime) {
  * @param {string} dayId Güncellenecek günün ID'si.
  * @returns {Promise<void>} İşlem tamamlandığında boş bir Promise döndürür.
  * @rpc update_treatment_time
+ * @tablo treatment_days (tazeleme)
  */
 async function caseDaySaatKaydet(dayId) {
   const timeVal = document.getElementById('saat-input')?.value;
@@ -9874,6 +9919,7 @@ async function caseDaySaatKaydet(dayId) {
  * @param {string} dayId Tamamlanacak tedavi gününün ID'si.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülür.
  * @rpc treatment_day_tamamla
+ * @tablo gorev_log (tazeleme), treatment_days (tazeleme)
  */
 async function caseDayTamamla(dayId) {
   const btn = event?.target;
@@ -9923,6 +9969,7 @@ function caseDayNotAc(dayId, mevcutNot) {
  * @param {string} dayId Güncellenecek günün ID'si.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülür.
  * @rpc treatment_day_not_guncelle
+ * @tablo treatment_days (tazeleme)
  */
 async function caseDayNotKaydet(dayId) {
   const not = document.getElementById('not-ta')?.value?.trim() || '';
@@ -10207,6 +10254,7 @@ function _kaydirHataMesaj(msg) {
  * @param {string} gun Kaydırılacak gün sayısı (string olarak, en az 1).
  * @returns {void} İşlem tamamlandığında veya hata oluştuğunda bir değer döndürmez.
  * @rpc vaka_kalan_gunleri_kaydir
+ * @tablo gorev_log (tazeleme), islem_log (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function caseKalanGunleriKaydir(gun) {
   if (_ertelemeOfflineGuard('kaydir')) return;   // E6: offline'da RPC ÇAĞRILMAZ
@@ -10436,6 +10484,7 @@ function caseGunGirisUygula() {
  * ilaç önbelleğini yeniden yükler ve vakanın zaman çizelgesini yeniden render eder.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda void döner.
  * @rpc add_treatment_day
+ * @tablo cases (tazeleme), treatment_days (tazeleme)
  */
 async function caseGunEkleOnayla() {
   if (!_curCase) return;
@@ -11130,6 +11179,7 @@ async function caseSablonListeRender(){
  * @param {string} sablonId Uygulanacak şablonun benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc tedavi_sablon_tohumlama_gorev_ekle, tedavi_sablon_uygula
+ * @tablo cases (tazeleme), drug_administrations (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function caseSablonUygula(sablonId){
   if(!sablonId || !_curCase) return;
@@ -11214,6 +11264,7 @@ function cdtTakvimAc(){
  * @param {HTMLElement} btn Tıklanan buton elemanı; işlem başarılıysa devre dışı bırakılır, başarısızsa tekrar aktif edilir.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülür.
  * @rpc vaka_tohumlama_ekle
+ * @tablo gorev_log (tazeleme)
  */
 async function caseTohumlamaEkleOnayla(btn) {
   if (!_curCase) return;
@@ -11380,6 +11431,7 @@ function cdfDrugSec() {}
  * @param {HTMLElement} btn Kayıt işlemi tetiklenen buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülür.
  * @rpc add_drug_administration
+ * @tablo drug_administrations (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_days (tazeleme)
  */
 async function caseDrugKaydet(btn) {
   if (!_activeDayId) return;
@@ -11459,6 +11511,7 @@ async function caseDrugKaydet(btn) {
  * @param {number|string} adminId - Silinecek ilaç uygulama kaydının kimliği.
  * @returns {Promise<void>} Hiçbir değer döndürmez.
  * @rpc remove_drug_administration
+ * @tablo drug_administrations (tazeleme), stok_hareket (tazeleme), stok (tazeleme)
  */
 async function caseDrugSil(adminId) {
   if (!confirm('Bu ilaç kaydı silinsin mi?')) return;
@@ -11475,6 +11528,7 @@ async function caseDrugSil(adminId) {
  * @param {string|number} dayId - Silinecek tedavi gününün kimliği.
  * @returns {Promise<void>} İşlem tamamlanınca çözülen Promise; hiçbir değer döndürmez.
  * @rpc delete_treatment_day
+ * @tablo cases (tazeleme), drug_administrations (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function caseDaySil(dayId) {
   if (!confirm('Bu tedavi gunu ve icindeki tum ilaclar silinecek. Emin misin?')) return;
@@ -11540,6 +11594,7 @@ function caseDrugDuzenle(btn) {
  * @param {number|string} adminId Güncellenecek kayıt için admin kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @rpc update_drug_administration
+ * @tablo drug_administrations (tazeleme), stok_hareket (tazeleme), stok (tazeleme)
  */
 async function caseDrugDuzenleKaydet(adminId) {
   const dose = Number.parseFloat(document.getElementById('ded-dose')?.value);
@@ -11563,6 +11618,7 @@ async function caseDrugDuzenleKaydet(adminId) {
  * Kullanıcı onayı alındıktan sonra mevcut vakayı kapatır, ilgili tabloları günceller ve vaka detaylarını yeniden açar.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda undefined döndürür.
  * @rpc close_case
+ * @tablo cases (tazeleme), diseases (tazeleme), kizginlik_log (tazeleme)
  */
 async function caseKapat() {
   if (!_curCase) return;
@@ -12387,6 +12443,7 @@ function _openInsemIntercept(hayvan,bekliyor){
  * @param {string} hayvanId İşaretlenmek istenen hayvanın ID'si.
  * @returns {void} İşlem başarılı veya başarısız olduğunda kullanıcıya bildirim gösterir.
  * @rpc tohumlama_sonuc_gebe
+ * @tablo tohumlama (okuma)
  */
 async function openGebelikEkle(hayvanId){
   const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvanId);
@@ -12440,6 +12497,7 @@ function setTheme(mode) {
  * Ayarlar sayfasını açarak hekim, vaccine, padok listelerini ve grup eşleştirmelerini render eder,
  * protokol ayarlarını yeniler, tema durumuna göre buton stillerini senkronize eder ve modalı açar.
  * @returns {void} Fonksiyon bir değer döndürmez.
+ * @tablo protokol_ayar (okuma), protokol_ayar (tazeleme)
  */
 function ayarlarAc(){
   renderAyarlarHekimList();
@@ -12820,6 +12878,7 @@ async function dataTrafficSil(qid){
 /**
  * Ayarlar ekranındaki hekim listesini veritabanından (yoksa varsayılan hekimlerden) çekerek oluşturur ve varsayılan hekimi işaretler.
  * @returns {Promise<void>} Hiçbir değer döndürmez; liste doğrudan DOM'a yazılır.
+ * @tablo hekimler (okuma)
  */
 async function renderAyarlarHekimList(){
   const el=document.getElementById('ay-hekim-list'); if(!el) return;
@@ -12833,6 +12892,7 @@ async function renderAyarlarHekimList(){
 /**
  * Aşı listesini getirir, boş ise uyarı gösterir; dolu ise her aşı için tekrar aralığı seçeneği içeren HTML bloğunu oluşturur.
  * @returns {void}
+ * @tablo vaccines (okuma)
  */
 async function renderAyarlarVaccineList(){
   const el=document.getElementById('ay-vaksiyon-list'); if(!el) return;
@@ -12864,6 +12924,7 @@ async function renderAyarlarVaccineList(){
  * @param {*} val - Yeni rapel gün sayısı; boş string ise null olarak kaydedilir, değilse tam sayıya çevrilir.
  * @returns {Promise<void>} İşlem tamamlanınca çözülen, değer döndürmeyen promise.
  * @rpc vaccine_rapel_guncelle
+ * @tablo vaccines (tazeleme)
  */
 async function vaccineRapelGuncelle(vaccineId,val){
   const days=val===''?null:parseInt(val);
@@ -12884,6 +12945,7 @@ function ayarlarHekimEkle(){ document.getElementById('ay-hekim-form').style.disp
  * Ayarlar formundan girilen ad ve telefon bilgisiyle yeni hekim kaydı oluşturur; kayıt sonrası hekim listelerini ve seçim alanlarını yeniler.
  * @returns {Promise<void>} İşlem tamamlanırken bir değer döndürmez; hata durumunda bildirim gösterip çıkar.
  * @rpc hekim_ekle
+ * @tablo hekimler (tazeleme)
  */
 async function ayarlarHekimKaydet(){
   const ad=v('ay-hek-ad').trim(); if(!ad) return;
@@ -12907,6 +12969,7 @@ let _hekimPeriodDays = 'all';
  * Belirtilen ID'ye sahip hekimin detaylarını getirir ve ilgili UI elemanlarını günceller.
  * @param {string} id - Aranan hekimin benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo hekimler (okuma)
  */
 async function hekimDetAc(id) {
   const hekimler = await getData('hekimler');
@@ -12939,6 +13002,7 @@ function hekimPeriod(days, e) {
 /**
  * Seçili hekimin tohumlama ve doğum kayıtlarından istatistik kartını (toplam tohumlama, gebelik oranı, gebe/doğum sayısı ve sperma kullanımı dökümü) render eder.
  * @returns {Promise<void>} İşlem tamamlandığında hiçbir değer döndürmez.
+ * @tablo dogum (okuma), tohumlama (okuma)
  */
 async function renderHekimStats() {
   const el = g('hk-stats');
@@ -13018,6 +13082,7 @@ async function renderHekimStats() {
  * Hekim detay formundaki verileri alıp günceller, tabloyu yeniler ve ilgili listeleri günceller.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda undefined döndürür.
  * @rpc hekim_guncelle
+ * @tablo hekimler (tazeleme)
  */
 async function hekimDetKaydet() {
   if (!_curHekimDet) return;
@@ -13039,6 +13104,7 @@ async function hekimDetKaydet() {
  * Mevcut seçili hekim detayını kullanarak ilgili kaydı siler, tabloyu günceller ve arayüzü yeniden render eder.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda undefined döndürür.
  * @rpc hekim_sil
+ * @tablo hekimler (tazeleme)
  */
 async function hekimDetSil() {
   if (!_curHekimDet) return;
@@ -13065,6 +13131,7 @@ async function hekimDetSil() {
  * Padok listesini getirip HTML olarak 'ay-padok-list' elementine render eder.
  * Eğer padok listesi boşsa, 'Henüz padok tanımlı değil' mesajını gösterir.
  * @returns {void}
+ * @tablo padoklar (okuma)
  */
 async function renderAyarlarPadokList(){
   const el=document.getElementById('ay-padok-list'); if(!el) return;
@@ -13084,6 +13151,7 @@ let _curPadokDet=null;
  * Verilen ID'ye sahip padok detayını getirir ve ilgili DOM elementlerini günceller.
  * @param {string} id Padokun benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo padoklar (okuma)
  */
 async function padokDuzenleAc(id){
   const padoklar=await getData('padoklar');
@@ -13100,6 +13168,7 @@ async function padokDuzenleAc(id){
  * Padok detayını doğrulayıp sunucuya gönderir, tabloyu yeniler ve ilgili arayüzleri günceller.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda undefined döndürür.
  * @rpc padok_guncelle
+ * @tablo padoklar (tazeleme)
  */
 async function padokDuzenleKaydet(){
   if(!_curPadokDet) return;
@@ -13123,6 +13192,7 @@ async function padokDuzenleKaydet(){
  * başarılı silme sonrası ilgili tabloları ve arayüz bileşenlerini yeniler.
  * @returns {Promise<void>} Herhangi bir değer döndürmez.
  * @rpc padok_sil
+ * @tablo grup_padok_eslem (tazeleme), hayvanlar (okuma), padoklar (tazeleme)
  */
 async function padokSilOnay(){
   if(!_curPadokDet) return;
@@ -13720,6 +13790,7 @@ function _btEtiketleriBir() {
  *
  * @returns {Promise<void>} İşlem tamamlandığında çözülen bir promise döndürür; anlamlı bir değer döndürmez.
  * @rpc padok_degistir_toplu
+ * @tablo gorev_log (tazeleme), hayvanlar (tazeleme), islem_log (tazeleme)
  */
 async function btTransferOnayla() {
   if (!_btModalSecilenIds.length || !_btHedefPadokId) return;
@@ -13795,6 +13866,7 @@ async function btTransferOnayla() {
  * Verilen padok ID'sine ait padok detaylarını getirir, ilgili DOM elementlerini günceller ve hayvan listesini render eder.
  * @param {number|string} id Padokun benzersiz kimlik numarası.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo padoklar (okuma)
  */
 async function padokDetayAc(id) {
   const padoklar = await getData('padoklar');
@@ -13815,6 +13887,7 @@ async function padokDetayAc(id) {
  * Belirtilen padok ID'sine ait aktif hayvanları getirir, filtreleme uygular ve HTML listesi olarak render eder.
  * @param {string} padokId - Filtrelenmesi istenen padokun benzersiz kimlik numarası.
  * @returns {void} Fonksiyon yanıt döndürmez, DOM elementini günceller.
+ * @tablo hayvanlar (okuma)
  */
 async function renderPadokHayvanlar(padokId) {
   const el = document.getElementById('pd-hayvan-listesi');
@@ -13898,6 +13971,7 @@ function padokTopluTasi() {
 /**
  * Kaynak padok ID'si hariç diğer tüm padokları filtreleyip seçici listesine ekler.
  * @returns {void}
+ * @tablo padoklar (okuma)
  */
 async function _pdTransferAcSelector() {
   const sel = document.getElementById('pt-select');
@@ -13918,6 +13992,7 @@ async function _pdTransferAcSelector() {
  * İşlem başarılı veya başarısız olduğunda kullanıcıya bildirim gösterir ve tabloyu yeniler.
  * @returns {Promise<void>} İşlem tamamlandığında boş bir Promise döndürür.
  * @rpc padok_degistir, padok_degistir_toplu
+ * @tablo hayvanlar (tazeleme)
  */
 async function padokTransferOnayla() {
   const sel = document.getElementById('pt-select');
@@ -13961,6 +14036,7 @@ async function padokTransferOnayla() {
  * Padok ve grup-padok eşleşme verilerini getirerek, 'ay-grup-padok-list' elementine padok seçim kutucukları içeren HTML oluşturur.
  * Eğer padok listesi boşsa, kullanıcıya uyarı mesajı gösterir.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo grup_padok_eslem (okuma), padoklar (okuma)
  */
 async function renderGrupPadokEslem(){
   const el=document.getElementById('ay-grup-padok-list'); if(!el) return;
@@ -13989,6 +14065,7 @@ async function renderGrupPadokEslem(){
  * @param {HTMLInputElement} checkbox - value özelliği padok kimliğini içeren checkbox öğesi.
  * @returns {Promise<void>} İşlem tamamlandığında hiçbir değer döndürmez.
  * @rpc grup_padok_eslem_toggle
+ * @tablo grup_padok_eslem (tazeleme)
  */
 async function grupPadokCheckbox(grup, checkbox){
   const padokId=checkbox.value;
@@ -14009,6 +14086,7 @@ function ayarlarPadokEkle(){ document.getElementById('ay-padok-form').style.disp
  * ilgili tabloyu günceller, formu gizler ve padok listesini yeniden render eder.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda undefined döndürür.
  * @rpc padok_ekle
+ * @tablo padoklar (tazeleme)
  */
 async function ayarlarPadokKaydet(){
   const ad=v('ay-padok-ad').trim(); if(!ad){ toast('Padok adı boş olamaz',true); return; }
@@ -14044,6 +14122,7 @@ async function bildirimIzniAl(){
 /**
  * Bildirim izni kontrol edilir ve bugün/yarın tarihlerinde tamamlanmamış, iptal edilmemiş, üst görevi olmayan görevler için bildirim gösterilir. Gösterilen bildirimlerin kaydı tutularak tekrar gösterilmesini önler ve eski kayıtları temizler.
  * @returns {Promise<void>} İşlem tamamlandığında boş Promise döndürür.
+ * @tablo gorev_log (okuma)
  */
 async function bildirimKontrol(){
   if(!('Notification' in window)||Notification.permission!=='granted') return;
@@ -14465,6 +14544,7 @@ function seansAddSaatSec(h, btn) {
  * @param {*} seansId - Silinecek seansın kimliği.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise.
  * @rpc remove_treatment_session
+ * @tablo drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function seansSilTekil(seansId) {
   const dayId = _seansAddCtx?.dayId;
@@ -14518,6 +14598,7 @@ function seansDuzenleAc(seansId) {
  * @param {*} btn - Kaydetme sırasında devre dışı bırakılan ve metni '…' olarak değiştirilen buton öğesi.
  * @returns {Promise<void>} Güncelleme tamamlandığında çözülen bir Promise. Doğrulama hatasında uyarı gösterip hiçbir şey döndürmez.
  * @rpc update_treatment_session
+ * @tablo drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function seansDuzenleKaydet(seansId, btn) {
   const time = document.getElementById('sd-time-' + seansId)?.value;
@@ -14556,6 +14637,7 @@ async function seansDuzenleKaydet(seansId, btn) {
  * @param {HTMLElement} btn Tıklanma tetikleyicisi olarak kullanılan buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında veya hata oluştuğunda çözülen bir Promise.
  * @rpc add_sessions_to_existing_day
+ * @tablo drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function caseSeansEkleKaydet(btn) {
   if (!_seansAddCtx || !_curCase) return;
@@ -14645,6 +14727,7 @@ async function caseErkenKapatToggle() {
  * Erken kapatma onay butonuna tıklandığında vakayı kapatır, kalan seansları iptal eder ve ilaçları stoğa iade eder.
  * @param {HTMLElement} btn Buton elemanı; işlem sırasında devre dışı bırakılır ve işlem tamamlandıktan sonra tekrar aktif hale getirilir.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo cases (tazeleme), drug_administrations (tazeleme), gorev_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 function caseErkenKapatOnayla(btn) {
   if (!_curCase) return;
@@ -14676,6 +14759,7 @@ let _asiDisSearch = '';
  * Belirtilen aşı ID'si verildiğinde aşı düzenleme formunu doldurur veya yoksa yeni aşı ekleme formunu başlatır.
  * @param {string} vaccineId Düzenlenecek aşı için ID, yoksa yeni aşı ekleme işlemi için null.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo diseases (okuma), vaccine_diseases (okuma), vaccine_protocol_steps (okuma), vaccines (okuma)
  */
 async function openAsiEkle(vaccineId){
   const diseases = await getData('diseases') || [];
