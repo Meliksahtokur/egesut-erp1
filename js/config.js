@@ -62,6 +62,7 @@ let PADOKLAR = [];
 /**
  * Padok listesi ile grup-padok eşleme verilerini paralel olarak yükler; grup bazlı padok adı haritasını global değişkenlere aktarır. Veri boşsa veya hata oluşursa mevcut değerler korunur.
  * @returns {Promise<void>} İşlem tamamlandığında çözülen bir Promise; anlamlı bir değer döndürmez.
+ * @tablo grup_padok_eslem (okuma), padoklar (okuma)
  */
 async function loadPadokConfig() {
   try {
@@ -87,6 +88,7 @@ async function loadPadokConfig() {
 /**
  * Veritabanından hekimleri çeker ve HEKIMLER küresel değişkenine id ve ad alanlarıyla eşleştirilmiş bir dizi olarak atar.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo hekimler (okuma)
  */
 async function loadHekimlerFromDB() {
   try {

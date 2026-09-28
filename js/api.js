@@ -909,6 +909,7 @@ let _realtimeChannel = null;
  * ERP tablosundaki değişiklikleri dinleyerek ilgili tabloları günceller ve kullanıcı arayüzünü (UI) gerçek zamanlı olarak yeniler.
  * Bağlantı durumu (SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT) kontrol edilerek arka plan senkronizasyonu (polling) başlatılır veya durdurulur.
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
+ * @tablo dogum (tazeleme), gorev_log (tazeleme), hayvanlar (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), protokol_ayar (tazeleme), stok_hareket (tazeleme), stok (tazeleme), tohumlama (tazeleme)
  */
 function initRealtime() {
   if (_realtimeChannel) return; // zaten başlatıldı
