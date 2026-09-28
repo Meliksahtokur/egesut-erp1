@@ -1,6 +1,7 @@
 {
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "espree": "^11.2.0",
     "fast-check": "^4.8.0",
     "supabase": "^2.76.16"
   },
@@ -20,7 +21,8 @@
     "test:local": "PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080/ playwright test",
     "test:demo": "PLAYWRIGHT_DEMO_MODE=1 playwright test",
     "test:docker": "docker run --rm -v \"$PWD\":/work -w /work mcr.microsoft.com/playwright:v1.58.2-noble npx playwright test",
-    "test:docker:demo": "docker run --rm -e PLAYWRIGHT_DEMO_MODE=1 -v \"$PWD\":/work -w /work mcr.microsoft.com/playwright:v1.58.2-noble npx playwright test"
+    "test:docker:demo": "docker run --rm -e PLAYWRIGHT_DEMO_MODE=1 -v \"$PWD\":/work -w /work mcr.microsoft.com/playwright:v1.58.2-noble npx playwright test",
+    "etiket:kontrol": "node scripts/etiket-tazelik.mjs"
   },
   "repository": {
     "type": "git",
