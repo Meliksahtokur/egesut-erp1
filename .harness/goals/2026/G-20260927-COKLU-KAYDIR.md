@@ -1,3 +1,58 @@
+---
+id: G-20260927-COKLU-KAYDIR
+status: done
+owner: Melik Şah Tokur
+flow: Full mode, subagent-driven development
+created: 2026-09-27
+base_sha: d737c1d710aa050adc8f96eadb8279bf40175513
+launch_sha: d737c1d710aa050adc8f96eadb8279bf40175513
+branch: toplu-işlemler-ui-pratik-degil
+worktree: /home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil
+plan_report: docs/plans/2026-09-27-coklu-kaydirma-PLAN.md
+report: .harness/reports/2026-09-27-coklu-kaydir.md
+write_manifest:
+  - .harness/goals/2026/G-20260927-COKLU-KAYDIR.md
+  - supabase/migrations/20260927000001_vaka_kalan_gunleri_kaydir_coklu.sql
+  - js/api.js
+  - js/ui.js
+  - js/forms.js
+  - index.html
+  - tests/unit/coklu-kaydir-ui.test.js
+  - tests/unit/vaka-toplu-ac.test.js
+  - .harness/references/rpc-reference.md
+  - .harness/reports/2026-09-27-coklu-kaydir.md
+  - docs/plans/2026-09-27-coklu-kaydirma-SPEC.md
+  - docs/plans/2026-09-27-coklu-kaydirma-PLAN.md
+docs_authority:
+  tracked_paths:
+    write: []
+    append:
+      - .harness/references/rpc-reference.md
+  local_paths:
+    write:
+      - .superpowers/sdd/2026-09-27-coklu-kaydirma-PLAN/progress.md
+    append: []
+  db: write
+  propose_only:
+    - prod DB apply (20260927000001_vaka_kalan_gunleri_kaydir_coklu.sql)
+pattern_refs:
+  - FORM-SUBMIT-01
+  - MODAL-ROUTER-01
+  - RPC-WRITE-01
+  - TESTING-01
+acceptance:
+  - bash scripts/db-validate.sh supabase/migrations/20260927000001_vaka_kalan_gunleri_kaydir_coklu.sql → PASS
+  - npm run test:unit → all PASS (erteleme-kaydir-ui regresyonu dahil)
+  - glmf-max demo browser run 8-item list (plan Task 6 Step 4) → all PASS
+stop_conditions:
+  - prod DB apply, merge, push, deploy ayrı sahip kapılarıdır — asla otomatik yapılmaz
+checkpoint:
+  sequence: 8
+  kind: final
+  head: 563ac05
+  docs_verdict: PASS
+---
+
 # G-20260927-COKLU-KAYDIR — Multi-case treatment shift (F1)
 
 - **id:** G-20260927-COKLU-KAYDIR
