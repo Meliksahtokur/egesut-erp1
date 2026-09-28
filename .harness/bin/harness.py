@@ -1345,6 +1345,53 @@ def parse_surface_arguments(values: Iterable[str]) -> dict[str, str]:
 TRAILER_RE = re.compile(r"^(Docs-Update|Tests):\s*(PASS|PARTIAL|FAIL)\s*$", re.MULTILINE)
 
 
+def _etiket_tazelik_uyari(root: Path, staged_js: list[str]) -> tuple[list[dict[str, Any]], str]:
+    """Staged js/ dosyalarında @rpc/@tablo/@olay etiket tazeliğini denetle.
+
+    UYARI katmanıdır: commit'i ENGELLEMEZ (WARNING, ok hesabına ERROR gibi girmez).
+    Betik yoksa / node yoksa / betik çökerse sessiz geçiş yerine gürültülü WARNING basar.
+    Dönüş: (findings, özet satırı)
+    """
+    script = root / "scripts" / "etiket-tazelik.mjs"
+    ozet = ""
+    if not script.is_file():
+        return (
+            [finding("ETIKET_TAZELIK_SKIPPED", "WARNING", "scripts/etiket-tazelik.mjs",
+                     "denetleyici betiği yok; etiket tazelik uyarısı koşulamadı")],
+            ozet,
+        )
+    try:
+        proc = subprocess.run(
+            ["node", str(script), "--dosya", *staged_js],
+            cwd=str(root), capture_output=True, text=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return (
+            [finding("ETIKET_TAZELIK_SKIPPED", "WARNING", "scripts/etiket-tazelik.mjs",
+                     f"etiket tazelik denetimi koşulamadı (node kurulu mu?): {exc}")],
+            ozet,
+        )
+    for line in proc.stdout.splitlines():
+        if line.startswith("payda "):
+            ozet = line.strip()
+    kotu = [line.strip() for line in proc.stdout.splitlines() if line.strip().startswith("[HATALI]")]
+    if proc.returncode not in (0, 1):
+        return (
+            [finding("ETIKET_TAZELIK_SKIPPED", "WARNING", "scripts/etiket-tazelik.mjs",
+                     f"etiket tazelik denetleyicisi hata ile çıktı (rc={proc.returncode}): "
+                     f"{proc.stderr.strip()[:200]}")],
+            ozet,
+        )
+    if proc.returncode == 1 or kotu:
+        detay = "; ".join(kotu[:3]) + (f" (+{len(kotu) - 3} satır)" if len(kotu) > 3 else "")
+        return (
+            [finding("ETIKET_TAZELIK_MISMATCH", "WARNING", "js/",
+                     f"etiket-gövde uyumsuzluğu (engellemez): {ozet or 'özet yok'} — {detay}")],
+            ozet,
+        )
+    return ([], ozet)
+
+
 def commit_gate(
     root: Path,
     *,
@@ -1383,6 +1430,15 @@ def commit_gate(
             )
         )
     staged = current_changed_paths(root, "staged")
+    etiket_js = [
+        p for p in staged
+        if p.startswith("js/") and p.endswith(".js")
+        and "/_archive/" not in p and not p.endswith(".bak.js")
+    ]
+    etiket_ozet = ""
+    if etiket_js:
+        etiket_bulgulari, etiket_ozet = _etiket_tazelik_uyari(root, etiket_js)
+        findings.extend(etiket_bulgulari)
     if goal is not None:
         manifest = goal.get("write_manifest") if isinstance(goal.get("write_manifest"), list) else []
         for path in staged:
@@ -1427,6 +1483,7 @@ def commit_gate(
         "receipt_path": str(receipt_path),
         "pre_commit_hook": hook_state,
         "staged_paths": staged,
+        "etiket_tazelik": etiket_ozet,
     }
 
 
