@@ -4303,6 +4303,11 @@ let _detEpoch=0;
 let _detAraSayac=0;           // epoch başına ara çizim sayacı — cap ≤2 (A7/A16 mekanik garanti)
 let _detTazeleTimer=null;     // t1 — trailing debounce timer'ı
 let _detNihaiTimer=null;      // t2 — cap dolunca onaylı nihai çizim timer'ı
+// t1/t2 kurulurkenki generation/epoch (FIX-R1 H-01): callback kuyruğa girdikten
+// sonra kart kapanıp yeniden açılabilir — callback başında kurulma anındaki bağlam
+// güncelle karşılaştırılır (yalnız '_detAcik()' stale callback'i ayıramaz).
+let _detTimerGen=0;
+let _detTimerEpoch=0;
 // let bilinçli: testler vm.runInContext('_DET_TAZELE_DEBOUNCE_MS = 5') ile hızlandırır
 let _DET_TAZELE_DEBOUNCE_MS=250;
 // Kartın GERÇEK okuma evreni (SPEC §3.3, R1-H01) — tek sabit, kaynak gruplarıyla:
@@ -4341,31 +4346,36 @@ function _detAciksaTazele(requested, ok, failed, detInternal){
   if(kesisen(failed)) return;                   // bastırma predicate'i (R1-H02/A14)
   if(!kesisen(ok)) return;                      // çizim predicate'i (R6/A8)
   clearTimeout(_detTazeleTimer); clearTimeout(_detNihaiTimer);
+  _detTimerGen=_detGen; _detTimerEpoch=_detEpoch; // H-01: kurulma anı bağlamı yakalanır
   _detTazeleTimer=setTimeout(_detTazeleFire, _DET_TAZELE_DEBOUNCE_MS);
 }
 /**
  * Debounce (t1) fire: kart açıkken ara çizim yapar; cap doluysa (epoch başına ≤2)
- * onaylı nihai çizim timer'ını (t2) kurar. Tekrar-doğrulama: kart kapandıysa çizilmez.
+ * onaylı nihai çizim timer'ını (t2) kurar. Tekrar-doğrulama: kart kapandıysa VEYA
+ * kurulma anından sonra generation/epoch geçiştiyse çizilmez (H-01 — kuyruğa girmiş
+ * stale callback, yeni kartın DOM'una dokunamaz).
  * @returns {void}
  */
 function _detTazeleFire(){
   _detTazeleTimer=null;
-  if(!_detAcik()) return;                       // timer guard (R1-H04/A15)
+  if(_detTimerGen!==_detGen || _detTimerEpoch!==_detEpoch || !_detAcik()) return; // H-01 + A15
   if(_detAraSayac<2){
     ++_detAraSayac;
     openDet(_detOpenId, true);
   } else {
     clearTimeout(_detNihaiTimer);
+    _detTimerGen=_detGen; _detTimerEpoch=_detEpoch; // t2 de kurulduğu anki bağlamla damgalanır
     _detNihaiTimer=setTimeout(_detTazeleNihai, _DET_TAZELE_DEBOUNCE_MS);
   }
 }
 /**
  * Nihai çizim (t2 fire): epoch başına son trailing çizim — nihai doğruluk garantisi (R1/A7).
+ * Tekrar-doğrulama t1 ile aynı: scheduled gen/epoch + kart açık şartı (H-01).
  * @returns {void}
  */
 function _detTazeleNihai(){
   _detNihaiTimer=null;
-  if(!_detAcik()) return;
+  if(_detTimerGen!==_detGen || _detTimerEpoch!==_detEpoch || !_detAcik()) return; // H-01 + A15
   openDet(_detOpenId, true);
 }
 // 🏥 Hasta tag'ine bağlı dinamik hastalık filtresi (T2):
@@ -4809,6 +4819,10 @@ function _detGecmisGunBannerGuncelle(){
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  */
 async function _detRenderGecmis(id,el,opts){
+  // FIX-R1 H-02: opsiyonel opts.gen devam-guard'ı — openDet kendi myGen'ini geçirir;
+  // her await sonrası ve her DOM/içerik yazımı öncesi doğrulanır. guard'sız çağıranlar
+  // (gecmisDetGunSec/gecmisDetGunKapat gunKoru yolu) mevcut davranışı korur.
+  const _bayat=()=>!!(opts && typeof opts.gen==='number' && opts.gen!==_detGen);
   if(!(opts&&opts.gunKoru)) _detGecmisGun=null; // yeni kart açılışı gün süzmesini sıfırlar
   _detGecmisCtx={id,el};
   el.innerHTML='<div class="loader"><div class="spin"></div></div>';
@@ -4818,6 +4832,7 @@ async function _detRenderGecmis(id,el,opts){
     // TG1-W3: seçili gün varsa gün hattı (olayGunu + gün politikaları + DEDUP,
     // hayvan kapsamıyla) — defter hattı aynen korunur.
     const sources=await _gecmisCollectSources();
+    if(_bayat()) return; // H-02: askı sırasında kart değişti — devamlı B'nin DOM'una yazamaz
     // W3: kart takviminin işaretli günleri — hayvan kapsamlı küme (ek pull yok)
     if(typeof _gmGunKumesiFromSources==='function') _detGecmisGunKumesi=_gmGunKumesiFromSources(sources,{animalId:id});
     const entries=_detGecmisGun
@@ -4880,7 +4895,7 @@ async function _detRenderGecmis(id,el,opts){
     <div id="det-gecmis-body"></div>`;
     _detGecmisGunBannerGuncelle();
     _renderDetGecmisList('');
-  } catch(e){ el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; }
+  } catch(e){ if(!_bayat()) el.innerHTML=`<div class="empty">⚠️ ${esc(e.message)}</div>`; } // H-02: stale catch DOM'A YAZMAZ
 }
 
 // ──────────────────────────────────────────
@@ -4894,9 +4909,14 @@ async function _detRenderGecmis(id,el,opts){
  * @param {Object} a Render edilecek hayvanın veri nesnesi.
  * @param {Array} vaxLogs Hayvanın aşı uygulama geçmişi.
  * @param {Array} uygulamaLogs Hayvanın hızlı ilaç/vitamin uygulama geçmişi.
+ * @param {Object} [ctx] Opsiyonel devam bağlamı (FIX-R1 H-02) — {gen: myGen} verilirse
+ *   her await sonrası ve DOM yazımı öncesi guard koşar; verilmezse mevcut davranış korunur.
  * @returns {void} Elementin innerHTML'i güncellenir, değer döndürmez.
  */
-async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygulamaLogs=[]){
+async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygulamaLogs=[],ctx){
+  // FIX-R1 H-02: askı sırasında generation geçiştiyse bu helper'ın DOM devamı B'nin
+  // kartına yazamaz — openDet'in çağrı-sonrası guard'ı buraya taşınır.
+  const _bayat=()=>!!(ctx && typeof ctx.gen==='number' && ctx.gen!==_detGen);
   const activeCaseChips=activeCases.length
     ?`<div style="margin-bottom:8px;display:flex;flex-wrap:wrap;gap:6px">`+activeCases.map(c=>{
         const dis=allDiseasesList.find(d=>d.id===c.disease_id);
@@ -4904,6 +4924,7 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
       }).join('')+`</div>`
     :'';
   const _caseListHtml=await renderCasesForAnimal(a.id);
+  if(_bayat()) return; // H-02: await-sonrası devam guard'ı
   const vaxButton = `<div style="padding:6px 0 6px;display:grid;grid-template-columns:1fr 1fr;gap:6px">
     <button class="btn btn-g" style="padding:9px" data-kupe="${escAttr(a.kupe_no||a.devlet_kupe||a.id)}" onclick="openMWithHayvan('m-disease','d-hid',this.dataset.kupe)">🏥 Vaka Aç</button>
     <button class="btn btn-g" style="padding:9px" data-kupe="${escAttr(a.kupe_no||a.devlet_kupe||a.id)}" onclick="openMWithHayvan('m-vaccine','v-hid',this.dataset.kupe)">💉 Aşı Uygula</button>
@@ -4912,6 +4933,7 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
 
   // Sonraki aşı chip'i
   const vaccines = await idbGetAll('vaccines');
+  if(_bayat()) return; // H-02: await-sonrası devam guard'ı
   const vaxMap = {};
   vaccines.forEach(v => vaxMap[v.id] = v);
   const nextDueVax = vaxLogs
@@ -4957,6 +4979,7 @@ async function _detSaglikRender(el,activeCases,allDiseasesList,a,vaxLogs=[],uygu
   
   // Hızlı uygulama geçmişi
   const stokList = await idbGetAll('stok');
+  if(_bayat()) return; // H-02: son await guard'ı — innerHTML yazımı bundan sonra
   const uygulamaHtml = uygulamaLogs.length ? `<div style="margin-top:12px;border-top:2px solid var(--card3);padding-top:8px">
     <div style="font-size:.7rem;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">💉 Hızlı Uygulamalar</div>
     ${uygulamaLogs.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||'')).map(u => {
@@ -5075,7 +5098,10 @@ async function openDet(id, keepTab){
     document.getElementById('tab-ozet').innerHTML=_detOzetHtml(a,births,diseases,tasks,subs,yavrular,yasRaw,yasGun,displayId);
 
     const allDiseasesList=await idbGetAll('diseases');
-    await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a,vaxLogs,uygulamaLogs);
+    // H-02: myGen alt helper'lara geçirilir — helper içi await'ler askıda kalırken
+    // kart değişirse helper'ın DOM devamı kendi guard'ıyla durur (çağrı-sonrası
+    // guard tek başına helper İÇİ yazımı kapatamıyordu).
+    await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a,vaxLogs,uygulamaLogs,{gen:myGen});
     if(myGen!==_detGen) return; // DOM yazım bloğu öncesi son devam-guard'ı (§3.4)
 
     document.getElementById('tab-ureme').innerHTML=_detUremeHtml(a,tohs,kizgs);
@@ -5083,9 +5109,9 @@ async function openDet(id, keepTab){
     document.getElementById('tab-gorev').innerHTML=_detGorevHtml(a,tasks,subs,today);
 
     const gecmisEl=document.getElementById('tab-gecmis');
-    if(gecmisEl) await _detRenderGecmis(id,gecmisEl);
+    if(gecmisEl) await _detRenderGecmis(id,gecmisEl,{gen:myGen});
 
-  } catch(e){ document.getElementById('det-name').textContent='Hata: '+e.message; }
+  } catch(e){ if(myGen===_detGen) document.getElementById('det-name').textContent='Hata: '+e.message; } // H-02: stale catch DOM'A YAZMAZ
 }
 /**
  * 'det' elementinden 'on' sınıfını kaldırarak detay görünümünü kapatır.

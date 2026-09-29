@@ -31,7 +31,9 @@ const DET_EL_IDS = ['det', 'det-name', 'det-meta', 'det-chips', 'tab-ozet', 'tab
 const bekle = ms => new Promise(r => setTimeout(r, ms));
 
 // ── Sahne kurulumu ──────────────────────────────────────────────────
-function kurSahne({ hayvanFix = null } = {}) {
+// gercmisYardimcilari=true: _detRenderGecmis STUB'LANMAZ (gerçek helper koşar);
+// js/gecmis.js global'lerinin minimal test karşılıkları extra'ya girer (H-02 yarışı).
+function kurSahne({ hayvanFix = null, casesFix = null, gercmisYardimcilari = false } = {}) {
   const rec = { pulls: [], pullOpts: [], draws: [], toasts: [], refresh: [], hist: [], showTab: [], pedigree: [], pushState: [], rpcs: [], ozet: [] };
   const document = makeDomStub();
   for (const id of DET_EL_IDS) document.__setEl(id, makeElement('div'));
@@ -45,8 +47,30 @@ function kurSahne({ hayvanFix = null } = {}) {
   const hayvanlar = hayvanFix || [
     { id: 'H-1', kupe_no: 'KUPE-1', durum: 'Aktif', irk: 'Holstein', padok: 'P1', dogum_tarihi: '2023-01-15', cinsiyet: 'Dişi' },
   ];
-  const veri = { hayvanlar, cases: [], tohumlama: [], dogum: [], gorev_log: [], kizginlik_log: [], uygulama_log: [], vaccination_log: [] };
+  const veri = { hayvanlar, cases: casesFix || [], tohumlama: [], dogum: [], gorev_log: [], kizginlik_log: [], uygulama_log: [], vaccination_log: [] };
   const pullKontrol = { beklet: false, coz: null };
+  // FIX-R1 H-02: idbGetAll çağrı kontrolü — plan(tab, çağrıNo) true dönerse O çağrı
+  // askıda tutulur (bekleyen haritasında coz/patlat ile); helper içi yarışlar bunu
+  // kullanır. plan yoksa eski davranış: her çağrı anında [] çözer.
+  const idbKontrol = { plan: null, bekleyen: new Map(), sayac: new Map() };
+  const idbGetAll = (tab) => {
+    const n = (idbKontrol.sayac.get(tab) || 0) + 1;
+    idbKontrol.sayac.set(tab, n);
+    if (idbKontrol.plan && idbKontrol.plan(tab, n)) {
+      return new Promise((coz, patlat) => { idbKontrol.bekleyen.set(`${tab}#${n}`, { coz, patlat }); });
+    }
+    return Promise.resolve([]);
+  };
+  const gecmisEkstra = gercmisYardimcilari ? {
+    // js/gecmis.js global'leri — gerçek _detRenderGecmis sandbox'ta koşsun diye
+    // minimal, deterministik test karşılıkları (A'ya işaretli kayıt, B'ye boş):
+    _gmEntriesFromSources: (sources, scope) => (scope && scope.animalId === 'A')
+      ? [{ type: 'islem', data: { id: 'A-GECMIS' } }]
+      : [],
+    _gecmisSearchText: e => `ar-${e.type}`,
+    _gecmisEntryHtml: e => `<div class="gm-stub">${(e.data && e.data.id) || '?'}</div>`,
+    _gmSearch: entries => entries,
+  } : {};
 
   const sahne = loadBrowserModule('js/ui.js', {
     dom: document,
@@ -58,13 +82,14 @@ function kurSahne({ hayvanFix = null } = {}) {
       getState: k => (k === 'animals' ? veri.hayvanlar : null),
       bugun, esc, escAttr, fmtTarih, fmtTarihSaat,
       getData: async (tab, pred) => (veri[tab] || []).filter(pred),
-      idbGetAll: async () => [],
+      idbGetAll,
       rpc: async (name, args) => { rec.rpcs.push({ name, args }); return { ok: true }; },
       pullTables: async (t, opts) => {
         rec.pulls.push(t); rec.pullOpts.push(opts || null);
         if (pullKontrol.beklet) return new Promise(res => { pullKontrol.coz = () => res({ ok: [...t], failed: [] }); });
         return { ok: [...t], failed: [] };
       },
+      ...gecmisEkstra,
     },
   });
   const { sandbox } = sahne;
@@ -72,11 +97,11 @@ function kurSahne({ hayvanFix = null } = {}) {
   // monkeypatch kaydediciler
   sandbox.showTab = (...a) => { rec.showTab.push(a); };
   sandbox.pedigreeSetFocus = (...a) => { rec.pedigree.push(a); };
-  sandbox._detRenderGecmis = async (...a) => { rec.hist.push(a); };
+  if (!gercmisYardimcilari) sandbox._detRenderGecmis = async (...a) => { rec.hist.push(a); };
   sandbox._islemSonrasiRefresh = async () => { rec.refresh.push(1); };
   sandbox._detOzetHtml = (...a) => { rec.ozet.push(a[0] && a[0].id); return '<ozet-stub>'; };
   sandbox.history.pushState = (...a) => { rec.pushState.push(a); };
-  return { sandbox, document, rec, veri, pullKontrol, window: sahne.window };
+  return { sandbox, document, rec, veri, pullKontrol, idbKontrol, window: sahne.window };
 }
 
 // Kartı GERÇEK openDet ile açar (_detOpenId + det.on kurulur), sonra kanca
@@ -281,4 +306,129 @@ test('temiz-01: hızlı uygulama akışı doğrudan openDet ÇAĞIRMAZ — _isle
   assert.strictEqual(rec.rpcs.filter(r => r.name === 'hizli_uygulama').length, 1, 'hizli_uygulama rpc bir kez');
   assert.strictEqual(rec.refresh.length, 1, '_islemSonrasiRefresh çağrıldı (pull seti evren içi — kanca çizer)');
   assert.strictEqual(rec.draws.length, 0, 'doğrudan openDet YOK (çifte çizim temizliği)');
+});
+
+// ── FIX-R1 (luna review R1 bulguları) ───────────────────────────────
+// H-01: t1/t2 timer callback'leri kurulma anındaki generation/epoch'u doğrulamalı.
+// closeDet/openDet(keepTab=false) timer'ı temizler; ama keepTab=true yerinde tazeleme
+// (T3'ün forms yolu: abortKaydet/hayvanNotEkle → openDet(id, _detAcik())) gen'i
+// ARTIRIRken timer'ı TEMİZLEMEZ — deadline'ı geçmiş callback eski gen bağlamıyla
+// koşar. Node'da timer cancel-until-started olduğundan (clearTimeout çalışma
+// başlayana kadar iptal eder) tarayıcı giriş-kuyruk yarışı burada birebir
+// simüle edilemez; gen sapması aynı guard'ı deterministik koşturur — guard'ın
+// kendisi (scheduledGen===_detGen && scheduledEpoch===_detEpoch && _detAcik())
+// her iki düzende de aynı kapıdır.
+
+test('timer-01 (H-01): t1 askıdayken gen artarsa (keepTab=true tazeleme) callback çizmemeli', async () => {
+  const sahne = kurSahne();
+  const { sandbox, rec } = sahne;
+  const { gercek } = await kartAc(sahne); // gen=G, epoch=E; openDet→spy
+  sandbox._detAciksaTazele(['hayvanlar'], ['hayvanlar'], [], false); // t1 kuruldu, scheduledGen=G
+  await gercek('H-1', true); // keepTab=true: gen=G+1 — t1 temizlenmez
+  await bekle(40); // t1 deadline geçer, callback koşar
+  assert.strictEqual(rec.draws.length, 0,
+    'stale gen\'li t1 callback\'i kart açık olsa bile ÇİZMEMELİ (H-01)');
+});
+
+test('timer-02 (H-01): t2 (nihai) askıdayken gen artarsa nihai çizim düşmeli', async () => {
+  const sahne = kurSahne();
+  const { sandbox, rec } = sahne;
+  const { gercek } = await kartAc(sahne);
+  sandbox._detAciksaTazele(['hayvanlar'], ['hayvanlar'], [], false); await bekle(30); // ara 1
+  sandbox._detAciksaTazele(['hayvanlar'], ['hayvanlar'], [], false); await bekle(30); // ara 2
+  // cap dolu: 3. pull'un t1'i fire edince t2 kurulur (+5ms). 7ms'lik test bekleyişi
+  // heap sırasıyla t1-fire (5ms) SONRASI, t2-fire (10ms) ÖNCESİ uyanır — gen artışı
+  // tam t2'nin askıdaki penceresine düşer (debounce=5, kurSahne).
+  sandbox._detAciksaTazele(['hayvanlar'], ['hayvanlar'], [], false);
+  await new Promise(r => setTimeout(r, 7));
+  await gercek('H-1', true); // gen artar — t2 temizlenmez (keepTab=true yolu timer'ı silmez)
+  await bekle(40); // t2 deadline geçer, callback koşar
+  assert.strictEqual(rec.draws.length, 2,
+    'stale gen\'li t2 nihai çizimi düşmeli — yalnız 2 ara çizim kalmalı (H-01)');
+});
+
+// ── FIX-R1 H-02: async alt-render yardımcılarının DOM yazımları guard kapsamına ──
+// openDet'in kendi guard'ları (myGen) _detSaglikRender/_detRenderGecmis ÇAĞRISINDAN
+// sonraya geliyor; helper kendi await'inden sonra doğrudan DOM'a yazıyor. Gerçek
+// helper'lar (stub'sız) + planlı idbGetAll askılarıyla: A askıdayken B tamamlanır,
+// A'nın devamı B'nin DOM'una YAZAMAMALI; stale catch de DOM'A YAZMAMALI.
+
+const IKI_HAYVAN = [
+  { id: 'A', kupe_no: 'A-KUPE', durum: 'Aktif', irk: 'Holstein', padok: 'P1', dogum_tarihi: '2023-01-15', cinsiyet: 'Dişi' },
+  { id: 'B', kupe_no: 'B-KUPE', durum: 'Aktif', irk: 'Holstein', padok: 'P2', dogum_tarihi: '2023-02-20', cinsiyet: 'Dişi' },
+];
+
+test('race-02 (H-02): gerçek _detSaglikRender askıdayken B çizer — A\'nın devamı tab-saglik\'e yazamaz', async () => {
+  const sahne = kurSahne({
+    hayvanFix: IKI_HAYVAN,
+    casesFix: [{ id: 'C-A', animal_id: 'A', status: 'active', disease_id: 'D1' }], // yalnız A'nın vaka chip'i
+  });
+  const { sandbox, document, idbKontrol } = sahne;
+  idbKontrol.plan = (tab, n) => tab === 'cases' && n === 1; // A: renderCasesForAnimal askıda
+  const pA = sandbox.openDet('A');
+  await bekle(10);
+  assert.strictEqual(document.getElementById('det-name').textContent, 'A-KUPE',
+    'A senkron bloğunu yazdı, helper await\'inde askıda');
+  await sandbox.openDet('B'); // B tamamlanır — gen artar
+  assert.strictEqual(document.getElementById('det-name').textContent, 'B-KUPE', 'B çizildi');
+  const bIcerik = document.getElementById('tab-saglik').innerHTML;
+  assert.ok(!bIcerik.includes('C-A'), 'B içeriğinde A izi yok');
+  idbKontrol.bekleyen.get('cases#1').coz([]); // A'nın askısı çözülür
+  await pA;
+  await bekle(10);
+  const son = document.getElementById('tab-saglik').innerHTML;
+  assert.ok(!son.includes('C-A'), 'A\'nın stale helper devamı tab-saglik\'e yazamaz (H-02)');
+  assert.strictEqual(son, bIcerik, 'B içeriği aynen korunur');
+});
+
+test('race-03 (H-02): gerçek _detRenderGecmis askıdayken B çizer — A\'nın gecmis devamı yazamaz', async () => {
+  const sahne = kurSahne({ hayvanFix: IKI_HAYVAN, gercmisYardimcilari: true });
+  const { sandbox, document, idbKontrol } = sahne;
+  idbKontrol.plan = (tab, n) => tab === 'gorev_log' && n === 1; // A: _gecmisCollectSources askıda
+  const pA = sandbox.openDet('A');
+  await bekle(10);
+  assert.ok(document.getElementById('tab-gecmis').innerHTML.includes('loader'),
+    'A loader yazdı, collect await\'inde askıda');
+  await sandbox.openDet('B'); // B tamamlanır — gen artar
+  const bIcerik = document.getElementById('tab-gecmis').innerHTML;
+  assert.ok(bIcerik.includes('Kayıt yok'), 'B gecmis içeriği yerleşti');
+  idbKontrol.bekleyen.get('gorev_log#1').coz([]); // A'nın collect'i çözülür (A için kayıt var)
+  await pA;
+  await bekle(10);
+  const son = document.getElementById('tab-gecmis').innerHTML;
+  assert.ok(son.includes('Kayıt yok'), 'A\'nın stale gecmis devamı B içeriğini EZEMEZ (H-02)');
+  assert.strictEqual(son, bIcerik, 'tab-gecmis B içeriğiyle aynı kalır');
+});
+
+test('race-04 (H-02): stale _detRenderGecmis catch DOM\'a yazmaz — hata güncel akışta basılır', async () => {
+  const sahne = kurSahne({ hayvanFix: IKI_HAYVAN, gercmisYardimcilari: true });
+  const { sandbox, document, idbKontrol } = sahne;
+  idbKontrol.plan = (tab, n) => tab === 'gorev_log' && n === 1;
+  const pA = sandbox.openDet('A');
+  await bekle(10);
+  await sandbox.openDet('B');
+  const bIcerik = document.getElementById('tab-gecmis').innerHTML;
+  idbKontrol.bekleyen.get('gorev_log#1').patlat(new Error('idb-patlat')); // A'nın collect'i PATLAR
+  await pA;
+  await bekle(10);
+  const son = document.getElementById('tab-gecmis').innerHTML;
+  assert.ok(!son.includes('idb-patlat'), 'stale catch DOM\'a hata YAZMAMALI (H-02: stale catch DOM\'a yazmaz)');
+  assert.strictEqual(son, bIcerik, 'B içeriği korunur');
+});
+
+test('race-05 (H-02): stale openDet catch det-name\'i ezemez', async () => {
+  const sahne = kurSahne({ hayvanFix: IKI_HAYVAN, casesFix: [{ id: 'C-A', animal_id: 'A', status: 'active', disease_id: 'D1' }] });
+  const { sandbox, document, idbKontrol } = sahne;
+  idbKontrol.plan = (tab, n) => tab === 'vaccines' && n === 1; // A: _detSaglikRender 2. await'i askıda
+  const pA = sandbox.openDet('A');
+  await bekle(10);
+  assert.strictEqual(document.getElementById('det-name').textContent, 'A-KUPE', 'A helper içinde askıda');
+  await sandbox.openDet('B');
+  assert.strictEqual(document.getElementById('det-name').textContent, 'B-KUPE', 'B çizildi');
+  idbKontrol.bekleyen.get('vaccines#1').patlat(new Error('asipatla')); // A helper'ı PATLAR
+  await pA; // openDet catch'ine düşer
+  await bekle(10);
+  const isim = document.getElementById('det-name').textContent;
+  assert.ok(!isim.includes('asipatla'), 'stale openDet catch DOM\'a hata YAZMAMALI (hata yalnız güncel akışta basılır)');
+  assert.strictEqual(isim, 'B-KUPE', 'det-name B içeriğini korur');
 });

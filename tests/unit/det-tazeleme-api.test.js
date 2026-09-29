@@ -40,6 +40,16 @@ function fromChain(result = { data: [], error: null }) {
   return chain;
 }
 
+// M-01: await edildiğinde REJECT eden from zinciri — fetcher'ın {data,error}
+// dönmediği, Promise'i düştüğü gerçek tarz (ağ kopması/istisna vb.).
+function rejectingChain(err) {
+  const chain = {
+    select: () => chain, eq: () => chain, order: () => chain, limit: () => chain,
+    then: (res, rej) => Promise.reject(err).then(res, rej),
+  };
+  return chain;
+}
+
 // api.test.js:45-62 makeClient kalıbı (rpc bu testte kullanılmamalı)
 function makeClient({ fromHandler } = {}) {
   const calls = { createClient: [], from: [] };
@@ -187,4 +197,27 @@ test('hook-05: tek argümanlı mevcut çağrı — çalışır, kanca detInterna
   assert.deepStrictEqual(Array.from(failed), []);
   assert.strictEqual(detInternal, false, 'opts verilmediğinde false');
   assert.strictEqual(rec.kanca.calls[0].length, 4, 'kanca 4 argümanla çağrılır');
+});
+
+// ── hook-06 (FIX-R1 M-01): fetcher Promise REJECTION da failed setine düşer ──
+// hook-02 yalnız {data:null,error:{message}} dönüş biçimini ölçüyordu; fetcher
+// Promise'i düştüğünde Promise.all run'u düşürüyor, failed seti ve kanca oluşmuyordu.
+// SPEC §3.1: tablo hatası run'u reject etmez — rejection da aynı kapıdan failed'a
+// girer, run RESOLVE olur, kanca üçlüyü taşır ("fetcher rejection = tam red" ayrımı YOK).
+
+test('hook-06 (M-01): fetcher Promise REJECT eder — run RESOLVE, kanca failed içinde o tabloyu taşır', async () => {
+  const t = ['hayvanlar', 'gorev_log'];
+  const { sandbox, rec } = loadApi({
+    fromHandler: (table) => table === 'hayvan_durum_view' // 'hayvanlar' fetcher'ının kaynağı
+      ? rejectingChain(new Error('kabul-koptu'))
+      : fromChain({ data: [{ id: 'g1' }], error: null }),
+  });
+  const sonuc = await sandbox.pullTables(t).catch(e => ({ __reject: String((e && e.message) || e) }));
+  await settle();
+
+  assert.ok(!sonuc.__reject, `rejection run'u düşürmemeli — reject sebebi: ${sonuc.__reject}`);
+  assert.deepStrictEqual(Array.from(sonuc.ok), ['gorev_log'], 'başarılı tablo ok\'ta');
+  assert.deepStrictEqual(Array.from(sonuc.failed), ['hayvanlar'], 'REJECT eden tablo failed setinde (bastırma predicate\'ini bu besler)');
+  assert.strictEqual(rec.kanca.calls.length, 1, 'kanca yine çağrıldı (run resolve — kancaya üçlü taşınır)');
+  assert.deepStrictEqual(Array.from(rec.kanca.calls[0][2]), ['hayvanlar'], 'kanca failed üçlüsü rejection\'ı içerir');
 });

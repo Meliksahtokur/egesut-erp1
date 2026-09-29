@@ -772,7 +772,14 @@ async function _pullTablesNow(tables = []) {
     // store'ları yoktu (TABLES dışı), ilk pullTables çağrısında NotFoundError
     // patlatırlardı; çağıranları yok (m-insem doğrudan db.from kullanıyor)
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
-    const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
+    // FIX-R1 M-01: fetcher Promise REJECT'i de tablo hatası sayılır — rejection
+    // run'u düşürmez, her fetcher kendi promise'ine bağlı catch ile {data:null,error}
+    // biçimine dönüşür ve aşağıdaki döngüde failed setine girer (SPEC §3.1: tablo
+    // hatası run'u reject etmez; kanca üçlüyü taşır). Promise.resolve().then(...)
+    // fetcher'ın senkron fırlatmasını da aynı kapıya alır.
+    const results = await Promise.all(uniq.map(t =>
+      Promise.resolve().then(FETCHERS[t]).catch(error => ({ data: null, error }))
+    ));
     let hataSayisi = 0;
     // kart-tazeleme T1: FETCHERS döngüsünün yapısı değişmedi — yalnız set
     // toplama eklendi (ok = fetch+IDB yazımı başarılı; failed = fetcher hatası).
