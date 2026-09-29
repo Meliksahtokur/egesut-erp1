@@ -74,9 +74,25 @@ test('v23c nitelikli + bilinen çıplak tablo birlikte: satır DOĞRULANAMADI (d
 
 test('v23c K7 kolü koşar ve adsizEkleme yolunu yakalar (sentetik fixture; gerçek ağaçta aday yok)', () => {
   const s = kirmiziKos(['@rpc a_rpci'], `return rpc('a_rpci');`);
-  assert.ok(s.ham.includes('K7'), 'çıktıda K7 kolu yok: ' + s.ham);
-  assert.ok(s.ham.includes('YAKALANDI'), 'K7 YAKALANDI değil: ' + s.ham);
+  // v23d (D2 — dış review Önemli-2): pin KOL-SPESİFİK — 'YAKALANDI' metni K1'in satırından
+  // da gelebilir; K7'nin KENDİ satırında aranır, aksi halde K7 bozulsa test yeşil kalır
+  const k7 = s.ham.split('\n').find(l => l.includes('K7'));
+  assert.ok(k7, 'çıktıda K7 kolu yok: ' + s.ham);
+  assert.ok(k7.includes('YAKALANDI'), 'K7 satırı YAKALANDI değil: ' + k7);
   assert.strictEqual(s.exit, 0, 'kırmızı kontrol exit 0 olmalı: ' + s.ham + s.hata);
+});
+
+test('v23d K7 gerçek ağaçta sabitlenir: kol satırı YAKALANDI + özet 7 canlı/7 kol/0 ATLANDI + exit 0', () => {
+  const sonuc = spawnSync('node', [KAPI, '--kirmizi'], { encoding: 'utf8', timeout: TIMEOUT_MS });
+  if (sonuc.error) assert.fail(`kapı ${TIMEOUT_MS} ms içinde dönmedi: ${sonuc.error.code || sonuc.error.message}`);
+  const ham = sonuc.stdout || '';
+  const k7 = ham.split('\n').find(l => l.includes('K7'));
+  assert.ok(k7, 'gerçek ağaç koşumunda K7 kolu yok: ' + ham.slice(-400));
+  assert.ok(k7.includes('YAKALANDI'), 'K7 gerçek ağaçta YAKALANDI değil: ' + k7);
+  assert.ok(
+    ham.includes('kırmızı kontrol: YAKALANDI (7 canlı kol / 7 kol, 0 ATLANDI)'),
+    'özet sözleşmesi (7 canlı / 7 kol / 0 ATLANDI) bozuldu: ' + ham.split('\n').filter(l => l.includes('kırmızı kontrol')).join(' | '));
+  assert.strictEqual(sonuc.status, 0, 'gerçek ağaç kırmızı kontrol exit 0 olmalı');
 });
 
 test('v23c ATLANDI kolu sayaca görünür: çıktı canlı/kol/ATLANDI ayrımını taşır', () => {
