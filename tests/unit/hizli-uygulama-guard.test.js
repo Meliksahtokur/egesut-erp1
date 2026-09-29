@@ -91,7 +91,7 @@ test('guard-03: validasyon erken dönüşü butonu kilitlemez', async () => {
   assert.strictEqual(btn.disabled, false, 'validasyon dönüşü butonu kilitlememeli');
 });
 
-test('guard-04: hayvan kartı hızlı uygulaması — aynı koruma + success akışı', async () => {
+test('guard-04: hayvan kartı hızlı uygulaması — aynı koruma + tazeleme sözleşmesi (kanca çizer, doğrudan openDet yok)', async () => {
   let bırak;
   const { sandbox, btn, rec } = loadScene({
     rpcImpl: () => new Promise(res => { bırak = () => res({ ok: true }); }),
@@ -102,7 +102,11 @@ test('guard-04: hayvan kartı hızlı uygulaması — aynı koruma + success ak�
   assert.strictEqual(rec.rpcs.length, 1, 'ikinci rpc AÇILMAMALI');
   bırak();
   await p1;
-  assert.strictEqual(rec.openDet.length, 1, 'success sonrası hayvan kartı yeniden açılmalı');
+  // kart-tazeleme T2b (SPEC §4 çifte çizim temizliği): success sonrası doğrudan
+  // openDet ÇAĞRILMAZ — _islemSonrasiRefresh'in pull seti kart evreni İÇİDİR;
+  // kart açıksa _detAciksaTazele kancası yerinde tazeler, kapalıysa maliyet sıfır.
+  assert.strictEqual(rec.refresh.length, 1, 'success sonrası _islemSonrasiRefresh çağrılır');
+  assert.strictEqual(rec.openDet.length, 0, 'doğrudan openDet YOK (çifte çizim temizliği — kanca çizer)');
   assert.strictEqual(btn.disabled, false);
 });
 
