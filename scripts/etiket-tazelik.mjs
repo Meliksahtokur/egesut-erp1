@@ -108,14 +108,21 @@ function etiketCoz(comment) {
     if (tip === 'rpc') {
       satir.adlar = govde.split(',').map(s => s.trim()).filter(Boolean);
       // v2.3: koşullu çift işareti — yalnız SON adın sonundaki '(koşullu)' eki soyulur
-      // (etiket çıkarıcısı atlas-etiket'in yazdığı tek biçim; satır.kosullu bilgi amaçlı)
+      // (etiket çıkarıcısı atlas-etiket'in yazdığı tek biçim; satır.kosullu bilgi amaçlı).
+      // v2.3b: eki adı boşaltırsa (ör. '@rpc a, (koşullu)') sessiz filtre YOK — adsizEkleme
+      // bayrağı HATALI hüküm verir (fail-closed; test: etiket-tazelik-v23b.test.js)
       const son = satir.adlar[satir.adlar.length - 1];
       if (son && son.endsWith('(koşullu)')) {
-        satir.adlar[satir.adlar.length - 1] = son.slice(0, -'(koşullu)'.length).trim();
-        satir.kosullu = true;
+        const soyulan = son.slice(0, -'(koşullu)'.length).trim();
+        if (soyulan) {
+          satir.adlar[satir.adlar.length - 1] = soyulan;
+          satir.kosullu = true;
+        } else {
+          satir.adsizEkleme = true;
+        }
       }
       satir.adlar = satir.adlar.filter(Boolean);
-      if (satir.adlar.length === 0) satir.dogrulanamadiSorun = `tanınmayan @rpc satırı (ad yok): ${ham.trim()}`;
+      if (satir.adlar.length === 0 && !satir.adsizEkleme) satir.dogrulanamadiSorun = `tanınmayan @rpc satırı (ad yok): ${ham.trim()}`;
     } else if (tip === 'tablo') {
       satir.girisler = [];
       for (const g of govde.split(', ')) {
@@ -151,6 +158,7 @@ function govdeOlc(fnDugumu) {
   const rpcler = new Set();
   const olaylar = new Set();
   const tablolar = new Map(); // tablo -> Set(islem|null)
+  const belirsizYardimci = []; // v2.3b: tam tanınmayan yardımcı girdileri (sessiz atlama yasak)
   function yuru(dugum) {
     if (!dugum || typeof dugum.type !== 'string') return;
     if (dugum.type === 'CallExpression') {
@@ -164,7 +172,12 @@ function govdeOlc(fnDugumu) {
       } else if (ad === 'rpc' && deger !== null) {
         rpcler.add(deger);
       } else if (ad === 'rpc') {
-        // v2.3-KA1: ternary literal çifti — iki dal da kaydedilir (atlas.mjs ile birebir)
+        // v2.3-KA1: ternary literal çifti — iki dal da kaydedilir (atlas.mjs ile birebir).
+        // v2.3b SINIR (bilinçli, değişmez): yalnız derinlik-1 ConditionalExpression, iki dalı
+        // da string literal. İç-ice ternary ve `||` fallback tanınmaz — atlas.mjs sözleşmesi
+        // birebir korunur (kapı genişletmeden motor genişlemez). Tanınmayan biçim EKSİK
+        // üretmez; etiket satırı o adı yazıyorsa FAZLA → HATALI'a düşer (sessiz-yeşil yok).
+        // Bu sınırı sabitleyen test: tests/unit/etiket-tazelik-v23b.test.js (SABİT kümesi).
         const kosul = ilkArg && ilkArg.type === 'ConditionalExpression'
           ? [ilkArg.consequent, ilkArg.alternate].map(x => x && x.type === 'Literal' && typeof x.value === 'string' ? x.value : null)
           : null;
@@ -175,15 +188,24 @@ function govdeOlc(fnDugumu) {
         olaylar.add(deger);
       } else if (TABLO_YARDIMCILARI.has(ad) && dugum.callee.type === 'Identifier') {
         // v2.3-KA2: dolaylı tablo erişimi — getData('t') → okuma;
-        // pullTables/_pullTablesNow(['a','b']) dizi literal → tazeleme (atlas.mjs ile birebir)
+        // pullTables/_pullTablesNow(['a','b']) dizi literal → tazeleme (atlas.mjs ile birebir).
+        // v2.3b: string-olmayan eleman/literal-olmayan girdi SESSİZ ATLANMAZ — çağrının tablo
+        // kümesi bilinemez → belirsizYardimci'ye yazılır, @tablo satırı DOĞRULANAMADI olur
+        // (atlas bunu dinamik.tablo olarak görünür kılar; kapı sessiz kalamaz).
         const islem = TABLO_YARDIMCILARI.get(ad);
         const a0 = dugum.arguments[0];
         const adaylar = a0 && a0.type === 'ArrayExpression' ? a0.elements
-          : a0 && a0.type === 'Literal' && typeof a0.value === 'string' ? [a0] : [];
-        for (const el of adaylar) {
-          if (el && el.type === 'Literal' && typeof el.value === 'string') {
-            if (!tablolar.has(el.value)) tablolar.set(el.value, new Set());
-            tablolar.get(el.value).add(islem);
+          : a0 && a0.type === 'Literal' && typeof a0.value === 'string' ? [a0] : null;
+        if (adaylar === null) {
+          belirsizYardimci.push(`${ad}(...) literal-olmayan girdi — tablo kümesi bilinemez`);
+        } else {
+          for (const el of adaylar) {
+            if (el && el.type === 'Literal' && typeof el.value === 'string') {
+              if (!tablolar.has(el.value)) tablolar.set(el.value, new Set());
+              tablolar.get(el.value).add(islem);
+            } else {
+              belirsizYardimci.push(`${ad}([...]) dizi literalinde string olmayan eleman — tablo kümesi bilinemez`);
+            }
           }
         }
       } else if (ISLEMLER.has(ad)) {
@@ -211,16 +233,23 @@ function govdeOlc(fnDugumu) {
     }
   }
   yuru(fnDugumu);
-  return { rpcler, olaylar, tablolar };
+  return { rpcler, olaylar, tablolar, belirsizYardimci };
 }
 
 // Bir etiket satırını gövde ölçümüyle karşılaştır -> sorun listesi
 function karsilastir(satir, govde) {
   const sorunlar = [];
   if (satir.tip === 'rpc') {
+    if (satir.adsizEkleme) sorunlar.push('FAZLA: (koşullu) eki adı boşalttı — adsız koşullu ad');
     for (const a of satir.adlar) if (!govde.rpcler.has(a)) sorunlar.push(`FAZLA: gövdede rpc('${a}') yok`);
     for (const a of govde.rpcler) if (!satir.adlar.includes(a)) sorunlar.push(`EKSİK: rpc('${a}') etikette yok`);
   } else if (satir.tip === 'tablo') {
+    // v2.3b: belirsiz yardımcı girdisi varken FAZLA/EKSİK hükmü kanıtlanamaz (tanınmayan
+    // kısım o tabloyu taşıyor olabilir) — karşılaştırma yapılmaz, satır DOĞRULANAMADI
+    if ((govde.belirsizYardimci || []).length > 0) {
+      for (const b of govde.belirsizYardimci) sorunlar.push(`BELİRSİZ: ${b}`);
+      return sorunlar;
+    }
     for (const g of satir.girisler) {
       if (!govde.tablolar.has(g.tablo)) sorunlar.push(`FAZLA: gövdede .from('${g.tablo}') yok`);
       else if (g.islem && !govde.tablolar.get(g.tablo).has(g.islem)) {
