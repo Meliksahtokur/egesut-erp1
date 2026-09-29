@@ -3999,8 +3999,10 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
+      // kart-tazeleme T2: doğrudan openDet KALDIRILDI (çifte çizim temizliği) —
+      // _islemSonrasiRefresh'in pull seti (uygulama_log/stok_hareket) kart evreni
+      // İÇİDİR; kart açıksa kanca yerinde tazeler, kapalıysa maliyet sıfır.
       _islemSonrasiRefresh();
-      openDet(hayvanId, true);
     } else {
       toast(res?.mesaj || 'Hata', true);
     }
@@ -4289,6 +4291,83 @@ document.addEventListener('click',e=>{
 });
 let _fchip={cinsiyet:'hepsi',gebelik:null,saglik:null,kisir:null,tekrar:null,grup:null,dogum:null};
 let _detOpenId=null;
+// ── kart-tazeleme T2 (SPEC v6 §3.2/§3.3/§3.4) — açık kart (#det) tazeleme durumu ──
+// _detGen: devam-sahiplik token'ı — HER openDet girişinde artırılır (ara tazelemeler
+// dahil); tüm async devam noktalarında myGen!==_detGen ise eski devam DOM'a yazamaz
+// (aynı-ID close/reopen yarışı dahil — R2-M01).
+let _detGen=0;
+// _detEpoch: kartın açık dönemi (cap/batch sınırı) — yalnız closeDet ve yeni açılışta
+// (keepTab=false yolu) artar; yerinde tazeleme (keepTab=true) DEĞİŞTİRMEZ (R5-M01:
+// _detGen'den AYRI kavram; epoch değişince _detAraSayac sıfırlanır).
+let _detEpoch=0;
+let _detAraSayac=0;           // epoch başına ara çizim sayacı — cap ≤2 (A7/A16 mekanik garanti)
+let _detTazeleTimer=null;     // t1 — trailing debounce timer'ı
+let _detNihaiTimer=null;      // t2 — cap dolunca onaylı nihai çizim timer'ı
+// let bilinçli: testler vm.runInContext('_DET_TAZELE_DEBOUNCE_MS = 5') ile hızlandırır
+let _DET_TAZELE_DEBOUNCE_MS=250;
+// Kartın GERÇEK okuma evreni (SPEC §3.3, R1-H01) — tek sabit, kaynak gruplarıyla:
+//   openDet pull+getData evreni: hayvanlar, cases, diseases, dogum, gorev_log,
+//     tohumlama, kizginlik_log, uygulama_log, vaccination_log, vaccines, drugs,
+//     drug_products, drug_classes
+//   _detRenderGecmis → _gecmisCollectSources evreni: islem_log, stok_hareket,
+//     treatment_days, drug_administrations, protokol_instance, stok
+// openDet okuma grafiği değişirse bu sabit birlikte güncellenir.
+const _DET_TABLOLAR=['hayvanlar','cases','diseases','dogum','gorev_log','tohumlama','kizginlik_log','uygulama_log','vaccination_log','vaccines','drugs','drug_products','drug_classes','islem_log','stok_hareket','treatment_days','drug_administrations','protokol_instance','stok'];
+window.__detSayac={openDet:0,epoch:0}; // test/demo oracle'ı (A1/A7/A16)
+/**
+ * Hayvan kartının (#det) açık olup olmadığını söyler — 'on' sınıfı VE aktif kart kimliği şart.
+ * Task 3 (forms.js) kart-zaten-açık keepTab kararında da kullanır.
+ * @returns {boolean} Kart açıksa true.
+ */
+function _detAcik(){
+  const el=document.getElementById('det');
+  return !!(el && el.classList && el.classList.contains('on') && _detOpenId);
+}
+/**
+ * pullTables run sonu kancası (T1 kontratı): kart açıkken kartın okuma evrenine
+ * giren tablolar başarıyla tazelendiyse trailing-edge debounce ile yerinde tazeleme
+ * planlar. İçsel pull (detInternal) yok sayılır; kesişen tablo hatası flush'ı
+ * bastırır (bayat IDB ile çizim = silent-success); evren-dışı tablo çizdirmez.
+ * @param {Array} requested pullTables'a verilen tablolar (kontrat taşır — karar ok/failed üzerinedir).
+ * @param {Array} ok fetch+IDB yazımı başarılı tablolar.
+ * @param {Array} failed fetcher hatası veren tablolar.
+ * @param {boolean} detInternal run openDet'in kendi pull'uysa true.
+ * @returns {void}
+ */
+function _detAciksaTazele(requested, ok, failed, detInternal){
+  if(detInternal) return;                       // openDet'in kendi pull'u (R2-M02)
+  if(!_detAcik()) return;                       // R5: kart kapalıyken sıfır maliyet
+  const kesisen=arr => !!(arr||[]).some(t => _DET_TABLOLAR.includes(t));
+  if(kesisen(failed)) return;                   // bastırma predicate'i (R1-H02/A14)
+  if(!kesisen(ok)) return;                      // çizim predicate'i (R6/A8)
+  clearTimeout(_detTazeleTimer); clearTimeout(_detNihaiTimer);
+  _detTazeleTimer=setTimeout(_detTazeleFire, _DET_TAZELE_DEBOUNCE_MS);
+}
+/**
+ * Debounce (t1) fire: kart açıkken ara çizim yapar; cap doluysa (epoch başına ≤2)
+ * onaylı nihai çizim timer'ını (t2) kurar. Tekrar-doğrulama: kart kapandıysa çizilmez.
+ * @returns {void}
+ */
+function _detTazeleFire(){
+  _detTazeleTimer=null;
+  if(!_detAcik()) return;                       // timer guard (R1-H04/A15)
+  if(_detAraSayac<2){
+    ++_detAraSayac;
+    openDet(_detOpenId, true);
+  } else {
+    clearTimeout(_detNihaiTimer);
+    _detNihaiTimer=setTimeout(_detTazeleNihai, _DET_TAZELE_DEBOUNCE_MS);
+  }
+}
+/**
+ * Nihai çizim (t2 fire): epoch başına son trailing çizim — nihai doğruluk garantisi (R1/A7).
+ * @returns {void}
+ */
+function _detTazeleNihai(){
+  _detNihaiTimer=null;
+  if(!_detAcik()) return;
+  openDet(_detOpenId, true);
+}
 // 🏥 Hasta tag'ine bağlı dinamik hastalık filtresi (T2):
 // seçenekler aktif vakalardan (cases status='active' + diseases) türetilir,
 // kontrol yalnız hasta tag aktifken görünür.
@@ -4928,7 +5007,17 @@ function _detGorevHtml(a,tasks,subs,today){
  * @tablo cases (okuma), cases (tazeleme), diseases (tazeleme), dogum (okuma), drug_classes (tazeleme), drug_products (tazeleme), drugs (tazeleme), gorev_log (okuma), gorev_log (tazeleme), hayvanlar (okuma), kizginlik_log (okuma), kizginlik_log (tazeleme), tohumlama (okuma), uygulama_log (okuma), uygulama_log (tazeleme), vaccination_log (okuma), vaccination_log (tazeleme), vaccines (tazeleme)
  */
 async function openDet(id, keepTab){
+  // kart-tazeleme T2 (§3.4): myGen = devam-sahiplik token'ı — her çağrıda artar;
+  // tüm async devam noktalarında doğrulanır (aynı-ID close/reopen dahil).
+  const myGen=++_detGen;
   _detOpenId=id;
+  window.__detSayac.openDet++;
+  if(!keepTab){
+    // yeni açılış = yeni epoch: bekleyen tazeleme timer'ları söndürülür, sayaç sıfırlanır
+    clearTimeout(_detTazeleTimer); clearTimeout(_detNihaiTimer);
+    _detTazeleTimer=null; _detNihaiTimer=null;
+    _detEpoch++; window.__detSayac.epoch=_detEpoch; _detAraSayac=0;
+  }
   const activeTab = keepTab ? document.querySelector('.tab.on')?.dataset?.action?.replace('tab-','') : null;
   const curPg=getState('currentPage')||'dash';
   if (!keepTab) history.pushState({pg:curPg||'dash',det:id},'','#'+(curPg||'dash'));
@@ -4950,8 +5039,8 @@ async function openDet(id, keepTab){
   // Soy sekmesi aktifse controller yükler, değilse sekme ilk aktive olduğunda yükler.
   const _pedPane=document.getElementById('tab-pedigree');
   if (typeof pedigreeSetFocus === 'function') pedigreeSetFocus(id, !!(_pedPane && _pedPane.classList && _pedPane.classList.contains('on')));
-  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes']).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
-  if(_detOpenId!==id) return;
+  await pullTables(['cases','diseases','drugs','vaccines','vaccination_log','kizginlik_log','gorev_log','uygulama_log','drug_products','drug_classes'], {detInternal:true}).catch(e=>toast('Veri yüklenemedi: '+e.message,true));
+  if(myGen!==_detGen) return;
   try {
     const [aArr,diseases,tohs,tasks,births,subs,yavrular,activeCases,vaxLogs,kizgs,uygulamaLogs]=await Promise.all([
       getData('hayvanlar',a=>a.id===id||a.kupe_no===id||a.devlet_kupe===id),
@@ -4966,7 +5055,7 @@ async function openDet(id, keepTab){
       getData('kizginlik_log',k=>k.hayvan_id===id),
       getData('uygulama_log',u=>u.hayvan_id===id),
     ]);
-    if(_detOpenId!==id) return;
+    if(myGen!==_detGen) return;
     // K7: id/küpe referansıyla eşleşen birden çok kayıt varsa AKTİF olan önce
     const a=aArr.find(x=>x.durum==='Aktif')||aArr[0]; if(!a){ document.getElementById('det-name').textContent='Bulunamadı'; return; }
     diseases.sort((x,y)=>(y.tarih||'').localeCompare(x.tarih||''));
@@ -4987,6 +5076,7 @@ async function openDet(id, keepTab){
 
     const allDiseasesList=await idbGetAll('diseases');
     await _detSaglikRender(document.getElementById('tab-saglik'),activeCases,allDiseasesList,a,vaxLogs,uygulamaLogs);
+    if(myGen!==_detGen) return; // DOM yazım bloğu öncesi son devam-guard'ı (§3.4)
 
     document.getElementById('tab-ureme').innerHTML=_detUremeHtml(a,tohs,kizgs);
 
@@ -5003,6 +5093,13 @@ async function openDet(id, keepTab){
  * @returns {void} Fonksiyon bir değer döndürmez.
  */
 function closeDet(){
+  // kart-tazeleme T2 (§3.4/A15): bekleyen tazeleme timer'ları söndürülür, kart kimliği
+  // temizlenir, devam token'ı (gen) geçersizleşir ve dönem (epoch) kapatılır —
+  // bekleyen bir flush kartı yeniden AÇAMAZ.
+  clearTimeout(_detTazeleTimer); clearTimeout(_detNihaiTimer);
+  _detTazeleTimer=null; _detNihaiTimer=null;
+  _detOpenId=null; _detGen++; _detEpoch++; _detAraSayac=0;
+  window.__detSayac.epoch=_detEpoch;
   document.getElementById('det').classList.remove('on');
   // REV-5: sessiz sheet'inden gelindiyse sheet'i geri göster (scroll korunur);
   // hem ✕/geri butonu hem Android geri (app.js popstate det dalı) bu noktadan döner.
