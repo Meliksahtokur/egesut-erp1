@@ -22,8 +22,10 @@ function koş(jsdocSatirlari, govde) {
     `/**\n${jsdocSatirlari.map(s => ` * ${s}`).join('\n')}\n */\nfunction ornekV23(kayit){\n${govde}\n}\n`,
     'utf8');
   try {
-    // spawnSync: kapı HATALI'da exit 1 verir (sözleşme) — fırlatma yok, çıktı yine okunur
-    const sonuc = spawnSync('node', [KAPI, '--dosya', dosya], { encoding: 'utf8' });
+    // spawnSync: kapı HATALI'da exit 1 verir (sözleşme) — fırlatma yok, çıktı yine okunur.
+    // v2.3b (V23 review not 3): 15 sn timeout — kapı donarsa test KIRMIZI (sessiz bekleme yok)
+    const sonuc = spawnSync('node', [KAPI, '--dosya', dosya], { encoding: 'utf8', timeout: 15000 });
+    if (sonuc.error) assert.fail(`kapı 15 sn içinde dönmedi: ${sonuc.error.code || sonuc.error.message}`);
     const ham = sonuc.stdout || '';
     const satir = ham.split('\n').find(l => l.startsWith('payda '));
     assert.ok(satir, 'kapı çıktısında payda satırı yok: ' + ham.slice(0, 300));
