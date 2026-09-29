@@ -166,11 +166,15 @@ function govdeOlc(fnDugumu) {
   function yuru(dugum) {
     if (!dugum || typeof dugum.type !== 'string') return;
     if (dugum.type === 'CallExpression') {
-      const ad = dugum.callee.type === 'Identifier' ? dugum.callee.name
-        : dugum.callee.type === 'MemberExpression' ? propAdi(dugum.callee.property) : null;
-      // v2.3e (V23E E2): computed + literal-olmayan üye şekli — zincir son kolu için bayrak
+      // v2.3e (V23E E2 + iç review Önemli-1): computed + literal-olmayan üye şekli.
+      // Bayrak ad'den ÖNCE hesaplanır ve true iken ad null'a çekilir — aksi halde
+      // çakışma-adları bypass eder: x[from] → from-dalı fail-open kanıt üretir,
+      // x[select] → ISLEMLER kolu sessiz kalıp bayrak kolunu atlar (atlas'ta bu köşe
+      // yok: propertyAdi üye düğümü alır, bayrak-true iken ad daima null).
       const bilinmeyenComputedUye = dugum.callee.type === 'MemberExpression' && dugum.callee.computed
         && !(dugum.callee.property.type === 'Literal' && typeof dugum.callee.property.value === 'string');
+      const ad = bilinmeyenComputedUye ? null : (dugum.callee.type === 'Identifier' ? dugum.callee.name
+        : dugum.callee.type === 'MemberExpression' ? propAdi(dugum.callee.property) : null);
       const ilkArg = dugum.arguments[0];
       const deger = ilkArg && ilkArg.type === 'Literal' && typeof ilkArg.value === 'string' ? ilkArg.value : null;
       if (ad === 'from' && deger !== null) {

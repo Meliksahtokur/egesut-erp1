@@ -60,3 +60,20 @@ test('v23e kontrol kolu: bracket-string-literal davranışı değişmedi (x[\'ge
   assert.strictEqual(s.hatali, 0, s.ham);
   assert.ok(s.ham.includes('nitelikli'), s.ham);
 });
+
+// --- iç review Önemli-1: isim-çakışmalı computed şekiller de fail-closed olmalı ---
+
+test("v23e çakışma-adı: x[from]('cases') statik tablo-okuma SANILMAMALI → DOĞRULANAMADI", () => {
+  const s = koş(['@tablo cases (okuma)'],
+    `return x[from]('cases');`);
+  assert.strictEqual(s.dogrulanamadi, 1, s.ham);
+  assert.strictEqual(s.hatali, 0, s.ham);
+  assert.strictEqual(s.dogru, 0, 'fail-open köşesi: çakışma-adı kanıt üretiyor: ' + s.ham);
+});
+
+test("v23e çakışma-adı: x[select]('cases') tamamen sessiz kalmamalı → DOĞRULANAMADI", () => {
+  const s = koş(['@tablo cases (select)'],
+    `return x[select]('cases');`);
+  assert.strictEqual(s.dogrulanamadi, 1, s.ham);
+  assert.strictEqual(s.hatali, 0, s.ham);
+});
