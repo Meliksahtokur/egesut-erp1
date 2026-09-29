@@ -168,6 +168,9 @@ function govdeOlc(fnDugumu) {
     if (dugum.type === 'CallExpression') {
       const ad = dugum.callee.type === 'Identifier' ? dugum.callee.name
         : dugum.callee.type === 'MemberExpression' ? propAdi(dugum.callee.property) : null;
+      // v2.3e (V23E E2): computed + literal-olmayan üye şekli — zincir son kolu için bayrak
+      const bilinmeyenComputedUye = dugum.callee.type === 'MemberExpression' && dugum.callee.computed
+        && !(dugum.callee.property.type === 'Literal' && typeof dugum.callee.property.value === 'string');
       const ilkArg = dugum.arguments[0];
       const deger = ilkArg && ilkArg.type === 'Literal' && typeof ilkArg.value === 'string' ? ilkArg.value : null;
       if (ad === 'from' && deger !== null) {
@@ -230,6 +233,12 @@ function govdeOlc(fnDugumu) {
           }
           o = o.callee && o.callee.object;
         }
+      } else if (bilinmeyenComputedUye) {
+        // v2.3e (V23E E2 — root kararı FAIL-CLOSED): computed + literal-olmayan üye çağrısı
+        // (x[degisken](...)) yardımcı adı taşımaz; eski davranışta ad sözlükte bulunamayınca
+        // SESSİZ kalmış olacaktı. BelirsizYardimci → @tablo satırı DOĞRULANAMADI
+        // (E1 atlas ile birebir: dinamik sınıf; dot/bracket-literal yolları korunur).
+        belirsizYardimci.push(`bilinmeyen endeksli üye çağrı — tablo kümesi güvenilmez (satır ${dugum.loc.start.line})`);
       }
     }
     for (const anahtar of Object.keys(dugum)) {
