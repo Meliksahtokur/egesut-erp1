@@ -63,12 +63,19 @@ function kurSahne({ hayvanFix = null, casesFix = null, gercmisYardimcilari = fal
   };
   const gecmisEkstra = gercmisYardimcilari ? {
     // js/gecmis.js global'leri — gerçek _detRenderGecmis sandbox'ta koşsun diye
-    // minimal, deterministik test karşılıkları (A'ya işaretli kayıt, B'ye boş):
+    // minimal, deterministik test karşılıkları (A'ya işaretli kayıt, B'ye boş).
+    // DİKKAT: yalnız gecmis.js'te bildirilenler; _gecmisSearchText/_gecmisEntryHtml
+    // ui.js İÇİNDE bildirildiğinden extra'da kalsa gölgelenir — aşağıda yükleme-
+    // sonrası ezilir (FIX-R2: entries>0 yolu bunları gerçekten çağırır).
     _gmEntriesFromSources: (sources, scope) => (scope && scope.animalId === 'A')
       ? [{ type: 'islem', data: { id: 'A-GECMIS' } }]
       : [],
-    _gecmisSearchText: e => `ar-${e.type}`,
-    _gecmisEntryHtml: e => `<div class="gm-stub">${(e.data && e.data.id) || '?'}</div>`,
+    // FIX-R2 H-02R: gün-hattı yardımcıları — gunSec/gunKapat yolları gun görünümünde
+    // bunları çağırır; A'ya 2026-09-15 günü kaydı, B'ye boş (görünür ayırt edici iz).
+    _gmGunEntriesFromSources: (sources, scope) => (scope && scope.animalId === 'A')
+      ? [{ type: 'islem', data: { id: 'A-GUN' }, olayGunu: '2026-09-15' }]
+      : [],
+    _gmGunKumesiFromSources: () => new Set(),
     _gmSearch: entries => entries,
   } : {};
 
@@ -97,6 +104,16 @@ function kurSahne({ hayvanFix = null, casesFix = null, gercmisYardimcilari = fal
   // monkeypatch kaydediciler
   sandbox.showTab = (...a) => { rec.showTab.push(a); };
   sandbox.pedigreeSetFocus = (...a) => { rec.pedigree.push(a); };
+  if (gercmisYardimcilari) {
+    // ui.js kendi _gecmisSearchText (ui.js:6493) ve _gecmisEntryHtml (ui.js:6367)
+    // tanımlarını YÜKLERKEN extra stub'larını gölgeler — entries>0 yolu (gunSec/
+    // gunKapat ve dolu defter) bunları çağırdığından yükleme-sonrası ezilir.
+    sandbox._gecmisSearchText = e => `ar-${e.type}`;
+    sandbox._gecmisEntryHtml = e => `<div class="gm-stub">${(e.data && e.data.id) || '?'}</div>`;
+    // _renderDetGecmisList listeyi 'det-gecmis-body'ye yazar (stub DOM'da tab-gecmis
+    // innerHTML'i ayrı string'dir; gerçek DOM'daki iç div'in karşılığı) — kayıtlı olsun.
+    document.__setEl('det-gecmis-body', makeElement('div'));
+  }
   if (!gercmisYardimcilari) sandbox._detRenderGecmis = async (...a) => { rec.hist.push(a); };
   sandbox._islemSonrasiRefresh = async () => { rec.refresh.push(1); };
   sandbox._detOzetHtml = (...a) => { rec.ozet.push(a[0] && a[0].id); return '<ozet-stub>'; };
@@ -431,4 +448,68 @@ test('race-05 (H-02): stale openDet catch det-name\'i ezemez', async () => {
   const isim = document.getElementById('det-name').textContent;
   assert.ok(!isim.includes('asipatla'), 'stale openDet catch DOM\'a hata YAZMAMALI (hata yalnız güncel akışta basılır)');
   assert.strictEqual(isim, 'B-KUPE', 'det-name B içeriğini korur');
+});
+
+// ── FIX-R2 (luna review R2 artık bulgusu: H-02 residual) ────────────
+// _detRenderGecmis'in iki gun-filter çağıranı (gecmisDetGunSec/gecmisDetGunKapat)
+// {gunKoru:true} ile opts.gen VERMEDİ — _bayat() hep false, FIX-R1 guard'ı bu
+// yollarda devreye girmiyordu. A kartının gün görünümü collect'te askıdayken
+// openDet(B) gen'i artırır; guard'sız A devamı B'nin tab-gecmis'ine YAZABİLİYORDU.
+// Yarış testleri çağrı-anı gen'inin geçirilmesini zorunlu kılar; gun-01 senkron
+// yolun (kart değişmeden gün seçimi) bozulmadığını korur.
+
+test('race-06 (H-02R): gunSec yolu collect\'te askıdayken B açılırsa A\'nın devamı tab-gecmis\'e yazamaz', async () => {
+  const sahne = kurSahne({ hayvanFix: IKI_HAYVAN, gercmisYardimcilari: true });
+  const { sandbox, document, idbKontrol } = sahne;
+  await sandbox.openDet('A'); // tamamlanır — collect gorev_log#1 tükendi
+  assert.strictEqual(document.getElementById('det-name').textContent, 'A-KUPE', 'A çizildi');
+  idbKontrol.plan = (tab, n) => tab === 'gorev_log' && n === 2; // gunSec collect'i askıda
+  sandbox.gecmisDetGunSec('2026-09-15');
+  await bekle(10);
+  assert.ok(document.getElementById('tab-gecmis').innerHTML.includes('loader'),
+    'A gunSec loader yazdı, collect await\'inde askıda');
+  await sandbox.openDet('B'); // gen artar; B'nin collect'i (#3) plan-dışı — B tamamlanır
+  assert.strictEqual(document.getElementById('det-name').textContent, 'B-KUPE', 'B çizildi');
+  const bIcerik = document.getElementById('tab-gecmis').innerHTML;
+  assert.ok(bIcerik.includes('Kayıt yok'), 'B gecmis içeriği yerleşti');
+  idbKontrol.bekleyen.get('gorev_log#2').coz([]); // A'nın gunSec collect'i çözülür
+  await bekle(10);
+  const son = document.getElementById('tab-gecmis').innerHTML;
+  assert.strictEqual(son, bIcerik, 'A\'nın stale gunSec devamı tab-gecmis\'i EZEMEZ (H-02R)');
+  assert.ok(!document.getElementById('det-gecmis-body').innerHTML.includes('A-GUN'),
+    'A\'nın gün kaydı gün-listesine YAZAMAZ (H-02R)');
+});
+
+test('gun-01 (H-02R senkron): kart değişmeden gün seçimi çalışmaya devam eder', async () => {
+  const sahne = kurSahne({ hayvanFix: IKI_HAYVAN, gercmisYardimcilari: true });
+  const { sandbox, document, rec } = sahne;
+  await sandbox.openDet('A');
+  sandbox.gecmisDetGunSec('2026-09-15'); // collect anında çözülür (plan yok)
+  await bekle(10);
+  const govde = document.getElementById('det-gecmis-body').innerHTML;
+  assert.ok(govde.includes('A-GUN'), 'gün süzmesi seçilen günün kaydını ÇİZMELİ (guard senkron yolu bozmamalı)');
+  assert.ok(!govde.includes('A-GECMIS'), 'defter kaydı gün görünümüne SIZMAMALI');
+  assert.strictEqual(rec.pushState.length, 2, 'ilk açış + gün seçimi history\'ye yazılır (W3 semantiği)');
+});
+
+test('race-07 (H-02R): gunKapat yolu collect\'te askıdayken B açılırsa A\'nın devamı yazamaz', async () => {
+  const sahne = kurSahne({ hayvanFix: IKI_HAYVAN, gercmisYardimcilari: true });
+  const { sandbox, document, idbKontrol } = sahne;
+  await sandbox.openDet('A'); // collect #1
+  sandbox.gecmisDetGunSec('2026-09-15'); // gün görünümü kurulsun — kapat gerçek akışı; collect #2
+  await bekle(10);
+  idbKontrol.plan = (tab, n) => tab === 'gorev_log' && n === 3; // gunKapat collect'i askıda
+  sandbox.gecmisDetGunKapat();
+  await bekle(10);
+  assert.ok(document.getElementById('tab-gecmis').innerHTML.includes('loader'),
+    'A gunKapat loader yazdı, collect await\'inde askıda');
+  await sandbox.openDet('B'); // gen artar; B collect #4 plan-dışı
+  const bIcerik = document.getElementById('tab-gecmis').innerHTML;
+  assert.ok(bIcerik.includes('Kayıt yok'), 'B gecmis içeriği yerleşti');
+  idbKontrol.bekleyen.get('gorev_log#3').coz([]); // A'nın gunKapat collect'i çözülür
+  await bekle(10);
+  const son = document.getElementById('tab-gecmis').innerHTML;
+  assert.strictEqual(son, bIcerik, 'A\'nın stale gunKapat devamı tab-gecmis\'i EZEMEZ (H-02R)');
+  assert.ok(!document.getElementById('det-gecmis-body').innerHTML.includes('A-GECMIS'),
+    'A\'nın defter kaydı B kartına YAZAMAZ (H-02R)');
 });

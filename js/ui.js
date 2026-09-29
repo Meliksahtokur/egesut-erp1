@@ -4779,7 +4779,9 @@ function gecmisDetGunSec(iso){
   // W3: kart-içi gün görünümü history'ye girer — geri tuşu görünümden karta
   // döner (popstate 'det-gun' dalı → gecmisDetGunKapat), kart kapanmaz.
   if(_detGecmisGun && _detGecmisGun!==_eski) history.pushState({pg:getState('currentPage')||'dash',dgun:_detGecmisGun},'','');
-  if(_detGecmisCtx) _detRenderGecmis(_detGecmisCtx.id,_detGecmisCtx.el,{gunKoru:true});
+  // FIX-R2 H-02R: çağrı-anı _detGen geçirilir (openDet caller sözleşmesiyle aynı) —
+  // collect askıdayken kart değişirse helper'ın devamı guard'a takılır.
+  if(_detGecmisCtx) _detRenderGecmis(_detGecmisCtx.id,_detGecmisCtx.el,{gunKoru:true,gen:_detGen});
 }
 // W3: ✕ Kapat + geri tuşu ortak kapanışı — det-back deseni korunur (kart açık kalır).
 /**
@@ -4788,7 +4790,8 @@ function gecmisDetGunSec(iso){
  */
 function gecmisDetGunKapat(){
   _detGecmisGun=null;
-  if(_detGecmisCtx) _detRenderGecmis(_detGecmisCtx.id,_detGecmisCtx.el,{gunKoru:true});
+  // FIX-R2 H-02R: gunSec ile AYNI sözleşme — çağrı-anı _detGen guard'ı.
+  if(_detGecmisCtx) _detRenderGecmis(_detGecmisCtx.id,_detGecmisCtx.el,{gunKoru:true,gen:_detGen});
   if(typeof navViewBack==='function') navViewBack();
 }
 /**
@@ -4819,9 +4822,9 @@ function _detGecmisGunBannerGuncelle(){
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  */
 async function _detRenderGecmis(id,el,opts){
-  // FIX-R1 H-02: opsiyonel opts.gen devam-guard'ı — openDet kendi myGen'ini geçirir;
-  // her await sonrası ve her DOM/içerik yazımı öncesi doğrulanır. guard'sız çağıranlar
-  // (gecmisDetGunSec/gecmisDetGunKapat gunKoru yolu) mevcut davranışı korur.
+  // FIX-R1 H-02 + FIX-R2 H-02R: opsiyonel opts.gen devam-guard'ı — openDet kendi
+  // myGen'ini geçirir; gunSec/gunKapat gunKoru yolları çağrı-anı _detGen'i geçirir.
+  // Her await sonrası ve her DOM/içerik yazımı öncesi doğrulanır.
   const _bayat=()=>!!(opts && typeof opts.gen==='number' && opts.gen!==_detGen);
   if(!(opts&&opts.gunKoru)) _detGecmisGun=null; // yeni kart açılışı gün süzmesini sıfırlar
   _detGecmisCtx={id,el};
