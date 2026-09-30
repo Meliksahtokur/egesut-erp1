@@ -109,6 +109,9 @@ function etiketCoz(comment) {
       satir.adlar = govde.split(',').map(s => s.trim()).filter(Boolean);
       // v2.3: koşullu çift işareti — yalnız SON adın sonundaki '(koşullu)' eki soyulur
       // (etiket çıkarıcısı atlas-etiket'in yazdığı tek biçim; satır.kosullu bilgi amaçlı).
+      // v2.3c (kalem 6) KASITLI AYRIŞMA: tanımayan RPC biçimleri (iç-ice ternary, || fallback)
+      // kapıda hiçbir kümeye girmez; atlas aynı biçimleri dinamik.rpc olarak sayar. Kapı
+      // etiket-satır merkezli — etiket adı yazmışsa FAZLA → HATALI, sessiz-yeşil yok.
       // v2.3b: eki adı boşaltırsa (ör. '@rpc a, (koşullu)') sessiz filtre YOK — adsizEkleme
       // bayrağı HATALI hüküm verir (fail-closed; test: etiket-tazelik-v23b.test.js)
       const son = satir.adlar[satir.adlar.length - 1];
@@ -119,6 +122,7 @@ function etiketCoz(comment) {
           satir.kosullu = true;
         } else {
           satir.adsizEkleme = true;
+          satir.adlar.pop(); // v2.3c: '(koşullu)' kalıntısı adlar'dan düşsün — kozmetik ikinci FAZLA üretmesin
         }
       }
       satir.adlar = satir.adlar.filter(Boolean);
@@ -162,8 +166,15 @@ function govdeOlc(fnDugumu) {
   function yuru(dugum) {
     if (!dugum || typeof dugum.type !== 'string') return;
     if (dugum.type === 'CallExpression') {
-      const ad = dugum.callee.type === 'Identifier' ? dugum.callee.name
-        : dugum.callee.type === 'MemberExpression' ? propAdi(dugum.callee.property) : null;
+      // v2.3e (V23E E2 + iç review Önemli-1): computed + literal-olmayan üye şekli.
+      // Bayrak ad'den ÖNCE hesaplanır ve true iken ad null'a çekilir — aksi halde
+      // çakışma-adları bypass eder: x[from] → from-dalı fail-open kanıt üretir,
+      // x[select] → ISLEMLER kolu sessiz kalıp bayrak kolunu atlar (atlas'ta bu köşe
+      // yok: propertyAdi üye düğümü alır, bayrak-true iken ad daima null).
+      const bilinmeyenComputedUye = dugum.callee.type === 'MemberExpression' && dugum.callee.computed
+        && !(dugum.callee.property.type === 'Literal' && typeof dugum.callee.property.value === 'string');
+      const ad = bilinmeyenComputedUye ? null : (dugum.callee.type === 'Identifier' ? dugum.callee.name
+        : dugum.callee.type === 'MemberExpression' ? propAdi(dugum.callee.property) : null);
       const ilkArg = dugum.arguments[0];
       const deger = ilkArg && ilkArg.type === 'Literal' && typeof ilkArg.value === 'string' ? ilkArg.value : null;
       if (ad === 'from' && deger !== null) {
@@ -186,25 +197,28 @@ function govdeOlc(fnDugumu) {
         }
       } else if (ad === 'addEventListener' && deger !== null) {
         olaylar.add(deger);
-      } else if (TABLO_YARDIMCILARI.has(ad) && dugum.callee.type === 'Identifier') {
+      } else if (TABLO_YARDIMCILARI.has(ad)) {
         // v2.3-KA2: dolaylı tablo erişimi — getData('t') → okuma;
         // pullTables/_pullTablesNow(['a','b']) dizi literal → tazeleme (atlas.mjs ile birebir).
-        // v2.3b: string-olmayan eleman/literal-olmayan girdi SESSİZ ATLANMAZ — çağrının tablo
-        // kümesi bilinemez → belirsizYardimci'ye yazılır, @tablo satırı DOĞRULANAMADI olur
-        // (atlas bunu dinamik.tablo olarak görünür kılar; kapı sessiz kalamaz).
+        // v2.3b: string-olmayan eleman/literal-olmayan girdi SESSİZ ATLANMAZ — belirsiz.
+        // v2.3c (kalem 2, kapı-atlas birebir): nitelikli çağrı (x.getData — çıplak değil)
+        // tablo kümesini güvenilmez kılar → belirsiz; atlas aynı vakayı dinamik.tablo sayar.
         const islem = TABLO_YARDIMCILARI.get(ad);
+        const nitelikli = dugum.callee.type !== 'Identifier';
         const a0 = dugum.arguments[0];
-        const adaylar = a0 && a0.type === 'ArrayExpression' ? a0.elements
+        const adaylar = nitelikli ? null : a0 && a0.type === 'ArrayExpression' ? a0.elements
           : a0 && a0.type === 'Literal' && typeof a0.value === 'string' ? [a0] : null;
-        if (adaylar === null) {
-          belirsizYardimci.push(`${ad}(...) literal-olmayan girdi — tablo kümesi bilinemez`);
+        if (nitelikli) {
+          belirsizYardimci.push(`nitelikli yardımcı çağrı ${ad} (çıplak değil) — tablo kümesi güvenilmez (satır ${dugum.loc.start.line})`);
+        } else if (adaylar === null) {
+          belirsizYardimci.push(`${ad}(...) literal-olmayan girdi (satır ${dugum.loc.start.line}) — tablo kümesi bilinemez`);
         } else {
           for (const el of adaylar) {
             if (el && el.type === 'Literal' && typeof el.value === 'string') {
               if (!tablolar.has(el.value)) tablolar.set(el.value, new Set());
               tablolar.get(el.value).add(islem);
             } else {
-              belirsizYardimci.push(`${ad}([...]) dizi literalinde string olmayan eleman — tablo kümesi bilinemez`);
+              belirsizYardimci.push(`${ad}([...]) dizi literalinde string olmayan eleman (satır ${dugum.loc.start.line}) — tablo kümesi bilinemez`);
             }
           }
         }
@@ -223,6 +237,12 @@ function govdeOlc(fnDugumu) {
           }
           o = o.callee && o.callee.object;
         }
+      } else if (bilinmeyenComputedUye) {
+        // v2.3e (V23E E2 — root kararı FAIL-CLOSED): computed + literal-olmayan üye çağrısı
+        // (x[degisken](...)) yardımcı adı taşımaz; eski davranışta ad sözlükte bulunamayınca
+        // SESSİZ kalmış olacaktı. BelirsizYardimci → @tablo satırı DOĞRULANAMADI
+        // (E1 atlas ile birebir: dinamik sınıf; dot/bracket-literal yolları korunur).
+        belirsizYardimci.push(`bilinmeyen endeksli üye çağrı — tablo kümesi güvenilmez (satır ${dugum.loc.start.line})`);
       }
     }
     for (const anahtar of Object.keys(dugum)) {
@@ -311,6 +331,19 @@ function etiketliKayitlar(dosya, kod, ast, goreli) {
 // --- kırmızı kontrol: 4 bozma kolu ( bellekte, diske yazmaz ) ----------------
 function kirmiziKontrol(kayitlar) {
   const kollar = [];
+  // v2.3c (kalem 3): K7 adsizEkleme kolu — gerçek ağaçta aday yoksa sentetik fixture kayıt
+  // (kapının kendi ayrıştırıcısıyla) üretilip kol o üzerinde koşar; ATLANDI sessiz kalmaz.
+  let k7Kaynak = 'gerçek ağaç';
+  if (!kayitlar.some(k => k._satir && k._satir.adsizEkleme)) {
+    const kod = "/**\n * @rpc a_rpci, (koşullu)\n */\nfunction sentetikAdsiz(){\n  return rpc('a_rpci');\n}\n";
+    try {
+      const sentetikKayit = etiketliKayitlar('(sentetik)', kod, ayristir(kod, '(sentetik)'), '(sentetik)')[0];
+      if (sentetikKayit && sentetikKayit._satir && sentetikKayit._satir.adsizEkleme) {
+        kayitlar.push(sentetikKayit);
+        k7Kaynak = 'sentetik örnek';
+      }
+    } catch (e) { /* sentetik üretilemezse kol ATLANDI olarak görünür — sessiz değil */ }
+  }
   function kos(ad, boz) {
     // boz(kopya) -> beklenen sorun deseni (ya da null = bozma etkisiz kaldı)
     const kopya = kayitlar.filter(k => k._satir).map(k => ({ ...k, _satir: { ...k._satir, adlar: k._satir.adlar ? [...k._satir.adlar] : undefined, girisler: k._satir.girisler ? k._satir.girisler.map(g => ({ ...g })) : undefined } }));
@@ -345,7 +378,8 @@ function kirmiziKontrol(kayitlar) {
     return "addEventListener('olmayan-olay')";
   }) && tam;
   tam = kos('K4 tablo-islem', ks => {
-    const k = ks.find(x => x._satir.tip === 'tablo' && x._satir.girisler.some(g => g.islem));
+    // v2.3c (kalem 4b): belirsiz-yardımcılı satır seçilmez — bozma erken ayrışmada kaybolur
+    const k = ks.find(x => x._satir.tip === 'tablo' && !(x._govde.belirsizYardimci && x._govde.belirsizYardimci.length) && x._satir.girisler.some(g => g.islem));
     if (!k) return null;
     for (const g of k._satir.girisler) {
       if (!g.islem) continue;
@@ -364,11 +398,18 @@ function kirmiziKontrol(kayitlar) {
     return "rpc('olmayan_kosullu_ad') yok";
   }) && tam;
   tam = kos('K6 yardimci-tablo-ad', ks => {
-    const k = ks.find(x => x._satir.tip === 'tablo' && (x._satir.girisler || []).some(g => g.islem === 'okuma' || g.islem === 'tazeleme'));
+    const k = ks.find(x => x._satir.tip === 'tablo' && !(x._govde.belirsizYardimci && x._govde.belirsizYardimci.length) && (x._satir.girisler || []).some(g => g.islem === 'okuma' || g.islem === 'tazeleme'));
     if (!k) return null;
     const g = k._satir.girisler.find(x => x.islem === 'okuma' || x.islem === 'tazeleme');
     g.tablo = 'olmayan_yardimci_tablo';
     return ".from('olmayan_yardimci_tablo') yok";
+  }) && tam;
+  // v2.3c (kalem 3): adsizEkleme fail-closed yolu kırmızı kontrolde de koşmalı —
+  // aday gerçek ağaçta yoksa sentetik fixture (yukarıda) üzerinde koşar.
+  tam = kos(`K7 adsiz-koşullu (${k7Kaynak})`, ks => {
+    const k = ks.find(x => x._satir && x._satir.adsizEkleme);
+    if (!k) return null;
+    return 'adsız koşullu'; // bozmasız: sorunun kayıtlarda görünür olduğunu kanıtlar
   }) && tam;
   for (const k of kollar) console.log(`  [kirmizi] ${k.ad}: ${k.sonuc}`);
   return { tam, kollar };
@@ -392,11 +433,14 @@ for (const dosya of dosyalar) {
 if (KIRMIZI) {
   console.log(`kırmızı kontrol — etiketli satır paydası: ${kayitlar.length}`);
   const kirmizi = kirmiziKontrol(kayitlar);
-  const canli = kirmizi.kollar.filter(k => k.sonuc !== 'ATLANDI (uygun örnek yok)').length;
-  console.log(kirmizi.tam
-    ? `kırmızı kontrol: YAKALANDI (${canli} canlı kol / ${kirmizi.kollar.length} kol)`
-    : 'kırmızı kontrol: EKSİK — bazı kollar kaçtı');
-  process.exitCode = kirmizi.tam ? 0 : 1;
+  // v2.3c: ATLANDI kol SAYACA görünür (gizlenemez) ama exit bozmaz — kol türünün
+  // korpusa bağlılığı meşru; canlı kol 0 ise öz-kontrol kanıtsız kalır → exit 1 (gürültülü).
+  const atlandi = kirmizi.kollar.filter(k => k.sonuc.startsWith('ATLANDI')).length;
+  const canli = kirmizi.kollar.length - atlandi;
+  console.log(kirmizi.tam && canli > 0
+    ? `kırmızı kontrol: YAKALANDI (${canli} canlı kol / ${kirmizi.kollar.length} kol, ${atlandi} ATLANDI)`
+    : 'kırmızı kontrol: EKSİK — kollar kaçtı ya da hiçbiri canlı değil');
+  process.exitCode = kirmizi.tam && canli > 0 ? 0 : 1;
 } else {
   const dogru = kayitlar.filter(k => k.hukum === 'DOĞRU').length;
   const hatali = kayitlar.filter(k => k.hukum === 'HATALI').length;
