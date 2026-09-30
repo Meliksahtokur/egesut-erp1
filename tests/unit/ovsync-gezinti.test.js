@@ -9,8 +9,9 @@
 //     (window._curOvsyncPadok / window._curOvsyncBolum{acik}).
 //  4. Gezinme sözleşmesi (§6b, kaynak testleri): goTo ovsync dalı; scroll kaydı;
 //     #pg-ovsync .pg bloğu + R13 geri butonu (mevcut nav-geri = history.back —
-//     goTo('dash') YOK); alt-nav'a giriş YOK; render P6'nın (loadOvsyncDash
-//     renderOvsyncSayfa ÇAĞIRMAZ).
+//     goTo('dash') YOK); alt-nav'a giriş YOK.
+//     (P6 faz-geçişi: P5'teki "render P6'nın işi — renderOvsyncSayfa ÇAĞIRMAZ"
+//     geçici sınır pini, P6 teslimiyle gerçek bağa çevrildi — impl-P6-DONE.)
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
@@ -134,10 +135,10 @@ test('P5 DOM (iii-b): getir throw eder → açık mesaj (çökmez, sessiz boş Y
   assert.match(root.innerHTML, /İnternet yok — takip verisi alınamadı/);
 });
 
-test('P5 DOM (iv): taze → P6 yer tutucusu (P6 işareti taşır; hata mesajı YOK)', async () => {
+test('P5 DOM (iv) → P6: taze → gerçek render (KPA şeridi çizilir; hata mesajı YOK)', async () => {
   const { sandbox, root } = ovsyncSandboxu(() => ({ veri: { bayrak_kapali: false, kpa: {} } }));
   await sandbox.loadOvsyncDash();
-  assert.match(root.innerHTML, /P6/);
+  assert.match(root.innerHTML, /ovs-kpa/, 'P6: taze dal renderOvsyncSayfa çıktısını basar');
   assert.doesNotMatch(root.innerHTML, /İnternet yok/);
   assert.doesNotMatch(root.innerHTML, /kuralları kapalı/);
 });
@@ -204,7 +205,7 @@ test('P5 gezinti: alt-nav\'a giriş YOK (nb-ovsync yok)', () => {
   assert.doesNotMatch(src, /nb-ovsync/, 'alt-nav ovsync butonu olmamalı (§6b)');
 });
 
-test('P5 sınır: loadOvsyncDash renderOvsyncSayfa ÇAĞIRMAZ (render P6\'nın işi)', () => {
+test('P6 bağ: loadOvsyncDash renderOvsyncSayfa ÇAĞIRIR (render bağlandı; P5 geçici sınırı kalktı)', () => {
   const kaynak = extractFunctionSource(UI, 'loadOvsyncDash');
-  assert.doesNotMatch(kaynak, /renderOvsyncSayfa\(/, 'P5 render implementasyonu içeremez (P6 sınırı)');
+  assert.match(kaynak, /renderOvsyncSayfa\(/, 'P6: taze/bayat dal renderOvsyncSayfa çağırmalı');
 });
