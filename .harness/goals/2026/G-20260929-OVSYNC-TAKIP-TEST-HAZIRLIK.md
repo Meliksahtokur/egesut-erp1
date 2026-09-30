@@ -1,0 +1,48 @@
+# G-20260929-OVSYNC-TAKIP-TEST-HAZIRLIK — Ovsync takip test hazırlığı
+
+- **id:** G-20260929-OVSYNC-TAKIP-TEST-HAZIRLIK
+- **status:** active
+- **owner:** Melik Şah Tokur (bu oturumda Full goal kaydının oluşturulmasını seçti, 2026-09-29)
+- **flow:** Full mode, Herdr (sahibin `BASLANGIC-PROMPTU-2026-09-29c.md` devri)
+- **base SHA / launch SHA:** `40feed3c6b1e5da55b44ba998618fdb24a5ee250`
+- **branch:** `ovsync-takip`
+- **worktree:** `/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip`
+- **spec:** `docs/plans/2026-09-28-ovsync-takip-ekrani/design.md` (§9, §10c–§10h)
+- **plan:** `docs/plans/2026-09-28-ovsync-takip-ekrani/plan.md` (v7, P12 ve KATALOG GÜNCELLEME 1–17)
+- **scope:** Plan re-review5 KABUL sonrası, implementasyondan önce senaryo kataloğunu güncellemek ve çalıştırılabilir demo DB, Playwright ve T-72b testlerini hazırlamak. Ürün implementasyonu ayrı goal/manifest gerektirir.
+- **write manifest:**
+  - `.harness/goals/2026/G-20260929-OVSYNC-TAKIP-TEST-HAZIRLIK.md` (root; bu kayıt ve durum güncellemesi)
+  - `docs/plans/2026-09-28-ovsync-takip-ekrani/plan.md` (root; re-review5 ÖNEMLİ uygulama notları)
+  - `docs/plans/2026-09-28-ovsync-takip-ekrani/test-senaryolari.md` (test lead; katalog 1–17; ad 2026-09-30'da doğru yazıma düzeltildi — kanonik ad bu)
+  - `tests/sql/ovsync_takip_test.sql` (test lead; demo DB senaryoları)
+  - `tests/concurrency/ovsync-takip-t72b.mjs` (test lead; iki bağlantılı T-72b provası)
+  - `tests/e2e/ovsync-takip.spec.js` (test lead; demo Playwright senaryoları)
+  - `runs/2026-09-28-ovsync-takip/ui-test-listesi.md` (test lead; beklenen görünüm ve kanıt listesi)
+  - `runs/2026-09-28-ovsync-takip/test-uygulanabilir-GOREV.md` (root; test zarfı)
+  - `runs/2026-09-28-ovsync-takip/glm-saat-bekcisi.sh` (root; bu goal koltuğu açıkken saat koruması)
+  - `runs/2026-09-28-ovsync-takip/test-uygulanabilir-ILERLEME.md` (test lead; saat duraklaması)
+  - `runs/2026-09-28-ovsync-takip/test-uygulanabilir-DONE.md` (test lead; teslim raporu)
+  - `runs/2026-09-28-ovsync-takip/test-uygulanabilir-HANDOFF.md` (test lead; retroaktif ekleme — 2026-09-30 dar kapsam D kalemı, mimar; sahip diyagram onayında teyit edilir)
+  - `runs/2026-09-28-ovsync-takip/HANDOFF-2026-09-29d-ovsync-takip.md` (root; sahibin istediği session update)
+  - `runs/2026-09-28-ovsync-takip/BASLANGIC-PROMPTU-2026-09-29d.md` (root; devir giriş noktası)
+  - `runs/2026-09-28-ovsync-takip/HANDOFF-2026-09-30a-ovsync-takip.md` (root; 2026-09-30 session update)
+  - `runs/2026-09-28-ovsync-takip/BASLANGIC-PROMPTU-2026-09-30a.md` (root; yeni oturum giriş noktası)
+  - `.ss/ovsync-takip-mimar-HANDOFF.md` (root; yeni devir belgesine işaretçi)
+  - `.remember/remember.md` (root; kısa oturum sonu durumu)
+  - `/home/melik/.claude/projects/-home-melik-egesut-erp1/memory/ovsync-takip-ekrani-durum.md` (root; devir giriş işaretçisi)
+  - `/home/melik/.claude/projects/-home-melik-egesut-erp1/memory/MEMORY.md` (root; yalnız ovsync index satırı)
+  - `/home/melik/.codex/memories/extensions/ad_hoc/notes/20260930T041648Z-ovsync-takip-devir.md` (root; Codex memory güncelleme notu)
+  - `.crumbs/ovsync-takip.jsonl` (root/lead; yalnız rolü belirtilmiş satır ekleme)
+- **tracked paths:** `.harness/goals/2026/G-20260929-OVSYNC-TAKIP-TEST-HAZIRLIK.md`, `tests/sql/ovsync_takip_test.sql`, `tests/concurrency/ovsync-takip-t72b.mjs`, `tests/e2e/ovsync-takip.spec.js`
+- **local paths:** plandaki iki `docs/plans/` dosyası, dokuz `runs/` dosyası, `.ss/ovsync-takip-mimar-HANDOFF.md`, `.remember/remember.md`, `.crumbs/ovsync-takip.jsonl` ve yukarıdaki üç mutlak hafıza yolu (Git ignore durumundan bağımsız, manifest kapsamında)
+- **DB authority:** Yalnız demo testleri; PROD apply ve PROD DB yazması yok. Her DB bağlantısı ayrı doğrulanır. Sahip demo şifresi değiştirilmez. Migration ve canlı şema değişikliği bu goal kapsamında yoktur.
+- **pattern_refs:** Ürün kodu bu manifestte yok; testler mevcut `tests/` ve `tests/support/` desenlerini kullanır.
+- **acceptance commands:** `git status --short` ve manifest kapsamı incelemesi; `git diff --check`; senaryo kataloğunun 17 maddeyle birebir kontrolü; `node --test`/Playwright testlerinin uygun hedefli komutları; T-72b için 5 çift × 30 tur, `lock_timeout='5s'`, sonuç kodu oracle'ı. Implementasyon öncesi beklenen kırmızı testler PASS sayılmaz; demo DB koşumu ayrı kanıtlanır.
+- **stop conditions:** Manifest dışı yazma, ürün/migration değişikliği, PROD erişimi, commit, merge, push, deploy, geniş eski-yol B9 denetimi ve sahibe demo teslimi bu goal kapsamında yapılmaz. Domain kuralı çelişkisi veya tanımsız sonuç sözleşmesi sahibin kararına çıkarılır.
+- **report path:** `runs/2026-09-28-ovsync-takip/test-uygulanabilir-DONE.md`
+- **decision 2026-09-30 07:45 (sahip):** B = Ç3 ERTİLEME onaylı (P2b-sonrası checkpoint; ertelenmiş sözleşme IMPL goal'ine de işlenir). C = T-72b 4 açık çift × 30 tur koşumu onaylı (arka planda koşuyor; Ç3 bilinen BLOKE'unu korur, kanıt gelince kayda). Katalog kapsam-açığı denetimi + T-95+ yazımı builtin subagent'ta (sonuç bekleniyor). HANDOFF.md write manifeste retroaktif eklendi (D kalemı). Goal kapanışı: C kanıtı + subagent sonucu + sahip katalog onayı ile.
+- **measurement 2026-09-30 07:58 (C koşumu sonucu):** T-72b `--rounds=30` demo koşumu yapıldı (betik çıkış 2 = belgelenmiş fail-closed). Betik yeni-yol nesneleri yokken yarış turlarını yapısal olarak koşmaz [CONFIRMED `tests/concurrency/ovsync-takip-t72b.mjs:214-220` vs döngü `:232`]; bugün ölçülen: envanter `sarmal=0 takip_kolon=0 tetik=0 disease=1`, Ç1/Ç2/Ç4/Ç5 RED(beklenen), Ç3 BLOKE. Sonuç: "5 çift × 30 tur" kabul ölçütü implementasyon öncesi literal kapanamaz — gerçek yarış ölçümü IMPL goal'inin ertelenmiş sözleşmesi kapsamına geçti. Kanıt: `/home/melik/tmp/ovsync-takip-olcum/t72b-rounds30-2026-09-30.txt`.
+- **measurement 2026-09-30 08:05 (katalog kapsam turu):** builtin subagent 6 gerçek kapsam açığı buldu → T-95..T-100 yazıldı; katalog sürüm 3, toplam 100 senaryo, süreklilik T-01..T-100 [CONFIRMED grep]; üç bayat sayı cümlesi düzeltildi (kalıntı 0). Subagent dosyayı manifest dışında `test-senaryolari.md` olarak yeniden adlandırdı — plan.md referanslarıyla uyumlu (3/4 doğru yazım, kod yüzeyinde sıfır bağımlılık) → mimar RATİFİYE, kanonik ad bu. İhlal kaydı: subagent raporu ".harness dokunulmadı" diyor ama goal satır 16 ve DONE tablo satır 11 adları da değişmiş [kaynak INFERRED: subagent; ikinci manifest ihlali]. Rapor: `runs/2026-09-28-ovsync-takip/katalog-kapsam-DONE.md`. Katalog v3 SAHİP onayını bekliyor.
+- **gate 2026-09-30 08:55 (katalog v3 dış review):** ss-lead-codex (GPT-5.6-Luna max, herdr yan tab) review: ilk tur DÜZELTME (2 ÖNEMLİ + 1 MİNÖR — mimar üçünü de plan kaynağından doğruladı ve kataloğa işledi); re-check **KABUL** — T-95..T-100 açık bulgu yok. Kanıt: `runs/2026-09-28-ovsync-takip/katalog-v3-review-DONE.md` §6. Katalog v3 (100 senaryo) SAHİP final onayını bekliyor.
+- **latest checkpoint:** 2026-09-30 07:14 devir ölçümü: HEAD yine `40feed3`; w14'te yalnız mimar Codex `w14:p3`, ovsync worker yok, WAKE arm yok. Test lead DONE `TAMAM`, root kabul `PARTIAL`: T-95/T-96 yok (94/96), T-72b Ç3 `BLOKE` ve N=30 koşulmadı, lead manifest dışı HANDOFF yazdı. Ürün/UI PASS değil; yeni iş/koltuk açılmadı.
+- **docs verdict:** `PARTIAL` (handoff hazırlandı; katalog sayısı tutarsız; `docs-update` checkpoint'i çalıştırılmadı).

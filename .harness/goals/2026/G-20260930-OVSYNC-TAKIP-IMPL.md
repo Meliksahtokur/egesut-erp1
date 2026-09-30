@@ -1,0 +1,32 @@
+# G-20260930-OVSYNC-TAKIP-IMPL — Ovsync takip ekranı ürün implementasyonu
+
+- **id:** G-20260930-OVSYNC-TAKIP-IMPL
+- **status:** draft (hazır tutuluyor; aktivasyon sahip onayıyla — 2026-09-30 devam diyagramı onayı bekleniyor)
+- **owner:** Melik Şah Tokur (2026-09-30 yetkilendirmesi: mimar goal manifestini kendisi açabilir; push/merge/deploy yalnız sahip kapısı)
+- **flow:** Full mode, mimar oturumu + builtin subagent zarfları (pty worker açılmaz; ultracode YASAK)
+- **base SHA:** `40feed3c6b1e5da55b44ba998618fdb24a5ee250`
+- **branch:** `ovsync-takip`
+- **worktree:** `/home/melik/.herdr/worktrees/egesut-erp1/ovsync-takip`
+- **spec:** `docs/plans/2026-09-28-ovsync-takip-ekrani/design.md` (§6c, §9, §10c–§10h)
+- **plan:** `docs/plans/2026-09-28-ovsync-takip-ekrani/plan.md` (v7, KABUL — madde numaralı P1–P13)
+- **scope:** Plan v7 maddelerinin ürün implementasyonu. SQL maddeleri (P1, P2a–P2d, P3a, P3b) builtin subagent'lara YAZDIRILIR (sahip talimatı 2026-09-30); her migration dosyası `scripts/db-validate.sh` kapısından geçer, demo prova DB'sinde apply/rollback ölçülür. JS/UI maddeleri (P4–P10) planın paralellik haritasına göre zarflara bölünür. P11 birim testler kırmızı iskeletleri ÖNCE yazar. P12 demo E2E kırmızı→yeşil + glmf-max 25 maddelik `runs/2026-09-28-ovsync-takip/ui-test-listesi.md` kapısı. P13 doküman yüzeyleri EN SONDA (sıralı). Kapsam-açığı subagent'ının yazdığı T-95+ senaryoları (varsa) yeşil kapsama girer.
+- **ertelenmiş sözleşme (G-20260929'dan):** T-72b Ç3 (sarmal × seans_tamamla) bu goal'in P2b sonrası aşamasında fixture sözleşmesiyle koşulur; goal kabulüne "5 çift" tam sayıyla o aşamada kapanır.
+- **açık sözleşme girdileri:** H5 `TAKIP_ACIK` satır JSON alan adları P3b başında makine-okunur sabitlenir (rereview5 ÖNEMLİ #2); P3a tetikleyici ad-çözümü demo/prod uyumlu yazılır (demo hastalık adı `Ovsync Protokol` gözlemi).
+- **test üretim sözleşmesi (2026-09-30, dış öneri değerlendirmesi — benimsenenler):** testler risk sınıfına göre route edilir (R0–R2 → glmf worker; R3 atomicity → glmf + dış review; R4 ACL/bulk → glmf + dış review; R5 concurrency/lock → glm-high kendisi; R6 spec belirsizlik → glm). Her test zarfı `runs/2026-09-28-ovsync-takip/test-zarf-SABLONU.md` sözleşmesini taşır: **precondition assertion zorunlu** (fixture kurulduktan sonra başlangıç state'i assert edilir), positive + ters-kanıt assertion'ları birlikte, DONE'da scenario→assertion mapping + evidence packet (öncesi/sonrası ölçümler + komutlar), worker production algoritmasını testte yeniden implement ETMEZ (sabit expected değer), en fazla 2 self-repair turu sonra ESCALATE, eskalasyon sinyalleri (40P01/55P03, flaky, shared helper değişimi, prod-patch/schema isteği, spec çelişkisi) dış reviewya çıkar. Kritik UI aksiyonlarında üçlü oracle (DOM + RPC + DB). PASS tek başına kabul değildir: R3+ testlerde negative-oracle tamamlanma denetimi.
+- **write manifest (tek yazıcı kuralı; her zarf kendi alt listesini taşır):**
+  - `supabase/migrations/2026093*.sql` (P1–P3b; planın söylediği madde gruplaması)
+  - `js/api.js` (P4), `js/ui.js` (P6/P8), `js/app.js` `js/state.js` `js/forms.js` `js/config.js` (yalnız planın atadığı maddeler), `index.html` (P5/P7 gerektiriyorsa)
+  - `tests/unit/ovsync-*.test.js` (P11), `tests/sql/ovsync_takip_test.sql`, `tests/concurrency/ovsync-takip-t72b.mjs`, `tests/e2e/ovsync-takip.spec.js` (yeşil dönüşüm düzeltmeleri)
+  - `docs/plans/2026-09-28-ovsync-takip-ekrani/test-senaryolari.md` (yalnız implementasyon senaryo hatası ortaya çıkarırsa; kanonik ad 2026-09-30'da düzeltildi)
+  - `tests/test-manifest.yaml` (yeni — katalog v3'ün 100 senaryosundan üretilen kontrol düzlemi: risk/layers/target_file/fixtures/oracle'lar/eskalasyon koşulları; P11 öncesinde)
+  - `runs/2026-09-28-ovsync-takip/impl-*.md` (zarf/DONE/ILERLEME)
+  - `.crumbs/ovsync-takip.jsonl`, `.harness/goals/2026/G-20260930-OVSYNC-TAKIP-IMPL.md` (bu kayıt)
+- **tracked paths:** `supabase/migrations/` (yeni dosyalar), `js/*.js`, `index.html`, `tests/unit/`, `tests/sql/ovsync_takip_test.sql`, `tests/concurrency/ovsync-takip-t72b.mjs`, `tests/e2e/ovsync-takip.spec.js`, bu goal dosyası
+- **local paths:** `docs/plans/` iki dosya, `runs/` zarfları, `.crumbs/ovsync-takip.jsonl`
+- **DB authority:** Demo prova DB'sinde migration prova apply + rollback ölçümü serbesttir (db-validation GEÇTİKTEN sonra). PROD apply SAHİP KAPISIDIR — bu goal kapsamında yok. Sahip demo şifresi değiştirilmez, dosyalara yazılmaz. Canlı şema tek otorite; migration geçmişi değil.
+- **pattern_refs:** mevcut `supabase/migrations/` desenleri (REVOKE anon şablonu dahil), `js/api.js` RPC kayıt deseni, mevcut `tests/` desenleri, `.harness/references/rpc-reference.md` + `ui-map.md`
+- **acceptance commands:** her SQL için `scripts/db-validate.sh` (draft üzerinde VE prova apply öncesi); her değişen JS'te `node --check`; P11 birim test koşumu; P12 hedefli Playwright (Docker `mcr.microsoft.com/playwright:v1.58.2-noble --network host` deseni) kırmızı→yeşil ölçümü; T-72b 5 çift (Ç3 dahil, P2b sonrası); glmf-max `ui-test-listesi.md` 25/25 PASS; `git diff --check`; sahibe demodan ÖNCE glmf-max kapısı (proje UI testi kuralı). R3+ testlerde negative-oracle tamamlanma denetimi ve eskalasyon kuyruğunun boş olduğu kanıtlanır.
+- **stop conditions:** push/merge/deploy YASAK (sahip kapısı); `.ss/` yazma YASAK; PROD erişim YASAK; db-validation'sız migration teslimi YOK; glmf-max PASS'siz sahibe demo YOK; domain-rules çelişkisinde dur ve sahip kararına çıkar; GLM 09:00–13:00 penceresinde yeni subagent fan-out başlatma (sahip ezmesi hariç).
+- **report path:** `runs/2026-09-28-ovsync-takip/impl-DONE.md` (final) + madde bazlı `impl-<madde>-DONE.md`
+- **latest checkpoint:** 2026-09-30 07:50 draft yazıldı (mimar); aktivasyon için sahip onayı bekleniyor.
+- **docs verdict:** bekliyor (P13 tamamlanınca).

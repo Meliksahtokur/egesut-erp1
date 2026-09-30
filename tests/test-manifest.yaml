@@ -1,0 +1,1232 @@
+# tests/test-manifest.yaml
+# Uretim: katalog v3'ten (docs/plans/2026-09-28-ovsync-takip-ekrani/test-senaryolari.md, T-01..T-100)
+# Tarih: 2026-09-30. Kaynak dosyaya dokunulmadi.
+# Kurallar:
+#   risk: govde anahtar kelimeleriyle sirayla ilk eslesen (R6 acik sozlesme > R5 yarisi/kilit/deadlock
+#         > R4 ACL/anon/EXECUTE/imza/toplu/bulk/preflight/REVOKE > R3 atomik/transaction/yarim/tek-islem/XOR/guard/RAISE
+#         > R2 UI-PW+DB-SQL birlikte > R1 tek katman > R0 yalniz UNIT).
+#         "kilit" yalniz DB kilidi/yaris anlaminda R5 sayildi; UI "🔒 kilitli kart" (hard-block) R5 degil.
+#   target_file: insan-ui -> runs/2026-09-28-ovsync-takip/ui-test-listesi.md;
+#         DB yarisi (T-72/T-73/T-87) -> tests/concurrency/ovsync-takip-t72b.mjs;
+#         digerleri ilk-listelenen katmana gore tests/sql/ovsync_takip_test.sql |
+#         tests/e2e/ovsync-takip.spec.js (aile adi yukaridaki bolum yorumunda; -s2/-s3 sonek yok) |
+#         tests/unit/ovsync-takip.test.js
+#   max_self_repair: sablon geregi 2.
+
+# A. Devam secici — her secenek x her Bos giris noktasi (kapsam 1)
+- scenario: T-01
+  title: "Sonuc modali: Bos + Ovsync uygula (on secim, hemen)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["H sagmal, kural gunu gelmis, kisir=false", "sonucu Bekliyor tohumlama", "acik takip gorevi yok"]
+  positive_oracle: ["tohumlama.sonuc='Bos' + cases'te yeni active OVSYNC vakasi (start_date=bugun, snapshot dolu)", "4 treatment_days (d0/d7/d8/d9); TAI gorevi TOHUMLAMA_PLANLI hedef=bugun+10", "eski GEBELIK_KONTROL/TOHUMLAMA_HAZIRLIK gorevleri iptal; ekran S1'de yeni satir, hayvan S2'den duser"]
+  negative_oracle: ["'yalniz Bos ata' tek basina kaydedilmedi", "ikinci bir OVSYNC_BASLAT gorevi dogmadi", "pg_application_event yeni satir yok (stok dusumu olmadı)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-02
+  title: "Sonuc modali: Bos + PG uygula (urun/doz on dolu)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["T-01 kurulumu", "demo gecmiste kullanilmis PG urunu+dozu"]
+  positive_oracle: ["sonuc='Bos'; pg_application_event satiri (karar=ALLOW) + stok dusumu ayni kurallarla", "TAI'a uygunsa +48 s TOHUMLAMA_PLANLI (kaynak='PG_TOHUMLAMA:<olay_id>'); uygunsuzsa UYGUNSUZ olay kaydi ve gorev yok", "urun/doz alani son kullanilanla dolu ve duzenlenebilir (mockup 03)"]
+  negative_oracle: ["Ovsync vakasi acilmadi (cases yeni satir yok)", "doz alani salt-okunur degil"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-03
+  title: "Sonuc modali: Bos + Takibe birak (+7 g, atama saati)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["T-01 on kosulu"]
+  positive_oracle: ["sonuc='Bos'; tek takip muayenesi gorevi: hedef_tarih=bugun+7, hedef_saat=atama saati", "tamamlandi=false, iptal=false; kapanis-nedeni alani bos", "Ovsync ekraninda S3'te '🔍 takipte · muayene GG.AA SS:SS' rozeti"]
+  negative_oracle: ["OVSYNC_BASLAT gorevi dogmadi", "vaka acilmadi", "ikinci takip gorevi yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-04
+  title: "Birlesik muayene sonucu: Gebe / Bos→secici / Muayeneyi ertele"
+  risk: R3
+  owner_model: glmf+review
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["son tohumlama ≥40 gun once, Bekliyor", "acik GEBELIK_KONTROL gorevi (tek uretici cron — T-80)", "esik ayari 40"]
+  positive_oracle: ["b) Bos dali T-01/02/03 ile birebir ayni sonuclar (tek fark giris yuzeysi)", "a) Gebe T-78 cekirdek yolu; c) Ertele T-75 sozlesmesi (+7, saatsiz on ayar)", "ekran TAKIP_MUAYENE ekraniyla AYNI; etiketlerde 'Bos ata' oneki yok (S-10)"]
+  negative_oracle: ["gebelik muayenesi yuzeyinde 'yalniz Bos' kaydet yolu yok", "jenerik gorev_tamamla bu gorevi sonucsuz KAPATAMAZ (T-74 guard)", "'21. gun kontrol' ifadesi yok (§18.13)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-05
+  title: "Takip muayenesi sonuc ekrani (6c.4): secenek seti + Gebe"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui, ui-playwright]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["acik TAKIP_MUAYENE gorevi (T-03 ile kurulmus)", "muayene gunu gelmis"]
+  positive_oracle: ["mockup 05 birebir; Kaydet etiketi secime gore 'Muayene tamam + …' ('Bos ata' oneki yok)", "tam set GEBE/Ovsync/PG/Muayeneyi ertele; TAKIP_MUAYENE'de yeniden Takibe birak yok; ertele on ayari +7, SAATSIZ", "Gebe secilirse son tohumlama Gebe'ye cevrilir (p_bos_duzeltme=true), takip GEBE_BULUNDU ile kapanir"]
+  negative_oracle: ["bu ekranda 'yalniz sonuc kaydet' yok", "genel tohumlama_sonuc_gebe RPC'si Bos tohumlamayi hala REDDEDER (Bekliyor-only)", "ertelemede gorev UPDATE (yeni gorev INSERT degil)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-06
+  title: "PG kapisı 'Bos ata ve uygula'; secici acilmaz"
+  risk: R3
+  owner_model: glmf+review
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["sunucu PG_KAPI:* raise edecek durum (mevcut PG kapi kosullarindan biri)"]
+  positive_oracle: ["tek islemde: sonuc='Bos' + PG uygulamasi + (uygunsa) +48 s TAI — T-02 ile ayni sonuclar", "_pgKapiHata onay penceresi (#pg-kapi-bs); devam secici hic gorunmez"]
+  negative_oracle: ["cift onay/cift kayit yok", "'Vazgec' dalinda hicbir sey yazilmaz — sonuc Bekliyor kalir"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-07
+  title: "Secim zorunlu; secilmeden Kaydet pasif"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["herhangi bir Bos giris noktasi (T-01/T-04)"]
+  positive_oracle: ["Kaydet pasif (disabled); 'Devam nasil olsun? (zorunlu)' etiketi gorunur (mockup 01/07-akis)"]
+  negative_oracle: ["Bos sonucu secicisiz kaydeden gizli yol yok (tohumlama_bos_ve_devam'siz sonuc='Bos' yazan UI yolu yok — kod taramasi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# B. Tek-islem atomikligi (kapsam 2)
+- scenario: T-08
+  title: "PG dali hata → Bos ATANMAZ"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["T-02 on kosulu", "PG stok yetersizligi seed ya da gecersiz p_pg_urun"]
+  positive_oracle: ["tohumlama.sonuc hala 'Bekliyor'; pg_application_event yeni satir yok", "stok degismedi; gorev dogmadi", "UI varyanti: hata toast + modal acik kalir"]
+  negative_oracle: ["yarim durum yok — 'Bos atandi ama PG olmadı' ve 'PG oldu ama sonuc girilmedi' yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-09
+  title: "Ovsync dali hata → Bos ATANMAZ"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["kural gunu gelmemis H"]
+  positive_oracle: ["kural gunu gelmemis H'de p_secim='OVSYNC' zorla → OVSYNC_ERKEN:{…} (veya kisir guard redsi)", "sonuc Bekliyor; vaka/gun/gorev hic kurulmadi"]
+  negative_oracle: ["UI atlanarak kotu cagrida sunucu katmani tek basina dayanikli"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-10
+  title: "TAKIP dali hata → Bos ATANMAZ"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["hedef_tarih kisitina aykiri gecersiz p_gun"]
+  positive_oracle: ["p_secim='TAKIP' + gecersiz gun → sunucu red; sonuc Bekliyor; gorev yok"]
+  negative_oracle: ["takip gorevi 'sonra kurulur' artigi yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-11
+  title: "PG kapisı yolunda atomiklik"
+  risk: R3
+  owner_model: glmf+review
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["T-06 akisi", "PG cekirdeginde hata zorlamasi (stok dusumu basarisiz)"]
+  positive_oracle: ["sonuc Bekliyor (Bos atanmadi); olay yok"]
+  negative_oracle: ["'Bos atandi + PG dusmedi' yari-durumu yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+# C. Siralama tuzagi (kapsam 3)
+- scenario: T-12
+  title: "TAKIP seciminde OVSYNC_BASLAT DOGMAMALI"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["muafiyeti olmayan H (kural gunu gelmis, acik gorevi yok)"]
+  positive_oracle: ["T-03 akisi sonrasi gorev_log'da sifir yeni OVSYNC_BASLAT (gecikmeli etki dahil)", "yalniz takip gorevi"]
+  negative_oracle: ["muafiyet penceresi dolmadan gorev satiri belirdi → HATA (spec'in acik korkusu)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-13
+  title: "Takip acikken otomatik OVSYNC_BASLAT acilmaz (gece taramasi)"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["acik takip gorevli H", "H acik-disi taramasina girecek durumda (aksi muafiyeti yok)"]
+  positive_oracle: ["H icin gorev KURULMAZ (muafiyet listesi 'acik takip gorevi olani' icerir); islem kaydinda muafiyet izi"]
+  negative_oracle: ["takip kapaninca ayni tarama gorevi KURAR (pozitif kontrol — kapanis sonrasi kural gunu geldiyse)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# D. Hard block — Ovsync kilidi (kapsam 4)
+- scenario: T-14
+  title: "Kisir: Ovsync karti kilitli + gerekce; on secim Takibe birak"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui, ui-playwright]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["H kisir=true", "sonucu Bekliyor tohumlama"]
+  positive_oracle: ["Ovsync karti kilitli + '🔒 Kisir' gerekcesi; PG ve Takibe birak secilebilir", "on secim Takibe birak; Kaydet etiketi 'Bos ata + takibe birak' (mockup 02)", "Takibe birak ile T-03 sonuclari"]
+  negative_oracle: ["kilitli Ovsync karti tiklanabilir degil", "DB'de p_secim='OVSYNC' zorlamasi red (T-18)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-15
+  title: "Kural gunu gelmemis — duve (dogum+12 ay 21 g)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["H duve, dogum_tarihi bugun−(12ay21g−14g)", "kural gunu bugun+14"]
+  positive_oracle: ["'🔒 Kural gunu GG.AA — N gun var' metni duve formuluyle (dogum+12ay21g)", "Takibe birak yuruyor; on secim Takibe birak"]
+  negative_oracle: ["zorla Ovsync denemesi OVSYNC_ERKEN", "ekranda gun sayisi = kural_gunu − bugun"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-16
+  title: "Kural gunu gelmemis — dogumlu/abortlu (GREATEST+51)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["son dogum bugun−20 (kural gunu bugun+31)", "abort varyanti: abort daha yakin"]
+  positive_oracle: ["gerekce '🔒 Kural gunu bugun+31 — 31 gun var'", "abort daha yakinsa GREATEST abort'tan sayar"]
+  negative_oracle: ["abort dalinda da 51 g formulu dogru"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-17
+  title: "Kisir + kural gunu gelmemis (ikisi birden)"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["H kisir=true VE kural gunu gelmemis"]
+  positive_oracle: ["kilitli kart + EN AZ BIR gerekce; davranis (kilit) her iki durumda da ayni"]
+  negative_oracle: ["iki gerekce ayni anda yarim/yaris halinde basmiyor"]
+  escalate_if: [spec_conflict]
+  max_self_repair: 2
+
+- scenario: T-18
+  title: "Hard block sunucuda esnetilmez"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["kisir H", "kural-gunu-gelmemis H"]
+  positive_oracle: ["p_secim='OVSYNC', p_onay=true dahil → her ikisinde de red (kisir guard / OVSYNC_ERKEN)", "hicbir yan yazma yok"]
+  negative_oracle: ["p_onay=true hard block'u ASMAZ (onay yalniz TAKIP_ACIK icindir)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# E. Takip otomatik kapanis (kapsam 5)
+- scenario: T-19
+  title: "Yeni tohumlama → SESSIZ kapanis + neden kaydi"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["acik takip gorevli H", "girilecek kizginlik gozlemi/tohumlama kaydi"]
+  positive_oracle: ["takip gorevi KAPANDI; kapanis nedeni 'yeni tohumlama' iziyle kayitli (sessiz iptal degil)", "onay penceresi HIC acilmadi (sessizlik ekran tarafinda)"]
+  negative_oracle: ["TAKIP_ACIK hatasi/onayi cikmadi", "tohumlama engellenmedi"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-20
+  title: "PG/Ovsync → TAKIP_ACIK onayi: EVET"
+  risk: R3
+  owner_model: glmf+review
+  layers: [insan-ui, ui-playwright, db-sql]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["acik takip (muayene GG.AA SS:SS)", "PG uygulama ekrani (bagimsiz PG ya da Bos+PG)"]
+  positive_oracle: ["app'in kendi bottom-sheet'i: 'Kupe X, GG.AA SS:SS'te rektal muayene takibinde. Takip kapatilip PG uygulansin mi?' (tarayici confirm() DEGIL, mockup 04)", "Evet → p_onay=true ikinci cagri; takip kapandi + PG uygulandi TEK islemde", "onayda kupe no + muayene tarih/saat metni; tek onay penceresi"]
+  negative_oracle: ["'Evet'te takip acik kalip PG olmasi yok", "duz hata toast'i YASAK (§18.8 ruhu)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-21
+  title: "TAKIP_ACIK onayi: VAZGEC"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["T-20 kurulumu (onay penceresi acik)"]
+  positive_oracle: ["HICBIR degisiklik: takip acik, PG yok, vaka yok", "pencere kapanir, onceki ekrana donulur"]
+  negative_oracle: ["ikinci otomatik deneme yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-22
+  title: "Hayvan cikisi → kapanis"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["acik takip", "cikis (satis/olum) kaydi girilebilir demo durumu"]
+  positive_oracle: ["takip kapandi, neden=cikis; ek muayene gorevi dogmadi"]
+  negative_oracle: ["cikis sonrasi listede 'muayene bekler' artigi yok (T-59 KPA baglantisi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-23
+  title: "Kapanis nedeni uc olayda da kayitli"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["T-19/T-20/T-22 kosum ciktilari"]
+  positive_oracle: ["uc farkli olay uc ayirt edilebilir neden degeri; bos/null kapanis yok"]
+  negative_oracle: ["hepsinde ayni genel 'iptal' degeri degil (ayristirilabilirlik)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-24
+  title: "Ayni anda iki olay (cift kapanis yok)"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["acik takip"]
+  positive_oracle: ["ayni transaction sirasinda once tohumlama sonra PG → takip BIR kez kapanir", "ikinci olay takibi zaten kapali bulur (idempotent); hata/YARIM durum yok"]
+  negative_oracle: ["cift kapanis izi / cift kapanis-nedeni ust uste yazimi yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+# F. Muayene erteleme dongusu (kapsam 6)
+- scenario: T-25
+  title: "Tek erteleme: +7 gun, saat varsayilan SAATSIZ"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["H takip muayenesi gununde (T-05 ekrani)"]
+  positive_oracle: ["hedef_tarih=eski+7; saat girilmediyse hedef_saat NULL (saatsiz gorev)", "gorev satiri UPDATE (yeni gorev INSERT degil); takip isareti korunur; kapanis yok", "S3 rozeti yeni 'muayene GG.AA' (saatsizse saat gosterilmez)"]
+  negative_oracle: ["ikinci/paralel takip gorevi dogmadi", "'onceki saat on ayarli' davranis YOK (S-2 eski hali gecersiz)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-26
+  title: "Coklu erteleme (zincir 3 tur) + ≥21 g tek onay"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["T-25 kurulumu", "toplam takip suresi ≥21 gun varyanti"]
+  positive_oracle: ["her turda +7; TEK gorev satiri; 'takip N. gun' basligi guncel", "≥21 g'de tek onay: p_onay=false ile red (TAKIP_UZADI:{toplam_gun}); tek onayla gecer"]
+  negative_oracle: ["erteleme tavani YOK (sinirsiz)", "onaysiz gecis yok; cift onay penceresi yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-27
+  title: "Erteleme sonrasi S3 rozeti guncellenir"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["T-25 kosumu tamamlanmis"]
+  positive_oracle: ["satir rozeti '🔍 takipte · muayene <yeni tarih> <ayni saat>'; hayvan hicbir bolumden dusmedi"]
+  negative_oracle: ["eski tarih rozeti kalmadi"]
+  escalate_if: []
+  max_self_repair: 2
+
+# G. Deneme sayaci (kapsam 7)
+- scenario: T-28
+  title: "Dogum sonrasi sayac sifirlanir"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["3 tohumlama + eski dogum kaydi + yeni Bekliyor tohumlama"]
+  positive_oracle: ["deneme_sayisi = son dogum.tarih'ten beri tohumlama sayisi (bu kurulumda 1)", "rozet '1. deneme'"]
+  negative_oracle: ["omur-boyu sayim (4) gosterilmedi"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-29
+  title: "Dogumsuz duve — omur-boyu sayac"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["hic dogumu olmayan H (2 onceki tohumlamali)"]
+  positive_oracle: ["deneme_sayisi = omur boyu tohumlama sayisi (2) — 'son dogum yoksa omur boyu'"]
+  negative_oracle: ["0/bos degil"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-30
+  title: "tohumlama.deneme_no kolonuyla KARISMAZ"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["dogum + yeni tohumlama", "kolon deneme_no=4 (omur boyu) iken hesaplanan=1"]
+  positive_oracle: ["gosterim 1 ('1. deneme'); RPC deneme_sayisi=1"]
+  negative_oracle: ["deneme_no kolonunun ham degeri hicbir yuzeye sizmiyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-31
+  title: "Rozet metni 'N. deneme — onceki bos'"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["onceki sonucu Bos olan H'nin S1/S2 satiri"]
+  positive_oracle: ["'2. deneme — onceki bos' kalibi (mockup 01: '2. deneme (bu laktasyon)' — nihai metin planla kesinlesir)"]
+  negative_oracle: ["sayi gorsel olarak dogum oncesi denemeleri icermiyor"]
+  escalate_if: [spec_conflict]
+  max_self_repair: 2
+
+# H. Takip ekrani — §4b matrisi + bolum kurallari (kapsam 8)
+- scenario: T-32
+  title: "S0 BUGUN & GECIKEN + bossa gizli"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["bugun TAI'li hayvan (S0 adayi)", "gecikmis gunu olan hayvan", "ikinci kosum: hicbiri yok"]
+  positive_oracle: ["'Kupe X — TAI bugun SS:MM [▶]' canli kart; geciken kart kirmizi", "ikinci kosumda S0 bolumu hic render edilmiyor"]
+  negative_oracle: ["bos S0 basligi/placeholder yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-33
+  title: "S3 pencere disi: 🔒 + hedef tarih, aksiyon yok"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui, ui-playwright]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["OVSYNC_BASLAT gorevi hedefi bugun+8 (pencere = hedef−2 disi)"]
+  positive_oracle: ["satir 'X · Duve · hedef GG.AA (N gun)' + 🔒 kilidi; 'N gun sonra baslatilabilir' bilgi satiri"]
+  negative_oracle: ["▶ Baslat YOK; Ertele/✕ mevcut aksiyonlari kalir"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-34
+  title: "S3 pencere icinde (hedef−2): ▶ Baslat → S1"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["hedefi bugun+2 gorevli H"]
+  positive_oracle: ["▶ Baslat inline (ovsyncBaslat → start_first_service_protocol): vaka + 4 gun + TAI gorevi", "satir S1'e tasinir (listeler tazelenir); S3 sayisi azalir"]
+  negative_oracle: ["ek onay modalsiz inline", "pencere disi satirda buton yok (T-33 ile cift yonlu)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-35
+  title: "S1 gun vakti: amber + zaman cizelgesi"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui, ui-playwright]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["H'nin bugunu planli ilac gunu (gecikme 0)"]
+  positive_oracle: ["gun noktasi amber; tarih gorunur; 'N/4 uygulandi · siradaki: N+1. uygulama'", "dokunus → openCaseDet zaman cizelgesi (renderCaseTimeline); PG dogrudan dokunus YOK (§18.8)"]
+  negative_oracle: ["gun satirindan tek dokunusla ilac uygulama yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-36
+  title: "S1 gun gecikti: kirmizi +Ng, one alinir, Ertele"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["planli gun bugun−N (gecikme N>0)"]
+  positive_oracle: ["kirmizi '+Ng'; satir bolumde one alinmis; inline Ertele + openCaseDet var"]
+  negative_oracle: ["gecikmeli satir listede rastgele sirada degil"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-37
+  title: "S1 TAI gunu: BUGUN → kaydet → S2"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["TAI hedefi bugun olan H (S0 karti da var)"]
+  positive_oracle: ["[▶] → gorev detayi → 'Tohumlamayi Kaydet': tohumlama satiri (Bekliyor); TAI gorevi tamamlandi; vaka kapanis kurallari isler (§18.6)", "satir S2'ye gecer ('Sonuc bekleyenler': kupe + TAI tarihi + sayac + deneme rozeti)"]
+  negative_oracle: ["S1'de TAI'li satir kalmiyor", "S0 karti dusuyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-38
+  title: "S2 muayeneye N gun: sayac, aksiyon yok"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["TAI bugun−10 (esik 40 → kalan 30)"]
+  positive_oracle: ["'muayeneye 30 gun'; satirda aksiyon butonu yok (bilgi)"]
+  negative_oracle: ["'21. gun kontrol' ifadesi / 21'e dayali sayac YOK"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-39
+  title: "S2 muayene vakti (≥40 g) → birlesik muayene ekrani (K15)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["TAI bugun−40 (kalan 0 — sinir: kalan_gun <= 0)"]
+  positive_oracle: ["satir → birlesik muayene sonuc ekrani (K15, muayene_gorev_id'ye bagli)", "a) Gebe → sonuc='Gebe', satir S4'e (sonlanma rozeti + toh_sonuc=Gebe)", "b) Bos → devam secici (§6c) → secime gore S1/S3; c) Ertele → T-75"]
+  negative_oracle: ["muayene vakti satirinda olu aksiyon yok", "satirdan gorev ZORLA dogmaz (§10d #2 — gorev cron'undur)", "sayac 'vakti' metnine doner"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-40
+  title: "S4 sonlananlar: salt-okuma + pencere + katlanir"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["kapali vakalar: 30/59/61 gun once"]
+  positive_oracle: ["RPC default'ta 30 ve 59 doner, 61 donmez; p_sonlanan_gun=90'da 61 doner", "bolum katlanir (kapali baslar); satir rozet + toh_sonuc; dokunus openCaseDet salt-okuma"]
+  negative_oracle: ["S4'te yazma aksiyonu (baslat/ertele/kaydet) yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-41
+  title: "Akis yerlesimi: Bos sonrasi dogru bolume duser"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["uc dal hayvanlari: Bos+Ovsync / Bos+PG (uygun, TAI'li) / Bos+TAKIP"]
+  positive_oracle: ["Bos+Ovsync → S1; Bos+PG → S1; Bos+TAKIP → S3 '🔍 takipte'; sonuc girilen hayvan S2'den duser", "mockup 07 haritasi birebir; 'Bos hayvan hicbir bolumden dusmez'"]
+  negative_oracle: ["S2'de 'yeni deneme bekliyor' satiri kalmiyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-42
+  title: "Dalga gruplama + tekil baslangiclar"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["3 vaka ayni OVSYNC_BASLAT.hedef_tarih (dalga)", "1 gorevsiz vaka (anahtar=start_date)", "1 tekil gorevli vaka"]
+  positive_oracle: ["dalga grubu tek baslikta (hedef→fiilen + hayvan sayisi + ortak siradaki adim)", "gorevsiz vakalar kendi anahtarinda; tekil kalanlar 'tekil baslangiclar'"]
+  negative_oracle: ["gruplamada gorevli/gorevsiz karismiyor", "baslikta hedef≠fiili sapma gorunur (T-69 baglantisi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# I. Muayene esigi 40 — ayar tek kaynagi (kapsam 9)
+- scenario: T-43
+  title: "Ayar degisince sayac degisir"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["demo sessiz_tohumlama_muafiyet_gun=40", "TAI bugun−38 (kalan 2)"]
+  positive_oracle: ["ayar 35 yapilinca esikler.muayene_gun=35; satir 'muayene vakti' (kalan 0); muayene tarihi = TAI+35", "ayar 40'a geri getirilir (temizlik)"]
+  negative_oracle: ["sayac ayardan turemeden sabitse HATA"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-44
+  title: "21 hicbir yerde yok (§10d #1 ile guclendirildi)"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["esik kaynagi esikler ayari (demo)", "RPC ciktisi + JS esik modulu kod taramasi"]
+  positive_oracle: ["esik yalniz esikler ayar kaynagindan; JS'te muayene-gunu sabiti yok (21/40 hazir-degeri grep'i)", "uretim tarafinda +21/+35 g gorev uretimi KALDIRILMIS (P2c, T-80)"]
+  negative_oracle: ["'21. gun' metni/uretimi hicbir yuzeyde yok (§18.13 iptal + §10d #1)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-45
+  title: "Ayni esik iki yuzeyde — KUME-TAM ESITLIK (D2)"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["prova verisi: 30 g cooldown'a giren + girmeyen hayvanlar birlikte"]
+  positive_oracle: ["S2 satir kumesi ≡ gebelik_muayene_listele (iki yonlu EXCEPT, fark=0; cooldown predicate dahil)", "ayni tohumlama iki yuzeyde ayni kalan-gun"]
+  negative_oracle: ["predicate setinden biri eksikse iki yonlu fark bos cikmaz", "esik degisiminde (T-43) iki yuzey AYNI anda kayar"]
+  escalate_if: []
+  max_self_repair: 2
+
+# J. Bayrak kapali, offline, RPC hata (kapsam 10)
+- scenario: T-46
+  title: "Bayrak kapali: bayrak_kapali + acik mesaj"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["demo ovsync_pg_kurallari_aktif=0 (kosum sonrasi geri acilir)"]
+  positive_oracle: ["RPC {ok:true, bayrak_kapali:true} (satirlar bos/verilmez)", "ekranda bayrak-kapali acik mesaji; bossa gizli disiplini"]
+  negative_oracle: ["bos liste sessizce gosterilmez", "'hic kayit yok' yaniltici bos durumu yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-47
+  title: "Offline + onbellek var: bayat etiket"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["online ilk yukleme (__ovsyncTakip dolu)", "context.setOffline(true)"]
+  positive_oracle: ["bayat veri + 'cevrimdisi · HH:MM verisi' etiketi"]
+  negative_oracle: ["cevrimdisiyken sessiz taze-mis gibi davranis yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-48
+  title: "Offline + onbellek yok: acik mesaj"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["onbelleksiz taze yuklemede offline"]
+  positive_oracle: ["'Internet yok — takip verisi alinamadi' mesaji"]
+  negative_oracle: ["bos kpa/satir render edilmedi"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-49
+  title: "RPC hata (500/timeout): offline yolu gibi"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["stub-backend hata enjeksiyonu"]
+  positive_oracle: ["onbellege gore T-47/T-48 davranisi; hata toast'u veri yuzeyini ezmez"]
+  negative_oracle: ["ham hata metni kullaniciya sizmiyor (kullanici diline cevrilmis)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-50
+  title: "Yazma akislari sonrasi invalidate"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["acik sayfa", "yazma akislari: ovsyncBaslat / erteleme / tohumlama kaydi / Gebe-Bos atama / §6c RPC"]
+  positive_oracle: ["her yazma sonrasi __ovsyncTakip=null → yeniden yukle; ekran yeni durumu gosterir (ayni oturumdaki yazma)"]
+  negative_oracle: ["bayat satir kalmiyor (kapanan vaka hala 'aktif' gibi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# K. Gezinme sozlesmesi §6b (kapsam 11)
+- scenario: T-51
+  title: "Yatay gecis; hub mecburiyeti yok"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: []
+  positive_oracle: ["Ana → Ovsync → Gorevler → Ovsync (dogrudan); her adim dogru yuzey", "goTo('ovsync') pushState'e katilir (navGeriKarar)"]
+  negative_oracle: ["Ovsync↔Gorevler gecisi Ana uzerinden zorlanmiyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-52
+  title: "Modal acikken geri: yalniz modal kapanir"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["Ovsync'te acik openCaseDet modali"]
+  positive_oracle: ["tarayici Geri → modal kapanir, sayfa yerinde tazelenir; sayfa gecisi olmadı"]
+  negative_oracle: ["geri = sayfadan cikmak degil"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-53
+  title: "Kaydirma konumu korunur"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["uzun liste (kaydirma yapilmis)"]
+  positive_oracle: ["Gorevler'e gecip donuste ayni kaydirma konumu; veri taze (her donuste yeniden yukleme)"]
+  negative_oracle: ["en uste sifirlanma yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-54
+  title: "Padok filtresi korunur"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["uygulanmis padok filtresi"]
+  positive_oracle: ["filtre ve bolum acik/kapali durumu korunur (ayril/don)"]
+  negative_oracle: ["donuste filtre sifir degil"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-55
+  title: "‹ = history.back()"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["Ana→Ovsync→Gorevler gecmis yigini"]
+  positive_oracle: ["Ovsync'te ‹ → bir adim geri (gecmis yigindan); goTo('dash') DEGIL"]
+  negative_oracle: ["‹ her zaman Ana'ya atmiyor (yigin sismiyor)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# L. Girisler + sayi tutarliligi (kapsam 12)
+- scenario: T-56
+  title: "Dashboard 6. stat hucresi + sinif kosullari"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["uc durum kuran demo verisi: S0>0 / yalniz bekleyen-baslatma>0 / sakin"]
+  positive_oracle: ["uc kosumda uc sinif: alert / warn / ok (kosul sirasi spec'inki)", "hucre '🔄 Ovsync ›' + aktif zincir sayisi; tikla → goTo('ovsync'); grid'de 6. hucre (2 kolon)"]
+  negative_oracle: ["sinif esikleri ters/karisik degil"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-57
+  title: "Ikincil giris: 🔔 'Tum takibi ac →' + Gorevler koprusu"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: []
+  positive_oracle: ["🔔 🌱 bolumunde 'Tum takibi ac →' ovsync sayfasina; Gorevler basliginda 'Tum ovsync takibi →'", "ovsync gorevleri 🌱 Ureme cipinde (§18.16; ozel emoji insan-UI goz karari)"]
+  negative_oracle: ["kopruler hub zorlamiyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-58
+  title: "Ovsync sayfasi = 🔔 🌱 sayisi (ayni anda)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["ayni veri ani (once 🔔 sonra ovsync, ayni pull)"]
+  positive_oracle: ["iki yuzeyin bekleyen-baslatma sayilari esit"]
+  negative_oracle: ["ovsync sayfa sayisi 🔔'den farkliysa HATA", "Gorevler roziti (IDB) ve can roziti (iki RPC toplami) icin esitlik iddiasi YOK — regresyonda korunur"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-59
+  title: "KPA serit tutarliligi"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["RPC kpa blogu + satir verisi"]
+  positive_oracle: ["kpa bes sayisi (Aktif/Bugun/Geciken/Muayene bekleyen/Bekleyen baslatma) RPC'den bagimsiz SQL ile yeniden hesap; uc yuzeyde esit", "'Bekleyen baslatma' takip dahil (S-6 kapandi)"]
+  negative_oracle: ["kapanan takip/vaka sonrasi sayi dusuyor (canlilik; sessiz-varsayilan yasagi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# M. Guvenlik (kapsam 13)
+- scenario: T-60
+  title: "Anon/PUBLIC EXECUTE yok"
+  risk: R4
+  owner_model: glmf+review
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["demo DB + iki RPC (ovsync_takip_listele, tohumlama_bos_ve_devam)"]
+  positive_oracle: ["has_function_privilege('anon',…,'EXECUTE') = false iki RPC icin + PUBLIC kontrolu", "SET ROLE anon cagri denemesi red; yalniz authenticated grant"]
+  negative_oracle: ["yeni RPC'ler sablondan TO anon delmiyor (default-privilege tuzagi: REVOKE'a PUBLIC dahil)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-61
+  title: "farm_id disiplini: predikat/damga YOKLUGUNUN kaniti"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql, unit]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["16 tablo listesi (P1/P2b dokunuslari)", "demo information_schema olcumu + grep/govde incelemesi"]
+  positive_oracle: ["16 tabloda farm_id kolonu yalniz pg_application_event'te (demo olcum 2026-09-29); kolon tasimayan 15 tabloya predikat/damga yazilmamis (§14)", "P2b son_pg okumasinda farm_id = public.current_farm_id() filtresi VAR"]
+  negative_oracle: ["kolonsuz tabloya predikat EKLENMISSE §14 ihlali (gereksiz retrofit)", "iki-farm negatif testi YOK (Faz 2'ye tasindi — §10c #13)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-62
+  title: "RPC_TABLES disiplini"
+  risk: R1
+  owner_model: glmf
+  layers: [unit, db-sql]
+  target_file: tests/unit/ovsync-takip.test.js
+  fixtures: ["RPC_TABLES haritasi (kod taramasi)"]
+  positive_oracle: ["RPC_TABLES'da ovsync_takip_listele YOK; tohumlama_bos_ve_devam VAR (pull tablolariyla)", "takip RPC'si rpc() dogrudan cagriyla calisiyor"]
+  negative_oracle: ["takip RPC'si tabloya eklenmisse R1 regresyonu (salt-okuma invariant)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# N. PROD kenar vakalari — demo replikasyonu (kapsam 14)
+- scenario: T-63
+  title: "'Kupe 51' replika: TAI'siz, sebebsiz kapanmis vaka"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["vaka: 4 gun tamamlanmis, TAI gorevi iptal, tohumlama YOK, close_reason=NULL, kapanmis"]
+  positive_oracle: ["S4 satiri rozet 'Eski/bilinmiyor'; toh_sonuc='bilinmiyor' (tahmin yok)", "gun noktalari tamam yesil"]
+  negative_oracle: ["'TOHUMLAMA ile kapandi' gibi uydurma rozet yok", "sessiz satir-dusme yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-64
+  title: "'Kupe 19' replika: gelecek tarihli gunler + erken TAI"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["gun2–4 tamamlandi=true + gelecek tarihli tamamlanma_tarihi", "vaka baslangic gunu girilmis (erken) tohumlama"]
+  positive_oracle: ["o gunler 'tutarsiz' (⚠ veri tutarsiz) — 'uygulanmadi' diye gosterilmez", "sapma rozeti 'erken Ng' (hedef−fiili)"]
+  negative_oracle: ["⚠ isaretsiz 'tamam yesil' gorunumu HATA"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-65
+  title: "'Kupe 902' replika: kapali (Bos sonuclu) + aktif vaka"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["eski vaka kapali (Bos sonuclu tohumlama ile)", "yeni vaka aktif"]
+  positive_oracle: ["S1'de TEK satir (aktif); eski vaka S4'te ayri satir", "eski TAI/sonuc detayda"]
+  negative_oracle: ["iki satir birlesmis / cift aktif gorunum yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-66
+  title: "'Kupe 183' replika: sonuc girilmis, vaka gec kapanmis"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["tohumlama sonucu Gebe (TAI+X gun)", "vaka sonuclardan 40 gun sonra kapanmis", "kontrol varyanti: kapanis+2g disi tohumlama"]
+  positive_oracle: ["S4'te toh_sonuc='Gebe' (K6: hayvan_id + TAI tarihi ∈ [start, kapanis+2g])", "sonlanma rozeti tutarli"]
+  negative_oracle: ["eslesme penceresi disinda 'bilinmiyor' (kontrol varyanti)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-67
+  title: "'Kupe 197' replika: Bos + yeni deneme Bekliyor → S2"
+  risk: R2
+  owner_model: glmf
+  layers: [insan-ui, ui-playwright, db-sql]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["onceki tohumlama Bos (TAI 40+ gun once)", "yeni tohumlama Bekliyor (kalan <40)"]
+  positive_oracle: ["S2 satiri: kupe + TAI tarihi + 'muayeneye N gun' + '2. deneme' rozeti (mockup 01)"]
+  negative_oracle: ["Bos gecmisi sayaca vurmuyorsa HATA (T-28 baglantisi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-68
+  title: "'Kupe 121' replika: Bekliyor tohumlama dururken yeni aktif vaka"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["09-17 tarihli Bekliyor tohumlama + aktif vaka (acik TAI gorevi)"]
+  positive_oracle: ["S1 satiri aktif TAI'yi gosterir; eski Bekliyor tohumlama satirda degil, detayda (§7.2)"]
+  negative_oracle: ["satirda iki TAI gorunmuyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-69
+  title: "Dalga sapmasi replika (hedef → fiilen +3g)"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui, ui-playwright]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["dalga: gorev hedef_tarih X, vaka start X+3", "islem_log VAKA_KAYDIR gecmisi"]
+  positive_oracle: ["grup basligi 'hedef GG.AA → fiilen GG.AA'; satirda '+3g' kayma rozeti", "veri bukeri gorunur (P2: gizlenmez)"]
+  negative_oracle: ["sapma satirdan silinmis/beyazlatilmis degil"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-70
+  title: "Cift bayrak + gorevsiz/erken tohumlama etiketleri"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["a) gorev tamamlandi=t, iptal=t (PG devraldi deseni)", "b) iptalli TAI gorevi + gorevsiz girilmis tohumlama", "c) hedeften erken girilmis tohumlama"]
+  positive_oracle: ["(tamamlandi, iptal) ikilisiyle yorum: kapandi-dendi ama devralindi ayrimi ikiliden dogru", "b) 'gorevsiz' rozeti; c) 'erken Ng' rozeti"]
+  negative_oracle: ["uc desen ayni genel duruma cokmedi (ayristirilabilir)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-71
+  title: "'Test inek 3' kaos replika + test notu + bozuk snapshot"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["vaka1 PG ile kapandi → vaka2 IPTAL → yeniden-baslat gorevi iptalli → gorevsiz tohumlama Bekliyor", "bir vakada bozuk/bilinmeyen protocol_snapshot parcasi"]
+  positive_oracle: ["S4'te iki satir iki farkli rozet (PG, IPTAL)", "test hayvani satirinda 'test' notu", "bozuk yapi 'bilinmiyor' ETIKETI basar (sessiz varsayilan YASAK)"]
+  negative_oracle: ["bozuk snapshot tum ekrani cokertmiyor", "test notu kalici (B3 tamamlanana kadar not duzeyi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+# O. Eszamanlilik (kapsam 15)
+- scenario: T-72
+  title: "Iki cihazdan ayni hayvana Bos — MK9 kilit sirasi + tek kazanan"
+  risk: R5
+  owner_model: glm
+  layers: [ui-playwright, db-sql, concurrency]
+  target_file: tests/concurrency/ovsync-takip-t72b.mjs
+  fixtures: ["iki oturum ayni Bekliyor tohumlamayi acik goruyor"]
+  positive_oracle: ["tek sonuc degisimi; kaybeden cagri TOH_SONUCLU acik hatasi; kaybedenden hicbir yan yazma (vaka/gorev/olay) yok", "kilit dizisi: sarmal hayvan NKU → tohumlama FU → (muayene yolunda) gorev_log FU; start_first_service_protocol gorev→hayvan ihlali duzeltilmis (P3b)", "UI: A Bos+TAKIP kaydeder, B (bayat ekranla) Bos+Ovsync dener → B red gorur"]
+  negative_oracle: ["cift deneme/cift gorev dogmuyor", "B'nin hatasi sessiz basari gibi gorunmuyor", "p_onay=true TOH_SONUCLU'yu asmaz (onay yalniz TAKIP_ACIK icindir)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-73
+  title: "Takip kapanirken muayene sonucu — sozlesme (S-8)"
+  risk: R5
+  owner_model: glm
+  layers: [db-sql, ui-playwright, concurrency]
+  target_file: tests/concurrency/ovsync-takip-t72b.mjs
+  fixtures: ["acik takip", "PG onayi (TAKIP_ACIK evet) tamamlanmak uzere + diger cihaz muayene sonucu gonderiyor"]
+  positive_oracle: ["kapandi-sonrasi penceresinde muayene sonucu → acik red TAKIP_KAPALI:{…} (P2b sozlesmesi)", "H4 kilitsiz kesif → yeniden dogrulama ayni red dondurur", "kayip/gozden dusen sonuc YOK; yari-kapali takip kalmiyor"]
+  negative_oracle: ["ikinci yazma ilkini geri almiyor", "cift kapanis yok (T-24 tamamlayici)", "sessiz basari yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+# P. K15/birlesik muayene senaryolari (kapsam 16)
+- scenario: T-74
+  title: "Jenerik gorev_tamamla guard — UC DAL"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["GEBELIK_KONTROL ve TAKIP_MUAYENE gorevli fixture hayvan (E2E- marker, demo)", "SUTTEN_KESME/padok tipli fixture gorev (dal 3)"]
+  positive_oracle: ["dal 1: jenerik gorev_tamamla (p_iptal bos/false) muayene tipli gorevde MUAYENE_SONUC_GEREKLI:{gorev_tipi} red; gorev acik kalir", "dal 2: p_iptal=true → iptal BASARILI (T5 sozlesmesi; js/ui.js:1841 korunur)", "dal 3: SUTTEN_KESME/padok gorevi mevcut davranis (kapanis + padok transferi); guard dokunmaz"]
+  negative_oracle: ["dal 1'de gorev sonucsuz sessiz kapanmadi (sessiz kapanis = HATA)", "dal 2'de iptal guard'a takilmadi", "dal 3'te mevcut akis bozulmadi; kilit sirasi degisir (guard tipi ilk erisimden once kilitsiz okur)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-75
+  title: "GEBELIK_KONTROL erteleme yolu (birlesik ekrandan; saatsiz)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["acik GEBELIK_KONTROL (T-79/T-80 kurulumu)"]
+  positive_oracle: ["hedef_tarih=bugun+7; p_saat girilmediyse hedef_saat NULL (SAATSIZ — iki gorev tipinde de)", "gorev acik kalir (UPDATE); zincir surer; ERTALE sarmal muayene kolundan"]
+  negative_oracle: ["yeni gorev INSERT degil", "eski atama saati on ayar olarak gelmiyor (S-2 eski hali gecersiz)", "genel 'ertele' butonu bu tiplerde YOK (§10d #3)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-76
+  title: "Iki gorev tipi ekran ozdesligi (S-10 copy)"
+  risk: R1
+  owner_model: glmf
+  layers: [insan-ui, ui-playwright]
+  target_file: runs/2026-09-28-ovsync-takip/ui-test-listesi.md
+  fixtures: ["GEBELIK_KONTROL gorevli hayvan (cron)", "TAKIP_MUAYENE gorevli hayvan"]
+  positive_oracle: ["ayni ekrani iki tip gorevle ac: AYNI sonuc ekrani (Gebe / Bos→devam secici / Muayeneyi ertele); tek fark baslik baglami", "'Muayene tamam + …' etiketleri ('Bos ata' oneki hicbir varyantta yok)"]
+  negative_oracle: ["tip bazli ayri ekran/sarici yok", "mockup 05 literal 'Bos ata + …' copy'si KULLANILMAZ (§10c copy satiri)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-77
+  title: "Takip muayenesinde Gebe (Bos→Gebe duzeltmesi, GEBE_BULUNDU)"
+  risk: R4
+  owner_model: glmf+review
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["son tohumlama sonuc='Bos' + bagli ACIK TAKIP_MUAYENE (kaynak='TAKIP:'||toh_id)", "muayene gunu gelmis"]
+  positive_oracle: ["onceki Bos hatali sayilir: tohumlama.sonuc='Gebe' + hayvanlar.tohumlama_durumu='Gebe'; gorev tamamlandi + takip_kapanis_nedeni='GEBE_BULUNDU'", "islem_log GEBE_ATAMA snapshot'inda bos_duzeltme blogu {eski_sonuc, bos_atama_tarihi, takip_kapanis}", "Bos'un TOHUMLAMA_SONUC izi DOKUNULMAZ; acik GEBELIK_KONTROL/TOHUMLAMA_HAZIRLIK iptalleri geri ALINMAZ (T-83)"]
+  negative_oracle: ["genel tohumlama_sonuc_gebe RPC'si Bos tohumlamayi hala REDDEDER (Bekliyor-only)", "cekirdege REST'ten dogrudan cagri red (authenticated EXECUTE yok — yalniz sarmal)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-78
+  title: "Gebelik kontrolunde Gebe (p_bos_duzeltme=false yolu)"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["son tohumlama sonuc='Bekliyor' (≥40 g)", "acik GEBELIK_KONTROL"]
+  positive_oracle: ["gorev once tamamlanir; cekirdek p_bos_duzeltme=false ile mevcut tohumlama_sonuc_gebe yan etkileri", "islem_log GEBE_ATAMA (bos_duzeltme blogu YOK); acik GEBELIK_KONTROL/TOHUMLAMA_HAZIRLIK/TOHUMLAMA_PLANLI iptali"]
+  negative_oracle: ["Bos'tan Gebe'ye cevrim yok (yanlis hayvanda duzeltme modu acilmiyor)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-79
+  title: "Cron entegrasyonu: gebelik_muayene_gorev_uret ≥40 g + S2 ayni kume"
+  risk: R2
+  owner_model: glmf
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["esik dolmus (son tohumlama ≥40 g) Bekliyor hayvan"]
+  positive_oracle: ["gebelik_muayene_gorev_uret(false) → GEBELIK_KONTROL gorevi (kaynak='GEBELIK-KONTROL-'||toh_id, ref_tohumlama_id)", "NOT EXISTS acik-gorev kosuluyla tekrar cagri cift gorev URETMEZ", "S2 satirinin muayene_gorev_id bu gorevin id'si; dashboard 40 g satiri bu gorevi acar (T-82)"]
+  negative_oracle: ["cron iki kez → tek gorev", "gebelik_muayene_listele predicate'leri disindaki hayvanda gorev/satir yok (cooldown dahil — T-45)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-80
+  title: "Tek uretici: yeni tohumlama sonrasi GEBELIK_KONTROL DOGMAZ (P2c)"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["fixture hayvan + yeni tohumlama kaydi (herhangi yol)"]
+  positive_oracle: ["gorev_log'da 0 yeni GEBELIK_KONTROL (+21/+35 uretimi kaldirildi)", "protokol_instance UREME/TOHUMLAMA kaydi KURULUR (bag kopmaz); gorevi yalniz cron kurar (T-79)"]
+  negative_oracle: ["tohumlama sonrasi aninda GEBELIK_KONTROL belirdiyse HATA (eski uretici hortladi)", "esik dolmamisken cron gorevi yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-81
+  title: "Temizlik sonrasi cift gorev yok (P2d; SAY→iptal→cron tek gorev)"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["eski +21/+35'li acik GEBELIK_KONTROL gorevli hayvanlar (SAY adimi ciktisi)"]
+  positive_oracle: ["SAY → iptal (islem_log GOREV_GUNCELLENDI, snapshot adet+olcut) → cron TEK gorev (her hayvanda acik GEBELIK_KONTROL ≤1)", "ikinci kosum 0 satir (idempotent); temizlik sonrasi acik +21/+35 gorevi 0"]
+  negative_oracle: ["cron goreviyle +21/+35 gorevi ayni hayvanda ayni anda acik kalmiyor (cift gorev = HATA)", "PROD apply ayri sahip kapisi (demo provasi)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-82
+  title: "Dashboard 40 g satiri: acik gorev → birlesik ekran; yoksa hayvan detayi"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["a) acik_gorev_var=true satir", "b) acik_gorev_var=false satir"]
+  positive_oracle: ["a) IDB'den acik GEBELIK_KONTROL bulunup birlesik muayene ekrani (_muayeneSonucAc) acilir", "b) hayvan detay sayfasi"]
+  negative_oracle: ["b dalinda gorev olusturma/sonuc ekrani yok (ertesi sabah cron — §10d #2)", "a dalinda gorev bulunamazsa sessiz bos ekran degil — hayvan detayina duser"]
+  escalate_if: []
+  max_self_repair: 2
+
+# R. Plan v4–v7 hizalama senaryolari (kapsam 17)
+- scenario: T-83
+  title: "D1 geri-alinma kaniti (yan-etki tablosu satir satir)"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["T-77 kosumu tamamlanmis"]
+  positive_oracle: ["(1) tohumlama.sonuc + hayvanlar.tohumlama_durumu='Gebe' (geri dondu); (2) Bos anindaki GEBELIK_KONTROL/TOHUMLAMA_HAZIRLIK iptalleri hala iptal (geri alinmaz)", "(3) Bos'un islem_log TOHUMLAMA_SONUC izi durur, geri_alindi DEGIL; (4) Bos+TAKIP yolunda _acik_disi_gorev_kur urunu hic dogmamis; (5) genel tohumlama_sonuc_gebe(Bos) mevcut mesajla red", "bes satirin besi tabloyla birebir; SQL ciktisi provaya eklenir"]
+  negative_oracle: ["iptal geri alma / iz silme / genel RPC'nin Bos'u kabul etmesi → HATA"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-84
+  title: "D1-UI iki satir: ustuz cizili Bos + Gebe (C1 cozucu)"
+  risk: R1
+  owner_model: glmf
+  layers: [ui-playwright, unit]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["T-77 sonrasi hayvan karti ureme gecmisi"]
+  positive_oracle: ["ayni tohumlama altinda iki satir: ustuz cizili '❌ Bos (bos_atama_tarihi)' + '✅ Gebe (takip muayenesi tarihi)'; tahmini dogum Gebe'den", "bos_atama_tarihi C1 normatif cozucuden (islem_log + iptal_sebep='bos', geri_alindi dislanir, ORDER BY tarih DESC id DESC, Europe/Istanbul)", "iz bulunamazsa Bos satirinda tarih gizli (sessiz varsayilan degil)"]
+  negative_oracle: ["tek satira cokme yok", "fmtTarih ilk-10-karakter kesimiyle hesap (UTC kaymasi) yok", "tarih uydurma yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-85
+  title: "Goreli gun etiketi: bugun/dun/N gun once (gunFarkiEtiket)"
+  risk: R0
+  owner_model: glmf
+  layers: [unit, ui-playwright]
+  target_file: tests/unit/ovsync-takip.test.js
+  fixtures: ["sabit +03:00 capa (Europe/Istanbul, yaz saati kaymasi kilitli)", "sinir caseleri 23:30 / 00:30 (UTC gece yarisi)"]
+  positive_oracle: ["0 → 'bugun', 1 → 'dun', N → 'N gun once'", "UTC 21:30 kaydi Istanbul'da ertesi gune duser → yerel takvim gunu esastir"]
+  negative_oracle: ["saat-cinsinden fark yok", "UTC kaymasina dusen yanlis gun yok", "negatif/future gosterim yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-86
+  title: "D4: uc PG yolunda birlesik preflight + bulk satir-secimli onay"
+  risk: R4
+  owner_model: glmf+review
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["takipli fixture hayvan", "uc yol ayri kosum: hizli_uygulama / seans_tamamla / bulk_ilac (karisik liste: takipli + takipsiz)"]
+  positive_oracle: ["her yolda yazma oncesi TAKIP_ACIK preflight (onaysiz) → red; p_pg_onay=true, p_takip_onay=true TEK cagrida uygulanir", "onayli takipte _takip_kapat(neden=PG) + uygulama tek islemde; birlesik payload PG_KAPI:TAKIP_ACIK (iki gerekce alt alta — S-4)", "bulk'ta satir-bazli karar listesi {hayvan_id, pg_kapi_karar, takip_acik, takip_bilgi}"]
+  negative_oracle: ["tetikleyiciye (ilk yazmadan sonra) birakilmis takip kontrolu yok", "cift onay penceresi yok", "onaysiz redde uygulama_log/islem_log/pg_application_event satiri DUSMEZ; bulk'ta onaysiz satir islenmedi (T-93)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-87
+  title: "T-72b capraz deadlock provasi — v7 SONUC ORACLE'I (final 5 cift)"
+  risk: R6
+  owner_model: glm
+  layers: [concurrency, db-sql]
+  target_file: tests/concurrency/ovsync-takip-t72b.mjs
+  fixtures: ["5 cift fixture: sarmal × kaydet / start_first_service_protocol / seans_tamamla / vaka_toplu_ac / kapanis tetikleyicisi", "demo DB'de iki gercek baglanti, lock_timeout 5s"]
+  positive_oracle: ["N=30 eszamanli tur; (a) hicbir turda SQLSTATE 40P01/55P03 yok", "(b) her turun sonucu cift basina IZINLI sonlu kumede (basari ya da TOH_SONUCLU/TAKIP_ACIK/TAKIP_KAPALI/GIRIS_CIFT_ANLAMLI/OVSYNC_ERKEN/VWP_VIOLATION vb.)", "bilinmeyen kod/timeout asla PASS degil; 'once kirmizi' sarti YOK"]
+  negative_oracle: ["eski-yol ciftleri (tohumlama_sonuc_bos × sarmal vb.) prova DISI (B9/H2)", "grafik ciftleri bilgi amacli", "kaynakla kapanamayan cift (cift 3 fixture / H5 JSON alani) BLOKE isaretlenir (fail-closed)"]
+  escalate_if: [spec_conflict]
+  max_self_repair: 2
+
+- scenario: T-88
+  title: "C1 cozucu uc vaka (bos_atama_tarihi normatif cozucu)"
+  risk: R0
+  owner_model: glmf
+  layers: [unit]
+  target_file: tests/unit/ovsync-takip.test.js
+  fixtures: ["islem_log iz caseleri: geri_alindi / coklu kayit / 21:30Z"]
+  positive_oracle: ["(a) durum='geri_alindi' kayit DISLANIR; (b) coklu kayitta ORDER BY tarih DESC, id DESC EN SON kazanir", "(c) tarih='2026-05-01T21:30:00Z' → Istanbul yerel takvim gunu 2 Mayis (ilk-10 kesimi 1 Mayis uretir — yanlislik kilitlenir)", "iz yoksa NULL + UI tarih gizler; fmtTarih kesimi kullanilmiyor"]
+  negative_oracle: ["geri-alinmis izin sayilmasi yok", "eski kaydin kazanmasi yok", "UTC gunu hesabi yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-89
+  title: "kizginlik_vaka_ac TAKIP_ACIK onay provasi (sorun-vaka yolu)"
+  risk: R2
+  owner_model: glmf
+  layers: [ui-playwright, db-sql]
+  target_file: tests/e2e/ovsync-takip.spec.js
+  fixtures: ["takipli hayvan + sorun-vaka ekrani"]
+  positive_oracle: ["vaka ac → sunucu TAKIP_ACIK:{...} → UI kendi onay sheet'i (tarayici confirm() DEGIL) → Evet → p_takip_onay=true", "onaysiz: red + cases'e satir dusmez; onayli: ayni tx'de takip OVSYNC nedeniyle kapanir + vaka acilir", "sheet'te kupe + muayene tarih/saat metni"]
+  negative_oracle: ["confirm() kullanimi yok", "onaysiz yazma yok", "duz hata toast'u yok (§18.8 ruhu)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-90
+  title: "C5 PostgREST negatif: eski imza → PGRST202/404 + anon ACL (ayri assertion'lar)"
+  risk: R4
+  owner_model: glmf+review
+  layers: [db-sql, unit]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["imzasi degisen RPC'ler (C5 DROP sonrasi)", "demo REST zemini (gercek yanit kaydi — assertion kayda sabitlenir)"]
+  positive_oracle: ["eski parametre setiyle REST cagrisi → PGRST202 + HTTP 404 (olculmus zemin demo 2026-09-29: 'Could not find the function … schema cache' OBSERVED)", "yeni imza calisir (ayri assertion)", "anon EXECUTE yok (has_function_privilege; kizginlik_vaka_ac anon=false/authenticated=true; anon REST 42501 — OBSERVED)"]
+  negative_oracle: ["PGRST204 beklentisi (v5'in yanlis hali) kullanilmiyor", "uc assertion tek tek dogrulaniyor (birlesik degil)", "eski-imza red'i C5 DROP'larina kadar RED (beklenen — bugun eski imza canli)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-91
+  title: "C6 farm_id envanter olcumu (16 tablo; son_pg filtresi)"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["16 tablo envanteri (demo information_schema, salt-okuma)"]
+  positive_oracle: ["farm_id kolon taramasi → yalniz pg_application_event tasir", "P2b son_pg sorgusunda farm_id = public.current_farm_id() filtresi VAR (govde incelemesi); erisim index (farm_id, hayvan_id, occurred_at DESC)", "P1'e filtre maddesi DUSMEZ (P1 pg_application_event okumaz)"]
+  negative_oracle: ["kolonsuz tabloya predikat yazilmasi yok", "filtresiz pg_application_event okumasi yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-92
+  title: "C4 DB negatif: kizginlik_vaka_ac kapisı TANIDAN BAGIMSIZ"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["takipli fixture hayvan", "iki tani varyanti: '💊 PG Protokolu' (Ovsync sinifi) / '+ Serbest Giris' keyfi tani (Ovsync-DISI)"]
+  positive_oracle: ["her iki varyantta da p_takip_onay=false → TAKIP_ACIK:{muayene_tarihi, muayene_saat} red + cases satir dusmez", "onayli → ayni tx _takip_kapat(neden='OVSYNC') + vaka acilir", "kapi H4 deseniyle (kilitsiz kesif → hayvan NKU → yeniden dogrulama); KIZGINLIK_YOK/cakisma redleri aynen"]
+  negative_oracle: ["taniya bagli kapi dali yok (keyfi tani kacmiyor — v4 dislamasi curutuldu)", "onaysiz vaka INSERT'i yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-93
+  title: "H5 satir-sonucu provasi: bulk karisik listede onaysiz satir islenmez"
+  risk: R6
+  owner_model: glm
+  layers: [db-sql, ui-playwright]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["bulk_ilac/vaka_toplu_ac karisik p_animal_ids: takipli (onay listesi DISI) + takipsiz + takipli-onayli"]
+  positive_oracle: ["onaysiz acik-takipli satir ISLENMEZ ve satir sonucu TAKIP_ACIK (PG bulk p_pg_onaylar deseni)", "onaylilar icin _takip_kapat satir islenmeden hemen once; mevcut dongu/kilit davranisi degisir; boyut siniri YOK", "retry = onayli alt kumeyle YENI cagri; alt kume disi id → TAKIP_ONAY_KUME_UYUMSUZ"]
+  negative_oracle: ["onaysiz satirin yazmasi (uygulama/cases) yok", "retry'in onaysizlari yeniden denemesi yok", "satir 'islenmedi' kosulu acilan/basari listelerinde OLMAMASIYLA sinanir (JSON alan adi P3b'de sabitlenecek — acik sozlesme)"]
+  escalate_if: [spec_conflict]
+  max_self_repair: 2
+
+- scenario: T-94
+  title: "H8 istemci cakisma mesaji: 40P01/55P03 → sabit metin, otomatik retry yok"
+  risk: R5
+  owner_model: glm
+  layers: [unit, ui-playwright]
+  target_file: tests/unit/ovsync-takip.test.js
+  fixtures: ["rpc() hata dalina error.code='40P01'/'55P03' enjeksiyonu (mock)"]
+  positive_oracle: ["iki kodda da kullanici mesaji 'Islem baska bir kayitla cakisti, tekrar deneyin' (sabit)", "mock rpc cagri sayisi = 1 (otomatik yeniden deneme TETIKLENMEZ)"]
+  negative_oracle: ["ham SQLSTATE/sunucu mesaji sizmiyor", "sessiz retry yok", "diger kodlar mevcut _trErr akisinda"]
+  escalate_if: []
+  max_self_repair: 2
+
+# S. Sarmal RPC + tetikleyici sozlesme guard'lari (kapsam-acik denetimi)
+- scenario: T-95
+  title: "Sarmal secim tablosu guard'i: TAKIP_MUAYENE'de TAKIP red + tablo-disi red"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql, unit]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["a) muayene_gorev_id'si GEBELIK_KONTROL tipli acik gorevli H", "b) TAKIP_MUAYENE tipli acik gorevli H", "bos-sonuclamis tohumlama baglami (T-01/T-05 kurulumu)"]
+  positive_oracle: ["GEBELIK_KONTROL goreviyle p_secim='TAKIP' → KABUL (setinde gecerli)", "TAKIP_MUAYENE goreviyle p_secim='TAKIP' → red TAKIP_YENIDEN_SECILEMEZ (gorev sonucu girilmemis, hicbir yazma yok)", "tablo disi p_secim='DIGER' → red SECIM_TANIMSIZ:{secim,gorev_tipi}; UNIT _muayeneSecimleri(gorevTipi) DB CASE tablosuyla birebir"]
+  negative_oracle: ["TAKIP_MUAYENE'den TAKIP secimiyle ikinci takip zinciri dogmuyor", "tablo-disi secim sessizce varsayilana covkmiyor", "UI secici seti DB tablosundan ayrismiyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-96
+  title: "Sarmal giris kimligi guard'lari: XOR + muayene-tip"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["acik TAKIP_MUAYENE gorevi + Bekliyor tohumlamasi olan H", "guard provasi icin SUTTEN_KESME tipli bir gorev id'si"]
+  positive_oracle: ["hem p_tohumlama_id hem p_muayene_gorev_id dolu → red GIRIS_CIFT_ANLAMLI (XOR); ikisi birden bos → ayni red", "muayene tipi OLMAYAN (SUTTEN_KESME) gorev id'si → red MUAYENE_GOREV_TIPI_UYUMSUZ", "uc cagrida da hicbir yazma yok (tohumlama.sonuc, gorev_log, cases degisir); GIRIS_CIFT_ANLAMLI T-87 oracle kumesinde gecerli"]
+  negative_oracle: ["kimlik-belirsiz cagida sessiz default'a dusme yok", "muayene-olmayan gorev id'siyle Bos/Gebe islemi yapilmiyor"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-97
+  title: "Bayrak kapaliyken sarmal YAZMA modlari → OZELLIK_KAPALI"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["sonuc='Bekliyor' tohumlamali H (sarmala TAM p_tohumlama_id verilir — review ONEMLI #1)", "demo ovsync_pg_kurallari_aktif=0 (kosum sonrasi geri acilir; T-46 ile ayni seed)"]
+  positive_oracle: ["sarmal dry-run (p_secim=NULL) → {bayrak_kapali:true}, yan etki YOK", "uc yazma modu (OVSYNC/PG/TAKIP, ayni tam p_tohumlama_id) → RAISE 'OZELLIK_KAPALI'; sonuc='Bekliyor' kalir; gorev/vaka/olay dogmaz", "tam p_tohumlama_id ile kimlik XOR'u gecer; red bayrak kapisindan gelir (GIRIS_CIFT_ANLAMLI beklenmez)"]
+  negative_oracle: ["bayrak kapaliyken herhangi bir modda yazma gerceklesmesi HATA", "sessiz bos-davranis (RAISE'siz normal donus) yok"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-98
+  title: "BOS_DUZELTME_KOSUL: Bos-duzeltme kosul seti saglanmazsa red"
+  risk: R3
+  owner_model: glmf+review
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["a) gorev GEBELIK_KONTROL (TAKIP_MUAYENE degil) + hedef tohumlama sonuc='Bos'", "b) hedef tohumlama hayvanin SON tohumlamasi degil — treatment_date ile KESIN daha yeni kayit (esitlikte created_at belirler — review ONEMLI #2)", "c) o tohumlamaya bagli ACIK takip zinciri yok (gorev kapali)"]
+  positive_oracle: ["(b) ve (c) → RAISE 'BOS_DUZELTME_KOSUL:{eksik...}'", "(a) icin izinli red kumesi {TOH_SONUCLU, BOS_DUZELTME_KOSUL} — hangisi geldigi sinanmaz, ikisi de kabul (plan.md:304)", "tum redlerde sonuc=Bos tohumlama dokunulmadan kalir; tohumlama_durumu degisir; gorev/vaka yazmasi yok"]
+  negative_oracle: ["kosullari saglamayan cagriyla Bos→Gebe cevrimi (cekirdek genislemesinin sizmasi) HATA", "genel tohumlama_sonuc_gebe Bekliyor-only sozlesmesi korunur (T-05/T-83 ters kaniti)"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-99
+  title: "PG geri alimi takibi YENIDEN ACMAZ (kapanis kalici)"
+  risk: R1
+  owner_model: glmf
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["acik takip (T-03 kurulumu)", "bagimsiz PG uygulama ekrani (hizli PG ya da seans)"]
+  positive_oracle: ["PG uygula → TAKIP_ACIK onayi → evet (T-20 yolu; takip kapanir, neden=PG)", "geri alim (pg_application_event.geri_alindi_at doldurulur) sonrasi takip KAPALI KALIR (takip_kapanis_nedeni='PG' bozulmaz)", "yeni TAKIP_MUAYENE gorevi DOGMAZ; OVSYNC_BASLAT/_acik_disi_gorev_kur urunu uretilmez"]
+  negative_oracle: ["geri alimin takibi yeniden acmasi (tamamlandi/iptal geri alinmasi) HATA", "cift takip gorevi dogmasi HATA"]
+  escalate_if: []
+  max_self_repair: 2
+
+- scenario: T-100
+  title: "Kapanis tetikleyicileri bayraktan bagimsiz (MK9-K) + H3 kilit kaniti"
+  risk: R5
+  owner_model: glm
+  layers: [db-sql]
+  target_file: tests/sql/ovsync_takip_test.sql
+  fixtures: ["bayrak ACIKKEN kurulan acik TAKIP_MUAYENE gorevi (T-03 yolu)", "ardindan demo ovsync_pg_kurallari_aktif=0 (kosum sonrasi geri acilir)"]
+  positive_oracle: ["bayrak kapaliyken eski yoldan (tohumlama kaydi) yeni tohumlama → takip KAPANIYOR (tetikleyici bayragi okumaz); takip_kapanis_nedeni='YENI_TOHUMLAMA'", "H3 kaynak kaniti: pg_get_functiondef govdesinde hayvanlar satir kilidi (FOR UPDATE/LOCK) kalibi YOK; kapanis 40P01/55P03 olmadan tamamlanir", "sarmal bu zeminde yazamaz (T-97 OZELLIK_KAPALI) — tetikleyiciye yeni-yol girisi olmaz"]
+  negative_oracle: ["bayrak kapaliyken kapanisin atlanmasi (takip acik kalmasi) HATA", "tetikleyicinin hayvan satiri kilidi almasi (H3 ihlali) HATA"]
+  escalate_if: []
+  max_self_repair: 2
