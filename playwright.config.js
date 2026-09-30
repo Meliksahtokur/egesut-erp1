@@ -16,9 +16,10 @@ const storageState = process.env.PLAYWRIGHT_DEMO_MODE
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: '**/*.spec.js', // unit *.test.js node:test ile koşar; PW toplamasın (sahip kararı 2026-09-30)
   timeout: 30000,
   retries: 1,
-  workers: process.env.CI ? 1 : undefined, // CI'da shard başına 1 worker
+  workers: process.env.CI ? 1 : 8, // CI'da shard başına 1 worker; lokalde 8 — demo rate-limit için düşürüldü (16→8, sahip kararı 2026-09-30)
   fullyParallel: !process.env.CI, // Local'de paralel, CI'da sequential
   reporter: [
     ['list'],
