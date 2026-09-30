@@ -10,10 +10,14 @@ const { loadBrowserModule, loadExtractedFunction } = require('./support/loadModu
 // F4/K7: sabitler js/ui.js KAYNAĞINDAN çıkar — fixture kopyası gerçek haritayı
 // gölgeliyordu. expose kalıbı: const'lar vm lexical scope'unda kaldığı için
 // ikinci script ile dışarı alınır (loadModule.js dokümanı).
-const _uiExposed = loadBrowserModule('js/ui.js', {
+// P7-K14 notu: _uremeVakaCaseIds artık modül-sabitine (UREME_VAKA_HASTALIKLARI)
+// referans verir — extract+extra ile gölgelenmesin diye sandbox'taki GERÇEK
+// closure sürümü kullanılır (kaynaktan pinnen).
+const _uiMod = loadBrowserModule('js/ui.js', {
   extra: { esc:s=>String(s), escAttr:s=>String(s), fmtTarih:s=>String(s) },
   expose: ['_katTipMap', '_allKatTips', '_planliUremeTipler'],
-}).exposed;
+});
+const _uiExposed = _uiMod.exposed;
 const _katTipMap = _uiExposed._katTipMap;
 const _allKatTips = _uiExposed._allKatTips;
 const _planliUremeTipler = _uiExposed._planliUremeTipler;
@@ -44,19 +48,28 @@ const gGunOv={id:'gG1', gorev_tipi:'TEDAVI_GUN', parent_id:null, hedef_tarih:'20
 const gSeansMast={id:'gS2', gorev_tipi:'TEDAVI_SEANS', seans_admin_id:'sMast', parent_id:'gP2', hedef_tarih:'2026-09-25', tamamlandi:false, iptal:false};
 const gSeansMet={id:'gS3', gorev_tipi:'TEDAVI_SEANS', seans_admin_id:'sMet', parent_id:'gP3', hedef_tarih:'2026-09-25', tamamlandi:false, iptal:false};
 
-const _uremeVakaCaseIds=loadExtractedFunction('js/ui.js','_uremeVakaCaseIds');
+const _uremeVakaCaseIds=_uiMod.sandbox._uremeVakaCaseIds;   // P7-K14: gerçek closure (modül sabitiyle)
 const _uremeGorevMi=loadExtractedFunction('js/ui.js','_uremeGorevMi',{extra:ortak});
 const _kategoriFiltreUygun=loadExtractedFunction('js/ui.js','_kategoriFiltreUygun',{extra:{...ortak,_uremeGorevMi}});
 const _bugunFiltreUygun=loadExtractedFunction('js/ui.js','_bugunFiltreUygun',{extra:ortak});
 
-test('C3-1 (eskiden K7-1): üreme vaka kümesi protocol_family=OVSYNC vakaları toplar', () => {
-  const s=_uremeVakaCaseIds(cases);
-  assert.ok(s.has('cOv'), 'ovsync damgalı vaka kümede');
-  assert.ok(!s.has('cMast')&&!s.has('cMet'), 'ailesiz vakalar kümede değil');
+// D6 (P7-K14): üreme-vaka kümesi ARTIK hastalık-adı kümesidir
+// {Ovsync, Kistik Over, Anoestrus} (cases→disease_id→diseases join'i IDB verisiyle);
+// protocol_family='OVSYNC' damgalılar da kümede KALIR. Metrit/Endometrit vb.
+// sızıntı kilidi aynen korunur (BUG-UREME-FILTRE-SIZINTI).
+const ADI_MAP={dOv:'Ovsync', dMast:'Mastit', dMet:'Metrit', dKis:'Kistik Over'};
+
+test('C3-1 (K14): üreme vaka kümesi hastalık-adı kümesi + OVSYNC damgalılar kümede kalır', () => {
+  const s=_uremeVakaCaseIds(cases, ADI_MAP);
+  assert.ok(s.has('cOv'), 'ovsync damgalı vaka kümede (damga kazanır)');
+  assert.ok(!s.has('cMast')&&!s.has('cMet'), 'Mastit VE Metrit kümede değil — sızıntı kilidi');
+  // damgasız ama hastalığı ad-kümede → K14 ile girer
+  const s2=_uremeVakaCaseIds([{id:'cKis', disease_id:'dKis', protocol_family:null}], ADI_MAP);
+  assert.ok(s2.has('cKis'), 'Kistik Over (damgasız) hastalık-adı kümesinden girer');
 });
 
-test('C3-2: ovsync seansı/günü Üreme\'de; Mastit VE Metrit seansı Tedavi\'de kalır', () => {
-  const uremeCaseIdler=_uremeVakaCaseIds(cases);
+test('C3-2 (K14): ovsync seansı/günü Üreme\'de; Mastit VE Metrit seansı Tedavi\'de kalır; GEBELIK_KONTROL/TAKIP_MUAYENE Üreme\'de', () => {
+  const uremeCaseIdler=_uremeVakaCaseIds(cases, ADI_MAP);
   assert.strictEqual(_uremeGorevMi(gSeansOv, uremeCaseIdler, tdById, seansById), true, 'ovsync seansı üreme');
   assert.strictEqual(_uremeGorevMi(gGunOv, uremeCaseIdler, tdById, seansById), true, 'ovsync tedavi günü üreme');
   assert.strictEqual(_uremeGorevMi(gSeansMast, uremeCaseIdler, tdById, seansById), false, 'mastit seansı üreme değil');
@@ -67,6 +80,14 @@ test('C3-2: ovsync seansı/günü Üreme\'de; Mastit VE Metrit seansı Tedavi\'d
   assert.strictEqual(_kategoriFiltreUygun(gSeansOv,'tedavi',uremeCaseIdler,tdById,seansById), false, 'çift sayım yok');
   assert.strictEqual(_kategoriFiltreUygun(gSeansMet,'tedavi',uremeCaseIdler,tdById,seansById), true, 'Metrit Tedavi\'de kalır');
   assert.strictEqual(_kategoriFiltreUygun({gorev_tipi:'OVSYNC_BASLAT'},'ureme',uremeCaseIdler,tdById,seansById), true);
+  // K14 (§18.16): "işin ucunda gebelik varsa üreme" — GEBELIK_KONTROL Muayene'den Üreme'ye;
+  // TAKIP_MUAYENE yeni üreme tipi (fixture K14 tipleri)
+  assert.strictEqual(_kategoriFiltreUygun({gorev_tipi:'GEBELIK_KONTROL'},'ureme',uremeCaseIdler,tdById,seansById), true,
+    'GEBELIK_KONTROL 🌱 Üreme çipinde görünmeli');
+  assert.strictEqual(_kategoriFiltreUygun({gorev_tipi:'TAKIP_MUAYENE'},'ureme',uremeCaseIdler,tdById,seansById), true,
+    'TAKIP_MUAYENE 🌱 Üreme çipinde görünmeli');
+  assert.strictEqual(_kategoriFiltreUygun({gorev_tipi:'GEBELIK_KONTROL'},'muayene',uremeCaseIdler,tdById,seansById), false,
+    'GEBELIK_KONTROL 🩺 Muayene filtresinde DEĞİL (K14)');
 });
 
 test('C3-3 (eskiden K7-3): yaklaşan planlı üreme görevi Bugün penceresinde', () => {
@@ -99,13 +120,18 @@ test('C3-4 (eskiden K7-4): loadTasks kablolaması — kaynak kanıtı', () => {
   assert.ok(ixHarita>-1&&ixFiltre>-1&&ixHarita<ixFiltre, 'üreme vaka kümesi süzgeçlerden ÖNCE kurulmalı');
 });
 
-test('C3-5 (eskiden K7-5): gerçek harita sabitleri kilitli', () => {
+test('C3-5 (K14): gerçek harita sabitleri kilitli — _planliUremeTipler türetim kaynağını izler', () => {
   assert.ok(Array.isArray(_katTipMap.ureme) && _katTipMap.ureme.includes('TOHUMLAMA_PLANLI')
     && _katTipMap.ureme.includes('OVSYNC_BASLAT'), 'üreme listesi planlı üreme tiplerini içerir');
+  assert.ok(_katTipMap.ureme.includes('GEBELIK_KONTROL') && _katTipMap.ureme.includes('TAKIP_MUAYENE'),
+    'K14 dörtlü liste — yeni tipler üremede');
   assert.ok(Array.isArray(_katTipMap.tedavi) && _katTipMap.tedavi.includes('TEDAVI_SEANS')
     && _katTipMap.tedavi.includes('TEDAVI_GUN'), 'tedavi listesi seans/gün tiplerini içerir');
-  assert.deepStrictEqual([..._planliUremeTipler].sort(), ['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'],
-    '_planliUremeTipler tam olarak bu iki tip');
+  // Davranış kararı (plan P7): türetim kaynağını izler — yeni tipler pencere
+  // istisnasına turetimden girer, ayrı pencere davranış değişikliği YOK.
+  assert.deepStrictEqual([..._planliUremeTipler].sort(),
+    ['GEBELIK_KONTROL','OVSYNC_BASLAT','TAKIP_MUAYENE','TOHUMLAMA_PLANLI'],
+    '_planliUremeTipler üreme listesinden türetilmiş tam-liste');
   assert.ok(_allKatTips.includes('TEDAVI_SEANS') && _allKatTips.includes('OVSYNC_BASLAT')
     && _allKatTips.includes('ASI_PLANLI'), '_allKatTips türetilmiş liste ipuçlarını taşır');
 });

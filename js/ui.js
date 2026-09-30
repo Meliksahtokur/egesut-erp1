@@ -63,26 +63,37 @@ async function _keepScroll(contentEl,fn){
 const _katTipMap={
   asi:    ['ASI_PLANLI','ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
-  muayene:['MUAYENE','GEBELIK_KONTROL','VETERINER_KONTROL'],
+  muayene:['MUAYENE','VETERINER_KONTROL'],   // K14: GEBELIK_KONTROL Üreme'ye taşındı (§18.16)
   tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
-  ureme:  ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT'],   // P3: Ovsync/PG görev tipleri 'Diğer'e düşmesin
+  ureme:  ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT','GEBELIK_KONTROL','TAKIP_MUAYENE'],   // P3+K14: "işin ucunda gebelik varsa üreme" — GEBELIK_KONTROL Muayene'den, TAKIP_MUAYENE eklendi
   bakim:  ['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME','BUZAGI_BAKIM'],
   diger:  null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
-const _planliUremeTipler=['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'];   // K7: planlı üreme görevleri Bugün'de 7-gün pencereyle (ASI_PLANLI örneği)
-// C3 (cila2): üreme-vaka kümesi hastalık KATEGORİSİ değil PROTOKOL AİLESİ bazlıdır.
-// K7'nin category='Üreme' ayrımı Metrit/Endometrit gibi tedavi vakalarının
-// seanslarını Üreme filtresine sızdırıyordu (BUG-UREME-FILTRE-SIZINTI).
-// protocol_family='OVSYNC' damgası (K4, 20260925000013:144-147) yalnız başlamış
-// ovsync zincirlerine yazılır — Metrit vb. NULL kalır, Tedavi'de listelenir.
+const _planliUremeTipler=[...(_katTipMap.ureme||[])];   // K7+K14: Bugün'de 7-gün pencere istisnası — türetim kaynağını izler (yeni tipler turetimden girer, ayrı pencere davranışı YOK)
+// K14 (§18.16, 2026-09-29/30): üreme-VAKA kümesi hastalık ADI kümesidir —
+// {Ovsync, Kistik Over, Anoestrus}. Enfeksiyon/doğum-sonrası hastalıklar (Metrit,
+// Endometrit, Pyometra, RFM, Retensiyo Sekundinarum, Postpartum Hemoraji) küme
+// DIŞI kalır (C3 sızıntı kilidi). Hastalık kataloğu DEĞİŞMEZ — yalnız filtre eşlemesi.
+const UREME_VAKA_HASTALIKLARI=['Ovsync','Kistik Over','Anoestrus'];
+// C3 (cila2) temeli: protocol_family='OVSYNC' damgası (K4, 20260925000013:144-147)
+// yalnız başlamış ovsync zincirlerine yazılır; K14 ile damga + hastalık-adı kümesi
+// birlikte küme kurar — damga kazanır (elle açılan Ovsync zincirleri kümede kalır).
 /**
- * Verilen vaka listesinden protokol ailesi 'OVSYNC' olanları filtreleyip ID'lerini içeren bir küme döndürür.
- * @param {Array} cases Filtrelenmesi gereken vaka nesnelerinden oluşan dizi.
- * @returns {Set} 'OVSYNC' protokol ailesine sahip vakaların ID'lerinden oluşan küme.
+ * Verilen vaka listesinden üreme-vaka kümesini kurar: hastalığı ad-kümede
+ * (UREME_VAKA_HASTALIKLARI — diseases.name eşleşmesi) veya protokol ailesi
+ * 'OVSYNC' damgalı vakaların ID'leri.
+ * @param {Array} cases Filtrelenecek vaka nesneleri (disease_id, protocol_family alanlı).
+ * @param {Object} [hastalikAdiById] disease_id → diseases.name haritası (IDB verisi; verilmezse yalnız damga yolu).
+ * @returns {Set} Üreme kapsamındaki vakaların ID kümesi.
  */
-function _uremeVakaCaseIds(cases){
-  return new Set((cases||[]).filter(c=>c&&c.protocol_family==='OVSYNC').map(c=>c.id));
+function _uremeVakaCaseIds(cases,hastalikAdiById){
+  return new Set((cases||[]).filter(c=>{
+    if(!c) return false;
+    if(c.protocol_family==='OVSYNC') return true;   // damga kazanır (K14)
+    const ad=hastalikAdiById?hastalikAdiById[c.disease_id]:null;
+    return !!ad&&UREME_VAKA_HASTALIKLARI.includes(ad);
+  }).map(c=>c.id));
 }
 /**
  * Verilen görev tipine göre üreme görevinin geçerli olup olmadığını kontrol eder.
@@ -147,7 +158,32 @@ function setTaskKat(kat,btn){
   _taskKategori=kat;
   document.querySelectorAll('.kat-btn').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
+  _uremeChipKopruSenkron();
   loadTasks(_curTaskFilter||'today');
+}
+/**
+ * Görevler kategori çubuğuna 🌱 Üreme aktifken "Tüm ovsync takibi →" köprüsü üretir
+ * (K9, design §6 — emoji YOK, varsayılan). index.html statik olduğundan çip başlığı
+ * köprüsü ui.js'ten senkronlanır.
+ * @param {boolean} uremeAktif Üreme kategorisi seçili mi (_taskKategori==='ureme').
+ * @returns {string} sh-link butonu HTML'i; pasifken boş string.
+ */
+function _uremeChipKopruHtml(uremeAktif){
+  if(uremeAktif!==true) return '';
+  return '<button class="sh-link" id="task-ureme-kopru" onclick="goTo(\'ovsync\')" style="margin-left:2px;white-space:nowrap">Tüm ovsync takibi →</button>';
+}
+/**
+ * Kategori çubuğundaki K9 köprüsünü _taskKategori'ye göre senkronlar: Üreme
+ * aktifken çubuğun sonuna ekler, değilken kaldırır (idempotent — loadTasks/setTaskKat çağırır).
+ * @returns {void}
+ */
+function _uremeChipKopruSenkron(){
+  const bar=document.getElementById('task-kategori-bar');
+  if(!bar) return;
+  const eski=bar.querySelector('#task-ureme-kopru');
+  if(_taskKategori==='ureme'){
+    if(!eski) bar.insertAdjacentHTML('beforeend',_uremeChipKopruHtml(true));
+  }else if(eski&&eski.remove) eski.remove();
 }
 
 // ──────────────────────────────────────────
@@ -248,24 +284,30 @@ function _dogumAnneBazliTekillestir(births){
   return [...m.values()];
 }
 /**
- * Aktif hayvan sayısını, gebe hayvan sayısını, aktif hastalık sayısını, sütten kesilmesi gereken buzağı sayısını ve bekleyen görev sayısını içeren bir dashboard satırı HTML elemanı döndürür.
+ * Aktif hayvan sayısını, gebe hayvan sayısını, aktif hastalık sayısını, sütten kesilmesi gereken buzağı sayısını, bekleyen görev sayısını ve Ovsync takip özetini içeren bir dashboard satırı HTML elemanı döndürür.
  * @param {Array} animals Aktif hayvan listesini temsil eden dizi.
  * @param {Array} gebeTohs Gebe hayvan listesini temsil eden dizi.
  * @param {Array} diseases Aktif hastalık kayıtlarını temsil eden dizi.
  * @param {Array} tasks Bekleyen görev listesini temsil eden dizi.
  * @param {number} badge Özel durum göstergesi (badge) için sayısal değer.
- * @returns {string} Dashboard istatistik satırını oluşturan HTML stringi.
+ * @param {Object} [ovsync] P7 6. hücre verisi: {sinif:'alert'|'warn'|'ok', soru:boolean, sayi:number|null} — loadDash _ovsyncStatSinif'tan üretir; eksikse hücre dürüst 'warn' + '?' basar (sessiz varsayılan YASAK — §7.8).
+ * @returns {string} Dashboard istatistik satırını oluşturan HTML stringi (R4: 6. hücre 2 kolonlu grid'in son satırını tamamlar).
  */
-function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
+function _dashStatRow(animals,gebeTohs,diseases,tasks,badge,ovsync){
   const _taskCls=tasks.length>0?'warn':'ok';
   // Sayaç = kesim vakti gelenler (suttenKesimeHazirSec) — modal rozet kümesiyle birebir aynı
   const sutBuzagiSayisi=suttenKesimeHazirSec(animals,(typeof suttenKesmeEsigi==='function')?suttenKesmeEsigi():60).length;
+  // P7 (K7): 6. hücre — sınıf kuralı _ovsyncStatSinif (loadDash'te); sayı = aktif zincir (kpa.aktif); bayat/hata → '?'
+  const _ov=(ovsync&&typeof ovsync==='object')?ovsync:null;
+  const _ovCls=_ov&&typeof _ov.sinif==='string'?_ov.sinif:'warn';
+  const _ovSayi=(_ov&&_ov.soru!==true&&typeof _ov.sayi==='number'&&isFinite(_ov.sayi))?String(_ov.sayi):'?';
   return `<div class="dash-row">
     <div class="sc ok" onclick="goTo('suru')"><div class="sv">${animals.length}</div><div class="sl">Aktif Hayvan ›</div></div>
     <div class="sc ok" onclick="showGebe()"><div class="sv">${gebeTohs.length}</div><div class="sl">Gebe ›</div></div>
     <div class="sc ${diseases.length>0?'alert':'ok'}" onclick="showHasta()"><div class="sv">${diseases.length}</div><div class="sl">Aktif Hastalık ›</div></div>
     <div class="sc ${sutBuzagiSayisi>0?'warn':'ok'}" onclick="openSuttenKesModal()"><div class="sv">${sutBuzagiSayisi}</div><div class="sl">🍼 Sütten Kes ›</div></div>
     <div class="sc ${badge>0?'alert':_taskCls}" onclick="goTo('tasks')"><div class="sv">${tasks.length}</div><div class="sl">Bekleyen Görev ›</div></div>
+    <div class="sc ${_ovCls}" onclick="goTo('ovsync')"><div class="sv">${_ovSayi}</div><div class="sl">🔄 Ovsync ›</div></div>
   </div>`;
 }
 /**
@@ -1291,9 +1333,30 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
+    // P7 (K7): 6. stat hücresi verisi — ovsyncTakipGetir (P4) + _ovsyncStatSinif (P6 kuralı).
+    // "muayene vakti dolan" = S2 satırlarında kalan_gun<=0 (kpa'da alan yok — P6 DONE notu 53:
+    // satırlardan türetilir). Taze değilse (bayat/hata/veri-yok) hücre 'warn' + '?' — dürüst.
+    let ovStat=null;
+    try {
+      if (typeof ovsyncTakipGetir === 'function') {
+        const ovDurum = _ovsyncDashDurum(await ovsyncTakipGetir(null));
+        if (ovDurum.tur === 'taze') {
+          const ovVeri = ovDurum.veri || {};
+          const ovSatirlar = Array.isArray(ovVeri.satirlar) ? ovVeri.satirlar : [];
+          const mvVakti = ovSatirlar.filter(s => s && s.bolum === 'S2' && s.muayene
+            && typeof s.muayene.kalan_gun === 'number' && isFinite(s.muayene.kalan_gun)
+            && s.muayene.kalan_gun <= 0).length;
+          const ovKpa = (ovVeri.kpa && typeof ovVeri.kpa === 'object') ? ovVeri.kpa : null;
+          const ovCls = _ovsyncStatSinif(ovKpa, mvVakti, true);
+          ovStat = { sinif: ovCls.sinif, soru: ovCls.soru,
+            sayi: (ovKpa && typeof ovKpa.aktif === 'number' && isFinite(ovKpa.aktif)) ? ovKpa.aktif : null };
+        }
+      }
+    } catch(e) { /* bayat/hata → hücre 'warn' + '?' (aşağıda) */ }
+
     // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
     // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
-    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge,ovStat)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
@@ -1636,6 +1699,7 @@ async function loadTasks(f,btn,opts){
       _pendChips.querySelectorAll('.fchip').forEach(c=>c.classList.toggle('on', c.dataset.win===_active));
     }
   }
+  _uremeChipKopruSenkron();   // P7-K9: Üreme kategorisi seçiliyse "Tüm ovsync takibi →" köprüsü çubukta
   const el=document.getElementById('tasks-body');
   const srchEl=document.getElementById('task-srch');
   // F4: arama sekme/filtre geçişlerinde korunur — loadTasks temizlemez (eskiden
@@ -1665,7 +1729,7 @@ async function loadTasks(f,btn,opts){
     const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
     const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
     const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
-    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases);   // C3: protocol_family='OVSYNC' kümesi
+    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases,_diseaseById);   // C3+K14: OVSYNC damgası + hastalık-adı kümesi {Ovsync, Kistik Over, Anoestrus}
     if(f==='done'){
       // Besleme zincirinde her görev (ilk hariç) parent_id'li → eski filtre hepsini gizliyordu.
       // Sadece geri alınabilir ucu göster: çocuğu tamamlanmamış besleme tamamlaması.
@@ -3620,14 +3684,14 @@ async function _showProtokolEkran(){
     window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
     const ovList = window.__ovsyncUyarilar;
     if (ovList.length) {
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="goTo('ovsync')" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   } catch(e) {
     // T10: taze çağrı başarısızsa rozet önbelleğine düş (bayat-fallback; konsol uyarısıyla)
     console.warn('ovsync_baslat_uyarilari:', e.message);
     const ovList = Array.isArray(window.__ovsyncUyarilar) ? window.__ovsyncUyarilar : [];
     if (ovList.length) {
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="goTo('ovsync')" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   }
   // C4 (cila2): K8'in seanslar panel bölümü geri alındı — sahip:
