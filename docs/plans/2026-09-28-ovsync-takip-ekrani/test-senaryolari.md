@@ -254,7 +254,7 @@
 - **Ref:** §6c.5 · kabul 11 · mockup 06
 - **Katman:** İnsan-UI
 - **Adımlar:** T-25 sonrası Ovsync ekranını aç.
-- **BEKLENEN — Ekran:** satır rozeti "🔍 takipte · muayene <yeni tarih> <aynı saat>"; hayvan hiçbir bölümden düşmedi.
+- **BEKLENEN — Ekran:** satır rozeti "🔍 takipte · muayene <yeni tarih>" (+ saat yalnız T-25 varyantında saat girildiyse gösterilir; saatsiz ertelemede saat gösterilmez — §10d #3); hayvan hiçbir bölümden düşmedi.
 - **Ters kanıt:** eski tarih rozeti kalmadı.
 
 ---
