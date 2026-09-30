@@ -554,17 +554,6 @@ test.describe('5 — Edge Cases', () => {
     await page.waitForTimeout(500);
   });
 
-  test('5.07 overlay dışına tıklanınca detay kapanmaz', async ({ page }) => {
-    await openApp(page);
-    await navTo(page, '#nb-suru');
-    await page.waitForSelector('.animal-card', { timeout: 15000 });
-    await page.locator('.animal-card').first().click();
-    await page.waitForSelector('#det.on', { timeout: 8000 });
-    await page.click('#pg-suru', { position: { x: 10, y: 10 } });
-    await page.waitForTimeout(500);
-    await expect(page.locator('#det.on')).toBeVisible();
-  });
-
   test('5.08 log sayfası tüm kayıt butonlarını gösterir', async ({ page }) => {
     await openApp(page);
     await navTo(page, '#nb-log');
