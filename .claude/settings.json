@@ -1,6 +1,33 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "mcp__tools-bank__supabase_migrate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/melik/egesut-erp1/scripts/hooks/post-migration-refresh.sh",
+            "timeout": 120,
+            "async": true
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/melik/egesut-erp1/scripts/hooks/precheck-reminder.sh",
+            "timeout": 10
+          }
+        ]
+      },
       {
         "matcher": "Bash",
         "hooks": [
@@ -17,6 +44,27 @@
           {
             "type": "command",
             "command": "python3 /home/melik/tools-bank/.superset/hooks/ram-pool-pretool-agent.py --timeout 30",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /home/melik/egesut-erp1/scripts/sql-lsp.sh start",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /home/melik/tools-bank/.superset/hooks/ram-pool-session-start.py --timeout 30",
             "timeout": 30
           }
         ]
@@ -45,18 +93,10 @@
           }
         ]
       }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 /home/melik/tools-bank/.superset/hooks/ram-pool-session-start.py --timeout 30",
-            "timeout": 30
-          }
-        ]
-      }
     ]
+  },
+  "enabledPlugins": {
+    "sql-lsp@egesut-local": true,
+    "ts-lsp@egesut-local": true
   }
 }
