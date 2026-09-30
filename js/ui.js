@@ -2179,33 +2179,62 @@ function _pgKapiKapat(){
   window.__pgKapiTekrar = null; window.__pgKapiToh = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
 }
-// [Boş ata ve uygula]: tohumlama_sonuc_bos → aynı zincirde uygulama p_pg_onay=true
-// (tek ekranda; ikinci dokunuş yarışı buton kilidiyle engellenir — idempotency sunucuda)
+// [Boş ata ve uygula] (P9, spec 10c #2): TEK sarmal RPC — tohumlama_bos_ve_devam
+// PG modu tek transaction'da Boş ataması + PG uygulaması yapar; eski
+// tohumlama_sonuc_bos + __pgKapiTekrar iki-RPC zinciri KALKTI (yarım durum
+// "Boş kaydedildi, PG uygulanamadı" artık imkânsız — T-11). Kapı = seçicinin
+// "Boş + PG" karşılığı; seçici AÇILMAZ (S7). PG ürünü sarmalın KENDİ dry-run
+// son_pg'sinden (yazmasız; seçicinin "son kullanılan PG" ön dolusuyla AYNI kaynak) —
+// sunucu PG_URUN_GEREKLI/PG_DOZ_GEREKLI'nin UI ikizi: çözümsüzse yazma YAPILMAZ.
 /**
- * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular, tohumlamayı Boş yapıp ardından PG'yi uygulamaya çalışır; hata durumunda butonu yeniden etkinleştirir.
+ * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular, dry-run
+ * ile son PG ürününü çözer, sonra TEK çağrıyla tohumlamayı Boş yapıp PG'yi uygular.
  * @returns {Promise<void>} İşlem sonunda değer döndürmez; başarıda kapı modalı kapatılır, hata durumunda hata mesajı gösterilir ve buton geri açılır.
  */
 async function _pgKapiBosAtaUygula(){
   const btn = document.getElementById('pg-kapi-onayla');
   const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
-  if (!gerekce || !window.__pgKapiToh || !window.__pgKapiTekrar) return;
+  if (!gerekce || !window.__pgKapiToh) return;
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   try {
-    const r = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: window.__pgKapiToh, p_notlar: 'PG öncesi değerlendirme: ' + gerekce });
-    toast('Tohumlama Boş yapıldı — PG uygulanıyor…');
-    // T3b: tekrar çağrısı hata atarsa modal AÇIK kalır — yarım durum görünür,
-    // aynı butonla yalnız-PG-retry mümkün (rpc ok:false gövdesi throw'a dönüşür:
-    // eski ölü `if (!r?.ok)` dalı kaldırıldı — T8)
+    let urun = null, doz = null;
     try {
-      await window.__pgKapiTekrar(true, gerekce);
-    } catch (e3) {
-      toast('⚠️ Tohumlama Boş kaydedildi, PG uygulanamadı — aynı butonla tekrar deneyin: ' + (getUserMessage ? getUserMessage(e3) : e3.message), true);
+      const onbilgi = await tohumlamaBosVeDevam({
+        p_secim: null, p_tohumlama_id: window.__pgKapiToh, p_muayene_gorev_id: null,
+        p_pg_urun: null, p_pg_doz: null, p_gun: null, p_saat: null,
+        p_notlar: null, p_onay: false,
+      });
+      if (onbilgi && onbilgi.son_pg && onbilgi.son_pg.stok_id && onbilgi.son_pg.doz != null) {
+        urun = onbilgi.son_pg.stok_id;
+        doz = Number(onbilgi.son_pg.doz);
+      }
+    } catch (e0) {
+      // offline/dry-run hatası: bayat veriyle yazma YAPILMAZ (P8 offline guard'ının aynısı)
+      toast('İnternet yok — işlem için bağlantı gerekli', true);
       if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
       return;
     }
+    if (!urun || !Number.isFinite(doz)) {
+      toast('⚠️ PG ürünü çözümlenemedi — Boş ataması yapılmadı', true);
+      if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
+      return;
+    }
+    // Tek transaction: Boş + PG birlikte ya da hiç (T-11); p_onay = tek onay
+    // (PG_KAPI + takip gerekçesi — sarmal tek p_onay alır, P2b S09b/S11).
+    await tohumlamaBosVeDevam({
+      p_tohumlama_id: window.__pgKapiToh,
+      p_secim: 'PG',
+      p_pg_urun: urun,
+      p_pg_doz: doz,
+      p_notlar: 'PG öncesi değerlendirme: ' + gerekce,
+      p_onay: true,
+    });
+    toast('✅ Tohumlama Boş atandı, PG uygulandı');
     _pgKapiKapat();
+    await pullTables(RPC_TABLES.tohumlama_bos_ve_devam || ['tohumlama', 'gorev_log']);
+    if (typeof loadDash === 'function') loadDash();
   } catch (e2) {
-    toast('❌ ' + getUserMessage(e2), true);
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e2) : (e2 && e2.message) || e2), true);
     if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
   }
 }
@@ -2698,6 +2727,56 @@ async function _devamSeciciOnayla() {
 }
 
 // ──────────────────────────────────────────
+// P9: K15 birleşik muayene sonuç akışı — GEBELIK_KONTROL ve TAKIP_MUAYENE AYNI
+// ekranı açar (T-04/T-05 ekran-özdeşliği; §18.17). Girişler: görev detayı/kartı
+// (openTaskDet + detayTamamla), S2 "muayene vakti" satırı (_ovsyncMuayeneSatirAc
+// köprüsü), dashboard 40 g listesi (_muayene40gAc). Gorev jenerik
+// gorev_tamamla'ya ASLA düşmez (DB guard P3b + UI ikizleri).
+/**
+ * Birleşik muayene sonuç ekranını açar: görev bağlamı IDB'den kurulur (openTaskDet
+ * bağlamı, S2 satırı, 40 g listesi ortak kapı) → _devamSeciciAc('muayene', …)
+ * dry-run ile açılır. Görev kapandıysa/bulunamadıysa seçici AÇILMAZ — liste
+ * tazelenir, false döner (openTaskDet yedeği karar verir).
+ * @param {string} muayeneGorevId Açık muayene görev id (GEBELIK_KONTROL | TAKIP_MUAYENE).
+ * @returns {Promise<boolean>} Seçici açıldıysa true.
+ */
+async function _muayeneSonucAc(muayeneGorevId){
+  if(!muayeneGorevId) return false;
+  const gorev=(await idbGetAll('gorev_log')).find(g=>g&&g.id===muayeneGorevId);
+  if(!gorev||gorev.tamamlandi||gorev.iptal){
+    toast('⚠️ Bu muayene görevi artık açık değil — liste tazeleniyor', true);
+    await pullTables(['gorev_log']);
+    if(typeof loadTasks==='function') loadTasks();
+    return false;
+  }
+  const h=(getState('animals')||[]).find(a=>a&&a.id===gorev.hayvan_id);
+  await _devamSeciciAc('muayene',{
+    muayene_gorev_id:gorev.id,
+    gorev_tipi:gorev.gorev_tipi,
+    kupe_no:(h&&(h.kupe_no||h.devlet_kupe))||'',
+    grup:(h&&h.grup)||'',
+    bos_tarihi:_tohGunNormalize(gorev.created_at),   // P8 sözleşmesi: görev kurulum günü
+  });
+  return !!(typeof window!=='undefined'&&window.__devamSecici&&window.__devamSecici.acik);
+}
+/**
+ * Dashboard 40 g listesi satırı (§10d #4 KARAR): acik_gorev_var=true ise IDB
+ * gorev_log'dan hayvanın açık GEBELIK_KONTROL görevi bulunup sonuç ekranı açılır;
+ * görev bulunamazsa (IDB bayat — fail-closed) ya da seçici açılamazsa hayvan
+ * detayı (bugünkü davranış; görev ertesi sabah cron'la doğar — satırdan doğmaz).
+ * @param {string} hayvanId Hayvan id.
+ * @param {boolean} acikGorevVar gebelik_muayene_listele acik_gorev_var bayrağı.
+ * @returns {Promise<void>}
+ */
+async function _muayene40gAc(hayvanId,acikGorevVar){
+  if(!acikGorevVar||!hayvanId){ openDet(hayvanId); return; }
+  const gorev=(await idbGetAll('gorev_log')).find(g=>g&&!g.tamamlandi&&!g.iptal
+    &&g.hayvan_id===hayvanId&&g.gorev_tipi==='GEBELIK_KONTROL');
+  if(gorev&&await _muayeneSonucAc(gorev.id)) return;
+  openDet(hayvanId);
+}
+
+// ──────────────────────────────────────────
 // P6: Erteleme modalı — mevcut tarih giriş kalıbı + pencere canlı önizleme
 // E1-UI: genel erteleme — tip kilidi kural cache'den (js'e tip listesi
 // YAZILMAZ); pencere önizlemesi YALNIZ pencere_kurali='tohumlama' tiplerinde.
@@ -2986,6 +3065,9 @@ function _ovsyncBaslatBtnHtml(t){
  */
 function _erteleBtnHtml(t){
   if(t.tamamlandi||t.iptal) return '';
+  // §18.17: GEBELIK_KONTROL/TAKIP_MUAYENE ertelemesi YALNIZ birleşik sonuç
+  // ekranından (ERTALE) — genel ertele butonu bu tiplerde çizilmez (§10d #3).
+  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE') return '';
   const kural=ertelemeKuralGetir(t.gorev_tipi);
   if(!kural||!kural.ertelenebilir) return '';
   if(!_ertelemeOnline()) return '';
@@ -3366,7 +3448,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
+      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'&&t.gorev_tipi!=='GEBELIK_KONTROL'&&t.gorev_tipi!=='TAKIP_MUAYENE'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -3976,7 +4058,7 @@ async function _showSessizList(){
      * @param {Object} m - Hayvan kaydı verisi (hayvan_id, kupe_no, grup, bekiyor_gun, son_tohumlama_tarihi vb. özelliklere sahip).
      * @returns {string} Tıklanabilir bir satır HTML'i.
      */
-    const mRow=m=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${escAttr(m.hayvan_id)}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const mRow=m=>`<div class="arow" onclick="_sessizSheetGizle();_muayene40gAc('${escAttr(m.hayvan_id)}', ${m.acik_gorev_var?'true':'false'})" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
     const muayeneRows=muayene.length?`<div style="font-size:.68rem;font-weight:800;color:var(--red2);margin:12px 0 4px;letter-spacing:.02em">🔬 Gebelik Muayenesi Bekleyenler · ${muayene.length}</div>${muayene.map(mRow).join('')}`:'';
     const rows=muayeneRows+_sessizGrupla(list||[]).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
     // S2 review-fix: sessiz=0 + muayene>0 iken sheet başlığı muayene odaklı olur ("(0)" tuzağı yok)
@@ -7190,14 +7272,72 @@ async function _uremeDogum(el){
 }
 
 /**
+ * ISO tarih/tarih-saat dizgisini Europe/Istanbul yerel takvim gününe ('YYYY-MM-DD') çevirir.
+ * Z/offset'li timestamptz İstanbul saatine döner (UTC 21:30 = ertesi gün 00:30 — C1
+ * normatif çözücü, spec §10f); saatsiz tarih aynen kalır. fmtTarih'in ilk-10-karakter
+ * kesimi timestamptz'de yanlış gün okur — kalem 11 tarihleri ve bos_tarihi için YASAK.
+ * @param {string} iso ISO tarih/tarih-saat dizgisi.
+ * @returns {string} 'YYYY-MM-DD' yerel takvim günü; boş girişte ''.
+ */
+function _tohGunNormalize(iso){
+  const s=String(iso||'');
+  if(!s) return '';
+  if(/(Z|[+-]\d{2}:\d{2})$/.test(s)){
+    try{
+      return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(s));
+    }catch(e){ /* düşer: saatsız kuralı */ }
+  }
+  return s.slice(0,10);
+}
+/**
+ * Kalem 11 (D1-UI): düzeltilmiş tohumlamanın iki-satır verisi (saf; P11 testi).
+ * t.sonuc='Gebe' VE islem_log'da bu tohumlamaya ait GEBE_ATAMA kaydının snapshot'ında
+ * bos_duzeltme bloğu varsa {duzeltme:true, bosTarihi, gebeTarihi} döner; izsiz kayıtta
+ * null (tek-satır mevcut görünüm). C1 normatif okuma (v5): GEBE_ATAMA seçiminde
+ * durum 'geri_alindi' OLMAYANlar; çoklu kayıtta tarih DESC, id DESC — EN SON kazanır
+ * (P2b çözücüsünün UI ikizi, S28). Her iki tarih Europe/Istanbul yerel takvim gününe
+ * normalize edilir (bos_atama_tarihi çekirdekten yerel 'date'; GEBE_ATAMA.tarih
+ * timestamptz → aynı dönüşüm).
+ * @param {Object|null} t IDB tohumlama kaydı.
+ * @param {Array|null} islemLogKayitlari IDB islem_log satırları.
+ * @returns {Object|null} {duzeltme:true, bosTarihi:'YYYY-MM-DD', gebeTarihi:'YYYY-MM-DD'} | null.
+ */
+function _tohumlamaGecmisSatirlari(t,islemLogKayitlari){
+  if(!t||t.sonuc!=='Gebe') return null;
+  const kayitlar=Array.isArray(islemLogKayitlari)?islemLogKayitlari:[];
+  const adaylar=kayitlar.filter(l=>l&&l.tip==='GEBE_ATAMA'
+    &&l.ref_tablo==='tohumlama'&&String(l.ref_id)===String(t.id)
+    &&l.durum!=='geri_alindi'
+    &&l.snapshot&&l.snapshot.bos_duzeltme);
+  if(!adaylar.length) return null;
+  adaylar.sort((a,b)=>{
+    const ta=String(a.tarih||''),tb=String(b.tarih||'');
+    if(ta!==tb) return ta<tb?1:-1;                                   // tarih DESC
+    return String(b.id||'').localeCompare(String(a.id||''));         // id DESC
+  });
+  const secili=adaylar[0];
+  const duzeltme=(secili.snapshot&&secili.snapshot.bos_duzeltme)||{};
+  return {
+    duzeltme:true,
+    bosTarihi:_tohGunNormalize(duzeltme.bos_atama_tarihi),
+    gebeTarihi:_tohGunNormalize(secili.tarih),
+  };
+}
+/**
  * Tohumlama kayıtlarını getirir, tarihe göre sıralar ve arama filtresi uygular.
  * Sonuç olarak HTML içeriği oluşturarak verilen DOM elemanına render eder.
+ * Kalem 11: sonuc='Gebe' + GEBE_ATAMA bos_duzeltme izi olan kayıt İKİ sonuç satırı
+ * basar (üstte üstü çizili ❌ Boş giriş tarihi, altta ✅ Gebe muayene tarihi);
+ * tahmini doğum hesabı buraya GELMEZ (mevcut hesap tohumlama.tarih'ten — değişmez).
+ * P9b: her satırın göreli günü KENDİ tarihinden (gunFarkiEtiket, UI-R1).
  * @param {HTMLElement} el Tohumlama kayıtlarının listeleneceği DOM elemanı.
  * @returns {void}
  */
 async function _uremeTohumlama(el){
   let list=await idbGetAll('tohumlama');
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+  let islemLoglar=[];
+  try{ islemLoglar=(await idbGetAll('islem_log'))||[]; }catch(e){ islemLoglar=[]; }
 
   // Searchbar filtresi (multi-field: küpe + sperma + sonuç + hayvan adı)
   const _q=trLower(globalThis._tohSearch||'').trim();
@@ -7228,6 +7368,12 @@ async function _uremeTohumlama(el){
       const sc=_gebe?'var(--green)':_scMid;
       const _bekliyor=!_gebe&&!_kotu;
       const _sonucBadge=_kotu?`<span style="background:rgba(192,50,26,.15);color:var(--red);font-size:.72rem;padding:2px 6px;border-radius:8px;font-weight:700;margin-left:4px">${t.sonuc}</span>`:'';
+      // Kalem 11: düzeltilmiş (Boş→Gebe) kayıt İKİ sonuç satırı; izsiz kayıt tek satır.
+      const _satirlar=_tohumlamaGecmisSatirlari(t,islemLoglar);
+      const _subHtml=_satirlar
+        ?`<div class="hist-sub" style="font-size:.78rem"><span style="text-decoration:line-through;color:var(--ink3)">❌ Boş (${esc(fmtTarih(_satirlar.bosTarihi))} · ${esc(gunFarkiEtiket(_satirlar.bosTarihi))})</span></div>`+
+         `<div class="hist-sub" style="font-size:.78rem">${esc(fmtTarih(_satirlar.gebeTarihi))} · <b style="color:var(--green)">✅ Gebe</b> (${esc(gunFarkiEtiket(_satirlar.gebeTarihi))})</div>`
+        :`<div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b>${_sonucBadge}${t.tarih?` · <span style="color:var(--ink3)">${esc(gunFarkiEtiket(t.tarih))}</span>`:''}</div>`;
       return `<div class="hist-row" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="openTohDet('${t.id}')">
         <div class="hist-dot" style="background:${dot};flex-shrink:0" role="img" aria-label="${t.sonuc||'Bekliyor'}"></div>
         <div class="hist-main" style="flex:1;min-width:0">
@@ -7235,7 +7381,7 @@ async function _uremeTohumlama(el){
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${esc(kupe)} — ${esc(t.sperma||'?')}</span>
             <span style="flex-shrink:0;background:rgba(176,120,0,.18);color:#7a4f00;font-size:.78rem;padding:2px 6px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span>
           </div>
-          <div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b>${_sonucBadge}</div>
+          ${_subHtml}
         </div>
         ${_bekliyor && t.tarih
           ? (()=>{
@@ -9928,6 +10074,13 @@ async function openTaskDet(id){
   // butonuna ULAŞILAMIYORDU ve görevin tek çıkışı gerçekten tohumlamaktı.
   // Artık modal normal açılıyor; tamamla butonu aşağıda forma yönlendiriliyor.
   _curTaskDet=t;
+  // K15 (T-04/T-05): muayene görevinde tıklama birleşik sonuç ekranına gider;
+  // seçici açılamazsa (bayrak kapalı/offline) akış jenerik detay yedeğine düşer —
+  // orada "✅ Tamamlandı" gizlidir (P3b UI ikizi), 🗑 İptal yolu açık kalır
+  // (TOHUMLAMA_PLANLI erken-return dersi).
+  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE'){
+    if(await _muayeneSonucAc(t.id)) return;
+  }
   const today=bugun();
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
   const isLate=t.hedef_tarih<today;
@@ -9972,6 +10125,10 @@ async function openTaskDet(id){
   // TOHUMLAMA_PLANLI: tek tıkla "tamamlandı" olmaz — gerçek tohumlama kaydı gerekir.
   // Buton etiketi bunu söylesin; detayTamamla() forma yönlendiriyor.
   if(t.gorev_tipi==='TOHUMLAMA_PLANLI'&&tamamBtn) tamamBtn.textContent='🐄 Tohumlamayı Kaydet';
+
+  // K15: muayene görevi yedeğinde jenerik tamamlama butonu GİZLİ — sonuç YALNIZ
+  // birleşik ekrandan (P3b gorev_tamamla guard'ının UI ikizi).
+  if((t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE')&&tamamBtn) tamamBtn.style.display='none';
 
   // ILERI_GEBE_ASI / ASI_RAPEL / ASI_HATIRLATMA: standart tamamla gizle, aşı butonu göster.
   // ASI_RAPEL özel olarak işlenmeli — generic 'Tamamlandı' görevi kayıtsız kapatıyordu
@@ -10176,6 +10333,9 @@ async function openTaskDet(id){
 async function detayTamamla(){
   if(!_curTaskDet) return;
   if(_curTaskDet.gorev_tipi==='TOHUMLAMA_PLANLI') return openPlanliTohumlama(_curTaskDet);
+  // K15: muayene görevleri jenerik doneTask'e ASLA düşmez (P3b gorev_tamamla
+  // guard'ının UI ikizi) — iki tip AYNI birleşik sonuç ekranını açar (T-04/T-05).
+  if(_curTaskDet.gorev_tipi==='GEBELIK_KONTROL'||_curTaskDet.gorev_tipi==='TAKIP_MUAYENE') return _muayeneSonucAc(_curTaskDet.id);
   // §3: etken_kod varsa ama stok_id yoksa → önce stok seçtir
   if (_curTaskDet.etken_kod && !_curTaskDet.stok_id) {
     return _gorevStokSecVeTamamla(_curTaskDet);

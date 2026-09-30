@@ -450,14 +450,15 @@ test('P8 handlers: data-input kayıtları (ertele gün/saat + pg doz/ürün)', (
   }
 });
 
-// ── 15. P9 bağlama YOK (drift kapısı — zarf sınırı) ──────────────────
+// ── 15. P9 bağlama VAR (drift kapısı P9 teslimiyle doldu — impl-P9, 2026-09-30) ──
 
-test('P8 sınır: _muayeneSonucAc TANIMI bu teslimde YAZILMAZ (P9 işi; P6 typeof-köprüsü mevcut)', () => {
+test('P9 bağlama: _muayeneSonucAc tanımı + tohSonuc seçici bağlaması teslim edildi', () => {
   const uiKay = fs.readFileSync(path.join(REPO, UI), 'utf8');
-  // P6/P7 parçaları P9'a typeof-guard köprüsü yazmış durumda (mevcut davranış, dokunulmaz);
-  // P8 yalnız TANIMI yazmamalı (function _muayeneSonucAc(...)).
-  assert.ok(!/^\s*(async\s+)?function\s+_muayeneSonucAc\s*\(/m.test(uiKay),
-    'P8 _muayeneSonucAc tanımlamamalı (P9 Interfaces)');
+  // Eski P8 sınır testi "tanım YAZILMAZ (P9 işi)" diyordu — sınır P9 ile doldu:
+  // tanım VAR olmalı ve P6 typeof-köprüsü artık gerçek fonksiyona bağlanır.
+  assert.ok(/^\s*(async\s+)?function\s+_muayeneSonucAc\s*\(/m.test(uiKay),
+    'P9: _muayeneSonucAc tanımlı olmalı (birleşik muayene ekranı, K15)');
   const formsKay = fs.readFileSync(path.join(REPO, 'js/forms.js'), 'utf8');
-  assert.ok(!formsKay.includes('_devamSeciciAc'), 'P8 forms.js DOKUNULMAZ (tohSonuc bağlama P9)');
+  assert.ok(formsKay.includes('_devamSeciciAc'),
+    'P9: tohSonuc Boş dalı devam seçicisine bağlı olmalı (S-5)');
 });

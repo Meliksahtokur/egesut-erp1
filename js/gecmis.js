@@ -126,6 +126,7 @@ const _GM_KOD_DEGER_ETIKET = {
     PADOK_DEGISIM: 'Padok Değişimi', MUAYENE: 'Muayene', ASI_PLANLI: 'Planlı Aşı',
     ILERI_GEBE_ASI: 'İleri Gebe Aşısı', ILERI_GEBE: 'İleri Gebe Takviyesi',
     SUTTEN_KESME: 'Sütten Kesme', DIGER: 'Diğer',
+    TAKIP_MUAYENE: 'Takip Muayenesi',   // P9/K15: ovsync takip zinciri muayenesi
   },
   durum: { active: 'Aktif', closed: 'Kapandı', geri_alindi: 'Geri Alındı' },
   status: { active: 'Aktif', closed: 'Kapandı' },

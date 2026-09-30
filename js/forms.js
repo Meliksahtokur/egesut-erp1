@@ -4337,7 +4337,6 @@ async function tohSonuc(sonuc, btn) {
   if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {
     toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın', true); return;
   }
-  if (sonuc === 'Boş' && !confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
 
   try {
     let rpcName, successMsg;
@@ -4345,6 +4344,23 @@ async function tohSonuc(sonuc, btn) {
       rpcName = 'tohumlama_sonuc_gebe';
       successMsg = '✅ Gebe olarak işaretlendi';
     } else if (sonuc === 'Boş') {
+      // P9/S-5 (§18.15): Boş sonrası DEVAM SEÇİCİ — confirm + doğrudan
+      // tohumlama_sonuc_bos yolu KALKTI; sonuc + devam adımı tek işlemde (P2b
+      // sarmal). Bayrak kapalıysa (#6, S-5) bugünkü davranış yaşar (fallback).
+      const _h=(getState('animals')||[]).find(a=>a&&a.id===_curToh.hayvan_id);
+      await _devamSeciciAc('bos', {
+        tohumlama_id: _curToh.id,
+        kupe_no: (_h && (_h.kupe_no || _h.devlet_kupe)) || '',
+        grup: (_h && _h.grup) || '',
+        tohumlama_tarihi: _curToh.tarih || '',
+        sperma: _curToh.sperma || '',
+      });
+      if (typeof window !== 'undefined' && window.__devamSecici && window.__devamSecici.acik) {
+        // Seçici akışı devraldı — sonuç modalı kapanır; yazma seçicide (tek RPC).
+        closeM('m-toh-det');
+        return;
+      }
+      if (!confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
       const res = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: _curToh.id });
       if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
       successMsg = 'Boş olarak işaretlendi';
