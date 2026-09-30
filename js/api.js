@@ -507,15 +507,33 @@ let _pullChain = Promise.resolve();
 // Sadece belirtilen tabloları Supabase'den çek
 /**
  * Verilen tablo listesi için veri çekme zincirini başlatır ve sonucu döndürür.
+ * Run resolve olduğunda üçlü kontratı (requested, ok, failed) + detInternal
+ * işaretini gevşek `window._detAciksaTazele` kancasına taşır (kart-tazeleme
+ * T1 — SPEC v6 §3.1); kanca yoksa veya hata fırlatırsa pull sonucu etkilenmez.
  * @param {Array} tables Çekilecek tablo listesi.
- * @returns {Promise} Tablo verilerinin çekilmesi işlemi için Promise.
+ * @param {Object} [opts] Opsiyonel seçenekler (geriye dönük uyumlu — tek argümanla da çağrılır).
+ * @param {boolean} [opts.detInternal] Kartın (openDet) kendi pull'unu işaretler;
+ *   kanca 4. argümanı olarak dürüst taşınır (bastırma kararı ui.js'tedir).
+ * @returns {Promise} Run sonucu ({ ok: string[], failed: string[] }) ile çözülür;
+ *   reject'te kanca çağrılmaz ("tam red'de kanca doğal olarak çağrılmaz").
  */
-function pullTables(tables = []) {
+function pullTables(tables = [], opts = {}) {
   _suruStatCache = {};
   if (!tables.length) return Promise.resolve();
+  const detInternal = opts.detInternal === true;
   const run = _pullChain.then(() => _pullTablesNow(tables), () => _pullTablesNow(tables));
   _pullChain = run.catch(() => {});
-  return run;
+  // kart-tazeleme T1 (SPEC v6 §3.1 R2-H01): üçlü kontrat kancası — yalnız
+  // RESOLVE'da çağrılır; reject'te ve `tables.length===0` erken dönüşünde
+  // çağrılmaz. Gevşek bağ: api.js DOM bilmez, kanca hatası pull'u bozmaz.
+  return run.then((sonuc) => {
+    try {
+      window._detAciksaTazele?.(tables, sonuc?.ok || [], sonuc?.failed || [], detInternal);
+    } catch (e) {
+      console.warn('⚠️ _detAciksaTazele kanca hatası (yok sayıldı):', e);
+    }
+    return sonuc;
+  });
 }
 
 // TG1-W3 (luna F10): islem_log 100-satır cap'i "seçilen gün için tüm olaylar"
@@ -551,10 +569,13 @@ async function _fetchIslemLogTumu(){
  * Verilen tablo isimlerinden oluşan dizideki her bir tablo için ilgili veritabanı sorgusunu (fetcher) çalıştırır,
  * sonuçları işler ve hata durumunda uyarı verir. Başarılı olan tablolardan gelen verileri işlenmiş hale getirir.
  * @param {Array} tables İşlenecek tablo isimlerinin listesi. Varsayılan olarak boş dizidir.
- * @returns {Promise<void>} İşlem tamamlandığında (başarılı veya hata) void döner.
+ * @returns {Promise<{ok: string[], failed: string[]}>} ok = başarıyla fetch+IDB
+ *   yazımı yapılan tablolar; failed = fetcher'ı hata veren tablolar
+ *   (kart-tazeleme T1 üçlü kontrat — tablo hatası reject ETMEZ, hataSayisi yolu korunur).
  * @tablo bildirim_log (select), cases (select), cop_kutusu (select), diseases (select), dogum (select), drug_administrations (select), drug_classes (select), drug_products (select), drugs (select), grup_padok_eslem (select), hayvan_durum_view (select), hekimler (select), kizginlik_log (select), padoklar (select), protokol_ayar (select), protokol_instance (select), sablon_hastalik_eslem (select), stok_hareket (select), stok_kategorileri (select), stok_tuketim_view (select), tedavi_sablonu_kalem (select), tedavi_sablonu (select), tohumlama (select), treatment_day_uygulamalar (select), treatment_days (select), uygulama_log (select), v_gorev_log_sync (select), vaccination_log (select), vaccination_schedule (select), vaccine_diseases (select), vaccine_protocol_steps (select), vaccines (select)
  */
 async function _pullTablesNow(tables = []) {
+  const ok = [], failed = [];
   try {
     const FETCHERS = {
       /**
@@ -751,15 +772,26 @@ async function _pullTablesNow(tables = []) {
     // store'ları yoktu (TABLES dışı), ilk pullTables çağrısında NotFoundError
     // patlatırlardı; çağıranları yok (m-insem doğrudan db.from kullanıyor)
     const uniq = [...new Set(tables)].filter(t => FETCHERS[t]);
-    const results = await Promise.all(uniq.map(t => FETCHERS[t]()));
+    // FIX-R1 M-01: fetcher Promise REJECT'i de tablo hatası sayılır — rejection
+    // run'u düşürmez, her fetcher kendi promise'ine bağlı catch ile {data:null,error}
+    // biçimine dönüşür ve aşağıdaki döngüde failed setine girer (SPEC §3.1: tablo
+    // hatası run'u reject etmez; kanca üçlüyü taşır). Promise.resolve().then(...)
+    // fetcher'ın senkron fırlatmasını da aynı kapıya alır.
+    const results = await Promise.all(uniq.map(t =>
+      Promise.resolve().then(FETCHERS[t]).catch(error => ({ data: null, error }))
+    ));
     let hataSayisi = 0;
-    await Promise.all(uniq.map((t, i) => {
+    // kart-tazeleme T1: FETCHERS döngüsünün yapısı değişmedi — yalnız set
+    // toplama eklendi (ok = fetch+IDB yazımı başarılı; failed = fetcher hatası).
+    await Promise.all(uniq.map(async (t, i) => {
       if (results[i].error) {
         hataSayisi++;
+        failed.push(t);
         console.warn(`⚠️ pullTables ${t}: ${results[i].error.message}`);
-        return Promise.resolve();
+        return;
       }
-      return idbClearAndPut(t, results[i].data || []);
+      await idbClearAndPut(t, results[i].data || []);
+      ok.push(t);
     }));
     // B19: tablo bazlı pull hataları yutulup nokta yeşil kalıyordu — bayat
     // veri "senkron" görünüyordu. warn sınıfı mevcut dot stili.
@@ -767,6 +799,7 @@ async function _pullTablesNow(tables = []) {
   } finally {
     // zincir _pullChain'de yönetiliyor; burada kilitleyecek bir şey yok
   }
+  return { ok, failed };
 }
 
 // Optimistic RPC: toast önce → rpc gönder → arka planda pull + render

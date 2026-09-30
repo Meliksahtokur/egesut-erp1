@@ -162,7 +162,7 @@ async function submitAnimal(btn) {
       closeAnimalEdit();
       await pullTables(['hayvanlar']);
       await renderFromLocal();
-      openDet(editId);
+      openDet(editId, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
     } else {
       // EKLEME MODU
       // UI Telemetry: hayvan ekle submit
@@ -854,7 +854,7 @@ async function submitCase(btn) {
     }
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
-      await openDet(hayvan.id);
+      await openDet(hayvan.id, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
       openCaseDet(res.case_id);
     }
   } catch (e) { toast(getUserMessage(e), true); }
@@ -3354,7 +3354,7 @@ async function abortKaydet(hayvanId, tohId) {
     toast('✅ Abort kaydedildi, gebelik kapatıldı');
     await pullTables(['tohumlama','hayvanlar','islem_log']);
     renderSafe();
-    openDet(hayvanId);
+    openDet(hayvanId, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
   } catch (e) { toast('❌ Abort kaydedilemedi: ' + (e?.message || getUserMessage(e)), true); }
 }
 
@@ -3379,7 +3379,7 @@ async function hayvanNotEkle(hayvanId, btn) {
     closeM('m-not');
     cl('not-input');
     pullTables(['hayvanlar']).then(renderSafe).catch(console.warn);
-    openDet(hayvanId);
+    openDet(hayvanId, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Not Ekle'; } }
 }
@@ -3564,7 +3564,8 @@ async function suttenKesTekil(hayvanId, btn) {
   try {
     await rpc('buzagi_sutten_kesme_onayla', { p_hayvan_id: hayvanId });
     toast(`✅ ${getDisplayKupe(h)} sütten kesildi`);
-    if (typeof closeDet === 'function') closeDet();
+    // kart-tazeleme T3 (R3): closeDet KALDIRILDI — kayıt sonrası kart KAPANMAZ;
+    // pullTables sonu kancası (_detAciksaTazele) kartı yerinde tazeler.
     pullTables(['hayvanlar','gorev_log','protokol_instance']).then(renderSafe).catch(console.warn);
   } catch (e) { toast(getUserMessage(e), true); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🍼 Sütten Kes'; } }
@@ -4374,8 +4375,8 @@ async function tohSonucKaydet() {
 }
 /**
  * Belirtilen tohumlama kaydının durumunu günceller (Gebe, Boş veya Bekliyor),
- * ilgili RPC çağrılarını yapar, başarı mesajı gösterir, tablo verilerini çeker,
- * detay modalını kapatır ve hayvan detayını yeniden açar.
+ * ilgili RPC çağrılarını yapar, başarı mesajı gösterir, tablo verilerini çeker
+ * ve detay modalını kapatır; açık kart pullTables sonu kancasıyla yerinde tazelenir.
  * @param {string} sonuc Kaydın yeni durumu ('Gebe', 'Boş' veya 'Bekliyor').
  * @param {HTMLElement} btn Tıklanan buton elemanı.
  * @returns {Promise<void>} İşlem tamamlandığında undefined döndürür.
@@ -4411,10 +4412,8 @@ async function tohSonuc(sonuc, btn) {
     toast(successMsg);
     await pullTables(['tohumlama', 'hayvanlar', 'islem_log']);
     closeM('m-toh-det');
-    const detEl = document.getElementById('det');
-    if (detEl && detEl.classList.contains('on') && _curToh.hayvan_id) {
-      await openDet(_curToh.hayvan_id, true);
-    }
+    // kart-tazeleme T3 (§4): doğrudan openDet KALDIRILDI — çifte çizim temizliği;
+    // pull seti kart okuma evreni İÇİ, _detAciksaTazele kancası kartı yerinde tazeler.
     await renderFromLocal();
   } catch (e) {
     // rpc() iş kuralı mesajlarını (data.mesaj / RAISE) zaten Türkçe fırlatır —

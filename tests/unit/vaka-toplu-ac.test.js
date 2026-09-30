@@ -2315,6 +2315,7 @@ describe('V2.3 (W18) — 📂 Şablon Yükle kablolaması + ?v= damgası (manife
     // 20260925-04: E0-UI (erteleme-genel S5) — "Kalan günleri kaydır" butonu + RPC kablolaması (js/ui.js + index.html)
     // 20260925-05: E1-UI+E4-UI (erteleme-genel) — genel [Ertele] butonu + kural cache + gorev_ertele RPC +
     //              protokol_iptal akışı + offline kapı E6 (damga kulvar tek değerine yükseltildi)
+    // 20260929-01: kart tazeleme kancası (api/ui/forms)
     const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]);
     const yerel = srcs.filter(s => !s.startsWith('http'));
     assert.ok(yerel.length >= 14, 'yerel script sayısı: ' + yerel.length);
