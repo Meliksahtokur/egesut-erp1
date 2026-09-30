@@ -2211,6 +2211,493 @@ async function _pgKapiBosAtaUygula(){
 }
 
 // ──────────────────────────────────────────
+// P8: Devam seçici bileşeni — Boş sonrası / muayene sonucu ('bos' + 'muayene' modları;
+// plan.md:559-588; mockup 01/02/03/05 copy sahib onaylı BİREBİR — paraphrase yasak).
+// Açılışta tohumlamaBosVeDevam({p_secim:null,…}) dry-run; bayrak_kapalı → seçici AÇILMAZ (#6);
+// offline/dry-run hatası → seçici AÇILMAZ + "İnternet yok" (bayat veriyle seçim YAPILMAZ).
+// Sunucu seçim değerleri P2b imzasıyla birebir: GEBE|OVSYNC|PG|TAKIP|ERTALE (p_secim literal).
+const _devamSecenekler = {
+  OVSYNC: { etiket: '🔄 Ovsync uygula', rozet: 'hemen', alt: 'Ovsync vakası bugün açılır (4 uygulama + TAI)' },
+  PG: { etiket: '💉 PG uygula', rozet: 'hemen', alt: '+48 saat TAI görevi açılır (uygunsa)' },
+  TAKIP: { etiket: '🔍 Takibe bırak', alt: 'Bu tarihte rektal muayene görevi açılır. Bu arada kızgınlıkta tohumlanır, PG ya da Ovsync yapılırsa takip kendiliğinden kapanır.' }
+};
+// Muayene moduna özel seçenekler (D3 tablosuna copy YAZILMAZ — tek sabit).
+const _muayeneEkstra = {
+  GEBE: { etiket: '✅ Gebe' },
+  ERTALE: { etiket: '📅 Muayeneyi ertele' }
+};
+// D3 tablosu: görev tipi → seçenek sekansı. TAKIP_MUAYENE'de TAKIP YOK
+// (sunucu karşılığı TAKIP_YENIDEN_SECILEMEZ — UI seçenek bile sunmaz).
+const _devamD3 = {
+  GEBELIK_KONTROL: ['GEBE', 'OVSYNC', 'PG', 'TAKIP', 'ERTALE'],
+  TAKIP_MUAYENE: ['GEBE', 'OVSYNC', 'PG', 'ERTALE']
+};
+/**
+ * Görev tipine göre devam seçeneklerini D3 tablosundan türetir (tek kaynak).
+ * @param {string} gorevTipi 'GEBELIK_KONTROL' | 'TAKIP_MUAYENE'.
+ * @returns {string[]} p_secim değerleri sırayla.
+ */
+function _muayeneSecimleri(gorevTipi) {
+  return _devamD3[gorevTipi] || [];
+}
+/**
+ * Seçim anahtarının etiket/alt-metin sabitini döndürür (OVSYNC/PG/TAKIP ortak, GEBE/ERTALE ekstra).
+ * @param {string} secim p_secim anahtarı.
+ * @returns {object|null} {etiket, rozet?, alt?} sabiti ya da null.
+ */
+function _devamSecenekAl(secim) {
+  return _devamSecenekler[secim] || _muayeneEkstra[secim] || null;
+}
+/**
+ * Ana buton etiketi — mockup 01/02/03 birebir; 'muayene' modunda "Boş ata" öneki YOK (S-10).
+ * @param {string} mod 'bos' | 'muayene'.
+ * @param {string} secim p_secim anahtarı.
+ * @param {number} [erteleGun] ERTALE'de +N gün (etiket içinde gösterilir).
+ * @returns {string} Buton etiketi.
+ */
+function _devamButonEtiketi(mod, secim, erteleGun) {
+  const gun = erteleGun || 7;
+  if (mod === 'muayene') {
+    if (secim === 'ERTALE') return `Muayeneyi ertele (+${gun} gün)`;
+    if (secim === 'GEBE') return 'Muayene tamam + Gebe işaretle';
+    if (secim === 'OVSYNC') return 'Muayene tamam + Ovsync başlat';
+    if (secim === 'PG') return 'Muayene tamam + PG uygula';
+    return '';
+  }
+  if (secim === 'OVSYNC') return 'Boş ata + Ovsync başlat';
+  if (secim === 'PG') return 'Boş ata + PG uygula';
+  if (secim === 'TAKIP') return 'Boş ata + Takibe bırak';
+  return '';
+}
+/**
+ * Mockup copy'nin kısa tarih biçimi (GG.AA — fmtTarih tam yılı kırpılır).
+ * @param {string} iso YYYY-MM-DD.
+ * @returns {string} 'GG.AA'.
+ */
+function _devamKisaTarih(iso) {
+  return fmtTarih(iso).slice(0, 5);
+}
+/**
+ * iso tarihinden n gün çıkarır (YYYY-MM-DD; dFwd'ün tersi — lokal gün aritmetiği).
+ * @param {string} iso YYYY-MM-DD.
+ * @param {number} n Geriye alınacak gün sayısı.
+ * @returns {string} YYYY-MM-DD.
+ */
+function _devamGunCikar(iso, n) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() - (n || 0));
+  const p = x => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+/**
+ * Dry-run ön-bilgisinden Ovsync kilit gerekçesi (mockup 02 birebir copy).
+ * @param {object} onbilgi dry-run dönüşü (ovsync_kilitli, kilit_gerekce, kural_tarihi, kalan_gun).
+ * @returns {{kilitli: boolean, gerekce: string|null}} Kilit durumu.
+ */
+function _devamKilitGerekce(onbilgi) {
+  if (!onbilgi || !onbilgi.ovsync_kilitli) return { kilitli: false, gerekce: null };
+  const g = onbilgi.kilit_gerekce;
+  if (g === 'KISIR') return { kilitli: true, gerekce: '🔒 Kısır' };
+  if (g === 'KURAL_GUNU') return { kilitli: true, gerekce: `🔒 Kural günü ${_devamKisaTarih(onbilgi.kural_tarihi)} — ${onbilgi.kalan_gun} gün var` };
+  return { kilitli: true, gerekce: '🔒 Kural günü hesaplanamadı (üreme geçmişi eksik)' };
+}
+/**
+ * Ön seçim: Ovsync; kilitliyse Takibe bırak'a düşer (mockup 02); TAKIP listede yoksa PG.
+ * @param {object} onbilgi dry-run dönüşü.
+ * @param {string[]} secimler seçenek sekansı (bos modu ya da D3).
+ * @returns {string} Ön seçim p_secim anahtarı.
+ */
+function _devamOnSecim(onbilgi, secimler) {
+  if (!_devamKilitGerekce(onbilgi).kilitli) return 'OVSYNC';
+  if (secimler.includes('TAKIP')) return 'TAKIP';
+  return 'PG';
+}
+/**
+ * Erteleme canlı ön izlemesi — '→ GG.AA' (saatsiz) ya da '→ GG.AA SS:DD' (mockup 05).
+ * @param {string} bugunISO Bugünün YYYY-MM-DD'si (hedef hesabı çapası).
+ * @param {number} gun Ertelenecek gün sayısı (+7 ön ayar).
+ * @param {string} saat 'SS:DD' | '' — varsayılan SAATSIZ (§10d #3).
+ * @returns {string} Ön izleme metni.
+ */
+function _erteleOnizleme(bugunISO, gun, saat) {
+  const hedef = dFwd(bugunISO, gun || 7);
+  return saat ? `→ ${_devamKisaTarih(hedef)} ${saat}` : `→ ${_devamKisaTarih(hedef)}`;
+}
+/**
+ * S-7 21 g eşiği — sunucu TAKIP_UZADI formülüyle aynı: (bugun+gun) − takip başlangıcı.
+ * Başlangıç: baglam.bos_tarihi (P9 görev created_at gününü taşır) yoksa
+ * hedef − varsayilan_gun tahmini (P8 sözleşmesi; erteleme zincirinde yaklaşık kalır).
+ * @param {object} baglam {bos_tarihi?}.
+ * @param {object} onbilgi dry-run dönüşü (takip_bilgi, varsayilan_gun).
+ * @param {number} gun Seçilen erteleme günü.
+ * @param {string} bugunISO Bugün YYYY-MM-DD.
+ * @returns {object|null} {toplam, mesaj:'Bu hayvan N gündür takipte, emin misiniz?'} — eşik altında null.
+ */
+function _takip21Onay(baglam, onbilgi, gun, bugunISO) {
+  const bosC = baglam && baglam.bos_tarihi;
+  const bilgi = onbilgi && onbilgi.takip_bilgi;
+  if (!bosC && !(bilgi && bilgi.hedef_tarih)) return null;
+  const varsayilan = (onbilgi && onbilgi.varsayilan_gun) || 7;
+  const baslangic = bosC || _devamGunCikar(bilgi.hedef_tarih, varsayilan);
+  const hedefYeni = dFwd(bugunISO, gun || 7);
+  const toplam = Math.round((new Date(hedefYeni + 'T00:00:00') - new Date(baslangic + 'T00:00:00')) / 86400000);
+  if (!(toplam >= 21)) return null;
+  return { toplam, mesaj: `Bu hayvan ${toplam} gündür takipte, emin misiniz?` };
+}
+/**
+ * PG seçimi Kaydet hazır mı — doz boşsa pasif (sunucu PG_SECIM_GEREKLI'nin UI ikizi).
+ * @param {string} secim Seçim anahtarı.
+ * @param {string|number|null} pgDoz Seçili/veya girilen doz.
+ * @returns {boolean} Hazırlık durumu.
+ */
+function _devamPgdHazirMi(secim, pgDoz) {
+  if (secim !== 'PG') return true;
+  return pgDoz !== null && pgDoz !== undefined && String(pgDoz).trim() !== '';
+}
+/**
+ * Görünür durumdan P2b p_* parametrelerini derler (imza birebir; DEFAULT'lu alanlar açık taşınır).
+ * TAKIP: p_gun = varsayılan_gun, p_saat = null (saat = atama anı — UI girmez).
+ * ERTALE: p_saat boşsa null (varsayılan saatsiz).
+ * @param {object} d Görünür durum (mod, baglam, secim, pgStokId, pgDoz, erteleGun, erteleSaat, onay21, onbilgi?).
+ * @returns {object} tohumlamaBosVeDevam params nesnesi.
+ */
+function _devamRpcParams(d) {
+  const secim = d.secim;
+  const dozHam = d.pgDoz === '' || d.pgDoz === null || d.pgDoz === undefined ? null : Number(String(d.pgDoz).replace(',', '.'));
+  const isTAKIP = secim === 'TAKIP';
+  const isERTALE = secim === 'ERTALE';
+  return {
+    p_tohumlama_id: d.mod === 'bos' ? (d.baglam?.tohumlama_id || null) : null,
+    p_muayene_gorev_id: d.mod === 'muayene' ? (d.baglam?.muayene_gorev_id || null) : null,
+    p_secim: secim,
+    p_pg_urun: secim === 'PG' ? (d.pgStokId || null) : null,
+    p_pg_doz: secim === 'PG' ? (Number.isFinite(dozHam) ? dozHam : null) : null,
+    p_gun: isTAKIP ? (d.onbilgi?.varsayilan_gun || 7) : (isERTALE ? (d.erteleGun || 7) : null),
+    p_saat: isERTALE ? (d.erteleSaat || null) : null,
+    p_notlar: d.baglam?.notlar || null,
+    p_onay: !!d.onay21,
+  };
+}
+/**
+ * Sunucu red kodunu tanır (P8 kümesi); tanınmayan hata → null (normal hata akışı).
+ * Birleşik PG_KAPI:TAKIP_ACIK kendi koduyla ayrıştırılır (TAKIP_ACIK'a düşmez).
+ * @param {string} msg Hata mesajı ('KOD:{json}' biçimi).
+ * @returns {object|null} {kod, detay} ya da null.
+ */
+function _devamRedIsle(msg) {
+  const m = /^(OVSYNC_SECIM_[A-Z_]+|PG_KAPI:TAKIP_ACIK|PG_KAPI:[A-Z_]+|TAKIP_ACIK|TAKIP_UZADI|TOH_SONUCLU|TAKIP_KAPALI|MUAYENE_SONUC_GEREKLI|SECIM_TANIMSIZ|OZELLIK_KAPALI|TAKIP_YENIDEN_SECILEMEZ|GEBE_SONUC_RED)(?::([\s\S]*))?$/.exec(String(msg || ''));
+  if (!m) return null;
+  let detay = {};
+  try { detay = JSON.parse(m[2] || '{}'); } catch (e) {}
+  return { kod: m[1], detay };
+}
+/**
+ * Devam seçiciyi açar: önce dry-run (yan etki yok); bayrak kapalı/offline'da AÇILMAZ.
+ * 'bos' → seçenekler OVSYNC/PG/TAKIP; 'muayene' → D3 tablosundan (baglam.gorev_tipi).
+ * @param {string} mod 'bos' | 'muayene'.
+ * @param {object} baglam {tohumlama_id?|muayene_gorev_id?, kupe_no, grup?, hayvan_adi?, gorev_tipi?, tohumlama_tarihi?, sperma?, bos_tarihi?}.
+ * @returns {Promise<void>}
+ */
+async function _devamSeciciAc(mod, baglam) {
+  if (mod !== 'bos' && mod !== 'muayene') return;
+  const eski = document.getElementById('devam-secici-bs');
+  if (eski) eski.remove();
+  let onbilgi = null;
+  try {
+    onbilgi = await tohumlamaBosVeDevam({
+      p_secim: null,
+      p_tohumlama_id: baglam?.tohumlama_id || null,
+      p_muayene_gorev_id: baglam?.muayene_gorev_id || null,
+      p_pg_urun: null, p_pg_doz: null, p_gun: null, p_saat: null,
+      p_notlar: null, p_onay: false,
+    });
+  } catch (e) {
+    // offline guard: bayat veriyle seçim YAPILMAZ — seçici açılmaz.
+    toast('İnternet yok — devam seçimi için bağlantı gerekli', true);
+    return;
+  }
+  if (!onbilgi || onbilgi.bayrak_kapali) {
+    // #6: kurallar kapalı — bugünkü Boş davranışı yaşar (S-5; bağlama P9'da).
+    toast('Ovsync/PG kuralları kapalı — Boş kaydı mevcut akışla yapılır');
+    return;
+  }
+  const secimler = mod === 'muayene' ? _muayeneSecimleri(baglam?.gorev_tipi) : ['OVSYNC', 'PG', 'TAKIP'];
+  window.__devamSecici = {
+    mod,
+    baglam: baglam || {},
+    onbilgi,
+    secimler,
+    kilit: _devamKilitGerekce(onbilgi),
+    secim: _devamOnSecim(onbilgi, secimler),
+    erteleGun: onbilgi.varsayilan_gun || 7,
+    erteleSaat: '',
+    pgStokId: onbilgi.son_pg?.stok_id || null,
+    pgDoz: onbilgi.son_pg?.doz != null ? String(onbilgi.son_pg.doz) : '',
+    onay21: false,
+    acik: true,
+    isleniyor: false,
+  };
+  _devamSeciciRender();
+  history.pushState({ devam_secici: true }, '', '');
+}
+/**
+ * Seçiciyi kapatır (_pgKapiKapat deseni: div remove + history geri girişli).
+ * @returns {void}
+ */
+function _devamSeciciKapat() {
+  const box = document.getElementById('devam-secici-bs');
+  if (box) box.remove();
+  window.__devamSecici = null;
+  if (history.state?.devam_secici) { globalThis._modalBackGuard = true; history.back(); }
+}
+/**
+ * Seçici içeriğini (başlık + seçenek kartları + iç içe bölümler) çizer.
+ * Copy mockup 01/02/03/05 birebir; stil _pgKapiAc inline deseni (index.html CSS gereksiz).
+ * @returns {void}
+ */
+function _devamSeciciRender() {
+  const st = window.__devamSecici;
+  if (!st?.acik) return;
+  let box = document.getElementById('devam-secici-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'devam-secici-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _devamSeciciKapat(); };
+
+  const b = st.baglam;
+  let eyebrow = `${esc(b.kupe_no || '—')}${b.grup ? ' · ' + esc(b.grup) : ''}`;
+  let baslik = '';
+  let ustCipler = '';
+  let sonucBloku = '';
+  let bilgiKutu = '';
+  let linkButon = '';
+  if (st.mod === 'bos') {
+    // mockup 01: TAI GG.AA · N. deneme (bu laktasyon)
+    const tarihKisa = b.tohumlama_tarihi ? _devamKisaTarih(b.tohumlama_tarihi) : '';
+    baslik = `TAI ${esc(tarihKisa || '—')} · ${esc(String(st.onbilgi.deneme_sayisi ?? '?'))}. deneme (bu laktasyon)`;
+    if (b.sperma) ustCipler += `<span class="chip">${esc(b.sperma)}</span>`;
+    if (b.grup) ustCipler += `<span class="chip">${esc(b.grup)}</span>`;
+    if (b.dogum_gunu) ustCipler += `<span class="chip">${esc(b.dogum_gunu)}</span>`;
+    sonucBloku = `
+      <div style="font-size:.75rem;font-weight:700;color:var(--ink3);margin-bottom:6px;text-transform:uppercase">Sonuç Güncelle</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <div style="flex:1;text-align:center;padding:12px;border-radius:12px;border:2px solid var(--card3);font-weight:700;font-size:.9rem;color:var(--ink2)">✅ Gebe</div>
+        <div style="flex:1;text-align:center;padding:12px;border-radius:12px;border:2px solid var(--red);background:rgba(192,50,26,.1);color:var(--red);font-weight:700;font-size:.9rem">❌ Boş</div>
+      </div>`;
+  } else {
+    // K15: GEBELIK_KONTROL ve TAKIP_MUAYENE aynı ekran — başlık görev tipine göre.
+    const gebelikKontrolu = b.gorev_tipi === 'GEBELIK_KONTROL';
+    eyebrow = gebelikKontrolu ? 'Gebelik kontrolü' : 'Takip muayenesi';
+    baslik = `${gebelikKontrolu ? '🔬 Gebelik kontrolü — Küpe' : '🔬 Takip muayenesi — Küpe'} ${esc(b.kupe_no || '—')}`;
+    if (!gebelikKontrolu) {
+      // mockup 05 bilgi kutusu: Boş atandı GG.AA · takip N. gün
+      const bosGun = b.bos_tarihi || (st.onbilgi.takip_bilgi?.hedef_tarih ? _devamGunCikar(st.onbilgi.takip_bilgi.hedef_tarih, st.onbilgi.varsayilan_gun || 7) : null);
+      const sira = bosGun && st.onbilgi.takip_bilgi?.hedef_tarih
+        ? Math.max(1, Math.round((new Date(st.onbilgi.takip_bilgi.hedef_tarih + 'T00:00:00') - new Date(bosGun + 'T00:00:00')) / 86400000))
+        : null;
+      if (bosGun) bilgiKutu = `<div style="background:var(--card2);border-radius:10px;padding:10px 12px;font-size:.8rem;color:var(--ink2);margin-bottom:14px">Boş atandı <b>${esc(_devamKisaTarih(bosGun))}</b>${sira ? ` · takip <b>${esc(String(sira))}</b>. gün` : ''}</div>`;
+      linkButon = `<button class="btn" data-action="devam-kizginlik-gecis" style="margin-top:6px;background:none;border:none;color:var(--blue);font-weight:700;text-decoration:underline;padding:8px;font-size:.85rem">🐄 Kızgınlıkta → tohumlama kaydına geç</button>`;
+    }
+  }
+
+  // Seçenek kartları (D3 tablosu / bos seti — copy yalnız sabitlerden)
+  let kartlar = '';
+  for (const secim of st.secimler) {
+    const s = _devamSecenekAl(secim);
+    if (!s) continue;
+    const secili = st.secim === secim;
+    const kilitli = secim === 'OVSYNC' && st.kilit.kilitli;
+    let ic = '';
+    if (secim === 'ERTALE' && secili) {
+      ic = `
+        <div style="margin-top:10px;padding-left:30px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="fi" data-input="devam-girdi" data-alan="erteleGun" type="number" min="1" max="60" value="${escAttr(String(st.erteleGun))}" style="width:56px;text-align:center;padding:7px 10px;font-weight:600">
+            <span style="font-size:.8rem;color:var(--ink3)">gün</span>
+            <input class="fi" data-input="devam-girdi" data-alan="erteleSaat" type="time" value="${escAttr(st.erteleSaat)}" style="padding:7px 10px;font-weight:600" title="Saat (boş = saatsiz)">
+            <span id="devam-onizleme" style="font-size:.78rem;color:var(--ink2);font-weight:600;background:var(--card2);padding:6px 10px;border-radius:8px">${esc(_erteleOnizleme(bugun(), st.erteleGun, st.erteleSaat))}</span>
+          </div>
+        </div>`;
+    }
+    if (secim === 'PG' && secili) {
+      const son = st.onbilgi.son_pg;
+      const urunEtiketi = son ? `${son.urun_adi || 'PG ürünü'}${son.doz != null ? ` ${son.doz}` : ''}${son.birim ? ` ${son.birim}` : ''}` : 'Ürün seç…';
+      ic = `
+        <div style="margin-top:10px;padding-left:30px">
+          <div style="font-size:.7rem;font-weight:700;color:var(--ink3);margin-bottom:6px">Ürün ve doz (son kullanılan, değiştirilebilir)</div>
+          <select class="fi" data-change="devam-urun" style="padding:8px 10px;font-size:.82rem;font-weight:600;background:#fff;border:1.5px solid var(--card3);border-radius:8px">
+            <option value="">Ürün seç…</option>
+            ${son && son.stok_id ? `<option value="${escAttr(String(son.stok_id))}" ${st.pgStokId === son.stok_id ? 'selected' : ''}>${esc(urunEtiketi)}</option>` : ''}
+          </select>
+        </div>`;
+    }
+    kartlar += `
+      <div data-action="devam-secici-sec" data-secim="${escAttr(secim)}" style="border:2px solid ${secili ? 'var(--green)' : 'var(--card3)'};${kilitli ? 'opacity:.75;' : ''}border-radius:14px;padding:12px 14px;margin-bottom:9px;background:${secili ? 'rgba(78,154,42,.06)' : '#fff'}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${secili ? 'var(--green)' : '#b7c2ab'};flex-shrink:0;display:flex;align-items:center;justify-content:center;${secili ? `background:radial-gradient(circle, var(--green) 45%, transparent 47%);` : ''}"></div>
+          <div style="font-size:.92rem;font-weight:700;color:var(--ink)">${esc(s.etiket)}</div>
+          ${s.rozet && !kilitli ? `<span style="font-size:.6rem;font-weight:700;color:var(--green);background:rgba(78,154,42,.14);border-radius:8px;padding:2px 7px;margin-left:auto;white-space:nowrap">${esc(s.rozet)}</span>` : ''}
+        </div>
+        ${kilitli ? `<div style="font-size:.76rem;color:var(--amber);margin-top:5px;padding-left:30px">${esc(st.kilit.gerekce)}</div>` : (s.alt ? `<div style="font-size:.76rem;color:var(--ink3);margin-top:5px;padding-left:30px;line-height:1.4">${esc(s.alt)}</div>` : '')}
+        ${ic}
+      </div>`;
+  }
+
+  const pgPasif = st.secim === 'PG' && !_devamPgdHazirMi('PG', st.pgDoz);
+  const etiket = _devamButonEtiketi(st.mod, st.secim, st.erteleGun);
+
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));max-height:86vh;overflow:auto">
+    <div style="width:36px;height:4px;background:var(--card3);border-radius:2px;margin:0 auto 10px"></div>
+    <div style="padding:0 0 12px;border-bottom:1px solid var(--card2)">
+      <div style="font-size:.68rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.07em">${eyebrow}</div>
+      <div style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px">${baslik}</div>
+      ${ustCipler ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${ustCipler}</div>` : ''}
+    </div>
+    <div style="padding:14px 2px 0">
+      ${sonucBloku}
+      ${bilgiKutu}
+      <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Devam nasıl olsun? (zorunlu)</div>
+      ${kartlar}
+      <button id="devam-onayla" class="btn" data-action="devam-secici-onayla" style="margin-top:8px;background:var(--green);color:#fff;font-weight:700" ${pgPasif || !etiket ? 'disabled' : ''}>${esc(etiket)}</button>
+      ${linkButon}
+      <div style="font-size:.72rem;color:var(--ink3);margin-top:10px;text-align:center">Sonuç kaydı ve seçilen devam adımı tek işlemde yapılır</div>
+    </div>
+  </div>`;
+  document.body.appendChild(box);
+}
+/**
+ * Seçim değişince kartları yeniden çizer (S3: seçim zorunlu — seçim yapılmadan ana buton pasif).
+ * @param {string} secim p_secim anahtarı.
+ * @returns {void}
+ */
+function _devamSeciciSec(secim) {
+  const st = window.__devamSecici;
+  if (!st?.acik) return;
+  st.secim = secim;
+  _devamSeciciRender();
+}
+/**
+ * Canlı girişler (ertele gün/saat, PG doz/ürün) — tam rerender YAPMADAN
+ * ön izleme + buton etiketi/pasifliğini günceller (input focus korunur).
+ * @param {string} alan 'erteleGun' | 'erteleSaat' | 'pgDoz' | 'pgUrun'.
+ * @param {string} deger Yeni değer.
+ * @returns {void}
+ */
+function _devamSeciciGirdi(alan, deger) {
+  const st = window.__devamSecici;
+  if (!st?.acik) return;
+  if (alan === 'erteleGun') st.erteleGun = Math.max(1, parseInt(deger, 10) || 7);
+  else if (alan === 'erteleSaat') st.erteleSaat = deger || '';
+  else if (alan === 'pgDoz') st.pgDoz = deger;
+  else if (alan === 'pgUrun') st.pgStokId = deger || null;
+  else return;
+  const oniz = document.getElementById('devam-onizleme');
+  if (oniz) oniz.textContent = _erteleOnizleme(bugun(), st.erteleGun, st.erteleSaat);
+  const btn = document.getElementById('devam-onayla');
+  if (btn) {
+    btn.textContent = _devamButonEtiketi(st.mod, st.secim, st.erteleGun);
+    btn.disabled = st.secim === 'PG' ? !_devamPgdHazirMi('PG', st.pgDoz) : false;
+  }
+}
+/**
+ * Muayenede kızgınlık gözlemlendiyse tohumlama kaydına geçiş (mockup 05 link-butonu).
+ * Seçiciyi kapatır, tohumlama kaydını kupe ön-dolu açar.
+ * @returns {void}
+ */
+function _devamKizginlikGecis() {
+  const st = window.__devamSecici;
+  const kupe = st?.baglam?.kupe_no;
+  _devamSeciciKapat();
+  if (kupe && typeof openMWithHayvan === 'function') openMWithHayvan('m-insem', 'i-hid', kupe);
+}
+/**
+ * Ana buton: 21g tek onay (S-7) → tohumlamaBosVeDevam tek çağrı → red tanıma.
+ * Redler: PG_KAPI:* → mevcut _pgKapiHata sarmalı (yeniden kullanım); TAKIP_UZADI → tek onay
+ * (p_onay=true); TAKIP_ACIK(+PG_KAPI:TAKIP_ACIK) → P10 tek sheet noktası (P8: tanıma + bilgilendirme);
+ * MUAYENE_SONUC_GEREKLI → görev zaten kapandı, liste tazelenir; TOH_SONUCLU/TAKIP_KAPALI → ekran tazelenir.
+ * @returns {Promise<void>}
+ */
+async function _devamSeciciOnayla() {
+  const st = window.__devamSecici;
+  if (!st?.acik || st.isleniyor) return;
+  if (st.secim === 'ERTALE' && !st.onay21) {
+    const n = _takip21Onay(st.baglam, st.onbilgi, st.erteleGun, bugun());
+    if (n) {
+      openConfirm('Takip uzatma', n.mesaj, async () => {
+        st.onay21 = true;
+        await _devamSeciciOnayla();
+      });
+      return;
+    }
+  }
+  const btn = document.getElementById('devam-onayla');
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  st.isleniyor = true;
+  try {
+    await tohumlamaBosVeDevam(_devamRpcParams(st));
+    _devamSeciciKapat();
+    toast('✅ Sonuç ve devam adımı kaydedildi');
+    const tablolar = (typeof RPC_TABLES !== 'undefined' && RPC_TABLES.tohumlama_bos_ve_devam) || ['tohumlama', 'gorev_log'];
+    await pullTables(tablolar);
+    loadDash();
+  } catch (e) {
+    st.isleniyor = false;
+    if (btn) { btn.disabled = false; btn.textContent = _devamButonEtiketi(st.mod, st.secim, st.erteleGun); }
+    const mesaj = e?.message || String(e);
+    const red = _devamRedIsle(mesaj);
+    if (!red) {
+      toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : mesaj), true);
+      return;
+    }
+    // PG kapısı — mevcut sarmal (yeniden kullanım; P9'da tekrarDene tek-transaction'a çevrilir)
+    if (red.kod.startsWith('PG_KAPI')) {
+      const tekrar = async (onay, gerekce) => {
+        const p = _devamRpcParams(st);
+        p.p_onay = !!onay;
+        if (gerekce) p.p_notlar = 'PG öncesi değerlendirme: ' + gerekce;
+        return tohumlamaBosVeDevam(p);
+      };
+      _pgKapiHata(e, tekrar);
+      return;
+    }
+    if (red.kod === 'TAKIP_UZADI') {
+      // Tek onay: sunucu TAKIP_UZADI:{toplam_gun} verirse onay p_onay=true ile bir kez tekrarlanır.
+      const gun = red.detay?.toplam_gun;
+      openConfirm('Takip uzatma',
+        gun ? `Bu hayvan ${gun} gündür takipte, emin misiniz?` : 'Bu hayvan 21 günden uzun takipte, emin misiniz?',
+        async () => { st.onay21 = true; await _devamSeciciOnayla(); });
+      return;
+    }
+    if (red.kod === 'MUAYENE_SONUC_GEREKLI') {
+      // Görev başka oturumda kapanmış — liste tazelenir (S-8 hizası).
+      toast('⚠️ Bu muayene görevi zaten sonuçlandı — liste tazeleniyor', true);
+      _devamSeciciKapat();
+      await pullTables(['gorev_log']);
+      loadTasks();
+      return;
+    }
+    if (red.kod === 'TOH_SONUCLU' || red.kod === 'TAKIP_KAPALI') {
+      // Kayıt artık güncel değil (S-8/#9) — ekran tazelenir, seçim uygulanmaz.
+      toast('❌ Bu kayıt güncel değil — ekran tazeleniyor', true);
+      _devamSeciciKapat();
+      loadDash();
+      return;
+    }
+    if (red.kod === 'TAKIP_ACIK' || red.kod === 'PG_KAPI:TAKIP_ACIK') {
+      // P10 tek sheet noktası — P8'de tanıma + yönlendirme bilgilendirmesi.
+      toast('⚠️ Açık takip muayenesi var — önce onu sonuçlandırın', true);
+      return;
+    }
+    if (red.kod.startsWith('OVSYNC_SECIM_')) {
+      toast('🔒 Ovsync uygulanamadı — kilit gerekçesine bakın (' + red.kod.replace('OVSYNC_SECIM_', '') + ')', true);
+      return;
+    }
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : mesaj), true);
+  }
+}
+
+// ──────────────────────────────────────────
 // P6: Erteleme modalı — mevcut tarih giriş kalıbı + pencere canlı önizleme
 // E1-UI: genel erteleme — tip kilidi kural cache'den (js'e tip listesi
 // YAZILMAZ); pencere önizlemesi YALNIZ pencere_kurali='tohumlama' tiplerinde.
