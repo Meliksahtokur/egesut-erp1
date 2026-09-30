@@ -266,7 +266,7 @@ test('invalidate envanteri: api.js yardımcısı + api.js içi nokta (tohumlamaB
   assert.match(govde, /_ovsyncTakipInvalidate\s*\(/, 'api.js içi invalidate noktası (sarmal gövdesinde) yok');
 });
 
-test('invalidate envanteri: plan P4 noktaları ui.js/forms.js kaynakta senkron (P9/P10 çağrıları buraya düşecek)', () => {
+test('invalidate envanteri: P4 noktaları + P9/P10 sarmal yüzeyleri kaynakta senkron (tamlık iki yönlü)', () => {
   const NOKTALAR = [
     // [dosya, aranan, plan referansı]
     ['js/ui.js', 'async function ovsyncBaslat', 'plan P4 / ui.js:1812 (güncel 1799)'],
@@ -279,9 +279,38 @@ test('invalidate envanteri: plan P4 noktaları ui.js/forms.js kaynakta senkron (
     ['js/forms.js', "rpc('bulk_ilac'", 'plan P4 / toplu PG'],
     ['js/forms.js', 'async function seansTamamla', 'plan P4 / seans PG yolu'],
     ['js/forms.js', "rpc('gebelik_kaydet_manual'", 'plan P4 / gebelik muayenesi (GEBE modu dahil)'],
+    // P9 teslim noktaları (impl-P9-DONE): sarmalı çağıran yüzeyler — invalidate
+    // api.js tohumlamaBosVeDevam gövdesinden gelir (yukarıdaki test). P10'un
+    // TAKIP_ACIK catch'leri invalidate ÜRETMEZ (yalnız onay sheet'i açar) → listeye GİRMEZ.
+    ['js/ui.js', 'async function _pgKapiBosAtaUygula', 'P9 md.5 / ui.js:2214 (dry-run+yazma+retry — 3 sarmal çağrı)'],
+    ['js/ui.js', 'async function _devamSeciciAc', 'P8 açılış dry-run / ui.js:2462 — P9 muayene sonuç akışı aynı yolu'],
+    ['js/ui.js', 'async function _devamSeciciOnayla', 'P8 onay + P10 TAKIP_ACIK/PG_KAPI:TAKIP_ACIK retry / ui.js:2682'],
   ];
   for (const [dosya, aranan, kaynak] of NOKTALAR) {
     const src = readFile(dosya);
     assert.ok(src.includes(aranan), `${dosya}: "${aranan}" bulunamadı — invalidate envanteri kaynağıyla senkron dışı (${kaynak})`);
   }
+
+  // Tamlık (plan.md:670 "grep tabanlı senkron — muayene sonu akışları dahil"):
+  // tohumlamaBosVeDevam'ı ÇAĞIRAN ui.js fonksiyonları kaynaktan türetilir;
+  // SARMAL_YUZEYLERI kümesiyle birebir olmalı — yeni sarmal çağıran yüzey
+  // listeye eklenmezse test kırılır, listeden düşerse de kırılır.
+  const SARMAL_YUZEYLERI = ['_pgKapiBosAtaUygula', '_devamSeciciAc', '_devamSeciciOnayla'];
+  const uiSatirlari = readFile('js/ui.js').split('\n').filter(l => {
+    const t = l.trim();
+    return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*');
+  });
+  const turetilmis = new Set();
+  let suAnki = null;
+  for (const satir of uiSatirlari) {
+    const fn = satir.match(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/);
+    if (fn) suAnki = fn[1];
+    if (suAnki && /tohumlamaBosVeDevam\s*\(/.test(satir)) turetilmis.add(suAnki);
+  }
+  assert.deepStrictEqual([...turetilmis].sort(), [...SARMAL_YUZEYLERI].sort(),
+    `ui.js sarmal çağıran yüzey kümesi [${[...turetilmis].sort()}] envanterle [${[...SARMAL_YUZEYLERI].sort()}] senkron dışı — NOKTALAR listesini güncelle`);
+  // forms.js sarmal çağrısı YOK (grep 0 hit; tohSonuc Boş dalı seçiciye yönlendirir) —
+  // biri forms.js'ten sarmal çağırırsa envanter güncellenmeli.
+  assert.ok(!readFile('js/forms.js').includes('tohumlamaBosVeDevam('),
+    'forms.js yeni tohumlamaBosVeDevam çağırdı — invalidate envanteri güncellenmeli');
 });

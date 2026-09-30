@@ -8,12 +8,14 @@
 //   * PG kapısı (P9) — _pgKapiBosAtaUygula tek-RPC gövdesi (T-11)
 //   * tohSonuc Boş dalı (P9) — seçici + bayrak-kapalı fallback (S-5/#6)
 //   * TAKIP_MUAYENE etiketi (gecmis.js tek kaynak)
+//   * D3 (P11) — secim-tablo senkron kilidi: _muayeneSecimleri ↔ migration DB CASE
 //
 // İstanbul sabit UTC+3'tür (2016'dan beri kalıcı yaz saati yok) — test girişleri
 // Z-suffixed verilir ki makine saat diliminden bağımsız deterministik koşsun:
 // "İstanbul 23:30" = "20:30Z", "İstanbul 00:30 (ertesi gün)" = "21:30Z".
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const helpers = require('../../js/utils/helpers.js');
@@ -508,4 +510,80 @@ test('TOH-SONUC: Gebe/Bekliyor yolları DEĞİŞMEZ (regresyon kilidi)', async (
 test('ETIKET: TAKIP_MUAYENE → "Takip Muayenesi" (gecmis.js tek kaynak; Değişiklikler aynı kaynaktan)', () => {
   const { sandbox } = loadBrowserModule('js/gecmis.js');
   assert.equal(sandbox.gmKodDegerEtiketi('gorev_tipi', 'TAKIP_MUAYENE'), 'Takip Muayenesi');
+});
+
+// ══ D3 — secim-tablo senkron kilidi (P11; plan.md:674) ═════════════════════
+// İki kaynak birebir kilitli: ui.js _devamD3 tablosu (_muayeneSecimleri) ↔
+// migration 20260929000002'deki DB CASE (v_gecerli := CASE v_gorev.gorev_tipi,
+// muayene yolu seçim doğrulaması). Test migration metnini fs ile OKUR — CASE
+// satırı değişirse test kırılır (kaynak-okuma deseni: tests/unit/ovsync-api.test.js
+// dosya-okuma testleri; UI yükleme deseni: tests/unit/ovsync-secici.test.js loadUiSaf).
+
+const D3_MIGRATION = 'supabase/migrations/20260929000002_takip_gorev_ve_bos_devam.sql';
+
+// Migration CASE bloğundan iki görev tipinin seçim kümelerini ayıklar.
+// GEBELIK_KONTROL → WHEN satırı; TAKIP_MUAYENE → ELSE satırı (DB'de adıyla
+// satır YOKTUR — muayene görev tipleri :605 guard'ıyla ikisiyle sınırlıdır).
+function d3DbSetleri() {
+  const sql = fs.readFileSync(path.join(REPO_ROOT, D3_MIGRATION), 'utf8');
+  const bas = sql.indexOf('v_gecerli := CASE v_gorev.gorev_tipi');
+  assert.ok(bas !== -1,
+    'migration D3 CASE bloğu bulunamadı (v_gecerli := CASE v_gorev.gorev_tipi) — migration metni değişti, D3 kilidi güncellenmeli');
+  const son = sql.indexOf('END;', bas);
+  assert.ok(son !== -1, 'D3 CASE bloğunun END; kapanışı bulunamadı');
+  const blok = sql.slice(bas, son);
+  const kume = desen => {
+    const m = blok.match(desen);
+    assert.ok(m, `D3 CASE satırı okunamadı: ${desen}`);
+    return m[1].split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(s => s.length > 0);
+  };
+  return {
+    gebelik: kume(/WHEN 'GEBELIK_KONTROL' THEN p_secim IN \(([^)]*)\)/),
+    else_: kume(/ELSE p_secim IN \(([^)]*)\)/),
+  };
+}
+
+// ui.js tam modül (saf yüzey) — D3 tablosunu gerçek yardımcı üzerinden okur.
+function uiTamYukle() {
+  return loadBrowserModule('js/ui.js', {
+    expose: [],
+    extra: {
+      esc: v => String(v == null ? '' : v),
+      escAttr: v => String(v == null ? '' : v),
+      getData: async () => [],
+      getState: () => [],
+      fmtTarih: helpers.fmtTarih,
+      dFwd: helpers.dFwd,
+      bugun: helpers.bugun,
+      rpc: async () => { throw new Error('rpc stub: D3 testinde rpc kullanılmaz'); },
+      tohumlamaBosVeDevam: async () => { throw new Error('tohumlamaBosVeDevam stub: D3 testinde beklenmeyen çağrı'); },
+      toast: () => {},
+      openConfirm: () => {},
+      pullTables: async () => {},
+      loadDash: () => {},
+      loadTasks: () => {},
+      loadOvsyncDash: () => {},
+    },
+  });
+}
+
+test('D3: _muayeneSecimleri tablosu migration DB CASE ile birebir — secim-tablo senkron kilidi', () => {
+  const { sandbox: ui } = uiTamYukle();
+  assert.equal(typeof ui._muayeneSecimleri, 'function', '_muayeneSecimleri ui.js\'te yok');
+  const db = d3DbSetleri();
+
+  // plan.md:674 birebir beklenenler
+  assert.deepEqual(ui._muayeneSecimleri('GEBELIK_KONTROL'), ['GEBE', 'OVSYNC', 'PG', 'TAKIP', 'ERTALE']);
+  assert.deepEqual(ui._muayeneSecimleri('TAKIP_MUAYENE'), ['GEBE', 'OVSYNC', 'PG', 'ERTALE'],
+    'TAKIP_MUAYENE seçeneklerinde TAKIP yok (sunucu karşılığı TAKIP_YENIDEN_SECILEMEZ)');
+
+  // UI ↔ DB birebirlik: SQL IN kümesi sırasız → sıralı karşılaştırma
+  assert.deepEqual([...ui._muayeneSecimleri('GEBELIK_KONTROL')].sort(), [...db.gebelik].sort(),
+    'GEBELIK_KONTROL: ui _devamD3 kümesi ≠ migration CASE WHEN kümesi');
+  assert.deepEqual([...ui._muayeneSecimleri('TAKIP_MUAYENE')].sort(), [...db.else_].sort(),
+    'TAKIP_MUAYENE: ui _devamD3 kümesi ≠ migration CASE ELSE kümesi');
+
+  // D3 özü iki kaynakta da: TAKIP yalnız GEBELIK_KONTROL'de
+  assert.ok(db.gebelik.includes('TAKIP'), 'DB GEBELIK_KONTROL dalı TAKIP taşımıyor — D3 ihlali');
+  assert.ok(!db.else_.includes('TAKIP'), 'DB ELSE (TAKIP_MUAYENE) dalı TAKIP taşıyor — D3 ihlali');
 });
