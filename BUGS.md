@@ -636,3 +636,20 @@ Rapor tablosu "sqlfluff stil uyarısı: 0" derken sqlfluff.out 6 stil bulgusu + 
 
 ### DEBT-CK-R6-TAI-TESTI — TAI GECMIS_TARIH kısmi-hata senaryosu test edilmedi [Minor]
 +7 sonrası TAI tarihi geçmişe düşerse vaka-başına tam geri sarma (VAKA_ACIK_DEGİL gibi hata bandında) — demo senaryosu koşulmadı (mimar R6). R3'ün tarifi de route.fetch()+abort() ile netleştirilmeli (mevcut haliyle I-1 yolunu her tetiklemeyebilir).
+
+---
+
+### BUG-DEAD-TOHUMLANABILIR-ONAY — ölü submit akışı: submitTohumOnayla / submitTohumErtele / openTohumErtele [open — tespit 2026-09-29]
+
+- **Kanıt (2026-09-29, mimar brainstorm turu, worktree minik-fixler @b507645):** üç fonksiyon da
+  js/forms.js:3657-3695'te tanımlı, atlas çağıran listeleri BOŞ; js/ ve index.html taramasında hiç
+  buton/onclick/data-action bağlantısı yok; `m-tohum-ertele` modalı index.html'de de YOK (0 eşleşme).
+  RPC_TABLES kayıtları duruyor: `hayvan_tohumlanabilir_onayla`, `hayvan_tohumlama_ertele`
+  (js/api.js:441-444).
+- **Köken:** "tohumlanabilir flag" yaklaşımı 2026-06-20'de terk edildi (domain-rules §9 —
+  sütten kesme `tohumlama_durumu` yazmaz notu; uygunluk v_eligible/_eligibleHayvanlar'a taşındı);
+  UI bağlantıları sökülmüş, fonksiyonlar kalmış.
+- **Etki:** doğrudan yok (ölü kod); kafa karışıklığı + kart-tazeleme denetiminde sahte "kart-kapatan"
+  sınıfı üretiyor (closeDet çağırıyorlar ama erişilemezler).
+- **Fix yönü:** silme ayrı iş/sahip kapısı — silinirken RPC'lerin canlı şemada durumu da
+  kararlanmalı (ölü RPC'ler mi, başka tüketici mi). Bu kayıt yalnızca tespit.
