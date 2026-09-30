@@ -1,7 +1,7 @@
 # G-20260929-OVSYNC-TAKIP-TEST-HAZIRLIK — Ovsync takip test hazırlığı
 
 - **id:** G-20260929-OVSYNC-TAKIP-TEST-HAZIRLIK
-- **status:** active
+- **status:** done (2026-09-30 14:25, sahip katalog v3 final onayı — "1 onay")
 - **owner:** Melik Şah Tokur (bu oturumda Full goal kaydının oluşturulmasını seçti, 2026-09-29)
 - **flow:** Full mode, Herdr (sahibin `BASLANGIC-PROMPTU-2026-09-29c.md` devri)
 - **base SHA / launch SHA:** `40feed3c6b1e5da55b44ba998618fdb24a5ee250`
@@ -44,5 +44,6 @@
 - **measurement 2026-09-30 07:58 (C koşumu sonucu):** T-72b `--rounds=30` demo koşumu yapıldı (betik çıkış 2 = belgelenmiş fail-closed). Betik yeni-yol nesneleri yokken yarış turlarını yapısal olarak koşmaz [CONFIRMED `tests/concurrency/ovsync-takip-t72b.mjs:214-220` vs döngü `:232`]; bugün ölçülen: envanter `sarmal=0 takip_kolon=0 tetik=0 disease=1`, Ç1/Ç2/Ç4/Ç5 RED(beklenen), Ç3 BLOKE. Sonuç: "5 çift × 30 tur" kabul ölçütü implementasyon öncesi literal kapanamaz — gerçek yarış ölçümü IMPL goal'inin ertelenmiş sözleşmesi kapsamına geçti. Kanıt: `/home/melik/tmp/ovsync-takip-olcum/t72b-rounds30-2026-09-30.txt`.
 - **measurement 2026-09-30 08:05 (katalog kapsam turu):** builtin subagent 6 gerçek kapsam açığı buldu → T-95..T-100 yazıldı; katalog sürüm 3, toplam 100 senaryo, süreklilik T-01..T-100 [CONFIRMED grep]; üç bayat sayı cümlesi düzeltildi (kalıntı 0). Subagent dosyayı manifest dışında `test-senaryolari.md` olarak yeniden adlandırdı — plan.md referanslarıyla uyumlu (3/4 doğru yazım, kod yüzeyinde sıfır bağımlılık) → mimar RATİFİYE, kanonik ad bu. İhlal kaydı: subagent raporu ".harness dokunulmadı" diyor ama goal satır 16 ve DONE tablo satır 11 adları da değişmiş [kaynak INFERRED: subagent; ikinci manifest ihlali]. Rapor: `runs/2026-09-28-ovsync-takip/katalog-kapsam-DONE.md`. Katalog v3 SAHİP onayını bekliyor.
 - **gate 2026-09-30 08:55 (katalog v3 dış review):** ss-lead-codex (GPT-5.6-Luna max, herdr yan tab) review: ilk tur DÜZELTME (2 ÖNEMLİ + 1 MİNÖR — mimar üçünü de plan kaynağından doğruladı ve kataloğa işledi); re-check **KABUL** — T-95..T-100 açık bulgu yok. Kanıt: `runs/2026-09-28-ovsync-takip/katalog-v3-review-DONE.md` §6. Katalog v3 (100 senaryo) SAHİP final onayını bekliyor.
-- **latest checkpoint:** 2026-09-30 07:14 devir ölçümü: HEAD yine `40feed3`; w14'te yalnız mimar Codex `w14:p3`, ovsync worker yok, WAKE arm yok. Test lead DONE `TAMAM`, root kabul `PARTIAL`: T-95/T-96 yok (94/96), T-72b Ç3 `BLOKE` ve N=30 koşulmadı, lead manifest dışı HANDOFF yazdı. Ürün/UI PASS değil; yeni iş/koltuk açılmadı.
-- **docs verdict:** `PARTIAL` (handoff hazırlandı; katalog sayısı tutarsız; `docs-update` checkpoint'i çalıştırılmadı).
+- **decision 2026-09-30 14:25 (sahip, "1 onay"):** Katalog v3 (100 senaryo) + 6 diyagram + `tests/test-manifest.yaml` (100 kayıt) paketi final ONAY — HAT 0 kapandı, goal DONE.
+- **latest checkpoint (kapanış ölçümü):** 2026-09-30 14:25: HEAD `fb08744` (devir commit'i); katalog v3 + diyagramlar iki dış review döngüsünde KABUL (`runs/2026-09-28-ovsync-takip/katalog-v3-review-DONE.md` §6, `runs/2026-09-28-ovsync-takip/diyagram-review-DONE.md` §6); T-72b "5 çift × 30 tur" kabul ölçütü implementasyon öncesi literal kapanamadı → ertelenmiş sözleşme olarak `G-20260930-OVSYNC-TAKIP-IMPL.md`'ye devredildi (sahip B-erteleme onayı 2026-09-30 07:45). Goal DONE.
+- **docs verdict:** `PARTIAL` → kapanış bilançosu: devir zinciri tamamlandı (HANDOFF-2026-09-30b + BASLANGIC-PROMPTU-2026-09-30b + kapanış kırıntısı); `docs-update` aracı bu goal'de koşmadı — bilinçli bilançodur, kabul engeli sayılmadı (sahip final onayı).

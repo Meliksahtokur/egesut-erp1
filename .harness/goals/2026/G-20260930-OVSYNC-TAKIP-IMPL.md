@@ -1,7 +1,7 @@
 # G-20260930-OVSYNC-TAKIP-IMPL — Ovsync takip ekranı ürün implementasyonu
 
 - **id:** G-20260930-OVSYNC-TAKIP-IMPL
-- **status:** draft (hazır tutuluyor; aktivasyon sahip onayıyla — 2026-09-30 devam diyagramı onayı bekleniyor)
+- **status:** active (2026-09-30 14:25, sahip "2 onay")
 - **owner:** Melik Şah Tokur (2026-09-30 yetkilendirmesi: mimar goal manifestini kendisi açabilir; push/merge/deploy yalnız sahip kapısı)
 - **flow:** Full mode, mimar oturumu + builtin subagent zarfları (pty worker açılmaz; ultracode YASAK)
 - **base SHA:** `40feed3c6b1e5da55b44ba998618fdb24a5ee250`
@@ -25,8 +25,9 @@
 - **local paths:** `docs/plans/` iki dosya, `runs/` zarfları, `.crumbs/ovsync-takip.jsonl`
 - **DB authority:** Demo prova DB'sinde migration prova apply + rollback ölçümü serbesttir (db-validation GEÇTİKTEN sonra). PROD apply SAHİP KAPISIDIR — bu goal kapsamında yok. Sahip demo şifresi değiştirilmez, dosyalara yazılmaz. Canlı şema tek otorite; migration geçmişi değil.
 - **pattern_refs:** mevcut `supabase/migrations/` desenleri (REVOKE anon şablonu dahil), `js/api.js` RPC kayıt deseni, mevcut `tests/` desenleri, `.harness/references/rpc-reference.md` + `ui-map.md`
+- **SQL araç sözleşmesi (sahip talimatı 2026-09-30):** PostgreSQL LSP (postgrestools, bu makinedeki yerel Postgres şema aynası) SQL yazan her subagent'ta ve review yüzeylerinde hover/completion/typecheck için ZORUNLU araç; LSP'de goto/references yok → sembol ilişki sorusunda GitNexus/Atlas kullanılır.
 - **acceptance commands:** her SQL için `scripts/db-validate.sh` (draft üzerinde VE prova apply öncesi); her değişen JS'te `node --check`; P11 birim test koşumu; P12 hedefli Playwright (Docker `mcr.microsoft.com/playwright:v1.58.2-noble --network host` deseni) kırmızı→yeşil ölçümü; T-72b 5 çift (Ç3 dahil, P2b sonrası); glmf-max `ui-test-listesi.md` 25/25 PASS; `git diff --check`; sahibe demodan ÖNCE glmf-max kapısı (proje UI testi kuralı). R3+ testlerde negative-oracle tamamlanma denetimi ve eskalasyon kuyruğunun boş olduğu kanıtlanır.
 - **stop conditions:** push/merge/deploy YASAK (sahip kapısı); `.ss/` yazma YASAK; PROD erişim YASAK; db-validation'sız migration teslimi YOK; glmf-max PASS'siz sahibe demo YOK; domain-rules çelişkisinde dur ve sahip kararına çıkar; GLM 09:00–13:00 penceresinde yeni subagent fan-out başlatma (sahip ezmesi hariç).
 - **report path:** `runs/2026-09-28-ovsync-takip/impl-DONE.md` (final) + madde bazlı `impl-<madde>-DONE.md`
-- **latest checkpoint:** 2026-09-30 07:50 draft yazıldı (mimar); aktivasyon için sahip onayı bekleniyor.
+- **latest checkpoint:** 2026-09-30 14:25 aktivasyon (sahip "2 onay"); P1 zarfı yazıldı → `runs/2026-09-28-ovsync-takip/impl-P1-GOREV.md`, builtin subagent (sonnet) dispatch edildi.
 - **docs verdict:** bekliyor (P13 tamamlanınca).
