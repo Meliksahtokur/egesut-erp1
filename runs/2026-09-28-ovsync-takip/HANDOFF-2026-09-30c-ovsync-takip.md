@@ -44,18 +44,17 @@ erteleme sahibe açıklandı, itiraz yok.
 Tam paket süit: **1309/1312** — 3 kırmızı PRE-EXISTING (2 tarih-duyarlı vaka-toplu-ac
 + LUNA-3 canlı-DB; HEAD baseline'ta kanıtlı).
 
-## §2 Canlı işler (yazma anı ölçümü ~21:00)
+## §2 Canlı işler (yazma anı ölçümü ~21:20 — GÜNCELLEME)
 
-- **P8 (devam seçici) SUBAGENT KOŞUYOR** — zarf
-  `runs/2026-09-28-ovsync-takip/impl-P8-GOREV.md`, DONE hedef `impl-P8-DONE.md` (yok henüz).
-  Bitiş bildirimi bu oturuma gelmedi. Devralan oturum: DONE varsa → nokta-kontrol →
-  kırıntı → commit → P9 dispatch. DONE yoksa subagent'in işi ölmüş olabilir → zarfı
-  yeniden dispatch et (aynı zarf; model sonnet).
+- **P8 KAPANDI (devir kapanışında hasat edildi)**: TAMAM, TDD 48/48; tam süit
+  1357/1360 (3 fail pre-existing, HEAD'te kanıtlı); mockup copy birebir + 2 bilinçli
+  sapma DONE'da notlu; commit **`ad13f98`**. GitNexus indeksi P8'li ağaçla yenilendi
+  (--index-only). **Canlı iş YOK** — devralan oturum doğrudan §3 adım 2'den başlar.
 - Başka canlı iş YOK; herdr w14'te yalnız bu mimar tab'ı.
 
 ## §3 Sıradaki (tek adım + zincir)
 
-1. **P8 hasat** (§2) → commit.
+1. ~~P8 hasat~~ — **KAPANDI** (`ad13f98`, §2 güncellemesi).
 2. **P9 dispatch** — zarf HAZIR: `runs/2026-09-28-ovsync-takip/impl-P9-GOREV.md`
    (bağlama + GEBELIK_KONTROL özel akışı + kalem 11 iki-satır + P9b bağlaması).
 3. **P10 dispatch** — zarf HAZIR: `impl-P10-GOREV.md` (birleşik kapı; H5 alan
