@@ -5,20 +5,35 @@
 // Yeni: belirsizYardimci → satır DOĞRULANAMADI (E1 atlas ile birebir: dinamik sınıf).
 // TDD: testler ÖNCE KIRMIZI koşuldu; sonra kapıya bilinmeyen-computed-üye kolu eklendi.
 // Mutant kanıtı: kural devre dışıyken testler KIRMIZI (V23D D2 desenindeki gibi).
+// E1 (MINOR-TAKIP): geciciKok — TMPDIR /tmp kökenliyse/göreliyse test AÇIK FAIL
+// (düzeltme öncesi TMPDIR=/tmp ile 5/5 sessiz PASS — kusur ölçüldü).
 // Koşum: npm run test:unit (ya da node --test tests/unit/etiket-tazelik-v23e.test.js)
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const KAPI = path.join(REPO, 'scripts', 'etiket-tazelik.mjs');
 const TIMEOUT_MS = 15000;
 
+// E1 (V23E açık-minör): TMPDIR /tmp'ye ÇÖZÜLÜYORSA (yok/'/tmp'/'/tmp/…' öneki),
+// '/' ise ya da GÖRELİYSA test AÇIK FAIL — sessiz ~/tmp düşüşü değil, sessiz
+// /tmp yazımı da değil (bu makinede /tmp tmpfs: RAM'e sayılır — YASAK).
+// Atlas testindeki geciciKok deseni, katı kolla (skip değil, FAIL).
+function geciciKok() {
+  const env = process.env.TMPDIR;
+  const gecersiz = !env || env === '/' || env === '/tmp' ||
+    env.startsWith('/tmp/') || !path.isAbsolute(env);
+  if (gecersiz) {
+    throw new Error(`TMPDIR geçersiz (/tmp yasak; disk kökü zorunlu): ${JSON.stringify(env)}`);
+  }
+  return env;
+}
+
 function koş(jsdocSatirlari, govde) {
-  const dizin = mkdtempSync(path.join(tmpdir(), 'etiket-v23e-'));
+  const dizin = mkdtempSync(path.join(geciciKok(), 'etiket-v23e-'));
   const dosya = path.join(dizin, 'ornek.js');
   writeFileSync(dosya,
     `/**\n${jsdocSatirlari.map(s => ` * ${s}`).join('\n')}\n */\nfunction ornekV23e(kayit){\n${govde}\n}\n`, 'utf8');
