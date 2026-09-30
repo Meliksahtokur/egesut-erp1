@@ -1,5 +1,8 @@
-// ss-repo-map — egesut-erp1 icin paralel repo haritalama.
-// Saf JS (TypeScript annotasyon YOK). Date.now / Math.random YASAK.
+// ss-repo-map — egesut-erp1 icin paralel repo haritalama (ram-pool).
+// Saf JS (TypeScript annotasyon YOK). Date.now / Math.random YASAK; kosu
+// kimligi (epoch) disaridan args.ramEpoch ile tasinir (§12.2).
+// Scan fazi ram-pool grant'indan genislik alir (ramPlan → lanes → ramClose);
+// Synthesize TEK ajandir, fan-out'a bolunmez.
 
 export const meta = {
   name: 'ss-repo-map',
@@ -8,9 +11,41 @@ export const meta = {
   phases: ['Scan', 'Synthesize']
 };
 
-const MAX_CONC = 6;
+// >>> ram-pool v<N> sha=<sha256[:12]>
+// ram-pool kanonik snippet YUVASI (§12.1-12.2; arayuz PLAN Task 15'te kilitli:
+// ramPlan(run, asked, opts) / parsePlan(raw) / lanes(items, grant, fn, run) /
+// ramClose(grant) / RAM_EXEC_NOTE — kanon:
+// tools-bank/.superset/lib/ram-pool/workflow-snippet.js).
+// Bu bloktaki govde YEREL TUTUCUDUR: `ram-ultracode sync-workflows` isaretler
+// arasini kanonik snippet ile degistirir (§12.3) ve isaret satirini v/sha ile
+// kanoniklestirir. Tutucu fail-closed atar; sync ONCESI kosum K6 ile yasak.
+const RAM_EXEC_NOTE =
+  'Test/build kosan ajan komutlari yalniz `ram-ultracode exec --class test|build --` ile ve tek tirnakli --sh sarmasiyla kosar (§7/§12.1).';
+async function ramPlan(run, asked, opts) {
+  throw new Error(
+    'FAIL-CLOSED: ram-pool kanonik snippet sync edilmemis — once ram-ultracode sync-workflows (§12.3)'
+  );
+}
+function parsePlan(raw) {
+  throw new Error(
+    'FAIL-CLOSED: ram-pool kanonik snippet sync edilmemis — once ram-ultracode sync-workflows (§12.3)'
+  );
+}
+async function lanes(items, grant, fn, run) {
+  throw new Error(
+    'FAIL-CLOSED: ram-pool kanonik snippet sync edilmemis — once ram-ultracode sync-workflows (§12.3)'
+  );
+}
+async function ramClose(grant) {
+  throw new Error(
+    'FAIL-CLOSED: ram-pool kanonik snippet sync edilmemis — once ram-ultracode sync-workflows (§12.3)'
+  );
+}
+// <<< ram-pool
 
-// Scan fazi acilari (en fazla 6; bir kismi bu repoya ozel).
+const RUN = 'ss-repo-map';
+
+// Scan fazi acilari (nufus: 6 aci; bir kismi bu repoya ozel).
 const SCAN_ANGLES = [
   {
     id: 'entrypoints',
@@ -85,40 +120,88 @@ const SYNTH_SCHEMA = {
   }
 };
 
-export default async function (input) {
-  const { target, question } = input;
-
-  // ---- Scan: acilar paralel, ayni anda en fazla MAX_CONC ----
-  const scanResults = [];
-  for (let i = 0; i < SCAN_ANGLES.length; i += MAX_CONC) {
-    const batch = SCAN_ANGLES.slice(i, i + MAX_CONC);
-    const results = await Promise.all(
-      batch.map((a) =>
-        agents.run({
-          prompt:
-            'Repoyu (' + target + ') asagidaki acidan tara ve yuzey raporu uret. ' +
-            'Uydurma YOK — sadece gordugun dosya/klasorleri yaz.\n' +
-            'Aci: ' + a.id + '\nOdak: ' + a.focus + '\n' +
-            (question ? 'Ozel soru: ' + question : ''),
-          schema: SCAN_SCHEMA,
-          label: 'scan:' + a.id
-        })
-      )
-    );
-    scanResults.push(...results);
+// Kalinti hesabi (§12.1 F6 null politikasi): lanes'in failed listesi +
+// (results dizisi items ile hizaliysa) bos kalan slotlar. Kayip sessizce
+// elenmez; remainder olarak rapor tasiyiciya gider.
+function remainderOf(items, out) {
+  const rem = Array.isArray(out && out.failed) ? out.failed.slice() : [];
+  const known = new Set(
+    rem.map((f) => (f && typeof f.index === 'number' ? f.index : null))
+  );
+  const results = out && out.results;
+  if (Array.isArray(results) && results.length === items.length) {
+    items.forEach((it, i) => {
+      if (results[i] == null && !known.has(i)) {
+        rem.push({ index: i, id: it && it.id });
+      }
+    });
   }
-
-  const areas = scanResults.flatMap((r) => (r && r.areas ? r.areas : []));
-
-  // ---- Synthesize: TEK ajan ----
-  const synth = await agents.run({
-    prompt:
-      'Asagidaki paralel tarama raporlarini TEK tutarli repo haritasina sentezle. ' +
-      'Cakisan ozetleri birlestir, tekrarlari at, riskleri one cikar.\n' +
-      'Raporlar: ' + JSON.stringify(areas),
-    schema: SYNTH_SCHEMA,
-    label: 'synthesize'
-  });
-
-  return { map: synth && synth.map ? synth.map : null, areas };
+  return rem;
 }
+
+const input = args || {};
+// §12.1 override: args.maxConc sayi ise force_shape ile o genislik istenir.
+const maxConcOverride = typeof input.maxConc === 'number';
+function askedFor(count) {
+  return { agent: maxConcOverride ? input.maxConc : count };
+}
+function planOpts(extra) {
+  const opts = extra || {};
+  if (maxConcOverride) opts.force_shape = true;
+  return opts;
+}
+
+const { target, question } = input;
+
+// ---- Scan: acilari ram-pool genisliginde tara (ramPlan → lanes → ramClose) ----
+const scanPlan = await ramPlan(
+  RUN,
+  askedFor(SCAN_ANGLES.length),
+  planOpts()
+);
+if (scanPlan.stopped) {
+  // ram-epoch-missing (§12.1): hicbir ajan acilmadan dur.
+  return scanPlan;
+}
+if (scanPlan.denied) {
+  return {
+    stopped: 'ram-pool-denied',
+    reason: scanPlan.reason,
+    remainder: SCAN_ANGLES.map((a, i) => ({ index: i, id: a.id, phase: 'Scan' }))
+  };
+}
+
+const scanOne = (a) =>
+  agent(
+    'Repoyu (' + target + ') asagidaki acidan tara ve yuzey raporu uret. ' +
+    'Uydurma YOK — sadece gordugun dosya/klasorleri yaz.\n' +
+    'Aci: ' + a.id + '\nOdak: ' + a.focus + '\n' +
+    (question ? 'Ozel soru: ' + question : ''),
+    { schema: SCAN_SCHEMA, label: 'scan:' + a.id, phase: 'Scan' }
+  );
+
+let scanOut = { results: [], failed: [] };
+if (scanPlan.grant) {
+  try {
+    scanOut = await lanes(SCAN_ANGLES, scanPlan, scanOne, RUN);
+  } finally {
+    await ramClose(scanPlan);
+  }
+}
+// scanPlan.skipped → bos faz (§12.1): plan ajani bile acilmadan gecildi.
+
+const areas = (scanOut.results || []).flatMap((r) => (r && r.areas ? r.areas : []));
+
+// ---- Synthesize: TEK ajan (fan-out'a bolunmez) ----
+const synth = await agent(
+  'Asagidaki paralel tarama raporlarini TEK tutarli repo haritasina sentezle. ' +
+  'Cakisan ozetleri birlestir, tekrarlari at, riskleri one cikar.\n' +
+  'Raporlar: ' + JSON.stringify(areas),
+  { schema: SYNTH_SCHEMA, label: 'synthesize', phase: 'Synthesize' }
+);
+
+return {
+  map: synth && synth.map ? synth.map : null,
+  areas,
+  remainder: remainderOf(SCAN_ANGLES, scanOut)
+};
