@@ -1,52 +1,55 @@
 # glmf-max UI test listesi — Ovsync Takip Ekranı (UI testi kapısı zarfı)
 
-- Tarih: 2026-09-29 · Kaynak: plan v7 P12 (kabul 5; proje CLAUDE.md "UI testi kapısı") + katalog sürüm 2 §İNSAN-UI (1–15)
-- **DURUM: ÜRÜN UI'SI UYGULANMADI — BU LİSTEDEKİ HİÇBİR MADDE BU TURDA PASS SAYILMAZ.** Sahibe demo linki VERİLMEZ; liste yalnız P5–P10 implementasyonundan SONRAKI glmf-max koşumu içindir.
-- Koşum zemini: `?demo` (Demo-Mirror Supabase); `ovsync_pg_kurallari_aktif=1`, `sessiz_tohumlama_muafiyet_gun=40` [demo ölçüm 2026-09-29]. Playwright temsilciler: `tests/e2e/ovsync-takip.spec.js` (8/8 RED — 2026-09-29 Docker koşumu).
+- Tarih: 2026-10-01 (P12 son eşleme) · Kaynak: plan v7 P12 (kabul 5; proje CLAUDE.md "UI testi kapısı") + katalog v3 §İNSAN-UI
+- **DURUM: ÜRÜN UI'SI TESLİM (P4–P10; son `2e64677`) — liste teslim edilen UI ile satır satır eşlendi (js/ui.js, js/forms.js, js/api.js, index.html okunarak; PW temsilciler 12/12 YEŞİL — `tests/e2e/ovsync-takip.spec.js`, koşum kanıtı `impl-P12-DONE.md`, ekranlar `artifacts/P12-*.png`).** Sahibe demo linki hâlâ VERİLMEZ; koşum bu listeden glmf-max koltuğunda yapılır.
+- Koşum zemini: `?demo` (Demo-Mirror Supabase); `ovsync_pg_kurallari_aktif=1`, `sessiz_tohumlama_muafiyet_gun=40` [demo ölçüm 2026-09-29]. Playwright temsilciler: 12/12 YEŞİL (2026-10-01, Docker `--workers=1` — koşum sözleşmesi dosya başlığında).
 - Her madde: beklenen görünüm + kanıt türü (DOM / ekran / konsol). Madde başına PASS/FAIL + kanıt; FAIL → düzeltme → yalnız FAIL maddeler yeniden koşulur.
+- **Teslimatta bulunan 3 sapma (mimar kararı bekler — maddelerde ⚠ ile işaretli):**
+  HATA-1 yalın TAKIP_ACIK sheet'inde muayene tarihi/saat boş (m.11) ·
+  HATA-2 erteleme hedef günü TR 00:00–08:00 arası sunucuda 1 gün geride (m.16) ·
+  HATA-3 S2 "muayeneye N gün" dalı canlı üründe ulaşılamaz — hep "muayene vakti" (m.19).
 
 ## A. Girişler ve omurga
 
-1. **6. stat hücresi (T-56)** — Dashboard `.dash-row`'da `🔄 Ovsync ›` hücresi + aktif zincir sayısı; 2 kolonlu grid'de son satırı tamamlar. Sınıf: S0>0 ∨ muayene-vakti dolan>0 → `alert`; yalnız bekleyen-başlatma>0 → `warn`; sakin → `ok`. Tık → `#pg-ovsync` açılır. Kanıt: DOM (hücre sayısı+sınıf üç koşumda) + ekran.
-2. **KPA şeridi (T-59)** — Aktif / Bugün / Geciken / Muayene bekleyen / Bekleyen başlatma; sayılar RPC `kpa` ile eşit; "Bekleyen başlatma" alt metni "(N takipte)". Kanıt: DOM (beş sayaç değeri) + RPC çıktı karşılaştırması (konsol).
-3. **S0–S4 bölümleri (T-32)** — Bugün/geciken canlı kartlar; aktif zincir kartları; sonuç bekleyenler; başlatılmayı bekleyenler; sonlananlar (katlanır). **Boş bölüm HİÇ render edilmez** (boş başlık/placeholder yok). Kanıt: DOM (boş koşumda bölüm eleman sayısı=0) + ekran.
-4. **🔔 "Tüm takibi aç →" + Görevler köprüsü (T-57)** — 🔔 🌱 bölümünde link ovsync sayfasına; Görevler başlığında "Tüm ovsync takibi →"; takip görevi 🌱 Üreme çipinde (K14). Kanıt: DOM (link href/handler) + ekran.
+1. **6. stat hücresi (T-56)** — Dashboard `.dash-row`'da `🔄 Ovsync ›` hücresi (`.sc`, onclick `goTo('ovsync')`) + üstünde `.sv` sayı (aktif zincir). Sınıf: S0>0 ∨ muayene-vakti>0 → `alert`; yalnız bekleyen-başlatma>0 → `warn`; sakin → `ok`. Tık → `#pg-ovsync.on`. Kanıt: DOM (hücre sayısı+sınıf) + ekran. [PW ✓; ekran P12-1]
+2. **KPA şeridi (T-59)** — `#pg-ovsync .ovs-kpa` içinde 5 hücre (`.ovs-kpa-c`), etiketler **küçük harfle**: `aktif · bugün · geciken · muayene bekleyen · bekleyen başlatma`; bugün>0 hücresi `ovs-one` vurgulu; bekleyen_baslatma_takipte>0 → altta `(N takipte)`. Sayılar RPC `kpa` ile eşit. Kanıt: DOM (beş hücre) + RPC karşılaştırması (konsol). [PW ✓]
+3. **S0–S4 bölümleri (T-32)** — Başlıklar: `S0 · Bugün & Geciken`, `S1 · Aktif zincirler`, `S2 · Sonuç bekleyenler`, `S3 · Başlatılmayı bekleyenler`, `S4 · Sonlananlar` (`.ovs-bolum h2` + alt sayı). **Boş bölüm HİÇ render edilmez** (başlık/placeholder yok). S3 ilk 5 + `tümü (M)` düğmesi; S4 katlanır (varsayılan kapalı). Kanıt: DOM (render edilen başlık kümesi = RPC satır kümesi — PW bu eşitliği kilitler) + ekran. [PW ✓; ekran P12-2]
+4. **🔔 "Tüm takibi aç →" + Görevler köprüsü (T-57)** — 🔔 🌱 bölümünde link ovsync sayfasına; Görevler başlığında "Tüm ovsync takibi →"; takip görevi 🌱 Üreme çipinde (K14: `GEBELIK_KONTROL`,`TAKIP_MUAYENE`,`TOHUMLAMA_PLANLI`,`OVSYNC_BASLAT`). Kanıt: DOM (link/handler) + ekran.
 5. **Sayı eşitliği (kabul 9)** — Ovsync sayfası bekleyen-başlatma = 🔔 🌱 sayısı (aynı anda; uyarılar alt kümesi). Kanıt: DOM (iki yüzeyden okunan sayı) + ekran.
 
 ## B. Boş sonrası devam (§6c) — pozitifler
 
-6. **Devam seçici (T-01/T-07)** — Boş seçince "Devam nasıl olsun? (zorunlu)" seçici; üç kart (🔄 Ovsync ÖN SEÇİLİ · 💉 PG · 🔍 Takibe bırak +7 g); Kaydet etiketi seçimle değişir ("Boş ata + Ovsync başlat" / "Boş ata + PG uygula" / "Boş ata + takibe bırak"); alt not "tek işlemde"; **"yalnız Kaydet" düğmesi YOK**. Kanıt: DOM (radio checked + buton metni) + ekran (mockup 01).
-7. **PG ön dolu (T-02)** — PG kartı seçilince ürün/doz alanı son kullanılanla DOLU ve düzenlenebilir. Kanıt: DOM (input değeri + enabled) + ekran (mockup 03).
-8. **TAKIP kurulumu (T-03)** — Takibe bırak: gün ön ayarı +7 (düzenlenebilir), saat atama anı; Kaydet → Görevler'de görev seçilen gün+saatte (🌱 Üreme), Ovsync S3'te "🔍 takipte · muayene GG.AA SS:DD" rozeti. Kanıt: DB (gorev_log) + DOM + ekran.
-9. **Kilitli Ovsync (T-14..T-17)** — Kısır: "🔒 Kısır" gerekçe ÖNCE (S-1), kural günü ikinci satır; düve/doğumlu kural günü: "🔒 Kural günü GG.AA — N gün var"; ön seçim Takibe bırak'a düşer. Kanıt: DOM (kilit metni) + ekran (mockup 02).
-10. **PG kapısı (T-06)** — `PG_KAPI:*` redsinde `#pg-kapi-bs` onay penceresi; "Boş ata ve uygula" tek işlemdir, **devam seçici AÇILMAZ**. Kanıt: DOM (sheet + seçici yokluğu) + DB (tek transaction sonucu).
-
-## C. Kapılar ve kapanışlar
-
-11. **TAKIP_ACIK onay sheet (T-20/T-21)** — App'in KENDİ bottom-sheet'i (native `confirm()`/`alert()` YASAK — konsol/dialog kanıtıyla): "Küpe X, GG.AA SS:DD'te rektal muayene takibinde. Takip kapatılıp PG uygulansın mı?"; Evet → takip kapanır + PG; Vazgeç → hiçbir yazma yok. Kanıt: DOM + konsol (dialog event yokluğu) + DB.
-12. **Birleşik kapı (S-4, T-86)** — PG_KAPI + TAKIP_ACIK birlikte: TEK sheet, iki gerekçe alt alta, TEK onay. Kanıt: DOM + ekran.
-13. **Sessiz kapanış (T-19)** — Takipli hayvana tohumlama kaydı: hiçbir onay çıkmaz; takip görevi kapanır (neden kayıtlı), listeden düşer. Kanıt: konsol (onay yokluğu) + DB.
-14. **Çıkış kapanışı (T-22)** — Hayvan çıkışı → takip kapanır (neden=çıkış). Kanıt: DB + DOM (satır düşer).
+6. **Devam seçici (T-01/T-07)** — Tohumlama detayında `❌ Boş` radyosu + `💾 Kaydet` → `#devam-secici-bs` açılır: başlık `TAI GG.AA · N. deneme (bu laktasyon)`, `Sonuç Güncelle` bloku (✅ Gebe soluk / ❌ Boş seçili — statik gösterim), **`Devam nasıl olsun? (zorunlu)`**, üç kart (🔄 Ovsync uygula · 💉 PG uygula · 🔍 Takibe bırak — **ön seçim Ovsync**, S3b), ana buton `#devam-onayla` etiketi seçimle değişir: `Boş ata + Ovsync başlat` / `Boş ata + PG uygula` / `Boş ata + Takibe bırak`; alt not `Sonuç kaydı ve seçilen devam adımı tek işlemde yapılır`; **"yalnız Kaydet" YOK** (sonuç modalı kapanır). Kartlar radio DEĞİL — `[data-action="devam-secici-sec"][data-secim=…]`. Kanıt: DOM (kart seçimi + buton etiketi) + ekran (mockup 01). [PW ✓; ekran P12-3]
+7. **PG ön dolu (T-02)** ⚠ — PG kartı seçilince ürün select'i (`Ürün ve doz (son kullanılan, değiştirilebilir)`) son PG kaydıyla **seçili** gelir; **doz alanı DÜZENLENEBİLİR DEĞİLDİR** — doz yalnız son PG kaydından taşınır (input yok); son PG yoksa buton pasif (`PG_SECIM_GEREKLI` UI ikizi). Kanıt: DOM (select değeri dolu + buton aktif) + ekran (mockup 03). [PW ✓ — son-PG'siz hayvanda buton pasifliği de glmf-max'te görülmeli]
+8. **TAKIP kurulumu (T-03)** ⚠ — Takibe bırak kartı **gün girişi İÇERMEZ**; gün sunucu varsayılanı (+7) ile kurulur (değiştirmek ayrı iş — plan sapması, mimar kararı). Kaydet → görev bugün+7'de, **saat = atama anı**; Görevler'de görev 🌱 Üreme çipinde, Ovsync S3'te `🔍 takipte` + `muayene GG.AA SS:DD` rozeti. Kanıt: DB (gorev_log hedef) + DOM + ekran. [PW ✓ — DB hedef bugün+7 doğrulandı]
+9. **Kilitli Ovsync (T-14..T-17)** — Kısır/kural günü gelmemiş hayvanda Ovsync kartı kilidi + gerekçe satırı; ön seçim Takibe bırak'a düşer (kilitliyken). Kanıt: DOM (kilit metni) + ekran (mockup 02).
+10. **PG kapısı (T-06)** — `PG_KAPI:*` redsinde `#pg-kapi-bs` onay penceresi ("Son tohumlama sonucu Bekliyor…" gerekçesi); `Boş ata ve uygula` tek sarmal işlemdir. Not: sarmal PG yolunda Boş ataması kapıdan ÖNCE yapıldığından bu red seçici-PG akışından BEKLENMEZ — kapı hızlı-PG/seans/toplu girişlerinde çıkar; glmf-max bu girişlerden biriyle koşar. Kanıt: DOM (sheet) + DB (tek transaction).
+11. **TAKIP_ACIK onay sheet (T-20/T-21)** — App'in KENDİ bottom-sheet'i `#takip-acik-bs` (native `confirm()`/`alert()` YASAK): `🔍` ikon + `Bu hayvan takipte` + `Küpe X, açık rektal muayene takibinde. Takip kapatılıp PG/Ovsync … uygulansın mı?` + gerekçe satırı `🔍 Rektal muayene takibi:` + butonlar `Evet, takibi kapat ve uygula` / `Vazgeç`. **⚠ HATA-1:** yalın TAKIP_ACIK'ta (devam seçici PG yolu) gerekçede muayene tarihi/saat BOŞ düşer (yalnız birleşikte dolar) — glmf-max bu maddede bulguyu bekler; Evet → takip kapanır + işlem; Vazgeç → hiçbir yazma yok. Kanıt: DOM + konsol (dialog yokluğu) + DB. [PW ✓ (Vazgeç + yazmasızlık); ekran P12-4]
+12. **Birleşik kapı (S-4, T-86)** — PG_KAPI + TAKIP_ACIK birlikte: TEK sheet, iki gerekçe alt alta (`💉 PG kapısı: …` üstte, `🔍 Rektal muayene takibi: …` altta), TEK onay; burada tarih/saat DOLAR. Kanıt: DOM + ekran.
+13. **Sessiz kapanış (T-19)** — Takipli hayvana tohumlama: hiçbir onay çıkmaz; takip görevi kapanır, `takip_kapanis_nedeni = YENI_TOHUMLAMA` izi, listeden düşer. Kanıt: konsol (onay yokluğu) + DB (neden kolonu) + DOM. [PW ✓]
+14. **Çıkış kapanışı (T-22)** — Hayvan çıkışı → takip kapanır (neden=`CIKIS`). Kanıt: DB + DOM (satır düşer).
 
 ## D. Birleşik muayene + geçmiş (K15, kalem 11/12)
 
-15. **Birleşik sonuç ekranı (T-04/T-76)** — `GEBELIK_KONTROL` ve `TAKIP_MUAYENE` görevlerinde AYNI ekran: Gebe / Boş→devam seçici / Muayeneyi ertele; etiketler **"Muayene tamam + …"** ("Boş ata" öneki YOK — S-10); jenerik "✅ Tamamlandı" akışı bu tiplerde sonuç ekranına yönlenir (T-74: doğrudan kapatma yok). Kanıt: DOM (iki görev tipinde aynı kart seti) + ekran.
-16. **Ertelenin saatsiz ön ayarı (T-25/T-26/§10d #3)** — "Muayeneyi ertele": +7 ön ayar, saat alanı BOŞ (saatsiz); saat girilebilir; ≥21 g'de tek onay "Bu hayvan N gündür takipte…". Kanıt: DOM (input değeri) + DB (hedef_saat NULL).
-17. **Üreme geçmişi iki satır (T-84)** — Takipte Gebe: üstü çizili `❌ Boş (GG.AA)` + `✅ Gebe (GG.AA)`; tahmini doğum Gebe'den. Kanıt: DOM (iki satır + stiller) + ekran.
-18. **Göreli gün (T-85)** — Geçmiş satırı tarih yanında "bugün"/"dün"/"N gün önce" (yalnız hayvan kartı üreme/tohumlama geçmişi). Kanıt: DOM.
+15. **Birleşik sonuç ekranı (T-04/T-76)** — `GEBELIK_KONTROL` (5 kart: Gebe/Ovsync/PG/Takip/Ertele) ve `TAKIP_MUAYENE` (4 kart — **Takip YOK**) AYNI ekran (`#devam-secici-bs`, eyebrow `Gebelik kontrolü` / `Takip muayenesi`; başlık `🔬 … — Küpe X`): Gebe / Boş→devam seçici / Muayeneyi ertele; etiketler **`Muayene tamam + …`** (S-10); jenerik "✅ Tamamlandı" akışı bu tiplerde sonuç ekranına yönlenir. Girişler: görev detayı (openTaskDet), S2 `🩺 Muayene sonucu` butonu, dashboard 40 g listesi. Kanıt: DOM (iki görev tipinde kart kümesi) + ekran. [PW ✓ (iki tip de); ekran P12-5]
+16. **Ertelenin saatsiz ön ayarı (T-25/T-26/§10d #3)** — `📅 Muayeneyi ertele` kartı: gün girişi (1–60, ön +7) + saat alanı **BOŞ** (`Saat (boş = saatsiz)`) + canlı ön izleme `→ GG.AA`; Kaydet → görev hedef +7, `hedef_saat NULL`. ≥21 g'de TEK onay `#m-confirm`: `Bu hayvan N gündür takipte, emin misiniz?` → Onayla. **⚠ HATA-2:** hedef günü sunucu `CURRENT_DATE`'i oturum (UTC) saat diliminde yazdığından TR 00:00–08:00 arası UI ön izlemesinden 1 gün geride düşer — glmf-max bu saat aralığında koşuyorsa bulguyu bekler. Kanıt: DOM (input değeri) + DB (hedef_saat NULL). [PW ✓]
+17. **Üreme geçmişi iki satır (T-84)** — Takipte Gebe: üstü çizili `❌ Boş (GG.AA · göreli)` + `✅ Gebe (GG.AA · göreli)` iki satır; tahmini doğum Gebe'den; iz `islem_log GEBE_ATAMA/bos_duzeltme` (geri_alindi dışlanır, en son kazanır). Kanıt: DOM (iki satır + stiller) + ekran. [PW ✓]
+18. **Göreli gün (T-85)** — Geçmiş satırı tarih yanında `bugün`/`dün`/`N gün önce` (yalnız hayvan kartı üreme/tohumlama geçmişi; sabit +03:00). Kanıt: DOM. [PW ✓]
 
 ## E. Ekran doğruluğu, offline, gezinme
 
-19. **S2 sayacı 40 g (T-38/T-43/T-44)** — "muayeneye N gün" / kalan 0 → "muayene vakti"; ayar 35'e çekilince iki yüzeyde aynı anda kayar; **"21" sabiti hiçbir yerde yok**. Kanıt: DOM + DB (ayar değişimi + geri alış).
-20. **Satır gün şeması (T-35/36)** — d0● d7◌ d8◌ d9◌ TAI⏳; renk dili (tamam yeşil/plan amber/gecikti kırmızı/uygulanmadi soluk/**tutarsiz ⚠**); alt "N/4 uygulandı · sıradaki…"; gün etiketleri nötr "1./2./3./4. uygulama" (ilaç adı YASAK). Kanıt: DOM + ekran.
-21. **Sapma/deneme rozetleri (T-69/T-67)** — "hedef GG.AA → fiilen GG.AA (+Ng)" / "erken Ng" / "görevsiz"; "2. deneme — önceki boş". Kanıt: DOM + ekran.
-22. **Bayrak kapalı (T-46)** — `ovsync_pg_kurallari_aktif=0`: açık mesaj ("Ovsync/PG kuralları kapalı"); boş liste SESSİZ gösterilmez; §6c seçici açılmaz. Kanıt: DOM + ekran.
-23. **Offline (T-47/T-48)** — Bayat: "çevrimdışı · HH:MM verisi"; önbelleksiz: "İnternet yok — takip verisi alınamadı". Kanıt: DOM + ekran.
-24. **Gezinme (T-51..T-55)** — Yatay geçiş Ana⇄Ovsync⇄Görevler; ‹ = `history.back()` (goTo('dash') DEĞİL); modal açıkken geri yalnız modalı kapatır; dönüşte scroll + padok filtresi yerinde. Kanıt: DOM (URL/pushState + scrollY) + ekran.
-25. **Invalidate (T-50)** — Her yazma sonrası `__ovsyncTakip=null` + taze; bayat satır kalmaz. Kanıt: konsol (`window.__ovsyncTakip` durumu) + DOM.
+19. **S2 satır sağ hücresi (T-38/T-43/T-44)** ⚠ HATA-3 — Canlı üründe S2 satırı **hep `muayene vakti · +Ng`** basar: S2 kümesi `tarih ≤ bugün−40` ile süzüldüğünden `kalan_gun ≤ 0` garantidir; `muayeneye N gün` (kalan>0) dalı ulaşılamazdır. glmf-max bu maddeyi `muayene vakti` beklentisiyle koşar; **"21" sabiti hiçbir yerde yok** (T-44 ✓). Ayar-değişimi testi (35'e çek → satır kayar) yine geçerli. Kalıcı çözüm (sayaç isteniyorsa) mimar kararı: S2 eşiği ile kalan hesabının ayrıştırılması. Kanıt: DOM + DB (ayar değişimi + geri alış). [PW ✓ (vakti + +Ng + 21-yok)]
+20. **Satır gün şeması (T-35/36)** — d0● d7◌ d8◌ d9◌ TAI⏳; renk dili (tamam yeşil/plan amber/gecikti kırmızı/uygulanmadi soluk/tutarsiz ⚠); alt `N/4 uygulandı · sıradaki…`; gün etiketleri nötr `1./2./3./4. uygulama`. Kanıt: DOM + ekran.
+21. **Sapma/deneme rozetleri (T-69/T-67)** — `hedef GG.AA → fiilen +Ng` / `erken Ng` / `görevsiz` / `erken TAI`; `N. deneme — önceki boş`. Dalga grup başlığı: `Dalga: hedef GG.AA → fiilen GG.AA` + `N hayvan`. Kanıt: DOM + ekran.
+22. **Bayrak kapalı (T-46)** — `ovsync_pg_kurallari_aktif=0`: `🔒 Ovsync/PG kuralları kapalı — takip verisi yok`; boş liste SESSİZ gösterilmez; §6c seçici açılmaz (`Ovsync/PG kuralları kapalı — Boş kaydı mevcut akışla yapılır`). Kanıt: DOM + ekran.
+23. **Offline (T-47/T-48)** — Bayat: `⚠️ çevrimdışı · HH:MM verisi`; önbelleksiz: `📡 İnternet yok — takip verisi alınamadı`. Kanıt: DOM + ekran. [PW ✓]
+24. **Gezinme (T-51..T-55)** — Yatay geçiş Ana⇄Ovsync⇄Görevler (`#nb-tasks`); `‹ Geri` = `history.back()` (goTo DEĞİL — `data-action="nav-geri"`); modal açıkken geri yalnız modalı kapatır (modal-router guard); dönüşte ovsync scroll konumu saklanır/geri yüklenir (§6b). Kanıt: DOM (URL/pushState + scrollY) + ekran. [PW ✓]
+25. **Invalidate (T-50)** — Her yazma sonrası `__ovsyncTakip=null` (api.js `tohumlamaBosVeDevam` iki yolda da bozar; ui/forms yazma noktaları bu sarmaldan geçer) + taze; bayat satır kalmaz. Kanıt: konsol (`window.__ovsyncTakip` durumu) + DOM. [PW ✓]
 
 ## Koşum sözleşmesi
 
 - Her madde ayrı PASS/FAIL + kanıt; **FAIL olanlar düzeltme sonrası yalnız FAIL maddelerle tekrar** (Playwright `--only` koşumlarında `sonuclar.json` ezilme tuzağına karşı önce yedek).
-- Bu tur koşumu: maddeler 1–25'in HİÇBİRİ koşulamadı (UI yok) — Playwright temsilciler 8/8 RED (kanıt: koşum çıktısı 2026-09-29). Implementasyon sonrası glmf-max koltuğu bu listeyi koşar; hepsi PASS olmadan sahibe demo linki VERİLMEZ.
+- Playwright temsilciler: `docker run --rm --network host -v "$PWD":/work -w /work -v /home/melik/egesut-erp1:/main:ro -e NODE_PATH=/main/node_modules -e PLAYWRIGHT_DEMO_MODE=1 -e PLAYWRIGHT_BASE_URL=http://127.0.0.1:8137/ -e HOME=/tmp/pwhome mcr.microsoft.com/playwright:v1.58.2-noble /main/node_modules/.bin/playwright test tests/e2e/ovsync-takip.spec.js --reporter=list --retries=0 --workers=1` (worktree yerel sunucusu: `python3 -m http.server 8137 --bind 127.0.0.1`). **`--workers=1` ZORUNLU** (beforeAll worker-başına koşar — çok worker'da paylaşımlı seed kendini siler).
+- Son koşum: 12/12 YEŞİL ×2 (2026-10-01 01:2x–01:4x TR; kanıt `impl-P12-DONE.md` + `artifacts/P12-*.png`).
+- ⚠ işaretli maddeler (7, 8, 11, 16, 19) teslimatta bilinen sapmaları taşır — glmf-max beklentiyi maddedeki nottan alır; düzeltmeler mimara döner (HATA-1/2/3).
 - Sahip şifresine dokunulmaz; demo seed'ler E2E- marker'lıdır ve temizlenir.

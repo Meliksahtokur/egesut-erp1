@@ -11,6 +11,19 @@
 // Yöntem: her çift için İKİ GERÇEK DB BAĞLANTISI (psql alt-süreçleri; dış npm dep yok),
 // N=30 eşzamanlı tur, her bağlantıda `SET lock_timeout='5s'` + `statement_timeout='30s'`.
 //
+// P12 FIXTURE ONARIMI (2026-10-01; ~/tmp/agents/t72b-mini.py gerçek-koşum deseni):
+//   1) psql protokol kusuru: pairDefs(fx) çift başına BİR KEZ derleniyor, setup'tan
+//      ÖNCE → yarış her tur SİLİNMİŞ/eski fixture id'siyle koşuyordu ("fixture
+//      işlenmeden başarı"). Artık a/b fonksiyon; SQL her tur setup SONRASI derlenir.
+//   2) fixture çıktıları doğrulanır (toh/gorev/disease = uuid-biçimli) — boşsa
+//      fail-closed throw (sessiz devam yok).
+//   3) fixture hayvan id'leri UUID-BİÇİMLİ: sarmalın TAKIP yolu hayvan id'sini
+//      ::uuid'e cast eder (mini.py e3e00000-… deseni); kupe_no okunabilir marker kalır.
+//   4) Ç3 BLOKE sözleşmesi KALKTI: fixture kendi seans zincirini kurar
+//      (cases → treatment_days → treatment_day_uygulamalar; mini.py Ç3 birebir),
+//      seans_tamamla CANLI imzayla 5 argüman (p_seans_admin_id, p_uygulanmadi,
+//      p_not, p_pg_onay, p_pg_gerekce — 20260923000004:195).
+//
 // PASS ORACLE'I (H7): (a) hiçbir turda SQLSTATE 40P01 / 55P03 yok; (b) her sonucu çiftin
 // İZİNLİ sonlu kümesinde (başarı ya da belgelenmiş iş hatası). BILINMEYEN kod, timeout (57014)
 // ve 40P01/55P03 ASLA PASS DEĞİL. "Önce kırmızı" şartı YOK (H7).
@@ -19,13 +32,12 @@
 //   export T72B_DB_URL='postgresql://postgres.vtzqjmazsvurxdeondmi:<PAROLA>@aws-0-eu-west-1.pooler.supabase.com:5432/postgres'
 //   node tests/concurrency/ovsync-takip-t72b.mjs                 # tüm çiftler, N=30
 //   node tests/concurrency/ovsync-takip-t72b.mjs --pairs=1,4 --rounds=10
-//   Ç3 (seans) fixture sözleşmesi AÇIK (fail-closed): koşum için mevcut bir seans uygulama
-//   satırı gerekir → `--seans-uygulama-id <uuid>` ver; verilmezse BLOKE raporlanır.
 //   T72B_ALLOW_ANY_HOST=1 hedef denetimini aşar (sahip kapısı — demo dışı hedef için).
 //
-// FIXTURE/TEMİZLİK: E2E-T72B- marker'lı hayvan/görev/tohumlama/vaka; her tur sonunda ve finally'de
-// silinir (gorev_log → tohumlama → treatment_day_uygulamalar/treatment_days/cases/protokol_instance
-// (TRY ile) → hayvanlar). islem_log izleri bilinçli silinmez (log tablosu; demo reset'i toplar).
+// FIXTURE/TEMİZLİK: E2E-T72B- marker'lı hayvan (id uuid-biçimli)/görev/tohumlama/vaka;
+// her tur sonunda ve finally'de silinir (gorev_log → tohumlama →
+// treatment_day_uygulamalar/treatment_days/cases/protokol_instance (TRY ile) → hayvanlar).
+// islem_log izleri bilinçli silinmez (log tablosu; demo reset'i toplar).
 //
 // Durum kodları: PASS / RED(beklenen) (yeni yol P2b/P3a/P3b yok) / FAIL (oracle ihlali) / BLOKE.
 // Çıkış kodu: PASS=0, FAIL=1, RED(beklenen)/BLOKE=2.
@@ -36,7 +48,6 @@ const DEMO_REF = 'vtzqjmazsvurxdeondmi';
 const DB_URL = process.env.T72B_DB_URL || '';
 const ROUNDS = Math.max(1, parseInt(argVal('--rounds') ?? '30', 10) || 30);
 const PAIRS_REQ = (argVal('--pairs') ?? '1,2,3,4,5').split(',').map(s => parseInt(s, 10)).filter(Boolean);
-const SEANS_UYGULAMA_ID = argVal('--seans-uygulama-id');
 
 function argVal(name) {
   // İki biçim de kabul: `--name value` ve `--name=value`
@@ -133,36 +144,38 @@ const ALLOWED = [
   ['trigger', /^$/], // tohumlama INSERT: iş hatası beklenmez (hata=oracle ihlali)
 ];
 const isAllowed = (family, st, msg) =>
-  (ALLOWED.find(([f]) => f === family) ?? [null, /^$/])[1].test(`${st} ${msg}`);
+  // kalıp RAISE METNINE against (KOD:…); st yalnız kayıt/rapor için — başa eklenirse
+  // ^-anchor "P0001 TAKIP_ACIK" ile hiç eşleşmezdi (P12 koşum dersi 2026-10-01)
+  (ALLOWED.find(([f]) => f === family) ?? [null, /^$/])[1].test(msg);
 
-// ── Pair tanımları (fixture getter'larıyla parametrik) ──────────────────────
+// ── Pair tanımları (a/b FONKSİYON: her tur setup SONRASI, TAZE id'lerle derlenir —
+//    eski kusur: pairDefs bir kez derliyor, yarış silinmiş fixture'la koşuyordu) ──
 function pairDefs(fx) {
   return {
     1: {
       ad: 'Ç1 sarmal × tohumlama_kaydet', setup: () => fx.setupBekliyor(),
-      a: { family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'TAKIP', p_gun=>7) INTO _out;` },
-      b: { family: 'kaydet', sql: `SELECT public.tohumlama_kaydet('${fx.hayvan}', CURRENT_DATE, 'E2E-T72B-SPERMA') INTO _out;` },
+      a: () => ({ family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'TAKIP', p_gun=>7) INTO _out;` }),
+      b: () => ({ family: 'kaydet', sql: `SELECT public.tohumlama_kaydet('${fx.hayvan}', CURRENT_DATE, 'E2E-T72B-SPERMA') INTO _out;` }),
     },
     2: {
       ad: 'Ç2 sarmal × start_first_service_protocol', setup: () => fx.setupBaslatGorev(),
-      a: { family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'OVSYNC', p_onay=>TRUE) INTO _out;` },
-      b: { family: 'start', sql: `SELECT public.start_first_service_protocol('${fx.gorev}'::uuid, p_takip_onay=>TRUE) INTO _out;` },
+      a: () => ({ family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'OVSYNC', p_onay=>TRUE) INTO _out;` }),
+      b: () => ({ family: 'start', sql: `SELECT public.start_first_service_protocol('${fx.gorev}'::uuid, p_takip_onay=>TRUE) INTO _out;` }),
     },
     3: {
-      ad: 'Ç3 sarmal × seans_tamamla', setup: () => fx.setupBekliyor(),
-      bloke: 'seans fixture sözleşmesi açık: koşum için --seans-uygulama-id <mevcut uygulama satırı uuid> gerekir (rereview5 ÖNEMLİ notları — fail-closed).',
-      a: SEANS_UYGULAMA_ID ? { family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'TAKIP', p_gun=>7) INTO _out;` } : null,
-      b: SEANS_UYGULAMA_ID ? { family: 'seans', sql: `SELECT public.seans_tamamla('${SEANS_UYGULAMA_ID}'::uuid, FALSE, 'E2E-T72B', FALSE, NULL, TRUE) INTO _out;` } : null,
+      ad: 'Ç3 sarmal × seans_tamamla', setup: () => fx.setupSeans(),
+      a: () => ({ family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'TAKIP', p_gun=>7) INTO _out;` }),
+      b: () => ({ family: 'seans', sql: `SELECT public.seans_tamamla('${fx.seans}'::uuid, FALSE, 'E2E-T72B', TRUE, NULL) INTO _out;` }),
     },
     4: {
       ad: 'Ç4 sarmal × vaka_toplu_ac', setup: () => fx.setupBulk(),
-      a: { family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'OVSYNC', p_onay=>TRUE) INTO _out;` },
-      b: { family: 'bulk', sql: `SELECT public.vaka_toplu_ac(ARRAY['${fx.hayvan}','${fx.hayvan2}']::text[], '${fx.disease}'::uuid, NULL, NULL, 'E2E-T72B bulk', CURRENT_DATE, FALSE, NULL, NULL, NULL) INTO _out;` },
+      a: () => ({ family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'OVSYNC', p_onay=>TRUE) INTO _out;` }),
+      b: () => ({ family: 'bulk', sql: `SELECT public.vaka_toplu_ac(ARRAY['${fx.hayvan}','${fx.hayvan2}']::text[], '${fx.disease}'::uuid, NULL, NULL, 'E2E-T72B bulk', CURRENT_DATE, FALSE, NULL, NULL, NULL) INTO _out;` }),
     },
     5: {
       ad: 'Ç5 kapanış tetikleyicisi (tohumlama INSERT) × sarmal', setup: () => fx.setupAcikTakip(),
-      a: { family: 'trigger', sql: `INSERT INTO tohumlama(id, hayvan_id, tarih, sonuc, deneme_sayisi, denemeler) VALUES (gen_random_uuid(), '${fx.hayvan}', CURRENT_DATE, 'Bekliyor', 1, '[]'::jsonb);` },
-      b: { family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'OVSYNC', p_onay=>TRUE) INTO _out;` },
+      a: () => ({ family: 'trigger', sql: `INSERT INTO tohumlama(id, hayvan_id, tarih, sonuc, deneme_sayisi, denemeler) VALUES (gen_random_uuid(), '${fx.hayvan}', CURRENT_DATE, 'Bekliyor', 1, '[]'::jsonb);` }),
+      b: () => ({ family: 'sarmal', sql: `SELECT public.tohumlama_bos_ve_devam(p_tohumlama_id=>'${fx.toh}', p_secim=>'OVSYNC', p_onay=>TRUE) INTO _out;` }),
     },
   };
 }
@@ -231,9 +244,10 @@ async function main() {
     try {
       for (let i = 0; i < ROUNDS; i++) {
         await def.setup();
-        // barrier: iki aksiyon arka arkaya yazılır; psql'ler eşzamanlı işler
-        const [ra, rb] = await Promise.all([outcome(A, def.a.sql, `P${no}A`), outcome(B, def.b.sql, `P${no}B`)]);
-        for (const [r, meta] of [[ra, def.a], [rb, def.b]]) {
+        // barrier: iki aksiyon arka arkaya yazılır; psql'ler eşzamanlı işler.
+        // a/b FONKSİYON — setup'taki TAZE fixture id'leriyle bu anda derlenir.
+        const [ra, rb] = await Promise.all([outcome(A, def.a().sql, `P${no}A`), outcome(B, def.b().sql, `P${no}B`)]);
+        for (const [r, meta] of [[ra, def.a()], [rb, def.b()]]) {
           const key = r.cls === 'OK' ? `${meta.family}:OK` : `${meta.family}: ${r.st} ${r.msg.slice(0, 50)}`;
           histogram.set(key, (histogram.get(key) || 0) + 1);
           if (r.cls === 'OK') { basari++; continue; }
@@ -281,66 +295,93 @@ async function main() {
   process.exit(fail ? 1 : (bloke || red) ? 2 : 0);
 }
 
-// ── Fixture kurucular (ctl bağlantısı; E2E-T72B- marker'lı; tip gerçekleri: hayvanlar.id text,
-//    tohumlama.id uuid + hayvan_id text, gorev_log.id uuid + hayvan_id text — demo ölçüm 2026-09-29)
+// ── Fixture kurucular (ctl bağlantısı; kupe_no E2E-T72B- marker'lı, id UUID-biçimli —
+//    sarmal TAKIP yolu hayvan id'sini ::uuid'e cast eder; mini.py e3e00000-… deseni.
+//    Tip gerçekleri: hayvanlar.id text, tohumlama.id uuid + hayvan_id text,
+//    gorev_log.id uuid + hayvan_id text — demo ölçüm 2026-09-29)
 function fixture(ctl) {
-  const yeniHayvan = () => `E2E-T72B-H-${Math.random().toString(36).slice(2, 8)}`;
-  let H = yeniHayvan(), H2 = yeniHayvan(), TOH = null, GOREV = null, DISEASE = null;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const yeniHayvan = () => {
+    const id = `e3e70000-0000-4000-8000-${Math.floor(Math.random() * 1e12).toString().padStart(12, '0')}`;
+    return { id, kupe: `E2E-T72B-H-${id.slice(-8)}` };
+  };
+  const dogrula = (deger, ne) => {
+    if (!deger || !UUID_RE.test(deger.trim())) {
+      throw new Error(`fixture ${ne} kurulamadı (fail-closed): '${String(deger).slice(0, 60)}' — psql protokolü/artı eski kusur: fixture işlenmeden koşulmaz`);
+    }
+    return deger.trim();
+  };
+  let H = yeniHayvan(), H2 = yeniHayvan(), TOH = null, GOREV = null, DISEASE = null, SEANS = null;
 
   const temizle = async () => {
     const TRYSQL = (inner) => `DO $cl$ BEGIN ${inner} EXCEPTION WHEN OTHERS THEN NULL; END $cl$;`;
     for (const sql of [
       `DELETE FROM gorev_log WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-T72B-%');`,
       `DELETE FROM tohumlama WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-T72B-%');`,
-      TRYSQL(`DELETE FROM treatment_day_uygulamalar WHERE treatment_day_id IN (SELECT td.id FROM treatment_days td JOIN cases c ON c.id::text = td.case_id::text WHERE c.hayvan_id LIKE 'E2E-T72B-%');`),
-      TRYSQL(`DELETE FROM treatment_days WHERE case_id IN (SELECT id FROM cases WHERE hayvan_id LIKE 'E2E-T72B-%');`),
-      TRYSQL(`DELETE FROM cases WHERE hayvan_id LIKE 'E2E-T72B-%';`),
+      TRYSQL(`DELETE FROM treatment_day_uygulamalar WHERE treatment_day_id IN (SELECT td.id FROM treatment_days td JOIN cases c ON c.id::text = td.case_id::text WHERE c.hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-T72B-%'));`),
+      TRYSQL(`DELETE FROM treatment_days WHERE case_id IN (SELECT id FROM cases WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-T72B-%'));`),
+      TRYSQL(`DELETE FROM cases WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-T72B-%');`),
       TRYSQL(`DELETE FROM protokol_instance WHERE kaynak_ref IN (SELECT 'TOH-'||id FROM tohumlama WHERE hayvan_id LIKE 'E2E-T72B-%');`),
       `DELETE FROM hayvanlar WHERE kupe_no LIKE 'E2E-T72B-%';`,
     ]) { try { await ctl.execRows(sql, 'cln'); } catch { /* TRY temizlik: sırada devam */ } }
   };
 
   return {
-    get hayvan() { return H; },
-    get hayvan2() { return H2; },
+    get hayvan() { return H.id; },
+    get hayvan2() { return H2.id; },
     get toh() { return TOH; },
     get gorev() { return GOREV; },
     get disease() { return DISEASE; },
+    get seans() { return SEANS; },
     async setupBekliyor() {
       await temizle();
       H = yeniHayvan();
-      TOH = (await ctl.execRows(
-        `WITH h AS (INSERT INTO hayvanlar(id, kupe_no, cinsiyet, dogum_tarihi, grup) VALUES ('${H}','${H}','Dişi', CURRENT_DATE-400, 'Sağmal (Laktasyonda)') RETURNING id),
+      TOH = dogrula((await ctl.execRows(
+        `WITH h AS (INSERT INTO hayvanlar(id, kupe_no, cinsiyet, dogum_tarihi, grup) VALUES ('${H.id}','${H.kupe}','Dişi', CURRENT_DATE-400, 'Sağmal (Laktasyonda)') RETURNING id),
               t AS (INSERT INTO tohumlama(id, hayvan_id, tarih, sonuc, deneme_sayisi, denemeler) SELECT gen_random_uuid(), id, CURRENT_DATE, 'Bekliyor', 1, '[]'::jsonb FROM h RETURNING id)
-         SELECT id::text FROM t;`, 'fx1')).prefix.trim();
+         SELECT id::text FROM t;`, 'fx1')).prefix, 'tohumlama');
     },
     async setupBaslatGorev() {
       await this.setupBekliyor();
-      GOREV = (await ctl.execRows(
+      GOREV = dogrula((await ctl.execRows(
         `INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal, kaynak)
-         VALUES (gen_random_uuid(), '${H}', 'OVSYNC_BASLAT', 'E2E-T72B baslat', CURRENT_DATE, false, false, 'ILK-TOH-E2E') RETURNING id::text;`, 'fx2')).prefix.trim();
+         VALUES (gen_random_uuid(), '${H.id}', 'OVSYNC_BASLAT', 'E2E-T72B baslat', CURRENT_DATE, false, false, 'ILK-TOH-E2E') RETURNING id::text;`, 'fx2')).prefix, 'gorev');
+    },
+    async setupSeans() {
+      // mini.py Ç3 birebir: vaka + gün + uygulama zinciri; seans_tamamla bu satırı kapatır
+      await this.setupBekliyor();
+      const dis = (await ctl.execRows(`SELECT id::text FROM diseases LIMIT 1;`, 'fx5a')).prefix.trim();
+      const cid = dogrula((await ctl.execRows(
+        `INSERT INTO cases(id, animal_id, disease_id, status, start_date)
+         VALUES (gen_random_uuid(), '${H.id}', '${dis}', 'active', CURRENT_DATE) RETURNING id::text;`, 'fx5b')).prefix, 'vaka');
+      SEANS = dogrula((await ctl.execRows(
+        `WITH td AS (INSERT INTO treatment_days(id, case_id, day_no, treatment_date, tamamlandi)
+                     VALUES (gen_random_uuid(), '${cid}', 1, CURRENT_DATE, false) RETURNING id),
+              tu AS (INSERT INTO treatment_day_uygulamalar(id, treatment_day_id, case_id, planned_time, planned_date, dose, unit, uygulanmadi)
+                     VALUES (gen_random_uuid(), (SELECT id FROM td), '${cid}', '10:00', CURRENT_DATE, 1, 'adet', false) RETURNING id)
+         SELECT id::text FROM tu;`, 'fx5c')).prefix, 'seans-uygulama');
     },
     async setupBulk() {
       await temizle();
       H = yeniHayvan(); H2 = yeniHayvan();
       await ctl.execRows(
         `INSERT INTO hayvanlar(id, kupe_no, cinsiyet, dogum_tarihi, grup)
-         VALUES ('${H}','${H}','Dişi', CURRENT_DATE-400, 'Sağmal (Laktasyonda)'),
-                ('${H2}','${H2}','Dişi', CURRENT_DATE-400, 'Sağmal (Laktasyonda)');`, 'fx3');
+         VALUES ('${H.id}','${H.kupe}','Dişi', CURRENT_DATE-400, 'Sağmal (Laktasyonda)'),
+                ('${H2.id}','${H2.kupe}','Dişi', CURRENT_DATE-400, 'Sağmal (Laktasyonda)');`, 'fx3');
       await ctl.execRows(
         `INSERT INTO tohumlama(id, hayvan_id, tarih, sonuc, deneme_sayisi, denemeler)
-         VALUES (gen_random_uuid(),'${H}', CURRENT_DATE, 'Bekliyor', 1, '[]'::jsonb);`, 'fx3b');
-      TOH = (await ctl.execRows(`SELECT id::text FROM tohumlama WHERE hayvan_id='${H}' LIMIT 1;`, 'fx3c')).prefix.trim();
+         VALUES (gen_random_uuid(),'${H.id}', CURRENT_DATE, 'Bekliyor', 1, '[]'::jsonb);`, 'fx3b');
+      TOH = dogrula((await ctl.execRows(`SELECT id::text FROM tohumlama WHERE hayvan_id='${H.id}' LIMIT 1;`, 'fx3c')).prefix, 'tohumlama');
       await ctl.execRows(
         `INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal, kaynak)
-         VALUES (gen_random_uuid(), '${H}', 'TAKIP_MUAYENE', 'E2E-T72B takip', CURRENT_DATE+7, false, false, 'TAKIP:E2E');`, 'fx3d');
-      DISEASE = (await ctl.execRows(`SELECT id::text FROM diseases WHERE name IN ('Ovsync','Ovsync Protokol') LIMIT 1;`, 'fx3e')).prefix.trim();
+         VALUES (gen_random_uuid(), '${H.id}', 'TAKIP_MUAYENE', 'E2E-T72B takip', CURRENT_DATE+7, false, false, 'TAKIP:E2E');`, 'fx3d');
+      DISEASE = dogrula((await ctl.execRows(`SELECT id::text FROM diseases WHERE name IN ('Ovsync','Ovsync Protokol') LIMIT 1;`, 'fx3e')).prefix, 'disease');
     },
     async setupAcikTakip() {
       await this.setupBekliyor();
       await ctl.execRows(
         `INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal, kaynak)
-         VALUES (gen_random_uuid(), '${H}', 'TAKIP_MUAYENE', 'E2E-T72B takip', CURRENT_DATE+7, false, false, 'TAKIP:E2E');`, 'fx4');
+         VALUES (gen_random_uuid(), '${H.id}', 'TAKIP_MUAYENE', 'E2E-T72B takip', CURRENT_DATE+7, false, false, 'TAKIP:E2E');`, 'fx4');
     },
     async teardown() { await temizle(); },
   };
