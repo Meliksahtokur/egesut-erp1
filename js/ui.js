@@ -2120,6 +2120,26 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene){
   try { detay = JSON.parse(detayJson || '{}'); } catch(e) {}
   const kz = detay.kupe_no ?? detay.kupe ?? '';
 
+  // P10: api.js sarmallarından (rpcSeansTamamla) gelen BİRLEŞİK red — TEK takip
+  // sheet'ine devredilir; seans_admin_id H5 pg_kapi detayında taşınır, onaylı
+  // tekrar TEK çağrı (p_pg_onay + p_takip_onay). Alan eksikse eski generic
+  // gövde (mevcut davranış korunur).
+  if (kod === 'TAKIP_ACIK') {
+    const pgD = detay.pg_kapi || {};
+    const taD = detay.takip_acik || {};
+    const seansId = pgD.seans_admin_id || null;
+    if (seansId && taD.muayene_tarihi) {
+      _takipAcikAc({
+        birlesik: true, pg_kapi: pgD, takip_acik: taD,
+        kupe: pgD.kupe_no || pgD.kupe || '', islem: 'uygulama yapılsın mı?',
+      }, () => rpc('seans_tamamla', {
+        p_seans_admin_id: seansId, p_uygulanmadi: false, p_not: null,
+        p_pg_onay: true, p_pg_gerekce: null, p_takip_onay: true,
+      }));
+      return;
+    }
+  }
+
   let box = document.getElementById('pg-kapi-bs');
   if (box) box.remove();
   box = document.createElement('div');
@@ -2234,6 +2254,18 @@ async function _pgKapiBosAtaUygula(){
     await pullTables(RPC_TABLES.tohumlama_bos_ve_devam || ['tohumlama', 'gorev_log']);
     if (typeof loadDash === 'function') loadDash();
   } catch (e2) {
+    // P10: sarmal birleşik/yalın takip red (PG_KAPI:TAKIP_ACIK / TAKIP_ACIK) —
+    // TEK sheet; retry TEK p_onay ile (sarmal imzasında p_takip_onay yok);
+    // çözümlü PG ürünü kapanışta yeniden kullanılır (yeni dry-run YOK).
+    const takipRetry = () => tohumlamaBosVeDevam({
+      p_tohumlama_id: window.__pgKapiToh,
+      p_secim: 'PG',
+      p_pg_urun: urun,
+      p_pg_doz: doz,
+      p_notlar: 'PG öncesi değerlendirme: ' + gerekce,
+      p_onay: true,
+    });
+    if (typeof _takipAcikHata === 'function' && _takipAcikHata(e2, takipRetry, { islem: 'PG uygulansın mı?' })) return;
     toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e2) : (e2 && e2.message) || e2), true);
     if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
   }
@@ -2714,8 +2746,24 @@ async function _devamSeciciOnayla() {
       return;
     }
     if (red.kod === 'TAKIP_ACIK' || red.kod === 'PG_KAPI:TAKIP_ACIK') {
-      // P10 tek sheet noktası — P8'de tanıma + yönlendirme bilgilendirmesi.
-      toast('⚠️ Açık takip muayenesi var — önce onu sonuçlandırın', true);
+      // P10: birleşik/tekil takip onayı TEK sheet (mockup 04). Sarmal imzasında
+      // p_takip_onay YOK — onay TEK p_onay ile taşınır (20260929000002:989);
+      // seçim parametresi _devamRpcParams(st) aynen korunur.
+      const takipRetry = () => {
+        const p = _devamRpcParams(st);
+        p.p_onay = true;
+        return tohumlamaBosVeDevam(p);
+      };
+      _takipAcikAc({
+        birlesik: red.kod === 'PG_KAPI:TAKIP_ACIK',
+        pg_kapi: red.detay?.pg_kapi || null,
+        takip_acik: red.detay?.takip_acik || null,
+        kupe: st.baglam?.kupe_no || '',
+        islem: st.secim === 'PG' ? 'PG uygulansın mı?'
+          : st.secim === 'OVSYNC' ? 'Ovsync başlatılsın mı?'
+          : st.secim === 'GEBE' ? 'gebe kaydı yapılsın mı?'
+          : 'uygulama yapılsın mı?',
+      }, takipRetry);
       return;
     }
     if (red.kod.startsWith('OVSYNC_SECIM_')) {
@@ -2951,6 +2999,263 @@ async function _topluTekrarGonder(){
   }
 }
 
+// ──────────────────────────────────────────
+// P10: TAKIP_ACIK/PG_KAPI birleşik onay kapısı (plan.md:638-658; mockup 04
+// copy sahib onaylı BİREBİR — paraphrase yasak). _pgKapiHata/_pgKapiAc ikizi.
+// Sunucu alan adları H5 tablosundan (impl-P3b-DONE §7 — uydurma yok):
+//   yalın  TAKIP_ACIK:{muayene_tarihi, muayene_saat}
+//   birleşik PG_KAPI:TAKIP_ACIK:{pg_kapi:{…detay}, takip_acik:{muayene_tarihi, muayene_saat}}
+// Retry imzaları C2: 6 üreticide p_takip_onay (tekil) / p_takip_onaylar (dizi);
+// SARMAlda p_takip_onay YOK — birleşik + takip onayı TEK p_onay ile taşınır
+// (20260929000002:989; sarmala olmayan param PGRST202/404 üretir).
+/**
+ * PG kapı karar kodunun kullanıcı metnini döndürür (_pgKapiAc copy'siyle aynı dil);
+ * ALLOW/ACK_PENDING boş, bilinmeyen kod ham döner. (Harita fonksiyon içinde —
+ * extract-tabanlı test ctx'i üst-seviye const görmez.)
+ * @param {string} karar _pg_kapi karar kodu.
+ * @returns {string} Kullanıcıya gösterilecek gerekçe metni.
+ */
+function _takipPgKararEtiket(karar){
+  if (karar === 'ALLOW' || karar === 'ACK_PENDING') return '';
+  return {
+    REQUIRE_ACK_PENDING: 'Son tohumlama sonucu Bekliyor — PG onayı gerekli',
+    BLOCK_PREGNANT: 'Gebe inekte PG uygulanamaz',
+    BLOCK_CATALOG_UNRESOLVED: 'Ürünün PG katalog bağı belirsiz',
+  }[karar] || (karar || 'bilinmiyor');
+}
+/**
+ * Mockup 04 kısa gün biçimi: '2026-10-05' (ya da ISO) → '05.10'.
+ * @param {string} tarih Tarih (YYYY-MM-DD ya da ISO an).
+ * @returns {string} gg.aa; çözülemediyse boş.
+ */
+function _takipKisaGun(tarih){
+  const g = _tohGunNormalize(tarih);
+  const p = g ? String(g).split('-') : [];
+  return p.length === 3 ? p[2] + '.' + p[1] : '';
+}
+/**
+ * Mockup 04 metin şablonu: "**Küpe 197**, 05.10 14:35'te rektal muayene takibinde.<br>Takip kapatılıp …".
+ * Fiil çağrı noktasından gelir (PG/Ovsync/vaka); kupe yoksa "Bu hayvan" der
+ * (yalın payload'da kupe alanı YOK — H5; kupe UI bağlamından taşınır).
+ * @param {object} detay {takip_acik:{muayene_tarihi,muayene_saat}, kupe?, islem?}.
+ * @returns {string} Sheet metni (HTML).
+ */
+function _takipAcikMetin(detay){
+  const ta = (detay && detay.takip_acik) || {};
+  const gun = _takipKisaGun(ta.muayene_tarihi);
+  const saat = String(ta.muayene_saat || '').slice(0, 5);
+  const kupe = detay && detay.kupe ? '<b>Küpe ' + esc(detay.kupe) + '</b>' : 'Bu hayvan';
+  const zaman = gun && saat ? gun + ' ' + saat + "'te" : (gun ? gun + ' tarihli' : 'açık');
+  const islem = (detay && detay.islem) || 'uygulama yapılsın mı?';
+  return kupe + ', ' + zaman + ' rektal muayene takibinde.<br>Takip kapatılıp ' + islem;
+}
+/**
+ * TAKIP_ACIK hata mesajını analiz eder: yalın TAKIP_ACIK ya da birleşik
+ * PG_KAPI:TAKIP_ACIK ise onay sheet'ini açar ve true döner; değilse false —
+ * çağıran mevcut hata akışına döner. Yalnız-PG kapıları buraya DÜŞMEZ
+ * (_pgKapiHata'nın işi); muayene_tarihi taşımayan TAKIP_ACIK türevleri
+ * (ZATEN_ACIK) H5 alan setine uymadığından sheet açmaz.
+ * @param {Error|Object|null} e Hata nesnesi veya mesaj string'i.
+ * @param {Function} retry Onayda çağrılacak closure: retry(birlesik:boolean) → Promise.
+ * @param {object} [baglam] {kupe?, islem?} — UI bağlamı (payload'da olmayanlar).
+ * @returns {boolean} TAKIP_ACIK/birleşik işlendi ise true.
+ */
+function _takipAcikHata(e, retry, baglam){
+  const msg = e?.message || String(e || '');
+  const m = /^(TAKIP_ACIK|PG_KAPI:TAKIP_ACIK):([\s\S]*)$/.exec(msg);
+  if (!m) return false;
+  let detay = {};
+  try { detay = JSON.parse(m[2] || '{}'); } catch (e2) {}
+  const ta = m[1] === 'PG_KAPI:TAKIP_ACIK' ? (detay.takip_acik || {}) : detay;
+  if (!ta.muayene_tarihi) return false;   // ZATEN_ACIK vb. türev — alan uydurma yok
+  const pg = m[1] === 'PG_KAPI:TAKIP_ACIK' ? (detay.pg_kapi || null) : null;
+  _takipAcikAc({
+    birlesik: !!pg,
+    pg_kapi: pg,
+    takip_acik: ta,
+    kupe: (pg && (pg.kupe_no || pg.kupe)) || (baglam && baglam.kupe) || '',
+    islem: (baglam && baglam.islem) || 'uygulama yapılsın mı?',
+  }, retry);
+  return true;
+}
+/**
+ * Birleşik/tekil takip onay bottom-sheet'ini açar (mockup 04 birebir: 🔍 ikon,
+ * "Bu hayvan takipte" başlığı, küpe+zaman+fiil metni, "Evet, takibi kapat ve
+ * uygula" / "Vazgeç" butonları). Birleşikte iki gerekçe alt alta basılır
+ * (PG_KAPI üstte, TAKIP_ACIK altta) — TEK onay butonu.
+ * @param {object} detay {birlesik?, pg_kapi?, takip_acik, kupe?, islem?}.
+ * @param {Function} retry Onayda çağrılacak closure (retry(birlesik) → Promise).
+ * @returns {void}
+ */
+function _takipAcikAc(detay, retry){
+  detay = detay || {};
+  let box = document.getElementById('takip-acik-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'takip-acik-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _takipAcikKapat(); };
+
+  let gerekceHtml = '';
+  if (detay.birlesik && detay.pg_kapi) {
+    gerekceHtml = '<div style="font-size:.74rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:8px 10px;margin-bottom:6px;text-align:left">💉 PG kapısı: ' + esc(_takipPgKararEtiket(detay.pg_kapi.karar)) + '</div>';
+  }
+  const ta = detay.takip_acik || {};
+  const gun = _takipKisaGun(ta.muayene_tarihi);
+  const saat = String(ta.muayene_saat || '').slice(0, 5);
+  gerekceHtml += '<div style="font-size:.74rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:8px 10px;margin-bottom:6px;text-align:left">🔍 Rektal muayene takibi: ' + esc(gun + (saat ? ' ' + saat : '')) + '</div>';
+
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));text-align:center">
+    <div style="font-size:2rem;margin-bottom:8px">🔍</div>
+    <div style="font-weight:800;font-size:1.05rem;margin-bottom:8px">Bu hayvan takipte</div>
+    <div style="font-size:.86rem;color:var(--ink2);line-height:1.55;margin-bottom:14px">${_takipAcikMetin(detay)}</div>
+    ${gerekceHtml}
+    <button id="takip-acik-onayla" class="btn" style="width:100%;padding:13px;font-weight:700;margin-bottom:8px" onclick="_takipOnayUygula()">Evet, takibi kapat ve uygula</button>
+    <button class="btn" style="width:100%;padding:13px;background:none;border:1.5px solid var(--card3);color:var(--ink2)" onclick="_takipAcikKapat()">Vazgeç</button>
+  </div>`;
+  document.body.appendChild(box);
+  history.pushState({ takip_acik: true }, '', '');
+  window.__takipAcik = { retry: retry || null, birlesik: !!detay.birlesik };
+}
+/**
+ * "Evet, takibi kapat ve uygula" butonu: saklı retry closure'unu birleşik
+ * bayrağıyla çağırır; başarıda sheet kapanır + liste tazelenir; hata toast'u
+ * sonrası sheet AÇIK kalır ve buton geri açılır (ikinci deneme mümkün).
+ * @returns {Promise<void>}
+ */
+async function _takipOnayUygula(){
+  const st = window.__takipAcik;
+  if (!st || typeof st.retry !== 'function') { _takipAcikKapat(); return; }
+  const btn = document.getElementById('takip-acik-onayla');
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  try {
+    await st.retry(!!st.birlesik);
+    toast('✅ Takip kapatıldı, işlem uygulandı');
+    _takipAcikKapat();
+    await pullTables(['gorev_log','tohumlama','cases','uygulama_log','islem_log','stok','stok_hareket','treatment_days','treatment_day_uygulamalar','drug_administrations']).catch(() => {});
+    if (typeof loadDash === 'function') loadDash();
+    if (typeof loadTasks === 'function') loadTasks(_curTaskFilter || 'today', null, { skipPull: true });
+  } catch (e) {
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : (e && e.message) || e), true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Evet, takibi kapat ve uygula'; }
+  }
+}
+/**
+ * Takip onay sheet'ini kapatır; state temizler; modal-router back guard'ı.
+ * @returns {void}
+ */
+function _takipAcikKapat(){
+  const box = document.getElementById('takip-acik-bs');
+  if (box) box.remove();
+  window.__takipAcik = null;
+  if (history.state?.takip_acik) { globalThis._modalBackGuard = true; history.back(); }
+}
+// ── P10 D4: bulk satır-bazlı onay listesi (plan.md:652) ──
+// bulk_ilac takip_onay_listesi[] / vaka_toplu_ac takip_acik[] satırları TEK
+// sheet'te satır satır (küpe + iki gerekce alt alta); "Evet, seçilenleri
+// uygula" → retry onaylı ALT KÜMEyle YENİ ÇAĞRI (p_animal_ids = p_takip_onaylar
+// = onaylılar — C2; küme uyuşmazlığı sunucuda TAKIP_ONAY_KUME_UYUMSUZ).
+// Onaysız satırların sonucu listede belirtilir: "⏳ TAKIP_ACIK — uygulanmadı".
+/**
+ * Bulk takip onay sheet'ini açar; satır seçimi DOM-sorgusuz kaptanla
+ * (_takipTopluCek) tutulur; render retry sonrası satır sonuçlarıyla yenilenir.
+ * @param {Array<{id, kupe?, tarih?, saat?, pgKarar?}>} rows Takip engelli satırlar (H5 alan adlarıyla eşlenmiş).
+ * @param {Function} retryFn retry(secilenIdler) → Promise — onaylı alt kümeyle YENİ ÇAĞRI.
+ * @returns {void}
+ */
+function _takipTopluSheet(rows, retryFn){
+  window.__takipToplu = { rows: (rows || []).slice(), retryFn: retryFn || null, secim: new Set(), uygulanan: new Set(), denendi: new Set(), isleniyor: false };
+  let box = document.getElementById('takip-toplu-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'takip-toplu-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _takipTopluKapat(); };
+  document.body.appendChild(box);
+  _takipTopluRender();
+  history.pushState({ takip_toplu: true }, '', '');
+}
+/**
+ * Satır checkbox'ının durumunu state'e yazar (inline onchange kaptanı).
+ * @param {string} id Satır hayvan id.
+ * @param {HTMLElement} el Checkbox elementi (this).
+ * @returns {void}
+ */
+function _takipTopluCek(id, el){
+  const st = window.__takipToplu;
+  if (!st) return;
+  if (el && el.checked) st.secim.add(id); else st.secim.delete(id);
+}
+/**
+ * Bulk sheet gövdesini state'ten yeniden kurar: işlenen satırlar "✅ uygulandı",
+ * onaysız denenen satırlar "⏳ TAKIP_ACIK — uygulanmadı" rozeti taşır; kalan
+ * satır varken buton "Evet, seçilenleri uygula", yokken "Kapat".
+ * @returns {void}
+ */
+function _takipTopluRender(){
+  const st = window.__takipToplu;
+  const box = document.getElementById('takip-toplu-bs');
+  if (!st || !box) return;
+  const satirHtml = r => {
+    const bitti = st.uygulanan.has(r.id);
+    const gun = _takipKisaGun(r.tarih);
+    const saat = String(r.saat || '').slice(0, 5);
+    const pgGerekce = r.pgKarar && _takipPgKararEtiket(r.pgKarar)
+      ? '<div style="font-size:.72rem;color:var(--ink2)">💉 PG kapısı: ' + esc(_takipPgKararEtiket(r.pgKarar)) + '</div>' : '';
+    const sonucRozet = bitti ? '<span style="color:var(--green);font-weight:700"> ✅ uygulandı</span>'
+      : (st.denendi.has(r.id) ? '<span style="color:var(--amber);font-weight:700"> ⏳ TAKIP_ACIK — uygulanmadı</span>' : '');
+    const chk = bitti ? '' : '<input type="checkbox" value="' + escAttr(r.id) + '"' + (st.secim.has(r.id) ? ' checked' : '') + ' onchange="_takipTopluCek(\'' + escAttr(r.id) + '\', this)">';
+    return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:.78rem;margin-bottom:8px">' + chk +
+      '<span><b>' + esc(r.kupe ? 'Küpe ' + r.kupe : r.id) + '</b>' + sonucRozet + '</span>' + pgGerekce +
+      '<div style="font-size:.72rem;color:var(--ink2)">🔍 Rektal muayene takibi: ' + esc(gun + (saat ? ' ' + saat : '')) + '</div></label>';
+  };
+  const kalanVar = st.rows.some(r => !st.uygulanan.has(r.id));
+  const buton = kalanVar
+    ? '<button id="takip-toplu-onayla" class="btn" style="width:100%;padding:13px;font-weight:700;margin-bottom:8px"' + (st.isleniyor ? ' disabled' : '') + ' onclick="_takipTopluUygula()">Evet, seçilenleri uygula</button>'
+    : '<button id="takip-toplu-onayla" class="btn" style="width:100%;padding:13px;font-weight:700;margin-bottom:8px" onclick="_takipTopluKapat()">Kapat</button>';
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.95rem;margin-bottom:10px">🔍 Takipteki hayvanlar</div>
+    ${st.rows.map(satirHtml).join('')}
+    ${buton}
+    <button class="btn" style="width:100%;padding:13px;background:none;border:1.5px solid var(--card3);color:var(--ink2)" onclick="_takipTopluKapat()">Vazgeç</button>
+  </div>`;
+}
+/**
+ * "Evet, seçilenleri uygula": işaretli satırların id dizisiyle retryFn çağrılır
+ * (onaylı alt küme); başarıda işlenen satırlar rozetlenir, onaysızlar
+ * "uygulanmadı" rozetiyle listede kalır; hata toast'u sonrası sheet açık kalır.
+ * @returns {Promise<void>}
+ */
+async function _takipTopluUygula(){
+  const st = window.__takipToplu;
+  if (!st || st.isleniyor) return;
+  const secilen = st.rows.filter(r => !st.uygulanan.has(r.id) && st.secim.has(r.id)).map(r => r.id);
+  if (!secilen.length) { toast('En az bir hayvan seçin', true); return; }
+  st.isleniyor = true;
+  _takipTopluRender();
+  try {
+    await st.retryFn(secilen);
+    secilen.forEach(id => st.uygulanan.add(id));
+    st.rows.forEach(r => { if (!st.uygulanan.has(r.id)) st.denendi.add(r.id); });
+    toast('✅ Seçilen takipteki hayvanlara uygulandı');
+    await pullTables(['gorev_log','cases','uygulama_log','islem_log','stok','stok_hareket']).catch(() => {});
+  } catch (e) {
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : (e && e.message) || e), true);
+  }
+  st.isleniyor = false;
+  _takipTopluRender();
+}
+/**
+ * Bulk takip sheet'ini kapatır; state temizler; modal-router back guard'ı.
+ * @returns {void}
+ */
+function _takipTopluKapat(){
+  const box = document.getElementById('takip-toplu-bs');
+  if (box) box.remove();
+  window.__takipToplu = null;
+  if (history.state?.takip_toplu) { globalThis._modalBackGuard = true; history.back(); }
+}
+
 
 // F4: native date YASAK — metin giriş (gg.aa.yyyy ya da yyyy-mm-dd) → 'YYYY-MM-DD' | null
 /**
@@ -3101,7 +3406,15 @@ function _istanbulAnIso(gun, saat){ return new Date(gun + 'T' + (saat || '12:00'
 async function ovsyncBaslat(gorevId, hayvanId){
   if(!gorevId) return;
   try{
-    const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId});
+    // P10: TAKIP_ACIK kapısı — takip açıkken başlatma onay sheet'ine düşer;
+    // onaylı tekrar p_takip_onay=true ile (C2 tekil imza).
+    const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId}).catch(e=>{
+      const takipRetry=()=>rpc('start_first_service_protocol',{p_gorev_id:gorevId,p_takip_onay:true});
+      const kzP10=(getState('animals')||[]).find(a=>a&&a.id===hayvanId);
+      if(typeof _takipAcikHata==='function'&&_takipAcikHata(e,takipRetry,{kupe:kzP10&&(kzP10.kupe_no||kzP10.devlet_kupe)||'',islem:'Ovsync başlatılsın mı?'})) return {_takipAcik:true};
+      throw e;
+    });
+    if(r&&r._takipAcik) return;
     if(r&&r.atlandi){ toast('Atlandı: '+r.atlandi,true); }
     else if(r&&r.zaten){ toast('Protokol zaten başlatılmış'); }
     else{
@@ -5031,10 +5344,18 @@ async function _protokolUygulaKaydet(hayvanId, idx){
       const retry = (onay, gerekce) => rpc('hizli_uygulama', {
         ...params, p_pg_onay: onay, p_pg_gerekce: gerekce || null
       });
+      // P10: TAKIP_ACIK/birleşik kapı — _pgKapiHata'dan ÖNCE (PG_KAPI:TAKIP_ACIK
+      // kendi regex'ine düşmeden yakalanır); onaylı tekrar TEK çağrı
+      // (birleşikte p_pg_onay da aynı parametre setinde).
+      const takipRetry = birlesik => rpc('hizli_uygulama', {
+        ...params, p_takip_onay: true, ...(birlesik ? { p_pg_onay: true } : {})
+      });
+      const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
+      if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
       if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
       throw e;
     });
-    if (res?._pgKapi) return;
+    if (res?._pgKapi || res?._takipAcik) return;
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
@@ -5245,10 +5566,18 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
       const retry = (onay, gerekce) => rpc('hizli_uygulama', {
         ...params, p_pg_onay: onay, p_pg_gerekce: gerekce || null
       });
+      // P10: TAKIP_ACIK/birleşik kapı — _pgKapiHata'dan ÖNCE (PG_KAPI:TAKIP_ACIK
+      // kendi regex'ine düşmeden yakalanır); onaylı tekrar TEK çağrı
+      // (birleşikte p_pg_onay da aynı parametre setinde).
+      const takipRetry = birlesik => rpc('hizli_uygulama', {
+        ...params, p_takip_onay: true, ...(birlesik ? { p_pg_onay: true } : {})
+      });
+      const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
+      if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
       if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
       throw e;
     });
-    if (res?._pgKapi) return;
+    if (res?._pgKapi || res?._takipAcik) return;
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
@@ -7041,7 +7370,33 @@ async function sorunVakaAc(tohId, kizId) {
         p_tani: tani,
         p_tohumlama_id: tohId || null,
         p_notlar: 'Tohumlama sırasında tespit edildi'
+      }).catch(e => {
+        // P10 (C4): kızgınlık sorun vaka yolu da TAKIP_ACIK fail-closed kapısından
+        // geçer — tanıdan bağımsız (P3b); onaylı tekrar p_takip_onay=true ile
+        // başarı zincirini (sheet kapanışı + liste + vakaya git) aynen koşar.
+        const takipRetry = async () => {
+          const res2 = await rpc('kizginlik_vaka_ac', {
+            p_kizginlik_id: kizId,
+            p_tani: tani,
+            p_tohumlama_id: tohId || null,
+            p_notlar: 'Tohumlama sırasında tespit edildi',
+            p_takip_onay: true
+          });
+          document.getElementById('sorun-bs')?.remove();
+          _sorunBsTemizle();
+          await pullTables(['cases','kizginlik_log','tohumlama']);
+          renderSafe();
+          if (res2?.case_id) setTimeout(() => { if (typeof openCaseById === 'function') openCaseById(res2.case_id); }, 400);
+          return res2;
+        };
+        return Promise.resolve(typeof idbGetAll === 'function' ? idbGetAll('kizginlik_log').catch(() => []) : []).then(l => {
+          const kzP10 = (l || []).find(k => k && k.id === kizId);
+          const hayvanP10 = kzP10 && (getState('animals') || []).find(a => a && a.id === kzP10.hayvan_id);
+          if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: hayvanP10 && (hayvanP10.kupe_no || hayvanP10.devlet_kupe) || '', islem: 'vaka açılsın mı?' })) return { _takipAcik: true };
+          throw e;
+        });
       });
+      if (res?._takipAcik) return;
       caseId = res?.case_id;
     } else {
       _sorunPreFill = { tani, kategori: 'Üreme', notlar: 'Tohumlama sırasında tespit edildi' };
@@ -10417,10 +10772,25 @@ async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
   if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
-    await rpc('hizli_uygulama', {
+    // P10: TAKIP_ACIK kapısı — onaylı tekrar uygulamayı VE görev tamamlamayı
+    // birlikte koşar (zincir yarım kalmaz); birleşikte p_pg_onay da eklenir.
+    const ilk = await rpc('hizli_uygulama', {
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz,
       p_birim: birim || 'ml', p_rota: rota || 'IM', p_notlar: 'Görev tamamlama'
+    }).catch(e => {
+      const takipRetry = async birlesik => {
+        await rpc('hizli_uygulama', {
+          p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz,
+          p_birim: birim || 'ml', p_rota: rota || 'IM', p_notlar: 'Görev tamamlama',
+          p_takip_onay: true, ...(birlesik ? { p_pg_onay: true } : {})
+        });
+        return rpc('gorev_tamamla', { p_gorev_id: gorevId, p_padok_hedef: padokHedef || null });
+      };
+      const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
+      if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: false, _takipAcik: true };
+      throw e;
     });
+    if (ilk?._takipAcik) return;
     const res = await rpc('gorev_tamamla', { p_gorev_id: gorevId, p_padok_hedef: padokHedef || null });
     if (res?.ok) {
       toast('✅ Görev tamamlandı');
