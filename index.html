@@ -935,6 +935,19 @@ body.dark .ac-vurgu{color:#8ec6ff}
   </div>
 </div>
 
+<!-- OVSYNC TAKİP (G-20260930-OVSYNC-TAKIP-IMPL P5 iskeleti; render P6) — js/ui.js loadOvsyncDash -->
+<div id="pg-ovsync" class="pg">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bg3)">
+    <div>
+      <div style="font-weight:800">🔄 Ovsync Takip</div>
+      <div style="font-size:.7rem;color:var(--ink3)">Aktif protokol zincirleri</div>
+    </div>
+    <!-- R13: başlıktaki ‹ geri = mevcut nav-geri handler'ı (history.back) -->
+    <button class="btn" data-action="nav-geri" style="padding:5px 10px">‹ Geri</button>
+  </div>
+  <div id="ovsync-root"><div class="loader"><div class="spin"></div></div></div>
+</div>
+
 </div><!-- /pages -->
 
 <!-- Asistan geçmiş çekmecesi -->

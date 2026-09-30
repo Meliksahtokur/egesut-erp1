@@ -535,6 +535,71 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   }
   return h;
 }
+
+// ═══ OVSYNC TAKİP SAYFASI (P5 iskelet — G-20260930-OVSYNC-TAKIP-IMPL) ═══
+// Bu iskelet yalnız DURUM ÜRETİR (spec §5/§6b; sessiz boş YASAK) — render P6'da
+// eklenir (renderOvsyncSayfa). Dört durum: (i) bayrak_kapali → açık mesaj;
+// (ii) bayat önbellek → bayat seridi + bayat içerik; (iii) veri yok → açık mesaj;
+// (iv) taze → render (P5'te yer tutucu).
+/**
+ * ovsyncTakipGetir() (js/api.js, P4) çözümünden sayfa durumunu SAF üretir (birim matrisi bunu pinler).
+ * @param {Object|null} getir P4 çözümü: {bayat?:boolean, veri:Object|null, zaman?:number}.
+ * @returns {Object} {tur:'bayrak_kapali'|'bayat'|'veri_yok'|'taze', veri?, zaman?}.
+ */
+function _ovsyncDashDurum(getir){
+  const s=getir||{};
+  const veri=s.veri||null;
+  if(s.bayat) return veri?{tur:'bayat',veri:veri,zaman:s.zaman||null}:{tur:'veri_yok'};
+  if(veri&&veri.bayrak_kapali) return {tur:'bayrak_kapali'};
+  if(veri) return {tur:'taze',veri:veri};
+  return {tur:'veri_yok'};
+}
+/**
+ * Bayat veri seridi etiketi (spec §5): "çevrimdışı · HH:MM verisi".
+ * @param {number|Date|null} zaman Önbelleğin kaydedildiği an (Date.now() ms veya Date).
+ * @returns {string} Etiket metni; zaman okunamıyorsa "çevrimdışı veri".
+ */
+function _ovsyncBayatEtiket(zaman){
+  const d=zaman?new Date(zaman):null;
+  if(!d||isNaN(d.getTime())) return 'çevrimdışı veri';
+  return 'çevrimdışı · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+' verisi';
+}
+/**
+ * Ovsync takip sayfasını yükler: P4 ovsyncTakipGetir'i çağırıp 4 durumdan birini
+ * #ovsync-root'a yazar; render sonrası §6b kaydırma sözleşmesiyle ovsync'ten ayrılırken
+ * saklanan konumu (window._ovsyncScrollY, app.js goTo) geri yükler. Render P6'da gelir.
+ * @returns {Promise<void>}
+ */
+async function loadOvsyncDash(){
+  const root=document.getElementById('ovsync-root');
+  if(!root) return;
+  // Gezinme durumu (§6b): padok filtresi + bölüm açık/kapalı — yazan UI P6'da gelir
+  if(typeof window._curOvsyncPadok==='undefined') window._curOvsyncPadok=null;
+  if(!window._curOvsyncBolum) window._curOvsyncBolum={acik:{}};
+  let getir=null;
+  if(typeof ovsyncTakipGetir==='function'){
+    try{ getir=await ovsyncTakipGetir(window._curOvsyncPadok||null); }
+    catch(_e){ getir={bayat:true,veri:null}; }
+  }else{
+    // P4 henüz yüklenmemişse (paralel geliştirme): önbellek varsa bayat, yoksa açık mesaj
+    const onc=window.__ovsyncTakip||null;
+    getir=onc?{bayat:true,veri:onc.veri,zaman:onc.zaman}:{bayat:true,veri:null};
+  }
+  const durum=_ovsyncDashDurum(getir);
+  if(durum.tur==='taze'){
+    // P6: takip render gövdesi (renderOvsyncSayfa) buraya bağlanacak — P5 yer tutucusu
+    root.innerHTML='<div class="pg-inner"><!-- P6: takip render gövdesi --><div class="loader"><div class="spin"></div></div></div>';
+  }else if(durum.tur==='bayat'){
+    root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div><!-- P6: bayat içerik render --></div>';
+  }else if(durum.tur==='bayrak_kapali'){
+    root.innerHTML='<div class="pg-inner"><div style="padding:20px 16px;color:var(--ink3)">🔒 Ovsync/PG kuralları kapalı — takip verisi yok</div></div>';
+  }else{
+    root.innerHTML='<div class="pg-inner"><div style="padding:20px 16px;color:var(--ink3)">📡 İnternet yok — takip verisi alınamadı</div></div>';
+  }
+  // §6b: kaydırma sözleşmesi — ovsync'ten ayrılırken kaydedilen konumu geri yükle
+  const ovPg=document.getElementById('pg-ovsync');
+  if(ovPg&&typeof window._ovsyncScrollY==='number') ovPg.scrollTop=window._ovsyncScrollY;
+}
 /**
  * Dashboard'u yükler: aktif hayvanlar, hastalıklar, görevler, stok, doğumlar, gebelikler, aşı kayıtları ve diğer verileri getirir,
  * kritik stok uyarılarını, geciken görevleri, yaklaşan doğumları, sütten kesme kontrollerini, sessiz hayvanları ve protokol uyarılarını hesaplayarak

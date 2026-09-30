@@ -110,6 +110,12 @@ async function goTo(pg, push = true) {
     if (sessizBsGo) sessizBsGo.remove();
   }
   if(getState('currentPage')==='tasks' && pg!=='tasks' && typeof flushPendingDone==='function') flushPendingDone();
+  // §6b kaydırma sözleşmesi: ovsync'ten ayrılırken kaydırma konumunu sakla
+  // (loadOvsyncDash render sonrası geri yükler)
+  if(getState('currentPage')==='ovsync' && pg!=='ovsync'){
+    const _ovPg=g('pg-ovsync');
+    window._ovsyncScrollY=_ovPg?_ovPg.scrollTop:0;
+  }
   setState('currentPage', pg);
   if (push) history.pushState({pg}, '', '#' + pg);
   document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
@@ -128,6 +134,7 @@ async function goTo(pg, push = true) {
   else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
   else if (pg === 'asistan')  { if (typeof asistanInit === 'function') asistanInit(); }
+  else if (pg === 'ovsync')   { if (typeof loadOvsyncDash === 'function') loadOvsyncDash(); }
   if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
 }
 
