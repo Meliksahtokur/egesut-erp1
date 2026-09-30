@@ -587,10 +587,13 @@ async function loadOvsyncDash(){
   }
   const durum=_ovsyncDashDurum(getir);
   if(durum.tur==='taze'){
-    // P6: takip render gövdesi (renderOvsyncSayfa) buraya bağlanacak — P5 yer tutucusu
-    root.innerHTML='<div class="pg-inner"><!-- P6: takip render gövdesi --><div class="loader"><div class="spin"></div></div></div>';
+    // P6: satır aksiyon motorları IDB eşlemesiyle (RPC satırında case_id/görev id taşınmaz)
+    await _ovsyncBaglamYukle();
+    root.innerHTML=renderOvsyncSayfa(durum.veri);
   }else if(durum.tur==='bayat'){
-    root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div><!-- P6: bayat içerik render --></div>';
+    // P6: bayat serit + bayat İÇERİK (sessiz boş YASAK — son bilinen veri gösterilir)
+    await _ovsyncBaglamYukle();
+    root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div>'+renderOvsyncSayfa(durum.veri)+'</div>';
   }else if(durum.tur==='bayrak_kapali'){
     root.innerHTML='<div class="pg-inner"><div style="padding:20px 16px;color:var(--ink3)">🔒 Ovsync/PG kuralları kapalı — takip verisi yok</div></div>';
   }else{
@@ -599,6 +602,607 @@ async function loadOvsyncDash(){
   // §6b: kaydırma sözleşmesi — ovsync'ten ayrılırken kaydedilen konumu geri yükle
   const ovPg=document.getElementById('pg-ovsync');
   if(ovPg&&typeof window._ovsyncScrollY==='number') ovPg.scrollTop=window._ovsyncScrollY;
+}
+
+// ═══ OVSYNC TAKİP RENDER (P6 — S0–S4 + KPA şeridi; plan madde P6, design §3/§4/§4b/§5/§7) ═══
+// SAF eşleme ailesi: birim matrisi tests/unit/ovsync-render.test.js pinler (P11 iskeleti).
+// Veri: ovsync_takip_listele RPC (js/api.js P4) — satır alanları design §5. Eşikler
+// yalnız RPC'den (esikler / muayene.kalan_gun); JS'te eşik sabiti YAZILMAZ (§18.13).
+// Satır aksiyonları MEVCUT motorlara: openTaskDet / openCaseDet /
+// _ovsyncBaslatKilitHtml+ovsyncBaslat / _erteleBtnHtml / P9 _muayeneSonucAc köprüsü.
+// RPC satırında case_id ve OVSYNC_BASLAT görev id taşınmadığından (P1 row_j şeması)
+// aksiyon hedefleri IDB'den _ovsyncBaglamKur ile eşlenir; eşleşmeyen satır dürüst
+// "bilinmiyor" gösterir — sessiz varsayılan YASAK (§7.8).
+/**
+ * Bir günün durumunu üretir: RPC `durum` alanı otorite (tek hesap noktası RPC'de);
+ * alan eksik/tanınmayan ise tamamlandi_tarihi + tarih'ten §7.3 durum makinesi
+ * aynasıyla hesaplar; tarih yoksa 'bilinmiyor' (tahmin yok — §7.8).
+ * @param {Object|null} g gunler[] öğesi {gun_no, tarih, planned_time, durum, tamamlandi_tarihi}.
+ * @param {string} bugunIso 'YYYY-MM-DD' (saf test için verilir).
+ * @param {boolean} vakaKapali Vaka kapandıysa açık kalan gün 'uygulanmadi' (RPC CASE 3. dal).
+ * @returns {string} 'tamam'|'planli'|'gecikti'|'uygulanmadi'|'tutarsiz'|'bilinmiyor'.
+ */
+function _ovsyncGunDurumu(g, bugunIso, vakaKapali){
+  if(!g||typeof g!=='object') return 'bilinmiyor';
+  const t=String(g.tarih||'');
+  if(!/^\d{4}-\d{2}-\d{2}/.test(t)) return 'bilinmiyor';
+  const d=g.durum;
+  if(d==='planli'||d==='tamam'||d==='gecikti'||d==='uygulanmadi'||d==='tutarsiz') return d;
+  const tm=g.tamamlandi_tarihi!=null&&g.tamamlandi_tarihi!=='';
+  if(tm&&t>bugunIso) return 'tutarsiz';   // §7.3: gelecek 'tamamlandı' → tutarsiz
+  if(tm) return 'tamam';
+  if(vakaKapali) return 'uygulanmadi';
+  if(t<bugunIso) return 'gecikti';
+  return 'planli';
+}
+/**
+ * Gün durumunu şerit CSS sınıfına eşler (R12 renk kuralları).
+ * @param {string} durum _ovsyncGunDurumu çıktısı.
+ * @returns {string} CSS sınıf adı; tanınmayan → bilinmiyor sınıfı.
+ */
+function _ovsyncGunSinif(durum){
+  const m={tamam:'ovs-g-tamam',planli:'ovs-g-plan',gecikti:'ovs-g-gecikti',uygulanmadi:'ovs-g-soluk',tutarsiz:'ovs-g-tutarsiz'};
+  return m[durum]||'ovs-g-bilinmiyor';
+}
+/**
+ * ISO tarihi 'GG.AA' kısa biçime çevirir (şerit/rozet etiketi; locale bağımsız).
+ * @param {string} iso 'YYYY-MM-DD...' tarihsel dize.
+ * @returns {string} 'GG.AA'; çözülemezse girişin kendisi (boşsa boş).
+ */
+function _ovsyncGunAy(iso){
+  const p=String(iso||'').slice(0,10).split('-');
+  return p.length===3?p[2]+'.'+p[1]:String(iso||'');
+}
+/**
+ * Dashboard 6. stat hücresi sınıf kuralı (P7 _dashStatRow bunu bağlar; plan P7):
+ * S0>0 ∨ muayene vakti dolan>0 → 'alert'; yalnız bekleyen-baslatma>0 → 'warn';
+ * sakin → 'ok'; bayat/hata/okunamayan kpa → 'warn' + soru işareti (§7.8 sessiz yok).
+ * @param {Object|null} kpa RPC kpa alanı {aktif,bugun,geciken,muayene_bekleyen,bekleyen_baslatma,...}.
+ * @param {number} muayeneVakti kalan_gun<=0 olan S2 satır sayısı (satırlardan türetilir).
+ * @param {boolean} gecerli Veri taze mi (bayat/hata=false).
+ * @returns {{sinif:string, soru:boolean}} Sınıf + '?' rozeti bayrağı.
+ */
+function _ovsyncStatSinif(kpa, muayeneVakti, gecerli){
+  if(!gecerli||!kpa||typeof kpa!=='object') return {sinif:'warn',soru:true};
+  const n=x=>(typeof x==='number'&&isFinite(x)?x:null);
+  const bugunN=n(kpa.bugun), gecikenN=n(kpa.geciken), bbN=n(kpa.bekleyen_baslatma);
+  if(bugunN===null||gecikenN===null||bbN===null) return {sinif:'warn',soru:true};
+  const mv=(typeof muayeneVakti==='number'&&isFinite(muayeneVakti))?muayeneVakti:0;
+  if(bugunN>0||gecikenN>0||mv>0) return {sinif:'alert',soru:false};
+  if(bbN>0) return {sinif:'warn',soru:false};
+  return {sinif:'ok',soru:false};
+}
+/**
+ * KPA şeridi (design §3 üst): Aktif · Bugün · Geciken · Muayene bekleyen · Bekleyen
+ * başlatma (toplam; bekleyen_baslatma_takipte>0 → "(N takipte)" alt metni — §10c #8).
+ * Okunamayan alan hücresi 'bilinmiyor' gösterir (§7.8).
+ * @param {Object|null} kpa RPC kpa alanı.
+ * @returns {string} HTML.
+ */
+function _ovsyncKpaHtml(kpa){
+  const k=kpa&&typeof kpa==='object'?kpa:{};
+  const sayi=x=>(typeof x==='number'&&isFinite(x)?String(x):'bilinmiyor');
+  let h='<div class="ovs-kpa">';
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.aktif))+'</b><span>aktif</span></div>';
+  h+='<div class="ovs-kpa-c'+(sayi(k.bugun)!=='bilinmiyor'&&k.bugun>0?' ovs-one':'')+'"><b>'+esc(sayi(k.bugun))+'</b><span>bugün</span></div>';
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.geciken))+'</b><span>geciken</span></div>';
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.muayene_bekleyen))+'</b><span>muayene bekleyen</span></div>';
+  let takipte='';
+  if(typeof k.bekleyen_baslatma_takipte==='number'&&isFinite(k.bekleyen_baslatma_takipte)&&k.bekleyen_baslatma_takipte>0){
+    takipte='<em>('+esc(String(k.bekleyen_baslatma_takipte))+' takipte)</em>';
+  }
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.bekleyen_baslatma))+'</b><span>bekleyen başlatma</span>'+takipte+'</div>';
+  return h+'</div>';
+}
+/**
+ * Deneme rozeti (§18.14: gösterim denemesi SON DOĞUMDAN beri — RPC deneme_sayisi öyle sayar).
+ * @param {number|null} n deneme_sayisi.
+ * @returns {string} Rozet HTML; n<2 → ''.
+ */
+function _ovsyncDenemeRozeti(n){
+  if(typeof n!=='number'||!isFinite(n)||n<2) return '';
+  return '<span class="ovs-rozet ovs-rozet-deneme">'+esc(String(n))+'. deneme — önceki boş</span>';
+}
+/**
+ * Sapma rozetleri (design §4): kayma 'hedef GG.AA → fiilen +Ng' · 'erken Ng' · 'görevsiz' · 'erken TAI'.
+ * @param {Object|null} sapma RPC sapma alanı.
+ * @returns {string} Rozet HTML'leri; boş sapma → ''.
+ */
+function _ovsyncSapmaRozeti(sapma){
+  if(!sapma||typeof sapma!=='object') return '';
+  let out='';
+  const kg=typeof sapma.kayma_gun==='number'&&isFinite(sapma.kayma_gun)?sapma.kayma_gun:null;
+  if(kg!==null&&kg!==0){
+    if(kg>0){
+      const hedef=sapma.hedef_baslangic?_ovsyncGunAy(sapma.hedef_baslangic)+' → ':'';
+      out+='<span class="ovs-rozet ovs-rozet-kayma">hedef '+esc(hedef)+'fiilen +'+esc(String(kg))+'g</span>';
+    }else{
+      out+='<span class="ovs-rozet ovs-rozet-erken">erken '+esc(String(-kg))+'g</span>';
+    }
+  }
+  if(sapma.erken_tai===true) out+='<span class="ovs-rozet ovs-rozet-erken">erken TAI</span>';
+  if(sapma.gorevsiz_tai===true) out+='<span class="ovs-rozet ovs-rozet-gorevsiz">görevsiz</span>';
+  return out;
+}
+/**
+ * Takipte rozeti (mockup 06): "🔍 takipte · muayene GG.AA SS:DD" (saat taşınıyorsa).
+ * @param {Object|null} takip RPC takip alanı {gorev_id, hedef_tarih, hedef_saat}.
+ * @returns {string} HTML; takip yok → ''.
+ */
+function _ovsyncTakipteRozeti(takip){
+  if(!takip||!takip.hedef_tarih) return '';
+  const saat=takip.hedef_saat?String(takip.hedef_saat).slice(0,5):'';
+  return '<span class="ovs-rozet ovs-rozet-takipte">🔍 takipte</span><span class="ovs-takip-saat">muayene '
+    +esc(_ovsyncGunAy(takip.hedef_tarih))+(saat?' '+esc(saat):'')+'</span>';
+}
+/**
+ * S2 sağ hücresi: kalan_gun>0 → sayaç "muayeneye N gün (GG.AA)"; kalan_gun<=0 →
+ * "muayene vakti · +Ng" rozeti; okunamıyor → "bilinmiyor" (§7.8 — sessiz sayaç yok).
+ * @param {Object|null} muayene RPC muayene alanı {tai_tarihi, muayene_tarihi, kalan_gun}.
+ * @returns {string} HTML.
+ */
+function _ovsyncMuayeneHtml(muayene){
+  if(!muayene||typeof muayene.kalan_gun!=='number'||!isFinite(muayene.kalan_gun)){
+    return '<span class="ovs-sayac ovs-sayac-bilinmiyor">bilinmiyor</span>';
+  }
+  if(muayene.kalan_gun>0){
+    return '<span class="ovs-sayac">muayeneye '+esc(String(muayene.kalan_gun))+' gün'
+      +(muayene.muayene_tarihi?' ('+esc(_ovsyncGunAy(muayene.muayene_tarihi))+')':'')+'</span>';
+  }
+  const gecikme=muayene.kalan_gun<0?' · +'+esc(String(-muayene.kalan_gun))+'g':'';
+  return '<span class="ovs-rozet ovs-rozet-mvakti">muayene vakti'+gecikme+'</span>';
+}
+/**
+ * S4 sonlanma rozetleri: toh_sonuc (K6) + kapanış nedeni (§7.4 NULL→'ESKI'; §7.5
+ * köprü eşleşmezse 'bilinmiyor'; tanınmayan enum → 'bilinmiyor' — §7.8).
+ * @param {string|null} closeReason RPC close_reason.
+ * @param {string|null} tohSonuc RPC toh_sonuc.
+ * @returns {string} Rozet HTML'leri.
+ */
+function _ovsyncSonlanmaRozeti(closeReason, tohSonuc){
+  const KR={TOHUMLAMA:'Tohumlama',PG:'PG',IPTAL:'İptal',ERKEN_KAPANIS:'Erken kapanış',ESKI:'Eski/bilinmiyor'};
+  const TOH={'Gebe':'Gebe','Boş':'Boş','Doğum Yaptı':'Doğum Yaptı','Abort':'Abort','Bekliyor':'Bekliyor',bilinmiyor:'bilinmiyor'};
+  const cr=(closeReason==null||closeReason==='')?'ESKI':String(closeReason);
+  const crAd=Object.prototype.hasOwnProperty.call(KR,cr)?KR[cr]:'bilinmiyor';
+  let h=cr==='bilinmiyor'
+    ?'<span class="ovs-rozet ovs-rozet-bilinmiyor">bilinmiyor</span>'
+    :'<span class="ovs-rozet ovs-rozet-kapanis">'+esc(crAd)+'</span>';
+  if(tohSonuc!=null&&tohSonuc!==''){
+    const ts=String(tohSonuc);
+    h+=Object.prototype.hasOwnProperty.call(TOH,ts)&&ts!=='bilinmiyor'
+      ?(ts==='Gebe'?'<span class="ovs-rozet ovs-rozet-gebe">Gebe</span>'
+        :ts==='Boş'?'<span class="ovs-rozet ovs-rozet-bos">Boş</span>'
+        :'<span class="ovs-rozet ovs-rozet-toh">'+esc(TOH[ts])+'</span>')
+      :'<span class="ovs-rozet ovs-rozet-bilinmiyor">bilinmiyor</span>';
+  }
+  return h;
+}
+/**
+ * taban_turu → etiket metni (domain-rules §18.1 kural günleri). Tanınmayan →
+ * 'bilinmiyor' (§7.8). Not: düve etiketi mockup'taki sayı-başlıklı gösterim yerine
+ * 'İlk toh. kuralı' — sayı dizesi eşik-sızıntısı grep'inde yanlış alarm üretmesin
+ * (eşikler RPC'den).
+ * @param {string|null} taban RPC taban_turu (dogum|abort|duve|acik_disi).
+ * @returns {string} Etiket metni.
+ */
+function _ovsyncTabanEtiketi(taban){
+  const m={dogum:'Doğum+51',abort:'Abort+51',duve:'İlk toh. kuralı',acik_disi:'Açık dişi'};
+  if(taban==null||taban==='') return 'bilinmiyor';
+  return Object.prototype.hasOwnProperty.call(m,String(taban))?m[String(taban)]:'bilinmiyor';
+}
+/**
+ * IDB bağlam haritası (RPC satırında case_id ve OVSYNC_BASLAT görev id taşınmaz):
+ * hayvan→en güncel açık OVSYNC_BASLAT görevi, hayvan→aktif/kapalı OVSYNC vakası, kısır kümesi.
+ * @param {Array} gorevler IDB gorev_log satırları.
+ * @param {Array} vakalar IDB cases satırları.
+ * @param {Array} hayvanlar IDB hayvanlar satırları.
+ * @returns {{baslat:Map, vakaAktif:Map, vakaKapali:Map, kisir:Set}} Hayvan-id anahtarlı haritalar.
+ */
+function _ovsyncBaglamKur(gorevler, vakalar, hayvanlar){
+  const baslat=new Map();
+  (Array.isArray(gorevler)?gorevler:[]).forEach(g=>{
+    if(!g||g.gorev_tipi!=='OVSYNC_BASLAT'||g.tamamlandi||g.iptal||!g.hayvan_id) return;
+    const eski=baslat.get(g.hayvan_id);
+    if(!eski||String(g.hedef_tarih||'')>String(eski.hedef_tarih||'')) baslat.set(g.hayvan_id,g);
+  });
+  const vakaAktif=new Map(), vakaKapali=new Map();
+  (Array.isArray(vakalar)?vakalar:[]).forEach(c=>{
+    if(!c||c.protocol_family!=='OVSYNC'||!c.animal_id) return;
+    if(c.status==='active'){ vakaAktif.set(c.animal_id,c); }
+    else if(c.status==='closed'){
+      const eski=vakaKapali.get(c.animal_id);
+      if(!eski||String(c.closed_at||'')>String(eski.closed_at||'')) vakaKapali.set(c.animal_id,c);
+    }
+  });
+  const kisir=new Set();
+  (Array.isArray(hayvanlar)?hayvanlar:[]).forEach(h=>{ if(h&&h.kisir===true&&h.id) kisir.add(h.id); });
+  return {baslat:baslat,vakaAktif:vakaAktif,vakaKapali:vakaKapali,kisir:kisir};
+}
+/**
+ * Kayıtlı IDB bağlamını okur; yoksa/bozuksa boş bağlam (aksiyon çizilmez,
+ * satır 'bilinmiyor' gösterir — duck-typing realm-bağımsız).
+ * @returns {{baslat:Map, vakaAktif:Map, vakaKapali:Map, kisir:Set}}.
+ */
+function _ovsyncBaglamAl(){
+  const w=typeof window!=='undefined'?window:{};
+  const b=w._ovsyncBaglam;
+  if(b&&b.baslat&&typeof b.baslat.get==='function'&&b.vakaAktif&&typeof b.vakaAktif.get==='function'
+     &&b.vakaKapali&&typeof b.vakaKapali.get==='function'&&b.kisir&&typeof b.kisir.has==='function') return b;
+  return {baslat:new Map(),vakaAktif:new Map(),vakaKapali:new Map(),kisir:new Set()};
+}
+/**
+ * IDB'den aksiyon eşleme bağlamını kurar (loadOvsyncDash render öncesi çağırır).
+ * Hata olursa boş bağlam — satırlar dürüst 'bilinmiyor' gösterir.
+ * @returns {Promise<void>}
+ */
+async function _ovsyncBaglamYukle(){
+  try{
+    const gorevler=await getData('gorev_log');
+    const vakalar=await getData('cases');
+    const hayvanlar=await getData('hayvanlar');
+    window._ovsyncBaglam=_ovsyncBaglamKur(gorevler,vakalar,hayvanlar);
+  }catch(_e){
+    window._ovsyncBaglam=_ovsyncBaglamKur([],[],[]);
+  }
+}
+/**
+ * S0 satırın alt tipini türetir (RPC bolum CASE aynası): gecikme>0 ∨ TAI gecikti →
+ * 'geciken'; aksi 'bugun' (row_j'de kpa_tip taşınmadığından satır verisinden).
+ * @param {Object} satir RPC satırı.
+ * @returns {string} 'bugun'|'geciken'.
+ */
+function _ovsyncS0Tip(satir){
+  const g=typeof satir.gecikme_gun==='number'&&isFinite(satir.gecikme_gun)?satir.gecikme_gun:0;
+  if(g>0) return 'geciken';
+  if(satir.tai&&satir.tai.durum==='gecikti') return 'geciken';
+  return 'bugun';
+}
+/**
+ * Gün şeridi: '1./2./3./4. uygulama' nötr etiketler (A10 — ilaç adlı etiket YASAK),
+ * durum noktaları + TAI hücresi (bugünse BUGÜN vurgusu; onclick openTaskDet).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} HTML.
+ */
+function _ovsyncGunlerHtml(satir, bugunIso){
+  const gunler=Array.isArray(satir.gunler)?satir.gunler:[];
+  const kapali=satir.bolum==='S4';
+  let h='<div class="ovs-gunler">';
+  gunler.forEach((g,i)=>{
+    const durum=_ovsyncGunDurumu(g,bugunIso,kapali);
+    const sinif=_ovsyncGunSinif(durum);
+    const tarih=g&&g.tarih?_ovsyncGunAy(g.tarih):'bilinmiyor';
+    h+='<div class="ovs-g '+sinif+'"><span class="ovs-nokta"></span><small>'+(i+1)+'. uygulama'
+      +(durum==='tutarsiz'?' ⚠':'')+'</small><em>'+esc(tarih)+'</em></div>';
+  });
+  const tai=satir.tai||null;
+  if(tai&&tai.gorev_id){
+    const bugunMu=tai.hedef_tarih===bugunIso;
+    const sinif=bugunMu?'ovs-g-bugun':(tai.durum==='gecikti'?'ovs-g-gecikti':'ovs-g-plan');
+    const etiket=bugunMu?'BUGÜN':_ovsyncGunAy(tai.hedef_tarih);
+    const saat=bugunMu&&tai.hedef_saat?' '+esc(String(tai.hedef_saat).slice(0,5)):'';
+    h+='<div class="ovs-g '+sinif+' ovs-g-tai" onclick="event.stopPropagation();openTaskDet(\''+escAttr(tai.gorev_id)
+      +'\')" role="button"><span class="ovs-nokta"></span><small>TAI</small><em>'+esc(etiket)+saat+'</em></div>';
+  }
+  return h+'</div>';
+}
+/**
+ * S0 canlı kartı (mockup: BUGÜN kırmızı vurgu / geciken +Ng): TAI kaydet →
+ * openTaskDet; gün detayı → openCaseDet (vaka eşlemesi IDB bağlamından).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS0SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const vaka=bag.vakaAktif.get(satir.hayvan_id)||null;
+  const tai=satir.tai||null;
+  const gunTop=Array.isArray(satir.gunler)?satir.gunler.length:0;
+  const tamSay=(satir.gunler||[]).filter(g=>_ovsyncGunDurumu(g,bugunIso,false)==='tamam').length;
+  const ozet=gunTop?esc(String(tamSay))+'/'+esc(String(gunTop))+' ilaç günü tamam':'bilinmiyor';
+  const vakaBtn=vaka
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Gün detayı</button>'
+    :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  const taiBtn=(tai&&tai.gorev_id)
+    ?'<button class="ovs-btn-red" onclick="event.stopPropagation();openTaskDet(\''+escAttr(tai.gorev_id)+'\')">▶ TAI kaydet</button>'
+    :'';
+  if(_ovsyncS0Tip(satir)==='bugun'){
+    const saat=(tai&&tai.hedef_saat)?' '+esc(String(tai.hedef_saat).slice(0,5)):'';
+    return '<div class="ovs-kart ovs-bugun-kart"><div class="ovs-k">BUGÜN</div>'+taiBtn
+      +'<div class="ovs-v"><b>'+esc(satir.kupe_no||'bilinmiyor')+'</b> · '+esc(satir.grup||'bilinmiyor')
+      +' — TAI bugün'+saat+'</div>'
+      +'<div class="ovs-v2">'+ozet+(tai&&tai.kaynak?' · kaynak: '+esc(tai.kaynak==='pg'?'PG':'şablon'):'')+'</div>'
+      +'<div class="ovs-alt"><span>'+_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span></div>'
+      +'<div class="ovs-alt"><span class="ovs-bilgi">'+ozet+'</span>'+vakaBtn+'</div>'
+      +'</div>';
+  }
+  const g=typeof satir.gecikme_gun==='number'?satir.gecikme_gun:0;
+  return '<div class="ovs-kart ovs-geciken-kart"><div class="ovs-k ovs-k-geciken">GECİKEN'
+    +(g>0?' +'+esc(String(g))+'g':'')+'</div>'+taiBtn
+    +'<div class="ovs-v"><b>'+esc(satir.kupe_no||'bilinmiyor')+'</b> · '+esc(satir.grup||'bilinmiyor')+'</div>'
+    +_ovsyncGunlerHtml(satir,bugunIso)
+    +'<div class="ovs-alt"><span>'+_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span>'+vakaBtn+'</div>'
+    +'</div>';
+}
+/**
+ * S1 aktif zincir kartı (design §4 satır şeması): kupe + grup + taban + sapma/deneme
+ * rozetleri + gün şeridi + alt bilgi + aksiyonlar (Gün detayı → openCaseDet).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS1SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const vaka=bag.vakaAktif.get(satir.hayvan_id)||null;
+  const gunTop=Array.isArray(satir.gunler)?satir.gunler.length:0;
+  const tamSay=(satir.gunler||[]).filter(g=>_ovsyncGunDurumu(g,bugunIso,false)==='tamam').length;
+  let sira='';
+  if(typeof satir.sonraki_gun==='number'&&isFinite(satir.sonraki_gun)){
+    const idx=(satir.gunler||[]).findIndex(g=>g&&g.gun_no===satir.sonraki_gun);
+    sira=' · sıradaki: '+(idx>=0?(idx+1):satir.sonraki_gun)+'. uygulama';
+  }
+  const vakaBtn=vaka
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Gün detayı</button>'
+    :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  return '<div class="ovs-kart"><div class="ovs-ust"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
+    +'</span><span class="ovs-etiket">'+esc(satir.grup||'bilinmiyor')
+    +'</span><span class="ovs-etiket">'+esc(_ovsyncTabanEtiketi(satir.taban_turu))+'</span>'
+    +_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)
+    +'</div>'
+    +_ovsyncGunlerHtml(satir,bugunIso)
+    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(String(tamSay))+'/'+esc(String(gunTop))+' uygulandı'+esc(sira)+'</span>'+vakaBtn+'</div>'
+    +'</div>';
+}
+/**
+ * S2 sonuç bekleyen kartı (K15): kalan_gun>0 → sayaç (aksiyon yok); kalan_gun<=0 →
+ * "muayene vakti" + satır aksiyonu P9 _muayeneSonucAc köprüsü (_ovsyncMuayeneSatirAc —
+ * muayene_gorev_id NULL ise hayvan detayı; §10d #2). Deneme rozeti §18.14.
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS2SatirHtml(satir, bugunIso){
+  const muayene=satir.muayene||null;
+  const kalan=(muayene&&typeof muayene.kalan_gun==='number'&&isFinite(muayene.kalan_gun))?muayene.kalan_gun:null;
+  const vakti=(kalan!==null&&kalan<=0);
+  const aksiyon=vakti
+    ?'<button class="ovs-aksiyon ovs-aksiyon-mvakti" onclick="_ovsyncMuayeneSatirAc(\''+escAttr(satir.hayvan_id||'')
+      +'\',\''+escAttr(satir.muayene_gorev_id||'')+'\')">🩺 Muayene sonucu</button>'
+    :'';
+  const taiAd=(muayene&&muayene.tai_tarihi)?' · TAI '+esc(_ovsyncGunAy(muayene.tai_tarihi)):' · TAI bilinmiyor';
+  return '<div class="ovs-kart ovs-s2-satir"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+    +esc(satir.kupe_no||'bilinmiyor')+'</b>'+taiAd+_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span>'
+    +_ovsyncMuayeneHtml(muayene)
+    +'</div>'+(vakti?'<div class="ovs-alt">'+aksiyon+'</div>':'')
+    +'</div>';
+}
+/**
+ * S3 başlatma bekleyen kartı: takip satırı (dalga NULL + takip dolu) → mor vurgu +
+ * 🔍 rozet; görevli → pencere kilidi/Başlat/İptal MEVCUT _ovsyncBaslatKilitHtml'den +
+ * _erteleBtnHtml; görevsiz → kural günü notu (§18.2; satırdan görev doğmaz).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS3SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const takip=satir.takip||null;
+  if(!satir.dalga_anahtari&&takip){
+    return '<div class="ovs-kart ovs-s3-satir ovs-takip-satir"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+      +esc(satir.kupe_no||'bilinmiyor')+'</b> '+_ovsyncTakipteRozeti(takip)+'</span></div>'
+      +'<div class="ovs-v2 ovs-takip-meta">Takip muayenesi bekleniyor — kızgınlıkta ya da PG/Ovsync ile otomatik kapanır</div>'
+      +'</div>';
+  }
+  const gorev=bag.baslat.get(satir.hayvan_id)||null;
+  const kisir=bag.kisir.has(satir.hayvan_id);
+  const pencereGun=(typeof satir.dalga_anahtari==='string')?_ovsyncBaslatPencereGunu({hedef_tarih:satir.dalga_anahtari}):null;
+  const gorevliBtn=gorev
+    ?_ovsyncBaslatKilitHtml(kisir,gorev.id,satir.hayvan_id,false,pencereGun)+_erteleBtnHtml(gorev)
+    :'<span class="ovs-kilit">📅 Görev hedef gününde otomatik açılır</span>';
+  const hedefAd=satir.dalga_anahtari?_ovsyncGunAy(satir.dalga_anahtari):'bilinmiyor';
+  const gunMetni=(typeof pencereGun==='number')
+    ?(pencereGun<=0?'bugün':(pencereGun===1?'yarın':pencereGun+' gün'))
+    :'';
+  const tabanAd=_ovsyncTabanEtiketi(satir.taban_turu);
+  return '<div class="ovs-kart ovs-s3-satir"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+    +esc(satir.kupe_no||'bilinmiyor')+'</b> · '+esc(satir.grup||'bilinmiyor')
+    +' · hedef <b>'+esc(hedefAd)+'</b>'+(gunMetni?' ('+esc(gunMetni)+')':'')
+    +'</span>'+gorevliBtn+'</div>'
+    +'<div class="ovs-alt"><span>'
+    +(tabanAd!=='bilinmiyor'?'<span class="ovs-etiket">'+esc(tabanAd)+'</span>':'')
+    +_ovsyncTakipteRozeti(takip)
+    +'</span></div>'
+    +'</div>';
+}
+/**
+ * S4 sonlanan kartı: sonlanma rozeti + toh_sonuc (K6) + salt-okuma vaka detayı
+ * (IDB vakaKapali eşlemesi; openCaseDet).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS4SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const vaka=bag.vakaKapali.get(satir.hayvan_id)||null;
+  const vakaBtn=vaka
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Vaka</button>'
+    :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  return '<div class="ovs-kart ovs-s4-kart ovs-sonlanan"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+    +esc(satir.kupe_no||'bilinmiyor')+'</b> '+_ovsyncSonlanmaRozeti(satir.close_reason,satir.toh_sonuc)
+    +_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span></div>'
+    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(satir.toh_sonuc||'bilinmiyor')+'</span>'+vakaBtn+'</div>'
+    +'</div>';
+}
+/**
+ * Tanınmayan bölümden gelen satır — sessizce düşürülmez (§7.8): kupe + bilinmiyor rozeti.
+ * @param {Object} satir RPC satırı.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncBilinmeyenSatirHtml(satir){
+  return '<div class="ovs-kart ovs-satir-bilinmiyor"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
+    +'</span><span class="ovs-rozet ovs-rozet-bilinmiyor">bölüm bilinmiyor</span></div>';
+}
+/**
+ * Satırı bölümüne göre karta çevirir (P6 üretim yüzeyi — P7 veri okur, render burada).
+ * @param {Object} satir RPC satırı (design §5 şeması).
+ * @param {string} [bugunIso] 'YYYY-MM-DD' (saf test için; yoksa bugun()).
+ * @returns {string} Kart HTML'i; satır yok → ''.
+ */
+function _ovsyncSatirHtml(satir, bugunIso){
+  if(!satir||typeof satir!=='object') return '';
+  const bg=(typeof bugunIso==='string'&&bugunIso)?bugunIso:(typeof bugun==='function'?bugun():'');
+  const b=satir.bolum;
+  if(b==='S0') return _ovsyncS0SatirHtml(satir,bg);
+  if(b==='S1') return _ovsyncS1SatirHtml(satir,bg);
+  if(b==='S2') return _ovsyncS2SatirHtml(satir,bg);
+  if(b==='S3') return _ovsyncS3SatirHtml(satir,bg);
+  if(b==='S4') return _ovsyncS4SatirHtml(satir,bg);
+  return _ovsyncBilinmeyenSatirHtml(satir);
+}
+/**
+ * S1 satırlarını dalga_anahtari'na göre gruplar; 1 hayvanlı dalgalar tekil havuza düşer.
+ * @param {Array} satirlar S1 satırları.
+ * @returns {{gruplar:Array<[string,Array]>, tekil:Array}}.
+ */
+function _ovsyncDalgaGrupla(satirlar){
+  const g=new Map(); const tekil=[];
+  (satirlar||[]).forEach(s=>{
+    const d=s&&s.dalga_anahtari?s.dalga_anahtari:null;
+    if(!d){ tekil.push(s); return; }
+    if(!g.has(d)) g.set(d,[]);
+    g.get(d).push(s);
+  });
+  const gruplar=[];
+  g.forEach((liste,anahtar)=>{ if(liste.length>=2) gruplar.push([anahtar,liste]); else tekil.push(liste[0]); });
+  return {gruplar:gruplar,tekil:tekil};
+}
+/**
+ * Bölüm bölümü: başlık + kartlar; satır listesi boşsa '' (bölüm tamamen gizli — S0 kuralı).
+ * @param {string} bolumAd 'S0'..'S4'.
+ * @param {Array|null} satirlar Bu bölümün satırları.
+ * @param {string} [bugunIso] 'YYYY-MM-DD'.
+ * @param {string} [govde] Başlık altındaki hazır gövde (S3/S4 özel render'ı için).
+ * @param {string} [altNot] Başlıktaki alt sayı metni.
+ * @returns {string} HTML; satır yok → ''.
+ */
+function _ovsyncBolumHtml(bolumAd, satirlar, bugunIso, govde, altNot){
+  const liste=Array.isArray(satirlar)?satirlar.filter(Boolean):[];
+  if(!liste.length) return '';
+  const basliklar={S0:'S0 · Bugün & Geciken',S1:'S1 · Aktif zincirler',S2:'S2 · Sonuç bekleyenler',S3:'S3 · Başlatılmayı bekleyenler',S4:'S4 · Sonlananlar'};
+  const baslik=Object.prototype.hasOwnProperty.call(basliklar,bolumAd)?basliklar[bolumAd]:(bolumAd||'bilinmiyor')+' · bilinmiyor';
+  const katla=(bolumAd==='S4')?'<span class="ovs-katla" onclick="_ovsyncS4Katla()">'+((window._curOvsyncBolum||{}).acik||{}).S4?'▾':'▸'+'</span>':'';
+  return '<div class="ovs-bolum"><div class="ovs-bh"><h2>'+esc(baslik)+katla+'</h2>'
+    +'<span class="ovs-n">'+esc(altNot||liste.length+' satır')+'</span></div>'
+    +(govde!=null?govde:liste.map(s=>_ovsyncSatirHtml(s,bugunIso)).join(''))
+    +'</div>';
+}
+/**
+ * S3 "tümü" düğmesi — gezinme durumunda (_curOvsyncBolum.acik.S3Tumu, §6b) sayfa yenilenir.
+ * @returns {void}
+ */
+function _ovsyncS3Tumu(){
+  const st=window._curOvsyncBolum=window._curOvsyncBolum||{acik:{}};
+  st.acik.S3Tumu=!st.acik.S3Tumu;
+  loadOvsyncDash();
+}
+/**
+ * S4 katlama düğmesi — gezinme durumunda (_curOvsyncBolum.acik.S4) sayfa yenilenir.
+ * @returns {void}
+ */
+function _ovsyncS4Katla(){
+  const st=window._curOvsyncBolum=window._curOvsyncBolum||{acik:{}};
+  st.acik.S4=!st.acik.S4;
+  loadOvsyncDash();
+}
+/**
+ * S2 "muayene vakti" satır aksiyonu (P6 çağrı noktası — ekran P9'da): görev id doluysa
+ * P9 _muayeneSonucAc (typeof ile — P9 merge edilmemişse kırılmaz); NULL ise hayvan
+ * detayına gider (§10d #2 KARAR: görev ertesi sabah cron'la doğar, satırdan doğmaz).
+ * @param {string} hayvanId Hayvan id.
+ * @param {string} gorevId Açık GEBELIK_KONTROL görev id (satir.muayene_gorev_id).
+ * @returns {void}
+ */
+function _ovsyncMuayeneSatirAc(hayvanId, gorevId){
+  if(gorevId&&typeof _muayeneSonucAc==='function'){ _muayeneSonucAc(gorevId); return; }
+  if(hayvanId&&typeof openDet==='function') openDet(hayvanId);
+}
+/**
+ * Ovsync takip sayfasını SAF üretir (P6 üretim yüzeyi): KPA şeridi + S0–S4 bölümleri.
+ * P7 yalnız __ovsyncTakip.veri.kpa okur; render tamamen burada. Bölümler boşsa gizli;
+ * S3 ilk 5 + "tümü (M)"; S4 katlanır (varsayılan kapalı); tanınmayan bölüm satırları
+ * "bilinmiyor" bölümünde görünür (§7.8).
+ * @param {Object} veri ovsync_takip_listele RPC dönüşü {kpa, esikler, satirlar}.
+ * @param {string} [bugunIso] 'YYYY-MM-DD' (saf test için; yoksa bugun()).
+ * @returns {string} Sayfa HTML'i (#ovsync-root içeriği).
+ */
+function renderOvsyncSayfa(veri, bugunIso){
+  const bg=(typeof bugunIso==='string'&&bugunIso)?bugunIso:(typeof bugun==='function'?bugun():'');
+  const st=(typeof window!=='undefined'?window:{});
+  st._curOvsyncBolum=st._curOvsyncBolum||{acik:{}};
+  st._curOvsyncBolum.acik=st._curOvsyncBolum.acik||{};
+  const acik=st._curOvsyncBolum.acik;
+  const satirlar=(veri&&Array.isArray(veri.satirlar))?veri.satirlar:[];
+  const kpa=(veri&&veri.kpa&&typeof veri.kpa==='object')?veri.kpa:null;
+  const grp={S0:[],S1:[],S2:[],S3:[],S4:[]};
+  const bilinmeyen=[];
+  satirlar.forEach(s=>{
+    if(s&&Object.prototype.hasOwnProperty.call(grp,s.bolum)) grp[s.bolum].push(s);
+    else bilinmeyen.push(s);
+  });
+  let h='';
+  // KPA şeridi — sayı yoksa da çizilir (hücreler 'bilinmiyor'); sessiz boş YASAK
+  h+=_ovsyncKpaHtml(kpa);
+  // S0: canlı kartlar — boşsa bölüm tamamen gizli
+  if(grp.S0.length){
+    const nb=grp.S0.filter(s=>_ovsyncS0Tip(s)==='bugun').length;
+    h+=_ovsyncBolumHtml('S0',grp.S0,bg,null,nb+' bugün · '+(grp.S0.length-nb)+' geciken');
+  }
+  // S1: dalga gruplu kartlar
+  if(grp.S1.length){
+    const dg=_ovsyncDalgaGrupla(grp.S1);
+    let govde='';
+    dg.gruplar.forEach(pair=>{
+      const liste=pair[1];
+      const ilk=(liste[0]&&liste[0].sapma)||{};
+      const hedefAd=_ovsyncGunAy(ilk.hedef_baslangic||pair[0]);
+      const fiilAd=ilk.fiili_baslangic?_ovsyncGunAy(ilk.fiili_baslangic):null;
+      govde+='<div class="ovs-kart ovs-grup"><div class="ovs-gt"><span>Dalga: hedef '+esc(hedefAd)
+        +(fiilAd?' → fiilen '+esc(fiilAd):'')+'</span><span class="ovs-sag">'+esc(String(liste.length))+' hayvan</span></div>'
+        +liste.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
+    });
+    if(dg.tekil.length){
+      govde+='<div class="ovs-kart ovs-grup"><div class="ovs-gt"><span>Tekil başlangıçlar</span><span class="ovs-sag">'
+        +esc(String(dg.tekil.length))+' vaka</span></div>'
+        +dg.tekil.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
+    }
+    h+=_ovsyncBolumHtml('S1',grp.S1,bg,govde,grp.S1.length+' vaka · '+dg.gruplar.length+' dalga');
+  }
+  // S2: sonuç bekleyenler (sayaç/vakti satırları)
+  if(grp.S2.length){
+    h+=_ovsyncBolumHtml('S2',grp.S2,bg,null,grp.S2.length+' tohumlama');
+  }
+  // S3: ilk 5 + "tümü (M)" — takipte rozetli satırlar dahil
+  if(grp.S3.length){
+    const s3Liste=acik.S3Tumu?grp.S3:grp.S3.slice(0,5);
+    const takipteSay=grp.S3.filter(s=>s.takip).length;
+    let govde=s3Liste.map(s=>_ovsyncSatirHtml(s,bg)).join('');
+    if(grp.S3.length>5){
+      govde+='<button class="ovs-daha" onclick="_ovsyncS3Tumu()">'+(acik.S3Tumu?'küçült':'tümü ('+grp.S3.length+')')+'</button>';
+    }
+    h+=_ovsyncBolumHtml('S3',grp.S3,bg,govde,grp.S3.length+' görev · '+takipteSay+' takipte');
+  }
+  // S4: katlanır (varsayılan kapalı) — satır varsa başlık da görünür
+  if(grp.S4.length){
+    const govde=acik.S4?grp.S4.map(s=>_ovsyncSatirHtml(s,bg)).join(''):'';
+    h+=_ovsyncBolumHtml('S4',grp.S4,bg,govde,grp.S4.length+' vaka');
+  }
+  // tanınmayan bölüm satırları — sessizce düşürülmez (§7.8)
+  if(bilinmeyen.length){
+    h+='<div class="ovs-bolum"><div class="ovs-bh"><h2>bilinmiyor</h2><span class="ovs-n">'
+      +esc(String(bilinmeyen.length))+' satır — tanınmayan bölüm</span></div>'
+      +bilinmeyen.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
+  }
+  return '<div class="pg-inner">'+h+'</div>';
 }
 /**
  * Dashboard'u yükler: aktif hayvanlar, hastalıklar, görevler, stok, doğumlar, gebelikler, aşı kayıtları ve diğer verileri getirir,
