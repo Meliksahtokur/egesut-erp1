@@ -1113,7 +1113,8 @@ async function ovsyncTakipGetir(p_padok = null) {
     return { bayat: false, veri, zaman: cache.zaman };
   } catch (e) {
     // bayat-veri sözleşmesi: önceki cache korunur; throw yok
-    return { bayat: true, veri: window.__ovsyncTakip ? window.__ovsyncTakip.veri : null };
+    const c = window.__ovsyncTakip;
+    return { bayat: true, veri: c ? c.veri : null, zaman: c ? c.zaman : null };
   }
 }
 

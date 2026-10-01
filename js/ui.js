@@ -950,9 +950,14 @@ function _ovsyncS0SatirHtml(satir, bugunIso){
     :'';
   if(_ovsyncS0Tip(satir)==='bugun'){
     const saat=(tai&&tai.hedef_saat)?' '+esc(String(tai.hedef_saat).slice(0,5)):'';
-    return '<div class="ovs-kart ovs-bugun-kart"><div class="ovs-k">BUGÜN</div>'+taiBtn
+    // TAI metni/butonu YALNIZ RPC tai.hedef_tarih === bugün iken; aksi hâlde RPC tarihi
+    // göreli gün etiketiyle (tarih JS'te hesaplanmaz — design §18.13), buton yok.
+    const taiBugun=!!(tai&&tai.hedef_tarih&&String(tai.hedef_tarih).slice(0,10)===bugunIso);
+    const taiMetin=taiBugun?' — TAI bugün'+saat
+      :(tai&&tai.hedef_tarih?' — TAI '+esc(gunFarkiEtiket(tai.hedef_tarih,bugunIso)||'tarihi bilinmiyor')+saat:'');
+    return '<div class="ovs-kart ovs-bugun-kart"><div class="ovs-k">BUGÜN</div>'+(taiBugun?taiBtn:'')
       +'<div class="ovs-v"><b>'+esc(satir.kupe_no||'bilinmiyor')+'</b> · '+esc(satir.grup||'bilinmiyor')
-      +' — TAI bugün'+saat+'</div>'
+      +taiMetin+'</div>'
       +'<div class="ovs-v2">'+ozet+(tai&&tai.kaynak?' · kaynak: '+esc(tai.kaynak==='pg'?'PG':'şablon'):'')+'</div>'
       +'<div class="ovs-alt"><span>'+_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span></div>'
       +'<div class="ovs-alt"><span class="ovs-bilgi">'+ozet+'</span>'+vakaBtn+'</div>'
@@ -1132,7 +1137,7 @@ function _ovsyncBolumHtml(bolumAd, satirlar, bugunIso, govde, altNot){
   if(!liste.length) return '';
   const basliklar={S0:'S0 · Bugün & Geciken',S1:'S1 · Aktif zincirler',S2:'S2 · Sonuç bekleyenler',S3:'S3 · Başlatılmayı bekleyenler',S4:'S4 · Sonlananlar'};
   const baslik=Object.prototype.hasOwnProperty.call(basliklar,bolumAd)?basliklar[bolumAd]:(bolumAd||'bilinmiyor')+' · bilinmiyor';
-  const katla=(bolumAd==='S4')?'<span class="ovs-katla" onclick="_ovsyncS4Katla()">'+((window._curOvsyncBolum||{}).acik||{}).S4?'▾':'▸'+'</span>':'';
+  const katla=(bolumAd==='S4')?'<span class="ovs-katla" onclick="_ovsyncS4Katla()">'+(((window._curOvsyncBolum||{}).acik||{}).S4?'▾':'▸')+'</span>':'';
   return '<div class="ovs-bolum"><div class="ovs-bh"><h2>'+esc(baslik)+katla+'</h2>'
     +'<span class="ovs-n">'+esc(altNot||liste.length+' satır')+'</span></div>'
     +(govde!=null?govde:liste.map(s=>_ovsyncSatirHtml(s,bugunIso)).join(''))
@@ -3112,7 +3117,15 @@ function _takipAcikAc(detay, retry){
 
   let gerekceHtml = '';
   if (detay.birlesik && detay.pg_kapi) {
-    gerekceHtml = '<div style="font-size:.74rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:8px 10px;margin-bottom:6px;text-align:left">💉 PG kapısı: ' + esc(_takipPgKararEtiket(detay.pg_kapi.karar)) + '</div>';
+    // Sunucu birleşik yükünde pg_kapi.karar YOK (H5): karar hata kodu önekinden
+    // (detay.pg_kapi_kod: 'PG_KAPI:REQUIRE_ACK_PENDING' vb.) çözülür; çözülemezse
+    // son tohumlama sonucu; o da yoksa 'bilinmiyor' (fail-closed, uydurma yok).
+    const _pgk = detay.pg_kapi;
+    const _kodM = /^(?:PG_KAPI:)?(REQUIRE_ACK_PENDING|BLOCK_PREGNANT|BLOCK_CATALOG_UNRESOLVED)\b/.exec(String(detay.pg_kapi_kod || ''));
+    const _karar = _pgk.karar || (_kodM ? _kodM[1] : null);
+    const _pgMetin = _karar ? _takipPgKararEtiket(_karar)
+      : (_pgk.tohumlama_sonuc ? 'Son tohumlama sonucu ' + _pgk.tohumlama_sonuc : _takipPgKararEtiket(null));
+    gerekceHtml = '<div style="font-size:.74rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:8px 10px;margin-bottom:6px;text-align:left">💉 PG kapısı: ' + esc(_pgMetin) + '</div>';
   }
   const ta = detay.takip_acik || {};
   const gun = _takipKisaGun(ta.muayene_tarihi);
@@ -4486,6 +4499,22 @@ async function _belirsizApply(val){
     _belirsizData=list; _belirsizSel=new Set(); _belirsizRender();
   }catch(e){toast('Hata: '+e.message,true);}
 }
+/**
+ * 🔔 protokol sheet'indeki "Tüm takibi aç →" linki: sheet'i MEVCUT kapatma yoluyla
+ * (_closeProtokolListe) kapatır, sonra ovsync sayfasına geçer. Kapatma history.back
+ * gerektiriyorsa goTo, geri-geçişin tüketilmesinden sonra (_modalBackDevam) koşar —
+ * aksi hâlde goTo'nun pushState'i bekleyen back'in altında kalırdı.
+ * @returns {void}
+ */
+function _protokolOvsyncGit(){
+  if (document.getElementById('protokol-bs') && history.state?.protokol) {
+    globalThis._modalBackDevam = () => goTo('ovsync');
+    _closeProtokolListe();
+    return;
+  }
+  _closeProtokolListe();
+  goTo('ovsync');
+}
 // ── Protokol sheet'leri tek noktadan kapat (B21) ──
 // DOM remove + (state eşleşiyorsa) history.back. Back'in popstate'ı
 // _modalBackGuard ile tüketilir → liste sheet'i ekranda kalır, dash'e atlanmaz.
@@ -4580,14 +4609,14 @@ async function _showProtokolEkran(){
     window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
     const ovList = window.__ovsyncUyarilar;
     if (ovList.length) {
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="goTo('ovsync')" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="_protokolOvsyncGit()" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   } catch(e) {
     // T10: taze çağrı başarısızsa rozet önbelleğine düş (bayat-fallback; konsol uyarısıyla)
     console.warn('ovsync_baslat_uyarilari:', e.message);
     const ovList = Array.isArray(window.__ovsyncUyarilar) ? window.__ovsyncUyarilar : [];
     if (ovList.length) {
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="goTo('ovsync')" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="_protokolOvsyncGit()" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   }
   // C4 (cila2): K8'in seanslar panel bölümü geri alındı — sahip:

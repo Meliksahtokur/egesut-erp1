@@ -195,5 +195,6 @@ test('P7-K10: 🔔 🌱 İlk Tohumlama başlığı "Tüm takibi aç →" sh-link
   assert.strictEqual((spe.match(/Tüm takibi aç →/g) || []).length, 2,
     'taze ve önbellek kollarının İKİSİNDE de link olmalı');
   assert.match(spe, /class="sh-link"/, 'sh-link deseni');
-  assert.match(spe, /goTo\('ovsync'\)/, 'link ovsync sayfasına götürmeli');
+  // ui-fix1 K2: link önce 🔔 sheet'i kapatır, sonra ovsync'e gider (_protokolOvsyncGit)
+  assert.match(spe, /_protokolOvsyncGit\(\)/, 'link ovsync sayfasına götürmeli');
 });

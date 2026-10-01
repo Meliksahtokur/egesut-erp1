@@ -149,6 +149,22 @@ window.addEventListener('popstate', e => {
     if (typeof _devam === 'function') { _devam(); }
     return;
   }
+  // M24: ovsync sheet'leri (devam seçici / takip onayı / PG kapısı) history state'i itiyor;
+  // Geri o state'i tüketti ama sheet DOM'da açıksa MEVCUT kapatma fonksiyonuyla kapat
+  // (kapatıcılar state eşleşmediği için history.back atmaz) — sayfa değişmez.
+  {
+    const _sheetler = [
+      ['devam-secici-bs', 'devam_secici', '_devamSeciciKapat'],
+      ['takip-acik-bs', 'takip_acik', '_takipAcikKapat'],
+      ['pg-kapi-bs', 'pg_kapi', '_pgKapiKapat'],
+    ];
+    for (const [_id, _st, _fn] of _sheetler) {
+      if (document.getElementById(_id) && !(e.state && e.state[_st]) && typeof globalThis[_fn] === 'function') {
+        globalThis[_fn]();
+        return;
+      }
+    }
+  }
   // W3: dal sırası ve karar SAF makinede (js/utils/handlers.js navGeriKarar) —
   // mevcut sıra korunur: modal → sessiz → sentinel → proto-detay → kart-içi
   // gün görünümü → kart (det) → state-guard → ana gün görünümü → tx detayı → sayfa.
