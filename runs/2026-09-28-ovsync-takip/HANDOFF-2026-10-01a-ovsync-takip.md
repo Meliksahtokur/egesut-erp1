@@ -89,9 +89,15 @@ TZ fix + demo apply (00:35). P10 bir kez 429 rate-limit'ten düştü — sıfır
 - ui-tur subagent'ı ~01:20'de dispatch edildi, devir anında hâlâ koşuyordu (11/25 kanıt);
   mimar 08:43'te durum-zorlaması gönderdi (makul değilse KISMI DONE + dur talimatı).
 
-## §6 Bağlayıcı davranışlar (değişmedi)
+## §6 Bağlayıcı davranışlar — devralan ajan öncekiyle BİREBİR aynı davranır (sahip vurgusu 2026-10-01)
 
-Kırıntı `.crumbs/ovsync-takip.jsonl` (bash -c ile; fish apostrophe yer); kanıt etiketleri;
-board disiplini goal checkpoint üzerinden; sahiplerle Türkçe + TAM mutlak yollar; review DIŞA
+Hasat düzeni her teslimde: **nokta-kontrol (1-2 yük taşıyan iddia, CONFIRMED/OBSERVED etiketiyle
+bağımsız doğrula — subagent raporuna güvenme) → kırıntı → commit (yalnız kendi yollarınla; staged
+alanı `git diff --cached --stat` ile doğrula) → sıradaki dispatch**. Bilinçli sapmalar DONE'daki
+gerekçesiyle mimarca ratifiye edilir VE kırıntıya yazılır. Sahip kapısı (demo apply, PROD, TZ fix
+sınıfı kalıcı-davranış değişiklikleri) AskUserQuestion ile ölçümlü fact'lerle sorulur. Süit
+iddiaları bağımsız yeniden koşulur; "pre-existing kırmızı" baseline kümesiyle birebir karşılaştırılır.
+Kırıntı `.crumbs/ovsync-takip.jsonl` (bash -c ile; fish apostrophe yer); kanıt etiketleri; board
+disiplini goal checkpoint üzerinden; sahiplerle Türkçe + TAM mutlak yollar; review DIŞA
 (ss-lead-codex luna/max) final review istenirse; subagent sonnet; ultracode YASAK; pkill/kill -9
 yasak; `.ss/`+main dokunma yasağı; yanlış-oturum kapısı.
