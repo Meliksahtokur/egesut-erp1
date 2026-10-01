@@ -79,7 +79,10 @@ TZ fix + demo apply (00:35). P10 bir kez 429 rate-limit'ten düştü — sıfır
   koşturmaktan ucuz.
 - e2e `--workers=1` ŞART (paylaşımlı seed siliniyor); `--only` öncesi JSON yedeği.
 - P12b'nin TZ düzeltmesinden sonra e2e tarih assertion'ları birebir `trGun(7)` — tolerans YOK.
-- GLM penceresi 09:00–13:00: yeni subagent fan-out başlatma (glmf muaf).
+- GLM penceresi 09:00–13:00: **bugün (2026-10-01) SAHİPÇE KALDIRILDI** (sahip mesajı 08:43 —
+  "bugün 9-13 arası işlemlere devam ediyoruz serbest"); normal günlerde pencere geçerli (glmf muaf).
+- ui-tur subagent'ı ~01:20'de dispatch edildi, devir anında hâlâ koşuyordu (11/25 kanıt);
+  mimar 08:43'te durum-zorlaması gönderdi (makul değilse KISMI DONE + dur talimatı).
 
 ## §6 Bağlayıcı davranışlar (değişmedi)
 
