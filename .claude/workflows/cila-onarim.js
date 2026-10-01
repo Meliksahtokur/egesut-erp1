@@ -19,7 +19,7 @@ export const meta = {
   ],
 }
 
-// >>> ram-pool
+// >>> ram-pool v1 sha=d8561f81b97c
 // ram-pool v1 — kanonik blok başlangıcı. Aşağıdakiler workflow kapsamına
 // tanımlanır: RAM_EXEC_NOTE, ramEpochGuard, ramPlan, parsePlan, lanes,
 // ramClose (+ özel crc yardımcıları fnv1a32/canonicalJson).
