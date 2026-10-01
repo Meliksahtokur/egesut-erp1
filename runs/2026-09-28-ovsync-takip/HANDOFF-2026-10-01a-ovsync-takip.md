@@ -31,10 +31,15 @@ Süit durumu: unit **1406 test / 1404 pass / 2 kırmızı pre-existing** (LUNA-3
 `ay ‹/›`); e2e ovsync 12/12; T-72b 5×30 PASS. Sahip onayları bu oturumda: demo apply (22:57),
 TZ fix + demo apply (00:35). P10 bir kez 429 rate-limit'ten düştü — sıfır yazma bıraktı, devamla kapandı.
 
-## §2 Canlı işler (devir anı)
+## §2 Canlı işler (devir anı — **context-budget stop 08:50 ile kapatıldı**)
 
 - **ui-tur subagent'ı**: `ui-tur-GOREV.md` zarfıyla 25 maddelik glmf-max UI turu dispatch edilmişti
-  (~01:20). Devir anında bitiş bildirimi GELMEDİ. Durum:
+  (~01:20). **Oturum context 500k HARD ile kapanıyor — tur BİTMEDEN bırakılıyor.** 08:43'te 11/25
+  kanıt ekran görüntüsü `runs/2026-09-28-ovsync-takip/artifacts/uitur-*.png` içindeydi; DONE YOK.
+  Mimari durum-zorlaması kuyruktaydı (makul değilse KISMI DONE + dur). Ajan oturumla ölürse:
+  kanıtlar diskte KALIR; yeni oturum kalan maddeleri yeniden koşturur (biten 11 maddenin
+  ekran görüntülerini DONE tablosuna kanıt olarak alabilir — yeniden koşma ZORUNLU DEĞİL,
+  hüküm güvenilirse). Durum:
   - `runs/2026-09-28-ovsync-takip/ui-tur-DONE.md` VARSA mimar (devreden oturum) hasat etmiştir —
     §1'deki commit tablosunda görülür; 25/25 ise kalan tek iş final rapor + sahibe demo.
   - DONE YOKSA: tur yarıda kalmış demektir — YENİ OTURUM yeniden koşturur (zarf hazır:
