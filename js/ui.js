@@ -2757,7 +2757,7 @@ async function _devamSeciciOnayla() {
       _takipAcikAc({
         birlesik: red.kod === 'PG_KAPI:TAKIP_ACIK',
         pg_kapi: red.detay?.pg_kapi || null,
-        takip_acik: red.detay?.takip_acik || null,
+        takip_acik: _takipDetayCoz(red.kod, red.detay),
         kupe: st.baglam?.kupe_no || '',
         islem: st.secim === 'PG' ? 'PG uygulansın mı?'
           : st.secim === 'OVSYNC' ? 'Ovsync başlatılsın mı?'
@@ -3050,6 +3050,20 @@ function _takipAcikMetin(detay){
   return kupe + ', ' + zaman + ' rektal muayene takibinde.<br>Takip kapatılıp ' + islem;
 }
 /**
+ * TAKIP_ACIK red gövdesinden takip detayını çözer — TEK çözümleyici (P12b):
+ * birleşikte (PG_KAPI:TAKIP_ACIK) detay.takip_acik altında; yalın TAKIP_ACIK'ta
+ * gövde DOĞRUDAN detaydır {muayene_tarihi, muayene_saat} (H5 — takip_acik anahtarı
+ * yalnız birleşik payload'ta ve bulk satır-sonucunda). _takipAcikHata +
+ * _devamSeciciOnayla paylaşır (kopya-yapıştır yok).
+ * @param {string} kod Red kodu ('TAKIP_ACIK' | 'PG_KAPI:TAKIP_ACIK').
+ * @param {object} [detay] Ayrıştırılmış payload gövdesi.
+ * @returns {object} Takip detayı (alanlar eksikse {}).
+ */
+function _takipDetayCoz(kod, detay){
+  detay = detay || {};
+  return kod === 'PG_KAPI:TAKIP_ACIK' ? (detay.takip_acik || {}) : detay;
+}
+/**
  * TAKIP_ACIK hata mesajını analiz eder: yalın TAKIP_ACIK ya da birleşik
  * PG_KAPI:TAKIP_ACIK ise onay sheet'ini açar ve true döner; değilse false —
  * çağıran mevcut hata akışına döner. Yalnız-PG kapıları buraya DÜŞMEZ
@@ -3066,7 +3080,7 @@ function _takipAcikHata(e, retry, baglam){
   if (!m) return false;
   let detay = {};
   try { detay = JSON.parse(m[2] || '{}'); } catch (e2) {}
-  const ta = m[1] === 'PG_KAPI:TAKIP_ACIK' ? (detay.takip_acik || {}) : detay;
+  const ta = _takipDetayCoz(m[1], detay);
   if (!ta.muayene_tarihi) return false;   // ZATEN_ACIK vb. türev — alan uydurma yok
   const pg = m[1] === 'PG_KAPI:TAKIP_ACIK' ? (detay.pg_kapi || null) : null;
   _takipAcikAc({

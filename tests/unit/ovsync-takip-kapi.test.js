@@ -54,6 +54,7 @@ const P10_UI_FNS = [
   '_takipPgKararEtiket',  // PG karar kodu → kullanıcı metni (_pgKapiAc copy dili)
   '_takipKisaGun',        // '2026-10-05' → '05.10' (mockup 04 "05.10 14:35" copy)
   '_takipAcikMetin',      // mockup 04 metin şablonu (küpe+zaman+fiil)
+  '_takipDetayCoz',       // P12b: yalın/birleşik takip detayı TEK çözümleyici
   '_takipAcikHata',       // e ayrıştırıcı: TAKIP_ACIK + PG_KAPI:TAKIP_ACIK
   '_takipAcikAc',         // birleşik/tekil onay bottom-sheet (mockup 04 birebir)
   '_takipOnayUygula',     // "Evet, takibi kapat ve uygula" butonu
@@ -192,12 +193,17 @@ test('KAPI-ENVANTER: sarmal yollarının UI ikizleri TAKIP_ACIK dalına bağlı 
   const secici = extractFunctionSource('js/ui.js', '_devamSeciciOnayla');
   assert.ok(secici.includes('_takipAcikAc('),
     '_devamSeciciOnayla TAKIP_ACIK/PG_KAPI:TAKIP_ACIK dalı tek sheet\'e bağlanmalı');
+  assert.ok(secici.includes('_takipDetayCoz('),
+    '_devamSeciciOnayla takip detayını ORTAK çözümleyiciden almalı (P12b — kopya-yapıştır yok)');
   const pgBosAta = extractFunctionSource('js/ui.js', '_pgKapiBosAtaUygula');
   assert.ok(pgBosAta.includes('_takipAcikHata('),
     '_pgKapiBosAtaUygula (sarmal PG yazması) birleşik/yalın takip redini yakalamalı');
   const redIsle = extractFunctionSource('js/ui.js', '_devamRedIsle');
   assert.ok(redIsle.includes('PG_KAPI:TAKIP_ACIK'),
     '_devamRedIsle birleşik kodu kendi adıyla ayrıştırmalı (TAKIP_ACIK\'a düşmez)');
+  const takipHata = extractFunctionSource('js/ui.js', '_takipAcikHata');
+  assert.ok(takipHata.includes('_takipDetayCoz('),
+    '_takipAcikHata da ORTAK çözümleyiciyi kullanmalı (tek kaynak — P12b)');
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -256,6 +262,36 @@ test('YALIN: kupe verilmemişse metin "Bu hayvan" der (payload\'da kupe alanı y
   ctx._takipAcikHata(new Error(YALIN_MSG), () => {});
   const html = doc.body.children.find(el => el.id === 'takip-acik-bs').innerHTML;
   assert.ok(html.includes('Bu hayvan'), 'kupe yoksa mockup metni hayvan vurgusuz kurulur');
+});
+
+test('YALIN-SECICI: _devamSeciciOnayla yalın TAKIP_ACIK redinde sheet\'i DOLU tarih/saatle açar (P12b)', async () => {
+  // Sunucu yalın red detayını DOĞRUDAN taşır: TAKIP_ACIK:{muayene_tarihi, muayene_saat}
+  // (P3b DONE §4; H5'te takip_acik anahtarı yalnız BİRLEŞİK payload'ta ve bulk
+  // satır-sonucunda). _devamSeciciOnayla'nın yalın dalı bu yüzden red.detay?.takip_acik
+  // okumamalı — :3069 çözümleyicisiyle AYNI mantık (_takipDetayCoz) kullanılmalı.
+  const st = {
+    acik: true, isleniyor: false, mod: 'bos', secim: 'PG',
+    baglam: { tohumlama_id: 'T-197', kupe_no: '197' },
+    onbilgi: { varsayilan_gun: 7 },
+    pgStokId: 'stok-1', pgDoz: '5', erteleGun: null, erteleSaat: null, onay21: false,
+  };
+  const { ctx, doc } = p10Ctx({
+    noktaFns: [
+      { dosya: 'js/ui.js', fn: '_devamSeciciOnayla' },
+      { dosya: 'js/ui.js', fn: '_devamRpcParams' },
+      { dosya: 'js/ui.js', fn: '_devamRedIsle' },
+    ],
+    globals: { tohumlamaBosVeDevam: async () => { throw new Error(YALIN_MSG); } },
+  });
+  ctx.window.__devamSecici = st;
+  await ctx._devamSeciciOnayla();
+  const box = doc.body.children.find(el => el.id === 'takip-acik-bs');
+  assert.ok(box, 'takip-acik-bs sheet basılmalı');
+  const html = box.innerHTML;
+  assert.ok(html.includes("05.10 14:35'te rektal muayene takibinde."),
+    'yalın payload\'ta muayene tarihi + saat sheet\'te DOLU (P12b HATA-1)');
+  assert.ok(html.includes('<b>Küpe 197</b>'), 'kupe seçici bağlamından taşınır');
+  assert.ok(html.includes('Takip kapatılıp PG uygulansın mı?'), 'fiil secimden türetilir');
 });
 
 test('AYRISTIRMA: TAKIP_ACIK olmayan hatalar false döner — mevcut hata akışı bozulmaz', () => {

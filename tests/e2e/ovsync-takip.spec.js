@@ -340,9 +340,11 @@ test('T-20: takipli+PG → TAKIP_ACIK onay sheet (#takip-acik-bs); Vazgeç yazma
   await expect(sheet).toContainText('Bu hayvan takipte');
   await expect(sheet).toContainText(S.b.kupe);
   await expect(sheet).toContainText(/Rektal muayene takibi/);
-  // NOT: yalın TAKIP_ACIK'ta sheet gerekçesinde muayene tarihi/saat GÖRÜNMÜYOR
-  // (ui.js _devamSeciciOnayla → _takipAcikAc'e takip_acik: red.detay?.takip_acik —
-  // yalın payload'ta alanlar tepede; UI HATASI #1, impl-P12-DONE'da raporlu)
+  // P12b: yalın TAKIP_ACIK'ta detay DOĞRUDAN payload'dadır (takip_acik anahtarı
+  // yalnız birleşikte) — _devamSeciciOnayla ortak çözümleyiciyle (ui.js
+  // _takipDetayCoz) okur; sheet'te muayene tarihi + saat DOLU basılır
+  // (seed b: hedef_saat '09:00:00'; UI HATASI #1 fix kanıtı, impl-P12b-DONE).
+  await expect(sheet).toContainText(/\d{2}\.\d{2} 09:00'te rektal muayene takibinde\./);
   const onayBtn = page.locator('#takip-acik-onayla');
   await expect(onayBtn).toHaveText('Evet, takibi kapat ve uygula');
   await expect(sheet.getByRole('button', { name: 'Vazgeç' })).toBeVisible();
@@ -412,14 +414,14 @@ test('T-25/T-26: muayeneyi ertele (+7) saatsiz → görev hedef +7, hedef_saat N
   // saat girilebilir ama ön ayar boş — saatsiz Kaydet
   await page.click('#devam-onayla');
   await expect(page.locator('#devam-secici-bs')).toHaveCount(0, { timeout: 15000 });
-  // hedef: UI ön izleme İstanbul bugünüyle bugün+7 der; sunucu CURRENT_DATE'i
-  // oturum saat diliminde (UTC) yazar — TR 00:00–08:00 arası BİR GÜN GERİDE
-  // (2026-10-01 koşum ölçümü; UI/SUNUCU HATASI #2 — DONE'da). İki gün de kabul.
+  // P12b: sunucu Europe/Istanbul yerel günüyle yazar (20261001000001) — hedef
+  // BİREBİR İstanbul bugünü+7 (gece koşumunda da; eski +6 toleransı UTC CURRENT_DATE
+  // hatasının gölgesiydi — UI/SUNUCU HATASI #2 fix kanıtı, impl-P12b-DONE).
   const gorev = await dbBekle(async () => {
     const g = await dbTek('gorev_log', 'id', S.c2.gorevId, 'hedef_tarih,hedef_saat');
-    return g && [trGun(6), trGun(7)].includes(g.hedef_tarih) ? g : null;
+    return g && g.hedef_tarih === trGun(7) ? g : null;
   });
-  expect(gorev, `görev hedefi bugün+6/+7 (${trGun(6)}/${trGun(7)}) olmalı`).toBeTruthy();
+  expect(gorev, `görev hedefi İstanbul-yerel bugün+7 (${trGun(7)}) olmalı`).toBeTruthy();
   expect(gorev.hedef_saat).toBeNull();
 });
 
@@ -447,8 +449,8 @@ test('T-87: TAKIP_MUAYENE ekranı 4 seçim (TAKIP yok); ertelemede "N gündür t
   await page.click('#m-confirm-ok');
   await expect(secici).toHaveCount(0, { timeout: 15000 });
   const gorev = await dbTek('gorev_log', 'id', S.h.gorevId, 'hedef_tarih,hedef_saat,takip_kapanis_nedeni');
-  // hedef boundary: sunucu CURRENT_DATE UTC oturumunda — bkz. T-25 notu (HATA #2)
-  expect([trGun(6), trGun(7)]).toContain(gorev?.hedef_tarih);
+  // P12b: hedef = Europe/Istanbul yerel bugün+7 (20261001000001; bkz. T-25 notu)
+  expect(gorev?.hedef_tarih).toBe(trGun(7));
   expect(gorev?.hedef_saat).toBeNull();
 });
 
