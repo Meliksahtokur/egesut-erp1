@@ -62,6 +62,11 @@ test.beforeAll(async () => {
   const { error } = await db.auth.signInWithPassword(DEMO_LOGIN);
   if (error) throw new Error(`demo giriş başarısız: ${error.message}`);
 
+  // ARTIK-DAYANIKLILIK (TB-6): önceki koşumun/çöken worker'ın kalıntısı (açık takip görevi,
+  // Bekliyor tohumlama, Satıldı'da kalmış hayvan) seed'i TAKIP_ACIK / "aktif değil" ile
+  // kırmasın. Temizlik fail-closed: başarısızsa seed hiç başlamaz.
+  await temizle('önce');
+
   // IDEMPOTENT SEED: tüm id'ler SABİT (harf türetilir). beforeAll worker-başına
   // ve worker-yeniden-başlangıcında TEKRAR koşabilir — her koşum AYNI duruma
   // yakınsar (var olan satır yeniden kullanılır, çocuklar tazelenir).
@@ -78,7 +83,14 @@ test.beforeAll(async () => {
     const hayvanNo = { a: 1, b: 2, c: 3, c2: 4, d: 5, e: 6, f: 7, h: 8, i: 9, l: 10 };
     const id = `e2ef0000-0000-4000-8000-${String(hayvanNo[ad]).padStart(12, '0')}`;
     const kupe = MARKER + ad;
-    const { data: got } = await db.from('hayvanlar').select('id').eq('id', id);
+    const { data: got, error: eg } = await db.from('hayvanlar').select('id,durum').eq('id', id);
+    if (eg) throw new Error(`seed hayvan ${ad} sorgusu başarısız: ${eg.message}`);
+    if (got?.length && got[0].durum !== 'Aktif') {
+      // temizle() FK yüzünden silemediği hayvanı Satıldı'ya çeker (çıkış); yeniden kullanımda
+      // aktifleştir (aksi halde hizli_uygulama "Hayvan bulunamadı veya aktif değil" der).
+      const { error: ea } = await db.from('hayvanlar').update({ durum: 'Aktif' }).eq('id', id);
+      if (ea) throw new Error(`seed hayvan ${ad} yeniden aktifleştirme başarısız: ${ea.message}`);
+    }
     if (!got?.length) {
       const { error: e1 } = await db.from('hayvanlar').insert({
         id, kupe_no: kupe, cinsiyet: 'Dişi', durum: 'Aktif',
@@ -121,13 +133,15 @@ test.beforeAll(async () => {
   // PG geçmişi (son_pg): hizli_uygulama RPC — pg_application_event authenticated
   // INSERT'e KAPALI (RLS/GRANT yok — 2026-10-01 ölçüm), olay yalnız RPC yoluyla kurulur.
   const pgGecmisiEkle = async ad => {
-    const TRY = async p => { try { await p; } catch { /* temizlik */ } };
     // RPC'den ÖNCE eski durum: açık takip görevi + Bekliyor tohumlama kaldıysa
-    // hizli_uygulama PG_KAPI:TAKIP_ACIK ile reddeder (2. koşum dersi 2026-10-01)
-    TRY(db.from('gorev_log').delete().eq('hayvan_id', S[ad].hayvanId));
-    TRY(db.from('tohumlama').delete().eq('hayvan_id', S[ad].hayvanId));
-    TRY(db.from('pg_application_event').delete().eq('hayvan_id', S[ad].hayvanId));
-    TRY(db.from('uygulama_log').delete().eq('hayvan_id', S[ad].hayvanId));
+    // hizli_uygulama PG_KAPI:TAKIP_ACIK ile reddeder (2. koşum dersi 2026-10-01).
+    // AWAIT + hata kontrolü (eskiden await'siz TRY: yarış + sessiz yutma). pg_application_event
+    // BİLEREK silinmez: authenticated DELETE yetkisi yok (42501, 2026-10-02 ölçüm); eski olay
+    // hayvan id'sine bağlı kalır, aşağıdaki RPC yeni olay ekler (zararsız, bkz. temizle()).
+    for (const t of ['gorev_log', 'tohumlama', 'uygulama_log']) {
+      const { error: ed } = await db.from(t).delete().eq('hayvan_id', S[ad].hayvanId);
+      if (ed) throw new Error(`seed ön-temizlik ${t}/${ad} başarısız: ${ed.message}`);
+    }
     const { data: stok, error: es } = await db.from('stok').select('id,birim').eq('urun_adi', 'PGs (alke)').limit(1).single();
     if (es || !stok) throw new Error('seed PG stoğu bulunamadı (PGs (alke))');
     const { data: res, error: er } = await db.rpc('hizli_uygulama', {
@@ -205,28 +219,62 @@ test.beforeAll(async () => {
   await gorevEkle('l', 'GEBELIK_KONTROL', -2, { kaynak: 'GEBELIK-KONTROL-' + S.l.tohId });
 });
 
-test.afterAll(async () => { await temizle(); });
+// afterAll hatayı FIRLATIR (fail-closed): temizlik başarısızsa açık hata görünür; test
+// sonuçlarını maskelemez (hook hatası ayrı satır olarak raporlanır, test PASS/FAIL'i değişmez).
+test.afterAll(async () => { await temizle('sonra'); });
 
-async function temizle() {
-  const { data: eski } = await db.from('hayvanlar').select('id').like('id', MARKER + '%');
+// TB-6 temizlik: hayvanlar `kupe_no LIKE MARKER%` ile bulunur (id UUID'dir; marker yalnız kupe_no'da).
+// Yalnız bu spec'in kendi E2E-TAKIP-PW-* fixture'ları — başka E2E-* (UITUR vb.) kümelerine DOKUNMAZ.
+// Her adım hata kontrollüdür; hatalar toplanır, sonda tek Error ile fırlatılır (sessiz yutma YOK).
+//   - pg_application_event BİLEREK silinmez: authenticated'a DELETE yetkisi yok (42501, 2026-10-02
+//     ölçüm) ve hayvan_id FK'sı hayvan satırını tutar. Bu bilinen kısıt hata SAYILMAZ; çözümü
+//     hayvanı çıkışa (Satıldı) çekmektir — trg_hayvan_cikis_gorev_iptal açık görevleri iptal eder
+//     (domain-rules §10). Başka her silme hatası gerçek hata → toplanır.
+//   - Sonda doğrulama: marker'lı hayvanlardan hiçbiri Aktif, hiçbir açık görev kalmamalı.
+async function temizle(faz) {
+  const hatalar = [];
+  const adim = async (ad, p) => {
+    const { data, error } = await p;
+    if (error) { hatalar.push(`${ad}: ${error.message}`); return null; }
+    return data ?? [];
+  };
+  const { data: eski, error: eh } = await db.from('hayvanlar').select('id').like('kupe_no', MARKER + '%');
+  if (eh) throw new Error(`temizlik[${faz}] hayvan sorgusu başarısız: ${eh.message}`);
   const ids = (eski ?? []).map(h => h.id);
   if (!ids.length) return;
-  const TRY = async p => { try { const r = await p; if (r?.error) throw new Error(r.error.message); } catch { /* temizlik: sıradan devam */ } };
+
   // vaka zinciri (C4 onaylı yol: cases + gün/uygulama) — cases.animal_id üzerinden
-  const { data: caseRows } = await db.from('cases').select('id').in('animal_id', ids);
-  const cid = (caseRows ?? []).map(c => c.id);
+  const cases = await adim('cases sorgu', db.from('cases').select('id').in('animal_id', ids));
+  const cid = (cases ?? []).map(c => c.id);
   if (cid.length) {
-    TRY(db.from('treatment_day_uygulamalar').delete().in('case_id', cid));
-    TRY(db.from('treatment_days').delete().in('case_id', cid));
+    await adim('treatment_day_uygulamalar', db.from('treatment_day_uygulamalar').delete().in('case_id', cid).select('id'));
+    await adim('treatment_days', db.from('treatment_days').delete().in('case_id', cid).select('id'));
   }
-  await TRY(db.from('protokol_instance').delete().in('hayvan_id', ids));
-  await TRY(db.from('kizginlik_log').delete().in('hayvan_id', ids));
-  await TRY(db.from('pg_application_event').delete().in('hayvan_id', ids));
-  await TRY(db.from('uygulama_log').delete().in('hayvan_id', ids));
-  await db.from('gorev_log').delete().in('hayvan_id', ids);
-  await db.from('tohumlama').delete().in('hayvan_id', ids);
-  if (cid.length) await TRY(db.from('cases').delete().in('id', cid));
-  await db.from('hayvanlar').delete().in('id', ids);
+  for (const t of ['protokol_instance', 'kizginlik_log', 'uygulama_log', 'gorev_log', 'tohumlama']) {
+    await adim(t, db.from(t).delete().in('hayvan_id', ids).select('id'));
+  }
+  if (cid.length) await adim('cases', db.from('cases').delete().in('id', cid).select('id'));
+
+  // hayvan: önce sil; yalnız FK ihlali (23503, pg_application_event) → çıkış (Satıldı).
+  // Çıkış, kalan açık görevleri trigger ile iptal eder. Başka hata → gerçek hata.
+  for (const id of ids) {
+    const { error: es } = await db.from('hayvanlar').delete().eq('id', id).select('id');
+    if (!es) continue;
+    if (es.code !== '23503') { hatalar.push(`hayvanlar sil ${id}: ${es.message}`); continue; }
+    await adim(`hayvanlar → Satıldı ${id}`, db.from('hayvanlar').update({ durum: 'Satıldı' }).eq('id', id).select('id'));
+  }
+
+  // DOĞRULAMA: kalan marker'lı hayvan Aktif olmamalı, açık görev kalmamalı
+  const { data: kalan, error: ek } = await db.from('hayvanlar').select('id,kupe_no,durum').like('kupe_no', MARKER + '%');
+  if (ek) hatalar.push(`doğrulama hayvan sorgusu: ${ek.message}`);
+  const aktif = (kalan ?? []).filter(h => h.durum === 'Aktif');
+  if (aktif.length) hatalar.push(`${aktif.length} marker'lı hayvan hâlâ Aktif: ${aktif.map(h => h.kupe_no).join(', ')}`);
+  if ((kalan ?? []).length) {
+    const { data: acik, error: eo } = await db.from('gorev_log').select('id').in('hayvan_id', kalan.map(h => h.id)).eq('tamamlandi', false).eq('iptal', false);
+    if (eo) hatalar.push(`doğrulama açık görev sorgusu: ${eo.message}`);
+    else if (acik?.length) hatalar.push(`${acik.length} açık görev kaldı`);
+  }
+  if (hatalar.length) throw new Error(`temizlik[${faz}] başarısız:\n  - ${hatalar.join('\n  - ')}`);
 }
 
 // DB bekleme yardımcıları (yazma→okuma tutarlılığı için kısa poll)
