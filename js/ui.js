@@ -3160,9 +3160,11 @@ function _takipAcikAc(detay, retry){
 
   let gerekceHtml = '';
   if (detay.birlesik && detay.pg_kapi) {
-    // Sunucu birleşik yükünde pg_kapi.karar YOK (H5): karar hata kodu önekinden
-    // (detay.pg_kapi_kod: 'PG_KAPI:REQUIRE_ACK_PENDING' vb.) çözülür; çözülemezse
-    // son tohumlama sonucu; o da yoksa 'bilinmiyor' (fail-closed, uydurma yok).
+    // Karar sunucudan gelir: migration 20261002000002 sonrası birleşik yükte
+    // pg_kapi.karar (REQUIRE_ACK_PENDING|BLOCK_PREGNANT|BLOCK_CATALOG_UNRESOLVED) dolu.
+    // N-1 yedeği (eski sunucu, karar yok): hata kodu öneki (detay.pg_kapi_kod) →
+    // son tohumlama sonucu → 'bilinmiyor' (fail-closed, uydurma yok). Yedek KALIR:
+    // UI, DB apply'ından önce yayınlanabilir.
     const _pgk = detay.pg_kapi;
     const _kodM = /^(?:PG_KAPI:)?(REQUIRE_ACK_PENDING|BLOCK_PREGNANT|BLOCK_CATALOG_UNRESOLVED)\b/.exec(String(detay.pg_kapi_kod || ''));
     const _karar = _pgk.karar || (_kodM ? _kodM[1] : null);
