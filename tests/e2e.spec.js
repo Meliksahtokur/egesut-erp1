@@ -52,9 +52,11 @@ function isCritical(msg) {
 
 // Bilinen/ortam-kaynaklı hatalı istekler — kaynağa (msg.location) göre
 // ayıklanır (ayrıntı smoke.spec.js başlığında): agent-telemetry/tracker.js
-// (repoda olmayan commit'lenmiş script → 404), rpc/demo_sema_diff ve
-// rpc/hekim_listesi (demo projesinde RPC yok → 401/404).
-const IGNORED_LOCATIONS = ['agent-telemetry', 'rpc/demo_sema_diff', 'rpc/hekim_listesi'];
+// (repoda olmayan commit'lenmiş script → 404) ve rpc/hekim_listesi (demo
+// projesinde RPC yok → 401/404). rpc/demo_sema_diff BURADA DEĞİL: RPC demo'da
+// var (yalnız authenticated); js/demo.js oturum yokken artık çağırmıyor
+// (K8b/TB-2), yani konsolda 401 görünürse regresyondur.
+const IGNORED_LOCATIONS = ['agent-telemetry', 'rpc/hekim_listesi'];
 
 function isIgnoredLocation(msg) {
   const url = msg.location()?.url || '';
