@@ -1,7 +1,7 @@
 # G-20261002-OVSYNC-SONRASI-BORC — Ovsync takip sonrası borç turu
 
 - **id:** G-20261002-OVSYNC-SONRASI-BORC
-- **status:** active
+- **status:** delivered (2026-10-02 — dal teslimi; PROD apply 20261002000002 + merge + push sahip kapısında)
 - **owner:** Melik Şah Tokur (2026-10-02 sıra/kapsam onayı: önerilen sıra tümü; TB-1 arşivle; UI kapısı ss-worker-sonnet-medium koltuğu; prod YALNIZ-OKUMA serbest)
 - **flow:** Full mode, mimar oturumu + builtin subagent zarfları (sonnet/haiku; opus worker yok; ultracode YASAK); UI tarayıcı kapısı herdr ayrı tab ss-worker-sonnet-medium
 - **base SHA:** `ffdc342`
@@ -31,4 +31,4 @@
 - **acceptance commands:** `scripts/db-validate.sh` her migration; `node --check` değişen JS; birim koşumu (baseline 1491/1489/2); hedefli Playwright Docker `mcr.microsoft.com/playwright:v1.58.2-noble --network host`; e2e kırmızısı A/B ile; `git diff --check`; sahibe demo öncesi koltuk UI kapısı PASS + `kupe_no LIKE 'E2E-%'` aktif 0.
 - **stop conditions:** push/merge/PROD apply YASAK; `.ss/` yazma YASAK; domain-rules çelişkisi → dur, sahibe; db-validate'siz migration teslimi yok.
 - **report path:** `runs/2026-10-02-ovsync-sonrasi/DONE.md` (+ `ILERLEME.md`)
-- **latest checkpoint:** 2026-10-02 — goal açıldı, sahip sıra/kapsam onayı alındı.
+- **latest checkpoint:** 2026-10-02 — 9 kalem kapandı (TB-4 kapsam dışı). Commitler: 9ecd6a0 GT · d6ea1dd TB-3 · f9ca7b6 TB-2 · bf35723 TB-5 SQL · 20766cb TB-5 UI test · b986755 damga ?v=20261002-02 · 626e3ee+5e8466e TB-6 e2e. Kanıt: birim 1511/1509/2 (baseline kırmızılar), e2e ovsync-takip 12/12 ×2, UI kapısı (sonnet-medium koltuk) 12/12 PASS, db-validate e98ae410 PASS, demo apply 20261002000002 + schema_migrations kaydı. B9: kayma yok (cron TR 08:10). Rapor `runs/2026-10-02-ovsync-sonrasi/DONE.md`.
