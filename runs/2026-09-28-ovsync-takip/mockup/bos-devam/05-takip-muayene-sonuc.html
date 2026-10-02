@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#111a0a;--bg2:#1a2812;
+  --card:#f7f4ee;--card2:#edeae2;--card3:#e2ddd3;
+  --ink:#1a1f14;--ink2:#3d4a32;--ink3:#6b7a5c;
+  --green:#4e9a2a;--green2:#6abf3d;--green3:#98d96e;
+  --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;--purple:#7c3aed;
+}
+html,body{background:#dfe3e6;}
+body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;width:420px;margin:0 auto;padding:0 0 24px;}
+.mock-tag{font-size:11px;color:#78909c;background:#dfe3e6;padding:8px 12px 6px;font-weight:700;}
+.telefon{width:420px;min-height:840px;background:var(--bg);position:relative;overflow:hidden;border-radius:0 0 18px 18px;}
+.arka-ekran{padding:16px;opacity:.5;filter:blur(1.5px);}
+.arka-baslik{color:#fff;font-size:1.1rem;font-weight:800;margin-bottom:10px;}
+.arka-kart{background:var(--bg2);border-radius:14px;padding:14px;margin-bottom:10px;color:#cfd8c4;font-size:.82rem;}
+.mo{position:relative;background:rgba(10,20,5,.82);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;min-height:840px;}
+.modal{background:var(--card);border-radius:22px 22px 0 0;width:100%;padding-bottom:20px;box-shadow:0 -6px 24px rgba(0,0,0,.3);}
+.m-handle{width:36px;height:4px;background:var(--card3);border-radius:2px;margin:10px auto 4px;}
+.m-hdr{padding:4px 16px 12px;border-bottom:1px solid var(--card2);}
+.m-eyebrow{font-size:.68rem;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.07em;}
+.m-title{font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px;}
+.m-body{padding:14px 16px;}
+.info-kutu{font-size:.82rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:14px;}
+.info-kutu b{color:var(--ink);}
+.btn{border:none;border-radius:12px;padding:12px;font-size:.88rem;font-weight:700;cursor:pointer;text-align:center;width:100%;}
+.btn-g{background:var(--green);color:#fff;}
+.btn-link{background:none;border:1.5px dashed var(--blue);color:var(--blue);margin-top:10px;}
+.ds-baslik{font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.ds-secenek{border:2px solid var(--card3);border-radius:14px;padding:12px 14px;margin-bottom:9px;background:#fff;}
+.ds-secenek.secili{border-color:var(--green);background:rgba(78,154,42,.06);}
+.ds-ust{display:flex;align-items:center;gap:10px;}
+.ds-radio{width:20px;height:20px;border-radius:50%;border:2px solid #b7c2ab;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.ds-secenek.secili .ds-radio{border-color:var(--green);}
+.ds-secenek.secili .ds-radio::after{content:'';width:10px;height:10px;border-radius:50%;background:var(--green);}
+.ds-metin{font-size:.92rem;font-weight:700;color:var(--ink);}
+.ds-hemen{font-size:.6rem;font-weight:700;color:var(--green);background:rgba(78,154,42,.14);border-radius:8px;padding:2px 7px;margin-left:auto;white-space:nowrap;}
+.ds-alt{font-size:.76rem;color:var(--ink3);margin-top:5px;padding-left:30px;line-height:1.4;}
+.ds-ic{margin-top:10px;padding-left:30px;}
+.ds-secim-satir{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.ds-select,.ds-gun-input{border:1.5px solid var(--card3);border-radius:8px;padding:7px 10px;font-size:.82rem;background:#fff;color:var(--ink);font-weight:600;}
+.ds-tarih-etiket{font-size:.78rem;color:var(--ink2);font-weight:600;background:var(--card2);padding:6px 10px;border-radius:8px;}
+.ds-note{font-size:.72rem;color:var(--ink3);margin-top:10px;text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="mock-tag">Mockup 5 — Takip muayenesi görevi sonucu (7. gün rektal muayene)</div>
+
+<div class="telefon">
+  <div class="arka-ekran">
+    <div class="arka-baslik">✅ Görevler</div>
+    <div class="arka-kart">🔍 Küpe 197 — muayene 05.10 14:35</div>
+  </div>
+
+  <div class="mo">
+    <div class="modal">
+      <div class="m-handle"></div>
+      <div class="m-hdr">
+        <div class="m-eyebrow">Takip muayenesi</div>
+        <div class="m-title">🔍 Takip muayenesi — Küpe 197</div>
+      </div>
+      <div class="m-body">
+        <div class="info-kutu">Boş atandı <b>28.09</b> · takip <b>7. gün</b></div>
+
+        <div class="ds-baslik">Devam nasıl olsun? (zorunlu)</div>
+
+        <div class="ds-secenek secili">
+          <div class="ds-ust">
+            <div class="ds-radio"></div>
+            <div class="ds-metin">🔄 Ovsync uygula</div>
+            <div class="ds-hemen">hemen</div>
+          </div>
+          <div class="ds-alt">Ovsync vakası bugün açılır (4 uygulama + TAI)</div>
+        </div>
+
+        <div class="ds-secenek">
+          <div class="ds-ust">
+            <div class="ds-radio"></div>
+            <div class="ds-metin">💉 PG uygula</div>
+            <div class="ds-hemen">hemen</div>
+          </div>
+          <div class="ds-alt">+48 saat TAI görevi açılır (uygunsa)</div>
+        </div>
+
+        <div class="ds-secenek">
+          <div class="ds-ust">
+            <div class="ds-radio"></div>
+            <div class="ds-metin">📅 Muayeneyi ertele</div>
+          </div>
+          <div class="ds-ic">
+            <div class="ds-secim-satir">
+              <input class="ds-gun-input" style="width:56px;text-align:center" value="7"> <span style="font-size:.8rem;color:var(--ink3)">gün</span>
+              <span class="ds-tarih-etiket">→ 05.10 14:35</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-g" style="margin-top:6px">Boş ata + Ovsync başlat</button>
+        <button class="btn btn-link">🐄 Kızgınlıkta → tohumlama kaydına geç</button>
+        <div class="ds-note">Sonuç kaydı ve seçilen devam adımı tek işlemde yapılır</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

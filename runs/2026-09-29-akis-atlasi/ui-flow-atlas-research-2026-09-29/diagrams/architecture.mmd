@@ -1,0 +1,12 @@
+flowchart LR
+  A[Demo fixture + seed test] --> B[Playwright Planner / MCP Explorer]
+  B --> C[Instrumented Playwright Runner]
+  C --> D[Trace + HAR + Dialog Log]
+  C --> E[UI State + IndexedDB Diff]
+  F[GitNexus Static Graph] --> H[Atlas Merger]
+  D --> H
+  E --> H
+  G[Postgres Introspector\nplpgsql_check + pg_trigger + pg_cron] --> H
+  H --> I[(flow.json / evidence.json)]
+  I --> J[FLOW.md + Mermaid]
+  I --> K[Staleness Gate]

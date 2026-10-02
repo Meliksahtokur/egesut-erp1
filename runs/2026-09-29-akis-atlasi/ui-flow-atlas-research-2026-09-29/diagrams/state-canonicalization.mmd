@@ -1,0 +1,11 @@
+flowchart TD
+  A[Raw browser state] --> B[Normalize DOM/ARIA]
+  B --> C[Remove timestamps/toasts/random IDs]
+  C --> D[Extract visible modal/bottom-sheet]
+  D --> E[Extract enabled primary actions]
+  E --> F[Add entity/scenario class]
+  F --> G[Add offline queue + IndexedDB digest class]
+  G --> H[Semantic state fingerprint]
+  H --> I{Seen before?}
+  I -- yes --> J[Loop/duplicate: do not create node]
+  I -- no --> K[Create atlas state node]

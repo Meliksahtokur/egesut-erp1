@@ -1,0 +1,50 @@
+# SOURCES — erişim 2026-09-29
+
+Kaynak tarihi yoksa “erişim tarihi” verilmiştir. Release/issue tarihleri kaynak sayfasındaki tarihtir.
+
+- **S01 — Playwright Test Agents (official docs).** Planner, generator, healer; Claude Code/Codex/OpenCode `init-agents`. Erişim: 2026-09-29. https://playwright.dev/docs/test-agents
+- **S02 — Playwright MCP (official GitHub docs).** Accessibility snapshot, MCP clients, Claude Code kurulumu. Erişim: 2026-09-29. https://github.com/microsoft/playwright/blob/main/docs/src/getting-started-mcp.md
+- **S03 — microsoft/playwright-mcp.** Package v0.0.82, Apache-2.0. Erişim: 2026-09-29. https://github.com/microsoft/playwright-mcp
+- **S04 — Playwright Trace Viewer.** Action/DOM/screenshot/network/console correlation. Erişim: 2026-09-29. https://playwright.dev/docs/trace-viewer
+- **S05 — Playwright BrowserContext storageState.** IndexedDB snapshot support (v1.51+). Erişim: 2026-09-29. https://playwright.dev/docs/api/class-browsercontext
+- **S06 — Chrome DevTools MCP package/release.** v1.10.1, 2026-09-23, Apache-2.0. https://github.com/ChromeDevTools/chrome-devtools-mcp/releases
+- **S07 — Chrome DevTools MCP tool reference.** `list_network_requests`, `get_network_request`. Erişim: 2026-09-29. https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/docs/tool-reference.md
+- **S08 — browser-use releases.** 0.13.10, 2026-09-04. https://github.com/browser-use/browser-use/releases
+- **S09 — Stagehand docs/API.** `env: LOCAL | BROWSERBASE`. Erişim: 2026-09-29. https://github.com/browserbase/stagehand/blob/main/packages/docs/v3/references/stagehand.mdx
+- **S10 — Crawljax README.** Event-driven JS SPA crawl + state-flow graph. Erişim: 2026-09-29. https://github.com/crawljax/crawljax
+- **S11 — Crawljax 5.2.3 Maven metadata.** Release 2023-06-01. https://mvnrepository.com/artifact/com.crawljax/crawljax-core/versions
+- **S12 — Crawljax issues.** Open “Chrome version not supported” issue (2024-09-23) visible in issue list. Erişim: 2026-09-29. https://github.com/crawljax/crawljax/issues
+- **S13 — Mesbah et al., Crawling AJAX-Based Web Applications...** ACM TWEB 2012; dynamic UI state change → state-flow graph. https://people.ece.ubc.ca/amesbah/resources/papers/tweb-final.pdf
+- **S14 — QExplore paper.** Discusses state explosion/coverage limitations of exhaustive dynamic web exploration including Crawljax. Published 2022. https://www.sciencedirect.com/science/article/abs/pii/S0164121222001881
+- **S15 — plpgsql_check.** Static PL/pgSQL analysis + `plpgsql_show_dependency_tb`; dynamic SQL limitation. Erişim: 2026-09-29. https://github.com/okbob/plpgsql_check
+- **S16 — PostgreSQL pg_trigger docs.** trigger relation and function OIDs. Erişim: 2026-09-29. https://www.postgresql.org/docs/17/catalog-pg-trigger.html
+- **S17 — PostgreSQL pg_depend docs.** Object dependencies. Erişim: 2026-09-29. https://www.postgresql.org/docs/17/catalog-pg-depend.html
+- **S18 — pg_cron README.** `cron.job`, `cron.job_run_details`, logging. Erişim: 2026-09-29. https://github.com/citusdata/pg_cron
+- **S19 — GraphWalker releases.** 4.3.3, 2024-09-26. https://github.com/GraphWalker/graphwalker-project/releases
+- **S20 — Playwright MCP issue #1479.** Accessibility snapshot indirect prompt injection discussion, 2026-03-21. https://github.com/microsoft/playwright-mcp/issues/1479
+- **S21 — Playwright MCP issue #586.** Modal overlay click interception report, 2025-06-20. https://github.com/microsoft/playwright-mcp/issues/586
+- **S22 — Playwright MCP issue #514.** Element missing from accessibility snapshot, 2025-06-03. https://github.com/microsoft/playwright-mcp/issues/514
+- **S23 — browser-use issue #4846.** MCP state/screenshot/CDP failure report, 2026-05-16. https://github.com/browser-use/browser-use/issues/4846
+- **S24 — browser-use issue #5239.** Codex readOnlyHint/MCP annotation report, 2026-07-15. https://github.com/browser-use/browser-use/issues/5239
+- **S25 — Chrome DevTools MCP issue #1036.** Pre-handshake network requests not available, 2026-02-25. https://github.com/ChromeDevTools/chrome-devtools-mcp/issues/1036
+- **S26 — Playwright Dialogs.** confirm/alert/prompt; default auto-dismiss without listener. Erişim: 2026-09-29. https://playwright.dev/docs/dialogs
+- **S27 — Playwright MCP Dialog tools.** Modal state + `browser_handle_dialog`. Erişim: 2026-09-29. https://playwright.dev/mcp/tools/dialogs
+- **S28 — browser-use integrations.** Local/cloud MCP and Claude Code examples. Erişim: 2026-09-29. https://github.com/browser-use/browser-use/blob/main/skills/open-source/references/integrations.md
+- **S29 — browser-use issue #5252.** Tool failures reported with `isError=false`, 2026-07-18. https://github.com/browser-use/browser-use/issues/5252
+- **S30 — Stagehand LICENSE.** MIT. Erişim: 2026-09-29. https://github.com/browserbase/stagehand/blob/main/LICENSE
+- **S31 — Stagehand issue #1914.** Local mode recordVideo limitation request, 2026-03-30. https://github.com/browserbase/stagehand/issues/1914
+- **S32 — OpenBrowser.** Playwright-based autonomous TS browser agent, MIT. Erişim: 2026-09-29. https://github.com/ntegrals/openbrowser
+- **S33 — agentic-test-explorer.** Community exploratory testing framework; Playwright/LangGraph, reproducer/report. Erişim: 2026-09-29. https://github.com/srbarrios/agentic-test-explorer
+- **S34 — Playwright Mock APIs / HAR.** HAR recording and replay. Erişim: 2026-09-29. https://playwright.dev/docs/mock
+- **S35 — Playwright BrowserContext routeFromHAR.** Service Worker limitation. Erişim: 2026-09-29. https://playwright.dev/docs/api/class-browsercontext
+- **S36 — Playwright tracing API.** 1.64-next `coverage` for Istanbul-instrumented app. Erişim: 2026-09-29. https://github.com/microsoft/playwright/blob/main/docs/src/api/class-tracing.md
+- **S37 — OpenTelemetry Demo Frontend.** Browser web instrumentation/fetch tracing example. Erişim: 2026-09-29. https://opentelemetry.io/docs/demo/services/frontend/
+- **S38 — PostgreSQL pg_depend source note.** Not all possible dependency pairs are represented. Erişim: 2026-09-29. https://doxygen.postgresql.org/pg__depend_8h_source.html
+- **S39 — pg_cron changelog/releases.** v1.6.8, 2026-09-08. https://github.com/citusdata/pg_cron/blob/main/CHANGELOG.md
+- **S40 — AGENTS.md.** Open format for coding-agent repository instructions. Erişim: 2026-09-29. https://agents.md/
+- **S41 — llms.txt proposal (v2).** Agent/LLM tüketimi için web içeriğini Markdown tabanlı olarak özetlemeyi önerir; yürütülebilir repo/UI akış grafiği değildir. Resmî repo 2026-08-10 tarihinde v2 metnini güncellemiş görünmektedir. Erişim: 2026-09-29. https://github.com/AnswerDotAI/llms-txt
+- **S42 — Playwright PageAssertions screenshots.** `toHaveScreenshot`. Erişim: 2026-09-29. https://playwright.dev/docs/api/class-pageassertions
+- **S43 — Playwright visual comparisons.** Baseline environment caveat. Erişim: 2026-09-29. https://playwright.dev/docs/next/test-snapshots
+- **S44 — GitTrend homepage.** Repository trend signal; 47M+ repos / ranked daily claim on site. Accessed 2026-09-29. https://gittrend.io/
+- **S45 — Model-based GUI automation.** Open-access paper published 2025-10-25; model-based GUI automation theory. https://link.springer.com/article/10.1007/s10270-025-01319-9
+- **S46 — cvrip: A Visual GUI Ripping Framework.** 2025 paper; visual GUI ripping as cross-platform exploration direction. https://onlinelibrary.wiley.com/doi/10.1002/smr.70009

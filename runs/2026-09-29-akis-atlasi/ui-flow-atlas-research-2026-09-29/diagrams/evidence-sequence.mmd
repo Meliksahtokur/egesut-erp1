@@ -1,0 +1,19 @@
+sequenceDiagram
+  actor U as User/Agent
+  participant UI as Vanilla JS UI
+  participant PW as Playwright Recorder
+  participant API as Supabase/PostgREST
+  participant DB as PostgreSQL
+  participant CR as pg_cron
+
+  U->>UI: click "Tohumlama Kaydet"
+  PW-->>PW: step_id + before state/IDB hash
+  UI->>API: POST /rest/v1/rpc/save_insemination
+  PW-->>PW: request ↔ step correlation
+  API->>DB: execute RPC
+  DB-->>DB: INSERT/UPDATE + trigger(s)
+  DB-->>API: response
+  API-->>UI: result
+  PW-->>PW: after state/IDB hash + screenshot
+  CR->>DB: scheduled task producer
+  PW-->>PW: later DB/UI observation

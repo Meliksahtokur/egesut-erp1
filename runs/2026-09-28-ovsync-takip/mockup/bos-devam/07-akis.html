@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;}
+body{background:#eef1f4;color:#263238;width:420px;margin:0 auto;padding:0 0 24px;font-size:12px;}
+.mock-tag{font-size:11px;color:#78909c;padding:8px 12px 4px;font-weight:700;}
+.t{font-size:15px;font-weight:800;padding:6px 12px 2px;}
+.s{font-size:10px;color:#78909c;padding:0 12px 10px;}
+.wrap{padding:0 12px;}
+.kutu{background:#fff;border:1.5px solid #d5dbe0;border-radius:12px;padding:10px 12px;margin-bottom:2px;}
+.kutu h4{font-size:12.5px;margin-bottom:3px;}
+.kutu p{font-size:10.5px;color:#546e7a;line-height:1.5;}
+.ok{text-align:center;color:#90a4ae;font-size:16px;line-height:1;margin:2px 0;}
+.start{border-top:4px solid #c62828;background:#ffebee;}
+.start h4{color:#c62828;}
+.sec{border-top:4px solid #6a1b9a;background:#f3e5f5;}
+.sec h4{color:#6a1b9a;}
+.dal{border-left:5px solid #b0bec5;border-radius:0 12px 12px 0;padding:9px 12px;margin-bottom:6px;background:#fff;}
+.dal.b1{border-left-color:#1565c0;}
+.dal.b1 h4{color:#1565c0;}
+.dal.b2{border-left-color:#f9a825;}
+.dal.b2 h4{color:#b26a00;}
+.dal.b3{border-left-color:#2e7d32;}
+.dal.b3 h4{color:#2e7d32;}
+.dal h4{font-size:12px;margin-bottom:3px;}
+.dal p{font-size:10.5px;color:#546e7a;line-height:1.5;}
+.dal p b{color:#263238;}
+.dallar-baslik{font-size:10px;font-weight:700;color:#78909c;text-align:center;margin:2px 0 6px;text-transform:uppercase;letter-spacing:.04em;}
+.otomatik{border-top:4px solid #2e7d32;background:#e8f5e9;}
+.otomatik h4{color:#2e7d32;}
+.otomatik ul{margin:5px 0 0 16px;font-size:10.5px;color:#33691e;line-height:1.6;}
+.muayene{border-top:4px solid #1565c0;background:#e3f2fd;}
+.muayene h4{color:#1565c0;}
+.loop-kutu{border:1.5px dashed #c62828;border-radius:12px;padding:9px 12px;background:#fff;margin-top:2px;}
+.loop-kutu h4{font-size:11.5px;color:#c62828;margin-bottom:3px;}
+.loop-kutu p{font-size:10px;color:#546e7a;line-height:1.5;}
+.loop-ok{text-align:center;color:#c62828;font-size:11px;font-weight:700;margin:4px 0;}
+.notlar{margin-top:10px;}
+.not{font-size:10px;color:#8a5a00;background:#fff8e1;border-left:4px solid #f9a825;border-radius:0 8px 8px 0;padding:7px 10px;margin-bottom:6px;line-height:1.5;}
+.kod{font-family:monospace;font-size:9.5px;background:#eceff1;border-radius:4px;padding:1px 4px;}
+</style>
+</head>
+<body>
+
+<div class="mock-tag">Mockup 7 — Boş sonrası devam akış diyagramı</div>
+<div class="t">🧭 "Boş" sonrası devam — uçtan uca akış</div>
+<div class="s">Devam seçici → 3 dal (Ovsync / PG / Takibe bırak) → takip DB'de otomatik kapanır ya da muayene görevine düşer → döngü</div>
+
+<div class="wrap">
+
+  <div class="kutu start"><h4>🐄 Tohumlama sonucu: Boş</h4><p>Sonuç modalında "❌ Boş" seçilir</p></div>
+  <div class="ok">↓</div>
+
+  <div class="kutu sec"><h4>🧭 Devam seçici (zorunlu)</h4><p>Ovsync uygula / PG uygula / Takibe bırak — biri seçilmeden Kaydet pasif. Hepsi tek işlemde yapılır.</p></div>
+  <div class="ok">↓</div>
+
+  <div class="dallar-baslik">seçime göre 3 dal</div>
+
+  <div class="dal b1">
+    <h4>🔄 Ovsync</h4>
+    <p><b>Vaka bugün açılır</b> (4 uygulama + TAI) → hayvan Ovsync Takip ekranı <b>② Aktif zincirler</b>'e düşer</p>
+  </div>
+
+  <div class="dal b2">
+    <h4>💉 PG</h4>
+    <p><b>+48 saat TAI görevi</b> açılır (uygunsa) — ürün/doz seçici önceden dolu</p>
+  </div>
+
+  <div class="dal b3">
+    <h4>🔍 Takibe bırak</h4>
+    <p>Varsayılan <b>+7 gün</b>, şu anki saat → <b>rektal muayene görevi</b> açılır</p>
+  </div>
+
+  <div class="ok" style="color:#2e7d32">↓ takip açıkken</div>
+
+  <div class="kutu otomatik">
+    <h4>⏳ Takip açık — DB otomatik kapatır</h4>
+    <ul>
+      <li>yeni tohumlama kaydı → sessiz kapanış</li>
+      <li>Ovsync / PG başlatma → onay penceresi ("Bu hayvan takipte") → kapanış</li>
+      <li>hayvan çıkışı (satış/ölüm) → kapanış</li>
+    </ul>
+  </div>
+  <div class="ok">↓ takip kapanmadan muayene günü gelirse</div>
+
+  <div class="kutu muayene"><h4>🔍 Muayene görevi → muayene sonucu ekranı</h4><p>"🔍 Takip muayenesi — Küpe X" ekranı açılır</p></div>
+  <div class="ok">↓</div>
+
+  <div class="loop-kutu">
+    <h4>🧭 Yine devam seçici</h4>
+    <p>Ovsync uygula / PG uygula / 📅 Muayeneyi ertele (↺ +7 gün) / 🐄 Kızgınlıkta → tohumlama kaydına geç</p>
+  </div>
+  <div class="loop-ok">↺ "Muayeneyi ertele" seçilirse aynı Devam seçici kutusuna döner</div>
+
+  <div class="notlar">
+    <div class="not"><b>Kural notu:</b> Kısır / kural günü gelmemiş → Ovsync kilitli (hard block), <span class="kod">🔒</span> gerekçeli.</div>
+    <div class="not"><b>Kural notu:</b> Takip açıkken otomatik Ovsync görevi açılmaz — takip kapanmadan yeni zincir başlamaz.</div>
+  </div>
+
+</div>
+
+</body>
+</html>

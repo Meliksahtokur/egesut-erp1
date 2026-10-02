@@ -1,0 +1,9 @@
+stateDiagram-v2
+  [*] --> VERIFIED
+  VERIFIED --> DIRTY: source_glob/db_object changed
+  VERIFIED --> STALE: live E2E fails or edge fingerprint changed
+  DIRTY --> VERIFIED: replay + evidence refreshed
+  DIRTY --> STALE: validation fails
+  STALE --> VERIFIED: fix + successful replay
+  VERIFIED --> PARTIAL: evidence source unavailable
+  PARTIAL --> VERIFIED: evidence completed

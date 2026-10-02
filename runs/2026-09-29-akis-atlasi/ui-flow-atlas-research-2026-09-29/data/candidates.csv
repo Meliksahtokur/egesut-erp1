@@ -1,0 +1,12 @@
+aday,kategori,vanilla_js_modal_spa,local_self_host,agent_integration,output,maturity,cost,setup_hours_estimate,sources
+Playwright Test Agents,keşif/test üretimi,Yüksek,Evet,Claude Code/Codex/OpenCode,Markdown + Playwright tests,Aktif 2026,OSS; LLM maliyeti,1-2,S01
+Playwright MCP,keşif,Yüksek,Evet,MCP,a11y snapshots + actions,v0.0.82 aktif,Ücretsiz OSS,<1,"S02,S03"
+Chrome DevTools MCP,izleme/debug,Yüksek,Evet,MCP/CLI,network/console/trace,v1.10.1 2026-09-23,Ücretsiz OSS,<1,"S06,S07"
+Playwright trace + HAR,izleme/evidence,Çok yüksek,Evet,API/CLI,trace.zip + HAR,Aktif 2026,Ücretsiz OSS,2-4 wrapper,"S04,S34,S35"
+plpgsql_check + PG catalogs,DB analizi,N/A,Evet,SQL,dependency rows/JSON,Aktif 2026,Ücretsiz BSD,1-3,"S15,S16,S17"
+browser-use,keşif,Orta-yüksek,Evet,MCP/CLI/Python,agent trajectory,0.13.10 2026-09-04,OSS + LLM,1-3,"S08,S28"
+Stagehand,keşif,Orta-yüksek,Evet LOCAL,API,actions/extract,Aktif 2026,OSS + LLM,1-3,"S09,S30"
+OpenBrowser,keşif,Orta,Evet,CLI/API,replay/session,Aktif 2026,OSS + LLM,2-4,S32
+Crawljax,keşif/model,Kavramsal yüksek; operasyonel risk,Evet,Java CLI/API,state-flow graph,son release 2023-06-01,Ücretsiz Apache-2,2-6 PoC,"S10,S11,S12"
+GraphWalker,MBT/test,Model sonrası yüksek,Evet,CLI/REST/WebSocket,model path/coverage,son release 2024-09-26,Ücretsiz MIT,2-4,S19
+agentic-test-explorer,keşif/test,Orta,Evet,CLI + MCP opsiyon,Markdown/test/Mermaid,Community 2026,OSS + LLM,2-6,S33

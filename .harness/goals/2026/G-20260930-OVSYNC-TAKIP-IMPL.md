@@ -1,7 +1,7 @@
 # G-20260930-OVSYNC-TAKIP-IMPL — Ovsync takip ekranı ürün implementasyonu
 
 - **id:** G-20260930-OVSYNC-TAKIP-IMPL
-- **status:** active (2026-09-30 14:25, sahip "2 onay")
+- **status:** done (2026-10-02 — canlıda: prod DB 6 migration + merge 8b1c599 + push; sahip onayı "sorun yoksa hepsini gonder apply")
 - **owner:** Melik Şah Tokur (2026-09-30 yetkilendirmesi: mimar goal manifestini kendisi açabilir; push/merge/deploy yalnız sahip kapısı)
 - **flow:** Full mode, mimar oturumu + builtin subagent zarfları (pty worker açılmaz; ultracode YASAK)
 - **base SHA:** `40feed3c6b1e5da55b44ba998618fdb24a5ee250`
@@ -32,6 +32,7 @@
 - **latest checkpoint:** 2026-10-01 01:10 — **P12b `7678d01` KABUL** (TZ migration 20261001000001: 4 gövde Europe/Istanbul yerel gün; db-validate 46f4d0b4 PASS; demo apply + canlı doğrulama mimar bağımsız ölçtü — 4/4 Istanbul VAR, CURRENT_DATE temiz, imza/ACL birebir. HATA-1 UI fix: kapi 22/22, e2e 12/12 — T-20 dolu-gerekçe, T-25/26/87 birebir trGun(7); unit 1406/1404/2 — üçüncü kırmızı bugün yeşil, tarih-duyarlı). **P12 `f425bea`**, **P11 `8c2b59c`**, **P10 `2e64677`**, **Demo apply `21a0758`** önceki checkpoint'lerde. Sahibe backlog: `gebelik_muayene_gorev_uret` (eski gövde, B9 sınıfı) CURRENT_DATE yazar; `cron.job` demo'da yok (prod'a özgü). **P13 KOŞUYOR** (rpc-reference + ui-map + GT sahibe-raporu). Kalan: P13 → final impl-DONE.md → glmf-max 25/25 tarayıcı turu → sahibe demo.
 - **docs verdict:** bekliyor (P13 tamamlanınca).
 - **final checkpoint (2026-10-01 gece):** plan P1–P13 teslim; UI kapısı 25 madde hükümlü (24 PASS + 12 ratifiye kısmi) — ui-tur4 elle yürüyüş + ui-fix1 `0c1f1b8` (6 ürün hatası) + kanıt `2147ac1`. Birim 1420/1418/2 (baseline kırmızı). e2e A/B: ui-fix1 regresyonsuz; ortam artığı TB-6. Final rapor `runs/2026-09-28-ovsync-takip/impl-DONE.md`. **status: done sahip kabulüyle.**
+- **CANLI (2026-10-02, root `egesut-erp1-09`):** GH DB Backup 36960793927 → prod prova temiz (açık GEBELIK_KONTROL 44→1) → 6 migration apply, schema_migrations 159, 21 fonksiyon + 3 trigger prod=demo md5, veri-eşleşme sızıntı 0 / yetim 0 / işaret 57 (taban). Merge `8b1c599` (`?v=20261002-01`; main'deki det-tazeleme-forms testine `_devamSeciciAc` stub'ı), birim 1491/1489/2 baseline. Push `9fa3064..8b1c599`, Pages yayını OK. Mimar doğrulaması: `a3367b2` origin/main'in atası [OBSERVED git], canlı sitede 26× `?v=20261002-01` [OBSERVED curl]. Loglar `/home/melik/tmp/ovsync-takip-prod-2026-10-02/`. Açık: GT refresh (runbook adım 6), TB-1..TB-7.
 - **teknik borç (sahip kararı 2026-10-01 — "sonra hallederiz"):**
   - **TB-1 ui-tur otomatik betiği triyajı:** `/home/melik/tmp/agents/uitur-20261001/uitur.spec.js` (63KB, incelenmemiş, gece yazıldı) resmi config + aynı ortamda 7/25 (run5 + run6 tekrarlı); resmi e2e aynı gün 12/12. 18 FAIL karışık imza: M3 veri-geldi→anında-DOM yarışı (render beklenmiyor), M8 (+7 tarih) / M9 (kilit) mantık beklentileri, fixture satırının ekrana düşmemesi (M13/M14/M20/M25), `#ovsync-root` loader'da kalma (`_ovsyncBaglamYukle` öncesi). Ürün mü test mi ayrımı yapılmadı. Kanıt: `run5.log`, `run6.log`, `m3-probe-run6.log`, `uitur-sonuc-run6.json`. Kapı bu tur elle tarayıcı yürüyüşüyle geçilir (ui-tur4).
   - **TB-2 `demo_sema_diff` RPC'si demo'da 401** (ovsync dışı; her sayfa açılışında konsol hatası). Sahiplik/izin kontrolü.

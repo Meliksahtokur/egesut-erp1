@@ -1,0 +1,16 @@
+# INDEX
+
+1. [SENTEZ](SENTEZ.md)
+2. [PART-01 — Problem, kriterler ve ana karar](parts/PART-01-problem-ve-karar.md)
+3. [PART-02 — Keşifsel UI tarama ve model-based testing](parts/PART-02-ui-kesif-mbt.md)
+4. [PART-03 — LLM browser ajanları ve MCP](parts/PART-03-browser-agent-mcp.md)
+5. [PART-04 — Trace, HAR ve tıklama→istek eşleme](parts/PART-04-runtime-trace-har.md)
+6. [PART-05 — Statik + dinamik graph birleştirme](parts/PART-05-static-dynamic-fusion.md)
+7. [PART-06 — PostgreSQL/RPC/trigger/cron zinciri](parts/PART-06-postgres-lineage.md)
+8. [PART-07 — Ajanlar için uygulama haritası ve bayatlık](parts/PART-07-agent-map-staleness.md)
+9. [PART-08 — Aday matrisi, senaryolar, risk ve pilot](parts/PART-08-matrix-senaryolar-pilot.md)
+10. [Kaynaklar](SOURCES.md)
+11. [Evidence matrisi](EVIDENCE.md)
+12. [Aday CSV](data/candidates.csv)
+13. [1 günlük pilot](tests/PILOT-1DAY.md)
+14. [Diyagramlar](diagrams/)

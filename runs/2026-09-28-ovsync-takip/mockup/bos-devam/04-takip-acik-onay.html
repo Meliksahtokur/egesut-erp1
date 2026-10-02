@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#111a0a;--bg2:#1a2812;
+  --card:#f7f4ee;--card2:#edeae2;--card3:#e2ddd3;
+  --ink:#1a1f14;--ink2:#3d4a32;--ink3:#6b7a5c;
+  --green:#4e9a2a;--green2:#6abf3d;--green3:#98d96e;
+  --amber:#c97d0a;--red:#c0321a;--red2:#e85535;--blue:#2a6bb5;--purple:#7c3aed;
+}
+html,body{background:#dfe3e6;}
+body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;width:420px;margin:0 auto;padding:0 0 24px;}
+.mock-tag{font-size:11px;color:#78909c;background:#dfe3e6;padding:8px 12px 6px;font-weight:700;}
+.telefon{width:420px;min-height:760px;background:var(--bg);position:relative;overflow:hidden;border-radius:0 0 18px 18px;}
+
+/* arkadaki soluk PG formu — üstten başlar, onay sheet'in üstünde görünür kalır */
+.arka-modal-shell{position:absolute;inset:0;display:block;opacity:.62;pointer-events:none;}
+.arka-modal{background:var(--card);border-radius:22px;width:calc(100% - 32px);margin:54px 16px 0;padding:16px;}
+.arka-modal .m-eyebrow{font-size:.68rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.07em;}
+.arka-modal .m-title{font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px;margin-bottom:12px;}
+.arka-row{background:#fff;border:2px solid var(--card3);border-radius:14px;padding:12px 14px;margin-bottom:9px;font-size:.85rem;font-weight:700;color:var(--ink);}
+.arka-row small{display:block;font-size:.74rem;color:var(--ink3);font-weight:400;margin-top:4px;}
+
+/* onay bottom-sheet (uygulamanın kendi paneli) */
+.onay-katman{position:absolute;inset:0;background:rgba(10,20,5,.45);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center;}
+.onay-sheet{background:var(--card);border-radius:22px 22px 0 0;width:100%;padding:6px 20px 22px;box-shadow:0 -8px 28px rgba(0,0,0,.35);}
+.m-handle{width:36px;height:4px;background:var(--card3);border-radius:2px;margin:10px auto 16px;}
+.onay-ikon{font-size:2rem;text-align:center;margin-bottom:8px;}
+.onay-baslik{font-size:1.05rem;font-weight:800;color:var(--ink);text-align:center;margin-bottom:8px;}
+.onay-metin{font-size:.86rem;color:var(--ink2);text-align:center;line-height:1.55;margin-bottom:18px;}
+.onay-metin b{color:var(--ink);}
+.btn{border:none;border-radius:12px;padding:13px;font-size:.88rem;font-weight:700;cursor:pointer;text-align:center;width:100%;}
+.btn-g{background:var(--green);color:#fff;margin-bottom:8px;}
+.btn-o{background:none;border:1.5px solid var(--card3);color:var(--ink2);}
+</style>
+</head>
+<body>
+
+<div class="mock-tag">Mockup 4 — "Bu hayvan takipte" onay penceresi (app'in kendi bottom-sheet'i)</div>
+
+<div class="telefon">
+  <div class="arka-modal-shell">
+    <div class="arka-modal">
+      <div class="m-eyebrow">Küpe 197 · Sağmal</div>
+      <div class="m-title">PG Uygula</div>
+      <div class="arka-row">Estrumate 2 ml <small>+48 saat TAI görevi açılır (uygunsa)</small></div>
+      <div class="arka-row">Uygulama tarihi: bugün 14:35 <small>Uygulayan: sen</small></div>
+    </div>
+  </div>
+
+  <div class="onay-katman">
+    <div class="onay-sheet">
+      <div class="m-handle"></div>
+      <div class="onay-ikon">🔍</div>
+      <div class="onay-baslik">Bu hayvan takipte</div>
+      <div class="onay-metin">
+        <b>Küpe 197</b>, 05.10 14:35'te rektal muayene takibinde.<br>
+        Takip kapatılıp PG uygulansın mı?
+      </div>
+      <button class="btn btn-g">Evet, takibi kapat ve uygula</button>
+      <button class="btn btn-o">Vazgeç</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
