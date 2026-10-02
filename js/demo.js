@@ -37,7 +37,27 @@
    * @returns {void} Fonksiyon herhangi bir değer döndürmez.
    * @rpc demo_sema_diff
    */
+  let semaDiffKosuldu = false; // sayfa başına en fazla bir kontrol (çift koşum yok)
   async function semaDiffKontrol(bar) {
+    if (semaDiffKosuldu) return;
+    try {
+      // demo_sema_diff yalnız `authenticated` rolüne açık (demo/03_sema_diff.sql:26; anon'a GRANT yasak).
+      // Oturum yokken (otomatik girişten önceki ilk yükleme / giriş ekranı) anon çağrı 401 verir:
+      // çağırma, oturum açılınca (SIGNED_IN / INITIAL_SESSION) bir kez koş.
+      const { data: { session } } = await db.auth.getSession();
+      if (session) { semaDiffCalistir(bar); return; }
+      const { data: abone } = db.auth.onAuthStateChange((event, s) => {
+        if (!s || (event !== 'SIGNED_IN' && event !== 'INITIAL_SESSION')) return;
+        if (abone && abone.subscription) abone.subscription.unsubscribe();
+        // onAuthStateChange geri çağrısında supabase çağrısı await edilmez (kilitlenme riski) → ertele
+        setTimeout(() => semaDiffCalistir(bar), 0);
+      });
+    } catch (_) {}
+  }
+
+  async function semaDiffCalistir(bar) {
+    if (semaDiffKosuldu) return;
+    semaDiffKosuldu = true;
     try {
       const { data, error } = await db.rpc('demo_sema_diff');
       if (error || !data) return;

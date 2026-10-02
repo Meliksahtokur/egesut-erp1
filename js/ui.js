@@ -612,9 +612,11 @@ function _ovsyncBayatEtiket(zaman){
  * Ovsync takip sayfasını yükler: P4 ovsyncTakipGetir'i çağırıp 4 durumdan birini
  * #ovsync-root'a yazar; render sonrası §6b kaydırma sözleşmesiyle ovsync'ten ayrılırken
  * saklanan konumu (window._ovsyncScrollY, app.js goTo) geri yükler. Render P6'da gelir.
+ * TB-3: yerel (IDB) bağlam okuması askıda kalır/reddedilirse spinner'da KALMAZ — açık hata + Tekrar Dene.
+ * @param {number} [zamanAsimiMs] Bağlam okuması zaman aşımı (test enjeksiyonu); sayı değilse OVSYNC_ZAMAN_ASIMI_MS.
  * @returns {Promise<void>}
  */
-async function loadOvsyncDash(){
+async function loadOvsyncDash(zamanAsimiMs){
   const root=document.getElementById('ovsync-root');
   if(!root) return;
   // Gezinme durumu (§6b): padok filtresi + bölüm açık/kapalı — yazan UI P6'da gelir
@@ -632,12 +634,12 @@ async function loadOvsyncDash(){
   const durum=_ovsyncDashDurum(getir);
   if(durum.tur==='taze'){
     // P6: satır aksiyon motorları IDB eşlemesiyle (RPC satırında case_id/görev id taşınmaz)
-    await _ovsyncBaglamYukle();
-    root.innerHTML=renderOvsyncSayfa(durum.veri);
+    if(!await _ovsyncBaglamYukle(zamanAsimiMs)) root.innerHTML=_ovsyncBaglamHataHtml();
+    else root.innerHTML=renderOvsyncSayfa(durum.veri);
   }else if(durum.tur==='bayat'){
     // P6: bayat serit + bayat İÇERİK (sessiz boş YASAK — son bilinen veri gösterilir)
-    await _ovsyncBaglamYukle();
-    root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div>'+renderOvsyncSayfa(durum.veri)+'</div>';
+    if(!await _ovsyncBaglamYukle(zamanAsimiMs)) root.innerHTML=_ovsyncBaglamHataHtml();
+    else root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div>'+renderOvsyncSayfa(durum.veri)+'</div>';
   }else if(durum.tur==='bayrak_kapali'){
     root.innerHTML='<div class="pg-inner"><div style="padding:20px 16px;color:var(--ink3)">🔒 Ovsync/PG kuralları kapalı — takip verisi yok</div></div>';
   }else{
@@ -874,20 +876,40 @@ function _ovsyncBaglamAl(){
      &&b.vakaKapali&&typeof b.vakaKapali.get==='function'&&b.kisir&&typeof b.kisir.has==='function') return b;
   return {baslat:new Map(),vakaAktif:new Map(),vakaKapali:new Map(),kisir:new Set()};
 }
+/** TB-3: yerel (IDB) bağlam okuması zaman aşımı (ms) — aşılırsa ekran hata + Tekrar Dene gösterir. */
+const OVSYNC_ZAMAN_ASIMI_MS=15000;
 /**
  * IDB'den aksiyon eşleme bağlamını kurar (loadOvsyncDash render öncesi çağırır).
- * Hata olursa boş bağlam — satırlar dürüst 'bilinmiyor' gösterir.
- * @returns {Promise<void>}
+ * TB-3: okuma askıda kalırsa (zamanAsimiMs) ya da reddedilirse FALSE döner ve bağlam KURULMAZ
+ * (eski davranış: reddedilince sessizce boş bağlam → satırlar "bilinmiyor", hata görünmezdi).
+ * Zaman aşımından sonra gelen geç sonuç yok sayılır (ekranı da bağlamı da ezmez).
+ * @param {number} [zamanAsimiMs] Zaman aşımı ms; sonlu pozitif sayı değilse OVSYNC_ZAMAN_ASIMI_MS.
+ * @returns {Promise<boolean>} true = bağlam kuruldu; false = zaman aşımı/okuma hatası.
  */
-async function _ovsyncBaglamYukle(){
-  try{
+async function _ovsyncBaglamYukle(zamanAsimiMs){
+  const ms=(typeof zamanAsimiMs==='number'&&isFinite(zamanAsimiMs)&&zamanAsimiMs>0)?zamanAsimiMs:OVSYNC_ZAMAN_ASIMI_MS;
+  let vazgecildi=false, zamanlayici=null;
+  const oku=(async()=>{
     const gorevler=await getData('gorev_log');
     const vakalar=await getData('cases');
     const hayvanlar=await getData('hayvanlar');
+    if(vazgecildi) return false;
     window._ovsyncBaglam=_ovsyncBaglamKur(gorevler,vakalar,hayvanlar);
-  }catch(_e){
-    window._ovsyncBaglam=_ovsyncBaglamKur([],[],[]);
-  }
+    return true;
+  })();
+  const sure=new Promise(coz=>{ zamanlayici=setTimeout(()=>{ vazgecildi=true; coz(false); },ms); });
+  try{ return await Promise.race([oku,sure]); }
+  catch(_e){ return false; }
+  finally{ clearTimeout(zamanlayici); oku.catch(()=>{}); }
+}
+/**
+ * Ovsync yerel bağlam okunamadığında (zaman aşımı/IDB hatası) #ovsync-root hata içeriği:
+ * açık mesaj + Tekrar Dene (loadDash hata kalıbıyla aynı btn btn-o; sessiz boş/spinner YASAK).
+ * @returns {string} HTML.
+ */
+function _ovsyncBaglamHataHtml(){
+  return '<div class="pg-inner"><div class="empty" style="padding:20px 16px">⚠️ Yerel veri okunamadı — takip ekranı hazırlanamadı'
+    +'<br><button class="btn btn-o" style="margin-top:12px;width:auto;padding:8px 20px" onclick="loadOvsyncDash()">Tekrar Dene</button></div></div>';
 }
 /**
  * S0 satırın alt tipini türetir (RPC bolum CASE aynası): gecikme>0 ∨ TAI gecikti →
@@ -3138,9 +3160,11 @@ function _takipAcikAc(detay, retry){
 
   let gerekceHtml = '';
   if (detay.birlesik && detay.pg_kapi) {
-    // Sunucu birleşik yükünde pg_kapi.karar YOK (H5): karar hata kodu önekinden
-    // (detay.pg_kapi_kod: 'PG_KAPI:REQUIRE_ACK_PENDING' vb.) çözülür; çözülemezse
-    // son tohumlama sonucu; o da yoksa 'bilinmiyor' (fail-closed, uydurma yok).
+    // Karar sunucudan gelir: migration 20261002000002 sonrası birleşik yükte
+    // pg_kapi.karar (REQUIRE_ACK_PENDING|BLOCK_PREGNANT|BLOCK_CATALOG_UNRESOLVED) dolu.
+    // N-1 yedeği (eski sunucu, karar yok): hata kodu öneki (detay.pg_kapi_kod) →
+    // son tohumlama sonucu → 'bilinmiyor' (fail-closed, uydurma yok). Yedek KALIR:
+    // UI, DB apply'ından önce yayınlanabilir.
     const _pgk = detay.pg_kapi;
     const _kodM = /^(?:PG_KAPI:)?(REQUIRE_ACK_PENDING|BLOCK_PREGNANT|BLOCK_CATALOG_UNRESOLVED)\b/.exec(String(detay.pg_kapi_kod || ''));
     const _karar = _pgk.karar || (_kodM ? _kodM[1] : null);
