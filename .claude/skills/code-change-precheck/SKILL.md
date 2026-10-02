@@ -7,7 +7,7 @@ description: EgeSüt ERP'de bir tablo/kolon/RPC/fonksiyon/view'ı DEĞİŞTİRME
 
 ## Neden var
 
-Bu projede çok sayıda agent (Claude Code, openclaude, Goose, DeepSeek) kod yazıyor ve
+Bu projede çok sayıda agent (Claude Code, openclaude, Goose, DeepSeek — Goose kolu 2026-10-01'de arşivlendi; kanon: worker sonnet-medium) kod yazıyor ve
 en sık hasar **değişikliğin etkisini kestirememekten** ve **sessiz hatalardan** geliyor:
 olmayan bir kolona referans veren migration, bir fonksiyonu kırınca onu çağıran 10 yeri
 fark etmeme, yanlış imzayla RPC. Elimizde bunları **önceden** yakalayan araçlar var:
@@ -34,7 +34,7 @@ Atlanabilir: salt-okuma keşif, doküman, yorum, test verisi.
 |---|---|---|
 | **Claude Code** | built-in `LSP` aracı (enabled, lazy) | SQL LSP `sql-lsp@egesut-local` (reload sonrası aktif) + `gitnexus` |
 | **openclaude** | built-in `LSP` (plugin `false` → önce enable + `/reload-plugins`) | SQL LSP (aynı, on-demand) |
-| **Goose / DeepSeek** | built-in LSP YOK → `gitnexus_impact`/`gitnexus_context` + `semantic_search` | built-in LSP YOK → `supabase_migrate` ile canlı `information_schema`/`pg_get_functiondef` doğrulaması |
+| **Goose / DeepSeek** (ARŞİV 2026-10-01: Goose kolu artık yok; kanon: Claude Code worker sonnet-medium) | built-in LSP YOK → `gitnexus_impact`/`gitnexus_context` + `semantic_search` | built-in LSP YOK → `supabase_migrate` ile canlı `information_schema`/`pg_get_functiondef` doğrulaması |
 
 Built-in `LSP` aracı yoksa (Goose/DeepSeek) panik yok: aynı işi `gitnexus` (kod) +
 `supabase_migrate` (DB şema sorgusu) ile yap.

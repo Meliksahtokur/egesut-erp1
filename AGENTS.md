@@ -60,9 +60,11 @@ surface for reports, plans, and archives.
 
 ## Runtime selection
 
-- ZCode Desktop: built-in agents by default; see `.harness/runtimes/zcode.md`.
+- ZCode Desktop: ARCHIVED 2026-10-01 (Anthropic-only transition); the zcode seat no longer exists.
+  Canon: Claude Code (`CLAUDE.md`) or terminal Codex below. `.harness/runtimes/zcode.md` is historical.
 - Terminal Codex: inline or built-in agents; see
   `.harness/runtimes/codex.md`.
+  Codex (luna-max) is an external-review seat only; implementation goes to worker sonnet-medium.
 - Claude Code: `CLAUDE.md` imports this entrypoint; see
   `.harness/runtimes/claude.md`.
 - Herdr: explicit terminal choice only; see `.harness/runtimes/herdr.md`.

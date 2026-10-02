@@ -18,3 +18,5 @@
 | 3 | Kabul 1–11 izlenebilirlik + İnsan-UI glmf-max listesi (12 madde) | TAMAM | kendim |
 | 4 | SPEC SORULARI (10 madde, uydurma cevap yok) | TAMAM | kendim |
 | 5 | test-DONE.md + dağıtana mesaj | TAMAM | kendim |
+
+> 2026-10-02 mimar notu (sahip talimatı): "İnsan-UI glmf-max listesi" (satır 3) ve lead-glm arşiv kol — kanon: UI testi worker sonnet-medium, lead sonnet-medium

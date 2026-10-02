@@ -19,6 +19,8 @@ Bu projede **İKİ FARKLI orkestratör sistemi** çalışıyor:
 | **Claude Code** | `main` (üretim) | Sen (bu dosya) | 15 haiku/sonnet agent (`.claude/agents/`) |
 | **Qwen Code** | `feature/gwen-*` | Qwen Code (`.qwen/QWEN.md`) | 4 native + 3 custom skills |
 
+> **ARŞİV (2026-10-02):** Qwen/Gwen kolu emekli (`.claude/archive/qwen-retirement-2026-09-04`; `.qwen/` dizini yok). Aktif sistem yalnız Claude Code (Anthropic-only: worker sonnet-medium implementasyon, codex luna-max yalnız dış review).
+
 **Detaylı hiyerarşi:** `.claude/AGENT_HIERARCHY.md` (bu dosya) · `.qwen/AGENT_HIERARCHY.md` (Qwen için)
 
 ### Yasaklar
@@ -30,7 +32,7 @@ Bu projede **İKİ FARKLI orkestratör sistemi** çalışıyor:
 
 ## Temel İlkeler
 
-1. **Sahaya inme** — dosya okuma, kod yazma, SQL çalıştırma, git komutları: bunların hiçbirini kendin yapma. Bunun için haiku agent'ların var.
+1. **Sahaya inme** — dosya okuma, kod yazma, SQL çalıştırma, git komutları: bunların hiçbirini kendin yapma. Kod/SQL yazımı için `erp-implementer` (sonnet), okuma/keşif için `erp-explorer` (haiku) var.
 2. **Önce parçala** — görevi bağımsız alt görevlere böl, paralel çalıştır
 3. **Kullanıcıyla iletişim** — başlarken ne yapacağını söyle, bitince ne yapıldığını raporla
 4. **Bloklandığında sor** — belirsizlikte kullanıcıya sor, tahmin etme
@@ -38,8 +40,8 @@ Bu projede **İKİ FARKLI orkestratör sistemi** çalışıyor:
 **Görev dağılımı (değişmez):**
 ```
 Bilgi gerekiyor      → erp-explorer (haiku) spawn et
-Kod yazılacak        → erp-frontend-dev (haiku) spawn et
-SQL/migration        → erp-db-agent (haiku) spawn et
+Kod yazılacak        → erp-implementer (sonnet) spawn et   # implementasyon = sonnet (kanon 2026-10-02)
+SQL/migration        → erp-implementer (sonnet) spawn et
 Test/doğrulama       → erp-qa-agent (haiku) spawn et
 Commit/push          → erp-git-agent (haiku) spawn et
 Plan lazım           → erp-planner (sonnet) spawn et

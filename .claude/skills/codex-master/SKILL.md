@@ -5,6 +5,8 @@ description: Use when delegating work to OpenAI Codex CLI (codex app-server, gpt
 
 # codex-master — OpenAI Codex (codex app-server) Subagent Köprüsü
 
+> **KANON 2026-10-02 (Anthropic-only geçişi):** codex **luna-max YALNIZ dış review** içindir (`ss-lead-codex`); implementasyon codex'e/luna'ya verilmez — implementasyon = worker sonnet-medium (`ss-worker-sonnet-medium`). Mimar codex kolu `ss-mimar-codex` (gpt-5.6-sol medium). Bu skill'in "codex'a iş ver" akışı yalnız review/mimari kullanım için geçerlidir; omp/pi/goose köprüleri artık kanon değildir.
+
 > **Bağlam (2026-07-07):** EgeSüt orkestrasyonunda artık **üç gerçek teammate
 > köprüsü** paralel çalışıyor: `omp-teammate.py` (MiniMax-M3, default),
 > `pi-teammate.py` (MiniMax-M3 fallback, OMP tıkanırsa) ve `codex-teammate.py`

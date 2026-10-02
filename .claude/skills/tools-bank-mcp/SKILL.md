@@ -5,6 +5,8 @@ description: Use when you need to use tools-bank MCP tools — supabase_*, seman
 
 # tools-bank MCP — Kullanım Kılavuzu
 
+> **ARŞİV 2026-10-01 (Anthropic-only geçişi):** goose kolu artık yok — aşağıdaki Goose/goused/telsiz bölümleri ve `goose_*`/`agent_*` satırları tarihsel referanstır, çağrılmaz. Kanon: implementasyon worker sonnet-medium, builtin alt-ajan (model açık seçilir).
+>
 > **⚠️ Bu Legion PC'de (2026-07-04) geçerli olmayanlar:**
 > - **Goose/goused araçları** (`goose_start`, `goose_status`, `agent_*`, tier/telsiz) — yerel Goose/goused binary'leri kurulu değil.
 > - Yol referansları: bu makinede `egesut-erp1` = `/home/melik/egesut-erp1`, `tools-bank` = `/home/melik/tools-bank` (metindeki `/root/...` yerine).

@@ -2,6 +2,7 @@
 name: ultracode-rehber
 description: egesut-erp1 reposunda hangi isi hangi ss-workflow ile kosacagini soyler. Kullanicinin ya da bir ust ajanin "ultracode", "paralel inceleme", "repo haritasi" demesi ya da bu repoda workflow katmani gerektiginde kullan. Paralellik/ram-pool kurallari burada DEGIL — once ultracode-master.
 ---
+> **ultracode ile worker/koltuk koşturmak YASAK (sahip 2026-09-28).** Bu skill yalnız tarihsel/başvuru; fan-out builtin Agent ile yapılır (_core Fan-out).
 
 # ultracode-rehber — egesut-erp1 routing
 
