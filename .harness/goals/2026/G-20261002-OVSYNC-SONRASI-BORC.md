@@ -1,7 +1,7 @@
 # G-20261002-OVSYNC-SONRASI-BORC — Ovsync takip sonrası borç turu
 
 - **id:** G-20261002-OVSYNC-SONRASI-BORC
-- **status:** delivered (2026-10-02 — dal teslimi; PROD apply 20261002000002 + merge + push sahip kapısında)
+- **status:** done (2026-10-02 — CANLI: PROD 20261002000002 + merge 9a48b8a + push; açık kalanlar aşağıda "teknik borç" TB-8..TB-17)
 - **owner:** Melik Şah Tokur (2026-10-02 sıra/kapsam onayı: önerilen sıra tümü; TB-1 arşivle; UI kapısı ss-worker-sonnet-medium koltuğu; prod YALNIZ-OKUMA serbest)
 - **flow:** Full mode, mimar oturumu + builtin subagent zarfları (sonnet/haiku; opus worker yok; ultracode YASAK); UI tarayıcı kapısı herdr ayrı tab ss-worker-sonnet-medium
 - **base SHA:** `ffdc342`
@@ -32,3 +32,16 @@
 - **stop conditions:** push/merge/PROD apply YASAK; `.ss/` yazma YASAK; domain-rules çelişkisi → dur, sahibe; db-validate'siz migration teslimi yok.
 - **report path:** `runs/2026-10-02-ovsync-sonrasi/DONE.md` (+ `ILERLEME.md`)
 - **latest checkpoint:** 2026-10-02 — 9 kalem kapandı (TB-4 kapsam dışı). Commitler: 9ecd6a0 GT · d6ea1dd TB-3 · f9ca7b6 TB-2 · bf35723 TB-5 SQL · 20766cb TB-5 UI test · b986755 damga ?v=20261002-02 · 626e3ee+5e8466e TB-6 e2e. Kanıt: birim 1511/1509/2 (baseline kırmızılar), e2e ovsync-takip 12/12 ×2, UI kapısı (sonnet-medium koltuk) 12/12 PASS, db-validate e98ae410 PASS, demo apply 20261002000002 + schema_migrations kaydı. B9: kayma yok (cron TR 08:10). Rapor `runs/2026-10-02-ovsync-sonrasi/DONE.md`.
+- **canlı checkpoint (root, 2026-10-02):** denetim KABUL (sonnet code-reviewer; 3 KÜÇÜK → TB-16) · GH DB Backup 36972508679 → prod prova temiz (sayım farkı 0) → PROD apply `20261002000002` + `schema_migrations` (160) → `_pg_kapi_detay` prod=demo md5 `dc51bc38…`, anon/authenticated EXECUTE yok → `veri-eslesme-kontrol.py hepsi` temiz (işaret 57 taban) → merge `9a48b8a` + hasat `3a3669b` push → Pages `?v=20261002-02` canlı. Dal silindi (tag `backup/2026-10-02-ovsync-sonrasi-dal-ucu`); worktree kalıntıları sahip tarafından silindi. Loglar `/home/melik/tmp/ovsync-sonrasi-prod-2026-10-02/`.
+- **teknik borç (devir 2026-10-02, AÇIK — kaynak `runs/2026-10-02-ovsync-sonrasi/DONE.md` "Açık kalemler" + root denetimi):**
+  - **TB-8 GT bakiyesi:** 2026-09-15..09-27 dönemi 79 `ground-truth-audit` farkı — 2 eksik tablo (`gorev_ertele_kural`, `pg_application_event`), 34 fonksiyon, 41 trigger bağı. Ayrı GT senkron kalemi (runbook adım 6, mekanik).
+  - **TB-9 UX — ilk IDB pull:** Üreme/Tohumlama listesi ilk pull sırasında "Arama sonucu yok" gösteriyor; "yükleniyor" durumu ayrılmıyor.
+  - **TB-10 IDB konsol uyarısı:** Boş bağlamı ilk pull'da `IDBObjectStore put key path` uyarısı (kök UNKNOWN).
+  - **TB-11 seans ✓ butonu:** vaka detayında `seansTamamla` butonu tarayıcı turunda bulunamadı (T8 fonksiyon doğrudan çağrılarak kanıtlandı) — UI'da erişilebilirliği kontrol.
+  - **TB-12 `vaka_toplu_ac` PG etiketi:** `js/forms.js:3295` satırında `pgKarar: null` → bu yolda PG karar etiketi gösterilmiyor (TB-5 sunucu kararı buraya bağlanmadı).
+  - **TB-13 TB-3 artığı:** yeniden yüklemede spinner yerine eski içerik kalıyor (hata dalı zamanında geliyor); `ovsyncTakipGetir` ağ çağrısının askıda kalma riski zaman aşımı kapsamı dışında.
+  - **TB-14 B9 savunma (opsiyonel):** `gebelik_muayene_gorev_uret` CURRENT_DATE (UTC); cron TR 08:10'da olduğu için bugün kayma yok, elle TR 00–03 çağrısına karşı Istanbul yerel gün kalıbı (`20261001000001`) eklenebilir.
+  - **TB-15 araç:** `gitnexus_impact` `/root/egesut-erp1` izin hatası (indeks yolu yanlış kökte).
+  - **TB-16 denetim KÜÇÜK bulguları (root, 2026-10-02):** (a) `js/demo.js:51-56` `onAuthStateChange` geri çağrısı `abone` const'una atamadan önce erişebilir (TDZ ReferenceError sessiz yutulur, abonelik temizlenmez); (b) `js/demo.js:42-58,63` `catch (_) {}` / `if (error || !data) return` sessiz yutma — demo-özel, görünürlük için hata kaydı; (c) `js/ui.js:889-899` zaman aşımında askıdaki IDB okumaları arka planda sürer (ezmez; bilgi notu).
+  - **TB-17 demo kalıntısı:** demo DB'de 12 `E2E-*` test hayvanı `Satildi` durumunda (`pg_application_event` FK silmeyi engelliyor) — kalıcı temizlik stratejisi (FK'lı kayıtlarla birlikte silme ya da arşiv).
+  - **TB-4 (tools-bank) ram-pool slot sızıntısı:** bu repoda değil → ticket `tools-bank/docs/goals/2026-10-02-ticket-ram-pool-slot-sizintisi.md` (`0f9f2644`; kancalar kapalı ama daemon 4 suspect slot tutuyor).
