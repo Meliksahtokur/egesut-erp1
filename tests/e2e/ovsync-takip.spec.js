@@ -294,6 +294,15 @@ async function dbBekle(fn, ms = 10000) {
 
 // ── Ortak akış: üreme → tohumlama → kayıt detayı → Boş → devam seçici ─────────
 async function devamSeciciAc(page, ad) {
+  // İlk IDB pull bitmeden tohumlama/hayvanlar depoları BOŞTUR (triyaj 2026-10-02: t=3 s'de
+  // her ikisi boş, satır pull'dan sonra düşer → 10 s'lik görünürlük beklemesi pull süresine
+  // yetmeyip "Arama sonucu yok" veriyordu). Aramadan ÖNCE seed kayıtlarının IDB'ye düşmesini bekle.
+  await expect.poll(async () => page.evaluate(async ([tid, hid]) => {
+    if (!window.idbGetAll) return false;
+    const t = (await window.idbGetAll('tohumlama')).some(x => x && x.id === tid);
+    const h = (await window.idbGetAll('hayvanlar')).some(x => x && x.id === hid);
+    return t && h;
+  }, [S[ad].tohId, S[ad].hayvanId]), { timeout: 45000, intervals: [500, 2000] }).toBe(true);
   await navTo(page, '#nb-ureme');
   await page.click('#ureme-tab-tohumlama');
   await page.fill('#tohumlama-srch', S[ad].kupe);
