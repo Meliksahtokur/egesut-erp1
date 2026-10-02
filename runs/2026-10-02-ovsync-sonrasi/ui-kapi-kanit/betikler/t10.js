@@ -1,0 +1,17 @@
+const L=require('./lib'),F=require('./fx');
+(async()=>{ const [,,tag,gun]=process.argv; const db=await L.db();
+ const gid='54be5919-d747-46ff-a51a-fede88c02214'; const tar=F.trGun(+gun);
+ const {error}=await db.from('gorev_log').update({hedef_tarih:tar}).eq('id',gid); if(error) throw error; console.log('TAI hedef_tarih ->',tar);
+ const b=await L.browser(); const c=await L.ctx(b); const page=await c.newPage();
+ await page.goto(L.BASE+'?demo',{waitUntil:'domcontentloaded'}); await page.waitForSelector('#pg-dash .sv',{timeout:45000});
+ await page.waitForFunction(async()=>{const a=await window.idbGetAll('gorev_log');return a.some(x=>x.id==='54be5919-d747-46ff-a51a-fede88c02214')},null,{timeout:90000,polling:1000});
+ await page.waitForTimeout(2000);
+ await page.locator('.dash-row .sc',{hasText:'Ovsync'}).click(); await page.waitForSelector('#pg-ovsync.on');
+ await page.waitForFunction(()=>document.querySelectorAll('#ovsync-root .loader').length===0&&document.querySelector('#ovsync-root').innerText.length>50,null,{timeout:45000}); await page.waitForTimeout(2500);
+ const kart=await page.evaluate(()=>[...document.querySelectorAll('#ovsync-root .ovs-bugun-kart')].map(k=>k.innerText.replace(/\n/g,' | ')));
+ console.log(tag,'BUGÜN kartları:',JSON.stringify(kart));
+ await page.evaluate(()=>{const k=[...document.querySelectorAll('#ovsync-root .ovs-bugun-kart')].find(k=>k.innerText.includes('UIK'));k&&k.scrollIntoView({block:'center'})}); await page.waitForTimeout(500);
+ await page.screenshot({path:L.KANIT+tag+'-S0.png'});
+ const html=await page.evaluate(()=>{const k=[...document.querySelectorAll('#ovsync-root .ovs-bugun-kart')].find(k=>k.innerText.includes('UIK'));return k?k.outerHTML:null}); require('fs').writeFileSync(L.KANIT+tag+'-S0-kart.html',html||'(yok)');
+ console.log(tag,'btn TAI kaydet var mı:',!!(html&&html.includes('TAI kaydet')));
+ await b.close(); })().catch(e=>{console.log('ERR',e.message);process.exit(1)});

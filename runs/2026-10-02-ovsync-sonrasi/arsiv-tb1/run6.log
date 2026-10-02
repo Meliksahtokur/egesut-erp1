@@ -1,0 +1,543 @@
+[uitur] pg_event-FK bloklu hayvan Satildi birakildi: 1
+
+Running 25 tests using 1 worker
+
+  ✓   1 [chromium] › ../agents/uitur.spec.js:96:5 › M1: dashboard 6. stat hücresi (T-56) — hücre + .sv + sınıf kuralı + goTo (4.2s)
+  ✘   2 [chromium] › ../agents/uitur.spec.js:123:5 › M2: KPA şeridi (T-59) — 5 hücre küçük harf; sayılar RPC kpa eşit; ovs-one; (N takipte) (4.5s)
+  ✘   3 [chromium] › ../agents/uitur.spec.js:154:5 › M3: S0–S4 bölümleri (T-32) — başlık kümesi=satır kümesi; boş gizli; S3 ilk 5+tümü; S4 katlanır (4.1s)
+  ✘   4 [chromium] › ../agents/uitur.spec.js:188:5 › M4: 🔔 "Tüm takibi aç →" + Görevler "Tüm ovsync takibi →" + takip görevi 🌱 Üreme çipinde (T-57) (8.6s)
+  ✘   5 [chromium] › ../agents/uitur.spec.js:208:5 › M5: sayı eşitliği (kabul 9) — 🔔 🌱 sayısı = KPA bekleyen-başlatma = S3 kart (9.1s)
+  ✓   6 [chromium] › ../agents/uitur.spec.js:242:5 › M6: devam seçici (T-01/T-07) — başlık, Sonuç Güncelle, 3 kart, buton etiketleri, alt not (12.4s)
+  ✓   7 [chromium] › ../agents/uitur.spec.js:270:5 › M7: PG ön dolu (T-02 ⚠) — ürün seçili, doz inputu YOK; PG geçmişi olmayanda buton pasif (13.9s)
+  ✘   8 [chromium] › ../agents/uitur.spec.js:292:5 › M8: TAKIP kurulumu (T-03 ⚠) — gün girişi yok; +7 saat=atama anı; S3 🔍 takipte rozet; Üreme çipi (19.3s)
+  ✘   9 [chromium] › ../agents/uitur.spec.js:335:5 › M9: kilitli Ovsync (T-14..T-17) — kilit gerekçesi + ön seçim Takibe bırak (13.6s)
+  ✘  10 [chromium] › ../agents/uitur.spec.js:349:5 › M10: PG kapısı (T-06) — hızlı-PG redsi #pg-kapi-bs; "Boş ata ve uygula" tek sarmal işlem (9.6s)
+  ✘  11 [chromium] › ../agents/uitur.spec.js:379:5 › M11: TAKIP_ACIK sheet (T-20/T-21) — app bottom-sheet, tarih/saat DOLU; Vazgeç yazmasız; Evet kapatır (24.9s)
+  ✘  12 [chromium] › ../agents/uitur.spec.js:430:5 › M12: birleşik kapı (S-4/T-86) — TEK sheet, iki gerekçe alt alta, TEK onay, tarih/saat dolu (9.1s)
+  ✘  13 [chromium] › ../agents/uitur.spec.js:456:5 › M13: sessiz kapanış (T-19) — onay yok; neden=YENI_TOHUMLAMA; listeden düşer (14.1s)
+  ✘  14 [chromium] › ../agents/uitur.spec.js:480:5 › M14: çıkış kapanışı (T-22) — hayvan çıkışı → takip kapanır (neden=CIKIS), satır düşer (16.1s)
+  ✘  15 [chromium] › ../agents/uitur.spec.js:500:5 › M15: birleşik sonuç ekranı (T-04/T-76) — GK 5 kart, TM 4 kart; görev detay + S2 + 40g listesi girişleri (28.3s)
+  ✓  16 [chromium] › ../agents/uitur.spec.js:546:5 › M16: ertele (T-25/T-26/§10d#3) — gün ön +7, saat BOŞ, canlı önizleme; saatsiz kayıt; ≥21g TEK onay (28.2s)
+  ✓  17 [chromium] › ../agents/uitur.spec.js:599:5 › M17: üreme geçmişi iki satır (T-84) — üstü çizili Boş + Gebe; tahmini doğum Gebe'den (32.9s)
+  ✓  18 [chromium] › ../agents/uitur.spec.js:639:5 › M18: göreli gün (T-85) — geçmiş satırında bugün/dün/N gün önce (13.1s)
+  ✓  19 [chromium] › ../agents/uitur.spec.js:651:5 › M19: S2 "muayene vakti · +Ng" (T-38/T-43/T-44 ⚠); ayar 35→satır kayar; "21" yok (8.8s)
+  ✘  20 [chromium] › ../agents/uitur.spec.js:685:5 › M25: invalidate (T-50) — yazma sonrası __ovsyncTakip=null; taze veri; bayat satır kalmaz (13.9s)
+  ✘  21 [chromium] › ../agents/uitur.spec.js:714:5 › M20: satır gün şeması (T-35/36) — d0● d7◌ d8◌ d9◌ TAI⏳; renk dili; N/4 uygulandı; nötr etiketler (15.3s)
+  ✘  22 [chromium] › ../agents/uitur.spec.js:754:5 › M21: rozetler (T-69/T-67) — kayma +Ng / erken Ng / görevsiz / erken TAI / deneme; Dalga başlığı (17.9s)
+  ✘  23 [chromium] › ../agents/uitur.spec.js:836:5 › M22: bayrak kapalı (T-46) — 🔒 şerit; boş liste sessiz gösterilmez; seçici açılmaz (20.5s)
+  ✘  24 [chromium] › ../agents/uitur.spec.js:867:5 › M23: offline (T-47/T-48) — bayat "⚠️ çevrimdışı · HH:MM verisi"; önbelleksiz "📡 İnternet yok" (50.6s)
+  ✘  25 [chromium] › ../agents/uitur.spec.js:892:5 › M24: gezinme (T-51..T-55) — yatay geçiş; ‹ Geri=history.back; scroll geri yükleme; modal guard (14.9s)
+[uitur] pg_event-FK bloklu hayvan Satildi birakildi: 1
+
+
+  1) [chromium] › ../agents/uitur.spec.js:123:5 › M2: KPA şeridi (T-59) — 5 hücre küçük harf; sayılar RPC kpa eşit; ovs-one; (N takipte) 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoContain[2m([22m[32mexpected[39m[2m) // indexOf[22m
+
+    Expected substring: [32m"(10 takipte)"[39m
+    Received string:    [31m"bekleyen başlatma"[39m
+
+      144 |   const takipteSpan = await page.locator('#pg-ovsync .ovs-kpa-c', { hasText: 'bekleyen başlatma' }).locator('span').allInnerTexts();
+      145 |   if ((kpa.bekleyen_baslatma_takipte ?? 0) > 0) {
+    > 146 |     expect(takipteSpan.join(' ')).toContain(`(${kpa.bekleyen_baslatma_takipte} takipte)`);
+          |                                   ^
+      147 |   } else {
+      148 |     expect(bbHucre.s).not.toContain('takipte');
+      149 |   }
+        at /agents/uitur.spec.js:146:35
+
+    Error Context: test-results/uitur-M2-KPA-şeridi-T-59-—-24d88-kpa-eşit-ovs-one-N-takipte--chromium/error-context.md
+
+  2) [chromium] › ../agents/uitur.spec.js:154:5 › M3: S0–S4 bölümleri (T-32) — başlık kümesi=satır kümesi; boş gizli; S3 ilk 5+tümü; S4 katlanır 
+
+    Error: başlıklar  ⇔ satırlar S2,S3,S4
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  - 5[39m
+    [31m+ Received  + 1[39m
+
+    [32m- Array [[39m
+    [32m-   "S2",[39m
+    [32m-   "S3",[39m
+    [32m-   "S4",[39m
+    [32m- ][39m
+    [31m+ Array [][39m
+
+      163 |   });
+      164 |   expect(karsilastir.baslik, `başlıklar ${karsilastir.baslik} ⇔ satırlar ${karsilastir.satir}`)
+    > 165 |     .toEqual(karsilastir.satir);
+          |      ^
+      166 |   for (const b of ['S0 · Bugün & Geciken', 'S1 · Aktif zincirler', 'S2 · Sonuç bekleyenler', 'S3 · Başlatılmayı bekleyenler', 'S4 · Sonlananlar']) {
+      167 |     await expect(page.locator('#pg-ovsync .ovs-bolum h2', { hasText: b })).toBeVisible();
+      168 |   }
+        at /agents/uitur.spec.js:165:6
+
+    Error Context: test-results/uitur-M3-S0–S4-bölümleri-T-a656a-i-S3-ilk-5-tümü-S4-katlanır-chromium/error-context.md
+
+  3) [chromium] › ../agents/uitur.spec.js:188:5 › M4: 🔔 "Tüm takibi aç →" + Görevler "Tüm ovsync takibi →" + takip görevi 🌱 Üreme çipinde (T-57) 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#dash-body').filter({ hasText: '🌱 İlk Tohumlama (' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#dash-body').filter({ hasText: '🌱 İlk Tohumlama (' })[22m
+
+
+      188 | test('M4: 🔔 "Tüm takibi aç →" + Görevler "Tüm ovsync takibi →" + takip görevi 🌱 Üreme çipinde (T-57)', async ({ page }) => {
+      189 |   await openApp(page);
+    > 190 |   await expect(page.locator('#dash-body', { hasText: '🌱 İlk Tohumlama (' })).toBeVisible();
+          |                                                                               ^
+      191 |   const link = page.getByRole('button', { name: 'Tüm takibi aç →' }).first();
+      192 |   await expect(link).toBeVisible();
+      193 |   await shot(page, 'uitur-04a-dash-ilk-tohumlama', false);
+        at /agents/uitur.spec.js:190:79
+
+    Error Context: test-results/uitur-M4-🔔-Tüm-takibi-aç--51c42-revi-🌱-Üreme-çipinde-T-57--chromium/error-context.md
+
+  4) [chromium] › ../agents/uitur.spec.js:208:5 › M5: sayı eşitliği (kabul 9) — 🔔 🌱 sayısı = KPA bekleyen-başlatma = S3 kart 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#dash-body div').filter({ hasText: '🌱 İlk Tohumlama (' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#dash-body div').filter({ hasText: '🌱 İlk Tohumlama (' }).first()[22m
+
+
+      209 |   await openApp(page);
+      210 |   const dashBant = page.locator('#dash-body div', { hasText: '🌱 İlk Tohumlama (' }).first();
+    > 211 |   await expect(dashBant).toBeVisible();
+          |                          ^
+      212 |   const m1 = await dashBant.innerText();
+      213 |   const dashN = Number((m1.match(/🌱 İlk Tohumlama \((\d+)/) || [])[1]);
+      214 |   expect(dashN, 'dashboard uyarı sayısı okunamadı: ' + m1).toBeGreaterThan(0);
+        at /agents/uitur.spec.js:211:26
+
+    Error Context: test-results/uitur-M5-sayı-eşitliği-kab-7dccc-A-bekleyen-başlatma-S3-kart-chromium/error-context.md
+
+  5) [chromium] › ../agents/uitur.spec.js:292:5 › M8: TAKIP kurulumu (T-03 ⚠) — gün girişi yok; +7 saat=atama anı; S3 🔍 takipte rozet; Üreme çipi 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m"2026-10-08"[39m
+    Received: [31mundefined[39m
+
+      309 |   });
+      310 |   expect(gorev, 'TAKIP görevi kurulmalı').toBeTruthy();
+    > 311 |   expect(gorev.hedef_tarih).toBe(trGun(7));
+          |                             ^
+      312 |   expect(gorev.hedef_saat, 'saat = atama anı (kayıt ' + kayitAni + ', DB ' + gorev.hedef_saat + ')').toBeTruthy();
+      313 |   const dkFark = Math.abs(
+      314 |     (Date.parse('2000-01-01T' + kayitAni + ':00') - Date.parse('2000-01-01T' + String(gorev.hedef_saat).slice(0, 5) + ':00')) / 60000);
+        at /agents/uitur.spec.js:311:29
+
+    Error Context: test-results/uitur-M8-TAKIP-kurulumu-T--3d5ae-🔍-takipte-rozet-Üreme-çipi-chromium/error-context.md
+
+  6) [chromium] › ../agents/uitur.spec.js:335:5 › M9: kilitli Ovsync (T-14..T-17) — kilit gerekçesi + ön seçim Takibe bırak 
+
+    Error: kural günü gelmemiş hayvanda Ovsync kilitli: {"kilitli":false,"gerekce":null}
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32mtrue[39m
+    Received: [31mfalse[39m
+
+      338 |   const secici = page.locator('#devam-secici-bs');
+      339 |   const kilit = await page.evaluate(() => window.__devamSecici?.kilit);
+    > 340 |   expect(kilit?.kilitli, 'kural günü gelmemiş hayvanda Ovsync kilitli: ' + JSON.stringify(kilit)).toBe(true);
+          |                                                                                                   ^
+      341 |   await expect(secici.locator('[data-secim="OVSYNC"]')).toContainText(/Kural günü|Kısır/);
+      342 |   expect(await page.evaluate(() => window.__devamSecici?.secim)).toBe('TAKIP');
+      343 |   await expect(page.locator('#devam-onayla')).toHaveText('Boş ata + Takibe bırak');
+        at /agents/uitur.spec.js:340:99
+
+    Error Context: test-results/uitur-M9-kilitli-Ovsync-T--1fc4b-kçesi-ön-seçim-Takibe-bırak-chromium/error-context.md
+
+  7) [chromium] › ../agents/uitur.spec.js:349:5 › M10: PG kapısı (T-06) — hızlı-PG redsi #pg-kapi-bs; "Boş ata ve uygula" tek sarmal işlem 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#proto-mini')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#proto-mini')[22m
+
+
+      350 |   await openApp(page);
+      351 |   await page.evaluate(hid => window._hayvanHizliUygulama(hid), S.k.hayvanId);
+    > 352 |   await expect(page.locator('#proto-mini')).toBeVisible();
+          |                                             ^
+      353 |   await page.selectOption('#pu-stok', { label: 'PGs (alke)' });
+      354 |   await page.fill('#pu-doz', '5');
+      355 |   await page.click('#pu-kaydet-btn');
+        at /agents/uitur.spec.js:352:45
+
+    Error Context: test-results/uitur-M10-PG-kapısı-T-06-—-81515--ve-uygula-tek-sarmal-işlem-chromium/error-context.md
+
+  8) [chromium] › ../agents/uitur.spec.js:379:5 › M11: TAKIP_ACIK sheet (T-20/T-21) — app bottom-sheet, tarih/saat DOLU; Vazgeç yazmasız; Evet kapatır 
+
+    TimeoutError: page.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#nb-ureme')[22m
+    [2m    - locator resolved to <button class="nb on" id="nb-ureme" data-action="go-ureme">…</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <div>Sonuç kaydı ve seçilen devam adımı tek işlemde ya…</div> from <div id="devam-secici-bs">…</div> subtree intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is visible, enabled and stable[22m
+    [2m      - scrolling into view if needed[22m
+    [2m      - done scrolling[22m
+    [2m      - <div>Sonuç kaydı ve seçilen devam adımı tek işlemde ya…</div> from <div id="devam-secici-bs">…</div> subtree intercepts pointer events[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    18 × waiting for element to be visible, enabled and stable[22m
+    [2m       - element is visible, enabled and stable[22m
+    [2m       - scrolling into view if needed[22m
+    [2m       - done scrolling[22m
+    [2m       - <div>Sonuç kaydı ve seçilen devam adımı tek işlemde ya…</div> from <div id="devam-secici-bs">…</div> subtree intercepts pointer events[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+    [2m    - waiting for element to be visible, enabled and stable[22m
+
+
+       at ../work/tests/support/app.js:52
+
+      50 | export async function navTo(page, btnId) {
+      51 |   const id = btnId.replace(/^#/, ''); // '#nb-x' ve 'nb-x' girişlerinin ikisi de kabul
+    > 52 |   await page.click('#' + id);
+         |              ^
+      53 |   await page.waitForSelector('#' + id.replace('nb-', 'pg-') + '.on', { timeout: 8000 });
+      54 | }
+      55 |
+        at navTo (/work/tests/support/app.js:52:14)
+        at devamSeciciAc (/agents/uitur.spec.js:64:14)
+        at /agents/uitur.spec.js:405:9
+
+    Error Context: test-results/uitur-M11-TAKIP-ACIK-sheet-db468-azgeç-yazmasız-Evet-kapatır-chromium/error-context.md
+
+  9) [chromium] › ../agents/uitur.spec.js:430:5 › M12: birleşik kapı (S-4/T-86) — TEK sheet, iki gerekçe alt alta, TEK onay, tarih/saat dolu 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#proto-mini')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#proto-mini')[22m
+
+
+      431 |   await openApp(page);
+      432 |   await page.evaluate(hid => window._hayvanHizliUygulama(hid), S.m.hayvanId);
+    > 433 |   await expect(page.locator('#proto-mini')).toBeVisible();
+          |                                             ^
+      434 |   await page.selectOption('#pu-stok', { label: 'PGs (alke)' });
+      435 |   await page.fill('#pu-doz', '5');
+      436 |   await page.click('#pu-kaydet-btn');
+        at /agents/uitur.spec.js:433:45
+
+    Error Context: test-results/uitur-M12-birleşik-kapı-S--21ad4-ta-TEK-onay-tarih-saat-dolu-chromium/error-context.md
+
+  10) [chromium] › ../agents/uitur.spec.js:456:5 › M13: sessiz kapanış (T-19) — onay yok; neden=YENI_TOHUMLAMA; listeden düşer 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-UITUR-e' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-UITUR-e' })[22m
+
+
+      456 | test('M13: sessiz kapanış (T-19) — onay yok; neden=YENI_TOHUMLAMA; listeden düşer', async ({ page }) => {
+      457 |   await ovAc(page);
+    > 458 |   await expect(page.locator('#pg-ovsync .ovs-takip-satir', { hasText: S.e.kupe })).toBeVisible({ timeout: 10000 });
+          |                                                                                    ^
+      459 |   let nativeDialog = false;
+      460 |   page.on('dialog', d => { nativeDialog = true; d.dismiss().catch(() => {}); });
+      461 |   const { error } = await db.from('tohumlama').insert({
+        at /agents/uitur.spec.js:458:84
+
+    Error Context: test-results/uitur-M13-sessiz-kapanış-T-c32aa-NI-TOHUMLAMA-listeden-düşer-chromium/error-context.md
+
+  11) [chromium] › ../agents/uitur.spec.js:480:5 › M14: çıkış kapanışı (T-22) — hayvan çıkışı → takip kapanır (neden=CIKIS), satır düşer 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-UITUR-q' })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for locator('#pg-ovsync .ovs-takip-satir').filter({ hasText: 'E2E-UITUR-q' })[22m
+
+
+      480 | test('M14: çıkış kapanışı (T-22) — hayvan çıkışı → takip kapanır (neden=CIKIS), satır düşer', async ({ page }) => {
+      481 |   await ovAc(page);
+    > 482 |   await expect(page.locator('#pg-ovsync .ovs-takip-satir', { hasText: S.q.kupe })).toBeVisible({ timeout: 10000 });
+          |                                                                                    ^
+      483 |   const { error } = await db.from('hayvanlar').update({ durum: 'Satildi' }).eq('id', S.q.hayvanId);
+      484 |   expect(error, error?.message).toBeNull();
+      485 |   const gorev = await dbBekle(async () => {
+        at /agents/uitur.spec.js:482:84
+
+    Error Context: test-results/uitur-M14-çıkış-kapanışı-T-0e66b-nır-neden-CIKIS-satır-düşer-chromium/error-context.md
+
+  12) [chromium] › ../agents/uitur.spec.js:500:5 › M15: birleşik sonuç ekranı (T-04/T-76) — GK 5 kart, TM 4 kart; görev detay + S2 + 40g listesi girişleri 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('#tc-e2e00000-0000-4c00-8000-000000000001')[22m
+
+
+      505 |   await page.click('[data-action="task-kat-ureme"]');
+      506 |   await page.evaluate(() => window.loadTasks && window.loadTasks('all'));
+    > 507 |   await page.locator(`#tc-${S.c.gorevId}`).click();
+          |                                            ^
+      508 |   const secici = page.locator('#devam-secici-bs');
+      509 |   await expect(secici).toBeVisible({ timeout: 10000 });
+      510 |   await expect(secici).toContainText('Gebelik kontrolü');
+        at /agents/uitur.spec.js:507:44
+
+    Error Context: test-results/uitur-M15-birleşik-sonuç-e-d83fe-ay-S2-40g-listesi-girişleri-chromium/error-context.md
+
+  13) [chromium] › ../agents/uitur.spec.js:685:5 › M25: invalidate (T-50) — yazma sonrası __ovsyncTakip=null; taze veri; bayat satır kalmaz 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#pg-ovsync .ovs-s3-satir').filter({ hasText: 'E2E-UITUR-g' }).getByRole('button', { name: /Başlat/ })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#pg-ovsync .ovs-s3-satir').filter({ hasText: 'E2E-UITUR-g' }).getByRole('button', { name: /Başlat/ })[22m
+
+
+      707 |   const gKart = page.locator('#pg-ovsync .ovs-s3-satir', { hasText: S.g.kupe });
+      708 |   await expect(gKart).toBeVisible({ timeout: 10000 });
+    > 709 |   await expect(gKart.getByRole('button', { name: /Başlat/ })).toBeVisible();
+          |                                                               ^
+      710 |   await shot(page, 'uitur-25-invalidaze-g-s3', false);
+      711 | });
+      712 |
+        at /agents/uitur.spec.js:709:63
+
+    Error Context: test-results/uitur-M25-invalidate-T-50--19949-aze-veri-bayat-satır-kalmaz-chromium/error-context.md
+
+  14) [chromium] › ../agents/uitur.spec.js:714:5 › M20: satır gün şeması (T-35/36) — d0● d7◌ d8◌ d9◌ TAI⏳; renk dili; N/4 uygulandı; nötr etiketler 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#pg-ovsync .ovs-s3-satir').filter({ hasText: 'E2E-UITUR-g' }).getByRole('button', { name: /Başlat/ })
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for locator('#pg-ovsync .ovs-s3-satir').filter({ hasText: 'E2E-UITUR-g' }).getByRole('button', { name: /Başlat/ })[22m
+
+
+      715 |   await ovAc(page);
+      716 |   const gKart = page.locator('#pg-ovsync .ovs-s3-satir', { hasText: S.g.kupe });
+    > 717 |   await expect(gKart.getByRole('button', { name: /Başlat/ })).toBeVisible({ timeout: 10000 });
+          |                                                               ^
+      718 |   await gKart.getByRole('button', { name: /Başlat/ }).click();
+      719 |   // d0 (1. uygulama) bugün tamam — satır S1'de kalsın (bugun_isi olmasın);
+      720 |   // tarihler Başlat'ın ürettiği d0/d7/d8/d9 yerleşimiyle korunur
+        at /agents/uitur.spec.js:717:63
+
+    Error Context: test-results/uitur-M20-satır-gün-şeması-9d6a6--4-uygulandı-nötr-etiketler-chromium/error-context.md
+
+  15) [chromium] › ../agents/uitur.spec.js:754:5 › M21: rozetler (T-69/T-67) — kayma +Ng / erken Ng / görevsiz / erken TAI / deneme; Dalga başlığı 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#pg-ovsync .ovs-kart').filter({ hasText: 'E2E-UITUR-p' }).first().locator('.ovs-rozet-kayma')
+    Expected pattern: [32m/hedef \d{2}\.\d{2} → fiilen \+3g/[39m
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 5000ms[22m
+    [2m  - waiting for locator('#pg-ovsync .ovs-kart').filter({ hasText: 'E2E-UITUR-p' }).first().locator('.ovs-rozet-kayma')[22m
+
+
+      815 |   const pKart = page.locator('#pg-ovsync .ovs-kart', { hasText: S.p.kupe }).first();
+      816 |   await expect(pKart).toBeVisible({ timeout: 15000 });
+    > 817 |   await expect(pKart.locator('.ovs-rozet-kayma')).toContainText(/hedef \d{2}\.\d{2} → fiilen \+3g/);
+          |                                                   ^
+      818 |   await expect(pKart.locator('.ovs-rozet-erken')).toContainText('erken TAI');
+      819 |   await expect(pKart.locator('.ovs-rozet-deneme')).toContainText('2. deneme — önceki boş');
+      820 |   const pzKart = page.locator('#pg-ovsync .ovs-kart', { hasText: S.pz.kupe }).first();
+        at /agents/uitur.spec.js:817:51
+
+    Error Context: test-results/uitur-M21-rozetler-T-69-T--fa5c8-en-TAI-deneme-Dalga-başlığı-chromium/error-context.md
+
+  16) [chromium] › ../agents/uitur.spec.js:836:5 › M22: bayrak kapalı (T-46) — 🔒 şerit; boş liste sessiz gösterilmez; seçici açılmaz 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('#pg-ovsync')
+    Timeout: 15000ms
+    [32m- Expected substring  -  1[39m
+    [31m+ Received string     + 11[39m
+
+    [32m- 🔒 Ovsync/PG kuralları kapalı — takip verisi yok[39m
+    [31m+[39m
+    [31m+ [43m  [49m[39m
+    [31m+ [43m    [49m[39m
+    [31m+       🔄 Ovsync Takip[39m
+    [31m+       Aktif protokol zincirleri[39m
+    [31m+ [43m    [49m[39m
+    [31m+ [43m    [49m[39m
+    [31m+     ‹ Geri[39m
+    [31m+ [43m  [49m[39m
+    [31m+   3aktif1bugün0geciken8muayene bekleyen48bekleyen başlatma(10 takipte)S0 · Bugün & Geciken1 bugün · 0 gecikenBUGÜN▶ TAI kaydetE2E-UITUR-pe · Sağmal (Laktasyonda) — TAI bugün 10:000/4 ilaç günü tamam · kaynak: şablonerken 2gerken TAI0/4 ilaç günü tamamvaka bağlantısı bilinmiyorS1 · Aktif zincirler2 vaka · 0 dalgaTekil başlangıçlar2 vakaE2E-UITUR-pSağmal (Laktasyonda)İlk toh. kuralıhedef 21.09 → fiilen +3gerken TAI2. deneme — önceki boş1. uygulama24.092. uygulama02.103. uygulama03.104. uygulama04.10TAI10.101/4 uygulandı · sıradaki: 2. uygulamavaka bağlantısı bilinmiyorE2E-UITUR-pzSağmal (Laktasyonda)İlk toh. kuralıgörevsiz1. uygulama26.092. uygulama02.103. uygulama03.104. uygulama04.101/4 uygulandı · sıradaki: 2. uygulamavaka bağlantısı bilinmiyorS2 · Sonuç bekleyenler8 tohumlamaE2E-UITUR-a · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-UITUR-c · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-UITUR-c2 · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-a · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-c · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-c2 · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-l · TAI 17.08muayene vakti · +5g🩺 Muayene sonucu176 · TAI 21.083. deneme — önceki boşmuayene vakti · +1g🩺 Muayene sonucuS3 · Başlatılmayı bekleyenler48 görev · 10 takipteE2E-UITUR-r · Sağmal (Laktasyonda) · hedef 01.10 (bugün)📅 Görev hedef gününde otomatik açılırİlk toh. kuralı🔍 takiptemuayene 08.10 11:00E2E-UITUR-g · Sağmal (Laktasyonda) · hedef 01.10 (bugün)📅 Görev hedef gününde otomatik açılırAçık dişiE2E-UITUR-b1 · Sağmal (Laktasyonda) · hedef 02.10 (yarın)📅 Görev hedef gününde otomatik açılırİlk toh. kuralıE2E-UITUR-b2 · Sağmal (Laktasyonda) · hedef 02.10 (yarın)📅 Görev hedef gününde otomatik açılırİlk toh. kuralıE2E-UITUR-b3 · Sağmal (Laktasyonda) · hedef 02.10 (yarın)📅 Görev hedef gününde otomatik açılırİlk toh. kuralıtümü (48)S4 · Sonlananlar▾1 vaka[39m
+    [31m+[39m
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 15000ms[22m
+    [2m  - waiting for locator('#pg-ovsync')[22m
+    [2m    4 × locator resolved to <div class="pg on" id="pg-ovsync">…</div>[22m
+    [2m      - unexpected value "[22m
+    [2m  [22m
+    [2m    [22m
+    [2m      🔄 Ovsync Takip[22m
+    [2m      Aktif protokol zincirleri[22m
+    [2m    [22m
+    [2m    [22m
+    [2m    ‹ Geri[22m
+    [2m  [22m
+    [2m  [22m
+    [2m"[22m
+    [2m    15 × locator resolved to <div class="pg on" id="pg-ovsync">…</div>[22m
+    [2m       - unexpected value "[22m
+    [2m  [22m
+    [2m    [22m
+    [2m      🔄 Ovsync Takip[22m
+    [2m      Aktif protokol zincirleri[22m
+    [2m    [22m
+    [2m    [22m
+    [2m    ‹ Geri[22m
+    [2m  [22m
+    [2m  3aktif1bugün0geciken8muayene bekleyen48bekleyen başlatma(10 takipte)S0 · Bugün & Geciken1 bugün · 0 gecikenBUGÜN▶ TAI kaydetE2E-UITUR-pe · Sağmal (Laktasyonda) — TAI bugün 10:000/4 ilaç günü tamam · kaynak: şablonerken 2gerken TAI0/4 ilaç günü tamamvaka bağlantısı bilinmiyorS1 · Aktif zincirler2 vaka · 0 dalgaTekil başlangıçlar2 vakaE2E-UITUR-pSağmal (Laktasyonda)İlk toh. kuralıhedef 21.09 → fiilen +3gerken TAI2. deneme — önceki boş1. uygulama24.092. uygulama02.103. uygulama03.104. uygulama04.10TAI10.101/4 uygulandı · sıradaki: 2. uygulamavaka bağlantısı bilinmiyorE2E-UITUR-pzSağmal (Laktasyonda)İlk toh. kuralıgörevsiz1. uygulama26.092. uygulama02.103. uygulama03.104. uygulama04.101/4 uygulandı · sıradaki: 2. uygulamavaka bağlantısı bilinmiyorS2 · Sonuç bekleyenler8 tohumlamaE2E-UITUR-a · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-UITUR-c · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-UITUR-c2 · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-a · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-c · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-c2 · TAI 17.08muayene vakti · +5g🩺 Muayene sonucuE2E-TAKIP-PW-l · TAI 17.08muayene vakti · +5g🩺 Muayene sonucu176 · TAI 21.083. deneme — önceki boşmuayene vakti · +1g🩺 Muayene sonucuS3 · Başlatılmayı bekleyenler48 görev · 10 takipteE2E-UITUR-r · Sağmal (Laktasyonda) · hedef 01.10 (bugün)📅 Görev hedef gününde otomatik açılırİlk toh. kuralı🔍 takiptemuayene 08.10 11:00E2E-UITUR-g · Sağmal (Laktasyonda) · hedef 01.10 (bugün)📅 Görev hedef gününde otomatik açılırAçık dişiE2E-UITUR-b1 · Sağmal (Laktasyonda) · hedef 02.10 (yarın)📅 Görev hedef gününde otomatik açılırİlk toh. kuralıE2E-UITUR-b2 · Sağmal (Laktasyonda) · hedef 02.10 (yarın)📅 Görev hedef gününde otomatik açılırİlk toh. kuralıE2E-UITUR-b3 · Sağmal (Laktasyonda) · hedef 02.10 (yarın)📅 Görev hedef gününde otomatik açılırİlk toh. kuralıtümü (48)S4 · Sonlananlar▾1 vaka[22m
+    [2m"[22m
+
+
+      841 |     await page.evaluate(() => { window.__ovsyncTakip = null; window.goTo('dash'); });
+      842 |     await page.evaluate(() => window.goTo('ovsync'));
+    > 843 |     await expect(page.locator('#pg-ovsync')).toContainText('🔒 Ovsync/PG kuralları kapalı — takip verisi yok', { timeout: 15000 });
+          |                                              ^
+      844 |     await shot(page, 'uitur-22-bayrak-kapali', false);
+      845 |     // §6c seçici açılmaz — y hayvanında Boş kaydet
+      846 |     await navTo(page, '#nb-ureme');
+        at /agents/uitur.spec.js:843:46
+
+    Error Context: test-results/uitur-M22-bayrak-kapalı-T--d19fc--gösterilmez-seçici-açılmaz-chromium/error-context.md
+
+  17) [chromium] › ../agents/uitur.spec.js:867:5 › M23: offline (T-47/T-48) — bayat "⚠️ çevrimdışı · HH:MM verisi"; önbelleksiz "📡 İnternet yok" 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('#pg-ovsync').filter({ hasText: '⚠️ çevrimdışı · ' })
+    Expected: visible
+    Timeout: 45000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 45000ms[22m
+    [2m  - waiting for locator('#pg-ovsync').filter({ hasText: '⚠️ çevrimdışı · ' })[22m
+
+
+      871 |   await page.evaluate(() => window.goTo('ovsync'));
+      872 |   const bayat = page.locator('#pg-ovsync', { hasText: '⚠️ çevrimdışı · ' });
+    > 873 |   await expect(bayat).toBeVisible({ timeout: 45000 });
+          |                       ^
+      874 |   const bayatTxt = await page.locator('#ovsync-root').innerText();
+      875 |   expect(bayatTxt).toMatch(/⚠️ çevrimdışı · \d{2}:\d{2} verisi/);
+      876 |   // bayat İÇERİK de gösterilir (sessiz boş YASAK)
+        at /agents/uitur.spec.js:873:23
+
+    Error Context: test-results/uitur-M23-offline-T-47-T-4-f1ddd-nbelleksiz-📡-İnternet-yok--chromium/error-context.md
+
+  18) [chromium] › ../agents/uitur.spec.js:892:5 › M24: gezinme (T-51..T-55) — yatay geçiş; ‹ Geri=history.back; scroll geri yükleme; modal guard 
+
+    TimeoutError: locator.click: Timeout 10000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('[data-action="nav-geri"]').first()[22m
+    [2m    - locator resolved to <button class="btn" data-action="nav-geri">← Geri</button>[22m
+    [2m  - attempting click action[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying click action[22m
+    [2m    - waiting 20ms[22m
+    [2m    2 × waiting for element to be visible, enabled and stable[22m
+    [2m      - element is not visible[22m
+    [2m    - retrying click action[22m
+    [2m      - waiting 100ms[22m
+    [2m    18 × waiting for element to be visible, enabled and stable[22m
+    [2m       - element is not visible[22m
+    [2m     - retrying click action[22m
+    [2m       - waiting 500ms[22m
+
+
+      897 |   await expect(page.locator('#pg-tasks')).toHaveClass(/on/);
+      898 |   await expect(page).toHaveURL(/#tasks/);
+    > 899 |   await page.locator('[data-action="nav-geri"]').first().click();
+          |                                                          ^
+      900 |   await expect(page.locator('#pg-ovsync')).toHaveClass(/on/, { timeout: 10000 });
+      901 |   await expect(page).toHaveURL(/#ovsync/);
+      902 |   const scrollY = await page.evaluate(() => document.querySelector('#pg-ovsync').scrollTop);
+        at /agents/uitur.spec.js:899:58
+
+    Error Context: test-results/uitur-M24-gezinme-T-51-T-5-1671d-ll-geri-yükleme-modal-guard-chromium/error-context.md
+
+  18 failed
+    [chromium] › ../agents/uitur.spec.js:123:5 › M2: KPA şeridi (T-59) — 5 hücre küçük harf; sayılar RPC kpa eşit; ovs-one; (N takipte) 
+    [chromium] › ../agents/uitur.spec.js:154:5 › M3: S0–S4 bölümleri (T-32) — başlık kümesi=satır kümesi; boş gizli; S3 ilk 5+tümü; S4 katlanır 
+    [chromium] › ../agents/uitur.spec.js:188:5 › M4: 🔔 "Tüm takibi aç →" + Görevler "Tüm ovsync takibi →" + takip görevi 🌱 Üreme çipinde (T-57) 
+    [chromium] › ../agents/uitur.spec.js:208:5 › M5: sayı eşitliği (kabul 9) — 🔔 🌱 sayısı = KPA bekleyen-başlatma = S3 kart 
+    [chromium] › ../agents/uitur.spec.js:292:5 › M8: TAKIP kurulumu (T-03 ⚠) — gün girişi yok; +7 saat=atama anı; S3 🔍 takipte rozet; Üreme çipi 
+    [chromium] › ../agents/uitur.spec.js:335:5 › M9: kilitli Ovsync (T-14..T-17) — kilit gerekçesi + ön seçim Takibe bırak 
+    [chromium] › ../agents/uitur.spec.js:349:5 › M10: PG kapısı (T-06) — hızlı-PG redsi #pg-kapi-bs; "Boş ata ve uygula" tek sarmal işlem 
+    [chromium] › ../agents/uitur.spec.js:379:5 › M11: TAKIP_ACIK sheet (T-20/T-21) — app bottom-sheet, tarih/saat DOLU; Vazgeç yazmasız; Evet kapatır 
+    [chromium] › ../agents/uitur.spec.js:430:5 › M12: birleşik kapı (S-4/T-86) — TEK sheet, iki gerekçe alt alta, TEK onay, tarih/saat dolu 
+    [chromium] › ../agents/uitur.spec.js:456:5 › M13: sessiz kapanış (T-19) — onay yok; neden=YENI_TOHUMLAMA; listeden düşer 
+    [chromium] › ../agents/uitur.spec.js:480:5 › M14: çıkış kapanışı (T-22) — hayvan çıkışı → takip kapanır (neden=CIKIS), satır düşer 
+    [chromium] › ../agents/uitur.spec.js:500:5 › M15: birleşik sonuç ekranı (T-04/T-76) — GK 5 kart, TM 4 kart; görev detay + S2 + 40g listesi girişleri 
+    [chromium] › ../agents/uitur.spec.js:685:5 › M25: invalidate (T-50) — yazma sonrası __ovsyncTakip=null; taze veri; bayat satır kalmaz 
+    [chromium] › ../agents/uitur.spec.js:714:5 › M20: satır gün şeması (T-35/36) — d0● d7◌ d8◌ d9◌ TAI⏳; renk dili; N/4 uygulandı; nötr etiketler 
+    [chromium] › ../agents/uitur.spec.js:754:5 › M21: rozetler (T-69/T-67) — kayma +Ng / erken Ng / görevsiz / erken TAI / deneme; Dalga başlığı 
+    [chromium] › ../agents/uitur.spec.js:836:5 › M22: bayrak kapalı (T-46) — 🔒 şerit; boş liste sessiz gösterilmez; seçici açılmaz 
+    [chromium] › ../agents/uitur.spec.js:867:5 › M23: offline (T-47/T-48) — bayat "⚠️ çevrimdışı · HH:MM verisi"; önbelleksiz "📡 İnternet yok" 
+    [chromium] › ../agents/uitur.spec.js:892:5 › M24: gezinme (T-51..T-55) — yatay geçiş; ‹ Geri=history.back; scroll geri yükleme; modal guard 
+  7 passed (7.6m)

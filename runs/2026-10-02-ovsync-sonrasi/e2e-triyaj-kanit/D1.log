@@ -1,0 +1,22 @@
+
+Running 12 tests using 1 worker
+
+  ✓   1 [chromium] › tests/e2e/ovsync-takip.spec.js:328:5 › T-56: dashboard 6. hücre "Ovsync" görünür; tıklayınca #pg-ovsync açılır (4.1s)
+  ✓   2 [chromium] › tests/e2e/ovsync-takip.spec.js:339:5 › T-32/T-59: KPA şeridi 5 sayaç; render edilen bölüm başlıkları = dolu bölümler (boş gizli) (4.4s)
+DIAG t0 {"tohIdb":[],"tohTotal":0,"hayvanIdb":[],"stateHas":false,"stateN":0,"tohSearch":"","rows":0}
+DIAG t3s {"tohIdb":[],"tohTotal":0,"hayvanIdb":[],"stateHas":false,"stateN":0,"tohSearch":"e2e-takıp-pw-b","rows":0}
+  ✓   3 [chromium] › tests/e2e/ovsync-takip.spec.js:362:5 › T-01/T-07/T-02/T-03: Boş→seçici; Ovsync ön seçili; PG kartı ürün/doz ÖN DOLU; TAKIP +7 gün (13.7s)
+DIAG t0 {"tohIdb":[],"tohTotal":0,"hayvanIdb":[],"stateHas":false,"stateN":0,"tohSearch":"","rows":0}
+DIAG t3s {"tohIdb":[],"tohTotal":0,"hayvanIdb":[],"stateHas":false,"stateN":0,"tohSearch":"e2e-takıp-pw-b","rows":0}
+  ✓   4 [chromium] › tests/e2e/ovsync-takip.spec.js:385:5 › T-20: takipli+PG → TAKIP_ACIK onay sheet (#takip-acik-bs); Vazgeç yazma yapmaz (13.9s)
+  ✓   5 [chromium] › tests/e2e/ovsync-takip.spec.js:422:5 › T-38/T-44: S2 "muayene vakti" rozeti (40 g eşik); "21" sabiti yok (4.3s)
+  ✓   6 [chromium] › tests/e2e/ovsync-takip.spec.js:436:5 › T-04/T-05 K15: S2 "muayene vakti" → 🩺 sonuç ekranı; GEBELIK_KONTROL 5 seçim (17.0s)
+  ✓   7 [chromium] › tests/e2e/ovsync-takip.spec.js:460:5 › T-25/T-26: muayeneyi ertele (+7) saatsiz → görev hedef +7, hedef_saat NULL (13.6s)
+  ✓   8 [chromium] › tests/e2e/ovsync-takip.spec.js:484:5 › T-87: TAKIP_MUAYENE ekranı 4 seçim (TAKIP yok); ertelemede "N gündür takipte" onayı (15.0s)
+  ✓   9 [chromium] › tests/e2e/ovsync-takip.spec.js:513:5 › T-19: takipli hayvana yeni tohumlama → sessiz kapanış (neden=YENI_TOHUMLAMA), listeden düşer (11.4s)
+  ✓  10 [chromium] › tests/e2e/ovsync-takip.spec.js:534:5 › T-73/T-89: jenerik gorev_tamamla GEBELIK_KONTROL kapatamaz; kizginlik_vaka_ac TAKIP_ACIK (2 varyant) + onaylı kapanış (5.7s)
+  ✓  11 [chromium] › tests/e2e/ovsync-takip.spec.js:577:5 › T-84/T-85: takipte Gebe → tohumlama Gebe olur; üreme geçmişinde üstü çizili Boş + Gebe + göreli gün (37.0s)
+  ✓  12 [chromium] › tests/e2e/ovsync-takip.spec.js:611:5 › T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur; S3 🔍 takipte (9.6s)
+
+  12 passed (2.8m)
+rc=0

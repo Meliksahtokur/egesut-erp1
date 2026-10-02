@@ -1,0 +1,10 @@
+<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.95rem;margin-bottom:10px">🚫 PG Güvenlik Kapısı</div>
+    <div style="font-size:.85rem;line-height:1.5">⚠️ <b>Son tohumlama sonucu Bekliyor</b> — UIK-d · 02.10.2026 · deneme 1.<br><span style="font-size:.72rem;color:var(--ink3)">PG gebeliği sonlandırabilir. "Boş ata ve uygula" tohumlamayı Boş yapıp PG'yi aynı zincirde uygular.</span></div>
+      <label style="font-size:.7rem;font-weight:600;display:block;margin:10px 0 4px">Gerekçe *</label>
+      <input id="pg-kapi-gerekce" class="fi" placeholder="Örn: 35. gün kontrolü negatif" oninput="document.getElementById('pg-kapi-onayla').disabled=!this.value.trim()">
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn" style="flex:1;padding:10px;background:var(--card2);color:var(--ink)" onclick="_pgKapiKapat()">Vazgeç</button>
+        <button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled="" onclick="_pgKapiBosAtaUygula()">Boş ata ve uygula</button>
+      </div>
+  </div>

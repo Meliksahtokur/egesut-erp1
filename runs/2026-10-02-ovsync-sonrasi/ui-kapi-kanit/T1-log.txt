@@ -1,0 +1,3 @@
+CONSOLE error: Failed to load resource: the server responded with a status of 404 (File not found)
+NET POST 200 https://vtzqjmazsvurxdeondmi.supabase.co/rest/v1/rpc/demo_sema_diff auth=...VYhIqqDG9oxQ apikeyOnly=false
+CONSOLE warning: pull failed: Failed to execute 'put' on 'IDBObjectStore': Evaluating the object store's key path did not yield a value.

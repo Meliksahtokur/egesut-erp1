@@ -1,0 +1,18 @@
+
+Running 12 tests using 1 worker
+
+  ✓   1 [chromium] › tests/e2e/ovsync-takip.spec.js:330:5 › T-56: dashboard 6. hücre "Ovsync" görünür; tıklayınca #pg-ovsync açılır (4.1s)
+  ✓   2 [chromium] › tests/e2e/ovsync-takip.spec.js:341:5 › T-32/T-59: KPA şeridi 5 sayaç; render edilen bölüm başlıkları = dolu bölümler (boş gizli) (4.8s)
+  ✓   3 [chromium] › tests/e2e/ovsync-takip.spec.js:364:5 › T-01/T-07/T-02/T-03: Boş→seçici; Ovsync ön seçili; PG kartı ürün/doz ÖN DOLU; TAKIP +7 gün (16.5s)
+  ✓   4 [chromium] › tests/e2e/ovsync-takip.spec.js:387:5 › T-20: takipli+PG → TAKIP_ACIK onay sheet (#takip-acik-bs); Vazgeç yazma yapmaz (16.0s)
+  ✓   5 [chromium] › tests/e2e/ovsync-takip.spec.js:424:5 › T-38/T-44: S2 "muayene vakti" rozeti (40 g eşik); "21" sabiti yok (4.4s)
+  ✓   6 [chromium] › tests/e2e/ovsync-takip.spec.js:438:5 › T-04/T-05 K15: S2 "muayene vakti" → 🩺 sonuç ekranı; GEBELIK_KONTROL 5 seçim (26.1s)
+  ✓   7 [chromium] › tests/e2e/ovsync-takip.spec.js:462:5 › T-25/T-26: muayeneyi ertele (+7) saatsiz → görev hedef +7, hedef_saat NULL (19.3s)
+  ✓   8 [chromium] › tests/e2e/ovsync-takip.spec.js:486:5 › T-87: TAKIP_MUAYENE ekranı 4 seçim (TAKIP yok); ertelemede "N gündür takipte" onayı (18.6s)
+  ✓   9 [chromium] › tests/e2e/ovsync-takip.spec.js:515:5 › T-19: takipli hayvana yeni tohumlama → sessiz kapanış (neden=YENI_TOHUMLAMA), listeden düşer (8.5s)
+  ✓  10 [chromium] › tests/e2e/ovsync-takip.spec.js:536:5 › T-73/T-89: jenerik gorev_tamamla GEBELIK_KONTROL kapatamaz; kizginlik_vaka_ac TAKIP_ACIK (2 varyant) + onaylı kapanış (5.8s)
+  ✓  11 [chromium] › tests/e2e/ovsync-takip.spec.js:579:5 › T-84/T-85: takipte Gebe → tohumlama Gebe olur; üreme geçmişinde üstü çizili Boş + Gebe + göreli gün (29.5s)
+  ✓  12 [chromium] › tests/e2e/ovsync-takip.spec.js:613:5 › T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur; S3 🔍 takipte (11.3s)
+
+  12 passed (3.1m)
+rc=0
