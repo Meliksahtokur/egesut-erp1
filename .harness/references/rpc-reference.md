@@ -107,9 +107,16 @@ DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanla
 
 **`tohumlama_sonuc_gebe(p_tohumlama_id)`** → jsonb
 → Sonuç Gebe; hayvan durumu Gebe. Abort edilmiş kayıtta `{ok:false, mesaj:'Bu tohumlama kaydı abort edildi — tekrar gebe işaretlenemez. Yeni bir tohumlama kaydı girin.'}` (20260830000031). Çağrı: ui.js:2768, 6579.
+→ **20260929000002 ile yeniden tanımlandı:** gövde D1 çekirdeği `_tohumlama_gebe_uygula(p_tohumlama_id,
+  p_bos_duzeltme)`'ye yönlendirir (imza değişmedi). Genel RPC **Bekliyor-only kalır** (§18.15: "Boş'u
+  Gebe'ye çevirme yalnız takip muayenesi yolundan"); Boş→Gebe düzeltmesi yalnız sarmalın
+  `p_secim='GEBE'` muayene yolu (p_bos_duzeltme=true) açar — D1: eski Boş islem_log iziyle saklanır,
+  eski iptal edilmiş GEBELIK_KONTROL görevi geri ALINMAZ.
 
 **`tohumlama_sonuc_bos(p_tohumlama_id)`** → jsonb
-→ Sonuç Boş. Çağrı: forms.js:1271.
+→ Sonuç Boş (gövde DEĞİŞMEDİ — §10h H1). Çağrı: forms.js:1271; P9'dan beri UI `tohSonuc` Boş dalı
+  ÖNCE `tohumlama_bos_ve_devam` seçicisini açar (sonuç+devam tek işlem), seçici açılamazsa
+  (bayrak kapalı / seçici hatası) fallback confirm + bu RPC (forms.js:4440).
 
 **`tohumlama_sonuc_bekliyor(p_tohumlama_id)`** → jsonb
 → Hatalı kayıt düzeltme → Bekliyor. Çağrı: forms.js:1275.
@@ -131,7 +138,9 @@ DB savunma katmanı: partial unique index **`hayvanlar_kupe_no_key`** (`hayvanla
 → Manuel gebelik kaydı (tohumlamasız). Çağrı: forms.js:1473.
 
 **`gebelik_protokol_kontrol()`** → jsonb
-→ Gebelik kontrol görevi üreticisi (21/35. gün); eşikler `_ayar()`'dan. Çağrı: app.js:621, ui.js:163.
+→ İleri gebe aşısı/besleme görev üreticisi (Rota vb.); **GEBELIK_KONTROL üretmez** (canlı gövde
+  2026-10-01: 0 eşleşme — eski "21/35. gün gebelik kontrol üreticisi" notu bayat; GK'nın tek
+  üreticisi ≥40 g cron `gebelik_muayene_gorev_uret`, yukarıdaki Ovsync Takip bölümü). Çağrı: app.js:621, ui.js:163.
 
 **`ileri_gebe_gorev_kontrol()`** → jsonb
 → İleri gebe aşı görevleri (d39 Evit vb.). Çağrı: js'te yok — cron/bakım (dashboard dolaylı).
@@ -203,6 +212,14 @@ Not: gorev_tamamla ASI_PLANLI görevlerde stok yazmaz (muafiyet koşulu) — çi
 
 **`gorev_tamamla(p_gorev_id, p_padok_hedef?, p_iptal?)`** → jsonb
 → Görevi tamamlar; SUTTEN_KESME tipinde `buzagi_sutten_kesme_onayla`'yı çağırır (her kaynaktan kesim garantisi).
+→ **Ovsync takip guard (H6, 20260929000003 — canlı gövde 2026-10-01):** yalnız TAMAMLAMA dalında
+  (`p_iptal` false/NULL) görev `gorev_tipi ∈ ('GEBELIK_KONTROL','TAKIP_MUAYENE')` ise
+  `MUAYENE_SONUC_GEREKLI:{gorev_tipi}` RAISE — bu iki tip yalnız `tohumlama_bos_ve_devam` muayene
+  yoluyla kapanır (UI jenerik akışı + REST dahil tüm giriş yolları). Guard kilitsiz TEK okumadır,
+  ilk kilitli tablo erişiminden ÖNCE — mevcut kilit sırası (gorev_log FU → koşullu hayvanlar FU)
+  DEĞİŞMEZ. Korunan dallar: `p_iptal=true` (T5) ve SUTTEN_KESME/padok tamamlaması aynen çalışır.
+  Yan etki (P3b ruling 3): kapanmış muayene görevinin tekrar-tamamlama çağrısı da artık bu kodu alır
+  (eski: 'zaten tamamlanmış').
 → `p_iptal=true` (T5, 20260925000006): offline replay iptal-PATCH'i iptal olarak kapatır
   (`iptal=true, tamamlandi=true`, audit 'Görev iptal edildi (offline replay)'); tek-imza — eski
   (text,text) overload kalktı (iki default'lu overload PostgREST adlı-çağrıda 42725 veriyordu).
@@ -575,6 +592,167 @@ aktif UREME instance'ları ve açık zincir görevleri (KISIR) için tek-seferli
 
 ---
 
+## Ovsync Takip Ekranı (G-20260930-OVSYNC-TAKIP-IMPL; migrations 20260929000001-000005 + 20261001000001)
+
+> İmza ve red sözleşmeleri CANLI demo gövdesinden yazıldı (`pg_get_functiondef` /
+> `pg_get_function_identity_arguments`, 2026-10-01 — doğrulama noktaları aşağıda).
+> PROD henüz P12b-öncesi `CURRENT_DATE`'li gövdeleri taşır: `_takip_gorev_kur`,
+> `tohumlama_bos_ve_devam` (ERTALE), `vaka_toplu_ac` (geçmiş guard), `kizginlik_vaka_ac`
+> (cases.start_date) fonksiyonlarında demo↔PROD/GT farkı **BEKLENEN işarettir**
+> (impl-P12b-DONE GT-notu). Davranış `protokol_ayar.ovsync_pg_kurallari_aktif` bayrağı
+> arkasındadır; kural metni domain-rules §18.15-17.
+
+**`ovsync_takip_listele(p_padok text DEFAULT NULL, p_sonlanan_gun integer DEFAULT 60)`** → jsonb *(canlı imza 2026-10-01 doğrulandı)*
+→ Salt-okunur takip ekranı verisi. Dönüş: `{ok, kpa:{aktif, bugun, geciken, muayene_bekleyen,
+bekleyen_baslatma, bekleyen_baslatma_takipte}, esikler:{muayene_gun:40, pencere_gun:2},
+bayrak_kapali, satirlar[]}`. Satır `bolum` S0-S4: S0 aktif zincir gecikeni/bugün-isi · S1 diğer aktif ·
+S2 = `gebelik_muayene_listele` kümesi (5 predicate birebir — T-45 küme-paritesi kanıtlı) ·
+S3 açık `OVSYNC_BASLAT` ∪ pencere görevsiz öneri ∪ açık `TAKIP_MUAYENE` · S4 kapalı ≤ `p_sonlanan_gun`.
+Diğer satır alanları: `deneme_sayisi` (son doğumdan — §18.14), `muayene{kalan_gun, gorev_id}`,
+`takip{gorev_id, hedef_tarih, hedef_saat}`, `toh_sonuc`, `close_reason` (NULL→'ESKI'), `tai`
+(kaynak parse: `sablon`|`pg`|`bilinmiyor`). Eşikler JS'e YAZILMAZ: muayene
+`_ayar('sessiz_tohumlama_muafiyet_gun', 40)`, pencere 2 (§18.3). S2'deki `CURRENT_DATE` kaynak-pariteli
+(bilinçli). ACL: authenticated + service_role (anon EXECUTE yok — canlı doğrulandı). **`RPC_TABLES`'a
+GİRMEZ** (salt-okunur invariant istisnası, api.js yorumu). Çağrı: `js/api.js:ovsyncTakipGetir`.
+
+**`tohumlama_bos_ve_devam(p_tohumlama_id text DEFAULT NULL, p_muayene_gorev_id uuid DEFAULT NULL,
+p_secim text DEFAULT NULL, p_pg_urun text DEFAULT NULL, p_pg_doz numeric DEFAULT NULL,
+p_gun integer DEFAULT NULL, p_saat time DEFAULT NULL, p_notlar text DEFAULT NULL,
+p_onay boolean DEFAULT false)`** → jsonb *(canlı imza 2026-10-01 doğrulandı; 9 param)*
+→ Boş sonucu + devam adımı TEK işlemde (§18.15); GEBELIK_KONTROL/TAKIP_MUAYENE görevlerinin TEK
+kapanış RPC'si. Kilit: hayvan NKU İLK → tohumlama FU → gorev_log FU (H3 yön kuralı); PG adımı
+patlarsa Boş ataması da geri alınır (tek transaction). ACL: authenticated + service_role;
+`RPC_TABLES`'ta 9 tablo. Çağrı: `js/api.js:tohumlamaBosVeDevam` (redler `e.data`'da taşınır).
+→ **Giriş XOR:** `p_tohumlama_id` / `p_muayene_gorev_id` tam biri dolu — ikisi de boş ya da ikisi de
+dolu → `GIRIS_CIFT_ANLAMLI:{p_tohumlama_id, p_muayene_gorev_id}`.
+→ **Seçim uzayı (p_secim; UI `_muayeneSecimleri` ile D3-CASE kilidi):**
+
+| Yol | Geçerli p_secim |
+|---|---|
+| Boş yolu (`p_tohumlama_id`) | `OVSYNC` \| `PG` \| `TAKIP` |
+| `GEBELIK_KONTROL` | `GEBE` \| `OVSYNC` \| `PG` \| `TAKIP` \| `ERTALE` |
+| `TAKIP_MUAYENE` | `GEBE` \| `OVSYNC` \| `PG` \| `ERTALE` (`TAKIP` → `TAKIP_YENIDEN_SECILEMEZ`) |
+
+→ **Dry-run (`p_secim=NULL`; yan etkisiz, bayrak-bağımsız hesap):** `{ok, bayrak_kapali,
+varsayilan_gun:7, ovsync_kilitli, kilit_gerekce (KISIR|TABAN_YOK|KURAL_GUNU; kalan_gun yalnız
+KURAL_GUNU'da dolu), kural_tarihi, son_pg {stok_id, urun_adi, doz, birim}, deneme_sayisi (son
+doğumdan), takip_acik, takip_bilgi {hedef_tarih, hedef_saat}}`.
+→ **Yazma dönüşleri:** `GEBE` `{ok, secim, gorev_id, tohumlama_id, islem_id, takip_kapanis:'GEBE_BULUNDU'
+(yalnız TAKIP_MUAYENE — D1: önceki Boş Gebe'ye çevrilir, islem_log izi eski sonucu+tarihi saklar)}` ·
+`ERTALE` `{ok, secim, gorev_id, tohumlama_id, hedef_tarih, hedef_saat}` · `TAKIP` `{ok, secim,
+tohumlama_id, islem_id, gorev_id}` (OVSYNC_BASLAT açılmaz — DEGISMEZ 1) · `OVSYNC` `{ok, secim,
+tohumlama_id, islem_id, ovsync_gorev_id, takip_kapatildi}` · `PG` `{ok, secim, tohumlama_id, islem_id,
+uygulama_id, stok_kalan, takip_kapatildi}`. Takip kapanış nedenleri: `PG`/`OVSYNC` (`_takip_kapat` tek
+yazıcı), `GEBE_BULUNDU`, `CIKIS`; sessiz kapanış `YENI_TOHUMLAMA` (tetikleyici, neden kayıtlı ama izsiz).
+→ **ERTALE kuralları:** `p_gun` NULL → +7; hedef = Europe/Istanbul **yerel** bugün + p_gun
+(20261001000001 TZ düzeltmesi). `p_saat` NULL → **saatsiz** (§18.17 varsayılan). Erteleme sınırsız;
+zincir eşik: yeni hedef − zincirin İLK kuruluşu (min `created_at`, aynı `kaynak`) ≥ 21 gün →
+`TAKIP_UZADI:{toplam_gun}` (`p_onay=true` geçer); GEBELIK_KONTROL ertelemesinde eşik kontrolü YOK.
+TAKIP kurulumunda (`p_secim='TAKIP'`) `p_saat` NULL → atama anı saati (yerel).
+→ **Red kodları (canlı gövdeden 2026-10-01; tümü RAISE EXCEPTION — tek transaction rollback):**
+
+| Kod | Payload / anlam |
+|---|---|
+| `GIRIS_CIFT_ANLAMLI` | `{p_tohumlama_id, p_muayene_gorev_id}` — XOR bozuk |
+| `TAKIP_KAPALI` | `{gorev_id, neden:'GOREV_BULUNAMADI'}` (keşifte) ya da `{gorev_id, tamamlandi, iptal}` (kilitli yeniden doğrulamada) |
+| `MUAYENE_GOREV_TIPI_UYUMSUZ` | `{gorev_tipi}` — görev muayene tipi değil |
+| `TOH_YOK` | `{tohumlama_id}` / `{hayvan_id, neden:'GOREV_TOHUM_YOK'}` / `{tohumlama_id, neden:'GORUSTE_SILINDI'}` — fail-closed keşif |
+| `TAKIP_HAYVAN_YOK` | düz metin hayvan id — hayvan satırı yok |
+| `MUAYENE_TOH_UYUMSUZ` | `{gorev_tohum, mevcut, neden:'GOREV_TOHUM_SON_DEGIL'}` — görev eski tohumlamaya bağlı (eski kayda yazım engeli) |
+| `TAKIP_YENIDEN_SECILEMEZ` | `{gorev_id, gorev_tipi}` — TAKIP_MUAYENE'de TAKIP seçimi |
+| `SECIM_TANIMSIZ` | `{secim, gorev_tipi}` — tablo dışı seçim |
+| `OZELLIK_KAPALI` | düz metin — bayrak kapalıyken yazma modu (dry-run çalışır) |
+| `GEBE_SONUC_RED` | `{mesaj}` — D1 çekirdeği red |
+| `HAYVAN_AKTIF_DEGIL` | düz metin id — Boş çekirdeği aktiflik kontrolü |
+| `TOH_SONUCLU` | `{tohumlama_id, sonuc}` — sonucu girilmiş tohumlama; hiçbir yazma olmaz |
+| `TAKIP_ACIK` | `{muayene_tarihi, muayene_saat}` — açık takip + onaysız (`p_onay=true` retry; sarmalda TEK onay anahtarı `p_onay`'dır — `p_takip_onay` SARMALDA YOK) |
+| `PG_KAPI:TAKIP_ACIK` | `{pg_kapi:{…detay}, takip_acik:{muayene_tarihi, muayene_saat}}` — birleşik kapı; TEK `p_onay` iki gerekçeyi geçer |
+| `OVSYNC_SECIM_KISIR` / `OVSYNC_SECIM_TABAN_YOK` | düz metin — kısır hard-block (§18.5) / kural tabanı yok |
+| `OVSYNC_SECIM_ERKEN` | `{kural_gun, kalan_gun}` — kural günü gelmedi (§18.3) |
+| `PG_URUN_GEREKLI` / `PG_DOZ_GEREKLI` | düz metin — sessiz varsayılan yasak (DEGISMEZ 5) |
+| `PG_STOK_YOK` / `PG_BIRIM_YOK` | `{stok_id}` — stok satırı yok / birimsiz stok (fail-closed) |
+| `PG_KAPI:{karar}` | `{…_pg_kapi_detay}` — mevcut PG kapısı (BLOCK_PREGNANT / REQUIRE_ACK_PENDING / BLOCK_CATALOG_UNRESOLVED) |
+| `PG_UYGULAMA_RED` | `{mesaj}` — iç `hizli_uygulama` red |
+
+**`gebelik_muayene` sistemi (P2c/P2d — 20260929000004 + 20260929000005):**
+`tohumlama_kaydet`'in +21/+35 gün `GEBELIK_KONTROL` üretimi KALDIRILDI (protokol_instance
+UREME/TOHUMLAMA kaydı korunur; canlı gövdede GEBELIK_KONTROL bloğu yok — 2026-10-01 doğrulandı).
+Görevin TEK üreticisi ≥40 g cron **`gebelik_muayene_gorev_uret(p_dry_run boolean)`** → jsonb
+(service_role-only; açık-görev `NOT EXISTS` koşulu — çift görev yok; kaynak `GEBELIK-KONTROL-<toh_id>`;
+hedef_tarih `CURRENT_DATE`). Eşik TEK kaynak `_ayar('sessiz_tohumlama_muafiyet_gun', 40)` —
+`gebelik_muayene_listele()` ile `ovsync_takip_listele` S2 aynı 5-predicate küme (T-45).
+`gebelik_protokol_kontrol()` artık GEBELIK_KONTROL ÜRETMEZ (canlı gövde 0 eşleşme — ileri gebe
+aşı/besleme görevleri kalır; ui-map'teki eski "21/35. gün üreticisi" notu bayat).
+Eski TOH- kaynaklı açık +21/+35 görevlerinin tek-seferlik iptali: 20260929000005
+(`kapatan_ref='p2d-veri-temizligi'` + islem_log `GOREV_GUNCELLENDI` etiketi '§10d #1 veri temizliği';
+idempotent — 2. koşum 0 satır; resmi apply'da koşar).
+
+**C2 — onay parametre geçişi (20260929000003; canlı imzalar 2026-10-01 doğrulandı):** 7 üreticinin
+hepsinde EKLEMELİ imza + eski overload DROP (tek imza kalır — `to_regprocedure` eski 7/7 NULL kanıtlı);
+ACL `REVOKE … FROM PUBLIC, anon` + `GRANT authenticated, service_role` (anon EXECUTE yok).
+Tekil → `p_takip_onay boolean DEFAULT false`; dizi → `p_takip_onaylar text[] DEFAULT '{}'::text[]`
+(yalnız `p_animal_ids` alt kümesi olabilir; liste dışı id → `TAKIP_ONAY_KUME_UYUMSUZ:{liste_disi_id}`).
+
+| RPC | Yeni parametre | Canlı imza (öz; 2026-10-01) |
+|---|---|---|
+| `hizli_uygulama` | `p_takip_onay` | (p_hayvan_id text, p_stok_id text, p_doz numeric, p_birim, p_rota, p_notlar, p_pg_onay, p_pg_gerekce, p_occurred_at timestamptz, p_takip_onay) |
+| `seans_tamamla` | `p_takip_onay` | (p_seans_admin_id uuid, p_uygulanmadi, p_not, p_pg_onay, p_pg_gerekce, p_takip_onay) |
+| `bulk_ilac` | `p_takip_onaylar` | (p_animal_ids text[], p_ilac_stok_id, p_miktar, p_notlar, p_pg_onaylar text[], p_pg_gerekce, p_takip_onaylar text[]) |
+| `start_first_service_protocol` | `p_takip_onay` | (p_gorev_id uuid, p_takip_onay) — MK9 gövde düzeltmesi: hayvan NKU İLK (T-72b 30/30 temiz) |
+| `create_case` | `p_takip_onay` | (p_animal_id text, p_disease_id uuid, p_notes, p_takip_onay) |
+| `vaka_toplu_ac` | `p_takip_onaylar` | (…mevcut 10 param…, p_takip_onaylar text[]) |
+| `kizginlik_vaka_ac` | `p_takip_onay` | (p_kizginlik_id text, p_tani, p_tohumlama_id, p_notlar, p_takip_onay) — C4: tanıdan bağımsız fail-closed kapı; onaylı → takip `OVSYNC` ile kapanır |
+
+Not: imzalar EKLEMELİ olduğundan eski argüman seti DEFAULT'larla yeni imzaya çözünür — REST eski-set
+çağrısı PGRST202 ÜRETMEZ (PGRST202 yalnız bilinmeyen argümanda; P3b-DONE kabul 5 kayıt-öncelikli hüküm).
+
+**H5 — TAKIP_ACIK satır-sonucu alan adları (makine-okunur sabit; kaynak impl-P3b-DONE):**
+
+| # | Yüzey | Kalıp | Payload alanları |
+|---|---|---|---|
+| 1 | sarmal (P2b) | `TAKIP_ACIK:{json}` | `muayene_tarihi` (date), `muayene_saat` (time) |
+| 2 | sarmal birleşik | `PG_KAPI:TAKIP_ACIK:{json}` | `{pg_kapi:{…}, takip_acik:{muayene_tarihi, muayene_saat}}` |
+| 3 | P3a tetikleyiciler | `TAKIP_ACIK:{json}` | `muayene_tarihi`, `muayene_saat` |
+| 4 | D4 tekil (hizli/seans) yalnız-takip | `TAKIP_ACIK:{json}` | `muayene_tarihi`, `muayene_saat` |
+| 5 | D4 tekil birleşik | `PG_KAPI:TAKIP_ACIK:{json}` | `{pg_kapi:{…}, takip_acik:{…}}` |
+| 6 | vaka yolları (create_case, vaka_toplu_ac, kizginlik_vaka_ac, start_first_service_protocol) | `TAKIP_ACIK:{json}` | `muayene_tarihi`, `muayene_saat` |
+| 7 | `bulk_ilac` dönüş anahtarı `takip_acik[]` | satır objesi | `{hayvan_id, kupe_no, kod:"TAKIP_ACIK", muayene_tarihi, muayene_saat}` |
+| 8 | `vaka_toplu_ac` dönüş anahtarı `takip_acik[]` | satır objesi | `{hayvan_id, kupe, kod:"TAKIP_ACIK", muayene_tarihi, muayene_saat}` (aynı `kupe` adı) |
+| 9 | `bulk_ilac` dönüş anahtarı `takip_onay_listesi[]` | satır objesi | `{hayvan_id, pg_kapi_karar, takip_acik (bool), takip_bilgi ({muayene_tarihi, muayene_saat} \| null)}` |
+| 10 | `gorev_tamamla` guard | `MUAYENE_SONUC_GEREKLI:{gorev_tipi}` | düz-metin suffix: `GEBELIK_KONTROL` \| `TAKIP_MUAYENE` |
+| 11 | dizi yolu küme uyuşmazlığı | `TAKIP_ONAY_KUME_UYUMSUZ:{json}` | `{liste_disi_id}` |
+
+Notlar: jsonb çıktıda anahtar sırası alfabetik (`muayene_saat` önce basılır); takip nedeniyle işlenmeyen
+bulk satırı `blocked[]`/`requires_ack[]`'e GİRMEZ — yalnız `takip_acik[]`; retry = istemcinin ONAYLI
+alt kümeyle YENİ çağrısı.
+
+**P3a — kapanış tetikleyicileri (bayraktan bağımsız MK9-K; hayvan kilidi YOK — H3; ACL: 5 fonksiyon
+REVOKE'lu, anon/authenticated/PUBLIC 15×f):**
+
+- `trg_takip_yeni_tohumlama_kapat` — AFTER INSERT `tohumlama` → `_trg_takip_yeni_tohumlama_kapat`:
+  açık takip SESSİZ kapanır (`takip_kapanis_nedeni='YENI_TOHUMLAMA'`, kapanış izi yok — T-19).
+- `trg_takip_pg_olay_kapisi` — BEFORE INSERT `pg_application_event` → `_trg_takip_pg_olay_kapisi`:
+  takipli hayvanda PG olayı onaysız RAISE `TAKIP_ACIK:{muayene_tarihi, muayene_saat}` (event INSERT
+  OLMAZ); onaylı yol `_takip_kapat(neden='PG')` sonrası event geçer.
+- `trg_takip_ovsync_case_kapisi` — BEFORE INSERT `cases` → `_trg_takip_ovsync_case_kapisi`: Ovsync
+  ölçütlü vaka INSERT'inde aynı red. Ölçüt ÜÇ-BACAKLI OR: `NEW.protocol_family='OVSYNC' OR
+  public._ovsync_hastalik_mi(NEW.disease_id) OR diseases.name ILIKE 'ovsync%'` (demo adı
+  `Ovsync Protokol`, prod damga/şablon — üç bacak birlikte; fazla-ret güvenli tarafa hata yapar).
+- `_trg_hayvan_cikis_gorev_iptal` (güncellendi): çıkışta TAKIP_MUAYENE'ye ek
+  `takip_kapanis_nedeni='CIKIS'` UPDATE'i (diğer görev iptalleri aynen).
+- `gorev_log_cycle_guard` (güncellendi): tek muafiyet `AND COALESCE(NEW.gorev_tipi,'') <>
+  'TAKIP_MUAYENE'` — Boş'a bağlı takip görevinin anlık-iptal boşluğu kapandı; GEBELIK_KONTROL eski
+  davranışında.
+
+Yeni yardımcılar (Internal): `_takip_gorev_kur(p_hayvan_id uuid, p_tohumlama_id text, p_gun int,
+p_saat time)` → uuid — TAKIP_MUAYENE görevi (`kaynak='TAKIP:<toh_id>'`; açık takipte
+`TAKIP_ACIK:ZATEN_ACIK:{gorev_id, hedef_tarih, hedef_saat}`; ACL auth+svc) ·
+`_takip_kapat(p_gorev_id uuid, p_neden text)` → void — tek satır NKU, idempotent (tamamlanmışa
+dokunmaz; görev yoksa `TAKIP_GOREV_YOK:<id>`) · `_tohumlama_gebe_uygula(p_tohumlama_id text,
+p_bos_duzeltme boolean)` → jsonb — D1 çekirdeği (EXECUTE YOK; yalnız sarmal + genel gebe RPC gövdesi).
+
+---
+
 ## İstatistik
 
 **`stat_suru_ozet(p_padok?, p_son_donem?)`** → jsonb
@@ -627,12 +805,15 @@ aktif UREME instance'ları ve açık zincir görevleri (KISIR) için tek-seferli
 | `_tohumlama_kizginlik_kapat()` | tohumlama (kızgınlık kapatma) |
 | `_trg_case_ureme_sessiz_iptal()` | cases → sessiz görev iptali |
 | `_trg_gorev_parent_kapandi()` | gorev_log (parent kapanınca çocuklar) |
-| `_trg_hayvan_cikis_gorev_iptal()` | hayvanlar durum (çıkışta görev iptali) |
+| `_trg_hayvan_cikis_gorev_iptal()` | hayvanlar durum (çıkışta görev iptali; 20260929000003: TAKIP_MUAYENE'ye ek `takip_kapanis_nedeni='CIKIS'` UPDATE'i) |
 | `_trg_kizginlik_sessiz_iptal()` | kizginlik_log |
 | `_trg_tohumlama_gebe_sessiz_iptal()` | tohumlama (gebe olunca) |
 | `_trg_tohumlama_sessiz_iptal()` | tohumlama |
 | `tohumlama_cycle_gorevcil_iptal()` | tohumlama cycle iptal zinciri |
-| `gorev_log_cycle_guard()` | gorev_log cycle koruması |
+| `gorev_log_cycle_guard()` | gorev_log cycle koruması (20260929000003: tek muafiyet `gorev_tipi <> 'TAKIP_MUAYENE'` — Boş'a bağlı takip görevi anlık-iptal edilmez) |
+| `_trg_takip_yeni_tohumlama_kapat()` | tohumlama trg_takip_yeni_tohumlama_kapat (AFTER INSERT — açık takip SESSİZ kapanır, neden YENI_TOHUMLAMA) |
+| `_trg_takip_pg_olay_kapisi()` | pg_application_event trg_takip_pg_olay_kapisi (BEFORE INSERT — takipli hayvanda onaysız PG olayı TAKIP_ACIK red) |
+| `_trg_takip_ovsync_case_kapisi()` | cases trg_takip_ovsync_case_kapisi (BEFORE INSERT — Ovsync ölçütlü vaka onaysız TAKIP_ACIK red; üç-bacaklı OR ölçütü) |
 | `drug_administration_stok_dusum()` | drug_administrations |
 | `vaccination_stok_dusum()` | vaccination_log |
 | `fn_dinle_uygulama()` / `fn_dinle_vaccination()` / `fn_dinle_drug_admin()` | protokol dinleyicileri |
@@ -799,3 +980,13 @@ mismatches in the sample, including the newest `asi_toplu_planla`
 one environment; the tracked reference remains a contract, not live-schema
 authority, and PROD signatures are verifiable only through their own
 separately authorized probe.
+
+**Ovsync takip probe (demo, 2026-10-01):** read-only `pg_get_function_identity_arguments` +
+`has_function_privilege` probe against the connected demo project. Checked: `ovsync_takip_listele`
+(text, integer → jsonb), `tohumlama_bos_ve_devam` (9 param, `p_onay boolean` → jsonb), `gorev_tamamla`
+(text, text, boolean — H6 guard'lı gövde), `gebelik_muayene_listele` / `gebelik_muayene_gorev_uret`
+(GK'nın tek üreticisi), C2'nin 7 üreticisinde `p_takip_onay`/`p_takip_onaylar` imzaları (eski overload
+0 — isim başına tek imza), yardımcılar `_takip_gorev_kur`/`_takip_kapat`/`_tohumlama_gebe_uygula` ve
+3 P3a tetikleyici fonksiyonu. Sonuç: yukarıdaki "Ovsync Takip Ekranı" bölümündeki girdilerle zero
+mismatch; yeni RPC'lerde anon EXECUTE f / authenticated t, `_tohumlama_gebe_uygula` auth f (EXECUTE
+yok). PROD parity ayrı kapıdır — P12b TZ gövdeleri (4 fonksiyon) PROD'da henüz yok (BEKLENEN fark).

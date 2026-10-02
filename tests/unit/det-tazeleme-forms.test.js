@@ -81,6 +81,8 @@ function loadForms({ kartAcik = false, state = {} } = {}) {
       loadAnimals: async () => { rec.loadAnimals++; },
       // Task 2 üretimi — sahne bayrağıyla: forms.js karta "zaten açık mı"yı buradan sorar
       _detAcik: () => kartAcik,
+      // ovsync-takip P9 (ui.js): Boş devam seçicisi — açılmaz → tohSonuc bayrak-kapalı yoluna düşer
+      _devamSeciciAc: async () => {},
       getDisplayKupe,
       bugun,
       getIrkValue: () => '',

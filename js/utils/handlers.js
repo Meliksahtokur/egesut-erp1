@@ -491,6 +491,15 @@ registerActions({
   'tr-sperma-elle':     () => trSpermaModElle(),
   'tr-sperma-select':   (el) => onTrSpermaSelect(el),
   'tr-sperma-text':     (el) => { g('tr-sperma').value = el.value; },
+
+  // ═══ OVSYNC DEVAM SEÇİCİ (P8) ═══
+  'devam-secici-kapat':    () => _devamSeciciKapat(),
+  'devam-secici-sec':      (el) => _devamSeciciSec(el.dataset.secim),
+  'devam-secici-onayla':   () => _devamSeciciOnayla(),
+  'devam-kizginlik-gecis': () => _devamKizginlikGecis(),
+  // canlı girişler (data-input / data-change delegation):
+  'devam-girdi': (el) => _devamSeciciGirdi(el.dataset.alan, el.value),
+  'devam-urun':  (el) => _devamSeciciGirdi('pgUrun', el.value),
 });
 
 // ═══ W3 (hapsolmama) — geri tuşu karar makinesi (SAF) ═══

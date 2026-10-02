@@ -86,7 +86,16 @@ async function rpc(name, params = {}) {
     }
     throw networkErr;
   }
-  if (error) throw new Error(_trErr(error.message));
+  if (error) {
+    // H8 (§10h, v7): PostgREST deadlock (40P01) / lock_not_available (55P03) yanıtında
+    // hata .code alanını taşır — _ERR_MAP yalnız mesaj METNİ eşlediğinden bu iki SQLSTATE
+    // burada yakalanır. Tek nokta Türkçe bilgilendirme; tüm UI catch'leri e.message gösterir.
+    // Otomatik retry YOK — kullanıcı kendi tekrarını bilerek dener.
+    if (error.code === '40P01' || error.code === '55P03') {
+      throw new Error('İşlem başka bir kayıtla çakıştı, tekrar deneyin');
+    }
+    throw new Error(_trErr(error.message));
+  }
   // ok:false gövdesini (oneri, detay vb.) hataya taşır — çağıranlar e.data ile okur
   if (data && data.ok === false) {
     const err = new Error(data.mesaj || data.error || 'İşlem başarısız');   // T8: sunucu 'error' alanlı Türkçe mesaj kaybolmasın
@@ -385,6 +394,10 @@ const RPC_TABLES = {
   // R3.2: sonuc_bos artik OVSYNC_BASLAT gorevu de aciyor (acik disi)
   tohumlama_sonuc_bos:       ['hayvanlar','tohumlama','islem_log','gorev_log'],
   tohumlama_sonuc_bekliyor:  ['hayvanlar','tohumlama','islem_log'],
+  // P4 (ovsync-takip): P2b sarmalı — Boş sonrası devam (PG/OVSYNC/TAKIP/GEBE modları):
+  // tohumlama/hayvanlar yazması, görev açma-kapatma, stok+stok_hareket, islem_log,
+  // PG modunda pg_application_event→tetikleyiciler. Pull seti tohumlama_kaydet ile aynı.
+  tohumlama_bos_ve_devam:    ['tohumlama','gorev_log','stok','stok_hareket','hayvanlar','islem_log','cases','treatment_days','treatment_day_uygulamalar'],
   // R3.2: abort ILK-TOH-ABORT gorevu aciyor
   tohumlama_abort:           ['hayvanlar','tohumlama','islem_log','gorev_log'],
   kizginlik_kaydet:          ['kizginlik_log','gorev_log'],
@@ -418,6 +431,8 @@ const RPC_TABLES = {
   // (invariant: her deger dolu dizi; pull istemeyen RPC haritaya girmez;
   //  gorev_ertele_kural_listele de salt-okuma — kural cache'i ui.js'te rpc() +
   //  setState ile yenilenir, ovsync_baslat_uyarilari deseni)
+  // ovsync_takip_listele de salt-okuma (P4, ovsync-takip planı): HARİTA DIŞI —
+  //  ovsyncTakipGetir kendi window.__ovsyncTakip cache'ini yönetir, pull istemez.
   ilk_tohumlama_zamanlayici: ['gorev_log','cases','treatment_days','treatment_day_uygulamalar','islem_log'],
   add_treatment_day:         ['cases','treatment_days'],
   add_drug_administration:   ['stok','stok_hareket','drug_administrations'],
@@ -1141,4 +1156,63 @@ async function apiCokluKaydir(gorevIds, gun) {
     p_gorev_ids: gorevIds,
     p_gun: gun,
   });
+}
+
+// ── OVSYNC TAKİP (P4 — ovsync-takip planı) ──
+
+/**
+ * Ovsync takip panosu cache'ini bozar. ovsync_takip_listele verisini etkileyen her
+ * yazma akışından sonra çağrılır: api.js içi nokta = tohumlamaBosVeDevam sarmalı;
+ * ui.js/forms.js'teki çağrı noktaları P9/P10'da eklenir (plan P4 tek-yazıcı sınırı).
+ * @returns {void}
+ */
+function _ovsyncTakipInvalidate() {
+  window.__ovsyncTakip = null;
+}
+
+/**
+ * Ovsync takip listesini çeker — P1 RPC ovsync_takip_listele(p_padok text DEFAULT NULL,
+ * p_sonlanan_gun int DEFAULT 60; p_sonlanan_gun DEFAULT'lu, buradan geçilmez).
+ * Bayat-veri sözleşmesi (plan §6): başarıda window.__ovsyncTakip = {veri, zaman: Date.now()}
+ * cache'i yazılır ve {bayat:false, veri, zaman} döner; hata/offline'da throw ETMEZ —
+ * {bayat:true, veri: önceki cache verisi|null} döner (önbellek yoksa veri:null —
+ * UI açık mesaj basar: P5 loadOvsyncDash). Bayat yolda cache EZİLMEZ.
+ * Offline tanıma rpc()'nin gerçek fetch hatasından gelir (M-25: navigator.onLine ön koşulu yazılmaz).
+ * @param {string|null} [p_padok=null] - padok filtresi
+ * @returns {Promise<{bayat: boolean, veri: any, zaman?: number}>}
+ */
+async function ovsyncTakipGetir(p_padok = null) {
+  try {
+    const veri = await rpc('ovsync_takip_listele', { p_padok: p_padok || null });
+    const cache = { veri, zaman: Date.now() };
+    window.__ovsyncTakip = cache;
+    return { bayat: false, veri, zaman: cache.zaman };
+  } catch (e) {
+    // bayat-veri sözleşmesi: önceki cache korunur; throw yok
+    const c = window.__ovsyncTakip;
+    return { bayat: true, veri: c ? c.veri : null, zaman: c ? c.zaman : null };
+  }
+}
+
+/**
+ * tohumlama_bos_ve_devam P2b sarmal RPC — Boş sonrası devam (secim: PG|OVSYNC|TAKIP|GEBE
+ * modları; gerçek imza P2b DONE: p_tohumlama_id/p_muayene_gorev_id/p_secim/p_pg_urun/
+ * p_pg_doz/p_gun/p_saat/p_notlar, tümü DEFAULT'lu → params nesnesi birebir taşınır).
+ * rpc() ok:false yolunda throw eder; sunucu red kodları e.data ile taşınır
+ * (H5 sözleşmesi: TAKIP_ACIK:{muayene_tarihi,muayene_saat}, PG_KAPI:*, OVSYNC_SECIM_* vb.).
+ * Çağrı takip verisini değiştirdiğinden her iki yolda da takip cache'i bozulur
+ * (api.js içi invalidate noktası). Online-only: RPC_MAP'e (offline replay) girmez;
+ * pull seti RPC_TABLES'ta (tohumlama_bos_ve_devam).
+ * @param {object} params - P2b imzası p_* parametreleri
+ * @returns {Promise<object>} RPC dönüşü (ok:true yolu)
+ */
+async function tohumlamaBosVeDevam(params) {
+  try {
+    const res = await rpc('tohumlama_bos_ve_devam', params);
+    _ovsyncTakipInvalidate();
+    return res;
+  } catch (e) {
+    _ovsyncTakipInvalidate();
+    throw e;
+  }
 }

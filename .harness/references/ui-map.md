@@ -65,7 +65,8 @@ Non-router overlays (direct DOM removal, no history): silent sheet
 (`js/ui.js:_showSessizList`), protocol sheets (`js/ui.js:_showProtokolEkran`),
 problem bottom-sheet (`js/ui.js:sorunBottomSheet`), slide panels
 (`js/ui.js:openTanimlarPanel`), animal detail page-panel
-(`js/ui.js:openDet` / `js/ui.js:closeDet`).
+(`js/ui.js:openDet` / `js/ui.js:closeDet`); ovsync takip sheet'leri
+(devam seçici / muayene sonuç / TAKIP_ACIK onay) aşağıdaki ayrı bölümde.
 
 Toplu vaka (`index.html:m-bulk-case`, G-20260906-TOPLU-VAKA) sub-elements:
 `index.html:bc-yapistir` küpe yapıştırma (`js/forms.js:bcYapistirCoz`),
@@ -79,6 +80,87 @@ write/read `js/forms.js:bcTarihYaz`, `js/forms.js:bcTarihDeger`),
 (`js/forms.js:bcSablonKaydet`, `js/forms.js:bcSablonYukle`), `index.html:bc-sonuc`
 bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCase`
 (ONLINE-ONLY → `vaka_toplu_ac`; plan derleme `js/forms.js:bcGunlardenItems`).
+
+## Ovsync takip ekranı (`index.html:pg-ovsync`; G-20260930-OVSYNC-TAKIP-IMPL; P5-P10 + P12b)
+
+- **Sayfa + gezinti:** `index.html:pg-ovsync` (`.pg` bloğu; başlık + ‹ geri
+  `data-action="nav-geri"` → `js/utils/handlers.js:navGeriDon` = `history.back()` — R13:
+  `goTo('dash')` DEĞİL). `js/app.js:goTo` zincirinde `ovsync` dalı (pushState/popstate jenerik
+  akışa katılır); alt-nav'a giriş YOK. Scroll sözleşmesi (§6b): ovsync'ten ayrılırken
+  `window._ovsyncScrollY` kaydı (goTo'da, setState ÖNCESİ), `js/ui.js:loadOvsyncDash` render
+  sonrası geri yükleme.
+- **Veri katmanı:** `js/api.js:ovsyncTakipGetir` → `ovsync_takip_listele`; taze →
+  `window.__ovsyncTakip = {veri, zaman}`, hata/offline → throw YOK `{bayat:true, veri:önceki|null}`
+  (önbellek ezilmez; taze dönüş `{bayat:false, veri, zaman}`); `js/api.js:_ovsyncTakipInvalidate`
+  (TEK üretim tanımı; sarmal çağıran ui.js yüzeyleri `_pgKapiBosAtaUygula`, `_devamSeciciAc`,
+  `_devamSeciciOnayla` — tests/unit/ovsync-api.test.js iki-yönlü tamlık kilidi);
+  `js/api.js:tohumlamaBosVeDevam` (sunucu redleri `e.data`'da; RPC_TABLES 9 tablo —
+  `ovsync_takip_listele` bilinçli HARİTA DIŞI, salt-okunur).
+- **Durum matrisi:** `js/ui.js:_ovsyncDashDurum` — (i) `bayrak_kapali` → açık mesaj
+  "Ovsync/PG kuralları kapalı — takip verisi yok"; (ii) bayat → "çevrimdışı · HH:MM verisi" seridi +
+  bayat içerik; (iii) `veri:null` → "İnternet yok — takip verisi alınamadı"; (iv) taze → render.
+  Sessiz boş YASAK (okunamayan alan "bilinmiyor").
+- **Render (P6):** `js/ui.js:renderOvsyncSayfa` ailesi — `js/ui.js:_ovsyncKpaHtml` (KPA şeridi +
+  "(N takipte)" alt metni), `js/ui.js:_ovsyncBolumHtml` (S0-S4; S0 boşsa gizli, S3 ilk 5 +
+  "tümü (M)", S4 katlanır, dalga grup başlığı, sapma/deneme/takipte/muayene/sonlanma rozetleri,
+  gün renkleri `ovs-g-*`), `js/ui.js:_ovsyncBaslatKilitHtml` (K4 pencere:
+  "📅 N gün sonra başlatılabilir" — ▶ Başlat çizilmez), `js/ui.js:_ovsyncMuayeneHtml`,
+  `js/ui.js:_ovsyncMuayeneSatirAc` (S2 satır aksiyonu: görevli → `_muayeneSonucAc`, görevsiz →
+  `openDet`). Eşik sayıları (21/50/55/40) JS'te YAZILMAZ — yalnız RPC `esikler`/`kalan_gun`
+  akışı (eşik-sızıntısı birim testi kilidi).
+- **3 bottom-sheet (non-router, `_pgKapiAc` inline-stil deseni; modal-geri yalnız sheet kapatır):**
+  1. **Devam seçici** `#devam-secici-bs` — `js/ui.js:_devamSeciciAc(mod, baglam)` (mod `'bos'` |
+      `'muayene'`). Girişler: `js/forms.js:tohSonuc` Boş dalı (seçici açılamazsa fallback confirm +
+      `tohumlama_sonuc_bos`) ve P9 muayene akışı. Kopya "Devam nasıl olsun? (zorunlu)"; seçenekler
+      `js/ui.js:_devamSecenekler` (`_muayeneSecimleri` D3 kilidi: GEBELIK_KONTROL
+      GEBE|OVSYNC|PG|TAKIP|ERTALE · TAKIP_MUAYENE −TAKIP · Boş yolu OVSYNC|PG|TAKIP); kilit
+      `js/ui.js:_devamKilitGerekce` (KISIR / KURAL_GUNU / TABAN_YOK; kilitliyken ön-seçim Takibe
+      bırak'a düşer); PG kartı dry-run `son_pg` ile ön-dolu (doz düzenlenmez); ERTALE saati
+      varsayılan SAATSIZ, ≥21 g ön-hesap `js/ui.js:_takip21Onay` ("N gündür takipte" onayı).
+      Handlers (`js/utils/handlers.js`): `devam-secici-kapat/sec/onayla`, `devam-kizginlik-gecis`
+      (→ m-insem prefill), `devam-girdi`, `devam-urun`. Onay `js/ui.js:_devamSeciciOnayla` →
+      `js/ui.js:_devamRpcParams`; red ayrıştırma `js/ui.js:_devamRedIsle` (TAKIP_ACIK /
+      PG_KAPI:TAKIP_ACIK → `_takipAcikAc`; sarmal retry yalnız `p_onay` — sarmalda `p_takip_onay` YOK).
+  2. **Muayene sonuç ekranı** — `js/ui.js:_muayeneSonucAc` (GEBELIK_KONTROL + TAKIP_MUAYENE ortak;
+      bağlam `{muayene_gorev_id, gorev_tipi, kupe_no, grup, bos_tarihi=created_at İstanbul günü}`) +
+      `js/ui.js:_muayene40gAc` (dashboard 40 g satırı: açık görev varsa sonuç ekranı, yoksa
+      `openDet`). Girişler: `js/ui.js:openTaskDet` muayene yönlendirmesi (seçici açılamazsa jenerik
+      detay yedeği — orada "✅ Tamamlandı" gizli, İptal açık), `js/ui.js:detayTamamla` muayene dalı
+      → `_devamSeciciAc('muayene')`, `_showSessizList` mRow → `_muayene40gAc`. GEBE → sarmal tek
+      çağrı (ayrı gebeAta UI'sı YOK; önceki Boş iki satır görünür — kalem 11); "🐄 Kızgınlıkta →
+      tohumlama kaydına geç" yalnız TAKIP_MUAYENE.
+  3. **TAKIP_ACIK / birleşik onay** `#takip-acik-bs` — `js/ui.js:_takipAcikAc` +
+      `js/ui.js:_takipAcikHata` (7 üreticinin UI noktalarında; 3. OPSİYONEL `baglam` — kupe/fiil
+      UI bağlamından taşınır, payload'a alan UYDURULMAZ) + `js/ui.js:_takipOnayUygula` +
+      `js/ui.js:_takipAcikKapat`. Payload çözümleyici TEK: `js/ui.js:_takipDetayCoz` (yalın
+      `TAKIP_ACIK:{...}` → detay tepede; birleşik `PG_KAPI:TAKIP_ACIK` → `detay.takip_acik`;
+      kopya-yapıştır regresyon kilidi kapi-testinde). Tekil retry `p_takip_onay:true` (+
+      birleşikte `p_pg_onay:true` TEK çağrı). Bulk satır-sonucu: `js/ui.js:_takipTopluSheet`
+      (+`_takipTopluCek/Render/Uygula/Kapat`) — `js/forms.js:submitBulkIlac` /
+      `js/forms.js:submitBulkCase` `takip_onay_listesi[]`/`takip_acik[]` → sheet, Evet → yalnız
+      ONAYLI alt kümeyle yeni çağrı (seçimsiz gönderim yok); `js/ui.js:_pgKapiAc` TAKIP_ACIK kod
+      dalı birleşik redi TEK sheet'e delege eder. `TAKIP_ACIK:ZATEN_ACIK` türevi sheet'e girmez
+      (alan uydurma yasak).
+- **Görev tipi özel tamamlama akışı (K15):** TAKIP_MUAYENE + GEBELIK_KONTROL —
+  `js/ui.js:renderTask` ck-btn exclusion (jenerik "✅ Tamamlandı" butonu bu iki tipte ÇİZİLMEZ,
+  diğer tipler etkilenmez), `js/ui.js:detayTamamla` iki tipi sonuç ekranına alır (`doneTask` /
+  `gorev_tamamla` bu tiplerde UI'dan HİÇ çağrılmaz — DB guard `MUAYENE_SONUC_GEREKLI` üçüncü
+  katman), `js/ui.js:_erteleBtnHtml` muayene kilidi (erteleme YALNIZ sonuç ekranından — §18.17;
+  saat seçilebilir, varsayılan SAATSIZ), `js/ui.js:openTaskDet` yedek dalı jenerik buton
+  gizleme. K14 kategori: `js/ui.js:_katTipMap` `ureme=['TOHUMLAMA_PLANLI','OVSYNC_BASLAT',
+  'GEBELIK_KONTROL','TAKIP_MUAYENE']` (GEBELIK_KONTROL Üreme'de, Muayene'de DEĞİL); vaka filtresi
+  `js/ui.js:_uremeVakaCaseIds` (ad kümesi Ovsync|Kistik Over|Anoestrus + `protocol_family==='OVSYNC'`
+  damgası; enfeksiyon/doğum-sonrası tanılar küme DIŞI). `TAKIP_MUAYENE` değer etiketinin TEK
+  kaynağı `js/gecmis.js` `_GM_KOD_DEGER_ETIKET` ('Takip Muayenesi' — Geçmiş + Değişiklikler yüzeyleri).
+- **Dashboard/Görevler köprüleri (P7):** `js/ui.js:_dashStatRow` 6. hücre "🔄 Ovsync ›"
+  (`onclick="goTo('ovsync')"`; sınıf `js/ui.js:_ovsyncStatSinif` — alert/warn/ok/bayat '?';
+  muayene-vakti sayımı S2 satırlarından türetilir), 🔔 "Tüm takibi aç →" `sh-link` (🌱 İlk
+  Tohumlama başlıklarında — taze + önbellek kolu, 2 yer; KPA ≡ 🔔 uyarıları alt kümesi), K9
+  `js/ui.js:_uremeChipKopruHtml` + `js/ui.js:_uremeChipKopruSenkron` (Üreme çipi aktifken
+  `#task-kategori-bar`'a "Tüm ovsync takibi →" ekler/kaldırır — index.html'e dokunmadan
+  ui.js'ten senkron). Üreme geçmişinde düzeltilmiş tohumlama iki satır: `js/ui.js:_uremeTohumlama`
+  + `js/ui.js:_tohumlamaGecmisSatirlari` (üstü çizili Boş + Gebe, göreli günler satırın KENDİ
+  tarihinden).
 
 ## js/ui.js — rendering and interaction
 

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --yesil:#2e7d32; --amber:#f9a825; --kirmizi:#c62828; --soluk:#b0bec5;
+    --mavi:#1565c0; --mor:#6a1b9a; --zemin:#eef1f4; --kart:#ffffff; --yazi:#263238;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;}
+  body{background:var(--zemin); color:var(--yazi); width:420px; margin:0 auto; padding-bottom:24px;}
+  .baslik{background:#37474f; color:#fff; padding:14px 14px 10px; position:sticky; top:0;}
+  .baslik h1{font-size:17px; font-weight:700;}
+  .baslik .alt{font-size:11px; opacity:.8; margin-top:2px;}
+  .kpa{display:flex; gap:6px; overflow-x:auto; padding:10px 12px; background:#fff; border-bottom:1px solid #e0e4e8;}
+  .kpa .c{flex:0 0 auto; border:1px solid #e0e4e8; border-radius:10px; padding:6px 10px; text-align:center;}
+  .kpa .c b{display:block; font-size:16px;}
+  .kpa .c span{font-size:10px; color:#607d8b;}
+  .kpa .c.one{border-color:var(--kirmizi); background:#ffebee;}
+  .kpa .c.one b{color:var(--kirmizi);}
+  .serit{margin:10px 12px; background:#fff; border:1px solid var(--kirmizi); border-left:5px solid var(--kirmizi); border-radius:10px; padding:10px 12px;}
+  .serit .k{font-size:11px; color:var(--kirmizi); font-weight:700; letter-spacing:.4px;}
+  .serit .v{font-size:14px; margin-top:2px;}
+  .serit .btn{float:right; background:var(--kirmizi); color:#fff; border:none; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:600; margin-top:-4px;}
+  bolum{display:block;}
+  .bh{display:flex; align-items:baseline; gap:8px; padding:14px 14px 6px;}
+  .bh h2{font-size:14px;}
+  .bh .n{font-size:11px; color:#78909c;}
+  .kart{background:var(--kart); border:1px solid #e0e4e8; border-radius:12px; margin:0 12px 8px; padding:10px 12px;}
+  .grup{background:#e3e9ee; border:none;}
+  .grup .gt{font-size:12px; font-weight:700; color:#455a64; display:flex; justify-content:space-between; margin-bottom:6px;}
+  .grup .gt .sag{font-weight:500; font-size:11px; color:#607d8b;}
+  .satir .ust{display:flex; align-items:center; gap:8px;}
+  .kupe{font-weight:800; font-size:15px;}
+  .etiket{font-size:10px; border-radius:6px; padding:2px 6px; background:#eceff1; color:#546e7a;}
+  .etiket.duve{background:#e8eaf6; color:#303f9f;}
+  .etiket.uyari{background:#fff3e0; color:#e65100;}
+  .rozet{font-size:10px; border-radius:8px; padding:2px 7px; font-weight:600;}
+  .rozet.kayma{background:#fff8e1; color:#b26a00; border:1px solid #ffe082;}
+  .rozet.erken{background:#f3e5f5; color:var(--mor); border:1px solid #ce93d8;}
+  .rozet.deneme2{background:#e0f2f1; color:#00695c; border:1px solid #80cbc4;}
+  .rozet.guncel{background:#e3f2fd; color:var(--mavi); border:1px solid #90caf9;}
+  .gunler{display:flex; gap:14px; margin:9px 0 4px; padding-left:2px;}
+  .g{text-align:center;}
+  .g .nokta{width:16px; height:16px; border-radius:50%; margin:0 auto; border:2px solid #cfd8dc; background:#fff;}
+  .g.tamam .nokta{background:var(--yesil); border-color:var(--yesil);}
+  .g.plan .nokta{border-color:var(--amber);}
+  .g.bugun .nokta{border-color:var(--kirmizi); background:#ffcdd2;}
+  .g.bekl .nokta{border-color:#90a4ae;}
+  .g small{display:block; font-size:9px; color:#90a4ae; margin-top:3px;}
+  .g em{display:block; font-style:normal; font-size:9px; color:#546e7a; margin-top:1px;}
+  .g.bugun small{color:var(--kirmizi); font-weight:700;}
+  .alt{display:flex; justify-content:space-between; align-items:center; margin-top:4px;}
+  .alt .bilgi{font-size:11px; color:#607d8b;}
+  .aksiyon{background:#eceff1; border:none; border-radius:8px; padding:5px 10px; font-size:11px; font-weight:600; color:#37474f;}
+  .daha{margin:0 12px 8px; font-size:12px; color:#78909c; text-align:center; padding:6px; border:1px dashed #cfd8dc; border-radius:10px;}
+  .sonuc-satir{display:flex; align-items:center; gap:8px; justify-content:space-between;}
+  .sonuc-satir .l{font-size:12px;}
+  .sonuc-satir .l b{font-size:13px;}
+  .sayac{font-size:11px; color:var(--mavi); font-weight:700; white-space:nowrap;}
+  .kilit{font-size:11px; color:#9e9d24;}
+  .sonlanan .rozet.gebeP{background:#e8f5e9; color:var(--yesil); border:1px solid #a5d6a7;}
+  .sonlanan .rozet.gebeM{background:#ffebee; color:var(--kirmizi); border:1px solid #ef9a9a;}
+  .sonlanan .rozet.tai{background:#e3f2fd; color:var(--mavi); border:1px solid #90caf9;}
+  .sonlanan .rozet.anomali{background:#fff3e0; color:#bf360c; border:1px solid #ffcc80;}
+  .footer{font-size:10px; color:#90a4ae; text-align:center; padding:14px;}
+</style>
+</head>
+<body>
+
+<div class="baslik">
+  <h1><span style="opacity:.65">‹</span> 🔄 Ovsync Takip</h1>
+  <div class="alt">ovsync dashboard sayfası — ana ekrandan goTo('ovsync') ile açılır (modal değil) · Ovsynch-56 + çift PGs · 2026-09-28</div>
+</div>
+
+<div class="kpa">
+  <div class="c one"><b>1</b><span>bugün</span></div>
+  <div class="c"><b>0</b><span>geciken</span></div>
+  <div class="c"><b>12</b><span>aktif zincir</span></div>
+  <div class="c"><b>11</b><span>sonuç beklenen</span></div>
+  <div class="c"><b>30</b><span>bekleyen başlatma</span></div>
+</div>
+
+<div class="serit">
+  <div class="k">BUGÜN</div>
+  <button class="btn">▶ TAI kaydet</button>
+  <div class="v"><b>Küpe 002</b> · Sağmal — TAI <b>bugün 19:00</b></div>
+  <div style="font-size:11px; color:#607d8b; margin-top:2px;">4/4 ilaç günü tamam · PG_YERINE zinciri (son PG kazanır)</div>
+</div>
+
+<bolum>
+  <div class="bh"><h2>② Aktif zincirler</h2><span class="n">12 vaka · 3 dalga</span></div>
+
+  <div class="kart grup">
+    <div class="gt"><span>Dalga: hedef 09-24 → fiilen 09-27</span><span class="sag">9 hayvan · PG#1 hep 10-04</span></div>
+
+    <div class="kart">
+      <div class="ust">
+        <span class="kupe">168</span><span class="etiket">Sağmal</span><span class="etiket">Doğum+51</span>
+        <span class="rozet kayma">hedef 09-24 → fiilen +3g</span>
+      </div>
+      <div class="gunler">
+        <div class="g tamam"><div class="nokta"></div><small>d0</small><em>27.09</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d7</small><em>04.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d8</small><em>05.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d9</small><em>06.10</em></div>
+        <div class="g bekl"><div class="nokta"></div><small>TAI</small><em>07.10</em></div>
+      </div>
+      <div class="alt"><span class="bilgi">1/4 uygulandı · sıradaki: 2. uygulama (PGs)</span><button class="aksiyon">Gün detayı</button></div>
+    </div>
+
+    <div class="kart">
+      <div class="ust">
+        <span class="kupe">122</span><span class="etiket">Sağmal</span><span class="etiket">Doğum+51</span>
+        <span class="rozet kayma">hedef 09-24 → fiilen +3g</span>
+      </div>
+      <div class="gunler">
+        <div class="g tamam"><div class="nokta"></div><small>d0</small><em>27.09</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d7</small><em>04.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d8</small><em>05.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d9</small><em>06.10</em></div>
+        <div class="g bekl"><div class="nokta"></div><small>TAI</small><em>07.10</em></div>
+      </div>
+      <div class="alt"><span class="bilgi">1/4 uygulandı</span><button class="aksiyon">Gün detayı</button></div>
+    </div>
+
+    <div class="kart">
+      <div class="ust">
+        <span class="kupe">31</span><span class="etiket duve">Düve (Büyük)</span><span class="etiket">12a21g</span>
+        <span class="rozet kayma">hedef 09-24 → fiilen +3g</span>
+      </div>
+      <div class="gunler">
+        <div class="g tamam"><div class="nokta"></div><small>d0</small><em>27.09</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d7</small><em>04.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d8</small><em>05.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d9</small><em>06.10</em></div>
+        <div class="g bekl"><div class="nokta"></div><small>TAI</small><em>07.10</em></div>
+      </div>
+      <div class="alt"><span class="bilgi">1/4 uygulandı</span><button class="aksiyon">Gün detayı</button></div>
+    </div>
+
+    <div class="daha">+ 6 hayvan daha (144 · 149 · 186 · 28 · 180 · 902) — aynı takvim</div>
+  </div>
+
+  <div class="kart grup">
+    <div class="gt"><span>Tekil başlangıçlar</span><span class="sag">3 vaka</span></div>
+
+    <div class="kart">
+      <div class="ust">
+        <span class="kupe">002</span><span class="etiket">Sağmal</span><span class="rozet guncel">TAI bugün 19:00</span>
+      </div>
+      <div class="gunler">
+        <div class="g tamam"><div class="nokta"></div><small>d0</small><em>18.09</em></div>
+        <div class="g tamam"><div class="nokta"></div><small>d7</small><em>25.09</em></div>
+        <div class="g tamam"><div class="nokta"></div><small>d8</small><em>26.09</em></div>
+        <div class="g tamam"><div class="nokta"></div><small>d9</small><em>27.09</em></div>
+        <div class="g bugun"><div class="nokta"></div><small>TAI</small><em>bugün</em></div>
+      </div>
+      <div class="alt"><span class="bilgi">4/4 tamam · elle açılmış (09-18)</span><button class="aksiyon">▶ TAI</button></div>
+    </div>
+
+    <div class="kart">
+      <div class="ust">
+        <span class="kupe">32</span><span class="etiket duve">Düve (Büyük)</span>
+        <span class="rozet guncel">cron · hedef gününde</span>
+      </div>
+      <div class="gunler">
+        <div class="g tamam"><div class="nokta"></div><small>d0</small><em>27.09</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d7</small><em>04.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d8</small><em>05.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d9</small><em>06.10</em></div>
+        <div class="g bekl"><div class="nokta"></div><small>TAI</small><em>07.10</em></div>
+      </div>
+      <div class="alt"><span class="bilgi">1/4 uygulandı · otomatik açıldı 09-26</span><button class="aksiyon">Gün detayı</button></div>
+    </div>
+
+    <div class="kart">
+      <div class="ust">
+        <span class="kupe">902</span><span class="etiket">Sağmal</span>
+        <span class="rozet deneme2">2. vakası — önceki boş (08-01)</span>
+      </div>
+      <div class="gunler">
+        <div class="g tamam"><div class="nokta"></div><small>d0</small><em>27.09</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d7</small><em>04.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d8</small><em>05.10</em></div>
+        <div class="g plan"><div class="nokta"></div><small>d9</small><em>06.10</em></div>
+        <div class="g bekl"><div class="nokta"></div><small>TAI</small><em>07.10</em></div>
+      </div>
+      <div class="alt"><span class="bilgi">1/4 uygulandı · yeniden deneme döngüsü</span><button class="aksiyon">Gün detayı</button></div>
+    </div>
+  </div>
+</bolum>
+
+<bolum>
+  <div class="bh"><h2>⑤ Sonuç beklenenler</h2><span class="n">11 tohumlama · kontroller 10-08…10-14</span></div>
+
+  <div class="kart">
+    <div class="sonuc-satir">
+      <span class="l"><b>119</b> · TAI 23.09 Darius</span>
+      <span class="sayac">kontrol 08.10 · 10 gün</span>
+    </div>
+  </div>
+  <div class="kart">
+    <div class="sonuc-satir">
+      <span class="l"><b>121</b> · TAI 17.09 <span class="rozet erken">erken 6g</span></span>
+      <span class="sayac">kontrol ~08.10 · 10 gün</span>
+    </div>
+  </div>
+  <div class="kart">
+    <div class="sonuc-satir">
+      <span class="l"><b>197</b> · boş çıktı (01.08) <span class="rozet deneme2">yeni deneme bekliyor</span></span>
+      <span class="sayac">görev açık</span>
+    </div>
+  </div>
+  <div class="daha">+ 8 tohumlama daha (200 · 14 · 04 · 178 · 23 · 135 · 136 · 02)</div>
+</bolum>
+
+<bolum>
+  <div class="bh"><h2>① Başlatılmayı bekleyenler</h2><span class="n">30 görev · 10-06…2027-09-22</span></div>
+
+  <div class="kart">
+    <div class="sonuc-satir">
+      <span class="l"><b>058</b> · Düve · hedef <b>06.10</b> (8 gün)</span>
+      <span class="kilit">🔒 Başlat −2 gün penceresinde</span>
+    </div>
+  </div>
+  <div class="kart">
+    <div class="sonuc-satir">
+      <span class="l"><b>045</b> · hedef <b>14.11</b> (İlk toh.+51)</span>
+      <span class="kilit">🔒 kilitli</span>
+    </div>
+  </div>
+  <div class="daha">+ 28 görev daha · hepsi gelecekte, gecikme 0</div>
+</bolum>
+
+<bolum>
+  <div class="bh"><h2>④ Sonlananlar ▾</h2><span class="n">23 vaka · son 60 gün</span></div>
+
+  <div class="kart sonlanan">
+    <div class="sonuc-satir">
+      <span class="l"><b>183</b> <span class="rozet gebeP">Gebe+</span> TAI 01.08 · vaka 10.09 kapandı</span>
+      <span class="sayac" style="color:var(--yesil)">doğum ~08.05.27</span>
+    </div>
+  </div>
+  <div class="kart sonlanan">
+    <div class="sonuc-satir">
+      <span class="l"><b>173</b> <span class="rozet gebeM">Gebe−</span> TAI 01.08 · Boş</span>
+      <span class="sayac">30.07 yeni deneme bekliyor</span>
+    </div>
+  </div>
+  <div class="kart sonlanan">
+    <div class="sonuc-satir">
+      <span class="l"><b>51</b> <span class="rozet anomali">⚠ TAI'sız kapatıldı</span> 4/4 ilaç verildi</span>
+      <span class="sayac" style="color:#bf360c">kural gününden 3 ay erken</span>
+    </div>
+  </div>
+  <div class="daha">+ 20 vaka daha (10 TAI-bekliyor④→⑤ · 1 PG · 4 erken kapanış · 1 iptal · 4 eski)</div>
+</bolum>
+
+<div class="footer">FAZ 1 mockup · sayılar PROD canlı verisinden (2026-09-28) · kart-liste + gün şeridi deseni A</div>
+
+</body>
+</html>

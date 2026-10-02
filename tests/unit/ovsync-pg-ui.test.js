@@ -24,8 +24,14 @@ const { sandbox, exposed } = loadBrowserModule('js/ui.js', {
 });
 const { _tohKaynakEtiket, _kalanGunEtiket, _ovsyncBaslatBtnHtml, _erteleBtnHtml } = sandbox;
 
-test('P3: _katTipMap üreme kategorisi TOHUMLAMA_PLANLI + OVSYNC_BASLAT içerir', () => {
-  assert.deepEqual(exposed._katTipMap.ureme, ['TOHUMLAMA_PLANLI', 'OVSYNC_BASLAT']);
+// D6 (P7-K14): eski ikili liste ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT'] K14 ile
+// dörtlüye genişledi — GEBELIK_KONTROL Muayene'den Üreme'ye taşındı (§18.16),
+// TAKIP_MUAYENE eklendi. Kırmızı→yeşil kanıtı impl-P7-DONE'da.
+test('P3/P7-K14: _katTipMap üreme kategorisi dörtlü liste (GEBELIK_KONTROL + TAKIP_MUAYENE dahil)', () => {
+  assert.deepEqual(exposed._katTipMap.ureme,
+    ['TOHUMLAMA_PLANLI', 'OVSYNC_BASLAT', 'GEBELIK_KONTROL', 'TAKIP_MUAYENE']);
+  assert.deepEqual(exposed._katTipMap.muayene, ['MUAYENE', 'VETERINER_KONTROL'],
+    'GEBELIK_KONTROL Muayene listesinden çıkarıldı (K14)');
 });
 
 test('P3: TOHUMLAMA_PLANLI kaynak etiketleri', () => {

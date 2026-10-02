@@ -857,7 +857,42 @@ async function submitCase(btn) {
       await openDet(hayvan.id, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
       openCaseDet(res.case_id);
     }
-  } catch (e) { toast(getUserMessage(e), true); }
+  } catch (e) {
+    // P10: elle vaka aç yolu (create_case) TAKIP_ACIK kapısından geçer (P3b) —
+    // onaylı tekrar p_takip_onay=true ile; şablon zinciri seçildiyse retry'da
+    // aynen koşar (mevcut akışın aynısı).
+    const caseTakipRetry = async () => {
+      const res2 = await rpc('create_case', {
+        p_animal_id: hayvan.id,
+        p_disease_id: diseaseId,
+        p_notes: v('d-case-notes') || null,
+        p_takip_onay: true,
+      });
+      const sablonId2 = globalThis._seciliSablonId;
+      if (sablonId2 && res2?.case_id) {
+        try {
+          const r2 = await rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2 });
+          const planli2 = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res2.case_id, p_sablon_id: sablonId2 });
+          if (r2?.atlanan?.length) toast(`⚠️ ${r2.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
+          if (planli2?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli2.sebep}`, true);
+          toast(`✅ Vaka açıldı + şablon uygulandı (${r2?.gun_sayisi||0} gün)${planli2?.olustu?' + tohumlama':''}`);
+        } catch (e3) { toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true); }
+        globalThis._seciliSablonId = null;
+      } else {
+        toast('✅ Vaka açıldı');
+      }
+      closeM('m-disease');
+      cl('d-hid'); cl('d-case-notes');
+      await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(() => {});
+      if (res2?.case_id) {
+        await openDet(hayvan.id);
+        openCaseDet(res2.case_id);
+      }
+      return res2;
+    };
+    if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, caseTakipRetry, { kupe: hayvan.kupe_no || hayvan.devlet_kupe || '', islem: 'vaka açılsın mı?' })) return;
+    toast(getUserMessage(e), true);
+  }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
 }
 
@@ -3248,6 +3283,47 @@ async function submitBulkCase(btn){
         p_tohumlama_cakisma:    bcCakismaPayloadDegeri(!!cakismaRadyosu, cakismaSecim),
       });
 
+      // P10 D4: takip engelli satırlar (takip_acik[] — H5 satır 8 alan adları:
+      // {hayvan_id, kupe, kod:'TAKIP_ACIK', muayene_tarihi, muayene_saat}) →
+      // satır-bazlı onay listesi; retry onaylı alt kümeyle YENİ ÇAĞRI
+      // (p_animal_ids = p_takip_onaylar = onaylılar — C2 imza).
+      const takipSatirlari = (Array.isArray(res?.takip_acik) ? res.takip_acik : []).map(t => ({
+        id: t.hayvan_id,
+        kupe: t.kupe || '',
+        tarih: t.muayene_tarihi || null,
+        saat: t.muayene_saat || null,
+        pgKarar: null,
+      }));
+      if (takipSatirlari.length && typeof _takipTopluSheet === 'function') {
+        const takipRetry = async secilen => {
+          const r2 = await rpc('vaka_toplu_ac', {
+            p_animal_ids: secilen,
+            p_disease_id: diseaseId,
+            p_notes: v('bc-notes') || null,
+            ...(manuelVar
+              ? { p_items: sec.items, p_sablon_id: null }
+              : { p_sablon_id: globalThis._bcSeciliSablonId || null }),
+            p_tarih:                tarih,
+            p_tohumlama:            tohumIste,
+            p_tohumlama_gun_offset: tohumGun,
+            p_tohumlama_saat:       tohumSaat,
+            p_tohumlama_cakisma:    bcCakismaPayloadDegeri(!!cakismaRadyosu, cakismaSecim),
+            p_takip_onaylar:        secilen,
+          });
+          const satirlar2 = bcSonucSatirlari(r2);
+          const sonucEl = g('bc-sonuc');
+          if (sonucEl) {
+            sonucEl.innerHTML = bcSonucBantlari(satirlar2, { acilan: r2.acilan || [], tohumIste, tohumSaat });
+            sonucEl.style.display = 'block';
+          }
+          if ((r2.basari || 0) > 0) toast(`✅ ${r2.basari} vaka açıldı`);
+          await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(console.warn);
+          renderSafe();
+          return r2;
+        };
+        _takipTopluSheet(takipSatirlari, takipRetry);
+      }
+
       // V2.1 — bantlı sonuç düzeni (owner-approved): bcSonucSatirlari
       // satırları renkli grup bantlarına bağlanır (Açılan green → Atlanan
       // amber → Hata red); sayaçlar bant başlıklarında — eski tek-satır
@@ -4388,7 +4464,6 @@ async function tohSonuc(sonuc, btn) {
   if (_curToh.sonuc === 'Gebe' || _curToh.sonuc === 'Doğum Yaptı') {
     toast('⛔ Bu kayıt değiştirilemez — hayvan kartını kullanın', true); return;
   }
-  if (sonuc === 'Boş' && !confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
 
   try {
     let rpcName, successMsg;
@@ -4396,6 +4471,23 @@ async function tohSonuc(sonuc, btn) {
       rpcName = 'tohumlama_sonuc_gebe';
       successMsg = '✅ Gebe olarak işaretlendi';
     } else if (sonuc === 'Boş') {
+      // P9/S-5 (§18.15): Boş sonrası DEVAM SEÇİCİ — confirm + doğrudan
+      // tohumlama_sonuc_bos yolu KALKTI; sonuc + devam adımı tek işlemde (P2b
+      // sarmal). Bayrak kapalıysa (#6, S-5) bugünkü davranış yaşar (fallback).
+      const _h=(getState('animals')||[]).find(a=>a&&a.id===_curToh.hayvan_id);
+      await _devamSeciciAc('bos', {
+        tohumlama_id: _curToh.id,
+        kupe_no: (_h && (_h.kupe_no || _h.devlet_kupe)) || '',
+        grup: (_h && _h.grup) || '',
+        tohumlama_tarihi: _curToh.tarih || '',
+        sperma: _curToh.sperma || '',
+      });
+      if (typeof window !== 'undefined' && window.__devamSecici && window.__devamSecici.acik) {
+        // Seçici akışı devraldı — sonuç modalı kapanır; yazma seçicide (tek RPC).
+        closeM('m-toh-det');
+        return;
+      }
+      if (!confirm('Bu tohumlama kaydı "Boş" olarak işaretlenecek. Emin misiniz?')) return;
       const res = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: _curToh.id });
       if (!res.ok) { toast(res.mesaj || 'Hata'); return; }
       successMsg = 'Boş olarak işaretlendi';
@@ -4927,11 +5019,54 @@ async function submitBulkIlac() {
       if (typeof _topluSonucModal === 'function') _topluSonucModal(result, tekrar);
     }
 
+    // P10 D4: takip nedeniyle İŞLENMEYEN satırlar — satır-bazlı onay listesi;
+    // retry onaylı alt kümeyle YENİ ÇAĞRI (p_animal_ids = p_takip_onaylar =
+    // onaylılar; H5 satır 7/9 alan adları — uydurma YASAK).
+    const takipSatirlari = (Array.isArray(result?.takip_onay_listesi) ? result.takip_onay_listesi : [])
+      .filter(r => r && r.takip_acik)
+      .map(r => {
+        const s = (Array.isArray(result?.takip_acik) ? result.takip_acik : []).find(t => t && t.hayvan_id === r.hayvan_id) || {};
+        return {
+          id: r.hayvan_id,
+          kupe: s.kupe_no || r.kupe_no || '',
+          tarih: (r.takip_bilgi && r.takip_bilgi.muayene_tarihi) || s.muayene_tarihi || null,
+          saat: (r.takip_bilgi && r.takip_bilgi.muayene_saat) || s.muayene_saat || null,
+          pgKarar: r.pg_kapi_karar || null,
+        };
+      });
+    if (takipSatirlari.length && typeof _takipTopluSheet === 'function') {
+      const takipRetry = async secilen => {
+        const r2 = await rpc('bulk_ilac', {
+          p_animal_ids: secilen,
+          p_ilac_stok_id: ilacId,
+          p_miktar: miktar,
+          p_notlar: notes,
+          p_takip_onaylar: secilen,
+        });
+        // retry sonucunda PG-ack kalan satırlar varsa mevcut P7 modalı devralır
+        if (Array.isArray(r2?.applied) || Array.isArray(r2?.requires_ack) || Array.isArray(r2?.blocked)) {
+          const tekrar2 = (s, g) => rpc('bulk_ilac', {
+            p_animal_ids: s,
+            p_ilac_stok_id: ilacId,
+            p_miktar: miktar,
+            p_notlar: notes,
+            p_pg_onaylar: s,
+            p_pg_gerekce: Object.entries(g || {}).map(([h, x]) => h + ': ' + x).join(' | ') || null
+          });
+          if (typeof _topluSonucModal === 'function') _topluSonucModal(r2, tekrar2);
+        }
+        return r2;
+      };
+      _takipTopluSheet(takipSatirlari, takipRetry);
+    }
+
     const div = document.getElementById('bi-result');
     if (div) {
       const errors = result.errors || [];
+      const takipEngelliSayi = Array.isArray(result?.takip_acik) ? result.takip_acik.length : 0;
       div.innerHTML = `<div style="margin-top:8px;font-size:.8rem">
         ✅ ${result.success}/${result.total} hayvana uygulandı
+        ${takipEngelliSayi ? `<br>🔍 ${takipEngelliSayi} hayvan takipte — onay listesi açıldı` : ''}
         ${errors.length ? '<br>⚠️ ' + errors.map(e=>esc(e.error)).join(', ') : ''}
       </div>`;
     }
@@ -5159,6 +5294,25 @@ async function seansTamamla(seansId, uygulanmadi, btn) {
       if(typeof updateTaskBadge==='function') updateTaskBadge();
     } catch(e){ /* sessiz */ }
   } catch (e) {
+    // P10: yalın TAKIP_ACIK (birleşik PG_KAPI:TAKIP_ACIK api.js içinde sheet'e
+    // düşer) — tam paramlı onaylı tekrar buradan; rpcSeansTamamla imzasında
+    // p_takip_onay taşımadığından TEK çağrı doğrudan rpc ile kurulur (C2).
+    const seansTakipRetry = birlesik => rpc('seans_tamamla', {
+      p_seans_admin_id: seansId,
+      p_uygulanmadi: !!uygulanmadi,
+      p_not: null,
+      p_pg_onay: !!birlesik,
+      p_pg_gerekce: null,
+      p_takip_onay: true,
+    });
+    const kzSeans = _curCase ? (getState('animals') || []).find(a => a && a.id === _curCase.animal_id) : null;
+    if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, seansTakipRetry, { kupe: kzSeans && (kzSeans.kupe_no || kzSeans.devlet_kupe) || '' })) {
+      // Akış sheet'e geçti — satır butonları tekrar tıklanabilir kalsın
+      // (sheet'te Vazgeç edilirse aynı seans yeniden denenemez olmasın).
+      if (row) row.querySelectorAll('button').forEach(b => { b.disabled = false; });
+      if (btn) btn.textContent = uygulanmadi ? '✕' : '✓ Uygulandı';
+      return;
+    }
     toast('❌ ' + (e.message || 'Hata'), true);
     if (row) row.querySelectorAll('button').forEach(b => { b.disabled = false; });
     if (btn) btn.textContent = uygulanmadi ? '✕' : '✓ Uygulandı';

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;}
+  body{background:#eef1f4;color:#263238;width:760px;margin:0 auto;padding:16px 16px 24px;font-size:12px;}
+  .t{font-size:15px;font-weight:800;padding:4px 0 2px;}
+  .s{font-size:10px;color:#78909c;padding-bottom:10px;}
+  .satir{display:flex;gap:10px;margin-bottom:8px;align-items:stretch;}
+  .kutu{background:#fff;border:1px solid #d5dbe0;border-radius:10px;padding:8px 10px;flex:1;}
+  .kutu h4{font-size:11.5px;margin-bottom:3px;}
+  .kutu p{font-size:10px;color:#546e7a;line-height:1.45;}
+  .giris{border-top:3px solid #1565c0;}
+  .ovsync{border:2px solid #1565c0;background:#f3f8ff;}
+  .ovsync h4{color:#1565c0;}
+  .hedef{border-top:3px solid #2e7d32;}
+  .inline{border-top:3px solid #f9a825;}
+  .ok-yazi{text-align:center;color:#90a4ae;font-size:14px;margin:-2px 0 6px;}
+  .ok-sag{display:flex;align-items:center;color:#90a4ae;font-size:16px;padding:0 2px;}
+  .dongu{background:#fff;border:1px solid #d5dbe0;border-radius:12px;padding:12px;margin-top:6px;}
+  .dongu h3{font-size:13px;margin-bottom:8px;color:#37474f;}
+  .adimlar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .adim{border-radius:16px;padding:5px 10px;font-size:10.5px;font-weight:600;border:1.5px solid #b0bec5;background:#fafafa;color:#455a64;}
+  .adim.b1{border-color:#1565c0;background:#e3f2fd;color:#1565c0;}
+  .adim.b2{border-color:#f9a825;background:#fff8e1;color:#b26a00;}
+  .adim.b3{border-color:#6a1b9a;background:#f3e5f5;color:#6a1b9a;}
+  .adim.b4{border-color:#2e7d32;background:#e8f5e9;color:#2e7d32;}
+  .adim.b5{border-color:#c62828;background:#ffebee;color:#c62828;}
+  .arr{color:#90a4ae;font-size:13px;font-weight:700;}
+  .loop{border:1.5px dashed #c62828;border-radius:16px;padding:4px 10px;font-size:10px;color:#c62828;font-weight:600;background:#fff;}
+  .tablo{width:100%;border-collapse:collapse;margin-top:4px;background:#fff;border-radius:10px;overflow:hidden;}
+  .tablo th{background:#37474f;color:#fff;font-size:10px;padding:6px 8px;text-align:left;}
+  .tablo td{border-top:1px solid #eceff1;font-size:10.5px;padding:6px 8px;vertical-align:top;line-height:1.5;}
+  .kod{font-family:monospace;font-size:9.5px;background:#eceff1;border-radius:4px;padding:1px 4px;}
+  .yesil{color:#2e7d32;font-weight:700;} .kirmizi{color:#c62828;font-weight:700;} .mavi{color:#1565c0;font-weight:700;} .amber{color:#b26a00;font-weight:700;}
+  .not{font-size:10px;color:#546e7a;background:#fff;border-left:4px solid #f9a825;border-radius:0 8px 8px 0;padding:8px 10px;margin-top:10px;line-height:1.55;}
+</style>
+</head>
+<body>
+
+<div class="t">🔄 Ovsync Takip — Hayat Döngüsü ve Geçiş Haritası (UX kurgusu)</div>
+<div class="s">Kararlar: Hibrit aksiyon (inline + mevcut modallar) · Görevler'de kalır+çip+köprü · 🔔 🌱 bölüm + link · §7.9: her aksiyon mevcut tekil protokol işlemi</div>
+
+<div class="satir">
+  <div class="kutu giris"><h4>📱 Ana Dashboard</h4><p>Stat butonu (6. hücre): <span class="mavi">🔄 Ovsync › 12</span><br>kırmızı=bugün aksiyon/geciken · amber=bekleyen başlatma<br><span class="kod">goTo('ovsync')</span></p></div>
+  <div class="kutu giris"><h4>✅ Görevler Ekranı</h4><p>Ovsync görevleri KALIR (karışık listede) + <b>kategori çipi/filtre</b> + <b>"Tüm ovsync takibi →"</b> köprüsü</p></div>
+  <div class="kutu giris"><h4>🔔 Protokol Paneli</h4><p>🌱 ovsync bölümü (izole liste, mevcut) + satır aksiyonları (mevcut) + <b>"Tüm takibi aç →"</b> linki</p></div>
+</div>
+<div class="ok-yazi">↘⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀↙⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀↙</div>
+
+<div class="satir">
+  <div class="kutu ovsync" style="flex:1.6">
+    <h4>🔄 OVSYNC DASHBOARD — kendi sayfası (#pg-ovsync)</h4>
+    <p style="font-size:10.5px;line-height:1.6;">
+    ① Başlatılmayı bekleyenler — satır: <span class="kod">▶ Başlat</span> (inline; pencere/kısır kilidiyle)<br>
+    ② Aktif zincirler (dalga gruplu) — gün şeridi + <span class="kod">Gün detayı</span> / <span class="kod">▶ Ertele</span> (inline)<br>
+    ③ Bugün & geciken şeridi — <span class="kod">▶ TAI kaydet</span> (modal açar)<br>
+    ⑤ Sonuç beklenenler — kontrol sayacı; vakti gelince muayene akışına köprü<br>
+    ④ Sonlananlar (katlanır) — vaka timeline (salt-okuma)</p>
+  </div>
+</div>
+
+<div class="ok-yazi">↓ satır aksiyonu olduğunda</div>
+
+<div class="satir">
+  <div class="kutu inline"><h4>⚡ INLINE tek-dokunuş</h4><p><span class="kod">ovsyncBaslat</span> (başlat)<br><span class="kod">gorev_ertele / vaka_kalan_gunleri_kaydir</span><br><span class="kod">_erteleBtnHtml</span> butonu tek kaynaktan<br>Sonra: ekran kendini tazeler (cache invalidate)</p></div>
+  <div class="kutu hedef"><h4>🪟 MEVCUT MODALLAR (form işleri)</h4><p><span class="kod">openTaskDet</span> → "🐄 Tohumlamayı Kaydet" (TAI)<br><span class="kod">openCaseDet</span> → vaka timeline + gün uygulama<br>Modal kapanınca ovsync sayfasına dönülür</p></div>
+  <div class="kutu hedef"><h4>🔬 Gebelik kontrolü sonucu</h4><p>Mevcut muayene akışı (gebelik_muayene listesi + sonuc güncelleme)<br>⑤ satırı "kontrol vakti" geldiğinde oraya köprü kurar; sonuç girilince satır ⑤'ten düşer → ④'e/①'a taşınır</p></div>
+</div>
+
+<div class="dongu">
+  <h3>🔁 Hayvanın ovsync yaşam döngüsü — ekran bölümleri bu döngünün kesitleri</h3>
+  <div class="adimlar">
+    <span class="adim b1">① Aday (kural günü bekler)</span><span class="arr">→</span>
+    <span class="adim b2">▶ Başlat (pencere içinde)</span><span class="arr">→</span>
+    <span class="adim b2">② İlaç günleri d0·d7·d8·d9</span><span class="arr">→</span>
+    <span class="adim b3">TAI (d10)</span><span class="arr">→</span>
+    <span class="adim b5">⑤ Sonuç bekle (kontrol +21g)</span><span class="arr">→</span>
+    <span class="adim b4">Gebe+ → bitti (④)</span>
+  </div>
+  <div class="adimlar" style="margin-top:6px;">
+    <span class="loop">↩ Gebe− / boş → yeni deneme: yeni OVSYNC_BASLAT görevi doğar → ①'e döner (902 örneği: 2. vaka)</span>
+    <span class="arr">·</span>
+    <span class="adim">İptal/erken kapanış → ④'ye "nasıl bitti" rozetiyle</span>
+  </div>
+</div>
+
+<div class="dongu">
+  <h3>🧭 Gezinme sözleşmesi — sürtünmesiz geçiş (sahip 2026-09-28: "hub'a cycle yapmamalıyım, geri = kaldığım yere ışınlanma")</h3>
+  <p style="margin-bottom:6px;"><b>Hub zorunluluğu YOK — yatay geçişler doğrudan:</b></p>
+  <div class="adimlar">
+    <span class="adim">📱 Ana Dashboard</span><span class="arr">⇄</span>
+    <span class="adim b1">🔄 Ovsync Dashboard</span><span class="arr">⇄</span>
+    <span class="adim">✅ Görevler</span>
+    <span class="arr">·</span>
+    <span class="adim b3">Ovsync → modal (görev/vaka detayı)</span><span class="arr">→ geri →</span>
+    <span class="adim b1">aynı satır, aynı yer</span>
+  </div>
+  <p style="margin-top:8px;line-height:1.6;">
+  • <span class="kod">goTo('ovsync')</span> mevcut pushState+popstate mekanizmasına katılır (app.js:104-152) — <b>telefon geri tuşu = önceki ekran</b>.<br>
+  • <b>Modal = sayfa geçişi değildir</b>: modal-router (pushState invariant) → geri tuşu modalı kapatır, ovsync sayfası yerinde ve taze kalır.<br>
+  • <b>Dönüşte durum korunur:</b> filtre/bölüm durumu (<span class="kod">_curOvsync*</span> deseni, _curTaskFilter örneği) + <b>kaydırma konumu</b> (sayfadan çıkarken scrollTop kaydet, dönüşte geri yükle).<br>
+  • Alt-nav'a yeni giriş YOK (nav kirletilmez); dönüş yolları: geri tuşu + sayfa başlığındaki ‹.</p>
+</div>
+
+<table class="tablo">
+  <tr><th style="width:16%">Satır durumu</th><th style="width:22%">Görünüm</th><th>Aksiyon → nereye</th></tr>
+  <tr><td>① pencere dışı</td><td>🔒 kilitli, hedef tarih</td><td>buton yok (bilgi)</td></tr>
+  <tr><td>① pencere içinde</td><td class="mavi">▶ Başlat aktif</td><td><b>inline</b> <span class="kod">ovsyncBaslat</span> → satır ②'ye taşınır</td></tr>
+  <tr><td>② gün vakti geldi</td><td class="amber">amber nokta + tarih</td><td><b>modal</b> <span class="kod">openCaseDet</span> (gün uygula) → dönünce yeşil</td></tr>
+  <tr><td>② gün gecikti</td><td class="kirmizi">kırmızı + "+Ngün"</td><td>satır üstte + <b>inline</b> <span class="kod">Ertele</span> / gün detayı</td></tr>
+  <tr><td>③/② TAI günü</td><td class="kirmizi">BUGÜN rozeti</td><td><b>modal</b> <span class="kod">openTaskDet</span> → "Tohumlamayı Kaydet" → vaka ④/⑤'e taşınır</td></tr>
+  <tr><td>⑤ kontrol vakti</td><td class="mavi">sayaç 0'a indi</td><td>köprü → muayene akışı; sonuç: <span class="yesil">Gebe+</span> bitti / <span class="kirmizi">Boş</span> → ① loop</td></tr>
+  <tr><td>④ sonlanmış</td><td>rozet + toh_sonuc</td><td><span class="kod">openCaseDet</span> salt-okuma timeline</td></tr>
+</table>
+
+<div class="not"><b>Tutarlılık kuralları:</b> üç yüzeyin (ovsync dashboard · Görevler · 🔔) ovsync sayaçları TEK kaynaktan (RPC) — çelişkili rozet yok.
+Her aksiyon <b>mevcut tekil protokol işlemi</b> olarak girer (yazma yolu §7.9): paralel kayıt yüzeyi yok.
+Modal kapanınca ovsync sayfası kendini tazeler (<span class="kod">__ovsyncTakip=null</span>); Görevler'e dönünce oranın listesi de mevcut invalidate ile taze.</div>
+
+</body>
+</html>

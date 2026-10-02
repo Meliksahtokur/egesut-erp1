@@ -590,7 +590,67 @@ function agirlikEksikHayvanlar(ids, animals) {
   });
 }
 
+// ── GÜN FARKI ETİKETİ (P9b — kalem 12, spec §10e UI-R1) ──
+// SÖZLEŞME (testle kilitli: tests/unit/ovsync-takip.test.js):
+// 1. gunFarkiEtiket(tarihISO, bugun?) → 'bugün' | 'dün' | 'N gün önce' | 'N gün sonra'
+//    — Europe/Istanbul YEREL takvim günü farkı (UTC değil).
+// 2. Fark İKİ takvim günü alanının karşılaştırmasıyla bulunur (Intl gg.aa.yyyy
+//    parçaları; UTC-milisaniye bölümü DEĞİL): dün 23:30 ile bugün 00:30 arası
+//    gerçek fark 1 saat olsa da takvim günü farkı 1'dir.
+// 3. Z/offset'li timestamptz İstanbul saatine çevrilir: UTC 21:30 = İstanbul
+//    00:30 ERTESİ gün → etiket ertesi güne göre. fmtTarih'in ilk-10-karakter
+//    kesimi timestamptz'de yanlış gün okur (yukarıdaki tuzak) — burada KULLANILMAZ.
+// 4. İleri tarih → 'N gün sonra' (1 gün ileri dahi '1 gün sonra'; 'dün' kısaltması
+//    yalnız geriye özeldir).
+// 5. bugun? verilmezse bugünün İstanbul takvim günü alınır; 'YYYY-MM-DD' (bugun())
+//    ya da gg.aa.yyyy kabul edilir. Ayrıştırılamayan girişte '' döner.
+// 6. Saf/durumsuz — DOM/window erişimi yok; Node require ile test edilir.
+/**
+ * İstanbul yerel takvim gününü gün numarasına çevirir (1 Ocak 1970'ten itibaren takvim günü sayısı).
+ * @param {string} iso ISO tarih/tarih-saat dizgisi.
+ * @returns {number|null} Takvim gün numarası; ayrıştırılamazsa null.
+ */
+function _istanbulGunNo(iso) {
+  if (!iso) return null;
+  try {
+    const parca = {};
+    new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: 'numeric' })
+      .formatToParts(new Date(iso))
+      .forEach(p => { parca[p.type] = p.value; });
+    if (!parca.day || !parca.month || !parca.year) return null;
+    return Date.UTC(+parca.year, +parca.month - 1, +parca.day) / 86400000;
+  } catch (e) { return null; }
+}
+/**
+ * Başvuru tarihini ('YYYY-MM-DD' ya da gg.aa.yyyy) takvim gün numarasına çevirir.
+ * @param {string} s Tarih dizgisi.
+ * @returns {number|null} Takvim gün numarası; tanınmayan biçimde null.
+ */
+function _gunNo(s) {
+  const str = String(s ?? '');
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+  if (ymd) return Date.UTC(+ymd[1], +ymd[2] - 1, +ymd[3]) / 86400000;
+  const gaa = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(str);
+  return gaa ? Date.UTC(+gaa[3], +gaa[2] - 1, +gaa[1]) / 86400000 : null;
+}
+/**
+ * Verilen tarihin bugüne göre İstanbul yerel takvim günü farkını etiketler.
+ * @param {string} tarihISO ISO tarih/tarih-saat dizgisi (timestamptz dahil).
+ * @param {string} [bugun] Başvuru günü ('YYYY-MM-DD' ya da gg.aa.yyyy); verilmezse bugün.
+ * @returns {string} 'bugün' | 'dün' | 'N gün önce' | 'N gün sonra'; geçersiz girişte ''.
+ */
+function gunFarkiEtiket(tarihISO, bugun) {
+  const gun = _istanbulGunNo(tarihISO);
+  if (gun === null) return '';
+  const ref = bugun == null || bugun === '' ? _istanbulGunNo(new Date().toISOString()) : _gunNo(bugun);
+  if (ref === null) return '';
+  const fark = gun - ref;
+  if (fark === 0) return 'bugün';
+  if (fark === -1) return 'dün';
+  return fark < 0 ? `${-fark} gün önce` : `${fark} gün sonra`;
+}
+
 // Test için dual-mode export (tarayıcıda module undefined, etkisiz)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala, dozOner, dozCipleri, kuceDogalBlok, kuceDogalKarsilastir, gorevSaatAnahtari, agirlikEksikHayvanlar });
+  module.exports = Object.assign(module.exports || {}, { trLower, _ymd, bugun, dAgo, dFwd, fmtTarih, fmtTarihSaat, getDisplayKupe, srchAdaySirala, vurguHtml, aktifHayvanSatirlari, sutIcenBuzagiSec, suttenKesimeHazirSec, suttenKesListeSirala, dozOner, dozCipleri, kuceDogalBlok, kuceDogalKarsilastir, gorevSaatAnahtari, agirlikEksikHayvanlar, gunFarkiEtiket });
 }

@@ -63,26 +63,37 @@ async function _keepScroll(contentEl,fn){
 const _katTipMap={
   asi:    ['ASI_PLANLI','ILERI_GEBE_ASI','ASI_HATIRLATMA','ASI_RAPEL'],
   vitamin:['ILERI_GEBE','TOHUMLAMA_HAZIRLIK','ILAC'],
-  muayene:['MUAYENE','GEBELIK_KONTROL','VETERINER_KONTROL'],
+  muayene:['MUAYENE','VETERINER_KONTROL'],   // K14: GEBELIK_KONTROL Üreme'ye taşındı (§18.16)
   tedavi: ['TEDAVI','ILAC_UYGULAMA','TEDAVI_GUN','TEDAVI_SEANS'],
-  ureme:  ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT'],   // P3: Ovsync/PG görev tipleri 'Diğer'e düşmesin
+  ureme:  ['TOHUMLAMA_PLANLI','OVSYNC_BASLAT','GEBELIK_KONTROL','TAKIP_MUAYENE'],   // P3+K14: "işin ucunda gebelik varsa üreme" — GEBELIK_KONTROL Muayene'den, TAKIP_MUAYENE eklendi
   bakim:  ['SUTTEN_KESME','PADOK_DEGISIM','DOGUM_TAKIP','BESLEME','BUZAGI_BAKIM'],
   diger:  null // özel mantık: _katTipMap'te olmayan tüm tipler
 };
 const _allKatTips=Object.values(_katTipMap).filter(Boolean).flat();
-const _planliUremeTipler=['OVSYNC_BASLAT','TOHUMLAMA_PLANLI'];   // K7: planlı üreme görevleri Bugün'de 7-gün pencereyle (ASI_PLANLI örneği)
-// C3 (cila2): üreme-vaka kümesi hastalık KATEGORİSİ değil PROTOKOL AİLESİ bazlıdır.
-// K7'nin category='Üreme' ayrımı Metrit/Endometrit gibi tedavi vakalarının
-// seanslarını Üreme filtresine sızdırıyordu (BUG-UREME-FILTRE-SIZINTI).
-// protocol_family='OVSYNC' damgası (K4, 20260925000013:144-147) yalnız başlamış
-// ovsync zincirlerine yazılır — Metrit vb. NULL kalır, Tedavi'de listelenir.
+const _planliUremeTipler=[...(_katTipMap.ureme||[])];   // K7+K14: Bugün'de 7-gün pencere istisnası — türetim kaynağını izler (yeni tipler turetimden girer, ayrı pencere davranışı YOK)
+// K14 (§18.16, 2026-09-29/30): üreme-VAKA kümesi hastalık ADI kümesidir —
+// {Ovsync, Kistik Over, Anoestrus}. Enfeksiyon/doğum-sonrası hastalıklar (Metrit,
+// Endometrit, Pyometra, RFM, Retensiyo Sekundinarum, Postpartum Hemoraji) küme
+// DIŞI kalır (C3 sızıntı kilidi). Hastalık kataloğu DEĞİŞMEZ — yalnız filtre eşlemesi.
+const UREME_VAKA_HASTALIKLARI=['Ovsync','Kistik Over','Anoestrus'];
+// C3 (cila2) temeli: protocol_family='OVSYNC' damgası (K4, 20260925000013:144-147)
+// yalnız başlamış ovsync zincirlerine yazılır; K14 ile damga + hastalık-adı kümesi
+// birlikte küme kurar — damga kazanır (elle açılan Ovsync zincirleri kümede kalır).
 /**
- * Verilen vaka listesinden protokol ailesi 'OVSYNC' olanları filtreleyip ID'lerini içeren bir küme döndürür.
- * @param {Array} cases Filtrelenmesi gereken vaka nesnelerinden oluşan dizi.
- * @returns {Set} 'OVSYNC' protokol ailesine sahip vakaların ID'lerinden oluşan küme.
+ * Verilen vaka listesinden üreme-vaka kümesini kurar: hastalığı ad-kümede
+ * (UREME_VAKA_HASTALIKLARI — diseases.name eşleşmesi) veya protokol ailesi
+ * 'OVSYNC' damgalı vakaların ID'leri.
+ * @param {Array} cases Filtrelenecek vaka nesneleri (disease_id, protocol_family alanlı).
+ * @param {Object} [hastalikAdiById] disease_id → diseases.name haritası (IDB verisi; verilmezse yalnız damga yolu).
+ * @returns {Set} Üreme kapsamındaki vakaların ID kümesi.
  */
-function _uremeVakaCaseIds(cases){
-  return new Set((cases||[]).filter(c=>c&&c.protocol_family==='OVSYNC').map(c=>c.id));
+function _uremeVakaCaseIds(cases,hastalikAdiById){
+  return new Set((cases||[]).filter(c=>{
+    if(!c) return false;
+    if(c.protocol_family==='OVSYNC') return true;   // damga kazanır (K14)
+    const ad=hastalikAdiById?hastalikAdiById[c.disease_id]:null;
+    return !!ad&&UREME_VAKA_HASTALIKLARI.includes(ad);
+  }).map(c=>c.id));
 }
 /**
  * Verilen görev tipine göre üreme görevinin geçerli olup olmadığını kontrol eder.
@@ -147,7 +158,32 @@ function setTaskKat(kat,btn){
   _taskKategori=kat;
   document.querySelectorAll('.kat-btn').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
+  _uremeChipKopruSenkron();
   loadTasks(_curTaskFilter||'today');
+}
+/**
+ * Görevler kategori çubuğuna 🌱 Üreme aktifken "Tüm ovsync takibi →" köprüsü üretir
+ * (K9, design §6 — emoji YOK, varsayılan). index.html statik olduğundan çip başlığı
+ * köprüsü ui.js'ten senkronlanır.
+ * @param {boolean} uremeAktif Üreme kategorisi seçili mi (_taskKategori==='ureme').
+ * @returns {string} sh-link butonu HTML'i; pasifken boş string.
+ */
+function _uremeChipKopruHtml(uremeAktif){
+  if(uremeAktif!==true) return '';
+  return '<button class="sh-link" id="task-ureme-kopru" onclick="goTo(\'ovsync\')" style="margin-left:2px;white-space:nowrap">Tüm ovsync takibi →</button>';
+}
+/**
+ * Kategori çubuğundaki K9 köprüsünü _taskKategori'ye göre senkronlar: Üreme
+ * aktifken çubuğun sonuna ekler, değilken kaldırır (idempotent — loadTasks/setTaskKat çağırır).
+ * @returns {void}
+ */
+function _uremeChipKopruSenkron(){
+  const bar=document.getElementById('task-kategori-bar');
+  if(!bar) return;
+  const eski=bar.querySelector('#task-ureme-kopru');
+  if(_taskKategori==='ureme'){
+    if(!eski) bar.insertAdjacentHTML('beforeend',_uremeChipKopruHtml(true));
+  }else if(eski&&eski.remove) eski.remove();
 }
 
 // ──────────────────────────────────────────
@@ -248,24 +284,30 @@ function _dogumAnneBazliTekillestir(births){
   return [...m.values()];
 }
 /**
- * Aktif hayvan sayısını, gebe hayvan sayısını, aktif hastalık sayısını, sütten kesilmesi gereken buzağı sayısını ve bekleyen görev sayısını içeren bir dashboard satırı HTML elemanı döndürür.
+ * Aktif hayvan sayısını, gebe hayvan sayısını, aktif hastalık sayısını, sütten kesilmesi gereken buzağı sayısını, bekleyen görev sayısını ve Ovsync takip özetini içeren bir dashboard satırı HTML elemanı döndürür.
  * @param {Array} animals Aktif hayvan listesini temsil eden dizi.
  * @param {Array} gebeTohs Gebe hayvan listesini temsil eden dizi.
  * @param {Array} diseases Aktif hastalık kayıtlarını temsil eden dizi.
  * @param {Array} tasks Bekleyen görev listesini temsil eden dizi.
  * @param {number} badge Özel durum göstergesi (badge) için sayısal değer.
- * @returns {string} Dashboard istatistik satırını oluşturan HTML stringi.
+ * @param {Object} [ovsync] P7 6. hücre verisi: {sinif:'alert'|'warn'|'ok', soru:boolean, sayi:number|null} — loadDash _ovsyncStatSinif'tan üretir; eksikse hücre dürüst 'warn' + '?' basar (sessiz varsayılan YASAK — §7.8).
+ * @returns {string} Dashboard istatistik satırını oluşturan HTML stringi (R4: 6. hücre 2 kolonlu grid'in son satırını tamamlar).
  */
-function _dashStatRow(animals,gebeTohs,diseases,tasks,badge){
+function _dashStatRow(animals,gebeTohs,diseases,tasks,badge,ovsync){
   const _taskCls=tasks.length>0?'warn':'ok';
   // Sayaç = kesim vakti gelenler (suttenKesimeHazirSec) — modal rozet kümesiyle birebir aynı
   const sutBuzagiSayisi=suttenKesimeHazirSec(animals,(typeof suttenKesmeEsigi==='function')?suttenKesmeEsigi():60).length;
+  // P7 (K7): 6. hücre — sınıf kuralı _ovsyncStatSinif (loadDash'te); sayı = aktif zincir (kpa.aktif); bayat/hata → '?'
+  const _ov=(ovsync&&typeof ovsync==='object')?ovsync:null;
+  const _ovCls=_ov&&typeof _ov.sinif==='string'?_ov.sinif:'warn';
+  const _ovSayi=(_ov&&_ov.soru!==true&&typeof _ov.sayi==='number'&&isFinite(_ov.sayi))?String(_ov.sayi):'?';
   return `<div class="dash-row">
     <div class="sc ok" onclick="goTo('suru')"><div class="sv">${animals.length}</div><div class="sl">Aktif Hayvan ›</div></div>
     <div class="sc ok" onclick="showGebe()"><div class="sv">${gebeTohs.length}</div><div class="sl">Gebe ›</div></div>
     <div class="sc ${diseases.length>0?'alert':'ok'}" onclick="showHasta()"><div class="sv">${diseases.length}</div><div class="sl">Aktif Hastalık ›</div></div>
     <div class="sc ${sutBuzagiSayisi>0?'warn':'ok'}" onclick="openSuttenKesModal()"><div class="sv">${sutBuzagiSayisi}</div><div class="sl">🍼 Sütten Kes ›</div></div>
     <div class="sc ${badge>0?'alert':_taskCls}" onclick="goTo('tasks')"><div class="sv">${tasks.length}</div><div class="sl">Bekleyen Görev ›</div></div>
+    <div class="sc ${_ovCls}" onclick="goTo('ovsync')"><div class="sv">${_ovSayi}</div><div class="sl">🔄 Ovsync ›</div></div>
   </div>`;
 }
 /**
@@ -537,6 +579,680 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
   }
   return h;
 }
+
+// ═══ OVSYNC TAKİP SAYFASI (P5 iskelet — G-20260930-OVSYNC-TAKIP-IMPL) ═══
+// Bu iskelet yalnız DURUM ÜRETİR (spec §5/§6b; sessiz boş YASAK) — render P6'da
+// eklenir (renderOvsyncSayfa). Dört durum: (i) bayrak_kapali → açık mesaj;
+// (ii) bayat önbellek → bayat seridi + bayat içerik; (iii) veri yok → açık mesaj;
+// (iv) taze → render (P5'te yer tutucu).
+/**
+ * ovsyncTakipGetir() (js/api.js, P4) çözümünden sayfa durumunu SAF üretir (birim matrisi bunu pinler).
+ * @param {Object|null} getir P4 çözümü: {bayat?:boolean, veri:Object|null, zaman?:number}.
+ * @returns {Object} {tur:'bayrak_kapali'|'bayat'|'veri_yok'|'taze', veri?, zaman?}.
+ */
+function _ovsyncDashDurum(getir){
+  const s=getir||{};
+  const veri=s.veri||null;
+  if(s.bayat) return veri?{tur:'bayat',veri:veri,zaman:s.zaman||null}:{tur:'veri_yok'};
+  if(veri&&veri.bayrak_kapali) return {tur:'bayrak_kapali'};
+  if(veri) return {tur:'taze',veri:veri};
+  return {tur:'veri_yok'};
+}
+/**
+ * Bayat veri seridi etiketi (spec §5): "çevrimdışı · HH:MM verisi".
+ * @param {number|Date|null} zaman Önbelleğin kaydedildiği an (Date.now() ms veya Date).
+ * @returns {string} Etiket metni; zaman okunamıyorsa "çevrimdışı veri".
+ */
+function _ovsyncBayatEtiket(zaman){
+  const d=zaman?new Date(zaman):null;
+  if(!d||isNaN(d.getTime())) return 'çevrimdışı veri';
+  return 'çevrimdışı · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+' verisi';
+}
+/**
+ * Ovsync takip sayfasını yükler: P4 ovsyncTakipGetir'i çağırıp 4 durumdan birini
+ * #ovsync-root'a yazar; render sonrası §6b kaydırma sözleşmesiyle ovsync'ten ayrılırken
+ * saklanan konumu (window._ovsyncScrollY, app.js goTo) geri yükler. Render P6'da gelir.
+ * @returns {Promise<void>}
+ */
+async function loadOvsyncDash(){
+  const root=document.getElementById('ovsync-root');
+  if(!root) return;
+  // Gezinme durumu (§6b): padok filtresi + bölüm açık/kapalı — yazan UI P6'da gelir
+  if(typeof window._curOvsyncPadok==='undefined') window._curOvsyncPadok=null;
+  if(!window._curOvsyncBolum) window._curOvsyncBolum={acik:{}};
+  let getir=null;
+  if(typeof ovsyncTakipGetir==='function'){
+    try{ getir=await ovsyncTakipGetir(window._curOvsyncPadok||null); }
+    catch(_e){ getir={bayat:true,veri:null}; }
+  }else{
+    // P4 henüz yüklenmemişse (paralel geliştirme): önbellek varsa bayat, yoksa açık mesaj
+    const onc=window.__ovsyncTakip||null;
+    getir=onc?{bayat:true,veri:onc.veri,zaman:onc.zaman}:{bayat:true,veri:null};
+  }
+  const durum=_ovsyncDashDurum(getir);
+  if(durum.tur==='taze'){
+    // P6: satır aksiyon motorları IDB eşlemesiyle (RPC satırında case_id/görev id taşınmaz)
+    await _ovsyncBaglamYukle();
+    root.innerHTML=renderOvsyncSayfa(durum.veri);
+  }else if(durum.tur==='bayat'){
+    // P6: bayat serit + bayat İÇERİK (sessiz boş YASAK — son bilinen veri gösterilir)
+    await _ovsyncBaglamYukle();
+    root.innerHTML='<div class="pg-inner"><div style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700;font-size:.74rem;padding:8px 10px;border-radius:8px;margin-bottom:8px">⚠️ '+esc(_ovsyncBayatEtiket(durum.zaman))+'</div>'+renderOvsyncSayfa(durum.veri)+'</div>';
+  }else if(durum.tur==='bayrak_kapali'){
+    root.innerHTML='<div class="pg-inner"><div style="padding:20px 16px;color:var(--ink3)">🔒 Ovsync/PG kuralları kapalı — takip verisi yok</div></div>';
+  }else{
+    root.innerHTML='<div class="pg-inner"><div style="padding:20px 16px;color:var(--ink3)">📡 İnternet yok — takip verisi alınamadı</div></div>';
+  }
+  // §6b: kaydırma sözleşmesi — ovsync'ten ayrılırken kaydedilen konumu geri yükle
+  const ovPg=document.getElementById('pg-ovsync');
+  if(ovPg&&typeof window._ovsyncScrollY==='number') ovPg.scrollTop=window._ovsyncScrollY;
+}
+
+// ═══ OVSYNC TAKİP RENDER (P6 — S0–S4 + KPA şeridi; plan madde P6, design §3/§4/§4b/§5/§7) ═══
+// SAF eşleme ailesi: birim matrisi tests/unit/ovsync-render.test.js pinler (P11 iskeleti).
+// Veri: ovsync_takip_listele RPC (js/api.js P4) — satır alanları design §5. Eşikler
+// yalnız RPC'den (esikler / muayene.kalan_gun); JS'te eşik sabiti YAZILMAZ (§18.13).
+// Satır aksiyonları MEVCUT motorlara: openTaskDet / openCaseDet /
+// _ovsyncBaslatKilitHtml+ovsyncBaslat / _erteleBtnHtml / P9 _muayeneSonucAc köprüsü.
+// RPC satırında case_id ve OVSYNC_BASLAT görev id taşınmadığından (P1 row_j şeması)
+// aksiyon hedefleri IDB'den _ovsyncBaglamKur ile eşlenir; eşleşmeyen satır dürüst
+// "bilinmiyor" gösterir — sessiz varsayılan YASAK (§7.8).
+/**
+ * Bir günün durumunu üretir: RPC `durum` alanı otorite (tek hesap noktası RPC'de);
+ * alan eksik/tanınmayan ise tamamlandi_tarihi + tarih'ten §7.3 durum makinesi
+ * aynasıyla hesaplar; tarih yoksa 'bilinmiyor' (tahmin yok — §7.8).
+ * @param {Object|null} g gunler[] öğesi {gun_no, tarih, planned_time, durum, tamamlandi_tarihi}.
+ * @param {string} bugunIso 'YYYY-MM-DD' (saf test için verilir).
+ * @param {boolean} vakaKapali Vaka kapandıysa açık kalan gün 'uygulanmadi' (RPC CASE 3. dal).
+ * @returns {string} 'tamam'|'planli'|'gecikti'|'uygulanmadi'|'tutarsiz'|'bilinmiyor'.
+ */
+function _ovsyncGunDurumu(g, bugunIso, vakaKapali){
+  if(!g||typeof g!=='object') return 'bilinmiyor';
+  const t=String(g.tarih||'');
+  if(!/^\d{4}-\d{2}-\d{2}/.test(t)) return 'bilinmiyor';
+  const d=g.durum;
+  if(d==='planli'||d==='tamam'||d==='gecikti'||d==='uygulanmadi'||d==='tutarsiz') return d;
+  const tm=g.tamamlandi_tarihi!=null&&g.tamamlandi_tarihi!=='';
+  if(tm&&t>bugunIso) return 'tutarsiz';   // §7.3: gelecek 'tamamlandı' → tutarsiz
+  if(tm) return 'tamam';
+  if(vakaKapali) return 'uygulanmadi';
+  if(t<bugunIso) return 'gecikti';
+  return 'planli';
+}
+/**
+ * Gün durumunu şerit CSS sınıfına eşler (R12 renk kuralları).
+ * @param {string} durum _ovsyncGunDurumu çıktısı.
+ * @returns {string} CSS sınıf adı; tanınmayan → bilinmiyor sınıfı.
+ */
+function _ovsyncGunSinif(durum){
+  const m={tamam:'ovs-g-tamam',planli:'ovs-g-plan',gecikti:'ovs-g-gecikti',uygulanmadi:'ovs-g-soluk',tutarsiz:'ovs-g-tutarsiz'};
+  return m[durum]||'ovs-g-bilinmiyor';
+}
+/**
+ * ISO tarihi 'GG.AA' kısa biçime çevirir (şerit/rozet etiketi; locale bağımsız).
+ * @param {string} iso 'YYYY-MM-DD...' tarihsel dize.
+ * @returns {string} 'GG.AA'; çözülemezse girişin kendisi (boşsa boş).
+ */
+function _ovsyncGunAy(iso){
+  const p=String(iso||'').slice(0,10).split('-');
+  return p.length===3?p[2]+'.'+p[1]:String(iso||'');
+}
+/**
+ * Dashboard 6. stat hücresi sınıf kuralı (P7 _dashStatRow bunu bağlar; plan P7):
+ * S0>0 ∨ muayene vakti dolan>0 → 'alert'; yalnız bekleyen-baslatma>0 → 'warn';
+ * sakin → 'ok'; bayat/hata/okunamayan kpa → 'warn' + soru işareti (§7.8 sessiz yok).
+ * @param {Object|null} kpa RPC kpa alanı {aktif,bugun,geciken,muayene_bekleyen,bekleyen_baslatma,...}.
+ * @param {number} muayeneVakti kalan_gun<=0 olan S2 satır sayısı (satırlardan türetilir).
+ * @param {boolean} gecerli Veri taze mi (bayat/hata=false).
+ * @returns {{sinif:string, soru:boolean}} Sınıf + '?' rozeti bayrağı.
+ */
+function _ovsyncStatSinif(kpa, muayeneVakti, gecerli){
+  if(!gecerli||!kpa||typeof kpa!=='object') return {sinif:'warn',soru:true};
+  const n=x=>(typeof x==='number'&&isFinite(x)?x:null);
+  const bugunN=n(kpa.bugun), gecikenN=n(kpa.geciken), bbN=n(kpa.bekleyen_baslatma);
+  if(bugunN===null||gecikenN===null||bbN===null) return {sinif:'warn',soru:true};
+  const mv=(typeof muayeneVakti==='number'&&isFinite(muayeneVakti))?muayeneVakti:0;
+  if(bugunN>0||gecikenN>0||mv>0) return {sinif:'alert',soru:false};
+  if(bbN>0) return {sinif:'warn',soru:false};
+  return {sinif:'ok',soru:false};
+}
+/**
+ * KPA şeridi (design §3 üst): Aktif · Bugün · Geciken · Muayene bekleyen · Bekleyen
+ * başlatma (toplam; bekleyen_baslatma_takipte>0 → "(N takipte)" alt metni — §10c #8).
+ * Okunamayan alan hücresi 'bilinmiyor' gösterir (§7.8).
+ * @param {Object|null} kpa RPC kpa alanı.
+ * @returns {string} HTML.
+ */
+function _ovsyncKpaHtml(kpa){
+  const k=kpa&&typeof kpa==='object'?kpa:{};
+  const sayi=x=>(typeof x==='number'&&isFinite(x)?String(x):'bilinmiyor');
+  let h='<div class="ovs-kpa">';
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.aktif))+'</b><span>aktif</span></div>';
+  h+='<div class="ovs-kpa-c'+(sayi(k.bugun)!=='bilinmiyor'&&k.bugun>0?' ovs-one':'')+'"><b>'+esc(sayi(k.bugun))+'</b><span>bugün</span></div>';
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.geciken))+'</b><span>geciken</span></div>';
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.muayene_bekleyen))+'</b><span>muayene bekleyen</span></div>';
+  let takipte='';
+  if(typeof k.bekleyen_baslatma_takipte==='number'&&isFinite(k.bekleyen_baslatma_takipte)&&k.bekleyen_baslatma_takipte>0){
+    takipte='<em>('+esc(String(k.bekleyen_baslatma_takipte))+' takipte)</em>';
+  }
+  h+='<div class="ovs-kpa-c"><b>'+esc(sayi(k.bekleyen_baslatma))+'</b><span>bekleyen başlatma</span>'+takipte+'</div>';
+  return h+'</div>';
+}
+/**
+ * Deneme rozeti (§18.14: gösterim denemesi SON DOĞUMDAN beri — RPC deneme_sayisi öyle sayar).
+ * @param {number|null} n deneme_sayisi.
+ * @returns {string} Rozet HTML; n<2 → ''.
+ */
+function _ovsyncDenemeRozeti(n){
+  if(typeof n!=='number'||!isFinite(n)||n<2) return '';
+  return '<span class="ovs-rozet ovs-rozet-deneme">'+esc(String(n))+'. deneme — önceki boş</span>';
+}
+/**
+ * Sapma rozetleri (design §4): kayma 'hedef GG.AA → fiilen +Ng' · 'erken Ng' · 'görevsiz' · 'erken TAI'.
+ * @param {Object|null} sapma RPC sapma alanı.
+ * @returns {string} Rozet HTML'leri; boş sapma → ''.
+ */
+function _ovsyncSapmaRozeti(sapma){
+  if(!sapma||typeof sapma!=='object') return '';
+  let out='';
+  const kg=typeof sapma.kayma_gun==='number'&&isFinite(sapma.kayma_gun)?sapma.kayma_gun:null;
+  if(kg!==null&&kg!==0){
+    if(kg>0){
+      const hedef=sapma.hedef_baslangic?_ovsyncGunAy(sapma.hedef_baslangic)+' → ':'';
+      out+='<span class="ovs-rozet ovs-rozet-kayma">hedef '+esc(hedef)+'fiilen +'+esc(String(kg))+'g</span>';
+    }else{
+      out+='<span class="ovs-rozet ovs-rozet-erken">erken '+esc(String(-kg))+'g</span>';
+    }
+  }
+  if(sapma.erken_tai===true) out+='<span class="ovs-rozet ovs-rozet-erken">erken TAI</span>';
+  if(sapma.gorevsiz_tai===true) out+='<span class="ovs-rozet ovs-rozet-gorevsiz">görevsiz</span>';
+  return out;
+}
+/**
+ * Takipte rozeti (mockup 06): "🔍 takipte · muayene GG.AA SS:DD" (saat taşınıyorsa).
+ * @param {Object|null} takip RPC takip alanı {gorev_id, hedef_tarih, hedef_saat}.
+ * @returns {string} HTML; takip yok → ''.
+ */
+function _ovsyncTakipteRozeti(takip){
+  if(!takip||!takip.hedef_tarih) return '';
+  const saat=takip.hedef_saat?String(takip.hedef_saat).slice(0,5):'';
+  return '<span class="ovs-rozet ovs-rozet-takipte">🔍 takipte</span><span class="ovs-takip-saat">muayene '
+    +esc(_ovsyncGunAy(takip.hedef_tarih))+(saat?' '+esc(saat):'')+'</span>';
+}
+/**
+ * S2 sağ hücresi: kalan_gun>0 → sayaç "muayeneye N gün (GG.AA)"; kalan_gun<=0 →
+ * "muayene vakti · +Ng" rozeti; okunamıyor → "bilinmiyor" (§7.8 — sessiz sayaç yok).
+ * @param {Object|null} muayene RPC muayene alanı {tai_tarihi, muayene_tarihi, kalan_gun}.
+ * @returns {string} HTML.
+ */
+function _ovsyncMuayeneHtml(muayene){
+  if(!muayene||typeof muayene.kalan_gun!=='number'||!isFinite(muayene.kalan_gun)){
+    return '<span class="ovs-sayac ovs-sayac-bilinmiyor">bilinmiyor</span>';
+  }
+  if(muayene.kalan_gun>0){
+    return '<span class="ovs-sayac">muayeneye '+esc(String(muayene.kalan_gun))+' gün'
+      +(muayene.muayene_tarihi?' ('+esc(_ovsyncGunAy(muayene.muayene_tarihi))+')':'')+'</span>';
+  }
+  const gecikme=muayene.kalan_gun<0?' · +'+esc(String(-muayene.kalan_gun))+'g':'';
+  return '<span class="ovs-rozet ovs-rozet-mvakti">muayene vakti'+gecikme+'</span>';
+}
+/**
+ * S4 sonlanma rozetleri: toh_sonuc (K6) + kapanış nedeni (§7.4 NULL→'ESKI'; §7.5
+ * köprü eşleşmezse 'bilinmiyor'; tanınmayan enum → 'bilinmiyor' — §7.8).
+ * @param {string|null} closeReason RPC close_reason.
+ * @param {string|null} tohSonuc RPC toh_sonuc.
+ * @returns {string} Rozet HTML'leri.
+ */
+function _ovsyncSonlanmaRozeti(closeReason, tohSonuc){
+  const KR={TOHUMLAMA:'Tohumlama',PG:'PG',IPTAL:'İptal',ERKEN_KAPANIS:'Erken kapanış',ESKI:'Eski/bilinmiyor'};
+  const TOH={'Gebe':'Gebe','Boş':'Boş','Doğum Yaptı':'Doğum Yaptı','Abort':'Abort','Bekliyor':'Bekliyor',bilinmiyor:'bilinmiyor'};
+  const cr=(closeReason==null||closeReason==='')?'ESKI':String(closeReason);
+  const crAd=Object.prototype.hasOwnProperty.call(KR,cr)?KR[cr]:'bilinmiyor';
+  let h=cr==='bilinmiyor'
+    ?'<span class="ovs-rozet ovs-rozet-bilinmiyor">bilinmiyor</span>'
+    :'<span class="ovs-rozet ovs-rozet-kapanis">'+esc(crAd)+'</span>';
+  if(tohSonuc!=null&&tohSonuc!==''){
+    const ts=String(tohSonuc);
+    h+=Object.prototype.hasOwnProperty.call(TOH,ts)&&ts!=='bilinmiyor'
+      ?(ts==='Gebe'?'<span class="ovs-rozet ovs-rozet-gebe">Gebe</span>'
+        :ts==='Boş'?'<span class="ovs-rozet ovs-rozet-bos">Boş</span>'
+        :'<span class="ovs-rozet ovs-rozet-toh">'+esc(TOH[ts])+'</span>')
+      :'<span class="ovs-rozet ovs-rozet-bilinmiyor">bilinmiyor</span>';
+  }
+  return h;
+}
+/**
+ * taban_turu → etiket metni (domain-rules §18.1 kural günleri). Tanınmayan →
+ * 'bilinmiyor' (§7.8). Not: düve etiketi mockup'taki sayı-başlıklı gösterim yerine
+ * 'İlk toh. kuralı' — sayı dizesi eşik-sızıntısı grep'inde yanlış alarm üretmesin
+ * (eşikler RPC'den).
+ * @param {string|null} taban RPC taban_turu (dogum|abort|duve|acik_disi).
+ * @returns {string} Etiket metni.
+ */
+function _ovsyncTabanEtiketi(taban){
+  const m={dogum:'Doğum+51',abort:'Abort+51',duve:'İlk toh. kuralı',acik_disi:'Açık dişi'};
+  if(taban==null||taban==='') return 'bilinmiyor';
+  return Object.prototype.hasOwnProperty.call(m,String(taban))?m[String(taban)]:'bilinmiyor';
+}
+/**
+ * IDB bağlam haritası (RPC satırında case_id ve OVSYNC_BASLAT görev id taşınmaz):
+ * hayvan→en güncel açık OVSYNC_BASLAT görevi, hayvan→aktif/kapalı OVSYNC vakası, kısır kümesi.
+ * @param {Array} gorevler IDB gorev_log satırları.
+ * @param {Array} vakalar IDB cases satırları.
+ * @param {Array} hayvanlar IDB hayvanlar satırları.
+ * @returns {{baslat:Map, vakaAktif:Map, vakaKapali:Map, kisir:Set}} Hayvan-id anahtarlı haritalar.
+ */
+function _ovsyncBaglamKur(gorevler, vakalar, hayvanlar){
+  const baslat=new Map();
+  (Array.isArray(gorevler)?gorevler:[]).forEach(g=>{
+    if(!g||g.gorev_tipi!=='OVSYNC_BASLAT'||g.tamamlandi||g.iptal||!g.hayvan_id) return;
+    const eski=baslat.get(g.hayvan_id);
+    if(!eski||String(g.hedef_tarih||'')>String(eski.hedef_tarih||'')) baslat.set(g.hayvan_id,g);
+  });
+  const vakaAktif=new Map(), vakaKapali=new Map();
+  (Array.isArray(vakalar)?vakalar:[]).forEach(c=>{
+    if(!c||c.protocol_family!=='OVSYNC'||!c.animal_id) return;
+    if(c.status==='active'){ vakaAktif.set(c.animal_id,c); }
+    else if(c.status==='closed'){
+      const eski=vakaKapali.get(c.animal_id);
+      if(!eski||String(c.closed_at||'')>String(eski.closed_at||'')) vakaKapali.set(c.animal_id,c);
+    }
+  });
+  const kisir=new Set();
+  (Array.isArray(hayvanlar)?hayvanlar:[]).forEach(h=>{ if(h&&h.kisir===true&&h.id) kisir.add(h.id); });
+  return {baslat:baslat,vakaAktif:vakaAktif,vakaKapali:vakaKapali,kisir:kisir};
+}
+/**
+ * Kayıtlı IDB bağlamını okur; yoksa/bozuksa boş bağlam (aksiyon çizilmez,
+ * satır 'bilinmiyor' gösterir — duck-typing realm-bağımsız).
+ * @returns {{baslat:Map, vakaAktif:Map, vakaKapali:Map, kisir:Set}}.
+ */
+function _ovsyncBaglamAl(){
+  const w=typeof window!=='undefined'?window:{};
+  const b=w._ovsyncBaglam;
+  if(b&&b.baslat&&typeof b.baslat.get==='function'&&b.vakaAktif&&typeof b.vakaAktif.get==='function'
+     &&b.vakaKapali&&typeof b.vakaKapali.get==='function'&&b.kisir&&typeof b.kisir.has==='function') return b;
+  return {baslat:new Map(),vakaAktif:new Map(),vakaKapali:new Map(),kisir:new Set()};
+}
+/**
+ * IDB'den aksiyon eşleme bağlamını kurar (loadOvsyncDash render öncesi çağırır).
+ * Hata olursa boş bağlam — satırlar dürüst 'bilinmiyor' gösterir.
+ * @returns {Promise<void>}
+ */
+async function _ovsyncBaglamYukle(){
+  try{
+    const gorevler=await getData('gorev_log');
+    const vakalar=await getData('cases');
+    const hayvanlar=await getData('hayvanlar');
+    window._ovsyncBaglam=_ovsyncBaglamKur(gorevler,vakalar,hayvanlar);
+  }catch(_e){
+    window._ovsyncBaglam=_ovsyncBaglamKur([],[],[]);
+  }
+}
+/**
+ * S0 satırın alt tipini türetir (RPC bolum CASE aynası): gecikme>0 ∨ TAI gecikti →
+ * 'geciken'; aksi 'bugun' (row_j'de kpa_tip taşınmadığından satır verisinden).
+ * @param {Object} satir RPC satırı.
+ * @returns {string} 'bugun'|'geciken'.
+ */
+function _ovsyncS0Tip(satir){
+  const g=typeof satir.gecikme_gun==='number'&&isFinite(satir.gecikme_gun)?satir.gecikme_gun:0;
+  if(g>0) return 'geciken';
+  if(satir.tai&&satir.tai.durum==='gecikti') return 'geciken';
+  return 'bugun';
+}
+/**
+ * Gün şeridi: '1./2./3./4. uygulama' nötr etiketler (A10 — ilaç adlı etiket YASAK),
+ * durum noktaları + TAI hücresi (bugünse BUGÜN vurgusu; onclick openTaskDet).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} HTML.
+ */
+function _ovsyncGunlerHtml(satir, bugunIso){
+  const gunler=Array.isArray(satir.gunler)?satir.gunler:[];
+  const kapali=satir.bolum==='S4';
+  let h='<div class="ovs-gunler">';
+  gunler.forEach((g,i)=>{
+    const durum=_ovsyncGunDurumu(g,bugunIso,kapali);
+    const sinif=_ovsyncGunSinif(durum);
+    const tarih=g&&g.tarih?_ovsyncGunAy(g.tarih):'bilinmiyor';
+    h+='<div class="ovs-g '+sinif+'"><span class="ovs-nokta"></span><small>'+(i+1)+'. uygulama'
+      +(durum==='tutarsiz'?' ⚠':'')+'</small><em>'+esc(tarih)+'</em></div>';
+  });
+  const tai=satir.tai||null;
+  if(tai&&tai.gorev_id){
+    const bugunMu=tai.hedef_tarih===bugunIso;
+    const sinif=bugunMu?'ovs-g-bugun':(tai.durum==='gecikti'?'ovs-g-gecikti':'ovs-g-plan');
+    const etiket=bugunMu?'BUGÜN':_ovsyncGunAy(tai.hedef_tarih);
+    const saat=bugunMu&&tai.hedef_saat?' '+esc(String(tai.hedef_saat).slice(0,5)):'';
+    h+='<div class="ovs-g '+sinif+' ovs-g-tai" onclick="event.stopPropagation();openTaskDet(\''+escAttr(tai.gorev_id)
+      +'\')" role="button"><span class="ovs-nokta"></span><small>TAI</small><em>'+esc(etiket)+saat+'</em></div>';
+  }
+  return h+'</div>';
+}
+/**
+ * S0 canlı kartı (mockup: BUGÜN kırmızı vurgu / geciken +Ng): TAI kaydet →
+ * openTaskDet; gün detayı → openCaseDet (vaka eşlemesi IDB bağlamından).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS0SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const vaka=bag.vakaAktif.get(satir.hayvan_id)||null;
+  const tai=satir.tai||null;
+  const gunTop=Array.isArray(satir.gunler)?satir.gunler.length:0;
+  const tamSay=(satir.gunler||[]).filter(g=>_ovsyncGunDurumu(g,bugunIso,false)==='tamam').length;
+  const ozet=gunTop?esc(String(tamSay))+'/'+esc(String(gunTop))+' ilaç günü tamam':'bilinmiyor';
+  const vakaBtn=vaka
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Gün detayı</button>'
+    :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  const taiBtn=(tai&&tai.gorev_id)
+    ?'<button class="ovs-btn-red" onclick="event.stopPropagation();openTaskDet(\''+escAttr(tai.gorev_id)+'\')">▶ TAI kaydet</button>'
+    :'';
+  if(_ovsyncS0Tip(satir)==='bugun'){
+    const saat=(tai&&tai.hedef_saat)?' '+esc(String(tai.hedef_saat).slice(0,5)):'';
+    // TAI metni/butonu YALNIZ RPC tai.hedef_tarih === bugün iken; aksi hâlde RPC tarihi
+    // göreli gün etiketiyle (tarih JS'te hesaplanmaz — design §18.13), buton yok.
+    const taiBugun=!!(tai&&tai.hedef_tarih&&String(tai.hedef_tarih).slice(0,10)===bugunIso);
+    const taiMetin=taiBugun?' — TAI bugün'+saat
+      :(tai&&tai.hedef_tarih?' — TAI '+esc(gunFarkiEtiket(tai.hedef_tarih,bugunIso)||'tarihi bilinmiyor')+saat:'');
+    return '<div class="ovs-kart ovs-bugun-kart"><div class="ovs-k">BUGÜN</div>'+(taiBugun?taiBtn:'')
+      +'<div class="ovs-v"><b>'+esc(satir.kupe_no||'bilinmiyor')+'</b> · '+esc(satir.grup||'bilinmiyor')
+      +taiMetin+'</div>'
+      +'<div class="ovs-v2">'+ozet+(tai&&tai.kaynak?' · kaynak: '+esc(tai.kaynak==='pg'?'PG':'şablon'):'')+'</div>'
+      +'<div class="ovs-alt"><span>'+_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span></div>'
+      +'<div class="ovs-alt"><span class="ovs-bilgi">'+ozet+'</span>'+vakaBtn+'</div>'
+      +'</div>';
+  }
+  const g=typeof satir.gecikme_gun==='number'?satir.gecikme_gun:0;
+  return '<div class="ovs-kart ovs-geciken-kart"><div class="ovs-k ovs-k-geciken">GECİKEN'
+    +(g>0?' +'+esc(String(g))+'g':'')+'</div>'+taiBtn
+    +'<div class="ovs-v"><b>'+esc(satir.kupe_no||'bilinmiyor')+'</b> · '+esc(satir.grup||'bilinmiyor')+'</div>'
+    +_ovsyncGunlerHtml(satir,bugunIso)
+    +'<div class="ovs-alt"><span>'+_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span>'+vakaBtn+'</div>'
+    +'</div>';
+}
+/**
+ * S1 aktif zincir kartı (design §4 satır şeması): kupe + grup + taban + sapma/deneme
+ * rozetleri + gün şeridi + alt bilgi + aksiyonlar (Gün detayı → openCaseDet).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS1SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const vaka=bag.vakaAktif.get(satir.hayvan_id)||null;
+  const gunTop=Array.isArray(satir.gunler)?satir.gunler.length:0;
+  const tamSay=(satir.gunler||[]).filter(g=>_ovsyncGunDurumu(g,bugunIso,false)==='tamam').length;
+  let sira='';
+  if(typeof satir.sonraki_gun==='number'&&isFinite(satir.sonraki_gun)){
+    const idx=(satir.gunler||[]).findIndex(g=>g&&g.gun_no===satir.sonraki_gun);
+    sira=' · sıradaki: '+(idx>=0?(idx+1):satir.sonraki_gun)+'. uygulama';
+  }
+  const vakaBtn=vaka
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Gün detayı</button>'
+    :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  return '<div class="ovs-kart"><div class="ovs-ust"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
+    +'</span><span class="ovs-etiket">'+esc(satir.grup||'bilinmiyor')
+    +'</span><span class="ovs-etiket">'+esc(_ovsyncTabanEtiketi(satir.taban_turu))+'</span>'
+    +_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)
+    +'</div>'
+    +_ovsyncGunlerHtml(satir,bugunIso)
+    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(String(tamSay))+'/'+esc(String(gunTop))+' uygulandı'+esc(sira)+'</span>'+vakaBtn+'</div>'
+    +'</div>';
+}
+/**
+ * S2 sonuç bekleyen kartı (K15): kalan_gun>0 → sayaç (aksiyon yok); kalan_gun<=0 →
+ * "muayene vakti" + satır aksiyonu P9 _muayeneSonucAc köprüsü (_ovsyncMuayeneSatirAc —
+ * muayene_gorev_id NULL ise hayvan detayı; §10d #2). Deneme rozeti §18.14.
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS2SatirHtml(satir, bugunIso){
+  const muayene=satir.muayene||null;
+  const kalan=(muayene&&typeof muayene.kalan_gun==='number'&&isFinite(muayene.kalan_gun))?muayene.kalan_gun:null;
+  const vakti=(kalan!==null&&kalan<=0);
+  const aksiyon=vakti
+    ?'<button class="ovs-aksiyon ovs-aksiyon-mvakti" onclick="_ovsyncMuayeneSatirAc(\''+escAttr(satir.hayvan_id||'')
+      +'\',\''+escAttr(satir.muayene_gorev_id||'')+'\')">🩺 Muayene sonucu</button>'
+    :'';
+  const taiAd=(muayene&&muayene.tai_tarihi)?' · TAI '+esc(_ovsyncGunAy(muayene.tai_tarihi)):' · TAI bilinmiyor';
+  return '<div class="ovs-kart ovs-s2-satir"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+    +esc(satir.kupe_no||'bilinmiyor')+'</b>'+taiAd+_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span>'
+    +_ovsyncMuayeneHtml(muayene)
+    +'</div>'+(vakti?'<div class="ovs-alt">'+aksiyon+'</div>':'')
+    +'</div>';
+}
+/**
+ * S3 başlatma bekleyen kartı: takip satırı (dalga NULL + takip dolu) → mor vurgu +
+ * 🔍 rozet; görevli → pencere kilidi/Başlat/İptal MEVCUT _ovsyncBaslatKilitHtml'den +
+ * _erteleBtnHtml; görevsiz → kural günü notu (§18.2; satırdan görev doğmaz).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS3SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const takip=satir.takip||null;
+  if(!satir.dalga_anahtari&&takip){
+    return '<div class="ovs-kart ovs-s3-satir ovs-takip-satir"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+      +esc(satir.kupe_no||'bilinmiyor')+'</b> '+_ovsyncTakipteRozeti(takip)+'</span></div>'
+      +'<div class="ovs-v2 ovs-takip-meta">Takip muayenesi bekleniyor — kızgınlıkta ya da PG/Ovsync ile otomatik kapanır</div>'
+      +'</div>';
+  }
+  const gorev=bag.baslat.get(satir.hayvan_id)||null;
+  const kisir=bag.kisir.has(satir.hayvan_id);
+  const pencereGun=(typeof satir.dalga_anahtari==='string')?_ovsyncBaslatPencereGunu({hedef_tarih:satir.dalga_anahtari}):null;
+  const gorevliBtn=gorev
+    ?_ovsyncBaslatKilitHtml(kisir,gorev.id,satir.hayvan_id,false,pencereGun)+_erteleBtnHtml(gorev)
+    :'<span class="ovs-kilit">📅 Görev hedef gününde otomatik açılır</span>';
+  const hedefAd=satir.dalga_anahtari?_ovsyncGunAy(satir.dalga_anahtari):'bilinmiyor';
+  const gunMetni=(typeof pencereGun==='number')
+    ?(pencereGun<=0?'bugün':(pencereGun===1?'yarın':pencereGun+' gün'))
+    :'';
+  const tabanAd=_ovsyncTabanEtiketi(satir.taban_turu);
+  return '<div class="ovs-kart ovs-s3-satir"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+    +esc(satir.kupe_no||'bilinmiyor')+'</b> · '+esc(satir.grup||'bilinmiyor')
+    +' · hedef <b>'+esc(hedefAd)+'</b>'+(gunMetni?' ('+esc(gunMetni)+')':'')
+    +'</span>'+gorevliBtn+'</div>'
+    +'<div class="ovs-alt"><span>'
+    +(tabanAd!=='bilinmiyor'?'<span class="ovs-etiket">'+esc(tabanAd)+'</span>':'')
+    +_ovsyncTakipteRozeti(takip)
+    +'</span></div>'
+    +'</div>';
+}
+/**
+ * S4 sonlanan kartı: sonlanma rozeti + toh_sonuc (K6) + salt-okuma vaka detayı
+ * (IDB vakaKapali eşlemesi; openCaseDet).
+ * @param {Object} satir RPC satırı.
+ * @param {string} bugunIso 'YYYY-MM-DD'.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncS4SatirHtml(satir, bugunIso){
+  const bag=_ovsyncBaglamAl();
+  const vaka=bag.vakaKapali.get(satir.hayvan_id)||null;
+  const vakaBtn=vaka
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Vaka</button>'
+    :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  return '<div class="ovs-kart ovs-s4-kart ovs-sonlanan"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
+    +esc(satir.kupe_no||'bilinmiyor')+'</b> '+_ovsyncSonlanmaRozeti(satir.close_reason,satir.toh_sonuc)
+    +_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span></div>'
+    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(satir.toh_sonuc||'bilinmiyor')+'</span>'+vakaBtn+'</div>'
+    +'</div>';
+}
+/**
+ * Tanınmayan bölümden gelen satır — sessizce düşürülmez (§7.8): kupe + bilinmiyor rozeti.
+ * @param {Object} satir RPC satırı.
+ * @returns {string} Kart HTML'i.
+ */
+function _ovsyncBilinmeyenSatirHtml(satir){
+  return '<div class="ovs-kart ovs-satir-bilinmiyor"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
+    +'</span><span class="ovs-rozet ovs-rozet-bilinmiyor">bölüm bilinmiyor</span></div>';
+}
+/**
+ * Satırı bölümüne göre karta çevirir (P6 üretim yüzeyi — P7 veri okur, render burada).
+ * @param {Object} satir RPC satırı (design §5 şeması).
+ * @param {string} [bugunIso] 'YYYY-MM-DD' (saf test için; yoksa bugun()).
+ * @returns {string} Kart HTML'i; satır yok → ''.
+ */
+function _ovsyncSatirHtml(satir, bugunIso){
+  if(!satir||typeof satir!=='object') return '';
+  const bg=(typeof bugunIso==='string'&&bugunIso)?bugunIso:(typeof bugun==='function'?bugun():'');
+  const b=satir.bolum;
+  if(b==='S0') return _ovsyncS0SatirHtml(satir,bg);
+  if(b==='S1') return _ovsyncS1SatirHtml(satir,bg);
+  if(b==='S2') return _ovsyncS2SatirHtml(satir,bg);
+  if(b==='S3') return _ovsyncS3SatirHtml(satir,bg);
+  if(b==='S4') return _ovsyncS4SatirHtml(satir,bg);
+  return _ovsyncBilinmeyenSatirHtml(satir);
+}
+/**
+ * S1 satırlarını dalga_anahtari'na göre gruplar; 1 hayvanlı dalgalar tekil havuza düşer.
+ * @param {Array} satirlar S1 satırları.
+ * @returns {{gruplar:Array<[string,Array]>, tekil:Array}}.
+ */
+function _ovsyncDalgaGrupla(satirlar){
+  const g=new Map(); const tekil=[];
+  (satirlar||[]).forEach(s=>{
+    const d=s&&s.dalga_anahtari?s.dalga_anahtari:null;
+    if(!d){ tekil.push(s); return; }
+    if(!g.has(d)) g.set(d,[]);
+    g.get(d).push(s);
+  });
+  const gruplar=[];
+  g.forEach((liste,anahtar)=>{ if(liste.length>=2) gruplar.push([anahtar,liste]); else tekil.push(liste[0]); });
+  return {gruplar:gruplar,tekil:tekil};
+}
+/**
+ * Bölüm bölümü: başlık + kartlar; satır listesi boşsa '' (bölüm tamamen gizli — S0 kuralı).
+ * @param {string} bolumAd 'S0'..'S4'.
+ * @param {Array|null} satirlar Bu bölümün satırları.
+ * @param {string} [bugunIso] 'YYYY-MM-DD'.
+ * @param {string} [govde] Başlık altındaki hazır gövde (S3/S4 özel render'ı için).
+ * @param {string} [altNot] Başlıktaki alt sayı metni.
+ * @returns {string} HTML; satır yok → ''.
+ */
+function _ovsyncBolumHtml(bolumAd, satirlar, bugunIso, govde, altNot){
+  const liste=Array.isArray(satirlar)?satirlar.filter(Boolean):[];
+  if(!liste.length) return '';
+  const basliklar={S0:'S0 · Bugün & Geciken',S1:'S1 · Aktif zincirler',S2:'S2 · Sonuç bekleyenler',S3:'S3 · Başlatılmayı bekleyenler',S4:'S4 · Sonlananlar'};
+  const baslik=Object.prototype.hasOwnProperty.call(basliklar,bolumAd)?basliklar[bolumAd]:(bolumAd||'bilinmiyor')+' · bilinmiyor';
+  const katla=(bolumAd==='S4')?'<span class="ovs-katla" onclick="_ovsyncS4Katla()">'+(((window._curOvsyncBolum||{}).acik||{}).S4?'▾':'▸')+'</span>':'';
+  return '<div class="ovs-bolum"><div class="ovs-bh"><h2>'+esc(baslik)+katla+'</h2>'
+    +'<span class="ovs-n">'+esc(altNot||liste.length+' satır')+'</span></div>'
+    +(govde!=null?govde:liste.map(s=>_ovsyncSatirHtml(s,bugunIso)).join(''))
+    +'</div>';
+}
+/**
+ * S3 "tümü" düğmesi — gezinme durumunda (_curOvsyncBolum.acik.S3Tumu, §6b) sayfa yenilenir.
+ * @returns {void}
+ */
+function _ovsyncS3Tumu(){
+  const st=window._curOvsyncBolum=window._curOvsyncBolum||{acik:{}};
+  st.acik.S3Tumu=!st.acik.S3Tumu;
+  loadOvsyncDash();
+}
+/**
+ * S4 katlama düğmesi — gezinme durumunda (_curOvsyncBolum.acik.S4) sayfa yenilenir.
+ * @returns {void}
+ */
+function _ovsyncS4Katla(){
+  const st=window._curOvsyncBolum=window._curOvsyncBolum||{acik:{}};
+  st.acik.S4=!st.acik.S4;
+  loadOvsyncDash();
+}
+/**
+ * S2 "muayene vakti" satır aksiyonu (P6 çağrı noktası — ekran P9'da): görev id doluysa
+ * P9 _muayeneSonucAc (typeof ile — P9 merge edilmemişse kırılmaz); NULL ise hayvan
+ * detayına gider (§10d #2 KARAR: görev ertesi sabah cron'la doğar, satırdan doğmaz).
+ * @param {string} hayvanId Hayvan id.
+ * @param {string} gorevId Açık GEBELIK_KONTROL görev id (satir.muayene_gorev_id).
+ * @returns {void}
+ */
+function _ovsyncMuayeneSatirAc(hayvanId, gorevId){
+  if(gorevId&&typeof _muayeneSonucAc==='function'){ _muayeneSonucAc(gorevId); return; }
+  if(hayvanId&&typeof openDet==='function') openDet(hayvanId);
+}
+/**
+ * Ovsync takip sayfasını SAF üretir (P6 üretim yüzeyi): KPA şeridi + S0–S4 bölümleri.
+ * P7 yalnız __ovsyncTakip.veri.kpa okur; render tamamen burada. Bölümler boşsa gizli;
+ * S3 ilk 5 + "tümü (M)"; S4 katlanır (varsayılan kapalı); tanınmayan bölüm satırları
+ * "bilinmiyor" bölümünde görünür (§7.8).
+ * @param {Object} veri ovsync_takip_listele RPC dönüşü {kpa, esikler, satirlar}.
+ * @param {string} [bugunIso] 'YYYY-MM-DD' (saf test için; yoksa bugun()).
+ * @returns {string} Sayfa HTML'i (#ovsync-root içeriği).
+ */
+function renderOvsyncSayfa(veri, bugunIso){
+  const bg=(typeof bugunIso==='string'&&bugunIso)?bugunIso:(typeof bugun==='function'?bugun():'');
+  const st=(typeof window!=='undefined'?window:{});
+  st._curOvsyncBolum=st._curOvsyncBolum||{acik:{}};
+  st._curOvsyncBolum.acik=st._curOvsyncBolum.acik||{};
+  const acik=st._curOvsyncBolum.acik;
+  const satirlar=(veri&&Array.isArray(veri.satirlar))?veri.satirlar:[];
+  const kpa=(veri&&veri.kpa&&typeof veri.kpa==='object')?veri.kpa:null;
+  const grp={S0:[],S1:[],S2:[],S3:[],S4:[]};
+  const bilinmeyen=[];
+  satirlar.forEach(s=>{
+    if(s&&Object.prototype.hasOwnProperty.call(grp,s.bolum)) grp[s.bolum].push(s);
+    else bilinmeyen.push(s);
+  });
+  let h='';
+  // KPA şeridi — sayı yoksa da çizilir (hücreler 'bilinmiyor'); sessiz boş YASAK
+  h+=_ovsyncKpaHtml(kpa);
+  // S0: canlı kartlar — boşsa bölüm tamamen gizli
+  if(grp.S0.length){
+    const nb=grp.S0.filter(s=>_ovsyncS0Tip(s)==='bugun').length;
+    h+=_ovsyncBolumHtml('S0',grp.S0,bg,null,nb+' bugün · '+(grp.S0.length-nb)+' geciken');
+  }
+  // S1: dalga gruplu kartlar
+  if(grp.S1.length){
+    const dg=_ovsyncDalgaGrupla(grp.S1);
+    let govde='';
+    dg.gruplar.forEach(pair=>{
+      const liste=pair[1];
+      const ilk=(liste[0]&&liste[0].sapma)||{};
+      const hedefAd=_ovsyncGunAy(ilk.hedef_baslangic||pair[0]);
+      const fiilAd=ilk.fiili_baslangic?_ovsyncGunAy(ilk.fiili_baslangic):null;
+      govde+='<div class="ovs-kart ovs-grup"><div class="ovs-gt"><span>Dalga: hedef '+esc(hedefAd)
+        +(fiilAd?' → fiilen '+esc(fiilAd):'')+'</span><span class="ovs-sag">'+esc(String(liste.length))+' hayvan</span></div>'
+        +liste.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
+    });
+    if(dg.tekil.length){
+      govde+='<div class="ovs-kart ovs-grup"><div class="ovs-gt"><span>Tekil başlangıçlar</span><span class="ovs-sag">'
+        +esc(String(dg.tekil.length))+' vaka</span></div>'
+        +dg.tekil.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
+    }
+    h+=_ovsyncBolumHtml('S1',grp.S1,bg,govde,grp.S1.length+' vaka · '+dg.gruplar.length+' dalga');
+  }
+  // S2: sonuç bekleyenler (sayaç/vakti satırları)
+  if(grp.S2.length){
+    h+=_ovsyncBolumHtml('S2',grp.S2,bg,null,grp.S2.length+' tohumlama');
+  }
+  // S3: ilk 5 + "tümü (M)" — takipte rozetli satırlar dahil
+  if(grp.S3.length){
+    const s3Liste=acik.S3Tumu?grp.S3:grp.S3.slice(0,5);
+    const takipteSay=grp.S3.filter(s=>s.takip).length;
+    let govde=s3Liste.map(s=>_ovsyncSatirHtml(s,bg)).join('');
+    if(grp.S3.length>5){
+      govde+='<button class="ovs-daha" onclick="_ovsyncS3Tumu()">'+(acik.S3Tumu?'küçült':'tümü ('+grp.S3.length+')')+'</button>';
+    }
+    h+=_ovsyncBolumHtml('S3',grp.S3,bg,govde,grp.S3.length+' görev · '+takipteSay+' takipte');
+  }
+  // S4: katlanır (varsayılan kapalı) — satır varsa başlık da görünür
+  if(grp.S4.length){
+    const govde=acik.S4?grp.S4.map(s=>_ovsyncSatirHtml(s,bg)).join(''):'';
+    h+=_ovsyncBolumHtml('S4',grp.S4,bg,govde,grp.S4.length+' vaka');
+  }
+  // tanınmayan bölüm satırları — sessizce düşürülmez (§7.8)
+  if(bilinmeyen.length){
+    h+='<div class="ovs-bolum"><div class="ovs-bh"><h2>bilinmiyor</h2><span class="ovs-n">'
+      +esc(String(bilinmeyen.length))+' satır — tanınmayan bölüm</span></div>'
+      +bilinmeyen.map(s=>_ovsyncSatirHtml(s,bg)).join('')+'</div>';
+  }
+  return '<div class="pg-inner">'+h+'</div>';
+}
 /**
  * Dashboard'u yükler: aktif hayvanlar, hastalıklar, görevler, stok, doğumlar, gebelikler, aşı kayıtları ve diğer verileri getirir,
  * kritik stok uyarılarını, geciken görevleri, yaklaşan doğumları, sütten kesme kontrollerini, sessiz hayvanları ve protokol uyarılarını hesaplayarak
@@ -626,9 +1342,30 @@ async function loadDash(){
     const _ddMap={};
     _dtDays.forEach(td=>{const c=_dtCById[td.case_id];if(c?.disease_id)_ddMap[td.id]=_dtDById[c.disease_id]||'';});
 
+    // P7 (K7): 6. stat hücresi verisi — ovsyncTakipGetir (P4) + _ovsyncStatSinif (P6 kuralı).
+    // "muayene vakti dolan" = S2 satırlarında kalan_gun<=0 (kpa'da alan yok — P6 DONE notu 53:
+    // satırlardan türetilir). Taze değilse (bayat/hata/veri-yok) hücre 'warn' + '?' — dürüst.
+    let ovStat=null;
+    try {
+      if (typeof ovsyncTakipGetir === 'function') {
+        const ovDurum = _ovsyncDashDurum(await ovsyncTakipGetir(null));
+        if (ovDurum.tur === 'taze') {
+          const ovVeri = ovDurum.veri || {};
+          const ovSatirlar = Array.isArray(ovVeri.satirlar) ? ovVeri.satirlar : [];
+          const mvVakti = ovSatirlar.filter(s => s && s.bolum === 'S2' && s.muayene
+            && typeof s.muayene.kalan_gun === 'number' && isFinite(s.muayene.kalan_gun)
+            && s.muayene.kalan_gun <= 0).length;
+          const ovKpa = (ovVeri.kpa && typeof ovVeri.kpa === 'object') ? ovVeri.kpa : null;
+          const ovCls = _ovsyncStatSinif(ovKpa, mvVakti, true);
+          ovStat = { sinif: ovCls.sinif, soru: ovCls.soru,
+            sayi: (ovKpa && typeof ovKpa.aktif === 'number' && isFinite(ovKpa.aktif)) ? ovKpa.aktif : null };
+        }
+      }
+    } catch(e) { /* bayat/hata → hücre 'warn' + '?' (aşağıda) */ }
+
     // T3+T4 birleşimi: _dashStatRow/_dashBands/_dashVacAlerts filtreli veriyle;
     // T4 süt buzağı bandı da aktifTasks alır (çıkmış buzağının görev chip'i sızmasın)
-    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
+    const h=_dashStatRow(animals,gebeTohsA,diseases,aktifTasks,badge,ovStat)+_dashBands(negStk,late,todayT,births60D,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,_ddMap,sessizList,sutBuzagiBandi,muayeneList)+_dashVacAlerts(today,vaxLogs,vaccines,aktifIdler);
     el.innerHTML=h||'<div class="empty"><div class="empty-ico">✅</div>Her şey yolunda</div>';
     // Protokol uyarı scanner (badge-only — açık ekranları yenilemez)
     try {
@@ -979,6 +1716,7 @@ async function loadTasks(f,btn,opts){
       _pendChips.querySelectorAll('.fchip').forEach(c=>c.classList.toggle('on', c.dataset.win===_active));
     }
   }
+  _uremeChipKopruSenkron();   // P7-K9: Üreme kategorisi seçiliyse "Tüm ovsync takibi →" köprüsü çubukta
   const el=document.getElementById('tasks-body');
   const srchEl=document.getElementById('task-srch');
   // F4: arama sekme/filtre geçişlerinde korunur — loadTasks temizlemez (eskiden
@@ -1008,7 +1746,7 @@ async function loadTasks(f,btn,opts){
     const _allSeans=await idbGetAll('treatment_day_uygulamalar').catch(()=>[]);
     const _seansById=Object.fromEntries(_allSeans.map(s=>[s.id,s]));
     const _tdById=Object.fromEntries(_allTDays.map(td=>[td.id,td]));
-    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases);   // C3: protocol_family='OVSYNC' kümesi
+    const _uremeCaseIdler=_uremeVakaCaseIds(_allTaskCases,_diseaseById);   // C3+K14: OVSYNC damgası + hastalık-adı kümesi {Ovsync, Kistik Over, Anoestrus}
     if(f==='done'){
       // Besleme zincirinde her görev (ilk hariç) parent_id'li → eski filtre hepsini gizliyordu.
       // Sadece geri alınabilir ucu göster: çocuğu tamamlanmamış besleme tamamlaması.
@@ -1403,6 +2141,26 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene){
   try { detay = JSON.parse(detayJson || '{}'); } catch(e) {}
   const kz = detay.kupe_no ?? detay.kupe ?? '';
 
+  // P10: api.js sarmallarından (rpcSeansTamamla) gelen BİRLEŞİK red — TEK takip
+  // sheet'ine devredilir; seans_admin_id H5 pg_kapi detayında taşınır, onaylı
+  // tekrar TEK çağrı (p_pg_onay + p_takip_onay). Alan eksikse eski generic
+  // gövde (mevcut davranış korunur).
+  if (kod === 'TAKIP_ACIK') {
+    const pgD = detay.pg_kapi || {};
+    const taD = detay.takip_acik || {};
+    const seansId = pgD.seans_admin_id || null;
+    if (seansId && taD.muayene_tarihi) {
+      _takipAcikAc({
+        birlesik: true, pg_kapi: pgD, takip_acik: taD,
+        kupe: pgD.kupe_no || pgD.kupe || '', islem: 'uygulama yapılsın mı?',
+      }, () => rpc('seans_tamamla', {
+        p_seans_admin_id: seansId, p_uygulanmadi: false, p_not: null,
+        p_pg_onay: true, p_pg_gerekce: null, p_takip_onay: true,
+      }));
+      return;
+    }
+  }
+
   let box = document.getElementById('pg-kapi-bs');
   if (box) box.remove();
   box = document.createElement('div');
@@ -1462,36 +2220,630 @@ function _pgKapiKapat(){
   window.__pgKapiTekrar = null; window.__pgKapiToh = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
 }
-// [Boş ata ve uygula]: tohumlama_sonuc_bos → aynı zincirde uygulama p_pg_onay=true
-// (tek ekranda; ikinci dokunuş yarışı buton kilidiyle engellenir — idempotency sunucuda)
+// [Boş ata ve uygula] (P9, spec 10c #2): TEK sarmal RPC — tohumlama_bos_ve_devam
+// PG modu tek transaction'da Boş ataması + PG uygulaması yapar; eski
+// tohumlama_sonuc_bos + __pgKapiTekrar iki-RPC zinciri KALKTI (yarım durum
+// "Boş kaydedildi, PG uygulanamadı" artık imkânsız — T-11). Kapı = seçicinin
+// "Boş + PG" karşılığı; seçici AÇILMAZ (S7). PG ürünü sarmalın KENDİ dry-run
+// son_pg'sinden (yazmasız; seçicinin "son kullanılan PG" ön dolusuyla AYNI kaynak) —
+// sunucu PG_URUN_GEREKLI/PG_DOZ_GEREKLI'nin UI ikizi: çözümsüzse yazma YAPILMAZ.
 /**
- * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular, tohumlamayı Boş yapıp ardından PG'yi uygulamaya çalışır; hata durumunda butonu yeniden etkinleştirir.
+ * PG kapısında "Boş ata ve uygula" işlemini yürütür: gerekçeyi doğrular, dry-run
+ * ile son PG ürününü çözer, sonra TEK çağrıyla tohumlamayı Boş yapıp PG'yi uygular.
  * @returns {Promise<void>} İşlem sonunda değer döndürmez; başarıda kapı modalı kapatılır, hata durumunda hata mesajı gösterilir ve buton geri açılır.
  * @rpc tohumlama_sonuc_bos
  */
 async function _pgKapiBosAtaUygula(){
   const btn = document.getElementById('pg-kapi-onayla');
   const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
-  if (!gerekce || !window.__pgKapiToh || !window.__pgKapiTekrar) return;
+  if (!gerekce || !window.__pgKapiToh) return;
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   try {
-    const r = await rpc('tohumlama_sonuc_bos', { p_tohumlama_id: window.__pgKapiToh, p_notlar: 'PG öncesi değerlendirme: ' + gerekce });
-    toast('Tohumlama Boş yapıldı — PG uygulanıyor…');
-    // T3b: tekrar çağrısı hata atarsa modal AÇIK kalır — yarım durum görünür,
-    // aynı butonla yalnız-PG-retry mümkün (rpc ok:false gövdesi throw'a dönüşür:
-    // eski ölü `if (!r?.ok)` dalı kaldırıldı — T8)
+    let urun = null, doz = null;
     try {
-      await window.__pgKapiTekrar(true, gerekce);
-    } catch (e3) {
-      toast('⚠️ Tohumlama Boş kaydedildi, PG uygulanamadı — aynı butonla tekrar deneyin: ' + (getUserMessage ? getUserMessage(e3) : e3.message), true);
+      const onbilgi = await tohumlamaBosVeDevam({
+        p_secim: null, p_tohumlama_id: window.__pgKapiToh, p_muayene_gorev_id: null,
+        p_pg_urun: null, p_pg_doz: null, p_gun: null, p_saat: null,
+        p_notlar: null, p_onay: false,
+      });
+      if (onbilgi && onbilgi.son_pg && onbilgi.son_pg.stok_id && onbilgi.son_pg.doz != null) {
+        urun = onbilgi.son_pg.stok_id;
+        doz = Number(onbilgi.son_pg.doz);
+      }
+    } catch (e0) {
+      // offline/dry-run hatası: bayat veriyle yazma YAPILMAZ (P8 offline guard'ının aynısı)
+      toast('İnternet yok — işlem için bağlantı gerekli', true);
       if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
       return;
     }
+    if (!urun || !Number.isFinite(doz)) {
+      toast('⚠️ PG ürünü çözümlenemedi — Boş ataması yapılmadı', true);
+      if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
+      return;
+    }
+    // Tek transaction: Boş + PG birlikte ya da hiç (T-11); p_onay = tek onay
+    // (PG_KAPI + takip gerekçesi — sarmal tek p_onay alır, P2b S09b/S11).
+    await tohumlamaBosVeDevam({
+      p_tohumlama_id: window.__pgKapiToh,
+      p_secim: 'PG',
+      p_pg_urun: urun,
+      p_pg_doz: doz,
+      p_notlar: 'PG öncesi değerlendirme: ' + gerekce,
+      p_onay: true,
+    });
+    toast('✅ Tohumlama Boş atandı, PG uygulandı');
     _pgKapiKapat();
+    await pullTables(RPC_TABLES.tohumlama_bos_ve_devam || ['tohumlama', 'gorev_log']);
+    if (typeof loadDash === 'function') loadDash();
   } catch (e2) {
-    toast('❌ ' + getUserMessage(e2), true);
+    // P10: sarmal birleşik/yalın takip red (PG_KAPI:TAKIP_ACIK / TAKIP_ACIK) —
+    // TEK sheet; retry TEK p_onay ile (sarmal imzasında p_takip_onay yok);
+    // çözümlü PG ürünü kapanışta yeniden kullanılır (yeni dry-run YOK).
+    const takipRetry = () => tohumlamaBosVeDevam({
+      p_tohumlama_id: window.__pgKapiToh,
+      p_secim: 'PG',
+      p_pg_urun: urun,
+      p_pg_doz: doz,
+      p_notlar: 'PG öncesi değerlendirme: ' + gerekce,
+      p_onay: true,
+    });
+    if (typeof _takipAcikHata === 'function' && _takipAcikHata(e2, takipRetry, { islem: 'PG uygulansın mı?' })) return;
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e2) : (e2 && e2.message) || e2), true);
     if (btn) { btn.disabled = false; btn.textContent = 'Boş ata ve uygula'; }
   }
+}
+
+// ──────────────────────────────────────────
+// P8: Devam seçici bileşeni — Boş sonrası / muayene sonucu ('bos' + 'muayene' modları;
+// plan.md:559-588; mockup 01/02/03/05 copy sahib onaylı BİREBİR — paraphrase yasak).
+// Açılışta tohumlamaBosVeDevam({p_secim:null,…}) dry-run; bayrak_kapalı → seçici AÇILMAZ (#6);
+// offline/dry-run hatası → seçici AÇILMAZ + "İnternet yok" (bayat veriyle seçim YAPILMAZ).
+// Sunucu seçim değerleri P2b imzasıyla birebir: GEBE|OVSYNC|PG|TAKIP|ERTALE (p_secim literal).
+const _devamSecenekler = {
+  OVSYNC: { etiket: '🔄 Ovsync uygula', rozet: 'hemen', alt: 'Ovsync vakası bugün açılır (4 uygulama + TAI)' },
+  PG: { etiket: '💉 PG uygula', rozet: 'hemen', alt: '+48 saat TAI görevi açılır (uygunsa)' },
+  TAKIP: { etiket: '🔍 Takibe bırak', alt: 'Bu tarihte rektal muayene görevi açılır. Bu arada kızgınlıkta tohumlanır, PG ya da Ovsync yapılırsa takip kendiliğinden kapanır.' }
+};
+// Muayene moduna özel seçenekler (D3 tablosuna copy YAZILMAZ — tek sabit).
+const _muayeneEkstra = {
+  GEBE: { etiket: '✅ Gebe' },
+  ERTALE: { etiket: '📅 Muayeneyi ertele' }
+};
+// D3 tablosu: görev tipi → seçenek sekansı. TAKIP_MUAYENE'de TAKIP YOK
+// (sunucu karşılığı TAKIP_YENIDEN_SECILEMEZ — UI seçenek bile sunmaz).
+const _devamD3 = {
+  GEBELIK_KONTROL: ['GEBE', 'OVSYNC', 'PG', 'TAKIP', 'ERTALE'],
+  TAKIP_MUAYENE: ['GEBE', 'OVSYNC', 'PG', 'ERTALE']
+};
+/**
+ * Görev tipine göre devam seçeneklerini D3 tablosundan türetir (tek kaynak).
+ * @param {string} gorevTipi 'GEBELIK_KONTROL' | 'TAKIP_MUAYENE'.
+ * @returns {string[]} p_secim değerleri sırayla.
+ */
+function _muayeneSecimleri(gorevTipi) {
+  return _devamD3[gorevTipi] || [];
+}
+/**
+ * Seçim anahtarının etiket/alt-metin sabitini döndürür (OVSYNC/PG/TAKIP ortak, GEBE/ERTALE ekstra).
+ * @param {string} secim p_secim anahtarı.
+ * @returns {object|null} {etiket, rozet?, alt?} sabiti ya da null.
+ */
+function _devamSecenekAl(secim) {
+  return _devamSecenekler[secim] || _muayeneEkstra[secim] || null;
+}
+/**
+ * Ana buton etiketi — mockup 01/02/03 birebir; 'muayene' modunda "Boş ata" öneki YOK (S-10).
+ * @param {string} mod 'bos' | 'muayene'.
+ * @param {string} secim p_secim anahtarı.
+ * @param {number} [erteleGun] ERTALE'de +N gün (etiket içinde gösterilir).
+ * @returns {string} Buton etiketi.
+ */
+function _devamButonEtiketi(mod, secim, erteleGun) {
+  const gun = erteleGun || 7;
+  if (mod === 'muayene') {
+    if (secim === 'ERTALE') return `Muayeneyi ertele (+${gun} gün)`;
+    if (secim === 'GEBE') return 'Muayene tamam + Gebe işaretle';
+    if (secim === 'OVSYNC') return 'Muayene tamam + Ovsync başlat';
+    if (secim === 'PG') return 'Muayene tamam + PG uygula';
+    return '';
+  }
+  if (secim === 'OVSYNC') return 'Boş ata + Ovsync başlat';
+  if (secim === 'PG') return 'Boş ata + PG uygula';
+  if (secim === 'TAKIP') return 'Boş ata + Takibe bırak';
+  return '';
+}
+/**
+ * Mockup copy'nin kısa tarih biçimi (GG.AA — fmtTarih tam yılı kırpılır).
+ * @param {string} iso YYYY-MM-DD.
+ * @returns {string} 'GG.AA'.
+ */
+function _devamKisaTarih(iso) {
+  return fmtTarih(iso).slice(0, 5);
+}
+/**
+ * iso tarihinden n gün çıkarır (YYYY-MM-DD; dFwd'ün tersi — lokal gün aritmetiği).
+ * @param {string} iso YYYY-MM-DD.
+ * @param {number} n Geriye alınacak gün sayısı.
+ * @returns {string} YYYY-MM-DD.
+ */
+function _devamGunCikar(iso, n) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() - (n || 0));
+  const p = x => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+/**
+ * Dry-run ön-bilgisinden Ovsync kilit gerekçesi (mockup 02 birebir copy).
+ * @param {object} onbilgi dry-run dönüşü (ovsync_kilitli, kilit_gerekce, kural_tarihi, kalan_gun).
+ * @returns {{kilitli: boolean, gerekce: string|null}} Kilit durumu.
+ */
+function _devamKilitGerekce(onbilgi) {
+  if (!onbilgi || !onbilgi.ovsync_kilitli) return { kilitli: false, gerekce: null };
+  const g = onbilgi.kilit_gerekce;
+  if (g === 'KISIR') return { kilitli: true, gerekce: '🔒 Kısır' };
+  if (g === 'KURAL_GUNU') return { kilitli: true, gerekce: `🔒 Kural günü ${_devamKisaTarih(onbilgi.kural_tarihi)} — ${onbilgi.kalan_gun} gün var` };
+  return { kilitli: true, gerekce: '🔒 Kural günü hesaplanamadı (üreme geçmişi eksik)' };
+}
+/**
+ * Ön seçim: Ovsync; kilitliyse Takibe bırak'a düşer (mockup 02); TAKIP listede yoksa PG.
+ * @param {object} onbilgi dry-run dönüşü.
+ * @param {string[]} secimler seçenek sekansı (bos modu ya da D3).
+ * @returns {string} Ön seçim p_secim anahtarı.
+ */
+function _devamOnSecim(onbilgi, secimler) {
+  if (!_devamKilitGerekce(onbilgi).kilitli) return 'OVSYNC';
+  if (secimler.includes('TAKIP')) return 'TAKIP';
+  return 'PG';
+}
+/**
+ * Erteleme canlı ön izlemesi — '→ GG.AA' (saatsiz) ya da '→ GG.AA SS:DD' (mockup 05).
+ * @param {string} bugunISO Bugünün YYYY-MM-DD'si (hedef hesabı çapası).
+ * @param {number} gun Ertelenecek gün sayısı (+7 ön ayar).
+ * @param {string} saat 'SS:DD' | '' — varsayılan SAATSIZ (§10d #3).
+ * @returns {string} Ön izleme metni.
+ */
+function _erteleOnizleme(bugunISO, gun, saat) {
+  const hedef = dFwd(bugunISO, gun || 7);
+  return saat ? `→ ${_devamKisaTarih(hedef)} ${saat}` : `→ ${_devamKisaTarih(hedef)}`;
+}
+/**
+ * S-7 21 g eşiği — sunucu TAKIP_UZADI formülüyle aynı: (bugun+gun) − takip başlangıcı.
+ * Başlangıç: baglam.bos_tarihi (P9 görev created_at gününü taşır) yoksa
+ * hedef − varsayilan_gun tahmini (P8 sözleşmesi; erteleme zincirinde yaklaşık kalır).
+ * @param {object} baglam {bos_tarihi?}.
+ * @param {object} onbilgi dry-run dönüşü (takip_bilgi, varsayilan_gun).
+ * @param {number} gun Seçilen erteleme günü.
+ * @param {string} bugunISO Bugün YYYY-MM-DD.
+ * @returns {object|null} {toplam, mesaj:'Bu hayvan N gündür takipte, emin misiniz?'} — eşik altında null.
+ */
+function _takip21Onay(baglam, onbilgi, gun, bugunISO) {
+  const bosC = baglam && baglam.bos_tarihi;
+  const bilgi = onbilgi && onbilgi.takip_bilgi;
+  if (!bosC && !(bilgi && bilgi.hedef_tarih)) return null;
+  const varsayilan = (onbilgi && onbilgi.varsayilan_gun) || 7;
+  const baslangic = bosC || _devamGunCikar(bilgi.hedef_tarih, varsayilan);
+  const hedefYeni = dFwd(bugunISO, gun || 7);
+  const toplam = Math.round((new Date(hedefYeni + 'T00:00:00') - new Date(baslangic + 'T00:00:00')) / 86400000);
+  if (!(toplam >= 21)) return null;
+  return { toplam, mesaj: `Bu hayvan ${toplam} gündür takipte, emin misiniz?` };
+}
+/**
+ * PG seçimi Kaydet hazır mı — doz boşsa pasif (sunucu PG_SECIM_GEREKLI'nin UI ikizi).
+ * @param {string} secim Seçim anahtarı.
+ * @param {string|number|null} pgDoz Seçili/veya girilen doz.
+ * @returns {boolean} Hazırlık durumu.
+ */
+function _devamPgdHazirMi(secim, pgDoz) {
+  if (secim !== 'PG') return true;
+  return pgDoz !== null && pgDoz !== undefined && String(pgDoz).trim() !== '';
+}
+/**
+ * Görünür durumdan P2b p_* parametrelerini derler (imza birebir; DEFAULT'lu alanlar açık taşınır).
+ * TAKIP: p_gun = varsayılan_gun, p_saat = null (saat = atama anı — UI girmez).
+ * ERTALE: p_saat boşsa null (varsayılan saatsiz).
+ * @param {object} d Görünür durum (mod, baglam, secim, pgStokId, pgDoz, erteleGun, erteleSaat, onay21, onbilgi?).
+ * @returns {object} tohumlamaBosVeDevam params nesnesi.
+ */
+function _devamRpcParams(d) {
+  const secim = d.secim;
+  const dozHam = d.pgDoz === '' || d.pgDoz === null || d.pgDoz === undefined ? null : Number(String(d.pgDoz).replace(',', '.'));
+  const isTAKIP = secim === 'TAKIP';
+  const isERTALE = secim === 'ERTALE';
+  return {
+    p_tohumlama_id: d.mod === 'bos' ? (d.baglam?.tohumlama_id || null) : null,
+    p_muayene_gorev_id: d.mod === 'muayene' ? (d.baglam?.muayene_gorev_id || null) : null,
+    p_secim: secim,
+    p_pg_urun: secim === 'PG' ? (d.pgStokId || null) : null,
+    p_pg_doz: secim === 'PG' ? (Number.isFinite(dozHam) ? dozHam : null) : null,
+    p_gun: isTAKIP ? (d.onbilgi?.varsayilan_gun || 7) : (isERTALE ? (d.erteleGun || 7) : null),
+    p_saat: isERTALE ? (d.erteleSaat || null) : null,
+    p_notlar: d.baglam?.notlar || null,
+    p_onay: !!d.onay21,
+  };
+}
+/**
+ * Sunucu red kodunu tanır (P8 kümesi); tanınmayan hata → null (normal hata akışı).
+ * Birleşik PG_KAPI:TAKIP_ACIK kendi koduyla ayrıştırılır (TAKIP_ACIK'a düşmez).
+ * @param {string} msg Hata mesajı ('KOD:{json}' biçimi).
+ * @returns {object|null} {kod, detay} ya da null.
+ */
+function _devamRedIsle(msg) {
+  const m = /^(OVSYNC_SECIM_[A-Z_]+|PG_KAPI:TAKIP_ACIK|PG_KAPI:[A-Z_]+|TAKIP_ACIK|TAKIP_UZADI|TOH_SONUCLU|TAKIP_KAPALI|MUAYENE_SONUC_GEREKLI|SECIM_TANIMSIZ|OZELLIK_KAPALI|TAKIP_YENIDEN_SECILEMEZ|GEBE_SONUC_RED)(?::([\s\S]*))?$/.exec(String(msg || ''));
+  if (!m) return null;
+  let detay = {};
+  try { detay = JSON.parse(m[2] || '{}'); } catch (e) {}
+  return { kod: m[1], detay };
+}
+/**
+ * Devam seçiciyi açar: önce dry-run (yan etki yok); bayrak kapalı/offline'da AÇILMAZ.
+ * 'bos' → seçenekler OVSYNC/PG/TAKIP; 'muayene' → D3 tablosundan (baglam.gorev_tipi).
+ * @param {string} mod 'bos' | 'muayene'.
+ * @param {object} baglam {tohumlama_id?|muayene_gorev_id?, kupe_no, grup?, hayvan_adi?, gorev_tipi?, tohumlama_tarihi?, sperma?, bos_tarihi?}.
+ * @returns {Promise<void>}
+ */
+async function _devamSeciciAc(mod, baglam) {
+  if (mod !== 'bos' && mod !== 'muayene') return;
+  const eski = document.getElementById('devam-secici-bs');
+  if (eski) eski.remove();
+  let onbilgi = null;
+  try {
+    onbilgi = await tohumlamaBosVeDevam({
+      p_secim: null,
+      p_tohumlama_id: baglam?.tohumlama_id || null,
+      p_muayene_gorev_id: baglam?.muayene_gorev_id || null,
+      p_pg_urun: null, p_pg_doz: null, p_gun: null, p_saat: null,
+      p_notlar: null, p_onay: false,
+    });
+  } catch (e) {
+    // offline guard: bayat veriyle seçim YAPILMAZ — seçici açılmaz.
+    toast('İnternet yok — devam seçimi için bağlantı gerekli', true);
+    return;
+  }
+  if (!onbilgi || onbilgi.bayrak_kapali) {
+    // #6: kurallar kapalı — bugünkü Boş davranışı yaşar (S-5; bağlama P9'da).
+    toast('Ovsync/PG kuralları kapalı — Boş kaydı mevcut akışla yapılır');
+    return;
+  }
+  const secimler = mod === 'muayene' ? _muayeneSecimleri(baglam?.gorev_tipi) : ['OVSYNC', 'PG', 'TAKIP'];
+  window.__devamSecici = {
+    mod,
+    baglam: baglam || {},
+    onbilgi,
+    secimler,
+    kilit: _devamKilitGerekce(onbilgi),
+    secim: _devamOnSecim(onbilgi, secimler),
+    erteleGun: onbilgi.varsayilan_gun || 7,
+    erteleSaat: '',
+    pgStokId: onbilgi.son_pg?.stok_id || null,
+    pgDoz: onbilgi.son_pg?.doz != null ? String(onbilgi.son_pg.doz) : '',
+    onay21: false,
+    acik: true,
+    isleniyor: false,
+  };
+  _devamSeciciRender();
+  history.pushState({ devam_secici: true }, '', '');
+}
+/**
+ * Seçiciyi kapatır (_pgKapiKapat deseni: div remove + history geri girişli).
+ * @returns {void}
+ */
+function _devamSeciciKapat() {
+  const box = document.getElementById('devam-secici-bs');
+  if (box) box.remove();
+  window.__devamSecici = null;
+  if (history.state?.devam_secici) { globalThis._modalBackGuard = true; history.back(); }
+}
+/**
+ * Seçici içeriğini (başlık + seçenek kartları + iç içe bölümler) çizer.
+ * Copy mockup 01/02/03/05 birebir; stil _pgKapiAc inline deseni (index.html CSS gereksiz).
+ * @returns {void}
+ */
+function _devamSeciciRender() {
+  const st = window.__devamSecici;
+  if (!st?.acik) return;
+  let box = document.getElementById('devam-secici-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'devam-secici-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _devamSeciciKapat(); };
+
+  const b = st.baglam;
+  let eyebrow = `${esc(b.kupe_no || '—')}${b.grup ? ' · ' + esc(b.grup) : ''}`;
+  let baslik = '';
+  let ustCipler = '';
+  let sonucBloku = '';
+  let bilgiKutu = '';
+  let linkButon = '';
+  if (st.mod === 'bos') {
+    // mockup 01: TAI GG.AA · N. deneme (bu laktasyon)
+    const tarihKisa = b.tohumlama_tarihi ? _devamKisaTarih(b.tohumlama_tarihi) : '';
+    baslik = `TAI ${esc(tarihKisa || '—')} · ${esc(String(st.onbilgi.deneme_sayisi ?? '?'))}. deneme (bu laktasyon)`;
+    if (b.sperma) ustCipler += `<span class="chip">${esc(b.sperma)}</span>`;
+    if (b.grup) ustCipler += `<span class="chip">${esc(b.grup)}</span>`;
+    if (b.dogum_gunu) ustCipler += `<span class="chip">${esc(b.dogum_gunu)}</span>`;
+    sonucBloku = `
+      <div style="font-size:.75rem;font-weight:700;color:var(--ink3);margin-bottom:6px;text-transform:uppercase">Sonuç Güncelle</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <div style="flex:1;text-align:center;padding:12px;border-radius:12px;border:2px solid var(--card3);font-weight:700;font-size:.9rem;color:var(--ink2)">✅ Gebe</div>
+        <div style="flex:1;text-align:center;padding:12px;border-radius:12px;border:2px solid var(--red);background:rgba(192,50,26,.1);color:var(--red);font-weight:700;font-size:.9rem">❌ Boş</div>
+      </div>`;
+  } else {
+    // K15: GEBELIK_KONTROL ve TAKIP_MUAYENE aynı ekran — başlık görev tipine göre.
+    const gebelikKontrolu = b.gorev_tipi === 'GEBELIK_KONTROL';
+    eyebrow = gebelikKontrolu ? 'Gebelik kontrolü' : 'Takip muayenesi';
+    baslik = `${gebelikKontrolu ? '🔬 Gebelik kontrolü — Küpe' : '🔬 Takip muayenesi — Küpe'} ${esc(b.kupe_no || '—')}`;
+    if (!gebelikKontrolu) {
+      // mockup 05 bilgi kutusu: Boş atandı GG.AA · takip N. gün
+      const bosGun = b.bos_tarihi || (st.onbilgi.takip_bilgi?.hedef_tarih ? _devamGunCikar(st.onbilgi.takip_bilgi.hedef_tarih, st.onbilgi.varsayilan_gun || 7) : null);
+      const sira = bosGun && st.onbilgi.takip_bilgi?.hedef_tarih
+        ? Math.max(1, Math.round((new Date(st.onbilgi.takip_bilgi.hedef_tarih + 'T00:00:00') - new Date(bosGun + 'T00:00:00')) / 86400000))
+        : null;
+      if (bosGun) bilgiKutu = `<div style="background:var(--card2);border-radius:10px;padding:10px 12px;font-size:.8rem;color:var(--ink2);margin-bottom:14px">Boş atandı <b>${esc(_devamKisaTarih(bosGun))}</b>${sira ? ` · takip <b>${esc(String(sira))}</b>. gün` : ''}</div>`;
+      linkButon = `<button class="btn" data-action="devam-kizginlik-gecis" style="margin-top:6px;background:none;border:none;color:var(--blue);font-weight:700;text-decoration:underline;padding:8px;font-size:.85rem">🐄 Kızgınlıkta → tohumlama kaydına geç</button>`;
+    }
+  }
+
+  // Seçenek kartları (D3 tablosu / bos seti — copy yalnız sabitlerden)
+  let kartlar = '';
+  for (const secim of st.secimler) {
+    const s = _devamSecenekAl(secim);
+    if (!s) continue;
+    const secili = st.secim === secim;
+    const kilitli = secim === 'OVSYNC' && st.kilit.kilitli;
+    let ic = '';
+    if (secim === 'ERTALE' && secili) {
+      ic = `
+        <div style="margin-top:10px;padding-left:30px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="fi" data-input="devam-girdi" data-alan="erteleGun" type="number" min="1" max="60" value="${escAttr(String(st.erteleGun))}" style="width:56px;text-align:center;padding:7px 10px;font-weight:600">
+            <span style="font-size:.8rem;color:var(--ink3)">gün</span>
+            <input class="fi" data-input="devam-girdi" data-alan="erteleSaat" type="time" value="${escAttr(st.erteleSaat)}" style="padding:7px 10px;font-weight:600" title="Saat (boş = saatsiz)">
+            <span id="devam-onizleme" style="font-size:.78rem;color:var(--ink2);font-weight:600;background:var(--card2);padding:6px 10px;border-radius:8px">${esc(_erteleOnizleme(bugun(), st.erteleGun, st.erteleSaat))}</span>
+          </div>
+        </div>`;
+    }
+    if (secim === 'PG' && secili) {
+      const son = st.onbilgi.son_pg;
+      const urunEtiketi = son ? `${son.urun_adi || 'PG ürünü'}${son.doz != null ? ` ${son.doz}` : ''}${son.birim ? ` ${son.birim}` : ''}` : 'Ürün seç…';
+      ic = `
+        <div style="margin-top:10px;padding-left:30px">
+          <div style="font-size:.7rem;font-weight:700;color:var(--ink3);margin-bottom:6px">Ürün ve doz (son kullanılan, değiştirilebilir)</div>
+          <select class="fi" data-change="devam-urun" style="padding:8px 10px;font-size:.82rem;font-weight:600;background:#fff;border:1.5px solid var(--card3);border-radius:8px">
+            <option value="">Ürün seç…</option>
+            ${son && son.stok_id ? `<option value="${escAttr(String(son.stok_id))}" ${st.pgStokId === son.stok_id ? 'selected' : ''}>${esc(urunEtiketi)}</option>` : ''}
+          </select>
+        </div>`;
+    }
+    kartlar += `
+      <div data-action="devam-secici-sec" data-secim="${escAttr(secim)}" style="border:2px solid ${secili ? 'var(--green)' : 'var(--card3)'};${kilitli ? 'opacity:.75;' : ''}border-radius:14px;padding:12px 14px;margin-bottom:9px;background:${secili ? 'rgba(78,154,42,.06)' : '#fff'}">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${secili ? 'var(--green)' : '#b7c2ab'};flex-shrink:0;display:flex;align-items:center;justify-content:center;${secili ? `background:radial-gradient(circle, var(--green) 45%, transparent 47%);` : ''}"></div>
+          <div style="font-size:.92rem;font-weight:700;color:var(--ink)">${esc(s.etiket)}</div>
+          ${s.rozet && !kilitli ? `<span style="font-size:.6rem;font-weight:700;color:var(--green);background:rgba(78,154,42,.14);border-radius:8px;padding:2px 7px;margin-left:auto;white-space:nowrap">${esc(s.rozet)}</span>` : ''}
+        </div>
+        ${kilitli ? `<div style="font-size:.76rem;color:var(--amber);margin-top:5px;padding-left:30px">${esc(st.kilit.gerekce)}</div>` : (s.alt ? `<div style="font-size:.76rem;color:var(--ink3);margin-top:5px;padding-left:30px;line-height:1.4">${esc(s.alt)}</div>` : '')}
+        ${ic}
+      </div>`;
+  }
+
+  const pgPasif = st.secim === 'PG' && !_devamPgdHazirMi('PG', st.pgDoz);
+  const etiket = _devamButonEtiketi(st.mod, st.secim, st.erteleGun);
+
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));max-height:86vh;overflow:auto">
+    <div style="width:36px;height:4px;background:var(--card3);border-radius:2px;margin:0 auto 10px"></div>
+    <div style="padding:0 0 12px;border-bottom:1px solid var(--card2)">
+      <div style="font-size:.68rem;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.07em">${eyebrow}</div>
+      <div style="font-size:1.05rem;font-weight:800;color:var(--ink);margin-top:4px">${baslik}</div>
+      ${ustCipler ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${ustCipler}</div>` : ''}
+    </div>
+    <div style="padding:14px 2px 0">
+      ${sonucBloku}
+      ${bilgiKutu}
+      <div style="font-size:.72rem;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Devam nasıl olsun? (zorunlu)</div>
+      ${kartlar}
+      <button id="devam-onayla" class="btn" data-action="devam-secici-onayla" style="margin-top:8px;background:var(--green);color:#fff;font-weight:700" ${pgPasif || !etiket ? 'disabled' : ''}>${esc(etiket)}</button>
+      ${linkButon}
+      <div style="font-size:.72rem;color:var(--ink3);margin-top:10px;text-align:center">Sonuç kaydı ve seçilen devam adımı tek işlemde yapılır</div>
+    </div>
+  </div>`;
+  document.body.appendChild(box);
+}
+/**
+ * Seçim değişince kartları yeniden çizer (S3: seçim zorunlu — seçim yapılmadan ana buton pasif).
+ * @param {string} secim p_secim anahtarı.
+ * @returns {void}
+ */
+function _devamSeciciSec(secim) {
+  const st = window.__devamSecici;
+  if (!st?.acik) return;
+  st.secim = secim;
+  _devamSeciciRender();
+}
+/**
+ * Canlı girişler (ertele gün/saat, PG doz/ürün) — tam rerender YAPMADAN
+ * ön izleme + buton etiketi/pasifliğini günceller (input focus korunur).
+ * @param {string} alan 'erteleGun' | 'erteleSaat' | 'pgDoz' | 'pgUrun'.
+ * @param {string} deger Yeni değer.
+ * @returns {void}
+ */
+function _devamSeciciGirdi(alan, deger) {
+  const st = window.__devamSecici;
+  if (!st?.acik) return;
+  if (alan === 'erteleGun') st.erteleGun = Math.max(1, parseInt(deger, 10) || 7);
+  else if (alan === 'erteleSaat') st.erteleSaat = deger || '';
+  else if (alan === 'pgDoz') st.pgDoz = deger;
+  else if (alan === 'pgUrun') st.pgStokId = deger || null;
+  else return;
+  const oniz = document.getElementById('devam-onizleme');
+  if (oniz) oniz.textContent = _erteleOnizleme(bugun(), st.erteleGun, st.erteleSaat);
+  const btn = document.getElementById('devam-onayla');
+  if (btn) {
+    btn.textContent = _devamButonEtiketi(st.mod, st.secim, st.erteleGun);
+    btn.disabled = st.secim === 'PG' ? !_devamPgdHazirMi('PG', st.pgDoz) : false;
+  }
+}
+/**
+ * Muayenede kızgınlık gözlemlendiyse tohumlama kaydına geçiş (mockup 05 link-butonu).
+ * Seçiciyi kapatır, tohumlama kaydını kupe ön-dolu açar.
+ * @returns {void}
+ */
+function _devamKizginlikGecis() {
+  const st = window.__devamSecici;
+  const kupe = st?.baglam?.kupe_no;
+  _devamSeciciKapat();
+  if (kupe && typeof openMWithHayvan === 'function') openMWithHayvan('m-insem', 'i-hid', kupe);
+}
+/**
+ * Ana buton: 21g tek onay (S-7) → tohumlamaBosVeDevam tek çağrı → red tanıma.
+ * Redler: PG_KAPI:* → mevcut _pgKapiHata sarmalı (yeniden kullanım); TAKIP_UZADI → tek onay
+ * (p_onay=true); TAKIP_ACIK(+PG_KAPI:TAKIP_ACIK) → P10 tek sheet noktası (P8: tanıma + bilgilendirme);
+ * MUAYENE_SONUC_GEREKLI → görev zaten kapandı, liste tazelenir; TOH_SONUCLU/TAKIP_KAPALI → ekran tazelenir.
+ * @returns {Promise<void>}
+ */
+async function _devamSeciciOnayla() {
+  const st = window.__devamSecici;
+  if (!st?.acik || st.isleniyor) return;
+  if (st.secim === 'ERTALE' && !st.onay21) {
+    const n = _takip21Onay(st.baglam, st.onbilgi, st.erteleGun, bugun());
+    if (n) {
+      openConfirm('Takip uzatma', n.mesaj, async () => {
+        st.onay21 = true;
+        await _devamSeciciOnayla();
+      });
+      return;
+    }
+  }
+  const btn = document.getElementById('devam-onayla');
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  st.isleniyor = true;
+  try {
+    await tohumlamaBosVeDevam(_devamRpcParams(st));
+    _devamSeciciKapat();
+    toast('✅ Sonuç ve devam adımı kaydedildi');
+    const tablolar = (typeof RPC_TABLES !== 'undefined' && RPC_TABLES.tohumlama_bos_ve_devam) || ['tohumlama', 'gorev_log'];
+    await pullTables(tablolar);
+    loadDash();
+  } catch (e) {
+    st.isleniyor = false;
+    if (btn) { btn.disabled = false; btn.textContent = _devamButonEtiketi(st.mod, st.secim, st.erteleGun); }
+    const mesaj = e?.message || String(e);
+    const red = _devamRedIsle(mesaj);
+    if (!red) {
+      toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : mesaj), true);
+      return;
+    }
+    // PG kapısı — mevcut sarmal (yeniden kullanım; P9'da tekrarDene tek-transaction'a çevrilir)
+    if (red.kod.startsWith('PG_KAPI')) {
+      const tekrar = async (onay, gerekce) => {
+        const p = _devamRpcParams(st);
+        p.p_onay = !!onay;
+        if (gerekce) p.p_notlar = 'PG öncesi değerlendirme: ' + gerekce;
+        return tohumlamaBosVeDevam(p);
+      };
+      _pgKapiHata(e, tekrar);
+      return;
+    }
+    if (red.kod === 'TAKIP_UZADI') {
+      // Tek onay: sunucu TAKIP_UZADI:{toplam_gun} verirse onay p_onay=true ile bir kez tekrarlanır.
+      const gun = red.detay?.toplam_gun;
+      openConfirm('Takip uzatma',
+        gun ? `Bu hayvan ${gun} gündür takipte, emin misiniz?` : 'Bu hayvan 21 günden uzun takipte, emin misiniz?',
+        async () => { st.onay21 = true; await _devamSeciciOnayla(); });
+      return;
+    }
+    if (red.kod === 'MUAYENE_SONUC_GEREKLI') {
+      // Görev başka oturumda kapanmış — liste tazelenir (S-8 hizası).
+      toast('⚠️ Bu muayene görevi zaten sonuçlandı — liste tazeleniyor', true);
+      _devamSeciciKapat();
+      await pullTables(['gorev_log']);
+      loadTasks();
+      return;
+    }
+    if (red.kod === 'TOH_SONUCLU' || red.kod === 'TAKIP_KAPALI') {
+      // Kayıt artık güncel değil (S-8/#9) — ekran tazelenir, seçim uygulanmaz.
+      toast('❌ Bu kayıt güncel değil — ekran tazeleniyor', true);
+      _devamSeciciKapat();
+      loadDash();
+      return;
+    }
+    if (red.kod === 'TAKIP_ACIK' || red.kod === 'PG_KAPI:TAKIP_ACIK') {
+      // P10: birleşik/tekil takip onayı TEK sheet (mockup 04). Sarmal imzasında
+      // p_takip_onay YOK — onay TEK p_onay ile taşınır (20260929000002:989);
+      // seçim parametresi _devamRpcParams(st) aynen korunur.
+      const takipRetry = () => {
+        const p = _devamRpcParams(st);
+        p.p_onay = true;
+        return tohumlamaBosVeDevam(p);
+      };
+      _takipAcikAc({
+        birlesik: red.kod === 'PG_KAPI:TAKIP_ACIK',
+        pg_kapi: red.detay?.pg_kapi || null,
+        takip_acik: _takipDetayCoz(red.kod, red.detay),
+        kupe: st.baglam?.kupe_no || '',
+        islem: st.secim === 'PG' ? 'PG uygulansın mı?'
+          : st.secim === 'OVSYNC' ? 'Ovsync başlatılsın mı?'
+          : st.secim === 'GEBE' ? 'gebe kaydı yapılsın mı?'
+          : 'uygulama yapılsın mı?',
+      }, takipRetry);
+      return;
+    }
+    if (red.kod.startsWith('OVSYNC_SECIM_')) {
+      toast('🔒 Ovsync uygulanamadı — kilit gerekçesine bakın (' + red.kod.replace('OVSYNC_SECIM_', '') + ')', true);
+      return;
+    }
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : mesaj), true);
+  }
+}
+
+// ──────────────────────────────────────────
+// P9: K15 birleşik muayene sonuç akışı — GEBELIK_KONTROL ve TAKIP_MUAYENE AYNI
+// ekranı açar (T-04/T-05 ekran-özdeşliği; §18.17). Girişler: görev detayı/kartı
+// (openTaskDet + detayTamamla), S2 "muayene vakti" satırı (_ovsyncMuayeneSatirAc
+// köprüsü), dashboard 40 g listesi (_muayene40gAc). Gorev jenerik
+// gorev_tamamla'ya ASLA düşmez (DB guard P3b + UI ikizleri).
+/**
+ * Birleşik muayene sonuç ekranını açar: görev bağlamı IDB'den kurulur (openTaskDet
+ * bağlamı, S2 satırı, 40 g listesi ortak kapı) → _devamSeciciAc('muayene', …)
+ * dry-run ile açılır. Görev kapandıysa/bulunamadıysa seçici AÇILMAZ — liste
+ * tazelenir, false döner (openTaskDet yedeği karar verir).
+ * @param {string} muayeneGorevId Açık muayene görev id (GEBELIK_KONTROL | TAKIP_MUAYENE).
+ * @returns {Promise<boolean>} Seçici açıldıysa true.
+ */
+async function _muayeneSonucAc(muayeneGorevId){
+  if(!muayeneGorevId) return false;
+  const gorev=(await idbGetAll('gorev_log')).find(g=>g&&g.id===muayeneGorevId);
+  if(!gorev||gorev.tamamlandi||gorev.iptal){
+    toast('⚠️ Bu muayene görevi artık açık değil — liste tazeleniyor', true);
+    await pullTables(['gorev_log']);
+    if(typeof loadTasks==='function') loadTasks();
+    return false;
+  }
+  const h=(getState('animals')||[]).find(a=>a&&a.id===gorev.hayvan_id);
+  await _devamSeciciAc('muayene',{
+    muayene_gorev_id:gorev.id,
+    gorev_tipi:gorev.gorev_tipi,
+    kupe_no:(h&&(h.kupe_no||h.devlet_kupe))||'',
+    grup:(h&&h.grup)||'',
+    bos_tarihi:_tohGunNormalize(gorev.created_at),   // P8 sözleşmesi: görev kurulum günü
+  });
+  return !!(typeof window!=='undefined'&&window.__devamSecici&&window.__devamSecici.acik);
+}
+/**
+ * Dashboard 40 g listesi satırı (§10d #4 KARAR): acik_gorev_var=true ise IDB
+ * gorev_log'dan hayvanın açık GEBELIK_KONTROL görevi bulunup sonuç ekranı açılır;
+ * görev bulunamazsa (IDB bayat — fail-closed) ya da seçici açılamazsa hayvan
+ * detayı (bugünkü davranış; görev ertesi sabah cron'la doğar — satırdan doğmaz).
+ * @param {string} hayvanId Hayvan id.
+ * @param {boolean} acikGorevVar gebelik_muayene_listele acik_gorev_var bayrağı.
+ * @returns {Promise<void>}
+ */
+async function _muayene40gAc(hayvanId,acikGorevVar){
+  if(!acikGorevVar||!hayvanId){ openDet(hayvanId); return; }
+  const gorev=(await idbGetAll('gorev_log')).find(g=>g&&!g.tamamlandi&&!g.iptal
+    &&g.hayvan_id===hayvanId&&g.gorev_tipi==='GEBELIK_KONTROL');
+  if(gorev&&await _muayeneSonucAc(gorev.id)) return;
+  openDet(hayvanId);
 }
 
 // ──────────────────────────────────────────
@@ -1673,6 +3025,285 @@ async function _topluTekrarGonder(){
   }
 }
 
+// ──────────────────────────────────────────
+// P10: TAKIP_ACIK/PG_KAPI birleşik onay kapısı (plan.md:638-658; mockup 04
+// copy sahib onaylı BİREBİR — paraphrase yasak). _pgKapiHata/_pgKapiAc ikizi.
+// Sunucu alan adları H5 tablosundan (impl-P3b-DONE §7 — uydurma yok):
+//   yalın  TAKIP_ACIK:{muayene_tarihi, muayene_saat}
+//   birleşik PG_KAPI:TAKIP_ACIK:{pg_kapi:{…detay}, takip_acik:{muayene_tarihi, muayene_saat}}
+// Retry imzaları C2: 6 üreticide p_takip_onay (tekil) / p_takip_onaylar (dizi);
+// SARMAlda p_takip_onay YOK — birleşik + takip onayı TEK p_onay ile taşınır
+// (20260929000002:989; sarmala olmayan param PGRST202/404 üretir).
+/**
+ * PG kapı karar kodunun kullanıcı metnini döndürür (_pgKapiAc copy'siyle aynı dil);
+ * ALLOW/ACK_PENDING boş, bilinmeyen kod ham döner. (Harita fonksiyon içinde —
+ * extract-tabanlı test ctx'i üst-seviye const görmez.)
+ * @param {string} karar _pg_kapi karar kodu.
+ * @returns {string} Kullanıcıya gösterilecek gerekçe metni.
+ */
+function _takipPgKararEtiket(karar){
+  if (karar === 'ALLOW' || karar === 'ACK_PENDING') return '';
+  return {
+    REQUIRE_ACK_PENDING: 'Son tohumlama sonucu Bekliyor — PG onayı gerekli',
+    BLOCK_PREGNANT: 'Gebe inekte PG uygulanamaz',
+    BLOCK_CATALOG_UNRESOLVED: 'Ürünün PG katalog bağı belirsiz',
+  }[karar] || (karar || 'bilinmiyor');
+}
+/**
+ * Mockup 04 kısa gün biçimi: '2026-10-05' (ya da ISO) → '05.10'.
+ * @param {string} tarih Tarih (YYYY-MM-DD ya da ISO an).
+ * @returns {string} gg.aa; çözülemediyse boş.
+ */
+function _takipKisaGun(tarih){
+  const g = _tohGunNormalize(tarih);
+  const p = g ? String(g).split('-') : [];
+  return p.length === 3 ? p[2] + '.' + p[1] : '';
+}
+/**
+ * Mockup 04 metin şablonu: "**Küpe 197**, 05.10 14:35'te rektal muayene takibinde.<br>Takip kapatılıp …".
+ * Fiil çağrı noktasından gelir (PG/Ovsync/vaka); kupe yoksa "Bu hayvan" der
+ * (yalın payload'da kupe alanı YOK — H5; kupe UI bağlamından taşınır).
+ * @param {object} detay {takip_acik:{muayene_tarihi,muayene_saat}, kupe?, islem?}.
+ * @returns {string} Sheet metni (HTML).
+ */
+function _takipAcikMetin(detay){
+  const ta = (detay && detay.takip_acik) || {};
+  const gun = _takipKisaGun(ta.muayene_tarihi);
+  const saat = String(ta.muayene_saat || '').slice(0, 5);
+  const kupe = detay && detay.kupe ? '<b>Küpe ' + esc(detay.kupe) + '</b>' : 'Bu hayvan';
+  const zaman = gun && saat ? gun + ' ' + saat + "'te" : (gun ? gun + ' tarihli' : 'açık');
+  const islem = (detay && detay.islem) || 'uygulama yapılsın mı?';
+  return kupe + ', ' + zaman + ' rektal muayene takibinde.<br>Takip kapatılıp ' + islem;
+}
+/**
+ * TAKIP_ACIK red gövdesinden takip detayını çözer — TEK çözümleyici (P12b):
+ * birleşikte (PG_KAPI:TAKIP_ACIK) detay.takip_acik altında; yalın TAKIP_ACIK'ta
+ * gövde DOĞRUDAN detaydır {muayene_tarihi, muayene_saat} (H5 — takip_acik anahtarı
+ * yalnız birleşik payload'ta ve bulk satır-sonucunda). _takipAcikHata +
+ * _devamSeciciOnayla paylaşır (kopya-yapıştır yok).
+ * @param {string} kod Red kodu ('TAKIP_ACIK' | 'PG_KAPI:TAKIP_ACIK').
+ * @param {object} [detay] Ayrıştırılmış payload gövdesi.
+ * @returns {object} Takip detayı (alanlar eksikse {}).
+ */
+function _takipDetayCoz(kod, detay){
+  detay = detay || {};
+  return kod === 'PG_KAPI:TAKIP_ACIK' ? (detay.takip_acik || {}) : detay;
+}
+/**
+ * TAKIP_ACIK hata mesajını analiz eder: yalın TAKIP_ACIK ya da birleşik
+ * PG_KAPI:TAKIP_ACIK ise onay sheet'ini açar ve true döner; değilse false —
+ * çağıran mevcut hata akışına döner. Yalnız-PG kapıları buraya DÜŞMEZ
+ * (_pgKapiHata'nın işi); muayene_tarihi taşımayan TAKIP_ACIK türevleri
+ * (ZATEN_ACIK) H5 alan setine uymadığından sheet açmaz.
+ * @param {Error|Object|null} e Hata nesnesi veya mesaj string'i.
+ * @param {Function} retry Onayda çağrılacak closure: retry(birlesik:boolean) → Promise.
+ * @param {object} [baglam] {kupe?, islem?} — UI bağlamı (payload'da olmayanlar).
+ * @returns {boolean} TAKIP_ACIK/birleşik işlendi ise true.
+ */
+function _takipAcikHata(e, retry, baglam){
+  const msg = e?.message || String(e || '');
+  const m = /^(TAKIP_ACIK|PG_KAPI:TAKIP_ACIK):([\s\S]*)$/.exec(msg);
+  if (!m) return false;
+  let detay = {};
+  try { detay = JSON.parse(m[2] || '{}'); } catch (e2) {}
+  const ta = _takipDetayCoz(m[1], detay);
+  if (!ta.muayene_tarihi) return false;   // ZATEN_ACIK vb. türev — alan uydurma yok
+  const pg = m[1] === 'PG_KAPI:TAKIP_ACIK' ? (detay.pg_kapi || null) : null;
+  _takipAcikAc({
+    birlesik: !!pg,
+    pg_kapi: pg,
+    takip_acik: ta,
+    kupe: (pg && (pg.kupe_no || pg.kupe)) || (baglam && baglam.kupe) || '',
+    islem: (baglam && baglam.islem) || 'uygulama yapılsın mı?',
+  }, retry);
+  return true;
+}
+/**
+ * Birleşik/tekil takip onay bottom-sheet'ini açar (mockup 04 birebir: 🔍 ikon,
+ * "Bu hayvan takipte" başlığı, küpe+zaman+fiil metni, "Evet, takibi kapat ve
+ * uygula" / "Vazgeç" butonları). Birleşikte iki gerekçe alt alta basılır
+ * (PG_KAPI üstte, TAKIP_ACIK altta) — TEK onay butonu.
+ * @param {object} detay {birlesik?, pg_kapi?, takip_acik, kupe?, islem?}.
+ * @param {Function} retry Onayda çağrılacak closure (retry(birlesik) → Promise).
+ * @returns {void}
+ */
+function _takipAcikAc(detay, retry){
+  detay = detay || {};
+  let box = document.getElementById('takip-acik-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'takip-acik-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _takipAcikKapat(); };
+
+  let gerekceHtml = '';
+  if (detay.birlesik && detay.pg_kapi) {
+    // Sunucu birleşik yükünde pg_kapi.karar YOK (H5): karar hata kodu önekinden
+    // (detay.pg_kapi_kod: 'PG_KAPI:REQUIRE_ACK_PENDING' vb.) çözülür; çözülemezse
+    // son tohumlama sonucu; o da yoksa 'bilinmiyor' (fail-closed, uydurma yok).
+    const _pgk = detay.pg_kapi;
+    const _kodM = /^(?:PG_KAPI:)?(REQUIRE_ACK_PENDING|BLOCK_PREGNANT|BLOCK_CATALOG_UNRESOLVED)\b/.exec(String(detay.pg_kapi_kod || ''));
+    const _karar = _pgk.karar || (_kodM ? _kodM[1] : null);
+    const _pgMetin = _karar ? _takipPgKararEtiket(_karar)
+      : (_pgk.tohumlama_sonuc ? 'Son tohumlama sonucu ' + _pgk.tohumlama_sonuc : _takipPgKararEtiket(null));
+    gerekceHtml = '<div style="font-size:.74rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:8px 10px;margin-bottom:6px;text-align:left">💉 PG kapısı: ' + esc(_pgMetin) + '</div>';
+  }
+  const ta = detay.takip_acik || {};
+  const gun = _takipKisaGun(ta.muayene_tarihi);
+  const saat = String(ta.muayene_saat || '').slice(0, 5);
+  gerekceHtml += '<div style="font-size:.74rem;color:var(--ink2);background:var(--card2);border-radius:10px;padding:8px 10px;margin-bottom:6px;text-align:left">🔍 Rektal muayene takibi: ' + esc(gun + (saat ? ' ' + saat : '')) + '</div>';
+
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));text-align:center">
+    <div style="font-size:2rem;margin-bottom:8px">🔍</div>
+    <div style="font-weight:800;font-size:1.05rem;margin-bottom:8px">Bu hayvan takipte</div>
+    <div style="font-size:.86rem;color:var(--ink2);line-height:1.55;margin-bottom:14px">${_takipAcikMetin(detay)}</div>
+    ${gerekceHtml}
+    <button id="takip-acik-onayla" class="btn" style="width:100%;padding:13px;font-weight:700;margin-bottom:8px" onclick="_takipOnayUygula()">Evet, takibi kapat ve uygula</button>
+    <button class="btn" style="width:100%;padding:13px;background:none;border:1.5px solid var(--card3);color:var(--ink2)" onclick="_takipAcikKapat()">Vazgeç</button>
+  </div>`;
+  document.body.appendChild(box);
+  history.pushState({ takip_acik: true }, '', '');
+  window.__takipAcik = { retry: retry || null, birlesik: !!detay.birlesik };
+}
+/**
+ * "Evet, takibi kapat ve uygula" butonu: saklı retry closure'unu birleşik
+ * bayrağıyla çağırır; başarıda sheet kapanır + liste tazelenir; hata toast'u
+ * sonrası sheet AÇIK kalır ve buton geri açılır (ikinci deneme mümkün).
+ * @returns {Promise<void>}
+ */
+async function _takipOnayUygula(){
+  const st = window.__takipAcik;
+  if (!st || typeof st.retry !== 'function') { _takipAcikKapat(); return; }
+  const btn = document.getElementById('takip-acik-onayla');
+  if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
+  try {
+    await st.retry(!!st.birlesik);
+    toast('✅ Takip kapatıldı, işlem uygulandı');
+    _takipAcikKapat();
+    await pullTables(['gorev_log','tohumlama','cases','uygulama_log','islem_log','stok','stok_hareket','treatment_days','treatment_day_uygulamalar','drug_administrations']).catch(() => {});
+    if (typeof loadDash === 'function') loadDash();
+    if (typeof loadTasks === 'function') loadTasks(_curTaskFilter || 'today', null, { skipPull: true });
+  } catch (e) {
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : (e && e.message) || e), true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Evet, takibi kapat ve uygula'; }
+  }
+}
+/**
+ * Takip onay sheet'ini kapatır; state temizler; modal-router back guard'ı.
+ * @returns {void}
+ */
+function _takipAcikKapat(){
+  const box = document.getElementById('takip-acik-bs');
+  if (box) box.remove();
+  window.__takipAcik = null;
+  if (history.state?.takip_acik) { globalThis._modalBackGuard = true; history.back(); }
+}
+// ── P10 D4: bulk satır-bazlı onay listesi (plan.md:652) ──
+// bulk_ilac takip_onay_listesi[] / vaka_toplu_ac takip_acik[] satırları TEK
+// sheet'te satır satır (küpe + iki gerekce alt alta); "Evet, seçilenleri
+// uygula" → retry onaylı ALT KÜMEyle YENİ ÇAĞRI (p_animal_ids = p_takip_onaylar
+// = onaylılar — C2; küme uyuşmazlığı sunucuda TAKIP_ONAY_KUME_UYUMSUZ).
+// Onaysız satırların sonucu listede belirtilir: "⏳ TAKIP_ACIK — uygulanmadı".
+/**
+ * Bulk takip onay sheet'ini açar; satır seçimi DOM-sorgusuz kaptanla
+ * (_takipTopluCek) tutulur; render retry sonrası satır sonuçlarıyla yenilenir.
+ * @param {Array<{id, kupe?, tarih?, saat?, pgKarar?}>} rows Takip engelli satırlar (H5 alan adlarıyla eşlenmiş).
+ * @param {Function} retryFn retry(secilenIdler) → Promise — onaylı alt kümeyle YENİ ÇAĞRI.
+ * @returns {void}
+ */
+function _takipTopluSheet(rows, retryFn){
+  window.__takipToplu = { rows: (rows || []).slice(), retryFn: retryFn || null, secim: new Set(), uygulanan: new Set(), denendi: new Set(), isleniyor: false };
+  let box = document.getElementById('takip-toplu-bs');
+  if (box) box.remove();
+  box = document.createElement('div');
+  box.id = 'takip-toplu-bs';
+  box.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:420;display:flex;align-items:flex-end';
+  box.onclick = e => { if (e.target === box) _takipTopluKapat(); };
+  document.body.appendChild(box);
+  _takipTopluRender();
+  history.pushState({ takip_toplu: true }, '', '');
+}
+/**
+ * Satır checkbox'ının durumunu state'e yazar (inline onchange kaptanı).
+ * @param {string} id Satır hayvan id.
+ * @param {HTMLElement} el Checkbox elementi (this).
+ * @returns {void}
+ */
+function _takipTopluCek(id, el){
+  const st = window.__takipToplu;
+  if (!st) return;
+  if (el && el.checked) st.secim.add(id); else st.secim.delete(id);
+}
+/**
+ * Bulk sheet gövdesini state'ten yeniden kurar: işlenen satırlar "✅ uygulandı",
+ * onaysız denenen satırlar "⏳ TAKIP_ACIK — uygulanmadı" rozeti taşır; kalan
+ * satır varken buton "Evet, seçilenleri uygula", yokken "Kapat".
+ * @returns {void}
+ */
+function _takipTopluRender(){
+  const st = window.__takipToplu;
+  const box = document.getElementById('takip-toplu-bs');
+  if (!st || !box) return;
+  const satirHtml = r => {
+    const bitti = st.uygulanan.has(r.id);
+    const gun = _takipKisaGun(r.tarih);
+    const saat = String(r.saat || '').slice(0, 5);
+    const pgGerekce = r.pgKarar && _takipPgKararEtiket(r.pgKarar)
+      ? '<div style="font-size:.72rem;color:var(--ink2)">💉 PG kapısı: ' + esc(_takipPgKararEtiket(r.pgKarar)) + '</div>' : '';
+    const sonucRozet = bitti ? '<span style="color:var(--green);font-weight:700"> ✅ uygulandı</span>'
+      : (st.denendi.has(r.id) ? '<span style="color:var(--amber);font-weight:700"> ⏳ TAKIP_ACIK — uygulanmadı</span>' : '');
+    const chk = bitti ? '' : '<input type="checkbox" value="' + escAttr(r.id) + '"' + (st.secim.has(r.id) ? ' checked' : '') + ' onchange="_takipTopluCek(\'' + escAttr(r.id) + '\', this)">';
+    return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:.78rem;margin-bottom:8px">' + chk +
+      '<span><b>' + esc(r.kupe ? 'Küpe ' + r.kupe : r.id) + '</b>' + sonucRozet + '</span>' + pgGerekce +
+      '<div style="font-size:.72rem;color:var(--ink2)">🔍 Rektal muayene takibi: ' + esc(gun + (saat ? ' ' + saat : '')) + '</div></label>';
+  };
+  const kalanVar = st.rows.some(r => !st.uygulanan.has(r.id));
+  const buton = kalanVar
+    ? '<button id="takip-toplu-onayla" class="btn" style="width:100%;padding:13px;font-weight:700;margin-bottom:8px"' + (st.isleniyor ? ' disabled' : '') + ' onclick="_takipTopluUygula()">Evet, seçilenleri uygula</button>'
+    : '<button id="takip-toplu-onayla" class="btn" style="width:100%;padding:13px;font-weight:700;margin-bottom:8px" onclick="_takipTopluKapat()">Kapat</button>';
+  box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
+    <div style="font-weight:800;font-size:.95rem;margin-bottom:10px">🔍 Takipteki hayvanlar</div>
+    ${st.rows.map(satirHtml).join('')}
+    ${buton}
+    <button class="btn" style="width:100%;padding:13px;background:none;border:1.5px solid var(--card3);color:var(--ink2)" onclick="_takipTopluKapat()">Vazgeç</button>
+  </div>`;
+}
+/**
+ * "Evet, seçilenleri uygula": işaretli satırların id dizisiyle retryFn çağrılır
+ * (onaylı alt küme); başarıda işlenen satırlar rozetlenir, onaysızlar
+ * "uygulanmadı" rozetiyle listede kalır; hata toast'u sonrası sheet açık kalır.
+ * @returns {Promise<void>}
+ */
+async function _takipTopluUygula(){
+  const st = window.__takipToplu;
+  if (!st || st.isleniyor) return;
+  const secilen = st.rows.filter(r => !st.uygulanan.has(r.id) && st.secim.has(r.id)).map(r => r.id);
+  if (!secilen.length) { toast('En az bir hayvan seçin', true); return; }
+  st.isleniyor = true;
+  _takipTopluRender();
+  try {
+    await st.retryFn(secilen);
+    secilen.forEach(id => st.uygulanan.add(id));
+    st.rows.forEach(r => { if (!st.uygulanan.has(r.id)) st.denendi.add(r.id); });
+    toast('✅ Seçilen takipteki hayvanlara uygulandı');
+    await pullTables(['gorev_log','cases','uygulama_log','islem_log','stok','stok_hareket']).catch(() => {});
+  } catch (e) {
+    toast('❌ ' + (typeof getUserMessage === 'function' ? getUserMessage(e) : (e && e.message) || e), true);
+  }
+  st.isleniyor = false;
+  _takipTopluRender();
+}
+/**
+ * Bulk takip sheet'ini kapatır; state temizler; modal-router back guard'ı.
+ * @returns {void}
+ */
+function _takipTopluKapat(){
+  const box = document.getElementById('takip-toplu-bs');
+  if (box) box.remove();
+  window.__takipToplu = null;
+  if (history.state?.takip_toplu) { globalThis._modalBackGuard = true; history.back(); }
+}
+
 
 // F4: native date YASAK — metin giriş (gg.aa.yyyy ya da yyyy-mm-dd) → 'YYYY-MM-DD' | null
 /**
@@ -1787,6 +3418,9 @@ function _ovsyncBaslatBtnHtml(t){
  */
 function _erteleBtnHtml(t){
   if(t.tamamlandi||t.iptal) return '';
+  // §18.17: GEBELIK_KONTROL/TAKIP_MUAYENE ertelemesi YALNIZ birleşik sonuç
+  // ekranından (ERTALE) — genel ertele butonu bu tiplerde çizilmez (§10d #3).
+  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE') return '';
   const kural=ertelemeKuralGetir(t.gorev_tipi);
   if(!kural||!kural.ertelenebilir) return '';
   if(!_ertelemeOnline()) return '';
@@ -1822,7 +3456,15 @@ function _istanbulAnIso(gun, saat){ return new Date(gun + 'T' + (saat || '12:00'
 async function ovsyncBaslat(gorevId, hayvanId){
   if(!gorevId) return;
   try{
-    const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId});
+    // P10: TAKIP_ACIK kapısı — takip açıkken başlatma onay sheet'ine düşer;
+    // onaylı tekrar p_takip_onay=true ile (C2 tekil imza).
+    const r=await rpc('start_first_service_protocol',{p_gorev_id:gorevId}).catch(e=>{
+      const takipRetry=()=>rpc('start_first_service_protocol',{p_gorev_id:gorevId,p_takip_onay:true});
+      const kzP10=(getState('animals')||[]).find(a=>a&&a.id===hayvanId);
+      if(typeof _takipAcikHata==='function'&&_takipAcikHata(e,takipRetry,{kupe:kzP10&&(kzP10.kupe_no||kzP10.devlet_kupe)||'',islem:'Ovsync başlatılsın mı?'})) return {_takipAcik:true};
+      throw e;
+    });
+    if(r&&r._takipAcik) return;
     if(r&&r.atlandi){ toast('Atlandı: '+r.atlandi,true); }
     else if(r&&r.zaten){ toast('Protokol zaten başlatılmış'); }
     else{
@@ -2173,7 +3815,7 @@ function renderTask(t,cls='',subs=[],drugs=[],diseaseName=''){
       ${subs.length===0&&t.gorev_tipi==='BESLEME'?`<button class="ck-btn" onclick="event.stopPropagation();togglePendingDone('besleme','${t.id}',this)">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
-      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
+      ${subs.length===0&&t.gorev_tipi!=='ASI_PLANLI'&&t.gorev_tipi!=='ILERI_GEBE_ASI'&&t.gorev_tipi!=='BESLEME'&&t.gorev_tipi!=='TEDAVI_GUN'&&t.gorev_tipi!=='TOHUMLAMA_PLANLI'&&t.gorev_tipi!=='OVSYNC_BASLAT'&&t.gorev_tipi!=='GEBELIK_KONTROL'&&t.gorev_tipi!=='TAKIP_MUAYENE'?`<button class="ck-btn" data-padok="${escAttr(t.padok_hedef||'')}" onclick="event.stopPropagation();togglePendingDone('gorev','${t.id}',this,{padok:this.dataset.padok})">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
       </button>`:''}
     </div>
@@ -2788,7 +4430,7 @@ async function _showSessizList(){
      * @param {Object} m - Hayvan kaydı verisi (hayvan_id, kupe_no, grup, bekiyor_gun, son_tohumlama_tarihi vb. özelliklere sahip).
      * @returns {string} Tıklanabilir bir satır HTML'i.
      */
-    const mRow=m=>`<div class="arow" onclick="_sessizSheetGizle();openDet('${escAttr(m.hayvan_id)}')" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const mRow=m=>`<div class="arow" onclick="_sessizSheetGizle();_muayene40gAc('${escAttr(m.hayvan_id)}', ${m.acik_gorev_var?'true':'false'})" style="cursor:pointer"><div class="arow-left"><div class="arow-id">${esc(m.kupe_no||'?')}<span style="font-size:.6rem;opacity:.6;margin-left:6px">${esc(m.grup||'')}</span></div><div class="arow-sub">${m.bekliyor_gun}. gün Bekliyor · Son tohumlama: ${esc(m.son_tohumlama_tarihi||'—')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
     const muayeneRows=muayene.length?`<div style="font-size:.68rem;font-weight:800;color:var(--red2);margin:12px 0 4px;letter-spacing:.02em">🔬 Gebelik Muayenesi Bekleyenler · ${muayene.length}</div>${muayene.map(mRow).join('')}`:'';
     const rows=muayeneRows+_sessizGrupla(list||[]).map(g=>`<div style="font-size:.68rem;font-weight:800;color:var(--ink3);margin:12px 0 4px;letter-spacing:.02em">${esc(g.grup)} · ${g.items.length}</div>${g.items.map(row).join('')}`).join('');
     // S2 review-fix: sessiz=0 + muayene>0 iken sheet başlığı muayene odaklı olur ("(0)" tuzağı yok)
@@ -2892,6 +4534,22 @@ async function _belirsizApply(val){
     _belirsizData=list; _belirsizSel=new Set(); _belirsizRender();
   }catch(e){toast('Hata: '+e.message,true);}
 }
+/**
+ * 🔔 protokol sheet'indeki "Tüm takibi aç →" linki: sheet'i MEVCUT kapatma yoluyla
+ * (_closeProtokolListe) kapatır, sonra ovsync sayfasına geçer. Kapatma history.back
+ * gerektiriyorsa goTo, geri-geçişin tüketilmesinden sonra (_modalBackDevam) koşar —
+ * aksi hâlde goTo'nun pushState'i bekleyen back'in altında kalırdı.
+ * @returns {void}
+ */
+function _protokolOvsyncGit(){
+  if (document.getElementById('protokol-bs') && history.state?.protokol) {
+    globalThis._modalBackDevam = () => goTo('ovsync');
+    _closeProtokolListe();
+    return;
+  }
+  _closeProtokolListe();
+  goTo('ovsync');
+}
 // ── Protokol sheet'leri tek noktadan kapat (B21) ──
 // DOM remove + (state eşleşiyorsa) history.back. Back'in popstate'ı
 // _modalBackGuard ile tüketilir → liste sheet'i ekranda kalır, dash'e atlanmaz.
@@ -2987,14 +4645,14 @@ async function _showProtokolEkran(){
     window.__ovsyncUyarilar = (ov && ov.uyarilar) || [];
     const ovList = window.__ovsyncUyarilar;
     if (ovList.length) {
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length})<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="_protokolOvsyncGit()" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   } catch(e) {
     // T10: taze çağrı başarısızsa rozet önbelleğine düş (bayat-fallback; konsol uyarısıyla)
     console.warn('ovsync_baslat_uyarilari:', e.message);
     const ovList = Array.isArray(window.__ovsyncUyarilar) ? window.__ovsyncUyarilar : [];
     if (ovList.length) {
-      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
+      ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="_protokolOvsyncGit()" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   }
   // C4 (cila2): K8'in seanslar panel bölümü geri alındı — sahip:
@@ -3772,10 +5430,18 @@ async function _protokolUygulaKaydet(hayvanId, idx){
       const retry = (onay, gerekce) => rpc('hizli_uygulama', {
         ...params, p_pg_onay: onay, p_pg_gerekce: gerekce || null
       });
+      // P10: TAKIP_ACIK/birleşik kapı — _pgKapiHata'dan ÖNCE (PG_KAPI:TAKIP_ACIK
+      // kendi regex'ine düşmeden yakalanır); onaylı tekrar TEK çağrı
+      // (birleşikte p_pg_onay da aynı parametre setinde).
+      const takipRetry = birlesik => rpc('hizli_uygulama', {
+        ...params, p_takip_onay: true, ...(birlesik ? { p_pg_onay: true } : {})
+      });
+      const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
+      if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
       if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
       throw e;
     });
-    if (res?._pgKapi) return;
+    if (res?._pgKapi || res?._takipAcik) return;
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
@@ -3992,10 +5658,18 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
       const retry = (onay, gerekce) => rpc('hizli_uygulama', {
         ...params, p_pg_onay: onay, p_pg_gerekce: gerekce || null
       });
+      // P10: TAKIP_ACIK/birleşik kapı — _pgKapiHata'dan ÖNCE (PG_KAPI:TAKIP_ACIK
+      // kendi regex'ine düşmeden yakalanır); onaylı tekrar TEK çağrı
+      // (birleşikte p_pg_onay da aynı parametre setinde).
+      const takipRetry = birlesik => rpc('hizli_uygulama', {
+        ...params, p_takip_onay: true, ...(birlesik ? { p_pg_onay: true } : {})
+      });
+      const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
+      if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
       if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
       throw e;
     });
-    if (res?._pgKapi) return;
+    if (res?._pgKapi || res?._takipAcik) return;
     if (res?.ok) {
       toast('✅ Uygulama kaydedildi');
       document.getElementById('proto-mini')?.remove();
@@ -5920,7 +7594,33 @@ async function sorunVakaAc(tohId, kizId) {
         p_tani: tani,
         p_tohumlama_id: tohId || null,
         p_notlar: 'Tohumlama sırasında tespit edildi'
+      }).catch(e => {
+        // P10 (C4): kızgınlık sorun vaka yolu da TAKIP_ACIK fail-closed kapısından
+        // geçer — tanıdan bağımsız (P3b); onaylı tekrar p_takip_onay=true ile
+        // başarı zincirini (sheet kapanışı + liste + vakaya git) aynen koşar.
+        const takipRetry = async () => {
+          const res2 = await rpc('kizginlik_vaka_ac', {
+            p_kizginlik_id: kizId,
+            p_tani: tani,
+            p_tohumlama_id: tohId || null,
+            p_notlar: 'Tohumlama sırasında tespit edildi',
+            p_takip_onay: true
+          });
+          document.getElementById('sorun-bs')?.remove();
+          _sorunBsTemizle();
+          await pullTables(['cases','kizginlik_log','tohumlama']);
+          renderSafe();
+          if (res2?.case_id) setTimeout(() => { if (typeof openCaseById === 'function') openCaseById(res2.case_id); }, 400);
+          return res2;
+        };
+        return Promise.resolve(typeof idbGetAll === 'function' ? idbGetAll('kizginlik_log').catch(() => []) : []).then(l => {
+          const kzP10 = (l || []).find(k => k && k.id === kizId);
+          const hayvanP10 = kzP10 && (getState('animals') || []).find(a => a && a.id === kzP10.hayvan_id);
+          if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: hayvanP10 && (hayvanP10.kupe_no || hayvanP10.devlet_kupe) || '', islem: 'vaka açılsın mı?' })) return { _takipAcik: true };
+          throw e;
+        });
       });
+      if (res?._takipAcik) return;
       caseId = res?.case_id;
     } else {
       _sorunPreFill = { tani, kategori: 'Üreme', notlar: 'Tohumlama sırasında tespit edildi' };
@@ -6154,14 +7854,72 @@ async function _uremeDogum(el){
 }
 
 /**
+ * ISO tarih/tarih-saat dizgisini Europe/Istanbul yerel takvim gününe ('YYYY-MM-DD') çevirir.
+ * Z/offset'li timestamptz İstanbul saatine döner (UTC 21:30 = ertesi gün 00:30 — C1
+ * normatif çözücü, spec §10f); saatsiz tarih aynen kalır. fmtTarih'in ilk-10-karakter
+ * kesimi timestamptz'de yanlış gün okur — kalem 11 tarihleri ve bos_tarihi için YASAK.
+ * @param {string} iso ISO tarih/tarih-saat dizgisi.
+ * @returns {string} 'YYYY-MM-DD' yerel takvim günü; boş girişte ''.
+ */
+function _tohGunNormalize(iso){
+  const s=String(iso||'');
+  if(!s) return '';
+  if(/(Z|[+-]\d{2}:\d{2})$/.test(s)){
+    try{
+      return new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(s));
+    }catch(e){ /* düşer: saatsız kuralı */ }
+  }
+  return s.slice(0,10);
+}
+/**
+ * Kalem 11 (D1-UI): düzeltilmiş tohumlamanın iki-satır verisi (saf; P11 testi).
+ * t.sonuc='Gebe' VE islem_log'da bu tohumlamaya ait GEBE_ATAMA kaydının snapshot'ında
+ * bos_duzeltme bloğu varsa {duzeltme:true, bosTarihi, gebeTarihi} döner; izsiz kayıtta
+ * null (tek-satır mevcut görünüm). C1 normatif okuma (v5): GEBE_ATAMA seçiminde
+ * durum 'geri_alindi' OLMAYANlar; çoklu kayıtta tarih DESC, id DESC — EN SON kazanır
+ * (P2b çözücüsünün UI ikizi, S28). Her iki tarih Europe/Istanbul yerel takvim gününe
+ * normalize edilir (bos_atama_tarihi çekirdekten yerel 'date'; GEBE_ATAMA.tarih
+ * timestamptz → aynı dönüşüm).
+ * @param {Object|null} t IDB tohumlama kaydı.
+ * @param {Array|null} islemLogKayitlari IDB islem_log satırları.
+ * @returns {Object|null} {duzeltme:true, bosTarihi:'YYYY-MM-DD', gebeTarihi:'YYYY-MM-DD'} | null.
+ */
+function _tohumlamaGecmisSatirlari(t,islemLogKayitlari){
+  if(!t||t.sonuc!=='Gebe') return null;
+  const kayitlar=Array.isArray(islemLogKayitlari)?islemLogKayitlari:[];
+  const adaylar=kayitlar.filter(l=>l&&l.tip==='GEBE_ATAMA'
+    &&l.ref_tablo==='tohumlama'&&String(l.ref_id)===String(t.id)
+    &&l.durum!=='geri_alindi'
+    &&l.snapshot&&l.snapshot.bos_duzeltme);
+  if(!adaylar.length) return null;
+  adaylar.sort((a,b)=>{
+    const ta=String(a.tarih||''),tb=String(b.tarih||'');
+    if(ta!==tb) return ta<tb?1:-1;                                   // tarih DESC
+    return String(b.id||'').localeCompare(String(a.id||''));         // id DESC
+  });
+  const secili=adaylar[0];
+  const duzeltme=(secili.snapshot&&secili.snapshot.bos_duzeltme)||{};
+  return {
+    duzeltme:true,
+    bosTarihi:_tohGunNormalize(duzeltme.bos_atama_tarihi),
+    gebeTarihi:_tohGunNormalize(secili.tarih),
+  };
+}
+/**
  * Tohumlama kayıtlarını getirir, tarihe göre sıralar ve arama filtresi uygular.
  * Sonuç olarak HTML içeriği oluşturarak verilen DOM elemanına render eder.
+ * Kalem 11: sonuc='Gebe' + GEBE_ATAMA bos_duzeltme izi olan kayıt İKİ sonuç satırı
+ * basar (üstte üstü çizili ❌ Boş giriş tarihi, altta ✅ Gebe muayene tarihi);
+ * tahmini doğum hesabı buraya GELMEZ (mevcut hesap tohumlama.tarih'ten — değişmez).
+ * P9b: her satırın göreli günü KENDİ tarihinden (gunFarkiEtiket, UI-R1).
  * @param {HTMLElement} el Tohumlama kayıtlarının listeleneceği DOM elemanı.
  * @returns {void}
  */
 async function _uremeTohumlama(el){
   let list=await idbGetAll('tohumlama');
   list.sort((a,b)=>(b.tarih||'').localeCompare(a.tarih||''));
+  let islemLoglar=[];
+  try{ islemLoglar=(await idbGetAll('islem_log'))||[]; }catch(e){ islemLoglar=[]; }
 
   // Searchbar filtresi (multi-field: küpe + sperma + sonuç + hayvan adı)
   const _q=trLower(globalThis._tohSearch||'').trim();
@@ -6192,6 +7950,12 @@ async function _uremeTohumlama(el){
       const sc=_gebe?'var(--green)':_scMid;
       const _bekliyor=!_gebe&&!_kotu;
       const _sonucBadge=_kotu?`<span style="background:rgba(192,50,26,.15);color:var(--red);font-size:.72rem;padding:2px 6px;border-radius:8px;font-weight:700;margin-left:4px">${t.sonuc}</span>`:'';
+      // Kalem 11: düzeltilmiş (Boş→Gebe) kayıt İKİ sonuç satırı; izsiz kayıt tek satır.
+      const _satirlar=_tohumlamaGecmisSatirlari(t,islemLoglar);
+      const _subHtml=_satirlar
+        ?`<div class="hist-sub" style="font-size:.78rem"><span style="text-decoration:line-through;color:var(--ink3)">❌ Boş (${esc(fmtTarih(_satirlar.bosTarihi))} · ${esc(gunFarkiEtiket(_satirlar.bosTarihi))})</span></div>`+
+         `<div class="hist-sub" style="font-size:.78rem">${esc(fmtTarih(_satirlar.gebeTarihi))} · <b style="color:var(--green)">✅ Gebe</b> (${esc(gunFarkiEtiket(_satirlar.gebeTarihi))})</div>`
+        :`<div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b>${_sonucBadge}${t.tarih?` · <span style="color:var(--ink3)">${esc(gunFarkiEtiket(t.tarih))}</span>`:''}</div>`;
       return `<div class="hist-row" style="cursor:pointer;display:flex;align-items:center;gap:8px" onclick="openTohDet('${t.id}')">
         <div class="hist-dot" style="background:${dot};flex-shrink:0" role="img" aria-label="${t.sonuc||'Bekliyor'}"></div>
         <div class="hist-main" style="flex:1;min-width:0">
@@ -6199,7 +7963,7 @@ async function _uremeTohumlama(el){
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${esc(kupe)} — ${esc(t.sperma||'?')}</span>
             <span style="flex-shrink:0;background:rgba(176,120,0,.18);color:#7a4f00;font-size:.78rem;padding:2px 6px;border-radius:8px;font-weight:700">${t.deneme_no||1}. Deneme</span>
           </div>
-          <div class="hist-sub" style="font-size:.78rem">${fmtTarih(t.tarih)} · <b style="color:${sc}">${t.sonuc||'Bekliyor'}</b>${_sonucBadge}</div>
+          ${_subHtml}
         </div>
         ${_bekliyor && t.tarih
           ? (()=>{
@@ -8911,6 +10675,13 @@ async function openTaskDet(id){
   // butonuna ULAŞILAMIYORDU ve görevin tek çıkışı gerçekten tohumlamaktı.
   // Artık modal normal açılıyor; tamamla butonu aşağıda forma yönlendiriliyor.
   _curTaskDet=t;
+  // K15 (T-04/T-05): muayene görevinde tıklama birleşik sonuç ekranına gider;
+  // seçici açılamazsa (bayrak kapalı/offline) akış jenerik detay yedeğine düşer —
+  // orada "✅ Tamamlandı" gizlidir (P3b UI ikizi), 🗑 İptal yolu açık kalır
+  // (TOHUMLAMA_PLANLI erken-return dersi).
+  if(t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE'){
+    if(await _muayeneSonucAc(t.id)) return;
+  }
   const today=bugun();
   const hekim=[...HEKIMLER,...(_customHekimler||[])].find(h=>h.id===t.hekim_id);
   const isLate=t.hedef_tarih<today;
@@ -8955,6 +10726,10 @@ async function openTaskDet(id){
   // TOHUMLAMA_PLANLI: tek tıkla "tamamlandı" olmaz — gerçek tohumlama kaydı gerekir.
   // Buton etiketi bunu söylesin; detayTamamla() forma yönlendiriyor.
   if(t.gorev_tipi==='TOHUMLAMA_PLANLI'&&tamamBtn) tamamBtn.textContent='🐄 Tohumlamayı Kaydet';
+
+  // K15: muayene görevi yedeğinde jenerik tamamlama butonu GİZLİ — sonuç YALNIZ
+  // birleşik ekrandan (P3b gorev_tamamla guard'ının UI ikizi).
+  if((t.gorev_tipi==='GEBELIK_KONTROL'||t.gorev_tipi==='TAKIP_MUAYENE')&&tamamBtn) tamamBtn.style.display='none';
 
   // ILERI_GEBE_ASI / ASI_RAPEL / ASI_HATIRLATMA: standart tamamla gizle, aşı butonu göster.
   // ASI_RAPEL özel olarak işlenmeli — generic 'Tamamlandı' görevi kayıtsız kapatıyordu
@@ -9159,6 +10934,9 @@ async function openTaskDet(id){
 async function detayTamamla(){
   if(!_curTaskDet) return;
   if(_curTaskDet.gorev_tipi==='TOHUMLAMA_PLANLI') return openPlanliTohumlama(_curTaskDet);
+  // K15: muayene görevleri jenerik doneTask'e ASLA düşmez (P3b gorev_tamamla
+  // guard'ının UI ikizi) — iki tip AYNI birleşik sonuç ekranını açar (T-04/T-05).
+  if(_curTaskDet.gorev_tipi==='GEBELIK_KONTROL'||_curTaskDet.gorev_tipi==='TAKIP_MUAYENE') return _muayeneSonucAc(_curTaskDet.id);
   // §3: etken_kod varsa ama stok_id yoksa → önce stok seçtir
   if (_curTaskDet.etken_kod && !_curTaskDet.stok_id) {
     return _gorevStokSecVeTamamla(_curTaskDet);
@@ -9243,10 +11021,25 @@ async function _gorevStokTamamlaSubmit(gorevId, hayvanId, padokHedef){
   if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {
-    await rpc('hizli_uygulama', {
+    // P10: TAKIP_ACIK kapısı — onaylı tekrar uygulamayı VE görev tamamlamayı
+    // birlikte koşar (zincir yarım kalmaz); birleşikte p_pg_onay da eklenir.
+    const ilk = await rpc('hizli_uygulama', {
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz,
       p_birim: birim || 'ml', p_rota: rota || 'IM', p_notlar: 'Görev tamamlama'
+    }).catch(e => {
+      const takipRetry = async birlesik => {
+        await rpc('hizli_uygulama', {
+          p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz,
+          p_birim: birim || 'ml', p_rota: rota || 'IM', p_notlar: 'Görev tamamlama',
+          p_takip_onay: true, ...(birlesik ? { p_pg_onay: true } : {})
+        });
+        return rpc('gorev_tamamla', { p_gorev_id: gorevId, p_padok_hedef: padokHedef || null });
+      };
+      const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
+      if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: false, _takipAcik: true };
+      throw e;
     });
+    if (ilk?._takipAcik) return;
     const res = await rpc('gorev_tamamla', { p_gorev_id: gorevId, p_padok_hedef: padokHedef || null });
     if (res?.ok) {
       toast('✅ Görev tamamlandı');

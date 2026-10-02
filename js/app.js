@@ -111,6 +111,12 @@ async function goTo(pg, push = true) {
     if (sessizBsGo) sessizBsGo.remove();
   }
   if(getState('currentPage')==='tasks' && pg!=='tasks' && typeof flushPendingDone==='function') flushPendingDone();
+  // §6b kaydırma sözleşmesi: ovsync'ten ayrılırken kaydırma konumunu sakla
+  // (loadOvsyncDash render sonrası geri yükler)
+  if(getState('currentPage')==='ovsync' && pg!=='ovsync'){
+    const _ovPg=g('pg-ovsync');
+    window._ovsyncScrollY=_ovPg?_ovPg.scrollTop:0;
+  }
   setState('currentPage', pg);
   if (push) history.pushState({pg}, '', '#' + pg);
   document.querySelectorAll('.pg').forEach(p => p.classList.remove('on'));
@@ -129,6 +135,7 @@ async function goTo(pg, push = true) {
   else if (pg === 'bildirim') { loadBildirimler(_curBildirimTab || 'bekliyor'); loadDash(); }
   else if (pg === 'raporlar') { loadRaporlar(); loadDash(); }
   else if (pg === 'asistan')  { if (typeof asistanInit === 'function') asistanInit(); }
+  else if (pg === 'ovsync')   { if (typeof loadOvsyncDash === 'function') loadOvsyncDash(); }
   if (typeof updateKizginlikAlert === 'function') updateKizginlikAlert();
 }
 
@@ -142,6 +149,22 @@ window.addEventListener('popstate', e => {
     globalThis._modalBackDevam = null;
     if (typeof _devam === 'function') { _devam(); }
     return;
+  }
+  // M24: ovsync sheet'leri (devam seçici / takip onayı / PG kapısı) history state'i itiyor;
+  // Geri o state'i tüketti ama sheet DOM'da açıksa MEVCUT kapatma fonksiyonuyla kapat
+  // (kapatıcılar state eşleşmediği için history.back atmaz) — sayfa değişmez.
+  {
+    const _sheetler = [
+      ['devam-secici-bs', 'devam_secici', '_devamSeciciKapat'],
+      ['takip-acik-bs', 'takip_acik', '_takipAcikKapat'],
+      ['pg-kapi-bs', 'pg_kapi', '_pgKapiKapat'],
+    ];
+    for (const [_id, _st, _fn] of _sheetler) {
+      if (document.getElementById(_id) && !(e.state && e.state[_st]) && typeof globalThis[_fn] === 'function') {
+        globalThis[_fn]();
+        return;
+      }
+    }
   }
   // W3: dal sırası ve karar SAF makinede (js/utils/handlers.js navGeriKarar) —
   // mevcut sıra korunur: modal → sessiz → sentinel → proto-detay → kart-içi
