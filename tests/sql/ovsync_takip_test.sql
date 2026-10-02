@@ -368,3 +368,193 @@ WHERE kodsatir IN ('S1_T80','S2_T08','S2_XOR','S3_KAPANIS','S4_DAL1','S4_DAL2','
 ORDER BY kodsatir;
 \echo 'S6/T-90 ACL + S7 REST pinleri yukarıdaki satır çıktılarındadır (kayıt: ${TMPDIR:-$HOME/tmp}/ovsync-takip-olcum/).'
 \echo 'Yorum sözlüğü: PASS = gerçek yeşil; RED(beklenen) = ürün implementasyonu bekliyor; KISMI = koşul kurulamadı; UNMEASURED = fixture kapalı koşum.'
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- S9 (K5A / TB-5 SQL ayağı) — `_pg_kapi_detay` `karar` alanı (migration 20261002000002)
+-- Sözleşme: birleşik `PG_KAPI:TAKIP_ACIK:{pg_kapi:{karar,…}, takip_acik:{…}}` yükünde
+-- `pg_kapi.karar` = sunucunun PG kapı kararı ∈ {REQUIRE_ACK_PENDING, BLOCK_PREGNANT,
+-- BLOCK_CATALOG_UNRESOLVED}; yalnız-ekleme (mevcut 9 anahtar aynen korunur).
+-- Her senaryo: ön-koşul assert'i (kapı kararı `_pg_kapi`'dan BAĞIMSIZ okunur) + ters kanıt.
+-- Migration uygulanmadan koşulursa K5A satırları FAIL düşer (kırmızı kanıtı); uygulanmışsa PASS.
+-- Saf birim (K5A-1..4) fixture gerektirmez; entegrasyon (K5A-5..9) ovs_fixture_ok=true ister.
+-- Fixture öneki E2E-TAKIP-K5A (başta+sonda temizlenir; marker'sız veriye dokunmaz).
+-- ═════════════════════════════════════════════════════════════════════════════
+\echo ''
+\echo '=== S9 K5A — _pg_kapi_detay karar alanı ==='
+DROP TABLE IF EXISTS _ovs_k5a;
+CREATE TEMP TABLE _ovs_k5a(kod text PRIMARY KEY, sonuc text, kanit text);
+CREATE OR REPLACE FUNCTION pg_temp._k5a_say(p_kod text, p_ok boolean, p_kanit text) RETURNS void
+LANGUAGE sql AS $f$
+  INSERT INTO _ovs_k5a VALUES (p_kod, CASE WHEN p_ok THEN 'PASS' ELSE 'FAIL' END, left(p_kanit, 300))
+  ON CONFLICT (kod) DO UPDATE SET sonuc = EXCLUDED.sonuc, kanit = EXCLUDED.kanit;
+$f$;
+
+-- K5A-0 ön-koşul: imza / SECURITY DEFINER / IMMUTABLE / ACL (anon+authenticated EXECUTE YOK)
+DO $do$
+DECLARE v_p record;
+BEGIN
+  SELECT p.prosecdef, p.provolatile, p.proconfig::text AS cfg
+    INTO v_p FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = '_pg_kapi_detay'
+     AND pg_get_function_identity_arguments(p.oid) = 'p_kapi jsonb, p_hayvan_id text, p_kupe_no text';
+  PERFORM pg_temp._k5a_say('K5A-0a imza+definer+immutable+search_path',
+    FOUND AND v_p.prosecdef AND v_p.provolatile = 'i' AND v_p.cfg LIKE '%search_path=public, pg_temp%',
+    coalesce(v_p::text, 'fonksiyon yok'));
+  PERFORM pg_temp._k5a_say('K5A-0b ACL: anon/authenticated EXECUTE yok',
+    NOT has_function_privilege('anon', 'public._pg_kapi_detay(jsonb,text,text)', 'EXECUTE')
+    AND NOT has_function_privilege('authenticated', 'public._pg_kapi_detay(jsonb,text,text)', 'EXECUTE'),
+    'anon='||has_function_privilege('anon', 'public._pg_kapi_detay(jsonb,text,text)', 'EXECUTE')
+    ||' auth='||has_function_privilege('authenticated', 'public._pg_kapi_detay(jsonb,text,text)', 'EXECUTE'));
+END
+$do$;
+
+-- K5A-1 saf birim: her karar değeri yükte AYNEN geri döner (3 bloklayıcı + 3 geçiren)
+DO $do$
+DECLARE v_k text; v_r jsonb;
+BEGIN
+  FOREACH v_k IN ARRAY ARRAY['REQUIRE_ACK_PENDING','BLOCK_PREGNANT','BLOCK_CATALOG_UNRESOLVED','ALLOW','ACK_PENDING','KAPALI'] LOOP
+    v_r := public._pg_kapi_detay(jsonb_build_object('karar', v_k, 'hayvan_id', 'H1', 'kupe_no', 'K1'), 'H1', 'K1');
+    PERFORM pg_temp._k5a_say('K5A-1 saf birim karar='||v_k, v_r->>'karar' IS NOT DISTINCT FROM v_k, v_r::text);
+  END LOOP;
+END
+$do$;
+
+-- K5A-2 ters kanıt: karar'sız / NULL kapı → anahtar VAR, değer JSON null (sessiz düşmez, uydurma yok)
+DO $do$
+DECLARE v_a jsonb; v_b jsonb;
+BEGIN
+  v_a := public._pg_kapi_detay(NULL, 'H1', 'K1');
+  v_b := public._pg_kapi_detay('{}'::jsonb, 'H1', 'K1');
+  PERFORM pg_temp._k5a_say('K5A-2 NULL kapı → karar anahtarı var, değer null',
+    v_a ? 'karar' AND jsonb_typeof(v_a->'karar') = 'null' AND v_b ? 'karar' AND jsonb_typeof(v_b->'karar') = 'null',
+    v_a::text||' | '||v_b::text);
+END
+$do$;
+
+-- K5A-3 yalnız-ekleme: eski 9 anahtar değerleriyle aynen korunur; toplam anahtar sayısı 10
+DO $do$
+DECLARE v_r jsonb; v_beklenen jsonb;
+BEGIN
+  v_r := public._pg_kapi_detay(
+    '{"karar":"BLOCK_PREGNANT","hayvan_id":"HX","kupe_no":"KX","tohumlama_id":"T1","tohumlama_tarihi":"2026-10-01","tohumlama_sonuc":"Gebe","gun":1,"sperma":"S","deneme_no":2,"urun_durumu":"PG"}'::jsonb,
+    'IGNORE', 'IGNORE');
+  v_beklenen := '{"hayvan_id":"HX","kupe_no":"KX","tohumlama_id":"T1","tohumlama_tarihi":"2026-10-01","tohumlama_sonuc":"Gebe","gun":1,"sperma":"S","deneme_no":2,"urun_durumu":"PG"}'::jsonb;
+  PERFORM pg_temp._k5a_say('K5A-3 eski 9 anahtar korunur + toplam 10',
+    (v_r - 'karar') = v_beklenen AND (SELECT count(*) FROM jsonb_object_keys(v_r)) = 10, v_r::text);
+  -- hayvan_id/kupe_no yedek yolu (kapıda yoksa parametreden) bozulmadı
+  v_r := public._pg_kapi_detay('{"karar":"ALLOW"}'::jsonb, 'HP', 'KP');
+  PERFORM pg_temp._k5a_say('K5A-4 hayvan_id/kupe_no parametre yedeği korunur',
+    v_r->>'hayvan_id' = 'HP' AND v_r->>'kupe_no' = 'KP' AND v_r->>'karar' = 'ALLOW', v_r::text);
+END
+$do$;
+
+-- K5A-5..9 entegrasyon: gerçek RPC RAISE yükü (hizli_uygulama + bulk_ilac)
+\if :ovs_fixture_ok
+DO $do$
+DECLARE
+  v_h text := 'E2E-TAKIP-K5A-H-'||substr(gen_random_uuid()::text,1,8);
+  v_pg_stok text; v_bel_stok text := 'E2E-TAKIP-K5A-STOK';
+  v_msg text; v_pre text; v_payload jsonb; v_res jsonb; v_g uuid;
+BEGIN
+  DELETE FROM gorev_log WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-TAKIP-K5A%');
+  DELETE FROM tohumlama WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-TAKIP-K5A%');
+  DELETE FROM hayvanlar WHERE kupe_no LIKE 'E2E-TAKIP-K5A%';
+  DELETE FROM stok WHERE id = v_bel_stok;
+
+  SELECT s.id INTO v_pg_stok FROM stok s WHERE public._pg_urun_durumu(s.id, NULL) = 'PG' ORDER BY s.id LIMIT 1;
+  IF v_pg_stok IS NULL OR NOT public._ovsync_pg_aktif() THEN
+    PERFORM pg_temp._k5a_say('K5A-5 ön-koşul: PG stok + bayrak AÇIK', false,
+      'pg_stok='||coalesce(v_pg_stok,'(yok)')||' bayrak='||public._ovsync_pg_aktif()::text||' — entegrasyon UNMEASURED');
+    RETURN;
+  END IF;
+
+  INSERT INTO hayvanlar(id, kupe_no, cinsiyet, dogum_tarihi, grup)
+  VALUES (v_h, 'E2E-TAKIP-K5A', 'Dişi', CURRENT_DATE - 400, 'Sağmal (Laktasyonda)');
+  -- sıra: ÖNCE tohumlama (yeni tohumlama açık takibi sessiz kapatır), SONRA takip görevi
+  INSERT INTO tohumlama(id, hayvan_id, tarih, sonuc, deneme_sayisi, denemeler)
+  VALUES (gen_random_uuid(), v_h, CURRENT_DATE, 'Bekliyor', 1, '[]'::jsonb);
+  v_g := gen_random_uuid();
+  INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, iptal, kaynak)
+  VALUES (v_g, v_h, 'TAKIP_MUAYENE', 'E2E-TAKIP-k5a', CURRENT_DATE + 7, false, false, 'TAKIP:E2E-K5A');
+
+  -- ── K5A-5 REQUIRE_ACK_PENDING (son tohumlama Bekliyor, onaysız, takip açık) ──
+  v_pre := public._pg_kapi(v_h, v_pg_stok, NULL, false)->>'karar';       -- kapı kararı detay'dan BAĞIMSIZ
+  v_msg := NULL;
+  BEGIN PERFORM public.hizli_uygulama(v_h, v_pg_stok, 1, 'ml', 'IM', 'E2E K5A');
+  EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM; END;
+  v_payload := CASE WHEN v_msg LIKE 'PG_KAPI:TAKIP_ACIK:%' THEN substr(v_msg, length('PG_KAPI:TAKIP_ACIK:') + 1)::jsonb END;
+  PERFORM pg_temp._k5a_say('K5A-5 REQUIRE_ACK_PENDING birleşik yük',
+    v_pre = 'REQUIRE_ACK_PENDING' AND v_payload #>> '{pg_kapi,karar}' = 'REQUIRE_ACK_PENDING'
+      AND v_payload #>> '{takip_acik,muayene_tarihi}' IS NOT NULL,
+    'ön-koşul _pg_kapi='||coalesce(v_pre,'?')||' | '||coalesce(left(v_msg,200),'RAISE yok'));
+
+  -- ters kanıt: p_pg_onay=true → karar ACK_PENDING (bloklamaz) → yalın TAKIP_ACIK, pg_kapi anahtarı YOK
+  v_msg := NULL;
+  BEGIN PERFORM public.hizli_uygulama(v_h, v_pg_stok, 1, 'ml', 'IM', 'E2E K5A', true, 'E2E gerekçe', NULL, false);
+  EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM; END;
+  PERFORM pg_temp._k5a_say('K5A-5r ters: onaylı → yalın TAKIP_ACIK (pg_kapi yok)',
+    v_msg LIKE 'TAKIP_ACIK:%' AND NOT ((substr(v_msg, length('TAKIP_ACIK:') + 1)::jsonb) ? 'pg_kapi'),
+    coalesce(left(v_msg,200),'RAISE yok'));
+
+  -- ── K5A-6 BLOCK_PREGNANT (son tohumlama Gebe) — onay kapıyı AÇMAZ ──
+  UPDATE tohumlama SET sonuc = 'Gebe' WHERE hayvan_id = v_h;
+  UPDATE gorev_log SET iptal = false, tamamlandi = false WHERE id = v_g;   -- sonuç değişimi takibi kapatmış olabilir; yeniden aç
+  v_pre := public._pg_kapi(v_h, v_pg_stok, NULL, true)->>'karar';        -- onaylı bile BLOCK_PREGNANT
+  v_msg := NULL;
+  BEGIN PERFORM public.hizli_uygulama(v_h, v_pg_stok, 1, 'ml', 'IM', 'E2E K5A', true, 'E2E gerekçe', NULL, false);
+  EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM; END;
+  v_payload := CASE WHEN v_msg LIKE 'PG_KAPI:TAKIP_ACIK:%' THEN substr(v_msg, length('PG_KAPI:TAKIP_ACIK:') + 1)::jsonb END;
+  PERFORM pg_temp._k5a_say('K5A-6 BLOCK_PREGNANT birleşik yük (onaylı bile)',
+    v_pre = 'BLOCK_PREGNANT' AND v_payload #>> '{pg_kapi,karar}' = 'BLOCK_PREGNANT',
+    'ön-koşul _pg_kapi(onaylı)='||coalesce(v_pre,'?')||' | '||coalesce(left(v_msg,200),'RAISE yok'));
+
+  -- ── K5A-7 takip KAPALI: tekil PG_KAPI:<karar>:<detay> — önek ile detay.karar AYNI ──
+  UPDATE gorev_log SET iptal = true WHERE id = v_g;
+  v_msg := NULL;
+  BEGIN PERFORM public.hizli_uygulama(v_h, v_pg_stok, 1, 'ml', 'IM', 'E2E K5A');
+  EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM; END;
+  v_payload := CASE WHEN v_msg LIKE 'PG_KAPI:BLOCK_PREGNANT:%' THEN substr(v_msg, length('PG_KAPI:BLOCK_PREGNANT:') + 1)::jsonb END;
+  PERFORM pg_temp._k5a_say('K5A-7 takipsiz tekil RAISE: önek = detay.karar',
+    v_payload->>'karar' = 'BLOCK_PREGNANT', coalesce(left(v_msg,200),'RAISE yok'));
+
+  -- ── K5A-8 bulk_ilac satırları: blocked[].karar = kod = takip_onay_listesi[].pg_kapi_karar ──
+  UPDATE gorev_log SET iptal = false, tamamlandi = false WHERE id = v_g;
+  v_res := public.bulk_ilac(ARRAY[v_h], v_pg_stok, 1);
+  PERFORM pg_temp._k5a_say('K5A-8 bulk_ilac blocked[].karar = kod = pg_kapi_karar',
+    (v_res #>> '{blocked,0,karar}') = 'BLOCK_PREGNANT' AND (v_res #>> '{blocked,0,kod}') = 'BLOCK_PREGNANT'
+      AND (v_res #>> '{takip_onay_listesi,0,pg_kapi_karar}') = 'BLOCK_PREGNANT',
+    left(v_res::text, 300));
+
+  -- ── K5A-9 BLOCK_CATALOG_UNRESOLVED (PG adlı, katalog bağsız stok) ──
+  INSERT INTO stok(id, urun_adi, birim, baslangic_miktar) VALUES (v_bel_stok, 'E2E-TAKIP Prostag', 'ml', 10);
+  UPDATE tohumlama SET sonuc = 'Boş' WHERE hayvan_id = v_h;                 -- kararın tohumlama durumundan bağımsız olduğunu da gösterir
+  UPDATE gorev_log SET iptal = false, tamamlandi = false WHERE id = v_g;
+  v_pre := public._pg_kapi(v_h, v_bel_stok, NULL, false)->>'karar';
+  v_msg := NULL;
+  BEGIN PERFORM public.hizli_uygulama(v_h, v_bel_stok, 1, 'ml', 'IM', 'E2E K5A');
+  EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM; END;
+  v_payload := CASE WHEN v_msg LIKE 'PG_KAPI:TAKIP_ACIK:%' THEN substr(v_msg, length('PG_KAPI:TAKIP_ACIK:') + 1)::jsonb END;
+  PERFORM pg_temp._k5a_say('K5A-9 BLOCK_CATALOG_UNRESOLVED birleşik yük',
+    v_pre = 'BLOCK_CATALOG_UNRESOLVED' AND v_payload #>> '{pg_kapi,karar}' = 'BLOCK_CATALOG_UNRESOLVED',
+    'ön-koşul _pg_kapi='||coalesce(v_pre,'?')||' | '||coalesce(left(v_msg,200),'RAISE yok'));
+
+  -- temizlik
+  DELETE FROM gorev_log WHERE hayvan_id = v_h;
+  DELETE FROM tohumlama WHERE hayvan_id = v_h;
+  DELETE FROM hayvanlar WHERE id = v_h;
+  DELETE FROM stok WHERE id = v_bel_stok;
+EXCEPTION WHEN OTHERS THEN
+  PERFORM pg_temp._k5a_say('K5A-ENT beklenmedik hata', false, SQLSTATE||' '||SQLERRM);
+  DELETE FROM gorev_log WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-TAKIP-K5A%');
+  DELETE FROM tohumlama WHERE hayvan_id IN (SELECT id FROM hayvanlar WHERE kupe_no LIKE 'E2E-TAKIP-K5A%');
+  DELETE FROM hayvanlar WHERE kupe_no LIKE 'E2E-TAKIP-K5A%';
+  DELETE FROM stok WHERE id = 'E2E-TAKIP-K5A-STOK';
+END
+$do$;
+\else
+\echo 'S9 entegrasyon atlandı (fixture kapalı → K5A-5..9 UNMEASURED)'
+\endif
+
+\echo '--- S9 ÖZET (K5A) ---'
+SELECT kod AS senaryo, sonuc, kanit FROM _ovs_k5a ORDER BY kod;
+SELECT 'K5A TOPLAM: PASS='||count(*) FILTER (WHERE sonuc='PASS')||' FAIL='||count(*) FILTER (WHERE sonuc='FAIL') AS ozet FROM _ovs_k5a;
