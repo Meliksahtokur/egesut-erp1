@@ -150,8 +150,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 ### Gebelik Süresi
 
 - Tahmini doğum = tohumlama tarihi + **280 gün**
-- 21. gün gebelik kontrolü görevi otomatik oluşturulur
-- 35. gün gebelik kontrolü görevi otomatik oluşturulur
+- ~~21./35. gün gebelik kontrolü görevi otomatik oluşturulur~~ — GEÇERSİZ (sahip 2026-09-29): tek üretici ≥40 g cron, bkz. §18.13
 
 ### Tohumlama ve Sperma
 
@@ -465,3 +464,29 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
 11. **Gebe otoritesi:** `hayvanlar.tohumlama_durumu` gebelik otoritesi DEĞİLDİR; son `tohumlama.sonuc` esastır.
 12. **Kapsam:** tüm açık dişiler (Boş dahil); muaf: Gebe / Bekliyor / aktif senkronizasyon / Aktif değil /
     açık `OVSYNC_BASLAT` görevi olan.
+13. **Gebelik kontrolü zamanı (sahip 2026-09-28):** tohumlama sonrası "21. gün kontrolü" YOKTUR (iptal edilmiş
+    karar; takip spec v1'de hortlamıştı, düzeltildi). Gebelik muayenesi son tohumlamadan **≥40 gün** sonra başlar;
+    tek eşik kaynağı `gebelik_muayene_listele`'deki `_ayar('sessiz_tohumlama_muafiyet_gun', 40)`. Başka yüzey
+    (ovsync takip dahil) kendi sabitini yazmaz, bu ayarı okur. **Tek üretici (sahip 2026-09-29):** `GEBELIK_KONTROL`
+    görevini yalnız ≥40 g cron'u (`gebelik_muayene_gorev_uret`) doğurur; `tohumlama_kaydet`'in +21/+35 g görev üretimi
+    kaldırılır (kodda hâlâ var: `20260923000005:438-444` — ovsync-takip planında düzeltilir; açık eski görevler ayrı veri temizliği).
+14. **Deneme sayacı her doğumda sıfırlanır (sahip 2026-09-28):** kullanıcıya gösterilen "kaçıncı deneme" son
+    `dogum.tarih`'ten (yoksa ömür boyu) bu yana sayılır. Not: `tohumlama.deneme_no` kolonu (trg `set_deneme_no`)
+    ÖMÜR BOYU sayar — bu kurala uymaz; kolon anlamı değişikliği ayrı sahip kararıdır, gösterim hesaplanır.
+15. **Boş sonrası devam (sahip 2026-09-28):** tohumlama sonucu **Boş** atanınca aynı modalda üç seçenek belirir:
+    **PG uygula · Ovsync uygula · Takibe bırak** — seçim sonucu Boş atamasıyla **tek işlemde** bağlanır.
+    Varsayılan **hemen**; Takibe bırak = belirlenen gün sonunda belirlenen saatte takip görevi, varsayılan **7 gün**.
+    Seçim ZORUNLU, ön seçim Ovsync; kısır ya da kural günü gelmemiş hayvanda Ovsync HARD BLOCK + gerekçe (§18.3/§18.5
+    esnetilmez; istisna DB seed). Takip = rektal muayene görevi (saat = atama anı); takip açıkken otomatik
+    `OVSYNC_BASLAT` açılmaz; DB beklenen olayla takibi kapatır: yeni tohumlama → sessiz; PG/Ovsync → onay penceresi
+    (`TAKIP_ACIK`), evet → takip kapanır; çıkış → kapanır. Muayene sonucu "ertele" (+7) yeni tarih kurar; erteleme sınırsız, takip ≥21 gün olunca "Bu hayvan N gündür takipte,
+    emin misiniz?" onayı. Takip muayenesinde Gebe bulunursa önceki Boş hatalı sayılır: son tohumlama Gebe'ye çevrilir, takip kapanır. (sahip 2026-09-29) Düzeltme yalnız bu muayene yolundan, ayrı "hatalı Boş" formu yok; genel Gebe RPC'si Bekliyor-only kalır. Üreme geçmişinde düzeltilen tohumlama iki satır görünür: üstü çizili Boş (giriş tarihi) + Gebe (takip muayenesi tarihi); kayıt izi eski sonucu ve tarihini saklar. Ayrıntılar: `docs/plans/2026-09-28-ovsync-takip-ekrani/design.md` §6c.
+16. **Üreme kategorisi (sahip 2026-09-28/29):** "işin ucunda gebelik varsa üreme". Görev tipleri `GEBELIK_KONTROL`,
+    `TAKIP_MUAYENE`, `TOHUMLAMA_PLANLI`, `OVSYNC_BASLAT` → 🌱 Üreme. Üreme vakaları: Ovsync, Kistik Over, Anoestrus.
+    Enfeksiyon/doğum sonrası hastalıklar (Metrit, Endometrit, Pyometra, RFM, Retensiyo Sekundinarum, Postpartum
+    Hemoraji) → normal muayene/tedavi. Hastalık kataloğu değişmez, yalnız kategori/filtre eşlemesi.
+17. **Birleşik muayene sonucu (sahip 2026-09-29):** `GEBELIK_KONTROL` (40 g sistemi) ve `TAKIP_MUAYENE` görevleri
+    aynı sonuç ekranını açar: Gebe / Boş (→ §18.15 devam seçici) / Muayeneyi ertele. Gebelik kontrol görevi
+    sonuçsuz kapanmaz. Eski 40 g listesi + cron bu işle güncellenir. (sahip 2026-09-29) Erteleme YALNIZ bu sonuç
+    ekranından (genel "ertele" butonu bu tiplerde yok); saat atanabilir, varsayılan SAATSİZ. Dashboard 40 g listesi
+    satırı açık görev varsa bu ekranı açar, yoksa hayvan detayı; takip ekranında görevsiz "muayene vakti" satırı → hayvan detayı.
