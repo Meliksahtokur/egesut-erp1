@@ -33,21 +33,21 @@ Atlanabilir: salt-okuma keşif, doküman, yorum, test verisi.
 
 | Agent | JS için | SQL/migration için |
 |---|---|---|
-| **Claude Code** | built-in `LSP` aracı (enabled, lazy) | SQL LSP `sql-lsp@egesut-local` (reload sonrası aktif) + atlas `etki` (JS çağrı grafiği; gitnexus isteğe bağlı yardımcı) |
+| **Claude Code** | built-in `LSP` aracı (enabled, lazy) + atlas `etki` | SQL LSP `sql-lsp@egesut-local` (reload sonrası aktif) |
 | **openclaude** | built-in `LSP` (plugin `false` → önce enable + `/reload-plugins`) | SQL LSP (aynı, on-demand) |
-| **Goose / DeepSeek** (ARŞİV 2026-10-01: Goose kolu artık yok; kanon: Claude Code worker sonnet-medium) | built-in LSP YOK → atlas `etki` (yerine geçen; eski `gitnexus_impact`/`gitnexus_context` yalnız isteğe bağlı yardımcı) | built-in LSP YOK → `supabase_migrate` ile canlı `information_schema`/`pg_get_functiondef` doğrulaması |
+| **Goose / DeepSeek** (ARŞİV 2026-10-01: Goose kolu artık yok; kanon: Claude Code worker sonnet-medium) | built-in LSP YOK → atlas `etki` | built-in LSP YOK → `supabase_migrate` ile canlı `information_schema`/`pg_get_functiondef` doğrulaması |
 
-Built-in `LSP` aracı yoksa (Goose/DeepSeek) panik yok: aynı işi atlas `etki` (kod; gitnexus isteğe bağlı yardımcı) +
+Built-in `LSP` aracı yoksa (Goose/DeepSeek) panik yok: aynı işi atlas `etki` (kod) +
 `supabase_migrate` (DB şema sorgusu) ile yap.
 
 ## İş akışı — JS değişikliği
 
-1. **Blast radius:** önce `mcp__tools-bank__atlas_status(repo="egesut-erp1")` ile indeks
-   tazeliğine bak, sonra `mcp__tools-bank__atlas_query(repo="egesut-erp1", komut="etki", arg="<fnAdı>", derinlik=2)`
-   → geçişli çağıranlar. Çağıran `index.html:<satır>` ya da `inline_cagiranlar` alanında görünürse
-   onclick/inline handler kökenlidir (zincir orada biter). Atlas risk seviyesi vermez: çağıran sayısı
+1. **Blast radius:** `mcp__tools-bank__atlas_query(repo="egesut-erp1", komut="etki", arg="<fnAdı>", derinlik=2)`
+   → geçişli çağıranlar (atlas_query tazeliği kendisi doğrular; sonuç şüpheliyse `atlas_status`).
+   Etki katmanında `index.html:<satır>` id'li çağıran onclick/inline handler kökenlidir (zincir orada
+   biter); ayrıntı için `komut="fn"` → `inline_cagiranlar`. Atlas risk seviyesi vermez: çağıran sayısı
    fazlaysa ya da birden çok katmana (ui/api/forms/app/state) yayılıyorsa kullanıcıya bildir.
-   Bu skill'in PreToolUse hook'u `js/(ui|api|forms|app|state).js` Edit/Write'ını son 600 sn içinde
+   Yerel kurulumdaki (settings.local.json) PreToolUse hook'u `js/(ui|api|forms|app|state).js` Edit/Write'ını son 600 sn içinde
    başarılı atlas `etki` çağrısı yoksa bloklar.
 2. **Doğrula / gez:** built-in `LSP` aracıyla
    - `goToDefinition` — gerçek tanımı bul (ui.js 8000+ satır, grep'le boğulma).
