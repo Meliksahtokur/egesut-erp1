@@ -11,7 +11,8 @@ Bu projede çok sayıda agent (Claude Code, openclaude, Goose, DeepSeek — Goos
 en sık hasar **değişikliğin etkisini kestirememekten** ve **sessiz hatalardan** geliyor:
 olmayan bir kolona referans veren migration, bir fonksiyonu kırınca onu çağıran 10 yeri
 fark etmeme, yanlış imzayla RPC. Elimizde bunları **önceden** yakalayan araçlar var:
-canlı şemaya bağlı SQL LSP, JS için built-in LSP, ve çağrı grafiğini bilen gitnexus.
+canlı şemaya bağlı SQL LSP, JS için built-in LSP, ve JS çağrı grafiğini bilen atlas
+(`mcp__tools-bank__atlas_query`; gitnexus yalnız isteğe bağlı yardımcı).
 Amaç bu araçları değişiklikten **önce** refleks olarak kullanmak — sonra değil.
 
 **Asıl hedef: blast radius (etki yarıçapı).** Bir şeyi değiştirmeden önce "bu neyi kırar?"
@@ -32,23 +33,32 @@ Atlanabilir: salt-okuma keşif, doküman, yorum, test verisi.
 
 | Agent | JS için | SQL/migration için |
 |---|---|---|
-| **Claude Code** | built-in `LSP` aracı (enabled, lazy) | SQL LSP `sql-lsp@egesut-local` (reload sonrası aktif) + `gitnexus` |
+| **Claude Code** | built-in `LSP` aracı (enabled, lazy) | SQL LSP `sql-lsp@egesut-local` (reload sonrası aktif) + atlas `etki` (JS çağrı grafiği; gitnexus isteğe bağlı yardımcı) |
 | **openclaude** | built-in `LSP` (plugin `false` → önce enable + `/reload-plugins`) | SQL LSP (aynı, on-demand) |
-| **Goose / DeepSeek** (ARŞİV 2026-10-01: Goose kolu artık yok; kanon: Claude Code worker sonnet-medium) | built-in LSP YOK → `gitnexus_impact`/`gitnexus_context` + `semantic_search` | built-in LSP YOK → `supabase_migrate` ile canlı `information_schema`/`pg_get_functiondef` doğrulaması |
+| **Goose / DeepSeek** (ARŞİV 2026-10-01: Goose kolu artık yok; kanon: Claude Code worker sonnet-medium) | built-in LSP YOK → atlas `etki` (yerine geçen; eski `gitnexus_impact`/`gitnexus_context` yalnız isteğe bağlı yardımcı) | built-in LSP YOK → `supabase_migrate` ile canlı `information_schema`/`pg_get_functiondef` doğrulaması |
 
-Built-in `LSP` aracı yoksa (Goose/DeepSeek) panik yok: aynı işi `gitnexus` (kod) +
+Built-in `LSP` aracı yoksa (Goose/DeepSeek) panik yok: aynı işi atlas `etki` (kod; gitnexus isteğe bağlı yardımcı) +
 `supabase_migrate` (DB şema sorgusu) ile yap.
 
 ## İş akışı — JS değişikliği
 
-1. **Blast radius:** `gitnexus_impact({target:"fonksiyonAdı", direction:"upstream"})` → kim çağırıyor,
-   hangi execution flow etkileniyor, risk seviyesi. HIGH/CRITICAL ise kullanıcıya bildir.
+1. **Blast radius:** önce `mcp__tools-bank__atlas_status(repo="egesut-erp1")` ile indeks
+   tazeliğine bak, sonra `mcp__tools-bank__atlas_query(repo="egesut-erp1", komut="etki", arg="<fnAdı>", derinlik=2)`
+   → geçişli çağıranlar. Çağıran `index.html:<satır>` ya da `inline_cagiranlar` alanında görünürse
+   onclick/inline handler kökenlidir (zincir orada biter). Atlas risk seviyesi vermez: çağıran sayısı
+   fazlaysa ya da birden çok katmana (ui/api/forms/app/state) yayılıyorsa kullanıcıya bildir.
+   Bu skill'in PreToolUse hook'u `js/(ui|api|forms|app|state).js` Edit/Write'ını son 600 sn içinde
+   başarılı atlas `etki` çağrısı yoksa bloklar.
 2. **Doğrula / gez:** built-in `LSP` aracıyla
    - `goToDefinition` — gerçek tanımı bul (ui.js 8000+ satır, grep'le boğulma).
    - `findReferences` — değiştireceğin sembolün tüm kullanımları (blast radius'u somutlaştırır).
    - `documentSymbol` — dosyanın haritası.
 3. Değişikliği yap.
-4. **Kapat** (aşağıdaki yaşam döngüsü).
+4. **Commit/merge öncesi:** atlas'ta diff→sembol yok. Değişen fonksiyon adlarını
+   `git diff -U0 -- js/` hunk'larından çıkar → her biri için `atlas_query` `komut="etki"`.
+   gitnexus `detect_changes` zorunlu değil, isteğe bağlı yardımcı: js/ui.js'i görmez (512 KB sınırı),
+   indeks bayat olabilir.
+5. **Kapat** (aşağıdaki yaşam döngüsü).
 
 ## İş akışı — migration / SQL
 
@@ -110,8 +120,8 @@ LSP sunucuları açıkken ~503MB RAM + CPU yer. Ortam RAM'i dar. **Kullan, işin
 
 Değişiklikten önce kendine sor:
 - [ ] Bu bir JS veya SQL/migration değişikliği mi? (evet → devam)
-- [ ] Blast radius'a baktım mı? (JS: `gitnexus_impact` + `findReferences` · DB: `pg_depend`)
-- [ ] HIGH/CRITICAL risk varsa kullanıcıya bildirdim mi?
+- [ ] Blast radius'a baktım mı? (JS: atlas `etki` + `findReferences` · DB: `pg_depend`)
+- [ ] Çağıran sayısı fazla / geniş katman (DB: yüksek risk) varsa kullanıcıya bildirdim mi?
 - [ ] (SQL) Şema aynası taze mi, SQL LSP "yok kolon/tablo" diyor mu?
 - [ ] (YENİ tablo / yazma RPC) **farm_id ileri-disiplini** uygulandı mı? → bkz `.claude/farm-id-discipline.md`
 - [ ] İş bitince LSP'yi kapattım mı?
