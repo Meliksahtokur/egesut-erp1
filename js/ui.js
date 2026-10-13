@@ -495,6 +495,54 @@ function _dashSutBuzagiBandi(animals,vaccines,vaxLogs,tasks,schRows,kesimEsik,to
   const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🍼 Süt İçen Buzağılar (${liste.length}) ${kesimBtn}</span>`;
   return band((gecikVar||liste.some(a=>a.yas>=esik))?'red':'amber',title,rows.join(''));
 }
+/**
+ * İleri gebe düvenin kuruya alınıp alınmadığını grup/padok adından söyler.
+ * Ayrım yalnız grup adından yapılır (K2.1); RPC/parite/doğum join'i yoktur.
+ * @param {Object} b RPC satırı (grup, padok).
+ * @returns {boolean} Grup 'Gebe Düve' ise ya da padok 'Kuru/Gebe Padok' ise true.
+ */
+function _ileriGebeKuruDuve(b){
+  return b.grup==='Gebe Düve'||b.padok==='Kuru/Gebe Padok';
+}
+/**
+ * 🤰 İleri Gebeler bandı (F2): ana blok RPC sırasında aynen (inekler +
+ * kuruya alınmış düveler yerinde) → kuruya alınmamış düveler en altta
+ * gruplu (gün DESC). Satır görünümü ineklerle aynı (zemin/şerit YOK);
+ * TÜM düvelerde mavi D-n (.duve-mavi) + amber alt satır (.duve-alt).
+ * Sayaçlar: inekler 1)..n), tüm düveler tek sayaçtan D-1).. ekran
+ * sırasına göre yukarıdan aşağıya. Kuru düve inek numarası tüketmez.
+ * @param {Array} ileriGebeler RPC sırasındaki ileri gebe satırları.
+ * @returns {string} Bant HTML'i; kayıt yoksa boş dize.
+ */
+function _dashIleriGebeBandi(ileriGebeler){
+  if(!(ileriGebeler||[]).length) return '';
+  const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
+  const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
+  const isDuve=b=>(b.grup||'').includes('Düve');
+  const anaBlok=[],altDuve=[];
+  (ileriGebeler||[]).forEach(b=>{
+    if(isDuve(b)&&!_ileriGebeKuruDuve(b))altDuve.push(b);
+    else anaBlok.push(b);
+  });
+  // F2: ana blok RPC sırasında yerinde; yalnız alttaki düveler gün DESC.
+  altDuve.sort((a,b)=>(b.gebelik_gun||0)-(a.gebelik_gun||0));
+  const sirali=[...anaBlok,...altDuve];
+  const dNo=new Map();let n=0;
+  sirali.forEach(b=>{if(isDuve(b))dNo.set(b,`D-${++n}`);});
+  let inekNo=0;
+  const rows=sirali.map(b=>{
+    const duve=isDuve(b);
+    const no=duve?dNo.get(b):`${++inekNo}`;
+    const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
+    const besUyari=b.gebelik_gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 5px;font-weight:700;font-size:.65rem;margin-left:4px">⚠️ Anyonik</span>`:'';
+    const padokYanlis=b.padok!=='Kuru/Gebe Padok';
+    const padokUyari=padokYanlis?`<span style="color:#ef4444;font-weight:700;font-size:.6rem;margin-left:4px">🔴 Transfer!</span>`:'';
+    const noCls=duve?'arow-no duve-mavi':'arow-no';
+    const subCls=duve?'arow-sub duve-alt':'arow-sub';
+    return `<div class="arow" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span class="${noCls}">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="${subCls}">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+  });
+  return band('amber',title,rows.join(''));
+}
 function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGebeler,aMap,yakAsi,yakTakviye,ddMap,sessizList,sutBuzagiHtml,muayeneList){
   const _dd=ddMap||{};
   /**
@@ -532,21 +580,7 @@ function _dashBands(negStk,late,todayT,births60,nearBirth,critStk,stock,ileriGeb
     h+=band('amber','💛 Kızgınlık Beklenenler (58-63. gün)',
       births60.map(b=>{const _an=aMap&&aMap[b.anne_id];const _kid=(_an&&(_an.kupe_no||_an.devlet_kupe))||b.anne_id;return `<div class="arow" style="display:flex;align-items:center;gap:6px"><div style="flex:1;cursor:pointer" onclick="openDet('${escAttr(b.anne_id)}')"><div class="arow-left"><div class="arow-id">${esc(_kid)}</div><div class="arow-sub">${esc(b.tarih)} — ${Math.floor((Date.now()-new Date(b.tarih))/86400000)}. gün</div></div></div><button style="font-size:.65rem;font-weight:700;color:var(--red2);background:rgba(192,50,26,.1);border:1px solid rgba(192,50,26,.3);border-radius:6px;padding:2px 7px;cursor:pointer;white-space:nowrap" onclick="event.stopPropagation();kizginlikYoktu('${escAttr(b.anne_id)}','${escAttr(b.id||'')}')">✕</button></div>`;}).join(''));
   }
-  if((ileriGebeler||[]).length){
-    const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
-    const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
-    let inekNo=0,duveNo=0;
-    h+=band('amber',title,
-      (ileriGebeler||[]).map(b=>{
-        const isDuve=(b.grup||'').includes('Düve');
-        const no=isDuve?`D-${++duveNo}`:`${++inekNo}`;
-        const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
-        const besUyari=b.gebelik_gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 5px;font-weight:700;font-size:.65rem;margin-left:4px">⚠️ Anyonik</span>`:'';
-        const padokYanlis=b.padok!=='Kuru/Gebe Padok';
-        const padokUyari=padokYanlis?`<span style="color:#ef4444;font-weight:700;font-size:.6rem;margin-left:4px">🔴 Transfer!</span>`:'';
-        return `<div class="arow" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span style="color:var(--ink3);font-size:.65rem;margin-right:3px">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
-      }).join(''));
-  }
+  if((ileriGebeler||[]).length) h+=_dashIleriGebeBandi(ileriGebeler);
   if(sutBuzagiHtml) h+=sutBuzagiHtml;   // 🍼 Süt İçen Buzağılar — ileri gebelerin hemen altı
   // S2: 🔬 Gebelik Muayenesi Bekleyenler — sessiz bandının HEMEN ÜSTÜNDE izole kırmızı bant
   if((muayeneList||[]).length){
