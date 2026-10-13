@@ -221,9 +221,9 @@ GRANT EXECUTE ON FUNCTION public.treatment_day_tamamla(uuid, text, uuid[], boole
 
 -- ── 4. add_drug_administration: DROP eski imza + CREATE (canlı gövde + kapı) ─
 -- Canlı gövde AYNI; eklenen: (a) imza sonuna p_pg_onay/p_pg_gerekce,
--- (b) INSERT'ten ÖNCE PG kapısı, (c) günü ZATEN tamamlanmış (treatment_days.tamamlandi,
--- canlı şemada MEASURED 2026-10-13) ya da güne bağlı olmayan kalemde ILAC_EKLE olayı
--- (+48 s TAI). Tamamlanmamış güne eklenen kalemin olayını treatment_day_tamamla yazar
+-- (b) INSERT'ten ÖNCE PG kapısı, (c) gün ZATEN tamamlanmışsa (treatment_days.tamamlandi,
+-- canlı şemada MEASURED 2026-10-13) ILAC_EKLE olayı (+48 s TAI).
+-- Tamamlanmamış güne eklenen kalemin olayını treatment_day_tamamla yazar
 -- (çift olay yok; savunma: tamamla döngüsü ILAC_EKLE'si olan kalemi NOT EXISTS ile atlar).
 DROP FUNCTION IF EXISTS public.add_drug_administration(uuid, uuid, text, numeric, text, text);
 CREATE FUNCTION public.add_drug_administration(p_day_id uuid, p_drug_product_id uuid, p_stok_id text, p_dose numeric, p_unit text, p_route text DEFAULT NULL, p_pg_onay boolean DEFAULT NULL, p_pg_gerekce text DEFAULT NULL)
@@ -234,15 +234,17 @@ AS $function$
 DECLARE
   v_id uuid;
   v_hayvan text;
-  v_tarih date;
   v_gun_tamamli boolean := false;
   v_kapi jsonb;
   v_kupe text;
 BEGIN
-  SELECT c.animal_id, td.treatment_date, COALESCE(td.tamamlandi, false) INTO v_hayvan, v_tarih, v_gun_tamamli
+  -- Yarış kilidi (kapı-2/5): gün satırı kilitli okunur; eşzamanlı add'ler
+  -- serilenir, tamamla'nın tamamlandi UPDATE'i sürmekte olan add'i bekler.
+  SELECT c.animal_id, COALESCE(td.tamamlandi, false) INTO v_hayvan, v_gun_tamamli
     FROM public.treatment_days td
     JOIN public.cases c ON c.id = td.case_id
-   WHERE td.id = p_day_id;
+   WHERE td.id = p_day_id
+   FOR UPDATE OF td;
   -- ── PG kapısı (hizli_uygulama deyimi): İLK yazmadan (INSERT) ÖNCE ──
   IF public._pg_urun_durumu(p_stok_id, p_drug_product_id) = 'PG' THEN
     v_kapi := public._pg_kapi(v_hayvan, p_stok_id, p_drug_product_id, COALESCE(p_pg_onay, false));
@@ -262,9 +264,9 @@ BEGIN
     VALUES (p_stok_id, 'Tedavi', p_dose, 'drug_admin:' || v_id::text);
   END IF;
 
-  -- ── PG olayı = uygulama anı: yalnız gün ZATEN tamamlanmışsa ya da güne bağlı değilse ──
+  -- ── PG olayı = uygulama anı: yalnız gün ZATEN tamamlanmışsa ──
   -- Tamamlanmamış güne eklenen kalemin olayını treatment_day_tamamla yazar (çift olay yok).
-  IF v_kapi IS NOT NULL AND (v_tarih IS NULL OR v_gun_tamamli) THEN
+  IF v_kapi IS NOT NULL AND v_gun_tamamli THEN
     PERFORM public._pg_olay_isle('ILAC_EKLE', v_id::text, v_hayvan, p_stok_id,
       p_drug_product_id, now(), v_kapi, p_pg_gerekce);
   END IF;

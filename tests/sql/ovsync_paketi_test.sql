@@ -167,13 +167,39 @@ BEGIN
     format('(i) ekle-sonrasi=%s tamamla-sonrasi=%s tai=%s; (ii) olay=%s tai=%s', v_i_ekle, v_i_tamamla, v_i_tai, v_ii_olay, v_ii_tai));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-PG-TEK-OLAY', 'RED', SQLERRM); END $do$;
 
--- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9, F1-düzeltme → 9.
+-- ── S-PG-SAVUNMA (NOT EXISTS savunma kilidi, 000002:204-211):
+--    ILAC_EKLE olayı önceden var olan kalemde günü tamamla → yeni olay YOK
+--    (toplam 1, TEDAVI_GUN 0). MUT-PG-SAVUNMASIZ (NOT EXISTS silik) → RED.
+DO $do$ DECLARE
+  v_r jsonb; v_id uuid; v_toplam int; v_tgun int; v_tai int;
+BEGIN
+  INSERT INTO hayvanlar(id, kupe_no, cinsiyet, durum, grup, padok, dogum_tarihi)
+    VALUES ('E2E-OVP-H-13', 'E2E-OVP-13', 'Dişi', 'Aktif', 'Sağmal (Laktasyonda)', 'Sağmal Padok', pg_temp.bg() - 800);
+  INSERT INTO cases(id, animal_id, disease_id, start_date, status)
+    VALUES (pg_temp.ovp_id('c',13), 'E2E-OVP-H-13', pg_temp.ovp_id('1',3), pg_temp.bg(), 'active');
+  INSERT INTO treatment_days(id, case_id, treatment_date)
+    VALUES (pg_temp.ovp_id('d',13), pg_temp.ovp_id('c',13), pg_temp.bg());
+  v_r := public.add_drug_administration(pg_temp.ovp_id('d',13), pg_temp.ovp_id('f',1), 'E2E-OVP-STK-PG', 2, 'ml', 'IM');
+  v_id := (v_r->>'id')::uuid;
+  INSERT INTO public.pg_application_event(source_type, source_id, hayvan_id, stok_id, drug_product_id, occurred_at, karar)
+    VALUES ('ILAC_EKLE', v_id::text, 'E2E-OVP-H-13', 'E2E-OVP-STK-PG', pg_temp.ovp_id('f',1), now(), 'ALLOW')
+    ON CONFLICT (source_type, source_id) DO NOTHING;
+  PERFORM public.treatment_day_tamamla(pg_temp.ovp_id('d',13));
+  SELECT count(*) INTO v_toplam FROM pg_application_event WHERE source_id = v_id::text;
+  SELECT count(*) INTO v_tgun FROM pg_application_event WHERE source_id = v_id::text AND source_type = 'TEDAVI_GUN';
+  SELECT count(*) INTO v_tai FROM gorev_log WHERE hayvan_id = 'E2E-OVP-H-13' AND kaynak LIKE 'PG_TOHUMLAMA:%';
+  INSERT INTO _ovp_durum VALUES ('S-PG-SAVUNMA',
+    CASE WHEN v_toplam = 1 AND v_tgun = 0 THEN 'PASS' ELSE 'RED' END,
+    format('toplam=%s tgun=%s tai=%s', v_toplam, v_tgun, v_tai));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-PG-SAVUNMA', 'RED', SQLERRM); END $do$;
+
+-- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9, F1-düzeltme → 9, F2-savunma → 10.
 SELECT senaryo, sonuc, kanit FROM _ovp_durum ORDER BY senaryo;
 SELECT count(*) FILTER (WHERE sonuc <> 'PASS') AS ovp_red, count(*) AS ovp_toplam FROM _ovp_durum \gset
 ROLLBACK;
 SELECT set_config('ovp.red', :'ovp_red', false), set_config('ovp.toplam', :'ovp_toplam', false) \g /dev/null
 DO $do$ BEGIN
-  IF current_setting('ovp.toplam')::int <> 9 OR current_setting('ovp.red')::int > 0 THEN
+  IF current_setting('ovp.toplam')::int <> 10 OR current_setting('ovp.red')::int > 0 THEN
     RAISE EXCEPTION 'OVSYNC-PAKETI TEST RED: % / % senaryo kirmizi', current_setting('ovp.red'), current_setting('ovp.toplam');
   END IF;
   RAISE NOTICE 'OVSYNC-PAKETI TEST PASS';

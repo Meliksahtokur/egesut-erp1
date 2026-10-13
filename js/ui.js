@@ -13503,7 +13503,7 @@ async function caseDrugKaydet(btn) {
       }
     }
     // Madde 3: PG kapısında durduysa k/n sayısıyla bildir, tazeleme aşağıda yine koşar.
-    if (pgDurdu) toast('✅ ' + eklenen + '/' + secililar.length + ' ilaç eklendi, PG kalemi kapıda durdu');
+    if (pgDurdu) toast((eklenen === 0 ? '' : '✅ ') + eklenen + '/' + secililar.length + ' ilaç eklendi, PG kalemi kapıda durdu');
     else toast('✅ ' + secililar.length + ' ilac eklendi');
     await pullTables(['stok','stok_hareket','drug_administrations','treatment_days']);
     btn.closest('.cd-drug-form').remove();
