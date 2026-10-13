@@ -886,6 +886,12 @@ function _ovsyncBaglamKur(gorevler, vakalar, hayvanlar){
     if(!eski||String(g.hedef_tarih||'')>String(eski.hedef_tarih||'')) baslat.set(g.hayvan_id,g);
   });
   const vakaAktif=new Map(), vakaKapali=new Map();
+  // Faz 2b (yetim rozeti): açık planlı iş (TAI/seans/gün) taşıyan hayvanlar + açık alt vakası olanlar.
+  const acikIs=new Set(), altAcik=new Set();
+  (Array.isArray(gorevler)?gorevler:[]).forEach(g=>{
+    if(!g||g.tamamlandi||g.iptal||!g.hayvan_id) return;
+    if(g.gorev_tipi==='TOHUMLAMA_PLANLI'||g.gorev_tipi==='TEDAVI_SEANS'||g.gorev_tipi==='TEDAVI_GUN') acikIs.add(g.hayvan_id);
+  });
   (Array.isArray(vakalar)?vakalar:[]).forEach(c=>{
     if(!c||c.protocol_family!=='OVSYNC'||!c.animal_id) return;
     if(c.status==='active'){ vakaAktif.set(c.animal_id,c); }
@@ -893,10 +899,11 @@ function _ovsyncBaglamKur(gorevler, vakalar, hayvanlar){
       const eski=vakaKapali.get(c.animal_id);
       if(!eski||String(c.closed_at||'')>String(eski.closed_at||'')) vakaKapali.set(c.animal_id,c);
     }
+    if(c.status==='active'&&c.kaynak_vaka_id) altAcik.add(c.animal_id);
   });
   const kisir=new Set();
   (Array.isArray(hayvanlar)?hayvanlar:[]).forEach(h=>{ if(h&&h.kisir===true&&h.id) kisir.add(h.id); });
-  return {baslat:baslat,vakaAktif:vakaAktif,vakaKapali:vakaKapali,kisir:kisir};
+  return {baslat:baslat,vakaAktif:vakaAktif,vakaKapali:vakaKapali,kisir:kisir,acikIs:acikIs,altAcik:altAcik};
 }
 /**
  * Kayıtlı IDB bağlamını okur; yoksa/bozuksa boş bağlam (aksiyon çizilmez,
@@ -1049,14 +1056,219 @@ function _ovsyncS1SatirHtml(satir, bugunIso){
   const vakaBtn=vaka
     ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Gün detayı</button>'
     :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  // Faz 2b: yetim rozeti (bağlamda iz yoksa '' — eski test baglamlari etkilenmez) +
+  // inaktif geçiş butonu (yalnız aktif OVSYNC vakası eşleşmişse).
+  const yetimRozet=(typeof _ovsyncYetimRozetHtml==='function')?_ovsyncYetimRozetHtml(satir,bag,vaka):'';
+  const inaktifBtn=(vaka&&vaka.status==='active'&&vaka.protocol_family==='OVSYNC')
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\')">İnaktif ovaryum</button>'
+    :'';
   return '<div class="ovs-kart"><div class="ovs-ust"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
     +'</span><span class="ovs-etiket">'+esc(satir.grup||'bilinmiyor')
     +'</span><span class="ovs-etiket">'+esc(_ovsyncTabanEtiketi(satir.taban_turu))+'</span>'
     +_ovsyncSapmaRozeti(satir.sapma)+_ovsyncDenemeRozeti(satir.deneme_sayisi)
     +'</div>'
     +_ovsyncGunlerHtml(satir,bugunIso)
-    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(String(tamSay))+'/'+esc(String(gunTop))+' uygulandı'+esc(sira)+'</span>'+vakaBtn+'</div>'
+    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(String(tamSay))+'/'+esc(String(gunTop))+' uygulandı'+esc(sira)+'</span>'+vakaBtn+yetimRozet+inaktifBtn+'</div>'
     +'</div>';
+}
+// ═══ FAZ 2b — İNAKTİF GEÇİŞ + YETİM ROZETİ (ovsync-paketi, karar 4-7) ═══
+// Alt vaka aç/kapat RPC'leri public'tir (öneksiz); UI'dan iç yardımcı
+// çağrılmaz. Tek öteleme yolu sunucudaki tohumlama_gorev_ertele'dir;
+// UI'dan kaydır RPC'si çağrılmaz.
+/**
+ * Aktif OVSYNC vakanın yetim (takipsiz) olup olmadığını hesaplar: açık
+ * (tamamlandi=false, iptal=false) TOHUMLAMA_PLANLI/TEDAVI_SEANS/TEDAVI_GUN
+ * yok ve açık alt vaka yoksa true. Saf — DOM/RPC kullanmaz.
+ * @param {Object} vaka cases satırı (status, protocol_family).
+ * @param {Array} gorevler gorev_log satırları.
+ * @param {Array} altVakalar Alt vaka cases satırları.
+ * @returns {boolean} Yetimse true.
+ */
+function _ovsyncYetimMi(vaka, gorevler, altVakalar){
+  if(!vaka||vaka.status!=='active'||vaka.protocol_family!=='OVSYNC') return false;
+  const acikAlt=(Array.isArray(altVakalar)?altVakalar:[]).some(a=>a&&a.status==='active');
+  if(acikAlt) return false;
+  const acikIs=(Array.isArray(gorevler)?gorevler:[]).some(g=>g&&!g.tamamlandi&&!g.iptal
+    &&(g.gorev_tipi==='TOHUMLAMA_PLANLI'||g.gorev_tipi==='TEDAVI_SEANS'||g.gorev_tipi==='TEDAVI_GUN'));
+  return !acikIs;
+}
+/**
+ * Takip kartı yetim rozeti: yalnız bağlamda Faz 2b izleri varken ve vaka
+ * gerçekten yetimse çizilir; iz yoksa '' (fail-closed — eski çağrılar etkilenmez).
+ * Rozet uyarıdır, otomatik kurtarma DEĞİLDİR: "PG ile devam et" vaka detayını açar,
+ * PG'yi kullanıcı elle girer.
+ * @param {Object} satir RPC satırı (hayvan_id).
+ * @param {Object} bag _ovsyncBaglamAl çıktısı.
+ * @param {Object|null} vaka Eşleşen aktif OVSYNC vakası.
+ * @returns {string} Rozet + aksiyon HTML'i ya da ''.
+ */
+function _ovsyncYetimRozetHtml(satir, bag, vaka){
+  if(!satir||!vaka||!satir.hayvan_id) return '';
+  const b=bag||{};
+  if(!b.acikIs||typeof b.acikIs.has!=='function'||!b.altAcik||typeof b.altAcik.has!=='function') return '';
+  if(typeof _ovsyncYetimMi!=='function') return '';
+  // Bağlam izleri _ovsyncYetimMi sözleşmesine indirgenir (tek doğruluk noktası).
+  const hid=satir.hayvan_id;
+  const gorevler=b.acikIs.has(hid)?[{gorev_tipi:'TOHUMLAMA_PLANLI',tamamlandi:false,iptal:false}]:[];
+  const altlar=b.altAcik.has(hid)?[{status:'active'}]:[];
+  if(!_ovsyncYetimMi(vaka,gorevler,altlar)) return '';
+  return '<span class="ovs-etiket" style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700">⚠ Takipsiz Ovsync</span>'
+    +'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">PG ile devam et</button>';
+}
+/**
+ * İnaktif geçiş sheet'i (saf): gün sorusu varsayılan 7 (karar 5),
+ * vitamin dozu varsayılan 20 ml (karar 7, statik değil — düzenlenebilir),
+ * hastalık listesi canlı kayıtlardan (İnaktif Ovaryum varsayılan, Kistik Over — karar 6-7).
+ * @param {string} anaVakaId Ana OVSYNC vaka id.
+ * @param {Object} secenek {hastaliklar: Array<{id,name}>, vitaminStok: {id, urun_adi}|null}.
+ * @returns {string} Sheet HTML'i.
+ */
+function inaktifGecisSheetHtml(anaVakaId, secenek){
+  const o=secenek||{};
+  const hastaliklar=Array.isArray(o.hastaliklar)?o.hastaliklar:[];
+  const vitaminStok=o.vitaminStok||null;
+  const opts=hastaliklar.map(h=>{
+    const ad=h?(h.name||''): '';
+    const sel=/inaktif/i.test(ad)?' selected':'';
+    return '<option value="'+escAttr(h?h.id:'')+'"'+sel+'>'+esc(ad)+'</option>';
+  }).join('');
+  let vitBlok='';
+  if(vitaminStok){
+    vitBlok='<div style="font-size:.76rem;font-weight:700;margin:10px 0 4px">💊 Vitamin desteği ('+esc(vitaminStok.urun_adi||'')+')</div>'
+      +'<div style="display:flex;gap:8px;align-items:center">'
+      +'<span style="font-size:.74rem;color:var(--ink2)">'+esc(vitaminStok.urun_adi||'')+'</span>'
+      +'<input type="number" id="ig-vit-doz" min="0" step="1" inputmode="decimal" value="20" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
+      +'<span style="font-size:.74rem;color:var(--ink2)">ml</span>'
+      +'<input type="hidden" id="ig-vit-stok" value="'+escAttr(vitaminStok.id||'')+'">'
+      +'</div>';
+  }
+  return '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));box-sizing:border-box">'
+    +'<div style="font-weight:800;font-size:.9rem;margin-bottom:6px">İnaktif Ovaryum Geçişi</div>'
+    +'<div style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin-bottom:12px">Ana Ovsync açık kalır; alt vaka açılır, açık tohumlama iptal edilmeden ötelenir.</div>'
+    +'<div class="fg"><label class="flbl">Hastalık</label>'
+    +'<select id="ig-hastalik" style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:.9rem;background:var(--card);color:var(--ink)">'+opts+'</select></div>'
+    +'<div class="fg"><label class="flbl">Erteleme (gün)</label>'
+    +'<input type="number" id="ig-gun" min="1" max="365" step="1" inputmode="numeric" value="7" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box"></div>'
+    +vitBlok
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button onclick="inaktifGecisKaydet(\''+escAttr(anaVakaId)+'\')" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Alt Vakayı Aç</button>'
+    +'<button onclick="document.getElementById(\'inaktif-gecis-modal\').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Vazgeç</button>'
+    +'</div></div>';
+}
+/**
+ * İnaktif geçiş sheet'ini açar; hastalık listesi IDB diseases'ten
+ * (İnaktif Ovaryum varsayılan, Kistik Over), vitamin IDB stok'tan (CAROFERTIN-E).
+ * @param {string} anaVakaId Ana OVSYNC vaka id.
+ * @returns {Promise<void>} Sheet açılınca çözülür.
+ */
+async function inaktifGecisAc(anaVakaId){
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('inaktif-gecis')) return;
+  let hastaliklar=[], vitaminStok=null;
+  try{
+    const dis=await idbGetAll('diseases');
+    hastaliklar=(dis||[]).filter(d=>d&&(d.name==='İnaktif Ovaryum'||d.name==='Kistik Over'))
+      .sort((a,b)=>(a.name==='İnaktif Ovaryum'?-1:1));
+    const stok=await idbGetAll('stok');
+    const vit=(stok||[]).find(s=>s&&/carofertin/i.test(s.urun_adi||''));
+    if(vit) vitaminStok={id:vit.id,urun_adi:vit.urun_adi};
+  }catch(e){ console.warn('inaktif-gecis listeleri:',e.message); }
+  let box=document.getElementById('inaktif-gecis-modal');
+  if(box) box.remove();
+  box=document.createElement('div');
+  box.id='inaktif-gecis-modal';
+  box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
+  box.onclick=e=>{ if(e.target===box) box.remove(); };
+  box.innerHTML=inaktifGecisSheetHtml(anaVakaId,{hastaliklar:hastaliklar,vitaminStok:vitaminStok});
+  document.body.appendChild(box);
+}
+/**
+ * Alt vakayı açar: public inaktif_alt_vaka_ac RPC'si (p_gun ile); ardından
+ * ilgili tablolar çekilir, kart tazelenir. Kaydır RPC'si çağrılmaz (tek
+ * öteleme yolu sunucudaki tohumlama_gorev_ertele'dir).
+ * @param {string} anaVakaId Ana OVSYNC vaka id.
+ * @returns {Promise<void>} Kayıt + tazeleme bitince çözülür.
+ * @rpc inaktif_alt_vaka_ac
+ * @tablo cases (tazeleme), treatment_days (tazeleme), drug_administrations (tazeleme), stok (tazeleme), stok_hareket (tazeleme), gorev_log (tazeleme), islem_log (tazeleme)
+ */
+async function inaktifGecisKaydet(anaVakaId){
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('inaktif-gecis')) return;
+  const gunEl=document.getElementById('ig-gun');
+  const hastalikEl=document.getElementById('ig-hastalik');
+  const dozEl=document.getElementById('ig-vit-doz');
+  const hamGun=gunEl&&gunEl.value?parseInt(gunEl.value,10):7;
+  const p_gun=Math.max(1,isFinite(hamGun)?hamGun:7);
+  const p_hastalik_id=hastalikEl&&hastalikEl.value?hastalikEl.value:null;
+  const dozHam=dozEl&&dozEl.value!==''?Number(dozEl.value):null;
+  const r=await rpc('inaktif_alt_vaka_ac',{p_ana_vaka_id:anaVakaId,p_gun:p_gun,p_hastalik_id:p_hastalik_id,p_vitamin_stok_id:vitaminStokIdBul(),p_vitamin_doz_ml:dozHam});
+  const box=document.getElementById('inaktif-gecis-modal');
+  if(box) box.remove();
+  toast('✅ İnaktif alt vaka açıldı');
+  const tables=(typeof RPC_TABLES!=='undefined'&&RPC_TABLES.inaktif_alt_vaka_ac)?RPC_TABLES.inaktif_alt_vaka_ac:['cases','gorev_log'];
+  pullTables(tables).then(renderSafe).catch(console.warn);
+  if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
+  if(typeof loadDash==='function') loadDash().catch(console.warn);
+  return r;
+}
+/**
+ * Sheet'teki vitamin stok seçimini okur (stok adı CAROFERTIN-E eşleşmesi
+ * liste doldurulurken data özniteliğe yazılır; seçimsiz kurulumda null).
+ * @returns {string|null} Stok id ya da null.
+ */
+function vitaminStokIdBul(){
+  const el=document.getElementById('ig-vit-stok');
+  return (el&&el.value)?el.value:null;
+}
+/**
+ * Alt vakadan ana Ovsync'e dönüş: TEK dönüş tetikleyicisi public
+ * inaktif_alt_vaka_kapat RPC'sidir; iç yardımcı UI'dan çağrılmaz.
+ * @param {string} altVakaId Alt vaka id.
+ * @returns {Promise<void>} Kapatma + tazeleme bitince çözülür.
+ * @rpc inaktif_alt_vaka_kapat
+ * @tablo cases (tazeleme), gorev_log (tazeleme)
+ */
+async function inaktifAltVakaDonus(altVakaId){
+  if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('inaktif-donus')) return;
+  if(!confirm('Alt vaka kapatılıp ana Ovsync akışına dönülsün mü?')) return;
+  const r=await rpc('inaktif_alt_vaka_kapat',{p_alt_vaka_id:altVakaId});
+  toast('✅ Ana Ovsync akışına dönüldü');
+  const tables=(typeof RPC_TABLES!=='undefined'&&RPC_TABLES.inaktif_alt_vaka_kapat)?RPC_TABLES.inaktif_alt_vaka_kapat:['cases','gorev_log'];
+  pullTables(tables).then(renderSafe).catch(console.warn);
+  if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
+  if(typeof loadDash==='function') loadDash().catch(console.warn);
+  return r;
+}
+/**
+ * Vaka detayındaki inaktif geçiş butonunu kurar/günceller: #cd-kaydir-btn
+ * yanında (index.html'e dokunmadan JS'ten eklenir), yalnız aktif OVSYNC
+ * vakada + çevrimiçiyken görünür.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
+function _inaktifGecisBtnSync(){
+  const kaydirBtn=document.getElementById('cd-kaydir-btn');
+  if(!kaydirBtn||!kaydirBtn.parentNode) return;
+  let btn=document.getElementById('cd-inaktif-gecis-btn');
+  if(!btn){
+    btn=document.createElement('button');
+    btn.id='cd-inaktif-gecis-btn';
+    btn.className='btn';
+    btn.style.cssText='background:none;border:1.5px solid var(--purple, #8e44ad);color:var(--purple, #8e44ad);width:100%;margin-bottom:6px';
+    btn.textContent='İnaktif Ovaryum Geçişi';
+    kaydirBtn.parentNode.insertBefore(btn,kaydirBtn.nextSibling);
+  }
+  const vaka=(typeof _curCase!=='undefined')?_curCase:null;
+  const online=!(typeof navigator!=='undefined'&&navigator.onLine===false);
+  if(!(online&&vaka&&vaka.status==='active')){ btn.style.display='none'; return; }
+  if(vaka.kaynak_vaka_id){
+    // Alt vaka: TEK dönüş tetikleyicisi (public kapat-RPC).
+    btn.textContent="Ana Ovsync'e Dön";
+    btn.style.display='block';
+    btn.onclick=()=>inaktifAltVakaDonus(vaka.id);
+    return;
+  }
+  const ovsyncAktif=vaka.protocol_family==='OVSYNC';
+  btn.textContent='İnaktif Ovaryum Geçişi';
+  btn.style.display=ovsyncAktif?'block':'none';
+  if(ovsyncAktif) btn.onclick=()=>inaktifGecisAc(vaka.id);
 }
 /**
  * S2 sonuç bekleyen kartı (K15): kalan_gun>0 → sayaç (aksiyon yok); kalan_gun<=0 →
@@ -11544,6 +11756,7 @@ async function openCaseDet(caseId) {
   document.getElementById('cd-gun-bolum').style.display   = aktif ? 'block' : 'none';
   document.getElementById('cd-kapat-bolum').style.display = aktif ? 'block' : 'none';
   ertelemeBtnGuncelle();   // E6: erteleme/kaydırma butonları online-only görünürlük
+  if(typeof _inaktifGecisBtnSync==='function') _inaktifGecisBtnSync();   // Faz 2b: inaktif geçiş butonu
 
   // Geri Al butonu kontrolü — islem_log'da VAKA_ACILDI kaydı varsa göster
   let islemler = await idbGetAll('islem_log');
