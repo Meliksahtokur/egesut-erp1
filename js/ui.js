@@ -1786,16 +1786,19 @@ function _ovsyncS4SatirHtml(satir, bugunIso){
   const vakaBtn=vaka
     ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Vaka</button>'
     :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
-  // K10-UI2: satır anahtarı korunur; öğeler artık treatment_days satırıdır
-  // (gün id'si vaka değildir) — rozet ebeveyn detayına çıkar (metin UI-3'te).
-  const altlar=Array.isArray(satir.alt_vakalar)?satir.alt_vakalar:[];
-  const altBtn=(altlar.length&&vaka&&vaka.id)
-    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">🔗 alt vaka'+(altlar.length>1?' ('+altlar.length+')':'')+'</button>'
+  // K10-UI3 (M6 devam rozeti): satır anahtarı korunur; öğeler hastalık-günü
+  // satırlarıdır ({id, hastalik, status}; hastalik = diseases.name, bağ
+  // treatment_days.disease_id) — rozet ebeveyn detayına çıkar, gün id'si
+  // hedef olmaz; metin yeni modeldir.
+  const gunler=Array.isArray(satir.alt_vakalar)?satir.alt_vakalar:[];
+  const tekAd=gunler.length===1&&gunler[0]&&gunler[0].hastalik?String(gunler[0].hastalik):'';
+  const gunBtn=(gunler.length&&vaka&&vaka.id)
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">🦠 '+(tekAd?esc(tekAd)+' · ':'')+'Ovsync içinde hastalık günü'+(gunler.length>1?' ('+gunler.length+')':'')+'</button>'
     :'';
   return '<div class="ovs-kart ovs-s4-kart ovs-sonlanan"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
     +esc(satir.kupe_no||'bilinmiyor')+'</b> '+_ovsyncSonlanmaRozeti(satir.close_reason,satir.toh_sonuc)
     +_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span></div>'
-    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(satir.toh_sonuc||'bilinmiyor')+'</span>'+vakaBtn+altBtn+'</div>'
+    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(satir.toh_sonuc||'bilinmiyor')+'</span>'+vakaBtn+gunBtn+'</div>'
     +'</div>';
 }
 /**
@@ -5405,8 +5408,9 @@ async function _showProtokolEkran(){
   box.onclick = e => { if (e.target === box) _closeProtokolListe(); };
 
   data = data || [];
-  // Faz 5 P7 EK-2: hayvanı aktif OVSYNC (ana ya da alt vakası) olan satırlar
-  // 🔄 bölmesine taşınır, aşağıdaki 🔴/🟡/✅ listelerinden çıkar.
+  // Faz 5 P7 EK-2 (K10-UI3: hastalık günleri vaka değildir): hayvanı aktif
+  // OVSYNC ebeveyn vakası olan satırlar 🔄 bölmesine taşınır, aşağıdaki
+  // 🔴/🟡/✅ listelerinden çıkar.
   // Kaynak IDB cases; bağlam yoksa yüklenir,
   // okunamazsa listeler değişmeden çizilir.
   let ovsyncHtml = '';

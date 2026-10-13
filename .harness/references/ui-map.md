@@ -108,7 +108,7 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
   `js/ui.js:_ovsyncMuayeneSatirAc` (S2 satır aksiyonu: görevli → `_muayeneSonucAc`, görevsiz →
   `openDet`). Eşik sayıları (21/50/55/40) JS'te YAZILMAZ — yalnız RPC `esikler`/`kalan_gun`
   akışı (eşik-sızıntısı birim testi kilidi).
-- **3 bottom-sheet (non-router, `_pgKapiAc` inline-stil deseni; modal-geri yalnız sheet kapatır):**
+- **4 bottom-sheet (non-router, `_pgKapiAc` inline-stil deseni; modal-geri yalnız sheet kapatır):**
   1. **Devam seçici** `#devam-secici-bs` — `js/ui.js:_devamSeciciAc(mod, baglam)` (mod `'bos'` |
       `'muayene'`). Girişler: `js/forms.js:tohSonuc` Boş dalı (seçici açılamazsa fallback confirm +
       `tohumlama_sonuc_bos`) ve P9 muayene akışı. Kopya "Devam nasıl olsun? (zorunlu)"; seçenekler
@@ -141,6 +141,15 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
       ONAYLI alt kümeyle yeni çağrı (seçimsiz gönderim yok); `js/ui.js:_pgKapiAc` TAKIP_ACIK kod
       dalı birleşik redi TEK sheet'e delege eder. `TAKIP_ACIK:ZATEN_ACIK` türevi sheet'e girmez
       (alan uydurma yasak).
+  4. **"+ Hastalık" sheet'i (K10, mockup N3/N3b)** `#hastalik-modal` —
+      `js/ui.js:hastalikGunAc` (N2 vaka detayından; kabul `js/ui.js:_hastalikKabulMu`:
+      damga + yedek tanım; çevrimdışı `_ertelemeOfflineGuard` — §18.10) →
+      `js/ui.js:hastalikSheetHtml` (saf: HASTALIK + TARİH + KAÇ GÜN→TAI önizleme +
+      ön-öneri/ek ilaç) → `js/ui.js:hastalikGunKaydet` → TEK RPC
+      `js/api.js:ovsync_hastalik_gunu_ekle` (UI kilit: çift-tık tek çağrı; PG
+      redi `_pgKapiHata`, başarısızda pull YOK). Zemin mevcut palet
+      (`background:var(--...)` yalnız), vurgu yazı rengi; S4 devam rozeti
+      "🦠 Ovsync içinde hastalık günü" (§18.18).
 - **Görev tipi özel tamamlama akışı (K15):** TAKIP_MUAYENE + GEBELIK_KONTROL —
   `js/ui.js:renderTask` ck-btn exclusion (jenerik "✅ Tamamlandı" butonu bu iki tipte ÇİZİLMEZ,
   diğer tipler etkilenmez), `js/ui.js:detayTamamla` iki tipi sonuç ekranına alır (`doneTask` /

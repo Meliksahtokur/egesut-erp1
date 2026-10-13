@@ -150,6 +150,40 @@ test('hastalik-cift-ekle-tek-cagri', async () => {
   assert.strictEqual(n, 1, 'çift tık tek çağrı, ölçülen: ' + n);
 });
 
+test('hastalik-ac-offline-gizli', async () => {
+  // §18.10: çevrimdışıyken erteleme/hastalık-günü girişi gizlidir —
+  // sheet açılmaz, IDB/RPC'ye dokunulmaz.
+  const govde = extractFunctionSource('js/ui.js', 'hastalikGunAc');
+  const iz = [];
+  const ctx = {
+    console,
+    _ertelemeOfflineGuard: (alan) => { iz.push(alan); return true; },
+    idbGetAll: async (t) => { iz.push('idb:' + t); return []; },
+    document: { getElementById: () => null, createElement: () => { throw new Error('acilmamali'); }, body: { appendChild: () => { throw new Error('acilmamali'); } } },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'hastalik-ac-offline-ctx' });
+  await vm.runInContext(`hastalikGunAc('v-ana')`, ctx);
+  assert.deepStrictEqual(iz, ['hastalik-gun'], 'guard sonrası dönüş, ölçülen: ' + JSON.stringify(iz));
+});
+
+test('hastalik-kaydet-offline-durur', async () => {
+  // §18.10: çevrimdışı Ekle RPC üretmez.
+  const govde = 'var _hgKayitKilit=false;\n' + extractFunctionSource('js/ui.js', 'hastalikGunKaydet');
+  const rpcCagrilari = [];
+  const ctx = {
+    console,
+    _ertelemeOfflineGuard: () => true,
+    rpc: async (ad) => { rpcCagrilari.push(ad); return {}; },
+    toast: () => {},
+    document: {},
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'hastalik-kaydet-offline-ctx' });
+  await vm.runInContext(`hastalikGunKaydet('v-ana')`, ctx);
+  assert.strictEqual(rpcCagrilari.length, 0, 'çevrimdışı RPC YOK, ölçülen: ' + JSON.stringify(rpcCagrilari));
+});
+
 test('hastalik-kabul-yedek', () => {
   const f = loadExtractedFunction('js/ui.js', '_hastalikKabulMu', { extra: ESC });
   const damga = { id: 'v1', status: 'active', protocol_family: 'OVSYNC' };
