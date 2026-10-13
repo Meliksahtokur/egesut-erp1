@@ -61,7 +61,7 @@ surface for reports, plans, and archives.
 ## Kod keşif protokolü
 
 Kod keşfi (atlas→gitnexus→atlas-py→LSP→grep; MCP varsa MCP, yoksa CLI): egesut JS atlas (atlas_query/atlas_status | atlas-sorgu), genel gitnexus (query/context/impact | gitnexus CLI), Python atlas-py, sonra LSP, son çare grep; tek araçtan yok hükmü çıkmaz.
-Tazelik: önce gitnexus list/status ile HEAD karşılaştır, bitince analyze --index-only (bayraksız analyze yasak).
+Tazelik: kullanmadan önce gitnexus list/status ile indeks commit'ini HEAD ile karşılaştır, bayatsa sonucu bayat say ve raporla; iş bitince yalnız kod yazan rol değişen repoda analyze --index-only koşar (bayraksız analyze yasak).
 Ayrıntı: ~/tools-bank/docs/kod-kesif-protokolu.md
 
 Değişiklik öncesi etki kapısı: code-change-precheck skill'i atlas `etki` ister.
