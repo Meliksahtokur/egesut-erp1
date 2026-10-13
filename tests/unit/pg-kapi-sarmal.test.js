@@ -61,6 +61,181 @@ test('drug-return-kilidi', () => {
     'tazeleme (pullTables) döngü sonrasında');
   assert.ok(/kapıda durdu/.test(govde), 'toast k/n sayısıyla kapıda durduğunu bildirir');
 });
+// ── Faz 4 (Kapı 5 ekleri 1-2): Veri Trafiği eş-op kuralı ─────────────────────
+// dataTrafficSil ilaç silerken _esBul ile eşi de siler; dataTrafficTekGonder
+// kuyrukta ilacı bekleyen eş stok satırını tek başına göndermez; TekGonder
+// catch'inde düz toast'tan ÖNCE _pgKapiHata (onaylı tekrar kaydı düşürür).
+// RPC_MAP tek kaynak (api.js); ui.js yerel kopyası YOK.
+// Adli mutantlar: MUT-TG-ESBUL-SONUCSUZ, MUT-TG-ES-TEK, MUT-SIL-ES-YETIM.
+const path = require('node:path');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const { makeDomStub } = require('./support/loadModule.js');
+
+const F4_KOK = path.join(__dirname, '..', '..');
+const F4_UI_YOLU = () => process.env.UI_YOLU || path.join(F4_KOK, 'js/ui.js');
+
+function f4KaynakCek(abs, ad) {
+  const src = fs.readFileSync(abs, 'utf8');
+  const start = src.search(new RegExp('^\\s*(?:async\\s+)?function\\s+' + ad + '\\s*\\(', 'm'));
+  if (start === -1) throw new Error('kirmizi: function ' + ad + ' yok (' + abs + ')');
+  let i = src.indexOf('{', start);
+  let depth = 0, str = null, esc = false, lc = false, bc = false;
+  for (; i < src.length; i++) {
+    const c = src[i], n = src[i + 1];
+    if (lc) { if (c === '\n') lc = false; continue; }
+    if (bc) { if (c === '*' && n === '/') { bc = false; i++; } continue; }
+    if (str) {
+      if (esc) { esc = false; continue; }
+      if (c === '\\') { esc = true; continue; }
+      if (c === str) str = null;
+      continue;
+    }
+    if (c === '/' && n === '/') { lc = true; i++; continue; }
+    if (c === '/' && n === '*') { bc = true; i++; continue; }
+    if (c === "'" || c === '"' || c === '`') { str = c; continue; }
+    if (c === '{') depth++;
+    else if (c === '}') { depth--; if (depth === 0) return src.slice(start, i + 1); }
+  }
+  throw new Error(ad + ': govde kapanmadi');
+}
+
+// api.js sözleşmesi (plan Faz 4 Interfaces): _esBul(q, op) -> op|null —
+// RPC'ye yönelen her drug_administrations POST'unun eş stok_hareket op'u
+// (notlar 'DrugAdmin:' + ilaç id); değilse null.
+function f4EsBul(q, op) {
+  if (!op || op.table !== 'drug_administrations' || op.method !== 'POST') return null;
+  const id = op.data && op.data[0] && op.data[0].id;
+  if (!id) return null;
+  return (q || []).find(o => o.table === 'stok_hareket' && o.data && o.data[0] && o.data[0].notlar === 'DrugAdmin:' + id) || null;
+}
+
+function f4TrafikCtx(kanca = {}) {
+  const adlar = ['dataTrafficTekGonder', 'dataTrafficSil', 'dataTrafficYenile',
+    '_pgKapiHata', '_pgKapiAc', '_pgKapiKapat', '_pgKapiOnayliTekrar'];
+  const govde = adlar.map(a => f4KaynakCek(F4_UI_YOLU(), a)).join('\n');
+  const doc = makeDomStub();
+  const histYigin = [null]; let histIdx = 0;
+  const hist = {
+    get length() { return histYigin.length; },
+    get state() { return histYigin[histIdx]; },
+    pushState(s) { histYigin.splice(histIdx + 1); histYigin.push(s); histIdx++; },
+    replaceState(s) { histYigin[histIdx] = s; },
+    back() { if (histIdx > 0) histIdx--; },
+  };
+  const toasts = [];
+  const rpcCagrilari = [];
+  const kuyruk = kanca.kuyruk || [];
+  const ctx = {
+    console, JSON, Math, Date,
+    document: doc, history: hist, window: {},
+    esc: s => String(s ?? ''), fmtTarih: s => String(s ?? ''),
+    toast: m => { toasts.push(String(m)); },
+    confirm: () => true,
+    getQueue: async () => kuyruk,
+    removeFromQueue: async qid => {
+      const i = kuyruk.findIndex(o => o._qid === qid);
+      if (i !== -1) kuyruk.splice(i, 1);
+    },
+    // RPC_MAP tek kaynak api.js (RPC_TABLES yanı) — test, güncel içeriğin
+    // birebirini globalden verir; ui.js yereli kalkar.
+    RPC_MAP: {
+      hayvanlar: { POST: 'hayvan_ekle', PATCH: 'hayvan_guncelle' },
+      tohumlama: { POST: 'tohumlama_kaydet' },
+      dogum: { POST: 'dogum_kaydet' },
+      gorev_log: { PATCH: 'gorev_tamamla' },
+      stok_hareket: { POST: 'stok_hareket_ekle' },
+      kizginlik_log: { POST: 'kizginlik_kaydet', DELETE: 'kizginlik_sil' },
+      cases: { POST: 'create_case' },
+      drug_administrations: { POST: 'add_drug_administration', PATCH: 'update_drug_administration' },
+    },
+    RPC_TABLES: {},
+    _esBul: f4EsBul,
+    buildRpcParams: (ad, veri) => ({ ...(veri || {}) }),
+    rpc: kanca.rpc || (async (ad, p) => { rpcCagrilari.push({ ad, p }); return { ok: true }; }),
+    pullTables: async () => ({ ok: [], failed: [] }),
+    renderSafe: () => {},
+    updateSyncBar: () => {},
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'pg-trafik-ctx' });
+  return { ctx, doc, hist, toasts, rpcCagrilari, kuyruk };
+}
+
+// Gerçek çevrimdışı caseDrugKaydet biçimi (js/ui.js:13695-13713).
+const f4IlacOp = (qid, id) => ({
+  _qid: qid, table: 'drug_administrations', method: 'POST',
+  data: [{ id, day_id: 'gun-1', stok_id: 's1', dose: 2, unit: 'ml' }],
+});
+const f4EsOp = (qid, id) => ({
+  _qid: qid, table: 'stok_hareket', method: 'POST',
+  data: [{ id: 'sh-' + id, stok_id: 's1', tur: 'Ilac', miktar: 2, notlar: 'DrugAdmin:' + id, iptal: false }],
+});
+
+function f4KutuyuBagla(doc) {
+  const box = doc.body.children.find(e => e && e.id === 'pg-kapi-bs');
+  assert.ok(box, 'pg-kapi-bs kutusu DOMda');
+  doc.__setEl('pg-kapi-bs', box);
+  return box;
+}
+
+test('rpc-map-tek-kaynak', () => {
+  const src = f4KaynakCek(F4_UI_YOLU(), 'dataTrafficTekGonder');
+  assert.ok(!/const RPC_MAP\s*=\s*\{/.test(src), 'ui.js yerel RPC_MAP kopyasi YOK (tek kaynak api.js)');
+  assert.ok(/RPC_MAP\[/.test(src), 'api.js RPC_MAP globali kullanilir');
+});
+
+test('tekgonder-es-birlikte-duser', async () => {
+  // MUT-TG-ESBUL-SONUCSUZ adli: _esBul sonucu kullanilmazsa es kuyrukta kalir → FAIL.
+  const t = f4TrafikCtx({ kuyruk: [f4IlacOp(11, 'd1'), f4EsOp(12, 'd1'),
+    { _qid: 16, table: 'stok', method: 'POST', data: [{ id: 's9' }] }] });
+  await vm.runInContext('dataTrafficTekGonder(11)', t.ctx);
+  assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [16], 'ilac + es birlikte duser');
+  assert.strictEqual(t.rpcCagrilari.length, 1);
+  assert.strictEqual(t.rpcCagrilari[0].ad, 'add_drug_administration');
+});
+
+test('tekgonder-yalniz-esi-gondermez', async () => {
+  // MUT-TG-ES-TEK adli: yalniz es gonderilirse FAIL.
+  const t = f4TrafikCtx({ kuyruk: [f4IlacOp(11, 'd1'), f4EsOp(12, 'd1')] });
+  await vm.runInContext('dataTrafficTekGonder(12)', t.ctx);
+  assert.strictEqual(t.rpcCagrilari.length, 0, 'es tek basina gonderilmez');
+  assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [11, 12], 'kuyruk degismez');
+  assert.ok(t.toasts.some(m => /ilaç/i.test(m)), 'uyari toast: ' + JSON.stringify(t.toasts));
+});
+
+test('sil-esi-de-siler', async () => {
+  // MUT-SIL-ES-YETIM adli: es silinmezse kuyrukta kalir → FAIL.
+  const t = f4TrafikCtx({ kuyruk: [f4IlacOp(11, 'd1'), f4EsOp(12, 'd1'),
+    { _qid: 16, table: 'stok', method: 'POST', data: [{ id: 's9' }] }] });
+  await vm.runInContext('dataTrafficSil(11)', t.ctx);
+  assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [16], 'ilac silinirken esi de silinir');
+});
+
+test('tekgonder-pg-kapi-onay-tekrar', async () => {
+  // TekGonder catch'inde _pgKapiHata: PG reddinde kayit + es kuyrukta kalir;
+  // modal onay dugmesi p_pg_onay===true ile tekrarlar, basarida ikisi duser.
+  const rpcCagrilari = [];
+  const t = f4TrafikCtx({
+    kuyruk: [f4IlacOp(11, 'd1'), f4EsOp(12, 'd1')],
+    rpc: async (ad, p) => {
+      rpcCagrilari.push({ ad, p });
+      if (p && p.p_pg_onay === true) return { ok: true, id: 'srv-d1' };
+      throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}');
+    },
+  });
+  await vm.runInContext('dataTrafficTekGonder(11)', t.ctx);
+  const box = f4KutuyuBagla(t.doc);
+  assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [11, 12], 'PG reddi: kayit + es kuyrukta kalir');
+  t.doc.__setEl('pg-kapi-gerekce', { value: 'kontrol negatif' });
+  const m = /id="pg-kapi-onayla"[^>]*onclick="([^"]+)"/.exec(box.innerHTML);
+  assert.ok(m, 'onay dugmesi kablolu');
+  await vm.runInContext(m[1], t.ctx);
+  const onayli = rpcCagrilari.filter(c => c.p && c.p.p_pg_onay === true);
+  assert.strictEqual(onayli.length, 1, 'onayli tekrar p_pg_onay===true ile gider');
+  assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [], 'onayli tekrar basarili: kayit + es duser');
+});
+
 // Madde 6 (KAPI-2 işaretli 6): ilk kalem PG'de durursa (eklenen=0) toast nötr — ✅ YOK.
 test('drug-pg-toast-notr-kilidi', () => {
   const govde = extractFunctionSource('js/ui.js', 'caseDrugKaydet');

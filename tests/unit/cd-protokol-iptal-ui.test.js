@@ -162,6 +162,10 @@ test('C1-7: cdProtokolIptal akışı KOPYALAMAZ — _protokolIptalAkisi A dalın
   assert.ok(guncelle.includes('cd-protokol-iptal-btn'), 'online/offline görünürlük taraması yeni butonu kapsar');
   // veri bağımlılığı: cases pull protocol_family'i zaten taşır (select('*'))
   const api = fs.readFileSync('js/api.js', 'utf8');
-  const casesPull = api.slice(api.indexOf('cases:'), api.indexOf('cases:') + 200);
+  // RPC_MAP taşıması sonrası ilk 'cases:' offline-replay eşlemesidir; pull
+  // satırı FETCHERS bloğu içindedir (api.js:637 çapası) — aynı niyet yeni yerde.
+  const fetchBase = api.indexOf('const FETCHERS = {');
+  assert.ok(fetchBase > -1, 'FETCHERS bloğu bulundu');
+  const casesPull = api.slice(api.indexOf('cases:', fetchBase), api.indexOf('cases:', fetchBase) + 200);
   assert.ok(casesPull.includes("select('*')"), "cases çekimi select(*) → protocol_family UI'da mevcut (api.js değişikliği GEREKMEZ)");
 });

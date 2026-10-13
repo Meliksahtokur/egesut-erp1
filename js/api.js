@@ -409,7 +409,7 @@ const RPC_TABLES = {
   geri_al:                   ['hayvanlar','tohumlama','dogum','gorev_log','islem_log','cases','treatment_days'],
   create_case:               ['cases'],
   // G-20260906-TOPLU-VAKA — toplu vaka; pull seti submitCase'in (forms.js:629)
-  // birebir aynısı. NOT: offline-replay RPC_MAP'e (ui.js dataTrafficTekGonder)
+  // birebir aynısı. NOT: offline-replay RPC_MAP'e (api.js, üstte tek kaynak)
   // EKLENMEZ — online-only RPC.
   vaka_toplu_ac:             ['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log'],
   // P2 (Ovsync/PG): yeni RPC pull setleri
@@ -420,11 +420,11 @@ const RPC_TABLES = {
   inaktif_alt_vaka_ac:      ['cases','treatment_days','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
   inaktif_alt_vaka_kapat:   ['cases','treatment_days','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
   // E1-UI (erteleme-genel): genel gorev erteleme — tohumlama_gorev_ertele deseni.
-  // RPC_MAP'e (ui.js dataTrafficTekGonder, offline kuyruk replay) BILINCLI girmez:
+  // RPC_MAP'e (api.js, offline kuyruk replay) BILINCLI girmez:
   // erteleme online-only'dir (E6 kapisu) — vaka_toplu_ac gerekce kalibi.
   gorev_ertele:              ['gorev_log','islem_log'],
   // F1 (coklu-kaydirma): gorev listesinden coklu vaka kaydirma — vaka_kalan_gunleri_kaydir
-  // pull setinin coklu hali. RPC_MAP'e (ui.js dataTrafficTekGonder) BILINCLI girmez:
+  // pull setinin coklu hali. RPC_MAP'e (api.js) BILINCLI girmez:
   // online-only'dir — vaka_toplu_ac gerekce kalibi.
   vaka_kalan_gunleri_kaydir_coklu: ['gorev_log','treatment_days','treatment_day_uygulamalar','islem_log'],
   // E4-UI (erteleme-genel): protokol iptali — vaka + gorev/seans/gun kapanisi +
@@ -504,6 +504,44 @@ const RPC_TABLES = {
   tedavi_sablon_tohumlama_gorev_ekle: ['gorev_log'],
   vaka_tohumlama_ekle:   ['gorev_log','islem_log'],
 };
+
+// ── OFFLINE REPLAY RPC EŞLEMESİ (Faz 4 — TEK KAYNAK) ─────────────────────
+// ui.js dataTrafficTekGonder'deki yerel kopya KALDIRILDI; burası tek kaynaktır
+// (api.js RPC_TABLES yanı). ui.js `typeof RPC_MAP === 'undefined'` guard'ıyla tüketir.
+// Online-only RPC'ler (vaka_toplu_ac, gorev_ertele, protokol_iptal vb.) BİLİNÇLİ girmez.
+const RPC_MAP = {
+  hayvanlar: { POST: 'hayvan_ekle', PATCH: 'hayvan_guncelle' },
+  tohumlama: { POST: 'tohumlama_kaydet' },
+  dogum: { POST: 'dogum_kaydet' },
+  gorev_log: { PATCH: 'gorev_tamamla' },
+  stok_hareket: { POST: 'stok_hareket_ekle' },
+  kizginlik_log: { POST: 'kizginlik_kaydet', DELETE: 'kizginlik_sil' },
+  cases: { POST: 'create_case' },
+  drug_administrations: { POST: 'add_drug_administration', PATCH: 'update_drug_administration' }
+};
+
+// Faz 4: syncNow'da RPC'ye ZORLANAN op'lar (tablo → izinli method'lar).
+// Diğer op'lar REST'te kalır. TekGonder ile aynı tek-satır kontratı (B6):
+// rpc(ad, buildRpcParams(ad, op.data[0], op)) — buildRpcParams ui.js global'i.
+const SYNC_RPC_ZORUNLU = { drug_administrations: ['POST'], hayvanlar: ['PATCH'] };
+
+/**
+ * RPC'ye yönlenen drug_administrations POST op'unun kuyruktaki eş
+ * stok_hareket op'unu bulur (çevrimdışı caseDrugKaydet biçimi: eş op'un
+ * notlar alanı 'DrugAdmin:' + ilaç id). Eş yoksa null.
+ * ui.js dataTrafficTekGonder/dataTrafficSil `typeof _esBul` guard'ıyla tüketir.
+ * @param {Array} q Kuyruk snapshot'ı.
+ * @param {Object} op Eşi aranan kuyruk op'u.
+ * @returns {Object|null} Eş stok op'u ya da null.
+ */
+function _esBul(q, op) {
+  if (!op || op.table !== 'drug_administrations' || op.method !== 'POST') return null;
+  const id = op.data && op.data[0] && op.data[0].id;
+  if (!id) return null;
+  const esNot = 'DrugAdmin:' + id;
+  return (q || []).find(o => o !== op && o.table === 'stok_hareket' &&
+    Array.isArray(o.data) && o.data.some(d => d && d.notlar === esNot)) || null;
+}
 
 // ── RENDER DEBOUNCE ─────────────────────────
 // Kısa sürede çok çağrı gelirse sadece 1 render yapar
@@ -879,17 +917,45 @@ async function syncNow() {
   _syncing = true;
   try {
     const q = await getQueue();
+    // Faz 4: eş stok op'ları döngüde REST ile GÖNDERİLMEZ — RPC (canlı
+    // add_drug_administration) kendi stok satırını yazar. Eş, ilaç RPC'si
+    // başarılıysa onunla birlikte düşer; reddedilirse ikisi kalır.
+    const _esQidler = new Set();
+    for (const o of q) { const es = _esBul(q, o); if (es) _esQidler.add(es._qid); }
     for (const op of q) {
       if ((_syncFailCount[op._qid] || 0) >= 5) continue;
+      if (_esQidler.has(op._qid)) continue;   // MUT-REPLAY-CIFT-STOK kilidi
       try {
-        if (op.method === 'PATCH') {
-          const idMatch = (op.filter || '').match(/id=eq\.([^&]+)/);
-          if (idMatch) await dbUpdate(op.table, idMatch[1], op.data[0]);
+        const _zorunlu = SYNC_RPC_ZORUNLU[op.table];
+        const _rpcAd = (_zorunlu && _zorunlu.includes(op.method) && RPC_MAP[op.table])
+          ? RPC_MAP[op.table][op.method] : null;
+        if (_rpcAd) {
+          // Faz 4: PG-kapılı replay — TekGonder ile aynı tek-satır kontratı (B6).
+          // PG_KAPI (ya da başka) reddi throw'a düşer: kayıt + eş kuyrukta kalır,
+          // sonraki op'a devam edilir (B17 atla-devam; dead-letter sayacı).
+          await rpc(_rpcAd, buildRpcParams(_rpcAd, op.data[0], op));
+          await removeFromQueue(op._qid);
+          delete _syncFailCount[op._qid];
+          const _es = _esBul(q, op);
+          if (_es && _es._qid !== op._qid) {
+            await removeFromQueue(_es._qid).catch(console.warn);
+            delete _syncFailCount[_es._qid];
+          }
+          try {
+            await pullTables(RPC_TABLES[_rpcAd] || [op.table]);
+          } catch (pe) {
+            console.warn('sync pull failed:', pe && pe.message ? pe.message : pe);
+          }
         } else {
-          await dbInsert(op.table, op.data);
+          if (op.method === 'PATCH') {
+            const idMatch = (op.filter || '').match(/id=eq\.([^&]+)/);
+            if (idMatch) await dbUpdate(op.table, idMatch[1], op.data[0]);
+          } else {
+            await dbInsert(op.table, op.data);
+          }
+          await removeFromQueue(op._qid);
+          delete _syncFailCount[op._qid];
         }
-        await removeFromQueue(op._qid);
-        delete _syncFailCount[op._qid];
       } catch (e) {
         // B17: ilk kalıcı hata tüm drain'i kesiyordu — zehirli kayıttan sonraki
         // TÜM offline yazmalar sonsuza dek yerel kalıyordu. Atla-devam; hatalı

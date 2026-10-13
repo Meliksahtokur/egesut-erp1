@@ -2441,12 +2441,19 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene){
     body = `<div style="font-size:.85rem;line-height:1.5">🔴 <b>Gebe inekte PG uygulanamaz</b>${kz?` (${esc(kz)})`:''}.<br><span style="font-size:.72rem;color:var(--ink3)">Gebelik sonlandırma ayrı, yetkili klinik işlemdir — bu ekrandan geçmez.</span></div>
       <button class="btn" style="width:100%;margin-top:14px;padding:10px;font-weight:700" onclick="_pgKapiKapat()">Tamam</button>`;
   } else if (kod === 'REQUIRE_ACK_PENDING') {
+    // Faz 4 (ROOT RULING 3, §18.8): tohumlama bağlamı varsa (detay.tohumlama_id)
+    // onaylı Boş-ata akışı (_pgKapiBosAtaUygula — tek transaction, P9); yoksa
+    // saklanan tekrar kapanışı (cagri) p_pg_onay=true + p_pg_gerekce ile çağrılır
+    // (_pgKapiOnayliTekrar). Gerekçe girişi iki kolda da aynı kimliktedir.
+    const onaylaDugme = detay.tohumlama_id
+      ? `<button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiBosAtaUygula()">Boş ata ve uygula</button>`
+      : `<button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiOnayliTekrar()">Onayla ve uygula</button>`;
     body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Son tohumlama sonucu Bekliyor</b>${kz?` — ${esc(kz)}`:''}${detay.tohumlama_tarihi?` · ${fmtTarih(detay.tohumlama_tarihi)}`:''}${detay.deneme_no?` · deneme ${esc(String(detay.deneme_no))}`:''}.<br><span style="font-size:.72rem;color:var(--ink3)">PG gebeliği sonlandırabilir. "Boş ata ve uygula" tohumlamayı Boş yapıp PG'yi aynı zincirde uygular.</span></div>
       <label style="font-size:.7rem;font-weight:600;display:block;margin:10px 0 4px">Gerekçe *</label>
       <input id="pg-kapi-gerekce" class="fi" placeholder="Örn: 35. gün kontrolü negatif" oninput="document.getElementById('pg-kapi-onayla').disabled=!this.value.trim()">
       <div style="display:flex;gap:8px;margin-top:14px">
         <button class="btn" style="flex:1;padding:10px;background:var(--card2);color:var(--ink)" onclick="_pgKapiKapat()">Vazgeç</button>
-        <button id="pg-kapi-onayla" class="btn" style="flex:2;padding:10px;font-weight:700" disabled onclick="_pgKapiBosAtaUygula()">Boş ata ve uygula</button>
+        ${onaylaDugme}
       </div>`;
   } else if (kod === 'BLOCK_CATALOG_UNRESOLVED') {
     body = `<div style="font-size:.85rem;line-height:1.5">⚠️ <b>Ürünün PG katalog bağı belirsiz.</b><br><span style="font-size:.72rem;color:var(--ink3)">Katalog kaydı düzeltilmeden uygulama yapılamaz (yöneticiye bildirin).</span></div>
@@ -2461,7 +2468,11 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene){
     ${body}
   </div>`;
   document.body.appendChild(box);
-  history.pushState({pg_kapi:true}, '', '');
+  // Faz 4 (ROOT RULING 4): yeniden renderda (onaylı-tekrar reddi, çift kapı)
+  // yeni entry YOK — üstte pg_kapi varken push, reddet→kapat akışında
+  // history.length'i +2 yapar (bayat kayıt, Android geri'de fazladan basış).
+  // İlk açılışta entry ŞART (geri tuşu sheet'i yakalar).
+  if (!(history.state && history.state.pg_kapi)) history.pushState({pg_kapi:true}, '', '');
   window.__pgKapiTekrar = tekrarDene || null;
   window.__pgKapiToh = detay.tohumlama_id || null;
 }
@@ -2487,6 +2498,29 @@ function _pgKapiKapat(){
   if (box) box.remove();
   window.__pgKapiTekrar = null; window.__pgKapiToh = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
+}
+/**
+ * PG kapısı genel onaylı-tekrar kapanışı (Faz 4, ROOT RULING 3, §18.8):
+ * kapı penceresindeki onay düğmesi saklanan tekrar kapanışını (cagri)
+ * `p_pg_onay=true` + `p_pg_gerekce` ile çağırır. Tohumlama-bağlamlı
+ * Boş-ata akışının (`_pgKapiBosAtaUygula`) genel karşılığıdır.
+ * @returns {Promise<void>} Başarıda modal kapanır; PG reddi yeniden kapıya düşer.
+ */
+async function _pgKapiOnayliTekrar(){
+  const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
+  const tekrar = window.__pgKapiTekrar;
+  if (typeof tekrar !== 'function') return;
+  if (!gerekce) { toast('⚠️ Gerekçe zorunlu', true); return; }
+  try {
+    await tekrar(true, gerekce);
+    _pgKapiKapat();
+    toast('✅ Onaylandı, işlem uygulandı');
+  } catch (e2) {
+    // Yeniden PG reddi: kapı aynı tekrar kapanışıyla yeniden açılır
+    // (yeni history entry YOK — _pgKapiAc koruması).
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e2, tekrar)) return;
+    toast('❌ ' + (e2?.message || e2), true);
+  }
 }
 // [Boş ata ve uygula] (P9, spec 10c #2): TEK sarmal RPC — tohumlama_bos_ve_devam
 // PG modu tek transaction'da Boş ataması + PG uygulaması yapar; eski
@@ -14874,20 +14908,27 @@ async function dataTrafficGonder(e){
 async function dataTrafficTekGonder(qid){
   const q=await getQueue();
   const op=q.find(o=>o._qid===qid); if(!op) return;
-  
-  // RPC mapping tablosu — her tablo/method için hangi RPC kullanılacak
-  const RPC_MAP = {
-    hayvanlar: { POST: 'hayvan_ekle', PATCH: 'hayvan_guncelle' },
-    tohumlama: { POST: 'tohumlama_kaydet' },
-    dogum: { POST: 'dogum_kaydet' },
-    gorev_log: { PATCH: 'gorev_tamamla' },
-    stok_hareket: { POST: 'stok_hareket_ekle' },
-    kizginlik_log: { POST: 'kizginlik_kaydet', DELETE: 'kizginlik_sil' },
-    cases: { POST: 'create_case' },
-    drug_administrations: { POST: 'add_drug_administration', PATCH: 'update_drug_administration' }
-  };
-  
-  try {
+
+  // Faz 4 (Kapı 5 eki 1): kuyrukta ilacı bekleyen eş stok_hareket satırı
+  // tek başına gönderilmez — önce ilaç gönderilir (ikisi birlikte düşer).
+  let esIlacBekliyor = false;
+  if (op.table === 'stok_hareket' && typeof _esBul === 'function') {
+    esIlacBekliyor = q.some(o => {
+      if (o === op || o.table !== 'drug_administrations') return false;
+      const es = _esBul(q, o);
+      return !!es && es._qid === op._qid;
+    });
+  }
+  // Faz 4: onaylı-tekrar kapanışı — _pgKapiHata modalının onay düğmesi bunu
+  // p_pg_onay=true + p_pg_gerekce ile çağırır (§18.8); başarıda kayıt+eş düşer.
+  let onayliTekrar = null;
+
+  if (esIlacBekliyor) {
+    toast('⚠️ Eş ilaç kaydı bekliyor — önce onu gönderin', true);
+  } else if (typeof RPC_MAP === 'undefined') {
+    // RPC_MAP tek kaynak: api.js üst seviye (RPC_TABLES yanı) — ui.js yerel kopya YOK.
+    toast('❌ RPC eşlemesi yüklenemedi (api.js)', true);
+  } else try {
     const rpcInfo = RPC_MAP[op.table];
     if(!rpcInfo) throw new Error(`Tablo "${op.table}" için RPC tanımlı değil`);
 
@@ -14895,7 +14936,7 @@ async function dataTrafficTekGonder(qid){
     // (kizginlik_sil) hiç seçilemiyordu, "RPC tanımlı değil" yanılgısı üretiyordu
     const rpcName = rpcInfo[op.method];
     if(!rpcName) throw new Error(`${op.method} için RPC tanımlı değil`);
-    
+
     // M-15 fix: eskiden boş string alanları da tamamen siliyordu (NOT NULL RPC
     // parametreleri için tehlikeli — p_unit gibi alanlar '' yerine hiç gönderilmeyince
     // RPC'nin kendi DEFAULT'u devreye giriyordu, bazen NULL). Artık sadece undefined
@@ -14904,25 +14945,39 @@ async function dataTrafficTekGonder(qid){
     const clean = op.method === 'POST'
       ? op.data.map(item => Object.fromEntries(Object.entries(item).filter(([k,v]) => v !== undefined)))
       : Object.fromEntries(Object.entries(op.data[0]).filter(([k,v]) => v !== undefined));
-    
+
     // RPC parametrelerini hazırla — B6: POST'ta clean DİZİ, PATCH'te obje;
     // dizi buildRpcParams'e data.x okutunca tüm alanlar undefined oluyordu
     const rpcParams = buildRpcParams(rpcName, Array.isArray(clean) ? clean[0] : clean, op);
-    
+
+    // Kayıt + eş birlikte düşer (Kapı 5 eki 1; _esBul SONUCU kullanılır).
+    const esiyleDusur = async () => {
+      await removeFromQueue(qid);
+      const guncel = await getQueue();
+      const es = (typeof _esBul === 'function') ? _esBul(guncel, op) : null;
+      if (es && es._qid !== qid) await removeFromQueue(es._qid);
+    };
+    onayliTekrar = async (onay, gerekce) => {
+      await rpc(rpcName, { ...rpcParams, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+      await esiyleDusur();
+      await dataTrafficYenile();
+    };
+
     // RPC çağrısı — REST bypass yerine backend validasyon + trigger'lar çalışır
     await rpc(rpcName, rpcParams);
-    
-    await removeFromQueue(qid);
+
+    await esiyleDusur();
     toast('✅ Kayıt gönderildi');
-    
+
     // İlgili tabloları çek + UI refresh
     const tables = RPC_TABLES[rpcName] || [op.table];
     pullTables(tables).then(renderSafe).catch(console.warn);
-    
+
   } catch(e){
-    toast('❌ '+e.message, true);
+    // Faz 4: düz toast'tan ÖNCE _pgKapiHata — PG reddi kuyrukta kalır, modal açılır.
+    if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, onayliTekrar)) toast('❌ '+e.message, true);
   }
-  
+
   await dataTrafficYenile();
   updateSyncBar();
 }
@@ -15098,7 +15153,13 @@ function buildRpcParams(rpcName, data, op) {
  */
 async function dataTrafficSil(qid){
   if(!confirm('Bu kaydı kuyruktan sil? (Supabase\'e gönderilmeyecek)')) return;
+  const qsil = await getQueue();
+  const opsil = qsil.find(o=>o._qid===qid);
   await removeFromQueue(qid);
+  // Faz 4 (Kapı 5 eki 1): ilaç silinirken _esBul ile eş stok_hareket satırı da
+  // silinir — yetim eş, sonradan tek başına REST'e gidip hayalet stok düşemez.
+  const essil = (opsil && typeof _esBul === 'function') ? _esBul(qsil, opsil) : null;
+  if (essil && essil._qid !== qid) await removeFromQueue(essil._qid);
   toast('🗑 Kayıt kuyruktan silindi');
   await dataTrafficYenile();
   updateSyncBar();
