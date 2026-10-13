@@ -1,7 +1,7 @@
 // tests/unit/ileri-gebe-duve-siralama.test.js
-// _dashIleriGebeBandi — 🤰 İleri Gebeler bandında düve sıralama/renk (K2.1-K2.5).
-// Düve ayrımı yalnız grup adından; kuruya alınmamış düveler en altta sarı (.duve),
-// kuruya alınmış düve inek bloğunda yerinde ve numarası mavi (.duve-kuru).
+// _dashIleriGebeBandi — 🤰 İleri Gebeler bandında düve sıralama/renk (K2.1-K2.5, F1 EK).
+// Düve ayrımı yalnız grup adından; sıra: inekler (gün DESC) → kuruya alınmış
+// düveler mavi D-n (gün DESC) → kuruya alınmamış düveler en altta sarı (.duve, gün DESC).
 const test = require('node:test');
 const assert = require('node:assert');
 const { loadBrowserModule } = require('./support/loadModule.js');
@@ -68,7 +68,7 @@ test('kırmızı Transfer uyarısı aynen kalır (inek + sarı düve çakışmas
   assert.ok(drow.startsWith(' duve"'));
 });
 
-test('kuruya alınmış düve inek bloğunda yerinde, numarası mavi sınıflı', () => {
+test('F1-EK kuruya alınmış düve inek bloğundan ÇIKAR, listenin sonunda mavi D-n', () => {
   const girdi = [
     { hayvan_id: 'h1', kupe_no: '101', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 250 },
     { hayvan_id: 'g1', kupe_no: '501', grup: 'Gebe Düve', padok: 'Kuru/Gebe Padok', gebelik_gun: 249 },
@@ -79,14 +79,15 @@ test('kuruya alınmış düve inek bloğunda yerinde, numarası mavi sınıflı'
   const html = _dashIleriGebeBandi(girdi);
   const rows = satirlar(html);
   assert.equal(rows.length, 5);
-  // Yerinde: RPC sırası korunur (stabil partition kuruya alınmışı oynatmaz).
+  // EK: inekler (gün DESC) → kuru düveler (gün DESC). 501/502 inek bloğunda DEĞİL.
   assert.deepEqual(rows.map((r) => kupeOf(r, ['101', '501', '102', '502', '103'])),
-    ['101', '501', '102', '502', '103']);
-  const kuruRows = [rows[1], rows[3]];
+    ['101', '102', '103', '501', '502']);
+  const kuruRows = [rows[3], rows[4]];
   assert.ok(kuruRows.every((r) => r.includes('duve-kuru')), 'iki kuru düve de mavi sınıflı');
-  assert.ok(kuruRows.every((r) => /D-\d+\)/.test(r)), 'kuru düve D-n alır');
-  assert.ok(rows[1].startsWith('"') && rows[3].startsWith('"'), 'kuru düve sarı satır DEĞİL');
-  assert.ok(rows[0].includes('>1)</span>') && rows[2].includes('>2)</span>') && rows[4].includes('>3)</span>'));
+  assert.ok(rows[3].includes('>D-1)</span>') && rows[4].includes('>D-2)</span>'), 'ekran sırasına göre D-1/D-2');
+  assert.ok(rows[3].startsWith('"') && rows[4].startsWith('"'), 'kuru düve sarı satır DEĞİL');
+  // İnek sayacı değişmez: kuru düve inek numarası tüketmez.
+  assert.ok(rows[0].includes('>1)</span>') && rows[1].includes('>2)</span>') && rows[2].includes('>3)</span>'));
 });
 
 test('Transfer uyarısız düve satırında inline kırmızı zemin YOK, sarı class VAR', () => {
@@ -110,7 +111,7 @@ test('Transfer uyarılı düve satırında kırmızı zemin VAR + kırmızı chi
   assert.ok(rows[0].includes('duve-kuru'), 'kuru düve mavi numaralı');
 });
 
-test('karışık: üstte kuru düve + altta düveler — kuru yerinde mavi, alttakiler D-1/D-2 sarı', () => {
+test('F1-EK karışık: inekler → kuru düve D-1 mavi → sarı düveler D-2/D-3', () => {
   const girdi = [
     { hayvan_id: 'h1', kupe_no: '101', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 250 },
     { hayvan_id: 'g1', kupe_no: '501', grup: 'Gebe Düve', padok: 'Kuru/Gebe Padok', gebelik_gun: 249 },
@@ -123,16 +124,77 @@ test('karışık: üstte kuru düve + altta düveler — kuru yerinde mavi, altt
   const rows = satirlar(html);
   assert.equal(rows.length, 6);
   assert.deepEqual(rows.map((r) => kupeOf(r, ['101', '501', '102', '207', '206', '103'])),
-    ['101', '501', '102', '103', '207', '206']);
-  // Alttakiler D-1'den başlar, sarı; kuru düve devamını alır (D-3), mavi, yerinde.
+    ['101', '102', '103', '501', '207', '206']);
+  // F1-EK: ekran sırası — kuru düve D-1 (mavi, inek bloğundan sonra), sarılar D-2/D-3.
+  assert.ok(rows[3].startsWith('"') && rows[3].includes('duve-kuru'));
+  assert.ok(rows[3].includes('>D-1)</span>'));
   assert.ok(rows[4].startsWith(' duve"') && rows[5].startsWith(' duve"'));
-  assert.ok(rows[4].includes('>D-1)</span>') && rows[5].includes('>D-2)</span>'));
-  assert.ok(rows[1].startsWith('"') && rows[1].includes('duve-kuru'));
-  assert.ok(rows[1].includes('>D-3)</span>'));
-  assert.ok(rows[0].includes('>1)</span>') && rows[2].includes('>2)</span>') && rows[3].includes('>3)</span>'));
+  assert.ok(rows[4].includes('>D-2)</span>') && rows[5].includes('>D-3)</span>'));
+  assert.ok(rows[0].includes('>1)</span>') && rows[1].includes('>2)</span>') && rows[2].includes('>3)</span>'));
 });
 
 test('boş kümede bant yok', () => {
   assert.equal(_dashIleriGebeBandi([]), '');
   assert.equal(_dashIleriGebeBandi(null), '');
+});
+
+// F1-EK: 999 (Gebe Düve, mavi) inek bloğunda DEĞİL — son inek (154) ile 207 arasında,
+// ekran sırasına göre D-1; 207/206/201 sarı D-2/D-3/D-4. İnek sayacı değişmez.
+test('F1-EK 999 inek bloğundan çıkar: son inek ile 207 arasında D-1 mavi', () => {
+  const girdi = [
+    { hayvan_id: 'h1', kupe_no: '163', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 282 },
+    { hayvan_id: 'h2', kupe_no: '182', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 260 },
+    { hayvan_id: 'g9', kupe_no: '999', grup: 'Gebe Düve', padok: 'Kuru/Gebe Padok', gebelik_gun: 255 },
+    { hayvan_id: 'h3', kupe_no: '155', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 248 },
+    { hayvan_id: 'd1', kupe_no: '207', grup: 'Düve (Büyük)', padok: 'Düve Padok (Büyük)', gebelik_gun: 247 },
+    { hayvan_id: 'd2', kupe_no: '206', grup: 'Düve (Büyük)', padok: 'Düve Padok (Büyük)', gebelik_gun: 246 },
+    { hayvan_id: 'd3', kupe_no: '201', grup: 'Düve (Büyük)', padok: 'Düve Padok (Büyük)', gebelik_gun: 240 },
+    { hayvan_id: 'h4', kupe_no: '154', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 238 },
+  ];
+  const html = _dashIleriGebeBandi(girdi);
+  const rows = satirlar(html);
+  assert.equal(rows.length, 8);
+  // Ekran sırası: inekler (gün DESC) → 999 mavi → sarılar (gün DESC).
+  assert.deepEqual(rows.map((r) => kupeOf(r, ['163', '182', '999', '155', '154', '207', '206', '201'])),
+    ['163', '182', '155', '154', '999', '207', '206', '201']);
+  const rowOf = (k) => rows.find((r) => r.includes(`>${k}<`));
+  const idx = (k) => rows.findIndex((r) => r.includes(`>${k}<`));
+  // 999 son inekten SONRA, ilk sarıdan ÖNCE.
+  assert.ok(idx('999') > idx('154'), '999 son ineğin altında');
+  assert.ok(idx('999') < idx('207'), '999 ilk sarının üstünde');
+  assert.ok(rowOf('999').includes('duve-kuru'), '999 mavi sınıflı');
+  assert.ok(rowOf('999').startsWith('"'), '999 sarı satır DEĞİL');
+  assert.ok(rowOf('999').includes('>D-1)</span>'), '999 ekran sırasında D-1');
+  assert.ok(rowOf('207').includes('>D-2)</span>'), 'alttaki ilk düve D-2');
+  assert.ok(rowOf('206').includes('>D-3)</span>'), 'alttaki ikinci düve D-3');
+  assert.ok(rowOf('201').includes('>D-4)</span>'), 'alttaki üçüncü düve D-4');
+  // İnek sayacı değişmez: 163→1, 182→2, 155→3, 154→4.
+  assert.ok(rowOf('163').includes('>1)</span>'));
+  assert.ok(rowOf('182').includes('>2)</span>'));
+  assert.ok(rowOf('155').includes('>3)</span>'));
+  assert.ok(rowOf('154').includes('>4)</span>'));
+});
+
+// F1.1/F1.2: sarı şerit + koyu-tema override kuralları index.html'de.
+test('F1.1 düve satırı sarı şeritli: .arow.duve kuralı ≥4px --amber sol şerit', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
+  assert.ok(css.includes('.arow.duve'), '.arow.duve kuralı var');
+  const sariKural = css.match(/\.arow\.duve\s*\{[^}]*\}/);
+  assert.ok(sariKural, '.arow.duve kural bloğu bulunur');
+  assert.ok(/border-left\s*:[^;}]*var\(--amber\)/.test(sariKural[0]), 'sol şerit --amber');
+  const px = sariKural[0].match(/border-left\s*:\s*(\d+)px/);
+  assert.ok(px && Number(px[1]) >= 4, 'şerit genişliği ≥4px');
+  assert.ok(css.includes('body.dark .arow.duve'), 'koyu tema sarı zemin override var');
+});
+
+test('F1.2 koyu temada mavi D-n: body.dark .arow-no.duve-kuru kuralı #8ec6ff', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const css = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
+  assert.ok(css.includes('body.dark .arow-no.duve-kuru'), 'koyu tema mavi numara override var');
+  const kural = css.match(/body\.dark\s+\.arow-no\.duve-kuru\s*\{[^}]*\}/);
+  assert.ok(kural, 'body.dark .arow-no.duve-kuru kural bloğu bulunur');
+  assert.ok(kural[0].toLowerCase().includes('#8ec6ff'), 'kontrast rengi #8ec6ff');
 });

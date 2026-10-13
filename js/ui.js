@@ -505,10 +505,11 @@ function _ileriGebeKuruDuve(b){
   return b.grup==='Gebe Düve'||b.padok==='Kuru/Gebe Padok';
 }
 /**
- * 🤰 İleri Gebeler bandı: kuruya alınmamış düveler stabil partition ile en altta
- * sarı satır (.duve); kuruya alınmış düve inek bloğunda yerinde, yalnız D-n
- * numarası mavi (.duve-kuru). İnek sırası RPC ORDER BY korunur. Sayaçlar:
- * inekler 1)..n), tüm düveler tek sayaçtan D-1).. (alttaki düveler D-1'den).
+ * 🤰 İleri Gebeler bandı (F1 EK): inekler (gün DESC) → kuruya alınmış
+ * düveler mavi D-n (gün DESC) → kuruya alınmamış düveler en altta sarı
+ * satır (.duve, gün DESC). Kuru düve inek bloğunda DEĞİL, inek numarası
+ * tüketmez. Sayaçlar: inekler 1)..n), tüm düveler tek sayaçtan D-1)..
+ * ekrandaki sıraya göre yukarıdan aşağıya (mavi önce).
  * @param {Array} ileriGebeler RPC sırasındaki ileri gebe satırları.
  * @returns {string} Bant HTML'i; kayıt yoksa boş dize.
  */
@@ -517,12 +518,18 @@ function _dashIleriGebeBandi(ileriGebeler){
   const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
   const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
   const isDuve=b=>(b.grup||'').includes('Düve');
-  const inekBlok=[],altDuve=[];
-  (ileriGebeler||[]).forEach(b=>{if(isDuve(b)&&!_ileriGebeKuruDuve(b))altDuve.push(b);else inekBlok.push(b);});
-  const sirali=[...inekBlok,...altDuve];
+  const inekBlok=[],kuruBlok=[],altDuve=[];
+  (ileriGebeler||[]).forEach(b=>{
+    if(!isDuve(b))inekBlok.push(b);
+    else if(_ileriGebeKuruDuve(b))kuruBlok.push(b);
+    else altDuve.push(b);
+  });
+  // F1 EK: her blok gün DESC (stabil sıralama); sıra inekler → mavi → sarılar.
+  const gunDesc=(a,b)=>(b.gebelik_gun||0)-(a.gebelik_gun||0);
+  inekBlok.sort(gunDesc);kuruBlok.sort(gunDesc);altDuve.sort(gunDesc);
+  const sirali=[...inekBlok,...kuruBlok,...altDuve];
   const dNo=new Map();let n=0;
-  altDuve.forEach(b=>dNo.set(b,`D-${++n}`));
-  sirali.forEach(b=>{if(isDuve(b)&&!dNo.has(b))dNo.set(b,`D-${++n}`);});
+  sirali.forEach(b=>{if(isDuve(b))dNo.set(b,`D-${++n}`);});
   let inekNo=0;
   const rows=sirali.map(b=>{
     const duve=isDuve(b),kuruDuve=duve&&_ileriGebeKuruDuve(b);
