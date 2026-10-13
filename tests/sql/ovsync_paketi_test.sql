@@ -84,13 +84,61 @@ DO $do$ DECLARE v_e text := 'HATA YOK'; v_n int; v_ack text; BEGIN
     format('blok kolu: hata=%s, satir=%s; %s', left(v_e, 60), v_n, v_ack));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-REPLAY', 'RED', SQLERRM); END $do$;
 
+-- ── S-ERT1 (kırmızı): ana OVSYNC + açık PG_TOHUMLAMA TAI → inaktif_alt_vaka_ac(ana, 7) → TAI +7 iptalsiz, alt bağlı, ana active
+DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',5); v_g record; v_bag int; v_st text; BEGIN
+  PERFORM public.inaktif_alt_vaka_ac(p_ana_vaka_id => v_ana, p_gun => 7, p_hastalik_id => pg_temp.ovp_id('1',2));
+  SELECT hedef_tarih, COALESCE(iptal, false) AS ip, COALESCE(tamamlandi, false) AS tm INTO v_g FROM gorev_log WHERE id = pg_temp.ovp_id('e',5);
+  EXECUTE 'SELECT count(*) FROM cases WHERE kaynak_vaka_id = $1' INTO v_bag USING v_ana;
+  SELECT status INTO v_st FROM cases WHERE id = v_ana;
+  INSERT INTO _ovp_durum VALUES ('S-ERT1', CASE WHEN v_g.hedef_tarih = pg_temp.bg() + 9 AND NOT v_g.ip AND NOT v_g.tm
+    AND v_bag = 1 AND v_st = 'active' THEN 'PASS' ELSE 'RED' END,
+    format('TAI hedef=%s iptal=%s tamam=%s; bagli alt=%s; ana=%s', v_g.hedef_tarih, v_g.ip, v_g.tm, v_bag, v_st));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-ERT1', 'RED', SQLERRM); END $do$;
+
+-- ── S-VIT (kırmızı): vitamin stoklu çağrı → alt vakada 1 ilaç satırı; NULL → 0 satır ama alt vaka kurulur
+DO $do$ DECLARE v_n1 int; v_n2 int; v_a2 int; BEGIN
+  PERFORM public.inaktif_alt_vaka_ac(p_ana_vaka_id => pg_temp.ovp_id('a',6), p_gun => 7, p_hastalik_id => pg_temp.ovp_id('1',2),
+    p_vitamin_stok_id => 'E2E-OVP-STK-VIT', p_vitamin_doz_ml => 20);
+  PERFORM public.inaktif_alt_vaka_ac(p_ana_vaka_id => pg_temp.ovp_id('a',7), p_gun => 7, p_hastalik_id => pg_temp.ovp_id('1',2),
+    p_vitamin_stok_id => NULL, p_vitamin_doz_ml => 20);
+  EXECUTE 'SELECT count(da.id) FILTER (WHERE c.kaynak_vaka_id = $1 AND da.stok_id = ''E2E-OVP-STK-VIT'' AND da.dose = 20),
+                  count(da.id) FILTER (WHERE c.kaynak_vaka_id = $2), count(DISTINCT c.id) FILTER (WHERE c.kaynak_vaka_id = $2)
+             FROM cases c LEFT JOIN treatment_days td ON td.case_id = c.id LEFT JOIN drug_administrations da ON da.treatment_day_id = td.id
+            WHERE c.kaynak_vaka_id IN ($1, $2)' INTO v_n1, v_n2, v_a2 USING pg_temp.ovp_id('a',6), pg_temp.ovp_id('a',7);
+  INSERT INTO _ovp_durum VALUES ('S-VIT', CASE WHEN v_n1 = 1 AND v_n2 = 0 AND v_a2 = 1 THEN 'PASS' ELSE 'RED' END,
+    format('vitaminli=%s; NULL kolu satir=%s, alt=%s', v_n1, v_n2, v_a2));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-VIT', 'RED', SQLERRM); END $do$;
+
+-- ── S-DONUS (kırmızı): açık alt → inaktif_alt_vaka_kapat(alt) → alt closed, ana active, bağ korunur
+DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',8); v_alt uuid := pg_temp.ovp_id('b',8); v_s text; BEGIN
+  EXECUTE 'INSERT INTO cases(id, animal_id, disease_id, start_date, status, kaynak_vaka_id) VALUES ($1, $2, $3, $4, ''active'', $5)'
+    USING v_alt, 'E2E-OVP-H-8', pg_temp.ovp_id('1',2), pg_temp.bg(), v_ana;
+  PERFORM public.inaktif_alt_vaka_kapat(p_alt_vaka_id => v_alt);
+  EXECUTE 'SELECT string_agg(status || ''/'' || COALESCE(kaynak_vaka_id::text, ''-''), '','' ORDER BY id) FROM cases WHERE id IN ($1, $2)'
+    INTO v_s USING v_ana, v_alt;
+  INSERT INTO _ovp_durum VALUES ('S-DONUS', CASE WHEN v_s = 'active/-,closed/' || v_ana THEN 'PASS' ELSE 'RED' END, 'ana,alt=' || v_s);
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-DONUS', 'RED', SQLERRM); END $do$;
+
+-- ── S-KISIR (kırmızı): ana + alt aktif → hayvan_guncelle(p_kisir => true) → ikisi closed/ERKEN_KAPANIS; yeni OVSYNC reddedilir (§18.5)
+DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',9); v_alt uuid := pg_temp.ovp_id('b',9); v_not text := ''; v_s text; v_ins text := 'INSERT GECTI'; BEGIN
+  BEGIN EXECUTE 'INSERT INTO cases(id, animal_id, disease_id, start_date, status, kaynak_vaka_id) VALUES ($1, $2, $3, $4, ''active'', $5)'
+    USING v_alt, 'E2E-OVP-H-9', pg_temp.ovp_id('1',2), pg_temp.bg(), v_ana;
+  EXCEPTION WHEN OTHERS THEN v_not := 'alt fixture kurulamadi: ' || SQLERRM || '; '; END;
+  PERFORM public.hayvan_guncelle(p_id => 'E2E-OVP-H-9', p_kisir => true);
+  SELECT string_agg(status || '/' || COALESCE(close_reason, '-'), ',' ORDER BY id) INTO v_s FROM cases WHERE animal_id = 'E2E-OVP-H-9';
+  BEGIN INSERT INTO cases(animal_id, disease_id, start_date, status, protocol_family) VALUES ('E2E-OVP-H-9', pg_temp.ovp_id('1',1), pg_temp.bg(), 'active', 'OVSYNC');
+  EXCEPTION WHEN OTHERS THEN v_ins := 'reddedildi: ' || left(SQLERRM, 60); END;
+  INSERT INTO _ovp_durum VALUES ('S-KISIR', CASE WHEN v_not = '' AND v_s = 'closed/ERKEN_KAPANIS,closed/ERKEN_KAPANIS'
+    AND v_ins LIKE 'reddedildi: KISIR_HAYVAN_OVSYNC_YASAK%' THEN 'PASS' ELSE 'RED' END, format('%svakalar=%s; yeni OVSYNC=%s', v_not, v_s, v_ins));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-KISIR', 'RED', SQLERRM); END $do$;
+
 -- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9.
 SELECT senaryo, sonuc, kanit FROM _ovp_durum ORDER BY senaryo;
 SELECT count(*) FILTER (WHERE sonuc <> 'PASS') AS ovp_red, count(*) AS ovp_toplam FROM _ovp_durum \gset
 ROLLBACK;
 SELECT set_config('ovp.red', :'ovp_red', false), set_config('ovp.toplam', :'ovp_toplam', false) \g /dev/null
 DO $do$ BEGIN
-  IF current_setting('ovp.toplam')::int <> 4 OR current_setting('ovp.red')::int > 0 THEN
+  IF current_setting('ovp.toplam')::int <> 8 OR current_setting('ovp.red')::int > 0 THEN
     RAISE EXCEPTION 'OVSYNC-PAKETI TEST RED: % / % senaryo kirmizi', current_setting('ovp.red'), current_setting('ovp.toplam');
   END IF;
   RAISE NOTICE 'OVSYNC-PAKETI TEST PASS';

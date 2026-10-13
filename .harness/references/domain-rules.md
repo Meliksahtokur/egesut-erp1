@@ -226,7 +226,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 ## 8. Sağlık Vakaları (Cases)
 
-### Hastalık Kategorileri (config.js `HASTALIK_KAT` — canlıdaki tam liste)
+### Hastalık Kategorileri (config.js `HASTALIK_KAT` — elle Vaka Aç seçim listesi; canlı `diseases`in alt kümesi)
 
 | Kategori | Hastalıklar |
 |---|---|
@@ -238,6 +238,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 | Solunum | Pnömoni |
 | Buzağı | Buzağı İshali, Buzağı Göbek İltihabı, Neonatal Zayıflık |
 | Diğer | (serbest) |
+Canlı `diseases` Üreme'de 12 kayıt var (2026-10-13 MEASURED); Ovsync alt vakası hastalığı canlı `İnaktif Ovaryum` kaydıdır, Anoestrus DEĞİL (karar 7). `js/config.js` listesi bu işle DEĞİŞMEZ (alt vaka hastalık id'sini canlı kayıttan alır).
 
 ### Vaka Kuralları
 
@@ -483,7 +484,7 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     (`TAKIP_ACIK`), evet → takip kapanır; çıkış → kapanır. Muayene sonucu "ertele" (+7) yeni tarih kurar; erteleme sınırsız, takip ≥21 gün olunca "Bu hayvan N gündür takipte,
     emin misiniz?" onayı. Takip muayenesinde Gebe bulunursa önceki Boş hatalı sayılır: son tohumlama Gebe'ye çevrilir, takip kapanır. (sahip 2026-09-29) Düzeltme yalnız bu muayene yolundan, ayrı "hatalı Boş" formu yok; genel Gebe RPC'si Bekliyor-only kalır. Üreme geçmişinde düzeltilen tohumlama iki satır görünür: üstü çizili Boş (giriş tarihi) + Gebe (takip muayenesi tarihi); kayıt izi eski sonucu ve tarihini saklar. Ayrıntılar: `docs/plans/2026-09-28-ovsync-takip-ekrani/design.md` §6c.
 16. **Üreme kategorisi (sahip 2026-09-28/29):** "işin ucunda gebelik varsa üreme". Görev tipleri `GEBELIK_KONTROL`,
-    `TAKIP_MUAYENE`, `TOHUMLAMA_PLANLI`, `OVSYNC_BASLAT` → 🌱 Üreme. Üreme vakaları: Ovsync, Kistik Over, Anoestrus.
+    `TAKIP_MUAYENE`, `TOHUMLAMA_PLANLI`, `OVSYNC_BASLAT` → 🌱 Üreme. Üreme vakaları: Ovsync, Kistik Over, İnaktif Ovaryum (Ovsync alt vakası, §18.18). Anoestrus elle seçim listesinde kalır, Ovsync alt vakası olarak kullanılmaz (karar 7).
     Enfeksiyon/doğum sonrası hastalıklar (Metrit, Endometrit, Pyometra, RFM, Retensiyo Sekundinarum, Postpartum
     Hemoraji) → normal muayene/tedavi. Hastalık kataloğu değişmez, yalnız kategori/filtre eşlemesi.
 17. **Birleşik muayene sonucu (sahip 2026-09-29):** `GEBELIK_KONTROL` (40 g sistemi) ve `TAKIP_MUAYENE` görevleri
@@ -491,3 +492,4 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     sonuçsuz kapanmaz. Eski 40 g listesi + cron bu işle güncellenir. (sahip 2026-09-29) Erteleme YALNIZ bu sonuç
     ekranından (genel "ertele" butonu bu tiplerde yok); saat atanabilir, varsayılan SAATSİZ. Dashboard 40 g listesi
     satırı açık görev varsa bu ekranı açar, yoksa hayvan detayı; takip ekranında görevsiz "muayene vakti" satırı → hayvan detayı.
+18. **İnaktif ovaryum/kist alt vakası (karar 4-7, sahip 2026-10-13):** ana Ovsync açık kalır; alt vaka yeni `cases` satırı, bağ `cases.kaynak_vaka_id`; açık TAI iptal edilmez, `tohumlama_gorev_ertele` ile gün-sorusu kadar (varsayılan 7) ötelenir; 5. gün PG opsiyonel ve elle, otomatik PG görevi yok (karar 5); hastalık canlı İnaktif Ovaryum, kist için Kistik Over — aynı RPC (karar 6-7); tedavi CAROFERTIN-E 20 ml ön-dolu ama statik değil, ilaç eklenebilir (karar 7); dönüş yalnız `inaktif_alt_vaka_kapat`; kısır işareti açık ana+alt vakayı `ERKEN_KAPANIS` ile kapatır (§18.5 aynen).
