@@ -14,9 +14,9 @@
 -- `add_drug_administration` üzerinden (PG sarmalı dahil); TAI yalnız
 -- `tohumlama_gorev_ertele` ile ötelenir (iptal YOK). `treatment_day_tamamla` ve
 -- `_pg_sonrasi_tohumlama` DEĞİŞMEZ (bu dosyada değinilmez).
--- Faz 0 OLCUM notu bu yaprağa ulaşmadı; plan Produces birincil adayı (tek RPC)
--- yazıldı — bileşim istenirse bu dosya daraltılır.
--- İç yardımcı: yalnız `_kisir_zincir_bitir` (tetik, §4); authenticated'a kapalı,
+--
+-- İç yardımcılar: `_vaka_ovsync_mu` (yedek-Ovsync tanımı TEK yer, §2+§4 ortak)
+-- + `_kisir_zincir_bitir` (tetik, §4); ikisi de authenticated'a kapalı,
 -- anon EXECUTE YOK. Yeni imzaya anon EXECUTE YOK.
 -- Tarihler Istanbul günü: (now() AT TIME ZONE 'Europe/Istanbul')::date.
 -- ════════════════════════════════════════════════════════════════════
@@ -63,6 +63,30 @@ END $do$;
 CREATE UNIQUE INDEX treatment_days_hastalik_gun_uniq
   ON public.treatment_days(case_id, disease_id, treatment_date) WHERE disease_id IS NOT NULL;
 
+-- ── 1b. İç yardımcı: yedek-Ovsync tanımı TEK yer (ROOT RULING 1) ───────────
+-- `protocol_family='OVSYNC'` VEYA (`protocol_family IS NULL` VE (OVSYNC-eşlemeli
+-- şablon EXISTS VEYA `TEDAVI_SABLON_TOHUMLAMA:<case>:%` logu EXISTS)).
+-- Yalnız iç kullanım (§2 kabul + §4 kısır); service_role dışı kapalı.
+CREATE OR REPLACE FUNCTION public._vaka_ovsync_mu(p_case_id uuid)
+ RETURNS boolean
+ LANGUAGE sql STABLE
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM public.cases c
+     WHERE c.id = p_case_id
+       AND (c.protocol_family = 'OVSYNC'
+            OR (c.protocol_family IS NULL
+                AND (EXISTS (SELECT 1 FROM public.sablon_hastalik_eslem e
+                              JOIN public.tedavi_sablonu t ON t.id = e.sablon_id
+                             WHERE e.disease_id = c.disease_id AND t.protokol_ailesi = 'OVSYNC')
+                     OR EXISTS (SELECT 1 FROM public.gorev_log g
+                                 WHERE g.kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:' || c.id::text || ':%')))));
+$function$;
+REVOKE ALL ON FUNCTION public._vaka_ovsync_mu(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._vaka_ovsync_mu(uuid) TO service_role;
+
 -- ── 2. Public: ovsync_hastalik_gunu_ekle (tek RPC, Dal A) ─────────────────
 -- Tek transaction: açık Ovsync vakasına hastalık günü aç + ilaçları güne yaz
 -- + hayvanın açık TOHUMLAMA_PLANLI'larını p_gun kadar ötele (iptal yazılmaz).
@@ -85,7 +109,6 @@ DECLARE
   v_case      record;
   v_kisir     boolean;
   v_hastalik  uuid;
-  v_bugun     date := (now() AT TIME ZONE 'Europe/Istanbul')::date;
   v_tarih     date := COALESCE(p_tarih, (now() AT TIME ZONE 'Europe/Istanbul')::date);
   v_gun       integer := COALESCE(p_gun, 7);
   v_day_id    uuid;
@@ -105,8 +128,8 @@ BEGIN
   IF v_case.status IS DISTINCT FROM 'active' THEN
     RETURN jsonb_build_object('ok', false, 'error', 'VAKA_KAPALI');
   END IF;
-  -- NULL-aile açık kuralı (Review Focus): yalnız ADLI başka aile reddedilir.
-  IF v_case.protocol_family IS NOT NULL AND v_case.protocol_family IS DISTINCT FROM 'OVSYNC' THEN
+  -- Vaka kabulü = yedek-Ovsync tanımı (TEK yer: _vaka_ovsync_mu).
+  IF NOT public._vaka_ovsync_mu(p_case_id) THEN
     RETURN jsonb_build_object('ok', false, 'error', 'ANA_ACIK_OVSYNC_DEGIL');
   END IF;
   SELECT COALESCE(kisir, false) INTO v_kisir FROM public.hayvanlar WHERE id = v_case.animal_id;
@@ -177,7 +200,8 @@ GRANT EXECUTE ON FUNCTION public.ovsync_hastalik_gunu_ekle(uuid, uuid, date, int
 -- Kök neden hükmü: kısır-kapanış trigger'ı alt-vaka nesnesi DEĞİL, domain
 -- davranışıdır — mühür kapsamı dışındadır, yeni modelde YAŞAR.
 -- Gövde: HEAD 000003 §5'ten minimal uyarlama — düşürülen `kaynak_vaka_id`
--- kolu (OR EXISTS alt-vaka dalı) çıkarıldı; açık OVSYNC kapatma aynen.
+-- kolu (OR EXISTS alt-vaka dalı) çıkarıldı; kapatma ölçütü yedek-Ovsync
+-- tanımıdır (TEK yer: _vaka_ovsync_mu).
 -- hayvan_guncelle (18-arg, COALESCE) + hayvan_kisir_isaretle ikisi de yalın
 -- UPDATE yapar → AFTER UPDATE OF kisir ateşlenir. §18.5 reddi
 -- (trg_cases_kisir_ovsync) ayrı guard'dadır, burada değinilmez.
@@ -193,7 +217,7 @@ BEGIN
      SET status = 'closed', close_reason = 'ERKEN_KAPANIS'
    WHERE alt.animal_id = NEW.id
      AND alt.status = 'active'
-     AND alt.protocol_family = 'OVSYNC';
+     AND public._vaka_ovsync_mu(alt.id);
   RETURN NEW;
 END;
 $function$;

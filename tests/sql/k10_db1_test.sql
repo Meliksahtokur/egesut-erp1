@@ -1,6 +1,7 @@
 -- tests/sql/k10_db1_test.sql — DB-1 adli testler: S-DB1-sablon-tai-son-pg + MUT-SON-PG-KAZANMAZ probu
 --   + S-DB1-gun-tekil, S-DB1-cift-tik, S-DB1-ertele-iptalsiz, S-DB1-pg-opsiyonel,
---   S-DB1-grant-tek, S-DB1-zincir + MUT-DB1-unique-yok, MUT-DB1-anon-acik.
+--   S-DB1-grant-tek, S-DB1-zincir + MUT-DB1-unique-yok, MUT-DB1-anon-acik
+--   + B1 (null-sablonlu/null-mastit/kisir-null-ovsync) + ERT5 (alt-ozet: durum+sıra+ad).
 -- HEDEF: YALNIZ yerel izole DB.
 -- KOŞUM: psql "$ISO" -X -v ON_ERROR_STOP=1 -f tests/sql/k10_db1_test.sql → rc=0 PASS; rc!=0 RED.
 -- Zemin: kur.sh + 000002..000005 sırayla (rc=0). kur.sh-only zeminde (yeni nesneler yok) KIRMIZI (FAIL).
@@ -138,6 +139,23 @@ INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_sa
   SELECT pg_temp.k10_id('e', i), 'K10-H-' || i, 'TOHUMLAMA_PLANLI', 'K10 TAI ' || i,
          pg_temp.k10_bg() + 2, '10:00', 'K10-TAI:' || i FROM generate_series(4, 7) i;
 
+-- ── B1 null-aile fixture (K10-H-8..11): a8 eşleme-kolu, a9 log-kolu, a10 izsiz, a11 kısır ──
+INSERT INTO diseases(id, name, category) SELECT pg_temp.k10_id('1', 3), 'K10-Mastit', 'Üreme'
+  WHERE NOT EXISTS (SELECT 1 FROM diseases WHERE id = pg_temp.k10_id('1', 3));
+INSERT INTO hayvanlar(id, kupe_no, cinsiyet, durum, grup, padok, dogum_tarihi)
+  SELECT 'K10-H-' || i, 'K10-' || i, 'Dişi', 'Aktif', 'Sağmal (Laktasyonda)', 'Sağmal Padok', pg_temp.k10_bg() - 800 FROM generate_series(8, 11) i;
+INSERT INTO cases(id, animal_id, disease_id, start_date, status, protocol_family)
+  VALUES (pg_temp.k10_id('a',8), 'K10-H-8', pg_temp.k10_id('1',1), pg_temp.k10_bg()-3, 'active', NULL),
+         (pg_temp.k10_id('a',9), 'K10-H-9', pg_temp.k10_id('1',2), pg_temp.k10_bg()-3, 'active', NULL),
+         (pg_temp.k10_id('a',10), 'K10-H-10', pg_temp.k10_id('1',2), pg_temp.k10_bg()-3, 'active', NULL),
+         (pg_temp.k10_id('a',11), 'K10-H-11', pg_temp.k10_id('1',1), pg_temp.k10_bg()-3, 'active', NULL);
+INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, kaynak)
+  VALUES (pg_temp.k10_id('e',9), 'K10-H-9', 'TOHUMLAMA_PLANLI', 'K10 sablon TAI a9',
+          pg_temp.k10_bg()+2, '10:00',
+          'TEDAVI_SABLON_TOHUMLAMA:' || pg_temp.k10_id('a',9)::text || ':' || pg_temp.k10_id('3',1)::text),
+         (pg_temp.k10_id('e',10), 'K10-H-10', 'TOHUMLAMA_PLANLI', 'K10 duz TAI a10',
+          pg_temp.k10_bg()+2, '10:00', 'K10-TAI:10');
+
 -- ── S-DB1-gun-tekil: aynı vaka+hastalık+tarih iki kez → ikinci çağrı aynı günü döner, ilaç tekrar yazılmaz ──
 DO $do$ DECLARE
   v_d date := pg_temp.k10_bg() + 2;
@@ -246,73 +264,72 @@ BEGIN
       (v_dinle ILIKE '%_etken_kod_bul%'), (v_rozet ILIKE '%alt_vakalar%')));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-zincir', 'RED', SQLERRM); END $do$;
 
--- ── MUT-DB1-unique-yok: kısmi unique düşürülmüş kopyada mükerrer kabul edilir (cift-tik RED) → YEDEKTEN restore ──
+-- ── S-DB1-null-sablonlu: NULL aile + Ovsync izi (a8 eşleme-kolu, a9 log-kolu) → PASS ──
 DO $do$ DECLARE
-  v_yedek text; v_d1 uuid := gen_random_uuid(); v_d2 uuid := gen_random_uuid();
-  v_kabul boolean := false; v_reddet boolean := false;
-  v_c uuid := pg_temp.k10_id('a', 4); v_h uuid := pg_temp.k10_id('1', 2); v_d date := pg_temp.k10_bg() + 9;
+  v_r8 jsonb; v_r9 jsonb; v_n8 int; v_n9 int;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'ovsync_hastalik_gunu_ekle') THEN
-    INSERT INTO _k10_durum VALUES ('MUT-DB1-unique-yok', 'RED', 'onkoşul yok (kur-only zeminde FAIL)');
-  ELSE
-    SELECT indexdef INTO v_yedek FROM pg_indexes
-     WHERE schemaname = 'public' AND indexname = 'treatment_days_hastalik_gun_uniq';
-    IF v_yedek IS NULL THEN
-      INSERT INTO _k10_durum VALUES ('MUT-DB1-unique-yok', 'RED', 'yedek alınamadı: kısmi unique yok');
-    ELSE
-      EXECUTE 'DROP INDEX public.treatment_days_hastalik_gun_uniq';
-      BEGIN
-        INSERT INTO treatment_days(id, case_id, treatment_date, disease_id) VALUES (v_d1, v_c, v_d, v_h);
-        INSERT INTO treatment_days(id, case_id, treatment_date, disease_id) VALUES (v_d2, v_c, v_d, v_h);
-        v_kabul := true;
-      EXCEPTION WHEN unique_violation THEN v_kabul := false; END;
-      DELETE FROM treatment_days WHERE id IN (v_d1, v_d2);
-      EXECUTE v_yedek;
-      BEGIN
-        INSERT INTO treatment_days(id, case_id, treatment_date, disease_id) VALUES (v_d1, v_c, v_d, v_h);
-        INSERT INTO treatment_days(id, case_id, treatment_date, disease_id) VALUES (v_d2, v_c, v_d, v_h);
-        v_reddet := false;
-      EXCEPTION WHEN unique_violation THEN v_reddet := true; END;
-      DELETE FROM treatment_days WHERE id IN (v_d1, v_d2);
-      INSERT INTO _k10_durum VALUES ('MUT-DB1-unique-yok',
-        CASE WHEN v_kabul AND v_reddet THEN 'PASS' ELSE 'RED' END,
-        format('mutant(unique yok): mukerrer %s; restore(yedek indexdef): mukerrer %s',
-          CASE WHEN v_kabul THEN 'KABUL-edildi=RED-gozlendi' ELSE 'reddedildi=mutant-yakalanamadi' END,
-          CASE WHEN v_reddet THEN 'reddedildi=PASS' ELSE 'kabul=restore-bozuk' END));
-    END IF;
-  END IF;
-EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('MUT-DB1-unique-yok', 'RED', SQLERRM); END $do$;
+  v_r8 := public.ovsync_hastalik_gunu_ekle(pg_temp.k10_id('a',8), pg_temp.k10_id('1',2), pg_temp.k10_bg()+4, 7, '[]');
+  v_r9 := public.ovsync_hastalik_gunu_ekle(pg_temp.k10_id('a',9), pg_temp.k10_id('1',2), pg_temp.k10_bg()+4, 7, '[]');
+  SELECT count(*) INTO v_n8 FROM treatment_days WHERE case_id = pg_temp.k10_id('a',8);
+  SELECT count(*) INTO v_n9 FROM treatment_days WHERE case_id = pg_temp.k10_id('a',9);
+  INSERT INTO _k10_durum VALUES ('S-DB1-null-sablonlu',
+    CASE WHEN COALESCE((v_r8->>'ok')::boolean, false) AND COALESCE((v_r9->>'ok')::boolean, false)
+      AND v_n8 = 1 AND v_n9 = 1 THEN 'PASS' ELSE 'RED' END,
+    format('esleme-kolu(a8) ok=%s gun=%s; log-kolu(a9) ok=%s gun=%s', v_r8->>'ok', v_n8, v_r9->>'ok', v_n9));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-null-sablonlu', 'RED', SQLERRM); END $do$;
 
--- ── MUT-DB1-anon-acik: anon GRANT'lı kopyada grant-tek RED verir → REVOKE ile yedek ACL'ye restore ──
+-- ── S-DB1-null-mastit: NULL aile + Ovsync izi yok → ANA_ACIK_OVSYNC_DEGIL, yan etki yok ──
 DO $do$ DECLARE
-  v_oid oid; v_yedek text; v_acik boolean := false; v_kapali boolean := false;
-  v_imza constant text := 'public.ovsync_hastalik_gunu_ekle(uuid, uuid, date, integer, jsonb, boolean, text)';
+  v_r jsonb; v_eski date; v_yeni date; v_gun int;
 BEGIN
-  SELECT p.oid, p.proacl::text INTO v_oid, v_yedek FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-   WHERE n.nspname = 'public' AND p.proname = 'ovsync_hastalik_gunu_ekle' LIMIT 1;
-  IF v_oid IS NULL THEN
-    INSERT INTO _k10_durum VALUES ('MUT-DB1-anon-acik', 'RED', 'onkoşul yok (kur-only zeminde FAIL)');
-  ELSE
-    EXECUTE 'GRANT EXECUTE ON FUNCTION ' || v_imza || ' TO anon';
-    SELECT has_function_privilege('anon', v_oid, 'EXECUTE') INTO v_acik;
-    IF v_yedek IS NULL OR v_yedek NOT LIKE '%anon%' THEN
-      EXECUTE 'REVOKE EXECUTE ON FUNCTION ' || v_imza || ' FROM anon';
-    END IF;
-    SELECT has_function_privilege('anon', v_oid, 'EXECUTE') INTO v_kapali;
-    v_kapali := NOT v_kapali;
-    INSERT INTO _k10_durum VALUES ('MUT-DB1-anon-acik',
-      CASE WHEN v_acik AND v_kapali THEN 'PASS' ELSE 'RED' END,
-      format('mutant(anon GRANT): execute=%s=RED-gozlendi; restore(REVOKE): kapali=%s; yedek_acl=%s',
-        v_acik, v_kapali, left(COALESCE(v_yedek, 'NULL'), 120)));
-  END IF;
-EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('MUT-DB1-anon-acik', 'RED', SQLERRM); END $do$;
+  SELECT hedef_tarih INTO v_eski FROM gorev_log WHERE id = pg_temp.k10_id('e',10);
+  v_r := public.ovsync_hastalik_gunu_ekle(pg_temp.k10_id('a',10), pg_temp.k10_id('1',3), pg_temp.k10_bg()+4, 7, '[]');
+  SELECT count(*) INTO v_gun FROM treatment_days WHERE case_id = pg_temp.k10_id('a',10);
+  SELECT hedef_tarih INTO v_yeni FROM gorev_log WHERE id = pg_temp.k10_id('e',10);
+  INSERT INTO _k10_durum VALUES ('S-DB1-null-mastit',
+    CASE WHEN COALESCE((v_r->>'ok')::boolean, true) = false AND v_r->>'error' = 'ANA_ACIK_OVSYNC_DEGIL'
+      AND v_gun = 0 AND v_yeni = v_eski THEN 'PASS' ELSE 'RED' END,
+    format('ok=%s err=%s; gun_satir=%s (beklenen 0); TAI %s->%s (oynamamali)', v_r->>'ok', v_r->>'error', v_gun, v_eski, v_yeni));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-null-mastit', 'RED', SQLERRM); END $do$;
+
+-- ── S-DB1-kisir-null-ovsync: NULL-aile Ovsync vakası kısırda kapanır; izsiz NULL vaka açık kalır ──
+DO $do$ DECLARE
+  v_d11 text; v_k11 text; v_d10 text;
+BEGIN
+  UPDATE public.hayvanlar SET kisir = true WHERE id = 'K10-H-11';
+  SELECT status, close_reason INTO v_d11, v_k11 FROM cases WHERE id = pg_temp.k10_id('a',11);
+  SELECT status INTO v_d10 FROM cases WHERE id = pg_temp.k10_id('a',10);
+  INSERT INTO _k10_durum VALUES ('S-DB1-kisir-null-ovsync',
+    CASE WHEN v_d11 = 'closed' AND v_k11 = 'ERKEN_KAPANIS' AND v_d10 = 'active' THEN 'PASS' ELSE 'RED' END,
+    format('izli(a11)=%s/%s (closed/ERKEN_KAPANIS); izsiz(a10)=%s (active)', v_d11, v_k11, v_d10));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-kisir-null-ovsync', 'RED', SQLERRM); END $do$;
+
+-- ── S-DB1-alt-ozet (ERT5): hastalık günü olan vakada takip_listele gün durumu + sıra + diseases.name ──
+DO $do$ DECLARE
+  v_out jsonb; v_alt jsonb; v_n int;
+BEGIN
+  PERFORM public.ovsync_hastalik_gunu_ekle(pg_temp.k10_id('a',4), pg_temp.k10_id('1',1), pg_temp.k10_bg()+1, 7, '[]');
+  UPDATE public.treatment_days SET tamamlandi = true, tamamlanma_tarihi = now()
+   WHERE case_id = pg_temp.k10_id('a',4) AND disease_id = pg_temp.k10_id('1',1) AND treatment_date = pg_temp.k10_bg()+1;
+  v_out := public.ovsync_takip_listele();
+  SELECT r->'alt_vakalar' INTO v_alt FROM jsonb_array_elements(COALESCE(v_out->'satirlar', '[]')) r
+   WHERE r->>'kupe_no' = 'K10-4' AND jsonb_array_length(COALESCE(r->'alt_vakalar', '[]')) > 0 LIMIT 1;
+  v_n := COALESCE(jsonb_array_length(v_alt), -1);
+  INSERT INTO _k10_durum VALUES ('S-DB1-alt-ozet',
+    CASE WHEN v_n = 2
+      AND v_alt->0->>'hastalik' = 'K10-Ovsync' AND v_alt->0->>'status' = 'tamam'
+      AND v_alt->1->>'hastalik' = 'K10-Hastalik' AND v_alt->1->>'status' = 'acik'
+      THEN 'PASS' ELSE 'RED' END,
+    format('alt_vakalar n=%s; [0]=%s/%s [1]=%s/%s (tarih sirali: tamam once)',
+      v_n, v_alt->0->>'hastalik', v_alt->0->>'status', v_alt->1->>'hastalik', v_alt->1->>'status'));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-alt-ozet', 'RED', SQLERRM); END $do$;
 
 SELECT senaryo, sonuc, kanit FROM _k10_durum ORDER BY senaryo;
 SELECT count(*) FILTER (WHERE sonuc <> 'PASS') AS k10_red, count(*) AS k10_toplam FROM _k10_durum \gset
 ROLLBACK;
 SELECT set_config('k10.red', :'k10_red', false), set_config('k10.toplam', :'k10_toplam', false) \g /dev/null
 DO $do$ BEGIN
-  IF current_setting('k10.toplam')::int <> 10 OR current_setting('k10.red')::int > 0 THEN
+  IF current_setting('k10.toplam')::int <> 12 OR current_setting('k10.red')::int > 0 THEN
     RAISE EXCEPTION 'K10-DB1 TEST RED: % / % senaryo kirmizi', current_setting('k10.red'), current_setting('k10.toplam');
   END IF;
   RAISE NOTICE 'K10-DB1 TEST PASS';
