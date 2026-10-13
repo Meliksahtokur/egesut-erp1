@@ -532,7 +532,10 @@ function _dashIleriGebeBandi(ileriGebeler){
     const padokYanlis=b.padok!=='Kuru/Gebe Padok';
     const padokUyari=padokYanlis?`<span style="color:#ef4444;font-weight:700;font-size:.6rem;margin-left:4px">🔴 Transfer!</span>`:'';
     const noCls=kuruDuve?'arow-no duve-kuru':'arow-no';
-    return `<div class="arow${(!duve||kuruDuve)?'':' duve'}" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span class="${noCls}">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const sariDuve=duve&&!kuruDuve;
+    // Sarı düve satırında inline kırmızı zemin üretme (K2.3: sarı class'tan gelsin);
+    // Transfer uyarısı olan satırda (inek/kuru düve) kırmızı zemin+chip aynen kalır.
+    return `<div class="arow${sariDuve?' duve':''}" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis&&!sariDuve?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span class="${noCls}">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
   });
   return band('amber',title,rows.join(''));
 }

@@ -89,6 +89,49 @@ test('kuruya alınmış düve inek bloğunda yerinde, numarası mavi sınıflı'
   assert.ok(rows[0].includes('>1)</span>') && rows[2].includes('>2)</span>') && rows[4].includes('>3)</span>'));
 });
 
+test('Transfer uyarısız düve satırında inline kırmızı zemin YOK, sarı class VAR', () => {
+  const html = _dashIleriGebeBandi([
+    { hayvan_id: 'd1', kupe_no: '207', grup: 'Düve (Büyük)', padok: 'Düve Padok (Büyük)', gebelik_gun: 247 },
+  ]);
+  const rows = satirlar(html);
+  assert.equal(rows.length, 1);
+  assert.ok(rows[0].startsWith(' duve"'), 'sarı satır class’ı');
+  assert.ok(!rows[0].includes('background:rgba(239,68,68,.04)'), 'inline kırmızı zemin yok');
+});
+
+test('Transfer uyarılı düve satırında kırmızı zemin VAR + kırmızı chip VAR', () => {
+  const html = _dashIleriGebeBandi([
+    { hayvan_id: 'g1', kupe_no: '501', grup: 'Gebe Düve', padok: 'Sağmal Padok', gebelik_gun: 249 },
+  ]);
+  const rows = satirlar(html);
+  assert.equal(rows.length, 1);
+  assert.ok(rows[0].includes('background:rgba(239,68,68,.04)'), 'kırmızı zemin aynen');
+  assert.ok(rows[0].includes('🔴 Transfer!'), 'kırmızı chip görünür');
+  assert.ok(rows[0].includes('duve-kuru'), 'kuru düve mavi numaralı');
+});
+
+test('karışık: üstte kuru düve + altta düveler — kuru yerinde mavi, alttakiler D-1/D-2 sarı', () => {
+  const girdi = [
+    { hayvan_id: 'h1', kupe_no: '101', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 250 },
+    { hayvan_id: 'g1', kupe_no: '501', grup: 'Gebe Düve', padok: 'Kuru/Gebe Padok', gebelik_gun: 249 },
+    { hayvan_id: 'h2', kupe_no: '102', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 248 },
+    { hayvan_id: 'd1', kupe_no: '207', grup: 'Düve (Büyük)', padok: 'Düve Padok (Büyük)', gebelik_gun: 247 },
+    { hayvan_id: 'd2', kupe_no: '206', grup: 'Düve (Büyük)', padok: 'Düve Padok (Büyük)', gebelik_gun: 246 },
+    { hayvan_id: 'h3', kupe_no: '103', grup: 'Sağmal (Kuru)', padok: 'Kuru/Gebe Padok', gebelik_gun: 245 },
+  ];
+  const html = _dashIleriGebeBandi(girdi);
+  const rows = satirlar(html);
+  assert.equal(rows.length, 6);
+  assert.deepEqual(rows.map((r) => kupeOf(r, ['101', '501', '102', '207', '206', '103'])),
+    ['101', '501', '102', '103', '207', '206']);
+  // Alttakiler D-1'den başlar, sarı; kuru düve devamını alır (D-3), mavi, yerinde.
+  assert.ok(rows[4].startsWith(' duve"') && rows[5].startsWith(' duve"'));
+  assert.ok(rows[4].includes('>D-1)</span>') && rows[5].includes('>D-2)</span>'));
+  assert.ok(rows[1].startsWith('"') && rows[1].includes('duve-kuru'));
+  assert.ok(rows[1].includes('>D-3)</span>'));
+  assert.ok(rows[0].includes('>1)</span>') && rows[2].includes('>2)</span>') && rows[3].includes('>3)</span>'));
+});
+
 test('boş kümede bant yok', () => {
   assert.equal(_dashIleriGebeBandi([]), '');
   assert.equal(_dashIleriGebeBandi(null), '');
