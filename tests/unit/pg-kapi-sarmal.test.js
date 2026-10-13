@@ -41,24 +41,31 @@ test('pg-return-kapanis-kilidi', () => {
   }
 });
 // Madde 3 (IMPL-A-F1): caseDrugKaydet — PG reddinde döngüden break, tazeleme yine koşar.
-// KAPI madde 3: tazeleme (:13500-13509) atlanırsa tekrar Kaydet mükerrer ilaç yazar.
-// F2 (KAPI-2 işaretli 1): kapı satırı ±2 dilimi YASAK — kapı satırından tazeleme
-// satırına kadarki DİLİMDE return tara (mA tazeleme-öncesi return'ü kaçırıyordu).
+// KAPI madde 3: tazeleme atlanırsa tekrar Kaydet mükerrer ilaç yazar.
+// F2 KAPI-2 madde 2: tazeleme `sonra` kapanışındadır — kapı `sonra` geçirir,
+// normal yol döngü sonrası `sonra()` çağırır (metinsel pullTables konumu
+// sonra-gövdesidir; kapı→sonra() diliminde return YOK).
 test('drug-return-kilidi', () => {
   const govde = extractFunctionSource('js/ui.js', 'caseDrugKaydet');
   const satirlar = govde.split('\n');
   const kapiIdx = satirlar.findIndex(s => s.includes('_pgKapiHata('));
   assert.ok(kapiIdx !== -1, 'caseDrugKaydet: PG kapısı sarmalı (§18.8)');
-  const tazeleIdx = satirlar.findIndex((s, i) => i > kapiIdx && s.includes('pullTables('));
-  assert.ok(tazeleIdx > kapiIdx, 'kapıdan sonra tazeleme (pullTables) gelir');
-  const dilim = satirlar.slice(kapiIdx, tazeleIdx + 1).join('\n');
-  assert.ok(!/\breturn\b/.test(dilim),
-    'kapı→tazeleme diliminde return YOK (tazeleme atlanırsa mükerrer ilaç)');
-  assert.ok(govde.includes('break'), 'PG reddinde döngüden break ile çıkılır');
-  // Tazeleme bloğu döngü sonrasında koşar.
+  assert.match(satirlar[kapiIdx], /_pgKapiHata\(\s*\w+\s*,\s*\w+\s*,\s*sonra\b/,
+    'kapı sonra geçirir: ' + satirlar[kapiIdx].trim());
+  // sonra gövdesi tazeler (onaylı tekrarda AYNI kapanış).
+  const sonraIdx = satirlar.findIndex(s => /sonra\s*=\s*async/.test(s));
+  assert.ok(sonraIdx !== -1, 'sonra kapanışı tanımlı');
+  const sonraGovde = satirlar.slice(sonraIdx).join('\n');
+  assert.ok(sonraGovde.includes('pullTables('), 'sonra tazeler (pullTables)');
+  assert.ok(sonraGovde.includes('renderCaseTimeline('), 'sonra kartı tazeler');
+  // Normal yol döngü sonrası sonra() çağırır; kapı→sonra() diliminde return YOK.
   const forIdx = satirlar.findIndex(s => s.includes('for (const item of secililar)'));
-  assert.ok(forIdx !== -1 && tazeleIdx !== -1 && tazeleIdx > forIdx,
-    'tazeleme (pullTables) döngü sonrasında');
+  const sonraCagriIdx = satirlar.findIndex((s, i) => i > kapiIdx && /await sonra\(\)/.test(s));
+  assert.ok(forIdx !== -1 && sonraCagriIdx > forIdx, 'sonra() döngü sonrasında çağrılır');
+  const dilim = satirlar.slice(kapiIdx, sonraCagriIdx + 1).join('\n');
+  assert.ok(!/\breturn\b/.test(dilim),
+    'kapı→sonra() diliminde return YOK (tazeleme atlanırsa mükerrer ilaç)');
+  assert.ok(govde.includes('break'), 'PG reddinde döngüden break ile çıkılır');
   assert.ok(/kapıda durdu/.test(govde), 'toast k/n sayısıyla kapıda durduğunu bildirir');
 });
 // ── Faz 4 (Kapı 5 ekleri 1-2): Veri Trafiği eş-op kuralı ─────────────────────
@@ -131,7 +138,7 @@ function f4TrafikCtx(kanca = {}) {
     document: doc, history: hist, window: {},
     esc: s => String(s ?? ''), fmtTarih: s => String(s ?? ''),
     toast: m => { toasts.push(String(m)); },
-    confirm: () => true,
+    confirm: kanca.confirm || (() => true),
     getQueue: async () => kuyruk,
     removeFromQueue: async qid => {
       const i = kuyruk.findIndex(o => o._qid === qid);
@@ -205,12 +212,40 @@ test('tekgonder-yalniz-esi-gondermez', async () => {
 });
 
 test('sil-onay-es-bilgilendirme', () => {
-  // F turu KAPI-6 adli: confirm dizesi es stok satirinin da silinecegini soyler.
+  // F2 KAPI-2 madde 9: 'Eş stok satırı da silinir' YALNIZ eş bulunduğunda —
+  // confirm iki dallı olur (eşli / eşsiz), niyet cümlesi korunur.
   const src = extractFunctionSource('js/ui.js', 'dataTrafficSil');
-  const m = /confirm\(\s*(['"`])((?:\\\1|[\s\S])*?)\1\s*\)/.exec(src);
-  assert.ok(m, 'confirm dizesi bulunur');
-  assert.ok(/eş stok/i.test(m[2]), 'confirm eş stok satırını anar: ' + m[2]);
-  assert.ok(/gönderilmeyecek/i.test(m[2]), 'niyet korunur (gönderilmeyecek): ' + m[2]);
+  assert.ok(/Eş stok satırı da silinir/.test(src), 'eşli dal cümleyi taşır');
+  assert.ok(/_esBul\(/.test(src), 'eş araması confirm ÖNCESİ yapılır');
+  const confirmIdx = src.indexOf('confirm(');
+  const esBulIdx = src.indexOf('_esBul(');
+  assert.ok(esBulIdx !== -1 && confirmIdx !== -1 && esBulIdx < confirmIdx,
+    'sıra: _esBul → confirm');
+});
+
+test('sil-onay-es-yoksa-cumle-yok', async () => {
+  // Eşsiz kayıtta confirm 'Eş stok' ANMAZ (madde 9).
+  let soru = '';
+  const t = f4TrafikCtx({
+    kuyruk: [{ _qid: 16, table: 'stok', method: 'POST', data: [{ id: 's9' }] }],
+    confirm: (m) => { soru = String(m); return true; },
+  });
+  await vm.runInContext('dataTrafficSil(16)', t.ctx);
+  assert.ok(/kuyruktan sil/i.test(soru), 'silme sorusu sorulur: ' + soru);
+  assert.ok(!/eş stok/i.test(soru), 'eş yoksa cümle YOK: ' + soru);
+  assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [], 'kayıt silinir');
+});
+
+test('sil-onay-es-varsa-cumle-var', async () => {
+  // Eşli kayıtta confirm 'Eş stok satırı da silinir' der (madde 9).
+  let soru = '';
+  const t = f4TrafikCtx({
+    kuyruk: [f4IlacOp(11, 'd1'), f4EsOp(12, 'd1')],
+    confirm: (m) => { soru = String(m); return true; },
+  });
+  await vm.runInContext('dataTrafficSil(11)', t.ctx);
+  assert.ok(/Eş stok satırı da silinir/.test(soru), 'eş varsa cümle VAR: ' + soru);
+  assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [], 'kayıt + eş silinir');
 });
 
 test('sil-esi-de-siler', async () => {
@@ -251,6 +286,18 @@ test('replay-pg-kapi-sarmal', () => {
   const src = extractFunctionSource('js/ui.js', 'dataTrafficTekGonder');
   assert.ok(src.includes('_pgKapiHata('), 'PG kapı sarmalı');
   assert.ok(src.includes('_esBul('), 'manuel gönderimde eş stok_hareket op birlikte düşer (KAPI-4 #1)');
+});
+
+// F2 KAPI-2 madde 2 (BLOKLAYAN): ui.js sarmal çağıranları kendi başarı kapanışını
+// (sonra) geçirir — onaylı tekrar bayat ekran bırakmaz. Adli mutant: MUT-SONRAGEÇİRMEZ
+// (bir çağırandaki `, sonra` silinirse bu test FAIL).
+test('kapi-sonra-bes-cagiran-kilidi', () => {
+  const FNS = ['_tedaviGunExecute', 'caseDayTamamla', 'caseSablonUygula', 'caseDrugKaydet', 'dataTrafficTekGonder'];
+  for (const fn of FNS) {
+    const govde = extractFunctionSource('js/ui.js', fn);
+    assert.match(govde, /_pgKapiHata\(\s*\w+\s*,\s*\w+\s*,\s*sonra\b/, fn + ': sonra geçirir');
+    assert.ok(/sonra\s*=\s*async|async function sonra|const sonra/.test(govde), fn + ': sonra kapanışı tanımlı');
+  }
 });
 
 // Madde 6 (KAPI-2 işaretli 6): ilk kalem PG'de durursa (eklenen=0) toast nötr — ✅ YOK.

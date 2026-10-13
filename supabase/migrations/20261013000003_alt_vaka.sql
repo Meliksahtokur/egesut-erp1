@@ -132,15 +132,20 @@ BEGIN
     END IF;
   END IF;
 
-  INSERT INTO public.cases(animal_id, disease_id, start_date, status, kaynak_vaka_id)
-    VALUES (v_ana.animal_id, v_hastalik, v_bugun, 'active', p_ana_vaka_id)
-    RETURNING id INTO v_alt_id;
-
+  -- F2 KAPI-2 madde 10: VITAMIN_STOK_YOK kontrolü cases INSERT'ten ÖNCE —
+  -- stok yoksa alt vaka satırı oluşmaz (erken RETURN, yazma yok). İmza değişmez.
   IF p_vitamin_stok_id IS NOT NULL THEN
     SELECT drug_product_id INTO v_urun FROM public.stok WHERE id = p_vitamin_stok_id;
     IF NOT FOUND THEN
       RETURN jsonb_build_object('ok', false, 'error', 'VITAMIN_STOK_YOK');
     END IF;
+  END IF;
+
+  INSERT INTO public.cases(animal_id, disease_id, start_date, status, kaynak_vaka_id)
+    VALUES (v_ana.animal_id, v_hastalik, v_bugun, 'active', p_ana_vaka_id)
+    RETURNING id INTO v_alt_id;
+
+  IF p_vitamin_stok_id IS NOT NULL THEN
     INSERT INTO public.treatment_days(case_id, treatment_date)
       VALUES (v_alt_id, v_bugun) RETURNING id INTO v_day_id;
     PERFORM public.add_drug_administration(v_day_id, v_urun, p_vitamin_stok_id,

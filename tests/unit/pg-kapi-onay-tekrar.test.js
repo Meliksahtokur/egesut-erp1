@@ -195,6 +195,56 @@ test('onayli-tekrar-basarida-cagirana-ozgu-tazeleme', async () => {
   }
 });
 
+// F2 KAPI-2 madde 2 (BLOKLAYAN): _pgKapiHata(e, cagri, sonra) — çağıran kendi başarı
+// kapanışını geçirir; onaylı tekrar başarıda sonrayı çağırır (bayat ekran guard'ı).
+// Adli mutant: MUT-SONRASIZ (sonra çağrısı silinirse __sonraSayi 0 kalır → FAIL).
+test('sonra-onayli-tekrar-cagrilir', async () => {
+  const rpcCagrilari = [];
+  const { ctx, doc } = kapiCtx({
+    rpc: async (ad, p) => {
+      rpcCagrilari.push({ ad, p });
+      if (p && p.p_pg_onay === true) return { ok: true };
+      throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}');
+    },
+  });
+  vm.runInContext(`var __sonraSayi = 0;
+    async function cagri(onay, gerekce) {
+      return rpc('treatment_day_tamamla', { p_day_id: 'gun-1',
+        p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+    }
+    async function sonra() { __sonraSayi++; }`, ctx);
+  await vm.runInContext(`(async () => {
+    try { await cagri(false, null); } catch (e) { _pgKapiHata(e, cagri, sonra); }
+  })()`, ctx);
+  const box = kutuyuBagla(doc);
+  doc.__setEl('pg-kapi-gerekce', { value: 'kontrol negatif' });
+  await vm.runInContext(onaylaKodu(box), ctx);
+  assert.strictEqual(vm.runInContext('__sonraSayi', ctx), 1,
+    'onaylı tekrar başarıda sonrayı 1 kez çağırır, ölçülen: ' + vm.runInContext('__sonraSayi', ctx));
+  assert.ok(!doc.body.children.includes(box), 'başarıda modal kapanır');
+});
+
+// F2 KAPI-2 madde 2: sonra yoksa eski genel tazeleme korunur (geri-uyumluluk kilidi).
+test('sonrasiz-genel-tazeleme-korunur', async () => {
+  const t = kapiCtx({ rpc: async (ad, p) => {
+    if (p && p.p_pg_onay === true) return { ok: true };
+    throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}');
+  } });
+  vm.runInContext(`async function cagri0(onay, gerekce) {
+    return rpc('hizli_uygulama', { p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+  }`, t.ctx);
+  await vm.runInContext(`(async () => {
+    try { await cagri0(false, null); } catch (e) { _pgKapiHata(e, cagri0, 'hizli_uygulama'); }
+  })()`, t.ctx);
+  const box = kutuyuBagla(t.doc);
+  t.doc.__setEl('pg-kapi-gerekce', { value: 'kontrol negatif' });
+  await vm.runInContext(onaylaKodu(box), t.ctx);
+  assert.deepStrictEqual([...t.pulls[0]],
+    ['uygulama_log', 'stok_hareket', 'gorev_log'], 'sonrasız çağrıda genel tazeleme koşar');
+  assert.strictEqual(t.pulls.length, 1, 'tek tazeleme');
+  assert.strictEqual(t.renders(), 1, 'render çalışır');
+});
+
 test('reddet-kapat-history-tekligi', async () => {
   // ROOT RULING 4 — MUT-PG-CIFT-PUSH adli: _pgKapiAc'deki
   // "ustte pg_kapi varsa push YOK" korumasi kaldirilirsa ikinci red

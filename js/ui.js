@@ -1060,13 +1060,17 @@ function _ovsyncS1SatirHtml(satir, bugunIso){
   // inaktif geçiş butonu (yalnız aktif OVSYNC vakası eşleşmişse).
   const yetimRozet=(typeof _ovsyncYetimRozetHtml==='function')?_ovsyncYetimRozetHtml(satir,bag,vaka):'';
   // F turu KAPI-4 (mockup M1 birebir): tek buton yerine iki seçenek kartı —
-  // İnaktif Ovarium (ön-dolu M2) / Kist (boş başlayan M3); seçim sheet'e taşınır.
+  // İnaktif Ovaryum (ön-dolu M2) / Kist (boş başlayan M3); seçim sheet'e taşınır.
+  // F2 KAPI-2 madde 7: radyo dairesi + alt metin ayrı satır (zemin mevcut stil).
+  // Eşik-sızıntısı kilidi (ovsync-render.test.js): eşik sayısı yazımı YASAK → daire
+  // border-radius ile yüzde-yüz çizilir (kutu kare olduğundan tam daire).
+  const radyoDaire='<span style="display:inline-block;width:13px;height:13px;border:2px solid var(--ink2);border-radius:100%;margin-right:8px;vertical-align:-2px"></span>';
   const taiEski=(satir.tai&&satir.tai.hedef_tarih)?String(satir.tai.hedef_tarih).slice(0,10):'';
   const inaktifBtn=(vaka&&vaka.status==='active'&&vaka.protocol_family==='OVSYNC')
     ?'<div style="margin-top:8px"><div style="font-size:.72rem;font-weight:800;color:var(--ink2);margin-bottom:6px">MUAYENEDE SORUN VARSA ALT VAKA AÇ</div>'
     +'<div style="display:grid;gap:6px">'
-    +'<button class="ovs-aksiyon" style="text-align:left" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\',{secim:\'inaktif\',kupeNo:\''+escAttr(satir.kupe_no||'')+'\',taiEski:\''+escAttr(taiEski)+'\'})">İnaktif Ovarium<span class="ovs-etiket">Vitamin desteği + erteleme · Ovsync devam eder</span></button>'
-    +'<button class="ovs-aksiyon" style="text-align:left" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\',{secim:\'kist\',kupeNo:\''+escAttr(satir.kupe_no||'')+'\',taiEski:\''+escAttr(taiEski)+'\'})">Kist<span class="ovs-etiket">Kist tedavisi alt vaka olarak bağlanır</span></button>'
+    +'<button class="ovs-aksiyon" style="text-align:left" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\',{secim:\'inaktif\',kupeNo:\''+escAttr(satir.kupe_no||'')+'\',taiEski:\''+escAttr(taiEski)+'\'})">'+radyoDaire+'İnaktif Ovaryum<span class="ovs-etiket" style="display:block;margin-top:4px">Vitamin desteği + erteleme · Ovsync devam eder</span></button>'
+    +'<button class="ovs-aksiyon" style="text-align:left" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\',{secim:\'kist\',kupeNo:\''+escAttr(satir.kupe_no||'')+'\',taiEski:\''+escAttr(taiEski)+'\'})">'+radyoDaire+'Kist<span class="ovs-etiket" style="display:block;margin-top:4px">Kist tedavisi alt vaka olarak bağlanır</span></button>'
     +'</div></div>'
     :'';
   return '<div class="ovs-kart"><div class="ovs-ust"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
@@ -1131,22 +1135,25 @@ function _ovsyncYetimRozetHtml(satir, bag, vaka){
  * (igGunDegisti); not kutusu M2/M3 metni; düğmeler Kaydet / Vazgeç.
  * Zemin mevcut palet (background:var(--...) yalnız) — ROOT RULING 1.
  * @param {string} anaVakaId Ana OVSYNC vaka id.
- * @param {Object} secenek {hastalik: {id,name}|null, hastaliklar: Array<{id,name}>, secim: 'inaktif'|'kist', kupeNo: string, taiEski: 'YYYY-MM-DD'|null, vitaminStok: {id, urun_adi}|null}.
+ * @param {Object} secenek {hastalik: {id,name}|null, hastaliklar: Array<{id,name}>, secim: 'inaktif'|'kist'|null, kupeNo: string, taiEski: 'YYYY-MM-DD'|null, vitaminStok: {id, urun_adi}|null}.
  * @returns {string} Sheet HTML'i.
  */
 function inaktifGecisSheetHtml(anaVakaId, secenek){
   const o=secenek||{};
   const hastaliklar=Array.isArray(o.hastaliklar)?o.hastaliklar:[];
+  // F2 KAPI-2 madde 3: kist algılaması ad-soyad değil SEÇİMDEN (M1 kartı taşır).
+  const kistIstendi=/kist/i.test(o.secim||'');
   let hastalik=(o.hastalik&&o.hastalik.name)?o.hastalik:null;
   if(!hastalik&&hastaliklar.length){
-    const kistIstendi=/kist/i.test(o.secim||'');
     hastalik=hastaliklar.find(h=>h&&(kistIstendi?/kist/i.test(h.name||''):/inaktif/i.test(h.name||'')))||null;
-    if(!hastalik) hastalik=kistIstendi?(hastaliklar[1]||hastaliklar[0]):hastaliklar[0];
+    // Sessiz çapraz yedek YOK: kist istendiyse inaktif kayda düşülmez (fail-closed
+    // inaktifGecisAc'dedir; burada seçim-dışı kayıt atanmaz).
+    if(!hastalik&&!kistIstendi) hastalik=hastaliklar[0]||null;
   }
-  const hAd=hastalik?(hastalik.name||''):'İnaktif Ovaryum';
-  const hId=hastalik?(hastalik.id||''):'';
-  const kist=/kist/i.test(hAd)||/kist/i.test(o.secim||'');
-  const baslik=(kist?'Kist':'İnaktif Ovarium')+' — Küpe '+esc(o.kupeNo||'bilinmiyor');
+  const kist=kistIstendi||/kist/i.test(hastalik?(hastalik.name||''):'');
+  // h=null 'İnaktif Ovaryum' yedeği KALKTI — ad seçimden gelir, id boş kalır.
+  const hAd=hastalik?(hastalik.name||''):(kist?'Kistik Over':'İnaktif Ovaryum');
+  const hId=hastalik?(hastalik.id||''):'';  const baslik=(kist?'Kist':'İnaktif Ovaryum')+' — Küpe '+esc(o.kupeNo||'bilinmiyor');
   const vitaminStok=o.vitaminStok||null;
   const vitAd=vitaminStok?(vitaminStok.urun_adi||''):'';
   const vitId=vitaminStok?(vitaminStok.id||''):'';
@@ -1172,7 +1179,8 @@ function inaktifGecisSheetHtml(anaVakaId, secenek){
     +'<div style="font-weight:800;font-size:.9rem;margin-bottom:6px">'+esc(baslik)+'</div>'
     +'<div class="fg"><label class="flbl">HASTALIK (SABİT)</label>'
     +'<div style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:.9rem;background:var(--card);color:var(--ink);box-sizing:border-box">'+esc(hAd)+'</div>'
-    +'<input type="hidden" id="ig-hastalik" value="'+escAttr(hId)+'"></div>'
+    +'<input type="hidden" id="ig-hastalik" value="'+escAttr(hId)+'">'
+    +'<input type="hidden" id="ig-kist" value="'+(kist?'1':'')+'"></div>'
     +'<div style="font-size:.76rem;font-weight:700;margin:10px 0 4px">'
     +(kist?'İLAÇ (BOŞ BAŞLAR, EKLENEBİLİR)':'İLAÇ (ÖN-DOLU, DEĞİŞTİRİLEBİLİR)')+'</div>'
     +'<div id="ig-ilac-liste" data-vit-stok="'+escAttr(vitId)+'" data-vit-ad="'+escAttr(vitAd)+'">'+ilacGovde+'</div>'
@@ -1184,7 +1192,8 @@ function inaktifGecisSheetHtml(anaVakaId, secenek){
     +'<span id="ig-tai-chip" data-tai-eski="'+escAttr(taiEski)+'" style="font-size:.78rem;font-weight:700;color:var(--green)">'+esc(chip)+'</span>'
     +'</div></div>'
     +'<div style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin:12px 0">5. gün PG elle girilebilir (opsiyonel) · Ovsync kapanmaz, tohumlamaya bağlanır</div>'
-    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    // F2 KAPI-2 madde 7: Kaydet/Vazgeç ALT ALTA (M2/M3).
+    +'<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">'
     +'<button onclick="inaktifGecisKaydet(\''+escAttr(anaVakaId)+'\')" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Kaydet</button>'
     +'<button onclick="document.getElementById(\'inaktif-gecis-modal\').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Vazgeç</button>'
     +'</div></div>';
@@ -1249,6 +1258,12 @@ async function inaktifGecisAc(anaVakaId, secim){
   const sec=(secim&&typeof secim==='object')?secim:{secim:(secim||null),kupeNo:null,taiEski:null};
   const kistIstendi=/kist/i.test(sec.secim||'');
   const h=hastaliklar.find(d=>d&&(kistIstendi?/kist/i.test(d.name||''):/inaktif/i.test(d.name||'')))||hastaliklar[0]||null;
+  // F2 KAPI-2 madde 3: fail-closed — kist istendi ama Kistik Over kaydı yoksa
+  // sessiz inaktif yedeğe DÜŞÜLMEZ; açık hata toast + sheet açılmaz.
+  if(kistIstendi&&!/kist/i.test((h&&(h.name||''))||'')){
+    if(typeof toast==='function') toast('❌ Kistik Over hastalığı bulunamadı — alt vaka açılamadı',true);
+    return;
+  }
   const cur=(typeof _curCase!=='undefined')? _curCase:null;
   const kupeNo=sec.kupeNo||(cur&&(cur.kupe_no||cur.kupe))||'bilinmiyor';
   let box=document.getElementById('inaktif-gecis-modal');
@@ -1257,7 +1272,7 @@ async function inaktifGecisAc(anaVakaId, secim){
   box.id='inaktif-gecis-modal';
   box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
   box.onclick=e=>{ if(e.target===box) box.remove(); };
-  box.innerHTML=inaktifGecisSheetHtml(anaVakaId,{hastalik:h,kupeNo:kupeNo,taiEski:sec.taiEski||null,vitaminStok:vitaminStok});
+  box.innerHTML=inaktifGecisSheetHtml(anaVakaId,{hastalik:h,secim:sec.secim||null,kupeNo:kupeNo,taiEski:sec.taiEski||null,vitaminStok:vitaminStok});
   document.body.appendChild(box);
 }
 /**
@@ -1285,9 +1300,12 @@ async function inaktifGecisKaydet(anaVakaId){
     params.p_vitamin_doz_ml=(dozEl.value!=='')?Number(dozEl.value):null;
   }
   const r=await rpc('inaktif_alt_vaka_ac',params);
+  // F2 KAPI-2 madde 8: toast hastalığa göre (modal kalkmadan bayrak okunur).
+  const kistEl=document.getElementById('ig-kist');
+  const kistMi=(kistEl&&kistEl.value==='1');
   const box=document.getElementById('inaktif-gecis-modal');
   if(box) box.remove();
-  toast('✅ İnaktif alt vaka açıldı');
+  toast(kistMi?'✅ Kist alt vakası açıldı':'✅ İnaktif ovaryum alt vakası açıldı');
   const tables=(typeof RPC_TABLES!=='undefined'&&RPC_TABLES.inaktif_alt_vaka_ac)?RPC_TABLES.inaktif_alt_vaka_ac:['cases','gorev_log'];
   pullTables(tables).then(renderSafe).catch(console.warn);
   if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
@@ -1323,37 +1341,62 @@ async function inaktifAltVakaDonus(altVakaId){
   return r;
 }
 /**
- * Vaka detayındaki inaktif geçiş butonunu kurar/günceller: #cd-kaydir-btn
+ * Vaka detayındaki inaktif geçiş butonlarını kurar/günceller: #cd-kaydir-btn
  * yanında (index.html'e dokunmadan JS'ten eklenir), yalnız aktif OVSYNC
- * vakada + çevrimiçiyken görünür.
- * @returns {void} Fonksiyon bir değer döndürmez.
+ * vakada + çevrimiçiyken görünür. F2 KAPI-2 madde 6: inaktif + KİST iki seçenek
+ * (M1 kartındaki gibi) + açık TAI tarihi (taiEski) geçirilir — sheet önizlemesi
+ * 'TAI <eski> → <yeni>' çizer.
+ * @returns {Promise<void>} Butonlar kurulunca çözülür.
  */
-function _inaktifGecisBtnSync(){
+async function _inaktifGecisBtnSync(){
   const kaydirBtn=document.getElementById('cd-kaydir-btn');
   if(!kaydirBtn||!kaydirBtn.parentNode) return;
-  let btn=document.getElementById('cd-inaktif-gecis-btn');
-  if(!btn){
-    btn=document.createElement('button');
-    btn.id='cd-inaktif-gecis-btn';
-    btn.className='btn';
-    btn.style.cssText='background:none;border:1.5px solid var(--purple);color:var(--purple);width:100%;margin-bottom:6px';
-    btn.textContent='İnaktif Ovaryum Geçişi';
-    kaydirBtn.parentNode.insertBefore(btn,kaydirBtn.nextSibling);
-  }
+  const morStil='background:none;border:1.5px solid var(--purple);color:var(--purple);width:100%;margin-bottom:6px';
+  const kur=(id,metin)=>{
+    let b=document.getElementById(id);
+    if(!b){
+      b=document.createElement('button');
+      b.id=id;
+      b.className='btn';
+      b.style.cssText=morStil;
+      b.textContent=metin;
+      kaydirBtn.parentNode.insertBefore(b,kaydirBtn.nextSibling);
+    }
+    return b;
+  };
+  const btn=kur('cd-inaktif-gecis-btn','İnaktif Ovaryum Geçişi');
+  const kistBtn=kur('cd-kist-gecis-btn','Kist Geçişi');
   const vaka=(typeof _curCase!=='undefined')?_curCase:null;
   const online=!(typeof navigator!=='undefined'&&navigator.onLine===false);
-  if(!(online&&vaka&&vaka.status==='active')){ btn.style.display='none'; return; }
+  if(!(online&&vaka&&vaka.status==='active')){ btn.style.display='none'; kistBtn.style.display='none'; return; }
   if(vaka.kaynak_vaka_id){
     // Alt vaka: TEK dönüş tetikleyicisi (public kapat-RPC).
     btn.textContent="Ana Ovsync'e Dön";
     btn.style.display='block';
     btn.onclick=()=>inaktifAltVakaDonus(vaka.id);
+    kistBtn.style.display='none';
     return;
   }
+  // Açık TOHUMLAMA_PLANLI'nın en yakın hedef tarihi (sheet TAI önizlemesi için).
+  let taiEski=null;
+  try{
+    if(vaka&&vaka.animal_id&&typeof idbGetAll==='function'){
+      const gorevler=await idbGetAll('gorev_log');
+      const tai=(gorevler||[]).filter(g=>g&&g.hayvan_id===vaka.animal_id&&g.gorev_tipi==='TOHUMLAMA_PLANLI'
+          &&!g.tamamlandi&&!g.iptal&&g.hedef_tarih)
+        .sort((a,b)=>String(a.hedef_tarih).localeCompare(String(b.hedef_tarih)))[0]||null;
+      if(tai) taiEski=String(tai.hedef_tarih).slice(0,10);
+    }
+  }catch(e){}
   const ovsyncAktif=vaka.protocol_family==='OVSYNC';
   btn.textContent='İnaktif Ovaryum Geçişi';
   btn.style.display=ovsyncAktif?'block':'none';
-  if(ovsyncAktif) btn.onclick=()=>inaktifGecisAc(vaka.id);
+  kistBtn.textContent='Kist Geçişi';
+  kistBtn.style.display=ovsyncAktif?'block':'none';
+  if(ovsyncAktif){
+    btn.onclick=()=>inaktifGecisAc(vaka.id,{secim:'inaktif',kupeNo:null,taiEski:taiEski});
+    kistBtn.onclick=()=>inaktifGecisAc(vaka.id,{secim:'kist',kupeNo:null,taiEski:taiEski});
+  }
 }
 /**
  * S2 sonuç bekleyen kartı (K15): kalan_gun>0 → sayaç (aksiyon yok); kalan_gun<=0 →
@@ -2482,9 +2525,12 @@ async function tdAsiVaxSec(vId){
 // ──────────────────────────────────────────
 // ──────────────────────────────────────────
 // P5: PG kapısı modalı (dinamik bottom-sheet; modal-router invariant: pushState)
-// _pgKapiHata(e, tekrarDene, rpcAd?) — PG_KAPI hatasını yakalar, koda göre ekran verir.
+// _pgKapiHata(e, tekrarDene, sonra?, rpcAd?) — PG_KAPI hatasını yakalar, koda göre ekran verir.
 // tekrarDene(onay, gerekce): çağıran tarafın aynı işlemi onay parametreleriyle
-// yeniden gönderen kapanışı. Gebe (BLOCK_PREGNANT) için "yine de uygula" YOK.
+// yeniden gönderen kapanışı. sonra(): çağıranın normal başarı kapanışı
+// (F2 KAPI-2 madde 2 — onaylı tekrar başarıda çağrılır; verilmezse genel tazeleme).
+// Eski 3-arg çağrılar (_pgKapiHata(e, cagri, 'rpc_ad')) aynen çalışır.
+// Gebe (BLOCK_PREGNANT) için "yine de uygula" YOK.
 /**
  * PG güvenlik kapısı arayüzünü gösterir; kod durumuna göre uyarı mesajı, form alanları ve butonlar oluşturur.
  * @param {string} kodTam Tam kod adı (örn: 'PG_KAPI:BLOCK_PREGNANT').
@@ -2492,7 +2538,12 @@ async function tdAsiVaxSec(vId){
  * @param {boolean} tekrarDene İşlemi tekrar deneme bayrağı.
  * @returns {void} Fonksiyon bir değer döndürmez.
  */
-function _pgKapiAc(kodTam, detayJson, tekrarDene, rpcAd){
+function _pgKapiAc(kodTam, detayJson, tekrarDene, sonraOrRpcAd, rpcAd){
+  // F2 KAPI-2 madde 2: 4. arg `sonra` (çağıranın başarı kapanışı, function) ya da
+  // eski `rpcAd` (string) olabilir — geri-uyumluluk için türüne göre çözülür.
+  let sonra = null, ad = null;
+  if (typeof sonraOrRpcAd === 'function') { sonra = sonraOrRpcAd; ad = rpcAd || null; }
+  else if (typeof sonraOrRpcAd === 'string') { ad = sonraOrRpcAd; }
   const kod = String(kodTam||'').replace('PG_KAPI:','');
   let detay = {};
   try { detay = JSON.parse(detayJson || '{}'); } catch(e) {}
@@ -2564,20 +2615,22 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene, rpcAd){
   if (!(history.state && history.state.pg_kapi)) history.pushState({pg_kapi:true}, '', '');
   window.__pgKapiTekrar = tekrarDene || null;
   window.__pgKapiToh = detay.tohumlama_id || null;
-  window.__pgKapiRpcAd = rpcAd || null;
+  window.__pgKapiRpcAd = ad || null;
+  window.__pgKapiSonra = sonra || null;
 }
 /**
  * PG_KAPI hata mesajını analiz eder, hata kodunu ve detayını ayırarak ilgili fonksiyonu çağırır.
  * @param {Error|Object} e Hata nesnesi veya hata mesajı string'i.
  * @param {boolean} tekrarDene Hata durumunda tekrar deneme işlemini tetikleyip tetiklemeyeceğini belirten bayrak.
- * @param {string} [rpcAd] Tekrar kapanışının RPC adı (onaylı-tekrar tazeleme seti için; opsiyonel).
+ * @param {Function|string} [sonraOrRpcAd] Çağıranın başarı kapanışı (function) ya da RPC adı (string, eski biçim).
+ * @param {string} [rpcAd] Tekrar kapanışının RPC adı (sonra verildiyse 4. arg; opsiyonel).
  * @returns {boolean} Hata mesajı PG_KAPI formatında ise true, değilse false döndürür.
  */
-function _pgKapiHata(e, tekrarDene, rpcAd){
+function _pgKapiHata(e, tekrarDene, sonraOrRpcAd, rpcAd){
   const msg = e?.message || String(e);
   const m = /^(PG_KAPI:[A-Z_]+):([\s\S]*)$/.exec(msg);
   if (!m) return false;         // PG_KAPI değil — çağıran normal hata akışına dönsün
-  _pgKapiAc(m[1], m[2], tekrarDene, rpcAd);
+  _pgKapiAc(m[1], m[2], tekrarDene, sonraOrRpcAd, rpcAd);
   return true;
 }
 /**
@@ -2588,6 +2641,7 @@ function _pgKapiKapat(){
   const box = document.getElementById('pg-kapi-bs');
   if (box) box.remove();
   window.__pgKapiTekrar = null; window.__pgKapiToh = null; window.__pgKapiRpcAd = null;
+  window.__pgKapiSonra = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
 }
 /**
@@ -2601,6 +2655,7 @@ function _pgKapiKapat(){
 async function _pgKapiOnayliTekrar(){
   const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
   const tekrar = window.__pgKapiTekrar;
+  const sonra = window.__pgKapiSonra || null;
   if (typeof tekrar !== 'function') return;
   if (!gerekce) { toast('⚠️ Gerekçe zorunlu', true); return; }
   try {
@@ -2608,10 +2663,14 @@ async function _pgKapiOnayliTekrar(){
     await tekrar(true, gerekce);
     _pgKapiKapat();
     toast('✅ Onaylandı, işlem uygulandı');
-    // F turu KAPI-3: çağıranın atladığı tazeleme (toast sonrası eski veri).
-    // Liste RPC_TABLES'tan (sabit YOK): rpcAd biliniyorsa o RPC'nin seti,
-    // yoksa (forms.js kapıları dahil) PG-geçitli RPC'lerin birleşimi.
-    if (typeof pullTables === 'function' && typeof RPC_TABLES !== 'undefined') {
+    // F2 KAPI-2 madde 2: çağıran kendi başarı kapanışını (sonra) geçirdiyse o
+    // koşar (normal başarı yoluyla AYNI kapanış — bayat ekran YOK); yoksa
+    // F turu KAPI-3 genel tazeleme (toast sonrası eski veri guard'ı).
+    if (typeof sonra === 'function') {
+      await sonra();
+    } else if (typeof pullTables === 'function' && typeof RPC_TABLES !== 'undefined') {
+      // Liste RPC_TABLES'tan (sabit YOK): rpcAd biliniyorsa o RPC'nin seti,
+      // yoksa (forms.js kapıları dahil) PG-geçitli RPC'lerin birleşimi.
       const havuz = (rpcAd && RPC_TABLES[rpcAd]) ? [rpcAd]
         : ['hizli_uygulama', 'add_drug_administration', 'tedavi_sablon_uygula', 'tohumlama_bos_ve_devam'];
       const tablolar = [...new Set(havuz.flatMap(a => RPC_TABLES[a] || []))];
@@ -2620,8 +2679,8 @@ async function _pgKapiOnayliTekrar(){
     if (typeof renderSafe === 'function') renderSafe();
   } catch (e2) {
     // Yeniden PG reddi: kapı aynı tekrar kapanışıyla yeniden açılır
-    // (yeni history entry YOK — _pgKapiAc koruması).
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e2, tekrar, window.__pgKapiRpcAd || null)) return;
+    // (yeni history entry YOK — _pgKapiAc koruması; sonra korunur).
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e2, tekrar, sonra, window.__pgKapiRpcAd || null)) return;
     toast('❌ ' + (e2?.message || e2), true);
   }
 }
@@ -3122,13 +3181,17 @@ async function _devamSeciciOnayla() {
   const btn = document.getElementById('devam-onayla');
   if (btn) { btn.disabled = true; btn.textContent = 'İşleniyor…'; }
   st.isleniyor = true;
-  try {
-    await tohumlamaBosVeDevam(_devamRpcParams(st));
+  // F2 KAPI-2 madde 2: başarı kapanışı (onaylı tekrarda AYNI kapanış koşar).
+  const sonra = async () => {
     _devamSeciciKapat();
     toast('✅ Sonuç ve devam adımı kaydedildi');
     const tablolar = (typeof RPC_TABLES !== 'undefined' && RPC_TABLES.tohumlama_bos_ve_devam) || ['tohumlama', 'gorev_log'];
     await pullTables(tablolar);
     loadDash();
+  };
+  try {
+    await tohumlamaBosVeDevam(_devamRpcParams(st));
+    await sonra();
   } catch (e) {
     st.isleniyor = false;
     if (btn) { btn.disabled = false; btn.textContent = _devamButonEtiketi(st.mod, st.secim, st.erteleGun); }
@@ -3146,7 +3209,7 @@ async function _devamSeciciOnayla() {
         if (gerekce) p.p_notlar = 'PG öncesi değerlendirme: ' + gerekce;
         return tohumlamaBosVeDevam(p);
       };
-      _pgKapiHata(e, tekrar, 'tohumlama_bos_ve_devam');
+      _pgKapiHata(e, tekrar, sonra, 'tohumlama_bos_ve_devam');
       return;
     }
     if (red.kod === 'TAKIP_UZADI') {
@@ -5863,6 +5926,19 @@ async function _protokolUygulaKaydet(hayvanId, idx){
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: '',
       ...(occurredAt ? { p_occurred_at: occurredAt } : {})
     };
+    // F2 KAPI-2 madde 2: başarı kapanışı (onaylı tekrarda AYNI kapanış koşar).
+    const sonra = async () => {
+      toast('✅ Uygulama kaydedildi');
+      document.getElementById('proto-mini')?.remove();
+      await _islemSonrasiRefresh();
+      // Detay sheet'i yerinde tazele — remove+pushState öksüz history bırakıyordu.
+      // _showProtokolDetay kendi remove'unu yapar; existedBefore kontrolü
+      // pushState'i atlar.
+      if (document.getElementById('proto-detay-bs')) {
+        const d = window.__protokolUyarilar[idx];
+        if (d) _showProtokolDetay(d.hayvan_id, d.protokol, idx);
+      }
+    };
     // P5: PG kapısı reaktif — sunucu RAISE'ı _pgKapiHata yakalar; onaylı tekrar
     // aynı parametrelere p_pg_onay/p_pg_gerekce eklenerek gönderilir (tek ekranda)
     const res = await rpc('hizli_uygulama', params).catch(e => {
@@ -5884,21 +5960,12 @@ async function _protokolUygulaKaydet(hayvanId, idx){
       });
       const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
       if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
-      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry, 'hizli_uygulama')) return { ok: true, _pgKapi: true };
+      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry, sonra, 'hizli_uygulama')) return { ok: true, _pgKapi: true };
       throw e;
     });
     if (res?._pgKapi || res?._takipAcik) return;
     if (res?.ok) {
-      toast('✅ Uygulama kaydedildi');
-      document.getElementById('proto-mini')?.remove();
-      await _islemSonrasiRefresh();
-      // Detay sheet'i yerinde tazele — remove+pushState öksüz history bırakıyordu.
-      // _showProtokolDetay kendi remove'unu yapar; existedBefore kontrolü
-      // pushState'i atlar.
-      if (document.getElementById('proto-detay-bs')) {
-        const d = window.__protokolUyarilar[idx];
-        if (d) _showProtokolDetay(d.hayvan_id, d.protokol, idx);
-      }
+      await sonra();
     } else {
       toast(res?.mesaj || 'Hata', true);
     }
@@ -6091,6 +6158,15 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
     const params = {
       p_hayvan_id: hayvanId, p_stok_id: stok, p_doz: doz, p_birim: birim, p_rota: rota, p_notlar: ''
     };
+    // F2 KAPI-2 madde 2: başarı kapanışı (onaylı tekrarda AYNI kapanış koşar).
+    const sonra = async () => {
+      toast('✅ Uygulama kaydedildi');
+      document.getElementById('proto-mini')?.remove();
+      // kart-tazeleme T2: doğrudan openDet KALDIRILDI (çifte çizim temizliği) —
+      // _islemSonrasiRefresh'in pull seti (uygulama_log/stok_hareket) kart evreni
+      // İÇİDİR; kart açıksa kanca yerinde tazeler, kapalıysa maliyet sıfır.
+      _islemSonrasiRefresh();
+    };
     // P5: PG kapısı reaktif — sunucu RAISE'ı _pgKapiHata yakalar; onaylı tekrar
     // aynı parametrelere p_pg_onay/p_pg_gerekce eklenerek gönderilir (tek ekranda)
     const res = await rpc('hizli_uygulama', params).catch(e => {
@@ -6112,17 +6188,12 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
       });
       const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
       if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
-      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry, 'hizli_uygulama')) return { ok: true, _pgKapi: true };
+      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry, sonra, 'hizli_uygulama')) return { ok: true, _pgKapi: true };
       throw e;
     });
     if (res?._pgKapi || res?._takipAcik) return;
     if (res?.ok) {
-      toast('✅ Uygulama kaydedildi');
-      document.getElementById('proto-mini')?.remove();
-      // kart-tazeleme T2: doğrudan openDet KALDIRILDI (çifte çizim temizliği) —
-      // _islemSonrasiRefresh'in pull seti (uygulama_log/stok_hareket) kart evreni
-      // İÇİDİR; kart açıksa kanca yerinde tazeler, kapalıysa maliyet sıfır.
-      _islemSonrasiRefresh();
+      await sonra();
     } else {
       toast(res?.mesaj || 'Hata', true);
     }
@@ -11566,6 +11637,7 @@ async function _tedaviGunExecute(uygulanmadiIds){
   const uygNotu=document.getElementById('td-uygulayici-notu')?.value?.trim()||null;
   // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
   let cagri = null;
+  let sonra = null; // F2 KAPI-2 madde 2: catch'te görünür olmalı (blok-dışı bildirilir).
   try {
     let meta={};
     try { meta=JSON.parse(_curTaskDet.aciklama||'{}'); } catch(e){}
@@ -11577,20 +11649,24 @@ async function _tedaviGunExecute(uygulanmadiIds){
       p_pg_onay: !!onay,
       p_pg_gerekce: gerekce || null
     });
+    // F2 KAPI-2 madde 2: başarı kapanışı (onaylı tekrarda AYNI kapanış koşar).
+    sonra = async () => {
+      await rpc('gorev_tamamla', { p_gorev_id: _curTaskDet.id });
+      const msg = uygulanmadiIds.length
+        ? `✅ Tamamlandı — ${uygulanmadiIds.length} ilaç iade edildi`
+        : '✅ Tedavi günü tamamlandı';
+      toast(msg);
+      closeM('m-task-det');
+      await pullTables(['treatment_days','gorev_log','drug_administrations','stok_hareket','stok']);
+      loadTasks(_curTaskFilter||'today',null,{skipPull:true});
+      loadDash();
+      if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
+    };
     await cagri(false, null);
-    await rpc('gorev_tamamla', { p_gorev_id: _curTaskDet.id });
-    const msg = uygulanmadiIds.length
-      ? `✅ Tamamlandı — ${uygulanmadiIds.length} ilaç iade edildi`
-      : '✅ Tedavi günü tamamlandı';
-    toast(msg);
-    closeM('m-task-det');
-    await pullTables(['treatment_days','gorev_log','drug_administrations','stok_hareket','stok']);
-    loadTasks(_curTaskFilter||'today',null,{skipPull:true});
-    loadDash();
-    if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
+    await sonra();
   } catch(e){
     if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, 'treatment_day_tamamla')) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, sonra, 'treatment_day_tamamla')) return;
     toast('❌ ' + e.message, true);
   }
   if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
@@ -12301,17 +12377,21 @@ async function caseDayTamamla(dayId) {
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
   const cagri = (onay, gerekce) => rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: null, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
-  try {
-    await cagri(false, null);
+  // F2 KAPI-2 madde 2: başarı kapanışı (onaylı tekrarda AYNI kapanış koşar).
+  const sonra = async () => {
     toast('✅ Tedavi tamamlandı');
     await pullTables(['treatment_days','gorev_log']);
     if (_curCase) {
       await renderCaseTimeline(_curCase.id);
       _updateKapatBtn(_curCase.id);
     }
+  };
+  try {
+    await cagri(false, null);
+    await sonra();
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = '✅ Tamamla'; }
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, 'treatment_day_tamamla')) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, sonra, 'treatment_day_tamamla')) return;
     toast('❌ ' + e.message, true);
   }
 }
@@ -13570,8 +13650,9 @@ async function caseSablonUygula(sablonId){
   // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
   const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula',
     { p_case_id: _curCase.id, p_sablon_id: sablonId, p_baslangic_tarihi: tarih, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
-  try {
-    const r = await cagri(false, null);
+  let r = null;
+  // F2 KAPI-2 madde 2: başarı kapanışı (onaylı tekrarda AYNI kapanış koşar).
+  const sonra = async () => {
     let tohumMsg = '';
     // submitCase (forms.js:620-624) toast dili birebir; ikinci RPC ayrı
     // try'da — günler zaten eklendi, tazeleme atlanmamalı.
@@ -13590,8 +13671,12 @@ async function caseSablonUygula(sablonId){
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
     _updateKapatBtn(_curCase.id);
+  };
+  try {
+    r = await cagri(false, null);
+    await sonra();
   } catch(e) {
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, 'tedavi_sablon_uygula')) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, sonra, 'tedavi_sablon_uygula')) return;
     toast(getUserMessage(e), true);
   }
 }
@@ -13840,6 +13925,18 @@ async function caseDrugKaydet(btn) {
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
   let eklenen = 0;     // Madde 3: yazılan kalem sayacı (PG kapısında duran sayılmaz)
   let pgDurdu = false; // Madde 3: PG reddinde break — tazeleme bloğu yine koşar
+  // F2 KAPI-2 madde 2: başarı kapanışı (tazeleme bloğu; onaylı tekrarda AYNI kapanış koşar).
+  const sonra = async () => {
+    await pullTables(['stok','stok_hareket','drug_administrations','treatment_days']);
+    btn.closest('.cd-drug-form').remove();
+    _activeDayId = null; // M-17 fix: form kapanınca modül-düzey state sızmasın
+    _drugsCache = [];
+    await loadDrugsCache();
+    await renderCaseTimeline(_curCase.id);
+    // Stok panelini güncelle
+    const _sp = document.getElementById('stok-panel');
+    if (_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
+  };
   try {
     const isOnline = navigator.onLine;
     for (const item of secililar) {
@@ -13861,7 +13958,7 @@ async function caseDrugKaydet(btn) {
           eklenen++;
         } catch(e0) {
           // Madde 3: PG reddinde döngüden break ile çık, tazeleme yine koşsun.
-          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e0, cagri, 'add_drug_administration')) { pgDurdu = true; break; }
+          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e0, cagri, sonra, 'add_drug_administration')) { pgDurdu = true; break; }
           throw e0;
         }
       } else {
@@ -13895,15 +13992,7 @@ async function caseDrugKaydet(btn) {
     // Madde 3: PG kapısında durduysa k/n sayısıyla bildir, tazeleme aşağıda yine koşar.
     if (pgDurdu) toast((eklenen === 0 ? '' : '✅ ') + eklenen + '/' + secililar.length + ' ilaç eklendi, PG kalemi kapıda durdu');
     else toast('✅ ' + secililar.length + ' ilac eklendi');
-    await pullTables(['stok','stok_hareket','drug_administrations','treatment_days']);
-    btn.closest('.cd-drug-form').remove();
-    _activeDayId = null; // M-17 fix: form kapanınca modül-düzey state sızmasın
-    _drugsCache = [];
-    await loadDrugsCache();
-    await renderCaseTimeline(_curCase.id);
-    // Stok panelini güncelle
-    const _sp = document.getElementById('stok-panel');
-    if (_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
+    await sonra();
   } catch(e) { toast(e.message, true); }
   finally { btn.disabled = false; btn.textContent = 'Kaydet'; }
 }
@@ -15066,6 +15155,7 @@ async function dataTrafficTekGonder(qid){
   // p_pg_onay=true + p_pg_gerekce ile çağırır (§18.8); başarıda kayıt+eş düşer.
   let onayliTekrar = null;
   let rpcName = null;
+  let sonra = null; // F2 KAPI-2 madde 2: catch'te görünür olmalı (blok-dışı bildirilir).
 
   if (esIlacBekliyor) {
     toast('⚠️ Eş ilaç kaydı bekliyor — önce onu gönderin', true);
@@ -15107,19 +15197,24 @@ async function dataTrafficTekGonder(qid){
       await dataTrafficYenile();
     };
 
+    // F2 KAPI-2 madde 2: başarı kapanışı (onaylı tekrarda AYNI kapanış koşar).
+    sonra = async () => {
+      // İlgili tabloları çek + UI refresh
+      const tables = RPC_TABLES[rpcName] || [op.table];
+      await pullTables(tables).then(renderSafe).catch(console.warn);
+    };
+
     // RPC çağrısı — REST bypass yerine backend validasyon + trigger'lar çalışır
     await rpc(rpcName, rpcParams);
 
     await esiyleDusur();
     toast('✅ Kayıt gönderildi');
 
-    // İlgili tabloları çek + UI refresh
-    const tables = RPC_TABLES[rpcName] || [op.table];
-    pullTables(tables).then(renderSafe).catch(console.warn);
+    await sonra();
 
   } catch(e){
     // Faz 4: düz toast'tan ÖNCE _pgKapiHata — PG reddi kuyrukta kalır, modal açılır.
-    if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, onayliTekrar, rpcName)) toast('❌ '+e.message, true);
+    if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, onayliTekrar, sonra, rpcName)) toast('❌ '+e.message, true);
   }
 
   await dataTrafficYenile();
@@ -15296,14 +15391,19 @@ function buildRpcParams(rpcName, data, op) {
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  */
 async function dataTrafficSil(qid){
-  if(!confirm('Bu kaydı kuyruktan sil? Eş stok satırı da silinir. (Supabase\'e gönderilmeyecek)')) return;
+  // F2 KAPI-2 madde 9: 'Eş stok satırı da silinir' YALNIZ eş bulunduğunda —
+  // eş araması confirm ÖNCESİ yapılır.
   const qsil = await getQueue();
   const opsil = qsil.find(o=>o._qid===qid);
+  const essil = (opsil && typeof _esBul === 'function') ? _esBul(qsil, opsil) : null;
+  const esVar = !!(essil && essil._qid !== qid);
+  if(!confirm(esVar
+    ?'Bu kaydı kuyruktan sil? Eş stok satırı da silinir. (Supabase\'e gönderilmeyecek)'
+    :'Bu kaydı kuyruktan sil? (Supabase\'e gönderilmeyecek)')) return;
   await removeFromQueue(qid);
   // Faz 4 (Kapı 5 eki 1): ilaç silinirken _esBul ile eş stok_hareket satırı da
   // silinir — yetim eş, sonradan tek başına REST'e gidip hayalet stok düşemez.
-  const essil = (opsil && typeof _esBul === 'function') ? _esBul(qsil, opsil) : null;
-  if (essil && essil._qid !== qid) await removeFromQueue(essil._qid);
+  if (esVar) await removeFromQueue(essil._qid);
   toast('🗑 Kayıt kuyruktan silindi');
   await dataTrafficYenile();
   updateSyncBar();

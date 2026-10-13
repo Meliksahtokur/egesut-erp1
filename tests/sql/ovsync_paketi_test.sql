@@ -193,6 +193,19 @@ BEGIN
     format('toplam=%s tgun=%s tai=%s', v_toplam, v_tgun, v_tai));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-PG-SAVUNMA', 'RED', SQLERRM); END $do$;
 
+-- ── S-VIT-ONCE (F2 KAPI-2 madde 10): stok YOKKEN alt vaka satırı oluşmaz
+--    (VITAMIN_STOK_YOK kontrolü cases INSERT'ten ÖNCE).
+DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',2); v_r jsonb; v_bag int; BEGIN
+  INSERT INTO cases(id, animal_id, disease_id, start_date, status, protocol_family, source_template_id)
+    VALUES (v_ana, 'E2E-OVP-H-2', pg_temp.ovp_id('1',1), pg_temp.bg() - 3, 'active', 'OVSYNC', pg_temp.ovp_id('3',1));
+  v_r := public.inaktif_alt_vaka_ac(p_ana_vaka_id => v_ana, p_gun => 7, p_hastalik_id => pg_temp.ovp_id('1',2),
+    p_vitamin_stok_id => 'E2E-OVP-STK-YOK', p_vitamin_doz_ml => 20);
+  EXECUTE 'SELECT count(*) FROM cases WHERE kaynak_vaka_id = $1' INTO v_bag USING v_ana;
+  INSERT INTO _ovp_durum VALUES ('S-VIT-ONCE', CASE WHEN COALESCE((v_r->>'ok')::boolean, true) IS NOT TRUE
+    AND v_r->>'error' = 'VITAMIN_STOK_YOK' AND v_bag = 0 THEN 'PASS' ELSE 'RED' END,
+    format('rpc ok=%s err=%s; bagli alt=%s', v_r->>'ok', v_r->>'error', v_bag));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-VIT-ONCE', 'RED', SQLERRM); END $do$;
+
 -- ── S-S4 (kırmızı): alt vakalı hayvanın ovsync_takip_listele satırı alt_vakalar taşır
 DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',10); v_r jsonb; v_n int; v_k int; BEGIN
   EXECUTE 'INSERT INTO cases(id, animal_id, disease_id, start_date, status, kaynak_vaka_id) VALUES ($1, $2, $3, $4, ''active'', $5)'
@@ -203,13 +216,13 @@ DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',10); v_r jsonb; v_n int; v_k in
   INSERT INTO _ovp_durum VALUES ('S-S4', CASE WHEN v_k >= 1 THEN 'PASS' ELSE 'RED' END, format('H-10 satir=%s, alt_vakalar dolu=%s', v_n, v_k));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-S4', 'RED', SQLERRM); END $do$;
 
--- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9, F1-düzeltme → 9, F2-savunma → 10, S-S4 → 11.
+-- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9, F1-düzeltme → 9, F2-savunma → 10, S-S4 → 11, S-VIT-ONCE → 12.
 SELECT senaryo, sonuc, kanit FROM _ovp_durum ORDER BY senaryo;
 SELECT count(*) FILTER (WHERE sonuc <> 'PASS') AS ovp_red, count(*) AS ovp_toplam FROM _ovp_durum \gset
 ROLLBACK;
 SELECT set_config('ovp.red', :'ovp_red', false), set_config('ovp.toplam', :'ovp_toplam', false) \g /dev/null
 DO $do$ BEGIN
-  IF current_setting('ovp.toplam')::int <> 11 OR current_setting('ovp.red')::int > 0 THEN
+  IF current_setting('ovp.toplam')::int <> 12 OR current_setting('ovp.red')::int > 0 THEN
     RAISE EXCEPTION 'OVSYNC-PAKETI TEST RED: % / % senaryo kirmizi', current_setting('ovp.red'), current_setting('ovp.toplam');
   END IF;
   RAISE NOTICE 'OVSYNC-PAKETI TEST PASS';

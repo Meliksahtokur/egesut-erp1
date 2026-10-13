@@ -712,7 +712,7 @@ async function wInaktifModalAc(page, seed) {
   await expect(page.locator('#pg-ovsync')).toHaveClass(/on/);
   await page.waitForFunction(() => window.__ovsyncTakip?.veri, null, { timeout: 20000 });
   const btn = page.locator('#pg-ovsync .ovs-kart', { hasText: seed.kupe })
-    .locator('.ovs-aksiyon', { hasText: 'İnaktif Ovarium' }).first();
+    .locator('.ovs-aksiyon', { hasText: 'İnaktif Ovaryum' }).first();
   await expect(btn, 'S1 kartında İnaktif ovaryum düğmesi').toBeVisible({ timeout: 15000 });
   await btn.click();
   const modal = page.locator('#inaktif-gecis-modal');
@@ -727,7 +727,7 @@ test('Y1: Ovsync kartı → İnaktif ovaryum → gün 7 + CAROFERTIN-E 20 ml →
   const tohId = await wTohumlama(seed, 0);
   const anaId = await wDevamOvsync(page, seed, tohId);
   const modal = await wInaktifModalAc(page, seed);
-  await expect(modal).toContainText('İnaktif Ovarium — Küpe');
+  await expect(modal).toContainText('İnaktif Ovaryum — Küpe');
   expect(await modal.locator('#ig-gun').inputValue(), 'gün sorusu varsayılan 7').toBe('7');
   // Vitamin bloğu demo IDB stok'una bağlı (CAROFERTIN-E kaydı varsa çizilir).
   if (await modal.locator('#ig-vit-doz').count()) {
