@@ -32,8 +32,7 @@ INSERT INTO tohumlama(hayvan_id, tarih, sperma, sonuc) VALUES ('E2E-OVP-H-3', pg
 INSERT INTO cases(id, animal_id, disease_id, start_date, status) SELECT pg_temp.ovp_id('c', i), 'E2E-OVP-H-' || i, pg_temp.ovp_id('1',3), pg_temp.bg(), 'active' FROM generate_series(3, 4) i;
 INSERT INTO treatment_days(id, case_id, treatment_date) SELECT pg_temp.ovp_id('d', i), pg_temp.ovp_id('c', i), pg_temp.bg() FROM generate_series(3, 4) i;
 INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, kaynak)   -- açık TAI: H-2 ertelenmiş, H-5 PG kaynaklı
-  VALUES (pg_temp.ovp_id('e',2), 'E2E-OVP-H-2', 'TOHUMLAMA_PLANLI', 'E2E-OVP ertelenmiş TAI', pg_temp.bg() + 20, '10:00', 'E2E-OVP-TAI:2'),
-         (pg_temp.ovp_id('e',5), 'E2E-OVP-H-5', 'TOHUMLAMA_PLANLI', 'E2E-OVP PG TAI', pg_temp.bg() + 2, '10:00', 'PG_TOHUMLAMA:E2E-OVP-5');
+  VALUES (pg_temp.ovp_id('e',2), 'E2E-OVP-H-2', 'TOHUMLAMA_PLANLI', 'E2E-OVP ertelenmiş TAI', pg_temp.bg() + 20, '10:00', 'E2E-OVP-TAI:2');
 CREATE TEMP TABLE _ovp_durum(senaryo text PRIMARY KEY, sonuc text, kanit text);
 
 -- ── S-PG1 (kırmızı): aktif OVSYNC + bağımsız PG (hizli_uygulama → _pg_olay_isle) → vaka active KALIR

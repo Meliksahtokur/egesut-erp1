@@ -490,7 +490,7 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     (`TAKIP_ACIK`), evet → takip kapanır; çıkış → kapanır. Muayene sonucu "ertele" (+7) yeni tarih kurar; erteleme sınırsız, takip ≥21 gün olunca "Bu hayvan N gündür takipte,
     emin misiniz?" onayı. Takip muayenesinde Gebe bulunursa önceki Boş hatalı sayılır: son tohumlama Gebe'ye çevrilir, takip kapanır. (sahip 2026-09-29) Düzeltme yalnız bu muayene yolundan, ayrı "hatalı Boş" formu yok; genel Gebe RPC'si Bekliyor-only kalır. Üreme geçmişinde düzeltilen tohumlama iki satır görünür: üstü çizili Boş (giriş tarihi) + Gebe (takip muayenesi tarihi); kayıt izi eski sonucu ve tarihini saklar. Ayrıntılar: `docs/plans/2026-09-28-ovsync-takip-ekrani/design.md` §6c.
 16. **Üreme kategorisi (sahip 2026-09-28/29):** "işin ucunda gebelik varsa üreme". Görev tipleri `GEBELIK_KONTROL`,
-    `TAKIP_MUAYENE`, `TOHUMLAMA_PLANLI`, `OVSYNC_BASLAT` → 🌱 Üreme. Üreme vakaları: Ovsync, Kistik Over, İnaktif Ovaryum (Ovsync alt vakası, §18.18). Anoestrus elle seçim listesinde kalır, Ovsync alt vakası olarak kullanılmaz (karar 7).
+    `TAKIP_MUAYENE`, `TOHUMLAMA_PLANLI`, `OVSYNC_BASLAT` → 🌱 Üreme. Üreme vakaları: Ovsync, Kistik Over, İnaktif Ovaryum (Ovsync içinde hastalık günü, §18.18). Anoestrus elle seçim listesinde kalır, Ovsync alt vakası olarak kullanılmaz (karar 7).
     Enfeksiyon/doğum sonrası hastalıklar (Metrit, Endometrit, Pyometra, RFM, Retensiyo Sekundinarum, Postpartum
     Hemoraji) → normal muayene/tedavi. Hastalık kataloğu değişmez, yalnız kategori/filtre eşlemesi.
 17. **Birleşik muayene sonucu (sahip 2026-09-29):** `GEBELIK_KONTROL` (40 g sistemi) ve `TAKIP_MUAYENE` görevleri
