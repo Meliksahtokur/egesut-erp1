@@ -635,6 +635,16 @@ test('f3-ok-false-kismi-basari', async () => {
   assert.strictEqual(t.rpcCagrilari.filter(c => c.ad === 'inaktif_alt_vaka_ac').length, 1, 'alt vaka çağrısı 1');
   assert.strictEqual(t.rpcCagrilari.filter(c => c.ad === 'add_drug_administration').length, 2, 'iki ek de denendi');
   assert.ok(t.toasts.some(m => /1\/2 ilaç eklendi/.test(m)), "'1/2' toast, ölçülen: " + JSON.stringify(t.toasts));
+  // RPC gerçek anahtarı (mesaj) varyantı: red mesajı toast'a taşınır (jenerik YOK).
+  const t2 = f3KaydetCtx({
+    satirlar: [f3Satir('sA', 5), f3Satir('sB', 10)],
+    acDonus: F3_AC,
+    addDavranis: async (i) => (i === 0 ? { ok: true } : { ok: false, mesaj: 'Geçerli bir doz girin' }),
+  });
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t2.ctx);
+  assert.ok(t2.toasts.some(m => /1\/2 ilaç eklendi/.test(m)), "'1/2' toast (mesaj varyantı), ölçülen: " + JSON.stringify(t2.toasts));
+  assert.ok(t2.toasts.some(m => /Geçerli bir doz girin/.test(m)),
+    'gerçek red mesajı toastta, ölçülen: ' + JSON.stringify(t2.toasts));
 });
 
 test('f3-istisna-sheet-kapanir', async () => {

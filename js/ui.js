@@ -1506,7 +1506,7 @@ async function inaktifGecisKaydet(anaVakaId){
         // F3 madde 1b: add_drug_administration istisna ATMAZ, {ok:false} döner —
         // başarısız sayılır (eklenen++ YOK), hata metni toplanır.
         const r2=await cagri(false,null);
-        if(r2&&r2.ok===false){ hatalar.push(r2.error||r2.message||'kayıt reddedildi'); continue; }
+        if(r2&&r2.ok===false){ hatalar.push(r2.mesaj||r2.error||r2.message||'kayıt reddedildi'); continue; }
         eklenen++;
       }catch(e0){
         if(typeof _pgKapiHata==='function'&&_pgKapiHata(e0,cagri,sonraTam,'add_drug_administration')){ pgDurdu=true; break; }
