@@ -11176,15 +11176,20 @@ async function _tedaviGunExecute(uygulanmadiIds){
   const btn=document.getElementById('td-tedavi-gun-btn');
   if(btn){btn.disabled=true;btn.textContent='İşleniyor…';}
   const uygNotu=document.getElementById('td-uygulayici-notu')?.value?.trim()||null;
+  // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
+  let cagri = null;
   try {
     let meta={};
     try { meta=JSON.parse(_curTaskDet.aciklama||'{}'); } catch(e){}
     if(!meta.day_id){ toast('❌ Tedavi günü ID bulunamadı', true); return; }
-    await rpc('treatment_day_tamamla', {
+    cagri = (onay, gerekce) => rpc('treatment_day_tamamla', {
       p_day_id: meta.day_id,
       p_not: uygNotu,
-      p_uygulanmadi_ids: uygulanmadiIds.length ? uygulanmadiIds : null
+      p_uygulanmadi_ids: uygulanmadiIds.length ? uygulanmadiIds : null,
+      p_pg_onay: !!onay,
+      p_pg_gerekce: gerekce || null
     });
+    await cagri(false, null);
     await rpc('gorev_tamamla', { p_gorev_id: _curTaskDet.id });
     const msg = uygulanmadiIds.length
       ? `✅ Tamamlandı — ${uygulanmadiIds.length} ilaç iade edildi`
@@ -11195,7 +11200,11 @@ async function _tedaviGunExecute(uygulanmadiIds){
     loadTasks(_curTaskFilter||'today',null,{skipPull:true});
     loadDash();
     if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
-  } catch(e){ toast('❌ ' + e.message, true); }
+  } catch(e){
+    if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) return;
+    toast('❌ ' + e.message, true);
+  }
   if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
 }
 /**
@@ -11901,15 +11910,21 @@ async function caseDaySaatKaydet(dayId) {
 async function caseDayTamamla(dayId) {
   const btn = event?.target;
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
+  const cagri = (onay, gerekce) => rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: null, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
   try {
-    await rpc('treatment_day_tamamla', { p_day_id: dayId, p_not: null });
+    await cagri(false, null);
     toast('✅ Tedavi tamamlandı');
     await pullTables(['treatment_days','gorev_log']);
     if (_curCase) {
       await renderCaseTimeline(_curCase.id);
       _updateKapatBtn(_curCase.id);
     }
-  } catch(e) { toast('❌ ' + e.message, true); if (btn) { btn.disabled = false; btn.textContent = '✅ Tamamla'; } }
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Tamamla'; }
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) return;
+    toast('❌ ' + e.message, true);
+  }
 }
 
 /**
@@ -13163,9 +13178,11 @@ async function caseSablonUygula(sablonId){
   if(!navigator.onLine){ toast('⚠️ İnternet bağlantısı gerekli', true); return; }
   const tarih = _cdSablonTarih;
   if(!tarih){ toast('Şablonun ilk gününü seçin', true); return; }
+  // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
+  const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula',
+    { p_case_id: _curCase.id, p_sablon_id: sablonId, p_baslangic_tarihi: tarih, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
   try {
-    const r = await rpc('tedavi_sablon_uygula',
-      { p_case_id: _curCase.id, p_sablon_id: sablonId, p_baslangic_tarihi: tarih });
+    const r = await cagri(false, null);
     let tohumMsg = '';
     // submitCase (forms.js:620-624) toast dili birebir; ikinci RPC ayrı
     // try'da — günler zaten eklendi, tazeleme atlanmamalı.
@@ -13184,7 +13201,10 @@ async function caseSablonUygula(sablonId){
     await loadDrugsCache();
     await renderCaseTimeline(_curCase.id);
     _updateKapatBtn(_curCase.id);
-  } catch(e) { toast(getUserMessage(e), true); }
+  } catch(e) {
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) return;
+    toast(getUserMessage(e), true);
+  }
 }
 
 // ── VAKAYA PLANLI TOHUMLAMA ────────────────────────────────────────────────
@@ -13433,15 +13453,23 @@ async function caseDrugKaydet(btn) {
     for (const item of secililar) {
       const d = (_drugsCache||[]).find(x => x.id === item.id);
       if (isOnline) {
-        // Online: RPC kullan
-        await rpc('add_drug_administration', {
+        // Online: RPC kullan (§18.8 PG kapı sarmalı — rpcSeansTamamla kalıbı)
+        const cagri = (onay, gerekce) => rpc('add_drug_administration', {
           p_day_id:          _activeDayId,
           p_drug_product_id: d?._legacy ? null : item.id,
           p_stok_id:         d?.stock_id || null,
           p_dose:            item.dose,
           p_unit:            item.unit,
           p_route:           (item.route||'').split(' ')[0] || null,
+          p_pg_onay: !!onay,
+          p_pg_gerekce: gerekce || null,
         });
+        try {
+          await cagri(false, null);
+        } catch(e0) {
+          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e0, cagri)) return;
+          throw e0;
+        }
       } else {
         // Offline: write() kullan + queue'ya ekle
         const adminId = crypto.randomUUID();
@@ -14808,13 +14836,16 @@ function buildRpcParams(rpcName, data, op) {
       // canlı: (p_day_id, p_drug_product_id, p_stok_id, p_dose, p_unit, p_route)
       // — p_time parametresi YOK (uygulama saati RPC üzerinden aktarılamaz,
       // M-14: p_stok_id eksikti, eklendi)
+      // Faz 1: p_pg_onay/p_pg_gerekce passthrough (offline replay PG kapısından geçer)
       return {
         p_day_id: data.day_id ?? data.treatment_day_id ?? null,
         p_drug_product_id: data.drug_product_id,
         p_stok_id: data.stok_id ?? null,
         p_dose: data.dose,
         p_unit: data.unit,
-        p_route: data.route
+        p_route: data.route,
+        p_pg_onay: data.p_pg_onay ?? null,
+        p_pg_gerekce: data.p_pg_gerekce ?? null
       };
     case 'update_drug_administration':
       return {

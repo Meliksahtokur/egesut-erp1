@@ -452,7 +452,7 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
    hayvanda (ırk eşiği `irk_esik.tohumlama_gun`, düvede tipik 365 g; doğum/abort sonrası bekleme —
    `_tohumlama_gorev_uygunluk`). Uygunsuz hayvanda görev açılmaz, `UYGUNSUZ` olay kaydı düşer —
    bu doğru davranıştır, regresyon değildir. TAI açık planlı tohumlamanın yerine geçer; son PG kazanır.
-7. **Bağımsız PG aktif Ovsync vakasında:** vaka `closed / close_reason = PG`, protokol görevleri kapanır.
+7. **Bağımsız PG aktif Ovsync vakasında:** PG uzatır, vaka açık kalır (karar 3; E3 kancası 20261013000002 ile kalktı); TAI +48 s yenilenir (§18.6). `_vaka_kapat` PG dalı + CHECK `PG` tarihsel kayıtlar için korunur (dormant).
 8. **PG onay kapısı:** sunucu `PG_KAPI:*` RAISE ettiğinde HER UI giriş noktası `_pgKapiHata` zinciriyle
    onay penceresi (`#pg-kapi-bs`: Boş ata ve uygula / Vazgeç) açar; düz "Hata" toast'ı YASAK.
    Yeni bir PG giriş noktası eklenirse aynı sarmal zorunludur.
