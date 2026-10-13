@@ -204,6 +204,15 @@ test('tekgonder-yalniz-esi-gondermez', async () => {
   assert.ok(t.toasts.some(m => /ilaç/i.test(m)), 'uyari toast: ' + JSON.stringify(t.toasts));
 });
 
+test('sil-onay-es-bilgilendirme', () => {
+  // F turu KAPI-6 adli: confirm dizesi es stok satirinin da silinecegini soyler.
+  const src = extractFunctionSource('js/ui.js', 'dataTrafficSil');
+  const m = /confirm\(\s*(['"`])((?:\\\1|[\s\S])*?)\1\s*\)/.exec(src);
+  assert.ok(m, 'confirm dizesi bulunur');
+  assert.ok(/eş stok/i.test(m[2]), 'confirm eş stok satırını anar: ' + m[2]);
+  assert.ok(/gönderilmeyecek/i.test(m[2]), 'niyet korunur (gönderilmeyecek): ' + m[2]);
+});
+
 test('sil-esi-de-siler', async () => {
   // MUT-SIL-ES-YETIM adli: es silinmezse kuyrukta kalir → FAIL.
   const t = f4TrafikCtx({ kuyruk: [f4IlacOp(11, 'd1'), f4EsOp(12, 'd1'),

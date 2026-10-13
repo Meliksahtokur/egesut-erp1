@@ -1059,8 +1059,15 @@ function _ovsyncS1SatirHtml(satir, bugunIso){
   // Faz 2b: yetim rozeti (bağlamda iz yoksa '' — eski test baglamlari etkilenmez) +
   // inaktif geçiş butonu (yalnız aktif OVSYNC vakası eşleşmişse).
   const yetimRozet=(typeof _ovsyncYetimRozetHtml==='function')?_ovsyncYetimRozetHtml(satir,bag,vaka):'';
+  // F turu KAPI-4 (mockup M1 birebir): tek buton yerine iki seçenek kartı —
+  // İnaktif Ovarium (ön-dolu M2) / Kist (boş başlayan M3); seçim sheet'e taşınır.
+  const taiEski=(satir.tai&&satir.tai.hedef_tarih)?String(satir.tai.hedef_tarih).slice(0,10):'';
   const inaktifBtn=(vaka&&vaka.status==='active'&&vaka.protocol_family==='OVSYNC')
-    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\')">İnaktif ovaryum</button>'
+    ?'<div style="margin-top:8px"><div style="font-size:.72rem;font-weight:800;color:var(--ink2);margin-bottom:6px">MUAYENEDE SORUN VARSA ALT VAKA AÇ</div>'
+    +'<div style="display:grid;gap:6px">'
+    +'<button class="ovs-aksiyon" style="text-align:left" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\',{secim:\'inaktif\',kupeNo:\''+escAttr(satir.kupe_no||'')+'\',taiEski:\''+escAttr(taiEski)+'\'})">İnaktif Ovarium<span class="ovs-etiket">Vitamin desteği + erteleme · Ovsync devam eder</span></button>'
+    +'<button class="ovs-aksiyon" style="text-align:left" onclick="event.stopPropagation();inaktifGecisAc(\''+escAttr(vaka.id)+'\',{secim:\'kist\',kupeNo:\''+escAttr(satir.kupe_no||'')+'\',taiEski:\''+escAttr(taiEski)+'\'})">Kist<span class="ovs-etiket">Kist tedavisi alt vaka olarak bağlanır</span></button>'
+    +'</div></div>'
     :'';
   return '<div class="ovs-kart"><div class="ovs-ust"><span class="ovs-kupe">'+esc(satir.kupe_no||'bilinmiyor')
     +'</span><span class="ovs-etiket">'+esc(satir.grup||'bilinmiyor')
@@ -1116,52 +1123,119 @@ function _ovsyncYetimRozetHtml(satir, bag, vaka){
     +'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">PG ile devam et</button>';
 }
 /**
- * İnaktif geçiş sheet'i (saf): gün sorusu varsayılan 7 (karar 5),
- * vitamin dozu varsayılan 20 ml (karar 7, statik değil — düzenlenebilir),
- * hastalık listesi canlı kayıtlardan (İnaktif Ovaryum varsayılan, Kistik Over — karar 6-7).
+ * İnaktif/kist geçiş sheet'i (saf, mockup M2/M3 birebir): başlık
+ * '<hastalık> — Küpe <no>'; HASTALIK sabit kutu (seçim M1 kartından gelir,
+ * sheet'te select YOK); İLAÇ bloğu inaktifte CAROFERTIN-E 20 ml ön-dolu (M2),
+ * kistte boş başlar (M3 — 'Henüz ilaç yok'); '+ İlaç ekle' doz satırını açar
+ * (igIlacEkle); 'KAÇ GÜN ERTELENSİN?' + 'TAI <eski> → <yeni>' canlı önizleme
+ * (igGunDegisti); not kutusu M2/M3 metni; düğmeler Kaydet / Vazgeç.
+ * Zemin mevcut palet (background:var(--...) yalnız) — ROOT RULING 1.
  * @param {string} anaVakaId Ana OVSYNC vaka id.
- * @param {Object} secenek {hastaliklar: Array<{id,name}>, vitaminStok: {id, urun_adi}|null}.
+ * @param {Object} secenek {hastalik: {id,name}|null, hastaliklar: Array<{id,name}>, secim: 'inaktif'|'kist', kupeNo: string, taiEski: 'YYYY-MM-DD'|null, vitaminStok: {id, urun_adi}|null}.
  * @returns {string} Sheet HTML'i.
  */
 function inaktifGecisSheetHtml(anaVakaId, secenek){
   const o=secenek||{};
   const hastaliklar=Array.isArray(o.hastaliklar)?o.hastaliklar:[];
+  let hastalik=(o.hastalik&&o.hastalik.name)?o.hastalik:null;
+  if(!hastalik&&hastaliklar.length){
+    const kistIstendi=/kist/i.test(o.secim||'');
+    hastalik=hastaliklar.find(h=>h&&(kistIstendi?/kist/i.test(h.name||''):/inaktif/i.test(h.name||'')))||null;
+    if(!hastalik) hastalik=kistIstendi?(hastaliklar[1]||hastaliklar[0]):hastaliklar[0];
+  }
+  const hAd=hastalik?(hastalik.name||''):'İnaktif Ovaryum';
+  const hId=hastalik?(hastalik.id||''):'';
+  const kist=/kist/i.test(hAd)||/kist/i.test(o.secim||'');
+  const baslik=(kist?'Kist':'İnaktif Ovarium')+' — Küpe '+esc(o.kupeNo||'bilinmiyor');
   const vitaminStok=o.vitaminStok||null;
-  const opts=hastaliklar.map(h=>{
-    const ad=h?(h.name||''): '';
-    const sel=/inaktif/i.test(ad)?' selected':'';
-    return '<option value="'+escAttr(h?h.id:'')+'"'+sel+'>'+esc(ad)+'</option>';
-  }).join('');
-  let vitBlok='';
-  if(vitaminStok){
-    vitBlok='<div style="font-size:.76rem;font-weight:700;margin:10px 0 4px">💊 Vitamin desteği ('+esc(vitaminStok.urun_adi||'')+')</div>'
-      +'<div style="display:flex;gap:8px;align-items:center">'
-      +'<span style="font-size:.74rem;color:var(--ink2)">'+esc(vitaminStok.urun_adi||'')+'</span>'
-      +'<input type="number" id="ig-vit-doz" min="0" step="1" inputmode="decimal" value="20" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
-      +'<span style="font-size:.74rem;color:var(--ink2)">ml</span>'
-      +'<input type="hidden" id="ig-vit-stok" value="'+escAttr(vitaminStok.id||'')+'">'
-      +'</div>';
+  const vitAd=vitaminStok?(vitaminStok.urun_adi||''):'';
+  const vitId=vitaminStok?(vitaminStok.id||''):'';
+  const dozSatir='<div style="display:flex;gap:8px;align-items:center">'
+    +'<span style="font-size:.74rem;color:var(--ink2)">'+esc(vitAd)+'</span>'
+    +'<input type="number" id="ig-vit-doz" min="0" step="1" inputmode="decimal" value="20" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
+    +'<span style="font-size:.74rem;color:var(--ink2)">ml</span>'
+    +'<input type="hidden" id="ig-vit-stok" value="'+escAttr(vitId)+'">'
+    +'</div>';
+  const ilacGovde=(!kist&&vitaminStok)
+    ?dozSatir
+    :'<span style="font-size:.74rem;color:var(--ink3)">Henüz ilaç yok</span>';
+  const GUN=7;
+  const taiEski=String(o.taiEski||'').slice(0,10);
+  let chip=GUN+' gün ertelenecek';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(taiEski)){
+    const p=taiEski.split('-');
+    const d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+    d.setUTCDate(d.getUTCDate()+GUN);
+    chip='TAI '+p[1]+'-'+p[2]+' → '+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
   }
   return '<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));box-sizing:border-box">'
-    +'<div style="font-weight:800;font-size:.9rem;margin-bottom:6px">İnaktif Ovaryum Geçişi</div>'
-    +'<div style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin-bottom:12px">Ana Ovsync açık kalır; alt vaka açılır, açık tohumlama iptal edilmeden ötelenir.</div>'
-    +'<div class="fg"><label class="flbl">Hastalık</label>'
-    +'<select id="ig-hastalik" style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:.9rem;background:var(--card);color:var(--ink)">'+opts+'</select></div>'
-    +'<div class="fg"><label class="flbl">Erteleme (gün)</label>'
-    +'<input type="number" id="ig-gun" min="1" max="365" step="1" inputmode="numeric" value="7" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box"></div>'
-    +vitBlok
+    +'<div style="font-weight:800;font-size:.9rem;margin-bottom:6px">'+esc(baslik)+'</div>'
+    +'<div class="fg"><label class="flbl">HASTALIK (SABİT)</label>'
+    +'<div style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:.9rem;background:var(--card);color:var(--ink);box-sizing:border-box">'+esc(hAd)+'</div>'
+    +'<input type="hidden" id="ig-hastalik" value="'+escAttr(hId)+'"></div>'
+    +'<div style="font-size:.76rem;font-weight:700;margin:10px 0 4px">'
+    +(kist?'İLAÇ (BOŞ BAŞLAR, EKLENEBİLİR)':'İLAÇ (ÖN-DOLU, DEĞİŞTİRİLEBİLİR)')+'</div>'
+    +'<div id="ig-ilac-liste" data-vit-stok="'+escAttr(vitId)+'" data-vit-ad="'+escAttr(vitAd)+'">'+ilacGovde+'</div>'
+    +'<button onclick="igIlacEkle()" style="margin-top:6px;background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:8px 12px;font-size:.8rem;font-weight:700;color:var(--ink);cursor:pointer">+ İlaç ekle</button>'
+    +'<div class="fg"><label class="flbl">KAÇ GÜN ERTELENSİN?</label>'
+    +'<div style="display:flex;gap:8px;align-items:center">'
+    +'<input type="number" id="ig-gun" min="1" max="365" step="1" inputmode="numeric" value="7" oninput="igGunDegisti()" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
+    +'<span style="font-size:.74rem;color:var(--ink2)">gün</span>'
+    +'<span id="ig-tai-chip" data-tai-eski="'+escAttr(taiEski)+'" style="font-size:.78rem;font-weight:700;color:var(--green)">'+esc(chip)+'</span>'
+    +'</div></div>'
+    +'<div style="font-size:.76rem;color:var(--ink2);line-height:1.5;margin:12px 0">5. gün PG elle girilebilir (opsiyonel) · Ovsync kapanmaz, tohumlamaya bağlanır</div>'
     +'<div style="display:flex;gap:8px;margin-top:12px">'
-    +'<button onclick="inaktifGecisKaydet(\''+escAttr(anaVakaId)+'\')" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Alt Vakayı Aç</button>'
+    +'<button onclick="inaktifGecisKaydet(\''+escAttr(anaVakaId)+'\')" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Kaydet</button>'
     +'<button onclick="document.getElementById(\'inaktif-gecis-modal\').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Vazgeç</button>'
     +'</div></div>';
 }
 /**
- * İnaktif geçiş sheet'ini açar; hastalık listesi IDB diseases'ten
- * (İnaktif Ovaryum varsayılan, Kistik Over), vitamin IDB stok'tan (CAROFERTIN-E).
+ * '+ İlaç ekle' (M2/M3, çalışma-anı): doz satırı yoksa stok bilgisinden
+ * 20 ml satırını listeye ekler; stok tanımsızsa yazmadan uyarır.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
+function igIlacEkle(){
+  if(document.getElementById('ig-vit-doz')) return;
+  const liste=document.getElementById('ig-ilac-liste');
+  if(!liste) return;
+  const stokId=liste.getAttribute?liste.getAttribute('data-vit-stok'):null;
+  const stokAd=liste.getAttribute?liste.getAttribute('data-vit-ad'):null;
+  if(!stokId){ if(typeof toast==='function') toast('⚠️ Stokta vitamin bulunamadı',true); return; }
+  liste.innerHTML='<div style="display:flex;gap:8px;align-items:center">'
+    +'<span style="font-size:.74rem;color:var(--ink2)">'+esc(stokAd||'')+'</span>'
+    +'<input type="number" id="ig-vit-doz" min="0" step="1" inputmode="decimal" value="20" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
+    +'<span style="font-size:.74rem;color:var(--ink2)">ml</span>'
+    +'<input type="hidden" id="ig-vit-stok" value="'+escAttr(stokId)+'">'
+    +'</div>';
+}
+/**
+ * Gün değişiminde TAI önizlemesini günceller (M2/M3, çalışma-anı):
+ * 'TAI <eski> → <yeni>'; eski tarih yoksa gün metni.
+ * @returns {void} Fonksiyon bir değer döndürmez.
+ */
+function igGunDegisti(){
+  const gunEl=document.getElementById('ig-gun'), chip=document.getElementById('ig-tai-chip');
+  if(!gunEl||!chip) return;
+  const ham=parseInt(gunEl.value,10);
+  const gun=Math.max(1,isFinite(ham)?ham:7);
+  const eski=chip.getAttribute?chip.getAttribute('data-tai-eski'):null;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(eski||'')){ chip.textContent=gun+' gün ertelenecek'; return; }
+  const p=eski.split('-');
+  const d=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));
+  d.setUTCDate(d.getUTCDate()+gun);
+  chip.textContent='TAI '+p[1]+'-'+p[2]+' → '+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+}
+/**
+ * İnaktif/kist geçiş sheet'ini açar (mockup M1→M2/M3): hastalık listesi IDB
+ * diseases'ten (İnaktif Ovaryum varsayılan, Kistik Over), vitamin IDB stok'tan
+ * (CAROFERTIN-E). Seçim M1 kartından gelir (secim 'inaktif'|'kist'); kistte
+ * ilaç boş başlar (M3), inaktifte ön-dolu kalır (M2). Küpe/TAI bağlamdan
+ * (açık vaka detayı ya da kart satırı) alınır, yoksa sheet geri çekilir.
  * @param {string} anaVakaId Ana OVSYNC vaka id.
+ * @param {string|Object} secim 'inaktif'|'kist' ya da {secim, kupeNo, taiEski}.
  * @returns {Promise<void>} Sheet açılınca çözülür.
  */
-async function inaktifGecisAc(anaVakaId){
+async function inaktifGecisAc(anaVakaId, secim){
   if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('inaktif-gecis')) return;
   let hastaliklar=[], vitaminStok=null;
   try{
@@ -1172,13 +1246,18 @@ async function inaktifGecisAc(anaVakaId){
     const vit=(stok||[]).find(s=>s&&/carofertin/i.test(s.urun_adi||''));
     if(vit) vitaminStok={id:vit.id,urun_adi:vit.urun_adi};
   }catch(e){ console.warn('inaktif-gecis listeleri:',e.message); }
+  const sec=(secim&&typeof secim==='object')?secim:{secim:(secim||null),kupeNo:null,taiEski:null};
+  const kistIstendi=/kist/i.test(sec.secim||'');
+  const h=hastaliklar.find(d=>d&&(kistIstendi?/kist/i.test(d.name||''):/inaktif/i.test(d.name||'')))||hastaliklar[0]||null;
+  const cur=(typeof _curCase!=='undefined')? _curCase:null;
+  const kupeNo=sec.kupeNo||(cur&&(cur.kupe_no||cur.kupe))||'bilinmiyor';
   let box=document.getElementById('inaktif-gecis-modal');
   if(box) box.remove();
   box=document.createElement('div');
   box.id='inaktif-gecis-modal';
   box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
   box.onclick=e=>{ if(e.target===box) box.remove(); };
-  box.innerHTML=inaktifGecisSheetHtml(anaVakaId,{hastaliklar:hastaliklar,vitaminStok:vitaminStok});
+  box.innerHTML=inaktifGecisSheetHtml(anaVakaId,{hastalik:h,kupeNo:kupeNo,taiEski:sec.taiEski||null,vitaminStok:vitaminStok});
   document.body.appendChild(box);
 }
 /**
@@ -1198,8 +1277,14 @@ async function inaktifGecisKaydet(anaVakaId){
   const hamGun=gunEl&&gunEl.value?parseInt(gunEl.value,10):7;
   const p_gun=Math.max(1,isFinite(hamGun)?hamGun:7);
   const p_hastalik_id=hastalikEl&&hastalikEl.value?hastalikEl.value:null;
-  const dozHam=dozEl&&dozEl.value!==''?Number(dozEl.value):null;
-  const r=await rpc('inaktif_alt_vaka_ac',{p_ana_vaka_id:anaVakaId,p_gun:p_gun,p_hastalik_id:p_hastalik_id,p_vitamin_stok_id:vitaminStokIdBul(),p_vitamin_doz_ml:dozHam});
+  // F turu KAPI-1 (M3): vitamin yalnız doz satırı varken gider — kist boş
+  // başlar (satır yok) → vitamin anahtarları RPC'ye hiç eklenmez.
+  const params={p_ana_vaka_id:anaVakaId,p_gun:p_gun,p_hastalik_id:p_hastalik_id};
+  if(dozEl){
+    params.p_vitamin_stok_id=vitaminStokIdBul();
+    params.p_vitamin_doz_ml=(dozEl.value!=='')?Number(dozEl.value):null;
+  }
+  const r=await rpc('inaktif_alt_vaka_ac',params);
   const box=document.getElementById('inaktif-gecis-modal');
   if(box) box.remove();
   toast('✅ İnaktif alt vaka açıldı');
@@ -1251,7 +1336,7 @@ function _inaktifGecisBtnSync(){
     btn=document.createElement('button');
     btn.id='cd-inaktif-gecis-btn';
     btn.className='btn';
-    btn.style.cssText='background:none;border:1.5px solid var(--purple, #8e44ad);color:var(--purple, #8e44ad);width:100%;margin-bottom:6px';
+    btn.style.cssText='background:none;border:1.5px solid var(--purple);color:var(--purple);width:100%;margin-bottom:6px';
     btn.textContent='İnaktif Ovaryum Geçişi';
     kaydirBtn.parentNode.insertBefore(btn,kaydirBtn.nextSibling);
   }
@@ -2397,7 +2482,7 @@ async function tdAsiVaxSec(vId){
 // ──────────────────────────────────────────
 // ──────────────────────────────────────────
 // P5: PG kapısı modalı (dinamik bottom-sheet; modal-router invariant: pushState)
-// _pgKapiHata(e, tekrarDene) — PG_KAPI hatasını yakalar, koda göre ekran verir.
+// _pgKapiHata(e, tekrarDene, rpcAd?) — PG_KAPI hatasını yakalar, koda göre ekran verir.
 // tekrarDene(onay, gerekce): çağıran tarafın aynı işlemi onay parametreleriyle
 // yeniden gönderen kapanışı. Gebe (BLOCK_PREGNANT) için "yine de uygula" YOK.
 /**
@@ -2407,7 +2492,7 @@ async function tdAsiVaxSec(vId){
  * @param {boolean} tekrarDene İşlemi tekrar deneme bayrağı.
  * @returns {void} Fonksiyon bir değer döndürmez.
  */
-function _pgKapiAc(kodTam, detayJson, tekrarDene){
+function _pgKapiAc(kodTam, detayJson, tekrarDene, rpcAd){
   const kod = String(kodTam||'').replace('PG_KAPI:','');
   let detay = {};
   try { detay = JSON.parse(detayJson || '{}'); } catch(e) {}
@@ -2479,18 +2564,20 @@ function _pgKapiAc(kodTam, detayJson, tekrarDene){
   if (!(history.state && history.state.pg_kapi)) history.pushState({pg_kapi:true}, '', '');
   window.__pgKapiTekrar = tekrarDene || null;
   window.__pgKapiToh = detay.tohumlama_id || null;
+  window.__pgKapiRpcAd = rpcAd || null;
 }
 /**
  * PG_KAPI hata mesajını analiz eder, hata kodunu ve detayını ayırarak ilgili fonksiyonu çağırır.
  * @param {Error|Object} e Hata nesnesi veya hata mesajı string'i.
  * @param {boolean} tekrarDene Hata durumunda tekrar deneme işlemini tetikleyip tetiklemeyeceğini belirten bayrak.
+ * @param {string} [rpcAd] Tekrar kapanışının RPC adı (onaylı-tekrar tazeleme seti için; opsiyonel).
  * @returns {boolean} Hata mesajı PG_KAPI formatında ise true, değilse false döndürür.
  */
-function _pgKapiHata(e, tekrarDene){
+function _pgKapiHata(e, tekrarDene, rpcAd){
   const msg = e?.message || String(e);
   const m = /^(PG_KAPI:[A-Z_]+):([\s\S]*)$/.exec(msg);
   if (!m) return false;         // PG_KAPI değil — çağıran normal hata akışına dönsün
-  _pgKapiAc(m[1], m[2], tekrarDene);
+  _pgKapiAc(m[1], m[2], tekrarDene, rpcAd);
   return true;
 }
 /**
@@ -2500,15 +2587,16 @@ function _pgKapiHata(e, tekrarDene){
 function _pgKapiKapat(){
   const box = document.getElementById('pg-kapi-bs');
   if (box) box.remove();
-  window.__pgKapiTekrar = null; window.__pgKapiToh = null;
+  window.__pgKapiTekrar = null; window.__pgKapiToh = null; window.__pgKapiRpcAd = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
 }
 /**
  * PG kapısı genel onaylı-tekrar kapanışı (Faz 4, ROOT RULING 3, §18.8):
  * kapı penceresindeki onay düğmesi saklanan tekrar kapanışını (cagri)
  * `p_pg_onay=true` + `p_pg_gerekce` ile çağırır. Tohumlama-bağlamlı
- * Boş-ata akışının (`_pgKapiBosAtaUygula`) genel karşılığıdır.
- * @returns {Promise<void>} Başarıda modal kapanır; PG reddi yeniden kapıya düşer.
+ * Boş-ata akışının (`_pgKapiBosAtaUygula`) genel karşılığıdır. Başarıda
+ * çağırana özgü tazeleme yapar (pullTables + renderSafe; liste RPC_TABLES'tan).
+ * @returns {Promise<void>} Başarıda modal kapanır + tazeleme koşar; PG reddi yeniden kapıya düşer.
  */
 async function _pgKapiOnayliTekrar(){
   const gerekce = document.getElementById('pg-kapi-gerekce')?.value?.trim() || '';
@@ -2516,13 +2604,24 @@ async function _pgKapiOnayliTekrar(){
   if (typeof tekrar !== 'function') return;
   if (!gerekce) { toast('⚠️ Gerekçe zorunlu', true); return; }
   try {
+    const rpcAd = window.__pgKapiRpcAd || null;
     await tekrar(true, gerekce);
     _pgKapiKapat();
     toast('✅ Onaylandı, işlem uygulandı');
+    // F turu KAPI-3: çağıranın atladığı tazeleme (toast sonrası eski veri).
+    // Liste RPC_TABLES'tan (sabit YOK): rpcAd biliniyorsa o RPC'nin seti,
+    // yoksa (forms.js kapıları dahil) PG-geçitli RPC'lerin birleşimi.
+    if (typeof pullTables === 'function' && typeof RPC_TABLES !== 'undefined') {
+      const havuz = (rpcAd && RPC_TABLES[rpcAd]) ? [rpcAd]
+        : ['hizli_uygulama', 'add_drug_administration', 'tedavi_sablon_uygula', 'tohumlama_bos_ve_devam'];
+      const tablolar = [...new Set(havuz.flatMap(a => RPC_TABLES[a] || []))];
+      if (tablolar.length) await pullTables(tablolar).catch(() => {});
+    }
+    if (typeof renderSafe === 'function') renderSafe();
   } catch (e2) {
     // Yeniden PG reddi: kapı aynı tekrar kapanışıyla yeniden açılır
     // (yeni history entry YOK — _pgKapiAc koruması).
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e2, tekrar)) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e2, tekrar, window.__pgKapiRpcAd || null)) return;
     toast('❌ ' + (e2?.message || e2), true);
   }
 }
@@ -3047,7 +3146,7 @@ async function _devamSeciciOnayla() {
         if (gerekce) p.p_notlar = 'PG öncesi değerlendirme: ' + gerekce;
         return tohumlamaBosVeDevam(p);
       };
-      _pgKapiHata(e, tekrar);
+      _pgKapiHata(e, tekrar, 'tohumlama_bos_ve_devam');
       return;
     }
     if (red.kod === 'TAKIP_UZADI') {
@@ -5785,7 +5884,7 @@ async function _protokolUygulaKaydet(hayvanId, idx){
       });
       const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
       if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
-      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
+      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry, 'hizli_uygulama')) return { ok: true, _pgKapi: true };
       throw e;
     });
     if (res?._pgKapi || res?._takipAcik) return;
@@ -6013,7 +6112,7 @@ async function _hayvanHizliUygulaKaydet(hayvanId){
       });
       const kzP10 = (getState('animals') || []).find(a => a && a.id === hayvanId);
       if (typeof _takipAcikHata === 'function' && _takipAcikHata(e, takipRetry, { kupe: kzP10 && (kzP10.kupe_no || kzP10.devlet_kupe) || '' })) return { ok: true, _takipAcik: true };
-      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry)) return { ok: true, _pgKapi: true };
+      if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, retry, 'hizli_uygulama')) return { ok: true, _pgKapi: true };
       throw e;
     });
     if (res?._pgKapi || res?._takipAcik) return;
@@ -11491,7 +11590,7 @@ async function _tedaviGunExecute(uygulanmadiIds){
     if(typeof _curCase !== 'undefined' && _curCase) await renderCaseTimeline(_curCase.id);
   } catch(e){
     if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, 'treatment_day_tamamla')) return;
     toast('❌ ' + e.message, true);
   }
   if(btn){btn.disabled=false;btn.textContent='✅ Tedavi Gününü Tamamla';}
@@ -12212,7 +12311,7 @@ async function caseDayTamamla(dayId) {
     }
   } catch(e) {
     if (btn) { btn.disabled = false; btn.textContent = '✅ Tamamla'; }
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, 'treatment_day_tamamla')) return;
     toast('❌ ' + e.message, true);
   }
 }
@@ -13492,7 +13591,7 @@ async function caseSablonUygula(sablonId){
     await renderCaseTimeline(_curCase.id);
     _updateKapatBtn(_curCase.id);
   } catch(e) {
-    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) return;
+    if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri, 'tedavi_sablon_uygula')) return;
     toast(getUserMessage(e), true);
   }
 }
@@ -13762,7 +13861,7 @@ async function caseDrugKaydet(btn) {
           eklenen++;
         } catch(e0) {
           // Madde 3: PG reddinde döngüden break ile çık, tazeleme yine koşsun.
-          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e0, cagri)) { pgDurdu = true; break; }
+          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e0, cagri, 'add_drug_administration')) { pgDurdu = true; break; }
           throw e0;
         }
       } else {
@@ -14966,6 +15065,7 @@ async function dataTrafficTekGonder(qid){
   // Faz 4: onaylı-tekrar kapanışı — _pgKapiHata modalının onay düğmesi bunu
   // p_pg_onay=true + p_pg_gerekce ile çağırır (§18.8); başarıda kayıt+eş düşer.
   let onayliTekrar = null;
+  let rpcName = null;
 
   if (esIlacBekliyor) {
     toast('⚠️ Eş ilaç kaydı bekliyor — önce onu gönderin', true);
@@ -14978,7 +15078,7 @@ async function dataTrafficTekGonder(qid){
 
     // B25: yalnız POST/PATCH okunuyordu — RPC_MAP'te tanımlı DELETE dalı
     // (kizginlik_sil) hiç seçilemiyordu, "RPC tanımlı değil" yanılgısı üretiyordu
-    const rpcName = rpcInfo[op.method];
+    rpcName = rpcInfo[op.method];
     if(!rpcName) throw new Error(`${op.method} için RPC tanımlı değil`);
 
     // M-15 fix: eskiden boş string alanları da tamamen siliyordu (NOT NULL RPC
@@ -15019,7 +15119,7 @@ async function dataTrafficTekGonder(qid){
 
   } catch(e){
     // Faz 4: düz toast'tan ÖNCE _pgKapiHata — PG reddi kuyrukta kalır, modal açılır.
-    if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, onayliTekrar)) toast('❌ '+e.message, true);
+    if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, onayliTekrar, rpcName)) toast('❌ '+e.message, true);
   }
 
   await dataTrafficYenile();
@@ -15196,7 +15296,7 @@ function buildRpcParams(rpcName, data, op) {
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  */
 async function dataTrafficSil(qid){
-  if(!confirm('Bu kaydı kuyruktan sil? (Supabase\'e gönderilmeyecek)')) return;
+  if(!confirm('Bu kaydı kuyruktan sil? Eş stok satırı da silinir. (Supabase\'e gönderilmeyecek)')) return;
   const qsil = await getQueue();
   const opsil = qsil.find(o=>o._qid===qid);
   await removeFromQueue(qid);

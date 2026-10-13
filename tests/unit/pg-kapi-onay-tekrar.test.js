@@ -72,16 +72,26 @@ function kapiCtx(kanca = {}) {
   const doc = makeDomStub();
   const hist = tarihceStub();
   const toasts = [];
+  const pulls = [];
+  let renders = 0;
   const ctx = {
     console, JSON, Math, Date,
     document: doc, history: hist, window: {},
     esc: s => String(s ?? ''), fmtTarih: s => String(s ?? ''),
     toast: m => { toasts.push(String(m)); },
     rpc: kanca.rpc || (async () => { throw new Error('stub rpc tanimsiz'); }),
+    pullTables: async (t) => { pulls.push(t); return { ok: [], failed: [] }; },
+    renderSafe: () => { renders++; },
+    RPC_TABLES: {
+      hizli_uygulama: ['uygulama_log', 'stok_hareket', 'gorev_log'],
+      add_drug_administration: ['stok', 'stok_hareket', 'drug_administrations'],
+      tedavi_sablon_uygula: ['cases', 'treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log', 'islem_log'],
+      tohumlama_bos_ve_devam: ['tohumlama', 'gorev_log', 'stok', 'stok_hareket', 'hayvanlar', 'islem_log', 'cases', 'treatment_days', 'treatment_day_uygulamalar'],
+    },
   };
   vm.createContext(ctx);
   vm.runInContext(govde, ctx, { filename: 'pg-kapi-ctx' });
-  return { ctx, doc, hist, toasts };
+  return { ctx, doc, hist, toasts, pulls, renders: () => renders };
 }
 
 // Acilan pg-kapi-bs kutusunu bulup getElementById'ye bagla (stub innerHTML parse etmez).
@@ -134,10 +144,63 @@ test('onay-dugmesi-cagriyi-pg-onayla-cagirir', async () => {
   assert.ok(!doc.body.children.includes(box), 'basarida modal kapanir');
 });
 
+test('onayli-tekrar-basarida-cagirana-ozgu-tazeleme', async () => {
+  // F turu KAPI-3 adli (MUT-TAZELEME-YOK): basari kolundaki pullTables +
+  // renderSafe silinirse pulls/renders bos kalir → FAIL.
+  const T = {
+    hizli_uygulama: ['uygulama_log', 'stok_hareket', 'gorev_log'],
+    add_drug_administration: ['stok', 'stok_hareket', 'drug_administrations'],
+    tedavi_sablon_uygula: ['cases', 'treatment_days', 'treatment_day_uygulamalar', 'drug_administrations', 'stok', 'stok_hareket', 'gorev_log', 'islem_log'],
+    tohumlama_bos_ve_devam: ['tohumlama', 'gorev_log', 'stok', 'stok_hareket', 'hayvanlar', 'islem_log', 'cases', 'treatment_days', 'treatment_day_uygulamalar'],
+  };
+  const birlesim = [...new Set(['hizli_uygulama', 'add_drug_administration', 'tedavi_sablon_uygula', 'tohumlama_bos_ve_devam'].flatMap(a => T[a]))];
+  // (a) rpcAd'siz cagri (forms.js kapilari): birlesim tazelenir.
+  {
+    const t = kapiCtx({ rpc: async (ad, p) => {
+      if (p && p.p_pg_onay === true) return { ok: true };
+      throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}');
+    } });
+    vm.runInContext(`async function cagri(onay, gerekce) {
+      return rpc('treatment_day_tamamla', { p_day_id: 'gun-1',
+        p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+    }`, t.ctx);
+    t.doc.__setEl('pg-kapi-gerekce', { value: 'kontrol negatif' });
+    await vm.runInContext(`(async () => {
+      try { await cagri(false, null); } catch (e) { _pgKapiHata(e, cagri); }
+    })()`, t.ctx);
+    const box = kutuyuBagla(t.doc);
+    await vm.runInContext(onaylaKodu(box), t.ctx);
+    assert.strictEqual(t.pulls.length, 1, 'rpcAd yok: tek tazeleme, ölçülen: ' + t.pulls.length);
+    // pulls[0] vm-realm dizisi — dış realm'e yayarak karşılaştır (prototip farkı).
+    assert.deepStrictEqual([...t.pulls[0]], birlesim, 'liste RPC_TABLES birlesimi (sabit YOK)');
+    assert.strictEqual(t.renders(), 1, 'render calisir');
+  }
+  // (b) rpcAd'li cagri: yalniz o RPC'nin seti tazelenir.
+  {
+    const t = kapiCtx({ rpc: async (ad, p) => {
+      if (p && p.p_pg_onay === true) return { ok: true };
+      throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}');
+    } });
+    vm.runInContext(`async function cagri2(onay, gerekce) {
+      return rpc('hizli_uygulama', { p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+    }`, t.ctx);
+    t.doc.__setEl('pg-kapi-gerekce', { value: 'kontrol negatif' });
+    await vm.runInContext(`(async () => {
+      try { await cagri2(false, null); } catch (e) { _pgKapiHata(e, cagri2, 'hizli_uygulama'); }
+    })()`, t.ctx);
+    const box = kutuyuBagla(t.doc);
+    await vm.runInContext(onaylaKodu(box), t.ctx);
+    assert.deepStrictEqual([...t.pulls[0]], T.hizli_uygulama, 'cagirana ozgu set');
+    assert.strictEqual(t.renders(), 1, 'render calisir');
+  }
+});
+
 test('reddet-kapat-history-tekligi', async () => {
   // ROOT RULING 4 — MUT-PG-CIFT-PUSH adli: _pgKapiAc'deki
   // "ustte pg_kapi varsa push YOK" korumasi kaldirilirsa ikinci red
   // (onayli-tekrar reddinde yeniden render) yeni entry iter → net +2 → FAIL.
+  // F turu KAPI-2 (sıkılaştırma, MEASURED back=1/son=null): MUT-KAPAT-BACKSIZ
+  // (_pgKapiKapat history.back silinirse) backSayisi 0 + bayat pg_kapi → FAIL.
   const { ctx, doc, hist } = kapiCtx({ rpc: async () => ({ ok: true }) });
   const taban = hist.length;
   await vm.runInContext(`_pgKapiHata(new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}'), async () => ({}))`, ctx);
@@ -149,6 +212,8 @@ test('reddet-kapat-history-tekligi', async () => {
   })()`, ctx);
   assert.ok(hist.length - taban <= 1,
     'reddet→kapat net 0 ya da tek kayit, olculen: ' + (hist.length - taban));
+  assert.strictEqual(hist.backSayisi, 1, 'kapat tek back iter, ölçülen: ' + hist.backSayisi);
+  assert.ok(!(hist.state && hist.state.pg_kapi), 'son state pg_kapi DEĞİL (bayat kayıt yok)');
 });
 
 test('pg-kapi-ilk-acilis-tek-entry', async () => {

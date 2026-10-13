@@ -712,7 +712,7 @@ async function wInaktifModalAc(page, seed) {
   await expect(page.locator('#pg-ovsync')).toHaveClass(/on/);
   await page.waitForFunction(() => window.__ovsyncTakip?.veri, null, { timeout: 20000 });
   const btn = page.locator('#pg-ovsync .ovs-kart', { hasText: seed.kupe })
-    .locator('.ovs-aksiyon', { hasText: 'İnaktif ovaryum' }).first();
+    .locator('.ovs-aksiyon', { hasText: 'İnaktif Ovarium' }).first();
   await expect(btn, 'S1 kartında İnaktif ovaryum düğmesi').toBeVisible({ timeout: 15000 });
   await btn.click();
   const modal = page.locator('#inaktif-gecis-modal');
@@ -727,13 +727,13 @@ test('Y1: Ovsync kartı → İnaktif ovaryum → gün 7 + CAROFERTIN-E 20 ml →
   const tohId = await wTohumlama(seed, 0);
   const anaId = await wDevamOvsync(page, seed, tohId);
   const modal = await wInaktifModalAc(page, seed);
-  await expect(modal).toContainText('İnaktif Ovaryum Geçişi');
+  await expect(modal).toContainText('İnaktif Ovarium — Küpe');
   expect(await modal.locator('#ig-gun').inputValue(), 'gün sorusu varsayılan 7').toBe('7');
   // Vitamin bloğu demo IDB stok'una bağlı (CAROFERTIN-E kaydı varsa çizilir).
   if (await modal.locator('#ig-vit-doz').count()) {
     expect(await modal.locator('#ig-vit-doz').inputValue(), 'CAROFERTIN-E 20 ml ön-dolu').toBe('20');
   }
-  await modal.getByRole('button', { name: 'Alt Vakayı Aç' }).click();
+  await modal.getByRole('button', { name: 'Kaydet' }).click();
   await expect(modal).toHaveCount(0, { timeout: 15000 });
   const alt = await dbBekle(async () => {
     const v = await db.from('cases').select('id,kaynak_vaka_id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
@@ -759,7 +759,7 @@ test('Y2: 5. gün elle PG → +48 s TAI, ertelenmiş TAI PG_YERINE kapanır; dö
   const tohId = await wTohumlama(seed, 0);
   const anaId = await wDevamOvsync(page, seed, tohId);
   const modal = await wInaktifModalAc(page, seed);
-  await modal.getByRole('button', { name: 'Alt Vakayı Aç' }).click();
+  await modal.getByRole('button', { name: 'Kaydet' }).click();
   const alt = await dbBekle(async () => {
     const v = await db.from('cases').select('id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
     return v.data?.[0] ?? null;
@@ -873,7 +873,7 @@ test('Y5: S4 Sonlananlar ana+alt kapanışta bağ rozeti gösterir', async ({ pa
   const tohId = await wTohumlama(seed, 0);
   const anaId = await wDevamOvsync(page, seed, tohId);
   const modal = await wInaktifModalAc(page, seed);
-  await modal.getByRole('button', { name: 'Alt Vakayı Aç' }).click();
+  await modal.getByRole('button', { name: 'Kaydet' }).click();
   const alt = await dbBekle(async () => {
     const v = await db.from('cases').select('id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
     return v.data?.[0] ?? null;
