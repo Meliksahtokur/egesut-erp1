@@ -1,15 +1,17 @@
 -- ════════════════════════════════════════════════════════════════════
 -- Ovsync paketi Faz 4 — S4 devam rozeti: ovsync_takip_listele satırına alt_vakalar
--- (PLAN.md ### Faz 4; Interfaces: satır `alt_vakalar jsonb [{id, hastalik, status}]`,
---  cases.kaynak_vaka_id = satırın Ovsync vakası; yoksa '[]').
+-- (PLAN-K10 ### Faz DB-1; Interfaces: satır `alt_vakalar jsonb [{id, hastalik, status}]`,
+--  id = hastalık günü (treatment_days.id), yoksa '[]').
 --
 -- Gövde türetme: CANLI pg_get_functiondef (Mgmt API, yalnız SELECT, 2026-10-13 MEASURED):
 --   ovsync_takip_listele(p_padok text DEFAULT NULL, p_sonlanan_gun integer DEFAULT 60)
---   — canlı gövde repo 20260929000001 gövdesiyle BAYT-EŞİT (27395 karakter, diff 0).
+--   — canlı gövde repo 20260929000001 gövdesi + TEK değişiklik: `alt_ozet` CTE
+--   hastalık-günü modeline yeniden yazıldı (karar 10: cases.kaynak_vaka_id bağı
+--   YOK; bağ treatment_days.disease_id, 000003 kolonu).
 --   İmza aynı → CREATE OR REPLACE; anon GRANT YOK (REVOKE/GRANT mührü aynen).
--- TEK davranış değişikliği: yeni `alt_ozet` CTE (cases.kaynak_vaka_id'den alt vaka
---   toplama, 000003 kolonu) + vaka_satirlar'da `alt_vakalar` anahtarı; vaka-dışı
---   satırlar (S2/S3) `alt_vakalar = '[]'` literal'i alır.
+-- TEK davranış değişikliği: `alt_ozet` CTE (hastalık günleri + diseases.name)
+--   + vaka_satirlar'da `alt_vakalar` anahtarı; vaka-dışı satırlar (S2/S3)
+--   `alt_vakalar = '[]'` literal'i alır.
 -- Salt-okunur RPC (SELECT only); yeni gün hesabı YOK (Istanbul/UTC tuzağı yok);
 --   yeni tenant nesnesi YOK (farm_id disiplini tetiklenmez); S2'deki CURRENT_DATE
 --   kaynak fonksiyon aynasıdır, kasıtlı korunur (20260929000001:15-17).
@@ -279,19 +281,21 @@ SELECT CASE
          AND COALESCE(g.iptal, false) = false
        ORDER BY g.hayvan_id, g.hedef_tarih DESC NULLS LAST, g.created_at DESC NULLS LAST
     ), alt_ozet AS (
-      -- ── S4 rozeti (Faz 4, 000005): ana OVSYNC vakasına bağlı alt vakalar ──
-      -- Bağ cases.kaynak_vaka_id (000003); alt vakanın hastalığı diseases.name.
-      -- Vakası olmayan satır bu CTE'ye değmez ('[]' literal).
-      SELECT c.kaynak_vaka_id AS case_id,
+      -- ── S4 rozeti (K10, 000005): OVSYNC vakasının İÇİNDEKİ hastalık günleri ──
+      -- Bağ treatment_days.disease_id (000003, karar 10); günün hastalığı diseases.name.
+      -- status gün durumudur: tamamlanmış gün 'tamam', açık gün 'acik'
+      -- (eski alt-vaka active/closed yerine). Vakası olmayan satır bu CTE'ye
+      -- değmez ('[]' literal).
+      SELECT td.case_id AS case_id,
              jsonb_agg(jsonb_build_object(
-                 'id', c.id,
+                 'id', td.id,
                  'hastalik', d.name,
-                 'status', c.status)
-                 ORDER BY c.start_date, c.id) AS alt_vakalar
-        FROM public.cases c
-        LEFT JOIN public.diseases d ON d.id = c.disease_id
-       WHERE c.kaynak_vaka_id IS NOT NULL
-       GROUP BY c.kaynak_vaka_id
+                 'status', CASE WHEN COALESCE(td.tamamlandi, false) THEN 'tamam' ELSE 'acik' END)
+                 ORDER BY td.treatment_date, td.id) AS alt_vakalar
+        FROM public.treatment_days td
+        LEFT JOIN public.diseases d ON d.id = td.disease_id
+       WHERE td.disease_id IS NOT NULL
+       GROUP BY td.case_id
     ), ilgili_hayvanlar AS (
       -- ── Hayvan düzeyi yardımcılar (K13 deneme sayacı + taban_turu) ──
 
