@@ -287,10 +287,291 @@ test('yetim-ovsync-rozeti', () => {
   assert.strictEqual(f({ ...v, status: 'closed' }, [], []), false);
 });
 
+// F2 madde 1 (çoklu ilaç, RULING 1'): kaydet zinciri — ek ilaç varsa
+// p_gun_ac=true ile aç-RPC, dönen gun_id'ye add_drug_administration (PG kapı
+// sarmalı dahil); kısmi başarıda alt vaka kalır, 'k/n ilaç eklendi' + alt detay.
+function madde1KaydetCtx(els, acDonus) {
+  const govde = ['inaktifGecisKaydet', 'vitaminStokIdBul', 'igEkIlaclariOku']
+    .map(a => extractFunctionSource('js/ui.js', a)).join('\n');
+  const doc = makeDomStub();
+  for (const [id, el] of Object.entries(els)) doc.__setEl(id, el);
+  const rpcCagrilari = [];
+  const toasts = [];
+  const acilan = [];
+  const ctx = {
+    console, JSON, Math, Date,
+    document: doc, window: {},
+    esc: s => String(s ?? ''), escAttr: s => String(s ?? ''),
+    toast: (m) => { toasts.push(String(m)); },
+    rpc: async (ad, p) => { rpcCagrilari.push({ ad, p }); return ad === 'inaktif_alt_vaka_ac' ? acDonus : { ok: true }; },
+    pullTables: async (t) => ({ ok: [], failed: [] }),
+    renderSafe: () => {},
+    RPC_TABLES: { inaktif_alt_vaka_ac: ['cases', 'treatment_days'] },
+    openCaseDet: async (id) => { acilan.push(id); },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'madde1-kaydet-ctx' });
+  return { ctx, doc, rpcCagrilari, toasts, acilan };
+}
+function madde1Satir(stokId, urunId, doz) {
+  const { makeElement } = require('./support/loadModule.js');
+  const r = makeElement('div');
+  r._ek = { stok_id: stokId, urun_id: urunId, doz: doz, birim: 'ml', yol: null };
+  return r;
+}
+function madde1Liste(...satirlar) {
+  const { makeElement } = require('./support/loadModule.js');
+  const l = makeElement('div');
+  satirlar.forEach(s => l.appendChild(s));
+  return l;
+}
+
+test('madde1-kist-ilacsiz-gun-yok', async () => {
+  // (a) kist + 0 ek ilaç → p_gun_ac=false, ek add YOK, gun_id null, alt detay açılır.
+  const t = madde1KaydetCtx({
+    'ig-gun': { value: '7' },
+    'ig-hastalik': { value: 'd2' },
+    'ig-kist': { value: '1' },
+    'ig-ilac-liste': madde1Liste(),
+    'inaktif-gecis-modal': { remove() {} },
+  }, { ok: true, alt_vaka_id: 'alt-a', gun_id: null, ertelenen: 0 });
+  const r = await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(r.gun_id, null, 'gun_id null döner');
+  assert.strictEqual(t.rpcCagrilari[0].p.p_gun_ac, false, 'ek yoksa gün istenmez');
+  assert.strictEqual(t.rpcCagrilari.filter(c => c.ad === 'add_drug_administration').length, 0, 'ek add YOK');
+  assert.deepStrictEqual(t.acilan, ['alt-a'], 'alt vaka detayı açılır');
+  assert.ok(t.toasts.includes('✅ Kist alt vakası açıldı'), 'kist toast, ölçülen: ' + JSON.stringify(t.toasts));
+});
+
+test('madde1-kist-iki-ilac-ayni-gune', async () => {
+  // (b) kist + 2 ek ilaç → p_gun_ac=true, 2 add DOĞRU gun_id ile, '2/2' toast.
+  const t = madde1KaydetCtx({
+    'ig-gun': { value: '7' },
+    'ig-hastalik': { value: 'd2' },
+    'ig-kist': { value: '1' },
+    'ig-ilac-liste': madde1Liste(madde1Satir('sA', 'uA', 5), madde1Satir('sB', 'uB', 10)),
+    'inaktif-gecis-modal': { remove() {} },
+  }, { ok: true, alt_vaka_id: 'alt-b', gun_id: 'gun-1', ertelenen: 0 });
+  const r = await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(r.gun_id, 'gun-1', 'gun_id taşınır');
+  assert.strictEqual(t.rpcCagrilari[0].p.p_gun_ac, true, 'ek varsa p_gun_ac=true (MUT-GUN-AC-YOK bekçisi)');
+  const adds = t.rpcCagrilari.filter(c => c.ad === 'add_drug_administration');
+  assert.strictEqual(adds.length, 2, '2 ek satır yazılır');
+  for (const a of adds) assert.strictEqual(a.p.p_day_id, 'gun-1', 'DOĞRU gun_id: ' + JSON.stringify(a.p));
+  assert.deepStrictEqual(adds.map(a => a.p.p_stok_id).sort(), ['sA', 'sB'], 'stoklar taşınır');
+  assert.ok(t.toasts.some(m => /2\/2 ilaç eklendi/.test(m)), 'k/n toast, ölçülen: ' + JSON.stringify(t.toasts));
+  assert.deepStrictEqual(t.acilan, ['alt-b'], 'alt vaka detayı açılır');
+});
+
+test('madde1-inaktif-vitamin-gunu-yeniden', async () => {
+  // (c) inaktif + vitamin + 1 ek → vitamin günü (dönen gun_id) yeniden kullanılır.
+  const t = madde1KaydetCtx({
+    'ig-gun': { value: '7' },
+    'ig-hastalik': { value: 'd1' },
+    'ig-vit-doz': { value: '20' },
+    'ig-vit-stok': { value: 's1' },
+    'ig-ilac-liste': madde1Liste(madde1Satir('sC', 'uC', 3)),
+    'inaktif-gecis-modal': { remove() {} },
+  }, { ok: true, alt_vaka_id: 'alt-c', gun_id: 'gun-V', ertelenen: 0 });
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(t.rpcCagrilari[0].p.p_vitamin_stok_id, 's1', 'vitamin aynen gider');
+  assert.strictEqual(t.rpcCagrilari[0].p.p_gun_ac, true, 'ek varsa p_gun_ac=true');
+  const adds = t.rpcCagrilari.filter(c => c.ad === 'add_drug_administration');
+  assert.strictEqual(adds.length, 1, '1 ek satır');
+  assert.strictEqual(adds[0].p.p_day_id, 'gun-V', 'vitamin günü yeniden kullanılır');
+  assert.strictEqual(adds[0].p.p_stok_id, 'sC', 'ek stok taşınır');
+  assert.ok(t.toasts.some(m => /1\/1 ilaç eklendi/.test(m)), 'k/n toast, ölçülen: ' + JSON.stringify(t.toasts));
+});
+
+test('madde1-bos-stok-id-gonderilmez', async () => {
+  // MUT-A bekçisi: stok id boş ek satır add'e DÜŞMEZ (gönderen varyant → FAIL).
+  const t = madde1KaydetCtx({
+    'ig-gun': { value: '7' },
+    'ig-hastalik': { value: 'd2' },
+    'ig-kist': { value: '1' },
+    'ig-ilac-liste': madde1Liste(madde1Satir('', null, 5)),
+    'inaktif-gecis-modal': { remove() {} },
+  }, { ok: true, alt_vaka_id: 'alt-d', gun_id: 'gun-2', ertelenen: 0 });
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  const adds = t.rpcCagrilari.filter(c => c.ad === 'add_drug_administration');
+  assert.strictEqual(adds.length, 0, 'boş stok id yazılmaz, ölçülen: ' + JSON.stringify(adds.map(a => a.p)));
+  assert.ok(t.toasts.some(m => /0\/1 ilaç eklendi/.test(m)), 'k/n dürüst sayar, ölçülen: ' + JSON.stringify(t.toasts));
+});
+
+test('madde1-igIlacEkle-cok-satir', () => {
+  // '+ İlaç ekle' çok-satırlı: ek satır listeye eklenir, okuyucu bulur (kistte
+  // CAROFERTIN dayatması yok — stok çağrıdan gelir).
+  const govde = ['igIlacEkle', 'igEkIlaclariOku']
+    .map(a => extractFunctionSource('js/ui.js', a)).join('\n');
+  const doc = makeDomStub();
+  const { makeElement } = require('./support/loadModule.js');
+  const liste = makeElement('div');
+  doc.__setEl('ig-ilac-liste', liste);
+  const toasts = [];
+  const ctx = {
+    console, JSON, Math, Date, document: doc, window: {},
+    esc: s => String(s ?? ''), escAttr: s => String(s ?? ''),
+    toast: (m) => { toasts.push(String(m)); },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'madde1-ekle-ctx' });
+  vm.runInContext(`igIlacEkle({stok_id:'s9',urun_id:'u9',ad:'X-ILAC',doz:5})`, ctx);
+  vm.runInContext(`igIlacEkle({stok_id:'s8',urun_id:'u8',ad:'Y-ILAC',doz:7})`, ctx);
+  const ekler = vm.runInContext('igEkIlaclariOku()', ctx);
+  assert.strictEqual(ekler.length, 2, 'iki satır birikir');
+  assert.strictEqual(ekler.map(e => e.stok_id).join(','), 's9,s8', 'stoklar çağrıdan (dayatma yok)');
+});
+
 // F turu KAPI-5: mor kalıp fallback'siz (index.html:24 --purple tanımlı).
 test('mor-buton-fallbacksuz', () => {
   const src = extractFunctionSource('js/ui.js', '_inaktifGecisBtnSync');
   assert.ok(!/var\(--purple,/.test(src), 'var(--purple) fallback YOK');
   assert.ok(src.includes('var(--purple)'), 'mor kalıp korunur');
   assert.ok(/background:none/.test(src), 'mor kalıp background:none aynen');
+});
+
+// Madde 1 picker kablosu (davranışsal prob — gerçek sheet HTML + stub DOM,
+// verifier MEASURED akışı): '+ İlaç ekle' her tıkta stok <select>'li satır
+// ekler, kistte CAROFERTIN dayatması YOK, seçim+doldur okuyucuya düşer,
+// kaydet zinciri p_gun_ac=true ile açılır.
+function pickerAttrEl(tag) {
+  const { makeElement } = require('./support/loadModule.js');
+  const el = makeElement(tag);
+  const attrs = new Map();
+  el.setAttribute = (k, v) => { attrs.set(String(k), String(v)); };
+  el.getAttribute = (k) => (attrs.has(String(k)) ? attrs.get(String(k)) : null);
+  el.removeAttribute = (k) => { attrs.delete(String(k)); };
+  return el;
+}
+function pickerDoc() {
+  const doc = makeDomStub();
+  doc.createElement = (tag) => pickerAttrEl(tag);
+  return doc;
+}
+function pickerCocukBul(kok, pred) {
+  const kids = (kok && kok.children) || [];
+  for (const c of kids) {
+    if (!c) continue;
+    if (pred(c)) return c;
+    const alt = pickerCocukBul(c, pred);
+    if (alt) return alt;
+  }
+  return null;
+}
+const pickerSinifVar = (c, s) => String(c.className || '').split(/\s+/).indexOf(s) !== -1;
+const pickerSelBul = (kok) => pickerCocukBul(kok, (c) => c.tagName === 'SELECT' && pickerSinifVar(c, 'ig-ek-stok'));
+const pickerDozBul = (kok) => pickerCocukBul(kok, (c) => c.tagName === 'INPUT' && pickerSinifVar(c, 'ig-ek-doz'));
+const pickerVitBul = (kok) => pickerCocukBul(kok, (c) => c.id === 'ig-vit-doz');
+const pickerEscAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function pickerAttrCek(html, ad) {
+  const m = html.match(new RegExp(ad + '="([^"]*)"'));
+  if (!m) return null;
+  return m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+}
+const PICKER_STOK = [
+  { id: 'sA', urun_adi: 'A-ILAC', birim: 'ml', urun_id: 'uA' },
+  { id: 'sB', urun_adi: 'B-ILAC', birim: 'ml', urun_id: 'uB' },
+];
+const pickerKistSec = () => ({ hastalik: { id: 'd2', name: 'Kistik Over' }, kupeNo: '31', taiEski: '2026-10-07', vitaminStok: { id: 's1', urun_adi: 'CAROFERTIN-E' }, ilacStoklar: PICKER_STOK });
+function pickerCtx(secenek) {
+  const htmlFn = loadExtractedFunction('js/ui.js', 'inaktifGecisSheetHtml', { extra: { escAttr: pickerEscAttr, esc: String } });
+  const html = htmlFn('v-ana', secenek);
+  const govde = ['igIlacEkle', 'igEkIlaclariOku', 'inaktifGecisKaydet', 'vitaminStokIdBul']
+    .map((a) => extractFunctionSource('js/ui.js', a)).join('\n');
+  const doc = pickerDoc();
+  const liste = pickerAttrEl('div');
+  liste.id = 'ig-ilac-liste';
+  for (const ad of ['data-vit-stok', 'data-vit-ad', 'data-ilac-stoklar']) {
+    const v = pickerAttrCek(html, ad);
+    if (v !== null) liste.setAttribute(ad, v);
+  }
+  doc.__setEl('ig-ilac-liste', liste);
+  const rpcCagrilari = [];
+  const toasts = [];
+  const acilan = [];
+  const ctx = {
+    console, JSON, Math, Date,
+    document: doc, window: {},
+    esc: String, escAttr: pickerEscAttr,
+    toast: (m) => { toasts.push(String(m)); },
+    rpc: async (ad, p) => { rpcCagrilari.push({ ad, p }); return ad === 'inaktif_alt_vaka_ac' ? { ok: true, alt_vaka_id: 'alt-p', gun_id: 'gun-1', ertelenen: 0 } : { ok: true }; },
+    pullTables: async () => ({ ok: [], failed: [] }),
+    renderSafe: () => {},
+    RPC_TABLES: { inaktif_alt_vaka_ac: ['cases', 'treatment_days'] },
+    openCaseDet: async (id) => { acilan.push(id); },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'picker-ctx' });
+  return { ctx, doc, html, liste, rpcCagrilari, toasts, acilan };
+}
+
+test('picker-kist-tik-secim-satri-dayatma-yok', () => {
+  // (a) kist sheet'te buton tıkı → select'li satır VAR, vitamin satırı YOK.
+  const t = pickerCtx(pickerKistSec());
+  assert.ok(t.html.includes('onclick="igIlacEkle()"'), 'buton argsız picker çağrısı');
+  assert.ok(!t.html.includes('id="ig-vit-doz"'), 'kist sheet vitamin satırı YOK (M3)');
+  vm.runInContext('igIlacEkle()', t.ctx);
+  assert.strictEqual(t.liste.children.length, 1, 'ilk tık 1 satır ekler');
+  const satir = t.liste.children[0];
+  const sel = pickerSelBul(satir);
+  assert.ok(sel, 'satırda stok <select> var');
+  const opts = sel.children.filter((c) => c && c.tagName === 'OPTION' && c.value);
+  assert.strictEqual(opts.length, 2, 'seçenekler stok listesinden, ölçülen: ' + JSON.stringify(sel.children.map((c) => c && c.value)));
+  assert.ok(!pickerVitBul(satir), 'CAROFERTIN dayatması YOK');
+  assert.strictEqual(satir.getAttribute('data-ek-stok'), 'sA', 'satır okuyucu özniteliği taşır (stok)');
+  vm.runInContext('igIlacEkle()', t.ctx);
+  assert.strictEqual(t.liste.children.length, 2, 'ikinci tık no-op DEĞİL — 2 satır');
+  // İnaktif: ön-dolu aynen + eklenebilir (M2).
+  const t2 = pickerCtx({ ...INAKTIF, kupeNo: '31', taiEski: '2026-10-07', ilacStoklar: PICKER_STOK });
+  assert.ok(t2.html.includes('id="ig-vit-doz"'), 'inaktifte ön-dolu KALIR (M2)');
+  const vit = pickerAttrEl('input');
+  vit.id = 'ig-vit-doz';
+  t2.liste.appendChild(vit);
+  t2.doc.__setEl('ig-vit-doz', vit);
+  vm.runInContext('igIlacEkle()', t2.ctx);
+  assert.strictEqual(t2.liste.children.length, 2, 'ön-dolu varken de satır eklenir');
+  assert.strictEqual(t2.liste.children[0], vit, 'ön-dolu satır aynen durur');
+  assert.ok(pickerSelBul(t2.liste.children[1]), 'eklenen satır seçimli');
+});
+
+test('picker-secim-doldur-okuyucu', () => {
+  // (b) seçim+doldur → okuyucu [{stok,doz}] döner.
+  const t = pickerCtx(pickerKistSec());
+  vm.runInContext('igIlacEkle()', t.ctx);
+  const satir = t.liste.children[0];
+  const sel = pickerSelBul(satir);
+  assert.ok(sel, 'seçim kutusu var');
+  sel.value = 'sB';
+  if (typeof sel.onchange === 'function') sel.onchange();
+  const doz = pickerDozBul(satir);
+  assert.ok(doz, 'doz girdisi var');
+  doz.value = '5';
+  if (typeof doz.oninput === 'function') doz.oninput();
+  const ekler = vm.runInContext('igEkIlaclariOku()', t.ctx);
+  // vm-realm prototip farkı için JSON normalizasyonu (alan bazında birebir).
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(ekler)), [{ stok_id: 'sB', urun_id: 'uB', doz: 5, birim: 'ml', yol: null }]);
+});
+
+test('picker-kaydet-gun-ac', async () => {
+  // (c) seçimli satırla kaydet → aç-RPC p_gun_ac=true, add doğru güne.
+  const t = pickerCtx(pickerKistSec());
+  t.doc.__setEl('ig-gun', { value: '7' });
+  t.doc.__setEl('ig-hastalik', { value: 'd2' });
+  t.doc.__setEl('ig-kist', { value: '1' });
+  t.doc.__setEl('inaktif-gecis-modal', { remove() {} });
+  vm.runInContext('igIlacEkle()', t.ctx);
+  const sel = pickerSelBul(t.liste.children[0]);
+  sel.value = 'sB';
+  if (typeof sel.onchange === 'function') sel.onchange();
+  const doz = pickerDozBul(t.liste.children[0]);
+  doz.value = '5';
+  if (typeof doz.oninput === 'function') doz.oninput();
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(t.rpcCagrilari[0].ad, 'inaktif_alt_vaka_ac', 'önce aç-RPC');
+  assert.strictEqual(t.rpcCagrilari[0].p.p_gun_ac, true, 'ek satır varken p_gun_ac=true');
+  const adds = t.rpcCagrilari.filter((c) => c.ad === 'add_drug_administration');
+  assert.strictEqual(adds.length, 1, '1 ek satır yazılır, ölçülen: ' + JSON.stringify(adds.map((a) => a.p)));
+  assert.strictEqual(adds[0].p.p_stok_id, 'sB', 'seçilen stok taşınır');
+  assert.strictEqual(adds[0].p.p_day_id, 'gun-1', 'açılan güne yazılır');
+  assert.ok(t.toasts.some((m) => /1\/1 ilaç eklendi/.test(m)), 'k/n toast, ölçülen: ' + JSON.stringify(t.toasts));
 });

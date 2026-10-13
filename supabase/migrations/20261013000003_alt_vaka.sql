@@ -89,12 +89,19 @@ REVOKE ALL ON FUNCTION public._inaktif_alt_vaka_donus_hazirla(uuid) FROM PUBLIC,
 
 -- ── 3. Public: inaktif/kist alt vakası aç ────────────────────────────────
 -- Tek transaction: ana active+OVSYNC değilse ok:false; alt cases satırı
--- (kaynak_vaka_id = ana, protocol_family NULL); vitamin doluysa bugünün
--- treatment_days satırı + add_drug_administration (NULL ise atlanır, akış
--- dallanmaz); hayvanın her açık TOHUMLAMA_PLANLI'sı tohumlama_gorev_ertele
--- ile p_gun kadar ötelenir (kaydır RPC çağrılmaz, iptal yazılmaz).
+-- (kaynak_vaka_id = ana, protocol_family NULL); vitamin VARSA ya da
+-- p_gun_ac=true ise bugünün treatment_days satırı kurulur (ikisi de yoksa
+-- gün satırı YOK — boş gün satırı kurulmaz, RULING 1'); vitamin kolu
+-- add_drug_administration ile yazılır, gun_ac kolu BOŞ gün bırakır (ek
+-- ilaçların hedefi — UI dönen gun_id'ye yazar); hayvanın her açık
+-- TOHUMLAMA_PLANLI'sı tohumlama_gorev_ertele ile p_gun kadar ötelenir
+-- (kaydır RPC çağrılmaz, iptal yazılmaz). Dönüş {ok, alt_vaka_id,
+-- gun_id (gün yoksa null), ertelenen}.
+-- RULING 1' öncesi 5-arg imza DROP edilir — TEK imza (ikinci overload yok).
+DROP FUNCTION IF EXISTS public.inaktif_alt_vaka_ac(uuid, integer, uuid, text, numeric);
 CREATE OR REPLACE FUNCTION public.inaktif_alt_vaka_ac(p_ana_vaka_id uuid, p_gun integer DEFAULT 7,
-  p_hastalik_id uuid DEFAULT NULL, p_vitamin_stok_id text DEFAULT NULL, p_vitamin_doz_ml numeric DEFAULT 20)
+  p_hastalik_id uuid DEFAULT NULL, p_vitamin_stok_id text DEFAULT NULL, p_vitamin_doz_ml numeric DEFAULT 20,
+  p_gun_ac boolean DEFAULT false)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -133,7 +140,7 @@ BEGIN
   END IF;
 
   -- F2 KAPI-2 madde 10: VITAMIN_STOK_YOK kontrolü cases INSERT'ten ÖNCE —
-  -- stok yoksa alt vaka satırı oluşmaz (erken RETURN, yazma yok). İmza değişmez.
+  -- stok yoksa alt vaka satırı oluşmaz (erken RETURN, yazma yok).
   IF p_vitamin_stok_id IS NOT NULL THEN
     SELECT drug_product_id INTO v_urun FROM public.stok WHERE id = p_vitamin_stok_id;
     IF NOT FOUND THEN
@@ -145,11 +152,15 @@ BEGIN
     VALUES (v_ana.animal_id, v_hastalik, v_bugun, 'active', p_ana_vaka_id)
     RETURNING id INTO v_alt_id;
 
-  IF p_vitamin_stok_id IS NOT NULL THEN
+  -- Madde 1 (RULING 1'): gün YALNIZ vitamin VARSA ya da p_gun_ac=true ise
+  -- kurulur; vitamin kolu dolar, gun_ac kolu BOŞ gün bırakır.
+  IF p_vitamin_stok_id IS NOT NULL OR COALESCE(p_gun_ac, false) THEN
     INSERT INTO public.treatment_days(case_id, treatment_date)
       VALUES (v_alt_id, v_bugun) RETURNING id INTO v_day_id;
-    PERFORM public.add_drug_administration(v_day_id, v_urun, p_vitamin_stok_id,
-      COALESCE(p_vitamin_doz_ml, 20), 'ml');
+    IF p_vitamin_stok_id IS NOT NULL THEN
+      PERFORM public.add_drug_administration(v_day_id, v_urun, p_vitamin_stok_id,
+        COALESCE(p_vitamin_doz_ml, 20), 'ml');
+    END IF;
   END IF;
 
   FOR v_g IN SELECT id, hedef_tarih, hedef_saat FROM public.gorev_log
@@ -161,11 +172,11 @@ BEGIN
     v_ertelenen := v_ertelenen + 1;
   END LOOP;
 
-  RETURN jsonb_build_object('ok', true, 'alt_vaka_id', v_alt_id, 'ertelenen', v_ertelenen);
+  RETURN jsonb_build_object('ok', true, 'alt_vaka_id', v_alt_id, 'gun_id', v_day_id, 'ertelenen', v_ertelenen);
 END;
 $function$;
-REVOKE ALL ON FUNCTION public.inaktif_alt_vaka_ac(uuid, integer, uuid, text, numeric) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.inaktif_alt_vaka_ac(uuid, integer, uuid, text, numeric) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.inaktif_alt_vaka_ac(uuid, integer, uuid, text, numeric, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.inaktif_alt_vaka_ac(uuid, integer, uuid, text, numeric, boolean) TO authenticated, service_role;
 
 -- ── 4. Public: alt vaka kapat (dönüş) ────────────────────────────────────
 -- Ana active kalır, kaynak_vaka_id izi korunur.

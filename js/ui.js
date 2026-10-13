@@ -1135,7 +1135,7 @@ function _ovsyncYetimRozetHtml(satir, bag, vaka){
  * (igGunDegisti); not kutusu M2/M3 metni; düğmeler Kaydet / Vazgeç.
  * Zemin mevcut palet (background:var(--...) yalnız) — ROOT RULING 1.
  * @param {string} anaVakaId Ana OVSYNC vaka id.
- * @param {Object} secenek {hastalik: {id,name}|null, hastaliklar: Array<{id,name}>, secim: 'inaktif'|'kist'|null, kupeNo: string, taiEski: 'YYYY-MM-DD'|null, vitaminStok: {id, urun_adi}|null}.
+ * @param {Object} secenek {hastalik: {id,name}|null, hastaliklar: Array<{id,name}>, secim: 'inaktif'|'kist'|null, kupeNo: string, taiEski: 'YYYY-MM-DD'|null, vitaminStok: {id, urun_adi}|null, ilacStoklar: Array<{id,urun_adi,birim,urun_id}>|undefined}.
  * @returns {string} Sheet HTML'i.
  */
 function inaktifGecisSheetHtml(anaVakaId, secenek){
@@ -1157,6 +1157,8 @@ function inaktifGecisSheetHtml(anaVakaId, secenek){
   const vitaminStok=o.vitaminStok||null;
   const vitAd=vitaminStok?(vitaminStok.urun_adi||''):'';
   const vitId=vitaminStok?(vitaminStok.id||''):'';
+  // Picker stok listesi (igIlacEkle argsız yolu okur — stok <select> seçenekleri).
+  const ilacStoklar=Array.isArray(o.ilacStoklar)?o.ilacStoklar:[];
   const dozSatir='<div style="display:flex;gap:8px;align-items:center">'
     +'<span style="font-size:.74rem;color:var(--ink2)">'+esc(vitAd)+'</span>'
     +'<input type="number" id="ig-vit-doz" min="0" step="1" inputmode="decimal" value="20" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
@@ -1183,7 +1185,7 @@ function inaktifGecisSheetHtml(anaVakaId, secenek){
     +'<input type="hidden" id="ig-kist" value="'+(kist?'1':'')+'"></div>'
     +'<div style="font-size:.76rem;font-weight:700;margin:10px 0 4px">'
     +(kist?'İLAÇ (BOŞ BAŞLAR, EKLENEBİLİR)':'İLAÇ (ÖN-DOLU, DEĞİŞTİRİLEBİLİR)')+'</div>'
-    +'<div id="ig-ilac-liste" data-vit-stok="'+escAttr(vitId)+'" data-vit-ad="'+escAttr(vitAd)+'">'+ilacGovde+'</div>'
+    +'<div id="ig-ilac-liste" data-vit-stok="'+escAttr(vitId)+'" data-vit-ad="'+escAttr(vitAd)+'" data-ilac-stoklar="'+escAttr(JSON.stringify(ilacStoklar))+'">'+ilacGovde+'</div>'
     +'<button onclick="igIlacEkle()" style="margin-top:6px;background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:8px 12px;font-size:.8rem;font-weight:700;color:var(--ink);cursor:pointer">+ İlaç ekle</button>'
     +'<div class="fg"><label class="flbl">KAÇ GÜN ERTELENSİN?</label>'
     +'<div style="display:flex;gap:8px;align-items:center">'
@@ -1199,23 +1201,154 @@ function inaktifGecisSheetHtml(anaVakaId, secenek){
     +'</div></div>';
 }
 /**
- * '+ İlaç ekle' (M2/M3, çalışma-anı): doz satırı yoksa stok bilgisinden
- * 20 ml satırını listeye ekler; stok tanımsızsa yazmadan uyarır.
+ * '+ İlaç ekle' (M2/M3, çalışma-anı): argsız her çağrıda stoktan GERÇEK bir
+ * ek-ilaç satırı ekler — stok ilaç <select>'i (caseDrugKaydet yolundaki stok
+ * listeleme dili) + doz girdisi; satır igEkIlaclariOku()'nun okuduğu data
+ * özniteliklerini taşır (stok id + doz aynası). Kistte CAROFERTIN dayatması
+ * YOK (M3 boş başlar); inaktifte ön-dolu aynen kalır, satır yanına birikir
+ * (M2). Stil mevcut palet (background:var(--...) yalnız) — yeni zemin YOK.
+ * F2 madde 1: {stok_id, urun_id, ad, doz, birim, yol} ile çağrıda genel
+ * ek-ilaç satırı ekler (stok çağrıdan gelir).
+ * @param {Object} [ek] Ek-ilaç satır verisi (yoksa stok picker satırı).
  * @returns {void} Fonksiyon bir değer döndürmez.
  */
-function igIlacEkle(){
-  if(document.getElementById('ig-vit-doz')) return;
+function igIlacEkle(ek){
   const liste=document.getElementById('ig-ilac-liste');
   if(!liste) return;
-  const stokId=liste.getAttribute?liste.getAttribute('data-vit-stok'):null;
-  const stokAd=liste.getAttribute?liste.getAttribute('data-vit-ad'):null;
-  if(!stokId){ if(typeof toast==='function') toast('⚠️ Stokta vitamin bulunamadı',true); return; }
-  liste.innerHTML='<div style="display:flex;gap:8px;align-items:center">'
-    +'<span style="font-size:.74rem;color:var(--ink2)">'+esc(stokAd||'')+'</span>'
-    +'<input type="number" id="ig-vit-doz" min="0" step="1" inputmode="decimal" value="20" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
-    +'<span style="font-size:.74rem;color:var(--ink2)">ml</span>'
-    +'<input type="hidden" id="ig-vit-stok" value="'+escAttr(stokId)+'">'
+  if(!ek){
+    // Stok seçenekleri: önce sheet'in taşıdığı liste, yoksa çalışma-anı
+    // ilaç önbellekleri (caseDrugKaydet yolu — _drugsCache/_ilacCache).
+    let stoklar=[];
+    try{
+      const ham=(liste.getAttribute)?liste.getAttribute('data-ilac-stoklar'):null;
+      if(ham){ const coz=JSON.parse(ham); if(Array.isArray(coz)) stoklar=coz; }
+    }catch(e){}
+    if(!stoklar.length){
+      try{
+        if(typeof _drugsCache!=='undefined'&&_drugsCache&&_drugsCache.length)
+          stoklar=_drugsCache.map(function(d){ return {id:(d.stock_id||(d._legacy?d.id:null)),urun_adi:d.name,birim:d.birim||d.default_unit||'ml',urun_id:d._legacy?null:d.id}; });
+        else if(typeof _ilacCache!=='undefined'&&_ilacCache&&_ilacCache.length)
+          stoklar=_ilacCache.map(function(s){ return {id:s.id,urun_adi:s.urun_adi,birim:s.birim||'ml',urun_id:s.drug_product_id||null}; });
+      }catch(e){}
+    }
+    stoklar=stoklar.filter(function(s){ return s&&s.id; });
+    const ilk=stoklar.length?stoklar[0]:null;
+    const satir=document.createElement('div');
+    const senkron=function(){
+      let sid='';
+      try{
+        const so=sel.selectedOptions;
+        if(so&&so.length&&so[0]&&so[0].value!==undefined&&so[0].value!==null&&so[0].value!=='') sid=String(so[0].value);
+        else if(sel.value!==undefined&&sel.value!==null) sid=String(sel.value);
+      }catch(e){ try{ sid=String(sel.value||''); }catch(e2){} }
+      let meta=null;
+      for(const s of stoklar){ if(s&&String(s.id)===sid){ meta=s; break; } }
+      const uid=meta?(meta.urun_id||''):'';
+      const brm=(meta&&meta.birim)||'ml';
+      let dz=null;
+      try{ if(doz&&doz.value!==undefined&&doz.value!==null&&doz.value!=='') dz=Number(doz.value); }catch(e){}
+      if(satir.setAttribute){ try{ satir.setAttribute('data-ek-stok',sid); satir.setAttribute('data-ek-urun',uid); satir.setAttribute('data-ek-doz',(dz===null||dz===undefined)?'':String(dz)); }catch(e){} }
+      try{ satir.dataset.ekStok=sid; satir.dataset.ekUrun=uid; satir.dataset.ekDoz=(dz===null||dz===undefined)?'':String(dz); }catch(e){}
+      satir._ek={stok_id:sid,urun_id:uid||null,doz:dz,birim:brm,yol:null};
+      try{ brmEl.textContent=brm; }catch(e){}
+    };
+    const wrap=document.createElement('div');
+    if(wrap.setAttribute){ try{ wrap.setAttribute('style','display:flex;gap:8px;align-items:center;margin-top:6px'); }catch(e){} }
+    const sel=document.createElement('select');
+    sel.className='ig-ek-stok';
+    if(sel.setAttribute){ try{ sel.setAttribute('style','flex:1;min-width:0;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:.9rem;background:var(--card);color:var(--ink);box-sizing:border-box'); }catch(e){} }
+    stoklar.forEach(function(s){
+      const o=document.createElement('option');
+      try{ o.value=s.id; }catch(e){}
+      try{ o.textContent=s.urun_adi||s.id; }catch(e){}
+      if(o.setAttribute){ try{ o.setAttribute('value',s.id); o.setAttribute('data-birim',s.birim||'ml'); o.setAttribute('data-urun',s.urun_id||''); }catch(e){} }
+      try{ o.dataset.birim=s.birim||'ml'; o.dataset.urun=s.urun_id||''; }catch(e){}
+      try{ sel.appendChild(o); }catch(e){}
+    });
+    if(!stoklar.length){
+      const o=document.createElement('option');
+      try{ o.value=''; }catch(e){}
+      try{ o.textContent='Stokta ilaç yok'; }catch(e){}
+      try{ sel.appendChild(o); }catch(e){}
+    }
+    const doz=document.createElement('input');
+    try{ doz.type='number'; }catch(e){}
+    doz.className='ig-ek-doz';
+    if(doz.setAttribute){ try{ doz.setAttribute('min','0'); doz.setAttribute('step','1'); doz.setAttribute('inputmode','decimal'); doz.setAttribute('style','width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box'); }catch(e){} }
+    try{ doz.value=''; }catch(e){}
+    const brmEl=document.createElement('span');
+    if(brmEl.setAttribute){ try{ brmEl.setAttribute('style','font-size:.74rem;color:var(--ink2)'); }catch(e){} }
+    try{ brmEl.textContent=(ilk&&ilk.birim)||'ml'; }catch(e){}
+    const sil=document.createElement('button');
+    try{ sil.textContent='×'; }catch(e){}
+    if(sil.setAttribute){ try{ sil.setAttribute('style','background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:8px 10px;font-size:.8rem;color:var(--ink2);cursor:pointer'); }catch(e){} }
+    sil.onclick=function(){ try{ satir.remove(); }catch(e){ if(satir.parentNode) satir.parentNode.removeChild(satir); } };
+    try{ wrap.appendChild(sel); wrap.appendChild(doz); wrap.appendChild(brmEl); wrap.appendChild(sil); }catch(e){}
+    try{ satir.appendChild(wrap); }catch(e){}
+    try{ if(sel.addEventListener) sel.addEventListener('change',senkron); }catch(e){}
+    try{ sel.onchange=senkron; }catch(e){}
+    try{ if(doz.addEventListener) doz.addEventListener('input',senkron); }catch(e){}
+    try{ doz.oninput=senkron; }catch(e){}
+    try{ sel.value=(ilk&&ilk.id)||''; }catch(e){}
+    senkron();
+    try{ liste.appendChild(satir); }catch(e){}
+    return;
+  }
+  const stokId=(ek&&ek.stok_id)||'';
+  const urunId=(ek&&ek.urun_id)||'';
+  const satir=document.createElement('div');
+  if(satir.setAttribute){ satir.setAttribute('data-ek-stok',stokId); satir.setAttribute('data-ek-urun',urunId); }
+  try{ satir.dataset.ekStok=stokId; satir.dataset.ekUrun=urunId; }catch(e){}
+  satir._ek={stok_id:stokId,urun_id:urunId||null,doz:(ek&&ek.doz!=null)?ek.doz:null,birim:(ek&&ek.birim)||'ml',yol:(ek&&ek.yol)||null};
+  satir.innerHTML='<div style="display:flex;gap:8px;align-items:center;margin-top:6px">'
+    +'<span style="font-size:.74rem;color:var(--ink2)">'+esc((ek&&ek.ad)||stokId||'ilaç')+'</span>'
+    +'<input type="number" class="ig-ek-doz" min="0" step="1" inputmode="decimal" value="'+escAttr(String((ek&&ek.doz!=null)?ek.doz:''))+'" style="width:86px;border:1.5px solid var(--card3);border-radius:10px;padding:10px;font-size:1rem;background:var(--card);color:var(--ink);outline:none;text-align:center;box-sizing:border-box">'
+    +'<span style="font-size:.74rem;color:var(--ink2)">'+esc((ek&&ek.birim)||'ml')+'</span>'
+    +'<button onclick="this.parentNode.parentNode.remove()" style="background:var(--card);border:1px solid var(--card3);border-radius:10px;padding:8px 10px;font-size:.8rem;color:var(--ink2);cursor:pointer">×</button>'
     +'</div>';
+  liste.appendChild(satir);
+}
+/**
+ * Ek-ilaç satırlarını okur (F2 madde 1, saf): #ig-ilac-liste çocuklarından
+ * data-ek-stok taşıyanlar (vitamin satırı taşınmaz — onda bu öznitelik yok).
+ * Stok data özniteliği → dataset → anlık görüntü (_ek) sırasıyla çözülür;
+ * doz her zaman canlı girdiden (yoksa anlık görüntüden) okunur.
+ * @returns {Array<Object>} [{stok_id, urun_id, doz, birim, yol}] (stok_id boş
+ * dize olabilir — kaydet filtresiyle elenir, burada atılmaz).
+ */
+function igEkIlaclariOku(){
+  const out=[];
+  const liste=(typeof document!=='undefined')?document.getElementById('ig-ilac-liste'):null;
+  const kids=(liste&&liste.children)?liste.children:[];
+  for(const el of kids){
+    if(!el) continue;
+    let stok=(el.getAttribute)?el.getAttribute('data-ek-stok'):null;
+    let urun=(el.getAttribute)?el.getAttribute('data-ek-urun'):null;
+    if(el.dataset&&typeof el.dataset==='object'){
+      try{
+        if((stok===null||stok===undefined)&&el.dataset.ekStok!==undefined&&el.dataset.ekStok!==null) stok=el.dataset.ekStok;
+        if((urun===null||urun===undefined)&&el.dataset.ekUrun!==undefined&&el.dataset.ekUrun!==null) urun=el.dataset.ekUrun;
+      }catch(e){}
+    }
+    const snap=(el._ek&&typeof el._ek==='object')?el._ek:null;
+    if((stok===null||stok===undefined)&&snap&&snap.stok_id!==undefined&&snap.stok_id!==null) stok=snap.stok_id;
+    if((urun===null||urun===undefined)&&snap&&snap.urun_id!==undefined) urun=snap.urun_id;
+    if(stok===null||stok===undefined) continue;
+    const dEl=(el.querySelector)?el.querySelector('.ig-ek-doz'):null;
+    const bEl=(el.querySelector)?el.querySelector('.ig-ek-birim'):null;
+    const yEl=(el.querySelector)?el.querySelector('.ig-ek-yol'):null;
+    let doz=null;
+    if(dEl&&dEl.value!=null&&dEl.value!=='') doz=Number(dEl.value);
+    else if(snap&&snap.doz!==undefined&&snap.doz!==null) doz=snap.doz;
+    let birim='ml';
+    if(bEl&&bEl.value) birim=bEl.value;
+    else if(snap&&snap.birim) birim=snap.birim;
+    let yol=null;
+    if(yEl&&yEl.value) yol=yEl.value;
+    else if(snap&&snap.yol) yol=snap.yol;
+    out.push({stok_id:stok,urun_id:(urun===undefined||urun===null||urun==='')?null:urun,doz:doz,birim:birim,yol:yol});
+  }
+  return out;
 }
 /**
  * Gün değişiminde TAI önizlemesini günceller (M2/M3, çalışma-anı):
@@ -1236,8 +1369,8 @@ function igGunDegisti(){
 }
 /**
  * İnaktif/kist geçiş sheet'ini açar (mockup M1→M2/M3): hastalık listesi IDB
- * diseases'ten (İnaktif Ovaryum varsayılan, Kistik Over), vitamin IDB stok'tan
- * (CAROFERTIN-E). Seçim M1 kartından gelir (secim 'inaktif'|'kist'); kistte
+ * diseases'ten (İnaktif Ovaryum varsayılan, Kistik Over), vitamin + picker
+ * stok listesi IDB stok'tan (CAROFERTIN-E + ilaç kategorileri). Seçim M1 kartından gelir (secim 'inaktif'|'kist'); kistte
  * ilaç boş başlar (M3), inaktifte ön-dolu kalır (M2). Küpe/TAI bağlamdan
  * (açık vaka detayı ya da kart satırı) alınır, yoksa sheet geri çekilir.
  * @param {string} anaVakaId Ana OVSYNC vaka id.
@@ -1246,7 +1379,7 @@ function igGunDegisti(){
  */
 async function inaktifGecisAc(anaVakaId, secim){
   if(typeof _ertelemeOfflineGuard==='function'&&_ertelemeOfflineGuard('inaktif-gecis')) return;
-  let hastaliklar=[], vitaminStok=null;
+  let hastaliklar=[], vitaminStok=null, ilacStoklar=[];
   try{
     const dis=await idbGetAll('diseases');
     hastaliklar=(dis||[]).filter(d=>d&&(d.name==='İnaktif Ovaryum'||d.name==='Kistik Over'))
@@ -1254,6 +1387,9 @@ async function inaktifGecisAc(anaVakaId, secim){
     const stok=await idbGetAll('stok');
     const vit=(stok||[]).find(s=>s&&/carofertin/i.test(s.urun_adi||''));
     if(vit) vitaminStok={id:vit.id,urun_adi:vit.urun_adi};
+    // Picker stok listesi (ilaç kategorileri — refreshIlacCache kümesi).
+    ilacStoklar=(stok||[]).filter(s=>s&&s.kategori&&['Antibiyotik','NSAID','Hormon','Vitamin','Antiparaziter','Diğer İlaç','İlaç','Diger Ilac','Ilac','Metabolik'].includes(s.kategori))
+      .map(s=>({id:s.id,urun_adi:s.urun_adi||s.id,birim:s.birim||'ml',urun_id:s.drug_product_id||null}));
   }catch(e){ console.warn('inaktif-gecis listeleri:',e.message); }
   const sec=(secim&&typeof secim==='object')?secim:{secim:(secim||null),kupeNo:null,taiEski:null};
   const kistIstendi=/kist/i.test(sec.secim||'');
@@ -1272,16 +1408,20 @@ async function inaktifGecisAc(anaVakaId, secim){
   box.id='inaktif-gecis-modal';
   box.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:300;display:flex;align-items:flex-end';
   box.onclick=e=>{ if(e.target===box) box.remove(); };
-  box.innerHTML=inaktifGecisSheetHtml(anaVakaId,{hastalik:h,secim:sec.secim||null,kupeNo:kupeNo,taiEski:sec.taiEski||null,vitaminStok:vitaminStok});
+  box.innerHTML=inaktifGecisSheetHtml(anaVakaId,{hastalik:h,secim:sec.secim||null,kupeNo:kupeNo,taiEski:sec.taiEski||null,vitaminStok:vitaminStok,ilacStoklar:ilacStoklar});
   document.body.appendChild(box);
 }
 /**
- * Alt vakayı açar: public inaktif_alt_vaka_ac RPC'si (p_gun ile); ardından
- * ilgili tablolar çekilir, kart tazelenir. Kaydır RPC'si çağrılmaz (tek
- * öteleme yolu sunucudaki tohumlama_gorev_ertele'dir).
+ * Alt vakayı açar: public inaktif_alt_vaka_ac RPC'si (p_gun ile + F2 madde 1
+ * p_gun_ac); ardından ilgili tablolar çekilir, kart tazelenir. Kaydır RPC'si
+ * çağrılmaz (tek öteleme yolu sunucudaki tohumlama_gorev_ertele'dir).
+ * F2 madde 1 (çoklu ilaç): ek satır varsa p_gun_ac=true ile açılır, dönen
+ * gun_id'ye her ek satır add_drug_administration ile yazılır (PG kapı sarmalı
+ * dahil — rpcSeansTamamla/caseDrugKaydet kalıbı). Kısmi başarıda alt vaka
+ * kalır, toast 'k/n ilaç eklendi' sayar, alt vaka detayı açılır.
  * @param {string} anaVakaId Ana OVSYNC vaka id.
  * @returns {Promise<void>} Kayıt + tazeleme bitince çözülür.
- * @rpc inaktif_alt_vaka_ac
+ * @rpc inaktif_alt_vaka_ac, add_drug_administration (koşullu)
  * @tablo cases (tazeleme), treatment_days (tazeleme), drug_administrations (tazeleme), stok (tazeleme), stok_hareket (tazeleme), gorev_log (tazeleme), islem_log (tazeleme)
  */
 async function inaktifGecisKaydet(anaVakaId){
@@ -1292,6 +1432,9 @@ async function inaktifGecisKaydet(anaVakaId){
   const hamGun=gunEl&&gunEl.value?parseInt(gunEl.value,10):7;
   const p_gun=Math.max(1,isFinite(hamGun)?hamGun:7);
   const p_hastalik_id=hastalikEl&&hastalikEl.value?hastalikEl.value:null;
+  // F2 madde 1: ek satırlar (stok id boş olanlar YAZILMAZ — MUT-A bekçisi).
+  const ekler=(typeof igEkIlaclariOku==='function')?igEkIlaclariOku():[];
+  const gecerli=ekler.filter(e=>e&&e.stok_id);
   // F turu KAPI-1 (M3): vitamin yalnız doz satırı varken gider — kist boş
   // başlar (satır yok) → vitamin anahtarları RPC'ye hiç eklenmez.
   const params={p_ana_vaka_id:anaVakaId,p_gun:p_gun,p_hastalik_id:p_hastalik_id};
@@ -1299,17 +1442,59 @@ async function inaktifGecisKaydet(anaVakaId){
     params.p_vitamin_stok_id=vitaminStokIdBul();
     params.p_vitamin_doz_ml=(dozEl.value!=='')?Number(dozEl.value):null;
   }
+  params.p_gun_ac=gecerli.length>0;
   const r=await rpc('inaktif_alt_vaka_ac',params);
+  if(!r||!r.ok){
+    toast('❌ Alt vaka açılamadı'+((r&&r.error)?': '+r.error:''),true);
+    return r;
+  }
   // F2 KAPI-2 madde 8: toast hastalığa göre (modal kalkmadan bayrak okunur).
   const kistEl=document.getElementById('ig-kist');
   const kistMi=(kistEl&&kistEl.value==='1');
+  const taban=kistMi?'✅ Kist alt vakası açıldı':'✅ İnaktif ovaryum alt vakası açıldı';
+  const tables=(typeof RPC_TABLES!=='undefined'&&RPC_TABLES.inaktif_alt_vaka_ac)?RPC_TABLES.inaktif_alt_vaka_ac:['cases','gorev_log'];
+  const altId=r.alt_vaka_id||null;
+  const gunId=r.gun_id||null;
+  // F2 KAPI-2 madde 2: başarı kapanışı (tazeleme bloğu; onaylı tekrarda AYNI kapanış koşar).
+  const sonra=async ()=>{
+    pullTables(tables).then(renderSafe).catch(console.warn);
+    if(altId&&typeof openCaseDet==='function'){
+      try{ await openCaseDet(altId); }catch(e){ console.warn('alt vaka detay:',e.message); }
+    }else{
+      if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
+      if(typeof loadDash==='function') loadDash().catch(console.warn);
+    }
+  };
+  let eklenen=0;
+  let pgDurdu=false;
+  if(gecerli.length&&!gunId){
+    toast('⚠️ Gün açılamadı — ek ilaçlar eklenemedi',true);
+  }else{
+    for(const e of gecerli){
+      // Online: RPC kullan (§18.8 PG kapı sarmalı — caseDrugKaydet kalıbı)
+      const cagri=(onay,gerekce)=>rpc('add_drug_administration',{
+        p_day_id:gunId,
+        p_drug_product_id:e.urun_id||null,
+        p_stok_id:e.stok_id,
+        p_dose:e.doz,
+        p_unit:e.birim||'ml',
+        p_route:e.yol||null,
+        p_pg_onay:!!onay,
+        p_pg_gerekce:gerekce||null,
+      });
+      try{
+        await cagri(false,null);
+        eklenen++;
+      }catch(e0){
+        if(typeof _pgKapiHata==='function'&&_pgKapiHata(e0,cagri,sonra,'add_drug_administration')){ pgDurdu=true; break; }
+        throw e0;
+      }
+    }
+  }
   const box=document.getElementById('inaktif-gecis-modal');
   if(box) box.remove();
-  toast(kistMi?'✅ Kist alt vakası açıldı':'✅ İnaktif ovaryum alt vakası açıldı');
-  const tables=(typeof RPC_TABLES!=='undefined'&&RPC_TABLES.inaktif_alt_vaka_ac)?RPC_TABLES.inaktif_alt_vaka_ac:['cases','gorev_log'];
-  pullTables(tables).then(renderSafe).catch(console.warn);
-  if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
-  if(typeof loadDash==='function') loadDash().catch(console.warn);
+  toast(taban+(ekler.length?(' · '+eklenen+'/'+ekler.length+' ilaç eklendi'+(pgDurdu?', PG kalemi kapıda durdu':'')):''));
+  await sonra();
   return r;
 }
 /**

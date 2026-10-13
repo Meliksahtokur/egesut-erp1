@@ -206,6 +206,42 @@ DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',2); v_r jsonb; v_bag int; BEGIN
     format('rpc ok=%s err=%s; bagli alt=%s', v_r->>'ok', v_r->>'error', v_bag));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-VIT-ONCE', 'RED', SQLERRM); END $do$;
 
+-- ── S-GUN-AC (madde 1, RULING 1'): tek imza (ikinci overload yok) + p_gun_ac;
+--    (a) kist + vitaminsiz + gun_ac=false → gün YOK (boş gün satırı YOK), gun_id null;
+--    (b) gun_ac=true → 1 gün + gun_id döner. Adli mutantlar: eski sıra
+--    (p_gun_ac'siz, yalnız vitamin kolu) → (b) RED; kontrolsüz (hep gün) → (a) RED.
+DO $do$ DECLARE
+  v_n_over int; v_args text;
+  v_ha uuid := pg_temp.ovp_id('a',14); v_hb uuid := pg_temp.ovp_id('a',15);
+  v_kist uuid := pg_temp.ovp_id('1',4);
+  v_ra jsonb; v_rb jsonb; v_alt_a uuid; v_alt_b uuid; v_gun_a int; v_gun_b int; v_gun_b_id uuid;
+BEGIN
+  INSERT INTO hayvanlar(id, kupe_no, cinsiyet, durum, grup, padok, dogum_tarihi)
+    VALUES ('E2E-OVP-H-14', 'E2E-OVP-14', 'Dişi', 'Aktif', 'Sağmal (Laktasyonda)', 'Sağmal Padok', pg_temp.bg() - 800),
+           ('E2E-OVP-H-15', 'E2E-OVP-15', 'Dişi', 'Aktif', 'Sağmal (Laktasyonda)', 'Sağmal Padok', pg_temp.bg() - 800);
+  INSERT INTO diseases(id, name, category) VALUES (v_kist, 'E2E-OVP-Kistik Over', 'Üreme') ON CONFLICT (id) DO NOTHING;
+  INSERT INTO cases(id, animal_id, disease_id, start_date, status, protocol_family, source_template_id)
+    VALUES (v_ha, 'E2E-OVP-H-14', pg_temp.ovp_id('1',1), pg_temp.bg() - 3, 'active', 'OVSYNC', pg_temp.ovp_id('3',1)),
+           (v_hb, 'E2E-OVP-H-15', pg_temp.ovp_id('1',1), pg_temp.bg() - 3, 'active', 'OVSYNC', pg_temp.ovp_id('3',1));
+  SELECT count(*), string_agg(pg_get_function_arguments(p.oid), ';') INTO v_n_over, v_args
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace AND n.nspname = 'public'
+   WHERE p.proname = 'inaktif_alt_vaka_ac';
+  v_ra := public.inaktif_alt_vaka_ac(p_ana_vaka_id => v_ha, p_gun => 7, p_hastalik_id => v_kist, p_gun_ac => false);
+  v_alt_a := (v_ra->>'alt_vaka_id')::uuid;
+  SELECT count(*) INTO v_gun_a FROM treatment_days WHERE case_id = v_alt_a;
+  v_rb := public.inaktif_alt_vaka_ac(p_ana_vaka_id => v_hb, p_gun => 7, p_hastalik_id => v_kist, p_gun_ac => true);
+  v_alt_b := (v_rb->>'alt_vaka_id')::uuid;
+  SELECT count(*) INTO v_gun_b FROM treatment_days WHERE case_id = v_alt_b;
+  SELECT id INTO v_gun_b_id FROM treatment_days WHERE case_id = v_alt_b ORDER BY treatment_date LIMIT 1;
+  INSERT INTO _ovp_durum VALUES ('S-GUN-AC',
+    CASE WHEN v_n_over = 1 AND v_args LIKE '%p_gun_ac%'
+      AND (v_ra->>'ok')::boolean AND (v_ra->>'gun_id') IS NULL AND v_gun_a = 0
+      AND (v_rb->>'ok')::boolean AND (v_rb->>'gun_id')::uuid = v_gun_b_id AND v_gun_b = 1
+      THEN 'PASS' ELSE 'RED' END,
+    format('imza sayim=%s args=%s; (a) ok=%s gun_id=%s gun=%s; (b) ok=%s gun_id=%s gun=%s day=%s',
+      v_n_over, left(COALESCE(v_args, ''), 120), v_ra->>'ok', v_ra->>'gun_id', v_gun_a, v_rb->>'ok', v_rb->>'gun_id', v_gun_b, v_gun_b_id));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-GUN-AC', 'RED', SQLERRM); END $do$;
+
 -- ── S-S4 (kırmızı): alt vakalı hayvanın ovsync_takip_listele satırı alt_vakalar taşır
 DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',10); v_r jsonb; v_n int; v_k int; BEGIN
   EXECUTE 'INSERT INTO cases(id, animal_id, disease_id, start_date, status, kaynak_vaka_id) VALUES ($1, $2, $3, $4, ''active'', $5)'
@@ -216,13 +252,13 @@ DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',10); v_r jsonb; v_n int; v_k in
   INSERT INTO _ovp_durum VALUES ('S-S4', CASE WHEN v_k >= 1 THEN 'PASS' ELSE 'RED' END, format('H-10 satir=%s, alt_vakalar dolu=%s', v_n, v_k));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-S4', 'RED', SQLERRM); END $do$;
 
--- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9, F1-düzeltme → 9, F2-savunma → 10, S-S4 → 11, S-VIT-ONCE → 12.
+-- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9, F1-düzeltme → 9, F2-savunma → 10, S-S4 → 11, S-VIT-ONCE → 12, S-GUN-AC → 13.
 SELECT senaryo, sonuc, kanit FROM _ovp_durum ORDER BY senaryo;
 SELECT count(*) FILTER (WHERE sonuc <> 'PASS') AS ovp_red, count(*) AS ovp_toplam FROM _ovp_durum \gset
 ROLLBACK;
 SELECT set_config('ovp.red', :'ovp_red', false), set_config('ovp.toplam', :'ovp_toplam', false) \g /dev/null
 DO $do$ BEGIN
-  IF current_setting('ovp.toplam')::int <> 12 OR current_setting('ovp.red')::int > 0 THEN
+  IF current_setting('ovp.toplam')::int <> 13 OR current_setting('ovp.red')::int > 0 THEN
     RAISE EXCEPTION 'OVSYNC-PAKETI TEST RED: % / % senaryo kirmizi', current_setting('ovp.red'), current_setting('ovp.toplam');
   END IF;
   RAISE NOTICE 'OVSYNC-PAKETI TEST PASS';
