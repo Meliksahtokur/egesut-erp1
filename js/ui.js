@@ -1409,7 +1409,16 @@ async function inaktifGecisAc(anaVakaId, secim){
     return;
   }
   const cur=(typeof _curCase!=='undefined')? _curCase:null;
-  const kupeNo=sec.kupeNo||(cur&&(cur.kupe_no||cur.kupe))||'bilinmiyor';
+  // UI-0 (U2): _curCase ham cases satırıdır (kupe_no YOK) — sec.kupeNo boşsa
+  // hayvan kartındaki küpeye düş (vaka detay yolunda kupeNo:null geçer).
+  let kupeNo=(sec&&sec.kupeNo)||(cur&&(cur.kupe_no||cur.kupe))||null;
+  if(!kupeNo&&cur&&cur.animal_id&&typeof getState==='function'){
+    try{
+      const hv=(getState('animals')||[]).find(a=>a&&a.id===cur.animal_id);
+      if(hv) kupeNo=hv.kupe_no||hv.devlet_kupe||null;
+    }catch(e){}
+  }
+  if(!kupeNo) kupeNo='bilinmiyor';
   let box=document.getElementById('inaktif-gecis-modal');
   if(box) box.remove();
   box=document.createElement('div');
@@ -1476,12 +1485,29 @@ async function inaktifGecisKaydet(anaVakaId){
     pullTables(tables).then(renderSafe).catch(console.warn);
   };
   const sonraTam=async ()=>{
-    pullTables(tables).then(renderSafe).catch(console.warn);
-    if(altId&&typeof openCaseDet==='function'){
-      try{ await openCaseDet(altId); }catch(e){ console.warn('alt vaka detay:',e.message); }
-    }else{
+    // UI-0 (U3/U4 yarış kapısı): pull BEKLENİR; alt kayıt IDB'ye düşmeden
+    // detay AÇILMAZ — erken openCaseDet 'Vaka bulunamadı' üretirdi.
+    await pullTables(tables).then(renderSafe).catch(console.warn);
+    const taze=async ()=>{
       if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
       if(typeof loadDash==='function') loadDash().catch(console.warn);
+    };
+    if(altId&&typeof openCaseDet==='function'){
+      let kapiVar=false, kapiBakildi=false;
+      if(typeof idbGetAll==='function'){
+        kapiBakildi=true;
+        try{
+          const tum=await idbGetAll('cases');
+          kapiVar=(tum||[]).some(x=>x&&x.id===altId);
+        }catch(e){ kapiVar=false; }
+      }
+      if(!kapiBakildi||kapiVar){
+        try{ await openCaseDet(altId); }catch(e){ console.warn('alt vaka detay:',e.message); }
+      }else{
+        await taze();
+      }
+    }else{
+      await taze();
     }
   };
   let eklenen=0;
