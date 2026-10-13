@@ -201,10 +201,13 @@ BEGIN
     jsonb_build_object('olusturulan','[]'::jsonb, 'guncellenen', jsonb_build_array(jsonb_build_object('tablo','treatment_days','id',p_day_id::text)), 'silinen','[]'::jsonb),
     format('Tedavi günü %s tamamlandı', p_day_id));
   -- ── PG olayı = uygulama anı: kapıdan geçen her doğrudan PG kalemi için ──
+  -- Savunma: aynı kalem için ILAC_EKLE olayı zaten varsa atla (çift olay yok).
   FOR v_pg_kalem IN
     SELECT da.id AS id, da.stok_id AS stok_id, da.drug_product_id AS drug_product_id
       FROM public.drug_administrations da
      WHERE da.id = ANY (v_pg_ids)
+       AND NOT EXISTS (SELECT 1 FROM public.pg_application_event e
+                        WHERE e.source_type = 'ILAC_EKLE' AND e.source_id = da.id::text)
   LOOP
     v_kapi := public._pg_kapi(v_pg_hayvan, v_pg_kalem.stok_id, v_pg_kalem.drug_product_id, COALESCE(p_pg_onay, false));
     PERFORM public._pg_olay_isle('TEDAVI_GUN', v_pg_kalem.id::text, v_pg_hayvan,
@@ -218,9 +221,10 @@ GRANT EXECUTE ON FUNCTION public.treatment_day_tamamla(uuid, text, uuid[], boole
 
 -- ── 4. add_drug_administration: DROP eski imza + CREATE (canlı gövde + kapı) ─
 -- Canlı gövde AYNI; eklenen: (a) imza sonuna p_pg_onay/p_pg_gerekce,
--- (b) INSERT'ten ÖNCE PG kapısı, (c) günü gelmiş (treatment_date <= bugün)
--- PG kalemde ILAC_EKLE olayı (+48 s TAI). İleri tarihli plan kalemin olayı
--- gün tamamlanınca treatment_day_tamamla ile doğar (çift olay yok).
+-- (b) INSERT'ten ÖNCE PG kapısı, (c) günü ZATEN tamamlanmış (treatment_days.tamamlandi,
+-- canlı şemada MEASURED 2026-10-13) ya da güne bağlı olmayan kalemde ILAC_EKLE olayı
+-- (+48 s TAI). Tamamlanmamış güne eklenen kalemin olayını treatment_day_tamamla yazar
+-- (çift olay yok; savunma: tamamla döngüsü ILAC_EKLE'si olan kalemi NOT EXISTS ile atlar).
 DROP FUNCTION IF EXISTS public.add_drug_administration(uuid, uuid, text, numeric, text, text);
 CREATE FUNCTION public.add_drug_administration(p_day_id uuid, p_drug_product_id uuid, p_stok_id text, p_dose numeric, p_unit text, p_route text DEFAULT NULL, p_pg_onay boolean DEFAULT NULL, p_pg_gerekce text DEFAULT NULL)
  RETURNS jsonb
@@ -231,11 +235,11 @@ DECLARE
   v_id uuid;
   v_hayvan text;
   v_tarih date;
-  v_bgun date := (now() AT TIME ZONE 'Europe/Istanbul')::date;
+  v_gun_tamamli boolean := false;
   v_kapi jsonb;
   v_kupe text;
 BEGIN
-  SELECT c.animal_id, td.treatment_date INTO v_hayvan, v_tarih
+  SELECT c.animal_id, td.treatment_date, COALESCE(td.tamamlandi, false) INTO v_hayvan, v_tarih, v_gun_tamamli
     FROM public.treatment_days td
     JOIN public.cases c ON c.id = td.case_id
    WHERE td.id = p_day_id;
@@ -258,8 +262,9 @@ BEGIN
     VALUES (p_stok_id, 'Tedavi', p_dose, 'drug_admin:' || v_id::text);
   END IF;
 
-  -- ── PG olayı = uygulama anı: yalnız günü gelmiş kalemde ──
-  IF v_kapi IS NOT NULL AND v_tarih IS NOT NULL AND v_tarih <= v_bgun THEN
+  -- ── PG olayı = uygulama anı: yalnız gün ZATEN tamamlanmışsa ya da güne bağlı değilse ──
+  -- Tamamlanmamış güne eklenen kalemin olayını treatment_day_tamamla yazar (çift olay yok).
+  IF v_kapi IS NOT NULL AND (v_tarih IS NULL OR v_gun_tamamli) THEN
     PERFORM public._pg_olay_isle('ILAC_EKLE', v_id::text, v_hayvan, p_stok_id,
       p_drug_product_id, now(), v_kapi, p_pg_gerekce);
   END IF;

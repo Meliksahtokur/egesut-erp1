@@ -828,8 +828,8 @@ async function submitCase(btn) {
         if (planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
         toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
       } catch(e) {
-        if (typeof _pgKapiHata === 'function' && _pgKapiHata(e, cagri)) return;
-        toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
+        // Madde 2: PG reddinde return YOK — kapı ekranı açıldıysa akış kapanışa düşer.
+        if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
       }
     } else {
       toast('✅ Vaka açıldı');
@@ -884,8 +884,8 @@ async function submitCase(btn) {
           if (planli2?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli2.sebep}`, true);
           toast(`✅ Vaka açıldı + şablon uygulandı (${r2?.gun_sayisi||0} gün)${planli2?.olustu?' + tohumlama':''}`);
         } catch (e3) {
-          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e3, cagri)) return;
-          toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
+          // Madde 2: PG reddinde return YOK — akış kapanışa düşer.
+          if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
         }
         globalThis._seciliSablonId = null;
       } else {

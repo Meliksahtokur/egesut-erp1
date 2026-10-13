@@ -13448,6 +13448,8 @@ async function caseDrugKaydet(btn) {
   });
   if (!secililar.length) { toast('Ilac secin', true); return; }
   btn.disabled = true; btn.textContent = 'Kaydediliyor...';
+  let eklenen = 0;     // Madde 3: yazılan kalem sayacı (PG kapısında duran sayılmaz)
+  let pgDurdu = false; // Madde 3: PG reddinde break — tazeleme bloğu yine koşar
   try {
     const isOnline = navigator.onLine;
     for (const item of secililar) {
@@ -13466,8 +13468,10 @@ async function caseDrugKaydet(btn) {
         });
         try {
           await cagri(false, null);
+          eklenen++;
         } catch(e0) {
-          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e0, cagri)) return;
+          // Madde 3: PG reddinde döngüden break ile çık, tazeleme yine koşsun.
+          if (typeof _pgKapiHata === 'function' && _pgKapiHata(e0, cagri)) { pgDurdu = true; break; }
           throw e0;
         }
       } else {
@@ -13495,9 +13499,12 @@ async function caseDrugKaydet(btn) {
             iptal: false,
           });
         }
+        eklenen++;
       }
     }
-    toast('✅ ' + secililar.length + ' ilac eklendi');
+    // Madde 3: PG kapısında durduysa k/n sayısıyla bildir, tazeleme aşağıda yine koşar.
+    if (pgDurdu) toast('✅ ' + eklenen + '/' + secililar.length + ' ilaç eklendi, PG kalemi kapıda durdu');
+    else toast('✅ ' + secililar.length + ' ilac eklendi');
     await pullTables(['stok','stok_hareket','drug_administrations','treatment_days']);
     btn.closest('.cd-drug-form').remove();
     _activeDayId = null; // M-17 fix: form kapanınca modül-düzey state sızmasın

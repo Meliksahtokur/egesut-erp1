@@ -132,13 +132,48 @@ DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',9); v_alt uuid := pg_temp.ovp_i
     AND v_ins LIKE 'reddedildi: KISIR_HAYVAN_OVSYNC_YASAK%' THEN 'PASS' ELSE 'RED' END, format('%svakalar=%s; yeni OVSYNC=%s', v_not, v_s, v_ins));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-KISIR', 'RED', SQLERRM); END $do$;
 
--- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9.
+-- ── S-PG-TEK-OLAY (kırmızı; çift PG olayı kilidi, 000002:262-265 ↔ :204-212):
+--    (i) tamamlanmamış bugünkü güne PG ekle → olay 0; günü tamamla → olay 1 + _pg_sonrasi_tohumlama 1 kez;
+--    (ii) tamamlanmış güne PG ekle → olay 1
+DO $do$ DECLARE
+  v_r jsonb; v_id1 uuid; v_id2 uuid;
+  v_i_ekle int; v_i_tamamla int; v_i_tai int; v_ii_olay int; v_ii_tai int;
+BEGIN
+  INSERT INTO hayvanlar(id, kupe_no, cinsiyet, durum, grup, padok, dogum_tarihi)
+    VALUES ('E2E-OVP-H-11', 'E2E-OVP-11', 'Dişi', 'Aktif', 'Sağmal (Laktasyonda)', 'Sağmal Padok', pg_temp.bg() - 800);
+  INSERT INTO cases(id, animal_id, disease_id, start_date, status)
+    VALUES (pg_temp.ovp_id('c',11), 'E2E-OVP-H-11', pg_temp.ovp_id('1',3), pg_temp.bg(), 'active');
+  INSERT INTO treatment_days(id, case_id, treatment_date)
+    VALUES (pg_temp.ovp_id('d',11), pg_temp.ovp_id('c',11), pg_temp.bg());
+  v_r := public.add_drug_administration(pg_temp.ovp_id('d',11), pg_temp.ovp_id('f',1), 'E2E-OVP-STK-PG', 2, 'ml', 'IM');
+  v_id1 := (v_r->>'id')::uuid;
+  SELECT count(*) INTO v_i_ekle FROM pg_application_event WHERE source_id = v_id1::text;
+  PERFORM public.treatment_day_tamamla(pg_temp.ovp_id('d',11));
+  SELECT count(*) INTO v_i_tamamla FROM pg_application_event WHERE source_id = v_id1::text;
+  SELECT count(*) INTO v_i_tai FROM gorev_log WHERE hayvan_id = 'E2E-OVP-H-11' AND kaynak LIKE 'PG_TOHUMLAMA:%';
+  INSERT INTO hayvanlar(id, kupe_no, cinsiyet, durum, grup, padok, dogum_tarihi)
+    VALUES ('E2E-OVP-H-12', 'E2E-OVP-12', 'Dişi', 'Aktif', 'Sağmal (Laktasyonda)', 'Sağmal Padok', pg_temp.bg() - 800);
+  INSERT INTO cases(id, animal_id, disease_id, start_date, status)
+    VALUES (pg_temp.ovp_id('c',12), 'E2E-OVP-H-12', pg_temp.ovp_id('1',3), pg_temp.bg(), 'active');
+  INSERT INTO treatment_days(id, case_id, treatment_date)
+    VALUES (pg_temp.ovp_id('d',12), pg_temp.ovp_id('c',12), pg_temp.bg());
+  PERFORM public.treatment_day_tamamla(pg_temp.ovp_id('d',12));
+  v_r := public.add_drug_administration(pg_temp.ovp_id('d',12), pg_temp.ovp_id('f',1), 'E2E-OVP-STK-PG', 2, 'ml', 'IM');
+  v_id2 := (v_r->>'id')::uuid;
+  SELECT count(*) INTO v_ii_olay FROM pg_application_event WHERE source_id = v_id2::text;
+  SELECT count(*) INTO v_ii_tai FROM gorev_log WHERE hayvan_id = 'E2E-OVP-H-12' AND kaynak LIKE 'PG_TOHUMLAMA:%';
+  INSERT INTO _ovp_durum VALUES ('S-PG-TEK-OLAY',
+    CASE WHEN v_i_ekle = 0 AND v_i_tamamla = 1 AND v_i_tai = 1 AND v_ii_olay = 1 AND v_ii_tai = 1 THEN 'PASS' ELSE 'RED' END,
+    format('(i) ekle-sonrasi=%s tamamla-sonrasi=%s tai=%s; (ii) olay=%s tai=%s', v_i_ekle, v_i_tamamla, v_i_tai, v_ii_olay, v_ii_tai));
+EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-PG-TEK-OLAY', 'RED', SQLERRM); END $do$;
+
+-- ── Özet + hüküm (ROLLBACK = temizlik). Beklenen senaryo sayısı: Faz 1 → 4, Faz 2a → 8, Faz 4 → 9, F1-düzeltme → 9.
 SELECT senaryo, sonuc, kanit FROM _ovp_durum ORDER BY senaryo;
 SELECT count(*) FILTER (WHERE sonuc <> 'PASS') AS ovp_red, count(*) AS ovp_toplam FROM _ovp_durum \gset
 ROLLBACK;
 SELECT set_config('ovp.red', :'ovp_red', false), set_config('ovp.toplam', :'ovp_toplam', false) \g /dev/null
 DO $do$ BEGIN
-  IF current_setting('ovp.toplam')::int <> 8 OR current_setting('ovp.red')::int > 0 THEN
+  IF current_setting('ovp.toplam')::int <> 9 OR current_setting('ovp.red')::int > 0 THEN
     RAISE EXCEPTION 'OVSYNC-PAKETI TEST RED: % / % senaryo kirmizi', current_setting('ovp.red'), current_setting('ovp.toplam');
   END IF;
   RAISE NOTICE 'OVSYNC-PAKETI TEST PASS';
