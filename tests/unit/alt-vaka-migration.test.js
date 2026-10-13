@@ -10,32 +10,40 @@ test('mevcut-erteleme-iptalsiz-oteler [kilit]', () => {
   assert.ok(g.includes('PERFORM public.tohumlama_gorev_ertele('));
   assert.ok(!/iptal\s*=\s*true/i.test(g));
 });
-test('alt-vaka-acilis-bagli', () => {
+test('hastalik-gunu-disease-id [kilit]', () => {
   const sql = oku('20261013000003_alt_vaka.sql');
-  assert.match(sql, /ADD COLUMN IF NOT EXISTS kaynak_vaka_id uuid/);
-  assert.ok(sqlBlok(sql, 'inaktif_alt_vaka_ac').includes('kaynak_vaka_id'));
+  assert.match(sql, /ADD COLUMN disease_id uuid/, 'gün treatment_days satırıdır');
+  assert.ok(sql.includes('treatment_days_disease_id_fkey'), 'diseases FK niyeti');
 });
-test('inaktif-erteleme-dogrudan-ertele', () => {
-  const ac = sqlBlok(oku('20261013000003_alt_vaka.sql'), 'inaktif_alt_vaka_ac');
-  assert.ok(ac.includes('tohumlama_gorev_ertele('), 'açık TAI doğrudan ötelenir');
-  assert.ok(!ac.includes('vaka_kalan_gunleri_kaydir'), 'kaydır RPC çağrılmaz');
-  assert.ok(!/iptal\s*:?=\s*true/i.test(ac), 'iptal yazılmaz');
-});
-test('donus-public-ic-ayrimi', () => {
+test('hastalik-gunu-tekil [kilit]', () => {
   const sql = oku('20261013000003_alt_vaka.sql');
-  assert.ok(sqlBlok(sql, 'inaktif_alt_vaka_kapat').includes('_inaktif_alt_vaka_donus_hazirla('));
-  const ac = sqlBlok(sql, 'inaktif_alt_vaka_ac');
-  assert.ok(!ac.includes('_inaktif_alt_vaka_donus_hazirla(') && !ac.includes("'closed'"), 'aç-RPC kapatmaz');
-  assert.ok(!/GRANT[^;]*_inaktif_alt_vaka_donus_hazirla[^;]*TO\s+authenticated/.test(sql), 'iç yardımcı açılmaz');
+  assert.match(sql, /CREATE UNIQUE INDEX treatment_days_hastalik_gun_uniq\s+ON public\.treatment_days\(case_id, disease_id, treatment_date\) WHERE disease_id IS NOT NULL/, 'kısmi unique: ikinci çağrı mevcut günü döner');
 });
-test('vitamin-zincir-kilit', () => {
-  const ac = sqlBlok(oku('20261013000003_alt_vaka.sql'), 'inaktif_alt_vaka_ac');
-  assert.ok(ac.includes('add_drug_administration('), 'vitamin mevcut ilaç zincirinden');
-  assert.match(ac, /p_vitamin_stok_id text DEFAULT NULL/, 'stok.id text (MEASURED), tek değer');
+test('hastalik-gunu-tek-rpc [kilit]', () => {
+  const sql = oku('20261013000003_alt_vaka.sql');
+  assert.equal(sql.split('CREATE FUNCTION public.ovsync_hastalik_gunu_ekle(').length - 1, 1, 'tek imza');
+  const f = sqlBlok(sql, 'ovsync_hastalik_gunu_ekle');
+  assert.ok(f.includes('add_drug_administration('), 'ilaç mevcut zincirden');
+  assert.ok(f.includes('tohumlama_gorev_ertele('), 'açık TAI doğrudan ötelenir');
+  assert.ok(!f.includes('vaka_kalan_gunleri_kaydir'), 'kaydır RPC çağrılmaz');
+  assert.ok(!/iptal\s*:?=\s*true/i.test(f), 'iptal yazılmaz');
+  assert.ok(/GRANT EXECUTE[^;]*ovsync_hastalik_gunu_ekle[^;]*TO authenticated/.test(sql), 'public RPC açıktır');
+  assert.ok(/REVOKE ALL[^;]*ovsync_hastalik_gunu_ekle[^;]*FROM PUBLIC, anon/.test(sql), 'anon kapalıdır');
 });
-test('kisir-zincir-bitir-kilidi', () => {
+test('alt-vaka-nesneleri-yok [kilit]', () => {
+  const sql = oku('20261013000003_alt_vaka.sql');
+  assert.equal((sql.match(/CREATE[^;]*?FUNCTION public\.inaktif_alt_vaka_(ac|kapat)\(/g) || []).length, 0, 'aç/kapat doğmaz');
+  assert.equal((sql.match(/CREATE[^;]*?FUNCTION public\._inaktif_alt_vaka_donus_hazirla\(/g) || []).length, 0, 'dönüş yardımcısı doğmaz');
+  assert.equal((sql.match(/ADD\s+COLUMN[^;]*kaynak_vaka_id/gi) || []).length, 0, 'kaynak kolonu doğmaz');
+  assert.ok(sql.includes('DROP FUNCTION IF EXISTS public.inaktif_alt_vaka_ac(uuid, integer, uuid, text, numeric, boolean);'), 'artık mührü');
+  assert.ok(sql.includes('ALTER TABLE public.cases DROP COLUMN IF EXISTS kaynak_vaka_id;'), 'kolon mührü');
+});
+test('kisir-zincir-yeni-kriter [kilit]', () => {
   const sql = oku('20261013000003_alt_vaka.sql');
   assert.match(sql, /AFTER UPDATE OF kisir ON public\.hayvanlar[\s\S]*?EXECUTE FUNCTION public\._kisir_zincir_bitir\(\)/, 'tek tetik');
   const f = sqlBlok(sql, '_kisir_zincir_bitir');
-  assert.ok(f.includes("'ERKEN_KAPANIS'") && f.includes('kaynak_vaka_id'), 'açık alt+ana kapanır');
+  assert.ok(f.includes("'ERKEN_KAPANIS'") && f.includes('_vaka_ovsync_mu(alt.id)'), 'açık OVSYNC yedek-tanımla kapanır');
+  assert.equal(sql.split('CREATE OR REPLACE FUNCTION public._vaka_ovsync_mu(').length - 1, 1, 'ölçüt tek yerdedir');
+  assert.ok(!f.includes('kaynak_vaka_id'), 'alt-vaka dalı yok (yeni kriter)');
+  assert.ok(/REVOKE ALL[^;]*_kisir_zincir_bitir\(\)[^;]*FROM PUBLIC, anon, authenticated/.test(sql), 'iç yardımcı kapalıdır');
 });
