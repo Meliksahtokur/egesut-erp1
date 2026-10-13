@@ -236,6 +236,14 @@ test('tekgonder-pg-kapi-onay-tekrar', async () => {
   assert.deepStrictEqual(t.kuyruk.map(o => o._qid), [], 'onayli tekrar basarili: kayit + es duser');
 });
 
+// PLAN ### Faz 4 Step 1 birebir (review-düzeltme: TekGonder sarmalı bu dosyada;
+// davranış ölçümü 'tekgonder-*' testlerinde — Kapı 5 eki 2).
+test('replay-pg-kapi-sarmal', () => {
+  const src = extractFunctionSource('js/ui.js', 'dataTrafficTekGonder');
+  assert.ok(src.includes('_pgKapiHata('), 'PG kapı sarmalı');
+  assert.ok(src.includes('_esBul('), 'manuel gönderimde eş stok_hareket op birlikte düşer (KAPI-4 #1)');
+});
+
 // Madde 6 (KAPI-2 işaretli 6): ilk kalem PG'de durursa (eklenen=0) toast nötr — ✅ YOK.
 test('drug-pg-toast-notr-kilidi', () => {
   const govde = extractFunctionSource('js/ui.js', 'caseDrugKaydet');

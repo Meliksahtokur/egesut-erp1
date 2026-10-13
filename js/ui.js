@@ -1112,7 +1112,7 @@ function _ovsyncYetimRozetHtml(satir, bag, vaka){
   const gorevler=b.acikIs.has(hid)?[{gorev_tipi:'TOHUMLAMA_PLANLI',tamamlandi:false,iptal:false}]:[];
   const altlar=b.altAcik.has(hid)?[{status:'active'}]:[];
   if(!_ovsyncYetimMi(vaka,gorevler,altlar)) return '';
-  return '<span class="ovs-etiket" style="background:rgba(201,125,10,.15);color:var(--amber);font-weight:700">⚠ Takipsiz Ovsync</span>'
+  return '<span class="ovs-etiket" style="color:var(--amber);font-weight:700">⚠ Takipsiz Ovsync</span>'
     +'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">PG ile devam et</button>';
 }
 /**
