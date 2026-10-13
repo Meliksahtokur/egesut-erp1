@@ -505,11 +505,12 @@ function _ileriGebeKuruDuve(b){
   return b.grup==='Gebe Düve'||b.padok==='Kuru/Gebe Padok';
 }
 /**
- * 🤰 İleri Gebeler bandı (F1 EK): inekler (gün DESC) → kuruya alınmış
- * düveler mavi D-n (gün DESC) → kuruya alınmamış düveler en altta sarı
- * satır (.duve, gün DESC). Kuru düve inek bloğunda DEĞİL, inek numarası
- * tüketmez. Sayaçlar: inekler 1)..n), tüm düveler tek sayaçtan D-1)..
- * ekrandaki sıraya göre yukarıdan aşağıya (mavi önce).
+ * 🤰 İleri Gebeler bandı (F2): ana blok RPC sırasında aynen (inekler +
+ * kuruya alınmış düveler yerinde) → kuruya alınmamış düveler en altta
+ * gruplu (gün DESC). Satır görünümü ineklerle aynı (zemin/şerit YOK);
+ * TÜM düvelerde mavi D-n (.duve-mavi) + amber alt satır (.duve-alt).
+ * Sayaçlar: inekler 1)..n), tüm düveler tek sayaçtan D-1).. ekran
+ * sırasına göre yukarıdan aşağıya. Kuru düve inek numarası tüketmez.
  * @param {Array} ileriGebeler RPC sırasındaki ileri gebe satırları.
  * @returns {string} Bant HTML'i; kayıt yoksa boş dize.
  */
@@ -518,31 +519,27 @@ function _dashIleriGebeBandi(ileriGebeler){
   const kontrolBtn=`<button onclick="ileriGebeKontrol()" style="font-size:.65rem;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--amber);background:rgba(255,160,0,.12);color:var(--amber);cursor:pointer;white-space:nowrap;margin-left:auto">🔔 Görev Kontrol</button>`;
   const title=`<span style="display:flex;align-items:center;gap:8px;width:100%">🤰 İleri Gebeler (210+ gün) ${kontrolBtn}</span>`;
   const isDuve=b=>(b.grup||'').includes('Düve');
-  const inekBlok=[],kuruBlok=[],altDuve=[];
+  const anaBlok=[],altDuve=[];
   (ileriGebeler||[]).forEach(b=>{
-    if(!isDuve(b))inekBlok.push(b);
-    else if(_ileriGebeKuruDuve(b))kuruBlok.push(b);
-    else altDuve.push(b);
+    if(isDuve(b)&&!_ileriGebeKuruDuve(b))altDuve.push(b);
+    else anaBlok.push(b);
   });
-  // F1 EK: her blok gün DESC (stabil sıralama); sıra inekler → mavi → sarılar.
-  const gunDesc=(a,b)=>(b.gebelik_gun||0)-(a.gebelik_gun||0);
-  inekBlok.sort(gunDesc);kuruBlok.sort(gunDesc);altDuve.sort(gunDesc);
-  const sirali=[...inekBlok,...kuruBlok,...altDuve];
+  // F2: ana blok RPC sırasında yerinde; yalnız alttaki düveler gün DESC.
+  altDuve.sort((a,b)=>(b.gebelik_gun||0)-(a.gebelik_gun||0));
+  const sirali=[...anaBlok,...altDuve];
   const dNo=new Map();let n=0;
   sirali.forEach(b=>{if(isDuve(b))dNo.set(b,`D-${++n}`);});
   let inekNo=0;
   const rows=sirali.map(b=>{
-    const duve=isDuve(b),kuruDuve=duve&&_ileriGebeKuruDuve(b);
+    const duve=isDuve(b);
     const no=duve?dNo.get(b):`${++inekNo}`;
     const kid=b.kupe_no||b.devlet_kupe||b.hayvan_id;
     const besUyari=b.gebelik_gun>=260?`<span style="background:rgba(176,120,0,.15);color:#b07800;border-radius:4px;padding:1px 5px;font-weight:700;font-size:.65rem;margin-left:4px">⚠️ Anyonik</span>`:'';
     const padokYanlis=b.padok!=='Kuru/Gebe Padok';
     const padokUyari=padokYanlis?`<span style="color:#ef4444;font-weight:700;font-size:.6rem;margin-left:4px">🔴 Transfer!</span>`:'';
-    const noCls=kuruDuve?'arow-no duve-kuru':'arow-no';
-    const sariDuve=duve&&!kuruDuve;
-    // Sarı düve satırında inline kırmızı zemin üretme (K2.3: sarı class'tan gelsin);
-    // Transfer uyarısı olan satırda (inek/kuru düve) kırmızı zemin+chip aynen kalır.
-    return `<div class="arow${sariDuve?' duve':''}" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis&&!sariDuve?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span class="${noCls}">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="arow-sub">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
+    const noCls=duve?'arow-no duve-mavi':'arow-no';
+    const subCls=duve?'arow-sub duve-alt':'arow-sub';
+    return `<div class="arow" onclick="openDet('${b.hayvan_id}')" style="${padokYanlis?'background:rgba(239,68,68,.04);':''}"><div class="arow-left"><div class="arow-id"><span class="${noCls}">${no})</span>${esc(kid)}${besUyari}${padokUyari}</div><div class="${subCls}">${b.gebelik_gun}. gün · ${esc(b.grup||'')} · ${esc(b.padok||'')}</div></div><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></div>`;
   });
   return band('amber',title,rows.join(''));
 }
