@@ -12202,15 +12202,26 @@ async function renderCasesForAnimal(animalId) {
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   if (!animalCases.length) return '<div class="empty"><div class="empty-ico">✅</div>Aktif vaka yok</div>';
   const allDiseases = await idbGetAll('diseases');
+  // K10-UI1 (N1): Ovsync içindeki hastalık günleri (treatment_days.disease_id
+  // IS NOT NULL) kartta girintili alt-satırdır; ayrı vaka satırı AÇILMAZ.
+  const allGunler = await idbGetAll('treatment_days').catch(() => []);
   return animalCases.map(c => {
     const dis = allDiseases.find(d => d.id === c.disease_id);
     const isActive = c.status === 'active';
+    const hastalikGunleri = allGunler
+      .filter(g => g && g.case_id === c.id && g.disease_id != null)
+      .sort((a, b) => String(a.treatment_date || '').localeCompare(String(b.treatment_date || '')));
+    const hastalikAlt = hastalikGunleri.map(g => {
+      const gad = allDiseases.find(d => d.id === g.disease_id);
+      return `<div class="gm-kat-acik"><span style="color:var(--amber)">└ ${esc(gad?.name || '?')} · ${_devamKisaTarih(g.treatment_date)} (Ovsync içinde)</span></div>`;
+    }).join('');
     return `<div class="hist-row" onclick="openCaseDet('${c.id}')" style="cursor:pointer">
       <div class="hist-dot" style="background:${isActive ? 'var(--red2)' : 'var(--green2)'}"></div>
       <div class="hist-main">
         <div class="hist-title">${esc(dis?.name || '?')}</div>
         <div class="hist-sub">${fmtTarih(c.start_date)} · <b style="color:${isActive ? 'var(--red)' : 'var(--green)'}">${isActive ? 'Aktif' : 'Kapalı'}</b></div>
         ${c.notes ? `<div class="hist-sub" style="margin-top:2px">${esc(c.notes)}</div>` : ''}
+        ${hastalikAlt}
       </div>
     </div>`;
   }).join('');
