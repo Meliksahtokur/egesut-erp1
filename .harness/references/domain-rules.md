@@ -135,7 +135,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 - Abort `tohumlama_abort(p_tohumlama_id, p_notlar?, p_abort_tarihi?)` ile kaydedilir; `abort_tarihi` kolonu (default bugün, geriye dönük girilebilir) VWP çapasıdır.
 - Abort yapan hayvana 55 gün dolmadan tohumlama denemesi `ABORT_VWP_VIOLATION` + confirm uyarısı verir ("Bu hayvan abort yaptı").
-- **Aktif vaka (hastalık/tedavi) hayvanı sessiz takipten DÜŞÜRMEZ** — v_eligible'da vaka filtresi yoktur.
+- **Aktif vaka (hastalık/tedavi) hayvanı sessiz takipten DÜŞÜRMEZ** — v_eligible'da vaka filtresi yoktur. **İstisna (sahip kararı 2026-10-13):** aktif OVSYNC vakası olan hayvan sessiz listede görünmez — `sessiz_hayvanlar_listele` dışlar; diğer aktif vakalar düşürmez.
 - `geri_al` ile abort geri alınabilir (kayıt tekrar Gebe olur); `tohumlama_geri_al` ise kaydı SILER — ikisi karıştırılmamalı.
 
 ### Sessiz Hayvan Takibi (2026-08-31 güncel — v_eligible ankraj fix'i)
@@ -145,6 +145,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 - **Event'siz düveler** (20260831000002; eşik 20260925000019 ile güncellendi): sayaç ham yaş değil, **12 ay 21 günlük uygunluk noktasından** (Ovsync kural günü, §18.1) sayılır; RPC `p_min_gun=55` ile düve listeye **12 ay 21 gün + 55 gün**de girer. Kural gününden önce genç düve listede görünmez.
 - **"Hiç kayıt yok" (9999):** ne event'i ne doğum bilgisi olan hayvanlarda `sessiz_gun` NULL'dur; RPC `COALESCE(...,9999)` ile 9999 döner. UI'da (dashboard bandı + modal) **en altta** sıralanır (bb4ea92) — sentinel-son sıralama her iki yüzeyde de client-side yapılır.
 - `v_eligible` SADECE sessiz akışlarını besler (listele/reconcile/stat); tohumlama form uygunluk listesi client-side `_eligibleHayvanlar()`'dır — view'dan bağımsız.
+- **Aktif OVSYNC dışlama (sahip kararı 2026-10-13):** aktif OVSYNC vakası olan hayvan sessiz listede görünmez — `sessiz_hayvanlar_listele` dışlar (`NOT EXISTS cases status='active' AND protocol_family='OVSYNC'`); diğer aktif vakalar düşürmez.
 - Bilinen tutarsızlık: `stat_suru_ozet` sessiz sayacı `sessiz_gun >= 55` (NULL hariç), liste ise 9999'ları içerir → istatistik, listeden "hiç kayıt yok" kadar düşük görünür. **Kök neden canlıda doğrulandı (2026-09-02):** `20260625000030_stat_suru_ozet_readonly.sql` gövdesine yazılırken v3'teki COALESCE düşmüş. Taslak hazır: `.claude/draft-migrations/20260902000000_stat_suru_ozet_sessiz_coalesce.sql` (tek satır restore; otomatik-deploy emniyeti için migrations/ DIŞINDA — deploy emrinde supabase/migrations/'a taşınır). Analiz: `.claude/idle-reports/2026-09-02-sessiz-9999-analiz.md`. Not: `sessiz_hayvanlar_reconcile` da bilinçli COALESCE'siz — NULL hayvanlara vet-kontrol görevi üretilmez (veri eksiği olan hayvanlara görev spam'i olmasın).
 
 ### Gebelik Süresi
