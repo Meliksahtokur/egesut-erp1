@@ -41,3 +41,9 @@ sonnet-medium, büyük spec+plan = mimar opus-high, sahiple konuşma/kabul/merge
 **codex luna-max YALNIZ dış review içindir; implementasyon luna'ya verilmez.**
 glm, glmf, zcode ve goose kolları arşivlendi (artık yok). Builtin alt-ajanda model açık seçilir
 (tarama haiku, test/mekanik sonnet, kod review sonnet).
+
+## Kod keşif protokolü
+
+Kod keşfi (atlas→gitnexus→atlas-py→LSP→grep; MCP varsa MCP, yoksa CLI): egesut JS atlas (atlas_query/atlas_status | atlas-sorgu), genel gitnexus (query/context/impact | gitnexus CLI), Python atlas-py, sonra LSP, son çare grep; tek araçtan yok hükmü çıkmaz.
+Tazelik: önce gitnexus list/status ile HEAD karşılaştır, bitince analyze --index-only (bayraksız analyze yasak).
+Ayrıntı: ~/tools-bank/docs/kod-kesif-protokolu.md

@@ -58,6 +58,14 @@ The transitional `.claude` reference copies were retired on 2026-09-04
 the only DB authority, and `.claude/` stays the owner's local working
 surface for reports, plans, and archives.
 
+## Kod keşif protokolü
+
+Kod keşfi (atlas→gitnexus→atlas-py→LSP→grep; MCP varsa MCP, yoksa CLI): egesut JS atlas (atlas_query/atlas_status | atlas-sorgu), genel gitnexus (query/context/impact | gitnexus CLI), Python atlas-py, sonra LSP, son çare grep; tek araçtan yok hükmü çıkmaz.
+Tazelik: önce gitnexus list/status ile HEAD karşılaştır, bitince analyze --index-only (bayraksız analyze yasak).
+Ayrıntı: ~/tools-bank/docs/kod-kesif-protokolu.md
+
+Değişiklik öncesi etki kapısı: code-change-precheck skill'i atlas `etki` ister.
+
 ## Runtime selection
 
 - ZCode Desktop: ARCHIVED 2026-10-01 (Anthropic-only transition); the zcode seat no longer exists.
