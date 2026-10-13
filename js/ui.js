@@ -1145,15 +1145,15 @@ function inaktifGecisSheetHtml(anaVakaId, secenek){
   const kistIstendi=/kist/i.test(o.secim||'');
   let hastalik=(o.hastalik&&o.hastalik.name)?o.hastalik:null;
   if(!hastalik&&hastaliklar.length){
-    hastalik=hastaliklar.find(h=>h&&(kistIstendi?/kist/i.test(h.name||''):/inaktif/i.test(h.name||'')))||null;
-    // Sessiz çapraz yedek YOK: kist istendiyse inaktif kayda düşülmez (fail-closed
-    // inaktifGecisAc'dedir; burada seçim-dışı kayıt atanmaz).
-    if(!hastalik&&!kistIstendi) hastalik=hastaliklar[0]||null;
+    hastalik=hastaliklar.find(h=>h&&(kistIstendi?/kist/i.test(h.name||''):/[iİ]naktif/i.test(h.name||'')))||null;
+    // Sessiz çapraz yedek YOK (F3 KAPI-3 madde 5 aynası: ters yönde de seçim-dışı
+    // kayıt atanmaz) — fail-closed inaktifGecisAc'dedir.
   }
   const kist=kistIstendi||/kist/i.test(hastalik?(hastalik.name||''):'');
   // h=null 'İnaktif Ovaryum' yedeği KALKTI — ad seçimden gelir, id boş kalır.
   const hAd=hastalik?(hastalik.name||''):(kist?'Kistik Over':'İnaktif Ovaryum');
-  const hId=hastalik?(hastalik.id||''):'';  const baslik=(kist?'Kist':'İnaktif Ovaryum')+' — Küpe '+esc(o.kupeNo||'bilinmiyor');
+  const hId=hastalik?(hastalik.id||''):'';
+  const baslik=(kist?'Kist':'İnaktif Ovaryum')+' — Küpe '+esc(o.kupeNo||'bilinmiyor');
   const vitaminStok=o.vitaminStok||null;
   const vitAd=vitaminStok?(vitaminStok.urun_adi||''):'';
   const vitId=vitaminStok?(vitaminStok.id||''):'';
@@ -1393,11 +1393,19 @@ async function inaktifGecisAc(anaVakaId, secim){
   }catch(e){ console.warn('inaktif-gecis listeleri:',e.message); }
   const sec=(secim&&typeof secim==='object')?secim:{secim:(secim||null),kupeNo:null,taiEski:null};
   const kistIstendi=/kist/i.test(sec.secim||'');
-  const h=hastaliklar.find(d=>d&&(kistIstendi?/kist/i.test(d.name||''):/inaktif/i.test(d.name||'')))||hastaliklar[0]||null;
+  // F3 KAPI-3 madde 5 (ROOT RULING 5, madde 3'ün aynası): sessiz çapraz yedek
+  // YOK — seçilen adın kaydı bulunamazsa açık hata toast + sheet açılmaz.
+  const h=hastaliklar.find(d=>d&&(kistIstendi?/kist/i.test(d.name||''):/[iİ]naktif/i.test(d.name||'')))||null;
   // F2 KAPI-2 madde 3: fail-closed — kist istendi ama Kistik Over kaydı yoksa
   // sessiz inaktif yedeğe DÜŞÜLMEZ; açık hata toast + sheet açılmaz.
   if(kistIstendi&&!/kist/i.test((h&&(h.name||''))||'')){
     if(typeof toast==='function') toast('❌ Kistik Over hastalığı bulunamadı — alt vaka açılamadı',true);
+    return;
+  }
+  // F3 KAPI-3 madde 5 (ters yön): inaktif istendi ama İnaktif Ovaryum kaydı
+  // yoksa Kistik Over'a DÜŞÜLMEZ; açık hata toast + sheet açılmaz.
+  if(!kistIstendi&&!/[iİ]naktif/i.test((h&&(h.name||''))||'')){
+    if(typeof toast==='function') toast('❌ İnaktif Ovaryum hastalığı bulunamadı — alt vaka açılamadı',true);
     return;
   }
   const cur=(typeof _curCase!=='undefined')? _curCase:null;
@@ -1435,6 +1443,12 @@ async function inaktifGecisKaydet(anaVakaId){
   // F2 madde 1: ek satırlar (stok id boş olanlar YAZILMAZ — MUT-A bekçisi).
   const ekler=(typeof igEkIlaclariOku==='function')?igEkIlaclariOku():[];
   const gecerli=ekler.filter(e=>e&&e.stok_id);
+  // F3 madde 1a: doz kontrolü Kaydet'in BAŞINDA, aç-RPC'den ÖNCE (caseDrugKaydet
+  // kalıbı): stok seçili her ek satırda doz>0 değilse toast + return, hiç RPC yok.
+  for(const e of gecerli){
+    const dozSayi=Number(e&&e.doz);
+    if(!isFinite(dozSayi)||dozSayi<=0){ toast('⚠️ Geçerli bir doz girin',true); return; }
+  }
   // F turu KAPI-1 (M3): vitamin yalnız doz satırı varken gider — kist boş
   // başlar (satır yok) → vitamin anahtarları RPC'ye hiç eklenmez.
   const params={p_ana_vaka_id:anaVakaId,p_gun:p_gun,p_hastalik_id:p_hastalik_id};
@@ -1456,7 +1470,12 @@ async function inaktifGecisKaydet(anaVakaId){
   const altId=r.alt_vaka_id||null;
   const gunId=r.gun_id||null;
   // F2 KAPI-2 madde 2: başarı kapanışı (tazeleme bloğu; onaylı tekrarda AYNI kapanış koşar).
-  const sonra=async ()=>{
+  // F3 madde 3: pgDurdu yolunda detay AÇILMAZ (openM pushState bayat pg_kapi
+  // bırakır) — detay işi onaylı tekrarın sonrasına (sonraTam) kalır.
+  const sonraHizli=async ()=>{
+    pullTables(tables).then(renderSafe).catch(console.warn);
+  };
+  const sonraTam=async ()=>{
     pullTables(tables).then(renderSafe).catch(console.warn);
     if(altId&&typeof openCaseDet==='function'){
       try{ await openCaseDet(altId); }catch(e){ console.warn('alt vaka detay:',e.message); }
@@ -1467,6 +1486,7 @@ async function inaktifGecisKaydet(anaVakaId){
   };
   let eklenen=0;
   let pgDurdu=false;
+  const hatalar=[];
   if(gecerli.length&&!gunId){
     toast('⚠️ Gün açılamadı — ek ilaçlar eklenemedi',true);
   }else{
@@ -1483,18 +1503,31 @@ async function inaktifGecisKaydet(anaVakaId){
         p_pg_gerekce:gerekce||null,
       });
       try{
-        await cagri(false,null);
+        // F3 madde 1b: add_drug_administration istisna ATMAZ, {ok:false} döner —
+        // başarısız sayılır (eklenen++ YOK), hata metni toplanır.
+        const r2=await cagri(false,null);
+        if(r2&&r2.ok===false){ hatalar.push(r2.error||r2.message||'kayıt reddedildi'); continue; }
         eklenen++;
       }catch(e0){
-        if(typeof _pgKapiHata==='function'&&_pgKapiHata(e0,cagri,sonra,'add_drug_administration')){ pgDurdu=true; break; }
-        throw e0;
+        if(typeof _pgKapiHata==='function'&&_pgKapiHata(e0,cagri,sonraTam,'add_drug_administration')){ pgDurdu=true; break; }
+        // F3 madde 1c: PG dışı istisnada throw YOK — alt vaka açıldı sayılır,
+        // döngüden çıkılır, k/n toast + sonra yine çalışır (çift yazma YOK).
+        hatalar.push((e0&&e0.message)?e0.message:String(e0));
+        break;
       }
     }
   }
   const box=document.getElementById('inaktif-gecis-modal');
   if(box) box.remove();
-  toast(taban+(ekler.length?(' · '+eklenen+'/'+ekler.length+' ilaç eklendi'+(pgDurdu?', PG kalemi kapıda durdu':'')):''));
-  await sonra();
+  let ekBolum='';
+  if(ekler.length){
+    ekBolum=' · '+eklenen+'/'+ekler.length+' ilaç eklendi';
+    if(pgDurdu) ekBolum+=', PG kalemi kapıda durdu';
+    else if(hatalar.length) ekBolum+=' ('+hatalar[0]+')';
+  }
+  toast(taban+ekBolum);
+  if(pgDurdu){ await sonraHizli(); return r; }
+  await sonraTam();
   return r;
 }
 /**
@@ -2845,7 +2878,14 @@ async function _pgKapiOnayliTekrar(){
   if (!gerekce) { toast('⚠️ Gerekçe zorunlu', true); return; }
   try {
     const rpcAd = window.__pgKapiRpcAd || null;
-    await tekrar(true, gerekce);
+    const tekrarSonuc = await tekrar(true, gerekce);
+    // F3 madde 2: RPC istisna ATMAZ, {ok:false} dönebilir (fake-arm YOK) —
+    // başarı toast'u YOK, dönen mesajla hata toast'u; sonra çalışmaz.
+    if (tekrarSonuc && tekrarSonuc.ok === false) {
+      _pgKapiKapat();
+      toast('❌ ' + (tekrarSonuc.mesaj || tekrarSonuc.error || tekrarSonuc.message || 'işlem uygulanamadı'), true);
+      return;
+    }
     _pgKapiKapat();
     toast('✅ Onaylandı, işlem uygulandı');
     // F2 KAPI-2 madde 2: çağıran kendi başarı kapanışını (sonra) geçirdiyse o
@@ -14122,6 +14162,9 @@ async function caseDrugKaydet(btn) {
     const _sp = document.getElementById('stok-panel');
     if (_sp && _sp.style.transform !== 'translateX(100%)') loadStokPanel();
   };
+  // F3 madde 2: gün kimliğini döngüden ÖNCE yakala — PG reddinde sonra()
+  // HEMEN çalışıp _activeDayId'yi sıfırlar; cagri tembel okuma YAPMAZ.
+  const gunId = _activeDayId;
   try {
     const isOnline = navigator.onLine;
     for (const item of secililar) {
@@ -14129,7 +14172,7 @@ async function caseDrugKaydet(btn) {
       if (isOnline) {
         // Online: RPC kullan (§18.8 PG kapı sarmalı — rpcSeansTamamla kalıbı)
         const cagri = (onay, gerekce) => rpc('add_drug_administration', {
-          p_day_id:          _activeDayId,
+          p_day_id:          gunId,
           p_drug_product_id: d?._legacy ? null : item.id,
           p_stok_id:         d?.stock_id || null,
           p_dose:            item.dose,

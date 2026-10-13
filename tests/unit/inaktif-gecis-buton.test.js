@@ -552,6 +552,125 @@ test('picker-secim-doldur-okuyucu', () => {
   assert.deepStrictEqual(JSON.parse(JSON.stringify(ekler)), [{ stok_id: 'sB', urun_id: 'uB', doz: 5, birim: 'ml', yol: null }]);
 });
 
+// F3 madde 1+3 (ROOT RULING 1, 3; KAPI-3 madde 1, 3): doz guard, ok:false,
+// istisnada throw'suz kapanış, PG reddinde erken detay YOK.
+function f3KaydetCtx({ satirlar, acDonus, addDavranis, pgKapi }) {
+  const govde = ['inaktifGecisKaydet', 'vitaminStokIdBul', 'igEkIlaclariOku']
+    .map(a => extractFunctionSource('js/ui.js', a)).join('\n');
+  const { makeElement } = require('./support/loadModule.js');
+  const doc = makeDomStub();
+  doc.__setEl('ig-gun', { value: '7' });
+  doc.__setEl('ig-hastalik', { value: 'd2' });
+  doc.__setEl('ig-kist', { value: '1' });
+  const liste = makeElement('div');
+  for (const s of satirlar) liste.appendChild(s);
+  doc.__setEl('ig-ilac-liste', liste);
+  let sheetKapandi = false;
+  const modal = makeElement('div');
+  modal.remove = () => { sheetKapandi = true; };
+  doc.__setEl('inaktif-gecis-modal', modal);
+  const rpcCagrilari = [];
+  const toasts = [];
+  const acilan = [];
+  const pulls = [];
+  const yakalanan = { sonra: null };
+  // Gerçek openM/pushState ikizi: detay history'e kayıt ekler (KAPI-3 madde 3).
+  const tarih = { yigin: [], pushSay: 0, backSay: 0 };
+  const historyStub = {
+    pushState: (st) => { tarih.yigin.push(st); tarih.pushSay++; },
+    back: () => { tarih.yigin.pop(); tarih.backSay++; },
+    get state() { return tarih.yigin.length ? tarih.yigin[tarih.yigin.length - 1] : null; },
+  };
+  let addSay = 0;
+  const ctx = {
+    console, JSON, Math, Date,
+    document: doc, window: {}, history: historyStub,
+    esc: s => String(s ?? ''), escAttr: s => String(s ?? ''),
+    toast: (m) => { toasts.push(String(m)); },
+    rpc: async (ad, p) => {
+      rpcCagrilari.push({ ad, p });
+      if (ad === 'inaktif_alt_vaka_ac') return acDonus;
+      return addDavranis(addSay++, p);
+    },
+    pullTables: async (t) => { pulls.push(t); return { ok: [], failed: [] }; },
+    renderSafe: () => {},
+    RPC_TABLES: { inaktif_alt_vaka_ac: ['cases', 'treatment_days'] },
+    openCaseDet: async (id) => { acilan.push(id); historyStub.pushState({ modal: 'm-case-det' }); },
+    _pgKapiHata: pgKapi || ((e, tekrar, sonra) => {
+      if (!/^PG_KAPI:/.test(e && e.message ? e.message : String(e))) return false;
+      historyStub.pushState({ pg_kapi: true });
+      yakalanan.sonra = sonra;
+      return true;
+    }),
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'f3-kaydet-ctx' });
+  const pgNet = () => tarih.yigin.filter(s => s && s.pg_kapi).length;
+  return { ctx, rpcCagrilari, toasts, acilan, pulls, yakalanan, tarih, pgNet, sheetKapandi: () => sheetKapandi };
+}
+function f3Satir(stokId, doz) {
+  const { makeElement } = require('./support/loadModule.js');
+  const r = makeElement('div');
+  r._ek = { stok_id: stokId, urun_id: 'uX', doz: doz, birim: 'ml', yol: null };
+  return r;
+}
+const F3_AC = { ok: true, alt_vaka_id: 'alt-f3', gun_id: 'gun-f3', ertelenen: 0 };
+
+test('f3-doz-bos-sifir-rpc', async () => {
+  // Madde 1a: stok seçili + doz '' → toast + return, HİÇ RPC yok (aç-RPC dahil).
+  const t = f3KaydetCtx({ satirlar: [f3Satir('sA', '')], acDonus: F3_AC, addDavranis: async () => ({ ok: true }) });
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(t.rpcCagrilari.length, 0, '0 RPC çağrısı, ölçülen: ' + JSON.stringify(t.rpcCagrilari.map(c => c.ad)));
+  assert.ok(t.toasts.some(m => /doz/i.test(m)), 'doz toast, ölçülen: ' + JSON.stringify(t.toasts));
+});
+
+test('f3-ok-false-kismi-basari', async () => {
+  // Madde 1b: 2 ekten biri {ok:false} → '1/2' toast, alt vaka çağrısı 1.
+  const t = f3KaydetCtx({
+    satirlar: [f3Satir('sA', 5), f3Satir('sB', 10)],
+    acDonus: F3_AC,
+    addDavranis: async (i) => (i === 0 ? { ok: true } : { ok: false, error: 'Geçerli bir doz girin' }),
+  });
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(t.rpcCagrilari.filter(c => c.ad === 'inaktif_alt_vaka_ac').length, 1, 'alt vaka çağrısı 1');
+  assert.strictEqual(t.rpcCagrilari.filter(c => c.ad === 'add_drug_administration').length, 2, 'iki ek de denendi');
+  assert.ok(t.toasts.some(m => /1\/2 ilaç eklendi/.test(m)), "'1/2' toast, ölçülen: " + JSON.stringify(t.toasts));
+});
+
+test('f3-istisna-sheet-kapanir', async () => {
+  // Madde 1c: ilk ek istisna → throw YOK, sheet kapandı, sonra çalıştı, aç-RPC 1.
+  const t = f3KaydetCtx({
+    satirlar: [f3Satir('sA', 5)],
+    acDonus: F3_AC,
+    addDavranis: async () => { throw new Error('ağ kesildi'); },
+  });
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(t.rpcCagrilari.filter(c => c.ad === 'inaktif_alt_vaka_ac').length, 1, 'inaktif_alt_vaka_ac 1 kez');
+  assert.strictEqual(t.sheetKapandi(), true, 'sheet kapandı (closeM)');
+  assert.ok(t.pulls.length >= 1, 'sonra çalıştı (tazeleme), ölçülen: ' + JSON.stringify(t.pulls));
+  assert.ok(t.toasts.some(m => /0\/1 ilaç eklendi/.test(m)), "k/n toast, ölçülen: " + JSON.stringify(t.toasts));
+});
+
+test('f3-pg-reddinde-erken-detay-yok', async () => {
+  // Madde 3: PG reddi → onaydan ÖNCE openCaseDet YOK; kapı onayı akışında
+  // pg history net +0; detay YALNIZ onaylı tekrarın sonrasında açılır.
+  const t = f3KaydetCtx({
+    satirlar: [f3Satir('sA', 5)],
+    acDonus: F3_AC,
+    addDavranis: async () => { throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"31"}'); },
+  });
+  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  assert.strictEqual(t.tarih.pushSay, 1, 'kapı 1 push (gate), ölçülen: ' + t.tarih.pushSay);
+  assert.deepStrictEqual(t.acilan, [], 'openCaseDet onaydan ÖNCE çağrılmaz');
+  assert.strictEqual(t.sheetKapandi(), true, 'pgDurdu yolunda da sheet kapanır');
+  // Onay akışı: tekrar ok → kapat (üstte pg_kapi varken back) → saklanan sonra.
+  assert.strictEqual(typeof t.yakalanan.sonra, 'function', 'kapıya sonra taşındı');
+  if (t.tarih.yigin.length && t.tarih.yigin[t.tarih.yigin.length - 1].pg_kapi) t.ctx.history.back();
+  assert.strictEqual(t.pgNet(), 0, 'kapı onayı akışında pg history net +0');
+  await t.yakalanan.sonra();
+  assert.deepStrictEqual(t.acilan, ['alt-f3'], 'detay YALNIZ onaylı tekrarın sonrasında');
+});
+
 test('picker-kaydet-gun-ac', async () => {
   // (c) seçimli satırla kaydet → aç-RPC p_gun_ac=true, add doğru güne.
   const t = pickerCtx(pickerKistSec());
@@ -574,4 +693,27 @@ test('picker-kaydet-gun-ac', async () => {
   assert.strictEqual(adds[0].p.p_stok_id, 'sB', 'seçilen stok taşınır');
   assert.strictEqual(adds[0].p.p_day_id, 'gun-1', 'açılan güne yazılır');
   assert.ok(t.toasts.some((m) => /1\/1 ilaç eklendi/.test(m)), 'k/n toast, ölçülen: ' + JSON.stringify(t.toasts));
+});
+
+// F3 KAPI-3 madde 5 (ROOT RULING 5, madde 3'ün aynası — ters yön): inaktif
+// seçiminde 'İnaktif Ovaryum' kaydı yoksa Kistik Over'a DÜŞÜLMEZ (fail-closed:
+// sheet açılmaz + açık hata toast). Adli mutant: MUT-B2 (yedek geri) → FAIL.
+test('inaktif-secimi-fail-closed', async () => {
+  // Yalnız Kistik Over IDB'de VARKEN secim inaktif → sheet YOK + toast.
+  {
+    const t = inaktifAcCtx([{ id: 'd2', name: 'Kistik Over' }]);
+    await vm.runInContext(`inaktifGecisAc('v-ana',{secim:'inaktif',kupeNo:'31',taiEski:'2026-10-07'})`, t.ctx);
+    assert.strictEqual(acikSheetVarMi(t.doc), false, 'İnaktif Ovaryum yoksa sheet açılmaz (fail-closed, Kistik Over\'a düşme YOK)');
+    assert.ok(t.toasts.some(m => /İnaktif Ovaryum/i.test(m) && /bulunamad/i.test(m)),
+      'açık hata toast, ölçülen: ' + JSON.stringify(t.toasts));
+  }
+  // İki kayıt varken secim inaktif → İnaktif sheet'i doğru hastalık id'siyle açılır.
+  {
+    const t = inaktifAcCtx([{ id: 'd1', name: 'İnaktif Ovaryum' }, { id: 'd2', name: 'Kistik Over' }]);
+    await vm.runInContext(`inaktifGecisAc('v-ana',{secim:'inaktif',kupeNo:'31',taiEski:'2026-10-07'})`, t.ctx);
+    assert.strictEqual(acikSheetVarMi(t.doc), true, 'inaktif kaydı varken sheet açılır');
+    const box = t.doc.body.children.find(e => e && e.id === 'inaktif-gecis-modal');
+    assert.ok(box.innerHTML.includes('İnaktif Ovaryum — Küpe 31'), 'M2 başlığı (seçimden)');
+    assert.ok(box.innerHTML.includes('value="d1"'), 'İnaktif Ovaryum id taşınır, ölçülen: ' + box.innerHTML.slice(0, 400));
+  }
 });

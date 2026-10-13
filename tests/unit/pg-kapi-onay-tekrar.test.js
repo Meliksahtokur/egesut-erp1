@@ -275,3 +275,104 @@ test('pg-kapi-ilk-acilis-tek-entry', async () => {
   assert.strictEqual(hist.length - taban, 1);
   assert.strictEqual(hist.state && hist.state.pg_kapi, true);
 });
+
+// ── F3 madde 2 (IMPL-B-KAPI-3 madde 2): caseDrugKaydet onaylı tekrar boş gün ──
+// sonra() PG reddinde HEMEN çalışıp _activeDayId'yi sıfırlar; cagri gün
+// kimliğini döngüden ÖNCE yakalamazsa onaylı tekrar p_day_id:null ile gider,
+// RPC {ok:false,'Tedavi günü bulunamadı'} döner. Gerçek caseDrugKaydet
+// kaynağı vm'de koşar (kopya kapanış YOK).
+// Adli mutant: MUT-TEMBEL-GUN (cagri'da gunId yerine _activeDayId geri).
+function drugCtx(rpcDavranis) {
+  const adlar = ['_pgKapiAc', '_pgKapiHata', '_pgKapiKapat', '_pgKapiOnayliTekrar', 'caseDrugKaydet'];
+  const govde = adlar.map(a => kaynakCek(UI_YOLU(), a)).join('\n');
+  const doc = makeDomStub();
+  const hist = tarihceStub();
+  const toasts = [];
+  const pulls = [];
+  const rpcCagrilari = [];
+  const chk = { dataset: { id: 'd1' }, checked: true };
+  doc.querySelectorAll = (sel) => (String(sel).includes('cdf-chk') ? [chk] : []);
+  doc.querySelector = (sel) => {
+    const s = String(sel);
+    if (s.includes('cdf-dose-inp')) return { value: '5' };
+    if (s.includes('cdf-unit-inp')) return { value: 'ml' };
+    if (s.includes('cdf-route-inp')) return { value: 'IM' };
+    return null;
+  };
+  const btn = { disabled: false, textContent: 'Kaydet', closest: () => ({ remove() {} }) };
+  const ctx = {
+    console, JSON, Math, Date,
+    document: doc, history: hist, window: {},
+    navigator: { userAgent: 'node-test', onLine: true },
+    esc: s => String(s ?? ''), fmtTarih: s => String(s ?? ''),
+    toast: (m, hata) => { toasts.push({ m: String(m), hata: !!hata }); },
+    rpc: async (ad, p) => {
+      rpcCagrilari.push({ ad, p: { ...(p || {}) } });
+      return rpcDavranis(ad, p);
+    },
+    pullTables: async (t) => { pulls.push(t); return { ok: [], failed: [] }; },
+    renderSafe: () => {},
+    renderCaseTimeline: async () => {},
+    loadDrugsCache: async () => {},
+    loadStokPanel: () => {},
+    _activeDayId: null,
+    _drugsCache: [{ id: 'd1', _legacy: false, stock_id: 's1' }],
+    _curCase: { id: 'vaka-1' },
+    RPC_TABLES: {
+      add_drug_administration: ['stok', 'stok_hareket', 'drug_administrations'],
+    },
+    btn,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(govde, ctx, { filename: 'drug-kapi-ctx' });
+  return { ctx, doc, hist, toasts, pulls, rpcCagrilari, btn };
+}
+
+test('drug-onayli-tekrar-gun-id-dolu', async () => {
+  // MUT-TEMBEL-GUN adli: cagri p_day_id'yi tembel okursa onaylı tekrar
+  // null günle gider → FAIL (ölçülen null yazılır).
+  const t = drugCtx(async (ad, p) => {
+    if (p && p.p_pg_onay === true) return { ok: true };
+    throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}');
+  });
+  vm.runInContext('_activeDayId = "gun-1"', t.ctx);
+  await vm.runInContext('caseDrugKaydet(btn)', t.ctx);
+  assert.strictEqual(vm.runInContext('_activeDayId', t.ctx), null,
+    'tuzak: sonra() PG reddinde HEMEN çalışır, _activeDayId sıfırlanır');
+  const box = kutuyuBagla(t.doc);
+  t.doc.__setEl('pg-kapi-gerekce', { value: '35. gun kontrolu negatif' });
+  await vm.runInContext(onaylaKodu(box), t.ctx);
+  const onayli = t.rpcCagrilari.filter(c => c.p && c.p.p_pg_onay === true);
+  assert.strictEqual(onayli.length, 1, 'onaylı tekrar 1 kez gider, ölçülen: ' + onayli.length);
+  assert.strictEqual(onayli[0].p.p_day_id, 'gun-1',
+    'tekrar p_day_id DOLU gider, ölçülen: ' + onayli[0].p.p_day_id);
+});
+
+test('onayli-tekrar-ok-false-hata-toast', async () => {
+  // Tekrar {ok:false} dönerse "✅ uygulandı" YASAK — dönen mesajla hata
+  // toast'u; çağıran başarı kapanışı (sonra) çalışmaz.
+  const t = kapiCtx({
+    rpc: async (ad, p) => {
+      if (p && p.p_pg_onay === true) return { ok: false, mesaj: 'Tedavi günü bulunamadı' };
+      throw new Error('PG_KAPI:REQUIRE_ACK_PENDING:{"kupe_no":"TR-01"}');
+    },
+  });
+  vm.runInContext(`async function cagriB(onay, gerekce) {
+    return rpc('add_drug_administration', { p_day_id: 'gun-1',
+      p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+  }
+  var __sonraB = 0;
+  async function sonraB() { __sonraB++; }`, t.ctx);
+  await vm.runInContext(`(async () => {
+    try { await cagriB(false, null); } catch (e) { _pgKapiHata(e, cagriB, sonraB, 'add_drug_administration'); }
+  })()`, t.ctx);
+  const box = kutuyuBagla(t.doc);
+  t.doc.__setEl('pg-kapi-gerekce', { value: 'kapi notu' });
+  await vm.runInContext(onaylaKodu(box), t.ctx);
+  assert.ok(!t.toasts.some(m => m.includes('✅') || m.includes('Onaylandı')),
+    'ok:false → başarı toastu YOK, ölçülen: ' + JSON.stringify(t.toasts));
+  assert.ok(t.toasts.some(m => m.includes('Tedavi günü bulunamadı')),
+    'dönen mesajla hata toastu, ölçülen: ' + JSON.stringify(t.toasts));
+  assert.strictEqual(vm.runInContext('__sonraB', t.ctx), 0,
+    'ok:false → sonra çalışmaz, ölçülen: ' + vm.runInContext('__sonraB', t.ctx));
+});
