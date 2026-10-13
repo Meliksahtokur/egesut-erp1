@@ -453,6 +453,12 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
    hayvanda (ırk eşiği `irk_esik.tohumlama_gun`, düvede tipik 365 g; doğum/abort sonrası bekleme —
    `_tohumlama_gorev_uygunluk`). Uygunsuz hayvanda görev açılmaz, `UYGUNSUZ` olay kaydı düşer —
    bu doğru davranıştır, regresyon değildir. TAI açık planlı tohumlamanın yerine geçer; son PG kazanır.
+   **Kural GLOBALDİR, Ovsync istisnası YOK (sahip 2026-10-13, KESİN — yeniden sorulmaz):** Ovsync şablonunun
+   kendi PG'leri de +48 s TAI açar ve şablon TAI'sini (`TEDAVI_SABLON_TOHUMLAMA:*`) `PG_YERINE` ile kapatır;
+   şablon TAI'si için kilit/`GREATEST` daraltması YAZILMAZ. Bilinen, kabul edilmiş sonuç: iki PG'li şablonda
+   1. PG ile 2. PG arasında TAI bir gün öne (son GnRH gününe) düşer, 2. PG girilince şablon TAI gününe kayar
+   (ör. 188: 13.10 PG → TAI 15.10; 14.10 PG → 16.10). Sahip birebir: "2. pg girilince tohumlama kayacak
+   muhtemelen global ayar olması lazım" + "evet dedim zaten işleyiş b değil mi? kurallaştıralım madem".
 7. **Bağımsız PG aktif Ovsync vakasında:** PG uzatır, vaka açık kalır (karar 3; E3 kancası 20261013000002 ile kalktı); TAI +48 s yenilenir (§18.6). `_vaka_kapat` PG dalı + CHECK `PG` tarihsel kayıtlar için korunur (dormant).
 8. **PG onay kapısı:** sunucu `PG_KAPI:*` RAISE ettiğinde HER UI giriş noktası `_pgKapiHata` zinciriyle
    onay penceresi (`#pg-kapi-bs`: Boş ata ve uygula / Vazgeç) açar; düz "Hata" toast'ı YASAK.
