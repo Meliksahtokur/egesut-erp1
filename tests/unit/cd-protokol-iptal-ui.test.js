@@ -152,6 +152,34 @@ test('C1-6: iptal onayı RED → RPC ÇAĞRILMAZ + vaka detayı AÇIK kalır', a
 
 // ── Kablolama: ikinci akış kopyası yok + veri bağımlılığı ──────────────
 
+// ── Faz 4 (PLAN Step 1 — kart-tazeleme): iptal sonrası kart tazeleme + S4 bağ rozeti ──
+
+test('iptal-sonrasi-kart-guncel', () => {
+  const govde = extractFunctionSource(UI, 'caseTohumlamaIptal');
+  assert.match(govde, /pullTables\(\[[^\]]*'gorev_log'/);
+  assert.ok(govde.includes("'islem_log'"), 'islem_log da tazelenir (PLAN Step 3)');
+  assert.ok(govde.indexOf('pullTables(') < govde.indexOf('renderCaseTimeline'),
+    'sıra: önce pull, sonra kart render');
+});
+
+test('s4-devam-rozeti', () => {
+  assert.ok(extractFunctionSource(UI, '_ovsyncS4SatirHtml').includes('alt_vakalar'));
+});
+
+test('s4-devam-rozeti-davranis', () => {
+  const ctx = {
+    _ovsyncBaglamAl: () => ({ vakaKapali: new Map() }),
+    esc: String, escAttr: String,
+    _ovsyncSonlanmaRozeti: () => '', _ovsyncDenemeRozeti: () => '',
+  };
+  const f = require('./support/loadModule.js').loadExtractedFunction(UI, '_ovsyncS4SatirHtml', { extra: ctx });
+  const bagli = f({ hayvan_id: 'h1', kupe_no: 'E2E-95', bolum: 'S4',
+    alt_vakalar: [{ id: 'alt1', hastalik: 'İnaktif Ovaryum', status: 'closed' }] }, '2026-10-13');
+  assert.ok(bagli.includes('alt1'), 'bağ rozeti alt vakaya (openCaseDet) çıkar');
+  const bagsiz = f({ hayvan_id: 'h1', kupe_no: 'E2E-95', bolum: 'S4', alt_vakalar: [] }, '2026-10-13');
+  assert.ok(!bagsiz.includes('openCaseDet(\'alt'), 'alt vaka yoksa bağ rozeti çizilmez');
+});
+
 test('C1-7: cdProtokolIptal akışı KOPYALAMAZ — _protokolIptalAkisi A dalına devreder; protocol_family alanını vakadan okur', () => {
   const cd = extractFunctionSource(UI, 'cdProtokolIptal');
   assert.ok(cd.includes('_protokolIptalAkisi('), 'mevcut A-dal akışına devir (kopya-yapıştır yok)');

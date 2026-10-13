@@ -1344,10 +1344,14 @@ function _ovsyncS4SatirHtml(satir, bugunIso){
   const vakaBtn=vaka
     ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(vaka.id)+'\')">Vaka</button>'
     :'<span class="ovs-etiket">vaka bağlantısı bilinmiyor</span>';
+  const altlar=Array.isArray(satir.alt_vakalar)?satir.alt_vakalar:[];
+  const altBtn=(altlar.length&&altlar[0]&&altlar[0].id)
+    ?'<button class="ovs-aksiyon" onclick="event.stopPropagation();openCaseDet(\''+escAttr(altlar[0].id)+'\')">🔗 alt vaka'+(altlar.length>1?' ('+altlar.length+')':'')+'</button>'
+    :'';
   return '<div class="ovs-kart ovs-s4-kart ovs-sonlanan"><div class="ovs-ust ovs-sonuc-satir"><span class="ovs-l"><b>'
     +esc(satir.kupe_no||'bilinmiyor')+'</b> '+_ovsyncSonlanmaRozeti(satir.close_reason,satir.toh_sonuc)
     +_ovsyncDenemeRozeti(satir.deneme_sayisi)+'</span></div>'
-    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(satir.toh_sonuc||'bilinmiyor')+'</span>'+vakaBtn+'</div>'
+    +'<div class="ovs-alt"><span class="ovs-bilgi">'+esc(satir.toh_sonuc||'bilinmiyor')+'</span>'+vakaBtn+altBtn+'</div>'
     +'</div>';
 }
 /**
@@ -4883,6 +4887,24 @@ function _closeProtokolDetay(){
  * @returns {void} Fonksiyon bir değer döndürmez.
  * @rpc ovsync_baslat_uyarilari, protokol_eksik_tara
  */
+/**
+ * Faz 5 P7 EK-2: protokol uyarılarındaki aktif-Ovsync alt-bölmesi (saf).
+ * ROOT RULING 1: beyaz/krem zemin YOK — mevcut `.arow` sınıfı + yazı rengi vurgu;
+ * satır tıklaması `_showProtokolDetay` ile aynı aksiyonlara çıkar (P4 kapısı korunur).
+ * @param {Array} satirlar {hayvan_id, kupe_no, gorev_tipi|adim, hedef_tarih} satırları.
+ * @returns {string} Boş dizide boş string; doluda başlıklı alt-bölme.
+ */
+function _ovsyncAktifBolmeHtml(satirlar){
+  const liste=Array.isArray(satirlar)?satirlar:[];
+  if(!liste.length) return '';
+  const satir=d=>`<div class="arow" style="margin-bottom:6px;padding:8px 10px;cursor:pointer" onclick="_showProtokolDetay('${escAttr(d.hayvan_id)}','${escAttr(d.protokol||'')}','')">
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:.8rem">${esc(d.kupe_no||'?')}</div>
+      <div style="font-size:.7rem;color:var(--ink3)">${esc(d.gorev_tipi||d.adim||'')} · ${esc(d.hedef_tarih||'')}</div>
+    </div>
+  </div>`;
+  return `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🔄 Aktif Ovsync (${liste.length})</div>${liste.map(satir).join('')}`;
+}
 async function _showProtokolEkran(){
   let data = window.__protokolUyarilar;
   if (!data || !data.length) {
@@ -4898,9 +4920,28 @@ async function _showProtokolEkran(){
   box.onclick = e => { if (e.target === box) _closeProtokolListe(); };
 
   data = data || [];
-  const eksik = data.filter(u => u.durum === 'eksik');
-  const yaklasan = data.filter(u => u.durum === 'yaklasan');
-  const tamamlandi = data.filter(u => u.durum === 'tamamlandi');
+  // Faz 5 P7 EK-2: hayvanı aktif OVSYNC (ana ya da alt vakası) olan satırlar
+  // 🔄 bölmesine taşınır, aşağıdaki 🔴/🟡/✅ listelerinden çıkar.
+  // Kaynak IDB cases (Faz 2a kaynak_vaka_id); bağlam yoksa yüklenir,
+  // okunamazsa listeler değişmeden çizilir.
+  let ovsyncHtml = '';
+  let ovsyncTasinan = null;
+  try {
+    if (!window._ovsyncBaglam) await _ovsyncBaglamYukle();
+    const bag = _ovsyncBaglamAl();
+    const aktif = (bag && bag.vakaAktif && typeof bag.vakaAktif.has === 'function') ? bag.vakaAktif : null;
+    if (aktif) {
+      const tasinan = data.filter(d => d && d.hayvan_id && aktif.has(d.hayvan_id));
+      if (tasinan.length) {
+        ovsyncHtml = _ovsyncAktifBolmeHtml(tasinan);
+        ovsyncTasinan = new Set(tasinan);
+      }
+    }
+  } catch (_e) { ovsyncHtml = ''; ovsyncTasinan = null; }
+  const kalan = ovsyncTasinan ? data.filter(d => !ovsyncTasinan.has(d)) : data;
+  const eksik = kalan.filter(u => u.durum === 'eksik');
+  const yaklasan = kalan.filter(u => u.durum === 'yaklasan');
+  const tamamlandi = kalan.filter(u => u.durum === 'tamamlandi');
 
   /**
    * Durumu 'eksik' olan öğeler için kırmızı, 'yaklasan' olanlar için turuncu, diğerleri için yeşil renk döndürür.
@@ -4959,10 +5000,12 @@ async function _showProtokolEkran(){
       ovHtml = `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--green)">🌱 İlk Tohumlama (${ovList.length} · önbellek)<button onclick="_showOvsyncYardim()" style="margin-left:6px;width:18px;height:18px;border:1px solid var(--ink3);border-radius:50%;background:none;color:var(--ink3);font-size:.65rem;cursor:pointer;line-height:1">?</button><button class="sh-link" onclick="_protokolOvsyncGit()" style="margin-left:6px">Tüm takibi aç →</button></div>${ovList.map(_ovUyariSatirHtml).join('')}`;
     }
   }
+  // Faz 5 P7: 🔄 bölmesi ov-slotunda çizilir (C4-3 montaj kilidi aynen korunur).
+  if (ovsyncHtml) ovHtml = ovHtml + ovsyncHtml;
   // C4 (cila2): K8'in seanslar panel bölümü geri alındı — sahip:
   // "ana listeye monte etmişler, ben böyle bir şey istemedim; sabahki yeterli".
   // Ovsync seansları Görevler listesinde normal görev satırları olarak görünür (1f01e8b hâli).
-  if (!data.length && !ovHtml) { toast('Protokol uyarısı yok'); return; }
+  if (!data.length && !ovHtml && !ovsyncHtml) { toast('Protokol uyarısı yok'); return; }
 
   const eksikHtml = eksik.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:var(--red2)">🔴 Gecikmiş (${eksik.length})</div>${eksik.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
   const yakHtml = yaklasan.length ? `<div style="font-weight:800;font-size:.8rem;margin:12px 0 6px;color:#b8860b">🟡 Yaklaşan (${yaklasan.length})</div>${yaklasan.map((d,i) => _satirHtml(d, data.indexOf(d))).join('')}` : '';
@@ -13551,6 +13594,7 @@ async function caseTohumlamaIptal(gorevId) {
   openConfirm('Tohumlamayı İptal Et', 'Bu planlı tohumlama iptal edilsin mi?', async () => {
     try {
       await write('gorev_log', { ...g, tamamlandi: true, tamamlanma_tarihi: new Date().toISOString(), iptal: true }, 'PATCH', `id=eq.${g.id}`);
+      await pullTables(['gorev_log','islem_log']);
       toast('🗑 Planlı tohumlama iptal edildi');
       await renderCaseTimeline(_curCase.id);
       updateTaskBadge();

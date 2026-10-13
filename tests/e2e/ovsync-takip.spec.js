@@ -43,7 +43,10 @@ const DEMO_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 const DEMO_LOGIN = { email: 'demo@egesut.web', password: 'demo2026' };
 const MARKER = 'E2E-TAKIP-PW-';
 
-test.skip(!IS_DEMO, 'ovsync-takip temsilcileri: yalnız PLAYWRIGHT_DEMO_MODE=1 ile koşar');
+// Dosya-düzeyi koşullu skip (niyet: yalnız PLAYWRIGHT_DEMO_MODE=1 ile koşar):
+// test.describe.configure dosya başında yükleyiciyle uyumludur; çıplak
+// test.skip() üst-seviyede Playwright 1.58.2'de hata verir.
+test.describe.configure({ mode: !IS_DEMO ? 'skip' : 'default' });
 
 // KOŞUM SÖZLEŞMESİ: --workers=1 ZORUNLU. beforeAll worker başına bir kez koşar;
 // paylaşımlı seed çok-worker'da kendini siler (2026-10-01 koşum dersi: 12 worker
@@ -644,3 +647,312 @@ test('T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur
   await expect(fSatir).toBeVisible({ timeout: 10000 });
   await expect(fSatir).toContainText('🔍 takipte');
 });
+
+// ═══ UI kapısı yürüyüş 1-6 — Ovsync paketi (Faz 2b/4/5; IMPL-B) ═════════════
+// DURUM: YAZILDI, KOŞULMADI — demo'da 000002-5 migration'ları yokken koşmaz
+// (brief madde 8: demo apply sonrası ayrı koltuk koşar). Derleme kanıtı:
+// `npx playwright test tests/e2e/ovsync-takip.spec.js --list`.
+// Küpeler MARKER'lı → mevcut temizle() otomatik toplar. Seçici referansları
+// ui.js satırlarıyla verildi; INFERRED işaretli DB varsayımları var.
+async function wSeedHayvan(tag, no) {
+  const id = `e2e90000-0000-4000-8000-${String(no).padStart(12, '0')}`;
+  const kupe = MARKER + tag;
+  const { data: got } = await db.from('hayvanlar').select('id,durum').eq('id', id);
+  if (!got?.length) {
+    const { error } = await db.from('hayvanlar').insert({
+      id, kupe_no: kupe, cinsiyet: 'Dişi', durum: 'Aktif',
+      dogum_tarihi: trGun(-500), grup: 'Sağmal (Laktasyonda)',
+    });
+    if (error) throw new Error(`yürüyüş seed hayvan ${tag} başarısız: ${error.message}`);
+  }
+  return { kupe, hayvanId: id };
+}
+
+async function wTohumlama(seed, gunOffset, sonuc = 'Bekliyor') {
+  const { data, error } = await db.from('tohumlama').insert({
+    hayvan_id: seed.hayvanId, tarih: trGun(gunOffset), sonuc,
+    deneme_sayisi: 1, denemeler: [],
+  }).select('id').single();
+  if (error) throw new Error(`yürüyüş seed tohumlama ${seed.kupe} başarısız: ${error.message}`);
+  return data.id;
+}
+
+// Devam seçici OVSYNC kolu (T-01 deseni): Boş ata + Ovsync başlat → aktif ana vaka id döner.
+async function wDevamOvsync(page, seed, tohId) {
+  await expect.poll(async () => page.evaluate(async ([tid, hid]) => {
+    if (!window.idbGetAll) return false;
+    const t = (await window.idbGetAll('tohumlama')).some(x => x && x.id === tid);
+    const h = (await window.idbGetAll('hayvanlar')).some(x => x && x.id === hid);
+    return t && h;
+  }, [tohId, seed.hayvanId]), { timeout: 45000, intervals: [500, 2000] }).toBe(true);
+  await navTo(page, '#nb-ureme');
+  await page.click('#ureme-tab-tohumlama');
+  await page.fill('#tohumlama-srch', seed.kupe);
+  const satir = page.locator('#ureme-body .hist-row', { hasText: seed.kupe }).first();
+  await expect(satir).toBeVisible({ timeout: 10000 });
+  await satir.click();
+  await expect(page.locator('#m-toh-det')).toHaveClass(/on/);
+  await page.check('input[name="toh-sonuc"][value="Boş"]');
+  await page.click('[data-action="toh-sonuc-kaydet"]');
+  await expect(page.locator('#devam-secici-bs')).toBeVisible({ timeout: 10000 });
+  expect(await page.evaluate(() => window.__devamSecici?.secim)).toBe('OVSYNC');
+  await expect(page.locator('#devam-onayla')).toHaveText('Boş ata + Ovsync başlat');
+  await page.click('#devam-onayla');
+  const ana = await dbBekle(async () => {
+    const v = await db.from('cases').select('id').eq('animal_id', seed.hayvanId).eq('status', 'active');
+    return v.data?.[0] ?? null;
+  });
+  expect(ana, 'OVSYNC ana vaka açılmalı').toBeTruthy();
+  return ana.id;
+}
+
+// S1 kartındaki "İnaktif ovaryum" düğmesi (ui.js _ovsyncS1SatirHtml) → modalı açar.
+async function wInaktifModalAc(page, seed) {
+  await page.evaluate(() => window.goTo && window.goTo('ovsync'));
+  await expect(page.locator('#pg-ovsync')).toHaveClass(/on/);
+  await page.waitForFunction(() => window.__ovsyncTakip?.veri, null, { timeout: 20000 });
+  const btn = page.locator('#pg-ovsync .ovs-kart', { hasText: seed.kupe })
+    .locator('.ovs-aksiyon', { hasText: 'İnaktif ovaryum' }).first();
+  await expect(btn, 'S1 kartında İnaktif ovaryum düğmesi').toBeVisible({ timeout: 15000 });
+  await btn.click();
+  const modal = page.locator('#inaktif-gecis-modal');
+  await expect(modal).toBeVisible({ timeout: 10000 });
+  return modal;
+}
+
+// ═══ Y1 (yürüyüş 1) — İnaktif geçiş: gün sorusu 7, CAROFERTIN-E 20 ml, TAI +7, iptal yok ═
+test('Y1: Ovsync kartı → İnaktif ovaryum → gün 7 + CAROFERTIN-E 20 ml → TAI +7, iptal yok', async ({ page }) => {
+  await openApp(page);
+  const seed = await wSeedHayvan('W1', 91);
+  const tohId = await wTohumlama(seed, 0);
+  const anaId = await wDevamOvsync(page, seed, tohId);
+  const modal = await wInaktifModalAc(page, seed);
+  await expect(modal).toContainText('İnaktif Ovaryum Geçişi');
+  expect(await modal.locator('#ig-gun').inputValue(), 'gün sorusu varsayılan 7').toBe('7');
+  // Vitamin bloğu demo IDB stok'una bağlı (CAROFERTIN-E kaydı varsa çizilir).
+  if (await modal.locator('#ig-vit-doz').count()) {
+    expect(await modal.locator('#ig-vit-doz').inputValue(), 'CAROFERTIN-E 20 ml ön-dolu').toBe('20');
+  }
+  await modal.getByRole('button', { name: 'Alt Vakayı Aç' }).click();
+  await expect(modal).toHaveCount(0, { timeout: 15000 });
+  const alt = await dbBekle(async () => {
+    const v = await db.from('cases').select('id,kaynak_vaka_id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
+    return v.data?.[0] ?? null;
+  });
+  expect(alt, 'alt vaka ana vakaya bağlı açılmalı').toBeTruthy();
+  const tai = await dbBekle(async () => {
+    const g = await db.from('gorev_log').select('id,hedef_tarih,tamamlandi,iptal')
+      .eq('hayvan_id', seed.hayvanId).eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
+    return g.data?.[0] ?? null;
+  });
+  expect(tai, 'açık TAI durmalı (iptal yok)').toBeTruthy();
+  expect([trGun(6), trGun(7)], 'TAI hedefi +7 gün (UTC sınır payı)').toContain(tai.hedef_tarih);
+  expect(tai.iptal).toBe(false);
+  const iptaller = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId).eq('iptal', true);
+  expect(iptaller.data ?? [], 'geçişte iptal satırı yazılmaz').toEqual([]);
+});
+
+// ═══ Y2 (yürüyüş 2) — 5. gün PG: +48 s TAI, ertelenmiş TAI PG_YERINE kapanır; dönüş → ana açık ═
+test('Y2: 5. gün elle PG → +48 s TAI, ertelenmiş TAI PG_YERINE kapanır; dönüşte ana açık', async ({ page }) => {
+  await openApp(page);
+  const seed = await wSeedHayvan('W2', 92);
+  const tohId = await wTohumlama(seed, 0);
+  const anaId = await wDevamOvsync(page, seed, tohId);
+  const modal = await wInaktifModalAc(page, seed);
+  await modal.getByRole('button', { name: 'Alt Vakayı Aç' }).click();
+  const alt = await dbBekle(async () => {
+    const v = await db.from('cases').select('id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
+    return v.data?.[0] ?? null;
+  });
+  expect(alt, 'alt vaka açık olmalı').toBeTruthy();
+  const ertelenmis = await dbBekle(async () => {
+    const g = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId)
+      .eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
+    return g.data?.[0] ?? null;
+  });
+  expect(ertelenmis, 'ertelenmiş TAI açık olmalı').toBeTruthy();
+  // 5. gün PG elle girişe eşdeğer alan olayı (tohumlama pgGecmisiEkle deseni).
+  const { data: stok } = await db.from('stok').select('id,birim').eq('urun_adi', 'PGs (alke)').limit(1).single();
+  expect(stok, 'seed PG stoğu (PGs (alke))').toBeTruthy();
+  const { error: epg } = await db.rpc('hizli_uygulama', {
+    p_hayvan_id: seed.hayvanId, p_stok_id: stok.id, p_doz: 5,
+    p_birim: stok.birim || 'ml', p_rota: 'IM', p_notlar: MARKER + 'y2-pg',
+  });
+  if (epg) throw new Error(`Y2 PG girişi başarısız: ${epg.message}`);
+  // INFERRED: kapanış nedeni kolonu takip_kapanis_nedeni, değeri PG_YERINE (SK2).
+  const kapanmis = await dbBekle(async () => {
+    const g = await db.from('gorev_log').select('id,takip_kapanis_nedeni')
+      .eq('id', ertelenmis.id).eq('tamamlandi', true);
+    return g.data?.[0] ?? null;
+  });
+  expect(kapanmis, 'ertelenmiş TAI kapanmalı').toBeTruthy();
+  expect(kapanmis.takip_kapanis_nedeni).toBe('PG_YERINE');
+  const yeniTai = await dbBekle(async () => {
+    const g = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId)
+      .eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
+    return g.data?.[0] ?? null;
+  });
+  expect(yeniTai, '+48 s yeni TAI doğmalı').toBeTruthy();
+  // Dönüş: kart düğmesinin çağırdığı aynı kapat-RPC yolu (ui.js inaktifAltVakaDonus);
+  // native confirm ÖNCE sorar (yıkıcı/geri alınamaz kapanış — forms.js openConfirm kalıbı dengi).
+  let soru = '';
+  page.on('dialog', d => { soru = d.message(); d.accept().catch(() => {}); });
+  await page.evaluate(altId => window.inaktifAltVakaDonus(altId), alt.id);
+  expect(soru).toContain('ana Ovsync akışına dönülsün mü');
+  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('Ana Ovsync');
+  const ana = await dbTek('cases', 'id', anaId, 'status');
+  expect(ana?.status, 'dönüşte ana Ovsync açık kalır').toBe('active');
+});
+
+// ═══ Y3 (yürüyüş 3) — caseTohumlamaIptal: önce sorar, sonra kart güncel TAI'yi gösterir ═
+test('Y3: planlı tohumlama iptali önce sorar (#m-confirm); kart güncel TAI ile tazelenir', async ({ page }) => {
+  await openApp(page);
+  const seed = await wSeedHayvan('W3', 93);
+  const tohId = await wTohumlama(seed, 0);
+  await wDevamOvsync(page, seed, tohId);
+  const tai = await dbBekle(async () => {
+    const g = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId)
+      .eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
+    return g.data?.[0] ?? null;
+  });
+  expect(tai, 'açık TAI olmalı').toBeTruthy();
+  // Yıkıcı adım ÖNCE sorar: caseTohumlamaIptal openConfirm kalıbı (forms.js kuralı).
+  await page.evaluate(taiId => window.caseTohumlamaIptal(taiId), tai.id);
+  const sheet = page.locator('#m-confirm');
+  await expect(sheet).toBeVisible({ timeout: 10000 });
+  await expect(sheet).toContainText('Tohumlamayı İptal Et');
+  await page.click('#m-confirm-ok');
+  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('iptal edildi');
+  const kapali = await dbTek('gorev_log', 'id', tai.id, 'tamamlandi,iptal');
+  expect(kapali?.iptal, 'görev iptal işaretli').toBe(true);
+});
+
+// ═══ Y4 (yürüyüş 4) — Offline PG ilacı kuyrukta kalır (gebe); online → PG kapı penceresi ═
+test('Y4: çevrimdışı PG ilacı kuyrukta kalır (gebe hayvan); bağlantıda PG kapı penceresi', async ({ page }) => {
+  await openApp(page);
+  const seed = await wSeedHayvan('W4', 94);
+  const tohId = await wTohumlama(seed, -10, 'Bekliyor');
+  const anaId = await wDevamOvsync(page, seed, tohId);
+  const gun = await dbBekle(async () => {
+    const g = await db.from('treatment_days').select('id').eq('case_id', anaId).limit(1);
+    return g.data?.[0] ?? null;
+  });
+  expect(gun, 'vakanın tedavi günü olmalı').toBeTruthy();
+  // Gebe: kapı BLOCK_PREGNANT kararı bu satırdan okur (Faz 1 _pg_kapi).
+  await db.from('tohumlama').update({ sonuc: 'Gebe' }).eq('id', tohId);
+  const { data: stok } = await db.from('stok').select('id').eq('urun_adi', 'PGs (alke)').limit(1).single();
+  expect(stok, 'seed PG stoğu (PGs (alke))').toBeTruthy();
+  const { data: urunler } = await db.from('drug_products').select('*').limit(50);
+  const pgUrun = (urunler ?? []).find(u => JSON.stringify(u).match(/PG/i));
+  expect(pgUrun, 'demo drug_products içinde PG ürünü').toBeTruthy();
+  await goOffline(page);
+  await page.evaluate(async ([dayId, urunId, stokId]) => {
+    await window.write('drug_administrations', {
+      treatment_day_id: dayId, drug_product_id: urunId, stok_id: stokId,
+      dose: 5, unit: 'ml', route: 'IM',
+    }, 'POST');
+  }, [gun.id, pgUrun.id, stok.id]);
+  const kuyrukta = await page.evaluate(async () => {
+    const q = await window.getQueue();
+    return q.filter(o => JSON.stringify(o).includes('drug_administrations')).length;
+  });
+  expect(kuyrukta, 'çevrimdışı ilaç kuyruğa düşmeli').toBeGreaterThan(0);
+  await goOnline(page);
+  // Faz 4 sözleşmesi: PG_KAPI reddi kuyrukta kalır (sessiz düşme YOK), kapı penceresi açılır.
+  await expect.poll(async () => page.evaluate(async () => {
+    const q = await window.getQueue();
+    return q.filter(o => JSON.stringify(o).includes('drug_administrations')).length;
+  }), { timeout: 30000, intervals: [1000, 2000] }).toBeGreaterThan(0);
+  await expect(page.locator('#pg-kapi-bs')).toBeVisible({ timeout: 30000 });
+});
+
+// ═══ Y5 (yürüyüş 5) — S4 Sonlananlar: alt vaka bağ rozeti ═
+test('Y5: S4 Sonlananlar ana+alt kapanışta bağ rozeti gösterir', async ({ page }) => {
+  await openApp(page);
+  const seed = await wSeedHayvan('W5', 95);
+  const tohId = await wTohumlama(seed, 0);
+  const anaId = await wDevamOvsync(page, seed, tohId);
+  const modal = await wInaktifModalAc(page, seed);
+  await modal.getByRole('button', { name: 'Alt Vakayı Aç' }).click();
+  const alt = await dbBekle(async () => {
+    const v = await db.from('cases').select('id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
+    return v.data?.[0] ?? null;
+  });
+  expect(alt, 'alt vaka açık olmalı').toBeTruthy();
+  // Kısır işareti zinciri bitirir: açık ana+alt ERKEN_KAPANIS (domain-rules §18.5/§18.18).
+  await page.evaluate(async hid => {
+    const hepsi = await window.idbGetAll('hayvanlar');
+    const h = hepsi.find(x => x && x.id === hid);
+    await window.write('hayvanlar', { ...h, kisir: true }, 'PATCH', 'id=eq.' + hid);
+    await window.syncNow();
+  }, seed.hayvanId);
+  const kisir = await dbBekle(async () => {
+    const h = await db.from('hayvanlar').select('kisir').eq('id', seed.hayvanId).single();
+    return h.data?.kisir === true ? h.data : null;
+  });
+  expect(kisir, 'kısır işareti backende ulaşmalı').toBeTruthy();
+  const anaKapali = await dbBekle(async () => {
+    const v = await db.from('cases').select('id,status').eq('id', anaId).neq('status', 'active');
+    return v.data?.[0] ?? null;
+  });
+  expect(anaKapali, 'ana vaka kapanmalı').toBeTruthy();
+  const altKapali = await dbBekle(async () => {
+    const v = await db.from('cases').select('id,status').eq('id', alt.id).neq('status', 'active');
+    return v.data?.[0] ?? null;
+  });
+  expect(altKapali, 'alt vaka kapanmalı').toBeTruthy();
+  // UI: S4 bölümünde küpe kartı (S4 kart sınıfı ui.js _ovsyncSatirHtml S4 dalı).
+  await page.evaluate(() => window.goTo && window.goTo('ovsync'));
+  await expect(page.locator('#pg-ovsync')).toHaveClass(/on/);
+  await page.waitForFunction(() => window.__ovsyncTakip?.veri, null, { timeout: 20000 });
+  const s4kart = page.locator('#pg-ovsync .ovs-s4-kart', { hasText: seed.kupe }).first();
+  await expect(s4kart, 'S4 Sonlananlar kartı').toBeVisible({ timeout: 15000 });
+  // Veri sözleşmesi (000005): S4 satırı alt_vakalar dizisini taşır.
+  const bag = await page.evaluate(async kupe => {
+    const r = await window.rpc('ovsync_takip_listele', { p_padok: null });
+    const rows = r?.satirlar || r?.veri?.satirlar || [];
+    const s4 = rows.filter(x => x && x.bolum === 'S4' && (x.kupe_no || '').includes(kupe));
+    return s4.map(x => ({ alt: x.alt_vakalar }));
+  }, seed.kupe);
+  expect(bag.length, 'S4 satırı RPCde olmalı').toBeGreaterThan(0);
+  expect(Array.isArray(bag[0].alt) && bag[0].alt.length > 0, 'S4 satırı alt_vakalar bağını taşımalı').toBe(true);
+});
+
+// ═══ Y6 (yürüyüş 6, Faz 5) — Protokol uyarıları: 🔄 Aktif Ovsync ayrı, 🌱 ile aynı sheet ═
+test('Y6: protokol uyarıları → 🔄 Aktif Ovsync alt-bölmesi genel listeden ayrı, 🌱 ile aynı sheet', async ({ page }) => {
+  await openApp(page);
+  // Deterministik: tarayıcı-içi durum tohumlanır (DB seed'siz); gerçek render yolu koşar.
+  const rapor = await page.evaluate(async () => {
+    window.__protokolUyarilar = [{
+      hayvan_id: 'y6-hayvan', kupe_no: 'E2E-Y6', protokol: 'ILERI_GEBE_PROTOKOL',
+      durum: 'eksik', adim: 'Rektal muayene', gecikme_gun: 3, grup: 'Sağmal',
+    }];
+    window.__ovsyncUyarilar = [{
+      hayvan_id: 'y6-diger', kupe_no: 'E2E-Y6B', kategori: 'Açık dişi',
+      hedef_tarih: '2026-10-20', tai_tarihi: '2026-10-22', taban_turu: 'acik_disi', gorev_id: null,
+    }];
+    window._ovsyncBaglam = {
+      baslat: new Map(), vakaAktif: new Map([['y6-hayvan', { id: 'y6-vaka' }]]),
+      vakaKapali: new Map(), kisir: new Set(),
+    };
+    let kanca = false;
+    const orig = window.rpc;
+    window.rpc = async (ad, prm) => {
+      if (ad === 'ovsync_baslat_uyarilari') { kanca = true; throw new Error('y6-kesinti'); }
+      return orig(ad, prm);
+    };
+    try { await window._showProtokolEkran(); }
+    finally { window.rpc = orig; }
+    const sheet = document.getElementById('protokol-bs');
+    return { sheetVar: !!sheet, kanca, html: sheet ? sheet.innerHTML : '' };
+  });
+  expect(rapor.sheetVar, '#protokol-bs açılmalı').toBe(true);
+  expect(rapor.html).toContain('🔄 Aktif Ovsync');
+  expect(rapor.html).toContain('E2E-Y6');
+  // Aktif Ovsync'li satır genel listeden çıktı: 🔴 Gecikmiş bölmesi çizilmez.
+  expect(rapor.html).not.toContain('🔴 Gecikmiş');
+  // 🌱 bölmesiyle aynı sheet (önbellek kolu; kanca tuttuysa deterministik).
+  if (rapor.kanca) expect(rapor.html).toContain('🌱');
+});
+
+
