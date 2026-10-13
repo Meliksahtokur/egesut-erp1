@@ -1,5 +1,6 @@
 // tests/unit/k10-yaris-kapi.test.js
-// Faz UI-0 (karar 10): U2 küpe başlığı + U3/U4 "Vaka bulunamadı" yarış kapısı.
+// Faz UI-0 (karar 10) + UI-2 uyarlaması: U2 küpe başlığı + U3/U4 yarış kapısı
+// yeni hastalık-günü kaydet zincirinde (hastalikGunKaydet/hastalikGunAc).
 // Yöntem: loadModule/extract — js/ui.js'e dokunmadan davranış probu.
 'use strict';
 const test = require('node:test');
@@ -7,70 +8,68 @@ const assert = require('node:assert');
 const vm = require('node:vm');
 const { extractFunctionSource, loadExtractedFunction, makeDomStub } = require('./support/loadModule.js');
 
-// ── Ortak: kaydet zinciri, yavaş pull + gerçek openCaseDet aynası ──
-// Gerçek openCaseDet (js/ui.js:12203-12207): IDB'de yoksa 'Vaka bulunamadı'
-// toast'u verir. Stub aynı sözleşmeyi taşır — yarış varsa toast düşer.
+// ── Ortak: kaydet zinciri, yavaş pull + IDB gün doğrulaması ──
+// Yarış varsa kayıt IDB'ye düşmeden taze render koşar; kilit bunu engeller.
 function yarisCtx() {
-  const govde = ['inaktifGecisKaydet', 'vitaminStokIdBul', 'igEkIlaclariOku']
+  const govde = 'var _hgKayitKilit=false;\n' + ['hastalikGunKaydet', 'hgEkIlaclariOku']
     .map(a => extractFunctionSource('js/ui.js', a)).join('\n');
   const doc = makeDomStub();
-  doc.__setEl('ig-gun', { value: '7' });
-  doc.__setEl('ig-hastalik', { value: 'd1' });
-  doc.__setEl('inaktif-gecis-modal', { remove() {} });
-  const casesIdb = [{ id: 'v-ana', animal_id: 'H-31', status: 'active' }];
+  doc.__setEl('hg-gun', { value: '7' });
+  doc.__setEl('hg-hastalik', { value: 'd1' });
+  doc.__setEl('hg-hastalik-ad', { value: 'İnaktif Ovaryum' });
+  doc.__setEl('hg-tarih', { value: '2026-10-13' });
+  doc.__setEl('hg-tai-chip', { getAttribute: () => '2026-10-15' });
+  doc.__setEl('hg-ilac-liste', { children: [] });
+  doc.__setEl('hastalik-modal', { remove() {} });
+  const gunIdb = [];
   const pulls = [];
   const toasts = [];
-  const acilan = [];
   const sira = [];
-  const idbGetAll = async (t) => (t === 'cases' ? casesIdb.slice() : []);
+  const idbGetAll = async (t) => (t === 'treatment_days' ? gunIdb.slice() : []);
   const ctx = {
     console, JSON, Math, Date,
     document: doc, window: {},
     esc: s => String(s ?? ''), escAttr: s => String(s ?? ''),
     toast: (m) => { toasts.push(String(m)); },
-    rpc: async (ad) => {
-      if (ad === 'inaktif_alt_vaka_ac') return { ok: true, alt_vaka_id: 'alt-yaris', gun_id: null, ertelenen: 0 };
-      return { ok: true };
-    },
+    rpc: async () => ({ ok: true, gun_id: 'gun-yaris', mevcut: false, ertelenen: 1, ilac: 0 }),
     // Yavaş pull: sunucu durumu IDB'ye YALNIZ pull bitince düşer (gerçek yarış).
     pullTables: async (t) => {
       pulls.push(t);
       await new Promise(r => setTimeout(r, 60));
-      casesIdb.push({ id: 'alt-yaris', animal_id: 'H-31', status: 'active' });
+      gunIdb.push({ id: 'gun-yaris', case_id: 'v-ana' });
       sira.push('pull-bitti');
       return { ok: [], failed: [] };
     },
     renderSafe: () => {},
-    RPC_TABLES: { inaktif_alt_vaka_ac: ['cases', 'treatment_days'] },
+    RPC_TABLES: { ovsync_hastalik_gunu_ekle: ['cases', 'treatment_days'] },
     idbGetAll,
-    openCaseDet: async (id) => {
-      const tum = await idbGetAll('cases');
-      if (!tum.some(x => x && x.id === id)) { toasts.push('Vaka bulunamadı'); return; }
-      sira.push('detay-acildi');
-      acilan.push(id);
-    },
+    renderCaseTimeline: async () => { sira.push('taze-render'); },
+    loadDash: () => {},
+    _curCase: { id: 'v-ana' },
+    dFwd: (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); const p = (x) => String(x).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); },
+    _pgKapiHata: () => false, _ertelemeOfflineGuard: () => false,
   };
   vm.createContext(ctx);
   vm.runInContext(govde, ctx, { filename: 'yaris-kaydet-ctx' });
-  return { ctx, pulls, toasts, acilan, sira };
+  return { ctx, pulls, toasts, sira };
 }
 
 test('yavas-detay-yaris-yok', async () => {
   const t = yarisCtx();
-  await vm.runInContext(`inaktifGecisKaydet('v-ana')`, t.ctx);
+  await vm.runInContext(`hastalikGunKaydet('v-ana')`, t.ctx);
   const kotu = t.toasts.filter(m => m.includes('bulunamadı'));
   assert.strictEqual(kotu.length, 0, '"Vaka bulunamadı" yarışı YOK, ölçülen: ' + JSON.stringify(t.toasts));
-  assert.deepStrictEqual(t.acilan, ['alt-yaris'], 'pull + IDB doğrulamasından SONRA detay açılır');
+  assert.ok(t.sira.includes('taze-render'), 'pull + IDB doğrulamasından SONRA taze render');
   assert.ok(t.pulls.length >= 1, 'pull koştu');
   assert.ok(
-    t.sira.indexOf('pull-bitti') !== -1 && t.sira.indexOf('pull-bitti') < t.sira.indexOf('detay-acildi'),
-    'sıra: önce pull, sonra detay — ölçülen: ' + JSON.stringify(t.sira)
+    t.sira.indexOf('pull-bitti') !== -1 && t.sira.indexOf('pull-bitti') < t.sira.indexOf('taze-render'),
+    'sıra: önce pull, sonra render — ölçülen: ' + JSON.stringify(t.sira)
   );
 });
 
-// ── U2: vaka detay yolunda başlık küpesi kart/_curCase'ten gelir ──
+// ── U2: modal yolunda başlık küpesi kart/_curCase'ten gelir ──
 function kupeCtx() {
-  const govde = ['inaktifGecisSheetHtml', 'inaktifGecisAc']
+  const govde = ['hastalikGunAc', 'hastalikSheetHtml', '_hgVitSatir', '_hgTaiChip']
     .map(a => extractFunctionSource('js/ui.js', a)).join('\n');
   const doc = makeDomStub();
   const toasts = [];
@@ -78,13 +77,18 @@ function kupeCtx() {
     console, JSON, Math, Date,
     document: doc, window: {},
     esc: s => String(s ?? ''), escAttr: s => String(s ?? ''),
+    fmtTarih: (iso) => { const p = String(iso || '').slice(0, 10).split('-'); return p.length === 3 ? p[2] + '.' + p[1] + '.' + p[0] : String(iso); },
     toast: (m) => { toasts.push(String(m)); },
     // _curCase ham cases satırıdır (kupe_no YOK — gerçek U2 durumu).
     _curCase: { id: 'v-ana', animal_id: 'H-31', status: 'active', protocol_family: 'OVSYNC' },
     getState: (k) => (k === 'animals' ? [{ id: 'H-31', kupe_no: '31' }] : []),
-    idbGetAll: async (t) => (t === 'diseases'
-      ? [{ id: 'd1', name: 'İnaktif Ovaryum' }]
-      : []),
+    idbGetAll: async (t) => {
+      if (t === 'diseases') return [{ id: 'd1', name: 'İnaktif Ovaryum' }];
+      if (t === 'cases') return [{ id: 'v-ana', animal_id: 'H-31', status: 'active', protocol_family: 'OVSYNC' }];
+      return [];
+    },
+    bugun: () => '2026-10-13',
+    _ertelemeOfflineGuard: () => false,
   };
   vm.createContext(ctx);
   vm.runInContext(govde, ctx, { filename: 'kupe-ac-ctx' });
@@ -93,8 +97,8 @@ function kupeCtx() {
 
 test('kupe-baslik-dolu', async () => {
   const t = kupeCtx();
-  await vm.runInContext(`inaktifGecisAc('v-ana',{secim:'inaktif',kupeNo:null,taiEski:null})`, t.ctx);
-  const box = t.doc.body.children.find(e => e && e.id === 'inaktif-gecis-modal');
+  await vm.runInContext(`hastalikGunAc('v-ana')`, t.ctx);
+  const box = t.doc.body.children.find(e => e && e.id === 'hastalik-modal');
   assert.ok(box, 'sheet açılır');
   assert.ok(box.innerHTML.includes('Küpe 31'), 'başlık kart küpesini taşır (U2)');
   assert.ok(!box.innerHTML.includes('bilinmiyor'), 'bilinmiyor YOK, ölçülen başlık: '

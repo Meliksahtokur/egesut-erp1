@@ -21,7 +21,7 @@ test('p7-metin-kilidi-zemin-yok', () => {
 // üreticilere genişler. Yasak = `background` yazımı;
 // İSTİSNA `background:var(--` (mevcut palet).
 test('p7-metin-kilidi-tum-ureticiler', () => {
-  for (const fn of ['_ovsyncAktifBolmeHtml', 'inaktifGecisSheetHtml', '_ovsyncYetimRozetHtml', '_ovsyncS4SatirHtml']) {
+  for (const fn of ['_ovsyncAktifBolmeHtml', 'hastalikSheetHtml', '_ovsyncYetimRozetHtml', '_ovsyncS4SatirHtml']) {
     const src = extractFunctionSource('js/ui.js', fn);
     const izinli = src.replace(/background:var\(--/g, '');
     assert.ok(!/background/.test(izinli), fn + ': yasak background yazımı (wash) — vurgu yalnız yazı rengi');

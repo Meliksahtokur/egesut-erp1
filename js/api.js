@@ -415,10 +415,10 @@ const RPC_TABLES = {
   // P2 (Ovsync/PG): yeni RPC pull setleri
   start_first_service_protocol: ['cases','treatment_days','treatment_day_uygulamalar','drug_administrations','gorev_log','islem_log','stok','stok_hareket','diseases','drugs','tedavi_sablonu'],
   tohumlama_gorev_ertele:    ['gorev_log','islem_log'],
-  // Faz 2b (ovsync-paketi): inaktif alt vaka aç/kapat — alt cases satırı +
-  // vitamin ilaç zinciri (treatment_days/drug_administrations/stok) + TAI öteleme (gorev_log).
-  inaktif_alt_vaka_ac:      ['cases','treatment_days','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
-  inaktif_alt_vaka_kapat:   ['cases','treatment_days','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
+  // K10-UI2 (karar 10): hastalık günü tek RPC — gün-aç + ilaçlar + TAI
+  // öteleme (treatment_days/drug_administrations/stok) + ertele denetimi
+  // (islem_log; timeline TAI eski→yeni notu buradan okunur).
+  ovsync_hastalik_gunu_ekle: ['cases','treatment_days','drug_administrations','stok','stok_hareket','gorev_log','islem_log'],
   // E1-UI (erteleme-genel): genel gorev erteleme — tohumlama_gorev_ertele deseni.
   // RPC_MAP'e (api.js, offline kuyruk replay) BILINCLI girmez:
   // erteleme online-only'dir (E6 kapisu) — vaka_toplu_ac gerekce kalibi.

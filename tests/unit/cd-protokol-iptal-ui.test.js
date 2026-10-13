@@ -167,17 +167,20 @@ test('s4-devam-rozeti', () => {
 });
 
 test('s4-devam-rozeti-davranis', () => {
+  // K10-UI2: öğeler treatment_days satırıdır (gün id'si vaka değildir) —
+  // rozet ebeveyn detayına çıkar.
   const ctx = {
-    _ovsyncBaglamAl: () => ({ vakaKapali: new Map() }),
+    _ovsyncBaglamAl: () => ({ vakaKapali: new Map([['h1', { id: 'v-ana' }]]) }),
     esc: String, escAttr: String,
     _ovsyncSonlanmaRozeti: () => '', _ovsyncDenemeRozeti: () => '',
   };
   const f = require('./support/loadModule.js').loadExtractedFunction(UI, '_ovsyncS4SatirHtml', { extra: ctx });
   const bagli = f({ hayvan_id: 'h1', kupe_no: 'E2E-95', bolum: 'S4',
-    alt_vakalar: [{ id: 'alt1', hastalik: 'İnaktif Ovaryum', status: 'closed' }] }, '2026-10-13');
-  assert.ok(bagli.includes('alt1'), 'bağ rozeti alt vakaya (openCaseDet) çıkar');
+    alt_vakalar: [{ id: 'gun-1', hastalik: 'İnaktif Ovaryum', status: 'acik' }] }, '2026-10-13');
+  assert.ok(bagli.includes('openCaseDet(\'v-ana\')'), 'bağ rozeti ebeveyn detayına çıkar');
+  assert.ok(!bagli.includes('gun-1'), 'gün id hedefte geçmez');
   const bagsiz = f({ hayvan_id: 'h1', kupe_no: 'E2E-95', bolum: 'S4', alt_vakalar: [] }, '2026-10-13');
-  assert.ok(!bagsiz.includes('openCaseDet(\'alt'), 'alt vaka yoksa bağ rozeti çizilmez');
+  assert.ok(!bagsiz.includes('🔗'), 'gün yoksa bağ rozeti çizilmez');
 });
 
 test('C1-7: cdProtokolIptal akışı KOPYALAMAZ — _protokolIptalAkisi A dalına devreder; protocol_family alanını vakadan okur', () => {

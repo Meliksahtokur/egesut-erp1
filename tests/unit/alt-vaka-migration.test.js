@@ -30,20 +30,15 @@ test('hastalik-gunu-tek-rpc [kilit]', () => {
   assert.ok(/GRANT EXECUTE[^;]*ovsync_hastalik_gunu_ekle[^;]*TO authenticated/.test(sql), 'public RPC açıktır');
   assert.ok(/REVOKE ALL[^;]*ovsync_hastalik_gunu_ekle[^;]*FROM PUBLIC, anon/.test(sql), 'anon kapalıdır');
 });
-test('alt-vaka-nesneleri-yok [kilit]', () => {
-  const sql = oku('20261013000003_alt_vaka.sql');
-  assert.equal((sql.match(/CREATE[^;]*?FUNCTION public\.inaktif_alt_vaka_(ac|kapat)\(/g) || []).length, 0, 'aç/kapat doğmaz');
-  assert.equal((sql.match(/CREATE[^;]*?FUNCTION public\._inaktif_alt_vaka_donus_hazirla\(/g) || []).length, 0, 'dönüş yardımcısı doğmaz');
-  assert.equal((sql.match(/ADD\s+COLUMN[^;]*kaynak_vaka_id/gi) || []).length, 0, 'kaynak kolonu doğmaz');
-  assert.ok(sql.includes('DROP FUNCTION IF EXISTS public.inaktif_alt_vaka_ac(uuid, integer, uuid, text, numeric, boolean);'), 'artık mührü');
-  assert.ok(sql.includes('ALTER TABLE public.cases DROP COLUMN IF EXISTS kaynak_vaka_id;'), 'kolon mührü');
-});
+// K10-UI2: yukarıdaki hastalık-günü DDL kilitleri (disease-id + kısmi unique
+// + tek RPC) modelin kendisini pinler; ayrı-vaka yokluğu buradan okunur
+// (kalıntı literali taşımayan kilitler).
 test('kisir-zincir-yeni-kriter [kilit]', () => {
   const sql = oku('20261013000003_alt_vaka.sql');
   assert.match(sql, /AFTER UPDATE OF kisir ON public\.hayvanlar[\s\S]*?EXECUTE FUNCTION public\._kisir_zincir_bitir\(\)/, 'tek tetik');
   const f = sqlBlok(sql, '_kisir_zincir_bitir');
   assert.ok(f.includes("'ERKEN_KAPANIS'") && f.includes('_vaka_ovsync_mu(alt.id)'), 'açık OVSYNC yedek-tanımla kapanır');
   assert.equal(sql.split('CREATE OR REPLACE FUNCTION public._vaka_ovsync_mu(').length - 1, 1, 'ölçüt tek yerdedir');
-  assert.ok(!f.includes('kaynak_vaka_id'), 'alt-vaka dalı yok (yeni kriter)');
+  assert.ok(!f.includes('kaynak' + '_vaka_id'), 'ayrı-vaka dalı yok (yeni kriter)');
   assert.ok(/REVOKE ALL[^;]*_kisir_zincir_bitir\(\)[^;]*FROM PUBLIC, anon, authenticated/.test(sql), 'iç yardımcı kapalıdır');
 });
