@@ -1492,6 +1492,14 @@ async function hastalikGunAc(anaVakaId){
       if(hv) kupeNo=hv.kupe_no||hv.devlet_kupe||null;
     }catch(e){}
   }
+  // K10-T (U2 yüzeyi): pano bağlamında state'te hayvan YOKSA IDB'ye düş
+  // (e2e Y-N3: başlık 'bilinmiyor' kalıyordu — demoda ölçüldü).
+  if(!kupeNo&&vaka&&vaka.animal_id&&typeof idbGetAll==='function'){
+    try{
+      const hv=((await idbGetAll('hayvanlar'))||[]).find(a=>a&&a.id===vaka.animal_id);
+      if(hv) kupeNo=hv.kupe_no||hv.devlet_kupe||null;
+    }catch(e){}
+  }
   if(!kupeNo) kupeNo='bilinmiyor';
   // Açık TAI hedefi (sheet TAI önizlemesi için).
   let taiEski=null;
@@ -1598,12 +1606,14 @@ async function hastalikGunKaydet(anaVakaId, btn){
       toast('❌ Hastalık günü açılamadı'+((r&&r.error)?': '+r.error:''),true);
       return r;
     }
-    const box=document.getElementById('hastalik-modal'); if(box) box.remove();
+    // K10-T (N3b toast): ad/chip sheet KALDIRILMADAN okunur — remove() sonrası
+    // getElementById null döner, toast hep inaktif dalına düşerdi (e2e Y-N3b).
     const adEl=document.getElementById('hg-hastalik-ad');
     const ad=adEl&&adEl.value?adEl.value:'';
     const taban=/kist/i.test(ad)?'✅ Kist günü açıldı':'✅ İnaktif ovaryum günü açıldı';
     const chipEl=document.getElementById('hg-tai-chip');
     const eski=chipEl&&chipEl.getAttribute?chipEl.getAttribute('data-tai-eski'):null;
+    const box=document.getElementById('hastalik-modal'); if(box) box.remove();
     let taiBolum='';
     if(r.ertelenen>0&&/^\d{4}-\d{2}-\d{2}$/.test(eski||'')&&typeof dFwd==='function'){
       const kisa=iso=>String(iso).slice(8,10)+'.'+String(iso).slice(5,7);

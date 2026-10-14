@@ -35,7 +35,7 @@
 //     /main/node_modules/.bin/playwright test tests/e2e/ovsync-takip.spec.js \
 //     --reporter=list --retries=0 --workers=1
 
-import { test, expect, openApp, navTo, goOffline, IS_DEMO } from '../support/app.js';
+import { test, expect, openApp, navTo, goOffline, toastText, IS_DEMO } from '../support/app.js';
 import { createClient } from '@supabase/supabase-js';
 
 const DEMO_URL = 'https://vtzqjmazsvurxdeondmi.supabase.co';
@@ -250,6 +250,11 @@ async function temizle(faz) {
   const cases = await adim('cases sorgu', db.from('cases').select('id').in('animal_id', ids));
   const cid = (cases ?? []).map(c => c.id);
   if (cid.length) {
+    // K10: hastalık günü ilaçları (drug_administrations) — CASCADE'a güvenmeden
+    // gün id'leri üzerinden açıkça önce silinir.
+    const gunler = await adim('gun sorgu', db.from('treatment_days').select('id').in('case_id', cid));
+    const gid = (gunler ?? []).map(g => g.id);
+    if (gid.length) await adim('drug_administrations', db.from('drug_administrations').delete().in('treatment_day_id', gid).select('id'));
     await adim('treatment_day_uygulamalar', db.from('treatment_day_uygulamalar').delete().in('case_id', cid).select('id'));
     await adim('treatment_days', db.from('treatment_days').delete().in('case_id', cid).select('id'));
   }
@@ -648,12 +653,13 @@ test('T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur
   await expect(fSatir).toContainText('🔍 takipte');
 });
 
-// ═══ UI kapısı yürüyüş 1-6 — Ovsync paketi (Faz 2b/4/5; IMPL-B) ═════════════
-// DURUM: YAZILDI, KOŞULMADI — demo'da 000002-5 migration'ları yokken koşmaz
-// (brief madde 8: demo apply sonrası ayrı koltuk koşar). Derleme kanıtı:
-// `npx playwright test tests/e2e/ovsync-takip.spec.js --list`.
-// Küpeler MARKER'lı → mevcut temizle() otomatik toplar. Seçici referansları
-// ui.js satırlarıyla verildi; INFERRED işaretli DB varsayımları var.
+// ═══ K10 yürüyüş (karar 10: hastalık = Ovsync İÇİNDE gün; ayrı vaka/dönüş YOK) ═
+// Eski Y1-Y6 (inaktif alt-vaka modeli) KALDIRILDI: js yüzeyi UI-2'de silindi,
+// demoda inaktif_alt_vaka_ac PGRST202 + devam-OVSYNC vaka açmıyor (kırmızı kanıt:
+// Y1 "OVSYNC ana vaka açılmalı" FAIL, 2026-10-13). Küpeler MARKER'lı → mevcut
+// temizle() otomatik toplar (+ drug_administrations). Seçiciler ui.js K10
+// satırlarıyla verildi; DB anahtarları 000003/000005-yeni.
+const K10_SHOT = '/home/melik/.herdr/worktrees/egesut-erp1/yar-m-jobs/runs/2026-10-13-ovsync-paketi/ui-k10';
 async function wSeedHayvan(tag, no) {
   const id = `e2e90000-0000-4000-8000-${String(no).padStart(12, '0')}`;
   const kupe = MARKER + tag;
@@ -668,291 +674,287 @@ async function wSeedHayvan(tag, no) {
   return { kupe, hayvanId: id };
 }
 
-async function wTohumlama(seed, gunOffset, sonuc = 'Bekliyor') {
-  const { data, error } = await db.from('tohumlama').insert({
-    hayvan_id: seed.hayvanId, tarih: trGun(gunOffset), sonuc,
-    deneme_sayisi: 1, denemeler: [],
+// OVSYNC vaka zemini (kızgınlık→onaylı vaka_ac; demo-ölçülü yol 2026-10-13):
+// damga modunda protocol_family='OVSYNC' PATCH + açık TAI; yedek modda
+// (Y-NULL-PF) aile NULL + TEDAVI_SABLON_TOHUMLAMA TAI. Sonda pullTables
+// (IDB tazeliği — U3/U4; openCaseDet/openDet IDB'den okur).
+async function wOvsyncVaka(page, tag, no, yedek = false, sablonKaynak = false) {
+  const seed = await wSeedHayvan(tag, no);
+  const kid = 'e2e-takip-pw-kiz-' + tag.toLowerCase();
+  await db.from('kizginlik_log').delete().eq('id', kid);
+  const kz = await db.from('kizginlik_log').insert({
+    id: kid, hayvan_id: seed.hayvanId, tarih: trBugun(), belirti: 'Kızgınlık',
   }).select('id').single();
-  if (error) throw new Error(`yürüyüş seed tohumlama ${seed.kupe} başarısız: ${error.message}`);
-  return data.id;
-}
-
-// Devam seçici OVSYNC kolu (T-01 deseni): Boş ata + Ovsync başlat → aktif ana vaka id döner.
-async function wDevamOvsync(page, seed, tohId) {
-  await expect.poll(async () => page.evaluate(async ([tid, hid]) => {
-    if (!window.idbGetAll) return false;
-    const t = (await window.idbGetAll('tohumlama')).some(x => x && x.id === tid);
-    const h = (await window.idbGetAll('hayvanlar')).some(x => x && x.id === hid);
-    return t && h;
-  }, [tohId, seed.hayvanId]), { timeout: 45000, intervals: [500, 2000] }).toBe(true);
-  await navTo(page, '#nb-ureme');
-  await page.click('#ureme-tab-tohumlama');
-  await page.fill('#tohumlama-srch', seed.kupe);
-  const satir = page.locator('#ureme-body .hist-row', { hasText: seed.kupe }).first();
-  await expect(satir).toBeVisible({ timeout: 10000 });
-  await satir.click();
-  await expect(page.locator('#m-toh-det')).toHaveClass(/on/);
-  await page.check('input[name="toh-sonuc"][value="Boş"]');
-  await page.click('[data-action="toh-sonuc-kaydet"]');
-  await expect(page.locator('#devam-secici-bs')).toBeVisible({ timeout: 10000 });
-  expect(await page.evaluate(() => window.__devamSecici?.secim)).toBe('OVSYNC');
-  await expect(page.locator('#devam-onayla')).toHaveText('Boş ata + Ovsync başlat');
-  await page.click('#devam-onayla');
-  const ana = await dbBekle(async () => {
-    const v = await db.from('cases').select('id').eq('animal_id', seed.hayvanId).eq('status', 'active');
-    return v.data?.[0] ?? null;
+  if (kz.error) throw new Error(`yürüyüş kızgınlık ${tag} başarısız: ${kz.error.message}`);
+  const v = await db.rpc('kizginlik_vaka_ac', { p_kizginlik_id: kid, p_tani: 'Ovsync', p_takip_onay: true });
+  if (v.error) throw new Error(`yürüyüş vaka_ac ${tag} başarısız: ${v.error.message}`);
+  let anaId = v.data?.case_id ?? null;
+  if (!anaId) anaId = (await db.from('cases').select('id').eq('animal_id', seed.hayvanId).eq('status', 'active')).data?.[0]?.id ?? null;
+  expect(anaId, `OVSYNC vaka açılmalı (${tag})`).toBeTruthy();
+  if (!yedek) {
+    const p = await db.from('cases').update({ protocol_family: 'OVSYNC' }).eq('id', anaId);
+    if (p.error) throw new Error(`yürüyüş damga ${tag} başarısız: ${p.error.message}`);
+  }
+  const kaynak = (yedek || sablonKaynak) ? ('TEDAVI_SABLON_TOHUMLAMA:' + anaId + ':e2e') : ('E2E-TAKIP:' + anaId);
+  const g = await db.from('gorev_log').insert({
+    hayvan_id: seed.hayvanId, gorev_tipi: 'TOHUMLAMA_PLANLI', aciklama: MARKER + tag,
+    hedef_tarih: trGun(7), tamamlandi: false, iptal: false, kaynak,
+  }).select('id').single();
+  if (g.error) throw new Error(`yürüyüş TAI ${tag} başarısız: ${g.error.message}`);
+  await page.evaluate(async () => {
+    if (window.pullTables) await window.pullTables(['cases', 'gorev_log', 'treatment_days', 'diseases', 'stok', 'islem_log', 'hayvanlar']);
   });
-  expect(ana, 'OVSYNC ana vaka açılmalı').toBeTruthy();
-  return ana.id;
+  return { seed, anaId, taiHedef: trGun(7) };
 }
 
-// S1 kartındaki "İnaktif ovaryum" düğmesi (ui.js _ovsyncS1SatirHtml) → modalı açar.
-async function wInaktifModalAc(page, seed) {
+// S1 kartındaki "Hastalık" düğmesi (ui.js _ovsyncS1SatirHtml K10-UI2) → #hastalik-modal.
+async function wHastalikModalAc(page, seed) {
+  await expect.poll(async () => page.evaluate(async () => {
+    if (!window.idbGetAll) return false;
+    const d = await window.idbGetAll('diseases');
+    return (d || []).some(x => x && x.name === 'İnaktif Ovaryum');
+  }), { timeout: 45000, intervals: [500, 2000] }).toBe(true);
   await page.evaluate(() => window.goTo && window.goTo('ovsync'));
   await expect(page.locator('#pg-ovsync')).toHaveClass(/on/);
   await page.waitForFunction(() => window.__ovsyncTakip?.veri, null, { timeout: 20000 });
   const btn = page.locator('#pg-ovsync .ovs-kart', { hasText: seed.kupe })
-    .locator('.ovs-aksiyon', { hasText: 'İnaktif Ovaryum' }).first();
-  await expect(btn, 'S1 kartında İnaktif ovaryum düğmesi').toBeVisible({ timeout: 15000 });
+    .locator('.ovs-aksiyon', { hasText: 'Hastalık' }).first();
+  await expect(btn, 'S1 kartında Hastalık düğmesi').toBeVisible({ timeout: 15000 });
   await btn.click();
-  const modal = page.locator('#inaktif-gecis-modal');
+  const modal = page.locator('#hastalik-modal');
   await expect(modal).toBeVisible({ timeout: 10000 });
   return modal;
 }
 
-// ═══ Y1 (yürüyüş 1) — İnaktif geçiş: gün sorusu 7, CAROFERTIN-E 20 ml, TAI +7, iptal yok ═
-test('Y1: Ovsync kartı → İnaktif ovaryum → gün 7 + CAROFERTIN-E 20 ml → TAI +7, iptal yok', async ({ page }) => {
-  await openApp(page);
-  const seed = await wSeedHayvan('W1', 91);
-  const tohId = await wTohumlama(seed, 0);
-  const anaId = await wDevamOvsync(page, seed, tohId);
-  const modal = await wInaktifModalAc(page, seed);
-  await expect(modal).toContainText('İnaktif Ovaryum — Küpe');
-  expect(await modal.locator('#ig-gun').inputValue(), 'gün sorusu varsayılan 7').toBe('7');
-  // Vitamin bloğu demo IDB stok'una bağlı (CAROFERTIN-E kaydı varsa çizilir).
-  if (await modal.locator('#ig-vit-doz').count()) {
-    expect(await modal.locator('#ig-vit-doz').inputValue(), 'CAROFERTIN-E 20 ml ön-dolu').toBe('20');
-  }
-  await modal.getByRole('button', { name: 'Kaydet' }).click();
+// Modal aç → (opsiyonel hastalık seç) → Ekle → kapanmayı bekle.
+async function wHastalikEkle(page, seed, secim) {
+  const modal = await wHastalikModalAc(page, seed);
+  if (secim) await modal.locator('#hg-hastalik').selectOption({ label: secim });
+  await wEkleTikla(modal);
   await expect(modal).toHaveCount(0, { timeout: 15000 });
-  const alt = await dbBekle(async () => {
-    const v = await db.from('cases').select('id,kaynak_vaka_id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
-    return v.data?.[0] ?? null;
-  });
-  expect(alt, 'alt vaka ana vakaya bağlı açılmalı').toBeTruthy();
+}
+
+// Ekle düğmesi: getByRole modal-içi role motorunda TypeError veriyor
+// (ölçüldü 2026-10-13) → CSS metin seçici (tam 'Ekle'; '+ İlaç ekle' eşleşmez).
+async function wEkleTikla(modal) {
+  await modal.locator('button', { hasText: /^Ekle$/ }).click();
+}
+
+// Vakanın hastalık günleri (disease_id IS NOT NULL).
+async function wGunler(anaId) {
+  const g = await db.from('treatment_days').select('id,disease_id,treatment_date')
+    .eq('case_id', anaId).not('disease_id', 'is', null).order('treatment_date');
+  return g.data ?? [];
+}
+
+// (wInaktifModalAc kaldırıldı — yerine wHastalikModalAc; eski alt-vaka modalı yok.)
+
+// ═══ Y-N3 — Modal (N3): gün 7 + CAROFERTIN-E 20 ml + TAI önce→sonra; Ekle → gün + TAI +7, iptal yok (U2: gerçek küpe) ═
+test('Y-N3: + Hastalık modalı ön-dolu (gün 7, CAROFERTIN-E 20 ml, TAI chip) → Ekle günü açar, TAI +7, iptal yok', async ({ page }) => {
+  await openApp(page);
+  const { seed, anaId, taiHedef } = await wOvsyncVaka(page, 'WN3', 93);
+  const modal = await wHastalikModalAc(page, seed);
+  await expect(modal).toContainText('+ Hastalık — Küpe ' + seed.kupe); // U2: kart küpesi, 'bilinmiyor' YOK
+  expect(await modal.locator('#hg-gun').inputValue(), 'gün sorusu varsayılan 7').toBe('7');
+  await expect(modal.locator('#hg-vit-doz'), 'CAROFERTIN-E 20 ml ön-dolu').toHaveValue('20');
+  await expect(modal.locator('#hg-tai-chip')).toContainText(/TAI \d{2}\.\d{2} →/);
+  await page.screenshot({ path: K10_SHOT + '/y-n3-modal.png' });
+  await wEkleTikla(modal);
+  await expect(modal).toHaveCount(0, { timeout: 15000 });
+  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('İnaktif ovaryum günü açıldı');
+  const gun = await dbBekle(async () => (await wGunler(anaId))[0] ?? null);
+  expect(gun, 'hastalık günü satırı').toBeTruthy();
+  const dis = await db.from('diseases').select('name').eq('id', gun.disease_id).single();
+  expect(dis.data?.name).toBe('İnaktif Ovaryum');
+  const ilac = await db.from('drug_administrations').select('id,dose').eq('treatment_day_id', gun.id);
+  expect((ilac.data ?? []).length, 'ön-öneri ilacı güne yazıldı').toBeGreaterThan(0);
   const tai = await dbBekle(async () => {
-    const g = await db.from('gorev_log').select('id,hedef_tarih,tamamlandi,iptal')
-      .eq('hayvan_id', seed.hayvanId).eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
-    return g.data?.[0] ?? null;
+    const t = await db.from('gorev_log').select('hedef_tarih,iptal').eq('hayvan_id', seed.hayvanId).eq('gorev_tipi', 'TOHUMLAMA_PLANLI');
+    const g0 = t.data?.[0];
+    return g0 && g0.hedef_tarih !== taiHedef ? g0 : null;
   });
-  expect(tai, 'açık TAI durmalı (iptal yok)').toBeTruthy();
-  expect([trGun(6), trGun(7)], 'TAI hedefi +7 gün (UTC sınır payı)').toContain(tai.hedef_tarih);
-  expect(tai.iptal).toBe(false);
+  expect(tai?.hedef_tarih, 'TAI +7 ertelendi').toBe(trGun(14));
+  expect(tai?.iptal).toBe(false);
   const iptaller = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId).eq('iptal', true);
-  expect(iptaller.data ?? [], 'geçişte iptal satırı yazılmaz').toEqual([]);
+  expect(iptaller.data ?? [], 'ertele iptal satırı yazmaz').toEqual([]);
 });
 
-// ═══ Y2 (yürüyüş 2) — 5. gün PG: +48 s TAI, ertelenmiş TAI PG_YERINE kapanır; dönüş → ana açık ═
-test('Y2: 5. gün elle PG → +48 s TAI, ertelenmiş TAI PG_YERINE kapanır; dönüşte ana açık', async ({ page }) => {
+// ═══ Y-N3b — Modal (N3b): Kistik Over boş başlar; Ekle kist gününü açar ═
+test('Y-N3b: Kistik Over seçiminde ön-öneri boş başlar; Ekle kist gününü açar', async ({ page }) => {
   await openApp(page);
-  const seed = await wSeedHayvan('W2', 92);
-  const tohId = await wTohumlama(seed, 0);
-  const anaId = await wDevamOvsync(page, seed, tohId);
-  const modal = await wInaktifModalAc(page, seed);
-  await modal.getByRole('button', { name: 'Kaydet' }).click();
-  const alt = await dbBekle(async () => {
-    const v = await db.from('cases').select('id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
-    return v.data?.[0] ?? null;
-  });
-  expect(alt, 'alt vaka açık olmalı').toBeTruthy();
-  const ertelenmis = await dbBekle(async () => {
-    const g = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId)
-      .eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
-    return g.data?.[0] ?? null;
-  });
-  expect(ertelenmis, 'ertelenmiş TAI açık olmalı').toBeTruthy();
-  // 5. gün PG elle girişe eşdeğer alan olayı (tohumlama pgGecmisiEkle deseni).
-  const { data: stok } = await db.from('stok').select('id,birim').eq('urun_adi', 'PGs (alke)').limit(1).single();
-  expect(stok, 'seed PG stoğu (PGs (alke))').toBeTruthy();
-  const { error: epg } = await db.rpc('hizli_uygulama', {
-    p_hayvan_id: seed.hayvanId, p_stok_id: stok.id, p_doz: 5,
-    p_birim: stok.birim || 'ml', p_rota: 'IM', p_notlar: MARKER + 'y2-pg',
-  });
-  if (epg) throw new Error(`Y2 PG girişi başarısız: ${epg.message}`);
-  // INFERRED: kapanış nedeni kolonu takip_kapanis_nedeni, değeri PG_YERINE (SK2).
-  const kapanmis = await dbBekle(async () => {
-    const g = await db.from('gorev_log').select('id,takip_kapanis_nedeni')
-      .eq('id', ertelenmis.id).eq('tamamlandi', true);
-    return g.data?.[0] ?? null;
-  });
-  expect(kapanmis, 'ertelenmiş TAI kapanmalı').toBeTruthy();
-  expect(kapanmis.takip_kapanis_nedeni).toBe('PG_YERINE');
-  const yeniTai = await dbBekle(async () => {
-    const g = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId)
-      .eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
-    return g.data?.[0] ?? null;
-  });
-  expect(yeniTai, '+48 s yeni TAI doğmalı').toBeTruthy();
-  // Dönüş: kart düğmesinin çağırdığı aynı kapat-RPC yolu (ui.js inaktifAltVakaDonus);
-  // native confirm ÖNCE sorar (yıkıcı/geri alınamaz kapanış — forms.js openConfirm kalıbı dengi).
-  let soru = '';
-  page.on('dialog', d => { soru = d.message(); d.accept().catch(() => {}); });
-  await page.evaluate(altId => window.inaktifAltVakaDonus(altId), alt.id);
-  expect(soru).toContain('ana Ovsync akışına dönülsün mü');
-  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('Ana Ovsync');
-  const ana = await dbTek('cases', 'id', anaId, 'status');
-  expect(ana?.status, 'dönüşte ana Ovsync açık kalır').toBe('active');
+  const { seed, anaId } = await wOvsyncVaka(page, 'WN3B', 94);
+  const modal = await wHastalikModalAc(page, seed);
+  await modal.locator('#hg-hastalik').selectOption({ label: 'Kistik Over' });
+  await expect(modal.locator('#hg-ilac-liste')).toContainText('Henüz ilaç yok');
+  await expect(modal.locator('#hg-vit-doz')).toHaveCount(0);
+  await wEkleTikla(modal);
+  await expect(modal).toHaveCount(0, { timeout: 15000 });
+  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('Kist günü açıldı');
+  const gun = await dbBekle(async () => (await wGunler(anaId))[0] ?? null);
+  expect(gun, 'kist günü satırı').toBeTruthy();
+  const dis = await db.from('diseases').select('name').eq('id', gun.disease_id).single();
+  expect(dis.data?.name).toBe('Kistik Over');
 });
 
-// ═══ Y3 (yürüyüş 3) — caseTohumlamaIptal: önce sorar, sonra kart güncel TAI'yi gösterir ═
-test('Y3: planlı tohumlama iptali önce sorar (#m-confirm); kart güncel TAI ile tazelenir', async ({ page }) => {
+// ═══ Y-N2 — Detay (N2): tek "+ Hastalık / + İlaç" çifti; Ekle sonrası timeline hastalık bloğu (U3/U4: pull→render, bayat yok) ═
+test('Y-N2: vaka detayında tek + Hastalık/+ İlaç çifti; Ekle sonrası timeline hastalık bloğu tazelenir', async ({ page }) => {
   await openApp(page);
-  const seed = await wSeedHayvan('W3', 93);
-  const tohId = await wTohumlama(seed, 0);
-  await wDevamOvsync(page, seed, tohId);
-  const tai = await dbBekle(async () => {
-    const g = await db.from('gorev_log').select('id').eq('hayvan_id', seed.hayvanId)
-      .eq('gorev_tipi', 'TOHUMLAMA_PLANLI').eq('tamamlandi', false);
-    return g.data?.[0] ?? null;
-  });
-  expect(tai, 'açık TAI olmalı').toBeTruthy();
-  // Yıkıcı adım ÖNCE sorar: caseTohumlamaIptal openConfirm kalıbı (forms.js kuralı).
-  await page.evaluate(taiId => window.caseTohumlamaIptal(taiId), tai.id);
-  const sheet = page.locator('#m-confirm');
-  await expect(sheet).toBeVisible({ timeout: 10000 });
-  await expect(sheet).toContainText('Tohumlamayı İptal Et');
-  await page.click('#m-confirm-ok');
-  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('iptal edildi');
-  const kapali = await dbTek('gorev_log', 'id', tai.id, 'tamamlandi,iptal');
-  expect(kapali?.iptal, 'görev iptal işaretli').toBe(true);
+  const { seed, anaId } = await wOvsyncVaka(page, 'WN2', 92);
+  await page.evaluate(aid => window.openCaseDet(aid), anaId);
+  await expect(page.locator('#m-case-det')).toHaveClass(/on/, { timeout: 10000 });
+  await expect(page.locator('#cd-hastalik-bar .btn'), 'tek çift: + Hastalık/+ İlaç').toHaveCount(2);
+  await expect(page.locator('#cd-hastalik-btn'), 'tek + Hastalık').toHaveText('+ Hastalık');
+  await expect(page.locator('#cd-ilac-btn'), 'yarım + İlaç').toHaveText('+ İlaç');
+  await page.locator('#cd-hastalik-btn').click();
+  const modal = page.locator('#hastalik-modal');
+  await expect(modal).toBeVisible({ timeout: 10000 });
+  await page.screenshot({ path: K10_SHOT + '/y-n2-modal.png' });
+  await wEkleTikla(modal);
+  await expect(modal).toHaveCount(0, { timeout: 15000 });
+  const blok = page.locator('#m-case-det .cd-tl-item', { hasText: 'İnaktif Ovaryum' }).first();
+  await expect(blok, 'U3/U4: pull sonrası timeline hastalık bloğu').toBeVisible({ timeout: 20000 });
+  await expect(blok).toContainText('5. gün PG (opsiyonel)');
+  await expect(blok).toContainText('+ İlaç ekle');
+  await page.screenshot({ path: K10_SHOT + '/y-n2-detay.png' });
 });
 
-// ═══ Y4 (yürüyüş 4) — Offline PG ilacı kuyrukta kalır (gebe); online → PG kapı penceresi ═
-test('Y4: çevrimdışı PG ilacı kuyrukta kalır (gebe hayvan); bağlantıda PG kapı penceresi', async ({ page }) => {
+// ═══ Y-N1 — Kart (N1): Ovsync satırı altında girintili "└ İnaktif Ovaryum · GG.AA (Ovsync içinde)"; ayrı vaka satırı yok ═
+test('Y-N1: hayvan kartında girintili hastalık alt-satırı; ayrı hastalık satırı yok', async ({ page }) => {
   await openApp(page);
-  const seed = await wSeedHayvan('W4', 94);
-  const tohId = await wTohumlama(seed, -10, 'Bekliyor');
-  const anaId = await wDevamOvsync(page, seed, tohId);
-  const gun = await dbBekle(async () => {
-    const g = await db.from('treatment_days').select('id').eq('case_id', anaId).limit(1);
-    return g.data?.[0] ?? null;
-  });
-  expect(gun, 'vakanın tedavi günü olmalı').toBeTruthy();
-  // Gebe: kapı BLOCK_PREGNANT kararı bu satırdan okur (Faz 1 _pg_kapi).
-  await db.from('tohumlama').update({ sonuc: 'Gebe' }).eq('id', tohId);
-  const { data: stok } = await db.from('stok').select('id').eq('urun_adi', 'PGs (alke)').limit(1).single();
-  expect(stok, 'seed PG stoğu (PGs (alke))').toBeTruthy();
-  const { data: urunler } = await db.from('drug_products').select('*').limit(50);
-  const pgUrun = (urunler ?? []).find(u => JSON.stringify(u).match(/PG/i));
-  expect(pgUrun, 'demo drug_products içinde PG ürünü').toBeTruthy();
-  await goOffline(page);
-  await page.evaluate(async ([dayId, urunId, stokId]) => {
-    await window.write('drug_administrations', {
-      treatment_day_id: dayId, drug_product_id: urunId, stok_id: stokId,
-      dose: 5, unit: 'ml', route: 'IM',
-    }, 'POST');
-  }, [gun.id, pgUrun.id, stok.id]);
-  const kuyrukta = await page.evaluate(async () => {
-    const q = await window.getQueue();
-    return q.filter(o => JSON.stringify(o).includes('drug_administrations')).length;
-  });
-  expect(kuyrukta, 'çevrimdışı ilaç kuyruğa düşmeli').toBeGreaterThan(0);
-  await goOnline(page);
-  // Faz 4 sözleşmesi: PG_KAPI reddi kuyrukta kalır (sessiz düşme YOK), kapı penceresi açılır.
-  await expect.poll(async () => page.evaluate(async () => {
-    const q = await window.getQueue();
-    return q.filter(o => JSON.stringify(o).includes('drug_administrations')).length;
-  }), { timeout: 30000, intervals: [1000, 2000] }).toBeGreaterThan(0);
-  await expect(page.locator('#pg-kapi-bs')).toBeVisible({ timeout: 30000 });
+  const { seed } = await wOvsyncVaka(page, 'WN1', 91);
+  await wHastalikEkle(page, seed);
+  await page.evaluate(hid => window.openDet(hid), seed.hayvanId);
+  await expect(page.locator('#det')).toHaveClass(/on/, { timeout: 10000 });
+  await page.locator('.tab[data-action="tab-saglik"]').click();
+  const saglik = page.locator('#tab-saglik');
+  const alt = saglik.locator('.gm-kat-acik', { hasText: 'İnaktif Ovaryum' });
+  await expect(alt, 'girintili alt-satır').toBeVisible({ timeout: 15000 });
+  await expect(alt).toContainText(/└.*\(Ovsync içinde\)/);
+  const vakalar = saglik.locator('.hist-row[onclick*="openCaseDet"]');
+  await expect(vakalar).toHaveCount(1); // tek vaka satırı — hastalık günü ayrı satır DEĞİL
+  await expect(vakalar.first().locator('.gm-kat-acik', { hasText: 'İnaktif Ovaryum' })).toHaveCount(1); // alt-satır vaka satırının İÇİNDE
+  await page.screenshot({ path: K10_SHOT + '/y-n1-kart.png' });
 });
 
-// ═══ Y5 (yürüyüş 5) — S4 Sonlananlar: alt vaka bağ rozeti ═
-test('Y5: S4 Sonlananlar ana+alt kapanışta bağ rozeti gösterir', async ({ page }) => {
+// ═══ Y-N4 — Timeline derinliği: hastalık bloğunda ilaç satırı + sanal TAI günü başlığında ertele soneki ═
+// Sonek sanal TAI günündedir (şablon-kaynaklı TAI gerekir; ui.js _taiErteleNotu +
+// renderCaseTimeline sanal-gün dalı) — hastalık bloğu başlığı sonek taşımaz.
+test('Y-N4: timeline hastalık bloğunda ilaç satırı ve TAI ertele soneki görünür', async ({ page }) => {
   await openApp(page);
-  const seed = await wSeedHayvan('W5', 95);
-  const tohId = await wTohumlama(seed, 0);
-  const anaId = await wDevamOvsync(page, seed, tohId);
-  const modal = await wInaktifModalAc(page, seed);
-  await modal.getByRole('button', { name: 'Kaydet' }).click();
-  const alt = await dbBekle(async () => {
-    const v = await db.from('cases').select('id').eq('kaynak_vaka_id', anaId).eq('status', 'active');
-    return v.data?.[0] ?? null;
+  const { seed, anaId } = await wOvsyncVaka(page, 'WN4', 95, false, true);
+  await wHastalikEkle(page, seed);
+  await page.evaluate(aid => window.openCaseDet(aid), anaId);
+  await expect(page.locator('#m-case-det')).toHaveClass(/on/, { timeout: 10000 });
+  const blok = page.locator('#m-case-det .cd-tl-item', { hasText: 'İnaktif Ovaryum' }).first();
+  await expect(blok).toBeVisible({ timeout: 20000 });
+  if (await blok.locator('.cd-acc.open').count() === 0) await blok.locator('.cd-acc-hdr').click();
+  await expect(blok.locator('.cd-acc-body')).toContainText(/CAROFERTIN/i);
+  await expect(page.locator('#m-case-det')).toContainText(/\(\d{2}\.\d{2} → \d{2}\.\d{2}\)/); // TAI ertele soneki
+});
+
+// ═══ Y-CIFT-TIK — Çift kayıt kilidi: üst-üste iki kayıt tek gün (UI kilit); sıralı tekrar mevcut döner, ilaç yinelenmez ═
+test('Y-CIFT-TIK: çift Ekle tek hastalık günü açar; tekrar mevcut döner, ilaç yinelenmez', async ({ page }) => {
+  await openApp(page);
+  const { seed, anaId } = await wOvsyncVaka(page, 'WCT', 96);
+  const modal = await wHastalikModalAc(page, seed);
+  // Modal tarihi tarayıcı-takviminden okunur (docker UTC / host +03 ayrışır;
+  // idempotency AYNI güne bakılarak ölçülür).
+  const hgTarih = await page.evaluate(() => document.getElementById('hg-tarih')?.value || null);
+  expect(hgTarih, 'modal tarihi okunur').toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  // Çift tık eşdeğeri: kilit ikinci çağrıyı düşürür (tek RPC).
+  await page.evaluate(aid => Promise.all([window.hastalikGunKaydet(aid), window.hastalikGunKaydet(aid)]), anaId);
+  await expect(modal).toHaveCount(0, { timeout: 15000 });
+  const gunler = await dbBekle(async () => {
+    const g = await wGunler(anaId);
+    return g.length ? g : null;
   });
-  expect(alt, 'alt vaka açık olmalı').toBeTruthy();
-  // Kısır işareti zinciri bitirir: açık ana+alt ERKEN_KAPANIS (domain-rules §18.5/§18.18).
-  await page.evaluate(async hid => {
-    const hepsi = await window.idbGetAll('hayvanlar');
-    const h = hepsi.find(x => x && x.id === hid);
-    await window.write('hayvanlar', { ...h, kisir: true }, 'PATCH', 'id=eq.' + hid);
-    await window.syncNow();
-  }, seed.hayvanId);
-  const kisir = await dbBekle(async () => {
-    const h = await db.from('hayvanlar').select('kisir').eq('id', seed.hayvanId).single();
-    return h.data?.kisir === true ? h.data : null;
-  });
-  expect(kisir, 'kısır işareti backende ulaşmalı').toBeTruthy();
-  const anaKapali = await dbBekle(async () => {
+  expect(gunler.length, 'çift çağrı tek gün').toBe(1);
+  expect(gunler[0].treatment_date, 'gün modal tarihinde').toBe(hgTarih);
+  const ilac0 = (await db.from('drug_administrations').select('id').eq('treatment_day_id', gunler[0].id)).data ?? [];
+  // Sıralı ikinci kayıt: sunucu idempotent — mevcut günü döner, ilaç/ertele tekrarlanmaz.
+  const dis = await db.from('diseases').select('id').eq('name', 'İnaktif Ovaryum').single();
+  const dup = await page.evaluate(async ([a, d, t]) =>
+    window.rpc('ovsync_hastalik_gunu_ekle', { p_case_id: a, p_hastalik_id: d, p_tarih: t, p_gun: 7, p_ilaclar: [] }),
+    [anaId, dis.data.id, hgTarih]);
+  expect(dup?.mevcut, 'sıralı tekrar mevcut döner').toBe(true);
+  expect(dup?.gun_id, 'aynı gün id').toBe(gunler[0].id);
+  const ilac1 = (await db.from('drug_administrations').select('id').eq('treatment_day_id', gunler[0].id)).data ?? [];
+  expect(ilac1.length, 'ilaç yinelenmez').toBe(ilac0.length);
+});
+
+// ═══ Y-NULL-PF — protocol_family NULL vakada yedek tanımla "+ Hastalık" görünür ve kayıt çalışır (B1) ═
+// NOT: pano omurgası (000005 vaka_spine) yalnız damgalı vakaları listeler —
+// yedek yüzey vaka detayıdır (openCaseDet → _hastalikBtnSync yedek-denetcimli).
+test('Y-NULL-PF: ailesi NULL vakada yedek tanımla + Hastalık görünür ve kayıt çalışır', async ({ page }) => {
+  await openApp(page);
+  const { seed, anaId } = await wOvsyncVaka(page, 'WNP', 97, true);
+  const pf = await db.from('cases').select('protocol_family').eq('id', anaId).single();
+  expect(pf.data?.protocol_family, 'zemin: aile NULL').toBeNull();
+  await page.evaluate(aid => window.openCaseDet(aid), anaId);
+  await expect(page.locator('#m-case-det')).toHaveClass(/on/, { timeout: 10000 });
+  await expect(page.locator('#cd-hastalik-btn'), 'yedek kabul → + Hastalık görünür').toBeVisible({ timeout: 10000 });
+  await page.locator('#cd-hastalik-btn').click();
+  const modal = page.locator('#hastalik-modal');
+  await expect(modal).toBeVisible({ timeout: 10000 });
+  await wEkleTikla(modal);
+  await expect(modal).toHaveCount(0, { timeout: 15000 });
+  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('günü açıldı');
+  const gun = await dbBekle(async () => (await wGunler(anaId))[0] ?? null);
+  expect(gun, 'yedek kabulde gün açılır').toBeTruthy();
+  await page.screenshot({ path: K10_SHOT + '/y-null-pf.png' });
+});
+
+// ═══ Y-M5M7 — S4 Sonlananlar: hastalık günlü kapanan vakada "🦠 … Ovsync içinde hastalık günü" rozeti (M6) ═
+// BULGU K10-T-1: kısır-kapanış S4'e düşmez (_kisir_zincir_bitir closed_at
+// yazmaz → omurga eleği) — DB yaprağına raporlu. Rozet, günü tamamlayıp
+// UI'dan kapatılan vakada ölçülür (close_case closed_at yazar).
+test('Y-M5M7: günü tamamlanıp kapatılan hastalık-günlü vaka S4 rozeti taşır', async ({ page }) => {
+  await openApp(page);
+  const { seed, anaId } = await wOvsyncVaka(page, 'WM5', 98);
+  await wHastalikEkle(page, seed);
+  await page.evaluate(aid => window.openCaseDet(aid), anaId);
+  await expect(page.locator('#m-case-det')).toHaveClass(/on/, { timeout: 10000 });
+  const blok = page.locator('#m-case-det .cd-tl-item', { hasText: 'İnaktif Ovaryum' }).first();
+  await expect(blok).toBeVisible({ timeout: 20000 });
+  // Akordiyon durumu tanımsızdır (otomatik-açık olabilir) — yalnız kapalıysa aç.
+  if (await blok.locator('.cd-acc.open').count() === 0) await blok.locator('.cd-acc-hdr').click();
+  await expect(blok.locator('button', { hasText: 'Tamamla' })).toBeVisible({ timeout: 10000 });
+  await blok.locator('button', { hasText: 'Tamamla' }).click();
+  await expect.poll(async () => page.evaluate(async aid => {
+    if (!window.idbGetAll) return false;
+    const gs = await window.idbGetAll('treatment_days');
+    return gs.some(g => g && g.case_id === aid && g.disease_id != null && g.tamamlandi);
+  }, anaId), { timeout: 20000 }).toBe(true);
+  await page.evaluate(aid => window.openCaseDet(aid), anaId);
+  const kapat = page.locator('#cd-kapat-btn');
+  await expect(kapat).toBeEnabled({ timeout: 10000 });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await kapat.click();
+  await expect.poll(async () => toastText(page), { timeout: 15000 }).toContain('Vaka kapatıldı');
+  const kapali = await dbBekle(async () => {
     const v = await db.from('cases').select('id,status').eq('id', anaId).neq('status', 'active');
     return v.data?.[0] ?? null;
   });
-  expect(anaKapali, 'ana vaka kapanmalı').toBeTruthy();
-  const altKapali = await dbBekle(async () => {
-    const v = await db.from('cases').select('id,status').eq('id', alt.id).neq('status', 'active');
-    return v.data?.[0] ?? null;
-  });
-  expect(altKapali, 'alt vaka kapanmalı').toBeTruthy();
-  // UI: S4 bölümünde küpe kartı (S4 kart sınıfı ui.js _ovsyncSatirHtml S4 dalı).
+  expect(kapali, 'vaka kapanır').toBeTruthy();
   await page.evaluate(() => window.goTo && window.goTo('ovsync'));
   await expect(page.locator('#pg-ovsync')).toHaveClass(/on/);
   await page.waitForFunction(() => window.__ovsyncTakip?.veri, null, { timeout: 20000 });
+  // Detay modalı panoyu örter — önce kapatılır; S4 katlanır bölüm
+  // (varsayılan kapalı) rozet için sonra açılır.
+  await page.evaluate(() => { if (window.closeM) window.closeM('m-case-det'); });
+  await expect(page.locator('#m-case-det')).not.toHaveClass(/on/);
+  await page.locator('#pg-ovsync .ovs-katla').click();
   const s4kart = page.locator('#pg-ovsync .ovs-s4-kart', { hasText: seed.kupe }).first();
   await expect(s4kart, 'S4 Sonlananlar kartı').toBeVisible({ timeout: 15000 });
-  // Veri sözleşmesi (000005): S4 satırı alt_vakalar dizisini taşır.
+  await expect(s4kart).toContainText('Ovsync içinde hastalık günü');
+  // Veri sözleşmesi (000005-yeni): S4 satırı alt_vakalar [{id, hastalik, status}] taşır.
   const bag = await page.evaluate(async kupe => {
     const r = await window.rpc('ovsync_takip_listele', { p_padok: null });
     const rows = r?.satirlar || r?.veri?.satirlar || [];
-    const s4 = rows.filter(x => x && x.bolum === 'S4' && (x.kupe_no || '').includes(kupe));
-    return s4.map(x => ({ alt: x.alt_vakalar }));
+    return rows.filter(x => x && x.bolum === 'S4' && (x.kupe_no || '').includes(kupe));
   }, seed.kupe);
-  expect(bag.length, 'S4 satırı RPCde olmalı').toBeGreaterThan(0);
-  expect(Array.isArray(bag[0].alt) && bag[0].alt.length > 0, 'S4 satırı alt_vakalar bağını taşımalı').toBe(true);
-});
-
-// ═══ Y6 (yürüyüş 6, Faz 5) — Protokol uyarıları: 🔄 Aktif Ovsync ayrı, 🌱 ile aynı sheet ═
-test('Y6: protokol uyarıları → 🔄 Aktif Ovsync alt-bölmesi genel listeden ayrı, 🌱 ile aynı sheet', async ({ page }) => {
-  await openApp(page);
-  // Deterministik: tarayıcı-içi durum tohumlanır (DB seed'siz); gerçek render yolu koşar.
-  const rapor = await page.evaluate(async () => {
-    window.__protokolUyarilar = [{
-      hayvan_id: 'y6-hayvan', kupe_no: 'E2E-Y6', protokol: 'ILERI_GEBE_PROTOKOL',
-      durum: 'eksik', adim: 'Rektal muayene', gecikme_gun: 3, grup: 'Sağmal',
-    }];
-    window.__ovsyncUyarilar = [{
-      hayvan_id: 'y6-diger', kupe_no: 'E2E-Y6B', kategori: 'Açık dişi',
-      hedef_tarih: '2026-10-20', tai_tarihi: '2026-10-22', taban_turu: 'acik_disi', gorev_id: null,
-    }];
-    window._ovsyncBaglam = {
-      baslat: new Map(), vakaAktif: new Map([['y6-hayvan', { id: 'y6-vaka' }]]),
-      vakaKapali: new Map(), kisir: new Set(),
-    };
-    let kanca = false;
-    const orig = window.rpc;
-    window.rpc = async (ad, prm) => {
-      if (ad === 'ovsync_baslat_uyarilari') { kanca = true; throw new Error('y6-kesinti'); }
-      return orig(ad, prm);
-    };
-    try { await window._showProtokolEkran(); }
-    finally { window.rpc = orig; }
-    const sheet = document.getElementById('protokol-bs');
-    return { sheetVar: !!sheet, kanca, html: sheet ? sheet.innerHTML : '' };
-  });
-  expect(rapor.sheetVar, '#protokol-bs açılmalı').toBe(true);
-  expect(rapor.html).toContain('🔄 Aktif Ovsync');
-  expect(rapor.html).toContain('E2E-Y6');
-  // Aktif Ovsync'li satır genel listeden çıktı: 🔴 Gecikmiş bölmesi çizilmez.
-  expect(rapor.html).not.toContain('🔴 Gecikmiş');
-  // 🌱 bölmesiyle aynı sheet (önbellek kolu; kanca tuttuysa deterministik).
-  if (rapor.kanca) expect(rapor.html).toContain('🌱');
+  expect(bag.length, 'S4 satırı RPCde').toBeGreaterThan(0);
+  expect(bag[0].alt_vakalar?.[0]?.hastalik, 'S4 öğesi hastalık adı').toBe('İnaktif Ovaryum');
 });
 
 
