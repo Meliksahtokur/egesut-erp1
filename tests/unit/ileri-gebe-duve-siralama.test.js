@@ -203,12 +203,15 @@ test('F2.3 amber alt satır: .arow-sub.duve-alt yazı rengi var(--amber), zemin 
   assert.ok(!/background/.test(kural[0]), 'zemin yok');
 });
 
-// F2.4: ?v= tek değer 20261013-03.
-test('F2.4 ?v= tek değer 20261013-03', () => {
+// F2.4: index.html tüm ?v= referansları TEK ayrık değerde (değer-bağımsız — bump testi kırmaz).
+// Kalıp: tests/unit/coklu-kaydir-ui.test.js F1-T5-c. Sabit değer pinlenmez; JS
+// değişince bump yapılır, test bump'ta kırılmaz ama karışık damgada kırılır.
+test('F2.4 ?v= damgaları TEK ayrık değerde (değer-bağımsız)', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const html = fs.readFileSync(path.join(__dirname, '..', '..', 'index.html'), 'utf8');
-  const tum = [...html.matchAll(/\?v=([0-9-]+)/g)].map((m) => m[1]);
-  assert.ok(tum.length > 0, '?v= damgası var');
-  assert.ok(tum.every((v) => v === '20261013-03'), `tek değer 20261013-03 (bulunan: ${[...new Set(tum)]})`);
+  const damgalar = [...html.matchAll(/\?v=([0-9]{8}-[0-9]+)/g)].map((m) => m[1]);
+  assert.strictEqual(damgalar.length, 26, 'dosyada ?v= referans sayısı 26 olmalı, bulunan: ' + damgalar.length);
+  const ayrik = [...new Set(damgalar)];
+  assert.strictEqual(ayrik.length, 1, 'tüm ?v= referansları tek değerde: ' + ayrik.join(' / '));
 });

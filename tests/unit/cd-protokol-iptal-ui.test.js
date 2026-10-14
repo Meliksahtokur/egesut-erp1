@@ -152,6 +152,37 @@ test('C1-6: iptal onayı RED → RPC ÇAĞRILMAZ + vaka detayı AÇIK kalır', a
 
 // ── Kablolama: ikinci akış kopyası yok + veri bağımlılığı ──────────────
 
+// ── Faz 4 (PLAN Step 1 — kart-tazeleme): iptal sonrası kart tazeleme + S4 bağ rozeti ──
+
+test('iptal-sonrasi-kart-guncel', () => {
+  const govde = extractFunctionSource(UI, 'caseTohumlamaIptal');
+  assert.match(govde, /pullTables\(\[[^\]]*'gorev_log'/);
+  assert.ok(govde.includes("'islem_log'"), 'islem_log da tazelenir (PLAN Step 3)');
+  assert.ok(govde.indexOf('pullTables(') < govde.indexOf('renderCaseTimeline'),
+    'sıra: önce pull, sonra kart render');
+});
+
+test('s4-devam-rozeti', () => {
+  assert.ok(extractFunctionSource(UI, '_ovsyncS4SatirHtml').includes('alt_vakalar'));
+});
+
+test('s4-devam-rozeti-davranis', () => {
+  // K10-UI2: öğeler treatment_days satırıdır (gün id'si vaka değildir) —
+  // rozet ebeveyn detayına çıkar.
+  const ctx = {
+    _ovsyncBaglamAl: () => ({ vakaKapali: new Map([['h1', { id: 'v-ana' }]]) }),
+    esc: String, escAttr: String,
+    _ovsyncSonlanmaRozeti: () => '', _ovsyncDenemeRozeti: () => '',
+  };
+  const f = require('./support/loadModule.js').loadExtractedFunction(UI, '_ovsyncS4SatirHtml', { extra: ctx });
+  const bagli = f({ hayvan_id: 'h1', kupe_no: 'E2E-95', bolum: 'S4',
+    alt_vakalar: [{ id: 'gun-1', hastalik: 'İnaktif Ovaryum', status: 'acik' }] }, '2026-10-13');
+  assert.ok(bagli.includes('openCaseDet(\'v-ana\')'), 'bağ rozeti ebeveyn detayına çıkar');
+  assert.ok(!bagli.includes('gun-1'), 'gün id hedefte geçmez');
+  const bagsiz = f({ hayvan_id: 'h1', kupe_no: 'E2E-95', bolum: 'S4', alt_vakalar: [] }, '2026-10-13');
+  assert.ok(!bagsiz.includes('🔗'), 'gün yoksa bağ rozeti çizilmez');
+});
+
 test('C1-7: cdProtokolIptal akışı KOPYALAMAZ — _protokolIptalAkisi A dalına devreder; protocol_family alanını vakadan okur', () => {
   const cd = extractFunctionSource(UI, 'cdProtokolIptal');
   assert.ok(cd.includes('_protokolIptalAkisi('), 'mevcut A-dal akışına devir (kopya-yapıştır yok)');
@@ -162,6 +193,10 @@ test('C1-7: cdProtokolIptal akışı KOPYALAMAZ — _protokolIptalAkisi A dalın
   assert.ok(guncelle.includes('cd-protokol-iptal-btn'), 'online/offline görünürlük taraması yeni butonu kapsar');
   // veri bağımlılığı: cases pull protocol_family'i zaten taşır (select('*'))
   const api = fs.readFileSync('js/api.js', 'utf8');
-  const casesPull = api.slice(api.indexOf('cases:'), api.indexOf('cases:') + 200);
+  // RPC_MAP taşıması sonrası ilk 'cases:' offline-replay eşlemesidir; pull
+  // satırı FETCHERS bloğu içindedir (api.js:637 çapası) — aynı niyet yeni yerde.
+  const fetchBase = api.indexOf('const FETCHERS = {');
+  assert.ok(fetchBase > -1, 'FETCHERS bloğu bulundu');
+  const casesPull = api.slice(api.indexOf('cases:', fetchBase), api.indexOf('cases:', fetchBase) + 200);
   assert.ok(casesPull.includes("select('*')"), "cases çekimi select(*) → protocol_family UI'da mevcut (api.js değişikliği GEREKMEZ)");
 });

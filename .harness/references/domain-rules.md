@@ -226,7 +226,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 
 ## 8. Sağlık Vakaları (Cases)
 
-### Hastalık Kategorileri (config.js `HASTALIK_KAT` — canlıdaki tam liste)
+### Hastalık Kategorileri (config.js `HASTALIK_KAT` — elle Vaka Aç seçim listesi; canlı `diseases`in alt kümesi)
 
 | Kategori | Hastalıklar |
 |---|---|
@@ -238,6 +238,7 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 | Solunum | Pnömoni |
 | Buzağı | Buzağı İshali, Buzağı Göbek İltihabı, Neonatal Zayıflık |
 | Diğer | (serbest) |
+Canlı `diseases` Üreme'de 12 kayıt var (2026-10-13 MEASURED); Ovsync alt vakası hastalığı canlı `İnaktif Ovaryum` kaydıdır, Anoestrus DEĞİL (karar 7). `js/config.js` listesi bu işle DEĞİŞMEZ (alt vaka hastalık id'sini canlı kayıttan alır).
 
 ### Vaka Kuralları
 
@@ -452,7 +453,13 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
    hayvanda (ırk eşiği `irk_esik.tohumlama_gun`, düvede tipik 365 g; doğum/abort sonrası bekleme —
    `_tohumlama_gorev_uygunluk`). Uygunsuz hayvanda görev açılmaz, `UYGUNSUZ` olay kaydı düşer —
    bu doğru davranıştır, regresyon değildir. TAI açık planlı tohumlamanın yerine geçer; son PG kazanır.
-7. **Bağımsız PG aktif Ovsync vakasında:** vaka `closed / close_reason = PG`, protokol görevleri kapanır.
+   **Kural GLOBALDİR, Ovsync istisnası YOK (sahip 2026-10-13, KESİN — yeniden sorulmaz):** Ovsync şablonunun
+   kendi PG'leri de +48 s TAI açar ve şablon TAI'sini (`TEDAVI_SABLON_TOHUMLAMA:*`) `PG_YERINE` ile kapatır;
+   şablon TAI'si için kilit/`GREATEST` daraltması YAZILMAZ. Bilinen, kabul edilmiş sonuç: iki PG'li şablonda
+   1. PG ile 2. PG arasında TAI bir gün öne (son GnRH gününe) düşer, 2. PG girilince şablon TAI gününe kayar
+   (ör. 188: 13.10 PG → TAI 15.10; 14.10 PG → 16.10). Sahip birebir: "2. pg girilince tohumlama kayacak
+   muhtemelen global ayar olması lazım" + "evet dedim zaten işleyiş b değil mi? kurallaştıralım madem".
+7. **Bağımsız PG aktif Ovsync vakasında:** PG uzatır, vaka açık kalır (karar 3; E3 kancası 20261013000002 ile kalktı); TAI +48 s yenilenir (§18.6). `_vaka_kapat` PG dalı + CHECK `PG` tarihsel kayıtlar için korunur (dormant).
 8. **PG onay kapısı:** sunucu `PG_KAPI:*` RAISE ettiğinde HER UI giriş noktası `_pgKapiHata` zinciriyle
    onay penceresi (`#pg-kapi-bs`: Boş ata ve uygula / Vazgeç) açar; düz "Hata" toast'ı YASAK.
    Yeni bir PG giriş noktası eklenirse aynı sarmal zorunludur.
@@ -483,7 +490,7 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     (`TAKIP_ACIK`), evet → takip kapanır; çıkış → kapanır. Muayene sonucu "ertele" (+7) yeni tarih kurar; erteleme sınırsız, takip ≥21 gün olunca "Bu hayvan N gündür takipte,
     emin misiniz?" onayı. Takip muayenesinde Gebe bulunursa önceki Boş hatalı sayılır: son tohumlama Gebe'ye çevrilir, takip kapanır. (sahip 2026-09-29) Düzeltme yalnız bu muayene yolundan, ayrı "hatalı Boş" formu yok; genel Gebe RPC'si Bekliyor-only kalır. Üreme geçmişinde düzeltilen tohumlama iki satır görünür: üstü çizili Boş (giriş tarihi) + Gebe (takip muayenesi tarihi); kayıt izi eski sonucu ve tarihini saklar. Ayrıntılar: `docs/plans/2026-09-28-ovsync-takip-ekrani/design.md` §6c.
 16. **Üreme kategorisi (sahip 2026-09-28/29):** "işin ucunda gebelik varsa üreme". Görev tipleri `GEBELIK_KONTROL`,
-    `TAKIP_MUAYENE`, `TOHUMLAMA_PLANLI`, `OVSYNC_BASLAT` → 🌱 Üreme. Üreme vakaları: Ovsync, Kistik Over, Anoestrus.
+    `TAKIP_MUAYENE`, `TOHUMLAMA_PLANLI`, `OVSYNC_BASLAT` → 🌱 Üreme. Üreme vakaları: Ovsync, Kistik Over, İnaktif Ovaryum (Ovsync içinde hastalık günü, §18.18). Anoestrus elle seçim listesinde kalır, hastalık günü olarak kullanılmaz (karar 7).
     Enfeksiyon/doğum sonrası hastalıklar (Metrit, Endometrit, Pyometra, RFM, Retensiyo Sekundinarum, Postpartum
     Hemoraji) → normal muayene/tedavi. Hastalık kataloğu değişmez, yalnız kategori/filtre eşlemesi.
 17. **Birleşik muayene sonucu (sahip 2026-09-29):** `GEBELIK_KONTROL` (40 g sistemi) ve `TAKIP_MUAYENE` görevleri
@@ -491,3 +498,4 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     sonuçsuz kapanmaz. Eski 40 g listesi + cron bu işle güncellenir. (sahip 2026-09-29) Erteleme YALNIZ bu sonuç
     ekranından (genel "ertele" butonu bu tiplerde yok); saat atanabilir, varsayılan SAATSİZ. Dashboard 40 g listesi
     satırı açık görev varsa bu ekranı açar, yoksa hayvan detayı; takip ekranında görevsiz "muayene vakti" satırı → hayvan detayı.
+18. **Hastalık = Ovsync içinde gün (karar 10, sahip 2026-10-13; karar 4/6'nın "alt vaka" kısmı GEÇERSİZ):** inaktif/kist için ayrı vaka AÇILMAZ — `cases.kaynak_vaka_id`, `inaktif_alt_vaka_ac/kapat`, alt-vaka trigger'ı, "dön" akışı YOKTUR. Hastalık günü = `treatment_days` satırı (`disease_id IS NOT NULL`); tekillik DB kısmi unique'idir (`treatment_days_hastalik_gun_uniq`: vaka+hastalık+tarih) — ikinci çağrı mevcut günü döner, ilaç tekrar yazılmaz, ertele tekrarlanmaz. İlaçlar o günün altına `add_drug_administration` ile (PG sarmalı dahil); açık TAI iptal edilmez, `tohumlama_gorev_ertele` ile sorulan gün kadar (varsayılan 7) ötelenir; 5. gün PG opsiyonel ve elle, otomatik PG görevi yok (karar 5 aynen); hastalık İnaktif Ovaryum, kist için Kistik Over — tek RPC `ovsync_hastalik_gunu_ekle` (karar 6-7); ön-öneri inaktifte CAROFERTIN-E 20 ml, kistte boş, +İlaç ile eklenebilir (karar 7); pencere TAI gününde biter. Kartta girintili alt-satır, ayrı vaka satırı yok. S4 kartındaki devam rozeti "🦠 Ovsync içinde hastalık günü" der, ebeveyn vaka detayına çıkar (gün id'sine değil); tek günde hastalık adı rozette görünür. Kısır hayvana hastalık günü açılmaz (`KISIR_HAYVANA_HASTALIK_GUNU_YOK`); kısır hard-block (§18.5) aynen.

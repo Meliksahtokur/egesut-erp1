@@ -284,7 +284,8 @@ const api = loadBrowserModule('js/api.js', {
 const T = api.exposed.RPC_TABLES;
 
 function rpcMapBolumu() {
-  const src = fs.readFileSync(UI, 'utf8');
+  // RPC_MAP tek kaynağı api.js'tir (Faz 4 taşıması; ui.js yerel kopyası kaldırıldı)
+  const src = fs.readFileSync('js/api.js', 'utf8');
   const bas = src.indexOf('const RPC_MAP = {');
   assert.ok(bas > -1, 'RPC_MAP bloğu bulundu');
   return src.slice(bas, src.indexOf('};', bas));

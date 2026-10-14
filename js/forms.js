@@ -818,14 +818,19 @@ async function submitCase(btn) {
     const sablonId = globalThis._seciliSablonId;
     if (sablonId && res?.case_id) {
       try {
-        const r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId });
+        // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
+        const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+        const r = await cagri(false, null);
         const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res.case_id, p_sablon_id: sablonId });
         if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
         // Şablonda tohumlama var ama hayvan uygun değilse (erkek/12 aydan küçük/gebe)
         // görev sessizce atlanır — kullanıcı nedenini görsün.
         if (planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
         toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
-      } catch(e) { toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true); }
+      } catch(e) {
+        // Madde 2: PG reddinde return YOK — kapı ekranı açıldıysa akış kapanışa düşer.
+        if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
+      }
     } else {
       toast('✅ Vaka açıldı');
     }
@@ -871,12 +876,17 @@ async function submitCase(btn) {
       const sablonId2 = globalThis._seciliSablonId;
       if (sablonId2 && res2?.case_id) {
         try {
-          const r2 = await rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2 });
+          // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
+          const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+          const r2 = await cagri(false, null);
           const planli2 = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res2.case_id, p_sablon_id: sablonId2 });
           if (r2?.atlanan?.length) toast(`⚠️ ${r2.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
           if (planli2?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli2.sebep}`, true);
           toast(`✅ Vaka açıldı + şablon uygulandı (${r2?.gun_sayisi||0} gün)${planli2?.olustu?' + tohumlama':''}`);
-        } catch (e3) { toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true); }
+        } catch (e3) {
+          // Madde 2: PG reddinde return YOK — akış kapanışa düşer.
+          if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
+        }
         globalThis._seciliSablonId = null;
       } else {
         toast('✅ Vaka açıldı');

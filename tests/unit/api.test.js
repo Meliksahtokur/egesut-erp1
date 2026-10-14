@@ -370,7 +370,9 @@ test('syncNow: aynı op 5 kez başarısız olduktan sonra denenMEZ (dead-letter)
 });
 
 test('syncNow: deadTarget PATCH op yeniden denenmez — kuyruktan DÜŞÜRÜLÜR', async () => {
-  const idb = makeIdbStub({ _queue: [qop(3, 'hayvanlar', [{ id: 'h3', ad: 'x' }], 'PATCH', 'id=eq.h3')] });
+  // Faz 4: hayvanlar PATCH artık RPC yolunda (SYNC_RPC_ZORUNLU) — deadTarget
+  // REST kontratı yönlendirilmeyen tabloda (gorev_log) sınanmaya devam eder.
+  const idb = makeIdbStub({ _queue: [qop(3, 'gorev_log', [{ id: 'g3', aciklama: 'x' }], 'PATCH', 'id=eq.g3')] });
   const { sandbox, exposed } = loadApi({
     idb,
     fromHandler: () => ({
@@ -424,4 +426,28 @@ test('rpcOptimistic: RPC hatası → onError verilmişse toast EDİLMEZ, hata ca
   );
   assert.strictEqual(onError.calls.length, 1);
   assert.strictEqual(spies.toast.calls.length, 0);             // onError varsa toast yok
+});
+
+// ── Faz 4: PG-kapılı offline replay (PLAN :623-644) ──────────────────────
+
+test('syncNow: PG-kapılı tablolar RPC_MAP ile rpc\'ye gider; PG_KAPI reddi kuyrukta kalır, sonraki op gönderilir', async () => {
+  // Gerçek çevrimdışı caseDrugKaydet biçimi (js/ui.js:13450-13468): drug_administrations + eş stok_hareket (notlar 'DrugAdmin:<id>')
+  const ilac = (qid, id) => qop(qid, 'drug_administrations', [{ id, day_id: 't1', stok_id: 's1', dose: 2, unit: 'ml' }]);
+  const es = (qid, id) => qop(qid, 'stok_hareket', [{ id: 'sh-' + id, stok_id: 's1', tur: 'Ilac', miktar: 2, notlar: 'DrugAdmin:' + id, iptal: false }]);
+  const idb = makeIdbStub({ _queue: [ilac(11, 'd1'), es(12, 'd1'), ilac(13, 'd2'), es(14, 'd2'),
+    qop(15, 'hayvanlar', [{ id: 'h1', kisir: true }], 'PATCH', 'id=eq.h1'), qop(16, 'stok', [{ id: 's9' }])] });
+  const yazilan = [];
+  const { sandbox, calls, exposed } = loadApi({ idb,
+    rpcHandlers: {
+      add_drug_administration: async (p) => p.id === 'd1'
+        ? { data: null, error: { message: 'PG_KAPI:BLOCK_PREGNANT:{}' } } : { data: { ok: true, id: 'srv-d2' }, error: null },
+      hayvan_guncelle: async () => ({ data: { ok: true }, error: null }) },
+    fromHandler: (t) => ({ insert: () => { yazilan.push(t); return Promise.resolve({ error: null }); } }) });
+  sandbox.buildRpcParams = (ad, veri) => ({ ad, ...veri });   // ui.js global'i; api.js yüklemesinde yok
+  sandbox.pullTables = async () => ({ ok: [], failed: [] });   // başarı sonrası tazeleme ağdan bağımsız
+  await sandbox.syncNow(); await settle();
+  assert.deepStrictEqual(calls.rpc.map(c => c.name), ['add_drug_administration', 'add_drug_administration', 'hayvan_guncelle']);
+  assert.deepStrictEqual(yazilan, ['stok'], 'eş stok_hareket REST ile yazılmaz (RPC kendi stok satırını yazar)');
+  assert.deepStrictEqual(idb.__snapshot('_queue').map(o => o._qid), [11, 12], 'PG_KAPI reddi: ilaç + eş stok birlikte kalır; başarıda ikisi düşer');
+  assert.strictEqual(exposed._syncFailCount[11], 1);
 });
