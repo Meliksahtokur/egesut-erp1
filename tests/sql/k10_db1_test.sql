@@ -301,15 +301,16 @@ EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-null-mastit', '
 -- ── S-DB1-kisir-null-ovsync: NULL-aile Ovsync vakası kısırda kapanır; izsiz NULL vakalar
 --   (a10 + H-11'in ikinci izsiz vakası a12) açık kalır ──
 DO $do$ DECLARE
-  v_d11 text; v_k11 text; v_d10 text; v_d12 text;
+  v_d11 text; v_k11 text; v_d10 text; v_d12 text; v_c11 boolean;
 BEGIN
   UPDATE public.hayvanlar SET kisir = true WHERE id = 'K10-H-11';
   SELECT status, close_reason INTO v_d11, v_k11 FROM cases WHERE id = pg_temp.k10_id('a',11);
   SELECT status INTO v_d10 FROM cases WHERE id = pg_temp.k10_id('a',10);
   SELECT status INTO v_d12 FROM cases WHERE id = pg_temp.k10_id('a',12);
+  SELECT closed_at IS NOT NULL INTO v_c11 FROM cases WHERE id = pg_temp.k10_id('a',11);
   INSERT INTO _k10_durum VALUES ('S-DB1-kisir-null-ovsync',
-    CASE WHEN v_d11 = 'closed' AND v_k11 = 'ERKEN_KAPANIS' AND v_d10 = 'active' AND v_d12 = 'active' THEN 'PASS' ELSE 'RED' END,
-    format('izli(a11)=%s/%s (closed/ERKEN_KAPANIS); izsiz(a10)=%s izsiz(a12)=%s (active)', v_d11, v_k11, v_d10, v_d12));
+    CASE WHEN v_d11 = 'closed' AND v_k11 = 'ERKEN_KAPANIS' AND COALESCE(v_c11, false) AND v_d10 = 'active' AND v_d12 = 'active' THEN 'PASS' ELSE 'RED' END,
+    format('izli(a11)=%s/%s closed_at_dolu=%s (closed/ERKEN_KAPANIS); izsiz(a10)=%s izsiz(a12)=%s (active)', v_d11, v_k11, v_c11, v_d10, v_d12));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-kisir-null-ovsync', 'RED', SQLERRM); END $do$;
 
 -- ── S-DB1-alt-ozet (ERT5): hastalık günü olan vakada takip_listele gün durumu + sıra + diseases.name ──

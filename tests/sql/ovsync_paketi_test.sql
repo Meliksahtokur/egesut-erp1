@@ -85,13 +85,14 @@ EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-REPLAY', 'RED', SQL
 
 -- ── S-KISIR (tek OVSYNC vakası; karar 10: ayrı alt vaka yok): hayvan_guncelle(p_kisir => true) → vaka
 --    closed/ERKEN_KAPANIS; yeni OVSYNC reddedilir (§18.5 KISIR_HAYVAN_OVSYNC_YASAK korunur)
-DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',9); v_s text; v_ins text := 'INSERT GECTI'; BEGIN
+DO $do$ DECLARE v_ana uuid := pg_temp.ovp_id('a',9); v_s text; v_ins text := 'INSERT GECTI'; v_c boolean; BEGIN
   PERFORM public.hayvan_guncelle(p_id => 'E2E-OVP-H-9', p_kisir => true);
   SELECT string_agg(status || '/' || COALESCE(close_reason, '-'), ',' ORDER BY id) INTO v_s FROM cases WHERE animal_id = 'E2E-OVP-H-9';
+  SELECT bool_and(closed_at IS NOT NULL) INTO v_c FROM cases WHERE animal_id = 'E2E-OVP-H-9';
   BEGIN INSERT INTO cases(animal_id, disease_id, start_date, status, protocol_family) VALUES ('E2E-OVP-H-9', pg_temp.ovp_id('1',1), pg_temp.bg(), 'active', 'OVSYNC');
   EXCEPTION WHEN OTHERS THEN v_ins := 'reddedildi: ' || left(SQLERRM, 60); END;
-  INSERT INTO _ovp_durum VALUES ('S-KISIR', CASE WHEN v_s = 'closed/ERKEN_KAPANIS'
-    AND v_ins LIKE 'reddedildi: KISIR_HAYVAN_OVSYNC_YASAK%' THEN 'PASS' ELSE 'RED' END, format('vakalar=%s; yeni OVSYNC=%s', v_s, v_ins));
+  INSERT INTO _ovp_durum VALUES ('S-KISIR', CASE WHEN v_s = 'closed/ERKEN_KAPANIS' AND COALESCE(v_c, false)
+    AND v_ins LIKE 'reddedildi: KISIR_HAYVAN_OVSYNC_YASAK%' THEN 'PASS' ELSE 'RED' END, format('vakalar=%s; closed_at_dolu=%s; yeni OVSYNC=%s', v_s, v_c, v_ins));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _ovp_durum VALUES ('S-KISIR', 'RED', SQLERRM); END $do$;
 
 -- ── S-PG-TEK-OLAY (kırmızı; çift PG olayı kilidi, 000002:262-265 ↔ :204-212):

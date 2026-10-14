@@ -213,8 +213,10 @@ CREATE OR REPLACE FUNCTION public._kisir_zincir_bitir()
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 BEGIN
+  -- closed_at: kanonik kapatma kalıbı now() birebir (timestamptz; prod
+  -- _vaka_kapat MEASURED); COALESCE yalnız closed_at IS NULL iken yazar.
   UPDATE public.cases alt
-     SET status = 'closed', close_reason = 'ERKEN_KAPANIS'
+     SET status = 'closed', closed_at = COALESCE(alt.closed_at, now()), close_reason = 'ERKEN_KAPANIS'
    WHERE alt.animal_id = NEW.id
      AND alt.status = 'active'
      AND public._vaka_ovsync_mu(alt.id);
