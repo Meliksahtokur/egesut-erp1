@@ -139,7 +139,8 @@ INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_sa
   SELECT pg_temp.k10_id('e', i), 'K10-H-' || i, 'TOHUMLAMA_PLANLI', 'K10 TAI ' || i,
          pg_temp.k10_bg() + 2, '10:00', 'K10-TAI:' || i FROM generate_series(4, 7) i;
 
--- ── B1 null-aile fixture (K10-H-8..11): a8 eşleme-kolu, a9 log-kolu, a10 izsiz, a11 kısır ──
+-- ── B1 null-aile fixture (K10-H-8..11): a8 eşleme-kolu, a9 log-kolu, a10 izsiz (Mastit),
+--   a11 kısır (izli), a12 H-11'in ikinci izsiz vakası (kısır negatif kolu) ──
 INSERT INTO diseases(id, name, category) SELECT pg_temp.k10_id('1', 3), 'K10-Mastit', 'Üreme'
   WHERE NOT EXISTS (SELECT 1 FROM diseases WHERE id = pg_temp.k10_id('1', 3));
 INSERT INTO hayvanlar(id, kupe_no, cinsiyet, durum, grup, padok, dogum_tarihi)
@@ -147,8 +148,9 @@ INSERT INTO hayvanlar(id, kupe_no, cinsiyet, durum, grup, padok, dogum_tarihi)
 INSERT INTO cases(id, animal_id, disease_id, start_date, status, protocol_family)
   VALUES (pg_temp.k10_id('a',8), 'K10-H-8', pg_temp.k10_id('1',1), pg_temp.k10_bg()-3, 'active', NULL),
          (pg_temp.k10_id('a',9), 'K10-H-9', pg_temp.k10_id('1',2), pg_temp.k10_bg()-3, 'active', NULL),
-         (pg_temp.k10_id('a',10), 'K10-H-10', pg_temp.k10_id('1',2), pg_temp.k10_bg()-3, 'active', NULL),
-         (pg_temp.k10_id('a',11), 'K10-H-11', pg_temp.k10_id('1',1), pg_temp.k10_bg()-3, 'active', NULL);
+         (pg_temp.k10_id('a',10), 'K10-H-10', pg_temp.k10_id('1',3), pg_temp.k10_bg()-3, 'active', NULL),
+         (pg_temp.k10_id('a',11), 'K10-H-11', pg_temp.k10_id('1',1), pg_temp.k10_bg()-3, 'active', NULL),
+         (pg_temp.k10_id('a',12), 'K10-H-11', pg_temp.k10_id('1',2), pg_temp.k10_bg()-3, 'active', NULL);
 INSERT INTO gorev_log(id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, hedef_saat, kaynak)
   VALUES (pg_temp.k10_id('e',9), 'K10-H-9', 'TOHUMLAMA_PLANLI', 'K10 sablon TAI a9',
           pg_temp.k10_bg()+2, '10:00',
@@ -278,30 +280,36 @@ BEGIN
     format('esleme-kolu(a8) ok=%s gun=%s; log-kolu(a9) ok=%s gun=%s', v_r8->>'ok', v_n8, v_r9->>'ok', v_n9));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-null-sablonlu', 'RED', SQLERRM); END $do$;
 
--- ── S-DB1-null-mastit: NULL aile + Ovsync izi yok → ANA_ACIK_OVSYNC_DEGIL, yan etki yok ──
+-- ── S-DB1-null-mastit: NULL aile + Ovsync izi yok (vaka hastalığı K10-Mastit, Ovsync-dışı) + dolu ilaç
+--   listesi → ANA_ACIK_OVSYNC_DEGIL; gün açılamaz, ilaç yazılamaz, TAI oynayamaz ──
 DO $do$ DECLARE
-  v_r jsonb; v_eski date; v_yeni date; v_gun int;
+  v_r jsonb; v_eski date; v_yeni date; v_gun int; v_ilac int;
 BEGIN
   SELECT hedef_tarih INTO v_eski FROM gorev_log WHERE id = pg_temp.k10_id('e',10);
-  v_r := public.ovsync_hastalik_gunu_ekle(pg_temp.k10_id('a',10), pg_temp.k10_id('1',3), pg_temp.k10_bg()+4, 7, '[]');
+  v_r := public.ovsync_hastalik_gunu_ekle(pg_temp.k10_id('a',10), pg_temp.k10_id('1',3), pg_temp.k10_bg()+4, 7, '[{"dose": 5, "unit": "ml"}]');
   SELECT count(*) INTO v_gun FROM treatment_days WHERE case_id = pg_temp.k10_id('a',10);
+  SELECT count(*) INTO v_ilac FROM drug_administrations da JOIN treatment_days td ON td.id = da.treatment_day_id
+   WHERE td.case_id = pg_temp.k10_id('a',10);
   SELECT hedef_tarih INTO v_yeni FROM gorev_log WHERE id = pg_temp.k10_id('e',10);
   INSERT INTO _k10_durum VALUES ('S-DB1-null-mastit',
     CASE WHEN COALESCE((v_r->>'ok')::boolean, true) = false AND v_r->>'error' = 'ANA_ACIK_OVSYNC_DEGIL'
-      AND v_gun = 0 AND v_yeni = v_eski THEN 'PASS' ELSE 'RED' END,
-    format('ok=%s err=%s; gun_satir=%s (beklenen 0); TAI %s->%s (oynamamali)', v_r->>'ok', v_r->>'error', v_gun, v_eski, v_yeni));
+      AND v_gun = 0 AND v_ilac = 0 AND v_yeni = v_eski THEN 'PASS' ELSE 'RED' END,
+    format('ok=%s err=%s; gun_satir=%s (beklenen 0); ilac_satir=%s (beklenen 0); TAI %s->%s (oynamamali)',
+      v_r->>'ok', v_r->>'error', v_gun, v_ilac, v_eski, v_yeni));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-null-mastit', 'RED', SQLERRM); END $do$;
 
--- ── S-DB1-kisir-null-ovsync: NULL-aile Ovsync vakası kısırda kapanır; izsiz NULL vaka açık kalır ──
+-- ── S-DB1-kisir-null-ovsync: NULL-aile Ovsync vakası kısırda kapanır; izsiz NULL vakalar
+--   (a10 + H-11'in ikinci izsiz vakası a12) açık kalır ──
 DO $do$ DECLARE
-  v_d11 text; v_k11 text; v_d10 text;
+  v_d11 text; v_k11 text; v_d10 text; v_d12 text;
 BEGIN
   UPDATE public.hayvanlar SET kisir = true WHERE id = 'K10-H-11';
   SELECT status, close_reason INTO v_d11, v_k11 FROM cases WHERE id = pg_temp.k10_id('a',11);
   SELECT status INTO v_d10 FROM cases WHERE id = pg_temp.k10_id('a',10);
+  SELECT status INTO v_d12 FROM cases WHERE id = pg_temp.k10_id('a',12);
   INSERT INTO _k10_durum VALUES ('S-DB1-kisir-null-ovsync',
-    CASE WHEN v_d11 = 'closed' AND v_k11 = 'ERKEN_KAPANIS' AND v_d10 = 'active' THEN 'PASS' ELSE 'RED' END,
-    format('izli(a11)=%s/%s (closed/ERKEN_KAPANIS); izsiz(a10)=%s (active)', v_d11, v_k11, v_d10));
+    CASE WHEN v_d11 = 'closed' AND v_k11 = 'ERKEN_KAPANIS' AND v_d10 = 'active' AND v_d12 = 'active' THEN 'PASS' ELSE 'RED' END,
+    format('izli(a11)=%s/%s (closed/ERKEN_KAPANIS); izsiz(a10)=%s izsiz(a12)=%s (active)', v_d11, v_k11, v_d10, v_d12));
 EXCEPTION WHEN OTHERS THEN INSERT INTO _k10_durum VALUES ('S-DB1-kisir-null-ovsync', 'RED', SQLERRM); END $do$;
 
 -- ── S-DB1-alt-ozet (ERT5): hastalık günü olan vakada takip_listele gün durumu + sıra + diseases.name ──
