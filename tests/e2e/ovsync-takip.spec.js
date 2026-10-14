@@ -51,9 +51,10 @@ test.describe.configure({ mode: !IS_DEMO ? 'skip' : 'default' });
 // KOŞUM SÖZLEŞMESİ: --workers=1 ZORUNLU. beforeAll worker başına bir kez koşar;
 // paylaşımlı seed çok-worker'da kendini siler (2026-10-01 koşum dersi: 12 worker
 // → 94 kalıntı hayvan). Test dosyası tek worker'da sıralı koşar, her test bağımsız.
-test.setTimeout(120000); // K10-B-F2 (Y-CIFT-TIK): dosya düzeyi 60 sn CLI
-// --timeout=120000'i eziyor, zincir testleri giyotinliyordu — CLI ile
-// aynı bütçe (niyet korunur: assert'ler değişmez, yalnız tavan).
+test.setTimeout(180000); // K10-B-F2 flake-sıkılaştırma (Y-N2): Y-N2 blok
+// bütçesi 75 sn + yavaş zeminde sabit maliyet ~69 sn (kosum2-r1: 45 sn
+// beklemeye rağmen test 1.9m) → 120 sn tavan bloğu tüketmeden giyotinlerdi.
+// CLI --timeout=120000'i ezer; niyet korunur, yalnız tavan (RULING 1).
 
 let db;   // demo authenticated client (seed/REST kanıtı/cleanup)
 let S;    // seed kayıtları (hayvan başına {kupe, hayvanId, tohId, gorevId, ...})
@@ -539,7 +540,11 @@ test('T-19: takipli hayvana yeni tohumlama → sessiz kapanış (neden=YENI_TOHU
   expect(gorev, 'takip görevi YENI_TOHUMLAMA ile kapanmalı').toBeTruthy();
   await page.evaluate(() => window.goTo && window.goTo('dash'));
   await page.evaluate(() => window.goTo && window.goTo('ovsync'));
-  await expect(page.locator('#pg-ovsync .ovs-takip-satir', { hasText: S.e.kupe })).toHaveCount(0, { timeout: 10000 });
+  // K10-B-F2 flake-sıkılaştırma (T-19): yeni tohumlama sonrası takip satırı
+  // 10 sn'de düşmedi (kosum1-r1 19/20, toHaveCount(0)→1); yeşil bant
+  // 12.6/14.8/17.2 sn → koşul beklemesi bütçesi 25 sn (sabit sleep YOK,
+  // assert aynen: satır düşer).
+  await expect(page.locator('#pg-ovsync .ovs-takip-satir', { hasText: S.e.kupe })).toHaveCount(0, { timeout: 25000 });
 });
 
 // ═══ 11) T-73 REST guard + T-89 C4 — betikleşmiş DB-SQL katmanları ═══════════
@@ -814,9 +819,11 @@ test('Y-N2: vaka detayında tek + Hastalık/+ İlaç çifti; Ekle sonrası timel
   await wEkleTikla(modal);
   await expect(modal).toHaveCount(0, { timeout: 15000 });
   const blok = page.locator('#m-case-det .cd-tl-item', { hasText: 'İnaktif Ovaryum' }).first();
-  // K10-B-F2 (Y-N2): koşul beklemesi — F-2 sonrası blok ~1 sn'de düşer;
-  // bütçe yavaş zemine göre (sabit sleep YOK, niyet korunur).
-  await expect(blok, 'U3/U4: pull sonrası timeline hastalık bloğu').toBeVisible({ timeout: 45000 });
+  // K10-B-F2 flake-sıkılaştırma (Y-N2): pull sonrası timeline hastalık bloğu
+  // 45 sn'de görünmedi (kosum2-r1 19/20, test 1.9m); yeşil bant ~24-54 sn
+  // (tekrarda 53.7 sn) → koşul beklemesi bütçesi 75 sn (sabit sleep YOK,
+  // assert aynen: blok görünür).
+  await expect(blok, 'U3/U4: pull sonrası timeline hastalık bloğu').toBeVisible({ timeout: 75000 });
   await expect(blok).toContainText('5. gün PG (opsiyonel)');
   await expect(blok).toContainText('+ İlaç ekle');
   await page.screenshot({ path: K10_SHOT + '/y-n2-detay.png' });
