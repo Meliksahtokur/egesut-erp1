@@ -33,12 +33,13 @@ function yarisCtx() {
     toast: (m) => { toasts.push(String(m)); },
     rpc: async () => ({ ok: true, gun_id: 'gun-yaris', mevcut: false, ertelenen: 1, ilac: 0 }),
     // Yavaş pull: sunucu durumu IDB'ye YALNIZ pull bitince düşer (gerçek yarış).
+    // ERT3: sahte pull istenen tabloya göre davranır (tablo-bağımsız ekleme YOK).
     pullTables: async (t) => {
-      pulls.push(t);
+      pulls.push((t || []).slice());
       await new Promise(r => setTimeout(r, 60));
-      gunIdb.push({ id: 'gun-yaris', case_id: 'v-ana' });
+      if ((t || []).indexOf('treatment_days') !== -1) gunIdb.push({ id: 'gun-yaris', case_id: 'v-ana' });
       sira.push('pull-bitti');
-      return { ok: [], failed: [] };
+      return { ok: (t || []).slice(), failed: [] };
     },
     renderSafe: () => {},
     RPC_TABLES: { ovsync_hastalik_gunu_ekle: ['cases', 'treatment_days'] },

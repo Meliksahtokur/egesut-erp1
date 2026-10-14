@@ -51,10 +51,8 @@ test.describe.configure({ mode: !IS_DEMO ? 'skip' : 'default' });
 // KOŞUM SÖZLEŞMESİ: --workers=1 ZORUNLU. beforeAll worker başına bir kez koşar;
 // paylaşımlı seed çok-worker'da kendini siler (2026-10-01 koşum dersi: 12 worker
 // → 94 kalıntı hayvan). Test dosyası tek worker'da sıralı koşar, her test bağımsız.
-test.setTimeout(180000); // K10-B-F2 flake-sıkılaştırma (Y-N2): Y-N2 blok
-// bütçesi 75 sn + yavaş zeminde sabit maliyet ~69 sn (kosum2-r1: 45 sn
-// beklemeye rağmen test 1.9m) → 120 sn tavan bloğu tüketmeden giyotinlerdi.
-// CLI --timeout=120000'i ezer; niyet korunur, yalnız tavan (RULING 1).
+test.setTimeout(90000); // E1-RETRY bütçesi: ham-E1 tabanı en yavaş adım 44.6 sn
+// (Y-M5M7) → tavan 90 sn (~2x). CLI --timeout'u ezer. Şişirme YOK.
 
 let db;   // demo authenticated client (seed/REST kanıtı/cleanup)
 let S;    // seed kayıtları (hayvan başına {kupe, hayvanId, tohId, gorevId, ...})
@@ -818,12 +816,14 @@ test('Y-N2: vaka detayında tek + Hastalık/+ İlaç çifti; Ekle sonrası timel
   await page.screenshot({ path: K10_SHOT + '/y-n2-modal.png' });
   await wEkleTikla(modal);
   await expect(modal).toHaveCount(0, { timeout: 15000 });
+  // FAZ1 [ortam/DB]: gün satırı DB'ye düştü mü — RPC/timeout (ortam) kırmızısı
+  // ürün-render hatasından burada ayrılır (sınıf ORTAM+8sn, a-teshis.md).
+  const gun = await dbBekle(async () => (await wGunler(anaId))[0] ?? null);
+  expect(gun, 'Y-N2 FAZ1 [ortam/DB]: hastalık günü DB satırı yok — RPC/ortam şüphesi, blok beklenemez').toBeTruthy();
   const blok = page.locator('#m-case-det .cd-tl-item', { hasText: 'İnaktif Ovaryum' }).first();
-  // K10-B-F2 flake-sıkılaştırma (Y-N2): pull sonrası timeline hastalık bloğu
-  // 45 sn'de görünmedi (kosum2-r1 19/20, test 1.9m); yeşil bant ~24-54 sn
-  // (tekrarda 53.7 sn) → koşul beklemesi bütçesi 75 sn (sabit sleep YOK,
-  // assert aynen: blok görünür).
-  await expect(blok, 'U3/U4: pull sonrası timeline hastalık bloğu').toBeVisible({ timeout: 75000 });
+  // FAZ2 [ürün/render]: F-2 hızlı fazı kilitler — ham-E1 tabanında blok sn mertebesinde;
+  // koşul bütçesi 10 sn (75 sn indirimi; şişirme YOK, sabit sleep YOK).
+  await expect(blok, 'Y-N2 FAZ2 [ürün/render]: pull sonrası timeline hastalık bloğu görünmedi').toBeVisible({ timeout: 10000 });
   await expect(blok).toContainText('5. gün PG (opsiyonel)');
   await expect(blok).toContainText('+ İlaç ekle');
   await page.screenshot({ path: K10_SHOT + '/y-n2-detay.png' });

@@ -1551,17 +1551,26 @@ async function hastalikGunKaydet(anaVakaId, btn){
   const sonraTam=async (rr, toastMetni)=>{
     const tables=(typeof RPC_TABLES!=='undefined'&&RPC_TABLES.ovsync_hastalik_gunu_ekle)?RPC_TABLES.ovsync_hastalik_gunu_ekle:['cases','treatment_days','drug_administrations','stok','stok_hareket','gorev_log','islem_log'];
     const HIZLI=['treatment_days','drug_administrations'];
-    await pullTables(HIZLI).then(renderSafe).catch(console.warn);
+    // ERT1 (K10-B-F3): hizli faz treatment_days cekemezse sessiz basari YOK.
+    let hizliOk=true;
+    let hizliSonuc=null;
+    try{
+      hizliSonuc=await pullTables(HIZLI);
+    }catch(e){ hizliOk=false; try{console.warn(e);}catch(_){} }
+    try{ renderSafe(); }catch(e){ hizliOk=false; try{console.warn(e);}catch(_){} }
+    if(hizliSonuc&&Array.isArray(hizliSonuc.failed)&&hizliSonuc.failed.indexOf('treatment_days')!==-1) hizliOk=false;
     const gunId=rr&&rr.gun_id?rr.gun_id:null;
     if(gunId&&typeof idbGetAll==='function'){
       try{
         const gunler=await idbGetAll('treatment_days');
-        if(!(gunler||[]).some(g=>g&&g.id===gunId)) console.warn('hastalik-gun pull-sonrasi yok');
-      }catch(e){}
-    }
+        if(!(gunler||[]).some(g=>g&&g.id===gunId)){ hizliOk=false; console.warn('hastalik-gun pull-sonrasi yok'); }
+      }catch(e){ hizliOk=false; }
+    }else if(gunId){ hizliOk=false; }
     if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
-    if(toastMetni) toast(toastMetni);
-    const kalan=(tables||[]).filter(t=>HIZLI.indexOf(t)===-1);
+    if(!hizliOk) toast('⚠️ Kaydedildi, ekran yenilenemedi — yenile',true);
+    else if(toastMetni) toast(toastMetni);
+    let kalan=(tables||[]).filter(t=>HIZLI.indexOf(t)===-1);
+    if(!hizliOk&&(tables||[]).indexOf('treatment_days')!==-1&&kalan.indexOf('treatment_days')===-1) kalan=['treatment_days'].concat(kalan);
     if(kalan.length) await pullTables(kalan).then(renderSafe).catch(console.warn);
     if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
     if(typeof loadDash==='function'){ try{ const _l=loadDash(); if(_l&&typeof _l.catch==='function') _l.catch(console.warn); }catch(e){} }
