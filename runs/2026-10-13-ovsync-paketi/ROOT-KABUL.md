@@ -1,6 +1,6 @@
 # ROOT-KABUL — ovsync-paketi (karar 10: hastalık = Ovsync içinde gün) — 2026-10-14
 
-Kapsam: PG +48 s TAI global (§18.6, sahip karar 11) · inaktif/kist hastalık günü Ovsync vakası içinde (`treatment_days.disease_id`, tek RPC `ovsync_hastalik_gunu_ekle`, `_vaka_ovsync_mu`) · kısır zinciri closed_at · tek "+ Hastalık" modalı (mockup2 N1-N4) · S4 rozeti · görev↔uyarı senkronu · iki fazlı tazeleme. Kayıtlar (iş deposu dalı yarım-jobs): /home/melik/.herdr/worktrees/egesut-erp1/yar-m-jobs/runs/2026-10-13-ovsync-paketi/
+Kapsam: PG +48 s TAI global (§18.6, sahip karar 11) · inaktif/kist hastalık günü Ovsync vakası içinde (`treatment_days.disease_id`, tek RPC `ovsync_hastalik_gunu_ekle`, `_vaka_ovsync_mu`) · kısır zinciri closed_at · tek "+ Hastalık" modalı (mockup2 N1-N4) · S4 rozeti · görev↔uyarı senkronu · iki fazlı tazeleme. Kayıtlar: iş deposu dalı `yarım-jobs`, `runs/2026-10-13-ovsync-paketi/`
 
 | Bulgu / kapı | Sonuç | Commit | Ölçüm |
 |---|---|---|---|

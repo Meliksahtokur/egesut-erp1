@@ -664,7 +664,7 @@ test('T-03/T-50: TAKIP seçimi görev kurar (+7g) ve __ovsyncTakip cache bozulur
 // Y1 "OVSYNC ana vaka açılmalı" FAIL, 2026-10-13). Küpeler MARKER'lı → mevcut
 // temizle() otomatik toplar (+ drug_administrations). Seçiciler ui.js K10
 // satırlarıyla verildi; DB anahtarları 000003/000005-yeni.
-const K10_SHOT = '/home/melik/.herdr/worktrees/egesut-erp1/yar-m-jobs/runs/2026-10-13-ovsync-paketi/ui-k10';
+const K10_SHOT = process.env.K10_SHOT_DIR || 'test-results/ui-k10';
 async function wSeedHayvan(tag, no) {
   const id = `e2e90000-0000-4000-8000-${String(no).padStart(12, '0')}`;
   const kupe = MARKER + tag;
