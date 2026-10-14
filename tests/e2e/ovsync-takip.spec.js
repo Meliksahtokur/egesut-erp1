@@ -51,7 +51,9 @@ test.describe.configure({ mode: !IS_DEMO ? 'skip' : 'default' });
 // KOŞUM SÖZLEŞMESİ: --workers=1 ZORUNLU. beforeAll worker başına bir kez koşar;
 // paylaşımlı seed çok-worker'da kendini siler (2026-10-01 koşum dersi: 12 worker
 // → 94 kalıntı hayvan). Test dosyası tek worker'da sıralı koşar, her test bağımsız.
-test.setTimeout(60000); // açık akış zincirleri (seçici→RPC→DB poll) 30 s'yi aşabilir
+test.setTimeout(120000); // K10-B-F2 (Y-CIFT-TIK): dosya düzeyi 60 sn CLI
+// --timeout=120000'i eziyor, zincir testleri giyotinliyordu — CLI ile
+// aynı bütçe (niyet korunur: assert'ler değişmez, yalnız tavan).
 
 let db;   // demo authenticated client (seed/REST kanıtı/cleanup)
 let S;    // seed kayıtları (hayvan başına {kupe, hayvanId, tohId, gorevId, ...})
@@ -812,7 +814,9 @@ test('Y-N2: vaka detayında tek + Hastalık/+ İlaç çifti; Ekle sonrası timel
   await wEkleTikla(modal);
   await expect(modal).toHaveCount(0, { timeout: 15000 });
   const blok = page.locator('#m-case-det .cd-tl-item', { hasText: 'İnaktif Ovaryum' }).first();
-  await expect(blok, 'U3/U4: pull sonrası timeline hastalık bloğu').toBeVisible({ timeout: 20000 });
+  // K10-B-F2 (Y-N2): koşul beklemesi — F-2 sonrası blok ~1 sn'de düşer;
+  // bütçe yavaş zemine göre (sabit sleep YOK, niyet korunur).
+  await expect(blok, 'U3/U4: pull sonrası timeline hastalık bloğu').toBeVisible({ timeout: 45000 });
   await expect(blok).toContainText('5. gün PG (opsiyonel)');
   await expect(blok).toContainText('+ İlaç ekle');
   await page.screenshot({ path: K10_SHOT + '/y-n2-detay.png' });
@@ -864,10 +868,14 @@ test('Y-CIFT-TIK: çift Ekle tek hastalık günü açar; tekrar mevcut döner, i
   // Çift tık eşdeğeri: kilit ikinci çağrıyı düşürür (tek RPC).
   await page.evaluate(aid => Promise.all([window.hastalikGunKaydet(aid), window.hastalikGunKaydet(aid)]), anaId);
   await expect(modal).toHaveCount(0, { timeout: 15000 });
+  // K10-B-F2 (Y-CIFT-TIK): yavaş zeminde 10 sn varsayılanı null
+  // döndürüp `null.length` TypeError'ü veriyordu — koşul beklemesi
+  // bütçesi (niyet korunur: tek-gün assert'i aynen).
   const gunler = await dbBekle(async () => {
     const g = await wGunler(anaId);
     return g.length ? g : null;
-  });
+  }, 45000);
+  expect(gunler, 'çift çağrı günü DBde').toBeTruthy();
   expect(gunler.length, 'çift çağrı tek gün').toBe(1);
   expect(gunler[0].treatment_date, 'gün modal tarihinde').toBe(hgTarih);
   const ilac0 = (await db.from('drug_administrations').select('id').eq('treatment_day_id', gunler[0].id)).data ?? [];
