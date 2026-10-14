@@ -1709,9 +1709,12 @@ async function _hastalikBtnSync(){
       }catch(e){ kabul=false; }
     }
   }
-  hBtn.style.display=kabul?'block':'none';
-  iBtn.style.display=(online&&vaka&&vaka.status==='active')?'block':'none';
-  bar.style.display=(kabul||(online&&vaka&&vaka.status==='active'))?'flex':'none';
+  // K10-B-F1 (BLOK1): "+ İlaç"/bar yalnız Ovsync kabulünde (mastit vb.
+  // aktif vakada gizli) — aynı kabul deseni teke indirildi.
+  const gor=kabul?'block':'none';
+  hBtn.style.display=gor;
+  iBtn.style.display=gor;
+  bar.style.display=kabul?'flex':'none';
   if(kabul) hBtn.onclick=()=>hastalikGunAc(vaka.id);
   iBtn.onclick=async ()=>{
     if(typeof idbGetAll!=='function') return;
