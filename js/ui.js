@@ -1542,10 +1542,16 @@ async function hastalikGunKaydet(anaVakaId, btn){
   _hgKayitKilit=true;
   if(btn){ try{btn.disabled=true;btn.textContent='Ekleniyor…';}catch(e){} }
   // UI-0 (U3/U4 yarış kapısı): pull BEKLENİR; gün IDB'ye düşmeden
-  // timeline TAZELENMEZ.
-  const sonraTam=async (rr)=>{
+  // timeline TAZELENMEZ. F-2 (K10-B-F2, Ruling: iki fazlı tazeleme):
+  // RPC ok sonrası blok ≤1.5 sn için tam 7-tablo pull beklenmez — önce
+  // timeline tabloları (hızlı set), render + toast; sonra kalan tablolar
+  // arkadan + yakınsama render'ı (kart/TAI soneki). UI-0 sırası (önce
+  // pull, sonra render) her fazda korunur; toast render SONRASIDIR
+  // ("eklendi" derken blok görünür).
+  const sonraTam=async (rr, toastMetni)=>{
     const tables=(typeof RPC_TABLES!=='undefined'&&RPC_TABLES.ovsync_hastalik_gunu_ekle)?RPC_TABLES.ovsync_hastalik_gunu_ekle:['cases','treatment_days','drug_administrations','stok','stok_hareket','gorev_log','islem_log'];
-    await pullTables(tables).then(renderSafe).catch(console.warn);
+    const HIZLI=['treatment_days','drug_administrations'];
+    await pullTables(HIZLI).then(renderSafe).catch(console.warn);
     const gunId=rr&&rr.gun_id?rr.gun_id:null;
     if(gunId&&typeof idbGetAll==='function'){
       try{
@@ -1553,6 +1559,10 @@ async function hastalikGunKaydet(anaVakaId, btn){
         if(!(gunler||[]).some(g=>g&&g.id===gunId)) console.warn('hastalik-gun pull-sonrasi yok');
       }catch(e){}
     }
+    if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
+    if(toastMetni) toast(toastMetni);
+    const kalan=(tables||[]).filter(t=>HIZLI.indexOf(t)===-1);
+    if(kalan.length) await pullTables(kalan).then(renderSafe).catch(console.warn);
     if(typeof renderCaseTimeline==='function'&&typeof _curCase!=='undefined'&&_curCase) await renderCaseTimeline(_curCase.id);
     if(typeof loadDash==='function'){ try{ const _l=loadDash(); if(_l&&typeof _l.catch==='function') _l.catch(console.warn); }catch(e){} }
   };
@@ -1619,8 +1629,7 @@ async function hastalikGunKaydet(anaVakaId, btn){
       const kisa=iso=>String(iso).slice(8,10)+'.'+String(iso).slice(5,7);
       taiBolum=' · TAI '+kisa(eski)+' → '+kisa(dFwd(eski,p_gun));
     }
-    toast(taban+(r.mevcut?' (zaten açıktı)':'')+taiBolum);
-    await sonraTam(r);
+    await sonraTam(r, taban+(r.mevcut?' (zaten açıktı)':'')+taiBolum);
     return r;
   }finally{
     _hgKayitKilit=false;
@@ -12323,10 +12332,13 @@ async function renderCasesForAnimal(animalId) {
  * DOM elementlerine yerleştirir, durum etiketlerini oluşturur, geri alma butonunun görünürlüğünü kontrol eder
  * ve tedavi zaman çizelgesini render eder.
  * @param {string} caseId - Detayları gösterilecek vakanın benzersiz kimlik numarası.
+ * @param {Object} [opts] - Seçenekler. acmadan:true ise modal AÇILMAZ, yalnız
+ *   içerik tazelenir (açıksa açık kalır, kapalıysa kapalı — K10-B-F2 Y-M5M7:
+ *   kapanış tazeleme geç dönerse yeniden-açılma yarışı olmaz).
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
  * @tablo drug_administrations (tazeleme), islem_log (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
-async function openCaseDet(caseId) {
+async function openCaseDet(caseId, opts) {
   const cases    = await idbGetAll('cases');
   const diseases = await idbGetAll('diseases');
   const c = cases.find(x => x.id === caseId);
@@ -12385,7 +12397,8 @@ async function openCaseDet(caseId) {
   await pullTables(['treatment_days','drug_administrations','treatment_day_uygulamalar']).catch(()=>{});
   await renderCaseTimeline(caseId);
   _updateKapatBtn(caseId);
-  openM('m-case-det');
+  // K10-B-F2 (Y-M5M7): tazeleme çağrısı (acmadan) 'on'u GERİ EKLEMEZ.
+  if(!(opts&&opts.acmadan)) openM('m-case-det');
 }
 
 /**
@@ -14490,7 +14503,9 @@ async function caseDrugDuzenleKaydet(adminId) {
 
 
 /**
- * Kullanıcı onayı alındıktan sonra mevcut vakayı kapatır, ilgili tabloları günceller ve vaka detaylarını yeniden açar.
+ * Kullanıcı onayı alındıktan sonra mevcut vakayı kapatır, ilgili tabloları günceller ve vaka detayını tazeler.
+ * Detay açık kaldıysa kapalı hâli gösterir; kullanıcı aradan kapattıysa
+ * YENİDEN açılmaz (K10-B-F2 Y-M5M7 — kapanış-sonrası yeniden-açılma yarışı).
  * @returns {Promise<void>} İşlem tamamlandığında veya hata durumunda undefined döndürür.
  * @rpc close_case
  * @tablo cases (tazeleme), diseases (tazeleme), kizginlik_log (tazeleme)
@@ -14502,7 +14517,7 @@ async function caseKapat() {
     await rpc('close_case', { p_case_id: _curCase.id });
     toast('✅ Vaka kapatıldı');
     await pullTables(['cases','diseases','kizginlik_log']);
-    await openCaseDet(_curCase.id);
+    await openCaseDet(_curCase.id, {acmadan:true});
   } catch(e) { toast(e.message, true); }
 }
 
