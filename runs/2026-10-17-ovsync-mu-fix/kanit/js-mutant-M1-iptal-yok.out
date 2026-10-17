@@ -1,0 +1,10 @@
+✖ ovsync-mu-log-kolu-js: kabul matrisi (3.405029ms)
+✔ ovsync-mu-log-kolu-js: bağlam kabul kümesi (8.044795ms)
+✔ ovsync-mu-log-kolu-js: vaka detay barı (prod 232e7f7d deseni) (5.431661ms)
+ℹ tests 3
+ℹ pass 2
+ℹ fail 1
+✖ failing tests:
+✖ ovsync-mu-log-kolu-js: kabul matrisi (3.405029ms)
+    actual: true,
+    expected: false,
