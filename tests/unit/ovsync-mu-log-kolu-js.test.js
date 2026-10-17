@@ -1,6 +1,6 @@
 // tests/unit/ovsync-mu-log-kolu-js.test.js
 // ovsync-mu-fix (2026-10-17): JS aynası `_hastalikKabulMu` DB `_vaka_ovsync_mu`
-// (20261017000001) ile aynı kural: log kolu yalnız anahtardaki şablon
+// (20261017100001) ile aynı kural: log kolu yalnız anahtardaki şablon
 // protokol_ailesi='OVSYNC' VE log iptal===false iken kabul; `:MANUEL` saymaz.
 'use strict';
 const test = require('node:test');
