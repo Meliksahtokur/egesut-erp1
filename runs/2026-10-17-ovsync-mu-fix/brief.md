@@ -27,3 +27,7 @@ Migration ≤80 satır, test ≤150 satır. Commit: görev başına, `git add` d
 
 ## Teslim
 `/home/melik/.herdr/worktrees/egesut-erp1/ovsync-mu-fix/runs/2026-10-17-ovsync-mu-fix/report.md`: etki (çağıranlar + prod 5 vakada bugünkü yanlış davranış), test kırmızı→yeşil kanıtı, db-validate sonucu, birim süit sayıları, `:MANUEL` ruling'i, prod uygulama taslağı (sahip kapısı için: hangi migration, geri alma), `kabul SHA:`. Dönüş ≤5 satır.
+
+## Root ruling'leri (2026-10-17, teslim sırasında; kapı KÜÇÜK bulgusu üzerine işlendi)
+- Ruling (a): JS `_hastalikKabulMu` aynı dalda aynı kurala çekilir → yazılabilir ek: js/ui.js, index.html (?v= damgası), tests/unit/ovsync-mu-log-kolu-js.test.js, tests/unit/k10-hastalik-modal.test.js, tests/unit/k10-ilac-bar-yalniz-ovsync.test.js.
+- Ruling (b): migration AP1 damgalarıyla çakışmasın diye 20261017000001 → 20261017100001 (git mv) + demo schema_migrations satırı güncellenir.
