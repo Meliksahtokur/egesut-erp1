@@ -6,7 +6,7 @@
 [koken] fk=5 doldurulan=1 ad_eslesme=1 YETIM=0 std_dose_dolu=26
 [statik] dosya=10 turetilmis=0 sabit=47 rpc_govdesi=38
 
-ÖZET: /home/melik/tmp/agents/veri-eslesme-20261017/ozet.json
+ÖZET: ~/tmp/agents/veri-eslesme-20261017/ozet.json
 HÜKÜM: BULGU: 58
 
 # SONRA (uygulama sonrası):
@@ -17,6 +17,6 @@ HÜKÜM: BULGU: 58
 [koken] fk=5 doldurulan=1 ad_eslesme=1 YETIM=0 std_dose_dolu=26
 [statik] dosya=10 turetilmis=0 sabit=47 rpc_govdesi=38
 
-ÖZET: /home/melik/tmp/agents/veri-eslesme-20261017/ozet.json
+ÖZET: ~/tmp/agents/veri-eslesme-20261017/ozet.json
 HÜKÜM: BULGU: 58
 # diff önce/sonra [sizinti|isaret|koken|statik]: boş (aynı)

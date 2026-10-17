@@ -67,7 +67,7 @@ MANUEL Ovsync sayılmaz (yeni kural kendiliğinden sağlar). Prod'da MANUEL logl
 
 ## Varsayımlar
 - İptali NULL log sayılmaz (prod/demo'da yok).
-- Worktree'de `.env` yok; `refresh_lsp_schema.sh`, `db-build-baseline.sh`, `db-validate.sh` ana checkout'tan (/home/melik/egesut-erp1, 56900c3) koşuldu.
+- Worktree'de `.env` yok; `refresh_lsp_schema.sh`, `db-build-baseline.sh`, `db-validate.sh` ana checkout'tan (~/egesut-erp1, 56900c3) koşuldu.
 - Yerel şema aynası prod'dan salt-okuma tazelendi.
 - Demo kalıcı uygulama kontrattaki "demo prova apply db-validate PASS sonrası serbest" kuralına dayanır.
 
