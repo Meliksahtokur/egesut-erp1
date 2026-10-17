@@ -31,3 +31,4 @@ Migration ≤80 satır, test ≤150 satır. Commit: görev başına, `git add` d
 ## Root ruling'leri (2026-10-17, teslim sırasında; kapı KÜÇÜK bulgusu üzerine işlendi)
 - Ruling (a): JS `_hastalikKabulMu` aynı dalda aynı kurala çekilir → yazılabilir ek: js/ui.js, index.html (?v= damgası), tests/unit/ovsync-mu-log-kolu-js.test.js, tests/unit/k10-hastalik-modal.test.js, tests/unit/k10-ilac-bar-yalniz-ovsync.test.js.
 - Ruling (b): migration AP1 damgalarıyla çakışmasın diye 20261017000001 → 20261017100001 (git mv) + demo schema_migrations satırı güncellenir.
+- Sahip onayı (prod apply + merge): 2026-10-17 sahibin cümlesi "tamam öneriler kabul" — root'un sunduğu madde 1 "[E/H] Prod'a uygulayıp main'e merge edeyim mi? (Önerim: E)" cevabı; faz kapısı KABUL + demo UI testi PASS sonrası.
