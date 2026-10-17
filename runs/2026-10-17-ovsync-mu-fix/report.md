@@ -5,7 +5,9 @@
 > worker'ın iki dönüş metninden birebir aktarıldı.
 
 sonuc: TAMAM
-kabul SHA: 4163167 (dal fix/ovsync-mu-log-kolu; taban 56900c3)
+kabul SHA: 7f6c033 (dal fix/ovsync-mu-log-kolu; taban 56900c3; kod 4163167 + prod kanıtı 7f6c033)
+kapanış kaydı: d7a0a6f
+prod: UYGULANDI 2026-10-17 (20261017100001, md5 6fd299d3, Ovsync 46→41; kanıt kanit/prod-1..5)
 Commit'ler: e7ba499 SQL test (kırmızı 8/11) · c38f0e3 migration · b48a0ba kanıt · d68be34 JS test (kırmızı) · 51389be JS fix + k10 testleri + ?v=20261017-01 · 074343e git mv → 20261017100001 · 4163167 kanıt
 BOYUT: migration 52 (≤80) · SQL test 94 (≤150) · ui.js +6/−2 (≤40) · JS test 59 (≤80) · iki eski testte 3 satır
 
