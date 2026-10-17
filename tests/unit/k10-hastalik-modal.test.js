@@ -190,7 +190,8 @@ test('hastalik-kabul-yedek', () => {
   assert.strictEqual(f(damga, {}), true, 'damga kazanır');
   const nul = { id: 'v2', status: 'active', protocol_family: null, disease_id: 'd9' };
   assert.strictEqual(f(nul, {}), false, 'NULL desteksiz kapalı (fail-closed)');
-  assert.strictEqual(f(nul, { gorevler: [{ kaynak: 'TEDAVI_SABLON_TOHUMLAMA:v2:7' }] }), true, 'NULL + tohumlama logu açık');
+  assert.strictEqual(f(nul, { gorevler: [{ kaynak: 'TEDAVI_SABLON_TOHUMLAMA:v2:7', iptal: false }], sablonlar: [{ id: '7', protokol_ailesi: 'OVSYNC' }] }), true, 'NULL + OVSYNC şablon tohumlama logu açık');
+  assert.strictEqual(f(nul, { gorevler: [{ kaynak: 'TEDAVI_SABLON_TOHUMLAMA:v2:7', iptal: false }] }), false, 'NULL + OVSYNC-dışı şablon logu kapalı (ovsync-mu-fix)');
   assert.strictEqual(f(nul, { eslem: [{ disease_id: 'd9', sablon_id: 's7' }], sablonlar: [{ id: 's7', protokol_ailesi: 'OVSYNC' }] }), true, 'NULL + şablon eşlemesi açık');
   assert.strictEqual(f({ ...nul, protocol_family: 'METRIT' }, { gorevler: [{ kaynak: 'TEDAVI_SABLON_TOHUMLAMA:v2:7' }] }), false, 'OVSYNC-dışı damga kapalı');
   assert.strictEqual(f({ ...damga, status: 'closed' }, {}), false, 'kapalı vaka kapalı');
