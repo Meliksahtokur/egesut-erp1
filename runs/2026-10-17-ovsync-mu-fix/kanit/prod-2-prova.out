@@ -1,0 +1,68 @@
+# prova SQL (BEGIN … ROLLBACK):
+BEGIN;
+CREATE TEMP TABLE _eski ON COMMIT DROP AS SELECT c.id FROM cases c WHERE public._vaka_ovsync_mu(c.id);
+-- ════════════════════════════════════════════════════════════════════
+-- `_vaka_ovsync_mu` log kolu yanlış pozitif düzeltmesi (2026-10-17, sahip onayı "ok").
+-- Önceki tanım: 20261013000003_alt_vaka.sql §1b (prod+demo md5 28b209ab… MEASURED).
+--
+-- Hata: log kolu her `TEDAVI_SABLON_TOHUMLAMA:<case>:%` logunu Ovsync belirteci
+-- sayıyordu; aynı anahtarı tedavi şablonlarının opsiyonel "planlı tohumlama"
+-- adımı (20260730000001, 20260909000001) ve elle ekleme `:MANUEL`
+-- (20260730000002) da yazar → mastit/tırnak/neonatal vakaları "Ovsync" sayıldı
+-- (prod 5 vaka). Etki: `ovsync_hastalik_gunu_ekle` bu vakaları kabul ediyor,
+-- `_kisir_zincir_bitir` kısır işaretlemede bunları ERKEN_KAPANIS ile kapatıyordu.
+--
+-- Yeni kural (root ruling; istatistik `stat_vaka_ovsync_mu` ile aynı): log kolu
+-- yalnız anahtardaki şablonun `protokol_ailesi = 'OVSYNC'` olduğu VE log
+-- `iptal = false` olduğu durumda Ovsync sayar. `:MANUEL` anahtarı şablonsuzdur
+-- → saymaz. Diğer kollar (protocol_family damgası, OVSYNC-eşlemeli hastalık)
+-- AYNEN. İmza, LANGUAGE/STABLE/DEFINER/search_path ve yetkiler AYNEN
+-- (service_role dışı kapalı; anon EXECUTE YOK).
+-- Geri alma: 20261013000003_alt_vaka.sql §1b gövdesi CREATE OR REPLACE ile.
+-- ════════════════════════════════════════════════════════════════════
+
+
+-- squawk hijyeni: yeniden tanım öncesinde timeout'lar (emsal 20261013000003:26-27)
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
+
+CREATE OR REPLACE FUNCTION public._vaka_ovsync_mu(p_case_id uuid)
+ RETURNS boolean
+ LANGUAGE sql STABLE
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM public.cases c
+     WHERE c.id = p_case_id
+       AND (c.protocol_family = 'OVSYNC'
+            OR (c.protocol_family IS NULL
+                AND (EXISTS (SELECT 1 FROM public.sablon_hastalik_eslem e
+                              JOIN public.tedavi_sablonu t ON t.id = e.sablon_id
+                             WHERE e.disease_id = c.disease_id AND t.protokol_ailesi = 'OVSYNC')
+                     OR EXISTS (SELECT 1 FROM public.gorev_log g
+                                  JOIN public.tedavi_sablonu t
+                                    ON t.id::text = split_part(g.kaynak, ':', 3)
+                                 WHERE g.kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:' || c.id::text || ':%'
+                                   AND t.protokol_ailesi = 'OVSYNC'
+                                   AND g.iptal = false)))));
+$function$;
+REVOKE ALL ON FUNCTION public._vaka_ovsync_mu(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._vaka_ovsync_mu(uuid) TO service_role;
+
+NOTIFY pgrst, 'reload schema';
+SELECT json_build_object(
+ 'eski_sayi', (SELECT count(*) FROM _eski),
+ 'yeni_sayi', (SELECT count(*) FROM cases c WHERE public._vaka_ovsync_mu(c.id)),
+ 'dusen', (SELECT json_agg(left(e.id::text,8) ORDER BY e.id::text) FROM _eski e WHERE NOT public._vaka_ovsync_mu(e.id)),
+ 'yeni_eklenen', (SELECT count(*) FROM cases c WHERE public._vaka_ovsync_mu(c.id) AND c.id NOT IN (SELECT id FROM _eski)),
+ 'ovs_iptal_log', (SELECT count(*) FROM gorev_log g JOIN tedavi_sablonu t ON t.id::text=split_part(g.kaynak,':',3) WHERE g.kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%' AND t.protokol_ailesi='OVSYNC' AND g.iptal),
+ 'ovs_iptal_log_damgasiz', (SELECT count(*) FROM gorev_log g JOIN tedavi_sablonu t ON t.id::text=split_part(g.kaynak,':',3) LEFT JOIN cases c ON c.id::text=split_part(g.kaynak,':',2) WHERE g.kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:%' AND t.protokol_ailesi='OVSYNC' AND g.iptal AND c.protocol_family IS DISTINCT FROM 'OVSYNC'),
+ 'md5_prova', md5(pg_get_functiondef('public._vaka_ovsync_mu(uuid)'::regprocedure)),
+ 'acl_prova', (SELECT array_to_string(proacl,',') FROM pg_proc WHERE oid='public._vaka_ovsync_mu(uuid)'::regprocedure));
+ROLLBACK;
+
+# sonuç:
+[{"json_build_object":{"eski_sayi":46,"yeni_sayi":41,"dusen":["0a23bc51","1f03f184","232e7f7d","375a8d6a","aad17352"],"yeni_eklenen":0,"ovs_iptal_log":23,"ovs_iptal_log_damgasiz":0,"md5_prova":"6fd299d311296e4f045cac3f6cdd8b2b","acl_prova":"postgres=X/postgres,service_role=X/postgres"}}]
+# ROLLBACK sonrası prod:
+[{"json_build_object":{"satirlar":null,"md5":"28b209abcbc0927629e85d2dcf690f01","max":"20261013000005"}}]

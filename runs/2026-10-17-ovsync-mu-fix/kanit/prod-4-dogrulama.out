@@ -1,0 +1,15 @@
+# doğrulama SQL:
+SELECT json_build_object(
+ 'md5', md5(pg_get_functiondef('public._vaka_ovsync_mu(uuid)'::regprocedure)),
+ 'acl', (SELECT array_to_string(proacl,',') FROM pg_proc WHERE oid='public._vaka_ovsync_mu(uuid)'::regprocedure),
+ 'secdef', (SELECT prosecdef FROM pg_proc WHERE oid='public._vaka_ovsync_mu(uuid)'::regprocedure),
+ 'anon_exec', has_function_privilege('anon','public._vaka_ovsync_mu(uuid)','EXECUTE'),
+ 'auth_exec', has_function_privilege('authenticated','public._vaka_ovsync_mu(uuid)','EXECUTE'),
+ 'sr_exec', has_function_privilege('service_role','public._vaka_ovsync_mu(uuid)','EXECUTE'),
+ 'sayi', (SELECT count(*) FROM cases c WHERE public._vaka_ovsync_mu(c.id)),
+ 'dusen', (SELECT json_agg(left(x::text,8) ORDER BY x::text) FROM unnest(ARRAY['aad17352-5a09-4560-b2f3-d77c04700403','0a23bc51-a675-488f-966f-c9af82563505','232e7f7d-1740-4f50-b9a9-702f05c6fc03','375a8d6a-3619-4dc8-9faa-7dd8828966c5','1f03f184-8ace-4d07-be11-775928f43615']::uuid[]) x WHERE NOT public._vaka_ovsync_mu(x)),
+ 'sm', (SELECT json_agg(json_build_object('version',version,'name',name)) FROM supabase_migrations.schema_migrations WHERE version='20261017100001'),
+ 'sm_max', (SELECT max(version) FROM supabase_migrations.schema_migrations),
+ 'sm_sayi', (SELECT count(*) FROM supabase_migrations.schema_migrations));
+# sonuç:
+[{"json_build_object":{"md5":"6fd299d311296e4f045cac3f6cdd8b2b","acl":"postgres=X/postgres,service_role=X/postgres","secdef":true,"anon_exec":false,"auth_exec":false,"sr_exec":true,"sayi":41,"dusen":["0a23bc51","1f03f184","232e7f7d","375a8d6a","aad17352"],"sm":[{"version":"20261017100001","name":"ovsync_mu_log_kolu"}],"sm_max":"20261017100001","sm_sayi":166}}]

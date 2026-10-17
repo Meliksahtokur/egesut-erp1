@@ -1,0 +1,58 @@
+# uygulama SQL (tek transaction):
+BEGIN;
+-- ════════════════════════════════════════════════════════════════════
+-- `_vaka_ovsync_mu` log kolu yanlış pozitif düzeltmesi (2026-10-17, sahip onayı "ok").
+-- Önceki tanım: 20261013000003_alt_vaka.sql §1b (prod+demo md5 28b209ab… MEASURED).
+--
+-- Hata: log kolu her `TEDAVI_SABLON_TOHUMLAMA:<case>:%` logunu Ovsync belirteci
+-- sayıyordu; aynı anahtarı tedavi şablonlarının opsiyonel "planlı tohumlama"
+-- adımı (20260730000001, 20260909000001) ve elle ekleme `:MANUEL`
+-- (20260730000002) da yazar → mastit/tırnak/neonatal vakaları "Ovsync" sayıldı
+-- (prod 5 vaka). Etki: `ovsync_hastalik_gunu_ekle` bu vakaları kabul ediyor,
+-- `_kisir_zincir_bitir` kısır işaretlemede bunları ERKEN_KAPANIS ile kapatıyordu.
+--
+-- Yeni kural (root ruling; istatistik `stat_vaka_ovsync_mu` ile aynı): log kolu
+-- yalnız anahtardaki şablonun `protokol_ailesi = 'OVSYNC'` olduğu VE log
+-- `iptal = false` olduğu durumda Ovsync sayar. `:MANUEL` anahtarı şablonsuzdur
+-- → saymaz. Diğer kollar (protocol_family damgası, OVSYNC-eşlemeli hastalık)
+-- AYNEN. İmza, LANGUAGE/STABLE/DEFINER/search_path ve yetkiler AYNEN
+-- (service_role dışı kapalı; anon EXECUTE YOK).
+-- Geri alma: 20261013000003_alt_vaka.sql §1b gövdesi CREATE OR REPLACE ile.
+-- ════════════════════════════════════════════════════════════════════
+
+
+-- squawk hijyeni: yeniden tanım öncesinde timeout'lar (emsal 20261013000003:26-27)
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '30s';
+
+CREATE OR REPLACE FUNCTION public._vaka_ovsync_mu(p_case_id uuid)
+ RETURNS boolean
+ LANGUAGE sql STABLE
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM public.cases c
+     WHERE c.id = p_case_id
+       AND (c.protocol_family = 'OVSYNC'
+            OR (c.protocol_family IS NULL
+                AND (EXISTS (SELECT 1 FROM public.sablon_hastalik_eslem e
+                              JOIN public.tedavi_sablonu t ON t.id = e.sablon_id
+                             WHERE e.disease_id = c.disease_id AND t.protokol_ailesi = 'OVSYNC')
+                     OR EXISTS (SELECT 1 FROM public.gorev_log g
+                                  JOIN public.tedavi_sablonu t
+                                    ON t.id::text = split_part(g.kaynak, ':', 3)
+                                 WHERE g.kaynak LIKE 'TEDAVI_SABLON_TOHUMLAMA:' || c.id::text || ':%'
+                                   AND t.protokol_ailesi = 'OVSYNC'
+                                   AND g.iptal = false)))));
+$function$;
+REVOKE ALL ON FUNCTION public._vaka_ovsync_mu(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._vaka_ovsync_mu(uuid) TO service_role;
+
+NOTIFY pgrst, 'reload schema';
+INSERT INTO supabase_migrations.schema_migrations(version, name) VALUES ('20261017100001', 'ovsync_mu_log_kolu');
+COMMIT;
+
+# uygulama öncesi durum kontrolü: md5 28b209ab…, sm max 20261013000005, 20261017100001 kaydı yok
+# Mgmt API yanıtı:
+[]

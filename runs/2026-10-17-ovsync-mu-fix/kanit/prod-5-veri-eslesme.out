@@ -1,0 +1,22 @@
+# python3 scripts/veri-eslesme-kontrol.py hepsi — ÖNCE (uygulama öncesi):
+[selftest] READ ONLY guard sınanıyor...
+[selftest] OK — iki DB'de de yazma reddedildi (salt-okunur kanıtlandı)
+[sizinti] ortak=52 kopya_tarihi=2026-07-02T00:00:00+03:00 SIZINTI(supheli)=0 bilgi: kesisim=5883 (klon_imzali=5883) pk_farki=0 demo_dogumlu=67965 prod_only=7189 olculmeyen=14
+[isaret] eslesen_kombinasyon=58 eslesen_toplam_satir=2763
+[koken] fk=5 doldurulan=1 ad_eslesme=1 YETIM=0 std_dose_dolu=26
+[statik] dosya=10 turetilmis=0 sabit=47 rpc_govdesi=38
+
+ÖZET: /home/melik/tmp/agents/veri-eslesme-20261017/ozet.json
+HÜKÜM: BULGU: 58
+
+# SONRA (uygulama sonrası):
+[selftest] READ ONLY guard sınanıyor...
+[selftest] OK — iki DB'de de yazma reddedildi (salt-okunur kanıtlandı)
+[sizinti] ortak=52 kopya_tarihi=2026-07-02T00:00:00+03:00 SIZINTI(supheli)=0 bilgi: kesisim=5883 (klon_imzali=5883) pk_farki=0 demo_dogumlu=67965 prod_only=7189 olculmeyen=14
+[isaret] eslesen_kombinasyon=58 eslesen_toplam_satir=2763
+[koken] fk=5 doldurulan=1 ad_eslesme=1 YETIM=0 std_dose_dolu=26
+[statik] dosya=10 turetilmis=0 sabit=47 rpc_govdesi=38
+
+ÖZET: /home/melik/tmp/agents/veri-eslesme-20261017/ozet.json
+HÜKÜM: BULGU: 58
+# diff önce/sonra [sizinti|isaret|koken|statik]: boş (aynı)
