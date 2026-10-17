@@ -1,0 +1,22 @@
+Running as unit: ram-exec-2008776-2008776.scope; invocation ID: bff895892eb34b799927011a78c5b261
+✔ hastalik-modal-oneri-inaktif (17.061543ms)
+✔ hastalik-modal-bos-kist (7.273418ms)
+✔ tai-once-sonra (3.728132ms)
+✔ hastalik-kaydet-tek-rpc (6.004191ms)
+✔ f3-ok-false-kismi-basari (3.976278ms)
+✔ f3-istisna-sheet-kapanir (3.159414ms)
+✔ hastalik-cift-ekle-tek-cagri (32.851486ms)
+✔ hastalik-ac-offline-gizli (2.689241ms)
+✔ hastalik-kaydet-offline-durur (2.92314ms)
+✔ hastalik-kabul-yedek (1.973297ms)
+✔ tai-ertele-notu (1.453259ms)
+✔ s4-gun-hedefi-ebeveyn (4.064138ms)
+✔ yetim-rozet-baglamsiz (2.043348ms)
+✔ MUT-ALT-VAKA-KALINTI (83.48402ms)
+✔ k10-ilac-bar-yalniz-ovsync (27.89687ms)
+✔ ovsync-mu-log-kolu-js: kabul matrisi (5.910394ms)
+✔ ovsync-mu-log-kolu-js: bağlam kabul kümesi (5.807099ms)
+✔ ovsync-mu-log-kolu-js: vaka detay barı (prod 232e7f7d deseni) (7.634358ms)
+ℹ tests 18
+ℹ pass 18
+ℹ fail 0

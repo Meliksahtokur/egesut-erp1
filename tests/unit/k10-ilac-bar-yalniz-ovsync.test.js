@@ -56,7 +56,7 @@ test('k10-ilac-bar-yalniz-ovsync', async () => {
   // 3) NULL-aile + şablon TAI izli vaka → görünür.
   {
     const vaka = { id: 'v-t', status: 'active', protocol_family: null, disease_id: 'd9' };
-    const t = barCtx(vaka, { gorev_log: [{ kaynak: 'TEDAVI_SABLON_TOHUMLAMA:v-t:7' }] });
+    const t = barCtx(vaka, { gorev_log: [{ kaynak: 'TEDAVI_SABLON_TOHUMLAMA:v-t:7', iptal: false }], tedavi_sablonu: [{ id: '7', protokol_ailesi: 'OVSYNC' }] });
     await vm.runInContext('_hastalikBtnSync()', t.ctx);
     assert.strictEqual(disp(t.bar, 'cd-ilac-btn'), 'block', 'null+TAI: + İlaç görünür');
     assert.strictEqual(t.bar.style.display, 'flex', 'null+TAI: bar görünür');

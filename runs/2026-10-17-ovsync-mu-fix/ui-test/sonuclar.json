@@ -1,0 +1,65 @@
+{
+  "veri": {
+    "c232": {
+      "id": "232e7f7d-1740-4f50-b9a9-702f05c6fc03",
+      "status": "active",
+      "pf": null,
+      "logs": []
+    },
+    "anyLogs232": [],
+    "manuel": [],
+    "ovs": [
+      {
+        "id": "19fb5f78-dd62-47b1-a5e7-792298c85391"
+      },
+      {
+        "id": "270eeb44-929f-4822-9de8-9255ea57a895"
+      },
+      {
+        "id": "2b669d26-d185-4e37-bd35-4f88992a615a"
+      },
+      {
+        "id": "2e24d9b0-3757-4e9f-8b3a-ee22d6145996"
+      },
+      {
+        "id": "4c6de251-64d4-425a-87e6-9c51a5f08e46"
+      },
+      {
+        "id": "517c6be9-a5dd-4795-85a4-da6a21ee4af6"
+      }
+    ]
+  },
+  "m1": {
+    "curCase": "232e7f7d-1740-4f50-b9a9-702f05c6fc03",
+    "bar": "none",
+    "h": "none",
+    "i": "none",
+    "not": "gorev_log tohumlama satiri: 0 (tum 232e7f7d referansli: 0); pf=null kupe=undefined"
+  },
+  "m2": "uygulanamaz: damgasiz acik + yalniz :MANUEL logu vaka yok",
+  "m3": {
+    "vaka": {
+      "id": "19fb5f78-dd62-47b1-a5e7-792298c85391"
+    },
+    "curCase": "19fb5f78-dd62-47b1-a5e7-792298c85391",
+    "bar": "flex",
+    "h": "block",
+    "i": "block",
+    "sheet": [
+      "+ Hastalık — Küpe UIK10-A-40"
+    ]
+  },
+  "m4": {
+    "adet": 3,
+    "kart": 33,
+    "head": "🔄 Ovsync Takip\nAktif protokol zincirleri\n‹ Geri\n19\naktif\n0\nbugün\n16\ngeciken\n8\nmuayene bekleyen\n28\nbekleyen başlatma\nS0 "
+  },
+  "m5": {
+    "errs": [],
+    "http4": [],
+    "uiReqs": [
+      "http://localhost:18431/js/ui.js?v=20261017-01",
+      "http://localhost:18431/js/ui.js?v=20261017-01"
+    ]
+  }
+}

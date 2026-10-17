@@ -918,7 +918,8 @@ function _ovsyncBaglamKur(gorevler, vakalar, hayvanlar, yedek){
 /**
  * "+ Hastalık" kabulü (K10-UI2 B1, saf): aktif vaka + damga
  * (`protocol_family==='OVSYNC`) ya da ailesi NULL iken yedek tanım
- * (OVSYNC-eşlemeli şablon + `TEDAVI_SABLON_TOHUMLAMA:<vaka>:%` logu).
+ * (OVSYNC-eşlemeli şablon ya da `TEDAVI_SABLON_TOHUMLAMA:<vaka>:<OVSYNC şablon id>`
+ * logu, iptal===false; `:MANUEL` saymaz).
  * OVSYNC-dışı damga kapalıdır; desteksiz NULL fail-closed'dur.
  * @param {Object} vaka cases satırı.
  * @param {Object} [ek] {gorevler, eslem:[{disease_id,sablon_id}], sablonlar:[{id,protokol_ailesi}]}.
@@ -933,9 +934,12 @@ function _hastalikKabulMu(vaka, ek){
     .filter(s=>s&&s.protokol_ailesi==='OVSYNC').map(s=>s.id));
   if(vaka.disease_id&&(Array.isArray(e.eslem)?e.eslem:[])
     .some(x=>x&&x.disease_id===vaka.disease_id&&ovsyncSablon.has(x.sablon_id))) return true;
+  // ovsync-mu-fix (DB 20261017100001 aynası): log kolu yalnız anahtardaki
+  // şablon OVSYNC ve iptal===false iken; :MANUEL/NULL-aile şablon saymaz.
   const pref='TEDAVI_SABLON_TOHUMLAMA:'+vaka.id+':';
   return (Array.isArray(e.gorevler)?e.gorevler:[])
-    .some(g=>g&&typeof g.kaynak==='string'&&g.kaynak.indexOf(pref)===0);
+    .some(g=>g&&typeof g.kaynak==='string'&&g.kaynak.indexOf(pref)===0
+      &&g.iptal===false&&ovsyncSablon.has(g.kaynak.slice(pref.length)));
 }
 /**
  * Kayıtlı IDB bağlamını okur; yoksa/bozuksa boş bağlam (aksiyon çizilmez,
