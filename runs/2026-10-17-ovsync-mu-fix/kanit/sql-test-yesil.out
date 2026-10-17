@@ -1,0 +1,42 @@
+=== OVSYNC-MU LOG KOLU — izole DB testi ===
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+DELETE 0
+DELETE 0
+DELETE 0
+DELETE 0
+DELETE 0
+DELETE 0
+INSERT 0 2
+INSERT 0 2
+INSERT 0 1
+INSERT 0 8
+INSERT 0 8
+INSERT 0 6
+CREATE TABLE
+DO
+DO
+psql:tests/sql/ovsync_mu_log_kolu_test.sql:64: NOTICE:  trigger "trg_hayvan_kisir_zincir_bitir" for relation "public.hayvanlar" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+DO
+DO
+    senaryo     | sonuc |                           kanit                           
+----------------+-------+-----------------------------------------------------------
+ C-KISIR        | PASS  | mastit=active/- ovsync=closed/ERKEN_KAPANIS
+ C-RPC          | PASS  | rpc={"ok": false, "error": "ANA_ACIK_OVSYNC_DEGIL"} gun=0
+ G-YETKI        | PASS  | (t,s,"{""search_path=public, pg_temp""}",f,f,t)
+ K-DAMGA        | PASS  | vaka 6: beklenen=t gelen=t
+ K-ESLEM        | PASS  | vaka 7: beklenen=t gelen=t
+ L-IPTAL-NULL   | PASS  | vaka 8: beklenen=f gelen=f
+ L-MANUEL       | PASS  | vaka 5: beklenen=f gelen=f
+ L-MASTIT-ACIK  | PASS  | vaka 2: beklenen=f gelen=f
+ L-MASTIT-IPTAL | PASS  | vaka 1: beklenen=f gelen=f
+ L-OVSYNC-ACIK  | PASS  | vaka 3: beklenen=t gelen=t
+ L-OVSYNC-IPTAL | PASS  | vaka 4: beklenen=f gelen=f
+(11 satır)
+
+ROLLBACK
+psql:tests/sql/ovsync_mu_log_kolu_test.sql:94: NOTICE:  OVSYNC-MU TEST PASS
+DO
