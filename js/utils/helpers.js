@@ -44,7 +44,8 @@ function _saatCipleriHtml(id, deger, bosIzinli) {
  * @param {{deger?:string, bosIzinli?:boolean, cipler?:boolean, attr?:string}} [o] Değer, boş anlamı, çip var/yok, input'a ek ham öznitelik.
  * @returns {string} Alan HTML'i.
  */
-function saatAlaniHtml(id, { deger = '', bosIzinli = false, cipler = true, attr = '' } = {}) {
+function saatAlaniHtml(id, o) {
+  const { deger = '', bosIzinli = false, cipler = true, attr = '' } = o || {};
   const input = `<input id="${escAttr(id)}" class="fi" type="time" value="${escAttr(deger)}"${attr ? ' ' + attr : ''}>`;
   return cipler ? `<div class="saat-alani">${input}${_saatCipleriHtml(id, deger, bosIzinli)}</div>` : input;
 }

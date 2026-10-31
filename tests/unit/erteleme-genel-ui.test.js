@@ -21,8 +21,15 @@ const _ovsyncTarihOkuMirror = v => { const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exe
 
 // ── kardeş yükleyici (K8-5 izole-kardeş deseni; E6 çekirdeği hazır gelir) ──
 function yukle(isimler, ctxExtra) {
-  const ctx = { Math, JSON, Number, parseInt, Date, ...ctxExtra };
+  const ctx = {
+    Math, JSON, Number, parseInt, Date, Event, HIZLI_SAATLER: ['08:00', '16:00', '20:00'],
+    g: id => ctx.document.getElementById(id), // saat yardımcıları (U2-S1)
+    ...ctxExtra,
+  };
   vm.createContext(ctx);
+  for (const n of ['_saatCipleriHtml', 'saatAlaniHtml', 'saatCipEsitle', 'saatYaz', 'saatCipSec', 'saatYarimMi']) {
+    vm.runInContext(extractFunctionSource('js/utils/helpers.js', n), ctx);
+  }
   for (const n of ['_ertelemeOnline', '_ertelemeOfflineGuard', ...isimler]) {
     vm.runInContext(extractFunctionSource(UI, n), ctx, { filename: `${UI}#${n}` });
   }
@@ -158,8 +165,57 @@ function modalCtxYap(kuralMap, gorev) {
     pencereYuvarla: ts => 'YUVARLANDI:' + ts,       // gerçek ayna config.test.js'te; burada çağrılma olgusu
     ertelemeKuralGetir: tip => kuralMap[tip] || null,
   });
-  return { ctx, toastlar, olusan, onizle, tarihIn };
+  return { ctx, toastlar, olusan, onizle, tarihIn, saatIn };
 }
+
+test('U2-S1 #12: ert-saat yardımcıda ve boş gelir; çip önizlemeyi yazar, ikinci dokunuş mevcut saate döner', async () => {
+  const { ctx, olusan, onizle, saatIn } = modalCtxYap(
+    { ASI_PLANLI: { ertelenebilir: true, pencere_kurali: 'yok' } },
+    { id: 'g1', gorev_tipi: 'ASI_PLANLI', tamamlandi: false, iptal: false, hedef_tarih: '2026-09-20', hedef_saat: '14:30:00' },
+  );
+  saatIn.id = 'ert-saat';
+  saatIn.value = '';
+  // Gerçek tarayıcı imzası: dispatchEvent(event) → type'a göre dinleyiciler.
+  saatIn.dispatchEvent = ev => { (saatIn._listeners[ev.type] || []).forEach(f => f(ev)); };
+  await ctx._erteleModal('g1');
+  await new Promise(r => setTimeout(r, 15));
+  const html = olusan[0].innerHTML;
+  assert.match(html, /<input id="ert-saat" class="fi" type="time" value=""/);
+  assert.match(html, /placeholder="14:30"/);
+  assert.match(html, /data-action="saat-chip"/);
+  assert.ok(!/saat-chip aktif/.test(html), 'ön seçim yok');
+  assert.ok(/data-bos="1"/.test(html), 'boş anlamlı alan');
+  assert.strictEqual(onizle.textContent, 'Kaydedilecek: 2026-10-05 14:30', 'boş = mevcut saat');
+  const cip = { dataset: { hedef: 'ert-saat', t: '16:00', bos: '1' } };
+  ctx.saatCipSec(cip);
+  assert.strictEqual(onizle.textContent, 'Kaydedilecek: 2026-10-05 16:00', 'çip input olayıyla önizler');
+  ctx.saatCipSec(cip);
+  assert.strictEqual(saatIn.value, '');
+  assert.strictEqual(onizle.textContent, 'Kaydedilecek: 2026-10-05 14:30');
+});
+
+test('U2-S1 #12: _erteleKaydet yarım saatte göndermez, boş saat null gider', async () => {
+  const calis = async saatIn => {
+    const rpcler = [], toastlar = [];
+    const tarihIn = makeElement('input'); tarihIn.value = '05.10.2099';
+    const ctx = yukle(['_erteleKaydet'], {
+      navigator: { onLine: true },
+      document: { getElementById: id => (id === 'ert-tarih' ? tarihIn : id === 'ert-saat' ? saatIn : null) },
+      rpc: async (ad, p) => { rpcler.push(p); return { hedef_tarih: '2099-10-05', hedef_saat: '10:00:00' }; },
+      toast: (m, e) => toastlar.push({ m, e }),
+      _ovsyncTarihOku: _ovsyncTarihOkuMirror,
+      getUserMessage: e => String(e?.message || e),
+      fmtTarih: s => s, loadTasks: async () => {}, _erteleKapat: () => {}, _curTaskFilter: 'today',
+    });
+    await ctx._erteleKaydet('g1');
+    return { rpcler, toastlar };
+  };
+  const yarim = await calis({ value: '', validity: { badInput: true } });
+  assert.strictEqual(yarim.rpcler.length, 0);
+  assert.match(yarim.toastlar[0].m, /Saat/);
+  const bos = await calis({ value: '', validity: { badInput: false } });
+  assert.strictEqual(bos.rpcler[0].p_yeni_saat, null, 'boş = mevcut saat kalır');
+});
 
 test('EG-4: _erteleModal — başlık "Görevi Ertele"; pencere_kurali=tohumlama → pencereYuvarla önizlemesi', async () => {
   const { ctx, olusan, onizle } = modalCtxYap(

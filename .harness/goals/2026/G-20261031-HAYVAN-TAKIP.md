@@ -50,6 +50,8 @@ write_manifest:
   - tests/unit/saat-alani.test.js
   - tests/unit/forms-validation.test.js
   - tests/unit/vaka-toplu-ac.test.js
+  - tests/unit/erteleme-genel-ui.test.js
+  - tests/unit/ovsync-secici.test.js
 docs_authority:
   tracked_paths:
     write:

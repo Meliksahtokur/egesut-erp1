@@ -3425,7 +3425,7 @@ function _devamSeciciRender() {
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input class="fi" data-input="devam-girdi" data-alan="erteleGun" type="number" min="1" max="60" value="${escAttr(String(st.erteleGun))}" style="width:56px;text-align:center;padding:7px 10px;font-weight:600">
             <span style="font-size:.8rem;color:var(--ink3)">gün</span>
-            <input class="fi" data-input="devam-girdi" data-alan="erteleSaat" type="time" value="${escAttr(st.erteleSaat)}" style="padding:7px 10px;font-weight:600" title="Saat (boş = saatsiz)">
+            ${saatAlaniHtml('devam-ertele-saat', { deger: st.erteleSaat, bosIzinli: true, attr: 'data-input="devam-girdi" data-alan="erteleSaat" style="padding:7px 10px;font-weight:600" title="Saat (boş = saatsiz)"' })}
             <span id="devam-onizleme" style="font-size:.78rem;color:var(--ink2);font-weight:600;background:var(--card2);padding:6px 10px;border-radius:8px">${esc(_erteleOnizleme(bugun(), st.erteleGun, st.erteleSaat))}</span>
           </div>
         </div>`;
@@ -3531,6 +3531,7 @@ function _devamKizginlikGecis() {
 async function _devamSeciciOnayla() {
   const st = window.__devamSecici;
   if (!st?.acik || st.isleniyor) return;
+  if (st.secim === 'ERTALE' && saatYarimMi('devam-ertele-saat')) return;
   if (st.secim === 'ERTALE' && !st.onay21) {
     const n = _takip21Onay(st.baglam, st.onbilgi, st.erteleGun, bugun());
     if (n) {
@@ -3708,11 +3709,11 @@ function _erteleModal(gorevId){
     box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
       <div style="font-weight:800;font-size:.95rem;margin-bottom:4px">🗓️ Görevi Ertele</div>
       <div style="font-size:.72rem;color:var(--ink3);margin-bottom:12px">Mevcut hedef: ${fmtTarih(t.hedef_tarih)} ${(t.hedef_saat||'').slice(0,5)}</div>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Yeni tarih</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+        <div style="flex:1 1 100%"><label style="font-size:.7rem;font-weight:600">Yeni tarih</label>
           <input id="ert-tarih" type="text" placeholder="gg.aa.yyyy" value="${bugunIso}" class="fi" style="width:100%"></div>
-        <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Saat (boş = mevcut)</label>
-          <input id="ert-saat" type="time" class="fi" style="width:100%" placeholder="${(t.hedef_saat||'09:00').slice(0,5)}"></div>
+        <div style="flex:1 1 100%"><label style="font-size:.7rem;font-weight:600">Saat (boş = mevcut)</label>
+          ${saatAlaniHtml('ert-saat', { bosIzinli: true, attr: `placeholder="${escAttr((t.hedef_saat||'09:00').slice(0,5))}"` })}</div>
       </div>
       <div id="ert-onizleme" style="font-size:.72rem;color:var(--blue);margin:8px 0"></div>
       <button id="ert-btn" class="btn" style="width:100%;padding:10px;font-weight:700" onclick="_erteleKaydet('${escAttr(gorevId)}')">Ertele</button>
@@ -3759,6 +3760,7 @@ function _erteleKapat(){
 async function _erteleKaydet(gorevId){
   // E6: modal açıkken bağlantı düşerse Ertele tıklaması RPC'ye ulaşmaz
   if (_ertelemeOfflineGuard('gorev-ertele-kaydet')) return;
+  if (saatYarimMi('ert-saat')) return;
   const btn = document.getElementById('ert-btn');
   const tarih = _ovsyncTarihOku(document.getElementById('ert-tarih')?.value);
   const saat = document.getElementById('ert-saat')?.value || null;
