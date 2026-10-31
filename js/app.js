@@ -787,6 +787,7 @@ document.addEventListener('keydown', e => {
 
 // ── INIT ─────────────────────────────────────
 window.addEventListener('load', withErrorHandling(async () => {
+  saatAlanlariKur();
   // ── AUTH GATE (Faz 1) — oturum yoksa login göster, app init etme ──
   const _session = await window.authGate();
   if (!_session) return;

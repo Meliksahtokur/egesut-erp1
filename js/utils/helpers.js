@@ -18,7 +18,87 @@ function v(id)   { return g(id)?.value || ''; }
  * @param {string} id Temizlenmesi istenen elemanın ID'si.
  * @returns {void} Hiçbir değer döndürmez.
  */
-function cl(id)  { const el = g(id); if (el) el.value = ''; }
+function cl(id)  {
+  const el = g(id);
+  if (!el) return;
+  el.value = '';
+  if (el.type === 'time') saatCipEsitle(el);
+}
+
+// ── Saat alanı standardı (sahip 2026-10-31) ──────────────────────────
+// Programdaki her saat seçimi: yerel <input type="time"> + yuvarlak HIZLI_SAATLER
+// çipleri (.ek-chip dili). Değer HH:MM, boşun anlamı alanın kendi akışındadır.
+/**
+ * Saat alanının hızlı saat çiplerini üretir.
+ * @param {string} id Hedef input id'si.
+ * @param {string} deger Alanın değeri; eşit çip aktif gelir.
+ * @param {boolean} bosIzinli Aktif çipe ikinci dokunuş alanı boşaltır.
+ * @returns {string} Çip HTML'i.
+ */
+function _saatCipleriHtml(id, deger, bosIzinli) {
+  return HIZLI_SAATLER.map(t => `<button type="button" class="ek-chip saat-chip${t === deger ? ' aktif' : ''}" data-action="saat-chip" data-hedef="${escAttr(id)}" data-t="${t}"${bosIzinli ? ' data-bos="1"' : ''}>${t}</button>`).join('');
+}
+/**
+ * Standart saat alanı HTML'i: input + çipler. Statik index.html alanları aynı biçimi elle yazar.
+ * @param {string} id Input id'si.
+ * @param {{deger?:string, bosIzinli?:boolean, cipler?:boolean, attr?:string}} [o] Değer, boş anlamı, çip var/yok, input'a ek ham öznitelik.
+ * @returns {string} Alan HTML'i.
+ */
+function saatAlaniHtml(id, { deger = '', bosIzinli = false, cipler = true, attr = '' } = {}) {
+  const input = `<input id="${escAttr(id)}" class="fi" type="time" value="${escAttr(deger)}"${attr ? ' ' + attr : ''}>`;
+  return cipler ? `<div class="saat-alani">${input}${_saatCipleriHtml(id, deger, bosIzinli)}</div>` : input;
+}
+/**
+ * index.html'deki statik saat alanlarına çiplerini ekler; ikinci çağrı çoğaltmaz.
+ * @returns {void}
+ */
+function saatAlanlariKur() {
+  document.querySelectorAll('.saat-alani>input[type=time]').forEach(i => {
+    if (i.parentElement.querySelector('.saat-chip')) return;
+    i.insertAdjacentHTML('afterend', _saatCipleriHtml(i.id, i.value, i.parentElement.dataset.bos === '1'));
+  });
+}
+/**
+ * Çip aktifliğini input değeriyle eşitler.
+ * @param {HTMLInputElement} i Saat input'u.
+ * @returns {void}
+ */
+function saatCipEsitle(i) {
+  i.parentElement?.querySelectorAll('.saat-chip').forEach(c => c.classList.toggle('aktif', c.dataset.t === i.value));
+}
+/**
+ * Saat alanına programatik yazar, çipleri eşitler; olay üretmez.
+ * @param {string} id Input id'si.
+ * @param {string} deger HH:MM ya da boş.
+ * @returns {void}
+ */
+function saatYaz(id, deger) {
+  const i = g(id);
+  if (!i) return;
+  i.value = deger;
+  saatCipEsitle(i);
+}
+/**
+ * Genel saat çipi: değeri yazar, kullanıcı girişi gibi kabarcıklı input ve change üretir.
+ * @param {HTMLElement} btn Tıklanan çip.
+ * @returns {void}
+ */
+function saatCipSec(btn) {
+  const i = g(btn.dataset.hedef);
+  if (!i) return;
+  saatYaz(i.id, btn.dataset.bos && i.value === btn.dataset.t ? '' : btn.dataset.t);
+  ['input', 'change'].forEach(t => i.dispatchEvent(new Event(t, { bubbles: true })));
+}
+/**
+ * Yarım yazılmış saat (value boş, badInput) kırpılıp saatsiz gitmesin: uyarır.
+ * @param {string} id Input id'si.
+ * @returns {boolean} Yarımsa true; çağıran göndermez.
+ */
+function saatYarimMi(id) {
+  if (!g(id)?.validity?.badInput) return false;
+  toast('⚠️ Saat eksik: tamamlayın ya da silin', true);
+  return true;
+}
 
 // Yerel Y-M-D biçimlendirici. toISOString() UTC'dir — yerel 00:00-02:59 arasında
 // bir gün ÖNCEKİ tarihi basar (B4: gece doğumları yanlış güne kaydırıyordu).

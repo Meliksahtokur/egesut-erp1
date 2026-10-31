@@ -674,12 +674,20 @@ describe('ek uygulama akışı (ekChipSec → ekUygulamaEkle → ekUygulama_sil)
     ctx.sel.selectedIndex = 0;
     ctx.doz = ctx.document.__setEl('ek-doz', makeElement('input'));
     ctx.yol = ctx.document.__setEl('ek-yol', makeElement('select'));
+    // index.html #ek-chip-row aynası: söndürme yalnız bu satırdaki çiplere dokunur.
+    const satir = ctx.document.__setEl('ek-chip-row', makeElement('div'));
     ctx.chip = ctx.document.__reg(makeElement('button'));
     ctx.chip.className = 'ek-chip';
     ctx.chip.dataset.tur = 'GnRH';
+    satir.appendChild(ctx.chip);
     ctx.chip2 = ctx.document.__reg(makeElement('button'));
     ctx.chip2.className = 'ek-chip';
     ctx.chip2.dataset.tur = 'E Vitamini';
+    satir.appendChild(ctx.chip2);
+    // Satır dışı saat çipi (U2-S1): açık pencerede seçili kalmalı.
+    ctx.saatCip = ctx.document.__reg(makeElement('button'));
+    ctx.saatCip.className = 'ek-chip saat-chip';
+    ctx.saatCip.classList.add('aktif');
     ctx.tick = () => new Promise(r => setTimeout(r, 0)); // _ekStokYukle async işinin oturması
     return ctx;
   }
@@ -691,6 +699,21 @@ describe('ek uygulama akışı (ekChipSec → ekUygulamaEkle → ekUygulama_sil)
     ctx.sel.selectedIndex = 0;
     ctx.sel.options = [opt];
   }
+
+  it('U2-S1: ek çip seçimi ve ekleme saat çipinin aktifini silmez; satır çipleri söner', async () => {
+    const ctx = ekSetup();
+    ctx.chip.classList.add('aktif');
+    ctx.sandbox.ekChipSec(ctx.chip2);
+    assert.strictEqual(ctx.chip.classList.contains('aktif'), false, 'satır çipi söner');
+    assert.strictEqual(ctx.chip2.classList.contains('aktif'), true);
+    assert.strictEqual(ctx.saatCip.classList.contains('aktif'), true, 'saat çipi ekChipSec ile sönmez');
+    await ctx.tick();
+    stokSec(ctx, { value: 'S1', ad: 'Vit' });
+    ctx.doz.value = '2';
+    ctx.sandbox.ekUygulamaEkle();
+    assert.strictEqual(ctx.chip2.classList.contains('aktif'), false, 'ekleme sonrası satır söner');
+    assert.strictEqual(ctx.saatCip.classList.contains('aktif'), true, 'saat çipi ekleme sonrası sönmez');
+  });
 
   it('ekle → listele → sil → liste gizlenir tam akışı', async () => {
     const ctx = ekSetup();

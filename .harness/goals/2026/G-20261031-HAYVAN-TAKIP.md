@@ -34,6 +34,9 @@ write_manifest:
   - js/hayvan-takip-pencere.js
   - js/utils/handlers.js
   - js/utils/modal.js
+  - js/utils/helpers.js
+  - js/utils/events.js
+  - js/app.js
   - js/gecmis.js
   - js/degisiklikler/etiketler.js
   - js/ui.js
@@ -44,6 +47,8 @@ write_manifest:
   - tests/unit/hayvan-takip-gecmis.test.js
   - tests/unit/hayvan-takip-ui.test.js
   - tests/unit/hayvan-takip-vaka.test.js
+  - tests/unit/saat-alani.test.js
+  - tests/unit/forms-validation.test.js
 docs_authority:
   tracked_paths:
     write:

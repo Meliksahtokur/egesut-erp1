@@ -153,6 +153,7 @@ async function htAcGonder(btn) {
   const aciklama = g('ht-ac-aciklama').value.trim();
   if (!sebep) { toast(`⚠️ ${HT_HATA_METINLERI.SEBEP_BOS}`, true); return; }
   if (sebep === 'DIGER' && !aciklama) { toast(`⚠️ ${HT_HATA_METINLERI.ACIKLAMA_GEREKLI}`, true); return; }
+  if (saatYarimMi('ht-ac-saat')) return;
   await _htGonder(btn, 'm-ht-ac', 'hayvan_takip_ac', {
     p_hayvan_id: g('ht-ac-hid').value,
     p_sebep_kodu: sebep,
@@ -192,6 +193,7 @@ async function htMuayeneGonder(btn) {
   const tarih = g('ht-mu-tarih').value;
   if (!takipId) { toast('⚠️ Takip seçin', true); return; }
   if (!tarih) { toast(`⚠️ ${HT_HATA_METINLERI.TARIH_GEREKLI}`, true); return; }
+  if (saatYarimMi('ht-mu-saat')) return;
   await _htGonder(btn, 'm-ht-muayene', 'hayvan_takip_muayene_planla', {
     p_takip_id: takipId,
     p_tarih: tarih,
@@ -363,6 +365,7 @@ async function htMuayeneVakaBagla(baglam, caseId) {
 async function htSonucGonder(btn) {
   if (!_htCevrimici()) return;
   const sursun = btn.dataset.sonuc === 'SURSUN';
+  if (sursun && saatYarimMi('ht-so-saat')) return;
   const params = {
     p_gorev_id: g('ht-so-gid').value,
     p_sonuc: btn.dataset.sonuc,

@@ -96,6 +96,11 @@ function kur(o = {}) {
       ...f1(),
       g,
       cl: id => { g(id).value = ''; },
+      saatYarimMi: (() => {
+        const h = loadBrowserModule('js/utils/helpers.js', { dom: { getElementById: g, addEventListener() {} } }).sandbox;
+        h.toast = (m, e) => { k.toastlar.push({ m, e: !!e }); }; // gerçek saatYarimMi, sahte toast
+        return h.saatYarimMi;
+      })(),
       esc: escMirror,
       escAttr: escAttrMirror,
       getDisplayKupe,
@@ -746,6 +751,38 @@ for (const [ad, gercekOpenM] of [['ayna', false], ['gerçek utils/modal.js openM
     assert.strictEqual(k.g('ht-so-tarih').value, '2026-11-03');
   });
 }
+
+test('U2-S1: yarım saatle üç pencere de gönderilmez, uyarı çıkar; boş saat gitmeye devam eder', async () => {
+  const k = kur({ takipler: BIR() });
+  hazirAc(k);
+  k.g('ht-ac-saat').validity = { badInput: true };
+  await k.s.htAcGonder(btn());
+  assert.strictEqual(k.rpcler.length, 0, 'takibe al gitmez');
+  assert.match(son(k), /Saat/);
+  k.g('ht-ac-saat').validity = { badInput: false };
+  await k.s.htAcGonder(btn());
+  assert.strictEqual(k.rpcler.length, 1, 'boş saat gider');
+  assert.strictEqual(k.rpcler[0].p.p_muayene_saati, null, 'boşun anlamı saatsiz');
+
+  const m = kur({ takipler: BIR() });
+  await m.s.htMuayenePencere('H1');
+  m.g('ht-mu-takip').value = 't1';
+  m.g('ht-mu-tarih').value = '2026-11-09';
+  m.g('ht-mu-saat').validity = { badInput: true };
+  await m.s.htMuayeneGonder(btn());
+  assert.strictEqual(m.rpcler.length, 0, 'muayene planla gitmez');
+  assert.match(son(m), /Saat/);
+
+  const so = kur({ takipler: BIR() });
+  so.g('ht-so-gid').value = 'g1';
+  so.g('ht-so-not').value = '';
+  so.g('ht-so-tarih').value = '2026-11-09';
+  so.g('ht-so-saat').validity = { badInput: true };
+  await so.s.htSonucGonder(btn({ sonuc: 'SURSUN' }));
+  assert.strictEqual(so.rpcler.length, 0, 'takip sürsün gitmez');
+  await so.s.htSonucGonder(btn({ sonuc: 'KAPANSIN' }));
+  assert.strictEqual(so.rpcler.length, 1, 'kapansında saat okunmaz, kapanış engellenmez');
+});
 
 test('HT-P-16b: yeniden açılış önceki formu temizler', async () => {
   const k = kur({ takipler: BIR() });

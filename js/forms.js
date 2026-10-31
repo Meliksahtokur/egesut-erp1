@@ -285,7 +285,7 @@ let _ekSeciliTur = null;
  */
 function ekChipSec(btn) {
   _ekSeciliTur = btn.dataset.tur;
-  document.querySelectorAll('.ek-chip').forEach(b => b.classList.remove('aktif'));
+  document.querySelectorAll('#ek-chip-row .ek-chip').forEach(b => b.classList.remove('aktif'));
   btn.classList.add('aktif');
   document.getElementById('ek-stok-row').style.display = 'flex';
   _ekStokYukle(_ekSeciliTur);
@@ -336,7 +336,7 @@ function ekUygulamaEkle() {
   _ekListeGoster();
 
   document.getElementById('ek-doz').value = '';
-  document.querySelectorAll('.ek-chip').forEach(b => b.classList.remove('aktif'));
+  document.querySelectorAll('#ek-chip-row .ek-chip').forEach(b => b.classList.remove('aktif'));
   document.getElementById('ek-stok-row').style.display = 'none';
   _ekSeciliTur = null;
 }
