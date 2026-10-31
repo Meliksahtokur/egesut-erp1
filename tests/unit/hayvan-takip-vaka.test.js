@@ -453,6 +453,14 @@ const PLAN_YOK = '⚠️ Vaka kayıtlı, tedavi planı uygulanmadı';
 const GOREV_YOK = '⚠️ Plan uygulandı, planlı tohumlama görevi açılamadı';
 const kapi = (o, takipAcik) => kos({ sablonId: 'S-1', gercekPg: true, ...o }, takipAcik);
 const TAZELE = ['pull', 'drugs', 'drugs bayat', 'render:C-9', 'kapat:C-9', 'render:C-X', 'kapat:C-X'];
+// Sahte DOM innerHTML çözmez: kapı düğmeleri elle bağlanır. Dokunuş tarayıcıdaki gibidir: disabled düğme onclick koşturmaz.
+function kapiDugmeleri(sandbox) {
+  const box = sandbox.document.body.children.find(e => e.id === 'pg-kapi-bs');
+  const [onay, vazgec, gerekce] = [makeElement('button'), makeElement('button'), makeElement('input')];
+  box.querySelectorAll = () => [onay, vazgec, gerekce];
+  sandbox.document.__setEl('pg-kapi-bs', box);
+  return { onay, vazgec, gerekce, dokun: () => (onay.disabled ? null : sandbox._pgKapiOnayliTekrar()) };
+}
 
 for (const [ad, takipAcik] of KOLLAR) {
   test(`HT-V-26 (${ad}): PG onayı başarılıysa görev bir kez eklenir, uyarılar normal yoldaki gibi çıkar, tazelenir`, async () => {
@@ -560,5 +568,29 @@ for (const [ad, takipAcik] of KOLLAR) {
       await assert.doesNotReject(sandbox._pgKapiOnayliTekrar(), JSON.stringify(o));
       assert.ok(rec.olay.includes('kapat:C-9'), JSON.stringify(o));
     }
+  });
+
+  test(`HT-V-36 (${ad}): çift dokunuşta onaylı tekrar bir kez gider, istek sürerken kapı kilitli`, async () => {
+    let bitir;
+    const { sandbox, rec } = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); return new Promise(res => { bitir = () => res(UYGUN); }); }, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    const d = kapiDugmeleri(sandbox);
+    const ilk = d.dokun();
+    assert.strictEqual(d.dokun(), null, 'ikinci dokunuş düşer');
+    assert.deepStrictEqual([d.onay.disabled, d.vazgec.disabled, d.gerekce.disabled], [true, true, true], 'gerekçe yazılıp onay yeniden açılamaz');
+    bitir();
+    await ilk;
+    assert.strictEqual(rec.rpc.filter(r => r.ad === 'tedavi_sablon_uygula' && r.p.p_pg_onay).length, 1);
+    assert.strictEqual(ekleler(rec).length, 1);
+  });
+
+  test(`HT-V-37 (${ad}): onaylı tekrar hatasında kilit açılır, yeniden denenir`, async () => {
+    let n = 0;
+    const { sandbox, rec } = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); if (!n++) throw new Error('ag'); return UYGUN; }, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    const d = kapiDugmeleri(sandbox);
+    await d.dokun();
+    assert.deepStrictEqual([d.onay.disabled, d.vazgec.disabled, d.gerekce.disabled], [false, false, false]);
+    await d.dokun();
+    assert.strictEqual(rec.rpc.filter(r => r.ad === 'tedavi_sablon_uygula' && r.p.p_pg_onay).length, 2);
+    assert.strictEqual(ekleler(rec).length, 1);
   });
 }

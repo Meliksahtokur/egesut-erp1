@@ -3019,6 +3019,10 @@ async function _pgKapiOnayliTekrar(){
   const sonra = window.__pgKapiSonra || null;
   if (typeof tekrar !== 'function') return;
   if (!gerekce) { toast('⚠️ Gerekçe zorunlu', true); return; }
+  // Çift dokunuş: istek sürerken kapı kilitli; gerekçe de kilitli, oninput onayı yeniden açmasın.
+  const kilitli = [...(document.getElementById('pg-kapi-bs')?.querySelectorAll('button, input') || [])];
+  const kilit = kapali => kilitli.forEach(d => { d.disabled = kapali; });
+  kilit(true);
   try {
     const rpcAd = window.__pgKapiRpcAd || null;
     const tekrarSonuc = await tekrar(true, gerekce);
@@ -3047,6 +3051,7 @@ async function _pgKapiOnayliTekrar(){
     }
     if (typeof renderSafe === 'function') renderSafe();
   } catch (e2) {
+    kilit(false);
     // Yeniden PG reddi: kapı aynı tekrar kapanışıyla yeniden açılır
     // (yeni history entry YOK — _pgKapiAc koruması; sonra korunur).
     if (typeof _pgKapiHata === 'function' && _pgKapiHata(e2, tekrar, sonra, window.__pgKapiRpcAd || null)) return;
