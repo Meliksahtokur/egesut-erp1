@@ -512,7 +512,8 @@ test('HT-P-32: aktif vaka yoksa bölüm görünmez; önceki açılışın satır
 test('HT-P-33: liste htSonucAc\'ı bekletmez: okuma bitmese de pencere açık, true döner', async () => {
   const k = kur({ takipler: BIR(), gorevler: [gorev('g1')],
     idb: (t, kk) => (t === 'cases' ? new Promise(() => {}) : kk.idb[t] || []) });
-  assert.strictEqual(await k.s.htSonucAc('g1'), true);
+  const zaman = new Promise(r => { setTimeout(r, 200, 'BEKLETTI').unref(); });
+  assert.strictEqual(await Promise.race([k.s.htSonucAc('g1'), zaman]), true);
   assert.deepStrictEqual(k.acilan, ['m-ht-sonuc']);
   assert.strictEqual(k.g('ht-so-vakalar').style.display, 'none');
 });
