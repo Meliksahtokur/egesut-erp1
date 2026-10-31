@@ -510,3 +510,5 @@ Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve
 4. **Kapatma:** Karttan pencereyle tek tek ya da tümü, isteğe bağlı not. Sürüden çıkan hayvanın bütün takipleri kendiliğinden kapanır.
 5. **Vaka:** Elle tek hayvanlık vaka açılınca açık takipler sorulur; hiçbiri işaretli gelmez, kendiliğinden kapanmaz. Toplu, kızgınlıktan ve otomatik vakalar sormaz.
 6. **Muayene görevi:** Takibe elle bağlanan `HAYVAN_TAKIP_MUAYENE` görevi; takip başına en fazla bir açık görev. Sonuçsuz kapanmaz: takip sürsün + sonraki muayene ya da takip kapansın. Genel Ertele yoktur. Takip kapanınca açık görev iptal olur.
+7. **Muayene sonucu geri alınmaz (sahip 2026-10-31):** Yeni tipte görev geri alma ve Geçmiş geri-al düğmeleri kapalıdır; yanlış kapanışta takip yeniden açılır.
+8. **Muayene tarihi (sahip 2026-10-31):** Geçmiş tarihe muayene planlanamaz; yalnız bugün ve sonrası.
