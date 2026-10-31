@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20261031-01">
+<link rel="manifest" href="manifest.json?v=20261031-02">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -103,6 +103,7 @@ button,input,select,textarea{font-family:inherit}
 .aband-hdr.amber{background:var(--amber);color:#fff}
 .aband-hdr.green{background:var(--green);color:#fff}
 .aband-hdr.blue{background:var(--blue);color:#fff}
+.aband-hdr.takip{color:var(--blue);text-transform:none}
 .aband-body{background:var(--card);border:1px solid var(--card3);border-top:none}
 .arow{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--card2);cursor:pointer;transition:background .1s}
 .arow:last-child{border-bottom:none}
@@ -300,6 +301,8 @@ body.dark .ac-vurgu{color:#8ec6ff}
 /* MODALS */
 .mo{position:fixed;inset:0;background:rgba(10,20,5,.8);backdrop-filter:blur(6px);z-index:80;display:none;align-items:flex-end;justify-content:center}
 .mo.on{display:flex}
+/* Sonuç penceresi 9998: takvim (ui.js z-index:300) tarih seçerken üstte kalmalı. */
+#m-ht-sonuc.on~#tek-tarih-takvim{z-index:9999!important}
 .modal{background:var(--card);border-radius:22px 22px 0 0;width:100%;max-height:94dvh;overflow-y:auto;padding-bottom:calc(16px + var(--safe));animation:slideup .28s cubic-bezier(.22,1,.36,1)}
 @keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .m-handle{width:38px;height:4px;background:var(--card3);border-radius:2px;margin:11px auto}
@@ -2363,6 +2366,72 @@ body.dark .ac-vurgu{color:#8ec6ff}
   </div>
 </div>
 
+<!-- ═══ HAYVAN TAKİP PENCERELERİ (domain §20) ═══ -->
+<div id="m-ht-ac" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="ht-ac-title">📌 Takibe al</div>
+    <input type="hidden" id="ht-ac-hid">
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Sebep *</label><select id="ht-ac-sebep" class="fsel"></select></div>
+      <div class="fg"><label class="flbl">Açıklama (Diğer için zorunlu)</label>
+        <textarea id="ht-ac-aciklama" class="fta" style="height:70px" placeholder="Ne gözlendi…"></textarea>
+      </div>
+      <div class="fg"><label class="flbl">Muayene tarihi (isteğe bağlı)</label><input id="ht-ac-tarih" class="fi" type="text"></div>
+      <div class="fg"><label class="flbl">Muayene saati (isteğe bağlı)</label><input id="ht-ac-saat" class="fi" type="time"></div>
+      <button class="btn btn-g" data-action="ht-ac-gonder">📌 Takibe al</button>
+      <button class="btn btn-o" data-action="ht-ac-iptal" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="m-ht-muayene" class="mo" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="ht-mu-title">🔍 Muayene planla</div>
+    <div class="m-body">
+      <div class="fg" id="ht-mu-secici"><label class="flbl">Takip *</label><select id="ht-mu-takip" class="fsel"></select></div>
+      <div class="fg"><label class="flbl">Muayene tarihi *</label><input id="ht-mu-tarih" class="fi" type="text"></div>
+      <div class="fg"><label class="flbl">Muayene saati (isteğe bağlı)</label><input id="ht-mu-saat" class="fi" type="time"></div>
+      <button class="btn btn-g" data-action="ht-mu-gonder">🔍 Planla</button>
+      <button class="btn btn-o" data-action="ht-mu-iptal" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="m-ht-kapat" class="mo" style="z-index:9998" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="ht-ka-title">✓ Takibi kapat</div>
+    <div class="m-body">
+      <div class="fg"><label class="flbl">Açık takipler</label><div id="ht-ka-liste"></div>
+        <button class="btn btn-o" data-action="ht-tumunu-sec" style="margin-top:6px">Tümünü seç</button>
+      </div>
+      <div class="fg"><label class="flbl">Not (isteğe bağlı)</label>
+        <textarea id="ht-ka-not" class="fta" style="height:70px" placeholder="Kapanış notu…"></textarea>
+      </div>
+      <button class="btn btn-g" data-action="ht-ka-gonder">✓ Seçilenleri kapat</button>
+      <button class="btn btn-o" id="ht-ka-acik-kalsin" data-action="ht-acik-kalsin" style="margin-top:6px">Açık kalsın</button>
+      <button class="btn btn-o" id="ht-ka-iptal" data-action="ht-ka-iptal" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
+<div id="m-ht-sonuc" class="mo" style="z-index:9998" data-action="mclose-overlay">
+  <div class="modal"><div class="m-handle"></div>
+    <div class="m-title" id="ht-so-title">🔍 Muayene sonucu</div>
+    <input type="hidden" id="ht-so-gid">
+    <div class="m-body">
+      <div id="ht-so-bilgi" style="font-size:.82rem;color:var(--ink2);margin-bottom:10px"></div>
+      <div class="fg"><label class="flbl">Not (isteğe bağlı)</label>
+        <textarea id="ht-so-not" class="fta" style="height:70px" placeholder="Muayene notu…"></textarea>
+      </div>
+      <div class="fg"><label class="flbl">Sonraki muayene tarihi (boş bırakılabilir)</label><input id="ht-so-tarih" class="fi" type="text"></div>
+      <div class="fg"><label class="flbl">Sonraki muayene saati (isteğe bağlı)</label><input id="ht-so-saat" class="fi" type="time"></div>
+      <button class="btn btn-g" data-action="ht-so-gonder" data-sonuc="SURSUN">🔍 Takip sürsün</button>
+      <button class="btn btn-o" data-action="ht-so-gonder" data-sonuc="KAPANSIN" style="margin-top:6px">✓ Takip kapansın</button>
+      <button class="btn btn-o" data-action="ht-so-iptal" style="margin-top:6px">İptal</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ ÇIKIŞ MODAL ═══ -->
 <div id="m-cikis" class="mo" data-action="mclose-overlay">
   <div class="modal"><div class="m-handle"></div>
@@ -2436,31 +2505,33 @@ body.dark .ac-vurgu{color:#8ec6ff}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20261031-01"></script>
-    <script src="js/gecmis.js?v=20261031-01"></script>
-    <script src="js/utils/modal.js?v=20261031-01"></script>
-    <script src="js/utils/errorHandler.js?v=20261031-01"></script>
-    <script src="js/utils/events.js?v=20261031-01"></script>
-    <script src="js/config.js?v=20261031-01"></script>
-    <script src="js/state.js?v=20261031-01"></script>
-    <script src="js/api.js?v=20261031-01"></script>
-    <script src="js/auth.js?v=20261031-01"></script>
-    <script src="js/tarih/tarih.js?v=20261031-01"></script>
-    <script src="js/ui.js?v=20261031-01"></script>
-    <script src="js/forms.js?v=20261031-01"></script>
-    <script src="js/ai-asistan.js?v=20261031-01"></script>
-    <script src="js/demo.js?v=20261031-01"></script>
-    <script src="vendor/cytoscape.min.js?v=20261031-01"></script>
-    <script src="js/pedigree/pedigree-api.js?v=20261031-01"></script>
-    <script src="js/pedigree/pedigree-adapter.js?v=20261031-01"></script>
-    <script src="js/pedigree/pedigree-style.js?v=20261031-01"></script>
-    <script src="js/pedigree/pedigree-view.js?v=20261031-01"></script>
-    <script src="js/pedigree/pedigree-controller.js?v=20261031-01"></script>
-    <script src="js/degisiklikler/etiketler.js?v=20261031-01"></script>
-    <script src="js/degisiklikler/diff.js?v=20261031-01"></script>
-    <script src="js/degisiklikler/degisiklikler.js?v=20261031-01"></script>
-    <script src="js/app.js?v=20261031-01"></script>
-    <script src="js/utils/handlers.js?v=20261031-01"></script>
+    <script src="js/utils/helpers.js?v=20261031-02"></script>
+    <script src="js/gecmis.js?v=20261031-02"></script>
+    <script src="js/utils/modal.js?v=20261031-02"></script>
+    <script src="js/utils/errorHandler.js?v=20261031-02"></script>
+    <script src="js/utils/events.js?v=20261031-02"></script>
+    <script src="js/config.js?v=20261031-02"></script>
+    <script src="js/state.js?v=20261031-02"></script>
+    <script src="js/api.js?v=20261031-02"></script>
+    <script src="js/auth.js?v=20261031-02"></script>
+    <script src="js/tarih/tarih.js?v=20261031-02"></script>
+    <script src="js/ui.js?v=20261031-02"></script>
+    <script src="js/forms.js?v=20261031-02"></script>
+    <script src="js/hayvan-takip.js?v=20261031-02"></script>
+    <script src="js/hayvan-takip-pencere.js?v=20261031-02"></script>
+    <script src="js/ai-asistan.js?v=20261031-02"></script>
+    <script src="js/demo.js?v=20261031-02"></script>
+    <script src="vendor/cytoscape.min.js?v=20261031-02"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20261031-02"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20261031-02"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20261031-02"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20261031-02"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20261031-02"></script>
+    <script src="js/degisiklikler/etiketler.js?v=20261031-02"></script>
+    <script src="js/degisiklikler/diff.js?v=20261031-02"></script>
+    <script src="js/degisiklikler/degisiklikler.js?v=20261031-02"></script>
+    <script src="js/app.js?v=20261031-02"></script>
+    <script src="js/utils/handlers.js?v=20261031-02"></script>
 
 
     <!-- GEBELİK EKLE MODAL -->
