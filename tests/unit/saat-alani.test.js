@@ -94,7 +94,8 @@ test('S-03b: id ve değer öznitelik kaçışından geçer', () => {
   const { s } = kur();
   const html = s.saatAlaniHtml('a"b', { deger: '"><x' });
   assert.ok(!html.includes('"><x'));
-  assert.ok(html.includes('a&quot;b'));
+  assert.ok(html.includes('<input id="a&quot;b"'), 'input id');
+  assert.ok(html.includes('data-hedef="a&quot;b"'), 'çip hedefi');
 });
 
 test('S-04: çip HH:MM yazar, kabarcıklı input ve change üretir, aktif tekil olur', () => {
