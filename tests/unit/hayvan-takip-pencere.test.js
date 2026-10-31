@@ -634,7 +634,7 @@ test('HT-P-12: index.html dört modal, iki script forms.js sonrası, tek damga',
   const a = srcs.indexOf('js/hayvan-takip.js');
   const b = srcs.indexOf('js/hayvan-takip-pencere.js');
   assert.ok(f >= 0 && a > f && b > a, `sıra: forms ${f}, takip ${a}, pencere ${b}`);
-  assert.deepStrictEqual([...new Set([...html.matchAll(/\?v=([0-9]{8}-[0-9]+)/g)].map(m => m[1]))], ['20261031-02']);
+  assert.strictEqual(new Set([...html.matchAll(/\?v=([0-9]{8}-[0-9]+)/g)].map(m => m[1])).size, 1);
 });
 
 test('HT-P-12b: z-index, tarih ve saat alanları, zeminsiz band başlığı', () => {

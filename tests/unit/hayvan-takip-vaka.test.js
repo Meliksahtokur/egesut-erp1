@@ -13,7 +13,7 @@ const DIZI = ['openCaseDet başladı', 'openCaseDet bitti', 'htVakaSonrasi'];
 const TAKIP_HATA = 'TAKIP_ACIK:{"muayene_tarihi":"2026-10-20"}';
 
 // openCaseDet modalı await'lerden sonra açar (js/ui.js); sahte de gecikmeli çözülür.
-function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9' } = {}) {
+function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, kizginlikKayit = [], idbRed = false } = {}) {
   const rec = { olay: [], rpc: [], toast: [], ht: [], takipHata: 0, retry: null };
   const document = makeDomStub();
   const input = (id, val) => { const el = makeElement('input'); el.value = val; document.__setEl(id, el); };
@@ -69,11 +69,15 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
       loadDrugsCache: async () => {},
       getDisplayKupe,
       bugun,
-      idbGetAll: async () => [],
+      idbGetAll: async t => {
+        if (idbRed) throw new Error('idb yok');
+        return t === 'kizginlik_log' ? kizginlikKayit : [];
+      },
       db: {},
     },
   });
   sandbox.navigator.onLine = true;
+  sandbox._kizginlikTedaviId = kizginlikId;
   return { sandbox, rec };
 }
 
@@ -189,4 +193,48 @@ test('HT-V-07: vaka açılmadıysa pencere yok', async () => {
   await kimliksiz.sandbox.submitCase(null);
   assert.deepStrictEqual(kimliksiz.rec.ht, []);
   assert.deepStrictEqual(sonuc(kimliksiz.rec, ...DIZI), []);
+});
+
+test('HT-V-06c: caseTakipRetry kolunda detay ve pencere birlikte reddederse retry yine çözülür, ikinci vaka açılmaz', async () => {
+  const { sandbox, rec } = sahne({ takipAcik: true, openCaseRed: true, htRed: true });
+  await sandbox.submitCase(null);
+  await assert.doesNotReject(rec.retry(false));
+  assert.strictEqual(createSayisi(rec), 2);
+});
+
+const KAYIT = [{ id: 'K-1', hayvan_id: 'H-1' }];
+
+test('HT-V-08: kızgınlık Tedavi Aç yolu pencere açmaz; bağlantı ve vaka detayı aynen çalışır', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', kizginlikKayit: KAYIT });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.ht, []);
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI.slice(0, 2));
+  assert.deepStrictEqual(rec.rpc.find(r => r.ad === 'kizginlik_tedavi_baglanti_kur').p, { p_kayit_id: 'K-1', p_case_id: 'C-9' });
+  assert.strictEqual(sandbox._kizginlikTedaviId, null, 'mevcut temizlik korunur');
+  assert.deepStrictEqual(hataToastlari(rec), []);
+});
+
+test('HT-V-08b: kızgınlık yolunun caseTakipRetry kolu da pencere açmaz', async () => {
+  const { sandbox, rec } = sahne({ takipAcik: true, kizginlikId: 'K-1', kizginlikKayit: KAYIT });
+  await sandbox.submitCase(null);
+  await rec.retry(false);
+  assert.deepStrictEqual(rec.ht, []);
+  assert.deepStrictEqual(sonuc(rec, ...DIZI), DIZI.slice(0, 2));
+});
+
+test('HT-V-08c: X ile kapanmış formdan kalan işaret başka hayvanın vakasında soruyu susturmaz', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', kizginlikKayit: [{ id: 'K-1', hayvan_id: 'BASKA' }] });
+  await sandbox.submitCase(null);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
+
+  const baskaKayit = sahne({ kizginlikId: 'K-1', kizginlikKayit: [{ id: 'K-2', hayvan_id: 'H-1' }] });
+  await baskaKayit.sandbox.submitCase(null);
+  assert.deepStrictEqual(baskaKayit.rec.ht, [['H-1', 'C-9']], 'hayvanın başka kaydı işareti doğrulamaz');
+});
+
+test('HT-V-08d: kızgınlık kaydı okunamazsa elle vaka sayılır, vaka etkilenmez', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', idbRed: true });
+  await assert.doesNotReject(sandbox.submitCase(null));
+  assert.strictEqual(createSayisi(rec), 1);
+  assert.deepStrictEqual(rec.ht, [['H-1', 'C-9']]);
 });
