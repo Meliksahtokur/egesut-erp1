@@ -450,6 +450,7 @@ const pgSablon = p => { if (!p.p_pg_onay) throw new Error(PG_RED); return UYGUN;
 const EKLE = 'tedavi_sablon_tohumlama_gorev_ekle';
 const ekleler = rec => rec.rpc.filter(r => r.ad === EKLE).map(r => r.p);
 const PLAN_YOK = '⚠️ Vaka kayıtlı, tedavi planı uygulanmadı';
+const GOREV_YOK = '⚠️ Plan uygulandı, planlı tohumlama görevi açılamadı';
 const kapi = (o, takipAcik) => kos({ sablonId: 'S-1', gercekPg: true, ...o }, takipAcik);
 const TAZELE = ['pull', 'drugs', 'drugs bayat', 'render:C-9', 'kapat:C-9', 'render:C-X', 'kapat:C-X'];
 
@@ -505,7 +506,7 @@ for (const [ad, takipAcik] of KOLLAR) {
     const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => { throw new Error('ag'); } }, takipAcik);
     rec.olay.length = 0;
     await assert.doesNotReject(sandbox._pgKapiOnayliTekrar());
-    assert.deepStrictEqual(hataToastlari(rec).filter(m => /tohumlama|tedavi planı/.test(m)), ['⚠️ Vaka kayıtlı, plan uygulandı ama planlı tohumlama görevi açılamadı: ag']);
+    assert.deepStrictEqual(hataToastlari(rec).filter(m => /tohumlama|tedavi planı/.test(m)), [GOREV_YOK + ': ag']);
     assert.ok(rec.olay.includes('pull'));
   });
 
@@ -516,6 +517,14 @@ for (const [ad, takipAcik] of KOLLAR) {
     assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün) + tohumlama'));
     assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)']);
     assert.ok(!sandbox.window.__pgKapiVazgec);
+  });
+
+  test(`HT-V-32 (${ad}): normal yolda görev RPC'si düşerse plan uygulandı der, "şablon uygulanamadı" demez; akış sürer`, async () => {
+    const { rec, sandbox } = await kapi({ sablonYanit: () => UYGUN, ekleYanit: () => { throw new Error('ag'); } }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec).filter(m => /tohumlama|şablon/i.test(m)), [GOREV_YOK + ': ag']);
+    assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün)'), 'plan yazıldı');
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi']);
+    assert.ok(!sandbox.window.__pgKapiVazgec, 'kapı yok');
   });
 
   test(`HT-V-33 (${ad}): PG onayından sonra açık vakanın planı, Kapat düğmesi ve ilaç önbelleği tazelenir, emsal sırayla`, async () => {

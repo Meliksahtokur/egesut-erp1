@@ -908,11 +908,13 @@ async function submitCase(btn) {
 }
 
 /**
- * Plan uygulandıktan sonra planlı tohumlama görevi ve uyarılar: normal yol ve PG onayı aynı adımdan geçer. Görev kaynak anahtarıyla tekildir.
+ * Plan uygulandıktan sonra planlı tohumlama görevi ve uyarılar: normal yol ve PG onayı aynı adımdan geçer. Görev kaynak anahtarıyla tekildir; görev hatası planı geri almaz.
  * @rpc tedavi_sablon_tohumlama_gorev_ekle
  */
 async function _vakaSablonSonu(caseId, sablonId, r) {
-  const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: caseId, p_sablon_id: sablonId });
+  let planli = null;
+  try { planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: caseId, p_sablon_id: sablonId }); }
+  catch (e) { toast('⚠️ Plan uygulandı, planlı tohumlama görevi açılamadı: ' + e.message, true); }
   if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
   // Şablonda tohumlama var ama hayvan uygun değilse (erkek/12 aydan küçük/gebe)
   // görev sessizce atlanır — kullanıcı nedenini görsün.
@@ -920,10 +922,9 @@ async function _vakaSablonSonu(caseId, sablonId, r) {
   toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
 }
 
-/** PG onaylı tekrar başarılı (_pgKapiOnayliTekrar sonra): plan yazıldı, görev hatası planı geri almaz; ekran tazelenir. */
+/** PG onaylı tekrar başarılı (_pgKapiOnayliTekrar sonra): plan yazıldı; ekran tazelenir. */
 async function _vakaSablonOnaySonu(caseId, sablonId, r) {
-  try { await _vakaSablonSonu(caseId, sablonId, r); }
-  catch (e) { toast('⚠️ Vaka kayıtlı, plan uygulandı ama planlı tohumlama görevi açılamadı: ' + e.message, true); }
+  await _vakaSablonSonu(caseId, sablonId, r);
   await _vakaTazele(async () => {
     await pullTables(RPC_TABLES.tedavi_sablon_uygula);
     _drugsCache = [];
