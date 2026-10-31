@@ -158,7 +158,7 @@ def selftest_readonly(db):
     if basarili:
         print(f"PANIK: [{db.tag}] READ ONLY guard çalışmıyor — yazma kabul edildi!: {out[:200]}")
         sys.exit(RC_PANIK)
-    print(f"BAGLANTI HATASI: [{db.tag}] READ ONLY guard sınanamadı (yazma kabulü YOK, hüküm üretilmedi): "
+    print(f"BAGLANTI HATASI: [{db.tag}] READ ONLY guard sınanamadı (yazma kabulü ölçülemedi, hüküm üretilmedi): "
           f"curl rc={r.returncode} {out[:200]} {r.stderr[:150]}")
     sys.exit(RC_BAGLANTI)
 

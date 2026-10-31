@@ -83,6 +83,8 @@ cleanup_baseline() {
   exit "$rc"
 }
 trap cleanup_baseline EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 # Varsayılan parite dosyası OUT_DIR'de YAŞAMAZ (trap siler; db-validate.sh sonra okur).
 [[ -n "$PARITE_OUT" ]] || PARITE_OUT="$TMP_ROOT/parite-$DB_NAME.txt"
 

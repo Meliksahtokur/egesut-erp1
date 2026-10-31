@@ -609,7 +609,10 @@ TS=$(date '+%Y-%m-%d %H:%M:%S%z')
 # Sinyal tuzağı: validator dışarıdan kesilirse raporsuz sessiz çıkış (fail-open) YASAK —
 # o ana kadarki sonuçlarla FAIL raporu yaz ve exit 1.
 # Rapor DSN parolası taşımaz (--db-url komut kaydı, baseline çıktısı dahil tüm içerik).
-rapor_maskele() { sed -E 's#(postgres(ql)?://[^:/@[:space:]]+:)[^@[:space:]]+@#\1***@#g'; }
+# Parola URL'nin yetki bölümünde son @'e dek sürer (/?# öncesi); yetkide @ yoksa dokunulmaz.
+rapor_maskele() {
+  sed -E "s#(postgres(ql)?://[^:/?\#@[:space:]]+:)[^/?\#[:space:]]*@#\1***@#g; s#(password[[:space:]]*=[[:space:]]*)('[^']*'|[^&[:space:]]+)#\1***#Ig"
+}
 yaz_rapor() {
   {
   echo "# DB Validation Raporu — $SHA8"
