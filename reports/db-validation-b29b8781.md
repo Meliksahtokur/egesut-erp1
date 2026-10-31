@@ -29,9 +29,9 @@
 $ sqlfluff lint --dialect postgres 'supabase/migrations/20261030100001_protokol_etken_senkron.sql'
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table 'supabase/migrations/20261030100001_protokol_etken_senkron.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
-$ timeout 900 bash '~/tmp/t4/val/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ timeout 900 bash '~/tmp/t4/val/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (schema)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261030100001_protokol_etken_senkron.sql'  # db=egesut_val_tmp
-$ timeout 900 bash '~/tmp/t4/val/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (data)
+$ timeout 900 bash '~/tmp/t4/val/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (data)
 $ psql -v ON_ERROR_STOP=1 -f 'supabase/migrations/20261030100001_protokol_etken_senkron.sql'  # C2 db=egesut_val_tmp (tohumlu)
 ```
 

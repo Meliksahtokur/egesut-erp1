@@ -80,7 +80,7 @@ VAL_DB_URL="${VAL_DB_URL:-}"
 if [[ -f "$ENV_FILE" ]]; then
   LOCAL_LSP_URL=$(grep -E "^LOCAL_LSP_URL=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
   # Doğrulama motoru (opsiyonel): --db-url argümanı env'i ezer. Örnek .env:
-  #   VAL_DB_URL=postgres://postgres:val@127.0.0.1:5433/postgres  (supabase/postgres:17 konteyneri)
+  #   VAL_DB_URL=postgres://postgres:<parola>@127.0.0.1:5433/postgres  (supabase/postgres:17 konteyneri)
   [[ -n "$VAL_DB_URL" ]] || VAL_DB_URL=$(grep -E "^VAL_DB_URL=" "$ENV_FILE" | tail -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
 fi
 : "${LOCAL_LSP_URL:?LOCAL_LSP_URL missing — .env dosyasını kontrol et (egesut_lsp şema aynası bağlantısı)}"
@@ -100,8 +100,10 @@ ENGINE_BASE="${VAL_DB_URL:-$LOCAL_LSP_URL}"
 MAINT_URL="$(echo "$ENGINE_BASE" | sed -E 's#/[^//?]+$#/postgres#')"
 db_url_of() { echo "$1" | sed -E "s#/[^//?]+(\?.*)?\$#/${2}#"; }
 
-# Oluşturduğumuz izole DB'ler (trap'te drop edilir).
+# Oluşturduğumuz izole DB'ler (trap'te drop edilir). Ad çağrı başına benzersizdir:
+# eşzamanlı oturumlar çakışmaz, trap yalnız bu oturumun ürettiği adları siler.
 declare -a OWN_DBS=()
+yeni_db_adi() { echo "egesut_val_$$_$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"; }
 cleanup() {
   local rc=$?
   if [[ $KEEP_DB -eq 0 && ${#OWN_DBS[@]} -gt 0 ]]; then
@@ -338,9 +340,12 @@ BASELINE_META="(meta alınamadı)"
 # run_baseline: baseline script'ini çağır, stdout SON SATIR JSON'ını ayrıştır.
 # Beklenen sözleşme alanları: db_name, obje sayıları, parite_durumu.
 run_baseline() { # $1 = ek etiket (log)
-  local tag="$1" out_json
+  local tag="$1" out_json own_db
+  own_db=$(yeni_db_adi)
+  # Baseline yarıda düşse de kendi DB'miz silinsin diye kayıt çağrıdan ÖNCE.
+  OWN_DBS+=("$own_db")
   # timeout 900: baseline'in Mgmt API çağrısı takılırsa sonsuz bekleme YOK — fail-closed.
-  BASELINE_ARGS=(--json)
+  BASELINE_ARGS=(--json --db-name "$own_db" --parite-out "$WORK/parite-$own_db.txt")
   [[ -n "$VAL_DB_URL" ]] && BASELINE_ARGS+=(--db-url "$VAL_DB_URL")
   if ! log_cmd "timeout 900 bash '$BASELINE_SH' ${BASELINE_ARGS[*]}  # ($tag)" || \
      ! timeout 900 bash "$BASELINE_SH" "${BASELINE_ARGS[@]}" > "$BASELINE_OUT" 2>&1; then
@@ -360,7 +365,6 @@ run_baseline() { # $1 = ek etiket (log)
     log_result "C1.baseline-restore-$tag" "FAIL" "sözleşme ihlali: db_name eksik"
     return 1
   fi
-  OWN_DBS+=("$C1_DB")
   PARITE=$(echo "$out_json" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("parite_durum","bilinmiyor"))')
   BASELINE_META=$(echo "$out_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print({k:v for k,v in d.items() if k!="db_name"})')
   log_result "C1.baseline-restore-$tag" "PASS" "db=$C1_DB parite=$PARITE meta=$BASELINE_META"
@@ -604,6 +608,8 @@ TS=$(date '+%Y-%m-%d %H:%M:%S%z')
 # Raporda 'VERİ UYUMLULUĞU DOĞRULANMADI' notu: data mode koşulmadıysa yazılır (aşağıda).
 # Sinyal tuzağı: validator dışarıdan kesilirse raporsuz sessiz çıkış (fail-open) YASAK —
 # o ana kadarki sonuçlarla FAIL raporu yaz ve exit 1.
+# Rapor DSN parolası taşımaz (--db-url komut kaydı, baseline çıktısı dahil tüm içerik).
+rapor_maskele() { sed -E 's#(postgres(ql)?://[^:/@[:space:]]+:)[^@[:space:]]+@#\1***@#g'; }
 yaz_rapor() {
   {
   echo "# DB Validation Raporu — $SHA8"
@@ -658,7 +664,7 @@ yaz_rapor() {
     tail -15 "$f"
     echo '```'
   done
-} > "$REPORT"
+} | rapor_maskele > "$REPORT"
 }
 trap 'log_result "D.kesinti" "FAIL" "validator sinyalle kesildi — kanıt tamamlanmadı (fail-open kapatıldı)"; FAILS=1; OVERALL="FAIL"; yaz_rapor 2>/dev/null; exit 1' INT TERM HUP
 yaz_rapor

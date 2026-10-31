@@ -32,10 +32,10 @@
 $ sqlfluff lint --dialect postgres '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/supabase/migrations/20260927000001_vaka_kalan_gunleri_kaydir_coklu.sql'
 $ squawk --exclude=require-concurrent-index-creation,ban-drop-table '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/supabase/migrations/20260927000001_vaka_kalan_gunleri_kaydir_coklu.sql'
 $ psql egesut_lsp: tablo/view/fonksiyon isimleri (information_schema + pg_proc)
-$ timeout 900 bash '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (schema)
+$ timeout 900 bash '~/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (schema)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql'  # prior (C1)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/supabase/migrations/20260927000001_vaka_kalan_gunleri_kaydir_coklu.sql'  # db=egesut_val_tmp
-$ timeout 900 bash '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:val@127.0.0.1:5433/postgres  # (data)
+$ timeout 900 bash '~/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/scripts/db-build-baseline.sh' --json --db-url postgres://postgres:***@127.0.0.1:5433/postgres  # (data)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/supabase/migrations/20260925100001_vaka_kalan_gunleri_kaydir.sql'  # prior (C2)
 $ psql -v ON_ERROR_STOP=1 -f '/home/melik/.herdr/worktrees/egesut-erp1/toplu-i-lemler-ui-pratik-degil/supabase/migrations/20260927000001_vaka_kalan_gunleri_kaydir_coklu.sql'  # C2 db=egesut_val_tmp (tohumlu)
 ```
