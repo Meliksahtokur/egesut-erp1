@@ -55,6 +55,7 @@ docs_authority:
   db: write
   propose_only:
     - prod DB apply (S1, sahip kapisi)
+    - R14 disi demo yazimi (T6 O1 fixture, U1 fixture; acik soru)
     - merge ve push (S1, sahip kapisi)
 pattern_refs:
   - RPC-WRITE-01
@@ -66,8 +67,8 @@ pattern_exceptions:
 acceptance:
   - scripts/db-validate.sh her migration icin PASS (--priors tests/db-validation/hayvan_takip_priors.sql + onceki dosyalar)
   - tests/sql/hayvan_takip_kos.sh ile hayvan_takip_test.sql rc=0
-  - tests/sql/hayvan_takip_kos.sh ile hayvan_takip_karsi_test.sql rc=0, mutant rc!=0
-  - node --test tests/unit/*.test.js yalniz 5 taban kirmizisi (1598/1592/5/1, db46032)
+  - tests/sql/hayvan_takip_kos.sh ile hayvan_takip_karsi_test.sql rc=0, KOS_MOD=topla mutant DUSEN tam olarak KR01-KR07 ve KR09
+  - node --test tests/unit/*.test.js yalniz M0'da olculen taban kirmizilari (db46032: 1598/1592/5/1)
   - U1 26/26 PASS ve anlam olcumu
 stop_conditions:
   - push, merge, prod YASAK; S1 sahip kapisi
@@ -93,9 +94,11 @@ checkpoint:
 - **branch:** `hayvan-takipte`
 - **worktree:** herdr worktree `egesut-erp1/hayvan-takipte`. Frontmatter'da `null`: repo public, mutlak yol yazılmaz; konum otoritesi `git worktree list`.
 - **spec:** `docs/plans/2026-10-31-hayvan-takip-SPEC.md`
-- **plan:** `docs/plans/2026-10-31-hayvan-takip-PLAN.md` (görevler T0-T6, F1-F5, D1, K1, U1, S1)
+- **plan:** `docs/plans/2026-10-31-hayvan-takip-PLAN.md` (görevler M0, T0-T6, F1-F5, D1, K1, U1, S1)
+- **spec sapması (sahip onaylı, 2026-10-31):** R10: Ö3b prod apply sonrasına kalır, spec §7 "faz kapanmadan" kuralının istisnası. Sahip kararları R6, R7 `domain-rules.md` §20.7-8'de (`5abe587`).
 - **scope:** Spec §4-§6'nın tamamı; kapsam dışı spec §1. Prod apply, merge, push bu goal'ün kabul kapsamında değildir; S1 sahip kapısıdır.
 - **write manifest (dosya başına tek düğüm, plan DAG'ı):**
+  - M0: merge commit (main'den gelen dosyalar manifest ihlali sayılmaz)
   - T0: `tests/db-validation/hayvan_takip_priors.sql`
   - T1: `tests/sql/hayvan_takip_kos.sh`, `tests/sql/hayvan_takip_karsi_test.sql`, `tests/sql/hayvan_takip_karsi_mutant.sql`
   - T2: `tests/sql/hayvan_takip_test.sql`
@@ -114,17 +117,17 @@ checkpoint:
 - **tracked paths:** yukarıdaki manifestin `runs/` ve `.crumbs/` dışındaki dosyaları. `docs/plans/` gitignore'dadır, `git add -f` ile eklenir.
 - **local paths:** `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`, `reports/db-validation-*`
 - **docs authority:** T6 spec ve domain-rules; D1 rpc-reference ve ui-map; root bu goal'ün checkpoint'leri. Workers kanonik belleğe yazmaz.
-- **DB authority:** Canlı şema okuması (prod ve demo, yalnız SELECT) T0'da serbest (spec Ö2). Demo apply ve demo fixture yalnız T6 ve U1'de, `db-validate` PASS sonrası (spec §7, §8.5). Prod yazma YOK; S1 sahip kapısı. Demo sahip şifresi okunmaz, yazılmaz, değiştirilmez. Canlı şema tek otoritedir.
+- **DB authority:** Canlı şema okuması (prod ve demo, yalnız SELECT) T0'da serbest (spec Ö2). **Demo yazma yetkisi (sahip açık talimatı, 2026-10-31):** kapsam yalnız T6: demo'ya migration apply + ROLLBACK'li `demo_klonla`, `db-validate` PASS sonrası. Commit edilen `demo_klonla` dışındaki TRUNCATE, prod işlemi ve kapsam dışı demo yazımı bu yetkiye girmez. **Açık soru (root):** T6 Ö1 COMMIT'li fixture ve U1 `E2E-HT-UI-` fixture bu kapsamda değil; yetki genişlemeden o adımlar koşulmaz. Prod yazma YOK; S1 sahip kapısı. Demo sahip şifresi okunmaz, yazılmaz, değiştirilmez. Canlı şema tek otoritedir.
 - **pattern_refs:** `RPC-WRITE-01`, `MODAL-ROUTER-01`, `FORM-SUBMIT-01`, `TESTING-01`
 - **pattern_exceptions:** `OFFLINE-SYNC-01` uygulanmaz: spec §1 ve §6 çevrimdışı kuyruğu kapsam dışı tutar, yeni RPC'ler online-only kalır.
 - **acceptance commands:**
   - Her migration: `scripts/db-validate.sh` (taslak ve final) `--priors tests/db-validation/hayvan_takip_priors.sql` + serinin önceki dosyaları; `PASS`, rapor `reports/db-validation-<sha8>.md`.
   - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_test.sql` rc=0.
-  - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_karsi_test.sql` rc=0, mutant rc≠0.
-  - `node --test tests/unit/*.test.js` (`NODE_PATH` ana checkout): yalnız 5 taban kırmızısı (1598/1592/5/1, db46032).
+  - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_karsi_test.sql` rc=0, `OZET: 11 PASS`; `KOS_MOD=topla` mutant `DUSEN` tam olarak `KR01-KR07`, `KR09`.
+  - `node --test tests/unit/*.test.js` (`NODE_PATH` ana checkout): yalnız M0'da ölçülen taban kırmızıları (db46032: 1598/1592/5/1).
   - Değişen JS'te `node --check`; `git diff --check`.
   - U1 26/26 PASS + anlam ölçümü.
 - **stop conditions:** Push, merge, prod YASAK. `db-validate` INCONCLUSIVE'da sahibe sor. Domain-rules ya da spec davranışıyla çelişkide `SORU:`. Sahibe U1 PASS olmadan demo verilmez. Dosya manifest dışına çıkılmaz. Muse ve sonnet açılmaz. Paylaşılan DB (`egesut_ovsync_kabul`, `egesut_val_tmp`) başka oturumda meşgulse lead'e sor.
 - **report path:** `runs/2026-10-31-hayvan-takip/<görev-id>-report.md`; final `.harness/reports/2026-10-31-hayvan-takip.md` (root)
-- **latest checkpoint:** 2026-10-31 — spec `db46032`; plan ve goal yazıldı, plan kapısı (`ss-reviewer-kapi`) bekliyor. Kod, migration, DB mutasyonu yok.
+- **latest checkpoint:** 2026-10-31 — spec `db46032`; plan ve goal yazıldı, kapı tur 1 bulguları düzeltildi, plan kapısı tur 2 (`ss-reviewer-kapi`) bekliyor. Kod, migration, DB mutasyonu yok.
 - **docs verdict:** bekliyor.

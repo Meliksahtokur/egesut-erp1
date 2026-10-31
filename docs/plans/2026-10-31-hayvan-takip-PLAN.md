@@ -8,7 +8,7 @@
 
 **Tech Stack:** PostgreSQL/Supabase, Vanilla JS, IndexedDB, node:test, psql test betikleri, Playwright (demo).
 
-**Spec:** `docs/plans/2026-10-31-hayvan-takip-SPEC.md` (commit `db46032`). **Goal:** `.harness/goals/2026/G-20261031-HAYVAN-TAKIP.md`. Taban: `db46032`.
+**Spec:** `docs/plans/2026-10-31-hayvan-takip-SPEC.md` (commit `db46032`). **Goal:** `.harness/goals/2026/G-20261031-HAYVAN-TAKIP.md`. Taban: `db46032`; M0 main'i alır (aşağıda). Plan düzeltmesi tabanı `5abe587` (§20.7-8).
 
 ## Global Constraints
 
@@ -22,9 +22,9 @@ Her görevin gereksinimlerine dahildir.
 - Worktree'de `node_modules` ve `.env` yoktur. `NODE_PATH=$MAIN/node_modules`; `db-validate`, `db-build-baseline`, `kabul-db/build.sh` `$MAIN`'den koşulur.
 - `/tmp` yasak (`TMPDIR` ya da `~/tmp`). Bash aracı zsh'tır: `for x in $var` bölmez, `${=var}` yazılır; eşleşmeyen glob hata verir.
 - Ağır test komutu `ram-ultracode exec --class test --sh '<ifade>'` ile koşulur (ifadede tek tırnak yok; aksi halde betik dosyası).
-- Birim tabanı (db46032, MEASURED): 1598 test, 1592 pass, 5 fail, 1 skip. Taban kırmızıları: `LUNA-3`, `EG-7`, `EG-8`, bc-tarih takvim altındaki iki test. Yeni kırmızı kabul edilmez.
+- Birim tabanı (db46032, MEASURED): 1598 test, 1592 pass, 5 fail, 1 skip. Taban kırmızıları: `LUNA-3`, `EG-7`, `EG-8`, bc-tarih takvim altındaki iki test. `some-fixes` test eklediğinden M0 tabanı yeniden ölçer; kabul sayısı M0 ölçümüdür. Yeni kırmızı kabul edilmez.
 - Yeni migration'da `anon` GRANT yok. RPC: `REVOKE ALL ... FROM PUBLIC, anon, authenticated`, `GRANT EXECUTE ... TO authenticated, service_role`. Tablo ve fonksiyon için Supabase default-privilege tuzağı nedeniyle REVOKE'a `authenticated` dahildir.
-- Migration damga bloğu `202610312000xx` (`some-fixes` dalı `20261031000001` kullanıyor, MEASURED). Merge öncesi en güncel damga ve `DB_VER` yeniden kontrol edilir.
+- Migration damga bloğu `202610312000xx` (main'in son damgası `20261031000001`, `a0b2327` ile girdi; MEASURED). Merge öncesi en güncel damga ve `DB_VER` yeniden kontrol edilir (S1.4).
 - Migration dosyası kendi `BEGIN/COMMIT`'ini taşımaz: runbook adım 4 ve test sarmalayıcısı dışarıdan sarar. İçinde `SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s';` bulunur. Başlığa rollback notu yazılır.
 - Tarih: `(now() AT TIME ZONE 'Europe/Istanbul')::date`; `CURRENT_DATE` yasak. Renk: vurgu yalnız yazı rengi; satır zemini ve şerit yok.
 - Sebep kodları: `TOPALLIK`, `SUT_DUSUSU`, `ZAYIFLAMA`, `ISTAHSIZLIK`, `DIGER`. Etiketler: Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Diğer. Sabitler: görev tipi `HAYVAN_TAKIP_MUAYENE`, kolon `ref_takip_id`, `kaynak='HAYVAN_TAKIP:<takip_id>'`, `kapatan_ref='hayvan-takip-kapandi'`, islem tipleri `HAYVAN_TAKIP_ACILDI|KAPANDI|MUAYENE`.
@@ -41,18 +41,18 @@ Spec §3 (K1-K9), §4, §5 yeniden sorulmaz. Görev tipi, kolon ve RPC adları s
 |---|---|---|
 | R1 | Kısmi unique koşulu `tamamlandi IS NOT TRUE AND iptal IS NOT TRUE`. | Ayna kolonları nullable gösteriyor (MEASURED). `NOT x` NULL satırı indeksten kaçırır. Davranış spec'le aynı. T0 canlıda doğrular. |
 | R2 | `db-validate` `--priors tests/db-validation/hayvan_takip_priors.sql` ile koşulur. Fixture yalnız izole baseline'a `hayvanlar` PK ekler. | Baseline constraint'sizdir; `REFERENCES hayvanlar(id)` 42830 ile FAIL oldu, fixture ile C1 PASS oldu (MEASURED, kazıma migration). Fixture prod'a gitmez. |
-| R3 | Görev açıklaması RPC'de `_hayvan_takip_sebep_etiket(kod)` CASE ile üretilir; bilinmeyen kod ham kalır. Parite birim testi config ile CASE'i eşitler. | RPC imzası etiket almıyor, `gorev_log.aciklama` DB'de yazılıyor. Liste CHECK ile sınırlanmaz; spec §4.1 korunur. |
+| R3 | Görev açıklaması RPC'de `_hayvan_takip_sebep_etiket(kod)` CASE ile üretilir; CASE'de olmayan kod görev açıklamasında ham kalır. Parite tek yönlü: CASE kodları ⊆ config ve etiketleri eş. | RPC imzası etiket almıyor, `gorev_log.aciklama` DB'de yazılıyor. Config'e migration'sız sebep eklenebilir; spec §4.1 korunur. |
 | R4 | Rozet iki yüzeye eklenir: kart `_detChipsHtml`, liste `_animalTagsHtml`. | Spec başlığı kartı, satır atfı (`5107-5112`) listeyi gösteriyor. |
 | R5 | `HAYVAN_TAKIP_MUAYENE` jenerik görev detayını hiç açmaz: `openTaskDet` sonuç penceresine gider ve döner. Çevrimdışıysa toast. | Spec §6. Detay modalı açılmayınca `detayIptal`, `openTaskEdit`, rapel tarihi yolları kapanır. |
-| R6 | Yeni tip için tamamlanmış görev detayında `↩️ Geri Al` kapalı (`Muayene sonucu geri alınamaz`); üç islem tipinde Geçmiş geri-al düğmesi yok (`_gmUndoRef` null). | Görevi geri açmak kapalı takibe açık görev bırakır. Spec'te boşluktu. Değişiklikler sayfası parolalı motor olarak kalır; davranışı T6'da ölçülür. |
-| R7 | Geçmiş tarihli muayene `HT_GECMIS_TARIH` ile reddedilir (bugün serbest). | Spec'te boşluk; emsal `gorev_ertele` `GECMIS_TARIH`. |
+| R6 | **Sahip kararı 2026-10-31, `domain-rules.md` §20.7.** Yeni tip için tamamlanmış görev detayında `↩️ Geri Al` kapalı (`Muayene sonucu geri alınamaz`); üç islem tipinde Geçmiş geri-al düğmesi yok (`_gmUndoRef` null). | Görevi geri açmak kapalı takibe açık görev bırakır. Spec'te boşluktu. Değişiklikler sayfası parolalı motor olarak kalır; davranışı T6'da ölçülür. |
+| R7 | **Sahip kararı 2026-10-31, `domain-rules.md` §20.8.** Geçmiş tarihli muayene `HT_GECMIS_TARIH` ile reddedilir (bugün serbest); tarih alanları alt sınır `bugun` taşır. | Emsal `gorev_ertele` `GECMIS_TARIH`, §17 alan sözleşmesi. |
 | R8 | `trg_degisim_log` yeni migration'da `CREATE TRIGGER` ile bağlanır; `20260913000001`'e dokunulmaz. | Eski migration dosyası değiştirilmez. |
 | R9 | `kapatan_vaka_id uuid`, FK yok. RPC vakanın aynı hayvana ait olduğunu doğrular (`HT_VAKA_UYUMSUZ`). | Spec "`cases.id` tipi" der. FK `case_geri_al` silmesini bloklardı. |
-| R10 | Ö3 iki parça: Ö3a demo fazında, Ö3b prod apply sonrası S1'de. | FDW içe aktarması prod'da tablo olmadan ölçülemez. |
+| R10 | **Sahip onaylı spec sapması (2026-10-31; spec §7 Ö3).** Ö3 iki parça: Ö3a demo fazında, Ö3b prod apply sonrası S1'de. | FDW içe aktarması prod'da tablo olmadan ölçülemez. |
 | R11 | `islem_log` `HAYVAN_TAKIP_MUAYENE` yalnız sonuç girişinde yazılır; planlama yazmaz. | Spec §5.6 "not metni görünür" sonuç notunu hedefler. |
-| R12 | `DIGER` satırı, rozeti ve listesi sebep olarak `aciklama` gösterir; görev açıklaması `Diğer takibi muayenesi` kalır. | "Neden" sorusu tek başına "Diğer" ile cevaplanmaz; görev metni spec §5.4. |
+| R12 | `DIGER` satırı, rozeti ve listesi sebep olarak `aciklama` gösterir; görev açıklaması `Diğer takibi muayenesi` kalır. | "Neden" sorusu tek başına "Diğer" ile cevaplanmaz; görev metni spec §5.4. Tasarım ayrıntısıdır; §20'ye yazılmaz. |
 | R13 | `hayvan_takip_ac` kilit sırası: `hayvanlar` → `hayvan_takip` → `gorev_log`. Dört RPC de bu sırayı izler. | Çıkış tetikleyicisi aynı sırada çalışır; kilitlenme önlenir. |
-| R14 | Demo apply ve Ö ölçümleri bu goal'ün DB yetkisindedir (spec §7, §8.5; kontrat "demo prova db-validate PASS sonrası"). | Prod yetkisi yoktur. |
+| R14 | Demo yazma yetkisi: sahibin açık talimatı (2026-10-31), kapsam yalnız T6: demo'ya migration apply + ROLLBACK'li `demo_klonla`. Prod, başka TRUNCATE ve kapsam dışı demo yazımı bu yetkiye girmez. | `.harness/contract.md:115-116` canlı yazma için açık talimat, TRUNCATE için son özel onay ister. `demo_klonla` işlem içinde TRUNCATE eder (`demo/02_demo_klonla.sql:115`). |
 
 Hata kodları (`RAISE EXCEPTION '<KOD>'`, `TAKIP_ACIK` eşleşmesinden kaçınmak için `HT_` önekli): `HT_HAYVAN_AKTIF_DEGIL`, `HT_SEBEP_BOS`, `HT_SEBEP_ZATEN_ACIK`, `HT_ACIKLAMA_GEREKLI`, `HT_TARIH_GEREKLI`, `HT_GECMIS_TARIH`, `HT_BOS_LISTE`, `HT_FARKLI_HAYVAN`, `HT_VAKA_UYUMSUZ`, `HT_TAKIP_YOK`, `HT_TAKIP_KAPALI`, `HT_GOREV_YOK`, `HT_GOREV_TIP_UYUMSUZ`, `HT_GOREV_KAPALI`, `HT_SONUC_GECERSIZ`.
 
@@ -60,9 +60,9 @@ Hata kodları (`RAISE EXCEPTION '<KOD>'`, `TAKIP_ACIK` eşleşmesinden kaçınma
 
 Spec'in sezdirdiği ama kendi testlerinde geçmeyen, kullanıcıyı en olası ısıracak durumlar. Her satırın testi sahip göreve eklidir.
 
-1. Çıkış, `authenticated` rolüyle tetiklenir; tetikleyici tabloya yazamazsa hayvan çıkışı tümden kırılır. Beklenen: çıkış başarılı, takipler kapalı. (T2 `C02`; T4 `SECURITY DEFINER`.)
+1. `cikis_yap` zaten `SECURITY DEFINER` (`20260706000003:181-184`); uygulama yolu tetikleyici DEFINER olmasa da çalışır. DEFINER savunmadır: `authenticated` `hayvan_takip`'e yazamaz, `hayvanlar.durum`'a doğrudan `UPDATE` (kabul DB'de yetki var, JS kullanmıyor; prod T0'da ölçülür) çıkışı kırardı. Beklenen: iki yolda takipler kapalı. (T2 `C02`, `C04`, `P03`.)
 2. Tamamlanmış muayene görevinde `↩️ Geri Al`: kapalı takibe açık görev kalır. Beklenen: geri alma kapalı. (F4 `HT-UI-07`, F3 `HT-GM-03`, U1 #22.)
-3. Vaka sonrası pencere vaka detayının üstünde açılır; Android geri tuşu yalnız üst pencereyi kapatır. Beklenen: vaka detayı açık kalır, vaka kayıtlı. (U1 #17, #18.)
+3. Vaka sonrası pencere vaka detayının üstünde açılır (`openCaseDet` beklenir; `openM` `js/ui.js:12414`'te await'lerden sonradır); Android geri tuşu yalnız üst pencereyi kapatır. Beklenen: vaka detayı açık kalır, vaka kayıtlı. (F5 `HT-V-01`, U1 #17, #18.)
 4. İstanbul gece yarısı: `2026-10-30T21:30:00Z` 31 Ekim'dir. Beklenen: gün sayısı UTC'ye kaymaz. (F1 `HT-S-01`.)
 5. Serbest açıklamada HTML: band, rozet, liste kaçışsız basarsa XSS olur. Beklenen: `esc` ile metin. (F1 `HT-S-07`, F4 `HT-UI-11`.)
 
@@ -72,6 +72,7 @@ Her dosya tek düğümdedir. Aynı düğüm içi sıralıdır; ok bağımlılık
 
 ```mermaid
 flowchart TD
+  M0["M0 main alımı<br/>merge commit"]
   T0["T0 Ö2 + test yatağı<br/>tests/db-validation/hayvan_takip_priors.sql"]
   T1["T1 karşı testler<br/>tests/sql/hayvan_takip_kos.sh<br/>hayvan_takip_karsi_test.sql<br/>hayvan_takip_karsi_mutant.sql"]
   T2["T2 DB sözleşme testi<br/>tests/sql/hayvan_takip_test.sql"]
@@ -88,6 +89,7 @@ flowchart TD
   K1["K1 kapı review<br/>ss-reviewer-kapi (root)"]
   U1["U1 UI kapısı<br/>runs/ kanıt"]
   S1["S1 sahip kapısı<br/>sahip testi, prod, merge, push"]
+  M0 --> T0
   T0 --> T1 & T2
   T1 & T2 --> T3 --> T4 --> T5 --> T6 --> F1
   F1 --> F2 & F3
@@ -102,7 +104,7 @@ Paralel gidebilir: T1 ile T2; F2 ile F3; F4 ile F5 (F2 ve F3 sonrası); D1 front
 
 ## HAYVAN_TAKIP_MUAYENE görevini kapatabilen yollar
 
-Tarama: atlas (`rpc gorev_tamamla`, `tablo gorev_log`, `etki`, sha `5d3f6a3`; `js/` db46032'de aynı [MEASURED `git diff --stat`]), yerel ayna `prosrc` taraması, grep. gitnexus indeksi `5d3f6a3`'te, HEAD'den yalnız doküman farkı var. Satırlar db46032'dir. Atlas'ın dinamik kör alanı için `TAKIP_MUAYENE` ve `write('gorev_log'` grep'iyle ayrıca taranmıştır.
+Tarama: atlas (`rpc gorev_tamamla`, `tablo gorev_log`, `etki`, sha `5d3f6a3`; `js/` db46032'de aynı [MEASURED `git diff --stat`]), yerel ayna `prosrc` taraması, grep. gitnexus indeksi `5d3f6a3`'te, HEAD'den yalnız doküman farkı var. Satırlar db46032'dir; `js/ui.js`, `js/api.js` ve `index.html` M0 ile değişir, her görev satırı M0 sonrası yeniden doğrular. Atlas'ın dinamik kör alanı için `TAKIP_MUAYENE` ve `write('gorev_log'` grep'iyle ayrıca taranmıştır.
 
 | # | Yol | Giriş noktası | Durum | Eylem |
 |---|---|---|---|---|
@@ -129,13 +131,26 @@ Sonuç: sonuç penceresini atlayan yol kalmaz. 1-4, 13-15 eylem ister; diğerler
 
 ---
 
+### Task M0: main'i dala alma
+
+**Karar:** `merge` (rebase değil): `db46032`, `7363121`, `5abe587` kapı ve rapor kayıtlarında geçiyor, SHA'lar korunur. `git merge-tree` çakışmasız (MEASURED, 5abe587 + main `b4253e1`). Push yok.
+
+- [ ] **Adım 1:** `git fetch` yok; yerel `main` ucunu raporla, `git merge --no-ff main -m "hayvan-takip: main alındı"`. Çakışmada dur, lead'e sor. Main'den gelen dosyalar merge commit'ine aittir, manifest ihlali sayılmaz.
+- [ ] **Adım 2:** Birim tabanını yeniden ölç, sayıyı ve kırmızıları raporla. Yeni kırmızı main kaynaklıysa listele, düzeltme.
+- [ ] **Adım 3:** Satır atıflarını doğrula: yol matrisi ve F4 tablosu için `js/ui.js`, spec'in `js/forms.js` atıfları. Kayan satırları rapora tablo olarak yaz; görev worker'ları bunu kullanır. `gorev_tamamla` main'de değişmedi (son gövde `20261013000004`, MEASURED); yeniden doğrula. Atlas ve `gitnexus analyze --index-only` tazele.
+
+**## Yazılabilir dosyalar:** merge commit, `runs/2026-10-31-hayvan-takip/M0-report.md`
+**## Boyut bütçesi:** Rapor ≤40 satır.
+**## Review: T0**
+**## Run:** `git merge-base --is-ancestor main HEAD`
+
 ### Task T0: Ö2 canlı şema okuması ve test yatağı
 
 **Files:** Create `tests/db-validation/hayvan_takip_priors.sql`; kanıt `runs/2026-10-31-hayvan-takip/kanit/o2-{prod,demo}.txt`.
 
 **Interfaces:** Produces: priors fixture; taze `egesut_ovsync_kabul` DB'si; T3-T5'in dayandığı ölçüm tablosu.
 
-- [ ] **Adım 1:** Prod ve demo'ya yalnız `SELECT` (Mgmt API). Okunacak: `gorev_log` kolon sırası ve nullable; `cases.id`, `hayvanlar.id` tipi ve PK; `pg_get_functiondef(gorev_tamamla)`, `pg_get_viewdef(v_gorev_log_sync)`, `_trg_hayvan_cikis_gorev_iptal` gövdesi; `hayvanlar` trigger listesi; `pg_publication_tables` `supabase_realtime`; `gorev_ertele_kural` yeni tip satırı; `to_regclass('public.hayvan_takip')`; `ref_takip_id` kolonu.
+- [ ] **Adım 1:** Prod ve demo'ya yalnız `SELECT` (Mgmt API). Okunacak: `gorev_log` kolon sırası ve nullable; `cases.id`, `hayvanlar.id` tipi ve PK; `pg_get_functiondef(gorev_tamamla)`, `pg_get_viewdef(v_gorev_log_sync)`, `_trg_hayvan_cikis_gorev_iptal` gövdesi; `hayvanlar` trigger listesi; `pg_publication_tables` `supabase_realtime`; `gorev_ertele_kural` yeni tip satırı; `to_regclass('public.hayvan_takip')`; `ref_takip_id` kolonu; `has_table_privilege('authenticated','public.hayvanlar','UPDATE')` ve `gorev_log` için aynısı (C04 yolu; prod'da yetki yoksa C04 kalır, raporda yalnız savunma diye yazılır).
 - [ ] **Adım 2:** Beklenenle karşılaştır, raporda tablo yaz. Beklenen: `tamamlandi`, `iptal` nullable; `gorev_log` kolonları `... hedef_saat, takip_kapanis_nedeni` ile biter; görünüm `hedef_saat` ile biter (`SELECT *` genişlemesi `takip_kapanis_nedeni`'ni de ekleyecek); `cases.id=uuid`, `hayvanlar.id=text`; guard `IN ('GEBELIK_KONTROL','TAKIP_MUAYENE')`; yeni nesne yok; yeni tip kural satırı yok; `gorev_tamamla` gövdesi `20261013000004` ile eş. Prod ve demo ayrışırsa ya da beklenenden sapma varsa: uyarlanabiliyorsa `Ruling:` önerisi, davranış değişiyorsa `SORU:`.
 - [ ] **Adım 3:** Fixture yaz: `ALTER TABLE public.hayvanlar ADD CONSTRAINT hayvanlar_pkey PRIMARY KEY (id);` ve "yalnız izole baseline" başlığı.
 - [ ] **Adım 4:** `cd "$MAIN" && bash scripts/kabul-db/build.sh`. DB paylaşımlıdır: `pg_stat_activity`'de başka bağlantı varsa dur, lead'e sor. Yerel ayna bayatsa `scripts/refresh_lsp_schema.sh`.
@@ -154,7 +169,9 @@ test -s runs/2026-10-31-hayvan-takip/kanit/o2-prod.txt && test -s runs/2026-10-3
 
 **Files:** Create `tests/sql/hayvan_takip_kos.sh`, `tests/sql/hayvan_takip_karsi_test.sql`, `tests/sql/hayvan_takip_karsi_mutant.sql`.
 
-**Interfaces:** Produces: `[BOLUM=sema|rpc|guard] bash tests/sql/hayvan_takip_kos.sh <sql...>` — dosyaları `BEGIN; ...; ROLLBACK;` içinde `egesut_ovsync_kabul`'a verir, `ON_ERROR_STOP=1`, `-v bolum=${BOLUM:-hepsi}`, rc psql'in. Test dosyaları `BEGIN/ROLLBACK` taşımaz; her senaryo `DO $t$...$t$`, FAIL'de `RAISE EXCEPTION`, sonda `OZET: N PASS` (emsal `supabase/tests/ovsync_pg_kabul.sql`).
+**Interfaces:** Produces: `[BOLUM=sema|rpc|guard] bash tests/sql/hayvan_takip_kos.sh <sql...>` — dosyaları `BEGIN; ...; ROLLBACK;` içinde `egesut_ovsync_kabul`'a verir, `ON_ERROR_STOP=1`, `-v bolum=${BOLUM:-hepsi}`, rc psql'in. Test dosyaları `BEGIN/ROLLBACK` taşımaz; her senaryo `DO $t$...$t$`, FAIL'de `RAISE EXCEPTION`, başarıda `<id> PASS`, sonda `OZET: N PASS` (emsal `supabase/tests/ovsync_pg_kabul.sql`).
+
+`KOS_MOD=topla` kipi: `-v ON_ERROR_STOP=0 -v ON_ERROR_ROLLBACK=on`; sonda `DUSEN: KR.. KR..` (sıralı) basar. `KR*` bloğu `SAVEPOINT kr; DO ...; ROLLBACK TO kr;` biçimindedir, kendi fixture'ını kurar, her hatayı `EXCEPTION WHEN OTHERS THEN RAISE EXCEPTION 'KRnn FAIL: %', SQLERRM` ile etiketler, OZET her iki test dosyasında `NOTICE '<id> PASS'` satırlarından `kos.sh` tarafından sayılır (geri sarılan sayaç kullanılmaz). Etiketsiz `ERROR` (mutant ya da betik hatası) rc=2.
 
 **Tasarım:** `gorev_tipi` serbest metin olduğundan test şemaya bağımlı değildir: fixture satırı `gorev_tipi='HAYVAN_TAKIP_MUAYENE'`, `kaynak='HAYVAN_TAKIP:<sabit uuid>'`, `ref_takip_id` yazmaz. Bu yüzden migration'dan önce YEŞİL koşar ve kırmızı kanıtı mutantla üretilir. Fixture: `E2E-HT-K-A` (açık yeni tip görev) ve `E2E-HT-K-B` (ikiz, görevsiz).
 
@@ -165,40 +182,42 @@ test -s runs/2026-10-31-hayvan-takip/kanit/o2-prod.txt && test -s runs/2026-10-3
 | `KR01` | A'da Ovsync hastalığıyla `create_case` | `TAKIP_ACIK` yok, vaka açılır |
 | `KR02` | A'da `pg_application_event` eklenir | `TAKIP_ACIK` yok |
 | `KR03` | A'da tohumlama | Yeni tip görev açık kalır, `takip_kapanis_nedeni` NULL |
-| `KR04` | A ve B'de `_ovsync_baslat_gorev_kur` | İkisinde aynı sonuç: `OVSYNC_BASLAT` sayısı ve `hedef_tarih` eşit |
+| `KR04` | A ve B'de `_ovsync_baslat_gorev_kur` ve `_acik_disi_hedef_ic` | İkisinde aynı sonuç: `OVSYNC_BASLAT` sayısı, `hedef_tarih` ve `_acik_disi_hedef_ic` eşit, NULL değil (takip muafiyeti `_ovsync_baslat_gorev_kur`'da değil, burada) |
 | `KR05` | `sessiz_hayvanlar_listele` | A ve B eşit bulunur, `sessiz_gun` eşit |
 | `KR06` | `ovsync_takip_listele` takipteki kümesi | A yok |
 | `KR07` | A'da `_takip_gorev_kur` | `ZATEN_ACIK` yok, `TAKIP_MUAYENE` açılır |
 | `KR08` | `TAKIP_MUAYENE` akışı: açıkken Ovsync `create_case` | Hâlâ `TAKIP_ACIK` |
-| `KR09` | `TAKIP_MUAYENE` açıkken tohumlama | Kapanır, `takip_kapanis_nedeni='YENI_TOHUMLAMA'`; yeni tip görev etkilenmez |
+| `KR09` | `TAKIP_MUAYENE` açıkken tohumlama; aynı hayvanda yeni tip görev, `hedef_tarih` daha ileri | Kapanır, `takip_kapanis_nedeni='YENI_TOHUMLAMA'`; yeni tip görev etkilenmez |
 | `KR10` | `gorev_tamamla(TAKIP_MUAYENE)` | `MUAYENE_SONUC_GEREKLI:TAKIP_MUAYENE` |
+| `KR11` | T5 sonrası: `hayvan_takip_ac` ile gerçek görev (`ref_takip_id` dolu); üstünde `KR01`, `KR05`, `KR06`, `KR07` assert'leri, `gorev_tamamla` guard'ı | Sonuçlar görevsiz ikizle eş; `MUAYENE_SONUC_GEREKLI:HAYVAN_TAKIP_MUAYENE`. `gorev_tamamla` gövdesi yeni tipi içermiyorsa `NOTICE 'KR11 ATLANDI'`, sayılmaz |
 
 - [ ] **Adım 2:** Yeşil: `bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_karsi_test.sql`. Beklenen rc=0, `OZET: 10 PASS`.
-- [ ] **Adım 3:** Mutant yaz: `DO` bloğu `gorev_tipi = 'TAKIP_MUAYENE'` içeren bütün `public` fonksiyonlarını `pg_get_functiondef` + `replace` ile `gorev_tipi IN ('TAKIP_MUAYENE','HAYVAN_TAKIP_MUAYENE')` yapıp `EXECUTE` eder.
-- [ ] **Adım 4:** Kırmızı kanıt: `bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_karsi_mutant.sql tests/sql/hayvan_takip_karsi_test.sql`. Beklenen rc≠0. Çıktıyı kanıta yaz; hangi senaryonun düştüğünü raporla.
+- [ ] **Adım 3:** Mutant yaz: `DO` bloğu `gorev_tipi = 'TAKIP_MUAYENE'` içeren bütün `public` fonksiyonlarını `pg_get_functiondef` + `replace` ile `gorev_tipi IN ('TAKIP_MUAYENE','HAYVAN_TAKIP_MUAYENE')` yapıp `EXECUTE` eder. `sessiz_hayvanlar_listele` bu metni taşımaz (`20261013000001`, INFERRED: gövde taraması); `KR05` için mutant ayrıca bu fonksiyona açık yeni tip görevli hayvanı eleyen `AND NOT EXISTS` ekler.
+- [ ] **Adım 4:** Kırmızı kanıt: Run'daki `KOS_MOD=topla` komutu. Beklenen düşen küme tam olarak `KR01-KR07` ve `KR09` (`KR09` mutantta en ileri görevi, yani yeni tipi kapatır); `KR08`, `KR10` düşmez. Sapma varsa fixture ya da mutant düzeltilir; küme gevşetilmez, açıklanamıyorsa lead'e sor. Çıktıyı kanıta yaz.
 - [ ] **Adım 5:** Commit.
 
 **## Yazılabilir dosyalar:** yukarıdaki üç dosya, `runs/2026-10-31-hayvan-takip/T1-report.md`, `runs/2026-10-31-hayvan-takip/kanit/t1-*`
-**## Boyut bütçesi:** Üç dosya toplam ≤260 satır.
+**## Boyut bütçesi:** Üç dosya toplam ≤320 satır.
 **## Review: T2**
 **## Run:**
 ```
 bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_karsi_test.sql                      # rc=0
-! bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_karsi_mutant.sql tests/sql/hayvan_takip_karsi_test.sql   # rc≠0
+test "$(KOS_MOD=topla bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_karsi_mutant.sql tests/sql/hayvan_takip_karsi_test.sql | sed -n 's/^DUSEN: //p')" = "KR01 KR02 KR03 KR04 KR05 KR06 KR07 KR09"
 ```
 
 ### Task T2: DB sözleşme testleri (kırmızı)
 
 **Files:** Create `tests/sql/hayvan_takip_test.sql`.
 
-**Interfaces:** Consumes: T1 `hayvan_takip_kos.sh`. Produces: T3-T5 kabul paketi. Henüz olmayan nesneler dinamik `EXECUTE` ile çağrılır; dosya psql `\if` ile bölümlere ayrılır, seçim `BOLUM` ortam değişkeniyle (T1): `sema` = `P*`, `L01`; `rpc` = `A*`, `K*`, `M*`, `S*`, `C*`; `guard` = `G*`. Fixture: `E2E-HT-T-*`. Sabit uuid yardımcısı `pg_temp.ht_id`.
+**Interfaces:** Consumes: T1 `hayvan_takip_kos.sh`. Produces: T3-T5 kabul paketi. Henüz olmayan nesneler dinamik `EXECUTE` ile çağrılır; dosya psql `\if` ile bölümlere ayrılır, seçim `BOLUM` ortam değişkeniyle (T1): `sema` = `P01`, `P02`, `L01` (yalnız T3 nesneleri); `rpc` = `P03`, `A*`, `K*`, `M*`, `S*`, `C*`; `guard` = `G*`. Fixture: `E2E-HT-T-*`. Sabit uuid yardımcısı `pg_temp.ht_id`.
 
 - [ ] **Adım 1:** Senaryoları yaz. Kodlar ve sabitler bu plandaki listededir.
 
 | Id | Senaryo | Assert |
 |---|---|---|
-| `P01` | ACL | `has_function_privilege`: anon dört RPC'de yok; authenticated ve service_role var; `_hayvan_takip_*` ve `_trg_hayvan_cikis_takip_kapat`'ta authenticated yok. `has_table_privilege`: authenticated yalnız SELECT, anon yok |
+| `P01` | Tablo ACL | `has_table_privilege`: authenticated yalnız SELECT, anon yok |
 | `P02` | Şema | RLS açık; `trg_degisim_log` var; `v_gorev_log_sync` `ref_takip_id` içerir, açık ve kapalı kolları doğru; `hayvan_takip` kısıtları (kapanış çifti, neden CHECK, boş sebep, `DIGER` açıklama) `check_violation` |
+| `P03` | RPC ACL ve DEFINER | `has_function_privilege`: anon dört RPC'de yok; authenticated ve service_role var; `_hayvan_takip_*` ve `_trg_hayvan_cikis_takip_kapat`'ta authenticated yok. `pg_proc.prosecdef=true`: dört RPC ve `_trg_hayvan_cikis_takip_kapat` |
 | `A01` | `hayvan_takip_ac` tarihsiz | `ok`, `takip_id`; `farm_id=current_farm_id()`, `acan` dolu, kapanış NULL; `HAYVAN_TAKIP_ACILDI` 1 satır; görev 0 |
 | `A02` | Tarih+saatle aç | Görev: tip, `kaynak`, `ref_takip_id`, tarih, saat; `aciklama='Topallık takibi muayenesi'`; `parent_id` NULL, `etken_kod` NULL |
 | `A03` | Aktif değil | `HT_HAYVAN_AKTIF_DEGIL` |
@@ -227,17 +246,18 @@ bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_karsi_test.sql        
 | `S06` | Görev açık, takip kapalı (elle kurulan) | `HT_TAKIP_KAPALI` |
 | `S07` | Geçersiz `p_sonuc` | `HT_SONUC_GECERSIZ` |
 | `C01` | `cikis_yap` | Açıklar `CIKIS`, `kapatan='sistem'`; takip başına KAPANDI log; görev iptal; kapalı takip değişmez |
-| `C02` | `SET LOCAL ROLE authenticated` + JWT claim ile `cikis_yap` | Yetki hatası yok, takip kapalı |
+| `C02` | `SET LOCAL ROLE authenticated` + JWT claim ile `cikis_yap` | Yetki hatası yok, takip kapalı (DEFINER'ı sınamaz; `cikis_yap` kendisi DEFINER) |
 | `C03` | `durum` Aktif→Aktif güncellemesi | Takip değişmez |
+| `C04` | `SET LOCAL ROLE authenticated` + doğrudan `UPDATE hayvanlar SET durum='Ölü'` | Yetki hatası yok, takip kapalı; tetikleyici DEFINER değilse düşer |
 | `G01` | `gorev_tamamla(yeni tip)` | `MUAYENE_SONUC_GEREKLI:HAYVAN_TAKIP_MUAYENE` |
 | `G02` | `p_iptal=true` | İptal olur (dal değişmez) |
 | `G03` | `TAKIP_MUAYENE`, `GEBELIK_KONTROL` | Guard aynı |
 | `G04` | Düz görev | Tamamlanır |
 | `G05` | `_asistan_step_calistir('gorev_kapat', ...)` yeni tipte | RAISE, görev açık |
 | `G06` | `gorev_ertele(yeni tip)` | `TIP_ERTELENEMEZ` |
-| `L01` | Takip aç ve kapat | `degisim_log`'da `hayvan_takip` I ve U |
+| `L01` | Doğrudan `INSERT` + `UPDATE` (RPC'siz, T3'te koşar) | `degisim_log`'da `hayvan_takip` I ve U |
 
-- [ ] **Adım 2:** Kırmızı: `bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_test.sql`. Beklenen rc≠0, ilk hata `P01`/`P02` nesne yok. Çıktıyı kanıta yaz.
+- [ ] **Adım 2:** Kırmızı: `bash tests/sql/hayvan_takip_kos.sh tests/sql/hayvan_takip_test.sql`. Beklenen rc≠0, ilk hata `P01` nesne yok. Çıktıyı kanıta yaz.
 - [ ] **Adım 3:** Commit. Test dosyasında sonraki değişiklik yalnız bu düğümden; test hatası çıkarsa T2 kapsamında taze worker.
 
 **## Yazılabilir dosyalar:** `tests/sql/hayvan_takip_test.sql`, `runs/2026-10-31-hayvan-takip/T2-report.md`, `runs/2026-10-31-hayvan-takip/kanit/t2-*`
@@ -297,7 +317,7 @@ cd "$WT" && bash tests/sql/hayvan_takip_kos.sh supabase/migrations/2026103120000
   - `_hayvan_takip_kapat_ic(p_takip_id uuid, p_neden text, p_kapatan text, p_not text, p_vaka uuid) -> boolean` (açıksa kapatıp true): kapanış + açık görev iptali + `HAYVAN_TAKIP_KAPANDI` logu; RPC ve tetikleyici ortak kullanır.
 - [ ] **Adım 3:** Dört RPC. Kilit R13. Davranış spec §4.4, ret kodları plandaki liste, sıra: parametre → varlık → durum. `INSERT` `unique_violation` da `HT_SEBEP_ZATEN_ACIK`'e çevrilir. `islem_log` kalıbı: `(tip, ana_hayvan_id, ref_id, ref_tablo, snapshot, kullanici_notu)`, `ref_tablo='hayvan_takip'`, `snapshot={sebep_kodu,aciklama,...}`. `muayene_sonuc` görevi doğrudan `UPDATE` ile tamamlar (`tamamlandi=true`, `tamamlanma_tarihi=now()`), `gorev_tamamla` çağırmaz.
 - [ ] **Adım 4:** Tetikleyici: `_trg_hayvan_cikis_takip_kapat()` `SECURITY DEFINER` + `search_path`; `CREATE TRIGGER trg_hayvan_cikis_takip_kapat AFTER UPDATE OF durum ON public.hayvanlar FOR EACH ROW WHEN (OLD.durum='Aktif' AND NEW.durum IS DISTINCT FROM 'Aktif')`. Mevcut `_trg_hayvan_cikis_gorev_iptal`'e dokunulmaz.
-- [ ] **Adım 5:** ACL (Global Constraints). `db-validate` PASS; `BOLUM=rpc` ile iki migration + test dosyası yeşil.
+- [ ] **Adım 5:** ACL (Global Constraints). `db-validate` PASS; `BOLUM=rpc` ile iki migration + test dosyası yeşil. Mutant kanıtı (repoya girmez, `ROLLBACK`'li tek işlem): iki migration + `ALTER FUNCTION public._trg_hayvan_cikis_takip_kapat() SECURITY INVOKER` + `C04` adımları → `insufficient_privilege` (42501). Çıktı kanıta.
 - [ ] **Adım 6:** Commit.
 
 **## Yazılabilir dosyalar:** bu migration, `runs/2026-10-31-hayvan-takip/T4-report.md`, `runs/2026-10-31-hayvan-takip/kanit/t4-*`
@@ -330,7 +350,7 @@ cd "$WT" && bash tests/sql/hayvan_takip_kos.sh $M/20261031200001_hayvan_takip_se
 M=supabase/migrations; P1=$M/20261031200001_hayvan_takip_sema.sql; P2=$M/20261031200002_hayvan_takip_rpc.sql; P3=$M/20261031200003_gorev_tamamla_hayvan_takip.sql
 cd "$MAIN" && bash scripts/db-validate.sh "$WT/$P3" --priors "$WT/tests/db-validation/hayvan_takip_priors.sql" "$WT/$P1" "$WT/$P2"   # PASS
 cd "$WT" && bash tests/sql/hayvan_takip_kos.sh $P1 $P2 $P3 tests/sql/hayvan_takip_test.sql       # rc=0, OZET tümü
-bash tests/sql/hayvan_takip_kos.sh $P1 $P2 $P3 tests/sql/hayvan_takip_karsi_test.sql              # rc=0, OZET: 10 PASS
+bash tests/sql/hayvan_takip_kos.sh $P1 $P2 $P3 tests/sql/hayvan_takip_karsi_test.sql              # rc=0, OZET: 11 PASS (KR11 dahil)
 ```
 
 ### Task T6: Demo uygulaması, Ö1, Ö3a
@@ -339,15 +359,15 @@ bash tests/sql/hayvan_takip_kos.sh $P1 $P2 $P3 tests/sql/hayvan_takip_karsi_test
 
 **Interfaces:** Consumes: üç migration ve PASS raporları. Produces: demo'da özellik şeması; §20 ölçümleri.
 
-- [ ] **Adım 1:** Runbook (`.harness/runbooks/db-migration.md`) demo uygulaması: yedek (`gorev_log`, repo dışı), `scripts/db-dry-run.sh`, tek işlemde üç migration, `schema_migrations` kaydı, geri okuma. GT yenilemesi prod işidir, S1 bakiyesi olarak yazılır. `hayvan_takip_test.sql` demoya koşulmaz.
-- [ ] **Adım 2: Ö1.** Fixture `E2E-HT-O1` ile ayrı işlemlerde: takip ve açık görev aç (COMMIT); `cikis_yap` (COMMIT); çıkış `txid`'sini `degisim_log`'dan al. Sonra `degisim_onizle` çıktısını `islem` ve `satir` seviyesinde kaydet. Uygulamayı parola gerektirmeden ölç: `BEGIN; SELECT surum_gizli._degisim_uygula(surum_gizli._degisim_plan(<hedef>,<seviye>)); SELECT durum, kapanis_tarihi, kapanis_nedeni, iptal ...; ROLLBACK;`. Şifreye dokunulmaz. Kayıt tablosu:
+- [ ] **Adım 1:** Yetki R14. Runbook (`.harness/runbooks/db-migration.md`) demo uygulaması: yedek (`gorev_log`, repo dışı), `scripts/db-dry-run.sh`, tek işlemde üç migration, `schema_migrations` kaydı, geri okuma. GT yenilemesi prod işidir, S1 bakiyesi olarak yazılır. `hayvan_takip_test.sql` demoya koşulmaz.
+- [ ] **Adım 2: Ö1.** COMMIT'li fixture R14 kapsamında değildir; root yetkiyi genişletmeden koşulmaz (goal, açık soru). Fixture `E2E-HT-O1` ile ayrı işlemlerde: takip ve açık görev aç (COMMIT); `cikis_yap` (COMMIT); çıkış `txid`'sini `degisim_log`'dan al. Sonra `degisim_onizle` çıktısını `islem` ve `satir` seviyesinde kaydet. Uygulamayı parola gerektirmeden ölç: `BEGIN; SELECT surum_gizli._degisim_uygula(surum_gizli._degisim_plan(<hedef>,<seviye>)); SELECT durum, kapanis_tarihi, kapanis_nedeni, iptal ...; ROLLBACK;`. Şifreye dokunulmaz. Kayıt tablosu:
 
 | Seviye | `hayvanlar.durum` | `hayvan_takip` | `gorev_log.iptal` | Çakışma/uyarı |
 |---|---|---|---|---|
 
   Karar: `islem` seviyesi takibi ve görevi geri açıyorsa bu davranış yazılır. Açmıyorsa spec kuralı geçerli: "takip kapalı kalır, karttan yeniden açılır". Ayrıca `satir` seviyesinde kapalı takibin (`hayvan_takip` satırı) geri alınması da aynı tabloya yazılır. Ek geliştirme bu görevde açılmaz; davranış değişikliği gerekiyorsa `SORU:`. Fixture temizlenir.
 - [ ] **Adım 3: Ö3a.** `demo/01_fdw_bridge.sql` ve `demo/03_sema_diff.sql` bu aşamada değişmez. Ölçüm: `SELECT public.demo_sema_diff();` → `hayvan_takip` ve `gorev_log.ref_takip_id` demo-tarafı drift. `BEGIN; SELECT public.demo_klonla(); SELECT count(*) FROM hayvan_takip; ROLLBACK;` → `ok=true`, 2BP01 yok, `ekstra_bosalan` `hayvan_takip` içerir. ROLLBACK demo verisini korur. Süre ve kilit notu raporlanır; paralel demo oturumu varsa önce lead'e sor.
-- [ ] **Adım 4:** Spec §7'ye Ö1, Ö2, Ö3a sonuç ve tarih; §20'ye Ö1 davranışı, "demo'da uygulandı; prod bekliyor". §11'e üç islem tipi; §12'ye `HAYVAN_TAKIP_MUAYENE`. Ruling R6, R7, R12 §20'ye işlenir.
+- [ ] **Adım 4:** Spec §7'ye Ö1, Ö2, Ö3a sonuç ve tarih; §20'ye Ö1 davranışı, "demo'da uygulandı; prod bekliyor". §11'e üç islem tipi; §12'ye `HAYVAN_TAKIP_MUAYENE`; §17 "gelecek meşru" satırına üç `ht-*` alanı (`min: bugun`). R6 ve R7 §20.7-8'de zaten yazılı (`5abe587`), yeniden yazılmaz; R12 §20'ye girmez.
 - [ ] **Adım 5:** Commit: `git add -f docs/plans/2026-10-31-hayvan-takip-SPEC.md`, `git add .harness/references/domain-rules.md`.
 
 **## Yazılabilir dosyalar:** spec, `domain-rules.md`, `runs/2026-10-31-hayvan-takip/T6-report.md`, `runs/2026-10-31-hayvan-takip/kanit/*`. Demo DB yazımı yalnız bu görevde.
@@ -374,7 +394,8 @@ test -s runs/2026-10-31-hayvan-takip/kanit/o1-tablo.md && test -s runs/2026-10-3
   - `htKartBlokHtml(acikTakipler, gorevler) -> string`.
   - `htKapatOnSecim(acikTakipler, baglam:'kart'|'vaka') -> string[]`.
   - `htVarsayilanSonrakiTarih(bugunIso) -> 'YYYY-MM-DD'` (+3).
-  - `htHataMetni(err) -> string` — `HT_SEBEP_ZATEN_ACIK` → `Bu sebeple zaten takipte`; diğerleri `getUserMessage`'a düşer.
+  - `htHataMetni(err) -> string` — mesajdaki `HT_[A-Z_]+` `HT_HATA_METINLERI`'nden çevrilir, `getUserMessage`'dan önce (`HT_GECMIS_TARIH`, `errorHandler.js:64-82` adım 2'de `config.js:225` `GECMIS_TARIH` metnine düşerdi; noktasız kodlar jenerik olurdu). Haritada olmayan `HT_` kodu `İşlem reddedildi: <KOD>`. `HT_` olmayanlar `getUserMessage`.
+  - `HT_HATA_METINLERI`: `HAYVAN_AKTIF_DEGIL` Hayvan aktif değil. · `SEBEP_BOS` Sebep seçilmedi. · `SEBEP_ZATEN_ACIK` Bu sebeple zaten takipte · `ACIKLAMA_GEREKLI` Diğer için açıklama gerekli. · `TARIH_GEREKLI` Muayene tarihi gerekli. · `GECMIS_TARIH` Muayene tarihi geçmişte olamaz. · `BOS_LISTE` Kapatılacak takip seçilmedi. · `FARKLI_HAYVAN` Takipler aynı hayvana ait olmalı. · `VAKA_UYUMSUZ` Vaka bu hayvana ait değil. · `TAKIP_YOK` Takip bulunamadı. · `TAKIP_KAPALI` Bu takip kapanmış. · `GOREV_YOK` Muayene görevi bulunamadı. · `GOREV_TIP_UYUMSUZ` Bu görev takip muayenesi değil. · `GOREV_KAPALI` Bu muayene görevi kapanmış. · `SONUC_GECERSIZ` Geçersiz muayene sonucu.
 
 - [ ] **Adım 1: Test (kırmızı).** `loadBrowserModule`/`loadExtractedFunction`.
 
@@ -389,7 +410,8 @@ test -s runs/2026-10-31-hayvan-takip/kanit/o1-tablo.md && test -s runs/2026-10-3
 | `HT-S-07` | `<img onerror=x>` açıklaması kaçışlı |
 | `HT-S-08` | `htKapatOnSecim`: kart+tek → o id; kart+çok → `[]`; vaka → `[]` |
 | `HT-S-09` | `htVarsayilanSonrakiTarih('2026-10-31')==='2026-11-03'` |
-| `HT-S-10` | Parite: `HAYVAN_TAKIP_SEBEPLER` ile migration CASE'i (dosyadan okunur) eş |
+| `HT-S-10` | Tek yönlü parite: migration CASE kodları (dosyadan okunur) ⊆ `HAYVAN_TAKIP_SEBEPLER`, etiketleri eş; config'e CASE'de olmayan kod eklemek testi bozmaz |
+| `HT-S-12` | `htHataMetni`: T4 migration'ındaki her `HT_[A-Z_]+` kodu haritada; `HT_GECMIS_TARIH` → `Muayene tarihi geçmişte olamaz.` (`erteleme` içermez); `HT_HAYVAN_AKTIF_DEGIL` jenerik değil; bilinmeyen `HT_X` → `İşlem reddedildi: HT_X`; `TAKIP_ACIK` gibi `HT_`siz metin `getUserMessage` |
 | `HT-S-11` | `api.js`: `TABLES` içerir, `DB_VER>=25`, dört RPC `RPC_TABLES`'ta `['hayvan_takip','gorev_log','islem_log']`, `REALTIME_TABLES` içerir, `RPC_MAP`'te yeni RPC yok |
 
 - [ ] **Adım 2:** Kırmızı koş.
@@ -397,7 +419,7 @@ test -s runs/2026-10-31-hayvan-takip/kanit/o1-tablo.md && test -s runs/2026-10-3
 - [ ] **Adım 4:** Yeşil; `node --check`. Commit.
 
 **## Yazılabilir dosyalar:** yukarıdaki dört dosya, `runs/2026-10-31-hayvan-takip/F1-report.md`
-**## Boyut bütçesi:** `hayvan-takip.js` ≤160 satır; `api.js` ≤15 satır fark.
+**## Boyut bütçesi:** `hayvan-takip.js` ≤180 satır; `api.js` ≤15 satır fark.
 **## Review: T1**
 **## Run:**
 ```
@@ -429,10 +451,14 @@ Router modalları: `m-ht-ac`, `m-ht-muayene`, `m-ht-kapat`, `m-ht-sonuc`; `MODAL
 | `HT-P-09` | `htSonucAc` sonraki tarih `+3` dolu; kapalı görevde `false` + toast + `pullTables`; çevrimdışı `false` + toast |
 | `HT-P-10` | `htSonucGonder`: `SURSUN` boş tarih → `p_sonraki_tarih:null`; `KAPANSIN` tarih göndermez; `HT_TAKIP_KAPALI` → toast + tazeleme |
 | `HT-P-11` | `htVakaSonrasi`: açık takip yoksa pencere yok; `pullTables` reddi vaka akışını bozmaz, yalnız uyarı |
+| `HT-P-13` | Spec §6 çıkmış hayvan: `HT_HAYVAN_AKTIF_DEGIL` → toast `htHataMetni`, `pullTables` + açık kart tazelenir (`openDet` sahte, bir kez) |
+| `HT-P-14` | Spec §6 başka biri kapatmış: `HT_TAKIP_KAPALI` (`htMuayeneGonder`) toast + liste tazelenir; `kapanan=0` (`htKapatGonder`) toast yok, tazeleme var |
+| `HT-P-15` | Spec §6 vaka sonrası kapatma reddi: `baglam:'vaka'` `htKapatGonder` RPC hatası uyarı toast'u verir, vaka yazma ya da `closeM('m-case-det')` çağrısı yok |
+| `HT-P-16` | Pencere açılışında üç tarih alanı boş kalır (`openM` otomatik doldurmaz); `htSonucAc` yalnız `+3` yazar |
 | `HT-P-12` | `index.html`: dört modal id, iki yeni `<script>`; `handlers.js` her `data-action="ht-*"` kayıtlı |
 
 - [ ] **Adım 2:** Kırmızı koş.
-- [ ] **Adım 3:** Uygula. Başarıda: `pullTables(['hayvan_takip','gorev_log','islem_log'])`, `loadDash()`, görev sekmesi açıksa `loadTasks`. Kart `_DET_TABLOLAR` üzerinden tazelenir (F4). `index.html`: `js/hayvan-takip.js` ve `js/hayvan-takip-pencere.js` `forms.js`'den sonra; bütün `?v=` tek değer `20261031-01`.
+- [ ] **Adım 3:** Uygula. Başarıda: `pullTables(['hayvan_takip','gorev_log','islem_log'])`, `loadDash()`, görev sekmesi açıksa `loadTasks`. Kart `_DET_TABLOLAR` üzerinden tazelenir (F4). Bütün RPC hataları `htHataMetni` ile. `utils/modal.js:26` `openM` boş `input[type=date]`'i bugünle doldurur; pencereler `openM` kullanıyorsa açılışta üç alan temizlenir. `index.html`: `js/hayvan-takip.js` ve `js/hayvan-takip-pencere.js` `forms.js`'den sonra; bütün `?v=` tek değer `20261031-02` (main `20261031-01` kullanıyor, MEASURED).
 - [ ] **Adım 4:** Mevcut damga testleri (`coklu-kaydir-ui`, `ileri-gebe-duve-siralama`, `vaka-toplu-ac`) dahil yeşil. Commit.
 
 **## Yazılabilir dosyalar:** yukarıdaki dört dosya, `runs/2026-10-31-hayvan-takip/F2-report.md`
@@ -496,7 +522,7 @@ node --check js/gecmis.js && node --check js/degisiklikler/etiketler.js
 | `_DET_TABLOLAR` | 6873 | `hayvan_takip` |
 | Geçmiş kartı | ~9009-9134 | `islem` üç tipinde `sub=esc(gmHtIslemAlt(data))` |
 | Arama metni | 9163 | `gmHtIslemAlt` aramaya eklenir |
-| `TARIH_ALANLARI` | 13953 | `ht-ac-tarih`, `ht-mu-tarih`, `ht-so-tarih`: `{temizlenebilir:true}`, `max` yok (§17) |
+| `TARIH_ALANLARI` | 13953 | `ht-ac-tarih`, `ht-mu-tarih`, `ht-so-tarih`: `{min:'bugun',temizlenebilir:true}`, `max` yok; `min:'bugun'` `tarihAlaniTakvimAc:13921`'de destekli (§17, §20.8) |
 
 - [ ] **Adım 1: Test (kırmızı).**
 
@@ -513,7 +539,7 @@ node --check js/gecmis.js && node --check js/degisiklikler/etiketler.js
 | `HT-UI-09` | `_katTipMap.muayene` yeni tipi içerir, `ureme` içermez |
 | `HT-UI-10` | `_detOzetHtml`: takipsiz yalnız `Takibe al`; açık takipte üçü; çıkmış hayvanda hiçbiri |
 | `HT-UI-11` | Rozetlerde açıklama kaçışlı; `_detChipsHtml` eski çağrı çalışır (`det-kisir-chip`) |
-| `HT-UI-12` | `TARIH_ALANLARI` üç alan `max` taşımaz; `_DET_TABLOLAR` içerir |
+| `HT-UI-12` | `TARIH_ALANLARI` üç alan `min:'bugun'` taşır, `max` taşımaz; `_DET_TABLOLAR` içerir |
 
 - [ ] **Adım 2:** Kırmızı, uygula, yeşil.
 - [ ] **Adım 3:** Bütün birim süiti: yeni kırmızı yok. Commit.
@@ -525,7 +551,7 @@ node --check js/gecmis.js && node --check js/degisiklikler/etiketler.js
 ```
 NODE_PATH=$MAIN/node_modules node --test tests/unit/hayvan-takip-ui.test.js tests/unit/det-kisir-chip.test.js tests/unit/cikis-filtre.test.js tests/unit/ui-pure.test.js
 node --check js/ui.js
-ram-ultracode exec --class test --sh "cd $WT && NODE_PATH=$MAIN/node_modules node --test tests/unit/*.test.js 2>&1 | tail -30"   # fail yalnız 5 taban kırmızısı
+ram-ultracode exec --class test --sh "cd $WT && NODE_PATH=$MAIN/node_modules node --test tests/unit/*.test.js 2>&1 | tail -30"   # fail yalnız M0 taban kırmızıları
 ```
 
 ### Task F5: Vaka sonrası pencere
@@ -538,13 +564,13 @@ ram-ultracode exec --class test --sh "cd $WT && NODE_PATH=$MAIN/node_modules nod
 
 | Id | Assert |
 |---|---|
-| `HT-V-01` | Başarı kolu: `openCaseDet` sonrası `htVakaSonrasi(hayvan.id, case_id)` bir kez |
-| `HT-V-02` | `caseTakipRetry` kolu: aynı çağrı |
+| `HT-V-01` | Başarı kolu: sahte `openCaseDet` gecikmeli Promise; olay sırası `openCaseDet başladı`, `openCaseDet bitti`, `htVakaSonrasi` ve bir kez. `await` silinince düşer |
+| `HT-V-02` | `caseTakipRetry` kolu: aynı sıra |
 | `HT-V-03` | `htVakaSonrasi` reddederse vaka toast'u korunur, istisna dışarı çıkmaz |
 | `HT-V-04` | `TAKIP_ACIK` onayı vaka öncesinde kalır: `_takipAcikHata` sırası değişmez; `caseTakipRetry` onaydan sonra çalışır |
 | `HT-V-05` | Kaynak taraması: `submitBulkCase`, `gonder`, `kizginlik` gövdelerinde `htVakaSonrasi` yok |
 
-- [ ] **Adım 2:** Kırmızı, uygula: `if(res?.case_id){ ...; openCaseDet(res.case_id); await _htVakaSonrasiGuvenli(hayvan.id,res.case_id); }`. `caseTakipRetry` (`forms.js:869`) aynı. `_htVakaSonrasiGuvenli` hata yakalar, `toast` uyarır.
+- [ ] **Adım 2:** Kırmızı, uygula: `if(res?.case_id){ ...; await openCaseDet(res.case_id); await _htVakaSonrasiGuvenli(hayvan.id,res.case_id); }`. `openCaseDet` modalı await'lerden sonra açar (`js/ui.js:12354-12414`); beklenmezse pencere altta kalır. `caseTakipRetry` (`forms.js:869`, `res2`) aynı. `_htVakaSonrasiGuvenli` hata yakalar, `toast` uyarır.
 - [ ] **Adım 3:** Yeşil, commit.
 
 **## Yazılabilir dosyalar:** `js/forms.js`, `tests/unit/hayvan-takip-vaka.test.js`, `runs/2026-10-31-hayvan-takip/F5-report.md`
@@ -576,7 +602,7 @@ Root `ss-reviewer-kapi` (opus high) açar; spec §9. Girdi: kabul SHA diff'i, g�
 
 Koltuk: `ss-worker-high`, `model=opus` (spec §8.5; sahip talimatı proje `CLAUDE.md` sonnet koltuğunu bu işte geçersiz kılar). Kod yazmaz; FAIL sahibi düğüme döner, koltuk yalnız FAIL maddelerini yeniden koşar. PASS olmadan sahibe verilmez.
 
-**Ortam:** Dal kodu `python3 -m http.server 8137 --bind 127.0.0.1` ile worktree kökünden, `?demo`. Playwright Docker `mcr.microsoft.com/playwright:v1.58.2-noble --network host`, viewport 390×844. Demo sahip şifresi kullanılmaz. Oracle üçlü: DOM + ekran görüntüsü + demo DB `SELECT`. Fixture: `E2E-HT-UI-A/B/C` küpeli aktif dişi; C'nin takibi `acilis_tarihi=now()-5 gün`. Bitişte fixture temizlenir (önce `gorev_log`, sonra `hayvan_takip`, `hayvanlar`). Belgelenmiş koşum tekrarlanmaz.
+**Ortam:** Dal kodu `python3 -m http.server 8137 --bind 127.0.0.1` ile worktree kökünden, `?demo`. Playwright Docker `mcr.microsoft.com/playwright:v1.58.2-noble --network host`, viewport 390×844. Demo sahip şifresi kullanılmaz. `E2E-HT-UI-` fixture yazımı R14 kapsamında değildir; root yetkiyi genişletmeden koşulmaz (goal, açık soru). Oracle üçlü: DOM + ekran görüntüsü + demo DB `SELECT`. Fixture: `E2E-HT-UI-A/B/C` küpeli aktif dişi; C'nin takibi `acilis_tarihi=now()-5 gün`. Bitişte fixture temizlenir (önce `gorev_log`, sonra `hayvan_takip`, `hayvanlar`). Belgelenmiş koşum tekrarlanmaz.
 
 ```mermaid
 flowchart TD
@@ -647,8 +673,8 @@ Bu adımlar sahibin ayrı talimatıyla, ayrı zarfla yürür. Plan bunları koş
 
 1. Sahip testi: link ve U1 listesi. Karar soruları sahibin cümleleriyle.
 2. Prod apply: `.harness/runbooks/db-migration.md` yedi adım; apply, kayıt, GT yenilemesi birlikte; `scripts/veri-eslesme-kontrol.py hepsi`.
-3. Ö3b: `demo/01_fdw_bridge.sql` ile `IMPORT FOREIGN SCHEMA` yenile, `demo_sema_diff()` temiz; `demo_klonla()` `hayvan_takip` satırlarını prod ile eş kopyalar, `ekstra_bosalan`'da yok. Sonuç spec §7 ve §20'ye.
-4. Merge öncesi: en güncel migration damgası, `DB_VER` (`istatistik-modülü`, `some-fixes` dalları), `?v=` tek değer, dal ucu = kapı commit'i. `git merge --no-commit --no-ff`.
+3. Ö3b (R10, sahip onaylı spec sapması): `demo/01_fdw_bridge.sql` ile `IMPORT FOREIGN SCHEMA` yenile, `demo_sema_diff()` temiz; `demo_klonla()` `hayvan_takip` satırlarını prod ile eş kopyalar, `ekstra_bosalan`'da yok. Sonuç spec §7 ve §20'ye.
+4. Merge öncesi: en güncel migration damgası; `DB_VER`: main ≥25 ise main+1 (`istatistik-modülü` dalı dahil; `HT-S-11` bunu yakalamaz); `?v=` tek değer ve main'den farklı; dal ucu = kapı commit'i. `git merge --no-commit --no-ff`.
 5. Push: `harness.py push-gate --goal`. Dal kapanışı.
 
 ## Kapsam kontrolü (self-review)
@@ -669,4 +695,4 @@ Bu adımlar sahibin ayrı talimatıyla, ayrı zarfla yürür. Plan bunları koş
 | §6 hata durumları | T2, F1, F2 |
 | §7 Ö1, Ö2, Ö3 | T6, T0, T6 + S1 |
 | §8.1-8.5 | T3-T5, T2, T1, F1-F5, U1 |
-| §9 sıra | DAG, K1, U1, S1 |
+| §9 sıra | M0, DAG, K1, U1, S1 |
