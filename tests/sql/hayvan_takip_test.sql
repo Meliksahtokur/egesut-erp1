@@ -521,6 +521,16 @@ BEGIN
   PERFORM pg_temp.ht_dogru(src ~ 'public\.cases c\s+WHERE[^;]*FOR SHARE;', 'vaka satırı kilitli değil');
   PERFORM pg_temp.ht_dogru(src ~ 'public\.hayvanlar\s+WHERE[^;]*FOR NO KEY UPDATE;', 'hayvan kilidi NO KEY UPDATE değil');
 END $t$);
+-- PG onayından sonra görev ekleme tekrar edilse de çift görev olmaz (kaynak anahtarı).
+SELECT pg_temp.ht_test('V09', $t$ DECLARE h text := pg_temp.ht_hayvan(1); c uuid := pg_temp.ht_vaka(h); s uuid; r1 jsonb; r2 jsonb;
+BEGIN
+  INSERT INTO public.tedavi_sablonu (ad, tohumlama_plani) VALUES ('E2E-HT-T', jsonb_build_object('gun_ofset', 1, 'planned_time', '08:00')) RETURNING id INTO s;
+  r1 := public.tedavi_sablon_tohumlama_gorev_ekle(c, s);
+  r2 := public.tedavi_sablon_tohumlama_gorev_ekle(c, s);
+  PERFORM pg_temp.ht_esit(r1->>'olustu', 'true', 'ilk çağrı');
+  PERFORM pg_temp.ht_esit(r2->>'olustu', 'false', 'ikinci çağrı');
+  PERFORM pg_temp.ht_esit((SELECT count(*)::text FROM public.gorev_log WHERE kaynak = 'TEDAVI_SABLON_TOHUMLAMA:' || c || ':' || s), '1', 'görev sayısı');
+END $t$);
 SELECT pg_temp.ht_test('C01', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t1 uuid := pg_temp.ht_ac(h, 'TOPALLIK', NULL, pg_temp.ht_gun() + 1); g uuid := pg_temp.ht_acik_id(t1);
   t2 uuid := pg_temp.ht_ac(h, 'ZAYIFLAMA'); t3 uuid := pg_temp.ht_ac(h, 'ISTAHSIZLIK'); x uuid; r jsonb;
 BEGIN

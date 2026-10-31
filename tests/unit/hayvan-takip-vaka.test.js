@@ -14,7 +14,7 @@ const DIZI = ['openCaseDet başladı', 'openCaseDet bitti', 'htVakaSonrasi'];
 const TAKIP_HATA = 'TAKIP_ACIK:{"muayene_tarihi":"2026-10-20"}';
 
 // openCaseDet modalı await'lerden sonra açar (js/ui.js); sahte de gecikmeli çözülür.
-function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, muayene = null, bagHata = null, sablonId = null, sablonHata = null, pgKapi = false, pullRed = false, openDetRed = false } = {}) {
+function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, muayene = null, bagHata = null, sablonId = null, sablonHata = null, pgKapi = false, pullRed = false, openDetRed = false, sablonYanit = null, ekleYanit = null, gercekPg = false } = {}) {
   const rec = { olay: [], rpc: [], toast: [], ht: [], takipHata: 0, retry: null };
   const document = makeDomStub();
   const input = (id, val) => { const el = makeElement('input'); el.value = val; document.__setEl(id, el); };
@@ -43,10 +43,14 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
         }
         if (ad === 'hayvan_takip_muayene_vaka' && bagHata) throw new Error(bagHata);
         if (ad === 'tedavi_sablon_uygula' && sablonHata) throw new Error(sablonHata);
+        if (ad === 'tedavi_sablon_uygula' && sablonYanit) return sablonYanit(p);
+        if (ad === 'tedavi_sablon_tohumlama_gorev_ekle' && ekleYanit) return ekleYanit(p);
         return { ok: true, case_id: caseId };
       },
-      pullTables: async () => { if (pullRed) { rec.olay.push('pull reddetti'); throw new Error('pull'); } return { ok: true, failed: [] }; },
-      history: { state: null, back() {} },
+      pullTables: async () => { rec.olay.push('pull'); if (pullRed) { rec.olay.push('pull reddetti'); throw new Error('pull'); } return { ok: true, failed: [] }; },
+      history: { state: null, back() {}, pushState() {} },
+      fmtTarih: x => String(x),
+      RPC_TABLES: { tedavi_sablon_uygula: ['cases', 'gorev_log'] },
       openDet: async () => { rec.olay.push('openDet'); if (openDetRed) throw new Error('kart'); },
       _pgKapiHata: pgKapi ? (e, cagri) => { rec.pgKapi = cagri; return /^PG_KAPI:/.test(e.message); } : undefined,
       openCaseDet: async id => {
@@ -84,6 +88,11 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
   sandbox._seciliSablonId = sablonId;
   vm.runInContext(extractFunctionSource('js/utils/modal.js', 'closeM'), sandbox);
   vm.runInContext(extractFunctionSource('js/hayvan-takip-pencere.js', 'htMuayeneVakaBagla'), sandbox);
+  // Gerçek PG kapısı: onay, vazgeç ve tekrar ui.js'in kendi akışından geçer.
+  if (gercekPg) {
+    for (const f of ['_pgKapiAc', '_pgKapiHata', '_pgKapiKapat', '_pgKapiOnayliTekrar']) vm.runInContext(extractFunctionSource('js/ui.js', f), sandbox);
+    input('pg-kapi-gerekce', 'gerekçe');
+  }
   return { sandbox, rec, formDoldur };
 }
 
@@ -430,3 +439,78 @@ test('HT-V-25: tazeleme reddi kızgınlık bağlantısını da kesmez', async ()
   assert.strictEqual(baglantilar(rec).length, 1);
   assert.deepStrictEqual(hataToastlari(rec), []);
 });
+
+// ── Madde 8: PG kapısı onayı ve vazgeçişi ────────────────────
+const PG_RED = 'PG_KAPI:REQUIRE_ACK_PENDING:{}';
+const UYGUN = { ok: true, gun_sayisi: 3, atlanan: ['x'] };
+const pgSablon = p => { if (!p.p_pg_onay) throw new Error(PG_RED); return UYGUN; };
+const EKLE = 'tedavi_sablon_tohumlama_gorev_ekle';
+const ekleler = rec => rec.rpc.filter(r => r.ad === EKLE).map(r => r.p);
+const PLAN_YOK = '⚠️ Vaka kayıtlı, tedavi planı uygulanmadı';
+const kapi = (o, takipAcik) => kos({ sablonId: 'S-1', gercekPg: true, ...o }, takipAcik);
+
+for (const [ad, takipAcik] of KOLLAR) {
+  test(`HT-V-26 (${ad}): PG onayı başarılıysa görev bir kez eklenir, uyarılar normal yoldaki gibi çıkar, tazelenir`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true, olustu: false, sebep: 'gebe' }) }, takipAcik);
+    assert.deepStrictEqual(ekleler(rec), [], 'onaydan önce görev yok');
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi'], 'bağ ve soru kapıyı beklemez');
+    rec.olay.length = 0;
+    rec.toast.length = 0;
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(ekleler(rec), [{ p_case_id: 'C-9', p_sablon_id: 'S-1' }]);
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)', 'ℹ️ Planlı tohumlama görevi açılmadı: gebe']);
+    assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün)'));
+    assert.ok(rec.olay.includes('pull'), 'plan ekrana gelir');
+    const once = rec.rpc.findIndex(r => r.ad === 'tedavi_sablon_uygula' && r.p.p_pg_onay);
+    assert.ok(once >= 0 && once < rec.rpc.findIndex(r => r.ad === EKLE), 'önce plan');
+  });
+
+  test(`HT-V-27 (${ad}): kapıdan vazgeçilirse görev eklenmez, plan uyarısı bir kez çıkar, bağ ve soru sürer`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon }, takipAcik);
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi']);
+    assert.deepStrictEqual(hataToastlari(rec), [], 'kapı açıkken karar verilmedi');
+    sandbox._pgKapiKapat();
+    sandbox._pgKapiKapat();
+    assert.deepStrictEqual(ekleler(rec), []);
+    assert.deepStrictEqual(hataToastlari(rec), [PLAN_YOK]);
+  });
+
+  test(`HT-V-28 (${ad}): onaylı tekrar ok:false dönerse görev eklenmez, plan uyarısı çıkar`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); return { ok: false, mesaj: 'olmadı' }; } }, takipAcik);
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(ekleler(rec), []);
+    assert.deepStrictEqual(hataToastlari(rec).sort(), [PLAN_YOK, '❌ olmadı'].sort());
+  });
+
+  test(`HT-V-29 (${ad}): onaylı tekrar hatası kapıyı açık bırakır; görev yok, vazgeçince plan uyarısı; ikinci onay başarılıysa uyarı yok`, async () => {
+    let n = 0;
+    const k = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); if (!n++) throw new Error('ag'); return UYGUN; } }, takipAcik);
+    await k.sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(ekleler(k.rec), []);
+    assert.ok(!hataToastlari(k.rec).includes(PLAN_YOK), 'karar verilmedi');
+    await k.sandbox._pgKapiOnayliTekrar();
+    assert.strictEqual(ekleler(k.rec).length, 1);
+    assert.ok(!hataToastlari(k.rec).includes(PLAN_YOK));
+    const v = await kapi({ sablonYanit: p => { if (!p.p_pg_onay) throw new Error(PG_RED); throw new Error('ag'); } }, takipAcik);
+    await v.sandbox._pgKapiOnayliTekrar();
+    v.sandbox._pgKapiKapat();
+    assert.ok(hataToastlari(v.rec).includes(PLAN_YOK));
+  });
+
+  test(`HT-V-30 (${ad}): onaydan sonra görev eklenemezse plan kalır: ayrı uyarı, tazeleme sürer, plan-yok uyarısı yok`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => { throw new Error('ag'); } }, takipAcik);
+    rec.olay.length = 0;
+    await assert.doesNotReject(sandbox._pgKapiOnayliTekrar());
+    assert.deepStrictEqual(hataToastlari(rec).filter(m => /tohumlama|tedavi planı/.test(m)), ['⚠️ Vaka kayıtlı, plan uygulandı ama planlı tohumlama görevi açılamadı: ag']);
+    assert.ok(rec.olay.includes('pull'));
+  });
+
+  test(`HT-V-31 (${ad}): normal yol değişmez: plan ve görev bir kez, kapı kancası bırakılmaz`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: () => UYGUN, ekleYanit: () => ({ ok: true, olustu: true }) }, takipAcik);
+    assert.deepStrictEqual(rec.rpc.filter(r => r.ad === 'tedavi_sablon_uygula').map(r => r.p.p_pg_onay), [false]);
+    assert.strictEqual(ekleler(rec).length, 1);
+    assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün) + tohumlama'));
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)']);
+    assert.ok(!sandbox.window.__pgKapiVazgec);
+  });
+}

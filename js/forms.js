@@ -786,7 +786,7 @@ async function _renderSablonSecim(diseaseId, containerId='d-sablon-list', prefix
  * kızgınlık tedavi bağlantısı kurar ve ilgili tabloları günceller.
  * @param {HTMLElement} btn Tıklanan buton (opsiyonel).
  * @returns {void} Fonksiyon herhangi bir değer döndürmez.
- * @rpc create_case, kizginlik_tedavi_baglanti_kur, tedavi_sablon_tohumlama_gorev_ekle, tedavi_sablon_uygula
+ * @rpc create_case, kizginlik_tedavi_baglanti_kur, tedavi_sablon_uygula
  * @tablo cases (tazeleme), diseases (tazeleme), drug_administrations (tazeleme), drugs (tazeleme), gorev_log (tazeleme), islem_log (tazeleme), kizginlik_log (tazeleme), stok_hareket (tazeleme), stok (tazeleme), treatment_day_uygulamalar (tazeleme), treatment_days (tazeleme)
  */
 async function submitCase(btn) {
@@ -823,18 +823,15 @@ async function submitCase(btn) {
     const sablonId = globalThis._seciliSablonId;
     if (sablonId && res?.case_id) {
       // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
-      const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+      let r = null;
+      const cagri = async (onay, gerekce) => (r = await rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null }));
       try {
-        const r = await cagri(false, null);
-        const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res.case_id, p_sablon_id: sablonId });
-        if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
-        // Şablonda tohumlama var ama hayvan uygun değilse (erkek/12 aydan küçük/gebe)
-        // görev sessizce atlanır — kullanıcı nedenini görsün.
-        if (planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
-        toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
+        await cagri(false, null);
+        await _vakaSablonSonu(res.case_id, sablonId, r);
       } catch(e) {
         // Madde 2: PG reddinde return YOK — kapı ekranı açıldıysa akış kapanışa düşer.
-        if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
+        if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e, cagri, () => _vakaSablonOnaySonu(res.case_id, sablonId, r))) toast('Vaka açıldı ama şablon uygulanamadı: '+e.message, true);
+        else window.__pgKapiVazgec = _vakaPlanUygulanmadi;
       }
     } else {
       toast('✅ Vaka açıldı');
@@ -881,16 +878,15 @@ async function submitCase(btn) {
       const sablonId2 = globalThis._seciliSablonId;
       if (sablonId2 && res2?.case_id) {
         // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
-        const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
+        let r2 = null;
+        const cagri = async (onay, gerekce) => (r2 = await rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null }));
         try {
-          const r2 = await cagri(false, null);
-          const planli2 = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res2.case_id, p_sablon_id: sablonId2 });
-          if (r2?.atlanan?.length) toast(`⚠️ ${r2.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
-          if (planli2?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli2.sebep}`, true);
-          toast(`✅ Vaka açıldı + şablon uygulandı (${r2?.gun_sayisi||0} gün)${planli2?.olustu?' + tohumlama':''}`);
+          await cagri(false, null);
+          await _vakaSablonSonu(res2.case_id, sablonId2, r2);
         } catch (e3) {
           // Madde 2: PG reddinde return YOK — akış kapanışa düşer.
-          if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri)) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
+          if (typeof _pgKapiHata !== 'function' || !_pgKapiHata(e3, cagri, () => _vakaSablonOnaySonu(res2.case_id, sablonId2, r2))) toast('Vaka açıldı ama şablon uygulanamadı: '+e3.message, true);
+          else window.__pgKapiVazgec = _vakaPlanUygulanmadi;
         }
         globalThis._seciliSablonId = null;
       } else {
@@ -910,6 +906,32 @@ async function submitCase(btn) {
   }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
 }
+
+/**
+ * Plan uygulandıktan sonra planlı tohumlama görevi ve uyarılar: normal yol ve PG onayı aynı adımdan geçer. Görev kaynak anahtarıyla tekildir.
+ * @rpc tedavi_sablon_tohumlama_gorev_ekle
+ */
+async function _vakaSablonSonu(caseId, sablonId, r) {
+  const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: caseId, p_sablon_id: sablonId });
+  if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
+  // Şablonda tohumlama var ama hayvan uygun değilse (erkek/12 aydan küçük/gebe)
+  // görev sessizce atlanır — kullanıcı nedenini görsün.
+  if (planli?.sebep) toast(`ℹ️ Planlı tohumlama görevi açılmadı: ${planli.sebep}`, true);
+  toast(`✅ Vaka açıldı + şablon uygulandı (${r?.gun_sayisi||0} gün)${planli?.olustu?' + tohumlama':''}`);
+}
+
+/** PG onaylı tekrar başarılı (_pgKapiOnayliTekrar sonra): plan yazıldı, görev hatası planı geri almaz; ekran tazelenir. */
+async function _vakaSablonOnaySonu(caseId, sablonId, r) {
+  try { await _vakaSablonSonu(caseId, sablonId, r); }
+  catch (e) { toast('⚠️ Vaka kayıtlı, plan uygulandı ama planlı tohumlama görevi açılamadı: ' + e.message, true); }
+  await _vakaTazele(async () => {
+    await pullTables(RPC_TABLES.tedavi_sablon_uygula);
+    if (typeof _curCase !== 'undefined' && _curCase?.id === caseId) await renderCaseTimeline(caseId);
+  });
+}
+
+/** PG kapısı onaysız kapandı (_pgKapiKapat): vaka durur, plan yazılmadı. */
+function _vakaPlanUygulanmadi() { toast('⚠️ Vaka kayıtlı, tedavi planı uygulanmadı', true); }
 
 /** Vaka kayıtlıdır: tazeleme ya da kart hatası bağı ve soruyu kesmez, dış catch'e düşüp "vaka açılamadı" gibi görünmez (§20.6). */
 async function _vakaTazele(adim) {

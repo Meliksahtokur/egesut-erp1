@@ -3001,6 +3001,9 @@ function _pgKapiKapat(){
   window.__pgKapiTekrar = null; window.__pgKapiToh = null; window.__pgKapiRpcAd = null;
   window.__pgKapiSonra = null;
   if (history.state?.pg_kapi) { globalThis._modalBackGuard = true; history.back(); }
+  // Çağıranın onaysız kapanış kancası (submitCase): onaylı başarı önce siler, tek sefer koşar.
+  const vazgec = window.__pgKapiVazgec; window.__pgKapiVazgec = null;
+  if (typeof vazgec === 'function') vazgec();
 }
 /**
  * PG kapısı genel onaylı-tekrar kapanışı (Faz 4, ROOT RULING 3, §18.8):
@@ -3026,6 +3029,7 @@ async function _pgKapiOnayliTekrar(){
       toast('❌ ' + (tekrarSonuc.mesaj || tekrarSonuc.error || tekrarSonuc.message || 'işlem uygulanamadı'), true);
       return;
     }
+    window.__pgKapiVazgec = null;
     _pgKapiKapat();
     toast('✅ Onaylandı, işlem uygulandı');
     // F2 KAPI-2 madde 2: çağıran kendi başarı kapanışını (sonra) geçirdiyse o
