@@ -124,7 +124,7 @@ checkpoint:
 - **pattern_exceptions:** `OFFLINE-SYNC-01` uygulanmaz: spec §1 ve §6 çevrimdışı kuyruğu kapsam dışı tutar, yeni RPC'ler online-only kalır.
 - **acceptance commands:**
   - Her migration: `scripts/db-validate.sh` (taslak ve final) `--priors tests/db-validation/hayvan_takip_priors.sql` + serinin önceki dosyaları; `PASS`, rapor `reports/db-validation-<sha8>.md`.
-  - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_test.sql` rc=0.
+  - `bash tests/sql/hayvan_takip_kos.sh` rc=0 (argümansız: seri migration'lar + `hayvan_takip_test.sql`).
   - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_karsi_test.sql` rc=0, `OZET: 11 PASS`; migration'sız (T1 Run) `KOS_MOD=topla` mutant `DUSEN` tam olarak `KR01-KR07`, `KR09`.
   - `node --test tests/unit/*.test.js` (`NODE_PATH` ana checkout): yalnız M0'da ölçülen taban kırmızıları (db46032: 1598/1592/5/1).
   - Değişen JS'te `node --check`; `git diff --check`.

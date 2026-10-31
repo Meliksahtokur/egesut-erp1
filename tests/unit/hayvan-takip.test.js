@@ -279,10 +279,9 @@ test('HT-S-10b: 200004 yalnız etiket fonksiyonunu değiştirir; 200002 etiketle
   const yeni = fs.readFileSync(path.join(REPO_ROOT, ETIKET_MIGRATION), 'utf8');
   const eski = fs.readFileSync(path.join(REPO_ROOT, RPC_MIGRATION), 'utf8');
   const kod = yeni.replace(/^\s*--.*$/gm, '');
-  assert.deepStrictEqual(
-    [...kod.matchAll(/\b(?:CREATE|ALTER|DROP)\s+(?:OR\s+REPLACE\s+)?\w+\s+(\S+?)\(/gi)].map(m => m[0].replace(/\s+/g, ' ')),
-    ['CREATE OR REPLACE FUNCTION public._hayvan_takip_sebep_etiket('],
-  );
+  const deyimler = kod.match(/\b(?:CREATE|ALTER|DROP)\b/gi) ?? [];
+  assert.strictEqual(deyimler.length, 1, `CREATE|ALTER|DROP deyimleri: ${deyimler}`);
+  assert.match(kod, /\bCREATE OR REPLACE FUNCTION public\._hayvan_takip_sebep_etiket\(/);
   const yeniSatirlar = sebepCaseSatirlari(ETIKET_MIGRATION).map(m => [m[1], m[2]]);
   for (const [, k, e] of sebepCaseSatirlari(RPC_MIGRATION)) {
     assert.deepStrictEqual(yeniSatirlar.find(s => s[0] === k), [k, e], `${k} değişmemeli`);
