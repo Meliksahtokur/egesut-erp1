@@ -14,7 +14,7 @@ const DIZI = ['openCaseDet başladı', 'openCaseDet bitti', 'htVakaSonrasi'];
 const TAKIP_HATA = 'TAKIP_ACIK:{"muayene_tarihi":"2026-10-20"}';
 
 // openCaseDet modalı await'lerden sonra açar (js/ui.js); sahte de gecikmeli çözülür.
-function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, muayene = null, bagHata = null, sablonId = null, sablonHata = null, pgKapi = false, pullRed = false, openDetRed = false, sablonYanit = null, ekleYanit = null, gercekPg = false } = {}) {
+function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, muayene = null, bagHata = null, sablonId = null, sablonHata = null, pgKapi = false, pullRed = false, openDetRed = false, sablonYanit = null, ekleYanit = null, gercekPg = false, kapatRed = false, drugsRed = false, renderRed = false } = {}) {
   const rec = { olay: [], rpc: [], toast: [], ht: [], takipHata: 0, retry: null };
   const document = makeDomStub();
   const input = (id, val) => { const el = makeElement('input'); el.value = val; document.__setEl(id, el); };
@@ -75,7 +75,9 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
       },
       _detAcik: () => false,
       hayvanByKupeRef: hid => (hid === '12345' ? { id: 'H-1', kupe_no: '12345' } : null),
-      loadDrugsCache: async () => {},
+      loadDrugsCache: async () => { rec.olay.push(sandbox._drugsCache.length ? 'drugs bayat' : 'drugs'); if (drugsRed) throw new Error('ilac'); },
+      renderCaseTimeline: async id => { rec.olay.push('render:' + id); if (renderRed) throw new Error('cizim'); },
+      _updateKapatBtn: async id => { rec.olay.push('kapat:' + id); if (kapatRed) throw new Error('idb'); },
       getDisplayKupe,
       bugun,
       idbGetAll: async () => [],
@@ -83,6 +85,7 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
     },
   });
   sandbox.navigator.onLine = true;
+  sandbox._drugsCache = [];
   sandbox._kizginlikTedaviId = kizginlikId;
   sandbox._htMuayeneVaka = muayene;
   sandbox._seciliSablonId = sablonId;
@@ -448,6 +451,7 @@ const EKLE = 'tedavi_sablon_tohumlama_gorev_ekle';
 const ekleler = rec => rec.rpc.filter(r => r.ad === EKLE).map(r => r.p);
 const PLAN_YOK = '⚠️ Vaka kayıtlı, tedavi planı uygulanmadı';
 const kapi = (o, takipAcik) => kos({ sablonId: 'S-1', gercekPg: true, ...o }, takipAcik);
+const TAZELE = ['pull', 'drugs', 'drugs bayat', 'render:C-9', 'kapat:C-9', 'render:C-X', 'kapat:C-X'];
 
 for (const [ad, takipAcik] of KOLLAR) {
   test(`HT-V-26 (${ad}): PG onayı başarılıysa görev bir kez eklenir, uyarılar normal yoldaki gibi çıkar, tazelenir`, async () => {
@@ -512,5 +516,40 @@ for (const [ad, takipAcik] of KOLLAR) {
     assert.ok(rec.toast.some(([m]) => m === '✅ Vaka açıldı + şablon uygulandı (3 gün) + tohumlama'));
     assert.deepStrictEqual(hataToastlari(rec), ['⚠️ 1 kalem atlandı (silinmiş ilaç)']);
     assert.ok(!sandbox.window.__pgKapiVazgec);
+  });
+
+  test(`HT-V-33 (${ad}): PG onayından sonra açık vakanın planı, Kapat düğmesi ve ilaç önbelleği tazelenir, emsal sırayla`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    sandbox._curCase = { id: 'C-9' };
+    sandbox._drugsCache = ['eski'];
+    rec.olay.length = 0;
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(sonuc(rec, ...TAZELE), ['pull', 'drugs', 'render:C-9', 'kapat:C-9']);
+  });
+
+  test(`HT-V-34 (${ad}): başka vaka açıksa onun planına ve düğmesine dokunulmaz; önbellek yine tazelenir`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }) }, takipAcik);
+    sandbox._curCase = { id: 'C-X' };
+    rec.olay.length = 0;
+    await sandbox._pgKapiOnayliTekrar();
+    assert.deepStrictEqual(sonuc(rec, ...TAZELE), ['pull', 'drugs']);
+  });
+
+  test(`HT-V-35 (${ad}): Kapat düğmesi tazelenemezse hata yutulur, onay akışı düşmez`, async () => {
+    const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }), kapatRed: true }, takipAcik);
+    sandbox._curCase = { id: 'C-9' };
+    await assert.doesNotReject(sandbox._pgKapiOnayliTekrar());
+    assert.ok(rec.olay.includes('kapat:C-9'));
+    assert.deepStrictEqual(hataToastlari(rec).filter(m => /^❌/.test(m)), []);
+  });
+
+  test(`HT-V-38 (${ad}): pull, ilaç ya da plan çizimi düşse de Kapat düğmesi tazelenir: açık günlü vaka kapatılamasın`, async () => {
+    for (const o of [{ pullRed: true }, { drugsRed: true }, { renderRed: true }]) {
+      const { sandbox, rec } = await kapi({ sablonYanit: pgSablon, ekleYanit: () => ({ ok: true }), ...o }, takipAcik);
+      sandbox._curCase = { id: 'C-9' };
+      rec.olay.length = 0;
+      await assert.doesNotReject(sandbox._pgKapiOnayliTekrar(), JSON.stringify(o));
+      assert.ok(rec.olay.includes('kapat:C-9'), JSON.stringify(o));
+    }
   });
 }

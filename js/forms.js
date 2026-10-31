@@ -926,8 +926,13 @@ async function _vakaSablonOnaySonu(caseId, sablonId, r) {
   catch (e) { toast('⚠️ Vaka kayıtlı, plan uygulandı ama planlı tohumlama görevi açılamadı: ' + e.message, true); }
   await _vakaTazele(async () => {
     await pullTables(RPC_TABLES.tedavi_sablon_uygula);
-    if (typeof _curCase !== 'undefined' && _curCase?.id === caseId) await renderCaseTimeline(caseId);
+    _drugsCache = [];
+    await loadDrugsCache();
   });
+  if (typeof _curCase === 'undefined' || _curCase?.id !== caseId) return;
+  await _vakaTazele(() => renderCaseTimeline(caseId));
+  // Ayrı adım: close_case gün denetlemez, bayat düğme açık günlü vakayı kapattırır (emsal caseSablonUygula).
+  await _vakaTazele(() => _updateKapatBtn(caseId));
 }
 
 /** PG kapısı onaysız kapandı (_pgKapiKapat): vaka durur, plan yazılmadı. */
