@@ -860,7 +860,7 @@ async function submitCase(btn) {
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
       await openDet(hayvan.id, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
-      openCaseDet(res.case_id);
+      await _vakaSonrasiAkis(hayvan.id, res.case_id, () => openCaseDet(res.case_id));
     }
   } catch (e) {
     // P10: elle vaka aç yolu (create_case) TAKIP_ACIK kapısından geçer (P3b) —
@@ -896,7 +896,7 @@ async function submitCase(btn) {
       await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(() => {});
       if (res2?.case_id) {
         await openDet(hayvan.id);
-        openCaseDet(res2.case_id);
+        await _vakaSonrasiAkis(hayvan.id, res2.case_id, () => openCaseDet(res2.case_id));
       }
       return res2;
     };
@@ -904,6 +904,18 @@ async function submitCase(btn) {
     toast(getUserMessage(e), true);
   }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
+}
+
+/** Takip sorusunu vakayı etkilemeden açar (§20.5, spec §6); hata yalnız uyarıdır. */
+async function _htVakaSonrasiGuvenli(hayvanId, caseId) {
+  try { await htVakaSonrasi(hayvanId, caseId); }
+  catch (e) { console.warn('⚠️ Vaka sonrası takip penceresi:', e); toast('⚠️ Vaka kayıtlı, takip penceresi açılamadı', true); }
+}
+
+/** Vaka detayı bitince takibi sorar: pencere üstte kalır; detay hatası kayıtlı vakaya hata göstermez. */
+async function _vakaSonrasiAkis(hayvanId, caseId, detayAc) {
+  try { await detayAc(); } catch (e) { console.warn('⚠️ Vaka detayı açılamadı:', e); }
+  await _htVakaSonrasiGuvenli(hayvanId, caseId);
 }
 
 // ── TOPLU VAKA (m-bulk-case) — G-20260906-TOPLU-VAKA ──
