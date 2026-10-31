@@ -239,11 +239,17 @@ Hayvan kaydında yaş zorunlu değil; biliniyorsa aşağıdaki kurallar uygulan�
 | Buzağı | Buzağı İshali, Buzağı Göbek İltihabı, Neonatal Zayıflık |
 | Diğer | (serbest) |
 Canlı `diseases` Üreme'de 12 kayıt var (2026-10-13 MEASURED); Ovsync alt vakası hastalığı canlı `İnaktif Ovaryum` kaydıdır, Anoestrus DEĞİL (karar 7). `js/config.js` listesi bu işle DEĞİŞMEZ (alt vaka hastalık id'sini canlı kayıttan alır).
+Canlı `diseases` toplam **52 satır / 9 kategori** ("Aşı ile Önlenebilir" 16 dahil; MEASURED prod 2026-10-17,
+`runs/2026-10-05-istatistik-modulu/f3-yeniden/spec-v2-report.md`); tablo yalnız form listesidir, tam liste DEĞİL —
+istatistik hastalık listesini DB'den okur (§19.6). (sahip 2026-10-17, spec v2)
 
 ### Vaka Kuralları
 
 - Bir hayvanın aynı anda birden fazla aktif vakası olabilir
 - Vaka `status`: `active` veya `closed`
+- **İstatistikte üreme protokolü vakaları tedavi sayılmaz (sahip 2026-10-06):** `protocol_family` dolu ya da
+  Ovsync hastalıklı vakalar tedavi/ilaç sonuç istatistiğine (`v_stat_vaka`) girmez; protokoller tohumlama gibi
+  "gebelikle bitme olasılığı"na göre ayrı ölçümle değerlendirilir (spec `docs/2026-10-05-istatistik-modulu-spec.md` §5.3).
 - Lokasyon seçenekleri Meme/Ayak/**Göz** kategorilerinde sunulur (config.js `LOKASYON_KAT`); ancak
   **zorunluluk yaptırımı yok** — form boş geçilebilir, backend'de RAISE yok. Lokasyon istenen-bilgi
   düzeyindedir,sert kural değildir.
@@ -500,3 +506,33 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     ekranından (genel "ertele" butonu bu tiplerde yok); saat atanabilir, varsayılan SAATSİZ. Dashboard 40 g listesi
     satırı açık görev varsa bu ekranı açar, yoksa hayvan detayı; takip ekranında görevsiz "muayene vakti" satırı → hayvan detayı.
 18. **Hastalık = Ovsync içinde gün (karar 10, sahip 2026-10-13; karar 4/6'nın "alt vaka" kısmı GEÇERSİZ):** inaktif/kist için ayrı vaka AÇILMAZ — `cases.kaynak_vaka_id`, `inaktif_alt_vaka_ac/kapat`, alt-vaka trigger'ı, "dön" akışı YOKTUR. Hastalık günü = `treatment_days` satırı (`disease_id IS NOT NULL`); tekillik DB kısmi unique'idir (`treatment_days_hastalik_gun_uniq`: vaka+hastalık+tarih) — ikinci çağrı mevcut günü döner, ilaç tekrar yazılmaz, ertele tekrarlanmaz. İlaçlar o günün altına `add_drug_administration` ile (PG sarmalı dahil); açık TAI iptal edilmez, `tohumlama_gorev_ertele` ile sorulan gün kadar (varsayılan 7) ötelenir; 5. gün PG opsiyonel ve elle, otomatik PG görevi yok (karar 5 aynen); hastalık İnaktif Ovaryum, kist için Kistik Over — tek RPC `ovsync_hastalik_gunu_ekle` (karar 6-7); ön-öneri inaktifte CAROFERTIN-E 20 ml, kistte boş, +İlaç ile eklenebilir (karar 7); pencere TAI gününde biter. Kartta girintili alt-satır, ayrı vaka satırı yok. S4 kartındaki devam rozeti "🦠 Ovsync içinde hastalık günü" der, ebeveyn vaka detayına çıkar (gün id'sine değil); tek günde hastalık adı rozette görünür. Kısır hayvana hastalık günü açılmaz (`KISIR_HAYVANA_HASTALIK_GUNU_YOK`); kısır hard-block (§18.5) aynen.
+
+---
+
+## 19. İstatistik Modülü — Hesap Kapsamı (2026-10-06, sahip kararları)
+
+Kaynak: spec `docs/2026-10-05-istatistik-modulu-spec.md` §2 (K16, K17); plan `docs/plans/egesut-istatistik-f2-plan-2026-10-06.md`.
+
+1. **Ölen/kesilen hayvanın verisi uzun dönem hesaplarında kalır (sahip 2026-10-06):** "ölenler takibi kesildi
+   sayılsın ama sağlıklı süreçteki datalarını kullanalım yani yaşarkenki dataları uzun dönem hesaplarında."
+   Sağkalım (Kaplan-Meier) ve benzeri uzun dönem modellerde ölüm/kesim (ve nüks) olay gününde **sansür**
+   sayılır. Hayvan dışlanmaz; o güne kadarki verisi hesaba girer.
+2. **Aktif dönem hesapları yalnız aktif hayvanlar üzerinden (sahip 2026-10-06):** "aktif dönem hesaplamaları
+   sadece aktif hayvanlar üzerinden yapılmalı zaten örn: mevcut dönemdeki hayvan başı süt ortalaması ve
+   maliyetleri etc". Mevcut döneme ait **hayvan başı / sürü kesiti** ölçümlerinin paydası yalnız aktif
+   (çıkışı olmayan) hayvanlardır: süt ortalaması, maliyet vb. (F3/F4). Vaka sonucu ölçümleri (tedavi
+   `stat_tedavi_*`) bu kesit değildir. Çıkışlı hayvanın vakası K7 gereği `oldu_kesildi` olarak sayılır,
+   kural 1 gereği dışlanmaz. (Yorum: mimar 2026-10-06; sahip teyidi F2 SORULAR F2-S6.)
+
+Kaynak (3-6): sahip 2026-10-17, spec v2 (`docs/2026-10-17-istatistik-atolyesi-spec.md` §2, §11 SK-1..SK-9 ★ kabul).
+
+3. **Olgunlaşmamış vaka (SK-8, M2):** kapanıştan bu yana 30 gün dolmamış ve olay (ölüm/kesim/nüks/tedavi değişti) görülmemiş vaka
+   başarı paydasına girmez; kapanma hızı hesabına girer.
+4. **"İlaç x" = x'i içeren tüm vakalar (V2, M4):** tam ilaç kümesiyle gruplanmaz; bir vaka birden çok ilaç satırında
+   sayılabilir. Hız (kapanma günü) ve başarı ayrı ölçüdür, birleştirilmez (V3).
+5. **"Protokol" kelimesi ilaç kombinasyonu için kullanılmaz (V9):** istatistikte yalnız üreme protokolü (Ovsync) anlamındadır.
+6. **Hastalık listesi DB'den (V8):** istatistik seçicileri canlı `diseases`'ten gelir; statik `HASTALIK_KAT` kullanılmaz.
+7. **Tedavi değişti (S1, sahip 2026-10-31):** kapanan vakadan sonra 24 saat içinde aynı hayvan + hastalık için yeni vaka açılırsa
+   eski vaka nüks değil `basarisiz_tedavi_degisti` sayılır: başarı paydasında başarısız, nüks sayacında yok, kapanma hızında yok, dipnotta ayrı.
+   Yeni vaka eski vakadan sonra kaydedilmiş olmalı (`n.created_at > k.created_at`); eski vaka kapanmadan önce aynı gün açılmış yeni vaka da bu sonucu alır (root ruling, Kapı F3).
+   24 saatten sonra ve 30 gün içindeki yeni vaka nüks kalır; ölüm/kesim önceliği değişmez.

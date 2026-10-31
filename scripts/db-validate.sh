@@ -159,15 +159,23 @@ apply_priors() { # $1 = izole DB url, $2 = faz etiketi (C1|C2)
 # FAZ A — Statik risk (sqlfluff + squawk)
 # ══════════════════════════════════════════════════════════════════════
 FAZA_OUT="$WORK/sqlfluff.out"
-log_cmd "sqlfluff lint --dialect postgres '$SQL_ABS'"
+# [F2 P1] sqlfluff varsayılanı 20000 bayt üstü dosyayı WARNING ile ATLAR (rc=0) →
+# parse denetimi sessiz PASS oluyordu [MEASURED: 21019 baytlık bozuk dosya PASS].
+# Boyut sınırı geçici config ile kapatılır (0 = sınırsız).
+FAZA_CFG="$WORK/sqlfluff.cfg"
+printf '[sqlfluff]\nlarge_file_skip_byte_limit = 0\n' > "$FAZA_CFG"
+log_cmd "sqlfluff lint --dialect postgres --config '$FAZA_CFG' '$SQL_ABS'"
 # sqlfluff exit 1 = kural ihlali, 2+ = hata. PRS kodu = parse hatası → FAIL;
 # diğer ihlaller stil düzeyi → uyarı (SPEC: yalnız parse hatası FAIL).
 SQLFLUFF_RC=0
-sqlfluff lint --dialect postgres "$SQL_ABS" > "$FAZA_OUT" 2>&1 || SQLFLUFF_RC=$?
+sqlfluff lint --dialect postgres --config "$FAZA_CFG" "$SQL_ABS" > "$FAZA_OUT" 2>&1 || SQLFLUFF_RC=$?
 PARSE_ERRS=$(grep -cE '\bPRS[0-9]*\b' "$FAZA_OUT" || true)
 STYLE_ERRS=$(( $(grep -cE '^\s*L['"'"']?[0-9]+' "$FAZA_OUT" || true) - PARSE_ERRS ))
 [[ $STYLE_ERRS -lt 0 ]] && STYLE_ERRS=0
-if [[ $SQLFLUFF_RC -ge 2 && $PARSE_ERRS -eq 0 ]]; then
+if grep -qiE 'skipp(ed|ing)|large[ _]file' "$FAZA_OUT"; then
+  # Config yine de atlatırsa (sürüm farkı vb.) dosya parse EDİLMEDİ → sessiz PASS yok.
+  log_result "A.sqlfluff-parse" "FAIL" "dosya atlandı (sqlfluff skip/large file) — parse denetlenmedi"
+elif [[ $SQLFLUFF_RC -ge 2 && $PARSE_ERRS -eq 0 ]]; then
   log_result "A.sqlfluff-parse" "FAIL" "sqlfluff arızası (rc=$SQLFLUFF_RC), PRS dışı"
 elif [[ $PARSE_ERRS -gt 0 ]]; then
   log_result "A.sqlfluff-parse" "FAIL" "$PARSE_ERRS parse hatası (PRS)"
@@ -500,7 +508,11 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
         echo "$t: baseline'da yok (migration yaratıyor) — tohumlama atlandı, apply sırasında sınanır" >> "$SEED_LOG"
         continue
       fi
-      COLS_SQL="SELECT string_agg(format('%I', column_name), ', ') FROM information_schema.columns WHERE table_schema='public' AND table_name='$t' AND is_nullable='NO' AND column_default IS NULL"
+      # [FIX 2026-10-05 T5a] identity/generated kolonların column_default'u NULL görünür
+      #   ama DEFAULT'tan dolar (GENERATED ALWAYS'a değer yazılamaz) → seçim dışı.
+      #   COLS ve VALS aynı süzgeç + ORDER BY ordinal_position ile hizalı kalır.
+      SEED_WHERE="table_schema='public' AND table_name='$t' AND is_nullable='NO' AND column_default IS NULL AND is_identity='NO' AND is_generated='NEVER'"
+      COLS_SQL="SELECT string_agg(format('%I', column_name), ', ' ORDER BY ordinal_position) FROM information_schema.columns WHERE $SEED_WHERE"
       COLS=$(psql "$C2_URL" -qAt -c "$COLS_SQL" 2>/dev/null || true)
       [[ -z "$COLS" ]] && { echo "$t: zorunlu-default'suz kolon yok" >> "$SEED_LOG"; continue; }
       # Değer ifadeleri: tip bazlı; kolon adları ŞEMADAN geldi (uydurma yok).
@@ -517,8 +529,16 @@ elif [[ $DATA_NEEDED -eq 1 ]]; then
           WHEN data_type='uuid' THEN 'gen_random_uuid()'
           WHEN data_type LIKE 'time%' THEN '''00:00'''
           WHEN data_type='jsonb' OR data_type='json' THEN '''{}'''
+          -- [FIX 2026-10-05 T5a] CHECK'li text kolon: kolona conkey/attnum ile bağlı
+          --   CHECK tanımındaki ilk tırnaklı literal (ör. tip IN ('sql','motor') → 'sql').
+          WHEN data_type IN ('text','character varying','character') AND chk.lit IS NOT NULL THEN quote_literal(chk.lit)
           ELSE format('''dbval_%s''', column_name)
-        END, ', ') FROM information_schema.columns WHERE table_schema='public' AND table_name='$t' AND is_nullable='NO' AND column_default IS NULL"
+        END, ', ' ORDER BY ordinal_position) FROM information_schema.columns
+        LEFT JOIN LATERAL (SELECT replace((regexp_match(pg_get_constraintdef(c.oid), '''((?:[^'']|'''')*)'''))[1], '''''', '''') AS lit
+          FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+          WHERE c.contype = 'c' AND c.conrelid = format('public.%I', table_name)::regclass AND a.attname = column_name
+            AND pg_get_constraintdef(c.oid) ~ '''' ORDER BY c.conname LIMIT 1) chk ON true
+        WHERE $SEED_WHERE"
       VALS_ERR="$WORK/vals.err"; : > "$VALS_ERR"
       VALS=$(psql "$C2_URL" -qAt -c "$VALS_SQL" 2>"$VALS_ERR" || true)
       if [[ -z "$VALS" ]]; then

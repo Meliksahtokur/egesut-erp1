@@ -973,6 +973,7 @@ async function syncNow() {
     }
     const remaining = await getQueue();
     if (remaining.length) updateSyncBar(); else hideSyncBar();
+    if (q.length) _statInvalidate(); // F1 borcu: senkron veriyi değiştirdi → istatistik önbelleği bayat
   } finally {
     _syncing = false;
   }
@@ -1264,6 +1265,101 @@ async function ovsyncTakipGetir(p_padok = null) {
     const c = window.__ovsyncTakip;
     return { bayat: true, veri: c ? c.veri : null, zaman: c ? c.zaman : null };
   }
+}
+
+// ── İstatistik Atölyesi (AP1) RPC sarmalayıcıları — spec §4.6/§4.7 ──
+// Hata sözleşmesi: rpc() throw eder; burada YAKALANMAZ, bayat veri dönmez (hata şeridi
+// reject'e dayanır; ayrıştırma statHataKodu). Yalnız başarılı sonuç önbelleğe yazılır.
+// Önbellek nesnesi await'ten ÖNCE alınır: uçuştayken _statInvalidate olursa sonuç
+// atılmış nesneye yazılır, yeni önbelleğe bayat veri girmez.
+const _STAT_LISTE_TTL = 5 * 60 * 1000;
+
+/** Önbellekleri (ölçüm listesi + seri sonuçları + seçenekler) boşaltır. */
+function _statInvalidate() {
+  window.__statOlcumler = null;
+  window.__statCache = {};
+  window.__statSecenekCache = {};
+}
+
+/** stat_olcum_listele() — 5 dk önbellekli ölçüm kataloğu. */
+async function statOlcumListele() {
+  const c = window.__statOlcumler;
+  if (c && Date.now() - c.zaman < _STAT_LISTE_TTL) return c.veri;
+  const veri = await rpc('stat_olcum_listele', {});
+  window.__statOlcumler = { veri, zaman: Date.now() };
+  return veri;
+}
+
+/** stat_atolye_secenekler(p_cumle) — süresiz önbellek (anahtar = cümle), _statInvalidate boşaltır. */
+async function statAtolyeSecenekler(cumle) {
+  const anahtar = JSON.stringify(cumle);
+  const cache = window.__statSecenekCache || (window.__statSecenekCache = {});
+  if (Object.prototype.hasOwnProperty.call(cache, anahtar)) return cache[anahtar];
+  const veri = await rpc('stat_atolye_secenekler', { p_cumle: cumle });
+  cache[anahtar] = veri;
+  return veri;
+}
+
+/**
+ * stat_atolye_seri(p_cumle, p_gecici) → {zarflar, kombinasyon, fiyat_eksik}.
+ * Geçici fiyat yalnız RPC parametresi ve önbellek anahtarında yaşar (Review Focus 3).
+ * {yenile:true} önbelleği atlar, başarıda üzerine yazar.
+ */
+async function statAtolyeSeri(cumle, gecici = {}, { yenile = false } = {}) {
+  const anahtar = JSON.stringify([cumle, gecici]);
+  const cache = window.__statCache || (window.__statCache = {});
+  if (!yenile && Object.prototype.hasOwnProperty.call(cache, anahtar)) return cache[anahtar];
+  const veri = await rpc('stat_atolye_seri', { p_cumle: cumle, p_gecici: gecici });
+  cache[anahtar] = veri;
+  return veri;
+}
+
+/** stat_atolye_vakalar(p_cumle, p_grup) — önbelleksiz. */
+async function statAtolyeVakalar(cumle, grup) {
+  return rpc('stat_atolye_vakalar', { p_cumle: cumle, p_grup: grup });
+}
+
+// Kayıtlı grafik RPC'leri önbelleksiz; yazanlar _statInvalidate ÇAĞIRMAZ (hesap verisi değişmedi).
+/** stat_grafik_listele() → [{id, baslik, cumle, cumle_surum, sira, guncelleme_at}] */
+async function statGrafikListele() {
+  return rpc('stat_grafik_listele', {});
+}
+
+/** stat_grafik_kaydet(p_id, p_baslik, p_cumle) → uuid; id null = yeni kayıt. */
+async function statGrafikKaydet(id, baslik, cumle) {
+  return rpc('stat_grafik_kaydet', { p_id: id, p_baslik: baslik, p_cumle: cumle });
+}
+
+/** stat_grafik_sil(p_id) */
+async function statGrafikSil(id) {
+  return rpc('stat_grafik_sil', { p_id: id });
+}
+
+/** stat_grafik_sirala(p_idler) — çiftliğin tüm kayıt id'leri, yeni sırayla. */
+async function statGrafikSirala(idler) {
+  return rpc('stat_grafik_sirala', { p_idler: idler });
+}
+
+/**
+ * Hata ayrıştırıcı (P13); throw yutmaz, yalnız sınıflar.
+ * 'STAT_CUMLE:<yol>:<neden>' → cumle · 'STAT_GRAFIK:<neden>' → grafik ·
+ * navigator.onLine===false ya da rpc()'nin iletim hatası metinleri ('İnternet bağlantısı
+ * gerekli' · _trErr 'Sunucuya ulaşılamıyor' · rpc'nin _ERR_MAP eşlemediği Safari iletim
+ * mesajı 'TypeError: Load failed') → cevrimdisi · diğer → genel. rpc dışı
+ * TypeError programlama hatasıdır, genel sayılır (B23). Sunucu öneki önce bakılır.
+ * @returns {{tip:'cumle'|'grafik'|'cevrimdisi'|'genel', yol?:string, neden?:string}}
+ */
+function statHataKodu(err) {
+  const m = String((err && err.message) || err || '');
+  let r = m.match(/STAT_CUMLE:(\S+):(\w+)/);
+  if (r) return { tip: 'cumle', yol: r[1], neden: r[2] };
+  r = m.match(/STAT_GRAFIK:(\w+)/);
+  if (r) return { tip: 'grafik', neden: r[1] };
+  if ((typeof navigator !== 'undefined' && navigator.onLine === false) ||
+      /İnternet bağlantısı gerekli|Sunucuya ulaşılamıyor|load failed/i.test(m)) {
+    return { tip: 'cevrimdisi' };
+  }
+  return { tip: 'genel' };
 }
 
 /**
