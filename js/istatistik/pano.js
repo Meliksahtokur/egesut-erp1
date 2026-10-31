@@ -35,22 +35,22 @@ function _panoDurumKutu(metin) { return `<div class="atolye-durum">${esc(metin)}
 // Fiyat panoda girilmez: kartın cümlesiyle kurucuya götürür (Kurucuda aç yolu).
 function _panoFiyatEylem(sinif) { return `<button class="${sinif}" onclick="_panoKurucudaAc(this)">Kurucuda fiyat gir</button>`; }
 
-function _panoIcerikHtml(d, ilk, cumle) {
+function _panoIcerikHtml(d, ilk, cumle, uyariMetni) {
   if (d === 'eski') return _panoDurumKutu('Bu grafik eski sürümle kaydedildi, yeniden kur.');
   if (d === 'yukleniyor') return _PANO_YUKLENIYOR;
   if (d === 'hata') return _panoDurumKutu('Bu grafik hesaplanamadı.');
   if (d === 'fiyat_yok') return `<div class="atolye-durum"><div>${esc(_PANO_FIYATSIZ)}</div><div>${_panoFiyatEylem('atolye-eylem')}</div></div>`;
   if (d === 'zaman_seyrek') return _panoDurumKutu(durumMetni(d, ilk, cumle).metin) + _kurucuYetersizSatir(ilk);   // eylem: "Kurucuda aç"
-  if (d !== 'tamam' && d !== 'kontrast_yok') return _panoDurumKutu(durumMetni(d, ilk, cumle).metin);
+  if (!grafikCizilir(d)) return _panoDurumKutu(durumMetni(d, ilk, cumle).metin);
   const uyari = d === 'kontrast_yok' ? `<div class="atolye-sayac">${esc(durumMetni(d, ilk, cumle).metin)}</div>` : '';
-  return `<div class="atolye-grafik"><canvas></canvas></div><p class="atolye-ozet">${esc(zarfOzetCumle(ilk))}</p>${_kurucuUyariSatir(ilk, d)}${_kurucuYetersizSatir(ilk)}${uyari}`;
+  return `<div class="atolye-grafik"><canvas></canvas></div><p class="atolye-ozet">${esc(zarfOzetCumle(ilk))}</p>${_kurucuUyariSatir(uyariMetni)}${_kurucuYetersizSatir(ilk)}${uyari}`;
 }
 
 // Diğer ölçülerin tek satırı (P10): çizilebilir ölçüde özet cümlesi, aksi ölçü adı + durum metni.
 function _panoDigerOzetHtml(z, cumle) {
   const d = zarfDurum(z, cumle);
   let metin;
-  if (d === 'tamam' || d === 'kontrast_yok') metin = zarfOzetCumle(z);
+  if (grafikCizilir(d)) metin = zarfOzetCumle(z);
   else if (d === 'zaman_seyrek' && _grafikDoluNokta(z)) metin = durumMetni(d, z, cumle).metin;   // ölçü adı cümlede var
   else {
     const o = ATOLYE_OLCULER.find(x => x.ad === z.olcum);
@@ -112,14 +112,14 @@ function panoKartHtml(kayit, zarflar, durum) {
   const hesap = eski || d === 'yukleniyor' ? '' : `<div class="atolye-hesap">${esc(atolyeHesapTarihi(ilk && ilk.hesap_at))} · `
     + '<button class="atolye-baglanti" onclick="_panoYenidenHesapla(this)">Yeniden hesapla</button></div>';
   const diger = eski ? '' : (zarflar || []).filter(z => z && z !== ilk).map(z => _panoDigerOzetHtml(z, cumle)).join('');
-  const { kalan } = grafikDipnotAyir(ilk, d);
+  const { uyari, kalan } = grafikDipnotAyir(ilk, d);
   const dipnot = kalan.length ? `<ul class="atolye-dipnot">${kalan.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
   // Hesap hatasında "Yeniden hesapla" kapalı alanda saklanmaz.
   const hesapDisarda = d === 'hata' || d === 'cevrimdisi';
   const ayrinti = cumleSatir + (hesapDisarda ? '' : hesap) + dipnot;
   return `<div class="atolye-kart" data-grafik-id="${escAttr(kayit.id)}">`
     + `<div class="atolye-kart-bas"><div>${_panoSiraHtml()}<div class="atolye-kart-baslik">${esc(kayit.baslik)}</div></div>${rozet}</div>`
-    + (hesapDisarda ? hesap : '') + _panoIcerikHtml(d, ilk, cumle) + diger
+    + (hesapDisarda ? hesap : '') + _panoIcerikHtml(d, ilk, cumle, uyari) + diger
     + (ayrinti ? `<details class="atolye-ayrinti"><summary>Ayrıntı</summary>${ayrinti}</details>` : '')
     + `<div class="atolye-panel-alt" data-pano-eylem>${_panoEylemHtml(kart.silOnay)}</div></div>`;
 }
@@ -182,8 +182,8 @@ function _panoIzgaraYaz() {
     return;
   }
   const sirala = s.kayitlar.length < 2 ? '' : (s.sirala
-    ? '<button class="atolye-eylem" onclick="panoSiralaModu(false)">Sıralamayı bitir</button>'
-    : '<button class="atolye-eylem" onclick="panoSiralaModu(true)">Sırala</button>');
+    ? '<button class="atolye-eylem" data-pano-sirala onclick="panoSiralaModu(false)">Sıralamayı bitir</button>'
+    : '<button class="atolye-eylem" data-pano-sirala onclick="panoSiralaModu(true)">Sırala</button>');
   _panoYaz(kok, '<div class="atolye-kart-bas"><div class="atolye-kart-baslik">Kaydettiğim grafikler</div>'
     + `<div class="atolye-cipler">${sirala}<button class="atolye-btn-ana" onclick="atolyeSekme('kurucu')">+ Yeni grafik kur</button></div></div>`
     + `<div class="atolye-pano">${s.kayitlar.map(k => panoKartHtml(k, s.kartlar[k.id].zarflar, s.kartlar[k.id].durum)).join('')}</div>`);
@@ -254,6 +254,9 @@ function panoSiralaModu(acik) {
   if (!_pano || !_pano.kayitlar.length) return;
   _pano.sirala = !!acik;
   _panoIzgaraYaz();
+  const kok = _panoKok();
+  const d = kok && kok.querySelector('[data-pano-sirala]');   // ızgara yazımı basılan düğmeyi siler, odak body'ye düşerdi
+  if (d) d.focus();
 }
 
 /** Saf: id'yi yon (-1 yukarı / +1 aşağı) yönünde bir adım taşır; taşınamıyorsa aynı diziyi döner. */

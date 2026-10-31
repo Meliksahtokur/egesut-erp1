@@ -776,3 +776,43 @@ test('y_ekseni_sag_dolgudan_kisilmaz', () => {
   assert.strictEqual(olc(116, 300), 174, 'tuvalin yarısını aşmaz');
 });
 
+// ── BORC-UI ──
+test('borc_u2_cizilir_tek_tanim', () => {
+  for (const d of ['tamam', 'kontrast_yok']) assert.strictEqual(G.grafikCizilir(d), true, d);
+  for (const d of ['veri_yok', 'yetersiz', 'fiyat_yok', 'zaman_seyrek', 'eski', 'hata', 'cevrimdisi', 'yukleniyor']) assert.strictEqual(G.grafikCizilir(d), false, d);
+  for (const f of ['grafik', 'kurucu', 'pano']) {
+    const s = fs.readFileSync(path.join(__dirname, `../../js/istatistik/${f}.js`), 'utf8').replace(/function grafikCizilir[^\n]*\n/, '');
+    assert.ok(!/'tamam' (&&|\|\|) \w+ [!=]== 'kontrast_yok'/.test(s), `${f}: koşul tekrarı`);
+  }
+});
+
+const TL_ILAC = (olcum, fiyatsiz) => zarf(olcum, { ad: 'tl', n: [6, 3, 0], y: [120, null, null], q1: [100, null, null], q3: [140, null, null] }, {
+  sayac: { fiyatsiz_n: fiyatsiz }, fiyat_kaynagi: 'gecici',
+  zarf: { x: { ad: 'grup', deger: ['A içeren', 'B içeren', 'C içeren'], anahtar: ['ilac:Aa', 'ilac:Bb', 'ilac:Cc'] } },
+});
+
+test('borc_u3_tl_kismi_fiyat_vaka_azdan_ayrilir', () => {
+  assert.strictEqual(G.grafikGruplariHazirla(TL_ILAC('saglik_vaka_tl', 4)).azMetin,
+    '1 ilaçta fiyatlı vaka az (<5): Bb 3. 1 ilaçta fiyatlı vaka yok: Cc');
+  assert.strictEqual(G.grafikGruplariHazirla(TL_ILAC('saglik_basari_tl', 4)).azMetin,
+    '1 ilaçta fiyatlı başarılı vaka az (<5): Bb 3. 1 ilaçta fiyatlı başarılı vaka yok: Cc');
+});
+
+test('borc_u3_fiyatsiz_yoksa_ya_da_tl_degilse_metin_aynen', () => {
+  const eski = '2 ilaçta veri az (<5 vaka): Bb 3 · Cc 0';
+  assert.strictEqual(G.grafikGruplariHazirla(TL_ILAC('saglik_vaka_tl', 0)).azMetin, eski);
+  assert.strictEqual(G.grafikGruplariHazirla(TL_ILAC('saglik_kapanma_gunu', 4)).azMetin, eski);
+});
+
+const yKapsam = (en, ad) => ({
+  getLabelForValue: () => ad, chart: { width: en }, _resolveTickFontOptions: () => ({ string: '12px x' }),
+  ctx: { font: '', save() {}, restore() {}, measureText: t => ({ width: t.length * 6 }) },
+});
+
+test('borc_u5_uzun_ad_kesilmez_iki_satira_bolunur', () => {
+  const cb = G.zarfGrafikConfig(coklu('saglik_basari'), { tema: TEMA }).options.scales.y.ticks.callback;
+  const ad = 'CAROFERTIN-E ( alivira ) içeren';                    // 31 × 6 = 186 px; 348/2-14 = 160 px
+  assert.deepStrictEqual([...cb.call(yKapsam(348, ad), 0)], ['CAROFERTIN-E (', 'alivira ) içeren']);
+  assert.strictEqual(cb.call(yKapsam(798, ad), 0), ad, 'geniş tuvalde tek satır');
+  assert.strictEqual(cb.call(yKapsam(348, 'X'.repeat(40)), 0), 'X'.repeat(40), 'boşluksuz ad bölünmez');
+});

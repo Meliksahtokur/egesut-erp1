@@ -169,8 +169,7 @@ function _kurucuYetersizSatir(z) {
 }
 
 // S4: az vakalı ilaç üstteyken uyarı kapalı Ayrıntı'da kalmasın (pano da bunu kullanır).
-function _kurucuUyariSatir(z, durum) {
-  const metin = grafikDipnotAyir(z, durum).uyari;
+function _kurucuUyariSatir(metin) {
   return metin ? `<div class="atolye-veri-az">${esc(metin)}</div>` : '';
 }
 
@@ -210,14 +209,14 @@ function kurucuKartHtml(zarf, tanimKarti, idx) {
 
   const cumle = (window._atolye || {}).cumle;
   const durum = zarfDurum(z, cumle);
-  const cizilir = durum === 'tamam' || durum === 'kontrast_yok';
+  const cizilir = grafikCizilir(durum);
   const rozet = _kurucuRozet(z, durum);
-  const { kalan } = grafikDipnotAyir(z, durum);
+  const { uyari, kalan } = grafikDipnotAyir(z, durum);
   let g = bas(rozet ? `<span class="atolye-rozet">${esc(rozet)}</span>` : '');
   if (z.fiyat_kaynagi === 'gecici') g += '<div class="atolye-gecici-bant">geçici, kaydedilmedi</div>';
   if (cizilir) {
     g += `<div class="atolye-grafik"><canvas data-kurucu-kart="${Number(idx)}"></canvas></div>`;
-    g += `<div class="atolye-ozet">${esc(zarfOzetCumle(z))}</div>` + _kurucuUyariSatir(z, durum) + _kurucuYetersizSatir(z);
+    g += `<div class="atolye-ozet">${esc(zarfOzetCumle(z))}</div>` + _kurucuUyariSatir(uyari) + _kurucuYetersizSatir(z);
     if (z.olcum === 'saglik_kapanma_gunu' && (z.egri || []).some(k => k.gun && k.gun.length)) {
       g += `<label class="atolye-onay"><input type="checkbox" data-kurucu-egri="1"${_kurucuEkran.egri ? ' checked' : ''}> Kapanma eğrisini göster</label>`;
     }
@@ -253,21 +252,30 @@ function _kurucuKabuk() {
   return kok;
 }
 
+// Yeniden çizimde aynı denetimi bulur: select değeri değişse de aynıdır, çip değeriyle ayrılır.
+function _kurucuOdakAnahtar(el) {
+  const d = el.dataset || {};
+  return el.id || [el.tagName, d.kurucuSlot, d.kurucuOlcu, d.kurucuEylem, d.alan, el.tagName === 'SELECT' ? '' : d.deger].join('|');
+}
+
 function _kurucuPanelCiz() {
   const s = window._atolye;
   const p = document.getElementById('atolye-cumle-panel');
   if (!p || !s.cumle) return;
   const alan = document.getElementById('atolye-kaydet-baslik');
   if (alan && _kurucuEkran.kaydet) _kurucuEkran.kaydetBaslik = alan.value;   // yanıt gelince yazılan başlık silinmesin
-  // outerHTML düğümü değiştirir: select odağı ve panelin kendi kaydırması (index.html G6) elle taşınır (TF G7).
+  // outerHTML düğümü değiştirir: denetim odağı, imleç ve panelin kendi kaydırması (index.html G6) elle taşınır (TF G7).
   const odak = document.activeElement;
-  const odakSlot = odak && odak.tagName === 'SELECT' && p.contains(odak) ? odak.dataset.kurucuSlot : null;
+  const anahtar = odak && p.contains(odak) ? _kurucuOdakAnahtar(odak) : null;
+  const imlec = anahtar && typeof odak.selectionStart === 'number' ? [odak.selectionStart, odak.selectionEnd] : null;
   const tepe = p.scrollTop;
   p.outerHTML = kurucuCumlePanelHtml(s.cumle, s.secenekler);
   const yeni = document.getElementById('atolye-cumle-panel');
   yeni.scrollTop = tepe;
-  const secim = odakSlot ? yeni.querySelector(`select[data-kurucu-slot="${odakSlot}"]`) : null;
-  if (secim) secim.focus({ preventScroll: true });
+  const hedef = anahtar ? Array.from(yeni.querySelectorAll('button,select,input')).find(el => _kurucuOdakAnahtar(el) === anahtar) : null;
+  if (!hedef) return;
+  hedef.focus({ preventScroll: true });
+  if (imlec) hedef.setSelectionRange(imlec[0], imlec[1]);
 }
 
 // Başlık yazıldıkça durumda: Pano'ya geçişte alan DOM'dan gider, aynı cümleyle dönüşte yazılan geri gelir.
