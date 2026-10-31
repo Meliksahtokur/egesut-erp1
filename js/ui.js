@@ -10587,7 +10587,7 @@ function _renderSablonBuilder(){
         <label style="display:flex;align-items:center;gap:7px;font-size:.76rem;color:var(--ink2);margin:4px 0 7px">Başlangıçtan gün
           <input class="fi" type="number" min="0" step="1" value="${gun.offset}" data-change="sablon-gun-ofset" data-gi="${gi}" style="width:75px;margin:0;padding:5px 7px"></label>
         ${seansRows}
-        ${tohumlama?`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;font-size:.8rem;border-top:1px solid var(--card3);margin-top:6px"><span style="font-weight:700;min-width:42px">🐄 ${esc(tohumlama.planned_time)}</span><span style="flex:1;font-weight:700">Planlı tohumlama <span style="font-weight:400;color:var(--ink3);font-size:.72rem">Sperma görevde seçilir</span></span><input class="fi" type="time" value="${tohumlama.planned_time}" data-change="sablon-tohumlama-saat" style="width:92px;padding:4px"><button data-action="sablon-tohumlama-sil" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button></div>`:''}
+        ${tohumlama?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;font-size:.8rem;border-top:1px solid var(--card3);margin-top:6px"><span style="font-weight:700;min-width:42px">🐄 ${esc(tohumlama.planned_time)}</span><span style="flex:1;font-weight:700">Planlı tohumlama <span style="font-weight:400;color:var(--ink3);font-size:.72rem">Sperma görevde seçilir</span></span><button data-action="sablon-tohumlama-sil" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button><div style="flex:1 1 100%">${saatAlaniHtml('sablon-tohumlama-saat', { deger: tohumlama.planned_time, attr: 'data-change="sablon-tohumlama-saat" style="padding:4px"' })}</div></div>`:''}
         <button class="btn-sm" data-action="sablon-seans-ac" data-gi="${gi}" style="margin-top:6px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(42,107,181,.1);color:var(--blue);border:1px dashed rgba(42,107,181,.4);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne seans/ilaç ekle</button>
         ${!tohumlama?`<button class="btn-sm" data-action="sablon-tohumlama-gun-ekle" data-gi="${gi}" style="margin-top:6px;font-size:.78rem;font-weight:700;padding:7px 12px;background:rgba(126,87,194,.10);color:#7151a6;border:1px dashed rgba(126,87,194,.45);border-radius:7px;cursor:pointer;width:100%">＋ Bu güne tohumlama ekle</button>`:''}
       </div>
@@ -10798,6 +10798,7 @@ function sablonSeansEkle(gi){
  * @tablo sablon_hastalik_eslem (tazeleme), tedavi_sablonu_kalem (tazeleme), tedavi_sablonu (tazeleme)
  */
 async function sablonKaydet(){
+  if(saatYarimMi('sablon-tohumlama-saat')) return;
   _syncSablonAd();
   const s=_sablonEdit;
   if(!s.ad.trim()){ toast('Şablon adı zorunlu', true); return; }
@@ -17543,7 +17544,7 @@ function seansDuzenleAc(seansId) {
     .map(y => `<option value="${y}"${(s.route || '') === y ? ' selected' : ''}>${y}</option>`).join('');
   row.innerHTML = `
     <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;width:100%">
-      <input id="sd-time-${seansId}" class="fi" type="time" value="${esc(fmtSeansSaat(s.planned_time) || '08:00')}" style="margin:0;width:88px">
+      <div style="flex:1 1 100%">${saatAlaniHtml('sd-time-' + seansId, { deger: fmtSeansSaat(s.planned_time) || '08:00' })}</div>
       <input id="sd-dose-${seansId}" class="fi" type="number" min="0.01" step="0.01" value="${s.dose ?? ''}" placeholder="Doz" style="margin:0;width:64px">
       ${_dozHintBtnHtml('sd-dose-' + seansId, s.drug_product_id || '', document.getElementById('m-case-det')?.classList.contains('on') ? (_curCase?.animal_id || '') : '')}
       <input id="sd-unit-${seansId}" class="fi" type="text" value="${esc(s.unit || 'ml')}" placeholder="Birim" style="margin:0;width:52px">

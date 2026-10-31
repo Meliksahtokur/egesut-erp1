@@ -208,6 +208,103 @@ test('G2 #4-7: kopyalar kalktı, tek çip dili; dolu başlangıçlar korunur', (
   assert.match(forms, /saatYaz\('bc-gsaat', '09:00'\)/);
 });
 
+// ui.js'ten tek fonksiyonu gerçek yardımcılarla çalıştırıp body'ye eklenen HTML'i döner.
+function uiHtml(fn, args, ek = {}) {
+  const { s } = kur();
+  const eklenen = [];
+  const document = {
+    getElementById: () => null,
+    createElement: t => makeElement(t),
+    body: { appendChild: e => { eklenen.push(e); return e; } },
+    ...ek.document,
+  };
+  loadExtractedFunction('js/ui.js', fn, {
+    extra: { document, saatAlaniHtml: s.saatAlaniHtml, setTimeout: () => {}, ...ek.extra },
+  })(...args);
+  return { html: eklenen.map(e => e.innerHTML).join(''), eklenen };
+}
+
+test('G3 #9: saat-input yardımcıda; mevcut saat dolu ve çipi aktif, boşken hiçbiri', () => {
+  const dolu = uiHtml('caseDaySaatAc', ['d1', '16:00:00']).html;
+  assert.match(dolu, /<input id="saat-input" class="fi" type="time" value="16:00"/);
+  assert.deepStrictEqual(cipleriOku(dolu).filter(c => c.classList.contains('aktif')).map(c => c.dataset.t), ['16:00']);
+  const bos = uiHtml('caseDaySaatAc', ['d1', null]).html;
+  assert.match(bos, /<input id="saat-input" class="fi" type="time" value=""/);
+  assert.ok(!cipleriOku(bos).some(c => c.dataset.action === 'saat-chip' && c.classList.contains('aktif')));
+});
+
+test('G3 #10: cdt-saat yardımcıda, 08:00 dolu; yarım saat gönderilmez, boş 08:00 kalır', async () => {
+  const kutu = makeElement('div');
+  uiHtml('caseTohumlamaEkleAc', [], {
+    document: { getElementById: id => (id === 'cd-gun-bolum' ? kutu : null) },
+    extra: { _curCase: { id: 'c1' }, bugun: () => '2026-10-31', fmtTarih: x => x },
+  });
+  const html = kutu.children[0].innerHTML;
+  assert.match(html, /<input id="cdt-saat" class="fi" type="time" value="08:00"/);
+  assert.ok(!/<label[^>]*>(?:(?!<\/label>).)*saat-chip/s.test(html), 'çip label içinde değil');
+
+  const calis = async (saatEl) => {
+    const rpcler = [];
+    const k = kur();
+    k.els.set('cdt-tarih', { value: '2026-11-01' });
+    k.els.set('cdt-saat', saatEl);
+    await loadExtractedFunction('js/ui.js', 'caseTohumlamaEkleOnayla', {
+      extra: {
+        _curCase: { id: 'c1' }, toast() {}, rpc: async (a, p) => { rpcler.push(p); }, pullTables: async () => {},
+        renderCaseTimeline: async () => {}, updateTaskBadge() {}, saatYarimMi: k.s.saatYarimMi,
+        document: { getElementById: id => k.els.get(id) || null },
+      },
+    })(null);
+    return { rpcler, toastlar: k.toastlar };
+  };
+  const yarim = await calis({ value: '', validity: { badInput: true } });
+  assert.strictEqual(yarim.rpcler.length, 0);
+  assert.strictEqual(yarim.toastlar.length, 1);
+  const bos = await calis({ value: '', validity: { badInput: false } });
+  assert.strictEqual(bos.rpcler[0].p_saat, '08:00', 'boş=08:00 korunur');
+});
+
+test('G4 #8: şablon tohumlama saati yardımcıda, kendi satırında; çipin change olayı mevcut handler\'a gider', () => {
+  const ui = oku('js/ui.js');
+  const satir = ui.split('\n').find(l => l.includes("saatAlaniHtml('sablon-tohumlama-saat'"));
+  assert.ok(satir, 'yardımcıya alındı');
+  assert.match(satir, /deger: tohumlama\.planned_time/);
+  assert.match(satir, /data-change="sablon-tohumlama-saat"/);
+  assert.match(satir, /display:flex;[^"]*flex-wrap:wrap/, 'dar satır sarar');
+  assert.match(satir, /<div style="flex:1 1 100%">\$\{saatAlaniHtml/, 'çipler kendi satırında sığar');
+  assert.match(oku('js/utils/handlers.js'), /'sablon-tohumlama-saat':\s*\(el\) => sablonTohumlamaSaat\(el\.value\)/);
+});
+
+test('G4 #8: yarım şablon saati şablon kaydını durdurur', async () => {
+  const k = kur();
+  k.alan('sablon-tohumlama-saat').validity = { badInput: true };
+
+  await loadExtractedFunction('js/ui.js', 'sablonKaydet', {
+    extra: { saatYarimMi: k.s.saatYarimMi, _sablonEdit: { ad: 'A', gunler: [] }, toast() { throw new Error('ad uyarısına inmemeli'); } },
+  })();
+  assert.strictEqual(k.toastlar.length, 1);
+  assert.match(k.toastlar[0].m, /Saat/);
+});
+
+test('G4 #11: seans düzenleme saati yardımcıda, kendi satırında; mevcut saat dolu ve id korunur', () => {
+  const { s } = kur();
+  const row = makeElement('div');
+  loadExtractedFunction('js/ui.js', 'seansDuzenleAc', {
+    extra: {
+      saatAlaniHtml: s.saatAlaniHtml,
+      _seansAddCtx: { dayId: 'd1' },
+      _cdDayData: { d1: { sessions: [{ id: 's1', planned_time: '20:00:00', dose: 1, unit: 'ml', route: 'IM', drug_product_id: 'p' }] } },
+      fmtSeansSaat: t => String(t).slice(0, 5),
+      esc: x => String(x),
+      _dozHintBtnHtml: () => '',
+      _curCase: null,
+      document: { getElementById: id => (id === 'seans-mevcut-s1' ? row : null) },
+    },
+  })('s1');
+  assert.match(row.innerHTML, /<div style="flex:1 1 100%"><div class="saat-alani"><input id="sd-time-s1" class="fi" type="time" value="20:00"/);
+  assert.deepStrictEqual(cipleriOku(row.innerHTML).filter(c => c.classList.contains('aktif')).map(c => c.dataset.t), ['20:00']);
+});
+
 test('S-10: tek genel handler ve statik bağlama', () => {
   assert.match(oku('js/utils/handlers.js'), /'saat-chip':\s*\(el\)\s*=>\s*saatCipSec\(el\)/);
   const html = oku('index.html');
