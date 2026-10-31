@@ -47,6 +47,7 @@ write_manifest:
   - tests/unit/hayvan-takip-gecmis.test.js
   - tests/unit/hayvan-takip-ui.test.js
   - tests/unit/hayvan-takip-vaka.test.js
+  - tests/unit/hayvan-takip-belge.test.js
   - tests/unit/saat-alani.test.js
   - tests/unit/forms-validation.test.js
   - tests/unit/vaka-toplu-ac.test.js
@@ -126,6 +127,8 @@ checkpoint:
   - D1: `.harness/references/rpc-reference.md`, `.harness/references/ui-map.md`
   - U2-G0: `supabase/migrations/20261031200004_hayvan_takip_halsizlik_etiket.sql` (diğer dosyalar yukarıdaki düğümlerde)
   - U2-M1: `supabase/migrations/20261031200005_hayvan_takip_muayene_vaka.sql`, `js/utils/modal.js` (diğer dosyalar yukarıdaki düğümlerde)
+  - U2-S1: `js/utils/helpers.js`, `js/utils/events.js`, `tests/unit/saat-alani.test.js`, `tests/unit/forms-validation.test.js`, `tests/unit/vaka-toplu-ac.test.js`, `tests/unit/erteleme-genel-ui.test.js`, `tests/unit/ovsync-secici.test.js`, `tests/unit/hizli-uygulama-guard.test.js` (diğer dosyalar yukarıdaki düğümlerde)
+  - U2-K: `tests/unit/hayvan-takip-belge.test.js` (diğer dosyalar yukarıdaki düğümlerde)
   - Plan ve kapanış: `docs/plans/2026-10-31-hayvan-takip-PLAN.md`, bu goal dosyası, `.harness/reports/2026-10-31-hayvan-takip.md`
   - Yerel: `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`
 - **tracked paths:** yukarıdaki manifestin `runs/` ve `.crumbs/` dışındaki dosyaları. `docs/plans/` gitignore'dadır, `git add -f` ile eklenir.

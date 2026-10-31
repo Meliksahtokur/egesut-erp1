@@ -434,6 +434,13 @@ Tarih girişi artık tek kanonik bileşenden geçer (bkz. `D-20260909-CANONICAL-
   (`v-date`) kuralına hizalandı. Sahip istemezse `TARIH_ALANLARI`'nda tek satır
   geri alma.
 
+### Saat alanı standardı (sahip 2026-10-31: "programdaki tüm saat seçimlerinde onu kullanalım standart olsun")
+
+- **Tek biçim:** Programdaki saat alanları `<input type="time">` + `saatAlaniHtml` (`js/utils/helpers.js`) kullanır; değer `HH:MM`. Sahip "yuvarlak hızlı düğmeler" dedi, kendi kadran bileşeni yazılmaz.
+- **Tek çip seti:** `HIZLI_SAATLER` (08:00, 16:00, 20:00). Alan kendi çip setini yazmaz.
+- **Boşun anlamı değişmez:** Standart yalnız girişi değiştirir, boşu alanın kendi akışı yorumlar: takip alanlarında saatsiz, `ert-saat`'te mevcut saat kalır, `bc-tohum-saat` ve `cdt-saat`'te 08:00, saati zorunlu alanlarda hata. Yarım yazılmış saat gönderilmez.
+- **İstisnalar:** `devam-ertele-saat` (§18.15, §18.17) ön seçimsiz açılır, boş = saatsiz. `pu-saat` çipsizdir: geçmiş bir anı girer, hazır saatler uymaz.
+
 ## 18. Üreme Protokolleri — Ovsync / PG / Kısır / Erteleme (2026-09-26, p5b sürümü)
 
 Kaynak: SPEC `docs/plans/2026-09-23-ovsync-pg-tohumlama-SPEC.md` (R3/R3.1/R3.2) + cila/erteleme/p5b-fix
@@ -513,9 +520,11 @@ Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve
 2. **Sebep:** Hazır liste + serbest metin (Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Halsizlik, Diğer). Halsizlik sahip kararıdır (2026-10-31, "sebeplere halsizlik eklenmeli"); `20261031200004` ile gelir, demo ve prod'a henüz uygulanmadı. Yeni hazır sebep hem `js/config.js` hem `_hayvan_takip_sebep_etiket` ister: etiketsiz kod görev açıklamasında ham kalır.
 3. **Dashboard:** En üstte band; hayvan başına tek satır, sebepler yan yana, en eski açık takip üstte.
 4. **Kapatma:** Karttan pencereyle tek tek ya da tümü, isteğe bağlı not. Sürüden çıkan hayvanın bütün takipleri kendiliğinden kapanır.
-5. **Vaka:** Elle tek hayvanlık vaka açılınca açık takipler sorulur; hiçbiri işaretli gelmez, kendiliğinden kapanmaz. Toplu, kızgınlıktan ve otomatik vakalar sormaz.
-6. **Muayene görevi:** Takibe elle bağlanan `HAYVAN_TAKIP_MUAYENE` görevi; takip başına en fazla bir açık görev. Sonuçsuz kapanmaz: takip sürsün + sonraki muayene ya da takip kapansın. Genel Ertele yoktur. Takip kapanınca açık görev iptal olur.
-7. **Muayene sonucu geri alınmaz (sahip 2026-10-31):** Yeni tipte görev geri alma ve Geçmiş geri-al düğmeleri kapalıdır; yanlış kapanışta takip yeniden açılır.
+5. **Vaka:** Elle tek hayvanlık vaka açılınca açık takipler sorulur; hiçbiri işaretli gelmez, kendiliğinden kapanmaz. Toplu, kızgınlıktan ve otomatik vakalar sormaz. Muayene sonucundaki `Vaka` yolu (§20.6, sahip 2026-10-31) bu kuralla çelişmez: elle ve açık tek düğmedir, yalnız muayenesi yapılan takibi kapatır; öteki takipler yine sorulur, işaretsiz gelir.
+6. **Muayene görevi:** Takibe elle bağlanan `HAYVAN_TAKIP_MUAYENE` görevi; takip başına en fazla bir açık görev. Sonuçsuz kapanmaz, üç sonuç vardır: takip sürsün + sonraki muayene, takip kapansın ya da `Vaka`. Genel Ertele yoktur. Takip kapanınca açık görev iptal olur; `Vaka` sonucunda görev önce tamamlanır.
+   - **`Vaka` sonucu (sahip 2026-10-31, "muayene tedavi planı ile kapanmıyor oraya bağlanamıyor", "zaten aktif vaka varsa takip oraya bağlanabilir"):** Muayene, yeni vaka ya da hayvanın mevcut aktif vakası ile sonuçlanır; görev `tamamlandi`, takip `VAKA` nedeniyle kapanır (`hayvan_takip_muayene_vaka`, `20261031200005`). Aktif vaka listesi hastalıkla sınırlı değildir; seçilirse yeni vaka ya da plan açılmaz. Vaka bu hayvanın aktif vakası değilse `HT_VAKA_UYUMSUZ`.
+   - **Hata:** Vazgeçilirse ya da vaka açılamazsa hiçbir şey yazılmaz, görev ve takip açık kalır. Vaka açılıp bağ kurulamazsa vaka kalır, uyarı `Vaka kayıtlı, takip bağlanamadı`; takip vaka sonrası pencereden kapatılabilir, bu yolda görev iptal olur.
+7. **Muayene sonucu geri alınmaz (sahip 2026-10-31):** Yeni tipte görev geri alma ve Geçmiş geri-al düğmeleri kapalıdır; yanlış kapanışta takip yeniden açılır. Bilinen sınırlar (`GERI_ALINDI` kartı, doğrudan RPC yolu): §20.10.
 8. **Muayene tarihi (sahip 2026-10-31):** Geçmiş tarihe muayene planlanamaz; yalnız bugün ve sonrası.
 9. **Değişiklikler sayfasından geri alma (yalnız demo ölçümü Ö1, 2026-10-31; tutarsız durumlar için sahip kararı: §20.10):** Plan ve uygulama motoru işlem içinde çalıştırılıp geri sarılarak ölçüldü; parolalı `degisim_geri_al` çağrılmadı.
    - **§20.7 ile ilişki:** §20.7 görev detayındaki ve Geçmiş'teki geri alma düğmelerini kapatır. `islem` ve `satir` geri alma yalnız parolalı değişiklik motorunda (Değişiklikler sayfası) kalır; §20.7 bu yolu kapatmaz.
@@ -523,6 +532,7 @@ Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve
    - **`satir` seviyesi yalnız seçilen satırı döndürür.** `hayvanlar` satırı dönerse hayvan `Aktif` olur, takip kapalı ve görev iptal kalır; takip karttan yeniden açılır. Önizleme bu seviyede eksik kalan satırlar için uyarı vermez.
    - **Tutarsız bırakan iki `satir` hedefi (sahip kararı §20.10: merge'i tutmaz, önizleme uyarısı ayrı iş; bugün engel yok):** Çıkışın `hayvan_takip` satırı, çıkmış hayvanda açık takip bırakır. `gorev_log` satırı, çıkmış hayvanda ya da kapalı takipte açık görev bırakır; bu görevi sonuç penceresi (`HT_TAKIP_KAPALI`) ve `gorev_tamamla` (`MUAYENE_SONUC_GEREKLI`) reddeder, yalnız `p_iptal=true` kapatır.
    - **Aynı sebep yeniden açıldıysa:** Önizleme "geri alınabilir" der, uygulama `hayvan_takip_acik_sebep_uq` ile reddedilir; eski kapanış geri alınamaz.
+   - **`Vaka` sonucu ölçülmedi:** Ö1 bu sonuçtan önce yapıldı; `islem` geri almasının vakayı nasıl bıraktığı bilinmiyor.
 10. **Sahip kararları (2026-10-31):**
    - **`GERI_ALINDI` kartı:** Sebep ve not göstermez, `⟲ Geri alınanı geri al` düğmesi kalır. §20.7 ile bilinen uyumsuzluktur; merge'i tutmaz, ayrı iş.
    - **Muayene kapanışı:** Geçmiş'te üç satır kalır: Kapandı, Takip Muayenesi, notsuz görev kartı.

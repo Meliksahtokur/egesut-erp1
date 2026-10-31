@@ -352,7 +352,9 @@ test('HT-UI-18: çakışan iki loadAnimals tek rozet bırakır, yükleme sıras�
     ? new Promise(ac => kapilar.push(() => ac(gercekGetData(t, pred))))
     : gercekGetData(t, pred));
   const yuklemeler = [sandbox.loadAnimals(), sandbox.loadAnimals()];
-  while (kapilar.length < 2) await new Promise(c => setImmediate(c));
+  // Yükleme kapıya hiç gelmezse takılmak yerine düşer.
+  for (let tur = 0; kapilar.length < 2 && tur < 1000; tur++) await new Promise(c => setImmediate(c));
+  assert.strictEqual(kapilar.length, 2, 'iki yükleme de hayvan_takip okumasına gelir');
   assert.strictEqual(rozet(), 1, 'yükleme sürerken eski harita görünür kalır');
 
   kapilar.forEach(ac => ac());

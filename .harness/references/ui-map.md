@@ -182,8 +182,10 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
   `js/hayvan-takip-pencere.js:HT_BAYAT_VERI` kodlarında pencere kapanır ve liste tazelenir, diğerlerinde açık kalır.
 - **Takibi kapat:** karttan tek takip işaretli gelir (`js/hayvan-takip.js:htKapatOnSecim`), `index.html:ht-ka-iptal` görünür. Vakadan
   hiçbiri işaretli gelmez, yerine `index.html:ht-ka-acik-kalsin` görünür. `index.html:ht-tumunu-sec` hepsini işaretler.
-- **Muayene sonucu:** `index.html:ht-so-gonder` iki düğmedir, `data-sonuc` = `SURSUN` | `KAPANSIN`; sonraki tarih +3 gün hazır
+- **Muayene sonucu:** Üç sonuç (§20.6). `index.html:ht-so-gonder` iki düğmedir, `data-sonuc` = `SURSUN` | `KAPANSIN`; üçüncüsü aşağıda. Sonraki tarih +3 gün hazır
   gelir, boş bırakılırsa görev açılmaz. Takvim üstte kalsın diye `#m-ht-sonuc.on~#tek-tarih-takvim` kuralı var. Üç tarih alanını `js/ui.js:TARIH_ALANLARI` bağlar (`min:'bugun'`).
+- **Muayeneden yeni vaka:** `index.html:ht-so-vaka-ac` → `js/hayvan-takip-pencere.js:htSonucVakaAc`: bağlamı `globalThis._htMuayeneVaka`'ya yazar, sonuç penceresini kapatıp `m-disease` açar (z-index 80, sonuç üstte kalmasın). Bağlam `js/utils/modal.js:closeM` ile düşer. `js/forms.js:submitCase` kapanıştan önce okur, başka hayvana açılan vakayı durdurur. `js/forms.js:_vakaSonrasiAkis`: vaka detayı → `js/hayvan-takip-pencere.js:htMuayeneVakaBagla` → kalan takipler için pencere.
+- **Muayeneden aktif vaka:** `index.html:ht-so-vakalar` listesini `js/hayvan-takip.js:htAktifVakaHtml` çizer: hayvanın bütün aktif vakaları, satırda hastalık ve başlangıç tarihi; aktif vaka yoksa gizli. Okuma yerel, pencereyi bekletmez (`js/hayvan-takip-pencere.js:_htAktifVakalariGoster`). `data-action="ht-so-vaka-bagla"` → `js/hayvan-takip-pencere.js:htVakaBagla`; yeni vaka açılmaz, başarıda kalan takipler sorulur.
 - **Dashboard bandı:** `js/ui.js:loadDash` açık takipleri okur, `js/hayvan-takip.js:htDashSatirlari` yalnız aktif hayvanları hayvan başına
   tek satıra indirir, `js/ui.js:_dashBands` `js/hayvan-takip.js:htBandHtml` çıktısını Negatif Stok'tan önce basar. Satır `openDet` açar.
 - **Kart düğmeleri:** `js/ui.js:_detOzetHtml` (`js/ui.js:_htDugme`, yalnız `durum==='Aktif'`): "📌 Takibe al" her zaman; "🔍 Muayene planla"
@@ -195,6 +197,12 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
   **Bilinen sınır (sahip kararı 2026-10-31, domain-rules §20.10: şimdilik kabul, tip kilidi ayrı iş):** doğrudan çağrılan `gorev_geri_al` (JS çağıranı yok) kapalı takipte açık görev bırakabilir, §20.7 delinir; doğrudan çağrılan `gorev_guncelle` (UI yolları sonuç penceresinin arkasında) geçmiş tarih yazabilir ve tipi değiştirebilir, §20.6 ve §20.8 delinir.
 - **Vaka sonrası soru:** `js/forms.js:submitCase` ve `js/forms.js:caseTakipRetry` → `js/forms.js:_vakaSonrasiAkis` (önce vaka detayı, sonra pencere).
   Kızgınlık "Tedavi"sinden gelen form sormaz (`js/forms.js:_vakaSonrasiAkis`, `kizginliktan` parametresi); toplu ve otomatik vaka yolları bu akışa girmez.
+
+## Saat alanı (domain-rules §17)
+
+- **Yardımcı:** `js/utils/helpers.js:saatAlaniHtml` input + `HIZLI_SAATLER` çiplerini (`.ek-chip`) üretir; dinamik alanlar bunu çağırır. `{bosIzinli}` aktif çipe ikinci dokunuşu boşaltır, `{cipler:false}` yalnız input verir (`pu-saat`).
+- **Statik alanlar:** `index.html` içinde `.saat-alani` sarmalı (`ht-ac-saat`, `ht-mu-saat`, `ht-so-saat`, `bc-tohum-saat`); çipleri `js/utils/helpers.js:saatAlanlariKur` `js/app.js` açılışında ekler.
+- **Davranış:** `data-action="saat-chip"` → `js/utils/helpers.js:saatCipSec` kabarcıklı `input` + `change` üretir. Programatik yazım `js/utils/helpers.js:saatYaz`, olay üretmez. Gönderimde `js/utils/helpers.js:saatYarimMi` yarım saati durdurur.
 
 ## js/ui.js — rendering and interaction
 

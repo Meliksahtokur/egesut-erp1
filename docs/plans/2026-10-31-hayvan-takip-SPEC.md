@@ -55,6 +55,14 @@ Sahibin itiraz etmediği tasarım ayrıntıları:
 - Genel Ertele düğmesi yoktur; tarih yalnız "Muayene planla" ya da "Takip sürsün" ile değişir.
 - Bir takibin en fazla bir açık muayene görevi olur.
 
+### U2 kararları (sahip 2026-10-31, demo testi sonrası)
+
+Otorite `domain-rules.md` §17 ve §20; K8 ve §5.2 bu ekle genişler.
+
+- **Halsizlik:** Hazır sebeplere eklendi (`20261031200004`).
+- **Saat alanı:** Programın bütün saat alanları `saatAlaniHtml` + `HIZLI_SAATLER` yuvarlak çipleri. `<input type="time">` kalır, kendi kadran yok, boşun anlamı değişmez.
+- **Üçüncü sonuç `Vaka`:** Sonuç penceresinden yeni vaka ya da hayvanın mevcut aktif vakası. Görev tamamlanır, takip `VAKA` ile kapanır (`hayvan_takip_muayene_vaka`, `20261031200005`). Yeni vakada önce `create_case`, sonra bu RPC; bağ hatasında vaka kalır. Öteki takipler sorulur.
+
 ## 4. Veri modeli
 
 ### 4.1 `hayvan_takip` tablosu
