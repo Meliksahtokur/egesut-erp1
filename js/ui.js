@@ -5024,8 +5024,10 @@ async function loadAnimals(){
     globalThis._tohMap={};
     gebeTohs.forEach(t=>{ if(!globalThis._tohMap[t.hayvan_id]||t.tarih>globalThis._tohMap[t.hayvan_id]) globalThis._tohMap[t.hayvan_id]=t.tarih; });
     // 📌 rozet haritası: hayvan başına açık takipler (R4)
-    globalThis._htAcikMap={};
-    (await getData('hayvan_takip',t=>!t.kapanis_tarihi)).forEach(t=>{ (globalThis._htAcikMap[t.hayvan_id]=globalThis._htAcikMap[t.hayvan_id]||[]).push(t); });
+    const htAciklar=await getData('hayvan_takip',t=>!t.kapanis_tarihi);
+    const htAcikMap={};
+    htAciklar.forEach(t=>{ (htAcikMap[t.hayvan_id]=htAcikMap[t.hayvan_id]||[]).push(t); });
+    globalThis._htAcikMap=htAcikMap;
     // Bekleyen tohumlama haritası (sadece sonuc=Bekliyor — badge için)
     const bosTohs=await getData('tohumlama',t=>t.sonuc==='Bekliyor');
     globalThis._bosTohMap={};

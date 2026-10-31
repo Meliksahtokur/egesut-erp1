@@ -336,3 +336,26 @@ test('HT-UI-17: loadDash açık takipleri banda taşır, kapalı ve çıkmış h
   assert.ok(h.includes('Topallık'), h);
   assert.ok(!h.includes('Zayıflama') && !h.includes('Süt düşüşü'), h);
 });
+
+test('HT-UI-18: çakışan iki loadAnimals tek rozet bırakır, yükleme sırasında harita boşalmaz', async () => {
+  const k = kur({ veri: { hayvanlar: [hayvan()], hayvan_takip: [takip('t1')] } });
+  const { sandbox } = k;
+  sandbox.renderAnimals = () => {};
+  const rozet = () => say(sandbox._animalTagsHtml(hayvan(), new Set()), '📌');
+  await sandbox.loadAnimals();
+  assert.strictEqual(rozet(), 1, 'ilk yükleme');
+
+  // Her iki yükleme de hayvan_takip okumasında bekler; ikisi de oradayken kapı açılır.
+  const gercekGetData = sandbox.getData;
+  const kapilar = [];
+  sandbox.getData = (t, pred) => (t === 'hayvan_takip'
+    ? new Promise(ac => kapilar.push(() => ac(gercekGetData(t, pred))))
+    : gercekGetData(t, pred));
+  const yuklemeler = [sandbox.loadAnimals(), sandbox.loadAnimals()];
+  while (kapilar.length < 2) await new Promise(c => setImmediate(c));
+  assert.strictEqual(rozet(), 1, 'yükleme sürerken eski harita görünür kalır');
+
+  kapilar.forEach(ac => ac());
+  await Promise.all(yuklemeler);
+  assert.strictEqual(rozet(), 1, 'çakışan yüklemeler çift rozet üretmez');
+});
