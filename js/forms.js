@@ -845,9 +845,11 @@ async function submitCase(btn) {
     g('d-disease-id').value = '';
     g('d-disease-cat').style.display = 'none';
     { const sb = g('d-sablon-blok'); if (sb) sb.style.display = 'none'; }
-    await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']);
-    _drugsCache = [];
-    await loadDrugsCache();
+    await _vakaTazele(async () => {
+      await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']);
+      _drugsCache = [];
+      await loadDrugsCache();
+    });
     // Kızgınlık tedavi bağlantısı
     if (kizginlikKayitId && res?.case_id) {
       try {
@@ -862,7 +864,7 @@ async function submitCase(btn) {
     }
     // Hayvan kartını güncelle + vakayı göster
     if (res?.case_id) {
-      await openDet(hayvan.id, _detAcik()); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
+      await _vakaTazele(() => openDet(hayvan.id, _detAcik())); // kart-tazeleme T3: kart zaten açıksa yerinde tazele (keepTab), kapalıysa ilk açış
       await _vakaSonrasiAkis(hayvan.id, res.case_id, () => openCaseDet(res.case_id), !!kizginlikKayitId, htMuayene);
     }
   } catch (e) {
@@ -898,7 +900,7 @@ async function submitCase(btn) {
       cl('d-hid'); cl('d-case-notes');
       await pullTables(['cases','diseases','drugs','kizginlik_log','islem_log','treatment_days','treatment_day_uygulamalar','drug_administrations','stok','stok_hareket','gorev_log']).catch(() => {});
       if (res2?.case_id) {
-        await openDet(hayvan.id);
+        await _vakaTazele(() => openDet(hayvan.id));
         await _vakaSonrasiAkis(hayvan.id, res2.case_id, () => openCaseDet(res2.case_id), !!kizginlikKayitId, htMuayene);
       }
       return res2;
@@ -907,6 +909,11 @@ async function submitCase(btn) {
     toast(getUserMessage(e), true);
   }
   finally { if (btn) { btn.disabled = false; btn.textContent = '🏥 Vakayı Aç'; } }
+}
+
+/** Vaka kayıtlıdır: tazeleme ya da kart hatası bağı ve soruyu kesmez, dış catch'e düşüp "vaka açılamadı" gibi görünmez (§20.6). */
+async function _vakaTazele(adim) {
+  try { await adim(); } catch (e) { console.warn('⚠️ Vaka sonrası tazeleme:', e); }
 }
 
 /** Takip sorusunu vakayı etkilemeden açar (§20.5, spec §6); hata yalnız uyarıdır. */

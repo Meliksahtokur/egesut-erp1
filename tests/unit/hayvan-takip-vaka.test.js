@@ -400,4 +400,25 @@ for (const [ad, takipAcik] of KOLLAR) {
     await rec.pgKapi(true, 'gerekçe').catch(() => {});
     assert.deepStrictEqual(rec.rpc, [{ ad: 'tedavi_sablon_uygula', p: { p_case_id: 'C-9', p_sablon_id: 'S-1', p_pg_onay: true, p_pg_gerekce: 'gerekçe' } }]);
   });
+
+  test(`HT-V-23 (${ad}): kart ya da tazeleme reddi bağı ve soruyu kesmez, ikinci vaka açılmaz`, async () => {
+    for (const o of [{ pullRed: true }, { openDetRed: true }, { pullRed: true, openDetRed: true }]) {
+      const { rec } = await kos(o, takipAcik);
+      assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi'], JSON.stringify(o));
+      assert.deepStrictEqual(hataToastlari(rec), [], JSON.stringify(o));
+      assert.strictEqual(createSayisi(rec), takipAcik ? 2 : 1);
+    }
+  });
+
+  test(`HT-V-24 (${ad}): tazeleme reddinden sonra bağ da düşerse §20.6 uyarısı çıkar`, async () => {
+    const { rec } = await kos({ pullRed: true, openDetRed: true, bagHata: 'BAGLANTI' }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec), ['⚠️ Vaka kayıtlı, takip bağlanamadı']);
+  });
 }
+
+test('HT-V-25: tazeleme reddi kızgınlık bağlantısını da kesmez', async () => {
+  const { sandbox, rec } = sahne({ kizginlikId: 'K-1', pullRed: true });
+  await sandbox.submitCase(null);
+  assert.strictEqual(baglantilar(rec).length, 1);
+  assert.deepStrictEqual(hataToastlari(rec), []);
+});
