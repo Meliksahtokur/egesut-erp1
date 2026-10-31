@@ -16,7 +16,9 @@ const _GM_TOH_TERMINAL = ['Gebe', 'Boş', 'Doğum Yaptı', 'Abort'];
 // GERI_ALINDI telafi kaydı (W1 köprü trigger'ı yazan degisim_geri_al INSERT'i)
 // kartı Geçmiş akışına girer — "X geri alındı — 14.09 17:25 · küpe" (sahibin
 // örnek başlığı; etiket _gmGeriAlindiEtiketi, hedef çözücü geri alma tx'i).
-const _GM_ISLEM_TIPLERI = ['HAYVAN_EKLENDI', 'ABORT_KAYDI', 'KIZGINLIK_KAYDI', 'ASI_KAYDI', 'TOPLU_ILAC', 'GERI_ALINDI'];
+// Hayvan Takip (domain-rules §20): defterde görünür, Geçmiş'ten geri alınmaz (§20.7).
+const _GM_HT_ISLEM_TIPLERI = ['HAYVAN_TAKIP_ACILDI', 'HAYVAN_TAKIP_KAPANDI', 'HAYVAN_TAKIP_MUAYENE'];
+const _GM_ISLEM_TIPLERI = ['HAYVAN_EKLENDI', 'ABORT_KAYDI', 'KIZGINLIK_KAYDI', 'ASI_KAYDI', 'TOPLU_ILAC', 'GERI_ALINDI', ..._GM_HT_ISLEM_TIPLERI];
 // GERİ AL (L4-W2): 6-tip kısıtı KALKTI — buton kararı _gmGeriAlHedef çözücüsündedir
 // (hedef üreten her islem kartında geri-al olur; çözülemeyen kartta buton yok).
 // Karttaki fmtTarihSaat Europe/Istanbul'a çevirir (helpers.js) — CSV ve dateKey
@@ -70,6 +72,7 @@ const _GM_ISLEM_TIP_ETIKET = {
   GOREV_EKLENDI: 'Görev Eklendi', GOREV_GUNCELLENDI: 'Görev Güncellendi',
   GERI_ALINDI: 'Geri Alındı',
   GOREV_GUNCELLE: 'Görev Güncellendi', GOREV_TAMAMLA: 'Görev Tamamlandı', GOREV_OTOKAPAT: 'Görev Otomatik Kapandı',
+  HAYVAN_TAKIP_ACILDI: 'Takibe Alındı', HAYVAN_TAKIP_KAPANDI: 'Takip Kapandı', HAYVAN_TAKIP_MUAYENE: 'Takip Muayenesi',
 };
 const _GM_ISLEM_TIP_EMOJI = {
   HAYVAN_EKLENDI: '🐮', HAYVAN_GUNCELLENDI: '✏️', TOHUMLAMA: '💉', TOHUMLAMA_GUNCELLENDI: '✏️',
@@ -88,6 +91,7 @@ const _GM_ISLEM_TIP_EMOJI = {
   KISIR_ISARETLE: '💲', KISIR_KALDIR: '⭕',
   GOREV_EKLENDI: '➕', GOREV_GUNCELLENDI: '✏️', GOREV_GUNCELLE: '✏️', GOREV_TAMAMLA: '✅', GOREV_OTOKAPAT: '⏹️',
   GERI_ALINDI: '↩️',
+  HAYVAN_TAKIP_ACILDI: '📌', HAYVAN_TAKIP_KAPANDI: '✓', HAYVAN_TAKIP_MUAYENE: '🔍',
 };
 // Bilinmeyen tip için okunur yedek (U1 md.1): 'TEDAVI_GUN_EKLENDI' benzeri
 // bilinmeyen 'YENI_ISLEM_TIPI' → 'İşlem: yeni işlem tipi' (ham kod değil).
@@ -127,7 +131,9 @@ const _GM_KOD_DEGER_ETIKET = {
     ILERI_GEBE_ASI: 'İleri Gebe Aşısı', ILERI_GEBE: 'İleri Gebe Takviyesi',
     SUTTEN_KESME: 'Sütten Kesme', DIGER: 'Diğer',
     TAKIP_MUAYENE: 'Takip Muayenesi',   // P9/K15: ovsync takip zinciri muayenesi
+    HAYVAN_TAKIP_MUAYENE: 'Hayvan Takip Muayenesi',
   },
+  hayvan_takip_sonuc: { SURSUN: 'Takip sürsün', KAPANSIN: 'Takip kapansın' },
   durum: { active: 'Aktif', closed: 'Kapandı', geri_alindi: 'Geri Alındı' },
   status: { active: 'Aktif', closed: 'Kapandı' },
 };
@@ -142,6 +148,20 @@ function gmKodDegerEtiketi(alan, deger) {
   if (!m) return null;
   const v = typeof deger === 'string' ? deger.trim() : deger;
   return Object.prototype.hasOwnProperty.call(m, v) ? m[v] : null;
+}
+
+/**
+ * Hayvan Takip islem kartının alt satırı: sebep · sonuç · not. Kaçışsızdır; HTML'e basan esc uygular.
+ * Açılışta not açıklamanın kopyası olabildiğinden sebeple aynı not ikinci kez yazılmaz (DIGER).
+ * @param {Object} data islem_log satırı.
+ * @returns {string} Alt satır metni; üç tip dışında boş.
+ */
+function gmHtIslemAlt(data) {
+  if (!data || !_GM_HT_ISLEM_TIPLERI.includes(data.tip)) return '';
+  const snap = data.snapshot && typeof data.snapshot === 'object' ? data.snapshot : {};
+  const sebep = htSebepEtiket(snap);
+  const not = String(data.kullanici_notu || '').trim();
+  return [sebep, gmKodDegerEtiketi('hayvan_takip_sonuc', snap.sonuc), not === sebep ? '' : not].filter(Boolean).join(' · ');
 }
 
 // W8-D3 (saf): hayvan referans etiketi — ham id/UUID ASLA görünmez; çözülemeyen
@@ -204,6 +224,9 @@ function gmNotlarGorunur(n) {
  */
 function _gmGeriAlHedef(entry) {
   if (!entry || typeof entry !== 'object') return null;
+  // §20.7: kart düğmesi (_gmUndoRef) ve detay paneli (_openIslemDetayRow) burada kapanır.
+  // Değişiklikler sayfası bu çözücüye uğramaz; parolalı motor aynen kalır (§20.9).
+  if (_GM_HT_ISLEM_TIPLERI.includes(entry.tip)) return null;
   const snap = entry.snapshot && typeof entry.snapshot === 'object' ? entry.snapshot : {};
   const payload = entry.payload && typeof entry.payload === 'object' ? entry.payload : {};
   // 1) Kesin köprü: degisim_txid. GERI_ALINDI kartının txid'i geri alma
