@@ -293,6 +293,9 @@ Her kritik işlem `islem_log` tablosına yazılır. Tip değerleri (kodda üreti
 | `TEDAVI_GUNCELLENDI` | Tedavi güncelleme |
 | `GOREV_EKLENDI` / `GOREV_GUNCELLENDI` | Görev yaşam döngüsü |
 | `VAKA_ACILDI` | Vaka açılışı |
+| `HAYVAN_TAKIP_ACILDI` | `hayvan_takip_ac` RPC'si |
+| `HAYVAN_TAKIP_KAPANDI` | Takip kapanışı (elle, muayene, vaka, çıkış); takip başına bir satır |
+| `HAYVAN_TAKIP_MUAYENE` | `hayvan_takip_muayene_sonuc` RPC'si; planlama yazmaz |
 
 `ref_id` alanı migration 016+ sonrası kayıtlarda dolu; eski kayıtlarda `snapshot` içinde aranmalı.
 
@@ -303,7 +306,7 @@ Her kritik işlem `islem_log` tablosına yazılır. Tip değerleri (kodda üreti
 - `gorev_tipi` değerleri (CHECK kısıtı **yok** — serbest metin; kodda üretilenler):
   `ILAC`, `ASI_PLANLI` (planlı aşı — stok rezervasyonlu, 20260902000003), `BUZAGI_BAKIM`, `GEBELIK_KONTROL` (eski `TOHUMLAMA_HAZIRLIK`'ın yerini aldı, 20260830000010),
   `ILERI_GEBE`, `ILERI_GEBE_ASI`, `BESLEME`, `SUTTEN_KESME`, `PADOK_DEGISIM`, `TOHUMLAMA_PLANLI`,
-  `TEDAVI_GUN`, `TEDAVI_SEANS`, `VETERINER_KONTROL`, `KIZGINLIK_TAKIP`, `DIGER`
+  `TEDAVI_GUN`, `TEDAVI_SEANS`, `VETERINER_KONTROL`, `KIZGINLIK_TAKIP`, `HAYVAN_TAKIP_MUAYENE` (§20.6), `DIGER`
 - Ana görev (`parent_id = NULL`) + alt görevler (`parent_id` dolu); parent kapanınca çocuklar `trg_gorev_parent_kapandi` ile iptal olur
 - `tamamlandi = false` → bekleyen görev
 - `hedef_tarih` geçmişte kalan ve tamamlanmamış görevler gecikmiş sayılır
@@ -422,7 +425,8 @@ Tarih girişi artık tek kanonik bileşenden geçer (bkz. `D-20260909-CANONICAL-
   (`sk-tarih`), doğum (`b-tarih`), hayvan güncelleme (`a-dt`), aşılama
   (`td-asi-tarih`), çıkış (`cx-tarih`), gebelik kontrolü (`geb-tarih`).
 - **Gelecek meşru:** görev hedef tarihleri (`ta-tarih`, `te-tarih`) ve rapel
-  (`td-rapel-tarih`; parent+14..21 dinamik pencere).
+  (`td-rapel-tarih`; parent+14..21 dinamik pencere); hayvan takip muayenesi
+  (`ht-ac-tarih`, `ht-mu-tarih`, `ht-so-tarih`; `min: bugun`, §20.8).
 - **OWNER ONAYI BEKLEYEN davranış değişikliği:** `cx-tarih` (süründen çıkış) ve
   `sk-tarih` (sütten kesme) eski UI'da gelecek tarihe izin veriyordu; F2 ile
   `max=bugun` kısıtı geldi (RPC'ler kaydı anında zaten uygular — gelecek tarihli
@@ -501,7 +505,7 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
     satırı açık görev varsa bu ekranı açar, yoksa hayvan detayı; takip ekranında görevsiz "muayene vakti" satırı → hayvan detayı.
 18. **Hastalık = Ovsync içinde gün (karar 10, sahip 2026-10-13; karar 4/6'nın "alt vaka" kısmı GEÇERSİZ):** inaktif/kist için ayrı vaka AÇILMAZ — `cases.kaynak_vaka_id`, `inaktif_alt_vaka_ac/kapat`, alt-vaka trigger'ı, "dön" akışı YOKTUR. Hastalık günü = `treatment_days` satırı (`disease_id IS NOT NULL`); tekillik DB kısmi unique'idir (`treatment_days_hastalik_gun_uniq`: vaka+hastalık+tarih) — ikinci çağrı mevcut günü döner, ilaç tekrar yazılmaz, ertele tekrarlanmaz. İlaçlar o günün altına `add_drug_administration` ile (PG sarmalı dahil); açık TAI iptal edilmez, `tohumlama_gorev_ertele` ile sorulan gün kadar (varsayılan 7) ötelenir; 5. gün PG opsiyonel ve elle, otomatik PG görevi yok (karar 5 aynen); hastalık İnaktif Ovaryum, kist için Kistik Over — tek RPC `ovsync_hastalik_gunu_ekle` (karar 6-7); ön-öneri inaktifte CAROFERTIN-E 20 ml, kistte boş, +İlaç ile eklenebilir (karar 7); pencere TAI gününde biter. Kartta girintili alt-satır, ayrı vaka satırı yok. S4 kartındaki devam rozeti "🦠 Ovsync içinde hastalık günü" der, ebeveyn vaka detayına çıkar (gün id'sine değil); tek günde hastalık adı rozette görünür. Kısır hayvana hastalık günü açılmaz (`KISIR_HAYVANA_HASTALIK_GUNU_YOK`); kısır hard-block (§18.5) aynen.
 
-## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; henüz uygulanmadı)
+## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; demo'da uygulandı, prod bekliyor)
 
 Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve Ovsync "🔍 takipte" rozetinden AYRI bir kavramdır; üreme akışlarını etkilemez. (§19 başka dalda istatistik için kullanılıyor; çakışmasın diye 20.)
 
@@ -513,3 +517,8 @@ Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve
 6. **Muayene görevi:** Takibe elle bağlanan `HAYVAN_TAKIP_MUAYENE` görevi; takip başına en fazla bir açık görev. Sonuçsuz kapanmaz: takip sürsün + sonraki muayene ya da takip kapansın. Genel Ertele yoktur. Takip kapanınca açık görev iptal olur.
 7. **Muayene sonucu geri alınmaz (sahip 2026-10-31):** Yeni tipte görev geri alma ve Geçmiş geri-al düğmeleri kapalıdır; yanlış kapanışta takip yeniden açılır.
 8. **Muayene tarihi (sahip 2026-10-31):** Geçmiş tarihe muayene planlanamaz; yalnız bugün ve sonrası.
+9. **Değişiklikler sayfasından geri alma (demo ölçümü Ö1, 2026-10-31):** Plan ve uygulama motoru işlem içinde çalıştırılıp geri sarılarak ölçüldü; parolalı `degisim_geri_al` çağrılmadı.
+   - **`islem` seviyesi tutarlıdır.** Çıkış geri alınırsa hayvan `Aktif` olur; kapanan takipler ve iptal olan muayene görevi geri açılır. `KAPANSIN` sonucu geri alınırsa takip ve görev geri açılır.
+   - **`satir` seviyesi yalnız seçilen satırı döndürür.** `hayvanlar` satırı dönerse hayvan `Aktif` olur, takip kapalı ve görev iptal kalır; takip karttan yeniden açılır. Önizleme bu seviyede eksik kalan satırlar için uyarı vermez.
+   - **Tutarsız bırakan iki `satir` hedefi:** Çıkışın `hayvan_takip` satırı, çıkmış hayvanda açık takip bırakır. `gorev_log` satırı, çıkmış hayvanda ya da kapalı takipte açık görev bırakır; bu görevi sonuç penceresi (`HT_TAKIP_KAPALI`) ve `gorev_tamamla` (`MUAYENE_SONUC_GEREKLI`) reddeder, yalnız `p_iptal=true` kapatır.
+   - **Aynı sebep yeniden açıldıysa:** Önizleme "geri alınabilir" der, uygulama `hayvan_takip_acik_sebep_uq` ile reddedilir; eski kapanış geri alınamaz.

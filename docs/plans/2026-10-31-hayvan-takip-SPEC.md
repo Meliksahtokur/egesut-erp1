@@ -180,6 +180,17 @@ Bu maddeler kapanmadan ilgili faz kabul edilmez.
 | Ö2 | Canlı `gorev_log`, `cases.id`, `gorev_tamamla` tanımları migration'larla uyuşuyor mu? | DB işi öncesi canlı şema okuması |
 | Ö3 | Demo klonuna yeni tablo FDW içe aktarması sonrası doğru giriyor mu? | Demo uygulaması sırasında `demo/01_fdw_bridge.sql` ve `demo/03_sema_diff.sql` ile ölçüm |
 
+### Sonuçlar (2026-10-31)
+
+| No | Durum | Sonuç |
+|---|---|---|
+| Ö1 | Kapandı (demo) | Çıkışı `islem` seviyesinde geri almak hayvanı `Aktif` yapar; kapanan takipleri ve iptal olan görevi geri açar. `satir` seviyesi yalnız seçilen satırı döndürür: `hayvanlar` satırında takip kapalı kalır ve karttan yeniden açılır. Ayrıntı: `domain-rules.md` §20.9. |
+| Ö2 | Kapandı (prod ve demo okuması) | Canlı `gorev_log`, `cases.id` ve `gorev_tamamla` tanımları beklenenle eş. Spec davranışını değiştiren sapma yok. |
+| Ö3a | Kapandı (demo) | `demo_klonla()` işlem içinde `ok=true`, 2BP01 yok; `hayvan_takip` boşaltılan ek tablolar arasında ve boş kalıyor. `demo_sema_diff()` yalnız prod'da olup demo'da olmayanı bildirdiği için bu demo fazında fark göstermez. |
+| Ö3b | Açık | Prod uygulamasından sonra ölçülür (sahip onaylı ayrım, 2026-10-31). |
+
+Şema demo'da uygulandı; prod bekliyor.
+
 ## 8. Test ve kabul
 
 1. **Migration:** Her migration `scripts/db-validate.sh` kapısından geçer.
