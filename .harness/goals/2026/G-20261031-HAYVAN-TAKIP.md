@@ -23,7 +23,14 @@ write_manifest:
   - supabase/migrations/20261031200003_gorev_tamamla_hayvan_takip.sql
   - supabase/migrations/20261031200004_hayvan_takip_halsizlik_etiket.sql
   - supabase/migrations/20261031200005_hayvan_takip_muayene_vaka.sql
+  - supabase/migrations/20261031200006_hayvan_takip_kilit.sql
+  - .harness/runbooks/db-migration.md
+  - demo/01_fdw_bridge.sql
   - tests/db-validation/hayvan_takip_priors.sql
+  - tests/db-validation/hayvan_takip_kilit_priors.sql
+  - tests/unit/ileri-gebe-duve-siralama.test.js
+  - tests/unit/ovsync-girisler.test.js
+  - tests/unit/ovsync-pg-ui.test.js
   - tests/sql/hayvan_takip_kos.sh
   - tests/sql/hayvan_takip_karsi_test.sql
   - tests/sql/hayvan_takip_karsi_mutant.sql
@@ -131,6 +138,8 @@ checkpoint:
   - U2-S1: `js/utils/helpers.js`, `js/utils/events.js`, `tests/unit/saat-alani.test.js`, `tests/unit/forms-validation.test.js`, `tests/unit/vaka-toplu-ac.test.js`, `tests/unit/erteleme-genel-ui.test.js`, `tests/unit/ovsync-secici.test.js`, `tests/unit/hizli-uygulama-guard.test.js` (diğer dosyalar yukarıdaki düğümlerde)
   - U2-K: `tests/unit/hayvan-takip-belge.test.js` (diğer dosyalar yukarıdaki düğümlerde)
   - U2-düzeltme: `tests/sql/hayvan_takip_kilit_test.sh` (diğer dosyalar yukarıdaki düğümlerde)
+  - U2-düzeltme 2: `supabase/migrations/20261031200006_hayvan_takip_kilit.sql`, `tests/db-validation/hayvan_takip_kilit_priors.sql`, `.harness/runbooks/db-migration.md` (diğer dosyalar yukarıdaki düğümlerde)
+  - Sonradan eklenen, dalda zaten değişen: `demo/01_fdw_bridge.sql` (demo klon koltuğu), `tests/unit/ileri-gebe-duve-siralama.test.js`, `tests/unit/ovsync-girisler.test.js`, `tests/unit/ovsync-pg-ui.test.js`
   - Plan ve kapanış: `docs/plans/2026-10-31-hayvan-takip-PLAN.md`, bu goal dosyası, `.harness/reports/2026-10-31-hayvan-takip.md`
   - Yerel: `runs/2026-10-31-hayvan-takip/*`, `.crumbs/*`
 - **tracked paths:** yukarıdaki manifestin `runs/` ve `.crumbs/` dışındaki dosyaları. `docs/plans/` gitignore'dadır, `git add -f` ile eklenir.
@@ -140,9 +149,10 @@ checkpoint:
 - **pattern_refs:** `RPC-WRITE-01`, `MODAL-ROUTER-01`, `FORM-SUBMIT-01`, `TESTING-01`
 - **pattern_exceptions:** `OFFLINE-SYNC-01` uygulanmaz: spec §1 ve §6 çevrimdışı kuyruğu kapsam dışı tutar, yeni RPC'ler online-only kalır.
 - **acceptance commands:**
-  - Her migration: `scripts/db-validate.sh` (taslak ve final) `--priors tests/db-validation/hayvan_takip_priors.sql` + serinin önceki dosyaları; `PASS`, rapor `reports/db-validation-<sha8>.md`.
+  - Her migration: `scripts/db-validate.sh` (taslak ve final) `--priors tests/db-validation/hayvan_takip_priors.sql` + serinin önceki dosyaları; `PASS`, rapor `reports/db-validation-<sha8>.md`. `200006` için `200005`'ten sonra `tests/db-validation/hayvan_takip_kilit_priors.sql` de verilir.
+  - Apply sırası altı dosya, tek işlem: `.harness/runbooks/db-migration.md` "Series apply order".
   - `bash tests/sql/hayvan_takip_kos.sh` rc=0 (argümansız: seri migration'lar + `hayvan_takip_test.sql`).
-  - `bash tests/sql/hayvan_takip_kilit_test.sh` rc=0 (kabul DB kopyasında iki oturum: K1-K3).
+  - `bash tests/sql/hayvan_takip_kilit_test.sh` rc=0 (kabul DB kopyasında iki oturum: K0-K7).
   - `bash tests/sql/hayvan_takip_kos.sh <3 migration> tests/sql/hayvan_takip_karsi_test.sql` rc=0, `OZET: 11 PASS`; migration'sız (T1 Run) `KOS_MOD=topla` mutant `DUSEN` tam olarak `KR01-KR07`, `KR09`.
   - `node --test tests/unit/*.test.js` (`NODE_PATH` ana checkout): yalnız M0'da ölçülen taban kırmızıları (db46032: 1598/1592/5/1).
   - Değişen JS'te `node --check`; `git diff --check`.
