@@ -192,7 +192,7 @@ bandlı sonuç (`js/forms.js:bcSonucBantlari`); submit `js/forms.js:submitBulkCa
   `js/ui.js:renderTask` ✓ ve `js/ui.js:_erteleBtnHtml` Ertele çizmez; `js/ui.js:detayTamamla` sonuç penceresine gider;
   `js/ui.js:openDoneTaskDet` ve Geçmiş'te `js/gecmis.js:_gmGeriAlHedef` geri almayı kapatır. Ürün yolları korumalıdır; migration serisi `gorev_geri_al`, `gorev_ertele`, `gorev_guncelle` gövdelerine dokunmaz.
   Doğrudan RPC ölçümü (kabul DB, ROLLBACK): `gorev_tamamla` `MUAYENE_SONUC_GEREKLI` ile, `gorev_ertele` `GOREV_ERTELENEMEZ` (sebep `TIP_ERTELENEMEZ`) ile reddeder.
-  **Bilinen sınır, sahip kararı bekliyor:** doğrudan çağrılan `gorev_geri_al` (JS çağıranı yok) kapalı takipte açık görev bırakabilir, §20.7 delinir; doğrudan çağrılan `gorev_guncelle` (UI yolları sonuç penceresinin arkasında) geçmiş tarih yazabilir ve tipi değiştirebilir, §20.6 ve §20.8 delinir.
+  **Bilinen sınır (sahip kararı 2026-10-31, domain-rules §20.10: şimdilik kabul, tip kilidi ayrı iş):** doğrudan çağrılan `gorev_geri_al` (JS çağıranı yok) kapalı takipte açık görev bırakabilir, §20.7 delinir; doğrudan çağrılan `gorev_guncelle` (UI yolları sonuç penceresinin arkasında) geçmiş tarih yazabilir ve tipi değiştirebilir, §20.6 ve §20.8 delinir.
 - **Vaka sonrası soru:** `js/forms.js:submitCase` ve `js/forms.js:caseTakipRetry` → `js/forms.js:_vakaSonrasiAkis` (önce vaka detayı, sonra pencere).
   Kızgınlık "Tedavi"sinden gelen form sormaz (`js/forms.js:_kizginliktenVakaMi`); toplu ve otomatik vaka yolları bu akışa girmez.
 

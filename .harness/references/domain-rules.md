@@ -517,9 +517,14 @@ Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve
 6. **Muayene görevi:** Takibe elle bağlanan `HAYVAN_TAKIP_MUAYENE` görevi; takip başına en fazla bir açık görev. Sonuçsuz kapanmaz: takip sürsün + sonraki muayene ya da takip kapansın. Genel Ertele yoktur. Takip kapanınca açık görev iptal olur.
 7. **Muayene sonucu geri alınmaz (sahip 2026-10-31):** Yeni tipte görev geri alma ve Geçmiş geri-al düğmeleri kapalıdır; yanlış kapanışta takip yeniden açılır.
 8. **Muayene tarihi (sahip 2026-10-31):** Geçmiş tarihe muayene planlanamaz; yalnız bugün ve sonrası.
-9. **Değişiklikler sayfasından geri alma (yalnız demo ölçümü Ö1, 2026-10-31; tutarsız durumlar sahip kararı bekliyor):** Plan ve uygulama motoru işlem içinde çalıştırılıp geri sarılarak ölçüldü; parolalı `degisim_geri_al` çağrılmadı.
+9. **Değişiklikler sayfasından geri alma (yalnız demo ölçümü Ö1, 2026-10-31; tutarsız durumlar için sahip kararı: §20.10):** Plan ve uygulama motoru işlem içinde çalıştırılıp geri sarılarak ölçüldü; parolalı `degisim_geri_al` çağrılmadı.
    - **§20.7 ile ilişki:** §20.7 görev detayındaki ve Geçmiş'teki geri alma düğmelerini kapatır. `islem` ve `satir` geri alma yalnız parolalı değişiklik motorunda (Değişiklikler sayfası) kalır; §20.7 bu yolu kapatmaz.
    - **`islem` seviyesi tutarlıdır.** Çıkış geri alınırsa hayvan `Aktif` olur; kapanan takipler ve iptal olan muayene görevi geri açılır. `KAPANSIN` sonucu geri alınırsa takip ve görev geri açılır.
    - **`satir` seviyesi yalnız seçilen satırı döndürür.** `hayvanlar` satırı dönerse hayvan `Aktif` olur, takip kapalı ve görev iptal kalır; takip karttan yeniden açılır. Önizleme bu seviyede eksik kalan satırlar için uyarı vermez.
-   - **Tutarsız bırakan iki `satir` hedefi (sahip kararı bekliyor; bugün engel yok):** Çıkışın `hayvan_takip` satırı, çıkmış hayvanda açık takip bırakır. `gorev_log` satırı, çıkmış hayvanda ya da kapalı takipte açık görev bırakır; bu görevi sonuç penceresi (`HT_TAKIP_KAPALI`) ve `gorev_tamamla` (`MUAYENE_SONUC_GEREKLI`) reddeder, yalnız `p_iptal=true` kapatır.
+   - **Tutarsız bırakan iki `satir` hedefi (sahip kararı §20.10: merge'i tutmaz, önizleme uyarısı ayrı iş; bugün engel yok):** Çıkışın `hayvan_takip` satırı, çıkmış hayvanda açık takip bırakır. `gorev_log` satırı, çıkmış hayvanda ya da kapalı takipte açık görev bırakır; bu görevi sonuç penceresi (`HT_TAKIP_KAPALI`) ve `gorev_tamamla` (`MUAYENE_SONUC_GEREKLI`) reddeder, yalnız `p_iptal=true` kapatır.
    - **Aynı sebep yeniden açıldıysa:** Önizleme "geri alınabilir" der, uygulama `hayvan_takip_acik_sebep_uq` ile reddedilir; eski kapanış geri alınamaz.
+10. **Sahip kararları (2026-10-31):**
+   - **`GERI_ALINDI` kartı:** Sebep ve not göstermez, `⟲ Geri alınanı geri al` düğmesi kalır. §20.7 ile bilinen uyumsuzluktur; merge'i tutmaz, ayrı iş.
+   - **Muayene kapanışı:** Geçmiş'te üç satır kalır: Kapandı, Takip Muayenesi, notsuz görev kartı.
+   - **Doğrudan RPC yolu:** `gorev_geri_al` ve `gorev_guncelle` yeni tipi kilitlemez, §20.6-8 bu yolla delinebilir. Şimdilik kabul; tip kilidi ayrı iş.
+   - **§20.9 `satir` hedefleri:** Tutarsız bırakan hedefler merge'i tutmaz; önizleme uyarısı ayrı iş.
