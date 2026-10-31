@@ -12773,7 +12773,7 @@ function caseDaySaatAc(dayId, currentTime) {
   const saatVal = currentTime ? currentTime.slice(0,5) : '';
   box.innerHTML = `<div style="background:var(--card);border-radius:18px 18px 0 0;width:100%;padding:20px 16px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px))">
     <div style="font-weight:800;font-size:.9rem;margin-bottom:14px">🕐 Tedavi Saatini Ayarla</div>
-    <input type="time" id="saat-input" value="${saatVal}" style="width:100%;border:1.5px solid var(--card3);border-radius:10px;padding:12px;font-size:1.1rem;background:var(--card);color:var(--ink);outline:none;margin-bottom:12px">
+    <div style="margin-bottom:12px">${saatAlaniHtml('saat-input', { deger: saatVal, attr: 'style="font-size:1.1rem"' })}</div>
     <div style="display:flex;gap:8px">
       <button onclick="caseDaySaatKaydet('${dayId}')" style="flex:1;padding:12px;background:var(--green);color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">Kaydet</button>
       <button onclick="document.getElementById('saat-modal').remove()" style="flex:1;padding:12px;background:var(--card2);color:var(--ink);border:1px solid var(--card3);border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer">İptal</button>
@@ -14139,11 +14139,12 @@ function caseTohumlamaEkleAc() {
   div.style.cssText = 'background:rgba(78,154,42,.06);border:1px solid rgba(78,154,42,.2);border-radius:10px;padding:12px;margin-bottom:10px';
   div.innerHTML =
     '<div style="font-size:.74rem;font-weight:700;color:var(--ink2);margin-bottom:8px">🐄 Planlı Tohumlama Ekle</div>' +
-    '<div style="display:flex;gap:8px;margin-bottom:10px">' +
-      '<label style="flex:2;font-size:.7rem;color:var(--ink3)">Tarih' +
+    '<div style="margin-bottom:10px">' +
+      '<label style="display:block;font-size:.7rem;color:var(--ink3);margin-bottom:8px">Tarih' +
       '<input type="hidden" id="cdt-tarih" value="' + bugunTr + '">' +
       '<button type="button" id="cdt-tarih-btn" data-action="cdt-takvim-ac" style="width:100%;margin-top:3px;background:var(--card);border:1px solid var(--card3);border-radius:8px;padding:8px;font-size:.8rem;font-weight:600;color:var(--ink);cursor:pointer;text-align:left">📅 ' + fmtTarih(bugunTr) + '</button></label>' +
-      '<label style="flex:1;font-size:.7rem;color:var(--ink3)">Saat<input id="cdt-saat" class="fi" type="time" value="08:00" style="margin-top:3px"></label>' +
+      '<label for="cdt-saat" style="display:block;font-size:.7rem;color:var(--ink3);margin-bottom:3px">Saat</label>' +
+      saatAlaniHtml('cdt-saat', { deger: '08:00' }) +
     '</div>' +
     '<div style="display:flex;gap:6px">' +
       '<button onclick="caseTohumlamaEkleOnayla(this)" style="flex:1;background:var(--green);color:#fff;border:none;border-radius:8px;padding:9px;font-size:.76rem;font-weight:700;cursor:pointer">Ekle</button>' +
@@ -14181,7 +14182,9 @@ async function caseTohumlamaEkleOnayla(btn) {
   if (!_curCase) return;
   const tarih = document.getElementById('cdt-tarih')?.value;
   const saat  = document.getElementById('cdt-saat')?.value || '08:00';
-  if (!tarih) { toast('Tarih seçin', true); return; }  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
+  if (!tarih) { toast('Tarih seçin', true); return; }
+  if (saatYarimMi('cdt-saat')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Ekleniyor…'; }
   try {
     await rpc('vaka_tohumlama_ekle', { p_case_id: _curCase.id, p_tarih: tarih, p_saat: saat });
     document.getElementById('cd-toh-form')?.remove();
