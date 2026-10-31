@@ -327,13 +327,22 @@ async function _htAktifVakalariGoster(gorevId, hayvanId) {
 /**
  * Yeni vaka yolu: bağlamı yazar, sonuç penceresini kapatıp vaka formunu açar. Yazma burada yok;
  * bağlam m-disease kapanınca düşer (closeM), bağ vaka açıldıktan sonra kurulur (_vakaSonrasiAkis).
+ * closeM history.back atarsa form geri geçişi bitince açılır (_modalBackDevam): aynı turda pushState
+ * geri tuşunu formu kapatmak yerine uygulamadan çıkarır (Chromium'da ölçüldü, emsal _protokolOvsyncGit).
  * @returns {void}
  */
 function htSonucVakaAc() {
   globalThis._kizginlikTedaviId = null;
   globalThis._htMuayeneVaka = { gorevId: g('ht-so-gid').value, hayvanId: _htSonucHayvanId, not: g('ht-so-not').value.trim() || null };
+  const kupe = _htKupe(_htSonucHayvanId);
+  const ac = () => openMWithHayvan('m-disease', 'd-hid', kupe);
+  if (history.state?.modal === 'm-ht-sonuc') {
+    globalThis._modalBackDevam = ac;
+    closeM('m-ht-sonuc');
+    return;
+  }
   closeM('m-ht-sonuc');
-  openMWithHayvan('m-disease', 'd-hid', _htKupe(_htSonucHayvanId));
+  ac();
 }
 
 /**

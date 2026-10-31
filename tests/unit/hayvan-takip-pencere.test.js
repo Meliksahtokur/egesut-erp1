@@ -142,6 +142,7 @@ function kur(o = {}) {
       closeM: id => { k.kapanan.push(id); k.sira.push('closeM:' + id); },
       openMWithHayvan: (...a) => { k.sira.push(['openMWithHayvan', ...a]); },
       _htVakaSonrasiGuvenli: async (...a) => { k.sira.push(['soru', ...a]); },
+      history: o.history || { state: null },
       _curTaskFilter: 'today',
     },
   });
@@ -499,6 +500,25 @@ test('HT-P-30: Vaka aç bağlamı yazar, kızgınlık işaretini siler, önce so
   k.g('ht-so-not').value = '   ';
   k.s.htSonucVakaAc();
   assert.strictEqual(k.s._htMuayeneVaka.not, null, 'boş not null');
+});
+
+test('HT-P-30b: sonuç penceresi history tepesindeyse vaka formu geri geçişi bitince açılır; aynı turda pushState yok', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], history: { state: { modal: 'm-ht-sonuc' } } });
+  await k.s.htSonucAc('g1');
+  k.sira.length = 0;
+  k.s.htSonucVakaAc();
+  assert.deepStrictEqual(duz(k.sira), ['closeM:m-ht-sonuc'], 'form aynı turda açılmaz');
+  assert.strictEqual(typeof k.s._modalBackDevam, 'function');
+  k.s._modalBackDevam();
+  assert.deepStrictEqual(duz(k.sira), ['closeM:m-ht-sonuc', ['openMWithHayvan', 'm-disease', 'd-hid', 'K-1']]);
+});
+
+test('HT-P-30c: bekleyen geri yoksa devam bırakılmaz, form hemen açılır', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')] });
+  await k.s.htSonucAc('g1');
+  k.s.htSonucVakaAc();
+  assert.ok(!k.s._modalBackDevam, 'sonraki popstate\'e iş kalmaz');
+  assert.strictEqual(k.sira.filter(o => o[0] === 'openMWithHayvan').length, 1);
 });
 
 test('HT-P-31: yalnız hayvanın aktif vakaları listelenir, aynı hastalıkla sınırlı değil; satırda hastalık ve tarih', async () => {
