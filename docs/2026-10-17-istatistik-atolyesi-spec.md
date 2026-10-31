@@ -22,6 +22,7 @@ v1 (`docs/2026-10-05-istatistik-modulu-spec.md`) yerinde kalır. Aşağıdaki ta
 | §2 K12, §8.1 | RPC çizime hazır seri | **Geçerli**, zarf genişler (§4.5). |
 | §3.4 | mevcut kalıntı tablosu | Genişletildi: F0-F2 nesnelerinin kaderi §4.9. |
 | §5.2 `v_stat_vaka` | "protokol" = ürün kümesi; tam küme gruplaması | **Geçersiz.** Yerine §4.2 vaka satırı + vaka×ilaç satırı, "içeren" ekseni. |
+| §5.2 `kapanis` | koşulsuz `closed_at::date` | **Kod esas.** Kapanış yalnız `status='closed'` iken yazılır (`v_stat_vaka`, migration `20261005000002`; §4.2.2 aynı kural): closed_at dolu aktif vaka kapanmış sayılmaz. |
 | §5.2 `maliyet_tl` | Σ doz × `stok.maliyet` | **Geçersiz.** `stok.maliyet` prod'da 51/51 satırda 0 (MEASURED 2026-10-17). Yerine §4.2.4. |
 | §5.3 ölçüm listesi | `stat_tedavi_ozet/protokol/sure_dagilim`, motor sağkalım/fark | **Emekli** (§4.9). Yerine §4.3. |
 | §6.3, §12 A1 | ekran sözleşmesi; grafik kütüphanesi açık | Yerine §3 (Stitch envanteri), §4.6 (kütüphane önerisi). |
@@ -88,8 +89,16 @@ Sormadan önce buraya bak. v1 K1-K17 geçerli (yukarıdaki §0 istisnalarıyla).
 | M1 | Gruplama, sayma, oran, medyan **Postgres'te**; JS yalnız seçim + çizim. Brainstorming bölüm 1'deki "gruplama ekranda" ifadesinin yerine geçer. | V14 bağlayıcı; n<5 kuralı tek yerde; her sayı tek SQL tanımına izlenir (v1 başarı ölçütü); AP3 kıyası aynı tanımı kullanır. §11 SK-7. |
 | M2 | Başarı olgunlaşması: kapanıştan bu yana 30 gün dolmamış ve henüz olay (ölüm/kesim/nüks/tedavi değişti) görülmemiş vaka başarı paydasına girmez ("olgunlaşmamış"), hız hesabına girer. | V4'teki "30 gün içinde yok" ancak 30 gün geçince söylenebilir. Aksi hâlde yeni kapanan vakalar başarıyı şişirir. §11 SK-8. |
 | M3 | Vaka aktifken hayvan ölür/kesilirse vaka **sonuçlanmış ve başarısız** sayılır (açık değil). Aktif vaka + satış/kayıp çıkışı = açık (hesap dışı). | v1 §5.2 sıra 1 ile aynı; hayvanı olmayan vaka "süren" değildir. |
-| M4 | Gruplar örtüşür ("içeren"): bir vaka birden çok ilaç satırında sayılır; grafiğin altında dipnot. Etiket: "Enrolen içeren", "Enrolen + Halocur içeren", "Enrolen içeren, Halocur'suz". | V2 |
-| M5 | Ekrandaki her yorum cümlesi betimseldir ("medyan 1 gün daha kısa"); nedensellik dili ("sağlar", "etkilidir") yazılmaz. Dipnot: "Karşılaştırma gözlemseldir; şiddet/yaş eşleştirmesi yok." | v1 §5.2 sınırlamalar; şiddet alanı yok |
+| M4 | Gruplar örtüşür ("içeren"): bir vaka birden çok ilaç satırında sayılır; grafik çizilen kartta özetin altında görünür tek satır (S4), metin sunucu dipnotundan. Etiket: "Enrolen içeren", "Enrolen + Halocur içeren", "Enrolen içeren, Halocur'suz". | V2 |
+| M5 | Ekrandaki her yorum cümlesi betimseldir ("medyan 1 gün daha kısa"); nedensellik dili ("sağlar", "etkilidir") yazılmaz. Dipnot: "Karşılaştırma gözlemseldir; şiddet/yaş eşleştirmesi yok."; M4 dipnotuyla aynı görünür satırda (S4). | v1 §5.2 sınırlamalar; şiddet alanı yok |
+
+**Sahip kararları (2026-10-31, "öneriler kabul"):**
+
+| # | Karar | Uygulama |
+|---|---|---|
+| S2 | Az vakalı ilaç grafikte gizli, kalanı ölçüye göre sıralı | Çizilmeyen ilaçlar kart altında "veri az" satırında; başarı yüksekten, süre ve ₺ küçükten; eşitlikte n büyük önce; `(bilinmiyor)` sonda. Geri alma sabiti `_GRAFIK_YETERLI_GRUPLAR` (`js/istatistik/grafik.js`). |
+| S3 | Bu tur ₺ yalnız geçici fiyatla | Girilen fiyat kaydedilmez (§4.2.4); kalıcı ilaç fiyatı ayrı iş (SK-2). Fiyat yoksa ₺ kartı §4.8 "Fiyat yok" durumundadır. |
+| S4 | Gözlem uyarısı kartta görünür | M4 ve M5 dipnotları grafik çizilen kartta tek satır görünür, Ayrıntı'da tekrarlanmaz; öteki dipnotlar Ayrıntı'da kalır. Seçim sunucu metninin köküne bağlıdır (`grafikDipnotAyir`), kontrat testi `tests/unit/istatistik-dipnot-kontrat.test.js`. |
 
 ---
 
@@ -199,7 +208,7 @@ Kural:
 | **Vaka başı ₺** `saglik_vaka_tl` | sonuçlanmış + maliyeti hesaplanabilen | medyan | Q1–Q3 | n<5 |
 | **Başarı başına ₺** `saglik_basari_tl` (fiyat-performans) | aynı küme | Σ vaka maliyeti / başarılı sayısı | yok | başarılı <5 |
 
-Kurallar: süreler çıplak ortalama ile basılmaz (v1 §5.2); başarı ve hız aynı grafikte birleştirilmez (V3); açık vaka hiçbir ölçüde yok, `acik_n` her kartta "+N açık vaka hesap dışı" olarak yazar (V6); olgunlaşmamış vaka sayısı başarı kartında "N vaka 30 gün dolmadı" olarak yazar.
+Kurallar: süreler çıplak ortalama ile basılmaz (v1 §5.2); başarı ve hız aynı grafikte birleştirilmez (V3); açık vaka hiçbir ölçüde yok, `acik_n` her kartta "+N açık vaka hesap dışı" olarak yazar (V6); olgunlaşmamış vaka sayısı başarı kartında "N vaka 30 gün dolmadı" olarak yazar. **[T16 ruling, sadelik]** Bu iki sayaç kartın kapalı "Ayrıntı" alanındadır (§4.7).
 
 Kapanma eğrisi açık vakaları dışladığı için uzun süren vakaları eksik gösterebilir; kart dipnotu `acik_n` ile bunu söyler (risk §10).
 
@@ -290,7 +299,7 @@ Renk: tema değişkenlerinden iki ton (seçili grup / kıyas grubu) + gri (yeter
 
 **Tanım kartı:** `stat_olcum_kayit` (CONFIRMED `20261005000001_stat_iskelet.sql:22`) yeniden kullanılır; satır = bir ölçü tanımı. Eklenecek kolonlar: `birim text`, `tanim text` (tek paragraf, Türkçe), `kume text` (hangi vakalar girer). Eski 5 satır (`stat_tedavi_*`) silinir, §4.3'teki 5 satır eklenir (`alan='saglik'`, `tip='sql'`). Her grafik kartının altında "Tanım" açılır satırı: tanım + küme + sürüm + hesap tarihi. Bu kartlar AP3'te dış kaynağın tanımıyla eşleştirme anahtarıdır.
 
-**[T16 ruling, sadelik]** Yukarıdaki "Tanım" açılır satırı ve hesap tarihi ile dipnotlar, kartta tek kapalı "Ayrıntı" alanının altındadır.
+**[T16 ruling, sadelik]** Yukarıdaki "Tanım" açılır satırı ve hesap tarihi ile dipnotlar, kartta tek kapalı "Ayrıntı" alanının altındadır. İstisna S4 (§2): M4 ve M5 dipnotları grafik çizilen kartta görünür satırdadır.
 
 **Kaydedilen grafik:** yeni tablo `stat_kayitli_grafik` (domain-rules §14: tenant-scoped):
 | kolon | not |
@@ -314,11 +323,14 @@ Kural: kaydedilen şey **cümledir, sonuç değil**. Pano kartı açılışta `s
 | Veri yok | küme 0 | "Bu seçimde vaka yok" + son değiştirilen slotu geri al |
 | Doz | ölçü listesinde pasif "Doz" maddesi seçilirse | "Doz verisi yok: uygulamalar ml olarak kayıtlı, hayvan ağırlığı yok; doz kıyası yapılamaz." (V16) |
 | Fiyat yok | ₺ ölçüsü seçili, fiyatsız vaka var | "N vakanın ilaç fiyatı yok" + geçici fiyat paneli (08 deseni, "Bu değerler kaydedilmez") |
+| Zaman seyrek | zaman kırılımında hiçbir seride 2 dönem n≥5 dolu değil (`zaman_seyrek`) | dolu dönem varsa özet cümlesi + "Çizgi için en az 2 dönemde 5 vaka gerekir." + "Çeyreklik göster" (ay), "Yıllık göster" (çeyrek), yılda dönem eylemi |
 | Kontrast yok | kıyas grubu n<5 (ör. "Enrolen'siz" n=2) | "Karşı grup çok küçük (n=2)" + "Ek ilaç ekseninde kıyasla" (kombinasyon paneline götürür) |
 | Çevrimdışı | RPC erişilemez | "İstatistik çevrimiçi hesaplanır" + son çizilen grafik bayat etiketiyle kalır |
 | Hesap tarihi | her kart | "Hesap tarihi: GG.AA.YYYY SS:DD" + "Yeniden hesapla" (önbelleği boşaltıp yeniden çağırır) |
 
 **[T16 ruling, U6]** AK-3 ve U6'daki "n≥5 satır ≥4" eşiği yerine "yeterli gruplar çizilir, kalanı metinle" kabul edilir (Enterit'te n≥5 sonuçlanmış grup 2; dönem büyütmek değiştirmiyor, MEASURED; veri sınırı). Hesap tarihi satırı kapalı "Ayrıntı" altındadır (§4.7).
+
+**Veri az satırı (S2, S3):** ilaç kırılımında çizilmeyen ilaçlar "N ilaçta veri az (<5 vaka): ad n · ..." satırındadır. ₺ kartında fiyatsız vaka varsa n yalnız fiyatlı vakayı sayar; satır bunu ayırır: "N ilaçta fiyatlı vaka az (<5): ad n" ve "N ilaçta fiyatlı vaka yok: ad" (`saglik_basari_tl` kartında "fiyatlı başarılı vaka").
 
 ### 4.9 F0-F2 nesnelerinin kaderi
 
@@ -444,7 +456,7 @@ Ek kural (02-DESKTOP gözlemi): Stitch'in "+₺50 ek flunixin maliyeti · 1 gün
 | AK-7 | **Kaydet döngüsü:** kurulan grafik kaydedilir, panoda görünür, yeniden açılınca aynı cümle ve aynı sayılar; sil ve sırala çalışır; geçici fiyat saklanmaz | worker koşumu + DB satırı |
 | AK-8 | **Geçici fiyat:** fiyatsız ₺ kartı fiyat panelini açar; girilen fiyat yalnız o hesapta; kart "geçici, kaydedilmedi" bandı taşır; sayfa yenilenince fiyat yok | worker koşumu + `stok.maliyet` değişmedi |
 | AK-9 | **Masaüstü + telefon:** 1440 px ve 390 px genişlikte yatay kaydırma yok, grafik etiketleri okunur, cümle kurucu telefonda kullanılabilir | PNG + `scrollWidth ≤ clientWidth` |
-| AK-10 | **Durumlar:** §4.8'deki 7 durumun her biri demo'da tetiklenip görüldü | worker koşumu, durum başına PNG |
+| AK-10 | **Durumlar:** §4.8'deki 8 durumun her biri demo'da tetiklenip görüldü | worker koşumu, durum başına PNG |
 | AK-11 | **Güvenlik/DB:** db-validate PASS; yeni RPC'lerde anon EXECUTE yok; `stat_kayitli_grafik` farm_id + index + RLS | db-validate raporu + `has_function_privilege` |
 | AK-12 | **Sahip demo yürüyüşü:** UI testi kapısı PASS sonrası sahibe link + sahibin cümleleriyle yazılmış soru listesi; sahip YEŞİL | sahip |
 
