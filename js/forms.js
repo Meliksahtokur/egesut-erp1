@@ -822,9 +822,9 @@ async function submitCase(btn) {
     // #63 — şablon seçildiyse tek tıkla tüm planı uygula
     const sablonId = globalThis._seciliSablonId;
     if (sablonId && res?.case_id) {
+      // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
+      const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
       try {
-        // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
-        const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res.case_id, p_sablon_id: sablonId, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
         const r = await cagri(false, null);
         const planli = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res.case_id, p_sablon_id: sablonId });
         if (r?.atlanan?.length) toast(`⚠️ ${r.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);
@@ -878,9 +878,9 @@ async function submitCase(btn) {
       });
       const sablonId2 = globalThis._seciliSablonId;
       if (sablonId2 && res2?.case_id) {
+        // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle. catch da kullanır, try dışında.
+        const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
         try {
-          // §18.8 PG kapı sarmalı (rpcSeansTamamla kalıbı): onaylı tekrar aynı parametrelerle.
-          const cagri = (onay, gerekce) => rpc('tedavi_sablon_uygula', { p_case_id: res2.case_id, p_sablon_id: sablonId2, p_pg_onay: !!onay, p_pg_gerekce: gerekce || null });
           const r2 = await cagri(false, null);
           const planli2 = await rpc('tedavi_sablon_tohumlama_gorev_ekle', { p_case_id: res2.case_id, p_sablon_id: sablonId2 });
           if (r2?.atlanan?.length) toast(`⚠️ ${r2.atlanan.length} kalem atlandı (silinmiş ilaç)`, true);

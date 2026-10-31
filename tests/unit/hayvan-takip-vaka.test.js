@@ -14,7 +14,7 @@ const DIZI = ['openCaseDet başladı', 'openCaseDet bitti', 'htVakaSonrasi'];
 const TAKIP_HATA = 'TAKIP_ACIK:{"muayene_tarihi":"2026-10-20"}';
 
 // openCaseDet modalı await'lerden sonra açar (js/ui.js); sahte de gecikmeli çözülür.
-function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, muayene = null, bagHata = null } = {}) {
+function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHata = null, caseId = 'C-9', kizginlikId = null, muayene = null, bagHata = null, sablonId = null, sablonHata = null, pgKapi = false, pullRed = false, openDetRed = false } = {}) {
   const rec = { olay: [], rpc: [], toast: [], ht: [], takipHata: 0, retry: null };
   const document = makeDomStub();
   const input = (id, val) => { const el = makeElement('input'); el.value = val; document.__setEl(id, el); };
@@ -42,11 +42,13 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
           if (createHata) throw new Error(createHata);
         }
         if (ad === 'hayvan_takip_muayene_vaka' && bagHata) throw new Error(bagHata);
+        if (ad === 'tedavi_sablon_uygula' && sablonHata) throw new Error(sablonHata);
         return { ok: true, case_id: caseId };
       },
-      pullTables: async () => ({ ok: true, failed: [] }),
+      pullTables: async () => { if (pullRed) { rec.olay.push('pull reddetti'); throw new Error('pull'); } return { ok: true, failed: [] }; },
       history: { state: null, back() {} },
-      openDet: async () => { rec.olay.push('openDet'); },
+      openDet: async () => { rec.olay.push('openDet'); if (openDetRed) throw new Error('kart'); },
+      _pgKapiHata: pgKapi ? (e, cagri) => { rec.pgKapi = cagri; return /^PG_KAPI:/.test(e.message); } : undefined,
       openCaseDet: async id => {
         rec.olay.push('openCaseDet başladı');
         rec.acilanVaka = id;
@@ -79,6 +81,7 @@ function sahne({ takipAcik = false, openCaseRed = false, htRed = false, createHa
   sandbox.navigator.onLine = true;
   sandbox._kizginlikTedaviId = kizginlikId;
   sandbox._htMuayeneVaka = muayene;
+  sandbox._seciliSablonId = sablonId;
   vm.runInContext(extractFunctionSource('js/utils/modal.js', 'closeM'), sandbox);
   vm.runInContext(extractFunctionSource('js/hayvan-takip-pencere.js', 'htMuayeneVakaBagla'), sandbox);
   return { sandbox, rec, formDoldur };
@@ -356,7 +359,6 @@ test('HT-V-18: elle vakada bağlam yok, bağ RPC\'si çağrılmaz (mevcut akış
   assert.deepStrictEqual(rec.toast, [['✅ Vaka açıldı', false]]);
 });
 
-// Şablon reddi kolu burada ölçülmez: catch'teki kapsam dışı `cagri` (eski hata, bu işte düzeltilmez) akışı dış catch'e atar.
 test('HT-V-19: detay hatası bağı kesmez: vaka kayıtlı, bağ kurulur', async () => {
   const det = sahne({ muayene: MUAYENE, openCaseRed: true });
   await det.sandbox.submitCase(null);
@@ -368,3 +370,34 @@ test('HT-V-20: vaka kimliği yoksa bağ yok', async () => {
   await sandbox.submitCase(null);
   assert.deepStrictEqual(baglar(rec), []);
 });
+
+// ── Vaka kayıtlıyken ara hatalar (U2 kapı turu) ──────────────
+const KOLLAR = [['başarı', false], ['retry', true]];
+const kos = async (o, takipAcik) => {
+  const k = sahne({ muayene: MUAYENE, takipAcik, ...o });
+  await assert.doesNotReject(k.sandbox.submitCase(null));
+  if (takipAcik) await assert.doesNotReject(k.rec.retry(false));
+  return k;
+};
+
+for (const [ad, takipAcik] of KOLLAR) {
+  test(`HT-V-21 (${ad}): şablon reddi kayıtlı vakayı bozmaz: uyarı çıkar, form kapanır, bağ ve soru koşar, ikinci basış ikinci vaka açmaz`, async () => {
+    const { sandbox, rec } = await kos({ sablonId: 'S-1', sablonHata: 'stok yok', pgKapi: true }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec), ['Vaka açıldı ama şablon uygulanamadı: stok yok']);
+    assert.deepStrictEqual(sonuc(rec, ...BAG_DIZI), BAG_DIZI);
+    assert.strictEqual(sandbox._seciliSablonId, null);
+    assert.strictEqual(sandbox._htMuayeneVaka, null, 'form kapandı');
+    const sayi = createSayisi(rec);
+    await sandbox.submitCase(null);
+    assert.strictEqual(createSayisi(rec), sayi, 'ikinci vaka yok');
+  });
+
+  test(`HT-V-22 (${ad}): PG kapısı reddi kapı ekranına gider; onaylı tekrar aynı vaka ve şablonla gider, bağ ve soru koşar`, async () => {
+    const { rec } = await kos({ sablonId: 'S-1', sablonHata: 'PG_KAPI:REQUIRE_ACK_PENDING:{}', pgKapi: true }, takipAcik);
+    assert.deepStrictEqual(hataToastlari(rec), []);
+    assert.deepStrictEqual(sonuc(rec, BAG, 'htVakaSonrasi'), [BAG, 'htVakaSonrasi']);
+    rec.rpc.length = 0;
+    await rec.pgKapi(true, 'gerekçe').catch(() => {});
+    assert.deepStrictEqual(rec.rpc, [{ ad: 'tedavi_sablon_uygula', p: { p_case_id: 'C-9', p_sablon_id: 'S-1', p_pg_onay: true, p_pg_gerekce: 'gerekçe' } }]);
+  });
+}
