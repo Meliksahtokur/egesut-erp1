@@ -284,18 +284,38 @@ async function htSonucAc(gorevId) {
 }
 
 /**
- * Aktif vaka bölümünü doldurur. Pencereyi bekletmez (await edilmez); yerel okuma hatasında bölüm gizli kalır.
+ * Hayvanın aktif vakalarını sunucudan okur: yerel cases son 200 kayıtla sınırlıdır, eski aktif vaka orada olmayabilir.
+ * Hata ya da çevrimdışıysa yerel listeye düşer.
+ * @param {string} hayvanId Hayvan kimliği.
+ * @returns {Promise<Array>} Vaka satırları.
+ * @tablo cases (select), cases (yerel)
+ */
+async function _htAktifVakalariOku(hayvanId) {
+  if (navigator.onLine) {
+    try {
+      const { data, error } = await db.from('cases').select('*').eq('animal_id', hayvanId).eq('status', 'active');
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.warn('⚠️ Aktif vakalar sunucudan okunamadı, yerel liste kullanılıyor:', e);
+    }
+  }
+  return idbGetAll('cases');
+}
+
+/**
+ * Aktif vaka bölümünü doldurur. Pencereyi bekletmez (await edilmez); okuma hatasında bölüm gizli kalır.
  * @param {string} gorevId Pencerenin görevi; geç gelen okuma başka göreve yazmaz.
  * @param {string} hayvanId Hayvan kimliği.
  * @returns {Promise<void>}
- * @tablo cases (yerel), diseases (yerel)
+ * @tablo diseases (yerel)
  */
 async function _htAktifVakalariGoster(gorevId, hayvanId) {
   const kutu = g('ht-so-vakalar');
   kutu.innerHTML = '';
   kutu.style.display = 'none';
   try {
-    const [vakalar, hastaliklar] = await Promise.all([idbGetAll('cases'), idbGetAll('diseases')]);
+    const [vakalar, hastaliklar] = await Promise.all([_htAktifVakalariOku(hayvanId), idbGetAll('diseases')]);
     if (g('ht-so-gid').value !== gorevId) return;
     kutu.innerHTML = htAktifVakaHtml(vakalar, hastaliklar, hayvanId);
     kutu.style.display = kutu.innerHTML ? '' : 'none';

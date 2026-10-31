@@ -76,7 +76,7 @@ function kur(o = {}) {
   const g = id => { if (!els.has(id)) els.set(id, eleman(id)); return els.get(id); };
   const k = {
     g, els,
-    rpcler: [], toastlar: [], pulllar: [], acilan: [], kapanan: [], olay: [], sira: [],
+    rpcler: [], toastlar: [], pulllar: [], acilan: [], kapanan: [], olay: [], sira: [], sorgular: [],
     yuklenenGorev: [], dash: 0, openDet: 0, onLine: o.onLine !== false,
     idb: { hayvan_takip: o.takipler || [], gorev_log: o.gorevler || [], cases: o.vakalar || [], diseases: o.hastaliklar || [] },
     sayfa: o.sayfa || 'dash',
@@ -120,6 +120,20 @@ function kur(o = {}) {
         return { ok: [...t], failed: [] };
       },
       idbGetAll: async t => { if (o.idb) return o.idb(t, k); return k.idb[t] || []; },
+      // Sunucu sahtesi: eq süzgeçlerini gerçekten uygular; o.db yanıtı değiştirir (hata, gecikme).
+      db: { from: t => {
+        const sz = {};
+        const q = {
+          select: () => q,
+          eq: (a, d) => { sz[a] = d; return q; },
+          then: (ok, red) => Promise.resolve().then(() => {
+            k.sorgular.push({ t, sz: { ...sz } });
+            if (o.db) return o.db(sz, k);
+            return { data: (k.idb[t] || []).filter(r => Object.entries(sz).every(([a, d]) => r[a] === d)), error: null };
+          }).then(ok, red),
+        };
+        return q;
+      } },
       getState: a => (a === 'animals' ? [{ id: 'H1', kupe_no: 'K-1' }] : a === 'currentPage' ? k.sayfa : undefined),
       loadDash: async () => { k.dash++; k.olay.push('dash'); k.sira.push('dash'); },
       loadTasks: async f => { k.yuklenenGorev.push(f); k.olay.push('tasks'); },
@@ -515,17 +529,17 @@ test('HT-P-32: aktif vaka yoksa bölüm görünmez; önceki açılışın satır
 });
 
 test('HT-P-33: liste htSonucAc\'ı bekletmez: okuma bitmese de pencere açık, true döner', async () => {
-  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')],
-    idb: (t, kk) => (t === 'cases' ? new Promise(() => {}) : kk.idb[t] || []) });
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], db: () => new Promise(() => {}) });
   const zaman = new Promise(r => { setTimeout(r, 200, 'BEKLETTI').unref(); });
   assert.strictEqual(await Promise.race([k.s.htSonucAc('g1'), zaman]), true);
   assert.deepStrictEqual(k.acilan, ['m-ht-sonuc']);
   assert.strictEqual(k.g('ht-so-vakalar').style.display, 'none');
 });
 
-test('HT-P-34: vaka okunamazsa bölüm görünmez, hata toast\'u yok, pencere açık kalır', async () => {
+test('HT-P-34: sunucu ve yerel okunamazsa bölüm görünmez, hata toast\'u yok, pencere açık kalır', async () => {
   for (const tablo of ['cases', 'diseases']) {
     const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], vakalar: [vaka('c1')],
+      db: tablo === 'cases' ? () => ({ data: null, error: new Error('ag') }) : undefined,
       idb: async (t, kk) => { if (t === tablo) throw new Error('idb'); return kk.idb[t] || []; } });
     assert.strictEqual(await k.s.htSonucAc('g1'), true);
     await dokun();
@@ -539,7 +553,7 @@ test('HT-P-35: geç gelen liste başka göreve açılmış pencereye yazılmaz',
   const bekle = new Promise(r => { bitir = r; });
   let ilk = true;
   const k = kur({ takipler: BIR(), gorevler: [gorev('g1'), gorev('g2')], vakalar: [vaka('c1')],
-    idb: async (t, kk) => { if (t === 'cases' && ilk) { ilk = false; await bekle; return [vaka('eski')]; } return kk.idb[t] || []; } });
+    db: async (sz, kk) => { if (ilk) { ilk = false; await bekle; return { data: [vaka('eski')], error: null }; } return { data: kk.idb.cases, error: null }; } });
   await k.s.htSonucAc('g1');
   await k.s.htSonucAc('g2');
   await dokun();
@@ -547,6 +561,35 @@ test('HT-P-35: geç gelen liste başka göreve açılmış pencereye yazılmaz',
   bitir();
   await dokun();
   assert.deepStrictEqual(satirKimlik(k), ['c1'], 'eski satır ezmez');
+});
+
+test('HT-P-35b: yerel önbellekte olmayan aktif vaka listelenir; sorgu hayvan ve aktif durumla süzülür', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], hastaliklar: HASTALIK, vakalar: [],
+    db: () => ({ data: [vaka('c-eski')], error: null }) });
+  await k.s.htSonucAc('g1');
+  await dokun();
+  assert.deepStrictEqual(satirKimlik(k), ['c-eski']);
+  assert.deepStrictEqual(k.sorgular, [{ t: 'cases', sz: { animal_id: 'H1', status: 'active' } }]);
+});
+
+test('HT-P-35c: sunucu hatasında ve reddinde yerele düşülür, hata toast\'u yok', async () => {
+  const yanitlar = [() => ({ data: null, error: new Error('ag') }), () => { throw new Error('fetch'); }];
+  for (const db of yanitlar) {
+    const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], hastaliklar: HASTALIK, vakalar: [vaka('c-yerel')], db });
+    await k.s.htSonucAc('g1');
+    await dokun();
+    assert.deepStrictEqual(satirKimlik(k), ['c-yerel']);
+    assert.deepStrictEqual(k.toastlar, []);
+  }
+});
+
+test('HT-P-35d: çevrimdışıyken sunucu sorulmaz, yerel liste gösterilir', async () => {
+  const k = kur({ takipler: BIR(), gorevler: [gorev('g1')], hastaliklar: HASTALIK, vakalar: [vaka('c-yerel')] });
+  k.onLine = false;
+  k.g('ht-so-gid').value = 'g1';
+  await k.s._htAktifVakalariGoster('g1', 'H1');
+  assert.deepStrictEqual(k.sorgular, []);
+  assert.deepStrictEqual(satirKimlik(k), ['c-yerel']);
 });
 
 test('HT-P-36: mevcut vakaya bağ yalnız RPC; pencere kapanır, kalan takipler sorulur, liste tazelenir; vaka açılmaz', async () => {
