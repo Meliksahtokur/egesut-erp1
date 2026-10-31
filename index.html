@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ege Süt">
 <meta name="theme-color" content="#111a0a">
-<link rel="manifest" href="manifest.json?v=20261031-05">
+<link rel="manifest" href="manifest.json?v=20261031-07">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="EgeSüt">
@@ -639,6 +639,72 @@ body.dark .ac-vurgu{color:#8ec6ff}
 .ovs-takip-meta{font-size:11px;color:var(--purple);margin-top:3px}
 .ovs-sonlanan .ovs-rozet-gebe{background:#e8f5e9}
 .ovs-satir-bilinmiyor{display:flex;gap:8px;align-items:center}
+/* ═══ İSTATİSTİK ATÖLYESİ (AP1 T11 kabuk; sınıf sözlüğü T12-T15 içindir) ═══ */
+/* Renk: seçili/vurgu --green, kıyas/gri --ink3; durum ve hata şeritleri sakin gri, kırmızı/amber ve satır zemini yok */
+#pg-istatistik{min-width:0;max-width:100%}
+#istatistik-root,#atolye-icerik{min-width:0}
+#atolye-icerik{padding:12px}
+.atolye-sekmeler{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--card3)}
+.atolye-sekmeler button{border:1px solid var(--card3);border-radius:10px;padding:6px 16px;background:var(--card);color:var(--ink);font-size:13px;cursor:pointer}
+.atolye-sekmeler button.on{border-color:var(--green);color:var(--green);font-weight:700}
+.atolye-hata{margin:0 0 10px;padding:8px 12px;border:1px solid var(--card3);border-radius:10px;background:var(--card2);color:var(--ink3);font-size:12px}
+.atolye-bayat-etiket{margin-left:6px;padding:1px 6px;border:1px solid var(--ink3);border-radius:6px;font-size:11px}
+.atolye-bayat canvas{opacity:.5}
+.atolye-kurucu,.atolye-kartlar,.atolye-pano{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;min-width:0}
+.atolye-kart,.atolye-cumle-panel,.atolye-komb,.atolye-fiyat{background:var(--card);border:1px solid var(--card3);border-radius:12px;padding:12px;min-width:0}
+.atolye-kart-bas{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.atolye-kart-baslik{font-weight:700;font-size:14px;color:var(--ink)}
+.atolye-rozet{flex:0 0 auto;padding:1px 8px;border:1px solid var(--card3);border-radius:8px;font-size:11px;color:var(--ink3);white-space:nowrap}
+.atolye-grafik{position:relative;width:100%;height:240px;min-width:0}
+.atolye-grafik canvas{max-width:100%}
+.atolye-ozet{margin:8px 0 4px;font-size:13px;color:var(--ink)}
+.atolye-sayac,.atolye-dipnot,.atolye-hesap{font-size:11px;color:var(--ink3)}
+.atolye-dipnot{margin:6px 0 0;padding-left:16px}
+.atolye-gecici-bant{display:inline-block;margin:4px 0;padding:2px 8px;border:1px dashed var(--ink3);border-radius:6px;font-size:11px;color:var(--ink3)}
+.atolye-durum{padding:18px 12px;text-align:center;border:1px dashed var(--card3);border-radius:10px;color:var(--ink3);font-size:13px}
+.atolye-tanim{margin-top:8px;font-size:12px;color:var(--ink2)}
+.atolye-eylem,.atolye-btn-ana{border:1px solid var(--green);border-radius:10px;padding:6px 12px;background:transparent;color:var(--green);font-size:12px;cursor:pointer}
+.atolye-btn-ana{background:var(--green);color:var(--card);font-weight:700}
+.atolye-baglanti{border:none;background:none;padding:0;color:var(--green);font-size:12px;text-decoration:underline;cursor:pointer}
+.atolye-cumle-baslik{font-size:17px;font-weight:800;line-height:1.35;color:var(--ink);margin-bottom:10px}
+.atolye-slot{margin:10px 0}
+.atolye-slot-ad{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px}
+.atolye-cipler{display:flex;flex-wrap:wrap;gap:6px}
+.atolye-cip{border:1px solid var(--card3);border-radius:10px;padding:5px 10px;background:var(--card);color:var(--ink);font-size:12px;cursor:pointer}
+.atolye-cip.on{border-color:var(--green);color:var(--green);font-weight:700}
+.atolye-slot select,.atolye-slot input,.atolye-fiyat input{max-width:100%;border:1px solid var(--card3);border-radius:8px;padding:5px 8px;background:var(--card);color:var(--ink);font-size:12px}
+.atolye-onay{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink);padding:3px 0}
+.atolye-pasif,.atolye-sira button.atolye-pasif{opacity:.55;cursor:not-allowed}
+.atolye-panel-alt{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.atolye-katla{display:none}
+.atolye-vakalar{overflow-x:auto;margin-top:8px}
+.atolye-vakalar table{border-collapse:collapse;width:100%;font-size:12px}
+.atolye-vakalar th,.atolye-vakalar td{border-bottom:1px solid var(--card3);padding:4px 6px;text-align:left;white-space:nowrap;color:var(--ink)}
+.atolye-komb-satir{padding:8px 0;border-bottom:1px solid var(--card3)}
+.atolye-komb-alt{display:grid;grid-template-columns:minmax(0,2fr) repeat(4,minmax(0,1fr));gap:6px;align-items:center;font-size:12px;color:var(--ink)}
+.atolye-cubuk{height:6px;border-radius:3px;background:var(--card2);overflow:hidden}
+.atolye-cubuk>span{display:block;height:100%;background:var(--green)}
+.atolye-cubuk>span.kiyas,.atolye-yetersiz .atolye-cubuk>span{background:var(--ink3)}
+.atolye-yetersiz{color:var(--ink3)}
+.atolye-fiyat-satir{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;font-size:12px;color:var(--ink)}
+.atolye-fiyat-satir input{width:110px}
+.atolye-tutamak{cursor:grab;color:var(--ink3);user-select:none;padding:0 4px}
+.atolye-sira button{border:1px solid var(--card3);border-radius:6px;background:var(--card);color:var(--ink);padding:2px 8px;cursor:pointer}
+.atolye-sil-onay{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3)}
+.atolye-bos{padding:28px 12px;text-align:center;color:var(--ink3);font-size:13px}
+.atolye-pano{align-items:start}
+.atolye-ayrinti{margin-top:8px;font-size:12px;color:var(--ink2)}
+.atolye-ayrinti summary{cursor:pointer;color:var(--ink3)}
+.atolye-veri-az{margin:6px 0 0;font-size:11px;color:var(--ink3)}
+/* --bg iki temada da koyu ve sayfanın kendi zemini yok; --ink açık temada koyu: başlık zemine göre seçilir. */
+.atolye-sayfa-baslik{font-weight:800;color:var(--card)}
+body.dark .atolye-sayfa-baslik{color:var(--ink)}
+@media (min-width:601px){.atolye-pano{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1024px){.atolye-kurucu{grid-template-columns:360px minmax(0,1fr);align-items:start}.atolye-cumle-panel{position:sticky;top:8px;max-height:calc(100vh - 280px);overflow-y:auto}.atolye-cumle-panel>.atolye-panel-alt{position:sticky;bottom:0;padding:8px 0;background:var(--card)}}
+@media (max-width:600px){#atolye-icerik{padding:8px}.atolye-katla{display:block;width:100%}.atolye-cumle-panel.katli .atolye-slot,.atolye-cumle-panel.katli .atolye-panel-alt{display:none}.atolye-komb-alt{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#pg-istatistik button,#pg-istatistik select,#pg-istatistik input:not([type=checkbox]),.atolye-cip,.atolye-onay,.atolye-ayrinti summary{min-height:36px}
+.atolye-cip{display:inline-flex;align-items:center}
+.atolye-ayrinti summary{padding:10px 0}}
 </style>
 </head>
 <body>
@@ -1027,6 +1093,21 @@ body.dark .ac-vurgu{color:#8ec6ff}
     <button class="btn" data-action="nav-geri" style="padding:5px 10px">‹ Geri</button>
   </div>
   <div id="ovsync-root"><div class="loader"><div class="spin"></div></div></div>
+</div>
+
+<!-- İSTATİSTİK ATÖLYESİ (AP1 T11 kabuk) — js/istatistik/atolye.js loadIstatistik; içerik kurucu.js / pano.js -->
+<div id="pg-istatistik" class="pg">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--bg3)">
+    <div class="atolye-sayfa-baslik">📊 İstatistik Atölyesi</div>
+    <button class="btn btn-sm" data-action="nav-geri" style="padding:5px 10px">‹ Geri</button>
+  </div>
+  <div id="istatistik-root">
+    <div id="atolye-sekmeler" class="atolye-sekmeler" role="tablist">
+      <button type="button" role="tab" data-sekme="pano" class="on" aria-selected="true" onclick="atolyeSekme('pano')">Pano</button>
+      <button type="button" role="tab" data-sekme="kurucu" aria-selected="false" onclick="atolyeSekme('kurucu')">Kurucu</button>
+    </div>
+    <div id="atolye-icerik"><div class="loader"><div class="spin"></div></div></div>
+  </div>
 </div>
 
 </div><!-- /pages -->
@@ -2506,33 +2587,41 @@ body.dark .ac-vurgu{color:#8ec6ff}
 
     <!-- EgeSüt JS modülleri -->
     <!-- ?v= damgası: her js/css değişikliğinde GÜNCELLE (cache-busting) -->
-    <script src="js/utils/helpers.js?v=20261031-05"></script>
-    <script src="js/gecmis.js?v=20261031-05"></script>
-    <script src="js/utils/modal.js?v=20261031-05"></script>
-    <script src="js/utils/errorHandler.js?v=20261031-05"></script>
-    <script src="js/utils/events.js?v=20261031-05"></script>
-    <script src="js/config.js?v=20261031-05"></script>
-    <script src="js/state.js?v=20261031-05"></script>
-    <script src="js/api.js?v=20261031-05"></script>
-    <script src="js/auth.js?v=20261031-05"></script>
-    <script src="js/tarih/tarih.js?v=20261031-05"></script>
-    <script src="js/ui.js?v=20261031-05"></script>
-    <script src="js/forms.js?v=20261031-05"></script>
-    <script src="js/hayvan-takip.js?v=20261031-05"></script>
-    <script src="js/hayvan-takip-pencere.js?v=20261031-05"></script>
-    <script src="js/ai-asistan.js?v=20261031-05"></script>
-    <script src="js/demo.js?v=20261031-05"></script>
-    <script src="vendor/cytoscape.min.js?v=20261031-05"></script>
-    <script src="js/pedigree/pedigree-api.js?v=20261031-05"></script>
-    <script src="js/pedigree/pedigree-adapter.js?v=20261031-05"></script>
-    <script src="js/pedigree/pedigree-style.js?v=20261031-05"></script>
-    <script src="js/pedigree/pedigree-view.js?v=20261031-05"></script>
-    <script src="js/pedigree/pedigree-controller.js?v=20261031-05"></script>
-    <script src="js/degisiklikler/etiketler.js?v=20261031-05"></script>
-    <script src="js/degisiklikler/diff.js?v=20261031-05"></script>
-    <script src="js/degisiklikler/degisiklikler.js?v=20261031-05"></script>
-    <script src="js/app.js?v=20261031-05"></script>
-    <script src="js/utils/handlers.js?v=20261031-05"></script>
+    <script src="js/utils/helpers.js?v=20261031-07"></script>
+    <script src="js/gecmis.js?v=20261031-07"></script>
+    <script src="js/utils/modal.js?v=20261031-07"></script>
+    <script src="js/utils/errorHandler.js?v=20261031-07"></script>
+    <script src="js/utils/events.js?v=20261031-07"></script>
+    <script src="js/config.js?v=20261031-07"></script>
+    <script src="js/state.js?v=20261031-07"></script>
+    <script src="js/api.js?v=20261031-07"></script>
+    <script src="js/auth.js?v=20261031-07"></script>
+    <script src="js/tarih/tarih.js?v=20261031-07"></script>
+    <script src="js/ui.js?v=20261031-07"></script>
+    <script src="js/forms.js?v=20261031-07"></script>
+    <script src="js/hayvan-takip.js?v=20261031-07"></script>
+    <script src="js/hayvan-takip-pencere.js?v=20261031-07"></script>
+    <script src="js/ai-asistan.js?v=20261031-07"></script>
+    <script src="js/demo.js?v=20261031-07"></script>
+    <script src="vendor/cytoscape.min.js?v=20261031-07"></script>
+    <script src="js/pedigree/pedigree-api.js?v=20261031-07"></script>
+    <script src="js/pedigree/pedigree-adapter.js?v=20261031-07"></script>
+    <script src="js/pedigree/pedigree-style.js?v=20261031-07"></script>
+    <script src="js/pedigree/pedigree-view.js?v=20261031-07"></script>
+    <script src="js/pedigree/pedigree-controller.js?v=20261031-07"></script>
+    <script src="js/degisiklikler/etiketler.js?v=20261031-07"></script>
+    <script src="js/degisiklikler/diff.js?v=20261031-07"></script>
+    <script src="js/degisiklikler/degisiklikler.js?v=20261031-07"></script>
+    <script src="vendor/chart.umd.min.js?v=20261031-07"></script>
+    <script src="js/istatistik/cumle.js?v=20261031-07"></script>
+    <script src="js/istatistik/grafik.js?v=20261031-07"></script>
+    <script src="js/istatistik/kombinasyon.js?v=20261031-07"></script>
+    <script src="js/istatistik/gecici-fiyat.js?v=20261031-07"></script>
+    <script src="js/istatistik/kurucu.js?v=20261031-07"></script>
+    <script src="js/istatistik/pano.js?v=20261031-07"></script>
+    <script src="js/istatistik/atolye.js?v=20261031-07"></script>
+    <script src="js/app.js?v=20261031-07"></script>
+    <script src="js/utils/handlers.js?v=20261031-07"></script>
 
 
     <!-- GEBELİK EKLE MODAL -->

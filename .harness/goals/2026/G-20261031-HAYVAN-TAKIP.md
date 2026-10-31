@@ -146,5 +146,5 @@ checkpoint:
   - U1 26/26 PASS + anlam ölçümü.
 - **stop conditions:** Push, merge, prod YASAK. `db-validate` INCONCLUSIVE'da sahibe sor. Domain-rules ya da spec davranışıyla çelişkide `SORU:`. Sahibe U1 PASS olmadan demo verilmez. Dosya manifest dışına çıkılmaz. Muse ve sonnet açılmaz. Paylaşılan DB (`egesut_ovsync_kabul`, `egesut_val_tmp`) başka oturumda meşgulse lead'e sor.
 - **report path:** `runs/2026-10-31-hayvan-takip/<görev-id>-report.md`; final `.harness/reports/2026-10-31-hayvan-takip.md` (root)
-- **latest checkpoint:** 2026-10-31 — spec `db46032`; plan ve goal yazıldı, kapı tur 1 bulguları düzeltildi, plan kapısı tur 2 (`ss-reviewer-kapi`) bekliyor. Kod, migration, DB mutasyonu yok.
+- **latest checkpoint:** 2026-10-31 — spec `db46032`; plan ve goal yazıldı, kapı tur 1 bulguları düzeltildi, plan kapısı tur 2 (`ss-reviewer-kapi`) bekliyor. Kod, migration, DB mutasyonu yok. 2026-10-31 sonrası: U2-K `e11e276` üstüne `main` `ec3d464` (istatistik AP1) yerelde birleşti, damga `20261031-07`, `DB_VER` 25; kapı ve tarayıcı testi birleşik kodda koşar. Push, main, prod yok.
 - **docs verdict:** bekliyor.
