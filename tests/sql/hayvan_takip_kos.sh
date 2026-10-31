@@ -3,9 +3,16 @@
 #   [BOLUM=sema|rpc|guard] bash tests/sql/hayvan_takip_kos.sh <sql...>     rc = psql'in
 #   KOS_MOD=topla ...  düşenleri toplar: sonda "DUSEN: KR.. KR.." (sıralı);
 #                      etiketsiz ERROR (mutant ya da betik hatası) rc=2.
+#   Argümansız: seri migration'ları + hayvan_takip_test.sql (kabul paketi).
 # OZET, "<id> PASS" NOTICE satırlarından sayılır; geri sarılan sayaç kullanılmaz.
 set -u
-[ "$#" -ge 1 ] || { echo "kullanım: $0 <sql...>" >&2; exit 64; }
+if [ "$#" -eq 0 ]; then
+  kok=$(cd "$(dirname "$0")/../.." && pwd)
+  m="$kok/supabase/migrations"
+  set -- "$m/20261031200001_hayvan_takip_sema.sql" "$m/20261031200002_hayvan_takip_rpc.sql" \
+    "$m/20261031200003_gorev_tamamla_hayvan_takip.sql" "$m/20261031200004_hayvan_takip_halsizlik_etiket.sql" \
+    "$kok/tests/sql/hayvan_takip_test.sql"
+fi
 
 if [ "${KOS_MOD:-}" = topla ]; then
   mod_args=(-v ON_ERROR_STOP=0 -v ON_ERROR_ROLLBACK=on)

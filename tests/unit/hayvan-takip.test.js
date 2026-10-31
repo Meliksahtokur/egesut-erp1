@@ -10,6 +10,7 @@ const { fmtTarih, getDisplayKupe, kuceDogalKarsilastir } = require('../../js/uti
 
 const REPO_ROOT = path.join(__dirname, '..', '..');
 const RPC_MIGRATION = 'supabase/migrations/20261031200002_hayvan_takip_rpc.sql';
+const ETIKET_MIGRATION = 'supabase/migrations/20261031200004_hayvan_takip_halsizlik_etiket.sql';
 const RPC_LERI = ['hayvan_takip_ac', 'hayvan_takip_kapat', 'hayvan_takip_muayene_planla', 'hayvan_takip_muayene_sonuc'];
 
 // helpers.js esc()'inin saf aynası (ui-pure.test.js deseni; asıl esc DOM ister).
@@ -250,21 +251,48 @@ test('HT-S-09: varsayılan sonraki tarih +3 gün, ay ve yıl sınırı', () => {
   assert.strictEqual(s.htVarsayilanSonrakiTarih('2026-12-30'), '2027-01-02');
 });
 
+function sebepCaseSatirlari(dosya) {
+  const sql = fs.readFileSync(path.join(REPO_ROOT, dosya), 'utf8');
+  const blok = sql.slice(sql.indexOf('_hayvan_takip_sebep_etiket(p_kod text)'));
+  const caseBlok = blok.slice(blok.indexOf('SELECT CASE p_kod'), blok.indexOf('ELSE p_kod'));
+  return [...caseBlok.matchAll(/WHEN '([A-Z_]+)' THEN '([^']+)'/g)];
+}
+
 // ── HT-S-10 ──
 test('HT-S-10: migration CASE kodları config listesinin alt kümesi, etiketler eş (tek yönlü)', () => {
   const { HAYVAN_TAKIP_SEBEPLER, HAYVAN_TAKIP_GOREV_TIPI } = config();
   assert.strictEqual(HAYVAN_TAKIP_GOREV_TIPI, 'HAYVAN_TAKIP_MUAYENE');
-  assert.strictEqual(HAYVAN_TAKIP_SEBEPLER.length, 5);
-  const sql = fs.readFileSync(path.join(REPO_ROOT, RPC_MIGRATION), 'utf8');
-  const blok = sql.slice(sql.indexOf('_hayvan_takip_sebep_etiket(p_kod text)'));
-  const caseBlok = blok.slice(blok.indexOf('SELECT CASE p_kod'), blok.indexOf('ELSE p_kod'));
-  const satirlar = [...caseBlok.matchAll(/WHEN '([A-Z_]+)' THEN '([^']+)'/g)];
-  assert.strictEqual(satirlar.length, 5, 'CASE ayrıştırıldı');
+  assert.strictEqual(HAYVAN_TAKIP_SEBEPLER.length, 6);
+  assert.strictEqual(HAYVAN_TAKIP_SEBEPLER.find(x => x.kod === 'HALSIZLIK')?.ad, 'Halsizlik');
+  assert.strictEqual(HAYVAN_TAKIP_SEBEPLER.at(-1).kod, 'DIGER', 'DIGER son kalır');
+  const satirlar = sebepCaseSatirlari(ETIKET_MIGRATION);
+  assert.strictEqual(satirlar.length, 6, 'CASE ayrıştırıldı');
   for (const [, kod, etiket] of satirlar) {
     const c = HAYVAN_TAKIP_SEBEPLER.find(x => x.kod === kod);
     assert.ok(c, `${kod} config'te yok`);
     assert.strictEqual(c.ad, etiket);
   }
+});
+
+// ── HT-S-10b ──
+test('HT-S-10b: 200004 yalnız etiket fonksiyonunu değiştirir; 200002 etiketleri ve öznitelikleri aynı', () => {
+  const yeni = fs.readFileSync(path.join(REPO_ROOT, ETIKET_MIGRATION), 'utf8');
+  const eski = fs.readFileSync(path.join(REPO_ROOT, RPC_MIGRATION), 'utf8');
+  const kod = yeni.replace(/^\s*--.*$/gm, '');
+  assert.deepStrictEqual(
+    [...kod.matchAll(/\b(?:CREATE|ALTER|DROP)\s+(?:OR\s+REPLACE\s+)?\w+\s+(\S+?)\(/gi)].map(m => m[0].replace(/\s+/g, ' ')),
+    ['CREATE OR REPLACE FUNCTION public._hayvan_takip_sebep_etiket('],
+  );
+  const yeniSatirlar = sebepCaseSatirlari(ETIKET_MIGRATION).map(m => [m[1], m[2]]);
+  for (const [, k, e] of sebepCaseSatirlari(RPC_MIGRATION)) {
+    assert.deepStrictEqual(yeniSatirlar.find(s => s[0] === k), [k, e], `${k} değişmemeli`);
+  }
+  const oznitelik = s => {
+    const bas = s.indexOf('_hayvan_takip_sebep_etiket(p_kod text)');
+    return s.slice(bas, s.indexOf('AS $function$', bas));
+  };
+  assert.strictEqual(oznitelik(yeni), oznitelik(eski));
+  assert.match(kod, /ELSE p_kod/);
 });
 
 // ── HT-S-12 ──

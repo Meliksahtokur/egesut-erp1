@@ -238,6 +238,25 @@ BEGIN
   PERFORM pg_temp.ht_esit(public._hayvan_takip_sebep_etiket('ZAYIFLAMA'), 'Zayıflama', 'etiket ZAYIFLAMA');
   PERFORM pg_temp.ht_esit(public._hayvan_takip_sebep_etiket('ISTAHSIZLIK'), 'İştahsızlık', 'etiket ISTAHSIZLIK');
 END $t$);
+-- 200004: HALSIZLIK etiketi; diğer kodlar, ham kod davranışı, öznitelik ve ACL 200002 ile aynı.
+SELECT pg_temp.ht_test('A09', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t uuid; p record; n int;
+BEGIN
+  t := pg_temp.ht_ac(h, 'HALSIZLIK', NULL, pg_temp.ht_gun());
+  PERFORM pg_temp.ht_alan(pg_temp.ht_gr(pg_temp.ht_acik_id(t)), 'aciklama', 'Halsizlik takibi muayenesi');
+  PERFORM pg_temp.ht_esit(public._hayvan_takip_sebep_etiket('HALSIZLIK'), 'Halsizlik', 'etiket HALSIZLIK');
+  PERFORM pg_temp.ht_esit(public._hayvan_takip_sebep_etiket('TOPALLIK'), 'Topallık', 'etiket TOPALLIK');
+  PERFORM pg_temp.ht_esit(public._hayvan_takip_sebep_etiket('DIGER'), 'Diğer', 'etiket DIGER');
+  PERFORM pg_temp.ht_esit(public._hayvan_takip_sebep_etiket('YOK_KOD'), 'YOK_KOD', 'bilinmeyen ham');
+  SELECT f.oid, f.provolatile, f.prosecdef, f.proconfig, f.proacl, f.proowner INTO p FROM pg_proc f
+   WHERE f.oid = 'public._hayvan_takip_sebep_etiket(text)'::regprocedure;
+  PERFORM pg_temp.ht_esit(p.provolatile::text, 'i', 'IMMUTABLE');
+  PERFORM pg_temp.ht_dogru(p.prosecdef, 'DEFINER değil');
+  PERFORM pg_temp.ht_esit(p.proconfig::text, '{"search_path=public, pg_temp"}', 'search_path');
+  PERFORM pg_temp.ht_dogru(p.proacl IS NOT NULL, 'ACL varsayılana döndü');
+  SELECT count(*) INTO n FROM aclexplode(p.proacl) a WHERE a.grantee <> p.proowner;
+  PERFORM pg_temp.ht_esit(n::text, '0', 'sahipten başkasına yetki');
+  PERFORM pg_temp.ht_dogru(NOT has_function_privilege('service_role', p.oid, 'EXECUTE'), 'service_role EXECUTE var');
+END $t$);
 SELECT pg_temp.ht_test('A08', $t$ DECLARE h text := pg_temp.ht_hayvan(1); t uuid; n int;
 BEGIN
   PERFORM pg_temp.ht_red('HT_GECMIS_TARIH', 'SELECT public.hayvan_takip_ac(%L, %L, NULL, %L)', h, 'TOPALLIK', (pg_temp.ht_gun() - 1)::text);

@@ -227,13 +227,14 @@ const PG_HATA_SOZLUGU = {
   'PROTOKOL_IPTAL_EDILEMEZ': 'Protokol vakası iptal edilemedi — vaka kapalı ya da protokol vakası değil.',
 };
 
-// Hayvan Takip (domain-rules §20). Sebep DB'de sınırlanmaz; yeni kod buraya eklenebilir.
+// Hayvan Takip (domain-rules §20). Sebep DB'de sınırlanmaz; yeni kod için _hayvan_takip_sebep_etiket de güncellenir.
 const HAYVAN_TAKIP_GOREV_TIPI = 'HAYVAN_TAKIP_MUAYENE';
 const HAYVAN_TAKIP_SEBEPLER = [
   { kod: 'TOPALLIK', ad: 'Topallık' },
   { kod: 'SUT_DUSUSU', ad: 'Süt düşüşü' },
   { kod: 'ZAYIFLAMA', ad: 'Zayıflama' },
   { kod: 'ISTAHSIZLIK', ad: 'İştahsızlık' },
+  { kod: 'HALSIZLIK', ad: 'Halsizlik' },
   { kod: 'DIGER', ad: 'Diğer' },
 ];
 

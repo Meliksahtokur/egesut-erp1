@@ -510,7 +510,7 @@ migration'ları (20260925000001..019, 20260925100001..007, 20260926000002..003) 
 Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve Ovsync "🔍 takipte" rozetinden AYRI bir kavramdır; üreme akışlarını etkilemez. (§19 başka dalda istatistik için kullanılıyor; çakışmasın diye 20.)
 
 1. **Birden çok takip:** Bir hayvanda aynı anda birden çok açık takip olabilir. Aynı sebepten iki açık takip olamaz; `DIGER` muaftır ve açıklaması zorunludur.
-2. **Sebep:** Hazır liste + serbest metin (Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Diğer).
+2. **Sebep:** Hazır liste + serbest metin (Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Halsizlik, Diğer). Halsizlik sahip kararıdır (2026-10-31, "sebeplere halsizlik eklenmeli"); `20261031200004` ile gelir, demo ve prod'a henüz uygulanmadı. Yeni hazır sebep hem `js/config.js` hem `_hayvan_takip_sebep_etiket` ister: etiketsiz kod görev açıklamasında ham kalır.
 3. **Dashboard:** En üstte band; hayvan başına tek satır, sebepler yan yana, en eski açık takip üstte.
 4. **Kapatma:** Karttan pencereyle tek tek ya da tümü, isteğe bağlı not. Sürüden çıkan hayvanın bütün takipleri kendiliğinden kapanır.
 5. **Vaka:** Elle tek hayvanlık vaka açılınca açık takipler sorulur; hiçbiri işaretli gelmez, kendiliğinden kapanmaz. Toplu, kızgınlıktan ve otomatik vakalar sormaz.

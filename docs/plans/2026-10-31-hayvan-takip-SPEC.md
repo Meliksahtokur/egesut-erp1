@@ -39,7 +39,7 @@ Dashboard'a bakan kişi ilk bakışta şunları görür: hangi hayvan, hangi seb
 | No | Karar |
 |---|---|
 | K1 | Bir hayvanda aynı anda birden çok takip olabilir. |
-| K2 | Sebep = hazır liste + serbest metin. Başlangıç listesi: Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Diğer. |
+| K2 | Sebep = hazır liste + serbest metin. Başlangıç listesi: Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Diğer. Sonradan eklenen (sahip 2026-10-31): Halsizlik. |
 | K3 | Dashboard'da hayvan başına tek satır; sebepler yan yana; en eski açık takip üstte. |
 | K4 | Kapatırken pencere: tek tek seçim ya da tümü, isteğe bağlı not. |
 | K5 | Hayvan sürüden çıkınca bütün takipler kapanır. |
@@ -81,7 +81,7 @@ Kısıtlar ve indeksler:
 - Index: `(farm_id, hayvan_id)`.
 - RLS açık, policy `USING(true)` (§14). `authenticated` yalnız `SELECT` alır; yazma yalnız RPC ile.
 
-Sebep kodları: `TOPALLIK`, `SUT_DUSUSU`, `ZAYIFLAMA`, `ISTAHSIZLIK`, `DIGER`. Liste ve etiketler `js/config.js`'te durur. DB bu listeyi CHECK ile sınırlamaz, böylece liste migration'sız değişir. Etiketi bulunmayan kod ekranda ham haliyle gösterilir, satır gizlenmez.
+Sebep kodları: `TOPALLIK`, `SUT_DUSUSU`, `ZAYIFLAMA`, `ISTAHSIZLIK`, `HALSIZLIK`, `DIGER`. Liste ve etiketler `js/config.js`'te durur. DB bu listeyi CHECK ile sınırlamaz, kayıt için migration gerekmez. Görev açıklaması etiketi ise `_hayvan_takip_sebep_etiket` CASE'indedir: yeni hazır sebep bu fonksiyon için migration ister (`20261031200004`), yoksa görev `<KOD> takibi muayenesi` görünür. Etiketi bulunmayan kod ekranda ham haliyle gösterilir, satır gizlenmez.
 
 ### 4.2 `gorev_log` değişikliği
 

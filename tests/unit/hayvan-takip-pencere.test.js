@@ -617,7 +617,7 @@ test('HT-P-17: serbest açıklama seçici ve listede kaçışlı; sebep listesi 
     assert.ok(k.g(id).innerHTML.includes('&lt;img'), id);
   }
   k.s.htAcPencere('H1');
-  for (const ad of ['Topallık', 'Süt düşüşü', 'Zayıflama', 'İştahsızlık', 'Diğer']) {
+  for (const ad of ['Topallık', 'Süt düşüşü', 'Zayıflama', 'İştahsızlık', 'Halsizlik', 'Diğer']) {
     assert.ok(k.g('ht-ac-sebep').innerHTML.includes(ad), ad);
   }
   assert.match(k.g('ht-ac-title').textContent, /K-1/);

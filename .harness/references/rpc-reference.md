@@ -758,7 +758,7 @@ p_bos_duzeltme boolean)` → jsonb — D1 çekirdeği (EXECUTE YOK; yalnız sarm
 
 ---
 
-## Hayvan Takip (migrations 20261031200001-000003; domain-rules §20)
+## Hayvan Takip (migrations 20261031200001-000004; domain-rules §20)
 
 Migration dosyalarından yazıldı, canlı gövde kanıtı değildir; prod apply sahip kapısında. Dördü de SECURITY DEFINER; EXECUTE `authenticated, service_role`. Tablo `hayvan_takip`te `authenticated`
 yalnız SELECT alır, yazma bu RPC'lerden. Hepsi online-only: `RPC_TABLES`'ta var, `RPC_MAP`'te bilerek yok.
@@ -769,6 +769,7 @@ Hatalar düz metin `RAISE EXCEPTION`; ret sırası parametre → varlık → dur
 → Ret: `HT_SEBEP_BOS`, `HT_ACIKLAMA_GEREKLI` (DIGER), `HT_TARIH_GEREKLI` (saat var, tarih yok), `HT_GECMIS_TARIH`,
   `HT_HAYVAN_AKTIF_DEGIL` (hayvan yoksa da), `HT_SEBEP_ZATEN_ACIK` (`hayvan_takip_acik_sebep_uq`; DIGER muaf).
 → Tarih doluysa görev aynı işlemde açılır, `gorev_id` aksi halde null. Log `HAYVAN_TAKIP_ACILDI`. Sebep listesini DB sınırlamaz (`js/config.js`).
+→ Görev açıklaması `_hayvan_takip_sebep_etiket` (iç yardımcı, EXECUTE yok; son tanım `20261031200004`, `HALSIZLIK` dahil): CASE'te olmayan kod ham kalır, yeni hazır sebep bu fonksiyona migration ister.
 
 **`hayvan_takip_kapat(p_takip_ids uuid[], p_not text?, p_kapatan_vaka_id uuid?)`** → jsonb `{ok, kapanan, hayvan_id}`
 → Ret: `HT_BOS_LISTE`, `HT_TAKIP_YOK` (listede hiç takip yok), `HT_FARKLI_HAYVAN`, `HT_VAKA_UYUMSUZ`.
