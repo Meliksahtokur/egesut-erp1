@@ -6249,7 +6249,7 @@ async function _protokolUygula(idx){
       <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Uygulama zamanı (opsiyonel)</label>
         <input id="pu-tarih" type="text" placeholder="gg.aa.yyyy" class="fi" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"></div>
       <div style="flex:1"><label style="font-size:.7rem;font-weight:600">Saat</label>
-        <input id="pu-saat" type="time" class="fi" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"></div>
+        ${saatAlaniHtml('pu-saat', { cipler: false, attr: 'style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);font-size:.78rem"' })}</div>
     </div>
     <label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Uygulama Yolu</label>
     <select id="pu-rota" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px;font-size:.8rem">${rotaOpts}</select>
@@ -6283,6 +6283,7 @@ async function _protokolUygulaKaydet(hayvanId, idx){
   const rota = document.getElementById('pu-rota')?.value || 'IM';
   if (!stok) { toast('Stok seçilmedi', true); return; }
   if (!doz || isNaN(doz) || doz <= 0) { toast('Geçerli doz girin', true); return; }
+  if (saatYarimMi('pu-saat')) return;
   if(kaydetBtn){kaydetBtn.disabled=true;kaydetBtn.textContent='İşleniyor…';}
 
   try {

@@ -305,6 +305,38 @@ test('G4 #11: seans düzenleme saati yardımcıda, kendi satırında; mevcut saa
   assert.deepStrictEqual(cipleriOku(row.innerHTML).filter(c => c.classList.contains('aktif')).map(c => c.dataset.t), ['20:00']);
 });
 
+test('G6 kabul: tek yardımcı, 14 alan korunur, pu-saat çipsiz', () => {
+  // js/ içinde type="time" yalnız yardımcıda; index.html'de yalnız dört statik alan.
+  const kaynaklar = [];
+  const gez = d => {
+    for (const a of fs.readdirSync(path.join(REPO_ROOT, d), { withFileTypes: true })) {
+      if (a.name === '_archive') continue;
+      const y = path.join(d, a.name);
+      if (a.isDirectory()) gez(y);
+      else if (a.name.endsWith('.js')) kaynaklar.push(y);
+    }
+  };
+  gez('js');
+  const zamanli = kaynaklar.filter(y => /type="time"/.test(oku(y)));
+  assert.deepStrictEqual(zamanli, ['js/utils/helpers.js']);
+  assert.strictEqual((oku('js/utils/helpers.js').match(/type="time"/g) || []).length, 1);
+  assert.deepStrictEqual(
+    [...oku('index.html').matchAll(/<input id="([^"]+)"[^>]*type="time"/g)].map(m => m[1]).sort(),
+    ['bc-tohum-saat', 'ht-ac-saat', 'ht-mu-saat', 'ht-so-saat'],
+  );
+  const js = kaynaklar.map(oku).join('\n');
+  for (const id of ['bc-gsaat', 'seans-add-time', 'sbs-time', 'sablon-tohumlama-saat', 'saat-input', 'cdt-saat', 'ert-saat', 'devam-ertele-saat', 'pu-saat']) {
+    assert.ok(js.includes(`saatAlaniHtml('${id}'`), id);
+  }
+  assert.ok(js.includes("saatAlaniHtml('sd-time-' + seansId"), 'sd-time-<id>');
+  assert.match(js, /saatAlaniHtml\('pu-saat', \{ cipler: false,/);
+  // Yarım giriş kontrolü boş anlamı olan her alanda.
+  for (const id of ['ht-ac-saat', 'ht-mu-saat', 'ht-so-saat', 'bc-tohum-saat', 'cdt-saat', 'ert-saat', 'devam-ertele-saat', 'pu-saat', 'sablon-tohumlama-saat']) {
+    assert.ok(js.includes(`saatYarimMi('${id}')`), id);
+  }
+  assert.strictEqual((oku('js/forms.js').match(/tohumIste && saatYarimMi\('bc-tohum-saat'\)/g) || []).length, 2, 'şablon ve toplu vaka');
+});
+
 test('S-10: tek genel handler ve statik bağlama', () => {
   assert.match(oku('js/utils/handlers.js'), /'saat-chip':\s*\(el\)\s*=>\s*saatCipSec\(el\)/);
   const html = oku('index.html');

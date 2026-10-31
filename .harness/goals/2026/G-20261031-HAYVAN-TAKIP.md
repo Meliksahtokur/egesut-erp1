@@ -52,6 +52,7 @@ write_manifest:
   - tests/unit/vaka-toplu-ac.test.js
   - tests/unit/erteleme-genel-ui.test.js
   - tests/unit/ovsync-secici.test.js
+  - tests/unit/hizli-uygulama-guard.test.js
 docs_authority:
   tracked_paths:
     write:

@@ -26,7 +26,7 @@ function cl(id)  {
 }
 
 // ── Saat alanı standardı (sahip 2026-10-31) ──────────────────────────
-// Programdaki her saat seçimi: yerel <input type="time"> + yuvarlak HIZLI_SAATLER
+// Programdaki her saat seçimi: yerel saat input'u + yuvarlak HIZLI_SAATLER
 // çipleri (.ek-chip dili). Değer HH:MM, boşun anlamı alanın kendi akışındadır.
 /**
  * Saat alanının hızlı saat çiplerini üretir.
