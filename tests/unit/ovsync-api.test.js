@@ -231,7 +231,7 @@ test('H8: eşleşmeyen kod mevcut _trErr akışında kalır (ör. duplicate key 
   await assert.rejects(
     () => sandbox.rpc('hayvan_ekle', {}),
     e => {
-      assert.strictEqual(e.message, 'Bu kayıt zaten mevcut');
+      assert.strictEqual(e.message, 'Bu kayıt zaten mevcut.');
       return true;
     },
   );

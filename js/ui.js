@@ -8723,7 +8723,7 @@ async function _uremeDogum(el){
         <div class="hist-main">
           <div class="hist-title" style="color:var(--ink2)">
             <span onclick="openDet('${b.anne_id}')" style="cursor:pointer">🐄 ${esc(anneKupe)}</span>
-            → <b onclick="openDetByKupe('${b.yavru_kupe}')" style="cursor:pointer;color:var(--blue)">${esc(b.yavru_kupe)}</b> (${esc(b.yavru_cins||'?')})
+            → <b ${_dogumYavruAksiyon(b)} style="cursor:pointer;color:var(--blue)">${esc(b.yavru_kupe)}</b> (${esc(b.yavru_cins||'?')})
           </div>
           <div class="hist-sub">${fmtTarih(b.tarih)} · <span style="background:${tipBg};color:${tipRenk};border-radius:4px;padding:1px 6px;font-weight:700;font-size:.7rem">${tip}</span></div>
         </div>
@@ -9004,6 +9004,17 @@ function _gmKatKartHtml(g){
 }
 
 /**
+ * Doğum satırındaki yavru bağlantısının dataset aksiyonu. K1: küpe yeniden verilmiş olabilir,
+ * o yüzden buzagi_id varsa o doğumun buzağısı açılır; yoksa küpeyle (K7 aktif öncelikli) açılır.
+ * @param {Object} d dogum satırı (buzagi_id, yavru_kupe).
+ * @returns {string} data-action/data-det öznitelikleri; ikisi de yoksa boş.
+ */
+function _dogumYavruAksiyon(d){
+  if(d.buzagi_id) return `data-action="gm-det" data-det="${escAttr(d.buzagi_id)}"`;
+  return d.yavru_kupe?`data-action="gm-kupe" data-det="${escAttr(d.yavru_kupe)}"`:'';
+}
+
+/**
  * Geçmiş kayıtları (hastalık, tohumlama, doğum, görev, uygulama, aşı vb.) için HTML kartı oluşturur.
  * Kayıt tipine göre başlık, alt bilgi, ikon ve tıklanabilir aksiyonları (dataset delegasyonu) belirler.
  * @param {Object} e Kayıt olayı veya veri nesnesi (type, data, eventAt, sourceKey, undoRef vb. içerir).
@@ -9029,7 +9040,7 @@ function _gecmisEntryHtml(e, overrideOc){
   else if(type==='dogum') oc='';
   if(type==='dogum'){
     const anneLabel=_gmHayvanEtiketVeya(data.anne_id,'Anne'); // W8-D3: ham id/'?' yok
-    title=`<span${data.anne_id?` data-action="gm-det" data-det="${escAttr(data.anne_id)}" style="cursor:pointer"`:''}>${esc(anneLabel)}</span> → <b${data.yavru_kupe?` data-action="gm-kupe" data-det="${escAttr(data.yavru_kupe)}" style="cursor:pointer;color:var(--blue)"`:''}>${esc(data.yavru_kupe||'Yavru')}</b>${data.yavru_cins?` (${esc(data.yavru_cins)})`:''}`; // U1: dataset delegasyonu; W8-D3: (?) kalmaz
+    title=`<span${data.anne_id?` data-action="gm-det" data-det="${escAttr(data.anne_id)}" style="cursor:pointer"`:''}>${esc(anneLabel)}</span> → <b${_dogumYavruAksiyon(data)?` ${_dogumYavruAksiyon(data)} style="cursor:pointer;color:var(--blue)"`:''}>${esc(data.yavru_kupe||'Yavru')}</b>${data.yavru_cins?` (${esc(data.yavru_cins)})`:''}`; // U1: dataset delegasyonu; W8-D3: (?) kalmaz
     sub=`${esc(data.dogum_tipi||'Normal')}${hkName}`; // TG1-W3 (luna F3): dogum_tipi escape
   } else if(type==='tohumlama'&&_sk==='tohumlama_sonuc'){
     // TG1 gün görünümü: terminal sonuç KALEMİ — kendi sonuç gününde ayrı satır
@@ -15298,7 +15309,7 @@ function openMWithHayvan(modalId,inputId,kupeNo){
 }
 
 async function openInsemSafe(kupeNo){
-  const hayvan=(getState('animals')||[]).find(a=>a.kupe_no===kupeNo||a.devlet_kupe===kupeNo);
+  const hayvan=hayvanByKupeRef(kupeNo); // K7: aynı küpe ölü+aktifse aktif
   if(!hayvan){ openMWithHayvan('m-insem','i-hid',kupeNo); return; }
   const tohs=await getData('tohumlama',t=>t.hayvan_id===hayvan.id);
   const bekliyor=tohs.find(t=>t.sonuc==='Bekliyor');
@@ -16454,12 +16465,9 @@ function btSerbestYukle() {
   if (!input || !sonuc) return;
   const satirlar = input.value.split('\n').map(s => s.trim()).filter(Boolean);
   if (!satirlar.length) { sonuc.textContent = ''; return; }
-  const suruData = getState('animals') || [];
   let eslesen = 0, bulunamayan = [];
   satirlar.forEach(aranan => {
-    const hayvan = suruData.find(h =>
-      h.kupe_no === aranan || h.devlet_kupe === aranan || h.id === aranan
-    );
+    const hayvan = hayvanByKupeRef(aranan); // K7: aynı küpe ölü+aktifse aktif
     if (hayvan && !_btModalSecilenIds.includes(hayvan.id)) {
       _btModalSecilenIds.push(hayvan.id);
       eslesen++;

@@ -1,0 +1,64 @@
+const {boot}=require('./lib.cjs');
+const K='/work/runs/2026-10-30-some-fixes/t7-kanit/';
+const fs=require('fs'); const out={};
+const OLU511='b9b7c132-fc10-4439-9a86-c1d7212c5d2b';
+(async()=>{
+const {browser,page,cons}=await boot();
+await page.waitForFunction(()=>typeof getState==='function'&&getState('animals').length>100,null,{timeout:90000});
+const shot=n=>page.screenshot({path:K+n+'.png'});
+const R=async(t,f)=>{try{const r=await f();out[t]=r;console.log(t,JSON.stringify(r));}catch(e){out[t]={hata:e.message.split('\n')[0]};console.log(t,'HATA',out[t].hata);await shot(t+'-hata').catch(()=>{});}};
+const loaded=async()=>{await page.waitForFunction(()=>{const n=document.getElementById('det-name'); return n&&n.textContent.trim()&&n.textContent.trim()!=='—';},null,{timeout:20000}); await page.waitForTimeout(800);};
+const toDogumList=async()=>{await page.click('#nb-ureme'); await page.waitForTimeout(500); await page.click('#ureme-tab-dogum'); await page.waitForTimeout(1200);};
+await R('T7a',async()=>{
+  await toDogumList();
+  const row=page.locator('#ureme-icerik b[data-det="'+OLU511+'"], b[data-det="'+OLU511+'"]').first();
+  const n=await row.count(); if(!n) return {hata:'satir yok'};
+  await shot('T7a-0-liste');
+  await row.click(); await loaded();
+  const id=await page.evaluate(()=>_detOpenId);
+  const meta=await page.evaluate(()=>[document.getElementById('det-name').textContent.trim(),document.getElementById('det-meta').textContent.trim(),document.getElementById('det-chips').textContent.trim()]);
+  const yeni=await page.evaluate(()=>getState('animals').filter(a=>a.kupe_no==='511').map(a=>a.id+':'+a.durum));
+  await shot('T7a-eski-satir-tikla');
+  return {detId:id,oluBuzagiMi:id===OLU511,meta,hayvanlar511:yeni};
+});
+await R('T8',async()=>{
+  const btn=page.locator('#det-scroll button[onclick^="openAnimalEdit"]').first();
+  if(!await btn.count()) return {hata:'duzenle butonu yok'};
+  await btn.click(); await page.waitForTimeout(1200);
+  await shot('T8-0-duzenle-formu');
+  const kupeVal=await page.inputValue('#a-kupe');
+  await page.fill('#a-ozellik','T7 test notu'); 
+  const warn=await page.textContent('#a-kupe-warn');
+  await page.click('[data-action="submit-animal"]'); await page.waitForTimeout(3000);
+  const toast=(await page.textContent('#toast')).trim(); const cls=await page.evaluate(()=>document.getElementById('toast').className);
+  const modalOpen=await page.evaluate(()=>document.getElementById('m-animal').classList.contains('on'));
+  await shot('T8-sonuc');
+  return {kupeVal,warn:warn.trim(),toast,cls,modalOpen};
+});
+await R('T7b',async()=>{
+  await page.evaluate(()=>{closeDet();}); await page.waitForTimeout(600);
+  await toDogumList();
+  const row=page.locator('b[data-action="gm-kupe"][data-det="90"]').first();
+  if(!await row.count()) return {hata:'legacy satir yok'};
+  await row.click(); await loaded();
+  const id=await page.evaluate(()=>_detOpenId);
+  await shot('T7b-legacy-satir');
+  return {detId:id,id90aktif:id==='95016797-77fe-4448-9e03-ee3defb62a03'};
+});
+await R('T11',async()=>{
+  await page.evaluate(()=>{closeDet();}); await page.waitForTimeout(600);
+  const before=cons.length;
+  await toDogumList();
+  await page.click('[data-action="open-birth-modal"]'); await page.waitForTimeout(800);
+  await page.selectOption('#b-cins','Erkek');
+  await page.click('#b-kupe-oner'); await page.waitForTimeout(1200);
+  const chips=await page.evaluate(()=>[...document.querySelectorAll('#b-kupe-oner-list button')].map(b=>b.textContent.trim()));
+  const info=await page.evaluate(()=>document.getElementById('b-kupe-oner-list').textContent.trim().slice(0,120));
+  await shot('T11-oneri-erkek');
+  const hepsi5xx=chips.length>0&&chips.every(c=>/^5\d\d$/.test(c));
+  return {chips,hepsi5xx,yeniKonsol:cons.slice(before)};
+});
+console.log('KONSOL',JSON.stringify(cons.slice(0,15)));
+fs.writeFileSync('/t7/d78-res.json',JSON.stringify(out));
+await browser.close();
+})();

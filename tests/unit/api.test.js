@@ -158,21 +158,21 @@ test('api: demo modu — EGESUT_DEMO=1 ayrı demo projesine bağlanır, key yine
 test('_trErr: bilinen İngilizce Postgres/ızgara hataları Türkçe karşılığına eşlenir', () => {
   const { sandbox } = loadApi();
   const cases = [
-    ['row-level security policy', 'Yetkisiz işlem'],
-    ['duplicate key value violates', 'Bu kayıt zaten mevcut'],
-    ['foreign key violation', 'İlişkili kayıt bulunamadı'],
-    ['not-null constraint', 'Zorunlu alan boş bırakıldı'],
-    ['violates not-null', 'Zorunlu alan boş bırakıldı'],
-    ['network error', 'Sunucuya ulaşılamıyor'],
-    ['Failed to fetch', 'Sunucuya ulaşılamıyor'],
+    ['row-level security policy', 'Yetkisiz işlem.'],
+    ['duplicate key value violates', 'Bu kayıt zaten mevcut.'],
+    ['foreign key violation', 'İlişkili kayıt bulunamadı.'],
+    ['not-null constraint', 'Zorunlu alan boş bırakıldı.'],
+    ['violates not-null', 'Zorunlu alan boş bırakıldı.'],
+    ['network error', 'Sunucuya ulaşılamıyor.'],
+    ['Failed to fetch', 'Sunucuya ulaşılamıyor.'],
   ];
   for (const [inp, expected] of cases) assert.strictEqual(sandbox._trErr(inp), expected, inp);
 });
 
 test('_trErr: eşleme büyük/küçük harf duyarsız; bilinmeyen mesaj OLDUĞU GİBİ döner', () => {
   const { sandbox } = loadApi();
-  assert.strictEqual(sandbox._trErr('DUPLICATE KEY VALUE'), 'Bu kayıt zaten mevcut');
-  assert.strictEqual(sandbox._trErr('row-level security'.toUpperCase()), 'Yetkisiz işlem');
+  assert.strictEqual(sandbox._trErr('DUPLICATE KEY VALUE'), 'Bu kayıt zaten mevcut.');
+  assert.strictEqual(sandbox._trErr('row-level security'.toUpperCase()), 'Yetkisiz işlem.');
   assert.strictEqual(sandbox._trErr('bilinmeyen hata xyz'), 'bilinmeyen hata xyz');
   assert.strictEqual(sandbox._trErr(null), '');
   assert.strictEqual(sandbox._trErr(undefined), '');
@@ -189,7 +189,7 @@ test('rpc: başarılı çağrı → data aynen döner, parametreler iletilir', a
 
 test('rpc: db error objesi → _trErr ile çevrilmiş mesajla throw', async () => {
   const { sandbox } = loadApi({ rpcHandlers: { x: async () => ({ data: null, error: { message: 'duplicate key value' } }) } });
-  await assert.rejects(() => sandbox.rpc('x'), { message: 'Bu kayıt zaten mevcut' });
+  await assert.rejects(() => sandbox.rpc('x'), { message: 'Bu kayıt zaten mevcut.' });
 });
 
 test('rpc: ok:false gövdesi → data.mesaj ile throw ve err.data orijinal gövdeyi taşır (B31)', async () => {
@@ -422,7 +422,7 @@ test('rpcOptimistic: RPC hatası → onError verilmişse toast EDİLMEZ, hata ca
   const onError = spy();
   await assert.rejects(
     () => sandbox.rpcOptimistic('asi_sil', {}, { onError }),
-    { message: 'İlişkili kayıt bulunamadı' },
+    { message: 'İlişkili kayıt bulunamadı.' },
   );
   assert.strictEqual(onError.calls.length, 1);
   assert.strictEqual(spies.toast.calls.length, 0);             // onError varsa toast yok

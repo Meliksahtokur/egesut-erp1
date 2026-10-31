@@ -42,13 +42,15 @@ window.db = db;
 
 // ── HATA MAP ────────────────────────────────
 const _ERR_MAP = [
-  ['row-level security',  'Yetkisiz işlem'],
-  ['duplicate key',       'Bu kayıt zaten mevcut'],
-  ['foreign key',         'İlişkili kayıt bulunamadı'],
-  ['not-null',            'Zorunlu alan boş bırakıldı'],
-  ['not null',            'Zorunlu alan boş bırakıldı'],
-  ['network',             'Sunucuya ulaşılamıyor'],
-  ['Failed to fetch',     'Sunucuya ulaşılamıyor'],
+  // Metinler noktayla biter: getUserMessage noktalamasız metni jenerik "Bir hata oluştu" ile ezer.
+  ['row-level security',  'Yetkisiz işlem.'],
+  ['hayvanlar_kupe_no_key', 'Bu küpe numarası aktif bir hayvanda kayıtlı. Başka bir numara seçin.'],
+  ['duplicate key',       'Bu kayıt zaten mevcut.'],
+  ['foreign key',         'İlişkili kayıt bulunamadı.'],
+  ['not-null',            'Zorunlu alan boş bırakıldı.'],
+  ['not null',            'Zorunlu alan boş bırakıldı.'],
+  ['network',             'Sunucuya ulaşılamıyor.'],
+  ['Failed to fetch',     'Sunucuya ulaşılamıyor.'],
 ];
 /**
  * Mesajı alıp hata kodlarını içeren bir diziyle eşleştirir ve eşleşen bir hata kodu bulunursa onu, yoksa orijinal mesajı döndürür.

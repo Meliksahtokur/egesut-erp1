@@ -1,8 +1,8 @@
 -- ═══════════════════════════════════════════════════════
 -- GROUND TRUTH MIGRATION — REFERANS, CALISTIRMAYIN
--- Tarih: 2026-10-02
+-- Tarih: 2026-10-31
 -- Tum migration'larin birlestirilmis hali, sifirdan kurulum icin referans.
--- Son senkron: 2026-10-02 (K2, ovsync takip 6 migration) — onceki: 2026-09-15 (G1); canli prod salt-okunur envanterle incremental guncelleme
+-- Son senkron: 2026-10-31 (20261030000001, 20261030100001, 20261031000001; 4 fonksiyon canli tanimla, uq_hayvanlar_kupe_no cikti; yalniz bu nesneler) — onceki: 2026-10-02 (K2, ovsync takip 6 migration), 2026-09-15 (G1); canli prod salt-okunur envanterle incremental guncelleme
 -- ═══════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.hayvanlar (
@@ -2118,7 +2118,9 @@ DECLARE
   v_aktif_cakisma text; v_devlet_cakisma text;
   v_gecmis_id text; v_gecmis_durum text;
 BEGIN
-  IF p_kupe_no IS NOT NULL AND p_kupe_no <> '' THEN
+  -- Düzenlenen hayvanın kendi değişmeyen küpesi çakışma sayılmaz (K1: küpesi yeniden verilmiş çıkmış hayvan)
+  IF p_kupe_no IS NOT NULL AND p_kupe_no <> ''
+     AND NOT EXISTS (SELECT 1 FROM public.hayvanlar WHERE id = p_hayvan_id AND kupe_no = p_kupe_no) THEN
     SELECT id INTO v_aktif_cakisma FROM public.hayvanlar
      WHERE kupe_no = p_kupe_no AND durum = 'Aktif'
        AND (p_hayvan_id IS NULL OR id <> p_hayvan_id) LIMIT 1;
@@ -10650,6 +10652,7 @@ CREATE OR REPLACE FUNCTION public.dogum_kaydet(p_anne_id text, p_tarih date, p_k
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_anne           record;
@@ -10679,8 +10682,10 @@ BEGIN
       'Erkek buzağı küpesi 500-599 aralığında olmalı (girilen: ' || p_kupe || ')');
   END IF;
 
-  -- İKİZ GUARD: aynı anne + aynı yavru küpesi zaten kayıtlıysa reddet (typo → yanlış ikiz engeli)
-  IF EXISTS (SELECT 1 FROM public.dogum WHERE anne_id = p_anne_id AND yavru_kupe = p_kupe) THEN
+  -- İKİZ GUARD: aynı anne + aynı yavru küpesi AKTİF yavruda kayıtlıysa reddet (typo → yanlış ikiz engeli).
+  -- Çıkmış yavrunun küpesi serbest (K1, sahip 2026-10-31); buzagi_id boş satır engellemez.
+  IF EXISTS (SELECT 1 FROM public.dogum d JOIN public.hayvanlar h ON h.id = d.buzagi_id
+             WHERE d.anne_id = p_anne_id AND d.yavru_kupe = p_kupe AND h.durum = 'Aktif') THEN
     RETURN jsonb_build_object('ok', false, 'mesaj', 'Bu küpe bu annenin yavrusu olarak zaten kayıtlı: ' || p_kupe);
   END IF;
 
@@ -10712,7 +10717,7 @@ BEGIN
   INSERT INTO public.dogum (id, anne_id, tarih, yavru_cins, yavru_kupe, yavru_irk, dogum_tipi, hekim_id, dogum_kg, baba_bilgi, olay_id)
   VALUES (v_dogum_id, p_anne_id, p_tarih, p_cins, p_kupe, v_anne.irk, p_tip, p_hekim_id, p_kg, v_baba_bilgi, v_olay_id);
 
-  SELECT 'H' || LPAD((COUNT(*)+1)::text, 6, '0') INTO v_buzagi_id FROM public.hayvanlar;
+  v_buzagi_id := gen_random_uuid()::text;
 
   INSERT INTO public.hayvanlar (id, kupe_no, irk, dogum_tarihi, anne_id, baba_bilgi, cinsiyet, grup, padok, durum, dogum_kg)
   VALUES (v_buzagi_id, p_kupe, v_anne.irk, p_tarih, p_anne_id, v_baba_bilgi, p_cins,
@@ -10740,7 +10745,7 @@ BEGIN
       (gen_random_uuid(), p_anne_id, 'ILAC', 'Doğum günü: Ademin',    p_tarih,      false, 'DOGUM-' || p_anne_id, 'ADEMIN',    v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', 'Doğum günü: Kalsiyum',  p_tarih,      false, 'DOGUM-' || p_anne_id, 'KALSIYUM',  v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', '2. Gün PG',             p_tarih + 2,  false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
-      (gen_random_uuid(), p_anne_id, 'ILAC', '11. Gün PG',            p_tarih + 11, false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
+      (gen_random_uuid(), p_anne_id, 'ILAC', '39. Gün PG (Presynch-14 senkron)', p_tarih + 39, false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', '25. Gün PG',            p_tarih + 25, false, 'DOGUM-' || p_anne_id, 'PG',        v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'ILAC', '53. Gün: E Vitamini',       p_tarih + 53, false, 'DOGUM-' || p_anne_id, 'E_VIT',     v_anne_inst_id),
       (gen_random_uuid(), p_anne_id, 'DIGER','⚡ 58-63. gün kızgınlık takibi', p_tarih + 58, false, 'DOGUM-' || p_anne_id, NULL, v_anne_inst_id);
@@ -10748,13 +10753,25 @@ BEGIN
     UPDATE public.tohumlama
     SET sonuc = 'Doğum Yaptı', dogum_tarihi = p_tarih, buzagi_kupe = p_kupe
     WHERE hayvan_id = p_anne_id AND sonuc = 'Gebe';
-    GET DIAGNOSTICS v_sayac = ROW_COUNT;
 
     UPDATE public.gorev_log SET iptal = true
     WHERE hayvan_id = p_anne_id AND gorev_tipi = 'BESLEME' AND tamamlandi = false AND iptal = false;
 
     UPDATE public.protokol_instance SET durum = 'iptal', kapandi_at = now(), kapandi_sebep = 'DOGUM'
     WHERE hayvan_id = p_anne_id AND alttip = 'BESLEME' AND durum = 'aktif';
+
+    -- S-8/R3.2: anne ilk tohumlama rotası (kural = bu doğum + 51). Bayrak
+    -- kapalıyken NULL (MK5). İkiz/üçüz ikinci yavru bu dala girmez; girse de
+    -- kaynak_ref (olay_id) UNIQUE ile idempotent.
+    PERFORM public._ilk_tohumlama_rota_kur(p_anne_id, p_tarih, 'ILK-TOH-DOGUM-' || v_olay_id::text);
+  END IF;
+
+  -- R3.2 SK8: DİŞİ BUZAĞI → düve rotası (kural = dogum_tarihi + 12 ay 21 gün;
+  -- _ovsync_kural_tarihi buzağı için düve dalına düşer). Kaynak buzağıya özgü
+  -- olduğundan ikiz dişi yavruların her biri kendi rotasını alır. Erkek buzağı
+  -- ve bayrak kapalı → NULL, yan etki yok.
+  IF p_cins = 'Dişi' THEN
+    PERFORM public._ilk_tohumlama_rota_kur(v_buzagi_id, p_tarih, 'ILK-TOH-DUVE-' || v_buzagi_id);
   END IF;
 
   INSERT INTO public.protokol_instance (hayvan_id, tip, alttip, kaynak_ref, baslangic, durum)
@@ -10929,7 +10946,10 @@ GRANT EXECUTE ON FUNCTION public.ileri_gebe_gorev_kontrol() TO anon, authenticat
 -- 9. gebelik_protokol_kontrol (eşikler protokol_ayar/_ayar config'inde; besleme = BESLEME_OTOMATIK)
 -- NOT: besleme protokol_instance mantığı 20260613000001'de BESLEME_OTOMATIK'e geri alındı; canlı ile birebir.
 CREATE OR REPLACE FUNCTION public.gebelik_protokol_kontrol()
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER AS $$
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
 DECLARE
   v_olusturulan int := 0;
   v_sayac       int := 0;
@@ -10946,90 +10966,168 @@ DECLARE
   v_g_evit   constant numeric := public._ayar('ileri_gebe_evit_gun', 265);
   v_g_besle  constant numeric := public._ayar('besleme_baslangic_gun', 260);
 BEGIN
-  SELECT v.stock_item_id INTO v_stok_id FROM vaccines v WHERE v.name ILIKE '%Rota%' LIMIT 1;
+  SELECT v.stock_item_id INTO v_stok_id
+  FROM vaccines v WHERE v.name ILIKE '%Rota%' LIMIT 1;
+
   SELECT ad INTO v_padok_kuru FROM padoklar WHERE ad ILIKE '%Kuru%' LIMIT 1;
 
   FOR v_toh IN
     SELECT DISTINCT ON (t.hayvan_id) t.hayvan_id, t.tarih, t.id
-    FROM tohumlama t JOIN hayvanlar h ON h.id = t.hayvan_id AND h.durum = 'Aktif'
+    FROM tohumlama t
+    JOIN hayvanlar h ON h.id = t.hayvan_id AND h.durum = 'Aktif'
     WHERE t.sonuc = 'Gebe'
     ORDER BY t.hayvan_id, t.tarih DESC
   LOOP
     SELECT * INTO v_hayvan FROM hayvanlar WHERE id = v_toh.hayvan_id;
     v_gun := CURRENT_DATE - v_toh.tarih::date;
 
-    IF v_gun >= v_g_kuru AND v_hayvan.grup ILIKE '%Sağmal%' AND v_hayvan.grup NOT ILIKE '%Kuru%' THEN
+    IF v_gun >= v_g_kuru
+       AND v_hayvan.grup ILIKE '%Sağmal%'
+       AND v_hayvan.grup NOT ILIKE '%Kuru%'
+    THEN
       v_hedef := v_toh.tarih::date + v_g_kuru::int;
       INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, padok_hedef, ref_tohumlama_id)
       SELECT gen_random_uuid(), v_toh.hayvan_id, 'PADOK_DEGISIM',
              '⚠️ Kuru döneme geçiş zamanı (' || v_gun || '. gün gebelik) — Kuru/Gebe padoğuna transfer',
              v_hedef, false, v_padok_kuru, v_toh.id::text
       WHERE NOT EXISTS (
-        SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND gorev_tipi = 'PADOK_DEGISIM'
-          AND aciklama ILIKE '%Kuru döneme%' AND iptal = false
+        SELECT 1 FROM gorev_log
+        WHERE hayvan_id = v_toh.hayvan_id
+          AND gorev_tipi = 'PADOK_DEGISIM'
+          AND aciklama ILIKE '%Kuru döneme%'
+          AND iptal = false
           AND (NOT tamamlandi OR tamamlanma_tarihi > now() - interval '24 hours')
       );
-      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
+      GET DIAGNOSTICS v_sayac = ROW_COUNT;
+      v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
     IF v_gun >= v_g_asi1 THEN
       v_hedef := v_toh.tarih::date + v_g_asi1::int;
-      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, ref_tohumlama_id)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE_ASI', '💉 Rota-Corona Aşısı (1. doz)', v_hedef, false, v_stok_id, 1, v_toh.id::text
-      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💉 Rota-Corona Aşısı (1. doz)' AND iptal = false);
-      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
+      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, ref_tohumlama_id, etken_kod)
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE_ASI',
+             '💉 Rota-Corona Aşısı (1. doz)', v_hedef, false, v_stok_id, 1, v_toh.id::text,
+             'ROTA'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM gorev_log
+        WHERE hayvan_id = v_toh.hayvan_id
+          AND aciklama = '💉 Rota-Corona Aşısı (1. doz)'
+          AND iptal = false
+      );
+      GET DIAGNOSTICS v_sayac = ROW_COUNT;
+      v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
     IF v_gun >= v_g_asi2 AND v_hayvan.grup ILIKE '%Düve%' THEN
       v_hedef := v_toh.tarih::date + v_g_asi2::int;
       INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, stok_id, miktar, ref_tohumlama_id, etken_kod)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE_ASI', '💉 Rota-Corona Aşısı (2. doz — düve)', v_hedef, false, v_stok_id, 1, v_toh.id::text, 'ROTA_2DOZ'
-      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND etken_kod = 'ROTA_2DOZ' AND iptal = false);
-      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE_ASI',
+             '💉 Rota-Corona Aşısı (2. doz — düve)', v_hedef, false, v_stok_id, 1, v_toh.id::text,
+             'ROTA_2DOZ'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM gorev_log
+        WHERE hayvan_id = v_toh.hayvan_id
+          AND etken_kod = 'ROTA_2DOZ'
+          AND iptal = false
+      );
+      GET DIAGNOSTICS v_sayac = ROW_COUNT;
+      v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
     IF v_gun >= v_g_ademin THEN
       v_hedef := v_toh.tarih::date + v_g_ademin::int;
-      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, ref_tohumlama_id)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE', '💊 SC Ademin uygulaması', v_hedef, false, v_toh.id::text
-      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💊 SC Ademin uygulaması' AND iptal = false);
-      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
+      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, ref_tohumlama_id, etken_kod)
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE',
+             '💊 SC Ademin uygulaması', v_hedef, false, v_toh.id::text,
+             'ADEMIN'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM gorev_log
+        WHERE hayvan_id = v_toh.hayvan_id
+          AND aciklama = '💊 SC Ademin uygulaması'
+          AND iptal = false
+      );
+      GET DIAGNOSTICS v_sayac = ROW_COUNT;
+      v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
     IF v_gun >= v_g_evit THEN
       v_hedef := v_toh.tarih::date + v_g_evit::int;
-      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, ref_tohumlama_id)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE', '💊 IM E Vitamini uygulaması', v_hedef, false, v_toh.id::text
-      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND aciklama = '💊 IM E Vitamini uygulaması' AND iptal = false);
-      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
+      INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, ref_tohumlama_id, etken_kod)
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'ILERI_GEBE',
+             '💊 IM E Vitamini uygulaması', v_hedef, false, v_toh.id::text,
+             'E_VIT'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM gorev_log
+        WHERE hayvan_id = v_toh.hayvan_id
+          AND aciklama = '💊 IM E Vitamini uygulaması'
+          AND iptal = false
+      );
+      GET DIAGNOSTICS v_sayac = ROW_COUNT;
+      v_olusturulan := v_olusturulan + v_sayac;
     END IF;
 
     IF v_gun >= v_g_besle THEN
       INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, ref_tohumlama_id)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'BESLEME', '🌅 Anyonik Besleme (Sabah)', CURRENT_DATE, false, 'BESLEME_OTOMATIK', v_toh.id::text
-      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND gorev_tipi = 'BESLEME' AND aciklama = '🌅 Anyonik Besleme (Sabah)' AND hedef_tarih = CURRENT_DATE AND iptal = false);
-      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'BESLEME',
+             '🌅 Anyonik Besleme (Sabah)', CURRENT_DATE, false, 'BESLEME_OTOMATIK', v_toh.id::text
+      WHERE NOT EXISTS (
+        SELECT 1 FROM gorev_log
+        WHERE hayvan_id = v_toh.hayvan_id
+          AND gorev_tipi = 'BESLEME'
+          AND aciklama = '🌅 Anyonik Besleme (Sabah)'
+          AND hedef_tarih = CURRENT_DATE
+          AND iptal = false
+      );
+      GET DIAGNOSTICS v_sayac = ROW_COUNT;
+      v_olusturulan := v_olusturulan + v_sayac;
 
       INSERT INTO gorev_log (id, hayvan_id, gorev_tipi, aciklama, hedef_tarih, tamamlandi, kaynak, ref_tohumlama_id)
-      SELECT gen_random_uuid(), v_toh.hayvan_id, 'BESLEME', '🌙 Anyonik Besleme (Akşam)', CURRENT_DATE, false, 'BESLEME_OTOMATIK', v_toh.id::text
-      WHERE NOT EXISTS (SELECT 1 FROM gorev_log WHERE hayvan_id = v_toh.hayvan_id AND gorev_tipi = 'BESLEME' AND aciklama = '🌙 Anyonik Besleme (Akşam)' AND hedef_tarih = CURRENT_DATE AND iptal = false);
-      GET DIAGNOSTICS v_sayac = ROW_COUNT; v_olusturulan := v_olusturulan + v_sayac;
+      SELECT gen_random_uuid(), v_toh.hayvan_id, 'BESLEME',
+             '🌙 Anyonik Besleme (Akşam)', CURRENT_DATE, false, 'BESLEME_OTOMATIK', v_toh.id::text
+      WHERE NOT EXISTS (
+        SELECT 1 FROM gorev_log
+        WHERE hayvan_id = v_toh.hayvan_id
+          AND gorev_tipi = 'BESLEME'
+          AND aciklama = '🌙 Anyonik Besleme (Akşam)'
+          AND hedef_tarih = CURRENT_DATE
+          AND iptal = false
+      );
+      GET DIAGNOSTICS v_sayac = ROW_COUNT;
+      v_olusturulan := v_olusturulan + v_sayac;
     END IF;
+
   END LOOP;
 
-  RETURN jsonb_build_object('ok', true, 'olusturulan', v_olusturulan,
+  RETURN jsonb_build_object(
+    'ok', true,
+    'olusturulan', v_olusturulan,
     'hayvanlar', (
-      SELECT jsonb_agg(jsonb_build_object('hayvan_id', t.hayvan_id, 'tarih', t.tarih::text,
-        'gebelik_gun', CURRENT_DATE - t.tarih::date, 'kupe_no', h.kupe_no,
-        'devlet_kupe', h.devlet_kupe, 'grup', h.grup, 'padok', h.padok)
-        ORDER BY CURRENT_DATE - t.tarih::date DESC)
-      FROM tohumlama t JOIN hayvanlar h ON h.id = t.hayvan_id
-      WHERE t.sonuc = 'Gebe' AND h.durum = 'Aktif' AND CURRENT_DATE - t.tarih::date >= v_g_kuru
-        AND t.tarih = (SELECT MAX(t2.tarih) FROM tohumlama t2 WHERE t2.hayvan_id = t.hayvan_id AND t2.sonuc = 'Gebe')
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'hayvan_id',    t.hayvan_id,
+          'tarih',        t.tarih::text,
+          'gebelik_gun',  CURRENT_DATE - t.tarih::date,
+          'kupe_no',      h.kupe_no,
+          'devlet_kupe',  h.devlet_kupe,
+          'grup',         h.grup,
+          'padok',        h.padok
+        )
+        ORDER BY CURRENT_DATE - t.tarih::date DESC
+      )
+      FROM tohumlama t
+      JOIN hayvanlar h ON h.id = t.hayvan_id
+      WHERE t.sonuc = 'Gebe'
+        AND h.durum = 'Aktif'
+        AND CURRENT_DATE - t.tarih::date >= v_g_kuru
+        AND t.tarih = (
+          SELECT MAX(t2.tarih) FROM tohumlama t2
+          WHERE t2.hayvan_id = t.hayvan_id AND t2.sonuc = 'Gebe'
+        )
     )
   );
 END;
-$$;
+$function$
+;
 GRANT EXECUTE ON FUNCTION public.gebelik_protokol_kontrol() TO anon, authenticated;
 
 -- FUNCTION: public.besleme_tamam(p_gorev_id text)
@@ -12634,7 +12732,6 @@ CREATE INDEX IF NOT EXISTS idx_tohumlama_hayvan_sonuc ON public.tohumlama USING 
 CREATE INDEX IF NOT EXISTS kizginlik_log_cozuldu_idx ON public.kizginlik_log USING btree (cozuldu);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_gorev_rota_2doz_active ON public.gorev_log USING btree (hayvan_id, etken_kod) WHERE ((etken_kod = 'ROTA_2DOZ'::text) AND (iptal = false) AND (tamamlandi = false));
 CREATE UNIQUE INDEX IF NOT EXISTS uq_hayvanlar_devlet_kupe ON public.hayvanlar USING btree (devlet_kupe) WHERE (devlet_kupe IS NOT NULL);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_hayvanlar_kupe_no ON public.hayvanlar USING btree (kupe_no) WHERE (kupe_no IS NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS hayvanlar_kupe_no_key ON public.hayvanlar USING btree (kupe_no) WHERE ((durum = 'Aktif'::text) AND (kupe_no IS NOT NULL) AND (kupe_no <> ''::text));
 
 -- ── 4. RLS ENABLE (canlıda açık, GT'de eksik olanlar) ──
@@ -17341,7 +17438,7 @@ BEGIN
   -- [OVSYNC-PG S-4] güvenlik kapısı (MK6: blok → RAISE PG_KAPI:<KOD>:<json>)
   -- [OVSYNC-PG R3.1 MK7] PG anı doğrulaması aynı kapıda: NULL → now(); gelecekte
   -- >5dk ya da geçmişte >7g → PG_ZAMAN_GECERSIZ. Bayrak kapalıyken kontrol edilmez
-  -- (MK5: eski davranış, p_occurred_at yok sayılır).
+  -- (MK5: PG olayı yok; uygulama_log.tarih yine p_occurred_at'tan yazılır).
   IF v_pg_aktif THEN
     IF p_occurred_at IS NULL THEN
       v_occurred_at := now();
@@ -17393,8 +17490,10 @@ BEGIN
     END IF;
   END IF;
 
-  INSERT INTO public.uygulama_log (hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar)
-  VALUES (p_hayvan_id, p_stok_id, v_etken, p_doz, p_birim, p_rota, p_notlar)
+  -- [PROTOKOL-ETKEN F2] girilen an İstanbul gününe yazılır; boşsa kolon varsayılanı (CURRENT_DATE)
+  INSERT INTO public.uygulama_log (hayvan_id, stok_id, etken_kod, doz, birim, rota, notlar, tarih)
+  VALUES (p_hayvan_id, p_stok_id, v_etken, p_doz, p_birim, p_rota, p_notlar,
+          COALESCE((p_occurred_at AT TIME ZONE 'Europe/Istanbul')::date, CURRENT_DATE))
   RETURNING id INTO v_id;
 
   -- [OVSYNC-PG S-4] PG gerçekleşme kaydı (+ACK, +S-5 görev); PG değilse no-op
