@@ -548,12 +548,12 @@ Kaynak (3-6): sahip 2026-10-17, spec v2 (`docs/2026-10-17-istatistik-atolyesi-sp
    Yeni vaka eski vakadan sonra kaydedilmiş olmalı (`n.created_at > k.created_at`); eski vaka kapanmadan önce aynı gün açılmış yeni vaka da bu sonucu alır (root ruling, Kapı F3).
    24 saatten sonra ve 30 gün içindeki yeni vaka nüks kalır; ölüm/kesim önceliği değişmez.
 
-## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; demo'da uygulandı, prod bekliyor)
+## 20. Hayvan Takip — 📌 Takipte (sahip 2026-10-31; 200001-6 demoda uygulandı, prod bekliyor)
 
 Kaynak: `docs/plans/2026-10-31-hayvan-takip-SPEC.md`. §18.15 `TAKIP_MUAYENE` ve Ovsync "🔍 takipte" rozetinden AYRI bir kavramdır; üreme akışlarını etkilemez. (§19 istatistik modülünündür.)
 
 1. **Birden çok takip:** Bir hayvanda aynı anda birden çok açık takip olabilir. Aynı sebepten iki açık takip olamaz; `DIGER` muaftır ve açıklaması zorunludur.
-2. **Sebep:** Hazır liste + serbest metin (Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Halsizlik, Diğer). Halsizlik sahip kararıdır (2026-10-31, "sebeplere halsizlik eklenmeli"); `20261031200004` ile gelir, demo ve prod'a henüz uygulanmadı. Yeni hazır sebep hem `js/config.js` hem `_hayvan_takip_sebep_etiket` ister: etiketsiz kod görev açıklamasında ham kalır.
+2. **Sebep:** Hazır liste + serbest metin (Topallık, Süt düşüşü, Zayıflama, İştahsızlık, Halsizlik, Diğer). Halsizlik sahip kararıdır (2026-10-31, "sebeplere halsizlik eklenmeli"); `20261031200004` ile gelir; 200001-6 demoda uygulandı, prod bekliyor. Yeni hazır sebep hem `js/config.js` hem `_hayvan_takip_sebep_etiket` ister: etiketsiz kod görev açıklamasında ham kalır.
 3. **Dashboard:** En üstte band; hayvan başına tek satır, sebepler yan yana, en eski açık takip üstte.
 4. **Kapatma:** Karttan pencereyle tek tek ya da tümü, isteğe bağlı not. Sürüden çıkan hayvanın bütün takipleri kendiliğinden kapanır.
 5. **Vaka:** Elle tek hayvanlık vaka açılınca açık takipler sorulur; hiçbiri işaretli gelmez, kendiliğinden kapanmaz. Toplu, kızgınlıktan ve otomatik vakalar sormaz. Muayene sonucundaki `Vaka` yolu (§20.6, sahip 2026-10-31) bu kuralla çelişmez: elle ve açık tek düğmedir, yalnız muayenesi yapılan takibi kapatır; öteki takipler yine sorulur, işaretsiz gelir.
